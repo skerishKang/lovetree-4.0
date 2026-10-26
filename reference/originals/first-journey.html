@@ -1,0 +1,3031 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LoveTree · 첫 여정 통합</title>
+<meta name="description" content="사랑에 빠지는 순간을 하나의 러브트리로 이어 보세요.">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=Gowun+Dodum&family=Manrope:wght@500;600;700&display=swap');
+:root{
+  --paper:#f7f0e8;--white:#fffdf8;--ink:#403536;--muted:#93837d;
+  --rose:#c86e79;--deep:#98505e;--sage:#879975;--sage-deep:#596b4c;
+  --line:rgba(119,91,82,.18);--display:'Gowun Batang','Noto Serif KR',serif;
+  --body:'Gowun Dodum','Noto Sans KR',sans-serif;--latin:'Manrope','Gowun Dodum',sans-serif;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;background:var(--paper)}
+body{margin:0;color:var(--ink);font-family:var(--body);background:var(--paper)}
+button,a,input,textarea{font:inherit}
+button{cursor:pointer}
+button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px solid rgba(200,110,121,.34);outline-offset:3px}
+.unified-bar{
+  position:sticky;top:0;z-index:1000;min-height:76px;padding:0 max(24px,calc((100vw - 1210px)/2));
+  display:grid;grid-template-columns:minmax(145px,1fr) auto minmax(145px,1fr);align-items:center;gap:22px;
+  border-bottom:1px solid rgba(119,91,82,.14);background:rgba(255,253,248,.89);
+  backdrop-filter:blur(18px);box-shadow:0 8px 28px rgba(75,51,42,.055)
+}
+.unified-logo{border:0;background:transparent;padding:0;display:inline-flex;align-items:center;gap:10px;width:max-content;color:var(--deep);font:700 1.34rem var(--display);letter-spacing:-.045em;text-decoration:none}
+.unified-mark{width:28px;height:28px;position:relative;transform:rotate(7deg)}
+.unified-mark:before{content:"";position:absolute;left:12px;top:3px;width:2px;height:22px;border-radius:99px;background:var(--sage-deep)}
+.unified-mark:after{content:"";position:absolute;left:3px;top:4px;width:20px;height:15px;background:radial-gradient(ellipse at 23% 58%,var(--sage) 0 34%,transparent 36%),radial-gradient(ellipse at 78% 35%,var(--rose) 0 30%,transparent 32%);transform:rotate(-14deg)}
+.stage-nav{display:flex;align-items:center;justify-content:center;gap:7px;min-width:0}
+.stage-button{position:relative;min-height:36px;padding:0 12px;border:1px solid transparent;border-radius:999px;background:transparent;color:#aa9992;font-size:.65rem;white-space:nowrap;transition:.18s}
+.stage-button:hover{background:rgba(255,250,243,.85);color:var(--deep)}
+.stage-button.active{border-color:rgba(200,110,121,.22);background:rgba(240,215,213,.58);color:var(--deep);font-weight:700}
+.stage-button.done{color:var(--sage-deep)}
+.stage-button.done:before{content:"✓";margin-right:5px;color:var(--sage);font-weight:700}
+.stage-button.locked{opacity:.45}
+.stage-button .index{font:700 .49rem var(--latin);margin-right:4px}
+.menu-actions{justify-self:end;display:flex;align-items:center;gap:15px;color:var(--muted);font-size:.67rem}
+.menu-actions button{border:0;background:transparent;color:inherit;padding:7px 0}
+.menu-actions button:hover{color:var(--deep)}
+.reset-link{display:none!important;font-size:.56rem!important;color:#b5a49d!important}
+body[data-started="true"] .reset-link{display:inline-block!important}
+.stage-wrap{position:relative;min-height:calc(100vh - 76px)}
+landing-stage,memory-stage,connect-stage,growth-stage{display:block;animation:stageIn .24s ease both}
+landing-stage[hidden],memory-stage[hidden],connect-stage[hidden],growth-stage[hidden]{display:none!important}
+@keyframes stageIn{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}
+.global-toast{position:fixed;left:50%;bottom:24px;z-index:3000;opacity:0;pointer-events:none;transform:translate(-50%,20px);padding:11px 16px;border-radius:999px;background:#433536;color:white;font-size:.64rem;box-shadow:0 13px 30px rgba(45,32,30,.24);transition:.2s}
+.global-toast.show{opacity:1;transform:translate(-50%,0)}
+.growth-screen{min-height:calc(100vh - 76px);padding:46px 24px 70px;background:radial-gradient(circle at 12% 18%,rgba(219,151,145,.20),transparent 27rem),radial-gradient(circle at 92% 80%,rgba(156,174,130,.17),transparent 28rem),linear-gradient(135deg,#f8f1e9,#fbf8f1 58%,#f1e8dc)}
+.growth-shell{width:min(1000px,100%);margin:auto;text-align:center}
+.growth-eyebrow{margin:0 0 15px;color:var(--deep);font:700 .62rem var(--latin);letter-spacing:.16em;text-transform:uppercase}
+.growth-shell h1{margin:0;font:400 clamp(2.8rem,6vw,5.2rem)/1.08 var(--display);letter-spacing:-.085em}.growth-shell h1 span{display:block;color:var(--rose)}
+.growth-shell>p{max-width:600px;margin:20px auto 30px;color:var(--muted);font-size:.83rem;line-height:1.8}
+.growth-board{position:relative;min-height:430px;padding:26px;border:1px solid var(--line);border-radius:34px;background:rgba(255,253,248,.84);box-shadow:0 28px 80px rgba(75,51,42,.15);overflow:hidden;text-align:left}
+.growth-board:before{content:"";position:absolute;left:50%;top:34px;bottom:44px;width:3px;border-radius:9px;background:linear-gradient(var(--rose),#d9bda4,var(--sage));transform:translateX(-50%)}
+.growth-cards{position:relative;z-index:2;display:grid;grid-template-columns:1fr 72px 1fr;align-items:center;gap:18px;min-height:330px}.growth-card{overflow:hidden;border:1px solid var(--line);border-radius:18px;background:var(--white);box-shadow:0 16px 35px rgba(75,51,42,.13)}
+.growth-thumb{height:155px;background:linear-gradient(145deg,#dba6a2,#e8cfbf 48%,#a7b38e);background-size:cover;background-position:center;display:grid;place-items:center;color:white;font-size:1.5rem}.growth-copy{padding:15px}.growth-copy small{color:var(--deep);font:700 .55rem var(--latin)}.growth-copy strong{display:block;margin-top:6px;font:400 1.1rem var(--display)}.growth-copy p{margin:6px 0 0;color:var(--muted);font-size:.65rem;line-height:1.55}.growth-arrow{display:grid;place-items:center;width:52px;height:52px;margin:auto;border-radius:50%;background:#e1e9dc;color:var(--sage-deep);font-size:1.2rem}
+.growth-actions{display:flex;justify-content:center;gap:10px;margin-top:24px}.growth-actions button{min-height:45px;padding:0 18px;border-radius:999px;font-weight:700}.growth-again{border:1px solid rgba(89,107,76,.3);background:var(--white);color:var(--sage-deep)}.growth-home{border:0;background:var(--rose);color:white}
+@media(max-width:860px){.unified-bar{grid-template-columns:auto 1fr auto;padding:0 18px;gap:12px}.stage-nav{justify-content:flex-start;overflow-x:auto;scrollbar-width:none}.stage-nav::-webkit-scrollbar{display:none}.stage-button{padding:0 9px}.menu-actions{gap:8px}.menu-actions .desktop-action{display:none}}
+@media(max-width:560px){.unified-bar{min-height:66px;grid-template-columns:auto minmax(0,1fr);padding:0 14px}.unified-logo{font-size:1.12rem}.stage-nav{grid-column:2}.menu-actions{display:none}.stage-button{font-size:.59rem;min-height:32px;padding:0 8px}.stage-button .label-long{display:none}.stage-wrap{min-height:calc(100vh - 66px)}.growth-screen{min-height:calc(100vh - 66px);padding:30px 15px 50px}.growth-cards{grid-template-columns:1fr;gap:12px}.growth-board:before{left:50%;top:185px;bottom:185px}.growth-arrow{transform:rotate(90deg)}.growth-actions{display:grid}.growth-actions button{width:100%}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;transition-duration:.01ms!important}}
+</style>
+</head>
+<body data-started="false">
+<header class="unified-bar" aria-label="LoveTree 첫 여정 메뉴">
+  <button class="unified-logo" id="brand-home" type="button" aria-label="LoveTree 처음 화면으로"><span class="unified-mark" aria-hidden="true"></span>LoveTree</button>
+  <nav class="stage-nav" aria-label="첫 여정 단계">
+    <button class="stage-button" type="button" data-stage="step1"><span class="index">01</span><span>첫 순간</span></button>
+    <button class="stage-button" type="button" data-stage="step2"><span class="index">02</span><span>마음 남기기</span></button>
+    <button class="stage-button" type="button" data-stage="step3"><span class="index">03</span><span>다음 영상 잇기</span></button>
+    <button class="stage-button" type="button" data-stage="growth"><span class="index">04</span><span class="label-long">러브트리 </span><span>성장</span></button>
+  </nav>
+  <div class="menu-actions">
+    <button class="desktop-action" type="button" id="browse-action">둘러보기</button>
+    <button class="desktop-action" type="button" id="login-action">로그인</button>
+    <button class="reset-link" type="button" id="reset-action">처음부터 다시 시작</button>
+  </div>
+</header>
+<main class="stage-wrap">
+  <landing-stage id="landing-stage"></landing-stage>
+  <memory-stage id="memory-stage" hidden></memory-stage>
+  <connect-stage id="connect-stage" hidden></connect-stage>
+  <growth-stage id="growth-stage" hidden></growth-stage>
+</main>
+<div class="global-toast" id="global-toast" role="status" aria-live="polite"></div>
+
+<template id="landing-template"><style>@import url('https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=Gowun+Dodum&family=Manrope:wght@500;600;700&display=swap');
+
+:host{
+  --paper:#f7f0e8;
+  --white:#fffdf8;
+  --ink:#403536;
+  --muted:#93837d;
+  --soft-ink:#8f817d;
+  --rose:#c86e79;
+  --deep:#98505e;
+  --sage:#879975;
+  --sage-deep:#596b4c;
+  --sand:#d8bbaa;
+  --line:#775b522f;
+  --display:'Gowun Batang','Noto Serif KR',serif;
+  --body:'Gowun Dodum','Noto Sans KR',sans-serif;
+  --latin:'Manrope','Gowun Dodum',sans-serif;
+  --shadow:0 26px 76px rgba(98,68,58,.15);
+  --soft-shadow:0 15px 38px rgba(98,68,58,.12);
+}
+
+*{box-sizing:border-box}
+:host{scroll-behavior:smooth}
+:host{
+  margin:0;
+  color:var(--ink);
+  font-family:var(--body);
+  background:var(--paper);
+}
+:host::before{
+  content:"";
+  position:fixed;
+  inset:0;
+  z-index:100;
+  pointer-events:none;
+  opacity:.09;
+  mix-blend-mode:multiply;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180' viewBox='0 0 180 180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.75' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.08'/%3E%3C/svg%3E");
+}
+button,input,textarea{font:inherit}
+button{cursor:pointer}
+a{color:inherit;text-decoration:none}
+.hidden{display:none!important}
+
+.home{
+  min-height:100vh;
+  overflow:hidden;
+  background:
+    radial-gradient(circle at 12% 19%,rgba(232,187,178,.21),transparent 28rem),
+    radial-gradient(circle at 92% 70%,rgba(156,175,130,.18),transparent 29rem),
+    linear-gradient(132deg,#f8f1e9,#fbf8f1 55%,#f2e7dd);
+}
+.bar,.hero,.row,.foot{
+  width:min(1190px,calc(100% - 64px));
+  margin:auto;
+}
+.bar{
+  min-height:84px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  border-bottom:1px solid rgba(119,91,82,.15);
+}
+.logo{
+  display:flex;
+  gap:10px;
+  align-items:center;
+  color:var(--deep);
+  font:700 1.44rem var(--display);
+  letter-spacing:-.045em;
+}
+.mark{
+  width:28px;
+  height:28px;
+  position:relative;
+  transform:rotate(7deg);
+}
+.mark:before{
+  content:"";
+  position:absolute;
+  left:12px;
+  top:3px;
+  width:2px;
+  height:22px;
+  border-radius:99px;
+  background:var(--sage-deep);
+}
+.mark:after{
+  content:"";
+  position:absolute;
+  left:3px;
+  top:4px;
+  width:20px;
+  height:15px;
+  background:
+    radial-gradient(ellipse at 23% 58%,var(--sage) 0 34%,transparent 36%),
+    radial-gradient(ellipse at 78% 35%,var(--rose) 0 30%,transparent 32%);
+  transform:rotate(-14deg);
+}
+.nav{
+  display:flex;
+  gap:25px;
+  align-items:center;
+  color:var(--muted);
+  font:.76rem var(--latin);
+}
+.nav a{
+  position:relative;
+  padding:8px 0;
+}
+.nav a:after{
+  content:"";
+  position:absolute;
+  left:0;
+  right:100%;
+  bottom:2px;
+  height:1px;
+  background:var(--rose);
+  transition:.18s;
+}
+.nav a:hover:after{right:0}
+.login{
+  min-height:40px;
+  padding:0 16px;
+  border:1px solid rgba(119,91,82,.12);
+  border-radius:999px;
+  background:rgba(255,253,248,.72);
+  color:var(--deep);
+  box-shadow:0 6px 18px rgba(98,68,58,.07);
+  font-weight:700;
+}
+
+.hero{
+  min-height:680px;
+  padding:50px 0 72px;
+  display:grid;
+  grid-template-columns:.88fr 1.12fr;
+  align-items:center;
+  gap:62px;
+}
+.eyebrow{
+  margin:0 0 18px;
+  color:var(--deep);
+  font:700 .61rem var(--latin);
+  letter-spacing:.18em;
+  text-transform:uppercase;
+}
+.hero h1{
+  margin:0;
+  max-width:560px;
+  font:400 clamp(3.2rem,5.3vw,5.35rem)/1.04 var(--display);
+  letter-spacing:-.095em;
+}
+.hero h1 span{
+  display:block;
+  white-space:nowrap;
+}
+.hero h1 .line-1{color:var(--ink)}
+.hero h1 .line-2{color:#8d7e79}
+.hero h1 .line-3{
+  margin-left:39px;
+  color:var(--rose);
+}
+.hero h1 .line-4{
+  margin-left:78px;
+  color:var(--sage-deep);
+  font-size:.84em;
+}
+.desc{
+  max-width:455px;
+  margin:28px 0 0;
+  color:var(--muted);
+  font-size:.88rem;
+  line-height:1.9;
+}
+.actions{
+  display:flex;
+  flex-wrap:wrap;
+  gap:11px;
+  margin-top:30px;
+}
+.btn{
+  min-height:49px;
+  padding:0 21px;
+  border:1px solid transparent;
+  border-radius:999px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:9px;
+  font-weight:700;
+  transition:.2s;
+}
+.btn:hover{transform:translateY(-2px)}
+.primary{
+  background:linear-gradient(135deg,#d27b86,#bd626e);
+  color:#fffaf6;
+  box-shadow:0 13px 28px rgba(200,110,121,.28);
+}
+.primary:hover{background:var(--deep)}
+.quiet{
+  border-color:rgba(89,107,76,.32);
+  background:rgba(255,253,248,.70);
+  color:var(--sage-deep);
+}
+.note{
+  margin-top:15px;
+  color:var(--muted);
+  font-size:.7rem;
+}
+.note b{color:var(--rose)}
+.proof{
+  margin-top:57px;
+  color:#b0a19b;
+  font-size:.64rem;
+}
+.proof small{display:block;margin-bottom:11px}
+.proof-line{
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.proof-line i{
+  width:27px;
+  height:1px;
+  background:#d9cac2;
+}
+.proof-line b{
+  font:700 .52rem var(--latin);
+  color:#b7a59e;
+}
+.proof-line .active{color:var(--deep)}
+.proof-line .active b{color:var(--rose)}
+
+.board{
+  min-height:580px;
+  padding:22px 24px 20px;
+  border:1px solid rgba(143,104,95,.19);
+  border-radius:40px;
+  background:rgba(255,253,248,.80);
+  box-shadow:var(--shadow);
+  transform:rotate(.55deg);
+  position:relative;
+}
+.board:after{
+  content:"";
+  position:absolute;
+  inset:10px -9px -9px 10px;
+  z-index:-1;
+  border:1px solid rgba(138,154,117,.22);
+  border-radius:40px;
+  transform:rotate(-1.4deg);
+}
+.board-top{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  color:var(--sage-deep);
+  font:.59rem var(--latin);
+  padding:0 6px 10px;
+}
+.dot{
+  display:inline-block;
+  width:6px;
+  height:6px;
+  border-radius:50%;
+  margin-right:6px;
+  background:var(--rose);
+  box-shadow:0 0 0 5px rgba(200,110,121,.11);
+}
+.canvas{
+  height:470px;
+  position:relative;
+  overflow:hidden;
+  border-radius:27px;
+  background:
+    radial-gradient(circle at 50% 48%,rgba(245,199,175,.33),transparent 15rem),
+    linear-gradient(155deg,rgba(244,233,221,.88),rgba(238,241,222,.82));
+}
+.orbit{
+  position:absolute;
+  left:50%;
+  top:47%;
+  width:410px;
+  height:250px;
+  border:1px solid rgba(200,110,121,.17);
+  border-radius:50%;
+  transform:translate(-50%,-50%) rotate(-18deg);
+}
+.orbit.two{
+  width:510px;
+  height:335px;
+  border-color:rgba(89,107,76,.14);
+  transform:translate(-50%,-50%) rotate(18deg);
+}
+.branch-svg{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  z-index:1;
+  pointer-events:none;
+}
+.branch-svg path{
+  fill:none;
+  stroke-linecap:round;
+  filter:drop-shadow(0 5px 7px rgba(74,55,48,.09));
+}
+.card{
+  position:absolute;
+  z-index:3;
+  overflow:hidden;
+  width:176px;
+  border:1px solid rgba(119,91,82,.17);
+  border-radius:16px;
+  background:rgba(255,253,248,.96);
+  box-shadow:0 15px 30px rgba(98,68,58,.15);
+  transform:rotate(-2deg);
+}
+.root{
+  left:50%;
+  top:30px;
+  width:220px;
+  transform:translateX(-50%) rotate(-1deg);
+}
+.card-a{left:20px;top:215px}
+.card-b{right:15px;top:242px;transform:rotate(2deg)}
+.media{
+  height:84px;
+  position:relative;
+  overflow:hidden;
+  background:#a88c91;
+}
+.root .media{height:108px}
+.media img{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  display:block;
+  filter:saturate(.72) brightness(1.08) contrast(.92) sepia(.08);
+}
+.media:before{
+  content:"";
+  position:absolute;
+  inset:0;
+  z-index:1;
+  background:linear-gradient(180deg,rgba(255,246,233,.08),rgba(244,225,211,.22));
+}
+.media:after{
+  content:"";
+  position:absolute;
+  inset:0;
+  z-index:1;
+  background:linear-gradient(180deg,transparent 48%,rgba(47,37,38,.34));
+}
+.media span{
+  position:absolute;
+  z-index:2;
+  left:10px;
+  bottom:8px;
+  width:25px;
+  height:25px;
+  border:1px solid rgba(255,255,255,.76);
+  border-radius:50%;
+  background:rgba(255,253,248,.86);
+  color:#604e49;
+  display:grid;
+  place-items:center;
+  font-size:.5rem;
+}
+.media small{
+  position:absolute;
+  z-index:2;
+  right:8px;
+  bottom:7px;
+  padding:3px 5px;
+  border-radius:4px;
+  background:rgba(58,46,47,.58);
+  color:white;
+  font:.5rem var(--latin);
+}
+.:host{padding:10px 12px 13px}
+.tag{color:var(--deep);font:700 .52rem var(--latin)}
+.body h2{
+  margin:5px 0 4px;
+  font:400 .89rem/1.23 var(--display);
+}
+.body p{
+  margin:0;
+  color:var(--muted);
+  font-size:.59rem;
+  line-height:1.5;
+}
+.body small{
+  display:block;
+  margin-top:8px;
+  color:#b09d95;
+  font:.51rem var(--latin);
+}
+.pill{
+  position:absolute;
+  z-index:4;
+  padding:5px 8px;
+  border-radius:999px;
+  background:rgba(255,253,248,.91);
+  font:.51rem var(--latin);
+  box-shadow:0 7px 17px rgba(98,68,58,.09);
+}
+.pill.left{
+  left:72px;
+  top:193px;
+  color:var(--deep);
+  border:1px solid rgba(200,110,121,.24);
+  transform:rotate(-5deg);
+}
+.pill.right{
+  right:82px;
+  top:218px;
+  color:var(--sage-deep);
+  border:1px solid rgba(89,107,76,.23);
+  transform:rotate(5deg);
+}
+.seed{
+  position:absolute;
+  z-index:4;
+  left:46%;
+  bottom:24px;
+  display:grid;
+  place-items:center;
+  width:36px;
+  height:36px;
+  border:1px solid rgba(200,110,121,.34);
+  border-radius:50%;
+  background:rgba(255,253,248,.87);
+  color:var(--rose);
+  box-shadow:0 0 0 8px rgba(200,110,121,.08),0 11px 24px rgba(98,68,58,.12);
+}
+.caption{
+  display:flex;
+  gap:12px;
+  align-items:center;
+  margin:14px 7px 0;
+  color:var(--muted);
+  font:400 .77rem/1.5 var(--display);
+}
+.caption b{
+  color:var(--sage-deep);
+  font-weight:400;
+}
+.rule{width:28px;height:1px;background:var(--rose)}
+
+.row{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:14px;
+  padding-bottom:70px;
+}
+.mini{
+  padding:23px 24px;
+  border-top:1px solid var(--line);
+  min-height:135px;
+}
+.mini span{color:var(--rose);font:.57rem var(--latin)}
+.mini strong{
+  display:block;
+  margin-top:12px;
+  font:400 1.04rem var(--display);
+}
+.mini p{
+  margin:5px 0;
+  color:var(--muted);
+  font-size:.71rem;
+  line-height:1.5;
+}
+.foot{
+  border-top:1px solid var(--line);
+  padding:18px 0 28px;
+  display:flex;
+  justify-content:space-between;
+  color:#a29089;
+  font-size:.63rem;
+}
+.foot b{color:var(--deep);font:400 .92rem var(--display)}
+
+/* modal */
+.backdrop{
+  position:fixed;
+  inset:0;
+  z-index:20;
+  display:grid;
+  place-items:center;
+  padding:20px;
+  background:rgba(57,41,39,.38);
+  backdrop-filter:blur(9px);
+}
+.modal{
+  position:relative;
+  width:min(460px,100%);
+  padding:36px;
+  border:1px solid rgba(143,104,95,.20);
+  border-radius:27px;
+  background:var(--white);
+  box-shadow:0 32px 94px rgba(57,41,39,.28);
+}
+.close{
+  position:absolute;
+  right:16px;
+  top:13px;
+  border:0;
+  background:transparent;
+  color:var(--muted);
+  font-size:1.5rem;
+}
+.modal h2{
+  margin:0;
+  font:400 2.35rem/1.13 var(--display);
+  letter-spacing:-.07em;
+}
+.modal h2 em{color:var(--rose);font-style:normal}
+.modal p:not(.eyebrow){
+  margin:15px 0 22px;
+  color:var(--muted);
+  font-size:.77rem;
+  line-height:1.7;
+}
+.modal form{display:grid;gap:9px}
+.modal label,.field-label{
+  color:var(--sage-deep);
+  font-size:.67rem;
+  font-weight:700;
+}
+.modal input{
+  min-height:48px;
+  padding:0 13px;
+  border:1px solid rgba(119,91,82,.25);
+  border-radius:13px;
+  background:#fffaf4;
+  outline:0;
+}
+.modal input:focus,.url-row:focus-within,.form textarea:focus{
+  border-color:var(--rose);
+  box-shadow:0 0 0 4px rgba(200,110,121,.13);
+}
+.modal-note{
+  margin:4px 0 0!important;
+  padding:10px 12px;
+  border-radius:12px;
+  background:rgba(223,232,220,.62);
+  color:var(--sage-deep)!important;
+  font-size:.65rem!important;
+}
+.modal .btn{margin-top:7px}
+
+/* flow */
+.flow{
+  min-height:100vh;
+  padding:28px 28px 55px;
+  background:
+    radial-gradient(circle at 10% 20%,rgba(219,151,145,.20),transparent 24rem),
+    radial-gradient(circle at 90% 80%,rgba(156,174,130,.19),transparent 26rem),
+    linear-gradient(135deg,#f8f1e9,#fbf8f1 60%,#f1e8dc);
+}
+.shell{width:min(1120px,100%);margin:auto}
+.flow-top{display:flex;justify-content:space-between;align-items:center}
+.back{border:0;background:transparent;color:var(--muted);font-size:.72rem}
+.step{color:var(--deep);font:.61rem var(--latin);letter-spacing:.12em;text-transform:uppercase}
+.progress{height:2px;margin:25px 0 61px;background:rgba(152,80,94,.12)}
+.progress span{display:block;width:25%;height:100%;background:var(--rose)}
+.layout{
+  display:grid;
+  grid-template-columns:1.03fr .97fr;
+  align-items:center;
+  gap:76px;
+}
+.copy h1{
+  margin:0;
+  font:400 clamp(2.65rem,5vw,4.65rem)/1.12 var(--display);
+  letter-spacing:-.08em;
+}
+.copy h1 em{display:block;color:var(--rose);font-style:normal}
+.copy>p:not(.eyebrow){
+  max-width:510px;
+  margin:23px 0 30px;
+  color:var(--muted);
+  font-size:.86rem;
+  line-height:1.82;
+}
+.form label{display:block;margin-bottom:10px}
+.url-row{
+  display:flex;
+  align-items:center;
+  border:1px solid rgba(119,91,82,.25);
+  border-radius:13px;
+  background:rgba(255,253,248,.79);
+}
+.url-icon{padding-left:13px;color:var(--rose)}
+.url-row input{
+  width:100%;
+  height:45px;
+  border:0;
+  outline:0;
+  padding:0 12px;
+  background:transparent;
+  color:var(--ink);
+  font-size:.77rem;
+}
+.url-hint{margin:7px 0 19px;color:#ad9890;font-size:.64rem}
+.form textarea,.form input[type=date]{
+  width:100%;
+  border:1px solid rgba(119,91,82,.25);
+  border-radius:13px;
+  background:rgba(255,253,248,.79);
+  outline:0;
+  color:var(--ink);
+}
+.form textarea{min-height:108px;padding:13px;resize:vertical;line-height:1.6}
+.form input[type=date]{height:45px;padding:0 12px;margin-top:9px}
+.flow-actions{display:flex;align-items:center;gap:14px;margin-top:23px}
+.hint{color:#ae9b94;font-size:.64rem}
+.preview{
+  position:relative;
+  min-height:500px;
+  padding:22px;
+  border:1px solid rgba(143,104,95,.20);
+  border-radius:34px;
+  background:rgba(255,253,248,.80);
+  box-shadow:var(--shadow);
+  transform:rotate(.7deg);
+}
+.preview-window{
+  position:relative;
+  min-height:450px;
+  overflow:hidden;
+  border-radius:24px;
+  background:linear-gradient(160deg,#eee3d9,#e8eedb);
+  display:grid;
+  place-items:center;
+  background-size:cover;
+  background-position:center;
+}
+.preview-window:after{
+  content:"";
+  position:absolute;
+  inset:0;
+  background:linear-gradient(180deg,transparent 48%,rgba(37,30,30,.20));
+  pointer-events:none;
+}
+.preview-tree-name{
+  position:absolute;
+  z-index:3;
+  left:18px;
+  top:17px;
+  padding:6px 9px;
+  border-radius:999px;
+  background:rgba(255,250,242,.88);
+  color:var(--deep);
+  font:700 .54rem var(--latin);
+}
+.glow{
+  position:absolute;
+  width:125px;
+  height:125px;
+  border-radius:50%;
+  background:radial-gradient(circle,rgba(255,224,189,.92),rgba(255,224,189,0));
+}
+.orb{
+  position:relative;
+  z-index:2;
+  display:grid;
+  place-items:center;
+  width:94px;
+  height:94px;
+  border:1px solid rgba(200,110,121,.32);
+  border-radius:50%;
+  background:rgba(255,253,248,.85);
+  color:var(--rose);
+  font:2rem var(--display);
+  box-shadow:0 0 0 14px rgba(200,110,121,.08),0 18px 35px rgba(98,68,58,.13);
+}
+.preview-copy{
+  position:absolute;
+  z-index:3;
+  left:27px;
+  right:27px;
+  bottom:24px;
+  padding:13px 15px;
+  border:1px solid rgba(119,91,82,.16);
+  border-radius:14px;
+  background:rgba(255,253,248,.92);
+}
+.preview-copy span{
+  display:block;
+  color:var(--deep);
+  font:700 .52rem var(--latin);
+  letter-spacing:.08em;
+  text-transform:uppercase;
+}
+.preview-copy strong{
+  display:block;
+  margin-top:5px;
+  font:400 1.03rem var(--display);
+}
+.preview-copy p{
+  margin:5px 0 0;
+  color:var(--muted);
+  font-size:.64rem;
+}
+.toast{
+  position:fixed;
+  left:50%;
+  bottom:24px;
+  z-index:80;
+  transform:translate(-50%,20px);
+  opacity:0;
+  pointer-events:none;
+  padding:11px 15px;
+  border-radius:999px;
+  background:#433536;
+  color:white;
+  font-size:.64rem;
+  transition:.2s;
+}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media(max-width:1050px){
+  .hero{grid-template-columns:1fr}
+  .hero>div:first-child{max-width:680px}
+  .board{width:min(700px,100%);justify-self:center}
+  .layout{grid-template-columns:1fr;gap:38px}
+  .preview{width:min(600px,100%);justify-self:center}
+}
+@media(max-width:680px){
+  .bar,.hero,.row,.foot{width:calc(100% - 32px)}
+  .nav a{display:none}
+  .hero{padding:49px 0 44px;min-height:auto}
+  .hero h1{font-size:clamp(2.75rem,14vw,4.45rem)}
+  .hero h1 .line-3{margin-left:23px}
+  .hero h1 .line-4{margin-left:44px}
+  .actions{display:grid}
+  .btn{width:100%}
+  .board{min-height:550px;padding:17px 13px;transform:none;border-radius:28px}
+  .canvas{height:435px;border-radius:21px}
+  .root{top:23px;width:193px}
+  .root .media{height:95px}
+  .card-a{left:6px;top:211px;width:146px}
+  .card-b{right:6px;top:242px;width:146px}
+  .pill.left{left:19px;top:192px}
+  .pill.right{right:15px;top:224px}
+  .row{grid-template-columns:1fr;padding-bottom:43px}
+  .mini{min-height:auto;padding:17px 0}
+  .foot{display:block;line-height:2}
+  .foot b{display:block}
+  .modal{padding:31px 22px 24px}
+  .modal h2{font-size:2.08rem}
+  .flow{padding:20px 16px 45px}
+  .progress{margin:22px 0 42px}
+  .layout{gap:29px}
+  .copy h1{font-size:clamp(2.4rem,13vw,3.55rem)}
+  .flow-actions{display:grid;gap:10px}
+  .hint{text-align:center}
+  .preview{min-height:430px;padding:14px}
+  .preview-window{min-height:400px}
+  .preview-copy{left:17px;right:17px;bottom:17px}
+}
+
+:host{display:block;min-height:calc(100vh - 76px)}
+.bar{display:none!important}
+.media.image-fallback{background:linear-gradient(145deg,#dba6a2,#e8cfbf 48%,#a7b38e)!important}
+.media.image-fallback img{display:none!important}
+.fallback-flower{position:absolute;z-index:2;inset:0;display:grid;place-items:center;color:rgba(255,253,248,.92);font:1.55rem var(--display)}
+</style><section class="home" id="home">
+<header class="bar">
+  <a class="logo" href="#home"><span class="mark" aria-hidden="true"></span>LoveTree</a>
+  <nav class="nav">
+    <a href="#browse">둘러보기</a>
+    <button class="login" type="button" data-open>로그인</button>
+  </nav>
+</header>
+
+<main>
+<section class="hero">
+  <div>
+    <p class="eyebrow">A little garden for every feeling</p>
+    <h1>
+      <span class="line-1">사랑에 빠지는</span>
+      <span class="line-2">순간을 하나의</span>
+      <span class="line-3">러브트리로</span>
+      <span class="line-4">이어 보세요</span>
+    </h1>
+    <p class="desc">
+      처음 발견한 영상, 다시 찾은 장면, 그때의 마음과 다음 순간을
+      한 그루의 나무처럼 이어 보세요.
+    </p>
+
+    <div class="actions">
+      <button class="btn primary" type="button" data-open>＋ 첫 순간 심기</button>
+      <a class="btn quiet" href="#browse">러브트리 둘러보기 →</a>
+    </div>
+
+    <p class="note"><b>✦</b> 처음에는 단 하나의 순간만 있어도 충분해요.</p>
+
+    <div class="proof">
+      <small>러브트리는 이렇게 자라요</small>
+      <div class="proof-line">
+        <span class="active"><b>01</b> 발견</span><i></i>
+        <span><b>02</b> 기록</span><i></i>
+        <span><b>03</b> 연결</span><i></i>
+        <span><b>04</b> 성장</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="board">
+    <div class="board-top">
+      <span><i class="dot"></i>러브트리 미리보기</span>
+      <span>season 01</span>
+    </div>
+
+    <div class="canvas">
+      <div class="orbit"></div>
+      <div class="orbit two"></div>
+
+      <svg class="branch-svg" viewBox="0 0 600 470" preserveAspectRatio="none" aria-hidden="true">
+        <defs>
+          <linearGradient id="branchGradient" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#c86e79"/>
+            <stop offset="50%" stop-color="#d8bbaa"/>
+            <stop offset="100%" stop-color="#879975"/>
+          </linearGradient>
+        </defs>
+        <path d="M300 170 C285 238 205 270 112 316" stroke="url(#branchGradient)" stroke-width="4.5"/>
+        <path d="M300 170 C330 238 420 280 501 338" stroke="url(#branchGradient)" stroke-width="4.5"/>
+        <path d="M300 170 C310 260 307 350 320 435" stroke="#87997577" stroke-width="4"/>
+      </svg>
+
+      <article class="card root">
+        <div class="media">
+          <img src="https://img.youtube.com/vi/nqofkzQD19E/hqdefault.jpg" alt="처음 발견한 순간">
+          <span>▶</span><small>01:30</small>
+        </div>
+        <div class="body">
+          <span class="tag">처음 발견한 순간</span>
+          <h2>처음 마음이 멈춘 장면</h2>
+          <p>짧은 영상 하나가 이상하게 오래 마음에 남았어요.</p>
+          <small>YouTube · 나의 기록</small>
+        </div>
+      </article>
+
+      <div class="pill left">♥ 팬의 추천</div>
+      <article class="card card-a">
+        <div class="media">
+          <img src="https://img.youtube.com/vi/bcUfIpQ6aeA/hqdefault.jpg" alt="팬이 추천한 영상">
+          <span>▶</span><small>03:12</small>
+        </div>
+        <div class="body">
+          <span class="tag">팬의 추천</span>
+          <h2>다정한 말투가 남은 인터뷰</h2>
+          <p>다른 팬이 꼭 보라고 이어 준 영상이에요.</p>
+        </div>
+      </article>
+
+      <div class="pill right">✦ 내가 고른 다음 순간</div>
+      <article class="card card-b">
+        <div class="media">
+          <img src="https://img.youtube.com/vi/mRppy-KnyNI/hqdefault.jpg" alt="내가 선택한 다음 영상">
+          <span>▶</span><small>07:48</small>
+        </div>
+        <div class="body">
+          <span class="tag">내가 고른 다음 순간</span>
+          <h2>댓글을 따라 찾아본 장면</h2>
+          <p>이 순간부터 마음이 더 빠르게 자랐어요.</p>
+        </div>
+      </article>
+
+      <div class="seed">✦</div>
+    </div>
+
+    <div class="caption">
+      <span class="rule"></span>
+      <p>한 장면에서 시작한 마음이<br><b>다음 장면과 연결되어 자라나요.</b></p>
+    </div>
+  </div>
+</section>
+
+<section class="row" id="browse">
+  <div class="mini"><span>01</span><strong>첫 순간</strong><p>마음이 멈춘 정확한 장면을 심어 보세요.</p></div>
+  <div class="mini"><span>02</span><strong>감정 메모</strong><p>그때의 말과 감정을 짧게 기록해요.</p></div>
+  <div class="mini"><span>03</span><strong>다음 가지</strong><p>팬의 추천으로 이야기의 흐름을 이어가요.</p></div>
+</section>
+</main>
+
+<footer class="foot">
+  <b>LoveTree</b>
+  <span>마음이 시작된 순간을 오래 간직하는 법</span>
+</footer>
+</section>
+
+<section class="flow hidden" id="flow">
+<div class="shell">
+  <div class="flow-top">
+    <button class="back" type="button" data-home>← 처음 화면으로</button>
+    <span class="step">plant your first moment</span>
+  </div>
+
+  <div class="progress"><span></span></div>
+
+  <div class="layout">
+    <div class="copy">
+      <p class="eyebrow">01 · 처음 발견</p>
+      <h1>마음이 처음 멈춘<br><em>그 순간을 심어볼까요?</em></h1>
+      <p>
+        발견한 콘텐츠의 링크를 먼저 남겨 주세요.
+        링크와 함께 그때의 마음을 기록하면 러브트리의 첫 뿌리가 됩니다.
+      </p>
+
+      <form class="form" id="discovery-form">
+        <label class="field-label" for="content-url">발견한 콘텐츠 링크</label>
+        <div class="url-row">
+          <span class="url-icon">↗</span>
+          <input id="content-url" type="url" placeholder="https://youtube.com/watch?v=..." required>
+        </div>
+        <p class="url-hint">YouTube 링크를 넣으면 제목과 썸네일을 연결할 수 있어요.</p>
+
+        <label class="field-label" for="discovery-note">그때 어떤 마음이었나요?</label>
+        <textarea id="discovery-note" placeholder="예: 우연히 보게 됐는데, 하루 종일 이 장면이 생각났어."></textarea>
+
+        <label class="field-label" for="discovery-date">발견한 날짜</label>
+        <input id="discovery-date" type="date">
+
+        <div class="flow-actions">
+          <button class="btn primary" type="submit">이 순간 심기 →</button>
+          <span class="hint">나중에 다시 수정할 수 있어요.</span>
+        </div>
+      </form>
+    </div>
+
+    <aside class="preview">
+      <div class="preview-window" id="preview-window">
+        <span class="preview-tree-name" id="preview-tree-name">나의 첫 러브트리</span>
+        <div class="glow"></div>
+        <div class="orb">✦</div>
+        <div class="preview-copy">
+          <span>your first seed</span>
+          <strong id="preview-title">링크를 넣으면 콘텐츠가 보여요</strong>
+          <p id="preview-subtitle">YouTube 주소를 붙여 넣어 러브트리의 뿌리를 만들어 보세요.</p>
+        </div>
+      </div>
+    </aside>
+  </div>
+</div>
+</section>
+
+<div class="backdrop hidden" id="modal">
+  <div class="modal">
+    <button class="close" type="button" data-close>×</button>
+    <p class="eyebrow">plant your first moment</p>
+    <h2>어떤 러브트리를<br><em>처음 심어볼까요?</em></h2>
+    <p>최애, 배우, 작품, 노래, 여행처럼 마음이 자란 대상이라면 무엇이든 좋아요.</p>
+
+    <form id="name-form">
+      <label for="tree-name">러브트리 이름</label>
+      <input id="tree-name" value="건호에게 입덕한 3일" required>
+      <p class="modal-note">순간을 3개 이상 남기면 공개 러브트리로 소개할 수 있어요. 공개 범위는 나중에 바꿀 수 있습니다.</p>
+      <button class="btn primary" type="submit">이 이름으로 시작하기 →</button>
+    </form>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div></template>
+<template id="step2-template"><style>@import url('https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=Gowun+Dodum&family=Manrope:wght@500;600;700&display=swap');
+
+:host{
+  --paper:#f7f0e8;
+  --paper-2:#fffaf3;
+  --white:#fffdf8;
+  --ink:#403536;
+  --ink-soft:#8e7f7a;
+  --muted:#9b8982;
+  --rose:#c86e79;
+  --rose-deep:#98505e;
+  --rose-pale:#f0d7d5;
+  --sage:#879975;
+  --sage-deep:#596b4c;
+  --sage-pale:#e1e9dc;
+  --sand:#d9bda4;
+  --line:rgba(119,91,82,.20);
+  --line-soft:rgba(119,91,82,.12);
+  --display:'Gowun Batang','Noto Serif KR',serif;
+  --body:'Gowun Dodum','Noto Sans KR',sans-serif;
+  --latin:'Manrope','Gowun Dodum',sans-serif;
+  --shadow-lg:0 30px 85px rgba(75,51,42,.16);
+  --shadow-md:0 18px 46px rgba(75,51,42,.12);
+  --shadow-sm:0 9px 24px rgba(75,51,42,.08);
+}
+
+*{box-sizing:border-box}
+:host{scroll-behavior:smooth}
+:host{
+  margin:0;
+  min-height:100vh;
+  color:var(--ink);
+  font-family:var(--body);
+  background:
+    radial-gradient(circle at 8% 16%,rgba(219,151,145,.22),transparent 27rem),
+    radial-gradient(circle at 93% 82%,rgba(156,174,130,.18),transparent 29rem),
+    linear-gradient(135deg,#f8f1e9,#fbf8f1 58%,#f1e8dc);
+}
+:host::before{
+  content:"";
+  position:fixed;
+  inset:0;
+  z-index:100;
+  pointer-events:none;
+  opacity:.09;
+  mix-blend-mode:multiply;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180' viewBox='0 0 180 180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.76' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.075'/%3E%3C/svg%3E");
+}
+button,input,textarea{font:inherit}
+button{cursor:pointer}
+a{color:inherit;text-decoration:none}
+.hidden{display:none!important}
+
+.shell{
+  width:min(1180px,calc(100% - 54px));
+  margin:auto;
+  padding:24px 0 54px;
+}
+
+/* top */
+.top{
+  min-height:58px;
+  display:grid;
+  grid-template-columns:1fr auto 1fr;
+  align-items:center;
+}
+.back{
+  justify-self:start;
+  border:0;
+  background:transparent;
+  color:var(--muted);
+  font-size:.72rem;
+  padding:8px 0;
+}
+.back:hover{color:var(--rose-deep)}
+.brand{
+  display:flex;
+  align-items:center;
+  gap:9px;
+  color:var(--rose-deep);
+  font:700 1.28rem var(--display);
+  letter-spacing:-.05em;
+}
+.brand-mark{
+  position:relative;
+  width:26px;
+  height:27px;
+}
+.brand-mark::before{
+  content:"";
+  position:absolute;
+  left:12px;
+  top:4px;
+  width:2px;
+  height:22px;
+  border-radius:99px;
+  background:var(--sage-deep);
+  transform:rotate(8deg);
+}
+.brand-mark i,.brand-mark b{
+  position:absolute;
+  width:13px;
+  height:8px;
+  border-radius:100% 0;
+}
+.brand-mark i{
+  left:1px;
+  top:6px;
+  background:var(--sage);
+  transform:rotate(-26deg);
+}
+.brand-mark b{
+  right:0;
+  top:2px;
+  background:var(--rose);
+  transform:scaleX(-1) rotate(-26deg);
+}
+.step-label{
+  justify-self:end;
+  color:var(--rose-deep);
+  font:700 .59rem var(--latin);
+  letter-spacing:.14em;
+  text-transform:uppercase;
+}
+
+/* progress */
+.journey-progress{
+  margin:22px 0 56px;
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  position:relative;
+}
+.journey-progress::before{
+  content:"";
+  position:absolute;
+  left:4%;
+  right:4%;
+  top:11px;
+  height:1px;
+  background:rgba(152,80,94,.15);
+}
+.progress-item{
+  position:relative;
+  z-index:1;
+  text-align:center;
+  color:#b3a29b;
+  font-size:.59rem;
+}
+.progress-item i{
+  width:23px;
+  height:23px;
+  margin:0 auto 8px;
+  border:1px solid rgba(152,80,94,.18);
+  border-radius:50%;
+  display:grid;
+  place-items:center;
+  background:#f8f1e9;
+  color:#b49e97;
+  font:700 .49rem var(--latin);
+  font-style:normal;
+}
+.progress-item.done{color:var(--sage-deep)}
+.progress-item.done i{
+  border-color:rgba(89,107,76,.26);
+  background:var(--sage-pale);
+  color:var(--sage-deep);
+}
+.progress-item.active{
+  color:var(--rose-deep);
+  font-weight:700;
+}
+.progress-item.active i{
+  border-color:var(--rose);
+  background:var(--rose);
+  color:white;
+  box-shadow:0 0 0 7px rgba(200,110,121,.10),0 8px 20px rgba(200,110,121,.22);
+}
+
+/* layout */
+.layout{
+  display:grid;
+  grid-template-columns:.94fr 1.06fr;
+  gap:70px;
+  align-items:start;
+}
+.eyebrow{
+  margin:0 0 17px;
+  color:var(--rose-deep);
+  font:700 .61rem var(--latin);
+  letter-spacing:.18em;
+  text-transform:uppercase;
+}
+.copy h1{
+  margin:0;
+  font:400 clamp(2.75rem,5vw,4.65rem)/1.08 var(--display);
+  letter-spacing:-.095em;
+}
+.copy h1 span{display:block}
+.copy h1 .soft{color:#8f817d}
+.copy h1 .rose{
+  margin-left:32px;
+  color:var(--rose);
+}
+.copy>p:not(.eyebrow){
+  max-width:500px;
+  margin:23px 0 27px;
+  color:var(--muted);
+  font-size:.87rem;
+  line-height:1.85;
+}
+
+/* connected content */
+.connected-card{
+  position:relative;
+  padding:14px;
+  border:1px solid var(--line);
+  border-radius:25px;
+  background:rgba(255,253,248,.82);
+  box-shadow:var(--shadow-lg);
+  transform:rotate(-.65deg);
+}
+.connected-card::after{
+  content:"";
+  position:absolute;
+  inset:8px -7px -7px 8px;
+  z-index:-1;
+  border:1px solid rgba(135,153,117,.20);
+  border-radius:25px;
+  transform:rotate(1.4deg);
+}
+.tape{
+  position:absolute;
+  z-index:5;
+  left:50%;
+  top:-10px;
+  width:67px;
+  height:21px;
+  transform:translateX(-50%) rotate(-2deg);
+  background:rgba(221,190,153,.56);
+}
+.video-frame{
+  position:relative;
+  overflow:hidden;
+  height:255px;
+  border-radius:17px;
+  background:
+    radial-gradient(circle at 30% 25%,rgba(255,222,171,.75),transparent 16%),
+    linear-gradient(145deg,#4c566a,#927080 48%,#dc9b8d);
+  background-size:cover;
+  background-position:center;
+}
+.video-frame::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  background:linear-gradient(180deg,rgba(255,248,239,.05),rgba(62,41,42,.26));
+}
+.play{
+  position:absolute;
+  left:50%;
+  top:50%;
+  transform:translate(-50%,-50%);
+  width:52px;
+  height:52px;
+  border:1px solid rgba(255,255,255,.72);
+  border-radius:50%;
+  background:rgba(255,253,248,.78);
+  color:#5a4945;
+  box-shadow:0 12px 28px rgba(49,35,34,.20);
+  font-size:.86rem;
+}
+.video-badge{
+  position:absolute;
+  left:14px;
+  top:14px;
+  padding:7px 10px;
+  border-radius:999px;
+  background:rgba(255,253,248,.86);
+  color:var(--rose-deep);
+  font:700 .53rem var(--latin);
+  letter-spacing:.06em;
+}
+.video-time{
+  position:absolute;
+  right:14px;
+  bottom:13px;
+  padding:5px 7px;
+  border-radius:6px;
+  background:rgba(53,41,42,.65);
+  color:white;
+  font:700 .57rem var(--latin);
+}
+.connected-meta{padding:15px 5px 4px}
+.connected-meta small{
+  display:block;
+  color:var(--rose-deep);
+  font:700 .55rem var(--latin);
+  letter-spacing:.10em;
+}
+.connected-meta strong{
+  display:block;
+  margin-top:6px;
+  font:400 1.16rem/1.4 var(--display);
+}
+.connected-meta p{
+  margin:5px 0 0;
+  color:var(--muted);
+  font-size:.65rem;
+  line-height:1.5;
+  word-break:break-all;
+}
+.scene-strip{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  margin-top:15px;
+  padding:12px 13px;
+  border:1px solid var(--line-soft);
+  border-radius:14px;
+  background:rgba(255,250,243,.72);
+}
+.scene-strip span{
+  color:var(--sage-deep);
+  font-size:.62rem;
+  font-weight:700;
+  white-space:nowrap;
+}
+.scene-strip input{
+  width:92px;
+  height:36px;
+  border:1px solid var(--line);
+  border-radius:10px;
+  background:var(--white);
+  color:var(--ink);
+  text-align:center;
+  outline:0;
+  font:700 .66rem var(--latin);
+}
+.scene-strip input:focus{border-color:var(--rose);box-shadow:0 0 0 4px rgba(200,110,121,.12)}
+.scene-strip button{
+  margin-left:auto;
+  min-height:35px;
+  padding:0 12px;
+  border:1px solid rgba(89,107,76,.27);
+  border-radius:999px;
+  background:rgba(255,253,248,.88);
+  color:var(--sage-deep);
+  font-size:.59rem;
+  font-weight:700;
+}
+
+/* form paper */
+.form-paper{
+  position:relative;
+  padding:31px 31px 27px;
+  border:1px solid rgba(119,91,82,.18);
+  border-radius:28px;
+  background:rgba(255,253,248,.88);
+  box-shadow:var(--shadow-lg);
+}
+.form-paper::before{
+  content:"";
+  position:absolute;
+  left:31px;
+  right:31px;
+  top:85px;
+  height:1px;
+  background:linear-gradient(90deg,rgba(200,110,121,.35),transparent);
+}
+.form-head{
+  display:flex;
+  justify-content:space-between;
+  gap:18px;
+  align-items:start;
+  padding-bottom:24px;
+}
+.form-head h2{
+  margin:0;
+  font:400 1.54rem/1.3 var(--display);
+  letter-spacing:-.055em;
+}
+.form-head p{
+  margin:7px 0 0;
+  color:var(--muted);
+  font-size:.66rem;
+  line-height:1.55;
+}
+.leaf-mark{
+  flex:0 0 auto;
+  width:43px;
+  height:43px;
+  border:1px solid rgba(200,110,121,.22);
+  border-radius:50%;
+  display:grid;
+  place-items:center;
+  background:rgba(240,215,213,.55);
+  color:var(--rose);
+  font:1.1rem var(--display);
+}
+.field-group{
+  padding:20px 0;
+  border-bottom:1px solid var(--line-soft);
+}
+.field-group:last-of-type{border-bottom:0}
+.label{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:10px;
+  margin:0 0 10px;
+  color:var(--sage-deep);
+  font-size:.68rem;
+  font-weight:700;
+}
+.label small{
+  color:#b19d95;
+  font-weight:400;
+  font-size:.57rem;
+}
+
+/* emotion chips */
+.chips{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+}
+.chip{
+  min-height:38px;
+  padding:0 13px;
+  border:1px solid rgba(119,91,82,.20);
+  border-radius:999px;
+  background:rgba(255,250,243,.72);
+  color:var(--muted);
+  font-size:.67rem;
+  transition:.16s;
+}
+.chip:hover{transform:translateY(-1px);border-color:rgba(200,110,121,.42)}
+.chip.selected{
+  border-color:var(--rose);
+  background:var(--rose-pale);
+  color:var(--rose-deep);
+  box-shadow:0 7px 17px rgba(200,110,121,.14);
+}
+.chip[data-tone="sage"].selected{
+  border-color:var(--sage);
+  background:var(--sage-pale);
+  color:var(--sage-deep);
+}
+.custom-emotion{
+  width:120px;
+  min-height:38px;
+  padding:0 12px;
+  border:1px dashed rgba(119,91,82,.25);
+  border-radius:999px;
+  background:transparent;
+  color:var(--ink);
+  outline:0;
+  font-size:.64rem;
+}
+.custom-emotion:focus{border-style:solid;border-color:var(--rose)}
+
+/* inputs */
+.time-row{
+  display:grid;
+  grid-template-columns:112px auto 1fr;
+  gap:9px;
+  align-items:center;
+}
+.time-input{
+  width:112px;
+  height:43px;
+  padding:0 12px;
+  border:1px solid var(--line);
+  border-radius:12px;
+  background:rgba(255,250,243,.78);
+  color:var(--ink);
+  outline:0;
+  text-align:center;
+  font:700 .71rem var(--latin);
+}
+.time-input:focus,.memo:focus,.date:focus{
+  border-color:var(--rose);
+  box-shadow:0 0 0 4px rgba(200,110,121,.12);
+}
+.time-controls{display:flex;gap:6px}
+.time-controls button{
+  min-width:39px;
+  height:38px;
+  border:1px solid var(--line);
+  border-radius:10px;
+  background:var(--white);
+  color:var(--muted);
+  font:700 .57rem var(--latin);
+}
+.time-controls button:hover{color:var(--rose-deep);border-color:rgba(200,110,121,.38)}
+.time-help{
+  color:#ab9790;
+  font-size:.59rem;
+  line-height:1.5;
+}
+.memo-wrap{position:relative}
+.memo{
+  width:100%;
+  min-height:112px;
+  padding:14px 14px 28px;
+  border:1px solid var(--line);
+  border-radius:14px;
+  background:rgba(255,250,243,.78);
+  color:var(--ink);
+  outline:0;
+  resize:vertical;
+  line-height:1.7;
+}
+.counter{
+  position:absolute;
+  right:12px;
+  bottom:10px;
+  color:#b9a59d;
+  font:.54rem var(--latin);
+}
+.date-row{
+  display:grid;
+  grid-template-columns:1fr auto;
+  gap:11px;
+  align-items:center;
+}
+.date{
+  width:100%;
+  height:43px;
+  padding:0 12px;
+  border:1px solid var(--line);
+  border-radius:12px;
+  background:rgba(255,250,243,.78);
+  color:var(--ink);
+  outline:0;
+}
+.visibility{
+  display:flex;
+  align-items:center;
+  gap:9px;
+  color:var(--muted);
+  font-size:.62rem;
+}
+.switch{
+  position:relative;
+  width:44px;
+  height:25px;
+  border:0;
+  border-radius:999px;
+  background:#ded4cd;
+  padding:0;
+  transition:.18s;
+}
+.switch::after{
+  content:"";
+  position:absolute;
+  top:4px;
+  left:4px;
+  width:17px;
+  height:17px;
+  border-radius:50%;
+  background:white;
+  box-shadow:0 3px 8px rgba(69,47,36,.18);
+  transition:.18s;
+}
+.switch.on{background:var(--sage)}
+.switch.on::after{left:23px}
+
+/* action */
+.actions{
+  display:flex;
+  align-items:center;
+  gap:13px;
+  margin-top:22px;
+}
+.submit{
+  min-height:49px;
+  padding:0 21px;
+  border:0;
+  border-radius:999px;
+  background:linear-gradient(135deg,#d27b86,#bd626e);
+  color:white;
+  box-shadow:0 13px 27px rgba(200,110,121,.28);
+  font-weight:700;
+}
+.submit:hover{transform:translateY(-2px)}
+.form-hint{
+  color:#ad9991;
+  font-size:.61rem;
+}
+
+/* success */
+.success{
+  padding:15px 0 2px;
+  text-align:center;
+}
+.success-flower{
+  width:92px;
+  height:92px;
+  margin:12px auto 21px;
+  border:1px solid rgba(200,110,121,.28);
+  border-radius:50%;
+  display:grid;
+  place-items:center;
+  background:
+    radial-gradient(circle,rgba(255,232,206,.85),rgba(255,232,206,0) 64%),
+    rgba(255,253,248,.78);
+  color:var(--rose);
+  box-shadow:0 0 0 15px rgba(200,110,121,.07),var(--shadow-md);
+  font:2.1rem var(--display);
+}
+.success h2{
+  margin:0;
+  font:400 2rem/1.25 var(--display);
+  letter-spacing:-.065em;
+}
+.success h2 span{color:var(--rose)}
+.success p{
+  max-width:420px;
+  margin:13px auto 22px;
+  color:var(--muted);
+  font-size:.74rem;
+  line-height:1.75;
+}
+.result-card{
+  padding:14px 15px;
+  border:1px solid var(--line);
+  border-radius:16px;
+  background:rgba(255,250,243,.74);
+  text-align:left;
+}
+.result-card small{
+  color:var(--sage-deep);
+  font:700 .53rem var(--latin);
+}
+.result-card strong{
+  display:block;
+  margin-top:5px;
+  font:400 1rem/1.45 var(--display);
+}
+.result-card span{
+  display:block;
+  margin-top:5px;
+  color:var(--muted);
+  font-size:.60rem;
+}
+.success-actions{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+  margin-top:16px;
+}
+.success-actions button{
+  min-height:43px;
+  border-radius:999px;
+  font-size:.63rem;
+  font-weight:700;
+}
+.next{
+  border:0;
+  background:var(--rose);
+  color:white;
+}
+.edit{
+  border:1px solid rgba(89,107,76,.30);
+  background:var(--white);
+  color:var(--sage-deep);
+}
+
+/* toast */
+.toast{
+  position:fixed;
+  left:50%;
+  bottom:24px;
+  z-index:80;
+  opacity:0;
+  pointer-events:none;
+  transform:translate(-50%,20px);
+  padding:11px 16px;
+  border-radius:999px;
+  background:#433536;
+  color:white;
+  font-size:.64rem;
+  box-shadow:0 13px 30px rgba(45,32,30,.24);
+  transition:.2s;
+}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media(max-width:950px){
+  .layout{grid-template-columns:1fr;gap:38px}
+  .copy{max-width:680px}
+  .connected-card{width:min(640px,100%)}
+}
+@media(max-width:620px){
+  .shell{width:calc(100% - 30px);padding-top:15px}
+  .top{grid-template-columns:1fr auto}
+  .brand{justify-self:start}
+  .back{display:none}
+  .step-label{grid-column:2}
+  .journey-progress{margin:18px 0 43px}
+  .progress-item span{display:none}
+  .copy h1{font-size:clamp(2.45rem,13vw,3.65rem)}
+  .copy h1 .rose{margin-left:19px}
+  .video-frame{height:205px}
+  .form-paper{padding:26px 20px 22px;border-radius:24px}
+  .form-paper::before{left:20px;right:20px}
+  .time-row{grid-template-columns:104px 1fr}
+  .time-help{grid-column:1/-1}
+  .date-row{grid-template-columns:1fr}
+  .actions{display:grid}
+  .submit{width:100%}
+  .form-hint{text-align:center}
+}
+
+:host{display:block;min-height:calc(100vh - 76px)}
+.top .brand{visibility:hidden;pointer-events:none}
+.card-extra-meta{display:block;margin-top:6px;color:var(--sage-deep);font:.55rem var(--latin)}
+</style><main class="shell">
+  <header class="top">
+    <button class="back" type="button" id="back">← 첫 순간으로 돌아가기</button>
+    <a class="brand" href="#">
+      <span class="brand-mark" aria-hidden="true"><i></i><b></b></span>
+      LoveTree
+    </a>
+    <span class="step-label">02 · record the feeling</span>
+  </header>
+
+  <nav class="journey-progress" aria-label="러브트리 시작 단계">
+    <div class="progress-item done"><i>✓</i><span>첫 순간</span></div>
+    <div class="progress-item active"><i>02</i><span>마음 남기기</span></div>
+    <div class="progress-item"><i>03</i><span>첫 카드</span></div>
+    <div class="progress-item"><i>04</i><span>다음 가지</span></div>
+  </nav>
+
+  <section class="layout">
+    <div class="copy">
+      <p class="eyebrow">02 · 마음을 잎으로 남기는 시간</p>
+      <h1>
+        <span>첫 가지가</span>
+        <span class="soft">살며시 돋았어요.</span>
+        <span class="rose">그때의 마음도 적어볼까요?</span>
+      </h1>
+      <p>
+        콘텐츠가 러브트리의 첫 뿌리라면, 그 장면에서 느낀 마음은 첫 잎이 됩니다.
+        기억하고 싶은 시간과 한 문장을 함께 남겨 주세요.
+      </p>
+
+      <article class="connected-card" aria-label="연결한 첫 콘텐츠">
+        <span class="tape" aria-hidden="true"></span>
+        <div class="video-frame" id="video-frame">
+          <span class="video-badge">FIRST ROOT · 연결된 첫 순간</span>
+          <button class="play" id="play" type="button" aria-label="미리보기 재생">▶</button>
+          <span class="video-time" id="video-time">01:30</span>
+        </div>
+        <div class="connected-meta">
+          <small>CONNECTED YOUTUBE MOMENT</small>
+          <strong id="video-title">처음 마음이 멈춘 장면</strong>
+          <p id="video-url">https://youtube.com/watch?v=nqofkzQD19E</p>
+        </div>
+        <div class="scene-strip">
+          <span>기억할 장면</span>
+          <input id="card-time" value="01:30" aria-label="카드에 표시할 시간">
+          <button id="sync-time" type="button">이 시간으로 맞추기</button>
+        </div>
+      </article>
+    </div>
+
+    <section class="form-paper">
+      <div id="form-view">
+        <header class="form-head">
+          <div>
+            <h2>이 장면에<br>어떤 마음이 머물렀나요?</h2>
+            <p>정답은 없어요. 그때 가장 가까웠던 말 하나면 충분합니다.</p>
+          </div>
+          <span class="leaf-mark">❦</span>
+        </header>
+
+        <form id="memory-form">
+          <div class="field-group">
+            <label class="label">
+              <span>그때 가장 가까웠던 감정</span>
+              <small>하나를 골라 주세요</small>
+            </label>
+            <div class="chips" id="chips">
+              <button class="chip selected" type="button" data-emotion="설렘">설렘</button>
+              <button class="chip" type="button" data-emotion="웃음">웃음</button>
+              <button class="chip" type="button" data-emotion="위로" data-tone="sage">위로</button>
+              <button class="chip" type="button" data-emotion="놀람">놀람</button>
+              <button class="chip" type="button" data-emotion="존경" data-tone="sage">존경</button>
+              <button class="chip" type="button" data-emotion="애틋함">애틋함</button>
+              <input class="custom-emotion" id="custom-emotion" placeholder="다른 마음 ＋">
+            </div>
+          </div>
+
+          <div class="field-group">
+            <label class="label" for="time">
+              <span>영상에서 기억하고 싶은 시간</span>
+              <small>분:초</small>
+            </label>
+            <div class="time-row">
+              <input class="time-input" id="time" value="01:30" inputmode="numeric" aria-label="기억할 영상 시간">
+              <div class="time-controls">
+                <button type="button" id="minus-five">−5초</button>
+                <button type="button" id="plus-five">＋5초</button>
+              </div>
+              <span class="time-help">장면의 정확한 시간을 남기면 나중에 바로 다시 열 수 있어요.</span>
+            </div>
+          </div>
+
+          <div class="field-group">
+            <label class="label" for="memory">
+              <span>이 장면이 특별했던 이유</span>
+              <small>최대 140자</small>
+            </label>
+            <div class="memo-wrap">
+              <textarea class="memo" id="memory" maxlength="140" placeholder="예: 우연히 보게 됐는데, 하루 종일 이 표정과 말투가 생각났어."></textarea>
+              <span class="counter" id="counter">0 / 140</span>
+            </div>
+          </div>
+
+          <div class="field-group">
+            <label class="label" for="date">
+              <span>이 마음을 발견한 날</span>
+              <small>나중에 바꿀 수 있어요</small>
+            </label>
+            <div class="date-row">
+              <input class="date" id="date" type="date">
+              <div class="visibility">
+                <button class="switch" id="visibility" type="button" aria-pressed="false"></button>
+                <span id="visibility-label">공개할 때 이 메모는 나만 보기</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="actions">
+            <button class="submit" type="submit">첫 마음 카드 피우기 →</button>
+            <span class="form-hint">링크와 원문은 그대로 보존됩니다.</span>
+          </div>
+        </form>
+      </div>
+
+      <div class="success hidden" id="success-view">
+        <div class="success-flower">✦</div>
+        <h2>첫 마음 카드가<br><span>조용히 피어났어요.</span></h2>
+        <p>처음 발견한 장면과 그때의 마음이 한 장의 카드로 연결됐습니다. 이제 여기에서 다음 가지가 자라기 시작해요.</p>
+
+        <div class="result-card">
+          <small id="result-emotion">설렘 · 01:30</small>
+          <strong id="result-memory">마음을 남긴 첫 문장이 이곳에 표시됩니다.</strong>
+          <span id="result-date">기록 날짜</span>
+        </div>
+
+        <div class="success-actions">
+          <button class="edit" id="edit" type="button">다시 다듬기</button>
+          <button class="next" id="next" type="button">첫 여정 보기 →</button>
+        </div>
+      </div>
+    </section>
+  </section>
+</main>
+
+<div class="toast" id="toast"></div></template>
+<template id="step3-template"><style>@import url('https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=Gowun+Dodum&family=Manrope:wght@500;600;700&display=swap');
+
+:host{
+  --paper:#f7f0e8;
+  --paper-2:#fffaf3;
+  --white:#fffdf8;
+  --ink:#403536;
+  --soft-ink:#8f817d;
+  --muted:#9b8982;
+  --rose:#c86e79;
+  --rose-deep:#98505e;
+  --rose-pale:#f0d7d5;
+  --sage:#879975;
+  --sage-deep:#596b4c;
+  --sage-pale:#e1e9dc;
+  --sand:#d9bda4;
+  --line:rgba(119,91,82,.20);
+  --line-soft:rgba(119,91,82,.12);
+  --display:'Gowun Batang','Noto Serif KR',serif;
+  --body:'Gowun Dodum','Noto Sans KR',sans-serif;
+  --latin:'Manrope','Gowun Dodum',sans-serif;
+  --shadow-lg:0 30px 85px rgba(75,51,42,.16);
+  --shadow-md:0 18px 46px rgba(75,51,42,.12);
+  --shadow-sm:0 9px 24px rgba(75,51,42,.08);
+}
+
+*{box-sizing:border-box}
+:host{scroll-behavior:smooth}
+:host{
+  margin:0;
+  min-height:100vh;
+  color:var(--ink);
+  font-family:var(--body);
+  background:
+    radial-gradient(circle at 9% 16%,rgba(219,151,145,.22),transparent 27rem),
+    radial-gradient(circle at 92% 82%,rgba(156,174,130,.18),transparent 29rem),
+    linear-gradient(135deg,#f8f1e9,#fbf8f1 58%,#f1e8dc);
+}
+:host::before{
+  content:"";
+  position:fixed;
+  inset:0;
+  z-index:100;
+  pointer-events:none;
+  opacity:.09;
+  mix-blend-mode:multiply;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180' viewBox='0 0 180 180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.76' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.075'/%3E%3C/svg%3E");
+}
+button,input,textarea{font:inherit}
+button{cursor:pointer}
+a{color:inherit;text-decoration:none}
+.hidden{display:none!important}
+
+.shell{
+  width:min(1210px,calc(100% - 54px));
+  margin:auto;
+  padding:24px 0 55px;
+}
+
+/* header */
+.top{
+  min-height:58px;
+  display:grid;
+  grid-template-columns:1fr auto 1fr;
+  align-items:center;
+}
+.back{
+  justify-self:start;
+  border:0;
+  background:transparent;
+  color:var(--muted);
+  font-size:.72rem;
+  padding:8px 0;
+}
+.back:hover{color:var(--rose-deep)}
+.brand{
+  display:flex;
+  align-items:center;
+  gap:9px;
+  color:var(--rose-deep);
+  font:700 1.28rem var(--display);
+  letter-spacing:-.05em;
+}
+.brand-mark{position:relative;width:26px;height:27px}
+.brand-mark::before{
+  content:"";
+  position:absolute;
+  left:12px;
+  top:4px;
+  width:2px;
+  height:22px;
+  border-radius:99px;
+  background:var(--sage-deep);
+  transform:rotate(8deg);
+}
+.brand-mark i,.brand-mark b{
+  position:absolute;
+  width:13px;
+  height:8px;
+  border-radius:100% 0;
+}
+.brand-mark i{
+  left:1px;
+  top:6px;
+  background:var(--sage);
+  transform:rotate(-26deg);
+}
+.brand-mark b{
+  right:0;
+  top:2px;
+  background:var(--rose);
+  transform:scaleX(-1) rotate(-26deg);
+}
+.step-label{
+  justify-self:end;
+  color:var(--rose-deep);
+  font:700 .59rem var(--latin);
+  letter-spacing:.14em;
+  text-transform:uppercase;
+}
+
+/* progress */
+.journey-progress{
+  margin:22px 0 54px;
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  position:relative;
+}
+.journey-progress::before{
+  content:"";
+  position:absolute;
+  left:4%;
+  right:4%;
+  top:11px;
+  height:1px;
+  background:rgba(152,80,94,.15);
+}
+.progress-item{
+  position:relative;
+  z-index:1;
+  text-align:center;
+  color:#b3a29b;
+  font-size:.59rem;
+}
+.progress-item i{
+  width:23px;
+  height:23px;
+  margin:0 auto 8px;
+  border:1px solid rgba(152,80,94,.18);
+  border-radius:50%;
+  display:grid;
+  place-items:center;
+  background:#f8f1e9;
+  color:#b49e97;
+  font:700 .49rem var(--latin);
+  font-style:normal;
+}
+.progress-item.done{color:var(--sage-deep)}
+.progress-item.done i{
+  border-color:rgba(89,107,76,.26);
+  background:var(--sage-pale);
+  color:var(--sage-deep);
+}
+.progress-item.active{
+  color:var(--rose-deep);
+  font-weight:700;
+}
+.progress-item.active i{
+  border-color:var(--rose);
+  background:var(--rose);
+  color:white;
+  box-shadow:0 0 0 7px rgba(200,110,121,.10),0 8px 20px rgba(200,110,121,.22);
+}
+
+/* main layout */
+.layout{
+  display:grid;
+  grid-template-columns:1.05fr .95fr;
+  gap:58px;
+  align-items:start;
+}
+.eyebrow{
+  margin:0 0 17px;
+  color:var(--rose-deep);
+  font:700 .61rem var(--latin);
+  letter-spacing:.18em;
+  text-transform:uppercase;
+}
+.copy h1{
+  margin:0;
+  font:400 clamp(2.72rem,5vw,4.65rem)/1.08 var(--display);
+  letter-spacing:-.095em;
+}
+.copy h1 span{display:block}
+.copy h1 .soft{color:#8f817d}
+.copy h1 .rose{
+  margin-left:30px;
+  color:var(--rose);
+}
+.copy>p:not(.eyebrow){
+  max-width:535px;
+  margin:23px 0 27px;
+  color:var(--muted);
+  font-size:.87rem;
+  line-height:1.85;
+}
+
+/* connection board */
+.connection-board{
+  position:relative;
+  min-height:515px;
+  padding:20px;
+  border:1px solid rgba(119,91,82,.18);
+  border-radius:31px;
+  background:rgba(255,253,248,.80);
+  box-shadow:var(--shadow-lg);
+  overflow:hidden;
+}
+.connection-board::after{
+  content:"";
+  position:absolute;
+  inset:9px -8px -8px 9px;
+  z-index:-1;
+  border:1px solid rgba(135,153,117,.20);
+  border-radius:31px;
+  transform:rotate(-1.2deg);
+}
+.board-label{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:0 4px 12px;
+  color:var(--sage-deep);
+  font:600 .56rem var(--latin);
+  letter-spacing:.08em;
+}
+.board-label span:last-child{color:#ab9991}
+.canvas{
+  position:relative;
+  height:425px;
+  overflow:hidden;
+  border-radius:23px;
+  background:
+    radial-gradient(circle at 50% 47%,rgba(245,199,175,.34),transparent 15rem),
+    linear-gradient(155deg,rgba(244,233,221,.90),rgba(238,242,224,.82));
+}
+.canvas::before,.canvas::after{
+  content:"";
+  position:absolute;
+  left:50%;
+  top:49%;
+  border:1px solid rgba(200,110,121,.16);
+  border-radius:50%;
+  transform:translate(-50%,-50%) rotate(-18deg);
+}
+.canvas::before{width:410px;height:235px}
+.canvas::after{
+  width:510px;
+  height:330px;
+  border-color:rgba(89,107,76,.14);
+  transform:translate(-50%,-50%) rotate(18deg);
+}
+.branch-svg{
+  position:absolute;
+  inset:0;
+  z-index:1;
+  width:100%;
+  height:100%;
+  pointer-events:none;
+}
+.branch-path{
+  fill:none;
+  stroke:url(#branch-gradient);
+  stroke-width:5;
+  stroke-linecap:round;
+  stroke-dasharray:7 8;
+  opacity:.54;
+  transition:.35s;
+  filter:drop-shadow(0 5px 7px rgba(75,51,42,.10));
+}
+.branch-path.connected{
+  stroke-dasharray:0;
+  opacity:1;
+}
+.branch-leaf{
+  opacity:.38;
+  transition:.35s;
+}
+.branch-leaf.connected{opacity:1}
+
+.moment{
+  position:absolute;
+  z-index:3;
+  overflow:hidden;
+  width:210px;
+  border:1px solid rgba(119,91,82,.17);
+  border-radius:18px;
+  background:rgba(255,253,248,.96);
+  box-shadow:0 16px 34px rgba(75,51,42,.15);
+}
+.moment.first{
+  left:25px;
+  top:38px;
+  transform:rotate(-1.5deg);
+}
+.moment.next{
+  right:23px;
+  bottom:35px;
+  transform:rotate(1.7deg);
+}
+.moment.next.waiting{
+  border-style:dashed;
+  box-shadow:0 13px 28px rgba(75,51,42,.08);
+}
+.card-number{
+  position:absolute;
+  z-index:3;
+  left:11px;
+  top:10px;
+  width:27px;
+  height:27px;
+  border-radius:50%;
+  display:grid;
+  place-items:center;
+  background:rgba(255,253,248,.88);
+  color:var(--rose-deep);
+  box-shadow:var(--shadow-sm);
+  font:700 .50rem var(--latin);
+}
+.thumb{
+  position:relative;
+  height:111px;
+  overflow:hidden;
+  background:linear-gradient(145deg,#5e687c,#a47b86 52%,#dea08e);
+  background-size:cover;
+  background-position:center;
+}
+.thumb::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  background:linear-gradient(180deg,rgba(255,246,233,.05),rgba(52,38,39,.29));
+}
+.thumb .play{
+  position:absolute;
+  z-index:2;
+  left:50%;
+  top:50%;
+  transform:translate(-50%,-50%);
+  width:38px;
+  height:38px;
+  border:1px solid rgba(255,255,255,.74);
+  border-radius:50%;
+  display:grid;
+  place-items:center;
+  background:rgba(255,253,248,.80);
+  color:#5b4a46;
+  font-size:.62rem;
+}
+.thumb time{
+  position:absolute;
+  z-index:2;
+  right:9px;
+  bottom:8px;
+  padding:4px 6px;
+  border-radius:5px;
+  background:rgba(52,39,40,.61);
+  color:white;
+  font:700 .50rem var(--latin);
+}
+.waiting .thumb{
+  display:grid;
+  place-items:center;
+  background:
+    radial-gradient(circle,rgba(255,224,190,.72),transparent 46%),
+    linear-gradient(145deg,#f2e5da,#e8eddf);
+}
+.waiting .thumb::before{display:none}
+.empty-seed{
+  width:58px;
+  height:58px;
+  border:1px solid rgba(200,110,121,.30);
+  border-radius:50%;
+  display:grid;
+  place-items:center;
+  color:var(--rose);
+  background:rgba(255,253,248,.74);
+  box-shadow:0 0 0 11px rgba(200,110,121,.07);
+  font:1.45rem var(--display);
+}
+.card-copy{padding:11px 12px 13px}
+.card-copy small{
+  display:block;
+  color:var(--rose-deep);
+  font:700 .51rem var(--latin);
+  letter-spacing:.07em;
+}
+.card-copy strong{
+  display:block;
+  margin-top:5px;
+  font:400 .91rem/1.35 var(--display);
+  display:-webkit-box;
+  -webkit-line-clamp:2;
+  -webkit-box-orient:vertical;
+  overflow:hidden;
+}
+.card-copy p{
+  margin:6px 0 0;
+  color:var(--muted);
+  font-size:.59rem;
+  line-height:1.5;
+  display:-webkit-box;
+  -webkit-line-clamp:2;
+  -webkit-box-orient:vertical;
+  overflow:hidden;
+}
+
+.relation-bubble{
+  position:absolute;
+  z-index:5;
+  left:50%;
+  top:49%;
+  transform:translate(-50%,-50%) rotate(-2deg);
+  max-width:190px;
+  padding:8px 11px;
+  border:1px solid rgba(89,107,76,.22);
+  border-radius:999px;
+  background:rgba(255,253,248,.92);
+  color:var(--sage-deep);
+  box-shadow:var(--shadow-sm);
+  font-size:.57rem;
+  font-weight:700;
+  text-align:center;
+}
+.board-caption{
+  position:absolute;
+  z-index:5;
+  left:21px;
+  bottom:14px;
+  color:#9f8e87;
+  font:400 .64rem/1.5 var(--display);
+}
+.board-caption b{color:var(--sage-deep);font-weight:400}
+
+/* form */
+.form-paper{
+  position:relative;
+  padding:30px 30px 26px;
+  border:1px solid rgba(119,91,82,.18);
+  border-radius:28px;
+  background:rgba(255,253,248,.88);
+  box-shadow:var(--shadow-lg);
+}
+.form-head{
+  display:flex;
+  justify-content:space-between;
+  align-items:start;
+  gap:18px;
+  padding-bottom:22px;
+  border-bottom:1px solid var(--line-soft);
+}
+.form-head h2{
+  margin:0;
+  font:400 1.53rem/1.32 var(--display);
+  letter-spacing:-.055em;
+}
+.form-head p{
+  margin:7px 0 0;
+  color:var(--muted);
+  font-size:.66rem;
+  line-height:1.55;
+}
+.form-icon{
+  flex:0 0 auto;
+  width:43px;
+  height:43px;
+  border:1px solid rgba(135,153,117,.25);
+  border-radius:50%;
+  display:grid;
+  place-items:center;
+  background:rgba(225,233,220,.65);
+  color:var(--sage-deep);
+  font:1.08rem var(--display);
+}
+.group{
+  padding:18px 0;
+  border-bottom:1px solid var(--line-soft);
+}
+.group:last-of-type{border-bottom:0}
+.label{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin:0 0 9px;
+  color:var(--sage-deep);
+  font-size:.67rem;
+  font-weight:700;
+}
+.label small{
+  color:#b09c95;
+  font-size:.56rem;
+  font-weight:400;
+}
+.input,.textarea{
+  width:100%;
+  border:1px solid var(--line);
+  border-radius:13px;
+  background:rgba(255,250,243,.78);
+  color:var(--ink);
+  outline:0;
+}
+.input{
+  height:43px;
+  padding:0 12px;
+}
+.textarea{
+  min-height:93px;
+  padding:12px 13px 27px;
+  resize:vertical;
+  line-height:1.65;
+}
+.input:focus,.textarea:focus{
+  border-color:var(--rose);
+  box-shadow:0 0 0 4px rgba(200,110,121,.12);
+}
+.url-wrap{position:relative}
+.url-wrap .input{padding-left:37px}
+.url-mark{
+  position:absolute;
+  left:13px;
+  top:50%;
+  transform:translateY(-50%);
+  color:var(--rose);
+}
+.url-status{
+  margin:7px 2px 0;
+  color:#ad9991;
+  font-size:.58rem;
+}
+.title-time{
+  display:grid;
+  grid-template-columns:1fr 100px;
+  gap:8px;
+  margin-top:9px;
+}
+.time-control{position:relative}
+.time-control .input{
+  text-align:center;
+  font:700 .67rem var(--latin);
+}
+.relations{
+  display:flex;
+  flex-wrap:wrap;
+  gap:7px;
+}
+.relation{
+  min-height:36px;
+  padding:0 11px;
+  border:1px solid rgba(119,91,82,.20);
+  border-radius:999px;
+  background:rgba(255,250,243,.72);
+  color:var(--muted);
+  font-size:.62rem;
+  transition:.16s;
+}
+.relation:hover{transform:translateY(-1px);border-color:rgba(135,153,117,.42)}
+.relation.selected{
+  border-color:var(--sage);
+  background:var(--sage-pale);
+  color:var(--sage-deep);
+  box-shadow:0 7px 17px rgba(89,107,76,.12);
+}
+.memo-wrap{position:relative}
+.counter{
+  position:absolute;
+  right:12px;
+  bottom:9px;
+  color:#b9a59d;
+  font:.53rem var(--latin);
+}
+.actions{
+  display:flex;
+  align-items:center;
+  gap:13px;
+  margin-top:21px;
+}
+.submit{
+  min-height:49px;
+  padding:0 21px;
+  border:0;
+  border-radius:999px;
+  background:linear-gradient(135deg,#d27b86,#bd626e);
+  color:white;
+  box-shadow:0 13px 27px rgba(200,110,121,.28);
+  font-weight:700;
+}
+.submit:hover{transform:translateY(-2px)}
+.hint{
+  color:#ad9991;
+  font-size:.60rem;
+}
+
+/* success */
+.success{
+  text-align:center;
+  padding:8px 0 0;
+}
+.success-mark{
+  width:92px;
+  height:92px;
+  margin:12px auto 21px;
+  border:1px solid rgba(135,153,117,.30);
+  border-radius:50%;
+  display:grid;
+  place-items:center;
+  background:
+    radial-gradient(circle,rgba(232,239,220,.92),rgba(232,239,220,0) 66%),
+    rgba(255,253,248,.80);
+  color:var(--sage-deep);
+  box-shadow:0 0 0 15px rgba(135,153,117,.07),var(--shadow-md);
+  font:2rem var(--display);
+}
+.success h2{
+  margin:0;
+  font:400 2rem/1.28 var(--display);
+  letter-spacing:-.065em;
+}
+.success h2 span{color:var(--rose)}
+.success p{
+  max-width:410px;
+  margin:13px auto 20px;
+  color:var(--muted);
+  font-size:.73rem;
+  line-height:1.75;
+}
+.path-summary{
+  position:relative;
+  display:grid;
+  grid-template-columns:1fr 38px 1fr;
+  gap:8px;
+  align-items:center;
+  padding:14px;
+  border:1px solid var(--line);
+  border-radius:16px;
+  background:rgba(255,250,243,.74);
+  text-align:left;
+}
+.path-card{
+  min-width:0;
+}
+.path-card small{
+  color:var(--rose-deep);
+  font:700 .50rem var(--latin);
+}
+.path-card strong{
+  display:block;
+  margin-top:4px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  font:400 .83rem var(--display);
+}
+.path-arrow{
+  display:grid;
+  place-items:center;
+  width:38px;
+  height:38px;
+  border-radius:50%;
+  background:var(--sage-pale);
+  color:var(--sage-deep);
+}
+.success-relation{
+  margin-top:9px;
+  color:var(--sage-deep);
+  font-size:.61rem;
+}
+.success-actions{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+  margin-top:15px;
+}
+.success-actions button{
+  min-height:43px;
+  border-radius:999px;
+  font-size:.62rem;
+  font-weight:700;
+}
+.again{
+  border:1px solid rgba(89,107,76,.30);
+  background:var(--white);
+  color:var(--sage-deep);
+}
+.finish{
+  border:0;
+  background:var(--rose);
+  color:white;
+}
+
+/* toast */
+.toast{
+  position:fixed;
+  left:50%;
+  bottom:24px;
+  z-index:80;
+  opacity:0;
+  pointer-events:none;
+  transform:translate(-50%,20px);
+  padding:11px 16px;
+  border-radius:999px;
+  background:#433536;
+  color:white;
+  font-size:.64rem;
+  box-shadow:0 13px 30px rgba(45,32,30,.24);
+  transition:.2s;
+}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media(max-width:960px){
+  .layout{grid-template-columns:1fr;gap:38px}
+  .copy{max-width:700px}
+  .connection-board{width:min(680px,100%)}
+}
+@media(max-width:620px){
+  .shell{width:calc(100% - 30px);padding-top:15px}
+  .top{grid-template-columns:1fr auto}
+  .back{display:none}
+  .brand{justify-self:start}
+  .step-label{grid-column:2}
+  .journey-progress{margin:18px 0 42px}
+  .progress-item span{display:none}
+  .copy h1{font-size:clamp(2.42rem,13vw,3.62rem)}
+  .copy h1 .rose{margin-left:18px}
+  .connection-board{min-height:660px;padding:14px;border-radius:26px}
+  .canvas{height:590px}
+  .canvas::before,.canvas::after{display:none}
+  .moment.first{
+    left:50%;
+    top:25px;
+    transform:translateX(-50%) rotate(-1deg);
+  }
+  .moment.next{
+    left:50%;
+    right:auto;
+    bottom:34px;
+    transform:translateX(-50%) rotate(1deg);
+  }
+  .branch-svg{
+    transform:rotate(90deg) scale(.78);
+    transform-origin:center;
+  }
+  .relation-bubble{top:50%}
+  .board-caption{left:50%;bottom:9px;transform:translateX(-50%);white-space:nowrap}
+  .form-paper{padding:26px 20px 22px;border-radius:24px}
+  .title-time{grid-template-columns:1fr}
+  .actions{display:grid}
+  .submit{width:100%}
+  .hint{text-align:center}
+  .success-actions{grid-template-columns:1fr}
+}
+
+:host{display:block;min-height:calc(100vh - 76px)}
+.top .brand{visibility:hidden;pointer-events:none}
+.first-extra-meta{display:block;margin-top:6px;color:var(--sage-deep);font:.52rem var(--latin)}
+</style><main class="shell">
+  <header class="top">
+    <button class="back" id="back" type="button">← 마음 카드로 돌아가기</button>
+    <a class="brand" href="#">
+      <span class="brand-mark" aria-hidden="true"><i></i><b></b></span>
+      LoveTree
+    </a>
+    <span class="step-label">03 · connect the next moment</span>
+  </header>
+
+  <nav class="journey-progress" aria-label="러브트리 시작 단계">
+    <div class="progress-item done"><i>✓</i><span>첫 순간</span></div>
+    <div class="progress-item done"><i>✓</i><span>마음 남기기</span></div>
+    <div class="progress-item active"><i>03</i><span>다음 영상 잇기</span></div>
+    <div class="progress-item"><i>04</i><span>러브트리 성장</span></div>
+  </nav>
+
+  <section class="layout">
+    <div class="copy">
+      <p class="eyebrow">03 · 첫 가지를 이어가는 시간</p>
+      <h1>
+        <span>첫 마음이</span>
+        <span class="soft">다음 장면을</span>
+        <span class="rose">찾아갔어요.</span>
+      </h1>
+      <p>
+        첫 영상을 본 뒤 무엇을 더 찾아봤는지 남겨 주세요.
+        댓글을 따라갔든, 팬의 추천을 받았든, 직접 검색했든 그 경로가 러브트리의 첫 가지가 됩니다.
+      </p>
+
+      <section class="connection-board" aria-label="첫 영상과 다음 영상의 연결 미리보기">
+        <div class="board-label">
+          <span>FIRST BRANCH · 첫 연결</span>
+          <span>01 → 02</span>
+        </div>
+
+        <div class="canvas">
+          <svg class="branch-svg" viewBox="0 0 620 425" preserveAspectRatio="none" aria-hidden="true">
+            <defs>
+              <linearGradient id="branch-gradient" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stop-color="#c86e79"/>
+                <stop offset="52%" stop-color="#d9bda4"/>
+                <stop offset="100%" stop-color="#879975"/>
+              </linearGradient>
+            </defs>
+            <path id="branch-path" class="branch-path" d="M205 148 C290 175 325 248 418 285"/>
+            <path id="branch-leaf" class="branch-leaf" d="M323 222 C301 207 290 219 302 236 C315 238 322 232 323 222Z" fill="#879975"/>
+          </svg>
+
+          <article class="moment first">
+            <span class="card-number">01</span>
+            <div class="thumb" id="first-thumb">
+              <span class="play">▶</span>
+              <time id="first-time">01:30</time>
+            </div>
+            <div class="card-copy">
+              <small>첫 마음 카드</small>
+              <strong id="first-title">처음 마음이 멈춘 장면</strong>
+              <p id="first-note">우연히 보게 됐는데 하루 종일 이 장면이 생각났어.</p>
+            </div>
+          </article>
+
+          <article class="moment next waiting" id="next-card">
+            <span class="card-number">02</span>
+            <div class="thumb" id="next-thumb">
+              <span class="empty-seed" id="empty-seed">✦</span>
+              <span class="play hidden" id="next-play">▶</span>
+              <time class="hidden" id="next-time-label">00:00</time>
+            </div>
+            <div class="card-copy">
+              <small>다음 영상</small>
+              <strong id="next-title-preview">아직 비어 있는 다음 가지</strong>
+              <p id="next-note-preview">링크를 넣으면 두 순간이 하나의 가지로 이어져요.</p>
+            </div>
+          </article>
+
+          <div class="relation-bubble" id="relation-bubble">다음 영상을 선택해 주세요</div>
+          <div class="board-caption">한 장면에서 다음 장면으로,<br><b>좋아하게 된 경로가 보여요.</b></div>
+        </div>
+      </section>
+    </div>
+
+    <section class="form-paper">
+      <div id="form-view">
+        <header class="form-head">
+          <div>
+            <h2>어떤 영상으로<br>마음이 이어졌나요?</h2>
+            <p>다음 영상의 링크와 이어진 이유만 남기면 충분해요.</p>
+          </div>
+          <span class="form-icon">↝</span>
+        </header>
+
+        <form id="connect-form">
+          <div class="group">
+            <label class="label" for="next-url">
+              <span>다음으로 찾아본 영상</span>
+              <small>YouTube 링크</small>
+            </label>
+            <div class="url-wrap">
+              <span class="url-mark">↗</span>
+              <input class="input" id="next-url" type="url" placeholder="https://youtube.com/watch?v=..." required>
+            </div>
+            <p class="url-status" id="url-status">링크를 넣으면 오른쪽 카드에 썸네일이 나타나요.</p>
+
+            <div class="title-time">
+              <input class="input" id="next-title" placeholder="다음 영상의 제목">
+              <div class="time-control">
+                <input class="input" id="next-time" value="00:00" inputmode="numeric" aria-label="다음 영상의 기억할 시간">
+              </div>
+            </div>
+          </div>
+
+          <div class="group">
+            <label class="label">
+              <span>왜 이 영상으로 이어졌나요?</span>
+              <small>하나를 골라 주세요</small>
+            </label>
+            <div class="relations" id="relations">
+              <button class="relation selected" type="button" data-relation="댓글을 따라 찾아봤어요">댓글을 따라갔어요</button>
+              <button class="relation" type="button" data-relation="팬이 추천해 줬어요">팬의 추천</button>
+              <button class="relation" type="button" data-relation="같은 사람의 다른 모습을 더 보고 싶었어요">다른 모습이 궁금했어요</button>
+              <button class="relation" type="button" data-relation="같은 무대와 노래를 더 찾아봤어요">같은 무대·노래</button>
+              <button class="relation" type="button" data-relation="내가 직접 다시 검색했어요">직접 다시 검색</button>
+            </div>
+          </div>
+
+          <div class="group">
+            <label class="label" for="next-note">
+              <span>두 장면 사이에 있었던 마음</span>
+              <small>최대 140자</small>
+            </label>
+            <div class="memo-wrap">
+              <textarea class="textarea" id="next-note" maxlength="140" placeholder="예: 댓글에서 인터뷰를 꼭 보라는 말을 보고 바로 찾아봤어. 무대와는 또 다른 말투가 좋아졌어."></textarea>
+              <span class="counter" id="counter">0 / 140</span>
+            </div>
+          </div>
+
+          <div class="actions">
+            <button class="submit" type="submit">두 순간을 가지로 잇기 →</button>
+            <span class="hint">첫 카드와 다음 카드가 그대로 연결됩니다.</span>
+          </div>
+        </form>
+      </div>
+
+      <div class="success hidden" id="success-view">
+        <div class="success-mark">❦</div>
+        <h2>첫 가지가<br><span>다정하게 이어졌어요.</span></h2>
+        <p>처음 만든 영상과 다음 영상 사이에 이유와 마음이 생겼습니다. 이제 러브트리가 단순한 영상 목록이 아니라 좋아하게 된 경로를 보여줘요.</p>
+
+        <div class="path-summary">
+          <div class="path-card">
+            <small>01 · 첫 순간</small>
+            <strong id="summary-first">처음 마음이 멈춘 장면</strong>
+          </div>
+          <span class="path-arrow">→</span>
+          <div class="path-card">
+            <small>02 · 다음 영상</small>
+            <strong id="summary-next">다음으로 찾아본 영상</strong>
+          </div>
+        </div>
+        <div class="success-relation" id="success-relation">댓글을 따라 찾아봤어요</div>
+
+        <div class="success-actions">
+          <button class="again" id="again" type="button">이 영상에서 또 이어보기</button>
+          <button class="finish" id="finish" type="button">내 러브트리 보기 →</button>
+        </div>
+      </div>
+    </section>
+  </section>
+</main>
+
+<div class="toast" id="toast"></div></template>
+
+<script>
+(() => {
+  'use strict';
+  const STORAGE_KEY='lovetree-first-journey-unified';
+  const STEP2_KEY='lovetree-step2-record';
+  const STEP3_KEY='lovetree-step3-connection';
+  const today=()=>new Date().toISOString().slice(0,10);
+  const defaultState=()=>({
+    currentScreen:'landing',treeName:'건호에게 입덕한 3일',
+    firstMoment:{url:'',videoId:'',title:'처음 마음이 멈춘 장면',note:'',discoveryDate:today(),thumbnail:'',saved:false},
+    memory:{emotion:'설렘',customEmotion:'',time:'01:30',note:'',date:today(),publicMemo:false,saved:false},
+    connections:[],step3Origin:null,
+    drafts:{step3:{url:'',title:'',time:'00:00',relation:'댓글을 따라 찾아봤어요',note:''}}
+  });
+  function loadState(){
+    const base=defaultState();
+    try{
+      const saved=JSON.parse(localStorage.getItem(STORAGE_KEY)||'null');
+      if(!saved)return base;
+      return {...base,...saved,firstMoment:{...base.firstMoment,...saved.firstMoment},memory:{...base.memory,...saved.memory},drafts:{...base.drafts,...saved.drafts,step3:{...base.drafts.step3,...saved.drafts?.step3}}};
+    }catch{return base}
+  }
+  let appState=loadState();
+  const globalToast=document.querySelector('#global-toast');
+  let toastTimer=0;
+  function showGlobalToast(message){clearTimeout(toastTimer);globalToast.textContent=message;globalToast.classList.add('show');toastTimer=setTimeout(()=>globalToast.classList.remove('show'),2300)}
+  function persist(){localStorage.setItem(STORAGE_KEY,JSON.stringify(appState));document.body.dataset.started=String(appState.currentScreen!=='landing'||appState.firstMoment.saved)}
+  function youtubeId(value){const match=(value||'').match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?(?:.*&)?v=|shorts\/|embed\/))([\w-]{6,})/);return match?match[1]:null}
+  function parseTime(value){const match=(value||'').trim().match(/^(\d{1,2}):([0-5]\d)$/);return match?Number(match[1])*60+Number(match[2]):null}
+  function formatTime(seconds){seconds=Math.max(0,seconds);return `${String(Math.floor(seconds/60)).padStart(2,'0')}:${String(seconds%60).padStart(2,'0')}`}
+  function thumb(id){return id?`https://img.youtube.com/vi/${id}/hqdefault.jpg`:''}
+  function stageForScreen(screen){if(screen==='landing'||screen==='step1')return 'landing';if(screen.startsWith('step2'))return 'step2';if(screen.startsWith('step3'))return 'step3';return 'growth'}
+  function normalizeScreen(){
+    if((appState.currentScreen.startsWith('step2')||appState.currentScreen.startsWith('step3')||appState.currentScreen==='growth')&&!appState.firstMoment.saved)appState.currentScreen='landing';
+    if((appState.currentScreen.startsWith('step3')||appState.currentScreen==='growth')&&!appState.memory.saved)appState.currentScreen='step2';
+    if(appState.currentScreen==='growth'&&!appState.connections.length)appState.currentScreen='step3';
+  }
+  normalizeScreen();
+
+  class LandingStage extends HTMLElement{
+    connectedCallback(){
+      if(this.shadowRoot)return;
+      this.attachShadow({mode:'open'}).append(document.querySelector('#landing-template').content.cloneNode(true));
+      this.$=s=>this.shadowRoot.querySelector(s);
+      this.toast=this.$('#toast');
+      this.wire();this.updateFromState();this.setMode(appState.currentScreen==='step1'?'step1':'landing');this.applyImageFallbacks();
+    }
+    showToast(message){this.toast.textContent=message;this.toast.classList.add('show');clearTimeout(this.toastTimer);this.toastTimer=setTimeout(()=>this.toast.classList.remove('show'),2400)}
+    openModal(){this.$('#modal').classList.remove('hidden');this.$('#modal').setAttribute('aria-hidden','false');setTimeout(()=>this.$('#tree-name').focus(),0)}
+    closeModal(){this.$('#modal').classList.add('hidden');this.$('#modal').setAttribute('aria-hidden','true')}
+    setMode(mode){this.$('#home').classList.toggle('hidden',mode!=='landing');this.$('#flow').classList.toggle('hidden',mode!=='step1');if(mode==='step1')this.updateFromState()}
+    updatePreview(){
+      const value=this.$('#content-url').value;const id=youtubeId(value);const win=this.$('#preview-window');
+      if(id){win.style.backgroundImage=`linear-gradient(180deg,rgba(255,244,231,.08),rgba(46,34,34,.27)),url(${thumb(id)})`;win.style.backgroundSize='cover';win.style.backgroundPosition='center';this.$('#preview-title').textContent='첫 순간으로 연결할 영상';this.$('#preview-subtitle').textContent='이 장면에서 러브트리의 첫 뿌리가 시작됩니다.'}
+      else{win.style.backgroundImage='';this.$('#preview-title').textContent='링크를 넣으면 콘텐츠가 보여요';this.$('#preview-subtitle').textContent='YouTube 주소를 붙여 넣어 러브트리의 뿌리를 만들어 보세요.'}
+    }
+    updateFromState(){
+      this.$('#tree-name').value=appState.treeName||'건호에게 입덕한 3일';this.$('#preview-tree-name').textContent=appState.treeName||'나의 첫 러브트리';
+      this.$('#content-url').value=appState.firstMoment.url||'';this.$('#discovery-note').value=appState.firstMoment.note||'';this.$('#discovery-date').value=appState.firstMoment.discoveryDate||today();this.updatePreview();
+    }
+    applyImageFallbacks(){this.shadowRoot.querySelectorAll('.media img').forEach(img=>{img.addEventListener('error',()=>{const media=img.closest('.media');media.classList.add('image-fallback');if(!media.querySelector('.fallback-flower')){const mark=document.createElement('b');mark.className='fallback-flower';mark.textContent='✿';media.append(mark)}})})}
+    wire(){
+      this.shadowRoot.querySelectorAll('[data-open]').forEach(button=>button.addEventListener('click',()=>this.openModal()));
+      this.$('[data-close]').addEventListener('click',()=>this.closeModal());
+      this.$('#modal').addEventListener('click',event=>{if(event.target===this.$('#modal'))this.closeModal()});
+      this.$('#name-form').addEventListener('submit',event=>{event.preventDefault();appState.treeName=this.$('#tree-name').value.trim()||'나의 첫 러브트리';persist();this.closeModal();showScreen('step1')});
+      this.$('[data-home]').addEventListener('click',()=>showScreen('landing'));
+      this.$('#content-url').addEventListener('input',()=>{appState.firstMoment.url=this.$('#content-url').value;appState.firstMoment.videoId=youtubeId(appState.firstMoment.url)||'';persist();this.updatePreview()});
+      this.$('#discovery-note').addEventListener('input',()=>{appState.firstMoment.note=this.$('#discovery-note').value;persist()});
+      this.$('#discovery-date').addEventListener('input',()=>{appState.firstMoment.discoveryDate=this.$('#discovery-date').value;persist()});
+      this.$('#discovery-form').addEventListener('submit',event=>{
+        event.preventDefault();const raw=this.$('#content-url').value.trim();let parsed;try{parsed=new URL(raw)}catch{this.$('#content-url').focus();this.showToast('발견한 콘텐츠 링크를 확인해 주세요.');return}
+        const id=youtubeId(parsed.href);if(!id){this.$('#content-url').focus();this.showToast('YouTube 링크를 확인해 주세요.');return}
+        appState.firstMoment={...appState.firstMoment,url:parsed.href,videoId:id,title:'첫 순간으로 연결할 영상',note:this.$('#discovery-note').value,discoveryDate:this.$('#discovery-date').value||today(),thumbnail:thumb(id),saved:true};
+        if(!appState.memory.note)appState.memory.note=appState.firstMoment.note;appState.memory.date=appState.firstMoment.discoveryDate;persist();this.showToast('첫 뿌리가 생겼어요 ✦');setTimeout(()=>showScreen('step2'),480)
+      });
+      this.shadowRoot.addEventListener('keydown',event=>{if(event.key==='Escape')this.closeModal()});
+    }
+  }
+
+  class MemoryStage extends HTMLElement{
+    connectedCallback(){if(this.shadowRoot)return;this.attachShadow({mode:'open'}).append(document.querySelector('#step2-template').content.cloneNode(true));this.$=s=>this.shadowRoot.querySelector(s);this.toast=this.$('#toast');this.publicMemo=false;this.wire();this.relabelProgress();this.updateFromState();this.setMode(appState.currentScreen==='step2-success'?'success':'form')}
+    showToast(message){this.toast.textContent=message;this.toast.classList.add('show');clearTimeout(this.toastTimer);this.toastTimer=setTimeout(()=>this.toast.classList.remove('show'),2200)}
+    relabelProgress(){const labels=['첫 순간','마음 남기기','다음 영상 잇기','러브트리 성장'];this.shadowRoot.querySelectorAll('.progress-item span').forEach((el,i)=>el.textContent=labels[i])}
+    selectedEmotion(){const custom=this.$('#custom-emotion').value.trim();return custom||this.$('.chip.selected')?.dataset.emotion||'설렘'}
+    setTime(seconds){const value=formatTime(seconds);this.$('#time').value=value;this.$('#card-time').value=value;this.$('#video-time').textContent=value;appState.memory.time=value;persist()}
+    setMode(mode){this.$('#form-view').classList.toggle('hidden',mode!=='form');this.$('#success-view').classList.toggle('hidden',mode!=='success')}
+    updateFromState(){
+      const first=appState.firstMoment;const memory=appState.memory;const frame=this.$('#video-frame');
+      frame.style.backgroundImage=`linear-gradient(180deg,rgba(255,245,233,.06),rgba(42,31,33,.30)),url(${thumb(first.videoId)})`;
+      this.$('#video-url').textContent=first.url||'https://youtube.com/watch?v=nqofkzQD19E';this.$('#video-title').textContent=first.title||'처음 마음이 멈춘 장면';
+      this.$('#time').value=memory.time||'01:30';this.$('#card-time').value=memory.time||'01:30';this.$('#video-time').textContent=memory.time||'01:30';
+      this.$('#memory').value=memory.note||first.note||'';this.$('#counter').textContent=`${this.$('#memory').value.length} / 140`;this.$('#date').value=memory.date||first.discoveryDate||today();
+      this.$('#custom-emotion').value=memory.customEmotion||'';this.shadowRoot.querySelectorAll('.chip').forEach(chip=>chip.classList.toggle('selected',!memory.customEmotion&&chip.dataset.emotion===(memory.emotion||'설렘')));
+      this.publicMemo=Boolean(memory.publicMemo);this.$('#visibility').classList.toggle('on',this.publicMemo);this.$('#visibility').setAttribute('aria-pressed',String(this.publicMemo));this.$('#visibility-label').textContent=this.publicMemo?'공개할 때 이 메모도 함께 보여주기':'공개할 때 이 메모는 나만 보기';
+      if(memory.saved)this.fillResult();
+    }
+    fillResult(){const m=appState.memory;this.$('#result-emotion').textContent=`${m.emotion||'설렘'} · ${m.time||'01:30'}`;this.$('#result-memory').textContent=m.note||'이 장면을 다시 보고 싶어서 첫 마음으로 남겼어요.';this.$('#result-date').textContent=`${m.date||'날짜 미정'} · ${m.publicMemo?'공개 메모':'나만 보는 메모'}`}
+    wire(){
+      this.shadowRoot.querySelectorAll('.chip').forEach(button=>button.addEventListener('click',()=>{this.shadowRoot.querySelectorAll('.chip').forEach(item=>item.classList.remove('selected'));button.classList.add('selected');this.$('#custom-emotion').value='';appState.memory.emotion=button.dataset.emotion;appState.memory.customEmotion='';persist()}));
+      this.$('#custom-emotion').addEventListener('input',event=>{if(event.target.value.trim())this.shadowRoot.querySelectorAll('.chip').forEach(item=>item.classList.remove('selected'));appState.memory.customEmotion=event.target.value;appState.memory.emotion=event.target.value.trim()||'설렘';persist()});
+      this.$('#memory').addEventListener('input',()=>{this.$('#counter').textContent=`${this.$('#memory').value.length} / 140`;appState.memory.note=this.$('#memory').value;persist()});
+      this.$('#date').addEventListener('input',()=>{appState.memory.date=this.$('#date').value;persist()});
+      this.$('#time').addEventListener('input',()=>{appState.memory.time=this.$('#time').value;persist()});
+      this.$('#minus-five').addEventListener('click',()=>{const seconds=parseTime(this.$('#time').value);this.setTime((seconds===null?90:seconds)-5)});
+      this.$('#plus-five').addEventListener('click',()=>{const seconds=parseTime(this.$('#time').value);this.setTime((seconds===null?90:seconds)+5)});
+      this.$('#sync-time').addEventListener('click',()=>{const seconds=parseTime(this.$('#card-time').value);if(seconds===null){this.$('#card-time').focus();this.showToast('시간을 01:30처럼 적어 주세요.');return}this.setTime(seconds);this.showToast('기억할 시간을 맞췄어요.')});
+      this.$('#play').addEventListener('click',()=>window.open(`https://www.youtube.com/watch?v=${appState.firstMoment.videoId}&t=${parseTime(this.$('#time').value)||0}s`,'_blank','noopener'));
+      this.$('#visibility').addEventListener('click',event=>{this.publicMemo=!this.publicMemo;event.currentTarget.classList.toggle('on',this.publicMemo);event.currentTarget.setAttribute('aria-pressed',String(this.publicMemo));this.$('#visibility-label').textContent=this.publicMemo?'공개할 때 이 메모도 함께 보여주기':'공개할 때 이 메모는 나만 보기';appState.memory.publicMemo=this.publicMemo;persist()});
+      this.$('#memory-form').addEventListener('submit',event=>{event.preventDefault();const seconds=parseTime(this.$('#time').value);if(seconds===null){this.$('#time').focus();this.showToast('영상 시간은 01:30 형식으로 적어 주세요.');return}const emotion=this.selectedEmotion();const note=this.$('#memory').value.trim()||'이 장면을 다시 보고 싶어서 첫 마음으로 남겼어요.';appState.memory={emotion,customEmotion:this.$('#custom-emotion').value.trim(),time:formatTime(seconds),note,date:this.$('#date').value,publicMemo:this.publicMemo,saved:true};localStorage.setItem(STEP2_KEY,JSON.stringify({id:appState.firstMoment.videoId,url:appState.firstMoment.url,title:appState.firstMoment.title,time:appState.memory.time,emotion,note,date:appState.memory.date,publicMemo:this.publicMemo}));persist();this.fillResult();this.setMode('success');appState.currentScreen='step2-success';persist();updateNav();this.showToast('첫 마음 카드가 피어났어요 ✦')});
+      this.$('#edit').addEventListener('click',()=>{this.setMode('form');appState.currentScreen='step2';persist();updateNav();this.$('#memory').focus()});
+      this.$('#next').addEventListener('click',()=>{this.showToast('첫 가지가 자라는 화면으로 이어집니다.');setTimeout(()=>showScreen('step3'),360)});
+      this.$('#back').addEventListener('click',()=>showScreen('step1'));
+    }
+  }
+
+  class ConnectStage extends HTMLElement{
+    connectedCallback(){if(this.shadowRoot)return;this.attachShadow({mode:'open'}).append(document.querySelector('#step3-template').content.cloneNode(true));this.$=s=>this.shadowRoot.querySelector(s);this.toast=this.$('#toast');this.firstRecord=null;this.wire();this.relabelProgress();this.updateFromState();this.setMode(appState.currentScreen==='step3-success'?'success':'form')}
+    showToast(message){this.toast.textContent=message;this.toast.classList.add('show');clearTimeout(this.toastTimer);this.toastTimer=setTimeout(()=>this.toast.classList.remove('show'),2200)}
+    relabelProgress(){const labels=['첫 순간','마음 남기기','다음 영상 잇기','러브트리 성장'];this.shadowRoot.querySelectorAll('.progress-item span').forEach((el,i)=>el.textContent=labels[i])}
+    currentFirst(){return appState.step3Origin||{id:appState.firstMoment.videoId,url:appState.firstMoment.url,title:appState.firstMoment.title,time:appState.memory.time||'01:30',emotion:appState.memory.emotion||'설렘',note:appState.memory.note||appState.firstMoment.note,date:appState.memory.date||appState.firstMoment.discoveryDate}}
+    selectedRelation(){return this.$('.relation.selected')?.dataset.relation||'댓글을 따라 찾아봤어요'}
+    setMode(mode){this.$('#form-view').classList.toggle('hidden',mode!=='form');this.$('#success-view').classList.toggle('hidden',mode!=='success');const items=[...this.shadowRoot.querySelectorAll('.progress-item')];if(mode==='success'){items[2].classList.remove('active');items[2].classList.add('done');items[2].querySelector('i').textContent='✓'}else{items[2].classList.add('active');items[2].classList.remove('done');items[2].querySelector('i').textContent='03'}}
+    applyFirstCard(){this.firstRecord=this.currentFirst();const id=this.firstRecord.id||youtubeId(this.firstRecord.url);this.$('#first-thumb').style.backgroundImage=`linear-gradient(180deg,rgba(255,245,233,.05),rgba(44,32,34,.30)),url(${thumb(id)})`;this.$('#first-title').textContent=this.firstRecord.title||'처음 마음이 멈춘 장면';this.$('#first-note').textContent=this.firstRecord.note||'우연히 보게 됐는데 하루 종일 이 장면이 생각났어.';this.$('#first-time').textContent=this.firstRecord.time||'01:30';let meta=this.$('.first-extra-meta');if(!meta){meta=document.createElement('span');meta.className='first-extra-meta';this.$('.moment.first .card-copy').append(meta)}meta.textContent=`${this.firstRecord.emotion||'설렘'} · ${this.firstRecord.date||'날짜 미정'}`}
+    updateNextPreview(){const id=youtubeId(this.$('#next-url').value);const title=this.$('#next-title').value.trim()||'다음으로 찾아본 영상';const note=this.$('#next-note').value.trim()||'왜 이 영상으로 이어졌는지 한 문장으로 남겨 보세요.';const validTime=parseTime(this.$('#next-time').value)!==null?this.$('#next-time').value:'00:00';this.$('#next-title-preview').textContent=title;this.$('#next-note-preview').textContent=note;this.$('#next-time-label').textContent=validTime;this.$('#relation-bubble').textContent=this.selectedRelation();if(id){this.$('#next-thumb').style.backgroundImage=`linear-gradient(180deg,rgba(255,245,233,.05),rgba(44,32,34,.30)),url(${thumb(id)})`;this.$('#next-card').classList.remove('waiting');this.$('#empty-seed').classList.add('hidden');this.$('#next-play').classList.remove('hidden');this.$('#next-time-label').classList.remove('hidden');this.$('#url-status').textContent='다음 영상이 카드에 연결됐어요.';this.$('#url-status').style.color='var(--sage-deep)'}else{this.$('#next-thumb').style.backgroundImage='';this.$('#next-card').classList.add('waiting');this.$('#empty-seed').classList.remove('hidden');this.$('#next-play').classList.add('hidden');this.$('#next-time-label').classList.add('hidden');this.$('#url-status').textContent='링크를 넣으면 오른쪽 카드에 썸네일이 나타나요.';this.$('#url-status').style.color=''}}
+    updateFromState(){this.applyFirstCard();const d=appState.drafts.step3||{};this.$('#next-url').value=d.url||'';this.$('#next-title').value=d.title||'';this.$('#next-time').value=d.time||'00:00';this.$('#next-note').value=d.note||'';this.$('#counter').textContent=`${this.$('#next-note').value.length} / 140`;this.shadowRoot.querySelectorAll('.relation').forEach((item,index)=>item.classList.toggle('selected',d.relation?item.dataset.relation===d.relation:index===0));this.updateNextPreview();if(appState.connections.length&&appState.currentScreen==='step3-success')this.fillSuccess(appState.connections[appState.connections.length-1])}
+    saveDraft(){appState.drafts.step3={url:this.$('#next-url').value,title:this.$('#next-title').value,time:this.$('#next-time').value,relation:this.selectedRelation(),note:this.$('#next-note').value};persist()}
+    fillSuccess(connection){this.$('#summary-first').textContent=connection.first.title||'처음 마음이 멈춘 장면';this.$('#summary-next').textContent=connection.next.title;this.$('#success-relation').textContent=connection.next.relation}
+    resetForm(){appState.drafts.step3={url:'',title:'',time:'00:00',relation:'댓글을 따라 찾아봤어요',note:''};this.$('#next-url').value='';this.$('#next-title').value='';this.$('#next-time').value='00:00';this.$('#next-note').value='';this.$('#counter').textContent='0 / 140';this.shadowRoot.querySelectorAll('.relation').forEach((item,index)=>item.classList.toggle('selected',index===0));this.$('#branch-path').classList.remove('connected');this.$('#branch-leaf').classList.remove('connected');persist();this.updateNextPreview()}
+    wire(){
+      ['#next-url','#next-title','#next-time'].forEach(selector=>this.$(selector).addEventListener('input',()=>{this.saveDraft();this.updateNextPreview()}));
+      this.$('#next-note').addEventListener('input',()=>{this.$('#counter').textContent=`${this.$('#next-note').value.length} / 140`;this.saveDraft();this.updateNextPreview()});
+      this.shadowRoot.querySelectorAll('.relation').forEach(button=>button.addEventListener('click',()=>{this.shadowRoot.querySelectorAll('.relation').forEach(item=>item.classList.remove('selected'));button.classList.add('selected');this.saveDraft();this.updateNextPreview()}));
+      this.$('#connect-form').addEventListener('submit',event=>{event.preventDefault();const id=youtubeId(this.$('#next-url').value);if(!id){this.$('#next-url').focus();this.showToast('YouTube 링크를 확인해 주세요.');return}if(parseTime(this.$('#next-time').value)===null){this.$('#next-time').focus();this.showToast('영상 시간은 01:30 형식으로 적어 주세요.');return}const nextRecord={id,url:this.$('#next-url').value.trim(),title:this.$('#next-title').value.trim()||'다음으로 찾아본 영상',time:this.$('#next-time').value.trim(),relation:this.selectedRelation(),note:this.$('#next-note').value.trim()||'첫 장면을 본 뒤 이 영상까지 찾아보게 됐어요.'};const connection={first:this.currentFirst(),next:nextRecord,createdAt:new Date().toISOString()};appState.connections.push(connection);localStorage.setItem(STEP3_KEY,JSON.stringify(connection));this.$('#branch-path').classList.add('connected');this.$('#branch-leaf').classList.add('connected');this.$('#relation-bubble').textContent=nextRecord.relation;this.fillSuccess(connection);this.setMode('success');appState.currentScreen='step3-success';persist();updateNav();this.showToast('첫 가지가 이어졌어요 ✦')});
+      this.$('#again').addEventListener('click',()=>{const last=appState.connections[appState.connections.length-1];if(last?.next){appState.step3Origin={...last.next,emotion:this.currentFirst().emotion||'설렘',date:today()};localStorage.setItem(STEP2_KEY,JSON.stringify(appState.step3Origin))}this.applyFirstCard();this.resetForm();this.setMode('form');appState.currentScreen='step3';persist();updateNav();this.$('#next-url').focus();this.showToast('방금 연결한 영상에서 다음 가지를 시작해요.')});
+      this.$('#finish').addEventListener('click',()=>{this.showToast('두 장면이 연결된 러브트리를 열어요.');setTimeout(()=>showScreen('growth'),350)});
+      this.$('#back').addEventListener('click',()=>showScreen('step2-success'));
+    }
+  }
+
+  class GrowthStage extends HTMLElement{
+    connectedCallback(){if(this.shadowRoot)return;this.attachShadow({mode:'open'});this.render()}
+    updateFromState(){this.render()}
+    render(){const last=appState.connections[appState.connections.length-1]||{first:{},next:{}};const firstId=last.first.id||youtubeId(last.first.url);const nextId=last.next.id||youtubeId(last.next.url);this.shadowRoot.innerHTML=`<style>:host{display:block}*{box-sizing:border-box}.growth-screen{min-height:calc(100vh - 76px);padding:46px 24px 70px;background:radial-gradient(circle at 12% 18%,rgba(219,151,145,.20),transparent 27rem),radial-gradient(circle at 92% 80%,rgba(156,174,130,.17),transparent 28rem),linear-gradient(135deg,#f8f1e9,#fbf8f1 58%,#f1e8dc);font-family:var(--body);color:var(--ink)}.growth-shell{width:min(1000px,100%);margin:auto;text-align:center}.eyebrow{margin:0 0 15px;color:var(--deep);font:700 .62rem var(--latin);letter-spacing:.16em;text-transform:uppercase}h1{margin:0;font:400 clamp(2.8rem,6vw,5.2rem)/1.08 var(--display);letter-spacing:-.085em}h1 span{display:block;color:var(--rose)}.intro{max-width:600px;margin:20px auto 30px;color:var(--muted);font-size:.83rem;line-height:1.8}.board{position:relative;min-height:430px;padding:26px;border:1px solid var(--line);border-radius:34px;background:rgba(255,253,248,.84);box-shadow:0 28px 80px rgba(75,51,42,.15);overflow:hidden;text-align:left}.board:before{content:"";position:absolute;left:50%;top:34px;bottom:44px;width:3px;border-radius:9px;background:linear-gradient(var(--rose),#d9bda4,var(--sage));transform:translateX(-50%)}.cards{position:relative;z-index:2;display:grid;grid-template-columns:1fr 72px 1fr;align-items:center;gap:18px;min-height:330px}.card{overflow:hidden;border:1px solid var(--line);border-radius:18px;background:var(--white);box-shadow:0 16px 35px rgba(75,51,42,.13)}.thumb{height:155px;background:linear-gradient(145deg,#dba6a2,#e8cfbf 48%,#a7b38e);background-size:cover;background-position:center;display:grid;place-items:center;color:white;font-size:1.5rem}.copy{padding:15px}.copy small{color:var(--deep);font:700 .55rem var(--latin)}.copy strong{display:block;margin-top:6px;font:400 1.1rem var(--display)}.copy p{margin:6px 0 0;color:var(--muted);font-size:.65rem;line-height:1.55}.arrow{display:grid;place-items:center;width:52px;height:52px;margin:auto;border-radius:50%;background:#e1e9dc;color:var(--sage-deep);font-size:1.2rem}.actions{display:flex;justify-content:center;gap:10px;margin-top:24px}.actions button{min-height:45px;padding:0 18px;border-radius:999px;font-weight:700}.again{border:1px solid rgba(89,107,76,.3);background:var(--white);color:var(--sage-deep)}.home{border:0;background:var(--rose);color:white}@media(max-width:560px){.growth-screen{min-height:calc(100vh - 66px);padding:30px 15px 50px}.cards{grid-template-columns:1fr;gap:12px}.board:before{left:50%;top:185px;bottom:185px}.arrow{transform:rotate(90deg)}.actions{display:grid}.actions button{width:100%}}</style><section class="growth-screen"><div class="growth-shell"><p class="eyebrow">04 · 러브트리 성장</p><h1>첫 가지가<br><span>다정하게 이어졌어요.</span></h1><p class="intro">처음 만든 영상과 다음 영상 사이에 이유와 마음이 생겼습니다. 이제 러브트리가 단순한 영상 목록이 아니라 좋아하게 된 경로를 보여줘요.</p><div class="board"><div class="cards"><article class="card"><div class="thumb" style="background-image:${firstId?`linear-gradient(180deg,rgba(255,245,233,.05),rgba(44,32,34,.28)),url(${thumb(firstId)})`:'none'}">${firstId?'':'✿'}</div><div class="copy"><small>01 · 첫 순간</small><strong>${escapeHtml(last.first.title||'처음 마음이 멈춘 장면')}</strong><p>${escapeHtml(last.first.note||'처음 마음이 머문 장면')}</p></div></article><span class="arrow">→</span><article class="card"><div class="thumb" style="background-image:${nextId?`linear-gradient(180deg,rgba(255,245,233,.05),rgba(44,32,34,.28)),url(${thumb(nextId)})`:'none'}">${nextId?'':'✿'}</div><div class="copy"><small>02 · 다음 영상</small><strong>${escapeHtml(last.next.title||'다음으로 찾아본 영상')}</strong><p>${escapeHtml(last.next.note||'두 장면 사이에 있었던 마음')}</p></div></article></div></div><div class="actions"><button class="again" id="growth-again" type="button">이 영상에서 또 이어보기</button><button class="home" id="growth-home" type="button">처음 화면으로</button></div></div></section>`;this.shadowRoot.querySelector('#growth-again').addEventListener('click',()=>showScreen('step3'));this.shadowRoot.querySelector('#growth-home').addEventListener('click',()=>showScreen('landing'))}
+  }
+  function escapeHtml(value){return String(value??'').replace(/[&<>'"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]))}
+
+  customElements.define('landing-stage',LandingStage);customElements.define('memory-stage',MemoryStage);customElements.define('connect-stage',ConnectStage);customElements.define('growth-stage',GrowthStage);
+  const stageEls={landing:document.querySelector('#landing-stage'),step2:document.querySelector('#memory-stage'),step3:document.querySelector('#connect-stage'),growth:document.querySelector('#growth-stage')};
+  function showScreen(screen){
+    if(screen==='step2'&&!appState.firstMoment.saved){showGlobalToast('첫 순간을 먼저 심어 주세요.');return}
+    if(screen==='step3'&&!appState.memory.saved){showGlobalToast('첫 마음 카드를 먼저 피워 주세요.');return}
+    if(screen==='growth'&&!appState.connections.length){showGlobalToast('다음 순간을 하나 연결해 주세요.');return}
+    appState.currentScreen=screen;persist();const stage=stageForScreen(screen);Object.entries(stageEls).forEach(([key,el])=>el.hidden=key!==stage);
+    if(stage==='landing'){stageEls.landing.setMode(screen==='step1'?'step1':'landing');stageEls.landing.updateFromState()}
+    if(stage==='step2'){stageEls.step2.updateFromState();stageEls.step2.setMode(screen==='step2-success'?'success':'form')}
+    if(stage==='step3'){stageEls.step3.updateFromState();stageEls.step3.setMode(screen==='step3-success'?'success':'form')}
+    if(stage==='growth')stageEls.growth.updateFromState();updateNav();window.scrollTo({top:0,behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'})
+  }
+  function updateNav(){
+    const screen=appState.currentScreen;const current=screen==='step1'?1:screen.startsWith('step2')?2:screen.startsWith('step3')?3:screen==='growth'?4:0;
+    document.querySelectorAll('.stage-button').forEach((button,index)=>{const n=index+1;const unlocked=n===1||(n===2&&appState.firstMoment.saved)||(n===3&&appState.memory.saved)||(n===4&&appState.connections.length);button.classList.toggle('locked',!unlocked);button.classList.toggle('active',current===n);button.classList.toggle('done',n<current||(n===3&&screen==='step3-success')||(n===4&&screen==='growth'));button.setAttribute('aria-disabled',String(!unlocked))});
+    document.body.dataset.started=String(screen!=='landing'||appState.firstMoment.saved)
+  }
+  document.querySelectorAll('.stage-button').forEach(button=>button.addEventListener('click',()=>{const target=button.dataset.stage;if(target==='step1'){if(!appState.treeName){stageEls.landing.openModal();return}showScreen('step1')}else showScreen(target)}));
+  document.querySelector('#brand-home').addEventListener('click',()=>showScreen('landing'));
+  document.querySelector('#browse-action').addEventListener('click',()=>showGlobalToast('러브트리 둘러보기는 다음 제품 화면에서 이어집니다.'));
+  document.querySelector('#login-action').addEventListener('click',()=>showGlobalToast('로그인은 실제 제품 구현 단계에서 연결됩니다.'));
+  document.querySelector('#reset-action').addEventListener('click',()=>{if(!confirm('첫 여정에 입력한 내용을 지우고 처음부터 다시 시작할까요?'))return;localStorage.removeItem(STORAGE_KEY);localStorage.removeItem(STEP2_KEY);localStorage.removeItem(STEP3_KEY);appState=defaultState();persist();stageEls.landing.updateFromState();stageEls.step2.updateFromState();stageEls.step3.updateFromState();showScreen('landing')});
+  window.addEventListener('storage',event=>{if(event.key===STORAGE_KEY){appState=loadState();showScreen(appState.currentScreen)}});
+  persist();showScreen(appState.currentScreen);
+})();
+</script>
+</body>
+</html>
