@@ -48,7 +48,8 @@ export function addMoment(tree, input, parentId, clock = new Date().toISOString(
 export function editMoment(tree, id, input, clock = new Date().toISOString()) {
   const current = tree.moments.find(m => m.id === id);
   if (!current) throw new Error('이 순간을 찾을 수 없어요.');
-  return { ...tree, updatedAt: clock, moments: tree.moments.map(m => m.id === id ? { ...m, ...validateMomentInput(input), relation: m.parentId ? input.relation?.trim() || '' : '' } : m) };
+  const next = validateMomentInput(input);
+  return { ...tree, updatedAt: clock, moments: tree.moments.map(m => m.id === id ? { ...m, ...next, relation: m.parentId ? next.relation : '' } : m) };
 }
 export function removeMoment(tree, id, clock = new Date().toISOString()) {
   const target = tree.moments.find(m => m.id === id);
@@ -71,10 +72,12 @@ export function validateState(value) {
   const idValid = id => typeof id === 'string' && /^[a-zA-Z0-9_-]{1,80}$/.test(id);
   const time = v => typeof v === 'string' && v.length <= 40 && !Number.isNaN(Date.parse(v));
   const trees = value.trees.map(tree => {
+    if (!tree || typeof tree !== 'object') throw new Error('트리 데이터가 올바르지 않아요.');
     if (!idValid(tree.id) || treeIds.has(tree.id) || !Array.isArray(tree.moments) || !tree.moments.length || tree.moments.length > MAX_MOMENTS || !time(tree.createdAt) || !time(tree.updatedAt)) throw new Error('트리 데이터가 올바르지 않아요.');
     treeIds.add(tree.id);
     const ids = new Set();
     const moments = tree.moments.map(m => {
+      if (!m || typeof m !== 'object') throw new Error('순간 데이터가 올바르지 않아요.');
       if (!idValid(m.id) || ids.has(m.id) || !time(m.createdAt) || (m.parentId !== null && !idValid(m.parentId))) throw new Error('순간 데이터가 올바르지 않아요.');
       ids.add(m.id);
       return { ...validateMomentInput(m), id: m.id, parentId: m.parentId, createdAt: m.createdAt };
