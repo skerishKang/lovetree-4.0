@@ -1,4 +1,7 @@
 import './styles.css';
+import { mountOrbit, ORBIT_EXAMPLE } from './views/orbit.js';
+import { mountBook } from './views/book.js';
+import { hasRecovery as recoveryAvailable, recoveryData } from './views/memory.js';
 import { createTree, addMoment, editMoment, removeMoment, importTrees, MAX_TREES, EMOTIONS, treeLayout } from './domain.js';
 import { loadState, saveState, STORAGE_KEY, RECOVERY_KEY } from './storage.js';
 import { EXAMPLES } from './examples.js';
@@ -36,6 +39,8 @@ let viewMode = 'tree';
 let zoom = 1;
 let activeTreeId = null;
 let toastTimer;
+let disposeView = () => {};
+const DEMOS = [...EXAMPLES, ORBIT_EXAMPLE];
 let opener;
 let formDirty = false;
 const dialog = $('#moment-dialog');
@@ -54,9 +59,9 @@ function commit(next) {
 function currentTree() {
   const route = location.hash.slice(1);
   const [kind, id] = route.split('/');
-  return kind === 'demo' ? EXAMPLES.find(t => t.id === id) : state.trees.find(t => t.id === id);
+  return ['demo','demo-book'].includes(kind) ? DEMOS.find(t => t.id === id) : state.trees.find(t => t.id === id);
 }
-const isDemo = () => location.hash.startsWith('#demo/');
+const isDemo = () => /^#demo(?:-book)?\//.test(location.hash);
 function go(hash) {
   if (location.hash === hash) render(); else location.hash = hash;
 }
@@ -68,35 +73,17 @@ function header(active) {
 }
 function footer() { return `<footer class="site-footer"><a class="footer-brand" href="#start">${icon('leaf')} lovetree.</a><p>좋아하는 마음은, 이어질수록 자라니까.</p><span>당신의 작은 순간을 소중히.</span></footer>`; }
 function art(kind, cls = '') { return `<div class="art art-${kind} ${cls}" aria-hidden="true"><img src="/art/${kind === 'stage' ? 'stage' : 'sky'}.svg" alt="" /></div>`; }
-function heroCollage() {
-  return `<div class="hero-art" aria-label="세 순간이 연결된 러브트리 예시">
-    <div class="orbit orbit-one"></div><div class="orbit orbit-two"></div><span class="art-caption">MY LITTLE LOVE STORY</span>
-    <svg class="hero-branches" viewBox="0 0 600 560" fill="none" aria-hidden="true"><path d="M300 550C305 440 320 330 280 210M310 410C250 360 180 350 130 300M300 320C365 300 410 250 445 208" stroke="#84917b" stroke-width="3"/><path d="M306 460C265 462 254 441 265 434c18-11 34 5 41 26Zm-20-92c-34 3-53-18-45-29 21-4 41 10 45 29Zm40-60c30-29 56-23 59-10-14 17-36 18-59 10Z" fill="#a6b39a"/><circle cx="312" cy="403" r="5" fill="#f7f5ef" stroke="#88977e"/><circle cx="299" cy="317" r="5" fill="#f7f5ef" stroke="#88977e"/></svg>
-    <button class="memory-paper paper-main" data-action="open-demo" data-id="demo-voice" data-moment="voice-1"><span class="paper-tape"></span>${art('stage')}<span class="paper-content"><span class="paper-eyebrow">MY FIRST SPARK <span>✧</span></span><strong>우연히 멈춰 선 그 노래</strong><span class="paper-note">그 목소리를 처음 만났던 밤.</span><span class="emotion emotion-설렘">설렘</span></span></button>
-    <button class="memory-paper paper-side" data-action="open-demo" data-id="demo-voice" data-moment="voice-2">${art('sky')}<span class="paper-content"><small>2026. 09. 18</small><strong>가사 한 줄이 건넨 위로</strong><span class="paper-note">오늘의 나에게 꼭 필요했던 말.</span></span></button>
-    <button class="memory-paper paper-note-card" data-action="open-demo" data-id="demo-voice" data-moment="voice-3"><span class="scribble-heart">♡</span><span class="paper-content"><small>DEAR MY MOMENT</small><strong>같은 노래를<br>함께 부른 날</strong><span class="paper-note">혼자 좋아하던 마음이<br>우리의 기억이 되었다.</span><span class="emotion emotion-벅참">벅참</span></span></button>
-    <span class="floating-note">작은 순간이, 하나의 이야기가 되는 곳 ${icon('flower')}</span>
-  </div>`;
-}
-function exampleCard(tree, index) {
-  return `<button class="example-card ${tree.theme}" data-action="open-demo" data-id="${tree.id}"><div class="example-visual">${art(index === 1 ? 'sky' : 'stage')}<span class="example-label">${index === 1 ? '좋아하는 작품' : '좋아하는 아티스트'}</span><div class="tiny-note"><span>${icon(index === 1 ? 'sun' : 'heart')}</span><p>${index === 0 ? '이 마음의 시작을<br>오래 기억하고 싶어서.' : index === 1 ? '나도 몰랐던 마음을<br>발견한 순간.' : '조금씩, 오래도록<br>좋아하고 싶은 마음.'}</p></div></div><div class="example-content"><span class="overline">STORY 0${index + 1} <span>가상 예시</span></span><h3>${escape(tree.title)}</h3><p>${escape(tree.caption)}</p><span class="example-bottom"><span>${tree.moments.length}개의 순간 · ${escape(tree.subject)}</span>${icon('arrow')}</span></div></button>`;
-}
-function landing() {
-  return `${header(location.hash === '#examples' ? 'examples' : 'start')}<main id="main" tabindex="-1"><section class="hero wrap"><div class="hero-copy"><div class="eyebrow"><span></span> 좋아하는 마음을 위한 작은 정원</div><h1>좋아하는 순간이<br><em>나만의 이야기</em>로.</h1><p class="hero-description">우연히 만난 장면, 오래 남은 한마디.<br>흩어진 순간을 이어, 나만의 러브트리를 키워 보세요.</p><div class="hero-actions"><button class="button primary large" data-action="new">나의 첫 순간 남기기 ${icon('arrow')}</button><button class="text-button" data-action="open-demo" data-id="demo-voice">${icon('play')} 어떤 모습인지 볼까요?</button></div><p class="gentle-note">${icon('leaf')} 처음 좋아했던 날이 아니어도 괜찮아요.</p><div class="hero-footnote"><span>기록하고</span><i></i><span>이어 보고</span><i></i><span>다시 느끼고</span></div></div>${heroCollage()}</section>
-    <section class="invitation wrap" aria-label="러브트리에 담는 마음"><span class="invitation-mark">✳</span><p>잊고 싶지 않은 순간에 <strong>마음을 붙여 보세요.</strong><br><span>나의 기록이 쌓이면, 좋아하는 마음의 길이 보이기 시작해요.</span></p><span class="invitation-drawing">${icon('tree')}</span></section>
-    <section class="examples wrap" id="examples"><div class="section-heading"><div><span class="eyebrow">A LITTLE INSPIRATION</span><h2>마음은 이런 모습으로 자라요.</h2></div><p>세 개의 순간으로 미리 만나보는 러브트리</p></div><div class="example-grid">${EXAMPLES.map(exampleCard).join('')}</div></section>
-    <section class="bottom-invite wrap"><span class="eyebrow">YOUR STORY STARTS HERE</span><h2>오늘, 어떤 순간을 간직하고 싶나요?</h2><button class="button secondary" data-action="new">작은 순간 하나 남기기 ${icon('plus')}</button></section></main>${footer()}`;
-}
 function treeCard(tree) {
   const first = tree.moments.find(m => m.parentId === null);
-  return `<article class="saved-tree"><a href="#tree/${escape(tree.id)}" class="saved-tree-link"><div class="saved-tree-art">${icon('tree')}<span>${escape(first.emotion)}</span><p>${escape(first.note)}</p></div><div class="saved-tree-content"><small>${escape(tree.subject)}</small><h2>${escape(tree.title)}</h2><p>${tree.moments.length}개의 순간 <span>마지막 기록 ${dateLabel(tree.updatedAt.slice(0, 10))}</span></p></div></a><div class="saved-tree-actions"><button class="text-button small" data-action="export-tree" data-id="${escape(tree.id)}">${icon('download')} 파일로 보관</button><button class="icon-button subtle" aria-label="${escape(tree.title)} 트리 삭제" data-action="delete-tree" data-id="${escape(tree.id)}">${icon('trash')}</button></div></article>`;
+  return `<article class="saved-tree"><a href="#book/${escape(tree.id)}" class="saved-tree-link"><div class="saved-tree-art">${icon('tree')}<span>${escape(first.emotion)}</span><p>${escape(first.note)}</p></div><div class="saved-tree-content"><small>${escape(tree.subject)}</small><h2>${escape(tree.title)}</h2><p>${tree.moments.length}개의 순간 <span>마지막 기록 ${dateLabel(tree.updatedAt.slice(0, 10))}</span></p></div></a><div class="saved-tree-actions"><button class="text-button small" data-action="export-tree" data-id="${escape(tree.id)}">${icon('download')} 파일로 보관</button><button class="icon-button subtle" aria-label="${escape(tree.title)} 트리 삭제" data-action="delete-tree" data-id="${escape(tree.id)}">${icon('trash')}</button></div></article>`;
 }
 function filteredTrees(query = '') {
   const trees = [...state.trees].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).filter(t => `${t.title} ${t.subject}`.toLocaleLowerCase().includes(query.toLocaleLowerCase()));
   return trees.length ? trees.map(treeCard).join('') : `<div class="empty-state"><span>${icon(query ? 'search' : 'leaf')}</span><h2>${query ? '아직 이 이름의 트리가 없어요.' : '이곳에 나만의 마음이 자라요.'}</h2><p>${query ? '다른 이름으로 찾아보세요.' : '좋아하는 순간 하나면 충분해요.<br>첫 기록을 남기고, 나의 이야기를 시작해 보세요.'}</p>${query ? '' : '<button class="button primary" data-action="new">첫 순간 남기기</button>'}</div>`;
 }
+function hasRecovery() { return recoveryAvailable(storage, loaded); }
 function treesPage() {
-  return `${header('trees')}<main id="main" class="wrap my-trees" tabindex="-1"><div class="section-heading"><div><span class="eyebrow">MY LITTLE GARDEN</span><h1>다시 펼쳐 보는, 나의 마음.</h1><p>좋아했던 순간들이 여기에서 기다리고 있어요.</p></div><button class="button primary" data-action="new">${icon('plus')} 새 트리 시작하기</button></div><div class="library-toolbar"><label class="search-field">${icon('search')}<input id="tree-search" type="search" placeholder="트리 이름이나 좋아하는 대상 찾기" aria-label="내 트리 검색" /></label><div class="toolbar-actions"><button class="text-button" data-action="import">${icon('upload')} 파일 가져오기</button><button class="text-button" data-action="export-all" ${state.trees.length ? '' : 'disabled'}>${icon('download')} 전체 백업</button></div></div><div class="storage-notice">${icon('check')} <span>기록은 <strong>지금 사용하는 브라우저</strong>에 보관돼요. 다른 기기로 옮기거나 안전하게 보관하려면 파일로 백업해 주세요.</span></div>${loaded.error ? `<div class="notice" role="alert">${escape(loaded.error)} ${loaded.recovery ? '<button class="text-button" data-action="recovery">복구 파일 내보내기</button>' : ''}</div>` : ''}<div class="trees-grid" id="tree-results">${filteredTrees()}</div></main>${footer()}`;
+  return `${header('trees')}<main id="main" class="wrap my-trees" tabindex="-1"><div class="section-heading"><div><span class="eyebrow">MY LITTLE GARDEN</span><h1>다시 펼쳐 보는, 나의 마음.</h1><p>좋아했던 순간들이 여기에서 기다리고 있어요.</p></div><button class="button primary" data-action="new">${icon('plus')} 새 트리 시작하기</button></div><div class="library-toolbar"><label class="search-field">${icon('search')}<input id="tree-search" type="search" placeholder="트리 이름이나 좋아하는 대상 찾기" aria-label="내 트리 검색" /></label><div class="toolbar-actions"><button class="text-button" data-action="import">${icon('upload')} 파일 가져오기</button><button class="text-button" data-action="export-all" ${state.trees.length ? '' : 'disabled'}>${icon('download')} 전체 백업</button></div></div><div class="storage-notice">${icon('check')} <span>기록은 <strong>지금 사용하는 브라우저</strong>에 보관돼요. 다른 기기로 옮기거나 안전하게 보관하려면 파일로 백업해 주세요.</span></div>${loaded.error || hasRecovery() ? `<div class="notice" role="status">${escape(loaded.error || '이전에 보관한 복구 사본이 있어요.')} ${hasRecovery() ? '<button class="text-button" data-action="recovery">복구 파일 내보내기</button>' : ''}</div>` : ''}<div class="trees-grid" id="tree-results">${filteredTrees()}</div></main>${footer()}`;
 }
 function nodeCard(moment, pos, selected) {
   return `<button class="graph-node ${selected ? 'selected' : ''}" style="left:${pos.x}px;top:${pos.y}px" data-action="select-moment" data-id="${escape(moment.id)}" aria-pressed="${selected}"><span class="node-date">${moment.parentId ? dateLabel(moment.date) : `${icon('leaf')} 이 마음의 시작`}</span><strong>${escape(moment.title)}</strong><span class="node-note">${escape(moment.note)}</span><span class="node-footer"><span class="emotion emotion-${escape(moment.emotion)}">${escape(moment.emotion)}</span>${icon('arrow')}</span></button>`;
@@ -126,12 +113,23 @@ function workspace() {
   if (activeTreeId !== tree.id) { activeTreeId = tree.id; zoom = 1; }
   if (!tree.moments.some(m => m.id === selectedId)) selectedId = tree.moments.find(m => m.parentId === null).id;
   const selected = tree.moments.find(m => m.id === selectedId);
-  return `${header(demo ? 'examples' : 'trees')}<main id="main" class="workspace wrap" tabindex="-1"><a href="${demo ? '#examples' : '#trees'}" class="back-link">${icon('back')} ${demo ? '예시 둘러보기' : '내 트리'}</a><div class="workspace-heading"><div><div class="eyebrow">${escape(tree.subject)} <span class="mode-badge">${demo ? '가상 예시 · 체험' : '내 브라우저에 보관'}</span></div><h1>${escape(tree.title)}</h1><p>${demo ? '순간을 눌러, 이어지는 마음을 따라가 보세요.' : '순간을 고르고, 그 마음에서 다음 이야기를 이어 보세요.'}</p></div>${demo ? '<button class="button secondary" data-action="new">나의 트리 만들기 '+icon('plus')+'</button>' : `<button class="button secondary" data-action="export-tree" data-id="${escape(tree.id)}">${icon('download')} 파일로 보관</button>`}</div><div class="workspace-grid"><section class="tree-board" aria-label="트리 작업 공간"><div class="board-toolbar"><div class="view-switch" aria-label="보기 방식"><button data-action="view" data-view="tree" aria-pressed="${viewMode === 'tree'}">${icon('tree')} 트리로 보기</button><button data-action="view" data-view="list" aria-pressed="${viewMode === 'list'}">${icon('list')} 시간으로 보기</button></div><span class="moment-count">${tree.moments.length}개의 소중한 순간</span></div>${viewMode === 'tree' ? graph(tree) : timeline(tree)}<div class="board-bottom"><span>${icon('leaf')} ${demo ? '당신의 마음도 이렇게 자랄 수 있어요.' : '작은 순간들이 모여, 나만의 이야기가 돼요.'}</span>${viewMode === 'tree' ? `<div class="zoom-controls"><button data-action="zoom-out" aria-label="트리 축소" ${zoom <= .5 ? 'disabled' : ''}>−</button><button data-action="zoom-reset" aria-label="트리 배율 초기화">${Math.round(zoom*100)}%</button><button data-action="zoom-in" aria-label="트리 확대" ${zoom >= 1.4 ? 'disabled' : ''}>+</button></div>` : ''}</div></section>${detail(tree, selected, demo)}</div></main>${footer()}`;
+  return `${header(demo ? 'examples' : 'trees')}<main id="main" class="workspace wrap" tabindex="-1"><a href="${demo ? '#examples' : '#trees'}" class="back-link">${icon('back')} ${demo ? '예시 둘러보기' : '내 트리'}</a><div class="workspace-heading"><div><div class="eyebrow">${escape(tree.subject)} <span class="mode-badge">${demo ? '가상 예시 · 체험' : '내 브라우저에 보관'}</span></div><h1>${escape(tree.title)}</h1><p>${demo ? '순간을 눌러, 이어지는 마음을 따라가 보세요.' : '순간을 고르고, 그 마음에서 다음 이야기를 이어 보세요.'}</p></div>${demo ? '<button class="button secondary" data-action="new">나의 트리 만들기 '+icon('plus')+'</button>' : `<button class="button secondary" data-action="export-tree" data-id="${escape(tree.id)}">${icon('download')} 파일로 보관</button>`}</div><div class="workspace-grid"><section class="tree-board" aria-label="트리 작업 공간"><div class="board-toolbar"><div class="view-switch" aria-label="보기 방식"><button data-action="view" data-view="tree" aria-pressed="${viewMode === 'tree'}">${icon('tree')} 트리로 보기</button><button data-action="view" data-view="list" aria-pressed="${viewMode === 'list'}">${icon('list')} 시간으로 보기</button></div><a class="text-button small" href="#${demo ? 'demo-book' : 'book'}/${escape(tree.id)}">책으로 감상</a><span class="moment-count">${tree.moments.length}개의 순간</span></div>${viewMode === 'tree' ? graph(tree) : timeline(tree)}<div class="board-bottom"><span>${icon('leaf')} ${demo ? '당신의 마음도 이렇게 자랄 수 있어요.' : '작은 순간들이 모여, 나만의 이야기가 돼요.'}</span>${viewMode === 'tree' ? `<div class="zoom-controls"><button data-action="zoom-out" aria-label="트리 축소" ${zoom <= .5 ? 'disabled' : ''}>−</button><button data-action="zoom-reset" aria-label="트리 배율 초기화">${Math.round(zoom*100)}%</button><button data-action="zoom-in" aria-label="트리 확대" ${zoom >= 1.4 ? 'disabled' : ''}>+</button></div>` : ''}</div></section>${detail(tree, selected, demo)}</div></main>${footer()}`;
 }
 function render() {
+  disposeView(); disposeView = () => {};
   const route = location.hash.slice(1);
-  $('#app').innerHTML = route === 'trees' ? treesPage() : /^(tree|demo)\//.test(route) ? workspace() : landing();
-  if (route === 'examples') requestAnimationFrame(() => $('#examples')?.scrollIntoView({ behavior: 'smooth' }));
+  const showBook = (treeId, momentId, demo=false) => { selectedId=momentId; go(`#${demo?'demo-book':'book'}/${treeId}`); };
+  const showWorkspace = (treeId, momentId, demo=false) => { selectedId=momentId; go(`#${demo?'demo':'tree'}/${treeId}`); };
+  if (route === 'trees') $('#app').innerHTML=treesPage();
+  else if (/^(tree|demo)\//.test(route)) $('#app').innerHTML=workspace();
+  else if (/^(book|demo-book)\//.test(route) && currentTree()) {
+    $('#app').innerHTML='<main id="main" tabindex="-1"></main>';
+    disposeView=mountBook($('#main'), {tree:currentTree(),selectedId,storage,demo:isDemo(),onHome:()=>go('#start'),onWorkspace:showWorkspace,onNew:()=>openMoment('new'),onAdd:id=>openMoment('add',id),onEdit:id=>openMoment('edit',id)});
+  } else if (/^(book|demo-book)\//.test(route)) $('#app').innerHTML=workspace();
+  else {
+    $('#app').innerHTML='<main id="main" tabindex="-1"></main>';
+    disposeView=mountOrbit($('#main'),{trees:state.trees,storage,example:route==='examples',onNew:()=>openMoment('new'),onTrees:()=>go('#trees'),onBook:showBook,onWorkspace:showWorkspace,error:loaded.error});
+  }
 }
 function updateTree(tree) { commit({ ...state, trees: state.trees.map(t => t.id === tree.id ? tree : t) }); }
 
@@ -174,7 +172,7 @@ dialog.addEventListener('submit', event => {
     }
     formDirty = false;
     dialog.close();
-    go(`#tree/${tree.id}`);
+    go(`#${form.dataset.mode === 'new' || /book\//.test(location.hash) ? 'book' : 'tree'}/${tree.id}`);
     toast(form.dataset.mode === 'edit' ? '그날의 마음을 다시 담았어요.' : '새로운 순간이 트리에 자랐어요.');
   } catch (error) { $('#form-error').textContent = error.message; }
 });
@@ -215,7 +213,7 @@ document.addEventListener('click', event => {
     else if (action === 'export-tree') { const tree = state.trees.find(t => t.id === id); if (tree) download({ version: 1, trees: [tree] }, `lovetree-${id.slice(0, 8)}.json`); }
     else if (action === 'export-all') download(state, `lovetree-backup-${new Date().toISOString().slice(0,10)}.json`);
     else if (action === 'import') $('#import-file').click();
-    else if (action === 'recovery') download(storage.getItem(RECOVERY_KEY) || storage.getItem(STORAGE_KEY) || '{}', 'lovetree-recovery.json', true);
+    else if (action === 'recovery') { const raw = recoveryData(storage, loaded); if (raw === null) return toast('보관된 복구 사본이 없어요.'); download(raw, 'lovetree-recovery.json', true); }
   } catch (error) { toast(error.message); }
 });
 document.addEventListener('input', event => { if (event.target.id === 'tree-search') $('#tree-results').innerHTML = filteredTrees(event.target.value); });
@@ -232,6 +230,7 @@ $('#import-file').addEventListener('change', async event => {
 });
 window.addEventListener('hashchange', () => { render(); if (location.hash !== '#examples') window.scrollTo({ top: 0 }); });
 window.addEventListener('storage', event => {
+  if (event.key === RECOVERY_KEY && location.hash === '#trees' && !dialog.open) { render(); return; }
   if (event.key !== STORAGE_KEY) return;
   if (dialog.open) { toast('다른 탭에서 기록이 바뀌었어요. 작성 중인 내용을 복사한 뒤 새로고침해 주세요.'); return; }
   const next = loadState(storage);
