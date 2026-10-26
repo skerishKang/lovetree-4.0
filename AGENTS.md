@@ -9,7 +9,7 @@
 ## 함께 작업하기
 - COM1과 CGI 모두 같은 GitHub를 사용한다. `main`의 커밋이 공통 기준이다.
 - 시작 시 `git status --short`, `git fetch origin`, 현재 브랜치를 확인한다.
-- 작업마다 `ai/<device>/<task>` 브랜치와 별도 worktree를 만든다. `scripts/start-task.ps1` 사용 가능.
+- 작업마다 `ai/<device>-<task>` 브랜치와 별도 worktree를 만든다. `scripts/start-task.ps1` 사용 가능. Windows 예약 이름 `com1`을 경로의 단독 구성 요소로 쓰지 않는다.
 - 다른 모델의 작업 폴더·브랜치·실행 중인 프로세스를 임의로 변경하지 않는다.
 - 같은 기능을 두 모델이 맡으면 담당 파일/범위를 먼저 정한다. 하위 에이전트 실행 권한을 자동 부여하지 않는다.
 - 커밋·push는 맡은 작업의 일부로 진행한다. `main` 병합·외부 배포는 해당 작업의 Owner 지시 범위에서 한다.

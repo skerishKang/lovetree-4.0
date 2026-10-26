@@ -9,7 +9,7 @@
 | COM1 / Padiem-Command-Center | `G:\Ddrive\BatangD\task\workdiary\lovetree-4.0` | `D:\lovetree-4.0-worktrees` |
 | CGI / CGI-1 | `C:\cgi-work\lovetree-4.0` | `C:\cgi-work\lovetree-4.0-worktrees` |
 
-Owner가 정한 G드라이브 기준 폴더는 유지한다. Google Drive 동기화와 여러 모델의 편집 충돌을 줄이도록 실제 모델 작업은 장비별 로컬 worktree에서 수행한다. `node_modules`와 빌드 산출물은 Git에 포함하지 않는다.
+Owner가 정한 G드라이브 기준 폴더는 유지한다. 여러 모델의 편집 충돌을 줄이도록 실제 모델 작업은 장비별 로컬 worktree에서 수행한다. 확인된 COM1의 G드라이브는 NTFS 외장 디스크다. `node_modules`와 빌드 산출물은 Git에 포함하지 않는다.
 
 ## 새 작업 시작
 
@@ -29,7 +29,7 @@ pwsh -File scripts/start-task.ps1 -Device cgi -Task review-tree-editor -Worktree
 
 PowerShell 7의 `pwsh`가 없으면 `powershell -ExecutionPolicy Bypass -File ...`로 **이 스크립트 한 번만** 실행할 수 있다. 시스템 실행 정책은 변경하지 않는다.
 
-스크립트는 최신 `origin/main`에서 고유 브랜치와 worktree를 만들고 경로를 출력한다. 만들어진 폴더를 AI 도구/에디터에서 연 뒤 실행한다.
+스크립트는 최신 `origin/main`에서 고유 브랜치와 worktree를 만들고 경로를 출력한다. 브랜치 예시는 `ai/com1-improve-first-moment-날짜-고유값`이다. Windows 예약 이름인 `com1`을 단독 폴더 이름으로 쓰지 않는다. 만들어진 폴더를 AI 도구/에디터에서 연 뒤 실행한다.
 
 ```sh
 npm ci

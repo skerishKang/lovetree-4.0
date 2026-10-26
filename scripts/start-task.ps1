@@ -15,11 +15,12 @@ if ($ltRemote -notmatch '(github\.com[:/]skerishKang/lovetree-4\.0)(\.git)?$') {
 if ($LASTEXITCODE -ne 0) { throw 'Git fetch failed. Check the GitHub connection on this PC.' }
 $ltSuffix = Get-Date -Format 'yyyyMMdd-HHmmss'
 $ltRandom = [guid]::NewGuid().ToString('N').Substring(0,6)
-$ltBranch = "ai/$Device/$Task-$ltSuffix-$ltRandom"
+# COM1 is a reserved Windows filename, including inside .git/refs/heads.
+$ltBranch = "ai/$Device-$Task-$ltSuffix-$ltRandom"
 $ltDestination = Join-Path ([System.IO.Path]::GetFullPath($WorktreeRoot)) "$Device-$Task-$ltSuffix-$ltRandom"
 if (Test-Path -LiteralPath $ltDestination) { throw 'Destination already exists.' }
 New-Item -ItemType Directory -Force -Path $WorktreeRoot | Out-Null
-& git -C $ltRoot worktree add -b $ltBranch $ltDestination origin/main
+& git -C $ltRoot worktree add --no-track -b $ltBranch $ltDestination origin/main
 if ($LASTEXITCODE -ne 0) { throw 'Could not create the task worktree.' }
 Write-Output "BRANCH=$ltBranch"
 Write-Output "WORKTREE=$ltDestination"

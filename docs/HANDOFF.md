@@ -20,7 +20,7 @@ COM1의 지정 폴더가 기준 로컬, GitHub main이 공유 이력이다. CGI�
 
 Vite + 표준 JavaScript 모듈. `src/domain.js`는 데이터 규칙, `src/storage.js`는 저장 경계, `src/main.js`는 화면/이벤트, `src/styles.css`는 디자인이다. 인증과 서버 저장이 필요해지면 저장 어댑터를 확장한다. 미리 특정 프레임워크나 COM2 서버에 종속시키지 않았다.
 
-`npm run check`는 데이터 규칙/복구/충돌 방지 테스트 13개와 프로덕션 빌드를 실행한다. 브라우저에서 첫 트리 작성 → 두 번째 순간 연결 → 새로고침 복원을 확인했다. HTTP 미리보기에서 발견한 UUID 생성 호환성 문제를 수정하고 회귀 테스트를 추가했다.
+`npm run check`는 데이터 규칙/복구/충돌 방지 테스트 13개와 프로덕션 빌드를 실행한다. 브라우저에서 첫 트리 작성 → 두 번째 순간 연결 → 새로고침 복원, 시간순 보기와 순간 수정을 확인했다. HTTP 미리보기에서 발견한 UUID 생성 호환성 문제를 수정하고 회귀 테스트를 추가했다. GitHub CI는 Windows와 Linux에서 같은 검증을 수행한다. Windows 예약 이름 `com1`이 Git ref의 단독 폴더가 되지 않도록 작업 브랜치는 `ai/com1-작업명-고유값` 형태를 사용한다.
 
 원본 HTML 2개는 `reference/originals/`에 바이트 그대로 보관했다. 출처와 Git blob SHA는 `reference/SOURCES.md`에 있다. 참고 HTML은 제품 번들에 포함하지 않는다. 옛 문서의 공개 기본값/비공개 유료화/임의 통계는 현재 정책으로 승계하지 않는다.
 
