@@ -46,3 +46,11 @@ SHA-256:
 - `track59-sketchbook.html`: COM1 `G:/Ddrive/BatangD/task/workdiary/lovetree-limone/old/reference/source-tracks-snapshot/59_메모리스케치북_페이지여정/버전4_캐릭터실자산_최신후보/현재후보.html`. SHA-256 `85fecda2339f2e8287daf09bbd8572d8ca568bb2ff536a6e6599e30078c45916`.
 
 SRC064: 궤도 수식·카드 형태·예시 자산을 재사용하고, mock 메뉴/옛 로컬 파일 링크를 앱 이동으로 교체했다. Track59: 원본 version4 폴더의 V1.1 Link + Korean Editorial Typography를 사용했다. V5 구현으로 부르지 않는다. 페이지 스타일을 재사용하며 실제 기록·목차·분기·수정/추가 동작은 앱용으로 새로 연결했다.
+
+## Track32 실제 트리 책장 (2026-10-27)
+
+- 보존: `originals/track32-bookshelf.html` (74,978 bytes).
+- COM1 출처: `G:/Ddrive/BatangD/task/workdiary/lovetree-limone/old/reference/source-tracks-snapshot/32_사람별기억책장_실제페이지모션/01_사람별기억책장_실제페이지모션_v2-1.html`.
+- SHA-256: `cb64d80376d59ced65273784ce9723c22723827d25e800474e192d070833ca67`.
+
+원본의 입체 책 표지·책장 CSS와 거리 기반 배치 계산을 재사용했다. 원본 7개 고정 책 대신 실제 state.trees를 연결하고 대상 필터·검색·선택 복원·모바일 배치·키보드 이동을 보완했다. 원본 reader 대신 기존 Track59 감상 화면을 사용한다. 원본에는 Google Fonts import, YouTube 링크와 customBooks 로컬 저장이 있으나 새 책장 어댑터에는 가져오지 않았다. 데이터 규칙과 저장 스키마는 바꾸지 않는다.
