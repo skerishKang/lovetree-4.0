@@ -59,3 +59,14 @@ GitHub PR로 변경을 비교할 수 있다. 코멘트/리뷰 요청 전송은 O
 ## 개발과 서비스의 차이
 
 현재 `npm run dev`는 개발용이다. 인터넷에 공개하는 서버로 사용하지 않는다. Cloudflare 배포·인증·DB는 별도 단계다. COM2의 PADIEM 서버를 이 프로젝트 실행에 사용하거나 설정을 변경하지 않는다.
+
+## 초기 연결 확인 — 2026-10-27 KST
+
+두 PC에서 소스 커밋 `8e787e2`의 테스트 13개와 빌드가 통과했다. 두 PC 모두 GitHub push 권한을 `git push --dry-run`으로 확인했으며, 실제 테스트 브랜치를 원격에 만들지는 않았다. CGI의 커밋 작성자 설정은 이 저장소에만 GitHub 계정 이름과 noreply 주소로 설정했다.
+
+처음 만들어 둔 AI 작업 폴더:
+
+- COM1: `D:\lovetree-4.0-worktrees\com1-first-review-20261027-003944-ec6bd3`
+- CGI: `C:\cgi-work\lovetree-4.0-worktrees\cgi-first-review-20261027-003548-dbfbef`
+
+위 두 폴더에는 의존성이 설치되어 있다. 해당 폴더에서 `npm run dev -- --host 127.0.0.1`을 실행하고 `http://127.0.0.1:5173/`을 연다. 초기 검증 때 두 PC에서 HTTP 200을 확인했다. 실행 프로세스는 재부팅 후 유지되지 않으므로 포트와 실행 상태를 먼저 확인한다. 새 작업은 앞의 스크립트로 새 worktree를 만들거나 Owner가 지정한 기존 작업 폴더를 사용한다. 현재 목록은 기준 폴더에서 `git worktree list`로 확인한다.

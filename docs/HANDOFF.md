@@ -32,3 +32,5 @@ Vite + 표준 JavaScript 모듈. `src/domain.js`는 데이터 규칙, `src/stora
 4. 기록이 충분히 쌓이는지 확인한 뒤 선택적 공유와 발견 기능을 추가한다.
 
 각 AI는 먼저 `AGENTS.md`, `docs/PRODUCT.md`, `docs/DEVELOPMENT.md`를 읽는다. 최신 상태는 이 문서의 날짜보다 `git log`, `git status`, 현재 브랜치와 PR을 우선 확인한다. 검증하지 않은 기능을 완료로 기록하지 않는다.
+
+2026-10-27 KST 초기 구축 확인: COM1·CGI 기준 사본과 각 AI worktree에 동일 소스를 연결했다. 양쪽 설치/테스트 13개/빌드, GitHub push 권한과 로컬 HTTP 응답을 확인했다. 소스 커밋 `8e787e2`의 GitHub Windows/Linux CI도 성공했다. 390px 모바일 폭에서 발견한 첫 화면 가로 넘침을 수정하고 다시 확인했다. 실행 경로와 시작 방법은 `docs/DEVELOPMENT.md`에 있다.
