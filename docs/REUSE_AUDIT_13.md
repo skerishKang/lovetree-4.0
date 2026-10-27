@@ -75,7 +75,7 @@
 
 ## 6. 그래도 신규 구현 대상(기존에 없는 것)
 
-1. **관련 연결(`links`)의 서버 표현** — 두 스키마 어디에도 link/edge 없음(직접 확인). 4.0은 부모 1개 + 관련 연결 ≤20을 동시에 지켜야 한다.
+1. **관련 연결(`links`)의 서버 표현** — 두 스키마 어디에도 link/edge가 없다(직접 확인: LoveBud 커밋 전체 `CREATE TABLE` 목록에 없고 array/jsonb 연결 컬럼도 없음; limone `memories`는 `parent_id` + `connection_reason` 텍스트만, `schema.ts:66-104`). 4.0은 부모 1개 + 관련 연결 ≤20을 동시에 지켜야 한다.
 2. **문서 단위 동시성 계약** — `expectedRaw`는 같은 브라우저 탭에서만 작동하고 `undefined`이면 무방책(`src/storage.js:24`, `src/main.js:37`). 서버 revision/if-match가 필요하다.
 3. **id 안정성** — `importTrees`의 재발급을 멈추고 `client_key`로 승계.
 4. **첫 로그인 시 기존 브라우저 기록 이관**과 복구 사본(`lovetree.v4.workspace.recovery.v1`) 정책의 서버판.
