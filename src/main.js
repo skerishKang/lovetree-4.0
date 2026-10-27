@@ -3,7 +3,7 @@ import { mountOrbit, ORBIT_EXAMPLE } from './views/orbit.js';
 import { mountBook } from './views/book.js';
 import { mountShelf } from './views/shelf.js';
 import { hasRecovery as recoveryAvailable, recoveryData } from './views/memory.js';
-import { createTree, addMoment, editMoment, removeMoment, importTrees, MAX_TREES, EMOTIONS, treeLayout, pathTo } from './domain.js';
+import { createTree, addMoment, editMoment, removeMoment, importTrees, MAX_TREES, MAX_LINKS, EMOTIONS, treeLayout, pathTo, linkMoments, unlinkMoments, relatedMoments } from './domain.js';
 import { loadState, saveState, STORAGE_KEY, RECOVERY_KEY } from './storage.js';
 import { EXAMPLES } from './examples.js';
 
@@ -46,6 +46,7 @@ const DEMOS = [...EXAMPLES, ORBIT_EXAMPLE];
 let opener;
 let formDirty = false;
 const dialog = $('#moment-dialog');
+const linkDialog = $('#link-dialog');
 
 function toast(message) {
   $('#toast').textContent = message;
@@ -98,6 +99,18 @@ function graph(tree, scale) {
     const x1 = parent.x + 225, y1 = parent.y + 80, x2 = child.x, y2 = child.y + 80;
     edges += `<path d="M${x1} ${y1}C${x1 + 34} ${y1} ${x2 - 34} ${y2} ${x2} ${y2}"/><circle cx="${x2}" cy="${y2}" r="4"/>`;
   }
+  const linked = new Set();
+  for (const m of tree.moments) {
+    for (const target of m.links || []) {
+      const key = [m.id, target].sort().join('|');
+      if (linked.has(key)) continue;
+      linked.add(key);
+      const from = positions.get(m.id), to = positions.get(target);
+      if (!from || !to) continue;
+      const x1 = from.x + 112, y1 = from.y + 81, x2 = to.x + 112, y2 = to.y + 81;
+      edges += `<path class="link-edge" d="M${x1} ${y1}C${x1 + (x2 - x1) / 2} ${y1 - 70} ${x2 - (x2 - x1) / 2} ${y2 - 70} ${x2} ${y2}"/>`;
+    }
+  }
   return `<div class="graph-scroll" tabindex="0" role="region" aria-label="순간 연결 트리. 방향키나 스크롤로 이동할 수 있습니다."><div class="graph-sizer" style="width:${width * scale}px;height:${height * scale}px"><div class="graph-canvas" style="width:${width}px;height:${height}px;transform:scale(${scale})"><svg class="graph-edges" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" aria-hidden="true">${edges}</svg>${tree.moments.map(m => nodeCard(m, positions.get(m.id), m.id === selectedId)).join('')}</div></div></div>`;
 }
 function timeline(tree) {
@@ -113,7 +126,8 @@ function board(tree) {
   }
   const cards = [...tree.moments].sort((a, b) => a.date.localeCompare(b.date)).map(moment => {
     const parent = moment.parentId ? tree.moments.find(m => m.id === moment.parentId) : null;
-    return `<div role="listitem"><button class="board-card ${moment.id === selectedId ? 'selected' : ''} ${path.has(moment.id) ? 'on-path' : ''}" data-action="select-moment" data-id="${escape(moment.id)}" aria-pressed="${moment.id === selectedId}"><span class="board-date">${moment.parentId ? dateLabel(moment.date) : `${icon('leaf')} 이 마음의 시작`}</span><strong>${escape(moment.title)}</strong><span class="board-note">${escape(moment.note)}</span><span class="board-foot"><span class="emotion emotion-${escape(moment.emotion)}">${escape(moment.emotion)}</span>${parent ? `<small>${escape(parent.title)}에서</small>` : ''}</span></button></div>`;
+    const links = relatedMoments(tree, moment.id).length;
+    return `<div role="listitem"><button class="board-card ${moment.id === selectedId ? 'selected' : ''} ${path.has(moment.id) ? 'on-path' : ''}" data-action="select-moment" data-id="${escape(moment.id)}" aria-pressed="${moment.id === selectedId}"><span class="board-date">${moment.parentId ? dateLabel(moment.date) : `${icon('leaf')} 이 마음의 시작`}</span><strong>${escape(moment.title)}</strong><span class="board-note">${escape(moment.note)}</span><span class="board-foot"><span class="emotion emotion-${escape(moment.emotion)}">${escape(moment.emotion)}</span>${links ? `<span class="board-links" aria-label="관련 순간 ${links}개">${icon('link')} ${links}</span>` : ''}${parent ? `<small>${escape(parent.title)}에서</small>` : ''}</span></button></div>`;
   }).join('');
   return `<div class="moment-board" role="list" aria-label="순간 보드. 선택한 순간까지의 경로가 강조됩니다.">${cards}</div>`;
 }
@@ -128,9 +142,14 @@ function routeList(tree, moment) {
   if (route.length < 2) return '';
   return `<nav class="detail-route" aria-label="이 순간까지 온 길"><span class="detail-route-title">여기까지 온 길</span><ol>${route.map(m => `<li>${m.id === moment.id ? `<span aria-current="true">${escape(m.title)}</span>` : `<button class="text-button small" data-action="select-moment" data-id="${escape(m.id)}">${escape(m.title)}</button>`}</li>`).join('')}</ol></nav>`;
 }
+function relatedBlock(tree, moment, demo) {
+  if (demo) return '';
+  const related = relatedMoments(tree, moment.id);
+  return `<div class="detail-links"><span class="detail-links-title">관련 순간${related.length ? ` ${related.length}` : ''}</span>${related.length ? `<ul>${related.map(m => `<li><button class="link-chip" data-action="select-moment" data-id="${escape(m.id)}">${escape(m.title)}</button><button class="link-unlink" data-action="unlink" data-id="${escape(moment.id)}" data-target="${escape(m.id)}" aria-label="${escape(m.title)} 관련 연결 끊기">${icon('close')}</button></li>`).join('')}</ul>` : '<p class="detail-links-empty">부모 관계와 별개로, 함께 떠오르는 순간을 이어 둘 수 있어요.</p>'}<button class="text-button small" data-action="link" data-id="${escape(moment.id)}">${icon('link')} 관련 순간 잇기</button></div>`;
+}
 function detail(tree, moment, demo) {
   const parent = tree.moments.find(m => m.id === moment.parentId);
-  return `<aside class="moment-detail" aria-label="선택한 순간"><div class="detail-kicker"><span>${moment.parentId ? '이어진 순간' : '이 마음의 시작'}</span>${icon('heart')}</div>${moment.art ? art(moment.art, 'detail-art') : `<div class="detail-quote">“<p>${escape(moment.note)}</p>”</div>`}<time>${dateLabel(moment.date)}</time><h2>${escape(moment.title)}</h2><span class="emotion emotion-${escape(moment.emotion)}">${escape(moment.emotion)}</span><p class="detail-note">${escape(moment.note)}</p>${parent ? `<div class="connection-note">${icon('tree')}<div><small>${escape(parent.title)}에서 이어진 마음</small><p>${escape(moment.relation || '이 마음에서 다음 순간이 이어졌어요.')}</p></div></div>` : ''}${routeList(tree, moment)}${moment.url ? `<a class="button secondary full" href="${escape(moment.url)}" target="_blank" rel="noopener noreferrer">${icon('external')} 원본 링크 열기</a>` : ''}<div class="detail-actions">${demo ? '<button class="button primary full" data-action="new">나의 이야기 시작하기 '+icon('plus')+'</button>' : `<button class="button primary full" data-action="add" data-id="${escape(moment.id)}">이 순간에서 이어가기 ${icon('plus')}</button><div class="detail-small-actions"><button class="text-button" data-action="edit" data-id="${escape(moment.id)}">${icon('edit')} 순간 수정</button><button class="text-button danger" data-action="delete-moment" data-id="${escape(moment.id)}">${icon('trash')} 삭제</button></div>`}</div></aside>`;
+  return `<aside class="moment-detail" aria-label="선택한 순간"><div class="detail-kicker"><span>${moment.parentId ? '이어진 순간' : '이 마음의 시작'}</span>${icon('heart')}</div>${moment.art ? art(moment.art, 'detail-art') : `<div class="detail-quote">“<p>${escape(moment.note)}</p>”</div>`}<time>${dateLabel(moment.date)}</time><h2>${escape(moment.title)}</h2><span class="emotion emotion-${escape(moment.emotion)}">${escape(moment.emotion)}</span><p class="detail-note">${escape(moment.note)}</p>${parent ? `<div class="connection-note">${icon('tree')}<div><small>${escape(parent.title)}에서 이어진 마음</small><p>${escape(moment.relation || '이 마음에서 다음 순간이 이어졌어요.')}</p></div></div>` : ''}${routeList(tree, moment)}${relatedBlock(tree, moment, demo)}${moment.url ? `<a class="button secondary full" href="${escape(moment.url)}" target="_blank" rel="noopener noreferrer">${icon('external')} 원본 링크 열기</a>` : ''}<div class="detail-actions">${demo ? '<button class="button primary full" data-action="new">나의 이야기 시작하기 '+icon('plus')+'</button>' : `<button class="button primary full" data-action="add" data-id="${escape(moment.id)}">이 순간에서 이어가기 ${icon('plus')}</button><div class="detail-small-actions"><button class="text-button" data-action="edit" data-id="${escape(moment.id)}">${icon('edit')} 순간 수정</button><button class="text-button danger" data-action="delete-moment" data-id="${escape(moment.id)}">${icon('trash')} 삭제</button></div>`}</div></aside>`;
 }
 function workspace() {
   const tree = currentTree(), demo = isDemo();
@@ -208,6 +227,37 @@ dialog.addEventListener('submit', event => {
   } catch (error) { $('#form-error').textContent = error.message; }
 });
 
+function openLinkPicker(id) {
+  const tree = currentTree();
+  if (!tree || isDemo()) return;
+  if (!tree.moments.some(m => m.id === id)) return;
+  const related = new Set(relatedMoments(tree, id).map(m => m.id));
+  const candidates = tree.moments.filter(m => m.id !== id && !related.has(m.id)).sort((a, b) => a.date.localeCompare(b.date));
+  opener = document.activeElement;
+  while (opener?.shadowRoot?.activeElement) opener = opener.shadowRoot.activeElement;
+  const closeButton = `<div class="dialog-top"><span class="eyebrow">ANOTHER THREAD</span><button type="button" class="icon-button" data-action="close-link" aria-label="닫기">${icon('close')}</button></div>`;
+  linkDialog.innerHTML = candidates.length
+    ? `<form id="link-form" data-id="${escape(id)}">${closeButton}<h2 id="link-title">어떤 순간과 이어 볼까요?</h2><p class="dialog-intro">지금 순간과 함께 떠오르는 순간을 골라 주세요. 트리에서 이어진 위치는 그대로 두고, 두 순간만 서로 이어 둡니다.</p><label class="field">이을 순간<select name="target">${candidates.map(m => `<option value="${escape(m.id)}">${escape(m.title)} · ${dateLabel(m.date)}</option>`).join('')}</select></label><p class="form-error" role="alert" id="link-error"></p><div class="dialog-bottom"><span>한 순간에 ${MAX_LINKS}개까지 이을 수 있어요</span><button class="button primary" type="submit">관련 순간 잇기 ${icon('link')}</button></div></form>`
+    : `${closeButton}<h2 id="link-title">이을 수 있는 순간이 없어요</h2><p class="dialog-intro">이 트리의 모든 순간과 이미 이어져 있거나, 아직 다른 순간이 없어요.</p><div class="dialog-bottom"><span></span><button class="button primary" type="button" data-action="close-link">확인</button></div>`;
+  linkDialog.showModal();
+  linkDialog.querySelector('select')?.focus();
+}
+linkDialog.addEventListener('submit', event => {
+  event.preventDefault();
+  const form = event.target;
+  const id = form.dataset.id;
+  if (!id) return;
+  try {
+    updateTree(linkMoments(currentTree(), id, new FormData(form).get('target')));
+    linkDialog.close();
+    render();
+    $(`[data-action="link"][data-id="${CSS.escape(id)}"]`)?.focus();
+    toast('두 순간을 이어 두었어요. 트리에서 이어진 위치는 그대로예요.');
+  } catch (error) { $('#link-error').textContent = error.message; }
+});
+linkDialog.addEventListener('cancel', event => { event.preventDefault(); linkDialog.close(); });
+linkDialog.addEventListener('close', () => { if (opener?.isConnected) opener.focus(); });
+
 function exportRecovery() {
   const raw = recoveryData(storage, loaded);
   if (raw === null) return toast('보관된 복구 사본이 없어요.');
@@ -272,6 +322,14 @@ document.addEventListener('click', event => {
       (sameSide && !sameSide.disabled ? sameSide : otherSide && !otherSide.disabled ? otherSide : $(`[data-action="select-moment"][data-id="${CSS.escape(selectedId)}"]`))?.focus();
     }
     else if (action === 'add' || action === 'edit') openMoment(action, id);
+    else if (action === 'link') openLinkPicker(id);
+    else if (action === 'close-link') linkDialog.close();
+    else if (action === 'unlink') {
+      updateTree(unlinkMoments(currentTree(), id, button.dataset.target));
+      render();
+      $(`[data-action="link"][data-id="${CSS.escape(id)}"]`)?.focus();
+      toast('관련 연결을 끊었어요. 두 순간은 각자의 자리에 남아 있어요.');
+    }
     else if (action === 'delete-moment') {
       if (!confirm('이 순간을 지울까요? 이어진 순간들은 남기고 연결을 정리합니다.')) return;
       updateTree(removeMoment(currentTree(), id)); selectedId = null; render(); toast('순간을 지웠어요.');

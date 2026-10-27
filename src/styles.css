@@ -44,6 +44,21 @@ dialog{padding:30px 35px;width:min(610px,calc(100% - 32px));max-height:calc(100d
 .detail-route li:not(:last-child):after{content:'';position:absolute;left:6px;top:22px;bottom:-2px;width:1px;background:#dfe5d3}
 .detail-route li>span,.detail-route li>button{display:block;width:100%;text-align:left;font-size:10px;line-height:1.7;color:#7d8a71;padding:5px 0;overflow-wrap:anywhere}
 .detail-route li>span[aria-current=true]{color:#4f6b49;font-weight:500}
+.graph-edges .link-edge{stroke:#c2a3ae;stroke-width:1.6;stroke-dasharray:6 7}
+.board-foot{flex-wrap:wrap}
+.board-links{display:inline-flex;align-items:center;gap:3px;font-size:9px;color:#a5828e}
+.board-links .icon{width:11px;height:11px}
+.detail-links{margin:0 0 18px;border-top:1px solid #eceee4;padding-top:12px}
+.detail-links-title{font-size:9px;letter-spacing:.6px;color:#9aa28c}
+.detail-links ul{list-style:none;margin:8px 0 6px;padding:0;display:flex;flex-wrap:wrap;gap:6px}
+.detail-links li{display:flex;align-items:center;border:1px solid #e6dce0;background:#fbf5f6;border-radius:99px;max-width:100%}
+.link-chip{border:0;background:none;font-size:10px;color:#8b5f6d;padding:6px 4px 6px 10px;max-width:210px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.link-chip:hover{color:#6f4553}
+.link-unlink{border:0;background:none;display:grid;place-items:center;width:24px;height:24px;border-radius:50%;color:#b28b96}
+.link-unlink:hover{background:#f1e2e7;color:#8b5f6d}
+.link-unlink .icon{width:11px;height:11px}
+.detail-links-empty{font-size:10px;line-height:1.8;color:#9aa28c;margin:8px 0 10px}
+.detail-links .text-button{margin-top:2px}
 @media(max-width:820px){.moment-board{height:420px}.board-bottom{flex-wrap:wrap;row-gap:8px}}
 @media(max-width:540px){.route-nav small{display:none}.board-tools{gap:6px}.zoom-controls .zoom-fit{padding:0 7px}}
 @media(max-width:540px){.moment-board{height:auto;max-height:420px;padding:12px;gap:10px;grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}.board-card{min-height:138px;padding:12px}.board-card strong{font-size:14px}.board-note{-webkit-line-clamp:4}}

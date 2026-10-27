@@ -1,6 +1,7 @@
 export const EMOTIONS = ['설렘', '위로', '벅참', '그리움', '고마움', '즐거움'];
 export const MAX_MOMENTS = 300;
 export const MAX_TREES = 50;
+export const MAX_LINKS = 20;
 export const EMPTY_STATE = () => ({ version: 1, trees: [] });
 
 export function newId(provider = globalThis.crypto) {
@@ -42,13 +43,13 @@ export function validateMomentInput(input) {
 }
 export function createTree(input, clock = new Date().toISOString()) {
   const subject = requireText(input.subject, '좋아하는 대상', 60);
-  const moment = { ...validateMomentInput(input), id: newId(), parentId: null, relation: '', createdAt: clock };
+  const moment = { ...validateMomentInput(input), id: newId(), parentId: null, relation: '', links: [], createdAt: clock };
   return { id: newId(), subject, title: `${subject}, 나의 순간들`, createdAt: clock, updatedAt: clock, moments: [moment] };
 }
 export function addMoment(tree, input, parentId, clock = new Date().toISOString()) {
   if (tree.moments.length >= MAX_MOMENTS) throw new Error(`한 트리에는 ${MAX_MOMENTS}개의 순간까지 담을 수 있어요.`);
   if (!tree.moments.some(m => m.id === parentId)) throw new Error('이어질 순간을 먼저 선택해 주세요.');
-  const moment = { ...validateMomentInput(input), id: newId(), parentId, createdAt: clock };
+  const moment = { ...validateMomentInput(input), id: newId(), parentId, links: [], createdAt: clock };
   return { ...tree, updatedAt: clock, moments: [...tree.moments, moment] };
 }
 export function editMoment(tree, id, input, clock = new Date().toISOString()) {
@@ -62,7 +63,8 @@ export function removeMoment(tree, id, clock = new Date().toISOString()) {
   if (!target) throw new Error('이 순간을 찾을 수 없어요.');
   if (tree.moments.length === 1) throw new Error('마지막 순간이에요. 트리 전체를 지우려면 내 트리에서 삭제해 주세요.');
   let parentId = target.parentId;
-  const remaining = tree.moments.filter(m => m.id !== id);
+  // A deleted moment must not leave a dangling related link behind.
+  const remaining = tree.moments.filter(m => m.id !== id).map(m => m.links?.includes(id) ? { ...m, links: m.links.filter(link => link !== id) } : m);
   if (parentId === null) {
     const successor = remaining.find(m => m.parentId === id);
     if (!successor) throw new Error('순간 연결을 확인해 주세요.');
@@ -70,6 +72,38 @@ export function removeMoment(tree, id, clock = new Date().toISOString()) {
     return { ...tree, updatedAt: clock, moments: remaining.map(m => m.id === successor.id ? { ...m, parentId: null, relation: '' } : m.parentId === id ? { ...m, parentId, relation: '' } : m) };
   }
   return { ...tree, updatedAt: clock, moments: remaining.map(m => m.parentId === id ? { ...m, parentId, relation: '' } : m) };
+}
+
+export function linksOf(moment) {
+  return Array.isArray(moment?.links) ? moment.links : [];
+}
+export function relatedMoments(tree, id) {
+  const current = tree.moments.find(m => m.id === id);
+  if (!current) return [];
+  const ids = new Set(linksOf(current));
+  for (const other of tree.moments) if (linksOf(other).includes(id)) ids.add(other.id);
+  ids.delete(id);
+  return tree.moments.filter(m => ids.has(m.id));
+}
+export function linkMoments(tree, id, targetId, clock = new Date().toISOString()) {
+  if (id === targetId) throw new Error('같은 순간끼리는 이을 수 없어요.');
+  const current = tree.moments.find(m => m.id === id), target = tree.moments.find(m => m.id === targetId);
+  if (!current || !target) throw new Error('이을 순간을 찾을 수 없어요.');
+  if (linksOf(current).includes(targetId)) return tree;
+  if (linksOf(current).length >= MAX_LINKS || linksOf(target).length >= MAX_LINKS) throw new Error(`한 순간에는 ${MAX_LINKS}개의 관련 순간까지 이을 수 있어요.`);
+  return {
+    ...tree,
+    updatedAt: clock,
+    moments: tree.moments.map(m => m.id === id ? { ...m, links: [...linksOf(m), targetId] } : m.id === targetId ? { ...m, links: [...linksOf(m), id] } : m)
+  };
+}
+export function unlinkMoments(tree, id, targetId, clock = new Date().toISOString()) {
+  const without = (moment, other) => linksOf(moment).filter(link => link !== other);
+  return {
+    ...tree,
+    updatedAt: clock,
+    moments: tree.moments.map(m => m.id === id ? { ...m, links: without(m, targetId) } : m.id === targetId ? { ...m, links: without(m, id) } : m)
+  };
 }
 
 export function validateState(value) {
@@ -85,11 +119,15 @@ export function validateState(value) {
     const moments = tree.moments.map(m => {
       if (!m || typeof m !== 'object') throw new Error('순간 데이터가 올바르지 않아요.');
       if (!idValid(m.id) || ids.has(m.id) || !time(m.createdAt) || (m.parentId !== null && !idValid(m.parentId))) throw new Error('순간 데이터가 올바르지 않아요.');
+      const rawLinks = m.links ?? [];
+      if (!Array.isArray(rawLinks) || rawLinks.length > MAX_LINKS) throw new Error('관련 순간 데이터가 올바르지 않아요.');
+      for (const link of rawLinks) if (!idValid(link) || link === m.id) throw new Error('관련 순간 데이터가 올바르지 않아요.');
       ids.add(m.id);
-      return { ...validateMomentInput(m), id: m.id, parentId: m.parentId, createdAt: m.createdAt };
+      return { ...validateMomentInput(m), id: m.id, parentId: m.parentId, links: [...new Set(rawLinks)], createdAt: m.createdAt };
     });
     if (moments.filter(m => m.parentId === null).length !== 1) throw new Error('트리의 시작 순간은 하나여야 해요.');
     const byId = new Map(moments.map(m => [m.id, m]));
+    for (const moment of moments) for (const link of moment.links) if (!byId.has(link)) throw new Error('연결된 순간이 파일에 없어요.');
     for (const moment of moments) {
       let current = moment;
       const seen = new Set();
@@ -110,7 +148,7 @@ export function importTrees(current, incoming) {
   if (current.trees.length + safe.trees.length > MAX_TREES) throw new Error(`트리는 ${MAX_TREES}개까지 보관할 수 있어요.`);
   const copies = safe.trees.map(tree => {
     const ids = new Map(tree.moments.map(m => [m.id, newId()]));
-    return { ...tree, id: newId(), moments: tree.moments.map(m => ({ ...m, id: ids.get(m.id), parentId: m.parentId === null ? null : ids.get(m.parentId) })) };
+    return { ...tree, id: newId(), moments: tree.moments.map(m => ({ ...m, id: ids.get(m.id), parentId: m.parentId === null ? null : ids.get(m.parentId), links: linksOf(m).map(link => ids.get(link)).filter(Boolean) })) };
   });
   return { version: 1, trees: [...current.trees, ...copies] };
 }

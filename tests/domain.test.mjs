@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createTree, addMoment, editMoment, removeMoment, validateState, importTrees, treeLayout, pathTo, safeUrl, newId } from '../src/domain.js';
+import { createTree, addMoment, editMoment, removeMoment, validateState, importTrees, treeLayout, pathTo, linkMoments, unlinkMoments, relatedMoments, MAX_LINKS, safeUrl, newId } from '../src/domain.js';
 import { loadState, saveState, STORAGE_KEY, RECOVERY_KEY } from '../src/storage.js';
 
 const input = (title = '첫 목소리') => ({ subject: '윤슬', title, note: '오래 기억하고 싶은 마음', emotion: '설렘', date: '2026-10-27', url: '' });
@@ -154,6 +154,59 @@ test('the route to a moment is the single parent chain from the start', () => {
   assert.deepEqual(pathTo(tree, root).map(m => m.id), [root]);
   assert.deepEqual(pathTo(tree, 'missing'), []);
   assert.deepEqual(pathTo(removeMoment(tree, second), third).map(m => m.id), [root, third]);
+});
+test('related moments link both sides without changing the parent route', () => {
+  let tree = createTree(input());
+  const root = tree.moments[0].id;
+  tree = addMoment(tree, input('가을의 무대'), root);
+  const left = tree.moments[1].id;
+  tree = addMoment(tree, input('겨울의 인터뷰'), root);
+  const right = tree.moments[2].id;
+  const linked = linkMoments(tree, left, right);
+  assert.deepEqual(linked.moments.find(m => m.id === left).links, [right]);
+  assert.deepEqual(linked.moments.find(m => m.id === right).links, [left]);
+  assert.equal(linked.moments.find(m => m.id === right).parentId, root);
+  assert.deepEqual(pathTo(linked, right).map(m => m.id), [root, right]);
+  assert.deepEqual(relatedMoments(linked, left).map(m => m.id), [right]);
+  assert.deepEqual(relatedMoments(linked, right).map(m => m.id), [left]);
+  assert.equal(linkMoments(linked, left, right), linked);
+  assert.deepEqual(unlinkMoments(linked, left, right).moments.filter(m => m.links.length), []);
+  assert.throws(() => linkMoments(tree, left, left), /같은 순간/);
+  assert.throws(() => linkMoments(tree, left, 'missing'), /찾을 수 없어요/);
+  let crowded = tree;
+  for (let i = 0; i < MAX_LINKS; i++) {
+    crowded = addMoment(crowded, input(`동료 ${i}`), root);
+    crowded = linkMoments(crowded, left, crowded.moments.at(-1).id);
+  }
+  const extra = addMoment(crowded, input('한 명 더'), root);
+  assert.throws(() => linkMoments(extra, left, extra.moments.at(-1).id), /20개/);
+});
+test('deleting or importing a moment keeps related links consistent', () => {
+  let tree = createTree(input());
+  const root = tree.moments[0].id;
+  tree = addMoment(tree, input('봄의 무대'), root);
+  const left = tree.moments[1].id;
+  tree = addMoment(tree, input('여름의 인터뷰'), root);
+  const right = tree.moments[2].id;
+  const linked = linkMoments(tree, left, right);
+  validateState(stateOf(linked));
+  const afterDelete = removeMoment(linked, right);
+  assert.deepEqual(afterDelete.moments.find(m => m.id === left).links, []);
+  validateState(stateOf(afterDelete));
+  const merged = importTrees({ version: 1, trees: [] }, stateOf(linked));
+  const copy = merged.trees[0];
+  const copiedLeft = copy.moments.find(m => m.title === '봄의 무대'), copiedRight = copy.moments.find(m => m.title === '여름의 인터뷰');
+  assert.deepEqual(relatedMoments(copy, copiedLeft.id).map(m => m.id), [copiedRight.id]);
+  assert.throws(() => validateState(stateOf({ ...linked, moments: linked.moments.map(m => m.id === left ? { ...m, links: ['missing'] } : m) })), /파일에 없어요/);
+  assert.throws(() => validateState(stateOf({ ...linked, moments: linked.moments.map(m => m.id === left ? { ...m, links: [left] } : m) })), /관련 순간/);
+  assert.throws(() => validateState(stateOf({ ...linked, moments: linked.moments.map(m => m.id === left ? { ...m, links: 'nope' } : m) })), /관련 순간/);
+});
+test('older records without related links stay valid', () => {
+  const tree = createTree(input());
+  const stripped = { ...tree, moments: tree.moments.map(({ links, ...rest }) => rest) };
+  const loaded = validateState(stateOf(stripped));
+  assert.deepEqual(loaded.trees[0].moments[0].links, []);
+  assert.deepEqual(JSON.parse(JSON.stringify(loaded)).trees[0].moments[0].links, []);
 });
 test('branched tree layout places every child after its parent', () => {
   let tree = createTree(input());
