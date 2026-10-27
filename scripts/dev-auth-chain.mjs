@@ -17,8 +17,9 @@ import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { readFile, mkdtemp } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
 
@@ -165,7 +166,29 @@ const stubServer = createServer(async (req, res) => {
   res.end(url.pathname.startsWith('/stub/authorize') ? stubPage(url.searchParams) : '<pre>dev chain stub</pre>');
 });
 
-const distIndex = () => readFile(join(process.cwd(), 'dist', 'index.html'));
+const DIST = join(process.cwd(), 'dist');
+const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.json': 'application/json', '.woff2': 'font/woff2', '.ico': 'image/x-icon' };
+const assetType = (path) => MIME[path.slice(path.lastIndexOf('.'))] ?? 'application/octet-stream';
+async function serveStatic(path, res) {
+  const wanted = path === '/' ? '/index.html' : path;
+  const file = resolve(DIST, wanted.replace(/^\/+/, ''));
+  // 이 러너는 로컬 전용이지만 경로 밖으로 나가는 요청은 파일 존재 확인도 하지 않는다.
+  if (file !== DIST && !file.startsWith(DIST + sep)) {
+    res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' });
+    res.end('not found');
+    return true;
+  }
+  if (existsSync(file) && !file.endsWith('.html')) {
+    res.writeHead(200, { 'content-type': assetType(file), 'cache-control': 'no-store' });
+    res.end(await readFile(file));
+    return true;
+  }
+  const index = join(DIST, 'index.html');
+  if (!existsSync(index)) return false;
+  res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
+  res.end(await readFile(index));
+  return true;
+}
 
 async function startApp() {
   const provider = createLoginProvider({
@@ -213,10 +236,8 @@ async function startApp() {
   const app = createServer((req, res) => {
     const path = (req.url ?? '').split('?')[0];
     if (req.method === 'GET' && !path.startsWith('/api/') && !path.startsWith('/auth/')) {
-      distIndex().then((html) => {
-        res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
-        res.end(html);
-      }, () => { res.writeHead(500); res.end('no build'); });
+      serveStatic(path, res).then((handled) => { if (!handled) { res.writeHead(500); res.end('npm run build 가 먼저 필요합니다'); } },
+        () => { res.writeHead(500); res.end('no build'); });
       return;
     }
     api(req, res);
