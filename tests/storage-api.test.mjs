@@ -1,11 +1,18 @@
-import test from 'node:test';
+import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
+import net from 'node:net';
 import { addMoment, createTree, linkMoments, validateState } from '../src/domain.js';
 import { ApiError } from '../server/errors.js';
 import { createApiHandler, createNodeHandler } from '../server/http.js';
 import { createWorkspaceService } from '../server/workspace-service.js';
 import { createMemoryWorkspaceRepo } from '../server/testing/memory-workspace-repo.js';
+import { assertIsolatedTestDatabase } from '../server/testing/isolated-test-database.js';
+
+const unhandled = [];
+const captureUnhandled = error => unhandled.push(error);
+process.on('unhandledRejection', captureUnhandled);
+after(() => process.off('unhandledRejection', captureUnhandled));
 
 const PRODUCT = 'lovetree-test';
 const CLOCK = '2026-10-27T00:00:00.000Z';
@@ -190,6 +197,58 @@ test('GET and PUT work over a real socket', async () => {
     assert.equal(saved.status, 200);
     assert.equal((await saved.json()).revision, 1);
     assert.equal((await (await fetch(`${origin}/api/workspace`)).json()).revision, 1);
+  } finally {
+    await new Promise(resolve => server.close(resolve));
+  }
+});
+
+test('형식이 잘못된 문서의 내부 오류 문장은 응답에 싣지 않는다', async () => {
+  const { handle } = buildHandle();
+  const brokenUrl = structuredClone(sampleState());
+  brokenUrl.trees[0].moments[0].url = {};
+  const result = await put(handle, { state: brokenUrl, expectedRevision: 0, clientKey: 'k-1' });
+  assert.equal(result.status, 400);
+  assert.equal(result.body.error.code, 'invalid_document');
+  assert.equal(result.body.error.message, '기록 형식을 확인해 주세요.');
+  assert.doesNotMatch(JSON.stringify(result.body), /is not a function|undefined is not|Cannot read/);
+
+  const deep = { version: 1, trees: [{ id: 't', subject: '윤슬', title: '긴 제목'.repeat(1), createdAt: CLOCK, updatedAt: CLOCK, moments: [{ id: 'a', title: 'a'.repeat(10_000), note: 'n', emotion: '설렘', date: '2026-10-27', url: '', parentId: null, links: [], createdAt: CLOCK }] }] };
+  assert.equal((await put(handle, { state: deep, expectedRevision: 0, clientKey: 'k-2' })).body.error.message, '순간 제목을(를) 1~80자로 적어 주세요.');
+});
+
+test('격리 테스트 DB 가드는 loopback과 테스트 DB 이름을 모두 요구한다', () => {
+  assert.equal(assertIsolatedTestDatabase('postgres://postgres:ci@127.0.0.1:5432/lovetree_test_ci').hostname, '127.0.0.1');
+  assert.throws(() => assertIsolatedTestDatabase('postgres://postgres:ci@127.0.0.1:5432/prod_chat'), /lovetree_test_ 접두사/);
+  assert.throws(() => assertIsolatedTestDatabase('postgres://pooler.neon.example:5432/lovetree_test_ci'), /loopback/);
+  assert.throws(() => assertIsolatedTestDatabase('mysql://127.0.0.1:3306/lovetree_test_ci'), /postgres/);
+  assert.throws(() => assertIsolatedTestDatabase(''), /다른 연결 문자열로 대체하지/);
+  assert.throws(() => assertIsolatedTestDatabase(undefined), /다른 연결 문자열로 대체하지/);
+});
+
+test('큰 본문은 413으로 응답하고 끊긴 요청은 서버를 쓰러뜨리지 않는다', async () => {
+  const { handle } = buildHandle({ maxBodyBytes: 64 });
+  const server = createServer(createNodeHandler(handle, { maxBodyBytes: 64 }));
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const port = server.address().port;
+  try {
+    const padded = { ...sampleState(), note: '길게'.repeat(200) };
+    const big = await fetch(`http://127.0.0.1:${port}/api/workspace`, {
+      method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(padded)
+    });
+    assert.equal(big.status, 413);
+    assert.equal((await big.json()).error.code, 'payload_too_large');
+
+    await new Promise((resolve, reject) => {
+      const socket = net.connect(port, '127.0.0.1');
+      socket.on('error', reject);
+      socket.write(`PUT /api/workspace HTTP/1.1\r\nhost: 127.0.0.1\r\ncontent-type: application/json\r\ncontent-length: 4000\r\n\r\n{"state":`);
+      setTimeout(() => { socket.destroy(); resolve(); }, 60);
+    });
+
+    const after = await fetch(`http://127.0.0.1:${port}/api/workspace`);
+    assert.equal(after.status, 200);
+    assert.equal((await after.json()).revision, 0);
+    assert.deepEqual(unhandled, []);
   } finally {
     await new Promise(resolve => server.close(resolve));
   }

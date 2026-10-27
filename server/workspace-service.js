@@ -3,6 +3,15 @@ import { EMPTY_STATE, validateState } from '../src/domain.js';
 import { ApiError } from './errors.js';
 
 const CLIENT_KEY = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
+const GENERIC_DOCUMENT_MESSAGE = '기록 형식을 확인해 주세요.';
+
+// domain.js의 검증 오류 문구는 애초에 사용자에게 보여 주는 문구다. TypeError·RangeError처럼
+// 구현에서 발생한 문장은 응답에 그대로 실어 보내지 않는다.
+function documentMessage(error) {
+  if (error instanceof TypeError || error instanceof RangeError) return GENERIC_DOCUMENT_MESSAGE;
+  const message = error?.message;
+  return typeof message === 'string' && message.length <= 200 && !/[\u0000-\u001f]/.test(message) ? message : GENERIC_DOCUMENT_MESSAGE;
+}
 
 export function requestHashOf(validatedState, expectedRevision) {
   return createHash('sha256').update(`${JSON.stringify(validatedState)}\n${expectedRevision}`, 'utf8').digest('hex');
@@ -15,7 +24,7 @@ function parseWriteInput(payload) {
   if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 0) throw new ApiError(400, 'invalid_revision', '저장 번호를 바로 확인해 주세요.');
   if (typeof clientKey !== 'string' || !CLIENT_KEY.test(clientKey)) throw new ApiError(400, 'invalid_client_key', '요청 키 형식을 확인해 주세요.');
   let validated;
-  try { validated = validateState(state); } catch (error) { throw new ApiError(400, 'invalid_document', error.message); }
+  try { validated = validateState(state); } catch (error) { throw new ApiError(400, 'invalid_document', documentMessage(error)); }
   return { validated, expectedRevision, clientKey };
 }
 

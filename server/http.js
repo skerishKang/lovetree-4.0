@@ -50,18 +50,29 @@ export function createNodeHandler(requestHandler, { maxBodyBytes = DEFAULT_MAX_B
   return async function nodeHandler(req, res) {
     const chunks = [];
     let size = 0;
-    for await (const chunk of req) {
-      size += chunk.length;
-      chunks.push(chunk);
-      // cap+1까지 읽으면 handle 내부의 크기 검사가 413으로 결정한다.
-      if (size > maxBodyBytes) break;
+    let aborted = false;
+    req.on('aborted', () => { aborted = true; });
+    try {
+      // 한도를 넘겨도 읽기를 멈추지 않고 확보만 멈춘다. 반복자를 중간에 끊으면
+      // 스트림이 파괴되어 클라이언트가 413 응답 대신 연결 절단을 보게 된다.
+      for await (const chunk of req) {
+        if (size <= maxBodyBytes) chunks.push(chunk);
+        size += chunk.length;
+      }
+    } catch {
+      aborted = true;
     }
-    const result = await requestHandler({
-      method: req.method,
-      path: new URL(req.url, 'http://localhost').pathname,
-      headers: req.headers,
-      body: Buffer.concat(chunks).toString('utf8')
-    });
+    if (aborted || res.destroyed) { res.destroy(); return; }
+
+    let path;
+    try { path = new URL(req.url, 'http://localhost').pathname; }
+    catch {
+      res.writeHead(400, { 'content-type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ error: { code: 'invalid_path', message: '요청 경로를 읽을 수 없어요.' } }));
+      return;
+    }
+    const result = await requestHandler({ method: req.method, path, headers: req.headers, body: Buffer.concat(chunks).toString('utf8') });
+    if (res.destroyed) return;
     res.writeHead(result.status, { 'content-type': 'application/json; charset=utf-8' });
     res.end(JSON.stringify(result.body));
   };
