@@ -58,7 +58,7 @@ GitHub PR로 변경을 비교할 수 있다. 코멘트/리뷰 요청 전송은 O
 
 ## 개발과 서비스의 차이
 
-현재 `npm run dev`는 개발용이다. 인터넷에 공개하는 서버로 사용하지 않는다. Cloudflare 배포·인증·DB는 별도 단계다. COM2의 PADIEM 서버를 이 프로젝트 실행에 사용하거나 설정을 변경하지 않는다.
+현재 `npm run dev`는 개발용이다. 인터넷에 공개하는 서버로 사용하지 않는다. 정적 결과물은 Cloudflare Pages `lovetree-4-0`(https://lovetree-4-0.pages.dev/)이 GitHub 저장소에 연결되어 push할 때 자동 배포된다. 인증·서버 저장·DB는 아직 없고 별도 단계다. COM2의 PADIEM 서버를 이 프로젝트 실행에 사용하거나 설정을 변경하지 않는다.
 
 ## 초기 연결 확인 — 2026-10-27 KST
 

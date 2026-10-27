@@ -1,5 +1,14 @@
 # LoveTree 4.0 인수인계
 
+## Cloudflare Pages 배포 — 2026-10-27
+
+통합본을 인터넷에서 볼 수 있게 Cloudflare Pages 프로젝트 `lovetree-4-0`(Charliekant 계정)을 GitHub `skerishKang/lovetree-4.0`에 Git 연결했다. 주소는 **https://lovetree-4-0.pages.dev/** 다. Pages 프로젝트 이름에는 소문자·숫자·대시만 쓸 수 있어 점이 들어간 `lovetree-4.0.pages.dev`는 만들 수 없다.
+
+- 프로덕션 분기 `ai/com1-integration-review-20261027-071356-cf87f3`, 빌드 명령 `npm run build`, 출력 `dist`, 자동 배포 켜짐. 그 분기에 push하면 다시 빌드·배포된다(첫 배포 커밋 `8af4b7e`, 성공).
+- `main`을 병합하면 설정에서 프로덕션 분기를 `main`으로 바꿔야 그 커밋이 이 주소에 배포된다. 지금 이 주소는 **병합 전 통합 브랜치 내용**이다.
+- 정적 프런트만 배포했다. 기록은 방문자 브라우저 localStorage에만 저장되고 서버 저장·로그인·공유·DB는 없다(개발 서버와 달리 정적 호스팅이다).
+- 배포 확인: 배포된 JS `index-C-W9KDHd.js`(151,425 B)·CSS `index-C13j1MO_.css`(30,853 B)와 이미지가 로컬 `dist` 빌드와 해시·크기까지 일치, 첫 화면과 `#trees` 책장이 렌더링되고 콘솔 오류가 없다. 사이트 화면을 직접 조작하는 회귀 확인(책장→트리 연결, 390px 등)은 로컬 `127.0.0.1:4420`에서 한 결과와 같고, 배포 주소에서는 렌더링까지만 확인했다.
+
 ## 통합 검토 — 2026-10-27
 
 이슈 #26의 통합 브랜치 `ai/com1-integration-review-20261027-071356-cf87f3`(base `origin/main` `bb6c784`)에서 완료 PR 7개를 **merge**로 합쳤다: #16 저장·가져오기 오류 안내(`48c5d1b`) · #17 결정·백로그 문서(`cb00582`) · #18 old 자산 카탈로그(`431afed`) · #19 SRC064 첫 화면·기억책 UI(`6173f88`) · #21 Vite 8.3.5(`02824d1`) · #24 예시 이미지 분리(`1744911`, #19 다음에 merge) · #25 Track32 책장 연결(`8757010`, #19 위에 쌓인 브랜치). cherry-pick 없이 각 PR의 전체 이력을 보존했다. 실제 충돌은 #25 merge의 `docs/HANDOFF.md` 1건뿐이었고 코드 충돌은 없었다(#25는 #19 위에 쌓인 브랜치라 `src/main.js`·`src/views/book.js`도 자동 병합). 양쪽 문단을 모두 보존하고 책장 문단을 통합 상태에 맞게 고쳐 해결했다.
