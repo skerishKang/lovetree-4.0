@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createTree, addMoment, editMoment, removeMoment, validateState, importTrees, treeLayout, pathTo, linkMoments, unlinkMoments, relatedMoments, MAX_LINKS, safeUrl, newId } from '../src/domain.js';
+import { createTree, addMoment, editMoment, removeMoment, validateState, importTrees, treeLayout, pathTo, stemGroups, linkMoments, unlinkMoments, relatedMoments, MAX_LINKS, safeUrl, newId } from '../src/domain.js';
 import { loadState, saveState, STORAGE_KEY, RECOVERY_KEY } from '../src/storage.js';
 
 const input = (title = '첫 목소리') => ({ subject: '윤슬', title, note: '오래 기억하고 싶은 마음', emotion: '설렘', date: '2026-10-27', url: '' });
@@ -140,6 +140,22 @@ test('emotions outside the app list survive import and export unchanged', () => 
   assert.equal(withEmotion('  '), '설렘');
   assert.equal(withEmotion('가'.repeat(30)), '설렘');
   assert.equal(withEmotion(undefined), '설렘');
+});
+test('stems split the story by the branches that leave the start, in date order', () => {
+  let tree = createTree(input());
+  const root = tree.moments[0].id;
+  tree = addMoment(tree, { ...input('가을의 무대'), date: '2026-10-01' }, root);
+  const left = tree.moments[1].id;
+  tree = addMoment(tree, { ...input('가을의 인터뷰'), date: '2026-10-05' }, left);
+  tree = addMoment(tree, { ...input('봄의 무대'), date: '2026-09-20' }, root);
+  const groups = stemGroups(tree);
+  assert.equal(groups.length, 3);
+  assert.equal(groups[0].root, true);
+  assert.deepEqual(groups[0].moments.map(m => m.id), [root]);
+  assert.deepEqual(groups.slice(1).map(g => g.title), ['봄의 무대', '가을의 무대']);
+  const autumn = groups.find(g => g.title === '가을의 무대');
+  assert.deepEqual(autumn.moments.map(m => m.title), ['가을의 무대', '가을의 인터뷰']);
+  assert.equal(stemGroups(createTree(input())).length, 1);
 });
 test('the route to a moment is the single parent chain from the start', () => {
   let tree = createTree(input());
