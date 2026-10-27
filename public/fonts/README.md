@@ -16,7 +16,7 @@
 - 파일: `MaruBuri-Regular.woff2`, 429,572바이트, SHA-256 `74bd817d96466e5d071e19234faddc8099f9d5913757880a52a59516859a72ff`
 - 출처: 네이버 공식 CSS <https://hangeul.naver.com/css/fonts.css> 의 `@font-face`가 가리키는 `https://hangeul.pstatic.net/0/hangeul/2023/fonts/MaruBuri-Regular.woff2` 그 파일. 설치용 공식 ZIP <https://hangeul.pstatic.net/0/hangeul/2022/zip_v2/maruburi.zip>(SHA-256 `39e3bb6a00b4543563a745195a6a89282c5a1f0f8b71923ff15c1bc7c135fa0c`)으로도 대조했다. GitHub 미러 파일은 쓰지 않았다.
 - 굵기는 Regular 한 종만 싣는다(감상 제목은 400). 로딩은 `font-display: swap`, 대체 스택은 `'MaruBuri','Noto Serif CJK KR',Batang,Georgia,serif`.
-- 라이선스: 저작권 안내와 SIL OFL 1.1 전문을 `LICENSE-MaruBuri.txt`에 동봉(네이버 안내문은 마루 부리가 나눔 글꼴과 같은 오픈 라이선스이며 법적 효력은 영문 원본에 있다고 명시).
+- 라이선스: `LICENSE-MaruBuri.txt`에 ① 공식 파일에 박힌 이름 표(fontTools 실측 — copyright `© NAVER Corp. © NAVER Cultural Foundation Corp.`, 제조사 AG Typography Institute, name 13/14 라이선스 레코드 없음), ② 네이버 공식 페이지의 저작권 안내 원문, ③ 그 페이지에 게시된 라이선스 전문(영문 원본 + 한글 번역, NAVER 저작권과 Reserved Font Name ‘마루 부리’ 포함)을 그대로 담았다. ④ 표준 OFL 1.1 핵심 문구 17항을 페이지 전문과 대조해 전부 일치함을 확인했다. 네이버 안내문은 마루 부리가 나눔 글꼴과 같은 오픈 라이선스이고 법적 효력은 영문 원본에 있다고 명시한다.
 
 ## 실측(Chromium 156, 로컬 프로덕션 빌드, 화면 순회 누적)
 
