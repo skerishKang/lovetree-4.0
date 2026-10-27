@@ -36,7 +36,7 @@
 - 저장소의 유일한 localStorage 접점: `src/main.js:33`. 네트워크 호출·`ownerId`/`token`/`session`어휘가 `src/`·`tests/`·`index.html`에 **0건**(grep 확인).
 - 동기 저장·낙관 동시성: `src/storage.js:5-19` `loadState`, `:20-30` `saveState`, `:24` `expectedRaw` 문자열 일치(같은 브라우저 탭 한정, `undefined`이면 무방책), 복구 사본 `:12-17`.
 - 데이터: 트리 6키 외 저장 안 함(`src/domain.js:141` 화이트리스트) — 소유자·공개 범위 필드 없음. 순간 `parentId` 하나 + `links[]`(≤20, 양쪽 미러 `:88`, `MAX_LINKS` `:4`). 시점은 `createdAt`만(갱신 시각 없음). `importTrees`(`:146-154`)가 id를 새로 발급 → 기기 간 id 불안정.
-- 배포는 Cloudflare Pages `lovetree-4-0`이라는 **문서 주장**(`docs/DEVELOPMENT.md:61`, `docs/HANDOFF.md:78,84-89`)이고, 저장소에는 `wrangler.*`·`_headers`·`functions/`가 없으며 CI(`.github/workflows/ci.yml`)에 배포 단계가 없다.
+- 배포: Cloudflare Pages `lovetree-4-0`(`docs/DEVELOPMENT.md:61`, `docs/HANDOFF.md:78,84-89`). 이 주장은 실측으로 뒷받침된다 — PR #35의 checks에 `Cloudflare Pages` 항목이 붙어 같은 프로젝트의 미리보기 빌드가 통과했다. 다만 저장소에는 `wrangler.*`·`_headers`·`functions/`가 없고 `.github/workflows/ci.yml`에도 배포 단계가 없다. 즉 배포는 GitHub Actions가 아니라 Pages Git 연결이 담당하며, 서버 구성은 저장소 밖에 있다.
 
 ## 3. 문서상 계획 vs 실제 코드
 
