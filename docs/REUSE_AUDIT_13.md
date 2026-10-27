@@ -45,7 +45,7 @@
 | shared Firebase Auth가 현재 Product 인증 | LoveBud #4004(열림)·#4006(열림) 코멘트, `SHARED_LOVE_PLATFORM_AUTHORITY.md` §2 | **라이브 코드+배포 확인** (401 실측) |
 | Neon Auth 단계적 전환 | LoveBud #4006, `db/migrations/20260822054500_*` | 소스만 있고 **미배선**(`accountId: null`), 매핑 테이블 0행은 #4006 코멘트 보고 |
 | 별도 LoveTree DB = `TRANSITIONAL_BRIDGE_NONCANONICAL`, 두 번째 영구 canonical 금지 | LoveBud #4004·#4005, `AGENTS.md:45-52`, `SHARED_LOVE_PLATFORM_AUTHORITY.md:33` | 오너 승인 정책(문서) |
-| 세 번째 프런트 앱(4.0)용 클라이언트/테넌트 등록 | #4004 토포ロジー는 LoveBud·LoveTree만 명시, `app_id`/`tenant_id` 컬럼 없음 | **문서와 스키마 모순** — 개념 없음 |
+| 세 번째 프런트 앱(4.0)용 클라이언트/테넌트 등록 | #4004 토폴로지는 LoveBud·LoveTree만 명시, `app_id`/`tenant_id` 컬럼 없음 | **문서와 스키마 모순** — 개념 없음 |
 | LoveBud API의 CORS 허용 | `Access-Control-Allow-Origin`은 `docs/conversation/full/2026-04-17-*.md`에 인용된 과거 Netlify 함수에만 존재. 현행 `functions/`·`workers/`·`js/`는 git grep 0건, 라이브 응답 헤더에도 없음 | **문서=과거 사본, 코드=없음** |
 | 4.0 "Worker/D1 어댑터로 교체" | `README.md:62`, `docs/HANDOFF.md:130` | 4.0에 어댑터 인터페이스 자체가 없음(동기 호출 6곳 포함) |
 | `core/FRONTEND_BACKEND_BOUNDARY.md:16` "Target: Staged Neon Auth" | limone | 문서만, 코드 없음 |
