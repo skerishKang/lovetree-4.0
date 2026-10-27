@@ -333,7 +333,7 @@ export function mountSync({ controller, doc = globalThis.document, onAdopted = (
     bar.className = 'storage-notice';
     bar.setAttribute('role', 'status');
     bar.setAttribute('aria-live', 'polite');
-    bar.style.cssText = 'margin:18px auto 0;width:min(1400px,calc(100% - 80px));flex-wrap:wrap';
+    bar.style.cssText = 'position:sticky;bottom:14px;z-index:60;margin:18px auto 0;width:min(1400px,calc(100% - 80px));flex-wrap:wrap;box-shadow:0 8px 25px #26351a26';
     doc.body.append(bar);
   }
   const paint = (state) => {
