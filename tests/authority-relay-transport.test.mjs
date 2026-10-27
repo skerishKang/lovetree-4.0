@@ -92,7 +92,10 @@ test('the timeout really cancels the request instead of leaving it running', asy
 test('unreachable relay and missing configuration refuse without leaking the secret', async () => {
   assert.throws(() => createAuthorityRelayClient({ url: '', callerSecret: SECRET }), /LOVETREE_AUTHORITY_RELAY_URL/);
   assert.throws(() => createAuthorityRelayClient({ url: 'https://relay.example', callerSecret: '' }), /LOVETREE_CALLER_SECRET/);
-  assert.throws(() => createAuthorityRelayClient({ url: 'ftp://relay', callerSecret: SECRET }), /http\/https/);
+  assert.throws(() => createAuthorityRelayClient({ url: 'ftp://relay', callerSecret: SECRET }), /https/);
+  assert.throws(() => createAuthorityRelayClient({ url: 'http://relay.example/resolve-session', callerSecret: SECRET }), /loopback/);
+  assert.equal(createAuthorityRelayClient({ url: 'https://relay.example/resolve-session', callerSecret: SECRET }) !== undefined, true);
+  assert.throws(() => createAuthorityRelayClient({ url: `http://127.0.0.1:9/resolve-session`, callerSecret: '' }), /LOVETREE_CALLER_SECRET/);
   const client = createAuthorityRelayClient({ url: 'http://127.0.0.1:1/resolve-session', callerSecret: SECRET, timeoutMs: 300 });
   await assert.rejects(() => client.resolveIdentity({ sessionId: SID }), error => {
     assert.equal(error.status, 503);
@@ -110,5 +113,53 @@ test('the session id is bounded before any request leaves', async () => {
       await assert.rejects(() => client.resolveIdentity({ sessionId: bad }), error => error.status === 401);
     }
     assert.equal(reached, false);
+  } finally { await ended.close(); }
+});
+
+test('a relay that sends headers then stalls the body is cancelled and closes as 503', async () => {
+  let closed = false;
+  let completed = false;
+  const ended = await serve((_req, res) => {
+    res.on('close', () => { closed = true; });
+    res.writeHead(200, { 'content-type': 'application/json', 'content-length': '400' });
+    res.write('{"ok":true,"identity":{');
+    setTimeout(() => { if (!closed) { completed = true; res.end('}}'); } }, 250);
+  });
+  try {
+    const client = createAuthorityRelayClient({ url: ended.url, callerSecret: SECRET, timeoutMs: 40 });
+    await assert.rejects(() => client.resolveIdentity({ sessionId: SID }), error => error.status === 503);
+    await new Promise(resolve => setTimeout(resolve, 300));
+    assert.equal(closed, true, '본문 정지까지 취소되지 않았다');
+    assert.equal(completed, false, '취소된 응답이 끝까지 실렸다');
+  } finally { await ended.close(); }
+});
+
+test('an oversized relay body is refused at the client cap', async () => {
+  const padded = 'y'.repeat(4000);
+  const ended = await serve((_req, res) => json(res, 200, { ok: true, identity: { session_id: SID, product_id: 'lovetree-4-0', subject_id: padded, expires_at: '2999-01-01T00:00:00.000Z' } }));
+  const notes = [];
+  try {
+    const client = createAuthorityRelayClient({ url: ended.url, callerSecret: SECRET, maxResponseBytes: 512, onUnavailable: code => notes.push(code) });
+    await assert.rejects(() => client.resolveIdentity({ sessionId: SID }), error => {
+      assert.equal(error.status, 503);
+      assert.doesNotMatch(`${error.code} ${error.message}`, new RegExp(padded.slice(0, 20)));
+      return true;
+    });
+    assert.deepEqual(notes, [{ code: 'relay_response_too_large' }]);
+    assert.throws(() => createAuthorityRelayClient({ url: ended.url, callerSecret: SECRET, maxResponseBytes: 0 }), /응답 크기 상한/);
+  } finally { await ended.close(); }
+});
+
+test('a slow body is cut by the same deadline that covered the headers', async () => {
+  const ended = await serve((_req, res) => {
+    res.writeHead(200, { 'content-type': 'application/json' });
+    res.write('{"ok":true,"identity":{"session_id":"');
+    setTimeout(() => { res.end(`${SID}", "product_id":"lovetree-4-0","subject_id":"sub_1","expires_at":"2999-01-01T00:00:00.000Z"}}`); }, 200);
+  });
+  try {
+    const client = createAuthorityRelayClient({ url: ended.url, callerSecret: SECRET, timeoutMs: 60 });
+    await assert.rejects(() => client.resolveIdentity({ sessionId: SID }), error => error.status === 503);
+    const fast = createAuthorityRelayClient({ url: ended.url, callerSecret: SECRET, timeoutMs: 1_000 });
+    assert.deepEqual(await fast.resolveIdentity({ sessionId: SID }), { sessionId: SID, productId: 'lovetree-4-0', subjectId: 'sub_1', expiresAt: '2999-01-01T00:00:00.000Z' });
   } finally { await ended.close(); }
 });
