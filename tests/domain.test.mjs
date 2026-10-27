@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createTree, addMoment, editMoment, removeMoment, validateState, importTrees, treeLayout, safeUrl, newId } from '../src/domain.js';
+import { createTree, addMoment, editMoment, removeMoment, validateState, importTrees, treeLayout, pathTo, safeUrl, newId } from '../src/domain.js';
 import { loadState, saveState, STORAGE_KEY, RECOVERY_KEY } from '../src/storage.js';
 
 const input = (title = '첫 목소리') => ({ subject: '윤슬', title, note: '오래 기억하고 싶은 마음', emotion: '설렘', date: '2026-10-27', url: '' });
@@ -140,6 +140,20 @@ test('emotions outside the app list survive import and export unchanged', () => 
   assert.equal(withEmotion('  '), '설렘');
   assert.equal(withEmotion('가'.repeat(30)), '설렘');
   assert.equal(withEmotion(undefined), '설렘');
+});
+test('the route to a moment is the single parent chain from the start', () => {
+  let tree = createTree(input());
+  const root = tree.moments[0].id;
+  tree = addMoment(tree, input('둘'), root);
+  const second = tree.moments[1].id;
+  tree = addMoment(tree, input('셋'), second);
+  const third = tree.moments[2].id;
+  tree = addMoment(tree, input('옆가지'), root);
+  assert.deepEqual(pathTo(tree, third).map(m => m.id), [root, second, third]);
+  assert.deepEqual(pathTo(tree, tree.moments[3].id).map(m => m.title), ['첫 목소리', '옆가지']);
+  assert.deepEqual(pathTo(tree, root).map(m => m.id), [root]);
+  assert.deepEqual(pathTo(tree, 'missing'), []);
+  assert.deepEqual(pathTo(removeMoment(tree, second), third).map(m => m.id), [root, third]);
 });
 test('branched tree layout places every child after its parent', () => {
   let tree = createTree(input());
