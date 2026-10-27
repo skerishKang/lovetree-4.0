@@ -9,6 +9,8 @@
 
 base64 미디어 본문, 전체 HTML, 개인정보·비밀값은 이 문서에 옮기지 않았다. 미디어는 **개수만** 기록한다.
 
+**비교 미리보기(2026-10-27)**: `reference/originals/`에 58·56·66·55 원본을 해시 확인 후 보존했고, `reference/compare/index.html`에서 64·59·32·58·56·66·55를 old 원본과 4.0 대응 화면으로 나란히 볼 수 있다. 실행은 `npm run reference` → `http://127.0.0.1:4450/reference/compare/`. 출처·해시는 `reference/SOURCES.md`에 있다.
+
 ---
 
 ## 1. 추천 후보 비교표

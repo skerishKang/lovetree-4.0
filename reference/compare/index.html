@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LoveTree · old 화면 비교 미리보기</title>
+    <style>
+      :root { color-scheme: dark; --bg:#0d0b10; --panel:#171320; --line:#332b3d; --ink:#f2e9ee; --dim:#b6a9b6; --rose:#e0a4b8; }
+      * { box-sizing: border-box; }
+      body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.7 system-ui, sans-serif; }
+      a { color: var(--rose); }
+      header.top { padding:26px 28px 18px; border-bottom:1px solid var(--line); background:linear-gradient(180deg,#1a1320,#0d0b10); }
+      header.top h1 { margin:0 0 8px; font-size:22px; letter-spacing:-.3px; }
+      header.top p { margin:4px 0; color:var(--dim); font-size:12.5px; max-width:1000px; }
+      .warn { display:inline-block; margin-top:10px; padding:6px 10px; border:1px solid #6b4051; border-radius:8px; color:#f0c4d2; font-size:12px; }
+      .controls { display:flex; flex-wrap:wrap; gap:12px; align-items:center; padding:16px 28px; border-bottom:1px solid var(--line); position:sticky; top:0; z-index:20; background:#0f0c13f2; backdrop-filter:blur(8px); }
+      .controls button, .controls input { font:inherit; }
+      .controls button { padding:7px 12px; border-radius:999px; border:1px solid var(--line); background:#211a2b; color:var(--ink); cursor:pointer; }
+      .controls button[aria-pressed="true"] { border-color:var(--rose); color:#1a121b; background:var(--rose); }
+      .controls label { color:var(--dim); font-size:12px; }
+      .controls input { width:min(380px, 60vw); padding:7px 10px; border-radius:8px; border:1px solid var(--line); background:#191322; color:var(--ink); }
+      main { padding:22px 28px 60px; display:grid; gap:26px; }
+      article.compare { border:1px solid var(--line); border-radius:16px; background:var(--panel); overflow:hidden; }
+      .head { padding:16px 18px; border-bottom:1px solid var(--line); display:flex; flex-wrap:wrap; gap:10px 16px; align-items:baseline; }
+      .head h2 { margin:0; font-size:17px; }
+      .badge { font-size:11px; padding:3px 9px; border-radius:999px; border:1px solid var(--line); color:var(--dim); }
+      .badge.reuse { border-color:#4f7a5e; color:#9ed3ae; }
+      .badge.refine { border-color:#7a6a3f; color:#e2cf95; }
+      .badge.hold { border-color:#7a4350; color:#eaa9b8; }
+      .why { margin:0; padding:0 18px 12px; color:var(--dim); font-size:12.5px; }
+      .hash { padding:0 18px 10px; color:#8f818f; font-size:11px; overflow-wrap:anywhere; }
+      .hash code { color:#a993a6; }
+      .panes { display:grid; grid-template-columns:1fr 1fr; gap:1px; background:var(--line); }
+      .pane { background:#0b090e; display:flex; flex-direction:column; min-width:0; }
+      .pane header { display:flex; justify-content:space-between; gap:8px; align-items:center; padding:8px 12px; font-size:11.5px; color:var(--dim); border-bottom:1px solid var(--line); }
+      .pane iframe { border:0; width:100%; height:620px; background:#050407; }
+      .pane a { font-size:11.5px; }
+      body[data-mode="old"] .panes { grid-template-columns:1fr; }
+      body[data-mode="old"] .pane.app,
+      body[data-mode="app"] .pane.old { display:none; }
+      body[data-mode="app"] .panes { grid-template-columns:1fr; }
+      footer { padding:0 28px 60px; color:var(--dim); font-size:12px; }
+      footer h2 { font-size:14px; color:var(--ink); }
+      ul { padding-left:20px; }
+      @media (max-width: 900px) { .panes { grid-template-columns:1fr; } .pane iframe { height:460px; } }
+    </style>
+  </head>
+  <body data-mode="both">
+    <header class="top">
+      <h1>old 화면 ↔ 4.0 비교 미리보기</h1>
+      <p>이슈 #8의 검토용 화면입니다. 원본 HTML을 그대로 띄우고 옆에 4.0의 대응 화면을 함께 보여 줍니다. 제품 번들에는 포함되지 않으며(<code>public</code> 밖), 여기서의 조작은 4.0 기록에 저장되지 않습니다. 원본은 수정하지 않습니다.</p>
+      <p>판단 표시는 <strong>재사용</strong>(이미 이식) · <strong>보완</strong>(부분 이식, 개선 필요) · <strong>보류</strong>(4.0 스키마·정책 확정 전)입니다. 근거는 <code>reference/OLD_ASSET_CATALOG.md</code>와 이 페이지에 함께 적었습니다.</p>
+      <p>실행: <code>npm run reference</code> → <a href="http://127.0.0.1:4450/reference/compare/">http://127.0.0.1:4450/reference/compare/</a></p>
+      <span class="warn">원본은 mock 데이터로 움직입니다. 여기 보이는 기록은 실제 사용자 기록이 아닙니다.</span>
+    </header>
+
+    <div class="controls" role="group" aria-label="비교 보기 설정">
+      <button type="button" data-mode="both" aria-pressed="true">나란히</button>
+      <button type="button" data-mode="old" aria-pressed="false">원본만</button>
+      <button type="button" data-mode="app" aria-pressed="false">4.0만</button>
+      <label for="app-base">4.0 주소</label>
+      <input id="app-base" value="https://lovetree-4-0.pages.dev" spellcheck="false" />
+      <button type="button" id="apply-base">적용</button>
+    </div>
+
+    <main id="list"></main>
+
+    <footer>
+      <h2>추가 보존본</h2>
+      <ul>
+        <li><a href="../originals/first-journey.html">first-journey.html</a> — 통합 첫 여정 참고본(111,950 bytes)</li>
+        <li><a href="../originals/community-discovery.html">community-discovery.html</a> — 공개 둘러보기 참고본(40,685 bytes)</li>
+      </ul>
+      <p>전체 출처·Git blob SHA·SHA-256은 <code>reference/SOURCES.md</code>, 화면별 사실과 구현 상태는 <code>reference/OLD_ASSET_CATALOG.md</code>에 있습니다.</p>
+    </footer>
+
+    <script>
+      const tracks = [
+        {
+          id: '64', name: '64 · 부유 첫 화면 (SRC064)', verdict: 'reuse', verdictLabel: '재사용',
+          file: 'src064-orbit.html', route: '/',
+          why: '궤도 수식·카드 형태·예시 자산을 첫 화면에 적용했습니다. mock 메뉴와 옛 로컬 경로는 앱 이동으로 교체했고, 예시는 사용자 저장소에 넣지 않습니다.',
+          bytes: '1,565,313', sha: '80886540bb8e3148a7336bf9999298897ac0ab921797a6534c89ea0029c6de5d',
+          compare: '볼 것: 카드 배치·깊이 표현·첫 진입 문구'
+        },
+        {
+          id: '59', name: '59 · 메모리 스케치북', verdict: 'reuse', verdictLabel: '재사용',
+          file: 'track59-sketchbook.html', route: '#demo-book/demo-voice',
+          why: '종이·표지·좌우 페이지와 목차 패널을 재사용했고, 실제 기록·분기·수정은 앱 데이터로 새로 연결했습니다. 물리적 페이지 뒤집기·돋보기는 이식하지 않았습니다.',
+          bytes: '120,614', sha: '85fecda2339f2e8287daf09bbd8572d8ca568bb2ff536a6e6599e30078c45916',
+          compare: '볼 것: 페이지 질감·여백·페이지 넘김 손맛'
+        },
+        {
+          id: '32', name: '32 · 사람별 3D 책장', verdict: 'reuse', verdictLabel: '재사용',
+          file: 'track32-bookshelf.html', route: '#trees',
+          why: '입체 표지·거리 기반 배치를 재사용하고 실제 트리 목록·대상 필터·검색·선택 복원을 보완했습니다. 원본 reader·customBooks 저장·외부 폰트는 가져오지 않았습니다.',
+          bytes: '74,978', sha: 'cb64d80376d59ced65273784ce9723c22723827d25e800474e192d070833ca67',
+          compare: '볼 것: 책장 깊이·표지 각도·권 선택 반응'
+        },
+        {
+          id: '58', name: '58 · 리빙메모리 핀보드', verdict: 'refine', verdictLabel: '보완',
+          file: 'track58-pinboard.html', route: '#demo/demo-voice',
+          why: '핀 이동·경로 강조·시네마 재생은 매력적이지만 원본은 moments[]와 별도 connections[]를 씁니다. 4.0은 한 부모 트리로 같은 목적을 달성하고 있어, 다중 연결 규칙(#9) 전까지 배치·강조 표현만 후보입니다.',
+          bytes: '532,697', sha: '9fd5b6e7b69bc14347cf3eb1905e7a118ad9bd7b62faa9d81f47b4389a7d3cb5',
+          compare: '볼 것: 카드 간 경로 강조·핀 고정 방식·모바일 배치'
+        },
+        {
+          id: '56', name: '56 · 세로형 관계망', verdict: 'refine', verdictLabel: '보완',
+          file: 'track56-network.html', route: '#demo/demo-voice',
+          why: '6클러스터 조망·경로 재생·모바일 리본은 유용하지만 canvas 2D라 접근성이 없습니다. 현재 앱은 카드형 트리 보기 + 확대/축소로 대응하며, 전체 조망이 필요해지면 DOM 기반으로 다시 구현해야 합니다.',
+          bytes: '45,761', sha: '1828ef47acefd25f1f2b7cff0a3f58c74aa35e28bf127f41975491dcc156d909',
+          compare: '볼 것: 전체 조망 밀도·경로 재생·모바일 리본'
+        },
+        {
+          id: '66', name: '66 · 첫 트리 가이드', verdict: 'refine', verdictLabel: '보완',
+          file: 'track66-first-connection.html', route: '/',
+          why: '후보 선택 → 경로(MAIN/BRANCH) → 이유 작성 흐름은 앱 첫 기록 폼이 단순화해 흡수했습니다. 긴 영어 안내 전체를 강제하지 않고, 폼 문구·순서는 #10에서 확정합니다(4.0만 보기에서 `새 순간 남기기`로 폼 확인).',
+          bytes: '166,996', sha: 'b50e16984774f3284be38b2b8609fd0a6d7ca9f3d51e3ce5bcd910995911ffc6',
+          compare: '볼 것: 안내 단계 수·이유 입력의 부담·첫 기록 진입 문구'
+        },
+        {
+          id: '55', name: '55 · LUPT 자유 연결', verdict: 'hold', verdictLabel: '보류',
+          file: 'track55-lupt.html', route: '#demo/demo-voice',
+          why: '임의 다중 연결·재배선은 4.0의 "한 순간에 부모 하나" 규칙과 충돌합니다. 지금 스키마에서 바로 쓸 수 있는 것은 간선 시각·호버/포커스 규칙·키보드 삭제 규칙뿐이라 다중 연결 결정(#9) 전까지 보류합니다.',
+          bytes: '55,327', sha: '768a49f64da8621fc357a90401baa8f870351a6d27e58dc4d43dab89e80094bd',
+          compare: '볼 것: 연결 편집의 조작감·간선 표현(스키마 확장 여부 판단용)'
+        }
+      ];
+
+      const list = document.getElementById('list');
+      const baseInput = document.getElementById('app-base');
+      const appBase = () => baseInput.value.trim().replace(/\/+$/, '') || 'https://lovetree-4-0.pages.dev';
+      const escape = value => String(value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+      function render() {
+        list.innerHTML = tracks.map(t => `
+          <article class="compare" id="track-${t.id}">
+            <div class="head">
+              <h2>${escape(t.name)}</h2>
+              <span class="badge ${t.verdict}">${t.verdictLabel}</span>
+              <span class="badge">${escape(t.compare)}</span>
+            </div>
+            <p class="why">${escape(t.why)}</p>
+            <p class="hash">원본 <code>reference/originals/${escape(t.file)}</code> · ${t.bytes} bytes · SHA-256 <code title="${t.sha}">${t.sha.slice(0, 16)}…</code></p>
+            <div class="panes">
+              <div class="pane old">
+                <header><span>old 원본</span><a href="../originals/${escape(t.file)}" target="_blank" rel="noopener">새 탭 ↗</a></header>
+                <iframe loading="lazy" title="old ${escape(t.name)} 원본" src="../originals/${escape(t.file)}" referrerpolicy="no-referrer"></iframe>
+              </div>
+              <div class="pane app">
+                <header><span>4.0 대응 화면</span><a href="${escape(appBase() + t.route)}" target="_blank" rel="noopener">새 탭 ↗</a></header>
+                <iframe loading="lazy" title="4.0 ${escape(t.name)} 대응 화면" src="${escape(appBase() + t.route)}" referrerpolicy="no-referrer"></iframe>
+              </div>
+            </div>
+          </article>`).join('');
+      }
+
+      document.querySelectorAll('[data-mode]').forEach(button => {
+        button.addEventListener('click', () => {
+          document.body.dataset.mode = button.dataset.mode;
+          document.querySelectorAll('[data-mode]').forEach(b => b.setAttribute('aria-pressed', String(b === button)));
+        });
+      });
+      document.getElementById('apply-base').addEventListener('click', render);
+      baseInput.addEventListener('keydown', event => { if (event.key === 'Enter') render(); });
+      render();
+    </script>
+  </body>
+</html>

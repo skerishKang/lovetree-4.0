@@ -24,6 +24,17 @@ SHA-256:
 661d21d4e85711603f7e8fe3966d3fd5ccc29c920fd6479850c2f99040e39f59  originals/community-discovery.html
 ```
 
+## 이슈 #8 비교용으로 추가 보존한 원본 (2026-10-27)
+
+`reference/originals/`에 바이트 그대로 복사했고, 아래 SHA-256은 `reference/OLD_ASSET_CATALOG.md`의 기록과 일치함을 확인했다. 제품 번들에는 들어가지 않으며, 비교 화면은 `reference/compare/index.html`(`npm run reference` → `http://127.0.0.1:4450/reference/compare/`)이다.
+
+| 보존 파일 | 출처 (COM1 `lovetree-limone/old/reference/…`) | 크기 | SHA-256 |
+| --- | --- | --- | --- |
+| `originals/track58-pinboard.html` | `source-track-58-living-memory-pinboard/★_최종_58_리빙메모리_핀보드.html` | 532,697 | `9fd5b6e7b69bc14347cf3eb1905e7a118ad9bd7b62faa9d81f47b4389a7d3cb5` |
+| `originals/track56-network.html` | `source-track-56-vertical-moment-network/후보_버전1.2_세로형_모먼트관계망_전체조망.html` | 45,761 | `1828ef47acefd25f1f2b7cff0a3f58c74aa35e28bf127f41975491dcc156d909` |
+| `originals/track66-first-connection.html` | `source-tracks-snapshot/66_첫트리만들기_인터랙티브스크롤가이드/버전1.2_제품목적·실제Moment체험강화_후보/현재후보.html` | 166,996 | `b50e16984774f3284be38b2b8609fd0a6d7ca9f3d51e3ce5bcd910995911ffc6` |
+| `originals/track55-lupt.html` | `source-track-55-lupt/★_최종선택_55_LUPT_자유연결_V1.2_바로보기.html` | 55,327 | `768a49f64da8621fc357a90401baa8f870351a6d27e58dc4d43dab89e80094bd` |
+
 ## 초기 제안에 반영한 것
 
 - 종이 같은 배경, 세이지 그린·로즈 계열, 순간 카드와 유기적인 가지 표현.
