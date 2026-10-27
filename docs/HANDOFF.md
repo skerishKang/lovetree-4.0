@@ -1,5 +1,13 @@
 # LoveTree 4.0 인수인계
 
+## #8 old 비교 미리보기 — 2026-10-27
+
+58·56·66·55 원본을 `reference/originals/`에 추가 보존했다. 복사 전후 SHA-256이 `reference/OLD_ASSET_CATALOG.md` 기록과 일치함을 확인했고 출처·크기는 `reference/SOURCES.md`에 적었다. 지금 보존본은 64·59·32·58·56·66·55 일곱 개다.
+
+비교 화면은 `reference/compare/index.html`이며 `npm run reference`(`scripts/serve-reference.mjs`, 의존성 없음)로 `http://127.0.0.1:4450/reference/compare/`에서 연다. old 원본과 4.0 대응 화면(`#trees`, `#demo-book/demo-voice`, `#demo/demo-voice`, 첫 화면)을 iframe으로 나란히 띄우고, 화면별 판단(재사용·보완·보류)과 근거, 파일 크기·SHA-256, 확인할 지점을 함께 적었다. 4.0 주소는 입력창에서 바꿀 수 있어 다른 포트의 로컬 빌드와도 비교된다.
+
+검증: 로컬 4450에서 7개 카드와 원본 iframe 7개가 모두 `complete`(제목 확인: SRC064·Track59·Track32·58·56·66·55), `원본만`/`나란히` 전환과 4.0 주소 적용이 동작, 콘솔 오류 0, 1440px 가로 넘침 없음. 제품 번들(`public`·`dist`)에는 들어가지 않아 기존 테스트·배포에 영향이 없다. old 원본이 참조하는 외부 폰트·이미지는 여전히 원본 의존성이며 4.0 기능이 아니다.
+
 ## 접근성·복구·감정 보존 수정 — 2026-10-27
 
 **#7 첫 화면 키보드 진입**: 원인은 그림자 호스트 `<main id="main" tabindex="-1">`였다. Chromium은 호스트가 탭 정지점일 때 그 그림자 트리로 순차 포커스 이동을 하지 않는다. 호스트에서 `tabindex`를 빼고(그림자 뷰 3곳), skip link는 마운트된 뷰의 첫 컨트롤로 포커스를 옮긴다. 검증(로컬 preview 4430): Tab 순서가 `본문으로 바로가기 → 움직임 멈춤 → 순간 목록 → 카드`로 진입하고, skip link Enter는 `움직임 멈춤`에 포커스를 둔다. 책장(`#trees`)·기억책(`#book/…`)도 내부 컨트롤로 진입하며 콘솔 오류는 0이다.
