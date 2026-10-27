@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 /**
  * 테스트 전용 Control Plane 모형. 확인된 쓰기·읽기 RPC 여섯 개의 응답 형상만 닮는다
  * (`identity_authority_worker.py:192-231,232-238,264-281,316-338`).
@@ -28,7 +29,9 @@ export function createModelControlPlane({ sessionTtlSeconds = 3600, clock = () =
       const key = linkKey(product_id, product_user_id);
       let link = links.get(key);
       if (!link) {
-        const subject = `sub_${Buffer.from(`${product_id}:${provider_subject}`).toString('hex').slice(0, 24)}`;
+        // 앞쪽 몇 바이트만 베면 같은 접두사를 공유하는 provider_subject가 같은 주체가 된다.
+        // 서로 다른 검증 신원은 서로 다른 canonical subject로 나가야 하므로 전체를 해시한다.
+        const subject = `sub_${createHash('sha256').update(`${product_id}:${provider_subject}`, 'utf8').digest('hex').slice(0, 32)}`;
         link = { canonical_subject_id: subject, state: 'active' };
         links.set(key, link);
         reverse.set(subjectKey(product_id, subject), product_user_id);

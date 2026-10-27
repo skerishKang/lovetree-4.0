@@ -254,7 +254,7 @@ async function startLoveTree({ harnessOrigin, mintOrigin, readOrigin, plane }) {
 }
 
 // 브라우저 한 번의 왕복: 러브트리 시작 → 하네스 start → Google stub → 하네스 callback.
-async function googleJourney(harness, loveTreePort, { next = '/workspace' } = {}) {
+async function googleJourney(harness, loveTreePort, { next = '/workspace', code = 'chain-google-code' } = {}) {
   const begun = await request(loveTreePort, 'GET', `/auth/login?next=${next}`);
   assert.equal(begun.status, 302, '로그인 시작은 리다이렉트');
   const stateCookie = cookieValue(begun.cookie, 'lovetree_oauth_state');
@@ -269,7 +269,7 @@ async function googleJourney(harness, loveTreePort, { next = '/workspace' } = {}
   const redirect = new URL(authorize.searchParams.get('redirect_uri'));
   assert.equal(`${redirect.pathname}`, '/auth/google/callback');
 
-  const callbackQuery = new URLSearchParams({ code: 'chain-google-code', state: authorize.searchParams.get('state') });
+  const callbackQuery = new URLSearchParams({ code, state: authorize.searchParams.get("state") });
   const handed = await request(Number(redirect.port), 'GET', `/auth/google/callback?${callbackQuery}`);
   const back = new URL(handed.location);
   return {
@@ -453,6 +453,37 @@ test.describe('cross-repo login chain (PADIEM producer → handoff SQL → relay
       });
     assert.equal(unverified.status, 401, '미확인 로그인 표는 거부된다');
     assert.equal(state.database.prepare('SELECT status FROM lovetree_login_handoffs WHERE ticket_id=?').get(orphan.ticket_id).status, 'awaiting_login');
+  });
+
+  // 서로 다른 검증 신원은 서로 다른 소유자 문서로 이어진다. 권위 모형이 주체 id를 접두사만 이 건이 그 회귀를 막는다).
+  test('two verified identities keep separate workspaces', async () => {
+    const first = await googleJourney(state.googleHarness, state.app.port, { code: 'member-a' });
+    const firstSession = await finishAtLoveTree(state.app, first);
+    const credentialA = cookieValue(firstSession.cookie, SESSION_COOKIE);
+    assert.ok(credentialA);
+    const savedA = await request(state.app.port, 'PUT', '/api/workspace', {
+      headers: { 'content-type': 'application/json', cookie: `${SESSION_COOKIE}=${credentialA}` },
+      body: JSON.stringify({ state: doc, expectedRevision: 0, clientKey: 'chain-isolation-a' })
+    });
+    assert.equal(savedA.status, 200, savedA.body);
+
+    const second = await googleJourney(state.googleHarness, state.app.port, { code: 'member-b' });
+    const secondSession = await finishAtLoveTree(state.app, second);
+    const credentialB = cookieValue(secondSession.cookie, SESSION_COOKIE);
+    assert.ok(credentialB);
+    assert.notEqual(credentialB, credentialA, '서로 다른 신원은 서로 다른 세션이다');
+
+    const seenByB = await request(state.app.port, 'GET', '/api/workspace', { headers: { cookie: `${SESSION_COOKIE}=${credentialB}` } });
+    assert.equal(seenByB.json().revision, 0, 'B는 A의 문서를 보지 못한다');
+    const savedB = await request(state.app.port, 'PUT', '/api/workspace', {
+      headers: { 'content-type': 'application/json', cookie: `${SESSION_COOKIE}=${credentialB}` },
+      body: JSON.stringify({ state: doc, expectedRevision: 0, clientKey: 'chain-isolation-b' })
+    });
+    assert.equal(savedB.status, 200);
+    assert.equal(savedB.json().revision, 1);
+
+    const stillA = await request(state.app.port, 'GET', '/api/workspace', { headers: { cookie: `${SESSION_COOKIE}=${credentialA}` } });
+    assert.equal(stillA.json().revision, 1, 'A의 문서는 B의 저장으로 옮지 않는다');
   });
 
   test('password login binds only after a verified credential', async () => {

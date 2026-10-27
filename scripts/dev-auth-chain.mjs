@@ -162,7 +162,7 @@ const stubPage = (query) => {
 const stubServer = createServer(async (req, res) => {
   const url = new URL(req.url, 'http://127.0.0.1');
   res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
-  res.end(url.pathname === '/stub/authorize' ? stubPage(url.searchParams) : '<pre>dev chain stub</pre>');
+  res.end(url.pathname.startsWith('/stub/authorize') ? stubPage(url.searchParams) : '<pre>dev chain stub</pre>');
 });
 
 const distIndex = () => readFile(join(process.cwd(), 'dist', 'index.html'));
