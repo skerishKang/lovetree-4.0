@@ -129,6 +129,18 @@ test('storage failures are reported instead of claiming a successful save', () =
   const unreadable = { getItem: () => { throw new Error('SecurityError'); }, setItem: () => {} };
   assert.throws(() => saveState(unreadable, stateOf(createTree(input())), null), /저장소에 접근/);
 });
+test('emotions outside the app list survive import and export unchanged', () => {
+  const base = createTree(input());
+  const imported = { version: 1, trees: [{ ...base, moments: [{ ...base.moments[0], emotion: '행복' }] }] };
+  assert.equal(validateState(imported).trees[0].moments[0].emotion, '행복');
+  const merged = importTrees({ version: 1, trees: [] }, imported);
+  assert.equal(merged.trees[0].moments[0].emotion, '행복');
+  assert.equal(JSON.parse(JSON.stringify(merged)).trees[0].moments[0].emotion, '행복');
+  const withEmotion = emotion => validateState({ version: 1, trees: [{ ...base, moments: [{ ...base.moments[0], emotion }] }] }).trees[0].moments[0].emotion;
+  assert.equal(withEmotion('  '), '설렘');
+  assert.equal(withEmotion('가'.repeat(30)), '설렘');
+  assert.equal(withEmotion(undefined), '설렘');
+});
 test('branched tree layout places every child after its parent', () => {
   let tree = createTree(input());
   tree = addMoment(tree, input('둘'), tree.moments[0].id);

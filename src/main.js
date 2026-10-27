@@ -112,17 +112,17 @@ function render() {
   const showBook = (treeId, momentId, demo=false) => { selectedId=momentId; go(`#${demo?'demo-book':'book'}/${treeId}`); };
   const showWorkspace = (treeId, momentId, demo=false) => { selectedId=momentId; go(`#${demo?'demo':'tree'}/${treeId}`); };
   if (route === 'trees') {
-    $('#app').innerHTML='<main id="main" tabindex="-1"></main>';
+    $('#app').innerHTML='<main id="main"></main>';
     disposeView=mountShelf($('#main'), {trees:state.trees,storage,view:shelfView,error:loaded.error,recovery:hasRecovery(),onBook:showBook,onWorkspace:showWorkspace,onNew:()=>openMoment('new'),onAction:libraryAction});
   }
   else if (/^(tree|demo)\//.test(route)) $('#app').innerHTML=workspace();
   else if (/^(book|demo-book)\//.test(route) && currentTree()) {
-    $('#app').innerHTML='<main id="main" tabindex="-1"></main>';
+    $('#app').innerHTML='<main id="main"></main>';
     disposeView=mountBook($('#main'), {tree:currentTree(),selectedId,storage,demo:isDemo(),onHome:()=>go('#start'),onShelf:()=>{shelfView.selectedId=currentTree().id;go('#trees')},onWorkspace:showWorkspace,onNew:()=>openMoment('new'),onAdd:id=>openMoment('add',id),onEdit:id=>openMoment('edit',id)});
   } else if (/^(book|demo-book)\//.test(route)) $('#app').innerHTML=workspace();
   else {
-    $('#app').innerHTML='<main id="main" tabindex="-1"></main>';
-    disposeView=mountOrbit($('#main'),{trees:state.trees,storage,example:route==='examples',onNew:()=>openMoment('new'),onTrees:()=>go('#trees'),onBook:showBook,onWorkspace:showWorkspace,error:loaded.error});
+    $('#app').innerHTML='<main id="main"></main>';
+    disposeView=mountOrbit($('#main'),{trees:state.trees,storage,example:route==='examples',onNew:()=>openMoment('new'),onTrees:()=>go('#trees'),onBook:showBook,onWorkspace:showWorkspace,error:loaded.error,recovery:hasRecovery(),onRecovery:exportRecovery});
   }
 }
 function updateTree(tree) { commit({ ...state, trees: state.trees.map(t => t.id === tree.id ? tree : t) }); }
@@ -136,10 +136,11 @@ function openMoment(mode, id) {
   if (mode === 'edit' && !m) return;
   const today = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0,10);
   const emotion = m?.emotion || '설렘';
+  const emotionOptions = EMOTIONS.includes(emotion) ? EMOTIONS : [emotion, ...EMOTIONS];
   opener = document.activeElement;
   while (opener?.shadowRoot?.activeElement) opener = opener.shadowRoot.activeElement;
   formDirty = false;
-  dialog.innerHTML = `<form id="moment-form" data-mode="${mode}" data-id="${escape(id || '')}"><div class="dialog-top"><span class="eyebrow">${mode === 'new' ? 'A LITTLE BEGINNING' : 'ONE MORE MOMENT'}</span><button type="button" class="icon-button" data-action="close-dialog" aria-label="닫기">${icon('close')}</button></div><h2 id="dialog-title">${mode === 'new' ? '간직하고 싶은 순간이 있나요?' : mode === 'edit' ? '그날의 마음을 다듬어 볼까요?' : '이 마음에서, 다음 순간으로.'}</h2><p class="dialog-intro">${mode === 'new' ? '처음 좋아했던 날이 아니어도 좋아요. 지금 떠오르는 장면부터.' : '작은 기록 하나가 나의 이야기를 조금 더 자라게 해요.'}</p>${mode === 'new' ? '<label class="field">누구를, 무엇을 좋아하나요?<input name="subject" maxlength="60" required placeholder="아티스트, 배우, 작품 이름…" autocomplete="off" /></label>' : ''}<label class="field">이 순간에 이름을 붙여 주세요<input name="title" maxlength="80" required value="${escape(m?.title || '')}" placeholder="예: 그 목소리를 처음 만났던 밤" /></label><label class="field">왜 이 순간을 간직하고 싶나요?<textarea name="note" rows="3" maxlength="500" required placeholder="그때의 마음을 짧게 남겨 주세요.">${escape(m?.note || '')}</textarea></label><fieldset class="emotion-field"><legend>그날의 마음</legend><div>${EMOTIONS.map(e => `<label class="emotion-choice"><input type="radio" name="emotion" value="${e}" ${emotion === e ? 'checked' : ''} /><span>${e}</span></label>`).join('')}</div></fieldset><div class="form-row"><label class="field">순간의 날짜<input name="date" type="date" required value="${m?.date || today}" /></label><label class="field">원본 링크 <span>선택</span><input name="url" type="url" maxlength="2048" value="${escape(m?.url || '')}" placeholder="https://…" /></label></div>${mode === 'add' ? `<label class="field">어느 순간에서 이어지나요?<select name="parentId">${tree.moments.map(p => `<option value="${escape(p.id)}" ${p.id === id ? 'selected' : ''}>${escape(p.title)}</option>`).join('')}</select></label>` : ''}${mode === 'add' || m?.parentId ? `<label class="field">두 순간이 이어진 이유 <span>선택</span><input name="relation" maxlength="100" value="${escape(m?.relation || '')}" placeholder="예: 다른 무대도 찾아보고 싶어져서" /></label>` : ''}<p class="form-error" role="alert" id="form-error"></p><div class="dialog-bottom"><span>${icon('check')} 이 브라우저에 저장돼요</span><button class="button primary" type="submit">${mode === 'edit' ? '수정한 마음 저장하기' : mode === 'new' ? '첫 순간 심기' : '순간 이어 붙이기'} ${icon('arrow')}</button></div></form>`;
+  dialog.innerHTML = `<form id="moment-form" data-mode="${mode}" data-id="${escape(id || '')}"><div class="dialog-top"><span class="eyebrow">${mode === 'new' ? 'A LITTLE BEGINNING' : 'ONE MORE MOMENT'}</span><button type="button" class="icon-button" data-action="close-dialog" aria-label="닫기">${icon('close')}</button></div><h2 id="dialog-title">${mode === 'new' ? '간직하고 싶은 순간이 있나요?' : mode === 'edit' ? '그날의 마음을 다듬어 볼까요?' : '이 마음에서, 다음 순간으로.'}</h2><p class="dialog-intro">${mode === 'new' ? '처음 좋아했던 날이 아니어도 좋아요. 지금 떠오르는 장면부터.' : '작은 기록 하나가 나의 이야기를 조금 더 자라게 해요.'}</p>${mode === 'new' ? '<label class="field">누구를, 무엇을 좋아하나요?<input name="subject" maxlength="60" required placeholder="아티스트, 배우, 작품 이름…" autocomplete="off" /></label>' : ''}<label class="field">이 순간에 이름을 붙여 주세요<input name="title" maxlength="80" required value="${escape(m?.title || '')}" placeholder="예: 그 목소리를 처음 만났던 밤" /></label><label class="field">왜 이 순간을 간직하고 싶나요?<textarea name="note" rows="3" maxlength="500" required placeholder="그때의 마음을 짧게 남겨 주세요.">${escape(m?.note || '')}</textarea></label><fieldset class="emotion-field"><legend>그날의 마음</legend><div>${emotionOptions.map(e => `<label class="emotion-choice"><input type="radio" name="emotion" value="${escape(e)}" ${emotion === e ? 'checked' : ''} /><span>${escape(e)}${EMOTIONS.includes(e) ? '' : ' (가져온 값)'}</span></label>`).join('')}</div></fieldset><div class="form-row"><label class="field">순간의 날짜<input name="date" type="date" required value="${m?.date || today}" /></label><label class="field">원본 링크 <span>선택</span><input name="url" type="url" maxlength="2048" value="${escape(m?.url || '')}" placeholder="https://…" /></label></div>${mode === 'add' ? `<label class="field">어느 순간에서 이어지나요?<select name="parentId">${tree.moments.map(p => `<option value="${escape(p.id)}" ${p.id === id ? 'selected' : ''}>${escape(p.title)}</option>`).join('')}</select></label>` : ''}${mode === 'add' || m?.parentId ? `<label class="field">두 순간이 이어진 이유 <span>선택</span><input name="relation" maxlength="100" value="${escape(m?.relation || '')}" placeholder="예: 다른 무대도 찾아보고 싶어져서" /></label>` : ''}<p class="form-error" role="alert" id="form-error"></p><div class="dialog-bottom"><span>${icon('check')} 이 브라우저에 저장돼요</span><button class="button primary" type="submit">${mode === 'edit' ? '수정한 마음 저장하기' : mode === 'new' ? '첫 순간 심기' : '순간 이어 붙이기'} ${icon('arrow')}</button></div></form>`;
   dialog.showModal();
 }
 function closeDialog() {
@@ -172,6 +173,11 @@ dialog.addEventListener('submit', event => {
   } catch (error) { $('#form-error').textContent = error.message; }
 });
 
+function exportRecovery() {
+  const raw = recoveryData(storage, loaded);
+  if (raw === null) return toast('보관된 복구 사본이 없어요.');
+  download(raw, 'lovetree-recovery.json', true);
+}
 function download(data, filename, raw = false) {
   const objectUrl = URL.createObjectURL(new Blob([raw ? data : JSON.stringify(data, null, 2)], { type: 'application/json' }));
   const a = document.createElement('a');
@@ -188,11 +194,18 @@ function libraryAction(action, id) {
     else if (action === 'export-tree') { const tree = state.trees.find(t => t.id === id); if (tree) download({ version: 1, trees: [tree] }, `lovetree-${id.slice(0, 8)}.json`); }
     else if (action === 'export-all') download(state, `lovetree-backup-${new Date().toISOString().slice(0,10)}.json`);
     else if (action === 'import') $('#import-file').click();
-    else if (action === 'recovery') { const raw = recoveryData(storage, loaded); if (raw === null) return toast('보관된 복구 사본이 없어요.'); download(raw, 'lovetree-recovery.json', true); }
+    else if (action === 'recovery') exportRecovery();
   } catch (error) { toast(error.message); }
 }
 document.addEventListener('click', event => {
-  if (event.target.closest('.skip-link')) { event.preventDefault(); $('#main')?.focus(); return; }
+  if (event.target.closest('.skip-link')) {
+    event.preventDefault();
+    const host = $('#main');
+    // Chromium only tabs into a shadow tree when its host is not a tab stop, so focus the first control inside it.
+    const inner = host?.shadowRoot?.querySelector('a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])');
+    (inner || host)?.focus();
+    return;
+  }
   const button = event.target.closest('[data-action]');
   if (!button || button.disabled) return;
   const action = button.dataset.action, id = button.dataset.id;
