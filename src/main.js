@@ -5,6 +5,7 @@ import { mountShelf } from './views/shelf.js';
 import { hasRecovery as recoveryAvailable, recoveryData } from './views/memory.js';
 import { createTree, addMoment, editMoment, removeMoment, importTrees, MAX_TREES, MAX_LINKS, EMOTIONS, treeLayout, pathTo, stemGroups, linkMoments, unlinkMoments, relatedMoments } from './domain.js';
 import { loadState, saveState, STORAGE_KEY, RECOVERY_KEY } from './storage.js';
+import { createSyncController, createWorkspaceApi, mountSync } from './sync.js';
 import { EXAMPLES } from './examples.js';
 
 const $ = (selector, root = document) => root.querySelector(selector);
@@ -58,6 +59,7 @@ function commit(next) {
   if (loaded.blocked) throw new Error(loaded.error);
   expectedRaw = saveState(storage, next, expectedRaw);
   state = next;
+  sync.markLocalSave();
 }
 function currentTree() {
   const route = location.hash.slice(1);
@@ -377,5 +379,13 @@ window.addEventListener('storage', event => {
   if (!next.error) { state = next.state; expectedRaw = event.newValue; render(); }
   else toast(next.error);
 });
+const sync = createSyncController({
+  getState: () => state,
+  replaceState: (doc) => { commit(doc); render(); },
+  api: createWorkspaceApi(),
+  storage: window.localStorage
+});
+mountSync({ controller: sync, doc: document });
 render();
 if (loaded.error) toast(loaded.error);
+void sync.start();
