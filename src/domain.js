@@ -153,6 +153,24 @@ export function importTrees(current, incoming) {
   return { version: 1, trees: [...current.trees, ...copies] };
 }
 
+export function stemGroups(tree) {
+  const root = tree.moments.find(m => m.parentId === null);
+  if (!root) return [];
+  const children = new Map();
+  for (const m of tree.moments) {
+    if (!m.parentId) continue;
+    const list = children.get(m.parentId) || [];
+    list.push(m);
+    children.set(m.parentId, list);
+  }
+  const byDate = (a, b) => a.date.localeCompare(b.date) || a.createdAt.localeCompare(b.createdAt);
+  for (const list of children.values()) list.sort(byDate);
+  const collect = moment => [moment, ...(children.get(moment.id) || []).flatMap(collect)];
+  const stems = [{ id: root.id, title: root.title, root: true, moments: [root] }];
+  for (const child of children.get(root.id) || []) stems.push({ id: child.id, title: child.title, root: false, moments: collect(child) });
+  return stems;
+}
+
 export function pathTo(tree, id) {
   const byId = new Map(tree.moments.map(m => [m.id, m]));
   const path = [];

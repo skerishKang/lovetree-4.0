@@ -61,4 +61,23 @@ dialog{padding:30px 35px;width:min(610px,calc(100% - 32px));max-height:calc(100d
 .detail-links .text-button{margin-top:2px}
 @media(max-width:820px){.moment-board{height:420px}.board-bottom{flex-wrap:wrap;row-gap:8px}}
 @media(max-width:540px){.route-nav small{display:none}.board-tools{gap:6px}.zoom-controls .zoom-fit{padding:0 7px}}
+.view-switch .view-label{white-space:nowrap}
+.stem-board{height:485px;overflow:auto;padding:22px;display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:13px;align-content:start;background-image:radial-gradient(#dfe4d5 1px,transparent 1px);background-size:20px 20px;overscroll-behavior:contain}
+.stem-card{border:1px solid #dde2d3;border-radius:8px;background:#fffefb;padding:15px;display:flex;flex-direction:column;min-height:150px;min-width:0}
+.stem-root{background:#f4f6ec;border-color:#d6dfc7}
+.stem-card.on-stem{border-color:#8ba573;box-shadow:0 0 0 3px #e3eada}
+.stem-card header{display:flex;flex-direction:column;gap:5px;border-bottom:1px solid #edf0e3;padding-bottom:9px;margin-bottom:8px}
+.stem-index{font-size:8px;letter-spacing:1.4px;color:#a3ab92}
+.stem-card h3{margin:0;font-family:var(--serif);font-size:16px;font-weight:400;line-height:1.5;overflow-wrap:anywhere}
+.stem-meta{font-size:9px;color:#99a18d}
+.stem-note{font-size:10px;color:#9aa28c;margin:0;line-height:1.8}
+.stem-card ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+.stem-moment{display:flex;align-items:center;gap:7px;width:100%;text-align:left;border:0;background:none;border-radius:4px;padding:6px 5px;font-size:10px;color:#7f8a73}
+.stem-moment:hover{background:#f1f4e7}
+.stem-moment[aria-pressed=true]{background:#e9efde;color:#4f6b49}
+.stem-moment time{font-size:9px;color:#9ba38e;flex-shrink:0;font-variant-numeric:tabular-nums}
+.stem-moment>span:nth-child(2){flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.stem-moment .emotion{flex-shrink:0;font-size:8px;padding:3px 6px}
+@media(max-width:820px){.stem-board{height:420px}.board-toolbar{flex-wrap:wrap;row-gap:8px}}
+@media(max-width:540px){.stem-board{height:auto;max-height:420px;padding:12px;grid-template-columns:1fr}.view-switch .view-label{display:none}.view-switch button{padding:10px 8px}}
 @media(max-width:540px){.moment-board{height:auto;max-height:420px;padding:12px;gap:10px;grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}.board-card{min-height:138px;padding:12px}.board-card strong{font-size:14px}.board-note{-webkit-line-clamp:4}}
