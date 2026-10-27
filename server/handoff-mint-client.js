@@ -2,8 +2,6 @@ import { ApiError } from './errors.js';
 import { assertServiceUrl, postJson, unauthenticated, unavailable } from './http-client.js';
 
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
-const PRODUCT_USER_ID = /^usr_[A-Za-z0-9_-]{1,80}$/;
-const PROVIDERS = new Set(['google', 'password']);
 const REJECTED = new Set(['invalid_handoff', 'handoff_consumed', 'handoff_expired', 'session_not_minted']);
 
 const rejected = () => new ApiError(401, 'login_handoff_rejected', '로그인 확인을 다시 해야 해요. 처음부터 시도해 주세요.');
@@ -46,13 +44,11 @@ export function createHandoffMintClient({ url, callerSecret, productId, timeoutM
 
       const minted = envelope.session;
       const expires = Date.parse(minted?.expires_at ?? '');
+      // 중계는 발급 사실과 식별자만 돌려준다(#5977 후속 계약). 신원 값은 표 안에 남고 지나오지 않는다.
       const verified = minted
         && ID.test(minted.session_id ?? '')
         && minted.product_id === productId
         && ID.test(minted.subject_id ?? '')
-        && PRODUCT_USER_ID.test(minted.product_user_id ?? '')
-        && PROVIDERS.has(minted.auth_provider)
-        && typeof minted.provider_subject === 'string' && minted.provider_subject.length <= 255 && minted.provider_subject.trim()
         && Number.isFinite(expires) && expires > now().getTime();
       if (!verified) throw unavailable();
 

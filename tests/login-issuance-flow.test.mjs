@@ -97,15 +97,13 @@ async function startMint({ plane, tickets = new Map(), behaviour = 'ok' } = {}) 
       claimed.add(ticket);
       // 'liar'는 발급 서버가 다른 제품의 세션을 돌려주는 경우다. 수신자 확인은 이 쪽에서 한다.
       const issuedProduct = behaviour === 'liar' ? 'b62' : PRODUCT;
+      // 중계 응답은 발급 사실과 식별자만 담는다(#5977 후속 계약) — 표의 신원은 지나오지 않는다.
       return reply(200, {
         ok: true,
         session: {
           session_id: established.session.session_id,
           product_id: issuedProduct,
           subject_id: established.session.subject.subject_id,
-          product_user_id: bound.productUserId ?? USER,
-          auth_provider: bound.authProvider ?? 'google',
-          provider_subject: bound.providerSubject ?? PROVIDER_SUBJECT,
           expires_at: established.session.expires_at
         }
       });
