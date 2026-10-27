@@ -11,8 +11,8 @@ function errorBody(error) {
 export function createApiHandler({ authenticate, service, productId, maxBodyBytes = DEFAULT_MAX_BODY_BYTES }) {
   async function handle(request) {
     const { method = 'GET', path = '', body = '' } = request ?? {};
-    const bytes = new TextEncoder().encode(typeof body === 'string' ? body : String(body)).length;
-    if (bytes > maxBodyBytes) throw new ApiError(413, 'payload_too_large', '보내는 기록이 너무 커요. 일부만 나눠서 저장해 주세요.');
+    const text = typeof body === 'string' ? body : String(body);
+    if (Buffer.byteLength(text, 'utf8') > maxBodyBytes) throw new ApiError(413, 'payload_too_large', '보내는 기록이 너무 커요. 일부만 나눠서 저장해 주세요.');
 
     let verified;
     try { verified = await authenticate(request ?? {}); }
@@ -27,7 +27,7 @@ export function createApiHandler({ authenticate, service, productId, maxBodyByte
         throw new ApiError(415, 'unsupported_media_type', 'JSON으로만 저장할 수 있어요.');
       }
       let payload;
-      try { payload = JSON.parse(typeof body === 'string' ? body : String(body)); }
+      try { payload = JSON.parse(text); }
       catch { throw new ApiError(400, 'invalid_json', '기록 형식을 읽을 수 없어요.'); }
       return { status: 200, body: await service.write(principal, payload) };
     }
