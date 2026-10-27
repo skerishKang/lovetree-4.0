@@ -238,9 +238,20 @@ function openMoment(mode, id) {
   dialog.innerHTML = `<form id="moment-form" data-mode="${mode}" data-id="${escape(id || '')}"><div class="dialog-top"><span class="eyebrow">${mode === 'new' ? 'A LITTLE BEGINNING' : 'ONE MORE MOMENT'}</span><button type="button" class="icon-button" data-action="close-dialog" aria-label="닫기">${icon('close')}</button></div><h2 id="dialog-title">${mode === 'new' ? '간직하고 싶은 순간이 있나요?' : mode === 'edit' ? '그날의 마음을 다듬어 볼까요?' : '이 마음에서, 다음 순간으로.'}</h2><p class="dialog-intro">${mode === 'new' ? '처음 좋아했던 날이 아니어도 좋아요. 지금 떠오르는 장면부터.' : '작은 기록 하나가 나의 이야기를 조금 더 자라게 해요.'}</p>${mode === 'new' ? '<label class="field">누구를, 무엇을 좋아하나요?<input name="subject" maxlength="60" required placeholder="아티스트, 배우, 작품 이름…" autocomplete="off" /></label>' : ''}<label class="field">이 순간에 이름을 붙여 주세요<input name="title" maxlength="80" required value="${escape(m?.title || '')}" placeholder="예: 그 목소리를 처음 만났던 밤" /></label><label class="field">왜 이 순간을 간직하고 싶나요?<textarea name="note" rows="3" maxlength="500" required placeholder="그때의 마음을 짧게 남겨 주세요.">${escape(m?.note || '')}</textarea></label><fieldset class="emotion-field"><legend>그날의 마음</legend><div>${emotionOptions.map(e => `<label class="emotion-choice"><input type="radio" name="emotion" value="${escape(e)}" ${emotion === e ? 'checked' : ''} /><span>${escape(e)}${EMOTIONS.includes(e) ? '' : ' (가져온 값)'}</span></label>`).join('')}</div></fieldset><div class="form-row"><label class="field">순간의 날짜<input name="date" type="date" required value="${m?.date || today}" /></label><label class="field">원본 링크 <span>선택</span><input name="url" type="url" maxlength="2048" value="${escape(m?.url || '')}" placeholder="https://…" /></label></div>${mode === 'add' ? `<label class="field">어느 순간에서 이어지나요?<select name="parentId">${tree.moments.map(p => `<option value="${escape(p.id)}" ${p.id === id ? 'selected' : ''}>${escape(p.title)}</option>`).join('')}</select></label>` : ''}${mode === 'add' || m?.parentId ? `<label class="field">두 순간이 이어진 이유 <span>선택</span><input name="relation" maxlength="100" value="${escape(m?.relation || '')}" placeholder="예: 다른 무대도 찾아보고 싶어져서" /></label>` : ''}<p class="form-error" role="alert" id="form-error"></p><div class="dialog-bottom"><span>${icon('check')} 이 브라우저에 저장돼요</span><button class="button primary" type="submit">${mode === 'edit' ? '수정한 마음 저장하기' : mode === 'new' ? '첫 순간 심기' : '순간 이어 붙이기'} ${icon('arrow')}</button></div></form>`;
   dialog.showModal();
   lockScroll();
+  const initialField = mode === 'new' ? 'subject' : 'title';
+  setTimeout(() => {
+    const field = dialog.querySelector(`[name="${initialField}"]`);
+    field?.focus({ preventScroll: true });
+  }, 0);
 }
 function closeDialog() {
-  if (formDirty && !window.confirm('작성 중인 내용이 있어요. 저장하지 않고 닫을까요?')) return;
+  if (formDirty) {
+    const activeBefore = document.activeElement;
+    if (!window.confirm('작성 중인 내용이 있어요. 저장하지 않고 닫을까요?')) {
+      (activeBefore && activeBefore.isConnected ? activeBefore : dialog.querySelector('input,textarea,select,button'))?.focus?.({ preventScroll: true });
+      return;
+    }
+  }
   formSubmitting = false;
   dialogOriginHash = '';
   dialogOriginIdx = 0;
@@ -265,7 +276,7 @@ dialog.addEventListener('pointerup', event => {
   momentPointerDownOnBackdrop = false;
 });
 dialog.addEventListener('pointercancel', () => { momentPointerDownOnBackdrop = false; });
-dialog.addEventListener('close', () => { formDirty = false; formSubmitting = false; dialogOriginHash = ''; dialogOriginIdx = 0; opener?.focus?.(); if (!linkDialog.open) unlockScroll(); });
+dialog.addEventListener('close', () => { formDirty = false; formSubmitting = false; dialogOriginHash = ''; dialogOriginIdx = 0; const focusTarget = (opener && opener.isConnected) ? opener : (document.querySelector('[data-action="new"]') || document.querySelector('.header-cta')); focusTarget?.focus?.({ preventScroll: true }); if (!linkDialog.open) unlockScroll(); });
 dialog.addEventListener('input', () => { formDirty = true; });
 dialog.addEventListener('submit', event => {
   event.preventDefault();
@@ -335,7 +346,7 @@ function openLinkPicker(id) {
     ? `<form id="link-form" data-id="${escape(id)}">${closeButton}<h2 id="link-title">어떤 순간과 이어 볼까요?</h2><p class="dialog-intro">지금 순간과 함께 떠오르는 순간을 골라 주세요. 트리에서 이어진 위치는 그대로 두고, 두 순간만 서로 이어 둡니다.</p><label class="field">이을 순간<select name="target">${candidates.map(m => `<option value="${escape(m.id)}">${escape(m.title)} · ${dateLabel(m.date)}</option>`).join('')}</select></label><p class="form-error" role="alert" id="link-error"></p><div class="dialog-bottom"><span>한 순간에 ${MAX_LINKS}개까지 이을 수 있어요</span><button class="button primary" type="submit">관련 순간 잇기 ${icon('link')}</button></div></form>`
     : `${closeButton}<h2 id="link-title">이을 수 있는 순간이 없어요</h2><p class="dialog-intro">이 트리의 모든 순간과 이미 이어져 있거나, 아직 다른 순간이 없어요.</p><div class="dialog-bottom"><span></span><button class="button primary" type="button" data-action="close-link">확인</button></div>`;
   linkDialog.showModal();
-  linkDialog.querySelector('select')?.focus();
+  setTimeout(() => { linkDialog.querySelector('select, button')?.focus({ preventScroll: true }); }, 0);
   lockScroll();
 }
 linkDialog.addEventListener('submit', event => {
@@ -365,7 +376,7 @@ linkDialog.addEventListener('pointerup', event => {
   linkPointerDownOnBackdrop = false;
 });
 linkDialog.addEventListener('pointercancel', () => { linkPointerDownOnBackdrop = false; });
-linkDialog.addEventListener('close', () => { if (opener?.isConnected) opener.focus(); if (!dialog.open) unlockScroll(); });
+linkDialog.addEventListener('close', () => { const target = (opener && opener.isConnected) ? opener : null; target?.focus?.({ preventScroll: true }); if (!dialog.open) unlockScroll(); });
 
 function exportRecovery() {
   const raw = recoveryData(storage, loaded);
