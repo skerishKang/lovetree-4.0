@@ -46,6 +46,10 @@ const DEMOS = [...EXAMPLES, ORBIT_EXAMPLE];
 let opener;
 let formDirty = false;
 let formSubmitting = false;
+let dialogOriginHash = '';
+let savingNavigation = false;
+let focusToken = 0;
+let restoringHash = false;
 const dialog = $('#moment-dialog');
 const linkDialog = $('#link-dialog');
 
@@ -209,16 +213,18 @@ function openMoment(mode, id) {
   opener = document.activeElement;
   while (opener?.shadowRoot?.activeElement) opener = opener.shadowRoot.activeElement;
   formDirty = false;
+  dialogOriginHash = location.hash;
   dialog.innerHTML = `<form id="moment-form" data-mode="${mode}" data-id="${escape(id || '')}"><div class="dialog-top"><span class="eyebrow">${mode === 'new' ? 'A LITTLE BEGINNING' : 'ONE MORE MOMENT'}</span><button type="button" class="icon-button" data-action="close-dialog" aria-label="닫기">${icon('close')}</button></div><h2 id="dialog-title">${mode === 'new' ? '간직하고 싶은 순간이 있나요?' : mode === 'edit' ? '그날의 마음을 다듬어 볼까요?' : '이 마음에서, 다음 순간으로.'}</h2><p class="dialog-intro">${mode === 'new' ? '처음 좋아했던 날이 아니어도 좋아요. 지금 떠오르는 장면부터.' : '작은 기록 하나가 나의 이야기를 조금 더 자라게 해요.'}</p>${mode === 'new' ? '<label class="field">누구를, 무엇을 좋아하나요?<input name="subject" maxlength="60" required placeholder="아티스트, 배우, 작품 이름…" autocomplete="off" /></label>' : ''}<label class="field">이 순간에 이름을 붙여 주세요<input name="title" maxlength="80" required value="${escape(m?.title || '')}" placeholder="예: 그 목소리를 처음 만났던 밤" /></label><label class="field">왜 이 순간을 간직하고 싶나요?<textarea name="note" rows="3" maxlength="500" required placeholder="그때의 마음을 짧게 남겨 주세요.">${escape(m?.note || '')}</textarea></label><fieldset class="emotion-field"><legend>그날의 마음</legend><div>${emotionOptions.map(e => `<label class="emotion-choice"><input type="radio" name="emotion" value="${escape(e)}" ${emotion === e ? 'checked' : ''} /><span>${escape(e)}${EMOTIONS.includes(e) ? '' : ' (가져온 값)'}</span></label>`).join('')}</div></fieldset><div class="form-row"><label class="field">순간의 날짜<input name="date" type="date" required value="${m?.date || today}" /></label><label class="field">원본 링크 <span>선택</span><input name="url" type="url" maxlength="2048" value="${escape(m?.url || '')}" placeholder="https://…" /></label></div>${mode === 'add' ? `<label class="field">어느 순간에서 이어지나요?<select name="parentId">${tree.moments.map(p => `<option value="${escape(p.id)}" ${p.id === id ? 'selected' : ''}>${escape(p.title)}</option>`).join('')}</select></label>` : ''}${mode === 'add' || m?.parentId ? `<label class="field">두 순간이 이어진 이유 <span>선택</span><input name="relation" maxlength="100" value="${escape(m?.relation || '')}" placeholder="예: 다른 무대도 찾아보고 싶어져서" /></label>` : ''}<p class="form-error" role="alert" id="form-error"></p><div class="dialog-bottom"><span>${icon('check')} 이 브라우저에 저장돼요</span><button class="button primary" type="submit">${mode === 'edit' ? '수정한 마음 저장하기' : mode === 'new' ? '첫 순간 심기' : '순간 이어 붙이기'} ${icon('arrow')}</button></div></form>`;
   dialog.showModal();
 }
 function closeDialog() {
   if (formDirty && !window.confirm('작성 중인 내용이 있어요. 저장하지 않고 닫을까요?')) return;
   formSubmitting = false;
+  dialogOriginHash = '';
   dialog.close();
 }
 dialog.addEventListener('cancel', event => { event.preventDefault(); closeDialog(); });
-dialog.addEventListener('close', () => { formDirty = false; formSubmitting = false; opener?.focus?.(); });
+dialog.addEventListener('close', () => { formDirty = false; formSubmitting = false; dialogOriginHash = ''; opener?.focus?.(); });
 dialog.addEventListener('input', () => { formDirty = true; });
 dialog.addEventListener('submit', event => {
   event.preventDefault();
@@ -246,18 +252,27 @@ dialog.addEventListener('submit', event => {
     formDirty = false;
     dialog.close();
     const nextHash = `#${form.dataset.mode === 'new' || /book\//.test(location.hash) ? 'book' : 'tree'}/${tree.id}`;
+    savingNavigation = true;
     go(nextHash);
+    savingNavigation = false;
     const focusAfterRender = () => {
-      const mainHost = document.querySelector('#main');
-      const shadow = mainHost?.shadowRoot;
-      const focusTarget = (shadow?.querySelector(`[data-action="add"]`))
-        || document.querySelector(`[data-action="add"][data-id="${CSS.escape(selectedId)}"]`)
-        || document.querySelector('[data-action="add"]')
-        || document.querySelector(`[data-action="select-moment"][data-id="${CSS.escape(selectedId)}"]`);
-      focusTarget?.focus();
+      const token = ++focusToken;
+      setTimeout(() => {
+        if (token !== focusToken) return;
+        if (location.hash !== nextHash) return;
+        if (dialog.open) return;
+        const ae = document.activeElement;
+        if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.tagName === 'SELECT')) return;
+        const mainHost = document.querySelector('#main');
+        const shadow = mainHost?.shadowRoot;
+        const focusTarget = (shadow?.querySelector(`[data-action="add"]`))
+          || document.querySelector(`[data-action="add"][data-id="${CSS.escape(selectedId)}"]`)
+          || document.querySelector('[data-action="add"]')
+          || document.querySelector(`[data-action="select-moment"][data-id="${CSS.escape(selectedId)}"]`);
+        focusTarget?.focus();
+      }, 0);
     };
-    setTimeout(focusAfterRender, 0);
-    setTimeout(focusAfterRender, 100);
+    focusAfterRender();
     toast(form.dataset.mode === 'edit' ? '그날의 마음을 다시 담았어요.' : '새로운 순간이 트리에 자랐어요.');
   } catch (error) { $('#form-error').textContent = error.message; }
   finally {
@@ -387,7 +402,25 @@ $('#import-file').addEventListener('change', async event => {
   } catch (error) { toast(error instanceof SyntaxError ? '올바른 JSON 파일이 아니에요.' : error.message); }
   finally { event.target.value = ''; }
 });
-window.addEventListener('hashchange', () => { if (dialog.open) dialog.close(); if (linkDialog.open) linkDialog.close(); render(); if (location.hash !== '#examples') window.scrollTo({ top: 0 }); });
+window.addEventListener('hashchange', () => {
+  if (restoringHash) { restoringHash = false; }
+  else if (dialog.open && formDirty && !savingNavigation) {
+    const ok = window.confirm('작성 중인 내용이 있어요. 저장하지 않고 이동할까요?');
+    if (!ok) {
+      restoringHash = true;
+      const origin = dialogOriginHash;
+      if (origin !== location.hash) location.hash = origin;
+      else restoringHash = false;
+      return;
+    }
+    dialog.close();
+  } else if (dialog.open && !formDirty) {
+    dialog.close();
+  }
+  if (linkDialog.open) linkDialog.close();
+  render();
+  if (location.hash !== '#examples') window.scrollTo({ top: 0 });
+});
 let resizeTimer;
 window.addEventListener('resize', () => {
   clearTimeout(resizeTimer);
