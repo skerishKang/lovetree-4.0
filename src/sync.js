@@ -55,8 +55,13 @@ export function createSyncController(deps) {
   let suppress = false;
   let queued = 0;
   let lastIntended = null;
+  // 세션 세대. 로그아웃·다시 로그인은 세대를 올리고, 그 전에 출발한 응답은 버린다.
+  // 늦게 도착한 A의 응답이 B의 화면·번호를 채우거나 B 계정으로 올리는 일을 막는다.
+  let generation = 0;
+  let seenRevision = null;
 
   const publish = (next) => { current = next; onChange(next); listener(next); return next; };
+  const stale = (gen) => gen !== generation;
 
   function show(next) {
     if (next.phase === 'synced' && dirty) return publish(status({ phase: 'offline', actions: [{ name: 'retry', label: '다시 시도' }] }));
@@ -93,12 +98,15 @@ export function createSyncController(deps) {
   }
 
   async function start() {
+    const gen = generation;
     show(status({ phase: 'checking' }));
     const answer = await readServer();
+    if (stale(gen)) return current;
     if (answer.closed) return adoptLocalOnly(answer.closed === 'offline' ? 'offline' : answer.closed === 'unconfigured' ? 'unconfigured' : 'login');
 
     owned = true;
     revision = answer.revision;
+    seenRevision = null;
     const serverEmpty = answer.revision === 0;
     const localHas = localDocHasRecords();
 
@@ -112,6 +120,7 @@ export function createSyncController(deps) {
     }
     if (!localHas) return adoptServer(answer.state, { silent: true });
     if (sameDocument(answer.state, getState())) return show(status({ phase: 'synced', actions: [{ name: 'logout', label: '로그아웃' }] }));
+    seenRevision = answer.revision;
     return show(status({
       phase: 'adoptOffered',
       detail: '서버에 이미 기록이 있어요. 무엇을 기준으로 고르든 다른 쪽 사본은 이 기기에 백업으로 남아요.',
@@ -142,6 +151,7 @@ export function createSyncController(deps) {
       replaceState(validateState(serverState));
     } finally { suppress = false; }
     dirty = false;
+    seenRevision = null;
     return show(status({
       phase: 'synced',
       detail: silent ? null : '서버 기록을 기준으로 삼았어요. 이 기기 기록은 백업으로 남겨 두었어요.',
@@ -156,17 +166,22 @@ export function createSyncController(deps) {
 
   async function push(expected) {
     if (!Number.isSafeInteger(expected)) return start();
+    const gen = generation;
     const clientKey = makeClientKey();
     show(status({ phase: 'syncing', actions: [] }));
     const answer = await api.put({ state: getState(), expectedRevision: expected, clientKey });
+    // 로그아웃·계정 전환 뒤에 도착한 응답은 화면도 번호도 고치지 않는다.
+    if (stale(gen)) return current;
     if (answer.ok) {
       revision = answer.revision;
       dirty = false;
       lastIntended = null;
+      seenRevision = null;
       return show(status({ phase: 'synced', actions: [{ name: 'logout', label: '로그아웃' }] }));
     }
     if (answer.status === 409 && answer.code === 'revision_conflict') {
       lastIntended = { kind: 'force' };
+      seenRevision = Number.isSafeInteger(answer.currentRevision) ? answer.currentRevision : null;
       return show(status({
         phase: 'conflict',
         detail: conflictMessage(answer),
@@ -195,10 +210,12 @@ export function createSyncController(deps) {
   async function syncNow() {
     if (!owned || revision === null) return current;
     if (current.phase === 'conflict' || current.phase === 'adoptOffered' || current.phase === 'uploadOffered') return current;
+    const gen = generation;
     queued += 1;
     const myTicket = queued;
     await delay(900);
     if (myTicket !== queued) return current;
+    if (stale(gen) || !owned) return current;
     if (!dirty) return current;
     return push(revision);
   }
@@ -211,8 +228,30 @@ export function createSyncController(deps) {
     return current;
   }
 
+  // 덮어쓰기 직전에 서버를 다시 읽는다. 사용자가 마지막에 본 번호와 다르면
+  // 보지 못한 문서를 지우지 않는다 — PUT도 백업도 없이 다시 묻는다.
+  async function confirmOverwrite(gen) {
+    const fresh = await readServer();
+    if (stale(gen)) return { abort: current };
+    if (!fresh.ok) return { abort: show(status({ phase: 'offline', detail: '서버 기록을 다시 확인하지 못해 이 기기 기록을 그대로 뒀어요.', actions: [{ name: 'retry', label: '다시 시도' }] })) };
+    if (Number.isSafeInteger(seenRevision) && fresh.revision !== seenRevision) {
+      seenRevision = fresh.revision;
+      return { abort: show(status({
+        phase: 'conflict',
+        detail: `확인하는 동안 서버가 다시 바뀌었어요. 서버는 ${fresh.revision}번까지 진행됐어요. 무엇을 남길지 다시 골라 주세요.`,
+        actions: [{ name: 'pull', label: '서버 최신 기록 열기' }, { name: 'force', label: '내 기록으로 덮어쓰기' }, { name: 'retry', label: '다시 시도' }]
+      })) };
+    }
+    backupServer(fresh.state);
+    return { revision: Number.isSafeInteger(fresh.revision) ? fresh.revision : 0 };
+  }
+
   async function act(name) {
-    if (name === 'login') { navigate('/auth/login?next=/'); return current; }
+    if (name === 'login') {
+      generation += 1;
+      navigate('/auth/login?next=/');
+      return current;
+    }
     if (name === 'retry') {
       if (lastIntended?.kind === 'force') return act('force');
       if (lastIntended?.kind === 'synced' && Number.isSafeInteger(revision)) return push(revision);
@@ -223,34 +262,24 @@ export function createSyncController(deps) {
       lastIntended = { kind: 'synced' };
       return push(0);
     }
-    if (name === 'useServer') {
+    if (name === 'useServer' || name === 'pull') {
+      const gen = generation;
       const answer = await readServer();
+      if (stale(gen)) return current;
       if (!answer.ok) return show(status({ phase: 'offline', detail: '서버 기록을 불러오지 못해 이 기기 기록을 그대로 뒀어요.', actions: [{ name: 'retry', label: '다시 시도' }] }));
       revision = answer.revision;
       return adoptServer(answer.state);
     }
-    if (name === 'useLocal') {
-      const fresh = await readServer();
-      if (!fresh.ok) return show(status({ phase: 'offline', actions: [{ name: 'retry', label: '다시 시도' }] }));
-      backupServer(fresh.state);
+    if (name === 'useLocal' || name === 'force') {
+      const step = await confirmOverwrite(generation);
+      if (step.abort) return step.abort;
       lastIntended = { kind: 'synced' };
-      return push(Number.isSafeInteger(fresh.revision) ? fresh.revision : 0);
-    }
-    if (name === 'pull') {
-      const answer = await readServer();
-      if (!answer.ok) return show(status({ phase: 'offline', detail: '서버 기록을 불러오지 못해 이 기기 기록을 그대로 뒀어요.', actions: [{ name: 'retry', label: '다시 시도' }] }));
-      revision = answer.revision;
-      return adoptServer(answer.state);
-    }
-    if (name === 'force') {
-      const fresh = await readServer();
-      if (!fresh.ok) return show(status({ phase: 'offline', actions: [{ name: 'retry', label: '다시 시도' }] }));
-      backupServer(fresh.state);
-      lastIntended = { kind: 'synced' };
-      return push(fresh.revision);
+      return push(step.revision);
     }
     if (name === 'logout') {
+      const gen = ++generation;
       const answer = await api.logout();
+      if (stale(gen)) return current;
       const cleared = answer.ok && !dirty;
       if (cleared) {
         suppress = true;
@@ -262,12 +291,13 @@ export function createSyncController(deps) {
       revision = null;
       dirty = false;
       lastIntended = null;
+      seenRevision = null;
       return show(status({
         phase: 'local',
         detail: cleared
           ? '로그아웃했어요. 서버 기록은 계정에 남고 이 기기 사본은 비웠어요. 다른 계정으로 들어와도 이전 기록은 보이지 않습니다.'
           : answer.ok ? '동기화되지 않은 변경이 있어 이 기기 기록은 지우지 않았어요.' : '서버에서 로그아웃하지 못해 이 기기 기록을 그대로 둡니다.',
-        actions: [{ name: 'login', label: '다시 로그인' }, { name: 'export', label: '파일로 보관' }]
+        actions: [{ name: 'login', label: '다시 로그인' }]
       }));
     }
     return current;
