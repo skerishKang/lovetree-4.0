@@ -115,6 +115,19 @@ export function importTrees(current, incoming) {
   return { version: 1, trees: [...current.trees, ...copies] };
 }
 
+export function pathTo(tree, id) {
+  const byId = new Map(tree.moments.map(m => [m.id, m]));
+  const path = [];
+  const seen = new Set();
+  let current = byId.get(id);
+  while (current && !seen.has(current.id)) {
+    seen.add(current.id);
+    path.push(current);
+    current = current.parentId === null ? null : byId.get(current.parentId);
+  }
+  return path.reverse();
+}
+
 export function treeLayout(tree) {
   const children = new Map(tree.moments.map(m => [m.id, []]));
   for (const m of tree.moments) if (m.parentId) children.get(m.parentId)?.push(m);

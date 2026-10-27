@@ -3,7 +3,7 @@ import { mountOrbit, ORBIT_EXAMPLE } from './views/orbit.js';
 import { mountBook } from './views/book.js';
 import { mountShelf } from './views/shelf.js';
 import { hasRecovery as recoveryAvailable, recoveryData } from './views/memory.js';
-import { createTree, addMoment, editMoment, removeMoment, importTrees, MAX_TREES, EMOTIONS, treeLayout } from './domain.js';
+import { createTree, addMoment, editMoment, removeMoment, importTrees, MAX_TREES, EMOTIONS, treeLayout, pathTo } from './domain.js';
 import { loadState, saveState, STORAGE_KEY, RECOVERY_KEY } from './storage.js';
 import { EXAMPLES } from './examples.js';
 
@@ -79,7 +79,16 @@ function hasRecovery() { return recoveryAvailable(storage, loaded); }
 function nodeCard(moment, pos, selected) {
   return `<button class="graph-node ${selected ? 'selected' : ''}" style="left:${pos.x}px;top:${pos.y}px" data-action="select-moment" data-id="${escape(moment.id)}" aria-pressed="${selected}"><span class="node-date">${moment.parentId ? dateLabel(moment.date) : `${icon('leaf')} 이 마음의 시작`}</span><strong>${escape(moment.title)}</strong><span class="node-note">${escape(moment.note)}</span><span class="node-footer"><span class="emotion emotion-${escape(moment.emotion)}">${escape(moment.emotion)}</span>${icon('arrow')}</span></button>`;
 }
-function graph(tree) {
+function fitScale(tree) {
+  const { width, height } = treeLayout(tree);
+  const board = $('.tree-board');
+  const box = $('.graph-scroll');
+  // Measure the board and the box outline, so a scrollbar never feeds back into the fitted scale.
+  const availableWidth = Math.max(240, (board?.clientWidth || 930) - 30);
+  const availableHeight = Math.max(180, (box?.offsetHeight || 485) - 30);
+  return Math.max(.18, Math.min(1, Math.floor(Math.min(availableWidth / width, availableHeight / height) * 100) / 100));
+}
+function graph(tree, scale) {
   const { positions, width, height } = treeLayout(tree);
   let edges = '';
   for (const m of tree.moments) {
@@ -89,7 +98,7 @@ function graph(tree) {
     const x1 = parent.x + 225, y1 = parent.y + 80, x2 = child.x, y2 = child.y + 80;
     edges += `<path d="M${x1} ${y1}C${x1 + 34} ${y1} ${x2 - 34} ${y2} ${x2} ${y2}"/><circle cx="${x2}" cy="${y2}" r="4"/>`;
   }
-  return `<div class="graph-scroll" tabindex="0" role="region" aria-label="순간 연결 트리. 방향키나 스크롤로 이동할 수 있습니다."><div class="graph-sizer" style="width:${width * zoom}px;height:${height * zoom}px"><div class="graph-canvas" style="width:${width}px;height:${height}px;transform:scale(${zoom})"><svg class="graph-edges" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" aria-hidden="true">${edges}</svg>${tree.moments.map(m => nodeCard(m, positions.get(m.id), m.id === selectedId)).join('')}</div></div></div>`;
+  return `<div class="graph-scroll" tabindex="0" role="region" aria-label="순간 연결 트리. 방향키나 스크롤로 이동할 수 있습니다."><div class="graph-sizer" style="width:${width * scale}px;height:${height * scale}px"><div class="graph-canvas" style="width:${width}px;height:${height}px;transform:scale(${scale})"><svg class="graph-edges" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" aria-hidden="true">${edges}</svg>${tree.moments.map(m => nodeCard(m, positions.get(m.id), m.id === selectedId)).join('')}</div></div></div>`;
 }
 function timeline(tree) {
   return `<div class="moment-timeline">${[...tree.moments].sort((a,b) => a.date.localeCompare(b.date)).map(m => `<button class="timeline-moment ${m.id === selectedId ? 'selected' : ''}" data-action="select-moment" data-id="${escape(m.id)}" aria-pressed="${m.id === selectedId}"><span class="timeline-dot"></span><time>${dateLabel(m.date)}</time><strong>${escape(m.title)}</strong><p>${escape(m.note)}</p><span class="emotion emotion-${escape(m.emotion)}">${escape(m.emotion)}</span></button>`).join('')}</div>`;
@@ -108,9 +117,20 @@ function board(tree) {
   }).join('');
   return `<div class="moment-board" role="list" aria-label="순간 보드. 선택한 순간까지의 경로가 강조됩니다.">${cards}</div>`;
 }
+function routeNav(tree, moment) {
+  const route = pathTo(tree, moment.id);
+  if (route.length < 2) return '';
+  const index = route.findIndex(m => m.id === moment.id);
+  return `<div class="route-nav" role="group" aria-label="경로 따라가기"><button class="route-step" data-action="route-prev" aria-label="이전 순간으로" ${index === 0 ? 'disabled' : ''}>${icon('back')}</button><span class="route-position" aria-live="polite">${index + 1} / ${route.length}</span><button class="route-step" data-action="route-next" aria-label="다음 순간으로" ${index === route.length - 1 ? 'disabled' : ''}>${icon('arrow')}</button><small>여기까지 온 길</small></div>`;
+}
+function routeList(tree, moment) {
+  const route = pathTo(tree, moment.id);
+  if (route.length < 2) return '';
+  return `<nav class="detail-route" aria-label="이 순간까지 온 길"><span class="detail-route-title">여기까지 온 길</span><ol>${route.map(m => `<li>${m.id === moment.id ? `<span aria-current="true">${escape(m.title)}</span>` : `<button class="text-button small" data-action="select-moment" data-id="${escape(m.id)}">${escape(m.title)}</button>`}</li>`).join('')}</ol></nav>`;
+}
 function detail(tree, moment, demo) {
   const parent = tree.moments.find(m => m.id === moment.parentId);
-  return `<aside class="moment-detail" aria-label="선택한 순간"><div class="detail-kicker"><span>${moment.parentId ? '이어진 순간' : '이 마음의 시작'}</span>${icon('heart')}</div>${moment.art ? art(moment.art, 'detail-art') : `<div class="detail-quote">“<p>${escape(moment.note)}</p>”</div>`}<time>${dateLabel(moment.date)}</time><h2>${escape(moment.title)}</h2><span class="emotion emotion-${escape(moment.emotion)}">${escape(moment.emotion)}</span><p class="detail-note">${escape(moment.note)}</p>${parent ? `<div class="connection-note">${icon('tree')}<div><small>${escape(parent.title)}에서 이어진 마음</small><p>${escape(moment.relation || '이 마음에서 다음 순간이 이어졌어요.')}</p></div></div>` : ''}${moment.url ? `<a class="button secondary full" href="${escape(moment.url)}" target="_blank" rel="noopener noreferrer">${icon('external')} 원본 링크 열기</a>` : ''}<div class="detail-actions">${demo ? '<button class="button primary full" data-action="new">나의 이야기 시작하기 '+icon('plus')+'</button>' : `<button class="button primary full" data-action="add" data-id="${escape(moment.id)}">이 순간에서 이어가기 ${icon('plus')}</button><div class="detail-small-actions"><button class="text-button" data-action="edit" data-id="${escape(moment.id)}">${icon('edit')} 순간 수정</button><button class="text-button danger" data-action="delete-moment" data-id="${escape(moment.id)}">${icon('trash')} 삭제</button></div>`}</div></aside>`;
+  return `<aside class="moment-detail" aria-label="선택한 순간"><div class="detail-kicker"><span>${moment.parentId ? '이어진 순간' : '이 마음의 시작'}</span>${icon('heart')}</div>${moment.art ? art(moment.art, 'detail-art') : `<div class="detail-quote">“<p>${escape(moment.note)}</p>”</div>`}<time>${dateLabel(moment.date)}</time><h2>${escape(moment.title)}</h2><span class="emotion emotion-${escape(moment.emotion)}">${escape(moment.emotion)}</span><p class="detail-note">${escape(moment.note)}</p>${parent ? `<div class="connection-note">${icon('tree')}<div><small>${escape(parent.title)}에서 이어진 마음</small><p>${escape(moment.relation || '이 마음에서 다음 순간이 이어졌어요.')}</p></div></div>` : ''}${routeList(tree, moment)}${moment.url ? `<a class="button secondary full" href="${escape(moment.url)}" target="_blank" rel="noopener noreferrer">${icon('external')} 원본 링크 열기</a>` : ''}<div class="detail-actions">${demo ? '<button class="button primary full" data-action="new">나의 이야기 시작하기 '+icon('plus')+'</button>' : `<button class="button primary full" data-action="add" data-id="${escape(moment.id)}">이 순간에서 이어가기 ${icon('plus')}</button><div class="detail-small-actions"><button class="text-button" data-action="edit" data-id="${escape(moment.id)}">${icon('edit')} 순간 수정</button><button class="text-button danger" data-action="delete-moment" data-id="${escape(moment.id)}">${icon('trash')} 삭제</button></div>`}</div></aside>`;
 }
 function workspace() {
   const tree = currentTree(), demo = isDemo();
@@ -118,7 +138,8 @@ function workspace() {
   if (activeTreeId !== tree.id) { activeTreeId = tree.id; zoom = 1; }
   if (!tree.moments.some(m => m.id === selectedId)) selectedId = tree.moments.find(m => m.parentId === null).id;
   const selected = tree.moments.find(m => m.id === selectedId);
-  return `${header(demo ? 'examples' : 'trees')}<main id="main" class="workspace wrap" tabindex="-1"><a href="${demo ? '#examples' : '#trees'}" class="back-link">${icon('back')} ${demo ? '예시 둘러보기' : '내 트리'}</a><div class="workspace-heading"><div><div class="eyebrow">${escape(tree.subject)} <span class="mode-badge">${demo ? '가상 예시 · 체험' : '내 브라우저에 보관'}</span></div><h1>${escape(tree.title)}</h1><p>${demo ? '순간을 눌러, 이어지는 마음을 따라가 보세요.' : '순간을 고르고, 그 마음에서 다음 이야기를 이어 보세요.'}</p></div>${demo ? '<button class="button secondary" data-action="new">나의 트리 만들기 '+icon('plus')+'</button>' : `<button class="button secondary" data-action="export-tree" data-id="${escape(tree.id)}">${icon('download')} 파일로 보관</button>`}</div><div class="workspace-grid"><section class="tree-board" aria-label="트리 작업 공간"><div class="board-toolbar"><div class="view-switch" aria-label="보기 방식"><button data-action="view" data-view="tree" aria-pressed="${viewMode === 'tree'}">${icon('tree')} 트리로 보기</button><button data-action="view" data-view="list" aria-pressed="${viewMode === 'list'}">${icon('list')} 시간으로 보기</button><button data-action="view" data-view="board" aria-pressed="${viewMode === 'board'}">${icon('grid')} 보드로 보기</button></div><a class="text-button small" href="#${demo ? 'demo-book' : 'book'}/${escape(tree.id)}">책으로 감상</a><span class="moment-count">${tree.moments.length}개의 순간</span></div>${viewMode === 'tree' ? graph(tree) : viewMode === 'list' ? timeline(tree) : board(tree)}<div class="board-bottom"><span>${icon('leaf')} ${viewMode === 'board' ? (demo ? '선택한 순간까지의 길을 따라가 볼 수 있어요.' : '선택한 순간까지 이어진 경로를 강조했어요.') : (demo ? '당신의 마음도 이렇게 자랄 수 있어요.' : '작은 순간들이 모여, 나만의 이야기가 돼요.')}</span>${viewMode === 'tree' ? `<div class="zoom-controls"><button data-action="zoom-out" aria-label="트리 축소" ${zoom <= .5 ? 'disabled' : ''}>−</button><button data-action="zoom-reset" aria-label="트리 배율 초기화">${Math.round(zoom*100)}%</button><button data-action="zoom-in" aria-label="트리 확대" ${zoom >= 1.4 ? 'disabled' : ''}>+</button></div>` : ''}</div></section>${detail(tree, selected, demo)}</div></main>${footer()}`;
+  const graphScale = zoom === 'fit' ? fitScale(tree) : zoom;
+  return `${header(demo ? 'examples' : 'trees')}<main id="main" class="workspace wrap" tabindex="-1"><a href="${demo ? '#examples' : '#trees'}" class="back-link">${icon('back')} ${demo ? '예시 둘러보기' : '내 트리'}</a><div class="workspace-heading"><div><div class="eyebrow">${escape(tree.subject)} <span class="mode-badge">${demo ? '가상 예시 · 체험' : '내 브라우저에 보관'}</span></div><h1>${escape(tree.title)}</h1><p>${demo ? '순간을 눌러, 이어지는 마음을 따라가 보세요.' : '순간을 고르고, 그 마음에서 다음 이야기를 이어 보세요.'}</p></div>${demo ? '<button class="button secondary" data-action="new">나의 트리 만들기 '+icon('plus')+'</button>' : `<button class="button secondary" data-action="export-tree" data-id="${escape(tree.id)}">${icon('download')} 파일로 보관</button>`}</div><div class="workspace-grid"><section class="tree-board" aria-label="트리 작업 공간"><div class="board-toolbar"><div class="view-switch" aria-label="보기 방식"><button data-action="view" data-view="tree" aria-pressed="${viewMode === 'tree'}">${icon('tree')} 트리로 보기</button><button data-action="view" data-view="list" aria-pressed="${viewMode === 'list'}">${icon('list')} 시간으로 보기</button><button data-action="view" data-view="board" aria-pressed="${viewMode === 'board'}">${icon('grid')} 보드로 보기</button></div><a class="text-button small" href="#${demo ? 'demo-book' : 'book'}/${escape(tree.id)}">책으로 감상</a><span class="moment-count">${tree.moments.length}개의 순간</span></div>${viewMode === 'tree' ? graph(tree, graphScale) : viewMode === 'list' ? timeline(tree) : board(tree)}<div class="board-bottom"><span class="board-hint">${icon('leaf')} ${viewMode === 'board' ? (demo ? '선택한 순간까지의 길을 따라가 볼 수 있어요.' : '선택한 순간까지 이어진 경로를 강조했어요.') : (demo ? '당신의 마음도 이렇게 자랄 수 있어요.' : '작은 순간들이 모여, 나만의 이야기가 돼요.')}</span><div class="board-tools">${routeNav(tree, selected)}${viewMode === 'tree' ? `<div class="zoom-controls"><button data-action="zoom-out" aria-label="트리 축소" ${graphScale <= .18 ? 'disabled' : ''}>−</button><button data-action="zoom-reset" aria-label="트리 배율 초기화">${Math.round(graphScale*100)}%</button><button data-action="zoom-in" aria-label="트리 확대" ${graphScale >= 1.4 ? 'disabled' : ''}>+</button><button class="zoom-fit" data-action="zoom-fit" aria-label="전체가 보이도록 맞추기" aria-pressed="${zoom === 'fit'}">맞춤</button></div>` : ''}</div></div></section>${detail(tree, selected, demo)}</div></main>${footer()}`;
 }
 function render() {
   disposeView(); disposeView = () => {};
@@ -234,7 +255,22 @@ document.addEventListener('click', event => {
       $(`[data-action="select-moment"][data-id="${CSS.escape(id)}"]`)?.focus({ preventScroll: true });
     }
     else if (action === 'view') { viewMode = button.dataset.view; render(); $(`[data-view="${viewMode}"]`)?.focus(); }
-    else if (action.startsWith('zoom-')) { zoom = action === 'zoom-reset' ? 1 : Math.round(Math.min(1.4, Math.max(.5, zoom + (action === 'zoom-in' ? .1 : -.1))) * 10) / 10; render(); $(`[data-action="${action}"]`)?.focus(); }
+    else if (action.startsWith('zoom-')) {
+      const scale = zoom === 'fit' ? fitScale(currentTree()) : zoom;
+      zoom = action === 'zoom-fit' ? 'fit' : action === 'zoom-reset' ? 1 : Math.round(Math.min(1.4, Math.max(.18, scale + (action === 'zoom-in' ? .1 : -.1))) * 10) / 10;
+      render(); $(`[data-action="${action}"]`)?.focus();
+    }
+    else if (action === 'route-prev' || action === 'route-next') {
+      const route = pathTo(currentTree(), selectedId);
+      const index = route.findIndex(m => m.id === selectedId);
+      const target = route[index + (action === 'route-next' ? 1 : -1)];
+      if (!target) return;
+      selectedId = target.id; render();
+      // Keep the keyboard on the same side of the route; disabled steps cannot hold focus.
+      const sameSide = $(`[data-action="${action}"]`);
+      const otherSide = $(`[data-action="${action === 'route-next' ? 'route-prev' : 'route-next'}"]`);
+      (sameSide && !sameSide.disabled ? sameSide : otherSide && !otherSide.disabled ? otherSide : $(`[data-action="select-moment"][data-id="${CSS.escape(selectedId)}"]`))?.focus();
+    }
     else if (action === 'add' || action === 'edit') openMoment(action, id);
     else if (action === 'delete-moment') {
       if (!confirm('이 순간을 지울까요? 이어진 순간들은 남기고 연결을 정리합니다.')) return;
@@ -255,6 +291,12 @@ $('#import-file').addEventListener('change', async event => {
   finally { event.target.value = ''; }
 });
 window.addEventListener('hashchange', () => { render(); if (location.hash !== '#examples') window.scrollTo({ top: 0 }); });
+let resizeTimer;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  // The fitted overview depends on the visible board size, which changes with the layout breakpoints.
+  resizeTimer = setTimeout(() => { if (zoom === 'fit' && viewMode === 'tree' && !dialog.open && /^(tree|demo)\//.test(location.hash.slice(1))) render(); }, 160);
+});
 window.addEventListener('storage', event => {
   if (event.key === RECOVERY_KEY && location.hash === '#trees' && !dialog.open) { render(); return; }
   if (event.key !== STORAGE_KEY) return;
