@@ -45,6 +45,7 @@ const shelfView = {query: '', subject: '', mode: 'shelf', selectedId: null};
 const DEMOS = [...EXAMPLES, ORBIT_EXAMPLE];
 let opener;
 let formDirty = false;
+let formSubmitting = false;
 const dialog = $('#moment-dialog');
 const linkDialog = $('#link-dialog');
 
@@ -213,15 +214,21 @@ function openMoment(mode, id) {
 }
 function closeDialog() {
   if (formDirty && !window.confirm('작성 중인 내용이 있어요. 저장하지 않고 닫을까요?')) return;
+  formSubmitting = false;
   dialog.close();
 }
 dialog.addEventListener('cancel', event => { event.preventDefault(); closeDialog(); });
-dialog.addEventListener('close', () => { formDirty = false; opener?.focus?.(); });
+dialog.addEventListener('close', () => { formDirty = false; formSubmitting = false; opener?.focus?.(); });
 dialog.addEventListener('input', () => { formDirty = true; });
 dialog.addEventListener('submit', event => {
   event.preventDefault();
+  if (formSubmitting) return;
   const form = event.target;
+  const submitButton = form.querySelector('button[type="submit"]');
   const input = Object.fromEntries(new FormData(form));
+  formSubmitting = true;
+  if (submitButton) submitButton.disabled = true;
+  let saved = false;
   try {
     let tree;
     if (form.dataset.mode === 'new') {
@@ -230,15 +237,33 @@ dialog.addEventListener('submit', event => {
       selectedId = tree.moments[0].id;
     } else {
       const current = currentTree();
+      if (!current) throw new Error('이어질 트리를 먼저 선택해 주세요.');
       tree = form.dataset.mode === 'edit' ? editMoment(current, form.dataset.id, input) : addMoment(current, input, input.parentId);
       updateTree(tree);
       selectedId = form.dataset.mode === 'edit' ? form.dataset.id : tree.moments.at(-1).id;
     }
+    saved = true;
     formDirty = false;
     dialog.close();
-    go(`#${form.dataset.mode === 'new' || /book\//.test(location.hash) ? 'book' : 'tree'}/${tree.id}`);
+    const nextHash = `#${form.dataset.mode === 'new' || /book\//.test(location.hash) ? 'book' : 'tree'}/${tree.id}`;
+    go(nextHash);
+    const focusAfterRender = () => {
+      const mainHost = document.querySelector('#main');
+      const shadow = mainHost?.shadowRoot;
+      const focusTarget = (shadow?.querySelector(`[data-action="add"]`))
+        || document.querySelector(`[data-action="add"][data-id="${CSS.escape(selectedId)}"]`)
+        || document.querySelector('[data-action="add"]')
+        || document.querySelector(`[data-action="select-moment"][data-id="${CSS.escape(selectedId)}"]`);
+      focusTarget?.focus();
+    };
+    setTimeout(focusAfterRender, 0);
+    setTimeout(focusAfterRender, 100);
     toast(form.dataset.mode === 'edit' ? '그날의 마음을 다시 담았어요.' : '새로운 순간이 트리에 자랐어요.');
   } catch (error) { $('#form-error').textContent = error.message; }
+  finally {
+    formSubmitting = false;
+    if (!saved && submitButton) submitButton.disabled = false;
+  }
 });
 
 function openLinkPicker(id) {
@@ -362,7 +387,7 @@ $('#import-file').addEventListener('change', async event => {
   } catch (error) { toast(error instanceof SyntaxError ? '올바른 JSON 파일이 아니에요.' : error.message); }
   finally { event.target.value = ''; }
 });
-window.addEventListener('hashchange', () => { render(); if (location.hash !== '#examples') window.scrollTo({ top: 0 }); });
+window.addEventListener('hashchange', () => { if (dialog.open) dialog.close(); if (linkDialog.open) linkDialog.close(); render(); if (location.hash !== '#examples') window.scrollTo({ top: 0 }); });
 let resizeTimer;
 window.addEventListener('resize', () => {
   clearTimeout(resizeTimer);
