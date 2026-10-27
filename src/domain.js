@@ -24,10 +24,16 @@ export function safeUrl(value = '') {
   if (url.href.length > 2048) throw new Error('링크가 너무 길어요.');
   return url.href;
 }
+export function normalizeEmotion(value) {
+  if (EMOTIONS.includes(value)) return value;
+  // 가져온 기록(리모네 등)의 감정을 설렘으로 바꾸지 않고 그대로 보존한다.
+  const custom = typeof value === 'string' ? value.trim() : '';
+  return custom && custom.length <= 12 && !/[\u0000-\u001f]/.test(custom) ? custom : '설렘';
+}
 export function validateMomentInput(input) {
   const title = requireText(input.title, '순간 제목', 80);
   const note = requireText(input.note, '마음 한마디', 500);
-  const emotion = EMOTIONS.includes(input.emotion) ? input.emotion : '설렘';
+  const emotion = normalizeEmotion(input.emotion);
   const date = input.date || new Date().toISOString().slice(0, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(date)) || new Date(date).toISOString().slice(0, 10) !== date) throw new Error('날짜를 확인해 주세요.');
   const relation = typeof input.relation === 'string' ? input.relation.trim() : '';
