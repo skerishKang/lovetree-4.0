@@ -10,7 +10,7 @@
 
 ## 1. 결론
 
-로그인·신원 검증·소유권 강제·멱등성·배포 배선은 이미 네 저장소에 있고 일부는 라이브로 돈다. 확정 방향은 **PADIEM.net 공통 인증 재사용 + LoveBud/limone의 기존 DB·API·권한 코드 재사용 + 러브트리 저장 API는 컴2에서 운영 + 현재 4.0 프런트 유지**이며, §5가 그 방향으로 다시 쓰였다. 이 방향에서 4.0이 인증을 다시 발명할 필요는 없다. 소스가 가리키는 신규 대상은 두 개 — `links`(관련 연결)의 서버 표현, 문서 단위 동시성 — 이고, 운영측 미해결은 하나다: 4.0의 공개 오리진이 컴2 API의 신원을 어떻게 받는가. PADIEM의 제품 세션은 host-only 쿠키에다 제품 단위 격리(Engine 방화벽)까지 걸려 있어, 출처를 다른 도메인으로 둔 크로스 오리진 재사용이 구조적으로 막혀 있다(§2 PADIEM, §5, §7).
+로그인·신원 검증·소유권 강제·멱등성·배포 배선은 이미 네 저장소에 있고 일부는 라이브로 돈다. 확정 방향은 **PADIEM.net 공통 인증 재사용 + LoveBud/limone의 기존 DB·API·권한 코드 재사용 + 러브트리 저장 API는 컴2에서 운영 + 현재 4.0 프런트 유지**이며, §5가 그 방향으로 다시 쓰였다. 이 방향에서 4.0이 인증을 다시 발명할 필요는 없다. §6에 남긴 결정 항목은 저장 형태(JSON 문서형이면 `links` 테이블 문제가 사라진다), DB 드라이버(Neon 전용이라 컴2 일반 PostgreSQL에 문자열만 바꿔 붙여서는 동작하지 않는다), 문서 단위 동시성, ID와 멱등성 두 규칙이다. 신원 전달은 하나의 선택지가 아니라 세 요소로 나뉜다(§5 E1·E2·E3): 러브트리 고유의 자격 증명은 반드시 필요하고, 다른 도메인에서 Chat 세션을 빌리는 길은 host-only 쿠키와 제품 단위 격리(Engine 방화벽)가 구조적으로 막고 있으며, 프록시는 그걸 달성하는 수단 중 하나일 뿐이다. **Control Plane 인증 권위 전체의 컴2 이전은 러브트리 저장 API의 선행 조건이 아니다** — 기존 PADIEM 인증에 연결하는 것이 방향이다(§5-3).
 
 ## 2. 실제 구현과 검증 근거
 
@@ -91,25 +91,22 @@
 
 1. **PADIEM 공통 인증 연결(인증은 재사용, 신원은 제품 고유)** — LoveTree는 자기 제품 ID를 가진다(값 할당은 Control Plane 소유자 결정이고 이 문서에서 이름을 정하지 않는다). 연결 방식은 B54가 이미 배선한 것과 똑같다: 서버가 확립한 로그인 증거(`provider`는 `{google, password}` 닫힌 열거) → `resolve_or_create_product_link` → `IdentityLinkState.ACTIVE` → `CanonicalSubjectRef` → `establish_auth_session`(`b54_identity_bridge.py:17-34`). Chat의 쿠키·비밀·purpose를 복사하지 않고 `b62`/`b54-padiem-claw` 제품 ID를 전용하지 않는다 — Engine 방화벽(`auth_session.product_id == app_id`)이 제품 간 세션을 무조건 거부하므로 애초에 빌릴 수 없다(`b54_identity_bridge.py:13-15`).
 2. **기존 LoveBud/limone DB·API·권한 코드 재사용** — 소유권 가드 형태(`limone core/runtime/server/api/access.ts:76-151`, `LoveBud functions/_shared/tree-delete-direct-neon.js:142-144`), `client_key`와 멱등 재플레이(`limone core/runtime/db/schema.ts:49,62,73,101`, `LoveBud social_idempotency`), 그리고 4.0 도메인 검증(`src/domain.js:109-154`의 `validateState`)을 서버에서 그대로 다시 쓴다. 저장 API가 받을 신원·멱등 키의 길이와 문자 규격은 PADIEM 공통 계약(`contracts.py:10-16`)을 따른다.
-3. **러브트리 저장 API는 컴2에서 운영** — 4.0의 워크스페이스 문서를 문서 단위로 받는 API(로그인·신원 확립은 1에 위임). 컴2에 필요한 것은 마이그레이션 노트의 실행 순서 1·2 그대로다: 사용자 조종이 가능한 인증 헤더를 배제한 네이티브 ingress와 서버 간 인증, Control Plane Identity·Broker·OAuth·durable D1/R2의 컴2 제공(`MIGRATION_STATUS_20261017.md`, `deploy/host-com2/`에는 현재 `b14/`와 `file-lane/`만 커밋돼 있다). "인증 외 대부분은 컴2 서버 운영"이라는 방향과 맞는다.
+3. **러브트리 저장 API는 컴2에서 운영, 인증은 기존 PADIEM 권위에 연결** — 4.0의 워크스페이스 문서를 문서 단위로 받는 API(로그인·신원 확립은 1에 위임). **Control Plane 인증 권위 전체의 컴2 이전은 선행 조건이 아니다** — 오늘 배선된 기존 PADIEM 인증에 연결하는 것이 방향이고, 마이그레이션 노트의 실행 순서 2("Control Plane Identity, Broker, OAuth and durable D1/R2 storage available to COM2")은 온보딩·성능 관점의 후속 항목이지 러브트리 저장 API의 문턱이 아니다. 컴2에 실제로 필요한 것은 순서 1뿐이다: 사용자 조종이 가능한 인증 헤더를 배제한 네이티브 ingress와 서버 간 인증(`MIGRATION_STATUS_20261017.md`). 현재 `deploy/host-com2/`에는 `b14/`와 `file-lane/`만 커밋돼 있다. "인증 외 대부분은 컴2 서버 운영"이라는 방향과 맞는다.
 4. **현재 4.0 프런트 유지 + 로컬 우선 저장 유지** — `lovetree-4-0.pages.dev`를 그대로 쓴다. `src/storage.js`를 async 어댑터로 갈아치우면 동기 호출 6곳(`src/views/memory.js:3-16`, `src/views/shelf.js:21-42`)까지 함께 고쳐야 한다. 더 작은 방법은 로컬 저장을 캐시로 남기고 그 위에 동기화 계층을 얹는 것: 손대는 지점은 `src/main.js:32-37`의 저장 핸들과 `commit` 하나, `src/storage.js`의 회수 시점, 동기화 모듈 신설 — 3개다.
 
-### 남는 설계 문제 하나: 4.0 오리진과 저장 API 사이의 신원 전달
+### 신원 전달은 별개 설계 요소 셋으로 나눈다 (하나라를 고르는 문제가 아니다)
 
-소스만으로는 결정할 수 없고, 확인한 제약은 분명하다.
+- **E1 · 제품 전용 자격 증명 — 항상 필요하다.** 러브트리 제품 ID로 발급된 러브트리 고유의 자격 증명이다. Chat의 쿠키·비밀·purpose를 재사용하지 않으며, Engine 방화벽이 제품 간 세션을 무조건 거부하므로 재사용이 애초에 불가능하다(`b54_identity_bridge.py:13-15`, `auth.py:209-220`).
+- **E2 · 브라우저가 자격 증명을 실어 보내는 경로 — 오리진 조합에 따라 필요하다.** host-only·`HttpOnly`·`SameSite=Lax` 규격 때문에 4.0 Pages 오리진과 API 호스트가 다르면 쿠키가 실리지 않는다(`auth.py:209-220`). B64는 같은 오리진에서 서빙되는 방법으로만 재사용에 성공했다(`padiem-session-auth.ts:1-26`). 프런트를 유지하려면 전송 경로를 정해야 한다: API를 4.0과 같은 오리진에서 보이게 하거나, credentialed CORS를 러브트리 오리진으로 한정 허용하거나. 둘 다 인증을 다시 발명하는 선택이 아니라 전송 결정이고, LoveBud·limone API는 `Access-Control-Allow-Origin`을 보내지 않으므로(§2 실측) 후자를 택하면 상대 쪽 허용 추가가 필요하다.
+- **E3 · 프록시 — E2를 달성하는 구현 수단 중 하나이지 E1의 대체가 아니다.** Pages functions 프록시를 두면 same-origin이 만들어지고, 신원의 권위는 그대로 서버 쪽에 남는다.
 
-- Chat 세션은 `HttpOnly; Secure; SameSite=Lax`에 Domain 속성이 없는 host-only 쿠키다(`auth.py:209-220`). Pages 오리진에서 다른 호스트로 호출하면 브라우저가 쿠키를 싣지 않는다.
-- B64(TypeScript Worker)가 택한 재사용 방법은 **같은 오리진에서 서빙되는 것**뿐이었다(`padiem-session-auth.ts:1-26`) — 4번(프런트 유지)과 충돌한다.
-- LoveBud·limone API는 `Access-Control-Allow-Origin`을 보내지 않는다(§2 실측). 크로스 오리진 호출은 상대 쪽 허용 추가가 필요하다.
-- PADIEM에는 제품 고유 세션 손잡이가 이미 있다(`auth_sessions.py:1-20` 제품 스코프, `auth.py:82-144`에서 `sid`를 폐기 손잡이로 사용).
+필요 조건은 E1이고, E2는 두 오리진이 다를 때만 발생하며, E3은 E2의 구현 방법 하나다. 조합(같은 오리진 + 프록시, 다른 오리진 + CORS 허용 등)은 API·Control Plane 소유자 결정으로 남긴다.
 
-선택지는 셋이고 결정은 API·Control Plane 소유자 몫이다. (a) 러브트리 제품 ID로 발급된 **러브트리 고유의 first-party credential**을 러브트리 자기 경계에서 발급·검증(쿠키·비밀 공유 없음), (b) 4.0 Pages 오리진에 동등한 러브트리 로그인·세션 엔드포인트를 두고 `Access-Control-Allow-Origin`을 러브트리 오리진으로 한정 허용, (c) 4.0 Pages에 작은 프록시를 두어 API를 same-origin으로 보이게 하되 신원의 권위는 계속 컴2에 둔다. 공통 인증을 다시 발명하지 않는다는 조건에서는 (a)·(b)가 PADIEM 선례에 가장 가깝다.
+## 6. 필요한 차이만 정리 — 저장 형태 · DB 연결 · links · 기기 간 충돌 · ID와 멱등성
 
-## 6. 필요한 차이만 정리 — DB 연결 · links 저장 · 기기 간 충돌 · ID와 멱등성
-
-1. **관련 연결(`links`)의 서버 표현이 기존에 없다** — 근거: LoveBud 커밋 전체 `CREATE TABLE` 목록에 link/edge가 없고 array/jsonb 연결 컬럼도 없음; limone `memories`는 `parent_id` + `connection_reason` 텍스트만(`schema.ts:66-104`). 4.0은 부모 1개 + 관련 연결 ≤20을 동시에 지켜야 한다.
-2. **`links` 저장은 "변경 내용"과 "기존 데이터 영향"을 분리한다** — 새 테이블(`tree_id`, `moment_id`, `target_moment_id`, `kind`, 소유 손잡이, 인덱스)을 **추가**하는 변경이고, 기존 행·기존 컬럼을 고치지 않는다. 러브트리 저장 API는 처음 여는 저장소라 이전 대상 기존 행이 0이며, 첫 increment의 실제 데이터 영향은 없다. 같은 것을 LoveBud canonical 테이블에 붙일 때만 그쪽 프로덕션 DDL이 되어 파괴적 변경 게이트를 탄다 — 두 경우를 한 단어로 섞지 않는다. 지켜야 할 불변은 4.0에 이미 있다: `MAX_LINKS` 20, 자기 자신 금지, 없는 id 금지, **양쪽 미러**와 삭제 시 정리(`src/domain.js:77-107`). 서버가 한쪽만 지우면 미러가 깨진다.
-3. **DB 연결** — 재사용할 형태는 두 자매 저장소가 이미 쓰고 있는 패턴이다: Neon Postgres 직결 + **읽기/쓰기 연결 분리**(LoveBud `LOVE_PLATFORM_DATABASE_URL` / `LOVE_PLATFORM_WRITE_DATABASE_URL`, forbidden-fallback 목록 포함), 금지된 기본값으로 몰래 떨어지지 않게 하는 E2E 안전 게이트(`limone core/runtime/server/api/e2e-safety.ts:10-13,43-101` — Neon hostname allow/deny로 테스트가 프로덕션을 건드릴 수 없다), Expand/Contract/Re-forward 마이그레이션 순서(`limone ops/releases/sort-order/`). PADIEM 쪽 내구성 저장소는 D1(`padiem-chat-db`, `padiem-engine`)이고 LoveBud에는 D1/KV/R2가 없다. 필요한 차이는 러브트리 문서 테이블 한 개(소유 손잡이 `subject_id`, 제품 ID, revision, `client_key`)이고, 실제 연결 문자열·바인딩·스케줄은 컴2 소관이라 이 문서에서 정하지 않는다.
+1. **저장 형태를 먼저 가른다 — JSON 문서 저장과 관계형 저장은 별개 결정이다.** 4.0은 이미 `validateState`가 만든 트리 + `moments[]` + `links[]` 한 덩어리를 직렬화해 저장한다(`src/storage.js:26`). 그 형태를 유지하는 **JSON 문서 저장**(문서 컬럼에 JSON/JSONB + 소유 손잡이 + revision)을 택하면 **`links`는 문서 안에 있으므로 별도 테이블이 필요 없다.** 순간을 행으로 받는 **관계형 저장**을 택할 때만 연결 관계 표현이 추가로 필요하고, 그 경우에도 새 테이블 추가(기존 행·기존 컬럼 수정 없음)다. 두 자매 저장소는 관계형 쪽에 서 있다 — 근거: LoveBud 커밋 전체 `CREATE TABLE` 목록에 link/edge가 없고 array/jsonb 연결 컬럼도 없음, limone `memories`는 `parent_id` + `connection_reason` 텍스트만(`schema.ts:66-104`). 즉 "links용 테이블이 없다"는 관계형을 골랐을 때의 추가 사항이고, 문서형을 골랐을 때는 발생하지 않는다.
+2. **연결이 지켜야 할 불변은 저장 형태와 무관하고, 변경 내용과 기존 데이터 영향을 분리한다.** 불변: `MAX_LINKS` 20, 자기 자신 금지, 없는 id 금지, **양쪽 미러**와 삭제 시 정리(`src/domain.js:77-107`). 문서형은 4.0 클라이언트가 이미 양쪽을 미러로 유지한 채 올리므로 그대로 간다. 관계형은 서버가 양쪽을 함께 쓰거나 읽을 때 전개해야 하고 한쪽만 지우면 미러가 깨진다. 영향: 러브트리 저장 API는 처음 여는 저장소라 이전 대상 기존 행이 0이고 첫 increment의 기존 데이터 영향은 없다. 같은 형태를 LoveBud canonical 테이블에 붙일 때만 그쪽 프로덕션 DDL이 되어 파괴적 변경 게이트를 탄다 — 두 경우를 한 단어로 섞지 않는다.
+3. **DB 연결 — 재사용 대상은 패턴이고, 드라이버는 그대로 쓸 수 없다.** 재사용할 형태는 두 자매 저장소가 이미 쓰고 있는 패턴이다: Neon Postgres 직결 + **읽기/쓰기 연결 분리**(LoveBud `LOVE_PLATFORM_DATABASE_URL` / `LOVE_PLATFORM_WRITE_DATABASE_URL`, forbidden-fallback 목록 포함), 금지된 기본값으로 몰래 떨어지지 않게 하는 E2E 안전 게이트(`limone core/runtime/server/api/e2e-safety.ts:10-13,43-101` — Neon hostname allow/deny로 테스트가 프로덕션을 건드릴 수 없다), Expand/Contract/Re-forward 마이그레이션 순서(`limone ops/releases/sort-order/`). **드라이버 주의** — 두 저장소의 프로덕션 데이터 계층은 Neon 전용이다: 리모네는 `neon()` + `drizzle-orm/neon-http`(`core/runtime/db/index.ts:1-13`, 의존성 `@neondatabase/serverless ^1.1.0`), LoveBud는 `@neondatabase/serverless`에 WebSocket 트랜잭션 어댑터까지 쓴다(`functions/_shared/db/neon-ws-transaction-adapter.js`). 따라서 **일반적인 컴2 PostgreSQL에는 연결 문자열만 바꿔 붙여서 동작하지 않는다** — Neon 호환 엔드포인트를 두거나 드라이버를 교체해야 한다. 두 저장소도 generic Postgres 경로는 테스트 헬퍼로 분리해 두고 있다(`LoveBud tests/db-engine/helpers/postgres-disposable-harness.cjs`가 `pg` 사용) — 이 구분 자체가 같은 결론의 근거다. PADIEM 쪽 내구성 저장소는 D1(`padiem-chat-db`, `padiem-engine`)이고 LoveBud에는 D1/KV/R2가 없다. 필요한 차이는 러브트리 문서 한 개(소유 손잡이 `subject_id`, 제품 ID, revision, `client_key`)이고, 실제 연결 문자열·바인딩·스케줄은 컴2 소관이라 이 문서에서 정하지 않는다.
 4. **문서 단위 동시성** — `expectedRaw`는 같은 브라우저 탭에서만 작동하고 `undefined`이면 무방책이다(`src/storage.js:24`, `src/main.js:37`). 서버에서는 문서 revision + if-match, 그리고 409를 사용자에게 알리는 경계가 새로 필요하다. 순간별 merge는 하지 않는다(문서 단위 낙관 잠금). 재사용 근거: `limone`은 갱신·삭제 전에 소유권을 재조회한 뒤 행 필터(`server/api/trees.ts:216-249`), 결정적 id로 재플레이를 원자적으로 처리(`:460-701`).
 5. **ID와 멱등성 — 동기화와 최초 이전은 `importTrees`와 별개 규칙이다** — `importTrees`의 id 재발급은 "새 사본 가져오기"라는 기능의 의도된 동작이므로 **유지**한다(`src/domain.js:146-154`, links id도 재매핑). 별도로 정할 것:
    - *동기화 id*: 같은 기기에서 서버로 올라가는 편집 경로에서 순간 id는 불변하다(클라이언트 발급 UUIDv4, `src/domain.js:7-15`).
@@ -121,8 +118,9 @@
 ## 7. 확인하지 못한 것
 
 - **러브트리 제품 ID**: 값·할당 절차·누가 Control Plane에 등록하는지 소스에 없다(확인된 것은 `b62`, `b54-padiem-claw` 두 개뿐). Owner·권위 소유자 결정.
-- **4.0 오리진용 credential 전달**: PADIEM 안에 "다른 오리진의 브라우저가 제품 세션을 받는다"는 선례가 없다(§5 남는 설계 문제). 이 문서에서 방식을 단정하지 않았다.
-- **Control Plane Identity·Broker·OAuth·D1/R2의 컴2 제공 시점**: 마이그레이션 노트 기준 미이관. `deploy/host-com2/`에는 `b14/`와 `file-lane/`만 커밋돼 있다.
+- **4.0 오리진용 credential 전달 경로**: PADIEM 안에 "다른 오리진의 브라우저가 제품 세션을 받는다"는 선례가 없다(§5 E2·E3). 방식은 단정하지 않았고, 러브트리 고유 자격 증명(E1)이 필요하다는 사실만 확정돼 있다.
+- **Control Plane Identity·Broker·OAuth·D1/R2의 컴2 제공 시점**: 마이그레이션 노트 기준 미이관. `deploy/host-com2/`에는 `b14/`와 `file-lane/`만 커밋돼 있다. **러브트리 저장 API의 선행 조건은 아니며**(§5-3), 컴2에서 기존 PADIEM 인증에 붙는 경로가 실제로 도달 가능한지(ingress·서버 간 인증)만이 이번 단계에서 확인 필요한 항목이다.
+- **러브트리 저장 API의 저장 형태 결정**: JSON 문서형인지 관계형인지 아직 정해지지 않았다(§6-1). 관계형일 때만 연결 테이블 추가가 발생한다.
 - **`tenant_id` 생산자**: 계약상 부재가 기본(`auth_sessions.py:15-19`) — 소유권 키에 tenant가 들어갈 수 있는 시점 미확인.
 - 두 자매 저장소의 **프로덕션 Neon 실제 컬럼·행 상태**(저널 밖 수동 SQL이 수행됐는지 소스로 증명 불가, `trees`의 검증된 `CREATE TABLE`이 커밋에 없음).
 - Cloudflare Pages/Worker의 **실제 환경 변수·비밀 바인딩**(저장소 밖).
