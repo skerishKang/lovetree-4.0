@@ -3,27 +3,39 @@ import { ApiError } from './errors.js';
 const SESSION_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const PRODUCT_USER_ID = /^usr_[A-Za-z0-9_-]{1,80}$/;
 
+/** 이 저장소가 자기 제품 ID로 쓸 수 없는, 다른 제품의 검토된 ID. */
+export const OTHER_REVIEWED_PRODUCTS = Object.freeze(['b62', 'b54-padiem-claw']);
+
 /**
- * PADIEM 공통 인증 어댑터.
+ * PADIEM 공통 인증 어댑터 — 확인된 실제 계약(`skerishKang/ai-revenue-lab` main `b8c3840d`):
+ * - `packages/padiem-control-plane/identity_authority_worker.py:232-238` `resolve_auth_session({ session_id })` → `{ ok: true, session }`
+ * - `packages/padiem-control-plane/padiem_control_plane/auth_sessions.py:127-139` session 공개 형상
+ *   (`session_id`, `product_id`, `subject{subject_type,subject_id}`, `issued_at`, `expires_at`, `state`, `revision`)
+ * - `identity_authority_worker.py:316-338` `resolve_product_user_for_subject({ product_id, canonical_subject_id })` → `{ ok: true, product_user_id }`
+ * - 권위는 private service binding 전용(`PUBLIC_FETCH=False`, `PRODUCTION_ROUTE_CONFIGURED=False`, `fetch`는 404).
+ *   transport `call(method, payload)`은 주입받고, 이 파일은 URL·경로를 가지지 않는다.
  *
- * 확인된 실제 계약(`skerishKang/ai-revenue-lab` main `19c280dd`):
- * - `packages/padiem-control-plane/identity_authority_worker.py:232-238` `resolve_auth_session({ session_id })`
- *   → `{ ok: true, session }`, session 모양은 `padiem_control_plane/auth_sessions.py:127-139`
- *   (`session_id`, `product_id`, `subject{subject_type,subject_id}`, `issued_at`, `expires_at`, `state`, `revision`).
- * - `identity_authority_worker.py:316-338` `resolve_product_user_for_subject({ product_id, canonical_subject_id })`
- *   → `{ ok: true, product_user_id }`.
- * - 이 권위는 private service binding 전용이다(`PUBLIC_FETCH=False`, `PRODUCTION_ROUTE_CONFIGURED=False`,
- *   `fetch`는 404). 따라서 transport `call(method, payload)`는 주입받고, 이 파일은 URL·포트·경로를 가지지 않는다.
- * - 검증 순서는 이미 머지된 제품 경로 `apps/ai-reward-router/src/income-pipeline/authority-session-auth.ts:14-27`을 따른다:
- *   세션 id는 128비트 베어러 값으로 그 자체이고, 서명 비밀을 제품 쪽이 갖지 않는다.
+ * 로그인은 두 단계가 맞물려야 성립한다. B64가 머지한 경로(`apps/ai-reward-router/src/income-pipeline/authority-session-auth.ts:196-238`)는
+ * 1) 자격 증명 진위 확인 → 2) canonical 세션 조회 순서다. 그 파일에서 sid는 쿠키 페이로드에서 **HMAC 검증 없이** 뽑기만 하고(`:110-131`),
+ * 발행자(chat)의 서명 확인(`signatureProbe`, `:214`)을 권위에 묻기 **전에** 통과시킨다. 합성 페이로드가 살아 있는 sid를 실어도
+ * 신원이 되지 않게 하기 위해서다(`:33-42`의 security delta).
  *
- * 신뢰하지 않는 것: 요청 본문·query·임의 헤더의 사용자 ID, 쿠키 페이로드의 `uid` 주장, 이메일 일치.
- * 소유권 키는 권위가 돌려준 canonical subject id뿐이다.
+ * 이 어댑터는 2단계(`credential` 주입 이후)와 1단계를 **분리**해 받는다. `credential.verify`는
+ * - 서명된 자격 증명: 발행자가 검증한 뒤에 세션 id를 돌려준다. 러브트리 발급 경로가 그 발행자이며, Chat의 비밀키·purpose를 쓰지 않는다.
+ * - opaque bearer: 발급·검증·폐기 계약이 있어야 한다. 그 계약이 없는 지금은 배포가 검증자를 주입하지 않으면 열리지 않는다.
+ * `verify`가 null을 돌려주면 401(진위 확인 실패), 예외를 던지면 503(확인 자체를 못 했음)이고, 두 경우 모두 권위에는 요청을 보내지 않는다.
+ *
+ * 신원으로 쓰지 않는 것: 요청 본문·query·임의 헤더의 사용자 ID, 페이로드의 `uid` 주장, 이메일 일치.
  */
-export function createPadiemAuthorityAuth({ call, productId, readSessionId, timeoutMs = 3_000, now = () => new Date() }) {
+export function createPadiemAuthorityAuth({ credential, call, productId, timeoutMs = 3_000, now = () => new Date() }) {
+  if (!credential || typeof credential.verify !== 'function') {
+    throw new Error('credential.verify가 필요합니다. canonical session id만으로는 로그인을 인정하지 않습니다.');
+  }
   if (typeof call !== 'function') throw new Error('authority transport call가 필요합니다. 없는 상태로 인증을 열지 않습니다.');
   if (typeof productId !== 'string' || !productId) throw new Error('LOVETREE_PRODUCT_ID가 필요합니다.');
-  if (typeof readSessionId !== 'function') throw new Error('세션 자격 증명을 읽는 지점이 필요합니다.');
+  if (OTHER_REVIEWED_PRODUCTS.includes(productId)) {
+    throw new Error(`${productId}는 다른 제품의 세션 ID입니다. 러브트리 자기 제품 ID를 쓰세요.`);
+  }
 
   const unauthenticated = () => new ApiError(401, 'unauthenticated', '로그인이 필요해요.');
   const unavailable = () => new ApiError(503, 'auth_unavailable', '로그인 확인을 하지 못했어요. 잠시 뒤 다시 시도해 주세요.');
@@ -48,7 +60,10 @@ export function createPadiemAuthorityAuth({ call, productId, readSessionId, time
   }
 
   return async function authenticate(request) {
-    const sessionId = readSessionId(request ?? {});
+    let proof;
+    try { proof = await credential.verify(request ?? {}); }
+    catch (error) { if (error instanceof ApiError) throw error; throw unavailable(); }
+    const sessionId = proof?.sessionId;
     if (typeof sessionId !== 'string' || !SESSION_ID.test(sessionId)) throw unauthenticated();
 
     const { session } = await rpc('resolve_auth_session', { session_id: sessionId });
