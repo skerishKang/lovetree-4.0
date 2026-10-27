@@ -1,0 +1,53 @@
+import { createHash } from 'node:crypto';
+import { EMPTY_STATE, validateState } from '../src/domain.js';
+import { ApiError } from './errors.js';
+
+const CLIENT_KEY = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
+
+export function requestHashOf(validatedState, expectedRevision) {
+  return createHash('sha256').update(`${JSON.stringify(validatedState)}\n${expectedRevision}`, 'utf8').digest('hex');
+}
+
+function parseWriteInput(payload) {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw new ApiError(400, 'invalid_request', '요청 형식을 알 수 없어요.');
+  const { state, expectedRevision, clientKey } = payload;
+  if (!state || typeof state !== 'object') throw new ApiError(400, 'invalid_document', '문서 형식을 알 수 없어요.');
+  if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 0) throw new ApiError(400, 'invalid_revision', '저장 번호를 바로 확인해 주세요.');
+  if (typeof clientKey !== 'string' || !CLIENT_KEY.test(clientKey)) throw new ApiError(400, 'invalid_client_key', '요청 키 형식을 확인해 주세요.');
+  let validated;
+  try { validated = validateState(state); } catch (error) { throw new ApiError(400, 'invalid_document', error.message); }
+  return { validated, expectedRevision, clientKey };
+}
+
+export function createWorkspaceService({ repo, productId }) {
+  return {
+    async read(principal) {
+      const stored = await repo.load({ productId: principal.productId, subjectId: principal.subjectId });
+      if (!stored) return { revision: 0, savedAt: null, state: EMPTY_STATE() };
+      try {
+        return { revision: stored.revision, savedAt: stored.savedAt, state: validateState(stored.doc) };
+      } catch {
+        throw new ApiError(500, 'stored_document_invalid', '보관된 기록을 읽을 수 없어요.');
+      }
+    },
+
+    async write(principal, payload) {
+      const { validated, expectedRevision, clientKey } = parseWriteInput(payload);
+      const outcome = await repo.commit({
+        productId: principal.productId,
+        subjectId: principal.subjectId,
+        doc: validated,
+        expectedRevision,
+        clientKey,
+        requestHash: requestHashOf(validated, expectedRevision)
+      });
+      if (outcome.status === 'revisionConflict') {
+        throw new ApiError(409, 'revision_conflict', '다른 곳에서 먼저 저장했어요. 최신 기록을 불러온 뒤 다시 시도해 주세요.', { currentRevision: outcome.currentRevision });
+      }
+      if (outcome.status === 'keyConflict') {
+        throw new ApiError(409, 'client_key_conflict', '같은 요청 키로 다른 내용을 보내려 해요. 새 키로 다시 시도해 주세요.');
+      }
+      return { revision: outcome.revision, savedAt: outcome.savedAt };
+    }
+  };
+}
