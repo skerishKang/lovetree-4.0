@@ -172,10 +172,11 @@ export function stemGroups(tree) {
 }
 
 export function pathTo(tree, id) {
+  const resolved = (id && typeof id === 'object') ? id.id : id;
   const byId = new Map(tree.moments.map(m => [m.id, m]));
   const path = [];
   const seen = new Set();
-  let current = byId.get(id);
+  let current = byId.get(resolved);
   while (current && !seen.has(current.id)) {
     seen.add(current.id);
     path.push(current);
