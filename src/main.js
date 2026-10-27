@@ -229,6 +229,16 @@ function closeDialog() {
   dialog.close();
 }
 dialog.addEventListener('cancel', event => { event.preventDefault(); closeDialog(); });
+// 바깥(백드롭) 클릭으로 닫기. 내부 클릭·내부에서 시작한 드래그는 닫지 않음.
+let momentMouseDownTarget = null;
+dialog.addEventListener('mousedown', event => { momentMouseDownTarget = event.target; });
+dialog.addEventListener('click', event => {
+  if (event.target === dialog && momentMouseDownTarget === dialog) {
+    event.stopPropagation();
+    closeDialog();
+  }
+  momentMouseDownTarget = null;
+});
 dialog.addEventListener('close', () => { formDirty = false; formSubmitting = false; dialogOriginHash = ''; dialogOriginIdx = 0; opener?.focus?.(); });
 dialog.addEventListener('input', () => { formDirty = true; });
 dialog.addEventListener('submit', event => {
@@ -315,6 +325,15 @@ linkDialog.addEventListener('submit', event => {
   } catch (error) { $('#link-error').textContent = error.message; }
 });
 linkDialog.addEventListener('cancel', event => { event.preventDefault(); linkDialog.close(); });
+let linkMouseDownTarget = null;
+linkDialog.addEventListener('mousedown', event => { linkMouseDownTarget = event.target; });
+linkDialog.addEventListener('click', event => {
+  if (event.target === linkDialog && linkMouseDownTarget === linkDialog) {
+    event.stopPropagation();
+    linkDialog.close();
+  }
+  linkMouseDownTarget = null;
+});
 linkDialog.addEventListener('close', () => { if (opener?.isConnected) opener.focus(); });
 
 function exportRecovery() {
