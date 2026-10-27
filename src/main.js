@@ -448,7 +448,7 @@ document.addEventListener('click', event => {
       render();
       $(`[data-action="select-moment"][data-id="${CSS.escape(selectedId)}"]`)?.focus({ preventScroll: true });
     }
-    else if (action === 'branch-cancel') { branchPicker = null; render(); }
+    else if (action === 'branch-cancel') { branchPicker = null; render(); setTimeout(() => { document.querySelector('[data-action="route-next"]')?.focus({ preventScroll: true }); }, 0); }
     else if (action.startsWith('zoom-')) {
       const scale = zoom === 'fit' ? fitScale(currentTree()).scale : zoom;
       zoom = action === 'zoom-fit' ? 'fit' : action === 'zoom-reset' ? 1 : Math.round(Math.min(1.4, Math.max(.18, scale + (action === 'zoom-in' ? .1 : -.1))) * 10) / 10;
@@ -498,6 +498,9 @@ document.addEventListener('click', event => {
       // Multiple children: show picker, no arbitrary move.
       branchPicker = children;
       render();
+      setTimeout(() => {
+        document.querySelector('.branch-picker [data-action="branch-pick"]')?.focus({ preventScroll: true });
+      }, 0);
     }
     else if (action === 'add' || action === 'edit') openMoment(action, id);
     else if (action === 'link') openLinkPicker(id);
