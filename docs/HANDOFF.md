@@ -109,6 +109,49 @@ SRC064의 원본 CSS·5개 궤도 투영식·40개 예시 자산을 첫 화면�
 
 old 조사 PR #18은 후보 선택의 근거다. 64 → 59 흐름을 먼저 완성하고 32 책장은 위 작업으로 연결했고 57 상세 화면은 다음 검토 대상이다. 55의 자유 연결을 그대로 가져오려고 현재 한 부모 규칙을 바꾸지는 않는다. #8의 비교 미리보기는 조사 문서와 별도로 남아 있다.
 
+## 로그인·저장 운영 적용 순서 — 2026-10-28
+
+적용한 것은 아직 없다(병합·배포·migration·시크릿·운영 설정 변경은 이번 범위가 아니다). 아래는 순서대로 적용할 때의 계획이고, 각 칸의 대상·설정 이름·검증·복구를 묶었다. 값은 적지 않는다 — 필요 설정은 이름만 적는다.
+
+### 의존 순서와 현재 head (2026-10-28 확인)
+
+`lovetree-4.0`(COM1 저장소) 사슬과 `ai-revenue-lab`(PADIEM 정본) 사슬은 서로를 향한다. 아래 순서대로 합치고 배포한다.
+
+| 순서 | 저장소 | PR | base | head | 내용 |
+| --- | --- | --- | --- | --- | --- |
+| 1 | ai-revenue-lab | #5963 | main | `c51f6dbef` | 제품 `lovetree-4-0`을 검토 제품 집합에 등록(+ 계약 pin·회귀 시험) |
+| 2 | ai-revenue-lab | #5965 | #5963 브랜치 | `db8210d2f` | 읽기 전용 중계 Worker(세션 확인 두 RPC만) |
+| 3 | ai-revenue-lab | #5977 | #5965 브랜치 | `7a56d8e74` | 폐기 전용 중계 Worker |
+| 4 | ai-revenue-lab | #5984 | #5977 브랜치 | `c5685a8f3` | 1회용 handoff 표로 발급 개방 + 표를 만든 로그인 요청에 견착 + migration 073 |
+| 5 | ai-revenue-lab | #5988 | #5984 브랜치 | `33a6ac4cd` | 채팅 로그인 콜백의 handoff 생산(Google) + password 폼 배선 + 시험 하네스 |
+| 6 | lovetree-4.0 | #35 | main | `4bf6d5965` | 재사용 조사 문서(코드 없음) |
+| 7 | lovetree-4.0 | #37 | main | `abcda255a` | 저장 API·스키마·PostgreSQL CI |
+| 8 | lovetree-4.0 | #49 | #37 브랜치 | `606901242` | PADIEM 인증 어댑터·중계 transport |
+| 9 | lovetree-4.0 | #52 | #49 브랜치 | `15d7b07d1` | 발급·폐기 연결, 상태 저장소, 공급자 모듈, 두 저장소 연결 시험 |
+
+1~5는 한 번에 모이면 안 된다 — 같은 저장소 스택이라 위→아래로 합친다. 6~9는 1~5가 배포된 뒤에도 단독으로 켜지 않는다(러브트리는 확인 경로가 없으면 저장을 열지 않는다).
+
+### 단계별 적용·검증·복구
+
+1. 제품 등록 — 대상: Control Plane identity authority Worker. 필요 설정: `CONTROL_PLANE_ALLOWED_PRODUCTS`(검토 집합과 정확히 같아야 하고, 다르면 DO 생성 자체가 실패한다). 검증: gate·계약 시험(`IDENTITY_PRODUCTS` pin), 채팅 e2e의 env가 같은 집합인지. 복구: 이전 집합 값으로 되돌린 뒤 해당 Worker 재배포.
+2. 읽기 중계 배포 — 대상: Cloudflare Worker `lovetree-authority-caller`. 필요 설정: `LOVETREE_CALLER_SECRET`, `IDENTITY_AUTHORITY` service binding. 검증: `LoveTree Authority Caller CI`(읽기 11건 skip=0), 배포 후 `/health`, `/auth-check`, 유효 세션 1건 resolve 200·위조 401. 복구: 이전 버전으로 롤백(공개 표면은 이 중계 하나가 새로 늘어난 자리라 제거는 Worker 배포를 되돌린다).
+3. 발급·폐기 중계 배포 — 대상: Cloudflare Worker `lovetree-auth-caller`. 필요 설정: `LOVETREE_CALLER_SECRET`(러브트리는 두 중계에 같은 env 이름 하나로 서명하므로 **두 중계가 같은 값**이어야 한다), `IDENTITY_AUTHORITY`, `LOVETREE_LOGIN_DB`(D1). 검증: 같은 CI(발급 11건·읽기 11건·D1 gate 18건·cross-lane guard 11건), 배포 후 `/auth-check` methods 확인, 존재하지 않는 표로 `/mint-session` 401. 복구: 표 소비는 단일 UPDATE라 행이 남지 않고, 배포 되돌림 시 `/mint-session`은 401/501로 닫힌다(러브트리는 발급 없이도 조회·폐기 유지).
+4. migration 073 적용 — 대상: `padiem-chat-db`(D1). 필요 설정: 없음(스키마). 검증: D1 gate의 일반 마이그레이션 창(073은 seed=추가 전용으로 분류, apply 창·파괴적 목록에 없음), `lovetree_login_handoffs` 존재·CHECK. 복구: 테이블은 추가 전용이라 남기고 라우트/중계만 되돌린다(드롭은 별도 승인).
+5. 채팅 handoff 생산 배포 — 대상: `apps/padiem-chat` Worker. 필요 설정: 기존 `session_secret` 재사용(새 시크릿 불요), 코드 소유 allowlist origin에 실제 러브트리 주소 포함 여부 확인. 검증: B62 full regression·browser QA lane, 배포 후 `/auth/lovetree/start`가 기존 Google authorize로 302(redirect_uri 무변경), 로그인 완료 시 러브트리 콜백로만 되돌아감. 복구: 라우트 등록 해제(revert 커밋) — 행은 만료(120초)로 자연 소멸.
+6. 러브트리 저장 API 배포 — 대상: COM2 Node 서비스. 필요 설정 이름: `LOVETREE_PRODUCT_ID`, `LOVETREE_DATABASE_URL`, `LOVETREE_AUTHORITY_TRANSPORT=relay`, `LOVETREE_AUTHORITY_RELAY_URL`, `LOVETREE_CALLER_SECRET`, `LOVETREE_CREDENTIAL_MODULE=./server/credentials/lovetree-credential-module.js`, `LOVETREE_SESSION_SECRET`, `LOVETREE_SESSION_SOURCE`/`LOVETREE_SESSION_COOKIE`, `LOVETREE_AUTHORITY_WRITE_TRANSPORT`, `LOVETREE_LOGIN_PROVIDER_MODULE=./server/padiem-login-provider.js`, `LOVETREE_PADIEM_HANDOFF_START_URL`, `LOVETREE_PUBLIC_ORIGIN`, `LOVETREE_STATE_STORE=postgres`, `LOVETREE_MINT_URL`, `LOVETREE_MAX_BODY_BYTES`, `PORT`. DB 준비: `server/db/schema.sql`의 세 테이블(`lovetree_workspaces`, `lovetree_request_claims`, `lovetree_login_states`) — 모두 추가 전용. 검증(배포 전): `npm run check`, PostgreSQL job 9건 skip=0, 로컬 두 저장소 연결 시험 6건. 검증(배포 후): 브라우저에서 로그인 → 저장 → 새로고침 → 로그아웃 → 이전 자격 증명 거부, 회원 A/B 격리. 복구: `LOVETREE_MINT_URL`/`LOVETREE_LOGIN_PROVIDER_MODULE`를 빼면 로그인 라우트는 거부 전용으로 닫히고 저장 경계는 그대로 유지된다. 확인 경로 env를 빼면 저장을 열지 않는다(fail-closed 기본).
+7. 프런트 연결(#36) — 화면이 서버 저장을 아직 부르지 않는다. 연결 후에만 화면 기준 판정(저장 버튼·복원·경쟁 409 안내)이 가능하다.
+
+### 이미 준비된 것과 아직 필요한 것
+
+- 준비됨: 위 1~5의 코드·시험·CI(발급 11/읽기 11/gate 18/guard 11/B62 full regression pass), 러브트리(#37/#49/#52) 코드와 CI(ubuntu·windows·Pages·GitGuardian·PostgreSQL), 두 저장소 연결 시험 6건(실제 push된 SHA 청결 확인 포함), 실제 브라우저 판정(로그인→저장→새로고침 복원→로그아웃→세션 없음 거부, 회원 A/B 격리) — 국소 composition, 스텁 Google/모형 권위.
+- 아직 필요: PR 병합(어떤 것도 main에 없다), 두 Worker·채팅·러브트리 배포, migration 073 실행, `LOVETREE_LOGIN_DB` 바인딩, 시크릿 생성·등록(`LOVETREE_CALLER_SECRET`·`LOVETREE_SESSION_SECRET`), COM2 PostgreSQL에 스키마 적용, allowlist에 실제 배포 origin 확정, 실제 Google 계정으로 1회 왕복(크로스 사이트 쿠키 포함), password leg의 실제 화면 왕복, 프런트(#36) 연결.
+- 이번 브라우저 판정에서 확인하지 못한 것: (a) 운영 Google 화면·운영 채팅 셸을 지난 왕복 — 로컬 스텁authorize·하네스 API라 채팅 셸(`/`)이 없어 대화상자 왕복은 자동 시험으로만 확인했고, (b) 폐기된 canonical 세션 id를 직접 넣어 받는 거부는 브라우저가 Cookie 헤더를 덮어쓸 수 없어 자동 시험(서버측)이 담당한다.
+
+### 실행 기록 (2026-10-28)
+
+- 두 저장소 연결 시험: lovetree-4.0 `15d7b07d123b0aa8a51490531698f320d3fc51cd`, ai-revenue-lab `33a6ac4cd45702403b602f1da6f9d0f25d991369` 6 pass / 0 fail.
+- 실제 브라우저(로컬 런너 `scripts/dev-auth-chain.mjs`): 회원 A 로그인→저장(revision 1)→새로고침 후 동일 문서→로그아웃→비로그인 401; 회원 B는 빈 문서(revision 0)에서 시작해 자기 저장만 하고, A의 문서는 B의 저장으로 옮지 않음.
+
 ## Owner가 정한 방향
 
 러브버드 2.0과 러브트리-리모네 3.0의 자산을 참고하되 새로 설계할 수 있다. 팬이 좋아하는 대상과 관련된 순간·감정·이유를 기록하고 연결하는 경험에 집중한다. 범용 생각 정리/지식/업무 서비스는 별도 서비스로 분리한다. 첫 화면은 SRC064 부유 카드로 선택했다. 후속 화면은 old 자산을 우선 재사용한다. 기존 DB의 회원은 Owner가 만든 테스트 데이터이며 이전 의무가 없다.
