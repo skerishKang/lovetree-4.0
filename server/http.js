@@ -65,15 +65,16 @@ export function createNodeHandler(requestHandler, { maxBodyBytes = DEFAULT_MAX_B
     if (aborted || res.destroyed) { res.destroy(); return; }
 
     let path;
-    try { path = new URL(req.url, 'http://localhost').pathname; }
+    let query;
+    try { const url = new URL(req.url, 'http://localhost'); path = url.pathname; query = url.searchParams; }
     catch {
       res.writeHead(400, { 'content-type': 'application/json; charset=utf-8' });
       res.end(JSON.stringify({ error: { code: 'invalid_path', message: '요청 경로를 읽을 수 없어요.' } }));
       return;
     }
-    const result = await requestHandler({ method: req.method, path, headers: req.headers, body: Buffer.concat(chunks).toString('utf8') });
+    const result = await requestHandler({ method: req.method, path, query, headers: req.headers, body: Buffer.concat(chunks).toString('utf8') });
     if (res.destroyed) return;
-    res.writeHead(result.status, { 'content-type': 'application/json; charset=utf-8' });
+    res.writeHead(result.status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', ...(result.headers ?? {}) });
     res.end(JSON.stringify(result.body));
   };
 }
