@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { createServer } from 'node:http';
 import { pathToFileURL } from 'node:url';
 import { createTree } from '../src/domain.js';
@@ -12,6 +13,7 @@ import { createAuthorityRelayClient } from '../server/authority-relay-transport.
 import { createHandoffMintClient } from '../server/handoff-mint-client.js';
 import { createAuthorityWriter } from '../server/authority-writer.js';
 import { createLoginService } from '../server/login-service.js';
+import { createLoginProvider } from '../server/padiem-login-provider.js';
 import { createMemoryLoginStateStore } from '../server/login-state-store.js';
 import { createModelControlPlane } from '../server/testing/model-control-plane.js';
 import { createCredentialVerifier } from '../server/credentials/lovetree-credential-module.js';
@@ -37,7 +39,7 @@ const USER = 'usr_lovetree_1';
 const PROVIDER_SUBJECT = 'provider-subject-1';
 const AT = new Date();
 const epoch = () => Math.floor(AT.getTime() / 1000);
-const TICKET = 'hoft_0123456789abcdef';
+const TICKET = 'lovt_0123456789abcdefABCDEFGH';
 
 async function settle(promise) {
   try { return await promise; }
@@ -56,6 +58,7 @@ function cookieValue(header, name) {
 }
 
 const sidOf = (token) => readSessionToken({ secret: CREDENTIAL_SECRET, token, now: epoch() })?.canonicalSessionId;
+const sha256Hex = (value) => createHash('sha256').update(value, 'utf8').digest('hex');
 
 /** PADIEM 인증 서버 쪽 발급: 표를 확인하고 같은 권위에 링크·세션을 남긴다. */
 async function startMint({ plane, tickets = new Map(), behaviour = 'ok' } = {}) {
@@ -73,10 +76,17 @@ async function startMint({ plane, tickets = new Map(), behaviour = 'ok' } = {}) 
       seen.push(body);
       if (behaviour === 'closed') return reply(501, { ok: false, error: { code: 'mint_policy_undecided' } });
       const ticket = body.handoff_ticket;
-      if (Object.keys(body).length !== 1 || typeof ticket !== 'string') return reply(400, { ok: false, error: { code: 'invalid_request' } });
-      if (claimed.has(ticket)) return reply(401, { ok: false, error: { code: 'handoff_consumed' } });
+      const digest = body.login_request_sha256;
+      if (Object.keys(body).length !== 2 || typeof ticket !== 'string' || typeof digest !== 'string' || !/^[0-9a-f]{64}$/.test(digest)) {
+        return reply(400, { ok: false, error: { code: 'invalid_request' } });
+      }
       const bound = tickets.get(ticket);
       if (!bound) return reply(401, { ok: false, error: { code: 'invalid_handoff' } });
+      // 자기를 만든 로그인 요청이 아니면 표를 소비하지 않는다(거부는 비소비).
+      if (bound.loginState && digest !== sha256Hex(bound.loginState)) {
+        return reply(401, { ok: false, error: { code: 'login_request_mismatch' } });
+      }
+      if (claimed.has(ticket)) return reply(401, { ok: false, error: { code: 'handoff_consumed' } });
       if (bound.productId && bound.productId !== PRODUCT) return reply(401, { ok: false, error: { code: 'invalid_handoff' } });
       if (bound.expired) return reply(401, { ok: false, error: { code: 'handoff_expired' } });
 
@@ -110,7 +120,7 @@ async function startMint({ plane, tickets = new Map(), behaviour = 'ok' } = {}) 
     });
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
-  return { server, claimed, seen, url: `http://127.0.0.1:${server.address().port}/mint-session`, close: () => new Promise(resolve => server.close(resolve)) };
+  return { server, claimed, seen, tickets, url: `http://127.0.0.1:${server.address().port}/mint-session`, close: () => new Promise(resolve => server.close(resolve)) };
 }
 
 async function startRead({ plane } = {}) {
@@ -133,7 +143,18 @@ async function startRead({ plane } = {}) {
 }
 
 // 러브트리 서비스 인스턴스 하나. 발급은 표로, 폐기는 권위 RPC로 간다.
-async function instance({ plane, read, mint, stateStore = createMemoryLoginStateStore(), codes = new Map([[TICKET, TICKET]]) } = {}) {
+// 공급자는 배포가 실제로 물리는 `server/padiem-login-provider.js`를 기본으로 쓴다.
+function realProvider() {
+  return createLoginProvider({
+    env: {
+      LOVETREE_PADIEM_HANDOFF_START_URL: 'https://chat.example.test/auth/lovetree/start',
+      LOVETREE_PUBLIC_ORIGIN: 'https://lovetree-4-0.pages.dev'
+    },
+    productId: PRODUCT
+  });
+}
+
+async function instance({ plane, read, mint, stateStore = createMemoryLoginStateStore(), provider = realProvider() } = {}) {
   const writer = createAuthorityWriter({
     call: async (method, payload) => {
       if (method !== 'revoke_auth_session') throw new Error(`handoff 경로에서 링크·발급 RPC를 직접 부르지 않는다: ${method}`);
@@ -142,10 +163,6 @@ async function instance({ plane, read, mint, stateStore = createMemoryLoginState
     productId: PRODUCT,
     mint: createHandoffMintClient({ url: mint.url, callerSecret: CALLER_SECRET, productId: PRODUCT, now: () => AT })
   });
-  const provider = {
-    authorizationUrl: () => 'https://login.padiem.test/start',
-    exchangeCode: async ({ code }) => (codes.has(code) ? { handoffTicket: codes.get(code) } : null)
-  };
   const login = createLoginService({ productId: PRODUCT, writer, provider, credentialSecret: CREDENTIAL_SECRET, stateStore, now: () => AT });
   const repo = createMemoryWorkspaceRepo();
   const authenticate = createPadiemAuthorityAuth({
@@ -187,15 +204,20 @@ async function withPaths(run) {
   finally { await read.close(); await mint.close(); }
 }
 
+/** PADIEM 쪽 start Equivalent: 표를 지금 로그인 요청에 묶는다. */
+const bindTo = (mint, state, overrides = {}) => mint.tickets.set(TICKET, { loginState: state.state, ...overrides });
+
 test('verified login → handoff → LoveTree session → save → read → logout → reuse refused', { skip }, async () => {
   await withPaths(async ({ plane, read, mint }) => {
     const app = await instance({ plane, read, mint });
     const { stateCookie, state } = await begin(app.login);
+    bindTo(mint, state);
     const back = await exchange({ login: app.login, stateCookie, state });
     assert.equal(back.status, 302);
     const credential = cookieValue(back.headers['set-cookie'][0], SESSION_COOKIE);
     assert.ok(credential);
-    assert.deepEqual(mint.seen, [{ handoff_ticket: TICKET }], '표 하나만 발급 경로를 지난다');
+    // 발급 경로로 지나는 것은 두 값뿐: 표, 그리고 자기를 부른 로그인 요청의 해시(원본 아님).
+    assert.deepEqual(mint.seen, [{ handoff_ticket: TICKET, login_request_sha256: sha256Hex(state.state) }]);
 
     const sid = sidOf(credential);
     assert.ok(sid, '자격 증명은 canonical 세션 id를 담는다');
@@ -216,18 +238,96 @@ test('verified login → handoff → LoveTree session → save → read → logo
 
 test('the same handoff ticket cannot mint twice, even concurrently', { skip }, async () => {
   await withPaths(async ({ plane, read, mint }) => {
-    const first = await instance({ plane, read, mint });
-    const second = await instance({ plane, read, mint });
-    const begun = await Promise.all([begin(first.login), begin(second.login)]);
-    const back = await Promise.all([
-      exchange({ login: first.login, ...begun[0] }),
-      exchange({ login: second.login, ...begun[1] })
-    ]);
-    assert.equal(back.filter(r => r.status === 302).length, 1, '동시 교환은 하나만 성공');
-    const refused = back.find(r => r.status !== 302);
-    assert.equal(refused.status, 401);
-    assert.equal(refused.body.error.code, 'login_handoff_rejected');
+    const app = await instance({ plane, read, mint });
+    const { state } = await begin(app.login);
+    bindTo(mint, state);
+
+    // 표 경계만 본다: 같은 표 + 같은 로그인 요청을 두 발급자가 동시에 잡는다.
+    const issuers = [0, 1, 2].map(() => createAuthorityWriter({
+      call: async (method, payload) => plane[method](payload),
+      productId: PRODUCT,
+      mint: createHandoffMintClient({ url: mint.url, callerSecret: CALLER_SECRET, productId: PRODUCT, now: () => AT })
+    }));
+    const raced = await Promise.allSettled(issuers.map(writer => writer.issue({ handoffTicket: TICKET, loginState: state.state })));
+    const ok = raced.filter(result => result.status === 'fulfilled');
+    assert.equal(ok.length, 1, '동시 클레임은 하나만 성공');
+    assert.equal(raced.filter(result => result.status === 'rejected').length, 2);
+    assert.equal(ok[0].value.canonicalSessionId, [...plane.sessions.keys()][0]);
     assert.equal([...plane.sessions.values()].filter(s => s.state === 'active').length, 1);
+
+    const late = await settle(issuers[0].issue({ handoffTicket: TICKET, loginState: state.state }));
+    assert.equal(late.status, 401, '소진된 표는 뒤에도 실패');
+  });
+});
+
+test('a ticket forged for another login request is refused without being consumed', { skip }, async () => {
+  await withPaths(async ({ plane, read, mint }) => {
+    const app = await instance({ plane, read, mint });
+    const begunA = await begin(app.login, '/workspace');
+    const begunB = await begin(app.login, '/workspace');
+    bindTo(mint, begunA.state);
+
+    // B 콜백에 A의 표를 넣으면 거부된다. B가 표를 소모하지 않으므로 A는 그대로 살아 있다.
+    const crossed = await exchange({ login: app.login, ...begunB, code: TICKET });
+    assert.equal(crossed.status, 401);
+    assert.equal(crossed.body.error.code, 'login_handoff_rejected');
+    assert.equal(crossed.headers, undefined, '거부된 교환에 쿠키는 없다');
+    assert.equal(mint.seen.length, 1);
+    assert.equal(mint.claimed.size, 0, '남의 요청으로는 표가 소비되지 않는다');
+    assert.equal([...plane.sessions.values()].length, 0);
+
+    const own = await exchange({ login: app.login, ...begunA, code: TICKET });
+    assert.equal(own.status, 302, '거부된 시도는 정당한 요청을 방해하지 않는다');
+    assert.equal(mint.seen.length, 2);
+    assert.equal(mint.seen[1].login_request_sha256, sha256Hex(begunA.state.state));
+
+    // A가 소비한 표를 남의 요청이 다시 들고 오면 거부된다(이번 요청의 상태는 이미 소진됐거나 표가 소진된다).
+    const third = await begin(app.login);
+    const reused = await exchange({ login: app.login, ...third, code: TICKET });
+    assert.equal(reused.status, 401);
+    assert.equal(reused.body.error.code, 'login_handoff_rejected');
+    assert.equal(mint.claimed.size, 1, '발급은 한 번뿐');
+    assert.equal([...plane.sessions.values()].filter(s => s.state === 'active').length, 1);
+  });
+});
+
+test('a malformed ticket from the provider is refused before the mint path', { skip }, async () => {
+  const bad = [`${TICKET}\n`, `${TICKET} injected`, `${TICKET}$`, `${TICKET}#`, 'x'.repeat(200), '', null];
+  await withPaths(async ({ plane, read, mint }) => {
+    for (const returned of bad) {
+      // 공급자가 표 모양 밖의 값을 돌려주면 발급 경로에 닿기 전에 닫힌다.
+      const lying = { authorizationUrl: () => 'https://chat.example.test/auth/lovetree/start', exchangeCode: async () => ({ handoffTicket: returned }) };
+      const app = await instance({ plane, read, mint, provider: lying });
+      const begun = await begin(app.login);
+      const refused = await exchange({ login: app.login, ...begun });
+      assert.equal(refused.status, 401, JSON.stringify(returned));
+      assert.equal(refused.body.error.code, 'invalid_login_evidence', JSON.stringify(returned));
+      assert.equal(refused.headers, undefined, JSON.stringify(returned));
+    }
+    assert.equal(mint.seen.length, 0, '형식 검사 실패는 발급에 닿지 않는다');
+    assert.equal([...plane.sessions.values()].length, 0);
+  });
+});
+
+test('the mint request carries no caller-supplied identity', { skip }, async () => {
+  await withPaths(async ({ plane, read, mint }) => {
+    const app = await instance({ plane, read, mint });
+    const begun = await begin(app.login);
+    bindTo(mint, begun.state);
+    const writer = createAuthorityWriter({
+      call: async (method, payload) => plane[method](payload),
+      productId: PRODUCT,
+      mint: createHandoffMintClient({ url: mint.url, callerSecret: CALLER_SECRET, productId: PRODUCT, now: () => AT })
+    });
+    // 호출자가 신원을 덧붙여도 요청 본문에 실리는 것은 두 값뿐이다.
+    await writer.issue({
+      handoffTicket: TICKET,
+      loginState: begun.state.state,
+      evidence: { productUserId: 'usr_injected', authProvider: 'google', providerSubject: 'subject-injected' }
+    });
+    assert.deepEqual(Object.keys(mint.seen[0]).sort(), ['handoff_ticket', 'login_request_sha256']);
+    assert.equal(JSON.stringify(mint.seen).includes('usr_injected'), false);
+    assert.equal(JSON.stringify(mint.seen).includes(begun.state.state), false, '로그인 요청 원본은 해시로만 나간다');
   });
 });
 
@@ -247,11 +347,11 @@ test('a handoff bound to another product or already expired is refused', { skip 
   } finally { await read.close(); }
 });
 
-test('an unverified login code never reaches the mint path', { skip }, async () => {
+test('a code that is not a handoff ticket never reaches the mint path', { skip }, async () => {
   await withPaths(async ({ plane, read, mint }) => {
-    const app = await instance({ plane, read, mint, codes: new Map([['other-code', 'hoft_unrelated_0000000000']]) });
+    const app = await instance({ plane, read, mint });
     const { stateCookie, state } = await begin(app.login);
-    const refused = await exchange({ login: app.login, stateCookie, state, code: 'not-verified' });
+    const refused = await exchange({ login: app.login, stateCookie, state, code: 'google-code-not-a-ticket' });
     assert.equal(refused.status, 401);
     assert.equal(refused.body.error.code, 'invalid_login_evidence');
     assert.deepEqual(mint.seen, [], '표 없는 로그인은 발급에 닿지 않는다');

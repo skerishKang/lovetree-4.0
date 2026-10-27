@@ -1,15 +1,19 @@
+import { createHash } from 'node:crypto';
 import { ApiError } from './errors.js';
 import { assertServiceUrl, postJson, unauthenticated, unavailable } from './http-client.js';
 
+const sha256Hex = (value) => createHash('sha256').update(value, 'utf8').digest('hex');
+
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
-const REJECTED = new Set(['invalid_handoff', 'handoff_consumed', 'handoff_expired', 'session_not_minted']);
+const LOGIN_STATE = /^[A-Za-z0-9_-]{16,64}$/;
+const REJECTED = new Set(['invalid_handoff', 'handoff_consumed', 'handoff_expired', 'session_not_minted', 'login_request_mismatch']);
 
 const rejected = () => new ApiError(401, 'login_handoff_rejected', '로그인 확인을 다시 해야 해요. 처음부터 시도해 주세요.');
 
 /**
- * #5977의 `/mint-session`을 부르는 클라이언트. **handoff 표 하나만** 보낸다 —
- * 브라우저·컴2가 준 provider_subject·이메일·제품 user id는 이 요청에 들어가지 않는다.
- * 근거 확인·제품 링크·세션 발급은 전부 PADIEM 인증 서버 쪽에서 일어나고,
+ * #5977/#5984의 `/mint-session`을 부르는 클라이언트. **handoff 표와 지금 로그인 요청의
+ * 해시 두 값만** 보낸다 — 브라우저·컴2가 준 provider_subject·이메일·제품 user id는 이 요청에
+ * 들어가지 않는다. 근거 확인·제품 링크·세션 발급은 전부 PADIEM 인증 서버 쪽에서 일어나고,
  * 여기서 받는 것은 이미 검증된 결과뿐이다(`server/authority-writer.js`와 같은 계약).
  *
  * 표는 단일 사용이다. 표가 소비된 *뒤에* 발급이 실패하면 같은 표로 재시도할 수 없고
@@ -22,11 +26,14 @@ export function createHandoffMintClient({ url, callerSecret, productId, timeoutM
   if (typeof fetchImpl !== 'function') throw new Error('fetch 구현이 필요합니다.');
 
   return {
-    async redeem({ handoffTicket } = {}) {
+    async redeem({ handoffTicket, loginState } = {}) {
       if (typeof handoffTicket !== 'string' || !ID.test(handoffTicket)) throw unauthenticated();
+      // 표는 자기를 만든 로그인 요청에서만 소비된다. 요청 값은 원본 대신 해시로 보내
+      // 상태 문자열이 중계 로그·본문에 남지 않는다.
+      if (typeof loginState !== 'string' || !LOGIN_STATE.test(loginState)) throw unauthenticated();
       const outcome = await postJson({
         url: mintUrl.href,
-        body: { handoff_ticket: handoffTicket },
+        body: { handoff_ticket: handoffTicket, login_request_sha256: sha256Hex(loginState) },
         callerSecret,
         timeoutMs,
         maxResponseBytes,

@@ -12,7 +12,7 @@ import {
 } from './credentials/lovetree-session.js';
 
 const DEFAULT_NEXT = '/workspace';
-const TICKET = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}/;
+const TICKET = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 
 function parseCookies(header) {
   const out = {};
@@ -112,7 +112,8 @@ export function createLoginService({ productId, writer, provider, credentialSecr
 
     // 표는 단일 사용이다. 표가 소비된 뒤에 발급이 실패하면 같은 표로 재시도하지 않는다 —
     // 사용자는 처음부터 다시 로그인해야 하고, 이 실패는 권한 상승을 막는 방향의 실패다.
-    const issued = await writer.issue({ handoffTicket: ticket });
+    // 지금 로그인 요청(state)을 함께 넘긴다: 표는 자기가 태어난 요청에서만 소비된다.
+    const issued = await writer.issue({ handoffTicket: ticket, loginState: state.state });
     const token = mintSessionToken({ secret: credentialSecret, canonicalSessionId: issued.canonicalSessionId, now: seconds(now()), maxAgeSeconds: sessionMaxAgeSeconds });
     return respond(302, {
       location: state.next,
