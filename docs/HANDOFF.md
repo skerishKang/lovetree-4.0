@@ -1,11 +1,21 @@
 # LoveTree 4.0 인수인계
 
+## main 병합과 프로덕션 전환 — 2026-10-27
+
+통합 검토 PR #27을 `main`에 **merge**로 병합했다(병합 커밋 `27a9736`). 포함된 PR #16·#17·#18·#19·#21·#24·#25의 head가 모두 `main` 이력에 있는 것을 `git merge-base --is-ancestor`로 확인했고, 열린 PR은 0개가 됐다. 이슈 #6·#20·#22·#23·#26은 완료로 닫았고, #7은 아래 키보드 문제 때문에 열어 두었다.
+
+검증: 병합 head `1ce8648`에서 `npm run check` — 테스트 18개 통과, `vite 8.3.5` 빌드 성공(JS 151.42 kB / gzip 42.73 kB, CSS 30.85 kB / gzip 7.67 kB). 병합 커밋의 GitHub CI(ubuntu·windows)·GitGuardian·Pages 검사 통과. 저장소가 public이므로 추적 파일 71개에 비밀값·개인 백업 JSON이 없는지 확인했다.
+
+Cloudflare Pages 프로덕션 분기를 `ai/com1-integration-review-20261027-071356-cf87f3`에서 `main`으로 바꿨다(API `production_branch=main`). 이제 `main` push가 프로덕션 배포다.
+
+키보드·모션 확인(배포 주소, Chromium): `prefers-reduced-motion: reduce`에서 애니메이션 0개·0.1초 초과 transition 0개로 모션 감소가 동작하고, 포커스 링 스타일은 첫 화면·책장·기억책에 모두 있다. 다만 첫 화면 그림자 DOM 안의 버튼(움직임 멈춤·순간 목록·카드 40개)은 skip link 다음 Tab으로 진입하지 않고 body로 되돌아갔다(6회 반복 확인). 그림자 루트 내부에 포커스를 두면 Tab 이동은 정상이다(움직임 멈춤 → 순간 목록). 원인은 확정하지 못해 #7에 남겼다.
+
 ## Cloudflare Pages 배포 — 2026-10-27
 
 통합본을 인터넷에서 볼 수 있게 Cloudflare Pages 프로젝트 `lovetree-4-0`(Charliekant 계정)을 GitHub `skerishKang/lovetree-4.0`에 Git 연결했다. 주소는 **https://lovetree-4-0.pages.dev/** 다. Pages 프로젝트 이름에는 소문자·숫자·대시만 쓸 수 있어 점이 들어간 `lovetree-4.0.pages.dev`는 만들 수 없다.
 
-- 프로덕션 분기 `ai/com1-integration-review-20261027-071356-cf87f3`, 빌드 명령 `npm run build`, 출력 `dist`, 자동 배포 켜짐. 그 분기에 push하면 다시 빌드·배포된다(첫 배포 커밋 `8af4b7e`, 성공).
-- `main`을 병합하면 설정에서 프로덕션 분기를 `main`으로 바꿔야 그 커밋이 이 주소에 배포된다. 지금 이 주소는 **병합 전 통합 브랜치 내용**이다.
+- 처음에는 프로덕션 분기를 `ai/com1-integration-review-20261027-071356-cf87f3`로 두고 통합본을 먼저 배포했다(첫 배포 `8af4b7e`, 성공). 빌드 명령 `npm run build`, 출력 `dist`, 자동 배포 켜짐.
+- 병합 뒤 프로덕션 분기를 `main`으로 바꿨다. 이 주소는 이제 `main` 내용이며, `main`에 push하면 다시 빌드·배포된다.
 - 정적 프런트만 배포했다. 기록은 방문자 브라우저 localStorage에만 저장되고 서버 저장·로그인·공유·DB는 없다(개발 서버와 달리 정적 호스팅이다).
 - 배포 확인: 배포된 JS `index-C-W9KDHd.js`(151,425 B)·CSS `index-C13j1MO_.css`(30,853 B)와 이미지가 로컬 `dist` 빌드와 해시·크기까지 일치, 첫 화면과 `#trees` 책장이 렌더링되고 콘솔 오류가 없다. 사이트 화면을 직접 조작하는 회귀 확인(책장→트리 연결, 390px 등)은 로컬 `127.0.0.1:4420`에서 한 결과와 같고, 배포 주소에서는 렌더링까지만 확인했다.
 
