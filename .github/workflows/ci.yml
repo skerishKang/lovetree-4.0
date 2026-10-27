@@ -20,7 +20,7 @@ jobs:
       - run: npm test
       - run: npm run build
   postgres:
-    name: PostgreSQL 저장 검증
+    name: PostgreSQL 저장·로그인 상태 검증
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -43,7 +43,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: 격리 테스트 DB에서 저장 API 검증
+      - name: 격리 테스트 DB에서 저장 API·로그인 상태 검증
         env:
           LOVETREE_TEST_DATABASE_URL: postgres://postgres:ci@127.0.0.1:5432/lovetree_test_ci
         run: |
@@ -52,7 +52,7 @@ jobs:
             exit 1
           fi
           status=0
-          node --test --test-reporter=tap tests/storage-postgres.test.mjs > /tmp/pg.tap 2>&1 || status=$?
+          node --test --test-reporter=tap tests/storage-postgres.test.mjs tests/login-state-postgres.test.mjs > /tmp/pg.tap 2>&1 || status=$?
           cat /tmp/pg.tap
           if [ "$status" -ne 0 ]; then
             echo "실패: 연결 실패 또는 테스트 실패 (exit $status)"
@@ -62,7 +62,7 @@ jobs:
           fail=$(awk '/^# fail /{print $3}' /tmp/pg.tap)
           skipped=$(awk '/^# skipped /{print $3}' /tmp/pg.tap)
           echo "pass=$pass fail=$fail skipped=$skipped"
-          if [ "${fail:-1}" != "0" ] || [ "${skipped:-1}" != "0" ] || [ "${pass:-0}" -lt 6 ]; then
-            echo "실패: skip 또는 6건 미달 — PostgreSQL 검증이 수행되지 않았습니다."
+          if [ "${fail:-1}" != "0" ] || [ "${skipped:-1}" != "0" ] || [ "${pass:-0}" -lt 9 ]; then
+            echo "실패: skip 또는 9건 미달 — PostgreSQL 검증이 수행되지 않았습니다."
             exit 1
           fi

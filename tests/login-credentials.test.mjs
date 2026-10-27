@@ -8,6 +8,7 @@ import { createMemoryWorkspaceRepo } from '../server/testing/memory-workspace-re
 import { unconfiguredAuth } from '../server/auth.js';
 import { createAuthorityWriter } from '../server/authority-writer.js';
 import { createLoginService } from '../server/login-service.js';
+import { createMemoryLoginStateStore } from '../server/login-state-store.js';
 import { createModelControlPlane } from '../server/testing/model-control-plane.js';
 import { createCredentialVerifier } from '../server/credentials/lovetree-credential-module.js';
 import {
@@ -104,24 +105,26 @@ test('the writer accepts only a session it can tie to its own product and subjec
 test('the login service refuses to start without its boundaries', () => {
   const plane = createModelControlPlane();
   const writer = createAuthorityWriter({ call: (m, p) => plane[m](p), productId: PRODUCT });
-  const provider = { authorizationUrl: () => 'https://login.padiem.test/x', exchangeCode: async () => evidence };
-  assert.throws(() => createLoginService({ writer, provider, credentialSecret: SECRET }), /LOVETREE_PRODUCT_ID/);
-  assert.throws(() => createLoginService({ productId: PRODUCT, provider, credentialSecret: SECRET }), /발급·폐기 경계/);
-  assert.throws(() => createLoginService({ productId: PRODUCT, writer, credentialSecret: SECRET }), /PADIEM 로그인 공급자/);
+  const provider = { authorizationUrl: () => 'https://login.padiem.test/x', exchangeCode: async () => ({ handoffTicket: 'htk_placeholder' }) };
+  assert.throws(() => createLoginService({ writer, provider, credentialSecret: SECRET, stateStore: createMemoryLoginStateStore() }), /LOVETREE_PRODUCT_ID/);
+  assert.throws(() => createLoginService({ productId: PRODUCT, provider, credentialSecret: SECRET, stateStore: createMemoryLoginStateStore() }), /발급·폐기 경계/);
+  assert.throws(() => createLoginService({ productId: PRODUCT, writer, credentialSecret: SECRET, stateStore: createMemoryLoginStateStore() }), /PADIEM 로그인 공급자/);
   assert.throws(() => createLoginService({ productId: PRODUCT, writer, provider, credentialSecret: '' }), /LOVETREE_SESSION_SECRET/);
+  assert.throws(() => createLoginService({ productId: PRODUCT, writer, provider, credentialSecret: SECRET }), /상태 저장소/);
 });
 
-test('login routes refuse a plain-http start address and unknown paths', async () => {  const plane = createModelControlPlane();
+test('login routes refuse a plain-http start address and unknown paths', async () => {
+  const plane = createModelControlPlane();
   const writer = createAuthorityWriter({ call: (m, p) => plane[m](p), productId: PRODUCT });
   const http = createLoginService({
-    productId: PRODUCT, writer, credentialSecret: SECRET,
-    provider: { authorizationUrl: () => 'http://login.example/x', exchangeCode: async () => evidence }
+    productId: PRODUCT, writer, credentialSecret: SECRET, stateStore: createMemoryLoginStateStore(),
+    provider: { authorizationUrl: () => 'http://login.example/x', exchangeCode: async () => ({ handoffTicket: 'htk_placeholder' }) }
   });
   await assert.rejects(() => http.route({ method: 'GET', path: '/auth/login', query: new URLSearchParams(), headers: {} }), error => error.status === 503);
 
   const https = createLoginService({
-    productId: PRODUCT, writer, credentialSecret: SECRET,
-    provider: { authorizationUrl: ({ state }) => `https://login.padiem.test/x?state=${state}`, exchangeCode: async () => evidence }
+    productId: PRODUCT, writer, credentialSecret: SECRET, stateStore: createMemoryLoginStateStore(),
+    provider: { authorizationUrl: ({ state }) => `https://login.padiem.test/x?state=${state}`, exchangeCode: async () => ({ handoffTicket: 'htk_placeholder' }) }
   });
   const begun = await https.route({ method: 'GET', path: '/auth/login', query: new URLSearchParams(), headers: {} });
   assert.equal(begun.status, 302);

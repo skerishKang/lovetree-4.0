@@ -12,7 +12,7 @@ const PROVIDERS = new Set(['google', 'password']);
  *
  * `call(method, payload)`은 주입받는다. 이 저장소는 새 URL을 지어내지 않는다.
  */
-export function createAuthorityWriter({ call, productId, now = () => new Date(), timeoutMs = 5_000 }) {
+export function createAuthorityWriter({ call, productId, mint, now = () => new Date() }) {
   if (typeof call !== 'function') throw new Error('권위 write transport가 필요합니다. 없는 상태로 발급을 열지 않습니다.');
   if (typeof productId !== 'string' || !productId) throw new Error('LOVETREE_PRODUCT_ID가 필요합니다.');
   if (OTHER_REVIEWED_PRODUCTS.includes(productId)) {
@@ -32,10 +32,20 @@ export function createAuthorityWriter({ call, productId, now = () => new Date(),
 
   return {
     /**
-     * 서버가 검증한 로그인 증거로 제품 링크를 만들고 러브트리 전용 canonical 세션을 발급한다.
-     * 증거는 { productUserId, authProvider, providerSubject } 세 값뿐이다 — 이메일로 계정을 합치지 않는다.
+     * 발급 근거는 1회용 handoff 표 하나다. 표 확인·제품 링크·세션 발급이 전부 PADIEM 인증 서버 쪽에서
+     * 끝나고, 여기서는 그 결과만 받는다(#5977의 `/mint-session` 계약).
+     * mint가 없는 구성에서는 서버가 검증한 증거 { productUserId, authProvider, providerSubject } 세 값으로
+     * 링크·발급한다 — 이메일·provider_subject를 요청에서 그대로 받아 발급하는 경로는 없다.
      */
-    async issue({ evidence }) {
+    async issue({ evidence, handoffTicket }) {
+      // handoff 표 경로: 근거 확인·제품 링크·세션 발급을 PADIEM 인증 서버가 끝낸 뒤이다.
+      // 같은 값으로 링크·발급을 되풀이하면 세션이 두 개가 되니 두 경로는 함께 쓰지 않는다.
+      if (handoffTicket !== undefined) {
+        if (!mint || typeof mint.redeem !== 'function') throw unavailable();
+        const redeemed = await mint.redeem({ handoffTicket });
+        return { canonicalSessionId: redeemed.canonicalSessionId, subjectId: redeemed.subjectId };
+      }
+      if (mint) throw invalid();
       const { productUserId, authProvider, providerSubject } = evidence ?? {};
       if (!PRODUCT_USER_ID.test(productUserId ?? '')) invalid();
       if (!PROVIDERS.has(authProvider)) invalid();

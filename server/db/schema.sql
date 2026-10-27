@@ -23,3 +23,9 @@ CREATE TABLE IF NOT EXISTS lovetree_request_claims (
   CHECK (char_length(client_key) BETWEEN 1 AND 128),
   CHECK (char_length(request_hash) = 64)
 );
+
+-- 로그인 상태의 단일 사용 소비(재시작·다중 인스턴스 대응). 값은 해시로만 두고 원본은 남기지 않는다.
+CREATE TABLE IF NOT EXISTS lovetree_login_states (
+  state_hash char(64) PRIMARY KEY,
+  expires_at timestamptz NOT NULL
+);

@@ -1,6 +1,6 @@
 import { createServer } from 'node:http';
 import { pathToFileURL } from 'node:url';
-import { createWorkspaceRepoFromUrl } from './db/postgres.js';
+import { createPool, createWorkspaceRepo } from './db/postgres.js';
 import { createApiHandler, createNodeHandler } from './http.js';
 import { createWorkspaceService } from './workspace-service.js';
 import { createPadiemAuthorityAuth } from './padiem-authority-auth.js';
@@ -9,6 +9,8 @@ import { createAuthorityWriter } from './authority-writer.js';
 import { createLoginService } from './login-service.js';
 import { fromBearer, fromCookie } from './session-credential.js';
 import { unconfiguredAuth } from './auth.js';
+import { createMemoryLoginStateStore, createPostgresLoginStateStore } from './login-state-store.js';
+import { createHandoffMintClient } from './handoff-mint-client.js';
 import { ApiError } from './errors.js';
 
 const {
@@ -23,6 +25,8 @@ const {
   LOVETREE_SESSION_MAX_AGE_SECONDS = '',
   LOVETREE_COOKIE_SECURE = '',
   LOVETREE_AUTHORITY_WRITE_TRANSPORT = '',
+  LOVETREE_STATE_STORE = '',
+  LOVETREE_MINT_URL = '',
   LOVETREE_LOGIN_PROVIDER_MODULE = '',
   LOVETREE_SESSION_SOURCE = '',
   LOVETREE_SESSION_COOKIE = '',
@@ -67,13 +71,19 @@ async function buildAuthenticate() {
   });
 }
 
-// 발급·폐기는 권위의 쓰기 경계에서 한다. 그 경로는 아직 이 저장소에 없다(ai-revenue-lab 후속 PR).
-// 하나라도 없으면 로그인 라우트는 열지 않고 거부만 돌려준다.
-async function buildLogin() {
-  if (!LOVETREE_AUTHORITY_WRITE_TRANSPORT || !LOVETREE_LOGIN_PROVIDER_MODULE || !LOVETREE_SESSION_SECRET) {
-    console.warn('[lovetree-storage] 발급 경로·로그인 공급자·자격 증명 비밀 미설정 — /auth/* 는 거부만 합니다.');
+// 발급·폐기는 기존 인증 경계에서 한다. handoff 표를 받는 mint 경로(#5977)와 상태 저장소가
+// 하나라도 없으면 로그인 라우트는 열지 않고 거부만 돌려준다. URL을 여기서 지어내지 않는다.
+async function buildLogin(pool) {
+  if (!LOVETREE_AUTHORITY_WRITE_TRANSPORT || !LOVETREE_LOGIN_PROVIDER_MODULE || !LOVETREE_SESSION_SECRET || !LOVETREE_STATE_STORE) {
+    console.warn('[lovetree-storage] 발급 경로·로그인 공급자·자격 증명 비밀·상태 저장소 미설정 — /auth/* 는 거부만 합니다.');
     return null;
   }
+  if (LOVETREE_STATE_STORE !== 'memory' && LOVETREE_STATE_STORE !== 'postgres') {
+    throw new Error('LOVETREE_STATE_STORE는 memory(dev) 또는 postgres만 씁니다.');
+  }
+  if (LOVETREE_STATE_STORE === 'memory') console.warn('[lovetree-storage] 상태 저장소가 memory입니다 — 재시작·다중 인스턴스 검증에는 쓰지 마세요.');
+  const stateStore = LOVETREE_STATE_STORE === 'postgres' ? createPostgresLoginStateStore(pool) : createMemoryLoginStateStore();
+
   const writeModule = await loadModule(LOVETREE_AUTHORITY_WRITE_TRANSPORT, 'LOVETREE_AUTHORITY_WRITE_TRANSPORT');
   const providerModule = await loadModule(LOVETREE_LOGIN_PROVIDER_MODULE, 'LOVETREE_LOGIN_PROVIDER_MODULE');
   const call = writeModule.createAuthorityWriteCall?.(process.env);
@@ -82,11 +92,15 @@ async function buildLogin() {
   if (!provider || typeof provider.authorizationUrl !== 'function' || typeof provider.exchangeCode !== 'function') {
     throw new Error('login provider가 authorizationUrl·exchangeCode를 내보내야 합니다.');
   }
+  const mint = LOVETREE_MINT_URL
+    ? createHandoffMintClient({ url: LOVETREE_MINT_URL, callerSecret: LOVETREE_CALLER_SECRET, productId: LOVETREE_PRODUCT_ID, timeoutMs: Number(LOVETREE_AUTHORITY_TIMEOUT_MS || 0) || undefined })
+    : undefined;
   return createLoginService({
     productId: LOVETREE_PRODUCT_ID,
-    writer: createAuthorityWriter({ call, productId: LOVETREE_PRODUCT_ID }),
+    writer: createAuthorityWriter({ call, productId: LOVETREE_PRODUCT_ID, mint }),
     provider,
     credentialSecret: LOVETREE_SESSION_SECRET,
+    stateStore,
     sessionMaxAgeSeconds: Number(LOVETREE_SESSION_MAX_AGE_SECONDS || 0) || undefined,
     cookieSecure: LOVETREE_COOKIE_SECURE !== 'false'
   });
@@ -105,11 +119,12 @@ async function loginRoute(login, request) {
 }
 
 const maxBodyBytes = Number(LOVETREE_MAX_BODY_BYTES || 0) || undefined;
-const repo = await createWorkspaceRepoFromUrl(LOVETREE_DATABASE_URL);
+const pool = await createPool(LOVETREE_DATABASE_URL);
+const repo = createWorkspaceRepo(pool);
 const service = createWorkspaceService({ repo, productId: LOVETREE_PRODUCT_ID });
 const authenticate = await buildAuthenticate();
 const storageHandler = createApiHandler({ authenticate, service, productId: LOVETREE_PRODUCT_ID, maxBodyBytes });
-const login = await buildLogin();
+const login = await buildLogin(pool);
 
 const requestHandler = async (request) => {
   if (String(request.path ?? '').startsWith('/auth/')) return loginRoute(login, request);

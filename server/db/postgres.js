@@ -94,8 +94,12 @@ export function createWorkspaceRepo(pool) {
   };
 }
 
-export async function createWorkspaceRepoFromUrl(databaseUrl, options = {}) {
+export async function createPool(databaseUrl, options = {}) {
   const pg = await import('pg');
   const { Pool } = pg.default ?? pg;
-  return createWorkspaceRepo(new Pool({ connectionString: databaseUrl, ...options }));
+  return new Pool({ connectionString: databaseUrl, ...options });
+}
+
+export async function createWorkspaceRepoFromUrl(databaseUrl, options = {}) {
+  return createWorkspaceRepo(await createPool(databaseUrl, options));
 }

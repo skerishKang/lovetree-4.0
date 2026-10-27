@@ -9,21 +9,23 @@ import { createWorkspaceService } from '../server/workspace-service.js';
 import { createMemoryWorkspaceRepo } from '../server/testing/memory-workspace-repo.js';
 import { createPadiemAuthorityAuth } from '../server/padiem-authority-auth.js';
 import { createAuthorityRelayClient } from '../server/authority-relay-transport.js';
-import { fromCookie } from '../server/session-credential.js';
-import { createModelControlPlane } from '../server/testing/model-control-plane.js';
+import { createHandoffMintClient } from '../server/handoff-mint-client.js';
 import { createAuthorityWriter } from '../server/authority-writer.js';
 import { createLoginService } from '../server/login-service.js';
+import { createMemoryLoginStateStore } from '../server/login-state-store.js';
+import { createModelControlPlane } from '../server/testing/model-control-plane.js';
 import { createCredentialVerifier } from '../server/credentials/lovetree-credential-module.js';
-import { SESSION_COOKIE, STATE_COOKIE, mintSessionToken, readSessionToken, readStateToken } from '../server/credentials/lovetree-session.js';
+import { SESSION_COOKIE, STATE_COOKIE, readSessionToken, readStateToken } from '../server/credentials/lovetree-session.js';
+import { fromCookie } from '../server/session-credential.js';
 
 /**
- * 한 흐름 검증: 로그인 증거 확인 → 러브트리 전용 세션 발급 → 저장 → 조회 →
- * 로그아웃(브라우저 자격 증명 제거 + 서버 세션 폐기) → 같은 자격 증명 재사용 거부.
+ * 로그인 증거 → 1회용 handoff 표 → 러브트리 전용 세션 발급 → 저장 → 조회 → 로그아웃 → 재사용 거부.
  *
- * 저장 API → HTTP transport → **실제 중계 Worker 모듈**(`skerishKang/ai-revenue-lab#5965` 파일) →
- * 모형 Control Plane. 발급은 같은 모형 권위에 직접 쓴다 — 운영 쓰기 경로는 아직 없고,
- * 읽기 전용 중계 #5965에 쓰기를 추가하지 않기 때문이다.
- * 중계 모듈 경로를 주지 않으면 스킵한다. 스킵 상태에서 연결 완료라고 쓰지 않는다.
+ * 확인(읽기) 경로는 `skerishKang/ai-revenue-lab#5965`의 실제 중계 Worker 모듈을 불러 붙인다.
+ * 발급(mint) 경로는 #5977이 정한 HTTP 계약(`/mint-session`, 표 하나만 받는다)을 그대로 따르는
+ * 로컬 서버이고, 그 서버는 **같은 모형 Control Plane**에 링크·세션을 남긴다 — 그래서 발급된
+ * 세션이 읽기 경로에서 확인되고 로그아웃에서 실제로 폐기된다.
+ * 중계 경로를 주지 않으면 스킵한다. 스킵된 상태에서 연결 완료라고 쓰지 않는다.
  */
 const RELAY_WORKER = process.env.LOVETREE_RELAY_WORKER ?? '';
 const skip = RELAY_WORKER ? false : '중계 Worker 경로(LOVETREE_RELAY_WORKER)가 지정되지 않았습니다. 이 흐름 검증은 미수행입니다.';
@@ -32,11 +34,11 @@ const PRODUCT = 'lovetree-4-0';
 const CREDENTIAL_SECRET = 'lovetree-session-secret-for-tests';
 const CALLER_SECRET = 'caller-secret-for-tests';
 const USER = 'usr_lovetree_1';
-// 실제 시계를 기준으로 삼는다: 고정 시각을 쓰면 검증 시점에 세션이 이미 만료돼 이유가 흐려진다.
+const PROVIDER_SUBJECT = 'provider-subject-1';
 const AT = new Date();
 const epoch = () => Math.floor(AT.getTime() / 1000);
+const TICKET = 'hoft_0123456789abcdef';
 
-// 저장 API와 달리 로그인 라우는 ApiError를 던진다. 응답 형태로 고르게 담아 비교한다.
 async function settle(promise) {
   try { return await promise; }
   catch (error) {
@@ -53,7 +55,67 @@ function cookieValue(header, name) {
   return null;
 }
 
-async function start({ plane = createModelControlPlane() } = {}) {
+const sidOf = (token) => readSessionToken({ secret: CREDENTIAL_SECRET, token, now: epoch() })?.canonicalSessionId;
+
+/** PADIEM 인증 서버 쪽 발급: 표를 확인하고 같은 권위에 링크·세션을 남긴다. */
+async function startMint({ plane, tickets = new Map(), behaviour = 'ok' } = {}) {
+  const claimed = new Set();
+  const seen = [];
+  const server = createServer((req, res) => {
+    const chunks = [];
+    req.on('data', chunk => chunks.push(chunk));
+    req.on('end', async () => {
+      const reply = (status, body) => { res.writeHead(status, { 'content-type': 'application/json' }); res.end(JSON.stringify(body)); };
+      if (behaviour === 'throw') { res.destroy(); return; }
+      if ((req.headers.authorization ?? '') !== `Bearer ${CALLER_SECRET}`) return reply(401, { ok: false, error: { code: 'unauthorized' } });
+      if (req.url !== '/mint-session') return reply(404, { ok: false, error: { code: 'not_found' } });
+      const body = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}');
+      seen.push(body);
+      if (behaviour === 'closed') return reply(501, { ok: false, error: { code: 'mint_policy_undecided' } });
+      const ticket = body.handoff_ticket;
+      if (Object.keys(body).length !== 1 || typeof ticket !== 'string') return reply(400, { ok: false, error: { code: 'invalid_request' } });
+      if (claimed.has(ticket)) return reply(401, { ok: false, error: { code: 'handoff_consumed' } });
+      const bound = tickets.get(ticket);
+      if (!bound) return reply(401, { ok: false, error: { code: 'invalid_handoff' } });
+      if (bound.productId && bound.productId !== PRODUCT) return reply(401, { ok: false, error: { code: 'invalid_handoff' } });
+      if (bound.expired) return reply(401, { ok: false, error: { code: 'handoff_expired' } });
+
+      const linked = await plane.resolve_or_create_product_link({
+        product_id: PRODUCT,
+        product_user_id: bound.productUserId ?? USER,
+        auth_provider: bound.authProvider ?? 'google',
+        provider_subject: bound.providerSubject ?? PROVIDER_SUBJECT
+      });
+      if (!linked.ok) return reply(401, { ok: false, error: { code: 'session_not_minted' } });
+      const established = await plane.establish_auth_session({
+        product_id: PRODUCT,
+        subject: { subject_type: 'user', subject_id: linked.link.canonical_subject_id },
+        authenticated_at: AT.toISOString(),
+        not_after: new Date(AT.getTime() + 3600_000).toISOString()
+      });
+      if (!established.ok) return reply(401, { ok: false, error: { code: 'session_not_minted' } });
+      claimed.add(ticket);
+      // 'liar'는 발급 서버가 다른 제품의 세션을 돌려주는 경우다. 수신자 확인은 이 쪽에서 한다.
+      const issuedProduct = behaviour === 'liar' ? 'b62' : PRODUCT;
+      return reply(200, {
+        ok: true,
+        session: {
+          session_id: established.session.session_id,
+          product_id: issuedProduct,
+          subject_id: established.session.subject.subject_id,
+          product_user_id: bound.productUserId ?? USER,
+          auth_provider: bound.authProvider ?? 'google',
+          provider_subject: bound.providerSubject ?? PROVIDER_SUBJECT,
+          expires_at: established.session.expires_at
+        }
+      });
+    });
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  return { server, claimed, seen, url: `http://127.0.0.1:${server.address().port}/mint-session`, close: () => new Promise(resolve => server.close(resolve)) };
+}
+
+async function startRead({ plane } = {}) {
   const worker = await import(pathToFileURL(RELAY_WORKER).href);
   const relay = createServer((req, res) => {
     const chunks = [];
@@ -69,214 +131,189 @@ async function start({ plane = createModelControlPlane() } = {}) {
     });
   });
   await new Promise(resolve => relay.listen(0, '127.0.0.1', resolve));
-  return { plane, origin: `http://127.0.0.1:${relay.address().port}`, close: () => new Promise(resolve => relay.close(resolve)) };
+  return { origin: `http://127.0.0.1:${relay.address().port}`, close: () => new Promise(resolve => relay.close(resolve)) };
 }
 
-function wired({ plane, origin, callerSecret = CALLER_SECRET }) {
-  const at = AT;
-  const writer = createAuthorityWriter({ call: (method, payload) => plane[method](payload), productId: PRODUCT, now: () => at });
+// 러브트리 서비스 인스턴스 하나. 발급은 표로, 폐기는 권위 RPC로 간다.
+async function instance({ plane, read, mint, stateStore = createMemoryLoginStateStore(), codes = new Map([[TICKET, TICKET]]) } = {}) {
+  const writer = createAuthorityWriter({
+    call: async (method, payload) => {
+      if (method !== 'revoke_auth_session') throw new Error(`handoff 경로에서 링크·발급 RPC를 직접 부르지 않는다: ${method}`);
+      return plane[method](payload);
+    },
+    productId: PRODUCT,
+    mint: createHandoffMintClient({ url: mint.url, callerSecret: CALLER_SECRET, productId: PRODUCT, now: () => AT })
+  });
   const provider = {
-    authorizationUrl: ({ state }) => `https://login.padiem.test/oauth/start?state=${state}`,
-    exchangeCode: async ({ code }) => {
-      if (code !== 'verified-code') throw new ApiError(401, 'invalid_login_evidence', '로그인 확인을 하지 못했어요.');
-      return { productUserId: USER, authProvider: 'google', providerSubject: '10881234567890' };
-    }
+    authorizationUrl: () => 'https://login.padiem.test/start',
+    exchangeCode: async ({ code }) => (codes.has(code) ? { handoffTicket: codes.get(code) } : null)
   };
-  const login = createLoginService({ productId: PRODUCT, writer, provider, credentialSecret: CREDENTIAL_SECRET, now: () => at });
+  const login = createLoginService({ productId: PRODUCT, writer, provider, credentialSecret: CREDENTIAL_SECRET, stateStore, now: () => AT });
   const repo = createMemoryWorkspaceRepo();
   const authenticate = createPadiemAuthorityAuth({
-    credential: createCredentialVerifier({ env: { LOVETREE_SESSION_SECRET: CREDENTIAL_SECRET }, present: fromCookie(SESSION_COOKIE), now: epoch }),
     productId: PRODUCT,
-    authority: createAuthorityRelayClient({ url: `${origin}/resolve-session`, callerSecret, fetchImpl: globalThis.fetch })
+    credential: createCredentialVerifier({ env: { LOVETREE_SESSION_SECRET: CREDENTIAL_SECRET }, present: fromCookie(SESSION_COOKIE), now: epoch }),
+    authority: createAuthorityRelayClient({ url: `${read.origin}/resolve-session`, callerSecret: CALLER_SECRET, fetchImpl: globalThis.fetch })
   });
   const storage = createApiHandler({ authenticate, service: createWorkspaceService({ repo, productId: PRODUCT }), productId: PRODUCT });
-  return { login, storage, repo };
+  return { login, storage, repo, stateStore };
 }
 
 const statePayload = { version: 1, trees: [createTree({ subject: '윤슬', title: '첫 목소리', note: '기억', emotion: '설렘', date: '2026-10-27', url: '' })] };
 
-const save = (storage, sessionCookie, clientKey = 'ck-1') => storage({
+const save = (storage, credential, clientKey = 'ck-1') => storage({
   method: 'PUT', path: '/api/workspace',
-  headers: { 'content-type': 'application/json', cookie: `${SESSION_COOKIE}=${sessionCookie}` },
+  headers: { 'content-type': 'application/json', cookie: `${SESSION_COOKIE}=${credential}` },
   body: JSON.stringify({ state: statePayload, expectedRevision: 0, clientKey })
 });
-const read = (storage, sessionCookie) => storage({ method: 'GET', path: '/api/workspace', headers: { cookie: `${SESSION_COOKIE}=${sessionCookie}` } });
+const readDoc = (storage, credential) => storage({ method: 'GET', path: '/api/workspace', headers: { cookie: `${SESSION_COOKIE}=${credential}` } });
 
-async function begin(login, next = '/workspace') {
-  const begun = await login.route({ method: 'GET', path: '/auth/login', query: new URLSearchParams({ next }), headers: {} });
+async function begin(login, next) {
+  const query = next === undefined ? new URLSearchParams() : new URLSearchParams({ next });
+  const begun = await login.route({ method: 'GET', path: '/auth/login', query, headers: {} });
   const stateCookie = cookieValue(begun.headers['set-cookie'][0], STATE_COOKIE);
-  return { begun, stateCookie, state: readStateToken({ secret: CREDENTIAL_SECRET, token: stateCookie, now: epoch() }) };
+  return { stateCookie, state: readStateToken({ secret: CREDENTIAL_SECRET, token: stateCookie, now: epoch() }) };
 }
 
-async function loginOnce({ login }) {
-  const { stateCookie, state } = await begin(login);
-  const back = await login.route({
-    method: 'GET', path: '/auth/callback',
-    query: new URLSearchParams({ code: 'verified-code', state: state.state }),
-    headers: { cookie: `${STATE_COOKIE}=${stateCookie}` }
-  });
-  const sessionCookie = cookieValue(back.headers['set-cookie'][0], SESSION_COOKIE);
-  return { back, sessionCookie, sid: readSessionToken({ secret: CREDENTIAL_SECRET, token: sessionCookie, now: epoch() })?.canonicalSessionId };
+const exchange = ({ login, stateCookie, state, code = TICKET }) => settle(login.route({
+  method: 'GET', path: '/auth/callback',
+  query: new URLSearchParams({ code, state: state.state }),
+  headers: { cookie: `${STATE_COOKIE}=${stateCookie}` }
+}));
+
+async function withPaths(run) {
+  const plane = createModelControlPlane();
+  const read = await startRead({ plane });
+  const mint = await startMint({ plane, tickets: new Map([[TICKET, {}]]) });
+  try { return await run({ plane, read, mint }); }
+  finally { await read.close(); await mint.close(); }
 }
 
-test('issue → save → read → logout → reuse refused, through the real relay', { skip }, async () => {
-  const launched = await start();
-  try {
-    const { login, storage } = wired({ plane: launched.plane, origin: launched.origin });
-    const { back, sessionCookie, sid } = await loginOnce({ login });
+test('verified login → handoff → LoveTree session → save → read → logout → reuse refused', { skip }, async () => {
+  await withPaths(async ({ plane, read, mint }) => {
+    const app = await instance({ plane, read, mint });
+    const { stateCookie, state } = await begin(app.login);
+    const back = await exchange({ login: app.login, stateCookie, state });
     assert.equal(back.status, 302);
-    assert.equal(back.headers.location, '/workspace');
-    assert.match(sid ?? '', /^sess_/);
-    assert.equal(back.headers['set-cookie'][1].startsWith(`${STATE_COOKIE}=;`), true);
-    assert.match(back.headers['set-cookie'][0], /HttpOnly/);
-    assert.match(back.headers['set-cookie'][0], /SameSite=lax/);
+    const credential = cookieValue(back.headers['set-cookie'][0], SESSION_COOKIE);
+    assert.ok(credential);
+    assert.deepEqual(mint.seen, [{ handoff_ticket: TICKET }], '표 하나만 발급 경로를 지난다');
 
-    assert.equal((await save(storage, sessionCookie)).status, 200);
-    const readBack = await read(storage, sessionCookie);
-    assert.equal(readBack.status, 200);
-    assert.deepEqual(readBack.body.state.trees[0].moments.map(m => m.id), statePayload.trees[0].moments.map(m => m.id));
+    const sid = sidOf(credential);
+    assert.ok(sid, '자격 증명은 canonical 세션 id를 담는다');
+    assert.equal(plane.sessions.get(sid).product_id, PRODUCT);
+    assert.equal(plane.sessions.get(sid).state, 'active');
 
-    const out = await login.route({ method: 'POST', path: '/auth/logout', headers: { cookie: `${SESSION_COOKIE}=${sessionCookie}` } });
+    assert.equal((await save(app.storage, credential)).status, 200);
+    const loaded = await readDoc(app.storage, credential);
+    assert.deepEqual(loaded.body.state.trees[0].moments.map(m => m.id), statePayload.trees[0].moments.map(m => m.id));
+
+    const out = await app.login.route({ method: 'POST', path: '/auth/logout', headers: { cookie: `${SESSION_COOKIE}=${credential}` } });
     assert.equal(out.status, 200);
     assert.equal(cookieValue(out.headers['set-cookie'][0], SESSION_COOKIE), '');
-    assert.equal(launched.plane.sessions.get(sid).state, 'revoked');
-
-    const reused = await read(storage, sessionCookie);
-    assert.equal(reused.status, 401);
-    assert.equal(reused.body.error.code, 'unauthenticated');
-  } finally { await launched.close(); }
+    assert.equal(plane.sessions.get(sid).state, 'revoked', '서버 세션이 실제로 폐기된다');
+    assert.equal((await readDoc(app.storage, credential)).status, 401, '같은 자격 증명 재사용 거부');
+  });
 });
 
-test('a forged callback state issues nothing', { skip }, async () => {
-  const launched = await start();
-  try {
-    const { login } = wired({ plane: launched.plane, origin: launched.origin });
-    const { stateCookie } = await begin(login);
-    const forged = await settle(login.route({
-      method: 'GET', path: '/auth/callback',
-      query: new URLSearchParams({ code: 'verified-code', state: 'attacker-state-000000000000' }),
-      headers: { cookie: `${STATE_COOKIE}=${stateCookie}` }
-    }));
-    assert.equal(forged.status, 401);
-    assert.equal(forged.body.error.code, 'invalid_login_state');
-    assert.equal(forged.headers, undefined);
-    assert.equal(launched.plane.sessions.size, 0);
-  } finally { await launched.close(); }
+test('the same handoff ticket cannot mint twice, even concurrently', { skip }, async () => {
+  await withPaths(async ({ plane, read, mint }) => {
+    const first = await instance({ plane, read, mint });
+    const second = await instance({ plane, read, mint });
+    const begun = await Promise.all([begin(first.login), begin(second.login)]);
+    const back = await Promise.all([
+      exchange({ login: first.login, ...begun[0] }),
+      exchange({ login: second.login, ...begun[1] })
+    ]);
+    assert.equal(back.filter(r => r.status === 302).length, 1, '동시 교환은 하나만 성공');
+    const refused = back.find(r => r.status !== 302);
+    assert.equal(refused.status, 401);
+    assert.equal(refused.body.error.code, 'login_handoff_rejected');
+    assert.equal([...plane.sessions.values()].filter(s => s.state === 'active').length, 1);
+  });
 });
 
-test('a replayed callback is refused and an external destination is never followed', { skip }, async () => {
-  const launched = await start();
+test('a handoff bound to another product or already expired is refused', { skip }, async () => {
+  const plane = createModelControlPlane();
+  const read = await startRead({ plane });
   try {
-    const { login } = wired({ plane: launched.plane, origin: launched.origin });
-    const { stateCookie, state } = await begin(login, 'https://evil.example/steal');
-    assert.equal(state.next, '/workspace');
-    const request = { method: 'GET', path: '/auth/callback', query: new URLSearchParams({ code: 'verified-code', state: state.state }), headers: { cookie: `${STATE_COOKIE}=${stateCookie}` } };
-    assert.equal((await login.route(request)).status, 302);
-    const replay = await settle(login.route(request));
-    assert.equal(replay.status, 401);
-    assert.equal(replay.body.error.code, 'login_state_replayed');
-  } finally { await launched.close(); }
+    for (const [name, bound] of [['another product', { productId: 'b62' }], ['an expired ticket', { expired: true }]]) {
+      const mint = await startMint({ plane, tickets: new Map([[TICKET, bound]]) });
+      const app = await instance({ plane, read, mint });
+      const { stateCookie, state } = await begin(app.login);
+      const refused = await exchange({ login: app.login, stateCookie, state });
+      assert.equal(refused.status, 401, name);
+      assert.equal(refused.headers, undefined, `${name}: 실패한 로그인에 쿠키를 심지 않는다`);
+      await mint.close();
+    }
+  } finally { await read.close(); }
 });
 
-test('an unverified login code issues nothing', { skip }, async () => {
-  const launched = await start();
-  try {
-    const { login } = wired({ plane: launched.plane, origin: launched.origin });
-    const { stateCookie, state } = await begin(login);
-    const refused = await settle(login.route({ method: 'GET', path: '/auth/callback', query: new URLSearchParams({ code: 'not-verified', state: state.state }), headers: { cookie: `${STATE_COOKIE}=${stateCookie}` } }));
+test('an unverified login code never reaches the mint path', { skip }, async () => {
+  await withPaths(async ({ plane, read, mint }) => {
+    const app = await instance({ plane, read, mint, codes: new Map([['other-code', 'hoft_unrelated_0000000000']]) });
+    const { stateCookie, state } = await begin(app.login);
+    const refused = await exchange({ login: app.login, stateCookie, state, code: 'not-verified' });
     assert.equal(refused.status, 401);
     assert.equal(refused.body.error.code, 'invalid_login_evidence');
-    assert.equal(launched.plane.sessions.size, 0);
-  } finally { await launched.close(); }
+    assert.deepEqual(mint.seen, [], '표 없는 로그인은 발급에 닿지 않는다');
+  });
 });
 
-test('evidence that is only an email, or an unknown provider, never mints', { skip }, async () => {
-  const launched = await start();
+test('a closed, failing, or other-product mint path refuses the login without a cookie', { skip }, async () => {
+  const plane = createModelControlPlane();
+  const read = await startRead({ plane });
   try {
-    const writer = createAuthorityWriter({ call: (method, payload) => launched.plane[method](payload), productId: PRODUCT });
-    for (const evidence of [
-      { productUserId: USER, authProvider: 'email', providerSubject: 'someone@example.test' },
-      { productUserId: USER, authProvider: 'google' },
-      { productUserId: 'attacker', authProvider: 'google', providerSubject: 'sub-1' },
-      {}
-    ]) {
-      const refused = await settle(writer.issue({ evidence }));
-      assert.equal(refused.status ?? 'thrown', 400);
+    for (const behaviour of ['closed', 'throw', 'liar']) {
+      const mint = await startMint({ plane, tickets: new Map([[TICKET, {}]]), behaviour });
+      const app = await instance({ plane, read, mint });
+      const { stateCookie, state } = await begin(app.login);
+      const refused = await exchange({ login: app.login, stateCookie, state });
+      assert.equal(refused.status, 503, behaviour);
+      assert.equal(refused.headers, undefined, `${behaviour}: 실패한 발급 뒤에 쿠키를 심지 않는다`);
+      const attempts = mint.seen.length;
+
+      // 재시도 정책: 상태도 표도 이미 소비됐다. 같은 콜백을 다시 보내도 발급에 닿지 않고 거부만 한다.
+      const retried = await exchange({ login: app.login, stateCookie, state });
+      assert.equal(retried.status, 401, behaviour);
+      assert.equal(retried.body.error.code, 'login_state_replayed', `${behaviour}: 실패 후 같은 상태로 재시도하지 않는다`);
+      assert.equal(mint.seen.length, attempts, `${behaviour}: 발급 실패를 자동으로 재시도하지 않는다`);
+      await mint.close();
     }
-    assert.equal(launched.plane.sessions.size, 0);
-  } finally { await launched.close(); }
+  } finally { await read.close(); }
 });
 
-test('a session minted for another product cannot open LoveTree storage', { skip }, async () => {
-  const launched = await start();
-  try {
-    const { login, storage } = wired({ plane: launched.plane, origin: launched.origin });
-    const { sid } = await loginOnce({ login });
-    const link = await launched.plane.resolve_or_create_product_link({ product_id: 'b62', product_user_id: 'usr_chat', auth_provider: 'google', provider_subject: '10881234567890' });
-    const stranger = await launched.plane.establish_auth_session({
-      product_id: 'b62',
-      subject: { subject_type: 'user', subject_id: link.link.canonical_subject_id },
-      authenticated_at: AT.toISOString(),
-      not_after: '2999-01-01T00:00:00.000Z'
+test('login state is consumed once across two instances and survives a restart', { skip }, async () => {
+  await withPaths(async ({ plane, read, mint }) => {
+    const sharedRows = new Map();
+    const sharedStore = () => createMemoryLoginStateStore({ rows: sharedRows, now: () => AT.getTime() });
+    const first = await instance({ plane, read, mint, stateStore: sharedStore() });
+    const second = await instance({ plane, read, mint, stateStore: sharedStore() });
+    const { stateCookie, state } = await begin(first.login);
+    const attempt = (login) => login.route({
+      method: 'GET', path: '/auth/callback',
+      query: new URLSearchParams({ code: TICKET, state: state.state }),
+      headers: { cookie: `${STATE_COOKIE}=${stateCookie}` }
     });
-    assert.equal(stranger.ok, true);
-    const borrowed = mintSessionToken({ secret: CREDENTIAL_SECRET, canonicalSessionId: stranger.session.session_id, now: epoch() });
-    assert.equal((await read(storage, borrowed)).status, 401, '다른 제품 세션을 감춘 자격 증명은 저장을 열지 않는다');
-    assert.equal((await read(storage, mintSessionToken({ secret: CREDENTIAL_SECRET, canonicalSessionId: sid, now: epoch() }))).status, 200);
-  } finally { await launched.close(); }
+    const raced = await Promise.all([settle(attempt(first.login)), settle(attempt(second.login))]);
+    assert.equal(raced.filter(r => r.status === 302).length, 1, '같은 상태를 두 인스턴스가 잡아도 하나만 진행');
+
+    const restarted = await instance({ plane, read, mint, stateStore: sharedStore() });
+    const afterRestart = await settle(attempt(restarted.login));
+    assert.equal(afterRestart.status, 401);
+    assert.equal(afterRestart.body.error.code, 'login_state_replayed', '재시작 뒤에도 같은 상태는 쓰이지 않는다');
+  });
 });
 
-test('logout that cannot revoke keeps the credential instead of pretending', { skip }, async () => {
-  const launched = await start();
-  try {
-    const { login } = wired({ plane: launched.plane, origin: launched.origin });
-    const { sessionCookie } = await loginOnce({ login });
-    const failing = createLoginService({
-      productId: PRODUCT,
-      writer: createAuthorityWriter({ call: async () => { throw new Error('권위 장애'); }, productId: PRODUCT }),
-      provider: { authorizationUrl: () => 'https://login.padiem.test/x', exchangeCode: async () => ({}) },
-      credentialSecret: CREDENTIAL_SECRET, now: () => AT
-    });
-    const refused = await settle(failing.route({ method: 'POST', path: '/auth/logout', headers: { cookie: `${SESSION_COOKIE}=${sessionCookie}` } }));
-    assert.equal(refused.status, 503);
-    assert.equal(refused.headers, undefined);
-    assert.equal(launched.plane.sessions.get(readSessionToken({ secret: CREDENTIAL_SECRET, token: sessionCookie, now: epoch() }).canonicalSessionId).state, 'active');
-
-    const alreadyGone = await failing.route({ method: 'POST', path: '/auth/logout', headers: { cookie: `${SESSION_COOKIE}=forged-value` } });
-    assert.equal(alreadyGone.status, 200);
-    assert.equal(cookieValue(alreadyGone.headers['set-cookie'][0], SESSION_COOKIE), '');
-  } finally { await launched.close(); }
-});
-
-test('an expired credential is refused before any relay call', { skip }, async () => {
-  const launched = await start();
-  try {
-    const early = AT;
-    const writer = createAuthorityWriter({ call: (method, payload) => launched.plane[method](payload), productId: PRODUCT, now: () => early });
-    const login = createLoginService({
-      productId: PRODUCT, writer,
-      provider: { authorizationUrl: () => 'https://login.padiem.test/x', exchangeCode: async () => ({ productUserId: USER, authProvider: 'google', providerSubject: 'p-2' }) },
-      credentialSecret: CREDENTIAL_SECRET, sessionMaxAgeSeconds: 60, now: () => early
-    });
-    const { sessionCookie } = await loginOnce({ login });
-    const late = createPadiemAuthorityAuth({
-      credential: createCredentialVerifier({ env: { LOVETREE_SESSION_SECRET: CREDENTIAL_SECRET }, present: fromCookie(SESSION_COOKIE), now: () => Math.floor(AT.getTime() / 1000) + 120 }),
-      productId: PRODUCT,
-      authority: createAuthorityRelayClient({ url: `${launched.origin}/resolve-session`, callerSecret: CALLER_SECRET })
-    });
-    const repo = createMemoryWorkspaceRepo();
-    const storage = createApiHandler({ authenticate: late, service: createWorkspaceService({ repo, productId: PRODUCT }), productId: PRODUCT });
-    assert.equal((await read(storage, sessionCookie)).status, 401);
-
-    const stillValid = createPadiemAuthorityAuth({
-      credential: createCredentialVerifier({ env: { LOVETREE_SESSION_SECRET: CREDENTIAL_SECRET }, present: fromCookie(SESSION_COOKIE), now: () => Math.floor(AT.getTime() / 1000) + 30 }),
-      productId: PRODUCT,
-      authority: createAuthorityRelayClient({ url: `${launched.origin}/resolve-session`, callerSecret: CALLER_SECRET })
-    });
-    const validStorage = createApiHandler({ authenticate: stillValid, service: createWorkspaceService({ repo, productId: PRODUCT }), productId: PRODUCT });
-    assert.equal((await save(validStorage, sessionCookie)).status, 200);
-    assert.equal((await read(validStorage, sessionCookie)).status, 200);
-    const issued = launched.plane.sessions.get(readSessionToken({ secret: CREDENTIAL_SECRET, token: sessionCookie, now: epoch() }).canonicalSessionId);
-    assert.equal((await repo.load({ productId: PRODUCT, subjectId: issued.subject_id })).revision, 1);
-  } finally { await launched.close(); }
+test('the handoff path never falls back to caller-supplied evidence', { skip }, async () => {
+  await withPaths(async ({ plane, read, mint }) => {
+    const app = await instance({ plane, read, mint });
+    const begun = await begin(app.login);
+    const { stateCookie, state } = begun;
+    const back = await exchange({ login: app.login, stateCookie, state });
+    assert.equal(back.status, 302);
+    // 발급 성공 경로에서 링크·발급 RPC는 mint 서버만 통과했다(권위에 세션 하나).
+    assert.equal([...plane.sessions.values()].length, 1);
+    assert.ok(sidOf(cookieValue(back.headers['set-cookie'][0], SESSION_COOKIE)));
+  });
 });
