@@ -169,6 +169,7 @@ test('the route to a moment is the single parent chain from the start', () => {
   assert.deepEqual(pathTo(tree, tree.moments[3].id).map(m => m.title), ['첫 목소리', '옆가지']);
   assert.deepEqual(pathTo(tree, root).map(m => m.id), [root]);
   assert.deepEqual(pathTo(tree, 'missing'), []);
+  assert.deepEqual(pathTo(tree, tree.moments[2]).map(m => m.id), [root, second, third]);
   assert.deepEqual(pathTo(removeMoment(tree, second), third).map(m => m.id), [root, third]);
 });
 test('related moments link both sides without changing the parent route', () => {
