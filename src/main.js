@@ -383,7 +383,9 @@ const sync = createSyncController({
   getState: () => state,
   replaceState: (doc) => { commit(doc); render(); },
   api: createWorkspaceApi(),
-  storage: window.localStorage
+  storage: window.localStorage,
+  // 화면 경로는 이 파일이 소유한다. 안쪽으로 옮길 때는 앱의 이력 추적을 함께 쓴다.
+  navigate: (url) => { if (url.startsWith('#')) go(url); else location.assign(url); }
 });
 mountSync({ controller: sync, doc: document });
 render();
