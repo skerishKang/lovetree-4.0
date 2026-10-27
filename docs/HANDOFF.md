@@ -1,5 +1,16 @@
 # LoveTree 4.0 인수인계
 
+## #55 한글 타이포 적용(Pretendard + 기억책 제목 MaruBuri) — 2026-10-28
+
+PR #54 head `a69e1df` 위에 별도 worktree·브랜치로 적용했다(이 PR의 base는 PR #54 분기). 문서 PR #56과 같은 결정의 구현편이며, 문구·저장·인증은 바꾸지 않았다.
+
+- 글꼴은 공식 배포본을 수정 없이 자체 호스팅한다 — npm `pretendard@1.3.9`의 dynamic-subset CSS + woff2 92개, 그리고 네이버 공식 CSS가 가리키는 `MaruBuri-Regular.woff2` 한 종. 출처·SHA-256·라이선스 전문은 `public/fonts/README.md`와 `public/fonts/LICENSE-*.txt`에 뒀다. GitHub 미러의 MaruBuri 파일은 쓰지 않았다.
+- `src/styles.css`에 `--ui`(Pretendard)·`--reading`(MaruBuri)를 두고 `:root`와 `--serif`를 `--ui`로 수렴시켰다. 그림자 DOM은 각 뷰의 프로젝트 소유 CSS(orbit `extraCSS`, book 인라인 `css`, `shelf.css`)에서 `--ui-sans`·`--book-serif`·`--hand`·`--display`·`--body`·`--latin`을 `--ui`로 덮어쓴다. `*-source.css` 원본 자산은 수정하지 않았고, `.memory-title`만 `--reading`을 쓴다. Google Fonts @import는 삭제했다.
+- 실제 렌더는 CDP로 확인했다. 첫 화면·책장·트리·작성창·기억책 본문과 메뉴는 `Pretendard Variable`, 기억책 감상 제목만 `MaruBuriOTF`(공식 파일의 내부 이름). 교체 전에는 첫 화면과 기억책이 `Malgun Gothic`/`Times New Roman` 시스템 폴백이었다.
+- 전송량(1280×900 화면 순회 실측): 교체 전 82,360b → 단일 변수 파일 2,487,260b → **dynamic-subset 840,904b**(Pretendard 411,332b + 기억책을 열 때만 MaruBuri 429,572b). 첫 화면은 259,128b.
+- 크기와 굵기는 건드리지 않았다(작성창 12px/400, 버튼 500 유지, 날짜 일괄 700 없음). PC·390px 7화면 문서 가로 넘침 0, 버튼 잘림 0, 팝업 폐기 확인·포커스 복귀·분기 2선택지 → 2/2 동작 전과 동일, 콘솔 오류 0, `npm run check` 테스트 24 pass. #41 중앙 가독성은 같은 카드 위상에서 제목 18.06/9.91/11.86, 설명 8.54/4.97/8.54로 대등하다.
+- 남긴 것: #55의 출발값(본문·입력 16px, 설명·버튼 14~16px/500~600)은 이번 커밋에서 sizes를 바꾸지 않았으니 화면 비교 후 별도 반영. docs PR #56과 이 문서가 같은 파일을 고치므로 병합 순서의 충돌을 확인할 것.
+
 ## #41 첫 화면 중앙 가독성·마우스 패럴랙스 — 2026-10-28
 
 PR #53 head `2cc4a1b` 위(이 PR의 base는 PR #53 분기)에서 첫 화면(orbit)만 다뤘다. 데이터·저장·서버 규칙은 그대로다.

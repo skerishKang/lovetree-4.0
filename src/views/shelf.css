@@ -1,4 +1,4 @@
-:host { display:block; min-height:100dvh; --display:'Gowun Batang','Noto Serif KR',Georgia,serif; --body:system-ui,sans-serif; --latin:system-ui,sans-serif; }
+:host { display:block; min-height:100dvh; font-family:var(--ui,system-ui,sans-serif); --display:var(--ui,system-ui,sans-serif); --body:var(--ui,system-ui,sans-serif); --latin:var(--ui,system-ui,sans-serif); }
 .app { max-width:1440px; margin:auto; padding:20px 32px 32px; }
 a { color:inherit; text-decoration:none; }
 button, input, select { font:inherit; }
