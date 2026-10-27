@@ -48,6 +48,12 @@ test('import rejects duplicate IDs, cycles and disconnected references', () => {
   invalidDate.moments[0].date = '2026-02-31';
   assert.throws(() => validateState(stateOf(invalidDate)), /날짜/);
 });
+test('import rejects malformed entries in an untrusted file', () => {
+  for (const broken of [null, 5, 'text']) assert.throws(() => validateState({ version: 1, trees: [broken] }), /트리 데이터/);
+  const tree = createTree(input());
+  assert.throws(() => validateState({ version: 1, trees: [{ ...tree, moments: [null] }] }), /순간 데이터/);
+  assert.throws(() => validateState({ version: 1, trees: [{ ...tree, moments: [tree.moments[0], null] }] }), /순간 데이터/);
+});
 test('deleting the root promotes its first child and retains every other moment', () => {
   const first = createTree(input());
   const second = addMoment(first, input('A'), first.moments[0].id);
@@ -76,6 +82,16 @@ test('editing content preserves identity and parent, without mutating original t
   assert.equal(changed.moments[0].id, tree.moments[0].id);
   assert.equal(changed.moments[0].parentId, null);
   assert.equal(tree.moments[0].title, '첫 목소리');
+});
+test('editing a connected moment keeps its parent and reason, and ignores a non-text reason', () => {
+  const tree = createTree(input());
+  const connected = addMoment(tree, { ...input('이어진 순간'), relation: '그날의 이유' }, tree.moments[0].id);
+  const kept = editMoment(connected, connected.moments[1].id, { ...input('고친 제목'), relation: ' 고친 이유 ' });
+  assert.equal(kept.moments[1].parentId, tree.moments[0].id);
+  assert.equal(kept.moments[1].relation, '고친 이유');
+  validateState(stateOf(kept));
+  const coerced = editMoment(connected, connected.moments[1].id, { ...input('숫자 이유'), relation: 5 });
+  assert.equal(coerced.moments[1].relation, '');
 });
 test('import creates fresh identities and never overwrites existing trees', () => {
   const first = createTree(input());
@@ -110,6 +126,8 @@ test('two browser tabs cannot overwrite a newer saved state silently', () => {
 test('storage failures are reported instead of claiming a successful save', () => {
   const storage = { getItem: () => null, setItem: () => { throw new Error('QuotaExceeded'); } };
   assert.throws(() => saveState(storage, stateOf(createTree(input())), null), /공간/);
+  const unreadable = { getItem: () => { throw new Error('SecurityError'); }, setItem: () => {} };
+  assert.throws(() => saveState(unreadable, stateOf(createTree(input())), null), /저장소에 접근/);
 });
 test('branched tree layout places every child after its parent', () => {
   let tree = createTree(input());

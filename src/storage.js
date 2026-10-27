@@ -18,7 +18,9 @@ export function loadState(storage) {
   }
 }
 export function saveState(storage, state, expectedRaw) {
-  const latest = storage.getItem(STORAGE_KEY);
+  let latest;
+  try { latest = storage.getItem(STORAGE_KEY); }
+  catch { throw new Error('브라우저 저장소에 접근할 수 없어요. 기록을 파일로 내보내 보관해 주세요.'); }
   if (expectedRaw !== undefined && latest !== expectedRaw) throw new Error('다른 탭에서 기록이 바뀌었어요. 입력을 복사한 뒤 새로고침해 주세요.');
   const clean = validateState(state);
   const serialized = JSON.stringify(clean);
