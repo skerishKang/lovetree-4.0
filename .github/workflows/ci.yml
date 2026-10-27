@@ -52,7 +52,9 @@ jobs:
             exit 1
           fi
           status=0
-          node --test --test-reporter=tap tests/storage-postgres.test.mjs tests/login-state-postgres.test.mjs > /tmp/pg.tap 2>&1 || status=$?
+          # 두 PostgreSQL 파일이 같은 DB에서 동시에 CREATE TABLE 하면 카탈로그가 경합한다
+          # (pg_type_typname_nsp_index 중복). 파일 간 병렬을 풀어 DDL을 직렬화한다.
+          node --test --test-concurrency=1 --test-reporter=tap tests/storage-postgres.test.mjs tests/login-state-postgres.test.mjs > /tmp/pg.tap 2>&1 || status=$?
           cat /tmp/pg.tap
           if [ "$status" -ne 0 ]; then
             echo "실패: 연결 실패 또는 테스트 실패 (exit $status)"
