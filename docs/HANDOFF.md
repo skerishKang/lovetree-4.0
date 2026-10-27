@@ -139,17 +139,18 @@ old 조사 PR #18은 후보 선택의 근거다. 64 → 59 흐름을 먼저 완�
 4. migration 073 적용 — 대상: `padiem-chat-db`(D1). 필요 설정: 없음(스키마). 검증: D1 gate의 일반 마이그레이션 창(073은 seed=추가 전용으로 분류, apply 창·파괴적 목록에 없음), `lovetree_login_handoffs` 존재·CHECK. 복구: 테이블은 추가 전용이라 남기고 라우트/중계만 되돌린다(드롭은 별도 승인).
 5. 채팅 handoff 생산 배포 — 대상: `apps/padiem-chat` Worker. 필요 설정: 기존 `session_secret` 재사용(새 시크릿 불요), 코드 소유 allowlist origin에 실제 러브트리 주소 포함 여부 확인. 검증: B62 full regression·browser QA lane, 배포 후 `/auth/lovetree/start`가 기존 Google authorize로 302(redirect_uri 무변경), 로그인 완료 시 러브트리 콜백로만 되돌아감. 복구: 라우트 등록 해제(revert 커밋) — 행은 만료(120초)로 자연 소멸.
 6. 러브트리 저장 API 배포 — 대상: COM2 Node 서비스. 필요 설정 이름: `LOVETREE_PRODUCT_ID`, `LOVETREE_DATABASE_URL`, `LOVETREE_AUTHORITY_TRANSPORT=relay`, `LOVETREE_AUTHORITY_RELAY_URL`, `LOVETREE_CALLER_SECRET`, `LOVETREE_CREDENTIAL_MODULE=./server/credentials/lovetree-credential-module.js`, `LOVETREE_SESSION_SECRET`, `LOVETREE_SESSION_SOURCE`/`LOVETREE_SESSION_COOKIE`, `LOVETREE_AUTHORITY_WRITE_TRANSPORT`, `LOVETREE_LOGIN_PROVIDER_MODULE=./server/padiem-login-provider.js`, `LOVETREE_PADIEM_HANDOFF_START_URL`, `LOVETREE_PUBLIC_ORIGIN`, `LOVETREE_STATE_STORE=postgres`, `LOVETREE_MINT_URL`, `LOVETREE_MAX_BODY_BYTES`, `PORT`. DB 준비: `server/db/schema.sql`의 세 테이블(`lovetree_workspaces`, `lovetree_request_claims`, `lovetree_login_states`) — 모두 추가 전용. 검증(배포 전): `npm run check`, PostgreSQL job 9건 skip=0, 로컬 두 저장소 연결 시험 6건. 검증(배포 후): 브라우저에서 로그인 → 저장 → 새로고침 → 로그아웃 → 이전 자격 증명 거부, 회원 A/B 격리. 복구: `LOVETREE_MINT_URL`/`LOVETREE_LOGIN_PROVIDER_MODULE`를 빼면 로그인 라우트는 거부 전용으로 닫히고 저장 경계는 그대로 유지된다. 확인 경로 env를 빼면 저장을 열지 않는다(fail-closed 기본).
-7. 프런트 연결(#36) — 화면이 서버 저장을 아직 부르지 않는다. 연결 후에만 화면 기준 판정(저장 버튼·복원·경쟁 409 안내)이 가능하다.
+7. 프런트 서버 저장 연결 — 화면이 서버 저장을 아직 부르지 않는다. 이 작업은 별도 구현 이슈 `#57`이다. `#36`은 첫 기록 UX·입력 폼 작업(완료)이고 로그인 UI·서버 동기화와 무관하다 — 이전까지 이 표에서 `#36`으로 적던 호칭을 정정한다. `#57`가 끝난 뒤에야 화면 기준 판정(저장 버튼·복원·경쟁 409 안내·계정 전환 격리)이 가능하다.
 
 ### 이미 준비된 것과 아직 필요한 것
 
 - 준비됨: 위 1~5의 코드·시험·CI(발급 11/읽기 11/gate 18/guard 11/B62 full regression pass), 러브트리(#37/#49/#52) 코드와 CI(ubuntu·windows·Pages·GitGuardian·PostgreSQL), 두 저장소 연결 시험 6건(실제 push된 SHA 청결 확인 포함), 실제 브라우저 판정(로그인→저장→새로고침 복원→로그아웃→세션 없음 거부, 회원 A/B 격리) — 국소 composition, 스텁 Google/모형 권위.
-- 아직 필요: PR 병합(어떤 것도 main에 없다), 두 Worker·채팅·러브트리 배포, migration 073 실행, `LOVETREE_LOGIN_DB` 바인딩, 시크릿 생성·등록(`LOVETREE_CALLER_SECRET`·`LOVETREE_SESSION_SECRET`), COM2 PostgreSQL에 스키마 적용, allowlist에 실제 배포 origin 확정, 실제 Google 계정으로 1회 왕복(크로스 사이트 쿠키 포함), password leg의 실제 화면 왕복, 프런트(#36) 연결.
+- 아직 필요: PR 병합(어떤 것도 main에 없다), 두 Worker·채팅·러브트리 배포, migration 073 실행, `LOVETREE_LOGIN_DB` 바인딩, 시크릿 생성·등록(`LOVETREE_CALLER_SECRET`·`LOVETREE_SESSION_SECRET`), COM2 PostgreSQL에 스키마 적용, allowlist에 실제 배포 origin 확정, 실제 Google 계정으로 1회 왕복(크로스 사이트 쿠키 포함), password leg의 실제 화면 왕복, 프런트 서버 저장 연결(`#57`).
 - 이번 브라우저 판정에서 확인하지 못한 것: (a) 운영 Google 화면·운영 채팅 셸을 지난 왕복 — 로컬 스텁authorize·하네스 API라 채팅 셸(`/`)이 없어 대화상자 왕복은 자동 시험으로만 확인했고, (b) 폐기된 canonical 세션 id를 직접 넣어 받는 거부는 브라우저가 Cookie 헤더를 덮어쓸 수 없어 자동 시험(서버측)이 담당한다.
 
 ### 실행 기록 (2026-10-28)
 
 - 두 저장소 연결 시험: lovetree-4.0 `15d7b07d123b0aa8a51490531698f320d3fc51cd`, ai-revenue-lab `33a6ac4cd45702403b602f1da6f9d0f25d991369` 6 pass / 0 fail.
+- 이후 #52 head는 `a540553`이고, 위 시험 SHA와의 차이는 이 문서 한 파일 43줄 추가(문서 커밋 1건)뿐이다 — 코드가 같으므로 연결 시험을 다시 돌리지 않는다.
 - 실제 브라우저(로컬 런너 `scripts/dev-auth-chain.mjs`): 회원 A 로그인→저장(revision 1)→새로고침 후 동일 문서→로그아웃→비로그인 401; 회원 B는 빈 문서(revision 0)에서 시작해 자기 저장만 하고, A의 문서는 B의 저장으로 옮지 않음.
 
 ## Owner가 정한 방향
