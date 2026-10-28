@@ -66,9 +66,19 @@ export function createAdminRoleService({ store, productId, clock = () => new Dat
      * 최초 관리자 부팅은 이 함수로 하지 않는다.
      *
      * HTTP로 열린 자리는 읽기 둘(`GET /api/admin/session`·`GET /api/admin/roles`)뿐이라
-     * 외부에서 첫 관리자를 등록할 길이 없다. 첫 행은 DB 접근 권한이 있는 자리에서
-     * `store.assign({ productId, subjectId, role: 'admin' })`(또는 같은 모양의 INSERT)을
-     * 서버 운영자가 **확인된 canonical subject**로만 실한다. 브라우저가 보낸 이메일·
+     * 외부에서 첫 관리자를 등록할 길은 없다.
+     *
+     * 공식 경로는 **감사 이력을 함께 쓰는 저장소 호출**이다 — 서버 위에서 운영자가
+     * `createAdminRoleRepo(pool).assign({ productId, subjectId, role: 'admin',
+     * grantedBy: 'operator:<운영자>', reason: '최초 등록' })`를 실행한다. 이 자리는 역할 행과
+     * `lovetree_product_role_audit` 행을 같은 호출로 남기므로, 이후 판정·정리가 아래
+     * `assign`·`revoke`와 같은 모양으로 이어진다.
+     *
+     * `INSERT INTO lovetree_product_roles`를 직접 때리는 것은 **일반 절차로 권장하지
+     * 않는다** — 이력이 남지 않아 누가 언제 왜 붙였는지 되물을 근거가 없다. 저장소가 죽은
+     * 응급 상황에서만 별도 승인 아래 쓰고, 복구 후 이력을 메꾸는 기록을 남긴다.
+     *
+     * 어떤 경로든 근거는 서버가 확인한 canonical subject뿐이다 — 브라우저가 보낸 이메일·
      * 헤더·localStorage는 근거가 아니고, 지정 계정·subject·시크릿은 저장소에 적지 않는다.
      * 두 번째부터는 이렇게 등록된 관리자가 `actorPrincipal`을 견디고 아래를 쓴다.
      */
