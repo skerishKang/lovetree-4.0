@@ -1,5 +1,14 @@
 # LoveTree 4.0 인수인계
 
+## #65 화면 문맥·행동 계약 통일(2) — 2026-10-28
+
+`#70 71f13d3`(생명주기 계약) 위 별도 브랜치. 궤도·책장·기억책이 같은 모양으로 입력을 받고 같은 통로로만 바깥에 알리게 했다. 외형·URL·저장 형식·새 화면은 바꾸지 않았다.
+
+- `src/views/contract.js`의 `viewContext({treeId, momentId, readOnly})`가 고정(freeze) 문맥을 만든다. 궤도의 `example`과 기억책의 `demo`는 `readOnly` 하나로 수렴했고(값 동일), 책장은 선택 시작값만 `context.treeId`로 받는다.
+- 행동은 `actions` 하나로 모았다: `navigate('home'|'trees')`, `openBook(treeId, momentId, readOnly)`, `openWorkspace(...)`, `requestMoment('new'|'add'|'edit', id)`, `library(action, id)`. `src/main.js`에서는 mount 세 곳과 열기 도우미 인자 이름만 바뀌었고 기존 콜백 매핑을 그대로 옮겼다 — 동작 변화 없음.
+- 기억책에서 '내 트리'로 갈 때 그 트리가 선택되는 동작은 `navigate('trees')`의 화면별 구현으로 남겼다(공통 navigate가 다른 화면에 부작용을 만들지 않게).
+- 검증: `npm run check` 148 tests / 118 pass, 브라우저에서 세 화면의 13개 행동(새 트리·내 트리·기억책·연결 보기·처음으로·이어가기·수정·예시 읽기 전용 경로)과 책장 library(백업 다운로드·삭제 확인·새 트리) 확인. 390px 가로 넘침 0.
+
 ## #65 화면 연결 방식 정리(1) — 2026-10-28
 
 `#64 b30029b` 위 별도 worktree·브랜치. `#66` 로드맵의 "B. 화면 연결 기반" 첫 조각으로, 외형·문구·동작·주소 변화 없이 세 화면의 생명주기만 통일했다.

@@ -1,5 +1,6 @@
 import './styles.css';
 import { mountOrbit, ORBIT_EXAMPLE } from './views/orbit.js';
+import {viewContext} from './views/contract.js';
 import { mountBook } from './views/book.js';
 import { mountShelf } from './views/shelf.js';
 import { hasRecovery as recoveryAvailable, recoveryData } from './views/memory.js';
@@ -220,20 +221,28 @@ function workspace() {
 function render() {
   disposeView(); disposeView = () => {};
   const route = location.hash.slice(1);
-  const showBook = (treeId, momentId, demo=false) => { selectedId=momentId; go(`#${demo?'demo-book':'book'}/${treeId}`); };
-  const showWorkspace = (treeId, momentId, demo=false) => { selectedId=momentId; go(`#${demo?'demo':'tree'}/${treeId}`); };
+  const showBook = (treeId, momentId, readOnly=false) => { selectedId=momentId; go(`#${readOnly?'demo-book':'book'}/${treeId}`); };
+  const showWorkspace = (treeId, momentId, readOnly=false) => { selectedId=momentId; go(`#${readOnly?'demo':'tree'}/${treeId}`); };
+  // 화면이 바깥에 알리는 유일한 통로. 주소·팝업·저장소는 여기서만 만진다.
+  const actions = {
+    navigate: (where) => { if (where === 'trees') go('#trees'); else go('#start'); },
+    openBook: showBook,
+    openWorkspace: showWorkspace,
+    requestMoment: (kind, id) => openMoment(kind, id),
+    library: (action, id) => libraryAction(action, id)
+  };
   if (route === 'trees') {
     $('#app').innerHTML='<main id="main"></main>';
-    disposeView=mountShelf($('#main'), {trees:state.trees,storage,view:shelfView,error:loaded.error,recovery:hasRecovery(),onBook:showBook,onWorkspace:showWorkspace,onNew:()=>openMoment('new'),onAction:libraryAction});
+    disposeView=mountShelf($('#main'), {trees:state.trees,storage,view:shelfView,context:viewContext({treeId:shelfView.selectedId}),actions,error:loaded.error,recovery:hasRecovery()});
   }
   else if (/^(tree|demo)\//.test(route)) $('#app').innerHTML=workspace();
   else if (/^(book|demo-book)\//.test(route) && currentTree()) {
     $('#app').innerHTML='<main id="main"></main>';
-    disposeView=mountBook($('#main'), {tree:currentTree(),selectedId,storage,demo:isDemo(),onHome:()=>go('#start'),onShelf:()=>{shelfView.selectedId=currentTree().id;go('#trees')},onWorkspace:showWorkspace,onNew:()=>openMoment('new'),onAdd:id=>openMoment('add',id),onEdit:id=>openMoment('edit',id)});
+    disposeView=mountBook($('#main'), {tree:currentTree(),storage,context:viewContext({treeId:currentTree().id,momentId:selectedId,readOnly:isDemo()}),actions:{...actions,navigate:(where)=>{if(where==='trees'){shelfView.selectedId=currentTree().id;go('#trees');}else go('#start');}}});
   } else if (/^(book|demo-book)\//.test(route)) $('#app').innerHTML=workspace();
   else {
     $('#app').innerHTML='<main id="main"></main>';
-    disposeView=mountOrbit($('#main'),{trees:state.trees,storage,example:route==='examples',onNew:()=>openMoment('new'),onTrees:()=>go('#trees'),onBook:showBook,onWorkspace:showWorkspace,error:loaded.error,recovery:hasRecovery(),onRecovery:exportRecovery});
+    disposeView=mountOrbit($('#main'),{trees:state.trees,storage,context:viewContext({readOnly:route==='examples'}),actions,error:loaded.error,recovery:hasRecovery()});
   }
 }
 function updateTree(tree) { commit({ ...state, trees: state.trees.map(t => t.id === tree.id ? tree : t) }); }

@@ -38,15 +38,22 @@
    - `track(fn)`: observer·RAF·dialog처럼 signal로 정리되지 않는 자원.
    - `dispose()`: `signal` 해제 → 등록의 역순 정리. 여러 번 불러도 한 번만 실제 정리하고, 정리 중 하나가 던져도 나머지를 계속한다.
    - **mount는 새 host에만 한다.** 한 host에는 shadow root가 하나뿐이라 같은 요소에 다시 붙일 수 없다. 화면 교체 시 이전 화면 `dispose`와 새 host 준비는 호출자(`render`)가 맡는다 — 현재 앱이 `#app`을 갈아 끼우는 방식과 같다. 같은 host 재사용은 지원하지 않는다.
-2. **문맥 (다음 조각)** — `{ treeId, momentId, readOnly }`를 `main.js`가 한 번 계산해 모든 화면에 같은 모양으로 넘긴다. `example`/`demo`는 `readOnly`로 수렴시키고, 책장은 자기 것이므로 `readOnly:false`다.
-3. **행동 (다음 조각)** — 화면별 콜백(`onBook`·`onShelf`·`onAdd`…)을 의미 이름으로 모은다: `navigate(route)`, `select(treeId, momentId)`, `requestMoment('add'|'edit'|'delete', id)`. 화면은 저장소를 직접 쓰지 않는다(읽던 위치·선택 기록은 `main.js` 한 곳).
+2. **문맥 (구현됨)** — `src/views/contract.js`의 `viewContext({treeId, momentId, readOnly})`. `main.js`가 화면마다 한 번 만들어 넘긴다. 궤도의 `example`, 기억책의 `demo`는 **`readOnly` 하나로 수렴**했고(값 동일), 책장은 자기 기록이므로 `readOnly:false`이며 선택 시작값만 `treeId`로 받는다. 문맥은 고정(freeze)이라 화면이 바꿀 수 없다.
+3. **행동 (구현됨)** — 화면별 콜백을 의미 이름 하나로 모았다(`actions`). 화면은 저장소를 직접 쓰지 않고 이 통로로만 바깥에 알린다.
+   ```js
+   navigate(where)                        // 'home' | 'trees'
+   openBook(treeId, momentId, readOnly)   // 기억책으로 (읽기 전용이면 demo-book)
+   openWorkspace(treeId, momentId, readOnly)
+   requestMoment(kind, id)                // 'new' | 'add' | 'edit'
+   library(action, id)                    // 백업·가져오기·복구·삭제
+   ```
+   `main.js`의 기존 `onBook`·`onShelf`·`onAdd`·`onAction`·`onNew`·`onRecovery` 매핑을 그대로 옮겨 **동작 변화는 없다**. 기억책에서 '내 트리'로 갈 때 그 트리가 선택되는 동작은 `navigate('trees')`의 화면별 구현으로 남겼다.
 4. **소유 경계 (다음 조각)** — 공통 shell(메뉴·동기화 상태·팝업·여백)은 `main.js`가 소유하고, 화면은 자기 shadow root 밖을 만지지 않는다. 읽기 전용에서 편집 단추를 숨기는 것은 UX일 뿐이며 최종 판정은 서버가 한다.
 
 주소는 지금의 hash(`#start`·`#trees`·`#tree/<id>`·`#book/<id>`)를 유지한다. 리모네식 쿼리(`?moment=`)로 바꾸는 것은 이번 범위가 아니다.
 
-## 4. 이번 PR의 범위
+## 4. 진행 상태
 
-- 구현: `createView()` 도입과 궤도·책장·기억책의 채택. **외형·문구·동작·주소 변화 없음.**
-- 문서: 이 비교와 제안.
-- 시험: `tests/view-contract.test.mjs`(생명주기 6건). 화면 동작은 브라우저로 확인한다.
-- 하지 않은 것: `src/main.js` 변경(문맥·행동 수렴은 다음 조각), 새 화면, 커뮤니티, 프레임워크 교체.
+- **1차(#70, `71f13d3`)**: `createView()` 생명주기 도입·채택. 외형·문구·동작·주소 변화 없음.
+- **2차(이 PR)**: 문맥(`viewContext`)과 행동(`actions`) 통일. `src/main.js`는 mount 세 곳과 열기 도우미 인자 이름만 바뀌었다. 외형·URL·저장 형식 변화 없음.
+- **남은 것**: 화면이 저장소를 직접 쓰는 부분(읽던 위치·책장 선택 기록)을 `main.js` 한 곳으로 모으기, 공통 shell 소유 경계, 보기 전환의 선택 유지 규칙. 새 화면·커뮤니티·프레임워크 교체는 범위 밖.
