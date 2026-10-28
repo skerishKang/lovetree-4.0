@@ -1,0 +1,55 @@
+# Pages API 프록시 (`/api/*`·`/auth/*` → COM2)
+
+프런트는 Pages에서, 저장·로그인 서버는 COM2 Node에서 돈다. 프런트는 `/api/workspace`·`/auth/*`를 **상대 경로 + `credentials:'same-origin'`** 으로 부르고, 세션 쿠키는 **host-only + `Path=/` + `SameSite=Lax`** 다. 그래서 두 서비스가 같은 오리진이어야 하고, 이 프록시가 그 경계를 만든다.
+
+| 파일 | 역할 |
+| --- | --- |
+| `functions/api/[[path]].js` | `/api/*` 전체를 소유(허용 목록 밖은 404 JSON, 정적 폴백 없음) |
+| `functions/auth/[[path]].js` | `/auth/*` 전체를 소유(로그인·콜백·로그아웃만 통과) |
+| `functions/_lib/proxy.js` | 실제 프록시(설정·허용 목록·헤더·오류 계약) |
+| `public/_routes.json` | `/api/*`·`/auth/*`를 Function 소유로 못 박아 SPA 폴백이 삼키지 않게 한다(빌드 산출 `dist/_routes.json`) |
+| `tests/pages-proxy.test.mjs` | 계약 회귀 시험(15건) |
+| `scripts/dev-auth-chain.mjs` | `LOVETREE_DEV_FRONT_PORT`로 같은 프록시를 앞원진에 얹어 로컬에서 실제 화면 흐름을 검증한다 |
+
+## 통합 출처
+
+같은 경로에 프록시가 두 개(#68 `e2884e6`, #69 `d8b6d1c`)생겼고 **남은 구현은 이 파일 하나**다.
+#68에서 온 것: 응답 본문 완료까지의 기한과 실제 읽기 취소(504)·응답 크기 상한(8MiB, `server/http.js`의 4MiB와 시험으로 견줌)·HTML/비JSON 형식 검사(502)·허용 헤더 목록·`set-cookie` 복수 보존·시험 대부분.
+#69에서 더한 것: 경로별 메서드 제한(밖이면 405, COM2까지 내리지 않음)·`_routes.json` 라우팅·로컬 앞원진 검증.
+컴2가 프록시를 단독 정리하고, 컴1은 이 파일을 고치지 않는다.
+
+## 기존 PADIEM 프록시에서 재사용한 것 / 옮기지 않은 것
+
+재사용한 것은 **형태**다.
+
+- 업스트림은 설정 하나(`env.LOVETREE_API_ORIGIN`)에서만 온다. 요청 헤더·쿼리·본문으로 목적지를 바꿀 수 없다(`padiem-ai-engine-ingress`가 `ENGINE_EXECUTE_URL`을 고정하는 것과 같은 원칙).
+- 비밀·주소는 서버(엣지) 측에만 둔다. 브라우저가 보내는 것은 쿠키와 본문뿐이다.
+- 실패는 닫힌 방향으로 낸다. 계약 밖 응답은 그대로 흘리지 않고 JSON 오류로 끊는다.
+
+`padiem-ai-engine-ingress` 자체를 이식하지 않은 이유:
+
+- 그 Worker는 **단일 경로**(`/internal/v1/execute`)와 **서비스 바인딩**(`ENGINE`)·**호출 자격 증명 주입**(`x-padiem-engine-credential`) 전용이다. 브라우저가 쿠키·302·`Set-Cookie`를 주고받는 범용 리버스 프록시가 아니고, 인증을 자기가 발급하는 구조라 그대로 쓰면 러브트리의 쿠키 경계와 충돌한다.
+- `chat.padiem.net`·`local-agent.padiem.net`처럼 **도메인-워커**로 호스팅하는 패턴도 이번엔 쓰지 않았다. 프런트가 Pages에 있어 같은 오리진이 필요한데, Pages 커스텀 도메인 위에서는 Functions가 그 자리를 가장 적은 이동으로 채운다. COM2를 엣지에 붙이는 방식은 그 outbound 브로커 패턴을 배포 단계에서 재사용한다.
+
+## 계약
+
+- 통과 경로: `/api/workspace`, `/auth/login`, `/auth/callback`, `/auth/logout`. 그 밖의 `/api/*`·`/auth/*`는 **404 JSON**(`not_proxied`).
+- 요청: method·query·body 그대로. 전달 헤더는 `cookie`·`content-type`·`accept`·`accept-language`·`authorization`·`origin` 뿐이고 `x-forwarded-*`·`host`·목적지 지정 헤더는 넘기지 않는다.
+- 응답: status·`location`·`set-cookie`(복수)·`content-type`·`cache-control`·`x-content-type-options`·`www-authenticate`를 그대로. `Domain`을 덧붙이지 않는다.
+- **기한은 헤더 수신이 아니라 응답 본문 완료까지**입니다(15초). 본문을 다 읽어야 응답을 만들기 때문에, 헤더만 오고 본문이 멈춘 업스트림은 기한에 끊고 **진행 중이던 업스트림 읽기를 취소**합니다.
+- **본문은 프록시가 끝까지 읽어 한 번에 돌려줍니다**(잘린 200을 만들지 않기 위해). 상한은 `DEFAULT_RESPONSE_LIMIT_BYTES`(8MiB)이고, 서버가 받는 문서 상한(`server/http.js` `DEFAULT_MAX_BODY_BYTES` = 4MiB, `LOVETREE_MAX_BODY_BYTES`로 조정)보다 크도록 시험이 두 상수를 직접 견줍니다. 상한을 넘으면 502 `upstream_response_too_large`로 끊고 읽기를 취소합니다.
+- 오류: 설정 없음/형식 오류 → 503 `storage_unavailable`(업스트림 호출 없음), 연결 실패 → 502 `upstream_unreachable`, 기한 초과 → 504 `upstream_timeout`, 본문 상한 초과 → 502 `upstream_response_too_large`.
+- **형식 검사 범위**: `text/html` 응답, 그리고 `/api/workspace`의 `content-type`이 JSON이 아닌 경우를 502로 끊습니다. **JSON 본문 파싱까지 검증하지는 않습니다**(본문 해석은 클라이언트와 서버가 한다).
+- `LOVETREE_API_ORIGIN`은 origin만 받는다(경로·쿼리·자격 증명 포함 시 503). https만, 예외적으로 loopback http는 격리 검증용.
+
+## 수용 기준
+
+정적 호스트 폴백이 그대로 새지 않는지 **content-type으로** 판정한다.
+
+```bash
+curl -is https://<front>/api/workspace   # → 401 또는 200, content-type: application/json
+curl -is https://<front>/auth/login      # → 302, location 은 PADIEM handoff
+curl -is https://<front>/api/nope        # → 404 application/json (HTML 아님)
+```
+
+브라우저에서는 동기화 띠가 `checking`에 머물지 않고, 콘솔에 `지원하지 않는 러브트리 파일이에요`가 없어야 한다.

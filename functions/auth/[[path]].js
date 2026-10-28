@@ -1,6 +1,4 @@
-import { handleProxy } from '../../proxy/pages-api-proxy.js';
+import { createProxy } from '../_lib/proxy.js';
 
-// /auth/login·/auth/callback·/auth/logout만 넘긴다. 302와 Set-Cookie는 재작성하지 않는다.
-export function onRequest(context) {
-  return handleProxy(context);
-}
+// /auth/* 도 같은 이유로 전부 이 함수가 소유한다(로그인·콜백·로그아웃만 통과).
+export const onRequest = createProxy();

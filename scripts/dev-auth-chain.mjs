@@ -31,7 +31,7 @@ import { createAuthorityRelayClient } from '../server/authority-relay-transport.
 import { createAuthorityWriter } from '../server/authority-writer.js';
 import { createHandoffMintClient } from '../server/handoff-mint-client.js';
 import { createLoginProvider } from '../server/padiem-login-provider.js';
-import { createApiProxy } from '../proxy/pages-api-proxy.js';
+import { createProxy } from '../functions/_lib/proxy.js';
 import { createLoginService } from '../server/login-service.js';
 import { createMemoryLoginStateStore } from '../server/login-state-store.js';
 import { createModelControlPlane } from '../server/testing/model-control-plane.js';
@@ -253,7 +253,8 @@ async function startApp() {
 
 // Pages 프런트와 같은 모양: 화면은 이 origin에서 받고 /api·/auth만 COM2로 넘긴다.
 async function startFront() {
-  const proxy = createApiProxy({ env: { LOVETREE_API_ORIGIN: `http://127.0.0.1:${APP_PORT}` } });
+  const proxy = createProxy();
+  const upstream = { LOVETREE_API_ORIGIN: `http://127.0.0.1:${APP_PORT}` };
   const front = createServer((req, res) => {
     const path = (req.url ?? '').split('?')[0];
     if (!path.startsWith('/api/') && !path.startsWith('/auth/')) {
@@ -272,9 +273,10 @@ async function startFront() {
         if (!hasBody && (name === 'content-length' || name === 'transfer-encoding')) continue;
         headers[name] = Array.isArray(value) ? value.join(', ') : value;
       }
-      const answer = await proxy(new Request(`http://127.0.0.1:${FRONT_PORT}${req.url}`, {
-        method, headers, ...(hasBody ? { body: Buffer.concat(chunks) } : {})
-      }));
+      const answer = await proxy({
+        request: new Request(`http://127.0.0.1:${FRONT_PORT}${req.url}`, { method, headers, ...(hasBody ? { body: Buffer.concat(chunks) } : {}) }),
+        env: upstream
+      });
       const out = {};
       for (const [name, value] of answer.headers.entries()) out[name] = value;
       const cookies = typeof answer.headers.getSetCookie === 'function' ? answer.headers.getSetCookie() : [];
