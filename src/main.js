@@ -240,7 +240,7 @@ function render() {
     { id: 'workspace', matches: r => /^(tree|demo)\//.test(r), activate: renderWorkspace },
     { id: 'book', matches: r => /^(book|demo-book)\//.test(r) && !!currentTree(), activate: () => mountShadow(mountBook, {tree:currentTree(),storage,context:viewContext({treeId:currentTree().id,momentId:selectedId,readOnly:isDemo()}),actions:{...actions,navigate:(where)=>{if(where==='trees'){shelfView.selectedId=currentTree().id;go('#trees');}else go('#start');}}}) },
     { id: 'workspace-missing-tree', matches: r => /^(book|demo-book)\//.test(r), activate: renderWorkspace },
-    { id: 'orbit', matches: () => true, activate: () => mountShadow(mountOrbit, {trees:state.trees,storage,context:viewContext({readOnly:route==='examples'}),actions,error:loaded.error,recovery:hasRecovery()}) }
+    { id: 'orbit', fallback: true, activate: () => mountShadow(mountOrbit, {trees:state.trees,storage,context:viewContext({readOnly:route==='examples'}),actions,error:loaded.error,recovery:hasRecovery()}) }
   ]);
   const screen = screens.resolve(route);
   const dispose = screen.activate();

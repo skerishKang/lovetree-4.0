@@ -4,7 +4,7 @@
 
 `#72 dd1173b` 위 별도 브랜치. `render()`의 if/else 사슬을 화면 등록표로 바꿔, 경로 해석과 mount/dispose 호출을 한 자리에서 처리한다. hash 주소·뒤로가기·선택 유지·readOnly·행동은 그대로다.
 
-- `src/views/registry.js`의 `createScreenRegistry([{id, matches(route), activate()}])`. 먼저 선언된 화면이 이기고(기존 if/else 순서 보존: shelf → workspace → book → 대체 workspace → orbit), 마지막 항목이 모든 경로를 받지 않으면 즉시 거부한다. `activate()`가 돌려준 dispose를 `disposeView`로 쓴다.
+- `src/views/registry.js`의 `createScreenRegistry([{id, matches(route) | fallback: true, activate()}])`. 먼저 선언된 화면이 이기고(기존 if/else 순서 보존: shelf → workspace → book → 대체 workspace → orbit), **대체 화면은 `fallback: true` 표시로 하나만** 두며 받지 못한 경로는 모두 그 화면으로 간다. `matches` 술어의 전칭성을 표본으로 검사하지 않는다 — 누락은 표시로 막는다. `activate()`가 돌려준 dispose를 `disposeView`로 쓴다.
 - `src/main.js`의 `render()`만 바뀌었다. `#app`에 새 `#main`을 만들어 mount하는 두 줄 패턴은 `mountShadow()` 하나로 모았다. 세 화면 모듈·`lifecycle.js`·`contract.js`는 건드리지 않았다.
 - 선택/저장 주인 통합과 공통 shell은 이번 범위가 아니다(다음 조각).
 - 검증: `tests/screen-registry.test.mjs` 4건, `npm run check` 152 tests / 122 pass. 브라우저 왕복 3랩: **화면을 떠날 때마다 이전 dispose(abort)가 정확히 1회**(3랩 9회), 살아 있는 document/window 리스너 증가 0, 궤도 이탈 후 프레임 루프 0, `#main`·shadow root 각 1개, 뒤로가기 복원, 예시 readOnly 경로 유지, 390px 넘침 0, 콘솔 오류 0.

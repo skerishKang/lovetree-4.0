@@ -48,7 +48,7 @@
    library(action, id)                    // 백업·가져오기·복구·삭제
    ```
    `main.js`의 기존 `onBook`·`onShelf`·`onAdd`·`onAction`·`onNew`·`onRecovery` 매핑을 그대로 옮겨 **동작 변화는 없다**. 기억책에서 '내 트리'로 갈 때 그 트리가 선택되는 동작은 `navigate('trees')`의 화면별 구현으로 남겼다.
-4. **화면 등록 (구현됨)** — `src/views/registry.js`의 `createScreenRegistry([{id, matches(route), activate()}])`. `render()`의 if/else 사슬을 등록표로 바꿨다. 먼저 선언된 화면이 이기고, 마지막 항목은 모든 경로를 받는 대체 화면이어야 하며(아니면 경로가 새어 나간다), id는 중복될 수 없다. `activate()`는 붙인 화면의 dispose를 돌려주고, 호출자가 이전 화면을 dispose한 뒤 새 화면을 붙인다.
+4. **화면 등록 (구현됨)** — `src/views/registry.js`의 `createScreenRegistry([{id, matches(route) | fallback: true, activate()}])`. `render()`의 if/else 사슬을 등록표로 바꿨다. 먼저 선언된 화면이 이기고, id는 중복될 수 없다. **대체 화면은 `fallback: true` 표시로 정확히 하나** 두며, 어느 항목도 받지 않은 경로는 모두 그 화면으로 간다 — `matches` 술어의 전칭성을 표본 경로로 검사하지 않고 **표시로 보장**한다. `activate()`는 붙인 화면의 dispose를 돌려주고, 호출자가 이전 화면을 dispose한 뒤 새 화면을 붙인다.
 5. **소유 경계 (다음 조각)** — 공통 shell(메뉴·동기화 상태·팝업·여백)은 `main.js`가 소유하고, 화면은 자기 shadow root 밖을 만지지 않는다. 읽기 전용에서 편집 단추를 숨기는 것은 UX일 뿐이며 최종 판정은 서버가 한다.
 
 주소는 지금의 hash(`#start`·`#trees`·`#tree/<id>`·`#book/<id>`)를 유지한다. 리모네식 쿼리(`?moment=`)로 바꾸는 것은 이번 범위가 아니다.
