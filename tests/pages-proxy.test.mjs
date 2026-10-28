@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createProxy, upstreamOrigin } from '../functions/_lib/proxy.js';
+import { createProxy, upstreamOrigin, DEFAULT_RESPONSE_LIMIT_BYTES } from '../functions/_lib/proxy.js';
+import { DEFAULT_MAX_BODY_BYTES } from '../server/http.js';
 
 const UPSTREAM = 'https://api.lovetree.example';
 const onRequest = (proxy, url, init) => proxy({ request: new Request(url, init), env: { LOVETREE_API_ORIGIN: UPSTREAM } });
@@ -139,4 +140,61 @@ test('본문 없는 204 는 /api 에서는 계약 위반(502), /auth 에서는 �
   const auth = await onRequest(createProxy({ fetcher: recorder(new Response(null, { status: 204 })) }), 'https://lovetree.example/auth/logout');
   assert.equal(auth.status, 204);
   assert.equal(await auth.text(), '');
+});
+
+test('헤더만 오고 본문이 멈추면 기한에 끊고 업스트림 읽기를 취소한다', async () => {
+  let cancelled = false;
+  const stalled = () => new Response(new ReadableStream({
+    start() { /* 아무것도 보내지 않는다 */ },
+    cancel() { cancelled = true; }
+  }), { status: 200, headers: { 'content-type': 'application/json' } });
+  const proxy = createProxy({ fetcher: async () => stalled(), timeoutMs: 30 });
+  const started = Date.now();
+  const response = await onRequest(proxy, 'https://lovetree.example/api/workspace');
+  const elapsed = Date.now() - started;
+  assert.equal(response.status, 504);
+  assert.equal((await response.json()).error.code, 'upstream_timeout');
+  assert.equal(cancelled, true, '기한 초과 시 업스트림 읽기를 실제로 취소한다');
+  assert.ok(elapsed < 2000, `기한 안에 끝난다(${elapsed}ms)`);
+});
+
+test('본문이 늦게 와도 기한 안에 끝나면 그대로 통과한다', async () => {
+  const slow = () => new Response(new ReadableStream({
+    async start(controller) {
+      controller.enqueue(new TextEncoder().encode('{"revision":'));
+      await new Promise(r => setTimeout(r, 20));
+      controller.enqueue(new TextEncoder().encode('2}'));
+      controller.close();
+    }
+  }), { status: 200, headers: { 'content-type': 'application/json' } });
+  const response = await onRequest(createProxy({ fetcher: async () => slow(), timeoutMs: 500 }), 'https://lovetree.example/api/workspace');
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { revision: 2 });
+});
+
+test('응답 상한은 서버 문서 상한보다 크고, 정상 큰 기록을 막지 않는다', async () => {
+  assert.ok(DEFAULT_RESPONSE_LIMIT_BYTES > DEFAULT_MAX_BODY_BYTES,
+    `프록시 상한(${DEFAULT_RESPONSE_LIMIT_BYTES})은 서버 상한(${DEFAULT_MAX_BODY_BYTES})보다 커야 한다`);
+
+  const big = '{"revision":1,"payload":"' + 'x'.repeat(1024 * 1024) + '"}';
+  const response = await onRequest(createProxy({ fetcher: async () => new Response(big, { headers: { 'content-type': 'application/json' } }) }), 'https://lovetree.example/api/workspace');
+  assert.equal(response.status, 200);
+  assert.equal((await response.text()).length, big.length, '1MiB 본문이 잘리지 않는다');
+});
+
+test('상한을 넘는 본문은 502 로 끊고 읽기를 취소한다', async () => {
+  let cancelled = false;
+  const huge = () => new Response(new ReadableStream({
+    start(controller) {
+      controller.enqueue(new TextEncoder().encode('{"a":"'));
+      controller.enqueue(new Uint8Array(2048).fill(120));
+      // 닫지 않는다 — 상한 초과로 우리가 먼저 끊어야 한다.
+    },
+    cancel() { cancelled = true; }
+  }), { status: 200, headers: { 'content-type': 'application/json' } });
+  const proxy = createProxy({ fetcher: async () => huge(), timeoutMs: 5000, maxResponseBytes: 1024 });
+  const response = await onRequest(proxy, 'https://lovetree.example/api/workspace');
+  assert.equal(response.status, 502);
+  assert.equal((await response.json()).error.code, 'upstream_response_too_large');
+  assert.equal(cancelled, true);
 });

@@ -27,7 +27,10 @@
 - 통과 경로: `/api/workspace`, `/auth/login`, `/auth/callback`, `/auth/logout`. 그 밖의 `/api/*`·`/auth/*`는 **404 JSON**(`not_proxied`).
 - 요청: method·query·body 그대로. 전달 헤더는 `cookie`·`content-type`·`accept`·`accept-language`·`authorization`·`origin` 뿐이고 `x-forwarded-*`·`host`·목적지 지정 헤더는 넘기지 않는다.
 - 응답: status·`location`·`set-cookie`(복수)·`content-type`·`cache-control`·`x-content-type-options`·`www-authenticate`를 그대로. `Domain`을 덧붙이지 않는다.
-- 오류: 설정 없음/형식 오류 → 503 `storage_unavailable`(업스트림 호출 없음), 연결 실패 → 502 `upstream_unreachable`, 시간 초과(15초) → 504 `upstream_timeout`, HTML 또는 `/api/workspace`의 비 JSON → 502 `upstream_invalid_response`.
+- **기한은 헤더 수신이 아니라 응답 본문 완료까지**입니다(15초). 본문을 다 읽어야 응답을 만들기 때문에, 헤더만 오고 본문이 멈춘 업스트림은 기한에 끊고 **진행 중이던 업스트림 읽기를 취소**합니다.
+- **본문은 프록시가 끝까지 읽어 한 번에 돌려줍니다**(잘린 200을 만들지 않기 위해). 상한은 `DEFAULT_RESPONSE_LIMIT_BYTES`(8MiB)이고, 서버가 받는 문서 상한(`server/http.js` `DEFAULT_MAX_BODY_BYTES` = 4MiB, `LOVETREE_MAX_BODY_BYTES`로 조정)보다 크도록 시험이 두 상수를 직접 견줍니다. 상한을 넘으면 502 `upstream_response_too_large`로 끊고 읽기를 취소합니다.
+- 오류: 설정 없음/형식 오류 → 503 `storage_unavailable`(업스트림 호출 없음), 연결 실패 → 502 `upstream_unreachable`, 기한 초과 → 504 `upstream_timeout`, 본문 상한 초과 → 502 `upstream_response_too_large`.
+- **형식 검사 범위**: `text/html` 응답, 그리고 `/api/workspace`의 `content-type`이 JSON이 아닌 경우를 502로 끊습니다. **JSON 본문 파싱까지 검증하지는 않습니다**(본문 해석은 클라이언트와 서버가 한다).
 - `LOVETREE_API_ORIGIN`은 origin만 받는다(경로·쿼리·자격 증명 포함 시 503). https만, 예외적으로 loopback http는 격리 검증용.
 
 ## 수용 기준
