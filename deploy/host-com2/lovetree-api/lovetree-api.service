@@ -15,8 +15,10 @@ Environment=NODE_ENV=production
 # 공개 주소는 터널의 호스트네임이 정하므로 여기서 0.0.0.0을 여는 창은 없다.
 Environment=LOVETREE_HOST=127.0.0.1
 Environment=PORT=8790
-ExecCondition=/usr/bin/node /opt/padiem/lovetree-api/check_config.mjs
-ExecStart=/usr/bin/node /opt/padiem/lovetree-api/server/index.js
+# 노드는 한 경로만 부른다 — COM2 실측에서 /usr/local/bin/node가 v22.18.0, /usr/bin/node는 v18이다.
+# engines가 요구하는 22.13 미만이면 ExecCondition이 닫아서 시작하지 않는다.
+ExecCondition=/usr/local/bin/node /opt/padiem/lovetree-api/check_config.mjs
+ExecStart=/usr/local/bin/node /opt/padiem/lovetree-api/server/index.js
 Restart=always
 RestartSec=5
 UMask=0077

@@ -16,16 +16,18 @@ while (($#)); do
 done
 app=/opt/padiem/lovetree-api
 unit=lovetree-api.service
+# 유닛이 호출하는 노드 경로와 같은 자리를 확인한다(PATH의 node가 아니라).
+node_bin=/usr/local/bin/node
 if (( ! apply )); then
-  printf '%s\n' 'LOVETREE_INSTALL=DRY_RUN' "APP_ROOT=$app" "UNIT=$unit" 'START_SERVICE=NO' 'ENABLE_SERVICE=NO' 'TUNNEL_CHANGE=NO'
+  printf '%s\n' 'LOVETREE_INSTALL=DRY_RUN' "APP_ROOT=$app" "UNIT=$unit" "NODE_BIN=$node_bin" 'START_SERVICE=NO' 'ENABLE_SERVICE=NO' 'TUNNEL_CHANGE=NO' 'DB_CONTAINER_CREATED=NO'
   exit 0
 fi
 fail() { echo "LOVETREE_INSTALL=$1" >&2; exit 1; }
 [[ ${EUID} -eq 0 ]] || fail ROOT_REQUIRED
 [[ -f "$source_root/server/index.js" && -f "$source_root/package-lock.json" ]] || fail SOURCE_MISSING
-command -v node >/dev/null || fail NODE_MISSING
-node -e 'const[m,i]=process.versions.node.split(".").map(Number);process.exit(m>22||(m===22&&i>=13)?0:1)' || fail NODE_TOO_OLD
-[[ -x /usr/bin/node ]] || fail NODE_PATH_MISMATCH
+[[ -x "$node_bin" ]] || fail NODE_MISSING
+"$node_bin" -e 'const[m,i]=process.versions.node.split(".").map(Number);process.exit(m>22||(m===22&&i>=13)?0:1)' || fail NODE_TOO_OLD
+command -v npm >/dev/null || fail NPM_MISSING
 if systemctl is-active --quiet "$unit"; then fail STOP_LOVETREE_API_BEFORE_UPDATE; fi
 install -d -m 0755 "$app"
 if ! getent passwd lovetree-api >/dev/null; then
@@ -44,4 +46,4 @@ chmod 0600 "$app/.env"
 chown -R root:root "$app"
 install -m 0644 "$here/$unit" "/etc/systemd/system/$unit"
 systemctl daemon-reload
-printf '%s\n' 'LOVETREE_INSTALL=PASS' 'START_SERVICE=NO' 'ENABLE_SERVICE=NO' 'TUNNEL_CHANGE=NO'
+printf '%s\n' 'LOVETREE_INSTALL=PASS' "NODE_BIN=$node_bin" 'START_SERVICE=NO' 'ENABLE_SERVICE=NO' 'TUNNEL_CHANGE=NO' 'DB_CONTAINER_CREATED=NO'
