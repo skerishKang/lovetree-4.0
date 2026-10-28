@@ -1,5 +1,20 @@
 # LoveTree 4.0 인수인계
 
+## 운영 연결 진행 — 2026-10-28 (COM1)
+
+PADIEM 공통 인증과 러브트리 저장 API를 잇는 운영 작업의 실제 상태. 값·주소 기준은 아래 항목과 ai-revenue-lab main이다.
+
+- **identity Worker 재배포 완료**: ai-revenue-lab #5963(코드 pin에 lovetree-4-0 추가) 병합 후 b54 게이트로 exact main `ee4499805` 재배포 성공(3잡 success). pin+배포 설정 `{b62, b54-padiem-claw, lovetree-4-0}` 일치.
+- **인증 스택 main 반영**: #5965·#5977·#5984·#5988이 각자의 base 사이드 브랜치로 병합되는 실수가 있었고, 스택 끝 브랜치→main 복구 PR #6070(`309a6f3`)으로 반영했다. force push 없음.
+- **migration 재번호 073→076**: main에 이미 적용된 `073_pc_device_link_pause`와 #5984의 `073_lovetree_login_handoff`가 서수로 겹쳐 유일성 검사가 실패했다. production 장부는 건드리지 않고 러브트리 쪽 파일·참조를 076으로 옮겼다. b62-d1-migrate-gate(readonly→apply)로 `076_lovetree_login_handoff.sql`만 운영 D1에 적용했고 장부에 기록됐다(`lovetree_login_handoffs` 표 존재 실측). 게이트가 파일을 'wide destructive'로 표시한 것은 CHECK 절의 `ON DELETE CASCADE` DELETE 토큰 때문이며 drop-guard(DROP TABLE/COLUMN/INDEX)와는 무관하다.
+- **Chat(b62) 운영 재배포 완료**(exact main `99e147ea3`): `chat.padiem.net/auth/lovetree/start` 라이브 실측 — pages.dev origin+state는 302→Google OAuth, 외부 origin은 400 `invalid_lovetree_return_origin`.
+- **중계 Worker 2개**: 읽기 `lovetree-authority-caller`·발급·폐기 `lovetree-auth-caller` 배포(직전 세션)·헬스 200 확인. 둘 다 `LOVETREE_CALLER_SECRET` 등록됐으나 값은 읽을 수 없고 컴1 로컬 사본도 없다(생성 경로: 직전 세션 wrangler stdin, 잔존 파일·셸 이력 없음). 안전한 기기 간 전달 경로 확정 전 재생성 보류 중.
+- **Pages 설정**: production `LOVETREE_API_ORIGIN=https://lovetree-api.padiem.net` 설정 완료(다음 Pages 배포부터 적용). Pages 주소와 COM2 `LOVETREE_PUBLIC_ORIGIN`은 서로 다른 값이다.
+- **상단 로그인 진입 구현**(이 브랜치): 네 화면 상단 바에 로그인·로그아웃 진입을 추가했다. 새 인증 체계 없이 sync 컨트롤러(`owned`·`act('login'|'logout')`)를 재사용하고, orbit .menuBtn·shelf .ghost·book .ui-btn·공통 .button을 그대로 쓴다. 그림자 경계 클릭은 composedPath 위임 하나로 받는다. 검증: 테스트 141 pass·0 fail(+신규 8), 로컬 브라우저 12항목(PC·390 겹침 0·가로 넘침 0·클릭 시 `/auth/login?next=/` 이동) 통과. shelf 390px에서 로그인 버튼이 메뉴 둘째 줄로 흐르는 것은 이 뷰의 원래 줄바꿈 허용 설계 안이다(겹침 0).
+- **스택 빈틈 메움 — 폐기 write transport**: `server/index.js` buildLogin이 `createAuthorityWriteCall(env)`을 요구하는데 그 구현이 저장소에 없었다(테스트는 가짜 call 주입이라 미검출). `server/authority-relay-write-transport.js`를 추가했다: `LOVETREE_MINT_URL`의 중계(발급·폐기 같은 Worker)로 `/revoke-session`만 중계하고, 발급 RPC(mint 없는 구성 경로)는 닫아 둔다. 시험 4개.
+- **남은 것**: ① COM2 .env 추가 값 반영·재시작(요청서 전달됨), ② `LOVETREE_CALLER_SECRET` 세 곳(두 중계+COM2) 일치 — 전달 경로 확정 필요, ③ #75 후보 단일 병합 + 이 브랜치 통합(인증·COM2 배선 확인 뒤, Pages 자동 배포), ④ 운영 판정(401/404 JSON, 버튼→인증 화면, 실계정 로그인→저장→복원→로그아웃→이전 자격 거부, A/B 격리는 두 실계정 가능할 때, 관리자 미부여 200 admin:false·roles 403, 클릭 없는 마우스 패럴랙스 운영 확인).
+
+
 ## #40 첫 저장 후 다음 순간 연결 안내 — 2026-10-28
 
 main `84e3a54` 위에서 별도 worktree·브랜치로 진행했다. #59(프런트 동기화)와 `src/main.js`가 겹쳐 범위를 먼저 조율했고(#59 댓글), #59가 점유한 import 줄·`commit()` 본문·파일 최하단은 건드리지 않았다.
