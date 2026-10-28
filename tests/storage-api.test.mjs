@@ -73,7 +73,7 @@ test('users cannot reach each other workspace', async () => {
   await put(alice, { state: sampleState(), expectedRevision: 0, clientKey: 'k-1' });
   const read = await get(bob);
   assert.equal(read.status, 200);
-  assert.deepEqual(read.body, { revision: 0, savedAt: null, state: { version: 1, trees: [] } });
+  assert.deepEqual(read.body, { revision: 0, savedAt: null, state: { version: 1, trees: [] }, subject: 'usr_b' });
 });
 
 test('productId and uid inside the body are never identity', async () => {

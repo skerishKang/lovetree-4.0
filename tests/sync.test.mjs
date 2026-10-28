@@ -393,3 +393,125 @@ test('바에 나오는 단추는 전부 처리되는 동작만 가진다', async
     for (const action of shown.actions) assert.ok(handled.includes(action.name), `${name}: ${action.name} 은 처리되지 않는 단추다`);
   }
 });
+
+const PARKED = 'lovetree.v4.parked-unsent.v1';
+const DEVICE_ACCOUNT = 'lovetree.v4.device-account.v1';
+const okGetAs = (revision, state, subject) => ({ ...okGet(revision, state), subject });
+
+// 계정별 서버 문서를 가진 저장소. current를 바꾸는 것이 다른 계정으로 들어오는 것과 같다.
+function accountStore(docs) {
+  const puts = [];
+  return {
+    puts,
+    current: null,
+    api: {
+      async get() { const row = docs[accountStore.active]; return okGetAs(row.revision, row.state, accountStore.active); },
+      async put(body) { puts.push(body); const row = docs[accountStore.active]; row.revision += 1; row.state = body.state; return okPut(row.revision); },
+      async logout() { return { ok: true, status: 200 }; }
+    }
+  };
+}
+const enter = (store, subject) => { accountStore.active = subject; store.current = subject; };
+
+test('미전송 기록을 남기고 로그아웃하면 그 계정으로만 돌아오고 다른 계정은 빈 화면에서 시작한다', async () => {
+  const aDoc = doc('A의 순간');
+  const aGrown = doc('A의 순간', 'A의 미전송 순간');
+  const bDoc = doc('B의 순간');
+  const docs = { 'acct-a': { revision: 2, state: aDoc }, 'acct-b': { revision: 0, state: EMPTY } };
+  const store = accountStore(docs);
+  const made = harness({ initial: aDoc, api: store.api });
+  enter(store, 'acct-a');
+  await made.controller.start();
+
+  made.edit(aGrown);
+  made.controller.markLocalSave();
+  const out = await made.controller.act('logout');
+  assert.equal(out.phase, 'local');
+  assert.match(out.detail, /방금 계정의 기록으로 따로 보관/);
+  assert.deepEqual(made.current(), EMPTY, '로그아웃 화면에 앞 계정의 기록을 남기지 않는다');
+  assert.deepEqual(store.puts, [], '취소된 업로드는 나가지 않는다');
+  assert.deepEqual(Object.keys(JSON.parse(made.storage.get(PARKED))), ['acct-a'], '보관 사본에 소유 계정이 적혀 있다');
+  assert.deepEqual(JSON.parse(made.storage.get(PARKED))['acct-a'].state, aGrown);
+
+  enter(store, 'acct-b');
+  const bStart = await made.controller.start();
+  assert.equal(bStart.phase, 'synced', 'B는 빈 문서에서 시작한다');
+  assert.deepEqual(made.current(), EMPTY, 'B 화면에 A의 기록이 뜨지 않는다');
+  assert.deepEqual(store.puts, [], 'B 시작이 자동 PUT를 내지 않는다');
+  assert.deepEqual(JSON.parse(made.storage.get(DEVICE_ACCOUNT)).owner, 'acct-b');
+
+  made.edit(bDoc);
+  made.controller.markLocalSave();
+  await made.settle();
+  assert.equal(store.puts.length, 1, 'B의 저장은 B 계정으로만 올라간다');
+  assert.deepEqual(store.puts[0].state, bDoc);
+  assert.equal(docs['acct-b'].revision, 1);
+  assert.equal(docs['acct-a'].revision, 2, 'A의 서버 문서는 건드리지 않는다');
+
+  enter(store, 'acct-a');
+  const back = await made.controller.start();
+  assert.equal(back.phase, 'adoptOffered', 'A의 미전송 사본이 돌아와 서버 기록과 견준다');
+  assert.deepEqual(made.current(), aGrown, 'A가 남긴 순간이 되살아난다');
+  assert.equal(store.puts.length, 1, '돌아오는 것만으로는 업로드하지 않는다');
+
+  const kept = await made.controller.act('useLocal');
+  assert.equal(kept.phase, 'synced');
+  assert.equal(store.puts.length, 2);
+  assert.deepEqual(store.puts[1].state, aGrown);
+  assert.equal(docs['acct-a'].revision, 3);
+  const parkedAfter = JSON.parse(made.storage.get(PARKED));
+  assert.ok(!Object.prototype.hasOwnProperty.call(parkedAfter, 'acct-a'), '되살린 A의 보관 사본은 지운다');
+  assert.deepEqual(parkedAfter['acct-b'].state, bDoc, 'B의 사본은 B 이름으로 옮겨 둔다');
+});
+
+test('로그아웃하지 않은 채 계정이 바뀌어도 앞 계정의 사본은 화면과 업로드 후보에서 빠진다', async () => {
+  const aGrown = doc('A의 순간', 'A만 아는 추가');
+  const docs = { 'acct-a': { revision: 2, state: doc('A의 순간') }, 'acct-b': { revision: 0, state: EMPTY } };
+  const store = accountStore(docs);
+  const made = harness({ initial: aGrown, api: store.api, storage: new Map([[DEVICE_ACCOUNT, JSON.stringify({ owner: 'acct-a' })]]) });
+  enter(store, 'acct-b');
+  const state = await made.controller.start();
+
+  assert.equal(state.phase, 'synced');
+  assert.deepEqual(made.current(), EMPTY, 'B 화면이 A의 사본을 받지 않는다');
+  assert.deepEqual(store.puts, [], 'A의 사본이 B의 업로드 후보가 되지 않는다');
+  assert.deepEqual(JSON.parse(made.storage.get(PARKED))['acct-a'].state, aGrown, 'A의 사본은 A 이름으로 옮겨 둔다');
+});
+
+test('응답만 유실된 저장은 같은 요청 키로 다시 보내 복제로 끝난다', async () => {
+  const base = doc('기준');
+  const added = doc('기준', '추가');
+  const api = fakeApi({ get: [okGet(1, base)], put: [networkDown, okPut(2)] });
+  const made = harness({ initial: base, api });
+  await made.controller.start();
+  made.edit(added);
+  made.controller.markLocalSave();
+  await made.settle();
+  assert.equal(made.controller.status().phase, 'offline');
+
+  const back = await made.controller.act('retry');
+  assert.equal(back.phase, 'synced');
+  const [first, second] = api.puts();
+  assert.equal(first.clientKey, second.clientKey, '같은 내용·같은 번호는 같은 요청 키를 쓴다');
+  assert.equal(first.expectedRevision, second.expectedRevision);
+  assert.deepEqual(second.state, added);
+
+  // 다시 시도 전에 내용이 바뀌면 다른 요청 키로 나간다 — 복제가 아니라 새 저장이다.
+  const changed = doc('기준', '추가', '그 뒤 입력');
+  const later = fakeApi({ get: [okGet(1, base)], put: [networkDown, networkDown, okPut(2)] });
+  const again = harness({ initial: base, api: later });
+  await again.controller.start();
+  again.edit(added);
+  again.controller.markLocalSave();
+  await again.settle();
+  await again.controller.act('retry');
+  assert.equal(again.controller.status().phase, 'offline');
+  assert.equal(later.puts()[0].clientKey, later.puts()[1].clientKey, '그대로 재시도하면 같은 키');
+
+  again.edit(changed);
+  again.controller.markLocalSave();
+  await again.settle();
+  assert.equal(again.controller.status().phase, 'synced');
+  assert.notEqual(later.puts()[2].clientKey, later.puts()[0].clientKey, '내용이 바뀌면 새 키');
+  assert.deepEqual(later.puts()[2].state, changed);
+});

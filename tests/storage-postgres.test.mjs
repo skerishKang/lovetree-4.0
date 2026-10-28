@@ -58,9 +58,10 @@ test('schema is repeatable and the first save lands on revision 1', { skip }, as
     const second = new Pool({ connectionString: DATABASE_URL, max: 1 });
     try { await applySchema(second); } finally { await second.end(); }
 
-    const handle = buildHandle(repo, `usr_s_${suffix()}`);
+    const subject = `usr_s_${suffix()}`;
+    const handle = buildHandle(repo, subject);
     const state = sampleState();
-    assert.deepEqual(await read(handle), { status: 200, body: { revision: 0, savedAt: null, state: { version: 1, trees: [] } } });
+    assert.deepEqual(await read(handle), { status: 200, body: { revision: 0, savedAt: null, state: { version: 1, trees: [] }, subject } });
     assert.equal((await put(handle, { state, expectedRevision: 0, clientKey: `ck-${suffix()}` })).body.revision, 1);
     const loaded = await read(handle);
     assert.deepEqual(loaded.body.state, validateState(state));

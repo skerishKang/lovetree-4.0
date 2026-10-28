@@ -2,6 +2,9 @@ import { EMPTY_STATE, validateState } from './domain.js';
 
 const LOCAL_BACKUP_KEY = 'lovetree.v4.local-before-server.v1';
 const SERVER_BACKUP_KEY = 'lovetree.v4.server-before-overwrite.v1';
+// 계정을 떠나 보낸 미전송 사본과, 지금 화면 사본이 어느 계정의 것인지 적어 두는 자리.
+const PARKED_KEY = 'lovetree.v4.parked-unsent.v1';
+const ACCOUNT_KEY = 'lovetree.v4.device-account.v1';
 
 const PHASE_LABEL = {
   local: '이 기기에만 저장',
@@ -59,6 +62,7 @@ export function createSyncController(deps) {
   // 늦게 도착한 A의 응답이 B의 화면·번호를 채우거나 B 계정으로 올리는 일을 막는다.
   let generation = 0;
   let seenRevision = null;
+  let ownerSubject = null;
 
   const publish = (next) => { current = next; onChange(next); listener(next); return next; };
   const stale = (gen) => gen !== generation;
@@ -86,6 +90,7 @@ export function createSyncController(deps) {
   function adoptLocalOnly(reason) {
     owned = false;
     revision = null;
+    ownerSubject = null;
     return show(status({
       phase: reason === 'unconfigured' ? 'local' : reason === 'offline' ? 'offline' : 'local',
       detail: reason === 'unconfigured'
@@ -107,6 +112,22 @@ export function createSyncController(deps) {
     owned = true;
     revision = answer.revision;
     seenRevision = null;
+    ownerSubject = typeof answer.subject === 'string' && answer.subject ? answer.subject : null;
+    if (ownerSubject) {
+      // 다른 계정으로 갈아탈 때 앞 계정의 사본을 화면에 남기지 않는다.
+      const previous = deviceAccount();
+      if (previous && previous !== ownerSubject && localDocHasRecords() && !sameDocument(getState(), answer.state) && parkUnsent(previous, getState())) {
+        suppress = true;
+        try { replaceState(EMPTY_STATE()); } finally { suppress = false; }
+      }
+      const parked = peekParked(ownerSubject);
+      if (parked && !sameDocument(parked, getState())) {
+        suppress = true;
+        try { replaceState(parked); } finally { suppress = false; }
+        dropParked(ownerSubject);
+      }
+      writeJson(ACCOUNT_KEY, { owner: ownerSubject });
+    }
     const serverEmpty = answer.revision === 0;
     const localHas = localDocHasRecords();
 
@@ -144,6 +165,41 @@ export function createSyncController(deps) {
     try { storage.setItem(SERVER_BACKUP_KEY, JSON.stringify(serverState)); return true; } catch { return false; }
   }
 
+  function readJson(key) {
+    if (!storage) return null;
+    try { const raw = storage.getItem(key); return raw ? JSON.parse(raw) : null; } catch { return null; }
+  }
+  function writeJson(key, value) {
+    if (!storage) return false;
+    try { storage.setItem(key, JSON.stringify(value)); return true; } catch { return false; }
+  }
+  function parkedMap() {
+    const map = readJson(PARKED_KEY);
+    return map && typeof map === 'object' && !Array.isArray(map) ? map : {};
+  }
+  // 미전송 사본은 계정 식별자로만 보관한다. 다른 계정의 시작·제안·PUT 대상이 되지 않는다.
+  function parkUnsent(owner, state) {
+    if (!owner || !state) return false;
+    const map = parkedMap();
+    map[owner] = { state };
+    return writeJson(PARKED_KEY, map);
+  }
+  function peekParked(owner) {
+    const row = owner ? parkedMap()[owner] : null;
+    if (!row) return null;
+    try { return validateState(row.state); } catch { return null; }
+  }
+  function dropParked(owner) {
+    const map = parkedMap();
+    if (!Object.prototype.hasOwnProperty.call(map, owner)) return true;
+    delete map[owner];
+    return writeJson(PARKED_KEY, map);
+  }
+  function deviceAccount() {
+    const row = readJson(ACCOUNT_KEY);
+    return row && typeof row.owner === 'string' && row.owner ? row.owner : null;
+  }
+
   function adoptServer(serverState, { silent = false } = {}) {
     suppress = true;
     try {
@@ -164,10 +220,20 @@ export function createSyncController(deps) {
     return `${answer.message ?? '다른 곳에서 먼저 저장했어요.'}${step} 무엇을 남길지 고르면 나머지는 이 기기에 백업으로 남아요.`;
   }
 
+  // 서버는 같은 요청 키·같은 내용이면 첫 결과를 그대로 되돌려 준다(요청 키 멱등).
+  // 따라서 응답만 유실된 저장은 같은 키로 다시 보내 conflict가 아니라 복제로 끝난다.
+  function attemptFor(expected, serialized) {
+    const previous = lastIntended?.kind === 'synced' ? lastIntended.attempt : null;
+    if (previous && previous.expected === expected && previous.serialized === serialized) return previous.clientKey;
+    return makeClientKey();
+  }
+
   async function push(expected) {
     if (!Number.isSafeInteger(expected)) return start();
     const gen = generation;
-    const clientKey = makeClientKey();
+    const serialized = JSON.stringify(getState());
+    const clientKey = attemptFor(expected, serialized);
+    const attempt = { expected, serialized, clientKey };
     show(status({ phase: 'syncing', actions: [] }));
     const answer = await api.put({ state: getState(), expectedRevision: expected, clientKey });
     // 로그아웃·계정 전환 뒤에 도착한 응답은 화면도 번호도 고치지 않는다.
@@ -199,7 +265,7 @@ export function createSyncController(deps) {
       return show(status({ phase: 'rejected', detail: answer.message ?? '기록 형식을 확인해 주세요.', actions: [{ name: 'retry', label: '다시 시도' }] }));
     }
     dirty = true;
-    lastIntended = { kind: 'synced' };
+    lastIntended = { kind: 'synced', attempt };
     return show(status({
       phase: answer.status === 0 ? 'offline' : 'rejected',
       detail: answer.status === 0 ? '네트워크에 닿지 않아 이 기기에만 저장한 상태로 남겼어요.' : answer.message,
@@ -280,7 +346,8 @@ export function createSyncController(deps) {
       const gen = ++generation;
       const answer = await api.logout();
       if (stale(gen)) return current;
-      const cleared = answer.ok && !dirty;
+      const parked = answer.ok && dirty && ownerSubject ? parkUnsent(ownerSubject, getState()) : false;
+      const cleared = answer.ok && (!dirty || parked);
       if (cleared) {
         suppress = true;
         try { replaceState(EMPTY_STATE()); } finally { suppress = false; }
@@ -292,11 +359,14 @@ export function createSyncController(deps) {
       dirty = false;
       lastIntended = null;
       seenRevision = null;
+      ownerSubject = null;
       return show(status({
         phase: 'local',
         detail: cleared
-          ? '로그아웃했어요. 서버 기록은 계정에 남고 이 기기 사본은 비웠어요. 다른 계정으로 들어와도 이전 기록은 보이지 않습니다.'
-          : answer.ok ? '동기화되지 않은 변경이 있어 이 기기 기록은 지우지 않았어요.' : '서버에서 로그아웃하지 못해 이 기기 기록을 그대로 둡니다.',
+          ? (parked
+            ? '로그아웃했어요. 올리지 못한 변경은 이 기기에서 방금 계정의 기록으로 따로 보관했어요. 그 계정으로 다시 들어오면 돌아옵니다.'
+            : '로그아웃했어요. 서버 기록은 계정에 남고 이 기기 사본은 비웠어요. 다른 계정으로 들어와도 이전 기록은 보이지 않습니다.')
+          : answer.ok ? '동기화되지 않은 변경이 있어 이 기기 기록은 지우지 않았어요. 다른 계정으로 들어와도 보이지 않게 하려면 그 계정으로 다시 들어와 정리해 주세요.' : '서버에서 로그아웃하지 못해 이 기기 기록을 그대로 둡니다.',
         actions: [{ name: 'login', label: '다시 로그인' }]
       }));
     }
@@ -334,6 +404,7 @@ export function createWorkspaceApi({ fetchImpl = (...args) => globalThis.fetch(.
         message: payload?.error?.message ?? null,
         currentRevision: payload?.error?.currentRevision ?? undefined,
         revision: Number.isSafeInteger(payload?.revision) ? payload.revision : undefined,
+        subject: typeof payload?.subject === 'string' && payload.subject ? payload.subject : null,
         savedAt: payload?.savedAt ?? null,
         state: payload?.state ?? null
       };
