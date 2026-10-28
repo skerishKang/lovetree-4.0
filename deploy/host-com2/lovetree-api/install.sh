@@ -35,6 +35,10 @@ if ! getent passwd lovetree-api >/dev/null; then
 fi
 rm -rf "$app/server"
 cp -a "$source_root/server" "$app/server"
+# 서버가 검증 규칙을 프런트와 한 곳에서 쓴다(server/workspace-service.js → ../src/domain.js).
+# 이 한 파일이 없으면 서비스는 시작한 직후 ERR_MODULE_NOT_FOUND로 죽는다.
+install -d -m 0755 "$app/src"
+install -m 0644 "$source_root/src/domain.js" "$app/src/domain.js"
 install -m 0644 "$source_root/package.json" "$app/package.json"
 install -m 0644 "$source_root/package-lock.json" "$app/package-lock.json"
 install -m 0644 "$here/check_config.mjs" "$app/check_config.mjs"
