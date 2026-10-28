@@ -34,6 +34,7 @@ test('부여·조회·회수와 감사 이력이 실제 테이블에서 동작�
   await withRepo(async (pool) => {
     const productId = `lovetree-admin-test-${suffix()}`;
     const admin = createAdminRoleService({ store: createAdminRoleRepo(pool), productId });
+    await pool.query('INSERT INTO lovetree_product_roles (product_id, subject_id, role) VALUES ($1, $2, $3)', [productId, ADMIN, ROLE_ADMIN]);
     const actor = { productId, subjectId: ADMIN };
     const target = { productId, subjectId: MEMBER };
 
@@ -55,8 +56,9 @@ test('부여·조회·회수와 감사 이력이 실제 테이블에서 동작�
     assert.equal(await admin.roleFor(target), null);
 
     const history = await admin.history({ limit: 10 });
-    assert.deepEqual(history.map((row) => row.action), ['revoke', 'assign', 'assign', 'assign']);
-    assert.deepEqual(history.map((row) => row.previousRole), ['admin', 'admin', null, null]);
+    // 첫 행은 운영 절차의 직접 INSERT라 이력이 아니고, 이력은 서비스 경계를 지난 것만 남긴다.
+    assert.deepEqual(history.map((row) => row.action), ['revoke', 'assign', 'assign']);
+    assert.deepEqual(history.map((row) => row.previousRole), ['admin', 'admin', null]);
     assert.equal(history[0].subjectId, MEMBER);
     assert.deepEqual(await admin.list(), [], '회수하면 등록부에서 사라진다');
   });
