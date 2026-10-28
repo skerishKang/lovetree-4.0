@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createSyncController } from '../src/sync.js';
+import { createSyncController, createWorkspaceApi } from '../src/sync.js';
 import { createTree } from '../src/domain.js';
 
 const CLOCK = '2026-10-28T00:00:00.000Z';
@@ -514,4 +514,30 @@ test('응답만 유실된 저장은 같은 요청 키로 다시 보내 복제로
   assert.equal(again.controller.status().phase, 'synced');
   assert.notEqual(later.puts()[2].clientKey, later.puts()[0].clientKey, '내용이 바뀌면 새 키');
   assert.deepEqual(later.puts()[2].state, changed);
+});
+
+test('저장 API가 아닌 응답은 성공으로 읽지 않고 미설정으로 처리한다', async () => {
+  const html = async () => ({ ok: true, status: 200, headers: { get: () => 'text/html' }, text: async () => '<!doctype html><title>LoveTree</title>' });
+  const broken = async () => ({ ok: true, status: 200, headers: { get: () => 'application/json' }, text: async () => '{"unexpected":true}' });
+  for (const [name, reply] of [['SPA 폴백', html], ['문서 아닌 JSON', broken]]) {
+    const api = createWorkspaceApi({ fetchImpl: reply });
+    const read = await api.get();
+    assert.equal(read.ok, false, `${name}: 200이어도 문서가 아니면 성공이 아니다`);
+    assert.equal(read.code, 'storage_unavailable');
+    const written = await api.put({ state: doc('기준'), expectedRevision: 0, clientKey: 'ck-1' });
+    assert.equal(written.ok, false, `${name}: 저장도 같은 기준으로 다룬다`);
+    assert.equal(written.code, 'storage_unavailable');
+
+    const made = harness({ initial: doc('이 기기 기록'), api });
+    const state = await made.controller.start();
+    assert.equal(state.phase, 'local');
+    assert.match(state.detail, /서버 저장이 아직 켜지지/);
+  }
+});
+
+test('로그아웃 응답은 문서 형식 요구를 적용받지 않는다', async () => {
+  const api = createWorkspaceApi({ fetchImpl: async () => ({ ok: true, status: 200, headers: { get: () => 'application/json' }, text: async () => '{"loggedOut":true}' }) });
+  const out = await api.logout();
+  assert.equal(out.ok, true);
+  assert.equal(out.code, null);
 });
