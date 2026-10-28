@@ -1,5 +1,14 @@
 # LoveTree 4.0 인수인계
 
+## #65 화면 연결 방식 정리(1) — 2026-10-28
+
+`#64 b30029b` 위 별도 worktree·브랜치. `#66` 로드맵의 "B. 화면 연결 기반" 첫 조각으로, 외형·문구·동작·주소 변화 없이 세 화면의 생명주기만 통일했다.
+
+- `src/views/lifecycle.js`의 `createView(host)`가 shadow root·AbortController·정리 목록을 한 자리에서 만든다. `dispose()`는 멱등이고 등록의 역순으로 정리하며, 정리 하나가 던져도 나머지를 계속한다.
+- 궤도는 RAF·dialog를, 책장은 ResizeObserver를 `track()`으로 넘기고, 기억책은 이벤트에 `{signal}`을 붙여 AbortController 정리 경로를 처음 얻게 됐다. `src/main.js`는 건드리지 않았다.
+- 리모네 `TreeViewShell`/`ViewSwitcher`(같은 트리의 여러 보기, `?moment=`로 선택 유지, `isOwner` 게이트)와 4.0 세 화면 비교표·최소 계약은 `docs/VIEW_CONTRACT.md`에 있다. 문맥(`treeId`·`momentId`·`readOnly`)과 행동 콜백 수렴은 다음 조각.
+- 검증: `tests/view-contract.test.mjs` 6건, `npm run check`, 브라우저 화면 순회에서 프레임 루프가 남지 않는지(rAF 계수) 확인.
+
 ## #40 첫 저장 후 다음 순간 연결 안내 — 2026-10-28
 
 main `84e3a54` 위에서 별도 worktree·브랜치로 진행했다. #59(프런트 동기화)와 `src/main.js`가 겹쳐 범위를 먼저 조율했고(#59 댓글), #59가 점유한 import 줄·`commit()` 본문·파일 최하단은 건드리지 않았다.

@@ -2,6 +2,7 @@ import sourceCSS from './shelf-source.css?inline';
 import css from './shelf.css?inline';
 import {escape as esc, resume} from './memory.js';
 import {SERVICE, GO_HOME, GO_TREES, GO_EXAMPLES, READ_BOOK, VIEW_TREE, NEW_TREE, BOOK_IS_READING} from '../terms.js';
+import {createView} from './lifecycle.js';
 
 const SELECTION_KEY = 'lovetree.v4.shelf-selection.v1';
 const COLORS = ['#a8586b', '#627ba2', '#8d705e', '#6d8979', '#80708f', '#567e88'];
@@ -24,8 +25,7 @@ function cover(tree, number) {
 }
 
 export function mountShelf(host, {trees, storage, view, error, recovery, onBook, onWorkspace, onNew, onAction}) {
-  const root = host.attachShadow({mode: 'open'});
-  const abort = new AbortController(), signal = abort.signal;
+  const {root, signal, track, dispose} = createView(host);
   const sorted = [...trees].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   const last = resume(storage, trees);
   const subjects = [...new Set(trees.map(t => t.subject))].sort((a, b) => a.localeCompare(b, 'ko'));
@@ -134,5 +134,6 @@ export function mountShelf(host, {trees, storage, view, error, recovery, onBook,
   rail.addEventListener('pointercancel', () => { drag = null; suppressClick = false; }, {signal});
   const resize = new ResizeObserver(() => updateSelection()); resize.observe(rail);
   draw();
-  return () => { abort.abort(); resize.disconnect(); };
+  track(() => resize.disconnect());
+  return dispose;
 }
