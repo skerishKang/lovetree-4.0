@@ -1,0 +1,31 @@
+[Unit]
+Description=LoveTree 4.0 COM2 storage API
+Wants=network-online.target
+After=network-online.target
+ConditionPathExists=/opt/padiem/lovetree-api/.env
+
+[Service]
+Type=simple
+User=lovetree-api
+Group=lovetree-api
+WorkingDirectory=/opt/padiem/lovetree-api
+EnvironmentFile=/opt/padiem/lovetree-api/.env
+Environment=NODE_ENV=production
+# 루프백만. 8788은 padiem-file-lane.service가 이미 잡고 있어서 기본은 8790이다.
+# 공개 주소는 터널의 호스트네임이 정하므로 여기서 0.0.0.0을 여는 창은 없다.
+Environment=LOVETREE_HOST=127.0.0.1
+Environment=PORT=8790
+ExecCondition=/usr/bin/node /opt/padiem/lovetree-api/check_config.mjs
+ExecStart=/usr/bin/node /opt/padiem/lovetree-api/server/index.js
+Restart=always
+RestartSec=5
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
