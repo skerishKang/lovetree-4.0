@@ -7,7 +7,7 @@
  *   actions = {
  *     navigate(where)                         // 'home' | 'trees'
  *     openBook(treeId, momentId, readOnly)    // 기억책으로
- *     openWorkspace(treeId, momentId)         // 트리 연결 보기로
+ *     openWorkspace(treeId, momentId, readOnly)   // 트리 연결 보기로 (읽기 전용이면 demo)
  *     requestMoment(kind, id)                 // 'new' | 'add' | 'edit'
  *     library(action, id)                     // 백업·가져오기·복구·삭제 같은 화면 밖 동작
  *   }

@@ -43,7 +43,7 @@
    ```js
    navigate(where)                        // 'home' | 'trees'
    openBook(treeId, momentId, readOnly)   // 기억책으로 (읽기 전용이면 demo-book)
-   openWorkspace(treeId, momentId, readOnly)
+   openWorkspace(treeId, momentId, readOnly)   // 트리 연결 보기 (읽기 전용이면 demo)
    requestMoment(kind, id)                // 'new' | 'add' | 'edit'
    library(action, id)                    // 백업·가져오기·복구·삭제
    ```
