@@ -65,3 +65,28 @@ SRC064: 궤도 수식·카드 형태·예시 자산을 재사용하고, mock 메
 - SHA-256: `cb64d80376d59ced65273784ce9723c22723827d25e800474e192d070833ca67`.
 
 원본의 입체 책 표지·책장 CSS와 거리 기반 배치 계산을 재사용했다. 원본 7개 고정 책 대신 실제 state.trees를 연결하고 대상 필터·검색·선택 복원·모바일 배치·키보드 이동을 보완했다. 원본 reader 대신 기존 Track59 감상 화면을 사용한다. 원본에는 Google Fonts import, YouTube 링크와 customBooks 로컬 저장이 있으나 새 책장 어댑터에는 가져오지 않았다. 데이터 규칙과 저장 스키마는 바꾸지 않는다.
+
+## 기존 두 저장소와 4.0 비교 — 2026-10-28
+
+비교 기준: LoveBud `b80647f1b269c3d56204ba0cc92064f5eb05d4e6`, lovetree-limone `dd8394c5f27baf0ef7e2b341b9b496e0d63b2b51`, 4.0 운영 `84e3a54`, 동기화 PR #59 `9b7c9da`. 전체 파일 목록과 관련 코드 27개를 확인했다. 전수 정독이나 기존 서비스의 브라우저 실동작 검증은 아니다. 이후 커밋의 수정 여부는 각 담당자가 최신 head에서 확인한다.
+
+| 영역 | 기존 소스 | 4.0 적용 판단 / 이슈 |
+| --- | --- | --- |
+| 궤도·책장·기억책 | 리모네 SRC064·Track32·Track59 | 이미 이식. 중복 재작성하지 않음. #9 |
+| 선택 트리 감상·검색 | LoveBud `js/my-trees/my-trees-preview-hub.js`, `my-trees-filter.js` | 4.0 shelf.js에 검색·대상 필터·선택·주요 행동이 이미 있음. 배치 보완. #42 |
+| 모바일 선택 패널 | LoveBud `js/my-trees/my-trees-mobile-preview-sheet.js` | 배경/Esc 닫기·스크롤 복원 참고. 현재 화면보다 유용할 때 필요한 동작만 이식. #42 |
+| 첫→다음 연결 | 리모네 `app/components/v4/V4FirstJourneyV12.tsx` | 실제 API 연결형을 참고. 기본 V4FirstJourney의 독립 localStorage 데모와 구분. 긴 온보딩 중복 신설 불필요. #40 / PR #60 |
+| 미디어 | LoveBud `js/utils/media.js`; 리모네 `MomentComposerModal.tsx`, `core/runtime/db/schema.ts` | YouTube 시간·채널·썸네일·출처 입력을 먼저 재사용 검토. 저장/복원/가져오기/동기화까지 연결. #14 |
+| 계정별 캐시 | LoveBud `js/auth/auth-cache.js`, `js/my-trees/my-trees-data.js` | 소유자+epoch 및 지난 응답 폐기 패턴을 현재 PADIEM 소유권에 맞춰 대조. #57 / PR #59 |
+| 응답 유실 재시도 | 리모네 `lib/first-tree-create-client.ts` | pending clientKey를 완전 성공 전까지 유지하는 기존 패턴. #59 9b7c9da는 push마다 새 키이므로 커밋 성공 후 응답 유실 시험 필요. #57 |
+| 인증·DB | 리모네 `core/runtime/server/api/auth.ts`, `core/runtime/db/index.ts`, `memory-parent-integrity.ts` | Firebase·Neon HTTP/Drizzle과 PADIEM·COM2 문서 저장은 계약이 다름. 동일 트리 부모/순환/멱등 등 필요한 규칙을 활용하며 전체 이식하지 않음. #13 |
+
+판정 시 주의:
+- 리모네 V3MyGarden은 fixture 데이터, V4BookShelfV2A2는 BASE_BOOKS 기반 화면이다. 실제 회원 데이터에 연결된 완성품으로 단정하지 않는다.
+- LoveBud `workers/love-platform-api/authenticated-account-resolution.js`는 제품 인증 경로 미연결을 명시한다.
+- 리모네 스키마의 공개 기본값·소셜 테이블을 4.0 정책으로 자동 승계하지 않는다.
+- 4.0 validateState는 선택한 필드를 재구성하므로 미디어 필드를 화면에만 추가하면 보존되지 않는다.
+- 기능 이식 PR은 기존 소스 경로·고정 SHA·가져온 부분·새로 보완한 부분을 짧게 명시한다.
+
+상세 완료 조건: #9 / #13 / #14 / #40 / #42 / #57. 인덱스: #1 / #38. 이번 비교는 기존 제품 방향 내 구현 판단이며 공통 인증 권위·제품 등록·운영 정책을 변경하지 않았다. 별도 거버넌스 동기화 의무가 있는지는 해당 규칙을 확인한 뒤 판단하며, 컴1 거버넌스를 확인·갱신한 것으로 보고하지 않는다.
+
