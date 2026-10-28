@@ -21,10 +21,13 @@ export function mountOrbit(host,{trees,storage,example=false,onNew,onTrees,onBoo
  const app=shadow.querySelector('.app'),world=shadow.querySelector('.world'),dialog=shadow.querySelector('dialog');
  const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;let paused=reduced,phase=0,raf=0,previous=0,drag=null,moved=0,opener=null;
  // #41 마우스 패럴랙스: 중심 기준 제한된 변위를 보간한다(phase를 누적하지 않음). 멈춤·reduced·팝업·백그라운드에서 정지, 터치에는 걸지 않는다.
- const finePointer=matchMedia('(pointer:fine) and (hover:hover)'), PARALLAX=14;
- let pointerTarget={x:0,y:0}, pointerOffset={x:0,y:0};
+ // 깊이별 차등은 SRC064 원본의 카메라를 그대로 쓴다(reference/originals/src064-orbit.html):
+ //   목표 = (포인터 - 화면 중심) × 배율, 카드 이동량 = 카메라 × (0.45 + sc × 0.3) — 가까운 카드가 더 크게 움직인다.
+ // 하나의 층(.world)을 통째로 미는 방식은 배경이 함께 밀려 깊이로 읽히지 않았다.
+ const finePointer=matchMedia('(pointer:fine) and (hover:hover)'), CAMERA_X=.045, CAMERA_Y=.030, CAMERA_LIMIT_X=34, CAMERA_LIMIT_Y=22, CAMERA_LERP=.055;
+ let cameraTarget={x:0,y:0}, camera={x:0,y:0};
  const motionOn=() => !paused && !dialog.open && !document.hidden;
- const neutralizePointer=() => { pointerTarget={x:0,y:0}; pointerOffset={x:0,y:0}; world.style.transform=''; };
+ const neutralizePointer=() => { cameraTarget={x:0,y:0}; camera={x:0,y:0}; world.style.transform=''; };
  const pause=shadow.querySelector('[data-do=pause]');pause.textContent=paused?'움직임 켜기':'움직임 멈춤';pause.setAttribute('aria-pressed',String(paused));
  function rememberCard(c){if(!demo)remember(storage,c.treeId,c.id);}
  function focus(c){if(!c)return;rememberCard(c);if(!dialog.open)opener=shadow.activeElement;
@@ -39,16 +42,16 @@ export function mountOrbit(host,{trees,storage,example=false,onNew,onTrees,onBoo
  dialog.addEventListener('close',()=>{opener?.focus();schedule()},{signal});
  const elements=cards.map(c=>{const b=document.createElement('button');b.className=`card ${c.type} ${c.sizeClass}`;b.setAttribute('aria-label',`${c.title} 감상`);b.innerHTML=`<div class="surface">${c.image?`<img src="${esc(c.image)}" alt="" draggable="false" style="object-fit:${c.fitMode==='contain'?'contain':'cover'}">`:`<div class="memoKicker">${esc(c.date)}</div><div class="memoText">${esc(c.title)}</div><div class="memoFoot">${esc(c.emotion)}</div>`}</div>${c.first?'<div class="firstMark">FIRST</div>':''}<div class="caption"><span>${esc(c.title)}</span></div>`;b.onclick=e=>{if(e.detail===0||moved<9)focus(c)};world.append(b);return b;});
  function frame(now){raf=0;const dt=Math.min(40,now-previous||16);previous=now;if(!paused&&!dialog.open&&!drag)phase+=.000006*dt;const w=app.clientWidth,h=app.clientHeight;
-  cards.forEach((c,i)=>{const cfg=rings[c.ring],th=c.baseAngle+phase*cfg.speed+c.phaseOffset;let x=Math.cos(th)*cfg.rx,y=Math.sin(th)*cfg.ry+cfg.band+Math.sin(th*1.7+c.phaseOffset*3)*45,z=Math.sin(th+1.1+c.phaseOffset*4)*cfg.zAmp+cfg.zBase+c.zOffset;const d=Math.hypot(x/520,y/260);if(d<1&&z<260){x+=(x>=0?1:-1)*(1-d)*280;y+=(y>=0?1:-1)*(1-d)*56;}if(!demo&&cards.length<=8){const angle=i*Math.PI*2/cards.length+phase;x=Math.cos(angle)*Math.min(w*.34,420);y=Math.sin(angle)*Math.min(h*.3,250)+(i%2===0?80:-80);z=0;}const sc=Math.max(.18,Math.min(1.82,1050/(1050-z))),fit=Math.min(1,w/780,h/850);const placementFit=!demo&&cards.length<=8?1:fit;const el=elements[i];el.style.transform=`translate3d(${x*sc*placementFit-90}px,${y*sc*placementFit-116}px,0) scale(${sc*Math.max(.58,fit)}) rotateX(${c.tiltX+Math.sin(th)*9}deg) rotateY(${c.tiltY+Math.cos(th)*18}deg) rotateZ(${c.tiltZ+Math.sin(th*.6)*7}deg)`;el.style.opacity=Math.max(.25,Math.min(1,(z+620)/880));el.style.zIndex=Math.round(1000+z);});
-  if(motionOn()){pointerOffset={x:pointerOffset.x+(pointerTarget.x-pointerOffset.x)*.07,y:pointerOffset.y+(pointerTarget.y-pointerOffset.y)*.07};world.style.transform=`translate3d(${pointerOffset.x.toFixed(2)}px,${pointerOffset.y.toFixed(2)}px,0)`;}
+  cards.forEach((c,i)=>{const cfg=rings[c.ring],th=c.baseAngle+phase*cfg.speed+c.phaseOffset;let x=Math.cos(th)*cfg.rx,y=Math.sin(th)*cfg.ry+cfg.band+Math.sin(th*1.7+c.phaseOffset*3)*45,z=Math.sin(th+1.1+c.phaseOffset*4)*cfg.zAmp+cfg.zBase+c.zOffset;const d=Math.hypot(x/520,y/260);if(d<1&&z<260){x+=(x>=0?1:-1)*(1-d)*280;y+=(y>=0?1:-1)*(1-d)*56;}if(!demo&&cards.length<=8){const angle=i*Math.PI*2/cards.length+phase;x=Math.cos(angle)*Math.min(w*.34,420);y=Math.sin(angle)*Math.min(h*.3,250)+(i%2===0?80:-80);z=0;}const sc=Math.max(.18,Math.min(1.82,1050/(1050-z))),fit=Math.min(1,w/780,h/850);const placementFit=!demo&&cards.length<=8?1:fit;const el=elements[i];el.style.transform=`translate3d(${(x+camera.x*(.45+sc*.3))*sc*placementFit-90}px,${(y+camera.y*(.38+sc*.24))*sc*placementFit-116}px,0) scale(${sc*Math.max(.58,fit)}) rotateX(${c.tiltX+Math.sin(th)*9}deg) rotateY(${c.tiltY+Math.cos(th)*18}deg) rotateZ(${c.tiltZ+Math.sin(th*.6)*7}deg)`;el.style.opacity=Math.max(.25,Math.min(1,(z+620)/880));el.style.zIndex=Math.round(1000+z);});
+  if(motionOn()){camera={x:camera.x+(cameraTarget.x-camera.x)*CAMERA_LERP,y:camera.y+(cameraTarget.y-camera.y)*CAMERA_LERP};}
   if(!paused&&!document.hidden&&!dialog.open)raf=requestAnimationFrame(frame);
  }
  function schedule(){if(!raf&&!document.hidden)raf=requestAnimationFrame(frame);}
  app.addEventListener('pointerdown',e=>{if(e.target.closest('.center,.topbar'))return;drag={x:e.clientX,id:e.pointerId};moved=0;},{signal});
  app.addEventListener('pointermove',e=>{if(!drag||e.pointerId!==drag.id)return;const dx=e.clientX-drag.x;moved+=Math.abs(dx);phase+=dx*.0038;drag.x=e.clientX;schedule();},{signal});
  // 누르지 않아도 배경만 작게 움직인다. 문구·버튼·상단 메뉴는 .center/.topbar에 남아 고정된다.
- app.addEventListener('pointermove',e=>{if(!finePointer.matches||!motionOn())return;const box=app.getBoundingClientRect(),bound=v=>Math.max(-1,Math.min(1,(v-.5)*2));pointerTarget={x:bound((e.clientX-box.left)/box.width)*PARALLAX,y:bound((e.clientY-box.top)/box.height)*PARALLAX};schedule();},{signal});
- app.addEventListener('pointerleave',()=>{if(!finePointer.matches)return;pointerTarget={x:0,y:0};schedule();},{signal});
+ app.addEventListener('pointermove',e=>{if(!finePointer.matches||!motionOn())return;const box=app.getBoundingClientRect(),clamp=(v,limit)=>Math.max(-limit,Math.min(limit,v));cameraTarget={x:clamp((e.clientX-box.left-box.width/2)*CAMERA_X,CAMERA_LIMIT_X),y:clamp((e.clientY-box.top-box.height/2)*CAMERA_Y,CAMERA_LIMIT_Y)};schedule();},{signal});
+ app.addEventListener('pointerleave',()=>{if(!finePointer.matches)return;cameraTarget={x:0,y:0};schedule();},{signal});
  window.addEventListener('pointerup',()=>{drag=null;schedule()},{signal});window.addEventListener('pointercancel',()=>{drag=null;moved=20},{signal});window.addEventListener('resize',schedule,{signal});document.addEventListener('visibilitychange',()=>{if(document.hidden){cancelAnimationFrame(raf);raf=0;}else schedule()},{signal});
  if(error||recovery){const note=document.createElement('div');note.setAttribute('role',error?'alert':'status');note.style.cssText='position:absolute;bottom:44px;left:5%;right:5%;z-index:80;color:#e7c7d1;font-size:12px;line-height:1.7;display:flex;flex-wrap:wrap;gap:10px;align-items:center';if(error){const p=document.createElement('p');p.textContent=error;p.style.cssText='margin:0';note.append(p);}if(recovery){const b=document.createElement('button');b.type='button';b.className='subtleBtn';b.textContent='복구 파일 내보내기';b.style.minHeight='36px';b.onclick=()=>onRecovery?.();note.append(b);}app.append(note);}
  schedule();return()=>{abort.abort();cancelAnimationFrame(raf);dialog.close();};
