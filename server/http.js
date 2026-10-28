@@ -62,7 +62,8 @@ export function createApiHandler({ authenticate, service, productId, admin = nul
   return async function requestHandler(request) {
     try {
       const { status, body, headers } = await handle(request);
-      return { status, body, headers: headers ?? {} };
+      // 저장 경로의 응답 모양은 바꾸지 않는다 — 헤더는 실제로 붙인 자리만 지나간다.
+      return headers ? { status, body, headers } : { status, body };
     } catch (error) {
       if (error instanceof ApiError) return { status: error.status, body: errorBody(error) };
       console.error('[lovetree-storage] 요청 처리 실패', { path: request?.path, method: request?.method });

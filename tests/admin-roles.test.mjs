@@ -98,6 +98,8 @@ test('역할 확인 경로가 없으면 관리자 자리는 닫히고 저장은 
   assert.equal(closed.body.error.code, 'admin_roles_unavailable');
   const storage = ok(await made.handle({ method: 'GET', path: '/api/workspace', ...made.as('sess_admin') }));
   assert.equal(storage.status, 200, '관리자 미설정이 저장을 막지 않는다');
+  const shape = await made.handle({ method: 'GET', path: '/api/workspace', ...made.as('sess_admin') });
+  assert.deepEqual(shape, { status: 200, body: shape.body }, '저장 경로의 응답 모양은 그대로(헤더는 붙인 자리만)');
 });
 
 test('다른 제품의 세션과 없는 경로는 관리자 자리에서도 닫힌다', async () => {
