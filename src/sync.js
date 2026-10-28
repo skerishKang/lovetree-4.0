@@ -391,12 +391,18 @@ export function createSyncController(deps) {
 
 /** 서버 저장 API의 fetch 경계. 응답 형상은 `server/http.js`가 주는 닫힌 JSON 그대로 다룬다. */
 export function createWorkspaceApi({ fetchImpl = (...args) => globalThis.fetch(...args), base = '' } = {}) {
-  async function call(path, init) {
+  async function call(path, init, { requiresRevision = false, requiresState = false } = {}) {
     try {
       const response = await fetchImpl(`${base}${path}`, { credentials: 'same-origin', ...init });
       const text = await response.text();
       let payload = null;
       try { payload = text ? JSON.parse(text) : null; } catch { payload = null; }
+      const shaped = Number.isSafeInteger(payload?.revision) && (!requiresState || (payload.state && typeof payload.state === 'object'));
+      if (response.ok && requiresRevision && !shaped) {
+        // 정적 프리뷰는 없는 API 경로에 index.html을 200으로 돌려준다. 문서가 아닌 응답을
+        // 성공으로 읽으면 없는 서버 기록을 들이밀게 되므로 미설정으로 다룬다.
+        return { ok: false, status: 503, code: 'storage_unavailable', message: null, currentRevision: undefined, revision: undefined, subject: null, savedAt: null, state: null };
+      }
       return {
         ok: response.ok,
         status: response.status,
@@ -414,10 +420,10 @@ export function createWorkspaceApi({ fetchImpl = (...args) => globalThis.fetch(.
   }
 
   return {
-    get: () => call('/api/workspace', { method: 'GET', headers: { accept: 'application/json' } }),
+    get: () => call('/api/workspace', { method: 'GET', headers: { accept: 'application/json' } }, { requiresRevision: true, requiresState: true }),
     put: (body) => call('/api/workspace', {
       method: 'PUT', headers: { 'content-type': 'application/json', accept: 'application/json' }, body: JSON.stringify(body)
-    }),
+    }, { requiresRevision: true }),
     logout: () => call('/auth/logout', { method: 'POST', headers: { accept: 'application/json' } })
   };
 }
@@ -426,8 +432,9 @@ export function createWorkspaceApi({ fetchImpl = (...args) => globalThis.fetch(.
  * 최소 UI. `#toast`처럼 렌더에 지워지지 않는 자리를 골라 한 번만 붙인다.
  * 새 디자인·폰트·용어를 만들지 않고 이미 있는 클래스(`.storage-notice`, `.notice`, `.button small`)만 재사용한다.
  *
- * 좁은 화면(≤820px)에서는 아래에 붙는 띠가 본문 끝의 행동을 덮는다(#63 실측 390px:
- * 책장 선택 행동 3개가 가려짐). 그래서 좁을 때는 문서를 흐르는 자리, 본문 바로 위에 둔다.
+ * 자리는 항상 문서 흐름 안, 본문(#app) 위다. 아래에 붙이는 띠는 화면 끝의 행동을 덮는다 —
+ * 390px에서는 책장 선택 행동(#63), PC 기억책에서는 페이지 이동 nav와 번호(#64 검토)가 가려졌다.
+ * 띠 높이가 상태 문구로 들쭉날쭉하는 한 여백 조정으로는 보장할 수 없어 덮지 않는 자리를 고른다.
  */
 const NARROW_QUERY = '(max-width: 820px)';
 // 서버가 돌려주는 문장은 우리 글이지만, 마크업으로 해석되지 않게 그대로 두지 않는다.
@@ -444,18 +451,14 @@ export function mountSync({ controller, doc = globalThis.document, onAdopted = (
   }
   const narrow = () => globalThis.matchMedia?.(NARROW_QUERY)?.matches ?? false;
   const place = () => {
-    const wanted = narrow() ? 'flow' : 'sticky';
-    if (bar.dataset.syncPlacement === wanted && bar.isConnected) return;
-    if (wanted === 'flow') {
-      bar.style.cssText = 'margin:12px auto 0;width:calc(100% - 36px);flex-wrap:wrap';
-      const app = doc.getElementById('app');
-      if (app && bar !== app.previousElementSibling) doc.body.insertBefore(bar, app);
-      else if (!app && bar !== doc.body.lastElementChild) doc.body.append(bar);
-    } else {
-      bar.style.cssText = 'position:sticky;bottom:14px;z-index:60;margin:18px auto 0;width:min(1400px,calc(100% - 80px));flex-wrap:wrap;box-shadow:0 8px 25px #26351a26';
-      if (bar !== doc.body.lastElementChild) doc.body.append(bar);
-    }
-    bar.dataset.syncPlacement = wanted;
+    const width = narrow() ? 'calc(100% - 36px)' : 'min(1400px, calc(100% - 80px))';
+    const wanted = narrow() ? 'narrow' : 'wide';
+    if (bar.dataset.syncWidth === wanted && bar.isConnected) return;
+    bar.style.cssText = `margin:12px auto 0;width:${width};flex-wrap:wrap`;
+    const app = doc.getElementById('app');
+    if (app) { if (bar !== app.previousElementSibling) doc.body.insertBefore(bar, app); }
+    else if (bar !== doc.body.lastElementChild) doc.body.append(bar);
+    bar.dataset.syncWidth = wanted;
   };
   globalThis.matchMedia?.(NARROW_QUERY)?.addEventListener?.('change', place);
   globalThis.addEventListener?.('resize', place);
