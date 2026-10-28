@@ -1,6 +1,7 @@
 import './styles.css';
 import { mountOrbit, ORBIT_EXAMPLE } from './views/orbit.js';
 import {viewContext} from './views/contract.js';
+import {createScreenRegistry} from './views/registry.js';
 import { mountBook } from './views/book.js';
 import { mountShelf } from './views/shelf.js';
 import { hasRecovery as recoveryAvailable, recoveryData } from './views/memory.js';
@@ -231,19 +232,19 @@ function render() {
     requestMoment: (kind, id) => openMoment(kind, id),
     library: (action, id) => libraryAction(action, id)
   };
-  if (route === 'trees') {
-    $('#app').innerHTML='<main id="main"></main>';
-    disposeView=mountShelf($('#main'), {trees:state.trees,storage,view:shelfView,context:viewContext({treeId:shelfView.selectedId}),actions,error:loaded.error,recovery:hasRecovery()});
-  }
-  else if (/^(tree|demo)\//.test(route)) $('#app').innerHTML=workspace();
-  else if (/^(book|demo-book)\//.test(route) && currentTree()) {
-    $('#app').innerHTML='<main id="main"></main>';
-    disposeView=mountBook($('#main'), {tree:currentTree(),storage,context:viewContext({treeId:currentTree().id,momentId:selectedId,readOnly:isDemo()}),actions:{...actions,navigate:(where)=>{if(where==='trees'){shelfView.selectedId=currentTree().id;go('#trees');}else go('#start');}}});
-  } else if (/^(book|demo-book)\//.test(route)) $('#app').innerHTML=workspace();
-  else {
-    $('#app').innerHTML='<main id="main"></main>';
-    disposeView=mountOrbit($('#main'),{trees:state.trees,storage,context:viewContext({readOnly:route==='examples'}),actions,error:loaded.error,recovery:hasRecovery()});
-  }
+  const mountShadow = (mount, props) => { $('#app').innerHTML='<main id="main"></main>'; return mount($('#main'), props); };
+  const renderWorkspace = () => { $('#app').innerHTML=workspace(); };
+  // 화면 등록표: 어떤 경로가 어떤 화면을 여는지 한 곳에 적는다. 먼저 선언된 화면이 이긴다.
+  const screens = createScreenRegistry([
+    { id: 'shelf', matches: r => r === 'trees', activate: () => mountShadow(mountShelf, {trees:state.trees,storage,view:shelfView,context:viewContext({treeId:shelfView.selectedId}),actions,error:loaded.error,recovery:hasRecovery()}) },
+    { id: 'workspace', matches: r => /^(tree|demo)\//.test(r), activate: renderWorkspace },
+    { id: 'book', matches: r => /^(book|demo-book)\//.test(r) && !!currentTree(), activate: () => mountShadow(mountBook, {tree:currentTree(),storage,context:viewContext({treeId:currentTree().id,momentId:selectedId,readOnly:isDemo()}),actions:{...actions,navigate:(where)=>{if(where==='trees'){shelfView.selectedId=currentTree().id;go('#trees');}else go('#start');}}}) },
+    { id: 'workspace-missing-tree', matches: r => /^(book|demo-book)\//.test(r), activate: renderWorkspace },
+    { id: 'orbit', matches: () => true, activate: () => mountShadow(mountOrbit, {trees:state.trees,storage,context:viewContext({readOnly:route==='examples'}),actions,error:loaded.error,recovery:hasRecovery()}) }
+  ]);
+  const screen = screens.resolve(route);
+  const dispose = screen.activate();
+  disposeView = typeof dispose === 'function' ? dispose : () => {};
 }
 function updateTree(tree) { commit({ ...state, trees: state.trees.map(t => t.id === tree.id ? tree : t) }); }
 

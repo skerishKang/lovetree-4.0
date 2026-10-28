@@ -48,12 +48,14 @@
    library(action, id)                    // 백업·가져오기·복구·삭제
    ```
    `main.js`의 기존 `onBook`·`onShelf`·`onAdd`·`onAction`·`onNew`·`onRecovery` 매핑을 그대로 옮겨 **동작 변화는 없다**. 기억책에서 '내 트리'로 갈 때 그 트리가 선택되는 동작은 `navigate('trees')`의 화면별 구현으로 남겼다.
-4. **소유 경계 (다음 조각)** — 공통 shell(메뉴·동기화 상태·팝업·여백)은 `main.js`가 소유하고, 화면은 자기 shadow root 밖을 만지지 않는다. 읽기 전용에서 편집 단추를 숨기는 것은 UX일 뿐이며 최종 판정은 서버가 한다.
+4. **화면 등록 (구현됨)** — `src/views/registry.js`의 `createScreenRegistry([{id, matches(route), activate()}])`. `render()`의 if/else 사슬을 등록표로 바꿨다. 먼저 선언된 화면이 이기고, 마지막 항목은 모든 경로를 받는 대체 화면이어야 하며(아니면 경로가 새어 나간다), id는 중복될 수 없다. `activate()`는 붙인 화면의 dispose를 돌려주고, 호출자가 이전 화면을 dispose한 뒤 새 화면을 붙인다.
+5. **소유 경계 (다음 조각)** — 공통 shell(메뉴·동기화 상태·팝업·여백)은 `main.js`가 소유하고, 화면은 자기 shadow root 밖을 만지지 않는다. 읽기 전용에서 편집 단추를 숨기는 것은 UX일 뿐이며 최종 판정은 서버가 한다.
 
 주소는 지금의 hash(`#start`·`#trees`·`#tree/<id>`·`#book/<id>`)를 유지한다. 리모네식 쿼리(`?moment=`)로 바꾸는 것은 이번 범위가 아니다.
 
 ## 4. 진행 상태
 
 - **1차(#70, `71f13d3`)**: `createView()` 생명주기 도입·채택. 외형·문구·동작·주소 변화 없음.
-- **2차(이 PR)**: 문맥(`viewContext`)과 행동(`actions`) 통일. `src/main.js`는 mount 세 곳과 열기 도우미 인자 이름만 바뀌었다. 외형·URL·저장 형식 변화 없음.
+- **2차(#72)**: 문맥(`viewContext`)과 행동(`actions`) 통일. `src/main.js`는 mount 세 곳과 열기 도우미 인자 이름만 바뀌었다. 외형·URL·저장 형식 변화 없음.
+- **3차(이 PR)**: 화면 등록표(`createScreenRegistry`)로 경로 해석과 mount/dispose 호출을 한 자리로 모음. hash 주소·뒤로가기·선택 유지·readOnly·행동은 그대로.
 - **남은 것**: 화면이 저장소를 직접 쓰는 부분(읽던 위치·책장 선택 기록)을 `main.js` 한 곳으로 모으기, 공통 shell 소유 경계, 보기 전환의 선택 유지 규칙. 새 화면·커뮤니티·프레임워크 교체는 범위 밖.
