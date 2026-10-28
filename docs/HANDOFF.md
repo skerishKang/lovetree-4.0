@@ -1,5 +1,4 @@
-# LoveTree 4.0 인수인계
-
+AD
 
 ## #43 트리 상세·기억책 반복 본문·보조 글자 정리 — 2026-10-29
 
@@ -9,6 +8,34 @@ main `98be779` 위에서 별도 worktree·브랜치로 진행했다. `src/main.j
 - 기억책: 이미지 없는 기록의 표지 카드가 제목을 반복하지 않고 감정만 표시한다. 제목은 아래 `h1.memory-title` 한 곳에만 있어 대상·기록 식별은 그대로다. meta 12→13px, 연결 사유 보조 글자 12px.
 - 검증: `npm run check` 테스트 141 pass·빌드 성공. 브라우저 실측(로컬 preview 4173, 긴 제목·본문 픽스처 2순간) 37항목 전부 통과 — 인용 카드 0·본문 1회·본문 14px·날짜 11px·액션 위치·가로 넘침 0(PC 1280·390)·표지 감정=meta 감정·제목 h1 1회·meta 13px·페이지 이동·목차(현재 위치·점프·닫기 초점 복귀)·기억책↔트리 선택 유지·읽던 위치 복귀·수정창 Esc 취소 시 입력 유지와 버튼 초점 복귀(상세·기억책)·삭제 확인 1회·취소 보존. 콘솔 오류 0(로컬 preview의 `/api/workspace` 404는 서버 API 미구동일 때의 정상 탐색 실패다). 전후 캡처 8장과 재검증 4장은 컴1 기준 폴더 `.zwork/detail-book-shots`(저장소 미포함).
 - 남은 것: 실기기 터치 미검증. 병합·운영 배포는 별도 단계.
+
+## #65 화면 등록·전환 책임 분리(3) — 2026-10-28
+
+`#72 dd1173b` 위 별도 브랜치. `render()`의 if/else 사슬을 화면 등록표로 바꿔, 경로 해석과 mount/dispose 호출을 한 자리에서 처리한다. hash 주소·뒤로가기·선택 유지·readOnly·행동은 그대로다.
+
+- `src/views/registry.js`의 `createScreenRegistry([{id, matches(route) | fallback: true, activate()}])`. 먼저 선언된 화면이 이기고(기존 if/else 순서 보존: shelf → workspace → book → 대체 workspace → orbit), **대체 화면은 `fallback: true` 표시로 하나만** 두며 받지 못한 경로는 모두 그 화면으로 간다. `matches` 술어의 전칭성을 표본으로 검사하지 않는다 — 누락은 표시로 막는다. `activate()`가 돌려준 dispose를 `disposeView`로 쓴다.
+- `src/main.js`의 `render()`만 바뀌었다. `#app`에 새 `#main`을 만들어 mount하는 두 줄 패턴은 `mountShadow()` 하나로 모았다. 세 화면 모듈·`lifecycle.js`·`contract.js`는 건드리지 않았다.
+- 선택/저장 주인 통합과 공통 shell은 이번 범위가 아니다(다음 조각).
+- 검증: `tests/screen-registry.test.mjs` 4건, `npm run check` 152 tests / 122 pass. 브라우저 왕복 3랩: **화면을 떠날 때마다 이전 dispose(abort)가 정확히 1회**(3랩 9회), 살아 있는 document/window 리스너 증가 0, 궤도 이탈 후 프레임 루프 0, `#main`·shadow root 각 1개, 뒤로가기 복원, 예시 readOnly 경로 유지, 390px 넘침 0, 콘솔 오류 0.
+
+## #65 화면 문맥·행동 계약 통일(2) — 2026-10-28
+
+`#70 71f13d3`(생명주기 계약) 위 별도 브랜치. 궤도·책장·기억책이 같은 모양으로 입력을 받고 같은 통로로만 바깥에 알리게 했다. 외형·URL·저장 형식·새 화면은 바꾸지 않았다.
+
+- `src/views/contract.js`의 `viewContext({treeId, momentId, readOnly})`가 고정(freeze) 문맥을 만든다. 궤도의 `example`과 기억책의 `demo`는 `readOnly` 하나로 수렴했고(값 동일), 책장은 선택 시작값만 `context.treeId`로 받는다.
+- 행동은 `actions` 하나로 모았다: `navigate('home'|'trees')`, `openBook(treeId, momentId, readOnly)`, `openWorkspace(...)`, `requestMoment('new'|'add'|'edit', id)`, `library(action, id)`. `src/main.js`에서는 mount 세 곳과 열기 도우미 인자 이름만 바뀌었고 기존 콜백 매핑을 그대로 옮겼다 — 동작 변화 없음.
+- 기억책에서 '내 트리'로 갈 때 그 트리가 선택되는 동작은 `navigate('trees')`의 화면별 구현으로 남겼다(공통 navigate가 다른 화면에 부작용을 만들지 않게).
+- 검증: `npm run check` 148 tests / 118 pass, 브라우저에서 세 화면의 13개 행동(새 트리·내 트리·기억책·연결 보기·처음으로·이어가기·수정·예시 읽기 전용 경로)과 책장 library(백업 다운로드·삭제 확인·새 트리) 확인. 390px 가로 넘침 0.
+
+## #65 화면 연결 방식 정리(1) — 2026-10-28
+
+`#64 b30029b` 위 별도 worktree·브랜치. `#66` 로드맵의 "B. 화면 연결 기반" 첫 조각으로, 외형·문구·동작·주소 변화 없이 세 화면의 생명주기만 통일했다.
+
+- `src/views/lifecycle.js`의 `createView(host)`가 shadow root·AbortController·정리 목록을 한 자리에서 만든다. `dispose()`는 멱등이고 등록의 역순으로 정리하며, 정리 하나가 던져도 나머지를 계속한다. **mount는 새 host에만** 한다(한 host에 shadow root는 하나) — 이전 화면 dispose와 새 host 준비는 호출자가 맡는다. 세 화면의 dispose는 모두 이 계약을 따른다.
+- 궤도는 RAF·dialog를, 책장은 ResizeObserver를 `track()`으로 넘기고, 기억책은 shadow root 이벤트와 **목차 dialog의 close 콜백**에도 `{signal}`을 붙였다(정리가 먼저 리스너를 끊고 dialog를 닫으므로 이전 opener로 초점을 돌려주는 콜백이 남지 않는다). `src/main.js`는 건드리지 않았다.
+- 리모네 `TreeViewShell`/`ViewSwitcher`(같은 트리의 여러 보기, `?moment=`로 선택 유지, `isOwner` 게이트)와 4.0 세 화면 비교표·최소 계약은 `docs/VIEW_CONTRACT.md`에 있다. 문맥(`treeId`·`momentId`·`readOnly`)과 행동 콜백 수렴은 다음 조각.
+- 검증: `tests/view-contract.test.mjs` 6건, `npm run check`, 브라우저 화면 순회에서 프레임 루프가 남지 않는지(rAF 계수) 확인.
+
 ## 운영 연결 진행 — 2026-10-28 (COM1)
 
 PADIEM 공통 인증과 러브트리 저장 API를 잇는 운영 작업의 실제 상태. 값·주소 기준은 아래 항목과 ai-revenue-lab main이다.
@@ -22,7 +49,6 @@ PADIEM 공통 인증과 러브트리 저장 API를 잇는 운영 작업의 실�
 - **상단 로그인 진입 구현**(이 브랜치): 네 화면 상단 바에 로그인·로그아웃 진입을 추가했다. 새 인증 체계 없이 sync 컨트롤러(`owned`·`act('login'|'logout')`)를 재사용하고, orbit .menuBtn·shelf .ghost·book .ui-btn·공통 .button을 그대로 쓴다. 그림자 경계 클릭은 composedPath 위임 하나로 받는다. 검증: 테스트 141 pass·0 fail(+신규 8), 로컬 브라우저 12항목(PC·390 겹침 0·가로 넘침 0·클릭 시 `/auth/login?next=/` 이동) 통과. shelf 390px에서 로그인 버튼이 메뉴 둘째 줄로 흐르는 것은 이 뷰의 원래 줄바꿈 허용 설계 안이다(겹침 0).
 - **스택 빈틈 메움 — 폐기 write transport**: `server/index.js` buildLogin이 `createAuthorityWriteCall(env)`을 요구하는데 그 구현이 저장소에 없었다(테스트는 가짜 call 주입이라 미검출). `server/authority-relay-write-transport.js`를 추가했다: `LOVETREE_MINT_URL`의 중계(발급·폐기 같은 Worker)로 `/revoke-session`만 중계하고, 발급 RPC(mint 없는 구성 경로)는 닫아 둔다. 시험 4개.
 - **남은 것**: ① COM2 .env 추가 값 반영·재시작(요청서 전달됨), ② `LOVETREE_CALLER_SECRET` 세 곳(두 중계+COM2) 일치 — 전달 경로 확정 필요, ③ #75 후보 단일 병합 + 이 브랜치 통합(인증·COM2 배선 확인 뒤, Pages 자동 배포), ④ 운영 판정(401/404 JSON, 버튼→인증 화면, 실계정 로그인→저장→복원→로그아웃→이전 자격 거부, A/B 격리는 두 실계정 가능할 때, 관리자 미부여 200 admin:false·roles 403, 클릭 없는 마우스 패럴랙스 운영 확인).
-
 
 ## #40 첫 저장 후 다음 순간 연결 안내 — 2026-10-28
 
