@@ -32,9 +32,11 @@ export function createWorkspaceService({ repo, productId }) {
   return {
     async read(principal) {
       const stored = await repo.load({ productId: principal.productId, subjectId: principal.subjectId });
-      if (!stored) return { revision: 0, savedAt: null, state: EMPTY_STATE() };
+      // subject는 검증된 주체 식별자만 되돌린다. 이 기기에 남은 미전송 기록이
+      // 어느 계정의 것인지 다음 로그인에 가려 읽기 위한 최소 정보다.
+      if (!stored) return { revision: 0, savedAt: null, state: EMPTY_STATE(), subject: principal.subjectId };
       try {
-        return { revision: stored.revision, savedAt: stored.savedAt, state: validateState(stored.doc) };
+        return { revision: stored.revision, savedAt: stored.savedAt, state: validateState(stored.doc), subject: principal.subjectId };
       } catch {
         throw new ApiError(500, 'stored_document_invalid', '보관된 기록을 읽을 수 없어요.');
       }
