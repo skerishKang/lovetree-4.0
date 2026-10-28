@@ -38,7 +38,6 @@ test('부여·조회·회수와 감사 이력이 실제 테이블에서 동작�
     const actor = { productId, subjectId: ADMIN };
     const target = { productId, subjectId: MEMBER };
 
-    await pool.query('INSERT INTO lovetree_product_roles (product_id, subject_id, role) VALUES ($1, $2, $3)', [productId, ADMIN, ROLE_ADMIN]);
     assert.equal(await admin.roleFor(actor), ROLE_ADMIN);
     assert.equal(await admin.roleFor(target), null);
 
@@ -94,8 +93,9 @@ test('저장 장애와 계약 밖 값은 열린 방향으로 새지 않는다', 
   await withRepo(async (pool) => {
     const productId = `lovetree-admin-test-${suffix()}`;
     const admin = createAdminRoleService({ store: createAdminRoleRepo(pool), productId });
+    await pool.query('INSERT INTO lovetree_product_roles (product_id, subject_id, role) VALUES ($1, $2, $3)', [productId, ADMIN, ROLE_ADMIN]);
     await assert.rejects(
-      () => pool.query('INSERT INTO lovetree_product_roles (product_id, subject_id, role) VALUES ($1, $2, $3)', [productId, ADMIN, 'OWNER']),
+      () => pool.query('INSERT INTO lovetree_product_roles (product_id, subject_id, role) VALUES ($1, $2, $3)', [productId, MEMBER, 'OWNER']),
       (error) => error.code === '23514',
       'role CHECK 밖의 값은 DB가 거둔다'
     );
