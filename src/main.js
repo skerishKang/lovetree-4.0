@@ -5,6 +5,7 @@ import { mountShelf } from './views/shelf.js';
 import { hasRecovery as recoveryAvailable, recoveryData } from './views/memory.js';
 import { createTree, addMoment, editMoment, removeMoment, importTrees, MAX_TREES, MAX_LINKS, EMOTIONS, treeLayout, pathTo, stemGroups, linkMoments, unlinkMoments, relatedMoments } from './domain.js';
 import { loadState, saveState, STORAGE_KEY, RECOVERY_KEY } from './storage.js';
+import { createSyncController, createWorkspaceApi, mountSync } from './sync.js';
 import { EXAMPLES } from './examples.js';
 import { SERVICE, GO_HOME, GO_TREES, GO_EXAMPLES, READ_BOOK, NEW_TREE, CONTINUE_MOMENT, BOOK_IS_READING } from './terms.js';
 
@@ -86,6 +87,7 @@ function commit(next) {
   if (loaded.blocked) throw new Error(loaded.error);
   expectedRaw = saveState(storage, next, expectedRaw);
   state = next;
+  sync.markLocalSave();
 }
 function currentTree() {
   const route = location.hash.slice(1);
@@ -594,5 +596,15 @@ if (!history.state || typeof history.state.idx !== 'number') {
   currentIdx = history.state.idx;
   navCounter = currentIdx + 1;
 }
+const sync = createSyncController({
+  getState: () => state,
+  replaceState: (doc) => { commit(doc); render(); },
+  api: createWorkspaceApi(),
+  storage: window.localStorage,
+  // 화면 경로는 이 파일이 소유한다. 안쪽으로 옮길 때는 앱의 이력 추적을 함께 쓴다.
+  navigate: (url) => { if (url.startsWith('#')) go(url); else location.assign(url); }
+});
+mountSync({ controller: sync, doc: document });
 render();
 if (loaded.error) toast(loaded.error);
+void sync.start();
