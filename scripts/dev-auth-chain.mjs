@@ -31,6 +31,7 @@ import { createAuthorityRelayClient } from '../server/authority-relay-transport.
 import { createAuthorityWriter } from '../server/authority-writer.js';
 import { createHandoffMintClient } from '../server/handoff-mint-client.js';
 import { createLoginProvider } from '../server/padiem-login-provider.js';
+import { createApiProxy } from '../proxy/pages-api-proxy.js';
 import { createLoginService } from '../server/login-service.js';
 import { createMemoryLoginStateStore } from '../server/login-state-store.js';
 import { createModelControlPlane } from '../server/testing/model-control-plane.js';
@@ -48,6 +49,10 @@ const SESSION_SECRET = randomBytes(32).toString('base64url');
 const HARNESS_SECRET = randomBytes(32).toString('base64url');
 
 const APP_PORT = Number(process.env.LOVETREE_DEV_APP_PORT || 8791);
+// Pages 프런트(COM2 API 앞원진)를 흉내 낼 포트. 0이면 지금처럼 단일 원진으로 돈다.
+const FRONT_PORT = Number(process.env.LOVETREE_DEV_FRONT_PORT || 0);
+// 브라우저가 보는 주소. 앞원진을 세우면 공개 origin도 거기로 맞춘다(COM2는 자기 Host로 URL을 만들지 않는다).
+const PUBLIC_ORIGIN = FRONT_PORT ? `http://127.0.0.1:${FRONT_PORT}` : `http://127.0.0.1:${APP_PORT}`;
 const STUB_PORT = Number(process.env.LOVETREE_DEV_STUB_PORT || 8820);
 const HARNESS_GOOGLE_PORT = Number(process.env.LOVETREE_DEV_HARNESS_PORT || 8821);
 const HARNESS_PASSWORD_PORT = Number(process.env.LOVETREE_DEV_HARNESS_PORT2 || 8822);
@@ -194,7 +199,7 @@ async function startApp() {
   const provider = createLoginProvider({
     env: {
       LOVETREE_PADIEM_HANDOFF_START_URL: `http://127.0.0.1:${HARNESS_GOOGLE_PORT}/auth/lovetree/start`,
-      LOVETREE_PUBLIC_ORIGIN: `http://127.0.0.1:${APP_PORT}`
+      LOVETREE_PUBLIC_ORIGIN: PUBLIC_ORIGIN
     },
     productId: PRODUCT
   });
@@ -225,7 +230,7 @@ async function startApp() {
     const { method = 'GET', path = '', headers = {}, body, query } = request;
     if (path.startsWith('/auth/')) {
       try {
-        return await login.route({ method, path, query, headers, origin: `http://127.0.0.1:${APP_PORT}` });
+        return await login.route({ method, path, query, headers, origin: PUBLIC_ORIGIN });
       } catch (error) {
         return { status: error.status ?? 500, headers: {}, body: { error: { code: error.code ?? 'internal_error', message: error.message } } };
       }
@@ -246,15 +251,54 @@ async function startApp() {
   workers.app = app;
 }
 
+// Pages 프런트와 같은 모양: 화면은 이 origin에서 받고 /api·/auth만 COM2로 넘긴다.
+async function startFront() {
+  const proxy = createApiProxy({ env: { LOVETREE_API_ORIGIN: `http://127.0.0.1:${APP_PORT}` } });
+  const front = createServer((req, res) => {
+    const path = (req.url ?? '').split('?')[0];
+    if (!path.startsWith('/api/') && !path.startsWith('/auth/')) {
+      serveStatic(path, res).then((handled) => { if (!handled) { res.writeHead(500); res.end('npm run build 가 먼저 필요합니다'); } },
+        () => { res.writeHead(500); res.end('no build'); });
+      return;
+    }
+    const chunks = [];
+    req.on('data', (chunk) => chunks.push(chunk));
+    req.on('end', async () => {
+      const method = req.method ?? 'GET';
+      const hasBody = chunks.length > 0 && method !== 'GET' && method !== 'HEAD';
+      const headers = {};
+      for (const [name, value] of Object.entries(req.headers)) {
+        if (name.startsWith(':')) continue;
+        if (!hasBody && (name === 'content-length' || name === 'transfer-encoding')) continue;
+        headers[name] = Array.isArray(value) ? value.join(', ') : value;
+      }
+      const answer = await proxy(new Request(`http://127.0.0.1:${FRONT_PORT}${req.url}`, {
+        method, headers, ...(hasBody ? { body: Buffer.concat(chunks) } : {})
+      }));
+      const out = {};
+      for (const [name, value] of answer.headers.entries()) out[name] = value;
+      const cookies = typeof answer.headers.getSetCookie === 'function' ? answer.headers.getSetCookie() : [];
+      delete out['set-cookie'];
+      if (cookies.length) out['set-cookie'] = cookies;
+      res.writeHead(answer.status, out);
+      res.end(Buffer.from(await answer.arrayBuffer()));
+    });
+  });
+  await listen(front, FRONT_PORT);
+  workers.front = front;
+}
+
 await startRelays();
 startHarness(HARNESS_GOOGLE_PORT, 'hybrid', { CHAIN_GOOGLE_AUTHORIZE_PREFIX: `http://127.0.0.1:${STUB_PORT}/stub/authorize` });
 startHarness(HARNESS_PASSWORD_PORT, 'password');
 await listen(stubServer, STUB_PORT);
 await startApp();
+if (FRONT_PORT) await startFront();
 
 console.log(JSON.stringify({
   role: 'dev-only browser chain runner (memory storage repo, stub Google, model authority)',
   app: `http://127.0.0.1:${APP_PORT}`,
+  front: FRONT_PORT ? `http://127.0.0.1:${FRONT_PORT}` : null,
   stub: `http://127.0.0.1:${STUB_PORT}/stub/authorize`,
   harnessGoogle: HARNESS_GOOGLE_PORT,
   harnessPassword: HARNESS_PASSWORD_PORT,
