@@ -59,7 +59,7 @@ test('부여·조회·회수와 감사 이력이 실제 테이블에서 동작�
     assert.deepEqual(history.map((row) => row.action), ['revoke', 'assign', 'assign']);
     assert.deepEqual(history.map((row) => row.previousRole), ['admin', 'admin', null]);
     assert.equal(history[0].subjectId, MEMBER);
-    assert.deepEqual(await admin.list(), [], '회수하면 등록부에서 사라진다');
+    assert.deepEqual((await admin.list()).map((row) => row.subjectId), [ADMIN], '회수한 주체만 등록부에서 빠지고 행위자는 남는다');
   });
 });
 
