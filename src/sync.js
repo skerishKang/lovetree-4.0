@@ -397,7 +397,9 @@ export function createWorkspaceApi({ fetchImpl = (...args) => globalThis.fetch(.
       const text = await response.text();
       let payload = null;
       try { payload = text ? JSON.parse(text) : null; } catch { payload = null; }
-      const shaped = Number.isSafeInteger(payload?.revision) && (!requiresState || (payload.state && typeof payload.state === 'object'));
+      // 모양뿐 아니라 문서 검증까지 통과해야 서버 기록으로 다룬다.
+      const documentOk = (state) => { try { validateState(state); return true; } catch { return false; } };
+      const shaped = Number.isSafeInteger(payload?.revision) && (!requiresState || documentOk(payload.state));
       if (response.ok && requiresRevision && !shaped) {
         // 정적 프리뷰는 없는 API 경로에 index.html을 200으로 돌려준다. 문서가 아닌 응답을
         // 성공으로 읽으면 없는 서버 기록을 들이밀게 되므로 미설정으로 다룬다.

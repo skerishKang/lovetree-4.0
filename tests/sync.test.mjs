@@ -541,3 +541,19 @@ test('로그아웃 응답은 문서 형식 요구를 적용받지 않는다', as
   assert.equal(out.ok, true);
   assert.equal(out.code, null);
 });
+
+test('모양은 맞지만 검증에 실패한 문서도 서버 기록으로 읽지 않는다', async () => {
+  const invalidDoc = async () => ({ ok: true, status: 200, headers: { get: () => 'application/json' }, text: async () => JSON.stringify({ revision: 1, savedAt: CLOCK, state: { version: 9, trees: 'nope' }, subject: 'sub_probe' }) });
+  const api = createWorkspaceApi({ fetchImpl: invalidDoc });
+  const read = await api.get();
+  assert.equal(read.ok, false, '번호와 state가 있어도 검증을 통과하지 못하면 성공이 아니다');
+  assert.equal(read.code, 'storage_unavailable');
+
+  const local = doc('이 기기에 남는 순간');
+  const made = harness({ initial: local, api });
+  const state = await made.controller.start();
+  assert.equal(state.phase, 'local', 'checking에 머물지 않는다');
+  assert.match(state.detail, /서버 저장이 아직 켜지지/);
+  assert.deepEqual(made.current(), local, '이 기기 기록은 그대로');
+  assert.equal(made.controller.snapshot().revision, null, '서버 번호를 가진 것으로 보지 않는다');
+});
