@@ -17,8 +17,8 @@ function recorder(reply) {
   return fetcher;
 }
 
-test('허용한 네 경로만 업스트림으로 넘기고 나머지는 404 JSON 이다', async () => {
-  const allowed = [['/api/workspace', 'GET'], ['/auth/login', 'GET'], ['/auth/callback', 'GET'], ['/auth/logout', 'POST']];
+test('허용한 경로만 업스트림으로 넘기고 나머지는 404 JSON 이다', async () => {
+  const allowed = [['/api/workspace', 'GET'], ['/api/admin/session', 'GET'], ['/api/admin/roles', 'GET'], ['/auth/login', 'GET'], ['/auth/callback', 'GET'], ['/auth/logout', 'POST']];
   for (const [path, method] of allowed) {
     const fetcher = recorder(new Response('{}', { headers: { 'content-type': 'application/json' } }));
     const response = await onRequest(createProxy({ fetcher }), `https://lovetree.example${path}`, { method });
@@ -26,7 +26,7 @@ test('허용한 네 경로만 업스트림으로 넘기고 나머지는 404 JSON
     assert.equal(fetcher.calls.length, 1, `${path}: 업스트림 1회`);
     assert.equal(fetcher.calls[0].url, `${UPSTREAM}${path}`);
   }
-  for (const path of ['/api/other', '/api', '/auth/other', '/auth', '/auth/login/extra']) {
+  for (const path of ['/api/other', '/api', '/auth/other', '/auth', '/auth/login/extra', '/api/admin/unknown', '/api/admin']) {
     const fetcher = recorder(new Response('{}'));
     const response = await onRequest(createProxy({ fetcher }), `https://lovetree.example${path}`);
     assert.equal(response.status, 404, `${path}: 404`);
@@ -37,7 +37,7 @@ test('허용한 네 경로만 업스트림으로 넘기고 나머지는 404 JSON
 });
 
 test('경로가 허용해도 메서드가 밖이면 내려보내지 않고 405 JSON 이다', async () => {
-  for (const [path, method] of [['/auth/logout', 'GET'], ['/auth/login', 'POST'], ['/api/workspace', 'DELETE'], ['/api/workspace', 'POST']]) {
+  for (const [path, method] of [['/auth/logout', 'GET'], ['/auth/login', 'POST'], ['/api/workspace', 'DELETE'], ['/api/workspace', 'POST'], ['/api/admin/roles', 'POST'], ['/api/admin/session', 'PUT']]) {
     const fetcher = recorder(new Response('{}', { headers: { 'content-type': 'application/json' } }));
     const response = await onRequest(createProxy({ fetcher }), `https://lovetree.example${path}`, { method });
     assert.equal(response.status, 405, `${method} ${path}`);

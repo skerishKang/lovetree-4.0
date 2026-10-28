@@ -55,6 +55,8 @@ const APP_PORT = Number(process.env.LOVETREE_DEV_APP_PORT || 8791);
 const FRONT_PORT = Number(process.env.LOVETREE_DEV_FRONT_PORT || 0);
 // 브라우저가 보는 주소. 앞원진을 세우면 공개 origin도 거기로 맞춘다(COM2는 자기 Host로 URL을 만들지 않는다).
 const PUBLIC_ORIGIN = FRONT_PORT ? `http://127.0.0.1:${FRONT_PORT}` : `http://127.0.0.1:${APP_PORT}`;
+// 앞원진을 실제 Pages 런타임(wrangler pages dev)으로 둘 때만: 공개 주소를 그 포트로 못 박는다.
+const PUBLIC_ORIGIN_OVERRIDE = String(process.env.LOVETREE_DEV_PUBLIC_ORIGIN ?? '').trim();
 const STUB_PORT = Number(process.env.LOVETREE_DEV_STUB_PORT || 8820);
 const HARNESS_GOOGLE_PORT = Number(process.env.LOVETREE_DEV_HARNESS_PORT || 8821);
 const HARNESS_PASSWORD_PORT = Number(process.env.LOVETREE_DEV_HARNESS_PORT2 || 8822);
@@ -202,7 +204,7 @@ async function startApp() {
   const provider = createLoginProvider({
     env: {
       LOVETREE_PADIEM_HANDOFF_START_URL: `http://127.0.0.1:${HARNESS_GOOGLE_PORT}/auth/lovetree/start`,
-      LOVETREE_PUBLIC_ORIGIN: PUBLIC_ORIGIN
+      LOVETREE_PUBLIC_ORIGIN: PUBLIC_ORIGIN_OVERRIDE || PUBLIC_ORIGIN
     },
     productId: PRODUCT
   });
@@ -241,7 +243,7 @@ async function startApp() {
     const { method = 'GET', path = '', headers = {}, body, query } = request;
     if (path.startsWith('/auth/')) {
       try {
-        return await login.route({ method, path, query, headers, origin: PUBLIC_ORIGIN });
+        return await login.route({ method, path, query, headers, origin: PUBLIC_ORIGIN_OVERRIDE || PUBLIC_ORIGIN });
       } catch (error) {
         return { status: error.status ?? 500, headers: {}, body: { error: { code: error.code ?? 'internal_error', message: error.message } } };
       }

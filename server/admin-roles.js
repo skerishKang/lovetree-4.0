@@ -62,6 +62,16 @@ export function createAdminRoleService({ store, productId, clock = () => new Dat
       }
     },
 
+    /**
+     * 최초 관리자 부팅은 이 함수로 하지 않는다.
+     *
+     * HTTP로 열린 자리는 읽기 둘(`GET /api/admin/session`·`GET /api/admin/roles`)뿐이라
+     * 외부에서 첫 관리자를 등록할 길이 없다. 첫 행은 DB 접근 권한이 있는 자리에서
+     * `store.assign({ productId, subjectId, role: 'admin' })`(또는 같은 모양의 INSERT)을
+     * 서버 운영자가 **확인된 canonical subject**로만 실한다. 브라우저가 보낸 이메일·
+     * 헤더·localStorage는 근거가 아니고, 지정 계정·subject·시크릿은 저장소에 적지 않는다.
+     * 두 번째부터는 이렇게 등록된 관리자가 `actorPrincipal`을 견디고 아래를 쓴다.
+     */
     async assign({ actorPrincipal, targetSubjectId, role = ROLE_ADMIN, reason = null }) {
       const granted = await this.roleFor(actorPrincipal);
       if (!granted) throw new ApiError(403, 'admin_forbidden', '역할을 바꿀 권한이 없어요.');

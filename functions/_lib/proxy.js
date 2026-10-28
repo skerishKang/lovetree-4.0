@@ -17,6 +17,8 @@
 // 경로마다 브라우저가 실제로 쓰는 메서드만 넘긴다. 그 밖은 COM2까지 내려보내지 않는다.
 const ALLOWED = new Map([
   ['/api/workspace', new Set(['GET', 'PUT'])],
+  ['/api/admin/session', new Set(['GET'])],
+  ['/api/admin/roles', new Set(['GET'])],
   ['/auth/login', new Set(['GET'])],
   ['/auth/callback', new Set(['GET', 'POST'])],
   ['/auth/logout', new Set(['POST'])]

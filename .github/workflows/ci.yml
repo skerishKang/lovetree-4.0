@@ -54,7 +54,7 @@ jobs:
           status=0
           # 두 PostgreSQL 파일이 같은 DB에서 동시에 CREATE TABLE 하면 카탈로그가 경합한다
           # (pg_type_typname_nsp_index 중복). 파일 간 병렬을 풀어 DDL을 직렬화한다.
-          node --test --test-concurrency=1 --test-reporter=tap tests/storage-postgres.test.mjs tests/login-state-postgres.test.mjs > /tmp/pg.tap 2>&1 || status=$?
+          node --test --test-concurrency=1 --test-reporter=tap tests/storage-postgres.test.mjs tests/login-state-postgres.test.mjs tests/admin-roles-postgres.test.mjs > /tmp/pg.tap 2>&1 || status=$?
           cat /tmp/pg.tap
           if [ "$status" -ne 0 ]; then
             echo "실패: 연결 실패 또는 테스트 실패 (exit $status)"
@@ -64,7 +64,7 @@ jobs:
           fail=$(awk '/^# fail /{print $3}' /tmp/pg.tap)
           skipped=$(awk '/^# skipped /{print $3}' /tmp/pg.tap)
           echo "pass=$pass fail=$fail skipped=$skipped"
-          if [ "${fail:-1}" != "0" ] || [ "${skipped:-1}" != "0" ] || [ "${pass:-0}" -lt 9 ]; then
-            echo "실패: skip 또는 9건 미달 — PostgreSQL 검증이 수행되지 않았습니다."
+          if [ "${fail:-1}" != "0" ] || [ "${skipped:-1}" != "0" ] || [ "${pass:-0}" -lt 12 ]; then
+            echo "실패: skip 또는 12건 미달 — PostgreSQL 검증이 수행되지 않았습니다."
             exit 1
           fi
