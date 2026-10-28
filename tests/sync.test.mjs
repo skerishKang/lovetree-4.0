@@ -477,3 +477,41 @@ test('로그아웃하지 않은 채 계정이 바뀌어도 앞 계정의 사본�
   assert.deepEqual(store.puts, [], 'A의 사본이 B의 업로드 후보가 되지 않는다');
   assert.deepEqual(JSON.parse(made.storage.get(PARKED))['acct-a'].state, aGrown, 'A의 사본은 A 이름으로 옮겨 둔다');
 });
+
+test('응답만 유실된 저장은 같은 요청 키로 다시 보내 복제로 끝난다', async () => {
+  const base = doc('기준');
+  const added = doc('기준', '추가');
+  const api = fakeApi({ get: [okGet(1, base)], put: [networkDown, okPut(2)] });
+  const made = harness({ initial: base, api });
+  await made.controller.start();
+  made.edit(added);
+  made.controller.markLocalSave();
+  await made.settle();
+  assert.equal(made.controller.status().phase, 'offline');
+
+  const back = await made.controller.act('retry');
+  assert.equal(back.phase, 'synced');
+  const [first, second] = api.puts();
+  assert.equal(first.clientKey, second.clientKey, '같은 내용·같은 번호는 같은 요청 키를 쓴다');
+  assert.equal(first.expectedRevision, second.expectedRevision);
+  assert.deepEqual(second.state, added);
+
+  // 다시 시도 전에 내용이 바뀌면 다른 요청 키로 나간다 — 복제가 아니라 새 저장이다.
+  const changed = doc('기준', '추가', '그 뒤 입력');
+  const later = fakeApi({ get: [okGet(1, base)], put: [networkDown, networkDown, okPut(2)] });
+  const again = harness({ initial: base, api: later });
+  await again.controller.start();
+  again.edit(added);
+  again.controller.markLocalSave();
+  await again.settle();
+  await again.controller.act('retry');
+  assert.equal(again.controller.status().phase, 'offline');
+  assert.equal(later.puts()[0].clientKey, later.puts()[1].clientKey, '그대로 재시도하면 같은 키');
+
+  again.edit(changed);
+  again.controller.markLocalSave();
+  await again.settle();
+  assert.equal(again.controller.status().phase, 'synced');
+  assert.notEqual(later.puts()[2].clientKey, later.puts()[0].clientKey, '내용이 바뀌면 새 키');
+  assert.deepEqual(later.puts()[2].state, changed);
+});

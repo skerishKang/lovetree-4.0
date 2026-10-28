@@ -220,10 +220,20 @@ export function createSyncController(deps) {
     return `${answer.message ?? '다른 곳에서 먼저 저장했어요.'}${step} 무엇을 남길지 고르면 나머지는 이 기기에 백업으로 남아요.`;
   }
 
+  // 서버는 같은 요청 키·같은 내용이면 첫 결과를 그대로 되돌려 준다(요청 키 멱등).
+  // 따라서 응답만 유실된 저장은 같은 키로 다시 보내 conflict가 아니라 복제로 끝난다.
+  function attemptFor(expected, serialized) {
+    const previous = lastIntended?.kind === 'synced' ? lastIntended.attempt : null;
+    if (previous && previous.expected === expected && previous.serialized === serialized) return previous.clientKey;
+    return makeClientKey();
+  }
+
   async function push(expected) {
     if (!Number.isSafeInteger(expected)) return start();
     const gen = generation;
-    const clientKey = makeClientKey();
+    const serialized = JSON.stringify(getState());
+    const clientKey = attemptFor(expected, serialized);
+    const attempt = { expected, serialized, clientKey };
     show(status({ phase: 'syncing', actions: [] }));
     const answer = await api.put({ state: getState(), expectedRevision: expected, clientKey });
     // 로그아웃·계정 전환 뒤에 도착한 응답은 화면도 번호도 고치지 않는다.
@@ -255,7 +265,7 @@ export function createSyncController(deps) {
       return show(status({ phase: 'rejected', detail: answer.message ?? '기록 형식을 확인해 주세요.', actions: [{ name: 'retry', label: '다시 시도' }] }));
     }
     dirty = true;
-    lastIntended = { kind: 'synced' };
+    lastIntended = { kind: 'synced', attempt };
     return show(status({
       phase: answer.status === 0 ? 'offline' : 'rejected',
       detail: answer.status === 0 ? '네트워크에 닿지 않아 이 기기에만 저장한 상태로 남겼어요.' : answer.message,
