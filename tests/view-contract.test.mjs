@@ -6,7 +6,15 @@ function fakeHost() {
   const roots = [];
   return {
     roots,
-    attachShadow(init) { const root = { mode: init?.mode, mounted: true }; roots.push(root); return root; }
+    shadowRoot: null,
+    attachShadow(init) {
+      // 실제 DOM과 같다: 한 host에는 shadow root가 하나뿐이다.
+      if (this.shadowRoot) throw new Error('Shadow root cannot be created on a host which already hosts a shadow tree.');
+      const root = { mode: init?.mode, mounted: true };
+      this.shadowRoot = root;
+      roots.push(root);
+      return root;
+    }
   };
 }
 
@@ -61,4 +69,23 @@ test('이미 dispose된 뒤 등록한 정리는 즉시 실행된다', () => {
 test('host가 없으면 조용히 넘어가지 않고 거부한다', () => {
   assert.throws(() => createView(null), /host/);
   assert.throws(() => createView({}), /host/);
+});
+
+test('같은 host에 다시 mount하지 않는다 — 계약은 "새 host에 mount, 기존 화면 dispose는 호출자"', () => {
+  const host = fakeHost();
+  const first = createView(host);
+  first.dispose();
+  assert.throws(() => createView(host), /새 host/,
+    'shadow root가 남은 host에는 다시 붙이지 않는다(플랫폼도 거부한다)');
+  const second = createView(fakeHost());
+  assert.notEqual(second.root, first.root, '새 host에는 새 shadow root가 붙는다');
+  second.dispose();
+});
+
+test('signal은 track 정리보다 먼저 끊긴다 — dispose가 닫는 dialog의 close 콜백이 남지 않는 이유', () => {
+  const view = createView(fakeHost());
+  let abortedWhenCleanupRan = null;
+  view.track(() => { abortedWhenCleanupRan = view.signal.aborted; });
+  view.dispose();
+  assert.equal(abortedWhenCleanupRan, true, 'track(() => modal.close()) 실행 시점에 이미 이벤트 리스너는 해제되어 있다');
 });

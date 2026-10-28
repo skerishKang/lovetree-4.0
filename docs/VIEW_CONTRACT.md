@@ -37,6 +37,7 @@
    - `root`: shadow root. `signal`: 모든 이벤트 등록에 쓴다.
    - `track(fn)`: observer·RAF·dialog처럼 signal로 정리되지 않는 자원.
    - `dispose()`: `signal` 해제 → 등록의 역순 정리. 여러 번 불러도 한 번만 실제 정리하고, 정리 중 하나가 던져도 나머지를 계속한다.
+   - **mount는 새 host에만 한다.** 한 host에는 shadow root가 하나뿐이라 같은 요소에 다시 붙일 수 없다. 화면 교체 시 이전 화면 `dispose`와 새 host 준비는 호출자(`render`)가 맡는다 — 현재 앱이 `#app`을 갈아 끼우는 방식과 같다. 같은 host 재사용은 지원하지 않는다.
 2. **문맥 (다음 조각)** — `{ treeId, momentId, readOnly }`를 `main.js`가 한 번 계산해 모든 화면에 같은 모양으로 넘긴다. `example`/`demo`는 `readOnly`로 수렴시키고, 책장은 자기 것이므로 `readOnly:false`다.
 3. **행동 (다음 조각)** — 화면별 콜백(`onBook`·`onShelf`·`onAdd`…)을 의미 이름으로 모은다: `navigate(route)`, `select(treeId, momentId)`, `requestMoment('add'|'edit'|'delete', id)`. 화면은 저장소를 직접 쓰지 않는다(읽던 위치·선택 기록은 `main.js` 한 곳).
 4. **소유 경계 (다음 조각)** — 공통 shell(메뉴·동기화 상태·팝업·여백)은 `main.js`가 소유하고, 화면은 자기 shadow root 밖을 만지지 않는다. 읽기 전용에서 편집 단추를 숨기는 것은 UX일 뿐이며 최종 판정은 서버가 한다.
