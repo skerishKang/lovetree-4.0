@@ -3,6 +3,7 @@ import { pathToFileURL } from 'node:url';
 import { createPool, createWorkspaceRepo } from './db/postgres.js';
 import { createAdminRoleRepo } from './db/admin-roles-postgres.js';
 import { createAdminRoleService } from './admin-roles.js';
+import { resolveListen } from './listen-config.js';
 import { createApiHandler, createNodeHandler } from './http.js';
 import { createWorkspaceService } from './workspace-service.js';
 import { createPadiemAuthorityAuth } from './padiem-authority-auth.js';
@@ -33,7 +34,7 @@ const {
   LOVETREE_SESSION_SOURCE = '',
   LOVETREE_SESSION_COOKIE = '',
   LOVETREE_AUTHORITY_TIMEOUT_MS = '',
-  PORT = '8788'
+  PORT = ''
 } = process.env;
 
 if (!LOVETREE_PRODUCT_ID) throw new Error('LOVETREE_PRODUCT_ID가 필요합니다. 인증 권위의 제품 ID와 같은 값을 씁니다.');
@@ -136,7 +137,8 @@ const requestHandler = async (request) => {
 };
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
-  createServer(createNodeHandler(requestHandler, { maxBodyBytes })).listen(Number(PORT), () => {
-    console.log(`lovetree storage api :${PORT}`);
+  const { host, port } = resolveListen({ env: process.env });
+  createServer(createNodeHandler(requestHandler, { maxBodyBytes })).listen(port, host, () => {
+    console.log(`lovetree storage api ${host}:${port}`);
   });
 }
