@@ -36,6 +36,14 @@ main `98be779` 위에서 별도 worktree·브랜치로 진행했다. `src/main.j
 - 리모네 `TreeViewShell`/`ViewSwitcher`(같은 트리의 여러 보기, `?moment=`로 선택 유지, `isOwner` 게이트)와 4.0 세 화면 비교표·최소 계약은 `docs/VIEW_CONTRACT.md`에 있다. 문맥(`treeId`·`momentId`·`readOnly`)과 행동 콜백 수렴은 다음 조각.
 - 검증: `tests/view-contract.test.mjs` 6건, `npm run check`, 브라우저 화면 순회에서 프레임 루프가 남지 않는지(rAF 계수) 확인.
 
+
+## 구조 스택 통합(#70→#72→#74 → main 4aab220) — 2026-10-29
+
+- `ai/com1-screen-registry-20261028-141624`(= #70 `ae64b94`·`71f13d3` → #72 `7912765`·`dd1173b` → #74 `bc93145`·`9bca923` 전체 포함)를 main `4aab220` 위 브랜치로 merge해 통합했다. main에 이미 들어간 스택 조각은 없었고(merge-base `b30029b`), 빠진 6커밋 전부가 이번에 들어왔다.
+- 충돌 4파일 해결: `render()`는 스택의 화면 등록표 구조를 채택하고 세 그림자 화면 마운트에 #78 로그인 진입(`authHtml:authEntry(...)` — shelf ghost·book ui-btn·orbit menuBtn)을 얹었다. 뷰 3개는 스택의 context/actions·createView 계약에 `authHtml` 인자만 추가했다. #79 카메라 코드와 #80 상세/기억책 렌더는 diff상 한 줄도 바뀌지 않았다(정적 확인). `styles.css`·`sync.js`·`index.html`은 만지지 않았다(COM2 #81 범위 보호).
+- 범위 제한: lifecycle·context/actions·registry 통합만 했다. 선택/저장 소유권 통합과 공통 shell은 추가하지 않았다(스택 문서의 '다음 조각' 그대로 남김).
+- 검증: `npm run check` 테스트 189개(스택 신규 15개 포함)·0 fail·빌드 성공. 브라우저 33항목 통과(로컬 preview 4175): 화면 왕복(orbit→shelf→tree→book)·뒤로가기 5단계·앞으로가기 3단계 복귀와 트리 선택 유지·예시 3화면 읽기 전용·네 화면 로그인 진입 클릭→`/auth/login?next=/`·왕복 2랩에서 host 1개·열린 dialog 0·콘솔 오류 0(로컬 preview `/api/workspace` 404는 서버 API 미구동 시 정상). #79 마우스 반응 실측(카드 변형 변화) 확인.
+- 남은 것: PR 병합은 Owner 검수 후. 개별 PR #70·#72·#74는 이 통합이 병합되면 정리 대상.
 ## 운영 연결 진행 — 2026-10-28 (COM1)
 
 PADIEM 공통 인증과 러브트리 저장 API를 잇는 운영 작업의 실제 상태. 값·주소 기준은 아래 항목과 ai-revenue-lab main이다.
