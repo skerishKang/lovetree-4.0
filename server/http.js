@@ -1,7 +1,7 @@
 import { ApiError } from './errors.js';
 import { parsePrincipal } from './principal.js';
 
-const DEFAULT_MAX_BODY_BYTES = 4 * 1024 * 1024;
+export const DEFAULT_MAX_BODY_BYTES = 4 * 1024 * 1024;
 
 function errorBody(error) {
   const { code, message, details } = error;
