@@ -6,6 +6,7 @@ import { hasRecovery as recoveryAvailable, recoveryData } from './views/memory.j
 import { createTree, addMoment, editMoment, removeMoment, importTrees, MAX_TREES, MAX_LINKS, EMOTIONS, treeLayout, pathTo, stemGroups, linkMoments, unlinkMoments, relatedMoments } from './domain.js';
 import { loadState, saveState, STORAGE_KEY, RECOVERY_KEY } from './storage.js';
 import { createSyncController, createWorkspaceApi, mountSync } from './sync.js';
+import { authEntry, refreshAuthEntries } from './auth-entry.js';
 import { EXAMPLES } from './examples.js';
 import { SERVICE, GO_HOME, GO_TREES, GO_EXAMPLES, READ_BOOK, NEW_TREE, CONTINUE_MOMENT, BOOK_IS_READING } from './terms.js';
 
@@ -99,10 +100,12 @@ function go(hash) {
   if (location.hash === hash) render(); else location.hash = hash;
 }
 function dateLabel(date) { return date.replaceAll('-', '.'); }
+// 상단 로그인 진입의 현재 상태. sync 컨트롤러가 소유한 값만 읽는다.
+const authSnapshot = () => ({ ...sync.snapshot(), phase: sync.status().phase });
 function header(active) {
   return `<header class="site-header"><a href="#start" class="brand" aria-label="${SERVICE} ${GO_HOME}">${icon('leaf')}<span>${SERVICE}<span class="brand-dot">.</span></span></a>
     <nav aria-label="주 메뉴"><a href="#start" ${active === 'start' ? 'aria-current="page"' : ''}>${GO_HOME}</a><a href="#trees" ${active === 'trees' ? 'aria-current="page"' : ''}>${GO_TREES}${state.trees.length ? `<span class="nav-count">${state.trees.length}</span>` : ''}</a><a href="#examples" ${active === 'examples' ? 'aria-current="page"' : ''}>${GO_EXAMPLES}</a></nav>
-    <button class="button primary header-cta" data-action="new">${icon('plus')}<span>${NEW_TREE}</span></button></header>`;
+    <button class="button primary header-cta" data-action="new">${icon('plus')}<span>${NEW_TREE}</span></button>${authEntry(authSnapshot(), 'button secondary header-auth')}</header>`;
 }
 function footer() { return `<footer class="site-footer"><a class="footer-brand" href="#start">${icon('leaf')} ${SERVICE}.</a><p>좋아하는 마음은, 이어질수록 자라니까.</p><span>당신의 작은 순간을 소중히.</span></footer>`; }
 function art(kind, cls = '') { return `<div class="art art-${kind} ${cls}" aria-hidden="true"><img src="/art/${kind === 'stage' ? 'stage' : 'sky'}.svg" alt="" /></div>`; }
@@ -217,6 +220,15 @@ function workspace() {
   const graphScale = fit ? fit.scale : zoom;
   return `${header(demo ? 'examples' : 'trees')}<main id="main" class="workspace wrap" tabindex="-1"><a href="${demo ? '#examples' : '#trees'}" class="back-link">${icon('back')} ${demo ? GO_EXAMPLES : GO_TREES}</a><div class="workspace-heading"><div><div class="eyebrow">${escape(tree.subject)} <span class="mode-badge">${demo ? '가상 예시 · 체험' : '내 브라우저에 보관'}</span></div><h1>${escape(tree.title)}</h1><p>${demo ? '순간을 눌러, 이어지는 마음을 따라가 보세요.' : '순간을 고르고, 그 마음에서 다음 이야기를 이어 보세요.'} 기억책은 ${BOOK_IS_READING}이에요.</p></div>${demo ? `<button class="button secondary" data-action="new">${NEW_TREE} ${icon('plus')}</button>` : `<button class="button secondary" data-action="export-tree" data-id="${escape(tree.id)}">${icon('download')} 파일로 보관</button>`}</div>${!demo && selected && tree.id === guideTreeId ? saveGuide(tree, selected) : ''}<div class="workspace-grid"><section class="tree-board" aria-label="트리 작업 공간"><div class="board-toolbar"><div class="view-switch" aria-label="보기 방식"><button data-action="view" data-view="tree" aria-pressed="${viewMode === 'tree'}" aria-label="트리로 보기">${icon('tree')}<span class="view-label">트리로 보기</span></button><button data-action="view" data-view="list" aria-pressed="${viewMode === 'list'}" aria-label="시간으로 보기">${icon('list')}<span class="view-label">시간으로 보기</span></button><button data-action="view" data-view="board" aria-pressed="${viewMode === 'board'}" aria-label="보드로 보기">${icon('grid')}<span class="view-label">보드로 보기</span></button><button data-action="view" data-view="stems" aria-pressed="${viewMode === 'stems'}" aria-label="줄기로 보기">${icon('leaf')}<span class="view-label">줄기로 보기</span></button></div><a class="text-button small" href="#${demo ? 'demo-book' : 'book'}/${escape(tree.id)}" title="${BOOK_IS_READING}">${READ_BOOK}</a><span class="moment-count">${tree.moments.length}개의 순간</span></div>${viewMode === 'tree' ? graph(tree, graphScale) : viewMode === 'list' ? timeline(tree) : viewMode === 'board' ? board(tree) : stemView(tree)}<div class="board-bottom"><span class="board-hint">${icon('leaf')} ${viewMode === 'board' ? (demo ? '선택한 순간까지의 길을 따라가 볼 수 있어요.' : '선택한 순간까지 이어진 경로를 강조했어요.') : viewMode === 'stems' ? (demo ? '첫 순간에서 갈라진 줄기마다 순간을 모아 보여 줘요.' : '첫 순간에서 갈라진 줄기마다, 이어 온 순간을 모아 봐요.') : (demo ? '당신의 마음도 이렇게 자랄 수 있어요.' : '작은 순간들이 모여, 나만의 이야기가 돼요.')}</span><div class="board-tools">${viewMode === 'tree' && fit && !fit.fits ? `<span class="zoom-note" role="status">한 화면에 다 담지 못해 ${Math.round(graphScale * 100)}%까지만 줄였어요. ${tree.moments.length > 40 ? '줄기로 보기에서 전체 흐름을 볼 수 있어요.' : '나누어 살펴보세요.'}</span>` : ''}${routeNav(tree, selected)}${branchPicker ? `<div class="branch-picker" role="group" aria-label="다음 순간 선택">${branchPicker.map(c => `<button class="text-button small" data-action="branch-pick" data-id="${escape(c.id)}">${escape(c.title)}</button>`).join('')}<button class="text-button small" data-action="branch-cancel">취소</button></div>` : ''}${viewMode === 'tree' ? `<div class="zoom-controls"><button data-action="zoom-out" aria-label="트리 축소" ${graphScale <= .18 ? 'disabled' : ''}>−</button><button data-action="zoom-reset" aria-label="트리 배율 초기화">${Math.round(graphScale*100)}%</button><button data-action="zoom-in" aria-label="트리 확대" ${graphScale >= 1.4 ? 'disabled' : ''}>+</button><button class="zoom-fit" data-action="zoom-fit" aria-label="전체가 보이도록 맞추기" aria-pressed="${zoom === 'fit'}">맞춤</button></div>` : ''}</div></div></section>${detail(tree, selected, demo)}</div></main>${footer()}`;
 }
+// 로그인·로그아웃 진입 클릭. 그림자 뷰 안의 버튼도 같은 위임으로 받는다(composedPath).
+document.addEventListener('click', (event) => {
+  const button = event.composedPath().find((node) => node instanceof Element && node.hasAttribute('data-auth-action'));
+  if (!button || button.disabled) return;
+  const snapshot = authSnapshot();
+  const requested = button.getAttribute('data-auth-action');
+  void sync.act(requested === 'logout' && snapshot.owned ? 'logout' : 'login');
+});
+
 function render() {
   disposeView(); disposeView = () => {};
   const route = location.hash.slice(1);
@@ -224,16 +236,16 @@ function render() {
   const showWorkspace = (treeId, momentId, demo=false) => { selectedId=momentId; go(`#${demo?'demo':'tree'}/${treeId}`); };
   if (route === 'trees') {
     $('#app').innerHTML='<main id="main"></main>';
-    disposeView=mountShelf($('#main'), {trees:state.trees,storage,view:shelfView,error:loaded.error,recovery:hasRecovery(),onBook:showBook,onWorkspace:showWorkspace,onNew:()=>openMoment('new'),onAction:libraryAction});
+    disposeView=mountShelf($('#main'), {trees:state.trees,storage,view:shelfView,error:loaded.error,recovery:hasRecovery(),onBook:showBook,onWorkspace:showWorkspace,onNew:()=>openMoment('new'),onAction:libraryAction,authHtml:authEntry(authSnapshot(),'ghost')});
   }
   else if (/^(tree|demo)\//.test(route)) $('#app').innerHTML=workspace();
   else if (/^(book|demo-book)\//.test(route) && currentTree()) {
     $('#app').innerHTML='<main id="main"></main>';
-    disposeView=mountBook($('#main'), {tree:currentTree(),selectedId,storage,demo:isDemo(),onHome:()=>go('#start'),onShelf:()=>{shelfView.selectedId=currentTree().id;go('#trees')},onWorkspace:showWorkspace,onNew:()=>openMoment('new'),onAdd:id=>openMoment('add',id),onEdit:id=>openMoment('edit',id)});
+    disposeView=mountBook($('#main'), {tree:currentTree(),selectedId,storage,demo:isDemo(),onHome:()=>go('#start'),onShelf:()=>{shelfView.selectedId=currentTree().id;go('#trees')},onWorkspace:showWorkspace,onNew:()=>openMoment('new'),onAdd:id=>openMoment('add',id),onEdit:id=>openMoment('edit',id),authHtml:authEntry(authSnapshot(),'ui-btn')});
   } else if (/^(book|demo-book)\//.test(route)) $('#app').innerHTML=workspace();
   else {
     $('#app').innerHTML='<main id="main"></main>';
-    disposeView=mountOrbit($('#main'),{trees:state.trees,storage,example:route==='examples',onNew:()=>openMoment('new'),onTrees:()=>go('#trees'),onBook:showBook,onWorkspace:showWorkspace,error:loaded.error,recovery:hasRecovery(),onRecovery:exportRecovery});
+    disposeView=mountOrbit($('#main'),{trees:state.trees,storage,example:route==='examples',onNew:()=>openMoment('new'),onTrees:()=>go('#trees'),onBook:showBook,onWorkspace:showWorkspace,error:loaded.error,recovery:hasRecovery(),onRecovery:exportRecovery,authHtml:authEntry(authSnapshot(),'menuBtn')});
   }
 }
 function updateTree(tree) { commit({ ...state, trees: state.trees.map(t => t.id === tree.id ? tree : t) }); }
@@ -610,7 +622,9 @@ const sync = createSyncController({
   api: createWorkspaceApi(),
   storage: window.localStorage,
   // 화면 경로는 이 파일이 소유한다. 안쪽으로 옮길 때는 앱의 이력 추적을 함께 쓴다.
-  navigate: (url) => { if (url.startsWith('#')) go(url); else location.assign(url); }
+  navigate: (url) => { if (url.startsWith('#')) go(url); else location.assign(url); },
+  // 동기화 상태가 바뀌면 화면을 다시 그리지 않고 상단 진입 버튼 문구만 맞춘다.
+  onChange: () => { refreshAuthEntries(document, authSnapshot()); }
 });
 mountSync({ controller: sync, doc: document });
 render();

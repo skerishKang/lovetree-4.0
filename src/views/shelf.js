@@ -23,7 +23,7 @@ function cover(tree, number) {
   return `<span class="book-cover" style="--cover:${color(tree)}"><span class="cover-number">TREE · ${String(number).padStart(2, '0')}</span><span class="cover-symbol" aria-hidden="true"><span>✦</span></span><strong class="cover-title">${esc(tree.subject)}</strong><span class="cover-subtitle">${tree.moments.length}개의 순간</span></span>`;
 }
 
-export function mountShelf(host, {trees, storage, view, error, recovery, onBook, onWorkspace, onNew, onAction}) {
+export function mountShelf(host, {trees, storage, view, error, recovery, onBook, onWorkspace, onNew, onAction, authHtml = ''}) {
   const root = host.attachShadow({mode: 'open'});
   const abort = new AbortController(), signal = abort.signal;
   const sorted = [...trees].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
@@ -34,8 +34,8 @@ export function mountShelf(host, {trees, storage, view, error, recovery, onBook,
   if (!trees.some(t => t.id === selection)) selection = last?.tree.id || sorted[0]?.id;
   if (!subjects.includes(view.subject)) view.subject = '';
   const totalMoments = trees.reduce((n, tree) => n + tree.moments.length, 0);
-  root.innerHTML = `<style>${sourceCSS}\n${css}</style><div class="app">
-    <header class="topbar"><a class="brand" href="#start" aria-label="${SERVICE} ${GO_HOME}"><span class="brand-mark" aria-hidden="true"><i></i><b></b></span><span><strong>${SERVICE}</strong><small>LOVE MOMENT LIBRARY</small></span></a><span class="crumbs">${GO_TREES}</span><nav class="top-actions" aria-label="${GO_TREES} 메뉴"><a class="ghost" href="#start">${GO_HOME}</a><a class="ghost example-link" href="#examples">${GO_EXAMPLES}</a><button class="ghost primary" data-do="new">${NEW_TREE} +</button></nav></header>
+  root.innerHTML = `<style>${sourceCSS}\n${css}\n.auth-entry{white-space:nowrap}@media(max-width:540px){.auth-entry{min-height:34px;padding:0 11px;font-size:11px}}</style><div class="app">
+    <header class="topbar"><a class="brand" href="#start" aria-label="${SERVICE} ${GO_HOME}"><span class="brand-mark" aria-hidden="true"><i></i><b></b></span><span><strong>${SERVICE}</strong><small>LOVE MOMENT LIBRARY</small></span></a><span class="crumbs">${GO_TREES}</span><nav class="top-actions" aria-label="${GO_TREES} 메뉴"><a class="ghost" href="#start">${GO_HOME}</a><a class="ghost example-link" href="#examples">${GO_EXAMPLES}</a><button class="ghost primary" data-do="new">${NEW_TREE} +</button>${authHtml}</nav></header>
     <div class="page">${hero(trees, totalMoments, last, sorted)}
     ${error || recovery ? `<section class="recovery" role="status">${esc(error || '이전에 보관한 복구 사본이 있어요.')}${recovery ? '<button class="ghost" data-action="recovery">복구 파일 내보내기</button>' : ''}</section>` : ''}
     <div class="shelf-controls"><label class="search"><span class="sr-only">${GO_TREES} 검색</span><input type="search" aria-label="${GO_TREES} 검색" placeholder="대상, 트리 제목, 순간 제목으로 찾기" value="${esc(view.query || '')}"></label><select class="subject-select" aria-label="좋아하는 대상별 보기"><option value="">모든 대상</option>${subjects.map(subject => `<option value="${esc(subject)}" ${view.subject === subject ? 'selected' : ''}>${esc(subject)}</option>`).join('')}</select><div class="view-toggle" role="group" aria-label="${GO_TREES} 보는 방식"><button data-mode="shelf">표지</button><button data-mode="list">목록</button></div><span class="count" role="status" aria-live="polite"></span></div>
