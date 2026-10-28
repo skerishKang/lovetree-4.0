@@ -19,3 +19,52 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
+  postgres:
+    name: PostgreSQL 저장·로그인 상태 검증
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: lovetree_test_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d lovetree_test_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: 격리 테스트 DB에서 저장 API·로그인 상태 검증
+        env:
+          LOVETREE_TEST_DATABASE_URL: postgres://postgres:ci@127.0.0.1:5432/lovetree_test_ci
+        run: |
+          if [ -z "${LOVETREE_TEST_DATABASE_URL:-}" ]; then
+            echo "실패: 연결 설정 누락 — 다른 연결 문자열로 대체하지 않습니다."
+            exit 1
+          fi
+          status=0
+          # 두 PostgreSQL 파일이 같은 DB에서 동시에 CREATE TABLE 하면 카탈로그가 경합한다
+          # (pg_type_typname_nsp_index 중복). 파일 간 병렬을 풀어 DDL을 직렬화한다.
+          node --test --test-concurrency=1 --test-reporter=tap tests/storage-postgres.test.mjs tests/login-state-postgres.test.mjs > /tmp/pg.tap 2>&1 || status=$?
+          cat /tmp/pg.tap
+          if [ "$status" -ne 0 ]; then
+            echo "실패: 연결 실패 또는 테스트 실패 (exit $status)"
+            exit 1
+          fi
+          pass=$(awk '/^# pass /{print $3}' /tmp/pg.tap)
+          fail=$(awk '/^# fail /{print $3}' /tmp/pg.tap)
+          skipped=$(awk '/^# skipped /{print $3}' /tmp/pg.tap)
+          echo "pass=$pass fail=$fail skipped=$skipped"
+          if [ "${fail:-1}" != "0" ] || [ "${skipped:-1}" != "0" ] || [ "${pass:-0}" -lt 9 ]; then
+            echo "실패: skip 또는 9건 미달 — PostgreSQL 검증이 수행되지 않았습니다."
+            exit 1
+          fi
