@@ -29,3 +29,29 @@ CREATE TABLE IF NOT EXISTS lovetree_login_states (
   state_hash char(64) PRIMARY KEY,
   expires_at timestamptz NOT NULL
 );
+
+-- 제품 역할(#67 관리자 기반). 키는 서버가 확인한 이 제품의 canonical subject다.
+-- 공통 신원과 제품 권한을 분리한다 — 다른 제품의 역할은 여기로 전파되지 않는다.
+-- 지정 계정 등록은 승인된 비공개 운영 절차에서 하고, 이 파일에는 주소·이메일·subject를 적지 않는다.
+CREATE TABLE IF NOT EXISTS lovetree_product_roles (
+  product_id text NOT NULL,
+  subject_id text NOT NULL,
+  role text NOT NULL CHECK (role IN ('admin')),
+  granted_by text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (product_id, subject_id)
+);
+
+-- 부여·회수 이력. PADIEM migration 052의 감사 행과 같이 FK 없이 스스로 선다.
+CREATE TABLE IF NOT EXISTS lovetree_product_role_audit (
+  id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  product_id text NOT NULL,
+  subject_id text NOT NULL,
+  action text NOT NULL CHECK (action IN ('assign', 'revoke')),
+  previous_role text,
+  role text,
+  actor_subject_id text,
+  reason text,
+  changed_at timestamptz NOT NULL DEFAULT now()
+);

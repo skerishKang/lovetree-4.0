@@ -30,6 +30,8 @@ import { createPadiemAuthorityAuth } from '../server/padiem-authority-auth.js';
 import { createAuthorityRelayClient } from '../server/authority-relay-transport.js';
 import { createAuthorityWriter } from '../server/authority-writer.js';
 import { createHandoffMintClient } from '../server/handoff-mint-client.js';
+import { createAdminRoleService } from '../server/admin-roles.js';
+import { createModelAdminRoleStore } from '../server/testing/model-admin-role-store.js';
 import { createLoginProvider } from '../server/padiem-login-provider.js';
 import { createProxy } from '../functions/_lib/proxy.js';
 import { createLoginService } from '../server/login-service.js';
@@ -183,7 +185,8 @@ async function serveStatic(path, res) {
     res.end('not found');
     return true;
   }
-  if (existsSync(file) && !file.endsWith('.html')) {
+  // 실제 Pages와 같은 모양: 있는 파일은 그 자체로, 없는 화면 경로는 index로 폴백한다.
+  if (existsSync(file)) {
     res.writeHead(200, { 'content-type': assetType(file), 'cache-control': 'no-store' });
     res.end(await readFile(file));
     return true;
@@ -220,10 +223,18 @@ async function startApp() {
     credential: createCredentialVerifier({ env: { LOVETREE_SESSION_SECRET: SESSION_SECRET }, present: fromCookie(SESSION_COOKIE) }),
     authority: createAuthorityRelayClient({ url: `http://127.0.0.1:${READ_PORT}/resolve-session`, callerSecret: CALLER_SECRET })
   });
+  // #67 관리자 기반의 격리 확인용. 실제 배포에서는 server/db/admin-roles-postgres.js가 이 자리에 온다.
+  // 지정 계정은 커밋하지 않는다 — LOVETREE_DEV_ADMIN_SUBJECTS(쉼표 구분)로 런처에만 넘긴다.
+  const roleStore = createModelAdminRoleStore();
+  const admin = createAdminRoleService({ store: roleStore, productId: PRODUCT });
+  for (const subject of String(process.env.LOVETREE_DEV_ADMIN_SUBJECTS ?? '').split(',').map((value) => value.trim()).filter(Boolean)) {
+    await roleStore.assign({ productId: PRODUCT, subjectId: subject, role: 'admin', grantedBy: null });
+  }
   const storage = createApiHandler({
     authenticate,
     service: createWorkspaceService({ repo: createMemoryWorkspaceRepo(), productId: PRODUCT }),
-    productId: PRODUCT
+    productId: PRODUCT,
+    admin
   });
 
   const api = createNodeHandler(async (request) => {

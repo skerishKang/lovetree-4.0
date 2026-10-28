@@ -1,4 +1,5 @@
 import { ApiError } from './errors.js';
+import { ROLE_ADMIN } from './admin-roles.js';
 import { parsePrincipal } from './principal.js';
 
 export const DEFAULT_MAX_BODY_BYTES = 4 * 1024 * 1024;
@@ -8,7 +9,7 @@ function errorBody(error) {
   return { error: { code, message, ...(details ? details : {}) } };
 }
 
-export function createApiHandler({ authenticate, service, productId, maxBodyBytes = DEFAULT_MAX_BODY_BYTES }) {
+export function createApiHandler({ authenticate, service, productId, admin = null, maxBodyBytes = DEFAULT_MAX_BODY_BYTES }) {
   async function handle(request) {
     const { method = 'GET', path = '', body = '' } = request ?? {};
     const text = typeof body === 'string' ? body : String(body);
@@ -18,6 +19,30 @@ export function createApiHandler({ authenticate, service, productId, maxBodyByte
     try { verified = await authenticate(request ?? {}); }
     catch (error) { if (error instanceof ApiError) throw error; throw new ApiError(503, 'auth_unavailable', '로그인 연결에 문제를 만났어요.'); }
     const principal = parsePrincipal(verified, productId);
+
+    // 관리자 경계 (#67). 신원은 위와 같은 경로로만 정해지고, 역할은 그 주체에 견주어 다시 확인한다.
+    if (path === '/api/admin/session' || path === '/api/admin/roles') {
+      if (method !== 'GET') throw new ApiError(405, 'method_not_allowed', '이 요청은 지원하지 않아요.');
+      if (!admin) throw new ApiError(503, 'admin_roles_unavailable', '역할 확인을 아직 켜지 않았어요.');
+      const role = await admin.roleFor(principal);
+      if (path === '/api/admin/session') {
+        return {
+          status: 200,
+          body: {
+            ok: true, authenticated: true, admin: role !== null, role,
+            capabilities: { admin_entry: role !== null, product_roles_read: role !== null },
+            checkedAt: new Date().toISOString()
+          },
+          headers: { 'cache-control': 'private, no-store', 'x-content-type-options': 'nosniff' }
+        };
+      }
+      if (role !== ROLE_ADMIN) throw new ApiError(403, 'admin_forbidden', '관리자만 볼 수 있어요.');
+      return {
+        status: 200,
+        body: { ok: true, role, registry: await admin.list(), history: await admin.history({ limit: 20 }) },
+        headers: { 'cache-control': 'private, no-store', 'x-content-type-options': 'nosniff' }
+      };
+    }
 
     if (path !== '/api/workspace') throw new ApiError(404, 'not_found', '요청을 찾을 수 없어요.');
     if (method === 'GET') return { status: 200, body: await service.read(principal) };
@@ -36,8 +61,8 @@ export function createApiHandler({ authenticate, service, productId, maxBodyByte
 
   return async function requestHandler(request) {
     try {
-      const { status, body } = await handle(request);
-      return { status, body };
+      const { status, body, headers } = await handle(request);
+      return { status, body, headers: headers ?? {} };
     } catch (error) {
       if (error instanceof ApiError) return { status: error.status, body: errorBody(error) };
       console.error('[lovetree-storage] 요청 처리 실패', { path: request?.path, method: request?.method });

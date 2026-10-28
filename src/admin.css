@@ -1,0 +1,66 @@
+/* 관리자 진입·상태 화면의 자리 잡기만 정의한다(#67). 색·글꼴은 styles.css의 값을 그대로 쓴다. */
+.admin-shell {
+  width: min(760px, calc(100% - 40px));
+  margin: 40px auto 64px;
+  display: grid;
+  gap: 16px;
+}
+
+.admin-card {
+  display: block;
+  padding: 18px 20px;
+  line-height: 1.9;
+}
+
+.admin-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.admin-card-head strong {
+  font-size: 14px;
+}
+
+.admin-card .notice {
+  margin-top: 0;
+  flex: 1 1 240px;
+}
+
+.admin-facts {
+  margin: 14px 0 0;
+  display: grid;
+  gap: 6px;
+}
+
+.admin-facts div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.admin-facts dt {
+  font-size: 10px;
+  color: #8a927e;
+  min-width: 104px;
+}
+
+.admin-facts dd {
+  margin: 0;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.admin-actions {
+  margin-top: 16px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.admin-actions .button {
+  font-size: 12px;
+  text-decoration: none;
+}

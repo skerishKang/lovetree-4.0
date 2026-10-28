@@ -1,6 +1,8 @@
 import { createServer } from 'node:http';
 import { pathToFileURL } from 'node:url';
 import { createPool, createWorkspaceRepo } from './db/postgres.js';
+import { createAdminRoleRepo } from './db/admin-roles-postgres.js';
+import { createAdminRoleService } from './admin-roles.js';
 import { createApiHandler, createNodeHandler } from './http.js';
 import { createWorkspaceService } from './workspace-service.js';
 import { createPadiemAuthorityAuth } from './padiem-authority-auth.js';
@@ -123,7 +125,9 @@ const pool = await createPool(LOVETREE_DATABASE_URL);
 const repo = createWorkspaceRepo(pool);
 const service = createWorkspaceService({ repo, productId: LOVETREE_PRODUCT_ID });
 const authenticate = await buildAuthenticate();
-const storageHandler = createApiHandler({ authenticate, service, productId: LOVETREE_PRODUCT_ID, maxBodyBytes });
+// #67 제품 역할. 표가 아직 없거나 저장이 망가진 자리에서는 역할 없음으로 닫힌다(fail-closed).
+const admin = createAdminRoleService({ store: createAdminRoleRepo(pool), productId: LOVETREE_PRODUCT_ID });
+const storageHandler = createApiHandler({ authenticate, service, productId: LOVETREE_PRODUCT_ID, maxBodyBytes, admin });
 const login = await buildLogin(pool);
 
 const requestHandler = async (request) => {
