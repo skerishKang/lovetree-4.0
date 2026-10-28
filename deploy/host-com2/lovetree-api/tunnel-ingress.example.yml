@@ -1,0 +1,22 @@
+# COM2 cloudflared ingress — 러브트리 저장 API 한 항목(템플릿).
+#
+# 대상: /opt/cloudflared/config.yml (운영자가 가진 파일). 이 파일은 설치된 자산이
+# 아니고, ARL의 deploy/host-com2/b14/cloudflared-config.example.yml과 같은 규칙을 따른다.
+#
+# 적용 규칙:
+#   - 이미 있는 설정을 덮어쓰지 않는다. 빠진 호스트네임 항목만 추가한다.
+#   - 추가 후 `cloudflared tunnel --config <file> ingress validate`를 offline로 통과시킨다.
+#   - 호스트네임이 겹치면 재배정하지 않고 멈춘다.
+#   - catch-all(`http_status:404`)은 항상 마지막 — 알 수 없는 호스트는 프록시하지 않는다.
+#   - Pages 쪽 LOVETREE_API_ORIGIN에는 이 항의 https 주소를 쓰고, COM2 쪽
+#     LOVETREE_PUBLIC_ORIGIN에는 Pages 주소를 쓴다. 두 값은 같지 않다.
+#
+# 아래 <COM2_API_HOST>는 채워야 할 자리다. 저장소는 실제 호스트네임을 모르고, 지어내지 않는다.
+
+ingress:
+  - hostname: <COM2_API_HOST>
+    service: http://127.0.0.1:8790
+    originRequest:
+      connectTimeout: 30s
+      noTLSVerify: false
+  - service: http_status:404

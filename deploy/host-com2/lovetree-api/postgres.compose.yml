@@ -1,0 +1,31 @@
+# 러브트리 전용 PostgreSQL 한 개 — 격리의 최소 형태.
+#
+# 기존 `n8n-postgres`에는 DB·역할을 추가하지도, 포트를 열어 재시작하지도 않는다.
+# 같은 이미지가 COM2에 이미 받아져 있으니(native pull) 이미지만 재사용하고, 볼륨·네트워크·
+# 사용자·DB는 러브트리 것으로 따로 둔다. 앱이 이 인스턴스에 DDL을 놓는 경로는
+# `scripts/apply-schema.mjs` 하나뿐이다(모두 추가 전용).
+#
+# 실행은 운영자 결정이다 — 이 파일은 구성만 적는다. 값은 `.env.postgres`(0600)에 둔다.
+name: lovetree-postgres
+services:
+  db:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    env_file: .env.postgres
+    volumes:
+      - lovetree_pgdata:/var/lib/postgresql/data
+    ports:
+      # 루프백에만 드러낸다. 바깥으로 내보내는 일은 터널의 몫이고 이 서비스의 방식이 아니다.
+      - "127.0.0.1:5433:5432"
+    networks:
+      - lovetree_api
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+volumes:
+  lovetree_pgdata:
+networks:
+  lovetree_api:
+    name: lovetree_api
