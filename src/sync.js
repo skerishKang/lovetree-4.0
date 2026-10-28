@@ -444,19 +444,21 @@ export function mountSync({ controller, doc = globalThis.document, onAdopted = (
   }
   const narrow = () => globalThis.matchMedia?.(NARROW_QUERY)?.matches ?? false;
   const place = () => {
-    if (narrow()) {
+    const wanted = narrow() ? 'flow' : 'sticky';
+    if (bar.dataset.syncPlacement === wanted && bar.isConnected) return;
+    if (wanted === 'flow') {
       bar.style.cssText = 'margin:12px auto 0;width:calc(100% - 36px);flex-wrap:wrap';
       const app = doc.getElementById('app');
       if (app && bar !== app.previousElementSibling) doc.body.insertBefore(bar, app);
       else if (!app && bar !== doc.body.lastElementChild) doc.body.append(bar);
-      bar.dataset.syncPlacement = 'flow';
     } else {
       bar.style.cssText = 'position:sticky;bottom:14px;z-index:60;margin:18px auto 0;width:min(1400px,calc(100% - 80px));flex-wrap:wrap;box-shadow:0 8px 25px #26351a26';
       if (bar !== doc.body.lastElementChild) doc.body.append(bar);
-      bar.dataset.syncPlacement = 'sticky';
     }
+    bar.dataset.syncPlacement = wanted;
   };
   globalThis.matchMedia?.(NARROW_QUERY)?.addEventListener?.('change', place);
+  globalThis.addEventListener?.('resize', place);
   const paint = (state) => {
     place();
     const actions = state.actions.map((action) => `<button type="button" class="button small sync-action" data-sync-action="${action.name}">${text(action.label)}</button>`).join('');
