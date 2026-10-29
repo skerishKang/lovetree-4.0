@@ -9,6 +9,7 @@
  *     openBook(treeId, momentId, readOnly)    // 기억책으로
  *     openWorkspace(treeId, momentId, readOnly)   // 트리 연결 보기로 (읽기 전용이면 demo)
  *     requestMoment(kind, id)                 // 'new' | 'add' | 'edit'
+ *     selectMoment(momentId)                  // 기억책이 읽던 페이지를 앱 선택으로 보고
  *     library(action, id)                     // 백업·가져오기·복구·삭제 같은 화면 밖 동작
  *   }
  *

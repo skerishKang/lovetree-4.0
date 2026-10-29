@@ -4,7 +4,7 @@ import {viewContext} from './views/contract.js';
 import {createScreenRegistry} from './views/registry.js';
 import { mountBook } from './views/book.js';
 import { mountShelf } from './views/shelf.js';
-import { hasRecovery as recoveryAvailable, recoveryData } from './views/memory.js';
+import { hasRecovery as recoveryAvailable, recoveryData, lastRead, remember } from './views/memory.js';
 import { createTree, addMoment, editMoment, removeMoment, importTrees, MAX_TREES, MAX_LINKS, EMOTIONS, treeLayout, pathTo, stemGroups, linkMoments, unlinkMoments, relatedMoments } from './domain.js';
 import { loadState, saveState, STORAGE_KEY, RECOVERY_KEY } from './storage.js';
 import { createSyncController, createWorkspaceApi, mountSync } from './sync.js';
@@ -214,10 +214,16 @@ function workspace() {
   const tree = currentTree(), demo = isDemo();
   if (!tree) return `${header('trees')}<main id="main" class="wrap empty-state" tabindex="-1"><h1>이 트리를 찾을 수 없어요.</h1><p>다른 브라우저의 기록이라면 백업 파일을 가져와 주세요.</p><a class="button primary" href="#trees">${GO_TREES}로 돌아가기</a></main>${footer()}`;
   if (activeTreeId !== tree.id) { activeTreeId = tree.id; zoom = 1; navPath = null; branchPicker = null; }
-  if (!tree.moments.some(m => m.id === selectedId)) selectedId = tree.moments.find(m => m.parentId === null).id;
+  if (!tree.moments.some(m => m.id === selectedId)) {
+    // 새로고침·돌아온 화면은 이 트리의 읽던 위치부터 복원한다(기억책과 같은 시작점). 없으면 첫 순간.
+    const readBack = lastRead(storage, tree);
+    selectedId = (readBack || tree.moments.find(m => m.parentId === null)).id;
+  }
   if (navPath && !navPath.every(m => tree.moments.some(x => x.id === m.id))) { navPath = null; branchPicker = null; }
   if (navPath && !navPath.some(m => m.id === selectedId)) navPath = pathTo(tree, selectedId);
   const selected = tree.moments.find(m => m.id === selectedId);
+  // 트리에서 고른 순간도 읽던 위치다 — 기억책·책장·새로고침이 같은 순간을 가리키게 한다(저장 형식은 그대로).
+  if (selected && !demo) remember(storage, tree.id, selected.id);
   const fit = zoom === 'fit' ? fitScale(tree) : null;
   const graphScale = fit ? fit.scale : zoom;
   return `${header(demo ? 'examples' : 'trees')}<main id="main" class="workspace wrap" tabindex="-1"><a href="${demo ? '#examples' : '#trees'}" class="back-link">${icon('back')} ${demo ? GO_EXAMPLES : GO_TREES}</a><div class="workspace-heading"><div><div class="eyebrow">${escape(tree.subject)} <span class="mode-badge">${demo ? '가상 예시 · 체험' : '내 브라우저에 보관'}</span></div><h1>${escape(tree.title)}</h1><p>${demo ? '순간을 눌러, 이어지는 마음을 따라가 보세요.' : '순간을 고르고, 그 마음에서 다음 이야기를 이어 보세요.'} 기억책은 ${BOOK_IS_READING}이에요.</p></div>${demo ? `<button class="button secondary" data-action="new">${NEW_TREE} ${icon('plus')}</button>` : `<button class="button secondary" data-action="export-tree" data-id="${escape(tree.id)}">${icon('download')} 파일로 보관</button>`}</div>${!demo && selected && tree.id === guideTreeId ? saveGuide(tree, selected) : ''}<div class="workspace-grid"><section class="tree-board" aria-label="트리 작업 공간"><div class="board-toolbar"><div class="view-switch" aria-label="보기 방식"><button data-action="view" data-view="tree" aria-pressed="${viewMode === 'tree'}" aria-label="트리로 보기">${icon('tree')}<span class="view-label">트리로 보기</span></button><button data-action="view" data-view="list" aria-pressed="${viewMode === 'list'}" aria-label="시간으로 보기">${icon('list')}<span class="view-label">시간으로 보기</span></button><button data-action="view" data-view="board" aria-pressed="${viewMode === 'board'}" aria-label="보드로 보기">${icon('grid')}<span class="view-label">보드로 보기</span></button><button data-action="view" data-view="stems" aria-pressed="${viewMode === 'stems'}" aria-label="줄기로 보기">${icon('leaf')}<span class="view-label">줄기로 보기</span></button></div><a class="text-button small" href="#${demo ? 'demo-book' : 'book'}/${escape(tree.id)}" title="${BOOK_IS_READING}">${READ_BOOK}</a><span class="moment-count">${tree.moments.length}개의 순간</span></div>${viewMode === 'tree' ? graph(tree, graphScale) : viewMode === 'list' ? timeline(tree) : viewMode === 'board' ? board(tree) : stemView(tree)}<div class="board-bottom"><span class="board-hint">${icon('leaf')} ${viewMode === 'board' ? (demo ? '선택한 순간까지의 길을 따라가 볼 수 있어요.' : '선택한 순간까지 이어진 경로를 강조했어요.') : viewMode === 'stems' ? (demo ? '첫 순간에서 갈라진 줄기마다 순간을 모아 보여 줘요.' : '첫 순간에서 갈라진 줄기마다, 이어 온 순간을 모아 봐요.') : (demo ? '당신의 마음도 이렇게 자랄 수 있어요.' : '작은 순간들이 모여, 나만의 이야기가 돼요.')}</span><div class="board-tools">${viewMode === 'tree' && fit && !fit.fits ? `<span class="zoom-note" role="status">한 화면에 다 담지 못해 ${Math.round(graphScale * 100)}%까지만 줄였어요. ${tree.moments.length > 40 ? '줄기로 보기에서 전체 흐름을 볼 수 있어요.' : '나누어 살펴보세요.'}</span>` : ''}${routeNav(tree, selected)}${branchPicker ? `<div class="branch-picker" role="group" aria-label="다음 순간 선택">${branchPicker.map(c => `<button class="text-button small" data-action="branch-pick" data-id="${escape(c.id)}">${escape(c.title)}</button>`).join('')}<button class="text-button small" data-action="branch-cancel">취소</button></div>` : ''}${viewMode === 'tree' ? `<div class="zoom-controls"><button data-action="zoom-out" aria-label="트리 축소" ${graphScale <= .18 ? 'disabled' : ''}>−</button><button data-action="zoom-reset" aria-label="트리 배율 초기화">${Math.round(graphScale*100)}%</button><button data-action="zoom-in" aria-label="트리 확대" ${graphScale >= 1.4 ? 'disabled' : ''}>+</button><button class="zoom-fit" data-action="zoom-fit" aria-label="전체가 보이도록 맞추기" aria-pressed="${zoom === 'fit'}">맞춤</button></div>` : ''}</div></div></section>${detail(tree, selected, demo)}</div></main>${footer()}`;
@@ -242,6 +248,8 @@ function render() {
     openBook: showBook,
     openWorkspace: showWorkspace,
     requestMoment: (kind, id) => openMoment(kind, id),
+    // 기억책이 넘긴 페이지를 앱 선택으로 받는다 — 뒤로가기·새로고침 뒤에도 트리와 기억책이 같은 순간을 가리킨다.
+    selectMoment: (momentId) => { if (currentTree()?.moments.some(m => m.id === momentId)) selectedId = momentId; },
     library: (action, id) => libraryAction(action, id)
   };
   const mountShadow = (mount, props) => { $('#app').innerHTML='<main id="main"></main>'; return mount($('#main'), props); };
