@@ -8,6 +8,7 @@ async function setup() {
   let calls = 0;
   const auth = createSharedPagesAuth({ now: () => 1000, verify: async token => { if (token !== 'access') throw Error('bad'); }, fetcher: async (url, init) => {
     calls++; assert.equal(url, 'https://auth.padiem.net/token');
+    assert.equal(init.redirect, 'manual');
     assert.equal(new URLSearchParams(init.body).get('client_id'), 'lovetree-4-0');
     return Response.json({ access_token: 'access', refresh_token: 'refresh' });
   } });
@@ -38,4 +39,16 @@ test('callback with wrong state and cross-origin refresh are rejected', async ()
   assert.equal(response.status, 401); assert.equal(f.calls(), 0);
   const refresh = await f.auth(new Request('https://lovetree-4-0.pages.dev/auth/refresh', { method: 'POST', headers: { origin: 'https://evil.example', cookie: 'lovetree_refresh=refresh' } }), f.env);
   assert.equal(refresh.status, 403);
+});
+
+test('preview callback must be configured for the same origin', async () => {
+  const f = await setup();
+  const preview = 'https://preview.example.pages.dev';
+  assert.equal((await f.auth(new Request(`${preview}/auth/login`), f.env)).status, 503);
+  const env = { ...f.env, LOVETREE_AUTH_CALLBACK_URI: `${preview}/auth/callback` };
+  const begin = await f.auth(new Request(`${preview}/auth/login`), env);
+  assert.equal(begin.status, 302);
+  assert.equal(new URL(begin.headers.get('location')).searchParams.get('redirect_uri'), env.LOVETREE_AUTH_CALLBACK_URI);
+  const crossOrigin = { ...env, LOVETREE_AUTH_CALLBACK_URI: 'https://evil.example/auth/callback' };
+  assert.equal((await f.auth(new Request(`${preview}/auth/login`), crossOrigin)).status, 503);
 });
