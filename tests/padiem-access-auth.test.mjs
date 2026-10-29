@@ -22,3 +22,5 @@ test('invalid shared token and duplicate cookies do not fall back', async () => 
   await assert.rejects(() => auth({ headers: { cookie: `__Host-lovetree-access=${fixture.tokens.forged}` } }));
   await assert.rejects(() => auth({ headers: { cookie: '__Host-lovetree-access=x; __Host-lovetree-access=y' } }));
 });
+
+ test('JWKS redirect is rejected', async () => { const v=createVerifier({audience:fixture.audience,fetcher:async (_,opts) => { assert.equal(opts.redirect, 'manual'); return new Response(null,{status:302,headers:{location:'https://evil.example'}}); }}); await assert.rejects(() => v(fixture.tokens.valid), /jwks_unavailable/); });
