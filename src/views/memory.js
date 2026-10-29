@@ -21,6 +21,14 @@ export function resume(storage, trees) {
   const tree = [...trees].sort((a,b) => b.updatedAt.localeCompare(a.updatedAt))[0];
   return tree ? {tree, moment: tree.moments.at(-1)} : null;
 }
+// 이 트리의 읽던 위치만 돌려준다. 기록이 없거나 다른 트리의 것(전역 슬롯 한 칸)이면 null — 화면 시작값 복원에만 쓴다.
+export function lastRead(storage, tree) {
+  try {
+    const p = JSON.parse(storage.getItem(POSITION_KEY));
+    if (p?.treeId !== tree?.id) return null;
+    return tree.moments.find(m => m.id === p.momentId) || null;
+  } catch { return null; }
+}
 export function readingOrder(tree) {
   const children = new Map();
   for (const m of tree.moments) { const list = children.get(m.parentId) || []; list.push(m); children.set(m.parentId, list); }

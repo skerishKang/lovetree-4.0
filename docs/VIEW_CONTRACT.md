@@ -45,6 +45,7 @@
    openBook(treeId, momentId, readOnly)   // 기억책으로 (읽기 전용이면 demo-book)
    openWorkspace(treeId, momentId, readOnly)   // 트리 연결 보기 (읽기 전용이면 demo)
    requestMoment(kind, id)                // 'new' | 'add' | 'edit'
+   selectMoment(momentId)                 // 기억책이 읽던 페이지를 앱 선택으로 보고
    library(action, id)                    // 백업·가져오기·복구·삭제
    ```
    `main.js`의 기존 `onBook`·`onShelf`·`onAdd`·`onAction`·`onNew`·`onRecovery` 매핑을 그대로 옮겨 **동작 변화는 없다**. 기억책에서 '내 트리'로 갈 때 그 트리가 선택되는 동작은 `navigate('trees')`의 화면별 구현으로 남겼다.
@@ -58,4 +59,5 @@
 - **1차(#70, `71f13d3`)**: `createView()` 생명주기 도입·채택. 외형·문구·동작·주소 변화 없음.
 - **2차(#72)**: 문맥(`viewContext`)과 행동(`actions`) 통일. `src/main.js`는 mount 세 곳과 열기 도우미 인자 이름만 바뀌었다. 외형·URL·저장 형식 변화 없음.
 - **3차(이 PR)**: 화면 등록표(`createScreenRegistry`)로 경로 해석과 mount/dispose 호출을 한 자리로 모음. hash 주소·뒤로가기·선택 유지·readOnly·행동은 그대로.
+- **선택 보고(구현됨, 2026-10-29)**: 기억책은 페이지를 넘길 때 `actions.selectMoment(momentId)`로 현재 순간을 앱 선택에 보고한다(읽기 전용 제외). 트리 화면은 시작할 때 선택이 비어 있으면 이 트리의 읽던 위치(`memory.js` `lastRead`)부터 복원하고 없으면 첫 순간으로 둔다 — 뒤로가기·앞으로가기·새로고침 뒤에도 트리와 기억책이 같은 순간을 가리킨다. 주소 형식·저장 형식 변경은 없다.
 - **남은 것**: 화면이 저장소를 직접 쓰는 부분(읽던 위치·책장 선택 기록)을 `main.js` 한 곳으로 모으기, 공통 shell 소유 경계, 보기 전환의 선택 유지 규칙. 새 화면·커뮤니티·프레임워크 교체는 범위 밖.
