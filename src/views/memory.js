@@ -1,12 +1,4 @@
-import { RECOVERY_KEY, STORAGE_KEY } from '../storage.js';
 export const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-export function hasRecovery(storage, loaded = {}) {
-  try { return storage.getItem(RECOVERY_KEY) !== null || Boolean(loaded.recovery); }
-  catch { return Boolean(loaded.recovery); }
-}
-export function recoveryData(storage, loaded = {}) {
-  return storage.getItem(RECOVERY_KEY) ?? (loaded.recovery ? storage.getItem(STORAGE_KEY) : null);
-}
 const POSITION_KEY = 'lovetree.v4.reading-position.v1';
 export function remember(storage, treeId, momentId) {
   try { storage.setItem(POSITION_KEY, JSON.stringify({treeId, momentId})); } catch { /* Reading position is optional; records use the main storage boundary. */ }
