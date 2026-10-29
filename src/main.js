@@ -10,6 +10,7 @@ import { loadState, saveState, STORAGE_KEY, RECOVERY_KEY } from './storage.js';
 import { createSyncController, createWorkspaceApi, mountSync } from './sync.js';
 import { authEntry, refreshAuthEntries } from './auth-entry.js';
 import { EXAMPLES } from './examples.js';
+import { mediaLinkView, describeLinkForField } from './media.js';
 import { SERVICE, GO_HOME, GO_TREES, GO_EXAMPLES, READ_BOOK, NEW_TREE, CONTINUE_MOMENT, BOOK_IS_READING } from './terms.js';
 
 const $ = (selector, root = document) => root.querySelector(selector);
@@ -196,6 +197,13 @@ function routeList(tree, moment) {
   if (route.length < 2) return '';
   return `<nav class="detail-route" aria-label="이 순간까지 온 길"><span class="detail-route-title">여기까지 온 길</span><ol>${route.map(m => `<li>${m.id === moment.id ? `<span aria-current="true">${escape(m.title)}</span>` : `<button class="text-button small" data-action="select-moment" data-id="${escape(m.id)}">${escape(m.title)}</button>`}</li>`).join('')}</ol></nav>`;
 }
+// #14 링크 표시: 저장된 원본 문자열은 그대로 두고, 여는 주소와 문장만 media.js로 해석한다.
+function mediaLinkHtml(url) {
+  const link = mediaLinkView(url);
+  if (!link) return '';
+  if (link.kind === 'invalid') return `<span class="media-unrecognized" role="note">${escape(link.text)}</span>`;
+  return `<a class="button secondary full" href="${escape(link.href)}" target="_blank" rel="noopener noreferrer">${icon('external')} ${escape(link.text)}</a>`;
+}
 function relatedBlock(tree, moment, demo) {
   if (demo) return '';
   const related = relatedMoments(tree, moment.id);
@@ -203,7 +211,7 @@ function relatedBlock(tree, moment, demo) {
 }
 function detail(tree, moment, demo) {
   const parent = tree.moments.find(m => m.id === moment.parentId);
-  return `<aside class="moment-detail" aria-label="선택한 순간"><div class="detail-kicker"><span>${moment.parentId ? '이어진 순간' : '이 마음의 시작'}</span>${icon('heart')}</div>${moment.art ? art(moment.art, 'detail-art') : ''}<time>${dateLabel(moment.date)}</time><h2>${escape(moment.title)}</h2><span class="emotion emotion-${escape(moment.emotion)}">${escape(moment.emotion)}</span><p class="detail-note">${escape(moment.note)}</p>${parent ? `<div class="connection-note">${icon('tree')}<div><small>${escape(parent.title)}에서 이어진 마음</small><p>${escape(moment.relation || '이 마음에서 다음 순간이 이어졌어요.')}</p></div></div>` : ''}<div class="detail-actions">${demo ? `<button class="button primary full" data-action="new">${NEW_TREE} ${icon('plus')}</button>` : `<button class="button primary full" data-action="add" data-id="${escape(moment.id)}">${CONTINUE_MOMENT} ${icon('plus')}</button><div class="detail-small-actions"><button class="text-button" data-action="edit" data-id="${escape(moment.id)}">${icon('edit')} 순간 수정</button><button class="text-button danger" data-action="delete-moment" data-id="${escape(moment.id)}">${icon('trash')} 삭제</button></div>`}</div>${routeList(tree, moment)}${relatedBlock(tree, moment, demo)}${moment.url ? `<a class="button secondary full" href="${escape(moment.url)}" target="_blank" rel="noopener noreferrer">${icon('external')} 원본 링크 열기</a>` : ''}</aside>`;
+  return `<aside class="moment-detail" aria-label="선택한 순간"><div class="detail-kicker"><span>${moment.parentId ? '이어진 순간' : '이 마음의 시작'}</span>${icon('heart')}</div>${moment.art ? art(moment.art, 'detail-art') : ''}<time>${dateLabel(moment.date)}</time><h2>${escape(moment.title)}</h2><span class="emotion emotion-${escape(moment.emotion)}">${escape(moment.emotion)}</span><p class="detail-note">${escape(moment.note)}</p>${parent ? `<div class="connection-note">${icon('tree')}<div><small>${escape(parent.title)}에서 이어진 마음</small><p>${escape(moment.relation || '이 마음에서 다음 순간이 이어졌어요.')}</p></div></div>` : ''}<div class="detail-actions">${demo ? `<button class="button primary full" data-action="new">${NEW_TREE} ${icon('plus')}</button>` : `<button class="button primary full" data-action="add" data-id="${escape(moment.id)}">${CONTINUE_MOMENT} ${icon('plus')}</button><div class="detail-small-actions"><button class="text-button" data-action="edit" data-id="${escape(moment.id)}">${icon('edit')} 순간 수정</button><button class="text-button danger" data-action="delete-moment" data-id="${escape(moment.id)}">${icon('trash')} 삭제</button></div>`}</div>${routeList(tree, moment)}${relatedBlock(tree, moment, demo)}${mediaLinkHtml(moment.url)}</aside>`;
 }
 // #40 — 첫 저장 직후의 주 행동은 "다음 순간 연결"이고, 기억책 감상은 보조 행동으로 남긴다.
 function saveGuide(tree, moment) {
@@ -279,12 +287,13 @@ function openMoment(mode, id) {
   const today = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0,10);
   const emotion = m?.emotion || '설렘';
   const emotionOptions = EMOTIONS.includes(emotion) ? EMOTIONS : [emotion, ...EMOTIONS];
+  const urlHint = describeLinkForField(m?.url || '');
   opener = document.activeElement;
   while (opener?.shadowRoot?.activeElement) opener = opener.shadowRoot.activeElement;
   formDirty = false;
   dialogOriginHash = location.hash;
   dialogOriginIdx = currentIdx;
-  dialog.innerHTML = `<form id="moment-form" data-mode="${mode}" data-id="${escape(id || '')}"><div class="dialog-top"><span class="eyebrow">${mode === 'new' ? 'A LITTLE BEGINNING' : 'ONE MORE MOMENT'}</span><button type="button" class="icon-button" data-action="close-dialog" aria-label="닫기">${icon('close')}</button></div><h2 id="dialog-title">${mode === 'new' ? '간직하고 싶은 순간이 있나요?' : mode === 'edit' ? '그날의 마음을 다듬어 볼까요?' : '이 마음에서, 다음 순간으로.'}</h2><p class="dialog-intro">${mode === 'new' ? '처음 좋아했던 날이 아니어도 좋아요. 지금 떠오르는 장면부터.' : '작은 기록 하나가 나의 이야기를 조금 더 자라게 해요.'}</p>${mode === 'new' ? '<label class="field">누구를, 무엇을 좋아하나요?<input name="subject" maxlength="60" required placeholder="아티스트, 배우, 작품 이름…" autocomplete="off" /></label>' : ''}<label class="field">이 순간에 이름을 붙여 주세요<input name="title" maxlength="80" required value="${escape(m?.title || '')}" placeholder="예: 그 목소리를 처음 만났던 밤" /></label><label class="field">왜 이 순간을 간직하고 싶나요?<textarea name="note" rows="3" maxlength="500" required placeholder="그때의 마음을 짧게 남겨 주세요.">${escape(m?.note || '')}</textarea></label><fieldset class="emotion-field"><legend>그날의 마음</legend><div>${emotionOptions.map(e => `<label class="emotion-choice"><input type="radio" name="emotion" value="${escape(e)}" ${emotion === e ? 'checked' : ''} /><span>${escape(e)}${EMOTIONS.includes(e) ? '' : ' (가져온 값)'}</span></label>`).join('')}</div></fieldset><div class="form-row"><label class="field">순간의 날짜<input name="date" type="date" required value="${m?.date || today}" /></label><label class="field">원본 링크 <span>선택</span><input name="url" type="url" maxlength="2048" value="${escape(m?.url || '')}" placeholder="https://…" /></label></div>${mode === 'add' ? `<label class="field">어느 순간에서 이어지나요?<select name="parentId">${tree.moments.map(p => `<option value="${escape(p.id)}" ${p.id === id ? 'selected' : ''}>${escape(p.title)}</option>`).join('')}</select></label>` : ''}${mode === 'add' || m?.parentId ? `<label class="field">두 순간이 이어진 이유 <span>선택</span><input name="relation" maxlength="100" value="${escape(m?.relation || '')}" placeholder="예: 다른 무대도 찾아보고 싶어져서" /></label>` : ''}<p class="form-error" role="alert" id="form-error"></p><div class="dialog-bottom"><span>${icon('check')} 이 브라우저에 저장돼요</span><button class="button primary" type="submit">${mode === 'edit' ? '수정한 마음 저장하기' : mode === 'new' ? NEW_TREE : CONTINUE_MOMENT} ${icon('arrow')}</button></div></form>`;
+  dialog.innerHTML = `<form id="moment-form" data-mode="${mode}" data-id="${escape(id || '')}"><div class="dialog-top"><span class="eyebrow">${mode === 'new' ? 'A LITTLE BEGINNING' : 'ONE MORE MOMENT'}</span><button type="button" class="icon-button" data-action="close-dialog" aria-label="닫기">${icon('close')}</button></div><h2 id="dialog-title">${mode === 'new' ? '간직하고 싶은 순간이 있나요?' : mode === 'edit' ? '그날의 마음을 다듬어 볼까요?' : '이 마음에서, 다음 순간으로.'}</h2><p class="dialog-intro">${mode === 'new' ? '처음 좋아했던 날이 아니어도 좋아요. 지금 떠오르는 장면부터.' : '작은 기록 하나가 나의 이야기를 조금 더 자라게 해요.'}</p>${mode === 'new' ? '<label class="field">누구를, 무엇을 좋아하나요?<input name="subject" maxlength="60" required placeholder="아티스트, 배우, 작품 이름…" autocomplete="off" /></label>' : ''}<label class="field">이 순간에 이름을 붙여 주세요<input name="title" maxlength="80" required value="${escape(m?.title || '')}" placeholder="예: 그 목소리를 처음 만났던 밤" /></label><label class="field">왜 이 순간을 간직하고 싶나요?<textarea name="note" rows="3" maxlength="500" required placeholder="그때의 마음을 짧게 남겨 주세요.">${escape(m?.note || '')}</textarea></label><fieldset class="emotion-field"><legend>그날의 마음</legend><div>${emotionOptions.map(e => `<label class="emotion-choice"><input type="radio" name="emotion" value="${escape(e)}" ${emotion === e ? 'checked' : ''} /><span>${escape(e)}${EMOTIONS.includes(e) ? '' : ' (가져온 값)'}</span></label>`).join('')}</div></fieldset><div class="form-row"><label class="field">순간의 날짜<input name="date" type="date" required value="${m?.date || today}" /></label><label class="field">원본 링크 <span>선택</span><input name="url" type="url" maxlength="2048" value="${escape(m?.url || '')}" placeholder="https://…" aria-describedby="url-hint" /></label><p class="url-hint" id="url-hint" role="status" aria-live="polite" data-tone="${escape(urlHint.tone)}">${escape(urlHint.text)}</p></div>${mode === 'add' ? `<label class="field">어느 순간에서 이어지나요?<select name="parentId">${tree.moments.map(p => `<option value="${escape(p.id)}" ${p.id === id ? 'selected' : ''}>${escape(p.title)}</option>`).join('')}</select></label>` : ''}${mode === 'add' || m?.parentId ? `<label class="field">두 순간이 이어진 이유 <span>선택</span><input name="relation" maxlength="100" value="${escape(m?.relation || '')}" placeholder="예: 다른 무대도 찾아보고 싶어져서" /></label>` : ''}<p class="form-error" role="alert" id="form-error"></p><div class="dialog-bottom"><span>${icon('check')} 이 브라우저에 저장돼요</span><button class="button primary" type="submit">${mode === 'edit' ? '수정한 마음 저장하기' : mode === 'new' ? NEW_TREE : CONTINUE_MOMENT} ${icon('arrow')}</button></div></form>`;
   dialog.showModal();
   lockScroll();
   const initialField = mode === 'new' ? 'subject' : 'title';
@@ -326,7 +335,15 @@ dialog.addEventListener('pointerup', event => {
 });
 dialog.addEventListener('pointercancel', () => { momentPointerDownOnBackdrop = false; });
 dialog.addEventListener('close', () => { formDirty = false; formSubmitting = false; dialogOriginHash = ''; dialogOriginIdx = 0; const focusTarget = (opener && opener.isConnected) ? opener : (document.querySelector('[data-action="new"]') || document.querySelector('.header-cta')); focusTarget?.focus?.({ preventScroll: true }); if (!linkDialog.open) unlockScroll(); });
-dialog.addEventListener('input', () => { formDirty = true; });
+dialog.addEventListener('input', () => {
+  formDirty = true;
+  const hint = dialog.querySelector('#url-hint');
+  const field = dialog.querySelector('[name=url]');
+  if (!hint || !field) return;
+  const info = describeLinkForField(field.value);
+  hint.textContent = info.text;
+  hint.dataset.tone = info.tone;
+});
 dialog.addEventListener('submit', event => {
   event.preventDefault();
   if (formSubmitting) return;

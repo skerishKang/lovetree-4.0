@@ -61,6 +61,11 @@ dialog{padding:30px 35px;width:min(610px,calc(100% - 32px));max-height:calc(100d
 .link-unlink .icon{width:11px;height:11px}
 .detail-links-empty{font-size:10px;line-height:1.8;color:#9aa28c;margin:8px 0 10px}
 .detail-links .text-button{margin-top:2px}
+.media-unrecognized{display:block;margin-top:14px;padding:11px 13px;border:1px solid #dbe1ce;border-radius:8px;background:#f7f8ef;font-size:12px;line-height:1.8;color:#7c8570;overflow-wrap:anywhere}
+.url-hint{grid-column:1/-1;margin:-9px 0 14px;font-size:12px;line-height:1.7;color:#8b9379;overflow-wrap:anywhere}
+.url-hint:empty{display:none}
+.url-hint[data-tone="ok"]{color:#5f7a4f}
+.url-hint[data-tone="warn"]{color:#a35560}
 @media(max-width:820px){.moment-board{height:420px}.board-bottom{flex-wrap:wrap;row-gap:8px}}
 @media(max-width:540px){.route-nav small{display:none}.board-tools{gap:6px}.zoom-controls .zoom-fit{padding:0 7px}}
 .view-switch .view-label{white-space:nowrap}
