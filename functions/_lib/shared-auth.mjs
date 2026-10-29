@@ -41,7 +41,7 @@ async function assertion(env, now) {
 }
 async function exchange(env, params, fetcher, now) {
   const body = new URLSearchParams({ client_id: CLIENT, client_assertion_type: 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer', client_assertion: await assertion(env, now), ...params });
-  const response = await fetcher(`${AUTH}/token`, { method: 'POST', body, redirect: 'error' });
+  const response = await fetcher(`${AUTH}/token`, { method: 'POST', body, redirect: 'manual' });
   if (!response.ok) throw new Error('token exchange failed');
   return response.json();
 }
@@ -85,7 +85,7 @@ export function createSharedPagesAuth({ fetcher = fetch, now = () => Math.floor(
           return new Response(null, { status: 204, headers: issueCookies(tokens) });
         }
         const body = new URLSearchParams({ client_id: CLIENT, client_assertion_type: 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer', client_assertion: await assertion(env, current), refresh_token: jar.lovetree_refresh });
-        const response = await fetcher(`${AUTH}/logout`, { method: 'POST', body, redirect: 'error' });
+        const response = await fetcher(`${AUTH}/logout`, { method: 'POST', body, redirect: 'manual' });
         if (!response.ok) throw new Error('logout failed');
         const h = new Headers({ 'cache-control': 'no-store' });
         h.append('set-cookie', `__Host-lovetree-access=; Path=/; Max-Age=0; ${attrs}`);
