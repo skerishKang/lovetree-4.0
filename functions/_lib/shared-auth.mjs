@@ -11,6 +11,12 @@ const cookies = request => Object.fromEntries((request.headers.get('cookie') || 
 const attrs = 'Secure; HttpOnly; SameSite=Lax';
 const json = (status, error) => new Response(JSON.stringify({ error }), { status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' } });
 const validNext = value => typeof value === 'string' && /^\/[A-Za-z0-9_./-]*$/.test(value) && !value.startsWith('//') ? value : '/';
+function callbackFor(request, env) {
+  const configured = env.LOVETREE_AUTH_CALLBACK_URI || CALLBACK;
+  const url = new URL(configured);
+  if (url.protocol !== 'https:' || url.origin !== new URL(request.url).origin || url.pathname !== '/auth/callback' || url.search || url.hash || url.username || url.password) throw new Error('invalid callback');
+  return url.href;
+}
 async function aesKey(env) {
   const bytes = un64(env.LOVETREE_AUTH_STATE_KEY || '');
   if (bytes.length !== 32) throw new Error('state key unavailable');
@@ -54,16 +60,17 @@ export function createSharedPagesAuth({ fetcher = fetch, now = () => Math.floor(
     try {
       if (path === '/auth/login' && request.method === 'GET') {
         const state = random(), verifier = random(), next = validNext(url.searchParams.get('next'));
+        const callback = callbackFor(request, env);
         const challenge = b64(await crypto.subtle.digest('SHA-256', enc.encode(verifier)));
         const target = new URL(`${AUTH}/login`);
-        for (const [k,v] of Object.entries({ client_id: CLIENT, redirect_uri: CALLBACK, state, code_challenge: challenge, code_challenge_method: 'S256' })) target.searchParams.set(k,v);
+        for (const [k,v] of Object.entries({ client_id: CLIENT, redirect_uri: callback, state, code_challenge: challenge, code_challenge_method: 'S256' })) target.searchParams.set(k,v);
         const sealed = await seal(env, { state, verifier, next, exp: current + 600 });
         return new Response(null, { status: 302, headers: { location: target.href, 'cache-control': 'no-store', 'set-cookie': `lovetree_auth_state=${sealed}; Path=/auth; Max-Age=600; ${attrs}` } });
       }
       if (path === '/auth/callback' && request.method === 'GET') {
         const state = await unseal(env, jar.lovetree_auth_state);
         if (state.exp <= current || !state.state || state.state !== url.searchParams.get('state') || !url.searchParams.get('code') || validNext(state.next) !== state.next) return json(401, 'invalid_state');
-        const tokens = await exchange(env, { grant_type: 'authorization_code', code: url.searchParams.get('code'), redirect_uri: CALLBACK, code_verifier: state.verifier }, fetcher, current);
+        const tokens = await exchange(env, { grant_type: 'authorization_code', code: url.searchParams.get('code'), redirect_uri: callbackFor(request, env), code_verifier: state.verifier }, fetcher, current);
         await verify(tokens.access_token);
         if (typeof tokens.refresh_token !== 'string') throw new Error('missing refresh');
         const h = issueCookies(tokens); h.set('location', state.next); return new Response(null, { status: 302, headers: h });
