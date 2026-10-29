@@ -43,6 +43,8 @@ function issueCookies(tokens) {
   const h = new Headers({ 'cache-control': 'no-store', 'referrer-policy': 'no-referrer' });
   h.append('set-cookie', `__Host-lovetree-access=${tokens.access_token}; Path=/; Max-Age=900; ${attrs}`);
   h.append('set-cookie', `lovetree_refresh=${tokens.refresh_token}; Path=/auth; Max-Age=2592000; ${attrs}`);
+  // Non-secret marker lets the UI avoid changing the legacy 401 path.
+  h.append('set-cookie', '__Host-lovetree-shared=1; Path=/; Max-Age=2592000; Secure; SameSite=Lax');
   h.append('set-cookie', `lovetree_auth_state=; Path=/auth; Max-Age=0; ${attrs}`);
   return h;
 }
@@ -81,6 +83,7 @@ export function createSharedPagesAuth({ fetcher = fetch, now = () => Math.floor(
         const h = new Headers({ 'cache-control': 'no-store' });
         h.append('set-cookie', `__Host-lovetree-access=; Path=/; Max-Age=0; ${attrs}`);
         h.append('set-cookie', `lovetree_refresh=; Path=/auth; Max-Age=0; ${attrs}`);
+        h.append('set-cookie', '__Host-lovetree-shared=; Path=/; Max-Age=0; Secure; SameSite=Lax');
         return new Response(null, { status: 204, headers: h });
       }
       return json(404, 'not_found');

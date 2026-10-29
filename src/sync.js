@@ -415,7 +415,8 @@ export function createWorkspaceApi({ fetchImpl = (...args) => globalThis.fetch(.
       let response = await request();
       // Web Locks serializes refresh across tabs: retry after acquiring the lock
       // first, since another tab might already have rotated the credential.
-      if (response.status === 401 && path.startsWith('/api/')) {
+      const sharedSession = /(?:^|;\s*)__Host-lovetree-shared=1(?:;|$)/.test(globalThis.document?.cookie || '');
+      if (response.status === 401 && path.startsWith('/api/') && sharedSession) {
         const refreshAndRetry = async () => {
           const retry = await request();
           if (retry.status !== 401) return retry;

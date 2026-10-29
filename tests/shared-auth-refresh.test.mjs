@@ -4,6 +4,8 @@ import { createWorkspaceApi } from '../src/sync.js';
 
 test('two tabs serialize refresh, second retries with the refreshed cookie', async () => {
   const previous = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+  const previousDoc = Object.getOwnPropertyDescriptor(globalThis, 'document');
+  Object.defineProperty(globalThis, 'document', { configurable: true, value: { cookie: '__Host-lovetree-shared=1' } });
   let queue = Promise.resolve(); let refreshes = 0; let valid = false;
   Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { locks: { request(_name, fn) { const run = queue.then(fn); queue = run.catch(() => {}); return run; } } } });
   try {
@@ -19,11 +21,14 @@ test('two tabs serialize refresh, second retries with the refreshed cookie', asy
     assert.notEqual(a.status, 401); assert.notEqual(b.status, 401);
   } finally {
     if (previous) Object.defineProperty(globalThis, 'navigator', previous); else delete globalThis.navigator;
+    if (previousDoc) Object.defineProperty(globalThis, 'document', previousDoc); else delete globalThis.document;
   }
 });
 
 test('without Web Locks, both tabs can use the server grace response', async () => {
   const previous = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+  const previousDoc = Object.getOwnPropertyDescriptor(globalThis, 'document');
+  Object.defineProperty(globalThis, 'document', { configurable: true, value: { cookie: '__Host-lovetree-shared=1' } });
   let valid = false; let refreshes = 0;
   Object.defineProperty(globalThis, 'navigator', { configurable: true, value: {} });
   try {
@@ -37,5 +42,15 @@ test('without Web Locks, both tabs can use the server grace response', async () 
     assert.notEqual(a.status, 401); assert.notEqual(b.status, 401);
   } finally {
     if (previous) Object.defineProperty(globalThis, 'navigator', previous); else delete globalThis.navigator;
+    if (previousDoc) Object.defineProperty(globalThis, 'document', previousDoc); else delete globalThis.document;
   }
+});
+
+
+test('legacy unauthenticated response does not attempt shared refresh', async () => {
+  let calls = 0;
+  const api = createWorkspaceApi({ fetchImpl: async () => { calls++; return new Response('{}', { status: 401 }); } });
+  const response = await api.get();
+  assert.equal(response.status, 401);
+  assert.equal(calls, 1);
 });
