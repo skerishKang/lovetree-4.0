@@ -1,5 +1,14 @@
 AD
 
+## #14 미디어 링크 해석 첫 조각 — 2026-10-29 (COM2)
+
+`src/media.js`(신규) 한 곳에서 저장된 `url` 문자열을 표시용으로만 해석한다. 저장 형식·`domain.js`·`sync.js`는 바꾸지 않았고, 원본 문자열은 그대로 둔다.
+
+- 지원 범위: http/https 일반 링크는 '원본 링크 열기'. YouTube는 `youtube.com/watch?v=`·`youtu.be/<id>`·`youtube.com/shorts/<id>`·`youtube.com/live/<id>` 네 형태만 영상으로 본다(11자리 ID 확인). `t`·`start`는 초·`m:ss`·`hms`·한국어 단위를 받아 정수 초로 해석하고, 여는 주소는 `watch?v=<id>&t=<초>s`로 통일한다. 재생목록만 있는 링크·닮은 호스트·`/embed`는 일반 링크로 남긴다. 썸네일·iframe·서버 수집과 '재생 확인됨'·'미리보기 실패' 같은 표기는 이번 범위가 아니다.
+- 손댄 구간(컴1 통보용): `src/main.js`는 쓰기 대화창의 url 필드(`aria-describedby`·`#url-hint` 한 줄)와 `input` 리스너, 작업공간 우측 상세의 링크 한 줄(`mediaLinkHtml`)만 추가했다. `src/views/orbit.js`는 순간 팝업 `.detail-buttons`의 링크 한 줄과 전용 CSS 규칙 하나, `src/views/book.js`는 오른쪽 페이지 링크 한 줄과 CSS 규칙 하나다. `src/styles.css`에 `.url-hint`·`.media-unrecognized`을 더했다. 선택·라우팅·동기화 로직과 저장소는 그대로다.
+- 검증: `node --test tests/media.test.mjs` 8개 통과, `npm test` 201개(167 pass·33 skip은 기존 서버 의존), `npm run build` 통과. Playwright 1280x900·390x844로 작업공간 상세·기억책·오비트 팝업 세 곳에서 쇼츠 `?t=1m23s` → `watch?v=…&t=83s` + 'YouTube에서 열기 · 시작 1:23', 일반 링크와 재생목록 링크는 '원본 링크 열기'로 원본 href를 그대로 쓰는 것을 확인했다. 작성창 안내는 YouTube·일반·알 수 없는 입력에서 tone ok/ok/warn, `.form-row` 안에서 열을 건너뛰지 않고 가로 넘침 0. 390px 저장 사슬에서 `youtu.be/abc123DEF45?t=2분` 입력 → 저장 뒤 `parentId`·`links`·기존 순간 보존, 표시는 시작 2:00.
+- 남은 것: 썸네일·재생 준비와 이미지/영상 기록 구분은 #14의 다음 조각. 이 문서의 운영 서술·이슈 상태 정리는 컴1 소관.
+
 ## 기억책 모바일 페이지 이동 UX — 2026-10-29
 
 main `2ee507f` 위에서 별도 worktree·브랜치로 진행했다. `src/views/book.js`만 고쳤고(그림자 안 기억책 전용 CSS 포함) `styles.css`·`sync.js`·orbit·shelf는 건드리지 않았다. 리모네 Track59 원본의 읽기 UI(책 아래 알약 `.nav-pill`: 이전/다음·페이지 표시)를 재사용했다.
