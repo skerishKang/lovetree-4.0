@@ -42,7 +42,8 @@ async function assertion(env, now) {
 async function exchange(env, params, fetcher, now) {
   const body = new URLSearchParams({ client_id: CLIENT, client_assertion_type: 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer', client_assertion: await assertion(env, now), ...params });
   const response = await fetcher(`${AUTH}/token`, { method: 'POST', body, redirect: 'manual' });
-  console.log(JSON.stringify({ trial_stage: 'code_or_refresh_exchange', status: response.status }));
+  const stage = params.grant_type === 'authorization_code' ? 'code_exchange' : params.grant_type === 'refresh_token' ? 'refresh_exchange' : 'other_exchange';
+  console.log(JSON.stringify({ trial_stage: stage, status: response.status }));
   if (!response.ok) throw new Error('token exchange failed');
   return response.json();
 }
