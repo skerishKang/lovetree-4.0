@@ -1,4 +1,21 @@
-AD
+# LoveTree 4.0 인수인계
+
+## 작업 우선순위 — UI/UX 최우선 (2026-10-28 Owner 결정, PR #76 본문 반영)
+
+- **항상 사용자가 보고 조작하는 UI/UX를 1순위로 둔다.** 사용자 흐름·화면·진입 버튼·행동 결과를 먼저 정하고 실제로 확인한 뒤, 이를 완성하는 인증·저장·서버 기능을 연결한다.
+- 인증·DB·배포 작업이 진행 중이어도 독립적으로 가능한 UI 개선을 뒤로 미루지 않는다. 컴1·컴2의 담당 파일과 범위를 나누어 병행하고 같은 기능을 중복 구현하지 않는다.
+- 로그인 등 기능을 제공할 때는 찾을 수 있는 진입 버튼과 확인 중·성공·실패·재시도 상태까지 함께 준비한다. 사용자가 실행할 수 있는 화면과 경로를 확인하기 전에 로그인을 하거나 기능을 시험하라고 요청하지 않는다.
+- 기존 LoveBud·리모네에서 현재 제품 방향에 맞는 화면·동작을 먼저 재사용한다. 잘못된 구조나 불필요한 의존성은 그대로 승계하지 않는다.
+- 완료는 코드·CI 통과만으로 판정하지 않는다. 가능한 환경에서 PC·390px의 실제 화면과 클릭·키보드·팝업·가독성을 확인하고, 프리뷰와 운영 적용 여부를 구분해 보고한다. 실기기 등 미검증 범위는 명시한다.
+- UI 우선은 인증·권한·데이터 보호를 생략한다는 뜻이 아니다. 서버가 준비되지 않았으면 상태를 정확히 알리고 로컬 기록을 보존한다. 운영 변경의 승인 범위는 기존 규칙을 따른다.
+
+## 문서·이슈·PR 상태 정리 — 2026-10-29
+
+main `e073832` 기준. 제품 코드 변경 없음. 근거는 각 문서·이슈에 남겼다.
+
+- 첫 줄의 깨진 "AD"를 정상 제목으로 복구했다. `docs/PRODUCT.md`의 타이포 미적용·Worker/D1 저장·보기 미구현 서술을 main 근거(타이포 `public/fonts/`·`src/styles.css`, 동기화·서버·프록시 `src/sync.js`·`server/`·`functions/`, 트리·시간·보드·줄기 보기)로 정정했다. `docs/DECISIONS_AND_BACKLOG.md`와 `docs/VIEW_CONTRACT.md`에 초기 기록과 현재 상태의 구분 표기를 넣었다.
+- 아래 `로그인·저장 운영 적용 순서`의 "아직 필요" 문단을 2026-10-29 기준으로 갱신했다 — 이미 완료된 병합·migration 073→076·중계·채팅 배포가 재실행 대상으로 읽히지 않게 하고, 실행 근거가 기록되지 않은 COM2 측 설치와 실제 계정 E2E는 남은 것으로 명시했다. `타이포 선택 확정·적용 대기` 문단도 결정 시점 기록으로 표기했다(PR #58로 적용 완료).
+- 이슈: #1 최신 인덱스 추가(과거 이력 보존), #65 구현된 계약·선택 유지와 남은 shell·저장 소유권 구분, #44 실기기·소프트키보드·스크린리더 잔여 명시 후 재오픈, #13·#57에 운영 설치 완료와 실제 계정 E2E 잔여의 구분 기록. 열린 과거 PR 19개는 main 조상 여부와 고유 변경을 확인해 정리했다 — 내용이 main에 반영된 13개(조상 확인)와 통합·문서 제안 6개(#63·#68·#52·#35·#76·#66)를 각각 근거 코멘트와 함께 닫았고, 비교용 #63·#68은 재병합하지 않았다.
 
 ## 기억책 모바일 페이지 이동 UX — 2026-10-29
 
@@ -115,9 +132,9 @@ PR #54 head `a69e1df` 위에 별도 worktree·브랜치로 적용했다(이 PR�
 - MaruBuri는 공식 배포본 파일에 라이선스 전문(name 13/14)이 들어 있지 않아 네이버 공식 페이지의 저작권 안내·영문 전문을 그대로 동봉하고, 표준 OFL 1.1 핵심 17항과 대조해 전부 일치함을 확인했다(`public/fonts/LICENSE-MaruBuri.txt`).
 - docs PR #56의 결정 문서를 이 브랜치에 병합해 `docs/PRODUCT.md`의 타이포그래피 절과 HANDOFF의 결정·구현 두 문단을 모두 보존했다.
 
-## 타이포 선택 확정·적용 대기 — 2026-10-28
+## 타이포 선택 확정·적용 대기 — 2026-10-28(결정 시점 기록 — 적용은 위 #55 항목·PR #58로 완료)
 
-공통 조작 UI는 Pretendard, 기억책 감상 제목만 MaruBuri로 결정했다. 적용 범위·라이선스·검증 기준은 `docs/PRODUCT.md`의 타이포그래피 절과 이슈 #55를 따른다. 이번 변경은 문서만이며 폰트 파일·제품 코드·main·운영 배포는 변경하지 않았다. 잘못된 v4 경로/폰트 조사 결과를 현재 4.0 기준으로 승계하지 않는다.
+공통 조작 UI는 Pretendard, 기억책 감상 제목만 MaruBuri로 결정했다. 적용 범위·라이선스·검증 기준은 `docs/PRODUCT.md`의 타이포그래피 절과 이슈 #55를 따른다. **아래 문단은 결정 시점(적용 전) 기록이다 — "문서만 변경"은 그 시점 기준이며, 현재는 PR #58로 main에 적용됐다.** 잘못된 v4 경로/폰트 조사 결과를 현재 4.0 기준으로 승계하지 않는다.
 
 ## #41 첫 화면 중앙 가독성·마우스 패럴랙스 — 2026-10-28
 
@@ -297,13 +314,13 @@ old 조사 PR #18은 후보 선택의 근거다. 64 → 59 흐름을 먼저 완�
 
 1~5는 한 번에 모이면 안 된다 — 같은 저장소 스택이라 위→아래로 합친다. 러브트리 쪽은 개별 PR을 다시 순차 병합하지 않는다 — 배포 대상은 위 6번 브랜치 하나다. 6은 1~5가 배포된 뒤에도 단독으로 켜지지 않는다(러브트리는 확인 경로가 없으면 저장을 열지 않는다).
 
-**검증 판정 순서**: 1(제품 등록) → 3(migration 073) → 2·4(중계 배포) → 5(채팅 handoff)가 실제 로그인 검증보다 먼저다. 6·7의 저장 API 설치 준비와 DB·서비스 구성, 9의 역할 표는 미리 놓을 수 있으나 **선행 인증 연결(1·2·3·4·5)이 끝나기 전에는 로그인 사슬 성공으로 판정하지 않는다** — 그 자리에서 나는 503 `auth_unavailable`과 401은 정상이다.
+**검증 판정 순서**: 1(제품 등록) → 3(migration 073 — 러브트리 적용분은 076으로 재번호, 2026-10-28 운영 D1 적용·장부 기록) → 2·4(중계 배포, 2026-10-28 완료) → 5(채팅 handoff, 재배포 완료)가 실제 로그인 검증보다 먼저다. 6·7의 저장 API 설치 준비와 DB·서비스 구성, 9의 역할 표는 미리 놓을 수 있으나 **선행 인증 연결(1·2·3·4·5)이 끝나기 전에는 로그인 사슬 성공으로 판정하지 않는다** — 그 자리에서 나는 503 `auth_unavailable`과 401은 정상이다.
 
 ### 단계별 적용·검증·복구
 
 1. 제품 등록 — 대상: Control Plane identity authority Worker. **먼저 현재 값을 확인한다**: 배포된 DO의 `CONTROL_PLANE_ALLOWED_PRODUCTS`와 정본 `ai-revenue-lab` main의 `_ALLOWED_PRODUCTS`(확인 시각 `21cd8c239` = `b62`·`b54-padiem-claw`)를 읽어 적는다. 그 다음 `lovetree-4-0`를 **합집합으로 더하고 절대 덮어쓰지 않는다** — 오래된 PR의 pin(#5963 `c51f6dbef`는 `{b62, b54-padiem-claw, lovetree-4-0}`를 견딘다)을 그대로 올리면 그 뒤에 등록된 다른 제품을 지운다. #5963을 현재 main에 rebase 해 pin과 env를 함께 옮기고, 코드의 pin과 env가 같아야 DO 생성이 통과한다(다르면 실패). 검증: gate·계약 시험(`IDENTITY_PRODUCTS` pin), 채팅 e2e env가 같은 집합인지, 그리고 배포 후 DO의 실제 집합에서 확인한 제품이 지워지지 않고 `lovetree-4-0`가 늘었는지. 복구: 이전 집합 값으로 되돌린 뒤 해당 Worker 재배포.
 2. 읽기 중계 배포 — 대상: Cloudflare Worker `lovetree-authority-caller`. 필요 설정: `LOVETREE_CALLER_SECRET`, `IDENTITY_AUTHORITY` service binding. 검증: `LoveTree Authority Caller CI`(읽기 11건 skip=0), 배포 후 `/health`, `/auth-check`, 유효 세션 1건 resolve 200·위조 401. 복구: 이전 버전으로 롤백(공개 표면은 이 중계 하나가 새로 늘어난 자리라 제거는 Worker 배포를 되돌린다).
-3. migration 073 적용 — 대상: `padiem-chat-db`(D1). **발급 중계를 검증하기 전에** 적용한다 — `/mint-session`은 handoff 행을 실제로 클레임하므로 표 자리가 먼저 있어야 한다. 필요 설정: 없음(스키마). 검증: D1 gate의 일반 마이그레이션 창(073은 seed=추가 전용으로 분류, apply 창·파괴적 목록에 없음), `lovetree_login_handoffs` 존재·CHECK. 복구: 테이블은 추가 전용이라 남기고 라우트·중계만 되돌린다(드롭은 별도 승인).
+3. migration 073 적용 — **2026-10-29 기록: 서수 충돌(main의 `073_pc_device_link_pause`와 #5984의 `073_lovetree_login_handoff`)로 러브트리 적용분은 `076_lovetree_login_handoff.sql`로 재번호됐고, b62-d1-migrate-gate로 운영 D1에 적용·장부 기록까지 확인했다(`lovetree_login_handoffs` 표 존재 실측 — 위 `운영 연결 진행` 참조). 게이트가 'wide destructive'로 표시한 것은 CHECK 절의 `ON DELETE CASCADE` DELETE 토큰 때문이며 drop-guard와는 무관하다.** 아래는 적용 전 준비 당시 절차 기록이다. 대상: `padiem-chat-db`(D1). **발급 중계를 검증하기 전에** 적용한다 — `/mint-session`은 handoff 행을 실제로 클레임하므로 표 자리가 먼저 있어야 한다. 필요 설정: 없음(스키마). 검증: D1 gate의 일반 마이그레이션 창(073은 seed=추가 전용으로 분류, apply 창·파괴적 목록에 없음), `lovetree_login_handoffs` 존재·CHECK. 복구: 테이블은 추가 전용이라 남기고 라우트·중계만 되돌린다(드롭은 별도 승인).
 4. 발급·폐기 중계 배포 — 대상: Cloudflare Worker `lovetree-auth-caller`. 필요 설정: `LOVETREE_CALLER_SECRET`(러브트리는 두 중계에 같은 env 이름 하나로 서명하므로 **두 중계가 같은 값**이어야 한다), `IDENTITY_AUTHORITY`, `LOVETREE_LOGIN_DB`(D1). 검증: 같은 CI(발급 11건·읽기 11건·D1 gate 18건·cross-lane guard 11건), 배포 후 `/auth-check` methods 확인, 존재하지 않는 표로 `/mint-session` 401. 복구: 롤백은 **이전 배포·이전 설정을 되돌리는 것**이다. `LOVETREE_LOGIN_DB`·시크릿을 빼는 것은 검증을 못 하게 막는 긴급 차단 수단이지 롤백이 아니다. 표 소비는 상태를 `claimed`로 바꾸는 단일 UPDATE이고 **행은 남는다** — 만료는 `expires_at` 조건으로 재사용을 막을 뿐 삭제가 아니며, 지난 행을 지우는 일은 별도 정리(purge) 결정이다(러브트리는 발급 중계가 없어도 조회·폐기를 유지한다).
 5. 채팅 handoff 생산 배포 — 대상: `apps/padiem-chat` Worker. 필요 설정: 기존 `session_secret` 재사용(새 시크릿 불요), 코드 소유 allowlist origin에 실제 러브트리 주소 포함 여부 확인. 검증: B62 full regression·browser QA lane, 배포 후 `/auth/lovetree/start`가 기존 Google authorize로 302(redirect_uri 무변경), 로그인 완료 시 러브트리 콜백로만 되돌아감. 복구: 라우트 등록 해제(revert 커밋) — 이미 만든 행은 만료(120초)로 **더 이상 쓸 수 없을 뿐**이고 저절로 삭제되지 않는다(만료 ≠ 삭제). 지우는 일은 별도 정리 결정이다.
 6. 러브트리 저장 API 배포 — 대상: COM2 Node 서비스(WSL Ubuntu). 실행 구성은 이 브랜치에 있다(`deploy/host-com2/lovetree-api/`): 유닛은 127.0.0.1:8790 루프백 전용, 노드는 실측 경로 `/usr/local/bin/node`(v22.18.0 — `/usr/bin/node`는 v18이라 `check_config.mjs`가 닫는다), `install.sh`는 dry-run 기본(`--apply`로만 설치하고 시작·활성화·터널 변경·컨테이너 생성은 항상 NO), `check_config.mjs`는 값 출력 없이 깃발만 답한다. 필요 설정 이름: `LOVETREE_PRODUCT_ID`, `LOVETREE_DATABASE_URL`, `LOVETREE_AUTHORITY_TRANSPORT=relay`, `LOVETREE_AUTHORITY_RELAY_URL`, `LOVETREE_CALLER_SECRET`, `LOVETREE_CREDENTIAL_MODULE=./server/credentials/lovetree-credential-module.js`, `LOVETREE_SESSION_SECRET`, `LOVETREE_SESSION_SOURCE`/`LOVETREE_SESSION_COOKIE`, `LOVETREE_AUTHORITY_WRITE_TRANSPORT`, `LOVETREE_LOGIN_PROVIDER_MODULE=./server/padiem-login-provider.js`, `LOVETREE_PADIEM_HANDOFF_START_URL`, `LOVETREE_PUBLIC_ORIGIN`, `LOVETREE_STATE_STORE=postgres`, `LOVETREE_MINT_URL`, `LOVETREE_MAX_BODY_BYTES`, `PORT`(유닛이 8790으로 준다). DB 준비: `server/db/schema.sql`의 다섯 테이블(`lovetree_workspaces`, `lovetree_request_claims`, `lovetree_login_states`, `lovetree_product_roles`, `lovetree_product_role_audit`) — 모두 추가 전용, 적용 경로는 `scripts/apply-schema.mjs --apply` 한 개. 인스턴스는 **러브트리 전용 컨테이너 하나**로 따로 둔다(`postgres.compose.yml` + `postgres.env.example` — 볼륨·네트워크·DB·역할이 전부 독립, 127.0.0.1:5433 루프백만, 기존 `n8n-postgres`에는 DB·역할을 추가하지 않고 포트도 열지 않는다). 검증(배포 전): `npm run check`, PostgreSQL job skip=0, 로컬 두 저장소 연결 시험 6건. 검증(배포 후): 브라우저에서 로그인 → 저장 → 새로고침 → 로그아웃 → 이전 자격 증명 거부, 회원 A/B 격리. 단 1~5가 먼저다 — 인증 선행이 되기 전 이 자리의 정상 응답은 503 `auth_unavailable`·401이고, 그 상태를 로그인 사슬 성공으로 적지 않는다. 복구: 롤백은 이전 배포·이전 설정 복원이다. `LOVETREE_MINT_URL`·`LOVETREE_LOGIN_PROVIDER_MODULE`·확인 경로 env를 빼는 것은 저장과 로그인을 닫는 **긴급 차단** 수단이지 롤백으로 적지 않는다(닫히면 저장은 fail-closed로 열리지 않는다).
@@ -318,7 +335,8 @@ old 조사 PR #18은 후보 선택의 근거다. 64 → 59 흐름을 먼저 완�
 ### 이미 준비된 것과 아직 필요한 것
 
 - 준비됨: 위 1~5의 코드·시험·CI(발급 11/읽기 11/gate 18/guard 11/B62 full regression pass), 러브트리(#37/#49/#52) 코드와 CI(ubuntu·windows·Pages·GitGuardian·PostgreSQL), 두 저장소 연결 시험 6건(실제 push된 SHA 청결 확인 포함), 실제 브라우저 판정(로그인→저장→새로고침 복원→로그아웃→세션 없음 거부, 회원 A/B 격리) — 국소 composition, 스텁 Google/모형 권위.
-- 아직 필요: PR 병합(어떤 것도 main에 없다), 두 Worker·채팅·러브트리 배포, migration 073 실행, `LOVETREE_LOGIN_DB` 바인딩, 시크릿 생성·등록(`LOVETREE_CALLER_SECRET`·`LOVETREE_SESSION_SECRET`), COM2 PostgreSQL **전용 컨테이너 생성**과 `scripts/apply-schema.mjs --apply`로 표 다섯 개 적용(유일한 경로 — 아직 실행하지 않았다), 서비스 설치(`install.sh --apply`)와 `.env` 값 채우기, allowlist에 실제 배포 origin 확정, **기존 `cloudflared-padiem` 터널에 러브트리 API 호스트네임 1개 추가**(실 설정은 `/opt/padiem/cloudflared/config.yml`에 이미 `files`·`b14`·`mesh` 세 항과 catch-all 404가 걸어져 있다 — 덮어쓰지 말고 한 항만 더하고 offline `ingress validate`), **Pages Function 배포와 두 설정** — Pages `LOVETREE_API_ORIGIN` = `https://<컴2 API 호스트>`, COM2 `LOVETREE_PUBLIC_ORIGIN` = `https://lovetree-4-0.pages.dev`(서로 다른 두 값이고, 브라우저는 Pages 주소만 본다. 설정을 넣은 뒤에는 Pages 재배포가 한 번 더 필요하다). 이 브랜치가 main에 들어가면 Pages는 자동 배포된다, 실제 Google 계정으로 1회 왕복(크로스 사이트 쿠키 포함), password leg의 실제 화면 왕복. 프런트 서버 저장 연결(`#57`)은 #59로 구현되어 위 사슬의 7번째 칸에 있고 운영 후보(위 6번)에 이미 포함된다.
+- 완료됨(2026-10-28~29, 근거: 위 `운영 연결 진행`·`실행 기록`): PR 병합 — 운영 후보 PR #75 병합(`2793d3f`), 통합 후보 `7e6f6c7`(#64 b30029b + Pages 프록시 #69), 구조 스택 PR #83(`916a39b`), 이후 #78·#80·#84~#87까지 main에 반영. 두 중계 Worker(`lovetree-authority-caller`·`lovetree-auth-caller`) 배포·헬스 200, identity Worker 재배포(제품 pin), 채팅 재배포(`/auth/lovetree/start` 302→Google 실측), migration 073→076 재번호 후 운영 D1 적용·장부 기록(`lovetree_login_handoffs` 존재 실측). Pages `LOVETREE_API_ORIGIN` 설정 완료 — 이후 main 병합으로 Pages 재배포가 여러 번 있었으나 운영 프록시의 실사용 판정은 아래 실계정 E2E와 함께 남는다. 저장 API의 실행 구성·스키마 경로·런북은 PR #75로 main에 있다.
+- 아직 필요(실행 근거가 기록되지 않아 완료로 적지 않는다): COM2 측 적용 — `.env` 추가 값 반영·재시작, `LOVETREE_CALLER_SECRET` 세 곳(중계 2개·COM2) 일치 확인(전달 경로 확정 전 재생성 보류), 러브트리 전용 PostgreSQL 컨테이너 생성과 `scripts/apply-schema.mjs --apply`, `install.sh --apply`, allowlist에 실제 배포 origin 확정, 기존 터널에 러브트리 API 호스트네임 반영·offline `ingress validate` 확인. 그리고 실제 계정 E2E — 로그인→저장→복원→로그아웃→이전 자격 거부, A/B 격리 — 와 운영 판정(401/404 JSON, 버튼→인증 화면, 관리자 미부여). 실계정 주소·자격 증명 값은 이 기록에 남기지 않는다. 프런트 서버 저장 연결(`#57`)은 #59로 구현되어 main에 있다.
 - 이번 브라우저 판정에서 확인하지 못한 것: (a) 운영 Google 화면·운영 채팅 셸을 지난 왕복 — 로컬 스텁authorize·하네스 API라 채팅 셸(`/`)이 없어 대화상자 왕복은 자동 시험으로만 확인했고, (b) 폐기된 canonical 세션 id를 직접 넣어 받는 거부는 브라우저가 Cookie 헤더를 덮어쓸 수 없어 자동 시험(서버측)이 담당한다.
 
 ### 실행 기록 (2026-10-28)
