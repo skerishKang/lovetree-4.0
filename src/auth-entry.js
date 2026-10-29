@@ -17,13 +17,12 @@
 const LABEL = { login: '로그인', logout: '로그아웃' };
 
 // 로그아웃은 확인·저장 중에 누르면 서버 요청이 중복되거나 진행 중인 저장 결과를 잃는다 — 막는다.
-// 로그인은 반대다. 서버 확인이 늦거나 멈추면 로그인 진입이 그 상태를 빠져나오는 유일한 길이다 —
-// 그러므로 확인 중에는 막지 않는다. 확인 중 클릭은 컨트롤러가 세대를 올려 이전 응답을 버리므로
-// 늦게 도착한 답이 새 로그인 경로를 덮지 않는다(`sync.js`의 `generation`).
+// 최초 확인 중에는 버튼 자리를 유지하되 잘못된 로그인 표시를 노출하지 않는다.
 const LOGOUT_BUSY_PHASES = ['checking', 'syncing'];
 const LOGIN_BUSY_PHASES = ['syncing'];
 
 export function authEntryState({ owned = false, phase = 'local' } = {}) {
+  if (!owned && phase === 'checking') return { action: 'pending', label: '로그아웃', busy: true };
   const action = owned ? 'logout' : 'login';
   const busy = (action === 'logout' ? LOGOUT_BUSY_PHASES : LOGIN_BUSY_PHASES).includes(phase);
   return { action, label: LABEL[action], busy };
@@ -32,14 +31,15 @@ export function authEntryState({ owned = false, phase = 'local' } = {}) {
 export function authEntry(snapshot, extraClass = '') {
   const { action, label, busy } = authEntryState(snapshot ?? {});
   const cls = extraClass ? `${extraClass} auth-entry` : 'auth-entry';
-  return `<button class="${cls}" data-auth-action="${action}" aria-label="${label}"${busy ? ' disabled' : ''}>${label}</button>`;
+  return `<button class="${cls}" data-auth-action="${action}" aria-label="${action === 'pending' ? '로그인 상태 확인 중' : label}" style="min-width:5.5em;visibility:${action === 'pending' ? 'hidden' : 'visible'}"${busy ? ' disabled' : ''}>${label}</button>`;
 }
 
 export function applyAuthEntry(button, snapshot) {
   if (!button || typeof button.setAttribute !== 'function') return button;
   const { action, label, busy } = authEntryState(snapshot ?? {});
   button.setAttribute('data-auth-action', action);
-  button.setAttribute('aria-label', label);
+  button.setAttribute('aria-label', action === 'pending' ? '로그인 상태 확인 중' : label);
+  button.setAttribute('style', `min-width:5.5em;visibility:${action === 'pending' ? 'hidden' : 'visible'}`);
   button.textContent = label;
   button.disabled = busy;
   return button;

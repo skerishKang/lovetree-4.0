@@ -7,9 +7,12 @@ test('owned가 아니면 로그인, owned면 로그아웃을 가리킨다', () =
   assert.deepEqual(authEntryState({ owned: true, phase: 'synced' }), { action: 'logout', label: '로그아웃', busy: false });
 });
 
-test('확인 중에도 로그인은 막지 않는다 — 확인이 늦으면 그것이 유일한 탈출구다', () => {
-  assert.equal(authEntryState({ owned: false, phase: 'checking' }).busy, false, '서버 확인 중에도 로그인 진입은 눌린다');
-  assert.equal(authEntry({ owned: false, phase: 'checking' }, 'menuBtn'), '<button class="menuBtn auth-entry" data-auth-action="login" aria-label="로그인">로그인</button>');
+test('첫 확인 중에는 버튼 자리를 유지하고 로그인 표시를 숨긴다', () => {
+  assert.deepEqual(authEntryState({ owned: false, phase: 'checking' }), { action: 'pending', label: '로그아웃', busy: true });
+  const html = authEntry({ owned: false, phase: 'checking' }, 'menuBtn');
+  assert.match(html, /visibility:hidden/);
+  assert.match(html, /min-width:5.5em/);
+  assert.match(html, / disabled>/);
 });
 
 test('저장 중 중복 요청과 로그아웃 실수는 막는다', () => {
@@ -41,11 +44,13 @@ test('applyAuthEntry는 열려 있는 버튼의 문구·속성만 바꾼다', ()
   assert.equal(button.textContent, '로그인');
   assert.equal(button.disabled, false);
   applyAuthEntry(button, { owned: false, phase: 'checking' });
-  assert.equal(button.disabled, false, '확인 중에도 화면이 다시 그려지지 않은 채 눌린다');
+  assert.equal(button.disabled, true);
+  assert.match(attrs.style, /visibility:hidden/);
   applyAuthEntry(button, { owned: true, phase: 'synced' });
   assert.equal(attrs['data-auth-action'], 'logout');
   assert.equal(button.textContent, '로그아웃');
   assert.equal(button.disabled, false);
+  assert.match(attrs.style, /visibility:visible/);
   applyAuthEntry(button, { owned: true, phase: 'syncing' });
   assert.equal(button.disabled, true);
 });

@@ -51,7 +51,7 @@ export function createSyncController(deps) {
     navigate = (url) => { globalThis.location.assign(url); }
   } = deps;
 
-  let current = status({ phase: 'local', actions: [{ name: 'login', label: '로그인' }] });
+  let current = status({ phase: 'checking' });
   let listener = () => {};
   let owned = false;
   let revision = null;
