@@ -42,6 +42,7 @@ async function assertion(env, now) {
 async function exchange(env, params, fetcher, now) {
   const body = new URLSearchParams({ client_id: CLIENT, client_assertion_type: 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer', client_assertion: await assertion(env, now), ...params });
   const response = await fetcher(`${AUTH}/token`, { method: 'POST', body, redirect: 'manual' });
+  console.log(JSON.stringify({ trial_stage: 'code_or_refresh_exchange', status: response.status }));
   if (!response.ok) throw new Error('token exchange failed');
   return response.json();
 }
@@ -70,10 +71,11 @@ export function createSharedPagesAuth({ fetcher = fetch, now = () => Math.floor(
       if (path === '/auth/callback' && request.method === 'GET') {
         const state = await unseal(env, jar.lovetree_auth_state);
         if (state.exp <= current || !state.state || state.state !== url.searchParams.get('state') || !url.searchParams.get('code') || validNext(state.next) !== state.next) return json(401, 'invalid_state');
+        console.log(JSON.stringify({ trial_stage: 'callback_code_received', status: 200 }));
         const tokens = await exchange(env, { grant_type: 'authorization_code', code: url.searchParams.get('code'), redirect_uri: callbackFor(request, env), code_verifier: state.verifier }, fetcher, current);
         await verify(tokens.access_token);
         if (typeof tokens.refresh_token !== 'string') throw new Error('missing refresh');
-        const h = issueCookies(tokens); h.set('location', state.next); return new Response(null, { status: 302, headers: h });
+        const h = issueCookies(tokens); h.set('location', state.next); console.log(JSON.stringify({ trial_stage: 'session_cookie_issued', status: 302 })); return new Response(null, { status: 302, headers: h });
       }
       if ((path === '/auth/refresh' || path === '/auth/logout') && request.method === 'POST') {
         if (request.headers.get('origin') !== url.origin) return json(403, 'invalid_origin');
