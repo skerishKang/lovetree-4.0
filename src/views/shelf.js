@@ -2,6 +2,7 @@ import sourceCSS from './shelf-source.css?inline';
 import css from './shelf.css?inline';
 import {escape as esc, resume} from './memory.js';
 import {SERVICE, GO_HOME, GO_TREES, GO_EXAMPLES, READ_BOOK, VIEW_TREE, NEW_TREE, BOOK_IS_READING} from '../terms.js';
+import {createView} from './lifecycle.js';
 
 const SELECTION_KEY = 'lovetree.v4.shelf-selection.v1';
 const COLORS = ['#a8586b', '#627ba2', '#8d705e', '#6d8979', '#80708f', '#567e88'];
@@ -23,13 +24,12 @@ function cover(tree, number) {
   return `<span class="book-cover" style="--cover:${color(tree)}"><span class="cover-number">TREE · ${String(number).padStart(2, '0')}</span><span class="cover-symbol" aria-hidden="true"><span>✦</span></span><strong class="cover-title">${esc(tree.subject)}</strong><span class="cover-subtitle">${tree.moments.length}개의 순간</span></span>`;
 }
 
-export function mountShelf(host, {trees, storage, view, error, recovery, onBook, onWorkspace, onNew, onAction, authHtml = ''}) {
-  const root = host.attachShadow({mode: 'open'});
-  const abort = new AbortController(), signal = abort.signal;
+export function mountShelf(host, {trees, storage, view, context, actions, error, recovery, authHtml = ''}) {
+  const {root, signal, track, dispose} = createView(host);
   const sorted = [...trees].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   const last = resume(storage, trees);
   const subjects = [...new Set(trees.map(t => t.subject))].sort((a, b) => a.localeCompare(b, 'ko'));
-  let selection = view.selectedId, list = [], drag = null, suppressClick = false;
+  let selection = context.treeId || view.selectedId, list = [], drag = null, suppressClick = false;
   if (!selection) { try { selection = storage.getItem(SELECTION_KEY); } catch { /* optional view state */ } }
   if (!trees.some(t => t.id === selection)) selection = last?.tree.id || sorted[0]?.id;
   if (!subjects.includes(view.subject)) view.subject = '';
@@ -97,7 +97,7 @@ export function mountShelf(host, {trees, storage, view, error, recovery, onBook,
     if (!tree) return;
     rememberSelection();
     const moment = fromStart ? firstMoment(tree) : resume(storage, [tree])?.moment || firstMoment(tree);
-    onBook(tree.id, moment.id);
+    actions.openBook(tree.id, moment.id);
   }
   root.addEventListener('click', event => {
     const button = event.target.closest('button'); if (!button || button.disabled) return;
@@ -107,12 +107,12 @@ export function mountShelf(host, {trees, storage, view, error, recovery, onBook,
       else { selection = button.dataset.book; rememberSelection(); updateSelection(true); }
     } else if (button.dataset.move) move(Number(button.dataset.move));
     else if (button.dataset.mode) { view.mode = button.dataset.mode; draw(); }
-    else if (button.dataset.action) onAction(button.dataset.action, button.dataset.id);
-    else if (button.dataset.do === 'new') onNew();
-    else if (button.dataset.do === 'resume') onBook(last.tree.id, last.moment.id);
+    else if (button.dataset.action) actions.library(button.dataset.action, button.dataset.id);
+    else if (button.dataset.do === 'new') actions.requestMoment('new');
+    else if (button.dataset.do === 'resume') actions.openBook(last.tree.id, last.moment.id);
     else if (button.dataset.do === 'open') open(selectedTree());
     else if (button.dataset.do === 'first') open(selectedTree(), true);
-    else if (button.dataset.do === 'workspace') { const tree = selectedTree(); if (tree) { rememberSelection(); onWorkspace(tree.id, firstMoment(tree).id); } }
+    else if (button.dataset.do === 'workspace') { const tree = selectedTree(); if (tree) { rememberSelection(); actions.openWorkspace(tree.id, firstMoment(tree).id); } }
     else if (button.dataset.do === 'clear') { view.query = ''; view.subject = ''; root.querySelector('input').value = ''; root.querySelector('select').value = ''; draw(); root.querySelector('input').focus(); }
   }, {signal});
   root.querySelector('input').addEventListener('input', event => { view.query = event.target.value; draw(); }, {signal});
@@ -134,5 +134,6 @@ export function mountShelf(host, {trees, storage, view, error, recovery, onBook,
   rail.addEventListener('pointercancel', () => { drag = null; suppressClick = false; }, {signal});
   const resize = new ResizeObserver(() => updateSelection()); resize.observe(rail);
   draw();
-  return () => { abort.abort(); resize.disconnect(); };
+  track(() => resize.disconnect());
+  return dispose;
 }
