@@ -8,6 +8,7 @@ async function setup() {
   let calls = 0;
   const auth = createSharedPagesAuth({ now: () => 1000, verify: async token => { if (token !== 'access') throw Error('bad'); }, fetcher: async (url, init) => {
     calls++; assert.equal(url, 'https://auth.padiem.net/token');
+    assert.equal(init.redirect, 'manual');
     assert.equal(new URLSearchParams(init.body).get('client_id'), 'lovetree-4-0');
     return Response.json({ access_token: 'access', refresh_token: 'refresh' });
   } });
