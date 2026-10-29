@@ -1,5 +1,14 @@
 import { createProxy } from '../_lib/proxy.js';
 
-// /api/* 는 전부 이 함수가 소유한다. 허용 목록 밖 경로도 여기서 404 JSON 으로 끝나
-// 정적 자산(index.html) 폴백으로 흘러가지 않는다.
-export const onRequest = createProxy();
+const proxy = createProxy();
+const preview = 'https://ai-astra4-preview-auth-callb.lovetree-4-0.pages.dev';
+export function onRequest(context) {
+  const url = new URL(context.request.url);
+  // Trial branch only: read the existing workspace, never write to it.
+  // Remove this exception before merging the PR.
+  if (url.origin === preview && url.pathname === '/api/workspace') {
+    if (context.request.method !== 'GET') return new Response(null, { status: 405 });
+    return proxy({ ...context, env: { ...context.env, LOVETREE_API_ORIGIN: context.env?.LOVETREE_TRIAL_API_ORIGIN } });
+  }
+  return proxy(context);
+}
