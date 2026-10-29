@@ -56,5 +56,19 @@ export function mountOrbit(host,{trees,storage,context,actions,error,recovery=fa
  app.addEventListener('pointerleave',()=>{if(!finePointer.matches)return;cameraTarget={x:0,y:0};schedule();},{signal});
  window.addEventListener('pointerup',()=>{drag=null;schedule()},{signal});window.addEventListener('pointercancel',()=>{drag=null;moved=20},{signal});window.addEventListener('resize',schedule,{signal});document.addEventListener('visibilitychange',()=>{if(document.hidden){cancelAnimationFrame(raf);raf=0;}else schedule()},{signal});
  if(error||recovery){const note=document.createElement('div');note.setAttribute('role',error?'alert':'status');note.style.cssText='position:absolute;bottom:44px;left:5%;right:5%;z-index:80;color:#e7c7d1;font-size:12px;line-height:1.7;display:flex;flex-wrap:wrap;gap:10px;align-items:center';if(error){const p=document.createElement('p');p.textContent=error;p.style.cssText='margin:0';note.append(p);}if(recovery){const b=document.createElement('button');b.type='button';b.className='subtleBtn';b.textContent='복구 파일 내보내기';b.style.minHeight='36px';b.onclick=()=>actions.library('recovery');note.append(b);}app.append(note);}
+ // #81 뷰포트 높이 계약은 첫 화면만 갖는다. 동기화 안내가 흐름에 얹히는 만큼만 빼고,
+ // 나머지 화면(책장·기억책·작업공간)은 본문 자연 높이 뒤에 안내가 오도록 건드리지 않는다.
+ // 가리는 방식(overflow)은 쓰지 않고, 안내가 자라면 첫 화면이 그 만큼 줄어든다.
+ const noticeOuter=()=>{const bar=document.getElementById("sync-bar");if(!bar)return 0;const cs=getComputedStyle(bar);return Math.round(bar.getBoundingClientRect().height+parseFloat(cs.marginTop||0)+parseFloat(cs.marginBottom||0));};
+ const fitNotice=()=>{host.style.height=`calc(100dvh - ${noticeOuter()}px)`;schedule();};
+ const noticeResize=typeof ResizeObserver==="function"?new ResizeObserver(fitNotice):null;
+ const barNow=document.getElementById("sync-bar");
+ if(noticeResize&&barNow)noticeResize.observe(barNow);
+ const barWatch=typeof MutationObserver==="function"?new MutationObserver(()=>{if(noticeResize){noticeResize.disconnect();const bar=document.getElementById("sync-bar");if(bar)noticeResize.observe(bar);}fitNotice();}):null;
+ if(barWatch)barWatch.observe(document.body,{childList:true});
+ window.addEventListener("resize",fitNotice,{signal});
+ track(()=>noticeResize?.disconnect());
+ track(()=>barWatch?.disconnect());
+ fitNotice();
  schedule();track(()=>cancelAnimationFrame(raf));track(()=>dialog.close());return dispose;
 }
