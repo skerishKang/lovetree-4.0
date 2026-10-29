@@ -1,4 +1,13 @@
 import { createProxy } from '../_lib/proxy.js';
+import { createSharedPagesAuth } from '../_lib/shared-auth.mjs';
 
-// /auth/* 도 같은 이유로 전부 이 함수가 소유한다(로그인·콜백·로그아웃만 통과).
-export const onRequest = createProxy();
+const legacy = createProxy();
+const shared = createSharedPagesAuth();
+export async function onRequest(context) {
+  if (context.env?.LOVETREE_SHARED_AUTH_ENABLED !== 'true') return legacy(context);
+  const path = new URL(context.request.url).pathname;
+  const cookie = context.request.headers.get('cookie') || '';
+  if (path === '/auth/callback' && !/(?:^|;\s*)lovetree_auth_state=/.test(cookie)) return legacy(context);
+  if (path === '/auth/logout' && !/(?:^|;\s*)lovetree_refresh=/.test(cookie)) return legacy(context);
+  return shared(context.request, context.env);
+}

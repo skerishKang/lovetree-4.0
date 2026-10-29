@@ -411,7 +411,22 @@ export function createWorkspaceApi({ fetchImpl = (...args) => globalThis.fetch(.
     let expired = false;
     const timer = controller ? setTimeout(() => { expired = true; controller.abort(); }, Math.max(0, timeoutMs)) : null;
     try {
-      const response = await fetchImpl(`${base}${path}`, { credentials: 'same-origin', ...init, ...(controller ? { signal: controller.signal } : {}) });
+      const request = () => fetchImpl(`${base}${path}`, { credentials: 'same-origin', ...init, ...(controller ? { signal: controller.signal } : {}) });
+      let response = await request();
+      // Web Locks serializes refresh across tabs: retry after acquiring the lock
+      // first, since another tab might already have rotated the credential.
+      const sharedSession = /(?:^|;\s*)__Host-lovetree-shared=1(?:;|$)/.test(globalThis.document?.cookie || '');
+      if (response.status === 401 && path.startsWith('/api/') && sharedSession) {
+        const refreshAndRetry = async () => {
+          const retry = await request();
+          if (retry.status !== 401) return retry;
+          const refreshed = await fetchImpl(`${base}/auth/refresh`, { method: 'POST', credentials: 'same-origin', ...(controller ? { signal: controller.signal } : {}) });
+          return refreshed.ok ? request() : retry;
+        };
+        response = globalThis.navigator?.locks?.request
+          ? await globalThis.navigator.locks.request('lovetree-shared-auth-refresh', refreshAndRetry)
+          : await refreshAndRetry(); // Server grace covers overlapping tabs without Web Locks.
+      }
       const text = await response.text();
       let payload = null;
       try { payload = text ? JSON.parse(text) : null; } catch { payload = null; }
