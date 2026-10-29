@@ -16,6 +16,7 @@ const PHASE_LABEL = {
   adoptOffered: '서버에 다른 기록이 있어요',
   conflict: '서버 기록이 먼저 바뀌었어요',
   offline: '서버 연결을 확인할 수 없어요',
+  checkFailed: '서버 확인을 끝까지 받지 못했어요',
   rejected: '서버가 이 저장을 받지 않았어요'
 };
 
@@ -84,18 +85,27 @@ export function createSyncController(deps) {
       return { closed: 'local' };
     }
     if (answer.status === 503 || answer.code === 'auth_unavailable') return { closed: 'unconfigured' };
-    return { closed: answer.status === 0 ? 'offline' : 'rejected', detail: answer.message };
+    // 시간을 넘긴 것도 연결 확인을 못 한 것과 같은 자리에 둔다 — 다만 문구로 '기다림을 끝냈다'는
+    // 사실과 재시도 가능성을 분명히 남긴다.
+    if (answer.code === 'timeout') return { closed: 'offline', detail: '확인 응답을 기다리는 시간을 넘겼어요. 다시 시도할 수 있고, 그동안 기록은 이 기기에 안전하게 남아요.' };
+    // 401·503 이외의 실패(500·502·504 등)는 '이 기기에만 저장'으로 삼키지 않는다. 서버에 닿았지만
+    // 확인이 끝나지 않았다는 사실과 재시도·로그인 진입을 따로 보여 준다.
+    if (answer.status === 0) return { closed: 'offline' };
+    return { closed: 'rejected', detail: answer.message };
   }
 
-  function adoptLocalOnly(reason) {
+  function adoptLocalOnly(reason, detail) {
     owned = false;
     revision = null;
     ownerSubject = null;
+    const fallback = {
+      unconfigured: '서버 저장이 아직 켜지지 않았어요. 기록은 이 기기에만 저장돼요.',
+      offline: '연결을 확인한 뒤 다시 시도할 수 있어요. 그동안 기록은 이 기기에 안전하게 남아요.',
+      rejected: '서버 확인을 끝까지 받지 못했어요. 기록은 이 기기에 안전하게 남아요.'
+    };
     return show(status({
-      phase: reason === 'unconfigured' ? 'local' : reason === 'offline' ? 'offline' : 'local',
-      detail: reason === 'unconfigured'
-        ? '서버 저장이 아직 켜지지 않았어요. 기록은 이 기기에만 저장돼요.'
-        : reason === 'offline' ? '연결을 확인한 뒤 다시 시도할 수 있어요. 그동안 기록은 이 기기에 안전하게 남아요.' : null,
+      phase: reason === 'offline' ? 'offline' : reason === 'rejected' ? 'checkFailed' : 'local',
+      detail: detail ?? fallback[reason] ?? null,
       actions: reason === 'login' || reason === 'local'
         ? [{ name: 'login', label: '로그인' }]
         : [{ name: 'retry', label: '다시 시도' }, { name: 'login', label: '로그인' }]
@@ -107,7 +117,7 @@ export function createSyncController(deps) {
     show(status({ phase: 'checking' }));
     const answer = await readServer();
     if (stale(gen)) return current;
-    if (answer.closed) return adoptLocalOnly(answer.closed === 'offline' ? 'offline' : answer.closed === 'unconfigured' ? 'unconfigured' : 'login');
+    if (answer.closed) return adoptLocalOnly(answer.closed, answer.detail);
 
     owned = true;
     revision = answer.revision;
@@ -390,10 +400,18 @@ export function createSyncController(deps) {
 }
 
 /** 서버 저장 API의 fetch 경계. 응답 형상은 `server/http.js`가 주는 닫힌 JSON 그대로 다룬다. */
-export function createWorkspaceApi({ fetchImpl = (...args) => globalThis.fetch(...args), base = '' } = {}) {
+// 확인·저장을 기다리는 상한. Pages 프록시 자체 상한(15초, `functions/_lib/proxy.js`)보다 짧게 두어
+// 서버가 자기 문구를 먼저 닫고, 화면은 그 전에 실패 안내와 재시도·로그인 진입을 되찾는다.
+export const DEFAULT_REQUEST_TIMEOUT_MS = 8_000;
+
+export function createWorkspaceApi({ fetchImpl = (...args) => globalThis.fetch(...args), base = '', timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS } = {}) {
   async function call(path, init, { requiresRevision = false, requiresState = false } = {}) {
+    // 타이머는 응답 본문까지 읽고 나서 해제한다. 본문을 다 읽지 못한 채 끝나면 아직 성공이 아니다.
+    const controller = typeof AbortController === 'function' ? new AbortController() : null;
+    let expired = false;
+    const timer = controller ? setTimeout(() => { expired = true; controller.abort(); }, Math.max(0, timeoutMs)) : null;
     try {
-      const response = await fetchImpl(`${base}${path}`, { credentials: 'same-origin', ...init });
+      const response = await fetchImpl(`${base}${path}`, { credentials: 'same-origin', ...init, ...(controller ? { signal: controller.signal } : {}) });
       const text = await response.text();
       let payload = null;
       try { payload = text ? JSON.parse(text) : null; } catch { payload = null; }
@@ -416,8 +434,13 @@ export function createWorkspaceApi({ fetchImpl = (...args) => globalThis.fetch(.
         savedAt: payload?.savedAt ?? null,
         state: payload?.state ?? null
       };
-    } catch {
-      return { ok: false, status: 0, code: 'network', message: null };
+    } catch (error) {
+      // AbortError는 우리가 시간을 넘긴 자리다. 저장(PUT)에서 이 경로를 타면 요청 키를
+      // 유지한 채 다시 보내므로, 서버가 이미 커밋한 경우는 복제 회신으로 끝난다.
+      const timedOut = expired || error?.name === 'AbortError';
+      return { ok: false, status: 0, code: timedOut ? 'timeout' : 'network', message: null };
+    } finally {
+      if (timer !== null) clearTimeout(timer);
     }
   }
 

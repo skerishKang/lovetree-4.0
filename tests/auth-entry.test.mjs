@@ -7,9 +7,15 @@ test('owned가 아니면 로그인, owned면 로그아웃을 가리킨다', () =
   assert.deepEqual(authEntryState({ owned: true, phase: 'synced' }), { action: 'logout', label: '로그아웃', busy: false });
 });
 
-test('확인·저장 중에는 버튼을 막는다', () => {
-  assert.equal(authEntryState({ owned: false, phase: 'checking' }).busy, true);
+test('확인 중에도 로그인은 막지 않는다 — 확인이 늦으면 그것이 유일한 탈출구다', () => {
+  assert.equal(authEntryState({ owned: false, phase: 'checking' }).busy, false, '서버 확인 중에도 로그인 진입은 눌린다');
+  assert.equal(authEntry({ owned: false, phase: 'checking' }, 'menuBtn'), '<button class="menuBtn auth-entry" data-auth-action="login" aria-label="로그인">로그인</button>');
+});
+
+test('저장 중 중복 요청과 로그아웃 실수는 막는다', () => {
+  assert.equal(authEntryState({ owned: false, phase: 'syncing' }).busy, true, '저장 중에 로그인을 연타해 새 세션을 만들지 않는다');
   assert.equal(authEntryState({ owned: true, phase: 'syncing' }).busy, true);
+  assert.equal(authEntryState({ owned: true, phase: 'checking' }).busy, true, '확인 중인 세션에 로그아웃을 보내지 않는다');
   assert.equal(authEntryState({ owned: true, phase: 'conflict' }).busy, false);
 });
 
@@ -20,7 +26,7 @@ test('버튼 HTML은 data-auth-action과 aria-label을 가지고, busy면 disabl
   assert.match(html, /aria-label="로그인"/);
   assert.match(html, /로그인/);
   assert.doesNotMatch(html, /disabled/);
-  assert.match(authEntry({ owned: false, phase: 'checking' }, ''), / disabled>/);
+  assert.match(authEntry({ owned: true, phase: 'syncing' }, ''), / disabled>/);
 });
 
 test('applyAuthEntry는 열려 있는 버튼의 문구·속성만 바꾼다', () => {
@@ -34,6 +40,8 @@ test('applyAuthEntry는 열려 있는 버튼의 문구·속성만 바꾼다', ()
   assert.equal(attrs['data-auth-action'], 'login');
   assert.equal(button.textContent, '로그인');
   assert.equal(button.disabled, false);
+  applyAuthEntry(button, { owned: false, phase: 'checking' });
+  assert.equal(button.disabled, false, '확인 중에도 화면이 다시 그려지지 않은 채 눌린다');
   applyAuthEntry(button, { owned: true, phase: 'synced' });
   assert.equal(attrs['data-auth-action'], 'logout');
   assert.equal(button.textContent, '로그아웃');

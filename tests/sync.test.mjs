@@ -557,3 +557,48 @@ test('모양은 맞지만 검증에 실패한 문서도 서버 기록으로 읽�
   assert.deepEqual(made.current(), local, '이 기기 기록은 그대로');
   assert.equal(made.controller.snapshot().revision, null, '서버 번호를 가진 것으로 보지 않는다');
 });
+
+test('확인 응답이 없으면 기다리를 멈추고 재시도·로그인 진입을 남긴다', async () => {
+  // 실제 fetch 경계: 서버가 답하지 않는 요청은 영원히 열린 채 남으면 안 된다.
+  // 신호를 받아 취소하는 실제 AbortController 동작을 그대로 태운다.
+  const hung = (url, init) => new Promise((_, reject) => {
+    if (!init?.signal) throw new Error('fetch에 취소 신호가 전달되지 않았다');
+    init.signal.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' })));
+  });
+  const started = Date.now();
+  const read = await createWorkspaceApi({ fetchImpl: hung, timeoutMs: 40 }).get();
+  assert.equal(read.ok, false, '대기 상한을 넘긴 것은 성공이 아니다');
+  assert.equal(read.status, 0);
+  assert.equal(read.code, 'timeout', '네트워크 끊김과 구분되는 시간 초과로 남는다');
+  assert.ok(Date.now() - started >= 30, '기다릴 시간을 닫힌 값까지 쓴다');
+
+  const local = doc('이 기기에 남는 순간');
+  const made = harness({
+    initial: local,
+    api: { get: async () => read, put: async () => { throw new Error('확인 실패에서 저장은 부르하지 않는다'); }, logout: async () => { throw new Error('확인 실패에서 로그아웃을 부르하지 않는다'); } }
+  });
+  const state = await made.controller.start();
+  assert.equal(state.phase, 'offline', 'checking에 머물지 않는다');
+  assert.match(state.detail, /기다리는 시간을 넘겼어요/);
+  assert.deepEqual(state.actions.map((action) => action.name), ['retry', 'login'], '재시도와 로그인이 같은 자리에 남는다');
+  assert.deepEqual(made.current(), local, '이 기기 기록은 그대로');
+});
+
+test('서버 확인 실패는 이 기기에만 저장으로 삼켜지지 않는다', async () => {
+  for (const [status, code, message] of [
+    [502, 'upstream_invalid_response', '서버가 문서가 아닌 응답을 보냈어요.'],
+    [504, 'upstream_timeout', '서버 응답이 제때 오지 않았어요.']
+  ]) {
+    const api = fakeApi({ get: [{ ok: false, status, code, message }, okGet(0, EMPTY)] });
+    const made = harness({ initial: EMPTY, api });
+    const state = await made.controller.start();
+    assert.equal(state.phase, 'checkFailed', `${status}: 확인 실패를 확인 실패로 보인다`);
+    assert.equal(state.detail, message, '서버가 준 우리 글 문구를 그대로 쓴다');
+    assert.deepEqual(state.actions.map((action) => action.name), ['retry', 'login'], '재시도와 로그인 진입이 함께 남는다');
+    assert.equal(made.controller.snapshot().owned, false, '확인 실패를 로그인된 상태로 보지 않는다');
+
+    const again = await made.controller.act('retry');
+    assert.equal(again.phase, 'synced', '다시 시도는 새로 확인한다');
+    assert.deepEqual(api.seen.map((row) => row[0]), ['get', 'get'], '재시도가 확인 요청을 다시 낸다');
+  }
+});

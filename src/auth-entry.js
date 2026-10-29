@@ -16,12 +16,16 @@
 
 const LABEL = { login: '로그인', logout: '로그아웃' };
 
-// 확인(sync.start)과 저장(push) 중에는 다시 눌러 다른 요청을 만들지 않는다.
-export const AUTH_BUSY_PHASES = ['checking', 'syncing'];
+// 로그아웃은 확인·저장 중에 누르면 서버 요청이 중복되거나 진행 중인 저장 결과를 잃는다 — 막는다.
+// 로그인은 반대다. 서버 확인이 늦거나 멈추면 로그인 진입이 그 상태를 빠져나오는 유일한 길이다 —
+// 그러므로 확인 중에는 막지 않는다. 확인 중 클릭은 컨트롤러가 세대를 올려 이전 응답을 버리므로
+// 늦게 도착한 답이 새 로그인 경로를 덮지 않는다(`sync.js`의 `generation`).
+const LOGOUT_BUSY_PHASES = ['checking', 'syncing'];
+const LOGIN_BUSY_PHASES = ['syncing'];
 
 export function authEntryState({ owned = false, phase = 'local' } = {}) {
-  const busy = AUTH_BUSY_PHASES.includes(phase);
   const action = owned ? 'logout' : 'login';
+  const busy = (action === 'logout' ? LOGOUT_BUSY_PHASES : LOGIN_BUSY_PHASES).includes(phase);
   return { action, label: LABEL[action], busy };
 }
 
