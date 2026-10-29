@@ -1,6 +1,10 @@
 import { createVerifier } from './padiem-access-verify.mjs';
 import { ApiError } from './errors.js';
 
+export function sharedAuthEnabled(value) {
+  return value === '1' || value === 'true';
+}
+
 // Draft backend bridge. Pages callback and refresh handling must be connected
 // before this is enabled; the default remains the existing authority path.
 export function createSharedAccessAuth({ enabled = false, legacy, verifier = createVerifier({ audience: 'lovetree-4-0' }) }) {

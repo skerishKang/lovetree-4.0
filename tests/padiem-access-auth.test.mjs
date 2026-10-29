@@ -2,9 +2,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { createVerifier } from '../server/padiem-access-verify.mjs';
-import { createSharedAccessAuth } from '../server/padiem-access-auth.mjs';
+import { createSharedAccessAuth, sharedAuthEnabled } from '../server/padiem-access-auth.mjs';
 const fixture = JSON.parse(await readFile(new URL('./padiem-auth-vectors.json', import.meta.url)));
 const verifier = createVerifier({ audience: fixture.audience, clock: () => fixture.now * 1000, fetcher: async () => Response.json(fixture.jwks) });
+test('the documented 1 switch enables shared auth, with default disabled', () => {
+  assert.equal(sharedAuthEnabled('1'), true);
+  assert.equal(sharedAuthEnabled('true'), true);
+  for (const value of ['', '0', undefined, 'false']) assert.equal(sharedAuthEnabled(value), false);
+});
 test('old login remains default and new token resolves to existing workspace owner', async () => {
   const legacy = async () => ({ productId: 'lovetree-4-0', subjectId: 'old-subject' });
   const cookie = `__Host-lovetree-access=${fixture.tokens.valid}`;
@@ -17,3 +22,5 @@ test('invalid shared token and duplicate cookies do not fall back', async () => 
   await assert.rejects(() => auth({ headers: { cookie: `__Host-lovetree-access=${fixture.tokens.forged}` } }));
   await assert.rejects(() => auth({ headers: { cookie: '__Host-lovetree-access=x; __Host-lovetree-access=y' } }));
 });
+
+ test('JWKS redirect is rejected', async () => { const v=createVerifier({audience:fixture.audience,fetcher:async (_,opts) => { assert.equal(opts.redirect, 'manual'); return new Response(null,{status:302,headers:{location:'https://evil.example'}}); }}); await assert.rejects(() => v(fixture.tokens.valid), /jwks_unavailable/); });

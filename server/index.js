@@ -7,7 +7,7 @@ import { resolveListen } from './listen-config.js';
 import { createApiHandler, createNodeHandler } from './http.js';
 import { createWorkspaceService } from './workspace-service.js';
 import { createPadiemAuthorityAuth } from './padiem-authority-auth.js';
-import { createSharedAccessAuth } from './padiem-access-auth.mjs';
+import { createSharedAccessAuth, sharedAuthEnabled } from './padiem-access-auth.mjs';
 import { createAuthorityRelayClient } from './authority-relay-transport.js';
 import { createAuthorityWriter } from './authority-writer.js';
 import { createLoginService } from './login-service.js';
@@ -128,7 +128,7 @@ const pool = await createPool(LOVETREE_DATABASE_URL);
 const repo = createWorkspaceRepo(pool);
 const service = createWorkspaceService({ repo, productId: LOVETREE_PRODUCT_ID });
 const legacyAuthenticate = await buildAuthenticate();
-const authenticate = createSharedAccessAuth({ enabled: LOVETREE_SHARED_AUTH_ENABLED === 'true', legacy: legacyAuthenticate });
+const authenticate = createSharedAccessAuth({ enabled: sharedAuthEnabled(LOVETREE_SHARED_AUTH_ENABLED), legacy: legacyAuthenticate });
 // #67 제품 역할. 표가 아직 없거나 저장이 망가진 자리에서는 역할 없음으로 닫힌다(fail-closed).
 const admin = createAdminRoleService({ store: createAdminRoleRepo(pool), productId: LOVETREE_PRODUCT_ID });
 const storageHandler = createApiHandler({ authenticate, service, productId: LOVETREE_PRODUCT_ID, maxBodyBytes, admin });
