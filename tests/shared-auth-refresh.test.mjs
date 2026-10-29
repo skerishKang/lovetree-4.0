@@ -21,3 +21,21 @@ test('two tabs serialize refresh, second retries with the refreshed cookie', asy
     if (previous) Object.defineProperty(globalThis, 'navigator', previous); else delete globalThis.navigator;
   }
 });
+
+test('without Web Locks, both tabs can use the server grace response', async () => {
+  const previous = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+  let valid = false; let refreshes = 0;
+  Object.defineProperty(globalThis, 'navigator', { configurable: true, value: {} });
+  try {
+    const api = createWorkspaceApi({ fetchImpl: async (url) => {
+      if (url === '/auth/refresh') { refreshes++; valid = true; return new Response(null, { status: 204 }); }
+      if (!valid) return new Response('{}', { status: 401 });
+      return Response.json({ revision: 0, state: { trees: [], activeTreeId: null } });
+    } });
+    const [a, b] = await Promise.all([api.get(), api.get()]);
+    assert.ok(refreshes >= 1);
+    assert.notEqual(a.status, 401); assert.notEqual(b.status, 401);
+  } finally {
+    if (previous) Object.defineProperty(globalThis, 'navigator', previous); else delete globalThis.navigator;
+  }
+});
