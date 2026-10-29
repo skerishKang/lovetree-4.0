@@ -16,12 +16,12 @@ function color(tree) {
 function hero(trees, totalMoments, last, sorted) {
   const counts = `<div class="hero-note"><strong>${trees.length}개의 트리</strong><span>· ${totalMoments}개의 순간을 간직하고 있어요</span></div>`;
   if (!trees.length) return `<section class="hero" aria-labelledby="shelf-title"><div class="hero-copy"><p class="eyebrow">MY LOVETREE</p><h1 id="shelf-title">좋아한 마음마다,<br><em>하나의 트리로 이어져요.</em></h1><p>이어 쓴 순간이 한 그루의 트리가 돼요.<br>기억책은 ${BOOK_IS_READING}이에요.</p>${counts}</div>
-    <div class="hero-stage"><span class="book-cover" style="--cover:#9d6878" aria-hidden="true"><span class="cover-number">YOUR FIRST TREE</span><span class="cover-symbol"><span>♡</span></span><strong class="cover-title">어떤 마음으로<br>채워질까요?</strong></span><div class="reading-copy"><small>아직 쓰이지 않은 첫 장</small><h2>지금 떠오르는<br>순간 하나면 충분해요.</h2><p>처음 좋아했던 날부터 시작하지 않아도 괜찮아요.</p><button class="ghost" data-do="new">${NEW_TREE} ↗</button></div></div></section>`;
+    <div class="hero-stage"><span class="book-cover" style="--cover:#9d6878" aria-hidden="true"><span class="cover-number">YOUR FIRST TREE</span><span class="cover-symbol"><span class="cover-mark">♡</span></span><strong class="cover-title">어떤 마음으로<br>채워질까요?</strong></span><div class="reading-copy"><small>아직 쓰이지 않은 첫 장</small><h2>지금 떠오르는<br>순간 하나면 충분해요.</h2><p>처음 좋아했던 날부터 시작하지 않아도 괜찮아요.</p><button class="ghost" data-do="new">${NEW_TREE} ↗</button></div></div></section>`;
   return `<section class="hero is-compact" aria-labelledby="shelf-title"><div class="hero-copy"><p class="eyebrow">MY LOVETREE</p><h1 id="shelf-title">좋아한 마음마다, <em>하나의 트리로 이어져요.</em></h1>${counts}</div>
     <div class="hero-stage">${cover(last.tree, sorted.indexOf(last.tree) + 1)}<div class="reading-copy"><small>다시 펼칠 순간 · ${esc(last.tree.subject)}</small><h2>${esc(last.moment.title)}</h2><button class="ghost" data-do="resume">${READ_BOOK} ↗</button></div></div></section>`;
 }
 function cover(tree, number) {
-  return `<span class="book-cover" style="--cover:${color(tree)}"><span class="cover-number">TREE · ${String(number).padStart(2, '0')}</span><span class="cover-symbol" aria-hidden="true"><span>✦</span></span><strong class="cover-title">${esc(tree.subject)}</strong><span class="cover-subtitle">${tree.moments.length}개의 순간</span></span>`;
+  return `<span class="book-cover" style="--cover:${color(tree)}"><span class="cover-number">TREE · ${String(number).padStart(2, '0')}</span><span class="cover-symbol" aria-hidden="true"><span class="cover-mark">✦</span></span><strong class="cover-title">${esc(tree.subject)}</strong><span class="cover-subtitle">${tree.moments.length}개의 순간</span></span>`;
 }
 
 export function mountShelf(host, {trees, storage, view, context, actions, error, recovery, authHtml = ''}) {

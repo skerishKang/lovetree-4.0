@@ -105,4 +105,21 @@ dialog{padding:30px 35px;width:min(610px,calc(100% - 32px));max-height:calc(100d
 @media(max-width:540px){.save-guide{padding:13px 14px}.save-guide-copy strong{font-size:14px}.save-guide-copy p{font-size:10px}.save-guide-actions{gap:8px}.save-guide-actions .button{flex:1 1 auto;min-height:46px}.save-guide-actions .text-button{order:2}.save-guide-actions .icon-button{order:3}}
 
 /* #44 모바일 조작: 좁은 화면의 터치 대상 44px 하한. 가로 넘침·줄바꿈을 만들지 않는 자리만 올린다. */
-@media(max-width:540px){.header-auth{min-height:44px}/* .site-header nav a 폭은 미조정: 390px에서 한 줄 폭이 354px뿐이라 44px 폭을 주면 브랜드가 2줄로 줄바꿈한다(공간 계산은 PR 본문). */.view-switch button{min-height:44px;padding:0 12px}.route-nav .route-step{min-width:44px;min-height:44px}.zoom-controls button{min-width:44px;min-height:44px}.text-button{min-height:44px}.back-link{min-height:44px}.icon-button{width:44px;height:44px}.brand{min-height:44px}.footer-brand{min-height:44px}}
+@media(max-width:540px){.header-auth{min-height:44px}.view-switch button{min-height:44px;padding:0 12px}.route-nav .route-step{min-width:44px;min-height:44px}.zoom-controls button{min-width:44px;min-height:44px}.text-button{min-height:44px}.back-link{min-height:44px}.icon-button{width:44px;height:44px}.brand{min-height:44px}.footer-brand{min-height:44px}}
+
+/* #86에서 미뤘던 공통 헤더의 좁은 화면 조작. 한 줄에 브랜드·메뉴 셋·로그인을 억지로 넣으면
+   390px에서 내비 링크가 35~55px까지 쪼그라들고, 상태 문구가 길어지면 로고가 2~3줄로 접혔다
+   (320px에서는 가로 넘침 18px까지 재현). 541~820px도 같은 결함이다 — 560px에서 브랜드가 2줄로
+   접히고 '처음으로'가 32px까지 줄었다. 그래서 좁은 화면(동기화 안내가 본문 위로 올라가는 820px 이하)은
+   헤더를 두 줄로 접는다 — 첫 줄은 브랜드·새 트리·로그인, 둘째 줄은 주 메뉴.
+   로고는 줄바꿈하지 않고 기능은 숨기지 않는다. */
+@media(max-width:820px){
+  .site-header{display:grid;grid-template-columns:minmax(0,1fr) max-content max-content;align-content:center;column-gap:10px;row-gap:5px;height:auto;min-height:0;padding:9px 0 9px}
+  .brand{grid-column:1;grid-row:1;min-width:0;height:auto;min-height:44px;white-space:nowrap}
+  .header-cta{grid-column:2;grid-row:1;justify-self:end;min-height:44px}
+  .header-auth{grid-column:3;grid-row:1;justify-self:end;max-width:min(13em,132px);height:auto;min-height:44px;padding:6px 12px;font-size:11px;line-height:1.4;white-space:normal;overflow-wrap:break-word;text-align:center}
+  .site-header nav{grid-column:1/-1;grid-row:2;display:flex;justify-content:center;gap:6px;margin-left:0;width:100%}
+  .site-header nav a{flex:1 1 0;min-width:44px;max-width:220px;height:44px;font-size:11px;justify-content:center;border:1px solid #e7ebdd;border-radius:10px;background:#fbfcf6}
+  .site-header nav a[aria-current]{background:#eef3e5}
+  .site-header nav a[aria-current]:after{bottom:5px;left:11px;right:11px}
+}
