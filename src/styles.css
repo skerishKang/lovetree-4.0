@@ -98,3 +98,6 @@ dialog{padding:30px 35px;width:min(610px,calc(100% - 32px));max-height:calc(100d
 .save-guide-actions .text-button{white-space:nowrap}
 @media(max-width:820px){.save-guide{flex-wrap:wrap;row-gap:10px}.save-guide-actions{margin-left:0;width:100%}}
 @media(max-width:540px){.save-guide{padding:13px 14px}.save-guide-copy strong{font-size:14px}.save-guide-copy p{font-size:10px}.save-guide-actions{gap:8px}.save-guide-actions .button{flex:1 1 auto;min-height:46px}.save-guide-actions .text-button{order:2}.save-guide-actions .icon-button{order:3}}
+
+/* #44 모바일 조작: 좁은 화면의 터치 대상 44px 하한. 가로 넘침·줄바꿈을 만들지 않는 자리만 올린다. */
+@media(max-width:540px){.header-auth{min-height:44px}/* .site-header nav a 폭은 미조정: 390px에서 한 줄 폭이 354px뿐이라 44px 폭을 주면 브랜드가 2줄로 줄바꿈한다(공간 계산은 PR 본문). */.view-switch button{min-height:44px;padding:0 12px}.route-nav .route-step{min-width:44px;min-height:44px}.zoom-controls button{min-width:44px;min-height:44px}.text-button{min-height:44px}.back-link{min-height:44px}.icon-button{width:44px;height:44px}.brand{min-height:44px}.footer-brand{min-height:44px}}
