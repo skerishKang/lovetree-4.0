@@ -63,11 +63,20 @@ let currentIdx = 0;
 const dialog = $('#moment-dialog');
 const linkDialog = $('#link-dialog');
 
-function toast(message) {
-  $('#toast').textContent = message;
-  $('#toast').classList.add('visible');
+function toast(message, actions = [], onAction = () => {}) {
+  const element = $('#toast');
+  element.textContent = message;
+  for (const action of actions) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'button small';
+    button.textContent = action.label;
+    button.addEventListener('click', () => { element.classList.remove('visible'); void onAction(action.name); });
+    element.append(' ', button);
+  }
+  element.classList.add('visible');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => $('#toast').classList.remove('visible'), 4500);
+  toastTimer = setTimeout(() => element.classList.remove('visible'), actions.length ? 15000 : 4500);
 }
 function lockScroll() {
   if (scrollLocked) return;
@@ -85,7 +94,7 @@ function unlockScroll() {
   scrollLocked = false;
 }
 function commit(next) {
-  if (!sync.snapshot().owned) throw new Error('저장하려면 먼저 로그인해 주세요.');
+  if (!sync.snapshot().owned) throw new Error('저장하려면 오른쪽 위 로그인 버튼을 눌러 주세요.');
   state = validateState(next);
   sync.markLocalSave();
 }
@@ -273,7 +282,7 @@ function render() {
 function updateTree(tree) { commit({ ...state, trees: state.trees.map(t => t.id === tree.id ? tree : t) }); }
 
 function openMoment(mode, id) {
-  if (!sync.snapshot().owned) return toast('저장하려면 먼저 로그인해 주세요.');
+  if (!sync.snapshot().owned) return toast('저장하려면 오른쪽 위 로그인 버튼을 눌러 주세요.');
   if (mode === 'new' && state.trees.length >= MAX_TREES) return toast(`트리는 ${MAX_TREES}개까지 보관할 수 있어요.`);
   const tree = currentTree();
   if (mode !== 'new' && (!tree || isDemo())) return;
@@ -454,7 +463,7 @@ function libraryAction(action, id) {
     if (action === 'delete-tree') {
       const tree = state.trees.find(t => t.id === id);
       if (!tree || !confirm(`“${tree.title}”와 ${tree.moments.length}개의 순간을 지울까요? 필요하면 먼저 파일로 백업해 주세요.`)) return;
-      commit({ ...state, trees: state.trees.filter(t => t.id !== id) }); render(); toast('트리 변경을 서버에 저장하고 있어요.');
+      commit({ ...state, trees: state.trees.filter(t => t.id !== id) }); render();
     }
     else if (action === 'export-tree') { const tree = state.trees.find(t => t.id === id); if (tree) download({ version: 1, trees: [tree] }, `lovetree-${id.slice(0, 8)}.json`); }
     else if (action === 'export-all') download(state, `lovetree-backup-${new Date().toISOString().slice(0,10)}.json`);
@@ -556,14 +565,14 @@ document.addEventListener('click', event => {
       updateTree(unlinkMoments(currentTree(), id, button.dataset.target));
       render();
       $(`[data-action="link"][data-id="${CSS.escape(id)}"]`)?.focus();
-      toast('연결 변경을 서버에 저장하고 있어요.');
+
     }
     else if (action === 'delete-moment') {
       if (!confirm('이 순간을 지울까요? 이어진 순간들은 남기고 연결을 정리합니다.')) return;
       updateTree(removeMoment(currentTree(), id)); 
       if (navPath && navPath.some(m => m.id === id)) navPath = null;
       if (branchPicker && branchPicker.some(m => m.id === id)) branchPicker = null;
-      selectedId = null; render(); toast('순간 변경을 서버에 저장하고 있어요.');
+      selectedId = null; render();
     }
     else if (action === 'dismiss-guide') { guideTreeId = null; render(); document.querySelector('[data-action="add"]')?.focus(); }
     else libraryAction(action, id);
@@ -576,7 +585,7 @@ $('#import-file').addEventListener('change', async event => {
     if (file.size > 5 * 1024 * 1024) throw new Error('5MB 이하의 러브트리 JSON 파일을 선택해 주세요.');
     const incoming = JSON.parse(await file.text());
     const next = importTrees(state, incoming);
-    commit(next); go('#trees'); toast(`${incoming.trees.length}개의 트리를 서버에 저장하고 있어요.`);
+    commit(next); go('#trees');
   } catch (error) { toast(error instanceof SyntaxError ? '올바른 JSON 파일이 아니에요.' : error.message); }
   finally { event.target.value = ''; }
 });
@@ -642,7 +651,7 @@ const sync = createSyncController({
   // 동기화 상태가 바뀌면 화면을 다시 그리지 않고 상단 진입 버튼 문구만 맞춘다.
   onChange: () => { refreshAuthEntries(document, authSnapshot()); }
 });
-mountSync({ controller: sync, doc: document });
+mountSync({ controller: sync, notify: toast });
 render();
 void sync.start();
 
