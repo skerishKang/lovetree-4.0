@@ -1,3 +1,7 @@
+## 4.1 same-origin reader preparation — 2026-10-31
+
+Added isolated public/v41 assets from the Limone comparison Site (source 8ea4122e5f6095b1188336a9f92939a46868348f) with current 4.0 workspace API and domain validation reused. /v41/ uses existing /auth/login?next=/v41/, GET /api/workspace and POST /auth/logout on the same origin. No PUT, migration, auth policy or backend config changes. Login/account boundary clears imported records before each server read; stale reads cannot restore records after logout. Static demonstration images were removed from the text-only record reader. Imported record rendering and common auth browser roundtrip still require final browser validation before merge/deployment.
+
 ## 하단 저장 상태 줄 제거 — 2026-10-30
 정상 상태 줄을 없애고 저장 실패 시에만 재시도 안내를 잠깐 표시한다. 비로그인 저장 시 상단 로그인 버튼을 안내하며 미저장 종료 경고는 유지한다. 운영 브라우저 확인은 배포 뒤 필요하다.
 
