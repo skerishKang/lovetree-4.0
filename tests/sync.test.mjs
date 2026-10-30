@@ -54,466 +54,114 @@ function harness({ initial, api, storage = new Map(), on = null }) {
   return { controller, storage, navigated, settle, current: () => state, edit: (next) => { state = next; } };
 }
 
-test('미로그인·서버 미설정 모두 로컬 저장을 그대로 둔다', async () => {
-  for (const [refusal, expectedActions] of [[unauthorized, ['login']], [unconfigured, ['retry', 'login']]]) {
-    const local = doc('브라우저 첫 순간');
-    const api = fakeApi({ get: [refusal] });
-    const made = harness({ initial: local, api });
-    const state = await made.controller.start();
-
-    assert.equal(state.phase, 'local');
-    assert.equal(state.label, '이 기기에만 저장');
-    assert.deepEqual(state.actions.map((action) => action.name), expectedActions);
-    if (refusal === unconfigured) assert.match(state.detail, /서버 저장이 아직 켜지지/);
-
-    made.edit(doc('브라우저 첫 순간', '이후 순간'));
-    made.controller.markLocalSave();
-    await made.settle();
-    assert.deepEqual(api.puts(), [], '서버 세션이 없으면 PUT를 보내지 않는다');
-    assert.equal(made.controller.snapshot().revision, null);
-    assert.equal(made.controller.status().phase, 'local');
-  }
-});
-
-test('서버 문서가 비어 있고 이 기기에 기록이 있으면 올릴지 확인한다', async () => {
-  const local = doc('기기에만 있던 첫 순간');
-  const api = fakeApi({ get: [okGet(0, EMPTY)], put: [okPut(1)] });
-  const made = harness({ initial: local, api });
-
-  const offered = await made.controller.start();
-  assert.equal(offered.phase, 'uploadOffered');
-  assert.deepEqual(api.puts(), [], '제안만 하고 자동으로 올리지 않는다');
-
-  const synced = await made.controller.act('uploadLocal');
-  assert.equal(synced.phase, 'synced');
-  const [body] = api.puts();
-  assert.equal(body.expectedRevision, 0, '서버가 비어 있음을 확인한 뒤에만 0을 쓴다');
-  assert.match(body.clientKey, /^ck-/);
-  assert.equal(body.state, local, 'id와 연결을 그대로 보낸다 — 재발급이 없다');
-});
-
-test('서버에 문서가 있고 이 기기가 비어 있으면 그 문서를 기준으로 삼되 백업을 남긴다', async () => {
-  const serverDoc = doc('서버에 있던 첫 순간');
-  const api = fakeApi({ get: [okGet(4, serverDoc)] });
-  const storage = new Map();
-  const made = harness({ initial: EMPTY, api, storage });
-
+test('비로그인은 서버 저장을 하지 않고 로그인 안내를 표시한다', async () => {
+  const api = fakeApi({get:[unauthorized]});
+  const made = harness({initial:EMPTY, api});
   const state = await made.controller.start();
-  assert.equal(state.phase, 'synced');
-  assert.deepEqual(made.current(), serverDoc);
-  assert.equal(made.controller.snapshot().revision, 4);
-  assert.deepEqual(api.puts(), [], '채택만으로 업로드하지 않는다');
-  assert.ok(storage.get('lovetree.v4.local-before-server.v1'), '덮어쓰기 전 로컬 사본을 남긴다');
+  assert.equal(state.phase, 'login');
+  assert.match(state.label, /로그인/);
+  made.controller.markLocalSave(); await made.settle();
+  assert.deepEqual(api.seen.map(row => row[0]), ['get']);
 });
 
-test('서버와 이 기기의 기록이 다르면 어느 쪽도 조용히 덮어쓰지 않는다', async () => {
-  const serverDoc = doc('서버 기록');
-  const localDoc = doc('이 기기 기록');
-
-  const keepLocal = fakeApi({ get: [okGet(7, serverDoc), okGet(7, serverDoc)], put: [okPut(8)] });
-  const keptStorage = new Map();
-  const kept = harness({ initial: localDoc, api: keepLocal, storage: keptStorage });
-  const offered = await kept.controller.start();
-  assert.equal(offered.phase, 'adoptOffered');
-  assert.deepEqual(keepLocal.puts(), []);
-  assert.deepEqual(kept.current(), localDoc, '제안 단계에서는 화면 기록을 바꾸지 않는다');
-
-  const afterKeep = await kept.controller.act('useLocal');
-  assert.equal(afterKeep.phase, 'synced');
-  assert.equal(keepLocal.puts()[0].expectedRevision, 7, '덮어쓰기 직전 서버 번호를 다시 읽는다');
-  assert.equal(keepLocal.puts()[0].state, localDoc);
-  assert.deepEqual(JSON.parse(keptStorage.get('lovetree.v4.server-before-overwrite.v1')), serverDoc, '서버 사본을 백업으로 남긴다');
-
-  const takeServer = fakeApi({ get: [okGet(7, serverDoc), okGet(7, serverDoc)] });
-  const switched = harness({ initial: localDoc, api: takeServer });
-  await switched.controller.start();
-  const adopted = await switched.controller.act('useServer');
-  assert.equal(adopted.phase, 'synced');
-  assert.deepEqual(switched.current(), serverDoc);
-  assert.deepEqual(takeServer.puts(), [], '서버 기록을 택하면 올리지 않는다');
+test('서버 기록만 읽고 브라우저 저장소는 접근하지 않는다', async () => {
+  const server = doc('서버 순간');
+  const api = fakeApi({get:[okGet(2,server)]});
+  let current = EMPTY;
+  const storage = {getItem(){throw new Error('read forbidden')},setItem(){throw new Error('write forbidden')}};
+  const controller = createSyncController({getState:()=>current, replaceState:value=>{current=value},api,storage});
+  const result = await controller.start();
+  assert.equal(result.phase, 'synced'); assert.deepEqual(current,server);
 });
 
-test('동기화된 로컬 저장은 번호를 대고 올라가고, 충돌에서는 멈추고 사용자에게 묻는다', async () => {
-  const base = doc('함께 자란 기록');
-  const grown = doc('함께 자란 기록', '새 순간');
-  const api = fakeApi({ get: [okGet(2, base)], put: [okPut(3), revisionClash] });
-  const seenPhases = [];
-  const made = harness({ initial: base, api, on: (state) => seenPhases.push(state.phase) });
-  await made.controller.start();
-
-  made.edit(grown);
-  made.controller.markLocalSave();
-  await made.settle();
-  assert.ok(seenPhases.includes('syncing'), '올리는 동안 상태를 보여 준다');
-  assert.equal(made.controller.status().phase, 'synced');
-  assert.equal(api.puts()[0].expectedRevision, 2);
-  assert.equal(made.controller.snapshot().revision, 3);
-
-  const during = doc('함께 자란 기록', '새 순간', '충돌 중 추가');
-  made.edit(during);
-  made.controller.markLocalSave();
-  await made.settle();
-  const conflict = made.controller.status();
-  assert.equal(conflict.phase, 'conflict');
-  assert.match(conflict.detail, /9번까지/);
-  assert.deepEqual(conflict.actions.map((action) => action.name), ['pull', 'force', 'retry']);
-
-  made.edit(doc('함께 자란 기록', '새 순간', '충돌 중 추가', '그 뒤 입력'));
-  made.controller.markLocalSave();
-  await made.settle();
-  assert.equal(api.puts().length, 2, '충돌 상태에서 자동으로 다시 날리지 않는다');
-  assert.equal(made.controller.status().phase, 'conflict');
-
-  const pulled = fakeApi({ get: [okGet(2, base), okGet(9, base)], put: [revisionClash] });
-  const case2 = harness({ initial: base, api: pulled });
-  await case2.controller.start();
-  case2.edit(grown);
-  case2.controller.markLocalSave();
-  await case2.settle();
-  const resolved = await case2.controller.act('pull');
-  assert.equal(resolved.phase, 'synced');
-  assert.deepEqual(case2.current(), base);
-  assert.equal(case2.controller.snapshot().revision, 9);
+test('인증된 편집은 서버에 번호와 함께 저장하고 성공 뒤에만 동기화로 표시한다', async () => {
+  let complete; const pending = new Promise(resolve=>{complete=resolve});
+  const api = fakeApi({get:[okGet(2,EMPTY)],put:[pending]});
+  const made = harness({initial:EMPTY,api}); await made.controller.start();
+  made.edit(doc('수정')); made.controller.markLocalSave(); await made.settle();
+  assert.equal(made.controller.status().phase,'syncing');
+  assert.equal(api.puts()[0].expectedRevision,2);
+  complete(okPut(3)); await made.settle();
+  assert.equal(made.controller.status().phase,'synced');
 });
 
-test('충돌 후 내 기록으로 덮어쓰기는 서버 번호를 다시 읽은 뒤에만 한다', async () => {
-  const base = doc('기준');
-  const mine = doc('기준', '내 추가');
-  const api = fakeApi({
-    get: [okGet(2, base), okGet(9, base)],
-    put: [okPut(3), revisionClash, okPut(10)]
-  });
-  const made = harness({ initial: base, api });
-  await made.controller.start();
-  made.edit(mine);
-  made.controller.markLocalSave();
-  await made.settle();
-  assert.equal(made.controller.status().phase, 'synced');
-
-  const other = doc('기준', '내 추가', '남의 저장 이후 추가');
-  made.edit(other);
-  made.controller.markLocalSave();
-  await made.settle();
-  assert.equal(made.controller.status().phase, 'conflict');
-
-  const forced = await made.controller.act('force');
-  assert.equal(forced.phase, 'synced');
-  const last = api.puts().at(-1);
-  assert.equal(last.expectedRevision, 9, '먼저 서버 최신 번호를 다시 읽는다');
-  assert.deepEqual(last.state, other);
-  assert.deepEqual(JSON.parse(made.storage.get('lovetree.v4.server-before-overwrite.v1')), base, '덮어쓰인 서버 기록을 백업으로 남긴다');
+test('서버 저장 실패는 미저장으로 표시하고 같은 요청 키로 재시도한다', async () => {
+  const api = fakeApi({get:[okGet(0,EMPTY)],put:[networkDown,okPut(1)]});
+  const made = harness({initial:EMPTY,api}); await made.controller.start();
+  made.edit(doc('수정')); made.controller.markLocalSave(); await made.settle();
+  assert.equal(made.controller.status().phase,'offline');
+  assert.match(made.controller.status().detail,/저장되지 않았어요/);
+  await made.controller.act('retry');
+  assert.equal(api.puts()[0].clientKey,api.puts()[1].clientKey);
+  assert.equal(made.controller.status().phase,'synced');
 });
 
-test('요청 키 충돌과 네트워크 실패는 로컬을 보존하고 새 시도로 이어간다', async () => {
-  const base = doc('기준');
-  const added = doc('기준', '추가');
-  const clash = fakeApi({ get: [okGet(1, base)], put: [keyClash, okPut(2)] });
-  const made = harness({ initial: base, api: clash });
-  await made.controller.start();
-  made.edit(added);
-  made.controller.markLocalSave();
-  await made.settle();
-
-  assert.equal(made.controller.status().phase, 'rejected');
-  assert.equal(made.current(), added, '로컬 기록을 지우지 않는다');
-  const retried = await made.controller.act('retry');
-  assert.equal(retried.phase, 'synced');
-  const [first, second] = clash.puts();
-  assert.notEqual(first.clientKey, second.clientKey, '새 요청 키로 다시 보낸다');
-  assert.deepEqual(second.state, added);
-
-  const down = fakeApi({ get: [okGet(1, base)], put: [networkDown, okPut(2)] });
-  const offline = harness({ initial: base, api: down });
-  await offline.controller.start();
-  offline.edit(added);
-  offline.controller.markLocalSave();
-  await offline.settle();
-  assert.equal(offline.controller.status().phase, 'offline');
-  assert.match(offline.controller.status().detail, /이 기기에만 저장한 상태로 남/);
-  const back = await offline.controller.act('retry');
-  assert.equal(back.phase, 'synced');
-  assert.deepEqual(offline.current(), added);
+test('충돌은 멈추고 사용자의 선택 전에는 덮어쓰지 않는다', async () => {
+  const api = fakeApi({get:[okGet(2,EMPTY)],put:[revisionClash]});
+  const made = harness({initial:EMPTY,api}); await made.controller.start();
+  made.edit(doc('수정')); made.controller.markLocalSave(); await made.settle();
+  assert.equal(made.controller.status().phase,'conflict'); assert.equal(api.puts().length,1);
 });
 
-test('로그아웃: 동기화가 끝났으면 이 기기 사본을 비우고, 남은 변경이 있으면 지우지 않는다', async () => {
-  const local = doc('A의 첫 순간');
-  const api = fakeApi({ get: [okGet(0, EMPTY), okGet(0, EMPTY)], put: [okPut(1)], logout: [{ ok: true, status: 200 }] });
-  const made = harness({ initial: local, api });
-  await made.controller.start();
-  await made.controller.act('uploadLocal');
-  assert.equal(made.controller.status().phase, 'synced');
-
-  const out = await made.controller.act('logout');
-  assert.equal(out.phase, 'local');
-  assert.match(out.detail, /이 기기 사본은 비웠어요/);
-  assert.deepEqual(made.current(), EMPTY, '다음 계정에 이전 기록이 보이지 않는다');
-  assert.deepEqual(api.puts().length, 1, '로그아웃이 업로드를 유도하지 않는다');
-  assert.deepEqual(made.navigated, ['#start'], '지운 트리를 가리킨 화면을 남기지 않는다');
-
-  const nextAccount = fakeApi({ get: [okGet(0, EMPTY)] });
-  const fresh = harness({ initial: EMPTY, api: nextAccount });
-  const state = await fresh.controller.start();
-  assert.equal(state.phase, 'synced', '새 계정은 빈 문서에서 시작한다');
-
-  const keptApi = fakeApi({ get: [okGet(0, EMPTY)], put: [networkDown], logout: [{ ok: true, status: 200 }] });
-  const keptDoc = doc('B의 순간');
-  const unsynced = harness({ initial: keptDoc, api: keptApi });
-  await unsynced.controller.start();
-  await unsynced.controller.act('uploadLocal');
-  assert.equal(unsynced.controller.status().phase, 'offline');
-  const kept = await unsynced.controller.act('logout');
-  assert.match(kept.detail, /지우지 않았어요/);
-  assert.deepEqual(unsynced.current(), keptDoc, '동기화 전 기록은 이 기기에 남는다');
-  assert.deepEqual(unsynced.navigated, [], '남은 기록이 있으면 화면을 옮기지 않는다');
+test('미저장 변경이 있으면 로그아웃하지 않는다', async () => {
+  const api = fakeApi({get:[okGet(0,EMPTY)],put:[networkDown]});
+  const made = harness({initial:EMPTY,api}); await made.controller.start();
+  made.edit(doc('수정')); made.controller.markLocalSave(); await made.settle();
+  await made.controller.act('logout');
+  assert.equal(api.seen.filter(row=>row[0]==='logout').length,0);
+  assert.match(made.controller.status().detail,/저장되지 않은 변경/);
 });
 
-test('로그인은 서버가 정한 주소로만 이동하고 화면 경계 밖 상태를 두지 않는다', async () => {
-  const api = fakeApi({ get: [unauthorized] });
-  const made = harness({ initial: EMPTY, api });
-  await made.controller.start();
+test('세션이 만료되면 저장 실패를 알리고 로그인 안내로 전환한다', async () => {
+  const api = fakeApi({get:[okGet(0,EMPTY)],put:[unauthorized]});
+  const made = harness({initial:EMPTY,api}); await made.controller.start();
+  made.edit(doc('수정')); made.controller.markLocalSave(); await made.settle();
+  assert.equal(made.controller.status().phase,'login');
+  assert.match(made.controller.status().detail,/저장하지 못했어요/);
+  assert.equal(made.controller.snapshot().owned,false);
+});
+
+test('저장 중 새 편집은 이전 완료 뒤 새 번호로 다시 보낸다', async () => {
+  let complete; const pending = new Promise(resolve=>{complete=resolve});
+  const api = fakeApi({get:[okGet(1,EMPTY)],put:[pending,okPut(3)]});
+  const made = harness({initial:EMPTY,api}); await made.controller.start();
+  const first = doc('처음'), second = doc('다음');
+  made.edit(first); made.controller.markLocalSave(); await made.settle();
+  made.edit(second); made.controller.markLocalSave(); await made.settle();
+  assert.equal(api.puts().length,1);
+  complete(okPut(2)); await made.settle();
+  assert.equal(api.puts().length,2);
+  assert.equal(api.puts()[1].expectedRevision,2);
+  assert.deepEqual(api.puts()[1].state,second);
+  assert.equal(made.controller.status().phase,'synced');
+});
+
+test('충돌 이후 서버가 다시 변경되면 강제 저장도 멈춘다', async () => {
+  const api = fakeApi({get:[okGet(2,EMPTY),okGet(10,EMPTY)],put:[revisionClash]});
+  const made = harness({initial:EMPTY,api}); await made.controller.start();
+  made.edit(doc('수정')); made.controller.markLocalSave(); await made.settle();
+  await made.controller.act('force');
+  assert.equal(api.puts().length,1);
+  assert.equal(made.controller.status().phase,'conflict');
+});
+
+test('로그인으로 이동한 뒤 늦게 온 서버 응답은 화면을 채우지 않는다', async () => {
+  let complete; const pending = new Promise(resolve=>{complete=resolve});
+  const api = fakeApi({get:[pending]});
+  const made = harness({initial:EMPTY,api}); const running = made.controller.start();
   await made.controller.act('login');
-  assert.deepEqual(made.navigated, ['/auth/login?next=/']);
-  assert.deepEqual(api.puts(), []);
+  complete(okGet(3,doc('다른 계정'))); await running;
+  assert.deepEqual(made.current(),EMPTY);
+  assert.equal(made.controller.snapshot().owned,false);
 });
 
-function deferred() {
-  let resolve;
-  const promise = new Promise((r) => { resolve = r; });
-  return { promise, resolve };
-}
-
-test('로그아웃 뒤에 도착한 업로드 응답은 화면·번호·이 기기 기록을 고치지 않는다', async () => {
-  const base = doc('A의 기록');
-  const grown = doc('A의 기록', 'A의 추가');
-  const inflight = deferred();
-  const calls = [];
-  const api = {
-    async get() { calls.push('get'); return okGet(2, base); },
-    async put() { calls.push('put'); return inflight.promise; },
-    async logout() { calls.push('logout'); return { ok: true, status: 200 }; }
-  };
-  const made = harness({ initial: base, api });
-  await made.controller.start();
-  made.edit(grown);
-  made.controller.markLocalSave();
-  await made.settle();
-
-  const out = await made.controller.act('logout');
-  assert.equal(out.phase, 'local');
-  assert.match(out.detail, /지우지 않았어요/, '결과가 정해지지 않은 업로드는 기록을 지우지 않는다');
-  assert.deepEqual(made.current(), grown, '미전송 기록이 이 기기에 남는다');
-
-  inflight.resolve(okPut(3));
-  await made.settle();
-  assert.equal(made.controller.status().phase, 'local', '늦은 응답이 동기화됨으로 되돌리지 않는다');
-  assert.equal(made.controller.snapshot().revision, null, '지난 세대의 서버 번호를 되살리지 않는다');
-  assert.deepEqual(calls, ['get', 'put', 'logout'], '늦은 응답 뒤에도 새로 날리는 요청이 없다');
-});
-
-test('로그아웃 뒤에 도착한 읽기 응답은 다른 계정의 화면에 그 기록을 실어 나르지 않는다', async () => {
-  const aDoc = doc('A의 서버 기록');
-  const late = deferred();
-  const calls = [];
-  const api = {
-    async get() { calls.push('get'); return late.promise; },
-    async put(body) { calls.push(['put', body]); return okPut(1); },
-    async logout() { calls.push('logout'); return { ok: true, status: 200 }; }
-  };
-  const made = harness({ initial: EMPTY, api });
-  const starting = made.controller.start();
-  await made.settle();
-  const out = await made.controller.act('logout');
-  assert.equal(out.phase, 'local');
-  late.resolve(okGet(9, aDoc));
-  await starting;
-
-  assert.deepEqual(made.current(), EMPTY, 'A의 문서가 화면에 채택되지 않는다');
-  assert.equal(made.controller.snapshot().revision, null);
-  assert.deepEqual(calls.filter((c) => Array.isArray(c)), [], '지난 세대의 응답으로 업로드하지 않는다');
-  assert.deepEqual(made.navigated, ['#start'], '빈 화면을 정리하고 시작 화면으로 돌아간다');
-});
-
-test('충돌 안내 이후 서버가 다시 갱신되면 덮어쓰지 않고 사용자에게 다시 묻는다', async () => {
-  const base = doc('기준');
-  const mine = doc('기준', '내 추가');
-  const clash = { ok: false, status: 409, code: 'revision_conflict', message: '다른 곳에서 먼저 저장했어요.', currentRevision: 9 };
-  const api = fakeApi({ get: [okGet(2, base), okGet(12, base), okGet(12, base)], put: [clash, okPut(13)] });
-  const made = harness({ initial: base, api });
-  await made.controller.start();
-  made.edit(mine);
-  made.controller.markLocalSave();
-  await made.settle();
-  assert.equal(made.controller.status().phase, 'conflict');
-  assert.match(made.controller.status().detail, /9번까지/);
-
-  const reasked = await made.controller.act('force');
-  assert.equal(reasked.phase, 'conflict', '본 적 없는 12번을 덮어쓰지 않는다');
-  assert.match(reasked.detail, /12번까지/);
-  assert.equal(api.puts().length, 1, '다시 묻는 단계에서는 PUT를 보내지 않는다');
-  assert.equal(made.storage.get('lovetree.v4.server-before-overwrite.v1'), undefined, '재확인 전에는 백업도 쓰지 않는다');
-
-  const forced = await made.controller.act('force');
-  assert.equal(forced.phase, 'synced');
-  assert.equal(api.puts().at(-1).expectedRevision, 12, '사용자가 본 번호에 맞춘 뒤에만 올린다');
-  assert.deepEqual(JSON.parse(made.storage.get('lovetree.v4.server-before-overwrite.v1')), base, '덮어쓰기 직전 서버 사본을 백업한다');
-});
-
-test('계속 쓰기 제안도 서버가 먼저 바뀌었다면 다시 확인하고, 서버 기록 채택은 백업을 남긴다', async () => {
-  const serverDoc = doc('서버 기록');
-  const newerDoc = doc('서버 기록', '다른 기기 추가');
-  const localDoc = doc('이 기기 기록');
-  const api = fakeApi({ get: [okGet(7, serverDoc), okGet(11, newerDoc), okGet(11, newerDoc)] });
-  const made = harness({ initial: localDoc, api });
-  await made.controller.start();
-
-  const reasked = await made.controller.act('useLocal');
-  assert.equal(reasked.phase, 'conflict');
-  assert.match(reasked.detail, /11번까지/);
-  assert.deepEqual(api.puts(), [], '다시 확인하기 전에는 올리지 않는다');
-
-  const adopted = await made.controller.act('pull');
-  assert.equal(adopted.phase, 'synced');
-  assert.deepEqual(made.current(), newerDoc);
-  assert.deepEqual(JSON.parse(made.storage.get('lovetree.v4.local-before-server.v1')), localDoc, '채택한 쪽이 아니라 버린 쪽을 남긴다');
-});
-
-test('바에 나오는 단추는 전부 처리되는 동작만 가진다', async () => {
-  const handled = ['login', 'retry', 'uploadLocal', 'useServer', 'useLocal', 'pull', 'force', 'logout'];
-  const scripts = {
-    localOnly: { get: [{ ok: false, status: 401, code: 'unauthenticated', message: null }] },
-    adopt: { get: [okGet(7, doc('서버 기록'))] },
-    out: { get: [okGet(0, EMPTY)], logout: [{ ok: true, status: 200 }] }
-  };
-  for (const [name, script] of Object.entries(scripts)) {
-    const api = fakeApi(script);
-    const made = harness({ initial: name === 'adopt' ? doc('이 기기 기록') : EMPTY, api });
-    const state = await made.controller.start();
-    if (name === 'out') await made.controller.act('uploadLocal');
-    const shown = name === 'out' ? await made.controller.act('logout') : state;
-    for (const action of shown.actions) assert.ok(handled.includes(action.name), `${name}: ${action.name} 은 처리되지 않는 단추다`);
-  }
-});
-
-const PARKED = 'lovetree.v4.parked-unsent.v1';
-const DEVICE_ACCOUNT = 'lovetree.v4.device-account.v1';
-const okGetAs = (revision, state, subject) => ({ ...okGet(revision, state), subject });
-
-// 계정별 서버 문서를 가진 저장소. current를 바꾸는 것이 다른 계정으로 들어오는 것과 같다.
-function accountStore(docs) {
-  const puts = [];
-  return {
-    puts,
-    current: null,
-    api: {
-      async get() { const row = docs[accountStore.active]; return okGetAs(row.revision, row.state, accountStore.active); },
-      async put(body) { puts.push(body); const row = docs[accountStore.active]; row.revision += 1; row.state = body.state; return okPut(row.revision); },
-      async logout() { return { ok: true, status: 200 }; }
-    }
-  };
-}
-const enter = (store, subject) => { accountStore.active = subject; store.current = subject; };
-
-test('미전송 기록을 남기고 로그아웃하면 그 계정으로만 돌아오고 다른 계정은 빈 화면에서 시작한다', async () => {
-  const aDoc = doc('A의 순간');
-  const aGrown = doc('A의 순간', 'A의 미전송 순간');
-  const bDoc = doc('B의 순간');
-  const docs = { 'acct-a': { revision: 2, state: aDoc }, 'acct-b': { revision: 0, state: EMPTY } };
-  const store = accountStore(docs);
-  const made = harness({ initial: aDoc, api: store.api });
-  enter(store, 'acct-a');
-  await made.controller.start();
-
-  made.edit(aGrown);
-  made.controller.markLocalSave();
-  const out = await made.controller.act('logout');
-  assert.equal(out.phase, 'local');
-  assert.match(out.detail, /방금 계정의 기록으로 따로 보관/);
-  assert.deepEqual(made.current(), EMPTY, '로그아웃 화면에 앞 계정의 기록을 남기지 않는다');
-  assert.deepEqual(store.puts, [], '취소된 업로드는 나가지 않는다');
-  assert.deepEqual(Object.keys(JSON.parse(made.storage.get(PARKED))), ['acct-a'], '보관 사본에 소유 계정이 적혀 있다');
-  assert.deepEqual(JSON.parse(made.storage.get(PARKED))['acct-a'].state, aGrown);
-
-  enter(store, 'acct-b');
-  const bStart = await made.controller.start();
-  assert.equal(bStart.phase, 'synced', 'B는 빈 문서에서 시작한다');
-  assert.deepEqual(made.current(), EMPTY, 'B 화면에 A의 기록이 뜨지 않는다');
-  assert.deepEqual(store.puts, [], 'B 시작이 자동 PUT를 내지 않는다');
-  assert.deepEqual(JSON.parse(made.storage.get(DEVICE_ACCOUNT)).owner, 'acct-b');
-
-  made.edit(bDoc);
-  made.controller.markLocalSave();
-  await made.settle();
-  assert.equal(store.puts.length, 1, 'B의 저장은 B 계정으로만 올라간다');
-  assert.deepEqual(store.puts[0].state, bDoc);
-  assert.equal(docs['acct-b'].revision, 1);
-  assert.equal(docs['acct-a'].revision, 2, 'A의 서버 문서는 건드리지 않는다');
-
-  enter(store, 'acct-a');
-  const back = await made.controller.start();
-  assert.equal(back.phase, 'adoptOffered', 'A의 미전송 사본이 돌아와 서버 기록과 견준다');
-  assert.deepEqual(made.current(), aGrown, 'A가 남긴 순간이 되살아난다');
-  assert.equal(store.puts.length, 1, '돌아오는 것만으로는 업로드하지 않는다');
-
-  const kept = await made.controller.act('useLocal');
-  assert.equal(kept.phase, 'synced');
-  assert.equal(store.puts.length, 2);
-  assert.deepEqual(store.puts[1].state, aGrown);
-  assert.equal(docs['acct-a'].revision, 3);
-  const parkedAfter = JSON.parse(made.storage.get(PARKED));
-  assert.ok(!Object.prototype.hasOwnProperty.call(parkedAfter, 'acct-a'), '되살린 A의 보관 사본은 지운다');
-  assert.deepEqual(parkedAfter['acct-b'].state, bDoc, 'B의 사본은 B 이름으로 옮겨 둔다');
-});
-
-test('로그아웃하지 않은 채 계정이 바뀌어도 앞 계정의 사본은 화면과 업로드 후보에서 빠진다', async () => {
-  const aGrown = doc('A의 순간', 'A만 아는 추가');
-  const docs = { 'acct-a': { revision: 2, state: doc('A의 순간') }, 'acct-b': { revision: 0, state: EMPTY } };
-  const store = accountStore(docs);
-  const made = harness({ initial: aGrown, api: store.api, storage: new Map([[DEVICE_ACCOUNT, JSON.stringify({ owner: 'acct-a' })]]) });
-  enter(store, 'acct-b');
-  const state = await made.controller.start();
-
-  assert.equal(state.phase, 'synced');
-  assert.deepEqual(made.current(), EMPTY, 'B 화면이 A의 사본을 받지 않는다');
-  assert.deepEqual(store.puts, [], 'A의 사본이 B의 업로드 후보가 되지 않는다');
-  assert.deepEqual(JSON.parse(made.storage.get(PARKED))['acct-a'].state, aGrown, 'A의 사본은 A 이름으로 옮겨 둔다');
-});
-
-test('응답만 유실된 저장은 같은 요청 키로 다시 보내 복제로 끝난다', async () => {
-  const base = doc('기준');
-  const added = doc('기준', '추가');
-  const api = fakeApi({ get: [okGet(1, base)], put: [networkDown, okPut(2)] });
-  const made = harness({ initial: base, api });
-  await made.controller.start();
-  made.edit(added);
-  made.controller.markLocalSave();
-  await made.settle();
-  assert.equal(made.controller.status().phase, 'offline');
-
-  const back = await made.controller.act('retry');
-  assert.equal(back.phase, 'synced');
-  const [first, second] = api.puts();
-  assert.equal(first.clientKey, second.clientKey, '같은 내용·같은 번호는 같은 요청 키를 쓴다');
-  assert.equal(first.expectedRevision, second.expectedRevision);
-  assert.deepEqual(second.state, added);
-
-  // 다시 시도 전에 내용이 바뀌면 다른 요청 키로 나간다 — 복제가 아니라 새 저장이다.
-  const changed = doc('기준', '추가', '그 뒤 입력');
-  const later = fakeApi({ get: [okGet(1, base)], put: [networkDown, networkDown, okPut(2)] });
-  const again = harness({ initial: base, api: later });
-  await again.controller.start();
-  again.edit(added);
-  again.controller.markLocalSave();
-  await again.settle();
-  await again.controller.act('retry');
-  assert.equal(again.controller.status().phase, 'offline');
-  assert.equal(later.puts()[0].clientKey, later.puts()[1].clientKey, '그대로 재시도하면 같은 키');
-
-  again.edit(changed);
-  again.controller.markLocalSave();
-  await again.settle();
-  assert.equal(again.controller.status().phase, 'synced');
-  assert.notEqual(later.puts()[2].clientKey, later.puts()[0].clientKey, '내용이 바뀌면 새 키');
-  assert.deepEqual(later.puts()[2].state, changed);
+test('로그아웃 성공 시 서버 기록은 요청하지 않고 화면만 비운다', async () => {
+  const api = fakeApi({get:[okGet(1,doc('기록'))],logout:[{ok:true}]});
+  const made = harness({initial:EMPTY,api}); await made.controller.start();
+  await made.controller.act('logout');
+  assert.deepEqual(made.current(),EMPTY);
+  assert.equal(made.controller.status().phase,'login');
+  assert.deepEqual(api.seen.map(row=>row[0]),['get','logout']);
 });
 
 test('저장 API가 아닌 응답은 성공으로 읽지 않고 미설정으로 처리한다', async () => {
@@ -530,8 +178,8 @@ test('저장 API가 아닌 응답은 성공으로 읽지 않고 미설정으로 
 
     const made = harness({ initial: doc('이 기기 기록'), api });
     const state = await made.controller.start();
-    assert.equal(state.phase, 'local');
-    assert.match(state.detail, /서버 저장이 아직 켜지지/);
+    assert.equal(state.phase, 'offline');
+    assert.match(state.detail, /서버를 확인하지 못했어요/);
   }
 });
 
@@ -552,53 +200,9 @@ test('모양은 맞지만 검증에 실패한 문서도 서버 기록으로 읽�
   const local = doc('이 기기에 남는 순간');
   const made = harness({ initial: local, api });
   const state = await made.controller.start();
-  assert.equal(state.phase, 'local', 'checking에 머물지 않는다');
-  assert.match(state.detail, /서버 저장이 아직 켜지지/);
-  assert.deepEqual(made.current(), local, '이 기기 기록은 그대로');
+  assert.equal(state.phase, 'offline');
+  assert.match(state.detail, /서버를 확인하지 못했어요/);
+  assert.deepEqual(made.current(), EMPTY, 'invalid document is never used');
   assert.equal(made.controller.snapshot().revision, null, '서버 번호를 가진 것으로 보지 않는다');
 });
 
-test('확인 응답이 없으면 기다리를 멈추고 재시도·로그인 진입을 남긴다', async () => {
-  // 실제 fetch 경계: 서버가 답하지 않는 요청은 영원히 열린 채 남으면 안 된다.
-  // 신호를 받아 취소하는 실제 AbortController 동작을 그대로 태운다.
-  const hung = (url, init) => new Promise((_, reject) => {
-    if (!init?.signal) throw new Error('fetch에 취소 신호가 전달되지 않았다');
-    init.signal.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' })));
-  });
-  const started = Date.now();
-  const read = await createWorkspaceApi({ fetchImpl: hung, timeoutMs: 40 }).get();
-  assert.equal(read.ok, false, '대기 상한을 넘긴 것은 성공이 아니다');
-  assert.equal(read.status, 0);
-  assert.equal(read.code, 'timeout', '네트워크 끊김과 구분되는 시간 초과로 남는다');
-  assert.ok(Date.now() - started >= 30, '기다릴 시간을 닫힌 값까지 쓴다');
-
-  const local = doc('이 기기에 남는 순간');
-  const made = harness({
-    initial: local,
-    api: { get: async () => read, put: async () => { throw new Error('확인 실패에서 저장은 부르하지 않는다'); }, logout: async () => { throw new Error('확인 실패에서 로그아웃을 부르하지 않는다'); } }
-  });
-  const state = await made.controller.start();
-  assert.equal(state.phase, 'offline', 'checking에 머물지 않는다');
-  assert.match(state.detail, /기다리는 시간을 넘겼어요/);
-  assert.deepEqual(state.actions.map((action) => action.name), ['retry', 'login'], '재시도와 로그인이 같은 자리에 남는다');
-  assert.deepEqual(made.current(), local, '이 기기 기록은 그대로');
-});
-
-test('서버 확인 실패는 이 기기에만 저장으로 삼켜지지 않는다', async () => {
-  for (const [status, code, message] of [
-    [502, 'upstream_invalid_response', '서버가 문서가 아닌 응답을 보냈어요.'],
-    [504, 'upstream_timeout', '서버 응답이 제때 오지 않았어요.']
-  ]) {
-    const api = fakeApi({ get: [{ ok: false, status, code, message }, okGet(0, EMPTY)] });
-    const made = harness({ initial: EMPTY, api });
-    const state = await made.controller.start();
-    assert.equal(state.phase, 'checkFailed', `${status}: 확인 실패를 확인 실패로 보인다`);
-    assert.equal(state.detail, message, '서버가 준 우리 글 문구를 그대로 쓴다');
-    assert.deepEqual(state.actions.map((action) => action.name), ['retry', 'login'], '재시도와 로그인 진입이 함께 남는다');
-    assert.equal(made.controller.snapshot().owned, false, '확인 실패를 로그인된 상태로 보지 않는다');
-
-    const again = await made.controller.act('retry');
-    assert.equal(again.phase, 'synced', '다시 시도는 새로 확인한다');
-    assert.deepEqual(api.seen.map((row) => row[0]), ['get', 'get'], '재시도가 확인 요청을 다시 낸다');
-  }
-});

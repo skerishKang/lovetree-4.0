@@ -4,9 +4,8 @@ import {viewContext} from './views/contract.js';
 import {createScreenRegistry} from './views/registry.js';
 import { mountBook } from './views/book.js';
 import { mountShelf } from './views/shelf.js';
-import { hasRecovery as recoveryAvailable, recoveryData, lastRead, remember } from './views/memory.js';
-import { createTree, addMoment, editMoment, removeMoment, importTrees, MAX_TREES, MAX_LINKS, EMOTIONS, treeLayout, pathTo, stemGroups, linkMoments, unlinkMoments, relatedMoments } from './domain.js';
-import { loadState, saveState, STORAGE_KEY, RECOVERY_KEY } from './storage.js';
+import { lastRead, remember } from './views/memory.js';
+import { EMPTY_STATE, validateState, createTree, addMoment, editMoment, removeMoment, importTrees, MAX_TREES, MAX_LINKS, EMOTIONS, treeLayout, pathTo, stemGroups, linkMoments, unlinkMoments, relatedMoments } from './domain.js';
 import { createSyncController, createWorkspaceApi, mountSync } from './sync.js';
 import { authEntry, refreshAuthEntries } from './auth-entry.js';
 import { EXAMPLES } from './examples.js';
@@ -35,12 +34,10 @@ const icon = (name, cls = '') => `<svg class="icon ${cls}" aria-hidden="true" vi
   flower: '<path d="M12 8C5-2 0 8 8 12c-10 7 0 12 4 4 7 10 12 0 4-4 10-7 0-12-4-4Z"/><circle cx="12" cy="12" r="2"/>'
 })[name] || ''}</svg>`;
 
-let storage;
-try { storage = window.localStorage; } catch { storage = { getItem() { throw new Error(); }, setItem() { throw new Error(); } }; }
-const loaded = loadState(storage);
-let state = loaded.state;
-let expectedRaw;
-try { expectedRaw = storage.getItem(STORAGE_KEY); } catch { expectedRaw = undefined; }
+// View-only preferences live in memory; existing browser storage is not read.
+const volatile = new Map();
+const storage = { getItem: key => volatile.get(key) ?? null, setItem: (key, value) => volatile.set(key, String(value)) };
+let state = EMPTY_STATE();
 let selectedId = null;
 let navPath = null;
 let branchPicker = null;
@@ -88,9 +85,8 @@ function unlockScroll() {
   scrollLocked = false;
 }
 function commit(next) {
-  if (loaded.blocked) throw new Error(loaded.error);
-  expectedRaw = saveState(storage, next, expectedRaw);
-  state = next;
+  if (!sync.snapshot().owned) throw new Error('저장하려면 먼저 로그인해 주세요.');
+  state = validateState(next);
   sync.markLocalSave();
 }
 function currentTree() {
@@ -112,7 +108,6 @@ function header(active) {
 }
 function footer() { return `<footer class="site-footer"><a class="footer-brand" href="#start">${icon('leaf')} ${SERVICE}.</a><p>좋아하는 마음은, 이어질수록 자라니까.</p><span>당신의 작은 순간을 소중히.</span></footer>`; }
 function art(kind, cls = '') { return `<div class="art art-${kind} ${cls}" aria-hidden="true"><img src="/art/${kind === 'stage' ? 'stage' : 'sky'}.svg" alt="" /></div>`; }
-function hasRecovery() { return recoveryAvailable(storage, loaded); }
 function nodeCard(moment, pos, selected) {
   return `<button class="graph-node ${selected ? 'selected' : ''}" style="left:${pos.x}px;top:${pos.y}px" data-action="select-moment" data-id="${escape(moment.id)}" aria-pressed="${selected}"><span class="node-date">${moment.parentId ? dateLabel(moment.date) : `${icon('leaf')} 이 마음의 시작`}</span><strong>${escape(moment.title)}</strong><span class="node-note">${escape(moment.note)}</span><span class="node-footer"><span class="emotion emotion-${escape(moment.emotion)}">${escape(moment.emotion)}</span>${icon('arrow')}</span></button>`;
 }
@@ -215,7 +210,7 @@ function detail(tree, moment, demo) {
 }
 // #40 — 첫 저장 직후의 주 행동은 "다음 순간 연결"이고, 기억책 감상은 보조 행동으로 남긴다.
 function saveGuide(tree, moment) {
-  return `<div class="save-guide" role="status"><span class="save-guide-mark">${icon('check')}</span><div class="save-guide-copy"><strong>첫 순간이 저장됐어요.</strong><p>다음 순간을 이으면 두 마음이 한 줄기로 이어져요. 아직 하나라도 괜찮아요.</p></div><div class="save-guide-actions"><button class="button primary" data-action="add" data-id="${escape(moment.id)}">${CONTINUE_MOMENT} ${icon('plus')}</button><a class="text-button small" href="#book/${escape(tree.id)}" title="${BOOK_IS_READING}">${READ_BOOK}</a><button class="icon-button" data-action="dismiss-guide" aria-label="안내 닫기">${icon('close')}</button></div></div>`;
+  return `<div class="save-guide" role="status"><span class="save-guide-mark">${icon('check')}</span><div class="save-guide-copy"><strong>첫 순간을 남겼어요.</strong><p>다음 순간을 이으면 두 마음이 한 줄기로 이어져요. 아직 하나라도 괜찮아요.</p></div><div class="save-guide-actions"><button class="button primary" data-action="add" data-id="${escape(moment.id)}">${CONTINUE_MOMENT} ${icon('plus')}</button><a class="text-button small" href="#book/${escape(tree.id)}" title="${BOOK_IS_READING}">${READ_BOOK}</a><button class="icon-button" data-action="dismiss-guide" aria-label="안내 닫기">${icon('close')}</button></div></div>`;
 }
 let guideTreeId = null;
 function workspace() {
@@ -265,11 +260,11 @@ function render() {
   // 화면 등록표: 어떤 경로가 어떤 화면을 여는지 한 곳에 적는다. 먼저 선언된 화면이 이긴다.
   // #78 로그인 진입: 그림자 화면에는 authHtml로 버튼을 싣는다(orbit menuBtn · shelf ghost · book ui-btn).
   const screens = createScreenRegistry([
-    { id: 'shelf', matches: r => r === 'trees', activate: () => mountShadow(mountShelf, {trees:state.trees,storage,view:shelfView,context:viewContext({treeId:shelfView.selectedId}),actions,error:loaded.error,recovery:hasRecovery(),authHtml:authEntry(authSnapshot(),'ghost')}) },
+    { id: 'shelf', matches: r => r === 'trees', activate: () => mountShadow(mountShelf, {trees:state.trees,storage,view:shelfView,context:viewContext({treeId:shelfView.selectedId}),actions,authHtml:authEntry(authSnapshot(),'ghost')}) },
     { id: 'workspace', matches: r => /^(tree|demo)\//.test(r), activate: renderWorkspace },
     { id: 'book', matches: r => /^(book|demo-book)\//.test(r) && !!currentTree(), activate: () => mountShadow(mountBook, {tree:currentTree(),storage,context:viewContext({treeId:currentTree().id,momentId:selectedId,readOnly:isDemo()}),actions:{...actions,navigate:(where)=>{if(where==='trees'){shelfView.selectedId=currentTree().id;go('#trees');}else go('#start');}},authHtml:authEntry(authSnapshot(),'ui-btn')}) },
     { id: 'workspace-missing-tree', matches: r => /^(book|demo-book)\//.test(r), activate: renderWorkspace },
-    { id: 'orbit', fallback: true, activate: () => mountShadow(mountOrbit, {trees:state.trees,storage,context:viewContext({readOnly:route==='examples'}),actions,error:loaded.error,recovery:hasRecovery(),authHtml:authEntry(authSnapshot(),'menuBtn')}) }
+    { id: 'orbit', fallback: true, activate: () => mountShadow(mountOrbit, {trees:state.trees,storage,context:viewContext({readOnly:route==='examples'}),actions,authHtml:authEntry(authSnapshot(),'menuBtn')}) }
   ]);
   const screen = screens.resolve(route);
   const dispose = screen.activate();
@@ -278,7 +273,7 @@ function render() {
 function updateTree(tree) { commit({ ...state, trees: state.trees.map(t => t.id === tree.id ? tree : t) }); }
 
 function openMoment(mode, id) {
-  if (loaded.blocked) return toast(loaded.error);
+  if (!sync.snapshot().owned) return toast('저장하려면 먼저 로그인해 주세요.');
   if (mode === 'new' && state.trees.length >= MAX_TREES) return toast(`트리는 ${MAX_TREES}개까지 보관할 수 있어요.`);
   const tree = currentTree();
   if (mode !== 'new' && (!tree || isDemo())) return;
@@ -293,7 +288,7 @@ function openMoment(mode, id) {
   formDirty = false;
   dialogOriginHash = location.hash;
   dialogOriginIdx = currentIdx;
-  dialog.innerHTML = `<form id="moment-form" data-mode="${mode}" data-id="${escape(id || '')}"><div class="dialog-top"><span class="eyebrow">${mode === 'new' ? 'A LITTLE BEGINNING' : 'ONE MORE MOMENT'}</span><button type="button" class="icon-button" data-action="close-dialog" aria-label="닫기">${icon('close')}</button></div><h2 id="dialog-title">${mode === 'new' ? '간직하고 싶은 순간이 있나요?' : mode === 'edit' ? '그날의 마음을 다듬어 볼까요?' : '이 마음에서, 다음 순간으로.'}</h2><p class="dialog-intro">${mode === 'new' ? '처음 좋아했던 날이 아니어도 좋아요. 지금 떠오르는 장면부터.' : '작은 기록 하나가 나의 이야기를 조금 더 자라게 해요.'}</p>${mode === 'new' ? '<label class="field">누구를, 무엇을 좋아하나요?<input name="subject" maxlength="60" required placeholder="아티스트, 배우, 작품 이름…" autocomplete="off" /></label>' : ''}<label class="field">이 순간에 이름을 붙여 주세요<input name="title" maxlength="80" required value="${escape(m?.title || '')}" placeholder="예: 그 목소리를 처음 만났던 밤" /></label><label class="field">왜 이 순간을 간직하고 싶나요?<textarea name="note" rows="3" maxlength="500" required placeholder="그때의 마음을 짧게 남겨 주세요.">${escape(m?.note || '')}</textarea></label><fieldset class="emotion-field"><legend>그날의 마음</legend><div>${emotionOptions.map(e => `<label class="emotion-choice"><input type="radio" name="emotion" value="${escape(e)}" ${emotion === e ? 'checked' : ''} /><span>${escape(e)}${EMOTIONS.includes(e) ? '' : ' (가져온 값)'}</span></label>`).join('')}</div></fieldset><div class="form-row"><label class="field">순간의 날짜<input name="date" type="date" required value="${m?.date || today}" /></label><label class="field">원본 링크 <span>선택</span><input name="url" type="url" maxlength="2048" value="${escape(m?.url || '')}" placeholder="https://…" aria-describedby="url-hint" /></label><p class="url-hint" id="url-hint" role="status" aria-live="polite" data-tone="${escape(urlHint.tone)}">${escape(urlHint.text)}</p></div>${mode === 'add' ? `<label class="field">어느 순간에서 이어지나요?<select name="parentId">${tree.moments.map(p => `<option value="${escape(p.id)}" ${p.id === id ? 'selected' : ''}>${escape(p.title)}</option>`).join('')}</select></label>` : ''}${mode === 'add' || m?.parentId ? `<label class="field">두 순간이 이어진 이유 <span>선택</span><input name="relation" maxlength="100" value="${escape(m?.relation || '')}" placeholder="예: 다른 무대도 찾아보고 싶어져서" /></label>` : ''}<p class="form-error" role="alert" id="form-error"></p><div class="dialog-bottom"><span>${icon('check')} 이 브라우저에 저장돼요</span><button class="button primary" type="submit">${mode === 'edit' ? '수정한 마음 저장하기' : mode === 'new' ? NEW_TREE : CONTINUE_MOMENT} ${icon('arrow')}</button></div></form>`;
+  dialog.innerHTML = `<form id="moment-form" data-mode="${mode}" data-id="${escape(id || '')}"><div class="dialog-top"><span class="eyebrow">${mode === 'new' ? 'A LITTLE BEGINNING' : 'ONE MORE MOMENT'}</span><button type="button" class="icon-button" data-action="close-dialog" aria-label="닫기">${icon('close')}</button></div><h2 id="dialog-title">${mode === 'new' ? '간직하고 싶은 순간이 있나요?' : mode === 'edit' ? '그날의 마음을 다듬어 볼까요?' : '이 마음에서, 다음 순간으로.'}</h2><p class="dialog-intro">${mode === 'new' ? '처음 좋아했던 날이 아니어도 좋아요. 지금 떠오르는 장면부터.' : '작은 기록 하나가 나의 이야기를 조금 더 자라게 해요.'}</p>${mode === 'new' ? '<label class="field">누구를, 무엇을 좋아하나요?<input name="subject" maxlength="60" required placeholder="아티스트, 배우, 작품 이름…" autocomplete="off" /></label>' : ''}<label class="field">이 순간에 이름을 붙여 주세요<input name="title" maxlength="80" required value="${escape(m?.title || '')}" placeholder="예: 그 목소리를 처음 만났던 밤" /></label><label class="field">왜 이 순간을 간직하고 싶나요?<textarea name="note" rows="3" maxlength="500" required placeholder="그때의 마음을 짧게 남겨 주세요.">${escape(m?.note || '')}</textarea></label><fieldset class="emotion-field"><legend>그날의 마음</legend><div>${emotionOptions.map(e => `<label class="emotion-choice"><input type="radio" name="emotion" value="${escape(e)}" ${emotion === e ? 'checked' : ''} /><span>${escape(e)}${EMOTIONS.includes(e) ? '' : ' (가져온 값)'}</span></label>`).join('')}</div></fieldset><div class="form-row"><label class="field">순간의 날짜<input name="date" type="date" required value="${m?.date || today}" /></label><label class="field">원본 링크 <span>선택</span><input name="url" type="url" maxlength="2048" value="${escape(m?.url || '')}" placeholder="https://…" aria-describedby="url-hint" /></label><p class="url-hint" id="url-hint" role="status" aria-live="polite" data-tone="${escape(urlHint.tone)}">${escape(urlHint.text)}</p></div>${mode === 'add' ? `<label class="field">어느 순간에서 이어지나요?<select name="parentId">${tree.moments.map(p => `<option value="${escape(p.id)}" ${p.id === id ? 'selected' : ''}>${escape(p.title)}</option>`).join('')}</select></label>` : ''}${mode === 'add' || m?.parentId ? `<label class="field">두 순간이 이어진 이유 <span>선택</span><input name="relation" maxlength="100" value="${escape(m?.relation || '')}" placeholder="예: 다른 무대도 찾아보고 싶어져서" /></label>` : ''}<p class="form-error" role="alert" id="form-error"></p><div class="dialog-bottom"><span>${icon('check')} 서버에 저장돼요</span><button class="button primary" type="submit">${mode === 'edit' ? '수정한 마음 저장하기' : mode === 'new' ? NEW_TREE : CONTINUE_MOMENT} ${icon('arrow')}</button></div></form>`;
   dialog.showModal();
   lockScroll();
   const initialField = mode === 'new' ? 'subject' : 'title';
@@ -448,11 +443,6 @@ linkDialog.addEventListener('pointerup', event => {
 linkDialog.addEventListener('pointercancel', () => { linkPointerDownOnBackdrop = false; });
 linkDialog.addEventListener('close', () => { const target = (opener && opener.isConnected) ? opener : null; target?.focus?.({ preventScroll: true }); if (!dialog.open) unlockScroll(); });
 
-function exportRecovery() {
-  const raw = recoveryData(storage, loaded);
-  if (raw === null) return toast('보관된 복구 사본이 없어요.');
-  download(raw, 'lovetree-recovery.json', true);
-}
 function download(data, filename, raw = false) {
   const objectUrl = URL.createObjectURL(new Blob([raw ? data : JSON.stringify(data, null, 2)], { type: 'application/json' }));
   const a = document.createElement('a');
@@ -464,12 +454,11 @@ function libraryAction(action, id) {
     if (action === 'delete-tree') {
       const tree = state.trees.find(t => t.id === id);
       if (!tree || !confirm(`“${tree.title}”와 ${tree.moments.length}개의 순간을 지울까요? 필요하면 먼저 파일로 백업해 주세요.`)) return;
-      commit({ ...state, trees: state.trees.filter(t => t.id !== id) }); render(); toast('트리를 지웠어요.');
+      commit({ ...state, trees: state.trees.filter(t => t.id !== id) }); render(); toast('트리 변경을 서버에 저장하고 있어요.');
     }
     else if (action === 'export-tree') { const tree = state.trees.find(t => t.id === id); if (tree) download({ version: 1, trees: [tree] }, `lovetree-${id.slice(0, 8)}.json`); }
     else if (action === 'export-all') download(state, `lovetree-backup-${new Date().toISOString().slice(0,10)}.json`);
     else if (action === 'import') $('#import-file').click();
-    else if (action === 'recovery') exportRecovery();
   } catch (error) { toast(error.message); }
 }
 document.addEventListener('click', event => {
@@ -567,14 +556,14 @@ document.addEventListener('click', event => {
       updateTree(unlinkMoments(currentTree(), id, button.dataset.target));
       render();
       $(`[data-action="link"][data-id="${CSS.escape(id)}"]`)?.focus();
-      toast('관련 연결을 끊었어요. 두 순간은 각자의 자리에 남아 있어요.');
+      toast('연결 변경을 서버에 저장하고 있어요.');
     }
     else if (action === 'delete-moment') {
       if (!confirm('이 순간을 지울까요? 이어진 순간들은 남기고 연결을 정리합니다.')) return;
       updateTree(removeMoment(currentTree(), id)); 
       if (navPath && navPath.some(m => m.id === id)) navPath = null;
       if (branchPicker && branchPicker.some(m => m.id === id)) branchPicker = null;
-      selectedId = null; render(); toast('순간을 지웠어요.');
+      selectedId = null; render(); toast('순간 변경을 서버에 저장하고 있어요.');
     }
     else if (action === 'dismiss-guide') { guideTreeId = null; render(); document.querySelector('[data-action="add"]')?.focus(); }
     else libraryAction(action, id);
@@ -587,7 +576,7 @@ $('#import-file').addEventListener('change', async event => {
     if (file.size > 5 * 1024 * 1024) throw new Error('5MB 이하의 러브트리 JSON 파일을 선택해 주세요.');
     const incoming = JSON.parse(await file.text());
     const next = importTrees(state, incoming);
-    commit(next); go('#trees'); toast(`${incoming.trees.length}개의 트리를 새 사본으로 가져왔어요.`);
+    commit(next); go('#trees'); toast(`${incoming.trees.length}개의 트리를 서버에 저장하고 있어요.`);
   } catch (error) { toast(error instanceof SyntaxError ? '올바른 JSON 파일이 아니에요.' : error.message); }
   finally { event.target.value = ''; }
 });
@@ -635,14 +624,6 @@ window.addEventListener('resize', () => {
   // The fitted overview depends on the visible board size, which changes with the layout breakpoints.
   resizeTimer = setTimeout(() => { if (zoom === 'fit' && viewMode === 'tree' && !dialog.open && /^(tree|demo)\//.test(location.hash.slice(1))) render(); }, 160);
 });
-window.addEventListener('storage', event => {
-  if (event.key === RECOVERY_KEY && location.hash === '#trees' && !dialog.open) { render(); return; }
-  if (event.key !== STORAGE_KEY) return;
-  if (dialog.open) { toast('다른 탭에서 기록이 바뀌었어요. 작성 중인 내용을 복사한 뒤 새로고침해 주세요.'); return; }
-  const next = loadState(storage);
-  if (!next.error) { state = next.state; expectedRaw = event.newValue; render(); }
-  else toast(next.error);
-});
 // Track history position so cancel can return without destroying back/forward stack.
 if (!history.state || typeof history.state.idx !== 'number') {
   history.replaceState({ idx: 0 }, '', location.href);
@@ -654,9 +635,8 @@ if (!history.state || typeof history.state.idx !== 'number') {
 }
 const sync = createSyncController({
   getState: () => state,
-  replaceState: (doc) => { commit(doc); render(); },
+  replaceState: (doc) => { state = validateState(doc); render(); },
   api: createWorkspaceApi(),
-  storage: window.localStorage,
   // 화면 경로는 이 파일이 소유한다. 안쪽으로 옮길 때는 앱의 이력 추적을 함께 쓴다.
   navigate: (url) => { if (url.startsWith('#')) go(url); else location.assign(url); },
   // 동기화 상태가 바뀌면 화면을 다시 그리지 않고 상단 진입 버튼 문구만 맞춘다.
@@ -664,5 +644,6 @@ const sync = createSyncController({
 });
 mountSync({ controller: sync, doc: document });
 render();
-if (loaded.error) toast(loaded.error);
 void sync.start();
+
+window.addEventListener('beforeunload', event => { if (sync.snapshot().dirty) { event.preventDefault(); event.returnValue = ''; } });

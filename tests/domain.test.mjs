@@ -1,7 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createTree, addMoment, editMoment, removeMoment, validateState, importTrees, treeLayout, pathTo, stemGroups, linkMoments, unlinkMoments, relatedMoments, MAX_LINKS, safeUrl, newId } from '../src/domain.js';
-import { loadState, saveState, STORAGE_KEY, RECOVERY_KEY } from '../src/storage.js';
 
 const input = (title = '첫 목소리') => ({ subject: '윤슬', title, note: '오래 기억하고 싶은 마음', emotion: '설렘', date: '2026-10-27', url: '' });
 const stateOf = tree => ({ version: 1, trees: [tree] });
@@ -11,19 +10,12 @@ test('local HTTP preview can create records without crypto.randomUUID', () => {
   assert.equal(new Set(ids).size, 20);
   for (const id of ids) assert.match(id, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
 });
-function memoryStorage(seed = {}) {
-  const data = new Map(Object.entries(seed));
-  return { getItem: key => data.get(key) ?? null, setItem: (key, value) => data.set(key, value) };
-}
-test('create → connect → save → reload preserves the emotional path', () => {
+test('validated serialization preserves the emotional path', () => {
   const first = createTree(input());
   const connected = addMoment(first, { ...input('함께 부른 노래'), relation: '직접 만나고 싶어서' }, first.moments[0].id);
-  const storage = memoryStorage();
-  saveState(storage, stateOf(connected), null);
-  const reloaded = loadState(storage);
-  assert.equal(reloaded.error, null);
-  assert.equal(reloaded.state.trees[0].moments[1].parentId, first.moments[0].id);
-  assert.equal(reloaded.state.trees[0].moments[1].relation, '직접 만나고 싶어서');
+  const reloaded = validateState(JSON.parse(JSON.stringify(stateOf(connected))));
+  assert.equal(reloaded.trees[0].moments[1].parentId, first.moments[0].id);
+  assert.equal(reloaded.trees[0].moments[1].relation, '직접 만나고 싶어서');
 });
 test('invalid parent and non-web URLs cannot be saved', () => {
   const tree = createTree(input());
@@ -102,32 +94,6 @@ test('import creates fresh identities and never overwrites existing trees', () =
   assert.notEqual(merged.trees[0].moments[0].id, merged.trees[1].moments[0].id);
   assert.equal(merged.trees[1].moments[1].parentId, merged.trees[1].moments[0].id);
   validateState(merged);
-});
-test('corrupt local records are preserved in a recovery copy', () => {
-  const storage = memoryStorage({ [STORAGE_KEY]: '{broken' });
-  const result = loadState(storage);
-  assert.equal(result.recovery, true);
-  assert.equal(storage.getItem(RECOVERY_KEY), '{broken');
-  assert.equal(storage.getItem(STORAGE_KEY), '{broken');
-});
-test('an older recovery is never overwritten and saving remains blocked', () => {
-  const storage = memoryStorage({ [STORAGE_KEY]: '{new-broken', [RECOVERY_KEY]: '{old-broken' });
-  const result = loadState(storage);
-  assert.equal(result.blocked, true);
-  assert.equal(storage.getItem(RECOVERY_KEY), '{old-broken');
-});
-test('two browser tabs cannot overwrite a newer saved state silently', () => {
-  const storage = memoryStorage();
-  const old = saveState(storage, stateOf(createTree(input())), null);
-  const fresh = saveState(storage, stateOf(createTree(input('別の記録'))), old);
-  assert.throws(() => saveState(storage, stateOf(createTree(input('stale'))), old), /別|다른 탭/);
-  assert.equal(storage.getItem(STORAGE_KEY), fresh);
-});
-test('storage failures are reported instead of claiming a successful save', () => {
-  const storage = { getItem: () => null, setItem: () => { throw new Error('QuotaExceeded'); } };
-  assert.throws(() => saveState(storage, stateOf(createTree(input())), null), /공간/);
-  const unreadable = { getItem: () => { throw new Error('SecurityError'); }, setItem: () => {} };
-  assert.throws(() => saveState(unreadable, stateOf(createTree(input())), null), /저장소에 접근/);
 });
 test('emotions outside the app list survive import and export unchanged', () => {
   const base = createTree(input());

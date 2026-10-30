@@ -24,7 +24,7 @@ function cover(tree, number) {
   return `<span class="book-cover" style="--cover:${color(tree)}"><span class="cover-number">TREE · ${String(number).padStart(2, '0')}</span><span class="cover-symbol" aria-hidden="true"><span>✦</span></span><strong class="cover-title">${esc(tree.subject)}</strong><span class="cover-subtitle">${tree.moments.length}개의 순간</span></span>`;
 }
 
-export function mountShelf(host, {trees, storage, view, context, actions, error, recovery, authHtml = ''}) {
+export function mountShelf(host, {trees, storage, view, context, actions, authHtml = ''}) {
   const {root, signal, track, dispose} = createView(host);
   const sorted = [...trees].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   const last = resume(storage, trees);
@@ -37,10 +37,9 @@ export function mountShelf(host, {trees, storage, view, context, actions, error,
   root.innerHTML = `<style>${sourceCSS}\n${css}\n.auth-entry{white-space:nowrap}@media(max-width:540px){.auth-entry{min-height:34px;padding:0 11px;font-size:11px}}</style><div class="app">
     <header class="topbar"><a class="brand" href="#start" aria-label="${SERVICE} ${GO_HOME}"><span class="brand-mark" aria-hidden="true"><i></i><b></b></span><span><strong>${SERVICE}</strong><small>LOVE MOMENT LIBRARY</small></span></a><span class="crumbs">${GO_TREES}</span><nav class="top-actions" aria-label="${GO_TREES} 메뉴"><a class="ghost" href="#start">${GO_HOME}</a><a class="ghost example-link" href="#examples">${GO_EXAMPLES}</a><button class="ghost primary" data-do="new">${NEW_TREE} +</button>${authHtml}</nav></header>
     <div class="page">${hero(trees, totalMoments, last, sorted)}
-    ${error || recovery ? `<section class="recovery" role="status">${esc(error || '이전에 보관한 복구 사본이 있어요.')}${recovery ? '<button class="ghost" data-action="recovery">복구 파일 내보내기</button>' : ''}</section>` : ''}
     <div class="shelf-controls"><label class="search"><span class="sr-only">${GO_TREES} 검색</span><input type="search" aria-label="${GO_TREES} 검색" placeholder="대상, 트리 제목, 순간 제목으로 찾기" value="${esc(view.query || '')}"></label><select class="subject-select" aria-label="좋아하는 대상별 보기"><option value="">모든 대상</option>${subjects.map(subject => `<option value="${esc(subject)}" ${view.subject === subject ? 'selected' : ''}>${esc(subject)}</option>`).join('')}</select><div class="view-toggle" role="group" aria-label="${GO_TREES} 보는 방식"><button data-mode="shelf">표지</button><button data-mode="list">목록</button></div><span class="count" role="status" aria-live="polite"></span></div>
     <section class="shelf-viewport" aria-label="${GO_TREES}"><button class="shelf-arrow left" data-move="-1" aria-label="이전 트리">‹</button><div class="shelf-rail"></div><button class="shelf-arrow right" data-move="1" aria-label="다음 트리">›</button><div class="shelf-base" aria-hidden="true"></div></section><p class="shelf-hint"></p><section class="selected-book" aria-label="선택한 트리"></section>
-    <footer class="backup-bar"><p>기록은 <strong>지금 사용하는 브라우저</strong>에 보관돼요.<br>다른 기기로 옮기거나 안전하게 간직하려면 파일로 백업해 주세요.</p><div class="backup-actions"><button class="ghost" data-action="import">파일 가져오기</button><button class="ghost" data-action="export-all" ${trees.length ? '' : 'disabled'}>전체 백업 ↓</button></div></footer></div></div>`;
+    <footer class="backup-bar"><p>기록은 <strong>서버에 저장</strong>돼요.<br>필요하면 파일로 백업할 수 있어요.</p><div class="backup-actions"><button class="ghost" data-action="import">파일 가져오기</button><button class="ghost" data-action="export-all" ${trees.length ? '' : 'disabled'}>전체 백업 ↓</button></div></footer></div></div>`;
   const rail = root.querySelector('.shelf-rail'), viewport = root.querySelector('.shelf-viewport');
   const panel = root.querySelector('.selected-book');
 
