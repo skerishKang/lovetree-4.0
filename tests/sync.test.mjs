@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createSyncController, createWorkspaceApi } from '../src/sync.js';
+import { createSyncController, createWorkspaceApi, mountSync } from '../src/sync.js';
 import { createTree } from '../src/domain.js';
 
 const CLOCK = '2026-10-28T00:00:00.000Z';
@@ -206,3 +206,29 @@ test('모양은 맞지만 검증에 실패한 문서도 서버 기록으로 읽�
   assert.equal(made.controller.snapshot().revision, null, '서버 번호를 가진 것으로 보지 않는다');
 });
 
+
+
+test('동기화 상태 줄 없이 저장 실패만 알리고 재시도를 연결한다', async () => {
+  const api = fakeApi({get:[okGet(0,EMPTY)],put:[networkDown,okPut(1)]});
+  const made = harness({initial:EMPTY,api}), notices = [];
+  mountSync({controller:made.controller, notify:(message, actions, act) => notices.push({message,actions,act})});
+  await made.controller.start();
+  assert.equal(notices.length,0);
+  made.edit(doc('수정')); made.controller.markLocalSave(); await made.settle();
+  assert.equal(notices.length,1);
+  assert.match(notices[0].message,/저장되지 않았어요/);
+  assert.deepEqual(notices[0].actions.map(a=>a.name),['retry']);
+  await notices[0].act('retry');
+  assert.equal(made.controller.status().phase,'synced');
+  assert.equal(notices.length,1);
+});
+
+test('저장 중 세션 만료는 상단 로그인 버튼을 안내한다', async () => {
+  const api = fakeApi({get:[okGet(0,EMPTY)],put:[unauthorized]});
+  const made = harness({initial:EMPTY,api}), notices=[];
+  mountSync({controller:made.controller, notify:(message, actions)=>notices.push({message,actions})});
+  await made.controller.start();
+  made.edit(doc('수정')); made.controller.markLocalSave(); await made.settle();
+  assert.match(notices[0].message,/오른쪽 위 로그인 버튼/);
+  assert.deepEqual(notices[0].actions,[]);
+});
