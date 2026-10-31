@@ -63,3 +63,7 @@ html[data-v41-screen=board] .lt-media{color:#57425e;background:#fff7fc}
 html[data-v41-screen=network] .lt-media{color:#49344f}
 html[data-v41-screen=book] .clipping .lt-media{color:#57453c}
 html[data-v41-screen=book] .viewer-media .lt-media{width:100%;height:100%;overflow:auto}
+
+.private-upload{margin:16px 0;padding:16px;border:1px solid #c8bbb0;border-radius:14px}.private-upload p{font-size:13px;line-height:1.6;overflow-wrap:anywhere}.private-upload input[type=file]{width:100%;min-height:44px}.private-upload button,.private-upload summary{min-height:44px}.upload-asset{padding:12px 0;border-top:1px solid #c8bbb0}.upload-asset button{margin:4px 8px 4px 0}.private-upload details{margin-top:12px}
+
+.private-upload button{font:inherit;color:inherit;background:#2b242e;border:1px solid #66566b;border-radius:12px;padding:10px 14px;cursor:pointer}.private-upload button.danger{color:#efb0bd}.private-upload button:disabled{opacity:.6;cursor:wait}.private-upload input::file-selector-button{font:inherit;min-height:44px;border:1px solid #66566b;border-radius:8px;background:#2b242e;color:inherit;padding:8px 12px;margin-right:8px}

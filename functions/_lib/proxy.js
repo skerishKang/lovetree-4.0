@@ -1,7 +1,7 @@
 /**
  * Pages Functions 프록시 — 프런트가 부르는 서버 경계만 고정 업스트림으로 넘긴다.
  *
- * - 넘기는 경로는 `/api/workspace` 와 `/auth/login`·`/auth/callback`·`/auth/logout` 뿐이다.
+ * - 넘기는 경로는 workspace·관리자 읽기·미디어 UUID 경로와 지정한 auth 경로뿐이다.
  *   나머지 `/api/*`·`/auth/*` 는 404 JSON 이고, 정적 자산으로 폴백하지 않는다.
  * - 업스트림은 `env.LOVETREE_API_ORIGIN` 하나에서만 온다. 요청 헤더·쿼리·본문으로
  *   목적지를 바꿀 수 없고, 경로도 위 목록 밖으로 확장되지 않는다.
@@ -15,7 +15,9 @@
  * PR #69에서 더했다. 컴2가 프록시를 단독 정리한다.
  */
 // 경로마다 브라우저가 실제로 쓰는 메서드만 넘긴다. 그 밖은 COM2까지 내려보내지 않는다.
+const MEDIA_ITEM = /^\/api\/media\/[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}\.(?:png|jpg|gif|webp|mp4|webm)$/;
 const ALLOWED = new Map([
+  ['/api/media', new Set(['GET', 'POST'])],
   ['/api/workspace', new Set(['GET', 'PUT'])],
   ['/api/admin/session', new Set(['GET'])],
   ['/api/admin/roles', new Set(['GET'])],
@@ -24,8 +26,8 @@ const ALLOWED = new Map([
   ['/auth/logout', new Set(['POST'])]
 ]);
 const LOOPBACK = new Set(['127.0.0.1', 'localhost', '::1', '[::1]']);
-const REQUEST_HEADERS = ['cookie', 'content-type', 'accept', 'accept-language', 'authorization', 'origin'];
-const RESPONSE_HEADERS = ['content-type', 'location', 'cache-control', 'x-content-type-options', 'www-authenticate'];
+const REQUEST_HEADERS = ['cookie', 'content-type', 'accept', 'accept-language', 'authorization', 'origin', 'x-lovetree-subject', 'x-lovetree-upload-id'];
+const RESPONSE_HEADERS = ['content-type', 'location', 'cache-control', 'x-content-type-options', 'www-authenticate', 'content-security-policy'];
 
 // 응답 본문 상한. 서버가 받아들이는 문서 상한(`server/http.js` DEFAULT_MAX_BODY_BYTES = 4MiB,
 // `LOVETREE_MAX_BODY_BYTES`로 조정)보다 넉넉해야 정상 기록이 프록시에서 잘리지 않는다.
@@ -90,7 +92,8 @@ async function readWithDeadline(upstream, { limit, timedOut, cancel }) {
 export function createProxy({ fetcher = (...args) => fetch(...args), timeoutMs = 15_000, maxResponseBytes = DEFAULT_RESPONSE_LIMIT_BYTES } = {}) {
   return async function onRequest({ request, env }) {
     const incoming = new URL(request.url);
-    const methods = ALLOWED.get(incoming.pathname);
+    const media = incoming.pathname === '/api/media' || MEDIA_ITEM.test(incoming.pathname);
+    const methods = ALLOWED.get(incoming.pathname) || (MEDIA_ITEM.test(incoming.pathname) ? new Set(['GET','DELETE']) : null);
     if (!methods) return jsonError(404, 'not_proxied', '이 경로는 서버로 넘기지 않아요.');
     if (!methods.has(request.method)) return jsonError(405, 'method_not_allowed', '이 요청은 지원하지 않아요.');
 
@@ -111,7 +114,7 @@ export function createProxy({ fetcher = (...args) => fetch(...args), timeoutMs =
       expired = true;
       controller.abort();
       cancel.current?.();
-    }, Math.max(0, timeoutMs));
+    }, Math.max(0, media ? Math.max(timeoutMs, 60_000) : timeoutMs));
     const timedOut = () => expired;
 
     try {
@@ -128,7 +131,8 @@ export function createProxy({ fetcher = (...args) => fetch(...args), timeoutMs =
       // 정적 호스트 폴백(HTML)이나 계약 밖 형식은 성공이 아니다.
       const type = String(upstream.headers.get('content-type') || '').toLowerCase();
       const invalid = type.includes('text/html')
-        || (incoming.pathname === '/api/workspace' && !type.includes('application/json'));
+        || (incoming.pathname === '/api/workspace' && !type.includes('application/json'))
+        || (media && !(type.includes('application/json') || (MEDIA_ITEM.test(incoming.pathname) && request.method === 'GET' && upstream.ok && /^(?:image\/(?:png|jpeg|gif|webp)|video\/(?:mp4|webm))(?:;|$)/.test(type))));
       if (invalid) {
         await upstream.body?.cancel().catch(() => {});
         return jsonError(502, 'upstream_invalid_response', type.includes('text/html')
