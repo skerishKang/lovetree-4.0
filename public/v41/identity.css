@@ -1,0 +1,15 @@
+/* 4.1 identity layer. Imported artwork and data remain unchanged. */
+@import url('/fonts/pretendard/pretendardvariable-dynamic-subset.css');
+@font-face{font-family:MaruBuri;font-weight:400;font-style:normal;font-display:swap;src:url('/fonts/MaruBuri-Regular.woff2') format('woff2')}
+:root{--lt-ui:'Pretendard Variable',Pretendard,'Noto Sans KR',system-ui,sans-serif;--lt-reading:MaruBuri,'Noto Serif CJK KR',Batang,serif;--body:var(--lt-ui);--display:var(--lt-reading);--book-serif:var(--lt-reading);--ui-sans:var(--lt-ui);--hand:var(--lt-reading);font-synthesis:none}
+body{font-family:var(--lt-ui)}
+button,input,select,textarea,summary{font-family:var(--lt-ui)!important}
+.hero h1,.card h3,.cover-title,.book-title,.moment-title h3,.note-piece,.letter,.clipping,.archive-piece{font-family:var(--lt-reading)}
+.hero h1,.card h3,.moment-title h3,.note-piece h2,.letter h2,.clipping h2{font-weight:400}
+/* The shell owns the sole service mark; each view keeps its own tools. */
+html[data-v41-screen] header>.brand,html[data-v41-screen] .topbar>.brand{display:none!important}
+html[data-v41-screen=board] header>.crumb{display:none}
+html[data-v41-screen=book] .topbar{justify-content:flex-end}
+html[data-v41-screen=network] .topbar{justify-content:flex-end}
+html[data-v41-screen=book] body:before{content:none}
+html[data-v41-screen=book] .topbar .tools,html[data-v41-screen=board] header .headbtn,html[data-v41-screen=network] .top-actions{font-family:var(--lt-ui)}
