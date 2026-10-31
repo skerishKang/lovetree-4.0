@@ -10,12 +10,9 @@ const dispose=mountOrbit(document.getElementById('orbit'),{
  authHtml:`<button class="menuBtn auth-entry" data-home-account>${presentation.accountLabel}</button>`,actions:bridge.actions
 });
 const shadow=document.getElementById('orbit').shadowRoot;
-// Same Korean service mark as the shell, without changing the SRC064 gallery.
-const brand=parent.document.querySelector('.app-header .brand').cloneNode(true);
-brand.onclick=e=>{e.preventDefault();bridge.actions.navigate('home')};
-shadow.querySelector('.brand').replaceWith(brand);
+// Keep the original SRC064 wordmark on the welcome screen.
 const identity=document.createElement('style');
-identity.textContent=`:host{--ui:'Pretendard Variable',Pretendard,system-ui,sans-serif}.app{font-family:var(--ui)}.topbar{height:68px;padding:10px 24px;align-items:center}.brand{display:flex;align-items:center;gap:9px;color:#f4e5eb;text-decoration:none;font-family:var(--ui);font-size:16px;letter-spacing:-.04em;min-height:44px}.brand>span{font-weight:650;white-space:nowrap}.brand svg{width:24px;height:30px}.brand small{font-size:10px;font-weight:500;margin-left:7px;color:#e9bdcd;letter-spacing:.04em}.top-actions{gap:6px}.top-actions .menuBtn{font-family:var(--ui);font-size:12px;min-height:44px;padding:0 12px}@media(max-width:650px){.topbar{padding:6px 12px;gap:8px}.brand{font-size:15px;gap:6px}.brand svg{width:20px}.top-actions{gap:4px}.top-actions .menuBtn{font-size:11px;padding:0 7px}}`;
+identity.textContent=`:host{--ui:'Pretendard Variable',Pretendard,system-ui,sans-serif}.app{font-family:var(--ui)}`;
 shadow.append(identity);
 if(presentation.canResume){
  const primary=shadow.querySelector('.primary-cta'),secondary=shadow.querySelector('.actions [data-do="continue"]');
