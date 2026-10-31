@@ -20,4 +20,9 @@ if(!presentation.canResume)shadow.querySelector('.primary-cta').textContent='첫
 shadow.querySelector('.center-note').textContent='배경 카드는 감상 예시 · 내 기록에는 저장되지 않아요';
 const mobileFit=document.createElement('style');mobileFit.textContent='@media(max-width:650px){.topbar{gap:8px}.top-actions{gap:6px;flex-shrink:0}.topbar .menuBtn{white-space:nowrap;padding:10px 9px;font-size:10px}.brand{letter-spacing:.08em}}';shadow.append(mobileFit);
 shadow.querySelector('[data-home-account]').onclick=bridge.actions.account;
+shadow.querySelectorAll('.firstMark').forEach(e=>e.textContent='첫 순간');
+const dialog=shadow.querySelector('dialog');
+const labels=new MutationObserver(()=>{const b=dialog.querySelector('[data-do=book]');if(b&&b.textContent!=='기억책 열기')b.textContent='기억책 열기';});
+labels.observe(dialog,{childList:true,subtree:true});
+addEventListener('pagehide',()=>labels.disconnect(),{once:true});
 addEventListener('pagehide',dispose,{once:true});
