@@ -16,9 +16,13 @@
  */
 // 경로마다 브라우저가 실제로 쓰는 메서드만 넘긴다. 그 밖은 COM2까지 내려보내지 않는다.
 const MEDIA_ITEM = /^\/api\/media\/[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}\.(?:png|jpg|gif|webp|mp4|webm)$/;
+const SHARE_ITEM = /^\/api\/shares\/[A-Za-z0-9_-]{1,128}$/;
+const PUBLIC_SHARE_ITEM = /^\/api\/public\/shares\/[A-Za-z0-9_-]{1,128}$/;
 const ALLOWED = new Map([
   ['/api/media', new Set(['GET', 'POST'])],
   ['/api/workspace', new Set(['GET', 'PUT'])],
+  ['/api/shares', new Set(['GET', 'POST'])],
+  ['/api/shares/preview', new Set(['POST'])],
   ['/api/admin/session', new Set(['GET'])],
   ['/api/admin/roles', new Set(['GET'])],
   ['/auth/login', new Set(['GET'])],
@@ -93,7 +97,10 @@ export function createProxy({ fetcher = (...args) => fetch(...args), timeoutMs =
   return async function onRequest({ request, env }) {
     const incoming = new URL(request.url);
     const media = incoming.pathname === '/api/media' || MEDIA_ITEM.test(incoming.pathname);
-    const methods = ALLOWED.get(incoming.pathname) || (MEDIA_ITEM.test(incoming.pathname) ? new Set(['GET','DELETE']) : null);
+    const methods = ALLOWED.get(incoming.pathname)
+      || (MEDIA_ITEM.test(incoming.pathname) ? new Set(['GET','DELETE']) : null)
+      || (SHARE_ITEM.test(incoming.pathname) ? new Set(['DELETE']) : null)
+      || (PUBLIC_SHARE_ITEM.test(incoming.pathname) ? new Set(['GET']) : null);
     if (!methods) return jsonError(404, 'not_proxied', '이 경로는 서버로 넘기지 않아요.');
     if (!methods.has(request.method)) return jsonError(405, 'method_not_allowed', '이 요청은 지원하지 않아요.');
 
@@ -130,9 +137,9 @@ export function createProxy({ fetcher = (...args) => fetch(...args), timeoutMs =
 
       // 정적 호스트 폴백(HTML)이나 계약 밖 형식은 성공이 아니다.
       const type = String(upstream.headers.get('content-type') || '').toLowerCase();
+      const mediaBinary = MEDIA_ITEM.test(incoming.pathname) && request.method === 'GET' && upstream.ok && /^(?:image\/(?:png|jpeg|gif|webp)|video\/(?:mp4|webm))(?:;|$)/.test(type);
       const invalid = type.includes('text/html')
-        || (incoming.pathname === '/api/workspace' && !type.includes('application/json'))
-        || (media && !(type.includes('application/json') || (MEDIA_ITEM.test(incoming.pathname) && request.method === 'GET' && upstream.ok && /^(?:image\/(?:png|jpeg|gif|webp)|video\/(?:mp4|webm))(?:;|$)/.test(type))));
+        || (incoming.pathname.startsWith('/api/') && !(type.includes('application/json') || (media && mediaBinary)));
       if (invalid) {
         await upstream.body?.cancel().catch(() => {});
         return jsonError(502, 'upstream_invalid_response', type.includes('text/html')

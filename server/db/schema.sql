@@ -55,3 +55,22 @@ CREATE TABLE IF NOT EXISTS lovetree_product_role_audit (
   reason text,
   changed_at timestamptz NOT NULL DEFAULT now()
 );
+
+-- 4.1 명시적 공유(#120). 개인 문서 자체는 복제하지 않고 소유자 문서의 트리 하나를 가리킨다.
+-- 공개 읽기는 매 요청마다 최신 소유 문서에서 해당 트리만 투영하므로 취소·삭제가 즉시 반영된다.
+CREATE TABLE IF NOT EXISTS lovetree_shares (
+  product_id text NOT NULL,
+  share_id text NOT NULL,
+  subject_id text NOT NULL,
+  tree_id text NOT NULL,
+  entry_moment_id text NOT NULL,
+  initial_view text NOT NULL CHECK (initial_view IN ('book','board','network')),
+  status text NOT NULL DEFAULT 'active' CHECK (status IN ('active','revoked')),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  revoked_at timestamptz,
+  PRIMARY KEY (product_id, share_id),
+  CHECK (char_length(share_id) BETWEEN 20 AND 64)
+);
+CREATE INDEX IF NOT EXISTS lovetree_shares_owner_idx
+  ON lovetree_shares (product_id, subject_id, created_at DESC);
