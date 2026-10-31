@@ -405,7 +405,7 @@
         </div>
         <div class="reader-layout">
           <section class="reader-stage" id="readerStage" aria-label="3D 책 리더">
-            <div class="reader-stage-top"><span id="stageBookCode">VOLUME · 01</span><span>DRAG COVER · TURN PAGES</span></div>
+            <div class="reader-stage-top"><span id="stageBookCode">책 · 01</span><span>DRAG COVER · TURN PAGES</span></div>
             <div class="reader-shadow"></div>
             <div class="book-floor"></div>
             <div class="book-3d-wrap">
@@ -518,7 +518,7 @@
         $('#resultCount').textContent=list.length+'권';
         $('#shelfRail').innerHTML=list.length?list.map(function(book,index){
           return '<article class="book-card" data-book-index="'+index+'"><button type="button" data-book-id="'+esc(book.id)+'" aria-label="'+esc(book.name)+' 기억책 열기">'+
-            '<div class="book-cover" style="'+coverStyle(book)+'"><span class="cover-number">VOLUME · '+String(index+1).padStart(2,'0')+'</span><span class="cover-symbol"><span>'+esc(book.symbol)+'</span></span><strong class="cover-title">'+esc(book.name)+'</strong><small class="cover-subtitle">'+esc(book.english)+'</small></div>'+
+            '<div class="book-cover" style="'+coverStyle(book)+'"><span class="cover-number">책 · '+String(index+1).padStart(2,'0')+'</span><span class="cover-symbol"><span>'+esc(book.symbol)+'</span></span><strong class="cover-title">'+esc(book.name)+'</strong><small class="cover-subtitle">'+esc(book.english)+'</small></div>'+
             '<span class="book-card-meta"><strong>'+esc(book.name)+'</strong><span>'+book.chapters.length+'개 순간 · '+esc(categoryLabel(book.category))+'</span></span></button><div class="book-tags">'+book.tags.slice(0,2).map(function(tag){return '<span>'+esc(tag)+'</span>';}).join('')+'</div></article>';
         }).join(''):'<div class="empty"><strong>아직 이 책장에는 없어요.</strong><span>다른 검색어나 분류를 선택해 보세요.</span></div>';
         updateCarousel(false);
@@ -578,9 +578,9 @@
         $('#coverTitle').textContent=book.name;
         $('#coverSubtitle').textContent=book.english;
         $('#coverBack').innerHTML='순간의 기록<br /><small>'+esc(book.name)+'의 다음 장으로</small>';
-        $('#readerLabel').textContent='VOLUME · '+book.english;
-        $('#stageBookCode').textContent='VOLUME · '+String(allBooks().indexOf(book)+1).padStart(2,'0');
-        $('#readerEyebrow').textContent='VOLUME · '+book.english;
+        $('#readerLabel').textContent='책 · '+book.english;
+        $('#stageBookCode').textContent='책 · '+String(allBooks().indexOf(book)+1).padStart(2,'0');
+        $('#readerEyebrow').textContent='책 · '+book.english;
         $('#readerTitle').textContent=book.name+'의 LoveTree';
         $('#readerDescription').textContent=book.description;
         $('#chapterCount').textContent=book.chapters.length+'개 순간';

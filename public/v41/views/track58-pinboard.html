@@ -397,7 +397,7 @@ window.__LT58V11={youtubeId,youtubeThumb,youtubeThumbUrl,openEdit,saveEdit,choos
 (()=>{const tools=document.createElement('button');tools.id='mobileTools';tools.className='headbtn primary mobileTools';tools.textContent='도구';tools.setAttribute('aria-expanded','false');document.querySelector('header').append(tools);tools.onclick=()=>{const panel=document.getElementById('leftPanel');const open=panel.classList.toggle('mobileOpen');tools.setAttribute('aria-expanded',String(open));document.getElementById('detail').classList.remove('open');};const originalClose=document.getElementById('leftCollapse').onclick;document.getElementById('leftCollapse').onclick=()=>{originalClose();tools.setAttribute('aria-expanded',String(document.getElementById('leftPanel').classList.contains('mobileOpen')));};})();
 </script>
 <script>
-mobilePicker=LTMobileMoments({moments:LTDEMO.moments,selected:LTDEMO.get(),onSelect:id=>{focusBoardMoment(id,false);document.getElementById('detail').classList.remove('open');},onOpen:id=>selectMoment(id,true),openLabel:'순간 읽기',tone:'dark'});
+mobilePicker=LTMobileMoments({moments:LTDEMO.moments,selected:LTDEMO.get(),onSelect:id=>{focusBoardMoment(id,false);document.getElementById('detail').classList.remove('open');},onOpen:id=>selectMoment(id,true),openLabel:'기억책 열기',tone:'dark'});
 addEventListener('resize',()=>{if(innerWidth<700&&!cinema)focusBoardMoment(LTDEMO.get(),false);});
 matchMedia('(max-width:699px)').addEventListener('change',e=>{if(e.matches){focusBoardMoment(LTDEMO.get(),false);document.getElementById('detail').classList.remove('open');}});
 </script></body></html>

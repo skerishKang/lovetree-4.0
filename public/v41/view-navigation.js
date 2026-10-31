@@ -14,8 +14,8 @@
   document.head.append(style);
   if(shelf){
    const p=document.querySelector('.hero-copy>p:not(.eyebrow)');if(p)p.textContent='책을 누르면 읽던 순간부터 기억책이 열려요.';
-   const jump=document.getElementById('shelfJump');if(jump)jump.textContent='기억책 바로 열기';
-   const stage=document.querySelector('.stage-label');if(stage)stage.textContent='LOVE TREE LIBRARY';
+   const jump=document.getElementById('shelfJump');if(jump)jump.textContent='기억책 열기';
+   const stage=document.querySelector('.stage-label');if(stage)stage.textContent='내 책장';
    const art=document.querySelector('.hero-stage');if(art){art.setAttribute('aria-hidden','true');}
   }else{
    const name=document.querySelector('.topbar .brand span');if(name)name.textContent=c?.tree.title||'기억책';
