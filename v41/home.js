@@ -1,17 +1,21 @@
 import '../src/styles.css';
 import {mountOrbit} from '../src/views/orbit.js';
 import {createHomeActions} from './home-actions.js';
-const context=parent.LT41;
-const bridge=createHomeActions({getContext:()=>parent.LT41,send:message=>parent.postMessage(message,location.origin)});
-// Reading position is shared with this page's selection, never with 4.0 localStorage.
-const position=new Map();
-if(context?.tree)position.set('lovetree.v4.reading-position.v1',JSON.stringify({treeId:context.tree.id,momentId:context.momentId}));
-const storage={getItem:key=>position.get(key)||null,setItem:(key,value)=>{position.set(key,value);try{bridge.select(JSON.parse(value).momentId);}catch{}}};
-const example=!context||context.source==='example';
-const accountLabel=context?.source==='server'?'내 계정':'로그인';
+import {homePresentation} from './home-presentation.js';
+const context=parent.LT41||{source:parent.document.body.dataset.recordSource};
+const bridge=createHomeActions({getContext:()=>parent.LT41,send:message=>parent.postMessage(message,location.origin),gallery:true});
+const presentation=homePresentation(context);
 const dispose=mountOrbit(document.getElementById('orbit'),{
- trees:example?[]:[context.tree],storage,context:{treeId:context?.tree.id||null,momentId:context?.momentId||null,readOnly:example},authHtml:`<button class="menuBtn auth-entry" data-home-account>${accountLabel}</button>`,actions:bridge.actions,onSelect:bridge.select,recordNote:context?.source==='file'?'파일 감상 · 서버에 저장하지 않아요':null
+ trees:presentation.trees,storage:{getItem:()=>null,setItem:()=>{}},context:presentation.context,
+ authHtml:`<button class="menuBtn auth-entry" data-home-account>${presentation.accountLabel}</button>`,actions:bridge.actions
 });
-const mobileFit=document.createElement('style');mobileFit.textContent='@media(max-width:650px){.topbar{gap:8px}.top-actions{gap:6px;flex-shrink:0}.topbar .menuBtn{white-space:nowrap;padding:10px 9px;font-size:10px}.brand{letter-spacing:.08em}}';document.getElementById('orbit').shadowRoot.append(mobileFit);
-document.getElementById('orbit').shadowRoot.querySelector('[data-home-account]').onclick=bridge.actions.account;
+const shadow=document.getElementById('orbit').shadowRoot;
+if(presentation.canResume){
+ const primary=shadow.querySelector('.primary-cta'),secondary=shadow.querySelector('.actions [data-do="continue"]');
+ primary.dataset.do='member-continue';primary.textContent='이어 보던 순간';primary.onclick=bridge.actions.resume;
+ secondary.dataset.do='new';secondary.textContent='새 트리 만들기';
+}
+shadow.querySelector('.center-note').textContent='배경 카드는 감상 예시 · 내 기록에는 저장되지 않아요';
+const mobileFit=document.createElement('style');mobileFit.textContent='@media(max-width:650px){.topbar{gap:8px}.top-actions{gap:6px;flex-shrink:0}.topbar .menuBtn{white-space:nowrap;padding:10px 9px;font-size:10px}.brand{letter-spacing:.08em}}';shadow.append(mobileFit);
+shadow.querySelector('[data-home-account]').onclick=bridge.actions.account;
 addEventListener('pagehide',dispose,{once:true});
