@@ -10,7 +10,8 @@ const storage={getItem:key=>position.get(key)||null,setItem:(key,value)=>{positi
 const example=!context||context.source==='example';
 const accountLabel=context?.source==='server'?'내 계정':'로그인';
 const dispose=mountOrbit(document.getElementById('orbit'),{
- trees:example?[]:[context.tree],storage,context:{treeId:context?.tree.id||null,momentId:context?.momentId||null,readOnly:example},authHtml:`<button class="menuBtn" data-home-account>${accountLabel}</button>`,actions:bridge.actions,onSelect:bridge.select,recordNote:context?.source==='file'?'파일 감상 · 서버에 저장하지 않아요':null
+ trees:example?[]:[context.tree],storage,context:{treeId:context?.tree.id||null,momentId:context?.momentId||null,readOnly:example},authHtml:`<button class="menuBtn auth-entry" data-home-account>${accountLabel}</button>`,actions:bridge.actions,onSelect:bridge.select,recordNote:context?.source==='file'?'파일 감상 · 서버에 저장하지 않아요':null
 });
+const mobileFit=document.createElement('style');mobileFit.textContent='@media(max-width:650px){.topbar{gap:8px}.top-actions{gap:6px;flex-shrink:0}.topbar .menuBtn{white-space:nowrap;padding:10px 9px;font-size:10px}.brand{letter-spacing:.08em}}';document.getElementById('orbit').shadowRoot.append(mobileFit);
 document.getElementById('orbit').shadowRoot.querySelector('[data-home-account]').onclick=bridge.actions.account;
 addEventListener('pagehide',dispose,{once:true});
