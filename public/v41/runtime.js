@@ -6,7 +6,7 @@
     const outgoing = tree.edges.filter(e => e.kind === 'parent' && e.from === m.id);
     return {id:m.id,title:m.title,date:m.date,emotion:m.emotion,memo:m.note,
       whyNext:outgoing.map(e=>e.reason).filter(Boolean).join(' / '),
-      type:'memo',source:'불러온 기록',image:'',externalUrl:m.url||'',
+      type:context.exampleMedia?.[m.id]?.type||'memo',source:context.exampleMedia?'예시 이미지':'불러온 기록',image:context.exampleMedia?.[m.id]?.image||'',externalUrl:m.url||'',
       first:m.parentId===null,next:outgoing[0]?.to||null,branch:outgoing[1]?.to||null};
   });
   window.LTDEMO = {title:tree.title,moments,edges:tree.edges,
