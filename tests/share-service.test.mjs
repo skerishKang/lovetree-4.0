@@ -28,7 +28,10 @@ test('preview is non-mutating and explicit create exposes one projected tree onl
  assert.equal(preview.status,200);assert.equal(preview.body.preview.tree.moments[0].url,'');assert.equal(preview.body.preview.omittedPrivateMedia,1);
  assert.deepEqual((await request(handle,'GET','/api/shares',null,'alice')).body.shares,[]);
  const unpreviewed=await request(handle,'POST','/api/shares',input,'alice');assert.equal(unpreviewed.status,409);assert.equal(unpreviewed.body.error.code,'share_preview_stale');
- const made=await request(handle,'POST','/api/shares',{...input,previewToken:preview.body.preview.previewToken},'alice');assert.equal(made.status,201);
+ const made=await request(handle,'POST','/api/shares',{...input,previewToken:preview.body.preview.previewToken},'alice');assert.equal(made.status,201);assert.equal(made.body.share.discoverable,false);
+ assert.equal((await request(handle,'PUT','/api/shares/'+made.body.share.id+'/discovery',null,'bob')).status,403);
+ const listed=await request(handle,'PUT','/api/shares/'+made.body.share.id+'/discovery',null,'alice');assert.equal(listed.body.share.discoverable,true);
+ const unlisted=await request(handle,'DELETE','/api/shares/'+made.body.share.id+'/discovery',null,'alice');assert.equal(unlisted.body.share.discoverable,false);
  const publicRead=await request(handle,'GET','/api/public/shares/'+made.body.share.id);
  assert.equal(publicRead.status,200);assert.equal(publicRead.headers['cache-control'],'no-store, max-age=0');
  assert.equal(publicRead.body.tree.id,first.id);assert.equal(publicRead.body.tree.moments[0].url,'');

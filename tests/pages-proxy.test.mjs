@@ -240,7 +240,7 @@ test('실제 fetch로 PUT 본문을 넘기면 업스트림이 끝까지 받는�
 });
 
 test('명시적 공유 경로만 메서드별로 프록시하고 하위 확장은 막는다',async()=>{
- const cases=[['/api/shares','GET'],['/api/shares','POST'],['/api/shares/preview','POST'],['/api/shares/token_123','DELETE'],['/api/public/shares/token_123','GET']];
+ const cases=[['/api/shares','GET'],['/api/shares','POST'],['/api/shares/preview','POST'],['/api/shares/token_123','DELETE'],['/api/shares/token_123/discovery','PUT'],['/api/public/shares/token_123','GET']];
  for(const [path,method] of cases){const fetcher=recorder(new Response('{}',{headers:{'content-type':'application/json'}}));const response=await onRequest(createProxy({fetcher}),`https://lovetree.example${path}`,{method});assert.equal(response.status,200,`${method} ${path}`);assert.equal(fetcher.calls[0].url,`${UPSTREAM}${path}`);}
  for(const path of ['/api/shares/token/extra','/api/public/shares/token/extra','/api/public/shares/token.json']){const fetcher=recorder(new Response('{}'));const response=await onRequest(createProxy({fetcher}),`https://lovetree.example${path}`);assert.equal(response.status,404,path);assert.equal(fetcher.calls.length,0);}
 });

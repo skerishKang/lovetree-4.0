@@ -2,7 +2,8 @@ const iso = value => value instanceof Date ? value.toISOString() : value ? Strin
 const row = value => value && ({
   shareId: value.share_id, subjectId: value.subject_id, treeId: value.tree_id,
   entryMomentId: value.entry_moment_id, view: value.initial_view, status: value.status,
-  createdAt: iso(value.created_at), revokedAt: iso(value.revoked_at)
+  createdAt: iso(value.created_at), revokedAt: iso(value.revoked_at),
+  discoverable: value.discoverable === true, discoverableAt: iso(value.discoverable_at)
 });
 export function createShareRepo(pool) {
   return {
@@ -21,6 +22,14 @@ export function createShareRepo(pool) {
     async list({productId,subjectId}) {
       const result = await pool.query('SELECT * FROM lovetree_shares WHERE product_id=$1 AND subject_id=$2 ORDER BY created_at DESC LIMIT 50',[productId,subjectId]);
       return result.rows.map(row);
+    },
+    async setDiscoverable({productId,subjectId,shareId,discoverable}) {
+      const result = await pool.query(
+        `UPDATE lovetree_shares SET discoverable=$4, discoverable_at=CASE WHEN $4 THEN COALESCE(discoverable_at,now()) ELSE NULL END, updated_at=now()
+         WHERE product_id=$1 AND subject_id=$2 AND share_id=$3 AND status='active' RETURNING *`,
+        [productId,subjectId,shareId,discoverable]
+      );
+      return row(result.rows[0]);
     },
     async revoke({productId,subjectId,shareId}) {
       const result = await pool.query(

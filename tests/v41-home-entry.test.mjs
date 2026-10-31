@@ -41,7 +41,7 @@ test('4.0 gold cards and the four 4.1 views refer to the same moments and edges'
  assert.deepEqual(links,exampleTree.edges.map(e=>`${e.from}/${e.to}`).sort());
 });
 
-test('home account button delegates to the existing shell login/account action',()=>{const f=setup();f.actions.account();assert.deepEqual(f.sent,[{type:'lt41-account'}]);});
+test('home account and discovery buttons delegate to the existing shell actions',()=>{const f=setup();f.actions.account();f.actions.community();assert.deepEqual(f.sent,[{type:'lt41-account'},{type:'lt41-community'}]);});
 
 import {homePresentation} from '../v41/home-presentation.js';
 test('member homes with zero, one, or many records keep the same read-only original gallery',()=>{
