@@ -69,8 +69,99 @@ CREATE TABLE IF NOT EXISTS lovetree_shares (
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   revoked_at timestamptz,
+  discoverable boolean NOT NULL DEFAULT false,
+  discoverable_at timestamptz,
   PRIMARY KEY (product_id, share_id),
   CHECK (char_length(share_id) BETWEEN 20 AND 64)
 );
+ALTER TABLE lovetree_shares ADD COLUMN IF NOT EXISTS discoverable boolean NOT NULL DEFAULT false;
+ALTER TABLE lovetree_shares ADD COLUMN IF NOT EXISTS discoverable_at timestamptz;
 CREATE INDEX IF NOT EXISTS lovetree_shares_owner_idx
   ON lovetree_shares (product_id, subject_id, created_at DESC);
+
+-- 4.1 discovery/community (#121). Reactions never mutate another member's workspace JSON.
+CREATE TABLE IF NOT EXISTS lovetree_community_favorites (
+  product_id text NOT NULL,
+  share_id text NOT NULL,
+  subject_id text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (product_id, share_id, subject_id)
+);
+CREATE INDEX IF NOT EXISTS lovetree_community_favorites_owner_idx
+  ON lovetree_community_favorites (product_id, subject_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS lovetree_community_reactions (
+  product_id text NOT NULL,
+  share_id text NOT NULL,
+  subject_id text NOT NULL,
+  kind text NOT NULL CHECK (kind IN ('heart')),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (product_id, share_id, subject_id, kind)
+);
+
+CREATE TABLE IF NOT EXISTS lovetree_community_comments (
+  product_id text NOT NULL,
+  comment_id text NOT NULL,
+  share_id text NOT NULL,
+  subject_id text NOT NULL,
+  body text NOT NULL CHECK (char_length(body) BETWEEN 1 AND 1000),
+  client_key text NOT NULL,
+  status text NOT NULL DEFAULT 'visible' CHECK (status IN ('visible','deleted','hidden')),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (product_id, comment_id),
+  UNIQUE (product_id, subject_id, client_key)
+);
+CREATE INDEX IF NOT EXISTS lovetree_community_comments_share_idx
+  ON lovetree_community_comments (product_id, share_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS lovetree_community_reports (
+  product_id text NOT NULL,
+  report_id text NOT NULL,
+  share_id text NOT NULL,
+  reporter_subject_id text NOT NULL,
+  reason text NOT NULL CHECK (char_length(reason) BETWEEN 1 AND 500),
+  client_key text NOT NULL,
+  status text NOT NULL DEFAULT 'open' CHECK (status IN ('open','resolved','dismissed')),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  resolved_at timestamptz,
+  resolved_by text,
+  PRIMARY KEY (product_id, report_id),
+  UNIQUE (product_id, reporter_subject_id, client_key)
+);
+
+CREATE TABLE IF NOT EXISTS lovetree_community_blocks (
+  product_id text NOT NULL,
+  blocker_subject_id text NOT NULL,
+  blocked_subject_id text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (product_id, blocker_subject_id, blocked_subject_id),
+  CHECK (blocker_subject_id <> blocked_subject_id)
+);
+
+CREATE TABLE IF NOT EXISTS lovetree_community_hidden_shares (
+  product_id text NOT NULL,
+  share_id text NOT NULL,
+  report_id text,
+  hidden_by text NOT NULL,
+  hidden_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (product_id, share_id)
+);
+
+CREATE TABLE IF NOT EXISTS lovetree_community_moderation_audit (
+  id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  product_id text NOT NULL,
+  report_id text,
+  target_type text NOT NULL DEFAULT 'report' CHECK (target_type IN ('report','share','comment')),
+  target_id text,
+  action text NOT NULL CHECK (action IN ('resolved','dismissed','hide_share','restore_share','hide_comment')),
+  actor_subject_id text NOT NULL,
+  changed_at timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE lovetree_community_moderation_audit ALTER COLUMN report_id DROP NOT NULL;
+ALTER TABLE lovetree_community_moderation_audit ADD COLUMN IF NOT EXISTS target_type text NOT NULL DEFAULT 'report';
+ALTER TABLE lovetree_community_moderation_audit ADD COLUMN IF NOT EXISTS target_id text;
+ALTER TABLE lovetree_community_moderation_audit DROP CONSTRAINT IF EXISTS lovetree_community_moderation_audit_action_check;
+ALTER TABLE lovetree_community_moderation_audit ADD CONSTRAINT lovetree_community_moderation_audit_action_check CHECK (action IN ('resolved','dismissed','hide_share','restore_share','hide_comment'));
+ALTER TABLE lovetree_community_moderation_audit DROP CONSTRAINT IF EXISTS lovetree_community_moderation_audit_target_type_check;
+ALTER TABLE lovetree_community_moderation_audit ADD CONSTRAINT lovetree_community_moderation_audit_target_type_check CHECK (target_type IN ('report','share','comment'));

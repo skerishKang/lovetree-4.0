@@ -17,12 +17,28 @@
 // 경로마다 브라우저가 실제로 쓰는 메서드만 넘긴다. 그 밖은 COM2까지 내려보내지 않는다.
 const MEDIA_ITEM = /^\/api\/media\/[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}\.(?:png|jpg|gif|webp|mp4|webm)$/;
 const SHARE_ITEM = /^\/api\/shares\/[A-Za-z0-9_-]{1,128}$/;
+const SHARE_DISCOVERY = /^\/api\/shares\/[A-Za-z0-9_-]{1,128}\/discovery$/;
 const PUBLIC_SHARE_ITEM = /^\/api\/public\/shares\/[A-Za-z0-9_-]{1,128}$/;
+const COMMUNITY_SHARE_ACTION = /^\/api\/community\/shares\/[A-Za-z0-9_-]{1,128}\/(comments|favorite|reaction|report|block)$/;
+const COMMUNITY_COMMENT_ITEM = /^\/api\/community\/comments\/[A-Za-z0-9_-]{1,128}$/;
+const COMMUNITY_REPORT_ITEM = /^\/api\/community\/admin\/reports\/[A-Za-z0-9_-]{1,128}$/;
+function communityMethods(path) {
+  const action=path.match(COMMUNITY_SHARE_ACTION)?.[1];
+  if(action==='comments')return new Set(['GET','POST']);
+  if(action==='favorite'||action==='reaction')return new Set(['PUT','DELETE']);
+  if(action==='report'||action==='block')return new Set(['POST']);
+  if(COMMUNITY_COMMENT_ITEM.test(path))return new Set(['DELETE']);
+  if(COMMUNITY_REPORT_ITEM.test(path))return new Set(['PATCH']);
+  return null;
+}
 const ALLOWED = new Map([
   ['/api/media', new Set(['GET', 'POST'])],
   ['/api/workspace', new Set(['GET', 'PUT'])],
   ['/api/shares', new Set(['GET', 'POST'])],
   ['/api/shares/preview', new Set(['POST'])],
+  ['/api/community/shares', new Set(['GET'])],
+  ['/api/community/me/favorites', new Set(['GET'])],
+  ['/api/community/admin/reports', new Set(['GET'])],
   ['/api/admin/session', new Set(['GET'])],
   ['/api/admin/roles', new Set(['GET'])],
   ['/auth/login', new Set(['GET'])],
@@ -30,7 +46,7 @@ const ALLOWED = new Map([
   ['/auth/logout', new Set(['POST'])]
 ]);
 const LOOPBACK = new Set(['127.0.0.1', 'localhost', '::1', '[::1]']);
-const REQUEST_HEADERS = ['cookie', 'content-type', 'accept', 'accept-language', 'authorization', 'origin', 'x-lovetree-subject', 'x-lovetree-upload-id'];
+const REQUEST_HEADERS = ['cookie', 'content-type', 'accept', 'accept-language', 'authorization', 'origin', 'idempotency-key', 'x-lovetree-subject', 'x-lovetree-upload-id'];
 const RESPONSE_HEADERS = ['content-type', 'location', 'cache-control', 'x-content-type-options', 'www-authenticate', 'content-security-policy'];
 
 // 응답 본문 상한. 서버가 받아들이는 문서 상한(`server/http.js` DEFAULT_MAX_BODY_BYTES = 4MiB,
@@ -100,7 +116,9 @@ export function createProxy({ fetcher = (...args) => fetch(...args), timeoutMs =
     const methods = ALLOWED.get(incoming.pathname)
       || (MEDIA_ITEM.test(incoming.pathname) ? new Set(['GET','DELETE']) : null)
       || (SHARE_ITEM.test(incoming.pathname) ? new Set(['DELETE']) : null)
-      || (PUBLIC_SHARE_ITEM.test(incoming.pathname) ? new Set(['GET']) : null);
+      || (SHARE_DISCOVERY.test(incoming.pathname) ? new Set(['PUT','DELETE']) : null)
+      || (PUBLIC_SHARE_ITEM.test(incoming.pathname) ? new Set(['GET']) : null)
+      || communityMethods(incoming.pathname);
     if (!methods) return jsonError(404, 'not_proxied', '이 경로는 서버로 넘기지 않아요.');
     if (!methods.has(request.method)) return jsonError(405, 'method_not_allowed', '이 요청은 지원하지 않아요.');
 

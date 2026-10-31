@@ -42,7 +42,7 @@ function selectEntry(tree, value) {
   return tree.moments.find(moment => moment.parentId === null)?.id || tree.moments[0]?.id || null;
 }
 function shareSummary(row) {
-  return { id: row.shareId, treeId: row.treeId, entryMomentId: row.entryMomentId, view: row.view, status: row.status, createdAt: row.createdAt, revokedAt: row.revokedAt || null };
+  return { id: row.shareId, treeId: row.treeId, entryMomentId: row.entryMomentId, view: row.view, status: row.status, createdAt: row.createdAt, revokedAt: row.revokedAt || null, discoverable: row.discoverable === true, discoverableAt: row.discoverableAt || null };
 }
 
 export function createShareService({ shareRepo, workspaceRepo, productId, makeId = () => randomBytes(18).toString('base64url') }) {
@@ -72,6 +72,15 @@ export function createShareService({ shareRepo, workspaceRepo, productId, makeId
     },
     async list(subjectId) {
       return (await shareRepo.list({ productId, subjectId })).map(shareSummary);
+    },
+    async setDiscoverable(subjectId, shareId, discoverable) {
+      if (!SHARE_ID.test(shareId)) throw new ApiError(404, 'share_not_found', '공유 주소를 찾을 수 없어요.');
+      const existing = await shareRepo.load({ productId, shareId });
+      if (!existing) throw new ApiError(404, 'share_not_found', '공유 주소를 찾을 수 없어요.');
+      if (existing.subjectId !== subjectId) throw new ApiError(403, 'share_forbidden', '다른 계정의 공유는 바꿀 수 없어요.');
+      if (existing.status !== 'active') throw new ApiError(409, 'share_revoked', '취소된 공유는 발견에 공개할 수 없어요.');
+      const changed = await shareRepo.setDiscoverable({ productId, subjectId, shareId, discoverable });
+      return shareSummary(changed);
     },
     async revoke(subjectId, shareId) {
       if (!SHARE_ID.test(shareId)) throw new ApiError(404, 'share_not_found', '공유 주소를 찾을 수 없어요.');
@@ -117,6 +126,11 @@ export function createShareHandler({ authenticate, service, productId }) {
       if (method === 'GET') return { status: 200, body: { shares: await service.list(subjectId) }, headers: NO_STORE };
       if (method === 'POST') return { status: 201, body: await service.create(subjectId, jsonBody(request)), headers: NO_STORE };
       throw new ApiError(405, 'method_not_allowed', '이 요청은 지원하지 않아요.');
+    }
+    const discovery = path.match(/^\/api\/shares\/([^/]+)\/discovery$/);
+    if (discovery) {
+      if (method !== 'PUT' && method !== 'DELETE') throw new ApiError(405, 'method_not_allowed', '이 요청은 지원하지 않아요.');
+      return { status: 200, body: { share: await service.setDiscoverable(subjectId, discovery[1], method === 'PUT') }, headers: NO_STORE };
     }
     const item = path.match(/^\/api\/shares\/([^/]+)$/);
     if (item) {

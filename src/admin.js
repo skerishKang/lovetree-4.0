@@ -72,3 +72,105 @@ render(host, {
   roles: roles?.payload ?? null,
   error: session.status === 0 ? '서버에 닿지 못했어요.' : null
 });
+
+
+async function communityRequest(path, init = {}) {
+  try {
+    const response = await fetch(path, {
+      credentials: 'same-origin',
+      headers: { accept: 'application/json', ...(init.body ? { 'content-type': 'application/json' } : {}) },
+      ...init
+    });
+    const payload = await response.json().catch(() => null);
+    return { ok: response.ok, status: response.status, payload };
+  } catch {
+    return { ok: false, status: 0, payload: null };
+  }
+}
+
+async function mountCommunityModeration(sessionState) {
+  if (!sessionState?.authenticated || !sessionState?.admin) return;
+  const shell = document.querySelector('.admin-shell');
+  if (!shell) return;
+  const section = document.createElement('section');
+  section.className = 'storage-notice admin-card admin-community';
+  const heading = document.createElement('div');
+  heading.className = 'admin-card-head';
+  const title = document.createElement('strong');
+  title.textContent = '발견·커뮤니티 신고 검토';
+  const note = document.createElement('span');
+  note.className = 'notice';
+  note.textContent = '신고 처리와 발견 목록 숨김·복구를 함께 기록합니다. 공유 주소 자체의 소유자 회수와는 구분됩니다.';
+  heading.append(title, note);
+  const status = document.createElement('p');
+  status.className = 'admin-community-status';
+  status.setAttribute('role', 'status');
+  const list = document.createElement('div');
+  list.className = 'admin-report-list';
+  section.append(heading, status, list);
+  shell.append(section);
+
+  async function act(report, action) {
+    const hide = action === 'hide';
+    const result = await communityRequest('/api/community/admin/reports/' + encodeURIComponent(report.id), {
+      method: 'PATCH',
+      body: JSON.stringify({ status: hide ? 'resolved' : 'dismissed', visibility: hide ? 'hidden' : 'visible' })
+    });
+    status.textContent = result.ok
+      ? (hide ? '검토를 완료하고 발견 목록에서 숨겼어요.' : '신고를 기각하고 발견 목록 노출을 복구했어요.')
+      : (result.payload?.error?.message || '신고 처리에 실패했어요.');
+    if (result.ok) await load();
+  }
+
+  function row(report) {
+    const article = document.createElement('article');
+    article.className = 'admin-report';
+    const top = document.createElement('div');
+    top.className = 'admin-report-head';
+    const state = document.createElement('strong');
+    state.textContent = report.status === 'open' ? '검토 대기' : report.status === 'resolved' ? '처리 완료' : '기각';
+    const visibility = document.createElement('span');
+    visibility.textContent = report.hidden ? '발견 숨김' : '발견 노출';
+    top.append(state, visibility);
+    const reason = document.createElement('p');
+    reason.textContent = report.reason;
+    const meta = document.createElement('small');
+    meta.textContent = '공유 ' + report.shareId + ' · ' + time(report.createdAt);
+    const actions = document.createElement('div');
+    actions.className = 'admin-actions';
+    const hide = document.createElement('button');
+    hide.type = 'button';
+    hide.textContent = '검토 완료·발견 숨김';
+    hide.disabled = report.hidden;
+    hide.onclick = () => act(report, 'hide');
+    const restore = document.createElement('button');
+    restore.type = 'button';
+    restore.textContent = '신고 기각·발견 복구';
+    restore.disabled = !report.hidden && report.status === 'dismissed';
+    restore.onclick = () => act(report, 'restore');
+    actions.append(hide, restore);
+    article.append(top, reason, meta, actions);
+    return article;
+  }
+
+  async function load() {
+    status.textContent = '신고를 불러오는 중입니다.';
+    const result = await communityRequest('/api/community/admin/reports');
+    list.replaceChildren();
+    if (!result.ok) {
+      status.textContent = result.payload?.error?.message || '신고를 불러오지 못했어요.';
+      return;
+    }
+    const reports = Array.isArray(result.payload?.reports) ? result.payload.reports : [];
+    for (const report of reports) list.append(row(report));
+    if (!reports.length) {
+      const empty = document.createElement('p');
+      empty.textContent = '접수된 신고가 없습니다.';
+      list.append(empty);
+    }
+    status.textContent = '신고 ' + reports.length + '건 · 자동 숨김 없이 관리자가 명시적으로 처리합니다.';
+  }
+  await load();
+}
+
+await mountCommunityModeration(session.payload);

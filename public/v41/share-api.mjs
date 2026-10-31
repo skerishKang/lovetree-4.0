@@ -14,6 +14,7 @@ export function createShareApi({fetchImpl=(...args)=>fetch(...args)}={}) {
     preview:input=>call('/api/shares/preview',{method:'POST',body:JSON.stringify(input)}),
     create:input=>call('/api/shares',{method:'POST',body:JSON.stringify(input)}),
     list:()=>call('/api/shares'),
+    setDiscoverable:(id,enabled)=>call('/api/shares/'+encodeURIComponent(id)+'/discovery',{method:enabled?'PUT':'DELETE'}),
     revoke:id=>call('/api/shares/'+encodeURIComponent(id),{method:'DELETE'}),
     read:id=>call('/api/public/shares/'+encodeURIComponent(id))
   };

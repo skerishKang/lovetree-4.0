@@ -10,7 +10,8 @@ test('share rows are owner-scoped, revocable, and schema application is repeatab
  try{
   await applySchema(pool);await applySchema(pool);const repo=createShareRepo(pool),tag=suffix(),productId='lt-'+tag,subjectId='u-'+tag,shareId=('s'+tag).padEnd(24,'x').slice(0,24);
   const made=await repo.create({productId,subjectId,shareId,treeId:'tree-a',entryMomentId:'moment-a',view:'book'});
-  assert.equal(made.status,'active');assert.equal((await repo.load({productId,shareId})).subjectId,subjectId);
+  assert.equal(made.status,'active');assert.equal(made.discoverable,false);assert.equal((await repo.load({productId,shareId})).subjectId,subjectId);
+  assert.equal((await repo.setDiscoverable({productId,subjectId,shareId,discoverable:true})).discoverable,true);assert.equal((await repo.setDiscoverable({productId,subjectId:'other',shareId,discoverable:false})),null);
   assert.equal((await repo.list({productId,subjectId})).length,1);assert.equal((await repo.list({productId,subjectId:'other'})).length,0);
   const revoked=await repo.revoke({productId,subjectId,shareId});assert.equal(revoked.status,'revoked');assert.match(revoked.revokedAt,/^\d{4}-/);
   assert.equal(await repo.create({productId,subjectId,shareId,treeId:'tree-b',entryMomentId:'moment-b',view:'board'}),null);

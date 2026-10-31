@@ -4,6 +4,7 @@ import {MEMBER_LOGIN_URL,shouldLoadMemberRecords} from './member-entry.mjs';
 import {workspaceModel} from './workspace-model.mjs';
 import {createWorkspaceApi} from './api.mjs';
 import {createShareApi} from './share-api.mjs';
+import {mountCommunity} from './community-panel.mjs';
 import {createMemberSession} from './member-session.mjs';
 import {exampleTree} from './example.mjs';
 import {parseSelectionRoute,ownerSelectionRoute,accountPosition,rememberAccountPosition,resolveAccountPosition,stashPendingOwnerRoute,pendingOwnerRoute,takePendingOwnerRoute} from './selection-location.mjs';
@@ -93,14 +94,14 @@ function applyBrowserLocation(){if(location.hash===handledHash)return;handledHas
 document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>show(b.dataset.view));
 addEventListener('popstate',applyBrowserLocation);
 addEventListener('hashchange',applyBrowserLocation);
-addEventListener('message',e=>{if(e.origin!==location.origin||e.source!==$('view').contentWindow)return;if(e.data?.type==='lt41-navigate')show(e.data.view);if(e.data?.type==='lt41-select'&&window.LT41?.tree.moments.some(m=>m.id===e.data.id)){window.LT41.momentId=e.data.id;links();writeLocation();}if(e.data?.type==='lt41-write')openEditor(e.data.mode);if(e.data?.type==='lt41-open-book'&&model?.trees.some(t=>t.id===e.data.treeId&&t.moments.some(m=>m.id===e.data.id))){current='track59-sketchbook.html';choose(e.data.treeId,e.data.id);writeLocation();}if(e.data?.type==='lt41-account')$('account-entry').click();if(e.data?.type==='lt41-example'&&exampleTree.moments.some(m=>m.id===e.data.momentId)&&['track59-sketchbook.html','track58-pinboard.html'].includes(e.data.view)){sample({treeId:exampleTree.id,momentId:e.data.momentId},e.data.view);}if(e.data?.type==='lt-selection'||e.data?.type==='lt41-choose'){links();writeLocation();}});
+addEventListener('message',e=>{if(e.origin!==location.origin||e.source!==$('view').contentWindow)return;if(e.data?.type==='lt41-navigate')show(e.data.view);if(e.data?.type==='lt41-select'&&window.LT41?.tree.moments.some(m=>m.id===e.data.id)){window.LT41.momentId=e.data.id;links();writeLocation();}if(e.data?.type==='lt41-write')openEditor(e.data.mode);if(e.data?.type==='lt41-open-book'&&model?.trees.some(t=>t.id===e.data.treeId&&t.moments.some(m=>m.id===e.data.id))){current='track59-sketchbook.html';choose(e.data.treeId,e.data.id);writeLocation();}if(e.data?.type==='lt41-account')$('account-entry').click();if(e.data?.type==='lt41-community')$('community-menu').click();if(e.data?.type==='lt41-example'&&exampleTree.moments.some(m=>m.id===e.data.momentId)&&['track59-sketchbook.html','track58-pinboard.html'].includes(e.data.view)){sample({treeId:exampleTree.id,momentId:e.data.momentId},e.data.view);}if(e.data?.type==='lt-selection'||e.data?.type==='lt41-choose'){links();writeLocation();}});
 function sharePayload(){return {treeId:window.LT41?.tree.id||'',entryMomentId:$('share-moment').value,view:$('share-view').value};}
 function shareFailure(answer){return answer.status===401?'로그인이 필요해요.':answer.code==='timeout'?'서버 응답 시간이 초과됐어요.':answer.message||'공유 요청을 처리하지 못했어요.';}
 function renderShareList(shares=[]){
  const host=$('share-list'),treeId=window.LT41?.tree.id;host.replaceChildren();const selected=shares.filter(item=>item.treeId===treeId);
  if(!selected.length){const p=document.createElement('p');p.textContent='아직 만든 공유 주소가 없어요.';host.append(p);return;}
- for(const item of selected){const row=document.createElement('div');row.className='share-item'+(item.status==='revoked'?' share-revoked':'');const text=document.createElement('div'),strong=document.createElement('strong'),small=document.createElement('small');strong.textContent=item.status==='active'?'공유 중':'공유 취소됨';small.textContent=(item.view==='board'?'기억 보드':item.view==='network'?'관계 지도':'기억책')+' · '+new Date(item.createdAt).toLocaleString('ko-KR');text.append(strong,small);row.append(text);
-   if(item.status==='active'){const b=document.createElement('button');b.type='button';b.textContent='공유 취소';b.onclick=async()=>{if(!confirm('이 공유 주소를 지금 회수할까요? 새 요청은 성공 직후부터 차단됩니다.'))return;b.disabled=true;const answer=await shareApi.revoke(item.id);if(!answer.ok){$('share-feedback').textContent=shareFailure(answer);b.disabled=false;return;}$('share-feedback').textContent='공유를 취소했어요. 새 요청은 즉시 차단됩니다.';if($('share-url').dataset.shareId===item.id)$('share-created').hidden=true;await loadShareList();};row.append(b);}
+ for(const item of selected){const row=document.createElement('div');row.className='share-item'+(item.status==='revoked'?' share-revoked':'');const text=document.createElement('div'),strong=document.createElement('strong'),small=document.createElement('small');strong.textContent=item.status==='active'?(item.discoverable?'공유 중 · 발견 공개':'공유 중 · 주소로만 공개'):'공유 취소됨';small.textContent=(item.view==='board'?'기억 보드':item.view==='network'?'관계 지도':'기억책')+' · '+new Date(item.createdAt).toLocaleString('ko-KR');text.append(strong,small);row.append(text);
+   if(item.status==='active'){const actions=document.createElement('div');actions.className='share-item-actions';const discover=document.createElement('button');discover.type='button';discover.textContent=item.discoverable?'발견에서 내리기':'발견에 공개';discover.onclick=async()=>{const next=!item.discoverable;if(next&&!confirm('이 트리를 누구나 검색할 수 있는 발견 목록에 공개할까요? 공유 주소만 만든 상태와 달리 제목·대상·공개 순간이 목록에 나타납니다.'))return;discover.disabled=true;const answer=await shareApi.setDiscoverable(item.id,next);if(!answer.ok){$('share-feedback').textContent=shareFailure(answer);discover.disabled=false;return;}$('share-feedback').textContent=next?'발견 목록 공개를 켰어요.':'발견 목록에서 내렸어요. 공유 주소는 계속 사용할 수 있어요.';await loadShareList();};const revoke=document.createElement('button');revoke.type='button';revoke.textContent='공유 취소';revoke.onclick=async()=>{if(!confirm('이 공유 주소를 지금 회수할까요? 발견 목록에서도 즉시 내려갑니다.'))return;revoke.disabled=true;const answer=await shareApi.revoke(item.id);if(!answer.ok){$('share-feedback').textContent=shareFailure(answer);revoke.disabled=false;return;}$('share-feedback').textContent='공유를 취소했어요. 새 요청은 즉시 차단됩니다.';if($('share-url').dataset.shareId===item.id)$('share-created').hidden=true;await loadShareList();};actions.append(discover,revoke);row.append(actions);}
    host.append(row);
  }
 }
@@ -156,4 +157,13 @@ $('change-parent').onclick=()=>{try{member.apply('reparent',{targetId:$('parent-
 for(const [id,action] of [['link-moment','link'],['unlink-moment','unlink']])$(id).onclick=()=>{try{member.apply(action,{targetId:$('related-target').value},stateSelection());formBaseline=new URLSearchParams(new FormData($('moment-form'))).toString();parentBaseline=parentValue();setEditorMode('edit');}catch(e){$('form-error').textContent=e.message;}};
 $('delete-moment').onclick=()=>{if(!confirm('이 순간을 삭제할까요? 자식 순간은 이전 순간으로 이어지고 관련 연결은 해제됩니다.'))return;try{member.apply('delete',{},stateSelection());$('editor').close();}catch(e){$('form-error').textContent=e.message;}};
 $('backup-draft').onclick=backup;addEventListener('beforeunload',e=>{if(member?.snapshot().dirty||formDirty()||treeDirty()){e.preventDefault();e.returnValue='';}});
+mountCommunity({
+ button:$('community-menu'),dialog:$('community-panel'),
+ onOpenShare:item=>{$('community-panel').close();location.hash=`#share/${item.shareId}/${item.view||'book'}`;},
+ onStartRecord:subject=>{
+  $('community-panel').close();
+  if(source!=='server'||!member?.snapshot().owned){notify('로그인한 뒤 내 계정에 새 트리를 시작할 수 있어요. 원본 공개 트리는 복사하지 않아요.');panel('records');return;}
+  openEditor('new');$('moment-form').elements.subject.value=subject||'';formBaseline=new URLSearchParams(new FormData($('moment-form'))).toString();updateQuickEntryHint();
+ }
+});
 if(shouldLoadMemberRecords(location.search,document.cookie,location.hash))startMember();

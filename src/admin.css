@@ -64,3 +64,37 @@
   font-size: 12px;
   text-decoration: none;
 }
+
+
+.admin-community-status {
+  min-height: 22px;
+  color: #8a927e;
+  font-size: 12px;
+}
+.admin-report-list {
+  display: grid;
+  gap: 12px;
+}
+.admin-report {
+  padding: 14px;
+  border: 1px solid #d7c8d233;
+  border-radius: 12px;
+  background: #ffffff08;
+}
+.admin-report-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.admin-report-head span,
+.admin-report small {
+  color: #8a927e;
+  font-size: 11px;
+}
+.admin-report p {
+  margin: 10px 0;
+  overflow-wrap: anywhere;
+}
+.admin-report button {
+  min-height: 44px;
+}
