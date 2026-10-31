@@ -1,5 +1,13 @@
 ## 4.1 completed design promotion — 2026-10-31
 
+## 2026-10-31 — 4.1 회원 기록 편집
+
+- public/v41/member-session.mjs: 기존 domain/sync 규칙 재사용. 새 트리·이어쓰기·수정·삭제·관련 연결 및 revision 저장. 예시/파일은 업로드하지 않음.
+- 실패 시 메모리 보존·재시도·충돌 선택·JSON 백업·이탈 경고. GET features=bound-writes capability가 없으면 편집 금지; PUT expectedSubject는 검증된 현재 주체와 일치할 때만 저장. 기존 4.0 계약/DB 변경 없음.
+- 검증: npm run check 221건 중 188 pass, fail 0, 기존 서버 의존 skip 33. 신규 회귀 7건. PC/390px 작성·이어쓰기·수정 및 실제 제목/연결 표시 브라우저 확인. 실회원 Google 왕복과 실기기 터치는 미검증.
+- COM2 server/http.js 배포도 필요. 기존 설치 해시 일치 확인 후 단일 파일 백업/교체/재시작; 인증 설정·DB·터널은 유지.
+
+
 Promoted the exact forty-moment/forty-two-edge Limone demonstration (comparison source bcebf09dce72c30c09cd71658f4f8ee536a399ec) into the default /v41/ example view. Original five adapters are isolated under public/v41/design; account and file records continue through validated reader adapters and existing same-origin auth/API. The demo graph is not coerced into the member single-parent model and is never sent to the server. No new ChatGPT Site, database/auth configuration or 4.0 UI changes.
 
 ## 4.1 UI correction — 2026-10-31
