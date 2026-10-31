@@ -6,3 +6,6 @@
 @media(max-width:780px){#moment-form input,#moment-form textarea{font-size:16px}}
 
 #connections button strong{display:block;font-weight:600}.connection-reason{display:block;margin-top:5px;color:var(--muted);font-size:12px;line-height:1.7}#connections button small{min-width:48px}
+
+/* Keep the original 4.0 full-viewport composition on the welcome screen. */
+body.home-screen .app-header{display:none}

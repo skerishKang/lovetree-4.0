@@ -3,6 +3,7 @@ const BOOK='track59-sketchbook.html', BOARD='track58-pinboard.html', SHELF='trac
 export function createHomeActions({getContext,send}) {
  const select=id=>{if(!getContext()?.tree.moments.some(m=>m.id===id))return false;send({type:'lt41-select',id});return true;};
  return {select,actions:{
+  account:()=>send({type:'lt41-account'}),
   navigate:where=>send({type:'lt41-navigate',view:where==='trees'?SHELF:'src064-orbit.html'}),
   openBook:(_tree,id)=>{if(select(id))send({type:'lt41-navigate',view:BOOK});},
   openWorkspace:(_tree,id)=>{if(select(id))send({type:'lt41-navigate',view:BOARD});},

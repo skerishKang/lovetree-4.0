@@ -40,3 +40,5 @@ test('4.0 gold cards and the four 4.1 views refer to the same moments and edges'
  const links=samples.flatMap(m=>[m.next,m.branch].filter(Boolean).map(to=>`${m.id}/${to}`)).sort();
  assert.deepEqual(links,exampleTree.edges.map(e=>`${e.from}/${e.to}`).sort());
 });
+
+test('home account button delegates to the existing shell login/account action',()=>{const f=setup();f.actions.account();assert.deepEqual(f.sent,[{type:'lt41-account'}]);});
