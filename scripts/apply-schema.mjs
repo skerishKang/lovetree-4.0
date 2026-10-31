@@ -2,7 +2,7 @@
  * 운영 PostgreSQL에 표를 얹는 유일한 경로. `--apply` 없이는 대상만 알려주고 아무것도 실행하지 않는다.
  *
  * schema.sql은 모두 `IF NOT EXISTS`라서 두 번 실행해도 같은 자리에 있다 — 파일 레인이
- * 자기 루트를 확인하는 것처럼, 여기서는 표 다섯 개가 실제로 있는지 조회로 답한다.
+ * 자기 루트를 확인하는 것처럼, 여기서는 현재 표 여섯 개가 실제로 있는지 조회로 답한다.
  * 접속 문자열은 출력하지 않는다. 호스트와 데이터베이스 이름만 보여준다.
  */
 import { applySchema, createPool } from '../server/db/postgres.js';
@@ -12,7 +12,8 @@ const TABLES = [
   'lovetree_request_claims',
   'lovetree_login_states',
   'lovetree_product_roles',
-  'lovetree_product_role_audit'
+  'lovetree_product_role_audit',
+  'lovetree_shares'
 ];
 
 const url = String(process.env.LOVETREE_DATABASE_URL ?? '').trim();
