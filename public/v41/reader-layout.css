@@ -1,0 +1,38 @@
+/* Adapter-only refinements: retain Track32 covers and Track59 paper. */
+html[data-v41-screen=shelf] .hero{grid-template-columns:minmax(0,1fr) minmax(210px,32%);gap:24px;padding:20px 26px}
+html[data-v41-screen=shelf] .hero-copy{padding-left:0;max-width:none}
+html[data-v41-screen=shelf] .hero-copy h1{font-size:clamp(25px,2.8vw,36px);line-height:1.2;margin:6px 0 10px}
+html[data-v41-screen=shelf] .hero-note{display:none}
+html[data-v41-screen=shelf] .hero-stage{min-height:155px;height:155px}
+html[data-v41-screen=shelf] .hero-books{transform:scale(.6);transform-origin:center bottom;bottom:24px}
+html[data-v41-screen=shelf] .hero-shelf{bottom:14px}
+@media(max-width:820px){
+ html[data-v41-screen=shelf] .hero{display:block;padding:16px 18px}
+ html[data-v41-screen=shelf] .hero-stage{display:none}
+ html[data-v41-screen=shelf] .hero-copy h1{font-size:25px;line-height:1.25}
+ html[data-v41-screen=shelf] .hero-copy p:not(.eyebrow){font-size:13px;line-height:1.5}
+ html[data-v41-screen=shelf] .hero-cta{margin-top:12px}
+ html[data-v41-screen=book]{height:auto;min-height:100%;overflow-x:hidden;overflow-y:auto}
+ html[data-v41-screen=book] body{height:auto;min-height:100svh;overflow:visible}
+ html[data-v41-screen=book] .topbar{position:sticky;top:0;z-index:70}
+ html[data-v41-screen=book] .stage{position:relative;inset:auto;display:block;overflow:visible;padding:24px 14px 36px}
+ html[data-v41-screen=book] .book-wrap{width:100%;max-width:430px;height:auto;min-height:0;margin:0 auto;perspective:none;touch-action:pan-y}
+ html[data-v41-screen=book] .book{position:relative;inset:auto;transform:none;display:block}
+ html[data-v41-screen=book] .mobile-page{position:relative;inset:auto;overflow:visible;min-height:480px}
+ html[data-v41-screen=book] .mobile-content{position:relative;inset:auto;overflow:visible;min-height:480px;padding:52px 24px 28px 29px;touch-action:pan-y}
+ html[data-v41-screen=book] .mobile-support{position:relative;inset:auto;margin-top:22px}
+ html[data-v41-screen=book] .mobile-page .note-piece{min-height:0}
+ html[data-v41-screen=book] .mobile-page .note-piece p,
+ html[data-v41-screen=book] .mobile-page .letter p,
+ html[data-v41-screen=book] .mobile-page .clipping p{font-size:15px;line-height:1.8;overflow-wrap:anywhere}
+ html[data-v41-screen=book] .mobile-page .moment-title p{font-size:12px;line-height:1.6}
+ html[data-v41-screen=book] .mobile-support small{font-size:11px;line-height:1.6}
+ html[data-v41-screen=book] .nav-pill{position:sticky;left:auto;bottom:12px;transform:none;width:max-content;margin:22px auto 0;z-index:48}
+ html[data-v41-screen=book] .nav-pill button{width:44px;height:44px}
+ html[data-v41-screen=book] .why-margin{position:static;transform:none;width:auto;margin:16px 10px 0;line-height:1.7}
+ html[data-v41-screen=book] .branch-tab{position:static;display:block;width:100%;min-height:44px;margin-top:12px;border-radius:10px}
+ html[data-v41-screen=book] .branch-tab[hidden]{display:none}
+}
+
+html[data-v41-screen=shelf] .hero{min-height:0;height:auto}
+html[data-v41-screen=book] .binding-light{pointer-events:none}
