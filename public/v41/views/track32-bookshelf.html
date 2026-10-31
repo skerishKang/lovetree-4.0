@@ -149,17 +149,19 @@
     .book-card.is-center { background: rgba(255,252,247,.86); box-shadow: 0 18px 32px rgba(75,52,45,.16); }
     .book-card button { display: flex; flex-direction: column; align-items: center; width: 100%; height: 100%; border: 0; background: transparent; }
     .book-cover { position: relative; width: 140px; height: 210px; overflow: hidden; border-radius: 3px 8px 7px 3px; color: var(--cover-ink,#fff9ef); background: var(--cover,#6b5873); box-shadow: 10px 14px 20px rgba(62,42,39,.25),inset 8px 0 0 rgba(0,0,0,.12); transform: rotateY(-9deg) rotateZ(var(--tilt,0deg)); transform-style: preserve-3d; transition: .35s ease; }
-    .book-cover::before { content: ""; position: absolute; inset: 11px; border: 1px solid rgba(255,255,255,.48); }
+    .book-cover-media { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; filter: saturate(.78) brightness(.62); opacity: .78; }
+    .book-cover > :not(.book-cover-media), .cover-front > :not(.book-cover-media) { z-index: 2; }
+    .book-cover::before { content: ""; position: absolute; inset: 11px; z-index: 3; border: 1px solid rgba(255,255,255,.48); }
     .book-cover::after { content: ""; position: absolute; left: 14px; top: 16px; bottom: 16px; width: 1px; background: rgba(255,255,255,.28); }
     .book-card:hover .book-cover, .book-card.is-center .book-cover { transform: rotateY(0) rotateZ(0) translateY(-8px) scale(1.035); box-shadow: 12px 19px 25px rgba(62,42,39,.29); }
     .cover-number { position: absolute; left: 19px; top: 18px; font: 700 9px var(--latin); letter-spacing: .12em; opacity: .78; }
     .cover-symbol { position: absolute; left: 50%; top: 43%; display: grid; place-items: center; width: 54px; height: 54px; border: 1px solid rgba(255,255,255,.62); border-radius: 50% 0; transform: translate(-50%,-50%) rotate(45deg); }
     .cover-symbol span { font-size: 23px; transform: rotate(-45deg); }
-    .cover-title { position: absolute; left: 19px; right: 12px; bottom: 31px; z-index: 1; font: 700 16px/1.15 var(--display); text-align: center; letter-spacing: -.06em; }
-    .cover-subtitle { position: absolute; left: 15px; right: 15px; bottom: 14px; z-index: 1; font: 700 8px var(--latin); letter-spacing: .06em; text-align: center; opacity: .76; }
+    .cover-title { position: absolute; left: 19px; right: 12px; bottom: 31px; z-index: 1; display: -webkit-box; max-height: 3.45em; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 3; font: 700 16px/1.15 var(--display); text-align: center; letter-spacing: -.06em; }
+    .cover-subtitle { position: absolute; left: 15px; right: 15px; bottom: 14px; z-index: 1; overflow: hidden; font: 700 8px var(--latin); letter-spacing: .06em; text-align: center; text-overflow: ellipsis; white-space: nowrap; opacity: .76; }
     .book-card-meta { display: grid; gap: 3px; margin-top: 11px; text-align: center; }
-    .book-card-meta strong { font: 700 16px var(--display); }
-    .book-card-meta span { color: var(--muted); font-size: 10px; }
+    .book-card-meta strong { display: -webkit-box; max-height: 3.45em; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 3; font: 700 16px/1.15 var(--display); }
+    .book-card-meta span { display: -webkit-box; max-height: 2.8em; overflow: hidden; color: var(--muted); font-size: 10px; line-height: 1.4; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
     .book-tags { display: flex; justify-content: center; gap: 4px; margin-top: 7px; }
     .book-tags span { padding: 4px 7px; border-radius: 999px; color: var(--cover-accent,var(--rose-deep)); background: rgba(255,255,255,.67); font-size: 9px; }
     .empty { width: 100%; padding: 120px 20px; color: var(--muted); text-align: center; }
@@ -346,7 +348,7 @@
       .reader-info h2 { font-size: 27px; }
     }
   </style>
-<style>#newBookButton{display:none!important}</style><style>[data-filter="kpop"],[data-filter="actor"],[data-filter="series"]{display:none!important}</style><link rel="stylesheet" href="../reader-layout.css"><link rel="stylesheet" href="../identity.css"></head>
+<style>#newBookButton{display:none!important}</style><link rel="stylesheet" href="../reader-layout.css"><link rel="stylesheet" href="../identity.css"></head>
 <body>
   <div class="app">
     <header class="topbar">
@@ -382,12 +384,6 @@
         </section>
         <div class="shelf-controls">
           <div class="search"><input id="searchInput" type="search" placeholder="사람이나 순간 검색" aria-label="책 검색" /></div>
-          <div class="filter-row" role="group" aria-label="책 분류">
-            <button class="filter active" type="button" data-filter="all">전체</button>
-            <button class="filter" type="button" data-filter="kpop">K-pop</button>
-            <button class="filter" type="button" data-filter="actor">배우</button>
-            <button class="filter" type="button" data-filter="series">작품·캐릭터</button>
-          </div>
           <span class="count" id="resultCount"></span>
         </div>
         <section class="shelf-viewport" id="shelfViewport" aria-label="내 책장">
@@ -412,6 +408,7 @@
               <div class="book-3d" id="book3d" tabindex="0" aria-label="책 표지. 누른 채 오른쪽으로 움직여 책 열기">
                 <div class="book-cover-face" id="bookCoverFace">
                   <div class="cover-front">
+                    <img id="coverMedia" class="book-cover-media" alt="" hidden>
                     <span class="cover-number">순간의 기록</span>
                     <span class="cover-symbol"><span>♡</span></span>
                     <strong class="cover-title" id="coverTitle">책</strong>
@@ -479,7 +476,7 @@
       var $ = function (selector) { return document.querySelector(selector); };
       var $$ = function (selector) { return Array.prototype.slice.call(document.querySelectorAll(selector)); };
       var sourceLabel = 'bookmarks_LIKE_only_2026-07-28.html';
-      var books = LTDEMO.library.map(function(tree,index){var color=['#a84f5d','#627ba2','#8d705e','#6d8979'][index%4];return {id:tree.id,name:tree.title,english:'순간의 기록',category:'all',color:color,accent:color,symbol:'✦',description:'선택한 트리의 기록입니다.',tags:['순간','기록'],chapters:tree.moments.map(m=>({title:m.title,url:m.externalUrl||'',mood:m.emotion,note:m.memo||m.whyNext||'',id:m.id,type:m.type,image:m.image||''}))};});
+      var books = LTDEMO.library.map(function(tree,index){var color=['#a84f5d','#627ba2','#8d705e','#6d8979'][index%4],cover=tree.moments.find(function(moment){return moment.id===tree.coverMomentId;}),coverMedia=cover&&cover.type==='photo'?cover.image||'':'';return {id:tree.id,name:tree.title,subject:tree.subject||'',english:cover?cover.title:'기본 표지',category:'all',color:color,accent:color,symbol:'✦',coverMedia:coverMedia,description:tree.subject?'좋아하는 대상 · '+tree.subject:'좋아하는 대상을 기록한 책입니다.',tags:[tree.subject||'좋아하는 대상'],chapters:tree.moments.map(m=>({title:m.title,url:m.externalUrl||'',mood:m.emotion,note:m.memo||m.whyNext||'',id:m.id,type:m.type,image:m.image||''}))};});
       var state = { filter:'all', query:'', selectedId:null, shelfIndex:0, shelfList:[], chapterIndex:0, open:false, openProgress:0, customBooks:[], pageTurning:false };
       var storageKey = 'lovetree-people-book-shelf-v2-1-true-page-motion';
       var drag = { active:false, mode:'', startX:0, startY:0, moved:false, startProgress:0 };
@@ -500,7 +497,6 @@
       function esc(value) { return String(value || '').replace(/[&<>"']/g,function (char) { return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'})[char]; }); }
       function youtubeId(url) { var match = String(url || '').match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|shorts\/|embed\/))([^?&/]+)/i); return match ? match[1] : ''; }
       function showToast(message) { var toast=$('#toast'); toast.textContent=message; toast.classList.add('show'); clearTimeout(showToast.timer); showToast.timer=setTimeout(function(){toast.classList.remove('show');},2400); }
-      function categoryLabel(category) { return category === 'kpop' ? 'K-pop' : category === 'actor' ? '배우' : category === 'series' ? '작품·캐릭터' : 'LoveTree'; }
       function coverStyle(book) { return '--cover:'+book.color+';--cover-accent:'+book.accent+';--tilt:'+((book.id.length%5)-2)+'deg;'; }
       function openModal(id) { $('#'+id).classList.remove('hidden'); }
       function closeModal(id) { $('#'+id).classList.add('hidden'); }
@@ -518,9 +514,9 @@
         $('#resultCount').textContent=list.length+'권';
         $('#shelfRail').innerHTML=list.length?list.map(function(book,index){
           return '<article class="book-card" data-book-index="'+index+'"><button type="button" data-book-id="'+esc(book.id)+'" aria-label="'+esc(book.name)+' 기억책 열기">'+
-            '<div class="book-cover" style="'+coverStyle(book)+'"><span class="cover-number">책 · '+String(index+1).padStart(2,'0')+'</span><span class="cover-symbol"><span>'+esc(book.symbol)+'</span></span><strong class="cover-title">'+esc(book.name)+'</strong><small class="cover-subtitle">'+esc(book.english)+'</small></div>'+
-            '<span class="book-card-meta"><strong>'+esc(book.name)+'</strong><span>'+book.chapters.length+'개 순간 · '+esc(categoryLabel(book.category))+'</span></span></button><div class="book-tags">'+book.tags.slice(0,2).map(function(tag){return '<span>'+esc(tag)+'</span>';}).join('')+'</div></article>';
-        }).join(''):'<div class="empty"><strong>아직 이 책장에는 없어요.</strong><span>다른 검색어나 분류를 선택해 보세요.</span></div>';
+            '<div class="book-cover" style="'+coverStyle(book)+'">'+(book.coverMedia?'<img class="book-cover-media" src="'+esc(book.coverMedia)+'" alt="" loading="lazy" referrerpolicy="no-referrer">':'')+'<span class="cover-number">책 · '+String(index+1).padStart(2,'0')+'</span><span class="cover-symbol"><span>'+esc(book.symbol)+'</span></span><strong class="cover-title">'+esc(book.name)+'</strong><small class="cover-subtitle">'+esc(book.english)+'</small></div>'+
+            '<span class="book-card-meta"><strong>'+esc(book.name)+'</strong><span>'+book.chapters.length+'개 순간 · '+esc(book.subject||'좋아하는 대상')+'</span></span></button><div class="book-tags">'+book.tags.slice(0,2).map(function(tag){return '<span>'+esc(tag)+'</span>';}).join('')+'</div></article>';
+        }).join(''):'<div class="empty"><strong>찾는 책이 없어요.</strong><span>트리 이름·좋아하는 대상·순간 제목으로 검색해 보세요.</span></div>';
         updateCarousel(false);
       }
       function setShelfAtmosphere(book) {
@@ -574,6 +570,7 @@
         cover.style.setProperty('--cover',book.color);
         cover.style.setProperty('--cover-accent',book.accent);
         cover.style.setProperty('--tilt','0deg');
+        var coverMedia=$('#coverMedia');if(book.coverMedia){coverMedia.src=book.coverMedia;coverMedia.hidden=false;}else{coverMedia.hidden=true;coverMedia.removeAttribute('src');}
         cover.querySelector('.cover-symbol span').textContent=book.symbol;
         $('#coverTitle').textContent=book.name;
         $('#coverSubtitle').textContent=book.english;
@@ -686,7 +683,7 @@
         var cover=document.createElement('div');
         cover.className='book-cover';
         cover.style.setProperty('--cover',getBook(state.selectedId)?.color||'#6b5873');
-        cover.innerHTML='<span class="cover-number">순간의 기록</span><span class="cover-symbol"><span>'+esc(getBook(state.selectedId)?.symbol||'♡')+'</span></span><strong class="cover-title">'+esc(getBook(state.selectedId)?.name||'LoveTree')+'</strong><small class="cover-subtitle">'+esc(getBook(state.selectedId)?.english||'순간의 기록')+'</small>';
+        var selected=getBook(state.selectedId);cover.innerHTML=(selected?.coverMedia?'<img class="book-cover-media" src="'+esc(selected.coverMedia)+'" alt="" referrerpolicy="no-referrer">':'')+'<span class="cover-number">순간의 기록</span><span class="cover-symbol"><span>'+esc(selected?.symbol||'♡')+'</span></span><strong class="cover-title">'+esc(selected?.name||'LoveTree')+'</strong><small class="cover-subtitle">'+esc(selected?.english||'순간의 기록')+'</small>';
         source.appendChild(cover);
         document.body.appendChild(source);
         function place(rect){source.style.left=rect.left+'px';source.style.top=rect.top+'px';source.style.width=rect.width+'px';source.style.height=rect.height+'px';}
