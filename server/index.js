@@ -2,11 +2,13 @@ import { createPrivateMediaStore, createMediaHandler } from './private-media.js'
 import { createServer } from 'node:http';
 import { pathToFileURL } from 'node:url';
 import { createPool, createWorkspaceRepo } from './db/postgres.js';
+import { createShareRepo } from './db/shares-postgres.js';
 import { createAdminRoleRepo } from './db/admin-roles-postgres.js';
 import { createAdminRoleService } from './admin-roles.js';
 import { resolveListen } from './listen-config.js';
 import { createApiHandler, createNodeHandler } from './http.js';
 import { createWorkspaceService } from './workspace-service.js';
+import { createShareService, createShareHandler } from './share-service.js';
 import { createPadiemAuthorityAuth } from './padiem-authority-auth.js';
 import { createSharedAccessAuth, sharedAuthEnabled } from './padiem-access-auth.mjs';
 import { createAuthorityRelayClient } from './authority-relay-transport.js';
@@ -133,6 +135,11 @@ const authenticate = createSharedAccessAuth({ enabled: sharedAuthEnabled(LOVETRE
 // #67 제품 역할. 표가 아직 없거나 저장이 망가진 자리에서는 역할 없음으로 닫힌다(fail-closed).
 const admin = createAdminRoleService({ store: createAdminRoleRepo(pool), productId: LOVETREE_PRODUCT_ID });
 const storageHandler = createApiHandler({ authenticate, service, productId: LOVETREE_PRODUCT_ID, maxBodyBytes, admin });
+const shareHandler = createShareHandler({
+ authenticate,
+ service: createShareService({ shareRepo: createShareRepo(pool), workspaceRepo: repo, productId: LOVETREE_PRODUCT_ID }),
+ productId: LOVETREE_PRODUCT_ID
+});
 const login = await buildLogin(pool);
 const mediaHandler = createMediaHandler({
  authenticate, productId: LOVETREE_PRODUCT_ID,
@@ -141,8 +148,10 @@ const mediaHandler = createMediaHandler({
 });
 
 const requestHandler = async (request) => {
-  if (String(request.path ?? '').startsWith('/auth/')) return loginRoute(login, request);
-  if (String(request.path ?? '').startsWith('/api/media')) return mediaHandler(request);
+  const path = String(request.path ?? '');
+  if (path.startsWith('/auth/')) return loginRoute(login, request);
+  if (path.startsWith('/api/media')) return mediaHandler(request);
+  if (path.startsWith('/api/shares') || path.startsWith('/api/public/shares/')) return shareHandler(request);
   return storageHandler(request);
 };
 

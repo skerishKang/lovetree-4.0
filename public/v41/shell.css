@@ -24,3 +24,9 @@ body.home-screen .app-header{display:none}
 
 .quick-entry-lead{margin:0 0 18px;padding:12px 14px;border:1px solid #e9bdcd33;border-radius:12px;background:#e9bdcd0b;color:#eee2e8!important}.quick-entry-hint{min-height:24px;margin:4px 0 14px!important;padding-left:12px;border-left:2px solid #e9bdcd66;color:#d7c6d1!important}.quick-entry-hint:empty{display:none}
 .management-block{padding-bottom:22px}.management-block+.management-block{padding-top:22px;border-top:1px solid var(--line)}.management-block label{display:block;margin:14px 0;font-size:13px;color:#cfbfcc}.management-block input{display:block;width:100%;min-height:44px;margin-top:8px;padding:11px 12px;border:1px solid #746077;border-radius:10px;background:#120f16;color:#fff;line-height:1.6}#parent-current{margin:0;color:#f4e5eb;font-weight:600}#parent-management[hidden]{display:none}@media(max-width:780px){.management-block input,#tree-form input,#tree-form select{font-size:16px}}
+
+/* Explicit sharing keeps the established dark rose panels and 44px controls. */
+#share-panel{width:min(620px,calc(100vw - 24px))}.share-warning{margin:16px 0;padding:14px;border:1px solid #d9a66f66;border-radius:12px;background:#d9a66f10}.share-warning p{margin:6px 0 0}.share-url{display:flex;gap:8px}.share-url input{flex:1;min-width:0}.share-url button{flex:0 0 auto}.share-item{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line)}.share-item small{display:block;color:var(--muted);margin-top:4px}.share-item button{min-height:44px}.share-revoked{opacity:.62}#share-preview-moments{max-height:220px;overflow:auto;padding-left:22px}#share-preview-moments li{margin:8px 0;color:#e8dce4}@media(max-width:780px){#share-menu{min-width:44px}.share-url{display:grid;grid-template-columns:1fr}.share-url button{width:100%}}
+
+/* The HTML hidden state must win over shared button/display rules. */
+[hidden]{display:none!important}
