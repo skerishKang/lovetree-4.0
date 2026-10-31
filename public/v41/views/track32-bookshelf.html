@@ -445,7 +445,7 @@
             <p class="eyebrow" id="readerEyebrow">VOLUME · LOVE TREE</p>
             <h2 id="readerTitle">책 제목</h2>
             <p id="readerDescription">책을 열기 전에 오른쪽에서 챕터 목록을 먼저 골라볼 수 있어요.</p>
-            <div class="info-rule"><strong>책 속의 트리</strong><span>각 장은 예시 트리에 담긴 사진, 영상 예시, 메모와 링크입니다.</span></div>
+            <div class="info-rule"><strong>책 속의 트리</strong><span>각 장에서 같은 트리의 순간을 이어서 읽습니다.</span></div>
             <div class="chapter-heading"><strong>챕터 목록</strong><span id="chapterCount">0 chapters</span></div>
             <div class="chapter-list" id="chapterList"></div>
             <div class="reader-info-foot"><strong>사용 방법</strong><br />표지 위에서 마우스를 누르고 오른쪽으로 움직여 책을 열어요. 열린 뒤에는 책장 위를 좌우로 끌거나 아래 화살표로 한 장씩 넘겨요.</div>
@@ -472,7 +472,7 @@
     </section>
   </div>
 
-  <script src="../runtime.js"></script>
+  <script src="../runtime.js"></script><script src="../view-navigation.js"></script>
 <script>
     (function () {
       'use strict';
@@ -516,7 +516,7 @@
         else state.shelfIndex=Math.max(0,Math.min(state.shelfIndex,list.length-1));
         $('#resultCount').textContent=list.length+'권';
         $('#shelfRail').innerHTML=list.length?list.map(function(book,index){
-          return '<article class="book-card" data-book-index="'+index+'"><button type="button" data-book-id="'+esc(book.id)+'" aria-label="'+esc(book.name)+' 책 선택">'+
+          return '<article class="book-card" data-book-index="'+index+'"><button type="button" data-book-id="'+esc(book.id)+'" aria-label="'+esc(book.name)+' 기억책 열기">'+
             '<div class="book-cover" style="'+coverStyle(book)+'"><span class="cover-number">VOLUME · '+String(index+1).padStart(2,'0')+'</span><span class="cover-symbol"><span>'+esc(book.symbol)+'</span></span><strong class="cover-title">'+esc(book.name)+'</strong><small class="cover-subtitle">'+esc(book.english)+'</small></div>'+
             '<span class="book-card-meta"><strong>'+esc(book.name)+'</strong><span>'+book.chapters.length+'개 챕터 · '+esc(categoryLabel(book.category))+'</span></span></button><div class="book-tags">'+book.tags.slice(0,2).map(function(tag){return '<span>'+esc(tag)+'</span>';}).join('')+'</div></article>';
         }).join(''):'<div class="empty"><strong>아직 이 책장에는 없어요.</strong><span>다른 검색어나 분류를 선택해 보세요.</span></div>';
@@ -601,7 +601,7 @@
         var label=({photo:'사진',video:'영상 예시',memo:'메모',link:'링크'})[type]||'순간';
         var art=chapter.image?'<img src="'+esc(chapter.image)+'" alt="" loading="lazy" />':'<span class="poster-caption">기록해 둔 마음</span>';
         var info=type==='video'?'<span class="poster-caption">영상의 예시 이미지입니다</span>':'';
-        return '<div class="page-video"><span class="page-label">CHAPTER · '+String(index+1).padStart(2,'0')+' · '+esc(chapter.mood)+'</span><div class="video-holder"><div class="video-poster">'+art+info+'</div></div><h3>'+esc(chapter.title)+'</h3><p>'+esc(chapter.note)+'</p><span class="poster-caption">'+esc(label)+' · 보기 전용 예시</span></div>';
+        return '<div class="page-video"><span class="page-label">CHAPTER · '+String(index+1).padStart(2,'0')+' · '+esc(chapter.mood)+'</span><div class="video-holder"><div class="video-poster">'+art+info+'</div></div><h3>'+esc(chapter.title)+'</h3><p>'+esc(chapter.note)+'</p><span class="poster-caption">'+esc(label)+' · 내 기록</span></div>';
       }
       function clearVideo() {
         $$('#rightPage iframe, #sheetFront iframe, #sheetBack iframe').forEach(function(frame){frame.remove();});
@@ -708,6 +708,7 @@
         renderReader();
         var targetRect=$('#bookCoverFace').getBoundingClientRect();
         animateSharedBook(sourceRect,targetRect,function(){
+          if(LTDEMO.openBook){LTDEMO.openBook(LTDEMO.get());return;}
           $('#shelfScreen').style.display='none';
           $('#shelfScreen').classList.remove('is-leaving');
           $('#readerScreen').classList.remove('is-preparing');
@@ -822,6 +823,7 @@
       }
       function bindShelfDrag() {
         var rail=$('#shelfRail');
+        rail.addEventListener('click',function(event){if(event.detail===0){var card=event.target.closest('[data-book-index]');if(card)selectShelfIndex(Number(card.dataset.bookIndex));}});
         rail.addEventListener('pointerdown',function(event){
           var card=event.target.closest('.book-card');
           shelfDrag.active=true;shelfDrag.startX=event.clientX;shelfDrag.moved=false;shelfDrag.downIndex=card?Number(card.dataset.bookIndex):null;shelfDrag.startIndex=state.shelfIndex;
@@ -844,7 +846,7 @@
         rail.addEventListener('pointercancel',function(){if(!shelfDrag.active)return;shelfDrag.active=false;rail.classList.remove('dragging');state.shelfIndex=Math.round(state.shelfIndex);updateCarousel();});
       }
       function bind() {
-        $('#shelfJump').addEventListener('click',function(){state.query='';state.filter='all';$('#searchInput').value='';$$('.filter').forEach(function(item){item.classList.toggle('active',item.dataset.filter==='all');});renderShelf();var book=$('#shelfRail button[data-book-id]');if(book){book.scrollIntoView({block:'center'});book.focus({preventScroll:true});}});
+        $('#shelfJump').addEventListener('click',function(){state.query='';state.filter='all';$('#searchInput').value='';$$('.filter').forEach(function(item){item.classList.toggle('active',item.dataset.filter==='all');});renderShelf();var book=$('#shelfRail button[data-book-id]');if(book)openReader(book.dataset.bookId,book.closest('.book-card'));});
         $('#searchInput').addEventListener('input',function(event){state.query=event.target.value;renderShelf();});
         $$('.filter').forEach(function(button){button.addEventListener('click',function(){state.filter=button.dataset.filter;$$('.filter').forEach(function(item){item.classList.toggle('active',item===button);});renderShelf();});});
         $('#shelfPrev').addEventListener('click',function(){moveShelf(-1);});

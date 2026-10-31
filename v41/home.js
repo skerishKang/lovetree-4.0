@@ -15,6 +15,8 @@ if(presentation.canResume){
  primary.dataset.do='member-continue';primary.textContent='이어 보던 순간';primary.onclick=bridge.actions.resume;
  secondary.dataset.do='new';secondary.textContent='새 트리 만들기';
 }
+shadow.querySelector('[data-do=trees]').textContent='내 책장';
+if(!presentation.canResume)shadow.querySelector('.primary-cta').textContent='첫 순간 남기기';
 shadow.querySelector('.center-note').textContent='배경 카드는 감상 예시 · 내 기록에는 저장되지 않아요';
 const mobileFit=document.createElement('style');mobileFit.textContent='@media(max-width:650px){.topbar{gap:8px}.top-actions{gap:6px;flex-shrink:0}.topbar .menuBtn{white-space:nowrap;padding:10px 9px;font-size:10px}.brand{letter-spacing:.08em}}';shadow.append(mobileFit);
 shadow.querySelector('[data-home-account]').onclick=bridge.actions.account;

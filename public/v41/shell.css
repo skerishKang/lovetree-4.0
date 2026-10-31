@@ -9,3 +9,7 @@
 
 /* Keep the original 4.0 full-viewport composition on the welcome screen. */
 body.home-screen .app-header{display:none}
+
+/* Site destinations and views of the selected tree have separate roles. */
+.tree-views{display:flex;align-items:center;gap:4px;margin-left:12px;padding-left:12px;border-left:1px solid var(--line)}.tree-views>small{font-size:11px;white-space:nowrap;color:var(--muted);margin-right:5px}.tree-views[hidden],#connection-menu[hidden]{display:none!important}
+@media(max-width:780px){.tree-views{flex:3;margin-left:4px;padding-left:4px;gap:0}.tree-views>small{display:none}nav>button{flex:1}.tree-views>button{padding:0 8px}.header-actions{min-width:0}.header-actions #write-menu{max-width:96px;overflow:hidden;text-overflow:ellipsis}}
