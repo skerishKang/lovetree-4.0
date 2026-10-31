@@ -518,3 +518,11 @@ Vite + 표준 JavaScript 모듈. `src/domain.js`는 데이터 규칙, `src/stora
 구현 PR #127: head `b67ed23d02c66d58163515d77eb792ed734324b4`, merge `80288c2c6184544edc56cdce65aa0d0d51f5e27b`, main CI `41228425641`, Pages `a4a2c45a-180d-42c7-aec3-0163f026c85f`. 최초 운영 검증에서 디자인 예시 iframe의 `LTMedia is not defined` 및 남은 고정 필터를 발견해 완료 처리하지 않고 후속 PR #128로 수정했다. 후속 head `8ec979ee5910bd0a5a8951b622e87861b7ee0594`, merge `a1463ffd210eedaca584174316081f6179658f60`, PR/branch CI `41228928592`·`41228913176`, main CI `41229034060`, Pages `2f67dc06-2bd3-4d3a-89d6-7845fb245277`.
 
 최종 전체 `npm run check`: 256 subtests / 255 tests + 1 suite, 222 pass, 0 fail, 33 환경 의존 skip, Vite build 성공. 공식 Tabbit CLI로 운영 `https://lovetree-4-0.pages.dev/v41/#shelf`를 1440×900·390×844에서 재검증했고 책 카드 1, 고정 필터 0, 가로 넘침 0, pageerror 0이었다. 격리 fixture에서 긴 제목·사진 대표·대표 없음·영상 대체 표지, 대상 검색 3→1, 관리 dialog와 44px 조작 영역을 확인했다. 실제 Google 로그인·실회원 저장 E2E, 실기기·스크린리더 검증은 사람 조작이 필요한 미검증 범위이며 완료로 간주하지 않는다. 기존 실제 사용자 기록과 COM2는 변경하지 않았다.
+
+## 2026-11-01 — LoveTree 4.1 선택·읽던 위치/주소 완료 (#119)
+
+4.1 회원 기록은 로그인 주체별로 마지막 트리·순간·보기를 포인터만 저장하고, 새로고침·재진입 때 같은 위치로 돌아간다. 소유자 전용 주소는 `#my/<view>?tree=…&moment=…`이며 선택·보기 변경을 history에 남겨 뒤로/앞으로도 같은 위치를 복원한다. URL ID는 현재 계정의 서버 workspace 안에서 다시 검증한다. 삭제·미존재·현재 계정에 없는 ID는 최근 위치 또는 트리 시작 순간으로 대체하고 안내한다. `#share/…`는 공개 범위로 분리해 account 쿼리나 로그인 쿠키 조건이 있어도 비공개 workspace를 자동으로 읽지 않는다. 저장 포인터와 로그인 왕복용 sessionStorage에는 subject/treeId/momentId/view만 두고 기록 본문·인증 비밀은 넣지 않았다. 서버 state 스키마와 COM2는 변경하지 않았다.
+
+PR #130: head `fa93ac1f202687882aee8bdcc29ae62418f0dbe0`, merge `0ddb67e2bc6064b710a301a1bfe6f3bbefd7258c`. PR/branch CI `41231028832`·`41231005514`, main CI `41231110576` 모두 PostgreSQL·Ubuntu·Windows 성공. Cloudflare preview `04bc91d5-1237-408c-bc67-55ab45bd13e0`, production `3eb33d71-c4b8-46b3-8648-0bfa44a31ab1`.
+
+전체 `npm run check`: 261 subtests / 260 tests + 1 suite, 227 pass, 0 fail, 33 환경 의존 skip, Vite build 성공. 공식 Tabbit CLI 격리 fixture에서 1440×900·390×844, 직접 주소, 새로고침, 트리 왕복, 순간 삭제, 뒤로/앞으로, 계정 A/B 전환을 확인했고 가로 넘침 0, 390px 조작 높이 44px, pageerror 0이었다. 운영에서는 `https://lovetree-4-0.pages.dev/v41/?account=1#share/prod-smoke/book`가 workspace 요청 0·비공개 컨텍스트 null임을 PC/390px에서 확인했고, 소유자 주소는 강제 401 실패 fixture에서 로그인 안내와 포인터만 유지했다. 실제 Google 로그인·실회원 재로그인 E2E, 실기기·스크린리더는 사람 조작이 필요한 미검증 범위이며 완료로 간주하지 않는다.
