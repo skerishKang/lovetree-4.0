@@ -1,10 +1,10 @@
 import {workspaceModel} from './workspace-model.mjs';
 import {createWorkspaceApi} from './api.mjs';
-import {createServerReader} from './server-reader.mjs';
+import {createMemberSession} from './member-session.mjs';
 import {exampleTree} from './example.mjs';
 const $=id=>document.getElementById(id);
 const screens=[['home','src064-orbit.html','첫 화면'],['shelf','track32-bookshelf.html','내 책장'],['book','track59-sketchbook.html','기억책'],['board','track58-pinboard.html','기억 보드'],['network','track56-network.html','관계 지도']];
-let model=null,current=screens.find(s=>'#'+s[0]===location.hash)?.[1]||screens[0][1],source='example',loadGeneration=0,toastTimer;
+let model=null,current=screens.find(s=>'#'+s[0]===location.hash)?.[1]||screens[0][1],source='example',loadGeneration=0,toastTimer,previousDirty=false,member=null,editorMode='new',formBaseline='';
 window.LT41=null;
 function notify(text){$('record-feedback').textContent=text;$('toast').textContent=text;$('toast').hidden=$('records').open;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').hidden=true,6500);}
 function panel(id){const target=$(id);if(!target.open)target.showModal();}
@@ -14,22 +14,50 @@ function links(){const c=window.LT41;$('connections').replaceChildren();if(!c){$
  if(!edges.length){const p=document.createElement('p');p.textContent='아직 연결된 다른 순간이 없어요.';$('connections').append(p);}
  for(const e of edges){const id=e.from===c.momentId?e.to:e.from,m=c.tree.moments.find(m=>m.id===id),b=document.createElement('button'),kind=document.createElement('small'),title=document.createElement('span');kind.textContent=e.kind==='related'?'관련':e.from===c.momentId?'다음':'이전';title.textContent=m.title;b.append(kind,title);b.onclick=()=>{c.momentId=id;$('connection-panel').close();show(current,false);};$('connections').append(b);}}
 function show(file,write=true){if(!window.LT41)return;const screen=screens.find(s=>s[1]===file);if(!screen)return;current=file;document.querySelectorAll('[data-view]').forEach(b=>b.setAttribute('aria-current',String(b.dataset.view===file)));$('view').hidden=false;$('empty').hidden=true;$('view').title='러브트리 · '+screen[2];$('view').contentWindow.location.replace(new URL((source==='example'?'design/views/':'views/')+file,location.href).href);if(write&&location.hash!=='#'+screen[0])history.pushState(null,'','#'+screen[0]);links();}
-function choose(id){const tree=model.trees.find(t=>t.id===id);window.LT41=tree?{tree,momentId:tree.moments.find(m=>m.parentId===null).id,}:null;
+function choose(id,momentId){const tree=model.trees.find(t=>t.id===id);window.LT41=tree?{tree,source,momentId:tree.moments.find(m=>m.id===momentId)?.id||tree.moments.find(m=>m.parentId===null).id,}:null;
  if(tree)show(current,false);else{$('view').hidden=true;$('view').contentWindow.location.replace('about:blank');$('empty').hidden=false;links();}}
-function load(input,kind){model=kind==='example'?{trees:[exampleTree]}:workspaceModel(input);source=kind;$('source-label').textContent=kind==='example'?'예시 트리':kind==='server'?'내 기록':'파일 기록';$('record-description').textContent=kind==='example'?'실제 회원 데이터와 무관한 예시입니다.':kind==='server'?'로그인한 계정의 서버 기록 · 읽기 전용':'선택한 파일을 메모리에서 읽는 중입니다.';$('trees').replaceChildren();for(const t of model.trees){const o=document.createElement('option');o.value=t.id;o.textContent=t.title;$('trees').append(o);}$('trees').disabled=!model.trees.length;choose(model.trees[0]?.id);}
+function load(input,kind,selection={}){model=kind==='example'?{trees:[exampleTree]}:workspaceModel(input);source=kind;$('source-label').textContent=kind==='example'?'예시 트리':kind==='server'?'내 기록':'파일 기록';$('record-description').textContent=kind==='example'?'실제 회원 데이터와 무관한 예시입니다.':kind==='server'?'로그인한 계정의 서버 기록 · 작성·수정 후 자동 저장':'선택한 파일을 메모리에서 읽는 중입니다.';$('trees').replaceChildren();for(const t of model.trees){const o=document.createElement('option');o.value=t.id;o.textContent=t.title;$('trees').append(o);}$('trees').disabled=!model.trees.length;const chosen=model.trees.find(t=>t.id===selection.treeId)||model.trees[0];$('trees').value=chosen?.id||'';choose(chosen?.id,selection.momentId);}
 function clear(){load({revision:0,state:{version:1,trees:[]}},'file');$('source-label').textContent='기록 선택';$('record-description').textContent='펼쳐 볼 트리를 선택하세요.';}
-const reader=createServerReader({api:createWorkspaceApi(),onClear:clear,onDocument:d=>{load(d,'server');$('records').close();},onStatus:notify});
-function sample(){++loadGeneration;reader.cancel();load(null,'example');$('records').close();}
-$('record-menu').onclick=()=>{$('record-feedback').textContent='';panel('records');};$('connection-menu').onclick=()=>panel('connection-panel');$('empty-records').onclick=()=>panel('records');$('empty-sample').onclick=sample;
-$('sample').onclick=sample;$('clear').onclick=()=>{++loadGeneration;reader.cancel();$('file').value='';$('records').close();};
-$('server').onclick=()=>{++loadGeneration;reader.read();};$('logout').onclick=()=>{++loadGeneration;reader.logout();};
-$('file').onchange=async()=>{const f=$('file').files[0];if(!f)return;const generation=++loadGeneration;reader.cancel();try{if(f.size>4194304)throw Error('4MiB 이하 파일만 읽습니다.');const d=JSON.parse(await f.text());if(generation!==loadGeneration)return;load(d.state?d:{revision:0,state:d},'file');$('records').close();notify('파일을 열었어요. 서버에는 저장하지 않습니다.');}catch(e){if(generation===loadGeneration)notify('불러오기 실패: '+e.message);}};
+function stateSelection(){return {treeId:window.LT41?.tree.id,momentId:window.LT41?.momentId};}
+function formDirty(){return $('editor').open&&new URLSearchParams(new FormData($('moment-form'))).toString()!==formBaseline;}
+function canLeave(){return !(formDirty()||member?.snapshot().dirty)||confirm('아직 저장되지 않은 입력이 있어요. 현재 기록을 백업한 뒤 이동하는 것을 권합니다. 저장하지 않고 이동할까요?');}
+function leaveMember(){if(!canLeave())return false;member?.dispose();member=null;return true;}
+function memberStatus(status){
+ const failed=status.dirty&&['offline','rejected','conflict','login'].includes(status.phase);
+ $('save-feedback').hidden=!failed;$('save-message').textContent=failed?(status.detail||'서버에 저장하지 못했어요. 이 화면을 닫지 말고 다시 저장해 주세요.'):'';$('save-actions').replaceChildren();
+ if(failed){for(const a of status.actions.filter(a=>['retry','pull','force'].includes(a.name))){const b=document.createElement('button');b.textContent=a.label;b.onclick=async()=>{if(['pull','force'].includes(a.name)&&!confirm(a.name==='pull'?'미저장 변경을 버리고 서버 기록을 불러올까요?':'서버의 최신 기록을 현재 입력으로 덮어쓸까요? 다른 창의 변경이 사라질 수 있습니다.'))return;await member?.act(a.name);};$('save-actions').append(b);}const b=document.createElement('button');b.textContent='현재 기록 백업';b.onclick=backup;$('save-actions').append(b);}
+ if(status.phase==='checking')notify('내 서버 기록을 불러오고 있어요.');
+ else if(status.phase==='synced')notify(status.writable?(previousDirty?'서버에 저장됐어요.':'내 서버 기록을 불러왔어요.'):'기록을 읽었어요. 서버 편집 연결은 아직 준비되지 않았어요.');
+ else if(status.phase==='login'&&!status.dirty)notify('로그인이 필요해요.');
+ else if(!status.dirty&&status.phase==='offline')notify(status.detail||'서버 기록을 읽지 못했어요.');
+ $('account-entry').textContent=status.phase==='login'?'로그인':member?.snapshot().owned?'내 계정':'로그인';$('write-menu').textContent=status.dirty?'미저장 기록':'기록하기';$('empty-records').textContent=status.writable?'첫 트리 만들기':'내 기록 불러오기';previousDirty=status.dirty;
+}
+async function startMember(){if(!leaveMember())return;++loadGeneration;const generation=loadGeneration;clear();
+ const api=createWorkspaceApi({fetchImpl:(url,init)=>fetch(init?.method==='GET'&&url==='/api/workspace'?'/api/workspace?features=bound-writes':url,init)});
+ const session=createMemberSession({api,onState:(state,selection)=>{if(generation!==loadGeneration)return;load({revision:0,state},'server',selection||stateSelection());},onStatus:status=>{if(generation===loadGeneration)memberStatus(status);},navigate:url=>location.assign(url.startsWith('/auth/login')?'/auth/login?next=%2Fv41%2F%3Faccount%3D1':url)});member=session;await session.start();if(generation===loadGeneration&&session.snapshot().owned)$('records').close();}
+function sample(){if(!leaveMember())return;++loadGeneration;load(null,'example');$('save-feedback').hidden=true;$('records').close();}
+$('account-entry').onclick=e=>{if(member?.snapshot().owned){e.preventDefault();panel('records');}};$('record-menu').onclick=()=>{$('record-feedback').textContent='';panel('records');};$('connection-menu').onclick=()=>panel('connection-panel');$('empty-records').onclick=()=>member?.snapshot().writable?openEditor():panel('records');$('empty-sample').onclick=sample;
+$('sample').onclick=sample;$('clear').onclick=()=>{if(!leaveMember())return;++loadGeneration;clear();$('save-feedback').hidden=true;$('file').value='';$('records').close();};
+$('server').onclick=startMember;$('logout').onclick=async()=>{if(member){await member.act('logout');if(member.snapshot().dirty)notify('미저장 기록이 있어 로그아웃하지 않았어요. 다시 저장하거나 백업해 주세요.');}else{const answer=await createWorkspaceApi().logout();notify(answer.ok?'로그아웃했습니다.':'로그아웃하지 못했어요. 다시 시도해 주세요.');}};
+$('file').onchange=async()=>{const f=$('file').files[0];if(!f)return;if(!leaveMember())return;const generation=++loadGeneration;try{if(f.size>4194304)throw Error('4MiB 이하 파일만 읽습니다.');const d=JSON.parse(await f.text());if(generation!==loadGeneration)return;load(d.state?d:{revision:0,state:d},'file');$('records').close();notify('파일을 열었어요. 서버에는 저장하지 않습니다.');}catch(e){if(generation===loadGeneration)notify('불러오기 실패: '+e.message);}};
 $('trees').onchange=()=>{choose($('trees').value);$('records').close();};
-document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>$(b.dataset.close).close());
-for(const d of document.querySelectorAll('dialog'))d.addEventListener('click',e=>{if(e.target!==d)return;const r=d.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)d.close();});
+document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>{if(b.dataset.close==='editor'&&formDirty()&&!confirm('작성 중인 입력을 버리고 닫을까요?'))return;$(b.dataset.close).close();});
+for(const d of document.querySelectorAll('dialog'))d.addEventListener('click',e=>{if(e.target!==d||d.id==='editor')return;const r=d.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)d.close();});
 document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>show(b.dataset.view));
 addEventListener('popstate',()=>{const screen=screens.find(s=>'#'+s[0]===location.hash)||screens[0];show(screen[1],false);});
 addEventListener('hashchange',()=>{const screen=screens.find(s=>'#'+s[0]===location.hash);if(screen&&screen[1]!==current)show(screen[1],false);});
 addEventListener('message',e=>{if(e.origin!==location.origin||e.source!==$('view').contentWindow)return;if(e.data?.type==='lt41-navigate')show(e.data.view);if(e.data?.type==='lt-selection'||e.data?.type==='lt41-choose')links();});
 $('view').onload=()=>{const d=$('view').contentDocument;if(!d)return;d.addEventListener('click',e=>{const b=e.target.closest('button,a');if(!b)return;let file;if(b.matches('[data-action="tree"],[data-menu="tree"]'))file='track32-bookshelf.html';if(b.matches('#storyBook,[data-menu="book"]'))file='track59-sketchbook.html';if(current==='track56-network.html'&&b.id==='openMoment')file='track59-sketchbook.html';if(file){e.preventDefault();e.stopImmediatePropagation();show(file);}},true);};
 load(null,'example');
+
+function backup(){const data=member?.state();if(!data){notify('백업할 내 기록이 없어요.');return;}const a=document.createElement('a'),url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));a.href=url;a.download='lovetree-draft.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),0);}
+function setEditorMode(mode){if(formDirty()&&!confirm('현재 입력을 비우고 작업을 바꿀까요?'))return;const c=window.LT41,m=c?.tree.moments.find(m=>m.id===c.momentId);if(mode!=='new'&&!m){notify('먼저 순간을 선택해 주세요.');return;}editorMode=mode;const form=$('moment-form');form.reset();$('subject-label').hidden=mode!=='new';form.elements.subject.required=mode==='new';$('relation-label').hidden=mode==='new'||(mode==='edit'&&m?.parentId===null);for(const name of ['title','note','emotion','date','url','relation'])form.elements[name].value=mode==='edit'?m[name]||'':name==='emotion'?'설렘':name==='date'?new Date().toISOString().slice(0,10):'';
+ $('editor-context').textContent=mode==='new'?'새 트리의 첫 순간을 남깁니다.':`${mode==='add'?'이 순간에서 이어 씁니다':'선택한 순간을 수정합니다'} · ${m.title}`;$('form-error').textContent='';$('moment-management').hidden=mode!=='edit';$('related-target').replaceChildren();for(const other of c?.tree.moments||[]){if(other.id===m?.id)continue;const o=document.createElement('option');o.value=other.id;o.textContent=(m?.links?.includes(other.id)?'연결됨 · ':'')+other.title;$('related-target').append(o);}document.querySelectorAll('[data-mode]').forEach(b=>b.setAttribute('aria-current',String(b.dataset.mode===mode)));formBaseline=new URLSearchParams(new FormData(form)).toString();}
+function openEditor(){if(source!=='server'||!member?.snapshot().owned){notify('로그인한 뒤 내 서버 기록을 먼저 불러와 주세요.');panel('records');return;}if(!member.snapshot().writable){notify('서버 편집 연결이 아직 준비되지 않았어요. 기록은 안전하게 읽을 수 있습니다.');panel('records');return;}setEditorMode(window.LT41?'add':'new');panel('editor');}
+$('write-menu').onclick=openEditor;document.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>setEditorMode(b.dataset.mode));
+$('moment-form').onsubmit=e=>{e.preventDefault();try{member.apply(editorMode,Object.fromEntries(new FormData(e.target)),stateSelection());formBaseline=new URLSearchParams(new FormData(e.target)).toString();$('editor').close();notify('서버에 저장하고 있어요.');}catch(error){$('form-error').textContent=error.message;}};
+$('editor').addEventListener('cancel',e=>{if(formDirty()&&!confirm('작성 중인 입력을 버리고 닫을까요?'))e.preventDefault();});$('editor-cancel').onclick=()=>{if(!formDirty()||confirm('작성 중인 입력을 버리고 닫을까요?'))$('editor').close();};
+for(const [id,action] of [['link-moment','link'],['unlink-moment','unlink']])$(id).onclick=()=>{try{member.apply(action,{targetId:$('related-target').value},stateSelection());setEditorMode('edit');}catch(e){$('form-error').textContent=e.message;}};
+for(const [id,action,message] of [['delete-moment','delete','이 순간을 삭제할까요? 자식 순간은 이전 순간으로 이어지고 관련 연결은 해제됩니다.'],['delete-tree','deleteTree','이 트리와 모든 순간을 삭제할까요?']])$(id).onclick=()=>{if(!confirm(message))return;try{member.apply(action,{},stateSelection());$('editor').close();}catch(e){$('form-error').textContent=e.message;}};
+$('backup-draft').onclick=backup;addEventListener('beforeunload',e=>{if(member?.snapshot().dirty||formDirty()){e.preventDefault();e.returnValue='';}});
+if(new URLSearchParams(location.search).get('account')==='1')startMember();

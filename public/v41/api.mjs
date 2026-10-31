@@ -42,6 +42,7 @@ export function createWorkspaceApi({ fetchImpl = (...args) => globalThis.fetch(.
         message: payload?.error?.message ?? null,
         currentRevision: payload?.error?.currentRevision ?? undefined,
         revision: Number.isSafeInteger(payload?.revision) ? payload.revision : undefined,
+        writeSubjectBound: payload?.writeSubjectBound === true,
         subject: typeof payload?.subject === 'string' && payload.subject ? payload.subject : null,
         savedAt: payload?.savedAt ?? null,
         state: payload?.state ?? null
