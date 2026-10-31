@@ -398,5 +398,6 @@ window.__LT58V11={youtubeId,youtubeThumb,youtubeThumbUrl,openEdit,saveEdit,choos
 </script>
 <script>
 mobilePicker=LTMobileMoments({moments:LTDEMO.moments,selected:LTDEMO.get(),onSelect:id=>{focusBoardMoment(id,false);document.getElementById('detail').classList.remove('open');},onOpen:id=>selectMoment(id,true),openLabel:'순간 읽기',tone:'dark'});
+addEventListener('resize',()=>{if(innerWidth<700&&!cinema)focusBoardMoment(LTDEMO.get(),false);});
 matchMedia('(max-width:699px)').addEventListener('change',e=>{if(e.matches){focusBoardMoment(LTDEMO.get(),false);document.getElementById('detail').classList.remove('open');}});
 </script></body></html>
