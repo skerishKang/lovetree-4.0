@@ -1,10 +1,10 @@
 // Reuse Track32's cover transition, then read through the single Track59 reader.
 (() => {
  const c=parent.LT41;
- LTDEMO.openBook=id=>{
-  if(!c?.tree.moments.some(m=>m.id===id))return;
-  LTDEMO.select(id);
-  parent.postMessage({type:'lt41-navigate',view:'track59-sketchbook.html'},location.origin);
+ LTDEMO.library=(c?.trees||[c.tree]).map(t=>({id:t.id,title:t.title,moments:t.id===c.tree.id?LTDEMO.moments:t.moments.map(m=>({id:m.id,title:m.title,memo:m.note,emotion:m.emotion,date:m.date,externalUrl:m.url||'',type:m.url?'link':'memo',image:''}))}));
+ LTDEMO.openBook=(id,treeId=c.tree.id)=>{
+  if(!LTDEMO.library.some(t=>t.id===treeId&&t.moments.some(m=>m.id===id)))return;
+  parent.postMessage({type:'lt41-open-book',treeId,id},location.origin);
  };
  const apply=()=>{
   const shelf=location.pathname.includes('track32-bookshelf');

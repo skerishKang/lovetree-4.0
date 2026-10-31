@@ -479,13 +479,13 @@
       var $ = function (selector) { return document.querySelector(selector); };
       var $$ = function (selector) { return Array.prototype.slice.call(document.querySelectorAll(selector)); };
       var sourceLabel = 'bookmarks_LIKE_only_2026-07-28.html';
-      var books = [{id:'demo-tree',name:'좋아하는 순간들',english:'LOVE TREE · MEMORY',category:'kpop',color:'#a84f5d',accent:'#a84f5d',symbol:'✦',description:'첫 화면에서 만난 순간들이 한 권의 트리가 됩니다.',tags:['순간','기록','기억'],chapters:LTDEMO.moments.map(m=>({title:m.title,url:m.externalUrl||'',mood:m.emotion,note:m.memo||m.whyNext||'기억하고 싶은 순간',id:m.id,type:m.type,image:m.image||''}))}];
+      var books = LTDEMO.library.map(function(tree,index){var color=['#a84f5d','#627ba2','#8d705e','#6d8979'][index%4];return {id:tree.id,name:tree.title,english:'LOVE TREE · MEMORY',category:'kpop',color:color,accent:color,symbol:'✦',description:'선택한 트리의 기록입니다.',tags:['순간','기록'],chapters:tree.moments.map(m=>({title:m.title,url:m.externalUrl||'',mood:m.emotion,note:m.memo||m.whyNext||'',id:m.id,type:m.type,image:m.image||''}))};});
       var state = { filter:'all', query:'', selectedId:null, shelfIndex:0, shelfList:[], chapterIndex:0, open:false, openProgress:0, customBooks:[], pageTurning:false };
       var storageKey = 'lovetree-people-book-shelf-v2-1-true-page-motion';
       var drag = { active:false, mode:'', startX:0, startY:0, moved:false, startProgress:0 };
       var shelfDrag = { active:false, startX:0, moved:false, downIndex:null };
       try {
-        var saved = JSON.parse(localStorage.getItem(storageKey) || '{}');
+        var saved = {};
         state.selectedId = null;
         state.shelfIndex = Number.isInteger(saved.shelfIndex) ? saved.shelfIndex : 0;
         state.chapterIndex = Number.isInteger(saved.chapterIndex) ? saved.chapterIndex : 0;
@@ -493,9 +493,10 @@
         state.openProgress = 0;
         state.customBooks = [];
       } catch (error) {}
+      state.shelfIndex=Math.max(0,books.findIndex(book=>book.id===parent.LT41.tree.id));
       function allBooks() { return books.concat(state.customBooks); }
       function getBook(id) { return allBooks().find(function (book) { return book.id === id; }); }
-      function save() { if(state.selectedId==='demo-tree'&&LTDEMO.moments[state.chapterIndex])LTDEMO.select(LTDEMO.moments[state.chapterIndex].id); localStorage.setItem(storageKey, JSON.stringify({selectedId:state.selectedId,shelfIndex:state.shelfIndex,chapterIndex:state.chapterIndex,customBooks:state.customBooks})); }
+      function save() {} // Selection belongs to the shell; never persist another account's library.
       function esc(value) { return String(value || '').replace(/[&<>"']/g,function (char) { return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'})[char]; }); }
       function youtubeId(url) { var match = String(url || '').match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|shorts\/|embed\/))([^?&/]+)/i); return match ? match[1] : ''; }
       function showToast(message) { var toast=$('#toast'); toast.textContent=message; toast.classList.add('show'); clearTimeout(showToast.timer); showToast.timer=setTimeout(function(){toast.classList.remove('show');},2400); }
@@ -563,7 +564,7 @@
       }
       function selectShelfIndex(index) {
         if(index<0||index>=state.shelfList.length)return;
-        if(index!==state.shelfIndex){state.shelfIndex=index;save();updateCarousel();return;}
+        if(index!==state.shelfIndex){state.shelfIndex=index;updateCarousel();}
         var book=state.shelfList[index];
         if(book)openReader(book.id,getShelfCard(index));
       }
@@ -702,13 +703,13 @@
         if(!book)return;
         var source=sourceCard&&sourceCard.querySelector('.book-cover');
         var sourceRect=source?source.getBoundingClientRect():null;
-        state.selectedId=id;state.shelfIndex=Math.max(0,state.shelfList.findIndex(function(item){return item.id===id;}));state.chapterIndex=Math.max(0,LTDEMO.moments.findIndex(m=>m.id===LTDEMO.get()));state.open=false;state.openProgress=0;save();
+        state.selectedId=id;state.shelfIndex=Math.max(0,state.shelfList.findIndex(function(item){return item.id===id;}));state.chapterIndex=Math.max(0,book.chapters.findIndex(m=>m.id===LTDEMO.get()));state.open=false;state.openProgress=0;save();
         $('#shelfScreen').classList.add('is-leaving');
         $('#readerScreen').classList.add('active','is-preparing');
         renderReader();
         var targetRect=$('#bookCoverFace').getBoundingClientRect();
         animateSharedBook(sourceRect,targetRect,function(){
-          if(LTDEMO.openBook){LTDEMO.openBook(LTDEMO.get());return;}
+          if(LTDEMO.openBook){LTDEMO.openBook(book.chapters[state.chapterIndex].id,book.id);return;}
           $('#shelfScreen').style.display='none';
           $('#shelfScreen').classList.remove('is-leaving');
           $('#readerScreen').classList.remove('is-preparing');
@@ -846,7 +847,7 @@
         rail.addEventListener('pointercancel',function(){if(!shelfDrag.active)return;shelfDrag.active=false;rail.classList.remove('dragging');state.shelfIndex=Math.round(state.shelfIndex);updateCarousel();});
       }
       function bind() {
-        $('#shelfJump').addEventListener('click',function(){state.query='';state.filter='all';$('#searchInput').value='';$$('.filter').forEach(function(item){item.classList.toggle('active',item.dataset.filter==='all');});renderShelf();var book=$('#shelfRail button[data-book-id]');if(book)openReader(book.dataset.bookId,book.closest('.book-card'));});
+        $('#shelfJump').addEventListener('click',function(){state.query='';state.filter='all';$('#searchInput').value='';$$('.filter').forEach(function(item){item.classList.toggle('active',item.dataset.filter==='all');});renderShelf();var book=getShelfCard(state.shelfIndex)?.querySelector('button[data-book-id]');if(book)openReader(book.dataset.bookId,book.closest('.book-card'));});
         $('#searchInput').addEventListener('input',function(event){state.query=event.target.value;renderShelf();});
         $$('.filter').forEach(function(button){button.addEventListener('click',function(){state.filter=button.dataset.filter;$$('.filter').forEach(function(item){item.classList.toggle('active',item===button);});renderShelf();});});
         $('#shelfPrev').addEventListener('click',function(){moveShelf(-1);});
