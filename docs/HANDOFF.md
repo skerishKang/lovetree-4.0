@@ -526,3 +526,16 @@ Vite + 표준 JavaScript 모듈. `src/domain.js`는 데이터 규칙, `src/stora
 PR #130: head `fa93ac1f202687882aee8bdcc29ae62418f0dbe0`, merge `0ddb67e2bc6064b710a301a1bfe6f3bbefd7258c`. PR/branch CI `41231028832`·`41231005514`, main CI `41231110576` 모두 PostgreSQL·Ubuntu·Windows 성공. Cloudflare preview `04bc91d5-1237-408c-bc67-55ab45bd13e0`, production `3eb33d71-c4b8-46b3-8648-0bfa44a31ab1`.
 
 전체 `npm run check`: 261 subtests / 260 tests + 1 suite, 227 pass, 0 fail, 33 환경 의존 skip, Vite build 성공. 공식 Tabbit CLI 격리 fixture에서 1440×900·390×844, 직접 주소, 새로고침, 트리 왕복, 순간 삭제, 뒤로/앞으로, 계정 A/B 전환을 확인했고 가로 넘침 0, 390px 조작 높이 44px, pageerror 0이었다. 운영에서는 `https://lovetree-4-0.pages.dev/v41/?account=1#share/prod-smoke/book`가 workspace 요청 0·비공개 컨텍스트 null임을 PC/390px에서 확인했고, 소유자 주소는 강제 401 실패 fixture에서 로그인 안내와 포인터만 유지했다. 실제 Google 로그인·실회원 재로그인 E2E, 실기기·스크린리더는 사람 조작이 필요한 미검증 범위이며 완료로 간주하지 않는다.
+
+
+## 2026-11-01 — LoveTree 4.1 명시적 공유·회수 완료 (#120)
+
+공유는 기본 비공개를 유지하고 소유자가 미리보기한 한 권의 트리만 명시적으로 발행한다. 공개 응답은 서버가 최신 workspace에서 해당 트리만 투영하며, 다른 트리·계정 주체·비공개 업로드 URL은 포함하지 않는다. 미리보기 토큰이 없거나 그 뒤 내용이 바뀌면 발행을 거절한다. 공개 주소는 기억책·기억 보드·관계 지도 및 선택한 순간으로 바로 들어가며, 소유자 수정은 새로고침에 반영되고 회수 직후 다음 원본 요청부터 410과 `no-store`로 차단된다. 오래된 공개 기본값·과금·최소 공개 순간 규칙은 승계하지 않았고 발견/커뮤니티는 #121의 별도 opt-in 범위로 남겼다.
+
+구현 PR #132: head `c0e1261f07fd053761b9a8b2824b8b2ea6a35953`, merge `20eff7a43fcea02b87b6b30d579ab6455d1838eb`. PR/branch CI `41233355246`·`41233316387`, main CI `41233425407`, preview Pages `d23575f2-a423-4bc3-83c2-8daac7b0c7d0`. 배포 전 스키마 적용 검사가 새 테이블을 확인하지 않는 문제를 별도 PR #133으로 보완했다: head `6400c32e5fe95838421b985437ddfc1484e9f34a`, merge `977a55f818f12be1f3e3212e037d558e99039e88`, CI `41233585544`·`41233648543`, 최종 main CI `41233714485`, preview Pages `8208e699-7db4-40cb-a8a4-741385cac390`, production Pages `dbac8c22-8f83-4757-b9d2-b7812f90784f`.
+
+구현 worktree 전체 `npm run check`는 268 subtests / 267 tests + 1 suite, 233 pass, 0 fail, 34 환경 의존 skip 및 Vite build 성공. 공유 집중 시험은 23 tests, 22 pass, 0 fail, 로컬 PostgreSQL 1 skip였고 CI PostgreSQL lane은 skip 없이 성공했다. 배포 보완 회귀 시험 1건도 통과했다. 격리 fixture와 공식 Tabbit에서 미리보기→발행→비회원 감상→선택 보기 전환→회수→410, 공개 화면의 workspace 요청 0건·비공개 미디어 0건·다른 트리 0건, PC 1440×900·390×844 문서 가로 넘침 0과 모바일 핵심 조작 44px를 확인했다. 공유 화면에서 HTML `hidden`보다 강한 표시 규칙 때문에 소유자 버튼이 보이던 실제 오류도 `[hidden]` 규칙으로 수정 후 재검증했다.
+
+COM2에는 최종 merge `977a55f818f12be1f3e3212e037d558e99039e88`의 서버를 적용하고 `lovetree_shares`를 포함한 6개 테이블 검사를 모두 통과했으며 `lovetree-api.service` active와 설치 파일 일치를 확인했다. 운영 `https://lovetree-4-0.pages.dev/v41/`에서는 공식 Tabbit으로 잘못된 주소 `share_invalid`와 미존재 주소 `share_not_found`의 구분된 404·`no-store`, 공개 오류 화면의 소유자 기능 0·workspace 요청 0, PC/390px 문서 가로 넘침 0을 확인했다. 첫 화면의 `러브트리 · MEMORY ORBIT`, 40개 오빗 카드, 첫 순간, 금테(`rgb(242, 205, 124)`)와 광택도 보존됐다.
+
+실제 Google 로그인·실회원으로 운영 발행→비회원 감상→회수 E2E, 실기기·스크린리더 검증은 사람 조작이 필요해 수행하지 않았다. 인증 우회나 기존 실제 사용자 기록의 변경·삭제·자동 공개는 하지 않았다.
