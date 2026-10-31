@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createTree, addMoment, editMoment, removeMoment, validateState, validateMomentInput, suggestMomentTitle, importTrees, treeLayout, pathTo, stemGroups, linkMoments, unlinkMoments, relatedMoments, MAX_LINKS, safeUrl, newId } from '../src/domain.js';
+import { createTree, addMoment, editMoment, parentCandidates, reparentMoment, removeMoment, validateState, validateMomentInput, suggestMomentTitle, importTrees, treeLayout, pathTo, stemGroups, linkMoments, unlinkMoments, relatedMoments, MAX_LINKS, safeUrl, newId } from '../src/domain.js';
 
 const input = (title = '첫 목소리') => ({ subject: '윤슬', title, note: '오래 기억하고 싶은 마음', emotion: '설렘', date: '2026-10-27', url: '' });
 const stateOf = tree => ({ version: 1, trees: [tree] });
@@ -212,4 +212,35 @@ test('branched tree layout places every child after its parent', () => {
   assert.equal(positions.size, 3);
   assert.ok(positions.get(tree.moments[1].id).x > positions.get(tree.moments[0].id).x);
   assert.notEqual(positions.get(tree.moments[1].id).y, positions.get(tree.moments[2].id).y);
+});
+
+test('reparent moves one branch without cycles, orphans, or lost related links', () => {
+  let tree = createTree(input('root'));
+  const rootId = tree.moments[0].id;
+  tree = addMoment(tree, input('A'), rootId);
+  const aId = tree.moments.at(-1).id;
+  tree = addMoment(tree, input('B'), aId);
+  const bId = tree.moments.at(-1).id;
+  tree = addMoment(tree, input('C'), rootId);
+  const cId = tree.moments.at(-1).id;
+  tree = linkMoments(tree, aId, cId);
+
+  const candidates = parentCandidates(tree, aId).map(moment => moment.id);
+  assert.deepEqual(candidates, [rootId, cId]);
+  const moved = reparentMoment(tree, aId, cId, 'C에서 다시 이어져서', '2026-11-01T10:00:00.000Z');
+  assert.equal(moved.moments.find(moment => moment.id === aId).parentId, cId);
+  assert.equal(moved.moments.find(moment => moment.id === aId).relation, 'C에서 다시 이어져서');
+  assert.equal(moved.moments.find(moment => moment.id === bId).parentId, aId);
+  assert.ok(moved.moments.find(moment => moment.id === aId).links.includes(cId));
+  assert.ok(moved.moments.find(moment => moment.id === cId).links.includes(aId));
+  validateState(stateOf(moved));
+
+  assert.throws(() => reparentMoment(moved, rootId, cId), /시작 순간/);
+  assert.throws(() => reparentMoment(moved, aId, aId), /자기 자신/);
+  assert.throws(() => reparentMoment(moved, aId, bId), /다음 순간/);
+  assert.throws(() => reparentMoment(moved, aId, 'other-tree-moment'), /같은 트리/);
+
+  const afterDelete = removeMoment(moved, cId);
+  assert.equal(afterDelete.moments.find(moment => moment.id === aId).parentId, rootId);
+  validateState(stateOf(afterDelete));
 });

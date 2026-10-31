@@ -81,6 +81,35 @@ export function editMoment(tree, id, input, clock = new Date().toISOString()) {
   const next = validateMomentInput(input);
   return { ...tree, updatedAt: clock, moments: tree.moments.map(m => m.id === id ? { ...m, ...next, relation: m.parentId ? next.relation : '' } : m) };
 }
+export function parentCandidates(tree, id) {
+  if (!tree.moments.some(m => m.id === id)) return [];
+  const blocked = new Set([id]);
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const moment of tree.moments) {
+      if (moment.parentId && blocked.has(moment.parentId) && !blocked.has(moment.id)) {
+        blocked.add(moment.id);
+        changed = true;
+      }
+    }
+  }
+  return tree.moments.filter(m => !blocked.has(m.id));
+}
+export function reparentMoment(tree, id, parentId, relation = '', clock = new Date().toISOString()) {
+  const current = tree.moments.find(m => m.id === id);
+  if (!current) throw new Error('이 순간을 찾을 수 없어요.');
+  if (current.parentId === null) throw new Error('트리의 시작 순간은 이전 순간을 바꿀 수 없어요.');
+  if (!tree.moments.some(m => m.id === parentId)) throw new Error('같은 트리에서 새 이전 순간을 선택해 주세요.');
+  if (!parentCandidates(tree, id).some(m => m.id === parentId)) throw new Error('자기 자신이나 이어진 다음 순간은 이전 순간으로 정할 수 없어요.');
+  const nextRelation = optionalText(relation, '연결 이유', 100);
+  if (current.parentId === parentId && current.relation === nextRelation) return tree;
+  return {
+    ...tree,
+    updatedAt: clock,
+    moments: tree.moments.map(m => m.id === id ? { ...m, parentId, relation: nextRelation } : m)
+  };
+}
 export function removeMoment(tree, id, clock = new Date().toISOString()) {
   const target = tree.moments.find(m => m.id === id);
   if (!target) throw new Error('이 순간을 찾을 수 없어요.');
