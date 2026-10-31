@@ -21,3 +21,5 @@ body.home-screen .app-header{display:none}
 #context-kind{font-size:10px;color:var(--rose);white-space:nowrap}
 #context-tree{font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @media(max-width:780px){#view-context{padding:6px 12px;gap:8px}}
+
+.quick-entry-lead{margin:0 0 18px;padding:12px 14px;border:1px solid #e9bdcd33;border-radius:12px;background:#e9bdcd0b;color:#eee2e8!important}.quick-entry-hint{min-height:24px;margin:4px 0 14px!important;padding-left:12px;border-left:2px solid #e9bdcd66;color:#d7c6d1!important}.quick-entry-hint:empty{display:none}

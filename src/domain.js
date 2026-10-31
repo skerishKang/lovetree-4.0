@@ -17,6 +17,15 @@ function requireText(value, name, max) {
   if (typeof value !== 'string' || !value.trim() || value.length > max) throw new Error(`${name}을(를) 1~${max}자로 적어 주세요.`);
   return value.trim();
 }
+function optionalText(value, name, max) {
+  if (value === undefined || value === null || value === '') return '';
+  if (typeof value !== 'string' || value.length > max) throw new Error(`${name}을(를) 1~${max}자로 적어 주세요.`);
+  return value.trim();
+}
+function shortened(value, max = 40) {
+  const letters = Array.from(value.replace(/\s+/g, ' ').trim());
+  return letters.length > max ? `${letters.slice(0, max).join('')}…` : letters.join('');
+}
 export function safeUrl(value = '') {
   if (!value.trim()) return '';
   let url;
@@ -25,6 +34,18 @@ export function safeUrl(value = '') {
   if (url.href.length > 2048) throw new Error('링크가 너무 길어요.');
   return url.href;
 }
+export function suggestMomentTitle({ title = '', note = '', url = '' } = {}) {
+  const explicit = optionalText(title, '순간 제목', 80);
+  if (explicit) return explicit;
+  const memo = optionalText(note, '마음 한마디', 500);
+  if (memo) return shortened(memo.split(/\r?\n/)[0] || memo);
+  const normalized = safeUrl(url);
+  if (!normalized) return '';
+  const parsed = new URL(normalized);
+  if (/\.(?:png|jpe?g|gif|webp)$/.test(parsed.pathname.toLowerCase())) return '사진으로 남긴 순간';
+  if (/\.(?:mp4|webm)$/.test(parsed.pathname.toLowerCase())) return '영상으로 남긴 순간';
+  return `${parsed.hostname.replace(/^www\./, '') || '링크'}에서 간직한 순간`;
+}
 export function normalizeEmotion(value) {
   if (EMOTIONS.includes(value)) return value;
   // 가져온 기록(리모네 등)의 감정을 설렘으로 바꾸지 않고 그대로 보존한다.
@@ -32,14 +53,16 @@ export function normalizeEmotion(value) {
   return custom && custom.length <= 12 && !/[\u0000-\u001f]/.test(custom) ? custom : '설렘';
 }
 export function validateMomentInput(input) {
-  const title = requireText(input.title, '순간 제목', 80);
-  const note = requireText(input.note, '마음 한마디', 500);
+  const note = optionalText(input.note, '마음 한마디', 500);
+  const url = safeUrl(input.url || '');
+  const title = suggestMomentTitle({ title: input.title, note, url });
+  if (!title) throw new Error('순간 제목, 마음 한마디, 링크나 첨부 중 하나는 남겨 주세요.');
   const emotion = normalizeEmotion(input.emotion);
   const date = input.date || new Date().toISOString().slice(0, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(date)) || new Date(date).toISOString().slice(0, 10) !== date) throw new Error('날짜를 확인해 주세요.');
   const relation = typeof input.relation === 'string' ? input.relation.trim() : '';
   if (relation.length > 100) throw new Error('연결 이유는 100자까지 적을 수 있어요.');
-  return { title, note, emotion, date, relation, url: safeUrl(input.url || '') };
+  return { title, note, emotion, date, relation, url };
 }
 export function createTree(input, clock = new Date().toISOString()) {
   const subject = requireText(input.subject, '좋아하는 대상', 60);

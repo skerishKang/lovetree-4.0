@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createTree, addMoment, editMoment, removeMoment, validateState, importTrees, treeLayout, pathTo, stemGroups, linkMoments, unlinkMoments, relatedMoments, MAX_LINKS, safeUrl, newId } from '../src/domain.js';
+import { createTree, addMoment, editMoment, removeMoment, validateState, validateMomentInput, suggestMomentTitle, importTrees, treeLayout, pathTo, stemGroups, linkMoments, unlinkMoments, relatedMoments, MAX_LINKS, safeUrl, newId } from '../src/domain.js';
 
 const input = (title = '첫 목소리') => ({ subject: '윤슬', title, note: '오래 기억하고 싶은 마음', emotion: '설렘', date: '2026-10-27', url: '' });
 const stateOf = tree => ({ version: 1, trees: [tree] });
@@ -9,6 +9,19 @@ test('local HTTP preview can create records without crypto.randomUUID', () => {
   const ids = Array.from({ length: 20 }, () => newId(provider));
   assert.equal(new Set(ids).size, 20);
   for (const id of ids) assert.match(id, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+});
+test('quick entry accepts a short note or link and derives a stable title', () => {
+  const noteOnly = validateMomentInput({ title: '', note: '  오늘 표정이 오래 남았다  ', emotion: '설렘', date: '2026-11-01', url: '' });
+  assert.equal(noteOnly.title, '오늘 표정이 오래 남았다');
+  assert.equal(noteOnly.note, '오늘 표정이 오래 남았다');
+  const photoOnly = validateMomentInput({ title: '', note: '', emotion: '설렘', date: '2026-11-01', url: 'https://example.com/photo.JPG' });
+  assert.equal(photoOnly.title, '사진으로 남긴 순간');
+  const linkOnly = validateMomentInput({ title: '', note: '', emotion: '설렘', date: '2026-11-01', url: 'https://www.example.com/watch?id=1' });
+  assert.equal(linkOnly.title, 'example.com에서 간직한 순간');
+  assert.equal(suggestMomentTitle({ note: '첫 줄 제목\n둘째 줄은 본문' }), '첫 줄 제목');
+  assert.throws(() => validateMomentInput({ title: '', note: '', emotion: '설렘', date: '2026-11-01', url: '' }), /하나는 남겨/);
+  const tree = createTree({ subject: '윤슬', title: '', note: '짧은 마음', emotion: '설렘', date: '2026-11-01', url: '' });
+  assert.equal(validateState(stateOf(tree)).trees[0].moments[0].title, '짧은 마음');
 });
 test('validated serialization preserves the emotional path', () => {
   const first = createTree(input());
