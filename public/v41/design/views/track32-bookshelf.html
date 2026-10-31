@@ -445,7 +445,7 @@
             <p class="eyebrow" id="readerEyebrow">VOLUME · LOVE TREE</p>
             <h2 id="readerTitle">책 제목</h2>
             <p id="readerDescription">책을 열기 전에 오른쪽에서 챕터 목록을 먼저 골라볼 수 있어요.</p>
-            <div class="info-rule"><strong>책 속의 트리</strong><span>각 장은 예시 트리에 담긴 사진, 영상 예시, 메모와 링크입니다.</span></div>
+            <div class="info-rule"><strong>책 속의 트리</strong><span>각 장에서 같은 트리의 순간을 이어서 읽습니다.</span></div>
             <div class="chapter-heading"><strong>챕터 목록</strong><span id="chapterCount">0 chapters</span></div>
             <div class="chapter-list" id="chapterList"></div>
             <div class="reader-info-foot"><strong>사용 방법</strong><br />표지 위에서 마우스를 누르고 오른쪽으로 움직여 책을 열어요. 열린 뒤에는 책장 위를 좌우로 끌거나 아래 화살표로 한 장씩 넘겨요.</div>
@@ -472,20 +472,20 @@
     </section>
   </div>
 
-  <script src="../shared.js"></script>
+  <script src="../shared.js"></script><script src="../../view-navigation.js"></script>
 <script>
     (function () {
       'use strict';
       var $ = function (selector) { return document.querySelector(selector); };
       var $$ = function (selector) { return Array.prototype.slice.call(document.querySelectorAll(selector)); };
       var sourceLabel = 'bookmarks_LIKE_only_2026-07-28.html';
-      var books = [{id:'demo-tree',name:'좋아하는 순간들',english:'LOVE TREE · MEMORY',category:'kpop',color:'#a84f5d',accent:'#a84f5d',symbol:'✦',description:'첫 화면에서 만난 순간들이 한 권의 트리가 됩니다.',tags:['순간','기록','기억'],chapters:LTDEMO.moments.map(m=>({title:m.title,url:m.externalUrl||'',mood:m.emotion,note:m.memo||m.whyNext||'기억하고 싶은 순간',id:m.id,type:m.type,image:m.image||''}))}];
+      var books = LTDEMO.library.map(function(tree,index){var color=['#a84f5d','#627ba2','#8d705e','#6d8979'][index%4];return {id:tree.id,name:tree.title,english:'LOVE TREE · MEMORY',category:'kpop',color:color,accent:color,symbol:'✦',description:'선택한 트리의 기록입니다.',tags:['순간','기록'],chapters:tree.moments.map(m=>({title:m.title,url:m.externalUrl||'',mood:m.emotion,note:m.memo||m.whyNext||'',id:m.id,type:m.type,image:m.image||''}))};});
       var state = { filter:'all', query:'', selectedId:null, shelfIndex:0, shelfList:[], chapterIndex:0, open:false, openProgress:0, customBooks:[], pageTurning:false };
       var storageKey = 'lovetree-people-book-shelf-v2-1-true-page-motion';
       var drag = { active:false, mode:'', startX:0, startY:0, moved:false, startProgress:0 };
       var shelfDrag = { active:false, startX:0, moved:false, downIndex:null };
       try {
-        var saved = JSON.parse(localStorage.getItem(storageKey) || '{}');
+        var saved = {};
         state.selectedId = null;
         state.shelfIndex = Number.isInteger(saved.shelfIndex) ? saved.shelfIndex : 0;
         state.chapterIndex = Number.isInteger(saved.chapterIndex) ? saved.chapterIndex : 0;
@@ -493,9 +493,10 @@
         state.openProgress = 0;
         state.customBooks = [];
       } catch (error) {}
+      state.shelfIndex=Math.max(0,books.findIndex(book=>book.id===parent.LT41.tree.id));
       function allBooks() { return books.concat(state.customBooks); }
       function getBook(id) { return allBooks().find(function (book) { return book.id === id; }); }
-      function save() { if(state.selectedId==='demo-tree'&&LTDEMO.moments[state.chapterIndex])LTDEMO.select(LTDEMO.moments[state.chapterIndex].id); localStorage.setItem(storageKey, JSON.stringify({selectedId:state.selectedId,shelfIndex:state.shelfIndex,chapterIndex:state.chapterIndex,customBooks:state.customBooks})); }
+      function save() {} // Selection belongs to the shell; never persist another account's library.
       function esc(value) { return String(value || '').replace(/[&<>"']/g,function (char) { return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'})[char]; }); }
       function youtubeId(url) { var match = String(url || '').match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|shorts\/|embed\/))([^?&/]+)/i); return match ? match[1] : ''; }
       function showToast(message) { var toast=$('#toast'); toast.textContent=message; toast.classList.add('show'); clearTimeout(showToast.timer); showToast.timer=setTimeout(function(){toast.classList.remove('show');},2400); }
@@ -516,7 +517,7 @@
         else state.shelfIndex=Math.max(0,Math.min(state.shelfIndex,list.length-1));
         $('#resultCount').textContent=list.length+'권';
         $('#shelfRail').innerHTML=list.length?list.map(function(book,index){
-          return '<article class="book-card" data-book-index="'+index+'"><button type="button" data-book-id="'+esc(book.id)+'" aria-label="'+esc(book.name)+' 책 선택">'+
+          return '<article class="book-card" data-book-index="'+index+'"><button type="button" data-book-id="'+esc(book.id)+'" aria-label="'+esc(book.name)+' 기억책 열기">'+
             '<div class="book-cover" style="'+coverStyle(book)+'"><span class="cover-number">VOLUME · '+String(index+1).padStart(2,'0')+'</span><span class="cover-symbol"><span>'+esc(book.symbol)+'</span></span><strong class="cover-title">'+esc(book.name)+'</strong><small class="cover-subtitle">'+esc(book.english)+'</small></div>'+
             '<span class="book-card-meta"><strong>'+esc(book.name)+'</strong><span>'+book.chapters.length+'개 챕터 · '+esc(categoryLabel(book.category))+'</span></span></button><div class="book-tags">'+book.tags.slice(0,2).map(function(tag){return '<span>'+esc(tag)+'</span>';}).join('')+'</div></article>';
         }).join(''):'<div class="empty"><strong>아직 이 책장에는 없어요.</strong><span>다른 검색어나 분류를 선택해 보세요.</span></div>';
@@ -563,7 +564,7 @@
       }
       function selectShelfIndex(index) {
         if(index<0||index>=state.shelfList.length)return;
-        if(index!==state.shelfIndex){state.shelfIndex=index;save();updateCarousel();return;}
+        if(index!==state.shelfIndex){state.shelfIndex=index;updateCarousel();}
         var book=state.shelfList[index];
         if(book)openReader(book.id,getShelfCard(index));
       }
@@ -702,12 +703,13 @@
         if(!book)return;
         var source=sourceCard&&sourceCard.querySelector('.book-cover');
         var sourceRect=source?source.getBoundingClientRect():null;
-        state.selectedId=id;state.shelfIndex=Math.max(0,state.shelfList.findIndex(function(item){return item.id===id;}));state.chapterIndex=Math.max(0,LTDEMO.moments.findIndex(m=>m.id===LTDEMO.get()));state.open=false;state.openProgress=0;save();
+        state.selectedId=id;state.shelfIndex=Math.max(0,state.shelfList.findIndex(function(item){return item.id===id;}));state.chapterIndex=Math.max(0,book.chapters.findIndex(m=>m.id===LTDEMO.get()));state.open=false;state.openProgress=0;save();
         $('#shelfScreen').classList.add('is-leaving');
         $('#readerScreen').classList.add('active','is-preparing');
         renderReader();
         var targetRect=$('#bookCoverFace').getBoundingClientRect();
         animateSharedBook(sourceRect,targetRect,function(){
+          if(LTDEMO.openBook){LTDEMO.openBook(book.chapters[state.chapterIndex].id,book.id);return;}
           $('#shelfScreen').style.display='none';
           $('#shelfScreen').classList.remove('is-leaving');
           $('#readerScreen').classList.remove('is-preparing');
@@ -822,6 +824,7 @@
       }
       function bindShelfDrag() {
         var rail=$('#shelfRail');
+        rail.addEventListener('click',function(event){if(event.detail===0){var card=event.target.closest('[data-book-index]');if(card)selectShelfIndex(Number(card.dataset.bookIndex));}});
         rail.addEventListener('pointerdown',function(event){
           var card=event.target.closest('.book-card');
           shelfDrag.active=true;shelfDrag.startX=event.clientX;shelfDrag.moved=false;shelfDrag.downIndex=card?Number(card.dataset.bookIndex):null;shelfDrag.startIndex=state.shelfIndex;
@@ -844,7 +847,7 @@
         rail.addEventListener('pointercancel',function(){if(!shelfDrag.active)return;shelfDrag.active=false;rail.classList.remove('dragging');state.shelfIndex=Math.round(state.shelfIndex);updateCarousel();});
       }
       function bind() {
-        $('#shelfJump').addEventListener('click',function(){state.query='';state.filter='all';$('#searchInput').value='';$$('.filter').forEach(function(item){item.classList.toggle('active',item.dataset.filter==='all');});renderShelf();var book=$('#shelfRail button[data-book-id]');if(book){book.scrollIntoView({block:'center'});book.focus({preventScroll:true});}});
+        $('#shelfJump').addEventListener('click',function(){state.query='';state.filter='all';$('#searchInput').value='';$$('.filter').forEach(function(item){item.classList.toggle('active',item.dataset.filter==='all');});renderShelf();var book=getShelfCard(state.shelfIndex)?.querySelector('button[data-book-id]');if(book)openReader(book.dataset.bookId,book.closest('.book-card'));});
         $('#searchInput').addEventListener('input',function(event){state.query=event.target.value;renderShelf();});
         $$('.filter').forEach(function(button){button.addEventListener('click',function(){state.filter=button.dataset.filter;$$('.filter').forEach(function(item){item.classList.toggle('active',item===button);});renderShelf();});});
         $('#shelfPrev').addEventListener('click',function(){moveShelf(-1);});
