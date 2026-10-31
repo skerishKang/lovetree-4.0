@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {MEMBER_LOGIN_URL,shouldLoadMemberRecords} from '../public/v41/member-entry.mjs';
 import { createSharedPagesAuth } from '../functions/_lib/shared-auth.mjs';
 
 async function setup() {
@@ -51,4 +52,17 @@ test('preview callback must be configured for the same origin', async () => {
   assert.equal(new URL(begin.headers.get('location')).searchParams.get('redirect_uri'), env.LOVETREE_AUTH_CALLBACK_URI);
   const crossOrigin = { ...env, LOVETREE_AUTH_CALLBACK_URI: 'https://evil.example/auth/callback' };
   assert.equal((await f.auth(new Request(`${preview}/auth/login`), crossOrigin)).status, 503);
+});
+
+// Regression: the old /v41/?account=1 return target was rejected and silently became /.
+test('4.1 login callback returns to 4.1 and cookie marker triggers member loading',async()=>{
+ const f=await setup();
+ const begin=await f.auth(new Request('https://lovetree-4-0.pages.dev'+MEMBER_LOGIN_URL),f.env);
+ const target=new URL(begin.headers.get('location'));
+ const callback=new URL('https://lovetree-4-0.pages.dev/auth/callback');
+ callback.searchParams.set('state',target.searchParams.get('state'));callback.searchParams.set('code','fake');
+ const response=await f.auth(new Request(callback,{headers:{cookie:begin.headers.get('set-cookie').split(';')[0]}}),f.env);
+ assert.equal(response.status,302);assert.equal(response.headers.get('location'),'/v41/');
+ assert.match(response.headers.get('set-cookie'),/__Host-lovetree-shared=1/);
+ assert.equal(shouldLoadMemberRecords('','__Host-lovetree-shared=1'),true);
 });
