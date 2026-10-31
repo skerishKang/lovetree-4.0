@@ -12,7 +12,7 @@ const dispose=mountOrbit(document.getElementById('orbit'),{
 const shadow=document.getElementById('orbit').shadowRoot;
 // Keep the original SRC064 wordmark on the welcome screen.
 const identity=document.createElement('style');
-identity.textContent=`:host{--ui:'Pretendard Variable',Pretendard,system-ui,sans-serif}.app{font-family:var(--ui)}`;
+identity.textContent=`:host{--ui:'Pretendard Variable',Pretendard,system-ui,sans-serif}.app{font-family:var(--ui)}.actions .subtleBtn{font-size:14px}.center .center-note{font-size:12px}.menuBtn{font-size:14px}`;
 shadow.append(identity);
 if(presentation.canResume){
  const primary=shadow.querySelector('.primary-cta'),secondary=shadow.querySelector('.actions [data-do="continue"]');
@@ -22,7 +22,7 @@ if(presentation.canResume){
 shadow.querySelector('[data-do=trees]').textContent='내 책장';
 if(!presentation.canResume)shadow.querySelector('.primary-cta').textContent='첫 순간 남기기';
 shadow.querySelector('.center-note').textContent='배경 카드는 감상 예시 · 내 기록에는 저장되지 않아요';
-const mobileFit=document.createElement('style');mobileFit.textContent='@media(max-width:650px){.topbar{gap:8px}.top-actions{gap:6px;flex-shrink:0}.topbar .menuBtn{white-space:nowrap;padding:10px 9px;font-size:10px}}';shadow.append(mobileFit);
+const mobileFit=document.createElement('style');mobileFit.textContent='@media(max-width:650px){.topbar{gap:12px;flex-wrap:wrap;align-items:center}.top-actions{gap:6px;flex-shrink:0;flex-wrap:wrap;margin-left:auto}.topbar .menuBtn{white-space:nowrap;padding:10px 9px;font-size:13px}.actions .subtleBtn{font-size:14px}.center .center-note{font-size:12px}.hint{font-size:11px}}';shadow.append(mobileFit);
 shadow.querySelector('[data-home-account]').onclick=bridge.actions.account;
 shadow.querySelectorAll('.firstMark').forEach(e=>e.textContent='첫 순간');
 const dialog=shadow.querySelector('dialog');
