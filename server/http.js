@@ -1,3 +1,4 @@
+import { MAX_MEDIA_BYTES } from './private-media.js';
 import { ApiError } from './errors.js';
 import { ROLE_ADMIN } from './admin-roles.js';
 import { parsePrincipal } from './principal.js';
@@ -83,6 +84,8 @@ export function createApiHandler({ authenticate, service, productId, admin = nul
 
 export function createNodeHandler(requestHandler, { maxBodyBytes = DEFAULT_MAX_BODY_BYTES } = {}) {
   return async function nodeHandler(req, res) {
+    const media = /^\/api\/media(?:\/|$)/.test(String(req.url).split('?')[0]);
+    const limit = media ? MAX_MEDIA_BYTES : maxBodyBytes;
     const chunks = [];
     let size = 0;
     let aborted = false;
@@ -91,7 +94,7 @@ export function createNodeHandler(requestHandler, { maxBodyBytes = DEFAULT_MAX_B
       // 한도를 넘겨도 읽기를 멈추지 않고 확보만 멈춘다. 반복자를 중간에 끊으면
       // 스트림이 파괴되어 클라이언트가 413 응답 대신 연결 절단을 보게 된다.
       for await (const chunk of req) {
-        if (size <= maxBodyBytes) chunks.push(chunk);
+        if (size <= limit) chunks.push(chunk.subarray(0, limit + 1 - Math.min(size, limit + 1)));
         size += chunk.length;
       }
     } catch {
@@ -107,9 +110,9 @@ export function createNodeHandler(requestHandler, { maxBodyBytes = DEFAULT_MAX_B
       res.end(JSON.stringify({ error: { code: 'invalid_path', message: '요청 경로를 읽을 수 없어요.' } }));
       return;
     }
-    const result = await requestHandler({ method: req.method, path, query, headers: req.headers, body: Buffer.concat(chunks).toString('utf8') });
+    const result = await requestHandler({ method: req.method, path, query, headers: req.headers, body: media ? '' : Buffer.concat(chunks).toString('utf8'), ...(media ? { rawBody: Buffer.concat(chunks), bodyTooLarge: size > limit } : {}) });
     if (res.destroyed) return;
     res.writeHead(result.status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', ...(result.headers ?? {}) });
-    res.end(JSON.stringify(result.body));
+    res.end(result.binary ?? JSON.stringify(result.body));
   };
 }

@@ -23,5 +23,5 @@ export function createMemberSession({api,onState=()=>{},onStatus=()=>{},navigate
    }
    document=validateState({version:1,trees});onState(structuredClone(document),{treeId,momentId});sync.markLocalSave();return {treeId,momentId};
  }
- return {start:()=>sync.start(),apply,act:name=>sync.act(name),snapshot:()=>({...sync.snapshot(),writable:sync.snapshot().owned&&bound&&!mismatch,phase:sync.status().phase}),state:()=>structuredClone(document),dispose:()=>{active=false;bound=false;},status:()=>sync.status()};
+ return {start:()=>sync.start(),apply,act:name=>sync.act(name),snapshot:()=>({...sync.snapshot(),subject,writable:sync.snapshot().owned&&bound&&!mismatch,phase:sync.status().phase}),state:()=>structuredClone(document),dispose:()=>{active=false;bound=false;},status:()=>sync.status()};
 }

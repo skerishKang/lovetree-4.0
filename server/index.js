@@ -1,3 +1,4 @@
+import { createPrivateMediaStore, createMediaHandler } from './private-media.js';
 import { createServer } from 'node:http';
 import { pathToFileURL } from 'node:url';
 import { createPool, createWorkspaceRepo } from './db/postgres.js';
@@ -133,9 +134,15 @@ const authenticate = createSharedAccessAuth({ enabled: sharedAuthEnabled(LOVETRE
 const admin = createAdminRoleService({ store: createAdminRoleRepo(pool), productId: LOVETREE_PRODUCT_ID });
 const storageHandler = createApiHandler({ authenticate, service, productId: LOVETREE_PRODUCT_ID, maxBodyBytes, admin });
 const login = await buildLogin(pool);
+const mediaHandler = createMediaHandler({
+ authenticate, productId: LOVETREE_PRODUCT_ID,
+ store: process.env.LOVETREE_MEDIA_DIR ? createPrivateMediaStore({directory:process.env.LOVETREE_MEDIA_DIR}) : null,
+ publicOrigin: process.env.LOVETREE_PUBLIC_ORIGIN
+});
 
 const requestHandler = async (request) => {
   if (String(request.path ?? '').startsWith('/auth/')) return loginRoute(login, request);
+  if (String(request.path ?? '').startsWith('/api/media')) return mediaHandler(request);
   return storageHandler(request);
 };
 

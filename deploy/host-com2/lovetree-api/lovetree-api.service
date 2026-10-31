@@ -22,6 +22,9 @@ ExecStart=/usr/local/bin/node /opt/padiem/lovetree-api/server/index.js
 Restart=always
 RestartSec=5
 UMask=0077
+StateDirectory=lovetree-api
+StateDirectoryMode=0700
+Environment=LOVETREE_MEDIA_DIR=/var/lib/lovetree-api/media
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict

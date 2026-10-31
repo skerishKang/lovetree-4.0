@@ -1,3 +1,14 @@
+## 2026-11-01 — #14 회원 사진·영상 비공개 업로드
+기존 url 필드에 같은 Pages origin의 /api/media/<UUID>.<ext>를 저장한다. 스키마·ID·parentId/links·기존 외부 링크는 변경하지 않는다. 작성창에서 사진/영상 선택 → 파일 보관 → 미리보기 → 순간 저장을 구분한다. 파일만 올린 뒤 취소하면 보관 목록에 남아 다시 첨부하거나 삭제할 수 있다. 순간/트리 삭제는 파일을 자동 삭제하지 않는다. 명시적 파일 삭제는 사용 중인 순간 수와 복구 불가 경고를 확인하며, 글/연결은 남고 해당 파일 링크는 404가 된다. JSON 내보내기는 URL만 보존하고 첨부 바이트를 포함하지 않는다.
+
+COM2 단일 Node 프로세스의 전용 StateDirectory(/var/lib/lovetree-api/media), 계정·제품 해시 디렉터리(0700), 원자적으로 확정하는 파일(0600)을 사용. 기존 PADIEM authenticate/parsePrincipal로 매 요청 확인하며 다른 계정/제품은 읽지 못한다. 쓰기·삭제는 공개 origin과 expected canonical subject 헤더를 검사한다. UUID 재시도는 같은 파일만 재사용, 다른 내용은 409. JPG/PNG/GIF/WebP 4MiB, MP4/WebM 8MiB; MIME+시그니처 검사(백신/완전한 미디어 디코더 검증은 아님). 계정당 100MiB/200개, 소유자별 직렬 quota 검사. 멀티 프로세스/공유 파일시스템으로 확장하려면 저장소 잠금/용량 계약을 먼저 교체해야 한다. SVG/HTML/임의 경로/서버 URL 수집·공개 공유 없음. private,no-store/nosniff. 삭제·목록·파일 GET/POST만 닫힌 Pages 프록시에 추가, 8MiB 응답 상한 유지, 미디어는 본문 완료까지 60초·실제 취소. 기존 workspace 한도/15초 프록시는 유지.
+
+운영: systemd StateDirectory와 LOVETREE_MEDIA_DIR을 함께 설치하고 Node를 재시작한다. 기존 .env/인증/DB/터널을 바꾸지 않는다. DB 백업만으로 미디어는 복구되지 않으므로 파일 디렉터리도 별도로 백업/복원해야 한다(현재 자동 백업 작업 추가 없음). 코드 롤백 때 디렉터리는 삭제하지 않는다. 자동 purge/공개 링크/계정 전체 삭제 정책은 추가하지 않았다.
+
+재사용 대조: LoveBud b80647f1 js/utils/media.js의 URL 판별은 기존 #122를 유지. 같은 SHA functions/_shared/private-storage-entitlement-neon.js는 Firebase+Neon의 유료 비공개 권한 경계라 이식하지 않음. 리모네 dd8394c5 app/components/MomentComposerModal.tsx는 sourceUrl 입력/저장 흐름이며 실제 비공개 업로드 서버로 간주하지 않는다. 현재 PADIEM 신원·Pages 고정 목적지 프록시·4.1 작성/보관 URL 계약을 재사용해 부족한 파일 저장 경계만 추가했다.
+
+격리 검증: 저장·재시작 복원·A/B/제품 격리·소유자 삭제·같은 요청 재생·다른 파일 409·동시 quota·형식/크기/경로·변조 파일·origin/subject 검사·실제 Node/프록시 바이너리 왕복·8MiB 초과 413·클라이언트 취소를 신규 7시험에서 확인. 전체 248 tests: 215 pass/0 fail/33 기존 환경 의존 skip, build 통과. COM1 Tabbit 1280/390px: 사진 760px/영상 2초(자동재생 안 함), 파일 URL 저장→새로고침·동일 순간 ID 복원, 부모 연결 보존, 목록/삭제·A/B 격리, 가로 넘침/페이지 오류 0. 인증은 격리 A/B를 쓰고 workspace 저장은 메모리 repo이므로 실제 운영 Google/PG 저장 E2E로 확대하지 않는다. 운영 배포/확인 결과는 PR과 이슈에 별도로 기록한다. 실기기·스크린리더는 미검증.
+
 ## 2026-10-31 — 공통 세션 갱신 대기 종료와 이전 판정 정정
 
 COM1 Tabbit 운영 재현: GET /api/workspace 401(149ms) → 재확인 401(42ms) → POST /auth/refresh **204 성공**(858ms) → GET /api/workspace **200**(748ms). 같은 204 요청에 Tabbit가 ERR_ABORTED 이벤트도 기록했지만 앱은 갱신을 성공 처리하고 회원 문서를 읽었다. 그 이벤트만으로 갱신 실패라고 했던 앞선 보고는 정정한다. 새로고침 후에도 GET 200(254ms), source=server를 확인. PUT 0. 앞서 관찰한 다른 502까지 정상 응답으로 재분류하는 것은 아니다.
