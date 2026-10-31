@@ -51,3 +51,15 @@ html[data-v41-screen=network] .mobile-ribbon button.active{color:#fff}
 
 html[data-v41-screen] .lt-moment-picker button{font-size:14px}
 html[data-v41-screen] .lt-moment-picker label>span{font-size:12px}
+
+/* User media keeps the original photo/film paper; requests require explicit consent. */
+.lt-media{padding:12px;border:1px solid #ba9cae55;border-radius:12px;background:#ffffff12;font:14px/1.5 var(--lt-ui);overflow-wrap:anywhere;min-width:0}
+.lt-media-body{display:grid;place-items:center;min-height:100px;background:#82708016;border-radius:8px;overflow:hidden}
+.lt-media-body button{min-height:44px;max-width:100%;border:1px solid #927088;border-radius:999px;padding:8px 14px;background:#65446f;color:#fff;font-size:14px;cursor:pointer}
+.lt-media-body img,.lt-media-body video{position:static!important;display:block;width:100%;max-height:240px;height:auto!important;object-fit:contain!important;transform:none!important;mix-blend-mode:normal!important}
+.lt-media .lt-media-status{font:12px/1.5 var(--lt-ui)!important;color:inherit!important;margin:8px 0}
+.lt-media a{display:inline-flex;align-items:center;min-height:44px;color:inherit;text-decoration:underline;text-underline-offset:3px}
+html[data-v41-screen=board] .lt-media{color:#57425e;background:#fff7fc}
+html[data-v41-screen=network] .lt-media{color:#49344f}
+html[data-v41-screen=book] .clipping .lt-media{color:#57453c}
+html[data-v41-screen=book] .viewer-media .lt-media{width:100%;height:100%;overflow:auto}
