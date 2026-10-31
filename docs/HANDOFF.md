@@ -539,3 +539,16 @@ PR #130: head `fa93ac1f202687882aee8bdcc29ae62418f0dbe0`, merge `0ddb67e2bc6064b
 COM2에는 최종 merge `977a55f818f12be1f3e3212e037d558e99039e88`의 서버를 적용하고 `lovetree_shares`를 포함한 6개 테이블 검사를 모두 통과했으며 `lovetree-api.service` active와 설치 파일 일치를 확인했다. 운영 `https://lovetree-4-0.pages.dev/v41/`에서는 공식 Tabbit으로 잘못된 주소 `share_invalid`와 미존재 주소 `share_not_found`의 구분된 404·`no-store`, 공개 오류 화면의 소유자 기능 0·workspace 요청 0, PC/390px 문서 가로 넘침 0을 확인했다. 첫 화면의 `러브트리 · MEMORY ORBIT`, 40개 오빗 카드, 첫 순간, 금테(`rgb(242, 205, 124)`)와 광택도 보존됐다.
 
 실제 Google 로그인·실회원으로 운영 발행→비회원 감상→회수 E2E, 실기기·스크린리더 검증은 사람 조작이 필요해 수행하지 않았다. 인증 우회나 기존 실제 사용자 기록의 변경·삭제·자동 공개는 하지 않았다.
+
+
+## 2026-11-01 — LoveTree 4.1 발견·커뮤니티 완료 (#121)
+
+발견은 링크 공유와 분리된 소유자 명시 동의 기능이다. 공유 링크를 만들거나 기존 공개 링크가 있다는 이유만으로 발견 목록에 올라가지 않으며, 기본값과 기존 행은 비공개다. 소유자가 활성 공유를 발견에 올리거나 내릴 수 있고, 목록은 최신 공개 순만 제공하며 인기·추천 순위와 자동 승계 과금은 없다. 검색·감정 필터·페이지 이동, 원본 공유를 가리키는 즐겨찾기·반응·댓글·신고·차단을 추가했다. “내 기록 새로 시작”은 원본을 복제하지 않고 대상 이름만 채운 새 비공개 트리를 만든다. 회수·삭제·관리자 숨김은 발견과 상호작용에서 즉시 제외되며, 관리자는 원본 기록을 수정하지 않고 발견 노출·댓글만 감사 기록과 함께 조정한다. 커뮤니티 테이블은 workspace JSON과 분리했고 공개 DTO에서 계정 주체·정규 ID·비공개 미디어 URL을 제거했다.
+
+PR #135: head `e4e7ce98678cb3c53c672a5ef080566d248c5aac`, merge `6900df8aa446dfe0201d01997457fae04c4abe16`. PR CI `41236824880`·`41236853936`, main CI `41237225649`에서 PostgreSQL·Ubuntu·Windows가 모두 성공했다. Cloudflare preview `1489634c-4c81-49a9-bbef-b8f9f05ff4bb`, production `5456487d-d44b-4841-af3c-5ca3338b5db2`. 로컬 전체 `npm run check`는 279 subtests / 278 tests + 1 suite, 243 pass, 0 fail, 35 환경 의존 skip 및 Vite build 성공이었고, CI PostgreSQL lane은 실제 격리 DB에서 동시 댓글 idempotency·숨김/복원·감사·차단을 skip 없이 검증했다.
+
+COM2에는 merge `6900df8aa446dfe0201d01997457fae04c4abe16`의 변경 서버 파일만 적용했다. 적용 전 파일은 `/opt/padiem/lovetree-api/.deploy-backups/20261101-issue121-pre-6900df8aa446dfe0201d01997457fae04c4abe16`에 보존했다. 설치 파일은 가져온 commit과 byte 비교했고, `lovetree_shares`의 발견 열 및 7개 커뮤니티 테이블을 포함한 필수 13개 테이블 검사를 모두 통과했다. `lovetree-api.service`는 재시작 뒤 active·NRestarts 0·127.0.0.1:8790 listen이며 익명 `GET /api/community/shares?limit=1`은 200 JSON, `no-store`로 응답했다.
+
+공식 Tabbit CLI로 운영 `https://lovetree-4-0.pages.dev/v41/`을 1440×900·390×844에서 검증했다. 첫 SRC064 화면에서 발견 진입이 보이고, PC·모바일 모두 40개 오빗 카드, `러브트리 · MEMORY ORBIT` 로고, 금테 `rgb(242, 205, 124)`와 기존 광택, 문서 가로 넘침 0, 보이는 상단 조작 44px 이상을 확인했다. 운영 발견 목록은 기존 공유를 자동 공개하지 않아 0개이며, “공개에 동의한 트리만”과 최신 공개 순·비추천 안내가 정상 표시되고 pageerror가 없었다. preview에서 COM2 반영 전 발생한 503은 서버 배포 뒤 운영 200으로 해소했다.
+
+실제 Google 로그인·실회원의 발견 opt-in→비회원 발견→반응/댓글/회수 E2E, 실기기·스크린리더 검증은 사람 조작이 필요해 수행하지 않았다. 인증 우회, 기존 사용자 기록 변경·삭제·자동 공개, 관리자 권한 가장은 하지 않았다. 서버 쓰기 속도 제한은 현재 프로세스 인스턴스별이다.
