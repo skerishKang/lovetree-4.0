@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko">
+<html lang="ko" data-v41-screen="network">
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1"/>
@@ -52,11 +52,11 @@ button{font:inherit;color:inherit;cursor:pointer}
 }
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition-duration:.01ms!important}}
 </style>
-<style>#followPath{display:none!important}</style></head>
+<style>#followPath{display:none!important}</style><link rel="stylesheet" href="../identity.css"></head>
 <body>
 <div class="app">
  <canvas id="stage" aria-label="세로형 순간 관계 지도 전체 보기"></canvas><div class="paper-noise"></div>
- <header class="topbar"><div class="brand"><i class="brand-dot"></i><b>LOVETREE</b><span>관계 지도</span></div><div class="top-actions"><span class="mode-pill" id="modePill">전체 보기</span><button class="pill" id="overviewBtn">전체 보기</button><button class="pill" id="helpBtn">사용법</button></div></header>
+ <header class="topbar"><div class="brand"><i class="brand-dot"></i><b>러브트리</b><span>관계 지도</span></div><div class="top-actions"><span class="mode-pill" id="modePill">전체 보기</span><button class="pill" id="overviewBtn">전체 보기</button><button class="pill" id="helpBtn">사용법</button></div></header>
  <div class="hero"><div class="eyebrow">순간을 잇는 관계 지도</div><h1>처음의 마음에서,<br/>어떤 길들이 자라났는지 봅니다.</h1><p>순간 사이의 연결을 한눈에 보고, 선택한 순간에서 이어진 경로를 따라가 보세요.</p></div>
  <aside class="left-rail"><div class="legend"><h3>순간 위치 그룹</h3><div class="legend-row"><i class="swatch" style="background:#e45d8d"></i>01 순간 01–07</div><div class="legend-row"><i class="swatch" style="background:#8b69e8"></i>02 순간 08–14</div><div class="legend-row"><i class="swatch" style="background:#2ca4c0"></i>03 순간 15–21</div><div class="legend-row"><i class="swatch" style="background:#d49231"></i>04 순간 22–28</div><div class="legend-row"><i class="swatch" style="background:#3aa27c"></i>05 순간 29–35</div><div class="legend-row"><i class="swatch" style="background:#547cd0"></i>06 순간 36–40</div></div><div class="controls"><h3>탐색 모드</h3><button class="mini origin" id="focusFirst">첫 순간 보기</button><div class="control-row"><button class="mini" id="zoomIn">확대 +</button><button class="mini" id="zoomOut">축소 −</button></div><button class="mini" id="resetFocus">전체 보기로</button></div></aside>
  <aside class="progress-rail" id="progressRail"><div class="progress-label">위에서 아래로</div><div class="progress-line" id="progressLine"><i class="progress-thumb" id="progressThumb"></i></div></aside>
@@ -122,7 +122,7 @@ function generateCluster(c){
 const groupSize=Math.max(1,Math.ceil(LTDEMO.moments.length/6));
 CLUSTERS.splice(Math.ceil(LTDEMO.moments.length/groupSize));
 if(LTDEMO.moments.length<=36){CLUSTERS.forEach((c,i)=>c.y=250+i*220);WORLD.h=1600;}
-CLUSTERS.forEach((c,i)=>{c.name=`순간 ${String(i*groupSize+1).padStart(2,'0')}–${String(Math.min((i+1)*groupSize,LTDEMO.moments.length)).padStart(2,'0')}`;c.sub='LOVE TREE · 순간';c.count=Math.max(0,Math.min(groupSize,LTDEMO.moments.length-i*groupSize))});
+CLUSTERS.forEach((c,i)=>{c.name=`순간 ${String(i*groupSize+1).padStart(2,'0')}–${String(Math.min((i+1)*groupSize,LTDEMO.moments.length)).padStart(2,'0')}`;c.sub='순간의 연결';c.count=Math.max(0,Math.min(groupSize,LTDEMO.moments.length-i*groupSize))});
 document.querySelectorAll('.legend-row').forEach((row,i)=>{row.hidden=!CLUSTERS[i]?.count;row.textContent=CLUSTERS[i]?.count?CLUSTERS[i].name:''});
 LTDEMO.moments.forEach((m,i)=>{const ci=Math.min(5,Math.floor(i/groupSize)),c=CLUSTERS[ci],j=i%groupSize,a=-2.8+j*.78,dist=100+j*38;const n=momentBase(ci,m.id,c.x+Math.cos(a)*dist,c.y+Math.sin(a)*dist,0,`p${ci}_0`,j,i===0);Object.assign(n,{title:m.title,date:m.date,emotion:m.emotion,note:m.memo||'',why:m.whyNext||'',source:m.source||'예시 기록'});nodes.push(n)});
 CLUSTERS.forEach((c,ci)=>{const seq=nodes.filter(n=>n.cluster===ci).map(n=>n.id);addPath({id:`p${ci}_0`,cluster:ci,label:c.name,kind:'primary',nodes:seq,children:[],branchAt:-1})});

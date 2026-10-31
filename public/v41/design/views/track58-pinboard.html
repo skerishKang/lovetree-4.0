@@ -1,4 +1,4 @@
-<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>러브트리 4.1 · 기억 보드</title>
+<!doctype html><html lang="ko" data-v41-screen="board"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>러브트리 4.1 · 기억 보드</title>
 <style>
 :root{--plum:#130b20;--plum2:#241234;--ink:#21182d;--ivory:#f4eee5;--cream:#fffaf2;--rose:#ff5f9e;--violet:#a66bff;--cyan:#70dcff;--amber:#ffc86b;--line:#eadcf6;--muted:#8b7d95}
 *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;font-family:Inter,Pretendard,"Noto Sans KR",system-ui,sans-serif;background:#09060f;color:white}button,input,textarea{font:inherit}button{cursor:pointer}.app{position:relative;width:100%;height:100%;overflow:hidden;background:radial-gradient(circle at 50% 0%,#2d1640 0%,#12091d 43%,#09060f 78%)}
@@ -55,9 +55,9 @@ body[data-path-only="1"] .threadGroup:not(.selectedPath){opacity:.12}body[data-p
 .themeBadge{position:absolute;right:86px;top:78px;z-index:8;color:#6c5c73;font-size:9px;letter-spacing:.12em}.keywordOnCard{display:flex;gap:4px;flex-wrap:wrap;margin-top:7px}.keywordOnCard span{font-size:8px;padding:3px 5px;border-radius:99px;background:rgba(92,67,101,.07);color:#826f88}
 @media(max-width:760px){.leftPanel{top:auto;left:8px;bottom:78px;width:calc(100% - 16px);max-height:48vh;transform:translateY(calc(100% - 42px));border-radius:18px}.leftPanel.collapsed{transform:translateY(calc(100% - 42px))}.leftPanel.mobileOpen{transform:translateY(0)}.detail{right:8px;left:8px;top:auto;bottom:74px;width:auto;max-height:62vh;transform:translateY(calc(100% + 90px));border-radius:20px}.detail.open{transform:translateY(0);z-index:57}.nextChooser{left:8px;right:8px;top:auto;bottom:78px;width:auto}.postAdd{min-width:0;width:calc(100% - 20px);bottom:84px}.cinemaControls{grid-template-columns:repeat(4,1fr);bottom:8px}.cinProgress{grid-column:1/5;grid-row:2}.beatLabel{grid-column:1/3}.enterBeat{grid-column:3/5}.hideOnMobileV11{display:none!important}#addModal .modal,#editModal .modal{display:block;width:calc(100vw - 20px);max-height:92vh;overflow:auto}#composerPreviewWrap,#editPreview{margin-top:14px}.cursorRing{display:none}}
 
-</style><style>#addBtn,#toolAdd,#editMomentBtn,#undoBtn,#quickPin,#quickCard,[hidden]{display:none!important}.pin{pointer-events:none}</style></head><body><div class="app" id="app"><div class="spaceGlow"></div>
-<header><div class="brand"><span class="brandMark"></span>LOVETREE</div><div class="crumb">기억 보드</div><div class="spacer"></div><button class="headbtn" id="fitBtn">전체 보기</button><button class="headbtn" id="undoBtn">되돌리기</button><button class="headbtn primary" id="addBtn">＋ 순간 꽂기</button></header>
-<div class="boardFrame" id="viewport"><div class="boardWorld" id="world"><div class="surface"></div><div class="boardTitle"><h1>Living 기억 보드 <span class="private">● DEMO</span></h1><p>예시 순간을 선택하고, 실제로 연결된 다음 순간을 살펴보세요.</p></div>
+</style><style>#addBtn,#toolAdd,#editMomentBtn,#undoBtn,#quickPin,#quickCard,[hidden]{display:none!important}.pin{pointer-events:none}</style><link rel="stylesheet" href="../../identity.css"></head><body><div class="app" id="app"><div class="spaceGlow"></div>
+<header><div class="brand"><span class="brandMark"></span>러브트리</div><div class="crumb">기억 보드</div><div class="spacer"></div><button class="headbtn" id="fitBtn">전체 보기</button><button class="headbtn" id="undoBtn">되돌리기</button><button class="headbtn primary" id="addBtn">＋ 순간 꽂기</button></header>
+<div class="boardFrame" id="viewport"><div class="boardWorld" id="world"><div class="surface"></div><div class="boardTitle"><h1>기억 보드 <span class="private">● DEMO</span></h1><p>예시 순간을 선택하고, 실제로 연결된 다음 순간을 살펴보세요.</p></div>
 <svg class="threads" id="threadSvg" viewBox="0 0 2400 2200"><defs><filter id="glow"><feGaussianBlur stdDeviation="6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter><filter id="soft"><feGaussianBlur stdDeviation="1.2"/></filter></defs><g id="threadLayer"></g><circle id="hotTip" r="5" fill="#fff" opacity="0" style="filter:url(#glow)"/><path id="draftThread" fill="none" stroke="#fff" stroke-width="2" stroke-dasharray="6 7" opacity="0"/></svg>
 <div id="cardLayer"></div></div></div>
 <div class="toolbar"><button class="tool" id="minusBtn">−</button><span class="zoomLabel" id="zoomLabel">78%</span><button class="tool" id="plusBtn">＋</button><button class="tool hideMobile" id="resetBtn">보기 초기화</button></div><button class="cinemaBtn" id="cinemaBtn">▶ 시네마 보기</button>
@@ -81,7 +81,7 @@ body[data-path-only="1"] .threadGroup:not(.selectedPath){opacity:.12}body[data-p
 <div class="cinemaControls" id="cinemaControls"><button class="cinCtl" id="cinPrev">◀ 이전</button><button class="cinCtl" id="cinPlay">일시정지</button><button class="cinCtl" id="cinNext">다음 ▶</button><button class="cinCtl" id="cinRestart">↺ 처음부터</button><input class="cinProgress" id="cinProgress" type="range" min="0" max="100" value="0"><div class="beatLabel" id="beatLabel">첫 순간</div><button class="cinCtl enterBeat" id="enterBeat">이 장면에서 보드로 들어가기</button><button class="cinCtl hideOnMobileV11" id="cinExit">나가기</button></div>
 <div class="cursorRing" id="cursorRing"></div>
 
-<div class="cinemaOverlay" id="cinemaOverlay"><div class="cinemaTitle" id="cinemaTitle"><div class="k">LOVETREE MEMORY FILM</div><div class="b">A path remembered becomes alive.</div></div><div class="cinemaCaption" id="cinemaCaption"></div><div class="finalCTA" id="finalCTA"><div class="finalCard"><div class="label">WHOLE BOARD BLOOM</div><h2>당신이 좋아하게 된 경로</h2><p>순간들은 흩어진 자료가 아니라, 다시 걸을 수 있는 감정의 길입니다.</p><button id="walkAgain">이 경로 다시 걷기</button><button id="backBoard">기억 보드로 돌아가기</button><button id="finalOpen">순간 열기</button></div></div></div>
+<div class="cinemaOverlay" id="cinemaOverlay"><div class="cinemaTitle" id="cinemaTitle"><div class="k">기억의 시네마</div><div class="b">이어진 순간을 다시 걸어요.</div></div><div class="cinemaCaption" id="cinemaCaption"></div><div class="finalCTA" id="finalCTA"><div class="finalCard"><div class="label">WHOLE BOARD BLOOM</div><h2>당신이 좋아하게 된 경로</h2><p>순간들은 흩어진 자료가 아니라, 다시 걸을 수 있는 감정의 길입니다.</p><button id="walkAgain">이 경로 다시 걷기</button><button id="backBoard">기억 보드로 돌아가기</button><button id="finalOpen">순간 열기</button></div></div></div>
 </div>
 <script src="../../labels.js"></script><script src="../../mobile-moments.js"></script><script src="../shared.js"></script>
 <script>
@@ -230,7 +230,7 @@ window.__LT58V11={youtubeId,youtubeThumb,youtubeThumbUrl,openEdit,saveEdit,choos
 .netNote{font-size:9px;color:#9987a4;line-height:1.5;margin-top:6px}
 #viewerMedia{max-width:100%}
 @media(max-width:760px){
-  
+
   #viewerModal .modal{width:calc(100vw - 16px)!important;max-width:none!important;max-height:92vh;overflow:auto;padding:16px!important}
   .viewerYouTube{padding:0;gap:8px}.viewerYouTube iframe{min-height:0;width:100%;aspect-ratio:16/9;max-height:46vh}
   .viewerFallback{font-size:9px;padding:4px 0}.viewerFallback .miniBtn{width:100%;margin:0}

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>러브트리 4.1 · 내 책장</title>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=Gowun+Dodum:wght@400;700&family=Manrope:wght@500;700;800&display=swap');
+
     :root {
       --paper: #f7efe5;
       --paper-strong: #fffaf5;
@@ -346,13 +346,13 @@
       .reader-info h2 { font-size: 27px; }
     }
   </style>
-<style>#newBookButton{display:none!important}</style><link rel="stylesheet" href="../../reader-layout.css"></head>
+<style>#newBookButton{display:none!important}</style><link rel="stylesheet" href="../../reader-layout.css"><link rel="stylesheet" href="../../identity.css"></head>
 <body>
   <div class="app">
     <header class="topbar">
-      <a class="brand" href="#" aria-label="LoveTree 홈">
+      <a class="brand" href="#" aria-label="러브트리 첫 화면">
         <span class="brand-mark" aria-hidden="true"><i></i><b></b></span>
-        <span><strong>러브트리</strong><small>LoveTree · LOVE 순간 TREE</small></span>
+        <span><strong>러브트리</strong><small>LoveTree · 순간의 기록</small></span>
       </a>
       <div class="crumbs"><span id="crumbLabel">내 책장</span></div>
       <div class="top-actions"><button class="ghost" id="newBookButton" type="button">새 책 만들기 +</button></div>
@@ -362,14 +362,14 @@
       <section class="shelf-screen" id="shelfScreen">
         <section class="hero">
           <div class="hero-copy">
-            <p class="eyebrow">LOVE 순간 LIBRARY · PEOPLE</p>
+            <p class="eyebrow">내 책장</p>
             <h1>좋아하는 순간들을<br /><em>한 권의 책</em>으로.</h1>
             <p>아래 예시 책을 선택하고 표지를 열어 보세요. 사진, 영상 예시, 메모와 링크가 순간마다 이어집니다.</p>
             <div class="hero-note"><strong>하나의 예시 트리</strong><span>다른 화면에서도 같은 순간을 이어서 볼 수 있어요.</span></div>
             <button class="shelf-jump" id="shelfJump" type="button">예시 책 보러 가기 ↓</button>
           </div>
           <div class="hero-stage" aria-label="장식용 책장 그림">
-            <span class="stage-label">LOVE TREE LIBRARY · EXAMPLE</span>
+            <span class="stage-label">내 책장</span>
             <span class="stage-hint">아래 예시 책을 선택하세요</span>
             <div class="hero-books">
               <div class="hero-book" style="--book:#a84f5d;--tilt:-4deg"><i></i><span>순간 01</span></div>
@@ -401,7 +401,7 @@
       <section class="reader-screen" id="readerScreen">
         <div class="reader-head">
           <button class="back-button" id="backToShelf" type="button">← 책장으로 돌아가기</button>
-          <span class="reader-label" id="readerLabel">VOLUME · LOVE TREE</span>
+          <span class="reader-label" id="readerLabel">순간의 기록</span>
         </div>
         <div class="reader-layout">
           <section class="reader-stage" id="readerStage" aria-label="3D 책 리더">
@@ -412,12 +412,12 @@
               <div class="book-3d" id="book3d" tabindex="0" aria-label="책 표지. 누른 채 오른쪽으로 움직여 책 열기">
                 <div class="book-cover-face" id="bookCoverFace">
                   <div class="cover-front">
-                    <span class="cover-number">LOVE 순간 TREE</span>
+                    <span class="cover-number">순간의 기록</span>
                     <span class="cover-symbol"><span>♡</span></span>
                     <strong class="cover-title" id="coverTitle">책</strong>
-                    <small class="cover-subtitle" id="coverSubtitle">ONE PERSON · ONE LOVETREE</small>
+                    <small class="cover-subtitle" id="coverSubtitle">한 트리, 한 권의 기록</small>
                   </div>
-                  <div class="cover-back" id="coverBack">LOVE 순간 TREE<br /><small>기억의 다음 장으로</small></div>
+                  <div class="cover-back" id="coverBack">순간의 기록<br /><small>기억의 다음 장으로</small></div>
                 </div>
                 <div class="page-spine"></div>
                 <div class="book-pages" id="bookPages">
@@ -442,7 +442,7 @@
             </div>
           </section>
           <aside class="reader-info" aria-labelledby="readerTitle">
-            <p class="eyebrow" id="readerEyebrow">VOLUME · LOVE TREE</p>
+            <p class="eyebrow" id="readerEyebrow">순간의 기록</p>
             <h2 id="readerTitle">책 제목</h2>
             <p id="readerDescription">책을 열기 전에 오른쪽에서 순간 목록을 먼저 골라볼 수 있어요.</p>
             <div class="info-rule"><strong>책 속의 트리</strong><span>각 장에서 같은 트리의 순간을 이어서 읽습니다.</span></div>
@@ -460,7 +460,7 @@
   <div class="modal-backdrop hidden" id="newBookModal" role="presentation">
     <section class="modal" role="dialog" aria-modal="true" aria-labelledby="newBookTitle">
       <button class="modal-close" type="button" data-close="newBookModal" aria-label="닫기">×</button>
-      <p class="eyebrow">NEW LOVE TREE VOLUME</p>
+      <p class="eyebrow">새 트리 만들기</p>
       <h2 id="newBookTitle">새로운 사람의<br />책을 만들어요.</h2>
       <p>사람 이름과 첫 영상 링크를 넣으면 책장에 새 책이 생겨요.</p>
       <form class="new-book-form" id="newBookForm">
@@ -479,7 +479,7 @@
       var $ = function (selector) { return document.querySelector(selector); };
       var $$ = function (selector) { return Array.prototype.slice.call(document.querySelectorAll(selector)); };
       var sourceLabel = 'bookmarks_LIKE_only_2026-07-28.html';
-      var books = LTDEMO.library.map(function(tree,index){var color=['#a84f5d','#627ba2','#8d705e','#6d8979'][index%4];return {id:tree.id,name:tree.title,english:'LOVE TREE · MEMORY',category:'kpop',color:color,accent:color,symbol:'✦',description:'선택한 트리의 기록입니다.',tags:['순간','기록'],chapters:tree.moments.map(m=>({title:m.title,url:m.externalUrl||'',mood:m.emotion,note:m.memo||m.whyNext||'',id:m.id,type:m.type,image:m.image||''}))};});
+      var books = LTDEMO.library.map(function(tree,index){var color=['#a84f5d','#627ba2','#8d705e','#6d8979'][index%4];return {id:tree.id,name:tree.title,english:'순간의 기록',category:'kpop',color:color,accent:color,symbol:'✦',description:'선택한 트리의 기록입니다.',tags:['순간','기록'],chapters:tree.moments.map(m=>({title:m.title,url:m.externalUrl||'',mood:m.emotion,note:m.memo||m.whyNext||'',id:m.id,type:m.type,image:m.image||''}))};});
       var state = { filter:'all', query:'', selectedId:null, shelfIndex:0, shelfList:[], chapterIndex:0, open:false, openProgress:0, customBooks:[], pageTurning:false };
       var storageKey = 'lovetree-people-book-shelf-v2-1-true-page-motion';
       var drag = { active:false, mode:'', startX:0, startY:0, moved:false, startProgress:0 };
@@ -577,7 +577,7 @@
         cover.querySelector('.cover-symbol span').textContent=book.symbol;
         $('#coverTitle').textContent=book.name;
         $('#coverSubtitle').textContent=book.english;
-        $('#coverBack').innerHTML='LOVE 순간 TREE<br /><small>'+esc(book.name)+'의 다음 장으로</small>';
+        $('#coverBack').innerHTML='순간의 기록<br /><small>'+esc(book.name)+'의 다음 장으로</small>';
         $('#readerLabel').textContent='VOLUME · '+book.english;
         $('#stageBookCode').textContent='VOLUME · '+String(allBooks().indexOf(book)+1).padStart(2,'0');
         $('#readerEyebrow').textContent='VOLUME · '+book.english;
@@ -594,7 +594,7 @@
       function leftMarkup(book,index) {
         if(index===0)return '<span class="page-label">첫 마음 · '+esc(book.name)+'</span><div class="chapter-art"><span>'+esc(book.symbol)+'</span></div><span class="page-number">첫 순간</span>';
         var previous=book.chapters[index-1];
-        return '<span class="page-label">PREVIOUS CHAPTER · '+String(index).padStart(2,'0')+'</span><h3>'+esc(previous.title)+'</h3><p>'+esc(previous.note)+'</p><span class="page-number">LOVE PATH · '+String(index).padStart(2,'0')+'</span>';
+        return '<span class="page-label">PREVIOUS CHAPTER · '+String(index).padStart(2,'0')+'</span><h3>'+esc(previous.title)+'</h3><p>'+esc(previous.note)+'</p><span class="page-number">기록 경로 · '+String(index).padStart(2,'0')+'</span>';
       }
       function rightMarkup(book,index) {
         var chapter=book.chapters[index];
@@ -686,7 +686,7 @@
         var cover=document.createElement('div');
         cover.className='book-cover';
         cover.style.setProperty('--cover',getBook(state.selectedId)?.color||'#6b5873');
-        cover.innerHTML='<span class="cover-number">LOVE 순간 TREE</span><span class="cover-symbol"><span>'+esc(getBook(state.selectedId)?.symbol||'♡')+'</span></span><strong class="cover-title">'+esc(getBook(state.selectedId)?.name||'LoveTree')+'</strong><small class="cover-subtitle">'+esc(getBook(state.selectedId)?.english||'LOVE 순간 TREE')+'</small>';
+        cover.innerHTML='<span class="cover-number">순간의 기록</span><span class="cover-symbol"><span>'+esc(getBook(state.selectedId)?.symbol||'♡')+'</span></span><strong class="cover-title">'+esc(getBook(state.selectedId)?.name||'LoveTree')+'</strong><small class="cover-subtitle">'+esc(getBook(state.selectedId)?.english||'순간의 기록')+'</small>';
         source.appendChild(cover);
         document.body.appendChild(source);
         function place(rect){source.style.left=rect.left+'px';source.style.top=rect.top+'px';source.style.width=rect.width+'px';source.style.height=rect.height+'px';}
@@ -867,7 +867,7 @@
           event.preventDefault();
           var name=$('#newBookName').value.trim(),url=$('#newBookUrl').value.trim();
           if(!name||!url)return;
-          state.customBooks.push({id:'custom-'+Date.now(),name:name,english:'MY LOVE TREE',category:'all',color:'#8c6d83',accent:'#8c6d83',symbol:'♡',description:'새롭게 기록하기 시작한 LoveTree 책.',tags:['새 책','첫 마음'],chapters:[{title:$('#newBookChapter').value.trim()||'처음 마음이 움직인 장면',url:url,mood:'첫 마음',note:'이 사람을 처음 책으로 만들게 된 순간'}]});
+          state.customBooks.push({id:'custom-'+Date.now(),name:name,english:'내 트리',category:'all',color:'#8c6d83',accent:'#8c6d83',symbol:'♡',description:'새롭게 기록하기 시작한 트리.',tags:['새 책','첫 마음'],chapters:[{title:$('#newBookChapter').value.trim()||'처음 마음이 움직인 장면',url:url,mood:'첫 마음',note:'이 사람을 처음 책으로 만들게 된 순간'}]});
           save();closeModal('newBookModal');$('#newBookForm').reset();renderShelf();showToast(name+'의 책을 만들었어요.');
         });
       }

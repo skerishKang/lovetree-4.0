@@ -7,7 +7,7 @@ export function createHomeActions({getContext,send,gallery=false}) {
   account:()=>send({type:'lt41-account'}),
   navigate:where=>send({type:'lt41-navigate',view:where==='trees'?SHELF:'src064-orbit.html'}),
   openBook:(_tree,id)=>{if(gallery&&getContext()?.source!=='example'){send({type:'lt41-example',view:BOOK,momentId:id});return;}if(select(id))send({type:'lt41-navigate',view:BOOK});},
-  openWorkspace:(_tree,id)=>{if(select(id))send({type:'lt41-navigate',view:BOARD});},
+  openWorkspace:(_tree,id)=>{if(gallery&&getContext()?.source!=='example'){send({type:'lt41-example',view:BOARD,momentId:id});return;}if(select(id))send({type:'lt41-navigate',view:BOARD});},
   requestMoment:mode=>{if(['new','add','edit'].includes(mode))send({type:'lt41-write',mode});}
  }};
 }

@@ -64,3 +64,11 @@ test('gallery resume does nothing for empty or example records',()=>{
  const sent=[];for(const c of [null,{source:'server',tree:null},{source:'example',...context,momentId:'m01'}])createHomeActions({getContext:()=>c,send:m=>sent.push(m),gallery:true}).actions.resume();
  assert.deepEqual(sent,[]);
 });
+
+test('member gallery board action opens the matching example, leaving member selection untouched',()=>{
+ const c={source:'server',...context,momentId:'m02'},sent=[];
+ const f=createHomeActions({getContext:()=>c,send:m=>sent.push(m),gallery:true});
+ f.actions.openWorkspace('orbit-example','m01');
+ assert.deepEqual(sent,[{type:'lt41-example',view:'track58-pinboard.html',momentId:'m01'}]);
+ assert.equal(c.momentId,'m02');
+});
