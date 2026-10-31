@@ -4,7 +4,7 @@
 
 재사용 대조: Limone `dd8394c5`의 트랜잭션/트리 잠금은 행 단위 DB 모델이라 이식하지 않고, LoveTree의 전체 문서 revision+정본 검증을 유지했다. LoveBud에는 같은 부모 재배선 구현이 없어 가져오지 않았다. 삭제 회귀도 재배선 뒤 다시 확인했다. SRC064 첫 화면·금테·러브트리 · MEMORY ORBIT와 Limone Track32/59/58/56 원본 디자인은 건드리지 않았다.
 
-검증: 재배선 후보, 루트/자기/하위/없는 부모 거부, 이유·자식·links·선택 유지, 삭제, 저장 재시도와 새 세션 재로딩을 회귀 시험으로 추가했다. 대상 42건 전부 통과. 전체 `npm run check` 253 subtests / 252 tests + 1 suite(219 pass, 0 fail, 기존 환경 의존 33 skip), Vite build와 diff check 통과. COM1 공식 Tabbit 격리 fixture의 PC/390px에서 A→C 이동, 기억책·보드·관계 지도 반영, 후보 A/B 제외, 390px 가로 넘침 0, 44px 버튼, 분리된 재배선/관련 연결 UI와 페이지 오류 0을 확인하고 스크린샷을 직접 점검했다. 실제 Google 회원·실기기·소프트키보드·스크린리더 E2E는 미검증이며 완료 근거로 확대하지 않는다. 운영 PR/merge SHA/Pages 배포 결과는 #9와 해당 PR에 함께 기록한다.
+검증: 재배선 후보, 루트/자기/하위/없는 부모 거부, 이유·자식·links·선택 유지, 삭제, 저장 재시도와 새 세션 재로딩을 회귀 시험으로 추가했다. 대상 42건 전부 통과. 전체 `npm run check` 253 subtests / 252 tests + 1 suite(219 pass, 0 fail, 기존 환경 의존 33 skip), Vite build와 diff check 통과. COM1 공식 Tabbit 격리 fixture의 PC/390px에서 A→C 이동, 기억책·보드·관계 지도 반영, 후보 A/B 제외, 390px 가로 넘침 0, 44px 버튼, 분리된 재배선/관련 연결 UI와 페이지 오류 0을 확인하고 스크린샷을 직접 점검했다. 실제 Google 회원·실기기·소프트키보드·스크린리더 E2E는 미검증이며 완료 근거로 확대하지 않는다. PR #125 head `269d4b58942125cac0e2797607a1e17315b50812`, merge `5aaea6263f45cca8d60b80e803a5a1e0775a8595`. PR Check `41226325613`과 merge 후 Check `41226397605`의 Ubuntu/Windows/PostgreSQL이 모두 성공했다. Cloudflare Pages production `508b7e84-8952-422e-b6a7-e67976eba77a`가 main `5aaea62`를 배포했다. 운영 `/v41/`에서 domain/shell/index 200, 재배선 marker, PC/390px 첫 화면·금테·러브트리 · MEMORY ORBIT·가로 넘침/페이지 오류 0을 재확인했다.
 
 ## 2026-11-01 — #10 빠른 순간 작성 UX
 
