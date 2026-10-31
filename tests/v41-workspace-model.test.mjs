@@ -40,12 +40,14 @@ test('300 moments and multiple trees preserve all parents and selection',()=>{
 });
 test('shelf management uses real metadata and removes unsupported fixed classifications',()=>{
   const shelf=fs.readFileSync(new URL('../public/v41/views/track32-bookshelf.html',import.meta.url),'utf8');
+  const designShelf=fs.readFileSync(new URL('../public/v41/design/views/track32-bookshelf.html',import.meta.url),'utf8');
   const navigation=fs.readFileSync(new URL('../public/v41/view-navigation.js',import.meta.url),'utf8');
   const shell=fs.readFileSync(new URL('../public/v41/shell.mjs',import.meta.url),'utf8');
   assert.doesNotMatch(shelf,/data-filter="(?:kpop|actor|series)"/);
   assert.doesNotMatch(shelf,/categoryLabel\(/);
-  assert.match(shelf,/book\.subject/);assert.match(shelf,/coverMedia/);assert.match(shelf,/tree\.coverMomentId/);
-  assert.match(navigation,/subject:t\.subject/);assert.match(navigation,/coverMomentId:t\.coverMomentId/);
+  assert.doesNotMatch(designShelf,/data-filter="(?:kpop|actor|series)"/);assert.doesNotMatch(designShelf,/categoryLabel\(/);assert.doesNotMatch(designShelf,/category:'kpop'/);
+  assert.match(shelf,/book\.subject/);assert.match(designShelf,/book\.subject/);assert.match(shelf,/coverMedia/);assert.match(shelf,/tree\.coverMomentId/);
+  assert.match(navigation,/subject:t\.subject/);assert.match(navigation,/coverMomentId:t\.coverMomentId/);assert.match(navigation,/globalThis\.LTMedia\?\./);
   assert.match(shell,/apply\('editTree'/);assert.match(shell,/tree-manager/);assert.match(shell,/tree-delete/);
 });
 

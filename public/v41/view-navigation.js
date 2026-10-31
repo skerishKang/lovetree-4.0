@@ -1,7 +1,8 @@
 // Reuse Track32's cover transition, then read through the single Track59 reader.
 (() => {
  const c=parent.LT41;
- LTDEMO.library=(c?.trees||[c.tree]).map(t=>({id:t.id,title:t.title,subject:t.subject,coverMomentId:t.coverMomentId||'',moments:t.id===c.tree.id?LTDEMO.moments.map(moment=>{const raw=t.moments.find(item=>item.id===moment.id),media=LTMedia.describe(raw?.url||'');return {...moment,image:media.kind==='photo'&&media.privateFile?media.loadUrl:moment.image||''};}):t.moments.map(m=>{const media=LTMedia.describe(m.url||'');return {id:m.id,title:m.title,memo:m.note,emotion:m.emotion,date:m.date,externalUrl:m.url||'',type:media.kind==='photo'?'photo':media.kind==='video'||media.kind==='youtube'?'video':m.url?'link':'memo',image:media.kind==='photo'&&media.privateFile?media.loadUrl:''};})}));
+ const describe=value=>globalThis.LTMedia?.describe(value)||{kind:value?'link':'none',privateFile:false,loadUrl:''};
+ LTDEMO.library=(c?.trees||[c.tree]).map(t=>({id:t.id,title:t.title,subject:t.subject,coverMomentId:t.coverMomentId||'',moments:t.id===c.tree.id?LTDEMO.moments.map(moment=>{const raw=t.moments.find(item=>item.id===moment.id),media=describe(raw?.url||'');return {...moment,image:media.kind==='photo'&&media.privateFile?media.loadUrl:moment.image||''};}):t.moments.map(m=>{const media=describe(m.url||'');return {id:m.id,title:m.title,memo:m.note,emotion:m.emotion,date:m.date,externalUrl:m.url||'',type:media.kind==='photo'?'photo':media.kind==='video'||media.kind==='youtube'?'video':m.url?'link':'memo',image:media.kind==='photo'&&media.privateFile?media.loadUrl:''};})}));
  LTDEMO.openBook=(id,treeId=c.tree.id)=>{
   if(!LTDEMO.library.some(t=>t.id===treeId&&t.moments.some(m=>m.id===id)))return;
   parent.postMessage({type:'lt41-open-book',treeId,id},location.origin);
