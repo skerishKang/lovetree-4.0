@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createTree, addMoment, editMoment, parentCandidates, reparentMoment, removeMoment, validateState, validateMomentInput, suggestMomentTitle, importTrees, treeLayout, pathTo, stemGroups, linkMoments, unlinkMoments, relatedMoments, MAX_LINKS, safeUrl, newId } from '../src/domain.js';
+import { createTree, editTree, addMoment, editMoment, parentCandidates, reparentMoment, removeMoment, validateState, validateMomentInput, suggestMomentTitle, importTrees, treeLayout, pathTo, stemGroups, linkMoments, unlinkMoments, relatedMoments, MAX_LINKS, safeUrl, newId } from '../src/domain.js';
 
 const input = (title = '첫 목소리') => ({ subject: '윤슬', title, note: '오래 기억하고 싶은 마음', emotion: '설렘', date: '2026-10-27', url: '' });
 const stateOf = tree => ({ version: 1, trees: [tree] });
@@ -212,6 +212,33 @@ test('branched tree layout places every child after its parent', () => {
   assert.equal(positions.size, 3);
   assert.ok(positions.get(tree.moments[1].id).x > positions.get(tree.moments[0].id).x);
   assert.notEqual(positions.get(tree.moments[1].id).y, positions.get(tree.moments[2].id).y);
+});
+
+test('tree details and cover preserve identities, normalize old records, and remap imports', () => {
+  let tree = createTree(input('root'));
+  const rootId = tree.moments[0].id;
+  tree = addMoment(tree, input('cover'), rootId);
+  const coverId = tree.moments[1].id;
+  const beforeIds = tree.moments.map(moment => moment.id);
+  const changed = editTree(tree, { title: '새 책 이름', subject: '새 대상', coverMomentId: coverId }, '2026-11-01T12:00:00.000Z');
+  assert.equal(changed.title, '새 책 이름');
+  assert.equal(changed.subject, '새 대상');
+  assert.equal(changed.coverMomentId, coverId);
+  assert.deepEqual(changed.moments.map(moment => moment.id), beforeIds);
+  assert.equal(changed.moments[1].parentId, rootId);
+  assert.equal(tree.coverMomentId, '');
+  validateState(stateOf(changed));
+
+  const legacy = structuredClone(tree);
+  delete legacy.coverMomentId;
+  assert.equal(validateState(stateOf(legacy)).trees[0].coverMomentId, '');
+  assert.throws(() => editTree(tree, { title: tree.title, subject: tree.subject, coverMomentId: 'other-tree-moment' }), /표지 순간/);
+  assert.equal(removeMoment(changed, coverId).coverMomentId, '');
+
+  const imported = importTrees({ version: 1, trees: [] }, stateOf(changed)).trees[0];
+  assert.notEqual(imported.coverMomentId, coverId);
+  assert.ok(imported.moments.some(moment => moment.id === imported.coverMomentId && moment.title === 'cover'));
+  validateState(stateOf(imported));
 });
 
 test('reparent moves one branch without cycles, orphans, or lost related links', () => {

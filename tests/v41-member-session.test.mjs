@@ -10,6 +10,24 @@ test('response loss keeps draft and retries exactly the same request key',async(
 test('conflict never silently overwrites and account change closes write ownership',async()=>{const {session,writes,api}=setup({put:()=>({ok:false,status:409,code:'revision_conflict',currentRevision:4})});await session.start();session.apply('new',fields);await session.act('retry');assert.equal(session.snapshot().phase,'conflict');assert.throws(()=>session.apply('new',fields));await session.act('retry');assert.equal(writes.length,1);await session.act('pull');assert.equal(session.state().trees.length,0);api.put=async()=>({ok:false,status:401,code:'account_changed'});session.apply('new',fields);await session.act('retry');assert.equal(session.snapshot().owned,false);assert.equal(session.snapshot().writable,false);assert.equal(session.state().trees.length,1);assert.throws(()=>session.apply('new',fields));});
 test('disposed session cannot restore late account read',async()=>{let resolve;const {session,api,events}=setup();api.get=()=>new Promise(r=>resolve=r);const reading=session.start();session.dispose();resolve({ok:true,revision:0,state:{version:1,trees:[]},subject:'member-A',writeSubjectBound:true});await reading;assert.equal(events.length,0);assert.throws(()=>session.apply('new',fields));});
 
+test('tree details and selected cover save, reload, and keep moment identity',async()=>{
+  const {session,writes}=setup();await session.start();
+  const root=session.apply('new',{...fields,title:'root'});
+  const cover=session.apply('add',{...fields,title:'cover',url:'https://example.test/cover.jpg'},root);
+  const before=structuredClone(session.state().trees[0]);
+  const selection=session.apply('editTree',{title:'새 책 이름',subject:'새 대상',coverMomentId:cover.momentId},root);
+  assert.deepEqual(selection,root);
+  let tree=session.state().trees[0];
+  assert.equal(tree.title,'새 책 이름');assert.equal(tree.subject,'새 대상');assert.equal(tree.coverMomentId,cover.momentId);
+  assert.deepEqual(tree.moments.map(moment=>moment.id),before.moments.map(moment=>moment.id));
+  assert.equal(tree.moments[1].parentId,root.momentId);
+  validateState(session.state());
+  await session.act('retry');assert.equal(writes.length,1);
+  const restored=setup({read:{state:writes[0].state,revision:1}}).session;await restored.start();
+  tree=restored.state().trees[0];assert.equal(tree.title,'새 책 이름');assert.equal(tree.subject,'새 대상');assert.equal(tree.coverMomentId,cover.momentId);
+  assert.equal(tree.moments[1].parentId,root.momentId);validateState(restored.state());
+});
+
 test('reparent preserves selection, descendants, links, retry, and reload',async()=>{
   const {session,writes}=setup();await session.start();
   const root=session.apply('new',{...fields,title:'root'});

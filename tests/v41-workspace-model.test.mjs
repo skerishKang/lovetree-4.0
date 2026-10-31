@@ -7,7 +7,7 @@ import fs from 'node:fs';
 const time = '2026-10-31T00:00:00Z';
 const moment = (id, parentId, links = []) => ({id, parentId, links, title:id,
   note:'기록 본문', relation:parentId ? '이어진 이유' : '', emotion:'설렘', date:'2026-10-31', url:'', createdAt:time});
-const document = () => ({revision:7,state:{version:1,trees:[{id:'tree1',title:'기억',subject:'대상',
+const document = () => ({revision:7,state:{version:1,trees:[{id:'tree1',title:'기억',subject:'대상',coverMomentId:'a',
   createdAt:time,updatedAt:time,moments:[moment('root',null),moment('a','root',['b']),
   moment('b','root',['a']),moment('c','root')]}]}});
 test('all children and related connections survive without being confused',()=>{
@@ -17,6 +17,7 @@ test('all children and related connections survive without being confused',()=>{
   assert.deepEqual(result.selection,{treeId:'tree1',momentId:'c'});
   assert.equal(result.revision,7);assert.deepEqual(input,before);
   assert.deepEqual(result.trees[0].moments,input.state.trees[0].moments);
+  assert.equal(result.trees[0].subject,'대상');assert.equal(result.trees[0].coverMomentId,'a');
 });
 test('empty account stays empty; stale selection falls back to root',()=>{
   assert.deepEqual(workspaceModel({revision:0,state:{version:1,trees:[]}}).selection,{treeId:null,momentId:null});
@@ -29,7 +30,7 @@ test('invalid revision or dangling parent is rejected',()=>{
 });
 test('300 moments and multiple trees preserve all parents and selection',()=>{
   const input=document();
-  input.state.trees[0].moments=[moment('root',null),...Array.from({length:299},(_,i)=>moment('n'+i,'root'))];
+  input.state.trees[0].moments=[moment('root',null),...Array.from({length:299},(_,i)=>moment('n'+i,'root'))];input.state.trees[0].coverMomentId='';
   input.state.trees.push({...input.state.trees[0],id:'tree2',moments:[moment('second',null)]});
   const output=workspaceModel(input,{treeId:'tree1',momentId:'n298'});
   assert.equal(output.trees[0].moments.length,300);
@@ -37,6 +38,17 @@ test('300 moments and multiple trees preserve all parents and selection',()=>{
   assert.equal(output.selection.momentId,'n298');
   assert.equal(workspaceModel(input,{treeId:'tree2'}).selection.momentId,'second');
 });
+test('shelf management uses real metadata and removes unsupported fixed classifications',()=>{
+  const shelf=fs.readFileSync(new URL('../public/v41/views/track32-bookshelf.html',import.meta.url),'utf8');
+  const navigation=fs.readFileSync(new URL('../public/v41/view-navigation.js',import.meta.url),'utf8');
+  const shell=fs.readFileSync(new URL('../public/v41/shell.mjs',import.meta.url),'utf8');
+  assert.doesNotMatch(shelf,/data-filter="(?:kpop|actor|series)"/);
+  assert.doesNotMatch(shelf,/categoryLabel\(/);
+  assert.match(shelf,/book\.subject/);assert.match(shelf,/coverMedia/);assert.match(shelf,/tree\.coverMomentId/);
+  assert.match(navigation,/subject:t\.subject/);assert.match(navigation,/coverMomentId:t\.coverMomentId/);
+  assert.match(shell,/apply\('editTree'/);assert.match(shell,/tree-manager/);assert.match(shell,/tree-delete/);
+});
+
 test('view runtime uses imported text only, keeps every edge, and does not persist',()=>{
   const input=document();input.state.trees[0].moments[0].title='<b>원문 그대로</b>';
   const model=workspaceModel(input), context={tree:model.trees[0],momentId:'root'},sent=[];

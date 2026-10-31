@@ -67,7 +67,15 @@ export function validateMomentInput(input) {
 export function createTree(input, clock = new Date().toISOString()) {
   const subject = requireText(input.subject, '좋아하는 대상', 60);
   const moment = { ...validateMomentInput(input), id: newId(), parentId: null, relation: '', links: [], createdAt: clock };
-  return { id: newId(), subject, title: `${subject}, 나의 순간들`, createdAt: clock, updatedAt: clock, moments: [moment] };
+  return { id: newId(), subject, title: `${subject}, 나의 순간들`, coverMomentId: '', createdAt: clock, updatedAt: clock, moments: [moment] };
+}
+export function editTree(tree, input, clock = new Date().toISOString()) {
+  const title = requireText(input.title, '트리 이름', 100);
+  const subject = requireText(input.subject, '좋아하는 대상', 60);
+  const coverMomentId = input.coverMomentId === undefined || input.coverMomentId === null || input.coverMomentId === '' ? '' : input.coverMomentId;
+  if (typeof coverMomentId !== 'string' || (coverMomentId && !tree.moments.some(moment => moment.id === coverMomentId))) throw new Error('이 트리에서 표지 순간을 선택해 주세요.');
+  if (tree.title === title && tree.subject === subject && (tree.coverMomentId || '') === coverMomentId) return tree;
+  return { ...tree, title, subject, coverMomentId, updatedAt: clock };
 }
 export function addMoment(tree, input, parentId, clock = new Date().toISOString()) {
   if (tree.moments.length >= MAX_MOMENTS) throw new Error(`한 트리에는 ${MAX_MOMENTS}개의 순간까지 담을 수 있어요.`);
@@ -121,9 +129,9 @@ export function removeMoment(tree, id, clock = new Date().toISOString()) {
     const successor = remaining.find(m => m.parentId === id);
     if (!successor) throw new Error('순간 연결을 확인해 주세요.');
     parentId = successor.id;
-    return { ...tree, updatedAt: clock, moments: remaining.map(m => m.id === successor.id ? { ...m, parentId: null, relation: '' } : m.parentId === id ? { ...m, parentId, relation: '' } : m) };
+    return { ...tree, coverMomentId: tree.coverMomentId === id ? '' : tree.coverMomentId || '', updatedAt: clock, moments: remaining.map(m => m.id === successor.id ? { ...m, parentId: null, relation: '' } : m.parentId === id ? { ...m, parentId, relation: '' } : m) };
   }
-  return { ...tree, updatedAt: clock, moments: remaining.map(m => m.parentId === id ? { ...m, parentId, relation: '' } : m) };
+  return { ...tree, coverMomentId: tree.coverMomentId === id ? '' : tree.coverMomentId || '', updatedAt: clock, moments: remaining.map(m => m.parentId === id ? { ...m, parentId, relation: '' } : m) };
 }
 
 export function linksOf(moment) {
@@ -190,7 +198,9 @@ export function validateState(value) {
         if (!current) throw new Error('연결된 순간이 파일에 없어요.');
       }
     }
-    return { id: tree.id, subject: requireText(tree.subject, '대상', 60), title: requireText(tree.title, '트리 제목', 100), createdAt: tree.createdAt, updatedAt: tree.updatedAt, moments };
+    const coverMomentId = tree.coverMomentId ?? '';
+    if (typeof coverMomentId !== 'string' || (coverMomentId && !byId.has(coverMomentId))) throw new Error('표지 순간이 트리에 없어요.');
+    return { id: tree.id, subject: requireText(tree.subject, '대상', 60), title: requireText(tree.title, '트리 제목', 100), coverMomentId, createdAt: tree.createdAt, updatedAt: tree.updatedAt, moments };
   });
   return { version: 1, trees };
 }
@@ -200,7 +210,7 @@ export function importTrees(current, incoming) {
   if (current.trees.length + safe.trees.length > MAX_TREES) throw new Error(`트리는 ${MAX_TREES}개까지 보관할 수 있어요.`);
   const copies = safe.trees.map(tree => {
     const ids = new Map(tree.moments.map(m => [m.id, newId()]));
-    return { ...tree, id: newId(), moments: tree.moments.map(m => ({ ...m, id: ids.get(m.id), parentId: m.parentId === null ? null : ids.get(m.parentId), links: linksOf(m).map(link => ids.get(link)).filter(Boolean) })) };
+    return { ...tree, id: newId(), coverMomentId: tree.coverMomentId ? ids.get(tree.coverMomentId) : '', moments: tree.moments.map(m => ({ ...m, id: ids.get(m.id), parentId: m.parentId === null ? null : ids.get(m.parentId), links: linksOf(m).map(link => ids.get(link)).filter(Boolean) })) };
   });
   return { version: 1, trees: [...current.trees, ...copies] };
 }
