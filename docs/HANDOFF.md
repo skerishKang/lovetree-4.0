@@ -1,3 +1,7 @@
+## 4.1 UI correction — 2026-10-31
+
+Replaced the development toolbar with a compact shared header and full remaining viewport for all five Limone-derived views. Record loading/import and actual-edge navigation now live in modal panels. A 12-moment example with artwork reused from the original comparison sample opens on entry; its media is never applied to server/file records, even for matching IDs. Server API/auth contracts and member data remain unchanged. Mobile board tools/details no longer cover the canvas on entry; network overview now renders actual parent/related edges and fits the data at both widths.
+
 ## 4.1 same-origin reader preparation — 2026-10-31
 
 Added isolated public/v41 assets from the Limone comparison Site (source 8ea4122e5f6095b1188336a9f92939a46868348f) with current 4.0 workspace API and domain validation reused. /v41/ uses existing /auth/login?next=/v41/, GET /api/workspace and POST /auth/logout on the same origin. No PUT, migration, auth policy or backend config changes. Login/account boundary clears imported records before each server read; stale reads cannot restore records after logout. Static demonstration images were removed from the text-only record reader. Imported record rendering and common auth browser roundtrip still require final browser validation before merge/deployment.
