@@ -1,5 +1,5 @@
 import {mountPrivateUpload} from './private-upload.mjs';
-import {suggestMomentTitle} from './domain.mjs';
+import {suggestMomentTitle,parentCandidates} from './domain.mjs';
 import {MEMBER_LOGIN_URL,shouldLoadMemberRecords} from './member-entry.mjs';
 import {workspaceModel} from './workspace-model.mjs';
 import {createWorkspaceApi} from './api.mjs';
@@ -7,7 +7,7 @@ import {createMemberSession} from './member-session.mjs';
 import {exampleTree} from './example.mjs';
 const $=id=>document.getElementById(id);
 const screens=[['home','src064-orbit.html','첫 화면'],['shelf','track32-bookshelf.html','내 책장'],['book','track59-sketchbook.html','기억책'],['board','track58-pinboard.html','기억 보드'],['network','track56-network.html','관계 지도']];
-let model=null,current=screens.find(s=>'#'+s[0]===location.hash)?.[1]||screens[0][1],source='example',loadGeneration=0,toastTimer,previousDirty=false,member=null,editorMode='new',formBaseline='';
+let model=null,current=screens.find(s=>'#'+s[0]===location.hash)?.[1]||screens[0][1],source='example',loadGeneration=0,toastTimer,previousDirty=false,member=null,editorMode='new',formBaseline='',parentBaseline='';
 window.LT41=null;
 const uploads=mountPrivateUpload({form:$('moment-form'),getSubject:()=>source==='server'&&member?.snapshot().writable?member.snapshot().subject:null,getState:()=>member?.state(),onChange:()=>{updateMediaPreview();updateQuickEntryHint();}});
 function notify(text){$('record-feedback').textContent=text;$('toast').textContent=text;$('toast').hidden=$('records').open;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').hidden=true,6500);}
@@ -30,7 +30,9 @@ function choose(id,momentId){const tree=model.trees.find(t=>t.id===id);window.LT
 function load(input,kind,selection={}){model=kind==='example'?{trees:[exampleTree]}:workspaceModel(input);source=kind;document.body.dataset.recordSource=kind;$('source-label').textContent='트리 선택';$('record-description').textContent=kind==='example'?'실제 회원 데이터와 무관한 예시입니다.':kind==='server'?'로그인한 계정의 서버 기록 · 작성·수정 후 자동 저장':'선택한 파일을 메모리에서 읽는 중입니다.';$('trees').replaceChildren();for(const t of model.trees){const o=document.createElement('option');o.value=t.id;o.textContent=t.title;$('trees').append(o);}$('trees').disabled=!model.trees.length;const chosen=model.trees.find(t=>t.id===selection.treeId)||model.trees[0];$('trees').value=chosen?.id||'';choose(chosen?.id,selection.momentId);}
 function clear(){load({revision:0,state:{version:1,trees:[]}},'file');$('source-label').textContent='트리 선택';$('record-description').textContent='펼쳐 볼 트리를 선택하세요.';}
 function stateSelection(){return {treeId:window.LT41?.tree.id,momentId:window.LT41?.momentId};}
-function formDirty(){return $('editor').open&&new URLSearchParams(new FormData($('moment-form'))).toString()!==formBaseline;}
+function parentValue(){return new URLSearchParams({targetId:$('parent-target').value,relation:$('parent-relation').value}).toString();}
+function parentDirty(){return !$('parent-management').hidden&&parentValue()!==parentBaseline;}
+function formDirty(){return $('editor').open&&(new URLSearchParams(new FormData($('moment-form'))).toString()!==formBaseline||parentDirty());}
 function canLeave(){return !(formDirty()||member?.snapshot().dirty)||confirm('아직 저장되지 않은 입력이 있어요. 현재 기록을 백업한 뒤 이동하는 것을 권합니다. 저장하지 않고 이동할까요?');}
 function leaveMember(){if(!canLeave())return false;member?.dispose();member=null;return true;}
 function memberStatus(status){
@@ -62,17 +64,38 @@ $('view').onload=()=>{const d=$('view').contentDocument;if(!d)return;d.addEventL
 load(null,'example');
 
 function backup(){const data=member?.state();if(!data){notify('백업할 내 기록이 없어요.');return;}const a=document.createElement('a'),url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));a.href=url;a.download='lovetree-draft.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),0);}
-function setEditorMode(mode){if(uploads.busy){notify('파일 전송을 마치거나 취소한 뒤 작업을 바꿔 주세요.');return;}if(formDirty()&&!confirm('현재 입력을 비우고 작업을 바꿀까요?'))return;uploads.reset();const c=window.LT41,m=c?.tree.moments.find(m=>m.id===c.momentId);if(mode!=='new'&&!m){notify('먼저 순간을 선택해 주세요.');return;}editorMode=mode;$('editor-title').textContent=mode==='new'?'새 트리 만들기':mode==='add'?'순간 추가':'순간 수정';const form=$('moment-form');form.reset();$('subject-label').hidden=mode!=='new';form.elements.subject.required=mode==='new';$('relation-label').hidden=mode==='new'||(mode==='edit'&&m?.parentId===null);for(const name of ['title','note','emotion','date','url','relation'])form.elements[name].value=mode==='edit'?m[name]||'':name==='emotion'?'설렘':name==='date'?new Date().toISOString().slice(0,10):'';
- $('editor-context').textContent=mode==='new'?'새 트리의 첫 순간입니다. 좋아하는 대상을 먼저 적어 주세요.':mode==='add'?`이어질 순간 · ${m.title}`:`수정할 순간 · ${m.title}`;$('form-error').textContent='';$('moment-management').hidden=mode!=='edit';$('related-target').replaceChildren();for(const other of c?.tree.moments||[]){if(other.id===m?.id)continue;const o=document.createElement('option');o.value=other.id;o.textContent=(m?.links?.includes(other.id)?'연결됨 · ':'')+other.title;$('related-target').append(o);}document.querySelectorAll('[data-mode]').forEach(b=>b.setAttribute('aria-current',String(b.dataset.mode===mode)));updateMediaPreview();updateQuickEntryHint();formBaseline=new URLSearchParams(new FormData(form)).toString();}
+function setEditorMode(mode){
+ if(uploads.busy){notify('파일 전송을 마치거나 취소한 뒤 작업을 바꿔 주세요.');return;}
+ if(formDirty()&&!confirm('현재 입력을 비우고 작업을 바꿀까요?'))return;
+ uploads.reset();
+ const c=window.LT41,m=c?.tree.moments.find(moment=>moment.id===c.momentId);
+ if(mode!=='new'&&!m){notify('먼저 순간을 선택해 주세요.');return;}
+ editorMode=mode;
+ $('editor-title').textContent=mode==='new'?'새 트리 만들기':mode==='add'?'순간 추가':'순간 수정';
+ const form=$('moment-form');form.reset();
+ $('subject-label').hidden=mode!=='new';form.elements.subject.required=mode==='new';$('relation-label').hidden=mode!=='add';
+ for(const name of ['title','note','emotion','date','url','relation'])form.elements[name].value=mode==='edit'?m[name]||'':name==='emotion'?'설렘':name==='date'?new Date().toISOString().slice(0,10):'';
+ const parent=mode==='edit'&&m.parentId?c.tree.moments.find(moment=>moment.id===m.parentId):null;
+ $('editor-context').textContent=mode==='new'?'새 트리의 첫 순간입니다. 좋아하는 대상을 먼저 적어 주세요.':mode==='add'?`새 순간 추가 · ${m.title}에서 이어집니다.`:parent?`수정할 순간 · ${m.title} · 현재 이전 순간: ${parent.title}`:`수정할 순간 · ${m.title} · 트리의 시작 순간`;
+ $('form-error').textContent='';$('moment-management').hidden=mode!=='edit';
+ const reparenting=mode==='edit'&&m.parentId!==null;
+ $('parent-management').hidden=!reparenting;$('parent-current').textContent=parent?`현재 이전 순간 · ${parent.title}`:'';
+ $('parent-target').replaceChildren();
+ if(reparenting){for(const other of parentCandidates(c.tree,m.id)){const o=document.createElement('option');o.value=other.id;o.textContent=other.title;$('parent-target').append(o);}$('parent-target').value=m.parentId;$('parent-relation').value=m.relation||'';}else $('parent-relation').value='';
+ $('related-target').replaceChildren();for(const other of c?.tree.moments||[]){if(other.id===m?.id)continue;const o=document.createElement('option');o.value=other.id;o.textContent=(m?.links?.includes(other.id)?'연결됨 · ':'')+other.title;$('related-target').append(o);}
+ document.querySelectorAll('[data-mode]').forEach(b=>b.setAttribute('aria-current',String(b.dataset.mode===mode)));
+ updateMediaPreview();updateQuickEntryHint();formBaseline=new URLSearchParams(new FormData(form)).toString();parentBaseline=parentValue();
+}
 function openEditor(requestedMode){if(source!=='server'||!member?.snapshot().owned){notify('로그인한 뒤 내 기록을 먼저 불러와 주세요.');panel('records');return;}if(!member.snapshot().writable){notify('서버 편집 연결이 아직 준비되지 않았어요. 기록은 안전하게 읽을 수 있습니다.');panel('records');return;}const mode=['new','add','edit'].includes(requestedMode)?requestedMode:window.LT41?'add':'new';setEditorMode(mode);panel('editor');queueMicrotask(()=>$('moment-form').elements[mode==='new'?'subject':'note'].focus());}
 $('write-menu').onclick=()=>openEditor(current==='track32-bookshelf.html'?'new':undefined);document.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>setEditorMode(b.dataset.mode));
 function updateMediaPreview(){const form=$('moment-form'),url=form.elements.url.value,info=LTMedia.describe(url);$('url-media-hint').textContent=info.kind==='none'?'사진·영상은 직접 HTTPS 링크를 사용할 수 있어요. YouTube와 일반 링크도 지원해요. 사진·영상 파일도 직접 첨부할 수 있어요.':info.kind==='invalid'?'링크 형식을 확인해 주세요.':info.label;
  $('url-media-preview').innerHTML=url?LTMedia.markup(url,form.elements.title.value):'';}
 function updateQuickEntryHint(){const form=$('moment-form'),title=form.elements.title.value.trim(),note=form.elements.note.value.trim(),url=form.elements.url.value.trim();let suggested='';try{suggested=suggestMomentTitle({title,note,url});}catch{}$('quick-entry-hint').textContent=title?'입력한 제목으로 저장합니다.':suggested?`제목은 “${suggested}”(으)로 자동 정리됩니다.`:'제목·마음·링크나 첨부 중 하나만 남겨도 저장할 수 있어요.';}
 for(const name of ['title','note','url'])$('moment-form').elements[name].addEventListener('input',()=>{if(name==='url'||name==='title')updateMediaPreview();updateQuickEntryHint();});
- $('moment-form').onsubmit=e=>{e.preventDefault();if(uploads.busy)return;try{member.apply(editorMode,Object.fromEntries(new FormData(e.target)),stateSelection());formBaseline=new URLSearchParams(new FormData(e.target)).toString();$('editor').close();if(editorMode==='new')show('track59-sketchbook.html');notify('서버에 저장하고 있어요.');}catch(error){$('form-error').textContent=error.message;}};
+ $('moment-form').onsubmit=e=>{e.preventDefault();if(uploads.busy)return;if(parentDirty()){$('form-error').textContent='이전 순간 변경은 아래 버튼으로 먼저 저장해 주세요.';return;}try{member.apply(editorMode,Object.fromEntries(new FormData(e.target)),stateSelection());formBaseline=new URLSearchParams(new FormData(e.target)).toString();$('editor').close();if(editorMode==='new')show('track59-sketchbook.html');notify('서버에 저장하고 있어요.');}catch(error){$('form-error').textContent=error.message;}};
 $('editor').addEventListener('cancel',e=>{if(uploads.busy){e.preventDefault();return;}if(formDirty()&&!confirm('작성 중인 입력을 버리고 닫을까요?'))e.preventDefault();});$('editor-cancel').onclick=()=>{if(uploads.busy){notify('파일 전송을 마치거나 취소해 주세요.');return;}if(!formDirty()||confirm('작성 중인 입력을 버리고 닫을까요?'))$('editor').close();};
-for(const [id,action] of [['link-moment','link'],['unlink-moment','unlink']])$(id).onclick=()=>{try{member.apply(action,{targetId:$('related-target').value},stateSelection());setEditorMode('edit');}catch(e){$('form-error').textContent=e.message;}};
+$('change-parent').onclick=()=>{try{member.apply('reparent',{targetId:$('parent-target').value,relation:$('parent-relation').value},stateSelection());formBaseline=new URLSearchParams(new FormData($('moment-form'))).toString();parentBaseline=parentValue();setEditorMode('edit');notify('이전 순간을 바꾸고 서버에 저장하고 있어요.');queueMicrotask(()=>$('change-parent').focus());}catch(e){$('form-error').textContent=e.message;}};
+for(const [id,action] of [['link-moment','link'],['unlink-moment','unlink']])$(id).onclick=()=>{try{member.apply(action,{targetId:$('related-target').value},stateSelection());formBaseline=new URLSearchParams(new FormData($('moment-form'))).toString();parentBaseline=parentValue();setEditorMode('edit');}catch(e){$('form-error').textContent=e.message;}};
 for(const [id,action,message] of [['delete-moment','delete','이 순간을 삭제할까요? 자식 순간은 이전 순간으로 이어지고 관련 연결은 해제됩니다.'],['delete-tree','deleteTree','이 트리와 모든 순간을 삭제할까요?']])$(id).onclick=()=>{if(!confirm(message))return;try{member.apply(action,{},stateSelection());$('editor').close();}catch(e){$('form-error').textContent=e.message;}};
 $('backup-draft').onclick=backup;addEventListener('beforeunload',e=>{if(member?.snapshot().dirty||formDirty()){e.preventDefault();e.returnValue='';}});
 if(shouldLoadMemberRecords(location.search,document.cookie))startMember();

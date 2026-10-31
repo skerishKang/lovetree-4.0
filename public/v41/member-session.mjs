@@ -1,5 +1,5 @@
 import {createSyncController} from './sync-controller.mjs';
-import {EMPTY_STATE,validateState,createTree,addMoment,editMoment,removeMoment,linkMoments,unlinkMoments,MAX_TREES,newId} from './domain.mjs';
+import {EMPTY_STATE,validateState,createTree,addMoment,editMoment,reparentMoment,removeMoment,linkMoments,unlinkMoments,MAX_TREES,newId} from './domain.mjs';
 // Reuses 4.0 persistence, retries and revision conflicts; demo/file records cannot enter this session.
 export function createMemberSession({api,onState=()=>{},onStatus=()=>{},navigate=()=>{},delay,makeClientKey=()=>`v41-${newId()}`}){
  let document=EMPTY_STATE(),subject=null,bound=false,active=true,mismatch=false;
@@ -14,6 +14,7 @@ export function createMemberSession({api,onState=()=>{},onStatus=()=>{},navigate
    else {if(!tree)throw Error('트리를 선택해 주세요.');let next;
     if(action==='add'){next=addMoment(tree,input,momentId);momentId=next.moments.at(-1).id;}
     else if(action==='edit')next=editMoment(tree,momentId,input);
+    else if(action==='reparent')next=reparentMoment(tree,momentId,input.targetId,input.relation);
     else if(action==='delete'){next=removeMoment(tree,momentId);momentId=next.moments.find(m=>m.id===tree.moments.find(m=>m.id===momentId)?.parentId)?.id||next.moments[0].id;}
     else if(action==='link')next=linkMoments(tree,momentId,input.targetId);
     else if(action==='unlink')next=unlinkMoments(tree,momentId,input.targetId);

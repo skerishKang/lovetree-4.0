@@ -9,3 +9,29 @@ test('quick compose creates a first note and a linked URL without forcing both t
 test('response loss keeps draft and retries exactly the same request key',async()=>{const {session,writes}=setup({put:(_b,ws)=>ws.length===1?{ok:false,status:0}:{ok:true,revision:1}});await session.start();session.apply('new',fields);await session.act('retry');assert.equal(session.snapshot().dirty,true);await session.act('retry');assert.equal(writes[0].clientKey,writes[1].clientKey);assert.deepEqual(writes[0],writes[1]);assert.equal(session.snapshot().dirty,false);});
 test('conflict never silently overwrites and account change closes write ownership',async()=>{const {session,writes,api}=setup({put:()=>({ok:false,status:409,code:'revision_conflict',currentRevision:4})});await session.start();session.apply('new',fields);await session.act('retry');assert.equal(session.snapshot().phase,'conflict');assert.throws(()=>session.apply('new',fields));await session.act('retry');assert.equal(writes.length,1);await session.act('pull');assert.equal(session.state().trees.length,0);api.put=async()=>({ok:false,status:401,code:'account_changed'});session.apply('new',fields);await session.act('retry');assert.equal(session.snapshot().owned,false);assert.equal(session.snapshot().writable,false);assert.equal(session.state().trees.length,1);assert.throws(()=>session.apply('new',fields));});
 test('disposed session cannot restore late account read',async()=>{let resolve;const {session,api,events}=setup();api.get=()=>new Promise(r=>resolve=r);const reading=session.start();session.dispose();resolve({ok:true,revision:0,state:{version:1,trees:[]},subject:'member-A',writeSubjectBound:true});await reading;assert.equal(events.length,0);assert.throws(()=>session.apply('new',fields));});
+
+test('reparent preserves selection, descendants, links, retry, and reload',async()=>{
+  const {session,writes}=setup();await session.start();
+  const root=session.apply('new',{...fields,title:'root'});
+  const a=session.apply('add',{...fields,title:'A'},root);
+  const b=session.apply('add',{...fields,title:'B'},a);
+  const c=session.apply('add',{...fields,title:'C'},root);
+  session.apply('link',{targetId:c.momentId},a);
+  const selection=session.apply('reparent',{targetId:c.momentId,relation:'C에서 다시 이어져서'},a);
+  assert.deepEqual(selection,a);
+  let tree=session.state().trees[0];
+  assert.equal(tree.moments.find(moment=>moment.id===a.momentId).parentId,c.momentId);
+  assert.equal(tree.moments.find(moment=>moment.id===b.momentId).parentId,a.momentId);
+  assert.ok(tree.moments.find(moment=>moment.id===a.momentId).links.includes(c.momentId));
+  assert.throws(()=>session.apply('reparent',{targetId:b.momentId},a),/다음 순간/);
+  assert.throws(()=>session.apply('reparent',{targetId:c.momentId},root),/시작 순간/);
+  validateState(session.state());
+  await session.act('retry');
+  assert.equal(writes.length,1);
+  const restored=setup({read:{state:writes[0].state,revision:1}}).session;
+  await restored.start();
+  tree=restored.state().trees[0];
+  assert.equal(tree.moments.find(moment=>moment.id===a.momentId).parentId,c.momentId);
+  assert.equal(tree.moments.find(moment=>moment.id===b.momentId).parentId,a.momentId);
+  validateState(restored.state());
+});
