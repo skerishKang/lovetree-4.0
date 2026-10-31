@@ -14,11 +14,10 @@ body.home-screen .app-header{display:none}
 .tree-views{display:flex;align-items:center;gap:4px;margin-left:12px;padding-left:12px;border-left:1px solid var(--line)}.tree-views>small{font-size:11px;white-space:nowrap;color:var(--muted);margin-right:5px}.tree-views[hidden],#connection-menu[hidden]{display:none!important}
 @media(max-width:780px){.tree-views{flex:3;margin-left:4px;padding-left:4px;gap:0}.tree-views>small{display:none}nav>button{flex:1}.tree-views>button{padding:0 8px}.header-actions{min-width:0}.header-actions #write-menu{max-width:96px;overflow:hidden;text-overflow:ellipsis}}
 
-/* The selected tree stays visible when its presentation changes. */
-#view-context{flex:0 0 auto;display:flex;align-items:center;gap:12px;min-height:44px;padding:8px 24px;background:#1d1720;color:#dbced7;border-bottom:1px solid var(--line);font-size:12px}
+/* One tree label; the selected navigation tab already names the current view. */
+#view-context{flex:0 0 auto;display:flex;align-items:center;gap:10px;min-height:36px;padding:6px 24px;background:#1d1720;color:#dbced7;border-bottom:1px solid var(--line);font-size:12px}
 #view-context[hidden]{display:none}
+.context-label{font-size:11px;color:var(--muted);white-space:nowrap}
 #context-kind{font-size:10px;color:var(--rose);white-space:nowrap}
-#context-tree{font-weight:600;max-width:36%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-#context-screen{color:#f4e5eb;white-space:nowrap;border-left:1px solid #ffffff25;padding-left:12px}
-#context-moment{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);margin-left:auto}
-@media(max-width:780px){#view-context{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:4px 8px;padding:8px 12px}#context-tree{max-width:none}#context-moment{grid-column:2/4;margin-left:0;font-size:11px}#context-screen{font-size:11px;padding-left:8px}}
+#context-tree{font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media(max-width:780px){#view-context{padding:6px 12px;gap:8px}}
