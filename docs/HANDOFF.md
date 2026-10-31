@@ -1,3 +1,7 @@
+## 4.1 completed design promotion — 2026-10-31
+
+Promoted the exact forty-moment/forty-two-edge Limone demonstration (comparison source bcebf09dce72c30c09cd71658f4f8ee536a399ec) into the default /v41/ example view. Original five adapters are isolated under public/v41/design; account and file records continue through validated reader adapters and existing same-origin auth/API. The demo graph is not coerced into the member single-parent model and is never sent to the server. No new ChatGPT Site, database/auth configuration or 4.0 UI changes.
+
 ## 4.1 UI correction — 2026-10-31
 
 Replaced the development toolbar with a compact shared header and full remaining viewport for all five Limone-derived views. Record loading/import and actual-edge navigation now live in modal panels. A 12-moment example with artwork reused from the original comparison sample opens on entry; its media is never applied to server/file records, even for matching IDs. Server API/auth contracts and member data remain unchanged. Mobile board tools/details no longer cover the canvas on entry; network overview now renders actual parent/related edges and fits the data at both widths.
