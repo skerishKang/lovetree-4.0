@@ -6,7 +6,7 @@ export function mountPrivateUpload({form,getSubject,getState,onChange}){
  section.innerHTML='<h3>사진·영상 첨부</h3><p>내 계정에만 보관합니다. 사진 4MiB · 영상 8MiB, 계정당 100MiB·200개까지.</p><label class="file-label">파일 선택<input type="file" accept="image/png,image/jpeg,image/gif,image/webp,video/mp4,video/webm" data-media-file></label><div class="button-row"><button type="button" data-upload>파일 올리기</button><button type="button" data-stop hidden>전송 취소</button></div><p role="status" data-upload-status></p><details><summary>내 보관 파일 · 다시 첨부·삭제</summary><p>기록이나 트리를 지워도 첨부 파일은 남습니다. 파일을 삭제하면 그 파일을 쓰던 기록에서도 더 이상 볼 수 없어요. JSON 백업에는 링크만 포함됩니다.</p><button type="button" data-refresh>목록 새로고침</button><p data-usage></p><div data-assets></div></details>';
  form.querySelector('[name=url]').closest('label').before(section);
  const $=s=>section.querySelector(s),fileInput=$('[data-media-file]'),status=$('[data-upload-status]');
- let file=null,id=null,busy=false,controller=null,version=0;
+ let file=null,id=null,busy=false,controller=null,version=0,listRequest=0;
  function setBusy(value){busy=value;$('[data-upload]').disabled=value;fileInput.disabled=value;$('[data-stop]').hidden=!value;form.querySelector('[type=submit]').disabled=value;}
  fileInput.addEventListener('change',()=>{file=fileInput.files[0]||null;id=crypto.randomUUID();status.textContent=file?file.name+' · '+Math.ceil(file.size/1024)+' KiB':'';});
  $('[data-stop]').onclick=()=>controller?.abort();
@@ -26,10 +26,10 @@ export function mountPrivateUpload({form,getSubject,getState,onChange}){
  };
  function assetName(url){return window.LTMedia?.privateAssetName(url)||null;}
  async function refresh(){
-  const subject=getSubject(),generation=version;const host=$('[data-assets]');host.replaceChildren();
+  const subject=getSubject(),generation=version,request=++listRequest;const host=$('[data-assets]');host.replaceChildren();
   if(!subject){$('[data-usage]').textContent='내 기록을 먼저 불러와 주세요.';return;}
   $('[data-usage]').textContent='목록을 불러오고 있어요…';
-  const result=await api.listMedia();if(generation!==version||subject!==getSubject())return;
+  const result=await api.listMedia();if(generation!==version||request!==listRequest||subject!==getSubject())return;
   if(!result.ok||result.media?.subject!==subject){$('[data-usage]').textContent=result.message||'파일 목록을 불러오지 못했어요. 다시 시도해 주세요.';return;}
   const data=result.media;$('[data-usage]').textContent=(data.usedBytes/1048576).toFixed(1)+' / '+(data.quotaBytes/1048576)+' MiB · '+data.items.length+' / '+data.maxItems+'개';
   if(!data.items.length){host.textContent='보관한 파일이 없어요.';return;}
@@ -43,6 +43,6 @@ export function mountPrivateUpload({form,getSubject,getState,onChange}){
    row.append(use,remove);host.append(row);
   }
  }
- $('[data-refresh]').onclick=refresh;$('details').addEventListener('toggle',()=>{if($('details').open)refresh();});
- return {reset(){++version;controller?.abort();file=null;id=null;fileInput.value='';status.textContent='';$('[data-assets]').replaceChildren();$('[data-usage]').textContent='';$('details').open=false;},get busy(){return busy;}};
+ $('[data-refresh]').onclick=refresh;$('details').addEventListener('toggle',()=>{if($('details').open)refresh();else ++listRequest;});
+ return {reset(){++version;++listRequest;controller?.abort();file=null;id=null;fileInput.value='';status.textContent='';$('[data-assets]').replaceChildren();$('[data-usage]').textContent='';$('details').open=false;},get busy(){return busy;}};
 }
