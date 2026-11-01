@@ -6,7 +6,8 @@
 
 2026-11-01 Owner 결정으로 **앞으로의 신규 기능과 UI/UX 개선은 4.1에 집중한다.**
 
-- 운영·검수: https://lovetree-4-0.pages.dev/v41/
+- 4.1 기본 주소: https://lovetree.padiem.net/
+- 기존 4.1 주소도 유지: https://lovetree-4-0.pages.dev/v41/
 - 4.0 UI: 기존 루트와 경로를 호환용으로 보존한다. 루트/로그인 복귀 주소의 자동 전환은 이번 문서 변경에 포함하지 않는다.
 - 저장소는 기존 skerishKang/lovetree-4.0을 계속 사용한다.
 - SRC064 첫 화면·금테·카메라와 리모네 Track32/59/58/56의 디자인을 유지한다.
