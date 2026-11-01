@@ -155,7 +155,8 @@ const login = await buildLogin(pool);
 const mediaHandler = createMediaHandler({
  authenticate, productId: LOVETREE_PRODUCT_ID,
  store: process.env.LOVETREE_MEDIA_DIR ? createPrivateMediaStore({directory:process.env.LOVETREE_MEDIA_DIR}) : null,
- publicOrigin: process.env.LOVETREE_PUBLIC_ORIGIN
+ publicOrigin: process.env.LOVETREE_PUBLIC_ORIGIN,
+ additionalPublicOrigins: (process.env.LOVETREE_ADDITIONAL_PUBLIC_ORIGINS || '').split(',').map(x=>x.trim()).filter(Boolean)
 });
 
 const requestHandler = async (request) => {

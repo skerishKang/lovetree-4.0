@@ -1,7 +1,7 @@
 import { createVerifier } from './padiem-access-verify.mjs';
 const AUTH = 'https://auth.padiem.net';
 const CLIENT = 'lovetree-4-0';
-const CALLBACK = 'https://lovetree-4-0.pages.dev/auth/callback';
+const CALLBACKS = ['https://lovetree-4-0.pages.dev/auth/callback', 'https://lovetree.padiem.net/auth/callback'];
 const enc = new TextEncoder(), dec = new TextDecoder();
 const b64 = bytes => btoa(String.fromCharCode(...new Uint8Array(bytes))).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
 const un64 = s => Uint8Array.from(atob(s.replaceAll('-', '+').replaceAll('_', '/').padEnd(Math.ceil(s.length / 4) * 4, '=')), x => x.charCodeAt(0));
@@ -12,7 +12,7 @@ const attrs = 'Secure; HttpOnly; SameSite=Lax';
 const json = (status, error) => new Response(JSON.stringify({ error }), { status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' } });
 const validNext = value => typeof value === 'string' && /^\/[A-Za-z0-9_./-]*$/.test(value) && !value.startsWith('//') ? value : '/';
 function callbackFor(request, env) {
-  const configured = env.LOVETREE_AUTH_CALLBACK_URI || CALLBACK;
+  const configured = env.LOVETREE_AUTH_CALLBACK_URI || CALLBACKS.find(value => new URL(value).origin === new URL(request.url).origin);
   const url = new URL(configured);
   if (url.protocol !== 'https:' || url.origin !== new URL(request.url).origin || url.pathname !== '/auth/callback' || url.search || url.hash || url.username || url.password) throw new Error('invalid callback');
   return url.href;
@@ -64,12 +64,12 @@ export function createSharedPagesAuth({ fetcher = fetch, now = () => Math.floor(
         const challenge = b64(await crypto.subtle.digest('SHA-256', enc.encode(verifier)));
         const target = new URL(`${AUTH}/login`);
         for (const [k,v] of Object.entries({ client_id: CLIENT, redirect_uri: callback, state, code_challenge: challenge, code_challenge_method: 'S256' })) target.searchParams.set(k,v);
-        const sealed = await seal(env, { state, verifier, next, exp: current + 600 });
+        const sealed = await seal(env, { state, verifier, next, callback, exp: current + 600 });
         return new Response(null, { status: 302, headers: { location: target.href, 'cache-control': 'no-store', 'set-cookie': `lovetree_auth_state=${sealed}; Path=/auth; Max-Age=600; ${attrs}` } });
       }
       if (path === '/auth/callback' && request.method === 'GET') {
         const state = await unseal(env, jar.lovetree_auth_state);
-        if (state.exp <= current || !state.state || state.state !== url.searchParams.get('state') || !url.searchParams.get('code') || validNext(state.next) !== state.next) return json(401, 'invalid_state');
+        if (state.callback !== callbackFor(request, env) || state.exp <= current || !state.state || state.state !== url.searchParams.get('state') || !url.searchParams.get('code') || validNext(state.next) !== state.next) return json(401, 'invalid_state');
         const tokens = await exchange(env, { grant_type: 'authorization_code', code: url.searchParams.get('code'), redirect_uri: callbackFor(request, env), code_verifier: state.verifier }, fetcher, current);
         await verify(tokens.access_token);
         if (typeof tokens.refresh_token !== 'string') throw new Error('missing refresh');

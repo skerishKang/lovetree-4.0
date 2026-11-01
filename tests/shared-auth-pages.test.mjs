@@ -66,3 +66,20 @@ test('4.1 login callback returns to 4.1 and cookie marker triggers member loadin
  assert.match(response.headers.get('set-cookie'),/__Host-lovetree-shared=1/);
  assert.equal(shouldLoadMemberRecords('','__Host-lovetree-shared=1'),true);
 });
+
+test('official aliases get their own callback and sealed state cannot cross hosts',async()=>{
+ const f=await setup();
+ for(const origin of ['https://lovetree-4-0.pages.dev','https://lovetree.padiem.net']){
+  const start=await f.auth(new Request(origin+'/auth/login?next=/v41/'),f.env);
+  assert.equal(start.status,302);const target=new URL(start.headers.get('location'));
+  assert.equal(target.searchParams.get('redirect_uri'),origin+'/auth/callback');
+  const cookie=start.headers.get('set-cookie').split(';')[0],query='?state='+target.searchParams.get('state')+'&code=fake';
+  const other=origin.includes('pages.dev')?'https://lovetree.padiem.net':'https://lovetree-4-0.pages.dev';
+  const before=f.calls();const cross=await f.auth(new Request(other+'/auth/callback'+query,{headers:{cookie}}),f.env);
+  assert.equal(cross.status,401);assert.equal(f.calls(),before);
+  const done=await f.auth(new Request(origin+'/auth/callback'+query,{headers:{cookie}}),f.env);
+  assert.equal(done.status,302);assert.equal(done.headers.get('location'),'/v41/');
+  assert.doesNotMatch(done.headers.get('set-cookie'),/Domain=/i);
+ }
+ assert.equal((await f.auth(new Request('https://lovetree.padiem.net.evil.test/auth/login'),f.env)).status,503);
+});
