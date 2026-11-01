@@ -24,6 +24,15 @@ export function parseSelectionRoute(hash = '') {
   return {scope:'screen', view:viewName(path), treeId:null, momentId:null, explicit:VIEWS.has(path)};
 }
 
+// A bare domain is an intentional visit to the landing page. A pending
+// owner route only wins when returning from authentication.
+export function memberStartupView(active, pending, saved, fallback='home') {
+  if (active?.scope === 'owner') return viewName(active.view);
+  if (active?.scope === 'screen' && active.explicit) return viewName(active.view);
+  if (pending?.scope === 'owner') return viewName(pending.view);
+  return active?.scope === 'screen' ? viewName(active.view) : viewName(saved?.view || fallback);
+}
+
 export function ownerSelectionRoute({view='home', treeId, momentId} = {}) {
   const params = new URLSearchParams();
   const tree = safe(treeId), moment = safe(momentId);

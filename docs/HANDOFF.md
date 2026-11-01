@@ -1,3 +1,7 @@
+## 2026-11-01 — 4.1 첫 화면 진입
+
+도메인만 열 때 로그인 상태와 무관하게 첫 화면을 유지한다. 계정의 최근 트리·순간은 유지하며, 직접 연 기록 주소와 로그인 복귀 주소는 계속 복원한다. 관련 시험: v41-selection-location 및 v41-home-entry.
+
 ## 2026-11-01 — #138 도메인 실제 적용
 PR #139 merge fb943b22fd0b365cb6ba904443e5032991bb1a49. Pages production 4f058e50-ca43-47e7-9a3c-b07177ffa9fb가 해당 main을 배포했으며 Ubuntu/Windows/PostgreSQL/Pages 검증이 성공했다. lovetree.padiem.net CNAME→lovetree-4-0.pages.dev 한 개만 추가했고 Pages domain/verification/validation active, SSL 사용됨을 API와 COM1 Tabbit 대시보드에서 대조했다. 새 루트 302→/v41/, /api/workspace 401 JSON을 확인했다. 원래 pages.dev 4.0 루트는 유지한다.
 
