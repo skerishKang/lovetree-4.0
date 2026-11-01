@@ -1,6 +1,20 @@
 import {validateState} from './domain.mjs';
 export const DEFAULT_REQUEST_TIMEOUT_MS = 8_000;
 
+// Serialize cookie rotation across tabs and retry only responses rejected with 401.
+export async function refreshUnauthorized({fetchImpl, request, response, refreshUrl='/auth/refresh', signal}) {
+  if (response.status !== 401) return response;
+  const refreshAndRetry = async () => {
+    const retry = await request();
+    if (retry.status !== 401) return retry;
+    const refreshed = await fetchImpl(refreshUrl, {method:'POST', credentials:'same-origin', ...(signal ? {signal} : {})});
+    return refreshed.ok ? request() : retry;
+  };
+  return globalThis.navigator?.locks?.request
+    ? globalThis.navigator.locks.request('lovetree-shared-auth-refresh', signal ? {signal} : {}, refreshAndRetry)
+    : refreshAndRetry();
+}
+
 export function createWorkspaceApi({ fetchImpl = (...args) => globalThis.fetch(...args), base = '', timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS } = {}) {
   async function call(path, init, { requiresRevision = false, requiresState = false, binary = false, requestTimeout = timeoutMs, signal = null } = {}) {
     // 타이머는 응답 본문까지 읽고 나서 해제한다. 본문을 다 읽지 못한 채 끝나면 아직 성공이 아니다.
@@ -13,19 +27,8 @@ export function createWorkspaceApi({ fetchImpl = (...args) => globalThis.fetch(.
     try {
       const request = () => fetchImpl(`${base}${path}`, { credentials: 'same-origin', ...init, ...(controller ? { signal: controller.signal } : {}) });
       let response = await request();
-      // Web Locks serializes refresh across tabs: retry after acquiring the lock
-      // first, since another tab might already have rotated the credential.
-      // Cancel the queued lock too: aborting fetch alone cannot end a lock wait.
       if (response.status === 401 && path.startsWith('/api/')) {
-        const refreshAndRetry = async () => {
-          const retry = await request();
-          if (retry.status !== 401) return retry;
-          const refreshed = await fetchImpl(`${base}/auth/refresh`, { method: 'POST', credentials: 'same-origin', ...(controller ? { signal: controller.signal } : {}) });
-          return refreshed.ok ? request() : retry;
-        };
-        response = globalThis.navigator?.locks?.request
-          ? await globalThis.navigator.locks.request('lovetree-shared-auth-refresh', controller ? { signal: controller.signal } : {}, refreshAndRetry)
-          : await refreshAndRetry(); // Server grace covers overlapping tabs without Web Locks.
+        response = await refreshUnauthorized({fetchImpl, request, response, refreshUrl:`${base}/auth/refresh`, signal:controller?.signal});
       }
       if (response.status === 401 && path.startsWith('/api/') && globalThis.dispatchEvent && typeof Event === 'function') globalThis.dispatchEvent(new Event('lovetree-auth-required'));
       if (binary && response.ok) return {ok:true,status:response.status,blob:await response.blob()};
