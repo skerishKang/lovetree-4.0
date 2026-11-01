@@ -1,3 +1,12 @@
+## 2026-11-01 — #138 도메인 실제 적용
+PR #139 merge fb943b22fd0b365cb6ba904443e5032991bb1a49. Pages production 4f058e50-ca43-47e7-9a3c-b07177ffa9fb가 해당 main을 배포했으며 Ubuntu/Windows/PostgreSQL/Pages 검증이 성공했다. lovetree.padiem.net CNAME→lovetree-4-0.pages.dev 한 개만 추가했고 Pages domain/verification/validation active, SSL 사용됨을 API와 COM1 Tabbit 대시보드에서 대조했다. 새 루트 302→/v41/, /api/workspace 401 JSON을 확인했다. 원래 pages.dev 4.0 루트는 유지한다.
+
+COM2는 설치 index.js/private-media.js가 기준 4dfed247와 바이트 동일함을 SHA-256으로 먼저 확인한 뒤 두 파일과 추가 origin만 적용했다. 원복 사본 /root/lovetree-domain-backup-20261101-015712, 서비스 active/enabled 및 localhost 미인증 401·env 0600 확인. DB 스키마·회원 문서·첨부 디렉터리·다른 서비스·터널은 변경하지 않았다. 시크릿 교체 없음.
+
+PADIEM auth runtime에는 fresh 등록부에서 lovetree-4-0의 새 callback만 추가했다. 다른 client JSON/전체 binding 종류·이름이 보존됨을 검증. 차후 배포가 callback을 지우지 않도록 ai-revenue-lab PR #6503(c3dadfb813678fefd96f4928a4f64ee33647df74)에 동일 callback 한 개를 정본 설정에도 추가했다. auth Worker 재배포는 별도 필요 없다.
+
+실계정 Google 선택/승인 후 업로드→재로그인→삭제는 아직 완료로 표시하지 않는다. #14/#138의 체크리스트와 실제 브라우저 결과를 기준으로 후속 확인한다. 로컬/자동 시험을 실기기·스크린리더 검증으로 확대하지 않는다. 시간당 자동 작업 중지는 유지한다.
+
 ## 2026-11-01 — #138 4.1 사용자 도메인
 대표 요청으로 lovetree.padiem.net을 4.1 주소로 추가한다. 같은 Pages 프로젝트와 PADIEM lovetree-4-0 클라이언트·COM2 DB/파일 저장소를 재사용한다. pages.dev 루트의 4.0과 /v41/, 기존 회원 문서는 보존한다. 새 호스트의 루트만 /v41/로 보내며 데이터 복사·회원 병합·새 DB는 없다.
 
