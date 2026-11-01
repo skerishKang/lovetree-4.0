@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  parseSelectionRoute, ownerSelectionRoute, accountPosition,
+  parseSelectionRoute, memberStartupView, ownerSelectionRoute, accountPosition,
   rememberAccountPosition, resolveAccountPosition,
   stashPendingOwnerRoute, pendingOwnerRoute, takePendingOwnerRoute, selectionStorageKeys
 } from '../public/v41/selection-location.mjs';
@@ -75,4 +75,14 @@ test('pending owner route is one-time and rejects public routes',()=>{
   assert.equal(pendingOwnerRoute(session).treeId,'tree-b');
   assert.equal(takePendingOwnerRoute(session).treeId,'tree-b');
   assert.equal(takePendingOwnerRoute(session),null);
+});
+
+test('bare domain starts at home without losing explicit or pending routes',()=>{
+ const saved={view:'book',treeId:'tree-a',momentId:'m1'};
+ assert.equal(memberStartupView(parseSelectionRoute(''),null,saved),'home');
+ assert.equal(memberStartupView(parseSelectionRoute('#home'),null,saved),'home');
+ assert.equal(memberStartupView(parseSelectionRoute('#board'),null,saved),'board');
+ const owner=parseSelectionRoute('#my/network?tree=tree-a&moment=m1');
+ assert.equal(memberStartupView(owner,null,saved),'network');
+ assert.equal(memberStartupView(parseSelectionRoute(''),owner,saved),'network');
 });
