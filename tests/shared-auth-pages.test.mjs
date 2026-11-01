@@ -83,3 +83,15 @@ test('official aliases get their own callback and sealed state cannot cross host
  }
  assert.equal((await f.auth(new Request('https://lovetree.padiem.net.evil.test/auth/login'),f.env)).status,503);
 });
+
+
+test('invalid refresh grant is 401 while auth outage remains 503', async () => {
+ const keys=await crypto.subtle.generateKey({name:'ECDSA',namedCurve:'P-256'},true,['sign','verify']);
+ const env={LOVETREE_AUTH_CLIENT_PRIVATE_JWK:JSON.stringify(await crypto.subtle.exportKey('jwk',keys.privateKey)),LOVETREE_AUTH_CLIENT_KID:'test'};
+ const req=()=>new Request('https://lovetree.padiem.net/auth/refresh',{method:'POST',headers:{origin:'https://lovetree.padiem.net',cookie:'lovetree_refresh=invalid'}});
+ for(const [status,body,expected] of [[400,{error:'invalid_grant'},401],[401,{error:'invalid_client'},503],[503,{error:'unavailable'},503]]){
+  const auth=createSharedPagesAuth({fetcher:async()=>Response.json(body,{status})});const result=await auth(req(),env);assert.equal(result.status,expected);
+  if(expected===401)assert.match(result.headers.get('set-cookie'),/lovetree_refresh=; Path=\/auth; Max-Age=0/);
+  else assert.equal(result.headers.get('set-cookie'),null);
+ }
+});

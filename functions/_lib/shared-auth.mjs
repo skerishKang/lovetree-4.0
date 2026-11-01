@@ -39,10 +39,15 @@ async function assertion(env, now) {
   const input = `${j64({ alg: 'ES256', kid })}.${j64({ iss: CLIENT, sub: CLIENT, aud: `${AUTH}/token`, iat: now, exp: now + 120, jti: random() })}`;
   return `${input}.${b64(await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, key, enc.encode(input)))}`;
 }
+class InvalidGrant extends Error {}
 async function exchange(env, params, fetcher, now) {
   const body = new URLSearchParams({ client_id: CLIENT, client_assertion_type: 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer', client_assertion: await assertion(env, now), ...params });
   const response = await fetcher(`${AUTH}/token`, { method: 'POST', body, redirect: 'manual' });
-  if (!response.ok) throw new Error('token exchange failed');
+  if (!response.ok) {
+    const problem = await response.json().catch(() => null);
+    if (response.status === 400 && problem?.error === 'invalid_grant') throw new InvalidGrant();
+    throw new Error('token exchange failed');
+  }
   return response.json();
 }
 function issueCookies(tokens) {
@@ -94,6 +99,15 @@ export function createSharedPagesAuth({ fetcher = fetch, now = () => Math.floor(
         return new Response(null, { status: 204, headers: h });
       }
       return json(404, 'not_found');
-    } catch { return json(503, 'auth_unavailable'); }
+    } catch (error) {
+      if (path === '/auth/refresh' && error instanceof InvalidGrant) {
+        const response = json(401, 'not_authenticated');
+        response.headers.append('set-cookie', `__Host-lovetree-access=; Path=/; Max-Age=0; ${attrs}`);
+        response.headers.append('set-cookie', `lovetree_refresh=; Path=/auth; Max-Age=0; ${attrs}`);
+        response.headers.append('set-cookie', '__Host-lovetree-shared=; Path=/; Max-Age=0; Secure; SameSite=Lax');
+        return response;
+      }
+      return json(503, 'auth_unavailable');
+    }
   };
 }
