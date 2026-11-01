@@ -23,7 +23,7 @@ shadow.querySelector('[data-do=trees]').textContent='내 책장';
 if(!presentation.canResume)shadow.querySelector('.primary-cta').textContent='첫 순간 남기기';
 shadow.querySelector('.center-note').textContent='배경 카드는 감상 예시 · 내 기록에는 저장되지 않아요';
 const mobileFit=document.createElement('style');mobileFit.textContent='@media(max-width:650px){.topbar{gap:12px;flex-wrap:wrap;align-items:center}.top-actions{gap:6px;flex-shrink:0;flex-wrap:wrap;margin-left:auto}.topbar .menuBtn{white-space:nowrap;padding:10px 9px;font-size:13px}.actions .subtleBtn{font-size:14px}.center .center-note{font-size:12px}.hint{font-size:11px}}';shadow.append(mobileFit);
-const community=document.createElement('button');community.className='menuBtn';community.type='button';community.textContent='발견';community.setAttribute('aria-label','공개 트리 발견');community.onclick=bridge.actions.community;shadow.querySelector('[data-home-account]').before(community);
+const community=document.createElement('button');community.className='menuBtn';community.type='button';community.textContent='둘러보기';community.setAttribute('aria-label','공개 트리 둘러보기');community.onclick=bridge.actions.community;shadow.querySelector('[data-home-account]').before(community);
 shadow.querySelector('[data-home-account]').onclick=bridge.actions.account;
 shadow.querySelectorAll('.firstMark').forEach(e=>e.textContent='첫 순간');
 const dialog=shadow.querySelector('dialog');
