@@ -52,3 +52,4 @@ body.home-screen .app-header{display:none}
 
 /* Compact mobile actions without changing desktop controls. */
 #mobile-more{display:none}#header-overflow{display:contents}@media(max-width:780px){.app-header{position:relative}.header-actions #mobile-more{display:flex;min-width:44px}.header-actions #header-overflow{display:none;position:absolute;top:54px;right:12px;z-index:20;min-width:170px;padding:8px;border:1px solid #ffffff30;border-radius:12px;background:#211a25;box-shadow:0 12px 30px #0008}.header-actions #header-overflow.is-open{display:grid}.header-actions #header-overflow button{justify-content:flex-start;width:100%;max-width:none;min-height:44px;font-size:13px;padding:0 12px}}
+@media(max-width:780px){.header-actions .login{min-width:44px}}
