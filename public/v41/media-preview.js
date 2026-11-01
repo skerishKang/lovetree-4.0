@@ -99,6 +99,16 @@ function parseMomentLink(value = '') {
 }
 
 
+// Recognize only our two public aliases, then fetch private files on this origin.
+function privateAssetName(value,currentOrigin=globalThis.location?.origin){
+ try{
+  if(!currentOrigin)return null;
+  const u=new URL(value,currentOrigin),aliases=['https://lovetree-4-0.pages.dev','https://lovetree.padiem.net'];
+  if(u.username||u.password||u.search||u.hash)return null;
+  if(u.origin!==currentOrigin&&!(aliases.includes(currentOrigin)&&aliases.includes(u.origin)))return null;
+  return /^\/api\/media\/([a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}\.(?:png|jpg|gif|webp|mp4|webm))$/.exec(u.pathname)?.[1]||null;
+ }catch{return null;}
+}
 // Member media is URL-derived. No request is made until an explicit load action.
 function describe(value=''){
  const link=parseMomentLink(value);
@@ -106,7 +116,8 @@ function describe(value=''){
  if(link.kind==='youtube')return {...link,loadUrl:'https://i.ytimg.com/vi/'+link.videoId+'/hqdefault.jpg',loadLabel:'영상 썸네일 불러오기'};
  const u=new URL(link.openUrl);let path=u.pathname;try{path=decodeURIComponent(path)}catch{}
  const kind=/\.(?:png|jpe?g|webp|avif|gif)$/i.test(path)?'photo':/\.(?:mp4|webm|ogv)$/i.test(path)?'video':'link';
- const privateFile=u.origin===globalThis.location?.origin && /^\/api\/media\/[a-f0-9-]+\.(?:png|jpg|gif|webp|mp4|webm)$/.test(u.pathname);
+ const privateFile=!!privateAssetName(u.href);
+ if(privateFile)u.href=globalThis.location.origin+u.pathname;
  return {...link,kind,privateFile,loadUrl:kind==='link'?'':u.href,loadLabel:kind==='photo'?'사진 불러오기':'영상 불러오기',label:kind==='photo'?'사진 링크':kind==='video'?'영상 링크':link.label};
 }
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -137,7 +148,7 @@ async function load(root){
  delete root.dataset.ltLoading;body.replaceChildren(element);element.src=src;
 }
 const ownedUrls=new Map();
-window.LTMedia={describe,markup};
+window.LTMedia={describe,markup,privateAssetName};
 if(typeof document!=='undefined'){
  const cleanup=()=>{for(const [node,url] of ownedUrls)if(!node.isConnected){URL.revokeObjectURL(url);ownedUrls.delete(node);}};
  new MutationObserver(cleanup).observe(document.documentElement,{childList:true,subtree:true});

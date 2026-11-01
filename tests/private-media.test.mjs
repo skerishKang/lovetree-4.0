@@ -87,3 +87,19 @@ test('browser API keeps binary bytes and upload id, including cancellation',asyn
  const cancelled=createWorkspaceApi({fetchImpl:async(_,init)=>{init.signal.throwIfAborted();}});
  assert.equal((await cancelled.uploadMedia(new Blob([png]),A.subjectId,id,controller.signal)).code,'cancelled');
 });
+
+test('explicit frontend alias uploads share canonical storage; unlisted or malformed origins stay closed',async t=>{
+ const {store}=await setup(t),primary='https://lovetree-4-0.pages.dev',alias='https://lovetree.padiem.net';
+ const authenticate=async()=>A,handle=createMediaHandler({authenticate,productId:A.productId,store,publicOrigin:primary,additionalPublicOrigins:[alias]});
+ const post=origin=>({method:'POST',path:'/api/media',headers:{origin,'content-type':'image/png','x-lovetree-subject':A.subjectId,'x-lovetree-upload-id':randomUUID()},rawBody:png});
+ for(const origin of [primary,alias]){
+  const result=await handle(post(origin));assert.equal(result.status,200);assert.equal(new URL(result.body.url).origin,origin);
+  assert.deepEqual((await handle({method:'GET',path:new URL(result.body.url).pathname,headers:{}})).binary,png);
+ }
+ for(const origin of ['https://evil.test','https://lovetree.padiem.net.evil.test',undefined]){
+  const result=await handle(post(origin));assert.equal(result.status,403);assert.equal(result.body.error.message,'이 화면에서 다시 요청해 주세요.');
+ }
+ const invalid=createMediaHandler({authenticate,productId:A.productId,store,publicOrigin:primary,additionalPublicOrigins:[alias+'/path']});
+ assert.equal((await invalid(post(primary))).status,503);
+ assert.equal((await store.list(A)).items.length,2);
+});

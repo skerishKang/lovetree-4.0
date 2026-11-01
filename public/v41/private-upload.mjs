@@ -24,7 +24,7 @@ export function mountPrivateUpload({form,getSubject,getState,onChange}){
    form.elements.url.value=result.media.url;onChange();status.textContent='첨부 파일을 보관했어요. 아래 저장하기를 눌러 순간에 연결해 주세요.';fileInput.value='';file=null;id=null;
   }finally{controller=null;setBusy(false);}
  };
- function assetName(url){try{const u=new URL(url,location.origin);return u.origin===location.origin&&u.pathname.startsWith('/api/media/')?u.pathname.slice(11):null;}catch{return null;}}
+ function assetName(url){return window.LTMedia?.privateAssetName(url)||null;}
  async function refresh(){
   const subject=getSubject(),generation=version;const host=$('[data-assets]');host.replaceChildren();
   if(!subject){$('[data-usage]').textContent='내 기록을 먼저 불러와 주세요.';return;}

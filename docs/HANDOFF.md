@@ -1,3 +1,14 @@
+## 2026-11-01 — #138 4.1 사용자 도메인
+대표 요청으로 lovetree.padiem.net을 4.1 주소로 추가한다. 같은 Pages 프로젝트와 PADIEM lovetree-4-0 클라이언트·COM2 DB/파일 저장소를 재사용한다. pages.dev 루트의 4.0과 /v41/, 기존 회원 문서는 보존한다. 새 호스트의 루트만 /v41/로 보내며 데이터 복사·회원 병합·새 DB는 없다.
+
+공통 인증은 두 정식 callback의 닫힌 목록에서 요청 origin에 맞는 것을 선택하고 봉인된 로그인 상태에도 callback을 묶는다. 쿠키는 계속 host-only라 새 호스트에서 한 번 로그인해야 하며, 기존 호스트 세션을 읽거나 넓은 Domain 쿠키로 바꾸지 않는다. PADIEM_AUTH_CLIENTS에는 lovetree-4-0의 새 callback만 추가하고 다른 클라이언트·키·바인딩을 보존한다.
+
+COM2 LOVETREE_PUBLIC_ORIGIN은 기존 pages.dev로 유지하고 LOVETREE_ADDITIONAL_PUBLIC_ORIGINS=https://lovetree.padiem.net을 추가한다. 업로드/삭제는 명시 허용 origin과 canonical subject를 함께 확인하고 응답 파일 URL은 요청 frontend origin으로 만든다. 기존 기록의 절대 첨부 URL은 저장값을 바꾸지 않고 두 정식 호스트에서 현재 origin의 인증 API로 읽는다. 임의 호스트·닮은 이름·미등록 preview는 허용하지 않는다. 공개 DTO는 어느 호스트든 /api/media/를 계속 제외한다. 업로드 오류의 깨진 한글도 복구했다.
+
+검증: 대상 회귀 20 pass/0 fail, 전체 282 tests(247 pass/0 fail/기존 환경 의존 35 skip), npm ci 뒤 Vite build 성공. 최초 빌드의 vite 미설치는 npm ci로 해결했다. 새 호스트 root/구 호스트 root 분리, state의 호스트 간 재사용 거부, 두 origin 저장소 공유·잘못된 origin 차단, 이전 첨부 URL 원문 보존을 확인했다. 실제 배포/DNS/브라우저 결과는 #138·해당 PR 기록을 따른다. 실제 Google 계정 업로드→재로그인→삭제 및 실기기/스크린리더는 이 시험 통과만으로 완료 처리하지 않는다.
+
+재사용: 현재 shared-auth.mjs의 PKCE/서버 교환/host-only cookie, private-media.js의 주체별 파일 저장소, media-preview.js/private-upload.mjs의 명시적 로드·보관 목록을 확장했다. LoveBud/리모네의 과거 인증·DB·공개 기본값은 가져오지 않는다. UI/reference 원본은 수정하지 않았다. 복구는 새 DNS/Pages 도메인 및 새 callback과 추가 origin만 회수하고 이전 배포로 되돌리며 DB·파일 디렉터리는 삭제하지 않는다. 자동 작업은 중지 유지.
+
 ## 2026-11-01 Owner 확정 — 앞으로의 개발 기준은 4.1
 
 - **신규 기능·UI/UX 개선·운영 검수의 기본은 러브트리 4.1**이다. 현재 운영·검수 진입 주소는 https://lovetree-4-0.pages.dev/v41/ 이다.
