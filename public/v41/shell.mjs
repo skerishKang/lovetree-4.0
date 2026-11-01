@@ -9,6 +9,7 @@ import {createMemberSession} from './member-session.mjs';
 import {exampleTree} from './example.mjs';
 import {parseSelectionRoute,ownerSelectionRoute,accountPosition,rememberAccountPosition,resolveAccountPosition,stashPendingOwnerRoute,pendingOwnerRoute,takePendingOwnerRoute} from './selection-location.mjs';
 const $=id=>document.getElementById(id);
+const moreButton=$('mobile-more'),moreMenu=$('header-overflow');function closeMore(){moreMenu.classList.remove('is-open');moreButton.setAttribute('aria-expanded','false');}moreButton.addEventListener('click',()=>{const open=moreMenu.classList.toggle('is-open');moreButton.setAttribute('aria-expanded',String(open));});moreMenu.addEventListener('click',event=>{if(event.target.closest('button'))closeMore();});document.addEventListener('click',event=>{if(!moreMenu.contains(event.target)&&event.target!==moreButton)closeMore();});document.addEventListener('keydown',event=>{if(event.key==='Escape'&&moreMenu.classList.contains('is-open')){closeMore();moreButton.focus();}});
 const screens=[['home','src064-orbit.html','첫 화면'],['shelf','track32-bookshelf.html','내 책장'],['book','track59-sketchbook.html','기억책'],['board','track58-pinboard.html','기억 보드'],['network','track56-network.html','관계 지도']];
 const initialRoute=parseSelectionRoute(location.hash);
 const screenForView=view=>screens.find(screen=>screen[0]===view)||screens[0];
