@@ -79,22 +79,30 @@ function sample(selection={},view){if(!leaveMember())return;++loadGeneration;if(
 $('account-entry').onclick=e=>{if(member?.snapshot().owned){e.preventDefault();panel('records');}else if(parseSelectionRoute(location.hash).scope==='owner')stashPendingOwnerRoute(sessionStorage,location.hash);};$('record-menu').onclick=()=>{$('record-feedback').textContent='';panel('records');};$('connection-menu').onclick=()=>panel('connection-panel');$('empty-records').onclick=()=>member?.snapshot().writable?openEditor():panel('records');$('empty-sample').onclick=sample;
 $('sample').onclick=sample;$('clear').onclick=()=>{if(!leaveMember())return;++loadGeneration;clear();$('save-feedback').hidden=true;$('file').value='';$('records').close();};
 $('login-start-action').onclick=()=>{sessionStorage.setItem(PENDING_NEW,'1');location.assign(MEMBER_LOGIN_URL);};$('server').onclick=startMember;
+const ACCOUNT_DELETE_PHRASE='탈퇴합니다';
+let accountExpected=null;
+function accountConfirmMatches(){
+ const typed=$('account-confirm').value.trim();
+ if(!accountExpected||!typed)return false;
+ return accountExpected.kind==='email'?typed.toLowerCase()===accountExpected.value:typed===accountExpected.value;
+}
 async function openAccountSettings(){
- $('account-feedback').textContent='';$('account-confirm').value='';$('account-delete').disabled=true;
+ accountExpected=null;$('account-feedback').textContent='';$('account-confirm').value='';$('account-delete').disabled=true;
  if(!member?.snapshot().owned){$('account-confirm-hint').textContent='로그인한 뒤 이용할 수 있어요.';panel('account-settings');return;}
  const answer=await accountApi.account();
  if(!answer.ok){$('account-confirm-hint').textContent='계정 정보를 확인하지 못했어요. 잠시 뒤 다시 시도해 주세요.';panel('account-settings');return;}
  const byEmail=answer.confirmKind==='email';
- $('account-confirm-label').textContent=byEmail?'계정 이메일':'계정 확인 값';
- $('account-confirm-hint').textContent=byEmail?'가입한 공통 로그인 이메일을 그대로 입력하세요.':'이 계정의 확인 값: '+answer.subject+' — 위 칸에 그대로 입력하세요.';
+ accountExpected=byEmail?{kind:'email',value:String(answer.email||'').trim().toLowerCase()}:{kind:'phrase',value:ACCOUNT_DELETE_PHRASE};
+ $('account-confirm-label').textContent=byEmail?'계정 이메일':'확인 문구';
+ $('account-confirm-hint').textContent=byEmail?'계정 이메일을 입력하세요. 일치할 때만 버튼이 열려요.':"확인을 위해 '탈퇴합니다'를 입력하세요. 그대로 일치할 때만 버튼이 열려요.";
  panel('account-settings');queueMicrotask(()=>$('account-confirm').focus());
 }
 $('account-settings-open').onclick=()=>{void openAccountSettings();};
-$('account-confirm').oninput=()=>{$('account-delete').disabled=!$('account-confirm').value.trim();};
+$('account-confirm').oninput=()=>{$('account-delete').disabled=!accountConfirmMatches();};
 $('account-form').onsubmit=async event=>{
  event.preventDefault();
  const value=$('account-confirm').value.trim();
- if(!value)return;
+ if(!value||!accountConfirmMatches())return;
  if(!confirm('계정을 탈퇴하면 되돌릴 수 없습니다. 계속할까요?'))return;
  const button=$('account-delete');button.disabled=true;$('account-feedback').textContent='탈퇴를 처리하고 있어요.';
  const answer=await accountApi.deleteAccount(value);

@@ -18,6 +18,7 @@ const USER = 'sub_tester0001';
 const OTHER = 'sub_other00002';
 const ADMIN = 'sub_admin00003';
 const CLOCK = '2026-11-03T10:00:00.000Z';
+const PHRASE = '탈퇴합니다';
 
 const base = { subject: '윤슬', note: '남기고 싶은 마음', emotion: '설렘', date: '2026-11-03', url: '' };
 
@@ -55,7 +56,7 @@ test('정상 탈퇴: 사용자 키가 있는 모든 표에서 그 사용자 행�
   const media = { calls: 0, async removeAccount() { this.calls += 1; } };
   const { handle, account } = build({ repo, mediaStore: media });
 
-  const response = await post(handle, { confirm: USER });
+  const response = await post(handle, { confirm: PHRASE });
   assert.equal(response.status, 200);
   assert.equal(response.body.deleted, true);
   assert.equal(media.calls, 1, '데이터 삭제 뒤 파일 정리를 한 번 호출한다');
@@ -95,12 +96,12 @@ test('로그인 없음은 401, 다른 출처는 403이며 아무것도 지워지
     account: anonymous.account,
     allowedOrigins: [ORIGIN]
   });
-  const unauth = await post(anonymous.handle, { confirm: USER });
+  const unauth = await post(anonymous.handle, { confirm: PHRASE });
   assert.equal(unauth.status, 401);
 
   const { handle } = build({ repo });
   const before = JSON.stringify([...repo.snapshot().tables]);
-  const wrongOrigin = await post(handle, { confirm: USER }, { origin: 'https://evil.test' });
+  const wrongOrigin = await post(handle, { confirm: PHRASE }, { origin: 'https://evil.test' });
   assert.equal(wrongOrigin.status, 403);
   assert.equal(wrongOrigin.body.error.code, 'account_origin');
   assert.equal(JSON.stringify([...repo.snapshot().tables]), before);
@@ -115,7 +116,7 @@ test('중간 실패는 503이고 전부 되돌아간다', async () => {
   const media = { calls: 0, async removeAccount() { this.calls += 1; } };
   const { handle } = build({ repo, mediaStore: media });
 
-  const response = await post(handle, { confirm: USER });
+  const response = await post(handle, { confirm: PHRASE });
   assert.equal(response.status, 503);
   assert.equal(response.body.error.code, 'account_delete_failed');
   assert.equal(JSON.stringify([...repo.snapshot().tables]), before, '실패한 삭제가 일부 표에만 적용됐다');
@@ -130,7 +131,7 @@ test('탈퇴한 계정의 옛 세션은 인증 경계에서 거부된다', async
   const guard = createDeletedAccountGuard({ authenticate: async () => ({ productId: PRODUCT, subjectId: USER }), account, productId: PRODUCT });
   assert.equal((await guard({})).subjectId, USER);
 
-  await post(build({ repo }).handle, { confirm: USER });
+  await post(build({ repo }).handle, { confirm: PHRASE });
 
   await assert.rejects(() => guard({}), (error) => {
     assert.ok(error instanceof ApiError);
@@ -147,26 +148,62 @@ test('관리자 계정은 403으로 거부되고 아무것도 지워지지 않�
   const admin = { roleFor: async (principal) => (principal.subjectId === ADMIN ? 'admin' : null) };
   const { handle } = build({ repo, admin, verified: { productId: PRODUCT, subjectId: ADMIN } });
 
-  const response = await post(handle, { confirm: ADMIN });
+  const response = await post(handle, { confirm: PHRASE });
   assert.equal(response.status, 403);
   assert.equal(response.body.error.code, 'account_delete_admin_blocked');
   assert.equal(JSON.stringify([...repo.snapshot().tables]), before);
 });
 
-test('이메일을 아는 배포에서는 이메일이 확인 값이 되고 subject 입력은 거부된다', async () => {
+test('이메일을 아는 배포에서는 이메일이 확인 값이 되고 고정 문구는 거부된다', async () => {
   const repo = createMemoryAccountRepo();
   seedAll(repo);
-  const { handle } = build({ repo, verified: { productId: PRODUCT, subjectId: USER, email: 'owner@example.test' } });
+  const { handle } = build({ repo, verified: { productId: PRODUCT, subjectId: USER, email: 'Owner@Example.test' } });
 
-  const bySubject = await post(handle, { confirm: USER });
-  assert.equal(bySubject.status, 400);
+  const byPhrase = await post(handle, { confirm: PHRASE });
+  assert.equal(byPhrase.status, 400);
 
   const described = await getAccount(handle);
   assert.equal(described.body.confirmKind, 'email');
-  assert.equal(described.body.email, 'owner@example.test');
+  assert.equal(described.body.email, 'Owner@Example.test');
+  assert.equal('subject' in described.body, false);
 
-  const byEmail = await post(handle, { confirm: 'owner@example.test' });
+  // 이메일은 대소문자와 앞뒤 공백 차이만 인정한다.
+  const byEmail = await post(handle, { confirm: '  owner@example.test ' });
   assert.equal(byEmail.status, 200);
+});
+
+test('이메일 없는 토큰은 "탈퇴합니다"가 정확히 일치할 때만 탈퇴한다', async () => {
+  const repo = createMemoryAccountRepo();
+  seedAll(repo);
+  const { handle } = build({ repo });
+
+  const described = await getAccount(handle);
+  assert.equal(described.body.confirmKind, 'phrase');
+  assert.equal('email' in described.body, false);
+
+  for (const wrong of ['탈퇴', '탈퇴합니다.', '탈퇴 합니다', USER, '']) {
+    const refused = await post(handle, { confirm: wrong });
+    assert.equal(refused.status, 400, JSON.stringify(wrong));
+    assert.equal(refused.body.error.code, 'account_delete_confirm_mismatch');
+  }
+  assert.equal(await repo.isDeleted({ productId: PRODUCT, subjectHash: subjectHash(USER) }), false, '거부된 시도가 탈퇴 기록을 남겼다');
+  assert.equal(repo.rowCount('lovetree_workspaces', USER), 1, '거부된 시도가 데이터를 지웠다');
+
+  const ok = await post(handle, { confirm: PHRASE });
+  assert.equal(ok.status, 200);
+  assert.equal(ok.body.deleted, true);
+  assert.equal(repo.rowCount('lovetree_workspaces', USER), 0);
+  assert.equal(repo.rowCount('lovetree_workspaces', OTHER), 1);
+});
+
+test('GET /api/account는 확인 방식만 알려 주고 사용자 식별자를 내보내지 않는다', async () => {
+  const { handle } = build({});
+  const described = await getAccount(handle);
+  assert.equal(described.status, 200);
+  assert.equal(described.body.confirmKind, 'phrase');
+  assert.equal('subject' in described.body, false);
+  assert.equal('email' in described.body, false);
+  assert.equal(JSON.stringify(described.body).includes(USER), false, '응답에 subject 값이 실렸다');
 });
 
 test('사용자 키가 있는 표를 빠짐없이 지운다 (스키마 누락 검사)', () => {
