@@ -1,0 +1,22 @@
+[Unit]
+Description=LoveTree 4.0 operational log retention cleanup
+Wants=network-online.target
+After=network-online.target
+ConditionPathExists=/opt/padiem/lovetree-api/.env
+
+[Service]
+Type=oneshot
+User=lovetree-api
+Group=lovetree-api
+WorkingDirectory=/opt/padiem/lovetree-api
+EnvironmentFile=/opt/padiem/lovetree-api/.env
+Environment=NODE_ENV=production
+ExecStart=/usr/local/bin/node /opt/padiem/lovetree-api/server/purge-operational-logs.js
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/lovetree-api
+RestrictSUIDSGID=true
+LockPersonality=true

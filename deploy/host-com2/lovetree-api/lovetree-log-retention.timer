@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily LoveTree 4.0 operational log retention cleanup
+
+[Timer]
+OnCalendar=*-*-* 03:17:00
+RandomizedDelaySec=15m
+Persistent=true
+Unit=lovetree-log-retention.service
+
+[Install]
+WantedBy=timers.target

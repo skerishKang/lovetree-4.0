@@ -23,6 +23,8 @@ CREATE TABLE IF NOT EXISTS lovetree_request_claims (
   CHECK (char_length(client_key) BETWEEN 1 AND 128),
   CHECK (char_length(request_hash) = 64)
 );
+CREATE INDEX IF NOT EXISTS lovetree_request_claims_retention_idx
+  ON lovetree_request_claims (claimed_at, product_id, subject_id, client_key);
 
 -- 로그인 상태의 단일 사용 소비(재시작·다중 인스턴스 대응). 값은 해시로만 두고 원본은 남기지 않는다.
 CREATE TABLE IF NOT EXISTS lovetree_login_states (
@@ -55,6 +57,8 @@ CREATE TABLE IF NOT EXISTS lovetree_product_role_audit (
   reason text,
   changed_at timestamptz NOT NULL DEFAULT now()
 );
+CREATE INDEX IF NOT EXISTS lovetree_product_role_audit_retention_idx
+  ON lovetree_product_role_audit (changed_at, id);
 
 -- 4.1 명시적 공유(#120). 개인 문서 자체는 복제하지 않고 소유자 문서의 트리 하나를 가리킨다.
 -- 공개 읽기는 매 요청마다 최신 소유 문서에서 해당 트리만 투영하므로 취소·삭제가 즉시 반영된다.
@@ -165,6 +169,8 @@ ALTER TABLE lovetree_community_moderation_audit DROP CONSTRAINT IF EXISTS lovetr
 ALTER TABLE lovetree_community_moderation_audit ADD CONSTRAINT lovetree_community_moderation_audit_action_check CHECK (action IN ('resolved','dismissed','hide_share','restore_share','hide_comment'));
 ALTER TABLE lovetree_community_moderation_audit DROP CONSTRAINT IF EXISTS lovetree_community_moderation_audit_target_type_check;
 ALTER TABLE lovetree_community_moderation_audit ADD CONSTRAINT lovetree_community_moderation_audit_target_type_check CHECK (target_type IN ('report','share','comment'));
+CREATE INDEX IF NOT EXISTS lovetree_community_moderation_audit_retention_idx
+  ON lovetree_community_moderation_audit (changed_at, id);
 
 -- 2026-11-03 계정 탈퇴. 남기는 기록은 사용자 id 해시와 시각뿐이다(이메일·subject 원문 저장 금지).
 -- 이 행이 있으면 그 계정의 옛 세션은 인증 경계에서 거부되고, 저장·공유·커뮤니티 데이터는 남지 않는다.
