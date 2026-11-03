@@ -32,6 +32,8 @@ function communityMethods(path) {
   return null;
 }
 const ALLOWED = new Map([
+  ['/api/account', new Set(['GET'])],
+  ['/api/account/delete', new Set(['POST'])],
   ['/api/media', new Set(['GET', 'POST'])],
   ['/api/workspace', new Set(['GET', 'PUT'])],
   ['/api/shares', new Set(['GET', 'POST'])],
