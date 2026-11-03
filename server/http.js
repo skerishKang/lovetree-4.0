@@ -12,14 +12,18 @@ function errorBody(error) {
 
 const ACCOUNT_NO_STORE = { 'cache-control': 'private, no-store', 'x-content-type-options': 'nosniff' };
 
-export function createApiHandler({ authenticate, service, productId, admin = null, account = null, allowedOrigins = [], maxBodyBytes = DEFAULT_MAX_BODY_BYTES }) {
+export function createApiHandler({ authenticate, service, productId, admin = null, account = null, accountDeleteAuthenticate = null, accountDeleteWorkflow = null, allowedOrigins = [], maxBodyBytes = DEFAULT_MAX_BODY_BYTES }) {
   async function handle(request) {
     const { method = 'GET', path = '', body = '' } = request ?? {};
     const text = typeof body === 'string' ? body : String(body);
     if (Buffer.byteLength(text, 'utf8') > maxBodyBytes) throw new ApiError(413, 'payload_too_large', '보내는 기록이 너무 커요. 일부만 나눠서 저장해 주세요.');
 
     let verified;
-    try { verified = await authenticate(request ?? {}); }
+    const deleteEndpoint = path === '/api/account/delete' && method === 'POST';
+    const authForRequest = deleteEndpoint && typeof accountDeleteAuthenticate === 'function'
+      ? accountDeleteAuthenticate
+      : authenticate;
+    try { verified = await authForRequest(request ?? {}); }
     catch (error) { if (error instanceof ApiError) throw error; throw new ApiError(503, 'auth_unavailable', '로그인 연결에 문제를 만났어요.'); }
     const principal = parsePrincipal(verified, productId);
 
@@ -36,7 +40,20 @@ export function createApiHandler({ authenticate, service, productId, admin = nul
       }
       let accountBody;
       try { accountBody = JSON.parse(text); } catch { throw new ApiError(400, 'invalid_json', '요청 형식을 읽을 수 없어요.'); }
-      return { status: 200, body: await account.deleteAccount(verified, { confirm: accountBody?.confirm }), headers: ACCOUNT_NO_STORE };
+      let unlinkPlan = null;
+      if (accountDeleteWorkflow) {
+        const alreadyDeleted = await account.isDeleted(verified);
+        unlinkPlan = await accountDeleteWorkflow.prepare(verified, { alreadyDeleted });
+      }
+      const deletion = await account.deleteAccount(verified, { confirm: accountBody?.confirm });
+      if (accountDeleteWorkflow) {
+        if (deletion.mediaCleaned === false) {
+          throw new ApiError(503, 'account_delete_media_failed', '미디어 파일 정리를 완료하지 못했습니다. 다시 로그인해 시도해 주세요.');
+        }
+        const linkage = await accountDeleteWorkflow.complete(verified, unlinkPlan);
+        return { status: 200, body: { ...deletion, ...linkage }, headers: ACCOUNT_NO_STORE };
+      }
+      return { status: 200, body: deletion, headers: ACCOUNT_NO_STORE };
     }
 
     // 관리자 경계 (#67). 신원은 위와 같은 경로로만 정해지고, 역할은 그 주체에 견주어 다시 확인한다.

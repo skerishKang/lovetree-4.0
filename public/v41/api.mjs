@@ -55,6 +55,7 @@ export function createWorkspaceApi({ fetchImpl = (...args) => globalThis.fetch(.
         confirmKind: typeof payload?.confirmKind === 'string' ? payload.confirmKind : null,
         email: typeof payload?.email === 'string' ? payload.email : null,
         deleted: payload?.deleted === true,
+        commonAccountDeleted: payload?.commonAccountDeleted === true,
         savedAt: payload?.savedAt ?? null,
         ...(path.startsWith('/api/media') ? {media:payload} : {}),
         state: payload?.state ?? null

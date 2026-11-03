@@ -174,3 +174,11 @@ CREATE TABLE IF NOT EXISTS lovetree_account_deletions (
   deleted_at timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY (product_id, subject_hash)
 );
+
+-- Short-lived replay IDs for signed cross-service deletion calls. No account identifier is stored.
+CREATE TABLE IF NOT EXISTS lovetree_account_delete_rpc_requests (
+  service_id text PRIMARY KEY,
+  expires_at timestamptz NOT NULL
+);
+CREATE INDEX IF NOT EXISTS lovetree_account_delete_rpc_requests_expiry_idx
+  ON lovetree_account_delete_rpc_requests (expires_at);

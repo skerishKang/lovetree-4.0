@@ -13,7 +13,7 @@ export function createDeletedAccountGuard({ authenticate, account, productId }) 
     if (!verified) return verified;
     parsePrincipal(verified, productId);
     if (await account.isDeleted(verified)) {
-      throw new ApiError(401, 'account_deleted', '탈퇴한 계정이에요. 공통 로그인 계정은 다른 서비스에서 그대로 쓸 수 있어요.');
+      throw new ApiError(401, 'account_deleted', '탈퇴한 계정이라 이 서비스에 접근할 수 없어요.');
     }
     return verified;
   };

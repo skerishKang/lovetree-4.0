@@ -23,7 +23,7 @@ export const ACCOUNT_USER_TABLES = Object.freeze([
 
 // 사용자 키가 없어 탈퇴 경로가 지우지 않는 표. schema.sql의 사용자 키 검사에서 제외하는 근거다.
 // lovetree_login_states: state 해시와 만료 시각만 있고 계정과 연결되지 않는다(로그인 1회용).
-export const ACCOUNT_PRESERVED_TABLES = Object.freeze(['lovetree_login_states', 'lovetree_account_deletions']);
+export const ACCOUNT_PRESERVED_TABLES = Object.freeze(['lovetree_login_states', 'lovetree_account_deletions', 'lovetree_account_delete_rpc_requests']);
 
 export function createAccountRepo(pool) {
   if (!pool || typeof pool.query !== 'function' || typeof pool.connect !== 'function') throw new Error('PostgreSQL pool이 필요합니다.');
