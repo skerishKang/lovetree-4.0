@@ -52,6 +52,9 @@ export function createWorkspaceApi({ fetchImpl = (...args) => globalThis.fetch(.
         revision: Number.isSafeInteger(payload?.revision) ? payload.revision : undefined,
         writeSubjectBound: payload?.writeSubjectBound === true,
         subject: typeof payload?.subject === 'string' && payload.subject ? payload.subject : null,
+        confirmKind: typeof payload?.confirmKind === 'string' ? payload.confirmKind : null,
+        email: typeof payload?.email === 'string' ? payload.email : null,
+        deleted: payload?.deleted === true,
         savedAt: payload?.savedAt ?? null,
         ...(path.startsWith('/api/media') ? {media:payload} : {}),
         state: payload?.state ?? null
@@ -76,6 +79,10 @@ export function createWorkspaceApi({ fetchImpl = (...args) => globalThis.fetch(.
     put: (body) => call('/api/workspace', {
       method: 'PUT', headers: { 'content-type': 'application/json', accept: 'application/json' }, body: JSON.stringify(body)
     }, { requiresRevision: true }),
-    logout: () => call('/auth/logout', { method: 'POST', headers: { accept: 'application/json' } })
+    logout: () => call('/auth/logout', { method: 'POST', headers: { accept: 'application/json' } }),
+    account: () => call('/api/account', { method: 'GET', headers: { accept: 'application/json' } }),
+    deleteAccount: (confirm) => call('/api/account/delete', {
+      method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json' }, body: JSON.stringify({ confirm })
+    })
   };
 }

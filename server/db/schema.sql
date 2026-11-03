@@ -165,3 +165,12 @@ ALTER TABLE lovetree_community_moderation_audit DROP CONSTRAINT IF EXISTS lovetr
 ALTER TABLE lovetree_community_moderation_audit ADD CONSTRAINT lovetree_community_moderation_audit_action_check CHECK (action IN ('resolved','dismissed','hide_share','restore_share','hide_comment'));
 ALTER TABLE lovetree_community_moderation_audit DROP CONSTRAINT IF EXISTS lovetree_community_moderation_audit_target_type_check;
 ALTER TABLE lovetree_community_moderation_audit ADD CONSTRAINT lovetree_community_moderation_audit_target_type_check CHECK (target_type IN ('report','share','comment'));
+
+-- 2026-11-03 계정 탈퇴. 남기는 기록은 사용자 id 해시와 시각뿐이다(이메일·subject 원문 저장 금지).
+-- 이 행이 있으면 그 계정의 옛 세션은 인증 경계에서 거부되고, 저장·공유·커뮤니티 데이터는 남지 않는다.
+CREATE TABLE IF NOT EXISTS lovetree_account_deletions (
+  product_id text NOT NULL,
+  subject_hash char(64) NOT NULL,
+  deleted_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (product_id, subject_hash)
+);

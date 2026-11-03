@@ -21,6 +21,9 @@ import { unconfiguredAuth } from './auth.js';
 import { createMemoryLoginStateStore, createPostgresLoginStateStore } from './login-state-store.js';
 import { createHandoffMintClient } from './handoff-mint-client.js';
 import { ApiError } from './errors.js';
+import { createAccountRepo } from './db/account-postgres.js';
+import { createAccountService } from './account-service.js';
+import { createDeletedAccountGuard } from './account-guard.js';
 
 const {
   LOVETREE_SHARED_AUTH_ENABLED = '',
@@ -136,15 +139,22 @@ const legacyAuthenticate = await buildAuthenticate();
 const authenticate = createSharedAccessAuth({ enabled: sharedAuthEnabled(LOVETREE_SHARED_AUTH_ENABLED), legacy: legacyAuthenticate });
 // #67 제품 역할. 표가 아직 없거나 저장이 망가진 자리에서는 역할 없음으로 닫힌다(fail-closed).
 const admin = createAdminRoleService({ store: createAdminRoleRepo(pool), productId: LOVETREE_PRODUCT_ID });
-const storageHandler = createApiHandler({ authenticate, service, productId: LOVETREE_PRODUCT_ID, maxBodyBytes, admin });
+// 계정 탈퇴 (2026-11-03). 파일 저장소는 미디어 경로와 같은 인스턴스를 쓴다 — 삭제가 같은 폴더를 정리한다.
+const mediaStore = process.env.LOVETREE_MEDIA_DIR ? createPrivateMediaStore({ directory: process.env.LOVETREE_MEDIA_DIR }) : null;
+const accountService = createAccountService({ repo: createAccountRepo(pool), productId: LOVETREE_PRODUCT_ID, admin, mediaStore });
+// 탈퇴한 계정의 옛 자격 증명은 모든 API 경계에서 거부한다.
+const guardedAuthenticate = createDeletedAccountGuard({ authenticate, account: accountService, productId: LOVETREE_PRODUCT_ID });
+const publicOrigins = [process.env.LOVETREE_PUBLIC_ORIGIN, ...(process.env.LOVETREE_ADDITIONAL_PUBLIC_ORIGINS || '').split(',')]
+  .map((origin) => String(origin || '').trim()).filter(Boolean);
+const storageHandler = createApiHandler({ authenticate: guardedAuthenticate, service, productId: LOVETREE_PRODUCT_ID, maxBodyBytes, admin, account: accountService, allowedOrigins: publicOrigins });
 const shareRepo = createShareRepo(pool);
 const shareHandler = createShareHandler({
- authenticate,
+ authenticate: guardedAuthenticate,
  service: createShareService({ shareRepo, workspaceRepo: repo, productId: LOVETREE_PRODUCT_ID }),
  productId: LOVETREE_PRODUCT_ID
 });
 const communityHandler = createCommunityHandler({
- authenticate,
+ authenticate: guardedAuthenticate,
  service: createCommunityService({
   communityRepo: createCommunityRepo(pool), shareRepo, workspaceRepo: repo,
   productId: LOVETREE_PRODUCT_ID, admin
@@ -153,8 +163,8 @@ const communityHandler = createCommunityHandler({
 });
 const login = await buildLogin(pool);
 const mediaHandler = createMediaHandler({
- authenticate, productId: LOVETREE_PRODUCT_ID,
- store: process.env.LOVETREE_MEDIA_DIR ? createPrivateMediaStore({directory:process.env.LOVETREE_MEDIA_DIR}) : null,
+ authenticate: guardedAuthenticate, productId: LOVETREE_PRODUCT_ID,
+ store: mediaStore,
  publicOrigin: process.env.LOVETREE_PUBLIC_ORIGIN,
  additionalPublicOrigins: (process.env.LOVETREE_ADDITIONAL_PUBLIC_ORIGINS || '').split(',').map(x=>x.trim()).filter(Boolean)
 });

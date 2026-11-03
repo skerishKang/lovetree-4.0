@@ -16,12 +16,13 @@ const screenForView=view=>screens.find(screen=>screen[0]===view)||screens[0];
 const viewForFile=file=>screens.find(screen=>screen[1]===file)?.[0]||'home';
 let model=null,current=screenForView(initialRoute.view)[1],source='example',loadGeneration=0,toastTimer,previousDirty=false,member=null,editorMode='new',formBaseline='',parentBaseline='',treeBaseline='',handledHash=null,activeShareId=null,sharePreviewKey='',sharePreviewToken='';
 const shareApi=createShareApi();
+const accountApi=createWorkspaceApi();
 addEventListener('lovetree-auth-required',()=>{if(member?.snapshot().owned){$('account-entry').textContent='로그인';$('record-feedback').textContent='로그인 확인이 필요해요. 다시 로그인해 주세요.';notify('로그인 확인이 필요해요. 다시 로그인해 주세요.');}});
 window.LT41=null;
 const uploads=mountPrivateUpload({form:$('moment-form'),getSubject:()=>source==='server'&&member?.snapshot().writable?member.snapshot().subject:null,getState:()=>member?.state(),onChange:()=>{updateMediaPreview();updateQuickEntryHint();}});
 function notify(text){$('record-feedback').textContent=text;$('toast').textContent=text;$('toast').hidden=$('records').open;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').hidden=true,6500);}
 const PENDING_NEW='lovetree.v41.pending-new';
-function updateAccountControls(){const owned=!!member?.snapshot().owned;document.querySelectorAll('[data-guest-login]').forEach(x=>x.hidden=owned);$('server').hidden=!owned;$('logout').hidden=!owned;}
+function updateAccountControls(){const owned=!!member?.snapshot().owned;document.querySelectorAll('[data-guest-login]').forEach(x=>x.hidden=owned);$('server').hidden=!owned;$('logout').hidden=!owned;$('account-settings-open').hidden=!owned;}
 function panel(id){if(id==='records')updateAccountControls();const target=$(id);if(!target.open)target.showModal();}
 function ownerPosition(){const c=window.LT41;return c?{treeId:c.tree.id,momentId:c.momentId,view:viewForFile(current)}:null;}
 function writeLocation(mode='push'){
@@ -77,7 +78,39 @@ async function startMember(){if(!leaveMember())return;const startup=parseSelecti
 function sample(selection={},view){if(!leaveMember())return;++loadGeneration;if(view)current=view;load(null,'example',selection);if(view)writeLocation();$('save-feedback').hidden=true;$('records').close();}
 $('account-entry').onclick=e=>{if(member?.snapshot().owned){e.preventDefault();panel('records');}else if(parseSelectionRoute(location.hash).scope==='owner')stashPendingOwnerRoute(sessionStorage,location.hash);};$('record-menu').onclick=()=>{$('record-feedback').textContent='';panel('records');};$('connection-menu').onclick=()=>panel('connection-panel');$('empty-records').onclick=()=>member?.snapshot().writable?openEditor():panel('records');$('empty-sample').onclick=sample;
 $('sample').onclick=sample;$('clear').onclick=()=>{if(!leaveMember())return;++loadGeneration;clear();$('save-feedback').hidden=true;$('file').value='';$('records').close();};
-$('login-start-action').onclick=()=>{sessionStorage.setItem(PENDING_NEW,'1');location.assign(MEMBER_LOGIN_URL);};$('server').onclick=startMember;$('logout').onclick=async()=>{if(member){await member.act('logout');if(member.snapshot().dirty)notify('미저장 기록이 있어 로그아웃하지 않았어요. 다시 저장하거나 백업해 주세요.');}else{const answer=await createWorkspaceApi().logout();notify(answer.ok?'로그아웃했습니다.':'로그아웃하지 못했어요. 다시 시도해 주세요.');}};
+$('login-start-action').onclick=()=>{sessionStorage.setItem(PENDING_NEW,'1');location.assign(MEMBER_LOGIN_URL);};$('server').onclick=startMember;
+const ACCOUNT_DELETE_PHRASE='탈퇴합니다';
+let accountExpected=null;
+function accountConfirmMatches(){
+ const typed=$('account-confirm').value.trim();
+ if(!accountExpected||!typed)return false;
+ return accountExpected.kind==='email'?typed.toLowerCase()===accountExpected.value:typed===accountExpected.value;
+}
+async function openAccountSettings(){
+ accountExpected=null;$('account-feedback').textContent='';$('account-confirm').value='';$('account-delete').disabled=true;
+ if(!member?.snapshot().owned){$('account-confirm-hint').textContent='로그인한 뒤 이용할 수 있어요.';panel('account-settings');return;}
+ const answer=await accountApi.account();
+ if(!answer.ok){$('account-confirm-hint').textContent='계정 정보를 확인하지 못했어요. 잠시 뒤 다시 시도해 주세요.';panel('account-settings');return;}
+ const byEmail=answer.confirmKind==='email';
+ accountExpected=byEmail?{kind:'email',value:String(answer.email||'').trim().toLowerCase()}:{kind:'phrase',value:ACCOUNT_DELETE_PHRASE};
+ $('account-confirm-label').textContent=byEmail?'계정 이메일':'확인 문구';
+ $('account-confirm-hint').textContent=byEmail?'계정 이메일을 입력하세요. 일치할 때만 버튼이 열려요.':"확인을 위해 '탈퇴합니다'를 입력하세요. 그대로 일치할 때만 버튼이 열려요.";
+ panel('account-settings');queueMicrotask(()=>$('account-confirm').focus());
+}
+$('account-settings-open').onclick=()=>{void openAccountSettings();};
+$('account-confirm').oninput=()=>{$('account-delete').disabled=!accountConfirmMatches();};
+$('account-form').onsubmit=async event=>{
+ event.preventDefault();
+ const value=$('account-confirm').value.trim();
+ if(!value||!accountConfirmMatches())return;
+ if(!confirm('계정을 탈퇴하면 되돌릴 수 없습니다. 계속할까요?'))return;
+ const button=$('account-delete');button.disabled=true;$('account-feedback').textContent='탈퇴를 처리하고 있어요.';
+ const answer=await accountApi.deleteAccount(value);
+ if(!answer.ok){$('account-feedback').textContent=answer.message||'탈퇴하지 못했어요. 다시 시도해 주세요.';button.disabled=false;return;}
+ try{member?.dispose?.();}catch{}
+ member=null;source='example';clear();$('account-settings').close();updateAccountControls();$('account-entry').textContent='로그인';
+ notify('탈퇴했습니다. 공통 로그인 계정은 다른 서비스에서 그대로 쓸 수 있어요.');
+};$('logout').onclick=async()=>{if(member){await member.act('logout');if(member.snapshot().dirty)notify('미저장 기록이 있어 로그아웃하지 않았어요. 다시 저장하거나 백업해 주세요.');}else{const answer=await createWorkspaceApi().logout();notify(answer.ok?'로그아웃했습니다.':'로그아웃하지 못했어요. 다시 시도해 주세요.');}};
 $('file').onchange=async()=>{const f=$('file').files[0];if(!f)return;if(!leaveMember())return;const generation=++loadGeneration;try{if(f.size>4194304)throw Error('4MiB 이하 파일만 읽습니다.');const d=JSON.parse(await f.text());if(generation!==loadGeneration)return;load(d.state?d:{revision:0,state:d},'file');$('records').close();notify('파일을 열었어요. 서버에는 저장하지 않습니다.');}catch(e){if(generation===loadGeneration)notify('불러오기 실패: '+e.message);}};
 $('trees').onchange=()=>{choose($('trees').value);writeLocation();$('records').close();};
 document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>{if(b.dataset.close==='editor'&&uploads.busy){notify('파일 전송을 마치거나 취소해 주세요.');return;}if(b.dataset.close==='editor'&&formDirty()&&!confirm('작성 중인 입력을 버리고 닫을까요?'))return;if(b.dataset.close==='tree-manager'&&treeDirty()&&!confirm('책 정보 변경을 버리고 닫을까요?'))return;$(b.dataset.close).close();});
