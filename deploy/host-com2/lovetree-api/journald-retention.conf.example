@@ -1,0 +1,4 @@
+# Example for the host administrator to review. This setting is host-wide,
+# affects all systemd journal data, and is not installed by install.sh.
+[Journal]
+MaxRetentionSec=90day

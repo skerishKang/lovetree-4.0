@@ -633,3 +633,8 @@ COM2에는 merge `6900df8aa446dfe0201d01997457fae04c4abe16`의 변경 서버 파
 ### 2026-11-01 — 예시 연결과 표기 후속
 
 예시의 FAN CAM→기억해 둔 표정 연결이 만든 두 번째 순환을 4.0 첫 화면·4.1 예시에서 함께 제거하고 전체 방향 연결의 순환을 검사한다. 예시 제목과 패널 표기를 한국어로 정리하되 대표가 고른 첫 화면 로고·금테는 유지한다. 첨부 용량은 MB/KB로 실제 바이트를 환산하고, 지도 최초 안내가 선택 도구를 가리지 않도록 제거했다. 없는 공유 주소의 사용자 안내를 정리했다. 실기기와 실제 회수된 공유 주소는 별도 확인이 필요하다.
+
+
+### 2026-11-03 — 접속·요청·감사 로그 90일 보관
+
+`lovetree_request_claims`, `lovetree_product_role_audit`, `lovetree_community_moderation_audit`만 매일 제한 배치로 정리하는 PostgreSQL 작업과 systemd oneshot/timer 예시를 추가했다. 콘텐츠, 제품 권한 현재 상태, 계정 탈퇴 증거, 결제 기록은 보존 목록에 두었다. API stdout/stderr는 journald 예시(호스트 전체 적용)를 기록했고, Pages Functions 자체 로그가 없어 Cloudflare 관측 로그 보관은 대시보드/계정 설정 항목으로 남겼다. 새 timer는 설치 예시에 포함되나 설치기가 시작·활성화하지 않는다. 상세 분류는 `docs/ACCESS_LOG_RETENTION_20261103.md`.

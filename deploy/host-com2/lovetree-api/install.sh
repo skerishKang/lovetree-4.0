@@ -16,10 +16,12 @@ while (($#)); do
 done
 app=/opt/padiem/lovetree-api
 unit=lovetree-api.service
+retention_unit=lovetree-log-retention.service
+retention_timer=lovetree-log-retention.timer
 # 유닛이 호출하는 노드 경로와 같은 자리를 확인한다(PATH의 node가 아니라).
 node_bin=/usr/local/bin/node
 if (( ! apply )); then
-  printf '%s\n' 'LOVETREE_INSTALL=DRY_RUN' "APP_ROOT=$app" "UNIT=$unit" "NODE_BIN=$node_bin" 'START_SERVICE=NO' 'ENABLE_SERVICE=NO' 'TUNNEL_CHANGE=NO' 'DB_CONTAINER_CREATED=NO'
+  printf '%s\n' 'LOVETREE_INSTALL=DRY_RUN' "APP_ROOT=$app" "UNIT=$unit" "RETENTION_UNIT=$retention_unit" "RETENTION_TIMER=$retention_timer" "NODE_BIN=$node_bin" 'START_SERVICE=NO' 'ENABLE_SERVICE=NO' 'TUNNEL_CHANGE=NO' 'DB_CONTAINER_CREATED=NO'
   exit 0
 fi
 fail() { echo "LOVETREE_INSTALL=$1" >&2; exit 1; }
@@ -49,5 +51,7 @@ chmod 0600 "$app/.env"
 # cp -a는 원본 소유권을 그대로 옮긴다. 운영 자리에 개발자 uid가 남지 않게 한 번 닫는다.
 chown -R root:root "$app"
 install -m 0644 "$here/$unit" "/etc/systemd/system/$unit"
+install -m 0644 "$here/$retention_unit" "/etc/systemd/system/$retention_unit"
+install -m 0644 "$here/$retention_timer" "/etc/systemd/system/$retention_timer"
 systemctl daemon-reload
 printf '%s\n' 'LOVETREE_INSTALL=PASS' "NODE_BIN=$node_bin" 'START_SERVICE=NO' 'ENABLE_SERVICE=NO' 'TUNNEL_CHANGE=NO' 'DB_CONTAINER_CREATED=NO'
