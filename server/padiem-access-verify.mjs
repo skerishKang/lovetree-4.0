@@ -34,6 +34,7 @@ export function createVerifier({ audience, fetcher = fetch, clock = () => Date.n
     if (body.iss !== ISSUER || body.aud !== audience || body.token_use !== 'access' ||
         !Number.isSafeInteger(body.iat) || body.iat > now || !Number.isSafeInteger(body.exp) || body.exp <= now || body.exp > body.iat + 900 ||
         typeof body.sub !== 'string' || !body.sub || !/^sub_[A-Za-z0-9_-]+$/.test(body.account_id ?? '') || typeof body.sid !== 'string' || !body.sid) throw new Error('invalid_claims');
-    return Object.freeze({ subject: body.sub, accountId: body.account_id, sessionId: body.sid, expiresAt: body.exp });
+    return Object.freeze({ subject: body.sub, accountId: body.account_id, sessionId: body.sid, expiresAt: body.exp,
+      ...(typeof body.email === 'string' && body.email && body.email.length <= 320 ? { email: body.email } : {}) });
   };
 }

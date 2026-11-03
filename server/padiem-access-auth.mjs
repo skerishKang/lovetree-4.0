@@ -22,6 +22,6 @@ export function createSharedAccessAuth({ enabled = false, legacy, verifier = cre
       if (error?.message === 'jwks_unavailable' || error instanceof TypeError) throw new ApiError(503, 'auth_unavailable', '로그인 확인을 하지 못했어요.');
       throw new ApiError(401, 'unauthenticated', '로그인 확인을 하지 못했어요.');
     }
-    return Object.freeze({ productId: 'lovetree-4-0', subjectId: result.accountId });
+    return Object.freeze({ productId: 'lovetree-4-0', subjectId: result.accountId, ...(result.email ? { email: result.email } : {}) });
   };
 }

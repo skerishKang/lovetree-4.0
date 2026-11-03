@@ -10,7 +10,9 @@ function errorBody(error) {
   return { error: { code, message, ...(details ? details : {}) } };
 }
 
-export function createApiHandler({ authenticate, service, productId, admin = null, maxBodyBytes = DEFAULT_MAX_BODY_BYTES }) {
+const ACCOUNT_NO_STORE = { 'cache-control': 'private, no-store', 'x-content-type-options': 'nosniff' };
+
+export function createApiHandler({ authenticate, service, productId, admin = null, account = null, allowedOrigins = [], maxBodyBytes = DEFAULT_MAX_BODY_BYTES }) {
   async function handle(request) {
     const { method = 'GET', path = '', body = '' } = request ?? {};
     const text = typeof body === 'string' ? body : String(body);
@@ -20,6 +22,22 @@ export function createApiHandler({ authenticate, service, productId, admin = nul
     try { verified = await authenticate(request ?? {}); }
     catch (error) { if (error instanceof ApiError) throw error; throw new ApiError(503, 'auth_unavailable', '로그인 연결에 문제를 만났어요.'); }
     const principal = parsePrincipal(verified, productId);
+
+    // 계정 설정·탈퇴 (2026-11-03). 탈퇴는 되돌릴 수 없으므로 출처 확인을 먼저 한다.
+    if (path === '/api/account' || path === '/api/account/delete') {
+      if (!account) throw new ApiError(503, 'account_unavailable', '계정 설정을 아직 켜지 않았어요.');
+      if (path === '/api/account') {
+        if (method !== 'GET') throw new ApiError(405, 'method_not_allowed', '이 요청은 지원하지 않아요.');
+        return { status: 200, body: await account.describe(verified), headers: ACCOUNT_NO_STORE };
+      }
+      if (method !== 'POST') throw new ApiError(405, 'method_not_allowed', '이 요청은 지원하지 않아요.');
+      if (!allowedOrigins.includes(String(request?.headers?.origin ?? ''))) {
+        throw new ApiError(403, 'account_origin', '이 화면에서 다시 요청해 주세요.');
+      }
+      let accountBody;
+      try { accountBody = JSON.parse(text); } catch { throw new ApiError(400, 'invalid_json', '요청 형식을 읽을 수 없어요.'); }
+      return { status: 200, body: await account.deleteAccount(verified, { confirm: accountBody?.confirm }), headers: ACCOUNT_NO_STORE };
+    }
 
     // 관리자 경계 (#67). 신원은 위와 같은 경로로만 정해지고, 역할은 그 주체에 견주어 다시 확인한다.
     if (path === '/api/admin/session' || path === '/api/admin/roles') {
@@ -43,6 +61,12 @@ export function createApiHandler({ authenticate, service, productId, admin = nul
         body: { ok: true, role, registry: await admin.list(), history: await admin.history({ limit: 20 }) },
         headers: { 'cache-control': 'private, no-store', 'x-content-type-options': 'nosniff' }
       };
+    }
+
+    const treeItem = path.match(/^\/api\/workspace\/trees\/([^/]+)$/);
+    if (treeItem) {
+      if (method !== 'DELETE') throw new ApiError(405, 'method_not_allowed', '이 요청은 지원하지 않아요.');
+      return { status: 200, body: await service.deleteTree(principal, decodeURIComponent(treeItem[1])), headers: ACCOUNT_NO_STORE };
     }
 
     if (path !== '/api/workspace') throw new ApiError(404, 'not_found', '요청을 찾을 수 없어요.');

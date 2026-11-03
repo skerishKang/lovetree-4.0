@@ -1,7 +1,7 @@
 // Private product media: canonical identity from the existing PADIEM authenticator.
 // Local single-process store; no public URLs, external fetching, or filename paths.
 import {createHash, randomUUID} from 'node:crypto';
-import {mkdir, readdir, open, readFile, writeFile, link, unlink} from 'node:fs/promises';
+import {mkdir, readdir, open, readFile, writeFile, link, unlink, rm} from 'node:fs/promises';
 import {join, isAbsolute} from 'node:path';
 import {ApiError} from './errors.js';
 import {parsePrincipal} from './principal.js';
@@ -48,6 +48,7 @@ export function createPrivateMediaStore({directory,quotaBytes=100*1024*1024,maxI
    });
   },
   async get(p,name){const match=MEDIA_ITEM.exec('/api/media/'+name);if(!match)throw missing();return serial(p,async dir=>{const path=join(dir,match[1]+'.asset');let m;try{m=await metadata(path);}catch(e){if(e.code==='ENOENT')throw missing();throw e;}if(m.ext!==match[2])throw missing();const file=await readFile(path),bytes=file.subarray(m.offset);if(digest(bytes)!==m.sha256)throw Error('invalid asset checksum');return {mime:m.mime,bytes};});},
+  async removeAccount(p){return serial(p,async dir=>{await rm(dir,{recursive:true,force:true});return {deleted:true};});},
   async remove(p,name){const match=MEDIA_ITEM.exec('/api/media/'+name);if(!match)throw missing();return serial(p,async dir=>{const path=join(dir,match[1]+'.asset');let m;try{m=await metadata(path);}catch(e){if(e.code==='ENOENT')throw missing();throw e;}if(m.ext!==match[2])throw missing();await unlink(path);return {deleted:true};});}
  };
 }
