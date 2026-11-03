@@ -251,9 +251,13 @@ test('작업공간 문서 개별 삭제: 내 문서만 지우고 남의 문서�
 
 const RPC_SECRET = 'lovetree-account-deletion-test-secret-value-32';
 const IDENTITY_SECRET = 'control-plane-ingress-test-secret-value-32';
-function signedIncomingDelete(subjectId = USER, productId = PRODUCT, serviceId = randomUUID()) {
+function signedIncomingDelete(
+  subjectId = USER,
+  productId = PRODUCT,
+  serviceId = randomUUID(),
+  at = Math.floor(Date.parse(CLOCK) / 1000)
+) {
   const path = '/internal/account/delete';
-  const at = Math.floor(Date.parse(CLOCK) / 1000);
   const body = Buffer.from(JSON.stringify({ canonical_subject_id: subjectId, product_id: productId }));
   const canonical = Buffer.concat([
     Buffer.from('v2'), Buffer.from([10]), Buffer.from('POST'), Buffer.from([10]),
@@ -298,20 +302,25 @@ test('signed internal delete removes only LoveTree data, is idempotent, and reje
   assert.equal(claimed.size, 1);
 });
 
-test('signed internal delete refuses invalid proof and LoveTree admins before touching data', async () => {
+test('signed internal delete refuses invalid or stale proof and LoveTree admins before touching data', async () => {
   const repo = createMemoryAccountRepo();
   seedAll(repo);
   const admin = { roleFor: async principal => principal.subjectId === USER ? 'admin' : null };
   const account = createAccountService({ repo, productId: PRODUCT, admin });
+  let claims = 0;
   const handler = createTrustedAccountDeleteHandler({
     account, productId: PRODUCT, secret: RPC_SECRET,
-    claimServiceRequest: async () => true,
+    claimServiceRequest: async () => { claims++; return true; },
     now: () => Math.floor(Date.parse(CLOCK) / 1000)
   });
   const invalid = signedIncomingDelete();
   invalid.headers['x-padiem-service-proof'] = 'v2=' + '0'.repeat(64);
   assert.equal((await handler(invalid)).status, 401);
+  const stale = signedIncomingDelete(USER, PRODUCT, randomUUID(), Math.floor(Date.parse(CLOCK) / 1000) - 301);
+  assert.equal((await handler(stale)).status, 401);
+  assert.equal(claims, 0, 'invalid signatures and stale timestamps must not claim replay IDs');
   assert.equal((await handler(signedIncomingDelete())).status, 403);
+  assert.equal(claims, 1);
   assert.equal(repo.rowCount('lovetree_workspaces', USER), 1);
 });
 
