@@ -22,8 +22,10 @@ import { createMemoryLoginStateStore, createPostgresLoginStateStore } from './lo
 import { createHandoffMintClient } from './handoff-mint-client.js';
 import { ApiError } from './errors.js';
 import { createAccountRepo } from './db/account-postgres.js';
+import { createAccountDeleteRpcRepo } from './db/account-delete-rpc-postgres.js';
 import { createAccountService } from './account-service.js';
 import { createDeletedAccountGuard } from './account-guard.js';
+import { createTrustedAccountDeleteHandler, createSharedAccountDeletionWorkflow } from './shared-account-deletion.js';
 
 const {
   LOVETREE_SHARED_AUTH_ENABLED = '',
@@ -44,6 +46,9 @@ const {
   LOVETREE_SESSION_SOURCE = '',
   LOVETREE_SESSION_COOKIE = '',
   LOVETREE_AUTHORITY_TIMEOUT_MS = '',
+  LOVETREE_ACCOUNT_DELETE_RPC_SECRET = '',
+  LOVETREE_IDENTITY_RPC_URL = '',
+  LOVETREE_IDENTITY_RPC_SECRET = '',
   PORT = ''
 } = process.env;
 
@@ -141,12 +146,41 @@ const authenticate = createSharedAccessAuth({ enabled: sharedAuthEnabled(LOVETRE
 const admin = createAdminRoleService({ store: createAdminRoleRepo(pool), productId: LOVETREE_PRODUCT_ID });
 // 계정 탈퇴 (2026-11-03). 파일 저장소는 미디어 경로와 같은 인스턴스를 쓴다 — 삭제가 같은 폴더를 정리한다.
 const mediaStore = process.env.LOVETREE_MEDIA_DIR ? createPrivateMediaStore({ directory: process.env.LOVETREE_MEDIA_DIR }) : null;
-const accountService = createAccountService({ repo: createAccountRepo(pool), productId: LOVETREE_PRODUCT_ID, admin, mediaStore });
-// 탈퇴한 계정의 옛 자격 증명은 모든 API 경계에서 거부한다.
+const accountRepo = createAccountRepo(pool);
+const accountService = createAccountService({ repo: accountRepo, productId: LOVETREE_PRODUCT_ID, admin, mediaStore });
+const accountDeleteRpcRepo = createAccountDeleteRpcRepo(pool);
+const accountDeletionWorkflow = createSharedAccountDeletionWorkflow({
+  productId: LOVETREE_PRODUCT_ID,
+  identityRpcUrl: LOVETREE_IDENTITY_RPC_URL,
+  identityRpcSecret: LOVETREE_IDENTITY_RPC_SECRET,
+  accountDeleteRpcSecret: LOVETREE_ACCOUNT_DELETE_RPC_SECRET
+});
+const trustedAccountDelete = createTrustedAccountDeleteHandler({
+  account: accountService,
+  productId: LOVETREE_PRODUCT_ID,
+  secret: LOVETREE_ACCOUNT_DELETE_RPC_SECRET,
+  claimServiceRequest: (entry) => accountDeleteRpcRepo.claimServiceRequest(entry)
+});
+void accountDeleteRpcRepo.pruneExpiredAccountDeletionAudits().catch(() => {});
+const accountDeletionRetentionTimer = setInterval(() => {
+  void accountDeleteRpcRepo.pruneExpiredAccountDeletionAudits().catch(() => {});
+}, 24 * 60 * 60 * 1000);
+accountDeletionRetentionTimer.unref?.();
+// 탈퇴한 계정의 옛 자격 증명은 계정 탈퇴 외 모든 API 경계에서 거부한다.
 const guardedAuthenticate = createDeletedAccountGuard({ authenticate, account: accountService, productId: LOVETREE_PRODUCT_ID });
 const publicOrigins = [process.env.LOVETREE_PUBLIC_ORIGIN, ...(process.env.LOVETREE_ADDITIONAL_PUBLIC_ORIGINS || '').split(',')]
   .map((origin) => String(origin || '').trim()).filter(Boolean);
-const storageHandler = createApiHandler({ authenticate: guardedAuthenticate, service, productId: LOVETREE_PRODUCT_ID, maxBodyBytes, admin, account: accountService, allowedOrigins: publicOrigins });
+const storageHandler = createApiHandler({
+  authenticate: guardedAuthenticate,
+  accountDeleteAuthenticate: authenticate,
+  accountDeleteWorkflow: accountDeletionWorkflow,
+  service,
+  productId: LOVETREE_PRODUCT_ID,
+  maxBodyBytes,
+  admin,
+  account: accountService,
+  allowedOrigins: publicOrigins
+});
 const shareRepo = createShareRepo(pool);
 const shareHandler = createShareHandler({
  authenticate: guardedAuthenticate,
@@ -171,6 +205,7 @@ const mediaHandler = createMediaHandler({
 
 const requestHandler = async (request) => {
   const path = String(request.path ?? '');
+  if (path === '/internal/account/delete') return trustedAccountDelete(request);
   if (path.startsWith('/auth/')) return loginRoute(login, request);
   if (path.startsWith('/api/media')) return mediaHandler(request);
   if (path.startsWith('/api/shares') || path.startsWith('/api/public/shares/')) return shareHandler(request);

@@ -109,7 +109,9 @@ $('account-form').onsubmit=async event=>{
  if(!answer.ok){$('account-feedback').textContent=answer.message||'탈퇴하지 못했어요. 다시 시도해 주세요.';button.disabled=false;return;}
  try{member?.dispose?.();}catch{}
  member=null;source='example';clear();$('account-settings').close();updateAccountControls();$('account-entry').textContent='로그인';
- notify('탈퇴했습니다. 공통 로그인 계정은 다른 서비스에서 그대로 쓸 수 있어요.');
+ notify(answer.commonAccountDeleted
+  ? '러브트리 탈퇴와 함께 공통 로그인 계정과 인증 세션을 폐기했습니다.'
+  : '러브트리에서 탈퇴했습니다. 다른 서비스 연결이 남아 있어 공통 계정은 유지됩니다.');
 };$('logout').onclick=async()=>{if(member){await member.act('logout');if(member.snapshot().dirty)notify('미저장 기록이 있어 로그아웃하지 않았어요. 다시 저장하거나 백업해 주세요.');}else{const answer=await createWorkspaceApi().logout();notify(answer.ok?'로그아웃했습니다.':'로그아웃하지 못했어요. 다시 시도해 주세요.');}};
 $('file').onchange=async()=>{const f=$('file').files[0];if(!f)return;if(!leaveMember())return;const generation=++loadGeneration;try{if(f.size>4194304)throw Error('4MiB 이하 파일만 읽습니다.');const d=JSON.parse(await f.text());if(generation!==loadGeneration)return;load(d.state?d:{revision:0,state:d},'file');$('records').close();notify('파일을 열었어요. 서버에는 저장하지 않습니다.');}catch(e){if(generation===loadGeneration)notify('불러오기 실패: '+e.message);}};
 $('trees').onchange=()=>{choose($('trees').value);writeLocation();$('records').close();};

@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createHmac, randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { ApiError } from '../server/errors.js';
 import { createApiHandler } from '../server/http.js';
@@ -10,6 +11,7 @@ import { createAccountService, subjectHash } from '../server/account-service.js'
 import { createDeletedAccountGuard } from '../server/account-guard.js';
 import { ACCOUNT_USER_TABLES, ACCOUNT_PRESERVED_TABLES } from '../server/db/account-postgres.js';
 import { createTree, addMoment } from '../src/domain.js';
+import { createTrustedAccountDeleteHandler, createSharedAccountDeletionWorkflow } from '../server/shared-account-deletion.js';
 
 const PRODUCT = 'lovetree-4-0';
 const PRODUCT_MISMATCH = 'other-product';
@@ -29,11 +31,11 @@ function seedAll(repo) {
   }
 }
 
-function build({ verified = { productId: PRODUCT, subjectId: USER }, repo = createMemoryAccountRepo(), workspaceRepo = createMemoryWorkspaceRepo(), admin = null, mediaStore = null, allowedOrigins = [ORIGIN] } = {}) {
+function build({ verified = { productId: PRODUCT, subjectId: USER }, repo = createMemoryAccountRepo(), workspaceRepo = createMemoryWorkspaceRepo(), admin = null, mediaStore = null, accountDeleteWorkflow = null, accountDeleteAuthenticate = null, allowedOrigins = [ORIGIN] } = {}) {
   const service = createWorkspaceService({ repo: workspaceRepo, productId: PRODUCT });
   const account = createAccountService({ repo, productId: PRODUCT, admin, mediaStore, now: () => new Date(CLOCK) });
   const authenticate = async () => verified;
-  const handle = createApiHandler({ authenticate, service, productId: PRODUCT, admin, account, allowedOrigins });
+  const handle = createApiHandler({ authenticate, accountDeleteAuthenticate, accountDeleteWorkflow, service, productId: PRODUCT, admin, account, allowedOrigins });
   return { handle, account, repo, workspaceRepo, service };
 }
 
@@ -244,4 +246,236 @@ test('작업공간 문서 개별 삭제: 내 문서만 지우고 남의 문서�
   assert.equal(aliceAfter.body.state.trees.length, 0);
   const bobAfter = await bob.handle({ method: 'GET', path: '/api/workspace', headers: {} });
   assert.equal(bobAfter.body.state.trees.length, 1, '다른 사용자의 문서가 지워졌다');
+});
+
+
+const RPC_SECRET = 'lovetree-account-deletion-test-secret-value-32';
+const IDENTITY_SECRET = 'control-plane-ingress-test-secret-value-32';
+function signedIncomingDelete(subjectId = USER, productId = PRODUCT, serviceId = randomUUID()) {
+  const path = '/internal/account/delete';
+  const at = Math.floor(Date.parse(CLOCK) / 1000);
+  const body = Buffer.from(JSON.stringify({ canonical_subject_id: subjectId, product_id: productId }));
+  const canonical = Buffer.concat([
+    Buffer.from('v2'), Buffer.from([10]), Buffer.from('POST'), Buffer.from([10]),
+    Buffer.from(path), Buffer.from([10]), Buffer.from(String(at)), Buffer.from([10]),
+    Buffer.from(serviceId), Buffer.from([10]), body
+  ]);
+  const proof = 'v2=' + createHmac('sha256', RPC_SECRET).update(canonical).digest('hex');
+  return {
+    method: 'POST',
+    path,
+    headers: {
+      'content-type': 'application/json',
+      'x-padiem-service-at': String(at),
+      'x-padiem-service-id': serviceId,
+      'x-padiem-service-proof': proof
+    },
+    body: body.toString('utf8')
+  };
+}
+
+test('signed internal delete removes only LoveTree data, is idempotent, and rejects replay', async () => {
+  const repo = createMemoryAccountRepo();
+  seedAll(repo);
+  const account = createAccountService({ repo, productId: PRODUCT, now: () => new Date(CLOCK) });
+  const claimed = new Set();
+  const handler = createTrustedAccountDeleteHandler({
+    account, productId: PRODUCT, secret: RPC_SECRET,
+    claimServiceRequest: async ({ serviceId }) => {
+      if (claimed.has(serviceId)) return false;
+      claimed.add(serviceId);
+      return true;
+    },
+    now: () => Math.floor(Date.parse(CLOCK) / 1000)
+  });
+  const request = signedIncomingDelete();
+  const response = await handler(request);
+  assert.equal(response.status, 200);
+  assert.deepEqual(response.body, { ok: true, deleted: true });
+  assert.equal(repo.rowCount('lovetree_workspaces', USER), 0);
+  assert.equal(repo.rowCount('lovetree_workspaces', OTHER), 1);
+  assert.equal((await handler(request)).status, 409);
+  assert.equal(claimed.size, 1);
+});
+
+test('signed internal delete refuses invalid proof and LoveTree admins before touching data', async () => {
+  const repo = createMemoryAccountRepo();
+  seedAll(repo);
+  const admin = { roleFor: async principal => principal.subjectId === USER ? 'admin' : null };
+  const account = createAccountService({ repo, productId: PRODUCT, admin });
+  const handler = createTrustedAccountDeleteHandler({
+    account, productId: PRODUCT, secret: RPC_SECRET,
+    claimServiceRequest: async () => true,
+    now: () => Math.floor(Date.parse(CLOCK) / 1000)
+  });
+  const invalid = signedIncomingDelete();
+  invalid.headers['x-padiem-service-proof'] = 'v2=' + '0'.repeat(64);
+  assert.equal((await handler(invalid)).status, 401);
+  assert.equal((await handler(signedIncomingDelete())).status, 403);
+  assert.equal(repo.rowCount('lovetree_workspaces', USER), 1);
+});
+
+function verifyOutboundSignature(url, init, secret) {
+  const path = new URL(url).pathname;
+  const at = init.headers['x-padiem-service-at'];
+  const serviceId = init.headers['x-padiem-service-id'];
+  const body = Buffer.from(init.body);
+  const canonical = Buffer.concat([
+    Buffer.from('v2'), Buffer.from([10]), Buffer.from('POST'), Buffer.from([10]),
+    Buffer.from(path), Buffer.from([10]), Buffer.from(at), Buffer.from([10]),
+    Buffer.from(serviceId), Buffer.from([10]), body
+  ]);
+  assert.equal(init.headers['x-padiem-service-proof'], 'v2=' + createHmac('sha256', secret).update(canonical).digest('hex'));
+  return JSON.parse(body.toString('utf8'));
+}
+
+test('service unlink keeps other links; last-link unlink revokes Auth first and only then removes the common link', async () => {
+  const calls = [];
+  const workflow = createSharedAccountDeletionWorkflow({
+    productId: PRODUCT,
+    identityRpcUrl: 'https://identity.example',
+    identityRpcSecret: IDENTITY_SECRET,
+    accountDeleteRpcSecret: RPC_SECRET,
+    now: () => Math.floor(Date.parse(CLOCK) / 1000),
+    fetcher: async (url, init) => {
+      const path = new URL(url).pathname;
+      const secret = path.startsWith('/internal/rpc/') ? IDENTITY_SECRET : RPC_SECRET;
+      const payload = verifyOutboundSignature(url, init, secret);
+      calls.push({ path, payload });
+      if (path.endsWith('/list_active_product_links_for_subject')) {
+        return Response.json({ ok: true, links: [
+          { product_id: PRODUCT, product_user_id: 'usr_lovetree', state: 'active' },
+          { product_id: 'b62', product_user_id: 'usr_chat', state: 'active' }
+        ] });
+      }
+      if (path.endsWith('/remove_product_link')) {
+        return Response.json({ ok: true, removed: true, remaining_links: 1, common_account_deleted: false, revoked_sessions: 2, already_deleted: false });
+      }
+      throw new Error('unexpected endpoint');
+    }
+  });
+  const plan = await workflow.prepare({ subjectId: USER }, { alreadyDeleted: false });
+  assert.equal(plan.lastLink, false);
+  const result = await workflow.complete({ subjectId: USER }, plan);
+  assert.deepEqual(result, { commonAccountDeleted: false });
+  assert.deepEqual(calls.map(x => x.path), [
+    '/internal/rpc/list_active_product_links_for_subject',
+    '/internal/rpc/remove_product_link'
+  ]);
+
+  calls.length = 0;
+  const lastLinkWorkflow = createSharedAccountDeletionWorkflow({
+    productId: PRODUCT,
+    identityRpcUrl: 'https://identity.example',
+    identityRpcSecret: IDENTITY_SECRET,
+    accountDeleteRpcSecret: RPC_SECRET,
+    now: () => Math.floor(Date.parse(CLOCK) / 1000),
+    fetcher: async (url, init) => {
+      const path = new URL(url).pathname;
+      const secret = path.startsWith('/internal/rpc/') ? IDENTITY_SECRET : RPC_SECRET;
+      const payload = verifyOutboundSignature(url, init, secret);
+      calls.push({ path, payload });
+      if (path.endsWith('/list_active_product_links_for_subject')) {
+        return Response.json({ ok: true, links: [{ product_id: PRODUCT, product_user_id: 'usr_lovetree', state: 'active' }] });
+      }
+      if (path === '/internal/account-delete/prepare') return Response.json({ ok: true, prepared: true, revoked_sessions: 4 });
+      if (path.endsWith('/remove_product_link')) {
+        return Response.json({ ok: true, removed: true, remaining_links: 0, common_account_deleted: true, revoked_sessions: 3, already_deleted: false });
+      }
+      if (path === '/internal/account-delete/complete') return Response.json({ ok: true, deleted: true });
+      throw new Error('unexpected endpoint');
+    }
+  });
+  const lastPlan = await lastLinkWorkflow.prepare({ subjectId: USER }, { alreadyDeleted: false });
+  assert.equal(lastPlan.lastLink, true);
+  assert.deepEqual(await lastLinkWorkflow.complete({ subjectId: USER }, lastPlan), { commonAccountDeleted: true });
+  assert.deepEqual(calls.map(x => x.path), [
+    '/internal/rpc/list_active_product_links_for_subject',
+    '/internal/account-delete/prepare',
+    '/internal/rpc/remove_product_link',
+    '/internal/account-delete/complete'
+  ]);
+  assert.equal(calls[1].payload.account_id, USER);
+  assert.match(calls[1].payload.operation_id, /^[0-9a-f-]{36}$/);
+  assert.deepEqual(calls[3].payload, calls[1].payload);
+});
+
+test('failed shared unlink leaves the common link untouched and a deleted product can retry', async () => {
+  const repo = createMemoryAccountRepo();
+  seedAll(repo);
+  let completions = 0;
+  const workflow = {
+    async prepare(_verified, { alreadyDeleted }) { return { alreadyDeleted }; },
+    async complete(_verified, plan) {
+      completions++;
+      if (completions === 1) throw new ApiError(503, 'shared_account_unavailable', 'retry');
+      return { commonAccountDeleted: true };
+    }
+  };
+  const verified = { productId: PRODUCT, subjectId: USER };
+  const rawAuth = async () => verified;
+  const guard = createDeletedAccountGuard({
+    authenticate: rawAuth,
+    account: createAccountService({ repo, productId: PRODUCT }),
+    productId: PRODUCT
+  });
+  const service = createWorkspaceService({ repo: createMemoryWorkspaceRepo(), productId: PRODUCT });
+  const account = createAccountService({ repo, productId: PRODUCT, now: () => new Date(CLOCK) });
+  const handle = createApiHandler({
+    authenticate: guard,
+    accountDeleteAuthenticate: rawAuth,
+    accountDeleteWorkflow: workflow,
+    service, productId: PRODUCT, account, allowedOrigins: [ORIGIN]
+  });
+  const first = await post(handle, { confirm: PHRASE });
+  assert.equal(first.status, 503);
+  assert.equal(first.body.error.code, 'shared_account_unavailable');
+  assert.equal(repo.rowCount('lovetree_workspaces', USER), 0);
+  await assert.rejects(() => guard({}), error => error.code === 'account_deleted');
+
+  const retry = await post(handle, { confirm: PHRASE });
+  assert.equal(retry.status, 200);
+  assert.equal(retry.body.commonAccountDeleted, true);
+  assert.equal(retry.body.alreadyDeleted, true);
+  assert.equal(completions, 2);
+});
+
+
+test('failed last-link unlink aborts the Auth lock and keeps the common link retryable', async () => {
+  const calls = [];
+  const workflow = createSharedAccountDeletionWorkflow({
+    productId: PRODUCT,
+    identityRpcUrl: 'https://identity.example',
+    identityRpcSecret: IDENTITY_SECRET,
+    accountDeleteRpcSecret: RPC_SECRET,
+    now: () => Math.floor(Date.parse(CLOCK) / 1000),
+    fetcher: async (url, init) => {
+      const path = new URL(url).pathname;
+      const secret = path.startsWith('/internal/rpc/') ? IDENTITY_SECRET : RPC_SECRET;
+      const payload = verifyOutboundSignature(url, init, secret);
+      calls.push({ path, payload });
+      if (path.endsWith('/list_active_product_links_for_subject')) {
+        return Response.json({ ok: true, links: [{ product_id: PRODUCT, product_user_id: 'usr_lovetree', state: 'active' }] });
+      }
+      if (path === '/internal/account-delete/prepare') {
+        return Response.json({ ok: true, prepared: true, revoked_sessions: 1 });
+      }
+      if (path.endsWith('/remove_product_link')) {
+        return Response.json({ ok: false }, { status: 503 });
+      }
+      if (path === '/internal/account-delete/abort') {
+        return Response.json({ ok: true, aborted: true });
+      }
+      throw new Error('unexpected endpoint');
+    }
+  });
+  const plan = await workflow.prepare({ subjectId: USER }, { alreadyDeleted: false });
+  await assert.rejects(() => workflow.complete({ subjectId: USER }, plan), { code: 'shared_account_unavailable' });
+  assert.deepEqual(calls.map(x => x.path), [
+    '/internal/rpc/list_active_product_links_for_subject',
+    '/internal/account-delete/prepare',
+    '/internal/rpc/remove_product_link',
+    '/internal/account-delete/abort'
+  ]);
+  assert.deepEqual(calls[3].payload, calls[1].payload);
 });

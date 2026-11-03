@@ -18,10 +18,19 @@ const NODE_OK = (() => {
   return true;
 })();
 
+const identityRpcUrl = (() => {
+  try {
+    const url = new URL(String(process.env.LOVETREE_IDENTITY_RPC_URL ?? '').trim());
+    return url.protocol === 'https:' && !url.username && !url.password && url.pathname === '/' && !url.search && !url.hash;
+  } catch { return false; }
+})();
 const flags = {
   NODE: NODE_OK,
   PRODUCT_ID: String(process.env.LOVETREE_PRODUCT_ID ?? '').trim() !== '',
-  DATABASE_URL: String(process.env.LOVETREE_DATABASE_URL ?? '').trim() !== ''
+  DATABASE_URL: String(process.env.LOVETREE_DATABASE_URL ?? '').trim() !== '',
+  ACCOUNT_DELETE_RPC_SECRET: String(process.env.LOVETREE_ACCOUNT_DELETE_RPC_SECRET ?? '').length >= 32,
+  IDENTITY_RPC_URL: identityRpcUrl,
+  IDENTITY_RPC_SECRET: String(process.env.LOVETREE_IDENTITY_RPC_SECRET ?? '').length >= 32
 };
 
 try {
