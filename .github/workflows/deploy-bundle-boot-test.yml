@@ -51,9 +51,15 @@ jobs:
       - name: Set up Node.js 22 at the unit's fixed path
         run: |
           set -euo pipefail
-          sudo ln -sf "$(command -v node)" /usr/local/bin/node
-          sudo ln -sf "$(command -v npm)" /usr/local/bin/npm
+          # setup-node may already place node at the unit's fixed path.
+          if [ ! -e /usr/local/bin/node ]; then
+            sudo ln -s "$(readlink -f "$(command -v node)")" /usr/local/bin/node
+          fi
+          if [ ! -e /usr/local/bin/npm ]; then
+            sudo ln -s "$(readlink -f "$(command -v npm)")" /usr/local/bin/npm
+          fi
           /usr/local/bin/node --version
+          /usr/local/bin/npm --version
 
       - name: Start throwaway PostgreSQL and apply the shipped schema
         run: |
