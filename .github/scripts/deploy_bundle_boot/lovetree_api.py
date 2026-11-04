@@ -194,24 +194,25 @@ def cmd_stop(args) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--app", default="/opt/padiem/lovetree-api")
-    parser.add_argument("--node-bin", default="/usr/local/bin/node")
-    parser.add_argument("--port", type=int, default=8790)
-    parser.add_argument("--database-url", default="")
-    parser.add_argument("--media-dir", default="/tmp/lovetree-boot-media")
-    parser.add_argument("--session-secret", default="")
-    parser.add_argument("--account-delete-secret", default="")
-    parser.add_argument("--identity-rpc-url", default="https://identity.bundle-boot.invalid")
-    parser.add_argument("--identity-rpc-secret", default="")
-    parser.add_argument("--state", default="/tmp/lovetree-boot-state.json")
-    parser.add_argument("--log", default="/tmp/lovetree-boot-node.log")
-    parser.add_argument("--timeout-seconds", type=int, default=40)
+    # The workflow passes the shared options after the subcommand, so they
+    # belong to every subparser (argparse parents pattern).
+    common = argparse.ArgumentParser(add_help=False)
+    common.add_argument("--app", default="/opt/padiem/lovetree-api")
+    common.add_argument("--node-bin", default="/usr/local/bin/node")
+    common.add_argument("--port", type=int, default=8790)
+    common.add_argument("--database-url", default="")
+    common.add_argument("--media-dir", default="/tmp/lovetree-boot-media")
+    common.add_argument("--session-secret", default="")
+    common.add_argument("--account-delete-secret", default="")
+    common.add_argument("--identity-rpc-url", default="https://identity.bundle-boot.invalid")
+    common.add_argument("--identity-rpc-secret", default="")
+    common.add_argument("--state", default="/tmp/lovetree-boot-state.json")
+    common.add_argument("--log", default="/tmp/lovetree-boot-node.log")
+    common.add_argument("--timeout-seconds", type=int, default=40)
+    parser = argparse.ArgumentParser(description=__doc__, parents=[common])
     command = parser.add_subparsers(dest="command", required=True)
-    command.add_parser("check-config")
-    command.add_parser("boot")
-    command.add_parser("expect-fail")
-    command.add_parser("stop")
+    for name in ("check-config", "boot", "expect-fail", "stop"):
+        command.add_parser(name, parents=[common])
     args = parser.parse_args()
     if args.command == "stop":
         cmd_stop(args)
