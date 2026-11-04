@@ -99,3 +99,15 @@ test('report, block and moderation are separate audited data and blocked owners 
  const hidden=await call(handle,'GET','/api/community/shares',{account:'bob'});assert.deepEqual(hidden.body.items,[]);
  const anonymous=await call(handle,'GET','/api/community/shares');assert.equal(anonymous.body.items.length,1);
 });
+
+test('comment edit is own-only, sets edited flag, keeps existing comments, and blocked/hidden are rejected',async()=>{
+ const {handle,communityRepo}=await setup(),shareId='s'.repeat(24),path=`/api/community/shares/${shareId}/comments`;
+ const made=await call(handle,'POST',path,{account:'bob',key:'edit-key-0001',body:{body:'처음 글'}});assert.equal(made.status,201);
+ const other=await call(handle,'PATCH',`/api/community/comments/${made.body.comment.id}`,{account:'eve',body:{body:'남의 글'}});assert.equal(other.status,403);assert.equal(other.body.error.code,'comment_forbidden');
+ const empty=await call(handle,'PATCH',`/api/community/comments/${made.body.comment.id}`,{account:'bob',body:{body:'  '}});assert.equal(empty.status,400);assert.equal(empty.body.error.code,'comment_empty');
+ const edited=await call(handle,'PATCH',`/api/community/comments/${made.body.comment.id}`,{account:'bob',body:{body:'고친 글'}});assert.equal(edited.status,200);assert.equal(edited.body.comment.body,'고친 글');assert.equal(edited.body.comment.edited,true);assert.equal(edited.body.comment.canEdit,true);
+ const listed=await call(handle,'GET',path,{account:'bob'});assert.equal(listed.body.comments[0].body,'고친 글');assert.equal(communityRepo.inspect().comments.length,1);
+ await call(handle,'POST',`/api/community/shares/${shareId}/block`,{account:'bob'});
+ const blocked=await call(handle,'POST',path,{account:'bob',key:'edit-key-0002',body:{body:'차단 후'}});assert.equal(blocked.status,403);assert.equal(blocked.body.error.code,'comment_blocked');
+ const blockedEdit=await call(handle,'PATCH',`/api/community/comments/${made.body.comment.id}`,{account:'bob',body:{body:'차단 후 수정'}});assert.equal(blockedEdit.status,403);
+});

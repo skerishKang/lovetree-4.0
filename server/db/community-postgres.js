@@ -1,6 +1,6 @@
 const iso=value=>value instanceof Date?value.toISOString():value?String(value):null;
 const shareRow=value=>value&&({shareId:value.share_id,subjectId:value.subject_id,treeId:value.tree_id,entryMomentId:value.entry_moment_id,view:value.initial_view,status:value.status,createdAt:iso(value.created_at)});
-const commentRow=value=>value&&({id:value.comment_id,shareId:value.share_id,subjectId:value.subject_id,body:value.body,status:value.status,createdAt:iso(value.created_at),updatedAt:iso(value.updated_at)});
+const commentRow=value=>value&&({id:value.comment_id,shareId:value.share_id,subjectId:value.subject_id,body:value.body,status:value.status,createdAt:iso(value.created_at),updatedAt:iso(value.updated_at),editedAt:value.edited_at?iso(value.edited_at):null});
 const reportRow=value=>value&&({id:value.report_id,shareId:value.share_id,reporterSubjectId:value.reporter_subject_id,reason:value.reason,status:value.status,createdAt:iso(value.created_at),resolvedAt:iso(value.resolved_at),hidden:value.is_hidden===true||value.hidden===true});
 
 export function createCommunityRepo(pool){
@@ -86,6 +86,14 @@ export function createCommunityRepo(pool){
      RETURNING *`,
     [input.productId,input.commentId,input.shareId,input.subjectId,input.body,input.clientKey]
    );
+   return commentRow(rows[0]);
+  },
+  async getComment({productId,commentId}){
+   const {rows}=await pool.query(`SELECT * FROM lovetree_community_comments WHERE product_id=$1 AND comment_id=$2`,[productId,commentId]);
+   return commentRow(rows[0]);
+  },
+  async updateComment({productId,commentId,subjectId,body}){
+   const {rows}=await pool.query(`UPDATE lovetree_community_comments SET body=$4,updated_at=now(),edited_at=now() WHERE product_id=$1 AND comment_id=$2 AND status='visible' AND subject_id=$3 RETURNING *`,[productId,commentId,subjectId,body]);
    return commentRow(rows[0]);
   },
   async deleteComment({productId,commentId,subjectId,admin=false}){
