@@ -32,22 +32,32 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,pr
   if(!share||share.status!=='active')throw new ApiError(404,'share_not_found','공개 트리를 찾을 수 없어요.');
   return share;
  }
- async function card(share,viewerSubjectId){
+ async function card(share,viewerSubjectId,statsOverride=null,lastActivityAt=null){
   const stored=await workspaceRepo.load({productId,subjectId:share.subjectId});
   if(!stored)return null;
   let projected;try{projected=projectSharedTree(stored.doc,share.treeId);}catch{return null;}
   if(!projected.tree.moments.length)return null;
   const tree=projected.tree,cover=tree.moments.find(moment=>moment.id===tree.coverMomentId)||tree.moments.find(moment=>moment.id===share.entryMomentId)||tree.moments[0];
   const emotions=[...new Set(tree.moments.map(moment=>moment.emotion).filter(Boolean))];
-  const stats=await communityRepo.stats({productId,shareId:share.shareId,viewerSubjectId});
-  return {shareId:share.shareId,title:tree.title,subject:tree.subject,summary:clean(cover?.note,160),emotions,momentCount:tree.moments.length,entryMomentId:share.entryMomentId,view:share.view,cover:{title:cover?.title||tree.title,url:cover?.url||'',emotion:cover?.emotion||''},createdAt:share.createdAt,stats};
+  const stats=statsOverride||await communityRepo.stats({productId,shareId:share.shareId,viewerSubjectId});
+  return {shareId:share.shareId,title:tree.title,subject:tree.subject,summary:clean(cover?.note,160),emotions,momentCount:tree.moments.length,entryMomentId:share.entryMomentId,view:share.view,cover:{title:cover?.title||tree.title,url:cover?.url||'',emotion:cover?.emotion||''},createdAt:share.createdAt,lastActivityAt:lastActivityAt||share.createdAt,stats};
  }
  return {
   async discover({query='',emotion='',cursor='',limit=12,viewerSubjectId=null}={}){
    const q=clean(query,80).toLocaleLowerCase('ko-KR'),tag=clean(emotion,12),size=Math.max(1,Math.min(24,Number(limit)||12));
-   const shares=await communityRepo.listDiscoverable({productId,viewerSubjectId,limit:240});
+   let entries;
+   if(typeof communityRepo.listDiscoverableSummaries==='function'){
+    const summaries=await communityRepo.listDiscoverableSummaries({productId,viewerSubjectId,limit:240});
+    entries=await Promise.all(summaries.map(async summary=>{
+     const item=await card(summary.share,viewerSubjectId,summary.stats,summary.lastActivityAt);
+     return item;
+    }));
+   }else{
+    const shares=await communityRepo.listDiscoverable({productId,viewerSubjectId,limit:240});
+    entries=await Promise.all(shares.map(share=>card(share,viewerSubjectId)));
+   }
    const cards=[];
-   for(const share of shares){const item=await card(share,viewerSubjectId);if(!item)continue;const haystack=(item.title+' '+item.subject+' '+item.summary).toLocaleLowerCase('ko-KR');if(q&&!haystack.includes(q))continue;if(tag&&!item.emotions.includes(tag))continue;cards.push(item);}
+   for(const item of entries){if(!item)continue;const haystack=(item.title+' '+item.subject+' '+item.summary).toLocaleLowerCase('ko-KR');if(q&&!haystack.includes(q))continue;if(tag&&!item.emotions.includes(tag))continue;cards.push(item);}
    const start=cursor?Math.max(0,cards.findIndex(item=>item.shareId===cursor)+1):0,items=cards.slice(start,start+size),next=start+size<cards.length?items.at(-1)?.shareId||null:null;
    return {items,nextCursor:next,totalVisible:cards.length};
   },

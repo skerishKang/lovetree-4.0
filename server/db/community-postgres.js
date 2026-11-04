@@ -5,6 +5,44 @@ const reportRow=value=>value&&({id:value.report_id,shareId:value.share_id,report
 
 export function createCommunityRepo(pool){
  return {
+  async listDiscoverableSummaries({productId,viewerSubjectId=null,limit=240}){
+   const {rows}=await pool.query(
+    `SELECT s.*,
+      (SELECT count(*)::int FROM lovetree_community_favorites WHERE product_id=s.product_id AND share_id=s.share_id) AS fav_count,
+      (SELECT count(*)::int FROM lovetree_community_comments WHERE product_id=s.product_id AND share_id=s.share_id AND status='visible') AS comment_count,
+      (SELECT max(created_at) FROM lovetree_community_comments WHERE product_id=s.product_id AND share_id=s.share_id AND status='visible') AS last_activity_at,
+      (SELECT count(*)::int FROM lovetree_community_reactions WHERE product_id=s.product_id AND share_id=s.share_id AND kind='heart') AS heart_count,
+      (SELECT count(*)::int FROM lovetree_community_reactions WHERE product_id=s.product_id AND share_id=s.share_id) AS reacts_count,
+      EXISTS(SELECT 1 FROM lovetree_community_favorites WHERE product_id=s.product_id AND share_id=s.share_id AND subject_id=$2) AS favored,
+      EXISTS(SELECT 1 FROM lovetree_community_reactions WHERE product_id=s.product_id AND share_id=s.share_id AND subject_id=$2 AND kind='heart') AS hearted,
+      (SELECT COALESCE(jsonb_object_agg(k,kind_count),'{}'::jsonb) FROM (
+        SELECT 'heart' AS k, count(*)::int AS kind_count FROM lovetree_community_reactions
+        WHERE product_id=s.product_id AND share_id=s.share_id GROUP BY kind
+      ) t) AS reactions_json,
+      (SELECT COALESCE(array_agg(kind ORDER BY kind),'{}') FROM lovetree_community_reactions
+        WHERE product_id=s.product_id AND share_id=s.share_id AND subject_id=$2) AS mine_kinds
+     FROM lovetree_shares s
+     WHERE s.product_id=$1 AND s.status='active' AND s.discoverable=true
+       AND NOT EXISTS (
+         SELECT 1 FROM lovetree_community_hidden_shares h
+         WHERE h.product_id=s.product_id AND h.share_id=s.share_id
+       )
+       AND ($2::text IS NULL OR NOT EXISTS (
+         SELECT 1 FROM lovetree_community_blocks b
+         WHERE b.product_id=s.product_id AND b.blocker_subject_id=$2 AND b.blocked_subject_id=s.subject_id
+       ))
+     ORDER BY COALESCE((SELECT max(created_at) FROM lovetree_community_comments WHERE product_id=s.product_id AND share_id=s.share_id AND status='visible'), s.created_at) DESC,
+              s.created_at DESC, s.share_id DESC LIMIT $3`,
+    [productId,viewerSubjectId,limit]
+   );
+   return rows.map(row=>{
+    const share=shareRow(row);
+    const reactions={heart:0,like:0,love:0,laugh:0,wow:0,sad:0,angry:0};
+    if(row.reactions_json&&typeof row.reactions_json==='object')for(const [kind,n] of Object.entries(row.reactions_json))if(Object.prototype.hasOwnProperty.call(reactions,kind))reactions[kind]=Number(n)||0;
+    const stats={favorites:Number(row.fav_count||0),hearts:Number(row.heart_count||0),comments:Number(row.comment_count||0),favored:!!row.favored,hearted:!!row.hearted,reactions,mine:Array.isArray(row.mine_kinds)?row.mine_kinds.filter(Boolean):[]};
+    return {share,stats,lastActivityAt:row.last_activity_at?iso(row.last_activity_at):share.createdAt};
+   });
+  },
   async listDiscoverable({productId,viewerSubjectId=null,limit=240}){
    const {rows}=await pool.query(
     `SELECT s.* FROM lovetree_shares s
