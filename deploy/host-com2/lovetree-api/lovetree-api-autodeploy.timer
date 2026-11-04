@@ -1,0 +1,12 @@
+[Unit]
+Description=Check lovetree-4.0 main every 10 minutes and auto-deploy the COM2 API
+
+[Timer]
+# 부팅 2분 뒤 한 번, 그 다음은 이전 실행이 끝난 뒤 10분마다.
+OnBootSec=2min
+OnUnitActiveSec=10min
+AccuracySec=30s
+Unit=lovetree-api-autodeploy.service
+
+[Install]
+WantedBy=timers.target

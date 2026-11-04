@@ -117,3 +117,15 @@ jobs:
             echo "실패: skip 또는 1건 미달 — migration 검증이 수행되지 않았습니다."
             exit 1
           fi
+  autodeploy:
+    # 자동 배포 스크립트의 판정(같은 SHA/프런트만/migration/되돌림)을 가짜 명령으로 시험한다.
+    # 운영 서비스·DB에는 접속하지 않는다.
+    name: API 자동 배포 판정 시험
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: autodeploy.sh 판정·되돌림 시험
+        run: bash tests/autodeploy.test.sh
