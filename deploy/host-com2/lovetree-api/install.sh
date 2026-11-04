@@ -26,7 +26,7 @@ if (( ! apply )); then
 fi
 fail() { echo "LOVETREE_INSTALL=$1" >&2; exit 1; }
 [[ ${EUID} -eq 0 ]] || fail ROOT_REQUIRED
-[[ -f "$source_root/server/index.js" && -f "$source_root/package-lock.json" ]] || fail SOURCE_MISSING
+[[ -f "$source_root/server/index.js" && -f "$source_root/src/domain.js" && -f "$source_root/package-lock.json" ]] || fail SOURCE_MISSING
 [[ -x "$node_bin" ]] || fail NODE_MISSING
 "$node_bin" -e 'const[m,i]=process.versions.node.split(".").map(Number);process.exit(m>22||(m===22&&i>=13)?0:1)' || fail NODE_TOO_OLD
 command -v npm >/dev/null || fail NPM_MISSING
@@ -44,7 +44,13 @@ install -m 0644 "$source_root/src/domain.js" "$app/src/domain.js"
 install -m 0644 "$source_root/package.json" "$app/package.json"
 install -m 0644 "$source_root/package-lock.json" "$app/package-lock.json"
 install -m 0644 "$here/check_config.mjs" "$app/check_config.mjs"
+install -m 0644 "$here/preflight_imports.mjs" "$app/preflight_imports.mjs"
 (umask 022; cd "$app" && npm ci --omit=dev --no-audit --no-fund)
+# 사전점검: server/index.js의 import 그래프가 실제 파일로 해석되는지 확인한다.
+# 누락된 파일(src/domain.js 등)이 있으면 ESM 로더가 ERR_MODULE_NOT_FOUND를 낸다.
+# 이 시점에 설치를 중단해야 systemd가 재시작 루프에 빠지지 않는다(2026-10-28 재발 방지).
+# env를 비워 실행하므로 index.js 본문 부작용(포트 점유) 없이 그래프만 검사된다.
+if ! (cd "$app" && env -i "$node_bin" preflight_imports.mjs ./server/index.js); then fail IMPORT_PREFLIGHT_FAILED; fi
 if [[ ! -e "$app/.env" ]]; then install -m 0600 "$here/.env.example" "$app/.env"; fi
 chown root:root "$app/.env"
 chmod 0600 "$app/.env"
