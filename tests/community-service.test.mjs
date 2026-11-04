@@ -111,3 +111,26 @@ test('comment edit is own-only, sets edited flag, keeps existing comments, and b
  const blocked=await call(handle,'POST',path,{account:'bob',key:'edit-key-0002',body:{body:'차단 후'}});assert.equal(blocked.status,403);assert.equal(blocked.body.error.code,'comment_blocked');
  const blockedEdit=await call(handle,'PATCH',`/api/community/comments/${made.body.comment.id}`,{account:'bob',body:{body:'차단 후 수정'}});assert.equal(blockedEdit.status,403);
 });
+
+test('discover uses batched summaries, excludes blocked/hidden/deleted, and leaks no private ids',async()=>{
+ const {handle,communityRepo}=await setup(),shareId='s'.repeat(24);
+ await call(handle,'POST',`/api/community/shares/${shareId}/comments`,{account:'bob',key:'browse-key-0001',body:{body:'첫 댓글'}});
+ await call(handle,'POST',`/api/community/shares/${shareId}/comments`,{account:'bob',key:'browse-key-0002',body:{body:'ሁ번째'}});
+ await call(handle,'PUT',`/api/community/shares/${shareId}/reaction`,{account:'bob',body:{kind:'like'}});
+ communityRepo.queryCount=0;
+ const list=await call(handle,'GET','/api/community/shares');
+ assert.equal(list.status,200);
+ assert.equal(communityRepo.queryCount,1);
+ const card=list.body.items[0];
+ assert.equal(card.stats.comments,2);
+ assert.equal(card.stats.hearts,0);
+ assert.equal(card.stats.reactions.like,1);
+ assert.equal(card.stats.favorites,0);
+ assert.equal(JSON.stringify(list.body).includes('bob'),false);
+ assert.equal(JSON.stringify(list.body).includes('alice'),false);
+ assert.equal(JSON.stringify(list.body).includes('subjectId'),false);
+ assert.equal(card.lastActivityAt!=null,true);
+ await call(handle,'POST',`/api/community/shares/${shareId}/block`,{account:'eve'});
+ const hidden=await call(handle,'GET','/api/community/shares',{account:'eve'});
+ assert.deepEqual(hidden.body.items,[]);
+});

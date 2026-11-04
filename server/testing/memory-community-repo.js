@@ -2,8 +2,26 @@ export function createMemoryCommunityRepo(){
  const favorites=new Set(),reactionSet=new Set(),comments=new Map(),reports=new Map(),blocks=new Set(),hiddenShares=new Set(),audits=[];
  const key=(...parts)=>parts.join('\0'),copy=value=>structuredClone(value),now=()=>new Date().toISOString();
  const reactionKeys=()=>[...reactionSet];
+ const self={};
  return {
-  async listDiscoverable({productId,viewerSubjectId}){const shares=this.shares||[];return shares.filter(row=>row.productId===productId&&row.status==='active'&&row.discoverable===true&&!hiddenShares.has(key(productId,row.shareId))&&!blocks.has(key(productId,viewerSubjectId,row.subjectId))).map(copy);},
+  queryCount:0,
+  async listDiscoverable({productId,viewerSubjectId}){this.queryCount+=1;const shares=this.shares||[];return shares.filter(row=>row.productId===productId&&row.status==='active'&&row.discoverable===true&&!hiddenShares.has(key(productId,row.shareId))&&!blocks.has(key(productId,viewerSubjectId,row.subjectId))).map(copy);},
+  async listDiscoverableSummaries({productId,viewerSubjectId}){
+   this.queryCount+=1;
+   const shares=this.shares||[];
+   const filtered=shares.filter(row=>row.productId===productId&&row.status==='active'&&row.discoverable===true&&!hiddenShares.has(key(productId,row.shareId))&&!blocks.has(key(productId,viewerSubjectId,row.subjectId)));
+   return filtered.map(share=>{
+    const prefix=key(productId,share.shareId)+'\0';
+    const reqs=reactionKeys().filter(v=>v.startsWith(prefix));
+    const heartCount=reqs.filter(v=>v.split('\0')[3]==='heart').length;
+    const reactions={heart:0,like:0,love:0,laugh:0,wow:0,sad:0,angry:0};
+    for(const v of reqs){const kind=v.split('\0')[3]||'heart';if(Object.prototype.hasOwnProperty.call(reactions,kind))reactions[kind]+=1;}
+    const mine=reqs.filter(v=>viewerSubjectId&&v.split('\0')[2]===viewerSubjectId).map(v=>v.split('\0')[3]||'heart').sort();
+    const visible=[...comments.values()].filter(v=>v.productId===productId&&v.shareId===share.shareId&&v.status==='visible');
+    const lastActivityAt=visible.length?visible.map(v=>v.createdAt).sort().at(-1):share.createdAt;
+    return {share:copy(share),lastActivityAt,stats:{favorites:[...favorites].filter(v=>v.startsWith(prefix)).length,hearts:heartCount,comments:visible.length,favored:favorites.has(key(productId,share.shareId,viewerSubjectId)),hearted:reactionSet.has(key(productId,share.shareId,viewerSubjectId,'heart')),reactions,mine}};
+   });
+  },
   seedShares(rows){this.shares=rows.map(copy);},
   async stats({productId,shareId,viewerSubjectId}){
    const prefix=key(productId,shareId)+'\0';
