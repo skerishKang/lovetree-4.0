@@ -130,6 +130,18 @@ function markup(url,title=''){
  if(m.privateFile)html=html.replace('불러오기를 누르면 원본 사이트에 연결됩니다.','내 계정에 보관한 파일입니다. 불러오기를 눌러 확인하세요.').replace(/<a href=[\s\S]*?<\/a>/,'');
  return html;
 }
+async function youtubeMeta(root,m){
+ // 제목·채널은 서버 oEmbed 프록시에서만 받는다. 실패하면 썸네일만 두고 조용히 넘어간다.
+ if(typeof fetch!=='function')return;
+ try{
+  const answer=await fetch('/api/youtube/oembed?v='+encodeURIComponent(m.videoId),{headers:{accept:'application/json'}});
+  if(!answer.ok)throw Error('unavailable');
+  const data=await answer.json(),bits=[data.title,data.authorName].map(value=>typeof value==='string'?value.trim():'').filter(Boolean);
+  if(!bits.length||!root.isConnected)return;
+  const body=root.querySelector('.lt-media-body');if(!body)return;
+  const caption=document.createElement('p');caption.className='lt-media-title';caption.textContent=bits.join(' · ');body.append(caption);
+ }catch{}
+}
 async function load(root){
  const m=describe(root.dataset.ltUrl),body=root.querySelector('.lt-media-body'),status=root.querySelector('.lt-media-status');
  if(!m.loadUrl||(new URL(m.loadUrl).protocol!=='https:'&&!m.privateFile)||root.dataset.ltLoading)return;
@@ -139,7 +151,7 @@ async function load(root){
  const failed=()=>{delete root.dataset.ltLoading;body.replaceChildren();const retry=document.createElement('button');retry.type='button';retry.dataset.ltLoad='';retry.textContent='다시 불러오기';body.append(retry);status.textContent='불러오지 못했어요. 원본 링크에서 확인하거나 다시 시도해 주세요.';};
  element.addEventListener('error',failed,{once:true});
  if(m.kind==='video'){element.className='lt-user-video';element.controls=true;element.preload='metadata';element.playsInline=true;element.addEventListener('loadedmetadata',()=>status.textContent='영상이 준비됐어요. 재생을 눌러 보세요.',{once:true});}
- else{element.alt=root.dataset.ltTitle||'기록한 사진';element.referrerPolicy='no-referrer';element.addEventListener('load',()=>status.textContent=m.kind==='youtube'?'썸네일을 불러왔어요. 영상은 YouTube에서 열어 보세요.':'사진을 불러왔어요.',{once:true});}
+ else{element.alt=root.dataset.ltTitle||'기록한 사진';element.referrerPolicy='no-referrer';element.addEventListener('load',()=>{status.textContent=m.kind==='youtube'?'썸네일을 불러왔어요. 영상은 YouTube에서 열어 보세요.':'사진을 불러왔어요.';if(m.kind==='youtube')void youtubeMeta(root,m);},{once:true});}
  let src=m.loadUrl;
  if(m.privateFile){
   try{const {createWorkspaceApi}=await import('/v41/api.mjs');const answer=await createWorkspaceApi().fetchMedia(new URL(m.loadUrl).pathname.slice(11));if(!answer.ok)throw Error('unavailable');if(!root.isConnected)return;src=URL.createObjectURL(answer.blob);ownedUrls.set(element,src);}
