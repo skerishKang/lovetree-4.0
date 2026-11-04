@@ -145,6 +145,10 @@ def cmd_check_config(args) -> None:
 def cmd_boot(args) -> None:
     app = pathlib.Path(args.app)
     log_path = pathlib.Path(args.log)
+    # A previous server on this port would answer the health poll and make
+    # this boot look healthy without binding anything. Fail fast instead.
+    if health_once(args.port) == 200:
+        raise SystemExit('BOOT=FAIL reason=port_already_served')
     process = start_node(args, capture_log=log_path)
     deadline = time.monotonic() + args.timeout_seconds
     port = args.port
