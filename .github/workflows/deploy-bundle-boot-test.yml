@@ -69,13 +69,16 @@ jobs:
             -e POSTGRES_USER=lovetree -e POSTGRES_PASSWORD="$pg_temp" \
             -e POSTGRES_DB=lovetree -p 127.0.0.1:5432:5432 \
             postgres:16-alpine > /dev/null
-          for _ in $(seq 1 60); do
-            if docker exec lovetree-boot-pg pg_isready -U lovetree -d lovetree > /dev/null 2>&1; then
-              break
+          # pg_isready can answer during initdb's temporary server, so gate on a
+          # real query instead before feeding the schema.
+          ready=0
+          for _ in $(seq 1 90); do
+            if docker exec lovetree-boot-pg psql -U lovetree -d lovetree -c 'SELECT 1;' > /dev/null 2>&1; then
+              ready=1; break
             fi
             sleep 1
           done
-          docker exec lovetree-boot-pg pg_isready -U lovetree -d lovetree
+          [ "$ready" = 1 ] || { echo 'POSTGRES_NOT_READY' >&2; exit 1; }
           # 운영에서 migration은 사람이 적용한다(autodeploy 금지 규칙). 부트 검증은
           # 저장소가 배포하는 schema와 migration을 그 순서대로 그대로 적용한다.
           docker exec -i lovetree-boot-pg psql -U lovetree -d lovetree \
