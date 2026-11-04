@@ -98,10 +98,32 @@ CREATE TABLE IF NOT EXISTS lovetree_community_reactions (
   product_id text NOT NULL,
   share_id text NOT NULL,
   subject_id text NOT NULL,
-  kind text NOT NULL CHECK (kind IN ('heart')),
+  kind text NOT NULL CHECK (kind IN ('heart','like','love','laugh','wow','sad','angry')),
   created_at timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY (product_id, share_id, subject_id, kind)
 );
+
+-- Existing deployments created with kind IN ('heart') only. Re-applying
+-- schema.sql on them leaves the old CHECK in place, so the wider allowlist
+-- must be applied explicitly. The same statement lives in
+-- server/db/migrations/community-reaction-kinds-261104.sql (not auto-applied).
+DO $$
+DECLARE
+  constraint_name text;
+BEGIN
+  SELECT conname INTO constraint_name
+  FROM pg_constraint
+  WHERE conrelid = 'lovetree_community_reactions'::regclass
+    AND contype = 'c'
+    AND pg_get_constraintdef(oid) LIKE '%heart%';
+  IF constraint_name IS NOT NULL THEN
+    EXECUTE format('ALTER TABLE lovetree_community_reactions DROP CONSTRAINT %I', constraint_name);
+  END IF;
+  ALTER TABLE lovetree_community_reactions
+    ADD CONSTRAINT lovetree_community_reactions_kind_check
+    CHECK (kind IN ('heart','like','love','laugh','wow','sad','angry'));
+END
+$$;
 
 CREATE TABLE IF NOT EXISTS lovetree_community_comments (
   product_id text NOT NULL,

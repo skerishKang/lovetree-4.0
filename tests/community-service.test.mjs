@@ -71,6 +71,19 @@ test('comment writes are rate limited per authenticated member',async()=>{
  const limited=await call(handle,'POST',path,{account:'bob',key:'rate-key-9999',body:{body:'한 번 더'}});assert.equal(limited.status,429);assert.equal(limited.body.error.code,'rate_limited');
 });
 
+test('reaction kinds are allowlisted, per-kind idempotent, toggleable, and blocked after block',async()=>{
+ const {handle,communityRepo}=await setup(),shareId='s'.repeat(24);
+ const path=`/api/community/shares/${shareId}/reaction`;
+ const heart=await call(handle,'PUT',path,{account:'bob',body:{kind:'heart'}});assert.equal(heart.status,200);assert.equal(heart.body.stats.hearts,1);assert.equal(heart.body.stats.reactions.heart,1);assert.deepEqual(heart.body.stats.mine,['heart']);
+ const like=await call(handle,'PUT',path,{account:'bob',body:{kind:'like'}});assert.equal(like.status,200);assert.equal(like.body.stats.hearts,1);assert.equal(like.body.stats.reactions.like,1);assert.deepEqual(like.body.stats.mine,['heart','like']);
+ const dup=await call(handle,'PUT',path,{account:'bob',body:{kind:'like'}});assert.equal(dup.status,200);assert.equal(dup.body.stats.reactions.like,1);
+ const bad=await call(handle,'PUT',path,{account:'bob',body:{kind:'party'}});assert.equal(bad.status,400);assert.equal(bad.body.error.code,'reaction_kind_invalid');
+ const off=await call(handle,'DELETE',path,{account:'bob',query:'kind=like'});assert.equal(off.status,200);assert.equal(off.body.stats.reactions.like,0);assert.deepEqual(off.body.stats.mine,['heart']);
+ await call(handle,'POST',`/api/community/shares/${shareId}/block`,{account:'bob'});
+ const blocked=await call(handle,'PUT',path,{account:'bob',body:{kind:'wow'}});assert.equal(blocked.status,403);assert.equal(blocked.body.error.code,'reaction_blocked');
+ assert.ok(communityRepo.inspect().reactions.some(v=>v.includes('heart')));
+});
+
 test('report, block and moderation are separate audited data and blocked owners disappear for that member',async()=>{
  const {handle,communityRepo}=await setup(),shareId='s'.repeat(24);
  const report=await call(handle,'POST',`/api/community/shares/${shareId}/report`,{account:'bob',key:'report-key-0001',body:{reason:'확인이 필요해요'}});

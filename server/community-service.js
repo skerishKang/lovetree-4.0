@@ -3,6 +3,9 @@ import {ApiError} from './errors.js';
 import {parsePrincipal} from './principal.js';
 import {projectSharedTree} from './share-service.js';
 
+export const REACTION_KINDS=Object.freeze(['heart','like','love','laugh','wow','sad','angry']);
+const isReactionKind=value=>typeof value==='string'&&REACTION_KINDS.includes(value);
+
 const SHARE_ID=/^[A-Za-z0-9_-]{20,64}$/;
 const ITEM_ID=/^[A-Za-z0-9_-]{1,80}$/;
 const IDEMPOTENCY=/^[A-Za-z0-9._:-]{8,128}$/;
@@ -50,7 +53,14 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,pr
   },
   async favorite(subjectId,shareId,enabled){await activeShare(shareId);rate(subjectId,'favorite',40);await communityRepo.setFavorite({productId,shareId,subjectId,enabled});return communityRepo.stats({productId,shareId,viewerSubjectId:subjectId});},
   async favorites(subjectId){return communityRepo.listFavorites({productId,subjectId});},
-  async react(subjectId,shareId,enabled){await activeShare(shareId);rate(subjectId,'reaction',40);await communityRepo.setReaction({productId,shareId,subjectId,enabled});return communityRepo.stats({productId,shareId,viewerSubjectId:subjectId});},
+  async react(subjectId,shareId,enabled,kind='heart'){
+   if(!isReactionKind(kind))throw new ApiError(400,'reaction_kind_invalid','지원하지 않는 반응이에요.');
+   const share=await activeShare(shareId);rate(subjectId,'reaction',40);
+   if(communityRepo?.isBlocked){
+    const blocked=await communityRepo.isBlocked({productId,blockerSubjectId:subjectId,blockedSubjectId:share.subjectId});
+    if(blocked)throw new ApiError(403,'reaction_blocked','차단한 기록에는 반응할 수 없어요.');
+   }
+   await communityRepo.setReaction({productId,shareId,subjectId,kind,enabled});return communityRepo.stats({productId,shareId,viewerSubjectId:subjectId});},
   async comments(shareId,viewerSubjectId){await activeShare(shareId);const isAdmin=!!viewerSubjectId&&!!admin&&await admin.roleFor({productId,subjectId:viewerSubjectId})==='admin';return (await communityRepo.listComments({productId,shareId,limit:50})).map(row=>publicComment(row,viewerSubjectId,isAdmin));},
   async comment(subjectId,shareId,body,key){await activeShare(shareId);rate(subjectId,'comment',12);const text=clean(body,1000);if(!text)throw new ApiError(400,'comment_empty','댓글을 입력해 주세요.');const row=await communityRepo.createComment({productId,commentId:makeId(),shareId,subjectId,body:text,clientKey:key});return publicComment(row,subjectId);},
   async deleteComment(subjectId,commentId){if(!ITEM_ID.test(commentId))throw new ApiError(404,'comment_not_found','댓글을 찾을 수 없어요.');const principal={productId,subjectId};const isAdmin=!!admin&&await admin.roleFor(principal)==='admin';const row=await communityRepo.deleteComment({productId,commentId,subjectId,admin:isAdmin});if(!row)throw new ApiError(403,'comment_forbidden','이 댓글을 지울 수 없어요.');return {deleted:true};},
@@ -78,7 +88,7 @@ export function createCommunityHandler({authenticate,service,productId}){
   const commentItem=path.match(/^\/api\/community\/comments\/([^/]+)$/);
   if(commentItem&&method==='DELETE'){const who=await principal(request);return {status:200,body:await service.deleteComment(who.subjectId,commentItem[1]),headers:NO_STORE};}
   const action=path.match(/^\/api\/community\/shares\/([^/]+)\/(favorite|reaction|report|block)$/);
-  if(action){const who=await principal(request),[,shareId,kind]=action;if(kind==='favorite'&&(method==='PUT'||method==='DELETE'))return {status:200,body:{stats:await service.favorite(who.subjectId,shareId,method==='PUT')},headers:NO_STORE};if(kind==='reaction'&&(method==='PUT'||method==='DELETE'))return {status:200,body:{stats:await service.react(who.subjectId,shareId,method==='PUT')},headers:NO_STORE};if(kind==='report'&&method==='POST'){const body=jsonBody(request);return {status:201,body:{report:await service.report(who.subjectId,shareId,body.reason,clientKey(request))},headers:NO_STORE};}if(kind==='block'&&method==='POST')return {status:200,body:await service.block(who.subjectId,shareId),headers:NO_STORE};}
+  if(action){const who=await principal(request),[,shareId,kind]=action;if(kind==='favorite'&&(method==='PUT'||method==='DELETE'))return {status:200,body:{stats:await service.favorite(who.subjectId,shareId,method==='PUT')},headers:NO_STORE};if(kind==='reaction'&&(method==='PUT'||method==='DELETE')){let reactionKind='heart';if(method==='PUT'){try{const body=jsonBody(request);reactionKind=(body&&typeof body==='object'&&typeof body.kind==='string'&&body.kind.trim()!==''?body.kind.trim():'heart');}catch{reactionKind='heart';}}else{const q=String(request?.query?.get?.('kind')||'').trim();reactionKind=q||'heart';}return {status:200,body:{stats:await service.react(who.subjectId,shareId,method==='PUT',reactionKind)},headers:NO_STORE};}if(kind==='report'&&method==='POST'){const body=jsonBody(request);return {status:201,body:{report:await service.report(who.subjectId,shareId,body.reason,clientKey(request))},headers:NO_STORE};}if(kind==='block'&&method==='POST')return {status:200,body:await service.block(who.subjectId,shareId),headers:NO_STORE};}
   throw new ApiError(404,'not_found','요청을 찾을 수 없어요.');
  }
  return async request=>{try{return await handle(request);}catch(error){if(error instanceof ApiError)return {status:error.status,body:{error:{code:error.code,message:error.message,...(error.details||{})}},headers:NO_STORE};console.error('[lovetree-community] request failed',{path:request?.path,method:request?.method});return {status:500,body:{error:{code:'internal_error',message:'서버에서 처리하지 못했어요.'}},headers:NO_STORE};}};
