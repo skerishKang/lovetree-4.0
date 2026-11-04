@@ -15,6 +15,6 @@
 
 ## Cleanup and schedule
 
-`server/db/access-log-retention-postgres.js` deletes rows at or before the UTC cutoff (`now - 90 days`) from the three allow-listed operational tables. Each statement uses an ordered `FOR UPDATE SKIP LOCKED` batch. Defaults cap a run at 500 rows × 4 batches per table; the daily systemd timer adds a randomized delay and persistent catch-up. The result log contains only cutoff time and deleted row counts.
+`server/db/access-log-retention-postgres.js` deletes rows at or before the UTC cutoff (`now - 90 days`) from the three allow-listed operational tables. Each statement uses an ordered `FOR UPDATE SKIP LOCKED` batch. Defaults cap a run at 500 rows × 4 batches per table. The systemd timer (`deploy/host-com2/lovetree-api/lovetree-log-retention.timer`) fires daily at `03:17:00` with `RandomizedDelaySec=15m` and `Persistent=true`, adding a randomized delay and persistent catch-up. The result log contains only cutoff time and deleted row counts.
 
 The deployment installer places the oneshot and timer units after an explicitly requested install, and does not start or enable them. The timer must be enabled by a separately authorized server operator. `journald-retention.conf.example` is host-wide and is not installed by the Lovetree installer. Nothing in this change has been applied to a server or Cloudflare account.
