@@ -18,7 +18,9 @@
 #   AUTODEPLOY_ACCEPT_MIGRATIONS=1 /usr/local/sbin/lovetree-api-autodeploy run
 #     ↑ 사람이 migration 적용을 확인한 뒤 1회만. 기본값은 0(금지).
 set -euo pipefail
-umask 077
+# 서비스 사용자(lovetree-api)가 설치 트리를 읽을 수 있도록 022로 돈다.
+# 상태 파일은 0600, 백업 tar도 0600으로 따로 닫는다.
+umask 022
 
 now() { date -u +%Y-%m-%dT%H:%M:%SZ; }
 log() { printf '%s %s\n' "$(now)" "$*"; }
@@ -200,6 +202,7 @@ log "AUTODEPLOY=STEP backup file=$(basename "$backup")"
 tar -czf "$backup" -C "$app" --exclude=./node_modules --exclude=./backups . || {
   log "AUTODEPLOY=FAIL stage=backup"; exit 1;
 }
+chmod 0600 "$backup"
 mapfile -t old_backups < <(ls -1t "$backup_dir"/lovetree-api-*.tar.gz 2>/dev/null | tail -n +$((keep_backups + 1)) || true)
 if (( ${#old_backups[@]} )); then rm -f -- "${old_backups[@]}"; fi
 
@@ -209,6 +212,14 @@ if ! "${install_cmd[@]}" --dry-run --source-root "$repo"; then
   log "AUTODEPLOY=FAIL stage=dry_run"
   exit 1
 fi
+
+# 서비스 사용자(lovetree-api)가 파일을 읽고 디렉터리를 통과할 수 있어야 한다.
+# clone을 umask 077로 만들거나 npm ci가 0700으로 만들면 Node가 모듈을 못 찾는다.
+fix_permissions() {
+  chmod 0755 "$app"
+  chmod -R a+rX "$app/server" "$app/src" "$app/node_modules" 2>/dev/null || true
+  chmod a+r "$app/check_config.mjs" "$app/preflight_imports.mjs" "$app/package.json" "$app/package-lock.json" 2>/dev/null || true
+}
 
 rollback() {
   stage=$1
@@ -222,6 +233,7 @@ rollback() {
   fi
   (cd "$app" && "$npm_bin" ci --omit=dev --no-audit --no-fund) >/dev/null 2>&1 || \
     log "AUTODEPLOY=WARN stage=rollback_npm_ci"
+  fix_permissions
   "${systemctl_bin}" start "$unit" >/dev/null 2>&1 || true
   sleep 2
   if "${systemctl_bin}" is-active --quiet "$unit"; then
@@ -242,6 +254,7 @@ if ! LOVETREE_DEPLOY_LOCK_HELD=1 "${install_cmd[@]}" --apply --source-root "$rep
   rollback install_failed
 fi
 
+fix_permissions
 log "AUTODEPLOY=STEP start_service"
 "${systemctl_bin}" start "$unit" || rollback start_failed
 started_epoch=$(date +%s)

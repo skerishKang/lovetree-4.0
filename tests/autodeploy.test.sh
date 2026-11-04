@@ -201,6 +201,9 @@ grep -q 'AUTODEPLOY=INSTALLED' "$root/run.log" || { cat "$root/run.log"; fail in
 assert_eq "$D" "$(field installed_sha)" installed_sha
 assert_eq "v2" "$(cat "$app/INSTALLED")" installed_app_version
 assert_eq "2" "$(install_calls)" installed_calls
+# 서비스 사용자(lovetree-api)가 읽을 수 있어야 한다 — clone umask가 077이면 600이 된다.
+assert_eq "644" "$(stat -c '%a' "$app/server/index.js")" installed_server_mode
+assert_eq "755" "$(stat -c '%a' "$app/server")" installed_server_dir_mode
 pass installed
 
 # 5) 확인 실패(HTTP 503) → 백업으로 되돌림, 상태 rolled_back
@@ -233,6 +236,9 @@ assert_eq "$F" "$(field installed_sha)" next_installed
 assert_eq "v4" "$(cat "$app/INSTALLED")" next_app_version
 backup_count=$(find "$state/backups" -maxdepth 1 -name 'lovetree-api-*.tar.gz' | wc -l | tr -d ' ')
 [[ "$backup_count" -le 5 ]] || fail "backup_retention count=$backup_count"
+latest_backup=$(ls -1t "$state/backups"/lovetree-api-*.tar.gz | head -n 1)
+# 백업에는 .env가 들어 있으므로 0600이어야 한다.
+assert_eq "600" "$(stat -c '%a' "$latest_backup")" backup_mode
 pass next_sha_and_retention
 
 # 8) 수동 install.sh가 같은 잠금 파일을 쓰는지(정적 확인 — 적용 경로에 flock이 있어야 한다)
