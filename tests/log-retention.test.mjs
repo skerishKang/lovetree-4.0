@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import {
   ACCESS_LOG_RETENTION_DAYS,
   ACCESS_LOG_RETENTION_TARGETS,
@@ -86,4 +87,19 @@ test('cleanup enforces a per-table batch count and row limit', async () => {
   assert.equal(pool.tables.lovetree_request_claims.length, 650);
   assert.deepEqual(pool.calls.filter((call) => call.table === 'lovetree_request_claims').map((call) => call.limit), [50, 50]);
   assert.ok(pool.calls.every((call) => call.limit <= 50));
+});
+
+test('보관 문서의 일정은 타이머 유닛과 일치한다', async () => {
+  const timer = await readFile(new URL('../deploy/host-com2/lovetree-api/lovetree-log-retention.timer', import.meta.url), 'utf8');
+  const doc = await readFile(new URL('../docs/ACCESS_LOG_RETENTION_20261103.md', import.meta.url), 'utf8');
+  const onCalendar = timer.match(/^OnCalendar=(.+)$/m)?.[1]?.trim();
+  const randomizedDelay = timer.match(/^RandomizedDelaySec=(\S+)$/m)?.[1];
+  assert.ok(onCalendar, '타이머에 OnCalendar가 있어야 한다');
+  assert.ok(randomizedDelay, '타이머에 RandomizedDelaySec가 있어야 한다');
+  assert.match(timer, /^Persistent=true$/m);
+  // 문서는 타이머의 실제 시각을 적어야 하며, 다른 시각을 주장하면 안 된다.
+  const clockTime = onCalendar.split(/\s+/).pop();
+  assert.ok(doc.includes(clockTime), `문서가 타이머 시각 ${clockTime}를 담아야 한다`);
+  assert.ok(doc.includes(`RandomizedDelaySec=${randomizedDelay}`), '문서가 타이머 무작위 지연을 담아야 한다');
+  assert.ok(doc.includes('Persistent=true'), '문서가 Persistent=true를 담아야 한다');
 });
