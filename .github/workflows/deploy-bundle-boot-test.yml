@@ -147,6 +147,10 @@ jobs:
           # → 되돌리기 npm ci(11-04에 권한으로 실패한 단계) → 권한 정규화 → 기동.
           sudo tar -czf "$RUNNER_TEMP/lovetree-boot-backup.tar.gz" \
             -C "$BOOT_APP" --exclude=./node_modules --exclude=./backups .
+          # autodeploy 순서와 같다: 설치 전에 실행 중인 서비스를 멈춘다
+          # (여기서는 systemd가 아니라 직접 기동한 노드를 정지한다).
+          sudo env "PATH=$PATH" python3 "$BOOT_HELPER" stop
+          sleep 1
           git archive HEAD~1 | tar -x -C "$RUNNER_TEMP/src_prev"
           sudo env "PATH=$PATH" bash deploy/host-com2/lovetree-api/install.sh --apply \
             --source-root "$RUNNER_TEMP/src_prev"
