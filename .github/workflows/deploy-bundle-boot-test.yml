@@ -108,6 +108,7 @@ jobs:
           session_secret="boot-$(openssl rand -hex 32)"
           delete_secret="boot-$(openssl rand -hex 32)"
           identity_secret="boot-$(openssl rand -hex 32)"
+          caller_secret="boot-$(openssl rand -hex 32)"
           sudo env "PATH=$PATH" python3 "$BOOT_HELPER" check-config \
             --app "$BOOT_APP" --port "$BOOT_PORT" \
             --database-url "$LOVETREE_DATABASE_URL" \
@@ -116,6 +117,7 @@ jobs:
             --account-delete-secret "$delete_secret" \
             --identity-rpc-url "https://identity.bundle-boot.invalid" \
             --identity-rpc-secret "$identity_secret"
+            --caller-secret "$caller_secret"
 
       - name: Boot the installed tree as the service user (positive control)
         run: |
@@ -123,6 +125,7 @@ jobs:
           session_secret="boot-$(openssl rand -hex 32)"
           delete_secret="boot-$(openssl rand -hex 32)"
           identity_secret="boot-$(openssl rand -hex 32)"
+          caller_secret="boot-$(openssl rand -hex 32)"
           sudo env "PATH=$PATH" python3 "$BOOT_HELPER" boot \
             --app "$BOOT_APP" --port "$BOOT_PORT" \
             --database-url "$LOVETREE_DATABASE_URL" \
@@ -131,6 +134,7 @@ jobs:
             --account-delete-secret "$delete_secret" \
             --identity-rpc-url "https://identity.bundle-boot.invalid" \
             --identity-rpc-secret "$identity_secret"
+            --caller-secret "$caller_secret"
 
       - name: Run the real rollback sequence back to health 200
         run: |
@@ -156,6 +160,7 @@ jobs:
           session_secret="boot-$(openssl rand -hex 32)"
           delete_secret="boot-$(openssl rand -hex 32)"
           identity_secret="boot-$(openssl rand -hex 32)"
+          caller_secret="boot-$(openssl rand -hex 32)"
           sudo env "PATH=$PATH" python3 "$BOOT_HELPER" boot \
             --app "$BOOT_APP" --port "$BOOT_PORT" \
             --database-url "$LOVETREE_DATABASE_URL" \
@@ -164,6 +169,7 @@ jobs:
             --account-delete-secret "$delete_secret" \
             --identity-rpc-url "https://identity.bundle-boot.invalid" \
             --identity-rpc-secret "$identity_secret"
+            --caller-secret "$caller_secret"
 
       - name: Stop the healthy server so negative controls start clean
         run: |
@@ -180,6 +186,7 @@ jobs:
           session_secret="boot-$(openssl rand -hex 32)"
           delete_secret="boot-$(openssl rand -hex 32)"
           identity_secret="boot-$(openssl rand -hex 32)"
+          caller_secret="boot-$(openssl rand -hex 32)"
           sudo rm "$BOOT_APP/src/domain.js"
           if sudo env "PATH=$PATH" python3 "$BOOT_HELPER" expect-fail \
             --app "$BOOT_APP" --port "$BOOT_PORT" \
@@ -189,6 +196,7 @@ jobs:
             --account-delete-secret "$delete_secret" \
             --identity-rpc-url "https://identity.bundle-boot.invalid" \
             --identity-rpc-secret "$identity_secret" \
+            --caller-secret "$caller_secret" \
             --port 8791 \
             --timeout-seconds 15; then
             echo 'LOVETREE_NEGATIVE_MISSING_MODULE=OK'
@@ -203,6 +211,7 @@ jobs:
           session_secret="boot-$(openssl rand -hex 32)"
           delete_secret="boot-$(openssl rand -hex 32)"
           identity_secret="boot-$(openssl rand -hex 32)"
+          caller_secret="boot-$(openssl rand -hex 32)"
           # 11-04 사고 그 자체: #170 정규화가 없었다면 남을 root 전용 모드.
           sudo env "PATH=$PATH" bash deploy/host-com2/lovetree-api/install.sh --apply \
             --source-root "$RUNNER_TEMP/src077" > /dev/null
@@ -215,6 +224,7 @@ jobs:
             --account-delete-secret "$delete_secret" \
             --identity-rpc-url "https://identity.bundle-boot.invalid" \
             --identity-rpc-secret "$identity_secret" \
+            --caller-secret "$caller_secret" \
             --port 8791 \
             --timeout-seconds 15; then
             echo 'LOVETREE_NEGATIVE_ROOT_ONLY_TREE=OK'
