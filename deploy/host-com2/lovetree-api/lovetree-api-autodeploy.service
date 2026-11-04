@@ -1,0 +1,17 @@
+[Unit]
+Description=LoveTree 4.0 COM2 API auto-deploy (checks main every 10 minutes)
+Documentation=https://github.com/skerishKang/lovetree-4.0/blob/main/deploy/host-com2/lovetree-api/AUTODEPLOY.md
+Wants=network-online.target
+After=network-online.target lovetree-api.service
+ConditionPathExists=/usr/local/sbin/lovetree-api-autodeploy
+# 실패해도 타이머가 계속 확인하게 한다(같은 SHA 재시도는 스크립트가 상태 파일로 막는다).
+StartLimitIntervalSec=0
+
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=/
+Nice=10
+IOSchedulingClass=best-effort
+TimeoutStartSec=900
+ExecStart=/usr/local/sbin/lovetree-api-autodeploy run

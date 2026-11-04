@@ -25,6 +25,14 @@ if (( ! apply )); then
   exit 0
 fi
 fail() { echo "LOVETREE_INSTALL=$1" >&2; exit 1; }
+# 자동 배포(autodeploy.sh)와 같은 잠금 파일을 쓴다 — 수동 설치와 타이머가 겹치지 않게 한다.
+# autodeploy가 잠금을 쥔 채 이 스크립트를 부를 때는 LOVETREE_DEPLOY_LOCK_HELD=1로 넘어온다.
+lock_file=${LOVETREE_DEPLOY_LOCK:-/run/lock/lovetree-api-deploy.lock}
+if [[ ${LOVETREE_DEPLOY_LOCK_HELD:-0} != 1 ]]; then
+  [[ ${EUID} -eq 0 ]] || fail ROOT_REQUIRED
+  exec 9>"$lock_file" || fail DEPLOY_LOCK_UNAVAILABLE
+  flock -w 300 9 || fail DEPLOY_LOCKED
+fi
 [[ ${EUID} -eq 0 ]] || fail ROOT_REQUIRED
 [[ -f "$source_root/server/index.js" && -f "$source_root/src/domain.js" && -f "$source_root/package-lock.json" ]] || fail SOURCE_MISSING
 [[ -x "$node_bin" ]] || fail NODE_MISSING
