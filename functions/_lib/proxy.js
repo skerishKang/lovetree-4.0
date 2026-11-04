@@ -27,7 +27,7 @@ function communityMethods(path) {
   if(action==='comments')return new Set(['GET','POST']);
   if(action==='favorite'||action==='reaction')return new Set(['PUT','DELETE']);
   if(action==='report'||action==='block')return new Set(['POST']);
-  if(COMMUNITY_COMMENT_ITEM.test(path))return new Set(['DELETE']);
+  if(COMMUNITY_COMMENT_ITEM.test(path))return new Set(['DELETE','PATCH']);
   if(COMMUNITY_REPORT_ITEM.test(path))return new Set(['PATCH']);
   return null;
 }

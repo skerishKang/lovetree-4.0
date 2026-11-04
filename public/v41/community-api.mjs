@@ -9,6 +9,7 @@ export function createCommunityApi({fetchImpl=(...args)=>fetch(...args)}={}){
   comments:id=>call('/api/community/shares/'+encodeURIComponent(id)+'/comments'),
   comment:(id,body)=>call('/api/community/shares/'+encodeURIComponent(id)+'/comments',{method:'POST',headers:{'idempotency-key':key('comment')},body:JSON.stringify({body})}),
   removeComment:id=>call('/api/community/comments/'+encodeURIComponent(id),{method:'DELETE'}),
+  editComment:(id,body)=>call('/api/community/comments/'+encodeURIComponent(id),{method:'PATCH',body:JSON.stringify({body})}),
   report:(id,reason)=>call('/api/community/shares/'+encodeURIComponent(id)+'/report',{method:'POST',headers:{'idempotency-key':key('report')},body:JSON.stringify({reason})}),
   block:id=>call('/api/community/shares/'+encodeURIComponent(id)+'/block',{method:'POST'})
  };

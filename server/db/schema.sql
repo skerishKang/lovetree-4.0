@@ -135,9 +135,14 @@ CREATE TABLE IF NOT EXISTS lovetree_community_comments (
   status text NOT NULL DEFAULT 'visible' CHECK (status IN ('visible','deleted','hidden')),
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
+  edited_at timestamptz,
   PRIMARY KEY (product_id, comment_id),
   UNIQUE (product_id, subject_id, client_key)
 );
+-- Existing deployments lack edited_at. The column is nullable so old rows
+-- remain valid; the same ALTER lives in
+-- server/db/migrations/community-comments-enhance-261104.sql (not auto-applied).
+DO $$ BEGIN ALTER TABLE lovetree_community_comments ADD COLUMN IF NOT EXISTS edited_at timestamptz; END $$;
 CREATE INDEX IF NOT EXISTS lovetree_community_comments_share_idx
   ON lovetree_community_comments (product_id, share_id, created_at DESC);
 

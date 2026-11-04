@@ -28,8 +28,20 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
  async function comments(item,host){
   host.replaceChildren(el('p','community-muted','댓글을 불러오는 중이에요.'));
   const answer=await api.comments(item.shareId);if(!answer.ok){host.replaceChildren(el('p','community-muted',answer.message||'댓글을 불러오지 못했어요.'));return;}
-  const rows=el('div','community-comments');for(const comment of answer.comments){const row=el('article','community-comment'),head=el('small','',`${comment.authorLabel} · ${String(comment.createdAt||'').slice(0,10)}`),body=el('p','',comment.body);row.append(head,body);if(comment.canDelete){const remove=el('button','community-link','삭제');remove.type='button';remove.onclick=async()=>{const result=await api.removeComment(comment.id);if(result.ok)comments(item,host);else message(loginMessage(result));};row.append(remove);}rows.append(row);}if(!answer.comments.length)rows.append(el('p','community-muted','첫 댓글을 남겨 보세요.'));
+  const rows=el('div','community-comments');for(const comment of answer.comments){const row=el('article','community-comment'),editedNote=comment.edited?' · 수정됨':'',head=el('small','',`${comment.authorLabel} · ${String(comment.createdAt||'').slice(0,10)}${editedNote}`),body=el('p','',comment.body);row.append(head,body);const tools=el('div','community-comment-tools');if(comment.canEdit){const edit=el('button','community-link','수정');edit.type='button';edit.onclick=()=>startEdit(row,comment,host,item);tools.append(edit);}if(comment.canDelete){const remove=el('button','community-link','삭제');remove.type='button';remove.onclick=async()=>{const result=await api.removeComment(comment.id);if(result.ok)comments(item,host);else message(loginMessage(result));};tools.append(remove);}if(tools.children.length)row.append(tools);rows.append(row);}if(!answer.comments.length)rows.append(el('p','community-muted','첫 댓글을 남겨 보세요.'));
   const write=el('form','community-comment-form'),input=el('textarea',''),submit=el('button','community-mini','댓글 남기기');input.maxLength=1000;input.required=true;input.placeholder='공개 트리에 남길 말을 적어 주세요.';submit.type='submit';write.append(input,submit);write.onsubmit=async event=>{event.preventDefault();submit.disabled=true;const result=await api.comment(item.shareId,input.value);submit.disabled=false;if(!result.ok){message(loginMessage(result));return;}await comments(item,host);};host.replaceChildren(rows,write);
+ }
+ function startEdit(row,comment,host,item){
+  if(row.dataset.editing==='1')return;row.dataset.editing='1';
+  const original=comment.body||'';const head=row.querySelector('small'),body=row.querySelector('p'),tools=row.querySelector('.community-comment-tools');
+  row.replaceChildren();
+  const form=el('form','community-comment-edit'),input=el('textarea','',original);input.maxLength=1000;input.required=true;input.value=original;
+  const save=el('button','community-mini','저장');save.type='submit';
+  const cancel=el('button','community-link','취소');cancel.type='button';
+  form.append(input,save,cancel);
+  form.onsubmit=async event=>{event.preventDefault();save.disabled=true;const result=await api.editComment(comment.id,input.value);save.disabled=false;if(!result.ok){message(loginMessage(result));return;}await comments(item,host);};
+  cancel.onclick=()=>{delete row.dataset.editing;row.replaceChildren();if(head)row.append(head);if(body)row.append(body);if(tools)row.append(tools);};
+  row.append(form);
  }
  function renderPreview(item){
   preview.replaceChildren(el('p','community-preview-kicker','감상 허브'));
