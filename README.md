@@ -7,6 +7,7 @@
 2026-11-01 Owner 결정으로 **앞으로의 신규 기능과 UI/UX 개선은 4.1에 집중한다.**
 
 - 4.1 기본 주소: https://lovetree.padiem.net/
+- **개발 기간 접속 주소(대표 결정, 2026-11-05)**: 개발 기간 동안 확인·시험·보고는 https://lovetree-4-0.pages.dev/v41/ 를 쓴다. lovetree.padiem.net은 Cloudflare가 미국 LA 거점(colo=LAX)에서 처리해 파일 하나에 약 1~3초가 걸리고, pages.dev는 인천(ICN)에서 약 0.1초다. pages.dev 루트(/)는 4.0이므로 반드시 /v41/을 쓴다. 로그인은 auth.padiem.net 경유 후 pages.dev로 돌아오며, 로그인 상태는 주소별로 따로 저장된다. 운영 주소 lovetree.padiem.net은 그대로 유지한다(#169).
 - 기존 4.1 주소도 유지: https://lovetree-4-0.pages.dev/v41/
 - 4.0 UI: 기존 루트와 경로를 호환용으로 보존한다. 루트/로그인 복귀 주소의 자동 전환은 이번 문서 변경에 포함하지 않는다.
 - 저장소는 기존 skerishKang/lovetree-4.0을 계속 사용한다.
