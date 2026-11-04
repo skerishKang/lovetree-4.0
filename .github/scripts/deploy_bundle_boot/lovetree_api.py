@@ -73,13 +73,21 @@ def service_env(args) -> dict[str, str]:
         "LOVETREE_ACCOUNT_DELETE_RPC_SECRET": args.account_delete_secret,
         "LOVETREE_IDENTITY_RPC_URL": args.identity_rpc_url,
         "LOVETREE_IDENTITY_RPC_SECRET": args.identity_rpc_secret,
+        # Production-shaped auth lane: the shipped credential module verifies
+        # the signed session locally, so anonymous reads take the same 401 ->
+        # null principal path as the deployed service (no relay call happens).
+        "LOVETREE_AUTHORITY_TRANSPORT": "relay",
+        "LOVETREE_AUTHORITY_RELAY_URL": args.authority_relay_url,
+        "LOVETREE_CALLER_SECRET": args.caller_secret,
+        "LOVETREE_CREDENTIAL_MODULE": args.credential_module,
     }
 
 
 def secrets_of(args) -> list[str]:
     env = service_env(args)
     return [args.database_url, env["LOVETREE_SESSION_SECRET"],
-            env["LOVETREE_ACCOUNT_DELETE_RPC_SECRET"], env["LOVETREE_IDENTITY_RPC_SECRET"]]
+            env["LOVETREE_ACCOUNT_DELETE_RPC_SECRET"], env["LOVETREE_IDENTITY_RPC_SECRET"],
+            env["LOVETREE_CALLER_SECRET"]]
 
 
 def drop_to_service_user():
@@ -206,6 +214,9 @@ def main() -> None:
     common.add_argument("--account-delete-secret", default="")
     common.add_argument("--identity-rpc-url", default="https://identity.bundle-boot.invalid")
     common.add_argument("--identity-rpc-secret", default="")
+    common.add_argument("--authority-relay-url", default="https://relay.bundle-boot.invalid")
+    common.add_argument("--caller-secret", default="")
+    common.add_argument("--credential-module", default="./credentials/lovetree-credential-module.js")
     common.add_argument("--state", default="/tmp/lovetree-boot-state.json")
     common.add_argument("--log", default="/tmp/lovetree-boot-node.log")
     common.add_argument("--timeout-seconds", type=int, default=40)
