@@ -18,7 +18,7 @@ function recorder(reply) {
 }
 
 test('허용한 경로만 업스트림으로 넘기고 나머지는 404 JSON 이다', async () => {
-  const allowed = [['/api/account', 'GET'], ['/api/account/delete', 'POST'], ['/api/workspace', 'GET'], ['/api/admin/session', 'GET'], ['/api/admin/roles', 'GET'], ['/auth/login', 'GET'], ['/auth/callback', 'GET'], ['/auth/logout', 'POST']];
+  const allowed = [['/api/account', 'GET'], ['/api/account/delete', 'POST'], ['/api/workspace', 'GET'], ['/api/admin/session', 'GET'], ['/api/admin/roles', 'GET'], ['/api/youtube/oembed', 'GET'], ['/auth/login', 'GET'], ['/auth/callback', 'GET'], ['/auth/logout', 'POST']];
   for (const [path, method] of allowed) {
     const fetcher = recorder(new Response('{}', { headers: { 'content-type': 'application/json' } }));
     const response = await onRequest(createProxy({ fetcher }), `https://lovetree.example${path}`, { method });
@@ -37,7 +37,7 @@ test('허용한 경로만 업스트림으로 넘기고 나머지는 404 JSON 이
 });
 
 test('경로가 허용해도 메서드가 밖이면 내려보내지 않고 405 JSON 이다', async () => {
-  for (const [path, method] of [['/api/account', 'POST'], ['/api/account/delete', 'GET'], ['/api/account/delete', 'DELETE'], ['/auth/logout', 'GET'], ['/auth/login', 'POST'], ['/api/workspace', 'DELETE'], ['/api/workspace', 'POST'], ['/api/admin/roles', 'POST'], ['/api/admin/session', 'PUT']]) {
+  for (const [path, method] of [['/api/account', 'POST'], ['/api/account/delete', 'GET'], ['/api/account/delete', 'DELETE'], ['/auth/logout', 'GET'], ['/auth/login', 'POST'], ['/api/workspace', 'DELETE'], ['/api/workspace', 'POST'], ['/api/admin/roles', 'POST'], ['/api/admin/session', 'PUT'], ['/api/youtube/oembed', 'POST']]) {
     const fetcher = recorder(new Response('{}', { headers: { 'content-type': 'application/json' } }));
     const response = await onRequest(createProxy({ fetcher }), `https://lovetree.example${path}`, { method });
     assert.equal(response.status, 405, `${method} ${path}`);

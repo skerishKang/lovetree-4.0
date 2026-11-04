@@ -41,6 +41,7 @@ const ALLOWED = new Map([
   ['/api/community/shares', new Set(['GET'])],
   ['/api/community/me/favorites', new Set(['GET'])],
   ['/api/community/admin/reports', new Set(['GET'])],
+  ['/api/youtube/oembed', new Set(['GET'])],
   ['/api/admin/session', new Set(['GET'])],
   ['/api/admin/roles', new Set(['GET'])],
   ['/auth/login', new Set(['GET'])],
