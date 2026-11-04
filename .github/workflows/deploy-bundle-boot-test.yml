@@ -1,0 +1,252 @@
+name: Deploy Bundle Boot Test
+
+# ai-revenue-lab #6855 item 3, mirroring that repo's deploy-bundle-boot-test.yml:
+# CI tested source, but not what the host actually starts. On 2026-11-04 the
+# first autodeploy cloned under umask 077, install.sh's `cp -a` carried
+# root-0600/0700 modes into /opt/padiem/lovetree-api, and the lovetree-api
+# service user could not read its modules (the rollback's npm ci failed the
+# same way). These steps run the REAL install.sh --apply against a
+# umask-077-style source replica, boot the installed tree as the unprivileged
+# service user, require the autodeploy health read (GET /api/community/shares
+# -> 200), run the real rollback sequence back to health 200, and fail unless
+# two negative controls (missing module, root-0600 tree) refuse to boot.
+# No deployment, no tunnel change, no real credential: every secret-looking
+# value is generated inside the job.
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/deploy-bundle-boot-test.yml'
+      - '.github/scripts/deploy_bundle_boot/**'
+      - 'deploy/host-com2/lovetree-api/**'
+      - 'server/**'
+      - 'src/domain.js'
+      - 'package.json'
+      - 'package-lock.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-bundle-boot-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  lovetree-api-bundle-boot:
+    name: lovetree-api bundle-only boot (install.sh --apply, umask 077 source)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      BOOT_APP: /opt/padiem/lovetree-api
+      BOOT_PORT: '8790'
+      BOOT_HELPER: .github/scripts/deploy_bundle_boot/lovetree_api.py
+    steps:
+      - name: Checkout full history (rollback needs the previous release)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Node.js 22 at the unit's fixed path
+        run: |
+          set -euo pipefail
+          # setup-node may already place node at the unit's fixed path.
+          if [ ! -e /usr/local/bin/node ]; then
+            sudo ln -s "$(readlink -f "$(command -v node)")" /usr/local/bin/node
+          fi
+          if [ ! -e /usr/local/bin/npm ]; then
+            sudo ln -s "$(readlink -f "$(command -v npm)")" /usr/local/bin/npm
+          fi
+          /usr/local/bin/node --version
+          /usr/local/bin/npm --version
+
+      - name: Start throwaway PostgreSQL and apply the shipped schema
+        run: |
+          set -euo pipefail
+          pg_temp="pg-$(openssl rand -hex 24)"
+          docker run -d --name lovetree-boot-pg \
+            -e POSTGRES_USER=lovetree -e POSTGRES_PASSWORD="$pg_temp" \
+            -e POSTGRES_DB=lovetree -p 127.0.0.1:5432:5432 \
+            postgres:16-alpine > /dev/null
+          # pg_isready can answer during initdb's temporary server, so gate on a
+          # real query instead before feeding the schema.
+          ready=0
+          for _ in $(seq 1 90); do
+            if docker exec lovetree-boot-pg psql -U lovetree -d lovetree -c 'SELECT 1;' > /dev/null 2>&1; then
+              ready=1; break
+            fi
+            sleep 1
+          done
+          [ "$ready" = 1 ] || { echo 'POSTGRES_NOT_READY' >&2; exit 1; }
+          # 운영에서 migration은 사람이 적용한다(autodeploy 금지 규칙). 부트 검증은
+          # 저장소가 배포하는 schema와 migration을 그 순서대로 그대로 적용한다.
+          docker exec -i lovetree-boot-pg psql -U lovetree -d lovetree \
+            -v ON_ERROR_STOP=1 < server/db/schema.sql > /dev/null
+          for migration in server/db/migrations/*.sql; do
+            docker exec -i lovetree-boot-pg psql -U lovetree -d lovetree \
+              -v ON_ERROR_STOP=1 < "$migration" > /dev/null
+          done
+          echo "LOVETREE_DATABASE_URL=postgres://lovetree:${pg_temp}@127.0.0.1:5432/lovetree" >> "$GITHUB_ENV"
+
+      - name: Install with the real install.sh from a umask-077 source replica
+        run: |
+          set -euo pipefail
+          # 11-04 사고 재현: clone이 umask 077로 만들어진 소스 트리(전부 root 0600/0700).
+          rm -rf "$RUNNER_TEMP/src077" "$RUNNER_TEMP/src_prev"
+          mkdir -p "$RUNNER_TEMP/src077" "$RUNNER_TEMP/src_prev"
+          git archive HEAD | tar -x -C "$RUNNER_TEMP/src077"
+          chmod -R go-rwx "$RUNNER_TEMP/src077"
+          # install.sh는 스스로 umask 077을 걸고, --apply 후 설치 트리 권한을 정규화한다(#170).
+          bash deploy/host-com2/lovetree-api/install.sh --dry-run \
+            --source-root "$RUNNER_TEMP/src077"
+          sudo env "PATH=$PATH" bash deploy/host-com2/lovetree-api/install.sh --apply \
+            --source-root "$RUNNER_TEMP/src077"
+          test -f "$BOOT_APP/server/index.js"
+          test -f "$BOOT_APP/src/domain.js"
+
+      - name: Unit ExecCondition passes with job-generated temp values
+        run: |
+          set -euo pipefail
+          session_secret="boot-$(openssl rand -hex 32)"
+          delete_secret="boot-$(openssl rand -hex 32)"
+          identity_secret="boot-$(openssl rand -hex 32)"
+          caller_secret="boot-$(openssl rand -hex 32)"
+          sudo env "PATH=$PATH" python3 "$BOOT_HELPER" check-config \
+            --app "$BOOT_APP" --port "$BOOT_PORT" \
+            --database-url "$LOVETREE_DATABASE_URL" \
+            --media-dir /tmp/lovetree-boot-media \
+            --session-secret "$session_secret" \
+            --account-delete-secret "$delete_secret" \
+            --identity-rpc-url "https://identity.bundle-boot.invalid" \
+            --identity-rpc-secret "$identity_secret" \
+            --caller-secret "$caller_secret"
+
+      - name: Boot the installed tree as the service user (positive control)
+        run: |
+          set -euo pipefail
+          session_secret="boot-$(openssl rand -hex 32)"
+          delete_secret="boot-$(openssl rand -hex 32)"
+          identity_secret="boot-$(openssl rand -hex 32)"
+          caller_secret="boot-$(openssl rand -hex 32)"
+          sudo env "PATH=$PATH" python3 "$BOOT_HELPER" boot \
+            --app "$BOOT_APP" --port "$BOOT_PORT" \
+            --database-url "$LOVETREE_DATABASE_URL" \
+            --media-dir /tmp/lovetree-boot-media \
+            --session-secret "$session_secret" \
+            --account-delete-secret "$delete_secret" \
+            --identity-rpc-url "https://identity.bundle-boot.invalid" \
+            --identity-rpc-secret "$identity_secret" \
+            --caller-secret "$caller_secret"
+
+      - name: Run the real rollback sequence back to health 200
+        run: |
+          set -euo pipefail
+          # autodeploy.sh의 확인-실패 되돌림과 같은 순서: 백업 tar → 식별 가능한
+          # "다음 릴리스" 설치(여기서는 이전 커밋) → 백업 복원(node_modules 제외)
+          # → 되돌리기 npm ci(11-04에 권한으로 실패한 단계) → 권한 정규화 → 기동.
+          sudo tar -czf "$RUNNER_TEMP/lovetree-boot-backup.tar.gz" \
+            -C "$BOOT_APP" --exclude=./node_modules --exclude=./backups .
+          # autodeploy 순서와 같다: 설치 전에 실행 중인 서비스를 멈춘다
+          # (여기서는 systemd가 아니라 직접 기동한 노드를 정지한다).
+          sudo env "PATH=$PATH" python3 "$BOOT_HELPER" stop
+          sleep 1
+          git archive HEAD~1 | tar -x -C "$RUNNER_TEMP/src_prev"
+          sudo env "PATH=$PATH" bash deploy/host-com2/lovetree-api/install.sh --apply \
+            --source-root "$RUNNER_TEMP/src_prev"
+          sudo systemctl stop lovetree-api > /dev/null 2>&1 || true
+          sudo find "$BOOT_APP" -mindepth 1 -maxdepth 1 \
+            ! -name node_modules ! -name backups -exec rm -rf -- {} +
+          sudo tar -xzf "$RUNNER_TEMP/lovetree-boot-backup.tar.gz" -C "$BOOT_APP"
+          ( cd "$BOOT_APP" && sudo env "PATH=$PATH" npm ci --omit=dev --no-audit --no-fund ) \
+            > /dev/null
+          sudo chmod 0755 "$BOOT_APP"
+          sudo chmod -R a+rX "$BOOT_APP/server" "$BOOT_APP/src" "$BOOT_APP/node_modules"
+          sudo chmod a+r "$BOOT_APP/check_config.mjs" "$BOOT_APP/preflight_imports.mjs" \
+            "$BOOT_APP/package.json" "$BOOT_APP/package-lock.json"
+          session_secret="boot-$(openssl rand -hex 32)"
+          delete_secret="boot-$(openssl rand -hex 32)"
+          identity_secret="boot-$(openssl rand -hex 32)"
+          caller_secret="boot-$(openssl rand -hex 32)"
+          sudo env "PATH=$PATH" python3 "$BOOT_HELPER" boot \
+            --app "$BOOT_APP" --port "$BOOT_PORT" \
+            --database-url "$LOVETREE_DATABASE_URL" \
+            --media-dir /tmp/lovetree-boot-media \
+            --session-secret "$session_secret" \
+            --account-delete-secret "$delete_secret" \
+            --identity-rpc-url "https://identity.bundle-boot.invalid" \
+            --identity-rpc-secret "$identity_secret" \
+            --caller-secret "$caller_secret"
+
+      - name: Stop the healthy server so negative controls start clean
+        run: |
+          set -euo pipefail
+          sudo env "PATH=$PATH" python3 "$BOOT_HELPER" stop
+          sleep 1
+          code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 3 "http://127.0.0.1:${BOOT_PORT}/api/community/shares" || true)
+          if [ "$code" = 200 ]; then echo 'server still healthy' >&2; exit 1; fi
+          echo 'LOVETREE_STOPPED=OK'
+
+      - name: Negative control — a missing module must refuse to boot
+        run: |
+          set -euo pipefail
+          session_secret="boot-$(openssl rand -hex 32)"
+          delete_secret="boot-$(openssl rand -hex 32)"
+          identity_secret="boot-$(openssl rand -hex 32)"
+          caller_secret="boot-$(openssl rand -hex 32)"
+          sudo rm "$BOOT_APP/src/domain.js"
+          if sudo env "PATH=$PATH" python3 "$BOOT_HELPER" expect-fail \
+            --app "$BOOT_APP" --port "$BOOT_PORT" \
+            --database-url "$LOVETREE_DATABASE_URL" \
+            --media-dir /tmp/lovetree-boot-media \
+            --session-secret "$session_secret" \
+            --account-delete-secret "$delete_secret" \
+            --identity-rpc-url "https://identity.bundle-boot.invalid" \
+            --identity-rpc-secret "$identity_secret" \
+            --caller-secret "$caller_secret" \
+            --port 8791 \
+            --timeout-seconds 15; then
+            echo 'LOVETREE_NEGATIVE_MISSING_MODULE=OK'
+          else
+            echo 'LOVETREE_NEGATIVE_MISSING_MODULE=FAIL' >&2
+            exit 1
+          fi
+
+      - name: Negative control — the original root-0600/0700 tree must fail
+        run: |
+          set -euo pipefail
+          session_secret="boot-$(openssl rand -hex 32)"
+          delete_secret="boot-$(openssl rand -hex 32)"
+          identity_secret="boot-$(openssl rand -hex 32)"
+          caller_secret="boot-$(openssl rand -hex 32)"
+          # 11-04 사고 그 자체: #170 정규화가 없었다면 남을 root 전용 모드.
+          sudo env "PATH=$PATH" bash deploy/host-com2/lovetree-api/install.sh --apply \
+            --source-root "$RUNNER_TEMP/src077" > /dev/null
+          sudo chmod 0700 "$BOOT_APP/server" "$BOOT_APP/src"
+          if sudo env "PATH=$PATH" python3 "$BOOT_HELPER" expect-fail \
+            --app "$BOOT_APP" --port "$BOOT_PORT" \
+            --database-url "$LOVETREE_DATABASE_URL" \
+            --media-dir /tmp/lovetree-boot-media \
+            --session-secret "$session_secret" \
+            --account-delete-secret "$delete_secret" \
+            --identity-rpc-url "https://identity.bundle-boot.invalid" \
+            --identity-rpc-secret "$identity_secret" \
+            --caller-secret "$caller_secret" \
+            --port 8791 \
+            --timeout-seconds 15; then
+            echo 'LOVETREE_NEGATIVE_ROOT_ONLY_TREE=OK'
+          else
+            echo 'LOVETREE_NEGATIVE_ROOT_ONLY_TREE=FAIL' >&2
+            exit 1
+          fi
+
+      - name: Never deploy and never touch the tunnel
+        if: always()
+        run: |
+          echo 'SYSTEMD_START=0'
+          echo 'PRODUCTION_DEPLOYMENT=0'
+          echo 'TUNNEL_CHANGE=0'
+
+      - name: Stop the booted process
+        if: always()
+        run: sudo env "PATH=$PATH" python3 "$BOOT_HELPER" stop || true
