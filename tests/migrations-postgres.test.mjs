@@ -69,8 +69,9 @@ test('migrations apply cleanly to empty DB and are re-runnable', { skip }, async
     assert.equal(col.rows[0].data_type, 'timestamp with time zone');
 
     // ③ 신규 kind 삽입이 허용되고, 허용 외 kind는 거부される (CHECK가 실제로 동작)
-    const productId = 'lt-mig-' + Date.now().toString(36);
-    const shareId = 's-mig-' + Date.now().toString(36);
+    const tag = Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
+    const productId = ('lt-' + tag).slice(0, 32);
+    const shareId = ('s' + tag).padEnd(24, 'x').slice(0, 24);
     await pool.query(
       `INSERT INTO lovetree_shares(product_id, share_id, subject_id, tree_id, entry_moment_id, initial_view, discoverable)
        VALUES ($1, $2, 'owner', 'tree', 'moment', 'book', true)`,
