@@ -12,7 +12,7 @@ test('community rows are independent, idempotent and auditable',{skip},async()=>
   assert.equal((await repo.listDiscoverable({productId})).length,1);
   await repo.setFavorite({productId,shareId,subjectId:'reader',enabled:true});await repo.setFavorite({productId,shareId,subjectId:'reader',enabled:true});
   await repo.setReaction({productId,shareId,subjectId:'reader',enabled:true});
-  assert.deepEqual(await repo.stats({productId,shareId,viewerSubjectId:'reader'}),{favorites:1,hearts:1,comments:0,favored:true,hearted:true});
+  assert.deepEqual(await repo.stats({productId,shareId,viewerSubjectId:'reader'}),{favorites:1,hearts:1,comments:0,favored:true,hearted:true,reactions:{heart:1,like:0,love:0,laugh:0,wow:0,sad:0,angry:0},mine:['heart']});
   const first=await repo.createComment({productId,commentId:'comment-'+tag,shareId,subjectId:'reader',body:'hello',clientKey:'comment-key-'+tag});
   const replay=await repo.createComment({productId,commentId:'other-'+tag,shareId,subjectId:'reader',body:'changed',clientKey:'comment-key-'+tag});
   assert.equal(replay.id,first.id);assert.equal(replay.body,'hello');
