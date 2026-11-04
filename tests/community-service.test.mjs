@@ -77,11 +77,15 @@ test('reaction kinds are allowlisted, per-kind idempotent, toggleable, and block
  const heart=await call(handle,'PUT',path,{account:'bob',body:{kind:'heart'}});assert.equal(heart.status,200);assert.equal(heart.body.stats.hearts,1);assert.equal(heart.body.stats.reactions.heart,1);assert.deepEqual(heart.body.stats.mine,['heart']);
  const like=await call(handle,'PUT',path,{account:'bob',body:{kind:'like'}});assert.equal(like.status,200);assert.equal(like.body.stats.hearts,1);assert.equal(like.body.stats.reactions.like,1);assert.deepEqual(like.body.stats.mine,['heart','like']);
  const dup=await call(handle,'PUT',path,{account:'bob',body:{kind:'like'}});assert.equal(dup.status,200);assert.equal(dup.body.stats.reactions.like,1);
+ const love=await call(handle,'PUT',path,{account:'bob',body:{kind:'love'}});assert.equal(love.status,200);assert.equal(love.body.stats.reactions.love,1);assert.deepEqual(love.body.stats.mine,['heart','like','love']);
  const bad=await call(handle,'PUT',path,{account:'bob',body:{kind:'party'}});assert.equal(bad.status,400);assert.equal(bad.body.error.code,'reaction_kind_invalid');
- const off=await call(handle,'DELETE',path,{account:'bob',query:'kind=like'});assert.equal(off.status,200);assert.equal(off.body.stats.reactions.like,0);assert.deepEqual(off.body.stats.mine,['heart']);
+ const off=await call(handle,'DELETE',path,{account:'bob',query:'kind=like'});assert.equal(off.status,200);assert.equal(off.body.stats.reactions.like,0);assert.deepEqual(off.body.stats.mine,['heart','love']);
+ const offLove=await call(handle,'DELETE',path,{account:'bob',query:'kind=love'});assert.equal(offLove.status,200);assert.equal(offLove.body.stats.reactions.love,0);assert.deepEqual(offLove.body.stats.mine,['heart']);
+ const legacyOff=await call(handle,'DELETE',path,{account:'bob'});assert.equal(legacyOff.status,200);assert.equal(legacyOff.body.stats.reactions.heart,0);assert.equal(legacyOff.body.stats.hearts,0);assert.deepEqual(legacyOff.body.stats.mine,[]);
+ const sad=await call(handle,'PUT',path,{account:'bob',body:{kind:'sad'}});assert.equal(sad.status,200);assert.deepEqual(sad.body.stats.mine,['sad']);
  await call(handle,'POST',`/api/community/shares/${shareId}/block`,{account:'bob'});
  const blocked=await call(handle,'PUT',path,{account:'bob',body:{kind:'wow'}});assert.equal(blocked.status,403);assert.equal(blocked.body.error.code,'reaction_blocked');
- assert.ok(communityRepo.inspect().reactions.some(v=>v.includes('heart')));
+ assert.ok(communityRepo.inspect().reactions.some(v=>v.includes('sad')));
 });
 
 test('report, block and moderation are separate audited data and blocked owners disappear for that member',async()=>{
