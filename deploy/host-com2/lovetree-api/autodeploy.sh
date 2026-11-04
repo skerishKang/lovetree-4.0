@@ -178,6 +178,10 @@ if (( ! has_api )); then
   exit 0
 fi
 
+# clone은 --no-checkout이라 이 시점의 작업 트리는 비어 있다. install.sh를 찾기 전에 먼저 checkout한다.
+log "AUTODEPLOY=STEP checkout sha=$target from=$installed"
+git -C "$repo" checkout --quiet --force --detach "$target" || { log "AUTODEPLOY=FAIL stage=checkout"; exit 1; }
+
 if [[ -z "$install_sh" ]]; then install_sh=$repo/deploy/host-com2/lovetree-api/install.sh; fi
 if [[ -f "$install_sh" ]]; then
   if [[ -x "$install_sh" ]]; then install_cmd=("$install_sh"); else install_cmd=(bash "$install_sh"); fi
@@ -185,9 +189,6 @@ else
   log "AUTODEPLOY=FAIL stage=install_script_missing path=$install_sh"
   exit 1
 fi
-
-log "AUTODEPLOY=STEP checkout sha=$target from=$installed"
-git -C "$repo" checkout --quiet --force --detach "$target" || { log "AUTODEPLOY=FAIL stage=checkout"; exit 1; }
 
 before_restarts=$("${systemctl_bin}" show -p NRestarts --value "$unit" 2>/dev/null | tr -d '[:space:]' || true)
 before_restarts=${before_restarts:-0}

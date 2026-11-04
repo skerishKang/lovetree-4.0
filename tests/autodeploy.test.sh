@@ -30,11 +30,35 @@ git init -q "$seed"
 git -C "$seed" config user.email ci@example.com
 git -C "$seed" config user.name ci
 git -C "$seed" config commit.gpgsign false
-mkdir -p "$seed/server" "$seed/src"
+mkdir -p "$seed/server" "$seed/src" "$seed/deploy/host-com2/lovetree-api"
 printf 'v1\n' > "$seed/server/index.js"
 printf 'export const x = 1;\n' > "$seed/src/domain.js"
 printf '{}\n' > "$seed/package.json"
 printf '{}\n' > "$seed/package-lock.json"
+# install.sh는 autodeploy가 clone의 작업 트리에서 찾는다(--no-checkout 순서 회귀 방지).
+cat > "$seed/deploy/host-com2/lovetree-api/install.sh" <<'FAKE_INSTALL'
+#!/usr/bin/env bash
+set -euo pipefail
+mode=dry
+src=""
+while (($#)); do
+  case "$1" in
+    --apply) mode=apply; shift ;;
+    --dry-run) mode=dry; shift ;;
+    --source-root) src=${2:?}; shift 2 ;;
+    *) shift ;;
+  esac
+done
+printf '%s %s\n' "$mode" "$src" >> "${FAKE_INSTALL_LOG:?}"
+if [[ $mode == apply && ${FAKE_INSTALL_FAIL:-0} == 1 ]]; then exit 1; fi
+if [[ $mode == apply && -n $src ]]; then
+  rm -rf "${FAKE_APP:?}/server" "${FAKE_APP:?}/src"
+  cp -a "$src/server" "$FAKE_APP/server"
+  cp -a "$src/src" "$FAKE_APP/src"
+  cat "$src/server/index.js" > "$FAKE_APP/INSTALLED"
+fi
+FAKE_INSTALL
+chmod +x "$seed/deploy/host-com2/lovetree-api/install.sh"
 git -C "$seed" add -A
 git -C "$seed" commit -qm a
 A=$(git -C "$seed" rev-parse HEAD)
@@ -69,31 +93,6 @@ printf '%s' "${FAKE_HTTP_CODE:-200}"
 exit 0
 EOF
 chmod +x "$bin/systemctl" "$bin/journalctl" "$bin/curl"
-
-fake_install=$root/fake-install.sh
-cat > "$fake_install" <<'EOF'
-#!/usr/bin/env bash
-set -euo pipefail
-mode=dry
-src=""
-while (($#)); do
-  case "$1" in
-    --apply) mode=apply; shift ;;
-    --dry-run) mode=dry; shift ;;
-    --source-root) src=${2:?}; shift 2 ;;
-    *) shift ;;
-  esac
-done
-printf '%s %s\n' "$mode" "$src" >> "${FAKE_INSTALL_LOG:?}"
-if [[ $mode == apply && ${FAKE_INSTALL_FAIL:-0} == 1 ]]; then exit 1; fi
-if [[ $mode == apply && -n $src ]]; then
-  rm -rf "${FAKE_APP:?}/server" "${FAKE_APP:?}/src"
-  cp -a "$src/server" "$FAKE_APP/server"
-  cp -a "$src/src" "$FAKE_APP/src"
-  cat "$src/server/index.js" > "$FAKE_APP/INSTALLED"
-fi
-EOF
-chmod +x "$fake_install"
 
 # ── 배포 대상 앱과 상태 파일
 app=$root/app
@@ -139,7 +138,6 @@ run_autodeploy() {
     AUTODEPLOY_APP="$app" \
     AUTODEPLOY_STATE_DIR="$state" \
     AUTODEPLOY_REMOTE="$origin" \
-    AUTODEPLOY_INSTALL_SH="$fake_install" \
     AUTODEPLOY_NPM=true \
     AUTODEPLOY_NODE="$node_bin" \
     AUTODEPLOY_SYSTEMCTL=systemctl \
@@ -195,7 +193,7 @@ assert_eq "1" "$(install_calls)" accept_install_calls
 assert_eq "v1" "$(cat "$app/INSTALLED")" accept_app_version
 pass accept_migrations
 
-# 4) 서버 코드 변경 → 정상 설치
+# 4) 서버 코드 변경 → 정상 설치 (install.sh는 clone의 작업 트리에서 찾는다)
 printf 'v2\n' > "$seed/server/index.js"
 D=$(push_commit d)
 run_autodeploy
