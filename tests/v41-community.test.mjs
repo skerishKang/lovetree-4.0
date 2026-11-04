@@ -5,6 +5,21 @@ test('community client uses fixed same-origin routes and idempotency headers',as
  const calls=[],fetchImpl=async(url,init={})=>{calls.push({url,init});return new Response(JSON.stringify(url.includes('/comments')?{comments:[]}:{items:[],stats:{},report:{}}),{headers:{'content-type':'application/json'}});},api=createCommunityApi({fetchImpl});
  await api.discover({q:'윤슬',limit:12});await api.favorite('s'.repeat(24),true);await api.react('s'.repeat(24),false);await api.comments('s'.repeat(24));await api.comment('s'.repeat(24),'hello');await api.report('s'.repeat(24),'check');await api.block('s'.repeat(24));
  assert.equal(calls.every(call=>call.url.startsWith('/api/community/')),true);assert.match(calls[4].init.headers['idempotency-key'],/^comment-/);assert.match(calls[5].init.headers['idempotency-key'],/^report-/);
+ const shareId='s'.repeat(24);
+ await api.react(shareId,false,'like');
+ const removeKind=calls.at(-1);
+ assert.equal(removeKind.url,`/api/community/shares/${shareId}/reaction?kind=like`);
+ assert.equal(removeKind.init.method,'DELETE');
+ assert.equal(removeKind.init.body,undefined);
+ await api.react(shareId,true,'love');
+ const addKind=calls.at(-1);
+ assert.equal(addKind.url,`/api/community/shares/${shareId}/reaction`);
+ assert.equal(addKind.init.method,'PUT');
+ assert.equal(addKind.init.body,JSON.stringify({kind:'love'}));
+ await api.react(shareId,false);
+ const legacyRemove=calls.at(-1);
+ assert.equal(legacyRemove.url,`/api/community/shares/${shareId}/reaction`);
+ assert.equal(legacyRemove.init.method,'DELETE');
 });
 test('4.1 discovery explains explicit-public scope and separates bookmark from new private writing',()=>{
  const html=fs.readFileSync(new URL('../public/v41/index.html',import.meta.url),'utf8'),shell=fs.readFileSync(new URL('../public/v41/shell.mjs',import.meta.url),'utf8'),panel=fs.readFileSync(new URL('../public/v41/community-panel.mjs',import.meta.url),'utf8'),css=fs.readFileSync(new URL('../public/v41/shell.css',import.meta.url),'utf8'),admin=fs.readFileSync(new URL('../src/admin.js',import.meta.url),'utf8'),schema=fs.readFileSync(new URL('../server/db/schema.sql',import.meta.url),'utf8');

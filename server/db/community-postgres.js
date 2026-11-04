@@ -15,8 +15,8 @@ export function createCommunityRepo(pool){
       (SELECT count(*)::int FROM lovetree_community_reactions WHERE product_id=s.product_id AND share_id=s.share_id) AS reacts_count,
       EXISTS(SELECT 1 FROM lovetree_community_favorites WHERE product_id=s.product_id AND share_id=s.share_id AND subject_id=$2) AS favored,
       EXISTS(SELECT 1 FROM lovetree_community_reactions WHERE product_id=s.product_id AND share_id=s.share_id AND subject_id=$2 AND kind='heart') AS hearted,
-      (SELECT COALESCE(jsonb_object_agg(k,kind_count),'{}'::jsonb) FROM (
-        SELECT 'heart' AS k, count(*)::int AS kind_count FROM lovetree_community_reactions
+      (SELECT COALESCE(jsonb_object_agg(kind,kind_count),'{}'::jsonb) FROM (
+        SELECT kind, count(*)::int AS kind_count FROM lovetree_community_reactions
         WHERE product_id=s.product_id AND share_id=s.share_id GROUP BY kind
       ) t) AS reactions_json,
       (SELECT COALESCE(array_agg(kind ORDER BY kind),'{}') FROM lovetree_community_reactions

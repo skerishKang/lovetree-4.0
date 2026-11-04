@@ -26,3 +26,34 @@ test('community rows are independent, idempotent and auditable',{skip},async()=>
   assert.equal((await repo.listDiscoverable({productId,viewerSubjectId:'reader'})).length,0);
  }finally{await pool.end();}
 });
+test('browse reaction counts keep every kind and deletes remove only the requested kind',{skip},async()=>{
+ assertIsolatedTestDatabase(DATABASE_URL);const pool=await createPool(DATABASE_URL,{max:3});
+ try{
+  await applySchema(pool);const repo=createCommunityRepo(pool),tag=suffix(),productId='lt-'+tag,shareId=('r'+tag).padEnd(24,'x').slice(0,24);
+  await pool.query(`INSERT INTO lovetree_shares(product_id,share_id,subject_id,tree_id,entry_moment_id,initial_view,discoverable) VALUES($1,$2,$3,'tree','moment','book',true)`,[productId,shareId,'owner-'+tag]);
+  const card=async viewer=>{const rows=await repo.listDiscoverableSummaries({productId,viewerSubjectId:viewer});return rows.find(row=>row.share.shareId===shareId);};
+  await repo.setReaction({productId,shareId,subjectId:'reader-a',kind:'like',enabled:true});
+  const first=await card('reader-a');
+  assert.deepEqual(first.stats.reactions,{heart:0,like:1,love:0,laugh:0,wow:0,sad:0,angry:0});
+  assert.deepEqual(first.stats.mine,['like']);
+  await repo.setReaction({productId,shareId,subjectId:'reader-b',kind:'heart',enabled:true});
+  await repo.setReaction({productId,shareId,subjectId:'reader-a',kind:'love',enabled:true});
+  const both=await card('reader-a');
+  assert.equal(both.stats.reactions.heart,1);assert.equal(both.stats.reactions.like,1);assert.equal(both.stats.reactions.love,1);
+  assert.deepEqual([...both.stats.mine].sort(),['like','love']);
+  await repo.setReaction({productId,shareId,subjectId:'reader-a',kind:'like',enabled:false});
+  const afterDelete=await card('reader-a');
+  assert.deepEqual(afterDelete.stats.reactions,{heart:1,like:0,love:1,laugh:0,wow:0,sad:0,angry:0});
+  assert.deepEqual(afterDelete.stats.mine,['love']);
+  await repo.setReaction({productId,shareId,subjectId:'reader-a',kind:'love',enabled:false});
+  await repo.setReaction({productId,shareId,subjectId:'reader-a',kind:'like',enabled:true});
+  const switched=await card('reader-a');
+  assert.deepEqual(switched.stats.mine,['like']);
+  assert.equal(switched.stats.reactions.like,1);assert.equal(switched.stats.reactions.love,0);
+  await repo.setReaction({productId,shareId,subjectId:'reader-a',kind:'heart',enabled:true});
+  await repo.setReaction({productId,shareId,subjectId:'reader-a',kind:'heart',enabled:false});
+  const heartOff=await card('reader-a');
+  assert.deepEqual(heartOff.stats.mine,['like']);
+  assert.equal(heartOff.stats.reactions.heart,1);
+ }finally{await pool.end();}
+});
