@@ -116,7 +116,7 @@ jobs:
             --session-secret "$session_secret" \
             --account-delete-secret "$delete_secret" \
             --identity-rpc-url "https://identity.bundle-boot.invalid" \
-            --identity-rpc-secret "$identity_secret"
+            --identity-rpc-secret "$identity_secret" \
             --caller-secret "$caller_secret"
 
       - name: Boot the installed tree as the service user (positive control)
@@ -133,7 +133,7 @@ jobs:
             --session-secret "$session_secret" \
             --account-delete-secret "$delete_secret" \
             --identity-rpc-url "https://identity.bundle-boot.invalid" \
-            --identity-rpc-secret "$identity_secret"
+            --identity-rpc-secret "$identity_secret" \
             --caller-secret "$caller_secret"
 
       - name: Run the real rollback sequence back to health 200
@@ -168,7 +168,7 @@ jobs:
             --session-secret "$session_secret" \
             --account-delete-secret "$delete_secret" \
             --identity-rpc-url "https://identity.bundle-boot.invalid" \
-            --identity-rpc-secret "$identity_secret"
+            --identity-rpc-secret "$identity_secret" \
             --caller-secret "$caller_secret"
 
       - name: Stop the healthy server so negative controls start clean
