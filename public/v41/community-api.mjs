@@ -5,7 +5,7 @@ export function createCommunityApi({fetchImpl=(...args)=>fetch(...args)}={}){
  return {
   discover:params=>call('/api/community/shares?'+new URLSearchParams(Object.fromEntries(Object.entries(params||{}).filter(([,v])=>v!==''&&v!=null)))),
   favorite:(id,enabled)=>call('/api/community/shares/'+encodeURIComponent(id)+'/favorite',{method:enabled?'PUT':'DELETE'}),
-  react:(id,enabled)=>call('/api/community/shares/'+encodeURIComponent(id)+'/reaction',{method:enabled?'PUT':'DELETE'}),
+  react:(id,enabled,kind)=>kind?call('/api/community/shares/'+encodeURIComponent(id)+'/reaction',{method:enabled?'PUT':'DELETE',body:enabled?JSON.stringify({kind}):undefined}):call('/api/community/shares/'+encodeURIComponent(id)+'/reaction',{method:enabled?'PUT':'DELETE'}),
   comments:id=>call('/api/community/shares/'+encodeURIComponent(id)+'/comments'),
   comment:(id,body)=>call('/api/community/shares/'+encodeURIComponent(id)+'/comments',{method:'POST',headers:{'idempotency-key':key('comment')},body:JSON.stringify({body})}),
   removeComment:id=>call('/api/community/comments/'+encodeURIComponent(id),{method:'DELETE'}),

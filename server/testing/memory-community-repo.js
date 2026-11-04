@@ -1,13 +1,23 @@
 export function createMemoryCommunityRepo(){
- const favorites=new Set(),reactions=new Set(),comments=new Map(),reports=new Map(),blocks=new Set(),hiddenShares=new Set(),audits=[];
+ const favorites=new Set(),reactionSet=new Set(),comments=new Map(),reports=new Map(),blocks=new Set(),hiddenShares=new Set(),audits=[];
  const key=(...parts)=>parts.join('\0'),copy=value=>structuredClone(value),now=()=>new Date().toISOString();
+ const reactionKeys=()=>[...reactionSet];
  return {
   async listDiscoverable({productId,viewerSubjectId}){const shares=this.shares||[];return shares.filter(row=>row.productId===productId&&row.status==='active'&&row.discoverable===true&&!hiddenShares.has(key(productId,row.shareId))&&!blocks.has(key(productId,viewerSubjectId,row.subjectId))).map(copy);},
   seedShares(rows){this.shares=rows.map(copy);},
-  async stats({productId,shareId,viewerSubjectId}){const prefix=key(productId,shareId)+'\0';return {favorites:[...favorites].filter(v=>v.startsWith(prefix)).length,hearts:[...reactions].filter(v=>v.startsWith(prefix)).length,comments:[...comments.values()].filter(v=>v.productId===productId&&v.shareId===shareId&&v.status==='visible').length,favored:favorites.has(key(productId,shareId,viewerSubjectId)),hearted:reactions.has(key(productId,shareId,viewerSubjectId))};},
+  async stats({productId,shareId,viewerSubjectId}){
+   const prefix=key(productId,shareId)+'\0';
+   const reqs=reactionKeys().filter(v=>v.startsWith(prefix));
+   const heartCount=reqs.filter(v=>v.split('\0')[3]==='heart').length;
+   const reactions={heart:0,like:0,love:0,laugh:0,wow:0,sad:0,angry:0};
+   for(const v of reqs){const kind=v.split('\0')[3]||'heart';if(Object.prototype.hasOwnProperty.call(reactions,kind))reactions[kind]+=1;}
+   const mine=reqs.filter(v=>viewerSubjectId&&v.split('\0')[2]===viewerSubjectId).map(v=>v.split('\0')[3]||'heart').sort();
+   return {favorites:[...favorites].filter(v=>v.startsWith(prefix)).length,hearts:heartCount,comments:[...comments.values()].filter(v=>v.productId===productId&&v.shareId===shareId&&v.status==='visible').length,favored:favorites.has(key(productId,shareId,viewerSubjectId)),hearted:reactionSet.has(key(productId,shareId,viewerSubjectId,'heart')),reactions,mine};
+  },
   async setFavorite({productId,shareId,subjectId,enabled}){const value=key(productId,shareId,subjectId);enabled?favorites.add(value):favorites.delete(value);},
   async listFavorites({productId,subjectId}){return [...favorites].filter(v=>v.startsWith(key(productId)+'\0')&&v.endsWith('\0'+subjectId)).map(v=>v.split('\0')[1]);},
-  async setReaction({productId,shareId,subjectId,enabled}){const value=key(productId,shareId,subjectId);enabled?reactions.add(value):reactions.delete(value);},
+  async setReaction({productId,shareId,subjectId,enabled,kind='heart'}){const value=key(productId,shareId,subjectId,kind);enabled?reactionSet.add(value):reactionSet.delete(value);},
+  async isBlocked({productId,blockerSubjectId,blockedSubjectId}){return blocks.has(key(productId,blockerSubjectId,blockedSubjectId))||blocks.has(key(productId,blockedSubjectId,blockerSubjectId));},
   async listComments({productId,shareId,limit}){return [...comments.values()].filter(v=>v.productId===productId&&v.shareId===shareId&&v.status==='visible').slice(0,limit).map(copy);},
   async createComment(input){const existing=[...comments.values()].find(v=>v.productId===input.productId&&v.subjectId===input.subjectId&&v.clientKey===input.clientKey);if(existing)return copy(existing);const row={id:input.commentId,...input,status:'visible',createdAt:now(),updatedAt:now()};comments.set(key(input.productId,input.commentId),row);return copy(row);},
   async deleteComment({productId,commentId,subjectId,admin}){const row=comments.get(key(productId,commentId));if(!row||row.status!=='visible'||(!admin&&row.subjectId!==subjectId))return null;row.status=admin?'hidden':'deleted';row.updatedAt=now();if(admin)audits.push({productId,targetType:'comment',targetId:commentId,action:'hide_comment',actorSubjectId:subjectId});return copy(row);},
@@ -15,6 +25,6 @@ export function createMemoryCommunityRepo(){
   async blockOwner({productId,blockerSubjectId,blockedSubjectId}){blocks.add(key(productId,blockerSubjectId,blockedSubjectId));},
   async listReports({productId,limit}){return [...reports.values()].filter(v=>v.productId===productId).slice(0,limit).map(row=>({...copy(row),hidden:hiddenShares.has(key(productId,row.shareId))}));},
   async moderateReport({productId,reportId,status,visibility,actorSubjectId}){const row=reports.get(key(productId,reportId));if(!row)return null;row.status=status;row.resolvedAt=now();audits.push({productId,reportId,action:status,actorSubjectId});const hiddenKey=key(productId,row.shareId),wasHidden=hiddenShares.has(hiddenKey);if(visibility==='hidden')hiddenShares.add(hiddenKey);else hiddenShares.delete(hiddenKey);if(wasHidden!==(visibility==='hidden'))audits.push({productId,reportId,action:visibility==='hidden'?'hide_share':'restore_share',actorSubjectId});row.hidden=visibility==='hidden';return copy(row);},
-  inspect(){return {favorites:[...favorites],reactions:[...reactions],comments:[...comments.values()].map(copy),reports:[...reports.values()].map(copy),blocks:[...blocks],hiddenShares:[...hiddenShares],audits:audits.map(copy)};}
+  inspect(){return {favorites:[...favorites],reactions:[...reactionSet],comments:[...comments.values()].map(copy),reports:[...reports.values()].map(copy),blocks:[...blocks],hiddenShares:[...hiddenShares],audits:audits.map(copy)};}
  };
 }

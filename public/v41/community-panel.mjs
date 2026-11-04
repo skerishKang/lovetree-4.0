@@ -6,8 +6,24 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
  const message=text=>{feedback.textContent=text;};
  const loginMessage=answer=>answer.status===401?'로그인하면 이 기능을 사용할 수 있어요.':answer.message||'요청을 처리하지 못했어요.';
  function statButton(item,kind,label){
+  if(kind==='reaction')return reactionButtons(item,label);
   const active=kind==='favorite'?item.stats.favored:item.stats.hearted,count=kind==='favorite'?item.stats.favorites:item.stats.hearts,b=el('button','community-mini',`${active?'✓ ':''}${label} ${count}`);b.type='button';b.setAttribute('aria-pressed',String(active));
-  b.onclick=async()=>{const answer=kind==='favorite'?await api.favorite(item.shareId,!active):await api.react(item.shareId,!active);if(!answer.ok){message(loginMessage(answer));return;}item.stats=answer.stats;render();};return b;
+  b.onclick=async()=>{const answer=await api.favorite(item.shareId,!active);if(!answer.ok){message(loginMessage(answer));return;}item.stats=answer.stats;render();};return b;
+ }
+ function reactionButtons(item,label){
+  const kinds=['heart','like','love','laugh','wow','sad','angry'];
+  const labels={heart:'공감',like:'좋아요',love:'사랑',laugh:'웃음',wow:'놀람',sad:'슬픔',angry:'화남'};
+  const host=el('span','community-reaction-group');host.setAttribute('role','group');host.setAttribute('aria-label',label||'반응');
+  const counts=item.stats.reactions||{heart:item.stats.hearts||0};const mine=new Set(item.stats.mine||[]);
+  for(const reactionKind of kinds){
+   const active=mine.has(reactionKind)||(reactionKind==='heart'&&item.stats.hearted&&!item.stats.mine);
+   const count=counts[reactionKind]||0;
+   const b=el('button','community-mini community-reaction',`${active?'✓ ':''}${labels[reactionKind]||reactionKind} ${count}`);
+   b.type='button';b.dataset.reactionKind=reactionKind;b.setAttribute('aria-pressed',String(active));
+   b.onclick=async()=>{const answer=await api.react(item.shareId,!active,reactionKind);if(!answer.ok){message(loginMessage(answer));return;}item.stats=answer.stats;render();};
+   host.append(b);
+  }
+  return host;
  }
  async function comments(item,host){
   host.replaceChildren(el('p','community-muted','댓글을 불러오는 중이에요.'));

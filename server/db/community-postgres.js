@@ -33,7 +33,21 @@ export function createCommunityRepo(pool){
     [productId,shareId,viewerSubjectId]
    );
    const row=rows[0]||{};
-   return {favorites:Number(row.favorites||0),hearts:Number(row.hearts||0),comments:Number(row.comments||0),favored:!!row.favored,hearted:!!row.hearted};
+   const counts=await pool.query(
+    `SELECT kind,count(*)::int AS n FROM lovetree_community_reactions WHERE product_id=$1 AND share_id=$2 GROUP BY kind`,
+    [productId,shareId]
+   );
+   const reactions={heart:0,like:0,love:0,laugh:0,wow:0,sad:0,angry:0};
+   for(const r of counts.rows)reactions[r.kind]=Number(r.n);
+   let mine=[];
+   if(viewerSubjectId){
+    const mineRows=await pool.query(
+     `SELECT kind FROM lovetree_community_reactions WHERE product_id=$1 AND share_id=$2 AND subject_id=$3 ORDER BY kind`,
+     [productId,shareId,viewerSubjectId]
+    );
+    mine=mineRows.rows.map(r=>r.kind);
+   }
+   return {favorites:Number(row.favorites||0),hearts:Number(row.hearts||0),comments:Number(row.comments||0),favored:!!row.favored,hearted:!!row.hearted,reactions,mine};
   },
   async setFavorite({productId,shareId,subjectId,enabled}){
    if(enabled) await pool.query(`INSERT INTO lovetree_community_favorites(product_id,share_id,subject_id) VALUES($1,$2,$3) ON CONFLICT DO NOTHING`,[productId,shareId,subjectId]);
@@ -43,9 +57,22 @@ export function createCommunityRepo(pool){
    const {rows}=await pool.query(`SELECT share_id FROM lovetree_community_favorites WHERE product_id=$1 AND subject_id=$2 ORDER BY created_at DESC LIMIT 200`,[productId,subjectId]);
    return rows.map(row=>row.share_id);
   },
-  async setReaction({productId,shareId,subjectId,enabled}){
-   if(enabled) await pool.query(`INSERT INTO lovetree_community_reactions(product_id,share_id,subject_id,kind) VALUES($1,$2,$3,'heart') ON CONFLICT DO NOTHING`,[productId,shareId,subjectId]);
-   else await pool.query(`DELETE FROM lovetree_community_reactions WHERE product_id=$1 AND share_id=$2 AND subject_id=$3 AND kind='heart'`,[productId,shareId,subjectId]);
+  async setReaction({productId,shareId,subjectId,enabled,kind='heart'}){
+   if(enabled) await pool.query(`INSERT INTO lovetree_community_reactions(product_id,share_id,subject_id,kind) VALUES($1,$2,$3,$4) ON CONFLICT DO NOTHING`,[productId,shareId,subjectId,kind]);
+   else await pool.query(`DELETE FROM lovetree_community_reactions WHERE product_id=$1 AND share_id=$2 AND subject_id=$3 AND kind=$4`,[productId,shareId,subjectId,kind]);
+  },
+  async isBlocked({productId,blockerSubjectId,blockedSubjectId}){
+   const {rows}=await pool.query(
+    `SELECT EXISTS(
+      SELECT 1 FROM lovetree_community_blocks
+      WHERE product_id=$1 AND (
+        (blocker_subject_id=$2 AND blocked_subject_id=$3) OR
+        (blocker_subject_id=$3 AND blocked_subject_id=$2)
+      )
+    ) AS blocked`,
+    [productId,blockerSubjectId,blockedSubjectId]
+   );
+   return !!(rows[0]?.blocked);
   },
   async listComments({productId,shareId,limit=50}){
    const {rows}=await pool.query(`SELECT * FROM lovetree_community_comments WHERE product_id=$1 AND share_id=$2 AND status='visible' ORDER BY created_at DESC LIMIT $3`,[productId,shareId,limit]);
