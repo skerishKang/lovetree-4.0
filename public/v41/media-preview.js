@@ -51,7 +51,7 @@ function startFrom(parsed) {
   return parseTimeToSeconds(search || hash.get('t') || hash.get('start'));
 }
 
-/** watch/shorts/live/embed/youtu.be 형태만 YouTube로 본다. 재생목록만 있는 링크는 일반 링크. 임베드도 start= 시점을 살려 watch로 정규화한다. */
+/** watch/shorts/live/youtu.be 네 형태만 YouTube로 본다. 재생목록만 있는 링크는 일반 링크. */
 function youtubeVideoId(parsed) {
   const path = parsed.pathname || '';
   if (parsed.hostname === 'youtu.be') {
@@ -62,7 +62,7 @@ function youtubeVideoId(parsed) {
     const id = parsed.searchParams.get('v');
     return id && VIDEO_ID.test(id) ? id : null;
   }
-  const single = path.match(/^\/(shorts|live|embed)\/([^/?#]+)/);
+  const single = path.match(/^\/(shorts|live)\/([^/?#]+)/);
   if (single) return VIDEO_ID.test(single[2]) ? single[2] : null;
   return null;
 }
@@ -148,10 +148,10 @@ async function load(root){
  root.dataset.ltLoading='1';
  const element=document.createElement(m.kind==='video'?'video':'img');
  status.textContent='불러오는 중이에요…';
-  const failed=()=>{delete root.dataset.ltLoading;body.replaceChildren();const fallback=document.createElement('p');fallback.className='lt-media-fallback';fallback.textContent=(m.kind==='youtube'?'YouTube 영상':m.kind==='video'?'영상':m.kind==='photo'?'사진':'링크')+'을(를) 여기서 열지 못했어요.';body.append(fallback);const retry=document.createElement('button');retry.type='button';retry.dataset.ltLoad='';retry.textContent='다시 불러오기';body.append(retry);status.textContent='불러오지 못했어요. 아래 원본 링크에서 확인하거나 다시 시도해 주세요.';};
-  element.addEventListener('error',failed,{once:true});
-  if(m.kind==='video'){element.className='lt-user-video';element.controls=true;element.preload='metadata';element.playsInline=true;element.addEventListener('stalled',()=>{if(!element.readyState)status.textContent='영상 데이터를 받는 중이에요. 원본 링크에서도 확인할 수 있어요.';},{once:true});element.addEventListener('loadedmetadata',()=>status.textContent='영상이 준비됐어요. 재생을 눌러 보세요.',{once:true});element.addEventListener('playing',()=>status.textContent='재생 중이에요.',{once:true});element.addEventListener('canplay',()=>{if(!element.paused)status.textContent='재생 중이에요.';},{once:true});}
-  else{element.alt=root.dataset.ltTitle||'기록한 사진';element.referrerPolicy='no-referrer';element.addEventListener('load',()=>{status.textContent=m.kind==='youtube'?'썸네일을 불러왔어요. 영상은 YouTube에서 열어 보세요.':'사진을 불러왔어요.';if(m.kind==='youtube')void youtubeMeta(root,m);},{once:true});}
+ const failed=()=>{delete root.dataset.ltLoading;body.replaceChildren();const retry=document.createElement('button');retry.type='button';retry.dataset.ltLoad='';retry.textContent='다시 불러오기';body.append(retry);status.textContent='불러오지 못했어요. 원본 링크에서 확인하거나 다시 시도해 주세요.';};
+ element.addEventListener('error',failed,{once:true});
+ if(m.kind==='video'){element.className='lt-user-video';element.controls=true;element.preload='metadata';element.playsInline=true;element.addEventListener('loadedmetadata',()=>status.textContent='영상이 준비됐어요. 재생을 눌러 보세요.',{once:true});}
+ else{element.alt=root.dataset.ltTitle||'기록한 사진';element.referrerPolicy='no-referrer';element.addEventListener('load',()=>{status.textContent=m.kind==='youtube'?'썸네일을 불러왔어요. 영상은 YouTube에서 열어 보세요.':'사진을 불러왔어요.';if(m.kind==='youtube')void youtubeMeta(root,m);},{once:true});}
  let src=m.loadUrl;
  if(m.privateFile){
   try{const {createWorkspaceApi}=await import('/v41/api.mjs');const answer=await createWorkspaceApi().fetchMedia(new URL(m.loadUrl).pathname.slice(11));if(!answer.ok)throw Error('unavailable');if(!root.isConnected)return;src=URL.createObjectURL(answer.blob);ownedUrls.set(element,src);}

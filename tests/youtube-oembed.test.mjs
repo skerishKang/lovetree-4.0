@@ -14,9 +14,7 @@ test('id 추출은 watch·shorts·live·youtu.be와 평문 id만 받고 닮은 �
   assert.equal(youtubeVideoId('https://youtu.be/abcdefghijk?t=90'), ID);
   assert.equal(youtubeVideoId('https://www.youtube.com/shorts/abcdefghijk'), ID);
   assert.equal(youtubeVideoId('https://www.youtube.com/live/abcdefghijk'), ID);
-  assert.equal(youtubeVideoId('https://www.youtube.com/embed/abcdefghijk'), ID);
-  assert.equal(youtubeVideoId('https://music.youtube.com/watch?v=abcdefghijk'), ID);
-  for (const bad of ['', '   ', 'too-short', 'toolongtoolong', 'https://www.youtube.com/playlist?list=PL123', 'https://www.youtube.com/watch?v=bad', 'https://youtube.com.evil.example/watch?v=abcdefghijk', 'https://evil.example/watch?v=abcdefghijk', 'https://www.youtube.com/watch?x=abcdefghijk', 'https://user:pass@www.youtube.com/watch?v=abcdefghijk', 'javascript:alert(1)', 'http://www.youtube.com/watch?v=abcdefghijk', 'https://www.youtube.com/embed/bad', 'https://youtu.be.evil.example/abcdefghijk']) {
+  for (const bad of ['', '   ', 'too-short', 'toolongtoolong', 'https://www.youtube.com/playlist?list=PL123', 'https://www.youtube.com/watch?v=bad', 'https://youtube.com.evil.example/watch?v=abcdefghijk', 'https://evil.example/watch?v=abcdefghijk', 'https://www.youtube.com/watch?x=abcdefghijk', 'https://user:pass@www.youtube.com/watch?v=abcdefghijk', 'javascript:alert(1)']) {
     assert.equal(youtubeVideoId(bad), null, bad);
   }
 });

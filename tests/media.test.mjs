@@ -63,11 +63,8 @@ test('재생목록만 있는 링크와 닮은 호스트는 일반 링크로 보�
   const badId = parseMomentLink('https://youtu.be/shortid');
   assert.equal(badId.kind, 'link');
 
-  const embed = parseMomentLink('https://www.youtube.com/embed/dQw4w9WgXcQ?start=83');
-  assert.equal(embed.kind, 'youtube');
-  assert.equal(embed.videoId, 'dQw4w9WgXcQ');
-  assert.equal(embed.openUrl, 'https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=83s');
-  assert.equal(embed.label, 'YouTube 링크 · 시작 1:23');
+  const embed = parseMomentLink('https://www.youtube.com/embed/dQw4w9WgXcQ');
+  assert.equal(embed.kind, 'link'); // 이번 조각이 여는 네 형태에 없다
 });
 
 test('안전하지 않은 입력은 거절하고 원본을 지우지 않는다', () => {
