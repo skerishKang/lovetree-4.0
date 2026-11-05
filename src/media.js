@@ -59,7 +59,7 @@ function startFrom(parsed) {
   return parseTimeToSeconds(search || hash.get('t') || hash.get('start'));
 }
 
-/** watch/shorts/live/youtu.be 네 형태만 YouTube로 본다. 재생목록만 있는 링크는 일반 링크. */
+/** watch/shorts/live/embed/youtu.be 형태만 YouTube로 본다. 재생목록만 있는 링크는 일반 링크. 임베드도 start= 시점을 살려 watch로 정규화한다. */
 function youtubeVideoId(parsed) {
   const path = parsed.pathname || '';
   if (parsed.hostname === 'youtu.be') {
@@ -70,7 +70,7 @@ function youtubeVideoId(parsed) {
     const id = parsed.searchParams.get('v');
     return id && VIDEO_ID.test(id) ? id : null;
   }
-  const single = path.match(/^\/(shorts|live)\/([^/?#]+)/);
+  const single = path.match(/^\/(shorts|live|embed)\/([^/?#]+)/);
   if (single) return VIDEO_ID.test(single[2]) ? single[2] : null;
   return null;
 }
