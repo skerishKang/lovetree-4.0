@@ -12,7 +12,7 @@ import { ApiError } from './errors.js';
 import { parsePrincipal } from './principal.js';
 
 export const YOUTUBE_VIDEO_ID = /^[A-Za-z0-9_-]{11}$/;
-const YOUTUBE_HOSTS = new Set(['youtube.com', 'www.youtube.com', 'm.youtube.com', 'youtu.be']);
+const YOUTUBE_HOSTS = new Set(['youtube.com', 'www.youtube.com', 'm.youtube.com', 'music.youtube.com', 'youtu.be']);
 const OEMBED_ENDPOINT = 'https://www.youtube.com/oembed';
 const THUMBNAIL_HOST = /(?:^|\.)ytimg\.com$/;
 export const DEFAULT_TIMEOUT_MS = 3000;
@@ -22,14 +22,14 @@ const MAX_TITLE = 200;
 const MAX_AUTHOR = 120;
 const MAX_THUMBNAIL = 2048;
 
-/** 평문 11자리 id나 watch/shorts/live/youtu.be 주소에서 영상 id만 뽑는다. 그 밖은 null. */
+/** 평문 11자리 id나 watch/shorts/live/embed/youtu.be 주소에서 영상 id만 뽑는다. 그 밖은 null. */
 export function youtubeVideoId(value = '') {
   const raw = String(value ?? '').trim();
   if (!raw) return null;
   if (YOUTUBE_VIDEO_ID.test(raw)) return raw;
   let parsed;
   try { parsed = new URL(raw); } catch { return null; }
-  if (parsed.username || parsed.password || !['http:', 'https:'].includes(parsed.protocol)) return null;
+  if (parsed.username || parsed.password || !['https:'].includes(parsed.protocol)) return null;
   if (!YOUTUBE_HOSTS.has(parsed.hostname)) return null;
   const path = parsed.pathname || '';
   if (parsed.hostname === 'youtu.be') {
@@ -40,7 +40,7 @@ export function youtubeVideoId(value = '') {
     const id = parsed.searchParams.get('v');
     return id && YOUTUBE_VIDEO_ID.test(id) ? id : null;
   }
-  const single = path.match(/^\/(shorts|live)\/([^/?#]+)/);
+  const single = path.match(/^\/(shorts|live|embed)\/([^/?#]+)/);
   return single && YOUTUBE_VIDEO_ID.test(single[2]) ? single[2] : null;
 }
 
