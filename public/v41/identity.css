@@ -110,3 +110,10 @@ html[data-v41-screen] .lt-moment-picker button{border-radius:var(--lt-r-pill);ba
 html[data-v41-screen] .lt-moment-picker[data-tone=dark]{background:rgba(7,7,12,.94);border-color:var(--lt-line);color:var(--lt-pearl)}
 html[data-v41-screen] .lt-moment-picker[data-tone=dark] button{background:var(--lt-primary);color:var(--lt-primary-ink)}
 html[data-v41-screen] .lt-moment-picker select:focus-visible,html[data-v41-screen] .lt-moment-picker button:focus-visible{outline-color:var(--lt-gold)}
+/* 안쪽 화면 상단 도구 줄(기억책 도구, 보드 전체 보기, 관계 지도 전체 보기·사용법): 첫 화면 메뉴 알약(.menuBtn)과 같은 모양 */
+html[data-v41-screen=book] .tools .ui-btn,html[data-v41-screen=board] header .headbtn,html[data-v41-screen=network] .top-actions .pill{min-height:44px;height:auto;padding:10px 15px;border:1px solid rgba(255,255,255,.22);border-radius:var(--lt-r-pill);background:rgba(9,8,14,.62);color:#ece7f1;font-size:14px;letter-spacing:.06em;backdrop-filter:blur(8px);box-shadow:none;transform:none}
+html[data-v41-screen=book] .tools .ui-btn:hover,html[data-v41-screen=board] header .headbtn:hover,html[data-v41-screen=network] .top-actions .pill:hover{border-color:rgba(255,255,255,.44);background:rgba(255,255,255,.09);transform:none}
+html[data-v41-screen=book] .tools .ui-btn.active{border-color:var(--lt-gold-line);background:rgba(255,230,166,.08);box-shadow:inset 0 0 0 1px var(--lt-gold-line)}
+html[data-v41-screen=board] header .headbtn.primary{background:rgba(9,8,14,.62);border-color:rgba(255,255,255,.22);box-shadow:none}
+html[data-v41-screen=network] .top-actions .pill{background:rgba(9,8,14,.8)}
+@media(max-width:699px){html[data-v41-screen=book] .tools .ui-btn,html[data-v41-screen=board] header .headbtn,html[data-v41-screen=network] .top-actions .pill{padding:8px 11px;font-size:13px}}
