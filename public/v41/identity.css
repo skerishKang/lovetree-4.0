@@ -2,6 +2,23 @@
 @import url('/fonts/pretendard/pretendardvariable-dynamic-subset.css');
 @font-face{font-family:MaruBuri;font-weight:400;font-style:normal;font-display:swap;src:url('/fonts/MaruBuri-Regular.woff2') format('woff2')}
 :root{--lt-ui:'Pretendard Variable',Pretendard,'Noto Sans KR',system-ui,sans-serif;--lt-reading:MaruBuri,'Noto Serif CJK KR',Batang,serif;--body:var(--lt-ui);--latin:var(--lt-ui);--display:var(--lt-reading);--book-serif:var(--lt-reading);--ui-sans:var(--lt-ui);--hand:var(--lt-reading);font-synthesis:none}
+/* 4.1 공통 색·모양 토큰 (대표 결정 2026-11-05: 첫 화면 SRC064가 디자인 원본). 값은 SRC064 원본에서 그대로 뽑았다.
+   새 UI의 색·모서리는 이 토큰만 쓴다. 원본 화면의 :root 색은 이 파일의 화면별 덮어쓰기로만 바꾼다. 새 hex를 흩뿌리지 않는다. */
+:root{
+ --lt-stage:#040407;--lt-stage-2:#0a0a11;            /* 무대: 첫 화면 배경 radial 중심/가장자리 */
+ --lt-pearl:#f5f1e9;--lt-muted:#9b98a6;              /* 무대 위 글자 */
+ --lt-gold:#ffe6a6;--lt-gold-deep:#e6b14c;--lt-gold-ink:#8a6420; /* 금테: 선택·강조·프레임 (ink는 종이 위 글자용) */
+ --lt-gold-line:rgba(255,230,166,.45);--lt-gold-glow:rgba(238,190,104,.68);
+ --lt-rose:#d88f9c;--lt-rose-ink:#bd5d72;            /* 감정·연결 (ink는 종이 위 글자용) */
+ --lt-blue:#7892c9;--lt-violet:#a99ac9;              /* 보드·지도 구분색 */
+ --lt-paper:#f5efe2;--lt-ink:#433a34;                /* 허용되는 유일한 밝은 면 = 카드 속 종이 */
+ --lt-glass:rgba(10,10,16,.78);--lt-glass-strong:rgba(7,7,12,.9);--lt-line:rgba(255,255,255,.14);--lt-line-paper:rgba(73,61,58,.2);
+ --lt-primary:#eee9e0;--lt-primary-ink:#0a090d;      /* 1차 버튼 (첫 화면 감상창과 같음) */
+ --lt-r-pill:999px;--lt-r-panel:22px;--lt-r-card:14px;--lt-track:.2em;
+ /* 보드 실·핀, 지도 그룹색: 원본 네온/인포그래픽 6색을 첫 화면 색상으로 옮긴 값. JS가 읽는다. */
+ --lt-thread-rose:#d88f9c;--lt-thread-violet:#a99ac9;--lt-thread-cyan:#7892c9;--lt-thread-amber:#e6b14c;
+ --lt-group-1:#c9748a;--lt-group-2:#8f7fc0;--lt-group-3:#5a9aa6;--lt-group-4:#c59a3c;--lt-group-5:#6f9a7a;--lt-group-6:#6b86c2;
+}
 body{font-family:var(--lt-ui)}
 button,input,select,textarea,summary{font-family:var(--lt-ui)!important}
 .hero h1,.card h3,.cover-title,.book-title,.moment-title h3,.note-piece,.letter,.clipping,.archive-piece{font-family:var(--lt-reading)}
@@ -55,7 +72,7 @@ html[data-v41-screen] .lt-moment-picker label>span{font-size:12px}
 /* User media keeps the original photo/film paper; requests require explicit consent. */
 .lt-media{padding:12px;border:1px solid #ba9cae55;border-radius:12px;background:#ffffff12;font:14px/1.5 var(--lt-ui);overflow-wrap:anywhere;min-width:0}
 .lt-media-body{display:grid;place-items:center;min-height:100px;background:#82708016;border-radius:8px;overflow:hidden}
-.lt-media-body button{min-height:44px;max-width:100%;border:1px solid #927088;border-radius:999px;padding:8px 14px;background:#65446f;color:#fff;font-size:14px;cursor:pointer}
+.lt-media-body button{min-height:44px;max-width:100%;border:1px solid rgba(255,255,255,.14);border-radius:var(--lt-r-pill);padding:8px 14px;background:#1a1620;color:var(--lt-pearl);font-size:14px;cursor:pointer}
 .lt-media-body img,.lt-media-body video{position:static!important;display:block;width:100%;max-height:240px;height:auto!important;object-fit:contain!important;transform:none!important;mix-blend-mode:normal!important}
 .lt-media .lt-media-status{font:12px/1.5 var(--lt-ui)!important;color:inherit!important;margin:8px 0}
 .lt-media a{display:inline-flex;align-items:center;min-height:44px;color:inherit;text-decoration:underline;text-underline-offset:3px}
@@ -64,6 +81,32 @@ html[data-v41-screen=network] .lt-media{color:#49344f}
 html[data-v41-screen=book] .clipping .lt-media{color:#57453c}
 html[data-v41-screen=book] .viewer-media .lt-media{width:100%;height:100%;overflow:auto}
 
-.private-upload{margin:16px 0;padding:16px;border:1px solid #c8bbb0;border-radius:14px}.private-upload p{font-size:13px;line-height:1.6;overflow-wrap:anywhere}.private-upload input[type=file]{width:100%;min-height:44px}.private-upload button,.private-upload summary{min-height:44px}.upload-asset{padding:12px 0;border-top:1px solid #c8bbb0}.upload-asset button{margin:4px 8px 4px 0}.private-upload details{margin-top:12px}
+.private-upload{margin:16px 0;padding:16px;border:1px solid var(--lt-line);border-radius:var(--lt-r-card)}.private-upload p{font-size:13px;line-height:1.6;overflow-wrap:anywhere}.private-upload input[type=file]{width:100%;min-height:44px}.private-upload button,.private-upload summary{min-height:44px}.upload-asset{padding:12px 0;border-top:1px solid var(--lt-line)}.upload-asset button{margin:4px 8px 4px 0}.private-upload details{margin-top:12px}
 
-.private-upload button{font:inherit;color:inherit;background:#2b242e;border:1px solid #66566b;border-radius:12px;padding:10px 14px;cursor:pointer}.private-upload button.danger{color:#efb0bd}.private-upload button:disabled{opacity:.6;cursor:wait}.private-upload input::file-selector-button{font:inherit;min-height:44px;border:1px solid #66566b;border-radius:8px;background:#2b242e;color:inherit;padding:8px 12px;margin-right:8px}
+.private-upload button{font:inherit;color:inherit;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.22);border-radius:var(--lt-r-pill);padding:10px 14px;cursor:pointer}.private-upload button.danger{color:#efb0bd}.private-upload button:disabled{opacity:.6;cursor:wait}.private-upload input::file-selector-button{font:inherit;min-height:44px;border:1px solid rgba(255,255,255,.22);border-radius:var(--lt-r-pill);background:rgba(255,255,255,.04);color:inherit;padding:8px 12px;margin-right:8px}
+
+/* ---- 화면별 무대·강조색 덮어쓰기 (대표 결정 2026-11-05: 첫 화면 스타일로 통일) ----
+   원본의 종이·폴라로이드·코르크·책등·구성·질감은 그대로 두고, 무대(배경)와 강조색 변수만 첫 화면 토큰으로 맞춘다. */
+/* 기억책(Track59): 무대를 첫 화면과 같은 검정으로. 종이·잉크·로즈는 원본 유지. */
+html[data-v41-screen=book]{--bg:var(--lt-stage);--plum:var(--lt-stage-2);--gold:var(--lt-gold-deep);--shadow:rgba(0,0,0,.5)}
+html[data-v41-screen=book] .ambient{background:radial-gradient(circle at 50% 20%,rgba(132,79,111,.16),transparent 38%),radial-gradient(circle at 80% 75%,rgba(72,108,119,.1),transparent 33%),linear-gradient(135deg,#0a0a11,#130e17 56%,#040407)}
+/* 기억 보드(Track58): 기본 테마(진주빛)의 무대를 검정으로, 실·핀 색은 네온 대신 첫 화면 색(JS가 --lt-thread-*를 읽음). 사용자가 고른 다른 테마의 배경은 그대로. */
+html[data-v41-screen=board]{--plum:var(--lt-stage);--plum2:var(--lt-stage-2);--rose:var(--lt-rose);--violet:var(--lt-violet);--cyan:var(--lt-blue);--amber:var(--lt-gold);--boardPanel:rgba(10,10,16,.9)}
+html[data-v41-screen=board] body{background:var(--lt-stage)}
+html[data-v41-screen=board] body[data-theme=pearl]{--ambientA:#17121f;--ambientB:#040407;--panelAccent:var(--lt-gold)}
+html[data-v41-screen=board] body:not([data-theme]) .app,html[data-v41-screen=board] body[data-theme=pearl] .app{background:radial-gradient(circle at 50% 0%,#17121f 0%,#0a0a11 43%,#040407 78%)}
+/* 관계 지도(Track56): 밝은 면은 '종이'로(푸른 회백 → 첫 화면 종이색), 6그룹색은 첫 화면 색상 계열(JS가 --lt-group-*를 읽음). */
+html[data-v41-screen=network]{--bg:var(--lt-paper);--bg2:#efe7d9;--rose:var(--lt-group-1);--violet:var(--lt-group-2);--cyan:var(--lt-group-3);--amber:var(--lt-group-4);--mint:var(--lt-group-5);--blue:var(--lt-group-6)}
+html[data-v41-screen=network] .action.primary{background:linear-gradient(135deg,#8f7fc0,#c9748a);box-shadow:0 9px 24px rgba(120,90,120,.2)}
+/* 내 책장(Track32): 종이는 유지, 로즈와 어두운 무대만 첫 화면 토큰으로. */
+html[data-v41-screen=shelf]{--rose:var(--lt-rose);--rose-deep:var(--lt-rose-ink);--night:var(--lt-stage);--night-2:var(--lt-stage-2)}
+html[data-v41-screen=shelf] .reader-stage{background:radial-gradient(circle at 53% 42%,rgba(152,111,121,.22),transparent 26%),radial-gradient(circle at 22% 85%,rgba(77,117,122,.16),transparent 32%),linear-gradient(135deg,#17121f,#040407 85%)}
+/* 어댑터가 만든 선택 상태는 금테 한 줄로 통일한다(원본 예술 요소 제외). */
+html[data-v41-screen=board] .themeBtn.active,html[data-v41-screen=board] .styleMini.active{border-color:var(--lt-gold);box-shadow:0 0 14px rgba(238,190,104,.22)}
+html[data-v41-screen=shelf] .filter.active{border-color:var(--lt-gold-deep);box-shadow:0 0 0 1px var(--lt-gold-deep)}
+/* 모바일 순간 선택 바(어댑터 mobile-moments.js): 보라 계열 → 첫 화면 토큰 */
+html[data-v41-screen] .lt-moment-picker{border-color:var(--lt-line-paper);border-radius:var(--lt-r-card)}
+html[data-v41-screen] .lt-moment-picker button{border-radius:var(--lt-r-pill);background:#1a1620;color:var(--lt-pearl)}
+html[data-v41-screen] .lt-moment-picker[data-tone=dark]{background:rgba(7,7,12,.94);border-color:var(--lt-line);color:var(--lt-pearl)}
+html[data-v41-screen] .lt-moment-picker[data-tone=dark] button{background:var(--lt-primary);color:var(--lt-primary-ink)}
+html[data-v41-screen] .lt-moment-picker select:focus-visible,html[data-v41-screen] .lt-moment-picker button:focus-visible{outline-color:var(--lt-gold)}
