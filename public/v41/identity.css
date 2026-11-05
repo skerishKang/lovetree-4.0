@@ -117,3 +117,9 @@ html[data-v41-screen=book] .tools .ui-btn.active{border-color:var(--lt-gold-line
 html[data-v41-screen=board] header .headbtn.primary{background:rgba(9,8,14,.62);border-color:rgba(255,255,255,.22);box-shadow:none}
 html[data-v41-screen=network] .top-actions .pill{background:rgba(9,8,14,.8)}
 @media(max-width:699px){html[data-v41-screen=book] .tools .ui-btn,html[data-v41-screen=board] header .headbtn,html[data-v41-screen=network] .top-actions .pill{padding:8px 11px;font-size:13px}}
+/* 원본 보라·네온 1차 버튼을 첫 화면 1차 버튼(크림)/종이 위 1차(잉크)로: 보드 '시네마 보기'·'순간 열기', 관계 지도 '첫 순간 보기' */
+html[data-v41-screen=board] .cinemaBtn{border:0;border-radius:var(--lt-r-pill);background:var(--lt-primary);color:var(--lt-primary-ink);box-shadow:0 12px 36px rgba(0,0,0,.45);font-weight:600}
+html[data-v41-screen=board] .cinemaBtn:hover{background:#fff;color:var(--lt-primary-ink)}
+html[data-v41-screen=board] .miniBtn{border-radius:var(--lt-r-pill);border-color:rgba(255,255,255,.18);background:rgba(255,255,255,.05)}
+html[data-v41-screen=board] .miniBtn.accent{border-color:var(--lt-gold-line);background:rgba(255,230,166,.08);box-shadow:inset 0 0 0 1px var(--lt-gold-line)}
+html[data-v41-screen=network] .action.primary{background:#1a1620;color:var(--lt-pearl);box-shadow:none;border-radius:var(--lt-r-pill)}

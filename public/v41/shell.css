@@ -99,3 +99,7 @@ body.home-screen .app-header{display:none}
 body:not(.home-screen) #stage{padding:10px 14px 14px;background:radial-gradient(circle at 50% 0,var(--lt-stage-2),var(--lt-stage) 55%,#000)}
 body:not(.home-screen) iframe{border-radius:16px;border:1px solid var(--lt-gold-line);box-shadow:0 0 0 1px rgba(255,230,166,.1),0 0 32px rgba(238,190,104,.16),0 24px 60px rgba(0,0,0,.5)}
 @media(max-width:780px){body:not(.home-screen) #stage{padding:6px 6px 8px}body:not(.home-screen) iframe{border-radius:12px}}
+/* 화면 전환: 안쪽 화면이 첫 화면 카드처럼 살짝 커지며 도착한다(.lt-arrive는 shell.mjs가 iframe load 때 붙임). 움직임 줄이기 설정이면 없음. */
+@keyframes lt-arrive{from{opacity:0;transform:scale(.975)}to{opacity:1;transform:none}}
+body:not(.home-screen) iframe.lt-arrive{animation:lt-arrive .28s cubic-bezier(.2,.7,.2,1)}
+@media(prefers-reduced-motion:reduce){body:not(.home-screen) iframe.lt-arrive{animation:none}}
