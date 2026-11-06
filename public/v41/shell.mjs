@@ -2,7 +2,7 @@ import {mountPrivateUpload} from './private-upload.mjs';
 import {suggestMomentTitle,parentCandidates} from './domain.mjs';
 import {MEMBER_LOGIN_URL,shouldLoadMemberRecords} from './member-entry.mjs';
 import {workspaceModel} from './workspace-model.mjs';
-import {createWorkspaceApi} from './api.mjs';
+import {createWorkspaceApi, setMemberRefreshStarted} from './api.mjs';
 import {createShareApi} from './share-api.mjs';
 import {mountCommunity} from './community-panel.mjs';
 import {createMemberSession} from './member-session.mjs';
@@ -15,6 +15,7 @@ const initialRoute=parseSelectionRoute(location.hash);
 const screenForView=view=>screens.find(screen=>screen[0]===view)||screens[0];
 const viewForFile=file=>screens.find(screen=>screen[1]===file)?.[0]||'home';
 let model=null,current=screenForView(initialRoute.view)[1],source='example',loadGeneration=0,toastTimer,previousDirty=false,member=null,editorMode='new',formBaseline='',parentBaseline='',treeBaseline='',handledHash=null,activeShareId=null,sharePreviewKey='',sharePreviewToken='';
+setMemberRefreshStarted(false);
 const shareApi=createShareApi();
 const accountApi=createWorkspaceApi();
 addEventListener('lovetree-auth-required',()=>{if(member?.snapshot().owned){$('account-entry').textContent='로그인';$('record-feedback').textContent='로그인 확인이 필요해요. 다시 로그인해 주세요.';notify('로그인 확인이 필요해요. 다시 로그인해 주세요.');}});
@@ -67,7 +68,7 @@ function memberStatus(status){
  else if(!status.dirty&&status.phase==='offline')notify(status.detail||'내 기록을 불러오지 못했어요.');
  $('account-entry').textContent=status.phase==='login'?'로그인':member?.snapshot().owned?'내 계정':'로그인';$('write-menu').textContent=status.dirty?'미저장 기록' :'순간 남기기';$('empty-records').textContent=status.writable?'첫 트리 만들기':'내 기록 불러오기';previousDirty=status.dirty;flowNavigation();
 }
-async function startMember(){if(!leaveMember())return;const startup=parseSelectionRoute(location.hash);if(startup.scope==='owner')stashPendingOwnerRoute(sessionStorage,location.hash);++loadGeneration;const generation=loadGeneration;clear();
+async function startMember(){setMemberRefreshStarted(true);if(!leaveMember())return;const startup=parseSelectionRoute(location.hash);if(startup.scope==='owner')stashPendingOwnerRoute(sessionStorage,location.hash);++loadGeneration;const generation=loadGeneration;clear();
  const api=createWorkspaceApi({fetchImpl:(url,init)=>fetch(init?.method==='GET'&&url==='/api/workspace'?'/api/workspace?features=bound-writes':url,init)});
  let initialized=false,startupNotice='',session;
  session=createMemberSession({api,onState:(state,selection)=>{if(generation!==loadGeneration)return;const snapshot=session.snapshot(),saved=accountPosition(localStorage,snapshot.subject)||{},active=parseSelectionRoute(location.hash),pending=!initialized&&active.scope!=='owner'?pendingOwnerRoute(sessionStorage):null,route=active.scope==='owner'?active:pending;let requested=selection||stateSelection();

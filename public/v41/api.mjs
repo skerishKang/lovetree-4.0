@@ -1,9 +1,16 @@
 import {validateState} from './domain.mjs';
 export const DEFAULT_REQUEST_TIMEOUT_MS = 8_000;
 
+// 회원 셸 startMember() 전에는 갱신 쿠키가 없어 401을 그대로 돌려준다.
+// 셸을 거치지 않는 단독 클라이언트·시험은 기본값(true)으로 기존 동작을 유지한다.
+let memberRefreshStarted = true;
+export function setMemberRefreshStarted(started) { memberRefreshStarted = !!started; }
+export function memberRefreshAllowed() { return memberRefreshStarted; }
+
 // Serialize cookie rotation across tabs and retry only responses rejected with 401.
-export async function refreshUnauthorized({fetchImpl, request, response, refreshUrl='/auth/refresh', signal}) {
+export async function refreshUnauthorized({fetchImpl, request, response, refreshUrl='/auth/refresh', signal, canRefresh = true}) {
   if (response.status !== 401) return response;
+  if (!(typeof canRefresh === 'function' ? canRefresh() : canRefresh)) return response;
   const refreshAndRetry = async () => {
     const retry = await request();
     if (retry.status !== 401) return retry;
@@ -28,7 +35,7 @@ export function createWorkspaceApi({ fetchImpl = (...args) => globalThis.fetch(.
       const request = () => fetchImpl(`${base}${path}`, { credentials: 'same-origin', ...init, ...(controller ? { signal: controller.signal } : {}) });
       let response = await request();
       if (response.status === 401 && path.startsWith('/api/')) {
-        response = await refreshUnauthorized({fetchImpl, request, response, refreshUrl:`${base}/auth/refresh`, signal:controller?.signal});
+        response = await refreshUnauthorized({fetchImpl, request, response, refreshUrl:`${base}/auth/refresh`, signal:controller?.signal, canRefresh:memberRefreshAllowed});
       }
       if (response.status === 401 && path.startsWith('/api/') && globalThis.dispatchEvent && typeof Event === 'function') globalThis.dispatchEvent(new Event('lovetree-auth-required'));
       if (binary && response.ok) return {ok:true,status:response.status,blob:await response.blob()};
