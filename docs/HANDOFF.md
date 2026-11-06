@@ -1,3 +1,9 @@
+## 2026-11-06 — #144 세션 만료 후 작성 내용 복구
+
+15분 access token 만료는 저장·공유·커뮤니티 요청에서 401 뒤 기존 공통 refresh와 동일 요청 재시도로 처리한다. refresh까지 거부되어 재로그인이 필요한 회원 저장은 같은 계정의 현재 탭에만 임시 초안을 `sessionStorage`로 보관한다. 재로그인 뒤 계정 subject가 같으면 서버 workspace를 먼저 읽고 초안을 복원해 사용자가 다시 저장할 수 있게 한다. 다른 계정에는 복원하지 않으며, 서버 revision이 달라졌으면 기존 충돌 선택을 따른다. 저장 성공 또는 서버 기록 열기에서 임시 초안을 지운다. access/refresh token은 저장하지 않으며, 이는 기기 전용 저장 모드가 아니다.
+
+검증: 가짜 401→갱신→동일 workspace PUT 성공, 갱신 실패→401→같은 계정 재로그인→동일 내용 저장 성공, 다른 계정 복원 차단. 관련 인증·회원 세션·공유·커뮤니티 시험 31건 통과. 자연 만료 실계정 및 실시간 커뮤니티 쓰기는 별도 브라우저 실측으로 남긴다.
+
 ## 2026-11-06 — #174 로그인 전 공용 화면 /auth/refresh 차단
 
 `refreshUnauthorized`(`public/v41/api.mjs`) 진입부에 `canRefresh` 힌트 게이트를 넣었다. 회원 셸 `shell.mjs`가 모듈 시작 때 `setMemberRefreshStarted(false)`로 닫고 `startMember()`에서 true로 켠다. `createWorkspaceApi`·`createCommunityApi`·`createShareApi` 세 클라이언트가 모두 `memberRefreshAllowed`를 넘겨 같은 함수를 거친다. 셸을 거치지 않는 단독 클라이언트·시험은 기본값 true로 기존 동작을 유지해 `tests/missing-marker-refresh.test.mjs`의 복구 시나리오(표시 쿠키 없이도 HttpOnly 갱신 쿠키로 세션 복구)를 깨지 않는다. 새 시험 `tests/v41-refresh-gate.test.mjs`: 회원 시작 전 401 → refresh 0회 / 회원 시작 뒤 401 → refresh 1회(세 클라이언트), 진입부 `canRefresh=false` 단축, shell 배선 확인. `functions/_lib/shared-auth.mjs`의 401 응답·padiem-auth·시각 통일 결과 무변경.

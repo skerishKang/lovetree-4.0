@@ -10,18 +10,74 @@ function status({ phase, detail = null, actions = [] }) {
   return { phase, label: LABELS[phase], detail, actions };
 }
 
-// No browser storage is consulted. Unsaved edits live only in this page and
-// must be explicitly retried after a failed server write.
-export function createSyncController({getState, replaceState, api,
+const PENDING_DRAFT_PREFIX = 'lovetree.v41.pending-write:';
+function pendingDraftKey(subject) {
+  return typeof subject === 'string' && /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(subject)
+    ? `${PENDING_DRAFT_PREFIX}${subject}` : null;
+}
+
+// A failed, authenticated write may cross a full-page re-login. Keep its
+// one-tab retry buffer in sessionStorage, scoped to the same account only.
+export function createSyncController({getState, replaceState, api, draftStorage = null,
   makeClientKey = () => `front-${crypto.randomUUID()}`,
   delay = ms => new Promise(resolve => setTimeout(resolve, ms)),
   onChange = () => {}, navigate = url => globalThis.location.assign(url)}) {
   let current = status({phase:'checking'}), listener = () => {};
-  let owned = false, revision = null, dirty = false, generation = 0;
+  let owned = false, revision = null, dirty = false, generation = 0, activeSubject = null;
   let queued = 0, inflight = false, attempt = null, seenRevision = null;
   const emit = value => { current = value; onChange(value); listener(value); return value; };
   const actions = { login: [{name:'login',label:'로그인'}], logout: [{name:'logout',label:'로그아웃'}],
     retry: [{name:'retry',label:'다시 시도'}] };
+
+  function clearPendingDraft(subject = activeSubject) {
+    const key = pendingDraftKey(subject);
+    if (!draftStorage || !key) return;
+    try { draftStorage.removeItem(key); } catch { /* session storage may be unavailable */ }
+  }
+
+  function savePendingDraft(sent) {
+    const key = pendingDraftKey(activeSubject);
+    if (!draftStorage || !key) return;
+    try {
+      draftStorage.setItem(key, JSON.stringify({
+        version: 1, subject: activeSubject, expectedRevision: sent.expected,
+        clientKey: sent.key, state: JSON.parse(sent.serial)
+      }));
+    } catch { /* quota or browser policy: keep the in-page retry state */ }
+  }
+
+  function readPendingDraft(subject) {
+    const key = pendingDraftKey(subject);
+    if (!draftStorage || !key) return null;
+    let raw;
+    try { raw = draftStorage.getItem(key); } catch { return null; }
+    if (!raw) return null;
+    try {
+      const draft = JSON.parse(raw);
+      if (draft?.version !== 1 || draft.subject !== subject ||
+          !Number.isSafeInteger(draft.expectedRevision) || draft.expectedRevision < 0 ||
+          typeof draft.clientKey !== 'string' || !draft.clientKey || draft.clientKey.length > 200) throw new Error('invalid_pending_draft');
+      const state = validateState(draft.state);
+      return { key, state, serial: JSON.stringify(state), expectedRevision: draft.expectedRevision, clientKey: draft.clientKey };
+    } catch {
+      clearPendingDraft(subject);
+      return null;
+    }
+  }
+
+  function restorePendingDraft(subject, serverRevision) {
+    const draft = readPendingDraft(subject);
+    if (!draft) return false;
+    replaceState(draft.state);
+    dirty = true;
+    attempt = { serial: draft.serial, expected: draft.expectedRevision, key: draft.clientKey };
+    if (draft.expectedRevision === serverRevision) {
+      return emit(status({phase:'rejected',detail:'로그인 전에 저장하지 못한 내용을 복원했어요. 다시 저장해 주세요.',actions:actions.retry}));
+    }
+    seenRevision = serverRevision;
+    return emit(status({phase:'conflict',detail:'로그인 전에 저장하지 못한 내용을 복원했어요. 서버 기록을 확인한 뒤 선택해 주세요.',
+      actions:[{name:'pull',label:'서버 기록 열기'},{name:'force',label:'복원한 내용으로 덮어쓰기'}]}));
+  }
 
   async function start() {
     const gen = generation;
@@ -35,8 +91,9 @@ export function createSyncController({getState, replaceState, api,
         return emit(status({phase:'login',actions:actions.login}));
       return emit(status({phase:'offline',detail:'서버를 확인하지 못했어요. 다시 시도해 주세요.',actions:[...actions.retry,...actions.login]}));
     }
-    owned = true; revision = result.revision; dirty = false; attempt = null; seenRevision = null;
+    owned = true; revision = result.revision; dirty = false; attempt = null; seenRevision = null; activeSubject = result.subject || null;
     replaceState(validateState(result.state));
+    if (restorePendingDraft(activeSubject, revision)) return current;
     return emit(status({phase:'synced',actions:actions.logout}));
   }
 
@@ -56,11 +113,13 @@ export function createSyncController({getState, replaceState, api,
     if (gen !== generation) return current;
     if (answer.ok) {
       revision = answer.revision; attempt = null;
+      clearPendingDraft();
       dirty = JSON.stringify(getState()) !== sent.serial;
       if (dirty) return push();
       return emit(status({phase:'synced',actions:actions.logout}));
     }
     if (answer.status === 401 || answer.code === 'unauthenticated') {
+      savePendingDraft(sent);
       owned = false; revision = null; attempt = null;
       return emit(status({phase:'login',detail:'로그인이 만료되어 서버에 저장하지 못했어요.',actions:actions.login}));
     }
@@ -91,6 +150,7 @@ export function createSyncController({getState, replaceState, api,
       if (gen !== generation) return current;
       if (!result.ok) return emit(status({phase:'offline',detail:'서버 기록을 불러오지 못했어요.',actions:actions.retry}));
       revision = result.revision; dirty = false; attempt = null; seenRevision = null;
+      clearPendingDraft();
       replaceState(validateState(result.state));
       return emit(status({phase:'synced',actions:actions.logout}));
     }
