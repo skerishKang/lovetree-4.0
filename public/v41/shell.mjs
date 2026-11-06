@@ -60,8 +60,8 @@ function canLeave(){return !(formDirty()||treeDirty()||member?.snapshot().dirty)
 function leaveMember(){if(!canLeave())return false;member?.dispose();member=null;return true;}
 function memberStatus(status){
  const failed=status.dirty&&['offline','rejected','conflict','login'].includes(status.phase);
- $('save-feedback').hidden=!failed;$('save-message').textContent=failed?(status.detail||'서버에 저장하지 못했어요. 이 화면을 닫지 말고 다시 저장해 주세요.'):'';$('save-actions').replaceChildren();
- if(failed){for(const a of status.actions.filter(a=>['retry','pull','force'].includes(a.name))){const b=document.createElement('button');b.textContent=a.label;b.onclick=async()=>{if(['pull','force'].includes(a.name)&&!confirm(a.name==='pull'?'미저장 변경을 버리고 서버 기록을 불러올까요?':'서버의 최신 기록을 현재 입력으로 덮어쓸까요? 다른 창의 변경이 사라질 수 있습니다.'))return;await member?.act(a.name);};$('save-actions').append(b);}const b=document.createElement('button');b.textContent='현재 기록 백업';b.onclick=backup;$('save-actions').append(b);}
+ $('save-feedback').hidden=!failed;$('save-message').textContent=failed?(status.phase==='login'?'로그인이 만료되어 서버에 저장하지 못했어요. 새 창에서 로그인한 뒤 이 탭을 새로고침하면 입력을 복원합니다.':status.detail||'서버에 저장하지 못했어요. 이 화면을 닫지 말고 다시 저장해 주세요.'):'';$('save-actions').replaceChildren();
+ if(failed){for(const a of status.actions.filter(a=>['retry','pull','force','login'].includes(a.name))){const b=document.createElement('button');b.textContent=a.name==='login'?'새 창에서 로그인':a.label;b.onclick=async()=>{if(a.name==='login'){window.open(MEMBER_LOGIN_URL,'_blank','noopener,noreferrer');return;}if(['pull','force'].includes(a.name)&&!confirm(a.name==='pull'?'미저장 변경을 버리고 서버 기록을 불러올까요?':'서버의 최신 기록으로 현재 입력을 덮어쓸까요? 다른 창의 변경이 사라질 수 있습니다.'))return;await member?.act(a.name);};$('save-actions').append(b);}const b=document.createElement('button');b.textContent='현재 기록 백업';b.onclick=backup;$('save-actions').append(b);}
  if(status.phase==='checking')notify('내 기록을 불러오고 있어요.');
  else if(status.phase==='synced')notify(status.writable?(previousDirty?'서버에 저장됐어요.':'내 기록을 불러왔어요.'):'기록을 읽었어요. 서버 편집 연결은 아직 준비되지 않았어요.');
  else if(status.phase==='login'&&!status.dirty)notify('로그인이 필요해요.');
