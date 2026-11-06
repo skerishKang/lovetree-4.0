@@ -1,5 +1,5 @@
 import {createSyncController} from './sync-controller.mjs';
-import {EMPTY_STATE,validateState,createTree,editTree,addMoment,editMoment,reparentMoment,removeMoment,linkMoments,unlinkMoments,MAX_TREES,newId} from './domain.mjs';
+import {EMPTY_STATE,validateState,createTree,editTree,addMoment,editMoment,reparentMoment,removeMoment,linkMoments,unlinkMoments,cacheMomentMediaMetadata,MAX_TREES,newId} from './domain.mjs';
 // Reuses 4.0 persistence, retries and revision conflicts; demo/file records cannot enter this session.
 function sessionDraftStorage(){try{return globalThis.sessionStorage||null;}catch{return null;}}
 export function createMemberSession({api,onState=()=>{},onStatus=()=>{},navigate=()=>{},delay,makeClientKey=()=>`v41-${newId()}`,draftStorage=sessionDraftStorage()}){
@@ -16,6 +16,7 @@ export function createMemberSession({api,onState=()=>{},onStatus=()=>{},navigate
     if(action==='add'){next=addMoment(tree,input,momentId);momentId=next.moments.at(-1).id;}
     else if(action==='editTree')next=editTree(tree,input);
     else if(action==='edit')next=editMoment(tree,momentId,input);
+    else if(action==='cacheMediaMetadata'){next=cacheMomentMediaMetadata(tree,momentId,input.url,input.mediaMetadata);if(next===tree)return {treeId,momentId,changed:false};}
     else if(action==='reparent')next=reparentMoment(tree,momentId,input.targetId,input.relation);
     else if(action==='delete'){next=removeMoment(tree,momentId);momentId=next.moments.find(m=>m.id===tree.moments.find(m=>m.id===momentId)?.parentId)?.id||next.moments[0].id;}
     else if(action==='link')next=linkMoments(tree,momentId,input.targetId);

@@ -5,7 +5,7 @@
   const moments = tree.moments.map(m => {
     const media=window.LTMedia?.describe(m.url||'');
     const outgoing = tree.edges.filter(e => e.kind === 'parent' && e.from === m.id);
-    return {id:m.id,title:m.title,date:m.date,emotion:m.emotion,memo:m.note,
+    return {id:m.id,title:m.title,date:m.date,emotion:m.emotion,memo:m.note,mediaMetadata:m.mediaMetadata||null,
       whyNext:outgoing.map(e=>e.reason).filter(Boolean).join(' / '),
       type:context.exampleMedia?.[m.id]?.type||(media?.kind==='photo'?'photo':media?.kind==='video'||media?.kind==='youtube'?'video':m.url?'link':'memo'),source:context.exampleMedia?'예시 이미지':media?.openUrl?new URL(media.openUrl).hostname:'불러온 기록',image:context.exampleMedia?.[m.id]?.image||'',externalUrl:m.url||'',
       first:m.parentId===null,next:outgoing[0]?.to||null,branch:outgoing[1]?.to||null};
@@ -14,7 +14,7 @@
   if(typeof document!=='undefined')addEventListener('DOMContentLoaded',()=>{
     const detail=document.querySelector('#detailNote');
     if(detail&&window.LTMedia){const host=document.createElement('div');detail.parentElement.after(host);let last=null;
-      const update=()=>{const id=context.momentId;if(id===last)return;last=id;const m=tree.moments.find(m=>m.id===id);host.innerHTML=m?.url?window.LTMedia.markup(m.url,m.title):'';};
+      const update=()=>{const id=context.momentId;if(id===last)return;last=id;const m=tree.moments.find(m=>m.id===id);host.innerHTML=m?.url?window.LTMedia.markup(m.url,m.title,m.mediaMetadata,m.id):'';};
       new MutationObserver(update).observe(document.getElementById('detailTitle'),{childList:true,subtree:true});update();
     }
   });
