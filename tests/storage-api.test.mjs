@@ -57,6 +57,50 @@ test('save then read preserves ids, parents, links and order', async () => {
   assert.deepEqual(moments.map(m => m.links), state.trees[0].moments.map(m => m.links));
 });
 
+test('cached media metadata survives a save and is returned on the next read', async () => {
+  const { handle } = buildHandle();
+  const tree = sampleState().trees[0];
+  const withMedia = addMoment(tree, {
+    ...base, title: '다시 본 무대 영상', url: 'https://youtu.be/dQw4w9WgXcQ?t=83',
+    mediaMetadata: { title: '무대 영상', channel: '윤슬 채널', source: 'youtu.be' }
+  }, tree.moments[0].id, CLOCK);
+  assert.equal((await put(handle, { state: { version: 1, trees: [withMedia] }, expectedRevision: 0, clientKey: 'k-1' })).status, 200);
+  const read = await get(handle);
+  const moment = read.body.state.trees[0].moments.find(m => m.url.startsWith('https://youtu.be/'));
+  assert.deepEqual(moment.mediaMetadata, { title: '무대 영상', channel: '윤슬 채널', source: 'youtu.be' });
+});
+
+test('media metadata source is always re-derived from the moment link', async () => {
+  const { handle } = buildHandle();
+  const tree = sampleState().trees[0];
+  const withMedia = addMoment(tree, {
+    ...base, title: '영상 링크 순간', url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+    mediaMetadata: { title: '무대 영상', channel: '윤슬 채널', source: 'evil.example' }
+  }, tree.moments[0].id, CLOCK);
+  await put(handle, { state: { version: 1, trees: [withMedia] }, expectedRevision: 0, clientKey: 'k-1' });
+  const read = await get(handle);
+  const moment = read.body.state.trees[0].moments.find(m => m.title === '영상 링크 순간');
+  assert.deepEqual(moment.mediaMetadata, { title: '무대 영상', channel: '윤슬 채널', source: 'www.youtube.com' });
+});
+
+test('a malformed media metadata value is refused as an invalid document', async () => {
+  const { handle } = buildHandle();
+  const state = sampleState();
+  const forged = { ...state, trees: [{ ...state.trees[0], moments: state.trees[0].moments.map((m, i) => i === 1 ? { ...m, url: 'https://youtu.be/dQw4w9WgXcQ', mediaMetadata: '무대 영상' } : m) }] };
+  const saved = await put(handle, { state: forged, expectedRevision: 0, clientKey: 'k-1' });
+  assert.equal(saved.status, 400);
+  assert.equal(saved.body.error.code, 'invalid_document');
+  assert.equal((await get(handle)).body.revision, 0);
+});
+
+test('records without media metadata keep the previous moment shape', async () => {
+  const { handle } = buildHandle();
+  await put(handle, { state: sampleState(), expectedRevision: 0, clientKey: 'k-1' });
+  const read = await get(handle);
+  for (const moment of read.body.state.trees[0].moments)
+    assert.equal(Object.prototype.hasOwnProperty.call(moment, 'mediaMetadata'), false);
+});
+
 test('first save starts at revision 0 and each accepted save advances one', async () => {
   const { handle } = buildHandle();
   const state = sampleState();

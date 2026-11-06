@@ -98,6 +98,14 @@ test('editing a connected moment keeps its parent and reason, and ignores a non-
   const coerced = editMoment(connected, connected.moments[1].id, { ...input('숫자 이유'), relation: 5 });
   assert.equal(coerced.moments[1].relation, '');
 });
+test('editing a moment to another link address drops the stale cached media metadata', () => {
+  const tree = createTree({ ...input(), url: 'https://youtu.be/dQw4w9WgXcQ', mediaMetadata: { title: '무대 영상', channel: '윤슬 채널', source: 'youtu.be' } });
+  const moved = editMoment(tree, tree.moments[0].id, { ...input('다른 영상'), url: 'https://www.youtube.com/watch?v=aaaaaaaaaaa' });
+  assert.equal(Object.prototype.hasOwnProperty.call(moved.moments[0], 'mediaMetadata'), false);
+  validateState(stateOf(moved));
+  const same = editMoment(tree, tree.moments[0].id, { ...input('같은 영상'), url: tree.moments[0].url });
+  assert.deepEqual(same.moments[0].mediaMetadata, { title: '무대 영상', channel: '윤슬 채널', source: 'youtu.be' });
+});
 test('import creates fresh identities and never overwrites existing trees', () => {
   const first = createTree(input());
   const source = addMoment(first, input('두 번째'), first.moments[0].id);
