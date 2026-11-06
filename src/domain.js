@@ -22,6 +22,16 @@ function optionalText(value, name, max) {
   if (typeof value !== 'string' || value.length > max) throw new Error(`${name}을(를) 1~${max}자로 적어 주세요.`);
   return value.trim();
 }
+function normalizeMediaMetadata(value, url) {
+  if (value === undefined || value === null) return null;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('미디어 정보를 확인해 주세요.');
+  const title = optionalText(value.title, '미디어 제목', 240);
+  const channel = optionalText(value.channel, '미디어 채널', 160);
+  if (!title && !channel) return null;
+  const source = url ? new URL(url).hostname : '';
+  if (!source) return null;
+  return {title, channel, source};
+}
 function shortened(value, max = 40) {
   const letters = Array.from(value.replace(/\s+/g, ' ').trim());
   return letters.length > max ? `${letters.slice(0, max).join('')}…` : letters.join('');
@@ -62,7 +72,10 @@ export function validateMomentInput(input) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(date)) || new Date(date).toISOString().slice(0, 10) !== date) throw new Error('날짜를 확인해 주세요.');
   const relation = typeof input.relation === 'string' ? input.relation.trim() : '';
   if (relation.length > 100) throw new Error('연결 이유는 100자까지 적을 수 있어요.');
-  return { title, note, emotion, date, relation, url };
+  const result = { title, note, emotion, date, relation, url };
+  const mediaMetadata = normalizeMediaMetadata(input.mediaMetadata, url);
+  if (mediaMetadata) result.mediaMetadata = mediaMetadata;
+  return result;
 }
 export function createTree(input, clock = new Date().toISOString()) {
   const subject = requireText(input.subject, '좋아하는 대상', 60);
@@ -87,7 +100,12 @@ export function editMoment(tree, id, input, clock = new Date().toISOString()) {
   const current = tree.moments.find(m => m.id === id);
   if (!current) throw new Error('이 순간을 찾을 수 없어요.');
   const next = validateMomentInput(input);
-  return { ...tree, updatedAt: clock, moments: tree.moments.map(m => m.id === id ? { ...m, ...next, relation: m.parentId ? next.relation : '' } : m) };
+  return { ...tree, updatedAt: clock, moments: tree.moments.map(m => {
+    if (m.id !== id) return m;
+    const edited = { ...m, ...next, relation: m.parentId ? next.relation : '' };
+    if (next.url !== m.url && !next.mediaMetadata) delete edited.mediaMetadata;
+    return edited;
+  }) };
 }
 export function parentCandidates(tree, id) {
   if (!tree.moments.some(m => m.id === id)) return [];
