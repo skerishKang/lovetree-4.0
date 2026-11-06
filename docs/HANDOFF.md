@@ -1,3 +1,7 @@
+## 2026-11-06 — #174 로그인 전 공용 화면 /auth/refresh 차단
+
+`refreshUnauthorized`(`public/v41/api.mjs`) 진입부에 `canRefresh` 힌트 게이트를 넣었다. 회원 셸 `shell.mjs`가 모듈 시작 때 `setMemberRefreshStarted(false)`로 닫고 `startMember()`에서 true로 켠다. `createWorkspaceApi`·`createCommunityApi`·`createShareApi` 세 클라이언트가 모두 `memberRefreshAllowed`를 넘겨 같은 함수를 거친다. 셸을 거치지 않는 단독 클라이언트·시험은 기본값 true로 기존 동작을 유지해 `tests/missing-marker-refresh.test.mjs`의 복구 시나리오(표시 쿠키 없이도 HttpOnly 갱신 쿠키로 세션 복구)를 깨지 않는다. 새 시험 `tests/v41-refresh-gate.test.mjs`: 회원 시작 전 401 → refresh 0회 / 회원 시작 뒤 401 → refresh 1회(세 클라이언트), 진입부 `canRefresh=false` 단축, shell 배선 확인. `functions/_lib/shared-auth.mjs`의 401 응답·padiem-auth·시각 통일 결과 무변경.
+
 ## 2026-11-05 — 상단 메뉴 완전 통일(첫 화면·둘러보기 포함)
 
 대표 지적: "페이지 누를 때마다 상단 메뉴가 다르다." 6화면을 같은 크기로 찍어 보니 상단이 세 종류였다 — 첫 화면(원본 워드마크 + 알약 4개, 탭 없음), 안쪽 4화면(공통 헤더), 둘러보기(모달 패널 자체 머리글). 고친 것: `shell.css`의 `body.home-screen .app-header{display:none}` 제거로 공통 헤더를 첫 화면에도 표시, `v41/home.js`에서 첫 화면 안 워드마크·둘러보기·로그인 버튼 숨김과 고유 버튼(움직임 멈춤·순간 목록)을 오른쪽 위 도구 줄 자리로, 둘러보기 패널을 `#stage` 안 비모달(`dialog.show()`)로 옮겨 헤더 아래 금테 카드로 열리게(`index.html` 마크업 이동, 패널 머리글은 닫기만 남김, 화면 전환·Esc 시 닫힘, 둘러보기 탭 `aria-current`). 무대 프레임은 첫 화면에서 계속 뺀다. 원본 SRC064·네 화면 구조 무변경.
