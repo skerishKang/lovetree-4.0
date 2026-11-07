@@ -116,6 +116,55 @@ test('썸네일은 저장된 같은 출처·data 값만 쓰고 외부 이미지�
   assert.deepEqual(memos.map(c => c.id), ['external']);
 });
 
+const PRIVATE_ORIGIN = 'https://lovetree-4-0.pages.dev';
+const privateUpload = (id, n, ext = 'png') => moment(id, {
+  url: `${PRIVATE_ORIGIN}/api/media/0000000${n}-0000-4000-8000-00000000000${n}.${ext}`,
+});
+
+test('업로드 사진 3개는 섞어서와 내 것만에서 사진 카드가 된다', () => {
+  const uploads = [privateUpload('u1', 1), privateUpload('u2', 2), privateUpload('u3', 3)];
+  const cards = homeMomentCards(member(uploads), 40, PRIVATE_ORIGIN);
+  assert.equal(cards.photos.length, 3);
+  assert.equal(cards.memos.length, 0);
+  assert.ok(cards.photos.every(c => c.type === 'photo' && c.image.startsWith(PRIVATE_ORIGIN + '/api/media/')));
+  const mix = homeCardsPlan({mode: 'mix', loggedIn: true, context: member(uploads), origin: PRIVATE_ORIGIN});
+  assert.equal(mix.kind, 'mix');
+  assert.equal(mix.cards.filter(c => c.type === 'photo').length, 3);
+  assert.ok(mix.note.includes('금빛'));
+  const mine = homeCardsPlan({mode: 'mine', loggedIn: true, context: member(uploads), origin: PRIVATE_ORIGIN});
+  assert.equal(mine.kind, 'mine');
+  assert.equal(mine.cards.length, 3);
+  assert.ok(mine.cards.every(c => c.type === 'photo'));
+});
+
+test('업로드 사진은 YouTube mediaMetadata 순간과 섞여도 각자 카드로 남는다', () => {
+  const uploads = [privateUpload('u1', 1), privateUpload('u2', 2), privateUpload('u3', 3)];
+  const youtube = moment('yt', {url: 'https://youtu.be/dQw4w9WgXcQ', mediaMetadata: {thumbnail: '/media/yt.jpg'}});
+  const cards = homeMomentCards(member([...uploads, youtube]), 40, PRIVATE_ORIGIN);
+  assert.equal(cards.photos.length, 4);
+  assert.ok(cards.photos.some(c => c.id === 'yt' && c.type === 'photo'));
+  assert.ok(cards.photos.filter(c => c.id.startsWith('u')).every(c => c.type === 'photo'));
+  const mix = homeCardsPlan({mode: 'mix', loggedIn: true, context: member([...uploads, youtube]), origin: PRIVATE_ORIGIN});
+  assert.equal(mix.cards.filter(c => c.type === 'photo').length, 4);
+  assert.equal(mix.note.includes('금빛'), true);
+});
+
+test('다른 출처의 /api/media 모양과 업로드 영상은 사진 카드가 아니다', () => {
+  const external = moment('ext', {url: 'https://evil.test/api/media/00000001-0000-4000-8000-000000000001.png'});
+  const video = privateUpload('vid', 2, 'mp4');
+  const cards = homeMomentCards(member([external, video]), 40, PRIVATE_ORIGIN);
+  assert.equal(cards.photos.length, 0);
+  assert.equal(cards.memos.find(c => c.id === 'vid')?.type, 'video');
+  assert.equal(cards.memos.some(c => c.id === 'ext' && c.type === 'photo'), false);
+});
+
+test('공식 별칭의 보관 파일도 현재 출처 경로로만 쓴다', () => {
+  const alias = moment('alias', {url: 'https://lovetree.padiem.net/api/media/00000004-0000-4000-8000-000000000004.png'});
+  const cards = homeMomentCards(member([alias]), 40, PRIVATE_ORIGIN);
+  assert.equal(cards.photos.length, 1);
+  assert.equal(cards.photos[0].image, `${PRIVATE_ORIGIN}/api/media/00000004-0000-4000-8000-000000000004.png`);
+});
+
 test('궤도 어댑터: 예시 불투명도를 낮추지 않고 내 카드에만 금빛 표시를 쓴다', () => {
   const orbit = readFileSync(new URL('../src/views/orbit.js', import.meta.url), 'utf8');
   assert.equal(/c\.example\?\.\d/.test(orbit), false, '예시 카드 불투명도 보정이 없다');
