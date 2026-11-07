@@ -13,3 +13,7 @@ Thumbs.db
 .local/
 __pycache__/
 *.pyc
+
+# PR 작성 보조 파일(저장소에 두지 않는다)
+pr-body.md
+pr-payload.json
