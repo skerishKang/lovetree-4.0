@@ -2,7 +2,9 @@ import '../src/styles.css';
 import {mountOrbit} from '../src/views/orbit.js';
 import {createHomeActions} from './home-actions.js';
 import {homePresentation} from './home-presentation.js';
-const context=parent.LT41||{source:parent.document.body.dataset.recordSource};
+import {applyHomeCenter} from './home-center.js';
+const shellBody=parent.document.body;
+const context=parent.LT41||{source:shellBody.dataset.recordSource,member:shellBody.dataset.member,treeCount:Number(shellBody.dataset.treeCount||0)};
 const bridge=createHomeActions({getContext:()=>parent.LT41,send:message=>parent.postMessage(message,location.origin),gallery:true});
 const presentation=homePresentation(context);
 const dispose=mountOrbit(document.getElementById('orbit'),{
@@ -20,7 +22,16 @@ if(presentation.canResume){
  secondary.dataset.do='new';secondary.textContent='새 트리 만들기';
 }
 shadow.querySelector('[data-do=trees]').textContent='내 책장';
-if(!presentation.canResume)shadow.querySelector('.primary-cta').textContent='첫 순간 남기기';
+// 2026-11-07 대표 지시: 세 버튼의 자리·개수는 그대로 두고 강조와 첫 버튼 문구만 상태로 바꾼다.
+// 로그아웃=처음 시작하기(흰색) / 로그인·트리 0=새 트리 만들기(흰색) / 로그인·트리 있음=이어 보던 순간(흰색).
+const centerButtons=[...shadow.querySelectorAll('.center .actions button')];
+const centerPlan=applyHomeCenter(centerButtons,presentation.centerState);
+// 첫 버튼 동작: 로그아웃=로그인/가입으로, 로그인·트리 있음=이어 보던 순간, 로그인·트리 0=비활성.
+{
+ const first=centerButtons[0];
+ if(presentation.centerState.member==='out')first.onclick=bridge.actions.start;
+ else if(centerPlan.state==='in-trees')first.onclick=bridge.actions.resume;
+}
 shadow.querySelector('.center-note').textContent='배경 카드는 감상 예시 · 내 기록에는 저장되지 않아요';
 const mobileFit=document.createElement('style');mobileFit.textContent='@media(max-width:768px){.topbar{gap:12px;flex-wrap:wrap;align-items:center;padding:8px 12px}.top-actions{gap:6px;flex-shrink:0;flex-wrap:wrap;margin-left:auto}.topbar .menuBtn{white-space:nowrap;padding:10px 9px;font-size:14px}.actions .subtleBtn{font-size:14px}.center .center-note{font-size:14px}.hint{font-size:14px}}';shadow.append(mobileFit);
 const community=document.createElement('button');community.className='menuBtn home-community';community.type='button';community.textContent='둘러보기';community.setAttribute('aria-label','공개 트리 둘러보기');community.onclick=bridge.actions.community;shadow.querySelector('[data-home-account]').before(community);
