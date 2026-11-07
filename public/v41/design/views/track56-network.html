@@ -185,6 +185,11 @@ mobilePicker=LTMobileMoments({moments:LTDEMO.moments,selected:LTDEMO.get(),onSel
 addEventListener('resize',resize);setupMobileRibbon();resize();(()=>{overview(false);const n=nodes.find(n=>n.id===LTDEMO.get());if(n){state.selected=n;centerOn(n,state.mobile?.68:.96);}})();last=performance.now();requestAnimationFrame(loop);
 })();
 </script>
-<style>@media(max-width:640px){#overviewBtn{display:inline-flex!important;align-items:center;min-height:44px}.pill{min-height:44px}.detail{max-height:55%;overflow:auto}.mobile-ribbon button{min-height:44px}}</style><style>@media(max-width:640px){.hero{top:150px}.hero h1{font-size:23px}.hero .eyebrow{display:none}.hero p{font-size:12px}.route-status{display:none}.detail{bottom:70px}.detail-block p{font-size:14px}.detail-block span,.chip{font-size:11px}.close{min-width:44px;min-height:44px}}</style></body>
+<style>@media(max-width:640px){#overviewBtn{display:inline-flex!important;align-items:center;min-height:44px}.pill{min-height:44px}.detail{max-height:55%;overflow:auto}.mobile-ribbon button{min-height:44px}}</style><style>@media(max-width:640px){.hero{top:150px}.hero h1{font-size:23px}.hero .eyebrow{display:none}.hero p{font-size:12px}.route-status{display:none}.detail{bottom:70px}.detail-block p{font-size:14px}.detail-block span,.chip{font-size:11px}.close{min-width:44px;min-height:44px}}</style><style id="lt-touch-targets">/* 2026-11-08 터치 타깃: 보이는 모양은 그대로 두고 ::after로 누르는 영역만 44px 이상으로 넓힌다. */
+#focusFirst,#zoomIn,#zoomOut,#resetFocus,#openMoment{position:relative}
+#focusFirst::after,#zoomIn::after,#zoomOut::after,#resetFocus::after{content:"";position:absolute;inset:-5px 0}
+#openMoment::after{content:"";position:absolute;inset:-1px 0}
+#detailClose::after{content:"";position:absolute;inset:-6px}</style>
+</body>
 </html>
 

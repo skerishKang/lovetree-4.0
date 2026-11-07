@@ -148,4 +148,11 @@ const typoMode=new URLSearchParams(location.search).get('typo');if(String(typoMo
 window.addEventListener('resize',()=>{if(machineState==='IDLE'){renderSpread(current,null,false);setTimeout(syncLensClone,70)}});
 renderSpread(Math.max(0,Math.floor(LTDEMO.moments.findIndex(m=>m.id===LTDEMO.get())/2)),LTDEMO.get(),true);setTimeout(syncLensClone,120);
 window.__TRACK59__={getState:()=>({current,machineState,lensOn,recent:[...recent],detail:$('#detail').classList.contains('open'),viewer:$('#viewer').classList.contains('open'),archive:$('#archivePanel').classList.contains('open'),branch:$('#branchModal').classList.contains('open'),mobile:innerWidth<=820}),turnNext:()=>autoTurn('next'),turnPrev:()=>autoTurn('prev'),jump:(i,id)=>renderSpread(i,id,false),showDetail,openArchive,openBranch,openOverview,meta:metadataFor,openAddLink:openLinkModal,normalizeHttpUrl,youtubeId,customConnections:()=>[...customConnections]};
-</script></body></html>
+</script><style id="lt-touch-targets">/* 2026-11-08 터치 타깃: 보이는 모양은 그대로 두고 ::after로 누르는 영역만 44px 이상으로 넓힌다. */
+#prevBtn,#nextBtn,#detailClose,#viewerClose,#openViewerBtn,#detailIndexBtn,#linkCancel,#linkSave,#branchClose{position:relative}
+#prevBtn::after,#nextBtn::after{content:"";position:absolute;inset:-7px}
+#detailClose::after,#viewerClose::after{content:"";position:absolute;inset:-5px}
+#openViewerBtn::after,#detailIndexBtn::after,#branchClose::after{content:"";position:absolute;inset:-4px 0}
+#linkCancel::after,#linkSave::after{content:"";position:absolute;inset:-6px 0}
+#linkEmotion{min-height:44px}</style>
+</body></html>
