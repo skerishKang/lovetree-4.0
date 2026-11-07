@@ -36,7 +36,7 @@ export function homeCardsLabel(mode) {
 }
 
 // 모드별 궤도 구성. exampleCount는 예시 카드 수(최대 40), cards는 내/공개 카드.
-export function homeCardsPlan({mode, loggedIn = false, context = null, popular = [], limit = HOME_ORBIT_LIMIT} = {}) {
+export function homeCardsPlan({mode, loggedIn = false, context = null, popular = [], limit = HOME_ORBIT_LIMIT, origin = globalThis.location?.origin} = {}) {
   let effective = normalizeHomeCardsMode(mode) || (loggedIn ? 'mix' : 'example');
   if (!loggedIn && loggedInOnly(effective)) effective = 'example';
   if (effective === 'example') {
@@ -53,7 +53,7 @@ export function homeCardsPlan({mode, loggedIn = false, context = null, popular =
       note: short ? '아직 공개된 순간이 적어요' : '',
     };
   }
-  const {photos, memos} = homeMomentCards(context, limit);
+  const {photos, memos} = homeMomentCards(context, limit, origin);
   if (effective === 'mine') {
     const cards = [...photos, ...memos.slice(0, HOME_TEXT_LIMIT)].slice(0, limit);
     return {
