@@ -124,6 +124,21 @@ nav #record-menu[hidden]{display:none!important}
 .account-email{margin:0;padding:8px 10px 10px;border-bottom:1px solid var(--lt-line);font-size:12px;line-height:1.6;color:var(--lt-muted);overflow-wrap:anywhere}
 .account-popover button{justify-content:flex-start;width:100%;min-height:44px;padding:0 10px;border:0;border-radius:10px;background:none;font-size:13px;letter-spacing:.02em;color:var(--lt-pearl)}
 .account-popover button:hover{background:rgba(255,255,255,.08)}
+/* 2026-11-08 순간 추가·수정 패널: 링크·사진을 한 묶음으로, 나머지는 '더 적기' 접힘. 색은 --lt-* 토큰만 쓴다. */
+.link-photo-field{margin:18px 0;padding:16px;border:1px solid var(--lt-line);border-radius:var(--lt-r-card);background:var(--lt-stage-2)}
+.link-photo-field>label{margin:0}
+.link-photo-field .file-label{margin:14px 0 0;padding-top:14px;border-top:1px solid var(--lt-line)}
+.link-photo-field [data-upload-status]{margin:8px 0 0;font-size:12px;color:var(--lt-muted)}
+.link-photo-field [data-upload-status]:empty{display:none}
+.stop-upload{min-height:44px;margin-top:8px;padding:10px 14px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-pill);background:none;color:var(--lt-pearl)}
+.more-fields{margin:18px 0;padding:0 14px 8px;border:1px solid var(--lt-line);border-radius:var(--lt-r-card);background:var(--lt-stage-2)}
+.more-fields summary{padding:12px 0;color:var(--lt-muted)}
+.more-fields label:first-of-type{margin-top:2px}
+#account-assets{width:min(520px,calc(100vw - 24px))}
+.upload-assets{display:grid}
+.upload-asset{display:grid;gap:6px;padding:12px 0;border-bottom:1px solid var(--lt-line)}
+.upload-asset p{margin:0;font-size:12px;color:var(--lt-muted)}
+.upload-asset button{min-height:44px;padding:8px 12px;border:1px solid var(--lt-line);border-radius:var(--lt-r-pill);background:none;color:var(--lt-pearl)}
 /* 화면 안 도구 줄은 헤더 알약보다 한 단계 작게(높이 36, 터치 영역 44 유지). 두 번째 메뉴 줄로 보이지 않게. */
 html[data-v41-screen=book] .tools .ui-btn,html[data-v41-screen=board] header .headbtn,html[data-v41-screen=network] .top-actions .pill{height:36px;min-height:36px;padding:0 12px;font-size:13px;letter-spacing:.04em;position:relative}
 html[data-v41-screen=book] .tools .ui-btn::after,html[data-v41-screen=board] header .headbtn::after,html[data-v41-screen=network] .top-actions .pill::after{content:"";position:absolute;inset:-4px;border-radius:inherit}
