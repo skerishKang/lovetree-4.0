@@ -4,6 +4,7 @@ export function createHomeActions({getContext,send,gallery=false}) {
  const select=id=>{if(gallery&&getContext()?.source!=='example')return false;if(!getContext()?.tree?.moments.some(m=>m.id===id))return false;send({type:'lt41-select',id});return true;};
  return {select,actions:{
   resume:()=>{const c=getContext();if(c?.source!=='example'&&c?.tree?.moments.some(m=>m.id===c.momentId))send({type:'lt41-navigate',view:BOOK});},
+  start:()=>send({type:'lt41-start'}),
   account:()=>send({type:'lt41-account'}),
   community:()=>send({type:'lt41-community'}),
   navigate:where=>send({type:'lt41-navigate',view:where==='trees'?SHELF:'src064-orbit.html'}),
