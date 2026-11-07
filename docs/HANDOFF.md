@@ -746,3 +746,9 @@ COM2에는 merge `6900df8aa446dfe0201d01997457fae04c4abe16`의 변경 서버 파
 ### 2026-11-03 — 접속·요청·감사 로그 90일 보관
 
 `lovetree_request_claims`, `lovetree_product_role_audit`, `lovetree_community_moderation_audit`만 매일 제한 배치로 정리하는 PostgreSQL 작업과 systemd oneshot/timer 예시를 추가했다. 콘텐츠, 제품 권한 현재 상태, 계정 탈퇴 증거, 결제 기록은 보존 목록에 두었다. API stdout/stderr는 journald 예시(호스트 전체 적용)를 기록했고, Pages Functions 자체 로그가 없어 Cloudflare 관측 로그 보관은 대시보드/계정 설정 항목으로 남겼다. 새 timer는 설치 예시에 포함되나 설치기가 시작·활성화하지 않는다. 상세 분류는 `docs/ACCESS_LOG_RETENTION_20261103.md`.
+
+## 2026-11-08 첫 화면 카드 출처 (#261108 후속)
+- `v41/home-cards.js`가 모드·저장·구성 규칙, `v41/home-moments.js`가 사진/글 선별, `v41/home-popular.js`가 기존 공개 API 수집을 맡는다. `v41/home.js`는 `카드: <모드> ▾` 메뉴를 도구 줄에 두고 모드 변경 시 새로고침한다.
+- 예시는 선명도 보정 없이 원래 값이고, 내 카드에만 `.card.mine` 금빛 토큰 표시가 붙는다.
+- 인기 모드는 새 API·DB 없이 `/api/community/shares` + `/api/public/shares/:id`만 쓴다. 공개 순간에 같은 출처 썸네일이 없으면 예시로 채우고 부족 안내를 보여 준다.
+- 컴1 확인: 실제 계정에서 내 것만/섞어서 카드와 금빛 표시, 390 도구 줄 넘침, 인기 카드 클릭의 공개 트리 이동, 클릭 전 외부 요청 0.
