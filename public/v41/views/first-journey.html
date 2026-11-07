@@ -210,7 +210,8 @@ html[data-lt-theme=garden] .field input[type=date]{color-scheme:light}
 import {
   JOURNEY_EMOTIONS, JOURNEY_LAST_STEP, emptyJourneyDraft, journeyPreviewTitle, journeyRestoreQuestion,
   journeyStepProblem, nextJourneyStep, previousJourneyStep,
-  readJourneyDraft, writeJourneyDraft, clearJourneyDraft, normalizeJourneyDraft,
+  readJourneyDraft, persistJourneyDraft, finishJourneyDraft, discardFinishedJourneyDraft,
+  clearJourneyDraft, normalizeJourneyDraft,
   journeyRouteHash, parseJourneyRoute,
 } from '/v41/first-journey.mjs';
 
@@ -235,6 +236,7 @@ const state = {
   step: 0,
   phase: 'form',
   pending: false,
+  completed: false,
   saved: {treeId: '', momentId: ''},
 };
 let ready = false;
@@ -271,7 +273,7 @@ function snapshotDraft() {
 }
 
 function persistDraft() {
-  return writeJourneyDraft(storage, snapshotDraft());
+  return persistJourneyDraft(storage, snapshotDraft(), {completed: state.completed});
 }
 
 function post(message) {
@@ -606,8 +608,9 @@ $('form').addEventListener('submit', event => {
     return;
   }
   if (state.step === 4) {
+    state.completed = true;
+    finishJourneyDraft(storage);
     if (embedded) post({type: 'lt41-journey-open-book', treeId: state.saved.treeId, firstMomentId: state.saved.momentId});
-    clearJourneyDraft(storage);
     return;
   }
   const problem = journeyStepProblem(state.step, state.draft);
@@ -649,8 +652,7 @@ $('steps').addEventListener('click', event => {
 });
 
 $('close').onclick = () => {
-  readForm();
-  persistDraft();
+  if (!state.completed) { readForm(); persistDraft(); }
   if (embedded) { post({type: 'lt41-journey-close'}); return; }
   // 단독 미리보기에서는 닫기가 곷 첫 화면으로 돌아간다(단계 기록은 뒤로가기용으로 남긴다).
   location.assign('/v41/');
@@ -668,6 +670,7 @@ function startFresh(subject = '') {
   state.saved = {treeId: '', momentId: ''};
   state.phase = 'form';
   state.step = 0;
+  state.completed = false;
   $('restore').hidden = true;
   fillForm();
   render();
@@ -678,6 +681,7 @@ function restoreDraft(draft) {
   state.saved = {treeId: state.draft.savedTreeId, momentId: state.draft.savedMomentId};
   state.phase = 'form';
   state.step = state.saved.treeId ? Math.max(3, state.draft.step) : state.draft.step;
+  state.completed = false;
   $('restore').hidden = true;
   fillForm();
   render();
@@ -690,6 +694,7 @@ window.addEventListener('popstate', () => {
 });
 
 function boot() {
+  discardFinishedJourneyDraft(storage);
   buildEmotions();
   fillForm();
   render();
@@ -756,8 +761,14 @@ if (!embedded) {
 ready = true;
 reportStep();
 
-// 닫기·새로고침 때도 입력을 잃지 않는다.
-window.addEventListener('pagehide', () => { try { readForm(); persistDraft(); } catch {} });
+// 닫기·새로고침 때도 입력을 잃지 않는다. 저장을 마친 뒤에는 완료 플래그가
+// pagehide·visibilitychange의 늦은 저장을 막아 지운 임시값이 되살아나지 않는다.
+function saveDraftBeforeLeave() {
+  if (state.completed) return;
+  try { readForm(); persistDraft(); } catch {}
+}
+window.addEventListener('pagehide', saveDraftBeforeLeave);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') saveDraftBeforeLeave(); });
 </script>
 </body>
 </html>

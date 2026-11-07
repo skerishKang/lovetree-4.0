@@ -1,3 +1,13 @@
+## 2026-11-08 — 첫 여정 완료 뒤 임시 저장이 되살아나던 문제(컴2로컬2, ai/com2-lt-journey-draft-clear-261108)
+
+첫 여정을 끝까지 저장하고 기억책으로 나간 뒤 다시 `새 트리 만들기`를 누르면, 방금 만든 트리 이름으로 복원 안내가 떴다. 완료 시 임시값을 지우지만, iframe이 내려가며 `pagehide`가 `readForm(); persistDraft()`를 다시 실행해 저장된 트리·순간 id가 담긴 임시값을 되살렸기 때문이다.
+
+- 완료(`state.completed=true`) 시 `finishJourneyDraft(storage)`가 `lovetree.v41.first-journey.finished` 완료 표시를 남기고 임시값을 지운다. `persistJourneyDraft(...,{completed:true})`는 쓰지 않으며, `pagehide`·`visibilitychange`·닫기가 같은 `saveDraftBeforeLeave()` 가드를 쓴다.
+- 새 여정 `boot()`은 `discardFinishedJourneyDraft(storage)`로 완료 표시와 그 뒤 늦게 남은 이전 임시값을 함께 버린다. 저장 전 중간에 닫은 값은 그대로 남아 기존 복원 안내를 유지한다.
+- 뒤로가기(#189·#190)·정원/밤(#194·#195)·단계·문구·저장 경로는 변경 없음. `public/v41/home*.js`·`src/views/orbit*`는 건드리지 않았다.
+- 시험: `tests/v41-first-journey.test.mjs` 13건(완료 뒤 pagehide 재저장 0, 완료 표시가 남은 이전 임시값 폐기, 중간 닫기 복원 유지 포함). 전체 `npm test` 398 pass/0 fail/37 skip, `npm run build` pass(잠금 대기 0초).
+- 로그아웃 미리보기(밤, 1440/390): `out/journey-draft-clear/journey-0{0..4}-{1440,390}.png` 10장 + 첫 화면 `home-{1440,390}.png`. 장미색 0, 가로 넘침 0. 실제 저장 왕복은 시험 계정 로그인 없이 수행하지 않았고, 단위 시험과 iframe 수명주기 코드로 확인했다.
+
 ## 2026-11-08 — 밤(A) 첫 여정을 첫 화면 무채색으로(컴2로컬2, ai/com2-lt-journey-night-261108)
 
 첫 화면은 검정·진주색·금테인데 첫 여정만 제목 강조 줄과 주 버튼이 장미색이라 끊겨 보이던 문제를 고쳤다. **밤(기본) 테마만** 바꾸고, #194가 넣은 `html[data-lt-theme=garden]` 정원 블록은 건드리지 않았다.

@@ -5,6 +5,7 @@ import {
   JOURNEY_STEPS, JOURNEY_LAST_STEP, JOURNEY_STORAGE_KEY,
   emptyJourneyDraft, normalizeJourneyDraft, journeyDraftHasContent,
   readJourneyDraft, writeJourneyDraft, clearJourneyDraft, journeyRestoreQuestion,
+  persistJourneyDraft, finishJourneyDraft, discardFinishedJourneyDraft,
   nextJourneyStep, previousJourneyStep, journeyStepProblem, journeySavePlan,
   journeyPreviewTitle, journeyEntry,
 } from '../public/v41/first-journey.mjs';
@@ -125,6 +126,34 @@ test('깨진 임시 값과 저장소 오류는 화면을 멈추지 않는다', (
   assert.equal(readJourneyDraft(null), null);
 });
 
+test('완료한 여정은 임시값을 지우고 pagehide 뒤에도 다시 저장하지 않는다', () => {
+  const memory = new Map();
+  const storage = {getItem: key => memory.get(key) ?? null, setItem: (key, value) => memory.set(key, value), removeItem: key => memory.delete(key)};
+  const completed = draft({step: 4, savedTreeId: 'tree-1', savedMomentId: 'moment-1'});
+  assert.equal(writeJourneyDraft(storage, completed), true);
+  assert.equal(finishJourneyDraft(storage), true);
+  assert.equal(readJourneyDraft(storage), null);
+  assert.equal(memory.has(JOURNEY_STORAGE_KEY), false, '완료 즉시 임시값이 없다');
+  assert.equal(persistJourneyDraft(storage, completed, {completed: true}), false, '완료 뒤 pagehide는 쓰지 않는다');
+  assert.equal(memory.has(JOURNEY_STORAGE_KEY), false);
+  assert.equal(journeyRestoreQuestion(readJourneyDraft(storage)), '', '복원 안내가 없다');
+});
+
+test('새 여정은 완료 표시가 남은 이전 임시값을 버리고, 중간에 닫은 값은 남긴다', () => {
+  const memory = new Map();
+  const storage = {getItem: key => memory.get(key) ?? null, setItem: (key, value) => memory.set(key, value), removeItem: key => memory.delete(key)};
+  const stale = draft({step: 4, savedTreeId: 'tree-1', savedMomentId: 'moment-1'});
+  writeJourneyDraft(storage, stale);
+  finishJourneyDraft(storage);
+  writeJourneyDraft(storage, stale);
+  assert.equal(discardFinishedJourneyDraft(storage), true, '완료 표시를 새 여정이 소비한다');
+  assert.equal(readJourneyDraft(storage), null);
+  assert.equal(journeyRestoreQuestion(readJourneyDraft(storage)), '', '완료된 값은 복원 안내를 만들지 않는다');
+  writeJourneyDraft(storage, draft({step: 2}));
+  persistJourneyDraft(storage, draft({step: 2}), {completed: false});
+  assert.match(journeyRestoreQuestion(readJourneyDraft(storage)), /그날의 무대/, '중간에 닫은 값은 남는다');
+});
+
 test('복원 값은 길이·단계·저장 id만 안전하게 되살린다', () => {
   const restored = normalizeJourneyDraft({step: 99, subject: 'x'.repeat(80), emotion: '없는감정', savedTreeId: 'tree-1', savedMomentId: '', extra: '무시'});
   assert.equal(restored.step, 4);
@@ -146,6 +175,9 @@ test('첫 여정 화면은 --lt-* 토큰만 쓰고 새 hex·단어 중간 줄바
   for (const label of ['트리 이름', '첫 순간', '마음 남기기', '다음 영상 잇기', '성장']) assert.match(html, new RegExp(label));
   assert.match(html, /피어났어요/);
   assert.match(html, /이어졌어요/);
+  assert.match(html, /discardFinishedJourneyDraft\(storage\)/, '새 여정은 완료된 이전 임시값을 버린다');
+  assert.match(html, /state\.completed = true;/, '완료 플래그를 세운다');
+  assert.match(html, /function saveDraftBeforeLeave\(\)/, 'pagehide·visibilitychange를 같은 완료 가드로 묶는다');
   const style = html.slice(html.indexOf('<style>'), html.indexOf('</style>'));
   assert.equal(/(?<!text-)transform\s*:/.test(style), false, '전환은 transform이 아니라 페이드다');
 });
