@@ -399,4 +399,10 @@ window.__LT58V11={youtubeId,youtubeThumb,youtubeThumbUrl,openEdit,saveEdit,choos
 mobilePicker=LTMobileMoments({moments:LTDEMO.moments,selected:LTDEMO.get(),onSelect:id=>{focusBoardMoment(id,false);document.getElementById('detail').classList.remove('open');},onOpen:id=>selectMoment(id,true),openLabel:'기억책 열기',tone:'dark'});
 addEventListener('resize',()=>{if(innerWidth<700&&!cinema)focusBoardMoment(LTDEMO.get(),false);});
 matchMedia('(max-width:699px)').addEventListener('change',e=>{if(e.matches){focusBoardMoment(LTDEMO.get(),false);document.getElementById('detail').classList.remove('open');}});
-</script></body></html>
+</script><style id="lt-touch-targets">/* 2026-11-08 터치 타깃: 보이는 모양은 그대로 두고 ::after로 누르는 영역만 44px 이상으로 넓힌다. */
+#minusBtn,#plusBtn,#resetBtn,#openMoment,#nextMoment,#cinemaFromMoment,#startPathHere,#pathModeBtn,#toolCinema,#toolFit,#detailClose{position:relative}
+#minusBtn::after{content:"";position:absolute;inset:-3px -5px}
+#plusBtn::after{content:"";position:absolute;inset:-3px -2px}
+#resetBtn::after,#openMoment::after,#nextMoment::after,#cinemaFromMoment::after,#startPathHere::after,#pathModeBtn::after,#toolCinema::after,#toolFit::after{content:"";position:absolute;inset:-5px 0}
+#detailClose::after{content:"";position:absolute;inset:-11px}</style>
+</body></html>

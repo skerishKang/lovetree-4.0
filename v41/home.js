@@ -64,6 +64,9 @@ const centerPlan=applyHomeCenter(centerButtons,presentation.centerState);
 }
 // 예시 모드는 궤도의 기존 안내를 그대로 두고, 나머지는 계획의 문구를 쓴다(빈 문자열이면 숨김).
 if(cardsPlan.note!==null)shadow.querySelector('.center-note').textContent=cardsPlan.note;
+// 2026-11-08 접근성: 카드 출처 안내가 바뀌면 화면 낭독기가 알린다.
+shadow.querySelector('.center-note')?.setAttribute('aria-live','polite');
+shadow.querySelector('.center-note')?.setAttribute('role','status');
 const mobileFit=document.createElement('style');mobileFit.textContent='@media(max-width:768px){.topbar{gap:12px;flex-wrap:wrap;align-items:center;padding:8px 12px}.top-actions{gap:6px;flex-shrink:0;flex-wrap:wrap;margin-left:auto}.topbar .menuBtn{white-space:nowrap;padding:10px 9px;font-size:14px}.actions .subtleBtn{font-size:14px}.center .center-note{font-size:14px}.hint{font-size:14px}}';shadow.append(mobileFit);
 const community=document.createElement('button');community.className='menuBtn home-community';community.type='button';community.textContent='둘러보기';community.setAttribute('aria-label','공개 트리 둘러보기');community.onclick=bridge.actions.community;shadow.querySelector('[data-home-account]').before(community);
 shadow.querySelector('.top-actions').append(themeButton);
