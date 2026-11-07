@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {
   HOME_CARDS_KEY, readHomeCardsMode, writeHomeCardsMode, homeCardsMenu,
-  homeCardsLabel, homeCardsPlan,
+  homeCardsLabel, homeCardsPlan, clickWithin,
 } from '../v41/home-cards.js';
 import {homeMomentCards, HOME_TEXT_LIMIT} from '../v41/home-moments.js';
 
@@ -189,4 +189,29 @@ test('첫 화면 배선: 모드 저장 키, 인기 API, 공개 카드 클릭 경
   assert.match(popular, /\.discover\(/);
   assert.match(popular, /createShareApi/);
   assert.equal(/fetch\('/.test(popular), false, '직접 fetch로 새 API를 만들지 않는다');
+});
+
+test('카드 메뉴: shadow DOM 클릭은 document retarget에도 안쪽으로 판정한다', () => {
+  const wrap = {contains: () => false};
+  const button = {role: 'button'};
+  const host = {role: 'host'};
+  const documentNode = {role: 'document'};
+  // shadow DOM 안 버튼 클릭은 document에서 target이 host로 retarget되지만 composedPath에는 cardWrap이 남는다.
+  assert.equal(clickWithin({target: host, composedPath: () => [button, wrap, host, documentNode]}, wrap), true);
+  assert.equal(clickWithin({target: documentNode, composedPath: () => [documentNode]}, wrap), false);
+  const fallback = {contains: target => target === button};
+  assert.equal(clickWithin({target: button}, fallback), true, 'composedPath가 없으면 contains로 되돌아간다');
+  assert.equal(clickWithin({target: host}, fallback), false);
+  assert.equal(clickWithin({target: button}, null), false);
+});
+
+test('카드 메뉴 배선: 바깥 클릭은 composedPath 판정, Esc는 그대로 닫는다', () => {
+  const home = readFileSync(new URL('../v41/home.js', import.meta.url), 'utf8');
+  const cards = readFileSync(new URL('../v41/home-cards.js', import.meta.url), 'utf8');
+  assert.match(cards, /export function clickWithin\(event, \.\.\.nodes\)/);
+  assert.match(home, /import \{[^}]*clickWithin[^}]*\} from '\.\/home-cards\.js';/);
+  assert.match(home, /document\.addEventListener\('click',e=>\{if\(!clickWithin\(e,cardWrap\)\)closeMenu\(\);\}\);/);
+  assert.equal(/!cardWrap\.contains\(e\.target\)/.test(home), false, 'retarget에 취약한 target 판정을 남기지 않는다');
+  assert.match(home, /e\.key==='Escape'\)closeMenu\(\)/);
+  assert.match(home, /e\.key==='Escape'\)\{e\.preventDefault\(\);closeMenu\(true\);\}/);
 });

@@ -1,6 +1,6 @@
 import '../src/styles.css';
 import {mountOrbit,ORBIT_EXAMPLE} from '../src/views/orbit.js';
-import {homeCardsPlan,readHomeCardsMode,writeHomeCardsMode,homeCardsMenu,homeCardsLabel} from './home-cards.js';
+import {homeCardsPlan,readHomeCardsMode,writeHomeCardsMode,homeCardsMenu,homeCardsLabel,clickWithin} from './home-cards.js';
 import {HOME_ORBIT_LIMIT} from './home-moments.js';
 import {fetchPopularCards} from './home-popular.js';
 import {createHomeActions} from './home-actions.js';
@@ -86,7 +86,7 @@ function closeMenu(refocus=false){if(cardMenu.hidden)return;cardMenu.hidden=true
 cardButton.onclick=()=>{if(cardMenu.hidden)openMenu();else closeMenu();};
 cardButton.addEventListener('keydown',e=>{if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();openMenu();}else if(e.key==='Escape')closeMenu();});
 cardMenu.addEventListener('keydown',e=>{const items=[...cardMenu.querySelectorAll('[role=menuitemradio]')],index=items.indexOf(document.activeElement);if(e.key==='Escape'){e.preventDefault();closeMenu(true);}else if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();const step=e.key==='ArrowDown'?1:-1;items[(index+step+items.length)%items.length]?.focus();}else if(e.key==='Home'){e.preventDefault();items[0]?.focus();}else if(e.key==='End'){e.preventDefault();items.at(-1)?.focus();}});
-document.addEventListener('click',e=>{if(!cardWrap.contains(e.target))closeMenu();});
+document.addEventListener('click',e=>{if(!clickWithin(e,cardWrap))closeMenu();});
 cardWrap.append(cardButton,cardMenu);shadow.querySelector('.top-actions').append(cardWrap);
 shadow.querySelector('[data-home-account]').onclick=bridge.actions.account;
 shadow.querySelectorAll('.firstMark').forEach(e=>e.textContent='첫 순간');

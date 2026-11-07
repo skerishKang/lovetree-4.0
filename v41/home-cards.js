@@ -77,3 +77,13 @@ export function homeCardsPlan({mode, loggedIn = false, context = null, popular =
     note: '금빛 카드는 내가 남긴 순간이에요',
   };
 }
+
+// 2026-11-08 카드 메뉴 마우스 회귀: shadow DOM 안 클릭은 document 리스너에서 host로 retarget되어
+// target만으로는 안쪽 클릭을 판정할 수 없다. composedPath가 있으면 실제 클릭 경로로 먼저 판정한다.
+export function clickWithin(event, ...nodes) {
+  const targets = nodes.filter(Boolean);
+  if (!targets.length) return false;
+  const path = typeof event?.composedPath === 'function' ? event.composedPath() : null;
+  if (Array.isArray(path) && path.length) return targets.some(node => path.includes(node));
+  return targets.some(node => typeof node.contains === 'function' && node.contains(event?.target));
+}
