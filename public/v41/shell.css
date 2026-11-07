@@ -127,6 +127,8 @@ nav #record-menu[hidden]{display:none!important}
 /* 2026-11-08 순간 추가·수정 패널: 링크·사진을 한 묶음으로, 나머지는 '더 적기' 접힘. 색은 --lt-* 토큰만 쓴다. */
 .link-photo-field{margin:18px 0;padding:16px;border:1px solid var(--lt-line);border-radius:var(--lt-r-card);background:var(--lt-stage-2)}
 .link-photo-field>label{margin:0}
+.asset-picker{min-height:44px;margin-top:10px;padding:8px 12px;border:1px solid var(--lt-line);border-radius:var(--lt-r-pill);background:transparent;color:var(--lt-pearl)}
+.asset-picker:hover{border-color:var(--lt-gold-line);background:color-mix(in srgb,var(--lt-pearl) 8%,transparent)}
 .link-photo-field .file-label{margin:14px 0 0;padding-top:14px;border-top:1px solid var(--lt-line)}
 .link-photo-field [data-upload-status]{margin:8px 0 0;font-size:12px;color:var(--lt-muted)}
 .link-photo-field [data-upload-status]:empty{display:none}
