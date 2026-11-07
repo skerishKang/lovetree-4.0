@@ -9,13 +9,14 @@ import {createMemberSession} from './member-session.mjs';
 import {exampleTree} from './example.mjs';
 import {parseSelectionRoute,memberStartupView,ownerSelectionRoute,accountPosition,rememberAccountPosition,resolveAccountPosition,stashPendingOwnerRoute,pendingOwnerRoute,takePendingOwnerRoute} from './selection-location.mjs';
 import {accountPresentation,treePickerLabel,writeMenuLabel,homeCenterState,homeStartLoginUrl} from './header-state.mjs';
+import {journeyEntry,journeySavePlan} from './first-journey.mjs';
 const $=id=>document.getElementById(id);
 const moreButton=$('mobile-more'),moreMenu=$('header-overflow');function closeMore(){moreMenu.classList.remove('is-open');moreButton.setAttribute('aria-expanded','false');}moreButton.addEventListener('click',()=>{const open=moreMenu.classList.toggle('is-open');moreButton.setAttribute('aria-expanded',String(open));});moreMenu.addEventListener('click',event=>{if(event.target.closest('button'))closeMore();});document.addEventListener('click',event=>{if(!moreMenu.contains(event.target)&&event.target!==moreButton)closeMore();});document.addEventListener('keydown',event=>{if(event.key==='Escape'&&moreMenu.classList.contains('is-open')){closeMore();moreButton.focus();}});document.addEventListener('keydown',event=>{const c=$('community-panel');if(event.key==='Escape'&&c.open&&![...document.querySelectorAll('dialog[open]')].some(d=>d!==c&&d.matches(':modal')))c.close();});
 const screens=[['home','src064-orbit.html','첫 화면'],['shelf','track32-bookshelf.html','내 책장'],['book','track59-sketchbook.html','기억책'],['board','track58-pinboard.html','기억 보드'],['network','track56-network.html','관계 지도']];
 const initialRoute=parseSelectionRoute(location.hash);
 const screenForView=view=>screens.find(screen=>screen[0]===view)||screens[0];
 const viewForFile=file=>screens.find(screen=>screen[1]===file)?.[0]||'home';
-let model=null,current=screenForView(initialRoute.view)[1],source='example',loadGeneration=0,toastTimer,previousDirty=false,member=null,editorMode='new',formBaseline='',parentBaseline='',treeBaseline='',handledHash=null,activeShareId=null,sharePreviewKey='',sharePreviewToken='';
+let model=null,current=screenForView(initialRoute.view)[1],source='example',loadGeneration=0,toastTimer,previousDirty=false,member=null,editorMode='new',formBaseline='',parentBaseline='',treeBaseline='',handledHash=null,activeShareId=null,sharePreviewKey='',sharePreviewToken='',journeyReturn='src064-orbit.html';
 setMemberRefreshStarted(false);
 const shareApi=createShareApi();
 const accountApi=createWorkspaceApi();
@@ -182,7 +183,7 @@ function applyBrowserLocation(){if(location.hash===handledHash)return;handledHas
 document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>show(b.dataset.view));
 addEventListener('popstate',applyBrowserLocation);
 addEventListener('hashchange',applyBrowserLocation);
-addEventListener('message',e=>{if(e.origin!==location.origin||e.source!==$('view').contentWindow)return;if(e.data?.type==='lt41-media-metadata'&&source==='server'&&member?.snapshot().owned){const tree=window.LT41?.tree,moment=tree?.moments.find(m=>m.id===e.data.momentId&&m.url===e.data.url);if(moment)try{member.apply('cacheMediaMetadata',{url:e.data.url,mediaMetadata:e.data.mediaMetadata},{treeId:tree.id,momentId:moment.id})}catch{}}if(e.data?.type==='lt41-navigate')show(e.data.view);if(e.data?.type==='lt41-select'&&window.LT41?.tree.moments.some(m=>m.id===e.data.id)){window.LT41.momentId=e.data.id;links();writeLocation();}if(e.data?.type==='lt41-write')openEditor(e.data.mode);if(e.data?.type==='lt41-open-book'&&model?.trees.some(t=>t.id===e.data.treeId&&t.moments.some(m=>m.id===e.data.id))){current='track59-sketchbook.html';choose(e.data.treeId,e.data.id);writeLocation();}if(e.data?.type==='lt41-start'){location.assign(homeStartLoginUrl());return;}if(e.data?.type==='lt41-account'){if(member?.snapshot().owned)openAccountMenu();else $('account-entry').click();}if(e.data?.type==='lt41-community')$('community-menu').click();if(e.data?.type==='lt41-example'&&exampleTree.moments.some(m=>m.id===e.data.momentId)&&['track59-sketchbook.html','track58-pinboard.html'].includes(e.data.view)){sample({treeId:exampleTree.id,momentId:e.data.momentId},e.data.view);}if(e.data?.type==='lt-selection'||e.data?.type==='lt41-choose'){links();writeLocation();}});
+addEventListener('message',e=>{if(e.origin!==location.origin||e.source!==$('view').contentWindow)return;if(e.data?.type==='lt41-journey-save'){saveFirstJourney(e.data.draft);return;}if(e.data?.type==='lt41-journey-open-book'){openJourneyBook(e.data);return;}if(e.data?.type==='lt41-journey-close'){closeFirstJourney();return;}if(e.data?.type==='lt41-media-metadata'&&source==='server'&&member?.snapshot().owned){const tree=window.LT41?.tree,moment=tree?.moments.find(m=>m.id===e.data.momentId&&m.url===e.data.url);if(moment)try{member.apply('cacheMediaMetadata',{url:e.data.url,mediaMetadata:e.data.mediaMetadata},{treeId:tree.id,momentId:moment.id})}catch{}}if(e.data?.type==='lt41-navigate')show(e.data.view);if(e.data?.type==='lt41-select'&&window.LT41?.tree.moments.some(m=>m.id===e.data.id)){window.LT41.momentId=e.data.id;links();writeLocation();}if(e.data?.type==='lt41-write')openEditor(e.data.mode);if(e.data?.type==='lt41-open-book'&&model?.trees.some(t=>t.id===e.data.treeId&&t.moments.some(m=>m.id===e.data.id))){current='track59-sketchbook.html';choose(e.data.treeId,e.data.id);writeLocation();}if(e.data?.type==='lt41-start'){location.assign(homeStartLoginUrl());return;}if(e.data?.type==='lt41-account'){if(member?.snapshot().owned)openAccountMenu();else $('account-entry').click();}if(e.data?.type==='lt41-community')$('community-menu').click();if(e.data?.type==='lt41-example'&&exampleTree.moments.some(m=>m.id===e.data.momentId)&&['track59-sketchbook.html','track58-pinboard.html'].includes(e.data.view)){sample({treeId:exampleTree.id,momentId:e.data.momentId},e.data.view);}if(e.data?.type==='lt-selection'||e.data?.type==='lt41-choose'){links();writeLocation();}});
 function sharePayload(){return {treeId:window.LT41?.tree.id||'',entryMomentId:$('share-moment').value,view:$('share-view').value};}
 function shareFailure(answer){return answer.status===401?'로그인이 필요해요.':answer.code==='timeout'?'서버 응답 시간이 초과됐어요.':answer.message||'공유 요청을 처리하지 못했어요.';}
 function renderShareList(shares=[]){
@@ -230,11 +231,41 @@ function setEditorMode(mode){
  document.querySelectorAll('[data-mode]').forEach(b=>b.setAttribute('aria-current',String(b.dataset.mode===mode)));
  updateMediaPreview();updateQuickEntryHint();formBaseline=new URLSearchParams(new FormData(form)).toString();parentBaseline=parentValue();
 }
-function openEditor(requestedMode){if(source!=='server'||!member?.snapshot().owned){panel('login-start');return;}if(!member.snapshot().writable){notify('서버 편집 연결이 아직 준비되지 않았어요. 기록은 안전하게 읽을 수 있습니다.');panel('records');return;}const mode=['new','add','edit'].includes(requestedMode)?requestedMode:window.LT41?'add':'new';setEditorMode(mode);panel('editor');queueMicrotask(()=>$('moment-form').elements[mode==='new'?'subject':'note'].focus());}
+// 2026-11-07 첫 트리 = 첫 여정(A안, 어두운 무대). 새 트리를 여는 모든 경로가 이 화면으로 오고,
+// 순간 추가·이 순간 수정은 기존 오른쪽 패널을 그대로 쓴다. 저장은 member.apply('new'/'add') 하나뿐이다.
+function journeyReply(message){try{$('view').contentWindow?.postMessage(message,location.origin);}catch{}}
+function openFirstJourney({subject=''}={}){
+ const gate=journeyEntry({owned:!!member?.snapshot().owned,writable:!!member?.snapshot().writable,mode:'new'});
+ if(gate.screen==='login'){panel('login-start');return;}
+ if(gate.screen==='records'){notify('서버 편집 연결이 아직 준비되지 않았어요. 기록은 안전하게 읽을 수 있습니다.');panel('records');return;}
+ if(screens.some(screen=>screen[1]===current))journeyReturn=current;
+ if($('community-panel').open)$('community-panel').close();
+ current='first-journey.html';document.body.classList.remove('home-screen');$('empty').hidden=true;
+ const frame=$('view');frame.hidden=false;frame.title='러브트리 · 첫 여정';
+ frame.contentWindow.location.replace(new URL('/v41/views/first-journey.html'+(subject?'?subject='+encodeURIComponent(subject):''),location.origin).href);
+ flowNavigation();
+}
+function saveFirstJourney(draft){
+ if(source!=='server'||!member?.snapshot().owned){journeyReply({type:'lt41-journey-result',ok:false,message:'로그인한 뒤 내 기록에 저장할 수 있어요.'});return;}
+ if(!member.snapshot().writable){journeyReply({type:'lt41-journey-result',ok:false,message:'서버 편집 연결이 아직 준비되지 않았어요. 기록은 안전하게 읽을 수 있습니다.'});return;}
+ let plan;try{plan=journeySavePlan(draft);}catch(error){journeyReply({type:'lt41-journey-result',ok:false,message:error.message});return;}
+ try{
+  let treeId=plan.treeId,momentId=plan.momentId,firstMomentId=plan.momentId;
+  if(plan.first){const created=member.apply('new',plan.first,{});treeId=created.treeId;firstMomentId=created.momentId;momentId=created.momentId;}
+  if(plan.second){const added=member.apply('add',plan.second,{treeId,momentId});momentId=added.momentId;}
+  journeyReply({type:'lt41-journey-result',ok:true,treeId,firstMomentId,momentId,connected:!!plan.second});
+ }catch(error){journeyReply({type:'lt41-journey-result',ok:false,message:error.message});}
+}
+function openJourneyBook({treeId,firstMomentId}={}){
+ if(!treeId||!member?.state().trees.some(tree=>tree.id===treeId&&tree.moments.some(moment=>moment.id===firstMomentId)))return;
+ current='track59-sketchbook.html';choose(treeId,firstMomentId);show(current);writeLocation();
+}
+function closeFirstJourney(){show(screens.some(screen=>screen[1]===journeyReturn)?journeyReturn:'src064-orbit.html');writeLocation();}
+function openEditor(requestedMode){if(source!=='server'||!member?.snapshot().owned){panel('login-start');return;}if(!member.snapshot().writable){notify('서버 편집 연결이 아직 준비되지 않았어요. 기록은 안전하게 읽을 수 있습니다.');panel('records');return;}const mode=['new','add','edit'].includes(requestedMode)?requestedMode:window.LT41?'add':'new';if(mode==='new'){openFirstJourney();return;}setEditorMode(mode);panel('editor');queueMicrotask(()=>$('moment-form').elements.note.focus());}
 function updateTreeCoverHint(){const c=window.LT41,selected=c?.tree.moments.find(m=>m.id===$('tree-cover').value);if(!selected){$('tree-cover-hint').textContent='표지를 고르지 않으면 기존 금테 장식 표지를 사용합니다.';return;}const media=LTMedia.describe(selected.url||'');$('tree-cover-hint').textContent=media.kind==='photo'?`“${selected.title}”의 사진을 표지로 사용합니다.`:`“${selected.title}”을 표지 순간으로 표시하고 금테 장식 표지를 사용합니다.`;}
 function openTreeManager(){if(source!=='server'||!member?.snapshot().owned||!member.snapshot().writable||!window.LT41){notify('내 서버 기록을 불러온 뒤 책 정보를 관리해 주세요.');return;}const tree=window.LT41.tree,form=$('tree-form');form.elements.title.value=tree.title;form.elements.subject.value=tree.subject;$('tree-cover').replaceChildren();const fallback=document.createElement('option');fallback.value='';fallback.textContent='기본 금테 장식 표지';$('tree-cover').append(fallback);for(const moment of tree.moments){const option=document.createElement('option'),media=LTMedia.describe(moment.url||'');option.value=moment.id;option.textContent=`${moment.title} · ${media.kind==='photo'?'사진':media.kind==='video'?'영상':media.kind==='youtube'?'YouTube':media.kind==='link'?'링크':'기록'}`;$('tree-cover').append(option);}$('tree-cover').value=tree.coverMomentId||'';$('tree-form-error').textContent='';updateTreeCoverHint();treeBaseline=new URLSearchParams(new FormData(form)).toString();panel('tree-manager');queueMicrotask(()=>form.elements.title.focus());}
 $('manage-tree').onclick=openTreeManager;$('tree-cover').onchange=updateTreeCoverHint;$('tree-form').onsubmit=e=>{e.preventDefault();try{member.apply('editTree',Object.fromEntries(new FormData(e.target)),stateSelection());treeBaseline=new URLSearchParams(new FormData(e.target)).toString();$('tree-manager').close();notify('책 정보를 서버에 저장하고 있어요.');}catch(error){$('tree-form-error').textContent=error.message;}};$('tree-delete').onclick=()=>{const tree=window.LT41?.tree;if(!tree||!confirm(`“${tree.title}”과 ${tree.moments.length}개 순간을 모두 삭제할까요? 이 작업은 되돌릴 수 없습니다.`))return;try{member.apply('deleteTree',{},stateSelection());treeBaseline='';$('tree-manager').close();notify('트리를 삭제하고 서버에 반영하고 있어요.');}catch(error){$('tree-form-error').textContent=error.message;}};$('tree-manager').addEventListener('cancel',e=>{if(treeDirty()&&!confirm('책 정보 변경을 버리고 닫을까요?'))e.preventDefault();});
-$('write-menu').onclick=()=>openEditor(current==='track32-bookshelf.html'?'new':undefined);document.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>setEditorMode(b.dataset.mode));
+$('write-menu').onclick=()=>openEditor(current==='track32-bookshelf.html'?'new':undefined);document.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>b.dataset.mode==='new'?openFirstJourney():setEditorMode(b.dataset.mode));
 function updateMediaPreview(){const form=$('moment-form'),url=form.elements.url.value,info=LTMedia.describe(url);$('url-media-hint').textContent=info.kind==='none'?'사진·영상은 직접 HTTPS 링크를 사용할 수 있어요. YouTube와 일반 링크도 지원해요. 사진·영상 파일도 직접 첨부할 수 있어요.':info.kind==='invalid'?'링크 형식을 확인해 주세요.':info.label;
  $('url-media-preview').innerHTML=url?LTMedia.markup(url,form.elements.title.value):'';}
 function updateQuickEntryHint(){const form=$('moment-form'),title=form.elements.title.value.trim(),note=form.elements.note.value.trim(),url=form.elements.url.value.trim();let suggested='';try{suggested=suggestMomentTitle({title,note,url});}catch{}$('quick-entry-hint').textContent=title?'입력한 제목으로 저장합니다.':suggested?`제목은 “${suggested}”(으)로 자동 정리됩니다.`:'제목·마음·링크나 첨부 중 하나만 남겨도 저장할 수 있어요.';}
@@ -252,7 +283,7 @@ mountCommunity({
  onStartRecord:subject=>{
   $('community-panel').close();
   if(source!=='server'||!member?.snapshot().owned){notify('로그인한 뒤 내 계정에 새 트리를 시작할 수 있어요. 원본 공개 트리는 복사하지 않아요.');panel('records');return;}
-  openEditor('new');$('moment-form').elements.subject.value=subject||'';formBaseline=new URLSearchParams(new FormData($('moment-form'))).toString();updateQuickEntryHint();
+  openFirstJourney({subject:subject||''});
  }
 });
 if(shouldLoadMemberRecords(location.search,document.cookie,location.hash))startMember();
