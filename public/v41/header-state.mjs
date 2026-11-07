@@ -80,6 +80,66 @@ export function homeCenterState({ member = 'out', treeCount = 0 } = {}) {
 
 // 로그아웃 상태의 첫 버튼은 로그인/가입으로 가고, 돌아올 곳은 4.1 첫 화면이다.
 export const HOME_LOGIN_NEXT = '/v41/';
+
+// 4.1 첫 화면 테마 A/B(대표 지시 2026-11-07). A=밤(지금 운영), B=정원.
+// 셸과 첫 화면이 같은 키·같은 규칙을 쓰고, 시험은 이 함수들만 호출한다. 저장소는 인자로 받는다.
+export const THEME_KEY = 'lt41.theme';
+export const THEME_NIGHT = 'night';
+export const THEME_GARDEN = 'garden';
+
+export function normalizeTheme(value) {
+  return value === THEME_GARDEN ? THEME_GARDEN : THEME_NIGHT;
+}
+
+// 저장값을 읽는다. 저장소가 없거나 접근이 막히면 A로 본다.
+export function readTheme(storage) {
+  try {
+    return normalizeTheme(storage?.getItem(THEME_KEY));
+  } catch {
+    return THEME_NIGHT;
+  }
+}
+
+// 저장에 성공하면 그 값을, 실패하면 A를 돌려준다(실패하면 A 규칙).
+export function writeTheme(storage, theme) {
+  const next = normalizeTheme(theme);
+  try {
+    storage?.setItem(THEME_KEY, next);
+  } catch {
+    return THEME_NIGHT;
+  }
+  return next;
+}
+
+export function nextTheme(theme) {
+  return normalizeTheme(theme) === THEME_GARDEN ? THEME_NIGHT : THEME_GARDEN;
+}
+
+// 버튼 글자는 지금이 아니라 '누르면 갈 곳'을 쓴다.
+export function themeButtonLabel(theme) {
+  return normalizeTheme(theme) === THEME_GARDEN ? '밤' : '정원';
+}
+
+export function themeButtonAriaLabel(theme) {
+  return normalizeTheme(theme) === THEME_GARDEN ? '밤 테마로 바꾸기' : '정원 테마로 바꾸기';
+}
+
+export function themePressed(theme) {
+  return normalizeTheme(theme) === THEME_GARDEN;
+}
+
+// 1단계 범위: 공통 헤더와 첫 화면만 B를 쓴다. 안쪽 네 화면은 언제나 A다.
+export function appliedTheme(theme, view) {
+  return view === 'home' ? normalizeTheme(theme) : THEME_NIGHT;
+}
+
+// 속성 없음 = A. B일 때만 data-lt-theme=garden 을 붙인다.
+export function applyThemeAttribute(root, theme) {
+  if (!root) return THEME_NIGHT;
+  if (normalizeTheme(theme) === THEME_GARDEN) root.setAttribute('data-lt-theme', THEME_GARDEN);
+  else root.removeAttribute('data-lt-theme');
+  return normalizeTheme(theme);
+}
 export function homeStartLoginUrl() {
   return `/auth/login?next=${encodeURIComponent(HOME_LOGIN_NEXT)}`;
 }

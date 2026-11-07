@@ -123,3 +123,63 @@ html[data-v41-screen=board] .cinemaBtn:hover{background:#fff;color:var(--lt-prim
 html[data-v41-screen=board] .miniBtn{border-radius:var(--lt-r-pill);border-color:rgba(255,255,255,.18);background:rgba(255,255,255,.05)}
 html[data-v41-screen=board] .miniBtn.accent{border-color:var(--lt-gold-line);background:rgba(255,230,166,.08);box-shadow:inset 0 0 0 1px var(--lt-gold-line)}
 html[data-v41-screen=network] .action.primary{background:#1a1620;color:var(--lt-pearl);box-shadow:none;border-radius:var(--lt-r-pill)}
+
+/* 4.1 워드마크 글꼴 B(정원): Gowun Batang 라틴 서브셋. 저장소 안에서만 받고 외부 글꼴 요청은 쓰지 않는다.
+   라이선스 전문은 public/fonts/gowun-batang/OFL.txt. */
+@font-face{font-family:'Gowun Batang';font-style:normal;font-weight:700;font-display:swap;src:url('/fonts/gowun-batang/GowunBatang-Bold.latin.woff2') format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+
+/* 4.1 첫 화면 테마 A/B (대표 지시 2026-11-07). A=밤(지금 운영: 어두운 무대·금테), B=정원.
+   B의 새 색은 이 블록에만 둔다. 값은 reference/originals/first-journey.html의 :root에서 옮겼다:
+   종이 #f7f0e8 · 흰 종이 #fffdf8 · 잉크 #403536 · 장미 #c86e79 · 깊은 장미 #98505e · 선 rgba(119,91,82,.18).
+   적용 범위는 공통 헤더와 첫 화면(src064-orbit 어댑터)뿐이다. 안쪽 네 화면은 이 속성을 받지 않아 A로 남는다. */
+html[data-lt-theme=garden]{
+ color-scheme:light;
+ --lt-stage:#f7f0e8;--lt-stage-2:#fbf8f1;
+ --lt-pearl:#403536;--lt-muted:#6f605a;
+ --lt-gold:#98505e;--lt-gold-deep:#98505e;--lt-gold-ink:#8a4b57;
+ --lt-gold-line:rgba(152,80,94,.38);--lt-gold-glow:rgba(200,110,121,.32);
+ --lt-rose:#c86e79;--lt-rose-ink:#98505e;
+ --lt-paper:#fffdf8;--lt-ink:#403536;
+ --lt-glass:rgba(255,253,248,.92);--lt-glass-strong:rgba(255,253,248,.98);
+ --lt-line:rgba(119,91,82,.18);--lt-line-paper:rgba(119,91,82,.3);
+ --lt-primary:#98505e;--lt-primary-ink:#fffdf8;
+ --lt-garden-edge:#eee3d5;--lt-garden-shadow:0 18px 40px rgba(75,51,42,.16)
+}
+html[data-lt-theme=garden] body{background:var(--lt-stage)!important}
+html[data-lt-theme=garden] #stage,html[data-lt-theme=garden] iframe{background:var(--lt-stage)}
+html[data-lt-theme=garden] .app-header{border-bottom-color:var(--lt-line)}
+html[data-lt-theme=garden] .brand{color:var(--lt-ink);opacity:1}
+html[data-lt-theme=garden] .brand>span{font-family:'Gowun Batang',var(--lt-reading);color:var(--lt-ink);font-weight:700;letter-spacing:.22em}
+html[data-lt-theme=garden] .brand small{color:var(--lt-gold)}
+html[data-lt-theme=garden] nav button:hover{background:rgba(152,80,94,.08);color:var(--lt-ink)}
+html[data-lt-theme=garden] nav button[aria-current=true]{color:var(--lt-ink);background:rgba(200,110,121,.12);box-shadow:inset 0 0 0 1px var(--lt-gold-line)}
+html[data-lt-theme=garden] .header-actions button,html[data-lt-theme=garden] .login{color:var(--lt-ink);background:rgba(255,253,248,.9);border-color:rgba(119,91,82,.3)}
+html[data-lt-theme=garden] .header-actions button:hover,html[data-lt-theme=garden] .login:hover{background:var(--lt-paper);border-color:rgba(119,91,82,.55)}
+html[data-lt-theme=garden] .header-actions #write-menu.primary-action{background:rgba(200,110,121,.14);border-color:var(--lt-gold-line);color:var(--lt-gold-ink);box-shadow:inset 0 0 0 1px rgba(152,80,94,.18)}
+html[data-lt-theme=garden] .account-avatar{background:rgba(200,110,121,.16);border-color:var(--lt-gold-line);color:var(--lt-gold-ink)}
+html[data-lt-theme=garden] .account-popover{background:var(--lt-glass-strong);border-color:var(--lt-line);box-shadow:0 12px 30px rgba(75,51,42,.16)}
+html[data-lt-theme=garden] .account-popover button{color:var(--lt-ink)}
+html[data-lt-theme=garden] .account-popover button:hover{background:rgba(152,80,94,.08)}
+html[data-lt-theme=garden] .account-email{color:var(--lt-muted);border-bottom-color:var(--lt-line)}
+html[data-lt-theme=garden] .header-actions #header-overflow{background:var(--lt-glass-strong);border-color:var(--lt-line)}
+html[data-lt-theme=garden] body,html[data-lt-theme=garden] .app-header{transition:background-color .28s ease,color .28s ease,border-color .28s ease}
+@media(prefers-reduced-motion:reduce){html[data-lt-theme=garden] body,html[data-lt-theme=garden] .app-header{transition:none}}
+/* 첫 화면 정원: 궤도 배치·움직임·카메라를 그대로 두고 색만 바꾼다. 이 파일은 첫 화면 그림자 루트에도 들어가므로 :host를 쓴다. */
+:host([data-lt-theme=garden]) .app{background:radial-gradient(circle at 50% 46%,var(--lt-stage-2) 0%,var(--lt-stage) 52%,var(--lt-garden-edge) 100%)}
+/* 원본의 어두운 비네트(.app:before, z-index 4)는 크림 무대를 회색으로 죽인다. 깊이감은 따뜻한 옅은 비네트로 남긴다. */
+:host([data-lt-theme=garden]) .app:before{background:radial-gradient(circle at 50% 50%,transparent 0 30%,rgba(119,91,82,.05) 46%,rgba(75,51,42,.12) 78%,rgba(75,51,42,.2) 100%)}
+:host([data-lt-theme=garden]) .center h1{color:var(--lt-ink)}
+:host([data-lt-theme=garden]) .center p,:host([data-lt-theme=garden]) .center .center-note{color:var(--lt-muted)}
+:host([data-lt-theme=garden]) .center-scrim{background:radial-gradient(ellipse 62% 58% at 50% 49%,rgba(247,240,232,.92) 0%,rgba(247,240,232,.72) 44%,rgba(247,240,232,0) 100%)}
+:host([data-lt-theme=garden]) .card{border-color:var(--lt-gold-deep);box-shadow:var(--lt-garden-shadow)}
+:host([data-lt-theme=garden]) .card.memo{border-color:var(--lt-ink)}
+:host([data-lt-theme=garden]) .menuBtn,:host([data-lt-theme=garden]) .subtleBtn{background:rgba(255,253,248,.9);border-color:rgba(119,91,82,.34);color:var(--lt-ink)}
+:host([data-lt-theme=garden]) .menuBtn:hover,:host([data-lt-theme=garden]) .subtleBtn:hover{background:var(--lt-paper);border-color:rgba(119,91,82,.58)}
+:host([data-lt-theme=garden]) .primary-cta{background:var(--lt-primary)!important;color:var(--lt-primary-ink)!important;border-color:var(--lt-primary)!important}
+:host([data-lt-theme=garden]) .hint,:host([data-lt-theme=garden]) .caption{color:var(--lt-muted);text-shadow:none}
+:host([data-lt-theme=garden]) .firstMark{border-color:var(--lt-rose);background:rgba(255,253,248,.86);color:var(--lt-ink);box-shadow:none}
+:host([data-lt-theme=garden]) .orbit-dialog{background:var(--lt-paper);border-color:rgba(119,91,82,.3);color:var(--lt-ink)}
+:host([data-lt-theme=garden]) .orbit-dialog::backdrop{background:rgba(247,240,232,.72)}
+:host([data-lt-theme=garden]) .detail-copy p,:host([data-lt-theme=garden]) .detail-copy small{color:var(--lt-muted)}
+:host([data-lt-theme=garden]) .detail-buttons button,:host([data-lt-theme=garden]) .detail-buttons a,:host([data-lt-theme=garden]) .close,:host([data-lt-theme=garden]) .index-list button{background:rgba(255,253,248,.94);border-color:rgba(119,91,82,.34);color:var(--lt-ink)}
+:host([data-lt-theme=garden]) .media-unrecognized{background:var(--lt-paper);border-color:rgba(119,91,82,.3);color:var(--lt-ink)}
