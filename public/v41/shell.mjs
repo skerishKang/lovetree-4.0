@@ -28,7 +28,7 @@ const shareApi=createShareApi();
 const accountApi=createWorkspaceApi();
 addEventListener('lovetree-auth-required',()=>{if(member?.snapshot().owned){$('account-entry').textContent='로그인';$('account-entry').hidden=false;$('account-avatar').hidden=true;closeAccountMenu();$('record-feedback').textContent='로그인 확인이 필요해요. 다시 로그인해 주세요.';notify('로그인 확인이 필요해요. 다시 로그인해 주세요.');}});
 window.LT41=null;
-const uploads=mountPrivateUpload({form:$('moment-form'),assets:$('account-assets'),getSubject:()=>source==='server'&&member?.snapshot().writable?member.snapshot().subject:null,getState:()=>member?.state(),onChange:()=>{updateMediaPreview();updateQuickEntryHint();}});
+const uploads=mountPrivateUpload({form:$('moment-form'),assets:$('account-assets'),getSubject:()=>source==='server'&&member?.snapshot().writable?member.snapshot().subject:null,getState:()=>member?.state(),onChange:()=>{updateMediaPreview();updateQuickEntryHint();},onUseAsset:()=>usePrivateAsset()});
 function notify(text){$('record-feedback').textContent=text;$('toast').textContent=text;$('toast').hidden=$('records').open;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').hidden=true,6500);}
 const PENDING_NEW='lovetree.v41.pending-new';
 // 2026-11-07 계정 표시: 로그인 상태는 첫 글자 동그라미 + 작은 메뉴, 로그아웃 상태는 기존 로그인 알약.
@@ -134,7 +134,7 @@ async function startMember(){setMemberRefreshStarted(true);if(!leaveMember())ret
  if(generation===loadGeneration){const startupJourney=parseJourneyRoute(location.hash);if(startupJourney){if(session.snapshot().owned&&session.snapshot().writable)openFirstJourney({step:startupJourney.step,route:true});else{history.replaceState(null,'','#home');handledHash='#home';}}}
 }
 function sample(selection={},view){if(!leaveMember())return;++loadGeneration;if(view)current=view;load(null,'example',selection);if(view)writeLocation();$('save-feedback').hidden=true;$('records').close();}
-$('account-entry').onclick=e=>{if(member?.snapshot().owned){e.preventDefault();openAccountMenu();}else if(parseSelectionRoute(location.hash).scope==='owner')stashPendingOwnerRoute(sessionStorage,location.hash);};$('account-avatar').onclick=e=>{e.stopPropagation();if($('account-popover').hidden)openAccountMenu();else closeAccountMenu();};$('account-records').onclick=()=>{closeAccountMenu();panel('records');};$('account-backup').onclick=()=>{closeAccountMenu();backup();};$('account-assets-open').onclick=()=>{closeAccountMenu();if(!member?.snapshot().owned){notify('로그인한 뒤 내 보관 파일을 확인할 수 있어요.');return;}panel('account-assets');uploads.openAssets();};$('account-theme').onclick=()=>{toggleTheme();closeAccountMenu();};$('account-logout').onclick=async()=>{closeAccountMenu();$('logout').click();};document.addEventListener('click',e=>{if(!e.target.closest('.account-slot'))closeAccountMenu();});document.addEventListener('keydown',e=>{if(e.key==='Escape')closeAccountMenu();});$('record-menu').onclick=()=>{$('record-feedback').textContent='';panel('records');};$('empty-records').onclick=()=>member?.snapshot().writable?openEditor():panel('records');$('empty-sample').onclick=sample;
+$('account-entry').onclick=e=>{if(member?.snapshot().owned){e.preventDefault();openAccountMenu();}else if(parseSelectionRoute(location.hash).scope==='owner')stashPendingOwnerRoute(sessionStorage,location.hash);};$('account-avatar').onclick=e=>{e.stopPropagation();if($('account-popover').hidden)openAccountMenu();else closeAccountMenu();};$('account-records').onclick=()=>{closeAccountMenu();panel('records');};$('account-backup').onclick=()=>{closeAccountMenu();backup();};$('account-assets-open').onclick=()=>{closeAccountMenu();openAssets();};$('editor-assets-open').onclick=openAssets;$('account-theme').onclick=()=>{toggleTheme();closeAccountMenu();};$('account-logout').onclick=async()=>{closeAccountMenu();$('logout').click();};document.addEventListener('click',e=>{if(!e.target.closest('.account-slot'))closeAccountMenu();});document.addEventListener('keydown',e=>{if(e.key==='Escape')closeAccountMenu();});$('record-menu').onclick=()=>{$('record-feedback').textContent='';panel('records');};$('empty-records').onclick=()=>member?.snapshot().writable?openEditor():panel('records');$('empty-sample').onclick=sample;
 $('sample').onclick=sample;$('clear').onclick=()=>{if(!leaveMember())return;++loadGeneration;clear();$('save-feedback').hidden=true;$('file').value='';$('records').close();};
 $('login-start-action').onclick=()=>{sessionStorage.setItem(PENDING_NEW,'1');location.assign(MEMBER_LOGIN_URL);};$('server').onclick=startMember;
 const ACCOUNT_DELETE_PHRASE='탈퇴합니다';
@@ -314,6 +314,15 @@ function closeFirstJourney(){
  const depth=Number(history.state?.lt41Journey)||0;
  if(!journeyRouteOpened&&depth>0){journeyStep=0;history.go(-depth);return;}
  leaveJourney({replaceHash:true});
+}
+function openAssets(){if(!member?.snapshot().owned){notify('로그인한 뒤 내 보관 파일을 확인할 수 있어요.');return;}panel('account-assets');uploads.openAssets();}
+function usePrivateAsset(){
+ if(source!=='server'||!member?.snapshot().owned){panel('login-start');return false;}
+ if(!member.snapshot().writable){notify('서버 편집 연결이 아직 준비되지 않았어요. 기록은 안전하게 읽을 수 있습니다.');panel('records');return false;}
+ if(!window.LT41){openEditor();notify('새 트리를 만든 뒤 순간에 파일을 첨부할 수 있어요.');return false;}
+ if(!window.LT41.momentId){notify('순간을 먼저 연 뒤 내 보관 파일을 첨부할 수 있어요.');return false;}
+ if(!$('editor').open)openEditor('add');
+ return $('editor').open;
 }
 function openEditor(requestedMode){if(source!=='server'||!member?.snapshot().owned){panel('login-start');return;}if(!member.snapshot().writable){notify('서버 편집 연결이 아직 준비되지 않았어요. 기록은 안전하게 읽을 수 있습니다.');panel('records');return;}const mode=['new','add','edit'].includes(requestedMode)?requestedMode:window.LT41?'add':'new';if(mode==='new'){openFirstJourney();return;}setEditorMode(mode);panel('editor');queueMicrotask(()=>$('moment-form').elements.note.focus());}
 function updateTreeCoverHint(){const c=window.LT41,selected=c?.tree.moments.find(m=>m.id===$('tree-cover').value);if(!selected){$('tree-cover-hint').textContent='표지를 고르지 않으면 기존 금테 장식 표지를 사용합니다.';return;}const media=LTMedia.describe(selected.url||'');$('tree-cover-hint').textContent=media.kind==='photo'?`“${selected.title}”의 사진을 표지로 사용합니다.`:`“${selected.title}”을 표지 순간으로 표시하고 금테 장식 표지를 사용합니다.`;}

@@ -3,7 +3,7 @@ const TYPES=new Set(['image/png','image/jpeg','image/gif','image/webp','video/mp
 const SIZE_PROBLEM='PNG·JPEG·GIF·WebP(약 4.2MB), MP4·WebM(약 8.4MB)만 올릴 수 있어요.';
 // 2026-11-08 순간 추가·수정 패널: 링크와 사진을 한 묶음으로 두고, 파일은 선택하면 바로 올린다.
 // 보관 파일 목록·다시 첨부·삭제는 패널이 아니라 계정 메뉴의 다이얼로그가 맡는다.
-export function mountPrivateUpload({form,assets,getSubject,getState,onChange}){
+export function mountPrivateUpload({form,assets,getSubject,getState,onChange,onUseAsset}){
  const api=createWorkspaceApi(),slot=form.querySelector('[data-media-slot]');
  slot.innerHTML='<label class="file-label">사진·영상 파일<input type="file" accept="image/png,image/jpeg,image/gif,image/webp,video/mp4,video/webm" data-media-file></label><p role="status" data-upload-status></p><button type="button" data-stop class="stop-upload" hidden>전송 취소</button><p class="panel-note">내 계정에만 보관합니다. 사진 약 4.2MB · 영상 약 8.4MB, 계정당 약 105MB·200개까지.</p>';
  const $=s=>slot.querySelector(s),A=s=>assets.querySelector(s),fileInput=$('[data-media-file]'),status=$('[data-upload-status]'),stop=$('[data-stop]'),submit=form.querySelector('[type=submit]');
@@ -51,7 +51,7 @@ export function mountPrivateUpload({form,assets,getSubject,getState,onChange}){
    const row=document.createElement('div');row.className='upload-asset';
    const label=document.createElement('p');const references=(getState()?.trees||[]).flatMap(t=>t.moments).filter(m=>assetName(m.url)===asset.name).length;
    label.textContent=(asset.mime.startsWith('image/')?'사진':'영상')+' · '+Math.ceil(asset.size/1000)+' KB · '+new Date(asset.createdAt).toLocaleString('ko-KR')+' · '+(references?references+'개 순간에서 사용':'연결된 순간 없음');row.append(label);
-   const use=document.createElement('button');use.type='button';use.textContent='이 파일 첨부';use.onclick=()=>{if(busy||getSubject()!==subject)return;form.elements.url.value=location.origin+'/api/media/'+asset.name;onChange();status.textContent='첨부할 파일을 골랐어요. 순간을 저장해 주세요.';assets.close();};
+   const use=document.createElement('button');use.type='button';use.textContent='이 파일 첨부';use.onclick=()=>{if(busy||getSubject()!==subject)return;const url=location.origin+'/api/media/'+asset.name;assets.close();const accepted=onUseAsset?onUseAsset(url):true;if(accepted===false)return;form.elements.url.value=url;onChange();form.elements.url.focus?.();status.textContent='첨부할 파일을 골랐어요. 순간을 저장해 주세요.';};
    const remove=document.createElement('button');remove.type='button';remove.textContent='파일 삭제';remove.className='danger';
    remove.onclick=async()=>{if(busy||getSubject()!==subject||!confirm((references?references+'개 순간에서 사용 중입니다. 삭제하면 해당 사진·영상이 사라집니다. ':'')+'이 파일을 영구 삭제할까요? 순간의 글과 연결은 유지됩니다.'))return;remove.disabled=true;const result=await api.removeMedia(asset.name,subject);if(getSubject()!==subject)return;if(result.ok){if(assetName(form.elements.url.value)===asset.name){form.elements.url.value='';onChange();}await refresh();}else{status.textContent=result.message||'삭제하지 못했어요. 다시 시도해 주세요.';remove.disabled=false;}};
    row.append(use,remove);host.append(row);
