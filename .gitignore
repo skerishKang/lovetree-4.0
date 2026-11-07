@@ -14,6 +14,11 @@ Thumbs.db
 __pycache__/
 *.pyc
 
+# lovetree-postdeploy local state and output (never commit)
+tools/postdeploy/.profile/
+tools/postdeploy/out/
+tools/postdeploy/package-lock.json
+
 # PR 작성 보조 파일(저장소에 두지 않는다)
 pr-body.md
 pr-payload.json
