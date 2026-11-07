@@ -696,6 +696,12 @@ function boot() {
   // 저장소 밖 단독 미리보기: #journey/NN 또는 ?step=NN으로 단계 화면을 연다.
   const hashRoute = parseJourneyRoute(location.hash);
   const step = hashRoute ? hashRoute.step : Number.parseInt(params.get('step') || '', 10);
+  if (hashRoute && !readJourneyDraft(storage)) {
+    // 임시 보관값이 없으면 #journey/NN이어도 00부터 시작한다.
+    startFresh(seeded);
+    render();
+    return;
+  }
   if (Number.isFinite(step)) {
     const phase = params.get('phase') || 'form';
     const stored = readJourneyDraft(storage);
