@@ -1,5 +1,6 @@
 import '../src/styles.css';
-import {mountOrbit} from '../src/views/orbit.js';
+import {mountOrbit,ORBIT_EXAMPLE} from '../src/views/orbit.js';
+import {homeOrbitPlan} from './home-moments.js';
 import {createHomeActions} from './home-actions.js';
 import {homePresentation} from './home-presentation.js';
 import {applyHomeCenter} from './home-center.js';
@@ -8,8 +9,12 @@ const shellBody=parent.document.body;
 const context=parent.LT41||{source:shellBody.dataset.recordSource,member:shellBody.dataset.member,treeCount:Number(shellBody.dataset.treeCount||0)};
 const bridge=createHomeActions({getContext:()=>parent.LT41,send:message=>parent.postMessage(message,location.origin),gallery:true});
 const presentation=homePresentation(context);
+// 2026-11-08: 로그인한 사람의 순간을 궤도에 올린다. 예시만 도는 화면은 로그아웃·기록 0개일 때만 남긴다.
+const orbitPlan=homeOrbitPlan(context);
+const mineTrees=orbitPlan.cards.length?[{id:'home-mine',title:'내 순간들',momentCount:orbitPlan.cards.length,moments:orbitPlan.cards}]:[];
 const dispose=mountOrbit(document.getElementById('orbit'),{
- trees:presentation.trees,storage:{getItem:()=>null,setItem:()=>{}},context:presentation.context,
+ trees:mineTrees,examples:orbitPlan.fill?ORBIT_EXAMPLE.moments:[],onOpen:card=>bridge.actions.openMine(card.treeId,card.id),
+ storage:{getItem:()=>null,setItem:()=>{}},context:{...presentation.context,readOnly:!orbitPlan.cards.length},
  authHtml:`<button class="menuBtn auth-entry" data-home-account>${presentation.accountLabel}</button>`,actions:bridge.actions
 });
 const shadow=document.getElementById('orbit').shadowRoot;
@@ -45,7 +50,7 @@ const centerPlan=applyHomeCenter(centerButtons,presentation.centerState);
  if(presentation.centerState.member==='out')first.onclick=bridge.actions.start;
  else if(centerPlan.state==='in-trees')first.onclick=bridge.actions.resume;
 }
-shadow.querySelector('.center-note').textContent='배경 카드는 감상 예시 · 내 기록에는 저장되지 않아요';
+shadow.querySelector('.center-note').textContent=orbitPlan.note||'배경 카드는 감상 예시 · 내 기록에는 저장되지 않아요';
 const mobileFit=document.createElement('style');mobileFit.textContent='@media(max-width:768px){.topbar{gap:12px;flex-wrap:wrap;align-items:center;padding:8px 12px}.top-actions{gap:6px;flex-shrink:0;flex-wrap:wrap;margin-left:auto}.topbar .menuBtn{white-space:nowrap;padding:10px 9px;font-size:14px}.actions .subtleBtn{font-size:14px}.center .center-note{font-size:14px}.hint{font-size:14px}}';shadow.append(mobileFit);
 const community=document.createElement('button');community.className='menuBtn home-community';community.type='button';community.textContent='둘러보기';community.setAttribute('aria-label','공개 트리 둘러보기');community.onclick=bridge.actions.community;shadow.querySelector('[data-home-account]').before(community);
 shadow.querySelector('.top-actions').append(themeButton);
