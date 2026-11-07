@@ -12,7 +12,8 @@ import {accountPresentation,treePickerLabel,writeMenuLabel,homeCenterState,homeS
 import {journeyEntry,journeySavePlan,journeyRouteHash,parseJourneyRoute,journeyRouteDecision} from './first-journey.mjs';
 const $=id=>document.getElementById(id);
 // 2026-11-07 테마 A/B(밤/정원): 공통 헤더와 첫 화면만 바꾼다. 안쪽 네 화면은 속성을 받지 않아 A로 고정된다.
-function themedView(){return current==='src064-orbit.html'?'home':'inner';}
+// 2026-11-08 정원 2단계: 첫 화면과 첫 여정만 B를 받는다. 안쪽 네 화면은 계속 A다.
+function themedView(){return current==='src064-orbit.html'?'home':current==='first-journey.html'?'journey':'inner';}
 function paintThemeControls(theme=readTheme(localStorage)){for(const button of document.querySelectorAll('[data-lt-theme-toggle]')){button.textContent=themeButtonLabel(theme);button.setAttribute('aria-pressed',String(themePressed(theme)));button.setAttribute('aria-label',themeButtonAriaLabel(theme));button.title=themeButtonAriaLabel(theme);}}
 function applyTheme(theme=readTheme(localStorage)){const applied=applyThemeAttribute(document.documentElement,appliedTheme(theme,themedView()));const frame=$('view').contentDocument;if(frame)applyThemeAttribute(frame.documentElement,applied);return applied;}
 function toggleTheme(){const theme=writeTheme(localStorage,nextTheme(readTheme(localStorage)));applyTheme(theme);paintThemeControls(theme);}

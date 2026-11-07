@@ -91,7 +91,7 @@ test('안쪽 네 화면은 언제나 A다', () => {
   }
   assert.equal(appliedTheme('garden', 'inner'), 'night');
   // 문서 속성도 화면에 따라 정해진다(안쪽 화면은 속성을 받지 않는다).
-  assert.match(shell, /function themedView\(\)\{return current==='src064-orbit\.html'\?'home':'inner';\}/);
+  assert.match(shell, /function themedView\(\)\{return current==='src064-orbit\.html'\?'home':current==='first-journey\.html'\?'journey':'inner';\}/);
   assert.match(shell, /appliedTheme\(theme,themedView\(\)\)/);
 });
 

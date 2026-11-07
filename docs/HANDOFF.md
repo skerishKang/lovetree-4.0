@@ -1,3 +1,15 @@
+## 2026-11-08 — 정원 테마 2단계: 첫 여정까지(컴2로컬1, ai/com2-lt-journey-garden-261108)
+
+정원 테마 적용 범위를 헤더·첫 화면에서 **첫 여정**까지 넓혔다. 책장·기억책·기억 보드·관계 지도는 계속 A다.
+
+- 판정: `header-state.mjs`의 `appliedTheme(theme, view)`가 `home`·`journey`만 B를 돌려준다. 셸의 `themedView()`는 `current==='first-journey.html'`일 때 `'journey'`를 반환하고, `applyTheme`이 셸 문서와 iframe 문서(`$('view').contentDocument`) 양쪽에 같은 속성을 적용한다. iframe load 때도 다시 적용한다.
+- 첫 여정 문서: head에서 셸의 `data-lt-theme`를 그대로 받아 첫 그리기 전에 맞춘다(셸이 없으면 단독 미리보기만 `localStorage['lt41.theme']`을 읽는다). 화면 자체는 테마를 정하지 않는다.
+- 정원 규칙은 `first-journey.html`의 `html[data-lt-theme=garden]` 블록 하나에만 둔다. 크림 배경·잉크 글자, 카드(성장·복원·순간)에는 정원 테두리(`--lt-gold-deep`)와 따뜻한 그림자(`--lt-garden-shadow`), 장미 강조는 `--lt-rose-ink`, 큰 제목은 번들한 Gowun Batang + `--lt-reading` 대체, `word-break:keep-all` 유지. 새 색 값·hex는 추가하지 않았다.
+- 단계 구성·문구·피어남 연출(`lt-bloom`)·뒤로가기(#189·#190)는 변경 없음.
+- 시험: `tests/v41-journey-garden.test.mjs` 6건(정원일 때 첫 여정 전달·밤이면 A·안쪽 네 화면 A·head 전달·정원 토큰/테두리/글꼴/keep-all·대비 4.5:1 이상·기록 규칙 불변), `tests/v41-theme-ab.test.mjs`의 `themedView` 단언 갱신. 전체 `npm test` 421건 384 pass/0 fail/37 skip, `npm run build` pass.
+- 미리보기(정원, dist, Playwright + Chrome): `out/journey-garden/{1440,390,360}-0{0..4}.png` 15장. 실측 `data-lt-theme=garden`, 배경 `rgb(247,240,232)`, h1 글꼴 `Gowun Batang`, 가로 넘침 0(15/15), 콘솔 오류 0. 정원 대비(정원 토큰 계산값): 잉크 10.9:1 · 보조 5.3:1 · 장미 잉크 5.1:1 · 금 잉크 5.8:1 · 1차 버튼 글자 5.7:1.
+- 운영 로그아웃에서는 첫 여정이 로그인 게이트 뒤라, 배포된 문서·모듈에 정원 규칙이 실렸는지와 헤더 테마 적용만 확인했다. 로그인 상태 정원 첫 여정 저장 왕복은 컴1 레인 몫이다.
+
 ## 2026-11-08 — 순간 추가·수정 패널 정리(컴2로컬1, ai/com2-lt-moment-panel-261108)
 
 오른쪽 패널을 순간 추가·이 순간 수정 전용으로 줄였다. 첫 트리는 첫 여정(#187·#189·#190)이 계속 맡고, 패널의 `새 트리` 탭은 없앴다.
