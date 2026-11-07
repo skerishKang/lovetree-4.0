@@ -17,3 +17,5 @@ __pycache__/
 # PR 작성 보조 파일(저장소에 두지 않는다)
 pr-body.md
 pr-payload.json
+pr-comment.md
+pr-comment.json
