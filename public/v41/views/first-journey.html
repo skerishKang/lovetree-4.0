@@ -21,6 +21,7 @@ button{cursor:pointer;color:inherit}
 .steps li.done b{color:var(--lt-gold)}
 .steps li[aria-current=step]{color:var(--lt-pearl);border-color:var(--lt-gold-line);background:var(--lt-glass);box-shadow:inset 0 0 0 1px var(--lt-gold-line)}
 .steps li[aria-current=step] b{color:var(--lt-gold)}
+.steps li.step-link{cursor:pointer}
 .close{width:44px;height:44px;flex:0 0 auto;border:1px solid var(--lt-line);border-radius:50%;background:var(--lt-glass);font-size:22px;line-height:1;display:grid;place-items:center}
 .close:hover{border-color:var(--lt-gold-line)}
 .grid{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,.95fr);gap:clamp(20px,3.2vw,48px);align-items:start}
@@ -180,9 +181,10 @@ h1 em{font-style:normal;color:var(--lt-rose)}
 <script src="/v41/media-preview.js"></script>
 <script type="module">
 import {
-  JOURNEY_EMOTIONS, emptyJourneyDraft, journeyPreviewTitle, journeyRestoreQuestion,
+  JOURNEY_EMOTIONS, JOURNEY_LAST_STEP, emptyJourneyDraft, journeyPreviewTitle, journeyRestoreQuestion,
   journeyStepProblem, nextJourneyStep, previousJourneyStep,
   readJourneyDraft, writeJourneyDraft, clearJourneyDraft, normalizeJourneyDraft,
+  journeyRouteHash, parseJourneyRoute,
 } from '/v41/first-journey.mjs';
 
 const embedded = window.parent && window.parent !== window;
@@ -208,6 +210,7 @@ const state = {
   pending: false,
   saved: {treeId: '', momentId: ''},
 };
+let ready = false;
 
 const SAMPLE = {
   subject: '그날의 무대',
@@ -248,6 +251,20 @@ function post(message) {
   if (embedded) window.parent.postMessage(message, location.origin);
 }
 
+// 단계 기록: 셸 안에서는 셸이 #journey/NN을 남기고 화면은 단계만 알려 준다.
+// 단독 미리보기에서는 이 화면이 같은 해시 규칙을 직접 기록해 뒤로가기를 검수할 수 있게 한다.
+function reportStep() {
+  if (!embedded) return;
+  post({type: 'lt41-journey-step', step: state.step});
+}
+function syncHistory(mode = 'push') {
+  if (embedded) return;
+  const hash = journeyRouteHash(state.step);
+  if (location.hash === hash) return;
+  const depth = (Number(history.state?.lt41Journey) || 0) + (mode === 'push' ? 1 : 0);
+  history[mode === 'replace' ? 'replaceState' : 'pushState']({lt41Journey: depth}, '', hash);
+}
+
 function setError(message = '') {
   $('error').textContent = message;
 }
@@ -262,6 +279,7 @@ function renderSteps() {
   for (const item of $('steps').children) {
     const step = Number(item.dataset.step);
     item.classList.toggle('done', step < state.step);
+    item.classList.toggle('step-link', step < state.step);
     if (step === state.step) item.setAttribute('aria-current', 'step');
     else item.removeAttribute('aria-current');
   }
@@ -408,6 +426,21 @@ function render() {
   renderCopy();
   renderActions();
   renderGrow();
+  if (!ready) return;
+  if (embedded) reportStep();
+  else syncHistory();
+}
+
+// 뒤로가기·앞으로가기로 들어온 단계는 입력값을 그대로 두고 그 단계만 다시 보여 준다.
+function goToStep(value) {
+  readForm();
+  state.phase = 'form';
+  state.step = Math.min(JOURNEY_LAST_STEP, Math.max(0, Number.parseInt(value, 10) || 0));
+  setError('');
+  persistDraft();
+  render();
+  scrollTop();
+  focusStep();
 }
 
 /* ---------- form binding ---------- */
@@ -523,6 +556,7 @@ function requestSave() {
 
 window.addEventListener('message', event => {
   if (event.origin !== location.origin || event.source !== window.parent) return;
+  if (event.data?.type === 'lt41-journey-goto') { goToStep(event.data.step); return; }
   if (event.data?.type !== 'lt41-journey-result') return;
   if (!applyResult(event.data)) return;
   state.phase = state.step === 2 ? 'bloom' : 'connected';
@@ -578,10 +612,21 @@ $('skip').onclick = () => {
   scrollTop();
 };
 
+// 단계 탭도 같은 기록 규칙을 따른다. 이미 지나온 단계로만 돌아가고, 그 기록을 새로 남긴다.
+$('steps').addEventListener('click', event => {
+  const item = event.target.closest('li[data-step]');
+  if (!item || state.pending || state.phase !== 'form') return;
+  const step = Number(item.dataset.step);
+  if (step >= state.step) return;
+  goToStep(step);
+});
+
 $('close').onclick = () => {
   readForm();
   persistDraft();
-  if (embedded) post({type: 'lt41-journey-close'});
+  if (embedded) { post({type: 'lt41-journey-close'}); return; }
+  // 단독 미리보기에서는 닫기가 곷 첫 화면으로 돌아간다(단계 기록은 뒤로가기용으로 남긴다).
+  location.assign('/v41/');
 };
 
 function focusStep() {
@@ -611,6 +656,12 @@ function restoreDraft(draft) {
   render();
 }
 
+window.addEventListener('popstate', () => {
+  if (embedded) return;
+  const route = parseJourneyRoute(location.hash);
+  if (route) goToStep(route.step);
+});
+
 function boot() {
   buildEmotions();
   fillForm();
@@ -618,6 +669,19 @@ function boot() {
   const seeded = params.get('subject') || '';
   if (embedded) {
     const stored = readJourneyDraft(storage);
+    // 새로고침·직접 주소: #journey/NN의 단계로 열고, 임시 보관값이 없으면 00으로 간다.
+    const routeStep = Number.parseInt(params.get('step') || '', 10);
+    if (Number.isFinite(routeStep)) {
+      if (stored) restoreDraft(stored);
+      else startFresh(seeded);
+      state.step = stored
+        ? Math.min(JOURNEY_LAST_STEP, Math.max(state.saved.treeId ? 3 : 0, Math.min(JOURNEY_LAST_STEP, Math.max(0, routeStep))))
+        : 0;
+      persistDraft();
+      render();
+      focusStep();
+      return;
+    }
     if (stored && journeyRestoreQuestion(stored)) {
       $('restore-question').textContent = journeyRestoreQuestion(stored);
       $('restore').hidden = false;
@@ -629,17 +693,21 @@ function boot() {
     startFresh(seeded);
     return;
   }
-  // 저장소 밖 단독 미리보기: 단계 화면을 바로 열어 확인한다(셸에서는 쓰지 않는 경로).
-  const step = Number.parseInt(params.get('step') || '', 10);
+  // 저장소 밖 단독 미리보기: #journey/NN 또는 ?step=NN으로 단계 화면을 연다.
+  const hashRoute = parseJourneyRoute(location.hash);
+  const step = hashRoute ? hashRoute.step : Number.parseInt(params.get('step') || '', 10);
   if (Number.isFinite(step)) {
     const phase = params.get('phase') || 'form';
-    const draft = normalizeJourneyDraft(sampleForStep(step, phase));
-    draft.savedTreeId = step >= 2 ? 'preview-tree' : '';
-    draft.savedMomentId = step >= 2 ? 'preview-moment' : '';
+    const stored = readJourneyDraft(storage);
+    const draft = normalizeJourneyDraft(stored || sampleForStep(step, phase));
+    if (!stored) {
+      draft.savedTreeId = step >= 2 ? 'preview-tree' : '';
+      draft.savedMomentId = step >= 2 ? 'preview-moment' : '';
+    }
     state.draft = draft;
     state.saved = {treeId: draft.savedTreeId, momentId: draft.savedMomentId};
     state.step = Math.min(4, Math.max(0, step));
-    state.phase = ['bloom', 'connected'].includes(phase) ? phase : 'form';
+    state.phase = stored ? 'form' : ['bloom', 'connected'].includes(phase) ? phase : 'form';
     fillForm();
     render();
     return;
@@ -648,6 +716,12 @@ function boot() {
 }
 
 boot();
+if (!embedded) {
+  if (parseJourneyRoute(location.hash)) syncHistory('replace');
+  else history.replaceState({lt41Journey: 0}, '', '#journey/00');
+}
+ready = true;
+reportStep();
 
 // 닫기·새로고침 때도 입력을 잃지 않는다.
 window.addEventListener('pagehide', () => { try { readForm(); persistDraft(); } catch {} });
