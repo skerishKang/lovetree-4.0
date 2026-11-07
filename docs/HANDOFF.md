@@ -1,3 +1,15 @@
+## 2026-11-07 — 새 트리 만들기 = 첫 여정(A안, 어두운 무대) · 컴2 로컬2 레인
+
+`ai/com2-lt-first-journey-261107`. 새 트리를 여는 모든 경로를 어두운 무대의 첫 여정 화면 하나로 모으고, 순간 추가·이 순간 수정은 기존 오른쪽 패널에 남겼다. 저장 계약·스키마·인증·공통 헤더·`identity.css` 토큰 정의·`index.html` 워드마크는 바꾸지 않았다.
+
+- 화면 `public/v41/views/first-journey.html`, 순수 로직 `public/v41/first-journey.mjs`(단계·검증·저장 계획·임시 보관·진입 판정). 셸 `public/v41/shell.mjs`는 `openFirstJourney` 하나로 진입을 모으고 `lt41-journey-save`/`-open-book`/`-close` 메시지만 처리한다.
+- 진입: 로그아웃 첫 화면 `처음 시작하기` → 로그인 뒤 `openEditor('new')` → 첫 여정(트리 0개 계정), 첫 화면 가운데 `새 트리 만들기`(`openEditor()` → `new`), 헤더 주 버튼(책장에서 `new`), 작성 패널의 `새 트리` 탭, 둘러보기 `내 기록 새로 시작`(대상 이름을 첫 여정에 미리 채움). `순간 추가`·`이 순간 수정`은 `setEditorMode` 패널 그대로다.
+- 저장: 02에서 `member.apply('new')` → `createTree`, 03에서 `member.apply('add', {…, relation}, {treeId, momentId})` → `addMoment(parentId=첫 순간)`. 새 저장 경로·필드 없음. “기억할 시점”=`date`, “이유”=`note`(없으면 01 마음 한마디), 미디어 메타데이터는 #182·#183 규칙 그대로.
+- 04의 `내 러브트리 보기`는 방금 만든 첫 순간을 기억책으로 연다(`lt41-journey-open-book`).
+- 임시 보관: `localStorage` `lovetree.v41.first-journey`에 try/catch. 다시 열면 “이어서 쓸까요?”를 묻는다. 트리 저장 뒤 닫았으면 `savedTreeId`/`savedMomentId`로 이어져 트리를 두 번 만들지 않는다. 화면은 서버를 직접 부르지 않고 셸만 저장하며, 셸이 로그인·쓰기 가능을 확인한다(비로그인 서버 저장 없음).
+- 시험: `tests/v41-first-journey.test.mjs` 11건(단계 이동·나중에 잇기·저장 인자·진입 경로·임시 보관 복원·토큰/hex/keep-all). 전체 `npm test` 382건 345 pass/0 fail/37 skip, `npm run build` pass.
+- 로컬 캡처: `out/first-journey/`에 1440(7장)·390(5)·360(5). CDP 실측 `innerWidth` 1440/390/360, 0~04 단계 가로 넘침 0. 단독 미리보기(가짜 세션)이며 로그인·운영 저장 왕복은 컴1 레인이 머지 후 확인한다. (헤드리스 Chrome은 창 최소 폭 500px 때문에 390/360을 그대로 못 잡아 CDP `setDeviceMetricsOverride`로 캡처했다.)
+
 ## 2026-11-07 — 모바일 헤더 탭 잘림 수정(컴1 레인, ai/com1-lt-mobile-tabs-261107)
 
 #185로 트리 선택이 탭 묶음 앞으로 오면서 390·360에서 탭 7개가 폭을 넘어 기억 보드·관계 지도가 잘렸다(postdeploy `no-overflow-390` warn). 좁은 폭만 고쳤고 데스크톱 배치는 그대로다. 제품 코드 변경은 `public/v41/shell.css`·`public/v41/shell.mjs` 두 파일뿐이다.
