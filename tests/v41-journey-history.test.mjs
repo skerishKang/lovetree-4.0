@@ -78,4 +78,6 @@ test('여정 화면은 단계를 셸에 알리고, 되돌아갈 단계는 입력
   assert.match(html, /Number\.parseInt\(params\.get\('step'\) \|\| '', 10\)/, '주소의 단계를 읽는다');
   assert.match(html, /state\.step = stored[\s\S]{0,220}: 0;/, '임시 보관값이 없으면 00이다');
   assert.match(html, /\$\('steps'\)\.addEventListener\('click'/, '단계 탭도 같은 기록 규칙을 따른다');
+  assert.match(html, /if \(hashRoute && !readJourneyDraft\(storage\)\) \{/, '임시 보관값이 없으면 #journey/NN이어도 00부터 시작한다');
+  assert.match(html, /location\.assign\('\/v41\/'\)/, '단독 미리보기 닫기는 첫 화면으로 간다');
 });
