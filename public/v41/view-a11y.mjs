@@ -28,6 +28,14 @@ export function focusWrap(index, length, backward = false) {
   return (index + 1) % length;
 }
 
+// 닫힌 뒤 돌아갈 곳: 연결되어 있고 화면에 보이는 opener를 우선하고, 아니면 fallback.
+export function focusReturnTarget(opener, fallback) {
+  try {
+    if (opener?.isConnected && opener.getClientRects?.().length) return opener;
+  } catch { /* detached opener */ }
+  return fallback;
+}
+
 const isOpen = (el, mode) => {
   if (!el) return false;
   if (mode === 'hidden') return !el.classList.contains('hidden') && el.getClientRects().length > 0;
@@ -155,6 +163,17 @@ export function applyViewAccessibility(doc, win = doc?.defaultView) {
     else if (!event.shiftKey && (at < 0 || at === list.length - 1)) { event.preventDefault(); list[0].focus(); }
   };
   doc.addEventListener('keydown', tabHandler, true);
+  // 2026-11-08 #202 후속: 상세 패널은 Esc로도 닫는다. 닫기는 화면의 기존 닫기 버튼과 같은 경로를 타서
+  // updateDialogs가 연 곳으로 포커스를 되돌리게 한다. 위에 다른 대화상자가 있으면 건드리지 않는다.
+  doc.addEventListener('keydown', event => {
+    if (event.key !== 'Escape' || event.defaultPrevented) return;
+    const current = traps[traps.length - 1];
+    if (!current || current.el.id !== 'detail') return;
+    const close = current.el.querySelector('.close');
+    if (!close) return;
+    event.preventDefault();
+    close.click();
+  }, true);
   const updateDialogs = () => {
     for (const [selector, mode] of DIALOGS) {
       const el = doc.querySelector(selector);

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {connectionLabel, filterLabel, isSmallTarget, nodeStep, focusWrap} from '../public/v41/view-a11y.mjs';
+import {connectionLabel, filterLabel, isSmallTarget, nodeStep, focusWrap, focusReturnTarget} from '../public/v41/view-a11y.mjs';
 
 const read = path => fs.readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 
@@ -54,4 +54,40 @@ test('adapter covers every target screen without editing original views', () => 
   assert.match(shell, /applyViewAccessibility/);
   assert.match(shell, /connectionLabel/);
   assert.match(community, /showModal/);
+});
+
+test('A: 상세 패널 Esc는 같은 닫기 버튼 경로로 닫는다', () => {
+  const adapter = read('public/v41/view-a11y.mjs');
+  assert.match(adapter, /event\.key !== 'Escape'/);
+  assert.match(adapter, /current\.el\.id !== 'detail'/);
+  assert.match(adapter, /querySelector\('\.close'\)/);
+  assert.match(adapter, /close\.click\(\)/);
+});
+
+test('B: 편집기·보관 목록 Tab은 대화상자 안에서 순환한다', () => {
+  const shell = read('public/v41/shell.mjs');
+  assert.match(shell, /trapShellTab/);
+  assert.match(shell, /assets\?\.open\?assets:editor\?\.open\?editor:null/);
+  assert.match(shell, /SHELL_FOCUSABLE/);
+  assert.match(shell, /shiftKey/);
+  assert.equal(focusWrap(0, 3, true), 2);
+  assert.equal(focusWrap(2, 3, false), 0);
+});
+
+test('C: 계정 메뉴 Esc는 계정 동그라미로 돌아간다', () => {
+  const shell = read('public/v41/shell.mjs');
+  assert.match(shell, /if\(e\.key!=='Escape'\)return;/);
+  assert.match(shell, /closeAccountMenu\(\);\$\('account-avatar'\)\.focus\(\)/);
+});
+
+test('D: 보관 목록 Esc는 연 버튼(없으면 계정 동그라미)으로 돌아간다', () => {
+  const shell = read('public/v41/shell.mjs');
+  assert.match(shell, /assetsOpener=opener/);
+  assert.match(shell, /addEventListener\('cancel'/);
+  assert.match(shell, /focusReturnTarget\(assetsOpener,\$\('account-avatar'\)\)/);
+  const opener = {isConnected: true, getClientRects: () => [{}]};
+  const fallback = {};
+  assert.equal(focusReturnTarget(opener, fallback), opener);
+  assert.equal(focusReturnTarget({isConnected: false, getClientRects: () => [{}]}, fallback), fallback);
+  assert.equal(focusReturnTarget({isConnected: true, getClientRects: () => []}, fallback), fallback);
 });
