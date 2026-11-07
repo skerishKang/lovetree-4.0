@@ -17,6 +17,16 @@
 - 뒤로가기(#189·#190)·정원/밤(#194·#195)·단계·문구·저장 경로는 변경 없음. `public/v41/home*.js`·`src/views/orbit*`는 건드리지 않았다.
 - 시험: `tests/v41-first-journey.test.mjs` 13건(완료 뒤 pagehide 재저장 0, 완료 표시가 남은 이전 임시값 폐기, 중간 닫기 복원 유지 포함). 전체 `npm test` 398 pass/0 fail/37 skip, `npm run build` pass(잠금 대기 0초).
 - 로그아웃 미리보기(밤, 1440/390): `out/journey-draft-clear/journey-0{0..4}-{1440,390}.png` 10장 + 첫 화면 `home-{1440,390}.png`. 장미색 0, 가로 넘침 0. 실제 저장 왕복은 시험 계정 로그인 없이 수행하지 않았고, 단위 시험과 iframe 수명주기 코드로 확인했다.
+## 2026-11-08 — 첫 화면 카드 결함 2건 후속(컴2로컬1, ai/com2-lt-home-cards-fix-261108)
+
+결함 1은 comp1의 PR #197(머지 `99e6592`), 결함 2는 comp1의 PR #196(이 레인에서 머지 `b246d79`)으로 이미 구현되어 있었다. 같은 2줄 수정을 중복 PR로 다시 만들지 않고 #196을 머지한 뒤, 이 레인에서 가짜 세션으로 두 결함을 다시 확인하고 문서만 보탰다.
+
+- **업로드 사진 판정**: `v41/home-moments.js`의 `privateMediaKind`가 `moment.url`이 현재 출처(또는 공식 별칭)의 `/api/media/<uuid>.<ext>`일 때만 사진·영상으로 보고, 사진이면 그 경로를 카드 썸네일로 쓴다. mp4·webm은 영상 카드, 외부 출처·쿼리·자격 증명이 붙은 URL은 메모 카드다. 외부 요청 0.
+- **카드 메뉴 바깥 클릭**: `v41/home-cards.js`의 `clickWithin(event, ...nodes)`가 `composedPath()`를 먼저 보고, 없으면 `contains()`로 되돌아간다. shadow DOM 안 버튼 클릭이 document 리스너에서 host로 retarget되어도 메뉴·버튼이 경로에 남아 열린 상태가 유지된다. 첫 화면에서 같은 방식의 바깥 클릭 처리는 카드 메뉴 하나뿐이었다.
+- **시험**: `npm test` 398 pass / 0 fail / 37 skip, `npm run build` pass(2.27s).
+- **가짜 세션 캡처**(`out/home-cards-fix/`, `/api/workspace` 1 revision + 업로드 사진 3 + 글 1): 1440·390 모두 섞어서 40장 중 내 카드 4(사진 3+글 1)·금빛 문구, 내 것만 4장(사진 3), 가로 넘침 0, 콘솔 오류 0.
+- **메뉴**: 마우스 클릭 열림(`hidden=false`, aria-checked 유지), 바깥 클릭 닫힘, Esc 닫힘, ArrowDown 열림 3/3(390·1440).
+- **운영 로그아웃 `/v41/`**: 1440에서 `카드: 예시 ▾`를 마우스로 눌러 메뉴가 열린 채 유지되는 것을 확인했다. 로그인 상태의 섞어서·내 것만 카드 구성은 컴1 확인 몫이다.
 
 ## 2026-11-08 — 밤(A) 첫 여정을 첫 화면 무채색으로(컴2로컬2, ai/com2-lt-journey-night-261108)
 
