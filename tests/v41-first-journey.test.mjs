@@ -155,7 +155,8 @@ test('셸은 새 트리를 첫 여정으로 보내고 순간 추가·수정은 �
   assert.match(shell, /function openFirstJourney/);
   assert.match(shell, /journeyEntry\(\{owned:/);
   assert.match(shell, /if\(mode==='new'\)\{openFirstJourney\(\);return;\}/);
-  assert.match(shell, /b\.dataset\.mode==='new'\?openFirstJourney\(\):setEditorMode\(b\.dataset\.mode\)/);
+  assert.match(shell, /setEditorMode\(b\.dataset\.mode\)/);
+  assert.equal(/data-mode="new"/.test(readFileSync(new URL('../public/v41/index.html', import.meta.url), 'utf8')), false, '패널 탭에서 새 트리를 없앤다');
   assert.match(shell, /type==='lt41-journey-save'/);
   assert.match(shell, /type==='lt41-journey-open-book'/);
   assert.match(shell, /member\.apply\('new',plan\.first/);
