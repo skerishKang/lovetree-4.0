@@ -204,3 +204,38 @@ export function journeyEntry({owned = false, writable = false, mode = 'new'} = {
   if (mode !== 'new') return {screen: 'panel', reason: 'panel-mode', mode};
   return {screen: 'journey', reason: 'new-tree'};
 }
+
+// 2026-11-08 첫 여정 뒤로가기: 단계마다 #journey/00~04 기록을 남기고, popstate에서 그 기록을 해석한다.
+// 셸은 이 순수 규칙만 보고 이동하고, 실제 history 조작은 셸 한 곳에서만 한다.
+export const JOURNEY_ROUTE_PREFIX = '#journey/';
+
+export function journeyRouteHash(step) {
+  const value = clampStep(step);
+  return JOURNEY_ROUTE_PREFIX + JOURNEY_STEPS[value].index;
+}
+
+export function parseJourneyRoute(hash) {
+  if (typeof hash !== 'string' || !hash.startsWith(JOURNEY_ROUTE_PREFIX)) return null;
+  const index = hash.slice(JOURNEY_ROUTE_PREFIX.length);
+  const position = JOURNEY_STEPS.findIndex(step => step.index === index);
+  return position < 0 ? null : {step: position, index: JOURNEY_STEPS[position].index};
+}
+
+// 새로고침·직접 주소로 들어올 때 열 단계. 임시 보관값이 없으면 00,
+// 이미 트리를 만든 임시 값은 03(성장) 아래로 내려가지 않는다.
+export function journeyResumeStep(draft) {
+  if (!draft || !journeyDraftHasContent(draft)) return 0;
+  const value = normalizeJourneyDraft(draft);
+  return value.savedTreeId ? Math.max(3, value.step) : value.step;
+}
+
+// hash와 현재 화면만으로 뒤로가기 처리 방법을 정한다. 저장이 끝난 뒤에는
+// 성장 단계 기록으로 다시 들어가지 않고 첫 화면으로 나간다(같은 트리를 두 번 만들지 않는다).
+export function journeyRouteDecision({hash = '', open = false, saved = false} = {}) {
+  const route = parseJourneyRoute(hash);
+  if (route) {
+    if (saved) return {action: 'finished', step: null};
+    return {action: open ? 'goto' : 'open', step: route.step};
+  }
+  return {action: open ? 'leave' : 'ignore', step: null};
+}

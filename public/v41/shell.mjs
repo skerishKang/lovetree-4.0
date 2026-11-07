@@ -9,7 +9,7 @@ import {createMemberSession} from './member-session.mjs';
 import {exampleTree} from './example.mjs';
 import {parseSelectionRoute,memberStartupView,ownerSelectionRoute,accountPosition,rememberAccountPosition,resolveAccountPosition,stashPendingOwnerRoute,pendingOwnerRoute,takePendingOwnerRoute} from './selection-location.mjs';
 import {accountPresentation,treePickerLabel,writeMenuLabel,homeCenterState,homeStartLoginUrl,readTheme,writeTheme,nextTheme,themeButtonLabel,themeButtonAriaLabel,themePressed,appliedTheme,applyThemeAttribute} from './header-state.mjs';
-import {journeyEntry,journeySavePlan} from './first-journey.mjs';
+import {journeyEntry,journeySavePlan,journeyRouteHash,parseJourneyRoute,journeyRouteDecision} from './first-journey.mjs';
 const $=id=>document.getElementById(id);
 // 2026-11-07 테마 A/B(밤/정원): 공통 헤더와 첫 화면만 바꾼다. 안쪽 네 화면은 속성을 받지 않아 A로 고정된다.
 function themedView(){return current==='src064-orbit.html'?'home':'inner';}
@@ -21,7 +21,7 @@ const screens=[['home','src064-orbit.html','첫 화면'],['shelf','track32-books
 const initialRoute=parseSelectionRoute(location.hash);
 const screenForView=view=>screens.find(screen=>screen[0]===view)||screens[0];
 const viewForFile=file=>screens.find(screen=>screen[1]===file)?.[0]||'home';
-let model=null,current=screenForView(initialRoute.view)[1],source='example',loadGeneration=0,toastTimer,previousDirty=false,member=null,editorMode='new',formBaseline='',parentBaseline='',treeBaseline='',handledHash=null,activeShareId=null,sharePreviewKey='',sharePreviewToken='',journeyReturn='src064-orbit.html';
+let model=null,current=screenForView(initialRoute.view)[1],source='example',loadGeneration=0,toastTimer,previousDirty=false,member=null,editorMode='new',formBaseline='',parentBaseline='',treeBaseline='',handledHash=null,activeShareId=null,sharePreviewKey='',sharePreviewToken='',journeyReturn='src064-orbit.html',journeyStep=0,journeySaved=false,journeyRouteOpened=false;
 setMemberRefreshStarted(false);
 const shareApi=createShareApi();
 const accountApi=createWorkspaceApi();
@@ -129,7 +129,9 @@ async function startMember(){setMemberRefreshStarted(true);if(!leaveMember())ret
    if(!initialized){if(route)requested=route;else if(!selection)requested=saved;const view=memberStartupView(active,route,saved,viewForFile(current));current=screenForView(view)[1];}
    const resolved=load({revision:0,state},'server',requested,saved);initialized=true;
    if(snapshot.owned&&resolved.position.treeId){if(viewForFile(current)!=='home')writeLocation('replace');takePendingOwnerRoute(sessionStorage);if(route?.scope==='owner'&&resolved.treeMissing)startupNotice='이 주소의 기록을 현재 계정에서 찾을 수 없어 최근 위치를 열었어요.';else if(route?.scope==='owner'&&resolved.momentMissing)startupNotice='이 주소의 순간을 찾을 수 없어 트리의 시작 순간을 열었어요.';}
- },onStatus:status=>{if(generation===loadGeneration)memberStatus(status);},navigate:url=>{if(url.startsWith('/auth/login')&&parseSelectionRoute(location.hash).scope==='owner')stashPendingOwnerRoute(sessionStorage,location.hash);location.assign(url.startsWith('/auth/login')?MEMBER_LOGIN_URL:url==='#start'?'#home':url);}});member=session;await session.start();if(generation===loadGeneration&&session.snapshot().owned){if($('records').open)$('records').close();updateAccountControls();if(session.snapshot().writable&&sessionStorage.getItem(PENDING_NEW)==='1'){sessionStorage.removeItem(PENDING_NEW);openEditor('new');}if(startupNotice)notify(startupNotice);}}
+ },onStatus:status=>{if(generation===loadGeneration)memberStatus(status);},navigate:url=>{if(url.startsWith('/auth/login')&&parseSelectionRoute(location.hash).scope==='owner')stashPendingOwnerRoute(sessionStorage,location.hash);location.assign(url.startsWith('/auth/login')?MEMBER_LOGIN_URL:url==='#start'?'#home':url);}});member=session;await session.start();if(generation===loadGeneration&&session.snapshot().owned){if($('records').open)$('records').close();updateAccountControls();if(session.snapshot().writable&&sessionStorage.getItem(PENDING_NEW)==='1'){sessionStorage.removeItem(PENDING_NEW);openEditor('new');}if(startupNotice)notify(startupNotice);}
+ if(generation===loadGeneration){const startupJourney=parseJourneyRoute(location.hash);if(startupJourney){if(session.snapshot().owned&&session.snapshot().writable)openFirstJourney({step:startupJourney.step,route:true});else{history.replaceState(null,'','#home');handledHash='#home';}}}
+}
 function sample(selection={},view){if(!leaveMember())return;++loadGeneration;if(view)current=view;load(null,'example',selection);if(view)writeLocation();$('save-feedback').hidden=true;$('records').close();}
 $('account-entry').onclick=e=>{if(member?.snapshot().owned){e.preventDefault();openAccountMenu();}else if(parseSelectionRoute(location.hash).scope==='owner')stashPendingOwnerRoute(sessionStorage,location.hash);};$('account-avatar').onclick=e=>{e.stopPropagation();if($('account-popover').hidden)openAccountMenu();else closeAccountMenu();};$('account-records').onclick=()=>{closeAccountMenu();panel('records');};$('account-theme').onclick=()=>{toggleTheme();closeAccountMenu();};$('account-logout').onclick=async()=>{closeAccountMenu();$('logout').click();};document.addEventListener('click',e=>{if(!e.target.closest('.account-slot'))closeAccountMenu();});document.addEventListener('keydown',e=>{if(e.key==='Escape')closeAccountMenu();});$('record-menu').onclick=()=>{$('record-feedback').textContent='';panel('records');};$('empty-records').onclick=()=>member?.snapshot().writable?openEditor():panel('records');$('empty-sample').onclick=sample;
 $('sample').onclick=sample;$('clear').onclick=()=>{if(!leaveMember())return;++loadGeneration;clear();$('save-feedback').hidden=true;$('file').value='';$('records').close();};
@@ -181,14 +183,14 @@ async function showPublicRoute(route){if(member&&!leaveMember()){writeLocation('
  const answer=await shareApi.read(route.shareId||'');if(generation!==loadGeneration)return;if(!answer.ok){publicProblem(answer);return;}
  activeShareId=answer.share.id;const view=['book','board','network'].includes(route.view)?route.view:answer.share.view;current=screenForView(view)[1];load({revision:0,state:{version:1,trees:[answer.tree]}},'share',{treeId:answer.tree.id,momentId:answer.share.entryMomentId});activeShareId=answer.share.id;show(current,false);writeLocation('replace');notify('소유자가 명시적으로 공유한 트리입니다. 감상만 할 수 있어요.');
 }
-function applyBrowserLocation(){if(location.hash===handledHash)return;handledHash=location.hash;const route=parseSelectionRoute(location.hash);if(route.scope==='public'){showPublicRoute(route);return;}current=screenForView(route.view)[1];
+function applyBrowserLocation(){if(location.hash===handledHash)return;handledHash=location.hash;const journey=journeyRouteDecision({hash:location.hash,open:current==='first-journey.html',saved:journeySaved});if(journey.action==='goto'){gotoJourneyStep(journey.step);return;}if(journey.action==='open'){openFirstJourney({step:journey.step,route:true});return;}if(journey.action==='finished'){finishJourney();return;}if(journey.action==='leave'){leaveJourney();return;}const route=parseSelectionRoute(location.hash);if(route.scope==='public'){showPublicRoute(route);return;}current=screenForView(route.view)[1];
  if(route.scope==='owner'){if(source!=='server'||!member?.snapshot().owned){show(current,false);void startMember();return;}const saved=accountPosition(localStorage,member.snapshot().subject)||{},resolved=resolveAccountPosition(model?.trees||[],route,saved);choose(resolved.position.treeId,resolved.position.momentId);if(resolved.treeMissing||resolved.momentMissing){writeLocation('replace');notify(resolved.treeMissing?'이 주소의 기록을 현재 계정에서 찾을 수 없어 최근 위치를 열었어요.':'이 주소의 순간을 찾을 수 없어 트리의 시작 순간을 열었어요.');}else rememberAccountPosition(localStorage,member.snapshot().subject,{...resolved.position,view:route.view});return;}
  show(current,false);
 }
 document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>show(b.dataset.view));
 addEventListener('popstate',applyBrowserLocation);
 addEventListener('hashchange',applyBrowserLocation);
-addEventListener('message',e=>{if(e.origin!==location.origin||e.source!==$('view').contentWindow)return;if(e.data?.type==='lt41-theme'){applyTheme();paintThemeControls();}if(e.data?.type==='lt41-journey-save'){saveFirstJourney(e.data.draft);return;}if(e.data?.type==='lt41-journey-open-book'){openJourneyBook(e.data);return;}if(e.data?.type==='lt41-journey-close'){closeFirstJourney();return;}if(e.data?.type==='lt41-media-metadata'&&source==='server'&&member?.snapshot().owned){const tree=window.LT41?.tree,moment=tree?.moments.find(m=>m.id===e.data.momentId&&m.url===e.data.url);if(moment)try{member.apply('cacheMediaMetadata',{url:e.data.url,mediaMetadata:e.data.mediaMetadata},{treeId:tree.id,momentId:moment.id})}catch{}}if(e.data?.type==='lt41-navigate')show(e.data.view);if(e.data?.type==='lt41-select'&&window.LT41?.tree.moments.some(m=>m.id===e.data.id)){window.LT41.momentId=e.data.id;links();writeLocation();}if(e.data?.type==='lt41-write')openEditor(e.data.mode);if(e.data?.type==='lt41-open-book'&&model?.trees.some(t=>t.id===e.data.treeId&&t.moments.some(m=>m.id===e.data.id))){current='track59-sketchbook.html';choose(e.data.treeId,e.data.id);writeLocation();}if(e.data?.type==='lt41-start'){location.assign(homeStartLoginUrl());return;}if(e.data?.type==='lt41-account'){if(member?.snapshot().owned)openAccountMenu();else $('account-entry').click();}if(e.data?.type==='lt41-community')$('community-menu').click();if(e.data?.type==='lt41-example'&&exampleTree.moments.some(m=>m.id===e.data.momentId)&&['track59-sketchbook.html','track58-pinboard.html'].includes(e.data.view)){sample({treeId:exampleTree.id,momentId:e.data.momentId},e.data.view);}if(e.data?.type==='lt-selection'||e.data?.type==='lt41-choose'){links();writeLocation();}});function sharePayload(){return {treeId:window.LT41?.tree.id||'',entryMomentId:$('share-moment').value,view:$('share-view').value};}
+addEventListener('message',e=>{if(e.origin!==location.origin||e.source!==$('view').contentWindow)return;if(e.data?.type==='lt41-theme'){applyTheme();paintThemeControls();}if(e.data?.type==='lt41-journey-step'){noteJourneyStep(e.data.step);return;}if(e.data?.type==='lt41-journey-save'){saveFirstJourney(e.data.draft);return;}if(e.data?.type==='lt41-journey-open-book'){openJourneyBook(e.data);return;}if(e.data?.type==='lt41-journey-close'){closeFirstJourney();return;}if(e.data?.type==='lt41-media-metadata'&&source==='server'&&member?.snapshot().owned){const tree=window.LT41?.tree,moment=tree?.moments.find(m=>m.id===e.data.momentId&&m.url===e.data.url);if(moment)try{member.apply('cacheMediaMetadata',{url:e.data.url,mediaMetadata:e.data.mediaMetadata},{treeId:tree.id,momentId:moment.id})}catch{}}if(e.data?.type==='lt41-navigate')show(e.data.view);if(e.data?.type==='lt41-select'&&window.LT41?.tree.moments.some(m=>m.id===e.data.id)){window.LT41.momentId=e.data.id;links();writeLocation();}if(e.data?.type==='lt41-write')openEditor(e.data.mode);if(e.data?.type==='lt41-open-book'&&model?.trees.some(t=>t.id===e.data.treeId&&t.moments.some(m=>m.id===e.data.id))){current='track59-sketchbook.html';choose(e.data.treeId,e.data.id);writeLocation();}if(e.data?.type==='lt41-start'){location.assign(homeStartLoginUrl());return;}if(e.data?.type==='lt41-account'){if(member?.snapshot().owned)openAccountMenu();else $('account-entry').click();}if(e.data?.type==='lt41-community')$('community-menu').click();if(e.data?.type==='lt41-example'&&exampleTree.moments.some(m=>m.id===e.data.momentId)&&['track59-sketchbook.html','track58-pinboard.html'].includes(e.data.view)){sample({treeId:exampleTree.id,momentId:e.data.momentId},e.data.view);}if(e.data?.type==='lt-selection'||e.data?.type==='lt41-choose'){links();writeLocation();}});function sharePayload(){return {treeId:window.LT41?.tree.id||'',entryMomentId:$('share-moment').value,view:$('share-view').value};}
 function shareFailure(answer){return answer.status===401?'로그인이 필요해요.':answer.code==='timeout'?'서버 응답 시간이 초과됐어요.':answer.message||'공유 요청을 처리하지 못했어요.';}
 function renderShareList(shares=[]){
  const host=$('share-list'),treeId=window.LT41?.tree.id;host.replaceChildren();const selected=shares.filter(item=>item.treeId===treeId);
@@ -239,16 +241,54 @@ function setEditorMode(mode){
 // 2026-11-07 첫 트리 = 첫 여정(A안, 어두운 무대). 새 트리를 여는 모든 경로가 이 화면으로 오고,
 // 순간 추가·이 순간 수정은 기존 오른쪽 패널을 그대로 쓴다. 저장은 member.apply('new'/'add') 하나뿐이다.
 function journeyReply(message){try{$('view').contentWindow?.postMessage(message,location.origin);}catch{}}
-function openFirstJourney({subject=''}={}){
+// 2026-11-08 첫 여정 기록: 열 때와 단계를 옴길 때마다 #journey/00~04를 history에 남긴다.
+// 같은 단계로 다시 쓰지 않고, 뒤로가기는 이 기록만 보고 단계 복귀·종료를 정한다.
+function writeJourneyLocation(step,mode='push'){
+ const hash=journeyRouteHash(step);
+ if(location.hash!==hash){
+  const depth=Number(history.state?.lt41Journey)||0;
+  history[mode==='replace'?'replaceState':'pushState'](mode==='replace'?history.state:{lt41Journey:depth+1},'',hash);
+ }
+ handledHash=hash;
+}
+function noteJourneyStep(step,{replace=false}={}){
+ if(current!=='first-journey.html')return;
+ journeyStep=parseJourneyRoute(journeyRouteHash(step))?.step||0;
+ writeJourneyLocation(journeyStep,replace?'replace':'push');
+}
+function gotoJourneyStep(step){
+ if(current!=='first-journey.html'){openFirstJourney({step,route:true});return;}
+ journeyStep=parseJourneyRoute(journeyRouteHash(step))?.step||0;
+ try{$('view').contentWindow?.postMessage({type:'lt41-journey-goto',step:journeyStep},location.origin);}catch{}
+ handledHash=location.hash;
+}
+function leaveJourney({replaceHash=false}={}){
+ if(current!=='first-journey.html')return;
+ const target=screens.some(screen=>screen[1]===journeyReturn)?journeyReturn:'src064-orbit.html';
+ journeySaved=false;journeyRouteOpened=false;
+ show(target,false);
+ if(replaceHash){history.replaceState(null,'','#home');handledHash='#home';}else handledHash=location.hash;
+}
+// 저장을 마친 뒤(04 이후) 뒤로가기는 성장 단계로 다시 들어가지 않고 첫 화면으로 나간다.
+function finishJourney(){journeySaved=false;journeyRouteOpened=false;show('src064-orbit.html',false);history.replaceState(null,'','#home');handledHash='#home';}
+function openFirstJourney({subject='',step=null,route=false}={}){
  const gate=journeyEntry({owned:!!member?.snapshot().owned,writable:!!member?.snapshot().writable,mode:'new'});
- if(gate.screen==='login'){panel('login-start');return;}
- if(gate.screen==='records'){notify('서버 편집 연결이 아직 준비되지 않았어요. 기록은 안전하게 읽을 수 있습니다.');panel('records');return;}
+ const routed=route&&Number.isFinite(step);
+ if(gate.screen==='login'){if(routed){history.replaceState(null,'','#home');handledHash='#home';}panel('login-start');return;}
+ if(gate.screen==='records'){if(routed){history.replaceState(null,'','#home');handledHash='#home';}notify('서버 편집 연결이 아직 준비되지 않았어요. 기록은 안전하게 읽을 수 있습니다.');panel('records');return;}
  if(screens.some(screen=>screen[1]===current))journeyReturn=current;
  if($('community-panel').open)$('community-panel').close();
- current='first-journey.html';document.body.classList.remove('home-screen');$('empty').hidden=true;
+ const start=routed?parseJourneyRoute(journeyRouteHash(step))?.step||0:0;
+ current='first-journey.html';journeySaved=false;journeyStep=start;journeyRouteOpened=routed;
+ document.body.classList.remove('home-screen');$('empty').hidden=true;
  const frame=$('view');frame.hidden=false;frame.title='러브트리 · 첫 여정';
- frame.contentWindow.location.replace(new URL('/v41/views/first-journey.html'+(subject?'?subject='+encodeURIComponent(subject):''),location.origin).href);
+ const query=new URLSearchParams();
+ if(subject)query.set('subject',subject);
+ if(routed)query.set('step',String(start));
+ const suffix=query.toString();
+ frame.contentWindow.location.replace(new URL('/v41/views/first-journey.html'+(suffix?'?'+suffix:''),location.origin).href);
  flowNavigation();
+ writeJourneyLocation(start,routed?'replace':'push');
 }
 function saveFirstJourney(draft){
  if(source!=='server'||!member?.snapshot().owned){journeyReply({type:'lt41-journey-result',ok:false,message:'로그인한 뒤 내 기록에 저장할 수 있어요.'});return;}
@@ -263,9 +303,15 @@ function saveFirstJourney(draft){
 }
 function openJourneyBook({treeId,firstMomentId}={}){
  if(!treeId||!member?.state().trees.some(tree=>tree.id===treeId&&tree.moments.some(moment=>moment.id===firstMomentId)))return;
+ journeySaved=true;
  current='track59-sketchbook.html';choose(treeId,firstMomentId);show(current);writeLocation();
 }
-function closeFirstJourney(){show(screens.some(screen=>screen[1]===journeyReturn)?journeyReturn:'src064-orbit.html');writeLocation();}
+function closeFirstJourney(){
+ if(current!=='first-journey.html')return;
+ const depth=Number(history.state?.lt41Journey)||0;
+ if(!journeyRouteOpened&&depth>0){journeyStep=0;history.go(-depth);return;}
+ leaveJourney({replaceHash:true});
+}
 function openEditor(requestedMode){if(source!=='server'||!member?.snapshot().owned){panel('login-start');return;}if(!member.snapshot().writable){notify('서버 편집 연결이 아직 준비되지 않았어요. 기록은 안전하게 읽을 수 있습니다.');panel('records');return;}const mode=['new','add','edit'].includes(requestedMode)?requestedMode:window.LT41?'add':'new';if(mode==='new'){openFirstJourney();return;}setEditorMode(mode);panel('editor');queueMicrotask(()=>$('moment-form').elements.note.focus());}
 function updateTreeCoverHint(){const c=window.LT41,selected=c?.tree.moments.find(m=>m.id===$('tree-cover').value);if(!selected){$('tree-cover-hint').textContent='표지를 고르지 않으면 기존 금테 장식 표지를 사용합니다.';return;}const media=LTMedia.describe(selected.url||'');$('tree-cover-hint').textContent=media.kind==='photo'?`“${selected.title}”의 사진을 표지로 사용합니다.`:`“${selected.title}”을 표지 순간으로 표시하고 금테 장식 표지를 사용합니다.`;}
 function openTreeManager(){if(source!=='server'||!member?.snapshot().owned||!member.snapshot().writable||!window.LT41){notify('내 서버 기록을 불러온 뒤 책 정보를 관리해 주세요.');return;}const tree=window.LT41.tree,form=$('tree-form');form.elements.title.value=tree.title;form.elements.subject.value=tree.subject;$('tree-cover').replaceChildren();const fallback=document.createElement('option');fallback.value='';fallback.textContent='기본 금테 장식 표지';$('tree-cover').append(fallback);for(const moment of tree.moments){const option=document.createElement('option'),media=LTMedia.describe(moment.url||'');option.value=moment.id;option.textContent=`${moment.title} · ${media.kind==='photo'?'사진':media.kind==='video'?'영상':media.kind==='youtube'?'YouTube':media.kind==='link'?'링크':'기록'}`;$('tree-cover').append(option);}$('tree-cover').value=tree.coverMomentId||'';$('tree-form-error').textContent='';updateTreeCoverHint();treeBaseline=new URLSearchParams(new FormData(form)).toString();panel('tree-manager');queueMicrotask(()=>form.elements.title.focus());}
