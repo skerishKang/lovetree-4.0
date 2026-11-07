@@ -128,9 +128,9 @@ export function themePressed(theme) {
   return normalizeTheme(theme) === THEME_GARDEN;
 }
 
-// 1단계 범위: 공통 헤더와 첫 화면만 B를 쓴다. 안쪽 네 화면은 언제나 A다.
+// 2단계 범위: 공통 헤더·첫 화면·첫 여정만 B를 쓴다. 책장·기억책·보드·관계 지도는 언제나 A다.
 export function appliedTheme(theme, view) {
-  return view === 'home' ? normalizeTheme(theme) : THEME_NIGHT;
+  return view === 'home' || view === 'journey' ? normalizeTheme(theme) : THEME_NIGHT;
 }
 
 // 속성 없음 = A. B일 때만 data-lt-theme=garden 을 붙인다.

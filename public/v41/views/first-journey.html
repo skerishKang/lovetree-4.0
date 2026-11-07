@@ -5,6 +5,15 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>러브트리 · 첫 여정</title>
 <link rel="stylesheet" href="/v41/identity.css">
+<script>
+/* 정원 테마 2단계: 셸이 연 iframe은 셸이 정한 테마 속성을 그대로 받아 첫 그리기 전에 맞춘다.
+   셸 밖 단독 미리보기에서만 저장된 테마를 직접 읽는다(그 외에는 화면이 테마를 정하지 않는다). */
+try{
+  var ltHostTheme=window.parent!==window?window.parent.document.documentElement.getAttribute('data-lt-theme'):null;
+  if(!ltHostTheme&&window.parent===window)ltHostTheme=localStorage.getItem('lt41.theme')==='garden'?'garden':null;
+  if(ltHostTheme)document.documentElement.setAttribute('data-lt-theme',ltHostTheme);
+}catch(e){}
+</script>
 <style>
 /* 첫 여정 — 4.1 무대(iframe) 안에서 열린다. 색은 identity.css의 --lt-* 토큰만 쓴다. */
 *{box-sizing:border-box}
@@ -99,6 +108,17 @@ h1 em{font-style:normal;color:var(--lt-rose)}
  .primary,.ghost{width:100%}
  .chip{padding:9px 12px}
 }
+/* 정원 테마(2단계): 셸이 data-lt-theme=garden 을 넘길 때만 켜진다. 색은 identity.css 정원 토큰만 쓴다. */
+html[data-lt-theme=garden]{color-scheme:light}
+html[data-lt-theme=garden] body{background:radial-gradient(ellipse at 18% 0,var(--lt-stage-2),var(--lt-stage) 62%)}
+html[data-lt-theme=garden] h1{font-family:'Gowun Batang',var(--lt-reading);font-weight:700;letter-spacing:-.02em}
+html[data-lt-theme=garden] h1 em,html[data-lt-theme=garden] .eyebrow,html[data-lt-theme=garden] .moment-card .kicker{color:var(--lt-rose-ink)}
+html[data-lt-theme=garden] .error{color:var(--lt-rose-ink)}
+html[data-lt-theme=garden] .grow,html[data-lt-theme=garden] .restore,html[data-lt-theme=garden] .moment-card{border-color:var(--lt-gold-deep);box-shadow:var(--lt-garden-shadow)}
+html[data-lt-theme=garden] .seed,html[data-lt-theme=garden] .slot{border-color:var(--lt-line-paper)}
+html[data-lt-theme=garden] .primary{background:var(--lt-primary);color:var(--lt-primary-ink)}
+html[data-lt-theme=garden] .primary:hover{background:var(--lt-gold-deep);color:var(--lt-primary-ink)}
+html[data-lt-theme=garden] .field input[type=date]{color-scheme:light}
 </style>
 </head>
 <body>
