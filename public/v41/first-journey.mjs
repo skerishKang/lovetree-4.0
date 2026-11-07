@@ -4,6 +4,7 @@
 import {EMOTIONS, normalizeEmotion, safeUrl, suggestMomentTitle} from './domain.mjs';
 
 export const JOURNEY_STORAGE_KEY = 'lovetree.v41.first-journey';
+export const JOURNEY_COMPLETION_KEY = 'lovetree.v41.first-journey.finished';
 export const JOURNEY_STEPS = Object.freeze([
   {index: '00', key: 'subject', label: '트리 이름'},
   {index: '01', key: 'first', label: '첫 순간'},
@@ -100,6 +101,34 @@ export function writeJourneyDraft(storage, draft) {
 export function clearJourneyDraft(storage) {
   try {
     storage?.removeItem?.(JOURNEY_STORAGE_KEY);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// 저장을 마친 여정은 임시값을 지우고 완료 표시를 남긴다. 표시는 다음 새 여정이
+// 한 번 소비한다. pagehide가 늦게 돌아도 완료 뒤에는 다시 쓰지 않는다.
+export function persistJourneyDraft(storage, draft, {completed = false} = {}) {
+  if (completed) return false;
+  return writeJourneyDraft(storage, draft);
+}
+
+export function finishJourneyDraft(storage) {
+  try {
+    storage?.setItem?.(JOURNEY_COMPLETION_KEY, '1');
+    storage?.removeItem?.(JOURNEY_STORAGE_KEY);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function discardFinishedJourneyDraft(storage) {
+  try {
+    if (storage?.getItem?.(JOURNEY_COMPLETION_KEY) !== '1') return false;
+    storage.removeItem(JOURNEY_COMPLETION_KEY);
+    storage.removeItem(JOURNEY_STORAGE_KEY);
     return true;
   } catch {
     return false;
