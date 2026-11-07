@@ -11,7 +11,7 @@
 
 /* Site destinations and views of the selected tree have separate roles. */
 .tree-views{display:flex;align-items:center;gap:4px;margin-left:12px;padding-left:12px;border-left:1px solid var(--line)}.tree-views>small{font-size:11px;white-space:nowrap;color:var(--muted);margin-right:5px}.tree-views[hidden],#connection-menu[hidden]{display:none!important}
-@media(max-width:780px){.tree-views{flex:3;margin-left:4px;padding-left:4px;gap:0}.tree-views>small{display:none}nav>button{flex:1}.tree-views>button{padding:0 8px}.header-actions{min-width:0}.header-actions #write-menu{max-width:96px;overflow:hidden;text-overflow:ellipsis}}
+@media(max-width:780px){.tree-views{flex:0 0 auto;margin-left:4px;padding-left:4px;gap:0}.tree-views>small{display:none}.tree-views>button{padding:0 8px}.header-actions{min-width:0}.header-actions #write-menu{max-width:96px;overflow:hidden;text-overflow:ellipsis}}
 
 /* One tree label; the selected navigation tab already names the current view. */
 #view-context{flex:0 0 auto;display:flex;align-items:center;gap:10px;min-height:36px;padding:6px 24px;background:var(--lt-stage-2);color:var(--lt-pearl);border-bottom:1px solid var(--line);font-size:12px}
@@ -129,11 +129,24 @@ html[data-v41-screen=book] .tools .ui-btn,html[data-v41-screen=board] header .he
 html[data-v41-screen=book] .tools .ui-btn::after,html[data-v41-screen=board] header .headbtn::after,html[data-v41-screen=network] .top-actions .pill::after{content:"";position:absolute;inset:-4px;border-radius:inherit}
 @media(max-width:780px){
  .app-header{gap:8px}
- nav{flex-wrap:nowrap}
- nav #record-menu{max-width:132px;margin-left:6px;padding-left:6px;font-size:12px}
+ /* 2026-11-07: 390·360에서 탭 7개가 폭을 넘어 잘리던 문제. 탭 줄을 가로 스크롤로 바꾸고 현재 탭을 가운데로 보여 준다.
+    스크롤바는 숨기고, 넘치는 쪽 끝에 무대 배경(--lt-stage) 페이드를 둔다. 데스크톱 배치는 그대로 둔다. */
+ nav{flex-wrap:nowrap;scroll-snap-type:x proximity;scroll-padding-inline:12px;overscroll-behavior-x:contain}
+ nav>button,nav>#record-menu,nav>.tree-views{scroll-snap-align:center}
+ nav>button{flex:0 0 auto}
+ .tree-views{flex:0 0 auto}
+ .tree-views>button{flex:0 0 auto}
+ nav #record-menu{max-width:112px;margin-left:6px;padding-left:6px;font-size:12px}
  .header-actions #write-menu.primary-action{max-width:112px;overflow:hidden;text-overflow:ellipsis}
  .account-avatar{width:44px;height:44px}
  .account-popover{right:-4px;min-width:210px}
  .header-actions #header-overflow{top:52px}
 }
-@media(max-width:420px){nav #record-menu{max-width:104px}}
+/* 넘치는 쪽 끝의 페이드. 스크롤 위치에 따라 켜고 끄는 클래스는 shell.mjs가 붙인다. */
+@media(max-width:780px){
+ .app-header{--nav-fade:28px}
+ .app-header nav.fade-start{mask-image:linear-gradient(to right,transparent 0,#000 var(--nav-fade))}
+ .app-header nav.fade-end{mask-image:linear-gradient(to left,transparent 0,#000 var(--nav-fade))}
+ .app-header nav.fade-start.fade-end{mask-image:linear-gradient(to right,transparent 0,#000 var(--nav-fade),#000 calc(100% - var(--nav-fade)),transparent 100%)}
+}
+@media(max-width:420px){nav #record-menu{max-width:112px}}

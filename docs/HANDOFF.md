@@ -1,3 +1,16 @@
+## 2026-11-07 — 모바일 헤더 탭 잘림 수정(컴1 레인, ai/com1-lt-mobile-tabs-261107)
+
+#185로 트리 선택이 탭 묶음 앞으로 오면서 390·360에서 탭 7개가 폭을 넘어 기억 보드·관계 지도가 잘렸다(postdeploy `no-overflow-390` warn). 좁은 폭만 고쳤고 데스크톱 배치는 그대로다. 제품 코드 변경은 `public/v41/shell.css`·`public/v41/shell.mjs` 두 파일뿐이다.
+
+- ≤780px 탭 줄: `overflow-x:auto` + 스크롤바 숨김 + `scroll-snap-type:x proximity`. 탭은 `flex:0 0 auto`로 줄어들지 않는다(예전 `nav>button{flex:1}`·`.tree-views{flex:3}` 제거).
+- 화면 전환 때 현재 탭을 `scrollIntoView({inline:'center',block:'nearest'})`로 가운데에 보인다(`revealCurrentTab`, `flowNavigation`에서 호출). `prefers-reduced-motion`이면 `auto`.
+- 넘치는 쪽 끝에만 `--lt-stage` 기반 페이드(`fade-start`/`fade-end`, `mask-image`). 스크롤·리사이즈에 반응해 켜고 끈다(`updateNavFade`).
+- 트리 선택은 ≤780px에서 `max-width:112px` 말줄임(420 이하도 112px 유지).
+
+시험: `tests/v41-header-tabs-mobile.test.mjs` 8건 추가(CSS 규칙·데스크톱 무영향·현재 탭 노출·페이드 토글·탭 7개). 전체 `npm test` 371건 334 pass/0 fail, `npm run build` pass. 로컬 390/360/1440 실측 `tabs-check.mjs`: 가로 페이지 넘침 0, 7개 탭 모두 스크롤로 닿음, 현재 탭 보임, 1440은 스크롤·페이드 없음.
+
+저장소 밖 도구: `postdeploy.mjs`에서 스크롤 컨테이너 안 요소는 넘침으로 세지 않게 고치고, `no-overflow-*`를 warn→fail로 올렸다. 좁은 폭에 `tabs-390`·`tabs-360` 검사(7개 도달성·현재 탭 노출)를 추가하고 360 화면도 검사한다.
+
 ## 2026-11-07 — 상단 메뉴 재구성과 첫 화면 버튼 상태(컴1 레인, ai/com1-lt-header-ia-261107)
 
 대표 결정(2026-11-07)으로 4.1 상단 메뉴 배치를 바꿨다. 색·금테·무대·알약 모양은 그대로 두고 배치와 버튼 무게만 손댔다. 새 색 hex는 쓰지 않았고 `--lt-*` 토큰만 썼다.

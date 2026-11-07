@@ -70,7 +70,30 @@ function flowNavigation(){
  $('write-menu').hidden=publicReading;$('share-menu').hidden=source!=='server'||!member?.snapshot().owned||!window.LT41;
  if(!member?.snapshot().dirty)$('write-menu').textContent=writeMenuLabel({owned:!!member?.snapshot().owned,dirty:false,reading,hasTree:!!window.LT41});
  $('write-menu').title=source==='server'?(reading?'선택한 순간에서 이어지는 새 순간을 기록합니다.':'새 트리의 첫 순간을 기록합니다.'):'로그인한 계정에 내 트리를 만듭니다. 예시에는 저장하지 않아요.';
+ revealCurrentTab();
 }
+// 2026-11-07: 390·360에서 탭 7개가 폭을 넘는다. 탭 줄은 가로 스크롤이고, 화면을 바꿀 때 현재 탭을 가운데로 당겨 보이게 한다.
+// 넘치는 쪽 끝에만 페이드를 켜서 잘린 것이 아니라 더 있다는 신호를 준다. 데스크톱(넓은 폭)은 스크롤이 없어 아무 일도 하지 않는다.
+const navBar=document.querySelector('.app-header nav');
+const narrowNav=()=>matchMedia('(max-width:780px)').matches;
+function updateNavFade(){
+ if(!navBar)return;
+ const overflowing=navBar.scrollWidth-navBar.clientWidth>1;
+ const atStart=navBar.scrollLeft<=1;
+ const atEnd=navBar.scrollLeft>=navBar.scrollWidth-navBar.clientWidth-1;
+ navBar.classList.toggle('fade-start',overflowing&&!atStart);
+ navBar.classList.toggle('fade-end',overflowing&&!atEnd);
+}
+function revealCurrentTab(){
+ if(!navBar||!narrowNav()){updateNavFade();return;}
+ const active=navBar.querySelector('[aria-current="true"]')||navBar.querySelector('#record-menu');
+ if(active&&active.getClientRects().length){
+  const reduce=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  active.scrollIntoView({inline:'center',block:'nearest',behavior:reduce?'auto':'smooth'});
+ }
+ updateNavFade();
+}
+if(navBar){navBar.addEventListener('scroll',updateNavFade,{passive:true});addEventListener('resize',()=>revealCurrentTab());}
 function show(file,write=true){const screen=screens.find(s=>s[1]===file);if(!screen)return;if($('community-panel').open)$('community-panel').close();current=file;flowNavigation();if(!window.LT41&&file!=='src064-orbit.html'){document.body.classList.remove('home-screen');$('view').hidden=true;$('empty').hidden=false;if(write)writeLocation();links();return;}document.body.classList.toggle('home-screen',file==='src064-orbit.html');document.querySelectorAll('[data-view]').forEach(b=>b.setAttribute('aria-current',String(b.dataset.view===file)));$('view').hidden=false;$('empty').hidden=true;$('view').title='러브트리 · '+screen[2];$('view').contentWindow.location.replace(new URL('/v41/'+(file==='src064-orbit.html'?'home.html':(source==='example'?'design/views/':'views/')+file),location.origin).href);if(write)writeLocation();links();}
 function choose(id,momentId){const tree=model.trees.find(t=>t.id===id);window.LT41=tree?{tree,trees:model.trees,source,momentId:tree.moments.find(m=>m.id===momentId)?.id||tree.moments.find(m=>m.parentId===null)?.id||tree.moments[0]?.id,}:null;
  if(tree||current==='src064-orbit.html')show(current,false);else{flowNavigation();document.body.classList.remove('home-screen');$('view').hidden=true;$('view').contentWindow.location.replace('about:blank');$('empty').hidden=false;links();}}
