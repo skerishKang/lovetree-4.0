@@ -1,6 +1,8 @@
 import '../src/styles.css';
 import {mountOrbit,ORBIT_EXAMPLE} from '../src/views/orbit.js';
-import {homeOrbitPlan} from './home-moments.js';
+import {homeCardsPlan,readHomeCardsMode,writeHomeCardsMode,homeCardsMenu,homeCardsLabel} from './home-cards.js';
+import {HOME_ORBIT_LIMIT} from './home-moments.js';
+import {fetchPopularCards} from './home-popular.js';
 import {createHomeActions} from './home-actions.js';
 import {homePresentation} from './home-presentation.js';
 import {applyHomeCenter} from './home-center.js';
@@ -9,12 +11,18 @@ const shellBody=parent.document.body;
 const context=parent.LT41||{source:shellBody.dataset.recordSource,member:shellBody.dataset.member,treeCount:Number(shellBody.dataset.treeCount||0)};
 const bridge=createHomeActions({getContext:()=>parent.LT41,send:message=>parent.postMessage(message,location.origin),gallery:true});
 const presentation=homePresentation(context);
-// 2026-11-08: 로그인한 사람의 순간을 궤도에 올린다. 예시만 도는 화면은 로그아웃·기록 0개일 때만 남긴다.
-const orbitPlan=homeOrbitPlan(context);
-const mineTrees=orbitPlan.cards.length?[{id:'home-mine',title:'내 순간들',momentCount:orbitPlan.cards.length,moments:orbitPlan.cards}]:[];
+const loggedIn=presentation.centerState.member==='in';
+// 2026-11-08 카드 출처: 예시/인기/내 것만/섞어서. 저장값이 없으면 로그인=섞어서, 로그아웃=예시.
+const mode=readHomeCardsMode(localStorage,{loggedIn});
+const popular=mode==='popular'?await fetchPopularCards({limit:HOME_ORBIT_LIMIT}):[];
+const cardsPlan=homeCardsPlan({mode,loggedIn,context,popular});
+const cardTrees=cardsPlan.cards.length?[{id:'home-cards',title:'첫 화면 카드',moments:cardsPlan.cards}]:[];
 const dispose=mountOrbit(document.getElementById('orbit'),{
- trees:mineTrees,examples:orbitPlan.fill?ORBIT_EXAMPLE.moments:[],onOpen:card=>bridge.actions.openMine(card.treeId,card.id),
- storage:{getItem:()=>null,setItem:()=>{}},context:{...presentation.context,readOnly:!orbitPlan.cards.length},
+ trees:cardTrees,examples:cardsPlan.examples?ORBIT_EXAMPLE.moments.slice(0,cardsPlan.examples):[],
+ // 내 것만 0장은 예시로 대체하지 않고 빈 궤도와 첫 순간 안내를 남긴다.
+ empty:cardsPlan.kind==='mine-empty',
+ onOpen:card=>{if(card.source==='public'){parent.location.hash=`#share/${card.shareId}/${card.view||'book'}`;return;}bridge.actions.openMine(card.treeId,card.id);},
+ storage:{getItem:()=>null,setItem:()=>{}},context:{...presentation.context,readOnly:cardsPlan.kind==='example'},
  authHtml:`<button class="menuBtn auth-entry" data-home-account>${presentation.accountLabel}</button>`,actions:bridge.actions
 });
 const shadow=document.getElementById('orbit').shadowRoot;
@@ -34,6 +42,10 @@ themeButton.onclick=()=>{const theme=writeTheme(localStorage,nextTheme(readTheme
 const identity=document.createElement('style');
 identity.textContent=`:host{--ui:'Pretendard Variable',Pretendard,system-ui,sans-serif}.app{font-family:var(--ui)}.actions .subtleBtn{font-size:14px}.center .center-note{font-size:12px}.menuBtn{font-size:14px}.topbar .brand{display:none}.topbar{justify-content:flex-end;padding:12px 28px}[data-home-account],.home-community{display:none}`;
 shadow.append(identity);
+// 카드 출처 메뉴: 도구 줄 규칙(시각 높이 36·터치 44)을 그대로 쓰고, 항목은 44px 이상으로 둔다.
+const cardUI=document.createElement('style');
+cardUI.textContent=`.card-source{position:relative;display:inline-flex;align-items:center;min-height:44px}.card-source>.menuBtn{position:relative;height:36px;min-height:36px;display:inline-flex;align-items:center;padding-block:0}.card-source>.menuBtn:after{content:'';position:absolute;inset:-4px;border-radius:999px}.card-menu{position:absolute;top:calc(100% + 8px);right:0;z-index:4000;min-width:156px;padding:6px;border:1px solid var(--lt-line);border-radius:14px;background:var(--lt-glass-strong);box-shadow:0 14px 34px rgba(0,0,0,.45)}.card-menu button{display:block;width:100%;min-height:44px;padding:8px 12px;border:0;border-radius:10px;background:transparent;color:var(--lt-pearl);font:inherit;font-size:14px;text-align:left;cursor:pointer}.card-menu button[aria-checked=true],.card-menu button:hover{box-shadow:inset 0 0 0 1px var(--lt-gold-line)}.card-menu button[aria-checked=true]{color:var(--lt-gold)}@media(max-width:768px){.card-menu{right:auto;left:0}}`;
+shadow.append(cardUI);
 if(presentation.canResume){
  const primary=shadow.querySelector('.primary-cta'),secondary=shadow.querySelector('.actions [data-do="continue"]');
  primary.dataset.do='member-continue';primary.textContent='이어 보던 순간';primary.onclick=bridge.actions.resume;
@@ -50,10 +62,32 @@ const centerPlan=applyHomeCenter(centerButtons,presentation.centerState);
  if(presentation.centerState.member==='out')first.onclick=bridge.actions.start;
  else if(centerPlan.state==='in-trees')first.onclick=bridge.actions.resume;
 }
-shadow.querySelector('.center-note').textContent=orbitPlan.note||'배경 카드는 감상 예시 · 내 기록에는 저장되지 않아요';
+// 예시 모드는 궤도의 기존 안내를 그대로 두고, 나머지는 계획의 문구를 쓴다(빈 문자열이면 숨김).
+if(cardsPlan.note!==null)shadow.querySelector('.center-note').textContent=cardsPlan.note;
 const mobileFit=document.createElement('style');mobileFit.textContent='@media(max-width:768px){.topbar{gap:12px;flex-wrap:wrap;align-items:center;padding:8px 12px}.top-actions{gap:6px;flex-shrink:0;flex-wrap:wrap;margin-left:auto}.topbar .menuBtn{white-space:nowrap;padding:10px 9px;font-size:14px}.actions .subtleBtn{font-size:14px}.center .center-note{font-size:14px}.hint{font-size:14px}}';shadow.append(mobileFit);
 const community=document.createElement('button');community.className='menuBtn home-community';community.type='button';community.textContent='둘러보기';community.setAttribute('aria-label','공개 트리 둘러보기');community.onclick=bridge.actions.community;shadow.querySelector('[data-home-account]').before(community);
 shadow.querySelector('.top-actions').append(themeButton);
+// 카드 출처 버튼과 메뉴. 로그아웃에는 예시·인기만 보여 준다.
+const cardWrap=document.createElement('span');cardWrap.className='card-source';
+const cardButton=document.createElement('button');cardButton.type='button';cardButton.className='menuBtn';cardButton.dataset.ltCardSource='';
+cardButton.textContent=`카드: ${homeCardsLabel(cardsPlan.mode)} ▾`;cardButton.setAttribute('aria-haspopup','menu');cardButton.setAttribute('aria-expanded','false');cardButton.setAttribute('aria-controls','home-card-menu');
+const cardMenu=document.createElement('div');cardMenu.className='card-menu';cardMenu.id='home-card-menu';cardMenu.setAttribute('role','menu');cardMenu.hidden=true;
+const modes=homeCardsMenu({loggedIn});
+function renderMenu(){
+ cardMenu.replaceChildren();
+ for(const item of modes){
+  const b=document.createElement('button');b.type='button';b.setAttribute('role','menuitemradio');b.setAttribute('aria-checked',String(item===cardsPlan.mode));b.tabIndex=-1;b.textContent=homeCardsLabel(item);
+  b.onclick=()=>{writeHomeCardsMode(localStorage,item);closeMenu();location.reload();};
+  cardMenu.append(b);
+ }
+}
+function openMenu(){renderMenu();cardMenu.hidden=false;cardButton.setAttribute('aria-expanded','true');const items=[...cardMenu.querySelectorAll('[role=menuitemradio]')];(items.find(b=>b.getAttribute('aria-checked')==='true')||items[0])?.focus();}
+function closeMenu(refocus=false){if(cardMenu.hidden)return;cardMenu.hidden=true;cardButton.setAttribute('aria-expanded','false');if(refocus)cardButton.focus();}
+cardButton.onclick=()=>{if(cardMenu.hidden)openMenu();else closeMenu();};
+cardButton.addEventListener('keydown',e=>{if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();openMenu();}else if(e.key==='Escape')closeMenu();});
+cardMenu.addEventListener('keydown',e=>{const items=[...cardMenu.querySelectorAll('[role=menuitemradio]')],index=items.indexOf(document.activeElement);if(e.key==='Escape'){e.preventDefault();closeMenu(true);}else if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();const step=e.key==='ArrowDown'?1:-1;items[(index+step+items.length)%items.length]?.focus();}else if(e.key==='Home'){e.preventDefault();items[0]?.focus();}else if(e.key==='End'){e.preventDefault();items.at(-1)?.focus();}});
+document.addEventListener('click',e=>{if(!cardWrap.contains(e.target))closeMenu();});
+cardWrap.append(cardButton,cardMenu);shadow.querySelector('.top-actions').append(cardWrap);
 shadow.querySelector('[data-home-account]').onclick=bridge.actions.account;
 shadow.querySelectorAll('.firstMark').forEach(e=>e.textContent='첫 순간');
 const dialog=shadow.querySelector('dialog');
