@@ -1,6 +1,7 @@
 ## 2026-11-07 — 새 트리 만들기 = 첫 여정(A안, 어두운 무대) · 컴2 로컬2 레인
 
 `ai/com2-lt-first-journey-261107`. 새 트리를 여는 모든 경로를 어두운 무대의 첫 여정 화면 하나로 모으고, 순간 추가·이 순간 수정은 기존 오른쪽 패널에 남겼다. 저장 계약·스키마·인증·공통 헤더·`identity.css` 토큰 정의·`index.html` 워드마크는 바꾸지 않았다.
+- PR #187: CI 결과는 이 PR에서 확인한다.
 
 - 화면 `public/v41/views/first-journey.html`, 순수 로직 `public/v41/first-journey.mjs`(단계·검증·저장 계획·임시 보관·진입 판정). 셸 `public/v41/shell.mjs`는 `openFirstJourney` 하나로 진입을 모으고 `lt41-journey-save`/`-open-book`/`-close` 메시지만 처리한다.
 - 진입: 로그아웃 첫 화면 `처음 시작하기` → 로그인 뒤 `openEditor('new')` → 첫 여정(트리 0개 계정), 첫 화면 가운데 `새 트리 만들기`(`openEditor()` → `new`), 헤더 주 버튼(책장에서 `new`), 작성 패널의 `새 트리` 탭, 둘러보기 `내 기록 새로 시작`(대상 이름을 첫 여정에 미리 채움). `순간 추가`·`이 순간 수정`은 `setEditorMode` 패널 그대로다.
