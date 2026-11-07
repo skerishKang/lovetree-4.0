@@ -1,3 +1,16 @@
+## 2026-11-07 — 첫 화면 테마 A/B와 워드마크 LoveTree 통일 1단계(컴2레인, ai/com2-lt-theme-ab-261107)
+
+첫 화면과 공통 헤더에만 밤(A)/정원(B) 테마를 붙였다. A는 지금 운영 그대로이고 속성이 없으면 A다. B의 새 색은 `public/v41/identity.css`의 `html[data-lt-theme=garden]` 블록 한 곳에만 있다(`reference/originals/first-journey.html`의 `:root`: 종이 #f7f0e8 · 잉크 #403536 · 장미 #c86e79 · 깊은 장미 #98505e).
+
+- 워드마크를 `LoveTree` + 작은 `4.1`로 바꿨다(`aria-label="LoveTree 4.1 첫 화면"`). `· MEMORY ORBIT`와 새싹은 헤더에서 삭제했고 파비콘만 남긴다. A는 Pretendard 700/.22em(기존 헤더와 같은 값), B는 Gowun Batang 잉크색이다. 글꼴은 저장소 안(`public/fonts/gowun-batang/`, 라틴 서브셋 16KB + OFL 전문)에서만 받고 외부 글꼴 요청은 0건이다.
+- 첫 화면 B는 그림자 루트 안쪽(`:host([data-lt-theme=garden])`)에서 색만 바꾼다. 궤도 배치·움직임·깊이 카메라는 그대로이며, 연한 메모 카드는 잉크색 3px 테두리로 크림 배경과 대비를 확보한다. 같은 `identity.css`를 그림자 루트에도 `<link>`해 한 파일의 규칙을 같이 쓴다.
+- 전환은 첫 화면 오른쪽 위 도구 줄 버튼(글자 `밤`/`정원`, `aria-pressed`)과 계정 메뉴 항목 두 곳이다. 값은 `localStorage['lt41.theme']`, `index.html` head 인라인 스크립트가 첫 그리기 전에 적용하고 `try/catch` 실패 시 A다. `prefers-reduced-motion`이면 전환 애니메이션을 끈다.
+- 안쪽 네 화면은 1단계에서 A로 고정한다: `header-state.mjs`의 `appliedTheme(theme, view)`가 `home`이 아니면 A를 돌려주고 셸이 그 화면에 `data-lt-theme`를 붙이지 않는다. 셸은 화면 전환·iframe load 때마다 다시 적용하고, 첫 화면 프레임은 `postMessage({type:'lt41-theme'})`로 같은 값을 맞춘다.
+
+시험: `tests/v41-theme-ab.test.mjs` 11건 추가(기본 A · 저장/재방문 유지 · 저장 실패 A · 안쪽 화면 A · 버튼 문구와 aria-pressed · 워드마크 · head 인라인 스크립트 · 정원 색 단일 블록 · 메모 카드 테두리 · 움직임 줄이기 · 외부 글꼴 0건). 전체 `npm test` 382건 345 pass/0 fail/37 skip, `npm run build` pass(잠금 대기 0초).
+
+로컬 미리보기(로그아웃, `dist` 정적 서버, Playwright + 설치된 Chrome): `out/theme-ab/first-{night,garden}-{1440,390,360}.png` 6장과 `out/theme-ab/inner-book-{1440,390,360}.png` 3장. 가로 넘침 0(바깥 문서·첫 화면 문서 모두, 1440·390·360), 탭 7개 모두 스크롤로 도달(390 = 111px, 360 = 129px 스크롤 범위, 마지막 탭 보임), 외부 글꼴 요청 0건. 대비(계산값): A 헤더 18.18:1·안내 13.36:1, B 헤더 10.44:1·안내 5.31:1·메모 카드 테두리 10.44:1. 정원이 저장된 상태에서 `#book`을 열면 `html`에 속성이 없고 헤더가 `rgb(4,4,7)`(A)이다.
+
 ## 2026-11-07 — 새 트리 만들기 = 첫 여정(A안, 어두운 무대) · 컴2 로컬2 레인
 
 `ai/com2-lt-first-journey-261107`. 새 트리를 여는 모든 경로를 어두운 무대의 첫 여정 화면 하나로 모으고, 순간 추가·이 순간 수정은 기존 오른쪽 패널에 남겼다. 저장 계약·스키마·인증·공통 헤더·`identity.css` 토큰 정의·`index.html` 워드마크는 바꾸지 않았다.
@@ -10,7 +23,6 @@
 - 임시 보관: `localStorage` `lovetree.v41.first-journey`에 try/catch. 다시 열면 “이어서 쓸까요?”를 묻는다. 트리 저장 뒤 닫았으면 `savedTreeId`/`savedMomentId`로 이어져 트리를 두 번 만들지 않는다. 화면은 서버를 직접 부르지 않고 셸만 저장하며, 셸이 로그인·쓰기 가능을 확인한다(비로그인 서버 저장 없음).
 - 시험: `tests/v41-first-journey.test.mjs` 11건(단계 이동·나중에 잇기·저장 인자·진입 경로·임시 보관 복원·토큰/hex/keep-all). 전체 `npm test` 382건 345 pass/0 fail/37 skip, `npm run build` pass.
 - 로컬 캡처: `out/first-journey/`에 1440(7장)·390(5)·360(5). CDP 실측 `innerWidth` 1440/390/360, 0~04 단계 가로 넘침 0. 단독 미리보기(가짜 세션)이며 로그인·운영 저장 왕복은 컴1 레인이 머지 후 확인한다. (헤드리스 Chrome은 창 최소 폭 500px 때문에 390/360을 그대로 못 잡아 CDP `setDeviceMetricsOverride`로 캡처했다.)
-
 ## 2026-11-07 — 모바일 헤더 탭 잘림 수정(컴1 레인, ai/com1-lt-mobile-tabs-261107)
 
 #185로 트리 선택이 탭 묶음 앞으로 오면서 390·360에서 탭 7개가 폭을 넘어 기억 보드·관계 지도가 잘렸다(postdeploy `no-overflow-390` warn). 좁은 폭만 고쳤고 데스크톱 배치는 그대로다. 제품 코드 변경은 `public/v41/shell.css`·`public/v41/shell.mjs` 두 파일뿐이다.
