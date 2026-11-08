@@ -892,6 +892,20 @@ COM2에는 merge `6900df8aa446dfe0201d01997457fae04c4abe16`의 변경 서버 파
 - 확인(가짜 서버 기록: `url` + `mediaMetadata`가 있는 YouTube 순간): 1440·390, 밤·정원 모두 실제 마우스 클릭으로 `iframe.yt-frame` 1개 생성(임베드 `start=83`), 밤 큰 제목 Pretendard · 정원 큰 제목 MaruBuri, 넘침 0. 셸 경유(`#book`)에서도 iframe 테마가 garden으로 전달된다.
 - 시험: `tests/v41-book-usability.test.mjs` 12·13번, `tests/v41-journey-garden`·`v41-theme-ab`의 기대값 갱신(기억책·보드·지도=정원 허용(#274로 보드·지도도 정원), 그 밖의 안쪽 화면=밤 고정). `npm test` 483 pass / 0 fail / 37 skip, build 성공.
 
+## 2026-11-09 첫 화면(src064-orbit) 파일 지도 (원본 정리, ai/lt-orbit-source-261109)
+
+| 파일 | 줄 수 | 내용 |
+|---|---|---|
+| `public/v41/views/src064-orbit.html` | 49 | 마크업 + `orbit.css`·`orbit.js` 연결만 (75KB → 5.0KB) |
+| `public/v41/views/orbit/orbit.css` | 254 | 화면 스타일(원본 `<style>` 그대로, 공백만 정리) |
+| `public/v41/views/orbit/orbit.js` | 279 | 궤도 계산·그리기·포커스·뷰어·목록·입력(ES 모듈, `import`로 아래 두 파일 사용) |
+| `public/v41/views/orbit/orbit-cards.mjs` | 55 | 기본 카드 배치 `BASE_CARDS`(배치값 없는 실제 기록에만 쓰는 값) |
+| `public/v41/views/orbit/orbit-model.mjs` | 12 | 순수 함수 `escapeRecord`·`hasLayout`·`momentSeq` — node에서 import해 시험 |
+
+- 원칙 7: 조건·문구·id·순서·동작 변경 0. 스크립트는 **공백만 넣어** 줄을 나눴고(문자열·템플릿·정규식 밖에서만), `#286`에서 정리한 예시 분기 2곳은 자리만 옮겼다.
+- 화면 스크립트는 `type="module"`이다(순수 함수를 실제로 import하기 위해서). `runtime.js`는 그보다 먼저 실행되어 `window.LTDEMO`를 만든다.
+- 확인: home 4장(1440·390 × 밤·정원) **0.000%**, 24장 24/24 기준 이내, `npm test` **610 pass / 0 fail**.
+
 ## 2026-11-08 postdeploy visual/visual-theme 기대값 = 제품 함수 (ai/lt-postdeploy-garden-all-261108)
 
 - `tools/postdeploy/postdeploy.mjs`의 visual-theme 판정이 "기억책만 정원, 보드·지도는 A 고정"으로 박혀 있었다(#274로 보드·지도도 정원을 받아 실패).
