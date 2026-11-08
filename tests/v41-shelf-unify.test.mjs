@@ -7,7 +7,14 @@ import { displayTreeTitle, autoTreeTitle, hasAutoTitleSuffix, AUTO_TITLE_SUFFIX 
 import { createTree } from '../public/v41/domain.mjs';
 
 const read = path => fs.readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
-const shelf = read('public/v41/views/track32-bookshelf.html');
+// 2026-11-09 #231 후속: 스타일·스크립트를 views/shelf/로 나눴다(마크업+옮긴 파일을 함께 본다).
+const shelf = [
+  read('public/v41/views/track32-bookshelf.html'),
+  read('public/v41/views/shelf/shelf.css'),
+  read('public/v41/views/shelf/shelf-reader.css'),
+  read('public/v41/views/shelf/shelf-extra.css'),
+  read('public/v41/views/shelf/shelf.js')
+].join('\n');
 const css = read('public/v41/identity.css');
 
 // 선택자로 시작하는 첫 CSS 블록을 꺼낸다.

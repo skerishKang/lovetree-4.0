@@ -4,7 +4,15 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 const read = (file) => fs.readFileSync(new URL(`../public/v41/${file}`, import.meta.url), 'utf8');
-const SERVER = read('views/track32-bookshelf.html');
+// 2026-11-09 #231 후속: 스타일·스크립트를 views/shelf/로 나눴다. 화면 한 벌을 확인하도록
+// 마크업(HTML)과 옮긴 파일을 합쳐서 본다(검사 강도는 그대로).
+const SERVER = [
+  read('views/track32-bookshelf.html'),
+  read('views/shelf/shelf.css'),
+  read('views/shelf/shelf-reader.css'),
+  read('views/shelf/shelf-extra.css'),
+  read('views/shelf/shelf.js')
+].join('\n');
 
 test('design/views/에 화면 사본이 없다(한 벌만 남았다)', () => {
   assert.equal(fs.existsSync(new URL(`../public/v41/design/views/track32-bookshelf.html`, import.meta.url)), false);

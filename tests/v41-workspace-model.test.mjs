@@ -39,7 +39,12 @@ test('300 moments and multiple trees preserve all parents and selection',()=>{
   assert.equal(workspaceModel(input,{treeId:'tree2'}).selection.momentId,'second');
 });
 test('shelf management uses real metadata and removes unsupported fixed classifications',()=>{
-  const shelf=fs.readFileSync(new URL('../public/v41/views/track32-bookshelf.html',import.meta.url),'utf8');
+  // 2026-11-09 #231 후속: 스타일·스크립트는 views/shelf/로 나눴다(마크업+옮긴 파일을 함께 본다).
+  const shelf=[
+    fs.readFileSync(new URL('../public/v41/views/track32-bookshelf.html',import.meta.url),'utf8'),
+    fs.readFileSync(new URL('../public/v41/views/shelf/shelf.js',import.meta.url),'utf8'),
+    fs.readFileSync(new URL('../public/v41/views/shelf/shelf.css',import.meta.url),'utf8')
+  ].join('\n');
   // #231 1.5단계 ⑥: 안쪽 화면은 views/ 한 벌만 있다.
   assert.equal(fs.existsSync(new URL('../public/v41/design/views/track32-bookshelf.html',import.meta.url)),false);
   const navigation=fs.readFileSync(new URL('../public/v41/view-navigation.js',import.meta.url),'utf8');
