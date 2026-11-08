@@ -772,17 +772,21 @@ async function checkVisualTokens(page, target, opts, stamp) {
 }
 
 async function checkHomeCardMenuMouse(page, target, opts, stamp) {
-  // 2026-11-08 컴1로컬N: 첫 화면 "카드: ○○ ▾"를 마우스로 열어 1440/390에서 유지되는지,
+  // 2026-11-08 #213 2번: 첫 화면 도구 줄의 "보기 ▾" 메뉴를 마우스로 열어 1440/390에서 유지되는지,
   // 바깥 클릭·Esc로 닫히는지 운영에서 확인한다(shadow DOM retarget 회귀 방지).
+  // 메뉴 하나에 움직임·테마(밤/정원)·카드 출처가 함께 있고, "순간 목록"은 메뉴 밖에 따로 남는다.
   const problems = [];
   const base = new URL(target.href);
   const readMenu = () => page.evaluate(() => {
     const frame = document.getElementById('view');
     const doc = frame?.contentDocument;
     const sh = doc?.getElementById('orbit')?.shadowRoot;
+    const menu = sh?.querySelector('#home-view-menu');
     return {
-      hidden: sh?.querySelector('.card-menu')?.hidden,
-      expanded: sh?.querySelector('[data-lt-card-source]')?.getAttribute('aria-expanded')
+      hidden: menu?.hidden,
+      expanded: sh?.querySelector('[data-lt-view-menu]')?.getAttribute('aria-expanded'),
+      items: menu ? [...menu.querySelectorAll('[role^=menuitem]')].map((b) => b.textContent.trim()) : [],
+      toolButtons: sh ? [...sh.querySelectorAll('.top-actions > button, .top-actions > span > button')].filter((b) => b.getClientRects().length > 0).map((b) => b.textContent.trim()) : []
     };
   }).catch(() => null);
   for (const [width, height] of [[1440, 900], [390, 844]]) {
@@ -793,9 +797,9 @@ async function checkHomeCardMenuMouse(page, target, opts, stamp) {
     await page.goto(url.href, { waitUntil: 'load', timeout: opts.timeout }).catch(() => {});
     await sleep(2500);
     const frame = await viewFrame(page);
-    const button = frame?.locator('[data-lt-card-source]').first();
+    const button = frame?.locator('[data-lt-view-menu]').first();
     if (!button || !(await button.count().catch(() => 0))) {
-      problems.push(`${width}: 카드 메뉴 버튼 없음`);
+      problems.push(`${width}: 보기 메뉴 버튼 없음`);
       continue;
     }
     await button.click().catch((error) => problems.push(`${width}: 열기 클릭 실패 ${error.message}`));
@@ -805,6 +809,12 @@ async function checkHomeCardMenuMouse(page, target, opts, stamp) {
       problems.push(`${width}: 마우스 클릭 후 닫힘 ${JSON.stringify(opened)}`);
       continue;
     }
+    // 로그아웃 기준: 움직임 1 + 테마 2 + 카드 2 = 5항목, 도구 줄 버튼은 보기·순간 목록 둘.
+    if (!opened.items.includes('밤') || !opened.items.includes('정원')) problems.push(`${width}: 메뉴에 테마 항목 없음 ${JSON.stringify(opened.items)}`);
+    if (!opened.items.some((label) => label.startsWith('움직임'))) problems.push(`${width}: 메뉴에 움직임 항목 없음 ${JSON.stringify(opened.items)}`);
+    if (opened.items.length !== 5) problems.push(`${width}: 로그아웃 메뉴 항목 ${opened.items.length}개 (기대 5)`);
+    if (!opened.toolButtons.includes('순간 목록')) problems.push(`${width}: "순간 목록"이 도구 줄에 없음 ${JSON.stringify(opened.toolButtons)}`);
+    if (opened.toolButtons.filter((label) => label && label !== '순간 목록').length !== 1) problems.push(`${width}: 도구 줄 버튼 ${JSON.stringify(opened.toolButtons)} (기대 보기·순간 목록 2개)`);
     await page.screenshot({ path: path.join(opts.out, `${stamp}-card-menu-mouse-${width}.png`) }).catch(() => {});
     await frame.locator('body').click({ position: { x: 2, y: 2 } }).catch((error) => problems.push(`${width}: 바깥 클릭 실패 ${error.message}`));
     await sleep(400);
@@ -819,7 +829,7 @@ async function checkHomeCardMenuMouse(page, target, opts, stamp) {
   }
   await page.setViewportSize({ width: 1440, height: 900 }).catch(() => {});
   record('home-card-menu-mouse', 'visual', problems.length ? 'fail' : 'pass',
-    problems.length ? problems.join('; ') : '카드 메뉴: 마우스 열림 유지·바깥 클릭/Esc 닫힘 (1440/390)', { problems });
+    problems.length ? problems.join('; ') : '보기 메뉴: 열림 유지·항목(움직임·밤/정원·카드)·바깥 클릭/Esc 닫힘 (1440/390)', { problems });
 }
 
 async function checkThemeRoundTrip(page, base, opts, stamp) {
@@ -830,20 +840,47 @@ async function checkThemeRoundTrip(page, base, opts, stamp) {
     stored: (() => { try { return localStorage.getItem('lt41.theme') || ''; } catch { return 'n/a'; } })(),
     headerBg: getComputedStyle(document.querySelector('.app-header')).backgroundColor
   })).catch(() => ({ theme: '?', stored: '?', headerBg: '?' }));
-  const toggle = () => {
-    const f = page.frames().find((x) => x.name() === 'view' || /\/v41\/home/.test(x.url())) || null;
-    return f ? f.locator('[data-lt-theme-toggle]').first() : null;
+  // #213 2번: 테마는 "보기 ▾" 메뉴의 밤/정원 항목이 맡는다(도구 줄 버튼 토글은 없어졌다).
+  const homeFrame = () => page.frames().find((x) => x.name() === 'view' || /\/v41\/home/.test(x.url())) || null;
+  const menuButton = () => homeFrame()?.locator('[data-lt-view-menu]').first() || null;
+  const openMenu = async () => {
+    const b = menuButton();
+    if (!b || !(await b.count().catch(() => 0))) return false;
+    if ((await b.getAttribute('aria-expanded').catch(() => '')) !== 'true') {
+      await b.click().catch(() => {});
+      await sleep(250);
+    }
+    return true;
+  };
+  const themeChecked = async (value) => {
+    if (!(await openMenu())) return null;
+    const f = homeFrame();
+    if (!f) return null;
+    const item = f.locator(`#home-view-menu [data-lt-view-item="theme:${value}"]`).first();
+    const checked = await item.getAttribute('aria-checked').catch(() => null);
+    await page.keyboard.press('Escape').catch(() => {});
+    await sleep(150);
+    return checked;
+  };
+  const pickTheme = async (value) => {
+    if (!(await openMenu())) return false;
+    const f = homeFrame();
+    if (!f) return false;
+    const item = f.locator(`#home-view-menu [data-lt-view-item="theme:${value}"]`).first();
+    if (!(await item.count().catch(() => 0))) return false;
+    await item.click().catch(() => {});
+    await sleep(800);
+    return true;
   };
   const u = new URL(base.href); u.search = `?vt=${Date.now()}`; u.hash = '';
   await page.goto(u.href, { waitUntil: 'load', timeout: opts.timeout }).catch(() => {});
   await sleep(2500);
-  let t = toggle();
-  if (!t || !(await t.count().catch(() => 0))) problems.push('첫 화면 테마 토글([data-lt-theme-toggle]) 없음');
+  const before = await themeChecked('night');
+  if (before === null) problems.push('첫 화면 "보기" 메뉴([data-lt-view-menu]) 없음');
   else {
-    const before = { label: (await t.textContent().catch(() => '')).trim(), pressed: await t.getAttribute('aria-pressed').catch(() => '') };
-    if (before.label !== '정원' || before.pressed !== 'false') problems.push(`토글 초기 ${JSON.stringify(before)} (기대 정원/false)`);
-    await t.click().catch((e) => problems.push(`토글 클릭 실패 ${e.message}`));
-    await sleep(800);
+    if (before !== 'true') problems.push(`테마 초기 밤 항목 aria-checked=${before} (기대 true)`);
+    if ((await themeChecked('garden')) !== 'false') problems.push('테마 초기 정원 항목이 켜져 있음(기대 밤)');
+    if (!(await pickTheme('garden'))) problems.push('정원 항목을 고르지 못함');
     const b = await state();
     if (b.theme !== 'garden' || b.stored !== 'garden') problems.push(`정원 전환 ${JSON.stringify(b)}`);
     await page.screenshot({ path: path.join(opts.out, `${stamp}-visual-theme-garden.png`) }).catch(() => {});
@@ -859,8 +896,7 @@ async function checkThemeRoundTrip(page, base, opts, stamp) {
     if (k.theme !== '' || k.headerBg !== 'rgb(4, 4, 7)') problems.push(`정원에서 #book이 A가 아님 ${JSON.stringify(k)}`);
     await page.goto(u.href, { waitUntil: 'load', timeout: opts.timeout }).catch(() => {});
     await sleep(2500);
-    t = toggle();
-    if (t) { await t.click().catch(() => {}); await sleep(800); }
+    if (!(await pickTheme('night'))) problems.push('밤 항목을 고르지 못함');
     const a = await state();
     if (a.theme !== '' || a.stored !== 'night') problems.push(`밤 복귀 ${JSON.stringify(a)}`);
   }
