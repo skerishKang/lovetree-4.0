@@ -7,7 +7,9 @@ import {
 } from '../public/v41/header-state.mjs';
 
 const header = readFileSync(new URL('../public/v41/shell/header.mjs', import.meta.url), 'utf8');
-const shell = readFileSync(new URL('../public/v41/shell.mjs', import.meta.url), 'utf8');
+// #231 1-B 후속: 말풍선 Esc·포커스 되돌림은 shell/dialogs.mjs가 맡는다.
+const shell = readFileSync(new URL('../public/v41/shell.mjs', import.meta.url), 'utf8')
+  + readFileSync(new URL('../public/v41/shell/dialogs.mjs', import.meta.url), 'utf8');
 const html = readFileSync(new URL('../public/v41/index.html', import.meta.url), 'utf8');
 const css = readFileSync(new URL('../public/v41/shell.css', import.meta.url), 'utf8');
 
@@ -96,7 +98,7 @@ test('9. 말풍선 마크업·스타일: Esc·포커스 되돌림, 밤·정원 �
   assert.match(html, /<div id="tree-tips" class="tree-tips" role="dialog" aria-labelledby="tree-tips-title" hidden>/);
   assert.match(html, /<button type="button" id="tree-tips-close">알겠어요<\/button>/);
   assert.match(shell, /function closeTreeTips\(remember=true\)[\s\S]{0,400}back\.focus\(\);/);
-  assert.match(shell, /if\(event\.key!=='Escape'\)return;[\s\S]{0,300}closeTreeTips\(\);/);
+  assert.match(shell, /if \(event\.key !== 'Escape'\) return;[\s\S]{0,400}closeTreeTips\(\);/);
   assert.match(shell, /\$\('tree-tips-close'\)\?\.focus\(\);/);
   const block = css.slice(css.indexOf('.tree-tips{'));
   assert.ok(block.length > 100, '.tree-tips 스타일이 있다');
