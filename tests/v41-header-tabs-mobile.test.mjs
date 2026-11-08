@@ -4,8 +4,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import {readFileSync} from 'node:fs';
 
 const css = fs.readFileSync(new URL('../public/v41/shell.css', import.meta.url), 'utf8');
+const header = readFileSync(new URL('../public/v41/shell/header.mjs', import.meta.url), 'utf8');
 const shell = fs.readFileSync(new URL('../public/v41/shell.mjs', import.meta.url), 'utf8');
 const html = fs.readFileSync(new URL('../public/v41/index.html', import.meta.url), 'utf8');
 
@@ -83,20 +85,21 @@ test('데스크톱에는 스크롤·스냅·페이드를 걸지 않는다', () =
 });
 
 test('화면을 바꿀 때 현재 탭을 가운데로 보여 준다', () => {
-  assert.match(shell, /function revealCurrentTab\(\)/, 'revealCurrentTab 함수가 있어야 한다');
-  assert.match(shell, /scrollIntoView\(\{inline:'center'/, 'inline:center 로 당긴다');
-  assert.match(shell, /prefers-reduced-motion: reduce/, '동작 줄이기 설정을 존중한다');
+  // #231 1-B②-2: 탭 드러내기는 shell/header.mjs로 옮겼다.
+  assert.match(header, /function revealCurrentTab\(\)/, 'revealCurrentTab 함수가 있어야 한다');
+  assert.match(header, /scrollIntoView\(\{inline:'center'/, 'inline:center 로 당긴다');
+  assert.match(header, /prefers-reduced-motion: reduce/, '동작 줄이기 설정을 존중한다');
   // flowNavigation 이 화면 전환마다 현재 탭을 드러내야 한다.
-  const flow = shell.slice(shell.indexOf('function flowNavigation()'), shell.indexOf('function show(file'));
+  const flow = header.slice(header.indexOf('function flowNavigation()'), header.indexOf('function updateNavFade()'));
   assert.match(flow, /revealCurrentTab\(\)/, 'flowNavigation 이 revealCurrentTab 을 부른다');
 });
 
 test('페이드는 스크롤 위치에 따라 켜고 끈다', () => {
-  assert.match(shell, /function updateNavFade\(\)/, 'updateNavFade 함수');
-  assert.match(shell, /classList\.toggle\('fade-start'/, 'fade-start 토글');
-  assert.match(shell, /classList\.toggle\('fade-end'/, 'fade-end 토글');
-  assert.match(shell, /addEventListener\('scroll',updateNavFade/, '스크롤에 반응');
-  assert.match(shell, /addEventListener\('resize'/, '폭 변경에 반응');
+  assert.match(header, /function updateNavFade\(\)/, 'updateNavFade 함수');
+  assert.match(header, /classList\.toggle\('fade-start'/, 'fade-start 토글');
+  assert.match(header, /classList\.toggle\('fade-end'/, 'fade-end 토글');
+  assert.match(header, /addEventListener\('scroll',updateNavFade/, '스크롤에 반응');
+  assert.match(header, /addEventListener\('resize'/, '폭 변경에 반응');
 });
 
 test('탭 7개가 헤더에 있다', () => {
