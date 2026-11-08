@@ -56,6 +56,9 @@ shadow.querySelector('[data-do=trees]').textContent='내 책장';
 // 로그아웃=처음 시작하기(흰색) / 로그인·트리 0=새 트리 만들기(흰색) / 로그인·트리 있음=이어 보던 순간(흰색).
 const centerButtons=[...shadow.querySelectorAll('.center .actions button')];
 const centerPlan=applyHomeCenter(centerButtons,presentation.centerState);
+const byDo=name=>centerButtons.find(b=>b.dataset.do===name);
+const newButton=byDo('new');if(newButton)newButton.onclick=()=>bridge.actions.requestMoment('new');
+const treesButton=byDo('trees');if(treesButton)treesButton.onclick=()=>bridge.actions.navigate('trees');
 // 첫 버튼 동작: 로그아웃=로그인/가입으로, 로그인·트리 있음=이어 보던 순간, 로그인·트리 0=비활성.
 {
  const first=centerButtons[0];

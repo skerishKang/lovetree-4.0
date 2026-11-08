@@ -1,7 +1,7 @@
 // 첫 화면(SRC064) 가운데 버튼 3개의 상태별 표시(대표 지시 2026-11-07).
 // 자리와 개수는 그대로 두고, 흰색 강조와 첫 버튼 문구만 바꾼다.
 // 흰색 강조(primary-cta)는 언제나 정확히 하나다.
-import {homeCenterState, homeStartLoginUrl} from '../public/v41/header-state.mjs';
+import {homeCenterState, homeStartLoginUrl, readTheme} from '../public/v41/header-state.mjs';
 
 const KEY_TO_DO = {start: 'start', resume: 'resume', new: 'new', trees: 'trees'};
 
@@ -25,5 +25,5 @@ export function applyHomeCenter(buttons, state) {
 
 // 로그아웃 상태의 첫 버튼: 로그인/가입으로 보내고 next는 4.1 첫 화면으로 돌아온다.
 export function homeStartTarget() {
-  return homeStartLoginUrl();
+  return homeStartLoginUrl(readTheme(globalThis.localStorage));
 }
