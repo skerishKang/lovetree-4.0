@@ -1081,7 +1081,7 @@ async function completeGateLogin(page, password, target, timeout) {
     }
     await sleep(1000);
   }
-  return { ok: false, reason: `로그인 완료 대기 시간 초과 (${page.url()})`, lastStep };
+  return { ok: false, reason: `로그인 완료 대기 시간 초과 (${page.url().split(/[?#]/)[0]})`, lastStep };
 }
 
 const flowVisibleFrame = (page) => page.frames().filter((frame) => frame !== page.mainFrame() && !frame.url().startsWith('about:')).pop();
@@ -1132,6 +1132,7 @@ async function runAuthFlows(target, opts, stamp) {
     args: ['--disable-blink-features=AutomationControlled', '--no-first-run', '--no-default-browser-check']
   });
   let createdTrees = 0;
+  const restoreNavigation = new WeakSet();
   const withFlow = async (name, run) => {
     const started = Date.now();
     const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR', timezoneId: 'Asia/Seoul' });
@@ -1139,15 +1140,44 @@ async function runAuthFlows(target, opts, stamp) {
     const errors = [];
     const badResponses = [];
     const dialogs = [];
+    const notFound = [];
+    const initiators = new Map();
+    const safeUrl = (url) => { try { const u = new URL(url); return u.origin + u.pathname; } catch { return ''; } };
+    const cdp = await context.newCDPSession(page);
+    await cdp.send('Network.enable');
+    cdp.on('Network.requestWillBeSent', ({ request, initiator }) => {
+      const frames = initiator?.stack?.callFrames || [];
+      initiators.set(safeUrl(request.url), {
+        type: initiator?.type || '',
+        source: safeUrl(initiator?.url || ''),
+        line: initiator?.lineNumber ?? null,
+        stack: frames.slice(0, 4).map((f) => ({ url: safeUrl(f.url), line: f.lineNumber, function: f.functionName }))
+      });
+    });
+    page.on('response', (response) => {
+      if (response.status() === 404) notFound.push({
+        url: safeUrl(response.url()), resourceType: response.request().resourceType(),
+        initiator: initiators.get(safeUrl(response.url())) || null
+      });
+    });
     page.on('pageerror', (error) => errors.push(error.message.slice(0, 120)));
-    page.on('console', (message) => { if (message.type() === 'error') errors.push(message.text().slice(0, 120)); });
+    page.on('console', (message) => {
+      if (message.type() !== 'error') return;
+      const location = message.location();
+      const url = location.url ? location.url.split(/[?#]/)[0] : '';
+      errors.push(message.text().slice(0, 120) + (url ? ' [' + url + ':' + location.lineNumber + ']' : ''));
+    });
     page.on('response', (response) => {
       if (response.status() >= 400 && !/favicon|analytics|gtag/.test(response.url())) {
-        badResponses.push(`${response.status()} ${response.url().replace(/^https:\/\/[^/]+/, '')}`);
+        badResponses.push(`${response.status()} ${response.url().split(/[?#]/)[0]}`);
       }
     });
     // 흐름 중 뜨는 확인창은 메시지만 남기고 기본 동작(취소)을 유지한다. 정리 단계에서만 수락한다.
-    page.on('dialog', (dialog) => { dialogs.push(dialog.message().slice(0, 80)); dialog.dismiss().catch(() => {}); });
+    page.on('dialog', (dialog) => {
+      dialogs.push(dialog.type() + ': ' + dialog.message().slice(0, 80));
+      if (dialog.type() === 'beforeunload' && restoreNavigation.has(page)) dialog.accept().catch(() => {});
+      else dialog.dismiss().catch(() => {});
+    });
     let result = { ok: false, detail: '실행 전 중단' };
     try {
       result = await run(page, context);
@@ -1157,15 +1187,17 @@ async function runAuthFlows(target, opts, stamp) {
       const durationMs = Date.now() - started;
       const problem = errors.filter((text) => !isIgnorableConsoleError(text));
       if (result.ok && problem.length) {
-        result = { ok: false, detail: `${result.detail} / 콘솔 오류 ${problem.length}건: ${problem[0]}${badResponses.length ? ` [실패 응답 ${badResponses.slice(0, 3).join(' | ')}]` : ''}` };
+        result = { ...result, ok: false, detail: `${result.detail} / 콘솔 오류 ${problem.length}건: ${problem[0]}${badResponses.length ? ` [실패 응답 ${badResponses.slice(0, 3).join(' | ')}]` : ''}` };
       }
       await page.screenshot({ path: path.join(opts.out, `${stamp}-${name}.png`) }).catch(() => {});
       const status = result.status || (result.ok ? 'pass' : 'fail');
       record(name, 'auth-flows', status, `${result.detail} (${(durationMs / 1000).toFixed(1)}초)`, {
         durationMs,
         steps: result.steps || null,
-        diagnostics: result.diagnostics || null,
+        diagnostics: { ...result.diagnostics, shell: await page.evaluate(() => ({ member: document.body.dataset.member || '', treeCount: document.body.dataset.treeCount || '' })).catch(() => ({})), frames: page.frames().map((frame) => frame.url().split(/[?#]/)[0]) },
         dialogs: dialogs.length ? dialogs : null,
+        consoleErrors: problem,
+        notFound,
         badResponses: badResponses.length ? badResponses.slice(0, 6) : null
       });
       await context.close().catch(() => {});
@@ -1245,18 +1277,6 @@ async function runAuthFlows(target, opts, stamp) {
     // A2-1 먼저: 빈 계정 기대값(트리 0). 뒤 검사들이 트리를 만들기 때문에 순서가 중요하다.
     await withFlow('flow-status-a2-shelf-intent-empty', async (page) => {
       await openShell(page);
-      const apiCount = await page.evaluate(async () => {
-        try {
-          const response = await fetch('/api/workspace?features=bound-writes', { credentials: 'include', headers: { accept: 'application/json' } });
-          if (!response.ok) return null;
-          const data = await response.json();
-          const state = data?.state || data;
-          return Array.isArray(state?.trees) ? state.trees.length : null;
-        } catch { return null; }
-      }).catch(() => null);
-      if (apiCount === null ? (await flowState(page)).treeCount > 0 : apiCount > 0) {
-        return { ok: false, detail: `검사 시작 시점 계정 트리 ${apiCount ?? '?'}개 — 빈 계정 기대값을 확인할 수 없음` };
-      }
       await page.click('nav button[data-view="track32-bookshelf.html"]', { timeout: 5000 }).catch(() => {});
       await sleep(2500);
       const loginUrl = page.url();
@@ -1271,10 +1291,17 @@ async function runAuthFlows(target, opts, stamp) {
         const heading = node?.querySelector('h1, h2, strong');
         return { visible: !!node && !node.hidden && node.getClientRects().length > 0, text: (heading?.textContent || '').trim().slice(0, 40) };
       }).catch(() => ({}));
-      const ok = /#shelf/.test(state.hash || '') && empty.visible;
+      const apiCount = await page.evaluate(async () => {
+        const response = await fetch('/api/workspace?features=bound-writes', { credentials: 'include' });
+        if (!response.ok) return null;
+        const data = await response.json();
+        const state = data?.state || data;
+        return Array.isArray(state?.trees) ? state.trees.length : null;
+      }).catch(() => null);
+      const ok = apiCount === 0 && /#(?:my\/)?shelf(?:[?]|$)/.test(state.hash || '') && empty.visible;
       return { ok, detail: ok
         ? `트리 0 계정: 복귀 ${state.hash} · #empty 보임("${empty.text}")`
-        : `트리 0 계정 기대값 불일치: hash=${state.hash || ''} #empty=${empty.visible} frame=${flowVisibleFrame(page)?.url() || ''}` };
+        : `트리 0 계정 기대값 불일치: API trees=${apiCount} hash=${state.hash || ''} #empty=${empty.visible} frame=${flowVisibleFrame(page)?.url() || ''}` };
     });
 
     // A1: 로그인 복귀 주소에 ?intent= 없음 + 새 트리 흐름이 첫 여정을 한 번만 연다.
@@ -1302,26 +1329,39 @@ async function runAuthFlows(target, opts, stamp) {
 
     // A2-2: 트리 있는 계정 — 복귀하면 보이는 iframe이 내 책장. (A1이 만든 트리를 그대로 쓴다)
     await withFlow('flow-status-a2-shelf-intent-tree', async (page) => {
-      const loginFirst = await loginWithAccountEntry(page);
-      if (!loginFirst.ok) return { ok: false, detail: `로그인 실패: ${loginFirst.reason}` };
-      const made = await createTree(page, []);
-      if (made) createdTrees += 1;
+      // Prepare the account elsewhere so journey/sessionStorage state cannot consume the shelf intent.
+      const setupContext = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR' });
+      try {
+        const setupPage = await setupContext.newPage();
+        const loginFirst = await loginWithAccountEntry(setupPage);
+        if (!loginFirst.ok) return { ok: false, detail: '트리 준비 로그인 실패: ' + loginFirst.reason };
+        if (!(await createTree(setupPage, []))) return { ok: false, detail: '검사용 트리를 만들지 못함' };
+        const serverCount = await setupPage.evaluate(async () => {
+          const response = await fetch('/api/workspace?features=bound-writes', { credentials: 'include' });
+          if (!response.ok) return null;
+          const data = await response.json();
+          return (data?.state?.trees || data?.trees || []).length;
+        });
+        if (!(serverCount > 0)) return { ok: false, detail: '준비한 트리의 서버 저장 확인 실패' };
+      } finally {
+        await setupContext.close();
+      }
       await openShell(page);
-      const before = await flowState(page);
-      if (before.treeCount < 1) return { ok: false, detail: '검사용 트리를 만들지 못해 트리 있는 경우를 확인할 수 없음' };
       await page.click('nav button[data-view="track32-bookshelf.html"]', { timeout: 5000 }).catch(() => {});
       await sleep(2500);
       const loginUrl = page.url();
       const wentToLogin = new URL(loginUrl).host !== target.host || /\/auth\/login|\/login\?client_id=/.test(loginUrl);
+      if (!wentToLogin) return { ok: false, detail: '트리 있는 계정의 책장 클릭이 로그인으로 이어지지 않음' };
       if (wentToLogin) {
         const login2 = await completeGateLogin(page, secret.value, target, opts.timeout);
         if (!login2.ok) return { ok: false, detail: `로그인 실패: ${login2.reason}` };
       }
-      await sleep(7000);
+      await page.waitForFunction(() => document.body.dataset.member === 'in' && Number(document.body.dataset.treeCount) > 0, null, { timeout: opts.timeout });
+      await page.waitForFunction(() => /track32-bookshelf/.test(document.getElementById('view')?.contentDocument?.URL || ''), null, { timeout: opts.timeout });
       let frame = flowVisibleFrame(page);
       let state = await flowState(page);
       let shelf = /track32-bookshelf/.test(frame?.url() || '');
-      if (!shelf && /#shelf/.test(state.hash || '')) {
+      if (!shelf && /#(?:my\/)?shelf(?:[?]|$)/.test(state.hash || '')) {
         await sleep(5000);
         frame = flowVisibleFrame(page);
         state = await flowState(page);
@@ -1431,7 +1471,8 @@ async function runAuthFlows(target, opts, stamp) {
         return { status: 'warn', detail: `탭 B 로그아웃 뒤 세션 확인이 ${diagnostics.sessionStatus} — 401이 아니라 만료 시나리오를 태울 수 없음 (탭 B member=${diagnostics.tabBMember})`, steps, diagnostics };
       }
       // 탭 A: 입력 후 저장 → 만료 안내·입력 보존·임시 키
-      await fillMoment(page, '만료 검사 순간');
+      const momentTitle = `만료 검사 순간 ${stamp}`;
+      await fillMoment(page, momentTitle);
       await sleep(400);
       await page.evaluate(() => document.getElementById('moment-form').requestSubmit());
       await sleep(4500);
@@ -1446,20 +1487,36 @@ async function runAuthFlows(target, opts, stamp) {
       diagnostics.pendingKeys = afterSave.keys?.length || 0;
       diagnostics.requests = requests.slice(0, 12);
       steps.push(`탭 A 저장: 안내줄=${afterSave.feedback} 이벤트=${afterSave.authRequired} 임시 키=${afterSave.keys?.length || 0} 입력 보존="${afterSave.title}"`);
-      const expiredOk = afterSave.feedback && (afterSave.keys?.length || 0) > 0 && afterSave.title === '만료 검사 순간';
+      const expiredOk = afterSave.feedback && (afterSave.keys?.length || 0) > 0 && afterSave.title === momentTitle;
       if (!expiredOk) {
         return { ok: false, detail: `만료 처리 미동작: 안내=${afterSave.feedback} 이벤트=${afterSave.authRequired} 임시 키=${afterSave.keys?.length || 0}`, steps, diagnostics };
       }
       // 재로그인 → 새로고침 → 복원 안내 → 다시 시도 → 성공·임시 키 삭제
-      let again = await loginWithAccountEntry(page);
-      if (!again.ok) {
-        await openShell(page);
-        const member = (await flowState(page)).member;
-        again = member === 'in' ? { ok: true } : again;
+      // Follow the offered new-window login; navigating the dirty editor is cancelled by beforeunload.
+      const [reloginPage] = await Promise.all([
+        page.waitForEvent('popup', { timeout: opts.timeout }),
+        page.locator('#save-actions button', { hasText: '새 창에서 로그인' }).click({ timeout: 5000 })
+      ]);
+      watchRequests(reloginPage, 'relogin', requests);
+      let again = await completeGateLogin(reloginPage, secret.value, target, opts.timeout);
+      await reloginPage.waitForFunction(() => document.body.dataset.member === 'in', null, { timeout: opts.timeout }).catch(() => {});
+      const member = (await flowState(reloginPage)).member;
+      diagnostics.reloginMember = member;
+      if (!again.ok && member === 'in') {
+        diagnostics.reloginFallbackUsed = true;
+        again = { ok: true };
       }
-      if (!again.ok) return { ok: false, detail: `재로그인 실패: ${again.reason}`, steps, diagnostics };
-      await openShell(page);
-      await sleep(2500);
+      await reloginPage.close().catch(() => {});
+      if (!again.ok || member !== 'in') return { ok: false, detail: '재로그인 실패: ' + (again.reason || 'member=' + member), steps, diagnostics };
+      // Only after the pending draft was verified, accept the original tab's reload warning.
+      restoreNavigation.add(page);
+      try {
+        await page.reload({ waitUntil: 'domcontentloaded', timeout: opts.timeout });
+        await page.waitForFunction(() => document.body.dataset.member === 'in', null, { timeout: opts.timeout });
+        await page.locator('#save-actions button', { hasText: '다시 시도' }).waitFor({ state: 'visible', timeout: opts.timeout });
+      } finally {
+        restoreNavigation.delete(page);
+      }
       const restored = await page.evaluate(() => ({
         message: (document.getElementById('save-message')?.textContent || '').slice(0, 80),
         actions: [...(document.getElementById('save-actions')?.querySelectorAll('button') || [])].map((b) => (b.textContent || '').trim())
@@ -1467,15 +1524,27 @@ async function runAuthFlows(target, opts, stamp) {
       steps.push(`복원 안내="${restored.message}" 버튼=${(restored.actions || []).join('/') || '없음'}`);
       const retry = page.locator('#save-actions button', { hasText: '다시 시도' });
       if (!(await retry.count().catch(() => 0))) return { ok: false, detail: `복원 뒤 "다시 시도" 버튼이 없음 (안내="${restored.message}")`, steps, diagnostics };
-      await retry.first().click({ timeout: 5000 }).catch(() => {});
-      await sleep(5000);
+      const savedResponse = page.waitForResponse((response) =>
+        new URL(response.url()).pathname === '/api/workspace' && response.request().method() === 'PUT',
+        { timeout: opts.timeout }).catch(() => null);
+      await retry.first().click({ timeout: 5000 });
+      const saved = await savedResponse;
+      diagnostics.retryStatus = saved?.status() ?? null;
+      await page.waitForFunction(() => !Object.keys(sessionStorage).some((key) => key.startsWith('lovetree.v41.pending-write:')),
+        null, { timeout: opts.timeout }).catch(() => {});
+      diagnostics.serverSaved = await page.evaluate(async (title) => {
+        const response = await fetch('/api/workspace?features=bound-writes', { credentials: 'include' });
+        if (!response.ok) return false;
+        const data = await response.json();
+        return (data?.state?.trees || data?.trees || []).some((tree) => tree.moments?.some((moment) => moment.title === title));
+      }, momentTitle).catch(() => false);
       const final = await page.evaluate(() => ({
         toast: (document.getElementById('toast')?.textContent || '').slice(0, 60),
         keys: Object.keys(sessionStorage).filter((key) => key.startsWith('lovetree.v41.pending-write:')).length,
         dirty: document.getElementById('write-menu')?.textContent || ''
       })).catch(() => ({}));
       steps.push(`다시 시도 뒤 토스트="${final.toast}" 임시 키=${final.keys}`);
-      const savedOk = final.keys === 0 && !/미저장/.test(final.dirty || '');
+      const savedOk = saved?.ok() && diagnostics.serverSaved && final.keys === 0 && !/미저장/.test(final.dirty || '');
       return { ok: savedOk, detail: savedOk ? '만료 안내 → 입력 보존 → 재로그인 복원 → 다시 시도 저장 성공 → 임시 키 삭제' : `다시 시도 뒤 저장 확인 실패 (임시 키=${final.keys})`, steps, diagnostics };
     });
   } finally {
@@ -1485,6 +1554,7 @@ async function runAuthFlows(target, opts, stamp) {
 }
 
 async function cleanupAuthFlows(target, opts, stamp) {
+  const started = Date.now();
   // 검사가 만든 트리·순간은 실패해도 반드시 지운다. 결과는 리포트에 남긴다.
   const secret = await readSecret('PADIEM_TUTORIAL01_PASSWORD', opts.secrets);
   if (!secret.ok) {
@@ -1509,7 +1579,26 @@ async function cleanupAuthFlows(target, opts, stamp) {
     return;
   }
   const page = context.pages()[0] || (await context.newPage());
-  page.on('dialog', (dialog) => { dialog.accept().catch(() => {}); });
+  let confirmCount = 0;
+  page.on('dialog', (dialog) => {
+    if (dialog.type() === 'confirm') { confirmCount += 1; dialog.accept().catch(() => {}); }
+    else dialog.dismiss().catch(() => {});
+  });
+  const cleanupFailures = [];
+  const captureCleanupFailure = async (attempt, error) => {
+    const screenshot = path.join(opts.out, `${stamp}-flow-cleanup-failure-${attempt}.png`);
+    await page.screenshot({ path: screenshot }).catch(() => {});
+    const state = await page.evaluate(() => {
+      const dialog = document.getElementById('tree-manager');
+      const button = document.getElementById('tree-delete');
+      return { dialogExists: !!dialog, dialogOpen: !!dialog?.open,
+        dialogVisible: !!dialog?.getClientRects().length,
+        deleteExists: !!button, deleteVisible: !!button?.getClientRects().length,
+        deleteDisabled: button?.disabled ?? null, member: document.body.dataset.member || '',
+        treeCount: document.body.dataset.treeCount || '' };
+    }).catch(() => ({}));
+    cleanupFailures.push({ attempt, error, screenshot, ...state });
+  };
   try {
     await page.goto(target.href, { waitUntil: 'domcontentloaded', timeout: opts.timeout }).catch(() => {});
     await page.waitForSelector('#community-menu', { timeout: opts.timeout }).catch(() => {});
@@ -1521,6 +1610,7 @@ async function cleanupAuthFlows(target, opts, stamp) {
       await page.goto(target.href, { waitUntil: 'domcontentloaded', timeout: opts.timeout }).catch(() => {});
       await sleep(2500);
     }
+    await page.waitForFunction(() => document.body.dataset.member === 'in', null, { timeout: opts.timeout });
     let removed = 0;
     let lastError = '';
     for (let i = 0; i < 6; i += 1) {
@@ -1538,26 +1628,30 @@ async function cleanupAuthFlows(target, opts, stamp) {
           await sleep(2500);
           visible = await page.evaluate(() => !document.getElementById('manage-tree')?.hidden).catch(() => false);
         }
-        if (!visible) { lastError = '책 정보 버튼이 보이지 않음'; break; }
-        await page.click('#manage-tree', { timeout: 5000 }).catch((error) => { lastError = error.message.slice(0, 80); });
-        await sleep(1500);
-        // 트리 삭제는 confirm() 확인창을 띄운다(panels.mjs). 정리 단계에서만 수락한다.
-        let confirmText = '';
-        const acceptOnce = (dialog) => { confirmText = dialog.message().slice(0, 60); dialog.accept().catch(() => {}); };
-        page.once('dialog', acceptOnce);
-        const deleted = await page.locator('#tree-delete').click({ timeout: 5000 })
-          .then(() => true)
-          .catch(() => page.locator('#tree-delete').click({ force: true, timeout: 3000 })
-            .then(() => true)
-            .catch(() => false));
-        if (!deleted) lastError = '삭제 버튼 클릭 실패';
-        await sleep(3000);
-        page.off('dialog', acceptOnce);
-        if (confirmText) lastError = '';
+        if (!visible) throw new Error('책 정보 버튼이 보이지 않음');
+        const tipsClose = page.locator('#tree-tips-close');
+        if (await tipsClose.isVisible().catch(() => false)) await tipsClose.click({ timeout: 5000 });
+        await page.click('#manage-tree', { timeout: 5000 });
+        // Share an 8-second deadline for the dialog and actionable delete button.
+        const deadline = Date.now() + 8000;
+        const remaining = () => Math.max(1, deadline - Date.now());
+        await page.locator('#tree-manager[open]').waitFor({ state: 'visible', timeout: remaining() });
+        const deleteButton = page.locator('#tree-manager #tree-delete');
+        await deleteButton.waitFor({ state: 'visible', timeout: remaining() });
+        await deleteButton.click({ trial: true, timeout: remaining() });
+        const deletionSaved = page.waitForResponse((response) => new URL(response.url()).pathname === '/api/workspace' && response.request().method() === 'PUT', { timeout: opts.timeout }).catch(() => null);
+        const beforeConfirm = confirmCount;
+        await deleteButton.click({ timeout: remaining() });
+        if (confirmCount === beforeConfirm) throw new Error('삭제 확인창이 뜨지 않음');
+        await page.waitForFunction((before) => Number(document.body.dataset.treeCount) < before,
+          count, { timeout: opts.timeout });
+        const response = await deletionSaved;
+        if (!response?.ok()) throw new Error('삭제 저장 응답 실패: ' + (response?.status() ?? 'timeout'));
         removed += 1;
       } catch (error) {
         lastError = error.message.slice(0, 120);
-        await sleep(1500);
+        await captureCleanupFailure(i + 1, lastError);
+        break;
       }
     }
     // 마지막 확인은 화면 표시가 아니라 계정 응답(/api/workspace)으로 한다.
@@ -1573,22 +1667,30 @@ async function cleanupAuthFlows(target, opts, stamp) {
       }
     }).catch(() => ({ status: 'error', trees: null }));
     const domCount = await page.evaluate(() => Number(document.body.dataset.treeCount || 0)).catch(() => -1);
-    const treeCount = apiTrees.trees === null ? domCount : apiTrees.trees;
+    const treeCount = apiTrees.status === 200 ? apiTrees.trees : null;
     record('flow-cleanup', 'auth-flows', treeCount === 0 ? 'pass' : 'fail',
       treeCount === 0
         ? `검사용 트리 정리 완료 (삭제 ${removed}회, 계정 트리 0개 · /api/workspace ${apiTrees.status})`
         : `트리가 ${treeCount}개 남음 (삭제 ${removed}회 · /api/workspace ${apiTrees.status}${lastError ? ` · 마지막 오류: ${lastError}` : ''})`,
-      { removed, treeCount, apiStatus: apiTrees.status, domCount, lastError });
+      { durationMs: Date.now() - started, removed, treeCount, apiStatus: apiTrees.status, domCount, lastError, cleanupFailures });
     await page.goto(target.href + '#home', { waitUntil: 'domcontentloaded', timeout: opts.timeout }).catch(() => {});
-    await sleep(2000);
+    await page.waitForFunction(() => document.body.dataset.member === 'in' && document.body.dataset.treeCount === '0', null, { timeout: opts.timeout });
+    await page.screenshot({ path: path.join(opts.out, `${stamp}-flow-cleanup-trees.png`) });
+    const assetsStarted = Date.now();
     // 보관 파일도 0개인지 확인한다(검사는 업로드를 하지 않지만 요구사항 확인).
     await page.evaluate(() => document.getElementById('account-assets-open')?.click()).catch(() => {});
-    await sleep(2000);
+    await page.locator('#account-assets[open]').waitFor({ state: 'visible', timeout: 8000 });
+    await page.waitForFunction(() => document.getElementById('account-assets')?.textContent.includes('보관한 파일이 없어요.'), null, { timeout: 8000 }).catch(() => {});
     const assets = await page.evaluate(() => {
       const host = document.getElementById('account-assets');
-      return { count: [...(host?.querySelectorAll('li, .asset') || [])].map((node) => (node.textContent || '').trim()).filter(Boolean).length };
-    }).catch(() => ({ count: -1 }));
-    record('flow-cleanup-assets', 'auth-flows', assets.count === 0 ? 'pass' : 'warn', `보관 파일 ${assets.count}개`, assets);
+      return { open: !!host?.open, visible: !!host?.getClientRects().length,
+        empty: !!host?.textContent.includes('보관한 파일이 없어요.'),
+        count: host?.querySelectorAll('.upload-asset').length ?? null };
+    }).catch(() => ({}));
+    await page.screenshot({ path: path.join(opts.out, `${stamp}-flow-cleanup-assets.png`) });
+    record('flow-cleanup-assets', 'auth-flows',
+      assets.open && assets.visible && assets.empty && assets.count === 0 ? 'pass' : 'fail',
+      `보관 파일 ${assets.empty ? 0 : "미확인"}개 (목록 열림=${assets.open}, 빈 목록 안내=${assets.empty})`, { ...assets, durationMs: Date.now() - assetsStarted });
   } catch (error) {
     record('flow-cleanup', 'auth-flows', 'fail', `정리 중 예외: ${error.message.slice(0, 160)}`);
   } finally {
@@ -2050,13 +2152,13 @@ async function main() {
     } else {
       if (opts.authFlows) {
         // --auth-flows: 로그인 흐름만 검사한다(각 경로는 빈 프로필 context에서 시작, 끝나면 검사용 트리 삭제).
-        let flows = { createdTree: false };
+        let flows = { createdTrees: 0 };
         try {
           flows = await runAuthFlows(target, opts, stamp);
         } finally {
           await cleanupAuthFlows(target, opts, stamp);
         }
-        console.log(`\n로그인 흐름 검사 완료 (검사용 트리 생성=${flows.createdTree})`);
+        console.log(`\n로그인 흐름 검사 완료 (검사용 트리 생성=${flows.createdTrees})`);
       } else if (opts.autoLogin) {
         console.log('\n시험 계정으로 자동 로그인 시도 중...');
         const logged = await autoLogin(page, opts, target);
