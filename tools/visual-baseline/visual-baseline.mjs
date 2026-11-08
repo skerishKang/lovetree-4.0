@@ -14,7 +14,7 @@ import os from 'node:os';
 
 // 화면별 기준치(%). 기억 보드는 실·핀 선을 매 로드마다 미세하게 다시 그려 0.1%를 넘는 장이 나온다
 // (정리는 리팩터링 3단계 예정, #231).
-const SCENE_THRESHOLDS = { board: 0.3 };
+const SCENE_THRESHOLDS = { board: 0.5 };
 
 const DEFAULTS = {
   base: 'https://lovetree-4-0.pages.dev/v41/',
