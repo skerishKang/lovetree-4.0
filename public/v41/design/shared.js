@@ -1,1 +1,0 @@
-(() => {const c=parent.LT41;if(!c?.tree?.demoData)throw Error('예시를 먼저 선택하세요.');window.LTDEMO={...c.tree.demoData,edges:c.tree.edges,get:()=>c.momentId,select:id=>{if(c.tree.moments.some(m=>m.id===id)){c.momentId=id;parent.postMessage({type:'lt-selection',id},location.origin)}}};})();

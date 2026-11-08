@@ -135,3 +135,9 @@ export function bookTheme(theme) {
 export function bookTitleFont(theme) {
   return BOOK_TITLE_FONT[bookTheme(theme)];
 }
+
+/* 2026-11-08 #231 2단계: 제자리 재생은 왼쪽 클릭·탭(주 버튼)에만 반응한다.
+   오른쪽(2)·가운데(1) 버튼은 상황 메뉴·새 탭 열기 같은 브라우저 기본 동작을 막지 않는다. */
+export function isPrimaryButton(event) {
+  return !event || event.button === undefined || event.button === 0;
+}

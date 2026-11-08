@@ -889,6 +889,22 @@ COM2에는 merge `6900df8aa446dfe0201d01997457fae04c4abe16`의 변경 서버 파
 - 확인(가짜 서버 기록: `url` + `mediaMetadata`가 있는 YouTube 순간): 1440·390, 밤·정원 모두 실제 마우스 클릭으로 `iframe.yt-frame` 1개 생성(임베드 `start=83`), 밤 큰 제목 Pretendard · 정원 큰 제목 MaruBuri, 넘침 0. 셸 경유(`#book`)에서도 iframe 테마가 garden으로 전달된다.
 - 시험: `tests/v41-book-usability.test.mjs` 12·13번, `tests/v41-journey-garden`·`v41-theme-ab`의 기대값 갱신(기억책=정원 허용, 보드·지도=밤 고정). `npm test` 483 pass / 0 fail / 37 skip, build 성공.
 
+## 2026-11-08 기억책 파일 지도 (2단계 ①·②, ai/lt-book-source-261108 · ai/lt-book-inject-261108, #231)
+
+기억책(track59)은 이제 화면 뼈대 + 네 파일이다. **고칠 때 어디를 보면 되는지**
+
+| 파일 | 줄 수(대략) | 무엇이 들어 있나 |
+|---|---|---|
+| `public/v41/views/track59-sketchbook.html` | 35 | 마크업(책·페이지·상세·모달·목차)과 파일 연결만 |
+| `public/v41/views/book/book.css` | 325 | 화면 고유 스타일(종이·표지·페이지·돋보기·패널·모바일) |
+| `public/v41/views/book/book-usability.css` | 112 | 사용성 규칙 1~9(글꼴·상세 배치·다음 순간 안내·모바일) |
+| `public/v41/views/book/book.js` | 79 | 본문 동작(스프레드·페이지 넘김·돋보기·상세·목차·갈림길) |
+| `public/v41/views/book/book-extra.js` | 202 | 사용성 보조(제목 고치기·다음 순간 남기기·제자리 재생·트리 이름) |
+
+- 주입 스크립트 `scripts/apply-book-usability.mjs`와 `public/v41/design/shared.js`는 **없앴다**. 화면이 위 네 파일을 직접 싣는다(`<link>`·`<script src>`, 모두 `/v41/` 절대 경로).
+- 재생 단추는 `isPrimaryButton()`(`public/v41/book-usability.mjs`)을 거쳐 **왼쪽 클릭·탭에만** 반응한다(오른쪽·가운데 클릭은 브라우저 기본 동작 유지).
+- 규칙(문구·판정 함수)은 계속 `public/v41/book-usability.mjs` 한 곳에 둔다 — 화면 파일에 규칙을 복사하지 않는다.
+
 ## 2026-11-08 안쪽 화면 원본은 `public/v41/views/` 한 벌 (ai/lt-views-single-path-261108, #231 ⑥)
 
 1.5단계(두 벌 → 한 벌)를 마쳤다. **앞으로 안쪽 화면을 고칠 때는 `public/v41/views/`만 고친다.**
