@@ -18,6 +18,7 @@
 | `tests/v41-journey-flow.test.mjs` | `createJourney` 하네스(가짜 history/location/iframe) |
 | `tests/v41-panels-flow.test.mjs` | `createPanels` 하네스(편집기 폼·업로드·모드 표) |
 | `tests/v41-view-a11y-flow.test.mjs` | `applyViewAccessibility` 하네스(가짜 문서 + keydown 실제 전송) |
+| `tests/v41-home-view-menu-flow.test.mjs` | `createViewMenu` 하네스(가짜 shadowRoot·문서·저장소, 메뉴 열기/키보드/선택) |
 | `tests/helpers/fake-dom.mjs` `fakeBrowser()` | 가짜 `location`·`history`(push/replace/go) + `popstate`·`hashchange` 실제 발생 |
 | `tests/v41-shell-dialogs.test.mjs` · `v41-shell-location.test.mjs` | Tab 순환·Esc·포커스 복귀·주소 처리 |
 
@@ -35,15 +36,17 @@
 | `v41-first-journey`(11)·`v41-moment-panel`(7)·`v41-header-tabs-mobile`(1)·`v41-header-ia`(7)·`auth-entry`(7)·`v41-shell-tree-title`(11)·`v41-header-states`(2)·`v41-workspace-model`(2)·`v41-share-api`(2)·`v41-a11y-views`(3)·`v41-journey-history`(8) | 61 | 화면 마크업·토큰·정렬·`data-*` 훅·인라인 스크립트 문자열 |
 | `v41-shelf-unify`(4)·`v41-community`(3)·`v41-auth-skin`(3)·`v41-asset-reattach`(5)·`v41-media-preview`(1)·`v41-refresh-gate`(1)·`domain-routing`(1)·`shared-auth-pages`(1)·`cross-repo-chain`(1) | 20 | 구조·엔드포인트·파일 배치 같은 계약 문자열 |
 
-### 2) 제품 코드를 고쳐야만 바꿀 수 있는 것 (16건) — 동작이지만 지금은 함수 호출 불가
+### 2) 2026-11-11에 해소된 항목 — 보기 메뉴(16 → 1)
+
+`v41/home.js`의 인라인 메뉴 로직을 `public/v41/home-view-menu.mjs` `createViewMenu(deps)`로 옮겨 **15건을 함수 시험으로 전환**했다(`tests/v41-home-view-menu-flow.test.mjs` 8건). 남은 1건은 "첫 화면은 모듈을 연결만 한다"는 구조 검사다.
+
+### 3) 제품 코드를 고쳐야만 바꿀 수 있는 것 (8건) — 동작이지만 지금은 함수 호출 불가
 
 | 파일 | 건수 | 왜 못 바꾸나 | 필요 작업 |
 | --- | --- | --- | --- |
-| `v41-home-view-menu.test.mjs` | 14 | `v41/home.js`는 **shadow DOM 페이지 스크립트**: `import '../src/styles.css'`(node 불가) + 최상위에서 바로 DOM을 만든다. 메뉴 열기/닫기·키보드 배선·바깥 클릭·`aria-*`가 모두 인라인 | `home.js`에서 `createViewMenu(deps)`를 `public/v41/home-view-menu.mjs`로 추출(패널·대화상자와 같은 방식) → 새 표로 전환 |
-| `v41-home-view-menu.test.mjs` | 2 | `src/views/orbit.js`의 `dispose.motion` 게터/세터와 `viewButton.dataset.ltViewMenu` 배선 | 위 추출에 포함해 함께 시험 |
-| `v41-journey-history.test.mjs` | 8 | `views/first-journey.html` **인라인 스크립트**(내보낸 함수 없음) | 페이지 스크립트를 `first-journey-page.mjs`로 분리 |
+| `v41-journey-history.test.mjs` | 8 | `views/first-journey.html` **인라인 스크립트**(내보낸 함수 없음) | 페이지 스크립트를 `public/v41/views/journey/` 모듈로 분리 → 표로 전환 |
 
-→ **"바꿔야 함"(지금 당장 바꿀 수 있는 동작 검사): 0건.** 남은 16건은 위처럼 **제품 코드 추출이 선행 조건**이다. 추출은 "동작·복사·디자인 변경 0"을 지키기 어려운 별도 레인이라 여기서 하지 않았다.
+→ **지금 바꿀 수 있는 동작 검사: 0건.** 남은 동작 검사는 위 8건뿐이고, **페이지 스크립트 분리가 선행 조건**이다.
 
 ## 새 시험을 쓸 때
 
@@ -52,5 +55,7 @@
 3. 상태가 여러 개면 **표로 묶는다**(예: `v41-header-flow` 상태 4 × 화면 5, `v41-panels-flow` openEditor 6행, `v41-home-view-menu` 로그인 × 테마 × 멈춤 × 카드 8행).
 4. 새 시험을 붙였으면 **한 곳을 일부러 깨뜨려 실패하는지** 확인하고 되돌린다(강도 증명). 통과하면 그 시험은 약하다.
 5. 가짜 DOM은 `tests/helpers/fake-dom.mjs`를 늘려 쓴다 — 파일마다 새로 만들지 않는다.
+6. **페이지 스크립트에만 있는 동작**은 글자 검사에 남기고, 그 줄 수를 이 문서에 적는다(지금 8건 — 첫 여정 4단계).
+7. 페이지 스크립트를 모듈로 뺄 때는 **CSS import·최상위 DOM 생성 없이** `create...(deps)` 형태로 내보낸다(보기 메뉴가 그 예).
 6. **페이지 스크립트에만 있는 동작**은 글자 검사에 남기고, 그 줄 수를 이 문서에 적는다(지금 16건).
 - **겉모습 비교(2026-11-08)**: `미리보기 검사`가 `tools/visual-baseline`로 **운영(before) vs PR 미리보기(after)** 24장을 비교해 PR 체크 요약에 장별 차이 %를 표로 남긴다. **알림만** 하고 실패로 만들지 않는다(기준 초과는 "확인 필요"). diff 이미지는 artifact.
