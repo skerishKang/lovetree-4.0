@@ -6,23 +6,30 @@
 import { readdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
-// 미리보기에서 Functions가 아직 붙지 않아 503이 나는 경로들. 이 실패만 예외로 통과시킨다.
-const PREVIEW_503_PATHS = ['/api/youtube/oembed', '/api/community/shares', '/api/community', '/api/account', '/api/workspace'];
+// 미리보기 Functions 503에 직접 의존하는 검사만 예외로 인정한다(2026-11-08 CTO 판단).
+// 화면 검사(visual/*)는 503과 무관하므로 예외 대상이 아니다 — 진짜 회귀가 묻히지 않게 한다.
+const PREVIEW_503_CHECK_IDS = new Set([
+  'youtube/youtube-oembed',      // oEmbed API 응답을 그대로 확인하는 검사
+  'youtube/youtube-caption',     // 같은 oEmbed 경로
+  'community/community-cards',   // 공유 목록 API(/api/community/shares)
+  'console/console-errors'       // 콘솔에 찍힌 503만 있을 때(아래에서 한 번 더 확인)
+]);
+const API_503 = (text) => /503/.test(text) && /\/api\/[a-z0-9/-]+/.test(text);
 
-function isPreview503(check) {
+function exceptionReason(check, report) {
+  const id = `${check.area}/${check.id}`;
+  if (!PREVIEW_503_CHECK_IDS.has(id)) return '';
   const text = `${check.detail || ''} ${JSON.stringify(check.data || {})}`;
-  if (!/503/.test(text)) return false;
-  return PREVIEW_503_PATHS.some((route) => text.includes(route)) || /\/api\/[a-z/-]+/.test(text);
-}
-
-// 503이 콘솔에 찍혀 화면 기능 검사가 함께 무너진 경우(메뉴 항목 0개 등)도 503 영향으로 본다.
-// 단, 리포트 어딘가에 503이 실제로 있을 때만 인정한다(순수 화면 회귀는 그대로 실패).
-const CONSOLE_503 = (report) => (report.console?.errors || []).some((line) => /503/.test(line)) || (report.checks || []).some(isPreview503);
-function isPreview503KnockOn(check, report) {
-  if (!CONSOLE_503(report)) return false;
-  const text = `${check.detail || ''} ${JSON.stringify(check.data || {})}`;
-  if (check.area === 'console' && (report.console?.errors || []).every((line) => /503/.test(line))) return true;
-  return /"items":\[\]/.test(text) && /loggedIn":false/.test(text);
+  if (id === 'console/console-errors') {
+    const errors = report.console?.errors || [];
+    if (!errors.length) return '';
+    // 콘솔 오류가 전부 미리보기 503이면 예외, 하나라도 아니면 실제 오류로 본다.
+    return errors.every((line) => API_503(line)) ? '콘솔 오류가 모두 미리보기 503' : '';
+  }
+  if (id === 'community/community-cards') {
+    return API_503(text) || /카드 0개/.test(text) ? '공유 목록 API 503' : '';
+  }
+  return API_503(text) ? '미리보기 Functions 503' : '';
 }
 
 async function resolveReport(input) {
@@ -54,8 +61,9 @@ if (!reportPath) {
 const report = JSON.parse(await readFile(reportPath, 'utf8'));
 const checks = Array.isArray(report.checks) ? report.checks : [];
 const failures = checks.filter((check) => check.status === 'fail');
-const exceptions = failures.filter((check) => isPreview503(check) || isPreview503KnockOn(check, report));
-const realFailures = failures.filter((check) => !exceptions.includes(check));
+const exceptions = failures.map((check) => ({ check, reason: exceptionReason(check, report) })).filter((row) => row.reason);
+const exceptionChecks = new Set(exceptions.map((row) => row.check));
+const realFailures = failures.filter((check) => !exceptionChecks.has(check));
 const counts = { pass: 0, fail: 0, warn: 0, skip: 0 };
 for (const check of checks) counts[check.status] = (counts[check.status] || 0) + 1;
 const meta = report.meta || {};
@@ -69,8 +77,8 @@ lines.push(`- 대상: \`${meta.target || '(주소 미기록)'}\``);
 lines.push(`- 시각: ${meta.startedAt || meta.stamp || '(미기록)'} · 브라우저: ${meta.browser || 'chromium'} · 로그인: ${login.loggedIn ? '예' : '아니오'}(로그아웃 검사)`);
 lines.push(`- 결과: pass ${counts.pass} · fail ${counts.fail} · warn ${counts.warn} · skip ${counts.skip}`);
 if (exceptions.length) {
-  lines.push(`- 미리보기 Functions 503 예외 ${exceptions.length}건(통과 처리, 503 영향 포함):`);
-  for (const check of exceptions.slice(0, 6)) lines.push(`  - \`${check.area}/${check.id}\` — ${String(check.detail || '').slice(0, 120)}`);
+  lines.push(`- 미리보기 Functions 503 예외 ${exceptions.length}건(검사 id 허용 목록으로만 인정):`);
+  for (const row of exceptions.slice(0, 6)) lines.push(`  - \`${row.check.area}/${row.check.id}\` — ${row.reason}: ${String(row.check.detail || '').slice(0, 100)}`);
 }
 if (realFailures.length) {
   lines.push('');

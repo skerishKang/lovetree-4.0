@@ -37,10 +37,11 @@ jobs:
       - name: 브라우저 준비(Playwright Chromium, 캐시)
         id: browser
         run: |
-          if [ -d "$HOME/.cache/ms-playwright" ] && ls "$HOME/.cache/ms-playwright" | grep -q chromium; then
+          # 모듈은 항상 설치한다(캐시는 브라우저 바이너리에만 걸린다). 캐시가 있어도 모듈이 없으면 실행이 안 된다.
+          npm i --no-save --no-package-lock playwright@1.49.1
+          if ls "$HOME/.cache/ms-playwright" 2>/dev/null | grep -q chromium; then
             echo "캐시된 Chromium 사용"
           else
-            npm i --no-save --no-package-lock playwright@1.49.1
             npx playwright install --with-deps chromium
           fi
           node -e "import('playwright-core').then(()=>console.log('playwright-core 확인')).catch(e=>{console.error(e.message);process.exit(1)})"
