@@ -26,12 +26,13 @@ test('연결은 데이터(LTDEMO.edges)에서 만들고 실제 기록 문구를 
   assert.ok(!SERVER.includes('공개 예시'));
 });
 
-test('예시 분기는 2곳만 남는다: 연결 지우기 동작·말풍선 버튼·연결 색', () => {
+test('예시 판본 판단은 한 곳에만 둔다(연결 지우기 동작·말풍선 버튼·연결 색이 같은 값을 본다)', () => {
   const branches = SERVER.match(/LTDEMO\.example/g) || [];
-  assert.equal(branches.length, 3);
-  assert.match(SERVER, /function deleteSelectedConnection\(\)\{if\(!LTDEMO\.example\)\{/);
-  assert.match(SERVER, /\$\{LTDEMO\.example\?' <button id="deleteConnBubble">/);
-  assert.match(SERVER, /'cyan':\(LTDEMO\.example\?\['rose','violet','cyan','amber'\]\[Math\.max\(0,moments\.findIndex/);
+  assert.equal(branches.length, 1);
+  assert.match(SERVER, /const canEditBoard=LTDEMO\.example;/);
+  assert.match(SERVER, /function deleteSelectedConnection\(\)\{if\(!canEditBoard\)\{/);
+  assert.match(SERVER, /\$\{canEditBoard\?' <button id="deleteConnBubble">/);
+  assert.match(SERVER, /'cyan':\(canEditBoard\?\['rose','violet','cyan','amber'\]\[Math\.max\(0,moments\.findIndex/);
   assert.doesNotMatch(SERVER, /source===['"]example['"]/);
 });
 

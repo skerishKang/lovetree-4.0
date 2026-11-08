@@ -34,7 +34,7 @@ test('실제 기록 판본 문구를 기준으로 통일했다(범례 제목·�
 });
 
 test('재생 안내는 source가 아니라 데이터 상태(예시 여부)로 갈린다', () => {
-  assert.match(SERVER, /if\(!LTDEMO\.example\)\{toast\('실제 연결은 상단 부모·자식 및 관련 순간에서 선택하세요\.'\);return\}/);
+  assert.match(SERVER, /if\(!canPlay\)\{toast\('실제 연결은 상단 부모·자식 및 관련 순간에서 선택하세요\.'\);return\}/);
   assert.doesNotMatch(SERVER, /source===['"]example['"]/);
   assert.match(RUNTIME, /example:!!demo/);
 });
