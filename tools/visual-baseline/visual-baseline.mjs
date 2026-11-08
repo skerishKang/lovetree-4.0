@@ -22,13 +22,15 @@ const DEFAULTS = {
 // 첫 여정 주소는 `#journey`가 아니라 `#journey/00`(first-journey.mjs JOURNEY_ROUTE_PREFIX).
 // Pages는 `.html` 없이도 같은 화면을 준다(iframe 주소가 .../design/views/track59-sketchbook 형태).
 const SCENES = [
-  { name: 'home', hash: '', expect: 'src064-orbit' },
+  { name: 'home', hash: '', expect: '/v41/home' },
   { name: 'shelf', hash: '#shelf', expect: 'track32-bookshelf' },
   { name: 'book', hash: '#book', expect: 'track59-sketchbook' },
   { name: 'board', hash: '#board', expect: 'track58-pinboard' },
-  { name: 'network', hash: '#network', expect: 'track56-network' },
-  { name: 'journey', hash: '#journey/00', expect: 'first-journey' }
+  { name: 'network', hash: '#network', expect: 'track56-network' }
 ];
+
+// 헤더 오른쪽 계정 자리(로그아웃이면 "로그인" 알약)를 연 상태도 기준선에 넣는다.
+const ACCOUNT = { name: 'account', hash: '', expect: '/v41/home', openAccount: true };
 const WIDTHS = [
   { width: 1440, height: 900, tag: '1440' },
   { width: 390, height: 844, tag: '390' }
@@ -59,7 +61,13 @@ const STABILIZE = `(() => {
   style.setAttribute('data-visual-baseline', '1');
   style.textContent = '*,*::before,*::after{animation-play-state:paused!important;animation-delay:0s!important;animation-duration:0s!important;transition:none!important;caret-color:transparent!important}#toast,.toast,[role="status"]{visibility:hidden!important}';
   document.documentElement.append(style);
-  for (const animation of document.getAnimations?.() || []) { try { animation.pause(); animation.currentTime = 0; } catch {} }
+  for (const animation of document.getAnimations?.() || []) {
+    try {
+      const timing = animation.effect?.getComputedTiming?.() || {};
+      if (Number.isFinite(timing.duration) && Number.isFinite(timing.iterations)) animation.finish();
+      else { animation.pause(); animation.currentTime = 0; }
+    } catch {}
+  }
   try { window.scrollTo(0, 0); } catch {}
 })();`;
 
@@ -104,7 +112,7 @@ async function visibleFrameUrl(page) {
 }
 
 // 기대 화면이 보이는 iframe에 실제로 열릴 때까지 기다린다(최대 timeoutMs).
-async function waitForScene(page, expect, timeoutMs = 12000) {
+async function waitForScene(page, expect, timeoutMs = 8000) {
   const deadline = Date.now() + timeoutMs;
   let last = '';
   while (Date.now() < deadline) {
@@ -120,7 +128,7 @@ async function waitForScene(page, expect, timeoutMs = 12000) {
         }
       }
     }
-    await page.waitForTimeout(120);
+    await page.waitForTimeout(200);
   }
   return { frame: null, href: last };
 }
@@ -134,17 +142,28 @@ async function openScene(page, base, scene) {
       continue;
     }
     // 딥링크가 셸 준비 전에 들어오면 첫 화면에 머무는 경우가 있어, 준비된 뒤 해시를 다시 건다.
-    let result = await waitForScene(page, scene.expect, 6000);
+    let result = await waitForScene(page, scene.expect);
     if (result.frame) return result;
     await page.evaluate((hash) => { location.hash = hash; }, scene.hash).catch(() => {});
-    result = await waitForScene(page, scene.expect, 6000);
+    result = await waitForScene(page, scene.expect);
     if (result.frame) return result;
   }
   return { frame: null, href: await visibleFrameUrl(page) };
 }
 
 // 안쪽 화면에만 고정 장치를 걸고, 같은 그림이 두 번 연속 나올 때까지 기다린다.
+const SETTLE_SHELL = `(() => {
+  if (document.querySelector('style[data-visual-baseline-shell]')) return;
+  const style = document.createElement('style');
+  style.setAttribute('data-visual-baseline-shell', '1');
+  style.textContent = '#view,#view-next{transform:none!important;opacity:1!important;animation:none!important;transition:none!important}';
+  document.documentElement.append(style);
+  for (const animation of document.getAnimations?.() || []) { try { animation.finish(); } catch {} }
+})();`;
+
 async function settleInside(frame, page) {
+  // 화면 교체 애니메이션이 소수점 배율로 남으면 같은 화면도 픽셀이 흔들리므로, 다 열린 뒤 배율을 1로 고정한다.
+  await page.evaluate(SETTLE_SHELL).catch(() => {});
   await frame.evaluate(STABILIZE).catch(() => {});
   await page.waitForTimeout(200);
 }
@@ -182,49 +201,47 @@ async function capture(argv) {
   try {
     for (const viewport of WIDTHS) {
       for (const theme of THEMES) {
-        const context = await browser.newContext({
-          viewport: { width: viewport.width, height: viewport.height },
-          deviceScaleFactor: 1,
-          reducedMotion: 'reduce',
-          colorScheme: 'dark',
-          locale: 'ko-KR',
-          timezoneId: 'Asia/Seoul'
-        });
-        await context.addInitScript((value) => {
-          try { localStorage.setItem('lt41.theme', value); } catch {}
-        }, theme);
-        await context.addInitScript(FREEZE_INNER);
-        const page = await context.newPage();
-        for (const scene of SCENES) {
-          const { frame, href } = await openScene(page, options.base, scene);
-          if (!frame) {
-            manifest.push({ shot: shotName(scene.name, viewport, theme), scene: scene.name, opened: false, shown: href });
-            console.log(`! ${scene.name}-${viewport.tag}-${theme}: 화면이 열리지 않음 (${href})`);
-            unstable += 1;
-            continue;
+        for (const scene of [...SCENES, ACCOUNT]) {
+          // 장마다 새 context·새 페이지. 크기·테마는 context를 만들 때 정하고, 같은 페이지에서 크기를 바꾸지 않는다.
+          const context = await browser.newContext({
+            viewport: { width: viewport.width, height: viewport.height },
+            deviceScaleFactor: 1,
+            reducedMotion: 'reduce',
+            colorScheme: 'dark',
+            locale: 'ko-KR',
+            timezoneId: 'Asia/Seoul'
+          });
+          await context.addInitScript((value) => {
+            try { localStorage.setItem('lt41.theme', value); } catch {}
+          }, theme);
+          await context.addInitScript(FREEZE_INNER);
+          const page = await context.newPage();
+          const name = scene.openAccount ? `account-${viewport.tag}-${theme}.png` : shotName(scene.name, viewport, theme);
+          try {
+            const { frame, href } = await openScene(page, options.base, scene);
+            if (!frame) {
+              manifest.push({ shot: name, scene: scene.name, opened: false, shown: href });
+              console.log(`! ${name}: 화면이 열리지 않음 (${href || '주소 없음'})`);
+              unstable += 1;
+              continue;
+            }
+            if (scene.openAccount) {
+              await page.evaluate(() => {
+                const entry = document.getElementById('account-entry');
+                const avatar = document.getElementById('account-avatar');
+                if (avatar && !avatar.hidden) avatar.click();
+                else if (entry) entry.focus();
+              }).catch(() => {});
+              await page.waitForTimeout(400);
+            }
+            const stable = await stableShot(frame, page, path.join(out, name));
+            manifest.push({ shot: name, scene: scene.name, opened: true, shown: href, stable });
+            if (!stable) unstable += 1;
+            count += 1;
+          } finally {
+            await context.close();
           }
-          const stable = await stableShot(frame, page, path.join(out, shotName(scene.name, viewport, theme)));
-          manifest.push({ shot: shotName(scene.name, viewport, theme), scene: scene.name, opened: true, shown: href, stable });
-          if (!stable) unstable += 1;
-          count += 1;
         }
-        // 헤더 오른쪽 계정 자리(로그아웃이면 "로그인" 알약, 로그인이면 동그라미)를 연 상태
-        const home = await openScene(page, options.base, SCENES[0]);
-        if (home.frame) {
-          await page.evaluate(() => {
-            const entry = document.getElementById('account-entry');
-            const avatar = document.getElementById('account-avatar');
-            if (avatar && !avatar.hidden) avatar.click();
-            else if (entry) entry.focus();
-          }).catch(() => {});
-          await page.waitForTimeout(400);
-          const name = `account-${viewport.tag}-${theme}.png`;
-          const stable = await stableShot(home.frame, page, path.join(out, name));
-          manifest.push({ shot: name, scene: 'account', opened: true, shown: home.href, stable });
-          if (!stable) unstable += 1;
-          count += 1;
-        }
-        await context.close();
       }
     }
   } finally {
@@ -232,7 +249,7 @@ async function capture(argv) {
   }
   writeFileSync(path.join(out, 'manifest.json'), JSON.stringify(manifest, null, 1));
   console.log(`${count}장 저장: ${out}`);
-  console.log(`안쪽 화면이 열린 장 ${manifest.filter((row) => row.opened).length}장 / 고정 실패 ${unstable}장`);
+  console.log(`도착 ${manifest.filter((row) => row.opened).length}장 / 고정 실패 ${unstable}장`);
   return unstable ? 1 : 0;
 }
 
