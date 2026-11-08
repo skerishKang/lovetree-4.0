@@ -16,6 +16,23 @@ function pendingDraftKey(subject) {
     ? `${PENDING_DRAFT_PREFIX}${subject}` : null;
 }
 
+// 브라우저(sessionStorage)에만 남은 미저장 기록이 있는지 본다. 지우지 않고 표시만 한다.
+// 계정을 모르면(로그아웃 401) 남아 있는 키 중 하나라도 있으면 참이다.
+export function hasPendingDraft(storage, subject = null) {
+  if (!storage) return false;
+  try {
+    if (subject) {
+      const key = pendingDraftKey(subject);
+      return !!key && storage.getItem(key) !== null;
+    }
+    for (let index = 0; index < storage.length; index += 1) {
+      const key = storage.key(index);
+      if (typeof key === 'string' && key.startsWith(PENDING_DRAFT_PREFIX)) return true;
+    }
+    return false;
+  } catch { return false; }
+}
+
 // A failed, authenticated write may cross a full-page re-login. Keep its
 // one-tab retry buffer in sessionStorage, scoped to the same account only.
 export function createSyncController({getState, replaceState, api, draftStorage = null,
