@@ -106,9 +106,12 @@ test('전환 버튼은 누르면 갈 곳(밤/정원)과 aria-pressed를 쓴다',
   assert.equal(themePressed('garden'), true);
   assert.equal(nextTheme('night'), 'garden');
   assert.equal(nextTheme('garden'), 'night');
-  // 첫 화면 도구 줄 버튼과 계정 메뉴 항목이 같은 표시를 쓴다.
-  assert.match(homeJS, /dataset\.ltThemeToggle/);
-  assert.match(homeJS, /shadow\.querySelector\('\.top-actions'\)\.append\(themeButton\)/);
+  // #213 2번: 첫 화면 테마는 "보기" 메뉴 항목이 맡는다(도구 줄 버튼 하나로 묶었다).
+  // 표시 문구는 계정 메뉴 항목과 같은 header-state 규칙을 그대로 쓴다.
+  assert.match(homeJS, /dataset\.ltViewMenu/);
+  assert.match(homeJS, /shadow\.querySelector\('\.top-actions'\)\.append\(viewWrap\)/);
+  assert.match(homeJS, /kind==='theme'\).*writeTheme\(localStorage/, '메뉴에서 고른 테마를 저장한다');
+  assert.match(homeJS, /parent\.postMessage\(\{type:'lt41-theme',theme\}/, '셸에 테마를 알리는 기존 메시지를 그대로 쓴다');
   assert.match(html, /id="account-theme" data-lt-theme-toggle aria-pressed="false"/);
   assert.match(shell, /document\.querySelectorAll\('\[data-lt-theme-toggle\]'\)/);
 });

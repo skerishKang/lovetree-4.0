@@ -23,7 +23,7 @@ export function mountOrbit(host,{trees,storage,context,actions,authHtml='',onSel
  const all=demo?samples.map(c=>({...c,key:c.id,treeId:ORBIT_EXAMPLE.id,note:c.memo||c.whyNext})):[...memberCards,...fillers];
  const cards=all.slice(0,48), last=demo?all[0]:resume(storage,trees);
  const lastCard=demo?all[0]:all.find(c=>c.treeId===last?.tree.id&&c.id===last?.moment.id)||all[0];
- shadow.innerHTML=`<style>${originalCSS}${extraCSS}.auth-entry{white-space:nowrap}</style><section class="app" aria-label="${SERVICE} 첫 화면"><div class="topbar"><span class="brand">${SERVICE} · MEMORY ORBIT</span><div class="top-actions"><button class="menuBtn" data-do="pause" aria-pressed="false">움직임 멈춤</button><button class="menuBtn" data-do="index">순간 목록</button>${authHtml}</div></div><div class="world"></div><div class="center-scrim" aria-hidden="true"></div><div class="center"><div class="eyebrow">${demo?'나의 첫 순간':'WELCOME BACK'}</div><h1>${demo?'좋아하는 순간부터.':'다시, 그 순간으로.'}</h1><p>${demo?'간직하고 싶은 장면에 마음을 남겨 보세요.<br>지금 떠오르는 순간 하나면 충분해요.':'기억은 아직 여기에서 이어지고 있어요.'}</p><div class="actions"><button class="subtleBtn primary-cta" data-do="${demo?'new':'continue'}">${demo?NEW_TREE:'이어 보던 순간'}</button><button class="subtleBtn" data-do="${demo?'continue':'new'}">${demo?'예시 순간 감상':NEW_TREE}</button><button class="subtleBtn" data-do="trees">${GO_TREES}</button></div><p class="center-note">${demo?'감상 예시 · 내 기록에는 저장되지 않아요':esc(recordNote??`${all.length}개의 순간 · 서버에 보관`)}</p></div><div class="hint">드래그 · 금테 카드를 눌러 감상</div></section><dialog class="orbit-dialog" aria-label="순간 감상"></dialog>`;
+ shadow.innerHTML=`<style>${originalCSS}${extraCSS}.auth-entry{white-space:nowrap}</style><section class="app" aria-label="${SERVICE} 첫 화면"><div class="topbar"><span class="brand">${SERVICE} · MEMORY ORBIT</span><div class="top-actions"><button class="menuBtn" data-do="index">순간 목록</button>${authHtml}</div></div><div class="world"></div><div class="center-scrim" aria-hidden="true"></div><div class="center"><div class="eyebrow">${demo?'나의 첫 순간':'WELCOME BACK'}</div><h1>${demo?'좋아하는 순간부터.':'다시, 그 순간으로.'}</h1><p>${demo?'간직하고 싶은 장면에 마음을 남겨 보세요.<br>지금 떠오르는 순간 하나면 충분해요.':'기억은 아직 여기에서 이어지고 있어요.'}</p><div class="actions"><button class="subtleBtn primary-cta" data-do="${demo?'new':'continue'}">${demo?NEW_TREE:'이어 보던 순간'}</button><button class="subtleBtn" data-do="${demo?'continue':'new'}">${demo?'예시 순간 감상':NEW_TREE}</button><button class="subtleBtn" data-do="trees">${GO_TREES}</button></div><p class="center-note">${demo?'감상 예시 · 내 기록에는 저장되지 않아요':esc(recordNote??`${all.length}개의 순간 · 서버에 보관`)}</p></div><div class="hint">드래그 · 금테 카드를 눌러 감상</div></section><dialog class="orbit-dialog" aria-label="순간 감상"></dialog>`;
  const app=shadow.querySelector('.app'),world=shadow.querySelector('.world'),dialog=shadow.querySelector('dialog');
  const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;let paused=reduced,phase=0,raf=0,previous=0,drag=null,moved=0,opener=null,hoveredCard=null;
  // #41 마우스 패럴랙스: 중심 기준 제한된 변위를 보간한다(phase를 누적하지 않음). 멈춤·reduced·팝업·백그라운드에서 정지, 터치에는 걸지 않는다.
@@ -34,7 +34,8 @@ export function mountOrbit(host,{trees,storage,context,actions,authHtml='',onSel
  let cameraTarget={x:0,y:0}, camera={x:0,y:0};
  const motionOn=() => !paused && !hoveredCard && !dialog.open && !document.hidden;
  const neutralizePointer=() => { cameraTarget={x:0,y:0}; camera={x:0,y:0}; world.style.transform=''; };
- const pause=shadow.querySelector('[data-do=pause]');pause.textContent=paused?'움직임 켜기':'움직임 멈춤';pause.setAttribute('aria-pressed',String(paused));
+ // #213 2번: 움직임 켜기/멈춤은 도구 줄의 "보기" 메뉴가 부른다(setMotionPaused).
+ const setMotionPaused=(next)=>{paused=!!next;if(paused)neutralizePointer();schedule();};
  function rememberCard(c){if(!demo)remember(storage,c.treeId,c.id);}
  function focus(c){if(!c)return;if(!c.example){onSelect(c.id);rememberCard(c);}if(!dialog.open)opener=shadow.activeElement;
   const children=c.example?[all.find(x=>x.id===c.next),all.find(x=>x.id===c.branch)].filter(Boolean):demo?[all.find(x=>x.id===c.next),all.find(x=>x.id===c.branch)].filter(Boolean):all.filter(x=>x.treeId===c.treeId&&x.parentId===c.id);
@@ -45,7 +46,7 @@ export function mountOrbit(host,{trees,storage,context,actions,authHtml='',onSel
   if(!dialog.open)dialog.showModal();else dialog.querySelector('.close').focus();
  }
  function index(){opener=shadow.activeElement;dialog.innerHTML=`<button class="close" data-do="close">닫기 ×</button><div class="index-list"><h2>${demo?'예시 순간':'나의 순간'} · ${all.length}</h2>${all.map(c=>`<button data-next="${esc(c.key)}">${esc(c.title)}<small>${esc(c.date)} · ${esc(c.emotion)}</small></button>`).join('')}</div>`;dialog.showModal();}
- shadow.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.next){focus(all.find(c=>c.key===b.dataset.next));return;}switch(b.dataset.do){case'close':dialog.close();break;case'new':actions.requestMoment('new');break;case'trees':actions.navigate('trees');break;case'continue':focus(lastCard);break;case'index':index();break;case'pause':paused=!paused;b.textContent=paused?'움직임 켜기':'움직임 멈춤';b.setAttribute('aria-pressed',String(paused));if(paused)neutralizePointer();schedule();break;}},{signal});
+ shadow.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.next){focus(all.find(c=>c.key===b.dataset.next));return;}switch(b.dataset.do){case'close':dialog.close();break;case'new':actions.requestMoment('new');break;case'trees':actions.navigate('trees');break;case'continue':focus(lastCard);break;case'index':index();break;}},{signal});
  dialog.addEventListener('close',()=>{opener?.focus();schedule()},{signal});
  const elements=cards.map(c=>{const b=document.createElement('button');b.className=`card ${c.type} ${c.sizeClass}${c.example?' example':''}${c.source==='mine'?' mine':''}`;b.dataset.example=c.example?'1':'';b.setAttribute('aria-label',`${c.title} ${c.example?'감상 예시':'감상'}`);b.innerHTML=`<div class="surface">${c.image?`<img src="${esc(c.image)}" alt="" draggable="false" style="object-fit:${c.fitMode==='contain'?'contain':'cover'}">`:`<div class="memoKicker">${esc(c.date)}</div><div class="memoText">${esc(c.title)}</div><div class="memoFoot">${esc(c.emotion)}</div>`}</div>${c.first?'<div class="firstMark">FIRST</div>':''}<div class="caption"><span>${esc(c.title)}</span></div>`;b.addEventListener('pointerenter',e=>{if(e.pointerType==='mouse'&&!drag)hoveredCard=b;},{signal});b.addEventListener('pointerleave',()=>{if(hoveredCard===b)hoveredCard=null;},{signal});b.onclick=e=>{if(e.detail===0||moved<9){if(onOpen&&!c.example){onOpen(c);return;}focus(c)}};world.append(b);return b;});
  function frame(now){raf=0;const dt=Math.min(40,now-previous||16);previous=now;if(!paused&&!dialog.open&&!drag&&!hoveredCard)phase+=.000006*dt;const w=app.clientWidth,h=app.clientHeight;
@@ -74,5 +75,8 @@ export function mountOrbit(host,{trees,storage,context,actions,authHtml='',onSel
  track(()=>noticeResize?.disconnect());
  track(()=>barWatch?.disconnect());
  fitNotice();
- schedule();track(()=>cancelAnimationFrame(raf));track(()=>dialog.close());return dispose;
+ schedule();track(()=>cancelAnimationFrame(raf));track(()=>dialog.close());
+ // #213 2번: 첫 화면 도구 줄의 "보기" 메뉴가 움직임을 읽고 바꾼다. dispose는 함수 그대로 둔다.
+ dispose.motion={get paused(){return paused;},set(value){setMotionPaused(value);},toggle(){setMotionPaused(!paused);return paused;}};
+ return dispose;
 }

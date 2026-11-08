@@ -10,8 +10,9 @@ import {hasPendingDraft} from './sync-controller.mjs';
 import {exampleTree} from './example.mjs';
 import {parseSelectionRoute,memberStartupView,ownerSelectionRoute,accountPosition,rememberAccountPosition,resolveAccountPosition,stashPendingOwnerRoute,pendingOwnerRoute,takePendingOwnerRoute} from './selection-location.mjs';
 import {applyViewAccessibility,connectionLabel,focusReturnTarget} from './view-a11y.mjs';
-import {accountPresentation,treePickerLabel,treePickerText,treeViewsVisible,writeMenuLabel,homeCenterState,homeStartLoginUrl,readTheme,readLoginIntent,writeTheme,nextTheme,themeButtonLabel,themeButtonAriaLabel,themePressed,appliedTheme,applyThemeAttribute,LOGIN_INTENTS} from './header-state.mjs';
+import {accountPresentation,treePickerLabel,treePickerText,treeViewsVisible,writeMenuLabel,headerState,headerPartsFor,readTipsSeen,writeTipsSeen,tipsWanted,FIRST_TREE_TIPS,homeCenterState,homeStartLoginUrl,readTheme,readLoginIntent,writeTheme,nextTheme,themeButtonLabel,themeButtonAriaLabel,themePressed,appliedTheme,applyThemeAttribute,LOGIN_INTENTS} from './header-state.mjs';
 import {journeyEntry,journeySavePlan,journeyRouteHash,parseJourneyRoute,journeyRouteDecision} from './first-journey.mjs';
+import {displayTreeTitle} from './tree-name.mjs';
 const $=id=>document.getElementById(id);
 let pendingLoginIntent=readLoginIntent(location.search);
 {const params=new URLSearchParams(location.search);if(params.has('intent')){params.delete('intent');const query=params.toString();history.replaceState(null,'',location.pathname+(query?'?'+query:'')+location.hash);}}
@@ -71,7 +72,7 @@ function writeLocation(mode='push'){
  handledHash=hash;
  if(owned)rememberAccountPosition(localStorage,member.snapshot().subject,position);
 }
-function viewContext(){const c=window.LT41;$('view-context').hidden=!c||current==='src064-orbit.html';if(!c)return;$('context-tree').textContent=c.tree.title;$('context-kind').textContent=source==='example'?'예시':source==='file'?'파일':source==='share'?'공유 감상':'';$('context-kind').hidden=source==='server';$('manage-tree').hidden=source!=='server'||!member?.snapshot().owned||!member.snapshot().writable;}
+function viewContext(){const c=window.LT41;$('view-context').hidden=!c||current==='src064-orbit.html';if(!c)return;$('context-tree').textContent=displayTreeTitle(c.tree.title);$('context-kind').textContent=source==='example'?'예시':source==='file'?'파일':source==='share'?'공유 감상':'';$('context-kind').hidden=source==='server';$('manage-tree').hidden=source!=='server'||!member?.snapshot().owned||!member.snapshot().writable;}
 // 연결 보기는 헤더에서 뺐다(2026-11-07). 관계 지도 화면의 도구 줄(전체 보기·사용법과 같은 자리·모양)에
 // 같은 다이얼로그를 여는 버튼을 붙인다. 원본 화면 파일은 건드리지 않는다.
 function mountConnectionTool(doc){
@@ -87,24 +88,54 @@ function links(){viewContext();const c=window.LT41;$('connections').replaceChild
  const edges=c.tree.edges.filter(e=>e.from===c.momentId||e.to===c.momentId);setConnectionCount(edges.length);
  if(!edges.length){const p=document.createElement('p');p.textContent='아직 연결된 다른 순간이 없어요.';$('connections').append(p);}
  for(const e of edges){const id=e.from===c.momentId?e.to:e.from,m=c.tree.moments.find(m=>m.id===id),b=document.createElement('button'),kind=document.createElement('small'),title=document.createElement('span');kind.textContent=e.kind==='related'?'관련 순간':e.from===c.momentId?'다음 순간':'이전 순간';const name=document.createElement('strong'),reason=document.createElement('span');name.textContent=m.title;reason.className='connection-reason';reason.textContent=e.reason||(e.kind==='related'?'함께 기억할 관련 순간으로 연결했어요.':'연결 이유를 아직 남기지 않았어요.');title.append(name,reason);b.append(kind,title);b.onclick=()=>{c.momentId=id;$('connection-panel').close();show(current,false);writeLocation();};$('connections').append(b);}}
+// #213 3번: 첫 트리 안내 말풍선. 한 번만 보여 주고, 닫으면 기억한다(저장소가 막히면 다시 보여 준다).
+let tipsReturnFocus=null;
+function closeTreeTips(remember=true){
+  const box=$('tree-tips');if(!box||box.hidden)return;
+  box.hidden=true;if(remember)writeTipsSeen(localStorage);
+  const back=tipsReturnFocus||$('tree-views')?.querySelector('button')||$('mobile-more');tipsReturnFocus=null;
+  if(back&&document.contains(back)&&!back.hidden)back.focus();
+}
+function showTreeTips(){
+  const box=$('tree-tips');if(!box||!box.hidden)return;
+  const list=$('tree-tips-list');
+  if(list&&!list.children.length)for(const tip of FIRST_TREE_TIPS){const li=document.createElement('li');const strong=document.createElement('strong');const span=document.createElement('span');strong.textContent=tip.title;span.textContent=tip.body;li.append(strong,span);list.append(li);}
+  if(!tipsReturnFocus)tipsReturnFocus=document.activeElement;
+  box.hidden=false;
+  $('tree-tips-close')?.focus();
+}
+function syncTreeTips(){
+  const wanted=tipsWanted({owned:!!member?.snapshot().owned,treeCount:model?.trees?.length||0,seen:readTipsSeen(localStorage)});
+  if(wanted)showTreeTips();else closeTreeTips(false);
+}
+$('tree-tips-close')?.addEventListener('click',()=>closeTreeTips());
+document.addEventListener('keydown',event=>{
+  if(event.key!=='Escape')return;
+  const box=$('tree-tips');if(!box||box.hidden)return;
+  if([...document.querySelectorAll('dialog[open]')].some(d=>d.matches(':modal')))return;
+  event.preventDefault();closeTreeTips();
+});
 function flowNavigation(){
   const owned=!!member?.snapshot().owned;
   const reading=!!window.LT41&&['track59-sketchbook.html','track58-pinboard.html','track56-network.html'].includes(current);
   const publicReading=source==='share';
   // 트리 보기 탭은 로그인한 내 트리에서만 연다. 로그아웃이면 예시가 열려 있어도 숨긴다.
-  const showTreeViews=treeViewsVisible({owned,publicReading});
-  $('tree-views').hidden=!showTreeViews;for(const b of $('tree-views').querySelectorAll('button')){b.disabled=!window.LT41;b.title=window.LT41?'':'트리를 선택하면 열 수 있어요.';}
-  $('tree-views').setAttribute('aria-label',window.LT41?.tree.title?window.LT41.tree.title+' 보기':'이 트리 보기');
+  // #213 3번: 상태(out·in-empty·in-trees·share)마다 보이는 것만 남기고 나머지는 숨긴다(비활성 표시 없음).
+  const parts=headerPartsFor({owned,treeCount:model?.trees?.length||0,publicReading});
+  const showTreeViews=parts.treeViews&&treeViewsVisible({owned,publicReading});
+  $('tree-views').hidden=!showTreeViews;for(const b of $('tree-views').querySelectorAll('button')){b.disabled=false;b.title='';}
+  $('tree-views').setAttribute('aria-label',window.LT41?.tree.title?displayTreeTitle(window.LT41.tree.title)+' 보기':'이 트리 보기');
   for(const b of document.querySelectorAll('nav>button'))b.hidden=publicReading;
   // 트리 선택은 뒤쪽 탭 묶음 바로 앞에 있고, 로그인 상태에서만 "트리: <이름> ▾"로 보여 준다.
   // 로그아웃이면 "트리 고르기", 브라우저에만 남은 미저장 기록이 있으면 "저장 안 된 기록"이다.
   const pendingDraft=hasPendingDraft(sessionStorage,member?.snapshot().subject||null);
-  $('record-menu').hidden=publicReading;
-  $('source-label').textContent=treePickerText({owned,treeTitle:window.LT41?.tree.title,pendingDraft});
+  $('record-menu').hidden=!parts.treePicker||publicReading;
+  $('source-label').textContent=treePickerText({owned,treeTitle:displayTreeTitle(window.LT41?.tree.title||''),pendingDraft});
   $('record-menu').title=owned?(window.LT41?'다른 트리를 고릅니다.':'열어볼 트리를 고릅니다.'):(pendingDraft?'로그인하면 저장하지 못한 기록을 복원합니다.':'로그인하면 내 트리를 고를 수 있습니다.');
-  $('write-menu').hidden=publicReading;$('share-menu').hidden=source!=='server'||!owned||!window.LT41;
+  $('write-menu').hidden=!parts.write||publicReading;$('share-menu').hidden=!parts.share||source!=='server'||!window.LT41;
   if(!member?.snapshot().dirty)$('write-menu').textContent=writeMenuLabel({owned,dirty:false,reading,hasTree:!!window.LT41});
   $('write-menu').title=source==='server'?(reading?'선택한 순간에서 이어지는 새 순간을 기록합니다.':'새 트리의 첫 순간을 기록합니다.'):'로그인한 계정에 내 트리를 만듭니다. 예시에는 저장하지 않아요.';
+  syncTreeTips();
   revealCurrentTab();
 }
 // 2026-11-07: 390·360에서 탭 7개가 폭을 넘는다. 탭 줄은 가로 스크롤이고, 화면을 바꿀 때 현재 탭을 가운데로 당겨 보이게 한다.
@@ -183,7 +214,7 @@ function showInFrame(url,title){
 function show(file,write=true){const screen=screens.find(s=>s[1]===file);if(!screen)return;if($('community-panel').open)$('community-panel').close();current=file;flowNavigation();applyTheme();if(!window.LT41&&file!=='src064-orbit.html'){document.body.classList.remove('home-screen');hideFrames();$('empty').hidden=false;if(write)writeLocation();links();return;}document.body.classList.toggle('home-screen',file==='src064-orbit.html');document.querySelectorAll('[data-view]').forEach(b=>b.setAttribute('aria-current',String(b.dataset.view===file)));$('empty').hidden=true;showInFrame(new URL('/v41/'+(file==='src064-orbit.html'?'home.html':(source==='example'?'design/views/':'views/')+file),location.origin).href,'러브트리 · '+screen[2]);if(write)writeLocation();links();}
 function choose(id,momentId){const tree=model.trees.find(t=>t.id===id);window.LT41=tree?{tree,trees:model.trees,source,momentId:tree.moments.find(m=>m.id===momentId)?.id||tree.moments.find(m=>m.parentId===null)?.id||tree.moments[0]?.id,}:null;
  if(tree||current==='src064-orbit.html')show(current,false);else{flowNavigation();document.body.classList.remove('home-screen');hideFrames();$('empty').hidden=false;links();}}
-function load(input,kind,selection={},fallback={}){model=kind==='example'?{trees:[exampleTree]}:workspaceModel(input);source=kind;if(kind!=='share'){activeShareId=null;$('empty').querySelector('h1').textContent='다시 펼칠 순간을 기다리고 있어요.';$('empty').querySelector('p').textContent='예시를 둘러보거나 로그인한 계정의 기록을 불러오세요.';$('empty-sample').hidden=false;$('empty-records').hidden=false;}document.body.dataset.recordSource=kind;document.body.dataset.member=member?.snapshot().owned?'in':'out';document.body.dataset.treeCount=String(model?.trees?.length||0);$('source-label').textContent='트리 선택';$('record-description').textContent=kind==='example'?'실제 회원 데이터와 무관한 예시입니다.':kind==='server'?'로그인한 계정의 서버 기록 · 작성·수정 후 자동 저장':kind==='share'?'소유자가 명시적으로 공개한 트리 · 감상 전용':'선택한 파일을 메모리에서 읽는 중입니다.';$('trees').replaceChildren();for(const t of model.trees){const o=document.createElement('option');o.value=t.id;o.textContent=t.title;$('trees').append(o);}$('trees').disabled=!model.trees.length;const resolved=resolveAccountPosition(model.trees,selection,fallback),chosen=model.trees.find(t=>t.id===resolved.position.treeId);$('trees').value=chosen?.id||'';choose(chosen?.id,resolved.position.momentId);return resolved;}
+function load(input,kind,selection={},fallback={}){model=kind==='example'?{trees:[exampleTree]}:workspaceModel(input);source=kind;if(kind!=='share'){activeShareId=null;$('empty').querySelector('h1').textContent='다시 펼칠 순간을 기다리고 있어요.';$('empty').querySelector('p').textContent='예시를 둘러보거나 로그인한 계정의 기록을 불러오세요.';$('empty-sample').hidden=false;$('empty-records').hidden=false;}document.body.dataset.recordSource=kind;document.body.dataset.member=member?.snapshot().owned?'in':'out';document.body.dataset.treeCount=String(model?.trees?.length||0);$('source-label').textContent='트리 선택';$('record-description').textContent=kind==='example'?'실제 회원 데이터와 무관한 예시입니다.':kind==='server'?'로그인한 계정의 서버 기록 · 작성·수정 후 자동 저장':kind==='share'?'소유자가 명시적으로 공개한 트리 · 감상 전용':'선택한 파일을 메모리에서 읽는 중입니다.';$('trees').replaceChildren();for(const t of model.trees){const o=document.createElement('option');o.value=t.id;o.textContent=displayTreeTitle(t.title);$('trees').append(o);}$('trees').disabled=!model.trees.length;const resolved=resolveAccountPosition(model.trees,selection,fallback),chosen=model.trees.find(t=>t.id===resolved.position.treeId);$('trees').value=chosen?.id||'';choose(chosen?.id,resolved.position.momentId);return resolved;}
 function clear(){load({revision:0,state:{version:1,trees:[]}},'file');$('source-label').textContent='트리 선택';$('record-description').textContent='펼쳐 볼 트리를 선택하세요.';}
 function stateSelection(){return {treeId:window.LT41?.tree.id,momentId:window.LT41?.momentId};}
 function parentValue(){return new URLSearchParams({targetId:$('parent-target').value,relation:$('parent-relation').value}).toString();}
@@ -292,7 +323,7 @@ async function openSharePanel(){
  const tree=window.LT41.tree;$('share-moment').replaceChildren();for(const moment of tree.moments){const o=document.createElement('option');o.value=moment.id;o.textContent=moment.title;$('share-moment').append(o);}$('share-moment').value=window.LT41.momentId;$('share-view').value=['book','board','network'].includes(viewForFile(current))?viewForFile(current):'book';sharePreviewKey='';sharePreviewToken='';$('share-create').disabled=true;$('share-preview-result').hidden=true;$('share-created').hidden=true;$('share-feedback').textContent='';panel('share-panel');void loadShareList();
 }
 $('share-menu').onclick=openSharePanel;$('share-moment').onchange=invalidateSharePreview;$('share-view').onchange=invalidateSharePreview;
-$('share-preview').onclick=async()=>{const button=$('share-preview'),payload=sharePayload();button.disabled=true;$('share-feedback').textContent='서버에서 공개 범위를 확인하고 있어요.';const answer=await shareApi.preview(payload);button.disabled=false;if(!answer.ok){$('share-feedback').textContent=shareFailure(answer);return;}sharePreviewKey=JSON.stringify(payload);sharePreviewToken=answer.preview.previewToken;$('share-preview-summary').textContent=`“${answer.preview.tree.title}”의 ${answer.preview.tree.moments.length}개 순간을 공개합니다.${answer.preview.omittedPrivateMedia?' 비공개 업로드 '+answer.preview.omittedPrivateMedia+'개는 제외됩니다.':''}`;$('share-preview-moments').replaceChildren();for(const moment of answer.preview.tree.moments){const li=document.createElement('li');li.textContent=`${moment.title} · ${moment.emotion} · ${moment.date}`; $('share-preview-moments').append(li);}$('share-preview-result').hidden=false;$('share-create').disabled=false;$('share-feedback').textContent='미리보기를 확인한 뒤 링크를 만들 수 있어요.';};
+$('share-preview').onclick=async()=>{const button=$('share-preview'),payload=sharePayload();button.disabled=true;$('share-feedback').textContent='서버에서 공개 범위를 확인하고 있어요.';const answer=await shareApi.preview(payload);button.disabled=false;if(!answer.ok){$('share-feedback').textContent=shareFailure(answer);return;}sharePreviewKey=JSON.stringify(payload);sharePreviewToken=answer.preview.previewToken;$('share-preview-summary').textContent=`“${displayTreeTitle(answer.preview.tree.title)}”의 ${answer.preview.tree.moments.length}개 순간을 공개합니다.${answer.preview.omittedPrivateMedia?' 비공개 업로드 '+answer.preview.omittedPrivateMedia+'개는 제외됩니다.':''}`;$('share-preview-moments').replaceChildren();for(const moment of answer.preview.tree.moments){const li=document.createElement('li');li.textContent=`${moment.title} · ${moment.emotion} · ${moment.date}`; $('share-preview-moments').append(li);}$('share-preview-result').hidden=false;$('share-create').disabled=false;$('share-feedback').textContent='미리보기를 확인한 뒤 링크를 만들 수 있어요.';};
 $('share-create').onclick=async()=>{const payload=sharePayload();if(sharePreviewKey!==JSON.stringify(payload)){invalidateSharePreview();return;}const button=$('share-create');button.disabled=true;$('share-feedback').textContent='공유 주소를 만들고 있어요.';const answer=await shareApi.create({...payload,previewToken:sharePreviewToken});if(!answer.ok){$('share-feedback').textContent=shareFailure(answer);button.disabled=false;return;}const shareBase=location.hostname==='lovetree.padiem.net'?'/':'/v41/';const url=new URL(`${shareBase}#share/${answer.share.id}/${answer.share.view}`,location.origin).href;$('share-url').value=url;$('share-url').dataset.shareId=answer.share.id;$('share-created').hidden=false;$('share-feedback').textContent='명시적으로 공유 주소를 만들었어요.';sharePreviewKey='';sharePreviewToken='';await loadShareList();};
 $('share-copy').onclick=async()=>{const input=$('share-url');try{await navigator.clipboard.writeText(input.value);$('share-feedback').textContent='공유 주소를 복사했어요.';}catch{input.select();$('share-feedback').textContent='주소를 선택했어요. 복사해 주세요.';}};
 // 화면 한 장이 준비될 때마다: 테마·연결 도구·접근성·클릭 위임을 그 화면에 붙인다.
@@ -425,7 +456,7 @@ function usePrivateAsset(){
 function openEditor(requestedMode,parentId=''){if(source!=='server'||!member?.snapshot().owned){openLoginStart('new-tree');return;}if(!member.snapshot().writable){notify('서버 편집 연결이 아직 준비되지 않았어요. 기록은 안전하게 읽을 수 있습니다.');panel('records');return;}const mode=['new','add','edit'].includes(requestedMode)?requestedMode:window.LT41?'add':'new';if(mode==='new'){openFirstJourney();return;}setEditorMode(mode,parentId);panel('editor');queueMicrotask(()=>$('moment-form').elements.note.focus());}
 function updateTreeCoverHint(){const c=window.LT41,selected=c?.tree.moments.find(m=>m.id===$('tree-cover').value);if(!selected){$('tree-cover-hint').textContent='표지를 고르지 않으면 기존 금테 장식 표지를 사용합니다.';return;}const media=LTMedia.describe(selected.url||'');$('tree-cover-hint').textContent=media.kind==='photo'?`“${selected.title}”의 사진을 표지로 사용합니다.`:`“${selected.title}”을 표지 순간으로 표시하고 금테 장식 표지를 사용합니다.`;}
 function openTreeManager(){if(source!=='server'||!member?.snapshot().owned||!member.snapshot().writable||!window.LT41){notify('내 서버 기록을 불러온 뒤 책 정보를 관리해 주세요.');return;}const tree=window.LT41.tree,form=$('tree-form');form.elements.title.value=tree.title;form.elements.subject.value=tree.subject;$('tree-cover').replaceChildren();const fallback=document.createElement('option');fallback.value='';fallback.textContent='기본 금테 장식 표지';$('tree-cover').append(fallback);for(const moment of tree.moments){const option=document.createElement('option'),media=LTMedia.describe(moment.url||'');option.value=moment.id;option.textContent=`${moment.title} · ${media.kind==='photo'?'사진':media.kind==='video'?'영상':media.kind==='youtube'?'YouTube':media.kind==='link'?'링크':'기록'}`;$('tree-cover').append(option);}$('tree-cover').value=tree.coverMomentId||'';$('tree-form-error').textContent='';updateTreeCoverHint();treeBaseline=new URLSearchParams(new FormData(form)).toString();panel('tree-manager');queueMicrotask(()=>form.elements.title.focus());}
-$('manage-tree').onclick=openTreeManager;$('tree-cover').onchange=updateTreeCoverHint;$('tree-form').onsubmit=e=>{e.preventDefault();try{member.apply('editTree',Object.fromEntries(new FormData(e.target)),stateSelection());treeBaseline=new URLSearchParams(new FormData(e.target)).toString();$('tree-manager').close();notify('책 정보를 서버에 저장하고 있어요.');}catch(error){$('tree-form-error').textContent=error.message;}};$('tree-delete').onclick=()=>{const tree=window.LT41?.tree;if(!tree||!confirm(`“${tree.title}”과 ${tree.moments.length}개 순간을 모두 삭제할까요? 이 작업은 되돌릴 수 없습니다.`))return;try{member.apply('deleteTree',{},stateSelection());treeBaseline='';$('tree-manager').close();notify('트리를 삭제하고 서버에 반영하고 있어요.');}catch(error){$('tree-form-error').textContent=error.message;}};$('tree-manager').addEventListener('cancel',e=>{if(treeDirty()&&!confirm('책 정보 변경을 버리고 닫을까요?'))e.preventDefault();});
+$('manage-tree').onclick=openTreeManager;$('tree-cover').onchange=updateTreeCoverHint;$('tree-form').onsubmit=e=>{e.preventDefault();try{member.apply('editTree',Object.fromEntries(new FormData(e.target)),stateSelection());treeBaseline=new URLSearchParams(new FormData(e.target)).toString();$('tree-manager').close();notify('책 정보를 서버에 저장하고 있어요.');}catch(error){$('tree-form-error').textContent=error.message;}};$('tree-delete').onclick=()=>{const tree=window.LT41?.tree;if(!tree||!confirm(`“${displayTreeTitle(tree.title)}”과 ${tree.moments.length}개 순간을 모두 삭제할까요? 이 작업은 되돌릴 수 없습니다.`))return;try{member.apply('deleteTree',{},stateSelection());treeBaseline='';$('tree-manager').close();notify('트리를 삭제하고 서버에 반영하고 있어요.');}catch(error){$('tree-form-error').textContent=error.message;}};$('tree-manager').addEventListener('cancel',e=>{if(treeDirty()&&!confirm('책 정보 변경을 버리고 닫을까요?'))e.preventDefault();});
 $('write-menu').onclick=()=>openEditor(current==='track32-bookshelf.html'?'new':undefined);document.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>setEditorMode(b.dataset.mode));
 function updateMediaPreview(){const form=$('moment-form'),url=form.elements.url.value,info=LTMedia.describe(url);$('url-media-hint').textContent=info.kind==='none'?'사진·영상은 직접 HTTPS 링크를 사용할 수 있어요. YouTube와 일반 링크도 지원해요. 사진·영상 파일도 직접 첨부할 수 있어요.':info.kind==='invalid'?'링크 형식을 확인해 주세요.':info.label;
  $('url-media-preview').innerHTML=url?LTMedia.markup(url,form.elements.title.value):'';}

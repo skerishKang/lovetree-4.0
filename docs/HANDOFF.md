@@ -857,3 +857,27 @@ COM2에는 merge `6900df8aa446dfe0201d01997457fae04c4abe16`의 변경 서버 파
 - 고치기: 무대에 iframe 두 장(`#view`, `#view-next`)을 겹쳐 두고, 새 화면은 **뒤에서** `load` + `document.fonts.ready` + 본문 내용이 그려질 때까지 기다린 뒤 앞뒤(z-index·id)만 바꾼다. 이전 화면은 그 순간까지 그대로 보이고, 600ms 뒤 `about:blank`로 정리한다. `#stage`·`iframe` 바탕은 `--lt-stage`, `lt-arrive`는 투명도 없이 크기만 쓴다(투명에서 시작하면 무대가 비쳤다). 글꼴은 화면이 드러나기 전에 준비되므로 전환 시 글자 교체가 보이지 않는다.
 - 실측(로컬 빌드, 같은 하네스): 빈 바탕 프레임 0(책→보드, 보드→관계 지도, 첫 화면→기억책), 관계 지도→첫 화면은 첫 화면이 원래 대부분 빈 무대라 균일도 판정이 '빈 화면'으로 잡히지만 실제 내용 프레임은 120→7~12개로 줄었다. `/api/` 재요청 0 유지.
 - 시험: `tests/v41-journey-garden.test.mjs`의 iframe load 계약을 두 장 교대 방식으로 갱신. `npm test` 441 pass / 0 fail, `vite build` 성공.
+
+## 2026-11-08 상태별 노출 정리 + 첫 트리 말풍선 (#213 3번, ai/lt-header-states-261108)
+- `header-state.mjs`에 `headerState({owned,treeCount,publicReading})`·`headerParts(state)`를 두고, 상태를 넷으로 나눴다: 로그아웃(`out`)·로그인 트리 없음(`in-empty`)·트리 있음(`in-trees`)·공유 감상(`share`).
+  - `out`: 첫 화면·내 책장·둘러보기 + 로그인. 트리 선택·트리 보기 탭·순간 남기기·공유는 **숨김**.
+  - `in-empty`: 계정 동그라미 + "새 트리 만들기". 트리 선택·트리 보기 탭·공유 **숨김**.
+  - `in-trees`: "트리: 이름 ▾"·기억책·보드·관계 지도·순간 남기기·공유 **표시**.
+  - `share`: 트리 관련 전부 숨김.
+- 셸은 이 표를 그대로 적용한다(`flowNavigation`). 예전처럼 트리 탭을 `disabled`로 두지 않고 아예 숨긴다.
+- 첫 트리를 만든 직후 한 번만 뜨는 말풍선(`#tree-tips`, role=dialog) 2개: "여기서 순간을 더 남겨요", "기억책·보드·관계 지도로 다르게 봐요". 닫으면 `localStorage['lt41.tips.firstTree']='1'`(try/catch), Esc로 닫고 포커스는 보던 곳으로 돌아간다(#204 규칙). 밤·정원 모두 `--lt-*` 토큰만 쓰고 390·360에서 좌우 12px로 붙는다.
+- 시험: `tests/v41-header-states.test.mjs` 9개(상태 표·숨김/표시 배선·말풍선 1회·저장 실패·넘침). `npm test` 450 pass / 0 fail, build 성공.
+- `tools/postdeploy`: 로그아웃 탭 기대값 4 → 3, 트리 선택·순간 남기기가 로그아웃에 보이면 fail로 잡게 했다.
+## 2026-11-08 첫 화면 도구 줄 "보기" 메뉴 (#213 2번)
+- 도구 줄은 이제 버튼 둘이다: "보기 ▾"·"순간 목록". 시각 높이 36·누르는 영역 44.
+- 보기 메뉴 항목: 움직임 켜기/멈춤(menuitemcheckbox) · 테마 밤/정원(menuitemradio) · 카드 출처(로그인 4 / 로그아웃 예시·인기). 규칙은 `v41/home-view-menu.js` 한 파일에 있다.
+- 동작·저장값은 그대로다(테마 `lt41.theme`, 카드 `lt41.homeCards`, 셸에 알리는 `lt41-theme` 메시지). 열기/닫기는 마우스·ArrowDown·Enter/Space·Home/End·Esc·바깥 클릭(기존 `clickWithin`)로 된다.
+- 움직임 상태는 `src/views/orbit.js`가 `dispose.motion`으로 내보내고 메뉴가 읽고 바꾼다(도구 줄 버튼은 없앴다). 첫 화면 안에 중복으로 있던 둘러보기·로그인 버튼은 DOM에서 지웠다.
+- 카드 출처 안내(aria-live, #201)는 그대로다. `tools/postdeploy`의 첫 화면 검사는 새 메뉴 기준(테마 항목·카드 항목·도구 줄 2버튼)으로 바꿨다.
+
+## 2026-11-08 헤더 트리 이름에 자동 접미사 제거 연결 (#212 후속, ai/lt-tree-title-261108)
+- `public/v41/tree-name.mjs`의 `displayTreeTitle()`을 셸이 처음으로 쓴다(`import`). 저장 데이터는 그대로 두고 표시만 바꾼다: `", 나의 순간들"`로 정확히 끝나고 앞부분이 비어 있지 않을 때만 뗀다.
+- 연결한 곳: 헤더 "트리: <이름> ▾"(`#source-label`), 화면 위 문맥 줄(`#context-tree`), 트리 선택 목록(`#trees` option), 트리 보기 탭 묶음의 접근성 이름, 공유 미리보기 요약, 트리 삭제 확인 문구, 둘러보기 목록·미리보기 카드 제목(`community-panel.mjs`).
+- 책 정보 편집 입력(`#tree-form` title)은 **저장값 그대로** 둔다(여기서 줄이면 저장이 바뀐다).
+- 긴 이름은 헤더에서 말줄임(`max-width:190px` + `text-overflow:ellipsis`), 1440·390·360에서 페이지 넘침 0.
+- 시험: `tests/v41-shell-tree-title.test.mjs` 5개. `npm test` 477 pass / 0 fail / 37 skip, build 성공.
