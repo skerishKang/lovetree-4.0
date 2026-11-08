@@ -141,3 +141,37 @@ test('auth-skin 시안은 로컬 자산만 쓰고 1440·390 스크린샷이 있�
   assert.match(mockCss, /body\.garden\s*\{[^}]*--lt-stage:\s*#f7f0e8/);
   assert.match(mockCss, /GowunBatang-Bold\.latin\.woff2/);
 });
+
+test('밤 시안은 장미색을 쓰지 않고, Google 버튼은 공식 로고를 쓴다', () => {
+  const root = 'docs/design/auth-skin';
+  const mockCss = read(`${root}/auth-skin.css`);
+
+  // #195: 밤은 무채색(검정·진주색·금테), 장미색은 정원 전용.
+  assert.match(mockCss, /\.eyebrow\s*\{[^}]*color:\s*var\(--lt-muted\)/, '밤 머리글은 --lt-muted');
+  assert.match(mockCss, /\.error\s*\{[^}]*color:\s*var\(--lt-pearl\)/, '밤 오류 문구는 --lt-pearl');
+  assert.match(mockCss, /body\.garden \.eyebrow\s*\{[^}]*var\(--lt-rose-ink\)/, '정원 머리글은 그대로');
+  assert.match(mockCss, /body\.garden \.error\s*\{[^}]*var\(--lt-rose-ink\)/, '정원 오류 문구는 그대로');
+
+  // 밤 기본 규칙(.eyebrow/.error)에 장미색이 남아 있으면 안 된다.
+  const nightRules = mockCss.slice(0, mockCss.indexOf('body.garden'));
+  assert.equal(/var\(--lt-rose/.test(nightRules), false, '밤 규칙에 --lt-rose 금지');
+
+  // Google 브랜드 가이드라인: 공식 색상 G SVG를 로컬 자산으로 쓰고, 가이드라인 색을 지킨다.
+  assert.ok(existsSync(new URL(`../${root}/assets/googleg-standard-color.svg`, import.meta.url)), '공식 G 로고 SVG');
+  const logo = read(`${root}/assets/googleg-standard-color.svg`);
+  for (const color of ['#4285F4', '#34A853', '#FBBC05', '#EA4335']) assert.ok(logo.includes(color), color);
+  assert.match(mockCss, /--lt-google-fill:\s*#131314/, '밤 Google 버튼 바탕');
+  assert.match(mockCss, /--lt-google-stroke:\s*#8e918f/, '밤 Google 버튼 테두리');
+  assert.match(mockCss, /--lt-google-font:\s*#e3e3e3/, '밤 Google 버튼 글자');
+  assert.match(mockCss, /--lt-google-fill:\s*#ffffff/, '정원 Google 버튼 바탕');
+  assert.match(mockCss, /--lt-google-stroke:\s*#747775/, '정원 Google 버튼 테두리');
+  assert.match(mockCss, /--lt-google-font:\s*#1f1f1f/, '정원 Google 버튼 글자');
+
+  for (const name of ['login-night', 'login-garden']) {
+    const page = read(`${root}/${name}.html`);
+    assert.match(page, /class="btn google"/, `${name} Google 버튼`);
+    assert.match(page, /src="assets\/googleg-standard-color\.svg"/, `${name} 공식 로고`);
+    assert.match(page, /Google 계정으로 계속/, `${name} 가이드라인 문구`);
+    assert.equal(/<span class="g">G<\/span>/.test(page), false, `${name} 동그라미 글자 G 금지`);
+  }
+});

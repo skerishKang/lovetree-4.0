@@ -8,6 +8,25 @@
   src: url('assets/fonts/GowunBatang-Bold.latin.woff2') format('woff2');
 }
 
+/* Google Identity "Sign in with Google" 가이드라인 지정 서체(Roboto Medium).
+   한글 글리프는 Roboto에 없어 --lt-ui 대체 서체로 넘어간다. */
+@font-face {
+  font-family: 'Roboto';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('assets/fonts/Roboto-Medium.latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Roboto';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('assets/fonts/Roboto-Medium.latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
 :root {
   --lt-ui: 'Pretendard Variable', Pretendard, 'Noto Sans KR', system-ui, sans-serif;
   --lt-reading: 'Gowun Batang', 'Noto Serif CJK KR', Batang, serif;
@@ -34,6 +53,10 @@
   --lt-r-card: 14px;
   --lt-garden-edge: #eee3d5;
   --lt-garden-shadow: 0 18px 40px rgba(75, 51, 42, .16);
+  /* Google Identity "Sign in with Google" 어두운 테마(가이드라인 고정값) */
+  --lt-google-fill: #131314;
+  --lt-google-stroke: #8e918f;
+  --lt-google-font: #e3e3e3;
   color-scheme: dark;
 }
 
@@ -56,6 +79,10 @@ body.garden {
   --lt-line: rgba(119, 91, 82, .18);
   --lt-primary: #98505e;
   --lt-primary-ink: #fffdf8;
+  /* Google Identity "Sign in with Google" 밝은 테마(가이드라인 고정값) */
+  --lt-google-fill: #ffffff;
+  --lt-google-stroke: #747775;
+  --lt-google-font: #1f1f1f;
   color-scheme: light;
 }
 
@@ -156,7 +183,7 @@ body.garden .auth-card {
 
 .eyebrow {
   margin: 0 0 8px;
-  color: var(--lt-rose);
+  color: var(--lt-muted);
   font-size: 10px;
   font-weight: 700;
   letter-spacing: .2em;
@@ -217,18 +244,26 @@ body.garden .btn.secondary {
   border-color: var(--lt-line);
 }
 body.garden .btn.secondary:hover { background: var(--lt-stage-2); }
-.g {
-  display: inline-grid;
-  place-items: center;
-  width: 24px;
-  height: 24px;
-  border: 1px solid var(--lt-line);
-  border-radius: 50%;
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--lt-gold);
+/* Google Identity "Sign in with Google" 브랜드 가이드라인 버튼.
+   어두운 테마: 채우기 #131314 / 테두리 #8E918F 1px inside / 글자 #E3E3E3 / Roboto Medium 14px.
+   밝은 테마: 채우기 #FFFFFF / 테두리 #747775 1px inside / 글자 #1F1F1F / Roboto Medium 14px.
+   G 로고는 Google이 배포하는 표준 색상 SVG를 크기·색 변경 없이 쓴다. */
+.btn.google {
+  background: var(--lt-google-fill);
+  color: var(--lt-google-font);
+  border: 1px solid var(--lt-google-stroke);
+  font-family: 'Roboto', var(--lt-ui);
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 20px;
 }
-body.garden .g { color: var(--lt-gold-ink); }
+.btn.google:hover { filter: brightness(1.06); }
+.btn.google .g-logo {
+  display: block;
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+}
 
 .divider {
   display: flex;
@@ -284,7 +319,7 @@ body.garden .field input:focus { box-shadow: 0 0 0 3px var(--lt-gold-line); }
 .error {
   min-height: 18px;
   margin: 12px 0 0;
-  color: var(--lt-rose);
+  color: var(--lt-pearl);
   font-size: 12px;
   line-height: 1.5;
 }
