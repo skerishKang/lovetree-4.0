@@ -15,6 +15,7 @@ const html = read('public/v41/index.html');
 const css = read('public/v41/identity.css');
 const shell = read('public/v41/shell.mjs');
 const homeJS = read('v41/home.js');
+const menuJS = read('public/v41/home-view-menu.mjs');
 const homeHTML = read('v41/home.html');
 
 function memoryStorage(initial = {}) {
@@ -117,10 +118,12 @@ test('전환 버튼은 누르면 갈 곳(밤/정원)과 aria-pressed를 쓴다',
   assert.equal(nextTheme('garden'), 'night');
   // #213 2번: 첫 화면 테마는 "보기" 메뉴 항목이 맡는다(도구 줄 버튼 하나로 묶었다).
   // 표시 문구는 계정 메뉴 항목과 같은 header-state 규칙을 그대로 쓴다.
-  assert.match(homeJS, /dataset\.ltViewMenu/);
-  assert.match(homeJS, /shadow\.querySelector\('\.top-actions'\)\.append\(viewWrap\)/);
-  assert.match(homeJS, /kind==='theme'\).*writeTheme\(localStorage/, '메뉴에서 고른 테마를 저장한다');
-  assert.match(homeJS, /parent\.postMessage\(\{type:'lt41-theme',theme\}/, '셸에 테마를 알리는 기존 메시지를 그대로 쓴다');
+  // 2026-11-11: 메뉴 로직은 public/v41/home-view-menu.mjs로 옮겼다(연결만 home.js).
+  assert.match(menuJS, /viewButton\.dataset\.ltViewMenu = ''/);
+  assert.match(menuJS, /shadow\.querySelector\('\.top-actions'\)\.append\(viewWrap\)/);
+  assert.match(menuJS, /kind === 'theme'\)[^\n]*writeTheme\(storage/, '메뉴에서 고른 테마를 저장한다');
+  assert.match(menuJS, /sendTheme\(theme\)/, '셸에 테마를 알리는 기존 메시지를 그대로 쓴다');
+  assert.match(homeJS, /sendTheme:theme=>parent\.postMessage\(\{type:'lt41-theme',theme\}/, '첫 화면이 lt41-theme를 그대로 보낸다');
   assert.match(html, /id="account-theme" data-lt-theme-toggle aria-pressed="false"/);
   // #231 1-B: 테마 버튼 반영은 shell/theme.mjs로 옮겼다(같은 선택자·같은 문구).
   assert.match(themeModule, /document\.querySelectorAll\('\[data-lt-theme-toggle\]'\)/);

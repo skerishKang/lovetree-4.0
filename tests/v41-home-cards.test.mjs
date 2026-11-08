@@ -211,9 +211,11 @@ test('보기 메뉴 배선: 바깥 클릭은 composedPath 판정, Esc는 그대�
   assert.match(cards, /export function clickWithin\(event, \.\.\.nodes\)/);
   assert.match(home, /import \{[^}]*clickWithin[^}]*\} from '\.\/home-cards\.js';/);
   // #213 2번: 카드 출처 메뉴는 "보기" 메뉴 안으로 들어갔지만 바깥 클릭 판정은 같은 clickWithin을 쓴다.
-  assert.match(home, /document\.addEventListener\('click',e=>\{if\(!clickWithin\(e,viewWrap\)\)closeViewMenu\(\);\}\);/);
-  assert.equal(/!viewWrap\.contains\(e\.target\)/.test(home), false, 'retarget에 취약한 target 판정을 남기지 않는다');
+  // 2026-11-11: 메뉴 배선은 public/v41/home-view-menu.mjs로 옮겼다(같은 clickWithin 규칙).
+  const menu = readFileSync(new URL('../public/v41/home-view-menu.mjs', import.meta.url), 'utf8');
+  assert.match(menu, /doc\.addEventListener\('click', e => \{ if \(!clickWithin\(e, viewWrap\)\) closeViewMenu\(\); \}\);/);
+  assert.equal(/!viewWrap\.contains\(e\.target\)/.test(menu), false, 'retarget에 취약한 target 판정을 남기지 않는다');
   assert.equal(/!cardWrap\.contains\(e\.target\)/.test(home), false);
-  assert.match(home, /e\.key==='Escape'\)closeViewMenu\(\)/);
-  assert.match(home, /if\(next\.type==='close'\)\{e\.preventDefault\(\);closeViewMenu\(true\);\}/);
+  assert.match(menu, /else if \(e\.key === 'Escape'\) closeViewMenu\(\)/);
+  assert.match(menu, /if \(next\.type === 'close'\) \{ e\.preventDefault\(\); closeViewMenu\(true\); \}/);
 });
