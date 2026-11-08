@@ -26,13 +26,20 @@ test('깊이가 다른 두 폴더에서도 같은 파일을 쓰도록 자원 경
   assert.ok(SERVER.includes('"/v41/runtime.js"'));
 });
 
-test('카드 기본 배치(BASE_CARDS)와 개수 표시는 실제 기록에서만 적용된다', () => {
-  assert.match(SERVER, /\.\.\.\(LTDEMO\.example\?\{\}:BASE_CARDS\[i%BASE_CARDS\.length\]\)/);
-  assert.match(SERVER, /if\(!LTDEMO\.example\)document\.querySelector\('\[data-menu="moments"\] span:last-child'\)\.textContent=CARDS\.length;/);
+test('카드 기본 배치와 개수 표시는 데이터 모양으로 갈린다(예시 여부 분기 없음)', () => {
+  // 배치값을 스스로 가진 순간(예시)은 그대로, 없는 순간(실제 기록)만 기본 배치를 돌려 쓴다.
+  assert.match(SERVER, /const hasLayout=m=>typeof m\.ring==='string'&&'baseAngle' in m;/);
+  assert.match(SERVER, /\.\.\.\(hasLayout\(m\)\?\{\}:BASE_CARDS\[i%BASE_CARDS\.length\]\)/);
+  // 화면에 적힌 수가 자료 수와 다를 때만 고쳐 쓴다.
+  assert.match(SERVER, /el\.textContent\.trim\(\)!==String\(CARDS\.length\)/);
+  assert.doesNotMatch(SERVER, /LTDEMO\.example\?\{\}/);
+  assert.doesNotMatch(SERVER, /if\(!LTDEMO\.example\)document\.querySelector/);
 });
 
-test('목록 번호는 예시 판본 표기(m01 → 01)를 그대로 둔다', () => {
-  assert.match(SERVER, /LTDEMO\.example\?c\.id\.slice\(1\):CARDS\.indexOf\(c\)\+1/);
+test('목록 번호는 id 모양으로 갈린다(m01 → 01, 그 밖은 목록 자리)', () => {
+  assert.match(SERVER, /function momentSeq\(c\)\{const n=\/\^m\(\\d\+\)\$\/\.exec\(String\(c\.id\)\)/);
+  assert.match(SERVER, /return n\?c\.id\.slice\(1\):CARDS\.indexOf\(c\)\+1/);
+  assert.match(SERVER, /<small>\$\{momentSeq\(c\)\}<\/small>/);
 });
 
 test('이어가기와 책으로 보기는 예시에서 원래 동작을 유지한다(데이터 상태 분기)', () => {
