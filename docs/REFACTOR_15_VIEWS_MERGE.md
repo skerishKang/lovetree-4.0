@@ -103,6 +103,7 @@
 ## 6. 진행 결과
 | 화면 | 상태 | 비고 |
 |---|---|---|
-| track56-network | **완료(#231, PR #245)** | 두 벌 바이트 동일, 자원 경로 `/v41/` 절대, `LTDEMO.example`로 재생 안내 분기. 예시 겉모습 변화는 범례 제목 1곳(설계서 (d) 항목) |
-| 나머지 4화면 | 예정 | 순서대로 orbit → pinboard → bookshelf → sketchbook |
+| track56-network | **완료(#231, PR #246, `b94b3be`)** | 두 벌 바이트 동일, 자원 경로 `/v41/` 절대, `LTDEMO.example`로 재생 안내 분기. 예시 겉모습 변화는 범례 제목 1곳(설계서 (d) 항목) |
+| src064-orbit | **완료(#231, PR #247, `b38afd1`)** | 두 벌 바이트 동일, 경로 `/v41/` 절대. `BASE_CARDS` 기본 배치·카드 개수 표시·목록 번호·이어가기 갈래 선택·책으로 보기는 `LTDEMO.example`로 갈라 **예시 겉모습·동작 그대로(홈 4장 차이 0)** |
+| 나머지 3화면 | 예정 | 순서대로 pinboard → bookshelf → sketchbook |
 
