@@ -74,14 +74,7 @@ test('주소 단계와 임시 보관값이 만나 시작 단계가 정해진다(
   assert.equal(journeyDraftHasContent({...empty, subject: ''}), false, '빈 보관값은 내용 없음');
 });
 
-test('여정 화면은 단계를 셸에 알리고, 되돌아갈 단계는 입력을 유지한 채 다시 그린다', () => {
-  const html = readFileSync(new URL('../public/v41/views/first-journey.html', import.meta.url), 'utf8');
-  assert.match(html, /post\(\{type: 'lt41-journey-step', step: state\.step\}\)/);
-  assert.match(html, /event\.data\?\.type === 'lt41-journey-goto'\) \{ goToStep\(event\.data\.step\)/);
-  assert.match(html, /function goToStep\(value\) \{\n  readForm\(\);/, '단계 복귀 전에 입력을 읽어 둔다');
-  assert.match(html, /Number\.parseInt\(params\.get\('step'\) \|\| '', 10\)/, '주소의 단계를 읽는다');
-  assert.match(html, /state\.step = stored[\s\S]{0,220}: 0;/, '임시 보관값이 없으면 00이다');
-  assert.match(html, /\$\('steps'\)\.addEventListener\('click'/, '단계 탭도 같은 기록 규칙을 따른다');
-  assert.match(html, /if \(hashRoute && !readJourneyDraft\(storage\)\) \{/, '임시 보관값이 없으면 #journey/NN이어도 00부터 시작한다');
-  assert.match(html, /location\.assign\('\/v41\/'\)/, '단독 미리보기 닫기는 첫 화면으로 간다');
-});
+// 8번(여정 화면 인라인 스크립트 8줄)은 2026-11-09에 함수 시험으로 옮겼다.
+//  · 단계 알림(lt41-journey-step)·goto 복귀(입력 유지)·단계 탭·주소 단계/보관값 복원·
+//    #journey/NN 기록·단독 닫기 → tests/v41-journey-page.test.mjs
+//    (public/v41/views/journey/journey-page.mjs의 createJourneyPage를 가짜 문서로 띄운다)
