@@ -44,7 +44,27 @@ node tools/postdeploy/postdeploy.mjs https://lovetree-4-0.pages.dev/v41/ --profi
 node tools/postdeploy/postdeploy.mjs https://lovetree-4-0.pages.dev/v41/ --login
 ```
 
-자동 로그인은 `--secrets` 파일의 `PADIEM_TUTORIAL01_PASSWORD`를 실행 중에만 읽습니다.
+자동 로그인은 `--secrets` 파일에서 **그 계정의** `PADIEM_TUTORIAL<NN>_EMAIL`·`_PASSWORD`를 실행 중에만 읽습니다.
+
+### 레인별 전용 시험 계정 (#300)
+
+시험 계정은 **레인마다 하나**입니다. 두 레인이 같은 계정을 동시에 쓰면 (1) 한쪽 정리가 다른 쪽 트리를 지우고, (2) 로그아웃 검사가 상대 세션을 끊고, (3) 트리 개수에 따라 화면이 달라져 결과가 오염됩니다. 그래서 계정을 나눠 쓰고, **동시에 돌려도 됩니다**(브라우저 프로필도 계정별로 분리).
+
+| 레인 | 계정 | 실행 |
+| --- | --- | --- |
+| 로컬1 | **02** | `--account 02` |
+| 로컬2 | **03** | `--account 03` |
+| 로컬3 | **01**(기존) | `--account 01` |
+
+```powershell
+# 자기 계정만 사용한다(기본값은 01).
+node tools/postdeploy/postdeploy.mjs https://lovetree-4-0.pages.dev/v41/ --account 02 --auto-login
+```
+
+- `.secrets` 키: `PADIEM_TUTORIAL02_EMAIL`, `PADIEM_TUTORIAL02_PASSWORD` (03도 같은 규칙).
+- 계정 값이 없으면 로그인을 건너뛰고 **warn**으로 남깁니다(실패 아님). 이메일·비밀번호 값은 화면·로그·리포트에 쓰지 않습니다.
+- 프로필 기본 폴더: `01` → `tools/postdeploy/.profile`, `02`·`03` → `.profile-02`·`.profile-03`.
+- 작업을 마치면 **자기 계정으로** 트리 0개·보관 파일 0개 정리까지 확인합니다.
 
 ```powershell
 node tools/postdeploy/postdeploy.mjs https://lovetree-4-0.pages.dev/v41/ --auto-login --secrets C:\Users\<user>\.secrets\.env
