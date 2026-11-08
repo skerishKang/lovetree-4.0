@@ -87,10 +87,11 @@ test('저장에 실패하면 A로 남는다', () => {
   assert.equal(writeTheme(storage, 'garden'), 'night');
 });
 
-test('기억 보드·관계 지도는 언제나 A다(#212: 내 책장은 정원, 2026-11-08: 기억책도 정원)', () => {
+test('정원 대상: 책장·기억책·기억 보드·관계 지도(#212, 2026-11-08 정원 적용 레인)', () => {
   assert.equal(appliedTheme('garden', 'book'), 'garden');
   for (const view of ['board', 'network']) {
-    assert.equal(appliedTheme('garden', view), 'night', view);
+    assert.equal(appliedTheme('garden', view), 'garden', view);
+    assert.equal(appliedTheme('night', view), 'night', view);
   }
   assert.equal(appliedTheme('garden', 'shelf'), 'garden');
   assert.equal(appliedTheme('night', 'shelf'), 'night');
@@ -99,6 +100,8 @@ test('기억 보드·관계 지도는 언제나 A다(#212: 내 책장은 정원,
   // #231 1-B: 화면별 테마 대상 계산은 shell/navigation.mjs, 문서 반영은 shell/theme.mjs가 맡는다.
   assert.match(navigation, /if \(file === 'src064-orbit\.html'\) return 'home';/);
   assert.match(navigation, /if \(file === 'track59-sketchbook\.html'\) return 'book';/);
+  assert.match(navigation, /if \(file === 'track58-pinboard\.html'\) return 'board';/);
+  assert.match(navigation, /if \(file === 'track56-network\.html'\) return 'network';/);
   assert.match(navigation, /return 'inner';/);
   assert.match(themeModule, /appliedTheme\(theme, themedViewFor\(file\)\)/);
 });

@@ -22,6 +22,8 @@ export function themedViewFor(file) {
   if (file === 'first-journey.html') return 'journey';
   if (file === 'track32-bookshelf.html') return 'shelf';
   if (file === 'track59-sketchbook.html') return 'book';
+  if (file === 'track58-pinboard.html') return 'board';
+  if (file === 'track56-network.html') return 'network';
   return 'inner';
 }
 

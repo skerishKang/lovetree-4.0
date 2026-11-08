@@ -28,3 +28,73 @@
   .cinemaControls{max-width:calc(100vw - 12px);left:6px;right:6px;width:auto;gap:4px;transform:none}.cinCtl{min-width:0;padding:0 5px;font-size:9px}.enterBeat{font-size:9px}
 }
 @media(max-width:380px){#addModal .modal,#editModal .modal,#viewerModal .modal{width:calc(100vw - 8px)!important;padding:12px!important}.typeBtn{font-size:9px;padding:8px 4px}.field{font-size:12px}.cinemaControls{left:4px;right:4px;transform:none}}
+
+/* === 정원 테마 (2026-11-08): 무대를 종이로, 새 색은 만들지 않고 identity.css의 --lt-* 토큰만 쓴다. === */
+html[data-lt-theme=garden],html[data-lt-theme=garden] body{background:var(--lt-stage);color:var(--lt-ink)}
+html[data-lt-theme=garden][data-v41-screen=board] body .app{background:radial-gradient(circle at 50% -8%,var(--lt-stage-2) 0%,var(--lt-stage) 56%,var(--lt-garden-edge) 100%)}
+html[data-lt-theme=garden] .spaceGlow{opacity:.6;background:radial-gradient(circle at 25% 20%,rgba(200,110,121,.10),transparent 26%),radial-gradient(circle at 74% 28%,rgba(152,80,94,.07),transparent 32%)}
+html[data-lt-theme=garden] header{background:linear-gradient(180deg,rgba(255,253,248,.96),rgba(255,253,248,.58));border-bottom:1px solid var(--lt-line);color:var(--lt-ink)}
+html[data-lt-theme=garden] .brand,html[data-lt-theme=garden] .brand b{color:var(--lt-ink)}
+html[data-lt-theme=garden] .crumb,html[data-lt-theme=garden] .themeBadge{color:var(--lt-muted)}
+html[data-lt-theme=garden] .headbtn{background:var(--lt-paper);border-color:var(--lt-line);color:var(--lt-ink)}
+html[data-lt-theme=garden] .headbtn:hover{background:#fff;border-color:var(--lt-line-paper)}
+html[data-lt-theme=garden] .headbtn.primary{background:var(--lt-primary);border-color:var(--lt-primary);color:var(--lt-primary-ink)}
+html[data-lt-theme=garden][data-v41-screen=board] body .surface{background:linear-gradient(145deg,var(--lt-paper),var(--lt-garden-edge));box-shadow:var(--lt-garden-shadow)}
+html[data-lt-theme=garden] .surface:before{opacity:.18}
+html[data-lt-theme=garden] .boardTitle h1{font-family:var(--lt-font-display);color:var(--lt-ink);letter-spacing:-.02em}
+html[data-lt-theme=garden] .boardTitle p{color:var(--lt-muted)}
+html[data-lt-theme=garden] .card{background:linear-gradient(145deg,rgba(255,253,248,.98),rgba(247,240,232,.96));border-color:var(--lt-line);box-shadow:var(--lt-garden-shadow);color:var(--lt-ink)}
+html[data-lt-theme=garden] .card .mTitle,html[data-lt-theme=garden] .card .title{color:var(--lt-ink)}
+html[data-lt-theme=garden] .card .meta,html[data-lt-theme=garden] .card .momentDate{color:var(--lt-muted)}
+html[data-lt-theme=garden] .toolbar,html[data-lt-theme=garden] .leftPanel,html[data-lt-theme=garden] .detail,html[data-lt-theme=garden] .postAdd,html[data-lt-theme=garden] .nextChooser{
+ border-color:var(--lt-line);background:var(--lt-glass-strong);color:var(--lt-ink);box-shadow:var(--lt-garden-shadow)}
+html[data-lt-theme=garden] .panelTitle,html[data-lt-theme=garden] .panelHead{color:var(--lt-muted)}
+html[data-lt-theme=garden] .toolbar button,html[data-lt-theme=garden] .miniBtn,html[data-lt-theme=garden] .themeBtn,html[data-lt-theme=garden] .styleMini,html[data-lt-theme=garden] .keywordBtn{
+ background:rgba(255,253,248,.9);border-color:var(--lt-line);color:var(--lt-ink)}
+html[data-lt-theme=garden] .miniBtn.accent,html[data-lt-theme=garden] .themeBtn.active{background:rgba(200,110,121,.14);border-color:var(--lt-gold-line);color:var(--lt-gold-ink)}
+html[data-lt-theme=garden] .cinemaBtn{background:var(--lt-primary);color:var(--lt-primary-ink);box-shadow:0 12px 36px rgba(75,51,42,.18)}
+html[data-lt-theme=garden] .modal{background:var(--lt-paper);color:var(--lt-ink);border-color:var(--lt-line)}
+html[data-lt-theme=garden] .modalShade{background:rgba(75,51,42,.28)}
+html[data-lt-theme=garden] .toast{background:var(--lt-glass-strong);border-color:var(--lt-line);color:var(--lt-ink)}
+html[data-lt-theme=garden] .filterSelect,html[data-lt-theme=garden] .field{background:var(--lt-paper);border-color:var(--lt-line);color:var(--lt-ink)}
+html[data-lt-theme=garden] .chip{background:rgba(200,110,121,.12);color:var(--lt-gold-ink)}
+html[data-lt-theme=garden] .cinemaOverlay{background:radial-gradient(circle at 50% 50%,transparent 30%,rgba(75,51,42,.16) 78%,rgba(75,51,42,.3))}
+html[data-lt-theme=garden] .cinemaControls .cinCtl{background:var(--lt-glass-strong);border-color:var(--lt-line);color:var(--lt-ink)}
+html[data-lt-theme=garden] .cursorRing{border-color:var(--lt-gold-line);box-shadow:0 0 18px rgba(152,80,94,.18)}
+/* 정원: 패널 안 보조 글자(#cdbbd5·#9987a4 같은 밤용 회보라)를 토큰으로 바꾼다. */
+html[data-lt-theme=garden] .leftPanel,html[data-lt-theme=garden] .detail,html[data-lt-theme=garden] .toolbar,
+html[data-lt-theme=garden] .postAdd,html[data-lt-theme=garden] .nextChooser,html[data-lt-theme=garden] .modal{color:var(--lt-ink)}
+html[data-lt-theme=garden] .leftPanel small,html[data-lt-theme=garden] .leftPanel .label,html[data-lt-theme=garden] .leftPanel label,
+html[data-lt-theme=garden] .detail small,html[data-lt-theme=garden] .detail .label,html[data-lt-theme=garden] .detail p,
+html[data-lt-theme=garden] .netNote,html[data-lt-theme=garden] .themeBadge,html[data-lt-theme=garden] .detail .kv,
+html[data-lt-theme=garden] .modal .hint,html[data-lt-theme=garden] .minihint{color:var(--lt-muted)}
+html[data-lt-theme=garden] .detail h3,html[data-lt-theme=garden] .detail b,html[data-lt-theme=garden] .leftPanel b{color:var(--lt-ink)}
+html[data-lt-theme=garden][data-v41-screen=board] header .headbtn{background:var(--lt-paper);border-color:var(--lt-line);color:var(--lt-ink);box-shadow:none}
+html[data-lt-theme=garden][data-v41-screen=board] header .headbtn.primary{background:var(--lt-primary);border-color:var(--lt-primary);color:var(--lt-primary-ink)}
+/* 정원 대비 보정 2 (2026-11-08 CTO 지적): 패널 버튼·보조 글자·비율 표시를 정원 토큰으로. */
+html[data-lt-theme=garden][data-v41-screen=board] .wideTool{background:var(--lt-paper);border-color:var(--lt-line);color:var(--lt-ink)}
+html[data-lt-theme=garden][data-v41-screen=board] .wideTool:hover{background:#fff;border-color:var(--lt-line-paper)}
+html[data-lt-theme=garden][data-v41-screen=board] .detail .value,html[data-lt-theme=garden][data-v41-screen=board] .detail .kv,
+html[data-lt-theme=garden][data-v41-screen=board] .detail small,html[data-lt-theme=garden][data-v41-screen=board] .detail em{color:var(--lt-muted)}
+html[data-lt-theme=garden][data-v41-screen=board] .detail b,html[data-lt-theme=garden][data-v41-screen=board] .detail strong{color:var(--lt-ink)}
+html[data-lt-theme=garden][data-v41-screen=board] .close,html[data-lt-theme=garden][data-v41-screen=board] .collapseBtn,
+html[data-lt-theme=garden][data-v41-screen=board] .zoomLabel,html[data-lt-theme=garden][data-v41-screen=board] .zoomHit{color:var(--lt-muted)}
+html[data-lt-theme=garden][data-v41-screen=board] .hint,html[data-lt-theme=garden][data-v41-screen=board] .formHint,
+html[data-lt-theme=garden][data-v41-screen=board] .toolHint,html[data-lt-theme=garden][data-v41-screen=board] .leftPanel span,
+html[data-lt-theme=garden][data-v41-screen=board] .detail span{color:var(--lt-muted)}
+html[data-lt-theme=garden][data-v41-screen=board] .card .eyebrow,html[data-lt-theme=garden][data-v41-screen=board] .card small{color:var(--lt-muted)}
+html[data-lt-theme=garden][data-v41-screen=board] .section span,html[data-lt-theme=garden][data-v41-screen=board] .modal div,
+html[data-lt-theme=garden][data-v41-screen=board] .postAdd div,html[data-lt-theme=garden][data-v41-screen=board] .postAdd span,
+html[data-lt-theme=garden][data-v41-screen=board] .nextChooser span{color:var(--lt-muted)}
+html[data-lt-theme=garden][data-v41-screen=board] .postAdd b,html[data-lt-theme=garden][data-v41-screen=board] .modal b{color:var(--lt-ink)}
+/* 예시 기록의 인라인 색(#bca9c5 등)은 밤용이라 정원에서 읽히지 않는다: 정원에서만 토큰으로 덮는다. */
+html[data-lt-theme=garden][data-v41-screen=board] #dBasic,html[data-lt-theme=garden][data-v41-screen=board] #dBasic span,
+html[data-lt-theme=garden][data-v41-screen=board] #dConn,html[data-lt-theme=garden][data-v41-screen=board] #dConn span,
+html[data-lt-theme=garden][data-v41-screen=board] .postAdd div{color:var(--lt-muted)!important}
+/* 정원: 모바일 '선택한 순간' 줄(lt-moment-picker)이 밤 검정으로 남지 않게 토큰으로. */
+html[data-lt-theme=garden][data-v41-screen=board] .lt-moment-picker{background:var(--lt-glass-strong);border-color:var(--lt-line);color:var(--lt-ink)}
+html[data-lt-theme=garden][data-v41-screen=board] .lt-moment-picker button{background:var(--lt-paper);border-color:var(--lt-line);color:var(--lt-ink)}
+html[data-lt-theme=garden][data-v41-screen=board] .lt-moment-picker button[aria-pressed=true]{background:var(--lt-primary);border-color:var(--lt-primary);color:var(--lt-primary-ink)}
+html[data-lt-theme=garden][data-v41-screen=board] .toast{background:var(--lt-glass-strong);border-color:var(--lt-line);color:var(--lt-ink)}
+html[data-lt-theme=garden][data-v41-screen=board] .lt-moment-picker select{background:var(--lt-paper);border:1px solid var(--lt-line);color:var(--lt-ink)}
+html[data-lt-theme=garden][data-v41-screen=board] .lt-moment-picker button{border:1px solid var(--lt-line);background:var(--lt-paper);color:var(--lt-ink)}

@@ -55,10 +55,12 @@ test('정원이면 첫 여정도 정원이고, 밤이면 A, 기억책·보드·�
   // #212: 내 책장도 정원을 받는다(정원=지금 크림색 책장). 2026-11-08: 기억책도 정원을 따라간다.
   assert.equal(appliedTheme('garden', 'shelf'), 'garden');
   assert.equal(appliedTheme('garden', 'book'), 'garden');
-  // 기억 보드·관계 지도는 계속 A다.
-  for (const view of ['board', 'network', 'inner']) {
-    assert.equal(appliedTheme('garden', view), 'night', view);
-  }
+  // 2026-11-08: 기억 보드·관계 지도도 정원을 받는다. 그 밖의 안쪽 화면은 A로 남는다.
+  assert.equal(appliedTheme('garden', 'board'), 'garden');
+  assert.equal(appliedTheme('garden', 'network'), 'garden');
+  assert.equal(appliedTheme('garden', 'inner'), 'night');
+  assert.equal(appliedTheme('night', 'board'), 'night');
+  assert.equal(appliedTheme('night', 'network'), 'night');
   // #231 1-B: 화면별 테마 대상은 shell/navigation.mjs에 있다.
   assert.match(navigation, /if \(file === 'first-journey\.html'\) return 'journey';/);
   assert.match(navigation, /if \(file === 'track32-bookshelf\.html'\) return 'shelf';/);
