@@ -1,3 +1,4 @@
+import {displayTreeTitle} from './tree-name.mjs';
 // 기억책 사용성 규칙(2026-11-08 대표 피드백 1~9). 화면(iframe)과 셸이 같은 규칙을 쓰고,
 // 시험은 이 파일을 직접 불러 확인한다. 데이터는 읽기만 하고 바꾸지 않는다(표시 단계에서만 거른다).
 
@@ -113,6 +114,12 @@ export function nextMomentMessage(parentId) {
 /* ── 글꼴(대표 결정 2026-11-08) ─────────────────────────────────────────────
    밤(기본) = 기억책 큰 제목까지 전부 Pretendard(--lt-ui). 마루부리는 쓰지 않는다.
    정원(html[data-lt-theme=garden]) = 큰 제목만 마루부리(한글 글리프 포함). 나머지는 Pretendard. */
+// 트리 이름 표시(#212): 자동 접미사(", 나의 순간들")는 표시 단계에서만 뗀다(저장값 불변).
+// 규칙의 원본은 tree-name.mjs 하나이고, 화면은 이 함수를 통해서만 이름을 쓴다.
+export function treeTitleText(title) {
+  return displayTreeTitle(title);
+}
+
 export const BOOK_UI_FONT = 'var(--lt-ui)';
 export const BOOK_TITLE_FONT = Object.freeze({
   night: 'var(--lt-ui)',

@@ -12,7 +12,7 @@ const {
   isUserTitle, displayTitle, withoutAutoTitle, titleParts, videoTitle,
   embedUrl, connectionLine, NEXT_PAGE_COPY, NEXT_PAGE_ACTION,
   LENS_KEY, readLens, writeLens, detailPlacement, nextMomentMessage,
-  BOOK_UI_FONT, BOOK_TITLE_FONT, bookTheme, bookTitleFont,
+  BOOK_UI_FONT, BOOK_TITLE_FONT, bookTheme, bookTitleFont, treeTitleText,
 } = await import('../public/v41/book-usability.mjs');
 
 test('1. YouTube는 그 자리에서: nocookie embed, 시작 시점 유지, referrerpolicy', () => {
@@ -187,4 +187,24 @@ test('두 벌의 화면 파일이 같은 어댑터를 받는다(손으로 고치
   const [a, b] = VIEWS.map(block);
   assert.equal(a.replace(/'\.\/book-usability/g, 'PATH'), b.replace(/'\.\/book-usability/g, 'PATH'), '두 파일의 어댑터는 같다');
   assert.ok(read('scripts/apply-book-usability.mjs').includes('변경 없음'), '적용 스크립트는 두 번 돌려도 같다');
+});
+
+test('11. 기억책 트리 이름: "리센느, 나의 순간들" → "리센느", 직접 쓴 이름은 그대로 (#212)', () => {
+  assert.equal(treeTitleText('리센느, 나의 순간들'), '리센느');
+  assert.equal(treeTitleText('리센느'), '리센느');
+  assert.equal(treeTitleText('리센느, 나의 순간들 2'), '리센느, 나의 순간들 2');
+  assert.equal(treeTitleText(''), '');
+  assert.equal(treeTitleText(undefined), '');
+  const apply = read('scripts/apply-book-usability.mjs');
+  assert.ok(apply.includes('treeTitleText'), '어댑터가 같은 함수를 쓴다');
+  for (const path of VIEWS) {
+    const src = html[path];
+    // 갈래 글자(.crumb)와 목차 머리(.archive-tree)가 저장값이 아니라 표시 이름을 쓴다.
+    assert.ok(src.includes('function paintTreeTitles()'), path + ': 이름을 그리는 함수');
+    assert.ok(src.includes('treeTitleText(LTDEMO&&LTDEMO.title)'), path + ': 표시 규칙을 거친다');
+    assert.ok(src.includes("for(const el of document.querySelectorAll('.crumb'))"), path + ': 책 위쪽 갈래 글자');
+    assert.ok(src.includes("line.className='archive-tree'"), path + ': 목차 머리');
+    assert.ok(!/LTDEMO\.title\s*;/.test(src), path + ': 원본 제목을 그대로 쓰지 않는다');
+    assert.ok(src.includes('.archive-tree{'), path + ': 이름 줄 스타일');
+  }
 });
