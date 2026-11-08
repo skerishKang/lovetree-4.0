@@ -893,7 +893,13 @@ async function checkThemeRoundTrip(page, base, opts, stamp) {
     await page.goto(ub.href, { waitUntil: 'load', timeout: opts.timeout }).catch(() => {});
     await sleep(2500);
     const k = await state();
-    if (k.theme !== '' || k.headerBg !== 'rgb(4, 4, 7)') problems.push(`정원에서 #book이 A가 아님 ${JSON.stringify(k)}`);
+    // 2026-11-08 대표 결정: 기억책도 정원을 따라간다(밤=기본 글꼴, 정원=지금 글꼴). 보드·지도만 A 고정.
+    if (k.theme !== 'garden') problems.push(`정원에서 기억책이 정원이 아님 ${JSON.stringify(k)}`);
+    const boardUrl = new URL(base.href); boardUrl.search = `?vt=${Date.now()}`; boardUrl.hash = '#board';
+    await page.goto(boardUrl.href, { waitUntil: 'load', timeout: opts.timeout }).catch(() => {});
+    await sleep(2200);
+    const boardState = await state();
+    if (boardState.theme !== '') problems.push(`정원에서 기억 보드가 A가 아님 ${JSON.stringify(boardState)}`);
     await page.goto(u.href, { waitUntil: 'load', timeout: opts.timeout }).catch(() => {});
     await sleep(2500);
     if (!(await pickTheme('night'))) problems.push('밤 항목을 고르지 못함');
@@ -902,7 +908,7 @@ async function checkThemeRoundTrip(page, base, opts, stamp) {
   }
   await page.evaluate(() => { try { localStorage.removeItem('lt41.theme'); } catch {} }).catch(() => {});
   record('visual-theme', 'visual', problems.length ? 'fail' : 'pass',
-    problems.length ? problems.join('; ') : '정원 전환·저장·새로고침 유지·안쪽 A 고정·밤 복귀', {});
+    problems.length ? problems.join('; ') : '정원 전환·저장·새로고침 유지·기억책 정원·보드 A 고정·밤 복귀', {});
   return problems;
 }
 
