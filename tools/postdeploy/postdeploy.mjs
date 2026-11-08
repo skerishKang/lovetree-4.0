@@ -6,6 +6,14 @@ import { fileURLToPath } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const TOOL_VERSION = '0.1.2';
+// 보기 메뉴의 기대 항목은 제품 함수에서 계산한다(로그아웃 5 · 로그인 7).
+// 도구를 저장소 밖에서 단독 실행하면 파일이 없을 수 있으므로 실패하면 숫자 기대값으로 돌아간다.
+let viewMenuItems = null;
+try {
+  ({ viewMenuItems } = await import(new URL('../../v41/home-view-menu.js', import.meta.url).href));
+} catch {
+  viewMenuItems = null;
+}
 const REACTION_KINDS = ['heart', 'like', 'love', 'laugh', 'wow', 'sad', 'angry'];
 const REACTION_LABELS = { heart: '공감', like: '좋아요', love: '사랑', laugh: '웃음', wow: '대단', sad: '슬픔', angry: '화남' };
 const OEMBED_KEYS = new Set(['title', 'authorName', 'thumbnailUrl', 'providerName', 'videoId', 'cached']);
@@ -99,8 +107,13 @@ function summarize(summary) {
 
 function record(id, area, status, detail, data) {
   checks.push({ id, area, status, detail, data: data ?? null });
-  const tag = { pass: 'PASS', fail: 'FAIL', warn: 'WARN', skip: 'SKIP' }[status] || status.toUpperCase();
+  const tag = { pass: 'PASS', fail: 'FAIL', warn: 'WARN', skip: 'SKIP', info: 'INFO' }[status] || status.toUpperCase();
   console.log(`  [${tag}] ${area}/${id} — ${detail}`);
+}
+
+// 상태 판정에 영향을 주지 않는 참고 기록(예: 첫 방문 안내를 닫고 진행했다).
+function recordInfo(id, area, detail, data) {
+  record(id, area, 'info', detail, data);
 }
 
 function isIgnorableConsoleError(text) {
@@ -775,6 +788,8 @@ async function checkHomeCardMenuMouse(page, target, opts, stamp) {
   // 2026-11-08 #213 2번: 첫 화면 도구 줄의 "보기 ▾" 메뉴를 마우스로 열어 1440/390에서 유지되는지,
   // 바깥 클릭·Esc로 닫히는지 운영에서 확인한다(shadow DOM retarget 회귀 방지).
   // 메뉴 하나에 움직임·테마(밤/정원)·카드 출처가 함께 있고, "순간 목록"은 메뉴 밖에 따로 남는다.
+  // 기대 항목 수는 로그인 상태에 따라 다르다(로그아웃 5 = 움직임 1 + 테마 2 + 카드 2,
+  // 로그인 7 = 움직임 1 + 테마 2 + 카드 4). 제품 함수 viewMenuItems 로 계산해 숫자를 두 번 적지 않는다.
   const problems = [];
   const base = new URL(target.href);
   const readMenu = () => page.evaluate(() => {
@@ -782,13 +797,24 @@ async function checkHomeCardMenuMouse(page, target, opts, stamp) {
     const doc = frame?.contentDocument;
     const sh = doc?.getElementById('orbit')?.shadowRoot;
     const menu = sh?.querySelector('#home-view-menu');
+    const avatar = document.getElementById('account-avatar');
     return {
       hidden: menu?.hidden,
       expanded: sh?.querySelector('[data-lt-view-menu]')?.getAttribute('aria-expanded'),
       items: menu ? [...menu.querySelectorAll('[role^=menuitem]')].map((b) => b.textContent.trim()) : [],
-      toolButtons: sh ? [...sh.querySelectorAll('.top-actions > button, .top-actions > span > button')].filter((b) => b.getClientRects().length > 0).map((b) => b.textContent.trim()) : []
+      toolButtons: sh ? [...sh.querySelectorAll('.top-actions > button, .top-actions > span > button')].filter((b) => b.getClientRects().length > 0).map((b) => b.textContent.trim()) : [],
+      loggedIn: !!avatar && !avatar.hidden && getComputedStyle(avatar).display !== 'none'
     };
   }).catch(() => null);
+  const expectedItems = (loggedIn) => {
+    if (!viewMenuItems) return { count: loggedIn ? 7 : 5, labels: [], source: 'fallback' };
+    const items = viewMenuItems({ loggedIn });
+    return {
+      count: items.length,
+      labels: items.map((item) => item.label),
+      source: 'v41/home-view-menu.js'
+    };
+  };
   for (const [width, height] of [[1440, 900], [390, 844]]) {
     await page.setViewportSize({ width, height }).catch(() => {});
     const url = new URL(base.href);
@@ -796,6 +822,19 @@ async function checkHomeCardMenuMouse(page, target, opts, stamp) {
     url.hash = '';
     await page.goto(url.href, { waitUntil: 'load', timeout: opts.timeout }).catch(() => {});
     await sleep(2500);
+    // 첫 방문 안내(tree-tips)가 열려 있으면 클릭을 가로막으므로 먼저 닫고 진행한다.
+    const tips = await page.evaluate(() => {
+      const box = document.getElementById('tree-tips');
+      if (!box || box.hidden || !box.getClientRects().length) return null;
+      const title = box.querySelector('h2')?.textContent?.trim() || '안내';
+      document.getElementById('tree-tips-close')?.click();
+      return { title, closed: !!box.hidden };
+    }).catch(() => null);
+    if (tips) {
+      await sleep(300);
+      recordInfo(`card-menu-tips-${width}`, 'visual',
+        `${width}: 첫 방문 안내(${tips.title})를 닫고 메뉴 검사를 진행${tips.closed ? '' : ' — 닫힘 확인 실패'}`, tips);
+    }
     const frame = await viewFrame(page);
     const button = frame?.locator('[data-lt-view-menu]').first();
     if (!button || !(await button.count().catch(() => 0))) {
@@ -809,10 +848,15 @@ async function checkHomeCardMenuMouse(page, target, opts, stamp) {
       problems.push(`${width}: 마우스 클릭 후 닫힘 ${JSON.stringify(opened)}`);
       continue;
     }
-    // 로그아웃 기준: 움직임 1 + 테마 2 + 카드 2 = 5항목, 도구 줄 버튼은 보기·순간 목록 둘.
+    const expected = expectedItems(opened.loggedIn);
+    const state = opened.loggedIn ? '로그인' : '로그아웃';
     if (!opened.items.includes('밤') || !opened.items.includes('정원')) problems.push(`${width}: 메뉴에 테마 항목 없음 ${JSON.stringify(opened.items)}`);
     if (!opened.items.some((label) => label.startsWith('움직임'))) problems.push(`${width}: 메뉴에 움직임 항목 없음 ${JSON.stringify(opened.items)}`);
-    if (opened.items.length !== 5) problems.push(`${width}: 로그아웃 메뉴 항목 ${opened.items.length}개 (기대 5)`);
+    if (opened.items.length !== expected.count) problems.push(`${width}: ${state} 메뉴 항목 ${opened.items.length}개 (기대 ${expected.count}${expected.source === 'fallback' ? ' · 제품 함수 없음' : ''})`);
+    for (const label of expected.labels) {
+      const found = opened.items.some((actual) => actual === label || (label.startsWith('움직임') && actual.startsWith('움직임')));
+      if (!found) problems.push(`${width}: ${state} 메뉴에 "${label}" 없음 ${JSON.stringify(opened.items)}`);
+    }
     if (!opened.toolButtons.includes('순간 목록')) problems.push(`${width}: "순간 목록"이 도구 줄에 없음 ${JSON.stringify(opened.toolButtons)}`);
     if (opened.toolButtons.filter((label) => label && label !== '순간 목록').length !== 1) problems.push(`${width}: 도구 줄 버튼 ${JSON.stringify(opened.toolButtons)} (기대 보기·순간 목록 2개)`);
     await page.screenshot({ path: path.join(opts.out, `${stamp}-card-menu-mouse-${width}.png`) }).catch(() => {});
@@ -829,7 +873,7 @@ async function checkHomeCardMenuMouse(page, target, opts, stamp) {
   }
   await page.setViewportSize({ width: 1440, height: 900 }).catch(() => {});
   record('home-card-menu-mouse', 'visual', problems.length ? 'fail' : 'pass',
-    problems.length ? problems.join('; ') : '보기 메뉴: 열림 유지·항목(움직임·밤/정원·카드)·바깥 클릭/Esc 닫힘 (1440/390)', { problems });
+    problems.length ? problems.join('; ') : '보기 메뉴: 열림 유지·항목(움직임·밤/정원·카드, 로그인 상태별)·바깥 클릭/Esc 닫힘 (1440/390)', { problems });
 }
 
 async function checkThemeRoundTrip(page, base, opts, stamp) {
