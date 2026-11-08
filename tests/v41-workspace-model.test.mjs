@@ -43,7 +43,9 @@ test('shelf management uses real metadata and removes unsupported fixed classifi
   const shelf=[
     fs.readFileSync(new URL('../public/v41/views/track32-bookshelf.html',import.meta.url),'utf8'),
     fs.readFileSync(new URL('../public/v41/views/shelf/shelf.js',import.meta.url),'utf8'),
-    fs.readFileSync(new URL('../public/v41/views/shelf/shelf.css',import.meta.url),'utf8')
+    fs.readFileSync(new URL('../public/v41/views/shelf/shelf.css',import.meta.url),'utf8'),
+    fs.readFileSync(new URL('../public/v41/views/shelf/shelf-reader.js',import.meta.url),'utf8'),
+    fs.readFileSync(new URL('../public/v41/views/shelf/shelf-model.mjs',import.meta.url),'utf8')
   ].join('\n');
   // #231 1.5단계 ⑥: 안쪽 화면은 views/ 한 벌만 있다.
   assert.equal(fs.existsSync(new URL('../public/v41/design/views/track32-bookshelf.html',import.meta.url)),false);
@@ -53,7 +55,8 @@ test('shelf management uses real metadata and removes unsupported fixed classifi
   assert.doesNotMatch(shelf,/data-filter="(?:kpop|actor|series)"/);
   assert.doesNotMatch(shelf,/categoryLabel\(/);
     // #212: 카드 정보 줄은 '순간 N개 · 마지막 YYYY-MM-DD'로 바뀌었지만, 책 값은 계속 실제 tree 메타데이터에서 온다(고정 분류 없음).
-  assert.match(shelf,/subject:tree\.subject/);assert.match(shelf,/book\.lastDate/);assert.match(shelf,/coverMedia/);assert.match(shelf,/tree\.coverMomentId/);
+  // 2026-11-09: 책 값 계산은 shelf-model.mjs의 shelfBook이 맡는다(같은 출처를 그대로 본다).
+  assert.match(shelf,/subject: tree\.subject \|\| ''/);assert.match(shelf,/book\.lastDate/);assert.match(shelf,/coverMedia/);assert.match(shelf,/tree\.coverMomentId/);
   assert.match(navigation,/subject:t\.subject/);assert.match(navigation,/coverMomentId:t\.coverMomentId/);assert.match(navigation,/globalThis\.LTMedia\?\./);
   assert.match(shell,/apply\('editTree'/);assert.match(shell,/tree-manager/);assert.match(shell,/tree-delete/);
 });

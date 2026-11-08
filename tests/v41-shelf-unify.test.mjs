@@ -13,7 +13,9 @@ const shelf = [
   read('public/v41/views/shelf/shelf.css'),
   read('public/v41/views/shelf/shelf-reader.css'),
   read('public/v41/views/shelf/shelf-extra.css'),
-  read('public/v41/views/shelf/shelf.js')
+  read('public/v41/views/shelf/shelf.js'),
+  read('public/v41/views/shelf/shelf-reader.js'),
+  read('public/v41/views/shelf/shelf-model.mjs')
 ].join('\n');
 const css = read('public/v41/identity.css');
 
@@ -78,8 +80,9 @@ test('#212 "한 권의 책" 강조는 장미색이 아니라 흐린 진주색이
 test('#212 카드 표지에는 이름이 한 번만 나오고 아래는 "순간 N개 · 마지막 YYYY-MM-DD"다', () => {
   assert.match(shelf, /<strong class="cover-title">'\+esc\(book\.name\)\+'<\/strong><\/div>/);
   assert.ok(!/book-card-meta"><strong>/.test(shelf), '표지 아래 중복 제목을 두지 않는다');
-  assert.match(shelf, /book\.chapters\.length\+'개 순간 · 마지막 '\+esc\(book\.lastDate\|\|'-'\)/);
-  assert.match(shelf, /var lastMomentDate = function \(tree\)/, '마지막 날짜를 순간에서 계산한다');
+  // 2026-11-09: 정보 줄·마지막 날짜 계산은 shelf-model.mjs로 옮겼다.
+  assert.match(shelf, /export const bookMeta = \(book\) => book\.chapters\.length \+ '개 순간 · 마지막 ' \+ \(book\.lastDate \|\| '-'\)/);
+  assert.match(shelf, /export function lastMomentDate\(tree\)/, '마지막 날짜를 순간에서 계산한다');
 });
 
 test('#212 "책 · 02"·"기본 표지" 같은 내부 표시를 카드에서 뺀다', () => {
@@ -89,9 +92,9 @@ test('#212 "책 · 02"·"기본 표지" 같은 내부 표시를 카드에서 뺀
 });
 
 test('#212 선택 카드에서 표지 윗부분이 잘리지 않는다', () => {
-  assert.match(shelf, /absolute===0\?1\.06/, '중앙 카드 배율을 레일 높이에 맞춘다');
-  assert.ok(!/absolute===0\?-9/.test(shelf), '중앙 카드를 위로 띄우지 않는다');
-  assert.ok(!/absolute===0\?1\.12/.test(shelf), '레일을 넘던 배율을 쓰지 않는다');
+  assert.match(shelf, /absolute === 0 \? 1\.06/, '중앙 카드 배율을 레일 높이에 맞춘다');
+  assert.ok(!/absolute === 0 \? -9/.test(shelf), '중앙 카드를 위로 띄우지 않는다');
+  assert.ok(!/absolute === 0 \? 1\.12/.test(shelf), '레일을 넘던 배율을 쓰지 않는다');
 });
 
 // 3. 자동 접미사: 표시 단계에서만, 정확히 일치할 때만.
