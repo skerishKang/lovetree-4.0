@@ -5,7 +5,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 const read = (file) => fs.readFileSync(new URL(`../public/v41/${file}`, import.meta.url), 'utf8');
-const SERVER = read('views/track56-network.html');
+// #231 3단계: 화면 고유 스타일·스크립트는 views/network/ 아래 파일이다. 화면+파일을 한 소스로 본다.
+const SERVER = read('views/track56-network.html') + read('views/network/network.css') + read('views/network/network.js');
 const RUNTIME = read('runtime.js');
 
 test('design/views/에 화면 사본이 없다(한 벌만 남았다)', () => {
