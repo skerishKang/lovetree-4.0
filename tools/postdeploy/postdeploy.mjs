@@ -613,7 +613,8 @@ async function checkResponsive(page, width, height, outDir, stamp) {
       // #213: 트리 보기 탭(기억책·기억 보드·관계 지도)은 로그인한 내 트리에서만 보인다.
       const avatar = document.getElementById('account-avatar');
       const loggedIn = !!avatar && !avatar.hidden && getComputedStyle(avatar).display !== 'none';
-      return { ok: true, count: items.length, expected: loggedIn ? 7 : 4, loggedIn, unreachable, currentVisible, label: (active?.textContent || '').trim().slice(0, 12) };
+      // #213 3번: 로그아웃 헤더는 첫 화면·내 책장·둘러보기 3개다(트리 선택·트리 보기 숨김).
+      return { ok: true, count: items.length, expected: loggedIn ? 7 : 3, loggedIn, unreachable, currentVisible, label: (active?.textContent || '').trim().slice(0, 12) };
     }).catch((e) => ({ ok: false, reason: e.message }));
     if (!tabs.ok) record(`tabs-${width}`, 'layout', 'fail', `탭 확인 실패: ${tabs.reason}`);
     else {
@@ -692,6 +693,8 @@ async function checkVisualTokens(page, target, opts, stamp) {
         connectionInHeader: vis(document.getElementById('connection-menu')),
         shareInHeader: vis(document.getElementById('share-menu')),
         treeViewsHidden: !vis(document.getElementById('tree-views')),
+        treePickerHidden: !vis(document.getElementById('record-menu')),
+        writeMenuHidden: !vis(document.getElementById('write-menu')),
         viewHidden: !fr || fr.hidden || getComputedStyle(fr).display === 'none'
       };
     });
@@ -711,17 +714,20 @@ async function checkVisualTokens(page, target, opts, stamp) {
     }
     const problems = [];
     // #213: 로그아웃이면 트리 보기 탭 3개가 없고, 트리 선택 글자도 내 트리 이름이 아니다.
-    const expectedTabs = top.loginVisible ? 4 : 7;
+    // #213 3번: 로그아웃이면 트리 선택도 숨는다(첫 화면·내 책장·둘러보기 3개).
+    const expectedTabs = top.loginVisible ? 3 : 7;
     if (top.loginVisible) {
       if (!top.treeViewsHidden) problems.push('로그아웃인데 트리 보기 탭이 보임');
+      if (!top.treePickerHidden) problems.push('로그아웃인데 트리 선택이 보임');
+      if (!top.writeMenuHidden) problems.push('로그아웃인데 순간 남기기 버튼이 보임');
       if (!['트리 고르기', '저장 안 된 기록'].includes(top.recordLabel)) problems.push(`로그아웃 트리 선택 글자 "${top.recordLabel}" (기대 "트리 고르기")`);
     } else {
       if (top.treeViewsHidden) problems.push('로그인 상태인데 트리 보기 탭이 숨겨짐');
       if (!/^트리: /.test(top.recordLabel)) problems.push(`로그인 트리 선택 글자 "${top.recordLabel}" (기대 "트리: <이름>")`);
     }
     // 2026-11-07: 트리 선택은 뒤쪽 탭 묶음 바로 앞, 주 버튼은 #write-menu 하나(금색), 연결 보기는 헤더에 없다.
-    if (!top.recordBeforeTreeViews) problems.push('트리 선택이 기억책·보드·지도 탭 앞에 있지 않음');
-    if (!top.writeGold) problems.push(`주 버튼 금색 강조 없음: ${top.pillBorder}`);
+    if (!top.loginVisible && !top.recordBeforeTreeViews) problems.push('트리 선택이 기억책·보드·지도 탭 앞에 있지 않음');
+    if (!top.loginVisible && !top.writeGold) problems.push(`주 버튼 금색 강조 없음: ${top.pillBorder}`);
     if (top.connectionInHeader) problems.push('연결 보기가 아직 헤더에 있음');
     if (!/^LoveTree\s*4\.1$/.test(top.brand.replace(/\s+/g, ' ').trim())) problems.push(`워드마크 "${top.brand}" (기대 LoveTree 4.1)`);
     if (/MEMORY ORBIT/i.test(top.brand)) problems.push('워드마크에 MEMORY ORBIT 남음');
