@@ -21,7 +21,7 @@ function fakeElement(extra = {}) {
   return Object.assign(node, extra);
 }
 
-function harness({ owned = true, writable = true, source = 'server', busy = false, tree = null } = {}) {
+function harness({ owned = true, writable = true, source = 'server', busy = false, tree = null, view = 'track59-sketchbook.html' } = {}) {
   const calls = [];
   const notes = [];
   const els = {};
@@ -55,6 +55,7 @@ function harness({ owned = true, writable = true, source = 'server', busy = fals
   const panels = createPanels({
     $: id => (els[id] ||= fakeElement()),
     getMember: () => member,
+    getCurrent: () => view,
     getSource: () => source,
     getUploads: () => uploads,
     notify: text => notes.push(text),
@@ -231,4 +232,24 @@ test('책 정보 관리는 값·기준값·저장·삭제를 그대로 쓴다', 
     h.els['tree-delete'].onclick();
     assert.equal(h.calls[1][0], 'deleteTree');
   } finally { h.restore(); }
+});
+
+// 2026-11-09 사고 수정(#245): '순간 남기기'(#write-menu) 연결이 옮겨지지 않아 운영에서 무반응이었다.
+// 원래 shell.mjs(e508302) 460행 그대로 — 내 책장이면 새 트리, 나머지 화면이면 기본(추가) 편집기.
+test('순간 남기기 버튼은 화면에 따라 새 트리 또는 추가 편집기를 연다', () => {
+  const shelf = harness({ tree: sampleTree(), view: 'track32-bookshelf.html' });
+  try {
+    assert.equal(typeof shelf.els['write-menu'].onclick, 'function', '클릭 연결이 있어야 한다');
+    shelf.els['write-menu'].onclick();
+    assert.equal(shelf.counts().openedJourney, 1, '내 책장에서는 새 트리(첫 여정)를 연다');
+    assert.equal(shelf.counts().editorPanel, 0);
+  } finally { shelf.restore(); }
+
+  const book = harness({ tree: sampleTree(), view: 'track59-sketchbook.html' });
+  try {
+    book.els['write-menu'].onclick();
+    assert.equal(book.counts().editorPanel, 1, '기억책에서는 편집기를 연다');
+    assert.equal(book.counts().openedJourney, 0);
+    assert.equal(book.els['editor-title'].textContent, '순간 추가', '기본값은 추가 모드(인자 없음)');
+  } finally { book.restore(); }
 });

@@ -46,6 +46,7 @@ window.LT41=null;
 const uploads=mountPrivateUpload({form:$('moment-form'),assets:$('account-assets'),getSubject:()=>source==='server'&&member?.snapshot().writable?member.snapshot().subject:null,getState:()=>member?.state(),onChange:()=>shellPanels.uploadsChanged(),onUseAsset:()=>usePrivateAsset()});
 // 순간 패널·편집기·책 정보는 shell/panels.mjs가 맡는다(#231 1-B③-2). 셸은 자기 상태를 읽기 함수로 넘긴다.
 const shellPanels=createPanels({
+  getCurrent:()=>current,
   $,
   getMember:()=>member,
   getSource:()=>source,
