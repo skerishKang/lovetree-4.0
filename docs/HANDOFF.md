@@ -812,3 +812,9 @@ COM2에는 merge `6900df8aa446dfe0201d01997457fae04c4abe16`의 변경 서버 파
 - 시험: `tests/v41-book-usability.test.mjs`(1~9 각각 + 두 벌 동기화). 전체 `npm test` 437 pass / 0 fail, `vite build` 성공.
 - 컴1 확인(브라우저, 1440·390): 클릭 전 외부 요청 0, embed `start=83`·`rel=0`, 안쪽 스크롤 0, 빈 오른쪽 페이지 문구·단추, 돋보기 기본 꺼짐/저장, 상세 위치·Esc 초점 복귀, 머리 표시 감춤, 연결 안내 숨김·대체 문구.
 - 실제 계정이 필요한 확인(대표 계정으로): 제목 고치기가 그 순간 편집기로 열리는지, "다음 순간 남기기"가 부모를 그 순간으로 저장하는지. 예시 모드에서는 기존 규칙대로 로그인 안내가 열린다.
+
+### 2026-11-08 기억책 글꼴 확정 + 로그인 안내 창 제거 후속 (ai/lt-book-font-261108)
+- 대표 결정: 밤(기본)은 기억책 큰 제목까지 전부 Pretendard(`--lt-ui`), 마루부리 없음. 정원(`data-lt-theme=garden`)만 큰 제목에 마루부리(한글 포함). 규칙은 `book-usability.mjs`의 `BOOK_TITLE_FONT`·`bookTitleFont(theme)` 한 곳에 있고, `scripts/apply-book-usability.mjs`가 그 값을 그대로 CSS에 넣어 두 벌 화면이 같은 값을 쓴다.
+- 적용 스크립트가 스타일·스크립트를 "있으면 같은 자리에서 새 내용으로 교체"하도록 바꿨다. 규칙을 고친 뒤 두 번 실행하면 파일이 맞춰지고, 세 번째는 "변경 없음"이다.
+- #215로 `#login-start`가 사라진 뒤 로그아웃 예시 모드 확인: "제목 고치기"·"다음 순간 남기기"가 안내 창 없이 바로 `/auth/login?next=/v41/%3Fintent%3Dnew-tree&lt_theme=<theme>`로 간다(밤·정원 모두). 화면 코드에 `login-start` 참조는 0(시험으로 고정).
+- 실측(1440): 밤 = 큰 제목·정보 줄·태그·페이지 번호·상세 제목 모두 Pretendard, 마루부리 상태 `unloaded`. 정원 = 큰 제목·페이지 번호·상세 제목만 MaruBuri, 정보 줄·태그는 Pretendard.
