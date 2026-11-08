@@ -18,13 +18,7 @@ function requestNextMoment(parentId){
 }
 /* 6. 상세 카드: 오른쪽 페이지가 비면 오른쪽 페이지에, 아니면 카드 옆 작은 패널로. */
 let detailAnchor=null;
-function nextMomentOf(id){
- const m=LTDEMO.moments.find(x=>x.id===id);
- const next=m&&LTDEMO.moments.find(x=>x.id===m.next);
- if(!next)return null;
- const edge=LTDEMO.edges.find(e=>e.kind==='parent'&&e.from===id&&e.to===next.id);
- return {id:next.id,title:displayTitle(next.title)||String(next.memo||'').trim(),reason:edge?.reason||''};
-}
+const nextMomentOf=id=>LT59Model.nextMomentOf(id,LTDEMO.moments,LTDEMO.edges,displayTitle);
 function closeDetail(){
  const panel=$b('#detailSide'),card=detailAnchor;
  if(panel){panel.hidden=true;panel.replaceChildren()}
