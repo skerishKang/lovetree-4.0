@@ -60,8 +60,10 @@ test('셸은 기록·복귀·닫기·저장 뒤 이동을 이 규칙에 연결�
   // #231 1-B③-3: 여정 연결은 shell/journey.mjs, lt41-* 수신은 shell/messages.mjs로 옮겼다.
   const shell = readFileSync(new URL('../public/v41/shell.mjs', import.meta.url), 'utf8')
     + readFileSync(new URL('../public/v41/shell/journey.mjs', import.meta.url), 'utf8')
-    + readFileSync(new URL('../public/v41/shell/messages.mjs', import.meta.url), 'utf8');
-  assert.match(shell, /journeyRouteDecision\(\{hash:location\.hash,open:current==='first-journey\.html',saved:shellJourney\.saved\(\)\}\)/);
+    + readFileSync(new URL('../public/v41/shell/messages.mjs', import.meta.url), 'utf8')
+    // #231 1-B 후속: 주소 처리(journeyRouteDecision 연결)는 shell/location.mjs로 옮겼다.
+    + readFileSync(new URL('../public/v41/shell/location.mjs', import.meta.url), 'utf8');
+  assert.match(shell, /journeyRouteDecision\(\{\s*hash: location\.hash,\s*open: getCurrent\(\) === 'first-journey\.html',\s*saved: journey\.saved\(\)\s*\}\)/);
   assert.match(shell, /function writeJourneyLocation\(step, mode = 'push'\)/);
   assert.match(shell, /history\[mode === 'replace' \? 'replaceState' : 'pushState'\]\(mode === 'replace' \? history\.state : \{lt41Journey: depth \+ 1\}/);
   assert.match(shell, /type === 'lt41-journey-step'/);

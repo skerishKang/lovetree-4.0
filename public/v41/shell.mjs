@@ -7,7 +7,7 @@ import {createMemberSession} from './member-session.mjs';
 import {hasPendingDraft} from './sync-controller.mjs';
 import {exampleTree} from './example.mjs';
 import {parseSelectionRoute,memberStartupView,ownerSelectionRoute,accountPosition,rememberAccountPosition,resolveAccountPosition,stashPendingOwnerRoute,pendingOwnerRoute,takePendingOwnerRoute} from './selection-location.mjs';
-import {applyViewAccessibility,connectionLabel,focusReturnTarget} from './view-a11y.mjs';
+import {applyViewAccessibility,connectionLabel} from './view-a11y.mjs';
 import {accountPresentation,treePickerLabel,treePickerText,treeViewsVisible,writeMenuLabel,headerState,headerPartsFor,readTipsSeen,writeTipsSeen,tipsWanted,FIRST_TREE_TIPS,homeCenterState,homeStartLoginUrl,readTheme,readLoginIntent,writeTheme,nextTheme,themeButtonLabel,themeButtonAriaLabel,themePressed,appliedTheme,applyThemeAttribute,LOGIN_INTENTS} from './header-state.mjs';
 import {parseJourneyRoute,journeyRouteDecision} from './first-journey.mjs';
 import {displayTreeTitle} from './tree-name.mjs';
@@ -18,12 +18,33 @@ import {createAuth} from './shell/auth.mjs';
 import {createPanels} from './shell/panels.mjs';
 import {createJourney} from './shell/journey.mjs';
 import {createMessages} from './shell/messages.mjs';
+import {createDialogs} from './shell/dialogs.mjs';
+import {createLocation} from './shell/location.mjs';
 import {paintLoginLinks,paintThemeControls,applyTheme as applyThemeFor,toggleTheme as toggleThemeFor} from './shell/theme.mjs';
 const $=id=>document.getElementById(id);
 function themedView(){return themedViewFor(current);}
 function applyTheme(theme=readTheme(localStorage)){return applyThemeFor(current,theme);}
 function toggleTheme(){return toggleThemeFor(current);}
-const moreButton=$('mobile-more'),moreMenu=$('header-overflow');function closeMore(){moreMenu.classList.remove('is-open');moreButton.setAttribute('aria-expanded','false');}moreButton.addEventListener('click',()=>{const open=moreMenu.classList.toggle('is-open');moreButton.setAttribute('aria-expanded',String(open));});moreMenu.addEventListener('click',event=>{if(event.target.closest('button'))closeMore();});document.addEventListener('click',event=>{if(!moreMenu.contains(event.target)&&event.target!==moreButton)closeMore();});document.addEventListener('keydown',event=>{if(event.key==='Escape'&&moreMenu.classList.contains('is-open')){closeMore();moreButton.focus();}});document.addEventListener('keydown',event=>{const c=$('community-panel');if(event.key==='Escape'&&c.open&&![...document.querySelectorAll('dialog[open]')].some(d=>d!==c&&d.matches(':modal')))c.close();});
+const moreButton=$('mobile-more'),moreMenu=$('header-overflow');
+function closeMore(){moreMenu.classList.remove('is-open');moreButton.setAttribute('aria-expanded','false');}
+moreButton.addEventListener('click',()=>{
+ const open=moreMenu.classList.toggle('is-open');
+ moreButton.setAttribute('aria-expanded',String(open));
+});
+moreMenu.addEventListener('click',event=>{
+ if(event.target.closest('button'))closeMore();
+});
+// 더보기 메뉴 바깥 클릭·Esc로도 닫는다(원래 같은 줄에 있던 리스너 그대로).
+document.addEventListener('click',event=>{
+ if(!moreMenu.contains(event.target)&&event.target!==moreButton)closeMore();
+});
+document.addEventListener('keydown',event=>{
+ if(event.key==='Escape'&&moreMenu.classList.contains('is-open')){closeMore();moreButton.focus();}
+});
+document.addEventListener('keydown',event=>{
+ const c=$('community-panel');
+ if(event.key==='Escape'&&c.open&&![...document.querySelectorAll('dialog[open]')].some(d=>d!==c&&d.matches(':modal')))c.close();
+});
 const initialRoute=parseSelectionRoute(location.hash);
 let model=null,current=screenForView(initialRoute.view)[1],source='example',loadGeneration=0,toastTimer,previousDirty=false,member=null,handledHash=null,activeShareId=null;
 setMemberRefreshStarted(false);
@@ -111,17 +132,40 @@ function openFirstJourney(options){return shellJourney.openFirstJourney(options)
 function saveFirstJourney(draft){return shellJourney.saveFirstJourney(draft);}
 function openJourneyBook(args){return shellJourney.openJourneyBook(args);}
 function closeFirstJourney(){return shellJourney.closeFirstJourney();}
+// 주소 처리(#view·#tree/…·#share/…·#journey/NN 읽기·쓰기)는 shell/location.mjs가 맡는다.
+const shellLocation=createLocation({
+  $,
+  getCurrent:()=>current,
+  setCurrent:file=>{current=file;},
+  getMember:()=>member,
+  getSource:()=>source,
+  getModel:()=>model,
+  getActiveShareId:()=>activeShareId,
+  getHandled:()=>handledHash,
+  setHandled:hash=>{handledHash=hash;},
+  show:(file,write)=>show(file,write),
+  choose:(id,momentId)=>choose(id,momentId),
+  notify:text=>notify(text),
+  startMember:()=>startMember(),
+  showPublicRoute:route=>showPublicRoute(route),
+  journey:shellJourney,
+  gotoJourneyStep:step=>gotoJourneyStep(step),
+  openFirstJourney:options=>openFirstJourney(options),
+  finishJourney:()=>finishJourney(),
+  leaveJourney:()=>leaveJourney()
+});
+function writeLocation(mode){return shellLocation.writeLocation(mode);}
+function applyBrowserLocation(){return shellLocation.applyBrowserLocation();}
 function notify(text){$('record-feedback').textContent=text;$('toast').textContent=text;$('toast').hidden=$('records').open;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').hidden=true,6500);}
 const PENDING_NEW='lovetree.v41.pending-new';
 // 2026-11-07 계정 표시: 로그인 상태는 첫 글자 동그라미 + 작은 메뉴, 로그아웃 상태는 기존 로그인 알약.
 function panel(id){if(id==='records')updateAccountControls();const target=$(id);if(!target.open)target.showModal();}
-// 안내 창이 없어졌으니 close/cancel 복귀 연결도 필요 없다.
-// 2026-11-08 #202 후속: 셸 대화상자(순간 편집기·보관 파일) Tab을 내부에서 순환시킨다.
-// 보관 파일이 편집기 위에 열려 있으면 보관 파일 안에서만 순환한다.
-const SHELL_FOCUSABLE='a[href],button:not([disabled]),input:not([disabled]):not([type=hidden]),select:not([disabled]),textarea:not([disabled]),summary,[tabindex]:not([tabindex="-1"])';
-function shellFocusables(root){return [...root.querySelectorAll(SHELL_FOCUSABLE)].filter(el=>!el.disabled&&el.getClientRects().length>0&&getComputedStyle(el).visibility!=='hidden');}
-function trapShellTab(event){if(event.key!=='Tab')return;const assets=$('account-assets'),editor=$('editor');const dialog=assets?.open?assets:editor?.open?editor:null;if(!dialog)return;const list=shellFocusables(dialog);if(!list.length){event.preventDefault();return;}const at=list.indexOf(document.activeElement);if(event.shiftKey){if(at<=0){event.preventDefault();list[list.length-1].focus();}}else if(at<0||at===list.length-1){event.preventDefault();list[0].focus();}}
-document.addEventListener('keydown',trapShellTab,true);
+// 대화상자 접근성(Tab 순환·Esc 복귀·포커스 되돌리기)은 shell/dialogs.mjs가 맡는다(#231 1-B 후속).
+const shellDialogs=createDialogs({
+  $,
+  closeTreeTips:()=>closeTreeTips(),
+  closeAccountMenu:()=>closeAccountMenu()
+});
 
 const shellHeader=createHeader({
   $,
@@ -165,16 +209,6 @@ function showInFrame(url,title){return shellScreens.showInFrame(url,title);}
 function show(file,write=true){return shellScreens.show(file,write);}
 function frameLoaded(frame){return shellScreens.frameLoaded(frame);}
 
-let assetsOpener=null;
-$('account-assets').addEventListener('cancel',event=>{event.preventDefault();$('account-assets').close();const target=focusReturnTarget(assetsOpener,$('account-avatar'));setTimeout(()=>target?.focus?.(),0);});
-function ownerPosition(){const c=window.LT41;return c?{treeId:c.tree.id,momentId:c.momentId,view:viewForFile(current)}:null;}
-function writeLocation(mode='push'){
- const position=ownerPosition(),owned=source==='server'&&member?.snapshot().owned&&position;
- const hash=source==='share'&&activeShareId?`#share/${activeShareId}/${viewForFile(current)}`:owned?ownerSelectionRoute(position):'#'+viewForFile(current);
- if(location.hash!==hash)history[mode==='replace'?'replaceState':'pushState'](null,'',hash);
- handledHash=hash;
- if(owned)rememberAccountPosition(localStorage,member.snapshot().subject,position);
-}
 function viewContext(){const c=window.LT41;$('view-context').hidden=!c||current==='src064-orbit.html';if(!c)return;$('context-tree').textContent=displayTreeTitle(c.tree.title);$('context-kind').textContent=source==='example'?'예시':source==='file'?'파일':source==='share'?'공유 감상':'';$('context-kind').hidden=source==='server';$('manage-tree').hidden=source!=='server'||!member?.snapshot().owned||!member.snapshot().writable;}
 // 연결 보기는 헤더에서 뺐다(2026-11-07). 관계 지도 화면의 도구 줄(전체 보기·사용법과 같은 자리·모양)에
 // 같은 다이얼로그를 여는 버튼을 붙인다. 원본 화면 파일은 건드리지 않는다.
@@ -190,7 +224,18 @@ function links(){viewContext();const c=window.LT41;$('connections').replaceChild
  const moment=c.tree.moments.find(m=>m.id===c.momentId);$('selection-label').textContent=moment?.title||'';
  const edges=c.tree.edges.filter(e=>e.from===c.momentId||e.to===c.momentId);setConnectionCount(edges.length);
  if(!edges.length){const p=document.createElement('p');p.textContent='아직 연결된 다른 순간이 없어요.';$('connections').append(p);}
- for(const e of edges){const id=e.from===c.momentId?e.to:e.from,m=c.tree.moments.find(m=>m.id===id),b=document.createElement('button'),kind=document.createElement('small'),title=document.createElement('span');kind.textContent=e.kind==='related'?'관련 순간':e.from===c.momentId?'다음 순간':'이전 순간';const name=document.createElement('strong'),reason=document.createElement('span');name.textContent=m.title;reason.className='connection-reason';reason.textContent=e.reason||(e.kind==='related'?'함께 기억할 관련 순간으로 연결했어요.':'연결 이유를 아직 남기지 않았어요.');title.append(name,reason);b.append(kind,title);b.onclick=()=>{c.momentId=id;$('connection-panel').close();show(current,false);writeLocation();};$('connections').append(b);}}
+ for(const e of edges){
+  const id=e.from===c.momentId?e.to:e.from,m=c.tree.moments.find(m=>m.id===id),b=document.createElement('button'),kind=document.createElement('small'),title=document.createElement('span');
+  kind.textContent=e.kind==='related'?'관련 순간':e.from===c.momentId?'다음 순간':'이전 순간';
+  const name=document.createElement('strong'),reason=document.createElement('span');
+  name.textContent=m.title;
+  reason.className='connection-reason';
+  reason.textContent=e.reason||(e.kind==='related'?'함께 기억할 관련 순간으로 연결했어요.':'연결 이유를 아직 남기지 않았어요.');
+  title.append(name,reason);b.append(kind,title);
+  b.onclick=()=>{c.momentId=id;$('connection-panel').close();show(current,false);writeLocation();};
+  $('connections').append(b);
+ }
+}
 // #213 3번: 첫 트리 안내 말풍선. 한 번만 보여 주고, 닫으면 기억한다(저장소가 막히면 다시 보여 준다).
 let tipsReturnFocus=null;
 function closeTreeTips(remember=true){
@@ -212,19 +257,40 @@ function syncTreeTips(){
   if(wanted)showTreeTips();else closeTreeTips(false);
 }
 $('tree-tips-close')?.addEventListener('click',()=>closeTreeTips());
-document.addEventListener('keydown',event=>{
-  if(event.key!=='Escape')return;
-  const box=$('tree-tips');if(!box||box.hidden)return;
-  if([...document.querySelectorAll('dialog[open]')].some(d=>d.matches(':modal')))return;
-  event.preventDefault();closeTreeTips();
-});
 // 2026-11-07: 390·360에서 탭 7개가 폭을 넘는다. 탭 줄은 가로 스크롤이고, 화면을 바꿀 때 현재 탭을 가운데로 당겨 보이게 한다.
 // 넘치는 쪽 끝에만 페이드를 켜서 잘린 것이 아니라 더 있다는 신호를 준다. 데스크톱(넓은 폭)은 스크롤이 없어 아무 일도 하지 않는다.
 const navBar=document.querySelector('.app-header nav');
 const narrowNav=()=>matchMedia('(max-width:780px)').matches;
 function choose(id,momentId){const tree=model.trees.find(t=>t.id===id);window.LT41=tree?{tree,trees:model.trees,source,momentId:tree.moments.find(m=>m.id===momentId)?.id||tree.moments.find(m=>m.parentId===null)?.id||tree.moments[0]?.id,}:null;
  if(tree||current==='src064-orbit.html')show(current,false);else{flowNavigation();document.body.classList.remove('home-screen');hideFrames();$('empty').hidden=false;links();}}
-function load(input,kind,selection={},fallback={}){model=kind==='example'?{trees:[exampleTree]}:workspaceModel(input);source=kind;if(kind!=='share'){activeShareId=null;$('empty').querySelector('h1').textContent='다시 펼칠 순간을 기다리고 있어요.';$('empty').querySelector('p').textContent='예시를 둘러보거나 로그인한 계정의 기록을 불러오세요.';$('empty-sample').hidden=false;$('empty-records').hidden=false;}document.body.dataset.recordSource=kind;document.body.dataset.member=member?.snapshot().owned?'in':'out';document.body.dataset.treeCount=String(model?.trees?.length||0);$('source-label').textContent='트리 선택';$('record-description').textContent=kind==='example'?'실제 회원 데이터와 무관한 예시입니다.':kind==='server'?'로그인한 계정의 서버 기록 · 작성·수정 후 자동 저장':kind==='share'?'소유자가 명시적으로 공개한 트리 · 감상 전용':'선택한 파일을 메모리에서 읽는 중입니다.';$('trees').replaceChildren();for(const t of model.trees){const o=document.createElement('option');o.value=t.id;o.textContent=displayTreeTitle(t.title);$('trees').append(o);}$('trees').disabled=!model.trees.length;const resolved=resolveAccountPosition(model.trees,selection,fallback),chosen=model.trees.find(t=>t.id===resolved.position.treeId);$('trees').value=chosen?.id||'';choose(chosen?.id,resolved.position.momentId);return resolved;}
+function load(input,kind,selection={},fallback={}){
+ model=kind==='example'?{trees:[exampleTree]}:workspaceModel(input);
+ source=kind;
+ if(kind!=='share'){
+  activeShareId=null;
+  $('empty').querySelector('h1').textContent='다시 펼칠 순간을 기다리고 있어요.';
+  $('empty').querySelector('p').textContent='예시를 둘러보거나 로그인한 계정의 기록을 불러오세요.';
+  $('empty-sample').hidden=false;$('empty-records').hidden=false;
+ }
+ document.body.dataset.recordSource=kind;
+ document.body.dataset.member=member?.snapshot().owned?'in':'out';
+ document.body.dataset.treeCount=String(model?.trees?.length||0);
+ $('source-label').textContent='트리 선택';
+ $('record-description').textContent=kind==='example'
+  ?'실제 회원 데이터와 무관한 예시입니다.'
+  :kind==='server'
+   ?'로그인한 계정의 서버 기록 · 작성·수정 후 자동 저장'
+   :kind==='share'
+    ?'소유자가 명시적으로 공개한 트리 · 감상 전용'
+    :'선택한 파일을 메모리에서 읽는 중입니다.';
+ $('trees').replaceChildren();
+ for(const t of model.trees){const o=document.createElement('option');o.value=t.id;o.textContent=displayTreeTitle(t.title);$('trees').append(o);}
+ $('trees').disabled=!model.trees.length;
+ const resolved=resolveAccountPosition(model.trees,selection,fallback),chosen=model.trees.find(t=>t.id===resolved.position.treeId);
+ $('trees').value=chosen?.id||'';
+ choose(chosen?.id,resolved.position.momentId);
+ return resolved;
+}
 function clear(){load({revision:0,state:{version:1,trees:[]}},'file');$('source-label').textContent='트리 선택';$('record-description').textContent='펼쳐 볼 트리를 선택하세요.';}
 function stateSelection(){return {treeId:window.LT41?.tree.id,momentId:window.LT41?.momentId};}
 function formDirty(){return shellPanels.formDirty();}
@@ -233,8 +299,28 @@ function canLeave(){return !(formDirty()||treeDirty()||member?.snapshot().dirty)
 function leaveMember(){if(!canLeave())return false;member?.dispose();member=null;return true;}
 function memberStatus(status){
  const failed=status.dirty&&['offline','rejected','conflict','login'].includes(status.phase);
- $('save-feedback').hidden=!failed;$('save-message').textContent=failed?(status.phase==='login'?'로그인이 만료되어 서버에 저장하지 못했어요. 새 창에서 로그인한 뒤 이 탭을 새로고침하면 입력을 복원합니다.':status.detail||'서버에 저장하지 못했어요. 이 화면을 닫지 말고 다시 저장해 주세요.'):'';$('save-actions').replaceChildren();
- if(failed){for(const a of status.actions.filter(a=>['retry','pull','force','login'].includes(a.name))){const b=document.createElement('button');b.textContent=a.name==='login'?'새 창에서 로그인':a.label;b.onclick=async()=>{if(a.name==='login'){window.open(memberLoginUrl(readTheme(localStorage)),'_blank','noopener,noreferrer');return;}if(['pull','force'].includes(a.name)&&!confirm(a.name==='pull'?'미저장 변경을 버리고 서버 기록을 불러올까요?':'서버의 최신 기록으로 현재 입력을 덮어쓸까요? 다른 창의 변경이 사라질 수 있습니다.'))return;await member?.act(a.name);};$('save-actions').append(b);}const b=document.createElement('button');b.textContent='현재 기록 백업';b.onclick=backup;$('save-actions').append(b);}
+ $('save-feedback').hidden=!failed;
+ $('save-message').textContent=failed?
+  (status.phase==='login'
+   ?'로그인이 만료되어 서버에 저장하지 못했어요. 새 창에서 로그인한 뒤 이 탭을 새로고침하면 입력을 복원합니다.'
+   :status.detail||'서버에 저장하지 못했어요. 이 화면을 닫지 말고 다시 저장해 주세요.')
+  :'';
+ $('save-actions').replaceChildren();
+ if(failed){
+  for(const a of status.actions.filter(a=>['retry','pull','force','login'].includes(a.name))){
+   const b=document.createElement('button');
+   b.textContent=a.name==='login'?'새 창에서 로그인':a.label;
+   b.onclick=async()=>{
+    if(a.name==='login'){window.open(memberLoginUrl(readTheme(localStorage)),'_blank','noopener,noreferrer');return;}
+    if(['pull','force'].includes(a.name)&&!confirm(a.name==='pull'
+     ?'미저장 변경을 버리고 서버 기록을 불러올까요?'
+     :'서버의 최신 기록으로 현재 입력을 덮어쓸까요? 다른 창의 변경이 사라질 수 있습니다.'))return;
+    await member?.act(a.name);
+   };
+   $('save-actions').append(b);
+  }
+  const b=document.createElement('button');b.textContent='현재 기록 백업';b.onclick=backup;$('save-actions').append(b);
+ }
  if(status.phase==='checking')notify('내 기록을 불러오고 있어요.');
  else if(status.phase==='synced')notify(status.writable?(previousDirty?'서버에 저장됐어요.':'내 기록을 불러왔어요.'):'기록을 읽었어요. 서버 편집 연결은 아직 준비되지 않았어요.');
  else if(status.phase==='login'&&!status.dirty)notify('로그인이 필요해요.');
@@ -248,15 +334,44 @@ async function startMember(){setMemberRefreshStarted(true);if(!leaveMember())ret
    if(!initialized){if(route)requested=route;else if(!selection)requested=saved;const view=memberStartupView(active,route,saved,viewForFile(current));current=screenForView(view)[1];}
    const resolved=load({revision:0,state},'server',requested,saved);initialized=true;
    if(snapshot.owned&&resolved.position.treeId){if(viewForFile(current)!=='home')writeLocation('replace');takePendingOwnerRoute(sessionStorage);if(route?.scope==='owner'&&resolved.treeMissing)startupNotice='이 주소의 기록을 현재 계정에서 찾을 수 없어 최근 위치를 열었어요.';else if(route?.scope==='owner'&&resolved.momentMissing)startupNotice='이 주소의 순간을 찾을 수 없어 트리의 시작 순간을 열었어요.';}
- },onStatus:status=>{if(generation===loadGeneration)memberStatus(status);},navigate:url=>{if(url.startsWith('/auth/login')&&parseSelectionRoute(location.hash).scope==='owner')stashPendingOwnerRoute(sessionStorage,location.hash);location.assign(url.startsWith('/auth/login')?memberLoginUrl(readTheme(localStorage)):url==='#start'?'#home':url);}});member=session;await session.start();if(generation===loadGeneration&&session.snapshot().owned){if($('records').open)$('records').close();updateAccountControls();if(session.snapshot().writable&&sessionStorage.getItem(PENDING_NEW)==='1'){sessionStorage.removeItem(PENDING_NEW);openEditor('new');}shellAuth.consumeLoginIntent(session.snapshot());if(startupNotice)notify(startupNotice);}
+ },onStatus:status=>{if(generation===loadGeneration)memberStatus(status);},
+ navigate:url=>{
+  if(url.startsWith('/auth/login')&&parseSelectionRoute(location.hash).scope==='owner')stashPendingOwnerRoute(sessionStorage,location.hash);
+  location.assign(url.startsWith('/auth/login')?memberLoginUrl(readTheme(localStorage)):url==='#start'?'#home':url);
+ }
+});
+ member=session;
+ await session.start();
+ if(generation===loadGeneration&&session.snapshot().owned){
+  if($('records').open)$('records').close();
+  updateAccountControls();
+  if(session.snapshot().writable&&sessionStorage.getItem(PENDING_NEW)==='1'){sessionStorage.removeItem(PENDING_NEW);openEditor('new');}
+  shellAuth.consumeLoginIntent(session.snapshot());
+  if(startupNotice)notify(startupNotice);
+ }
  if(generation===loadGeneration){const startupJourney=parseJourneyRoute(location.hash);if(startupJourney){if(session.snapshot().owned&&session.snapshot().writable)openFirstJourney({step:startupJourney.step,route:true});else{history.replaceState(null,'','#home');handledHash='#home';}}}
 }
 function sample(selection={},view){if(!leaveMember())return;++loadGeneration;if(view)current=view;load(null,'example',selection);if(view)writeLocation();$('save-feedback').hidden=true;$('records').close();}
-$('account-entry').onclick=e=>{if(member?.snapshot().owned){e.preventDefault();openAccountMenu();}else if(parseSelectionRoute(location.hash).scope==='owner')stashPendingOwnerRoute(sessionStorage,location.hash);};$('account-avatar').onclick=e=>{e.stopPropagation();if($('account-popover').hidden)openAccountMenu();else closeAccountMenu();};$('account-records').onclick=()=>{closeAccountMenu();panel('records');};$('account-backup').onclick=()=>{closeAccountMenu();backup();};$('account-assets-open').onclick=()=>{closeAccountMenu();openAssets($('account-avatar'));};$('editor-assets-open').onclick=()=>openAssets($('editor-assets-open'));$('account-theme').onclick=()=>{toggleTheme();closeAccountMenu();};$('account-logout').onclick=async()=>{closeAccountMenu();$('logout').click();};document.addEventListener('click',e=>{if(!e.target.closest('.account-slot'))closeAccountMenu();});document.addEventListener('keydown',e=>{
- if(e.key!=='Escape')return;
- const pop=$('account-popover');
- if(pop&&!pop.hidden){closeAccountMenu();$('account-avatar').focus();}
-});$('record-menu').onclick=()=>{$('record-feedback').textContent='';panel('records');};$('empty-records').onclick=()=>member?.snapshot().writable?openEditor():panel('records');$('empty-sample').onclick=sample;
+$('account-entry').onclick=e=>{
+ if(member?.snapshot().owned){e.preventDefault();openAccountMenu();}
+ else if(parseSelectionRoute(location.hash).scope==='owner')stashPendingOwnerRoute(sessionStorage,location.hash);
+};
+$('account-avatar').onclick=e=>{
+ e.stopPropagation();
+ if($('account-popover').hidden)openAccountMenu();else closeAccountMenu();
+};
+ $('account-records').onclick=()=>{closeAccountMenu();panel('records');};
+ $('account-backup').onclick=()=>{closeAccountMenu();backup();};
+ $('account-assets-open').onclick=()=>{closeAccountMenu();openAssets($('account-avatar'));};
+ $('editor-assets-open').onclick=()=>openAssets($('editor-assets-open'));
+ $('account-theme').onclick=()=>{toggleTheme();closeAccountMenu();};
+ $('account-logout').onclick=async()=>{closeAccountMenu();$('logout').click();};
+document.addEventListener('click',e=>{
+ if(!e.target.closest('.account-slot'))closeAccountMenu();
+});
+$('record-menu').onclick=()=>{$('record-feedback').textContent='';panel('records');};
+$('empty-records').onclick=()=>member?.snapshot().writable?openEditor():panel('records');
+$('empty-sample').onclick=sample;
 $('sample').onclick=sample;$('clear').onclick=()=>{if(!leaveMember())return;++loadGeneration;clear();$('save-feedback').hidden=true;$('file').value='';$('records').close();};
 $('server').onclick=startMember;
 const ACCOUNT_DELETE_PHRASE='탈퇴합니다';
@@ -284,41 +399,63 @@ $('account-form').onsubmit=async event=>{
  const value=$('account-confirm').value.trim();
  if(!value||!accountConfirmMatches())return;
  if(!confirm('계정을 탈퇴하면 되돌릴 수 없습니다. 계속할까요?'))return;
- const button=$('account-delete');button.disabled=true;$('account-feedback').textContent='탈퇴를 처리하고 있어요.';
+ const button=$('account-delete');
+ button.disabled=true;
+ $('account-feedback').textContent='탈퇴를 처리하고 있어요.';
  const answer=await accountApi.deleteAccount(value);
- if(!answer.ok){$('account-feedback').textContent=answer.message||'탈퇴하지 못했어요. 다시 시도해 주세요.';button.disabled=false;return;}
+ if(!answer.ok){
+  $('account-feedback').textContent=answer.message||'탈퇴하지 못했어요. 다시 시도해 주세요.';
+  button.disabled=false;
+  return;
+ }
  try{member?.dispose?.();}catch{}
  member=null;source='example';clear();$('account-settings').close();updateAccountControls();
  notify(answer.commonAccountDeleted
   ? '러브트리 탈퇴와 함께 공통 로그인 계정과 인증 세션을 폐기했습니다.'
   : '러브트리에서 탈퇴했습니다. 다른 서비스 연결이 남아 있어 공통 계정은 유지됩니다.');
 };$('logout').onclick=async()=>{if(member){await member.act('logout');if(member.snapshot().dirty)notify('미저장 기록이 있어 로그아웃하지 않았어요. 다시 저장하거나 백업해 주세요.');}else{const answer=await createWorkspaceApi().logout();notify(answer.ok?'로그아웃했습니다.':'로그아웃하지 못했어요. 다시 시도해 주세요.');}};
-$('file').onchange=async()=>{const f=$('file').files[0];if(!f)return;if(!leaveMember())return;const generation=++loadGeneration;try{if(f.size>4194304)throw Error('4MiB 이하 파일만 읽습니다.');const d=JSON.parse(await f.text());if(generation!==loadGeneration)return;load(d.state?d:{revision:0,state:d},'file');$('records').close();notify('파일을 열었어요. 서버에는 저장하지 않습니다.');}catch(e){if(generation===loadGeneration)notify('불러오기 실패: '+e.message);}};
+$('file').onchange=async()=>{
+ const f=$('file').files[0];
+ if(!f)return;
+ if(!leaveMember())return;
+ const generation=++loadGeneration;
+ try{
+  if(f.size>4194304)throw Error('4MiB 이하 파일만 읽습니다.');
+  const d=JSON.parse(await f.text());
+  if(generation!==loadGeneration)return;
+  load(d.state?d:{revision:0,state:d},'file');
+  $('records').close();
+  notify('파일을 열었어요. 서버에는 저장하지 않습니다.');
+ }catch(e){
+  if(generation===loadGeneration)notify('불러오기 실패: '+e.message);
+ }
+};
 $('trees').onchange=()=>{choose($('trees').value);writeLocation();$('records').close();};
 document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>{if(b.dataset.close==='editor'&&uploads.busy){notify('파일 전송을 마치거나 취소해 주세요.');return;}if(b.dataset.close==='editor'&&formDirty()&&!confirm('작성 중인 입력을 버리고 닫을까요?'))return;if(b.dataset.close==='tree-manager'&&treeDirty()&&!confirm('책 정보 변경을 버리고 닫을까요?'))return;$(b.dataset.close).close();});
-for(const d of document.querySelectorAll('dialog'))d.addEventListener('click',e=>{if(e.target!==d||['editor','tree-manager'].includes(d.id))return;const r=d.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)d.close();});
 function publicProblem(answer){
  source='share';activeShareId=null;model={trees:[]};window.LT41=null;document.body.dataset.recordSource='share';flowNavigation();document.body.classList.remove('home-screen');hideFrames();$('empty').hidden=false;$('empty-sample').hidden=true;$('empty-records').hidden=true;
  const messages={share_invalid:['공유 주소를 찾을 수 없어요.','주소를 다시 확인해 주세요.'],share_not_found:['공유 주소를 찾을 수 없어요.','주소가 잘못되었거나 존재하지 않아요.'],share_revoked:['공유가 취소됐어요.','소유자가 이 공유 주소를 회수했습니다.'],share_removed:['공유된 트리가 없어졌어요.','트리가 삭제되었거나 더 이상 공개할 수 없어요.'],share_empty:['아직 공개할 순간이 없어요.','소유자가 순간을 남긴 뒤 다시 열어 주세요.'],share_forbidden:['이 공유는 볼 수 없어요.','접근 권한을 확인해 주세요.']};
  const [title,detail]=messages[answer.code]||['공유 기록을 불러오지 못했어요.',answer.code==='timeout'?'서버 응답 시간이 초과됐어요. 다시 시도해 주세요.':'잠시 뒤 다시 시도해 주세요.'];$('empty').querySelector('h1').textContent=title;$('empty').querySelector('p').textContent=detail;links();
 }
-async function showPublicRoute(route){if(member&&!leaveMember()){writeLocation('replace');return;}const generation=++loadGeneration;member=null;activeShareId=route.shareId;current=screenForView(['book','board','network'].includes(route.view)?route.view:'book')[1];handledHash=location.hash;$('empty').querySelector('h1').textContent='공유된 순간을 펼치고 있어요.';$('empty').querySelector('p').textContent='소유자가 공개한 트리 한 개만 확인합니다.';$('empty-sample').hidden=true;$('empty-records').hidden=true;$('view').hidden=true;$('empty').hidden=false;
+async function showPublicRoute(route){
+ if(member&&!leaveMember()){writeLocation('replace');return;}
+ const generation=++loadGeneration;
+ member=null;activeShareId=route.shareId;
+ current=screenForView(['book','board','network'].includes(route.view)?route.view:'book')[1];
+ handledHash=location.hash;
+ $('empty').querySelector('h1').textContent='공유된 순간을 펼치고 있어요.';
+ $('empty').querySelector('p').textContent='소유자가 공개한 트리 한 개만 확인합니다.';
+ $('empty-sample').hidden=true;$('empty-records').hidden=true;$('view').hidden=true;$('empty').hidden=false;
  const answer=await shareApi.read(route.shareId||'');if(generation!==loadGeneration)return;if(!answer.ok){publicProblem(answer);return;}
  activeShareId=answer.share.id;const view=['book','board','network'].includes(route.view)?route.view:answer.share.view;current=screenForView(view)[1];load({revision:0,state:{version:1,trees:[answer.tree]}},'share',{treeId:answer.tree.id,momentId:answer.share.entryMomentId});activeShareId=answer.share.id;show(current,false);writeLocation('replace');notify('소유자가 명시적으로 공유한 트리입니다. 감상만 할 수 있어요.');
 }
-function applyBrowserLocation(){if(location.hash===handledHash)return;handledHash=location.hash;const journey=journeyRouteDecision({hash:location.hash,open:current==='first-journey.html',saved:shellJourney.saved()});if(journey.action==='goto'){gotoJourneyStep(journey.step);return;}if(journey.action==='open'){openFirstJourney({step:journey.step,route:true});return;}if(journey.action==='finished'){finishJourney();return;}if(journey.action==='leave'){leaveJourney();return;}const route=parseSelectionRoute(location.hash);if(route.scope==='public'){showPublicRoute(route);return;}current=screenForView(route.view)[1];
- if(route.scope==='owner'){if(source!=='server'||!member?.snapshot().owned){show(current,false);void startMember();return;}const saved=accountPosition(localStorage,member.snapshot().subject)||{},resolved=resolveAccountPosition(model?.trees||[],route,saved);choose(resolved.position.treeId,resolved.position.momentId);if(resolved.treeMissing||resolved.momentMissing){writeLocation('replace');notify(resolved.treeMissing?'이 주소의 기록을 현재 계정에서 찾을 수 없어 최근 위치를 열었어요.':'이 주소의 순간을 찾을 수 없어 트리의 시작 순간을 열었어요.');}else rememberAccountPosition(localStorage,member.snapshot().subject,{...resolved.position,view:route.view});return;}
- show(current,false);
-}
 document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{if(b.dataset.view==='track32-bookshelf.html'&&!member?.snapshot().owned){openLoginStart('shelf');return;}show(b.dataset.view);});
-addEventListener('popstate',applyBrowserLocation);
-addEventListener('hashchange',applyBrowserLocation);
 for(const f of frames())f.addEventListener('load',()=>frameLoaded(f));
 paintThemeControls();applyTheme();
 if(initialRoute.scope==='public')showPublicRoute(initialRoute);else load(null,'example');
 
 function backup(){const data=member?.state();if(!data){notify('백업할 내 기록이 없어요.');return;}const a=document.createElement('a'),url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));a.href=url;a.download='lovetree-draft.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),0);}
-function openAssets(opener=document.activeElement){if(!member?.snapshot().owned){notify('로그인한 뒤 내 보관 파일을 확인할 수 있어요.');return;}assetsOpener=opener;panel('account-assets');uploads.openAssets();}
+function openAssets(opener=document.activeElement){if(!member?.snapshot().owned){notify('로그인한 뒤 내 보관 파일을 확인할 수 있어요.');return;}shellDialogs.rememberOpener(opener);panel('account-assets');uploads.openAssets();}
 function usePrivateAsset(){
  if(source!=='server'||!member?.snapshot().owned){openLoginStart('new-tree');return false;}
  if(!member.snapshot().writable){notify('서버 편집 연결이 아직 준비되지 않았어요. 기록은 안전하게 읽을 수 있습니다.');panel('records');return false;}
@@ -327,5 +464,7 @@ function usePrivateAsset(){
  if(!$('editor').open)openEditor('add');
  return $('editor').open;
 }
-addEventListener('beforeunload',e=>{if(member?.snapshot().dirty||formDirty()||treeDirty()){e.preventDefault();e.returnValue='';}});
+addEventListener('beforeunload',e=>{
+ if(member?.snapshot().dirty||formDirty()||treeDirty()){e.preventDefault();e.returnValue='';}
+});
 if(shouldLoadMemberRecords(location.search,document.cookie,location.hash))startMember();
