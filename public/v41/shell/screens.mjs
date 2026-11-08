@@ -1,7 +1,7 @@
 // 셸의 화면 전환과 iframe 두 장 교대 (#231 1-B ②).
 // 2026-11-08 리팩터링: 동작·겉모습 변경 0. shell.mjs에 있던 show·showInFrame·frameLoaded·hideFrames를 그대로 옮겼다.
 // 셸은 지금 화면(current)과 나머지 일(테마·주소·연결)을 넘겨 주고, 이 파일은 화면만 바꾼다.
-import {screenForView, screenUrl, screenTitle} from './navigation.mjs';
+import {screenUrl, screenTitle} from './navigation.mjs';
 
 export function createScreens(deps) {
   const {
@@ -110,8 +110,9 @@ export function createScreens(deps) {
   }
 
   function show(file, write = true) {
-    const screen = screenForView(file);
-    if (!screen || screen[1] !== file) return;
+    // show()는 화면 파일 이름을 받는다(화면 키가 아니다). 목록에서 그대로 찾는다.
+    const screen = screens.find(s => s[1] === file);
+    if (!screen) return;
     if ($('community-panel')?.open) $('community-panel').close();
     setCurrent(file);
     flowNavigation();
