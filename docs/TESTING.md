@@ -40,13 +40,11 @@
 
 `v41/home.js`의 인라인 메뉴 로직을 `public/v41/home-view-menu.mjs` `createViewMenu(deps)`로 옮겨 **15건을 함수 시험으로 전환**했다(`tests/v41-home-view-menu-flow.test.mjs` 8건). 남은 1건은 "첫 화면은 모듈을 연결만 한다"는 구조 검사다.
 
-### 3) 제품 코드를 고쳐야만 바꿀 수 있는 것 (8건) — 동작이지만 지금은 함수 호출 불가
+### 3) 2026-11-09에 해소 — 첫 여정 인라인 스크립트(8 → 0)
 
-| 파일 | 건수 | 왜 못 바꾸나 | 필요 작업 |
-| --- | --- | --- | --- |
-| `v41-journey-history.test.mjs` | 8 | `views/first-journey.html` **인라인 스크립트**(내보낸 함수 없음) | 페이지 스크립트를 `public/v41/views/journey/` 모듈로 분리 → 표로 전환 |
+`views/first-journey.html`의 인라인 모듈을 `public/v41/views/journey/journey-page.mjs` `createJourneyPage(env)`로 옮겨 **8건을 함수 시험으로 전환**했다(`tests/v41-journey-page.test.mjs` 9건). HTML은 연결 3줄만 남았다.
 
-→ **지금 바꿀 수 있는 동작 검사: 0건.** 남은 동작 검사는 위 8건뿐이고, **페이지 스크립트 분리가 선행 조건**이다.
+→ **"제품 코드 필요" 0건. "지금 바꿀 수 있는 동작 검사" 0건 — 시험 전환 작업 완료.** 남은 글자 검사는 모두 **마크업·CSS 값·문구·구조**라 유지 사유가 있다(위 1번 표).
 
 ## 새 시험을 쓸 때
 
