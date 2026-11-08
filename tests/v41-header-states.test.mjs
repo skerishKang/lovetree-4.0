@@ -6,6 +6,7 @@ import {
   FIRST_TREE_TIPS, TIPS_KEY, readTipsSeen, writeTipsSeen, tipsWanted
 } from '../public/v41/header-state.mjs';
 
+const header = readFileSync(new URL('../public/v41/shell/header.mjs', import.meta.url), 'utf8');
 const shell = readFileSync(new URL('../public/v41/shell.mjs', import.meta.url), 'utf8');
 const html = readFileSync(new URL('../public/v41/index.html', import.meta.url), 'utf8');
 const css = readFileSync(new URL('../public/v41/shell.css', import.meta.url), 'utf8');
@@ -52,12 +53,13 @@ test('5. 모르는 상태는 로그아웃으로 떨어진다(빈 화면을 만�
 });
 
 test('6. 셸은 숨김/표시로 정리한다 — 비활성(disabled)으로 남기지 않는다', () => {
-  assert.match(shell, /const parts=headerPartsFor\(\{owned,treeCount:model\?\.trees\?\.length\|\|0,publicReading\}\);/);
-  assert.match(shell, /\$\('tree-views'\)\.hidden=!showTreeViews;for\(const b of \$\('tree-views'\)\.querySelectorAll\('button'\)\)\{b\.disabled=false;b\.title='';\}/);
-  assert.match(shell, /\$\('record-menu'\)\.hidden=!parts\.treePicker\|\|publicReading;/);
-  assert.match(shell, /\$\('write-menu'\)\.hidden=!parts\.write\|\|publicReading;/);
-  assert.doesNotMatch(shell, /b\.disabled=!window\.LT41/, '트리 탭을 비활성으로 두지 않는다');
-  assert.match(shell, /syncTreeTips\(\);\s*\n\s*revealCurrentTab\(\);/);
+  // #231 1-B②-2: 헤더 판정은 shell/header.mjs로 옮겼다(조건·조회 방식 그대로).
+  assert.match(header, /const parts=headerPartsFor\(\{owned,treeCount:getModel\(\)\?\.trees\?\.length\|\|0,publicReading\}\);/);
+  assert.match(header, /\$\('tree-views'\)\.hidden=!showTreeViews;for\(const b of \$\('tree-views'\)\.querySelectorAll\('button'\)\)\{b\.disabled=false;b\.title='';\}/);
+  assert.match(header, /\$\('record-menu'\)\.hidden=!parts\.treePicker\|\|publicReading;/);
+  assert.match(header, /\$\('write-menu'\)\.hidden=!parts\.write\|\|publicReading;/);
+  assert.doesNotMatch(header, /b\.disabled=!window\.LT41/, '트리 탭을 비활성으로 두지 않는다');
+  assert.match(header, /delegate\.syncTreeTips\(\);\s*\n\s*revealCurrentTab\(\);/);
 });
 
 test('7. 첫 트리 말풍선: 2~3개, 순간 남기기·보기 전환을 알려 준다', () => {

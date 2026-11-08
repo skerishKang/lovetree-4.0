@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {displayTreeTitle, AUTO_TITLE_SUFFIX} from '../public/v41/tree-name.mjs';
 
+const header = readFileSync(new URL('../public/v41/shell/header.mjs', import.meta.url), 'utf8');
 const shell = readFileSync(new URL('../public/v41/shell.mjs', import.meta.url), 'utf8');
 const community = readFileSync(new URL('../public/v41/community-panel.mjs', import.meta.url), 'utf8');
 const css = readFileSync(new URL('../public/v41/shell.css', import.meta.url), 'utf8');
@@ -27,11 +28,11 @@ test('3. 셸이 트리 이름을 보여 주는 곳은 모두 displayTreeTitle을
   // 선택한 트리(화면 위 문맥 줄)
   assert.match(shell, /\$\('context-tree'\)\.textContent=displayTreeTitle\(c\.tree\.title\);/);
   // 헤더 "트리: <이름> ▾"
-  assert.match(shell, /\$\('source-label'\)\.textContent=treePickerText\(\{owned,treeTitle:displayTreeTitle\(window\.LT41\?\.tree\.title\|\|''\),pendingDraft\}\);/);
+  assert.match(header, /\$\('source-label'\)\.textContent=treePickerText\(\{owned,treeTitle:displayTreeTitle\(window\.LT41\?\.tree\.title\|\|''\),pendingDraft\}\);/);
   // 트리 선택 목록
   assert.match(shell, /o\.textContent=displayTreeTitle\(t\.title\);/);
   // 트리 보기 탭 묶음의 접근성 이름
-  assert.match(shell, /\$\('tree-views'\)\.setAttribute\('aria-label',window\.LT41\?\.tree\.title\?displayTreeTitle\(window\.LT41\.tree\.title\)\+' 보기':'이 트리 보기'\);/);
+  assert.match(header, /\$\('tree-views'\)\.setAttribute\('aria-label',window\.LT41\?\.tree\.title\?displayTreeTitle\(window\.LT41\.tree\.title\)\+' 보기':'이 트리 보기'\);/);
   // 공유 미리보기 요약
   assert.match(shell, /displayTreeTitle\(answer\.preview\.tree\.title\)/);
   // 삭제 확인 문구

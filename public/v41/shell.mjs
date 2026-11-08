@@ -15,6 +15,7 @@ import {journeyEntry,journeySavePlan,journeyRouteHash,parseJourneyRoute,journeyR
 import {displayTreeTitle} from './tree-name.mjs';
 import {screens,screenForView,viewForFile,themedViewFor} from './shell/navigation.mjs';
 import {createScreens} from './shell/screens.mjs';
+import {createHeader} from './shell/header.mjs';
 import {paintLoginLinks,paintThemeControls,applyTheme as applyThemeFor,toggleTheme as toggleThemeFor} from './shell/theme.mjs';
 const $=id=>document.getElementById(id);
 let pendingLoginIntent=readLoginIntent(location.search);
@@ -36,22 +37,13 @@ let model=null,current=screenForView(initialRoute.view)[1],source='example',load
 setMemberRefreshStarted(false);
 const shareApi=createShareApi();
 const accountApi=createWorkspaceApi();
+// 헤더·계정 메뉴는 shell/header.mjs가 맡는다(#231 1-B②-2). 셸은 자기 상태를 읽기 함수로 넘긴다.
 addEventListener('lovetree-auth-required',()=>{if(member?.snapshot().owned){$('account-entry').textContent='로그인';$('account-entry').hidden=false;$('account-avatar').hidden=true;closeAccountMenu();$('record-feedback').textContent='로그인 확인이 필요해요. 다시 로그인해 주세요.';notify('로그인 확인이 필요해요. 다시 로그인해 주세요.');}});
 window.LT41=null;
 const uploads=mountPrivateUpload({form:$('moment-form'),assets:$('account-assets'),getSubject:()=>source==='server'&&member?.snapshot().writable?member.snapshot().subject:null,getState:()=>member?.state(),onChange:()=>{updateMediaPreview();updateQuickEntryHint();},onUseAsset:()=>usePrivateAsset()});
 function notify(text){$('record-feedback').textContent=text;$('toast').textContent=text;$('toast').hidden=$('records').open;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').hidden=true,6500);}
 const PENDING_NEW='lovetree.v41.pending-new';
 // 2026-11-07 계정 표시: 로그인 상태는 첫 글자 동그라미 + 작은 메뉴, 로그아웃 상태는 기존 로그인 알약.
-let accountEmail='';
-function closeAccountMenu(){const pop=$('account-popover');if(!pop||pop.hidden)return;pop.hidden=true;$('account-avatar').setAttribute('aria-expanded','false');}
-function renderAccount(){const owned=!!member?.snapshot().owned,view=accountPresentation({owned,email:accountEmail,subject:member?.snapshot().subject||''});
- const login=$('account-entry'),avatar=$('account-avatar');
- if(view.mode==='login'){login.hidden=false;login.textContent='로그인';login.removeAttribute('aria-label');avatar.hidden=true;avatar.textContent='';closeAccountMenu();return;}
- login.hidden=true;avatar.hidden=false;avatar.textContent=view.initial;avatar.setAttribute('aria-label',view.ariaLabel);avatar.title=view.title;
- $('account-email').textContent=view.label;}
-function openAccountMenu(){const owned=!!member?.snapshot().owned;if(!owned){return;}const pop=$('account-popover');pop.hidden=false;$('account-avatar').setAttribute('aria-expanded','true');if(!accountEmail)void loadAccountEmail();}
-async function loadAccountEmail(){const answer=await accountApi.account().catch(()=>null);if(answer?.ok&&answer.email){accountEmail=answer.email;renderAccount();}}
-function updateAccountControls(){const owned=!!member?.snapshot().owned;document.querySelectorAll('[data-guest-login]').forEach(x=>x.hidden=owned);$('server').hidden=!owned;$('logout').hidden=!owned;$('account-settings-open').hidden=!owned;renderAccount();}
 function panel(id){if(id==='records')updateAccountControls();const target=$(id);if(!target.open)target.showModal();}
 function openLoginStart(intent='first'){startLogin(intent==='first'?'':intent);}
 // 안내 창이 없어졌으니 close/cancel 복귀 연결도 필요 없다.
@@ -61,6 +53,49 @@ const SHELL_FOCUSABLE='a[href],button:not([disabled]),input:not([disabled]):not(
 function shellFocusables(root){return [...root.querySelectorAll(SHELL_FOCUSABLE)].filter(el=>!el.disabled&&el.getClientRects().length>0&&getComputedStyle(el).visibility!=='hidden');}
 function trapShellTab(event){if(event.key!=='Tab')return;const assets=$('account-assets'),editor=$('editor');const dialog=assets?.open?assets:editor?.open?editor:null;if(!dialog)return;const list=shellFocusables(dialog);if(!list.length){event.preventDefault();return;}const at=list.indexOf(document.activeElement);if(event.shiftKey){if(at<=0){event.preventDefault();list[list.length-1].focus();}}else if(at<0||at===list.length-1){event.preventDefault();list[0].focus();}}
 document.addEventListener('keydown',trapShellTab,true);
+
+const shellHeader=createHeader({
+  $,
+  navBar:document.querySelector('.app-header nav'),
+  getMember:()=>member,
+  getModel:()=>model,
+  getSource:()=>source,
+  getCurrent:()=>current,
+  accountApi,
+  delegate:{syncTreeTips:()=>syncTreeTips()}
+});
+function flowNavigation(){return shellHeader.flowNavigation();}
+function updateNavFade(){return shellHeader.updateNavFade();}
+function revealCurrentTab(){return shellHeader.revealCurrentTab();}
+function closeAccountMenu(){return shellHeader.closeAccountMenu();}
+function renderAccount(){return shellHeader.renderAccount();}
+function openAccountMenu(){return shellHeader.openAccountMenu();}
+function loadAccountEmail(){return shellHeader.loadAccountEmail();}
+function updateAccountControls(){return shellHeader.updateAccountControls();}
+// 화면 전환·iframe 두 장 교대는 shell/screens.mjs가 맡는다(#231 1-B). 셸은 지금 화면과 나머지 일을 넘긴다.
+const shellScreens=createScreens({
+  $,
+  screens,
+  getCurrent:()=>current,
+  setCurrent:file=>{current=file;},
+  getSource:()=>source,
+  hasTree:()=>!!window.LT41,
+  flowNavigation,
+  applyTheme,
+  writeLocation,
+  links,
+  onFrameReady:frame=>{
+    const d=frame.contentDocument;if(!d)return;
+    mountConnectionTool(d);applyViewAccessibility(d);
+    d.addEventListener('click',e=>{const b=e.target.closest('button,a');if(!b)return;let file;if(b.matches('[data-action="tree"],[data-menu="tree"]'))file='track32-bookshelf.html';if(b.matches('#storyBook,[data-menu="book"]'))file='track59-sketchbook.html';if(current==='track56-network.html'&&b.id==='openMoment')file='track59-sketchbook.html';if(file){e.preventDefault();e.stopImmediatePropagation();show(file);}},true);
+  }
+});
+function frames(){return shellScreens.frames();}
+function hideFrames(){return shellScreens.hideFrames();}
+function showInFrame(url,title){return shellScreens.showInFrame(url,title);}
+function show(file,write=true){return shellScreens.show(file,write);}
+function frameLoaded(frame){return shellScreens.frameLoaded(frame);}
+
 let assetsOpener=null;
 $('account-assets').addEventListener('cancel',event=>{event.preventDefault();$('account-assets').close();const target=focusReturnTarget(assetsOpener,$('account-avatar'));setTimeout(()=>target?.focus?.(),0);});
 function ownerPosition(){const c=window.LT41;return c?{treeId:c.tree.id,momentId:c.momentId,view:viewForFile(current)}:null;}
@@ -114,74 +149,10 @@ document.addEventListener('keydown',event=>{
   if([...document.querySelectorAll('dialog[open]')].some(d=>d.matches(':modal')))return;
   event.preventDefault();closeTreeTips();
 });
-function flowNavigation(){
-  const owned=!!member?.snapshot().owned;
-  const reading=!!window.LT41&&['track59-sketchbook.html','track58-pinboard.html','track56-network.html'].includes(current);
-  const publicReading=source==='share';
-  // 트리 보기 탭은 로그인한 내 트리에서만 연다. 로그아웃이면 예시가 열려 있어도 숨긴다.
-  // #213 3번: 상태(out·in-empty·in-trees·share)마다 보이는 것만 남기고 나머지는 숨긴다(비활성 표시 없음).
-  const parts=headerPartsFor({owned,treeCount:model?.trees?.length||0,publicReading});
-  const showTreeViews=parts.treeViews&&treeViewsVisible({owned,publicReading});
-  $('tree-views').hidden=!showTreeViews;for(const b of $('tree-views').querySelectorAll('button')){b.disabled=false;b.title='';}
-  $('tree-views').setAttribute('aria-label',window.LT41?.tree.title?displayTreeTitle(window.LT41.tree.title)+' 보기':'이 트리 보기');
-  for(const b of document.querySelectorAll('nav>button'))b.hidden=publicReading;
-  // 트리 선택은 뒤쪽 탭 묶음 바로 앞에 있고, 로그인 상태에서만 "트리: <이름> ▾"로 보여 준다.
-  // 로그아웃이면 "트리 고르기", 브라우저에만 남은 미저장 기록이 있으면 "저장 안 된 기록"이다.
-  const pendingDraft=hasPendingDraft(sessionStorage,member?.snapshot().subject||null);
-  $('record-menu').hidden=!parts.treePicker||publicReading;
-  $('source-label').textContent=treePickerText({owned,treeTitle:displayTreeTitle(window.LT41?.tree.title||''),pendingDraft});
-  $('record-menu').title=owned?(window.LT41?'다른 트리를 고릅니다.':'열어볼 트리를 고릅니다.'):(pendingDraft?'로그인하면 저장하지 못한 기록을 복원합니다.':'로그인하면 내 트리를 고를 수 있습니다.');
-  $('write-menu').hidden=!parts.write||publicReading;$('share-menu').hidden=!parts.share||source!=='server'||!window.LT41;
-  if(!member?.snapshot().dirty)$('write-menu').textContent=writeMenuLabel({owned,dirty:false,reading,hasTree:!!window.LT41});
-  $('write-menu').title=source==='server'?(reading?'선택한 순간에서 이어지는 새 순간을 기록합니다.':'새 트리의 첫 순간을 기록합니다.'):'로그인한 계정에 내 트리를 만듭니다. 예시에는 저장하지 않아요.';
-  syncTreeTips();
-  revealCurrentTab();
-}
 // 2026-11-07: 390·360에서 탭 7개가 폭을 넘는다. 탭 줄은 가로 스크롤이고, 화면을 바꿀 때 현재 탭을 가운데로 당겨 보이게 한다.
 // 넘치는 쪽 끝에만 페이드를 켜서 잘린 것이 아니라 더 있다는 신호를 준다. 데스크톱(넓은 폭)은 스크롤이 없어 아무 일도 하지 않는다.
 const navBar=document.querySelector('.app-header nav');
 const narrowNav=()=>matchMedia('(max-width:780px)').matches;
-function updateNavFade(){
- if(!navBar)return;
- const overflowing=navBar.scrollWidth-navBar.clientWidth>1;
- const atStart=navBar.scrollLeft<=1;
- const atEnd=navBar.scrollLeft>=navBar.scrollWidth-navBar.clientWidth-1;
- navBar.classList.toggle('fade-start',overflowing&&!atStart);
- navBar.classList.toggle('fade-end',overflowing&&!atEnd);
-}
-function revealCurrentTab(){
- if(!navBar||!narrowNav()){updateNavFade();return;}
- const active=navBar.querySelector('[aria-current="true"]')||navBar.querySelector('#record-menu');
- if(active&&active.getClientRects().length){
-  const reduce=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  active.scrollIntoView({inline:'center',block:'nearest',behavior:reduce?'auto':'smooth'});
- }
- updateNavFade();
-}
-if(navBar){navBar.addEventListener('scroll',updateNavFade,{passive:true});addEventListener('resize',()=>revealCurrentTab());}
-// 화면 전환·iframe 두 장 교대는 shell/screens.mjs가 맡는다(#231 1-B). 셸은 지금 화면과 나머지 일을 넘긴다.
-const shellScreens=createScreens({
-  $,
-  screens,
-  getCurrent:()=>current,
-  setCurrent:file=>{current=file;},
-  getSource:()=>source,
-  hasTree:()=>!!window.LT41,
-  flowNavigation,
-  applyTheme,
-  writeLocation,
-  links,
-  onFrameReady:frame=>{
-    const d=frame.contentDocument;if(!d)return;
-    mountConnectionTool(d);applyViewAccessibility(d);
-    d.addEventListener('click',e=>{const b=e.target.closest('button,a');if(!b)return;let file;if(b.matches('[data-action="tree"],[data-menu="tree"]'))file='track32-bookshelf.html';if(b.matches('#storyBook,[data-menu="book"]'))file='track59-sketchbook.html';if(current==='track56-network.html'&&b.id==='openMoment')file='track59-sketchbook.html';if(file){e.preventDefault();e.stopImmediatePropagation();show(file);}},true);
-  }
-});
-function frames(){return shellScreens.frames();}
-function hideFrames(){return shellScreens.hideFrames();}
-function showInFrame(url,title){return shellScreens.showInFrame(url,title);}
-function show(file,write=true){return shellScreens.show(file,write);}
-function frameLoaded(frame){return shellScreens.frameLoaded(frame);}
 function choose(id,momentId){const tree=model.trees.find(t=>t.id===id);window.LT41=tree?{tree,trees:model.trees,source,momentId:tree.moments.find(m=>m.id===momentId)?.id||tree.moments.find(m=>m.parentId===null)?.id||tree.moments[0]?.id,}:null;
  if(tree||current==='src064-orbit.html')show(current,false);else{flowNavigation();document.body.classList.remove('home-screen');hideFrames();$('empty').hidden=false;links();}}
 function load(input,kind,selection={},fallback={}){model=kind==='example'?{trees:[exampleTree]}:workspaceModel(input);source=kind;if(kind!=='share'){activeShareId=null;$('empty').querySelector('h1').textContent='다시 펼칠 순간을 기다리고 있어요.';$('empty').querySelector('p').textContent='예시를 둘러보거나 로그인한 계정의 기록을 불러오세요.';$('empty-sample').hidden=false;$('empty-records').hidden=false;}document.body.dataset.recordSource=kind;document.body.dataset.member=member?.snapshot().owned?'in':'out';document.body.dataset.treeCount=String(model?.trees?.length||0);$('source-label').textContent='트리 선택';$('record-description').textContent=kind==='example'?'실제 회원 데이터와 무관한 예시입니다.':kind==='server'?'로그인한 계정의 서버 기록 · 작성·수정 후 자동 저장':kind==='share'?'소유자가 명시적으로 공개한 트리 · 감상 전용':'선택한 파일을 메모리에서 읽는 중입니다.';$('trees').replaceChildren();for(const t of model.trees){const o=document.createElement('option');o.value=t.id;o.textContent=displayTreeTitle(t.title);$('trees').append(o);}$('trees').disabled=!model.trees.length;const resolved=resolveAccountPosition(model.trees,selection,fallback),chosen=model.trees.find(t=>t.id===resolved.position.treeId);$('trees').value=chosen?.id||'';choose(chosen?.id,resolved.position.momentId);return resolved;}

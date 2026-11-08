@@ -935,7 +935,8 @@ COM2에는 merge `6900df8aa446dfe0201d01997457fae04c4abe16`의 변경 서버 파
 | 화면 목록·경로 선택(예시 → `design/views/`, 실제 기록 → `views/`)·테마 대상 계산 | `public/v41/shell/navigation.mjs` (분리 완료) |
 | 테마 적용·표시(테마 버튼, 로그인 링크 href) | `public/v41/shell/theme.mjs` (분리 완료) |
 | 화면 전환·iframe 두 장 교대(#219·#211)·도착 표시·화면 클릭 위임 | `public/v41/shell/screens.mjs` (분리 완료) |
-| 헤더 상태·탭·트리 선택(#222), 계정 메뉴, 로그인 시작·세션(#215·#218·#227) | `shell.mjs` (다음 PR에서 `shell/header.mjs`·`shell/auth.mjs`로) |
+| 헤더 상태·탭·트리 선택(#222)·탭 페이드·계정 메뉴(`flowNavigation`·`updateNavFade`·`revealCurrentTab`·`renderAccount`·`openAccountMenu`·`closeAccountMenu`·`loadAccountEmail`·`updateAccountControls`) | `public/v41/shell/header.mjs` (분리 완료) |
+| 로그인 시작·세션(#215·#218·#227) | `shell.mjs` (다음 PR에서 `shell/auth.mjs`로) |
 | 순간 패널·편집기·첫 여정·공유·둘러보기·`lt41-*` 메시지 수신 | `shell.mjs` (그다음 PR에서 `shell/panels.mjs`·`shell/messages.mjs`로) |
 | 접근성·포커스(#204) — 셸 대화상자 Tab 순환, Esc 복귀 | `shell.mjs` (`view-a11y.mjs`와 함께) |
 
