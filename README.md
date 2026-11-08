@@ -44,3 +44,11 @@ npm run preview
 6. reference/SOURCES.md — 원본과 재사용 출처
 
 4.0 전용 구조 과제 #65는 별도 범위다. 4.1 확정을 이유로 완료 처리하거나 미래 사용자 기능의 선행 조건으로 두지 않는다. 시간당 자동 작업은 중지 상태를 유지한다.
+
+## 로그인 흐름 자동 검사 (`--auth-flows`)
+
+```bash
+node tools/postdeploy/postdeploy.mjs https://lovetree-4-0.pages.dev/v41/ --auth-flows --secrets ~/.secrets/.env
+```
+- 각 경로(로그인 복귀·내 책장·정원 테마·로그아웃·만료 복원)는 **빈 프로필의 새 context**에서 시작하고, 비밀번호는 `.secrets`에서 읽어 출력하지 않는다. 결과는 `auth-flows/*` 검사 + 경로별 스크린샷.
+- 검사가 만든 트리는 끝에서 지우고 `flow-cleanup`(트리 0개)·`flow-cleanup-assets`(보관 파일 0개)로 정리 상태를 남긴다. 기존 실행(옵션 없음)은 그대로 동작한다.
