@@ -354,7 +354,52 @@
       .reader-info h2 { font-size: 27px; }
     }
   </style>
-<style>#newBookButton{display:none!important}</style><link rel="stylesheet" href="/v41/reader-layout.css"><link rel="stylesheet" href="/v41/identity.css"></head>
+<style>#newBookButton{display:none!important}</style><link rel="stylesheet" href="/v41/reader-layout.css"><link rel="stylesheet" href="/v41/identity.css"><style>
+/* 2026-11-09 내 책장 겉모습 정리(#256 후속): 카드 칸을 없애고 책이 배경 위에 떠 있게.
+   identity.css 다음에 오는 블록이라 같은 선택자에서 이 규칙이 이긴다. 글꼴·문구·기능은 그대로. */
+html[data-v41-screen=shelf] .book-card,
+html[data-v41-screen=shelf] .book-card.is-center {
+  border: 0;
+  background: none;
+  box-shadow: none;
+}
+/* 밤 테마는 identity.css가 :not([data-lt-theme=garden]) 가운데 카드에 회색 면·그림자를 준다(2-11-09 CTO 지적).
+   같은 선택자에 같은 무게로 뒤에서 덮어 칸을 없앤다. 가운데 책 아래 은은한 빛 번짐(스포트라이트)은 칸이 아니라 유지. */
+html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .book-card,
+html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .book-card.is-center {
+  border: 0;
+  background: none;
+  box-shadow: none;
+}
+/* 책 자체에만 바닥 그림자를 준다. 정원에서 책 뒤에 흰 기둥 같은 카드 면이 남지 않는다. */
+html[data-v41-screen=shelf] .book-card .book-cover {
+  border-radius: 3px 7px 6px 3px;
+  box-shadow: 9px 14px 20px rgba(62,42,39,.24), inset 8px 0 0 rgba(0,0,0,.13);
+  filter: drop-shadow(0 10px 14px rgba(38,26,34,.26));
+}
+html[data-v41-screen=shelf] .book-card:hover .book-cover,
+html[data-v41-screen=shelf] .book-card.is-center .book-cover {
+  box-shadow: 11px 18px 24px rgba(62,42,39,.28), inset 8px 0 0 rgba(0,0,0,.13);
+  filter: drop-shadow(0 16px 20px rgba(38,26,34,.3));
+}
+/* 표지 정리: 다이아몬드 무늬 아이콘은 없앤다. */
+html[data-v41-screen=shelf] .cover-symbol { display: none; }
+/* 사진이 있으면 표지 전체가 사진. 아래쪽은 표지 색으로 잦아들어 제목이 읽힌다. */
+html[data-v41-screen=shelf] .book-card .book-cover-media {
+  opacity: 1;
+  filter: none;
+  -webkit-mask-image: linear-gradient(to top,transparent 0%,#000 36%);
+  mask-image: linear-gradient(to top,transparent 0%,#000 36%);
+}
+/* 사진이 없으면 테마 표지 색 위에 은은한 종이·천 질감만. */
+html[data-v41-screen=shelf] .book-card .book-cover {
+  background-image:
+    repeating-linear-gradient(113deg,rgba(255,255,255,.055) 0 1px,transparent 1px 4px),
+    repeating-linear-gradient(23deg,rgba(0,0,0,.045) 0 1px,transparent 1px 5px),
+    radial-gradient(circle at 26% 18%,rgba(255,255,255,.16),transparent 52%),
+    radial-gradient(circle at 78% 84%,rgba(0,0,0,.18),transparent 58%);
+}
+</style></head>
 <body>
   <div class="app">
     <header class="topbar">
