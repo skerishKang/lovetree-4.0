@@ -6,6 +6,7 @@ import {appliedTheme} from '../public/v41/header-state.mjs';
 const read = path => readFileSync(new URL('../' + path, import.meta.url), 'utf8');
 const navigation = read('public/v41/shell/navigation.mjs');
 const themeModule = read('public/v41/shell/theme.mjs');
+const screenModule = read('public/v41/shell/screens.mjs');
 const html = read('public/v41/views/first-journey.html');
 const shell = read('public/v41/shell.mjs');
 const css = read('public/v41/identity.css');
@@ -67,7 +68,8 @@ test('셸은 첫 여정 iframe에만 테마 속성을 넘기고 화면마다 다
   assert.match(themeModule, /const applied = applyThemeAttribute\(document\.documentElement, appliedTheme\(theme, themedViewFor\(file\)\)\);/);
   assert.match(themeModule, /const frame = \$\('view'\)\.contentDocument;\n  if \(frame\) applyThemeAttribute\(frame\.documentElement, applied\);/);
   // #211: 화면 두 장이 교대하므로 load 마다 그 화면에 테마를 다시 계산한다.
-  assert.match(shell, /function frameLoaded\(frame\)\{\s*applyTheme\(\);/);
+  // #231 1-B②: 화면 한 장이 준비될 때마다 테마를 다시 계산하는 일은 shell/screens.mjs가 맡는다.
+  assert.match(screenModule, /function frameLoaded\(frame\) \{\s*applyTheme\(\);/);
   assert.match(shell, /for\(const f of frames\(\)\)f\.addEventListener\('load',\(\)=>frameLoaded\(f\)\);/);
   assert.match(shell, /function openFirstJourney/, '첫 여정은 셸이 여는 iframe 하나뿐이다');
 });
