@@ -130,3 +130,59 @@ test('invalid refresh grant is 401 while auth outage remains 503', async () => {
   else assert.equal(result.headers.get('set-cookie'),null);
  }
 });
+
+// #213: 로그인 뒤 사이트 루트(/)로 떨어지던 결함. next=/v41/?intent=new-tree|shelf 를 그대로 살린다.
+test('validNext는 첫 화면 경로와 의도(intent) 하나만 허용하고 나머지는 /v41/로 떨어뜨린다', async () => {
+  const { validNext } = await import('../functions/_lib/shared-auth.mjs');
+  const allowed = new Map([
+    ['/v41/', '/v41/'],
+    ['/v41', '/v41'],
+    ['/v41/?intent=new-tree', '/v41/?intent=new-tree'],
+    ['/v41/?intent=shelf', '/v41/?intent=shelf'],
+    ['/', '/'],
+    ['/workspace', '/workspace'],
+    ['/v41/views/first-journey', '/v41/views/first-journey']
+  ]);
+  for (const [input, expected] of allowed) assert.equal(validNext(input), expected, input);
+
+  const rejected = ['/v41/?intent=evil', '/v41/?x=1', '/v41/?intent=new-tree&intent=shelf', '/v41/?intent=', '/v41/#home',
+    '//evil.com', '/\\evil', 'https://evil.com', 'http://lovetree-4-0.pages.dev/v41/', '/v41/%2f%2fevil.com', '/v41/../etc', '', null, undefined,
+    'v41/', ' /v41/', '/v41/?intent=NEW-TREE', '/v41/?' + 'a'.repeat(200)];
+  for (const input of rejected) assert.equal(validNext(input), '/v41/', String(input));
+});
+
+test('로그인 시작 주소의 next가 /v41/?intent=… 로 봉인되어 콜백이 그 자리로 돌아간다', async () => {
+  const f = await setup();
+  for (const [query, expected] of [
+    ['/auth/login?next=' + encodeURIComponent('/v41/?intent=new-tree'), '/v41/?intent=new-tree'],
+    ['/auth/login?next=' + encodeURIComponent('/v41/?intent=shelf'), '/v41/?intent=shelf'],
+    ['/auth/login?next=' + encodeURIComponent('/v41/?intent=evil'), '/v41/'],
+    ['/auth/login?next=' + encodeURIComponent('/v41/?x=1'), '/v41/'],
+    ['/auth/login?next=' + encodeURIComponent('//evil.com'), '/v41/'],
+    ['/auth/login?next=' + encodeURIComponent('/\\evil'), '/v41/'],
+    ['/auth/login?next=' + encodeURIComponent('https://evil.com'), '/v41/'],
+    ['/auth/login', '/v41/']
+  ]) {
+    const start = await f.auth(new Request('https://lovetree-4-0.pages.dev' + query), f.env);
+    assert.equal(start.status, 302, query);
+    const target = new URL(start.headers.get('location'));
+    const callback = new URL('https://lovetree-4-0.pages.dev/auth/callback');
+    callback.searchParams.set('state', target.searchParams.get('state'));
+    callback.searchParams.set('code', 'fake');
+    const done = await f.auth(new Request(callback, { headers: { cookie: start.headers.get('set-cookie').split(';')[0] } }), f.env);
+    assert.equal(done.status, 302, query);
+    assert.equal(done.headers.get('location'), expected, query);
+  }
+});
+
+test('계정 동그라미 메뉴 맨 아래에 로그아웃이 있고 기존 로그아웃 동작을 부른다', async () => {
+  const { readFileSync } = await import('node:fs');
+  const html = readFileSync(new URL('../public/v41/index.html', import.meta.url), 'utf8');
+  const popover = html.match(/<div id="account-popover"[\s\S]*?<\/div>/)[0];
+  const roles = [...popover.matchAll(/id="([^"]+)"[^>]*>([^<]*)</g)].map(m => m[1]);
+  assert.equal(roles.at(-1), 'account-logout', '로그아웃은 메뉴 마지막 항목');
+  assert.match(popover, /id="account-logout">로그아웃</);
+  assert.match(popover, /role="menu"/);
+  const shell = readFileSync(new URL('../public/v41/shell.mjs', import.meta.url), 'utf8');
+  assert.match(shell, /\$\('account-logout'\)\.onclick=async\(\)=>\{closeAccountMenu\(\);\$\('logout'\)\.click\(\);\}/, '기존 #logout 경로를 부른다');
+});

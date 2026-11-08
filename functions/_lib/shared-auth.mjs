@@ -10,7 +10,29 @@ const j64 = x => b64(enc.encode(JSON.stringify(x)));
 const cookies = request => Object.fromEntries((request.headers.get('cookie') || '').split(';').map(x => x.trim().split(/=(.*)/s).slice(0, 2)).filter(x => x.length === 2));
 const attrs = 'Secure; HttpOnly; SameSite=Lax';
 const json = (status, error) => new Response(JSON.stringify({ error }), { status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' } });
-const validNext = value => typeof value === 'string' && /^\/[A-Za-z0-9_./-]*$/.test(value) && !value.startsWith('//') ? value : '/';
+// 로그인 뒤 돌아갈 자리. 기본값은 사이트 루트가 아니라 4.1 첫 화면이다.
+const NEXT_DEFAULT = '/v41/';
+const NEXT_ORIGIN = 'https://lovetree-4-0.pages.dev';
+// 첫 화면이 되돌려 보내는 의도는 둘뿐이다(#215).
+const NEXT_INTENTS = ['new-tree', 'shelf'];
+// 경로는 영문·숫자·_ . - 로 된 조각만 허용한다('/v41/', '/v41/views/x.html' 등).
+const NEXT_PATH = /^\/(?:[A-Za-z0-9_-]+\/)*[A-Za-z0-9_.-]*$/;
+// 정규식 하나로 통째로 판정하지 않고 URL로 풀어 경로·쿼리 키를 허용 목록과 맞춘다.
+// `//evil.com`·`/\\evil`·`https://evil`·`#해시`·인코딩 우회·모르는 쿼리는 모두 기본값으로 떨어진다.
+export function validNext(value) {
+  if (typeof value !== 'string' || value.length === 0 || value.length > 200) return NEXT_DEFAULT;
+  if (!value.startsWith('/') || value.startsWith('//') || /[\\#]/.test(value) || /(?:^|\/)\.\.?(?:\/|$)/.test(value)) return NEXT_DEFAULT;
+  let target;
+  try { target = new URL(value, NEXT_ORIGIN); } catch { return NEXT_DEFAULT; }
+  if (target.origin !== NEXT_ORIGIN || target.hash || target.username || target.password) return NEXT_DEFAULT;
+  const keys = [...target.searchParams.keys()];
+  if (keys.some(key => key !== 'intent')) return NEXT_DEFAULT;
+  const intents = target.searchParams.getAll('intent');
+  if (intents.length > 1) return NEXT_DEFAULT;
+  if (intents.length === 1 && !NEXT_INTENTS.includes(intents[0])) return NEXT_DEFAULT;
+  if (!NEXT_PATH.test(target.pathname)) return NEXT_DEFAULT;
+  return intents.length === 1 ? `${target.pathname}?intent=${intents[0]}` : target.pathname;
+}
 // 공용 로그인은 night|garden만 받는다. 그 외 값·없음·중복은 붙이지 않고 공용 쪽 기본(night)을 따른다.
 const LOGIN_THEMES = ['night', 'garden'];
 const validTheme = values => values.length === 1 && LOGIN_THEMES.includes(values[0]) ? values[0] : '';
