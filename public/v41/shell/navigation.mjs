@@ -25,9 +25,9 @@ export function themedViewFor(file) {
   return 'inner';
 }
 
-// 안쪽 화면 경로: 예시 감상은 design/views/, 실제 기록은 views/ 판본을 쓴다.
+// 안쪽 화면 경로: 예시 감상도 실제 기록도 같은 한 벌(/v41/views/)을 쓴다(#231 1.5단계 ⑥).
+// 두 벌을 한 벌로 합쳤으므로 source에 따라 경로를 가르지 않는다.
 export function screenUrl(file, source, origin) {
-  const inner = source === 'example' ? 'design/views/' : 'views/';
-  const path = file === 'src064-orbit.html' ? 'home.html' : inner + file;
+  const path = file === 'src064-orbit.html' ? 'home.html' : 'views/' + file;
   return new URL('/v41/' + path, origin).href;
 }

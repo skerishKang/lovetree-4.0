@@ -889,6 +889,20 @@ COM2에는 merge `6900df8aa446dfe0201d01997457fae04c4abe16`의 변경 서버 파
 - 확인(가짜 서버 기록: `url` + `mediaMetadata`가 있는 YouTube 순간): 1440·390, 밤·정원 모두 실제 마우스 클릭으로 `iframe.yt-frame` 1개 생성(임베드 `start=83`), 밤 큰 제목 Pretendard · 정원 큰 제목 MaruBuri, 넘침 0. 셸 경유(`#book`)에서도 iframe 테마가 garden으로 전달된다.
 - 시험: `tests/v41-book-usability.test.mjs` 12·13번, `tests/v41-journey-garden`·`v41-theme-ab`의 기대값 갱신(기억책=정원 허용, 보드·지도=밤 고정). `npm test` 483 pass / 0 fail / 37 skip, build 성공.
 
+## 2026-11-08 안쪽 화면 원본은 `public/v41/views/` 한 벌 (ai/lt-views-single-path-261108, #231 ⑥)
+
+1.5단계(두 벌 → 한 벌)를 마쳤다. **앞으로 안쪽 화면을 고칠 때는 `public/v41/views/`만 고친다.**
+
+| 항목 | 지금 상태 |
+|---|---|
+| 셸 경로 | `public/v41/shell/navigation.mjs` `screenUrl()` — 예시·실제 기록 모두 `/v41/views/`, 첫 화면은 `/v41/home.html` |
+| 화면 사본 | `public/v41/design/views/` **삭제**(orbit·bookshelf·network·pinboard·sketchbook 5개). `public/v41/design/shared.js`만 남음(예시 다리 시험용, 2단계 정리 대상) |
+| 옛 주소 | `public/_redirects`: `/v41/design/views/* /v41/views/:splat 301` — 옛 공유 링크도 같은 화면으로 열린다 |
+| 주입 | `scripts/apply-book-usability.mjs` 대상은 `public/v41/views/track59-sketchbook.html` 한 파일, 모듈 경로는 `/v41/book-usability.mjs`(두 번 돌려도 "변경 없음") |
+| 자원 경로 | 다섯 화면 모두 `/v41/` 절대 경로라 어느 폴더에서 열어도 같은 파일을 쓴다 |
+| 시험 | "두 벌 바이트 동일" → "`design/views/`에 화면 사본이 없음" 으로 교체(`tests/v41-merge-*.test.mjs`), `v41-shell-screens` 기대 경로 `/v41/views/` |
+| 예시 분기 | 화면 코드에 `LTDEMO.example` 분기 없음 — network 1(재생 안내)만 남고 orbit·pinboard는 데이터 상태로 갈린다 |
+
 ## 2026-11-08 안쪽 화면 두 벌(views/ · design/views/) 조사 — 중복 아님 (ai/lt-refactor-views-dedupe-261108)
 **결론: 두 벌은 같은 파일의 복사본이 아니라 서로 다른 변형(예시용·실제 기록용)이라, 한 벌로 합치면 동작·겉모습이 바뀐다. 이번 레인에서는 코드를 지우지 않았다.**
 

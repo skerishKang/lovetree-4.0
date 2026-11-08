@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readFileSync} from 'node:fs';
+import {readFileSync, existsSync as fsExists} from 'node:fs';
 
 // 2026-11-08 대표 피드백: 기억책(트랙59) 사용성 1~9.
-// 규칙은 public/v41/book-usability.mjs 한 곳에 있고, 두 벌의 화면 파일은 같은 어댑터를 받는다.
+// 규칙은 public/v41/book-usability.mjs 한 곳에 있고, 화면은 한 벌(#231 1.5단계 ⑥)이 그 어댑터를 받는다.
 const read = path => readFileSync(new URL('../' + path, import.meta.url), 'utf8');
-const VIEWS = ['public/v41/views/track59-sketchbook.html', 'public/v41/design/views/track59-sketchbook.html'];
+const VIEWS = ['public/v41/views/track59-sketchbook.html'];
 const html = Object.fromEntries(VIEWS.map(path => [path, read(path)]));
 
 const {
@@ -180,14 +180,12 @@ test('9. 아래 연결 안내는 다음 순간이 있을 때만, 시스템 용�
   }
 });
 
-test('두 벌의 화면 파일이 같은 어댑터를 받는다(손으로 고치지 않는다)', () => {
-  const block = path => {
-    const match = html[path].match(/<script type="module">([\s\S]*?)<\/script>\s*<\/body>/);
-    assert.ok(match, path + ': 어댑터 스크립트');
-    return match[1].replace(/'\.\.\/\.\.\//g, "'../").replace(/"\.\.\/\.\.\//g, '"../');
-  };
-  const [a, b] = VIEWS.map(block);
-  assert.equal(a.replace(/'\.\/book-usability/g, 'PATH'), b.replace(/'\.\/book-usability/g, 'PATH'), '두 파일의 어댑터는 같다');
+test('한 벌뿐인 화면 파일이 어댑터를 받는다(손으로 고치지 않는다)', () => {
+  const match = html[VIEWS[0]].match(/<script type="module">([\s\S]*?)<\/script>\s*<\/body>/);
+  assert.ok(match, VIEWS[0] + ': 어댑터 스크립트');
+  // #231 1.5단계 ⑥: 사본이 사라져 두 파일 비교 대신, 사본 부재와 모듈 경로를 함께 본다.
+  assert.equal(fsExists(new URL('../public/v41/design/views/', import.meta.url)), false, 'design/views/ 화면 사본 없음');
+  assert.match(match[1], /from '\/v41\/book-usability\.mjs'/);
   assert.ok(read('scripts/apply-book-usability.mjs').includes('변경 없음'), '적용 스크립트는 두 번 돌려도 같다');
 });
 

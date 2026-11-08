@@ -108,7 +108,8 @@
 | track58-pinboard | **완료(#231, PR #249, `86ade4c`)** | 두 벌 바이트 동일, 연결은 \`LTDEMO.edges\`에서 생성(색은 예시에서만 원래 팔레트 유지). 예시 분기 3곳(연결 지우기·말풍선 버튼·연결 색) |
 | track32-bookshelf | **완료(#231, PR #251, `e7c2da6`)** | 두 벌 바이트 동일, 경로 `/v41/` 절대. **화면 코드에 예시 분기 0곳** — 예시 판본이 갖고 있던 고정 팔레트·`english`·장식 책 4권·표지 번호/부제는 실제 기록 판본 값(테마 표지 색 `--lt-cover-N`, `lastDate`, `LTDEMO.library` 실책, 표지 사진)으로 대체 |
 | track59-sketchbook | **완료(#231, PR #254)** | 두 벌 바이트 동일, 경로 `/v41/` 절대. **예시 분기 0곳** — 제자리 재생(`m.url`+`LTMedia`), 읽기 스크롤, `.lt-media` 돋보기 예외, `LTDEMO.edges` 연결 이유·갈림길, 홀수 개수 `companion` 페이지는 모두 **데이터 상태**로 갈린다. 주입 스크립트(`scripts/apply-book-usability.mjs`)도 한 벌·`/v41/` 기준으로 수정(제거는 2단계) |
-| 안쪽 화면 5개 | **완료** | 남은 일은 ⑥ 셸 `screenUrl()` 한 줄 + `design/views/` 삭제 + 어댑터/시험 정리 |
+| 안쪽 화면 5개 | **완료** | ⑤까지 두 벌을 한 벌로 합쳤다 |
+| ⑥ 셸 경로·사본 삭제 | **완료(#231, PR #260)** | `shell/navigation.mjs` `screenUrl()`이 예시·실제 기록 모두 `/v41/views/`를 연다(함수 하나만 수정). `public/v41/design/views/` 화면 5개 삭제, 옛 주소는 `public/_redirects` 한 줄로 `/v41/views/:splat` **301**. 두 벌 바이트 동일 시험 5개 → "design/views/에 화면 사본이 없음" 시험으로 교체(시험 수 유지 549), `v41-book-usability`의 두 파일 비교 → 사본 부재+모듈 경로 단언, `v41-shell-screens` 기대 경로 `/v41/views/`. `design/shared.js`는 남겨 둔다(예시 다리 시험 `v41-example`이 참조, 2단계 정리 대상) |
 
 ### track32-bookshelf 예시 겉모습 변화(의도된 (d) 항목, #231 ④)
 | # | 바뀐 것 | 이전(예시 판본) | 지금(실제 기록 판본 기준) |

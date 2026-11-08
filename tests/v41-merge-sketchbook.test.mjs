@@ -5,11 +5,10 @@ import fs from 'node:fs';
 
 const read = (file) => fs.readFileSync(new URL(`../public/v41/${file}`, import.meta.url), 'utf8');
 const SERVER = read('views/track59-sketchbook.html');
-const EXAMPLE = read('design/views/track59-sketchbook.html');
 const INJECT = fs.readFileSync(new URL('../scripts/apply-book-usability.mjs', import.meta.url), 'utf8');
 
-test('기억책 두 벌은 바이트 단위로 같다', () => {
-  assert.equal(SERVER, EXAMPLE);
+test('design/views/에 화면 사본이 없다(한 벌만 남았다)', () => {
+  assert.equal(fs.existsSync(new URL(`../public/v41/design/views/track59-sketchbook.html`, import.meta.url)), false);
 });
 
 test('런타임 한 벌만 부르고 자원 경로는 /v41/ 절대 경로', () => {
