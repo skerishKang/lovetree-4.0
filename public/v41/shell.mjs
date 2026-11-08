@@ -54,7 +54,9 @@ async function loadAccountEmail(){const answer=await accountApi.account().catch(
 function updateAccountControls(){const owned=!!member?.snapshot().owned;document.querySelectorAll('[data-guest-login]').forEach(x=>x.hidden=owned);$('server').hidden=!owned;$('logout').hidden=!owned;$('account-settings-open').hidden=!owned;renderAccount();}
 function panel(id){if(id==='records')updateAccountControls();const target=$(id);if(!target.open)target.showModal();}
 function openLoginStart(intent='first'){const copy=LOGIN_START_COPY[intent]||LOGIN_START_COPY.first;loginStartIntent=LOGIN_START_COPY[intent]?intent:'first';$('login-start-title').textContent=copy.title;$('login-start-copy').textContent=copy.lead;$('login-start-action').textContent=copy.action;$('login-start-signup').href=memberLoginUrl(readTheme(localStorage),loginStartIntent==='first'?'':loginStartIntent);loginStartFocus=document.activeElement;panel('login-start');}
-$('login-start').addEventListener('close',()=>{const target=loginStartFocus;loginStartFocus=null;if(target&&target!==document.body&&target!==$('view')&&document.contains(target)){target.focus();return;}try{$('view').contentWindow?.postMessage({type:'lt41-login-focus'},location.origin);}catch{}});
+function restoreLoginFocus(){const target=loginStartFocus;loginStartFocus=null;if(target&&target!==document.body&&target!==$('view')&&document.contains(target)){target.focus();return;}const view=$('view');try{view?.focus?.();view?.contentWindow?.postMessage({type:'lt41-login-focus'},location.origin);}catch{}}
+$('login-start').addEventListener('close',restoreLoginFocus);
+$('login-start').addEventListener('cancel',()=>{setTimeout(restoreLoginFocus,0);});
 // 2026-11-08 #202 후속: 셸 대화상자(순간 편집기·보관 파일) Tab을 내부에서 순환시킨다.
 // 보관 파일이 편집기 위에 열려 있으면 보관 파일 안에서만 순환한다.
 const SHELL_FOCUSABLE='a[href],button:not([disabled]),input:not([disabled]):not([type=hidden]),select:not([disabled]),textarea:not([disabled]),summary,[tabindex]:not([tabindex="-1"])';
