@@ -4,7 +4,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 const read = (file) => fs.readFileSync(new URL(`../public/v41/${file}`, import.meta.url), 'utf8');
-const SERVER = read('views/track59-sketchbook.html');
+// #231 2단계: 스타일·본문 스크립트는 views/book/ 아래 파일이다. 화면+파일을 한 소스로 본다.
+const SERVER = read('views/track59-sketchbook.html') + read('views/book/book.css') + read('views/book/book.js');
 const INJECT = fs.readFileSync(new URL('../scripts/apply-book-usability.mjs', import.meta.url), 'utf8');
 
 test('design/views/에 화면 사본이 없다(한 벌만 남았다)', () => {
@@ -27,7 +28,7 @@ test('주입 스크립트도 한 벌·절대 경로 기준으로 동작한다', 
 });
 
 test('실제 기록 동작은 그대로 남는다(제자리 재생·읽기 스크롤·돋보기 예외·연결 이유·정원 제목)', () => {
-  assert.match(SERVER, /<style id="member-reading-scroll">/);
+  assert.match(SERVER, /member-reading-scroll/);
   assert.match(SERVER, /\.lt-media/, '미디어 위 돋보기 예외');
   assert.match(SERVER, /LTDEMO\.edges\.filter\(e=>e\.kind==='parent'/);
   assert.match(SERVER, /synthetic:true/);
