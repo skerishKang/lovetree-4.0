@@ -1022,3 +1022,4 @@ COM2에는 merge `6900df8aa446dfe0201d01997457fae04c4abe16`의 변경 서버 파
 
 - `shell.mjs`는 진입점으로 남기고, 옮긴 이름(`themedView`·`applyTheme`·`toggleTheme`·`screens` 등)은 얇은 래퍼·재수출로 유지한다.
 - 기준 스크린샷(`/mnt/e/lt-refactor-shots/before-*.png` 24장) 대비: 헤더 상단 80px 차이 0(18장), 완전 동일 6장. 나머지 차이는 iframe 안쪽 카드 회전·관계 지도 배치의 촬영 시점 차이.
+- **겉모습 비교(2026-11-08)**: `미리보기 검사`가 `tools/visual-baseline`로 **운영(before) vs PR 미리보기(after)** 24장을 비교해 PR 체크 요약에 장별 차이 %를 표로 남긴다. **알림만** 하고 실패로 만들지 않는다(기준 초과는 "확인 필요"). diff 이미지는 artifact.
