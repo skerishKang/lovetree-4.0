@@ -138,3 +138,5 @@
 |---|---|---|
 | ① 파일 분리 | **완료(#231, PR #262)** | `views/book/book.css`(325줄)·`book.js`(79줄), 화면 483→210줄. 조건·문구·id 변경 0 |
 | ② 주입 합치기 | **완료(#231, PR #264)** | `book-usability.css`(112줄)·`book-extra.js`(202줄)로 정식 포함, 주입 스크립트·`design/shared.js` 삭제, `v41-example` 시험을 runtime 기준으로 재작성, 재생 단추 주 버튼 한정(`isPrimaryButton`) |
+| ③ 관계 지도 분리 | **완료(#231, PR #266)** | `views/network/network.css`(46)·`network.js`(119), 화면 195→28줄 |
+| ④ 기억 보드 분리 | **완료(#231, PR #267)** | `views/board/` 5파일(css 54·30, js 338·107·145), 화면 410→51줄. 예시 분기 3곳 위치만 이동 |

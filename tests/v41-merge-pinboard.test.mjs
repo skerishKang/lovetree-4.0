@@ -4,7 +4,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 const read = (file) => fs.readFileSync(new URL(`../public/v41/${file}`, import.meta.url), 'utf8');
-const SERVER = read('views/track58-pinboard.html');
+// #231 3단계: 화면 고유 스타일·스크립트는 views/board/ 아래 파일이다. 화면+파일을 한 소스로 본다.
+const SERVER = ['views/track58-pinboard.html','views/board/board.css','views/board/board-extra.css',
+  'views/board/board.js','views/board/board-extras.js','views/board/board-detail.js'].map(read).join('');
 
 test('design/views/에 화면 사본이 없다(한 벌만 남았다)', () => {
   assert.equal(fs.existsSync(new URL(`../public/v41/design/views/track58-pinboard.html`, import.meta.url)), false);
