@@ -175,3 +175,16 @@ test('밤 시안은 장미색을 쓰지 않고, Google 버튼은 공식 로고�
     assert.equal(/<span class="g">G<\/span>/.test(page), false, `${name} 동그라미 글자 G 금지`);
   }
 });
+
+test('시안 네 화면은 제목 아래 설명 없이 같은 하단 한 줄을 쓴다', () => {
+  const root = 'docs/design/auth-skin';
+  const footer = 'PADIEM 계정으로 로그인합니다 · 하나의 계정으로 PADIEM 서비스를 이용할 수 있어요';
+  for (const name of ['login-night', 'login-garden', 'signup-night', 'signup-garden']) {
+    const page = read(`${root}/${name}.html`);
+    assert.match(page, new RegExp(`<p class="foot">${footer}</p>`), `${name} 하단 한 줄`);
+    // 제목 아래 설명 줄과 옛 하단 문구는 없어졌다.
+    assert.equal(/class="lead"/.test(page), false, `${name} 설명 줄 금지`);
+    assert.equal(page.includes('Chat 등 다른 서비스도'), false, `${name} 옛 설명 문구 금지`);
+    assert.equal(page.includes('LoveTree 4.1 · PADIEM'), false, `${name} 옛 하단 문구 금지`);
+  }
+});

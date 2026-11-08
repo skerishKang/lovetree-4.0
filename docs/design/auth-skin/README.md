@@ -99,15 +99,23 @@
 | 입력 높이 | `48px`, `border-radius: 12px` |
 | 포커스 | `outline: 2px solid var(--lt-gold); outline-offset: 3px` (입력은 금색 테두리 + `0 0 0 3px var(--lt-gold-line)`) |
 | 제목 | 밤 `clamp(28px,4vw,34px)`, 정원 `clamp(30px,4.2vw,36px)` Gowun Batang |
+| 하단 한 줄 | `.foot` 11px, `--lt-muted`, 1440은 아래 18px 고정·390은 카드 아래 흐름 |
 | 궤도 카드 | 3장, `opacity: .58`(밤) / `.48`(정원), blur 없음 |
 | 390 | 카드 `100%`, 바깥 여백 `16px`, 궤도 카드 가장자리 배치 |
 
 ## 공용 로그인 팀 연결
 
 - `html[data-lt-theme="garden"]`(또는 동등한 `body.garden`)에서 정원 토큰으로 바꾸고, 밤은 기본 토큰을 씁니다.
-- 제목은 "LoveTree에 로그인", 그 아래 "PADIEM 계정으로 Chat 등 다른 서비스도 함께 쓸 수 있어요"를 유지합니다.
+- 제목은 "LoveTree에 로그인", 그 아래 설명 줄 없이 바로 로그인 버튼이 옵니다.
+- 하단 한 줄은 네 화면(로그인·가입 × 밤·정원) 모두 같습니다:
+  "PADIEM 계정으로 로그인합니다 · 하나의 계정으로 PADIEM 서비스를 이용할 수 있어요".
+  이전의 제목 아래 설명 줄("PADIEM 계정으로 Chat 등 다른 서비스도 함께 쓸 수 있어요" /
+  "PADIEM 계정 하나로 LoveTree와 Chat을 함께 써요")과 하단 "LoveTree 4.1 · PADIEM"은 없어졌습니다.
 - 요소는 현재 auth 화면과 같습니다: Google 계정으로 계속, 이메일·비밀번호, 이메일로 로그인, 이메일로 회원가입, 오류 문구 자리. 회원가입은 이름(선택)·이메일·비밀번호·회원가입입니다.
 - 러브트리 쪽은 `/auth/login`으로 보낼 때 `lt_theme=night|garden`만 붙입니다. 인증 쪽이 아직 무시해도 동작에 영향이 없습니다.
+  `functions/_lib/shared-auth.mjs`의 `/auth/login` 처리에서 들어온 `lt_theme`가 `night`·`garden`일 때만
+  `auth.padiem.net/login` 주소에 그대로 붙입니다. 그 외 값·없음·중복이면 붙이지 않아 공용 쪽 기본(night)을 따릅니다.
+  `client_id`·`redirect_uri`·`state`·`code_challenge`와 state 봉인·`next` 검사는 그대로입니다.
 - 로그인 직전 안내 창의 `next`에는 `intent=new-tree|shelf`만 붙습니다. 로그인·가입 뒤 `next`를 보존하면 첫 여정/내 책장으로 바로 이어집니다.
 - `next`는 로컬 경로만 허용하고, `intent`는 `new-tree`·`shelf` 외 값을 무시합니다.
 

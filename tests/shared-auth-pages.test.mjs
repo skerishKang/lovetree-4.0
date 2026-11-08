@@ -85,6 +85,41 @@ test('official aliases get their own callback and sealed state cannot cross host
 });
 
 
+// 공용 로그인으로 테마를 넘긴다. night|garden만 붙고, 그 외 값·없음은 붙이지 않는다(공용 기본 night).
+test('/auth/login은 lt_theme night|garden만 공용 로그인으로 넘긴다', async () => {
+  const f = await setup();
+  const begin = async query => new URL((await f.auth(new Request(`https://lovetree-4-0.pages.dev/auth/login${query}`), f.env)).headers.get('location'));
+
+  assert.equal((await begin('?lt_theme=garden')).searchParams.get('lt_theme'), 'garden');
+  assert.equal((await begin('?lt_theme=night')).searchParams.get('lt_theme'), 'night');
+
+  // 그 외 값과 없음은 붙이지 않는다.
+  for (const query of ['?lt_theme=evil', '?lt_theme=GARDEN', '?lt_theme=', '?lt_theme=night%20', '?lt_theme=night&lt_theme=garden', '']) {
+    const target = await begin(query);
+    assert.equal(target.searchParams.has('lt_theme'), false, query || '(없음)');
+  }
+
+  // 테마를 넘겨도 나머지 파라미터와 state 봉인·next 검사는 그대로다.
+  const start = await f.auth(new Request('https://lovetree-4-0.pages.dev/auth/login?lt_theme=garden&next=/v41/'), f.env);
+  const target = new URL(start.headers.get('location'));
+  assert.equal(target.origin, 'https://auth.padiem.net');
+  assert.equal(target.pathname, '/login');
+  assert.equal(target.searchParams.get('client_id'), 'lovetree-4-0');
+  assert.equal(target.searchParams.get('redirect_uri'), 'https://lovetree-4-0.pages.dev/auth/callback');
+  assert.equal(target.searchParams.get('code_challenge_method'), 'S256');
+  assert.ok(target.searchParams.get('code_challenge'));
+  assert.ok(target.searchParams.get('state'));
+  assert.equal(target.searchParams.get('lt_theme'), 'garden');
+  assert.equal(target.searchParams.getAll('lt_theme').length, 1);
+
+  const callback = new URL('https://lovetree-4-0.pages.dev/auth/callback');
+  callback.searchParams.set('state', target.searchParams.get('state'));
+  callback.searchParams.set('code', 'fake');
+  const done = await f.auth(new Request(callback, { headers: { cookie: start.headers.get('set-cookie').split(';')[0] } }), f.env);
+  assert.equal(done.status, 302);
+  assert.equal(done.headers.get('location'), '/v41/');
+});
+
 test('invalid refresh grant is 401 while auth outage remains 503', async () => {
  const keys=await crypto.subtle.generateKey({name:'ECDSA',namedCurve:'P-256'},true,['sign','verify']);
  const env={LOVETREE_AUTH_CLIENT_PRIVATE_JWK:JSON.stringify(await crypto.subtle.exportKey('jwk',keys.privateKey)),LOVETREE_AUTH_CLIENT_KID:'test'};
