@@ -9,21 +9,20 @@ import {createMemberSession} from './member-session.mjs';
 import {exampleTree} from './example.mjs';
 import {parseSelectionRoute,memberStartupView,ownerSelectionRoute,accountPosition,rememberAccountPosition,resolveAccountPosition,stashPendingOwnerRoute,pendingOwnerRoute,takePendingOwnerRoute} from './selection-location.mjs';
 import {applyViewAccessibility,connectionLabel,focusReturnTarget} from './view-a11y.mjs';
-import {accountPresentation,treePickerLabel,writeMenuLabel,homeCenterState,homeStartLoginUrl,readTheme,readLoginIntent,writeTheme,nextTheme,themeButtonLabel,themeButtonAriaLabel,themePressed,appliedTheme,applyThemeAttribute} from './header-state.mjs';
+import {accountPresentation,treePickerLabel,writeMenuLabel,homeCenterState,homeStartLoginUrl,readTheme,readLoginIntent,writeTheme,nextTheme,themeButtonLabel,themeButtonAriaLabel,themePressed,appliedTheme,applyThemeAttribute,LOGIN_INTENTS} from './header-state.mjs';
 import {journeyEntry,journeySavePlan,journeyRouteHash,parseJourneyRoute,journeyRouteDecision} from './first-journey.mjs';
 const $=id=>document.getElementById(id);
 let pendingLoginIntent=readLoginIntent(location.search);
 {const params=new URLSearchParams(location.search);if(params.has('intent')){params.delete('intent');const query=params.toString();history.replaceState(null,'',location.pathname+(query?'?'+query:'')+location.hash);}}
-const LOGIN_START_COPY={
- first:{title:'첫 순간을 남겨 볼까요?',lead:'로그인하고 첫 순간을 남겨 보세요. PADIEM 계정으로 다른 서비스도 이어 쓸 수 있어요.',action:'로그인하고 시작하기'},
- 'new-tree':{title:'새 트리는 로그인하면 만들 수 있어요',lead:'로그인하고 첫 순간을 남겨 보세요. PADIEM 계정으로 이어서 쓸 수 있어요.',action:'로그인'},
- shelf:{title:'내 책장은 로그인하면 볼 수 있어요',lead:'로그인하면 내 책장과 순간을 이어서 볼 수 있어요.',action:'로그인'}
-};
-let loginStartIntent='first',loginStartFocus=null;
+// 2026-11-08 #261108: 로그인 직전 안내 창을 없앴다. 로그아웃 상태에서 로그인이 필요한 진입점은
+// 안내 창을 거치지 않고 바로 /auth/login으로 간다. 테마(lt_theme)와 의도(intent)는 주소에 유지한다.
+// 의도는 next 안에 남기므로 로그인·가입 뒤 첫 여정/내 책장으로 바로 이어진다.
+let pendingLoginIntentShown=pendingLoginIntent;
+function startLogin(intent=''){const target=LOGIN_INTENTS.includes(intent)?intent:'';location.assign(memberLoginUrl(readTheme(localStorage),target));}
 // 2026-11-07 테마 A/B(밤/정원): 공통 헤더와 첫 화면만 바꾼다. 안쪽 네 화면은 속성을 받지 않아 A로 고정된다.
 // 2026-11-08 정원 2단계: 첫 화면과 첫 여정만 B를 받는다. 안쪽 네 화면은 계속 A다.
 function themedView(){return current==='src064-orbit.html'?'home':current==='first-journey.html'?'journey':'inner';}
-function paintLoginLinks(theme=readTheme(localStorage)){const href=memberLoginUrl(theme);const entry=$('account-entry');if(entry)entry.href=href;for(const a of document.querySelectorAll('[data-guest-login]'))a.href=href;const signup=$('login-start-signup');if(signup)signup.href=href;}
+function paintLoginLinks(theme=readTheme(localStorage)){const href=memberLoginUrl(theme);const entry=$('account-entry');if(entry)entry.href=href;for(const a of document.querySelectorAll('[data-guest-login]'))a.href=href;}
 function paintThemeControls(theme=readTheme(localStorage)){for(const button of document.querySelectorAll('[data-lt-theme-toggle]')){button.textContent=themeButtonLabel(theme);button.setAttribute('aria-pressed',String(themePressed(theme)));button.setAttribute('aria-label',themeButtonAriaLabel(theme));button.title=themeButtonAriaLabel(theme);}paintLoginLinks(theme);}
 function applyTheme(theme=readTheme(localStorage)){const applied=applyThemeAttribute(document.documentElement,appliedTheme(theme,themedView()));const frame=$('view').contentDocument;if(frame)applyThemeAttribute(frame.documentElement,applied);return applied;}
 function toggleTheme(){const theme=writeTheme(localStorage,nextTheme(readTheme(localStorage)));applyTheme(theme);paintThemeControls(theme);}
@@ -53,10 +52,8 @@ function openAccountMenu(){const owned=!!member?.snapshot().owned;if(!owned){ret
 async function loadAccountEmail(){const answer=await accountApi.account().catch(()=>null);if(answer?.ok&&answer.email){accountEmail=answer.email;renderAccount();}}
 function updateAccountControls(){const owned=!!member?.snapshot().owned;document.querySelectorAll('[data-guest-login]').forEach(x=>x.hidden=owned);$('server').hidden=!owned;$('logout').hidden=!owned;$('account-settings-open').hidden=!owned;renderAccount();}
 function panel(id){if(id==='records')updateAccountControls();const target=$(id);if(!target.open)target.showModal();}
-function openLoginStart(intent='first'){const copy=LOGIN_START_COPY[intent]||LOGIN_START_COPY.first;loginStartIntent=LOGIN_START_COPY[intent]?intent:'first';$('login-start-title').textContent=copy.title;$('login-start-copy').textContent=copy.lead;$('login-start-action').textContent=copy.action;$('login-start-signup').href=memberLoginUrl(readTheme(localStorage),loginStartIntent==='first'?'':loginStartIntent);loginStartFocus=document.activeElement;panel('login-start');}
-function restoreLoginFocus(){const target=loginStartFocus;loginStartFocus=null;if(target&&target!==document.body&&target!==$('view')&&document.contains(target)){target.focus();return;}const view=$('view');try{view?.focus?.();view?.contentWindow?.postMessage({type:'lt41-login-focus'},location.origin);}catch{}}
-$('login-start').addEventListener('close',restoreLoginFocus);
-$('login-start').addEventListener('cancel',()=>{setTimeout(restoreLoginFocus,0);});
+function openLoginStart(intent='first'){startLogin(intent==='first'?'':intent);}
+// 안내 창이 없어졌으니 close/cancel 복귀 연결도 필요 없다.
 // 2026-11-08 #202 후속: 셸 대화상자(순간 편집기·보관 파일) Tab을 내부에서 순환시킨다.
 // 보관 파일이 편집기 위에 열려 있으면 보관 파일 안에서만 순환한다.
 const SHELL_FOCUSABLE='a[href],button:not([disabled]),input:not([disabled]):not([type=hidden]),select:not([disabled]),textarea:not([disabled]),summary,[tabindex]:not([tabindex="-1"])';
@@ -162,7 +159,7 @@ $('account-entry').onclick=e=>{if(member?.snapshot().owned){e.preventDefault();o
  if(pop&&!pop.hidden){closeAccountMenu();$('account-avatar').focus();}
 });$('record-menu').onclick=()=>{$('record-feedback').textContent='';panel('records');};$('empty-records').onclick=()=>member?.snapshot().writable?openEditor():panel('records');$('empty-sample').onclick=sample;
 $('sample').onclick=sample;$('clear').onclick=()=>{if(!leaveMember())return;++loadGeneration;clear();$('save-feedback').hidden=true;$('file').value='';$('records').close();};
-$('login-start-action').onclick=()=>{const intent=loginStartIntent;sessionStorage.removeItem(PENDING_NEW);if(intent==='first')sessionStorage.setItem(PENDING_NEW,'1');location.assign(memberLoginUrl(readTheme(localStorage),intent==='first'?'':intent));};$('login-start-signup').addEventListener('click',()=>{if(loginStartIntent==='first')sessionStorage.setItem(PENDING_NEW,'1');});$('server').onclick=startMember;
+$('server').onclick=startMember;
 const ACCOUNT_DELETE_PHRASE='탈퇴합니다';
 let accountExpected=null;
 function accountConfirmMatches(){

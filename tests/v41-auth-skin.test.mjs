@@ -82,25 +82,28 @@ test('로그인 intent는 new-tree|shelf만 next에 실리고 모르는 값은 �
   assert.equal(homeStartLoginUrl(), '/auth/login?next=%2Fv41%2F');
 });
 
-test('안내 창은 의도별 문구와 로그인/회원가입/닫기 포커스 복귀를 가진다', () => {
-  for (const text of ['새 트리는 로그인하면 만들 수 있어요', '내 책장은 로그인하면 볼 수 있어요', '로그인하고 시작하기']) {
-    assert.ok(shell.includes(text), text);
+test('로그인이 필요한 진입점은 안내 창 없이 바로 /auth/login으로 간다', () => {
+  // 안내 창은 없어졌다(#261108). 문구·포커스 복귀·회원가입 링크도 함께 사라졌다.
+  for (const gone of ['login-start', 'login-start-copy', 'login-start-signup', 'login-start-action', 'LOGIN_START_COPY', 'restoreLoginFocus', 'loginStartIntent']) {
+    assert.equal(shell.includes(gone), false, `shell.mjs에 ${gone} 남음`);
+    assert.equal(index.includes(gone), false, `index.html에 ${gone} 남음`);
   }
-  assert.match(shell, /function openLoginStart\(intent='first'\)/);
-  assert.match(shell, /login-start-copy/);
-  assert.match(shell, /login-start-signup/);
-  assert.match(shell, /function restoreLoginFocus\(\)/);
-  assert.match(shell, /addEventListener\('close',restoreLoginFocus\)/);
-  assert.match(shell, /addEventListener\('cancel'/);
-  assert.match(shell, /lt41-login-focus/);
-  assert.match(home, /loginFocusButton/);
-  assert.match(home, /lt41-login-focus/);
-  assert.match(shell, /openLoginStart\('shelf'\)/);
-  assert.match(shell, /show\('track32-bookshelf\.html'\)/);
+  assert.equal(shellCss.includes('#login-start'), false, 'shell.css에 #login-start 남음');
+
+  // 바로 로그인으로 보내는 단일 경로가 있고, 테마와 의도를 주소에 유지한다.
+  assert.match(shell, /function startLogin\(intent=''\)/);
+  assert.match(shell, /location\.assign\(memberLoginUrl\(readTheme\(localStorage\),target\)\)/);
+  assert.match(shell, /LOGIN_INTENTS\.includes\(intent\)\?intent:''/);
+
+  // 네 진입점이 모두 그 경로를 쓴다.
+  assert.match(shell, /b\.dataset\.view==='track32-bookshelf\.html'&&!member\?\.snapshot\(\)\.owned\)\{openLoginStart\('shelf'\)/, '헤더 내 책장 탭');
+  assert.match(shell, /e\.data\?\.type==='lt41-start'\)\{openLoginStart\('first'\)/, '가운데 처음 시작하기');
+  assert.match(shell, /openLoginStart\('new-tree'\)/, '새 트리 만들기');
+  assert.match(shell, /function openLoginStart\(intent='first'\)\{startLogin\(intent==='first'\?'':intent\);\}/);
+
+  // 로그인 뒤 의도대로 이어진다.
   assert.match(shell, /pendingLoginIntent/);
-  assert.match(index, /id="login-start-signup"/);
-  assert.match(index, /id="login-start-copy"/);
-  assert.match(index, /이메일로 회원가입/);
+  assert.match(shell, /show\('track32-bookshelf\.html'\)/);
   assert.match(home, /newButton\.onclick=\(\)=>bridge\.actions\.requestMoment\('new'\)/);
   assert.match(home, /treesButton\.onclick=\(\)=>bridge\.actions\.navigate\('trees'\)/);
 });
@@ -120,9 +123,10 @@ test('밤·정원 안내 창 글자 대비는 4.5:1 이상이다', () => {
     const ratio = contrast(token(source, fg.slice(2)), token(source, bg.slice(2)));
     assert.ok(ratio >= 4.5, `${theme} ${fg} on ${bg} = ${ratio.toFixed(2)}:1`);
   }
-  assert.match(shellCss, /#login-start\{[^}]*border:1px solid var\(--lt-gold-line\)/);
-  assert.match(shellCss, /html\[data-lt-theme=garden\] #login-start\{[^}]*background:var\(--lt-paper\)/);
-  assert.match(shellCss, /#login-start-signup\{[^}]*color:var\(--lt-pearl\)/);
+  // 안내 창이 없어졌으니 #login-start 대신 남은 셸 대화상자의 토큰 대비를 확인한다.
+  assert.match(shellCss, /dialog\{[^}]*background:var\(--lt-glass-strong\)/);
+  assert.match(shellCss, /dialog\{[^}]*color:var\(--lt-pearl\)/);
+  assert.equal(shellCss.includes('#login-start'), false, '안내 창 규칙이 남아 있다');
 });
 
 test('auth-skin 시안은 로컬 자산만 쓰고 1440·390 스크린샷이 있다', () => {
