@@ -927,7 +927,7 @@ COM2에는 merge `6900df8aa446dfe0201d01997457fae04c4abe16`의 변경 서버 파
 - 이유·원칙·단계별 계획: [REFACTOR_PLAN_20261108.md](REFACTOR_PLAN_20261108.md) · 추적 이슈 https://github.com/skerishKang/lovetree-4.0/issues/231
 - 1-A(두 벌 조사, #230) 결과 위에 1-B(셸 모듈 분리)·1.5단계(두 변형 한 벌)·2단계(기억책)3단계(보드·지도) 순서를 적었다. 기능·문구·디자인 변경 0.
 
-## 2026-11-08 셸 메시지·여정 분리 (#231 1-B③-3, ai/lt-refactor-shell-messages-261108, PR #246)
+## 2026-11-08 셸 메시지·여정 분리 (#231 1-B③-3, ai/lt-refactor-shell-messages-261108, PR #247)
 `shell.mjs` 384 → 330줄(35,443B, 500자 넘는 줄 9개). 공유·둘러보기·메시지 수신과 첫 여정 연결을 두 모듈로 나눴다.
 
 - `public/v41/shell/messages.mjs`(234줄): `addEventListener('message', …)`의 `lt41-*` 분기 전부, 공유 패널(`sharePayload`·`shareFailure`·`renderShareList`·`loadShareList`·`invalidateSharePreview`·`openSharePanel`과 미리보기/만들기/복사 연결), 둘러보기(`mountCommunity` 연결·`onOpenShare`·`onShareOwn`·`onStartRecord`).
