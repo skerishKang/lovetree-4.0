@@ -60,7 +60,7 @@ const byDo=name=>centerButtons.find(b=>b.dataset.do===name);
 const newButton=byDo('new');if(newButton)newButton.onclick=()=>bridge.actions.requestMoment('new');
 const treesButton=byDo('trees');if(treesButton)treesButton.onclick=()=>bridge.actions.navigate('trees');
 let loginFocusButton=null;
-centerButtons.forEach(b=>{b.addEventListener('pointerdown',()=>{loginFocusButton=b;});b.addEventListener('focus',()=>{loginFocusButton=b;});});
+centerButtons.forEach(b=>{b.addEventListener('pointerdown',()=>{loginFocusButton=b;});b.addEventListener('click',()=>{loginFocusButton=b;},true);b.addEventListener('focus',()=>{loginFocusButton=b;});});
 addEventListener('message',e=>{if(e.origin!==location.origin)return;if(e.data?.type==='lt41-login-focus'){const active=shadow.activeElement;if(active?.matches?.('button'))active.focus();else loginFocusButton?.focus();}});
 // 첫 버튼 동작: 로그아웃=로그인/가입으로, 로그인·트리 있음=이어 보던 순간, 로그인·트리 0=비활성.
 {
