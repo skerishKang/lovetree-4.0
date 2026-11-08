@@ -71,3 +71,19 @@ html[data-lt-theme=garden][data-v41-screen=network] .mini{background:var(--lt-pa
 html[data-lt-theme=garden][data-v41-screen=network] .pill:hover,html[data-lt-theme=garden][data-v41-screen=network] .pill:focus-visible{background:#fff;color:var(--lt-ink);border-color:var(--lt-line-paper)}
 html[data-lt-theme=garden][data-v41-screen=network] .top-actions .pill{background:var(--lt-paper);border-color:var(--lt-line);color:var(--lt-ink);box-shadow:none}
 html[data-lt-theme=garden][data-v41-screen=network] .top-actions .pill:hover{background:#fff;border-color:var(--lt-line-paper);color:var(--lt-ink)}
+html[data-lt-theme=garden][data-v41-screen=network] .action.primary,html[data-lt-theme=garden][data-v41-screen=network] .action.primary:hover{
+ background:var(--lt-primary);border-color:var(--lt-primary);color:var(--lt-primary-ink);box-shadow:none}
+/* 정원: 아래 순간 선택 줄(모바일)과 진행 슬라이더·토스트도 종이/강조 토큰으로. */
+html[data-lt-theme=garden][data-v41-screen=network] .lt-moment-picker{background:var(--lt-glass-strong);border-color:var(--lt-line);color:var(--lt-ink)}
+html[data-lt-theme=garden][data-v41-screen=network] .lt-moment-picker button{background:var(--lt-paper);border-color:var(--lt-line);color:var(--lt-ink)}
+html[data-lt-theme=garden][data-v41-screen=network] .lt-moment-picker button[aria-pressed=true],
+html[data-lt-theme=garden][data-v41-screen=network] .lt-moment-picker .primary{background:var(--lt-primary);border-color:var(--lt-primary);color:var(--lt-primary-ink)}
+html[data-lt-theme=garden][data-v41-screen=network] .progress-thumb{background:var(--lt-gold);border-color:var(--lt-paper)}
+html[data-lt-theme=garden][data-v41-screen=network] .toast{background:var(--lt-glass-strong);border-color:var(--lt-line);color:var(--lt-ink);box-shadow:var(--lt-garden-shadow)}
+/* 정원: 앱 상태로 흐려지는 안내문(.hero.dim)과 세로 레일 글자는 종이 바탕에서 읽히도록 최소 대비를 준다.
+   밤 규칙은 그대로 두고 정원에서만 바닥값을 올린다. */
+html[data-lt-theme=garden][data-v41-screen=network] .hero.dim{opacity:.9}
+html[data-lt-theme=garden][data-v41-screen=network] .hero .eyebrow,
+html[data-lt-theme=garden][data-v41-screen=network] .hero p{color:var(--lt-ink)}
+html[data-lt-theme=garden][data-v41-screen=network] .progress-label,
+html[data-lt-theme=garden][data-v41-screen=network] .progress-rail .label{color:var(--lt-muted)}

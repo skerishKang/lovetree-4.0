@@ -71,3 +71,28 @@ html[data-lt-theme=garden] .modal .hint,html[data-lt-theme=garden] .minihint{col
 html[data-lt-theme=garden] .detail h3,html[data-lt-theme=garden] .detail b,html[data-lt-theme=garden] .leftPanel b{color:var(--lt-ink)}
 html[data-lt-theme=garden][data-v41-screen=board] header .headbtn{background:var(--lt-paper);border-color:var(--lt-line);color:var(--lt-ink);box-shadow:none}
 html[data-lt-theme=garden][data-v41-screen=board] header .headbtn.primary{background:var(--lt-primary);border-color:var(--lt-primary);color:var(--lt-primary-ink)}
+/* 정원 대비 보정 2 (2026-11-08 CTO 지적): 패널 버튼·보조 글자·비율 표시를 정원 토큰으로. */
+html[data-lt-theme=garden][data-v41-screen=board] .wideTool{background:var(--lt-paper);border-color:var(--lt-line);color:var(--lt-ink)}
+html[data-lt-theme=garden][data-v41-screen=board] .wideTool:hover{background:#fff;border-color:var(--lt-line-paper)}
+html[data-lt-theme=garden][data-v41-screen=board] .detail .value,html[data-lt-theme=garden][data-v41-screen=board] .detail .kv,
+html[data-lt-theme=garden][data-v41-screen=board] .detail small,html[data-lt-theme=garden][data-v41-screen=board] .detail em{color:var(--lt-muted)}
+html[data-lt-theme=garden][data-v41-screen=board] .detail b,html[data-lt-theme=garden][data-v41-screen=board] .detail strong{color:var(--lt-ink)}
+html[data-lt-theme=garden][data-v41-screen=board] .close,html[data-lt-theme=garden][data-v41-screen=board] .collapseBtn,
+html[data-lt-theme=garden][data-v41-screen=board] .zoomLabel,html[data-lt-theme=garden][data-v41-screen=board] .zoomHit{color:var(--lt-muted)}
+html[data-lt-theme=garden][data-v41-screen=board] .hint,html[data-lt-theme=garden][data-v41-screen=board] .formHint,
+html[data-lt-theme=garden][data-v41-screen=board] .toolHint,html[data-lt-theme=garden][data-v41-screen=board] .leftPanel span,
+html[data-lt-theme=garden][data-v41-screen=board] .detail span{color:var(--lt-muted)}
+html[data-lt-theme=garden][data-v41-screen=board] .card .eyebrow,html[data-lt-theme=garden][data-v41-screen=board] .card small{color:var(--lt-muted)}
+html[data-lt-theme=garden][data-v41-screen=board] .section span,html[data-lt-theme=garden][data-v41-screen=board] .modal div,
+html[data-lt-theme=garden][data-v41-screen=board] .postAdd div,html[data-lt-theme=garden][data-v41-screen=board] .postAdd span,
+html[data-lt-theme=garden][data-v41-screen=board] .nextChooser span{color:var(--lt-muted)}
+html[data-lt-theme=garden][data-v41-screen=board] .postAdd b,html[data-lt-theme=garden][data-v41-screen=board] .modal b{color:var(--lt-ink)}
+/* 예시 기록의 인라인 색(#bca9c5 등)은 밤용이라 정원에서 읽히지 않는다: 정원에서만 토큰으로 덮는다. */
+html[data-lt-theme=garden][data-v41-screen=board] #dBasic,html[data-lt-theme=garden][data-v41-screen=board] #dBasic span,
+html[data-lt-theme=garden][data-v41-screen=board] #dConn,html[data-lt-theme=garden][data-v41-screen=board] #dConn span,
+html[data-lt-theme=garden][data-v41-screen=board] .postAdd div{color:var(--lt-muted)!important}
+/* 정원: 모바일 '선택한 순간' 줄(lt-moment-picker)이 밤 검정으로 남지 않게 토큰으로. */
+html[data-lt-theme=garden][data-v41-screen=board] .lt-moment-picker{background:var(--lt-glass-strong);border-color:var(--lt-line);color:var(--lt-ink)}
+html[data-lt-theme=garden][data-v41-screen=board] .lt-moment-picker button{background:var(--lt-paper);border-color:var(--lt-line);color:var(--lt-ink)}
+html[data-lt-theme=garden][data-v41-screen=board] .lt-moment-picker button[aria-pressed=true]{background:var(--lt-primary);border-color:var(--lt-primary);color:var(--lt-primary-ink)}
+html[data-lt-theme=garden][data-v41-screen=board] .toast{background:var(--lt-glass-strong);border-color:var(--lt-line);color:var(--lt-ink)}
