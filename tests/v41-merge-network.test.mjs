@@ -39,9 +39,14 @@ test('재생 안내는 source가 아니라 데이터 상태(예시 여부)로 �
   assert.match(RUNTIME, /example:!!demo/);
 });
 
-test('작은 트리 보정은 트리 크기(데이터) 조건으로 남는다', () => {
-  assert.ok(SERVER.includes('if(LTDEMO.moments.length<=36){CLUSTERS.forEach'));
+test('작은 트리 보정은 트리 크기(데이터) 조건으로 한 벌(network-model.js)이 맡는다', () => {
+  // 2026-11-09: 계산은 LT56Model 한 벌로 옮기고, 화면은 범례 행만 갱신한다.
+  const MODEL = fs.readFileSync(new URL('../public/v41/views/network/network-model.js', import.meta.url), 'utf8');
+  assert.ok(MODEL.includes('function smallTreeLayout(count) {'));
+  assert.ok(MODEL.includes('return count <= 36 ? { spacing: 220, baseY: 250, worldHeight: 1600 } : null;'));
+  assert.ok(SERVER.includes('LT56Model.smallTreeLayout(LTDEMO.moments.length)'));
   assert.ok(SERVER.includes("document.querySelectorAll('.legend-row').forEach"));
+  assert.ok(SERVER.includes('LT56Model.clusterSpan(i,groupSize,LTDEMO.moments.length)'));
 });
 
 test('runtime.js는 예시 모드에서 demoData를 그대로 쓴다(design/shared.js와 같은 모양)', () => {

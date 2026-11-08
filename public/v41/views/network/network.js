@@ -20,7 +20,7 @@ const nodes=[],edges=[],anchors=[],paths=[],pathById={},clusterPathIds=CLUSTERS.
 const addEdge=e=>{e.id=e.id||`e${edges.length}`;edges.push(e);return e};
 const addPath=p=>{paths.push(p);pathById[p.id]=p;clusterPathIds[p.cluster].push(p.id);return p};
 function momentBase(ci,id,x,y,level,pathId,indexInPath,first=false){return {id,kind:'moment',cluster:ci,x,y,r:level===0?6.6:level===1?5.2:3.6,color:COLORS[ci],title:titles[(ci*groupSize+nodes.length)%titles.length],date:`202${2+((ci+nodes.length)%5)}.${String(1+((nodes.length*2+ci)%12)).padStart(2,'0')}.${String(3+((nodes.length*3)%24)).padStart(2,'0')}`,emotion:['설렘','몰입','호기심','애정','그리움','기대'][(ci+nodes.length)%6],note:notes[(ci+nodes.length)%notes.length],why:whys[(ci*2+nodes.length)%whys.length],source:['YouTube','Photo','Note','Link','Video'][nodes.length%5],level,pathId,indexInPath,first};}
-function branchPoint(c,angle,step,len,branchIndex){const t=step/(len-1),curve=Math.sin(t*Math.PI)*(.10+branchIndex*.012);const radius=c.spread*(.16+.78*t);const ax=angle+curve*(branchIndex%2?1:-1);return {x:c.x+Math.cos(ax)*radius+Math.sin(t*5+branchIndex)*12,y:c.y+Math.sin(ax)*radius*.80+Math.cos(t*4+branchIndex)*10};}
+const branchPoint=(c,angle,step,len,branchIndex)=>LT56Model.branchPoint(c,angle,step,len,branchIndex);
 function generateCluster(c){
  const hub={...c,kind:'cluster',r:c.hubR};
  const entry={id:`a${c.index}_entry`,kind:'anchor',cluster:c.index,x:c.x,y:c.y,r:15,color:c.color,label:'ENTRY',level:0};anchors.push(entry);
@@ -50,10 +50,11 @@ function generateCluster(c){
  return hub;
 }
 // Use the same forty sample moments and actual links as the orbit.
-const groupSize=Math.max(1,Math.ceil(LTDEMO.moments.length/6));
+const groupSize=LT56Model.groupSizeFor(LTDEMO.moments.length);
 CLUSTERS.splice(Math.ceil(LTDEMO.moments.length/groupSize));
-if(LTDEMO.moments.length<=36){CLUSTERS.forEach((c,i)=>c.y=250+i*220);WORLD.h=1600;}
-CLUSTERS.forEach((c,i)=>{c.name=`순간 ${String(i*groupSize+1).padStart(2,'0')}–${String(Math.min((i+1)*groupSize,LTDEMO.moments.length)).padStart(2,'0')}`;c.sub='순간의 연결';c.count=Math.max(0,Math.min(groupSize,LTDEMO.moments.length-i*groupSize))});
+const smallLayout=LT56Model.smallTreeLayout(LTDEMO.moments.length);
+if(smallLayout){CLUSTERS.forEach((c,i)=>c.y=smallLayout.baseY+i*smallLayout.spacing);WORLD.h=smallLayout.worldHeight;}
+CLUSTERS.forEach((c,i)=>{const span=LT56Model.clusterSpan(i,groupSize,LTDEMO.moments.length);c.name=span.name;c.sub=span.sub;c.count=span.count});
 document.querySelectorAll('.legend-row').forEach((row,i)=>{row.hidden=!CLUSTERS[i]?.count;row.textContent=CLUSTERS[i]?.count?CLUSTERS[i].name:''});
 LTDEMO.moments.forEach((m,i)=>{const ci=Math.min(5,Math.floor(i/groupSize)),c=CLUSTERS[ci],j=i%groupSize,a=-2.8+j*.78,dist=100+j*38;const n=momentBase(ci,m.id,c.x+Math.cos(a)*dist,c.y+Math.sin(a)*dist,0,`p${ci}_0`,j,i===0);Object.assign(n,{title:m.title,date:m.date,emotion:m.emotion,note:m.memo||'',why:m.whyNext||'',source:m.source||'예시 기록'});nodes.push(n)});
 CLUSTERS.forEach((c,ci)=>{const seq=nodes.filter(n=>n.cluster===ci).map(n=>n.id);addPath({id:`p${ci}_0`,cluster:ci,label:c.name,kind:'primary',nodes:seq,children:[],branchAt:-1})});
@@ -73,7 +74,7 @@ function syncRibbon(){document.querySelectorAll('#mobileRibbon button[data-i]').
 function resize(){vw=innerWidth;vh=innerHeight;canvas.width=Math.round(vw*dpr);canvas.height=Math.round(vh*dpr);canvas.style.width=vw+'px';canvas.style.height=vh+'px';state.mobile=vw<=640;if(state.mobile){if(state.mode==='CLUSTER_PATH_OVERVIEW'||state.mode==='MOMENT_FOCUS'||state.mode==='PATH_PLAYBACK')centerMobileCluster(state.mobileCluster,false);else mobileOverview(false)}else if(state.mode==='OVERVIEW')overview(false)}
 function overview(show=true){cancelPlayback();state.selected=null;state.cluster=null;state.revealEdges.clear();state.trail.clear();state.preview.clear();setMode('OVERVIEW');$('detail').classList.remove('open');$('branchChooser').classList.remove('open');$('routeStatus').classList.remove('show');document.querySelector('.hero').classList.remove('dim');if(state.mobile)mobileOverview(false);else{state.scale=Math.min(.5,(vw-300)/WORLD.w,(vh-255)/WORLD.h);state.tx=(vw-WORLD.w*state.scale)/2;state.ty=220}syncRibbon();if(show)toast(state.mobile?'첫 순간이나 아래 위치 그룹을 선택하세요.':'첫 순간이나 위치 그룹을 선택하세요.')}
 function mobileOverview(show=true){state.scale=Math.min(.3,(vw-36)/WORLD.w,(vh-300)/WORLD.h);state.tx=(vw-WORLD.w*state.scale)/2;state.ty=220;state.cluster=null;state.selected=null;if(show)toast('모바일에서는 위치 그룹을 선택해 순간을 살펴볼 수 있습니다.')}
-function mobileFit(c){return clamp(Math.min((vw-26)/(c.spread*1.75),(vh-190)/(c.spread*1.25)),.40,.62)}
+function mobileFit(c){return LT56Model.mobileFit(vw,vh,c.spread)}
 function centerMobileCluster(ci,show=true){const c=CLUSTERS[ci];state.mobileCluster=ci;state.scale=mobileFit(c);state.tx=vw/2-c.x*state.scale;state.ty=vh*.47-c.y*state.scale;document.querySelector('.hero').classList.add('dim');syncRibbon();if(show)toast(`${String(ci+1).padStart(2,'0')}번 위치 그룹을 봅니다.`)}
 function centerOn(n,scale){state.scale=state.mobile?(scale||.62):(scale||.90);state.tx=vw/2-n.x*state.scale;state.ty=vh*.48-n.y*state.scale;document.querySelector('.hero').classList.add('dim')}
 function selectCluster(c){cancelPlayback();state.cluster=c;state.mobileCluster=c.index;state.selected=null;state.revealEdges=new Set(clusterRouteEdges(c.index).map(e=>e.id));state.revealStart=performance.now();setMode('CLUSTER_PATH_OVERVIEW');$('detail').classList.remove('open');$('branchChooser').classList.remove('open');if(state.mobile)centerMobileCluster(c.index,false);else centerOn(c,.78);showRouteStatus(`${String(c.index+1).padStart(2,'0')} · ${c.name}`,`이 영역에 배치된 순간과 실제 연결을 표시합니다.`);syncRibbon();toast(`${String(c.index+1).padStart(2,'0')}번 위치 그룹을 표시합니다.`)}
@@ -84,7 +85,7 @@ function shouldDrawNode(n){if(!state.mobile)return true;if(n.kind==='cluster')re
 function edgeSelected(e){if(state.play?.active)return state.trail.has(e.id)||state.preview.has(e.id)||state.animEdge?.id===e.id;if(state.mode==='ORIGIN_REVEAL')return state.revealEdges.has(e.id);if(state.mode==='CLUSTER_PATH_OVERVIEW')return state.revealEdges.has(e.id);if(state.mode==='MOMENT_FOCUS')return state.revealEdges.has(e.id);return false}
 function edgeAlpha(e){if(state.play?.active){if(state.animEdge?.id===e.id)return 1;if(state.trail.has(e.id))return .82;if(state.preview.has(e.id))return .26;return .035}if(state.mode==='ORIGIN_REVEAL')return state.revealEdges.has(e.id)?(e.kind==='origin'?1:.80):.07;if(state.mode==='CLUSTER_PATH_OVERVIEW')return state.revealEdges.has(e.id)?(['parent','related','primary','secondary'].includes(e.kind)?.86:.48):.055;if(state.mode==='MOMENT_FOCUS')return state.revealEdges.has(e.id)?.92:(e.cluster===state.mobileCluster?.12:.04);if(state.mode==='OVERVIEW'&&['parent','related'].includes(e.kind))return .68;if(state.mode==='OVERVIEW')return e.kind==='cross'?.035:e.kind==='support'?.055:e.kind==='bridge'||e.kind==='bridgeSecondary'?.14:.12;return .10}
 function nodeAlpha(n){if(state.play?.active){if(state.play.currentId===n.id)return 1;if(state.play.seq?.includes(n.id))return .72;if(n.cluster===state.mobileCluster)return .18;return .07}if(state.mode==='ORIGIN_REVEAL'){if(n.first)return 1;if(n.kind==='cluster'&&n.index<=2)return .95;if(n.cluster<=2&&n.level<=1)return .76;return .12}if(state.mode==='CLUSTER_PATH_OVERVIEW')return n.cluster===state.mobileCluster?.90:.13;if(state.mode==='MOMENT_FOCUS'){const p=pathSequenceForNode(state.selected);return p?.nodes.includes(n.id)?.96:(n.cluster===state.mobileCluster?.23:.08)}return n.level===2?.42:.76}
-function bezierGeometry(a,b,e){const A=w2s(a.x,a.y),B=w2s(b.x,b.y),dx=B.x-A.x,dy=B.y-A.y;let bend=12;if(['bridge','bridgeSecondary','origin'].includes(e.kind))bend=Math.min(64,Math.abs(dx)*.10+18);const sign=dx>=0?1:-1;const cp1={x:A.x+dx*.34+sign*bend,y:A.y+dy*.28},cp2={x:B.x-dx*.30-sign*bend*.55,y:B.y-dy*.26};return {A,B,cp1,cp2}}
+function bezierGeometry(a,b,e){return LT56Model.bezierGeometry(w2s(a.x,a.y),w2s(b.x,b.y),e.kind)}
 function pointBezier(g,t){const u=1-t;return {x:u*u*u*g.A.x+3*u*u*t*g.cp1.x+3*u*t*t*g.cp2.x+t*t*t*g.B.x,y:u*u*u*g.A.y+3*u*u*t*g.cp1.y+3*u*t*t*g.cp2.y+t*t*t*g.B.y}}
 function drawBezier(g,t=1){ctx.beginPath();let p=g.A;ctx.moveTo(p.x,p.y);const steps=Math.max(8,Math.floor(24*t));for(let i=1;i<=steps;i++){const q=pointBezier(g,t*i/steps);ctx.lineTo(q.x,q.y)}ctx.stroke()}
 function revealFactor(e){if(!state.revealEdges.has(e.id)||state.revealStart===0||reduced)return 1;const elapsed=performance.now()-state.revealStart;let order=0;if(e.kind==='origin')order=(e.originGroup||1)-1;else order=Math.min(8,e.order||0)+2+(e.cluster||0)*.2;return clamp((elapsed-order*95)/620,0,1)}
@@ -98,7 +99,7 @@ function showRouteStatus(title,text){$('routeStatusTitle').textContent=title;$('
 function hideRouteStatus(){if(state.mode==='OVERVIEW')$('routeStatus').classList.remove('show')}
 function toast(t){const el=$('toast');el.textContent=t;el.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>el.classList.remove('show'),2300)}
 function cancelPlayback(resetMode=true){state.play=null;state.animEdge=null;state.animT=0;state.trail.clear();state.preview.clear();state.branchPause=false;$('branchChooser').classList.remove('open');if(resetMode&&state.mode==='PATH_PLAYBACK')setMode(state.selected?'MOMENT_FOCUS':'CLUSTER_PATH_OVERVIEW')}
-function routeEdges(pid){const p=pathById[pid];if(!p)return[];const out=[];for(let i=0;i<p.nodes.length-1;i++){const e=edges.find(e=>e.a===p.nodes[i]&&e.b===p.nodes[i+1]&&e.pathId===pid);if(e)out.push(e)}return out}
+function routeEdges(pid){return LT56Model.routeEdges(pid,pathById,edges)}
 // 재생은 예시 판본에서만 연다. 실제 기록에는 경로 순서 데이터가 따로 없어(pathById는 두 판본 모두
 // 묶음에서 만든다) 데이터만으로 가를 수 없다 — 판단은 이 한 곳에서 한다.
 const canPlay=LTDEMO.example;
