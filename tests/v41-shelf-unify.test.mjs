@@ -145,3 +145,44 @@ test('#212 클래식 판본(tree-name.js)이 모듈과 같은 결과를 낸다',
   assert.equal(classic.autoTreeTitle('윤슬'), autoTreeTitle('윤슬'));
   assert.match(shelf, /<script src="\.\.\/tree-name\.js"><\/script>/);
 });
+
+// 5. 기억책(track59)도 같은 표시 규칙을 쓴다. 두 벌(views·design) 화면 모두.
+test('#212 기억책 두 벌 화면이 공용 표시 함수를 실어 트리 이름에 적용한다', () => {
+  for (const path of ['public/v41/views/track59-sketchbook.html', 'public/v41/design/views/track59-sketchbook.html']) {
+    const book = read(path);
+    const prefix = path.includes('/design/') ? '../../' : '../';
+    const nameTag = book.indexOf(`<script src="${prefix}tree-name.js"></script>`);
+    const navTag = book.indexOf(`<script src="${prefix}view-navigation.js"></script>`);
+    assert.ok(nameTag !== -1, `${path}: tree-name.js를 싣는다`);
+    assert.ok(navTag !== -1, `${path}: view-navigation.js를 싣는다`);
+    assert.ok(nameTag < navTag, `${path}: 표시 규칙이 뷰 스크립트보다 먼저 온다`);
+  }
+  const nav = read('public/v41/view-navigation.js');
+  assert.match(nav, /LTTreeName\?\.displayTreeTitle/, '뷰 이름 표시가 공용 함수를 쓴다');
+  assert.match(nav, /treeName\(t\.title\)/, '책 목록 이름에 적용한다');
+  assert.match(nav, /treeName\(c\?\.tree\.title\)/, '책 제목 표시에 적용한다');
+  assert.ok(!/textContent=c\?\.tree\.title/.test(nav), '원본 이름을 그대로 넣지 않는다');
+});
+
+test('#212 기억책 표시 이름은 저장 데이터를 바꾸지 않는다', async () => {
+  const vm = await import('node:vm');
+  const scope = { window: {} };
+  vm.runInNewContext(read('public/v41/tree-name.js'), scope);
+  const tree = { id: 't1', title: '리센느, 나의 순간들', subject: '리센느', moments: [] };
+  const snapshot = JSON.stringify(tree);
+  const shown = scope.window.LTTreeName.displayTreeTitle(tree.title);
+  assert.equal(shown, '리센느');
+  assert.equal(JSON.stringify(tree), snapshot, '원본 제목은 그대로다');
+  assert.equal(scope.window.LTTreeName.displayTreeTitle('리센느'), '리센느', '직접 쓴 이름은 그대로 둔다');
+  assert.equal(scope.window.LTTreeName.displayTreeTitle('리센느의 겨울, 나의 순간들'), '리센느의 겨울', '자동 문구와 일치할 때만 뗀다');
+});
+
+test('#212 기억책 어댑터는 트리 이름 규칙을 한 번만 싣는다', () => {
+  for (const [path, prefix] of [['public/v41/views/track59-sketchbook.html', '../'], ['public/v41/design/views/track59-sketchbook.html', '../../']]) {
+    const book = read(path);
+    assert.equal(book.split(`${prefix}tree-name.js`).length - 1, 1, `${path}: 한 번만 싣는다`);
+  }
+  const adapter = read('scripts/apply-book-usability.mjs');
+  assert.match(adapter, /tree-name\.js/, '어댑터가 두 벌 화면에 같은 규칙을 넣는다');
+  assert.match(adapter, /if \(!out\.includes\(`\$\{prefix\}tree-name\.js`\)\)/, '이미 있으면 다시 넣지 않는다');
+});

@@ -2,7 +2,9 @@
 (() => {
  const c=parent.LT41;
  const describe=value=>globalThis.LTMedia?.describe(value)||{kind:value?'link':'none',privateFile:false,loadUrl:''};
- LTDEMO.library=(c?.trees||[c.tree]).map(t=>({id:t.id,title:t.title,subject:t.subject,coverMomentId:t.coverMomentId||'',moments:t.id===c.tree.id?LTDEMO.moments.map(moment=>{const raw=t.moments.find(item=>item.id===moment.id),media=describe(raw?.url||'');return {...moment,image:media.kind==='photo'&&media.privateFile?media.loadUrl:moment.image||''};}):t.moments.map(m=>{const media=describe(m.url||'');return {id:m.id,title:m.title,memo:m.note,emotion:m.emotion,date:m.date,externalUrl:m.url||'',type:media.kind==='photo'?'photo':media.kind==='video'||media.kind==='youtube'?'video':m.url?'link':'memo',image:media.kind==='photo'&&media.privateFile?media.loadUrl:''};})}));
+ // #212: 트리 이름은 표시 단계에서만 자동 접미사(", 나의 순간들")를 뺀다. 저장 데이터는 그대로 둔다.
+ const treeName=value=>globalThis.LTTreeName?.displayTreeTitle(value)??value;
+ LTDEMO.library=(c?.trees||[c.tree]).map(t=>({id:t.id,title:treeName(t.title),subject:t.subject,coverMomentId:t.coverMomentId||'',moments:t.id===c.tree.id?LTDEMO.moments.map(moment=>{const raw=t.moments.find(item=>item.id===moment.id),media=describe(raw?.url||'');return {...moment,image:media.kind==='photo'&&media.privateFile?media.loadUrl:moment.image||''};}):t.moments.map(m=>{const media=describe(m.url||'');return {id:m.id,title:m.title,memo:m.note,emotion:m.emotion,date:m.date,externalUrl:m.url||'',type:media.kind==='photo'?'photo':media.kind==='video'||media.kind==='youtube'?'video':m.url?'link':'memo',image:media.kind==='photo'&&media.privateFile?media.loadUrl:''};})}));
  LTDEMO.openBook=(id,treeId=c.tree.id)=>{
   if(!LTDEMO.library.some(t=>t.id===treeId&&t.moments.some(m=>m.id===id)))return;
   parent.postMessage({type:'lt41-open-book',treeId,id},location.origin);
@@ -19,7 +21,7 @@
    const stage=document.querySelector('.stage-label');if(stage)stage.textContent='내 책장';
    const art=document.querySelector('.hero-stage');if(art){art.setAttribute('aria-hidden','true');}
   }else{
-   const name=document.querySelector('.topbar .brand span');if(name)name.textContent=c?.tree.title||'기억책';
+   const name=document.querySelector('.topbar .brand span');if(name)name.textContent=treeName(c?.tree.title)||'기억책';
    const index=document.getElementById('archiveBtn');if(index)index.textContent='목차';
    const title=document.querySelector('#archivePanel h2');if(title)title.textContent='순간 목차';
   }

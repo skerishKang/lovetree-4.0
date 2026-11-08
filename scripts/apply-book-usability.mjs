@@ -17,6 +17,8 @@ const COPIES = [
 
 const STYLE_TAG = '<style id="lt-book-usability">';
 const PANEL_TAG = '<div class="detail-panel" id="detailSide" role="dialog" aria-label="순간 상세" hidden></div>';
+// #212: 기억책의 트리 이름 표시는 책장과 같은 공용 규칙(tree-name.js)을 쓴다.
+const TREE_NAME_TAG = '<script src="PATH_PREFIXtree-name.js"></script>';
 
 function styleBlock() {
   return `${STYLE_TAG}
@@ -308,7 +310,14 @@ window.__BOOK_USABILITY__={titleParts,closeDetail,placeDetail,nextMomentOf,paint
 
 function patch(html, prefix) {
   const script = SCRIPT.replaceAll('PATH_PREFIX', prefix);
+  const treeNameTag = TREE_NAME_TAG.replaceAll('PATH_PREFIX', prefix);
   let out = html;
+  // #212: 트리 이름 표시 규칙(공용 함수)을 뷰 스크립트보다 먼저 싣는다. 이미 있으면 그대로 둔다(두 번 돌려도 같다).
+  const navTag = `<script src="${prefix}view-navigation.js"></script>`;
+  if (!out.includes(`${prefix}tree-name.js`)) {
+    if (out.includes(navTag)) out = out.replace(navTag, () => treeNameTag + navTag);
+    else out = out.replace('</body>', () => treeNameTag + '\n</body>');
+  }
   // 스타일은 이미 있으면 같은 자리에서 새 내용으로 바꾼다(규칙을 고쳐도 두 번 실행으로 맞출 수 있다).
   if (out.includes(STYLE_TAG)) {
     const start = out.indexOf(STYLE_TAG);
