@@ -245,7 +245,8 @@ test('12. 실제 기록에서도 그 자리 재생: 겹침·전파 차단에 지
 test('13. 기억책도 정원 테마를 받는다(밤=기본 글꼴, 정원=지금 글꼴) — 보드·지도는 밤 고정', () => {
   const { appliedTheme } = headerStateModule;
   assert.equal(appliedTheme('garden', 'book'), 'garden');
-  assert.equal(appliedTheme('garden', 'board'), 'night');
-  assert.equal(appliedTheme('garden', 'network'), 'night');
+  // 2026-11-08: 보드·관계 지도도 정원을 받는다(정원 적용 레인).
+  assert.equal(appliedTheme('garden', 'board'), 'garden');
+  assert.equal(appliedTheme('garden', 'network'), 'garden');
   assert.equal(appliedTheme('night', 'book'), 'night');
 });
