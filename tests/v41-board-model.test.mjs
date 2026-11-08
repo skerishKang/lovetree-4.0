@@ -1,68 +1,71 @@
-// 기억 보드 순수 계산 시험(#231 보충). 화면(DOM) 없이 모델만 부른다.
+// 기억 보드 계산 한 벌 시험(#231). 화면이 부르는 같은 파일(board-model.js)을 그대로 실행해 검사한다.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { cardPosition, threadPath, fitZoom, clampZoom, removeConnection, editGuard, filterMoments } from '../public/v41/views/board/board-model.mjs';
+import fs from 'node:fs';
 
-test('카드 자리: 8장씩 줄바꿈, 세로 400px 간격, 회전 -2·0·2도', () => {
-  assert.deepEqual(cardPosition(0), {x: 150, y: 150, rot: -2});
-  assert.deepEqual(cardPosition(1), {x: 430, y: 150, rot: 0});
-  assert.deepEqual(cardPosition(8), {x: 150, y: 550, rot: 2});
-  // 실제 보드와 같은 첫 줄: 8장이 x=150..2110 사이에 280px 간격으로 놓인다.
-  const firstRow = Array.from({length: 8}, (_, i) => cardPosition(i).x);
-  assert.deepEqual(firstRow, [150, 430, 710, 990, 1270, 1550, 1830, 2110]);
+// 화면과 같은 조건: 일반 스크립트가 window.LT58Model 하나를 남긴다.
+globalThis.window = globalThis;
+await import('../public/v41/views/board/board-model.js');
+const M = globalThis.LT58Model;
+const BOARD = fs.readFileSync(new URL('../public/v41/views/board/board.js', import.meta.url), 'utf8');
+
+test('0. 계산 한 벌은 화면이 실제로 부르는 함수만 노출한다', () => {
+  assert.deepEqual(Object.keys(M).sort(), ['cardPosition', 'editGuard', 'escapeHTML', 'fitZoom', 'removeConnection', 'threadPath']);
+  for (const fn of Object.keys(M)) assert.equal(typeof M[fn], 'function', fn);
 });
 
-test('실(연결선): 두 핀을 아래로 늘어뜨리고, dx가 크면 처짐이 커지되 140px에서 멈춘다', () => {
-  const near = threadPath({x: 0, y: 0}, {x: 100, y: 50});
+test('1. 카드 자리: 8장씩 줄바꿈, 세로 400px 간격, 회전 -2·0·2도', () => {
+  assert.deepEqual(M.cardPosition(0), { x: 150, y: 150, rot: -2 });
+  assert.deepEqual(M.cardPosition(1), { x: 430, y: 150, rot: 0 });
+  assert.deepEqual(M.cardPosition(8), { x: 150, y: 550, rot: 2 });
+  assert.deepEqual(Array.from({ length: 8 }, (_, i) => M.cardPosition(i).x), [150, 430, 710, 990, 1270, 1550, 1830, 2110]);
+});
+
+test('2. 실(연결선): 두 핀을 아래로 늘어뜨리고, dx가 크면 처짐이 커지되 140px에서 멈춘다', () => {
+  const near = M.threadPath({ x: 0, y: 0 }, { x: 100, y: 50 });
   assert.equal(near.sag, 63);
   assert.equal(near.cy, 113);
-  assert.equal(near.d, 'M0,0 C0,113 100,113 100,50');
-  assert.equal(threadPath({x: 0, y: 0}, {x: 5000, y: 0}).sag, 140);
-  // 위쪽으로 가는 연결도 처짐 기준점은 항상 아래쪽 핀이다.
-  assert.equal(threadPath({x: 0, y: 300}, {x: 100, y: 50}).cy, 300 + 63);
+  assert.equal(near.d, 'M 0 0 C 32 113, 68 113, 100 50');
+  assert.equal(M.threadPath({ x: 0, y: 0 }, { x: 5000, y: 0 }).sag, 140);
 });
 
-test('전체 맞춤 배율: 여백 40px·최대 0.92배', () => {
-  assert.equal(fitZoom(1440, 900), Math.min(1400 / 2400, 860 / 2200, 0.92));
-  assert.equal(fitZoom(390, 800), Math.min(350 / 2400, 760 / 2200, 0.92));
-  assert.equal(fitZoom(6000, 6000), 0.92);
+test('3. 실(연결선): 위로 가는 연결도 처짐 기준점은 항상 아래쪽 핀이다', () => {
+  assert.equal(M.threadPath({ x: 0, y: 300 }, { x: 100, y: 50 }).cy, 363);
+  assert.equal(M.threadPath({ x: 10, y: 10 }, { x: 10, y: 10 }).d, 'M 10 10 C 10 65, 10 65, 10 10');
 });
 
-test('확대 범위: 손가락 0.20~1.55, 그 밖 0.24~1.55', () => {
-  assert.equal(clampZoom(9, true), 1.55);
-  assert.equal(clampZoom(9, false), 1.55);
-  assert.equal(clampZoom(0.01, true), 0.2);
-  assert.equal(clampZoom(0.01, false), 0.24);
-  assert.equal(clampZoom(0.8, false), 0.8);
+test('4. 전체 맞춤 배율: 여백 40px·최대 0.92배', () => {
+  assert.equal(M.fitZoom(1440, 900), Math.min(1400 / 2400, 860 / 2200, 0.92));
+  assert.equal(M.fitZoom(390, 800), Math.min(350 / 2400, 760 / 2200, 0.92));
+  assert.equal(M.fitZoom(6000, 6000), 0.92);
 });
 
-test('연결 지우기 계산: 고른 연결 하나만 빠지고 원본은 그대로다', () => {
-  const list = [{id: 'c1'}, {id: 'c2'}, {id: 'c3'}];
-  const out = removeConnection(list, 'c2');
-  assert.deepEqual(out.map((c) => c.id), ['c1', 'c3']);
-  assert.equal(list.length, 3, '원본 배열은 건드리지 않는다');
-  assert.deepEqual(removeConnection(list, 'nope').map((c) => c.id), ['c1', 'c2', 'c3']);
+test('5. 연결 지우기 계산: 고른 연결 하나만 빠지고 원본은 그대로다', () => {
+  const list = [{ id: 'c1' }, { id: 'c2' }, { id: 'c3' }];
+  assert.deepEqual(M.removeConnection(list, 'c2').map((c) => c.id), ['c1', 'c3']);
+  assert.equal(list.length, 3);
+  assert.deepEqual(M.removeConnection(list, 'nope').map((c) => c.id), ['c1', 'c2', 'c3']);
 });
 
-test('연결 지우기 분기: 예시 판본은 지우고, 실제 기록은 읽기 전용 안내만 한다', () => {
-  assert.deepEqual(editGuard(true), {blocked: false, message: ''});
-  const guard = editGuard(false);
+test('6. 지우기 분기: 예시 판본은 지우고, 실제 기록은 읽기 전용 안내만 한다', () => {
+  assert.deepEqual(M.editGuard(true), { blocked: false, message: '' });
+  const guard = M.editGuard(false);
   assert.equal(guard.blocked, true);
   assert.equal(guard.message, '읽기 전용에서는 연결을 변경할 수 없어요.');
-  // 막힌 판본에서는 목록을 지우지 않는다(문구만 보여준다).
-  const list = [{id: 'c1'}];
-  const next = guard.blocked ? list : removeConnection(list, 'c1');
-  assert.equal(next.length, 1);
+  const list = [{ id: 'c1' }];
+  assert.equal((guard.blocked ? list : M.removeConnection(list, 'c1')).length, 1);
 });
 
-test('목록 필터: 종류·키워드로 순간을 고른다', () => {
-  const list = [
-    {id: 'a', type: 'photo', originalType: 'photo', keywords: ['첫만남']},
-    {id: 'b', type: 'video', originalType: 'video', keywords: ['무대']},
-    {id: 'c', type: 'note', originalType: 'note', keywords: ['첫만남', '무대']}
-  ];
-  assert.deepEqual(filterMoments(list).map((m) => m.id), ['a', 'b', 'c']);
-  assert.deepEqual(filterMoments(list, 'video').map((m) => m.id), ['b']);
-  assert.deepEqual(filterMoments(list, 'all', '무대').map((m) => m.id), ['b', 'c']);
-  assert.deepEqual(filterMoments(list, 'note', '무대').map((m) => m.id), ['c']);
+test('7. 화면(board.js)은 같은 계산을 다시 구현하지 않고 이 한 벌을 부른다', () => {
+  // 예전 중복 계산이 남아 있지 않다.
+  assert.doesNotMatch(BOARD, /x:150\+\(i%8\)\*280/);
+  assert.doesNotMatch(BOARD, /Math\.min\(\(vw-40\)\/2400/);
+  assert.doesNotMatch(BOARD, /Math\.min\(140,55\+Math\.abs\(dx\)\*\.08\)/);
+  assert.doesNotMatch(BOARD, /connections\.filter\(c=>c\.id!==selectedConn\)/);
+  assert.doesNotMatch(BOARD, /function esc\(s\)/);
+  // 부르는 자리(6곳)가 있다.
+  for (const call of ['LT58Model.escapeHTML', 'LT58Model.cardPosition', 'LT58Model.threadPath', 'LT58Model.fitZoom', 'LT58Model.removeConnection', 'LT58Model.editGuard']) {
+    assert.ok(BOARD.includes(call), call);
+  }
+  assert.match(BOARD, /toast\(guard\.message\)/);
 });
