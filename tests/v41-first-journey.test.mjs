@@ -183,10 +183,11 @@ test('첫 여정 화면은 --lt-* 토큰만 쓰고 새 hex·단어 중간 줄바
 });
 
 test('셸은 새 트리를 첫 여정으로 보내고 순간 추가·수정은 기존 패널에 남긴다', () => {
-  const shell = readFileSync(new URL('../public/v41/shell.mjs', import.meta.url), 'utf8');
+  // #231 1-B③-2: 편집기 진입은 shell/panels.mjs로 옮겼다. 두 파일을 함께 본다.
+  const shell = readFileSync(new URL('../public/v41/shell.mjs', import.meta.url), 'utf8') + readFileSync(new URL('../public/v41/shell/panels.mjs', import.meta.url), 'utf8');
   assert.match(shell, /function openFirstJourney/);
   assert.match(shell, /journeyEntry\(\{owned:/);
-  assert.match(shell, /if\(mode==='new'\)\{openFirstJourney\(\);return;\}/);
+  assert.match(shell, /if \(mode === 'new'\) \{ openFirstJourney\(\); return; \}/);
   assert.match(shell, /setEditorMode\(b\.dataset\.mode\)/);
   assert.equal(/data-mode="new"/.test(readFileSync(new URL('../public/v41/index.html', import.meta.url), 'utf8')), false, '패널 탭에서 새 트리를 없앤다');
   assert.match(shell, /type==='lt41-journey-save'/);

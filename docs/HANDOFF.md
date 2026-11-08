@@ -927,6 +927,15 @@ COM2에는 merge `6900df8aa446dfe0201d01997457fae04c4abe16`의 변경 서버 파
 - 이유·원칙·단계별 계획: [REFACTOR_PLAN_20261108.md](REFACTOR_PLAN_20261108.md) · 추적 이슈 https://github.com/skerishKang/lovetree-4.0/issues/231
 - 1-A(두 벌 조사, #230) 결과 위에 1-B(셸 모듈 분리)·1.5단계(두 변형 한 벌)·2단계(기억책)3단계(보드·지도) 순서를 적었다. 기능·문구·디자인 변경 0.
 
+## 2026-11-08 셸 패널 분리 (#231 1-B③-2, ai/lt-refactor-shell-panels-261108, PR #245)
+`shell.mjs` 413 → 384줄. 순간 패널·편집기·책 정보를 `public/v41/shell/panels.mjs`(268줄)로 그대로 옮겼다.
+
+- 옮긴 것: `setEditorMode`·`openEditor`·`updateTreeCoverHint`·`openTreeManager`·`updateMediaPreview`·`updateQuickEntryHint`, 폼 상태(`formDirty`·`treeDirty`·`parentDirty`·`parentValue`)와 그 기준값(`editorMode`·`formBaseline`·`parentBaseline`·`treeBaseline`·`parentChoice`), `moment-form`·`tree-form`·`editor`·`[data-mode]` 연결.
+- 셸에 남긴 것: `panel()`·`backup`·`openAssets`·`usePrivateAsset`(계정·보관 파일 성격), 얇은 래퍼 `openEditor`·`updateMediaPreview`·`updateQuickEntryHint`·`formDirty`·`treeDirty`.
+- 시험: `tests/v41-shell-panels.test.mjs` 8건(가짜 DOM 함수 직접 호출). 글자 시험은 옮긴 파일을 함께/대신 읽게 고쳤다. `npm test` 540건 503 pass/0 fail/37 skip, build pass.
+- 미리보기 `https://c1b66c19.lovetree-4-0.pages.dev/v41/` postdeploy: visual 6/6 pass, page 오류 0, fail 2건은 모두 미리보기 Functions 503(`storage_unavailable`) — `/api/community/shares`·`/api/youtube/oembed`가 미리보기에서 503, 운영에서는 200/401(curl 확인).
+- 남은 것: 공유·둘러보기·`lt41-*` 메시지 수신 → `shell/messages.mjs`, 첫 여정 연결.
+
 ## 2026-11-08 셸 모듈 지도 (#231 1-B, 브랜치 ai/lt-refactor-shell-261108)
 `public/v41/shell.mjs`(약 480줄)를 기능별 모듈로 나눈다. 동작·겉모습·이름·저장 키는 그대로다.
 
@@ -937,7 +946,9 @@ COM2에는 merge `6900df8aa446dfe0201d01997457fae04c4abe16`의 변경 서버 파
 | 화면 전환·iframe 두 장 교대(#219·#211)·도착 표시·화면 클릭 위임 | `public/v41/shell/screens.mjs` (분리 완료) |
 | 헤더 상태·탭·트리 선택(#222)·탭 페이드·계정 메뉴(`flowNavigation`·`updateNavFade`·`revealCurrentTab`·`renderAccount`·`openAccountMenu`·`closeAccountMenu`·`loadAccountEmail`·`updateAccountControls`) | `public/v41/shell/header.mjs` (분리 완료) |
 | 로그인 시작·의도(pendingLoginIntent)·401·만료 연결(#215·#218·#227·#144 안내 줄) | `public/v41/shell/auth.mjs` (분리 완료) |
-| 순간 패널·편집기·첫 여정·공유·둘러보기·`lt41-*` 메시지 수신 | `shell.mjs` (그다음 PR에서 `shell/panels.mjs`·`shell/messages.mjs`로) |
+| 순간 패널·편집기(추가/수정 모드·폼 기준값·저장 연결)·책 정보 관리 | `public/v41/shell/panels.mjs` (분리 완료) |
+| 첫 여정 | `shell.mjs` (#231 1-B③-3에서 `shell/journey.mjs` 후보) |
+| 공유·둘러보기·`lt41-*` 메시지 수신 | `shell.mjs` (그다음 PR에서 `shell/messages.mjs`로) |
 | 접근성·포커스(#204) — 셸 대화상자 Tab 순환, Esc 복귀 | `shell.mjs` (`view-a11y.mjs`와 함께) |
 
 - `shell.mjs`는 진입점으로 남기고, 옮긴 이름(`themedView`·`applyTheme`·`toggleTheme`·`screens` 등)은 얇은 래퍼·재수출로 유지한다.

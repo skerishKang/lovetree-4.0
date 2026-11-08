@@ -1,0 +1,251 @@
+// 셸의 순간 패널·편집기·책 정보 (#231 1-B ③-2).
+// 2026-11-08 리팩터링: 동작·문구·디자인·저장 계약 변경 0.
+// shell.mjs에서 조건·조회 방식·인자 형태를 바꾸지 않고 그대로 옮겼다(원칙 7).
+// 셸은 자기 상태(member·source·window.LT41·업로드)를 읽기 함수로 넘기고, 이 파일은 패널만 만진다.
+import {parentCandidates, suggestMomentTitle} from '../domain.mjs';
+import {displayTreeTitle} from '../tree-name.mjs';
+
+export function createPanels(deps) {
+  const {$} = deps;
+  const getMember = deps.getMember;
+  const getSource = deps.getSource;
+  const getUploads = deps.getUploads;
+  const notify = deps.notify;
+  const panel = deps.panel;
+  const show = deps.show;
+  const selection = deps.selection;
+  const openFirstJourney = deps.openFirstJourney;
+  const openLoginStart = deps.openLoginStart;
+
+  // 편집기 모드와 폼 기준값은 이 파일이 들고 있는다(셸은 formDirty·treeDirty만 묻는다).
+  let editorMode = 'add';
+  let formBaseline = '';
+  let parentBaseline = '';
+  let treeBaseline = '';
+
+  function parentValue() {
+    return new URLSearchParams({
+      targetId: $('parent-target').value,
+      relation: $('parent-relation').value
+    }).toString();
+  }
+  function parentDirty() {
+    return !$('parent-management').hidden && parentValue() !== parentBaseline;
+  }
+  function formDirty() {
+    return $('editor').open
+      && (new URLSearchParams(new FormData($('moment-form'))).toString() !== formBaseline || parentDirty());
+  }
+  function treeDirty() {
+    return $('tree-manager').open
+      && new URLSearchParams(new FormData($('tree-form'))).toString() !== treeBaseline;
+  }
+
+  // 2026-11-08 기억책 오른쪽 페이지 '다음 순간 남기기': 부모가 될 순간을 지정해 편집기를 연다.
+  // 선택 순간을 부모로 쓰는 기존 경로(선택 순간 + '순간 추가')와 같은 저장 계약이며, 부모만 명시한다.
+  let parentChoice = '';
+  function setEditorMode(mode, parentId = '') {
+    const uploads = getUploads();
+    if (uploads.busy) {
+      notify('파일 전송을 마치거나 취소한 뒤 작업을 바꿔 주세요.');
+      return;
+    }
+    if (formDirty() && !confirm('현재 입력을 비우고 작업을 바꿀까요?')) return;
+    uploads.reset();
+    const c = window.LT41;
+    parentChoice = mode === 'add' && parentId && c?.tree.moments.some(moment => moment.id === parentId) && c.tree.moments.some(moment => moment.id === c.momentId) ? parentId : '';
+    const m = parentChoice ? c.tree.moments.find(moment => moment.id === parentChoice) : c?.tree.moments.find(moment => moment.id === c.momentId);
+    if (!m) {
+      notify('먼저 순간을 선택해 주세요.');
+      return;
+    }
+    editorMode = mode;
+    $('editor-title').textContent = mode === 'add' ? '순간 추가' : '순간 수정';
+    const form = $('moment-form');
+    form.reset();
+    $('relation-label').hidden = mode !== 'add';
+    for (const name of ['title', 'note', 'emotion', 'date', 'url', 'relation']) form.elements[name].value = mode === 'edit' ? m[name] || '' : name === 'emotion' ? '설렘' : name === 'date' ? new Date().toISOString().slice(0, 10) : '';
+    // 2026-11-08 수정 모드에서 이미 적어 둔 제목·감정·날짜가 있으면 '더 적기'를 펼친 상태로 연다.
+    $('more-fields').open = mode === 'edit' && Boolean((m.title || '').trim() || (m.emotion || '').trim() || (m.date || '').trim());
+    const parent = mode === 'edit' && m.parentId ? c.tree.moments.find(moment => moment.id === m.parentId) : null;
+    $('editor-context').textContent = mode === 'add' ? `새 순간 추가 · ${m.title}에서 이어집니다.` : parent ? `수정할 순간 · ${m.title} · 현재 이전 순간: ${parent.title}` : `수정할 순간 · ${m.title} · 트리의 시작 순간`;
+    $('form-error').textContent = ''; $('moment-management').hidden = mode !== 'edit';
+    const reparenting = mode === 'edit' && m.parentId !== null;
+    $('parent-management').hidden = !reparenting; $('parent-current').textContent = parent ? `현재 이전 순간 · ${parent.title}` : '';
+    $('parent-target').replaceChildren();
+    if (reparenting) {
+      for (const other of parentCandidates(c.tree, m.id)) {
+        const o = document.createElement('option');
+        o.value = other.id; o.textContent = other.title;
+        $('parent-target').append(o);
+      }
+      $('parent-target').value = m.parentId; $('parent-relation').value = m.relation || '';
+    } else $('parent-relation').value = '';
+    $('related-target').replaceChildren();
+    for (const other of c?.tree.moments || []) {
+      if (other.id === m?.id) continue;
+      const o = document.createElement('option');
+      o.value = other.id;
+      o.textContent = (m?.links?.includes(other.id) ? '연결됨 · ' : '') + other.title;
+      $('related-target').append(o);
+    }
+    document.querySelectorAll('[data-mode]').forEach(b => b.setAttribute('aria-current', String(b.dataset.mode === mode)));
+    updateMediaPreview(); updateQuickEntryHint();
+    formBaseline = new URLSearchParams(new FormData(form)).toString();
+    parentBaseline = parentValue();
+  }
+
+  function openEditor(requestedMode, parentId = '') {
+    if (getSource() !== 'server' || !getMember()?.snapshot().owned) {
+      openLoginStart('new-tree'); return;
+    }
+    if (!getMember().snapshot().writable) {
+      notify('서버 편집 연결이 아직 준비되지 않았어요. 기록은 안전하게 읽을 수 있습니다.'); panel('records'); return;
+    }
+    const mode = ['new', 'add', 'edit'].includes(requestedMode) ? requestedMode : window.LT41 ? 'add' : 'new';
+    if (mode === 'new') { openFirstJourney(); return; }
+    setEditorMode(mode, parentId);
+    panel('editor');
+    queueMicrotask(() => $('moment-form').elements.note.focus());
+  }
+
+  function updateTreeCoverHint() {
+    const c = window.LT41, selected = c?.tree.moments.find(m => m.id === $('tree-cover').value);
+    if (!selected) {
+      $('tree-cover-hint').textContent = '표지를 고르지 않으면 기존 금테 장식 표지를 사용합니다.';
+      return;
+    }
+    const media = LTMedia.describe(selected.url || '');
+    $('tree-cover-hint').textContent = media.kind === 'photo' ? `“${selected.title}”의 사진을 표지로 사용합니다.` : `“${selected.title}”을 표지 순간으로 표시하고 금테 장식 표지를 사용합니다.`;
+  }
+  function openTreeManager() {
+    if (getSource() !== 'server' || !getMember()?.snapshot().owned || !getMember().snapshot().writable || !window.LT41) {
+      notify('내 서버 기록을 불러온 뒤 책 정보를 관리해 주세요.'); return;
+    }
+    const tree = window.LT41.tree, form = $('tree-form');
+    form.elements.title.value = tree.title;
+    form.elements.subject.value = tree.subject;
+    $('tree-cover').replaceChildren();
+    const fallback = document.createElement('option');
+    fallback.value = ''; fallback.textContent = '기본 금테 장식 표지';
+    $('tree-cover').append(fallback);
+    for (const moment of tree.moments) {
+      const option = document.createElement('option'), media = LTMedia.describe(moment.url || '');
+      option.value = moment.id;
+      option.textContent = `${moment.title} · ${media.kind === 'photo' ? '사진' : media.kind === 'video' ? '영상' : media.kind === 'youtube' ? 'YouTube' : media.kind === 'link' ? '링크' : '기록'}`;
+      $('tree-cover').append(option);
+    }
+    $('tree-cover').value = tree.coverMomentId || '';
+    $('tree-form-error').textContent = '';
+    updateTreeCoverHint();
+    treeBaseline = new URLSearchParams(new FormData(form)).toString();
+    panel('tree-manager');
+    queueMicrotask(() => form.elements.title.focus());
+  }
+
+  function updateMediaPreview() {
+    const form = $('moment-form'), url = form.elements.url.value, info = LTMedia.describe(url);
+    $('url-media-hint').textContent = info.kind === 'none' ? '사진·영상은 직접 HTTPS 링크를 사용할 수 있어요. YouTube와 일반 링크도 지원해요. 사진·영상 파일도 직접 첨부할 수 있어요.' : info.kind === 'invalid' ? '링크 형식을 확인해 주세요.' : info.label;
+    $('url-media-preview').innerHTML = url ? LTMedia.markup(url, form.elements.title.value) : '';
+  }
+  function updateQuickEntryHint() {
+    const form = $('moment-form'), title = form.elements.title.value.trim(), note = form.elements.note.value.trim(), url = form.elements.url.value.trim();
+    let suggested = '';
+    try { suggested = suggestMomentTitle({title, note, url}); } catch {}
+    $('quick-entry-hint').textContent = title ? '입력한 제목으로 저장합니다.' : suggested ? `제목은 “${suggested}”(으)로 자동 정리됩니다.` : '제목·마음·링크나 첨부 중 하나만 남겨도 저장할 수 있어요.';
+  }
+
+  // 계정 메뉴·편집기 버튼은 셸이 열고, 이 파일은 폼 상태만 본다.
+  $('manage-tree').onclick = openTreeManager;
+  $('tree-cover').onchange = updateTreeCoverHint;
+  $('tree-form').onsubmit = e => {
+    e.preventDefault();
+    try {
+      getMember().apply('editTree', Object.fromEntries(new FormData(e.target)), selection());
+      treeBaseline = new URLSearchParams(new FormData(e.target)).toString();
+      $('tree-manager').close();
+      notify('책 정보를 서버에 저장하고 있어요.');
+    } catch (error) { $('tree-form-error').textContent = error.message; }
+  };
+  $('tree-delete').onclick = () => {
+    const tree = window.LT41?.tree;
+    if (!tree || !confirm(`“${displayTreeTitle(tree.title)}”과 ${tree.moments.length}개 순간을 모두 삭제할까요? 이 작업은 되돌릴 수 없습니다.`)) return;
+    try {
+      getMember().apply('deleteTree', {}, selection());
+      treeBaseline = '';
+      $('tree-manager').close();
+      notify('트리를 삭제하고 서버에 반영하고 있어요.');
+    } catch (error) { $('tree-form-error').textContent = error.message; }
+  };
+  $('tree-manager').addEventListener('cancel', e => { if (treeDirty() && !confirm('책 정보 변경을 버리고 닫을까요?')) e.preventDefault(); });
+  document.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => setEditorMode(b.dataset.mode));
+
+  for (const name of ['title', 'note', 'url']) $('moment-form').elements[name].addEventListener('input', () => { if (name === 'url' || name === 'title') updateMediaPreview(); updateQuickEntryHint(); });
+  $('moment-form').onsubmit = e => {
+    e.preventDefault();
+    if (getUploads().busy) return;
+    if (parentDirty()) {
+      $('form-error').textContent = '이전 순간 변경은 아래 버튼으로 먼저 저장해 주세요.';
+      return;
+    }
+    try {
+      getMember().apply(editorMode, Object.fromEntries(new FormData(e.target)), selection());
+      formBaseline = new URLSearchParams(new FormData(e.target)).toString();
+      $('editor').close();
+      if (editorMode === 'new') show('track59-sketchbook.html');
+      notify('서버에 저장하고 있어요.');
+    } catch (error) { $('form-error').textContent = error.message; }
+  };
+  $('editor').addEventListener('cancel', e => {
+    if (getUploads().busy) { e.preventDefault(); return; }
+    if (formDirty() && !confirm('작성 중인 입력을 버리고 닫을까요?')) e.preventDefault();
+  });
+  $('editor-cancel').onclick = () => {
+    if (getUploads().busy) { notify('파일 전송을 마치거나 취소해 주세요.'); return; }
+    if (!formDirty() || confirm('작성 중인 입력을 버리고 닫을까요?')) $('editor').close();
+  };
+  $('change-parent').onclick = () => {
+    try {
+      getMember().apply('reparent', {targetId: $('parent-target').value, relation: $('parent-relation').value}, selection());
+      formBaseline = new URLSearchParams(new FormData($('moment-form'))).toString();
+      parentBaseline = parentValue();
+      setEditorMode('edit');
+      notify('이전 순간을 바꾸고 서버에 저장하고 있어요.');
+      queueMicrotask(() => $('change-parent').focus());
+    } catch (e) { $('form-error').textContent = e.message; }
+  };
+  for (const [id, action] of [['link-moment', 'link'], ['unlink-moment', 'unlink']]) $(id).onclick = () => {
+    try {
+      getMember().apply(action, {targetId: $('related-target').value}, selection());
+      formBaseline = new URLSearchParams(new FormData($('moment-form'))).toString();
+      parentBaseline = parentValue();
+      setEditorMode('edit');
+    } catch (e) { $('form-error').textContent = e.message; }
+  };
+  $('delete-moment').onclick = () => {
+    if (!confirm('이 순간을 삭제할까요? 자식 순간은 이전 순간으로 이어지고 관련 연결은 해제됩니다.')) return;
+    try {
+      getMember().apply('delete', {}, selection());
+      $('editor').close();
+    } catch (e) { $('form-error').textContent = e.message; }
+  };
+
+  // 업로드 모듈이 파일을 바꾼 뒤 미리보기·자동 제목 안내를 다시 그린다.
+  function uploadsChanged() {
+    updateMediaPreview();
+    updateQuickEntryHint();
+  }
+
+  return {
+    setEditorMode,
+    openEditor,
+    openTreeManager,
+    updateTreeCoverHint,
+    updateMediaPreview,
+    updateQuickEntryHint,
+    uploadsChanged,
+    formDirty,
+    treeDirty,
+    editorMode: () => editorMode
+  };
+}
