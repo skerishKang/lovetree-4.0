@@ -34,6 +34,21 @@ export function treePickerLabel(treeTitle) {
   return title || '트리 고르기';
 }
 
+// 트리 선택 버튼 문구(전체). 로그인 상태에서 트리가 열려 있으면 "트리: <이름> ▾" 형태로 보여 준다.
+// 로그아웃이면 예시 트리가 열려 있어도 "트리 고르기"다(내 트리가 아니다).
+// 브라우저에만 남은 미저장 기록이 있으면 "저장 안 된 기록"으로 구분해 보여 준다.
+export function treePickerText({ owned = false, treeTitle = '', pendingDraft = false } = {}) {
+  if (!owned) return pendingDraft ? '저장 안 된 기록' : '트리 고르기';
+  const title = clean(treeTitle);
+  return title ? `트리: ${title}` : '트리 고르기';
+}
+
+// 트리 보기 탭(기억책·기억 보드·관계 지도)은 로그인한 내 트리에서만 열린다.
+// 로그아웃 상태에서는 예시 트리가 열려 있어도 숨긴다(내 기록이 아니다).
+export function treeViewsVisible({ owned = false, publicReading = false } = {}) {
+  return owned && !publicReading;
+}
+
 // 헤더 주 버튼(#write-menu) 문구. 첫 화면 가운데 첫 버튼과 어긋나지 않게 같은 규칙을 쓴다.
 export function writeMenuLabel({ owned = false, dirty = false, reading = false, hasTree = false } = {}) {
   if (!owned) return '처음 시작하기';

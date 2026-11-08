@@ -6,10 +6,11 @@ import {createWorkspaceApi, setMemberRefreshStarted} from './api.mjs';
 import {createShareApi} from './share-api.mjs';
 import {mountCommunity} from './community-panel.mjs';
 import {createMemberSession} from './member-session.mjs';
+import {hasPendingDraft} from './sync-controller.mjs';
 import {exampleTree} from './example.mjs';
 import {parseSelectionRoute,memberStartupView,ownerSelectionRoute,accountPosition,rememberAccountPosition,resolveAccountPosition,stashPendingOwnerRoute,pendingOwnerRoute,takePendingOwnerRoute} from './selection-location.mjs';
 import {applyViewAccessibility,connectionLabel,focusReturnTarget} from './view-a11y.mjs';
-import {accountPresentation,treePickerLabel,writeMenuLabel,homeCenterState,homeStartLoginUrl,readTheme,readLoginIntent,writeTheme,nextTheme,themeButtonLabel,themeButtonAriaLabel,themePressed,appliedTheme,applyThemeAttribute,LOGIN_INTENTS} from './header-state.mjs';
+import {accountPresentation,treePickerLabel,treePickerText,treeViewsVisible,writeMenuLabel,homeCenterState,homeStartLoginUrl,readTheme,readLoginIntent,writeTheme,nextTheme,themeButtonLabel,themeButtonAriaLabel,themePressed,appliedTheme,applyThemeAttribute,LOGIN_INTENTS} from './header-state.mjs';
 import {journeyEntry,journeySavePlan,journeyRouteHash,parseJourneyRoute,journeyRouteDecision} from './first-journey.mjs';
 const $=id=>document.getElementById(id);
 let pendingLoginIntent=readLoginIntent(location.search);
@@ -87,16 +88,24 @@ function links(){viewContext();const c=window.LT41;$('connections').replaceChild
  if(!edges.length){const p=document.createElement('p');p.textContent='아직 연결된 다른 순간이 없어요.';$('connections').append(p);}
  for(const e of edges){const id=e.from===c.momentId?e.to:e.from,m=c.tree.moments.find(m=>m.id===id),b=document.createElement('button'),kind=document.createElement('small'),title=document.createElement('span');kind.textContent=e.kind==='related'?'관련 순간':e.from===c.momentId?'다음 순간':'이전 순간';const name=document.createElement('strong'),reason=document.createElement('span');name.textContent=m.title;reason.className='connection-reason';reason.textContent=e.reason||(e.kind==='related'?'함께 기억할 관련 순간으로 연결했어요.':'연결 이유를 아직 남기지 않았어요.');title.append(name,reason);b.append(kind,title);b.onclick=()=>{c.momentId=id;$('connection-panel').close();show(current,false);writeLocation();};$('connections').append(b);}}
 function flowNavigation(){
- const reading=!!window.LT41&&['track59-sketchbook.html','track58-pinboard.html','track56-network.html'].includes(current);
- $('tree-views').hidden=false;for(const b of $('tree-views').querySelectorAll('button')){b.disabled=!window.LT41;b.title=window.LT41?'':'트리를 선택하면 열 수 있어요.';}
- $('tree-views').setAttribute('aria-label',window.LT41?.tree.title?window.LT41.tree.title+' 보기':'이 트리 보기');
- const publicReading=source==='share';for(const b of document.querySelectorAll('nav>button'))b.hidden=publicReading;
- // 트리 선택은 뒤쪽 탭 묶음 바로 앞에 있고, 현재 트리 이름을 보여 준다(없으면 '트리 고르기').
- $('record-menu').hidden=publicReading;$('source-label').textContent=treePickerLabel(window.LT41?.tree.title);$('record-menu').title=window.LT41?'다른 트리를 고릅니다.':'열어볼 트리를 고릅니다.';
- $('write-menu').hidden=publicReading;$('share-menu').hidden=source!=='server'||!member?.snapshot().owned||!window.LT41;
- if(!member?.snapshot().dirty)$('write-menu').textContent=writeMenuLabel({owned:!!member?.snapshot().owned,dirty:false,reading,hasTree:!!window.LT41});
- $('write-menu').title=source==='server'?(reading?'선택한 순간에서 이어지는 새 순간을 기록합니다.':'새 트리의 첫 순간을 기록합니다.'):'로그인한 계정에 내 트리를 만듭니다. 예시에는 저장하지 않아요.';
- revealCurrentTab();
+  const owned=!!member?.snapshot().owned;
+  const reading=!!window.LT41&&['track59-sketchbook.html','track58-pinboard.html','track56-network.html'].includes(current);
+  const publicReading=source==='share';
+  // 트리 보기 탭은 로그인한 내 트리에서만 연다. 로그아웃이면 예시가 열려 있어도 숨긴다.
+  const showTreeViews=treeViewsVisible({owned,publicReading});
+  $('tree-views').hidden=!showTreeViews;for(const b of $('tree-views').querySelectorAll('button')){b.disabled=!window.LT41;b.title=window.LT41?'':'트리를 선택하면 열 수 있어요.';}
+  $('tree-views').setAttribute('aria-label',window.LT41?.tree.title?window.LT41.tree.title+' 보기':'이 트리 보기');
+  for(const b of document.querySelectorAll('nav>button'))b.hidden=publicReading;
+  // 트리 선택은 뒤쪽 탭 묶음 바로 앞에 있고, 로그인 상태에서만 "트리: <이름> ▾"로 보여 준다.
+  // 로그아웃이면 "트리 고르기", 브라우저에만 남은 미저장 기록이 있으면 "저장 안 된 기록"이다.
+  const pendingDraft=hasPendingDraft(sessionStorage,member?.snapshot().subject||null);
+  $('record-menu').hidden=publicReading;
+  $('source-label').textContent=treePickerText({owned,treeTitle:window.LT41?.tree.title,pendingDraft});
+  $('record-menu').title=owned?(window.LT41?'다른 트리를 고릅니다.':'열어볼 트리를 고릅니다.'):(pendingDraft?'로그인하면 저장하지 못한 기록을 복원합니다.':'로그인하면 내 트리를 고를 수 있습니다.');
+  $('write-menu').hidden=publicReading;$('share-menu').hidden=source!=='server'||!owned||!window.LT41;
+  if(!member?.snapshot().dirty)$('write-menu').textContent=writeMenuLabel({owned,dirty:false,reading,hasTree:!!window.LT41});
+  $('write-menu').title=source==='server'?(reading?'선택한 순간에서 이어지는 새 순간을 기록합니다.':'새 트리의 첫 순간을 기록합니다.'):'로그인한 계정에 내 트리를 만듭니다. 예시에는 저장하지 않아요.';
+  revealCurrentTab();
 }
 // 2026-11-07: 390·360에서 탭 7개가 폭을 넘는다. 탭 줄은 가로 스크롤이고, 화면을 바꿀 때 현재 탭을 가운데로 당겨 보이게 한다.
 // 넘치는 쪽 끝에만 페이드를 켜서 잘린 것이 아니라 더 있다는 신호를 준다. 데스크톱(넓은 폭)은 스크롤이 없어 아무 일도 하지 않는다.
