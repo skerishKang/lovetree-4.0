@@ -882,3 +882,9 @@ COM2에는 merge `6900df8aa446dfe0201d01997457fae04c4abe16`의 변경 서버 파
 - 원인: `functions/_lib/shared-auth.mjs`의 `validNext`가 `/^\/[A-Za-z0-9_./-]*$/`만 통과시켜, 첫 화면이 보내는 `next=/v41/?intent=new-tree|shelf`(#215)가 거부되고 콜백이 `/`로 복귀했다.
 - 수정: `validNext`를 URL 파싱 + 허용 목록으로 바꿨다. 경로는 영문·숫자·`_ . -` 조각만, 쿼리는 `intent=new-tree|shelf` 하나만. `//evil.com`·`/\evil`·`https://…`·`#해시`·`..`·모르는 쿼리는 모두 기본값 `/v41/`로 떨어진다(기본값도 `/`에서 `/v41/`로).
 - 계정 동그라미 메뉴에는 이미 맨 아래에 `#account-logout`(role=menuitem)이 있고 `#logout` 클릭으로 기존 로그아웃 경로를 부른다. 없던 게 아니라 확인 때 선택자를 잘못 잡았던 것 — 그래서 마크업·배선을 시험으로 고정했다.
+
+## 2026-11-08 기억책 실제 계정 결함 2건 (ai/lt-book-play-garden-261108)
+- **그 자리 재생이 실제 기록에서 안 되던 문제**: 사이트응답 헤더에 CSP가 없다(`public/_headers` 자체가 없고, Pages 응답에 `Content-Security-Policy` 없음) → `frame-src` 차단은 원인이 아니다. 어댑터의 재생 리스너는 `click` 캡처 하나뿐이어서, 카드 위 겹침(`.moment-title` 등)이나 다른 리스너의 `stopPropagation`에 걸리면 아무 일도 일어나지 않았다(증상: iframe 0, 외부 요청 0). 이제 `pointerdown` 캡처에서 먼저 잡고(`playInline()`), 재생 단추를 겹침 위(`z-index:3`)로 올리고, 제목 겹침은 `pointer-events:none`(제목 고치기 단추만 auto), 재생 주소를 못 만들면 원본 링크를 새 창으로 연다. 두 번 만들지 않는다.
+- **정원에서 기억책 제목이 명조가 아니던 문제**: `appliedTheme()`이 home·journey·shelf만 정원을 넘겼다. `appliedTheme`에 `book`을 더하고 셸 `themedView()`가 기억책(`track59-sketchbook.html`)을 `book`으로 보낸다. 셸이 iframe `documentElement`에 `data-lt-theme=garden`을 붙이므로 #217의 정원 글꼴 규칙이 그대로 적용된다. 기억 보드·관계 지도는 계속 밤.
+- 확인(가짜 서버 기록: `url` + `mediaMetadata`가 있는 YouTube 순간): 1440·390, 밤·정원 모두 실제 마우스 클릭으로 `iframe.yt-frame` 1개 생성(임베드 `start=83`), 밤 큰 제목 Pretendard · 정원 큰 제목 MaruBuri, 넘침 0. 셸 경유(`#book`)에서도 iframe 테마가 garden으로 전달된다.
+- 시험: `tests/v41-book-usability.test.mjs` 12·13번, `tests/v41-journey-garden`·`v41-theme-ab`의 기대값 갱신(기억책=정원 허용, 보드·지도=밤 고정). `npm test` 483 pass / 0 fail / 37 skip, build 성공.

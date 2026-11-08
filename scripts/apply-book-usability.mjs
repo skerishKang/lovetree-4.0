@@ -40,6 +40,10 @@ html[data-v41-screen=book][data-lt-theme=garden]{--lt-reading:${bookTitleFont('g
 html[data-v41-screen=book][data-lt-theme=garden] .moment-title h3,html[data-v41-screen=book][data-lt-theme=garden] .note-piece h2,
 html[data-v41-screen=book][data-lt-theme=garden] .clipping h2,html[data-v41-screen=book][data-lt-theme=garden] .letter h2,
 html[data-v41-screen=book][data-lt-theme=garden] .archive-piece h2{font-family:${bookTitleFont('garden')}!important}
+/* 2026-11-08: 카드 위 겹침이 재생 단추 클릭을 가로채지 않게 한다. */
+html[data-v41-screen=book] .yt-play{position:relative;z-index:3;cursor:pointer}
+html[data-v41-screen=book] .moment-title{pointer-events:none}
+html[data-v41-screen=book] .moment-title .title-edit{pointer-events:auto}
 /* #212: 목차 머리에 붙는 트리 이름 한 줄. 두 테마 모두 UI 글꼴을 쓴다. */
 html[data-v41-screen=book] .archive-tree{margin:6px 0 0;font:12px var(--lt-ui);letter-spacing:.06em;color:var(--lt-muted,#a78f92)}
 html[data-v41-screen=book] .next-page button{background:var(--lt-gold-ink);border-color:var(--lt-gold-ink);color:var(--lt-paper)}
@@ -214,16 +218,30 @@ showDetail=function(id){
  if(card)placeDetail(id,card);
 };
 document.addEventListener('keydown',e=>{if(e.key!=='Escape')return;const panel=$b('#detailSide');if(panel&&!panel.hidden){e.preventDefault();closeDetail();}},true);
+/* 1. 실제 기록에서 재생 단추가 눌리지 않던 문제(2026-11-08): 카드 위 겹침·다른 리스너의 전파 차단에
+   영향받지 않도록 pointerdown에서 먼저 잡고, 재생 주소를 못 만들면 원본 링크를 새 창으로 연다. */
+function playInline(yt,media){
+ const url=embedUrl(yt.dataset.ytPlay,Number(yt.dataset.ytStart||0));
+ if(!url){if(media&&media.openUrl)window.open(media.openUrl,'_blank','noopener');return}
+ const frame=document.createElement('iframe');frame.className='yt-frame';frame.src=url;frame.title='YouTube 영상 재생';
+ frame.allow='accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';frame.allowFullscreen=true;
+ frame.setAttribute('referrerpolicy','strict-origin-when-cross-origin');
+ const host=yt.parentElement;if(!host)return;host.replaceChildren(frame);
+}
+document.addEventListener('pointerdown',e=>{
+ const yt=e.target.closest&&e.target.closest('[data-yt-play]');
+ if(!yt)return;
+ e.preventDefault();e.stopPropagation();
+ const url=yt.dataset.ytPlay?{openUrl:'https://www.youtube.com/watch?v='+yt.dataset.ytPlay+(Number(yt.dataset.ytStart||0)?'&t='+Number(yt.dataset.ytStart||0):'')}:null;
+ playInline(yt,url);
+},true);
 document.addEventListener('click',e=>{
  const next=e.target.closest('[data-next-moment]');
  if(next){e.preventDefault();e.stopPropagation();requestNextMoment(next.dataset.nextMoment||selectedMomentId);return}
  /* 1. YouTube 그 자리 재생: 누른 뒤에만 iframe을 만든다(시작 시점 반영, referrerpolicy 엄격). */
  const yt=e.target.closest('[data-yt-play]');
- if(yt){e.preventDefault();e.stopPropagation();const url=embedUrl(yt.dataset.ytPlay,Number(yt.dataset.ytStart||0));if(!url)return;
-  const frame=document.createElement('iframe');frame.className='yt-frame';frame.src=url;frame.title='YouTube 영상 재생';
-  frame.allow='accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';frame.allowFullscreen=true;
-  frame.setAttribute('referrerpolicy','strict-origin-when-cross-origin');
-  const host=yt.parentElement;host.replaceChildren(frame);return}
+ if(yt){e.preventDefault();e.stopPropagation();if(!yt.parentElement||yt.parentElement.querySelector('iframe.yt-frame'))return;
+  playInline(yt,{openUrl:'https://www.youtube.com/watch?v='+yt.dataset.ytPlay});return}
  const edit=e.target.closest('[data-title-edit]');
  if(edit){e.preventDefault();e.stopPropagation();if(window.parent===window){toast('제목 고치기는 러브트리 화면에서 열 수 있어요');return}
   window.parent.postMessage({type:'lt41-select',id:edit.dataset.titleEdit},location.origin);

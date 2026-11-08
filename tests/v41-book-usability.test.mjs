@@ -14,6 +14,7 @@ const {
   LENS_KEY, readLens, writeLens, detailPlacement, nextMomentMessage,
   BOOK_UI_FONT, BOOK_TITLE_FONT, bookTheme, bookTitleFont, treeTitleText,
 } = await import('../public/v41/book-usability.mjs');
+const headerStateModule = await import('../public/v41/header-state.mjs');
 
 test('1. YouTube는 그 자리에서: nocookie embed, 시작 시점 유지, referrerpolicy', () => {
   assert.equal(embedUrl('dQw4w9WgXcQ', 83), 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?autoplay=1&rel=0&start=83');
@@ -207,4 +208,27 @@ test('11. 기억책 트리 이름: "리센느, 나의 순간들" → "리센느"
     assert.ok(!/LTDEMO\.title\s*;/.test(src), path + ': 원본 제목을 그대로 쓰지 않는다');
     assert.ok(src.includes('.archive-tree{'), path + ': 이름 줄 스타일');
   }
+});
+
+test('12. 실제 기록에서도 그 자리 재생: 겹침·전파 차단에 지지 않고, 실패하면 원본 링크로 (#212 후속)', () => {
+  const apply = read('scripts/apply-book-usability.mjs');
+  assert.ok(apply.includes("document.addEventListener('pointerdown'"), 'pointerdown에서 먼저 잡는다');
+  assert.ok(apply.includes('function playInline(yt,media)'), '재생은 한 곳에서 만든다');
+  assert.ok(apply.includes("window.open(media.openUrl,'_blank','noopener')"), '재생 주소가 없으면 원본 링크를 연다');
+  assert.ok(apply.includes("yt.parentElement.querySelector('iframe.yt-frame')"), '두 번 만들지 않는다');
+  for (const path of VIEWS) {
+    const src = html[path];
+    assert.ok(src.includes('function playInline(yt,media)'), path + ': 재생 함수');
+    assert.ok(src.includes("addEventListener('pointerdown'"), path + ': 먼저 잡는 리스너');
+    assert.ok(src.includes('.yt-play{position:relative;z-index:3'), path + ': 겹침 위로');
+    assert.ok(src.includes('.moment-title{pointer-events:none}'), path + ': 제목 겹침은 클릭을 막지 않는다');
+  }
+});
+
+test('13. 기억책도 정원 테마를 받는다(밤=기본 글꼴, 정원=지금 글꼴) — 보드·지도는 밤 고정', () => {
+  const { appliedTheme } = headerStateModule;
+  assert.equal(appliedTheme('garden', 'book'), 'garden');
+  assert.equal(appliedTheme('garden', 'board'), 'night');
+  assert.equal(appliedTheme('garden', 'network'), 'night');
+  assert.equal(appliedTheme('night', 'book'), 'night');
 });
