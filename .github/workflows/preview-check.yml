@@ -81,10 +81,80 @@ jobs:
         run: |
           if [ ! -d ./preview-out ]; then echo "리포트 폴더가 없습니다"; exit 2; fi
           node tools/postdeploy/preview-gate.mjs ./preview-out --summary "$GITHUB_STEP_SUMMARY"
+      # ---- 겉모습 비교(visual-baseline, 2026-11-08): 알림만 하고 실패로 만들지 않는다 ----
+      - name: 운영(main) 화면 캡처 — before
+        if: steps.preview.outputs.url != ''
+        id: capture-before
+        continue-on-error: true
+        env:
+          LOVETREE_POSTDEPLOY_BROWSER: chromium
+        run: |
+          start=$(date +%s)
+          node tools/visual-baseline/visual-baseline.mjs capture \
+            --base https://lovetree-4-0.pages.dev/v41/ --out visual-before > "$RUNNER_TEMP/before.log" 2>&1
+          echo "status=$?" >> "$GITHUB_OUTPUT"
+          echo "seconds=$(( $(date +%s) - start ))" >> "$GITHUB_OUTPUT"
+          tail -5 "$RUNNER_TEMP/before.log" || true
+      - name: 미리보기 화면 캡처 — after
+        if: steps.preview.outputs.url != ''
+        id: capture-after
+        continue-on-error: true
+        env:
+          LOVETREE_POSTDEPLOY_BROWSER: chromium
+        run: |
+          start=$(date +%s)
+          node tools/visual-baseline/visual-baseline.mjs capture \
+            --base "${{ steps.preview.outputs.url }}/v41/" --out visual-after > "$RUNNER_TEMP/after.log" 2>&1
+          echo "status=$?" >> "$GITHUB_OUTPUT"
+          echo "seconds=$(( $(date +%s) - start ))" >> "$GITHUB_OUTPUT"
+          tail -5 "$RUNNER_TEMP/after.log" || true
+      - name: 화면 비교(장별 차이 %)
+        if: steps.preview.outputs.url != ''
+        id: compare
+        continue-on-error: true
+        run: |
+          start=$(date +%s)
+          set +e
+          node tools/visual-baseline/visual-baseline.mjs compare \
+            --before visual-before --after visual-after --out visual-diff --json visual-diff.json > "$RUNNER_TEMP/compare.log" 2>&1
+          echo "기준 초과가 있어도 실패로 만들지 않습니다(종료 코드 $?)." >> "$RUNNER_TEMP/compare.log"
+          echo "seconds=$(( $(date +%s) - start ))" >> "$GITHUB_OUTPUT"
+          tail -12 "$RUNNER_TEMP/compare.log" || true
+      - name: 운영 배포 지연 확인 + 요약 표
+        if: steps.preview.outputs.url != ''
+        continue-on-error: true
+        run: |
+          if [ ! -f visual-diff.json ]; then
+            {
+              echo "## 겉모습 비교(visual-baseline) — 건너뜀"
+              echo ""
+              echo "- 이유: 캡처/비교 산출물이 없습니다(before=${{ steps.capture-before.outputs.status }} after=${{ steps.capture-after.outputs.status }})."
+              echo "- 캡처 로그: \`$RUNNER_TEMP/before.log\`, \`$RUNNER_TEMP/after.log\`"
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          # 운영 페이지에 실제로 배포된 것이 main 최신인지 확인(체크 요약에만 표시).
+          lag=""
+          main_state=$(curl -sS -H "Authorization: Bearer $GITHUB_TOKEN" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/commits/$(git rev-parse origin/main)/check-runs?per_page=50" \
+            | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{try{const d=JSON.parse(s);const p=(d.check_runs||[]).filter(c=>/cloudflare pages/i.test(c.name));console.log(p.length?(p[0].status+'/'+(p[0].conclusion||'-')):'unknown')}catch{console.log('unknown')}})")
+          case "$main_state" in
+            completed/success) lag="" ;;
+            *) lag="운영 배포가 아직 main 최신이 아닐 수 있습니다(main 커밋 배포 상태: $main_state). before는 그 시점 운영 화면입니다." ;;
+          esac
+          node tools/visual-baseline/visual-summary.mjs visual-diff.json \
+            --before-url "https://lovetree-4-0.pages.dev/v41/" \
+            --after-url "${{ steps.preview.outputs.url }}/v41/" \
+            ${lag:+"--lag" "$lag"} | head -40
+          echo "- 소요: 캡처 before ${{ steps.capture-before.outputs.seconds }}초 · after ${{ steps.capture-after.outputs.seconds }}초 · 비교 ${{ steps.compare.outputs.seconds }}초" >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         if: always() && steps.preview.outputs.url != ''
         with:
           name: preview-check-${{ github.event.pull_request.number }}
           path: |
             preview-out
+            visual-before
+            visual-after
+            visual-diff
+            visual-diff.json
           retention-days: 14
