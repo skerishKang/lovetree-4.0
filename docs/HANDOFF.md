@@ -950,7 +950,8 @@ COM2에는 merge `6900df8aa446dfe0201d01997457fae04c4abe16`의 변경 서버 파
 - 규칙: **자기 계정만** 사용하고, 끝나면 트리 0개·보관 파일 0개까지 정리한다. 다른 레인 계정으로는 로그인하지 않는다.
 - 계정 값이 `.secrets`에 없으면 `--auto-login`은 로그인을 건너뛰고 **warn**만 남긴다(실패 아님). 값은 화면·로그·리포트·커밋에 쓰지 않는다.
 - 브라우저 프로필은 계정별로 분리(`.profile`, `.profile-02`, `.profile-03`) → **두 레인이 동시에 돌아도** 세션이 엉키지 않는다.
-- 계정 생성은 대표님이 공통 로그인(auth.padiem.net)에서 직접 한다. 2026-11-09 현재 02·03 값은 아직 `.secrets`에 없다.
+- **계정 생성은 레인이 한다**(2026-11-09 완료). Chat QA 계정 도구(ai-revenue-lab `provision_qa_smoke_account.ps1`)와 같은 방식 — `POST https://chat.padiem.net/api/auth/password/register` → 409 `account_exists`면 가입 생략 → `POST .../api/auth/password/login`으로 쌍 검증. 이메일 인증 없이 점검 전용 주소(`@test.dev`)를 쓴다.
+- 02·03 계정·`.secrets` 값 준비 완료(값은 컴1 `C:\Users\limone\.secrets\.env`, 사본 `.env.bak-261109-*`). 두 계정 동시 `--auto-login`에서 **로그인 완료·트리 0개**를 확인했다. 계정을 새로 만들 때도 같은 순서(가입 → 로그인 검증 → `.secrets` 저장 → `--auto-login` fail 0)를 지킨다.
 
 ## 2026-11-09 내 책장 파일 지도 (보충, #231 · PR #290 `c517fd5`)
 
