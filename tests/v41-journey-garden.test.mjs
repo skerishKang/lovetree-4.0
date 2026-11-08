@@ -4,6 +4,8 @@ import {readFileSync} from 'node:fs';
 import {appliedTheme} from '../public/v41/header-state.mjs';
 
 const read = path => readFileSync(new URL('../' + path, import.meta.url), 'utf8');
+const navigation = read('public/v41/shell/navigation.mjs');
+const themeModule = read('public/v41/shell/theme.mjs');
 const html = read('public/v41/views/first-journey.html');
 const shell = read('public/v41/shell.mjs');
 const css = read('public/v41/identity.css');
@@ -56,12 +58,14 @@ test('정원이면 첫 여정도 정원이고, 밤이면 A, 기억책·보드·�
   for (const view of ['board', 'network', 'inner']) {
     assert.equal(appliedTheme('garden', view), 'night', view);
   }
-  assert.match(shell, /function themedView\(\)\{return current==='src064-orbit\.html'\?'home':current==='first-journey\.html'\?'journey':current==='track32-bookshelf\.html'\?'shelf':current==='track59-sketchbook\.html'\?'book':'inner';\}/);
+  // #231 1-B: 화면별 테마 대상은 shell/navigation.mjs에 있다.
+  assert.match(navigation, /if \(file === 'first-journey\.html'\) return 'journey';/);
+  assert.match(navigation, /if \(file === 'track32-bookshelf\.html'\) return 'shelf';/);
 });
 
 test('셸은 첫 여정 iframe에만 테마 속성을 넘기고 화면마다 다시 계산한다', () => {
-  assert.match(shell, /const applied=applyThemeAttribute\(document\.documentElement,appliedTheme\(theme,themedView\(\)\)\);/);
-  assert.match(shell, /const frame=\$\('view'\)\.contentDocument;if\(frame\)applyThemeAttribute\(frame\.documentElement,applied\);/);
+  assert.match(themeModule, /const applied = applyThemeAttribute\(document\.documentElement, appliedTheme\(theme, themedViewFor\(file\)\)\);/);
+  assert.match(themeModule, /const frame = \$\('view'\)\.contentDocument;\n  if \(frame\) applyThemeAttribute\(frame\.documentElement, applied\);/);
   // #211: 화면 두 장이 교대하므로 load 마다 그 화면에 테마를 다시 계산한다.
   assert.match(shell, /function frameLoaded\(frame\)\{\s*applyTheme\(\);/);
   assert.match(shell, /for\(const f of frames\(\)\)f\.addEventListener\('load',\(\)=>frameLoaded\(f\)\);/);
