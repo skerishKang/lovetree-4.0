@@ -18,6 +18,20 @@ try {
 } catch {
   viewMenuItems = null;
 }
+
+// 테마 기대값도 제품 함수에서 계산한다(#238·#242 방식). 화면별 목록을 도구에 박지 않는다.
+// 도구를 저장소 밖에서 단독 실행하면 파일이 없을 수 있으므로 그때만 안전한 기본값(밤)으로 물러난다.
+let appliedTheme = null;
+try {
+  ({ appliedTheme } = await import(new URL('../../public/v41/header-state.mjs', import.meta.url).href));
+} catch {
+  appliedTheme = null;
+}
+// 기대값: 'garden'이면 data-lt-theme=garden, 'night'이면 속성 없음.
+function expectedThemeAttribute(view) {
+  const theme = typeof appliedTheme === 'function' ? appliedTheme('garden', view) : 'night';
+  return theme === 'garden' ? 'garden' : '';
+}
 // 헤더 탭 개수·구성의 기대값도 제품 함수(public/v41/header-state.mjs, #222)로 계산한다.
 // 로그아웃 3 · 로그인+트리 없음 3 · 로그인+트리 있음 7 이라 고정값으로는 상태를 가릴 수 없다.
 let headerPartsFor = null;
@@ -1759,7 +1773,7 @@ async function cleanupAuthFlows(target, opts, stamp) {
 }
 
 async function checkThemeRoundTrip(page, base, opts, stamp) {
-  // 2026-11-08 #188: 첫 화면 토글로 정원(B) 전환·저장, 안쪽 화면은 A 고정, 다시 밤(A)으로 복귀.
+  // 2026-11-08 #188: 첫 화면 토글로 정원(B) 전환·저장, 안쪽 화면은 화면별 기대 테마(appliedTheme), 다시 밤(A)으로 복귀.
   const problems = [];
   const state = () => page.evaluate(() => ({
     theme: document.documentElement.dataset.ltTheme || '',
@@ -1815,17 +1829,24 @@ async function checkThemeRoundTrip(page, base, opts, stamp) {
     const r = await state();
     if (r.theme !== 'garden') problems.push(`새로고침 후 정원 유지 안 됨 ${JSON.stringify(r)}`);
     if (r.headerBg === 'rgb(4, 4, 7)') problems.push('정원인데 헤더가 A 색');
-    const ub = new URL(base.href); ub.search = `?vt=${Date.now()}`; ub.hash = '#book';
-    await page.goto(ub.href, { waitUntil: 'load', timeout: opts.timeout }).catch(() => {});
-    await sleep(2500);
-    const k = await state();
-    // 2026-11-08 대표 결정: 기억책도 정원을 따라간다(밤=기본 글꼴, 정원=지금 글꼴). 보드·지도만 A 고정.
-    if (k.theme !== 'garden') problems.push(`정원에서 기억책이 정원이 아님 ${JSON.stringify(k)}`);
-    const boardUrl = new URL(base.href); boardUrl.search = `?vt=${Date.now()}`; boardUrl.hash = '#board';
-    await page.goto(boardUrl.href, { waitUntil: 'load', timeout: opts.timeout }).catch(() => {});
-    await sleep(2200);
-    const boardState = await state();
-    if (boardState.theme !== '') problems.push(`정원에서 기억 보드가 A가 아님 ${JSON.stringify(boardState)}`);
+    // 2026-11-08 정원 적용 레인: 안쪽 화면의 기대 테마는 제품 함수(appliedTheme)로 계산한다.
+    // 지금은 기억책·기억 보드·관계 지도가 정원을 받고, 그 밖의 안쪽 화면은 A(속성 없음)로 남는다.
+    const themedViews = [
+      ['#shelf', 'shelf', '내 책장'],
+      ['#book', 'book', '기억책'],
+      ['#board', 'board', '기억 보드'],
+      ['#network', 'network', '관계 지도']
+    ];
+    for (const [hash, view, label] of themedViews) {
+      const url = new URL(base.href); url.search = `?vt=${Date.now()}`; url.hash = hash;
+      await page.goto(url.href, { waitUntil: 'load', timeout: opts.timeout }).catch(() => {});
+      await sleep(2200);
+      const seen = await state();
+      const want = expectedThemeAttribute(view);
+      if (seen.theme !== want) {
+        problems.push(`정원에서 ${label}이(가) ${want === 'garden' ? '정원' : 'A'}가 아님 ${JSON.stringify(seen)}`);
+      }
+    }
     await page.goto(u.href, { waitUntil: 'load', timeout: opts.timeout }).catch(() => {});
     await sleep(2500);
     if (!(await pickTheme('night'))) problems.push('밤 항목을 고르지 못함');
@@ -1834,7 +1855,7 @@ async function checkThemeRoundTrip(page, base, opts, stamp) {
   }
   await page.evaluate(() => { try { localStorage.removeItem('lt41.theme'); } catch {} }).catch(() => {});
   record('visual-theme', 'visual', problems.length ? 'fail' : 'pass',
-    problems.length ? problems.join('; ') : '정원 전환·저장·새로고침 유지·기억책 정원·보드 A 고정·밤 복귀', {});
+    problems.length ? problems.join('; ') : '정원 전환·저장·새로고침 유지·화면별 기대 테마(appliedTheme)·밤 복귀', {});
   return problems;
 }
 

@@ -890,7 +890,14 @@ COM2에는 merge `6900df8aa446dfe0201d01997457fae04c4abe16`의 변경 서버 파
 - **그 자리 재생이 실제 기록에서 안 되던 문제**: 사이트응답 헤더에 CSP가 없다(`public/_headers` 자체가 없고, Pages 응답에 `Content-Security-Policy` 없음) → `frame-src` 차단은 원인이 아니다. 어댑터의 재생 리스너는 `click` 캡처 하나뿐이어서, 카드 위 겹침(`.moment-title` 등)이나 다른 리스너의 `stopPropagation`에 걸리면 아무 일도 일어나지 않았다(증상: iframe 0, 외부 요청 0). 이제 `pointerdown` 캡처에서 먼저 잡고(`playInline()`), 재생 단추를 겹침 위(`z-index:3`)로 올리고, 제목 겹침은 `pointer-events:none`(제목 고치기 단추만 auto), 재생 주소를 못 만들면 원본 링크를 새 창으로 연다. 두 번 만들지 않는다.
 - **정원에서 기억책 제목이 명조가 아니던 문제**: `appliedTheme()`이 home·journey·shelf만 정원을 넘겼다. `appliedTheme`에 `book`을 더하고 셸 `themedView()`가 기억책(`track59-sketchbook.html`)을 `book`으로 보낸다. 셸이 iframe `documentElement`에 `data-lt-theme=garden`을 붙이므로 #217의 정원 글꼴 규칙이 그대로 적용된다. 기억 보드·관계 지도는 계속 밤.
 - 확인(가짜 서버 기록: `url` + `mediaMetadata`가 있는 YouTube 순간): 1440·390, 밤·정원 모두 실제 마우스 클릭으로 `iframe.yt-frame` 1개 생성(임베드 `start=83`), 밤 큰 제목 Pretendard · 정원 큰 제목 MaruBuri, 넘침 0. 셸 경유(`#book`)에서도 iframe 테마가 garden으로 전달된다.
-- 시험: `tests/v41-book-usability.test.mjs` 12·13번, `tests/v41-journey-garden`·`v41-theme-ab`의 기대값 갱신(기억책=정원 허용, 보드·지도=밤 고정). `npm test` 483 pass / 0 fail / 37 skip, build 성공.
+- 시험: `tests/v41-book-usability.test.mjs` 12·13번, `tests/v41-journey-garden`·`v41-theme-ab`의 기대값 갱신(기억책·보드·지도=정원 허용(#274로 보드·지도도 정원), 그 밖의 안쪽 화면=밤 고정). `npm test` 483 pass / 0 fail / 37 skip, build 성공.
+
+## 2026-11-08 postdeploy visual/visual-theme 기대값 = 제품 함수 (ai/lt-postdeploy-garden-all-261108)
+
+- `tools/postdeploy/postdeploy.mjs`의 visual-theme 판정이 "기억책만 정원, 보드·지도는 A 고정"으로 박혀 있었다(#274로 보드·지도도 정원을 받아 실패).
+- 이제 **화면별 기대 테마를 제품 함수로 계산**한다: `appliedTheme('garden', view)`(`public/v41/header-state.mjs`) 결과가 `garden`이면 `data-lt-theme=garden`, `night`이면 속성 없음. 대상: `shelf`·`book`·`board`·`network`.
+- 도구를 저장소 밖에서 단독 실행하면 제품 파일이 없을 수 있어, 그때만 밤(속성 없음)으로 물러난다.
+- 화면별 기대 목록을 도구에 다시 박지 않는다 — 테마 대상이 늘면 `appliedTheme`만 고치면 된다.
 
 ## 2026-11-08 관계 지도·기억 보드 파일 지도 (3단계, #231)
 
