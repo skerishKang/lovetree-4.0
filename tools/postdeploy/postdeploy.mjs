@@ -14,6 +14,32 @@ try {
 } catch {
   viewMenuItems = null;
 }
+// 헤더 탭 개수·구성의 기대값도 제품 함수(public/v41/header-state.mjs, #222)로 계산한다.
+// 로그아웃 3 · 로그인+트리 없음 3 · 로그인+트리 있음 7 이라 고정값으로는 상태를 가릴 수 없다.
+let headerPartsFor = null;
+let treePickerText = null;
+try {
+  ({ headerPartsFor, treePickerText } = await import(new URL('../../public/v41/header-state.mjs', import.meta.url).href));
+} catch {
+  headerPartsFor = null;
+  treePickerText = null;
+}
+// 첫 화면·내 책장·둘러보기는 모든 상태에서 남는 기본 탭이다.
+const BASE_HEADER_TABS = 3;
+function headerExpectation({ owned = false, treeCount = 0, publicReading = false } = {}) {
+  if (!headerPartsFor) {
+    const state = owned ? (Number(treeCount) > 0 ? 'in-trees' : 'in-empty') : 'out';
+    return { state, treePicker: state === 'in-trees', treeViews: state === 'in-trees', write: owned, tabs: state === 'in-trees' ? 7 : 3, source: 'fallback' };
+  }
+  const parts = headerPartsFor({ owned, treeCount, publicReading });
+  const tabs = BASE_HEADER_TABS + (parts.treePicker ? 1 : 0) + (parts.treeViews ? 3 : 0);
+  return { ...parts, tabs, source: 'public/v41/header-state.mjs' };
+}
+function expectedPickerLabel({ owned, treeTitle = '', pendingDraft = false } = {}) {
+  if (treePickerText) return treePickerText({ owned, treeTitle, pendingDraft });
+  if (!owned) return pendingDraft ? '저장 안 된 기록' : '트리 고르기';
+  return treeTitle ? `트리: ${treeTitle}` : '트리 고르기';
+}
 const REACTION_KINDS = ['heart', 'like', 'love', 'laugh', 'wow', 'sad', 'angry'];
 const REACTION_LABELS = { heart: '공감', like: '좋아요', love: '사랑', laugh: '웃음', wow: '대단', sad: '슬픔', angry: '화남' };
 const OEMBED_KEYS = new Set(['title', 'authorName', 'thumbnailUrl', 'providerName', 'videoId', 'cached']);
@@ -624,18 +650,21 @@ async function checkResponsive(page, width, height, outDir, stamp) {
         currentVisible = r.left >= nr.left - 1 && r.right <= nr.right + 1;
       }
       // #213: 트리 보기 탭(기억책·기억 보드·관계 지도)은 로그인한 내 트리에서만 보인다.
+      // 탭 개수 기대값은 셸이 적어 둔 상태(body.dataset.member/treeCount)로 제품 함수에서 계산한다.
       const avatar = document.getElementById('account-avatar');
-      const loggedIn = !!avatar && !avatar.hidden && getComputedStyle(avatar).display !== 'none';
-      // #213 3번: 로그아웃 헤더는 첫 화면·내 책장·둘러보기 3개다(트리 선택·트리 보기 숨김).
-      return { ok: true, count: items.length, expected: loggedIn ? 7 : 3, loggedIn, unreachable, currentVisible, label: (active?.textContent || '').trim().slice(0, 12) };
+      const avatarVisible = !!avatar && !avatar.hidden && getComputedStyle(avatar).display !== 'none';
+      const owned = document.body.dataset.member ? document.body.dataset.member === 'in' : avatarVisible;
+      const treeCount = Number(document.body.dataset.treeCount || (window.LT41?.trees?.length ?? 0)) || 0;
+      return { ok: true, count: items.length, owned, treeCount, loggedIn: avatarVisible, unreachable, currentVisible, label: (active?.textContent || '').trim().slice(0, 12) };
     }).catch((e) => ({ ok: false, reason: e.message }));
     if (!tabs.ok) record(`tabs-${width}`, 'layout', 'fail', `탭 확인 실패: ${tabs.reason}`);
     else {
-      const ok = tabs.count === tabs.expected && tabs.unreachable.length === 0 && tabs.currentVisible !== false;
+      const expected = headerExpectation({ owned: tabs.owned, treeCount: tabs.treeCount });
+      const ok = tabs.count === expected.tabs && tabs.unreachable.length === 0 && tabs.currentVisible !== false;
       record(`tabs-${width}`, 'layout', ok ? 'pass' : 'fail',
-        ok ? `${tabs.count}개 탭 모두 스크롤로 닿음, 현재 탭 "${tabs.label}" 보임${tabs.loggedIn ? '' : ' (로그아웃: 트리 보기 탭 숨김)'}`
-          : `탭 ${tabs.count}개 (기대 ${tabs.expected}) / 닿지 않음: ${tabs.unreachable.join(', ') || '없음'} / 현재 탭 보임: ${tabs.currentVisible}`,
-        tabs);
+        ok ? `${tabs.count}개 탭 모두 스크롤로 닿음, 현재 탭 "${tabs.label}" 보임 (${expected.state}${expected.source === 'fallback' ? ' · 제품 함수 없음' : ''})`
+          : `탭 ${tabs.count}개 (기대 ${expected.tabs} · ${expected.state}) / 닿지 않음: ${tabs.unreachable.join(', ') || '없음'} / 현재 탭 보임: ${tabs.currentVisible}`,
+        { ...tabs, expected });
     }
   }
 
@@ -708,6 +737,9 @@ async function checkVisualTokens(page, target, opts, stamp) {
         treeViewsHidden: !vis(document.getElementById('tree-views')),
         treePickerHidden: !vis(document.getElementById('record-menu')),
         writeMenuHidden: !vis(document.getElementById('write-menu')),
+        // 셸이 적어 둔 상태(#222). 기대값은 이 값으로 제품 함수에서 계산한다.
+        member: document.body.dataset.member || '',
+        treeCount: Number(document.body.dataset.treeCount || (window.LT41?.trees?.length ?? 0)) || 0,
         viewHidden: !fr || fr.hidden || getComputedStyle(fr).display === 'none'
       };
     });
@@ -726,21 +758,31 @@ async function checkVisualTokens(page, target, opts, stamp) {
       continue;
     }
     const problems = [];
-    // #213: 로그아웃이면 트리 보기 탭 3개가 없고, 트리 선택 글자도 내 트리 이름이 아니다.
-    // #213 3번: 로그아웃이면 트리 선택도 숨는다(첫 화면·내 책장·둘러보기 3개).
-    const expectedTabs = top.loginVisible ? 3 : 7;
-    if (top.loginVisible) {
+    // #213 3번: 로그아웃(out)은 트리 선택·트리 보기가 없고, 로그인해도 트리가 없으면(in-empty) 같은 모양이다.
+    // 트리가 있을 때(in-trees)만 트리 선택 + 기억책·보드·지도가 붙는다. 기대값은 header-state.mjs 가 계산한다.
+    const owned = top.member ? top.member === 'in' : !top.loginVisible;
+    const headerExpected = headerExpectation({ owned, treeCount: top.treeCount });
+    const expectedTabs = headerExpected.tabs;
+    if (headerExpected.state === 'out') {
       if (!top.treeViewsHidden) problems.push('로그아웃인데 트리 보기 탭이 보임');
       if (!top.treePickerHidden) problems.push('로그아웃인데 트리 선택이 보임');
       if (!top.writeMenuHidden) problems.push('로그아웃인데 순간 남기기 버튼이 보임');
-      if (!['트리 고르기', '저장 안 된 기록'].includes(top.recordLabel)) problems.push(`로그아웃 트리 선택 글자 "${top.recordLabel}" (기대 "트리 고르기")`);
+      const label = expectedPickerLabel({ owned: false });
+      if (![label, '저장 안 된 기록'].includes(top.recordLabel)) problems.push(`로그아웃 트리 선택 글자 "${top.recordLabel}" (기대 "${label}")`);
+    } else if (headerExpected.state === 'in-empty') {
+      if (!top.treeViewsHidden) problems.push('트리 없는 로그인인데 트리 보기 탭이 보임');
+      if (!top.treePickerHidden) problems.push('트리 없는 로그인인데 트리 선택이 보임');
+      if (top.writeMenuHidden) problems.push('트리 없는 로그인인데 순간 남기기 버튼이 숨겨짐');
+      const label = expectedPickerLabel({ owned: true });
+      if (![label, '저장 안 된 기록'].includes(top.recordLabel)) problems.push(`트리 없는 로그인 트리 선택 글자 "${top.recordLabel}" (기대 "${label}")`);
     } else {
       if (top.treeViewsHidden) problems.push('로그인 상태인데 트리 보기 탭이 숨겨짐');
+      if (top.treePickerHidden) problems.push('로그인 상태인데 트리 선택이 숨겨짐');
       if (!/^트리: /.test(top.recordLabel)) problems.push(`로그인 트리 선택 글자 "${top.recordLabel}" (기대 "트리: <이름>")`);
     }
     // 2026-11-07: 트리 선택은 뒤쪽 탭 묶음 바로 앞, 주 버튼은 #write-menu 하나(금색), 연결 보기는 헤더에 없다.
-    if (!top.loginVisible && !top.recordBeforeTreeViews) problems.push('트리 선택이 기억책·보드·지도 탭 앞에 있지 않음');
-    if (!top.loginVisible && !top.writeGold) problems.push(`주 버튼 금색 강조 없음: ${top.pillBorder}`);
+    if (!top.treeViewsHidden && !top.recordBeforeTreeViews) problems.push('트리 선택이 기억책·보드·지도 탭 앞에 있지 않음');
+    if (!top.writeMenuHidden && !top.writeGold) problems.push(`주 버튼 금색 강조 없음: ${top.pillBorder}`);
     if (top.connectionInHeader) problems.push('연결 보기가 아직 헤더에 있음');
     if (!/^LoveTree\s*4\.1$/.test(top.brand.replace(/\s+/g, ' ').trim())) problems.push(`워드마크 "${top.brand}" (기대 LoveTree 4.1)`);
     if (/MEMORY ORBIT/i.test(top.brand)) problems.push('워드마크에 MEMORY ORBIT 남음');
