@@ -96,3 +96,5 @@ html[data-lt-theme=garden][data-v41-screen=board] .lt-moment-picker{background:v
 html[data-lt-theme=garden][data-v41-screen=board] .lt-moment-picker button{background:var(--lt-paper);border-color:var(--lt-line);color:var(--lt-ink)}
 html[data-lt-theme=garden][data-v41-screen=board] .lt-moment-picker button[aria-pressed=true]{background:var(--lt-primary);border-color:var(--lt-primary);color:var(--lt-primary-ink)}
 html[data-lt-theme=garden][data-v41-screen=board] .toast{background:var(--lt-glass-strong);border-color:var(--lt-line);color:var(--lt-ink)}
+html[data-lt-theme=garden][data-v41-screen=board] .lt-moment-picker select{background:var(--lt-paper);border:1px solid var(--lt-line);color:var(--lt-ink)}
+html[data-lt-theme=garden][data-v41-screen=board] .lt-moment-picker button{border:1px solid var(--lt-line);background:var(--lt-paper);color:var(--lt-ink)}
