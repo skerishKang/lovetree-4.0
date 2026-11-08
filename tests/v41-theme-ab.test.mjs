@@ -9,6 +9,8 @@ import {
 } from '../public/v41/header-state.mjs';
 
 const read = path => fs.readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
+const navigation = read('public/v41/shell/navigation.mjs');
+const themeModule = read('public/v41/shell/theme.mjs');
 const html = read('public/v41/index.html');
 const css = read('public/v41/identity.css');
 const shell = read('public/v41/shell.mjs');
@@ -94,8 +96,11 @@ test('기억 보드·관계 지도는 언제나 A다(#212: 내 책장은 정원,
   assert.equal(appliedTheme('night', 'shelf'), 'night');
   assert.equal(appliedTheme('garden', 'inner'), 'night');
   // 문서 속성도 화면에 따라 정해진다.
-  assert.match(shell, /function themedView\(\)\{return current==='src064-orbit\.html'\?'home':current==='first-journey\.html'\?'journey':current==='track32-bookshelf\.html'\?'shelf':current==='track59-sketchbook\.html'\?'book':'inner';\}/);
-  assert.match(shell, /appliedTheme\(theme,themedView\(\)\)/);
+  // #231 1-B: 화면별 테마 대상 계산은 shell/navigation.mjs, 문서 반영은 shell/theme.mjs가 맡는다.
+  assert.match(navigation, /if \(file === 'src064-orbit\.html'\) return 'home';/);
+  assert.match(navigation, /if \(file === 'track59-sketchbook\.html'\) return 'book';/);
+  assert.match(navigation, /return 'inner';/);
+  assert.match(themeModule, /appliedTheme\(theme, themedViewFor\(file\)\)/);
 });
 
 test('전환 버튼은 누르면 갈 곳(밤/정원)과 aria-pressed를 쓴다', () => {
@@ -114,7 +119,8 @@ test('전환 버튼은 누르면 갈 곳(밤/정원)과 aria-pressed를 쓴다',
   assert.match(homeJS, /kind==='theme'\).*writeTheme\(localStorage/, '메뉴에서 고른 테마를 저장한다');
   assert.match(homeJS, /parent\.postMessage\(\{type:'lt41-theme',theme\}/, '셸에 테마를 알리는 기존 메시지를 그대로 쓴다');
   assert.match(html, /id="account-theme" data-lt-theme-toggle aria-pressed="false"/);
-  assert.match(shell, /document\.querySelectorAll\('\[data-lt-theme-toggle\]'\)/);
+  // #231 1-B: 테마 버튼 반영은 shell/theme.mjs로 옮겼다(같은 선택자·같은 문구).
+  assert.match(themeModule, /document\.querySelectorAll\('\[data-lt-theme-toggle\]'\)/);
 });
 
 test('워드마크는 LoveTree + 4.1이고 MEMORY ORBIT·새싹이 없다', () => {
