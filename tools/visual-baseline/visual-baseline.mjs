@@ -344,6 +344,16 @@ async function compare(argv) {
   for (const row of rows) {
     console.log(`${row.name.padEnd(width)}  ${row.ratio.toFixed(3).padStart(7)}  ${row.ratio === 0 ? '동일' : row.ratio <= row.limit ? '기준 이내' : 'FAIL'} ${row.note}`);
   }
+  // CI(미리보기 검사)가 표를 그릴 수 있게 결과를 JSON으로도 남긴다(2026-11-08).
+  if (options.json && options.json !== 'true') {
+    writeFileSync(path.resolve(options.json), JSON.stringify({
+      before, after, out,
+      threshold: Number(options.threshold),
+      shots: rows,
+      worst: Math.max(...rows.map((row) => row.ratio)),
+      over: rows.filter((row) => row.ratio > row.limit).length
+    }, null, 1));
+  }
   const worst = Math.max(...rows.map((row) => row.ratio));
   const limits = [...new Set(rows.map((row) => row.limit))].sort((a, b) => a - b);
   console.log(`\n${rows.length}장 중 차이 ${rows.filter((row) => row.ratio > 0).length}장, 최대 ${worst.toFixed(3)}% (기준 ${limits.join('/')}%)`);
@@ -369,7 +379,7 @@ try {
   if (command === 'capture') process.exitCode = await capture(argv);
   else if (command === 'compare') process.exitCode = await compare(argv);
   else {
-    console.log('사용법:\n  capture --base <url> --out <폴더>\n  compare --before <폴더> --after <폴더> [--out <폴더>] [--threshold 0.1]');
+    console.log('사용법:\n  capture --base <url> --out <폴더>\n  compare --before <폴더> --after <폴더> [--out <폴더>] [--threshold 0.1] [--json <파일>]');
     process.exitCode = 2;
   }
 } catch (error) {
