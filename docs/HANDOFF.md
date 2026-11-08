@@ -805,3 +805,10 @@ COM2에는 merge `6900df8aa446dfe0201d01997457fae04c4abe16`의 변경 서버 파
 - 예시는 선명도 보정 없이 원래 값이고, 내 카드에만 `.card.mine` 금빛 토큰 표시가 붙는다.
 - 인기 모드는 새 API·DB 없이 `/api/community/shares` + `/api/public/shares/:id`만 쓴다. 공개 순간에 같은 출처 썸네일이 없으면 예시로 채우고 부족 안내를 보여 준다.
 - 컴1 확인: 실제 계정에서 내 것만/섞어서 카드와 금빛 표시, 390 도구 줄 넘침, 인기 카드 클릭의 공개 트리 이동, 클릭 전 외부 요청 0.
+
+## 2026-11-08 기억책 사용성 1~9 (ai/lt-book-usability-261108)
+- 규칙은 `public/v41/book-usability.mjs` 한 파일에 모으고, 두 벌의 화면 파일(`views/`·`design/views/track59-sketchbook.html`)에는 `scripts/apply-book-usability.mjs`가 같은 어댑터(`<style id="lt-book-usability">` + `<script type="module">`)를 넣는다. 스크립트는 두 번 돌려도 "변경 없음"이다.
+- 셸은 `openEditor(mode,parentId)`·`setEditorMode(mode,parentId)`로 부모를 받고, `lt41-write` 메시지의 `parentId`를 그대로 넘긴다. 제목 고치기는 `lt41-select` 뒤 `lt41-write`(`edit`)로 지금 순간을 먼저 고른다.
+- 시험: `tests/v41-book-usability.test.mjs`(1~9 각각 + 두 벌 동기화). 전체 `npm test` 437 pass / 0 fail, `vite build` 성공.
+- 컴1 확인(브라우저, 1440·390): 클릭 전 외부 요청 0, embed `start=83`·`rel=0`, 안쪽 스크롤 0, 빈 오른쪽 페이지 문구·단추, 돋보기 기본 꺼짐/저장, 상세 위치·Esc 초점 복귀, 머리 표시 감춤, 연결 안내 숨김·대체 문구.
+- 실제 계정이 필요한 확인(대표 계정으로): 제목 고치기가 그 순간 편집기로 열리는지, "다음 순간 남기기"가 부모를 그 순간으로 저장하는지. 예시 모드에서는 기존 규칙대로 로그인 안내가 열린다.
