@@ -70,3 +70,22 @@ node tools\postdeploy\postdeploy.mjs https://lovetree-4-0.pages.dev/v41/ --auto-
 
 출력은 각 저장소의 `tools/postdeploy/out`에 저장됩니다. 기대 결과는 로그인·로그아웃
 모두 `fail=0`이며, 실패가 있으면 종료 코드 2로 멈춥니다.
+
+## 로그인 흐름 전체 검사 (--auth-flows)
+
+이 모드는 전용 시험 계정의 트리·순간을 만들고 마지막에 계정의 트리를 삭제합니다.
+다른 작업과 시험 계정을 공유하거나 동시에 실행하지 마세요. 빈 계정에서 시작하며,
+실패한 실행도 `flow-cleanup`과 `flow-cleanup-assets` 결과를 확인해야 합니다.
+
+```powershell
+node tools/postdeploy/postdeploy.mjs https://lovetree-4-0.pages.dev/v41/ --auth-flows --strict --secrets "$env:USERPROFILE\.secrets\.env" --out tools/postdeploy/out/auth-run1
+# 첫 실행과 정리가 끝난 뒤 같은 명령을 auth-run2 출력 폴더로 다시 실행
+```
+
+- A2(빈 계정) → A1(로그인 복귀·intent 제거·첫 여정) → A2(별도 context에서 트리 준비 뒤 새 context의 책장 로그인 복귀) → A3(정원 테마) → H1(로그아웃) → H2(미저장 보호 진단·만료 복원)를 새 context에서 순차 검사합니다.
+- H2는 탭 A 편집기 열기 → 탭 B 로그아웃 → 탭 A 입력·저장 순서입니다. 만료 안내·입력·임시 키를 확인한 뒤 화면의 **새 창에서 로그인**을 사용합니다. 로그인 셸의 `member=in`을 기다리고 원래 탭을 새로고침하여 복원 안내의 **다시 시도**를 누릅니다. 성공 PUT, 서버 재조회로 시험 순간 존재, 임시 키 삭제까지 확인합니다.
+- 확인창은 기본 취소합니다. 예외는 정리 단계의 삭제 confirm과, H2에서 임시 키를 확인한 뒤 원래 탭을 새로고침할 때의 beforeunload뿐입니다.
+- 정리는 첫 트리 안내를 닫고 책 정보를 연 뒤, `#tree-manager[open]`과 클릭 가능한 `#tree-delete`를 합계 최대 8초 기다립니다. 삭제 PUT 성공 뒤 `/api/workspace`의 트리 0개를 확인합니다. DOM의 0개 표시만으로 통과하지 않습니다.
+- 삭제 실패 순간의 screenshot과 dialog 열림·가시성, 삭제 버튼 가시성·활성 상태를 JSON에 기록합니다. 끝에는 트리 화면과 열린 보관 파일 목록의 명시적인 빈 상태를 캡처합니다.
+- 각 flow의 `notFound`에는 404 주소(origin/path), resource type, 호출 위치를 남깁니다. 인증 쿼리·요청 헤더·비밀번호·쿠키 값은 기록하지 않습니다. 실제 누락 파일은 검사 도구가 수정하거나 무시하지 않습니다.
+- 모든 결과와 화면은 `--out` 아래에만 저장하며 커밋하지 않습니다. `--strict` 실행은 경고도 실패로 처리합니다.
