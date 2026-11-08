@@ -205,13 +205,15 @@ test('카드 메뉴: shadow DOM 클릭은 document retarget에도 안쪽으로 �
   assert.equal(clickWithin({target: button}, null), false);
 });
 
-test('카드 메뉴 배선: 바깥 클릭은 composedPath 판정, Esc는 그대로 닫는다', () => {
+test('보기 메뉴 배선: 바깥 클릭은 composedPath 판정, Esc는 그대로 닫는다', () => {
   const home = readFileSync(new URL('../v41/home.js', import.meta.url), 'utf8');
   const cards = readFileSync(new URL('../v41/home-cards.js', import.meta.url), 'utf8');
   assert.match(cards, /export function clickWithin\(event, \.\.\.nodes\)/);
   assert.match(home, /import \{[^}]*clickWithin[^}]*\} from '\.\/home-cards\.js';/);
-  assert.match(home, /document\.addEventListener\('click',e=>\{if\(!clickWithin\(e,cardWrap\)\)closeMenu\(\);\}\);/);
-  assert.equal(/!cardWrap\.contains\(e\.target\)/.test(home), false, 'retarget에 취약한 target 판정을 남기지 않는다');
-  assert.match(home, /e\.key==='Escape'\)closeMenu\(\)/);
-  assert.match(home, /e\.key==='Escape'\)\{e\.preventDefault\(\);closeMenu\(true\);\}/);
+  // #213 2번: 카드 출처 메뉴는 "보기" 메뉴 안으로 들어갔지만 바깥 클릭 판정은 같은 clickWithin을 쓴다.
+  assert.match(home, /document\.addEventListener\('click',e=>\{if\(!clickWithin\(e,viewWrap\)\)closeViewMenu\(\);\}\);/);
+  assert.equal(/!viewWrap\.contains\(e\.target\)/.test(home), false, 'retarget에 취약한 target 판정을 남기지 않는다');
+  assert.equal(/!cardWrap\.contains\(e\.target\)/.test(home), false);
+  assert.match(home, /e\.key==='Escape'\)closeViewMenu\(\)/);
+  assert.match(home, /if\(next\.type==='close'\)\{e\.preventDefault\(\);closeViewMenu\(true\);\}/);
 });
