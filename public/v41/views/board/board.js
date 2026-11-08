@@ -5,9 +5,12 @@ const ltVar=(n,f)=>(getComputedStyle(document.documentElement).getPropertyValue(
 const colors={rose:ltVar('--lt-thread-rose','#ff659f'),violet:ltVar('--lt-thread-violet','#a86cff'),cyan:ltVar('--lt-thread-cyan','#69dcff'),amber:ltVar('--lt-thread-amber','#ffc96b'),pearl:'#e9dff3'}
 ;
 
+// 기억 보드는 실제 기록에서는 읽기 전용이다. 데이터에 쓰기 권한 필드가 없어(순간·연결 모두
+// kind/from/to/reason만 온다) 지금은 예시 판본 여부로만 가를 수 있다. 판단은 이 한 곳에서 한다.
+const canEditBoard=LTDEMO.example;
 let moments=LTDEMO.moments.map((m,i)=>({id:m.id,type:m.type==='memo'?'note':'photo',originalType:m.type==='memo'?'note':m.type,createdOrder:i+1,title:m.title,emotion:m.emotion,date:m.date,source:m.source||'예시 기록',mediaMetadata:m.mediaMetadata||null,memo:m.memo||m.whyNext||'',x:150+(i%8)*280,y:150+Math.floor(i/8)*400,rot:(i%3-1)*2,color:['rose','violet','cyan','amber'][i%4],asset:m.image,url:m.externalUrl||'',first:!!m.first}));
 
-let connections=LTDEMO.edges.map((e,i)=>({id:'c'+i,kind:e.kind,a:e.from,b:e.to,why:e.kind==='related'?'관련 순간':e.reason||'부모·자식 연결',color:e.kind==='related'?'cyan':(LTDEMO.example?['rose','violet','cyan','amber'][Math.max(0,moments.findIndex(m=>m.id===e.from))%4]:'rose')}));
+let connections=LTDEMO.edges.map((e,i)=>({id:'c'+i,kind:e.kind,a:e.from,b:e.to,why:e.kind==='related'?'관련 순간':e.reason||'부모·자식 연결',color:e.kind==='related'?'cyan':(canEditBoard?['rose','violet','cyan','amber'][Math.max(0,moments.findIndex(m=>m.id===e.from))%4]:'rose')}));
 
 const replayPath=(()=>{const ids=[],seen=new Set();let m=LTDEMO.moments[0];while(m&&!seen.has(m.id)){ids.push(m.id);seen.add(m.id);m=LTDEMO.moments.find(x=>x.id===m.next)}return ids})();
 
@@ -122,13 +125,13 @@ $('#whyModal').classList.add('open')}
 
 function showWhy(cid){selectedConn=cid;
 let c=connections.find(x=>x.id===cid),a=moments.find(x=>x.id===c.a),b=moments.find(x=>x.id===c.b);
-$('#whyBubble').innerHTML=`<b>${esc(a.title)} → ${esc(b.title)}</b><br>${esc(c.why)}${LTDEMO.example?' <button id="deleteConnBubble">연결 지우기</button>':''}`;
+$('#whyBubble').innerHTML=`<b>${esc(a.title)} → ${esc(b.title)}</b><br>${esc(c.why)}${canEditBoard?' <button id="deleteConnBubble">연결 지우기</button>':''}`;
 $('#whyBubble').classList.add('show');
 setTimeout(()=>{let b=$('#deleteConnBubble');if(b)b.onclick=deleteSelectedConnection},0);
 clearTimeout(showWhy.t);
 showWhy.t=setTimeout(()=>$('#whyBubble').classList.remove('show'),5200)}
 
-function deleteSelectedConnection(){if(!LTDEMO.example){toast('읽기 전용에서는 연결을 변경할 수 없어요.');
+function deleteSelectedConnection(){if(!canEditBoard){toast('읽기 전용에서는 연결을 변경할 수 없어요.');
 return}if(!selectedConn)return;
 snapshot();
 connections=connections.filter(c=>c.id!==selectedConn);
