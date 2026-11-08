@@ -892,6 +892,13 @@ COM2에는 merge `6900df8aa446dfe0201d01997457fae04c4abe16`의 변경 서버 파
 - 확인(가짜 서버 기록: `url` + `mediaMetadata`가 있는 YouTube 순간): 1440·390, 밤·정원 모두 실제 마우스 클릭으로 `iframe.yt-frame` 1개 생성(임베드 `start=83`), 밤 큰 제목 Pretendard · 정원 큰 제목 MaruBuri, 넘침 0. 셸 경유(`#book`)에서도 iframe 테마가 garden으로 전달된다.
 - 시험: `tests/v41-book-usability.test.mjs` 12·13번, `tests/v41-journey-garden`·`v41-theme-ab`의 기대값 갱신(기억책·보드·지도=정원 허용(#274로 보드·지도도 정원), 그 밖의 안쪽 화면=밤 고정). `npm test` 483 pass / 0 fail / 37 skip, build 성공.
 
+## 2026-11-09 기억책 계산 전부 LT59Model 한 벌 — 여섯 화면 계산 정리 완료 (ai/lt-book-model-261109)
+
+- 기억책의 순수 계산은 `public/v41/views/book/book-model.js`의 **`window.LT59Model` 한 벌**만 쓴다: `buildSpreads`(펼침면·동반 페이지·갈래)·`folioLabel`(쪽번호)·`turnAngle`(넘김 각도·휨)·`connectionSummary`(연결 요약)·`nextMomentOf`(다음 순간).
+- 표시 규칙은 이미 `public/v41/book-usability.mjs`가 한 벌로 갖고 있어 그대로 둔다: `displayTitle`·`connectionLine`·`detailPlacement`·`tapIntent`(#299)·`pageOverflows`(#301).
+- `book.js`·`book-extra.js`는 같은 계산을 다시 구현하지 않고 모델을 먼저 부른다(`track59-sketchbook.html`에서 `book-model.js` → `book.js` 순서). 시험 `tests/v41-book-model.test.mjs`가 옛 계산 부재 + 호출 존재를 함께 검사.
+- 이로써 **여섯 화면(홈·책장·기억책·기억 보드·관계 지도·계정)의 순수 계산이 모두 화면이 실제로 쓰는 한 벌**이 됐다(보드 `LT58Model`·지도 `LT56Model`·기억책 `LT59Model`·나머지는 각 화면/`book-usability.mjs`).
+
 ## 2026-11-09 관계 지도 계산 전부 LT56Model 한 벌 (ai/lt-network-model-261109)
 
 - 관계 지도의 순수 계산은 `public/v41/views/network/network-model.js`의 **`window.LT56Model` 한 벌**만 쓴다: `branchPoint`(갈래 점)·`groupSizeFor`·`clusterSpan`(묶음 나누기·이름)·`smallTreeLayout`(작은 트리 보정)·`bezierGeometry`(연결선 조절점)·`mobileFit`(손가락 맞춤)·`routeEdges`(경로 순서).
