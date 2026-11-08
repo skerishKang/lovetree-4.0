@@ -137,4 +137,4 @@
 | 단계 | 상태 | 비고 |
 |---|---|---|
 | ① 파일 분리 | **완료(#231, PR #262)** | `views/book/book.css`(325줄)·`book.js`(79줄), 화면 483→210줄. 조건·문구·id 변경 0 |
-| ② 주입 합치기 | **완료(#231, PR #263)** | `book-usability.css`(112줄)·`book-extra.js`(202줄)로 정식 포함, 주입 스크립트·`design/shared.js` 삭제, `v41-example` 시험을 runtime 기준으로 재작성, 재생 단추 주 버튼 한정(`isPrimaryButton`) |
+| ② 주입 합치기 | **완료(#231, PR #264)** | `book-usability.css`(112줄)·`book-extra.js`(202줄)로 정식 포함, 주입 스크립트·`design/shared.js` 삭제, `v41-example` 시험을 runtime 기준으로 재작성, 재생 단추 주 버튼 한정(`isPrimaryButton`) |
