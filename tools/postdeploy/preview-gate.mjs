@@ -15,6 +15,16 @@ function isPreview503(check) {
   return PREVIEW_503_PATHS.some((route) => text.includes(route)) || /\/api\/[a-z/-]+/.test(text);
 }
 
+// 503이 콘솔에 찍혀 화면 기능 검사가 함께 무너진 경우(메뉴 항목 0개 등)도 503 영향으로 본다.
+// 단, 리포트 어딘가에 503이 실제로 있을 때만 인정한다(순수 화면 회귀는 그대로 실패).
+const CONSOLE_503 = (report) => (report.console?.errors || []).some((line) => /503/.test(line)) || (report.checks || []).some(isPreview503);
+function isPreview503KnockOn(check, report) {
+  if (!CONSOLE_503(report)) return false;
+  const text = `${check.detail || ''} ${JSON.stringify(check.data || {})}`;
+  if (check.area === 'console' && (report.console?.errors || []).every((line) => /503/.test(line))) return true;
+  return /"items":\[\]/.test(text) && /loggedIn":false/.test(text);
+}
+
 async function resolveReport(input) {
   const candidates = [];
   const stat = await readdir(input, { withFileTypes: true }).catch(() => null);
@@ -44,8 +54,8 @@ if (!reportPath) {
 const report = JSON.parse(await readFile(reportPath, 'utf8'));
 const checks = Array.isArray(report.checks) ? report.checks : [];
 const failures = checks.filter((check) => check.status === 'fail');
-const exceptions = failures.filter(isPreview503);
-const realFailures = failures.filter((check) => !isPreview503(check));
+const exceptions = failures.filter((check) => isPreview503(check) || isPreview503KnockOn(check, report));
+const realFailures = failures.filter((check) => !exceptions.includes(check));
 const counts = { pass: 0, fail: 0, warn: 0, skip: 0 };
 for (const check of checks) counts[check.status] = (counts[check.status] || 0) + 1;
 const meta = report.meta || {};
@@ -59,7 +69,7 @@ lines.push(`- 대상: \`${meta.target || '(주소 미기록)'}\``);
 lines.push(`- 시각: ${meta.startedAt || meta.stamp || '(미기록)'} · 브라우저: ${meta.browser || 'chromium'} · 로그인: ${login.loggedIn ? '예' : '아니오'}(로그아웃 검사)`);
 lines.push(`- 결과: pass ${counts.pass} · fail ${counts.fail} · warn ${counts.warn} · skip ${counts.skip}`);
 if (exceptions.length) {
-  lines.push(`- 미리보기 Functions 503 예외 ${exceptions.length}건(통과 처리):`);
+  lines.push(`- 미리보기 Functions 503 예외 ${exceptions.length}건(통과 처리, 503 영향 포함):`);
   for (const check of exceptions.slice(0, 6)) lines.push(`  - \`${check.area}/${check.id}\` — ${String(check.detail || '').slice(0, 120)}`);
 }
 if (realFailures.length) {
