@@ -840,7 +840,8 @@ async function checkHomeCardMenuMouse(page, target, opts, stamp) {
   // 로그인 7 = 움직임 1 + 테마 2 + 카드 4). 제품 함수 viewMenuItems 로 계산해 숫자를 두 번 적지 않는다.
   const problems = [];
   const base = new URL(target.href);
-  const readMenu = () => page.evaluate(() => {
+  // 러너(headless chromium)에서 바깥 클릭 직후 shadow root 읽기가 한 번 비는 경우가 있어 3회까지 다시 읽는다.
+  const readMenuOnce = () => page.evaluate(() => {
     const frame = document.getElementById('view');
     const doc = frame?.contentDocument;
     const sh = doc?.getElementById('orbit')?.shadowRoot;
@@ -854,6 +855,14 @@ async function checkHomeCardMenuMouse(page, target, opts, stamp) {
       loggedIn: !!avatar && !avatar.hidden && getComputedStyle(avatar).display !== 'none'
     };
   }).catch(() => null);
+  const readMenu = async () => {
+    let last = await readMenuOnce();
+    for (let attempt = 0; attempt < 2 && (!last || (last.hidden === undefined && !last.items.length)); attempt += 1) {
+      await sleep(400);
+      last = await readMenuOnce();
+    }
+    return last;
+  };
   const expectedItems = (loggedIn) => {
     if (!viewMenuItems) return { count: loggedIn ? 7 : 5, labels: [], source: 'fallback' };
     const items = viewMenuItems({ loggedIn });
