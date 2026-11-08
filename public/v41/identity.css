@@ -1,7 +1,8 @@
 /* 4.1 identity layer. Imported artwork and data remain unchanged. */
 @import url('/fonts/pretendard/pretendardvariable-dynamic-subset.css');
 @font-face{font-family:MaruBuri;font-weight:400;font-style:normal;font-display:swap;src:url('/fonts/MaruBuri-Regular.woff2') format('woff2')}
-:root{--lt-ui:'Pretendard Variable',Pretendard,'Noto Sans KR',system-ui,sans-serif;--lt-reading:MaruBuri,'Noto Serif CJK KR',Batang,serif;--body:var(--lt-ui);--latin:var(--lt-ui);--display:var(--lt-reading);--book-serif:var(--lt-reading);--ui-sans:var(--lt-ui);--hand:var(--lt-reading);font-synthesis:none}
+/* 2026-11-09 제목 글꼴 토큰: 밤은 본문과 같은 기본 글꼴(Pretendard), 정원은 지금 명조(MaruBuri) 그대로. */
+:root{--lt-ui:'Pretendard Variable',Pretendard,'Noto Sans KR',system-ui,sans-serif;--lt-reading:MaruBuri,'Noto Serif CJK KR',Batang,serif;--body:var(--lt-ui);--latin:var(--lt-ui);--lt-font-display:var(--lt-ui);--display:var(--lt-font-display);--book-serif:var(--lt-reading);--ui-sans:var(--lt-ui);--hand:var(--lt-reading);font-synthesis:none}
 /* 4.1 공통 색·모양 토큰 (대표 결정 2026-11-05: 첫 화면 SRC064가 디자인 원본). 값은 SRC064 원본에서 그대로 뽑았다.
    새 UI의 색·모서리는 이 토큰만 쓴다. 원본 화면의 :root 색은 이 파일의 화면별 덮어쓰기로만 바꾼다. 새 hex를 흩뿌리지 않는다. */
 :root{
@@ -21,7 +22,7 @@
 }
 body{font-family:var(--lt-ui)}
 button,input,select,textarea,summary{font-family:var(--lt-ui)!important}
-.hero h1,.card h3,.cover-title,.book-title,.moment-title h3,.note-piece,.letter,.clipping,.archive-piece{font-family:var(--lt-reading)}
+.hero h1,.card h3,.cover-title,.book-title,.moment-title h3,.note-piece,.letter,.clipping,.archive-piece{font-family:var(--lt-font-display)}
 .hero h1,.card h3,.moment-title h3,.note-piece h2,.letter h2,.clipping h2{font-weight:400}
 /* The shell owns the sole service mark; each view keeps its own tools. */
 html[data-v41-screen] header>.brand,html[data-v41-screen] .topbar>.brand{display:none!important}
@@ -145,6 +146,8 @@ html[data-lt-theme=garden]{
  --lt-primary:#98505e;--lt-primary-ink:#fffdf8;
  --lt-garden-edge:#eee3d5;--lt-garden-shadow:0 18px 40px rgba(75,51,42,.16)
 }
+/* 정원(명조)은 지금 보이던 글꼴 그대로 — 토큰만 지금 값으로 되돌린다. */
+html[data-lt-theme=garden]{--lt-font-display:var(--lt-reading)}
 html[data-lt-theme=garden] body{background:var(--lt-stage)!important}
 html[data-lt-theme=garden] #stage,html[data-lt-theme=garden] iframe{background:var(--lt-stage)}
 html[data-lt-theme=garden] .app-header{border-bottom-color:var(--lt-line)}
@@ -202,7 +205,7 @@ html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .ghost{border-color:var(
 html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .ghost:hover{border-color:var(--lt-gold-line);color:var(--lt-gold);background:rgba(255,230,166,.08)}
 html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .hero{border-color:var(--lt-line);background:var(--lt-glass);box-shadow:0 24px 60px rgba(0,0,0,.5)}
 /* "한 권의 책" 강조는 장미색이 아니라 진주색 흐린 톤이다(이슈 #212). */
-html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .hero h1{color:var(--lt-pearl);font-family:var(--lt-reading)}
+html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .hero h1{color:var(--lt-pearl);font-family:var(--lt-font-display)}
 html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .hero h1 em{color:var(--lt-muted);font-style:normal}
 html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .hero-copy p:not(.eyebrow){color:var(--lt-muted)}
 html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .eyebrow{color:var(--lt-gold)}
