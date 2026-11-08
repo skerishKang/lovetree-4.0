@@ -8,9 +8,10 @@ globalThis.window = globalThis;
 await import('../public/v41/views/board/board-model.js');
 const M = globalThis.LT58Model;
 const BOARD = fs.readFileSync(new URL('../public/v41/views/board/board.js', import.meta.url), 'utf8');
+const EXTRAS = fs.readFileSync(new URL('../public/v41/views/board/board-extras.js', import.meta.url), 'utf8');
 
 test('0. 계산 한 벌은 화면이 실제로 부르는 함수만 노출한다', () => {
-  assert.deepEqual(Object.keys(M).sort(), ['cardPosition', 'editGuard', 'escapeHTML', 'fitZoom', 'removeConnection', 'threadPath']);
+  assert.deepEqual(Object.keys(M).sort(), ['cardPosition', 'cinemaBeats', 'collectPath', 'detailButtonState', 'editGuard', 'escapeHTML', 'fitZoom', 'nextConnections', 'removeConnection', 'threadPath']);
   for (const fn of Object.keys(M)) assert.equal(typeof M[fn], 'function', fn);
 });
 
@@ -68,4 +69,66 @@ test('7. 화면(board.js)은 같은 계산을 다시 구현하지 않고 이 한
     assert.ok(BOARD.includes(call), call);
   }
   assert.match(BOARD, /toast\(guard\.message\)/);
+});
+
+test('8. 경로 수집: 부모 연결을 따라가고, 순환·끊김에서 멈춘다', () => {
+  const cons = [
+    { id: 'c1', kind: 'parent', a: 'm1', b: 'm2' },
+    { id: 'c2', kind: 'parent', a: 'm2', b: 'm3' },
+    { id: 'r1', kind: 'related', a: 'm1', b: 'm9' },
+    { id: 'c3', kind: 'parent', a: 'm3', b: 'm1' } // 순환
+  ];
+  // 순환으로 돌아오면 그 연결까지 기록하고 멈춘다(예전 규칙 그대로).
+  assert.deepEqual(M.collectPath('m1', 5, cons), { ids: ['m1', 'm2', 'm3'], cons: ['c1', 'c2', 'c3'] });
+  assert.deepEqual(M.collectPath('m3', 5, cons), { ids: ['m3', 'm1', 'm2'], cons: ['c3', 'c1', 'c2'] });
+  // 갈래가 여럿이면 첫 연결을 따른다(예전과 같은 규칙).
+  const two = [{ id: 'a', kind: 'parent', a: 'm1', b: 'm2' }, { id: 'b', kind: 'parent', a: 'm1', b: 'm3' }];
+  assert.deepEqual(M.collectPath('m1', 5, two).ids, ['m1', 'm2']);
+  // 상한(순간 수)을 넘겨 돌지 않는다.
+  const loop = [{ id: 'x', kind: 'parent', a: 'm1', b: 'm2' }, { id: 'y', kind: 'parent', a: 'm2', b: 'm1' }];
+  assert.ok(M.collectPath('m1', 3, loop).ids.length <= 3);
+});
+
+test('9. 다음/이전 후보: 고른 순간에 이어진 부모 연결만 고른다', () => {
+  const cons = [
+    { id: 'c1', kind: 'parent', a: 'm1', b: 'm2' },
+    { id: 'c2', kind: 'parent', a: 'm1', b: 'm3' },
+    { id: 'r1', kind: 'related', a: 'm1', b: 'm4' },
+    { id: 'c3', kind: 'parent', a: 'm3', b: 'm1' }
+  ];
+  assert.deepEqual(M.nextConnections('next', 'm1', cons).map((c) => c.id), ['c1', 'c2']);
+  assert.deepEqual(M.nextConnections('prev', 'm1', cons).map((c) => c.id), ['c3']);
+  assert.deepEqual(M.nextConnections('next', 'zzz', cons), []);
+});
+
+test('10. 상세 버튼 상태: 연결이 없으면 잠그고 안내 문구를 붙인다', () => {
+  assert.deepEqual(M.detailButtonState([], []), { nextDisabled: true, nextTitle: '다음으로 연결된 순간이 없어요', prevDisabled: true });
+  assert.deepEqual(M.detailButtonState([{}], [{}]), { nextDisabled: false, nextTitle: '', prevDisabled: false });
+});
+
+test('11. 시네마 비트: 순간·연결·이유·갈림·마무리 순서와 길이', () => {
+  const moments = [{ id: 'm1', first: true }, { id: 'm2' }];
+  const cons = [{ id: 'c1', kind: 'parent', a: 'm1', b: 'm2' }, { id: 'c2', kind: 'parent', a: 'm1', b: 'm3' }];
+  const beats = M.cinemaBeats(['m1', 'm2'], moments, cons);
+  assert.deepEqual(beats.map((b) => b.type), ['moment', 'connection', 'why', 'branch', 'moment', 'bloom', 'final']);
+  assert.equal(beats[0].label, '첫 순간');
+  assert.equal(beats[0].dur, 2200);
+  assert.equal(beats[1].cid, 'c1');
+  assert.equal(beats[1].dur, 2300);
+  assert.equal(beats[4].label, 'NEXT 순간');
+  assert.equal(beats[4].dur, 1800);
+  assert.equal(beats[5].dur, 2300);
+  assert.equal(beats[6].dur, 999999);
+  // 빈 경로에서도 마무리 비트는 남는다(예전과 같은 모양).
+  assert.deepEqual(M.cinemaBeats([], moments, cons).map((b) => b.type), ['bloom', 'final']);
+});
+
+test('12. board-extras.js는 같은 계산을 다시 구현하지 않고 한 벌을 부른다', () => {
+  assert.doesNotMatch(EXTRAS, /while\(guard\+\+<moments\.length\)/);
+  assert.doesNotMatch(EXTRAS, /connections\.filter\(c=>c\.kind==='parent'&&\(dir==='next'/);
+  assert.doesNotMatch(EXTRAS, /beats\.push\(\{type:'moment'/);
+  assert.doesNotMatch(EXTRAS, /\$\('#nextMoment'\)\.disabled=outs\.length===0/);
+  for (const call of ['LT58Model.collectPath', 'LT58Model.nextConnections', 'LT58Model.detailButtonState', 'LT58Model.cinemaBeats']) {
+    assert.ok(EXTRAS.includes(call), call);
+  }
 });
