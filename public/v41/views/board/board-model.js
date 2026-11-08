@@ -34,5 +34,60 @@ window.LT58Model = (() => {
     return canEdit ? { blocked: false, message: '' } : { blocked: true, message: '읽기 전용에서는 연결을 변경할 수 없어요.' };
   }
 
-  return { escapeHTML, cardPosition, threadPath, fitZoom, removeConnection, editGuard };
+
+  // 경로 따라가기: 부모 연결을 한 줄로 따라가며 순간 id와 지나온 연결 id를 모은다.
+  // 같은 순간으로 돌아오거나 연결이 끊기면 멈춘다(무한 반복 방지 상한 = 순간 수).
+  function collectPath(start, momentCount, connections) {
+    let ids = [start], cons = [], cur = start, guard = 0;
+    while (guard++ < momentCount) {
+      const outs = connections.filter((c) => c.kind === 'parent' && c.a === cur);
+      if (!outs.length) break;
+      const c = outs[0];
+      cons.push(c.id);
+      cur = c.b;
+      if (ids.includes(cur)) break;
+      ids.push(cur);
+    }
+    return { ids, cons };
+  }
+
+  // 다음/이전 후보: 고른 순간에서 이어진 부모 연결 목록.
+  function nextConnections(dir, selected, connections) {
+    return connections.filter((c) => c.kind === 'parent' && (dir === 'next' ? c.a === selected : c.b === selected));
+  }
+
+  // 상세 버튼 상태: 다음·이전 순간이 없으면 잠근다.
+  function detailButtonState(ins, outs) {
+    return {
+      nextDisabled: outs.length === 0,
+      nextTitle: outs.length ? '' : '다음으로 연결된 순간이 없어요',
+      prevDisabled: ins.length === 0
+    };
+  }
+
+  // 시네마 비트: 경로의 순간·연결·갈림 표시를 정해진 순서와 길이로 늘어놓는다.
+  function cinemaBeats(path, moments, connections) {
+    const beats = [];
+    path.forEach((id, i) => {
+      beats.push({
+        type: 'moment',
+        id,
+        label: i === 0 ? (moments.find((m) => m.id === id)?.first ? '첫 순간' : 'SELECTED 순간') : 'NEXT 순간',
+        dur: i === 0 ? 2200 : 1800
+      });
+      if (i < path.length - 1) {
+        const c = connections.find((x) => x.a === id && x.b === path[i + 1]);
+        if (c) {
+          beats.push({ type: 'connection', cid: c.id, id, label: 'CONNECTION TRAVEL', dur: 2300 });
+          beats.push({ type: 'why', cid: c.id, id, label: '연결 이유', dur: 1300 });
+        }
+        if (connections.filter((c2) => c2.a === id).length > 1) beats.push({ type: 'branch', id, label: 'BRANCH CUE', dur: 1200 });
+      }
+    });
+    beats.push({ type: 'bloom', id: path[path.length - 1], label: 'WHOLE BOARD BLOOM', dur: 2300 });
+    beats.push({ type: 'final', id: path[path.length - 1], label: 'FINAL CTA', dur: 999999 });
+    return beats;
+  }
+
+  return { escapeHTML, cardPosition, threadPath, fitZoom, removeConnection, editGuard, collectPath, nextConnections, detailButtonState, cinemaBeats };
 })();
