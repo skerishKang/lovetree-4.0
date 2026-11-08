@@ -939,10 +939,14 @@ COM2에는 merge `6900df8aa446dfe0201d01997457fae04c4abe16`의 변경 서버 파
 | `public/v41/views/shelf/shelf.css` | 168 | 변수·프레임·책장 레일·카드·표지 |
 | `public/v41/views/shelf/shelf-reader.css` | 181 | 펼친 책(3D) 화면 |
 | `public/v41/views/shelf/shelf-extra.css` | 46 | #256/#257 칸 제거·표지 정리 덧입히기(identity.css 뒤) |
-| `public/v41/views/shelf/shelf.js` | 421 | 책장 동작(IIFE 그대로) |
+| `public/v41/views/shelf/shelf.js` | 172 | 책장 화면 + 배선(`<script type="module">`) |
+| `public/v41/views/shelf/shelf-reader.js` | 256 | 읽기 동작(펼침·장 넘김·끌기) — `createReader(deps)` |
+| `public/v41/views/shelf/shelf-model.mjs` | 137 | 순수 계산(표지·이름·정보 줄·검색·카드 배치·페이지·YouTube ID·두 쪽 마크업) |
 
 - **원칙 7**: 값·선택자·코드 순서 변경 0 — 파일 분리와 줄바꿈만. CSS 순서는 원래 자리 그대로(기본 → `reader-layout.css` → `identity.css` → 덧입히기).
-- `shelf.js`가 300줄을 넘는 이유: 원본이 **하나의 IIFE**(클로저 안 상태·함수를 공유)라 쪼개면 스코프를 바꿔야 한다. 실행 시점·스코프를 그대로 두려고 클래식 스크립트 한 파일로 둔다.
+- 2026-11-09 모듈화(`f42faa6`, PR #293): 계산은 `shelf-model.mjs`, 읽기 화면은 `shelf-reader.js`
+  `createReader(deps)`로 나가고 `shelf.js`가 **실제 import**한다(#291 궤도와 같은 방식, `<script type="module">`).
+  함수 시험 11건 = `tests/v41-shelf-flow.test.mjs`. 화면 동작을 고칠 때는 `shelf-reader.js`를 본다.
 - 시험은 마크업 + 옮긴 파일을 합쳐서 본다(`v41-merge-bookshelf`·`v41-shelf-unify`·`v41-workspace-model`).
 - 검증: 미리보기 겉모습 비교 **shelf 4장 0.000(동일)**, 운영 postdeploy `pass=17 fail=0`.
 

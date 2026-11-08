@@ -44,6 +44,10 @@
 
 `views/first-journey.html`의 인라인 모듈을 `public/v41/views/journey/journey-page.mjs` `createJourneyPage(env)`로 옮겨 **8건을 함수 시험으로 전환**했다(`tests/v41-journey-page.test.mjs` 9건). HTML은 연결 3줄만 남았다.
 
+### 4) 2026-11-09에 해소 — 내 책장 인라인 스크립트(계산·읽기 동작)
+
+`views/shelf/shelf.js`(421줄 IIFE)를 **`views/shelf/shelf-model.mjs`(137줄, 순수 계산)** + **`views/shelf/shelf-reader.js`(256줄, `createReader(deps)`)** + `shelf.js`(172줄, 배선)로 나눴다(`tests/v41-shelf-flow.test.mjs` 11건). 표지 색·정보 줄·검색·카드 배치·페이지 넘김 범위는 **표로** 확인하고, 첫/마지막 장 안내와 책 열기(셸에 기록 id 전달)는 `createReader`를 가짜 DOM으로 직접 부른다. 옛 글자 검사 4건은 옮긴 파일을 **합쳐서** 보도록 갱신(같은 규칙 유지).
+
 → **"제품 코드 필요" 0건. "지금 바꿀 수 있는 동작 검사" 0건 — 시험 전환 작업 완료.** 남은 글자 검사는 모두 **마크업·CSS 값·문구·구조**라 유지 사유가 있다(위 1번 표).
 
 ## 새 시험을 쓸 때
