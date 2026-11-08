@@ -28,6 +28,12 @@ export function fakeEl(extra = {}) {
     getAttribute(name) { return this.attrs[name] ?? null; },
     focus() { el.focused = true; },
     focused: false,
+    close() { el.closed = true; el.open = false; },
+    showModal() { el.open = true; },
+    closed: false,
+    listeners: {},
+    addEventListener(type, fn) { (el.listeners[type] ||= []).push(fn); },
+    dispatch(type, event) { for (const fn of el.listeners[type] || []) fn(event); },
     ...extra
   };
   return el;
@@ -39,6 +45,9 @@ export function fakeNav({scrollWidth = 400, clientWidth = 400, scrollLeft = 0, b
     scrollWidth,
     clientWidth,
     scrollLeft,
+    close() { el.closed = true; el.open = false; },
+    showModal() { el.open = true; },
+    closed: false,
     listeners: {},
     querySelector(sel) {
       if (sel === '[aria-current="true"]') return buttons.find((b) => b.getAttribute('aria-current') === 'true') || null;
