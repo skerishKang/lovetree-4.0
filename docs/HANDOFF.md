@@ -888,3 +888,37 @@ COM2에는 merge `6900df8aa446dfe0201d01997457fae04c4abe16`의 변경 서버 파
 - **정원에서 기억책 제목이 명조가 아니던 문제**: `appliedTheme()`이 home·journey·shelf만 정원을 넘겼다. `appliedTheme`에 `book`을 더하고 셸 `themedView()`가 기억책(`track59-sketchbook.html`)을 `book`으로 보낸다. 셸이 iframe `documentElement`에 `data-lt-theme=garden`을 붙이므로 #217의 정원 글꼴 규칙이 그대로 적용된다. 기억 보드·관계 지도는 계속 밤.
 - 확인(가짜 서버 기록: `url` + `mediaMetadata`가 있는 YouTube 순간): 1440·390, 밤·정원 모두 실제 마우스 클릭으로 `iframe.yt-frame` 1개 생성(임베드 `start=83`), 밤 큰 제목 Pretendard · 정원 큰 제목 MaruBuri, 넘침 0. 셸 경유(`#book`)에서도 iframe 테마가 garden으로 전달된다.
 - 시험: `tests/v41-book-usability.test.mjs` 12·13번, `tests/v41-journey-garden`·`v41-theme-ab`의 기대값 갱신(기억책=정원 허용, 보드·지도=밤 고정). `npm test` 483 pass / 0 fail / 37 skip, build 성공.
+
+## 2026-11-08 안쪽 화면 두 벌(views/ · design/views/) 조사 — 중복 아님 (ai/lt-refactor-views-dedupe-261108)
+**결론: 두 벌은 같은 파일의 복사본이 아니라 서로 다른 변형(예시용·실제 기록용)이라, 한 벌로 합치면 동작·겉모습이 바뀐다. 이번 레인에서는 코드를 지우지 않았다.**
+
+### 누가 어느 경로를 여는가
+| 부르는 곳 | 경로 | 근거 |
+|---|---|---|
+| 셸 화면 이동 | 예시 모드(예시·파일·공유 기록)는 `design/views/<이름>.html`, 실제 기록(`source==='server'`)은 `views/<이름>.html` | `public/v41/shell.mjs:214` `show()`의 `source==='example'?'design/views/':'views/'` |
+| 셸 첫 화면 | `home.html` | 같은 줄 |
+| 셸 첫 여정 | `views/first-journey.html` (design 판본 없음) | `first-journey` 참조는 `public/v41/views` 쪽에만 존재 |
+| 책 사용성 어댑터 | 두 벌 모두 주입 | `scripts/apply-book-usability.mjs:15-16` |
+| 시험 | `views/`·`design/views/` 둘 다 읽음 | `tests/v41-book-usability.test.mjs:8`, `tests/v41-touch-targets.test.mjs:9-19`, `tests/v41-workspace-model.test.mjs:43` |
+| 빌드·Pages | `public/`를 그대로 정적 복사(vite `publicDir`) → 두 경로 모두 배포됨 | `vite.config.js` |
+
+### 왜 하나로 못 합치나
+| 화면 | views/ 줄 | design/views/ 줄 | 다른 줄 | 차이의 성격 |
+|---|---|---|---|---|
+| src064-orbit.html | 228 | 226 | 32 | 예시는 `shared.js`, 실제는 `runtime.js` |
+| track32-bookshelf.html | 895 | 872 | 95 | 기록 읽기·정렬·빈 상태가 서버 판에만 |
+| track56-network.html | 191 | 195 | 24 | 예시 판은 고정 그래프 |
+| track58-pinboard.html | 405 | 408 | 61 | 서버 판은 `member-reading-scroll`·실시간 갱신 |
+| track59-sketchbook.html | 477 | 475 | 44 | 서버 판만 `runtime.js`·`LTDEMO` 실시간 선택, `.lt-media` 돋보기 예외 |
+
+- 공통: `identity.css`·`reader-layout.css`·`labels.js`·`media-preview.js`·`view-navigation.js`는 두 벌이 같은 파일을 상대 경로만 다르게 부른다.
+- 실제 기록 판본은 `parent.LT41`·`runtime.js`로 서버 데이터를 그리는 코드가 본문에 들어 있어, 예시 판본으로 통일하면 실제 계정 화면이 바뀐다(금지 조건: 동작·겉모습 변경 0).
+
+### 다음에 합치려면 (선행 조건)
+1. 셸의 경로 선택(`source==='example'`)을 한 벌로 바꾸는 결정 — `shell.mjs`는 다른 레인이 정리 중이라 이번 범위 밖.
+2. 두 변형의 차이를 데이터·설정으로 흡수(예: `runtime.js` 유무를 런타임 분기로) — 동작 변경이라 별도 레인.
+3. 그 뒤 `scripts/apply-book-usability.mjs`와 "두 벌 동기화" 시험을 한 벌 기준으로 바꾼다.
+
+### 기준 스크린샷(현재 상태, 변경 없음)
+- `/mnt/e/lt-refactor-shots/before-{home,shelf,book,board,network,journey}-{1440,390}-{night,garden}.png` (24장, 로그아웃 예시 모드)
+- 예시 모드에서 실제로 불러온 화면 파일: `views/track32-bookshelf.html`, `views/track56-network.html`, `views/track58-pinboard.html`, `views/track59-sketchbook.html`, `first-journey`(셸 경유) — 예시 트리를 열면 `design/views/` 판본이 열린다(같은 하네스에서 확인).
