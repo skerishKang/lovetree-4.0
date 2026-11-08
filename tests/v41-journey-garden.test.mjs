@@ -58,7 +58,9 @@ test('정원이면 첫 여정도 정원이고, 밤이면 A, 안쪽 네 화면은
 test('셸은 첫 여정 iframe에만 테마 속성을 넘기고 화면마다 다시 계산한다', () => {
   assert.match(shell, /const applied=applyThemeAttribute\(document\.documentElement,appliedTheme\(theme,themedView\(\)\)\);/);
   assert.match(shell, /const frame=\$\('view'\)\.contentDocument;if\(frame\)applyThemeAttribute\(frame\.documentElement,applied\);/);
-  assert.match(shell, /\$\('view'\)\.onload=\(\)=>\{applyTheme\(\);/);
+  // #211: 화면 두 장이 교대하므로 load 마다 그 화면에 테마를 다시 계산한다.
+  assert.match(shell, /function frameLoaded\(frame\)\{\s*applyTheme\(\);/);
+  assert.match(shell, /for\(const f of frames\(\)\)f\.addEventListener\('load',\(\)=>frameLoaded\(f\)\);/);
   assert.match(shell, /function openFirstJourney/, '첫 여정은 셸이 여는 iframe 하나뿐이다');
 });
 
