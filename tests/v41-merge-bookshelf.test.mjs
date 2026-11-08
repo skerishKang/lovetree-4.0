@@ -11,7 +11,9 @@ const SERVER = [
   read('views/shelf/shelf.css'),
   read('views/shelf/shelf-reader.css'),
   read('views/shelf/shelf-extra.css'),
-  read('views/shelf/shelf.js')
+  read('views/shelf/shelf.js'),
+  read('views/shelf/shelf-reader.js'),
+  read('views/shelf/shelf-model.mjs')
 ].join('\n');
 
 test('design/views/에 화면 사본이 없다(한 벌만 남았다)', () => {
@@ -33,7 +35,9 @@ test('예시 분기를 남기지 않는다(문구·표시는 실제 기록 판�
 });
 
 test('책 목록은 런타임 데이터에서 만들고 표지 이름은 표시 규칙 하나를 쓴다', () => {
-  assert.match(SERVER, /var books = LTDEMO\.library\.map\(/);
+  // 2026-11-09: 계산은 shelf-model.mjs로 옮겼다(같은 규칙을 함수에서 확인한다).
+  assert.match(SERVER, /var books = buildShelf\(LTDEMO\.library, palette, namer\)/);
+  assert.match(SERVER, /export const buildShelf = \(library, palette, namer\) => library\.map\(/);
   assert.match(SERVER, /LTTreeName\.displayTreeTitle/);
   assert.match(SERVER, /--lt-cover-1/);
 });
@@ -41,8 +45,8 @@ test('책 목록은 런타임 데이터에서 만들고 표지 이름은 표시 
 test('#212 개선(표지 사진·줄임·중앙 카드 잘림 방지)이 두 모드 공통 코드로 남는다', () => {
   assert.match(SERVER, /book-cover-media/);
   assert.match(SERVER, /-webkit-line-clamp: 3/);
-  assert.match(SERVER, /absolute===0\?1\.06/);
-  assert.match(SERVER, /absolute===0\?6:/);
+  assert.match(SERVER, /absolute === 0 \? 1\.06/);
+  assert.match(SERVER, /y: absolute === 0 \? 6 :/);
 });
 
 test('셸 연결(lt41-* 메시지·DOM id)은 그대로다', () => {
