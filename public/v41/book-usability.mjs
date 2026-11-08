@@ -153,3 +153,14 @@ export function bookTitleFont(theme) {
 export function isPrimaryButton(event) {
   return !event || event.button === undefined || event.button === 0;
 }
+
+/* 2026-11-09 #295: 순간 내용이 페이지보다 길면 그 페이지만 안에서 스크롤한다.
+   여유 4px는 세로 반올림 오차를 걸러 내기 위한 것으로, 짧은 순간은 이 판정을 통과하지 않아
+   화면이 그대로다(안1 — 페이지 안 스크롤. 안2 페이지 분할은 펼침·넘기기 구조를 바꾸므로 쓰지 않았다). */
+export const PAGE_OVERFLOW_SLACK = 4;
+export function pageOverflows(scrollHeight, clientHeight, slack = PAGE_OVERFLOW_SLACK) {
+  const sh = Number(scrollHeight);
+  const ch = Number(clientHeight);
+  if (!Number.isFinite(sh) || !Number.isFinite(ch)) return false;
+  return sh - ch > slack;
+}
