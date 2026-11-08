@@ -52,6 +52,8 @@
 
 - **기억 보드 계산 전부 한 벌(2026-11-09)**: 기억 보드의 순수 계산(카드 자리·실·맞춤 배율·경로 수집·시네마 비트·필터 판정 등)은 `views/board/board-model.js`의 `window.LT58Model` 한 벌만 쓰고, 화면(`board.js`·`board-extras.js`)은 DOM 반영만 한다. 시험은 같은 파일을 `await import`해 `globalThis.LT58Model`을 검사하며, 옛 계산이 화면에 남아 있지 않은지도 함께 본다(`tests/v41-board-model.test.mjs`).
 
+- **관계 지도 계산 전부 한 벌(2026-11-09)**: 관계 지도의 순수 계산(갈래 점·묶음 나누기·작은 트리 보정·연결선 조절점·손가락 맞춤·경로 순서)은 `views/network/network-model.js`의 `window.LT56Model` 한 벌만 쓰고, 화면(`network.js`)은 그리기·상태 반영만 한다. 시험은 같은 파일을 `await import`해 `globalThis.LT56Model`을 검사하고 옛 계산 부재도 함께 본다(`tests/v41-network-model.test.mjs`).
+
 ## 새 시험을 쓸 때
 
 1. 확인하려는 것이 **동작**(분기·호출·응답·포커스 이동)이면 → 그 함수를 `import`해 직접 부르고 인자·반환·부수효과를 본다.
