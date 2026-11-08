@@ -196,10 +196,10 @@ export function themePressed(theme) {
   return normalizeTheme(theme) === THEME_GARDEN;
 }
 
-// 2단계 범위: 공통 헤더·첫 화면·첫 여정은 B를 쓴다. 내 책장도 #212에서 B를 받는다(정원=지금 크림색 책장).
-// 기억책·보드·관계 지도는 계속 A다.
+// 2단계 범위: 공통 헤더·첫 화면·첫 여정은 B를 쓴다. 내 책장은 #212, 기억책은 2026-11-08 대표 확인으로 B를 받는다.
+// 기억 보드·관계 지도는 계속 A다(대표 결정: 책만 테마를 따라간다).
 export function appliedTheme(theme, view) {
-  return view === 'home' || view === 'journey' || view === 'shelf' ? normalizeTheme(theme) : THEME_NIGHT;
+  return view === 'home' || view === 'journey' || view === 'shelf' || view === 'book' ? normalizeTheme(theme) : THEME_NIGHT;
 }
 
 // 속성 없음 = A. B일 때만 data-lt-theme=garden 을 붙인다.

@@ -85,15 +85,16 @@ test('저장에 실패하면 A로 남는다', () => {
   assert.equal(writeTheme(storage, 'garden'), 'night');
 });
 
-test('기억책·보드·관계 지도는 언제나 A다(#212: 내 책장은 정원을 받는다)', () => {
-  for (const view of ['book', 'board', 'network']) {
+test('기억 보드·관계 지도는 언제나 A다(#212: 내 책장은 정원, 2026-11-08: 기억책도 정원)', () => {
+  assert.equal(appliedTheme('garden', 'book'), 'garden');
+  for (const view of ['board', 'network']) {
     assert.equal(appliedTheme('garden', view), 'night', view);
   }
   assert.equal(appliedTheme('garden', 'shelf'), 'garden');
   assert.equal(appliedTheme('night', 'shelf'), 'night');
   assert.equal(appliedTheme('garden', 'inner'), 'night');
   // 문서 속성도 화면에 따라 정해진다.
-  assert.match(shell, /function themedView\(\)\{return current==='src064-orbit\.html'\?'home':current==='first-journey\.html'\?'journey':current==='track32-bookshelf\.html'\?'shelf':'inner';\}/);
+  assert.match(shell, /function themedView\(\)\{return current==='src064-orbit\.html'\?'home':current==='first-journey\.html'\?'journey':current==='track32-bookshelf\.html'\?'shelf':current==='track59-sketchbook\.html'\?'book':'inner';\}/);
   assert.match(shell, /appliedTheme\(theme,themedView\(\)\)/);
 });
 

@@ -23,7 +23,7 @@ let pendingLoginIntentShown=pendingLoginIntent;
 function startLogin(intent=''){const target=LOGIN_INTENTS.includes(intent)?intent:'';location.assign(memberLoginUrl(readTheme(localStorage),target));}
 // 2026-11-07 테마 A/B(밤/정원): 공통 헤더와 첫 화면만 바꾼다. 안쪽 네 화면은 속성을 받지 않아 A로 고정된다.
 // 2026-11-08 정원 2단계: 첫 화면과 첫 여정만 B를 받는다. 안쪽 네 화면은 계속 A다.
-function themedView(){return current==='src064-orbit.html'?'home':current==='first-journey.html'?'journey':current==='track32-bookshelf.html'?'shelf':'inner';}
+function themedView(){return current==='src064-orbit.html'?'home':current==='first-journey.html'?'journey':current==='track32-bookshelf.html'?'shelf':current==='track59-sketchbook.html'?'book':'inner';}
 function paintLoginLinks(theme=readTheme(localStorage)){const href=memberLoginUrl(theme);const entry=$('account-entry');if(entry)entry.href=href;for(const a of document.querySelectorAll('[data-guest-login]'))a.href=href;}
 function paintThemeControls(theme=readTheme(localStorage)){for(const button of document.querySelectorAll('[data-lt-theme-toggle]')){button.textContent=themeButtonLabel(theme);button.setAttribute('aria-pressed',String(themePressed(theme)));button.setAttribute('aria-label',themeButtonAriaLabel(theme));button.title=themeButtonAriaLabel(theme);}paintLoginLinks(theme);}
 function applyTheme(theme=readTheme(localStorage)){const applied=applyThemeAttribute(document.documentElement,appliedTheme(theme,themedView()));const frame=$('view').contentDocument;if(frame)applyThemeAttribute(frame.documentElement,applied);return applied;}
