@@ -12,6 +12,10 @@ import { mkdirSync, writeFileSync, existsSync, readdirSync, readFileSync } from 
 import path from 'node:path';
 import os from 'node:os';
 
+// 화면별 기준치(%). 기억 보드는 실·핀 선을 매 로드마다 미세하게 다시 그려 0.1%를 넘는 장이 나온다
+// (정리는 리팩터링 3단계 예정, #231).
+const SCENE_THRESHOLDS = { board: 0.3 };
+
 const DEFAULTS = {
   base: 'https://lovetree-4-0.pages.dev/v41/',
   out: path.join(os.tmpdir(), 'lovetree-visual-baseline'),
@@ -270,13 +274,14 @@ async function compare(argv) {
   const browser = await launch(chromium);
   const page = await browser.newPage();
   const threshold = Number(options.threshold);
+  const thresholdFor = (name, note) => (/\["?크기 다름|after 없음/.test(note) ? threshold : SCENE_THRESHOLDS[name.split('-')[0]] ?? threshold);
   const rows = [];
   let failed = 0;
   try {
     for (const name of names) {
       const afterPath = path.join(after, name);
       if (!existsSync(afterPath)) {
-        rows.push({ name, ratio: 100, note: 'after 없음' });
+        rows.push({ name, ratio: 100, limit: threshold, note: 'after 없음' });
         failed += 1;
         continue;
       }
@@ -325,9 +330,10 @@ async function compare(argv) {
       });
       const ratio = Number(result.ratio.toFixed(4));
       if (result.diff) writeFileSync(path.join(out, `diff-${name}`), Buffer.from(result.diff.split(',')[1], 'base64'));
-      const ok = ratio <= threshold;
+      const limit = thresholdFor(name, result.note || '');
+      const ok = ratio <= limit;
       if (!ok) failed += 1;
-      rows.push({ name, ratio, note: result.note || (ok ? '' : '기준 초과') });
+      rows.push({ name, ratio, limit, note: result.note || (ok ? '' : `기준 초과(${limit}%)`) });
     }
   } finally {
     await browser.close();
@@ -336,10 +342,11 @@ async function compare(argv) {
   const width = Math.max(...rows.map((row) => row.name.length));
   console.log(`${'장'.padEnd(width)}  차이(%)  결과`);
   for (const row of rows) {
-    console.log(`${row.name.padEnd(width)}  ${row.ratio.toFixed(3).padStart(7)}  ${row.ratio === 0 ? '동일' : row.ratio <= threshold ? '기준 이내' : 'FAIL'} ${row.note}`);
+    console.log(`${row.name.padEnd(width)}  ${row.ratio.toFixed(3).padStart(7)}  ${row.ratio === 0 ? '동일' : row.ratio <= row.limit ? '기준 이내' : 'FAIL'} ${row.note}`);
   }
   const worst = Math.max(...rows.map((row) => row.ratio));
-  console.log(`\n${rows.length}장 중 차이 ${rows.filter((row) => row.ratio > 0).length}장, 최대 ${worst.toFixed(3)}% (기준 ${threshold}%)`);
+  const limits = [...new Set(rows.map((row) => row.limit))].sort((a, b) => a - b);
+  console.log(`\n${rows.length}장 중 차이 ${rows.filter((row) => row.ratio > 0).length}장, 최대 ${worst.toFixed(3)}% (기준 ${limits.join('/')}%)`);
   if (failed) console.log(`diff 이미지: ${out}`);
   return failed ? 1 : 0;
 }
