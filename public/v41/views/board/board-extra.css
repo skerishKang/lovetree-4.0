@@ -1,0 +1,30 @@
+/* === V1.2 FOCUSED REVISION: ACTUAL YOUTUBE MEDIA + MOBILE HARDENING === */
+.ytThumbWrap{position:relative;width:100%;height:100%;overflow:hidden;background:#17111f;display:grid;place-items:center}
+.ytThumbWrap>img{width:100%;height:100%;object-fit:cover;display:block}
+.ytLoadState{position:absolute;left:8px;right:8px;bottom:8px;z-index:3;padding:6px 8px;border-radius:9px;background:rgba(20,13,29,.78);color:#f0e7f6;font-size:9px;letter-spacing:.02em;backdrop-filter:blur(8px);pointer-events:none}
+.ytLoadState.ok{opacity:0;transition:opacity .25s ease}
+.ytLoadState.fail{color:#ffe9f1;background:rgba(78,34,56,.84)}
+.ytSourceBadge{position:absolute;right:8px;top:8px;z-index:4;background:rgba(14,9,20,.78);color:#fff;border:1px solid rgba(255,255,255,.18);padding:4px 6px;border-radius:999px;font-size:8px;font-weight:750;letter-spacing:.06em}
+.viewerYouTube{width:100%;display:grid;gap:10px;padding:10px}
+.viewerYouTube iframe{width:100%;aspect-ratio:16/9;min-height:220px;border:0;border-radius:14px;background:#0b0810;display:block}
+.viewerFallback{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:8px 4px 2px;color:#bdaec7;font-size:10px}
+.viewerFallback .miniBtn{margin-left:auto}
+.videoSourceChoice{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.videoSourceChoice label{display:flex;align-items:center;gap:7px;padding:9px 10px;border:1px solid rgba(255,255,255,.09);border-radius:12px;color:#d7c8df;font-size:11px;background:rgba(255,255,255,.035)}
+.videoSourceChoice label:has(input:checked){border-color:rgba(255,102,159,.52);background:rgba(255,102,159,.08);color:#fff}
+.videoSourcePanel{margin-top:8px}.videoSourcePanel[hidden]{display:none!important}
+.netNote{font-size:9px;color:#9987a4;line-height:1.5;margin-top:6px}
+#viewerMedia{max-width:100%}
+@media(max-width:760px){
+
+  #viewerModal .modal{width:calc(100vw - 16px)!important;max-width:none!important;max-height:92vh;overflow:auto;padding:16px!important}
+  .viewerYouTube{padding:0;gap:8px}.viewerYouTube iframe{min-height:0;width:100%;aspect-ratio:16/9;max-height:46vh}
+  .viewerFallback{font-size:9px;padding:4px 0}.viewerFallback .miniBtn{width:100%;margin:0}
+  .videoSourceChoice{grid-template-columns:1fr}.typeGrid{grid-template-columns:repeat(2,1fr)!important}
+  #addModal .modal,#editModal .modal{padding:15px!important;width:calc(100vw - 12px)!important;max-height:94vh!important}
+  #composerPreviewWrap,#editPreview{position:static!important;max-width:100%;overflow:hidden}
+  .previewCard{min-height:250px}.previewMedia{height:min(180px,31vh)}
+  .modalActions,.editActions{position:sticky;bottom:-1px;background:linear-gradient(180deg,rgba(24,15,30,0),rgba(24,15,30,.98) 26%);padding-top:20px;padding-bottom:2px;z-index:8}
+  .cinemaControls{max-width:calc(100vw - 12px);left:6px;right:6px;width:auto;gap:4px;transform:none}.cinCtl{min-width:0;padding:0 5px;font-size:9px}.enterBeat{font-size:9px}
+}
+@media(max-width:380px){#addModal .modal,#editModal .modal,#viewerModal .modal{width:calc(100vw - 8px)!important;padding:12px!important}.typeBtn{font-size:9px;padding:8px 4px}.field{font-size:12px}.cinemaControls{left:4px;right:4px;transform:none}}

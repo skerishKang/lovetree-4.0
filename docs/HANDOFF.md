@@ -889,6 +889,24 @@ COM2에는 merge `6900df8aa446dfe0201d01997457fae04c4abe16`의 변경 서버 파
 - 확인(가짜 서버 기록: `url` + `mediaMetadata`가 있는 YouTube 순간): 1440·390, 밤·정원 모두 실제 마우스 클릭으로 `iframe.yt-frame` 1개 생성(임베드 `start=83`), 밤 큰 제목 Pretendard · 정원 큰 제목 MaruBuri, 넘침 0. 셸 경유(`#book`)에서도 iframe 테마가 garden으로 전달된다.
 - 시험: `tests/v41-book-usability.test.mjs` 12·13번, `tests/v41-journey-garden`·`v41-theme-ab`의 기대값 갱신(기억책=정원 허용, 보드·지도=밤 고정). `npm test` 483 pass / 0 fail / 37 skip, build 성공.
 
+## 2026-11-08 관계 지도·기억 보드 파일 지도 (3단계, #231)
+
+| 화면 | 파일 | 줄 수 | 내용 |
+|---|---|---|---|
+| 관계 지도 | `public/v41/views/track56-network.html` | 28 | 마크업 + 파일 연결 |
+| | `public/v41/views/network/network.css` | 46 | 화면 고유 스타일 |
+| | `public/v41/views/network/network.js` | 119 | 본문 동작(노드·경로·상세·재생 안내) |
+| 기억 보드 | `public/v41/views/track58-pinboard.html` | 51 | 마크업 + 파일 연결 |
+| | `public/v41/views/board/board.css` | 54 | 무대(보드·카드·실·핀·툴바) 스타일 |
+| | `public/v41/views/board/board-extra.css` | 30 | 상세·패널·모바일 보정 |
+| | `public/v41/views/board/board.js` | 338 | 무대 동작(카드·실·핀·카메라·연결·시네마) |
+| | `public/v41/views/board/board-extras.js` | 107 | 상태·저장·유튜브·경로·필터·작성기 보조 |
+| | `public/v41/views/board/board-detail.js` | 145 | 상세 카드·다음 순간·키워드·편집 미리보기 |
+
+- 관계 지도 예시 분기 1곳(재생 안내), 기억 보드 예시 분기 3곳(연결 지우기·말풍선 버튼·연결 색)은 **자리만 옮겼고 내용·조건 그대로**.
+- `board.js`는 압축 해제만 하고 **한 파일 338줄**이다(300줄 초과 이유: 무대 동작이 서로 얽혀 있어 기능 경계로 더 쪼개면 문장 사이가 갈라진다). 나머지 보조 코드는 `board-extras.js`로 분리.
+- 파일을 나눌 때는 **원래 순서 그대로** `<link>`·`<script src>`를 나열한다(캐스케이드·실행 순서 보존).
+
 ## 2026-11-08 기억책 파일 지도 (2단계 ①·②, ai/lt-book-source-261108 · ai/lt-book-inject-261108, #231)
 
 기억책(track59)은 이제 화면 뼈대 + 네 파일이다. **고칠 때 어디를 보면 되는지**
