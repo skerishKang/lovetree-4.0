@@ -56,23 +56,22 @@ test('저장이 끝난 뒤 뒤로가기는 성장 단계로 다시 들어가지 
   assert.deepEqual(journeyRouteDecision({hash: '#journey/04', open: false}), {action: 'open', step: 4}, '저장 전에는 04로 열 수 있다');
 });
 
-test('셸은 기록·복귀·닫기·저장 뒤 이동을 이 규칙에 연결한다', () => {
-  // #231 1-B③-3: 여정 연결은 shell/journey.mjs, lt41-* 수신은 shell/messages.mjs로 옮겼다.
-  const shell = readFileSync(new URL('../public/v41/shell.mjs', import.meta.url), 'utf8')
-    + readFileSync(new URL('../public/v41/shell/journey.mjs', import.meta.url), 'utf8')
-    + readFileSync(new URL('../public/v41/shell/messages.mjs', import.meta.url), 'utf8')
-    // #231 1-B 후속: 주소 처리(journeyRouteDecision 연결)는 shell/location.mjs로 옮겼다.
-    + readFileSync(new URL('../public/v41/shell/location.mjs', import.meta.url), 'utf8');
-  assert.match(shell, /journeyRouteDecision\(\{\s*hash: location\.hash,\s*open: getCurrent\(\) === 'first-journey\.html',\s*saved: journey\.saved\(\)\s*\}\)/);
-  assert.match(shell, /function writeJourneyLocation\(step, mode = 'push'\)/);
-  assert.match(shell, /history\[mode === 'replace' \? 'replaceState' : 'pushState'\]\(mode === 'replace' \? history\.state : \{lt41Journey: depth \+ 1\}/);
-  assert.match(shell, /type === 'lt41-journey-step'/);
-  assert.match(shell, /type: 'lt41-journey-goto'/);
-  assert.match(shell, /function closeFirstJourney\(\) \{[\s\S]*?history\.go\(-depth\)/);
-  assert.match(shell, /function finishJourney\(\) \{[\s\S]*?show\('src064-orbit\.html', false\);\s*history\.replaceState\(null, '', '#home'\)/, '저장 뒤 뒤로가기는 첫 화면으로 나간다');
-  assert.match(shell, /journeySaved = true;\s*setCurrent\('track59-sketchbook\.html'\)/, '저장을 마치고 기억책으로 갈 때 완료로 표시한다');
-  assert.match(shell, /const startupJourney=parseJourneyRoute\(location\.hash\)/, '새로고침은 #journey/NN을 다시 연다');
-  assert.match(shell, /openFirstJourney\(\{step:startupJourney\.step,route:true\}\)/);
+// 7번(셸 연결 10줄)은 2026-11-09에 함수 시험으로 옮겼다.
+//  · popstate/hashchange 표·중복 처리·감시 등록 → tests/v41-journey-flow.test.mjs (createLocation + fakeBrowser)
+//  · 단계 기록 push/replace·닫기 go(-depth)·저장 뒤 첫 화면 → 같은 파일의 createJourney 표(3차)
+test('주소 단계와 임시 보관값이 만나 시작 단계가 정해진다(화면 규칙을 함수로 고정)', () => {
+  const startStep = (hash, stored) => {
+    const route = parseJourneyRoute(hash);
+    if (!route) return null;
+    if (!stored) return 0;
+    return journeyResumeStep(stored);
+  };
+  const empty = {subject: 'x', url: ''};
+  assert.equal(startStep('#journey/02', draft({step: 2})), 2, '보관값이 있으면 주소 단계를 따른다');
+  assert.equal(startStep('#journey/02', null), 0, '보관값이 없으면 00부터 시작한다');
+  assert.equal(startStep('#journey/04', draft({step: 1, savedTreeId: 't', savedMomentId: 'm'})), 3, '이미 만든 트리 아래로는 내려가지 않는다');
+  assert.equal(startStep('#home', draft({step: 2})), null, '여정 주소가 아니면 시작 단계가 없다');
+  assert.equal(journeyDraftHasContent({...empty, subject: ''}), false, '빈 보관값은 내용 없음');
 });
 
 test('여정 화면은 단계를 셸에 알리고, 되돌아갈 단계는 입력을 유지한 채 다시 그린다', () => {

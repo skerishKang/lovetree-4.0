@@ -253,3 +253,89 @@ test('마치기·떠나기: 저장 뒤에는 첫 화면으로, 도중에 나가�
     assert.equal(fromShelf.calls.handled.at(-1), '#journey/00');
   } finally { fromShelf.restore(); }
 });
+
+// ── 주소 처리와 첫 여정의 조합 (6차, 2026-11-09) ─────────────────────────────
+// 전: shell/location.mjs·journey.mjs 소스를 정규식으로 보던 시험(v41-journey-history 7번).
+// 후: createLocation을 createJourney와 함께 띄우고 popstate·hashchange를 실제로 발생시킨다.
+import { createLocation } from '../public/v41/shell/location.mjs';
+import { fakeBrowser } from './helpers/fake-dom.mjs';
+
+function browserHarness({hash = '#home', current = 'first-journey.html', saved = false} = {}) {
+  const browser = fakeBrowser({hash});
+  const moves = {goto: [], open: [], finish: 0, leave: 0, setCurrent: [], choose: [], notify: [], show: [], handled: [], startMember: 0, publicRoute: []};
+  let screen = current;
+  const locationApi = createLocation({
+    $: () => null,
+    getCurrent: () => screen,
+    setCurrent: (next) => { screen = next; moves.setCurrent.push(next); },
+    getMember: () => ({snapshot: () => ({owned: true, subject: 's1'})}),
+    getSource: () => 'server',
+    getActiveShareId: () => null,
+    setHandled: (value) => moves.handled.push(value),
+    getHandled: () => moves.handled.at(-1),
+    show: (...args) => moves.show.push(args),
+    choose: (...args) => moves.choose.push(args),
+    notify: (msg) => moves.notify.push(msg),
+    startMember: () => { moves.startMember += 1; },
+    showPublicRoute: (route) => moves.publicRoute.push(route),
+    journey: {saved: () => saved},
+    gotoJourneyStep: (step) => moves.goto.push(step),
+    openFirstJourney: (args) => moves.open.push(args),
+    finishJourney: () => { moves.finish += 1; },
+    leaveJourney: () => { moves.leave += 1; },
+    getModel: () => ({trees: []})
+  });
+  return {browser, moves, locationApi, screen: () => screen, restore: () => browser.restore()};
+}
+
+test('popstate/hashchange 표: 여정 안이면 단계 복귀·닫기, 저장 뒤면 첫 화면, 닫혀 있으면 무시', () => {
+  const cases = [
+    {name: '여정 안 · 단계 기록', hash: '#journey/01', current: 'first-journey.html', saved: false, event: 'popstate', want: {goto: [1]}},
+    {name: '여정 안 · 마지막 단계', hash: '#journey/04', current: 'first-journey.html', saved: false, event: 'hashchange', want: {goto: [4]}},
+    {name: '여정 안 · 바깥 주소', hash: '#home', current: 'first-journey.html', saved: false, event: 'popstate', want: {leave: 1}},
+    {name: '여정 안 · 저장 뒤 단계 기록', hash: '#journey/04', current: 'first-journey.html', saved: true, event: 'popstate', want: {finish: 1}},
+    {name: '여정 밖 · 단계 기록(새로고침·직접 주소)', hash: '#journey/02', current: 'src064-orbit.html', saved: false, event: 'popstate', want: {open: [{step: 2, route: true}]}},
+    {name: '여정 밖 · 다른 해시', hash: '#book', current: 'track59-sketchbook.html', saved: false, event: 'popstate', want: {setCurrent: ['track59-sketchbook.html']}}
+  ];
+  for (const c of cases) {
+    const h = browserHarness({hash: c.hash, current: c.current, saved: c.saved});
+    try {
+      h.browser.fire(c.event);
+      const got = {goto: h.moves.goto, open: h.moves.open, finish: h.moves.finish, leave: h.moves.leave};
+      const want = {goto: [], open: [], finish: 0, leave: 0, ...c.want};
+      assert.deepEqual(got, {goto: want.goto, open: want.open, finish: want.finish, leave: want.leave}, c.name);
+      if (want.setCurrent) assert.deepEqual(h.moves.setCurrent, want.setCurrent, c.name);
+      assert.deepEqual(h.moves.handled.at(-1), c.hash, `${c.name}: 같은 주소를 다시 처리하지 않도록 기억한다`);
+    } finally { h.restore(); }
+  }
+});
+
+test('이미 처리한 주소는 popstate가 다시 와도 한 번만 처리한다', () => {
+  const h = browserHarness({hash: '#journey/01', current: 'first-journey.html'});
+  try {
+    h.browser.popstate();
+    h.browser.popstate();
+    h.browser.hashchange();
+    assert.deepEqual(h.moves.goto, [1], '단계 이동은 한 번뿐');
+  } finally { h.restore(); }
+});
+
+test('popstate·hashchange 감시를 실제로 건다', () => {
+  const h = browserHarness({hash: '#home'});
+  try {
+    assert.equal(typeof h.browser.listeners.popstate?.[0], 'function', 'popstate 감시');
+    assert.equal(typeof h.browser.listeners.hashchange?.[0], 'function', 'hashchange 감시');
+  } finally { h.restore(); }
+});
+
+test('여정 화면과 셸이 주고받는 메시지: 단계 알림은 주소 기록으로, 복귀 지시는 화면으로', () => {
+  // createJourney가 실제로 postMessage하는지 본다(3차 표의 보완).
+  const j = harness({current: 'first-journey.html', hash: '#journey/01'});
+  try {
+    j.journey.gotoJourneyStep(3);
+    const message = j.calls.postMessage.at(-1);
+    assert.deepEqual(message, {type: 'lt41-journey-goto', step: 3}, '단계 복귀는 화면에 지시한다');
+    j.journey.noteJourneyStep(3);
+    assert.equal(j.calls.historyPush.at(-1), '#journey/03');
+  } finally { j.restore(); }
+});
