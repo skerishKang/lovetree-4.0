@@ -960,7 +960,9 @@ async function checkHomeCardMenuMouse(page, target, opts, stamp) {
     if (!opened.toolButtons.includes('순간 목록')) problems.push(`${width}: "순간 목록"이 도구 줄에 없음 ${JSON.stringify(opened.toolButtons)}`);
     if (opened.toolButtons.filter((label) => label && label !== '순간 목록').length !== 1) problems.push(`${width}: 도구 줄 버튼 ${JSON.stringify(opened.toolButtons)} (기대 보기·순간 목록 2개)`);
     await page.screenshot({ path: path.join(opts.out, `${stamp}-card-menu-mouse-${width}.png`) }).catch(() => {});
-    await frame.locator('body').click({ position: { x: 2, y: 2 } }).catch((error) => problems.push(`${width}: 바깥 클릭 실패 ${error.message}`));
+    // 바깥 클릭은 좌상단(2,2)을 피한다. 러너에서는 그 자리에 "화면으로 건너뛰기" 링크가 걸려
+    // 클릭이 화면 이동이 되어 버린다(2026-11-08 진단: 실패 시 보이는 iframe이 track59-sketchbook).
+    await frame.locator('body').click({ position: { x: 8, y: Math.min(700, Math.round(height * 0.85)) } }).catch((error) => problems.push(`${width}: 바깥 클릭 실패 ${error.message}`));
     await sleep(400);
     const closed = await readMenu();
     if (!closed || (closed.hidden !== true && closed.expanded !== 'false')) problems.push(`${width}: 바깥 클릭 후에도 열림 ${JSON.stringify(closed)}`);
