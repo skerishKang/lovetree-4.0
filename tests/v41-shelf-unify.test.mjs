@@ -115,7 +115,7 @@ test('#212 새 트리 생성 경로는 자동 접미사를 붙이지 않는다',
 });
 
 test('#212 책장은 공용 표시 함수를 싣고 카드 이름에 적용한다', () => {
-  assert.match(shelf, /<script src="\.\.\/tree-name\.js"><\/script>/);
+  assert.match(shelf, /<script src="\/v41\/tree-name\.js"><\/script>/);
   assert.match(shelf, /LTTreeName\.displayTreeTitle/);
 });
 
@@ -143,5 +143,5 @@ test('#212 클래식 판본(tree-name.js)이 모듈과 같은 결과를 낸다',
     assert.equal(classic.hasAutoTitleSuffix(value), hasAutoTitleSuffix(value), String(value));
   }
   assert.equal(classic.autoTreeTitle('윤슬'), autoTreeTitle('윤슬'));
-  assert.match(shelf, /<script src="\.\.\/tree-name\.js"><\/script>/);
+  assert.match(shelf, /<script src="\/v41\/tree-name\.js"><\/script>/);
 });
