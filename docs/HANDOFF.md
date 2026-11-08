@@ -862,3 +862,10 @@ COM2에는 merge `6900df8aa446dfe0201d01997457fae04c4abe16`의 변경 서버 파
 - 동작·저장값은 그대로다(테마 `lt41.theme`, 카드 `lt41.homeCards`, 셸에 알리는 `lt41-theme` 메시지). 열기/닫기는 마우스·ArrowDown·Enter/Space·Home/End·Esc·바깥 클릭(기존 `clickWithin`)로 된다.
 - 움직임 상태는 `src/views/orbit.js`가 `dispose.motion`으로 내보내고 메뉴가 읽고 바꾼다(도구 줄 버튼은 없앴다). 첫 화면 안에 중복으로 있던 둘러보기·로그인 버튼은 DOM에서 지웠다.
 - 카드 출처 안내(aria-live, #201)는 그대로다. `tools/postdeploy`의 첫 화면 검사는 새 메뉴 기준(테마 항목·카드 항목·도구 줄 2버튼)으로 바꿨다.
+
+## 2026-11-08 헤더 트리 이름에 자동 접미사 제거 연결 (#212 후속, ai/lt-tree-title-261108)
+- `public/v41/tree-name.mjs`의 `displayTreeTitle()`을 셸이 처음으로 쓴다(`import`). 저장 데이터는 그대로 두고 표시만 바꾼다: `", 나의 순간들"`로 정확히 끝나고 앞부분이 비어 있지 않을 때만 뗀다.
+- 연결한 곳: 헤더 "트리: <이름> ▾"(`#source-label`), 화면 위 문맥 줄(`#context-tree`), 트리 선택 목록(`#trees` option), 트리 보기 탭 묶음의 접근성 이름, 공유 미리보기 요약, 트리 삭제 확인 문구, 둘러보기 목록·미리보기 카드 제목(`community-panel.mjs`).
+- 책 정보 편집 입력(`#tree-form` title)은 **저장값 그대로** 둔다(여기서 줄이면 저장이 바뀐다).
+- 긴 이름은 헤더에서 말줄임(`max-width:190px` + `text-overflow:ellipsis`), 1440·390·360에서 페이지 넘침 0.
+- 시험: `tests/v41-shell-tree-title.test.mjs` 5개. `npm test` 477 pass / 0 fail / 37 skip, build 성공.
