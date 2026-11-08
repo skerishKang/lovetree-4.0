@@ -918,6 +918,128 @@ async function checkHomeCardMenuMouse(page, target, opts, stamp) {
     problems.length ? problems.join('; ') : '보기 메뉴: 열림 유지·항목(움직임·밤/정원·카드, 로그인 상태별)·바깥 클릭/Esc 닫힘 (1440/390)', { problems });
 }
 
+// 로그인 상태에서만 보이는 헤더 버튼 검사(2026-11-08).
+// #245 셸 분리 때 `#write-menu` 클릭 연결이 빠졌는데, 로그아웃 검사만으로는 이 버튼이 아예 안 보여 잡지 못했다.
+// 그래서 로그인(--auto-login)·트리 있는 상태에서 "순간 남기기"→편집기, 책장에서"새 트리 흐름", 계정 메뉴·공유 패널 열고 닫기를 확인한다.
+// 로그아웃 상태에서는 skip으로 남겨 세 실행(트리 있음·트리 0·로그아웃) 모두 같은 표를 갖게 한다.
+async function checkSignedInActions(page, target, opts, stamp) {
+  const state = await page.evaluate(() => {
+    const avatar = document.getElementById('account-avatar');
+    const owned = document.body.dataset.member ? document.body.dataset.member === 'in' : !!(avatar && !avatar.hidden);
+    return { owned, treeCount: Number(document.body.dataset.treeCount || 0) || 0 };
+  }).catch(() => ({ owned: false, treeCount: 0 }));
+  if (!state.owned) {
+    record('signed-in-actions', 'auth', 'skip', '로그아웃 상태라 로그인 전용 버튼 검사를 건너뜀');
+    return;
+  }
+
+  const writeButton = () => page.evaluate(() => {
+    const button = document.getElementById('write-menu');
+    if (!button) return null;
+    return { hidden: !!button.hidden, visible: button.getClientRects().length > 0, label: (button.textContent || '').trim() };
+  }).catch(() => null);
+  const editorOpen = () => page.waitForFunction(() => document.getElementById('editor')?.open === true, { timeout: 3000 })
+    .then(() => true).catch(() => false);
+  const closeEditor = async () => {
+    await page.evaluate(() => document.getElementById('editor')?.close()).catch(() => {});
+    await sleep(300);
+  };
+
+  // 1) 기록이 있는 화면: "순간 남기기" → 편집기(추가 모드)가 열린다.
+  await page.goto(target.href, { waitUntil: 'domcontentloaded', timeout: opts.timeout }).catch(() => {});
+  await page.waitForSelector('#community-menu', { timeout: opts.timeout }).catch(() => {});
+  await sleep(1500);
+  const button = await writeButton();
+  if (!button || !button.visible) {
+    record('write-menu-editor', 'auth', 'fail', `로그인 상태인데 "순간 남기기" 버튼이 보이지 않음 ${JSON.stringify(button)}`);
+  } else {
+    await clickSmart(page, '#write-menu');
+    const opened = await editorOpen();
+    const detail = await page.evaluate(() => ({
+      hash: location.hash,
+      editorOpen: !!document.getElementById('editor')?.open,
+      editorTitle: document.getElementById('editor-title')?.textContent || '',
+      journey: !!document.querySelector('iframe#view') && /first-journey/.test(document.getElementById('view')?.contentWindow?.location?.href || ''),
+      feedback: document.getElementById('record-feedback')?.textContent || ''
+    })).catch(() => ({}));
+    record('write-menu-editor', 'auth', opened ? 'pass' : 'fail',
+      opened ? `"${button.label}" 클릭 → 편집기 열림 (${detail.editorTitle || detail.hash})`
+        : `"${button.label}" 클릭 뒤 3초 안에 #editor 가 열리지 않음 (hash=${detail.hash || ''} journey=${detail.journey} 안내="${(detail.feedback || '').slice(0, 60)}")`,
+      { button, detail });
+    await page.screenshot({ path: path.join(opts.out, `${stamp}-write-menu-1440.png`) }).catch(() => {});
+    if (opened) await closeEditor();
+
+    // 2) 내 책장에서 같은 버튼 → 새 트리 흐름(첫 여정 또는 편집기 new 모드).
+    await page.evaluate(() => { location.hash = '#shelf'; }).catch(() => {});
+    await sleep(2500);
+    await clickSmart(page, '#write-menu');
+    const after = await page.evaluate(() => ({
+      hash: location.hash,
+      editorOpen: !!document.getElementById('editor')?.open,
+      editorTitle: document.getElementById('editor-title')?.textContent || '',
+      journey: /first-journey/.test(document.getElementById('view')?.contentWindow?.location?.href || '')
+    })).catch(() => ({}));
+    const newFlow = /#journey/.test(after.hash || '') || after.journey || (after.editorOpen && /새|추가/.test(after.editorTitle || ''));
+    record('write-menu-shelf-new-tree', 'auth', newFlow ? 'pass' : 'fail',
+      newFlow ? `책장에서 클릭 → 새 트리 흐름 (${after.hash || after.editorTitle})`
+        : `책장에서 클릭 뒤 새 트리 흐름이 열리지 않음 ${JSON.stringify(after)}`, { after });
+    if (after.editorOpen) await closeEditor();
+    await page.goto(target.href, { waitUntil: 'domcontentloaded', timeout: opts.timeout }).catch(() => {});
+    await page.waitForSelector('#community-menu', { timeout: opts.timeout }).catch(() => {});
+    await sleep(1500);
+  }
+
+  // 3) 계정 메뉴: 동그라미 클릭 → 팝오버 열림, 바깥 클릭 → 닫힘.
+  const popover = () => page.evaluate(() => ({
+    hidden: document.getElementById('account-popover')?.hidden,
+    expanded: document.getElementById('account-avatar')?.getAttribute('aria-expanded'),
+    items: [...(document.getElementById('account-popover')?.querySelectorAll('[role=menuitem]') || [])].map((n) => (n.textContent || '').trim())
+  })).catch(() => null);
+  await clickSmart(page, '#account-avatar');
+  await sleep(500);
+  const openedMenu = await popover();
+  // 닫기는 Esc(제품이 지원)로 먼저, 안 닫히면 바깥 클릭으로 한 번 더 확인한다.
+  await page.keyboard.press('Escape').catch(() => {});
+  await sleep(400);
+  let closedMenu = await popover();
+  if (closedMenu && closedMenu.hidden === false) {
+    await page.mouse.click(8, 400).catch(() => {});
+    await sleep(500);
+    closedMenu = await popover();
+  }
+  const menuOk = openedMenu && openedMenu.hidden === false && openedMenu.items.length >= 4 && closedMenu && closedMenu.hidden === true;
+  record('account-menu-open-close', 'auth', menuOk ? 'pass' : 'fail',
+    menuOk ? `계정 메뉴 열림(${openedMenu.items.length}개 항목)·바깥 클릭 닫힘`
+      : `계정 메뉴 열림/닫힘 확인 실패 ${JSON.stringify({ openedMenu, closedMenu })}`, { openedMenu, closedMenu });
+
+  // 4) 공유 패널: 로그인 전용 버튼 → 열림, 닫기 버튼 → 닫힘.
+  const shareVisible = await page.evaluate(() => {
+    const button = document.getElementById('share-menu');
+    return !!button && !button.hidden;
+  }).catch(() => false);
+  if (!shareVisible) {
+    record('share-panel-open-close', 'auth', 'warn', '공유 버튼이 보이지 않음(서버 기록을 열지 않은 상태일 수 있음)');
+  } else {
+    await clickSmart(page, '#share-menu');
+    await sleep(1200);
+    const shareOpen = await page.evaluate(() => !!document.getElementById('share-panel')?.open).catch(() => false);
+    const feedback = await page.evaluate(() => document.getElementById('share-feedback')?.textContent || '').catch(() => '');
+    let shareClosed = null;
+    if (shareOpen) {
+      const closeButton = await page.$('[data-close="share-panel"]');
+      if (closeButton) await closeButton.click().catch(() => {});
+      else await page.evaluate(() => document.getElementById('share-panel')?.close()).catch(() => {});
+      await sleep(600);
+      shareClosed = await page.evaluate(() => !document.getElementById('share-panel')?.open).catch(() => null);
+      await page.screenshot({ path: path.join(opts.out, `${stamp}-share-panel-1440.png`) }).catch(() => {});
+    }
+    record('share-panel-open-close', 'auth', shareOpen && shareClosed ? 'pass' : 'fail',
+      shareOpen && shareClosed ? '공유 패널 열림·닫힘 확인'
+        : `공유 패널 확인 실패 (열림=${shareOpen} 닫힘=${shareClosed} 안내="${(feedback || '').slice(0, 60)}")`, { shareOpen, shareClosed, feedback });
+  }
+  await page.screenshot({ path: path.join(opts.out, `${stamp}-signed-in-1440.png`) }).catch(() => {});
+}
+
 async function checkThemeRoundTrip(page, base, opts, stamp) {
   // 2026-11-08 #188: 첫 화면 토글로 정원(B) 전환·저장, 안쪽 화면은 A 고정, 다시 밤(A)으로 복귀.
   const problems = [];
@@ -1404,6 +1526,7 @@ async function main() {
       await page.screenshot({ path: path.join(opts.out, `${stamp}-community-360.png`) }).catch(() => {});
       await checkVisualTokens(page, target, opts, stamp);
       await checkHomeCardMenuMouse(page, target, opts, stamp);
+      await checkSignedInActions(page, target, opts, stamp);
 
       await page.setViewportSize({ width: 1440, height: 900 }).catch(() => {});
       oembed = await checkYoutubeEndpoint(page, opts.youtube);
