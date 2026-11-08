@@ -869,3 +869,11 @@ COM2에는 merge `6900df8aa446dfe0201d01997457fae04c4abe16`의 변경 서버 파
 - 책 정보 편집 입력(`#tree-form` title)은 **저장값 그대로** 둔다(여기서 줄이면 저장이 바뀐다).
 - 긴 이름은 헤더에서 말줄임(`max-width:190px` + `text-overflow:ellipsis`), 1440·390·360에서 페이지 넘침 0.
 - 시험: `tests/v41-shell-tree-title.test.mjs` 5개. `npm test` 477 pass / 0 fail / 37 skip, build 성공.
+
+## 2026-11-08 기억책 트리 이름 연결 (#212 마무리, ai/lt-book-tree-title-261108)
+- 기억책(트랙59) 두 벌 화면이 트리 이름을 보여 주기 시작했다. 규칙은 `tree-name.mjs`의 `displayTreeTitle()` 하나이고, 어댑터(`book-usability.mjs`)가 `treeTitleText()`로 감싼다(자동 접미사 `", 나의 순간들"`은 표시 단계에서만 제거, 저장값 불변).
+- 이름이 보이는 곳: 책 위쪽 갈래 글자(`.crumb`, 원래 "같은 트리 보기")와 순간 목차 머리 아래 한 줄(`.archive-tree`). 두 테마 모두 UI 글꼴(Pretendard).
+- 어댑터 주입 방식 그대로: `scripts/apply-book-usability.mjs`가 두 벌에 같은 스크립트·스타일을 넣고, 재실행하면 "변경 없음"이다. 원본 화면 파일은 손으로 고치지 않는다.
+- 기억 보드·관계 지도는 화면에 트리 이름을 그리는 자리가 없다(`기억 보드` 제목·`처음의 마음에서,` 문구뿐) → 이번에 연결할 곳 없음.
+- 시험: `tests/v41-book-usability.test.mjs`에 11번 추가("리센느, 나의 순간들" → "리센느", 직접 쓴 이름 그대로, 두 벌 배선). `npm test` 478 pass / 0 fail / 37 skip, build 성공.
+- 브라우저 확인(1440·390, 예시 트리 `좋아하는 순간들`): `.crumb`·`.archive-tree` 모두 "좋아하는 순간들", Pretendard, 넘침 0. 실제 화면에서 `treeTitleText('리센느, 나의 순간들')==='리센느'`.
