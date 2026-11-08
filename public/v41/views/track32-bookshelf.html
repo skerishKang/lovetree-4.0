@@ -363,6 +363,14 @@ html[data-v41-screen=shelf] .book-card.is-center {
   background: none;
   box-shadow: none;
 }
+/* 밤 테마는 identity.css가 :not([data-lt-theme=garden]) 가운데 카드에 회색 면·그림자를 준다(2-11-09 CTO 지적).
+   같은 선택자에 같은 무게로 뒤에서 덮어 칸을 없앤다. 가운데 책 아래 은은한 빛 번짐(스포트라이트)은 칸이 아니라 유지. */
+html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .book-card,
+html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .book-card.is-center {
+  border: 0;
+  background: none;
+  box-shadow: none;
+}
 /* 책 자체에만 바닥 그림자를 준다. 정원에서 책 뒤에 흰 기둥 같은 카드 면이 남지 않는다. */
 html[data-v41-screen=shelf] .book-card .book-cover {
   border-radius: 3px 7px 6px 3px;
