@@ -183,3 +183,86 @@ html[data-lt-theme=garden] body,html[data-lt-theme=garden] .app-header{transitio
 :host([data-lt-theme=garden]) .detail-copy p,:host([data-lt-theme=garden]) .detail-copy small{color:var(--lt-muted)}
 :host([data-lt-theme=garden]) .detail-buttons button,:host([data-lt-theme=garden]) .detail-buttons a,:host([data-lt-theme=garden]) .close,:host([data-lt-theme=garden]) .index-list button{background:rgba(255,253,248,.94);border-color:rgba(119,91,82,.34);color:var(--lt-ink)}
 :host([data-lt-theme=garden]) .media-unrecognized{background:var(--lt-paper);border-color:rgba(119,91,82,.3);color:var(--lt-ink)}
+
+/* #212 내 책장 테마. 밤(A)은 기본값이라 속성이 없어도 적용되고, 정원(B)은 밤 규칙을 되돌린다.
+   밤: 첫 화면과 같은 어두운 무대·진주색 글자·금 포인트. 장미색(--lt-rose)은 쓰지 않는다.
+   정원: 지금 크림색 책장과 글꼴을 그대로 둔다(아래 garden 블록이 기존 값을 되돌린다). */
+html[data-v41-screen=shelf]:not([data-lt-theme=garden]){
+ color-scheme:dark;
+ --shelf-paper:var(--lt-stage);--shelf-paper-2:var(--lt-stage-2);
+ --shelf-ink:var(--lt-pearl);--shelf-muted:var(--lt-muted);
+ --shelf-line:var(--lt-line);--shelf-accent:var(--lt-gold-deep);
+ --shelf-card:rgba(10,10,17,.62)
+}
+html[data-v41-screen=shelf]:not([data-lt-theme=garden]) body{color:var(--lt-pearl);background:radial-gradient(circle at 50% 8%,rgba(238,190,104,.07),transparent 34%),radial-gradient(circle at 82% 78%,rgba(120,146,201,.06),transparent 32%),linear-gradient(160deg,var(--lt-stage-2),var(--lt-stage) 62%,#040407)}
+html[data-v41-screen=shelf]:not([data-lt-theme=garden]) body::before{opacity:.03;mix-blend-mode:screen}
+html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .topbar{border-color:var(--lt-line);background:var(--lt-glass);box-shadow:0 8px 21px rgba(0,0,0,.4)}
+html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .crumbs{color:var(--lt-muted)}
+html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .ghost{border-color:var(--lt-line);color:var(--lt-pearl);background:rgba(10,10,17,.6)}
+html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .ghost:hover{border-color:var(--lt-gold-line);color:var(--lt-gold);background:rgba(255,230,166,.08)}
+html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .hero{border-color:var(--lt-line);background:var(--lt-glass);box-shadow:0 24px 60px rgba(0,0,0,.5)}
+/* "한 권의 책" 강조는 장미색이 아니라 진주색 흐린 톤이다(이슈 #212). */
+html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .hero h1{color:var(--lt-pearl);font-family:var(--lt-reading)}
+html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .hero h1 em{color:var(--lt-muted);font-style:normal}
+html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .hero-copy p:not(.eyebrow){color:var(--lt-muted)}
+html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .eyebrow{color:var(--lt-gold)}
+html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .hero-note{border-color:var(--lt-gold-line);color:var(--lt-pearl);background:rgba(255,230,166,.07)}
+html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .shelf-jump{border-color:var(--lt-gold-line);color:var(--lt-pearl);background:var(--lt-primary);color:var(--lt-primary-ink);font-weight:600}
+html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .shelf-jump:focus-visible{outline-color:var(--lt-gold)}
+html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .hero-stage{border-color:var(--lt-gold-line);background:radial-gradient(circle at 68% 24%,rgba(238,190,104,.14),transparent 26%),radial-gradient(circle at 30% 72%,rgba(120,146,201,.1),transparent 30%),linear-gradient(135deg,var(--lt-stage-2),var(--lt-stage) 82%)}
+html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .stage-label{color:var(--lt-gold)}
+html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .stage-hint{color:var(--lt-muted)}
+html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .search input{border-color:var(--lt-line);color:var(--lt-pearl);background:rgba(10,10,17,.66)}
+html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .search input::placeholder{color:var(--lt-muted)}
+html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .filter{border-color:var(--lt-line);color:var(--lt-muted);background:rgba(10,10,17,.5)}
+html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .filter.active,html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .filter:hover{border-color:var(--lt-gold-line);color:var(--lt-gold);background:rgba(255,230,166,.08)}
+html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .count{color:var(--lt-muted)}
+html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .shelf-viewport{border-color:var(--lt-line);background:radial-gradient(circle at 50% 11%,rgba(238,190,104,.1),transparent 33%),linear-gradient(180deg,var(--lt-stage-2),#05050a 88%);box-shadow:0 24px 60px rgba(0,0,0,.55)}
+html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .shelf-viewport[data-selected-book]{background:radial-gradient(circle at 50% 11%,color-mix(in srgb,var(--lt-gold-deep) 16%,transparent),transparent 33%),linear-gradient(180deg,var(--lt-stage-2),#05050a 88%)}
+html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .shelf-arrow{border-color:var(--lt-line);color:var(--lt-pearl);background:rgba(10,10,17,.8);box-shadow:0 7px 15px rgba(0,0,0,.4)}
+html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .shelf-arrow:hover{border-color:var(--lt-gold-line);color:var(--lt-gold)}
+html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .book-card{background:transparent}
+html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .book-card.is-center{background:rgba(255,230,166,.06);box-shadow:0 18px 32px rgba(0,0,0,.5)}
+html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .book-card:focus-within{outline:2px solid var(--lt-gold-line);outline-offset:3px}
+html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .book-card-meta strong{color:var(--lt-pearl)}
+html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .book-card-meta span{color:var(--lt-muted)}
+html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .empty{color:var(--lt-muted)}
+html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .empty strong{color:var(--lt-pearl)}
+/* 선택 카드에서 표지 윗부분이 잘리던 문제(#212): 카드 여백은 표지 위쪽에 남기고, 확대는 아래쪽 기준으로 한다. */
+html[data-v41-screen=shelf] .book-card{overflow:visible}
+html[data-v41-screen=shelf] .book-cover{transform-origin:50% 100%}
+/* #212 내 책장 안 기억책 리더: 밤에서는 어두운 무대·진주 글자·금 포인트. 종이(페이지)는 허용된 유일한 밝은 면이라 그대로 둔다. */
+html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .reader-screen.active{background:var(--lt-stage)}
+html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .reader-head .back-button{color:var(--lt-muted)}
+html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .reader-head .back-button:hover{color:var(--lt-gold)}
+html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .reader-label{color:var(--lt-muted)}
+html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .reader-info{border-color:var(--lt-line);background:var(--lt-glass);box-shadow:0 24px 60px rgba(0,0,0,.5)}
+html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .reader-info h2{color:var(--lt-pearl)}
+html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .reader-info>p{color:var(--lt-muted)}
+html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .reader-info .eyebrow{color:var(--lt-gold)}
+html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .info-rule{border-color:var(--lt-gold-line);color:var(--lt-pearl);background:rgba(255,230,166,.07)}
+html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .chapter-heading strong{color:var(--lt-pearl)}
+html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .chapter-heading span{color:var(--lt-muted)}
+html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .chapter-item{border-color:var(--lt-line);color:var(--lt-pearl);background:rgba(10,10,17,.5)}
+html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .chapter-item:hover,html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .chapter-item.active{border-color:var(--lt-gold-line);background:rgba(255,230,166,.09)}
+html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .chapter-item small,html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .chapter-item .arrow{color:var(--lt-muted)}
+html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .reader-info-foot{border-top-color:var(--lt-line);color:var(--lt-muted)}
+html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .reader-info-foot strong{color:var(--lt-gold)}
+html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .modal{border-color:var(--lt-line);background:var(--lt-stage-2);color:var(--lt-pearl);box-shadow:0 34px 82px rgba(0,0,0,.6)}
+html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .modal>p{color:var(--lt-muted)}
+html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .modal h2{color:var(--lt-pearl)}
+html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .modal .eyebrow{color:var(--lt-gold)}
+html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .modal-close{color:var(--lt-muted);background:rgba(255,255,255,.07)}
+html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .new-book-form label{color:var(--lt-muted)}
+html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .new-book-form input{border-color:var(--lt-line);color:var(--lt-pearl);background:rgba(10,10,17,.7)}
+html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .open-video{border-color:var(--lt-primary);color:var(--lt-primary-ink);background:var(--lt-primary)}
+html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .open-video:hover{background:var(--lt-pearl)}
+html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .reader-control{border-color:var(--lt-line);color:var(--lt-pearl);background:rgba(0,0,0,.4)}
+html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .reader-control:hover{border-color:var(--lt-gold-line);background:rgba(255,230,166,.14)}
+html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .toast{color:var(--lt-pearl);background:var(--lt-glass-strong);border-color:var(--lt-line)}
+/* 첫 화면과 같은 기본 글꼴(Pretendard)을 밤 책장에서도 쓴다. 책·순간 제목만 MaruBuri(시각 통일 기준). */
+html[data-v41-screen=shelf]:not([data-lt-theme=garden]) body,html[data-v41-screen=shelf]:not([data-lt-theme=garden]) button,html[data-v41-screen=shelf]:not([data-lt-theme=garden]) input{font-family:var(--lt-ui)}
+/* #212 표지 색: 밤은 장미색이 아닌 보드·지도 구분색, 정원은 지금 크림색 책장의 표지 색을 유지한다.
+   책장 스크립트는 var(--lt-cover-N)만 넘기고 실제 값은 테마 여기서 정한다. */
+html[data-v41-screen=shelf]{--lt-cover-1:var(--lt-group-6);--lt-cover-2:var(--lt-group-3);--lt-cover-3:var(--lt-group-5);--lt-cover-4:var(--lt-group-2)}
+html[data-v41-screen=shelf][data-lt-theme=garden]{--lt-cover-1:#a84f5d;--lt-cover-2:#627ba2;--lt-cover-3:#8d705e;--lt-cover-4:#6d8979}

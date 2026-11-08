@@ -46,13 +46,15 @@ const token = raw => {
   return match[1].toLowerCase();
 };
 
-test('정원이면 첫 여정도 정원이고, 밤이면 A, 안쪽 네 화면은 언제나 A다', () => {
+test('정원이면 첫 여정도 정원이고, 밤이면 A, 기억책·보드·지도는 언제나 A다', () => {
   assert.equal(appliedTheme('garden', 'journey'), 'garden');
   assert.equal(appliedTheme('night', 'journey'), 'night');
-  for (const view of ['shelf', 'book', 'board', 'network', 'inner']) {
+  // #212: 내 책장도 정원을 받는다(정원=지금 크림색 책장). 나머지 안쪽 화면은 계속 A다.
+  assert.equal(appliedTheme('garden', 'shelf'), 'garden');
+  for (const view of ['book', 'board', 'network', 'inner']) {
     assert.equal(appliedTheme('garden', view), 'night', view);
   }
-  assert.match(shell, /function themedView\(\)\{return current==='src064-orbit\.html'\?'home':current==='first-journey\.html'\?'journey':'inner';\}/);
+  assert.match(shell, /function themedView\(\)\{return current==='src064-orbit\.html'\?'home':current==='first-journey\.html'\?'journey':current==='track32-bookshelf\.html'\?'shelf':'inner';\}/);
 });
 
 test('셸은 첫 여정 iframe에만 테마 속성을 넘기고 화면마다 다시 계산한다', () => {

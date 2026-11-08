@@ -80,7 +80,8 @@ export function validateMomentInput(input) {
 export function createTree(input, clock = new Date().toISOString()) {
   const subject = requireText(input.subject, '좋아하는 대상', 60);
   const moment = { ...validateMomentInput(input), id: newId(), parentId: null, relation: '', links: [], createdAt: clock };
-  return { id: newId(), subject, title: `${subject}, 나의 순간들`, coverMomentId: '', createdAt: clock, updatedAt: clock, moments: [moment] };
+  // #212: 자동 접미사(", 나의 순간들")는 더 붙이지 않는다. 표시 단계 규칙은 tree-name.mjs.
+  return { id: newId(), subject, title: subject, coverMomentId: '', createdAt: clock, updatedAt: clock, moments: [moment] };
 }
 export function editTree(tree, input, clock = new Date().toISOString()) {
   const title = requireText(input.title, '트리 이름', 100);
