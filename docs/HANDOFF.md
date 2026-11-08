@@ -917,6 +917,21 @@ COM2에는 merge `6900df8aa446dfe0201d01997457fae04c4abe16`의 변경 서버 파
 - `board.js`는 압축 해제만 하고 **한 파일 338줄**이다(300줄 초과 이유: 무대 동작이 서로 얽혀 있어 기능 경계로 더 쪼개면 문장 사이가 갈라진다). 나머지 보조 코드는 `board-extras.js`로 분리.
 - 파일을 나눌 때는 **원래 순서 그대로** `<link>`·`<script src>`를 나열한다(캐스케이드·실행 순서 보존).
 
+## 2026-11-09 내 책장 파일 지도 (보충, #231 · PR #290 `c517fd5`)
+
+| 파일 | 줄 수 | 내용 |
+|---|---|---|
+| `public/v41/views/track32-bookshelf.html` | 125 | **마크업 + 파일 연결만** (73,535 → 8,312 B) |
+| `public/v41/views/shelf/shelf.css` | 168 | 변수·프레임·책장 레일·카드·표지 |
+| `public/v41/views/shelf/shelf-reader.css` | 181 | 펼친 책(3D) 화면 |
+| `public/v41/views/shelf/shelf-extra.css` | 46 | #256/#257 칸 제거·표지 정리 덧입히기(identity.css 뒤) |
+| `public/v41/views/shelf/shelf.js` | 421 | 책장 동작(IIFE 그대로) |
+
+- **원칙 7**: 값·선택자·코드 순서 변경 0 — 파일 분리와 줄바꿈만. CSS 순서는 원래 자리 그대로(기본 → `reader-layout.css` → `identity.css` → 덧입히기).
+- `shelf.js`가 300줄을 넘는 이유: 원본이 **하나의 IIFE**(클로저 안 상태·함수를 공유)라 쪼개면 스코프를 바꿔야 한다. 실행 시점·스코프를 그대로 두려고 클래식 스크립트 한 파일로 둔다.
+- 시험은 마크업 + 옮긴 파일을 합쳐서 본다(`v41-merge-bookshelf`·`v41-shelf-unify`·`v41-workspace-model`).
+- 검증: 미리보기 겉모습 비교 **shelf 4장 0.000(동일)**, 운영 postdeploy `pass=17 fail=0`.
+
 ## 2026-11-08 기억책 파일 지도 (2단계 ①·②, ai/lt-book-source-261108 · ai/lt-book-inject-261108, #231)
 
 기억책(track59)은 이제 화면 뼈대 + 네 파일이다. **고칠 때 어디를 보면 되는지**
