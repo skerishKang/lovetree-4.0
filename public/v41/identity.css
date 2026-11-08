@@ -8,7 +8,7 @@
 :root{
  --lt-stage:#040407;--lt-stage-2:#0a0a11;            /* 무대: 첫 화면 배경 radial 중심/가장자리 */
  --lt-pearl:#f5f1e9;--lt-muted:#9b98a6;              /* 무대 위 글자 */
- --lt-gold:#ffe6a6;--lt-gold-deep:#e6b14c;--lt-gold-ink:#8a6420; /* 금테: 선택·강조·프레임 (ink는 종이 위 글자용) */
+ --lt-gold:#ff0000;--lt-gold-deep:#e6b14c;--lt-gold-ink:#8a6420; /* 금테: 선택·강조·프레임 (ink는 종이 위 글자용) */
  --lt-gold-line:rgba(255,230,166,.45);--lt-gold-glow:rgba(238,190,104,.68);
  --lt-rose:#d88f9c;--lt-rose-ink:#bd5d72;            /* 감정·연결 (ink는 종이 위 글자용) */
  --lt-blue:#7892c9;--lt-violet:#a99ac9;              /* 보드·지도 구분색 */
