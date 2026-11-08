@@ -240,11 +240,53 @@ async function sessionLoggedIn(page, timeout) {
   return false;
 }
 
+// 셸은 #view·#view-next 두 iframe을 번갈아 쓴다(#219). 숨은 iframe에는 이전(빈) 문서가 남아 있어
+// "#view만 읽으면" 러너에서 첫 화면이 #view-next에 열렸을 때 빈 값을 읽는다(#243과 같은 원인, 2026-11-08).
+// 페이지 안에서 쓸 선택식: 보이는 iframe → 없으면 #view.
+const VISIBLE_VIEW_EXPR = "([document.getElementById('view'), document.getElementById('view-next')].find((el) => el && !el.hidden && el.getClientRects().length > 0) || document.getElementById('view'))";
+
+async function visibleViewFrameId(page) {
+  return page.evaluate(`(() => {
+    const pick = ${VISIBLE_VIEW_EXPR};
+    const ready = (el) => el && el.contentDocument && el.contentDocument.readyState !== 'loading';
+    for (const id of ['view', 'view-next']) {
+      const el = document.getElementById(id);
+      if (el && !el.hidden && el.getClientRects().length > 0 && ready(el)) return id;
+    }
+    return pick ? (pick.id || '') : '';
+  })()`).catch(() => '');
+}
+
+async function viewFrameInfo(page) {
+  // 실패 진단: 두 iframe 각각의 hidden·주소·readyState.
+  return page.evaluate(() => ['view', 'view-next'].map((id) => {
+    const el = document.getElementById(id);
+    if (!el) return { id, missing: true };
+    return {
+      id,
+      hidden: !!el.hidden,
+      visible: el.getClientRects().length > 0,
+      readyState: el.contentDocument?.readyState || '(문서 없음)',
+      href: (el.contentWindow?.location?.href || '').replace(location.origin, '')
+    };
+  })).catch(() => null);
+}
+
 async function viewFrame(page) {
   // 2026-11-08: 첫 여정 등 iframe이 늘어 '첫 번째 하위 frame'이 #view가 아닐 수 있다.
   const el = await page.$('#view').catch(() => null);
   const f = el ? await el.contentFrame().catch(() => null) : null;
   return f || page.frames().find((x) => x !== page.mainFrame()) || null;
+}
+
+async function visibleViewFrame(page) {
+  const id = await visibleViewFrameId(page);
+  if (id) {
+    const handle = await page.$('#' + id).catch(() => null);
+    const frame = handle ? await handle.contentFrame().catch(() => null) : null;
+    if (frame) return frame;
+  }
+  return viewFrame(page);
 }
 
 async function fillAuthEmailLogin(page, password) {
@@ -580,7 +622,7 @@ async function measure(page) {
   let frameDoc = null;
   let frameOverflow = [];
   let frameOverlaps = [];
-  const frame = await viewFrame(page);
+  const frame = await visibleViewFrame(page);
   if (frame) {
     try {
       const result = await frame.evaluate(() => {
@@ -708,7 +750,7 @@ async function checkVisualTokens(page, target, opts, stamp) {
     const top = await page.evaluate(() => {
       const vis = (el) => el && !el.hidden && getComputedStyle(el).display !== 'none' && el.getClientRects().length > 0;
       const hdr = document.querySelector('.app-header');
-      const fr = document.getElementById('view');
+      const fr = ([document.getElementById('view'), document.getElementById('view-next')].find((el) => el && !el.hidden && el.getClientRects().length > 0) || document.getElementById('view'));
       const wm = document.getElementById('write-menu');
       const nav = document.querySelector('.app-header nav');
       const navKids = nav ? [...nav.children] : [];
@@ -750,7 +792,7 @@ async function checkVisualTokens(page, target, opts, stamp) {
       };
     });
     let inner = null;
-    const frame = await viewFrame(page);
+    const frame = await visibleViewFrame(page);
     if (frame) {
       inner = await frame.evaluate(() => ({
         screen: document.documentElement.getAttribute('data-v41-screen') || '',
@@ -842,7 +884,7 @@ async function checkHomeCardMenuMouse(page, target, opts, stamp) {
   const base = new URL(target.href);
   // 러너(headless chromium)에서 바깥 클릭 직후 shadow root 읽기가 한 번 비는 경우가 있어 3회까지 다시 읽는다.
   const readMenuOnce = () => page.evaluate(() => {
-    const frame = document.getElementById('view');
+    const frame = ([document.getElementById('view'), document.getElementById('view-next')].find((el) => el && !el.hidden && el.getClientRects().length > 0) || document.getElementById('view'));
     const doc = frame?.contentDocument;
     const sh = doc?.getElementById('orbit')?.shadowRoot;
     const menu = sh?.querySelector('#home-view-menu');
@@ -893,7 +935,7 @@ async function checkHomeCardMenuMouse(page, target, opts, stamp) {
       recordInfo(`card-menu-tips-${width}`, 'visual',
         `${width}: 첫 방문 안내(${tips.title})를 닫고 메뉴 검사를 진행${tips.closed ? '' : ' — 닫힘 확인 실패'}`, tips);
     }
-    const frame = await viewFrame(page);
+    const frame = await visibleViewFrame(page);
     const button = frame?.locator('[data-lt-view-menu]').first();
     if (!button || !(await button.count().catch(() => 0))) {
       problems.push(`${width}: 보기 메뉴 버튼 없음`);
@@ -930,8 +972,10 @@ async function checkHomeCardMenuMouse(page, target, opts, stamp) {
     if (!escaped || (escaped.hidden !== true && escaped.expanded !== 'false')) problems.push(`${width}: Esc 후에도 열림 ${JSON.stringify(escaped)}`);
   }
   await page.setViewportSize({ width: 1440, height: 900 }).catch(() => {});
+  // 실패하면 두 iframe의 hidden·주소·readyState를 함께 남긴다(숨은 문서를 읽었는지 바로 알 수 있게).
+  const frames = problems.length ? await viewFrameInfo(page) : null;
   record('home-card-menu-mouse', 'visual', problems.length ? 'fail' : 'pass',
-    problems.length ? problems.join('; ') : '보기 메뉴: 열림 유지·항목(움직임·밤/정원·카드, 로그인 상태별)·바깥 클릭/Esc 닫힘 (1440/390)', { problems });
+    problems.length ? `${problems.join('; ')} [프레임 ${JSON.stringify(frames)}]` : '보기 메뉴: 열림 유지·항목(움직임·밤/정원·카드, 로그인 상태별)·바깥 클릭/Esc 닫힘 (1440/390)', { problems, frames });
 }
 
 // 로그인 상태에서만 보이는 헤더 버튼 검사(2026-11-08).
@@ -975,7 +1019,7 @@ async function checkSignedInActions(page, target, opts, stamp) {
       hash: location.hash,
       editorOpen: !!document.getElementById('editor')?.open,
       editorTitle: document.getElementById('editor-title')?.textContent || '',
-      journey: !!document.querySelector('iframe#view') && /first-journey/.test(document.getElementById('view')?.contentWindow?.location?.href || ''),
+      journey: /first-journey/.test((([document.getElementById('view'), document.getElementById('view-next')].find((el) => el && !el.hidden && el.getClientRects().length > 0) || document.getElementById('view'))?.contentWindow?.location?.href || '')),
       feedback: document.getElementById('record-feedback')?.textContent || ''
     })).catch(() => ({}));
     // 트리가 없으면 같은 버튼이 편집기 대신 첫 여정(새 트리 흐름)을 연다 — 둘 다 정상이다.
@@ -996,7 +1040,7 @@ async function checkSignedInActions(page, target, opts, stamp) {
       hash: location.hash,
       editorOpen: !!document.getElementById('editor')?.open,
       editorTitle: document.getElementById('editor-title')?.textContent || '',
-      journey: /first-journey/.test(document.getElementById('view')?.contentWindow?.location?.href || '')
+      journey: /first-journey/.test((([document.getElementById('view'), document.getElementById('view-next')].find((el) => el && !el.hidden && el.getClientRects().length > 0) || document.getElementById('view'))?.contentWindow?.location?.href || ''))
     })).catch(() => ({}));
     const newFlow = /#journey/.test(after.hash || '') || after.journey || (after.editorOpen && /새|추가/.test(after.editorTitle || ''));
     record('write-menu-shelf-new-tree', 'auth', newFlow ? 'pass' : 'fail',
@@ -1371,7 +1415,7 @@ async function runAuthFlows(target, opts, stamp) {
         if (!login2.ok) return { ok: false, detail: `로그인 실패: ${login2.reason}` };
       }
       await page.waitForFunction(() => document.body.dataset.member === 'in' && Number(document.body.dataset.treeCount) > 0, null, { timeout: opts.timeout });
-      await page.waitForFunction(() => /track32-bookshelf/.test(document.getElementById('view')?.contentDocument?.URL || ''), null, { timeout: opts.timeout });
+      await page.waitForFunction(() => /track32-bookshelf/.test(([document.getElementById('view'), document.getElementById('view-next')].find((el) => el && !el.hidden && el.getClientRects().length > 0) || document.getElementById('view'))?.contentDocument?.URL || ''), null, { timeout: opts.timeout });
       let frame = flowVisibleFrame(page);
       let state = await flowState(page);
       let shelf = /track32-bookshelf/.test(frame?.url() || '');
@@ -1839,7 +1883,7 @@ async function checkYoutubeEndpoint(page, videoId) {
 }
 
 async function checkYoutubeCaption(page, videoId) {
-  const frame = await viewFrame(page);
+  const frame = await visibleViewFrame(page);
   let foundMemory = false;
   if (frame) {
     foundMemory = await frame.evaluate(() =>
