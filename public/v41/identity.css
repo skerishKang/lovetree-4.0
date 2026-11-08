@@ -1,7 +1,8 @@
 /* 4.1 identity layer. Imported artwork and data remain unchanged. */
 @import url('/fonts/pretendard/pretendardvariable-dynamic-subset.css');
 @font-face{font-family:MaruBuri;font-weight:400;font-style:normal;font-display:swap;src:url('/fonts/MaruBuri-Regular.woff2') format('woff2')}
-:root{--lt-ui:'Pretendard Variable',Pretendard,'Noto Sans KR',system-ui,sans-serif;--lt-reading:MaruBuri,'Noto Serif CJK KR',Batang,serif;--body:var(--lt-ui);--latin:var(--lt-ui)/* 2026-11-09 제목 글꼴 토큰: 밤은 본문과 같은 기본 글꼴(Pretendard), 정원은 지금 명조(MaruBuri) 그대로. */--lt-font-display:var(--lt-ui);--display:var(--lt-font-display);--book-serif:var(--lt-reading);--ui-sans:var(--lt-ui);--hand:var(--lt-reading);font-synthesis:none}
+/* 2026-11-09 제목 글꼴 토큰: 밤은 본문과 같은 기본 글꼴(Pretendard), 정원은 지금 명조(MaruBuri) 그대로. */
+:root{--lt-ui:'Pretendard Variable',Pretendard,'Noto Sans KR',system-ui,sans-serif;--lt-reading:MaruBuri,'Noto Serif CJK KR',Batang,serif;--body:var(--lt-ui);--latin:var(--lt-ui);--lt-font-display:var(--lt-ui);--display:var(--lt-font-display);--book-serif:var(--lt-reading);--ui-sans:var(--lt-ui);--hand:var(--lt-reading);font-synthesis:none}
 /* 4.1 공통 색·모양 토큰 (대표 결정 2026-11-05: 첫 화면 SRC064가 디자인 원본). 값은 SRC064 원본에서 그대로 뽑았다.
    새 UI의 색·모서리는 이 토큰만 쓴다. 원본 화면의 :root 색은 이 파일의 화면별 덮어쓰기로만 바꾼다. 새 hex를 흩뿌리지 않는다. */
 :root{
