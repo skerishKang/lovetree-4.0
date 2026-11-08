@@ -99,7 +99,8 @@ test('로그인이 필요한 진입점은 안내 창 없이 바로 /auth/login�
 
   // 네 진입점이 모두 그 경로를 쓴다.
   assert.match(shell, /b\.dataset\.view==='track32-bookshelf\.html'&&!member\?\.snapshot\(\)\.owned\)\{openLoginStart\('shelf'\)/, '헤더 내 책장 탭');
-  assert.match(shell, /e\.data\?\.type==='lt41-start'\)\{openLoginStart\('first'\)/, '가운데 처음 시작하기');
+  const messages = read('public/v41/shell/messages.mjs');
+  assert.match(messages, /data\?\.type === 'lt41-start'\) \{ openLoginStart\('first'\); return; \}/, '가운데 처음 시작하기');
   assert.match(shell, /openLoginStart\('new-tree'\)/, '새 트리 만들기');
   assert.match(authModule, /function openLoginStart\(intent = 'first'\) \{\s*startLogin\(intent === 'first' \? '' : intent\);/);
 

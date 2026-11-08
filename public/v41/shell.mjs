@@ -3,20 +3,21 @@ import {memberLoginUrl,shouldLoadMemberRecords} from './member-entry.mjs';
 import {workspaceModel} from './workspace-model.mjs';
 import {createWorkspaceApi, setMemberRefreshStarted} from './api.mjs';
 import {createShareApi} from './share-api.mjs';
-import {mountCommunity} from './community-panel.mjs';
 import {createMemberSession} from './member-session.mjs';
 import {hasPendingDraft} from './sync-controller.mjs';
 import {exampleTree} from './example.mjs';
 import {parseSelectionRoute,memberStartupView,ownerSelectionRoute,accountPosition,rememberAccountPosition,resolveAccountPosition,stashPendingOwnerRoute,pendingOwnerRoute,takePendingOwnerRoute} from './selection-location.mjs';
 import {applyViewAccessibility,connectionLabel,focusReturnTarget} from './view-a11y.mjs';
 import {accountPresentation,treePickerLabel,treePickerText,treeViewsVisible,writeMenuLabel,headerState,headerPartsFor,readTipsSeen,writeTipsSeen,tipsWanted,FIRST_TREE_TIPS,homeCenterState,homeStartLoginUrl,readTheme,readLoginIntent,writeTheme,nextTheme,themeButtonLabel,themeButtonAriaLabel,themePressed,appliedTheme,applyThemeAttribute,LOGIN_INTENTS} from './header-state.mjs';
-import {journeyEntry,journeySavePlan,journeyRouteHash,parseJourneyRoute,journeyRouteDecision} from './first-journey.mjs';
+import {parseJourneyRoute,journeyRouteDecision} from './first-journey.mjs';
 import {displayTreeTitle} from './tree-name.mjs';
 import {screens,screenForView,viewForFile,themedViewFor} from './shell/navigation.mjs';
 import {createScreens} from './shell/screens.mjs';
 import {createHeader} from './shell/header.mjs';
 import {createAuth} from './shell/auth.mjs';
 import {createPanels} from './shell/panels.mjs';
+import {createJourney} from './shell/journey.mjs';
+import {createMessages} from './shell/messages.mjs';
 import {paintLoginLinks,paintThemeControls,applyTheme as applyThemeFor,toggleTheme as toggleThemeFor} from './shell/theme.mjs';
 const $=id=>document.getElementById(id);
 function themedView(){return themedViewFor(current);}
@@ -24,7 +25,7 @@ function applyTheme(theme=readTheme(localStorage)){return applyThemeFor(current,
 function toggleTheme(){return toggleThemeFor(current);}
 const moreButton=$('mobile-more'),moreMenu=$('header-overflow');function closeMore(){moreMenu.classList.remove('is-open');moreButton.setAttribute('aria-expanded','false');}moreButton.addEventListener('click',()=>{const open=moreMenu.classList.toggle('is-open');moreButton.setAttribute('aria-expanded',String(open));});moreMenu.addEventListener('click',event=>{if(event.target.closest('button'))closeMore();});document.addEventListener('click',event=>{if(!moreMenu.contains(event.target)&&event.target!==moreButton)closeMore();});document.addEventListener('keydown',event=>{if(event.key==='Escape'&&moreMenu.classList.contains('is-open')){closeMore();moreButton.focus();}});document.addEventListener('keydown',event=>{const c=$('community-panel');if(event.key==='Escape'&&c.open&&![...document.querySelectorAll('dialog[open]')].some(d=>d!==c&&d.matches(':modal')))c.close();});
 const initialRoute=parseSelectionRoute(location.hash);
-let model=null,current=screenForView(initialRoute.view)[1],source='example',loadGeneration=0,toastTimer,previousDirty=false,member=null,handledHash=null,activeShareId=null,sharePreviewKey='',sharePreviewToken='',journeyReturn='src064-orbit.html',journeyStep=0,journeySaved=false,journeyRouteOpened=false;
+let model=null,current=screenForView(initialRoute.view)[1],source='example',loadGeneration=0,toastTimer,previousDirty=false,member=null,handledHash=null,activeShareId=null;
 setMemberRefreshStarted(false);
 const shareApi=createShareApi();
 const accountApi=createWorkspaceApi();
@@ -59,6 +60,56 @@ const shellPanels=createPanels({
 function openEditor(mode,parentId=''){return shellPanels.openEditor(mode,parentId);}
 function updateMediaPreview(){return shellPanels.updateMediaPreview();}
 function updateQuickEntryHint(){return shellPanels.updateQuickEntryHint();}
+// 첫 여정 연결은 shell/journey.mjs, 공유·둘러보기·lt41-* 수신은 shell/messages.mjs가 맡는다(#231 1-B③-3).
+const shellJourney=createJourney({
+  $,
+  getCurrent:()=>current,
+  setCurrent:file=>{current=file;},
+  getMember:()=>member,
+  getSource:()=>source,
+  notify:text=>notify(text),
+  panel:id=>panel(id),
+  show:(file,write)=>show(file,write),
+  screens,
+  choose:(id,momentId)=>choose(id,momentId),
+  writeLocation:(mode)=>writeLocation(mode),
+  openLoginStart:intent=>openLoginStart(intent),
+  flowNavigation:()=>flowNavigation(),
+  setHandled:hash=>{handledHash=hash;}
+});
+const shellMessages=createMessages({
+  $,
+  getCurrent:()=>current,
+  setCurrent:file=>{current=file;},
+  getModel:()=>model,
+  getSource:()=>source,
+  getMember:()=>member,
+  shareApi,
+  notify:text=>notify(text),
+  panel:id=>panel(id),
+  show:(file,write)=>show(file,write),
+  links:()=>links(),
+  writeLocation:(mode)=>writeLocation(mode),
+  choose:(id,momentId)=>choose(id,momentId),
+  openEditor:(mode,parentId)=>openEditor(mode,parentId),
+  openLoginStart:intent=>openLoginStart(intent),
+  openAccountMenu:()=>openAccountMenu(),
+  sample:(selection,view)=>sample(selection,view),
+  applyTheme:(theme)=>applyTheme(theme),
+  paintThemeControls:()=>paintThemeControls(),
+  viewForFile:file=>viewForFile(file),
+  exampleTree,
+  journey:shellJourney
+});
+function openSharePanel(){return shellMessages.openSharePanel();}
+function noteJourneyStep(step,options){return shellJourney.noteJourneyStep(step,options);}
+function gotoJourneyStep(step){return shellJourney.gotoJourneyStep(step);}
+function leaveJourney(options){return shellJourney.leaveJourney(options);}
+function finishJourney(){return shellJourney.finishJourney();}
+function openFirstJourney(options){return shellJourney.openFirstJourney(options);}
+function saveFirstJourney(draft){return shellJourney.saveFirstJourney(draft);}
+function openJourneyBook(args){return shellJourney.openJourneyBook(args);}
+function closeFirstJourney(){return shellJourney.closeFirstJourney();}
 function notify(text){$('record-feedback').textContent=text;$('toast').textContent=text;$('toast').hidden=$('records').open;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').hidden=true,6500);}
 const PENDING_NEW='lovetree.v41.pending-new';
 // 2026-11-07 계정 표시: 로그인 상태는 첫 글자 동그라미 + 작은 메뉴, 로그아웃 상태는 기존 로그인 알약.
@@ -254,113 +305,18 @@ async function showPublicRoute(route){if(member&&!leaveMember()){writeLocation('
  const answer=await shareApi.read(route.shareId||'');if(generation!==loadGeneration)return;if(!answer.ok){publicProblem(answer);return;}
  activeShareId=answer.share.id;const view=['book','board','network'].includes(route.view)?route.view:answer.share.view;current=screenForView(view)[1];load({revision:0,state:{version:1,trees:[answer.tree]}},'share',{treeId:answer.tree.id,momentId:answer.share.entryMomentId});activeShareId=answer.share.id;show(current,false);writeLocation('replace');notify('소유자가 명시적으로 공유한 트리입니다. 감상만 할 수 있어요.');
 }
-function applyBrowserLocation(){if(location.hash===handledHash)return;handledHash=location.hash;const journey=journeyRouteDecision({hash:location.hash,open:current==='first-journey.html',saved:journeySaved});if(journey.action==='goto'){gotoJourneyStep(journey.step);return;}if(journey.action==='open'){openFirstJourney({step:journey.step,route:true});return;}if(journey.action==='finished'){finishJourney();return;}if(journey.action==='leave'){leaveJourney();return;}const route=parseSelectionRoute(location.hash);if(route.scope==='public'){showPublicRoute(route);return;}current=screenForView(route.view)[1];
+function applyBrowserLocation(){if(location.hash===handledHash)return;handledHash=location.hash;const journey=journeyRouteDecision({hash:location.hash,open:current==='first-journey.html',saved:shellJourney.saved()});if(journey.action==='goto'){gotoJourneyStep(journey.step);return;}if(journey.action==='open'){openFirstJourney({step:journey.step,route:true});return;}if(journey.action==='finished'){finishJourney();return;}if(journey.action==='leave'){leaveJourney();return;}const route=parseSelectionRoute(location.hash);if(route.scope==='public'){showPublicRoute(route);return;}current=screenForView(route.view)[1];
  if(route.scope==='owner'){if(source!=='server'||!member?.snapshot().owned){show(current,false);void startMember();return;}const saved=accountPosition(localStorage,member.snapshot().subject)||{},resolved=resolveAccountPosition(model?.trees||[],route,saved);choose(resolved.position.treeId,resolved.position.momentId);if(resolved.treeMissing||resolved.momentMissing){writeLocation('replace');notify(resolved.treeMissing?'이 주소의 기록을 현재 계정에서 찾을 수 없어 최근 위치를 열었어요.':'이 주소의 순간을 찾을 수 없어 트리의 시작 순간을 열었어요.');}else rememberAccountPosition(localStorage,member.snapshot().subject,{...resolved.position,view:route.view});return;}
  show(current,false);
 }
 document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{if(b.dataset.view==='track32-bookshelf.html'&&!member?.snapshot().owned){openLoginStart('shelf');return;}show(b.dataset.view);});
 addEventListener('popstate',applyBrowserLocation);
 addEventListener('hashchange',applyBrowserLocation);
-addEventListener('message',e=>{if(e.origin!==location.origin||e.source!==$('view').contentWindow)return;if(e.data?.type==='lt41-theme'){applyTheme();paintThemeControls();}if(e.data?.type==='lt41-journey-step'){noteJourneyStep(e.data.step);return;}if(e.data?.type==='lt41-journey-save'){saveFirstJourney(e.data.draft);return;}if(e.data?.type==='lt41-journey-open-book'){openJourneyBook(e.data);return;}if(e.data?.type==='lt41-journey-close'){closeFirstJourney();return;}if(e.data?.type==='lt41-media-metadata'&&source==='server'&&member?.snapshot().owned){const tree=window.LT41?.tree,moment=tree?.moments.find(m=>m.id===e.data.momentId&&m.url===e.data.url);if(moment)try{member.apply('cacheMediaMetadata',{url:e.data.url,mediaMetadata:e.data.mediaMetadata},{treeId:tree.id,momentId:moment.id})}catch{}}if(e.data?.type==='lt41-navigate'){if(e.data.view==='track32-bookshelf.html'&&!member?.snapshot().owned){openLoginStart('shelf');return;}show(e.data.view);}if(e.data?.type==='lt41-select'&&window.LT41?.tree.moments.some(m=>m.id===e.data.id)){window.LT41.momentId=e.data.id;links();writeLocation();}if(e.data?.type==='lt41-write')openEditor(e.data.mode,e.data.parentId);if(e.data?.type==='lt41-open-book'&&model?.trees.some(t=>t.id===e.data.treeId&&t.moments.some(m=>m.id===e.data.id))){current='track59-sketchbook.html';choose(e.data.treeId,e.data.id);writeLocation();}if(e.data?.type==='lt41-start'){openLoginStart('first');return;}if(e.data?.type==='lt41-account'){if(member?.snapshot().owned)openAccountMenu();else $('account-entry').click();}if(e.data?.type==='lt41-community')$('community-menu').click();if(e.data?.type==='lt41-example'&&exampleTree.moments.some(m=>m.id===e.data.momentId)&&['track59-sketchbook.html','track58-pinboard.html'].includes(e.data.view)){sample({treeId:exampleTree.id,momentId:e.data.momentId},e.data.view);}if(e.data?.type==='lt-selection'||e.data?.type==='lt41-choose'){links();writeLocation();}});function sharePayload(){return {treeId:window.LT41?.tree.id||'',entryMomentId:$('share-moment').value,view:$('share-view').value};}
-function shareFailure(answer){return answer.status===401?'로그인이 필요해요.':answer.code==='timeout'?'서버 응답 시간이 초과됐어요.':answer.message||'공유 요청을 처리하지 못했어요.';}
-function renderShareList(shares=[]){
- const host=$('share-list'),treeId=window.LT41?.tree.id;host.replaceChildren();const selected=shares.filter(item=>item.treeId===treeId);
- if(!selected.length){const p=document.createElement('p');p.textContent='아직 만든 공유 주소가 없어요.';host.append(p);return;}
- for(const item of selected){const row=document.createElement('div');row.className='share-item'+(item.status==='revoked'?' share-revoked':'');const text=document.createElement('div'),strong=document.createElement('strong'),small=document.createElement('small');strong.textContent=item.status==='active'?(item.discoverable?'공유 중 · 발견 공개':'공유 중 · 주소로만 공개'):'공유 취소됨';small.textContent=(item.view==='board'?'기억 보드':item.view==='network'?'관계 지도':'기억책')+' · '+new Date(item.createdAt).toLocaleString('ko-KR');text.append(strong,small);row.append(text);
-   if(item.status==='active'){const actions=document.createElement('div');actions.className='share-item-actions';const discover=document.createElement('button');discover.type='button';discover.textContent=item.discoverable?'발견에서 내리기':'발견에 공개';discover.onclick=async()=>{const next=!item.discoverable;if(next&&!confirm('이 트리를 누구나 검색할 수 있는 발견 목록에 공개할까요? 공유 주소만 만든 상태와 달리 제목·대상·공개 순간이 목록에 나타납니다.'))return;discover.disabled=true;const answer=await shareApi.setDiscoverable(item.id,next);if(!answer.ok){$('share-feedback').textContent=shareFailure(answer);discover.disabled=false;return;}$('share-feedback').textContent=next?'발견 목록 공개를 켰어요.':'발견 목록에서 내렸어요. 공유 주소는 계속 사용할 수 있어요.';await loadShareList();};const revoke=document.createElement('button');revoke.type='button';revoke.textContent='공유 취소';revoke.onclick=async()=>{if(!confirm('이 공유 주소를 지금 회수할까요? 발견 목록에서도 즉시 내려갑니다.'))return;revoke.disabled=true;const answer=await shareApi.revoke(item.id);if(!answer.ok){$('share-feedback').textContent=shareFailure(answer);revoke.disabled=false;return;}$('share-feedback').textContent='공유를 취소했어요. 새 요청은 즉시 차단됩니다.';if($('share-url').dataset.shareId===item.id)$('share-created').hidden=true;await loadShareList();};actions.append(discover,revoke);row.append(actions);}
-   host.append(row);
- }
-}
-async function loadShareList(){const answer=await shareApi.list();if(answer.ok)renderShareList(answer.shares);else $('share-list').textContent=shareFailure(answer);}
-function invalidateSharePreview(){sharePreviewKey='';sharePreviewToken='';$('share-create').disabled=true;$('share-preview-result').hidden=true;$('share-feedback').textContent='선택이 바뀌었어요. 공개 내용을 다시 미리 봐 주세요.';}
-async function openSharePanel(){
- if(source!=='server'||!member?.snapshot().owned||!window.LT41){notify('내 서버 기록에서 공유할 트리를 먼저 열어 주세요.');return;}
- if(member.snapshot().dirty){notify('서버 저장이 끝난 뒤 공유 내용을 확인해 주세요.');return;}
- const tree=window.LT41.tree;$('share-moment').replaceChildren();for(const moment of tree.moments){const o=document.createElement('option');o.value=moment.id;o.textContent=moment.title;$('share-moment').append(o);}$('share-moment').value=window.LT41.momentId;$('share-view').value=['book','board','network'].includes(viewForFile(current))?viewForFile(current):'book';sharePreviewKey='';sharePreviewToken='';$('share-create').disabled=true;$('share-preview-result').hidden=true;$('share-created').hidden=true;$('share-feedback').textContent='';panel('share-panel');void loadShareList();
-}
-$('share-menu').onclick=openSharePanel;$('share-moment').onchange=invalidateSharePreview;$('share-view').onchange=invalidateSharePreview;
-$('share-preview').onclick=async()=>{const button=$('share-preview'),payload=sharePayload();button.disabled=true;$('share-feedback').textContent='서버에서 공개 범위를 확인하고 있어요.';const answer=await shareApi.preview(payload);button.disabled=false;if(!answer.ok){$('share-feedback').textContent=shareFailure(answer);return;}sharePreviewKey=JSON.stringify(payload);sharePreviewToken=answer.preview.previewToken;$('share-preview-summary').textContent=`“${displayTreeTitle(answer.preview.tree.title)}”의 ${answer.preview.tree.moments.length}개 순간을 공개합니다.${answer.preview.omittedPrivateMedia?' 비공개 업로드 '+answer.preview.omittedPrivateMedia+'개는 제외됩니다.':''}`;$('share-preview-moments').replaceChildren();for(const moment of answer.preview.tree.moments){const li=document.createElement('li');li.textContent=`${moment.title} · ${moment.emotion} · ${moment.date}`; $('share-preview-moments').append(li);}$('share-preview-result').hidden=false;$('share-create').disabled=false;$('share-feedback').textContent='미리보기를 확인한 뒤 링크를 만들 수 있어요.';};
-$('share-create').onclick=async()=>{const payload=sharePayload();if(sharePreviewKey!==JSON.stringify(payload)){invalidateSharePreview();return;}const button=$('share-create');button.disabled=true;$('share-feedback').textContent='공유 주소를 만들고 있어요.';const answer=await shareApi.create({...payload,previewToken:sharePreviewToken});if(!answer.ok){$('share-feedback').textContent=shareFailure(answer);button.disabled=false;return;}const shareBase=location.hostname==='lovetree.padiem.net'?'/':'/v41/';const url=new URL(`${shareBase}#share/${answer.share.id}/${answer.share.view}`,location.origin).href;$('share-url').value=url;$('share-url').dataset.shareId=answer.share.id;$('share-created').hidden=false;$('share-feedback').textContent='명시적으로 공유 주소를 만들었어요.';sharePreviewKey='';sharePreviewToken='';await loadShareList();};
-$('share-copy').onclick=async()=>{const input=$('share-url');try{await navigator.clipboard.writeText(input.value);$('share-feedback').textContent='공유 주소를 복사했어요.';}catch{input.select();$('share-feedback').textContent='주소를 선택했어요. 복사해 주세요.';}};
 for(const f of frames())f.addEventListener('load',()=>frameLoaded(f));
 paintThemeControls();applyTheme();
 if(initialRoute.scope==='public')showPublicRoute(initialRoute);else load(null,'example');
 
 function backup(){const data=member?.state();if(!data){notify('백업할 내 기록이 없어요.');return;}const a=document.createElement('a'),url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));a.href=url;a.download='lovetree-draft.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),0);}
-// 2026-11-07 첫 트리 = 첫 여정(A안, 어두운 무대). 새 트리를 여는 모든 경로가 이 화면으로 오고,
-// 순간 추가·이 순간 수정은 기존 오른쪽 패널을 그대로 쓴다. 저장은 member.apply('new'/'add') 하나뿐이다.
-function journeyReply(message){try{$('view').contentWindow?.postMessage(message,location.origin);}catch{}}
-// 2026-11-08 첫 여정 기록: 열 때와 단계를 옴길 때마다 #journey/00~04를 history에 남긴다.
-// 같은 단계로 다시 쓰지 않고, 뒤로가기는 이 기록만 보고 단계 복귀·종료를 정한다.
-function writeJourneyLocation(step,mode='push'){
- const hash=journeyRouteHash(step);
- if(location.hash!==hash){
-  const depth=Number(history.state?.lt41Journey)||0;
-  history[mode==='replace'?'replaceState':'pushState'](mode==='replace'?history.state:{lt41Journey:depth+1},'',hash);
- }
- handledHash=hash;
-}
-function noteJourneyStep(step,{replace=false}={}){
- if(current!=='first-journey.html')return;
- journeyStep=parseJourneyRoute(journeyRouteHash(step))?.step||0;
- writeJourneyLocation(journeyStep,replace?'replace':'push');
-}
-function gotoJourneyStep(step){
- if(current!=='first-journey.html'){openFirstJourney({step,route:true});return;}
- journeyStep=parseJourneyRoute(journeyRouteHash(step))?.step||0;
- try{$('view').contentWindow?.postMessage({type:'lt41-journey-goto',step:journeyStep},location.origin);}catch{}
- handledHash=location.hash;
-}
-function leaveJourney({replaceHash=false}={}){
- if(current!=='first-journey.html')return;
- const target=screens.some(screen=>screen[1]===journeyReturn)?journeyReturn:'src064-orbit.html';
- journeySaved=false;journeyRouteOpened=false;
- show(target,false);
- if(replaceHash){history.replaceState(null,'','#home');handledHash='#home';}else handledHash=location.hash;
-}
-// 저장을 마친 뒤(04 이후) 뒤로가기는 성장 단계로 다시 들어가지 않고 첫 화면으로 나간다.
-function finishJourney(){journeySaved=false;journeyRouteOpened=false;show('src064-orbit.html',false);history.replaceState(null,'','#home');handledHash='#home';}
-function openFirstJourney({subject='',step=null,route=false}={}){
- const gate=journeyEntry({owned:!!member?.snapshot().owned,writable:!!member?.snapshot().writable,mode:'new'});
- const routed=route&&Number.isFinite(step);
- if(gate.screen==='login'){if(routed){history.replaceState(null,'','#home');handledHash='#home';}openLoginStart('new-tree');return;}
- if(gate.screen==='records'){if(routed){history.replaceState(null,'','#home');handledHash='#home';}notify('서버 편집 연결이 아직 준비되지 않았어요. 기록은 안전하게 읽을 수 있습니다.');panel('records');return;}
- if(screens.some(screen=>screen[1]===current))journeyReturn=current;
- if($('community-panel').open)$('community-panel').close();
- const start=routed?parseJourneyRoute(journeyRouteHash(step))?.step||0:0;
- current='first-journey.html';journeySaved=false;journeyStep=start;journeyRouteOpened=routed;
- document.body.classList.remove('home-screen');$('empty').hidden=true;
- const frame=$('view');frame.hidden=false;frame.title='러브트리 · 첫 여정';
- const query=new URLSearchParams();
- if(subject)query.set('subject',subject);
- if(routed)query.set('step',String(start));
- const suffix=query.toString();
- frame.contentWindow.location.replace(new URL('/v41/views/first-journey.html'+(suffix?'?'+suffix:''),location.origin).href);
- flowNavigation();
- writeJourneyLocation(start,routed?'replace':'push');
-}
-function saveFirstJourney(draft){
- if(source!=='server'||!member?.snapshot().owned){journeyReply({type:'lt41-journey-result',ok:false,message:'로그인한 뒤 내 기록에 저장할 수 있어요.'});return;}
- if(!member.snapshot().writable){journeyReply({type:'lt41-journey-result',ok:false,message:'서버 편집 연결이 아직 준비되지 않았어요. 기록은 안전하게 읽을 수 있습니다.'});return;}
- let plan;try{plan=journeySavePlan(draft);}catch(error){journeyReply({type:'lt41-journey-result',ok:false,message:error.message});return;}
- try{
-  let treeId=plan.treeId,momentId=plan.momentId,firstMomentId=plan.momentId;
-  if(plan.first){const created=member.apply('new',plan.first,{});treeId=created.treeId;firstMomentId=created.momentId;momentId=created.momentId;}
-  if(plan.second){const added=member.apply('add',plan.second,{treeId,momentId});momentId=added.momentId;}
-  journeyReply({type:'lt41-journey-result',ok:true,treeId,firstMomentId,momentId,connected:!!plan.second});
- }catch(error){journeyReply({type:'lt41-journey-result',ok:false,message:error.message});}
-}
-function openJourneyBook({treeId,firstMomentId}={}){
- if(!treeId||!member?.state().trees.some(tree=>tree.id===treeId&&tree.moments.some(moment=>moment.id===firstMomentId)))return;
- journeySaved=true;
- current='track59-sketchbook.html';choose(treeId,firstMomentId);show(current);writeLocation();
-}
-function closeFirstJourney(){
- if(current!=='first-journey.html')return;
- const depth=Number(history.state?.lt41Journey)||0;
- if(!journeyRouteOpened&&depth>0){journeyStep=0;history.go(-depth);return;}
- leaveJourney({replaceHash:true});
-}
 function openAssets(opener=document.activeElement){if(!member?.snapshot().owned){notify('로그인한 뒤 내 보관 파일을 확인할 수 있어요.');return;}assetsOpener=opener;panel('account-assets');uploads.openAssets();}
 function usePrivateAsset(){
  if(source!=='server'||!member?.snapshot().owned){openLoginStart('new-tree');return false;}
@@ -371,14 +327,4 @@ function usePrivateAsset(){
  return $('editor').open;
 }
 addEventListener('beforeunload',e=>{if(member?.snapshot().dirty||formDirty()||treeDirty()){e.preventDefault();e.returnValue='';}});
-mountCommunity({
- button:$('community-menu'),dialog:$('community-panel'),
- onOpenShare:item=>{$('community-panel').close();location.hash=`#share/${item.shareId}/${item.view||'book'}`;},
- onShareOwn:()=>{$('community-panel').close();if(source==='server'&&member?.snapshot().owned&&window.LT41)openSharePanel();else {notify('로그인하고 공유할 내 트리를 먼저 선택해 주세요.');panel('records');}},
- onStartRecord:subject=>{
-  $('community-panel').close();
-  if(source!=='server'||!member?.snapshot().owned){notify('로그인한 뒤 내 계정에 새 트리를 시작할 수 있어요. 원본 공개 트리는 복사하지 않아요.');panel('records');return;}
-  openFirstJourney({subject:subject||''});
- }
-});
 if(shouldLoadMemberRecords(location.search,document.cookie,location.hash))startMember();

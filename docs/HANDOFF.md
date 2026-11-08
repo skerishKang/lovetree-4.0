@@ -927,6 +927,15 @@ COM2에는 merge `6900df8aa446dfe0201d01997457fae04c4abe16`의 변경 서버 파
 - 이유·원칙·단계별 계획: [REFACTOR_PLAN_20261108.md](REFACTOR_PLAN_20261108.md) · 추적 이슈 https://github.com/skerishKang/lovetree-4.0/issues/231
 - 1-A(두 벌 조사, #230) 결과 위에 1-B(셸 모듈 분리)·1.5단계(두 변형 한 벌)·2단계(기억책)3단계(보드·지도) 순서를 적었다. 기능·문구·디자인 변경 0.
 
+## 2026-11-08 셸 메시지·여정 분리 (#231 1-B③-3, ai/lt-refactor-shell-messages-261108, PR #246)
+`shell.mjs` 384 → 330줄(35,443B, 500자 넘는 줄 9개). 공유·둘러보기·메시지 수신과 첫 여정 연결을 두 모듈로 나눴다.
+
+- `public/v41/shell/messages.mjs`(234줄): `addEventListener('message', …)`의 `lt41-*` 분기 전부, 공유 패널(`sharePayload`·`shareFailure`·`renderShareList`·`loadShareList`·`invalidateSharePreview`·`openSharePanel`과 미리보기/만들기/복사 연결), 둘러보기(`mountCommunity` 연결·`onOpenShare`·`onShareOwn`·`onStartRecord`).
+- `public/v41/shell/journey.mjs`(154줄): `journeyReply`·`writeJourneyLocation`·`noteJourneyStep`·`gotoJourneyStep`·`leaveJourney`·`finishJourney`·`openFirstJourney`·`saveFirstJourney`·`openJourneyBook`·`closeFirstJourney`와 그 상태(`journeyReturn`·`journeyStep`·`journeySaved`·`journeyRouteOpened`).
+- 셸에 남긴 것: `applyBrowserLocation`(주소 → 화면), `showPublicRoute`·`publicProblem`(공유 읽기), `startMember`(로그인·세션), 얇은 래퍼(`openFirstJourney`·`saveFirstJourney`·`noteJourneyStep`·`gotoJourneyStep`·`leaveJourney`·`finishJourney`·`openJourneyBook`·`closeFirstJourney`·`openSharePanel`), `saved`는 `shellJourney.saved()`로 읽는다.
+- 시험: `tests/v41-shell-messages.test.mjs` 12건(가짜 DOM·가짜 message 이벤트): 메시지 분기·출처 검증, 공유 미리보기 게이트·만들기·목록, 여정 저장 `member.apply(new→add)`·로그아웃 안내·history·뒤로가기. 글자 시험 6개 파일은 옮긴 파일을 함께 읽게 고쳤다. `npm test` 552건 515 pass/0 fail/37 skip, build pass.
+- 남은 것: 셸 대화상자 Tab 순환·Esc 복귀(접근성)는 `shell.mjs`에 남아 있다.
+
 ## 2026-11-08 셸 패널 분리 (#231 1-B③-2, ai/lt-refactor-shell-panels-261108, PR #245)
 `shell.mjs` 413 → 384줄. 순간 패널·편집기·책 정보를 `public/v41/shell/panels.mjs`(268줄)로 그대로 옮겼다.
 
@@ -947,8 +956,8 @@ COM2에는 merge `6900df8aa446dfe0201d01997457fae04c4abe16`의 변경 서버 파
 | 헤더 상태·탭·트리 선택(#222)·탭 페이드·계정 메뉴(`flowNavigation`·`updateNavFade`·`revealCurrentTab`·`renderAccount`·`openAccountMenu`·`closeAccountMenu`·`loadAccountEmail`·`updateAccountControls`) | `public/v41/shell/header.mjs` (분리 완료) |
 | 로그인 시작·의도(pendingLoginIntent)·401·만료 연결(#215·#218·#227·#144 안내 줄) | `public/v41/shell/auth.mjs` (분리 완료) |
 | 순간 패널·편집기(추가/수정 모드·폼 기준값·저장 연결)·책 정보 관리 | `public/v41/shell/panels.mjs` (분리 완료) |
-| 첫 여정 | `shell.mjs` (#231 1-B③-3에서 `shell/journey.mjs` 후보) |
-| 공유·둘러보기·`lt41-*` 메시지 수신 | `shell.mjs` (그다음 PR에서 `shell/messages.mjs`로) |
+| 첫 여정(진입·저장·단계 history·뒤로가기) | `public/v41/shell/journey.mjs` (분리 완료) |
+| 공유 패널·둘러보기 연결·`lt41-*` 메시지 수신(window message) | `public/v41/shell/messages.mjs` (분리 완료) |
 | 접근성·포커스(#204) — 셸 대화상자 Tab 순환, Esc 복귀 | `shell.mjs` (`view-a11y.mjs`와 함께) |
 
 - `shell.mjs`는 진입점으로 남기고, 옮긴 이름(`themedView`·`applyTheme`·`toggleTheme`·`screens` 등)은 얇은 래퍼·재수출로 유지한다.

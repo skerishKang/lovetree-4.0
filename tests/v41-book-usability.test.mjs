@@ -77,10 +77,10 @@ test('4. 오른쪽 빈 페이지는 다음 순간 안내 + 현재 순간을 부�
   }
   for (const path of VIEWS) assert.ok(!html[path].includes('login-start'), path + ': 사라진 안내 창 요소를 찾지 않는다');
   // #231 1-B③-2: 편집기 모드·부모 지정은 shell/panels.mjs로 옮겼다. 두 파일을 함께 본다.
-  const shell = read('public/v41/shell.mjs') + read('public/v41/shell/panels.mjs');
+  const shell = read('public/v41/shell.mjs') + read('public/v41/shell/panels.mjs') + read('public/v41/shell/messages.mjs');
   assert.ok(/function openEditor\(requestedMode, *parentId = ''\)/.test(shell), '셸: 편집기가 부모를 받는다');
   assert.ok(/setEditorMode\(mode, *parentId\)/.test(shell), '셸: 부모를 그대로 넘긴다');
-  assert.ok(shell.includes("type==='lt41-write')openEditor(e.data.mode,e.data.parentId)"), '셸: 메시지의 부모를 쓴다');
+  assert.ok(/type === 'lt41-write'\) openEditor\(data\.mode, data\.parentId\)/.test(shell), '셸: 메시지의 부모를 쓴다');
 });
 
 test('5. 돋보기는 기본 꺼짐, 카드는 누를 수 있는 모양, 선택은 저장(실패해도 계속 동작)', () => {
