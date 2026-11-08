@@ -42,7 +42,8 @@ test('shelf management uses real metadata and removes unsupported fixed classifi
   const shelf=fs.readFileSync(new URL('../public/v41/views/track32-bookshelf.html',import.meta.url),'utf8');
   const designShelf=fs.readFileSync(new URL('../public/v41/design/views/track32-bookshelf.html',import.meta.url),'utf8');
   const navigation=fs.readFileSync(new URL('../public/v41/view-navigation.js',import.meta.url),'utf8');
-  const shell=fs.readFileSync(new URL('../public/v41/shell.mjs',import.meta.url),'utf8');
+  // #231 1-B③-2: 책 정보 관리(editTree·tree-manager)는 shell/panels.mjs로 옮겼다. 두 파일을 함께 본다.
+  const shell=fs.readFileSync(new URL('../public/v41/shell.mjs',import.meta.url),'utf8')+fs.readFileSync(new URL('../public/v41/shell/panels.mjs',import.meta.url),'utf8');
   assert.doesNotMatch(shelf,/data-filter="(?:kpop|actor|series)"/);
   assert.doesNotMatch(shelf,/categoryLabel\(/);
   assert.doesNotMatch(designShelf,/data-filter="(?:kpop|actor|series)"/);assert.doesNotMatch(designShelf,/categoryLabel\(/);assert.doesNotMatch(designShelf,/category:'kpop'/);

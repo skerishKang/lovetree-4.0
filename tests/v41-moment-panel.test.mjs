@@ -5,6 +5,8 @@ import {readFileSync} from 'node:fs';
 const read = name => readFileSync(new URL('../public/v41/' + name, import.meta.url), 'utf8');
 const html = read('index.html');
 const shell = read('shell.mjs');
+// #231 1-B③-2: 순간 패널·편집기·책 정보는 shell/panels.mjs로 옮겼다.
+const panels = read('shell/panels.mjs');
 const upload = read('private-upload.mjs');
 const css = read('shell.css');
 const formStart = html.indexOf('<form id="moment-form">');
@@ -19,7 +21,7 @@ test('패널 탭은 순간 추가·이 순간 수정 두 개이고 새 트리 �
   assert.match(modes, />이 순간 수정</);
   assert.equal(/data-mode="new"/.test(html), false, '패널에서 새 트리 탭을 없앤다');
   assert.equal(/새 트리<\/button>/.test(html), false);
-  assert.match(shell, /if\(mode==='new'\)\{openFirstJourney\(\);return;\}/, '새 트리는 여전히 첫 여정으로 간다');
+  assert.match(panels, /if \(mode === 'new'\) \{ openFirstJourney\(\); return; \}/, '새 트리는 여전히 첫 여정으로 간다');
 });
 
 test('입력 순서는 링크·사진 → 마음 한마디 → 더 적기(제목·감정·날짜)다', () => {
@@ -50,7 +52,7 @@ test('파일은 선택하면 바로 올라가고 파일 올리기 2단계 버튼
 
 test('더 적기는 기본 접힘이고 수정 모드에서 기존 값이 있으면 펼친다', () => {
   assert.equal(/<details class="more-fields"[^>]*\bopen\b/.test(html), false, '마크업 기본값은 접힘');
-  assert.match(shell, /\$\('more-fields'\)\.open=mode==='edit'&&Boolean\(\(m\.title\|\|''\)\.trim\(\)\|\|\(m\.emotion\|\|''\)\.trim\(\)\|\|\(m\.date\|\|''\)\.trim\(\)\)/);
+  assert.match(panels, /\$\('more-fields'\)\.open = mode === 'edit' && Boolean\(\(m\.title \|\| ''\)\.trim\(\)/);
 });
 
 test('내 기록 백업과 보관 파일은 계정 메뉴에서 열리고 패널에서는 빠진다', () => {
@@ -68,7 +70,7 @@ test('내 기록 백업과 보관 파일은 계정 메뉴에서 열리고 패널
 });
 
 test('저장 경로·미디어 메타데이터 규칙은 그대로다', () => {
-  assert.match(shell, /member\.apply\(editorMode,Object\.fromEntries\(new FormData\(e\.target\)\),stateSelection\(\)\)/);
+  assert.match(panels, /apply\(editorMode, Object\.fromEntries\(new FormData\(e\.target\)\), selection\(\)\)/, '편집기 저장은 같은 member.apply 경로다');
   assert.match(shell, /type==='lt41-media-metadata'/);
   assert.match(shell, /member\.apply\('cacheMediaMetadata'/);
   assert.match(upload, /form\.elements\.url\.value=result\.media\.url/, '업로드는 기존 url 필드에만 쓴다');

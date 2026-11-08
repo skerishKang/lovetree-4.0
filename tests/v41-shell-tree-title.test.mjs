@@ -5,6 +5,8 @@ import {displayTreeTitle, AUTO_TITLE_SUFFIX} from '../public/v41/tree-name.mjs';
 
 const header = readFileSync(new URL('../public/v41/shell/header.mjs', import.meta.url), 'utf8');
 const shell = readFileSync(new URL('../public/v41/shell.mjs', import.meta.url), 'utf8');
+// #231 1-B③-2: 패널·책 정보 코드는 shell/panels.mjs로 옮겼다. 글자 시험은 그 파일에서 본다.
+const panels = readFileSync(new URL('../public/v41/shell/panels.mjs', import.meta.url), 'utf8');
 const community = readFileSync(new URL('../public/v41/community-panel.mjs', import.meta.url), 'utf8');
 const css = readFileSync(new URL('../public/v41/shell.css', import.meta.url), 'utf8');
 
@@ -36,9 +38,9 @@ test('3. 셸이 트리 이름을 보여 주는 곳은 모두 displayTreeTitle을
   // 공유 미리보기 요약
   assert.match(shell, /displayTreeTitle\(answer\.preview\.tree\.title\)/);
   // 삭제 확인 문구
-  assert.match(shell, /confirm\(`“\$\{displayTreeTitle\(tree\.title\)\}”과/);
+  assert.match(panels, /confirm\(`“\$\{displayTreeTitle\(tree\.title\)\}”과/);
   // 원본 이름을 그대로 써야 하는 곳(책 정보 편집 입력)은 건드리지 않는다
-  assert.match(shell, /form\.elements\.title\.value=tree\.title;/, '편집 입력은 저장값 그대로');
+  assert.match(panels, /form\.elements\.title\.value = tree\.title;/, '편집 입력은 저장값 그대로');
 });
 
 test('4. 둘러보기(공개 목록)도 같은 이름 규칙을 쓴다', () => {
