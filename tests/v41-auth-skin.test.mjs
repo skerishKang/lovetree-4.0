@@ -89,7 +89,10 @@ test('안내 창은 의도별 문구와 로그인/회원가입/닫기 포커스 
   assert.match(shell, /function openLoginStart\(intent='first'\)/);
   assert.match(shell, /login-start-copy/);
   assert.match(shell, /login-start-signup/);
-  assert.match(shell, /addEventListener\('close',\(\)=>\{if\(loginStartFocus/);
+  assert.match(shell, /addEventListener\('close',\(\)=>\{const target=loginStartFocus/);
+  assert.match(shell, /lt41-login-focus/);
+  assert.match(home, /loginFocusButton/);
+  assert.match(home, /lt41-login-focus/);
   assert.match(shell, /openLoginStart\('shelf'\)/);
   assert.match(shell, /show\('track32-bookshelf\.html'\)/);
   assert.match(shell, /pendingLoginIntent/);
