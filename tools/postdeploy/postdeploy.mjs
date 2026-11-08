@@ -592,7 +592,8 @@ async function checkResponsive(page, width, height, outDir, stamp) {
     const tabs = await page.evaluate(async () => {
       const nav = document.querySelector('.app-header nav');
       if (!nav) return { ok: false, reason: 'no-nav' };
-      const items = [...nav.querySelectorAll('button')];
+      // 숨은 탭(로그아웃의 트리 보기 탭)은 세지 않는다. #213
+      const items = [...nav.querySelectorAll('button')].filter((b) => b.getClientRects().length > 0);
       const unreachable = [];
       for (const b of items) {
         b.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'auto' });
@@ -609,14 +610,17 @@ async function checkResponsive(page, width, height, outDir, stamp) {
         const r = active.getBoundingClientRect();
         currentVisible = r.left >= nr.left - 1 && r.right <= nr.right + 1;
       }
-      return { ok: true, count: items.length, unreachable, currentVisible, label: (active?.textContent || '').trim().slice(0, 12) };
+      // #213: 트리 보기 탭(기억책·기억 보드·관계 지도)은 로그인한 내 트리에서만 보인다.
+      const avatar = document.getElementById('account-avatar');
+      const loggedIn = !!avatar && !avatar.hidden && getComputedStyle(avatar).display !== 'none';
+      return { ok: true, count: items.length, expected: loggedIn ? 7 : 4, loggedIn, unreachable, currentVisible, label: (active?.textContent || '').trim().slice(0, 12) };
     }).catch((e) => ({ ok: false, reason: e.message }));
     if (!tabs.ok) record(`tabs-${width}`, 'layout', 'fail', `탭 확인 실패: ${tabs.reason}`);
     else {
-      const ok = tabs.count === 7 && tabs.unreachable.length === 0 && tabs.currentVisible !== false;
+      const ok = tabs.count === tabs.expected && tabs.unreachable.length === 0 && tabs.currentVisible !== false;
       record(`tabs-${width}`, 'layout', ok ? 'pass' : 'fail',
-        ok ? `${tabs.count}개 탭 모두 스크롤로 닿음, 현재 탭 "${tabs.label}" 보임`
-          : `탭 ${tabs.count}개 / 닿지 않음: ${tabs.unreachable.join(', ') || '없음'} / 현재 탭 보임: ${tabs.currentVisible}`,
+        ok ? `${tabs.count}개 탭 모두 스크롤로 닿음, 현재 탭 "${tabs.label}" 보임${tabs.loggedIn ? '' : ' (로그아웃: 트리 보기 탭 숨김)'}`
+          : `탭 ${tabs.count}개 (기대 ${tabs.expected}) / 닿지 않음: ${tabs.unreachable.join(', ') || '없음'} / 현재 탭 보임: ${tabs.currentVisible}`,
         tabs);
     }
   }
@@ -687,6 +691,7 @@ async function checkVisualTokens(page, target, opts, stamp) {
         loginVisible: vis(login),
         connectionInHeader: vis(document.getElementById('connection-menu')),
         shareInHeader: vis(document.getElementById('share-menu')),
+        treeViewsHidden: !vis(document.getElementById('tree-views')),
         viewHidden: !fr || fr.hidden || getComputedStyle(fr).display === 'none'
       };
     });
@@ -705,6 +710,15 @@ async function checkVisualTokens(page, target, opts, stamp) {
       continue;
     }
     const problems = [];
+    // #213: 로그아웃이면 트리 보기 탭 3개가 없고, 트리 선택 글자도 내 트리 이름이 아니다.
+    const expectedTabs = top.loginVisible ? 4 : 7;
+    if (top.loginVisible) {
+      if (!top.treeViewsHidden) problems.push('로그아웃인데 트리 보기 탭이 보임');
+      if (!['트리 고르기', '저장 안 된 기록'].includes(top.recordLabel)) problems.push(`로그아웃 트리 선택 글자 "${top.recordLabel}" (기대 "트리 고르기")`);
+    } else {
+      if (top.treeViewsHidden) problems.push('로그인 상태인데 트리 보기 탭이 숨겨짐');
+      if (!/^트리: /.test(top.recordLabel)) problems.push(`로그인 트리 선택 글자 "${top.recordLabel}" (기대 "트리: <이름>")`);
+    }
     // 2026-11-07: 트리 선택은 뒤쪽 탭 묶음 바로 앞, 주 버튼은 #write-menu 하나(금색), 연결 보기는 헤더에 없다.
     if (!top.recordBeforeTreeViews) problems.push('트리 선택이 기억책·보드·지도 탭 앞에 있지 않음');
     if (!top.writeGold) problems.push(`주 버튼 금색 강조 없음: ${top.pillBorder}`);
@@ -716,14 +730,14 @@ async function checkVisualTokens(page, target, opts, stamp) {
       if (!top.home) problems.push('body.home-screen 아님');
       if (!top.headerVisible) problems.push('첫 화면에 공통 헤더가 안 보임');
       if (top.headerBg !== 'rgb(4, 4, 7)') problems.push(`헤더 배경 ${top.headerBg} (기대 rgb(4, 4, 7))`);
-      if (top.tabs !== 7) problems.push(`탭 ${top.tabs}개 (기대 7)`);
+      if (top.tabs !== expectedTabs) problems.push(`탭 ${top.tabs}개 (기대 ${expectedTabs})`);
       if (!/255, 255, 255, 0\.22/.test(top.pillBorder) && !top.writeGold) problems.push(`행동 버튼 테두리 ${top.pillBorder}`);
     } else {
       if (top.home) problems.push('home-screen 클래스가 남아 있음');
       if (!top.headerVisible) problems.push('공통 헤더가 안 보임');
       if (top.headerBg !== 'rgb(4, 4, 7)') problems.push(`헤더 배경 ${top.headerBg} (기대 rgb(4, 4, 7))`);
       if (top.headerHeight < 88) problems.push(`헤더 높이 ${top.headerHeight} (기대 92 근처)`);
-      if (top.tabs !== 7) problems.push(`탭 ${top.tabs}개 (기대 7)`);
+      if (top.tabs !== expectedTabs) problems.push(`탭 ${top.tabs}개 (기대 ${expectedTabs})`);
       if (!/255, 230, 166/.test(top.frameBorder)) problems.push(`금테 프레임 없음: ${top.frameBorder}`);
       if (!inner) problems.push('안쪽 화면 문서를 읽지 못함');
       else {
