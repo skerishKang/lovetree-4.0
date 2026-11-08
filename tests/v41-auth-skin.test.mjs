@@ -8,6 +8,8 @@ const read = path => readFileSync(new URL('../' + path, import.meta.url), 'utf8'
 const base = 'https://lovetree-4-0.pages.dev';
 const parse = url => new URL(url, base);
 const shell = read('public/v41/shell.mjs');
+// #231 1-B③-1: 로그인 시작·세션은 shell/auth.mjs로 옮겼다.
+const authModule = read('public/v41/shell/auth.mjs');
 const index = read('public/v41/index.html');
 const home = read('v41/home.js');
 const css = read('public/v41/identity.css');
@@ -91,19 +93,19 @@ test('로그인이 필요한 진입점은 안내 창 없이 바로 /auth/login�
   assert.equal(shellCss.includes('#login-start'), false, 'shell.css에 #login-start 남음');
 
   // 바로 로그인으로 보내는 단일 경로가 있고, 테마와 의도를 주소에 유지한다.
-  assert.match(shell, /function startLogin\(intent=''\)/);
-  assert.match(shell, /location\.assign\(memberLoginUrl\(readTheme\(localStorage\),target\)\)/);
-  assert.match(shell, /LOGIN_INTENTS\.includes\(intent\)\?intent:''/);
+  assert.match(authModule, /function startLogin\(intent = ''\)/);
+  assert.match(authModule, /location\.assign\(memberLoginUrl\(readTheme\(localStorage\), target\)\)/);
+  assert.match(authModule, /LOGIN_INTENTS\.includes\(intent\) \? intent : ''/);
 
   // 네 진입점이 모두 그 경로를 쓴다.
   assert.match(shell, /b\.dataset\.view==='track32-bookshelf\.html'&&!member\?\.snapshot\(\)\.owned\)\{openLoginStart\('shelf'\)/, '헤더 내 책장 탭');
   assert.match(shell, /e\.data\?\.type==='lt41-start'\)\{openLoginStart\('first'\)/, '가운데 처음 시작하기');
   assert.match(shell, /openLoginStart\('new-tree'\)/, '새 트리 만들기');
-  assert.match(shell, /function openLoginStart\(intent='first'\)\{startLogin\(intent==='first'\?'':intent\);\}/);
+  assert.match(authModule, /function openLoginStart\(intent = 'first'\) \{\s*startLogin\(intent === 'first' \? '' : intent\);/);
 
   // 로그인 뒤 의도대로 이어진다.
-  assert.match(shell, /pendingLoginIntent/);
-  assert.match(shell, /show\('track32-bookshelf\.html'\)/);
+  assert.match(authModule, /pendingLoginIntent/);
+  assert.match(authModule, /showScreen\('track32-bookshelf\.html'\)/);
   assert.match(home, /newButton\.onclick=\(\)=>bridge\.actions\.requestMoment\('new'\)/);
   assert.match(home, /treesButton\.onclick=\(\)=>bridge\.actions\.navigate\('trees'\)/);
 });

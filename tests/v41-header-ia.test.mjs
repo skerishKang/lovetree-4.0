@@ -213,11 +213,12 @@ test('브라우저에만 남은 미저장 기록을 찾아낸다', () => {
 // 셸의 저장 실패 안내(#save-feedback)로 그대로 동작하는지 소스로 고정한다.
 test('세션 만료 저장 실패는 없어진 안내 창 대신 #save-feedback으로 다시 로그인을 안내한다', () => {
   const shell = readSource('public/v41/shell.mjs');
+const authModule = readSource('public/v41/shell/auth.mjs');
   const index = readSource('public/v41/index.html');
 
   // 안내 창은 없다. 로그인이 필요한 진입점은 셸 대화상자가 아니라 바로 /auth/login으로 간다.
   assert.equal(index.includes('login-start'), false, 'index.html에 안내 창이 남음');
-  assert.match(shell, /function openLoginStart\(intent='first'\)\{startLogin\(/);
+  assert.match(authModule, /function openLoginStart\(intent = 'first'\) \{\s*startLogin\(/);
 
   // 저장 실패가 로그인 만료이면 상단 저장 안내가 문구와 '새 창에서 로그인' 행동을 그린다.
   assert.match(shell, /const failed=status\.dirty&&\['offline','rejected','conflict','login'\]\.includes\(status\.phase\)/);
