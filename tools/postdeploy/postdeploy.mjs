@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { DEFAULT_EMAILS, accountSecretKeys, defaultProfileFor, laneFor, normaliseAccount } from './accounts.mjs';
 import { chromium } from 'playwright-core';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -81,17 +82,17 @@ const USAGE = `lovetree-postdeploy ${TOOL_VERSION}
   --share <id>        쓰기 검사 대상 공유 id
   --youtube <id>      oEmbed 검사에 쓸 공개 YouTube 영상 id(기본 dQw4w9WgXcQ)
   --secrets <path>    자동 로그인 비밀 파일(기본 %USERPROFILE%\\.secrets\\.env)
-  --profile <dir>     로그인 세션 프로필 폴더(기본 tools/postdeploy/.profile)
+  --profile <dir>     로그인 세션 프로필 폴더(기본 tools/postdeploy/.profile, --account 02·03 이면 .profile-02·.profile-03)
   --out <dir>         결과 JSON·스크린샷 폴더(기본 tools/postdeploy/out)
   --timeout <ms>      대기 시간(기본 60000)
   --strict            경고(겹침 등)도 실패로 간주
   --cdp <endpoint>    기존 크롬의 CDP 주소에 붙기(http://127.0.0.1:9222)
-  --auto-login        시험 계정(kimbs5993+tutorial01@gmail.com) 으로 env 에서 비밀번호를 읽어 PADIEM 비밀번호 폼 자동 로그인. Google 화면이면 중단. --login 과 함께 쓸 수 없음
+  --auto-login        --account 의 시험 계정으로 env 에서 비밀번호를 읽어 PADIEM 비밀번호 폼 자동 로그인. Google 화면이면 중단. --login 과 함께 쓸 수 없음
   -h, --help          이 도움말
 
 로그인 세션:
   수동: node postdeploy.mjs <주소> --login   (열린 창에서 로그인 후 터미널에서 Enter)
-  자동: node postdeploy.mjs <주소> --auto-login (--secrets 기본 %USERPROFILE%\\.secrets\\.env 의 PADIEM_TUTORIAL01_PASSWORD 로 로그인)
+  자동: node postdeploy.mjs <주소> --auto-login --account 02 (--secrets 기본 %USERPROFILE%\\.secrets\\.env 의 PADIEM_TUTORIAL02_EMAIL/_PASSWORD 로 로그인)
   이후 실행은 같은 프로필을 재사용하므로 비밀번호 없이 읽기 검사를 돌린다.
 
 종료 코드: 실패 있으면 2, 경고만 있으면 0(--strict 시 2), 전부 통과면 0.`;
@@ -100,7 +101,8 @@ function parseArgs(argv) {
   const opts = {
     target: null,
     secrets: process.env.LOVETREE_SECRETS || path.join(process.env.USERPROFILE || process.env.HOME || '', '.secrets', '.env'),
-    profile: process.env.LOVETREE_POSTDEPLOY_PROFILE || path.join(HERE, '.profile'),
+    profile: process.env.LOVETREE_POSTDEPLOY_PROFILE || '',
+    profileGiven: false,
     out: process.env.LOVETREE_POSTDEPLOY_OUT || path.join(HERE, 'out'),
     headless: true,
     login: false,
@@ -112,6 +114,7 @@ function parseArgs(argv) {
     timeout: 60000,
     strict: false,
     cdp: null,
+    account: '01',
     help: false
   };
   const rest = [];
@@ -125,7 +128,7 @@ function parseArgs(argv) {
       case '--write': opts.write = true; break;
       case '--strict': opts.strict = true; break;
       case '--secrets': opts.secrets = argv[++i]; break;
-      case '--profile': opts.profile = argv[++i]; break;
+      case '--profile': opts.profile = argv[++i]; opts.profileGiven = true; break;
       case '--out': opts.out = argv[++i]; break;
       case '--share': opts.share = argv[++i]; break;
       case '--youtube': opts.youtube = argv[++i]; break;
@@ -133,14 +136,19 @@ function parseArgs(argv) {
       case '--cdp': opts.cdp = argv[++i]; opts.headless = false; break;
       case '--auto-login': opts.autoLogin = true; opts.headless = false; break;
       case '--auth-flows': opts.authFlows = true; break;
+      case '--account': opts.account = normaliseAccount(argv[++i]); break;
       default:
         if (a.startsWith('--')) throw new Error(`알 수 없는 옵션: ${a}`);
         rest.push(a);
     }
   }
   if (rest.length) opts.target = rest[0];
+  opts.account = normaliseAccount(opts.account);
+  if (!opts.profile) opts.profile = defaultProfileFor(opts.account, HERE);
   return opts;
 }
+
+
 
 const checks = [];
 const consoleErrors = [];
@@ -218,7 +226,7 @@ function wireConsole(page) {
   page.on('pageerror', (err) => pageErrors.push(err.message || String(err)));
 }
 
-const AUTO_LOGIN_EMAIL = 'kimbs5993+tutorial01@gmail.com';
+const AUTO_LOGIN_EMAIL = DEFAULT_EMAILS['01'];
 
 async function readSecret(key, secretsPath) {
   const fs = await import('node:fs');
@@ -231,6 +239,28 @@ async function readSecret(key, secretsPath) {
   } catch (error) {
     return { ok: false, reason: String(error && error.message ? error.message : error) };
   }
+}
+
+// 01은 예전처럼 고정 주소를 기본값으로 쓴다(값이 .secrets에 없어도 지금까지대로 동작).
+async function resolveAccount(account, secretsPath) {
+  const keys = accountSecretKeys(account);
+  const found = await readSecret(keys.email, secretsPath);
+  const email = found.ok ? found.value.trim() : (DEFAULT_EMAILS[normaliseAccount(account)] || '');
+  return { account: normaliseAccount(account), email, emailKey: keys.email, emailSource: found.ok ? 'secrets' : 'default', passwordKey: keys.password };
+}
+
+// 실행마다 한 번만 계정을 정한다(번호 → .secrets 키 → 값). 값은 로그에 쓰지 않는다.
+let accountCache = null;
+async function accountOf(opts) {
+  if (!accountCache || accountCache.key !== opts.account + '|' + opts.secrets) {
+    accountCache = { key: opts.account + '|' + opts.secrets, value: await resolveAccount(opts.account, opts.secrets) };
+  }
+  return accountCache.value;
+}
+
+async function accountPassword(opts) {
+  const account = await accountOf(opts);
+  return readSecret(account.passwordKey, opts.secrets);
 }
 
 async function sessionLoggedIn(page, timeout) {
@@ -303,11 +333,11 @@ async function visibleViewFrame(page) {
   return viewFrame(page);
 }
 
-async function fillAuthEmailLogin(page, password) {
+async function fillAuthEmailLogin(page, password, emailValue = AUTO_LOGIN_EMAIL) {
   // 2026-11-08: 공용 로그인 화면(auth.padiem.net)의 이메일 로그인 폼.
   const email = page.locator('#email');
   if (!(await email.count())) return false;
-  await email.fill(AUTO_LOGIN_EMAIL).catch(() => {});
+  await email.fill(emailValue).catch(() => {});
   await page.locator('#password').fill(password).catch(() => {});
   await page.locator('form button[type=submit]').first().click({ timeout: 5000 }).catch(() => {});
   await sleep(2500);
@@ -316,7 +346,7 @@ async function fillAuthEmailLogin(page, password) {
   return error ? { ok: false, error: error.trim() } : { ok: true };
 }
 
-async function fillChatPasswordLogin(page, password) {
+async function fillChatPasswordLogin(page, password, emailValue = AUTO_LOGIN_EMAIL) {
   const identifier = page.locator('#passwordLoginIdentifier');
   if (!(await identifier.count())) return false;
   const visible = await identifier.isVisible().catch(() => false);
@@ -324,7 +354,7 @@ async function fillChatPasswordLogin(page, password) {
     await page.locator('#authOpen, [data-auth-open], button:has-text("로그인")').first().click({ timeout: 3000 }).catch(() => {});
     await sleep(800);
   }
-  await identifier.fill(AUTO_LOGIN_EMAIL).catch(() => {});
+  await identifier.fill(emailValue).catch(() => {});
   await page.locator('#passwordLoginPassword').fill(password).catch(() => {});
   await page.locator('#passwordLoginSubmit').click({ timeout: 5000 }).catch(() => {});
   await sleep(2500);
@@ -333,14 +363,19 @@ async function fillChatPasswordLogin(page, password) {
 }
 
 async function autoLogin(page, opts, target) {
-  const secret = await readSecret('PADIEM_TUTORIAL01_PASSWORD', opts.secrets);
+  const account = await accountOf(opts);
+  const secret = await accountPassword(opts);
   if (!secret.ok) {
-    record('auto-login-secrets', 'auth', 'warn', `비밀번호 원천을 읽지 못함 (${opts.secrets}): ${secret.reason}`);
+    record('auto-login-secrets', 'auth', 'warn', `시험 계정 ${account.account} 비밀번호 원천을 읽지 못함 (${account.passwordKey} @ ${opts.secrets}): ${secret.reason}`);
+    return false;
+  }
+  if (!account.email) {
+    record('auto-login-secrets', 'auth', 'warn', `시험 계정 ${account.account} 이메일이 .secrets에 없음 (${account.emailKey}) — 대표님이 계정을 만든 뒤 값을 넣어 주세요`);
     return false;
   }
 
   if (await sessionLoggedIn(page, opts.timeout)) {
-    record('auto-login', 'auth', 'pass', `이미 로그인된 세션을 재사용 (${AUTO_LOGIN_EMAIL})`);
+    record('auto-login', 'auth', 'pass', `이미 로그인된 세션을 재사용 (계정 ${account.account})`);
     return true;
   }
 
@@ -368,7 +403,7 @@ async function autoLogin(page, opts, target) {
       consoleErrors.length = 0;
       consoleWarnings.length = 0;
       pageErrors.length = 0;
-      record('auto-login', 'auth', 'pass', `시험 계정 ${AUTO_LOGIN_EMAIL} 로그인 완료 (${lastStep || 'redirect'})`);
+      record('auto-login', 'auth', 'pass', `시험 계정 ${account.account} 로그인 완료 (${lastStep || 'redirect'})`);
       return true;
     }
     if (/accounts\.google\.com/.test(current)) {
@@ -377,7 +412,7 @@ async function autoLogin(page, opts, target) {
     }
     if (/auth\.padiem\.net/.test(current) && lastStep !== 'auth:email') {
       if (await page.locator('#email').count()) {
-        const result = await fillAuthEmailLogin(page, secret.value).catch((error) => ({ ok: false, error: error.message }));
+        const result = await fillAuthEmailLogin(page, secret.value, account.email).catch((error) => ({ ok: false, error: error.message }));
         lastStep = 'auth:email';
         if (result && result.ok === false && result.error) {
           record('auto-login', 'auth', 'fail', `이메일 로그인 실패: ${result.error}`);
@@ -391,7 +426,7 @@ async function autoLogin(page, opts, target) {
     }
     if (/chat\.padiem\.net/.test(current)) {
       if (await page.locator('#passwordLoginIdentifier').count()) {
-        const result = await fillChatPasswordLogin(page, secret.value).catch((error) => ({ ok: false, error: error.message }));
+        const result = await fillChatPasswordLogin(page, secret.value, account.email).catch((error) => ({ ok: false, error: error.message }));
         lastStep = 'chat:password';
         if (result && result.ok === false && result.error) {
           record('auto-login', 'auth', 'fail', `공용 로그인 거절: ${result.error}`);
@@ -1131,7 +1166,7 @@ async function completeGateLogin(page, password, target, timeout) {
     }
     if (/accounts\.google\.com/.test(url)) return { ok: false, reason: 'Google OAuth 화면이 나와 멈춤' };
     if (/auth\.padiem\.net/.test(url) && (await page.locator('#email').count().catch(() => 0))) {
-      await page.locator('#email').fill(AUTO_LOGIN_EMAIL).catch(() => {});
+      await page.locator('#email').fill(account.email).catch(() => {});
       await page.locator('#password').fill(password).catch(() => {});
       await page.locator('form button[type=submit]').first().click({ timeout: 5000 }).catch(() => {});
       lastStep = 'auth:email';
@@ -1145,7 +1180,7 @@ async function completeGateLogin(page, password, target, timeout) {
           await page.locator('#authOpen, [data-auth-open], button:has-text("로그인")').first().click({ timeout: 3000 }).catch(() => {});
           await sleep(800);
         }
-        await identifier.fill(AUTO_LOGIN_EMAIL).catch(() => {});
+        await identifier.fill(account.email).catch(() => {});
         await page.locator('#passwordLoginPassword').fill(password).catch(() => {});
         await page.locator('#passwordLoginSubmit').click({ timeout: 5000 }).catch(() => {});
         lastStep = 'chat:password';
@@ -1195,9 +1230,14 @@ async function logoutViaAccountMenu(page, timeout) {
 }
 
 async function runAuthFlows(target, opts, stamp) {
-  const secret = await readSecret('PADIEM_TUTORIAL01_PASSWORD', opts.secrets);
+  const account = await accountOf(opts);
+  const secret = await accountPassword(opts);
   if (!secret.ok) {
-    record('auth-flows', 'auth-flows', 'warn', `비밀번호 원천을 읽지 못해 로그인 흐름 검사를 건너뜀 (${secret.reason})`);
+    record('auth-flows', 'auth-flows', 'warn', `시험 계정 ${account.account} 비밀번호 원천(${account.passwordKey})을 읽지 못해 로그인 흐름 검사를 건너뜀 (${secret.reason})`);
+    return { createdTrees: 0 };
+  }
+  if (!account.email) {
+    record('auth-flows', 'auth-flows', 'warn', `시험 계정 ${account.account} 이메일이 .secrets에 없어 로그인 흐름 검사를 건너뜀 (${account.emailKey})`);
     return { createdTrees: 0 };
   }
   const browser = await chromium.launch({
@@ -1630,7 +1670,7 @@ async function runAuthFlows(target, opts, stamp) {
 async function cleanupAuthFlows(target, opts, stamp) {
   const started = Date.now();
   // 검사가 만든 트리·순간은 실패해도 반드시 지운다. 결과는 리포트에 남긴다.
-  const secret = await readSecret('PADIEM_TUTORIAL01_PASSWORD', opts.secrets);
+  const secret = await accountPassword(opts);
   if (!secret.ok) {
     record('flow-cleanup', 'auth-flows', 'warn', `정리용 비밀번호 원천을 읽지 못함 (${secret.reason})`);
     return;
