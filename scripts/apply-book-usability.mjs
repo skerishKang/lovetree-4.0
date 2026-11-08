@@ -1,7 +1,6 @@
 #!/usr/bin/env node
-// 기억책 사용성 1~9(2026-11-08 대표 피드백)을 원본 Track59 화면 두 사본에 같은 내용으로 적용한다.
-// - public/v41/views/track59-sketchbook.html        : 실제 기록(셸이 views/를 연다)
-// - public/v41/design/views/track59-sketchbook.html : 예시 기록(셸이 design/views/를 연다)
+// 기억책 사용성 1~9(2026-11-08 대표 피드백)을 Track59 화면 한 벌에 적용한다(#231 ⑤).
+// - public/v41/views/track59-sketchbook.html : 실제 기록·예시 기록 공용(1.5단계에서 두 벌을 합쳤다)
 // 원본 구조·질감은 그대로 두고, 어댑터 CSS + 화면 보조 스크립트를 덧붙인다. 여러 번 실행해도 결과가 같다.
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -10,9 +9,11 @@ import { BOOK_UI_FONT, bookTitleFont } from '../public/v41/book-usability.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..');
+// #231 1.5단계 ⑤(2026-11-08): 두 벌을 한 벌로 합쳤다. 주입 대상은 한 파일이고,
+// 화면은 /v41/ 절대 경로를 쓰므로 views/·design/views/ 어느 폴더에서 열어도 같은 자원을 찾는다.
+// 주입 스크립트 제거·원본 정리는 2단계에서 한다.
 const COPIES = [
-  ['public/v41/views/track59-sketchbook.html', '../'],
-  ['public/v41/design/views/track59-sketchbook.html', '../../'],
+  ['public/v41/views/track59-sketchbook.html', '/v41/'],
 ];
 
 const STYLE_TAG = '<style id="lt-book-usability">';
