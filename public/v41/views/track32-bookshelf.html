@@ -135,8 +135,14 @@
     .filter.active,.filter:hover { border-color: var(--rose); color: var(--rose-deep); background: #fff8f4; }
     .count { margin-left: auto; color: var(--muted); font-size: 11px; white-space: nowrap; }
     .shelf-viewport { --shelf-accent: var(--rose); position: relative; height: 445px; padding: 18px 51px 31px; overflow: hidden; border: 1px solid rgba(119,91,82,.14); border-radius: 25px; background: radial-gradient(circle at 50% 13%,rgba(217,120,137,.18),transparent 31%), linear-gradient(180deg,rgba(247,239,229,.72),rgba(232,221,209,.82)); box-shadow: var(--shadow-lg); transition: background .5s ease; }
+    /* #212: 선택 카드가 위로 떠오르며 넘치는 부분은 책장 프레임이 아니라 빈 여백에만 둔다. */
+    .shelf-rail { padding-top: 10px; }
+    .book-card { --card-lift: 0px; }
+    .book-card.is-center { --card-lift: 0px; }
     .shelf-viewport[data-selected-book] { background: radial-gradient(circle at 50% 13%,color-mix(in srgb,var(--shelf-accent) 24%,transparent),transparent 31%),linear-gradient(180deg,rgba(247,239,229,.72),rgba(232,221,209,.82)); }
     .shelf-viewport::before { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .34; background: radial-gradient(ellipse at 50% 82%,rgba(255,255,255,.62),transparent 28%), linear-gradient(102deg,transparent 21%,rgba(255,255,255,.18) 50%,transparent 79%); }
+    /* #212: 선택 카드가 위로 뜨며 잘리던 문제. 레일의 overflow는 좌우 이동을 막기 위해 남기되,
+       카드가 레일 높이(375px)보다 크므로 중앙 카드의 위 이동을 없애고 배율을 줄여 잘리지 않게 한다. */
     .shelf-rail { position: relative; z-index: 1; width: 100%; height: 375px; overflow: hidden; perspective: 1200px; transform-style: preserve-3d; cursor: grab; touch-action: none; user-select: none; }
     .shelf-rail.dragging { cursor: grabbing; }
     .shelf-rail::after { content: ""; position: absolute; left: 50%; bottom: 3px; width: 1px; height: 1px; }
@@ -370,16 +376,12 @@
             <div class="hero-note"><strong>선택한 트리</strong><span>다른 화면에서도 같은 순간을 이어서 볼 수 있어요.</span></div>
             <button class="shelf-jump" id="shelfJump" type="button">선택한 책 보러 가기 ↓</button>
           </div>
-          <div class="hero-stage" aria-label="장식용 책장 그림">
+          <!-- #212 4번: 실제 책과 무관한 예시 4권과 겹치는 안내 글자를 뺤다. 아래 책장이 실제 내 책을 보여 준다. -->
+          <div class="hero-stage" aria-hidden="true">
             <span class="stage-label">내 책장</span>
-            <span class="stage-hint">불러온 책을 선택하세요</span>
-            <div class="hero-books">
-              <div class="hero-book" style="--book:#a84f5d;--tilt:-4deg"><i></i><span>순간 01</span></div>
-              <div class="hero-book" style="--book:#4265a8;--tilt:2deg"><i></i><span>순간 02</span></div>
-              <div class="hero-book" style="--book:#906b5a;--tilt:-2deg"><i></i><span>순간 03</span></div>
-              <div class="hero-book" style="--book:#58728e;--tilt:4deg"><i></i><span>순간 04</span></div>
-              <div class="hero-shelf"></div>
-            </div>
+            <span class="stage-hint">아래 책장에서 책을 고르세요</span>
+            <div class="hero-books" id="heroBooks"></div>
+            <div class="hero-shelf" id="heroShelf"></div>
           </div>
         </section>
         <div class="shelf-controls">
@@ -409,10 +411,8 @@
                 <div class="book-cover-face" id="bookCoverFace">
                   <div class="cover-front">
                     <img id="coverMedia" class="book-cover-media" alt="" hidden>
-                    <span class="cover-number">순간의 기록</span>
                     <span class="cover-symbol"><span>♡</span></span>
                     <strong class="cover-title" id="coverTitle">책</strong>
-                    <small class="cover-subtitle" id="coverSubtitle">한 트리, 한 권의 기록</small>
                   </div>
                   <div class="cover-back" id="coverBack">순간의 기록<br /><small>기억의 다음 장으로</small></div>
                 </div>
@@ -469,14 +469,20 @@
     </section>
   </div>
 
-  <script src="../labels.js"></script><script src="../media-preview.js"></script><script src="../runtime.js"></script><script src="../view-navigation.js"></script>
+  <script src="../labels.js"></script><script src="../tree-name.js"></script><script src="../media-preview.js"></script><script src="../runtime.js"></script><script src="../view-navigation.js"></script>
 <script>
     (function () {
       'use strict';
       var $ = function (selector) { return document.querySelector(selector); };
       var $$ = function (selector) { return Array.prototype.slice.call(document.querySelectorAll(selector)); };
       var sourceLabel = 'bookmarks_LIKE_only_2026-07-28.html';
-      var books = LTDEMO.library.map(function(tree,index){var color=['#a84f5d','#627ba2','#8d705e','#6d8979'][index%4],cover=tree.moments.find(function(moment){return moment.id===tree.coverMomentId;}),coverMedia=cover&&cover.type==='photo'?cover.image||'':'';return {id:tree.id,name:tree.title,subject:tree.subject||'',english:cover?cover.title:'기본 표지',category:'all',color:color,accent:color,symbol:'✦',coverMedia:coverMedia,description:tree.subject?'좋아하는 대상 · '+tree.subject:'좋아하는 대상을 기록한 책입니다.',tags:[tree.subject||'좋아하는 대상'],chapters:tree.moments.map(m=>({title:m.title,url:m.externalUrl||'',mood:m.emotion,note:m.memo||m.whyNext||'',id:m.id,type:m.type,image:m.image||''}))};});
+      // #212: 표지에 보이는 이름은 한 번만 쓴다. 자동 접미사(", 나의 순간들")는 표시 단계에서만 뺀다(tree-name.mjs).
+      var treeTitle = function (value) { return (window.LTTreeName && window.LTTreeName.displayTreeTitle) ? window.LTTreeName.displayTreeTitle(value) : value; };
+      var lastMomentDate = function (tree) { var dates = tree.moments.map(function (moment) { return moment.date || ''; }).filter(Boolean).sort(); return dates.length ? dates[dates.length - 1] : ''; };
+      // #212: 표지 색은 테마 변수를 넘긴다. 밤은 장미색이 아닌 값, 정원은 지금 크림색 책장 색이며
+      // 실제 색값은 identity.css의 --lt-cover-N에만 있다(테마를 바꿔도 다시 그릴 필요가 없다).
+      var palette = ['var(--lt-cover-1)', 'var(--lt-cover-2)', 'var(--lt-cover-3)', 'var(--lt-cover-4)'];
+      var books = LTDEMO.library.map(function(tree,index){var color=palette[index%palette.length],cover=tree.moments.find(function(moment){return moment.id===tree.coverMomentId;}),coverMedia=cover&&cover.type==='photo'?cover.image||'':'';return {id:tree.id,name:treeTitle(tree.title),subject:tree.subject||'',category:'all',color:color,accent:color,symbol:'✦',coverMedia:coverMedia,lastDate:lastMomentDate(tree),description:tree.subject?'좋아하는 대상 · '+tree.subject:'좋아하는 대상을 기록한 책입니다.',tags:[tree.subject||'좋아하는 대상'],chapters:tree.moments.map(m=>({title:m.title,url:m.externalUrl||'',mood:m.emotion,note:m.memo||m.whyNext||'',id:m.id,type:m.type,image:m.image||''}))};});
       var state = { filter:'all', query:'', selectedId:null, shelfIndex:0, shelfList:[], chapterIndex:0, open:false, openProgress:0, customBooks:[], pageTurning:false };
       var storageKey = 'lovetree-people-book-shelf-v2-1-true-page-motion';
       var drag = { active:false, mode:'', startX:0, startY:0, moved:false, startProgress:0 };
@@ -504,7 +510,7 @@
         var query=state.query.trim().toLowerCase();
         var list=allBooks().filter(function(book){
           var filterOk=state.filter==='all'||book.category===state.filter;
-          var queryOk=!query||[book.name,book.english,book.description].concat(book.tags).concat(book.chapters.map(function(chapter){return chapter.title;})).join(' ').toLowerCase().indexOf(query)>=0;
+          var queryOk=!query||[book.name,book.description].concat(book.tags).concat(book.chapters.map(function(chapter){return chapter.title;})).join(' ').toLowerCase().indexOf(query)>=0;
           return filterOk&&queryOk;
         });
         state.shelfList=list;
@@ -512,12 +518,24 @@
         else if(state.selectedId){var selectedIndex=list.findIndex(function(book){return book.id===state.selectedId;});if(selectedIndex>=0)state.shelfIndex=selectedIndex;}
         else state.shelfIndex=Math.max(0,Math.min(state.shelfIndex,list.length-1));
         $('#resultCount').textContent=list.length+'권';
+        renderHeroShelf(list);
         $('#shelfRail').innerHTML=list.length?list.map(function(book,index){
+          // #212: 표지에 이름 한 번만. 표지 아래는 "순간 N개 · 마지막 YYYY-MM-DD" 하나만. "책 · 02"·"기본 표지" 같은 내부 표시는 없다.
           return '<article class="book-card" data-book-index="'+index+'"><button type="button" data-book-id="'+esc(book.id)+'" aria-label="'+esc(book.name)+' 기억책 열기">'+
-            '<div class="book-cover" style="'+coverStyle(book)+'">'+(book.coverMedia?'<img class="book-cover-media" src="'+esc(book.coverMedia)+'" alt="" loading="lazy" referrerpolicy="no-referrer">':'')+'<span class="cover-number">책 · '+String(index+1).padStart(2,'0')+'</span><span class="cover-symbol"><span>'+esc(book.symbol)+'</span></span><strong class="cover-title">'+esc(book.name)+'</strong><small class="cover-subtitle">'+esc(book.english)+'</small></div>'+
-            '<span class="book-card-meta"><strong>'+esc(book.name)+'</strong><span>'+book.chapters.length+'개 순간 · '+esc(book.subject||'좋아하는 대상')+'</span></span></button><div class="book-tags">'+book.tags.slice(0,2).map(function(tag){return '<span>'+esc(tag)+'</span>';}).join('')+'</div></article>';
+            '<div class="book-cover" style="'+coverStyle(book)+'">'+(book.coverMedia?'<img class="book-cover-media" src="'+esc(book.coverMedia)+'" alt="" loading="lazy" referrerpolicy="no-referrer">':'')+'<span class="cover-symbol"><span>'+esc(book.symbol)+'</span></span><strong class="cover-title">'+esc(book.name)+'</strong></div>'+
+            '<span class="book-card-meta"><span>'+book.chapters.length+'개 순간 · 마지막 '+esc(book.lastDate||'-')+'</span></span></button></article>';
         }).join(''):'<div class="empty"><strong>찾는 책이 없어요.</strong><span>트리 이름·좋아하는 대상·순간 제목으로 검색해 보세요.</span></div>';
         updateCarousel(false);
+      }
+      function renderHeroShelf(list) {
+        // #212 4번: 예시 그림 대신 실제 내 책(최대 4권)을 세운다. 책이 없으면 아무것도 그리지 않는다.
+        var host=$('#heroBooks'),shelf=$('#heroShelf');
+        if(!host)return;
+        var shown=list.slice(0,4);
+        host.innerHTML=shown.map(function(book,index){
+          return '<div class="hero-book" style="--book:'+esc(book.color)+';--tilt:'+(((index%3)-1)*2)+'deg" title="'+esc(book.name)+'"><i></i><span>'+esc(book.name)+'</span></div>';
+        }).join('');
+        if(shelf)shelf.style.display=shown.length?'block':'none';
       }
       function setShelfAtmosphere(book) {
         var viewport=$('#shelfViewport');
@@ -536,11 +554,13 @@
           var absolute=Math.abs(distance);
           var x=distance*158 + (distance>0?Math.min(absolute*8,22):distance<0?-Math.min(absolute*8,22):0);
           var z=-absolute*78;
-          var scale=absolute===0?1.12:absolute===1?.82:absolute===2?.66:.54;
+          // #212: 중앙 카드는 레일 높이(375)보다 큰 352px이라 위로 뜨면 표지 윗부분이 잘렸다.
+          // 중앙은 위로 띄우지 않고 아래로 살짝 내리고, 배율을 레일 안에 들어가는 값으로 조정한다.
+          var scale=absolute===0?1.06:absolute===1?.82:absolute===2?.66:.54;
           var rotate=distance===0?0:distance>0?-22:22;
           var alpha=absolute===0?1:absolute===1?.9:absolute===2?.66:absolute===3?.28:0;
           card.style.setProperty('--x',x+'px');
-          card.style.setProperty('--y',(absolute===0?-9:Math.min(absolute*8,28))+'px');
+          card.style.setProperty('--y',(absolute===0?6:Math.min(absolute*8,28))+'px');
           card.style.setProperty('--z',z+'px');
           card.style.setProperty('--scale',scale);
           card.style.setProperty('--rot',rotate+'deg');
@@ -573,11 +593,11 @@
         var coverMedia=$('#coverMedia');if(book.coverMedia){coverMedia.src=book.coverMedia;coverMedia.hidden=false;}else{coverMedia.hidden=true;coverMedia.removeAttribute('src');}
         cover.querySelector('.cover-symbol span').textContent=book.symbol;
         $('#coverTitle').textContent=book.name;
-        $('#coverSubtitle').textContent=book.english;
+        $('#coverTitle').textContent=book.name;
         $('#coverBack').innerHTML='순간의 기록<br /><small>'+esc(book.name)+'의 다음 장으로</small>';
-        $('#readerLabel').textContent='책 · '+book.english;
-        $('#stageBookCode').textContent='책 · '+String(allBooks().indexOf(book)+1).padStart(2,'0');
-        $('#readerEyebrow').textContent='책 · '+book.english;
+        $('#readerLabel').textContent='기억책';
+        $('#stageBookCode').textContent='순간의 기록';
+        $('#readerEyebrow').textContent='기억책';
         $('#readerTitle').textContent=book.name+'의 LoveTree';
         $('#readerDescription').textContent=book.description;
         $('#chapterCount').textContent=book.chapters.length+'개 순간';
@@ -683,7 +703,7 @@
         var cover=document.createElement('div');
         cover.className='book-cover';
         cover.style.setProperty('--cover',getBook(state.selectedId)?.color||'#6b5873');
-        var selected=getBook(state.selectedId);cover.innerHTML=(selected?.coverMedia?'<img class="book-cover-media" src="'+esc(selected.coverMedia)+'" alt="" referrerpolicy="no-referrer">':'')+'<span class="cover-number">순간의 기록</span><span class="cover-symbol"><span>'+esc(selected?.symbol||'♡')+'</span></span><strong class="cover-title">'+esc(selected?.name||'LoveTree')+'</strong><small class="cover-subtitle">'+esc(selected?.english||'순간의 기록')+'</small>';
+        var selected=getBook(state.selectedId);cover.innerHTML=(selected?.coverMedia?'<img class="book-cover-media" src="'+esc(selected.coverMedia)+'" alt="" referrerpolicy="no-referrer">':'')+'<span class="cover-symbol"><span>'+esc(selected?.symbol||'♡')+'</span></span><strong class="cover-title">'+esc(selected?.name||'LoveTree')+'</strong>';
         source.appendChild(cover);
         document.body.appendChild(source);
         function place(rect){source.style.left=rect.left+'px';source.style.top=rect.top+'px';source.style.width=rect.width+'px';source.style.height=rect.height+'px';}
@@ -864,7 +884,7 @@
           event.preventDefault();
           var name=$('#newBookName').value.trim(),url=$('#newBookUrl').value.trim();
           if(!name||!url)return;
-          state.customBooks.push({id:'custom-'+Date.now(),name:name,english:'내 트리',category:'all',color:'#8c6d83',accent:'#8c6d83',symbol:'♡',description:'새롭게 기록하기 시작한 트리.',tags:['새 책','첫 마음'],chapters:[{title:$('#newBookChapter').value.trim()||'처음 마음이 움직인 장면',url:url,mood:'첫 마음',note:'이 사람을 처음 책으로 만들게 된 순간'}]});
+          state.customBooks.push({id:'custom-'+Date.now(),name:name,category:'all',color:palette[0],accent:palette[0],symbol:'♡',description:'새롭게 기록하기 시작한 트리.',tags:['새 책','첫 마음'],lastDate:new Date().toISOString().slice(0,10),chapters:[{title:$('#newBookChapter').value.trim()||'처음 마음이 움직인 장면',url:url,mood:'첫 마음',note:'이 사람을 처음 책으로 만들게 된 순간'}]});
           save();closeModal('newBookModal');$('#newBookForm').reset();renderShelf();showToast(name+'의 책을 만들었어요.');
         });
       }
