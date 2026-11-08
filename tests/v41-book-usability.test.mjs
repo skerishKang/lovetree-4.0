@@ -6,7 +6,10 @@ import {readFileSync, existsSync as fsExists} from 'node:fs';
 // 규칙은 public/v41/book-usability.mjs 한 곳에 있고, 화면은 한 벌(#231 1.5단계 ⑥)이 그 어댑터를 받는다.
 const read = path => readFileSync(new URL('../' + path, import.meta.url), 'utf8');
 const VIEWS = ['public/v41/views/track59-sketchbook.html'];
-const html = Object.fromEntries(VIEWS.map(path => [path, read(path)]));
+// #231 2단계: 화면의 스타일·본문 스크립트는 views/book/ 아래 파일로 나갔다. 시험은 화면+파일을 한 소스로 본다.
+const BOOK_CSS = read('public/v41/views/book/book.css');
+const BOOK_JS = read('public/v41/views/book/book.js');
+const html = Object.fromEntries(VIEWS.map(path => [path, read(path) + '\n' + BOOK_CSS + '\n' + BOOK_JS]));
 
 const {
   isUserTitle, displayTitle, withoutAutoTitle, titleParts, videoTitle,
