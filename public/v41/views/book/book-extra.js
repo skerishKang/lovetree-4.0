@@ -1,6 +1,8 @@
 // 2026-11-08 기억책 사용성 1~9 화면 보조. 데이터·저장 계약은 그대로 두고 표시만 바꾼다.
-import {displayTitle,withoutAutoTitle,titleParts,embedUrl,connectionLine,readLens,writeLens,detailPlacement,nextMomentMessage,NEXT_PAGE_COPY,NEXT_PAGE_ACTION,treeTitleText,isPrimaryButton} from '/v41/book-usability.mjs';
+import {displayTitle,withoutAutoTitle,titleParts,embedUrl,connectionLine,readLens,writeLens,detailPlacement,nextMomentMessage,NEXT_PAGE_COPY,NEXT_PAGE_ACTION,treeTitleText,isPrimaryButton,tapIntent} from '/v41/book-usability.mjs';
 const $b=s=>document.querySelector(s);
+// #296: 손을 뗀 순간의 판단은 book-usability.mjs의 tapIntent가 맡는다(book.js는 클래식 스크립트라 여기서 넘겨 준다).
+window.LTTapIntent=tapIntent;
 const t=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 /* 5. 돋보기: 기본 꺼짐. 선택값은 localStorage(실패하면 꺼짐). */
 let lensPref=readLens(window.localStorage);

@@ -17,7 +17,7 @@ const {
   isUserTitle, displayTitle, withoutAutoTitle, titleParts, videoTitle,
   embedUrl, connectionLine, NEXT_PAGE_COPY, NEXT_PAGE_ACTION,
   LENS_KEY, readLens, writeLens, detailPlacement, nextMomentMessage,
-  BOOK_UI_FONT, BOOK_TITLE_FONT, bookTheme, bookTitleFont, treeTitleText, isPrimaryButton,
+  BOOK_UI_FONT, BOOK_TITLE_FONT, bookTheme, bookTitleFont, treeTitleText, isPrimaryButton, tapIntent,
 } = await import('../public/v41/book-usability.mjs');
 const headerStateModule = await import('../public/v41/header-state.mjs');
 
@@ -249,4 +249,24 @@ test('13. 기억책도 정원 테마를 받는다(밤=기본 글꼴, 정원=지�
   assert.equal(appliedTheme('garden', 'board'), 'garden');
   assert.equal(appliedTheme('garden', 'network'), 'garden');
   assert.equal(appliedTheme('night', 'book'), 'night');
+});
+
+// #296: 좁은 화면에서 손을 떼면 상세가 열린다 — 420ms 넘게 눌러 돋보기가 켜져도 그 자리에서 떼면 상세.
+test('좁은 화면 탭 판정: 돋보기가 켜져도 같은 자리에서 떼면 상세를 연다(430 이하)', () => {
+  const cases = [
+    // [mode, longPressed, dx, dy, hasMoment, width, cancel, 기대]
+    ['inspect', true, 1, 1, true, 390, false, 'detail'],
+    ['inspect', true, 0, 0, true, 360, false, 'detail'],
+    ['inspect', true, 30, 2, true, 390, false, 'close-lens'],   // 끌었으면 상세 아님
+    ['inspect', true, 1, 1, false, 390, false, 'close-lens'],   // 카드 밖
+    ['inspect', true, 1, 1, true, 390, true, 'close-lens'],     // 취소된 포인터
+    ['inspect', true, 1, 1, true, 431, false, 'close-lens'],    // 431px은 예전 그대로(돋보기만)
+    ['inspect', true, 1, 1, true, 1440, false, 'close-lens'],   // 큰 화면 그대로
+    ['pending', false, 2, 2, true, 390, false, 'detail'],
+    ['swipe', false, 40, 0, true, 390, false, 'none'],
+    ['pending', true, 2, 2, true, 390, false, 'none']
+  ];
+  for (const [mode, longPressed, dx, dy, hasMoment, width, cancel, expected] of cases) {
+    assert.equal(tapIntent({ mode, longPressed, dx, dy, hasMoment, width, cancel }), expected, [mode, dx, dy, width, cancel].join('/'));
+  }
 });
