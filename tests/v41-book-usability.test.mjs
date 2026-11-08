@@ -9,13 +9,15 @@ const VIEWS = ['public/v41/views/track59-sketchbook.html'];
 // #231 2단계: 화면의 스타일·본문 스크립트는 views/book/ 아래 파일로 나갔다. 시험은 화면+파일을 한 소스로 본다.
 const BOOK_CSS = read('public/v41/views/book/book.css');
 const BOOK_JS = read('public/v41/views/book/book.js');
-const html = Object.fromEntries(VIEWS.map(path => [path, read(path) + '\n' + BOOK_CSS + '\n' + BOOK_JS]));
+const BOOK_EXTRA_CSS = read('public/v41/views/book/book-usability.css');
+const EXTRA = read('public/v41/views/book/book-extra.js');
+const html = Object.fromEntries(VIEWS.map(path => [path, read(path) + '\n' + BOOK_CSS + '\n' + BOOK_EXTRA_CSS + '\n' + BOOK_JS + '\n' + EXTRA]));
 
 const {
   isUserTitle, displayTitle, withoutAutoTitle, titleParts, videoTitle,
   embedUrl, connectionLine, NEXT_PAGE_COPY, NEXT_PAGE_ACTION,
   LENS_KEY, readLens, writeLens, detailPlacement, nextMomentMessage,
-  BOOK_UI_FONT, BOOK_TITLE_FONT, bookTheme, bookTitleFont, treeTitleText,
+  BOOK_UI_FONT, BOOK_TITLE_FONT, bookTheme, bookTitleFont, treeTitleText, isPrimaryButton,
 } = await import('../public/v41/book-usability.mjs');
 const headerStateModule = await import('../public/v41/header-state.mjs');
 
@@ -152,10 +154,10 @@ test('7-1. 밤 제목 글꼴 = Pretendard, 정원 제목 글꼴 = 마루부리(�
     assert.ok(garden[1].startsWith('MaruBuri'), path + ': 정원 큰 제목은 마루부리');
     assert.ok(/html\[data-v41-screen=book\]\[data-lt-theme=garden\] \.moment-title h3[^{]*\{[^}]*MaruBuri/.test(src), path + ': 정원 큰 제목 줄에 마루부리');
   }
-  // 두 벌과 생성기가 같은 값을 쓴다.
-  const apply = read('scripts/apply-book-usability.mjs');
-  assert.ok(apply.includes("bookTitleFont('night')"), '적용 스크립트가 규칙을 가져다 쓴다');
-  assert.ok(apply.includes("bookTitleFont('garden')"), '적용 스크립트가 정원 규칙도 가져다 쓴다');
+  // #231 2단계: 주입 생성기 대신, 화면이 실제로 싣는 CSS가 규칙과 같은 값을 쓴다.
+  const nightFont = bookTitleFont('night'), gardenFont = bookTitleFont('garden');
+  assert.ok(BOOK_EXTRA_CSS.includes('--lt-reading:' + nightFont), '싣는 CSS가 밤 규칙 값을 쓴다');
+  assert.ok(BOOK_EXTRA_CSS.includes('--lt-reading:' + gardenFont), '싣는 CSS가 정원 규칙 값을 쓴다');
 });
 
 test('8. 책 가운데 머리 표시(01 · 날짜)를 지우고, 날짜는 정보 줄에만 둔다', () => {
@@ -183,13 +185,26 @@ test('9. 아래 연결 안내는 다음 순간이 있을 때만, 시스템 용�
   }
 });
 
-test('한 벌뿐인 화면 파일이 어댑터를 받는다(손으로 고치지 않는다)', () => {
-  const match = html[VIEWS[0]].match(/<script type="module">([\s\S]*?)<\/script>\s*<\/body>/);
-  assert.ok(match, VIEWS[0] + ': 어댑터 스크립트');
-  // #231 1.5단계 ⑥: 사본이 사라져 두 파일 비교 대신, 사본 부재와 모듈 경로를 함께 본다.
+test('한 벌뿐인 화면이 어댑터 파일을 싣는다(주입 스크립트 없음, #231 2단계)', () => {
+  const src = html[VIEWS[0]];
+  // 2단계: 주입 스크립트가 넣던 내용을 파일로 옮겼다.
+  assert.equal(fsExists(new URL('../public/v41/views/book/book-extra.js', import.meta.url)), true, '어댑터 파일');
+  assert.match(src, /<link rel="stylesheet" href="\/v41\/views\/book\/book-usability\.css">/);
+  assert.match(src, /<script type="module" src="\/v41\/views\/book\/book-extra\.js"><\/script>/);
+  assert.match(EXTRA, /from '\/v41\/book-usability\.mjs'/);
+  assert.equal(fsExists(new URL('../scripts/apply-book-usability.mjs', import.meta.url)), false, '주입 스크립트는 없다');
   assert.equal(fsExists(new URL('../public/v41/design/views/', import.meta.url)), false, 'design/views/ 화면 사본 없음');
-  assert.match(match[1], /from '\/v41\/book-usability\.mjs'/);
-  assert.ok(read('scripts/apply-book-usability.mjs').includes('변경 없음'), '적용 스크립트는 두 번 돌려도 같다');
+});
+
+test('13. 제자리 재생은 주 버튼(왼쪽 클릭·탭)에서만 반응한다 (#231 2단계)', () => {
+  assert.equal(isPrimaryButton({ button: 0 }), true, '왼쪽 클릭·탭');
+  assert.equal(isPrimaryButton({ button: 1 }), false, '가운데 버튼은 새 탭 열기 기본 동작을 지킨다');
+  assert.equal(isPrimaryButton({ button: 2 }), false, '오른쪽 버튼은 상황 메뉴 기본 동작을 지킨다');
+  assert.equal(isPrimaryButton({}), true, 'button이 없는 합성 이벤트(탭)');
+  assert.equal(isPrimaryButton(undefined), true, '이벤트 없이 부르는 경우');
+  // 리스너 두 곳이 모두 이 규칙을 먼저 통과시킨다.
+  const guards = EXTRA.match(/if\(!isPrimaryButton\(e\)\)return;/g) || [];
+  assert.equal(guards.length, 2, 'pointerdown·click 두 리스너');
 });
 
 test('11. 기억책 트리 이름: "리센느, 나의 순간들" → "리센느", 직접 쓴 이름은 그대로 (#212)', () => {
@@ -198,7 +213,7 @@ test('11. 기억책 트리 이름: "리센느, 나의 순간들" → "리센느"
   assert.equal(treeTitleText('리센느, 나의 순간들 2'), '리센느, 나의 순간들 2');
   assert.equal(treeTitleText(''), '');
   assert.equal(treeTitleText(undefined), '');
-  const apply = read('scripts/apply-book-usability.mjs');
+  const apply = EXTRA;
   assert.ok(apply.includes('treeTitleText'), '어댑터가 같은 함수를 쓴다');
   for (const path of VIEWS) {
     const src = html[path];
@@ -213,7 +228,7 @@ test('11. 기억책 트리 이름: "리센느, 나의 순간들" → "리센느"
 });
 
 test('12. 실제 기록에서도 그 자리 재생: 겹침·전파 차단에 지지 않고, 실패하면 원본 링크로 (#212 후속)', () => {
-  const apply = read('scripts/apply-book-usability.mjs');
+  const apply = EXTRA;
   assert.ok(apply.includes("document.addEventListener('pointerdown'"), 'pointerdown에서 먼저 잡는다');
   assert.ok(apply.includes('function playInline(yt,media)'), '재생은 한 곳에서 만든다');
   assert.ok(apply.includes("window.open(media.openUrl,'_blank','noopener')"), '재생 주소가 없으면 원본 링크를 연다');

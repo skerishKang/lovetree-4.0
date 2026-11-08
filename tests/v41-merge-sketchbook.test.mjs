@@ -5,8 +5,8 @@ import fs from 'node:fs';
 
 const read = (file) => fs.readFileSync(new URL(`../public/v41/${file}`, import.meta.url), 'utf8');
 // #231 2단계: 스타일·본문 스크립트는 views/book/ 아래 파일이다. 화면+파일을 한 소스로 본다.
-const SERVER = read('views/track59-sketchbook.html') + read('views/book/book.css') + read('views/book/book.js');
-const INJECT = fs.readFileSync(new URL('../scripts/apply-book-usability.mjs', import.meta.url), 'utf8');
+const SERVER = read('views/track59-sketchbook.html') + read('views/book/book.css')
+  + read('views/book/book-usability.css') + read('views/book/book.js') + read('views/book/book-extra.js');
 
 test('design/views/에 화면 사본이 없다(한 벌만 남았다)', () => {
   assert.equal(fs.existsSync(new URL(`../public/v41/design/views/track59-sketchbook.html`, import.meta.url)), false);
@@ -20,11 +20,12 @@ test('런타임 한 벌만 부르고 자원 경로는 /v41/ 절대 경로', () =
   assert.ok(!SERVER.includes('../'), '상대 경로가 남아 있으면 폴더마다 다른 파일을 찾는다');
 });
 
-test('주입 스크립트도 한 벌·절대 경로 기준으로 동작한다', () => {
-  assert.match(INJECT, /const COPIES = \[\n  \['public\/v41\/views\/track59-sketchbook\.html', '\/v41\/'\],\n\];/);
-  assert.doesNotMatch(INJECT, /design\/views\/track59-sketchbook\.html/);
-  assert.match(SERVER, /<style id="lt-book-usability">/);
-  assert.match(SERVER, /from '\/v41\/book-usability\.mjs'/);
+test('주입은 끝났다: 화면이 어댑터 파일을 직접 싣고 주입 스크립트는 없다(#231 2단계)', () => {
+  assert.ok(!SERVER.includes('scripts/apply-book-usability'), '화면은 주입 스크립트와 무관하다');
+  assert.equal(fs.existsSync(new URL('../scripts/apply-book-usability.mjs', import.meta.url)), false);
+  assert.equal(fs.existsSync(new URL('../public/v41/design/shared.js', import.meta.url)), false);
+  assert.match(SERVER, /href="\/v41\/views\/book\/book-usability\.css"/);
+  assert.match(SERVER, /src="\/v41\/views\/book\/book-extra\.js"/);
 });
 
 test('실제 기록 동작은 그대로 남는다(제자리 재생·읽기 스크롤·돋보기 예외·연결 이유·정원 제목)', () => {
