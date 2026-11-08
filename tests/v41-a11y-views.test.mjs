@@ -56,41 +56,7 @@ test('adapter covers every target screen without editing original views', () => 
   assert.match(community, /showModal/);
 });
 
-test('A: 상세 패널 Esc는 같은 닫기 버튼 경로로 닫는다', () => {
-  const adapter = read('public/v41/view-a11y.mjs');
-  assert.match(adapter, /event\.key !== 'Escape'/);
-  assert.match(adapter, /current\.el\.id !== 'detail'/);
-  assert.match(adapter, /querySelector\('\.close'\)/);
-  assert.match(adapter, /close\.click\(\)/);
-});
-
-// #231 1-B 후속: 대화상자 접근성(Tab 순환·Esc·포커스 되돌림)은 public/v41/shell/dialogs.mjs로 옮겼다.
-const dialogsAndShell = () => read('public/v41/shell/dialogs.mjs') + read('public/v41/shell.mjs');
-
-test('B: 편집기·보관 목록 Tab은 대화상자 안에서 순환한다', () => {
-  const shell = dialogsAndShell();
-  assert.match(shell, /trapShellTab/);
-  assert.match(shell, /assets\?\.open\s*\?\s*assets\s*:\s*editor\?\.open\s*\?\s*editor\s*:\s*null/);
-  assert.match(shell, /SHELL_FOCUSABLE/);
-  assert.match(shell, /shiftKey/);
-  assert.equal(focusWrap(0, 3, true), 2);
-  assert.equal(focusWrap(2, 3, false), 0);
-});
-
-test('C: 계정 메뉴 Esc는 계정 동그라미로 돌아간다', () => {
-  const shell = dialogsAndShell();
-  assert.match(shell, /if \(e\.key !== 'Escape'\) return;/);
-  assert.match(shell, /closeAccountMenu\(\);\s*\$\('account-avatar'\)\.focus\(\)/);
-});
-
-test('D: 보관 목록 Esc는 연 버튼(없으면 계정 동그라미)으로 돌아간다', () => {
-  const shell = dialogsAndShell();
-  assert.match(shell, /assetsOpener\s*=\s*opener/);
-  assert.match(shell, /addEventListener\('cancel'/);
-  assert.match(shell, /focusReturnTarget\(assetsOpener,\s*\$\('account-avatar'\)\)/);
-  const opener = {isConnected: true, getClientRects: () => [{}]};
-  const fallback = {};
-  assert.equal(focusReturnTarget(opener, fallback), opener);
-  assert.equal(focusReturnTarget({isConnected: false, getClientRects: () => [{}]}, fallback), fallback);
-  assert.equal(focusReturnTarget({isConnected: true, getClientRects: () => []}, fallback), fallback);
-});
+// A~D(상세 패널 Esc·대화상자 Tab 순환·계정 메뉴 Esc·보관 목록 Esc)는 2026-11-09에
+// 소스 글자에서 함수 직접 호출로 옮겼다.
+//  · A → tests/v41-view-a11y-flow.test.mjs (applyViewAccessibility에 keydown을 실제로 보낸다)
+//  · B·C·D → tests/v41-shell-dialogs.test.mjs (trapShellTab·closeAccountMenu·focusReturnTarget 호출)

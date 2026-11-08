@@ -1,0 +1,89 @@
+name: 미리보기 검사
+
+# 원칙 8(머지 전 PR 미리보기 postdeploy) 자동 실행. 로그아웃 검사만 하므로 비밀값이 필요 없다.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  checks: read
+  pull-requests: read
+
+concurrency:
+  group: preview-check-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  preview:
+    name: 미리보기 postdeploy(로그아웃)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      PR_SHA: ${{ github.event.pull_request.head.sha }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ms-playwright-${{ runner.os }}-1.49.1
+      - name: 브라우저 준비(Playwright Chromium, 캐시)
+        id: browser
+        run: |
+          if [ -d "$HOME/.cache/ms-playwright" ] && ls "$HOME/.cache/ms-playwright" | grep -q chromium; then
+            echo "캐시된 Chromium 사용"
+          else
+            npm i --no-save --no-package-lock playwright@1.49.1
+            npx playwright install --with-deps chromium
+          fi
+          node -e "import('playwright-core').then(()=>console.log('playwright-core 확인')).catch(e=>{console.error(e.message);process.exit(1)})"
+      - name: 미리보기 주소 찾기
+        id: preview
+        run: node tools/postdeploy/preview-url.mjs "$GITHUB_REPOSITORY" "$PR_SHA" --wait 600
+      - name: 미리보기 배포 없음 — 건너뜀
+        if: steps.preview.outputs.url == ''
+        run: |
+          echo "미리보기 검사를 건너뜁니다: ${{ steps.preview.outputs.reason }}"
+          {
+            echo "## 미리보기 검사 건너뜀"
+            echo ""
+            echo "- 이유: ${{ steps.preview.outputs.reason }}"
+            echo "- 커밋: \`$PR_SHA\`"
+            echo "- Cloudflare Pages 미리보기 배포가 없거나 주소를 확인할 수 없어 검사를 실행하지 않았습니다(실패 아님)."
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: postdeploy 로그아웃 검사
+        if: steps.preview.outputs.url != ''
+        id: run
+        env:
+          LOVETREE_POSTDEPLOY_BROWSER: chromium
+        run: |
+          set +e
+          node tools/postdeploy/postdeploy.mjs "${{ steps.preview.outputs.url }}/v41/" \
+            --profile "$RUNNER_TEMP/preview-profile" \
+            --out "$RUNNER_TEMP/preview-out" \
+            --timeout 45000 > "$RUNNER_TEMP/postdeploy.log" 2>&1
+          status=$?
+          echo "postdeploy 종료 코드=$status"
+          tail -40 "$RUNNER_TEMP/postdeploy.log"
+          cp -r "$RUNNER_TEMP/preview-out" ./preview-out 2>/dev/null || true
+          echo "postdeploy 채점은 다음 단계(preview-gate)에서 한다(미리보기 Functions 503 예외)."
+          exit 0
+      - name: 판정(visual·페이지 오류 0, 미리보기 503 예외)
+        if: steps.preview.outputs.url != ''
+        run: |
+          if [ ! -d ./preview-out ]; then echo "리포트 폴더가 없습니다"; exit 2; fi
+          node tools/postdeploy/preview-gate.mjs ./preview-out --summary "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.preview.outputs.url != ''
+        with:
+          name: preview-check-${{ github.event.pull_request.number }}
+          path: |
+            preview-out
+          retention-days: 14

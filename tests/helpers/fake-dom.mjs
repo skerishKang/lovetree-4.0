@@ -28,6 +28,12 @@ export function fakeEl(extra = {}) {
     getAttribute(name) { return this.attrs[name] ?? null; },
     focus() { el.focused = true; },
     focused: false,
+    close() { el.closed = true; el.open = false; },
+    showModal() { el.open = true; },
+    closed: false,
+    listeners: {},
+    addEventListener(type, fn) { (el.listeners[type] ||= []).push(fn); },
+    dispatch(type, event) { for (const fn of el.listeners[type] || []) fn(event); },
     ...extra
   };
   return el;
@@ -39,6 +45,9 @@ export function fakeNav({scrollWidth = 400, clientWidth = 400, scrollLeft = 0, b
     scrollWidth,
     clientWidth,
     scrollLeft,
+    close() { el.closed = true; el.open = false; },
+    showModal() { el.open = true; },
+    closed: false,
     listeners: {},
     querySelector(sel) {
       if (sel === '[aria-current="true"]') return buttons.find((b) => b.getAttribute('aria-current') === 'true') || null;
@@ -135,3 +144,45 @@ export function createHeaderHarness({
 
 // createHeader는 제품 모듈에서 가져온다(순환 참조를 피하려고 지연 import).
 import { createHeader as createHeaderForTest } from '../../public/v41/shell/header.mjs';
+
+// 주소·기록 흉내 (#231 후속, 2026-11-09). createLocation이 읽는 location.hash와
+// history.pushState/replaceState/go, 그리고 popstate·hashchange를 실제로 발생시킨다.
+export function fakeBrowser({hash = '#home', state = null} = {}) {
+  const calls = {push: [], replace: [], go: [], listeners: {} };
+  const listeners = {};
+  const browsed = {state, hash};
+  const location = {
+    origin: 'https://lovetree-4-0.pages.dev',
+    get hash() { return browsed.hash; },
+    set hash(value) { browsed.hash = value; }
+  };
+  const history = {
+    get state() { return browsed.state; },
+    pushState(next, title, url) { calls.push.push({next, url}); browsed.state = next; browsed.hash = url; },
+    replaceState(next, title, url) { calls.replace.push({next, url}); browsed.state = next; browsed.hash = url; },
+    go(n) { calls.go.push(n); }
+  };
+  const saved = {location: globalThis.location, history: globalThis.history, addEventListener: globalThis.addEventListener, localStorage: globalThis.localStorage};
+  globalThis.location = location;
+  globalThis.history = history;
+  globalThis.localStorage = globalThis.localStorage || { getItem: () => null, setItem() {}, removeItem() {} };
+  globalThis.addEventListener = (type, fn) => { (listeners[type] ||= []).push(fn); };
+
+  return {
+    location,
+    history,
+    calls,
+    listeners,
+    setHash(value) { browsed.hash = value; },
+    fire(type) { for (const fn of listeners[type] || []) fn({type}); },
+    popstate() { this.fire('popstate'); },
+    hashchange() { this.fire('hashchange'); },
+    restore() {
+      globalThis.location = saved.location;
+      globalThis.history = saved.history;
+      globalThis.addEventListener = saved.addEventListener;
+      if (saved.localStorage === undefined) delete globalThis.localStorage;
+      else globalThis.localStorage = saved.localStorage;
+    }
+  };
+}

@@ -27,3 +27,4 @@ pr-comment.json
 
 # 캡처 결과(out/)는 커밋하지 않는다
 out/
+.tmp-261108/

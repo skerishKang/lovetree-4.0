@@ -132,3 +132,61 @@ test('보기 메뉴는 마우스·키보드·Esc·바깥 클릭으로 열고 닫
   // 카드 출처 안내(aria-live, #201)는 그대로 남는다.
   assert.match(homeJS, /shadow\.querySelector\('\.center-note'\)\?\.setAttribute\('aria-live','polite'\)/);
 });
+
+// ── 7차(2026-11-09): 동작 표를 함수로 넓힌다 ─────────────────────────────────
+// home.js는 shadow DOM 페이지 스크립트라 node에서 불러올 수 없다(CSS import + 최상위 실행).
+// 그래서 메뉴가 만드는 값·항목·초점 규칙을 표로 고정해, 남은 글자 검사가 '배선'만 보게 좁힌다.
+test('표: 로그인 × 테마 × 멈춤 × 카드 출처 → 항목 이름과 켜짐', () => {
+  const rows = [
+    {loggedIn: true, theme: 'night', paused: false, cardsMode: 'mix', labels: ['움직임 멈춤', '밤', '정원', '예시', '인기', '내 것만', '섞어서'], checked: ['밤', '섞어서'], count: 7},
+    {loggedIn: true, theme: 'garden', paused: true, cardsMode: 'mine', labels: ['움직임 켜기', '밤', '정원', '예시', '인기', '내 것만', '섞어서'], checked: ['움직임 켜기', '정원', '내 것만'], count: 7},
+    {loggedIn: true, theme: 'night', paused: false, cardsMode: 'popular', labels: ['움직임 멈춤', '밤', '정원', '예시', '인기', '내 것만', '섞어서'], checked: ['밤', '인기'], count: 7},
+    {loggedIn: true, theme: 'night', paused: false, cardsMode: 'example', labels: ['움직임 멈춤', '밤', '정원', '예시', '인기', '내 것만', '섞어서'], checked: ['밤', '예시'], count: 7},
+    {loggedIn: false, theme: 'night', paused: false, cardsMode: 'example', labels: ['움직임 멈춤', '밤', '정원', '예시', '인기'], checked: ['밤', '예시'], count: 5},
+    {loggedIn: false, theme: 'garden', paused: true, cardsMode: 'popular', labels: ['움직임 켜기', '밤', '정원', '예시', '인기'], checked: ['움직임 켜기', '정원', '인기'], count: 5},
+    {loggedIn: false, theme: 'night', paused: false, cardsMode: 'mine', labels: ['움직임 멈춤', '밤', '정원', '예시', '인기'], checked: ['밤', '예시'], count: 5},
+    {loggedIn: false, theme: 'garden', paused: false, cardsMode: 'mix', labels: ['움직임 멈춤', '밤', '정원', '예시', '인기'], checked: ['정원', '예시'], count: 5}
+  ];
+  for (const row of rows) {
+    const items = viewMenuItems(row);
+    const name = `${row.loggedIn ? '로그인' : '로그아웃'} · ${row.theme} · ${row.paused ? '멈춤' : '움직임'} · ${row.cardsMode}`;
+    assert.equal(items.length, row.count, `${name}: 항목 수`);
+    assert.deepEqual(items.map(item => item.label), row.labels, `${name}: 항목 이름`);
+    assert.deepEqual(items.filter(item => item.checked).map(item => item.label).sort(), [...row.checked].sort(), `${name}: 켜진 항목`);
+  }
+});
+
+test('표: 키보드 × 위치 → 다음 초점·닫기·실행 (0개·범위 밖 위치 포함)', () => {
+  const rows = [
+    {key: 'ArrowDown', index: 0, count: 3, want: {type: 'focus', index: 1}},
+    {key: 'ArrowDown', index: 2, count: 3, want: {type: 'focus', index: 0}},
+    {key: 'ArrowUp', index: 0, count: 3, want: {type: 'focus', index: 2}},
+    {key: 'ArrowUp', index: 1, count: 3, want: {type: 'focus', index: 0}},
+    {key: 'Home', index: 2, count: 3, want: {type: 'focus', index: 0}},
+    {key: 'End', index: 0, count: 3, want: {type: 'focus', index: 2}},
+    {key: 'Escape', index: 1, count: 3, want: {type: 'close'}},
+    {key: 'Enter', index: 1, count: 3, want: {type: 'activate', index: 1}},
+    {key: ' ', index: 0, count: 3, want: {type: 'activate', index: 0}},
+    {key: 'Tab', index: 0, count: 3, want: {type: 'none'}},
+    {key: 'ArrowDown', index: null, count: 3, want: {type: 'focus', index: 1}},
+    {key: 'ArrowDown', index: 0, count: 0, want: {type: 'none'}}
+  ];
+  for (const row of rows) {
+    assert.deepEqual(viewMenuKey(row.key, row.index, row.count), row.want, `${JSON.stringify(row.key)} @${row.index}/${row.count}`);
+  }
+});
+
+test('불변식: 메뉴를 열면 언제나 켜진 카드 출처 항목에 초점이 간다', () => {
+  for (const loggedIn of [true, false]) {
+    for (const cardsMode of ['example', 'popular', 'mine', 'mix']) {
+      for (const theme of ['night', 'garden']) {
+        const items = viewMenuItems({loggedIn, cardsMode, theme});
+        const at = viewMenuInitialIndex(items);
+        const item = items[at];
+        assert.equal(item.kind, 'cards', `${loggedIn}/${cardsMode}/${theme}: 초점은 카드 출처 항목`);
+        assert.equal(item.checked, true, `${loggedIn}/${cardsMode}/${theme}: 그 항목은 켜져 있다`);
+      }
+    }
+  }
+  assert.equal(viewMenuInitialIndex([]), 0, '항목이 없으면 첫 자리');
+});
