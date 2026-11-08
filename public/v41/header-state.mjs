@@ -140,6 +140,24 @@ export function applyThemeAttribute(root, theme) {
   else root.removeAttribute('data-lt-theme');
   return normalizeTheme(theme);
 }
-export function homeStartLoginUrl() {
-  return `/auth/login?next=${encodeURIComponent(HOME_LOGIN_NEXT)}`;
+export const LOGIN_INTENTS = Object.freeze(['new-tree', 'shelf']);
+export function readLoginIntent(search = '') {
+  const intent = new URLSearchParams(search).get('intent');
+  return LOGIN_INTENTS.includes(intent) ? intent : '';
+}
+export function loginUrlWithTheme(url, theme, intent = '') {
+  const parsed = new URL(url, 'https://lovetree-4-0.pages.dev');
+  const next = parsed.searchParams.get('next');
+  if (next) {
+    const target = new URL(next, 'https://lovetree-4-0.pages.dev');
+    if (LOGIN_INTENTS.includes(intent)) target.searchParams.set('intent', intent);
+    else target.searchParams.delete('intent');
+    parsed.searchParams.set('next', `${target.pathname}${target.search}${target.hash}`);
+  }
+  if (theme === THEME_NIGHT || theme === THEME_GARDEN) parsed.searchParams.set('lt_theme', theme);
+  else parsed.searchParams.delete('lt_theme');
+  return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+}
+export function homeStartLoginUrl(theme, intent) {
+  return loginUrlWithTheme(`/auth/login?next=${encodeURIComponent(HOME_LOGIN_NEXT)}`, theme, intent);
 }
