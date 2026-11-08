@@ -48,7 +48,7 @@ test('shelf management uses real metadata and removes unsupported fixed classifi
   assert.doesNotMatch(shelf,/categoryLabel\(/);
   assert.doesNotMatch(designShelf,/data-filter="(?:kpop|actor|series)"/);assert.doesNotMatch(designShelf,/categoryLabel\(/);assert.doesNotMatch(designShelf,/category:'kpop'/);
   // #212: 카드 정보 줄은 '순간 N개 · 마지막 YYYY-MM-DD'로 바뀌었지만, 책 값은 계속 실제 tree 메타데이터에서 온다(고정 분류 없음).
-  assert.match(shelf,/subject:tree\.subject/);assert.match(shelf,/book\.lastDate/);assert.match(designShelf,/book\.subject/);assert.match(shelf,/coverMedia/);assert.match(shelf,/tree\.coverMomentId/);
+  assert.match(shelf,/subject:tree\.subject/);assert.match(shelf,/book\.lastDate/);assert.equal(designShelf,shelf,'#231 1.5단계 ④: 두 벌이 한 벌이 되었다');assert.match(shelf,/coverMedia/);assert.match(shelf,/tree\.coverMomentId/);
   assert.match(navigation,/subject:t\.subject/);assert.match(navigation,/coverMomentId:t\.coverMomentId/);assert.match(navigation,/globalThis\.LTMedia\?\./);
   assert.match(shell,/apply\('editTree'/);assert.match(shell,/tree-manager/);assert.match(shell,/tree-delete/);
 });
