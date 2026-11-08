@@ -922,3 +922,7 @@ COM2에는 merge `6900df8aa446dfe0201d01997457fae04c4abe16`의 변경 서버 파
 ### 기준 스크린샷(현재 상태, 변경 없음)
 - `/mnt/e/lt-refactor-shots/before-{home,shelf,book,board,network,journey}-{1440,390}-{night,garden}.png` (24장, 로그아웃 예시 모드)
 - 예시 모드에서 실제로 불러온 화면 파일: `views/track32-bookshelf.html`, `views/track56-network.html`, `views/track58-pinboard.html`, `views/track59-sketchbook.html`, `first-journey`(셸 경유) — 예시 트리를 열면 `design/views/` 판본이 열린다(같은 하네스에서 확인).
+
+## 2026-11-08 리팩터링 계획 문서 (#231, ai/lt-refactor-plan-doc-261108)
+- 이유·원칙·단계별 계획: [REFACTOR_PLAN_20261108.md](REFACTOR_PLAN_20261108.md) · 추적 이슈 https://github.com/skerishKang/lovetree-4.0/issues/231
+- 1-A(두 벌 조사, #230) 결과 위에 1-B(셸 모듈 분리)·1.5단계(두 변형 한 벌)·2단계(기억책)3단계(보드·지도) 순서를 적었다. 기능·문구·디자인 변경 0.
