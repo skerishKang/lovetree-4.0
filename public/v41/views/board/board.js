@@ -8,7 +8,7 @@ const colors={rose:ltVar('--lt-thread-rose','#ff659f'),violet:ltVar('--lt-thread
 // 기억 보드는 실제 기록에서는 읽기 전용이다. 데이터에 쓰기 권한 필드가 없어(순간·연결 모두
 // kind/from/to/reason만 온다) 지금은 예시 판본 여부로만 가를 수 있다. 판단은 이 한 곳에서 한다.
 const canEditBoard=LTDEMO.example;
-let moments=LTDEMO.moments.map((m,i)=>({id:m.id,type:m.type==='memo'?'note':'photo',originalType:m.type==='memo'?'note':m.type,createdOrder:i+1,title:m.title,emotion:m.emotion,date:m.date,source:m.source||'예시 기록',mediaMetadata:m.mediaMetadata||null,memo:m.memo||m.whyNext||'',x:150+(i%8)*280,y:150+Math.floor(i/8)*400,rot:(i%3-1)*2,color:['rose','violet','cyan','amber'][i%4],asset:m.image,url:m.externalUrl||'',first:!!m.first}));
+let moments=LTDEMO.moments.map((m,i)=>({id:m.id,type:m.type==='memo'?'note':'photo',originalType:m.type==='memo'?'note':m.type,createdOrder:i+1,title:m.title,emotion:m.emotion,date:m.date,source:m.source||'예시 기록',mediaMetadata:m.mediaMetadata||null,memo:m.memo||m.whyNext||'',...LT58Model.cardPosition(i),color:['rose','violet','cyan','amber'][i%4],asset:m.image,url:m.externalUrl||'',first:!!m.first}));
 
 let connections=LTDEMO.edges.map((e,i)=>({id:'c'+i,kind:e.kind,a:e.from,b:e.to,why:e.kind==='related'?'관련 순간':e.reason||'부모·자식 연결',color:e.kind==='related'?'cyan':(canEditBoard?['rose','violet','cyan','amber'][Math.max(0,moments.findIndex(m=>m.id===e.from))%4]:'rose')}));
 
@@ -21,7 +21,7 @@ let view={x:0,y:0,z:.78}
 
 const $=s=>document.querySelector(s), cardLayer=$('#cardLayer'), threadLayer=$('#threadLayer'), world=$('#world'), viewport=$('#viewport');
 
-function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+const esc=LT58Model.escapeHTML;
 
 function cardHTML(m){let media='';
 if(m.url)media=LTMedia.markup(m.url,m.title,m.mediaMetadata,m.id);
@@ -39,10 +39,7 @@ const card=cardLayer.querySelector(`[data-id="${id}"]`);
 let w=card?.offsetWidth||242;
 return {x:m.x+w/2,y:m.y-13}}
 
-function pathD(c){const a=pinPoint(c.a),b=pinPoint(c.b),dx=b.x-a.x;
-const sag=Math.min(140,55+Math.abs(dx)*.08);
-const cy=Math.max(a.y,b.y)+sag;
-return `M ${a.x} ${a.y} C ${a.x+dx*.32} ${cy}, ${a.x+dx*.68} ${cy}, ${b.x} ${b.y}`}
+function pathD(c){const a=pinPoint(c.a),b=pinPoint(c.b);return LT58Model.threadPath(a,b).d}
 
 function renderThreads(){threadLayer.innerHTML=connections.map(c=>{let col=colors[c.color];return `<g class="threadGroup" data-cid="${c.id}"><path class="threadGlow" d="${pathD(c)}" stroke="${col}"/><path class="threadColor" d="${pathD(c)}" stroke="${col}"/><path class="threadCore" d="${pathD(c)}"/><path class="threadHit" d="${pathD(c)}"/></g>`}).join('');
 threadLayer.querySelectorAll('.threadGroup').forEach(g=>g.addEventListener('pointerdown',e=>{e.stopPropagation();showWhy(g.dataset.cid)}))}
@@ -54,7 +51,7 @@ world.style.transform=`translate(${view.x}px,${view.y}px) scale(${view.z})`;
 $('#zoomLabel').textContent=Math.round(view.z*100)+'%'}
 
 function fitAll(animated=true){let vw=viewport.clientWidth,vh=viewport.clientHeight;
-let z=Math.min((vw-40)/2400,(vh-40)/2200,.92);
+let z=LT58Model.fitZoom(vw,vh);
 view.z=z;
 view.x=(vw-2400*z)/2;
 view.y=(vh-2200*z)/2;
@@ -131,10 +128,10 @@ setTimeout(()=>{let b=$('#deleteConnBubble');if(b)b.onclick=deleteSelectedConnec
 clearTimeout(showWhy.t);
 showWhy.t=setTimeout(()=>$('#whyBubble').classList.remove('show'),5200)}
 
-function deleteSelectedConnection(){if(!canEditBoard){toast('읽기 전용에서는 연결을 변경할 수 없어요.');
+function deleteSelectedConnection(){const guard=LT58Model.editGuard(canEditBoard);if(guard.blocked){toast(guard.message);
 return}if(!selectedConn)return;
 snapshot();
-connections=connections.filter(c=>c.id!==selectedConn);
+connections=LT58Model.removeConnection(connections,selectedConn);
 selectedConn=null;
 renderThreads();
 $('#whyBubble').classList.remove('show');

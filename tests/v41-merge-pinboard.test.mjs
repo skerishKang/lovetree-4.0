@@ -30,12 +30,16 @@ test('예시 판본 판단은 한 곳에만 둔다(연결 지우기 동작·말�
   const branches = SERVER.match(/LTDEMO\.example/g) || [];
   assert.equal(branches.length, 1);
   assert.match(SERVER, /const canEditBoard=LTDEMO\.example;/);
-  assert.match(SERVER, /function deleteSelectedConnection\(\)\{if\(!canEditBoard\)\{/);
+  assert.match(SERVER, /function deleteSelectedConnection\(\)\{const guard=LT58Model\.editGuard\(canEditBoard\);if\(guard\.blocked\)\{/);
   assert.match(SERVER, /\$\{canEditBoard\?' <button id="deleteConnBubble">/);
   assert.match(SERVER, /'cyan':\(canEditBoard\?\['rose','violet','cyan','amber'\]\[Math\.max\(0,moments\.findIndex/);
   assert.doesNotMatch(SERVER, /source===['"]example['"]/);
 });
 
 test('읽기 전용에서는 연결 변경 안내만 하고 지우지 않는다', () => {
-  assert.match(SERVER, /toast\('읽기 전용에서는 연결을 변경할 수 없어요\.'\)/);
+  // 안내 문구는 계산 한 벌(board-model.js)이 갖고, 화면은 그 문구를 그대로 띄운다.
+  const MODEL = fs.readFileSync(new URL('../public/v41/views/board/board-model.js', import.meta.url), 'utf8');
+  assert.match(MODEL, /'읽기 전용에서는 연결을 변경할 수 없어요\.'/);
+  assert.match(SERVER, /if\(guard\.blocked\)\{toast\(guard\.message\);/);
+  assert.match(SERVER, /connections=LT58Model\.removeConnection\(connections,selectedConn\)/);
 });
