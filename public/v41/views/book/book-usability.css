@@ -110,3 +110,8 @@ html[data-v41-screen=book] .detail-panel .close{width:44px;height:44px;border:0;
  html[data-v41-screen=book] .mobile-page .note-piece{min-height:0}
  html[data-v41-screen=book] .detail-panel{left:8px;right:8px;width:auto;bottom:8px;max-height:62%}
 }
+
+/* A closed mobile detail panel must not cover the page navigation. */
+@media(max-width:430px){
+ html[data-v41-screen=book] .detail-panel[hidden]{display:none}
+}
