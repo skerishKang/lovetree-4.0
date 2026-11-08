@@ -6,17 +6,17 @@ import {readFileSync} from 'node:fs';
 const read = path => readFileSync(new URL('../' + path, import.meta.url), 'utf8');
 
 const TARGETS = {
-  'public/v41/design/views/track59-sketchbook.html': {
+  'public/v41/views/track59-sketchbook.html': {
     '#prevBtn': [34, 30], '#nextBtn': [34, 30], '#detailClose': [34, 34], '#viewerClose': [34, 34],
     '#openViewerBtn': [85, 37], '#detailIndexBtn': [113, 37], '#linkCancel': [47, 32],
     '#linkSave': [123, 32], '#branchClose': [54, 37],
   },
-  'public/v41/design/views/track58-pinboard.html': {
+  'public/v41/views/track58-pinboard.html': {
     '#minusBtn': [35, 38], '#plusBtn': [41, 38], '#resetBtn': [99, 38], '#openMoment': [63, 34],
     '#nextMoment': [85, 34], '#cinemaFromMoment': [125, 34], '#startPathHere': [116, 34],
     '#pathModeBtn': [184, 34], '#toolCinema': [184, 34], '#toolFit': [184, 34], '#detailClose': [23, 23],
   },
-  'public/v41/design/views/track56-network.html': {
+  'public/v41/views/track56-network.html': {
     '#focusFirst': [194, 35], '#zoomIn': [94, 35], '#zoomOut': [94, 35], '#resetFocus': [194, 35],
     '#openMoment': [140, 43], '#detailClose': [32, 32],
   },
@@ -52,7 +52,7 @@ for (const [file, targets] of Object.entries(TARGETS)) {
 }
 
 test('기억책 감정 선택은 최소 높이 44px를 직접 보장한다', () => {
-  const css = styleBlock(read('public/v41/design/views/track59-sketchbook.html'));
+  const css = styleBlock(read('public/v41/views/track59-sketchbook.html'));
   const rule = rules(css).find(item => item.sel.includes('#linkEmotion'));
   assert.ok(rule && /min-height:44px/.test(rule.body), '#linkEmotion은 min-height:44px');
 });

@@ -7,11 +7,10 @@ import fs from 'node:fs';
 
 const read = (file) => fs.readFileSync(new URL(`../public/v41/${file}`, import.meta.url), 'utf8');
 const SERVER = read('views/src064-orbit.html');
-const EXAMPLE = read('design/views/src064-orbit.html');
 const RUNTIME = read('runtime.js');
 
-test('첫 화면 두 벌은 바이트 단위로 같다', () => {
-  assert.equal(SERVER, EXAMPLE);
+test('design/views/에 화면 사본이 없다(한 벌만 남았다)', () => {
+  assert.equal(fs.existsSync(new URL(`../public/v41/design/views/src064-orbit.html`, import.meta.url)), false);
 });
 
 test('합친 첫 화면은 런타임 한 벌만 부른다(예시 전용 shared.js 없음)', () => {

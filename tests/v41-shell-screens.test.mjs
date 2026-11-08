@@ -44,10 +44,10 @@ test('show()는 화면 파일 이름을 받아 그 화면의 iframe 경로로 �
       onFrameReady() {}
     });
 
-    // 예시 모드는 design/views/ 판본을 연다.
+    // #231 1.5단계 ⑥: 예시 모드도 실제 기록과 같은 /v41/views/ 한 벌을 연다.
     screens.show('track32-bookshelf.html');
     assert.equal(current, 'track32-bookshelf.html', '화면 이름을 그대로 받는다');
-    assert.equal(replaced.at(-1), 'https://lovetree-4-0.pages.dev/v41/design/views/track32-bookshelf.html');
+    assert.equal(replaced.at(-1), 'https://lovetree-4-0.pages.dev/v41/views/track32-bookshelf.html');
 
     // 목록에 없는 파일은 화면을 바꾸지 않는다.
     const before = replaced.length;

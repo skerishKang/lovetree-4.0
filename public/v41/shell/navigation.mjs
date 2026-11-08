@@ -1,6 +1,6 @@
 // 셸의 화면 목록·경로 선택·테마 대상 계산 (#231 1-B ①).
 // 2026-11-08 리팩터링: 동작·겉모습 변경 0. `shell.mjs:214`에 있던 경로 선택을 이 파일 하나로 모은다.
-// 1.5단계에서 안쪽 화면 두 벌(design/views/·views/)을 한 벌로 합칠 때 고칠 곳도 여기 하나다.
+// 1.5단계에서 안쪽 화면 두 벌(design/views/·views/)을 한 벌로 합쳤다(⑥). 화면 경로를 만드는 곳은 여기 하나뿐이다.
 // 이름은 그대로 둔다(시험·postdeploy가 화면 파일 이름으로 판정한다).
 
 export const screens = [
@@ -25,9 +25,9 @@ export function themedViewFor(file) {
   return 'inner';
 }
 
-// 안쪽 화면 경로: 예시 감상은 design/views/, 실제 기록은 views/ 판본을 쓴다.
+// 안쪽 화면 경로: 예시 감상도 실제 기록도 같은 한 벌(/v41/views/)을 쓴다(#231 1.5단계 ⑥).
+// 두 벌을 한 벌로 합쳤으므로 source에 따라 경로를 가르지 않는다.
 export function screenUrl(file, source, origin) {
-  const inner = source === 'example' ? 'design/views/' : 'views/';
-  const path = file === 'src064-orbit.html' ? 'home.html' : inner + file;
+  const path = file === 'src064-orbit.html' ? 'home.html' : 'views/' + file;
   return new URL('/v41/' + path, origin).href;
 }
