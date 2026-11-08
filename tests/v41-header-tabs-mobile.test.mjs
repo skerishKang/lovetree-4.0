@@ -84,23 +84,8 @@ test('데스크톱에는 스크롤·스냅·페이드를 걸지 않는다', () =
   assert.doesNotMatch(desktop, /nav\{[^}]*overflow-x:auto/, '데스크톱 nav 는 스크롤이 아니다');
 });
 
-test('화면을 바꿀 때 현재 탭을 가운데로 보여 준다', () => {
-  // #231 1-B②-2: 탭 드러내기는 shell/header.mjs로 옮겼다.
-  assert.match(header, /function revealCurrentTab\(\)/, 'revealCurrentTab 함수가 있어야 한다');
-  assert.match(header, /scrollIntoView\(\{inline:'center'/, 'inline:center 로 당긴다');
-  assert.match(header, /prefers-reduced-motion: reduce/, '동작 줄이기 설정을 존중한다');
-  // flowNavigation 이 화면 전환마다 현재 탭을 드러내야 한다.
-  const flow = header.slice(header.indexOf('function flowNavigation()'), header.indexOf('function updateNavFade()'));
-  assert.match(flow, /revealCurrentTab\(\)/, 'flowNavigation 이 revealCurrentTab 을 부른다');
-});
-
-test('페이드는 스크롤 위치에 따라 켜고 끈다', () => {
-  assert.match(header, /function updateNavFade\(\)/, 'updateNavFade 함수');
-  assert.match(header, /classList\.toggle\('fade-start'/, 'fade-start 토글');
-  assert.match(header, /classList\.toggle\('fade-end'/, 'fade-end 토글');
-  assert.match(header, /addEventListener\('scroll',updateNavFade/, '스크롤에 반응');
-  assert.match(header, /addEventListener\('resize'/, '폭 변경에 반응');
-});
+// 탭 드러내기·페이드 시험은 2026-11-09에 소스 글자에서 함수 직접 호출로 옮겼다.
+// → tests/v41-header-flow.test.mjs (가운데로 드러내기·동작 줄이기·넓은 화면·페이드 4조합·스크롤 반응)
 
 test('탭 7개가 헤더에 있다', () => {
   const nav = html.slice(html.indexOf('<nav aria-label="화면 선택">'), html.indexOf('</nav>'));
