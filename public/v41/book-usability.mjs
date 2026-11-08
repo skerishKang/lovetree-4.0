@@ -109,3 +109,22 @@ export function detailPlacement(rightEmpty) {
 export function nextMomentMessage(parentId) {
   return { type: 'lt41-write', mode: 'add', parentId: String(parentId ?? '') };
 }
+
+/* ── 글꼴(대표 결정 2026-11-08) ─────────────────────────────────────────────
+   밤(기본) = 기억책 큰 제목까지 전부 Pretendard(--lt-ui). 마루부리는 쓰지 않는다.
+   정원(html[data-lt-theme=garden]) = 큰 제목만 마루부리(한글 글리프 포함). 나머지는 Pretendard. */
+export const BOOK_UI_FONT = 'var(--lt-ui)';
+export const BOOK_TITLE_FONT = Object.freeze({
+  night: 'var(--lt-ui)',
+  garden: "MaruBuri,'Noto Serif CJK KR',Batang,serif",
+});
+
+/** 밤/정원 이름만 받는다. 모르는 값은 밤(기본)이다. */
+export function bookTheme(theme) {
+  return String(theme ?? '').trim().toLowerCase() === 'garden' ? 'garden' : 'night';
+}
+
+/** 기억책 큰 제목에 쓸 글꼴. 밤은 Pretendard, 정원은 마루부리. */
+export function bookTitleFont(theme) {
+  return BOOK_TITLE_FONT[bookTheme(theme)];
+}

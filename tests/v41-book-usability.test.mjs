@@ -12,6 +12,7 @@ const {
   isUserTitle, displayTitle, withoutAutoTitle, titleParts, videoTitle,
   embedUrl, connectionLine, NEXT_PAGE_COPY, NEXT_PAGE_ACTION,
   LENS_KEY, readLens, writeLens, detailPlacement, nextMomentMessage,
+  BOOK_UI_FONT, BOOK_TITLE_FONT, bookTheme, bookTitleFont,
 } = await import('../public/v41/book-usability.mjs');
 
 test('1. YouTube는 그 자리에서: nocookie embed, 시작 시점 유지, referrerpolicy', () => {
@@ -73,6 +74,7 @@ test('4. 오른쪽 빈 페이지는 다음 순간 안내 + 현재 순간을 부�
     assert.ok(src.includes('nextMomentMessage('), path + ': 부모 순간을 함께 보낸다');
     assert.ok(src.includes("type:'lt41-select'"), path + ': 편집기가 이 순간을 기준으로 열린다');
   }
+  for (const path of VIEWS) assert.ok(!html[path].includes('login-start'), path + ': 사라진 안내 창 요소를 찾지 않는다');
   const shell = read('public/v41/shell.mjs');
   assert.ok(/function openEditor\(requestedMode,parentId=''\)/.test(shell), '셸: 편집기가 부모를 받는다');
   assert.ok(/setEditorMode\(mode,parentId\)/.test(shell), '셸: 부모를 그대로 넘긴다');
@@ -121,6 +123,34 @@ test('7. 글꼴: 본문·날짜·단추는 Pretendard, 큰 제목 한 줄만 마
   assert.ok(identity.includes("--lt-ui:'Pretendard Variable',Pretendard"), 'UI 글꼴 토큰');
   assert.ok(identity.includes('/fonts/MaruBuri-Regular.woff2'), '마루부리는 저장소 안 파일을 쓴다');
   assert.ok(read('public/v41/shell.mjs').length > 0 && read('docs/PRODUCT.md').includes('MaruBuri'), 'PRODUCT.md 에 글꼴 조건 기록');
+});
+
+test('7-1. 밤 제목 글꼴 = Pretendard, 정원 제목 글꼴 = 마루부리(대표 결정 2026-11-08)', () => {
+  assert.equal(BOOK_UI_FONT, 'var(--lt-ui)');
+  assert.equal(bookTheme(undefined), 'night');
+  assert.equal(bookTheme('garden'), 'garden');
+  assert.equal(bookTheme('GARDEN'), 'garden');
+  assert.equal(bookTitleFont('night'), 'var(--lt-ui)', '밤은 큰 제목까지 Pretendard');
+  assert.equal(bookTitleFont(), 'var(--lt-ui)', '값이 없으면 밤이다');
+  assert.ok(bookTitleFont('garden').startsWith('MaruBuri'), '정원 큰 제목은 마루부리');
+  assert.ok(!bookTitleFont('night').includes('MaruBuri'), '밤에는 마루부리를 쓰지 않는다');
+  assert.equal(BOOK_TITLE_FONT.night, BOOK_UI_FONT);
+
+  for (const path of VIEWS) {
+    const src = html[path];
+    const night = src.match(/html\[data-v41-screen=book\]\{--book-serif:([^}]*)\}/);
+    assert.ok(night, path + ': 밤(기본) 글꼴 규칙');
+    assert.ok(night[1].includes('--lt-reading:var(--lt-ui)'), path + ': 밤은 큰 제목까지 Pretendard');
+    assert.ok(!night[1].includes('MaruBuri'), path + ': 밤 규칙에 마루부리가 없다');
+    const garden = src.match(/html\[data-v41-screen=book\]\[data-lt-theme=garden\]\{--lt-reading:([^}]*)\}/);
+    assert.ok(garden, path + ': 정원 글꼴 규칙');
+    assert.ok(garden[1].startsWith('MaruBuri'), path + ': 정원 큰 제목은 마루부리');
+    assert.ok(/html\[data-v41-screen=book\]\[data-lt-theme=garden\] \.moment-title h3[^{]*\{[^}]*MaruBuri/.test(src), path + ': 정원 큰 제목 줄에 마루부리');
+  }
+  // 두 벌과 생성기가 같은 값을 쓴다.
+  const apply = read('scripts/apply-book-usability.mjs');
+  assert.ok(apply.includes("bookTitleFont('night')"), '적용 스크립트가 규칙을 가져다 쓴다');
+  assert.ok(apply.includes("bookTitleFont('garden')"), '적용 스크립트가 정원 규칙도 가져다 쓴다');
 });
 
 test('8. 책 가운데 머리 표시(01 · 날짜)를 지우고, 날짜는 정보 줄에만 둔다', () => {

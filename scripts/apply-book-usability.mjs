@@ -6,6 +6,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { BOOK_UI_FONT, bookTitleFont } from '../public/v41/book-usability.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..');
@@ -23,8 +24,9 @@ function styleBlock() {
    밤/정원 모두 같은 규칙을 쓰고, 밤의 강조는 금테, 종이 위 글자는 --lt-rose-ink(--lt-gold-ink)다. */
 html[data-v41-screen=book] .moment{cursor:pointer}
 html[data-v41-screen=book] .moment:hover{filter:brightness(1.02)}
-/* 7. 글꼴: 본문·날짜·버튼·안내는 Pretendard(--lt-ui). 마루부리(--book-serif)는 순간 큰 제목 한 줄에만 남긴다. */
-html[data-v41-screen=book]{--book-serif:var(--lt-ui);--hand:var(--lt-ui)}
+/* 7. 글꼴(대표 결정 2026-11-08): 밤은 기억책 큰 제목까지 전부 Pretendard. 마루부리는 쓰지 않는다.
+   정원(html[data-lt-theme=garden])만 큰 제목에 마루부리(한글 포함)를 쓴다. 본문·날짜·단추·안내는 두 테마 모두 Pretendard. */
+html[data-v41-screen=book]{--book-serif:${BOOK_UI_FONT};--hand:${BOOK_UI_FONT};--lt-reading:${bookTitleFont('night')}}
 html[data-v41-screen=book] .moment-title h3,html[data-v41-screen=book] .note-piece h2,html[data-v41-screen=book] .clipping h2,
 html[data-v41-screen=book] .letter h2,html[data-v41-screen=book] .archive-piece h2,html[data-v41-screen=book] .viewer-card h2,
 html[data-v41-screen=book] .detail h2,html[data-v41-screen=book] .folio,html[data-v41-screen=book] .photo-caption{font-family:var(--lt-reading)!important}
@@ -34,9 +36,10 @@ html[data-v41-screen=book] .connection-note p,html[data-v41-screen=book] .link-p
 html[data-v41-screen=book] .link-preview h3,html[data-v41-screen=book] .archive-item b,html[data-v41-screen=book] .meta-why{font-family:var(--lt-ui)!important}
 /* 정원 테마의 한글 제목: Gowun Batang 라틴 서브셋에는 한글 글리프가 없어 다른 글꼴로 그려졌다.
    종이(책장)는 원본 종이를 그대로 두고, 어댑터가 새로 그리는 면(안내·상세·재생 단추)만 정원 토큰을 쓴다. */
-html[data-v41-screen=book][data-lt-theme=garden]{--lt-reading:MaruBuri,'Noto Serif CJK KR',Batang,serif}
+html[data-v41-screen=book][data-lt-theme=garden]{--lt-reading:${bookTitleFont('garden')}}
 html[data-v41-screen=book][data-lt-theme=garden] .moment-title h3,html[data-v41-screen=book][data-lt-theme=garden] .note-piece h2,
-html[data-v41-screen=book][data-lt-theme=garden] .clipping h2,html[data-v41-screen=book][data-lt-theme=garden] .letter h2{font-family:MaruBuri,var(--book-serif)!important}
+html[data-v41-screen=book][data-lt-theme=garden] .clipping h2,html[data-v41-screen=book][data-lt-theme=garden] .letter h2,
+html[data-v41-screen=book][data-lt-theme=garden] .archive-piece h2{font-family:${bookTitleFont('garden')}!important}
 html[data-v41-screen=book] .next-page button{background:var(--lt-gold-ink);border-color:var(--lt-gold-ink);color:var(--lt-paper)}
 html[data-v41-screen=book][data-lt-theme=garden] .ambient{background:linear-gradient(135deg,var(--lt-stage),var(--lt-stage-2) 56%,var(--lt-garden-edge))}
 html[data-v41-screen=book][data-lt-theme=garden] .next-page button{background:var(--lt-primary);border-color:var(--lt-primary);color:var(--lt-primary-ink)}
@@ -306,9 +309,22 @@ window.__BOOK_USABILITY__={titleParts,closeDetail,placeDetail,nextMomentOf,paint
 function patch(html, prefix) {
   const script = SCRIPT.replaceAll('PATH_PREFIX', prefix);
   let out = html;
-  if (!out.includes(STYLE_TAG)) out = out.replace('</head>', () => styleBlock() + '</head>');
+  // 스타일은 이미 있으면 같은 자리에서 새 내용으로 바꾼다(규칙을 고쳐도 두 번 실행으로 맞출 수 있다).
+  if (out.includes(STYLE_TAG)) {
+    const start = out.indexOf(STYLE_TAG);
+    const end = out.indexOf('</style>', start);
+    out = out.slice(0, start) + styleBlock() + out.slice(end + '</style>'.length);
+  } else {
+    out = out.replace('</head>', () => styleBlock() + '</head>');
+  }
   if (!out.includes(PANEL_TAG)) out = out.replace('<section class="detail" id="detail">', () => PANEL_TAG + '<section class="detail" id="detail">');
-  if (!out.includes('book-usability.mjs')) out = out.replace('</body>', () => script + '\n</body>');
+  if (out.includes('book-usability.mjs')) {
+    const start = out.indexOf('<script type="module">');
+    const end = out.indexOf('</script>', start);
+    out = out.slice(0, start) + script + out.slice(end + '</script>'.length);
+  } else {
+    out = out.replace('</body>', () => script + '\n</body>');
+  }
   return out;
 }
 
