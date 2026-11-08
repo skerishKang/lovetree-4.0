@@ -8,6 +8,7 @@ const navigation = read('public/v41/shell/navigation.mjs');
 const themeModule = read('public/v41/shell/theme.mjs');
 const screenModule = read('public/v41/shell/screens.mjs');
 const html = read('public/v41/views/first-journey.html');
+const page = read('public/v41/views/journey/journey-page.mjs');
 const shell = read('public/v41/shell.mjs');
 const css = read('public/v41/identity.css');
 
@@ -114,7 +115,8 @@ test('정원 첫 여정 글자 대비는 4.5:1 이상이다', () => {
 
 test('단계 구성·뒤로가기 규칙은 정원에서도 그대로다', () => {
   for (const label of ['트리 이름', '첫 순간', '마음 남기기', '다음 영상 잇기', '성장']) assert.match(html, new RegExp(label));
-  assert.match(html, /journeyRouteHash/);
-  assert.match(html, /addEventListener\('popstate'/);
+  // 2026-11-09: 단계·뒤로가기 규칙은 journey-page.mjs(옮긴 모듈)에 그대로 있다.
+  assert.match(page, /journeyRouteHash/);
+  assert.match(page, /addEventListener\('popstate'/);
   assert.match(html, /@keyframes lt-bloom/, '피어남 연출은 그대로다');
 });

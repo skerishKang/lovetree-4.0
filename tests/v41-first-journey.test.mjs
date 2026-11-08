@@ -165,19 +165,24 @@ test('복원 값은 길이·단계·저장 id만 안전하게 되살린다', () 
 
 test('첫 여정 화면은 --lt-* 토큰만 쓰고 새 hex·단어 중간 줄바꿈이 없다', () => {
   const html = readFileSync(new URL('../public/v41/views/first-journey.html', import.meta.url), 'utf8');
-  assert.match(html, /first-journey\.mjs/);
+  // 2026-11-09: 인라인 스크립트는 public/v41/views/journey/journey-page.mjs로 옮겼다(화면은 연결만).
+  const page = readFileSync(new URL('../public/v41/views/journey/journey-page.mjs', import.meta.url), 'utf8');
+  assert.match(html, /journey-page\.mjs/);
+  assert.match(page, /first-journey\.mjs/);
   assert.match(html, /identity\.css/);
   assert.match(html, /Pretendard|--lt-ui/, '글꼴은 공통 Pretendard를 쓴다');
   assert.match(html, /word-break:keep-all/);
   for (const token of ['--lt-stage', '--lt-pearl', '--lt-gold-line', '--lt-rose']) assert.match(html, new RegExp(token));
   assert.equal(/#[0-9a-fA-F]{3,8}\b/.test(html), false, '새 hex 색을 쓰지 않는다');
   assert.equal(/<header[^>]*class="(topbar|brand)"|MEMORY ORBIT/.test(html), false, '화면 안에 자체 머리글·워드마크를 두지 않는다');
-  for (const label of ['트리 이름', '첫 순간', '마음 남기기', '다음 영상 잇기', '성장']) assert.match(html, new RegExp(label));
-  assert.match(html, /피어났어요/);
-  assert.match(html, /이어졌어요/);
-  assert.match(html, /discardFinishedJourneyDraft\(storage\)/, '새 여정은 완료된 이전 임시값을 버린다');
-  assert.match(html, /state\.completed = true;/, '완료 플래그를 세운다');
-  assert.match(html, /function saveDraftBeforeLeave\(\)/, 'pagehide·visibilitychange를 같은 완료 가드로 묶는다');
+  // 문구·완료 규칙은 마크업(html)과 옮긴 페이지 모듈(page)을 합쳐서 본다(옮겨도 규칙은 그대로).
+  const withPage = html + page;
+  for (const label of ['트리 이름', '첫 순간', '마음 남기기', '다음 영상 잇기', '성장']) assert.match(withPage, new RegExp(label));
+  assert.match(withPage, /피어났어요/);
+  assert.match(withPage, /이어졌어요/);
+  assert.match(page, /discardFinishedJourneyDraft\(storage\)/, '새 여정은 완료된 이전 임시값을 버린다');
+  assert.match(page, /state\.completed = true;/, '완료 플래그를 세운다');
+  assert.match(page, /function saveDraftBeforeLeave\(\)/, 'pagehide·visibilitychange를 같은 완료 가드로 묶는다');
   const style = html.slice(html.indexOf('<style>'), html.indexOf('</style>'));
   assert.equal(/(?<!text-)transform\s*:/.test(style), false, '전환은 transform이 아니라 페이드다');
 });
