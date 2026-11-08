@@ -1,3 +1,6 @@
+
+- **원칙 8 자동화(2026-11-08)**: PR마다 `.github/workflows/preview-check.yml`이 Cloudflare Pages 미리보기 주소를 찾아 `tools/postdeploy`(로그아웃)를 돌리고, `tools/postdeploy/preview-gate.mjs`가 판정한다(visual·페이지 오류 0, 미리보기 Functions 503만 예외). 미리보기 배포가 없으면 실패가 아니라 건너뜀. 레인은 체크 요약만 확인한다.
+
 ## 2026-11-08 — 내 책장을 첫 화면과 맞추기: 밤 테마·책 카드 정보·트리 이름 접미사·예시 그림(#212, 컴1, ai/lt-shelf-unify-261108)
 
 이슈 #212의 1~4번을 **내 책장 화면과 트리 생성 경로** 범위에서 처리했다.

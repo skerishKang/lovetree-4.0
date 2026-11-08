@@ -5,6 +5,10 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
+// 러너에는 Google Chrome이 없을 수 있다. LOVETREE_POSTDEPLOY_BROWSER=chromium 이면 함께 설치한
+// Playwright chromium을 쓴다(CI 미리보기 검사).
+const BROWSER_CHANNEL = process.env.LOVETREE_POSTDEPLOY_BROWSER === 'chromium' ? undefined : 'chrome';
+
 const TOOL_VERSION = '0.1.2';
 // 보기 메뉴의 기대 항목은 제품 함수에서 계산한다(로그아웃 5 · 로그인 7).
 // 도구를 저장소 밖에서 단독 실행하면 파일이 없을 수 있으므로 실패하면 숫자 기대값으로 돌아간다.
@@ -179,7 +183,7 @@ async function launch(opts) {
   }
   await mkdir(opts.profile, { recursive: true });
   const context = await chromium.launchPersistentContext(opts.profile, {
-    channel: 'chrome',
+    channel: BROWSER_CHANNEL,
     headless: opts.headless,
     viewport: { width: 1440, height: 900 },
     args: ['--disable-blink-features=AutomationControlled', '--no-first-run', '--no-default-browser-check']
@@ -1127,7 +1131,7 @@ async function runAuthFlows(target, opts, stamp) {
     return { createdTrees: 0 };
   }
   const browser = await chromium.launch({
-    channel: 'chrome',
+    channel: BROWSER_CHANNEL,
     headless: opts.headless,
     args: ['--disable-blink-features=AutomationControlled', '--no-first-run', '--no-default-browser-check']
   });
@@ -1496,7 +1500,7 @@ async function cleanupAuthFlows(target, opts, stamp) {
   let openError = '';
   try {
     context = await chromium.launchPersistentContext(cleanupProfile, {
-      channel: 'chrome',
+      channel: BROWSER_CHANNEL,
       headless: true,
       viewport: { width: 1440, height: 900 },
       args: ['--disable-blink-features=AutomationControlled', '--no-first-run', '--no-default-browser-check']
