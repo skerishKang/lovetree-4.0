@@ -11,6 +11,9 @@ const cookies = request => Object.fromEntries((request.headers.get('cookie') || 
 const attrs = 'Secure; HttpOnly; SameSite=Lax';
 const json = (status, error) => new Response(JSON.stringify({ error }), { status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' } });
 const validNext = value => typeof value === 'string' && /^\/[A-Za-z0-9_./-]*$/.test(value) && !value.startsWith('//') ? value : '/';
+// 공용 로그인은 night|garden만 받는다. 그 외 값·없음·중복은 붙이지 않고 공용 쪽 기본(night)을 따른다.
+const LOGIN_THEMES = ['night', 'garden'];
+const validTheme = values => values.length === 1 && LOGIN_THEMES.includes(values[0]) ? values[0] : '';
 function callbackFor(request, env) {
   const configured = env.LOVETREE_AUTH_CALLBACK_URI || CALLBACKS.find(value => new URL(value).origin === new URL(request.url).origin);
   const url = new URL(configured);
@@ -69,6 +72,8 @@ export function createSharedPagesAuth({ fetcher = fetch, now = () => Math.floor(
         const challenge = b64(await crypto.subtle.digest('SHA-256', enc.encode(verifier)));
         const target = new URL(`${AUTH}/login`);
         for (const [k,v] of Object.entries({ client_id: CLIENT, redirect_uri: callback, state, code_challenge: challenge, code_challenge_method: 'S256' })) target.searchParams.set(k,v);
+        const theme = validTheme(url.searchParams.getAll('lt_theme'));
+        if (theme) target.searchParams.set('lt_theme', theme);
         const sealed = await seal(env, { state, verifier, next, callback, exp: current + 600 });
         return new Response(null, { status: 302, headers: { location: target.href, 'cache-control': 'no-store', 'set-cookie': `lovetree_auth_state=${sealed}; Path=/auth; Max-Age=600; ${attrs}` } });
       }

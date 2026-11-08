@@ -202,13 +202,6 @@ body.garden h1 {
   font-weight: 700;
   letter-spacing: .01em;
 }
-.lead {
-  margin: 10px 0 24px;
-  color: var(--lt-muted);
-  font-size: 13px;
-  line-height: 1.75;
-  overflow-wrap: anywhere;
-}
 
 .btn {
   display: flex;
@@ -346,10 +339,14 @@ body.garden .alt-link { color: var(--lt-ink); }
   bottom: 18px;
   left: 50%;
   transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100% - 48px);
   color: var(--lt-muted);
   font-size: 11px;
+  line-height: 1.6;
   letter-spacing: .04em;
-  white-space: nowrap;
+  text-align: center;
+  overflow-wrap: anywhere;
 }
 
 @media (max-width: 680px) {
@@ -360,7 +357,6 @@ body.garden .alt-link { color: var(--lt-ink); }
   .o2 { right: -28px; top: 9%; }
   .o3 { right: 8%; bottom: 2%; width: 104px; height: 137px; }
   .auth-card { width: 100%; padding: 25px 22px; border-radius: 18px; }
-  .lead { margin-bottom: 18px; }
-  .foot { position: static; transform: none; margin-top: 20px; text-align: center; white-space: normal; }
+  .foot { position: static; transform: none; width: auto; max-width: none; margin-top: 20px; text-align: center; }
   .divider { margin-top: 16px; }
 }
