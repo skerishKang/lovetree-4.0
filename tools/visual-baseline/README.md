@@ -6,7 +6,7 @@ node tools/visual-baseline/visual-baseline.mjs compare --before /mnt/e/base-befo
 ```
 
 - 기준치: 기본 0.1%, **기억 보드(board)만 0.3%** — 실·핀 선을 매 로드마다 미세하게 다시 그려 0.1%를 넘는 장이 나온다(정리는 리팩터링 3단계 예정).
-- `--base`(기본 `https://lovetree-4-0.pages.dev/v41/`)로 로컬 미리보기(`http://127.0.0.1:5173/v41/`)도 찍는다. `--threshold`(기본 0.1%)를 넘으면 종료 코드 1.
+- `--base`(기본 `https://lovetree-4-0.pages.dev/v41/`)로 로컬 미리보기(`http://127.0.0.1:5173/v41/index.html` — vite는 `/v41/`만으로는 셸을 주지 않음)도 찍는다. `--threshold`(기본 0.1%)를 넘으면 종료 코드 1.
 - 같은 조건에서 흔들리지 않게: 테마 고정·`Math.random` 고정 씨앗·CSS 애니메이션 일시정지·rAF 중단·토스트 숨김 + 두 번 연속 같은 그림일 때만 저장.
 - 화면 도착 판정은 **보이는(#view·#view-next 중 hidden 아님) iframe의 주소**로 한다. Pages는 `.html` 없이 응답하므로 기대 이름도 확장자 없이 맞춘다. 셸 문서의 rAF·타이머는 건드리지 않고, 고정 장치는 화면이 다 열린 뒤 iframe 안쪽에만 건다(셸 화면 교체가 rAF 2회를 기다리기 때문).
 - 기준선은 **5화면(첫 화면·내 책장·기억책·기억 보드·관계 지도) × 1440·390 × 밤·정원 = 20장 + 헤더 계정 자리 4장 = 24장**이다.

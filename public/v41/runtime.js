@@ -2,7 +2,9 @@
   const context = parent.LT41;
   if (!context?.tree) throw new Error('트리를 먼저 선택하세요.');
   const tree = context.tree;
-  const moments = tree.moments.map(m => {
+  // 예시 기록은 셸이 만들어 둔 demoData를 그대로 쓰고(design/shared.js와 같은 모양), 실제 기록은 서버 트리에서 만든다.
+  const demo = tree.demoData;
+  const moments = demo ? demo.moments.map(m => ({...m})) : tree.moments.map(m => {
     const media=window.LTMedia?.describe(m.url||'');
     const outgoing = tree.edges.filter(e => e.kind === 'parent' && e.from === m.id);
     return {id:m.id,title:m.title,date:m.date,emotion:m.emotion,memo:m.note,mediaMetadata:m.mediaMetadata||null,
@@ -18,7 +20,7 @@
       new MutationObserver(update).observe(document.getElementById('detailTitle'),{childList:true,subtree:true});update();
     }
   });
-  window.LTDEMO = {title:tree.title,moments,edges:tree.edges,
+  window.LTDEMO = {title:tree.title,moments,edges:tree.edges,example:!!demo,
     get:()=>context.momentId,
     select:id=>{if(moments.some(m=>m.id===id)){context.momentId=id;parent.postMessage({type:'lt-selection',id},location.origin)}}};
 })();

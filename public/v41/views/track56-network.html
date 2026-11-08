@@ -52,7 +52,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 }
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition-duration:.01ms!important}}
 </style>
-<style>#followPath{display:none!important}</style><link rel="stylesheet" href="../identity.css"></head>
+<style>#followPath{display:none!important}</style><link rel="stylesheet" href="/v41/identity.css"></head>
 <body>
 <div class="app">
  <canvas id="stage" aria-label="세로형 순간 관계 지도 전체 보기"></canvas><div class="paper-noise"></div>
@@ -65,7 +65,7 @@ button{font:inherit;color:inherit;cursor:pointer}
  <div class="branch-chooser" id="branchChooser"><h3>여기서 경로가 갈라집니다</h3><p>지금까지 온 길은 유지됩니다. 어느 감정 경로로 이어갈까요?</p><div class="branch-options" id="branchOptions"></div></div>
  <div class="mobile-ribbon" id="mobileRibbon"></div><div class="toast" id="toast"></div>
 </div>
-<script src="../labels.js"></script><script src="../mobile-moments.js"></script><script src="../media-preview.js"></script><script src="../runtime.js"></script>
+<script src="/v41/labels.js"></script><script src="/v41/mobile-moments.js"></script><script src="/v41/media-preview.js"></script><script src="/v41/runtime.js"></script>
 <script>
 (()=>{
 let mobilePicker=null;
@@ -168,7 +168,7 @@ function hideRouteStatus(){if(state.mode==='OVERVIEW')$('routeStatus').classList
 function toast(t){const el=$('toast');el.textContent=t;el.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>el.classList.remove('show'),2300)}
 function cancelPlayback(resetMode=true){state.play=null;state.animEdge=null;state.animT=0;state.trail.clear();state.preview.clear();state.branchPause=false;$('branchChooser').classList.remove('open');if(resetMode&&state.mode==='PATH_PLAYBACK')setMode(state.selected?'MOMENT_FOCUS':'CLUSTER_PATH_OVERVIEW')}
 function routeEdges(pid){const p=pathById[pid];if(!p)return[];const out=[];for(let i=0;i<p.nodes.length-1;i++){const e=edges.find(e=>e.a===p.nodes[i]&&e.b===p.nodes[i+1]&&e.pathId===pid);if(e)out.push(e)}return out}
-function startPlayback(){const n=state.selected;if(!n){toast('먼저 순간을 선택하세요.');return}toast('실제 연결은 상단 부모·자식 및 관련 순간에서 선택하세요.');return;let p=pathSequenceForNode(n);if(!p||p.nodes.length<2){toast('이 순간는 맥락 노드입니다. 주요 경로 순간를 선택하세요.');return}cancelPlayback(false);const start=Math.max(0,p.nodes.indexOf(n.id));const seq=p.nodes.slice(start);if(seq.length<4&&start>0){p=pathById[p.id];state.selected=byId[p.nodes[0]]}state.play={active:true,pathId:p.id,seq:p.nodes.slice(Math.max(0,p.nodes.indexOf(state.selected.id))),index:0,currentId:state.selected.id};if(state.play.seq.length<4)state.play.seq=p.nodes.slice(0);state.play.currentId=state.play.seq[0];state.mobileCluster=p.cluster;setMode('PATH_PLAYBACK');state.preview=new Set(routeEdges(p.id).map(e=>e.id));showRouteStatus(`경로 재생 · ${p.label}`,`${state.play.seq.length}개 순간 sequence · 지나온 길 / 현재 / 앞으로 갈 길을 함께 유지합니다.`);$('detail').classList.remove('open');nextPlaybackEdge();}
+function startPlayback(){const n=state.selected;if(!n){toast('먼저 순간을 선택하세요.');return}if(!LTDEMO.example){toast('실제 연결은 상단 부모·자식 및 관련 순간에서 선택하세요.');return}let p=pathSequenceForNode(n);if(!p||p.nodes.length<2){toast('이 순간는 맥락 노드입니다. 주요 경로 순간를 선택하세요.');return}cancelPlayback(false);const start=Math.max(0,p.nodes.indexOf(n.id));const seq=p.nodes.slice(start);if(seq.length<4&&start>0){p=pathById[p.id];state.selected=byId[p.nodes[0]]}state.play={active:true,pathId:p.id,seq:p.nodes.slice(Math.max(0,p.nodes.indexOf(state.selected.id))),index:0,currentId:state.selected.id};if(state.play.seq.length<4)state.play.seq=p.nodes.slice(0);state.play.currentId=state.play.seq[0];state.mobileCluster=p.cluster;setMode('PATH_PLAYBACK');state.preview=new Set(routeEdges(p.id).map(e=>e.id));showRouteStatus(`경로 재생 · ${p.label}`,`${state.play.seq.length}개 순간 sequence · 지나온 길 / 현재 / 앞으로 갈 길을 함께 유지합니다.`);$('detail').classList.remove('open');nextPlaybackEdge();}
 function nextPlaybackEdge(){if(!state.play?.active)return;const p=pathById[state.play.pathId],seq=state.play.seq,i=state.play.index;if(i>=seq.length-1){state.play.active=false;state.animEdge=null;toast('이 감정 경로의 끝까지 도착했습니다.');showRouteStatus(`도착 · ${p.label}`,`${seq.length}개의 순간를 연속으로 따라왔습니다.`);return}const currentId=seq[i],nextId=seq[i+1],e=edges.find(e=>e.a===currentId&&e.b===nextId&&e.pathId===state.play.pathId);if(!e){state.play.index++;nextPlaybackEdge();return}state.animEdge=e;state.animT=0;state.preview.delete(e.id);state.play.currentId=currentId;const cur=byId[currentId];if(cur)toast(cur.why);}
 function playbackArrive(){if(!state.play)return;const e=state.animEdge;state.trail.add(e.id);state.play.index++;state.play.currentId=e.b;state.selected=byId[e.b];state.animEdge=null;state.animT=0;const p=pathById[state.play.pathId],idxInPath=p.nodes.indexOf(e.b),children=(idxInPath===p.branchAt)?p.children:[];if(children?.length){state.branchPause=true;openBranchChooser(p,children);return}setTimeout(nextPlaybackEdge,reduced?0:240)}
 function openBranchChooser(p,children){const box=$('branchOptions');box.innerHTML='';const continueBtn=document.createElement('button');continueBtn.textContent=`주경로 계속 · ${p.label}`;continueBtn.onclick=()=>{state.branchPause=false;$('branchChooser').classList.remove('open');nextPlaybackEdge()};box.appendChild(continueBtn);children.forEach(pid=>{const cp=pathById[pid],b=document.createElement('button');b.textContent=`분기 선택 · ${cp.label}`;b.onclick=()=>chooseBranch(pid);box.appendChild(b)});$('branchChooser').classList.add('open');toast('Branch point · 다음 감정 경로를 선택하세요.')}
@@ -187,5 +187,9 @@ mobilePicker=LTMobileMoments({moments:LTDEMO.moments,selected:LTDEMO.get(),onSel
 addEventListener('resize',resize);setupMobileRibbon();resize();(()=>{overview(false);const n=nodes.find(n=>n.id===LTDEMO.get());if(n){state.selected=n;centerOn(n,state.mobile?.68:.96);}})();last=performance.now();requestAnimationFrame(loop);
 })();
 </script>
-<style>@media(max-width:640px){#overviewBtn{display:inline-flex!important;align-items:center;min-height:44px}.pill{min-height:44px}.detail{max-height:55%;overflow:auto}.mobile-ribbon button{min-height:44px}}</style><style>@media(max-width:640px){.hero{top:150px}.hero h1{font-size:23px}.hero .eyebrow{display:none}.hero p{font-size:12px}.route-status{display:none}.detail{bottom:70px}.detail-block p{font-size:14px}.detail-block span,.chip{font-size:11px}.close{min-width:44px;min-height:44px}}</style></body>
+<style>@media(max-width:640px){#overviewBtn{display:inline-flex!important;align-items:center;min-height:44px}.pill{min-height:44px}.detail{max-height:55%;overflow:auto}.mobile-ribbon button{min-height:44px}}</style><style>@media(max-width:640px){.hero{top:150px}.hero h1{font-size:23px}.hero .eyebrow{display:none}.hero p{font-size:12px}.route-status{display:none}.detail{bottom:70px}.detail-block p{font-size:14px}.detail-block span,.chip{font-size:11px}.close{min-width:44px;min-height:44px}}</style><style id="lt-touch-targets">/* 2026-11-08 터치 타깃: 보이는 모양은 그대로 두고 ::after로 누르는 영역만 44px 이상으로 넓힌다. */
+#focusFirst,#zoomIn,#zoomOut,#resetFocus,#openMoment{position:relative}
+#focusFirst::after,#zoomIn::after,#zoomOut::after,#resetFocus::after{content:"";position:absolute;inset:-5px 0}
+#openMoment::after{content:"";position:absolute;inset:-1px 0}
+#detailClose::after{content:"";position:absolute;inset:-6px}</style></body>
 </html>
