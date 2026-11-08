@@ -54,15 +54,8 @@ test('5. 모르는 상태는 로그아웃으로 떨어진다(빈 화면을 만�
   assert.equal(headerParts(undefined).state, 'out');
 });
 
-test('6. 셸은 숨김/표시로 정리한다 — 비활성(disabled)으로 남기지 않는다', () => {
-  // #231 1-B②-2: 헤더 판정은 shell/header.mjs로 옮겼다(조건·조회 방식 그대로).
-  assert.match(header, /const parts=headerPartsFor\(\{owned,treeCount:getModel\(\)\?\.trees\?\.length\|\|0,publicReading\}\);/);
-  assert.match(header, /\$\('tree-views'\)\.hidden=!showTreeViews;for\(const b of \$\('tree-views'\)\.querySelectorAll\('button'\)\)\{b\.disabled=false;b\.title='';\}/);
-  assert.match(header, /\$\('record-menu'\)\.hidden=!parts\.treePicker\|\|publicReading;/);
-  assert.match(header, /\$\('write-menu'\)\.hidden=!parts\.write\|\|publicReading;/);
-  assert.doesNotMatch(header, /b\.disabled=!window\.LT41/, '트리 탭을 비활성으로 두지 않는다');
-  assert.match(header, /delegate\.syncTreeTips\(\);\s*\n\s*revealCurrentTab\(\);/);
-});
+// 6번(셸이 숨김/표시로 정리하는지 소스 글자로 보던 시험)은 2026-11-09에
+// tests/v41-header-flow.test.mjs의 상태 4 × 화면 5 표(함수 직접 호출)로 옮겼다.
 
 test('7. 첫 트리 말풍선: 2~3개, 순간 남기기·보기 전환을 알려 준다', () => {
   assert.ok(FIRST_TREE_TIPS.length >= 2 && FIRST_TREE_TIPS.length <= 3, `말풍선 ${FIRST_TREE_TIPS.length}개`);
@@ -97,9 +90,7 @@ test('8. 말풍선은 한 번만 — 닫으면 저장하고, 저장소가 막히
 test('9. 말풍선 마크업·스타일: Esc·포커스 되돌림, 밤·정원 공통 토큰, 390·360 넘침 없음', () => {
   assert.match(html, /<div id="tree-tips" class="tree-tips" role="dialog" aria-labelledby="tree-tips-title" hidden>/);
   assert.match(html, /<button type="button" id="tree-tips-close">알겠어요<\/button>/);
-  assert.match(shell, /function closeTreeTips\(remember=true\)[\s\S]{0,400}back\.focus\(\);/);
-  assert.match(shell, /if \(event\.key !== 'Escape'\) return;[\s\S]{0,400}closeTreeTips\(\);/);
-  assert.match(shell, /\$\('tree-tips-close'\)\?\.focus\(\);/);
+  // Esc·포커스 되돌림은 글자가 아니라 함수로 확인한다(tests/v41-shell-dialogs.test.mjs).
   const block = css.slice(css.indexOf('.tree-tips{'));
   assert.ok(block.length > 100, '.tree-tips 스타일이 있다');
   assert.match(block, /border:1px solid var\(--lt-gold-line\)/, '금테');
