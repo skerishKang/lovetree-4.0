@@ -51,6 +51,15 @@ html[data-v41-screen=book] .mobile-support.next-page button{margin-top:10px;min-
 /* 3. 한 순간이 한 페이지에 다 들어오게: 페이지 안 스크롤 없이 썸네일 최대 높이와 여백을 줄인다. */
 html[data-v41-screen=book] .page-content{overflow:hidden;overscroll-behavior:auto}
 html[data-v41-screen=book] .page-content>.moment{display:block;margin-top:auto;margin-bottom:auto;max-height:100%}
+/* 3-보완(#295): 그래도 페이지보다 긴 글(긴 노트)은 그 페이지만 안에서 스크롤해 끝까지 읽게 한다.
+   lt-overflow는 book.js markOverflowPages가 넘침이 확인된 페이지에만 붙이므로 짧은 순간 화면은 그대로다.
+   세로 스크롤만 허용해(pan-y) 좌우 넘기기·가장자리 드래그는 그대로다. */
+html[data-v41-screen=book] .page-content.lt-overflow,html[data-v41-screen=book] .mobile-content.lt-overflow{overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:rgba(90,60,50,.35) transparent}
+html[data-v41-screen=book] .page-content.lt-overflow>.moment{max-height:none}
+html[data-v41-screen=book] .page-content.lt-overflow::-webkit-scrollbar,html[data-v41-screen=book] .mobile-content.lt-overflow::-webkit-scrollbar{width:8px}
+html[data-v41-screen=book] .page-content.lt-overflow::-webkit-scrollbar-thumb,html[data-v41-screen=book] .mobile-content.lt-overflow::-webkit-scrollbar-thumb{border-radius:4px;background:rgba(90,60,50,.3)}
+/* 모바일: 넘친 쪽이 현재 쪽일 때만 book-wrap이 세로 터치 스크롤을 허용한다(touch-action:none보다 구체성이 높다). */
+html[data-v41-screen=book] .book-wrap.lt-page-scroll{touch-action:pan-y}
 html[data-v41-screen=book] .page-content>.moment .link-thumb{height:120px}
 html[data-v41-screen=book] .photo-piece img{height:clamp(140px,26vh,250px)}
 html[data-v41-screen=book] .film-piece img{height:clamp(130px,24vh,232px)}

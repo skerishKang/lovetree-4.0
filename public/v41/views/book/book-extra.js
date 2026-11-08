@@ -1,5 +1,5 @@
 // 2026-11-08 기억책 사용성 1~9 화면 보조. 데이터·저장 계약은 그대로 두고 표시만 바꾼다.
-import {displayTitle,withoutAutoTitle,titleParts,embedUrl,connectionLine,readLens,writeLens,detailPlacement,nextMomentMessage,NEXT_PAGE_COPY,NEXT_PAGE_ACTION,treeTitleText,isPrimaryButton,tapIntent} from '/v41/book-usability.mjs';
+import {displayTitle,withoutAutoTitle,titleParts,embedUrl,connectionLine,readLens,writeLens,detailPlacement,nextMomentMessage,NEXT_PAGE_COPY,NEXT_PAGE_ACTION,treeTitleText,isPrimaryButton,tapIntent,createOverflowRejudge} from '/v41/book-usability.mjs';
 const $b=s=>document.querySelector(s);
 // #296: 손을 뗀 순간의 판단은 book-usability.mjs의 tapIntent가 맡는다(book.js는 클래식 스크립트라 여기서 넘겨 준다).
 window.LTTapIntent=tapIntent;
@@ -201,6 +201,10 @@ function paintTreeTitles(){
 }
 paintTreeTitles();
 /* 원본 화면은 이 모듈보다 먼저 한 번 그린다. 새 규칙으로 다시 그린다(저장·선택은 그대로). */
+/* #295 보완: 넘침 판정을 렌더 때만 하면 이미지가 늦게 로드되어 페이지가 나중에 넘칠 때 다시 잘린다.
+   book.js(클래식)는 createOverflowRejudge를 못 불러 오므로 여기서 연결하고, 이미지 load·창 크기 변경·
+   페이지 크기 변화(ResizeObserver) 뒤에 rAF로 묶어 다시 판정하게 한다. 아래 재그리기 때 관찰이 시작된다. */
+window.__TRACK59__.overflowRejudge=createOverflowRejudge({judge:()=>window.__TRACK59__.rejudgeOverflow(),raf:f=>requestAnimationFrame(f),cancelRaf:id=>cancelAnimationFrame(id),addDocListener:(t,f,o)=>document.addEventListener(t,f,o),addWinListener:(t,f)=>addEventListener(t,f),ResizeObserver:typeof ResizeObserver==='undefined'?null:ResizeObserver,isPageImage:n=>n instanceof HTMLImageElement&&!!n.closest('.page-content,.mobile-content')});
 renderSpread(current,LTDEMO.get(),false);
 syncLensClone();
 window.__BOOK_USABILITY__={titleParts,closeDetail,placeDetail,nextMomentOf,paintTitle,get lensPref(){return lensPref}};

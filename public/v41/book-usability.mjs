@@ -153,3 +153,49 @@ export function bookTitleFont(theme) {
 export function isPrimaryButton(event) {
   return !event || event.button === undefined || event.button === 0;
 }
+
+/* 2026-11-09 #295: 순간 내용이 페이지보다 길면 그 페이지만 안에서 스크롤한다.
+   여유 4px는 세로 반올림 오차를 걸러 내기 위한 것으로, 짧은 순간은 이 판정을 통과하지 않아
+   화면이 그대로다(안1 — 페이지 안 스크롤. 안2 페이지 분할은 펼침·넘기기 구조를 바꾸므로 쓰지 않았다). */
+export const PAGE_OVERFLOW_SLACK = 4;
+export function pageOverflows(scrollHeight, clientHeight, slack = PAGE_OVERFLOW_SLACK) {
+  const sh = Number(scrollHeight);
+  const ch = Number(clientHeight);
+  if (!Number.isFinite(sh) || !Number.isFinite(ch)) return false;
+  return sh - ch > slack;
+}
+
+/* 2026-11-09 #295 보완: 넘침 판정을 다시 매기는 연결. 판정을 렌더 때만 하면 사진·영상 썸네일이 늦게
+   로드되어 페이지가 나중에 넘치게 될 때 lt-overflow가 붙지 않아 다시 잘린다. 이미지 load(캡처 —
+   load는 올라오지 않는다)·창 크기 변경·페이지 요소 크기 변화(ResizeObserver)를 보고 rAF로 묶어
+   판정을 다시 실행한다. 화면(book.js)은 진짜 문서·창을 넘기고, 시험은 가짜를 넘겨 같은 연결을 검증한다. */
+export function createOverflowRejudge({ judge, raf, cancelRaf = () => {}, addDocListener, addWinListener, ResizeObserver: ROClass, isPageImage }) {
+  let pending = 0;
+  let observer = null; // null=미연결, false=연결했으나 관찰자 없음(ResizeObserver 미지원), 그 외=관찰자
+  let targets = [];
+  const run = () => { pending = 0; judge(); };
+  const schedule = () => { if (pending) return; pending = raf(run); };
+  const onDocLoad = (event) => { if (isPageImage(event.target)) schedule(); };
+  return {
+    schedule,
+    observe(els) {
+      if (observer === null) {
+        observer = false;
+        addDocListener('load', onDocLoad, true);
+        addWinListener('resize', schedule);
+        if (ROClass) observer = new ROClass(schedule);
+      }
+      const list = [...els];
+      if (observer) {
+        targets.forEach((el) => observer.unobserve(el));
+        targets = list;
+        list.forEach((el) => observer.observe(el));
+      }
+    },
+    stop() {
+      if (observer) targets.forEach((el) => observer.unobserve(el));
+      targets = [];
+      if (pending) { cancelRaf(pending); pending = 0; }
+    }
+  };
+}
