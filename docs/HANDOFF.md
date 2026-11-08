@@ -892,6 +892,12 @@ COM2에는 merge `6900df8aa446dfe0201d01997457fae04c4abe16`의 변경 서버 파
 - 확인(가짜 서버 기록: `url` + `mediaMetadata`가 있는 YouTube 순간): 1440·390, 밤·정원 모두 실제 마우스 클릭으로 `iframe.yt-frame` 1개 생성(임베드 `start=83`), 밤 큰 제목 Pretendard · 정원 큰 제목 MaruBuri, 넘침 0. 셸 경유(`#book`)에서도 iframe 테마가 garden으로 전달된다.
 - 시험: `tests/v41-book-usability.test.mjs` 12·13번, `tests/v41-journey-garden`·`v41-theme-ab`의 기대값 갱신(기억책·보드·지도=정원 허용(#274로 보드·지도도 정원), 그 밖의 안쪽 화면=밤 고정). `npm test` 483 pass / 0 fail / 37 skip, build 성공.
 
+## 2026-11-09 기억 보드 계산 전부 LT58Model 한 벌 (ai/lt-board-filters-model-261109)
+
+- 기억 보드의 순수 계산은 이제 **`public/v41/views/board/board-model.js`의 `window.LT58Model` 한 벌**만 쓴다: `escapeHTML`·`cardPosition`·`threadPath`·`fitZoom`·`removeConnection`·`editGuard`(#292) · `collectPath`·`nextConnections`·`detailButtonState`·`cinemaBeats`(#298) · `filterVisible`·`maxCreatedOrder`(필터, 이번).
+- `board.js`·`board-extras.js`는 같은 계산을 다시 구현하지 않는다(시험 7·12·14번이 부재+호출을 함께 검사). 화면은 DOM 반영(클래스 토글·버튼 상태 적용)만 맡는다.
+- 필터 판정: 미디어(전체·first·unconnected·recent·종류) × 키워드(AND) — 조건·순서는 예전 그대로, 예시/실제 기록으로 갈리지 않는다.
+
 ## 2026-11-09 첫 화면(src064-orbit) 파일 지도 (원본 정리, ai/lt-orbit-source-261109)
 
 | 파일 | 줄 수 | 내용 |
