@@ -13,7 +13,8 @@ import {applyViewAccessibility,connectionLabel,focusReturnTarget} from './view-a
 import {accountPresentation,treePickerLabel,treePickerText,treeViewsVisible,writeMenuLabel,headerState,headerPartsFor,readTipsSeen,writeTipsSeen,tipsWanted,FIRST_TREE_TIPS,homeCenterState,homeStartLoginUrl,readTheme,readLoginIntent,writeTheme,nextTheme,themeButtonLabel,themeButtonAriaLabel,themePressed,appliedTheme,applyThemeAttribute,LOGIN_INTENTS} from './header-state.mjs';
 import {journeyEntry,journeySavePlan,journeyRouteHash,parseJourneyRoute,journeyRouteDecision} from './first-journey.mjs';
 import {displayTreeTitle} from './tree-name.mjs';
-import {screens,screenForView,viewForFile,themedViewFor,screenTitle,screenUrl} from './shell/navigation.mjs';
+import {screens,screenForView,viewForFile,themedViewFor} from './shell/navigation.mjs';
+import {createScreens} from './shell/screens.mjs';
 import {paintLoginLinks,paintThemeControls,applyTheme as applyThemeFor,toggleTheme as toggleThemeFor} from './shell/theme.mjs';
 const $=id=>document.getElementById(id);
 let pendingLoginIntent=readLoginIntent(location.search);
@@ -158,58 +159,29 @@ function revealCurrentTab(){
  updateNavFade();
 }
 if(navBar){navBar.addEventListener('scroll',updateNavFade,{passive:true});addEventListener('resize',()=>revealCurrentTab());}
-// 2026-11-08 #211 화면 전환 깜빡임: 새 화면은 보이지 않는 두 번째 iframe에서 먼저 다 그린다.
-// 준비(load + 글꼴 준비)가 끝나면 두 장의 앞뒤만 바꾼다. 이전 화면은 그 순간까지 그대로 보인다.
-let viewToken=0;
-function frames(){return [$('view'),$('view-next')].filter(Boolean);}
-function hideFrames(){for(const f of frames()){f.hidden=true;try{f.contentWindow.location.replace('about:blank');}catch{}}}
-function revealFrame(next){
-  const active=$('view');
-  if(!next||next===active)return;
-  next.hidden=false;active.hidden=true;
-  next.id='view';active.id='view-next';
-  next.style.zIndex='2';active.style.zIndex='1';
-}
-function showInFrame(url,title){
-  const active=$('view'),next=$('view-next');
-  if(!next){active.hidden=false;active.title=title;active.contentWindow.location.replace(url);return;}
-  // 아직 아무 화면도 없으면(첫 진입·기록 없음) 보이는 한 장에 바로 그린다.
-  let blank=true;
-  try{blank=active.contentWindow.location.href==='about:blank';}catch{blank=false;}
-  if(blank){if(next)next.hidden=true;active.hidden=false;active.title=title;active.contentWindow.location.replace(url);return;}
-  const token=++viewToken;
-  let settled=false;
-  const done=()=>{
-    if(settled||token!==viewToken)return;
-    settled=true;
-    next.hidden=false;next.title=title;
-    revealFrame(next);
-    applyTheme();
-    if(!document.body.classList.contains('home-screen')){next.classList.remove('lt-arrive');void next.offsetWidth;next.classList.add('lt-arrive');}
-    links();
-    setTimeout(()=>{try{active.contentWindow.location.replace('about:blank');}catch{}},600);
-  };
-  const ready=()=>{
-    if(token!==viewToken)return;
-    let doc=null;
-    try{doc=next.contentDocument;}catch{}
-    // 글꼴이 준비되고, 새 화면에 실제 내용이 그려진 뒤에 넘긴다(빈 화면을 보여 주지 않는다).
-    const waitContent=(deadline)=>{
-      if(token!==viewToken)return;
-      let filled=false;
-      try{const d=next.contentDocument;filled=!!(d&&d.body&&d.body.children.length>0&&(d.body.innerText||'').trim().length>0);}catch{}
-      if(filled||Date.now()>deadline){requestAnimationFrame(()=>requestAnimationFrame(done));return;}
-      setTimeout(()=>waitContent(deadline),28);
-    };
-    if(doc&&doc.fonts&&doc.fonts.ready){doc.fonts.ready.then(()=>waitContent(Date.now()+900)).catch(()=>waitContent(Date.now()+900));}
-    else waitContent(Date.now()+900);
-    setTimeout(done,1200); // 글꼴이 늦어도 화면은 넘어간다
-  };
-  next.addEventListener('load',ready,{once:true});
-  next.contentWindow.location.replace(url);
-  setTimeout(ready,1500); // load를 놓쳐도 두 번은 넘어가지 않는다(settled)
-}
-function show(file,write=true){const screen=screens.find(s=>s[1]===file);if(!screen)return;if($('community-panel').open)$('community-panel').close();current=file;flowNavigation();applyTheme();if(!window.LT41&&file!=='src064-orbit.html'){document.body.classList.remove('home-screen');hideFrames();$('empty').hidden=false;if(write)writeLocation();links();return;}document.body.classList.toggle('home-screen',file==='src064-orbit.html');document.querySelectorAll('[data-view]').forEach(b=>b.setAttribute('aria-current',String(b.dataset.view===file)));$('empty').hidden=true;showInFrame(screenUrl(file,source,location.origin),'러브트리 · '+screenTitle(file));if(write)writeLocation();links();}
+// 화면 전환·iframe 두 장 교대는 shell/screens.mjs가 맡는다(#231 1-B). 셸은 지금 화면과 나머지 일을 넘긴다.
+const shellScreens=createScreens({
+  $,
+  screens,
+  getCurrent:()=>current,
+  setCurrent:file=>{current=file;},
+  getSource:()=>source,
+  hasTree:()=>!!window.LT41,
+  flowNavigation,
+  applyTheme,
+  writeLocation,
+  links,
+  onFrameReady:frame=>{
+    const d=frame.contentDocument;if(!d)return;
+    mountConnectionTool(d);applyViewAccessibility(d);
+    d.addEventListener('click',e=>{const b=e.target.closest('button,a');if(!b)return;let file;if(b.matches('[data-action="tree"],[data-menu="tree"]'))file='track32-bookshelf.html';if(b.matches('#storyBook,[data-menu="book"]'))file='track59-sketchbook.html';if(current==='track56-network.html'&&b.id==='openMoment')file='track59-sketchbook.html';if(file){e.preventDefault();e.stopImmediatePropagation();show(file);}},true);
+  }
+});
+function frames(){return shellScreens.frames();}
+function hideFrames(){return shellScreens.hideFrames();}
+function showInFrame(url,title){return shellScreens.showInFrame(url,title);}
+function show(file,write=true){return shellScreens.show(file,write);}
+function frameLoaded(frame){return shellScreens.frameLoaded(frame);}
 function choose(id,momentId){const tree=model.trees.find(t=>t.id===id);window.LT41=tree?{tree,trees:model.trees,source,momentId:tree.moments.find(m=>m.id===momentId)?.id||tree.moments.find(m=>m.parentId===null)?.id||tree.moments[0]?.id,}:null;
  if(tree||current==='src064-orbit.html')show(current,false);else{flowNavigation();document.body.classList.remove('home-screen');hideFrames();$('empty').hidden=false;links();}}
 function load(input,kind,selection={},fallback={}){model=kind==='example'?{trees:[exampleTree]}:workspaceModel(input);source=kind;if(kind!=='share'){activeShareId=null;$('empty').querySelector('h1').textContent='다시 펼칠 순간을 기다리고 있어요.';$('empty').querySelector('p').textContent='예시를 둘러보거나 로그인한 계정의 기록을 불러오세요.';$('empty-sample').hidden=false;$('empty-records').hidden=false;}document.body.dataset.recordSource=kind;document.body.dataset.member=member?.snapshot().owned?'in':'out';document.body.dataset.treeCount=String(model?.trees?.length||0);$('source-label').textContent='트리 선택';$('record-description').textContent=kind==='example'?'실제 회원 데이터와 무관한 예시입니다.':kind==='server'?'로그인한 계정의 서버 기록 · 작성·수정 후 자동 저장':kind==='share'?'소유자가 명시적으로 공개한 트리 · 감상 전용':'선택한 파일을 메모리에서 읽는 중입니다.';$('trees').replaceChildren();for(const t of model.trees){const o=document.createElement('option');o.value=t.id;o.textContent=displayTreeTitle(t.title);$('trees').append(o);}$('trees').disabled=!model.trees.length;const resolved=resolveAccountPosition(model.trees,selection,fallback),chosen=model.trees.find(t=>t.id===resolved.position.treeId);$('trees').value=chosen?.id||'';choose(chosen?.id,resolved.position.momentId);return resolved;}
@@ -324,16 +296,6 @@ $('share-menu').onclick=openSharePanel;$('share-moment').onchange=invalidateShar
 $('share-preview').onclick=async()=>{const button=$('share-preview'),payload=sharePayload();button.disabled=true;$('share-feedback').textContent='서버에서 공개 범위를 확인하고 있어요.';const answer=await shareApi.preview(payload);button.disabled=false;if(!answer.ok){$('share-feedback').textContent=shareFailure(answer);return;}sharePreviewKey=JSON.stringify(payload);sharePreviewToken=answer.preview.previewToken;$('share-preview-summary').textContent=`“${displayTreeTitle(answer.preview.tree.title)}”의 ${answer.preview.tree.moments.length}개 순간을 공개합니다.${answer.preview.omittedPrivateMedia?' 비공개 업로드 '+answer.preview.omittedPrivateMedia+'개는 제외됩니다.':''}`;$('share-preview-moments').replaceChildren();for(const moment of answer.preview.tree.moments){const li=document.createElement('li');li.textContent=`${moment.title} · ${moment.emotion} · ${moment.date}`; $('share-preview-moments').append(li);}$('share-preview-result').hidden=false;$('share-create').disabled=false;$('share-feedback').textContent='미리보기를 확인한 뒤 링크를 만들 수 있어요.';};
 $('share-create').onclick=async()=>{const payload=sharePayload();if(sharePreviewKey!==JSON.stringify(payload)){invalidateSharePreview();return;}const button=$('share-create');button.disabled=true;$('share-feedback').textContent='공유 주소를 만들고 있어요.';const answer=await shareApi.create({...payload,previewToken:sharePreviewToken});if(!answer.ok){$('share-feedback').textContent=shareFailure(answer);button.disabled=false;return;}const shareBase=location.hostname==='lovetree.padiem.net'?'/':'/v41/';const url=new URL(`${shareBase}#share/${answer.share.id}/${answer.share.view}`,location.origin).href;$('share-url').value=url;$('share-url').dataset.shareId=answer.share.id;$('share-created').hidden=false;$('share-feedback').textContent='명시적으로 공유 주소를 만들었어요.';sharePreviewKey='';sharePreviewToken='';await loadShareList();};
 $('share-copy').onclick=async()=>{const input=$('share-url');try{await navigator.clipboard.writeText(input.value);$('share-feedback').textContent='공유 주소를 복사했어요.';}catch{input.select();$('share-feedback').textContent='주소를 선택했어요. 복사해 주세요.';}};
-// 화면 한 장이 준비될 때마다: 테마·연결 도구·접근성·클릭 위임을 그 화면에 붙인다.
-// 도착 표시는 지금 보이는 화면(#view)에만 준다(뒤에서 준비 중인 화면에는 주지 않는다).
-function frameLoaded(frame){
- applyTheme();
- const v=frame;
- if(!document.body.classList.contains('home-screen')&&frame.id==='view'){v.classList.remove('lt-arrive');void v.offsetWidth;v.classList.add('lt-arrive');}
- const d=v.contentDocument;if(!d)return;
- mountConnectionTool(d);applyViewAccessibility(d);
- d.addEventListener('click',e=>{const b=e.target.closest('button,a');if(!b)return;let file;if(b.matches('[data-action="tree"],[data-menu="tree"]'))file='track32-bookshelf.html';if(b.matches('#storyBook,[data-menu="book"]'))file='track59-sketchbook.html';if(current==='track56-network.html'&&b.id==='openMoment')file='track59-sketchbook.html';if(file){e.preventDefault();e.stopImmediatePropagation();show(file);}},true);
-}
 for(const f of frames())f.addEventListener('load',()=>frameLoaded(f));
 paintThemeControls();applyTheme();
 if(initialRoute.scope==='public')showPublicRoute(initialRoute);else load(null,'example');
