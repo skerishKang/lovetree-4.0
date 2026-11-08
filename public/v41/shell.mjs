@@ -16,18 +16,9 @@ import {displayTreeTitle} from './tree-name.mjs';
 import {screens,screenForView,viewForFile,themedViewFor} from './shell/navigation.mjs';
 import {createScreens} from './shell/screens.mjs';
 import {createHeader} from './shell/header.mjs';
+import {createAuth} from './shell/auth.mjs';
 import {paintLoginLinks,paintThemeControls,applyTheme as applyThemeFor,toggleTheme as toggleThemeFor} from './shell/theme.mjs';
 const $=id=>document.getElementById(id);
-let pendingLoginIntent=readLoginIntent(location.search);
-{const params=new URLSearchParams(location.search);if(params.has('intent')){params.delete('intent');const query=params.toString();history.replaceState(null,'',location.pathname+(query?'?'+query:'')+location.hash);}}
-// 2026-11-08 #261108: 로그인 직전 안내 창을 없앴다. 로그아웃 상태에서 로그인이 필요한 진입점은
-// 안내 창을 거치지 않고 바로 /auth/login으로 간다. 테마(lt_theme)와 의도(intent)는 주소에 유지한다.
-// 의도는 next 안에 남기므로 로그인·가입 뒤 첫 여정/내 책장으로 바로 이어진다.
-let pendingLoginIntentShown=pendingLoginIntent;
-function startLogin(intent=''){const target=LOGIN_INTENTS.includes(intent)?intent:'';location.assign(memberLoginUrl(readTheme(localStorage),target));}
-// 2026-11-07 테마 A/B(밤/정원): 공통 헤더와 첫 화면만 바꾼다. 안쪽 네 화면은 속성을 받지 않아 A로 고정된다.
-// 2026-11-08 정원 2단계: 첫 화면과 첫 여정만 B를 받는다. 안쪽 네 화면은 계속 A다.
-// 테마·화면 경로 계산은 shell/ 아래 모듈이 맡는다(#231 1-B). 셸은 지금 화면만 넘긴다.
 function themedView(){return themedViewFor(current);}
 function applyTheme(theme=readTheme(localStorage)){return applyThemeFor(current,theme);}
 function toggleTheme(){return toggleThemeFor(current);}
@@ -37,15 +28,25 @@ let model=null,current=screenForView(initialRoute.view)[1],source='example',load
 setMemberRefreshStarted(false);
 const shareApi=createShareApi();
 const accountApi=createWorkspaceApi();
+// 로그인 시작·세션 연결은 shell/auth.mjs가 맡는다(#231 1-B③-1). 셸은 자기 상태를 넘기고 부르기만 한다.
+const shellAuth=createAuth({
+  $,
+  getMember:()=>member,
+  notify:text=>notify(text),
+  closeAccountMenu:()=>closeAccountMenu(),
+  openEditor:(mode,parentId)=>openEditor(mode,parentId),
+  showScreen:file=>show(file)
+});
+function startLogin(intent=''){return shellAuth.startLogin(intent);}
+function openLoginStart(intent='first'){return shellAuth.openLoginStart(intent);}
 // 헤더·계정 메뉴는 shell/header.mjs가 맡는다(#231 1-B②-2). 셸은 자기 상태를 읽기 함수로 넘긴다.
-addEventListener('lovetree-auth-required',()=>{if(member?.snapshot().owned){$('account-entry').textContent='로그인';$('account-entry').hidden=false;$('account-avatar').hidden=true;closeAccountMenu();$('record-feedback').textContent='로그인 확인이 필요해요. 다시 로그인해 주세요.';notify('로그인 확인이 필요해요. 다시 로그인해 주세요.');}});
+addEventListener('lovetree-auth-required',()=>shellAuth.authRequired());
 window.LT41=null;
 const uploads=mountPrivateUpload({form:$('moment-form'),assets:$('account-assets'),getSubject:()=>source==='server'&&member?.snapshot().writable?member.snapshot().subject:null,getState:()=>member?.state(),onChange:()=>{updateMediaPreview();updateQuickEntryHint();},onUseAsset:()=>usePrivateAsset()});
 function notify(text){$('record-feedback').textContent=text;$('toast').textContent=text;$('toast').hidden=$('records').open;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').hidden=true,6500);}
 const PENDING_NEW='lovetree.v41.pending-new';
 // 2026-11-07 계정 표시: 로그인 상태는 첫 글자 동그라미 + 작은 메뉴, 로그아웃 상태는 기존 로그인 알약.
 function panel(id){if(id==='records')updateAccountControls();const target=$(id);if(!target.open)target.showModal();}
-function openLoginStart(intent='first'){startLogin(intent==='first'?'':intent);}
 // 안내 창이 없어졌으니 close/cancel 복귀 연결도 필요 없다.
 // 2026-11-08 #202 후속: 셸 대화상자(순간 편집기·보관 파일) Tab을 내부에서 순환시킨다.
 // 보관 파일이 편집기 위에 열려 있으면 보관 파일 안에서만 순환한다.
@@ -181,7 +182,7 @@ async function startMember(){setMemberRefreshStarted(true);if(!leaveMember())ret
    if(!initialized){if(route)requested=route;else if(!selection)requested=saved;const view=memberStartupView(active,route,saved,viewForFile(current));current=screenForView(view)[1];}
    const resolved=load({revision:0,state},'server',requested,saved);initialized=true;
    if(snapshot.owned&&resolved.position.treeId){if(viewForFile(current)!=='home')writeLocation('replace');takePendingOwnerRoute(sessionStorage);if(route?.scope==='owner'&&resolved.treeMissing)startupNotice='이 주소의 기록을 현재 계정에서 찾을 수 없어 최근 위치를 열었어요.';else if(route?.scope==='owner'&&resolved.momentMissing)startupNotice='이 주소의 순간을 찾을 수 없어 트리의 시작 순간을 열었어요.';}
- },onStatus:status=>{if(generation===loadGeneration)memberStatus(status);},navigate:url=>{if(url.startsWith('/auth/login')&&parseSelectionRoute(location.hash).scope==='owner')stashPendingOwnerRoute(sessionStorage,location.hash);location.assign(url.startsWith('/auth/login')?memberLoginUrl(readTheme(localStorage)):url==='#start'?'#home':url);}});member=session;await session.start();if(generation===loadGeneration&&session.snapshot().owned){if($('records').open)$('records').close();updateAccountControls();if(session.snapshot().writable&&sessionStorage.getItem(PENDING_NEW)==='1'){sessionStorage.removeItem(PENDING_NEW);openEditor('new');}if(pendingLoginIntent){const intent=pendingLoginIntent;pendingLoginIntent='';if(intent==='new-tree'&&session.snapshot().writable)openEditor('new');else if(intent==='shelf')show('track32-bookshelf.html');}if(startupNotice)notify(startupNotice);}
+ },onStatus:status=>{if(generation===loadGeneration)memberStatus(status);},navigate:url=>{if(url.startsWith('/auth/login')&&parseSelectionRoute(location.hash).scope==='owner')stashPendingOwnerRoute(sessionStorage,location.hash);location.assign(url.startsWith('/auth/login')?memberLoginUrl(readTheme(localStorage)):url==='#start'?'#home':url);}});member=session;await session.start();if(generation===loadGeneration&&session.snapshot().owned){if($('records').open)$('records').close();updateAccountControls();if(session.snapshot().writable&&sessionStorage.getItem(PENDING_NEW)==='1'){sessionStorage.removeItem(PENDING_NEW);openEditor('new');}shellAuth.consumeLoginIntent(session.snapshot());if(startupNotice)notify(startupNotice);}
  if(generation===loadGeneration){const startupJourney=parseJourneyRoute(location.hash);if(startupJourney){if(session.snapshot().owned&&session.snapshot().writable)openFirstJourney({step:startupJourney.step,route:true});else{history.replaceState(null,'','#home');handledHash='#home';}}}
 }
 function sample(selection={},view){if(!leaveMember())return;++loadGeneration;if(view)current=view;load(null,'example',selection);if(view)writeLocation();$('save-feedback').hidden=true;$('records').close();}
