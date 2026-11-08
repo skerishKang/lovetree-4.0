@@ -89,5 +89,27 @@ window.LT58Model = (() => {
     return beats;
   }
 
-  return { escapeHTML, cardPosition, threadPath, fitZoom, removeConnection, editGuard, collectPath, nextConnections, detailButtonState, cinemaBeats };
+
+  // 목록 필터 판정: 이 순간이 지금 화면에 보이는가.
+  // 미디어(전체·first·unconnected·recent·종류) 조건과 키워드 조건을 AND로 본다.
+  function filterVisible(m, state, connections) {
+    const mf = state?.mediaFilter || 'all';
+    const kf = state?.keywordFilter || 'all';
+    let ok = true;
+    if (mf !== 'all') {
+      if (mf === 'first') ok = !!m.first;
+      else if (mf === 'unconnected') ok = !connections.some((c) => c.a === m.id || c.b === m.id);
+      else if (mf === 'recent') ok = (m.createdOrder || 0) >= (state?.maxOrder || 0) - 2;
+      else ok = (m.originalType || m.type) === mf;
+    }
+    if (kf !== 'all') ok = ok && (m.keywords || []).includes(kf);
+    return ok;
+  }
+
+  // 최근 모드의 기준점: 카드가 가진 가장 큰 생성 순번.
+  function maxCreatedOrder(moments) {
+    return Math.max(...moments.map((m) => m.createdOrder || 0));
+  }
+
+  return { escapeHTML, cardPosition, threadPath, fitZoom, removeConnection, editGuard, collectPath, nextConnections, detailButtonState, cinemaBeats, filterVisible, maxCreatedOrder };
 })();

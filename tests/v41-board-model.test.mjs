@@ -11,7 +11,7 @@ const BOARD = fs.readFileSync(new URL('../public/v41/views/board/board.js', impo
 const EXTRAS = fs.readFileSync(new URL('../public/v41/views/board/board-extras.js', import.meta.url), 'utf8');
 
 test('0. 계산 한 벌은 화면이 실제로 부르는 함수만 노출한다', () => {
-  assert.deepEqual(Object.keys(M).sort(), ['cardPosition', 'cinemaBeats', 'collectPath', 'detailButtonState', 'editGuard', 'escapeHTML', 'fitZoom', 'nextConnections', 'removeConnection', 'threadPath']);
+  assert.deepEqual(Object.keys(M).sort(), ['cardPosition', 'cinemaBeats', 'collectPath', 'detailButtonState', 'editGuard', 'escapeHTML', 'filterVisible', 'fitZoom', 'maxCreatedOrder', 'nextConnections', 'removeConnection', 'threadPath']);
   for (const fn of Object.keys(M)) assert.equal(typeof M[fn], 'function', fn);
 });
 
@@ -131,4 +131,54 @@ test('12. board-extras.js는 같은 계산을 다시 구현하지 않고 한 벌
   for (const call of ['LT58Model.collectPath', 'LT58Model.nextConnections', 'LT58Model.detailButtonState', 'LT58Model.cinemaBeats']) {
     assert.ok(EXTRAS.includes(call), call);
   }
+});
+
+// 13. 목록 필터 판정 — 분기 표(PR 본문) 그대로.
+//  미디어 \ 키워드 | all          | 키워드 있음
+//  all            | 모두 보임     | 그 키워드를 가진 순간만
+//  first          | first인 순간만 | first 이고 키워드도 있는 순간만
+//  unconnected    | 연결 없는 순간 | 연결 없고 키워드도 있는 순간
+//  recent         | 최근 3개(최대-2 이상) | 최근 3개 중 키워드 있는 순간
+//  photo/video/note(link 등) | 그 종류만 | 그 종류 + 키워드
+test('13. 목록 필터 판정: 미디어 × 키워드 조건을 표대로 본다', () => {
+  const connections = [{ id: 'c1', a: 'm1', b: 'm2' }];
+  const mk = (id, extra = {}) => ({ id, type: 'photo', originalType: 'photo', createdOrder: 1, keywords: [], ...extra });
+  const m1 = mk('m1', { first: true, createdOrder: 1, keywords: ['첫만남'] });
+  const m2 = mk('m2', { createdOrder: 2, keywords: ['무대'] });
+  const m3 = mk('m3', { type: 'video', originalType: 'video', createdOrder: 3, keywords: ['첫만남', '무대'] });
+  const m4 = mk('m4', { type: 'note', originalType: 'note', createdOrder: 4, keywords: [] });
+  const all = [m1, m2, m3, m4];
+  const maxOrder = M.maxCreatedOrder(all);
+  assert.equal(maxOrder, 4);
+  const visible = (filter, keyword = 'all') => all.filter((m) => M.filterVisible(m, { mediaFilter: filter, keywordFilter: keyword, maxOrder }, connections)).map((m) => m.id);
+
+  assert.deepEqual(visible('all'), ['m1', 'm2', 'm3', 'm4']);
+  assert.deepEqual(visible('all', '무대'), ['m2', 'm3']);
+  assert.deepEqual(visible('first'), ['m1']);
+  assert.deepEqual(visible('first', '첫만남'), ['m1']);
+  assert.deepEqual(visible('first', '무대'), []);
+  assert.deepEqual(visible('unconnected'), ['m3', 'm4']);
+  assert.deepEqual(visible('unconnected', '무대'), ['m3']);
+  assert.deepEqual(visible('recent'), ['m2', 'm3', 'm4']);
+  assert.deepEqual(visible('recent', '첫만남'), ['m3']);
+  assert.deepEqual(visible('video'), ['m3']);
+  assert.deepEqual(visible('note', '무대'), []);
+  assert.deepEqual(visible('photo', '무대'), ['m2']);
+  // 종류 판정은 originalType이 없으면 type으로 대신한다.
+  assert.equal(M.filterVisible({ id: 'x', type: 'video', createdOrder: 1 }, { mediaFilter: 'video' }, []), true);
+  // 필터 값이 없으면(요소 미존재) 전체로 본다 — 예전 `|| 'all'`과 같다.
+  assert.equal(M.filterVisible(m1, {}, []), true);
+  // 기록 종류(예시/실제)로 갈리지 않는다: 판정 함수에 그런 입력이 없다.
+  assert.deepEqual(Object.keys(M).filter((k) => /example|demo|real/i.test(k)), []);
+});
+
+test('14. board-extras.js는 필터 판정을 다시 구현하지 않고 한 벌을 부른다', () => {
+  assert.doesNotMatch(EXTRAS, /ok=(m\.createdOrder\|\|0)>=maxOrder-2/);
+  assert.doesNotMatch(EXTRAS, /ok=!connections\.some\(c=>c\.a===m\.id\|\|c\.b===m\.id\)/);
+  assert.doesNotMatch(EXTRAS, /ok=ok&&\(m\.keywords\|\|\[\]\)\.includes\(kf\)/);
+  assert.doesNotMatch(EXTRAS, /maxOrder=Math\.max\(\.\.\.moments\.map\(m=>m\.createdOrder/);
+  assert.ok(EXTRAS.includes('LT58Model.filterVisible(m,state,connections)'));
+  assert.ok(EXTRAS.includes('LT58Model.maxCreatedOrder(moments)'));
+  // DOM 반영(클래스 토글)은 화면에 그대로 남는다.
+  assert.ok(EXTRAS.includes("el.classList.toggle('filteredOut',!ok)"));
 });
