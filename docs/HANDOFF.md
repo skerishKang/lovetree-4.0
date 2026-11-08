@@ -927,6 +927,15 @@ COM2에는 merge `6900df8aa446dfe0201d01997457fae04c4abe16`의 변경 서버 파
 - 이유·원칙·단계별 계획: [REFACTOR_PLAN_20261108.md](REFACTOR_PLAN_20261108.md) · 추적 이슈 https://github.com/skerishKang/lovetree-4.0/issues/231
 - 1-A(두 벌 조사, #230) 결과 위에 1-B(셸 모듈 분리)·1.5단계(두 변형 한 벌)·2단계(기억책)3단계(보드·지도) 순서를 적었다. 기능·문구·디자인 변경 0.
 
+## 2026-11-09 사고: 순간 남기기(#write-menu) 연결 누락 — 로그아웃 검사가 못 잡는 자리 (PR #252, ai/lt-fix-write-menu-261108)
+
+#245(e4c78f2)에서 셸을 모듈로 나눌 때 옛 `shell.mjs`(e508302) 460행의 `$('write-menu').onclick = () => openEditor(current==='track32-bookshelf.html'?'new':undefined)`가 어디에도 옮겨지지 않고 사라졌다. 같은 줄 뒤의 `[data-mode]` 연결만 `shell/panels.mjs`로 갔다. 운영에서 `document.getElementById('write-menu').onclick === null` — **로그인 상태에서만 보이는 버튼이라 로그아웃 기준 postdeploy·visual-baseline(24장)이 잡지 못했다.**
+
+- 수정: `shell/panels.mjs`의 `[data-mode]` 연결 바로 아래에 원래 줄을 그대로 복구(`getCurrent` deps 사용). PR #252, 머지 `f08916f`.
+- 확인: 미리보기 `typeof onclick` = `function`(수정 전 운영은 `object`=null), 머지 뒤 운영도 `function`, 운영 postdeploy `pass=17 fail=0`.
+- 재발 방지: `tests/v41-shell-connections.test.mjs` — 리팩터링 전 셸이 연결하던 **39개 요소 id 목록**(e508302 기준)을 고정하고, 셸 전체(`shell.mjs` + `shell/*.mjs`)에 각 id 연결이 남아 있는지 본다. 연결을 지우면 그 id를 지목해 실패한다.
+- 교훈: 모듈 분리 PR에서 `$('id').onclick=`처럼 **한 줄에 붙은 여러 연결**을 옮길 때는, 해당 줄 전체를 목록으로 만들어 대조해야 한다. 로그아웃 검사만으로는 로그인 전용 UI를 지킬 수 없다.
+
 ## 2026-11-08 셸 메시지·여정 분리 (#231 1-B③-3, ai/lt-refactor-shell-messages-261108, PR #247)
 `shell.mjs` 384 → 330줄(35,443B, 500자 넘는 줄 9개). 공유·둘러보기·메시지 수신과 첫 여정 연결을 두 모듈로 나눴다.
 
