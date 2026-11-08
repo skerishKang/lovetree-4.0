@@ -49,6 +49,59 @@ export function treeViewsVisible({ owned = false, publicReading = false } = {}) 
   return owned && !publicReading;
 }
 
+// 상태별 헤더 노출(대표 결정 2026-11-08, #213 3번).
+// "비활성으로 보이기" 대신 "아예 숨기기"로 정리한다: 로그아웃이면 트리 탭·트리 선택·순간 남기기·공유가 없다.
+export function headerState({ owned = false, treeCount = 0, publicReading = false } = {}) {
+  if (publicReading) return 'share';
+  if (!owned) return 'out';
+  return Number(treeCount) > 0 ? 'in-trees' : 'in-empty';
+}
+
+const HEADER_PARTS = Object.freeze({
+  out: { account: 'login', browse: true, treePicker: false, treeViews: false, write: false, share: false },
+  'in-empty': { account: 'avatar', browse: true, treePicker: false, treeViews: false, write: true, share: false },
+  'in-trees': { account: 'avatar', browse: true, treePicker: true, treeViews: true, write: true, share: true },
+  share: { account: 'avatar', browse: true, treePicker: false, treeViews: false, write: false, share: false }
+});
+
+export function headerParts(state) {
+  const key = Object.prototype.hasOwnProperty.call(HEADER_PARTS, state) ? state : 'out';
+  return { ...HEADER_PARTS[key], state: key };
+}
+
+export function headerPartsFor(input = {}) {
+  return headerParts(headerState(input));
+}
+
+// 첫 트리를 만든 직후 한 번만 보여 주는 말풍선(#213 3번).
+// 닫으면 저장소에 남겨 다시 보여 주지 않는다. 저장소가 막히면 그냥 다시 보여 준다.
+export const TIPS_KEY = 'lt41.tips.firstTree';
+export const FIRST_TREE_TIPS = Object.freeze([
+  { id: 'write', anchor: 'write-menu', title: '여기서 순간을 더 남겨요', body: '오른쪽 위 "순간 남기기"를 누르면 오늘의 순간이 이 트리에 쌓입니다.' },
+  { id: 'views', anchor: 'tree-views', title: '기억책·보드·관계 지도로 다르게 봐요', body: '같은 기록을 책처럼, 카드처럼, 이어진 선처럼 볼 수 있어요.' }
+]);
+
+export function readTipsSeen(storage) {
+  try {
+    return storage?.getItem(TIPS_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+export function writeTipsSeen(storage) {
+  try {
+    storage?.setItem(TIPS_KEY, '1');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function tipsWanted({ owned = false, treeCount = 0, seen = false } = {}) {
+  return !!owned && Number(treeCount) > 0 && !seen;
+}
+
 // 헤더 주 버튼(#write-menu) 문구. 첫 화면 가운데 첫 버튼과 어긋나지 않게 같은 규칙을 쓴다.
 export function writeMenuLabel({ owned = false, dirty = false, reading = false, hasTree = false } = {}) {
   if (!owned) return '처음 시작하기';

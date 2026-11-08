@@ -10,7 +10,7 @@ import {hasPendingDraft} from './sync-controller.mjs';
 import {exampleTree} from './example.mjs';
 import {parseSelectionRoute,memberStartupView,ownerSelectionRoute,accountPosition,rememberAccountPosition,resolveAccountPosition,stashPendingOwnerRoute,pendingOwnerRoute,takePendingOwnerRoute} from './selection-location.mjs';
 import {applyViewAccessibility,connectionLabel,focusReturnTarget} from './view-a11y.mjs';
-import {accountPresentation,treePickerLabel,treePickerText,treeViewsVisible,writeMenuLabel,homeCenterState,homeStartLoginUrl,readTheme,readLoginIntent,writeTheme,nextTheme,themeButtonLabel,themeButtonAriaLabel,themePressed,appliedTheme,applyThemeAttribute,LOGIN_INTENTS} from './header-state.mjs';
+import {accountPresentation,treePickerLabel,treePickerText,treeViewsVisible,writeMenuLabel,headerState,headerPartsFor,readTipsSeen,writeTipsSeen,tipsWanted,FIRST_TREE_TIPS,homeCenterState,homeStartLoginUrl,readTheme,readLoginIntent,writeTheme,nextTheme,themeButtonLabel,themeButtonAriaLabel,themePressed,appliedTheme,applyThemeAttribute,LOGIN_INTENTS} from './header-state.mjs';
 import {journeyEntry,journeySavePlan,journeyRouteHash,parseJourneyRoute,journeyRouteDecision} from './first-journey.mjs';
 const $=id=>document.getElementById(id);
 let pendingLoginIntent=readLoginIntent(location.search);
@@ -87,24 +87,54 @@ function links(){viewContext();const c=window.LT41;$('connections').replaceChild
  const edges=c.tree.edges.filter(e=>e.from===c.momentId||e.to===c.momentId);setConnectionCount(edges.length);
  if(!edges.length){const p=document.createElement('p');p.textContent='아직 연결된 다른 순간이 없어요.';$('connections').append(p);}
  for(const e of edges){const id=e.from===c.momentId?e.to:e.from,m=c.tree.moments.find(m=>m.id===id),b=document.createElement('button'),kind=document.createElement('small'),title=document.createElement('span');kind.textContent=e.kind==='related'?'관련 순간':e.from===c.momentId?'다음 순간':'이전 순간';const name=document.createElement('strong'),reason=document.createElement('span');name.textContent=m.title;reason.className='connection-reason';reason.textContent=e.reason||(e.kind==='related'?'함께 기억할 관련 순간으로 연결했어요.':'연결 이유를 아직 남기지 않았어요.');title.append(name,reason);b.append(kind,title);b.onclick=()=>{c.momentId=id;$('connection-panel').close();show(current,false);writeLocation();};$('connections').append(b);}}
+// #213 3번: 첫 트리 안내 말풍선. 한 번만 보여 주고, 닫으면 기억한다(저장소가 막히면 다시 보여 준다).
+let tipsReturnFocus=null;
+function closeTreeTips(remember=true){
+  const box=$('tree-tips');if(!box||box.hidden)return;
+  box.hidden=true;if(remember)writeTipsSeen(localStorage);
+  const back=tipsReturnFocus||$('tree-views')?.querySelector('button')||$('mobile-more');tipsReturnFocus=null;
+  if(back&&document.contains(back)&&!back.hidden)back.focus();
+}
+function showTreeTips(){
+  const box=$('tree-tips');if(!box||!box.hidden)return;
+  const list=$('tree-tips-list');
+  if(list&&!list.children.length)for(const tip of FIRST_TREE_TIPS){const li=document.createElement('li');const strong=document.createElement('strong');const span=document.createElement('span');strong.textContent=tip.title;span.textContent=tip.body;li.append(strong,span);list.append(li);}
+  if(!tipsReturnFocus)tipsReturnFocus=document.activeElement;
+  box.hidden=false;
+  $('tree-tips-close')?.focus();
+}
+function syncTreeTips(){
+  const wanted=tipsWanted({owned:!!member?.snapshot().owned,treeCount:model?.trees?.length||0,seen:readTipsSeen(localStorage)});
+  if(wanted)showTreeTips();else closeTreeTips(false);
+}
+$('tree-tips-close')?.addEventListener('click',()=>closeTreeTips());
+document.addEventListener('keydown',event=>{
+  if(event.key!=='Escape')return;
+  const box=$('tree-tips');if(!box||box.hidden)return;
+  if([...document.querySelectorAll('dialog[open]')].some(d=>d.matches(':modal')))return;
+  event.preventDefault();closeTreeTips();
+});
 function flowNavigation(){
   const owned=!!member?.snapshot().owned;
   const reading=!!window.LT41&&['track59-sketchbook.html','track58-pinboard.html','track56-network.html'].includes(current);
   const publicReading=source==='share';
   // 트리 보기 탭은 로그인한 내 트리에서만 연다. 로그아웃이면 예시가 열려 있어도 숨긴다.
-  const showTreeViews=treeViewsVisible({owned,publicReading});
-  $('tree-views').hidden=!showTreeViews;for(const b of $('tree-views').querySelectorAll('button')){b.disabled=!window.LT41;b.title=window.LT41?'':'트리를 선택하면 열 수 있어요.';}
+  // #213 3번: 상태(out·in-empty·in-trees·share)마다 보이는 것만 남기고 나머지는 숨긴다(비활성 표시 없음).
+  const parts=headerPartsFor({owned,treeCount:model?.trees?.length||0,publicReading});
+  const showTreeViews=parts.treeViews&&treeViewsVisible({owned,publicReading});
+  $('tree-views').hidden=!showTreeViews;for(const b of $('tree-views').querySelectorAll('button')){b.disabled=false;b.title='';}
   $('tree-views').setAttribute('aria-label',window.LT41?.tree.title?window.LT41.tree.title+' 보기':'이 트리 보기');
   for(const b of document.querySelectorAll('nav>button'))b.hidden=publicReading;
   // 트리 선택은 뒤쪽 탭 묶음 바로 앞에 있고, 로그인 상태에서만 "트리: <이름> ▾"로 보여 준다.
   // 로그아웃이면 "트리 고르기", 브라우저에만 남은 미저장 기록이 있으면 "저장 안 된 기록"이다.
   const pendingDraft=hasPendingDraft(sessionStorage,member?.snapshot().subject||null);
-  $('record-menu').hidden=publicReading;
+  $('record-menu').hidden=!parts.treePicker||publicReading;
   $('source-label').textContent=treePickerText({owned,treeTitle:window.LT41?.tree.title,pendingDraft});
   $('record-menu').title=owned?(window.LT41?'다른 트리를 고릅니다.':'열어볼 트리를 고릅니다.'):(pendingDraft?'로그인하면 저장하지 못한 기록을 복원합니다.':'로그인하면 내 트리를 고를 수 있습니다.');
-  $('write-menu').hidden=publicReading;$('share-menu').hidden=source!=='server'||!owned||!window.LT41;
+  $('write-menu').hidden=!parts.write||publicReading;$('share-menu').hidden=!parts.share||source!=='server'||!window.LT41;
   if(!member?.snapshot().dirty)$('write-menu').textContent=writeMenuLabel({owned,dirty:false,reading,hasTree:!!window.LT41});
   $('write-menu').title=source==='server'?(reading?'선택한 순간에서 이어지는 새 순간을 기록합니다.':'새 트리의 첫 순간을 기록합니다.'):'로그인한 계정에 내 트리를 만듭니다. 예시에는 저장하지 않아요.';
+  syncTreeTips();
   revealCurrentTab();
 }
 // 2026-11-07: 390·360에서 탭 7개가 폭을 넘는다. 탭 줄은 가로 스크롤이고, 화면을 바꿀 때 현재 탭을 가운데로 당겨 보이게 한다.
