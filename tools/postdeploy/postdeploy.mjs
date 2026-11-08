@@ -962,9 +962,12 @@ async function checkSignedInActions(page, target, opts, stamp) {
       journey: !!document.querySelector('iframe#view') && /first-journey/.test(document.getElementById('view')?.contentWindow?.location?.href || ''),
       feedback: document.getElementById('record-feedback')?.textContent || ''
     })).catch(() => ({}));
-    record('write-menu-editor', 'auth', opened ? 'pass' : 'fail',
+    // 트리가 없으면 같은 버튼이 편집기 대신 첫 여정(새 트리 흐름)을 연다 — 둘 다 정상이다.
+    const newTreeFlow = /#journey/.test(detail.hash || '') || !!detail.journey;
+    record('write-menu-editor', 'auth', opened || newTreeFlow ? 'pass' : 'fail',
       opened ? `"${button.label}" 클릭 → 편집기 열림 (${detail.editorTitle || detail.hash})`
-        : `"${button.label}" 클릭 뒤 3초 안에 #editor 가 열리지 않음 (hash=${detail.hash || ''} journey=${detail.journey} 안내="${(detail.feedback || '').slice(0, 60)}")`,
+        : newTreeFlow ? `"${button.label}" 클릭 → 새 트리 흐름 (${detail.hash || 'first-journey'})`
+        : `"${button.label}" 클릭 뒤 3초 안에 #editor·첫 여정이 열리지 않음 (hash=${detail.hash || ''} journey=${detail.journey} 안내="${(detail.feedback || '').slice(0, 60)}")`,
       { button, detail });
     await page.screenshot({ path: path.join(opts.out, `${stamp}-write-menu-1440.png`) }).catch(() => {});
     if (opened) await closeEditor();
