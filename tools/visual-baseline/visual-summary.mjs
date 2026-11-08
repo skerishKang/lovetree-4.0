@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // 화면 비교 결과(JSON)를 PR 체크 요약용 Markdown으로 바꾼다(2026-11-08, 원칙 8 알림 단계).
 // 기준을 넘어도 실패로 만들지 않는다 — 의도한 디자인 변경도 있으므로 "확인 필요"로만 알린다.
-// 사용: node tools/visual-baseline/visual-summary.mjs <diff.json> [--before-url u] [--after-url u] [--lag 메모]
+// 사용: node tools/visual-baseline/visual-summary.mjs <diff.json> [--before-url u] [--after-url u] [--base-sha s] [--head-sha s] [--base-label 문구] [--lag 메모]
 import { readFileSync, appendFileSync } from 'node:fs';
 
 const args = process.argv.slice(2);
@@ -18,10 +18,14 @@ const data = JSON.parse(readFileSync(jsonPath, 'utf8'));
 const shots = data.shots || [];
 const over = shots.filter((shot) => shot.ratio > shot.limit);
 const lines = [];
-lines.push(`## 겉모습 비교(visual-baseline) — ${over.length ? `확인 필요 ${over.length}장` : '기준 이내'}`);
+const baseSha = (opt('base-sha') || '').slice(0, 7);
+const headSha = (opt('head-sha') || '').slice(0, 7);
+const baseLabel = opt('base-label') || '운영(대체)';
+const head = `## 겉모습 비교(visual-baseline) — ${over.length ? `확인 필요 ${over.length}장` : '기준 이내'}`;
+lines.push(baseSha ? `${head} · 기준 \`${baseSha}\`(${baseLabel}) ↔ 이 PR \`${headSha}\`` : head);
 lines.push('');
-if (opt('before-url')) lines.push(`- before(운영): \`${opt('before-url')}\``);
-if (opt('after-url')) lines.push(`- after(미리보기): \`${opt('after-url')}\``);
+if (opt('before-url')) lines.push(`- before(기준): \`${opt('before-url')}\``);
+if (opt('after-url')) lines.push(`- after(이 PR): \`${opt('after-url')}\``);
 if (opt('lag')) lines.push(`- ⚠ ${opt('lag')}`);
 lines.push(`- ${shots.length}장 중 차이 있음 ${shots.filter((shot) => shot.ratio > 0).length}장 · 최대 ${Number(data.worst || 0).toFixed(3)}% · 기준 초과 ${over.length}장`);
 lines.push(`- 이 비교는 **알림**입니다(실패 처리하지 않음). 의도한 디자인 변경이면 그대로 두고, 아니면 확인이 필요합니다.`);

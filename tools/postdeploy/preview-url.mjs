@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // PR 머리 커밋의 Cloudflare Pages 미리보기 주소를 찾는다(2026-11-08, 원칙 8 자동화).
 // 배포 체크가 끝날 때까지 기다리고, 체크 요약(output.summary)에 적힌 Preview URL을 읽는다.
-// 사용: GITHUB_TOKEN=... node tools/postdeploy/preview-url.mjs <owner/repo> <headSha> [--wait 600]
+// 사용: GITHUB_TOKEN=... node tools/postdeploy/preview-url.mjs <owner/repo> <headSha> [--wait 600] [--quiet]
+// --quiet: 주소를 못 찾아도 요약에 쓰지 않는다(기준 커밋 조회 등 호출자가 처리할 때).
 import { appendFileSync } from 'node:fs';
 
 const [repoArg, shaArg] = process.argv.slice(2).filter((value) => !value.startsWith('--'));
@@ -73,7 +74,7 @@ if (process.env.GITHUB_OUTPUT) {
   appendFileSync(process.env.GITHUB_OUTPUT, `url=${previewUrl}\nreason=${reason}\n`);
 }
 console.log(`preview=${previewUrl || '(없음)'} reason=${reason}`);
-if (!previewUrl) {
+if (!previewUrl && !process.argv.includes('--quiet')) {
   const summary = process.env.GITHUB_STEP_SUMMARY;
   if (summary) {
     appendFileSync(summary, `## 미리보기 검사 건너뜀\n\n- 이유: ${reason}\n- 커밋: \`${sha}\`\n- Cloudflare Pages 미리보기 배포가 없거나 주소를 확인할 수 없어 검사를 실행하지 않았습니다.\n`);

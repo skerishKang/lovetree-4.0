@@ -26,6 +26,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -48,6 +49,23 @@ jobs:
       - name: 미리보기 주소 찾기
         id: preview
         run: node tools/postdeploy/preview-url.mjs "$GITHUB_REPOSITORY" "$PR_SHA" --wait 600
+      - name: 기준 커밋 찾기(merge-base 배포본)
+        id: base
+        run: |
+          BASE_SHA=$(git merge-base "$PR_SHA" origin/main)
+          echo "baseSha=$BASE_SHA" >> "$GITHUB_OUTPUT"
+          echo "기준 커밋(merge-base): $BASE_SHA"
+          node tools/postdeploy/preview-url.mjs "$GITHUB_REPOSITORY" "$BASE_SHA" --wait 240 --quiet > "$RUNNER_TEMP/base.log" 2>&1 || true
+          BASE_URL=$(sed -n 's/.*preview=\([^ ]*\).*/\1/p' "$RUNNER_TEMP/base.log" | head -1)
+          if [ -n "$BASE_URL" ] && [ "$BASE_URL" != "(없음)" ]; then
+            echo "baseUrl=$BASE_URL" >> "$GITHUB_OUTPUT"
+            echo "baseLabel=기준 커밋 배포본" >> "$GITHUB_OUTPUT"
+            echo "기준 주소: $BASE_URL"
+          else
+            echo "baseUrl=https://lovetree-4-0.pages.dev" >> "$GITHUB_OUTPUT"
+            echo "baseLabel=운영(대체)" >> "$GITHUB_OUTPUT"
+            echo "기준 커밋 배포 주소를 못 찾아 운영으로 대체: $(sed -n 's/.*reason=//p' "$RUNNER_TEMP/base.log" | head -1)"
+          fi
       - name: 미리보기 배포 없음 — 건너뜀
         if: steps.preview.outputs.url == ''
         run: |
@@ -82,7 +100,7 @@ jobs:
           if [ ! -d ./preview-out ]; then echo "리포트 폴더가 없습니다"; exit 2; fi
           node tools/postdeploy/preview-gate.mjs ./preview-out --summary "$GITHUB_STEP_SUMMARY"
       # ---- 겉모습 비교(visual-baseline, 2026-11-08): 알림만 하고 실패로 만들지 않는다 ----
-      - name: 운영(main) 화면 캡처 — before
+      - name: 기준 커밋 화면 캡처 — before
         if: steps.preview.outputs.url != ''
         id: capture-before
         continue-on-error: true
@@ -91,7 +109,7 @@ jobs:
         run: |
           start=$(date +%s)
           node tools/visual-baseline/visual-baseline.mjs capture \
-            --base https://lovetree-4-0.pages.dev/v41/ --out visual-before > "$RUNNER_TEMP/before.log" 2>&1
+            --base "${{ steps.base.outputs.baseUrl }}/v41/" --out visual-before > "$RUNNER_TEMP/before.log" 2>&1
           echo "status=$?" >> "$GITHUB_OUTPUT"
           echo "seconds=$(( $(date +%s) - start ))" >> "$GITHUB_OUTPUT"
           tail -5 "$RUNNER_TEMP/before.log" || true
@@ -120,7 +138,7 @@ jobs:
           echo "기준 초과가 있어도 실패로 만들지 않습니다(종료 코드 $?)." >> "$RUNNER_TEMP/compare.log"
           echo "seconds=$(( $(date +%s) - start ))" >> "$GITHUB_OUTPUT"
           tail -12 "$RUNNER_TEMP/compare.log" || true
-      - name: 운영 배포 지연 확인 + 요약 표
+      - name: 겉모습 비교 요약 표
         if: steps.preview.outputs.url != ''
         continue-on-error: true
         run: |
@@ -133,19 +151,19 @@ jobs:
             } >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
-          # 운영 페이지에 실제로 배포된 것이 main 최신인지 확인(체크 요약에만 표시).
-          lag=""
-          main_state=$(curl -sS -H "Authorization: Bearer $GITHUB_TOKEN" \
-            "https://api.github.com/repos/$GITHUB_REPOSITORY/commits/$(git rev-parse origin/main)/check-runs?per_page=50" \
-            | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{try{const d=JSON.parse(s);const p=(d.check_runs||[]).filter(c=>/cloudflare pages/i.test(c.name));console.log(p.length?(p[0].status+'/'+(p[0].conclusion||'-')):'unknown')}catch{console.log('unknown')}})")
-          case "$main_state" in
-            completed/success) lag="" ;;
-            *) lag="운영 배포가 아직 main 최신이 아닐 수 있습니다(main 커밋 배포 상태: $main_state). before는 그 시점 운영 화면입니다." ;;
-          esac
+          # 기준이 운영 대체이면 차이에 다른 PR 변경이 섞였을 수 있음을 경고한다.
+          if [ "${{ steps.base.outputs.baseLabel }}" = "운영(대체)" ]; then
+            LAG_ARG="--lag 기준: 운영(대체) — 차이에 다른 PR 변경이 섞였을 수 있음"
+          else
+            LAG_ARG=""
+          fi
           node tools/visual-baseline/visual-summary.mjs visual-diff.json \
-            --before-url "https://lovetree-4-0.pages.dev/v41/" \
+            --before-url "${{ steps.base.outputs.baseUrl }}/v41/" \
             --after-url "${{ steps.preview.outputs.url }}/v41/" \
-            ${lag:+"--lag" "$lag"} | head -40
+            --base-sha "${{ steps.base.outputs.baseSha }}" \
+            --head-sha "$PR_SHA" \
+            --base-label "${{ steps.base.outputs.baseLabel }}" \
+            $LAG_ARG | head -40
           echo "- 소요: 캡처 before ${{ steps.capture-before.outputs.seconds }}초 · after ${{ steps.capture-after.outputs.seconds }}초 · 비교 ${{ steps.compare.outputs.seconds }}초" >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         if: always() && steps.preview.outputs.url != ''
