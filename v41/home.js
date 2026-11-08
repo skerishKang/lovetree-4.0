@@ -1,7 +1,7 @@
 import '../src/styles.css';
 import {mountOrbit,ORBIT_EXAMPLE} from '../src/views/orbit.js';
 import {homeCardsPlan,readHomeCardsMode,writeHomeCardsMode,clickWithin} from './home-cards.js';
-import {VIEW_MENU_ID,VIEW_MENU_LABEL,viewMenuGroups,viewMenuInitialIndex,viewMenuItems,viewMenuKey} from './home-view-menu.js';
+import {createViewMenu} from '../public/v41/home-view-menu.mjs';
 import {HOME_ORBIT_LIMIT} from './home-moments.js';
 import {fetchPopularCards} from './home-popular.js';
 import {createHomeActions} from './home-actions.js';
@@ -75,44 +75,13 @@ shadow.querySelector('.center-note')?.setAttribute('role','status');
 const mobileFit=document.createElement('style');mobileFit.textContent='@media(max-width:768px){.topbar{gap:12px;flex-wrap:wrap;align-items:center;padding:8px 12px}.top-actions{gap:6px;flex-shrink:0;flex-wrap:wrap;margin-left:auto}.topbar .menuBtn{white-space:nowrap;padding:10px 9px;font-size:14px}.actions .subtleBtn{font-size:14px}.center .center-note{font-size:14px}.hint{font-size:14px}}';shadow.append(mobileFit);
 // 2026-11-08 #213 2번: "움직임 멈춤"·"정원/밤"·"카드: ○○"를 "보기 ▾" 메뉴 하나로 묶는다.
 // 항목: 움직임 켜기/멈춤 · 테마 밤/정원 · 카드 출처(로그인 4 / 로그아웃 예시·인기). 저장값과 lt41-theme 메시지는 그대로다.
-let motionPaused=!!orbit?.motion?.paused;
-const viewWrap=document.createElement('span');viewWrap.className='view-menu-wrap';
-const viewButton=document.createElement('button');viewButton.type='button';viewButton.className='menuBtn view-menu-toggle';viewButton.dataset.ltViewMenu='';
-viewButton.textContent=`${VIEW_MENU_LABEL} ▾`;viewButton.setAttribute('aria-haspopup','menu');viewButton.setAttribute('aria-expanded','false');viewButton.setAttribute('aria-controls',VIEW_MENU_ID);viewButton.setAttribute('aria-label','보기 설정: 움직임·테마·카드 출처');
-const viewMenu=document.createElement('div');viewMenu.className='view-menu';viewMenu.id=VIEW_MENU_ID;viewMenu.setAttribute('role','menu');viewMenu.setAttribute('aria-label','첫 화면 보기 설정');viewMenu.hidden=true;
-const currentItems=()=>viewMenuItems({theme:readTheme(localStorage),paused:motionPaused,cardsMode:cardsPlan.mode,loggedIn});
-const viewItems=()=>[...viewMenu.querySelectorAll('[role^=menuitem]')];
-function runViewItem(item){
- if(item.kind==='motion'){motionPaused=!!orbit?.motion?.toggle();closeViewMenu(true);return;}
- if(item.kind==='theme'){const theme=writeTheme(localStorage,item.value==='garden'?'garden':'night');applyTheme(theme);parent.postMessage({type:'lt41-theme',theme},location.origin);closeViewMenu(true);return;}
- if(item.kind==='cards'){writeHomeCardsMode(localStorage,item.value);closeViewMenu();location.reload();}
-}
-function renderViewMenu(){
- viewMenu.replaceChildren();
- for(const [index,group] of viewMenuGroups({theme:readTheme(localStorage),paused:motionPaused,cardsMode:cardsPlan.mode,loggedIn}).entries()){
-  if(index){const sep=document.createElement('div');sep.className='view-menu-sep';sep.setAttribute('role','separator');viewMenu.append(sep);}
-  for(const item of group.items){
-   const b=document.createElement('button');b.type='button';b.setAttribute('role',item.role);b.setAttribute('aria-checked',String(item.checked));b.dataset.ltViewItem=`${item.kind}:${item.value}`;b.tabIndex=-1;b.textContent=item.label;b.onclick=()=>runViewItem(item);
-   viewMenu.append(b);
-  }
- }
-}
-function openViewMenu(){renderViewMenu();viewMenu.hidden=false;viewButton.setAttribute('aria-expanded','true');const items=viewItems();(items[viewMenuInitialIndex(currentItems())]||items[0])?.focus();}
-function closeViewMenu(refocus=false){if(viewMenu.hidden)return;viewMenu.hidden=true;viewButton.setAttribute('aria-expanded','false');if(refocus)viewButton.focus();}
-viewButton.onclick=()=>{if(viewMenu.hidden)openViewMenu();else closeViewMenu();};
-viewButton.addEventListener('keydown',e=>{
- if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();openViewMenu();}
- else if(e.key==='Escape')closeViewMenu();
+// 2026-11-11 #231 후속: 위 메뉴 로직은 public/v41/home-view-menu.mjs의 createViewMenu로 옮겼다(조건·문구·id 그대로).
+createViewMenu({
+ document,shadow,storage:localStorage,readTheme,writeTheme,applyTheme,clickWithin,
+ getCardsMode:()=>cardsPlan.mode,isLoggedIn:()=>loggedIn,getMotion:()=>orbit?.motion,
+ sendTheme:theme=>parent.postMessage({type:'lt41-theme',theme},location.origin),
+ writeCardsMode:writeHomeCardsMode,reload:()=>location.reload()
 });
-viewMenu.addEventListener('keydown',e=>{
- const items=viewItems(),index=items.indexOf(document.activeElement),next=viewMenuKey(e.key,index,items.length);
- if(next.type==='close'){e.preventDefault();closeViewMenu(true);}
- else if(next.type==='focus'){e.preventDefault();items[next.index]?.focus();}
- else if(next.type==='activate'){e.preventDefault();items[next.index]?.click();}
-});
-// shadow DOM 바깥 클릭 판정은 카드 메뉴 때 쓰던 clickWithin을 그대로 쓴다(#196).
-document.addEventListener('click',e=>{if(!clickWithin(e,viewWrap))closeViewMenu();});
-viewWrap.append(viewButton,viewMenu);shadow.querySelector('.top-actions').append(viewWrap);
 // 2026-11-08 #213 2번: 도구 줄 버튼은 "보기"·"순간 목록" 둘만 남긴다. 공통 헤더가 이미 둘러보기·로그인을 맡으므로
 // 첫 화면 안의 중복 버튼은 만들지 않고, 궤도가 넣어 둔 계정 자리도 지운다(화면 낭독기 순서에서도 사라진다).
 shadow.querySelector('[data-home-account]')?.remove();

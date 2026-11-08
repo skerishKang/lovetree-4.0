@@ -100,37 +100,14 @@ test('메뉴 선택은 기존 저장값을 그대로 쓴다(테마·카드 출�
   assert.equal(readHomeCardsMode(cards, {loggedIn: false}), 'example', '로그아웃에서는 내 것만을 무시한다');
 });
 
-test('도구 줄은 보기·순간 목록 두 버튼이고 순간 목록은 메뉴로 들어가지 않는다', () => {
-  // 도구 줄에서 사라진 옛 버튼들: 움직임·테마·카드 출처는 메뉴 항목이 됐다.
-  assert.equal(homeJS.includes('data-lt-theme-toggle'), false, 'home.js에 테마 토글 버튼이 남음');
-  assert.equal(homeJS.includes('data-lt-card-source'), false, 'home.js에 카드 메뉴 버튼이 남음');
-  assert.equal(homeJS.includes('dataset.ltCardSource'), false);
-  // 순간 목록은 궤도 도구 줄에 그대로 남고, 움직임 버튼은 없어졌다.
-  assert.match(orbitJS, /<button class="menuBtn" data-do="index">순간 목록<\/button>/);
-  assert.equal(orbitJS.includes('data-do="pause"'), false, '움직임 버튼은 메뉴로 옮겼다');
-  assert.match(orbitJS, /dispose\.motion=\{get paused\(\)\{return paused;\}/, '메뉴가 움직임 상태를 읽고 바꾼다');
-  // 보기 버튼 하나를 도구 줄에 붙인다.
-  assert.match(homeJS, /viewButton\.dataset\.ltViewMenu=''/);
-  assert.match(homeJS, /shadow\.querySelector\('\.top-actions'\)\.append\(viewWrap\)/);
-  assert.match(homeJS, /\.top-actions>\.menuBtn,?\.top-actions>\.view-menu-wrap>\.menuBtn\{position:relative;height:36px;min-height:36px/, '시각 높이 36(보기·순간 목록 둘 다)');
-  assert.match(homeJS, /:after\{content:'';position:absolute;inset:-4px/, '누르는 영역 44');
-  // 로그아웃 도구 줄에는 보기·순간 목록만 보여야 하므로 숨김 규칙을 도구 줄 규칙보다 뒤에 다시 둔다.
-  assert.match(homeJS, /\.top-actions>\.home-community,\.top-actions>\[data-home-account\]\{display:none\}/, '계정·둘러보기 버튼은 도구 줄에 남기지 않는다');
-  assert.match(homeJS, /shadow\.querySelector\('\[data-home-account\]'\)\?\.remove\(\)/, '중복 로그인 버튼은 DOM에서 지운다');
-  assert.equal(homeJS.includes('home-community'), true, '숨김 규칙은 남겨 둔다');
-});
-
-test('보기 메뉴는 마우스·키보드·Esc·바깥 클릭으로 열고 닫는다', () => {
-  assert.match(homeJS, /viewButton\.setAttribute\('aria-haspopup','menu'\)/);
-  assert.match(homeJS, /viewButton\.setAttribute\('aria-expanded','false'\)/);
-  assert.match(homeJS, /b\.setAttribute\('aria-checked',String\(item\.checked\)\)/, '항목 상태는 aria-checked로 알린다');
-  assert.match(homeJS, /viewButton\.onclick=\(\)=>\{if\(viewMenu\.hidden\)openViewMenu\(\);else closeViewMenu\(\);\}/);
-  assert.match(homeJS, /if\(e\.key==='ArrowDown'\|\|e\.key==='ArrowUp'\)\{e\.preventDefault\(\);openViewMenu\(\);\}/);
-  assert.match(homeJS, /if\(next\.type==='close'\)\{e\.preventDefault\(\);closeViewMenu\(true\);\}/);
-  // 바깥 클릭은 카드 메뉴 때 쓰던 clickWithin을 그대로 쓴다(#196). 그림자 루트 밖 클릭도 닫힌다.
-  assert.match(homeJS, /document\.addEventListener\('click',e=>\{if\(!clickWithin\(e,viewWrap\)\)closeViewMenu\(\);\}\)/);
-  // 카드 출처 안내(aria-live, #201)는 그대로 남는다.
-  assert.match(homeJS, /shadow\.querySelector\('\.center-note'\)\?\.setAttribute\('aria-live','polite'\)/);
+// 8·9번(도구 줄 배선·열고 닫기 16줄)은 2026-11-11에 함수 시험으로 옮겼다.
+//  · 메뉴 생성·열기/닫기·키보드·바깥 클릭·저장값·lt41-theme → tests/v41-home-view-menu-flow.test.mjs
+//    (public/v41/home-view-menu.mjs의 createViewMenu를 가짜 shadowRoot로 띄운다)
+//  · 궤도의 dispose.motion 읽기/뒤집기 → 같은 파일의 '메뉴 선택' 시험
+// 첫 화면 쪽은 연결만 남았는지 한 줄로 확인한다(메뉴 로직이 다시 home.js에 들어가지 않게).
+test('첫 화면은 메뉴 모듈을 연결만 한다(로직이 다시 인라인으로 돌아가지 않는다)', () => {
+  assert.match(homeJS, /createViewMenu\(\{/);
+  assert.doesNotMatch(homeJS, /viewMenuKey\(|renderViewMenu\(/, '메뉴 규칙·그리기는 모듈 안에 있다');
 });
 
 // ── 7차(2026-11-09): 동작 표를 함수로 넓힌다 ─────────────────────────────────
