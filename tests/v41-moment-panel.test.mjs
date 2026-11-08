@@ -71,8 +71,9 @@ test('내 기록 백업과 보관 파일은 계정 메뉴에서 열리고 패널
 
 test('저장 경로·미디어 메타데이터 규칙은 그대로다', () => {
   assert.match(panels, /apply\(editorMode, Object\.fromEntries\(new FormData\(e\.target\)\), selection\(\)\)/, '편집기 저장은 같은 member.apply 경로다');
-  assert.match(shell, /type==='lt41-media-metadata'/);
-  assert.match(shell, /member\.apply\('cacheMediaMetadata'/);
+  const messages = read('shell/messages.mjs');
+  assert.match(messages, /type === 'lt41-media-metadata'/);
+  assert.match(messages, /apply\('cacheMediaMetadata'/);
   assert.match(upload, /form\.elements\.url\.value=result\.media\.url/, '업로드는 기존 url 필드에만 쓴다');
 });
 

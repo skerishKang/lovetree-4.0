@@ -57,15 +57,18 @@ test('저장이 끝난 뒤 뒤로가기는 성장 단계로 다시 들어가지 
 });
 
 test('셸은 기록·복귀·닫기·저장 뒤 이동을 이 규칙에 연결한다', () => {
-  const shell = readFileSync(new URL('../public/v41/shell.mjs', import.meta.url), 'utf8');
-  assert.match(shell, /journeyRouteDecision\(\{hash:location\.hash,open:current==='first-journey\.html',saved:journeySaved\}\)/);
-  assert.match(shell, /function writeJourneyLocation\(step,mode='push'\)/);
-  assert.match(shell, /history\[mode==='replace'\?'replaceState':'pushState'\]\(mode==='replace'\?history\.state:\{lt41Journey:depth\+1\}/);
-  assert.match(shell, /type==='lt41-journey-step'/);
-  assert.match(shell, /type:'lt41-journey-goto'/);
-  assert.match(shell, /function closeFirstJourney\(\)\{[\s\S]*?history\.go\(-depth\)/);
-  assert.match(shell, /function finishJourney\(\)\{[^}]*show\('src064-orbit\.html',false\);history\.replaceState\(null,'','#home'\)/, '저장 뒤 뒤로가기는 첫 화면으로 나간다');
-  assert.match(shell, /journeySaved=true;\n current='track59-sketchbook\.html'/, '저장을 마치고 기억책으로 갈 때 완료로 표시한다');
+  // #231 1-B③-3: 여정 연결은 shell/journey.mjs, lt41-* 수신은 shell/messages.mjs로 옮겼다.
+  const shell = readFileSync(new URL('../public/v41/shell.mjs', import.meta.url), 'utf8')
+    + readFileSync(new URL('../public/v41/shell/journey.mjs', import.meta.url), 'utf8')
+    + readFileSync(new URL('../public/v41/shell/messages.mjs', import.meta.url), 'utf8');
+  assert.match(shell, /journeyRouteDecision\(\{hash:location\.hash,open:current==='first-journey\.html',saved:shellJourney\.saved\(\)\}\)/);
+  assert.match(shell, /function writeJourneyLocation\(step, mode = 'push'\)/);
+  assert.match(shell, /history\[mode === 'replace' \? 'replaceState' : 'pushState'\]\(mode === 'replace' \? history\.state : \{lt41Journey: depth \+ 1\}/);
+  assert.match(shell, /type === 'lt41-journey-step'/);
+  assert.match(shell, /type: 'lt41-journey-goto'/);
+  assert.match(shell, /function closeFirstJourney\(\) \{[\s\S]*?history\.go\(-depth\)/);
+  assert.match(shell, /function finishJourney\(\) \{[\s\S]*?show\('src064-orbit\.html', false\);\s*history\.replaceState\(null, '', '#home'\)/, '저장 뒤 뒤로가기는 첫 화면으로 나간다');
+  assert.match(shell, /journeySaved = true;\s*setCurrent\('track59-sketchbook\.html'\)/, '저장을 마치고 기억책으로 갈 때 완료로 표시한다');
   assert.match(shell, /const startupJourney=parseJourneyRoute\(location\.hash\)/, '새로고침은 #journey/NN을 다시 연다');
   assert.match(shell, /openFirstJourney\(\{step:startupJourney\.step,route:true\}\)/);
 });
