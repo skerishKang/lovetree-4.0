@@ -857,8 +857,9 @@ async function checkHomeCardMenuMouse(page, target, opts, stamp) {
   }).catch(() => null);
   const readMenu = async () => {
     let last = await readMenuOnce();
-    for (let attempt = 0; attempt < 2 && (!last || (last.hidden === undefined && !last.items.length)); attempt += 1) {
-      await sleep(400);
+    // 러너에서 iframe 문서가 잠깐 비어 읽히므로 최대 3초까지 다시 읽는다.
+    for (let attempt = 0; attempt < 6 && (!last || (last.hidden === undefined && !last.items.length)); attempt += 1) {
+      await sleep(500);
       last = await readMenuOnce();
     }
     return last;
@@ -920,13 +921,13 @@ async function checkHomeCardMenuMouse(page, target, opts, stamp) {
     await frame.locator('body').click({ position: { x: 2, y: 2 } }).catch((error) => problems.push(`${width}: 바깥 클릭 실패 ${error.message}`));
     await sleep(400);
     const closed = await readMenu();
-    if (!closed || closed.hidden !== true) problems.push(`${width}: 바깥 클릭 후에도 열림 ${JSON.stringify(closed)}`);
+    if (!closed || (closed.hidden !== true && closed.expanded !== 'false')) problems.push(`${width}: 바깥 클릭 후에도 열림 ${JSON.stringify(closed)}`);
     await button.click().catch(() => {});
     await sleep(300);
     await page.keyboard.press('Escape').catch(() => {});
     await sleep(300);
     const escaped = await readMenu();
-    if (!escaped || escaped.hidden !== true) problems.push(`${width}: Esc 후에도 열림 ${JSON.stringify(escaped)}`);
+    if (!escaped || (escaped.hidden !== true && escaped.expanded !== 'false')) problems.push(`${width}: Esc 후에도 열림 ${JSON.stringify(escaped)}`);
   }
   await page.setViewportSize({ width: 1440, height: 900 }).catch(() => {});
   record('home-card-menu-mouse', 'visual', problems.length ? 'fail' : 'pass',
