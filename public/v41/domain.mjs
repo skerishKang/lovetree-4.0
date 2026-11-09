@@ -54,9 +54,14 @@ export function safeUrl(value = '') {
   if (url.href.length > 2048) throw new Error('링크가 너무 길어요.');
   return url.href;
 }
-export function suggestMomentTitle({ title = '', note = '', url = '' } = {}) {
+export function suggestMomentTitle({ title = '', note = '', url = '', mediaMetadata = null } = {}) {
   const explicit = optionalText(title, '순간 제목', 80);
   if (explicit) return explicit;
+  // #344(2026-11-10 대표 요청): 미리보기 때 서버 oEmbed 프록시가 받아 둔 영상 제목을 자동 제목으로 쓴다(80자 자르기).
+  // 우선순위: 사용자 입력 > 영상 제목 > 마음 한마디 첫 줄 > 기존 도메인 규칙. oEmbed를 못 받으면(빈 값) 기존 규칙으로 물러난다.
+  // src/domain.js(서버가 쓰는 같은 규칙)와 이 규칙이 같은지 tests/v41-video-title.test.mjs가 확인한다.
+  const videoTitle = typeof mediaMetadata?.title === 'string' ? mediaMetadata.title.trim() : '';
+  if (videoTitle) return shortened(videoTitle, 80);
   const memo = optionalText(note, '마음 한마디', 500);
   if (memo) return shortened(memo.split(/\r?\n/)[0] || memo);
   const normalized = safeUrl(url);
@@ -75,7 +80,9 @@ export function normalizeEmotion(value) {
 export function validateMomentInput(input) {
   const note = optionalText(input.note, '마음 한마디', 500);
   const url = safeUrl(input.url || '');
-  const title = suggestMomentTitle({ title: input.title, note, url });
+  // #344: 영상 제목(mediaMetadata.title)을 자동 제목 후보로 함께 넘겨 판정하고, 저장값에도 그대로 남긴다.
+  const mediaMetadata = normalizeMediaMetadata(input.mediaMetadata, url);
+  const title = suggestMomentTitle({ title: input.title, note, url, mediaMetadata });
   if (!title) throw new Error('순간 제목, 마음 한마디, 링크나 첨부 중 하나는 남겨 주세요.');
   const emotion = normalizeEmotion(input.emotion);
   const date = input.date || new Date().toISOString().slice(0, 10);
@@ -83,7 +90,6 @@ export function validateMomentInput(input) {
   const relation = typeof input.relation === 'string' ? input.relation.trim() : '';
   if (relation.length > 100) throw new Error('연결 이유는 100자까지 적을 수 있어요.');
   const result = { title, note, emotion, date, relation, url };
-  const mediaMetadata = normalizeMediaMetadata(input.mediaMetadata, url);
   if (mediaMetadata) result.mediaMetadata = mediaMetadata;
   return result;
 }
@@ -200,7 +206,8 @@ function detachMoments(tree, movedIds) {
 // 만들고 그 순간이 시작 순간이 되고, 있으면 시작 순간 아래에 붙인다. 제목·감정은 기존 자동
 // 규칙(suggestMomentTitle·기본 감정)을 쓴다. 트리·순간 한도를 넘으면 기존 문구로 막는다.
 export function quickAdd(state, input, clock = new Date().toISOString()) {
-  const moment = { ...validateMomentInput({ url: input?.url || '' }), id: newId(), parentId: null, relation: '', links: [], createdAt: clock };
+  // #344: 빠른 추가도 미리보기 때 받은 영상 제목(mediaMetadata)을 저장에 함께 넘긴다.
+  const moment = { ...validateMomentInput({ url: input?.url || '', mediaMetadata: input?.mediaMetadata }), id: newId(), parentId: null, relation: '', links: [], createdAt: clock };
   const trees = state.trees;
   const inbox = trees.find(tree => tree.inbox === true);
   if (!inbox) {
@@ -208,7 +215,7 @@ export function quickAdd(state, input, clock = new Date().toISOString()) {
     const tree = { id: newId(), subject: INBOX_SUBJECT, title: INBOX_SUBJECT, coverMomentId: '', coverDesign: '', inbox: true, createdAt: clock, updatedAt: clock, moments: [moment] };
     return { state: { version: 1, trees: [...trees, tree] }, treeId: tree.id, momentId: moment.id };
   }
-  const grown = addMoment(inbox, { url: input?.url || '' }, inbox.moments.find(m => m.parentId === null).id, clock);
+  const grown = addMoment(inbox, { url: input?.url || '', mediaMetadata: input?.mediaMetadata }, inbox.moments.find(m => m.parentId === null).id, clock);
   return { state: { version: 1, trees: trees.map(tree => tree.id === inbox.id ? grown : tree) }, treeId: inbox.id, momentId: grown.moments.at(-1).id };
 }
 

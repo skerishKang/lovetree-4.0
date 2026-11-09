@@ -2,6 +2,7 @@
 // 판정·문구·추출은 ../quick-add.mjs의 순수 함수가 맡고, 이 파일은 DOM만 만진다(docs/TESTING.md).
 // 저장은 로컬1 계약(member.apply('quickAdd', {url}))을 그대로 부른다 — 화면은 이름만 쓴다.
 import {mountPrivateUpload} from '../private-upload.mjs';
+import {fetchVideoTitle} from '../video-title.mjs';
 import {extractDropUrl, hasDropPayload, firstImageFile, parseQuickUrl, dropRoute, QUICK_SAVED_TEXT, QUICK_REFINE_LABEL, QUICK_EMPTY_ERROR, QUICK_INVALID_ERROR, DROP_LOGIN_NOTICE, DROP_READONLY_NOTICE} from '../quick-add.mjs';
 
 export function createQuickAdd(deps) {
@@ -83,18 +84,14 @@ export function createQuickAdd(deps) {
     $('quick-preview').append(label);
   }
   // 제목은 기존 서버 oEmbed 프록시에서만 받는다(썸네일이 200이어도 없는 영상일 수 있어 실패는 조용히 넘긴다).
+  // 받아 둔 제목은 titleCache에 남고, 저장 시(#344) mediaMetadata.title로 함께 넘어가 자동 제목이 된다.
   async function loadYouTubeTitle(videoId, node, token) {
     if (!videoId) return;
     if (titleCache.has(videoId)) { node.textContent = titleCache.get(videoId); return; }
-    try {
-      const answer = await fetchImpl('/api/youtube/oembed?v=' + encodeURIComponent(videoId), {headers: {accept: 'application/json'}});
-      if (!answer?.ok) return;
-      const data = await answer.json();
-      const title = typeof data?.title === 'string' ? data.title.trim() : '';
-      if (!title) return;
-      titleCache.set(videoId, title);
-      if (token === previewToken && node.isConnected !== false) node.textContent = title;
-    } catch {}
+    const title = await fetchVideoTitle(videoId, fetchImpl);
+    if (!title) return;
+    titleCache.set(videoId, title);
+    if (token === previewToken && node.isConnected !== false) node.textContent = title;
   }
 
   function submitQuick(event) {
@@ -109,10 +106,19 @@ export function createQuickAdd(deps) {
     saveUrl(parsed.value);
   }
 
-  // 저장 한 번 = member.apply('quickAdd', {url}). 성공하면 칸을 비우고 초점을 유지해 연속 추가가 된다.
+  // 미리보기 때 받아 둔 영상 제목을 저장 입력에 붙인다(#344). 못 받았으면(늦은 응답·oEmbed 실패) 붙이지 않고
+  // 기존 도메인 규칙(suggestMomentTitle의 마음 한마디·링크 규칙)으로 물러난다.
+  function quickMediaTitle(url) {
+    const parsed = parseQuickUrl(url, describe);
+    if (parsed.status !== 'ok' || parsed.kind !== 'youtube' || !parsed.videoId) return {};
+    const title = titleCache.get(parsed.videoId) || '';
+    return title ? { mediaMetadata: { title } } : {};
+  }
+
+  // 저장 한 번 = member.apply('quickAdd', {url, mediaMetadata?}). 성공하면 칸을 비우고 초점을 유지해 연속 추가가 된다.
   function saveUrl(url) {
     let result = null;
-    try { result = deps.getMember().apply('quickAdd', {url}) || null; }
+    try { result = deps.getMember().apply('quickAdd', {url, ...quickMediaTitle(url)}) || null; }
     catch (error) { $('quick-error').textContent = error.message; return false; }
     showSaved(url, result);
     if ($('quick-add').open) {
