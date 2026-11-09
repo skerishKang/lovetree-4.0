@@ -82,7 +82,7 @@ const USAGE = `lovetree-postdeploy ${TOOL_VERSION}
   --share <id>        쓰기 검사 대상 공유 id
   --youtube <id>      oEmbed 검사에 쓸 공개 YouTube 영상 id(기본 dQw4w9WgXcQ)
   --secrets <path>    자동 로그인 비밀 파일(기본 %USERPROFILE%\\.secrets\\.env)
-  --profile <dir>     로그인 세션 프로필 폴더(기본 tools/postdeploy/.profile, --account 02·03 이면 .profile-02·.profile-03)
+  --profile <dir>     로그인 세션 프로필 폴더(기본 tools/postdeploy/.profile, --account 02·04 이면 .profile-02·.profile-04)
   --out <dir>         결과 JSON·스크린샷 폴더(기본 tools/postdeploy/out)
   --timeout <ms>      대기 시간(기본 60000)
   --strict            경고(겹침 등)도 실패로 간주
@@ -1051,6 +1051,17 @@ async function checkSignedInActions(page, target, opts, stamp) {
   }).catch(() => null);
   const editorOpen = () => page.waitForFunction(() => document.getElementById('editor')?.open === true, { timeout: 3000 })
     .then(() => true).catch(() => false);
+  // #327②부터 #write-menu는 고르기 창(#write-chooser)을 열고, 거기서 빠른 추가·자세한 추가를 고른다.
+  const chooserOpen = () => page.waitForFunction(() => document.getElementById('write-chooser')?.open === true, { timeout: 3000 })
+    .then(() => true).catch(() => false);
+  // 고르기 창에서 “자세한 추가”를 누른 뒤 편집기 또는 첫 여정이 열리는지 기다린다.
+  const chooseDetailed = async () => {
+    await page.evaluate(() => document.getElementById('write-detailed')?.click()).catch(() => {});
+    const opened = await editorOpen();
+    if (opened) return { editor: true };
+    await page.waitForFunction(() => /#journey/.test(location.hash || ''), { timeout: 3000 }).catch(() => {});
+    return { editor: false };
+  };
   const closeEditor = async () => {
     await page.evaluate(() => document.getElementById('editor')?.close()).catch(() => {});
     await sleep(300);
@@ -1065,9 +1076,11 @@ async function checkSignedInActions(page, target, opts, stamp) {
     record('write-menu-editor', 'auth', 'fail', `로그인 상태인데 "순간 남기기" 버튼이 보이지 않음 ${JSON.stringify(button)}`);
   } else {
     await clickSmart(page, '#write-menu');
-    const opened = await editorOpen();
+    const chooser = await chooserOpen();
+    const opened = chooser ? (await chooseDetailed()).editor : false;
     const detail = await page.evaluate(() => ({
       hash: location.hash,
+      chooserOpen: !!document.getElementById('write-chooser')?.open,
       editorOpen: !!document.getElementById('editor')?.open,
       editorTitle: document.getElementById('editor-title')?.textContent || '',
       journey: /first-journey/.test((([document.getElementById('view'), document.getElementById('view-next')].find((el) => el && !el.hidden && el.getClientRects().length > 0) || document.getElementById('view'))?.contentWindow?.location?.href || '')),
@@ -1075,10 +1088,11 @@ async function checkSignedInActions(page, target, opts, stamp) {
     })).catch(() => ({}));
     // 트리가 없으면 같은 버튼이 편집기 대신 첫 여정(새 트리 흐름)을 연다 — 둘 다 정상이다.
     const newTreeFlow = /#journey/.test(detail.hash || '') || !!detail.journey;
-    record('write-menu-editor', 'auth', opened || newTreeFlow ? 'pass' : 'fail',
-      opened ? `"${button.label}" 클릭 → 편집기 열림 (${detail.editorTitle || detail.hash})`
-        : newTreeFlow ? `"${button.label}" 클릭 → 새 트리 흐름 (${detail.hash || 'first-journey'})`
-        : `"${button.label}" 클릭 뒤 3초 안에 #editor·첫 여정이 열리지 않음 (hash=${detail.hash || ''} journey=${detail.journey} 안내="${(detail.feedback || '').slice(0, 60)}")`,
+    record('write-menu-editor', 'auth', chooser && (opened || newTreeFlow) ? 'pass' : 'fail',
+      chooser && opened ? `"${button.label}" 클릭 → 고르기 창 → 자세한 추가로 편집기 열림 (${detail.editorTitle || detail.hash})`
+        : chooser && newTreeFlow ? `"${button.label}" 클릭 → 고르기 창 → 자세한 추가로 새 트리 흐름 (${detail.hash || 'first-journey'})`
+        : chooser ? `"${button.label}" 클릭 → 고르기 창은 열렸지만 자세한 추가 뒤 3초 안에 #editor·첫 여정이 열리지 않음 (hash=${detail.hash || ''} journey=${detail.journey} 안내="${(detail.feedback || '').slice(0, 60)}")`
+        : `"${button.label}" 클릭 뒤 3초 안에 고르기 창(#write-chooser)이 열리지 않음 (hash=${detail.hash || ''})`,
       { button, detail });
     await page.screenshot({ path: path.join(opts.out, `${stamp}-write-menu-1440.png`) }).catch(() => {});
     if (opened) await closeEditor();
@@ -1087,16 +1101,20 @@ async function checkSignedInActions(page, target, opts, stamp) {
     await page.evaluate(() => { location.hash = '#shelf'; }).catch(() => {});
     await sleep(2500);
     await clickSmart(page, '#write-menu');
+    const shelfChooser = await chooserOpen();
+    const chosen = shelfChooser ? await chooseDetailed() : { editor: false };
     const after = await page.evaluate(() => ({
       hash: location.hash,
+      chooserOpen: !!document.getElementById('write-chooser')?.open,
       editorOpen: !!document.getElementById('editor')?.open,
       editorTitle: document.getElementById('editor-title')?.textContent || '',
       journey: /first-journey/.test((([document.getElementById('view'), document.getElementById('view-next')].find((el) => el && !el.hidden && el.getClientRects().length > 0) || document.getElementById('view'))?.contentWindow?.location?.href || ''))
     })).catch(() => ({}));
     const newFlow = /#journey/.test(after.hash || '') || after.journey || (after.editorOpen && /새|추가/.test(after.editorTitle || ''));
-    record('write-menu-shelf-new-tree', 'auth', newFlow ? 'pass' : 'fail',
-      newFlow ? `책장에서 클릭 → 새 트리 흐름 (${after.hash || after.editorTitle})`
-        : `책장에서 클릭 뒤 새 트리 흐름이 열리지 않음 ${JSON.stringify(after)}`, { after });
+    record('write-menu-shelf-new-tree', 'auth', shelfChooser && newFlow ? 'pass' : 'fail',
+      shelfChooser && newFlow ? `책장에서 클릭 → 고르기 창 → 자세한 추가 → 새 트리 흐름 (${after.hash || after.editorTitle})`
+        : shelfChooser ? `책장에서 클릭 → 고르기 창 → 자세한 추가 뒤 새 트리 흐름이 열리지 않음 ${JSON.stringify(after)}`
+        : `책장에서 클릭 뒤 고르기 창(#write-chooser)이 열리지 않음 ${JSON.stringify(after)}`, { after });
     if (after.editorOpen) await closeEditor();
     await page.goto(target.href, { waitUntil: 'domcontentloaded', timeout: opts.timeout }).catch(() => {});
     await page.waitForSelector('#community-menu', { timeout: opts.timeout }).catch(() => {});

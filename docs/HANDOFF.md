@@ -94,10 +94,10 @@
 2. **셸**은 `public/v41/shell.mjs`(배선) + `public/v41/shell/*.mjs`(화면·헤더·패널·메시지·여정·테마)로 나뉘어 있고, 각 파일 300줄 이하다.
 3. **원칙 7**: 옮기기만 하는 작업은 조건·문구·id·순서·저장 키·`lt41-*` 메시지·URL 형식을 바꾸지 않는다.
 4. **원칙 8**: 머지 전에 PR 미리보기 자동 검사(기능 + 겉모습 비교)를 통과해야 하고, 미리보기 Functions 503만 예외다(근거 링크 필요).
-5. **시험 계정은 레인별 전용**이다 — 로컬1 `--account 02`, 로컬2 `--account 03`, 로컬3 `--account 01`. 자기 계정만 쓰고, 끝나면 트리 0개·보관 파일 0개로 정리한다(`tools/postdeploy/README.md`).
+5. **시험 계정은 레인별 전용**이다 — 로컬1 `--account 02`, 로컬2 `--account 04`, 로컬3 `--account 01`. 자기 계정만 쓰고, 끝나면 트리 0개·보관 파일 0개로 정리한다(`tools/postdeploy/README.md`).
 6. **시험 원칙**: 동작은 함수 호출로, 마크업·CSS 값·문구만 글자 검사(`docs/TESTING.md`). 새 시험은 한 곳을 깨뜨려 실패를 확인한 뒤 되돌린다(강도 증명).
 7. **검증 명령**: `npm test` · `npm run build` · `node tools/postdeploy/postdeploy.mjs <주소> --account NN --auto-login`.
-8. **금지**: 값(비밀번호·이메일 원문)·`out/`·비밀 폴더 커밋, 다른 레인 파일 동시 수정.
+8. **금지**: 값(비밀번호·이메일 원문)·`out/`·비밀 폴더 커밋, 다른 레인 파일 동시 수정. **`git add -A`·`git add .` 금지(2026-11-09 대표 결정)** — 파일을 하나씩 지정해 add하고, 커밋 전 `git status`로 올라간 파일을 눈으로 확인한다. `tests/forbidden-paths.test.mjs`가 금지 경로(프로필·`.tmp-*`·`out/`)가 트래킹되면 CI를 실패시킨다.
 9. **이 문서**는 날짜별 기록이다. 구조·규칙을 알려면 이 10줄과 아래 "파일 지도" 절을 보면 되고, 지난 기록은 이력으로만 읽는다.
 10. 되돌리기·릴리스 판단은 `docs/REFACTOR_PLAN_20261108.md`(이유·계획)와 `docs/REFACTOR_15_VIEWS_MERGE.md`(한 벌 통합 결과)를 따른다.
 
@@ -1074,14 +1074,15 @@ COM2에는 merge `6900df8aa446dfe0201d01997457fae04c4abe16`의 변경 서버 파
 | 레인 | 계정 | 실행 | .secrets 키 |
 | --- | --- | --- | --- |
 | 로컬1 | **02** | `--account 02` | `PADIEM_TUTORIAL02_EMAIL`·`_PASSWORD` |
-| 로컬2 | **03** | `--account 03` | `PADIEM_TUTORIAL03_EMAIL`·`_PASSWORD` |
+| 로컬2 | **04** | `--account 04` | `PADIEM_TUTORIAL04_EMAIL`·`_PASSWORD` |
 | 로컬3 | **01**(기존) | `--account 01`(기본) | `PADIEM_TUTORIAL01_*` |
 
 - 규칙: **자기 계정만** 사용하고, 끝나면 트리 0개·보관 파일 0개까지 정리한다. 다른 레인 계정으로는 로그인하지 않는다.
 - 계정 값이 `.secrets`에 없으면 `--auto-login`은 로그인을 건너뛰고 **warn**만 남긴다(실패 아님). 값은 화면·로그·리포트·커밋에 쓰지 않는다.
-- 브라우저 프로필은 계정별로 분리(`.profile`, `.profile-02`, `.profile-03`) → **두 레인이 동시에 돌아도** 세션이 엉키지 않는다.
+- 브라우저 프로필은 계정별로 분리(`.profile`, `.profile-02`, `.profile-04`) → **두 레인이 동시에 돌아도** 세션이 엉키지 않는다.
 - **계정 생성은 레인이 한다**(2026-11-09 완료). Chat QA 계정 도구(ai-revenue-lab `provision_qa_smoke_account.ps1`)와 같은 방식 — `POST https://chat.padiem.net/api/auth/password/register` → 409 `account_exists`면 가입 생략 → `POST .../api/auth/password/login`으로 쌍 검증. 이메일 인증 없이 점검 전용 주소(`@test.dev`)를 쓴다.
-- 02·03 계정·`.secrets` 값 준비 완료(값은 컴1 `C:\Users\limone\.secrets\.env`, 사본 `.env.bak-261109-*`). 두 계정 동시 `--auto-login`에서 **로그인 완료·트리 0개**를 확인했다. 계정을 새로 만들 때도 같은 순서(가입 → 로그인 검증 → `.secrets` 저장 → `--auto-login` fail 0)를 지킨다.
+- 02·04 계정·`.secrets` 값 준비 완료(값은 컴1 `C:\Users\limone\.secrets\.env`). 두 계정 동시 `--auto-login`에서 **로그인 완료·트리 0개**를 확인했다. 계정을 새로 만들 때도 같은 순서(가입 → **`.secrets` 저장 → 로그인 검증** → `--auto-login` fail 0)를 지킨다.
+- **계정 03 삭제·04 신설(2026-11-09 밤, 대표 결정)**: PR 작업 중 브라우저 프로필(`tools/postdeploy/.profile-03`)이 커밋·푸시됐다(커밋 `64c4e2c2e9d932463d96326f4f314dde0f2b0aa0`, 브랜치 `ai/local2-lt-quick-add-261109`, 푸시 2026-11-09 22:46:48 +0900). 푸시된 커밋은 SHA로 계속 열릴 수 있어 세션을 노출로 보고, 계정 03을 레인 권한으로 탈퇴·삭제했다(러브트리 기록 트리 0·보관 0 확인 후, `/api/account/delete` 고정 문구 확인, 삭제 후 옛 쿠키 `/api/workspace`·`/api/account` **401** 확인, 미디어 정리 확인). 공통 계정은 다른 서비스 연결이 남아 자동 삭제되지 않았다 → **대표가 할 일: 공통 인증 화면에서 계정 03의 연결을 정리(또는 삭제)**. 로컬 `.profile-03` 폴더와 `.secrets`의 `PADIEM_TUTORIAL03_*`도 지웠다. 새 계정 **04**(점검 전용 `@test.dev` 주소)를 같은 방식으로 만들고 `--auto-login`을 통과시켰다. 자연 유도 주소(03 주소의 03→04) 하나는 생성 도중 비밀번호를 잃어 못 쓰게 됐다(로그인 불가 — 재사용 금지).
 
 ## 2026-11-09 내 책장 파일 지도 (보충, #231 · PR #290 `c517fd5`)
 

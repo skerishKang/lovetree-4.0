@@ -53,7 +53,7 @@ node tools/postdeploy/postdeploy.mjs https://lovetree-4-0.pages.dev/v41/ --login
 | 레인 | 계정 | 실행 |
 | --- | --- | --- |
 | 로컬1 | **02** | `--account 02` |
-| 로컬2 | **03** | `--account 03` |
+| 로컬2 | **04** | `--account 04` |
 | 로컬3 | **01**(기존) | `--account 01` |
 
 ```powershell
@@ -61,9 +61,9 @@ node tools/postdeploy/postdeploy.mjs https://lovetree-4-0.pages.dev/v41/ --login
 node tools/postdeploy/postdeploy.mjs https://lovetree-4-0.pages.dev/v41/ --account 02 --auto-login
 ```
 
-- `.secrets` 키: `PADIEM_TUTORIAL02_EMAIL`, `PADIEM_TUTORIAL02_PASSWORD` (03도 같은 규칙).
+- `.secrets` 키: `PADIEM_TUTORIAL02_EMAIL`, `PADIEM_TUTORIAL02_PASSWORD` (04도 같은 규칙).
 - 계정 값이 없으면 로그인을 건너뛰고 **warn**으로 남깁니다(실패 아님). 이메일·비밀번호 값은 화면·로그·리포트에 쓰지 않습니다.
-- 프로필 기본 폴더: `01` → `tools/postdeploy/.profile`, `02`·`03` → `.profile-02`·`.profile-03`.
+- 프로필 기본 폴더: `01` → `tools/postdeploy/.profile`, `02`·`04` → `.profile-02`·`.profile-04`. (03은 2026-11-09 삭제 — 프로필 노출 건, 재사용 금지)
 - 작업을 마치면 **자기 계정으로** 트리 0개·보관 파일 0개 정리까지 확인합니다.
 
 ```powershell
