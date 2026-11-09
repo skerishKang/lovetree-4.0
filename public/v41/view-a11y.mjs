@@ -51,7 +51,7 @@ function installStyle(doc) {
   if (doc.getElementById('lt-a11y-view-style')) return;
   const style = doc.createElement('style');
   style.id = 'lt-a11y-view-style';
-  style.textContent = `.lt-a11y-focusable:focus-visible,#stage:focus-visible{outline:2px solid var(--lt-gold,#ffe6a6);outline-offset:3px}.lt-a11y-sr-only{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}`;
+  style.textContent = `.lt-a11y-focusable:focus-visible,.lt-a11y-open:focus-visible,#stage:focus-visible{outline:2px solid var(--lt-gold,#ffe6a6);outline-offset:3px}.lt-a11y-sr-only{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}.lt-a11y-open{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}.lt-a11y-open:focus-visible{position:static!important;width:auto!important;height:auto!important;margin:0 0 8px!important;padding:6px 12px!important;overflow:visible!important;clip:auto!important;border:1px solid currentColor!important;border-radius:999px!important;background:transparent!important;color:inherit!important;font:inherit!important;cursor:pointer!important}`;
   doc.head.append(style);
 }
 
@@ -76,20 +76,40 @@ export function applyViewAccessibility(doc, win = doc?.defaultView) {
   const decorateBookMoments = () => all('#book [data-moment],#mobilePage [data-moment]').forEach(piece => {
     if (piece.dataset.ltA11yMoment === '1') return;
     piece.dataset.ltA11yMoment = '1';
+    const openMoment = () => {
+      const id = piece.dataset.moment;
+      if (typeof win.showDetail === 'function') win.showDetail(id);
+      else piece.click();
+    };
+    // 안에 실제 버튼·링크가 있는 순간(사진·미디어 순간)은 카드 자체를 버튼으로 만들지 않는다.
+    // 그러면 안쪽 '사진 불러오기' 버튼과 중첩 상호작용이 되어 안쪽 버튼이 낭독·탭 순서에서 가려진다(#325).
+    // 대신 키보드로 상세를 여는 실제 버튼을 카드 맨 앞에 하나 둔다(#202의 키보드 열기 유지).
+    if (piece.querySelector(FOCUSABLE)) {
+      if (!piece.querySelector('.lt-a11y-open')) {
+        const open = doc.createElement('button');
+        open.type = 'button';
+        open.className = 'lt-a11y-open';
+        open.textContent = '순간 열기';
+        open.addEventListener('click', openMoment);
+        piece.prepend(open);
+      }
+      return;
+    }
     piece.tabIndex = 0;
     piece.setAttribute('role', 'button');
     piece.classList.add('lt-a11y-focusable');
     piece.addEventListener('keydown', event => {
       if (!['Enter', ' ', 'Spacebar'].includes(event.key)) return;
       event.preventDefault();
-      const id = piece.dataset.moment;
-      if (typeof win.showDetail === 'function') win.showDetail(id);
-      else piece.click();
+      openMoment();
     });
   });
   decorateBookMoments();
   const book = doc.querySelector('#book');
   if (book) new MutationObserver(decorateBookMoments).observe(book, { childList: true, subtree: true });
+  // 책의 돋보기·모바일 돋보기는 확대용 복제본이다. 포커스·낭독 대상에서 빼 중복 탭 정지와
+  // 복제본 안의 중첩 버튼 오탐을 막는다.
+  for (const lens of all('#lens,#mobileInspect')) lens.setAttribute('inert', '');
 
   // 기억 보드: 네이티브 select의 이름을 제공한다.
   const media = doc.querySelector('#mediaFilter');
