@@ -1,0 +1,17 @@
+{
+  "name": "LoveTree 4.1",
+  "short_name": "러브트리",
+  "description": "순간을 잇고 모아두는 러브트리 4.1 — 주소 공유로 바로 담을 수 있어요.",
+  "start_url": "./",
+  "display": "standalone",
+  "theme_color": "#040407",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ],
+  "share_target": {
+    "action": "./",
+    "method": "GET",
+    "params": { "url": "quickadd" }
+  }
+}
