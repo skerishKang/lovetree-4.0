@@ -11,6 +11,8 @@ function paintLensButton(){const b=$b('#lensBtn');if(!b)return;b.classList.toggl
 /* 4. '다음 순간 남기기': 이 순간을 부모로 기존 순간 추가 편집기를 연다. */
 function requestNextMoment(parentId){
  if(!parentId)return;
+ // #315: 공유 감상은 쓰기를 열지 않는다(버튼이 남아도 메시지를 보내지 않는다).
+ if(LTDEMO.readOnly)return;
  if(window.parent===window){toast('순간 추가는 러브트리 화면에서 열 수 있어요');return}
  // 편집기는 지금 고른 순간을 기준으로 열린다. 먼저 이 순간을 고른 뒤 추가를 연다.
  window.parent.postMessage({type:'lt41-select',id:parentId},location.origin);
@@ -97,13 +99,13 @@ document.addEventListener('pointerdown',e=>{
 document.addEventListener('click',e=>{
  if(!isPrimaryButton(e))return;
  const next=e.target.closest('[data-next-moment]');
- if(next){e.preventDefault();e.stopPropagation();requestNextMoment(next.dataset.nextMoment||selectedMomentId);return}
+ if(next){if(LTDEMO.readOnly)return;e.preventDefault();e.stopPropagation();requestNextMoment(next.dataset.nextMoment||selectedMomentId);return}
  /* 1. YouTube 그 자리 재생: 누른 뒤에만 iframe을 만든다(시작 시점 반영, referrerpolicy 엄격). */
  const yt=e.target.closest('[data-yt-play]');
  if(yt){e.preventDefault();e.stopPropagation();if(!yt.parentElement||yt.parentElement.querySelector('iframe.yt-frame'))return;
   playInline(yt,{openUrl:'https://www.youtube.com/watch?v='+yt.dataset.ytPlay});return}
  const edit=e.target.closest('[data-title-edit]');
- if(edit){e.preventDefault();e.stopPropagation();if(window.parent===window){toast('제목 고치기는 러브트리 화면에서 열 수 있어요');return}
+ if(edit){if(LTDEMO.readOnly)return;e.preventDefault();e.stopPropagation();if(window.parent===window){toast('제목 고치기는 러브트리 화면에서 열 수 있어요');return}
   window.parent.postMessage({type:'lt41-select',id:edit.dataset.titleEdit},location.origin);
   window.parent.postMessage({type:'lt41-write',mode:'edit',momentId:edit.dataset.titleEdit},location.origin);return}
  if(e.target.closest('[data-detail-viewer]')){e.preventDefault();openViewer();return}
@@ -119,7 +121,7 @@ function paintTitle(m){
   (parts.media?'<p class="moment-video">'+t(parts.media)+'</p>':'')+
   '<p>'+t(m.date)+' · '+t(m.emotion)+' · '+t(m.source)+'</p>'+
   '<div class="chips">'+m.keywords.map(k=>'<span class="chip">#'+t(k)+'</span>').join('')+'</div>'+
-  (m.synthetic?'':'<button type="button" class="title-edit" data-title-edit="'+t(m.id)+'">제목 고치기</button>')+
+  ((m.synthetic||LTDEMO.readOnly)?'':'<button type="button" class="title-edit" data-title-edit="'+t(m.id)+'">제목 고치기</button>')+
   '</div>';
 }
 /* 3. 한 페이지에 다 들어오게 + 1. YouTube는 그 자리에서 재생(누르기 전 외부 요청 0). */
@@ -153,7 +155,7 @@ renderSpread=function(idx,focusId=null,land=true){
  }
  const right=SPREADS[current].right;
  if(right&&right.synthetic){
-  rightPage.innerHTML='<div class="next-page"><div><b>'+t(NEXT_PAGE_COPY)+'</b></div><button type="button" data-next-moment="'+t(SPREADS[current].left.id)+'">'+t(NEXT_PAGE_ACTION)+'</button></div>';
+  rightPage.innerHTML='<div class="next-page"><div><b>'+t(NEXT_PAGE_COPY)+'</b></div>'+(LTDEMO.readOnly?'':'<button type="button" data-next-moment="'+t(SPREADS[current].left.id)+'">'+t(NEXT_PAGE_ACTION)+'</button>')+'</div>';
  }
  paintLensButton();
 };
@@ -173,7 +175,7 @@ mobileSpreadContent=function(s,focusId=null){
  if(s.right&&s.right.synthetic){
   const at=html.lastIndexOf('<div class="mobile-support">');
   if(at>=0){const close=html.indexOf('</div>',at);
-   if(close>at)html=html.slice(0,at)+'<div class="mobile-support next-page"><b>'+t(NEXT_TITLE)+'</b><button type="button" data-next-moment="'+t(s.left.id)+'">'+t(NEXT_PAGE_ACTION)+'</button></div>'+html.slice(close+6);}
+   if(close>at)html=html.slice(0,at)+'<div class="mobile-support next-page"><b>'+t(NEXT_TITLE)+'</b>'+(LTDEMO.readOnly?'':'<button type="button" data-next-moment="'+t(s.left.id)+'">'+t(NEXT_PAGE_ACTION)+'</button>')+'</div>'+html.slice(close+6);}
  }
  return html;
 };

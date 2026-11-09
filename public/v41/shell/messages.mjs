@@ -36,7 +36,7 @@ export function createMessages(deps) {
     if (event.origin !== location.origin || event.source !== $('view').contentWindow) return;
     if (data?.type === 'lt41-theme') { applyTheme(); paintThemeControls(); }
     if (data?.type === 'lt41-journey-step') { journey.noteJourneyStep(data.step); return; }
-    if (data?.type === 'lt41-journey-save') { journey.saveFirstJourney(data.draft); return; }
+    if (data?.type === 'lt41-journey-save') { if (getSource() === 'share') return; journey.saveFirstJourney(data.draft); return; }
     if (data?.type === 'lt41-journey-open-book') { journey.openJourneyBook(data); return; }
     if (data?.type === 'lt41-journey-close') { journey.closeFirstJourney(); return; }
     if (data?.type === 'lt41-media-metadata' && getSource() === 'server' && getMember()?.snapshot().owned) {
@@ -52,6 +52,8 @@ export function createMessages(deps) {
     if (data?.type === 'lt41-select' && window.LT41?.tree.moments.some(m => m.id === data.id)) {
       window.LT41.momentId = data.id; links(); writeLocation();
     }
+    // #315: 공유 감상(share)은 읽기 전용이다. 안쪽 화면의 버튼 정리를 통과한 쓰기 메시지가 남아도 여기서 막는다(이중).
+    if (data?.type === 'lt41-write' && getSource() === 'share') return;
     if (data?.type === 'lt41-write') openEditor(data.mode, data.parentId);
     if (data?.type === 'lt41-open-book' && getModel()?.trees.some(t => t.id === data.treeId && t.moments.some(m => m.id === data.id))) {
       setCurrent('track59-sketchbook.html'); choose(data.treeId, data.id); writeLocation();
