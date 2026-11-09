@@ -120,17 +120,60 @@ function describe(value=''){
  if(privateFile)u.href=globalThis.location.origin+u.pathname;
  return {...link,kind,privateFile,loadUrl:kind==='link'?'':u.href,loadLabel:kind==='photo'?'사진 불러오기':'영상 불러오기',label:kind==='photo'?'사진 링크':kind==='video'?'영상 링크':link.label};
 }
+// #327 1부(대표 결정 2026-11-09): 화면 판정은 이 한 함수. 내 기록(서버 기록·로그인 소유자)만
+// YouTube 썸네일을 처음부터 보여 준다. 공유·예시·파일 기록은 눌렀을 때만 요청한다(기존 규칙).
+function autoLoadMedia(source, owned) {
+  return source === 'server' && owned === true;
+}
+// markup 을 그리는 문서의 기록 상태를 읽는다. 셸 문서는 window.LT41·body 데이터 속성을 쓰고,
+// 화면 문서(iframe)는 parent 의 같은 값을 읽는다. 아무 근거도 없으면(시험·파일 기록) 누를 때만.
+function mediaContext() {
+  try {
+    const shell = window.LT41 ? window : (window.parent && window.parent.LT41 ? window.parent : null);
+    const body = (typeof document !== 'undefined' && document.body) || (shell && shell.document && shell.document.body) || null;
+    const source = (shell && shell.LT41 && typeof shell.LT41.source === 'string' && shell.LT41.source) || (body && body.dataset.recordSource) || '';
+    const owned = source === 'server' && !!(body && body.dataset.member === 'in');
+    return { source, owned };
+  } catch { return { source: '', owned: false }; }
+}
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-function markup(url,title='',mediaMetadata=null,momentId=''){
+function markup(url,title='',mediaMetadata=null,momentId='',context=null){
  const m=describe(url);
  if(m.kind==='none')return '';
  if(m.kind==='invalid')return '<p class="lt-media-error">링크를 열 수 없어요. 원본 주소를 확인해 주세요.</p>';
  const canLoad=!!m.loadUrl&&(new URL(m.loadUrl).protocol==='https:'||m.privateFile);
+ const ctx=context||mediaContext();
+ const auto=canLoad&&m.kind==='youtube'&&autoLoadMedia(ctx.source,ctx.owned);
  const caption=[mediaMetadata?.title,mediaMetadata?.channel,mediaMetadata?.source].filter(value=>typeof value==='string'&&value.trim()).join(' · ');
  const cached=caption?'<p class="lt-media-title">'+esc(caption)+'</p>':'';
- let html = '<div class="lt-media" data-lt-url="'+esc(url)+'" data-lt-title="'+esc(title)+'"'+(momentId?' data-lt-moment-id="'+esc(momentId)+'"':'')+'><div class="lt-media-body">'+(canLoad?'<button type="button" data-lt-load>'+esc(m.loadLabel)+'</button>':'<span>'+esc(m.label)+'</span>')+cached+'</div><p class="lt-media-status" role="status">'+(canLoad?'불러오기를 누르면 원본 사이트에 연결됩니다.':'원본 사이트에서 확인할 수 있어요.')+'</p><a href="'+esc(m.openUrl)+'" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">'+esc(m.kind==='youtube'?m.actionLabel+(m.startSeconds?' · 시작 '+formatStart(m.startSeconds):''):'원본 링크 열기')+' ↗</a></div>';
+ const body=auto
+  // 내 기록: 썸네일을 처음부터 보여 준다(no-referrer·lazy). 재생 표시는 썸네일 전체를 덮는 단추라
+  // 썸네일 아무 곳이나 눌러도 그 자리에서 재생한다. autoplay 는 누른 뒤 만들어지는 embed 주소에만 있다.
+  ?'<figure class="lt-yt-preview"><img src="'+esc('https://i.ytimg.com/vi/'+m.videoId+'/hqdefault.jpg')+'" alt="'+esc(title||'YouTube 영상 썸네일')+'" referrerpolicy="no-referrer" loading="lazy" decoding="async"><button type="button" class="lt-yt-play" data-lt-play aria-label="여기서 재생"><span aria-hidden="true">▶</span></button></figure>'+cached
+  :(canLoad?'<button type="button" data-lt-load>'+esc(m.loadLabel)+'</button>':'<span>'+esc(m.label)+'</span>')+cached;
+ const status=auto?'재생을 누르면 여기서 바로 재생해요.':(canLoad?'불러오기를 누르면 원본 사이트에 연결됩니다.':'원본 사이트에서 확인할 수 있어요.');
+ let html = '<div class="lt-media" data-lt-url="'+esc(url)+'" data-lt-title="'+esc(title)+'"'+(momentId?' data-lt-moment-id="'+esc(momentId)+'"':'')+(m.kind==='youtube'?' data-lt-youtube="1"':'')+'><div class="lt-media-body">'+body+'</div><p class="lt-media-status" role="status">'+status+'</p><a href="'+esc(m.openUrl)+'" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">'+esc(m.kind==='youtube'?m.actionLabel+(m.startSeconds?' · 시작 '+formatStart(m.startSeconds):''):'원본 링크 열기')+' ↗</a></div>';
  if(m.privateFile)html=html.replace('불러오기를 누르면 원본 사이트에 연결됩니다.','내 계정에 보관한 파일입니다. 불러오기를 눌러 확인하세요.').replace(/<a href=[\s\S]*?<\/a>/,'');
  return html;
+}
+// 그 자리 재생: embed 주소는 book-usability.mjs 의 embedUrl 한 벌에서 만든다(누른 뒤에만 불린다).
+// 주소를 못 만들면(모듈 실패·모양이 다름) 원본 링크 안내로 물러난다.
+async function playInPlace(root){
+ const m=describe(root.dataset.ltUrl);
+ if(m.kind!=='youtube'||root.dataset.ltPlaying)return;
+ root.dataset.ltPlaying='1';
+ const body=root.querySelector('.lt-media-body'),status=root.querySelector('.lt-media-status');
+ let embed=null;
+ try{const usability=await import('/v41/book-usability.mjs');embed=usability.embedUrl(m.videoId,m.startSeconds);}catch{}
+ if(!embed){delete root.dataset.ltPlaying;if(status)status.textContent='여기서 재생할 수 없어요. 아래 원본 링크에서 열어 주세요.';return;}
+ if(!root.isConnected){delete root.dataset.ltPlaying;return;}
+ const frame=document.createElement('iframe');
+ frame.className='lt-yt-frame';frame.src=embed;frame.title=root.dataset.ltTitle||'YouTube 영상';
+ frame.allow='accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';frame.allowFullscreen=true;
+ frame.setAttribute('referrerpolicy','no-referrer');
+ body.replaceChildren(frame);
+ delete root.dataset.ltPlaying;
+ if(status)status.textContent='재생 중이에요. 아래 원본 링크로도 열 수 있어요.';
 }
 async function youtubeMeta(root,m,onUnavailable){
  // 제목·채널은 서버 oEmbed 프록시에서만 받는다. YouTube가 없는 영상을 가리켜도
@@ -169,12 +212,12 @@ async function load(root){
  delete root.dataset.ltLoading;body.replaceChildren(element);if(cachedCaption)body.append(cachedCaption);element.src=src;
 }
 const ownedUrls=new Map();
-window.LTMedia={describe,markup,privateAssetName};
+window.LTMedia={describe,markup,privateAssetName,autoLoadMedia};
 if(typeof document!=='undefined'){
  const cleanup=()=>{for(const [node,url] of ownedUrls)if(!node.isConnected){URL.revokeObjectURL(url);ownedUrls.delete(node);}};
  new MutationObserver(cleanup).observe(document.documentElement,{childList:true,subtree:true});
  addEventListener('pagehide',()=>{for(const url of ownedUrls.values())URL.revokeObjectURL(url);ownedUrls.clear();});
  document.addEventListener('pointerdown',e=>{if(e.target.closest?.('.lt-media'))e.stopPropagation();},true);
- document.addEventListener('click',e=>{const root=e.target.closest?.('.lt-media');if(!root)return;e.stopImmediatePropagation();if(e.target.closest('[data-lt-load]')){e.preventDefault();load(root);}},true);
+ document.addEventListener('click',e=>{const root=e.target.closest?.('.lt-media');if(!root)return;e.stopImmediatePropagation();if(e.target.closest('[data-lt-play]')){e.preventDefault();void playInPlace(root);return;}if(e.target.closest('[data-lt-load]')){e.preventDefault();load(root);}},true);
 }
 })();
