@@ -148,9 +148,13 @@ export function createPanels(deps) {
     $('tree-cover').value = tree.coverMomentId || '';
     // #256-3 2단계: 새 사진 표지 만들기는 로그인·서버 기록에서만 보인다.
     $('tree-cover-upload').hidden = false;
+    // #314: 이전 책에서 고르던 파일·전송 결과 안내가 새 책 창에 남지 않게 업로드 상태를 비운다.
+    coverUploads.reset();
     $('tree-cover-title').value = '';
-    // #256-3: 저장된 디자인 표지를 라디오에 반영한다(모르는 값은 도메인 규칙에서 ''로 정리되므로 여기도 빈 값으로 둔다).
-    form.elements.coverDesign.value = tree.coverDesign || '';
+    // #314: RadioNodeList.value = ''는 이전에 체크된 라디오를 해제하지 않는다(Chrome 실측).
+    // 모르는 값은 도메인 규칙에서 ''로 정리되므로, 저장값과 같은 라디오만 checked로 두어 이전 책의 선택을 지운다.
+    const design = tree.coverDesign || '';
+    for (const radio of form.elements.coverDesign) radio.checked = radio.value === design;
     $('tree-form-error').textContent = '';
     updateTreeCoverHint();
     treeBaseline = new URLSearchParams(new FormData(form)).toString();
