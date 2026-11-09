@@ -2,6 +2,19 @@
 
 > **main 보호 규칙(2026-11-09, 룰셋 "main 보호 (PR·필수 검사)")**: main은 PR로만 바꾼다(직접 푸시·force push·삭제 금지, 관리자도 예외 없음 — 비상시 대표가 룰셋 enforcement를 잠깐 끈다). 필수 검사: `check (ubuntu-latest)`·`check (windows-latest)`·`미리보기 postdeploy(로그아웃)` — 셋 다 paths 필터가 없어 문서만 바뀐 PR에서도 항상 돈다. 승인 수 0(레인이 스스로 머지). Deploy Bundle Boot Test는 paths 필터가 있어 필수에 넣지 않았다.
 
+## 2026-11-09 — 빠른 추가 ②: '순간 남기기'에서 고르고, 주소 하나로 모아둔 순간에 담는다(#327, 로컬2, ai/local2-lt-quick-add-261109, PR #329 머지 `8040276` + 정원 대비 후속 PR #332 머지 `fc14d00`)
+
+로컬1의 데이터 규칙(#328, `quickAdd`·`inbox`·`INBOX_SUBJECT`) 위에 화면을 얹었다. 이전 세션이 사용량 한도로 멈춘 지점(마크업·모듈·연결까지)에서 이어받아 시험·검증·PR까지 마쳤다.
+
+- **진입**: `순간 남기기`(#write-menu) → **고르기 창**(빠른 추가/자세한 추가). 책 안 "다음 순간 남기기" 등 문맥 진입은 기존처럼 자세한 추가로 바로 간다(`chooseDetailed` — 책장이면 'new', 나머지는 'add', 기존 #245 규칙 그대로). 연결은 panels.mjs에서 shell.mjs로 옮겼고, 구조 시험으로 고정(#245 전례 방지).
+- **빠른 추가 모달**: 주소 칸 하나. 붙여 넣으면 `parseQuickUrl`이 즉시 판정해 미리보기 — YouTube는 썸네일(`LTMedia.describe`의 loadUrl 재사용, 새 판정 함수 만들지 않음) + 서버 oEmbed 프록시 제목(`/api/youtube/oembed`, 실패는 조용히), 일반 링크는 라벨. Enter/추가 → `member.apply('quickAdd',{url})` 한 번 → "모아둔 순간에 담았어요 · 지금 다듬기". 저장 뒤 칸을 비우고 초점을 유지해 연속 추가.
+- **끌어다 놓기**(pointer:fine, 셸 문서 + iframe `mountFrame`): `dropRoute` 한 벌이 어디로 갈지 정한다 — 셸에 놓으면 "놓으면 모아둔 숨간에 담아요" 덮개 → 바로 저장 + 아래 안내판(썸네일·지금 다듬기, 20초 뒤 숨김). 빠른 추가 모달 위에 놓으면 그 칸에 넣어 미리보기만, 자세한 추가가 열려 있으면 그 주소 칸에 넣고 미리보기만(저장은 사용자가). 이미지 파일은 사진 업로더로(기존 업로더 재사용, `fileLabel` 옵션 추가 — 기본 호출은 그대로, 시험 고정). dataTransfer는 `text/uri-list` → `text/plain` 순(RFC 2483 주석 줄 제외). 공유 모드(#315)는 기본 동작만 막고 받지도 안내도 하지 않고, 로그아웃·예시·파일은 기존 로그인 안내, 읽기 전용은 안내+기록 패널.
+- **구조**: `public/v41/quick-add.mjs`(순수 계산 한 벌 — 판정·추출·분기·문구) + `public/v41/shell/quick-add.mjs`(DOM만, `createQuickAdd(deps)`). dialogs.mjs 초점 가두기·배경 클릭 닫기 예외에 새 창 2개 추가. shell.css는 --lt-* 토큰만(새 hex 없음), 오류 글자는 밤 `--lt-rose` / 정원 `--lt-rose-ink`.
+- **시험**: `tests/v41-quick-add.test.mjs` 8건(판정 표·uri-list 추출·끌기 분기 표·문구 계약·정원 대비 규칙), `tests/v41-quick-add-flow.test.mjs` 12건(createQuickAdd를 가짜 DOM으로 직접 호출 — 진입 가드 3종·고르기 분기·저장 1회 호출과 연속 추가·도메인 오류 문구·안내판·끌기 분기·덮개·연결 구조). 강도 증명 2회: ① `apply('quickAdd')`→`apply('add')`로 깨기 → 2건 실패 ② 저장 뒤 초점 유지 제거 → 2건 실패, 둘 다 복구 확인. 기존 write-menu 연결 시험 2건은 새 위치에 맞게 갱신. `npm test` **801건 764 pass / 0 fail / 37 skip**, `npm run build` pass.
+- **a11y**: 도구의 '숨간 남기기' 검사가 편집기만 보던 것을 고르기 창·빠른 추가 모달까지 훑게 교체(tools/a11y/a11y-run.mjs). 운영 실측(계정 03, 70행): 첫 실측에서 정원 고르기 창 1차 버튼 보조 글자 3.97:1(`opacity:.75`) serious 1건 → `html[data-lt-theme=garden] .write-choice button.primary span{opacity:1}`로 수정(#332) → 재실측 **serious 0 · critical 0**.
+- **운영 실측(계정 03, `https://lovetree-4-0.pages.dev/v41/`, 머지·배포 뒤, `.tmp-261109/verify-329.json` 12/12 PASS)**: ① 붙여 넣기 빠른 추가 3회 연속 → 안내·칸 비움·초점 유지 각각 확인, 모아둔 순간 트리 1개에 3개 ② 합성 DataTransfer 끌어다 놓기 → 덮개 문구 → 4번째 + 안내판(일반 링크라 썸네일 없음 — YouTube는 썸네일이 붙는다) ③ 새로고침 유지 4개 ④ 다섯 번째 담고 '지금 다듬기' → 편집기가 그 순간으로 열림 → 제목 수정 저장 확인 ⑤ 자세한 추가 화면에 끌어다 놓기 → 주소 칸 채움·미리보기·저장 안 함(개수 불변) ⑥ 1440·390 × 밤·정원 스크린샷 `.tmp-261109/shots-329/` ⑦ 끝에 트리 0개·보관 0개 정리. 사용자 조작 중 콘솔 오류 0.
+- **사고 기록**: 중간 커밋에서 `git add -A`가 브라우저 프로필(tools/postdeploy/.profile-03, 275파일 — 계정 03 세션 쿠키 포함 가능)을 커밋해 머지 전 브랜치에서 즉시 제거하고 .gitignore에 넣었다(머지된 main에는 한 번도 없음). 이후 문서 PR에서 .gitignore 규칙이 함께 들어간다.
+
 ## 2026-11-09 — 사진 순간 '불러오기' 버튼: 중첩 버튼·정원 대비 수정(#325, 로컬3, ai/local3-a11y-media-moments-261109, PR #326)
 
 #319 운영 재점검에서 나온 새 serious 5노드. 원인은 사진·미디어 순간이 책·보드에 그려질 때만 드러난다.
