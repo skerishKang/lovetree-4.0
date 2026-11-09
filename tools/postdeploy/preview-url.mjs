@@ -4,6 +4,7 @@
 // 사용: GITHUB_TOKEN=... node tools/postdeploy/preview-url.mjs <owner/repo> <headSha> [--wait 600] [--quiet]
 // --quiet: 주소를 못 찾아도 요약에 쓰지 않는다(기준 커밋 조회 등 호출자가 처리할 때).
 import { appendFileSync } from 'node:fs';
+import { functionsReady, READY_TIMEOUT_MS } from './preview-ready.mjs';
 
 const [repoArg, shaArg] = process.argv.slice(2).filter((value) => !value.startsWith('--'));
 const waitIndex = process.argv.indexOf('--wait');
@@ -69,6 +70,20 @@ while (Date.now() < deadline) {
   await sleep(15000);
 }
 if (!previewUrl) reason = reason || '미리보기 주소를 찾지 못함';
+
+// 주소를 찾았으면 /api/* Functions가 붙어 404가 아닌 응답을 주는지 확인한다(#337 실측: 배포 직후 404).
+// 기다려도 404면 검사를 막지 않고 지금처럼 진행하되 요약에 한 줄을 남긴다.
+// 시도 횟수·경과는 모듈이 log로 받는다 — 미리보기 검사 로그에서 대기 동작이 보이게.
+const ready = previewUrl
+  ? await functionsReady(previewUrl, { log: (message) => console.log(message) })
+  : null;
+if (ready === false) {
+  console.log('Functions 준비 확인 실패: /api/account가 404가 아닌 응답을 주지 않아 그대로 검사를 진행한다.');
+  const summary = process.env.GITHUB_STEP_SUMMARY;
+  if (summary && !process.argv.includes('--quiet')) {
+    appendFileSync(summary, `- Functions 준비 확인 실패: 미리보기 /api/account가 ${READY_TIMEOUT_MS / 1000}초 동안 404가 아닌 응답을 주지 않았다. 검사는 그대로 진행한다.\n`);
+  }
+}
 
 if (process.env.GITHUB_OUTPUT) {
   appendFileSync(process.env.GITHUB_OUTPUT, `url=${previewUrl}\nreason=${reason}\n`);
