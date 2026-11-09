@@ -115,6 +115,14 @@ export const spineStyle = (item) => '--cover:' + item.color + ';--tilt:' + item.
 // 책등을 눌렀을 때 아래 넘기기(레일)가 이동할 자리. 목차에 없는 책이면 -1(화면이 무시한다).
 export const spineTargetIndex = (books, id) => books.findIndex((book) => book.id === id);
 
+// 활성 책등을 목차 줄 가운데로 모는 가로 위치. 줄(row) 안에서만 자른다 —
+// scrollIntoView와 달리 스크롤 가능한 조상(책장 문서·셸 부모 문서)을 움직이지 않게 하기 위한 계산(#256 2번 후속).
+export function spineScrollLeft(rowClientWidth, rowScrollWidth, itemLeft, itemWidth) {
+  const max = Math.max(0, rowScrollWidth - rowClientWidth);
+  const ideal = itemLeft + itemWidth / 2 - rowClientWidth / 2;
+  return Math.max(0, Math.min(ideal, max));
+}
+
 export function youtubeId(url, describe) {
   let parsed;
   try { parsed = new URL(String(url || '')); } catch (e) { return ''; }

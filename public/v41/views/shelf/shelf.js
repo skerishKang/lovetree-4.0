@@ -4,7 +4,7 @@
 import {
   COVER_PALETTE, allBooks as allBooksOf, bookMeta, buildShelf, carouselTransform, coverStyle as coverStyleOf,
   escapeShelf, filterShelf, findBook, lastMomentDate as lastMomentDateOf,
-  resolveShelfIndex, spineItems as spineItemsOf, spineStyle as spineStyleOf, spineTargetIndex as spineTargetIndexOf, spineVisible as spineVisibleOf,
+  resolveShelfIndex, spineItems as spineItemsOf, spineScrollLeft as spineScrollLeftOf, spineStyle as spineStyleOf, spineTargetIndex as spineTargetIndexOf, spineVisible as spineVisibleOf,
   treeTitleOf, youtubeId as youtubeIdOf
 } from './shelf-model.mjs';
 import { createReader } from './shelf-reader.js';
@@ -44,8 +44,8 @@ import { createReader } from './shelf-reader.js';
       var youtubeId = function (url) { return youtubeIdOf(url, window.LTMedia && window.LTMedia.describe); };
       function showToast(message) { var toast=$('#toast'); toast.textContent=message; toast.classList.add('show'); clearTimeout(showToast.timer); showToast.timer=setTimeout(function(){toast.classList.remove('show');},2400); }
       var coverStyle = coverStyleOf;
-      // #256 2번: 책등 목차 계산은 shelf-model.mjs 한 벌만 쓴다(보일지 말지·책등 목록·누른 책 → 넘기기 위치).
-      var spineVisible = spineVisibleOf, spineItems = spineItemsOf, spineStyle = spineStyleOf, spineTargetIndex = spineTargetIndexOf;
+      // #256 2번: 책등 목차 계산은 shelf-model.mjs 한 벌만 쓴다(보일지 말지·책등 목록·누른 책 → 넘기기 위치·목차 줄 가로 위치).
+      var spineVisible = spineVisibleOf, spineItems = spineItemsOf, spineStyle = spineStyleOf, spineTargetIndex = spineTargetIndexOf, spineScrollLeft = spineScrollLeftOf;
       function openModal(id) { $('#'+id).classList.remove('hidden'); }
       function closeModal(id) { $('#'+id).classList.add('hidden'); }
       function renderShelf() {
@@ -72,10 +72,10 @@ import { createReader } from './shelf-reader.js';
         row.innerHTML=visible?spineItems(list).map(function(item){
           return '<button type="button" class="shelf-spine" data-book-id="'+esc(item.id)+'" data-book-index="'+item.index+'" style="'+spineStyle(item)+'" aria-label="'+esc(item.name)+' 책으로 넘기기"><span class="shelf-spine-title">'+esc(item.name)+'</span></button>';
         }).join(''):'';
-        syncSpines();
+        syncSpines(true);
       }
       var spineActiveId=null;
-      function syncSpines() {
+      function syncSpines(instant) {
         // 레일(아래 넘기기)이 움직이면 목차의 선택 표시와 가로 위치를 그 책에 맞춘다.
         var row=$('#shelfSpineRow');
         if(!row||!row.children.length)return;
@@ -88,7 +88,11 @@ import { createReader } from './shelf-reader.js';
         if(activeId===spineActiveId)return;
         spineActiveId=activeId;
         var active=row.querySelector('[data-book-id="'+CSS.escape(activeId||'')+'"]');
-        if(active)active.scrollIntoView({block:'nearest',inline:'center'});
+        if(!active)return;
+        // CTO 검토 후속: scrollIntoView는 목차 줄뿐 아니라 스크롤 가능한 조상(책장 문서·셸 부모)까지 움직인다.
+        // 목차 줄(#shelfSpineRow)의 가로 스크롤만 움직인다. 위치 계산은 shelf-model의 spineScrollLeft 한 벌.
+        var rowRect=row.getBoundingClientRect(),rect=active.getBoundingClientRect();
+        row.scrollTo({left:spineScrollLeft(row.clientWidth,row.scrollWidth,rect.left-rowRect.left+row.scrollLeft,rect.width),behavior:instant?'auto':'smooth'});
       }
       function renderHeroShelf(list) {
         // #212 4번: 예시 그림 대신 실제 내 책(최대 4권)을 세운다. 책이 없으면 아무것도 그리지 않는다.

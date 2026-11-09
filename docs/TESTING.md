@@ -57,10 +57,10 @@
 - **기억책 계산 전부 한 벌(2026-11-09)**: 기억책의 순수 계산(펼침면·쪽번호·넘김 각도·연결 요약·다음 순간)은 `views/book/book-model.js`의 `window.LT59Model` 한 벌만 쓰고, 표시 규칙은 `book-usability.mjs`(`tapIntent`·`pageOverflows` 포함)가 계속 맡는다. 시험은 같은 파일을 `await import`해 `globalThis.LT59Model`을 검사하고 옛 계산 부재도 함께 본다(`tests/v41-book-model.test.mjs`).
 - **여섯 화면 계산 모두 화면이 쓰는 한 벌(2026-11-09)**: 홈·책장·기억책·기억 보드·관계 지도·계정의 순수 계산은 각 화면이 실제로 부르는 모델 파일(보드 `LT58Model`·지도 `LT56Model`·기억책 `LT59Model`)에만 있고, 화면에는 그리기·상태 반영만 남는다.
 - **내 책장 모듈(2026-11-09)**: `views/shelf/shelf-model.mjs`(순수 계산) + `views/shelf/shelf-reader.js`(`createReader(deps)`)로 나누고 `tests/v41-shelf-flow.test.mjs` **11건**(카드 배치·페이지·넘김 범위는 표, 첫/마지막 장 안내·책 열기는 가짜 DOM으로 직접 호출). 글자 검사 4건은 옮긴 파일을 합쳐 보도록 갱신.
-- **책등 목차 계산 한 벌(#256 2번, 2026-11-09)**: 책이 3권부터 책등을 목차처럼 한 줄로 세운다. 보일지 말지(`spineVisible`)·책등 목록(`spineItems`·`spineStyle`)·누른 책 → 넘기기 위치(`spineTargetIndex`)는 `views/shelf/shelf-model.mjs` 한 벌만 쓰고, 화면(`shelf.js`)은 렌더·이벤트만 한다. 시험은 `tests/v41-shelf-spines.test.mjs` **6건**(0·1·2·3·12권을 함수 호출로, 화면 연결·누르는 영역 46×118px·가로 넘김 규격은 글자).
+- **책등 목차 계산 한 벌(#256 2번, 2026-11-09)**: 책이 3권부터 책등을 목차처럼 한 줄로 세운다. 보일지 말지(`spineVisible`)·책등 목록(`spineItems`·`spineStyle`)·누른 책 → 넘기기 위치(`spineTargetIndex`)·목차 줄 가로 위치(`spineScrollLeft`, scrollIntoView 대신 줄의 scrollTo만 쓴다)는 `views/shelf/shelf-model.mjs` 한 벌만 쓰고, 화면(`shelf.js`)은 렌더·이벤트만 한다. 시험은 `tests/v41-shelf-spines.test.mjs` **7건**(0·1·2·3·12권과 스크롤 위치 계산을 함수 호출로, 화면 연결·누르는 영역 46×118px·가로 넘김 규격은 글자).
 - **기억책 좁은 화면 탭 판정(#296, 2026-11-09)**: `public/v41/book-usability.mjs`의 **`tapIntent`**로 모아 `tests/v41-book-usability.test.mjs`에 **10행 표**(390·360 → 상세 / 431·1440 → 돋보기만 / 끌기·카드 밖·취소 → 없음).
 - **레인별 시험 계정(#300, 2026-11-09)**: `tools/postdeploy/accounts.mjs` — `tests/postdeploy-accounts.test.mjs` **4건**(배정 표·번호 정규화·계정별 `.secrets` 키·프로필 분리).
-- 현재 `npm test` 합계: **708건 / 671 pass / 0 fail / 37 skip**. 글자 검사 분류 수치는 위 1~3절(2026-11-09 7차 기준)에서 그대로 유지된다(책등 목차 6건은 함수 호출 4건 + 연결·규격 글자 검사 2건).
+- 현재 `npm test` 합계: **709건 / 672 pass / 0 fail / 37 skip**. 글자 검사 분류 수치는 위 1~3절(2026-11-09 7차 기준)에서 그대로 유지된다(책등 목차 7건은 함수 호출 5건 + 연결·규격 글자 검사 2건).
 
 ## 새 시험을 쓸 때
 

@@ -5,7 +5,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { spineItems, spineStyle, spineTargetIndex, spineVisible } from '../public/v41/views/shelf/shelf-model.mjs';
+import { spineItems, spineScrollLeft, spineStyle, spineTargetIndex, spineVisible } from '../public/v41/views/shelf/shelf-model.mjs';
 
 const read = (relative) => readFileSync(fileURLToPath(new URL('../' + relative, import.meta.url)), 'utf8');
 const book = (id, name) => ({ id, name, color: 'var(--lt-cover-' + ((id.length % 4) + 1) + ')' });
@@ -47,15 +47,28 @@ test('누른 책등 → 아래 넘기기가 이동할 자리', () => {
   assert.equal(spineTargetIndex(list.slice(3, 6), 'tree-05'), 1);
 });
 
+test('활성 책등을 가운데로 모는 가로 위치는 목차 줄 안에서만 자른다(조상 스크롤 없음)', () => {
+  // 390px 줄에 내용 600px(최대 넘김 210px)인 12권 상태 기준.
+  assert.equal(spineScrollLeft(390, 600, 0, 46), 0);       // 첫 책등: 이상적 위치가 음수 → 0
+  assert.equal(spineScrollLeft(390, 600, 150, 46), 0);     // 이미 보이는 책등: 그대로 0
+  assert.equal(spineScrollLeft(390, 600, 277, 46), 105);   // 가운데로 모는 중간값
+  assert.equal(spineScrollLeft(390, 600, 554, 46), 210);   // 마지막 책등: 최대값으로 자름
+  assert.equal(spineScrollLeft(300, 300, 500, 46), 0);     // 넘침 없는 줄은 늘 0
+});
+
 test('화면은 목차 계산을 shelf-model 한 벌에서 불러 쓰고, 목차 자리를 마크업에 둔다', () => {
   const shelfJs = read('public/v41/views/shelf/shelf.js');
   // 모듈 연결: 계산 함수를 shelf-model.mjs에서만 가져와 쓴다.
-  assert.match(shelfJs, /spineItems as spineItemsOf, spineStyle as spineStyleOf, spineTargetIndex as spineTargetIndexOf, spineVisible as spineVisibleOf,\n  treeTitleOf/);
-  assert.match(shelfJs, /var spineVisible = spineVisibleOf, spineItems = spineItemsOf, spineStyle = spineStyleOf, spineTargetIndex = spineTargetIndexOf;/);
+  assert.match(shelfJs, /spineItems as spineItemsOf, spineScrollLeft as spineScrollLeftOf, spineStyle as spineStyleOf, spineTargetIndex as spineTargetIndexOf, spineVisible as spineVisibleOf,\n  treeTitleOf/);
+  assert.match(shelfJs, /var spineVisible = spineVisibleOf, spineItems = spineItemsOf, spineStyle = spineStyleOf, spineTargetIndex = spineTargetIndexOf, spineScrollLeft = spineScrollLeftOf;/);
   // 렌더: 3권부터만 세우고, 책등 누르기는 data-book-id로 넘길 자리를 계산한다.
   assert.match(shelfJs, /nav\.hidden=!visible;/);
   assert.match(shelfJs, /spineItems\(list\)\.map/);
   assert.match(shelfJs, /spineTargetIndex\(state\.shelfList,spine\.dataset\.bookId\)/);
+  // 목차 줄의 가로 스크롤만 움직인다(scrollIntoView 금지 — 조상 문서까지 움직인다).
+  assert.match(shelfJs, /syncSpines\(true\);/);
+  assert.match(shelfJs, /row\.scrollTo\(\{left:spineScrollLeft\(row\.clientWidth,row\.scrollWidth,rect\.left-rowRect\.left\+row\.scrollLeft,rect\.width\),behavior:instant\?'auto':'smooth'\}\)/);
+  assert.ok(!/\.scrollIntoView\(/.test(shelfJs), 'scrollIntoView 호출은 조상 문서도 움직이므로 쓰지 않는다');
   // 레일이 움직이면 목차 선택도 함께 맞춘다.
   assert.match(shelfJs, /syncSpines\(\);\n        setShelfAtmosphere/);
   const html = read('public/v41/views/track32-bookshelf.html');
