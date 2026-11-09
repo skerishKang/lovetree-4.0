@@ -33,7 +33,11 @@ test('1. YouTube는 그 자리에서: nocookie embed, 시작 시점 유지, refe
     assert.ok(src.includes('document.createElement(\'iframe\')'), path + ': 누른 뒤에만 iframe 을 만든다');
     assert.ok(src.includes("setAttribute('referrerpolicy','strict-origin-when-cross-origin')"), path + ': referrerpolicy');
     assert.ok(src.includes('YouTube에서 열기'), path + ': 원본 링크는 남긴다');
-    assert.ok(!/i\.ytimg\.com/.test(src), path + ': 누르기 전 썸네일 요청을 만들지 않는다');
+    // #327 1부(대표 결정 2026-11-09): 내 기록(서버·로그인 소유자)은 썸네일을 처음부터 보여 준다.
+    // ytimg 주소는 autoLoadMedia 판정을 통과한 한 곳에서만 쓰고, 공유·예시는 여전히 요청 0이다.
+    assert.equal(src.split('i.ytimg.com').length - 1, 1, path + ': ytimg 썸네일 주소는 자동 판정 한 곳에만 있다');
+    assert.ok(/:auto\?'<img src="https:\/\/i\.ytimg\.com\//.test(src), path + ': 썸네일은 내 기록 판정(auto)을 통과했을 때만 그린다');
+    assert.ok(/autoLoadMedia\(ctx\.source,\s*ctx\.owned\)/.test(src), path + ': 판정은 media-preview 의 한 함수를 쓴다');
   }
 });
 

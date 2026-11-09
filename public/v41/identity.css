@@ -84,6 +84,11 @@ html[data-v41-screen=book] .viewer-media .lt-media{width:100%;height:100%;overfl
 /* #325: 정원에서 '사진/영상 불러오기' 버튼 글자가 어두운 버튼(#1a1620) 위에서 1.5:1이었다.
    기존 토큰 --lt-paper(정원 종이색)로 4.5:1 이상. 밤에는 이 규칙이 없어 그대로다. */
 html[data-lt-theme=garden] .lt-media-body button{color:var(--lt-paper)}
+/* #327 1부: 내 기록 YouTube 썸네일(처음부터 보임) + 썸네일 전체를 덮는 재생 단추 + 그 자리 재생 iframe */
+.lt-yt-preview{position:relative;margin:0;width:100%}
+.lt-yt-preview .lt-yt-play{position:absolute;inset:0;width:100%;min-height:44px;min-width:44px;border:0;padding:0;background:transparent;cursor:pointer;display:grid;place-items:center}
+.lt-yt-preview .lt-yt-play>span{display:grid;place-items:center;min-width:56px;min-height:56px;border-radius:50%;background:#1a1620d9;color:#ffffff;border:1px solid rgba(255,255,255,.4);font-size:22px;line-height:1}
+.lt-yt-frame{display:block;width:100%;aspect-ratio:16/9;border:0;border-radius:8px;background:#000}
 
 .private-upload{margin:16px 0;padding:16px;border:1px solid var(--lt-line);border-radius:var(--lt-r-card)}.private-upload p{font-size:13px;line-height:1.6;overflow-wrap:anywhere}.private-upload input[type=file]{width:100%;min-height:44px}.private-upload button,.private-upload summary{min-height:44px}.upload-asset{padding:12px 0;border-top:1px solid var(--lt-line)}.upload-asset button{margin:4px 8px 4px 0}.private-upload details{margin-top:12px}
 

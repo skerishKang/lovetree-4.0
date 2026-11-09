@@ -133,11 +133,18 @@ momentContent=function(m,compact=false){
  if(safe.url&&window.LTMedia&&LTMedia.describe){
   const media=LTMedia.describe(safe.url);
   if(media.kind==='youtube'){
+   // #327 1부: 내 기록(서버·로그인 소유자)은 썸네일을 처음부터 보여 준다(판정은 media-preview 의
+   // autoLoadMedia 한 함수). 공유·예시는 기존 규칙 그대로 — 누르기 전 외부 요청 0.
    const thumb=localThumb(safe);
+   const ctx=(typeof LTMedia.currentContext==='function')?LTMedia.currentContext():{source:'',owned:false};
+   const auto=!thumb&&LTMedia.autoLoadMedia(ctx.source,ctx.owned);
    const label=media.startSeconds?('여기서 재생 · '+media.label.replace('YouTube 링크 · ','')):'여기서 재생';
+   const face=thumb?'<img src="'+t(thumb)+'" alt="">'
+    :auto?'<img src="https://i.ytimg.com/vi/'+t(media.videoId)+'/hqdefault.jpg" alt="'+t(safe.title||'YouTube 영상 썸네일')+'" referrerpolicy="no-referrer" loading="lazy" decoding="async">'
+    :'<span class="yt-placeholder"></span>';
    const piece='<div class="clipping moment" data-moment="'+t(safe.id)+'">'+
     '<button type="button" class="yt-play" data-yt-play="'+t(media.videoId)+'" data-yt-start="'+t(media.startSeconds||0)+'">'+
-    (thumb?'<img src="'+t(thumb)+'" alt="">':'<span class="yt-placeholder"></span>')+
+    face+
     '<span class="yt-play-label">'+t(label)+'</span></button>'+
     '<a class="ui-btn ui-link" href="'+t(media.openUrl)+'" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">YouTube에서 열기 ↗</a></div>';
    return piece+paintTitle(safe);
