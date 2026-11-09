@@ -14,7 +14,8 @@ npm run a11y -- --screen shelf --out .tmp-261109/a11y-shelf
 - 판정: `serious`·`critical`만 보고한다. 색을 바꿔야 하는 대비 문제는 **고치지 않고** 목록으로만 남긴다(디자인 판단).
 - 실행 환경: Playwright Chromium 또는 이 PC의 Chrome/Edge(`CHROME_PATH`로 지정 가능).
   브라우저가 없으면 `npx playwright install chromium`.
-- 로그인: `.secrets/.env`의 `PADIEM_TUTORIAL01_EMAIL`·`PADIEM_TUTORIAL01_PASSWORD`를 읽는다(값은 출력하지 않는다).
+- 로그인: `.secrets/.env`의 `PADIEM_TUTORIAL<NN>_EMAIL`·`_PASSWORD`를 읽는다(값은 출력하지 않는다).
+- 계정 선택(#344, 2026-11-10): `--account` 인자 > `LT_ACCOUNT` 환경변수 > 둘 다 없으면 **시작 전에 멈춘다**(기본 계정 01로 조용히 진행하지 않는다, #300 레인 계정 규칙). 선택 규칙은 `tools/account-choice.mjs` 한 벌.
 - 시험 자료(계정 01): 트리 3권 + 사진 표지 1권. `npm test`·`npm run build`와 무관한 임시 자료이며,
   점검이 끝나면 트리 0개·보관 파일 0개로 정리한다.
 - 결과: `<out>/a11y.json`(라벨별 위반·대상·색 대비 값)과 화면 캡처 `<out>/<화면>-<폭>-<테마>-<상태>.png`.

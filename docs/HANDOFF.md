@@ -115,6 +115,13 @@
 
 - **원칙 8 자동화(2026-11-08)**: PR마다 `.github/workflows/preview-check.yml`이 Cloudflare Pages 미리보기 주소를 찾아 `tools/postdeploy`(로그아웃)를 돌리고, `tools/postdeploy/preview-gate.mjs`가 판정한다(visual·페이지 오류 0, 미리보기 Functions 503만 예외). 미리보기 배포가 없으면 실패가 아니라 건너뜀. 레인은 체크 요약만 확인한다.
 
+## 2026-11-10 — 도구 계정 선택 한 벌: --account 인자 우선·없으면 시작 전 정지(#344 대표 지시, 로컬2, ai/local2-a11y-account-arg-261110)
+
+- **문제(실측 확인)**: `tools/a11y/a11y-run.mjs`가 `--account` 인자를 무시하고 `LT_ACCOUNT` 환경변수·기본값 '01'로 시크릿 키·보고서 계정을 골랐다 — `--account 04`로 돌려도 보고서 account가 '01'이었다(실제로 계정 04 a11y 실행이 계정 01(읽기만, 기록 없음)으로 돌아간 것이 이 버그). postdeploy의 `normaliseAccount('')`도 조용한 '01'이었다.
+- **규칙 한 벌**: `tools/account-choice.mjs` — `--account` 인자 > `LT_ACCOUNT` 환경변수 > 둘 다 없으면 선택 없음(''), **계정을 쓰는 실행은 시작 전에 멈춘다**(기본 계정으로 조용히 진행하지 않음). 정규화(1→01·tutorial4→04·03 폐기 거절)도 한 벌에서 하고 postdeploy `accounts.mjs`는 위임.
+- **훑기 결과**: `a11y-run.mjs`(항상 계정으로 로그인 → 가드 한 곳, 시크릿 키·보고서 계정 모두 선택 계정 따름), `postdeploy.mjs`(`--auto-login`·`--auth-flows`만 계정 사용 → 그 두 모드에서 멈춤, 로그인 없는 읽기·수동 검사는 계정 '' — 프로필 기본값 동일), `visual-baseline`(계정을 쓰지 않음 — 변경 없음). README·도움말에 규칙 기록.
+- **시험**: `tests/tools-account-choice.test.mjs` 7건(우선순위·정규화·a11y/postdeploy **실제 실행** 가드 — child_process로 브라우저 띄우기 전 정지·종료 코드·인자 우선 확인·배선 글자 검사), `tests/postdeploy-accounts.test.mjs` 빈 값 단언을 새 규칙으로 갱신. 강도 증명: chooseTestAccount를 조용한 '01'로 되돌리면 4건 실패 확인 후 복구. 전체 `npm test` **868건 831 pass / 0 fail / 37 skip**, `npm run build` pass.
+
 ## 2026-11-10 — 첫 화면 카드: 내 기록 YouTube 순간을 썸네일 카드로(#340, 로컬2, ai/local2-home-youtube-cards-261110)
 
 빠른 추가(#329)로 담은 YouTube 순간이 첫 화면에서 글자 카드로만 분류돼 '사진 3장 미만' 예시로 물러나던 문제. 지난 세션에 ai-revenue-lab #7313에 잘못 올린 같은 내용은 **skerishKang/lovetree-4.0 #340**으로 옮기고(잘못 올림 댓글 후 원 이슈는 닫음) — **앞으로 러브트리 이슈는 lovetree-4.0에만 올린다**.
