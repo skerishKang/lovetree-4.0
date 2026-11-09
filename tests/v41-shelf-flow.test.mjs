@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import {
   COVER_PALETTE, allBooks, bookMeta, buildShelf, carouselTransform, coverStyle, escapeShelf,
   filterShelf, findBook, lastMomentDate, leftPageMarkup, pageMeta, pageTarget, resolveShelfIndex,
-  rightPageMarkup, shelfBook, treeTitleOf, youtubeId
+  resumeCard, rightPageMarkup, shelfBook, treeTitleOf, youtubeId
 } from '../public/v41/views/shelf/shelf-model.mjs';
 import { createReader } from '../public/v41/views/shelf/shelf-reader.js';
 import { fakeEl } from './helpers/fake-dom.mjs';
@@ -197,4 +197,32 @@ test('책을 열면 셸에 기록 id를 넘기고, 이미 열려 있으면 다�
   assert.deepEqual(opened, ['m2']);
   assert.deepEqual(openedBooks, ['tree1']);
   delete globalThis.LTDEMO;
+});
+
+// ── 이어 읽기 칸(#256-1): 어떤 칸을 보여줄지·문구는 shelf-model 한 벌이 정한다 ──
+test('이어 읽기 칸 표(출처·저장 위치·문구)', () => {
+  const books = buildShelf([tree(), tree({ id: 'tree2', title: '바다', subject: '여름', moments: [moment('s1', { title: '파도 사진' })] })], COVER_PALETTE, (v) => v);
+  const cases = [
+    // [source, treeId, momentId, 기대 kind, 기대 문구, 기대 책, 기대 순간]
+    ['server', 'tree1', 'm2', 'resume', '지난번 m2 순간까지 봤어요', 'tree1', 'm2'],
+    ['server', 'tree1', '', 'resume', '지난번 p1 순간까지 봤어요', 'tree1', 'p1'],      // 위치 없으면 첫 순간
+    ['server', 'gone', 'gone', 'resume', '지난번 p1 순간까지 봤어요', 'tree1', 'p1'],  // 지워진 트리 → 첫 책
+    ['server', '', '', 'resume', '지난번 p1 순간까지 봤어요', 'tree1', 'p1'],
+    ['example', '', '', 'example', '예시 책 펼쳐 보기', 'tree1', null],
+    ['file', '', '', 'example', '예시 책 펼쳐 보기', 'tree1', null],
+    ['server', '', '', 'first', '첫 책을 펼쳐 보세요', null, null] // books 비면(빈 계정) 아래에서 따로
+  ];
+  for (const [source, treeId, momentId, kind, title, bookId, momentId2] of cases.slice(0, -1)) {
+    const info = resumeCard({ source, treeId, momentId, books });
+    assert.equal(info.kind, kind, [source, treeId, momentId].join('/'));
+    assert.equal(info.title, title);
+    assert.equal(info.book ? info.book.id : null, bookId);
+    assert.equal(info.moment ? info.moment.id : null, momentId2);
+    assert.equal(info.action, kind === 'resume' ? '이어 보기' : '');
+  }
+  // 기록이 없는(트리 0개) 계정
+  const empty = resumeCard({ source: 'server', treeId: '', momentId: '', books: [] });
+  assert.deepEqual({ kind: empty.kind, title: empty.title, book: empty.book }, { kind: 'first', title: '첫 책을 펼쳐 보세요', book: null });
+  // 예시 칸은 이어 보기 문구를 쓰지 않는다
+  assert.equal(resumeCard({ source: 'example', books }).action, '');
 });

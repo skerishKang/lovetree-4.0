@@ -4,7 +4,7 @@
 import {
   COVER_PALETTE, allBooks as allBooksOf, bookMeta, buildShelf, carouselTransform, coverStyle as coverStyleOf,
   escapeShelf, filterShelf, findBook, lastMomentDate as lastMomentDateOf,
-  resolveShelfIndex, spineItems as spineItemsOf, spineScrollLeft as spineScrollLeftOf, spineStyle as spineStyleOf, spineTargetIndex as spineTargetIndexOf, spineVisible as spineVisibleOf,
+  resolveShelfIndex, resumeCard, spineItems as spineItemsOf, spineScrollLeft as spineScrollLeftOf, spineStyle as spineStyleOf, spineTargetIndex as spineTargetIndexOf, spineVisible as spineVisibleOf,
   treeTitleOf, youtubeId as youtubeIdOf
 } from './shelf-model.mjs';
 import { createReader } from './shelf-reader.js';
@@ -54,7 +54,8 @@ import { createReader } from './shelf-reader.js';
         state.shelfIndex=resolveShelfIndex(list, state.selectedId, state.shelfIndex);
         $('#resultCount').textContent=list.length+'권';
         renderSpines(list);
-        renderHeroShelf(list);
+        // #256-1: 목록이 바뀔 때마다 다시 그린다. 칸은 검색·필터와 무관하게 전체 책(allBooks) 기준이라 좁아져도 그대로다.
+        renderResumeCard();
         $('#shelfRail').innerHTML=list.length?list.map(function(book,index){
           // #212: 표지에 이름 한 번만. 표지 아래는 "순간 N개 · 마지막 YYYY-MM-DD" 하나만. "책 · 02"·"기본 표지" 같은 내부 표시는 없다.
           return '<article class="book-card" data-book-index="'+index+'"><button type="button" data-book-id="'+esc(book.id)+'" aria-label="'+esc(book.name)+' 기억책 열기">'+
@@ -94,15 +95,35 @@ import { createReader } from './shelf-reader.js';
         var rowRect=row.getBoundingClientRect(),rect=active.getBoundingClientRect();
         row.scrollTo({left:spineScrollLeft(row.clientWidth,row.scrollWidth,rect.left-rowRect.left+row.scrollLeft,rect.width),behavior:instant?'auto':'smooth'});
       }
-      function renderHeroShelf(list) {
-        // #212 4번: 예시 그림 대신 실제 내 책(최대 4권)을 세운다. 책이 없으면 아무것도 그리지 않는다.
-        var host=$('#heroBooks'),shelf=$('#heroShelf');
-        if(!host)return;
-        var shown=list.slice(0,4);
-        host.innerHTML=shown.map(function(book,index){
-          return '<div class="hero-book" style="--book:'+esc(book.color)+';--tilt:'+(((index%3)-1)*2)+'deg" title="'+esc(book.name)+'"><i></i><span>'+esc(book.name)+'</span></div>';
-        }).join('');
-        if(shelf)shelf.style.display=shown.length?'block':'none';
+      // #256-1: 오른쪽 위 작은 책장(빠른 이동) 자리를 이어 읽기 칸으로 쓴다.
+      // 마지막 위치는 새로 저장하지 않고, 셸이 이미 저장·복원하는 계정 위치를 읽어 보여 준다.
+      function renderResumeCard() {
+        var card=$('#resumeCard');
+        if(!card)return;
+        var context=window.parent&&window.parent.LT41?window.parent.LT41:null;
+        var info=resumeCard({
+          source:context?context.source:'server',
+          treeId:context&&context.tree?context.tree.id:'',
+          momentId:typeof LTDEMO.get==='function'?String(LTDEMO.get()||''):'',
+          books:allBooks()
+        });
+        card.hidden=false;
+        card.dataset.resumeKind=info.kind;
+        var cover=$('#resumeCover');
+        if(cover){
+          if(info.book){
+            cover.style.setProperty('--cover',info.book.color);
+            cover.style.setProperty('--cover-accent',info.book.accent);
+            cover.innerHTML=(info.book.coverMedia?'<img src="'+esc(info.book.coverMedia)+'" alt="" loading="lazy" referrerpolicy="no-referrer">':'')+'<span>'+esc(info.book.symbol)+'</span><strong>'+esc(info.book.name)+'</strong>';
+          } else cover.innerHTML='';
+        }
+        $('#resumeTitle').textContent=info.title;
+        $('#resumeAction').textContent=info.action;
+        card.onclick=function(){
+          if(info.kind==='first'){parent.postMessage({type:'lt41-write',mode:'new'},location.origin);return;}
+          if(info.book&&info.moment)LTDEMO.openBook(info.moment.id,info.book.id);
+          else if(info.book)LTDEMO.openBook(info.book.chapters[0]&&info.book.chapters[0].id,info.book.id);
+        };
       }
       function setShelfAtmosphere(book) {
         var viewport=$('#shelfViewport');
@@ -211,6 +232,6 @@ import { createReader } from './shelf-reader.js';
           save();closeModal('newBookModal');$('#newBookForm').reset();renderShelf();showToast(name+'의 책을 만들었어요.');
         });
       }
-      renderShelf();bind();
+      renderShelf();renderResumeCard();bind();
   }
 }

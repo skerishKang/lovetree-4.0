@@ -29,11 +29,12 @@
             <button class="shelf-jump" id="shelfJump" type="button">선택한 책 보러 가기 ↓</button>
           </div>
           <!-- #212 4번: 실제 책과 무관한 예시 4권과 겹치는 안내 글자를 뺤다. 아래 책장이 실제 내 책을 보여 준다. -->
-          <div class="hero-stage" aria-hidden="true">
-            <span class="stage-label">내 책장</span>
-            <span class="stage-hint">아래 책장에서 책을 고르세요</span>
-            <div class="hero-books" id="heroBooks"></div>
-            <div class="hero-shelf" id="heroShelf"></div>
+          <!-- #256-1: 오른쪽 위 작은 책장(빠른 이동)을 이어 읽기 칸으로 바꾼다. 마지막 위치는 셸이 저장·복원하는 계정 위치를 읽어 쓴다. -->
+          <button class="hero-stage resume" id="resumeCard" type="button" hidden>
+            <span class="stage-label">이어 읽기</span>
+            <span class="resume-cover" id="resumeCover" aria-hidden="true"></span>
+            <span class="resume-copy"><strong id="resumeTitle"></strong><em id="resumeAction"></em></span>
+          </button>
           </div>
         </section>
         <div class="shelf-controls">

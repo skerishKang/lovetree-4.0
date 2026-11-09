@@ -129,14 +129,18 @@ test('#212 책장은 공용 표시 함수를 싣고 카드 이름에 적용한�
   assert.match(shelf, /LTTreeName\.displayTreeTitle/);
 });
 
-// 4. 예시 그림.
-test('#212 오른쪽 위 예시 책 그림은 실제 내 책으로 그린다', () => {
+// 4. 예시 그림 자리 → 이어 읽기 칸(#256-1, 2026-11-09). #212의 "실제 내 책 4권" 작은 책장은
+//    역할이 아래 책장과 겹쳐 이어 읽기 칸으로 바뀌었다(이슈 #256 1번).
+test('#256-1 오른쪽 위 칸은 이어 읽기이고 문구·이동은 shelf-model 한 벌에서 온다', () => {
   const markup = shelf.slice(0, shelf.indexOf('<script'));
   assert.ok(!/<span>순간 0[1-4]<\/span>/.test(shelf), '가짜 예시 4권을 두지 않는다');
-  assert.match(shelf, /function renderHeroShelf\(list\)/);
-  assert.match(shelf, /list\.slice\(0,4\)/);
-  assert.equal((markup.match(/class="hero-book"/g) || []).length, 0, '마크업에 상수 예시 책이 없다');
-  assert.ok(markup.includes('id="heroBooks"'), '실제 책을 그릴 자리만 둔다');
+  assert.equal((markup.match(/class="hero-book"/g) || []).length, 0, '작은 책장 그림은 남기지 않는다');
+  assert.ok(markup.includes('id="resumeCard"'), '이어 읽기 칸을 둔다');
+  assert.match(shelf, /function renderResumeCard\(\)/);
+  assert.match(shelf, /resumeCard\(\{/, '문구·칸 판정은 shelf-model의 resumeCard를 쓴다');
+  assert.match(shelf, /renderShelf\(\);renderResumeCard\(\);bind\(\);/, '화면 진입 때 한 번 그린다');
+  // 마지막 위치를 새로 저장하지 않는다(읽기만).
+  assert.ok(!/setItem\(/.test(shelf), 'shelf.js는 위치를 저장하지 않는다');
 });
 
 // 화면은 모듈이 아니라 클래식 스크립트를 싣는다. 두 판본이 같은 결과를 내야 한다.
