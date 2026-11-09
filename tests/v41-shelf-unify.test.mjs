@@ -159,3 +159,10 @@ test('#212 클래식 판본(tree-name.js)이 모듈과 같은 결과를 낸다',
   assert.equal(classic.autoTreeTitle('윤슬'), autoTreeTitle('윤슬'));
   assert.match(shelf, /<script src="\/v41\/tree-name\.js"><\/script>/);
 });
+
+// #256-1: 책장 어댑터(view-navigation.js)가 이어 읽기 칸을 장식 취급하지 않는다.
+test('#256-1 view-navigation 어댑터가 이어 읽기 칸의 문구·접근성을 덮어 쓰지 않는다', () => {
+  const nav = read('public/v41/view-navigation.js');
+  assert.match(nav, /stage\.closest\('#resumeCard'\)/, 'stage-label 덮어쓰기는 이어 읽기 칸을 제외한다');
+  assert.match(nav, /hero-stage:not\(#resumeCard\)/, 'aria-hidden은 이어 읽기 칸에 다시 붙이지 않는다');
+});
