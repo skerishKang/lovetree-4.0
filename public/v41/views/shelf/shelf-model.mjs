@@ -101,6 +101,20 @@ export function pageTarget(index, count, direction, forcedIndex) {
   return next;
 }
 
+// #256 2번: 책이 3권부터 책등을 목차처럼 한 줄로 세운다. 0~2권은 목차가 시끄러우니 숨긴다.
+export const spineVisible = (count) => count >= 3;
+
+// 책등 목차 항목: 책장 순서 그대로 한 줄에 세운다. 눈금마다 살짝 기울여 책장에 꽂힌 모양을 낸다.
+export function spineItems(books) {
+  return books.map((book, index) => ({ id: book.id, name: book.name, index, color: book.color, tilt: ((index % 3) - 1) * 2 }));
+}
+
+// 책등에 새울 모양(표지 색 변수 + 기울임). 실제 색값은 identity.css의 --lt-cover-N이 테마별로 정한다.
+export const spineStyle = (item) => '--cover:' + item.color + ';--tilt:' + item.tilt + 'deg;';
+
+// 책등을 눌렀을 때 아래 넘기기(레일)가 이동할 자리. 목차에 없는 책이면 -1(화면이 무시한다).
+export const spineTargetIndex = (books, id) => books.findIndex((book) => book.id === id);
+
 export function youtubeId(url, describe) {
   let parsed;
   try { parsed = new URL(String(url || '')); } catch (e) { return ''; }

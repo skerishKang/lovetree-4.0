@@ -4,7 +4,8 @@
 import {
   COVER_PALETTE, allBooks as allBooksOf, bookMeta, buildShelf, carouselTransform, coverStyle as coverStyleOf,
   escapeShelf, filterShelf, findBook, lastMomentDate as lastMomentDateOf,
-  resolveShelfIndex, treeTitleOf, youtubeId as youtubeIdOf
+  resolveShelfIndex, spineItems as spineItemsOf, spineStyle as spineStyleOf, spineTargetIndex as spineTargetIndexOf, spineVisible as spineVisibleOf,
+  treeTitleOf, youtubeId as youtubeIdOf
 } from './shelf-model.mjs';
 import { createReader } from './shelf-reader.js';
 
@@ -43,6 +44,8 @@ import { createReader } from './shelf-reader.js';
       var youtubeId = function (url) { return youtubeIdOf(url, window.LTMedia && window.LTMedia.describe); };
       function showToast(message) { var toast=$('#toast'); toast.textContent=message; toast.classList.add('show'); clearTimeout(showToast.timer); showToast.timer=setTimeout(function(){toast.classList.remove('show');},2400); }
       var coverStyle = coverStyleOf;
+      // #256 2번: 책등 목차 계산은 shelf-model.mjs 한 벌만 쓴다(보일지 말지·책등 목록·누른 책 → 넘기기 위치).
+      var spineVisible = spineVisibleOf, spineItems = spineItemsOf, spineStyle = spineStyleOf, spineTargetIndex = spineTargetIndexOf;
       function openModal(id) { $('#'+id).classList.remove('hidden'); }
       function closeModal(id) { $('#'+id).classList.add('hidden'); }
       function renderShelf() {
@@ -50,6 +53,7 @@ import { createReader } from './shelf-reader.js';
         state.shelfList=list;
         state.shelfIndex=resolveShelfIndex(list, state.selectedId, state.shelfIndex);
         $('#resultCount').textContent=list.length+'권';
+        renderSpines(list);
         renderHeroShelf(list);
         $('#shelfRail').innerHTML=list.length?list.map(function(book,index){
           // #212: 표지에 이름 한 번만. 표지 아래는 "순간 N개 · 마지막 YYYY-MM-DD" 하나만. "책 · 02"·"기본 표지" 같은 내부 표시는 없다.
@@ -58,6 +62,33 @@ import { createReader } from './shelf-reader.js';
             '<span class="book-card-meta"><span>'+esc(bookMeta(book))+'</span></span></button></article>';
         }).join(''):'<div class="empty"><strong>찾는 책이 없어요.</strong><span>트리 이름·좋아하는 대상·순간 제목으로 검색해 보세요.</span></div>';
         updateCarousel(false);
+      }
+      function renderSpines(list) {
+        // #256 2번: 3권부터만 책등을 세운다. 1~2권이면 목차를 숨긴다(hidden).
+        var nav=$('#shelfSpines'),row=$('#shelfSpineRow');
+        if(!nav||!row)return;
+        var visible=spineVisible(list.length);
+        nav.hidden=!visible;
+        row.innerHTML=visible?spineItems(list).map(function(item){
+          return '<button type="button" class="shelf-spine" data-book-id="'+esc(item.id)+'" data-book-index="'+item.index+'" style="'+spineStyle(item)+'" aria-label="'+esc(item.name)+' 책으로 넘기기"><span class="shelf-spine-title">'+esc(item.name)+'</span></button>';
+        }).join(''):'';
+        syncSpines();
+      }
+      var spineActiveId=null;
+      function syncSpines() {
+        // 레일(아래 넘기기)이 움직이면 목차의 선택 표시와 가로 위치를 그 책에 맞춘다.
+        var row=$('#shelfSpineRow');
+        if(!row||!row.children.length)return;
+        var book=state.shelfList[state.shelfIndex],activeId=book?book.id:null;
+        Array.prototype.forEach.call(row.children,function(button){
+          var active=button.dataset.bookId===activeId;
+          button.classList.toggle('is-active',active);
+          if(active)button.setAttribute('aria-current','true');else button.removeAttribute('aria-current');
+        });
+        if(activeId===spineActiveId)return;
+        spineActiveId=activeId;
+        var active=row.querySelector('[data-book-id="'+CSS.escape(activeId||'')+'"]');
+        if(active)active.scrollIntoView({block:'nearest',inline:'center'});
       }
       function renderHeroShelf(list) {
         // #212 4번: 예시 그림 대신 실제 내 책(최대 4권)을 세운다. 책이 없으면 아무것도 그리지 않는다.
@@ -96,6 +127,7 @@ import { createReader } from './shelf-reader.js';
           card.style.pointerEvents=placed.pointerEvents;
           card.style.filter=placed.filter;
         });
+        syncSpines();
         setShelfAtmosphere(state.shelfList[center]);
       }
       function moveShelf(direction) {
@@ -143,6 +175,14 @@ import { createReader } from './shelf-reader.js';
         rail.addEventListener('pointercancel',function(){if(!shelfDrag.active)return;shelfDrag.active=false;rail.classList.remove('dragging');state.shelfIndex=Math.round(state.shelfIndex);updateCarousel();});
       }
       function bind() {
+        $('#shelfSpineRow').addEventListener('click',function(event){
+          // #256 2번: 책등을 누르면 아래 넘기기가 그 책으로 이동한다(책을 바로 열지는 않는다).
+          var spine=event.target.closest('[data-book-id]');
+          if(!spine)return;
+          var index=spineTargetIndex(state.shelfList,spine.dataset.bookId);
+          if(index<0||index>=state.shelfList.length||index===state.shelfIndex)return;
+          state.shelfIndex=index;save();updateCarousel();
+        });
         $('#shelfJump').addEventListener('click',function(){state.query='';state.filter='all';$('#searchInput').value='';$$('.filter').forEach(function(item){item.classList.toggle('active',item.dataset.filter==='all');});renderShelf();var book=getShelfCard(state.shelfIndex)?.querySelector('button[data-book-id]');if(book)openReader(book.dataset.bookId,book.closest('.book-card'));});
         $('#searchInput').addEventListener('input',function(event){state.query=event.target.value;renderShelf();});
         $$('.filter').forEach(function(button){button.addEventListener('click',function(){state.filter=button.dataset.filter;$$('.filter').forEach(function(item){item.classList.toggle('active',item===button);});renderShelf();});});
