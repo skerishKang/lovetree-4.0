@@ -19,8 +19,8 @@ export function createDialogs(deps) {
   }
   function trapShellTab(event) {
     if (event.key !== 'Tab') return;
-    const assets = $('account-assets'), editor = $('editor');
-    const dialog = assets?.open ? assets : editor?.open ? editor : null;
+    const quick = $('quick-add'), chooser = $('write-chooser'), assets = $('account-assets'), editor = $('editor');
+    const dialog = quick?.open ? quick : chooser?.open ? chooser : assets?.open ? assets : editor?.open ? editor : null;
     if (!dialog) return;
     const list = shellFocusables(dialog);
     if (!list.length) { event.preventDefault(); return; }
@@ -57,7 +57,7 @@ export function createDialogs(deps) {
 
   // 다이얼로그 바깥(어두운 배경) 클릭으로 닫기. 편집기·책 정보는 실수로 닫히지 않게 뺀다.
   for (const d of document.querySelectorAll('dialog')) d.addEventListener('click', e => {
-    if (e.target !== d || ['editor', 'tree-manager'].includes(d.id)) return;
+    if (e.target !== d || ['editor', 'tree-manager', 'quick-add', 'write-chooser'].includes(d.id)) return;
     const r = d.getBoundingClientRect();
     if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) d.close();
   });

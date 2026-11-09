@@ -39,4 +39,19 @@
 <form id="account-form"><label>확인을 위해 <strong id="account-confirm-label">확인 문구</strong>를 입력하세요<input id="account-confirm" name="confirm" autocomplete="off" spellcheck="false" maxlength="320" required></label>
 <p id="account-confirm-hint" class="panel-note"></p><p id="account-feedback" role="alert"></p>
 <div class="button-row"><button id="account-delete" class="danger" type="submit" disabled>계정 탈퇴 실행</button><button data-close="account-settings" type="button">취소</button></div></form></dialog>
+<dialog id="write-chooser" aria-labelledby="write-chooser-title"><div class="panel-heading"><div><span class="eyebrow">순간 남기기</span><h2 id="write-chooser-title">어떻게 남길까요?</h2></div><button data-close="write-chooser" aria-label="순간 남기기 닫기" class="close">×</button></div>
+<p class="panel-note">주소 하나면 바로 담고, 나중에 ‘지금 다듬기’로 이어 적을 수 있어요.</p>
+<div class="write-choice"><button type="button" id="write-quick" class="primary"><strong>빠른 추가</strong><span>주소만 붙여 넣기 · 모아둔 순간에 바로 담아요</span></button><button type="button" id="write-detailed"><strong>자세한 추가</strong><span>트리·제목·감정까지 적기</span></button></div></dialog>
+<dialog id="quick-add" aria-labelledby="quick-add-title"><div class="panel-heading"><div><span class="eyebrow">빠른 추가</span><h2 id="quick-add-title">주소 하나로 담아요</h2></div><button data-close="quick-add" aria-label="빠른 추가 닫기" class="close">×</button></div>
+<p class="panel-note">YouTube·사진·링크 주소를 붙여 넣으면 모아둔 순간에 담아요. 나중에 다듬어도 좋아요.</p>
+<form id="quick-form"><label>주소<input id="quick-url" name="url" type="url" maxlength="2048" placeholder="https://" autocomplete="off" spellcheck="false" aria-describedby="quick-hint"></label>
+<p id="quick-hint" class="panel-note">붙여 넣으면 지원 주소인지 바로 확인해 미리보기를 보여 줘요.</p>
+<div id="quick-preview" class="quick-preview" aria-live="polite"></div>
+<p id="quick-error" role="alert"></p>
+<div data-media-slot></div>
+<p id="quick-notice" class="quick-notice" role="status" hidden></p>
+<div class="button-row"><button class="primary" type="submit">추가</button><button type="button" id="quick-refine" hidden>지금 다듬기</button><button type="button" data-close="quick-add">닫기</button></div>
+</form></dialog>
+<div id="drop-veil" hidden><p id="drop-veil-text">놓으면 모아둔 순간에 담아요</p></div>
+<div id="quick-saved" role="status" hidden><img id="quick-saved-thumb" alt="" referrerpolicy="no-referrer" hidden><span id="quick-saved-text">모아둔 순간에 담았어요</span><button type="button" id="quick-saved-refine" hidden>지금 다듬기</button></div>
 <script src="media-preview.js"></script><script type="module" src="shell.mjs"></script></body></html>

@@ -299,7 +299,8 @@ async function auditDialogs(page, browser, options, base, storage, width, theme,
     await page.evaluate(() => document.getElementById('tree-manager')?.close()).catch(() => {});
   }
 
-  // 3) 순간 남기기(편집기) — 기억책 화면에서 연다.
+  // 3) 순간 남기기 — 기억책 화면에서 연다. 2026-11-09(#327 ②)부터 고르기 창(빠른/자세한 추가)이
+  //    먼저 열리고, 각각의 창을 차례로 검사한다. 자세한 추가는 기존 편집기 다이얼로그다.
   await page.evaluate((hash) => { location.hash = hash; }, '#my/book' + query).catch(() => {});
   await page.waitForTimeout(2000);
   await waitForScreen(page, { name: 'book', expect: 'track59-sketchbook' });
@@ -311,6 +312,23 @@ async function auditDialogs(page, browser, options, base, storage, width, theme,
     if (write && !write.hidden) write.click();
   }).catch(() => {});
   await page.waitForTimeout(900);
+  const chooserOpen = await page.evaluate(() => Boolean(document.getElementById('write-chooser')?.open));
+  if (chooserOpen) {
+    results.push(await runAxe(page.mainFrame(), `shell:write-chooser:${width}:${theme}`));
+    await page.evaluate(() => document.getElementById('write-quick')?.click()).catch(() => {});
+    await page.waitForTimeout(700);
+    const quickOpen = await page.evaluate(() => Boolean(document.getElementById('quick-add')?.open));
+    if (quickOpen) {
+      results.push(await runAxe(page.mainFrame(), `shell:quick-add:${width}:${theme}`));
+      await page.evaluate(() => document.getElementById('quick-add')?.close()).catch(() => {});
+    }
+    await page.evaluate(() => document.getElementById('write-chooser')?.close()).catch(() => {});
+    // 자세한 추가(기존 편집기)도 같은 화면에서 연다.
+    await page.evaluate(() => document.getElementById('write-menu')?.click()).catch(() => {});
+    await page.waitForTimeout(700);
+    await page.evaluate(() => document.getElementById('write-detailed')?.click()).catch(() => {});
+    await page.waitForTimeout(900);
+  }
   const editorOpen = await page.evaluate(() => Boolean(document.getElementById('editor')?.open));
   if (editorOpen) {
     results.push(await runAxe(page.mainFrame(), `shell:editor:${width}:${theme}`));

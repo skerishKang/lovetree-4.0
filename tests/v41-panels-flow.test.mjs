@@ -289,24 +289,14 @@ test('formDirty: 이전 순간을 바꾸면 본문이 그대로여도 변경으�
   } finally { h.restore(); }
 });
 
-test('write-menu 연결: 내 책장에서는 새 트리(첫 여정), 다른 화면에서는 추가 편집기', () => {
+// 2026-11-09 #빠른 추가 ②: '순간 남기기'는 이제 고르기 창(빠른 추가/자세한 추가)을 연다.
+// 연결은 shell.mjs가 createQuickAdd에 넘기고, 분기(책장→자세한 'new'·나머지→'add') 시험은
+// tests/v41-quick-add-flow.test.mjs가 createQuickAdd를 직접 불러 본다. panels는 편집기만 맡는다.
+test('write-menu 연결은 shell/quick-add.mjs가 맡는다 — panels가 다시 연결하지 않는다', () => {
   const shelf = harness({ current: 'track32-bookshelf.html' });
   try {
-    assert.equal(typeof shelf.elements['write-menu'].onclick, 'function', 'write-menu가 연결돼 있다');
-    shelf.elements['write-menu'].onclick();
-    assert.equal(shelf.calls.firstJourney, 1, '내 책장에서는 첫 여정으로');
-    assert.deepEqual(shelf.calls.panel, []);
+    assert.equal(shelf.elements['write-menu'].onclick, undefined, 'panels는 write-menu를 연결하지 않는다(고르기 창은 셸 몫)');
   } finally { shelf.restore(); }
-
-  for (const screen of ['src064-orbit.html', 'track59-sketchbook.html', 'track58-pinboard.html']) {
-    const h = harness({ current: screen });
-    try {
-      h.elements['write-menu'].onclick();
-      assert.equal(h.calls.firstJourney, 0, `${screen}: 첫 여정으로 보내지 않는다`);
-      assert.deepEqual(h.calls.panel, ['editor'], `${screen}: 추가 편집기를 연다`);
-      assert.equal(h.panels.editorMode(), 'add');
-    } finally { h.restore(); }
-  }
 });
 
 test('패널 탭 버튼은 각자 모드로 편집기를 바꾼다', () => {

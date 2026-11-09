@@ -5,10 +5,11 @@ const SIZE_PROBLEM='PNG·JPEG·GIF·WebP(약 4.2MB), MP4·WebM(약 8.4MB)만 올
 // 보관 파일 목록·다시 첨부·삭제는 패널이 아니라 계정 메뉴의 다이얼로그가 맡는다.
 // #256-3 2단계: onUploaded를 주면 업로드 성공 뒤 그 주소를 넘겨 후속(표지 만들기)을 맡긴다 —
 // 옵션이 없으면 기존 순간 폼 동작이 그대로다(시험으로 고정). imagesOnly는 사진만 받는 인스턴스용이다.
-export function mountPrivateUpload({form,assets,getSubject,getState,onChange,onUseAsset,onUploaded,imagesOnly=false}){
+// fileLabel: imagesOnly 인스턴스의 파일 라벨(기본 '표지 사진' — 기존 호출은 그대로다).
+export function mountPrivateUpload({form,assets,getSubject,getState,onChange,onUseAsset,onUploaded,imagesOnly=false,fileLabel='표지 사진'}){
  const api=createWorkspaceApi(),slot=form.querySelector('[data-media-slot]');
  const slotMarkup=imagesOnly
-  ?'<label class="file-label">표지 사진<input type="file" accept="image/png,image/jpeg,image/gif,image/webp" data-media-file></label><p role="status" data-upload-status></p><button type="button" data-stop class="stop-upload" hidden>전송 취소</button><p class="panel-note">내 계정에만 보관합니다. 사진 약 4.2MB, 계정당 약 105MB·200개까지.</p>'
+  ?`<label class="file-label">${fileLabel}<input type="file" accept="image/png,image/jpeg,image/gif,image/webp" data-media-file></label><p role="status" data-upload-status></p><button type="button" data-stop class="stop-upload" hidden>전송 취소</button><p class="panel-note">내 계정에만 보관합니다. 사진 약 4.2MB, 계정당 약 105MB·200개까지.</p>`
   :'<label class="file-label">사진·영상 파일<input type="file" accept="image/png,image/jpeg,image/gif,image/webp,video/mp4,video/webm" data-media-file></label><p role="status" data-upload-status></p><button type="button" data-stop class="stop-upload" hidden>전송 취소</button><p class="panel-note">내 계정에만 보관합니다. 사진 약 4.2MB · 영상 약 8.4MB, 계정당 약 105MB·200개까지.</p>';
  slot.innerHTML=slotMarkup;
  const $=s=>slot.querySelector(s),A=s=>assets.querySelector(s),fileInput=$('[data-media-file]'),status=$('[data-upload-status]'),stop=$('[data-stop]'),submit=form.querySelector('[type=submit]');
