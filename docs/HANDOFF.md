@@ -1,5 +1,7 @@
 # LoveTree 4.0 — 핸드오프
 
+> **main 보호 규칙(2026-11-09, 룰셋 "main 보호 (PR·필수 검사)")**: main은 PR로만 바꾼다(직접 푸시·force push·삭제 금지, 관리자도 예외 없음 — 비상시 대표가 룰셋 enforcement를 잠깐 끈다). 필수 검사: `check (ubuntu-latest)`·`check (windows-latest)`·`미리보기 postdeploy(로그아웃)` — 셋 다 paths 필터가 없어 문서만 바뀐 PR에서도 항상 돈다. 승인 수 0(레인이 스스로 머지). Deploy Bundle Boot Test는 paths 필터가 있어 필수에 넣지 않았다.
+
 ## 2026-11-09 — 표지 고르기 2단계: 창에서 새 사진을 표지로 만들기(#256-3 2단계, 로컬3, ai/lt-cover-upload-261109, PR #310 머지 `5f384d4`)
 
 “내 사진 올리기”를 (가)안으로 구현 — **스키마·서버 변경 0**. 올린 사진으로 순간을 하나 만들고 기존 `coverMomentId`(판정 1순위)로 가리킨다.
