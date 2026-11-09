@@ -153,3 +153,19 @@ test('책 정보 관리 창: 디자인 표지 라디오와 사진 표지 안내�
   assert.match(panels, /\$\('tree-photo-cover'\)\.hidden = !photoCover/, '사진 표지 안내 표시를 판정한다');
   assert.doesNotMatch(panels, /\$\('tree-design'\)\.disabled/, '디자인 줄을 disabled로 막지 않는다(막으면 저장 때 값이 빠진다)');
 });
+
+test('새 사진으로 표지 만들기: 기존 창 안에 있고, 로그아웃에선 숨고, 안내 문구가 반드시 있다(마크업 검사)', () => {
+  const shell = readFileSync('public/v41/index.html', 'utf8');
+  assert.match(shell, /<fieldset id="tree-cover-upload" hidden>/, '기본은 숨겨진다(로그아웃·예시에서는 보이지 않는다)');
+  assert.match(shell, /<legend>새 사진으로 표지 만들기<\/legend>/);
+  assert.match(shell, /올린 사진은 이 책의 새 순간으로도 남아요\./, '요구된 안내 한 줄');
+  assert.match(shell, /id="tree-cover-title" maxlength="80"/, '순간 제목은 선택 입력');
+  assert.match(shell, /placeholder="[^"]*사진으로 남긴 순간/, '비우면 기본값 안내');
+  const panels = readFileSync('public/v41/shell/panels.mjs', 'utf8');
+  assert.match(panels, /imagesOnly: true/, '사진만 받는다(영상은 범위 밖)');
+  assert.match(panels, /'add', \{ url, \.\.\.\(title \? \{ title \} : \{\}\) \}, \{ treeId: tree\.id, momentId: root\.id \}\)/, '루트 순간 아래로 붙인다');
+  assert.match(panels, /'editTree', \{ title: tree\.title, subject: tree\.subject, coverMomentId: added\.momentId, coverDesign: tree\.coverDesign \|\| '' \}/, '표지 지정은 기존 이름·대상·디자인을 보존해 저장한다');
+  assert.match(panels, /사진은 순간으로 남았지만 표지 지정은 실패했어요/, '부분 실패 안내');
+  assert.match(panels, /사진은 보관 파일로 남았어요/, '순간 만들기 실패 안내');
+  assert.match(panels, /\$\('tree-cover-upload'\)\.hidden = false/, '서버 기록·창을 열 때만 보인다');
+});

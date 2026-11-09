@@ -21,7 +21,7 @@ function fakeElement(extra = {}) {
   return Object.assign(node, extra);
 }
 
-function harness({ owned = true, writable = true, source = 'server', busy = false, tree = null, view = 'track59-sketchbook.html' } = {}) {
+function harness({ owned = true, writable = true, source = 'server', busy = false, tree = null, view = 'track59-sketchbook.html', applyImpl = null } = {}) {
   const calls = [];
   const notes = [];
   const els = {};
@@ -29,6 +29,13 @@ function harness({ owned = true, writable = true, source = 'server', busy = fals
   els['moment-form'] = fakeElement({ elements: fields() });
   // coverDesign 라디오 묶음(이슈 256-3): RadioNodeList처럼 .value를 갖는다.
   els['tree-form'] = fakeElement({ elements: { title: fakeElement(), subject: fakeElement(), coverDesign: fakeElement() } });
+  // 새 사진 표지 만들기(이슈 256-3 2단계): 업로더가 기대하는 최소 미디어 슬롯 흉내.
+  const coverSlotParts = { '[data-media-file]': fakeElement(), '[data-upload-status]': fakeElement(), '[data-stop]': fakeElement() };
+  const coverSlot = fakeElement({ innerHTML: '' });
+  coverSlot.querySelector = sel => coverSlotParts[sel] || null;
+  els['tree-form'].querySelector = sel => sel === '[data-media-slot]' ? coverSlot : sel === '[type=submit]' ? null : coverSlot.querySelector(sel);
+  els['tree-cover-upload'] = fakeElement({ hidden: true });
+  els['tree-cover-title'] = fakeElement({ value: '' });
   els['editor'] = fakeElement();
   els['tree-manager'] = fakeElement();
   els['parent-target'] = fakeElement();
@@ -37,7 +44,7 @@ function harness({ owned = true, writable = true, source = 'server', busy = fals
 
   const saved = {
     document: globalThis.document, window: globalThis.window,
-    FormData: globalThis.FormData, LTMedia: globalThis.LTMedia, confirm: globalThis.confirm
+    FormData: globalThis.FormData, LTMedia: globalThis.LTMedia, confirm: globalThis.confirm, location: globalThis.location
   };
   const LT41 = tree ? { tree, momentId: tree.moments[0]?.id, trees: [tree] } : null;
   globalThis.window = { LT41 };
@@ -50,7 +57,7 @@ function harness({ owned = true, writable = true, source = 'server', busy = fals
   globalThis.LTMedia = { describe: url => ({ kind: url ? 'photo' : 'none', label: url ? '사진' : '' }), markup: () => '' };
   globalThis.confirm = () => true;
 
-  const member = { snapshot: () => ({ owned, writable, dirty: false }), apply: (...args) => { calls.push(args); return {}; }, dispose() {} };
+  const member = { snapshot: () => ({ owned, writable, dirty: false, subject: 'sub_test0001' }), apply: (...args) => { calls.push(args); return applyImpl ? applyImpl(...args) : {}; }, dispose() {} };
   const uploads = { busy, resets: 0, reset() { this.resets += 1; } };
   let openedJourney = 0, loginIntent = null, editorPanel = 0, recordsPanel = 0;
   const panels = createPanels({
@@ -73,9 +80,10 @@ function harness({ owned = true, writable = true, source = 'server', busy = fals
     globalThis.FormData = saved.FormData;
     globalThis.LTMedia = saved.LTMedia;
     globalThis.confirm = saved.confirm;
+    globalThis.location = saved.location;
   };
   return {
-    panels, els, calls, notes, modeButtons, uploads,
+    panels, els, calls, notes, modeButtons, uploads, coverSlotParts, coverSlot,
     counts: () => ({ openedJourney, loginIntent, editorPanel, recordsPanel }),
     restore
   };
@@ -253,4 +261,124 @@ test('순간 남기기 버튼은 화면에 따라 새 트리 또는 추가 편�
     assert.equal(book.counts().openedJourney, 0);
     assert.equal(book.els['editor-title'].textContent, '순간 추가', '기본값은 추가 모드(인자 없음)');
   } finally { book.restore(); }
+});
+
+// #256-3 2단계: 책 정보 관리 창의 새 사진 표지 만들기. 흐름은 직접 불러 결과를 본다.
+const setImmediateTick = () => new Promise(resolve => setImmediate(resolve));
+
+async function driveCoverUpload(h, { file = { type: 'image/png', size: 1000 } } = {}) {
+  const fileInput = h.coverSlotParts['[data-media-file]'];
+  fileInput.files = [file];
+  await fileInput.listeners.change();
+  for (let i = 0; i < 200 && h.calls.length < 2; i += 1) await setImmediateTick();
+}
+
+test('새 사진 표지: 업로드 성공 뒤 순간 추가 → 표지 지정 두 번 저장으로 나간다', async () => {
+  let uploaded = 0;
+  const h = harness({ tree: sampleTree(), applyImpl: (action, input, selection) => {
+    if (action === 'add') {
+      assert.deepEqual(selection, { treeId: 'tree1', momentId: 'm1' }, '루트 순간 아래로 붙는다');
+      globalThis.window.LT41.tree = { ...globalThis.window.LT41.tree, coverMomentId: 'new1', moments: [...globalThis.window.LT41.tree.moments, { id: 'new1', title: '사진으로 남긴 순간', url: input.url, parentId: 'm1', relation: '' }] };
+      return { treeId: 'tree1', momentId: 'new1' };
+    }
+    return {};
+  } });
+  h.uploadedFetch = () => { uploaded += 1; return { status: 200, text: async () => JSON.stringify({ name: 'c.png', url: 'https://lovetree-4-0.pages.dev/api/media/c.png' }) }; };
+  try {
+    globalThis.location = { origin: 'https://lovetree-4-0.pages.dev' };
+    globalThis.fetch = () => { uploaded += 1; return Promise.resolve({ ok: true, status: 200, text: async () => JSON.stringify({ name: 'c.png', url: 'https://lovetree-4-0.pages.dev/api/media/c.png' }) }); };
+    h.panels.openTreeManager();
+    assert.equal(h.els['tree-cover-upload'].hidden, false, '서버·쓰기 가능이면 보인다');
+    await driveCoverUpload(h);
+    assert.equal(h.calls.length, 2, '순간 추가 + 표지 지정');
+    assert.equal(h.calls[0][0], 'add');
+    assert.equal(h.calls[1][0], 'editTree');
+    assert.deepEqual(h.calls[1][1], { title: '윤슬', subject: '윤슬', coverMomentId: 'new1', coverDesign: '' }, '이름·대상은 저장된 값, 표지는 새 순간, 디자인은 보존');
+    assert.equal(h.els['tree-cover'].value, 'new1', '선택지가 새 순간으로 채워지고 고른다');
+    assert.equal(h.els['tree-cover'].children.length, 4, '기본 + 기존 2 + 새 사진');
+    assert.match(h.notes.join(' '), /새 사진 순간을 표지로 만들었어요/);
+    assert.match(h.coverSlotParts['[data-upload-status]'].textContent, /새 사진 순간을 표지로 만들었어요/);
+    assert.equal(h.panels.treeDirty(), false, '성공 뒤 기준값을 다시 세워 닫을 때 경고가 없다');
+    assert.equal(h.els['tree-cover-title'].value, '', '제목 칸은 비운다');
+  } finally { h.restore(); }
+});
+
+test('새 사진 표지: 순간 제목을 적으면 그 제목으로 순간을 만든다', async () => {
+  const h = harness({ tree: sampleTree(), applyImpl: (action, input) => {
+    if (action === 'add') {
+      globalThis.window.LT41.tree = { ...globalThis.window.LT41.tree, moments: [...globalThis.window.LT41.tree.moments, { id: 'new1', title: input.title, url: input.url, parentId: 'm1', relation: '' }] };
+      return { treeId: 'tree1', momentId: 'new1' };
+    }
+    return {};
+  } });
+  try {
+    globalThis.location = { origin: 'https://lovetree-4-0.pages.dev' };
+    globalThis.fetch = () => Promise.resolve({ ok: true, status: 200, text: async () => JSON.stringify({ name: 'c.png', url: 'https://lovetree-4-0.pages.dev/api/media/c.png' }) });
+    h.panels.openTreeManager();
+    h.els['tree-cover-title'].value = '  첫 표지 사진  ';
+    await driveCoverUpload(h);
+    assert.deepEqual(h.calls[0][1], { url: h.calls[0][1].url, title: '첫 표지 사진' }, '공백만 남기고 제목을 넘긴다');
+  } finally { h.restore(); }
+});
+
+test('새 사진 표지: 제목을 비우면 기본값(사진으로 남긴 순간)에 맡긴다', async () => {
+  const h = harness({ tree: sampleTree(), applyImpl: (action, input) => {
+    if (action === 'add') {
+      assert.equal('title' in input, false, '제목 키를 보내지 않는다 — 도메인 기본값이 붙는다');
+      globalThis.window.LT41.tree = { ...globalThis.window.LT41.tree, moments: [...globalThis.window.LT41.tree.moments, { id: 'new1', title: '사진으로 남긴 순간', url: input.url, parentId: 'm1', relation: '' }] };
+      return { treeId: 'tree1', momentId: 'new1' };
+    }
+    return {};
+  } });
+  try {
+    globalThis.location = { origin: 'https://lovetree-4-0.pages.dev' };
+    globalThis.fetch = () => Promise.resolve({ ok: true, status: 200, text: async () => JSON.stringify({ name: 'c.png', url: 'https://lovetree-4-0.pages.dev/api/media/c.png' }) });
+    h.panels.openTreeManager();
+    await driveCoverUpload(h);
+    assert.equal(h.calls.length, 2);
+  } finally { h.restore(); }
+});
+
+test('새 사진 표지: 표지 지정이 실패하면 사진은 순간으로 남았다고 알린다', async () => {
+  const h = harness({ tree: sampleTree(), applyImpl: (action, input) => {
+    if (action === 'add') {
+      globalThis.window.LT41.tree = { ...globalThis.window.LT41.tree, moments: [...globalThis.window.LT41.tree.moments, { id: 'new1', title: '사진으로 남긴 순간', url: input.url, parentId: 'm1', relation: '' }] };
+      return { treeId: 'tree1', momentId: 'new1' };
+    }
+    if (action === 'editTree') throw Error('서버에 저장하지 못했어요');
+    return {};
+  } });
+  try {
+    globalThis.location = { origin: 'https://lovetree-4-0.pages.dev' };
+    globalThis.fetch = () => Promise.resolve({ ok: true, status: 200, text: async () => JSON.stringify({ name: 'c.png', url: 'https://lovetree-4-0.pages.dev/api/media/c.png' }) });
+    h.panels.openTreeManager();
+    await driveCoverUpload(h);
+    assert.match(h.coverSlotParts['[data-upload-status]'].textContent, /사진은 순간으로 남았지만 표지 지정은 실패했어요/);
+    assert.doesNotMatch(h.notes.join(' '), /표지로 만들었어요/);
+    assert.equal(h.els['tree-cover'].children.length, 4, '실패해도 새 순간은 선택지에 남는다');
+  } finally { h.restore(); }
+});
+
+test('새 사진 표지: 순간 만들기가 실패하면 사진은 보관 파일로 남았다고 알린다', async () => {
+  const h = harness({ tree: sampleTree(), applyImpl: (action) => {
+    if (action === 'add') throw Error('먼저 내 기록을 불러오고 저장 연결을 확인해 주세요');
+    return {};
+  } });
+  try {
+    globalThis.location = { origin: 'https://lovetree-4-0.pages.dev' };
+    globalThis.fetch = () => Promise.resolve({ ok: true, status: 200, text: async () => JSON.stringify({ name: 'c.png', url: 'https://lovetree-4-0.pages.dev/api/media/c.png' }) });
+    h.panels.openTreeManager();
+    await driveCoverUpload(h);
+    assert.equal(h.calls.length, 1, '표지 지정으로 나가지 않는다');
+    assert.match(h.coverSlotParts['[data-upload-status]'].textContent, /사진은 보관 파일로 남았어요/);
+  } finally { h.restore(); }
+});
+
+test('새 사진 표지: 예시(로그아웃) 상태에서는 창 자체가 열리지 않아 버튼이 보이지 않는다', () => {
+  const h = harness({ tree: sampleTree(), source: 'example' });
+  try {
+    h.panels.openTreeManager();
+    assert.equal(h.els['tree-manager'].open, false, '예시 기록에서는 열지 않는다(기존 안내 유지)');
+    assert.equal(h.els['tree-cover-upload'].hidden, true, '업로드 블록은 기본 숨김');
+  } finally { h.restore(); }
 });

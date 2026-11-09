@@ -3,15 +3,22 @@ const TYPES=new Set(['image/png','image/jpeg','image/gif','image/webp','video/mp
 const SIZE_PROBLEM='PNG·JPEG·GIF·WebP(약 4.2MB), MP4·WebM(약 8.4MB)만 올릴 수 있어요.';
 // 2026-11-08 순간 추가·수정 패널: 링크와 사진을 한 묶음으로 두고, 파일은 선택하면 바로 올린다.
 // 보관 파일 목록·다시 첨부·삭제는 패널이 아니라 계정 메뉴의 다이얼로그가 맡는다.
-export function mountPrivateUpload({form,assets,getSubject,getState,onChange,onUseAsset}){
+// #256-3 2단계: onUploaded를 주면 업로드 성공 뒤 그 주소를 넘겨 후속(표지 만들기)을 맡긴다 —
+// 옵션이 없으면 기존 순간 폼 동작이 그대로다(시험으로 고정). imagesOnly는 사진만 받는 인스턴스용이다.
+export function mountPrivateUpload({form,assets,getSubject,getState,onChange,onUseAsset,onUploaded,imagesOnly=false}){
  const api=createWorkspaceApi(),slot=form.querySelector('[data-media-slot]');
- slot.innerHTML='<label class="file-label">사진·영상 파일<input type="file" accept="image/png,image/jpeg,image/gif,image/webp,video/mp4,video/webm" data-media-file></label><p role="status" data-upload-status></p><button type="button" data-stop class="stop-upload" hidden>전송 취소</button><p class="panel-note">내 계정에만 보관합니다. 사진 약 4.2MB · 영상 약 8.4MB, 계정당 약 105MB·200개까지.</p>';
+ const slotMarkup=imagesOnly
+  ?'<label class="file-label">표지 사진<input type="file" accept="image/png,image/jpeg,image/gif,image/webp" data-media-file></label><p role="status" data-upload-status></p><button type="button" data-stop class="stop-upload" hidden>전송 취소</button><p class="panel-note">내 계정에만 보관합니다. 사진 약 4.2MB, 계정당 약 105MB·200개까지.</p>'
+  :'<label class="file-label">사진·영상 파일<input type="file" accept="image/png,image/jpeg,image/gif,image/webp,video/mp4,video/webm" data-media-file></label><p role="status" data-upload-status></p><button type="button" data-stop class="stop-upload" hidden>전송 취소</button><p class="panel-note">내 계정에만 보관합니다. 사진 약 4.2MB · 영상 약 8.4MB, 계정당 약 105MB·200개까지.</p>';
+ slot.innerHTML=slotMarkup;
  const $=s=>slot.querySelector(s),A=s=>assets.querySelector(s),fileInput=$('[data-media-file]'),status=$('[data-upload-status]'),stop=$('[data-stop]'),submit=form.querySelector('[type=submit]');
  let file=null,id=null,busy=false,controller=null,version=0,listRequest=0;
  function setBusy(value){busy=value;fileInput.disabled=value;stop.hidden=!value;if(submit)submit.disabled=value;}
  function fileProblem(chosen){
   if(!chosen)return '먼저 파일을 선택해 주세요.';
   if(!TYPES.has(chosen.type)||!chosen.size||chosen.size>(chosen.type.startsWith('image/')?4:8)*1024*1024)return SIZE_PROBLEM;
+  // #256-3 2단계: 표지 올리기는 사진만 받는다. 영상은 이번 범위 밖이라 기존 형식 안내 문구로 막는다.
+  if(imagesOnly&&chosen.type.startsWith('video/'))return SIZE_PROBLEM;
   return '';
  }
  async function upload(){
@@ -19,12 +26,18 @@ export function mountPrivateUpload({form,assets,getSubject,getState,onChange,onU
   if(!subject){status.textContent='로그인한 뒤 내 기록을 불러와 주세요.';return;}
   const problem=fileProblem(file);
   if(problem){status.textContent=problem;return;}
-  const generation=version;controller=new AbortController();setBusy(true);status.textContent='파일을 전송하고 있어요… 완료 후 순간을 저장해 주세요.';
+  const generation=version;controller=new AbortController();setBusy(true);status.textContent=onUploaded?'사진을 전송하고 있어요…':'파일을 전송하고 있어요… 완료 후 순간을 저장해 주세요.';
   try{
    const result=await api.uploadMedia(file,subject,id,controller.signal);
    if(generation!==version||getSubject()!==subject)return;
    if(!result.ok){status.textContent=result.message||(result.code==='cancelled'?'전송을 멈췄어요. 서버에 보관됐을 수 있으니 내 보관 파일을 확인해 주세요.':result.code==='timeout'?'응답이 늦어요. 같은 파일로 다시 시도하거나 내 보관 파일을 확인해 주세요.':'파일을 올리지 못했어요. 로그인과 연결을 확인한 뒤 다시 시도해 주세요.');return;}
    if(typeof result.media?.url!=='string'||!result.media.url.startsWith(location.origin+'/api/media/')){status.textContent='파일 보관 응답을 확인하지 못했어요. 내 보관 파일을 확인해 주세요.';return;}
+   if(onUploaded){
+    // #256-3 2단계: 주소만 넘겨 후속을 맡긴다. 순간 폼의 링크 칸은 건드리지 않는다.
+    const url=result.media.url;fileInput.value='';file=null;id=null;onChange();
+    try{await onUploaded(url);}catch(error){status.textContent=error?.message||'표지 만들기를 마치지 못했어요. 내 보관 파일에서 다시 고를 수 있어요.';}
+    return;
+   }
    form.elements.url.value=result.media.url;onChange();status.textContent='첨부 파일을 보관했어요. 아래 저장하기를 눌러 순간에 연결해 주세요.';fileInput.value='';file=null;id=null;
   }finally{controller=null;setBusy(false);}
  }
@@ -57,10 +70,10 @@ export function mountPrivateUpload({form,assets,getSubject,getState,onChange,onU
    row.append(use,remove);host.append(row);
   }
  }
- A('[data-refresh]').onclick=refresh;
+ if(assets)A('[data-refresh]').onclick=refresh;
  return {
-  openAssets(){A('[data-assets]').replaceChildren();A('[data-usage]').textContent='';void refresh();},
-  reset(){++version;++listRequest;controller?.abort();file=null;id=null;fileInput.value='';status.textContent='';A('[data-assets]').replaceChildren();A('[data-usage]').textContent='';},
+  openAssets(){if(!assets)return;A('[data-assets]').replaceChildren();A('[data-usage]').textContent='';void refresh();},
+  reset(){++version;++listRequest;controller?.abort();file=null;id=null;fileInput.value='';status.textContent='';if(assets){A('[data-assets]').replaceChildren();A('[data-usage]').textContent='';}},
   get busy(){return busy;}
  };
 }
