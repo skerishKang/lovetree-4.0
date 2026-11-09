@@ -32,6 +32,8 @@ function detailMarkup(m){
  const nextInfo=nextMomentOf(m.id);
  const line=connectionLine(nextInfo?.title,nextInfo?.reason);
  const open=m.url&&isYouTubeUrl(m.url)?'YouTube에서 열기 ↗':'원본 링크 열기 ↗';
+ // #327 2부: 내 기록(서버)의 순간 상세에서 다른 트리로 옮길 수 있다. 공유·예시는 숨긴다.
+ const canMove=(window.parent&&window.parent.LT41)?window.parent.LT41.source==='server':false;
  return '<div class="detail-kicker">'+t(LTLabels.type(m.kind))+' · '+t(m.date)+' · '+t(m.emotion)+'</div>'+
   (displayTitle(m.title)?'<h2>'+t(displayTitle(m.title))+'</h2>':'')+
   '<p>'+t(m.note)+' · 출처: '+t(m.source)+'</p>'+
@@ -39,7 +41,8 @@ function detailMarkup(m){
   '<div class="detail-why">'+t(line||'연결 이유는 아직 적지 않았어요')+'</div>'+
   '<div class="detail-actions"><button type="button" data-detail-viewer>순간 열기</button>'+
   (m.url?'<a href="'+t(m.url)+'" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">'+open+'</a>':'')+
-  '<button type="button" data-detail-index>목차에서 보기</button></div>';
+  '<button type="button" data-detail-index>목차에서 보기</button>'+
+  (canMove?'<button type="button" data-detail-move="'+t(m.id)+'">다른 트리로 옮기기</button>':'')+'</div>';
 }
 function cardFor(id){return [...document.querySelectorAll('.moment[data-moment]')].find(el=>el.dataset.moment===id&&el.closest('.page,.mobile-page'))||null}
 function placeDetail(id,card){
@@ -109,6 +112,9 @@ document.addEventListener('click',e=>{
   window.parent.postMessage({type:'lt41-select',id:edit.dataset.titleEdit},location.origin);
   window.parent.postMessage({type:'lt41-write',mode:'edit',momentId:edit.dataset.titleEdit},location.origin);return}
  if(e.target.closest('[data-detail-viewer]')){e.preventDefault();openViewer();return}
+ // #327 2부: 옮기기는 셸 정리 창이 맡는다(여기는 요청만 보낸다).
+ const move=e.target.closest('[data-detail-move]');
+ if(move){e.preventDefault();e.stopPropagation();parent.postMessage({type:'lt41-move',momentId:move.dataset.detailMove},location.origin);return}
  if(e.target.closest('[data-detail-index]')){e.preventDefault();closeDetail();openArchive();return}
  if(e.target.closest('[data-detail-close]')){e.preventDefault();closeDetail();return}
 },true);

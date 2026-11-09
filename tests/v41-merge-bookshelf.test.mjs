@@ -36,7 +36,8 @@ test('예시 분기를 남기지 않는다(문구·표시는 실제 기록 판�
 
 test('책 목록은 런타임 데이터에서 만들고 표지 이름은 표시 규칙 하나를 쓴다', () => {
   // 2026-11-09: 계산은 shelf-model.mjs로 옮겼다(같은 규칙을 함수에서 확인한다).
-  assert.match(SERVER, /var books = buildShelf\(LTDEMO\.library, palette, namer\)/);
+  // #327 2부: 책장 순서는 inbox-model.mjs의 shelfOrder(모아둔 순간 맨 앞 고정)를 거친다.
+  assert.match(SERVER, /var books = buildShelf\(shelfOrder\(LTDEMO\.library\), palette, namer\)/);
   assert.match(SERVER, /export const buildShelf = \(library, palette, namer\) => library\.map\(/);
   assert.match(SERVER, /LTTreeName\.displayTreeTitle/);
   assert.match(SERVER, /--lt-cover-1/);

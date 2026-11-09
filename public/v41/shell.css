@@ -238,3 +238,21 @@ html[data-lt-theme=garden] #quick-error{color:var(--lt-rose-ink)}
 #quick-saved span{min-width:0;overflow-wrap:anywhere}
 #quick-saved button{min-height:44px;padding:8px 14px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-pill);background:rgba(255,230,166,.1);color:var(--lt-gold);white-space:nowrap}
 @media(max-width:780px){#quick-saved{flex-wrap:wrap;justify-content:center;width:calc(100% - 24px)}}
+/* 이슈 327 2부: 모아둔 순간 표시·정리 창. 계산은 inbox-model.mjs, 여기는 자리만 잡는다. */
+#cleanup-menu{border-color:var(--lt-gold-line);color:var(--lt-gold)}
+#cleanup-menu[hidden]{display:none!important}
+#cleanup-panel fieldset{border:0;border-top:1px solid var(--line);margin:22px 0 0;padding:18px 0 0}
+#cleanup-panel legend{font-size:13px;font-weight:600;padding:0}
+#cleanup-panel label{display:block;font-size:13px;color:var(--lt-muted);margin:12px 0}
+#cleanup-panel input,#cleanup-panel select{display:block;width:100%;margin-top:8px;padding:11px 12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.22);border-radius:12px;color:var(--lt-pearl);min-height:44px;line-height:1.6}
+.cleanup-moments{display:grid;gap:8px;max-height:min(46vh,420px);overflow:auto;padding-right:4px}
+.cleanup-moment{display:flex;align-items:center;gap:12px;min-height:48px;margin:0!important;padding:8px 12px;background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:var(--lt-r-card);color:var(--lt-pearl);font-size:14px}
+.cleanup-moment input{width:22px;height:22px;margin:0;accent-color:var(--lt-primary);flex:0 0 auto}
+.cleanup-moment span{min-width:0;overflow-wrap:anywhere}
+#cleanup-count{margin:10px 0 0}
+#cleanup-error{color:var(--lt-rose);font-weight:600}
+#move-feedback{flex:0 0 auto;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;padding:10px 22px;background:rgba(238,190,104,.08);border-bottom:1px solid rgba(255,230,166,.35);font-size:13px;line-height:1.7}
+#move-feedback[hidden]{display:none}
+#move-actions{display:flex;gap:6px;flex-wrap:wrap}
+#move-actions button{min-height:44px;background:transparent;border:1px solid rgba(255,255,255,.3);border-radius:var(--lt-r-pill);padding:7px 12px;color:var(--lt-gold)}
+@media(max-width:780px){#move-feedback{padding:8px 12px}}
