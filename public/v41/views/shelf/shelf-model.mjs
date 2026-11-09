@@ -1,6 +1,7 @@
 // 내 책장의 순수 계산 (#231 후속, 2026-11-09).
 // views/shelf/shelf.js 안에 있던 계산을 화면(DOM) 없이 시험할 수 있게 그대로 옮겼다.
 // 조건·문구·계산식 변경 0.
+import { normalizeCoverDesign, coverDesignPaletteIndex } from '../../domain.mjs';
 
 export const escapeShelf = (value) => String(value || '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' })[char]);
 
@@ -15,19 +16,35 @@ export function lastMomentDate(tree) {
 // 표지 색은 테마 변수를 넘긴다(실제 색값은 identity.css의 --lt-cover-N에만 있다).
 export const COVER_PALETTE = ['var(--lt-cover-1)', 'var(--lt-cover-2)', 'var(--lt-cover-3)', 'var(--lt-cover-4)'];
 
-export function shelfBook(tree, index, palette, namer) {
+// #256-3: 책 표지를 무엇으로 그릴지 한 곳에서 정한다.
+// 우선순위: coverMomentId 사진 > coverDesign(디자인 표지) > 지금 규칙(palette[index % 4] 색).
+// 책장(shelf.js)과 펼친 책(shelf-reader.js)은 이 결과(book 객체)를 같이 쓴다.
+// 사진·디자인이 둘 다 없으면 color·accent·coverMedia는 지금과 같은 값이라 기존 화면 변화가 없다.
+export function coverChoice(tree, index, palette) {
   const color = palette[index % palette.length];
   const cover = tree.moments.find((moment) => moment.id === tree.coverMomentId);
   const coverMedia = cover && cover.type === 'photo' ? cover.image || '' : '';
+  if (coverMedia) return { color, accent: color, coverMedia, design: '' };
+  const design = normalizeCoverDesign(tree.coverDesign);
+  if (design) {
+    const designColor = palette[Math.max(0, coverDesignPaletteIndex(design)) % palette.length];
+    return { color: designColor, accent: designColor, coverMedia: '', design };
+  }
+  return { color, accent: color, coverMedia: '', design: '' };
+}
+
+export function shelfBook(tree, index, palette, namer) {
+  const choice = coverChoice(tree, index, palette);
   return {
     id: tree.id,
     name: treeTitleOf(tree.title, namer),
     subject: tree.subject || '',
     category: 'all',
-    color,
-    accent: color,
+    color: choice.color,
+    accent: choice.accent,
     symbol: '✦',
-    coverMedia,
+    coverMedia: choice.coverMedia,
+    design: choice.design,
     lastDate: lastMomentDate(tree),
     description: tree.subject ? '좋아하는 대상 · ' + tree.subject : '좋아하는 대상을 기록한 책입니다.',
     tags: [tree.subject || '좋아하는 대상'],

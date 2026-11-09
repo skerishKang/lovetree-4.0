@@ -112,6 +112,10 @@ export function createPanels(deps) {
 
   function updateTreeCoverHint() {
     const c = window.LT41, selected = c?.tree.moments.find(m => m.id === $('tree-cover').value);
+    // #256-3: 사진 표지가 디자인 표지보다 우선한다(coverChoice 규칙). 사진을 고르면 안내를 눈에 보이게 띄운다.
+    // 디자인 줄은 disabled로 막지 않는다 — 막으면 라디오가 전송에서 빠져 저장할 때 고른 디자인이 지워진다.
+    const photoCover = !!selected && LTMedia.describe(selected.url || '').kind === 'photo';
+    $('tree-photo-cover').hidden = !photoCover;
     if (!selected) {
       $('tree-cover-hint').textContent = '표지를 고르지 않으면 기존 금테 장식 표지를 사용합니다.';
       return;
@@ -137,6 +141,8 @@ export function createPanels(deps) {
       $('tree-cover').append(option);
     }
     $('tree-cover').value = tree.coverMomentId || '';
+    // #256-3: 저장된 디자인 표지를 라디오에 반영한다(모르는 값은 도메인 규칙에서 ''로 정리되므로 여기도 빈 값으로 둔다).
+    form.elements.coverDesign.value = tree.coverDesign || '';
     $('tree-form-error').textContent = '';
     updateTreeCoverHint();
     treeBaseline = new URLSearchParams(new FormData(form)).toString();
@@ -159,6 +165,8 @@ export function createPanels(deps) {
   // 계정 메뉴·편집기 버튼은 셸이 열고, 이 파일은 폼 상태만 본다.
   $('manage-tree').onclick = openTreeManager;
   $('tree-cover').onchange = updateTreeCoverHint;
+  // #256-3: 사진 표지를 빼면 디자인 표지(또는 기본 표지)로 돌아간다.
+  $('tree-photo-clear').onclick = () => { $('tree-cover').value = ''; updateTreeCoverHint(); };
   $('tree-form').onsubmit = e => {
     e.preventDefault();
     try {

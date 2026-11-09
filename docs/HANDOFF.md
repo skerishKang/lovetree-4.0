@@ -1,5 +1,20 @@
 # LoveTree 4.0 — 핸드오프
 
+## 2026-11-09 — 책(트리)마다 표지 고르기: coverDesign 필드 + 디자인 표지 6종(#256-3, 로컬3, ai/lt-cover-design-261109)
+
+이슈 #256의 3번. 책마다 표지를 고를 수 있게 했다. 사진 표지(기존 `coverMomentId`) > 디자인 표지 > 기본(책장 순서 색) 순서다.
+
+- **데이터**: 트리 화이트리스트에 `coverDesign` 하나만 추가(`src/domain.js`·`public/v41/domain.mjs` 같은 규칙). 허용 값은 `''` 또는 `texture-1..6`(`COVER_DESIGN_IDS`·`normalizeCoverDesign`·`coverDesignPaletteIndex` 내보냄). 모르는 값·타입은 저장 거부 없이 `''`로. 순간 화이트리스트·다른 필드 변경 0. 옛 클라이언트(필드를 모르는)가 저장하면 디자인이 기본 표지로 돌아간다 — 데이터 손상 아님, 허용.
+- **판정 한 벌**: `public/v41/views/shelf/shelf-model.mjs`의 `coverChoice(tree, index, palette)` — 사진 > 디자인 > 기존 규칙. 책장 카드(`shelf.js`)·펼친 책(`shelf-reader.js`의 `#bookCoverFace`와 넘어감 애니메이션)이 같은 `book` 객체를 쓴다. 사진·디자인이 둘 다 없으면 color·coverMedia가 기존과 같아 화면 변화 0. 디자인 색은 `texture-1..4` → `--lt-cover-1..4`, `texture-5·6` → 1·2색 + 다른 질감.
+- **질감 CSS는 identity.css 한 곳**(`[data-cover-design="texture-N"]` + 책 정보 창 칩 `#tree-design .cover-design-chip`). 외부 이미지·새 hex 없음(중성 white/black 덧칠만이라 밤·정원 모두에서 보인다). `#tree-design`에도 `--lt-cover-N` 값을 같이 둔다(값 중복 없음).
+- **고르는 곳**: 기존 책 정보 관리 창(`v41/index.html` dialog + `shell/panels.mjs`)에 디자인 표지 라디오(칩 미리보기 6종 + 기본) 추가. 사진 순간을 고르면 “사진 표지 사용 중 — 사진 표지가 디자인 표지보다 우선해요” 안내 + “사진 빼기” 버튼. 디자인 줄은 disabled로 막지 않는다(막으면 라디오가 전송에서 빠져 저장 때 고른 값이 지워진다). 새 창·새 저장 경로 없음 — `member.apply('editTree')` 그대로.
+- **주입 연결**: `view-navigation.js`가 `LTDEMO.library`를 만들 때 `coverDesign`을 전달(빠지면 책장이 전부 기본 표지가 된다).
+- 시험: `tests/v41-cover-design.test.mjs` 12건(두 벌 허용 목록 일치·normalize·validateState 보존/잘라내기·createTree·editTree·coverChoice 우선순위·기존 화면 동일·구조·칩) + `tests/server-cover-design.test.mjs` 4건(**서버 경계**: 배포될 같은 서버 코드로 PUT→GET 왕복 유지·목록 밖 ''·필드 생략 '' — #182 전례 대비). 강도 증명: coverChoice 사진 우선을 일부러 깨서 2건 실패 확인 후 복구. 전체 `npm test` 694건 pass/0 fail/37 skip, `npm run build` pass.
+- 캡처(가짜 세션, `out/cover-design-261109/`): 기본(변화 0)·디자인(texture-1·4·6)·사진 우선 × 밤/정원 × 1440/390 = 12장. 실측: 디자인 속성·배경색·질감이 카드에 적용되고 사진이 있으면 사진이 이기고(photoLoaded true), 가로 넘침 0, 콘솔 오류 0.
+- **배포 순서 주의**: 서버(Pages 프록시 뒤 COM2)도 `src/domain.js`를 쓴다. 머지되면 COM2 autodeploy(10분 타이머)가 서버를 재기동하기 전까지는 운영 서버가 `coverDesign`을 잘라낸다(디자인 표지가 기본으로 돌아옴). 프런트는 머지 즉시 CI가 배포한다. 머지 후 실계정 왕복 확인은 이어서 한다.
+- 계정 01: 검증 후 트리 0개·보관 파일 0개로 정리 완료.
+- **리베이스(#307·#308 머지 후)**: shelf-extra.css 충돌만 손으로 합치고 나머지는 자동 합병(#308의 renderSpines·syncSpines·spineScrollLeft, #307의 resumeCard·renderResumeCard 보존). 이어 읽기 칸 표지(`#resumeCover`)도 같은 판정(`book.design`)을 쓰고, identity.css의 같은 질감 규칙에 `.resume-cover[...]` 선택자를 재사용(복사 없음). 책등(#308)은 `spineItems`가 `book.color`를 쓰므로 디자인 색이 그대로 반영된다(질감 불필요). 시험 1건 추가(v41-cover-design 13건). 캡처 재촬영: 디자인 표지 책이 책장·이어 읽기 칸·책등에 함께 보이는 상태 12장(1440·390 × 밤·정원).
+
 ## 처음 오는 레인이 먼저 읽을 것 (10줄, 2026-11-09)
 
 1. **화면은 한 벌**이다. 안쪽 화면은 `public/v41/views/*.html` + 화면별 폴더(`views/shelf/`·`views/book/`·`views/journey/`·`views/board/`·`views/network/`·`views/orbit/`)이고, `design/views/` 두 번째 벌은 없다.

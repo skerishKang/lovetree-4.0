@@ -58,8 +58,9 @@ import { createReader } from './shelf-reader.js';
         renderResumeCard();
         $('#shelfRail').innerHTML=list.length?list.map(function(book,index){
           // #212: 표지에 이름 한 번만. 표지 아래는 "순간 N개 · 마지막 YYYY-MM-DD" 하나만. "책 · 02"·"기본 표지" 같은 내부 표시는 없다.
+          // #256-3: 디자인 표지는 shelf-model coverChoice 판정(book.design)을 그대로 쓴다. 없으면 속성도 없다(기존 화면 변화 0).
           return '<article class="book-card" data-book-index="'+index+'"><button type="button" data-book-id="'+esc(book.id)+'" aria-label="'+esc(book.name)+' 기억책 열기">'+
-            '<div class="book-cover" style="'+coverStyle(book)+'">'+(book.coverMedia?'<img class="book-cover-media" src="'+esc(book.coverMedia)+'" alt="" loading="lazy" referrerpolicy="no-referrer">':'')+'<span class="cover-symbol"><span>'+esc(book.symbol)+'</span></span><strong class="cover-title">'+esc(book.name)+'</strong></div>'+
+            '<div class="book-cover"'+(book.design?' data-cover-design="'+esc(book.design)+'"':'')+' style="'+coverStyle(book)+'">'+(book.coverMedia?'<img class="book-cover-media" src="'+esc(book.coverMedia)+'" alt="" loading="lazy" referrerpolicy="no-referrer">':'')+'<span class="cover-symbol"><span>'+esc(book.symbol)+'</span></span><strong class="cover-title">'+esc(book.name)+'</strong></div>'+
             '<span class="book-card-meta"><span>'+esc(bookMeta(book))+'</span></span></button></article>';
         }).join(''):'<div class="empty"><strong>찾는 책이 없어요.</strong><span>트리 이름·좋아하는 대상·순간 제목으로 검색해 보세요.</span></div>';
         updateCarousel(false);
@@ -114,8 +115,11 @@ import { createReader } from './shelf-reader.js';
           if(info.book){
             cover.style.setProperty('--cover',info.book.color);
             cover.style.setProperty('--cover-accent',info.book.accent);
+            // #256-3: 디자인 표지는 책장 카드와 같은 판정(coverChoice 결과 book.design)을 쓴다. 없으면 속성을 뺀다.
+            // 질감은 identity.css의 같은 규칙이 resume-cover 선택자로 함께 그린다(새 사본 없음).
+            if(info.book.design)cover.setAttribute('data-cover-design',info.book.design);else cover.removeAttribute('data-cover-design');
             cover.innerHTML=(info.book.coverMedia?'<img src="'+esc(info.book.coverMedia)+'" alt="" loading="lazy" referrerpolicy="no-referrer">':'')+'<span>'+esc(info.book.symbol)+'</span><strong>'+esc(info.book.name)+'</strong>';
-          } else cover.innerHTML='';
+          } else { cover.removeAttribute('data-cover-design'); cover.innerHTML=''; }
         }
         $('#resumeTitle').textContent=info.title;
         $('#resumeAction').textContent=info.action;

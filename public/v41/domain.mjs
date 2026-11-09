@@ -1,4 +1,11 @@
 export const EMOTIONS = ['설렘', '위로', '벅참', '그리움', '고마움', '즐거움'];
+// #256-3: 책(트리)마다 고르는 디자인 표지. 테마 표지 색(--lt-cover-N) 위의 질감 변형 6종.
+// 값은 이 목록뿐이다. 모르는 값·타입은 저장 거부가 아니라 ''(기본 표지)로 되돌린다.
+// src/domain.js(서버가 쓰는 같은 규칙)의 목록과 같은지 tests/v41-cover-design.test.mjs가 확인한다.
+export const COVER_DESIGN_IDS = ['texture-1', 'texture-2', 'texture-3', 'texture-4', 'texture-5', 'texture-6'];
+export function normalizeCoverDesign(value) {
+  return COVER_DESIGN_IDS.includes(value) ? value : '';
+}
 export const MAX_MOMENTS = 300;
 export const MAX_TREES = 50;
 export const MAX_LINKS = 20;
@@ -81,15 +88,16 @@ export function createTree(input, clock = new Date().toISOString()) {
   const subject = requireText(input.subject, '좋아하는 대상', 60);
   const moment = { ...validateMomentInput(input), id: newId(), parentId: null, relation: '', links: [], createdAt: clock };
   // #212: 자동 접미사(", 나의 순간들")는 더 붙이지 않는다. 표시 단계 규칙은 tree-name.mjs.
-  return { id: newId(), subject, title: subject, coverMomentId: '', createdAt: clock, updatedAt: clock, moments: [moment] };
+  return { id: newId(), subject, title: subject, coverMomentId: '', coverDesign: '', createdAt: clock, updatedAt: clock, moments: [moment] };
 }
 export function editTree(tree, input, clock = new Date().toISOString()) {
   const title = requireText(input.title, '트리 이름', 100);
   const subject = requireText(input.subject, '좋아하는 대상', 60);
   const coverMomentId = input.coverMomentId === undefined || input.coverMomentId === null || input.coverMomentId === '' ? '' : input.coverMomentId;
   if (typeof coverMomentId !== 'string' || (coverMomentId && !tree.moments.some(moment => moment.id === coverMomentId))) throw new Error('이 트리에서 표지 순간을 선택해 주세요.');
-  if (tree.title === title && tree.subject === subject && (tree.coverMomentId || '') === coverMomentId) return tree;
-  return { ...tree, title, subject, coverMomentId, updatedAt: clock };
+  const coverDesign = normalizeCoverDesign(input.coverDesign);
+  if (tree.title === title && tree.subject === subject && (tree.coverMomentId || '') === coverMomentId && (tree.coverDesign || '') === coverDesign) return tree;
+  return { ...tree, title, subject, coverMomentId, coverDesign, updatedAt: clock };
 }
 export function addMoment(tree, input, parentId, clock = new Date().toISOString()) {
   if (tree.moments.length >= MAX_MOMENTS) throw new Error(`한 트리에는 ${MAX_MOMENTS}개의 순간까지 담을 수 있어요.`);
@@ -226,9 +234,16 @@ export function validateState(value) {
     }
     const coverMomentId = tree.coverMomentId ?? '';
     if (typeof coverMomentId !== 'string' || (coverMomentId && !byId.has(coverMomentId))) throw new Error('표지 순간이 트리에 없어요.');
-    return { id: tree.id, subject: requireText(tree.subject, '대상', 60), title: requireText(tree.title, '트리 제목', 100), coverMomentId, createdAt: tree.createdAt, updatedAt: tree.updatedAt, moments };
+    const coverDesign = normalizeCoverDesign(tree.coverDesign);
+    return { id: tree.id, subject: requireText(tree.subject, '대상', 60), title: requireText(tree.title, '트리 제목', 100), coverMomentId, coverDesign, createdAt: tree.createdAt, updatedAt: tree.updatedAt, moments };
   });
   return { version: 1, trees };
+}
+
+// 디자인 표지가 어떤 테마 표지 색을 쓰는지. texture-1..4는 --lt-cover-1..4와 짝이고 5·6은 다시 1·2색에 다른 질감이다.
+export function coverDesignPaletteIndex(design) {
+  const index = COVER_DESIGN_IDS.indexOf(design);
+  return index < 0 ? -1 : index % 4;
 }
 
 export function importTrees(current, incoming) {

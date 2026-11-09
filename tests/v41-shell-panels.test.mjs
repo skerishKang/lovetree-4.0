@@ -27,7 +27,8 @@ function harness({ owned = true, writable = true, source = 'server', busy = fals
   const els = {};
   const fields = () => ({ title: fakeElement(), note: fakeElement(), emotion: fakeElement(), date: fakeElement(), url: fakeElement(), relation: fakeElement() });
   els['moment-form'] = fakeElement({ elements: fields() });
-  els['tree-form'] = fakeElement({ elements: { title: fakeElement(), subject: fakeElement() } });
+  // coverDesign 라디오 묶음(이슈 256-3): RadioNodeList처럼 .value를 갖는다.
+  els['tree-form'] = fakeElement({ elements: { title: fakeElement(), subject: fakeElement(), coverDesign: fakeElement() } });
   els['editor'] = fakeElement();
   els['tree-manager'] = fakeElement();
   els['parent-target'] = fakeElement();
