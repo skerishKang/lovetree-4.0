@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import {
   COVER_PALETTE, allBooks, bookMeta, buildShelf, carouselTransform, coverStyle, escapeShelf,
   filterShelf, findBook, lastMomentDate, leftPageMarkup, pageMeta, pageTarget, resolveShelfIndex,
-  rightPageMarkup, shelfBook, treeTitleOf, youtubeId
+  resumeCard, rightPageMarkup, shelfBook, treeTitleOf, youtubeId
 } from '../public/v41/views/shelf/shelf-model.mjs';
 import { createReader } from '../public/v41/views/shelf/shelf-reader.js';
 import { fakeEl } from './helpers/fake-dom.mjs';
@@ -197,4 +197,80 @@ test('책을 열면 셸에 기록 id를 넘기고, 이미 열려 있으면 다�
   assert.deepEqual(opened, ['m2']);
   assert.deepEqual(openedBooks, ['tree1']);
   delete globalThis.LTDEMO;
+});
+
+// ── 이어 읽기 칸(#256-1): 어떤 칸을 보여줄지·문구는 shelf-model 한 벌이 정한다 ──
+test('이어 읽기 칸 표(출처·저장 위치·문구)', () => {
+  const books = buildShelf([tree(), tree({ id: 'tree2', title: '바다', subject: '여름', moments: [moment('s1', { title: '파도 사진' })] })], COVER_PALETTE, (v) => v);
+  const cases = [
+    // [source, treeId, momentId, 기대 kind, 기대 문구, 기대 책, 기대 순간]
+    ['server', 'tree1', 'm2', 'resume', '지난번 m2 순간까지 봤어요', 'tree1', 'm2'],
+    ['server', 'tree1', '', 'resume', '지난번 p1 순간까지 봤어요', 'tree1', 'p1'],      // 위치 없으면 첫 순간
+    ['server', 'gone', 'gone', 'resume', '지난번 p1 순간까지 봤어요', 'tree1', 'p1'],  // 지워진 트리 → 첫 책
+    ['server', '', '', 'resume', '지난번 p1 순간까지 봤어요', 'tree1', 'p1'],
+    ['example', '', '', 'example', '예시 책 펼쳐 보기', 'tree1', null],
+    ['file', '', '', 'example', '예시 책 펼쳐 보기', 'tree1', null],
+    ['server', '', '', 'first', '첫 책을 펼쳐 보세요', null, null] // books 비면(빈 계정) 아래에서 따로
+  ];
+  for (const [source, treeId, momentId, kind, title, bookId, momentId2] of cases.slice(0, -1)) {
+    const info = resumeCard({ source, treeId, momentId, books });
+    assert.equal(info.kind, kind, [source, treeId, momentId].join('/'));
+    assert.equal(info.title, title);
+    assert.equal(info.book ? info.book.id : null, bookId);
+    assert.equal(info.moment ? info.moment.id : null, momentId2);
+    assert.equal(info.action, kind === 'resume' ? '이어 보기' : '');
+  }
+  // 기록이 없는(트리 0개) 계정
+  const empty = resumeCard({ source: 'server', treeId: '', momentId: '', books: [] });
+  assert.deepEqual({ kind: empty.kind, title: empty.title, book: empty.book }, { kind: 'first', title: '첫 책을 펼쳐 보세요', book: null });
+  // 예시 칸은 이어 보기 문구를 쓰지 않는다
+  assert.equal(resumeCard({ source: 'example', books }).action, '');
+});
+
+// ── #256-1 보완(CTO 검토): 칸은 책 목록이 바뀔 때 다시 그린다 ──
+// shelf.js를 가짜 DOM으로 싣어 본다. 모델 시험만으로는 "다시 그림"이 보이지 않기 때문이다.
+test('새 책을 만들면 이어 읽기 칸을 다시 그린다 · 검색으로 좁아져도 칸은 그대로', async () => {
+  const els = new Map();
+  const el = (selector) => {
+    if (!els.has(selector)) els.set(selector, fakeEl({
+      style: { setProperty(name, value) { this.props = { ...(this.props || {}), [name]: value }; }, props: {} },
+      innerHTML: '',
+      value: '',
+      scrollTo() {},
+      getBoundingClientRect: () => ({ left: 0, top: 0, width: 0, height: 0 }),
+      reset() {},
+      children: [],
+      scrollLeft: 0, clientWidth: 100, scrollWidth: 100
+    }));
+    return els.get(selector);
+  };
+  const library = { list: [] };
+  globalThis.window = globalThis;
+  globalThis.document = {
+    querySelector: (selector) => el(selector),
+    querySelectorAll: () => [],
+    addEventListener() {},
+    body: fakeEl()
+  };
+  globalThis.parent = { LT41: { source: 'server', tree: { id: 'tree1', title: '트리' }, momentId: 'm1' }, postMessage() {} };
+  globalThis.LTDEMO = { library: library.list, moments: [], get: () => globalThis.parent.LT41.momentId, select() {}, openBook() {} };
+  globalThis.CSS = { escape: (value) => String(value).replace(/"/g, '\\"') };
+  await import('../public/v41/views/shelf/shelf.js');
+  const title = () => el('#resumeTitle').textContent;
+  // 처음: 책이 없으면 "첫 책을 펼쳐 보세요"
+  assert.equal(el('#resumeCard').dataset.resumeKind, 'first');
+  assert.equal(title(), '첫 책을 펼쳐 보세요');
+  // 새 책 만들기 폼을 제출하면 칸이 다시 그려진다("첫 책을..."이 남지 않는다)
+  el('#newBookName').value = '가을 산책';
+  el('#newBookUrl').value = 'https://example.com/a';
+  el('#newBookForm').dispatch('submit', { preventDefault() {} });
+  assert.equal(el('#resumeCard').dataset.resumeKind, 'resume', '새 책 뒤에는 칸이 resume으로 바뀐다');
+  assert.match(title(), /^지난번 /);
+  assert.notEqual(title(), '첫 책을 펼쳐 보세요');
+  // 검색으로 레일이 좁아져도(0권) 칸은 전체 책 기준이라 그대로다
+  el('#searchInput').value = '찾을 수 없는 책 이름';
+  el('#searchInput').dispatch('input', { target: el('#searchInput') });
+  assert.equal(el('#resultCount').textContent, '0권');
+  assert.equal(el('#resumeCard').dataset.resumeKind, 'resume', '검색으로 좁아져도 칸은 바뀌지 않는다');
+  assert.match(title(), /^지난번 /);
 });

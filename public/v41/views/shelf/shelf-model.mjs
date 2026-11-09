@@ -157,3 +157,23 @@ export function rightPageMarkup(book, index, esc = escapeShelf) {
         var info=type==='video'?'<span class="poster-caption">영상의 예시 이미지입니다</span>':'';
         return '<div class="page-video"><span class="page-label">순간 · '+String(index+1).padStart(2,'0')+' · '+esc(chapter.mood)+'</span><div class="video-holder"><div class="video-poster">'+art+info+'</div></div><h3>'+esc(chapter.title)+'</h3><p>'+esc(chapter.note)+'</p><span class="poster-caption">'+esc(label)+' · 내 기록</span></div>';
       }
+
+// ── 이어 읽기 칸(#256-1, 2026-11-09) ────────────────────────────────────────
+// 마지막 위치는 새로 저장하지 않는다. 셸이 이미 저장·복원하는 계정 위치
+// (selection-location.mjs의 `lovetree.v41.account-positions.v1`, shell/location.mjs의
+// writeLocation → rememberAccountPosition)를 화면 진입 시 그대로 읽어 쓴다.
+export const RESUME_ACTION = '이어 보기';
+export const RESUME_COPY = { example: '예시 책 펼쳐 보기', first: '첫 책을 펼쳐 보세요' };
+
+// source: 'server'면 실제 기록(로그인), 그 외(예시·파일·공유)는 예시 칸으로 본다.
+export function resumeCard({ source = 'server', treeId = '', momentId = '', books = [] } = {}) {
+  if (source !== 'server') {
+    const book = books[0] || null;
+    return { kind: 'example', book, moment: null, title: RESUME_COPY.example, action: '' };
+  }
+  // 저장 위치의 트리가 지워졌으면 첫 책으로 대신 보여 준다(셸의 resolveAccountPosition과 같은 방향).
+  const book = books.find((item) => item.id === treeId) || books[0] || null;
+  if (!book) return { kind: 'first', book: null, moment: null, title: RESUME_COPY.first, action: '' };
+  const moment = book.chapters.find((chapter) => chapter.id === momentId) || book.chapters[0] || null;
+  return { kind: 'resume', book, moment, title: '지난번 ' + (moment ? moment.title : book.name) + '까지 봤어요', action: RESUME_ACTION };
+}
