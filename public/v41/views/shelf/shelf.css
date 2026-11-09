@@ -19,6 +19,9 @@
       --shadow-xl: 0 34px 82px rgba(39, 26, 26, .26);
       --shadow-lg: 0 21px 52px rgba(66, 46, 40, .14);
     }
+    /* #319: 정원에서 흐린 글자가 종이 배경 위 4.5:1을 넘도록 기존 토큰 --lt-muted(#6f605a)를 쓴다.
+       밤에는 이 규칙이 적용되지 않아 :root의 #8d7d77 그대로다(밤 겉모습 변화 0). */
+    html[data-lt-theme=garden] { --muted: var(--lt-muted); }
     * { box-sizing: border-box; }
     html, body { min-height: 100%; }
     body {
