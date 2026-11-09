@@ -2,6 +2,15 @@
 
 > **main 보호 규칙(2026-11-09, 룰셋 "main 보호 (PR·필수 검사)")**: main은 PR로만 바꾼다(직접 푸시·force push·삭제 금지, 관리자도 예외 없음 — 비상시 대표가 룰셋 enforcement를 잠깐 끈다). 필수 검사: `check (ubuntu-latest)`·`check (windows-latest)`·`미리보기 postdeploy(로그아웃)` — 셋 다 paths 필터가 없어 문서만 바뀐 PR에서도 항상 돈다. 승인 수 0(레인이 스스로 머지). Deploy Bundle Boot Test는 paths 필터가 있어 필수에 넣지 않았다.
 
+## 2026-11-09 — 사진 순간 '불러오기' 버튼: 중첩 버튼·정원 대비 수정(#325, 로컬3, ai/local3-a11y-media-moments-261109, PR #326)
+
+#319 운영 재점검에서 나온 새 serious 5노드. 원인은 사진·미디어 순간이 책·보드에 그려질 때만 드러난다.
+
+- **책 카드 중첩 버튼**: `view-a11y.mjs`가 모든 순간 카드에 `role=button`을 주는데, 안에 media-preview의 `button[data-lt-load]`("사진 불러오기")가 있으면 중첩 상호작용이 된다. 이제 카드 안에 실제 버튼·링크가 있으면 래퍼에 role/tabindex를 주지 않고, 카드 맨 앞에 **실제 '순간 열기' 버튼**(`lt-a11y-open`, 평소 1px 숨김·키보드 포커스에서만 보임)을 둔다. 일반 카드는 기존 그대로(role=button·Enter/Space). 책 돋보기 복제본(`#lens`·`#mobileInspect`)은 `inert`로 포커스·낭독 대상에서 뺐다(복제본이 두 번째 노드였다).
+- **정원 대비**: `.lt-media-body button` 글자가 정원에서 `--lt-pearl`(잉크 #403536)이라 어두운 버튼(#1a1620) 위 1.5:1이었다. `html[data-lt-theme=garden] .lt-media-body button{color:var(--lt-paper)}` → 16.6:1. 새 hex 없음, 밤 규칙 그대로.
+- **390이 0이던 이유**: 좁은 화면 책은 펼침면의 main 순간만 본문으로 그리고 반대쪽은 `mobile-support` 요약 카드로만 보여 준다(`book.js` `mobileSpreadContent`). 사진 순간이 main이 아니면 '불러오기' 버튼이 DOM에 없다. 1440 펼침면은 양쪽 모두 본문이라 재현된다.
+- 검증: 로컬 가짜 세션(비공개 사진 순간) axe 10행 — before **5 serious**(nested 4·contrast 1, 운영과 동일) → after **0**. 버튼 클릭·Enter 모두 상세 사이드 패널이 열림. 겉모습 비교 24장 최대 0.008%(보드 캔버스 흔들림, 기준 이내). `npm test` 762건 725 pass/0 fail/37 skip, `npm run build` pass. 회귀 시험 `tests/v41-a11y-media-moments.test.mjs` 5건(래퍼 role 제거·열기 버튼·일반 카드 유지·inert·정원 대비).
+
 ## 2026-11-09 — 정원 색 대비 3곳 수정: 로그아웃 재점검 12 → 0(#319, 로컬3, ai/local3-a11y-garden-contrast-261109, PR #322 머지 `3700a58`)
 
 - 셸 `#context-kind`(**정원 한정**) `--lt-rose` → `--lt-rose-ink`(3.32 → 5.43:1), 책장 `--muted`(**정원 한정**) `#8d7d77` → `var(--lt-muted)`(소개 문단 3.79→5.78, 결과 수 3.49→5.31). 새 hex 없음, 밤 규칙·`:root` 값 그대로.
