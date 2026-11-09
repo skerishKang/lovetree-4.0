@@ -233,9 +233,7 @@ export function createPanels(deps) {
   };
   $('tree-manager').addEventListener('cancel', e => { if (treeDirty() && !confirm('책 정보 변경을 버리고 닫을까요?')) e.preventDefault(); });
   document.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => setEditorMode(b.dataset.mode));
-  // 2026-11-09 사고 수정(#245): 이 연결이 옮겨지지 않아 운영에서 '순간 남기기'가 무반응이었다.
-  // 원래 shell.mjs(e508302) 460행 그대로 — 내 책장에서는 새 트리, 나머지 화면에서는 기본(추가) 편집기.
-  $('write-menu').onclick = () => openEditor(getCurrent() === 'track32-bookshelf.html' ? 'new' : undefined);
+  // '순간 남기기'는 이제 shell/quick-add.mjs가 고르기 창을 연다(#빠른 추가 ②). 이 파일은 편집기만 맡는다.
 
   for (const name of ['title', 'note', 'url']) $('moment-form').elements[name].addEventListener('input', () => { if (name === 'url' || name === 'title') updateMediaPreview(); updateQuickEntryHint(); });
   $('moment-form').onsubmit = e => {

@@ -16,6 +16,7 @@ import {createScreens} from './shell/screens.mjs';
 import {createHeader} from './shell/header.mjs';
 import {createAuth} from './shell/auth.mjs';
 import {createPanels} from './shell/panels.mjs';
+import {createQuickAdd} from './shell/quick-add.mjs';
 import {createJourney} from './shell/journey.mjs';
 import {createMessages} from './shell/messages.mjs';
 import {createDialogs} from './shell/dialogs.mjs';
@@ -80,6 +81,22 @@ const shellPanels=createPanels({
   openLoginStart:intent=>openLoginStart(intent)
 });
 function openEditor(mode,parentId=''){return shellPanels.openEditor(mode,parentId);}
+// 빠른 추가(#빠른 추가 ②): 고르기 창·모달·끌어다 놓기는 shell/quick-add.mjs가 맡는다.
+// 진입(순간 남기기)만 여기서 연결하고, 나머지 화면 분기는 그 모듈의 판정 함수가 정한다.
+const shellQuick=createQuickAdd({
+  $,
+  getMember:()=>member,
+  getSource:()=>source,
+  getCurrent:()=>current,
+  notify:text=>notify(text),
+  panel:id=>panel(id),
+  choose:(id,momentId)=>choose(id,momentId),
+  openEditor:(mode,parentId)=>openEditor(mode,parentId),
+  openLoginStart:intent=>openLoginStart(intent),
+  // 사진 올리기는 기존 업로더(#310 onUploaded·imagesOnly)를 그대로 쓴다.
+  mountUpload:mountPrivateUpload
+});
+$('write-menu').onclick=()=>shellQuick.openWriteChooser();
 function updateMediaPreview(){return shellPanels.updateMediaPreview();}
 function updateQuickEntryHint(){return shellPanels.updateQuickEntryHint();}
 // 첫 여정 연결은 shell/journey.mjs, 공유·둘러보기·lt41-* 수신은 shell/messages.mjs가 맡는다(#231 1-B③-3).
@@ -199,7 +216,7 @@ const shellScreens=createScreens({
   links,
   onFrameReady:frame=>{
     const d=frame.contentDocument;if(!d)return;
-    mountConnectionTool(d);applyViewAccessibility(d);
+    mountConnectionTool(d);applyViewAccessibility(d);shellQuick.mountFrame(d);
     d.addEventListener('click',e=>{const b=e.target.closest('button,a');if(!b)return;let file;if(b.matches('[data-action="tree"],[data-menu="tree"]'))file='track32-bookshelf.html';if(b.matches('#storyBook,[data-menu="book"]'))file='track59-sketchbook.html';if(current==='track56-network.html'&&b.id==='openMoment')file='track59-sketchbook.html';if(file){e.preventDefault();e.stopImmediatePropagation();show(file);}},true);
   }
 });
