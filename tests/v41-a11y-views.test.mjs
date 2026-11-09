@@ -56,6 +56,13 @@ test('adapter covers every target screen without editing original views', () => 
   assert.match(community, /showModal/);
 });
 
+// 2026-11-09 로컬3: 첫 화면 카드는 aria-label로 화면 글자(날짜·제목·감정)를 덮지 않는다.
+test('첫 화면 카드 이름은 화면에 보이는 글자를 그대로 쓴다', () => {
+  const orbit = read('src/views/orbit.js');
+  assert.doesNotMatch(orbit, /b\.setAttribute\('aria-label'/);
+  assert.match(orbit, /<div class="memoKicker">\$\{esc\(c\.date\)\}<\/div><div class="memoText">\$\{esc\(c\.title\)\}<\/div>/);
+});
+
 // A~D(상세 패널 Esc·대화상자 Tab 순환·계정 메뉴 Esc·보관 목록 Esc)는 2026-11-09에
 // 소스 글자에서 함수 직접 호출로 옮겼다.
 //  · A → tests/v41-view-a11y-flow.test.mjs (applyViewAccessibility에 keydown을 실제로 보낸다)
