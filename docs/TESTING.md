@@ -59,9 +59,10 @@
 - **내 책장 모듈(2026-11-09)**: `views/shelf/shelf-model.mjs`(순수 계산) + `views/shelf/shelf-reader.js`(`createReader(deps)`)로 나누고 `tests/v41-shelf-flow.test.mjs` **11건**(카드 배치·페이지·넘김 범위는 표, 첫/마지막 장 안내·책 열기는 가짜 DOM으로 직접 호출). 글자 검사 4건은 옮긴 파일을 합쳐 보도록 갱신.
 - **책등 목차 계산 한 벌(#256 2번, 2026-11-09)**: 책이 3권부터 책등을 목차처럼 한 줄로 세운다. 보일지 말지(`spineVisible`)·책등 목록(`spineItems`·`spineStyle`)·누른 책 → 넘기기 위치(`spineTargetIndex`)·목차 줄 가로 위치(`spineScrollLeft`, scrollIntoView 대신 줄의 scrollTo만 쓴다)는 `views/shelf/shelf-model.mjs` 한 벌만 쓰고, 화면(`shelf.js`)은 렌더·이벤트만 한다. 시험은 `tests/v41-shelf-spines.test.mjs` **7건**(0·1·2·3·12권과 스크롤 위치 계산을 함수 호출로, 화면 연결·누르는 영역 46×118px·가로 넘김 규격은 글자).
 - **기억책 좁은 화면 탭 판정(#296, 2026-11-09)**: `public/v41/book-usability.mjs`의 **`tapIntent`**로 모아 `tests/v41-book-usability.test.mjs`에 **10행 표**(390·360 → 상세 / 431·1440 → 돋보기만 / 끌기·카드 밖·취소 → 없음).
-- **레인별 시험 계정(#300, 2026-11-09)**: `tools/postdeploy/accounts.mjs` — `tests/postdeploy-accounts.test.mjs` **4건**(배정 표·번호 정규화·계정별 `.secrets` 키·프로필 분리).
+- **레인별 시험 계정(#300, 2026-11-09)**: `tools/postdeploy/accounts.mjs` — `tests/postdeploy-accounts.test.mjs` **4건**(배정 표·번호 정규화·계정별 `.secrets` 키·프로필 분리). 2026-11-09 밤 대표 결정으로 03 삭제·04 신설(로컬2 → 04, 03은 `normaliseAccount`가 거부).
+- **커밋 금지 경로 검사(2026-11-09)**: `tests/forbidden-paths.test.mjs` **1건** — `git ls-files`에 브라우저 프로필(`tools/postdeploy/.profile*`)·`.tmp-*`·`out/`이 트래킹되면 CI를 실패시킨다(프로필 노출 건 재발 방지).
 - **책 바꿔 열기 회귀(#314, 2026-11-09)**: 라디오 묶음은 `tests/helpers/fake-dom.mjs`의 **`fakeRadioGroup`**을 쓴다. Chromium 1254 실측대로 **빈 값·없는 값 대입은 무시**하고 있는 값만 체크하므로, 옛 `RadioNodeList.value = ''` 방식이면 시험이 실제로 실패한다. `v41-panels-flow` +2(A→B→A 연속 열기, 사진 표지 뒤 저장), `v41-shell-panels` +1(업로드→저장 전체 경로).
-- 현재 `npm test` 합계: **801건 / 764 pass / 0 fail / 37 skip**. 글자 검사 분류 수치는 위 1~3절(2026-11-09 7차 기준)에서 그대로 유지된다(책등 목차 7건은 함수 호출 5건 + 연결·규격 글자 검사 2건).
+- 현재 `npm test` 합계: **808건 / 771 pass / 0 fail / 37 skip**. 글자 검사 분류 수치는 위 1~3절(2026-11-09 7차 기준)에서 그대로 유지된다(책등 목차 7건은 함수 호출 5건 + 연결·규격 글자 검사 2건).
 - **빠른 추가(#327 ②, 2026-11-09)**: 판정·추출·분기·문구는 `tests/v41-quick-add.test.mjs` 8건(함수 직접 호출 + 정원 대비 CSS 값 1건), 연결은 `tests/v41-quick-add-flow.test.mjs` 12건(`createQuickAdd`를 가짜 DOM으로 직접 호출). '순간 남기기' 연결이 panels.mjs → shell.mjs(shell/quick-add.mjs)로 옮겨진 것도 두 기존 시험을 새 계약으로 갱신해 고정했다(#245 전례 — 연결 누락 방지).
 
 ## 새 시험을 쓸 때

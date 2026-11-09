@@ -15,8 +15,7 @@ __pycache__/
 *.pyc
 
 # lovetree-postdeploy local state and output (never commit)
-tools/postdeploy/.profile/
-tools/postdeploy/.profile-03/
+tools/postdeploy/.profile*/
 tools/postdeploy/out/
 tools/postdeploy/package-lock.json
 
@@ -29,6 +28,5 @@ pr-comment.json
 # 캡처 결과(out/)는 커밋하지 않는다
 out/
 
-# 레인 임시 작업 폴더(커밋 금지)
-.tmp-261108/
-.tmp-261109/
+# 레인 임시 작업 폴더(커밋 금지 — 번호가 바뀌어도 전부)
+.tmp-*/
