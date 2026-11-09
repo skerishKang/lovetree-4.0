@@ -36,7 +36,9 @@ export function homeCardsLabel(mode) {
 }
 
 // 모드별 궤도 구성. exampleCount는 예시 카드 수(최대 40), cards는 내/공개 카드.
-export function homeCardsPlan({mode, loggedIn = false, context = null, popular = [], limit = HOME_ORBIT_LIMIT, origin = globalThis.location?.origin} = {}) {
+// youtube는 #330 판정 한 벌의 재사용 묶음({describe, auto})이다 — 내 기록(서버·소유자)의
+// YouTube 순간을 썸네일 카드로 세운다(#340, 2026-11-10). mix-empty 3장 기준 자체는 그대로다.
+export function homeCardsPlan({mode, loggedIn = false, context = null, popular = [], limit = HOME_ORBIT_LIMIT, origin = globalThis.location?.origin, youtube = null} = {}) {
   let effective = normalizeHomeCardsMode(mode) || (loggedIn ? 'mix' : 'example');
   if (!loggedIn && loggedInOnly(effective)) effective = 'example';
   if (effective === 'example') {
@@ -53,7 +55,7 @@ export function homeCardsPlan({mode, loggedIn = false, context = null, popular =
       note: short ? '아직 공개된 순간이 적어요' : '',
     };
   }
-  const {photos, memos} = homeMomentCards(context, limit, origin);
+  const {photos, memos} = homeMomentCards(context, limit, origin, youtube);
   if (effective === 'mine') {
     const cards = [...photos, ...memos.slice(0, HOME_TEXT_LIMIT)].slice(0, limit);
     return {
@@ -65,6 +67,7 @@ export function homeCardsPlan({mode, loggedIn = false, context = null, popular =
     };
   }
   // mix: 사진·영상 순간이 3장 미만이면 내 카드를 올리지 않고 예시만 보여 준다.
+  // 2026-11-10(#340): YouTube 썸네일 카드도 이 3장 기준에 카드로 세어진다(#297 보류 — 기준 자체는 그대로).
   if (photos.length < HOME_PHOTO_MIN) {
     return {mode: effective, kind: 'mix-empty', cards: [], examples: limit, note: null};
   }

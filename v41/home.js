@@ -18,7 +18,11 @@ const loggedIn=presentation.centerState.member==='in';
 // 2026-11-08 카드 출처: 예시/인기/내 것만/섞어서. 저장값이 없으면 로그인=섞어서, 로그아웃=예시.
 const mode=readHomeCardsMode(localStorage,{loggedIn});
 const popular=mode==='popular'?await fetchPopularCards({limit:HOME_ORBIT_LIMIT}):[];
-const cardsPlan=homeCardsPlan({mode,loggedIn,context,popular});
+// 2026-11-10 CTO 결정(#340): 내 기록(서버·소유자)의 YouTube 순간은 #330 판정 한 벌(autoLoadMedia)로
+// 썸네일 카드를 처음부터 만든다. 판정 입력은 media-preview의 currentContext(셸 기록 상태)와 같은 값이다.
+const mediaState=globalThis.LTMedia?.currentContext?.()||{source:'',owned:false};
+const youtube={describe:url=>globalThis.LTMedia?.describe?.(url)??null,auto:globalThis.LTMedia?.autoLoadMedia?.(mediaState.source,mediaState.owned)===true};
+const cardsPlan=homeCardsPlan({mode,loggedIn,context,popular,youtube});
 const cardTrees=cardsPlan.cards.length?[{id:'home-cards',title:'첫 화면 카드',moments:cardsPlan.cards}]:[];
 const orbit=mountOrbit(document.getElementById('orbit'),{
  trees:cardTrees,examples:cardsPlan.examples?ORBIT_EXAMPLE.moments.slice(0,cardsPlan.examples):[],
