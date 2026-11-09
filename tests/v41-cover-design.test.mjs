@@ -41,7 +41,7 @@ test('validateState(서버 벌)는 coverDesign을 저장하고 모르는 트리 
   assert.equal(fallback.trees[0].coverDesign, '', '모르는 값은 \'\'로');
   const missing = serverDomain.validateState(stateOf(treeOf({})));
   assert.equal(missing.trees[0].coverDesign, '', '없으면 \'\'');
-  assert.deepEqual(Object.keys(missing.trees[0]).sort(), ['coverDesign', 'coverMomentId', 'createdAt', 'id', 'moments', 'subject', 'title', 'updatedAt'], '트리 필드는 이것만');
+  assert.deepEqual(Object.keys(missing.trees[0]).sort(), ['coverDesign', 'coverMomentId', 'createdAt', 'id', 'inbox', 'moments', 'subject', 'title', 'updatedAt'], '트리 필드는 이것만');
 });
 
 test('validateState(클라이언트 벌)도 같은 규칙으로 coverDesign을 정리한다', () => {

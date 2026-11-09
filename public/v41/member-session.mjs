@@ -1,5 +1,5 @@
 import {createSyncController} from './sync-controller.mjs';
-import {EMPTY_STATE,validateState,createTree,editTree,addMoment,editMoment,reparentMoment,removeMoment,linkMoments,unlinkMoments,cacheMomentMediaMetadata,MAX_TREES,newId} from './domain.mjs';
+import {EMPTY_STATE,validateState,createTree,editTree,addMoment,editMoment,reparentMoment,removeMoment,linkMoments,unlinkMoments,cacheMomentMediaMetadata,quickAdd,moveMoment,treeFromMoments,MAX_TREES,newId} from './domain.mjs';
 // Reuses 4.0 persistence, retries and revision conflicts; demo/file records cannot enter this session.
 function sessionDraftStorage(){try{return globalThis.sessionStorage||null;}catch{return null;}}
 export function createMemberSession({api,onState=()=>{},onStatus=()=>{},navigate=()=>{},delay,makeClientKey=()=>`v41-${newId()}`,draftStorage=sessionDraftStorage()}){
@@ -11,6 +11,16 @@ export function createMemberSession({api,onState=()=>{},onStatus=()=>{},navigate
  function apply(action,input={},selection={}){
    const snap=sync.snapshot();if(!active||!snap.owned||!bound||mismatch||['checking','login','conflict'].includes(sync.status().phase))throw Error('먼저 내 기록을 불러오고 저장 연결을 확인해 주세요.');
    let trees=[...document.trees],tree=trees.find(t=>t.id===selection.treeId),momentId=selection.momentId,treeId=selection.treeId;
+   // #327(① 데이터 규칙): 빠른 추가·옮기기·새 트리로 정리는 상태 전체를 도메인 함수가 바꾼다.
+   if(action==='quickAdd'||action==='moveMoment'||action==='treeFromMoments'){
+     const result=action==='quickAdd'?quickAdd(document,input)
+       :action==='moveMoment'?moveMoment(document,selection.treeId,selection.momentId,input.toTreeId,input.parentId)
+       :treeFromMoments(document,selection.treeId,input.momentIds,{subject:input.subject});
+     document=validateState(result.state);
+     treeId=result.treeId;
+     momentId=result.momentId??document.trees.find(t=>t.id===result.treeId)?.moments.find(m=>m.parentId===null)?.id??null;
+     onState(structuredClone(document),{treeId,momentId});sync.markLocalSave();return {treeId,momentId};
+   }
    if(action==='new'){if(trees.length>=MAX_TREES)throw Error('트리는 50개까지 만들 수 있어요.');tree=createTree(input);trees.push(tree);treeId=tree.id;momentId=tree.moments[0].id;}
    else {if(!tree)throw Error('트리를 선택해 주세요.');let next;
     if(action==='add'){next=addMoment(tree,input,momentId);momentId=next.moments.at(-1).id;}

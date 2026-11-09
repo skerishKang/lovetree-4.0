@@ -9,6 +9,9 @@ export function normalizeCoverDesign(value) {
 export const MAX_MOMENTS = 300;
 export const MAX_TREES = 50;
 export const MAX_LINKS = 20;
+// #327(① 데이터 규칙): 빠른 추가가 순간을 모아 두는 기본 트리. 트리 이름·대상 기본값이다.
+// public/v41/domain.mjs의 같은 상수와 이 값이 같은지 tests/v41-inbox-data.test.mjs가 확인한다.
+export const INBOX_SUBJECT = '모아둔 순간';
 export const EMPTY_STATE = () => ({ version: 1, trees: [] });
 
 export function newId(provider = globalThis.crypto) {
@@ -87,7 +90,7 @@ export function validateMomentInput(input) {
 export function createTree(input, clock = new Date().toISOString()) {
   const subject = requireText(input.subject, '좋아하는 대상', 60);
   const moment = { ...validateMomentInput(input), id: newId(), parentId: null, relation: '', links: [], createdAt: clock };
-  return { id: newId(), subject, title: `${subject}, 나의 순간들`, coverMomentId: '', coverDesign: '', createdAt: clock, updatedAt: clock, moments: [moment] };
+  return { id: newId(), subject, title: `${subject}, 나의 순간들`, coverMomentId: '', coverDesign: '', inbox: false, createdAt: clock, updatedAt: clock, moments: [moment] };
 }
 export function editTree(tree, input, clock = new Date().toISOString()) {
   const title = requireText(input.title, '트리 이름', 100);
@@ -160,6 +163,97 @@ export function removeMoment(tree, id, clock = new Date().toISOString()) {
   return { ...tree, coverMomentId: tree.coverMomentId === id ? '' : tree.coverMomentId || '', updatedAt: clock, moments: remaining.map(m => m.parentId === id ? { ...m, parentId, relation: '' } : m) };
 }
 
+// #327(① 데이터 규칙): 옮겨진 순간들을 한 트리에서 떼어 낸다. 남은 순간은 옮겨진 조상 중
+// 가장 가까운 남은 조상 아래로 다시 붙는다(한 개를 옮길 때는 '옮긴 순간의 부모에게 다시 붙는다'와
+// 같은 결과다). 남은 조상이 하나도 없으면 남은 순간 중 가장 먼저 만든 것을 새 시작 순간으로 올리고
+// 나머지를 그 아래로 붙인다. 옮긴 순간을 가리키던 링크도 남은 순간에서 지운다. 연결 이유는
+// 붙는 부모가 바뀐 순간만 ''로 되돌린다.
+function detachMoments(tree, movedIds) {
+  const byId = new Map(tree.moments.map(m => [m.id, m]));
+  const remaining = tree.moments.filter(m => !movedIds.has(m.id));
+  const oldest = [...remaining].sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)))[0] || null;
+  return remaining.map(m => {
+    const next = { ...m, links: linksOf(m).filter(link => !movedIds.has(link)) };
+    let keeper = next.parentId;
+    const seen = new Set();
+    while (keeper && movedIds.has(keeper)) {
+      if (seen.has(keeper)) break;
+      seen.add(keeper);
+      keeper = byId.get(keeper)?.parentId ?? null;
+    }
+    if (keeper && byId.has(keeper)) { if (next.parentId !== keeper) { next.parentId = keeper; next.relation = ''; } }
+    else if (oldest && next.id !== oldest.id) { next.parentId = oldest.id; next.relation = ''; }
+    else { next.parentId = null; next.relation = ''; }
+    return next;
+  });
+}
+
+// #327(① 데이터 규칙): 빠른 추가 — 주소 하나만으로 순간을 바로 저장한다. inbox 트리가 없으면
+// 만들고 그 순간이 시작 순간이 되고, 있으면 시작 순간 아래에 붙인다. 제목·감정은 기존 자동
+// 규칙(suggestMomentTitle·기본 감정)을 쓴다. 트리·순간 한도를 넘으면 기존 문구로 막는다.
+export function quickAdd(state, input, clock = new Date().toISOString()) {
+  const moment = { ...validateMomentInput({ url: input?.url || '' }), id: newId(), parentId: null, relation: '', links: [], createdAt: clock };
+  const trees = state.trees;
+  const inbox = trees.find(tree => tree.inbox === true);
+  if (!inbox) {
+    if (trees.length >= MAX_TREES) throw new Error(`트리는 ${MAX_TREES}개까지 만들 수 있어요.`);
+    const tree = { id: newId(), subject: INBOX_SUBJECT, title: INBOX_SUBJECT, coverMomentId: '', coverDesign: '', inbox: true, createdAt: clock, updatedAt: clock, moments: [moment] };
+    return { state: { version: 1, trees: [...trees, tree] }, treeId: tree.id, momentId: moment.id };
+  }
+  const grown = addMoment(inbox, { url: input?.url || '' }, inbox.moments.find(m => m.parentId === null).id, clock);
+  return { state: { version: 1, trees: trees.map(tree => tree.id === inbox.id ? grown : tree) }, treeId: inbox.id, momentId: grown.moments.at(-1).id };
+}
+
+// #327(① 데이터 규칙): 순간 하나를 다른 트리로 옮긴다. 자식은 함께 가지 않고 원래 트리에
+// 다시 붙는다(detachMoments). 옮긴 순간의 링크는 비우고, 표지로 쓰던 순간이면 표지를 해제하며,
+// 원래 트리가 비면 그 트리를 지운다(inbox 트리도 같다 — 다음 빠른 추가 때 다시 생긴다).
+// 같은 트리 안 이동은 기존 reparentMoment를 쓴다.
+export function moveMoment(state, fromTreeId, momentId, toTreeId, parentId, clock = new Date().toISOString()) {
+  if (fromTreeId === toTreeId) throw new Error('같은 트리 안에서는 옮길 수 없어요. 이전 순간 바꾸기를 사용해 주세요.');
+  const from = state.trees.find(tree => tree.id === fromTreeId);
+  const target = state.trees.find(tree => tree.id === toTreeId);
+  if (!from || !target) throw new Error('트리를 찾을 수 없어요.');
+  const moving = from.moments.find(m => m.id === momentId);
+  if (!moving) throw new Error('이 순간을 찾을 수 없어요.');
+  if (target.moments.length >= MAX_MOMENTS) throw new Error(`한 트리에는 ${MAX_MOMENTS}개의 순간까지 담을 수 있어요.`);
+  let attachTo = parentId ?? null;
+  if (!attachTo) attachTo = target.moments.find(m => m.parentId === null)?.id || null;
+  if (!attachTo || !target.moments.some(m => m.id === attachTo)) throw new Error('옮겨 붙일 순간을 대상 트리에서 골라 주세요.');
+  const moved = { ...moving, parentId: attachTo, relation: '', links: [] };
+  const targetNext = { ...target, updatedAt: clock, moments: [...target.moments, moved] };
+  const moments = detachMoments(from, new Set([momentId]));
+  if (!moments.length) {
+    return { state: { version: 1, trees: state.trees.filter(tree => tree.id !== fromTreeId).map(tree => tree.id === toTreeId ? targetNext : tree) }, treeId: toTreeId, momentId };
+  }
+  const fromNext = { ...from, coverMomentId: from.coverMomentId === momentId ? '' : from.coverMomentId || '', updatedAt: clock, moments };
+  return { state: { version: 1, trees: state.trees.map(tree => tree.id === fromTreeId ? fromNext : tree.id === toTreeId ? targetNext : tree) }, treeId: toTreeId, momentId };
+}
+
+// #327(① 데이터 규칙): 고른 순간들로 새 트리(inbox=false)를 만든다. 고른 순서의 첫 순간이
+// 시작 순간이 되고 나머지는 그 아래에 붙는다. 원래 트리 처리는 moveMoment와 같다. 이름(subject)은
+// 기존 requireText 규칙으로 반드시 적게 한다.
+export function treeFromMoments(state, fromTreeId, momentIds, options = {}, clock = new Date().toISOString()) {
+  const from = state.trees.find(tree => tree.id === fromTreeId);
+  if (!from) throw new Error('트리를 찾을 수 없어요.');
+  const subject = requireText(options.subject, '좋아하는 대상', 60);
+  const wanted = Array.isArray(momentIds) ? [...momentIds] : [];
+  if (!wanted.length) throw new Error('옮길 순간을 먼저 골라 주세요.');
+  if (new Set(wanted).size !== wanted.length) throw new Error('같은 순간을 두 번 골랐어요.');
+  const movedIds = new Set(wanted);
+  const moving = wanted.map(id => {
+    const moment = from.moments.find(m => m.id === id);
+    if (!moment) throw new Error('이 순간을 찾을 수 없어요.');
+    return moment;
+  });
+  if (state.trees.length >= MAX_TREES) throw new Error(`트리는 ${MAX_TREES}개까지 만들 수 있어요.`);
+  const root = { ...moving[0], parentId: null, relation: '', links: [] };
+  const tree = { id: newId(), subject, title: `${subject}, 나의 순간들`, coverMomentId: '', coverDesign: '', inbox: false, createdAt: clock, updatedAt: clock, moments: [root, ...moving.slice(1).map(m => ({ ...m, parentId: root.id, relation: '', links: [] }))] };
+  const moments = detachMoments(from, movedIds);
+  if (!moments.length) return { state: { version: 1, trees: [...state.trees.filter(t => t.id !== fromTreeId), tree] }, treeId: tree.id };
+  const fromNext = { ...from, coverMomentId: movedIds.has(from.coverMomentId) ? '' : from.coverMomentId || '', updatedAt: clock, moments };
+  return { state: { version: 1, trees: [...state.trees.map(t => t.id === fromTreeId ? fromNext : t), tree] }, treeId: tree.id };
+}
+
 export function linksOf(moment) {
   return Array.isArray(moment?.links) ? moment.links : [];
 }
@@ -197,6 +291,9 @@ export function validateState(value) {
   const treeIds = new Set();
   const idValid = id => typeof id === 'string' && /^[a-zA-Z0-9_-]{1,80}$/.test(id);
   const time = v => typeof v === 'string' && v.length <= 40 && !Number.isNaN(Date.parse(v));
+  // #327(① 데이터 규칙): inbox는 참/거짓뿐이고 한 계정에 최대 1개다. 2개 이상이면
+  // 목록의 첫 번째만 true로 남기고 나머지는 false로 정리한다(저장 거부가 아니다).
+  let inboxSeen = false;
   const trees = value.trees.map(tree => {
     if (!tree || typeof tree !== 'object') throw new Error('트리 데이터가 올바르지 않아요.');
     if (!idValid(tree.id) || treeIds.has(tree.id) || !Array.isArray(tree.moments) || !tree.moments.length || tree.moments.length > MAX_MOMENTS || !time(tree.createdAt) || !time(tree.updatedAt)) throw new Error('트리 데이터가 올바르지 않아요.');
@@ -227,7 +324,9 @@ export function validateState(value) {
     const coverMomentId = tree.coverMomentId ?? '';
     if (typeof coverMomentId !== 'string' || (coverMomentId && !byId.has(coverMomentId))) throw new Error('표지 순간이 트리에 없어요.');
     const coverDesign = normalizeCoverDesign(tree.coverDesign);
-    return { id: tree.id, subject: requireText(tree.subject, '대상', 60), title: requireText(tree.title, '트리 제목', 100), coverMomentId, coverDesign, createdAt: tree.createdAt, updatedAt: tree.updatedAt, moments };
+    const inbox = tree.inbox === true && !inboxSeen;
+    if (inbox) inboxSeen = true;
+    return { id: tree.id, subject: requireText(tree.subject, '대상', 60), title: requireText(tree.title, '트리 제목', 100), coverMomentId, coverDesign, inbox, createdAt: tree.createdAt, updatedAt: tree.updatedAt, moments };
   });
   return { version: 1, trees };
 }
