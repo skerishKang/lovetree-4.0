@@ -4,6 +4,7 @@
 // 셸은 자기 상태(member·source·window.LT41·업로드)를 읽기 함수로 넘기고, 이 파일은 패널만 만진다.
 import {parentCandidates, suggestMomentTitle} from '../domain.mjs';
 import {displayTreeTitle} from '../tree-name.mjs';
+import {mountPrivateUpload} from '../private-upload.mjs';
 
 export function createPanels(deps) {
   const {$} = deps;
@@ -123,13 +124,8 @@ export function createPanels(deps) {
     const media = LTMedia.describe(selected.url || '');
     $('tree-cover-hint').textContent = media.kind === 'photo' ? `“${selected.title}”의 사진을 표지로 사용합니다.` : `“${selected.title}”을 표지 순간으로 표시하고 금테 장식 표지를 사용합니다.`;
   }
-  function openTreeManager() {
-    if (getSource() !== 'server' || !getMember()?.snapshot().owned || !getMember().snapshot().writable || !window.LT41) {
-      notify('내 서버 기록을 불러온 뒤 책 정보를 관리해 주세요.'); return;
-    }
-    const tree = window.LT41.tree, form = $('tree-form');
-    form.elements.title.value = tree.title;
-    form.elements.subject.value = tree.subject;
+  function fillTreeCoverOptions(tree) {
+    // #256-3 2단계: 책 표지 선택지는 이 함수 한 곳에서 채운다(창 열기·새 사진 표지 만들기 뒤 다시 채우기 공용).
     $('tree-cover').replaceChildren();
     const fallback = document.createElement('option');
     fallback.value = ''; fallback.textContent = '기본 금테 장식 표지';
@@ -140,7 +136,19 @@ export function createPanels(deps) {
       option.textContent = `${moment.title} · ${media.kind === 'photo' ? '사진' : media.kind === 'video' ? '영상' : media.kind === 'youtube' ? 'YouTube' : media.kind === 'link' ? '링크' : '기록'}`;
       $('tree-cover').append(option);
     }
+  }
+  function openTreeManager() {
+    if (getSource() !== 'server' || !getMember()?.snapshot().owned || !getMember().snapshot().writable || !window.LT41) {
+      notify('내 서버 기록을 불러온 뒤 책 정보를 관리해 주세요.'); return;
+    }
+    const tree = window.LT41.tree, form = $('tree-form');
+    form.elements.title.value = tree.title;
+    form.elements.subject.value = tree.subject;
+    fillTreeCoverOptions(tree);
     $('tree-cover').value = tree.coverMomentId || '';
+    // #256-3 2단계: 새 사진 표지 만들기는 로그인·서버 기록에서만 보인다.
+    $('tree-cover-upload').hidden = false;
+    $('tree-cover-title').value = '';
     // #256-3: 저장된 디자인 표지를 라디오에 반영한다(모르는 값은 도메인 규칙에서 ''로 정리되므로 여기도 빈 값으로 둔다).
     form.elements.coverDesign.value = tree.coverDesign || '';
     $('tree-form-error').textContent = '';
@@ -167,6 +175,39 @@ export function createPanels(deps) {
   $('tree-cover').onchange = updateTreeCoverHint;
   // #256-3: 사진 표지를 빼면 디자인 표지(또는 기본 표지)로 돌아간다.
   $('tree-photo-clear').onclick = () => { $('tree-cover').value = ''; updateTreeCoverHint(); };
+  // #256-3 2단계: 창에서 새 사진을 올려 표지로 만든다. 순간 폼의 업로드와 같은 제한·문구를 쓰고(onUploaded 옵션),
+  // 성공 뒤 두 번 저장한다 — 순간 추가(루트 아래) → 표지 지정. 한쪽이 실패하면 어디까지 됐는지 상태 칸에 알린다.
+  function coverUploadStatus() { return $('tree-form').querySelector('[data-upload-status]'); }
+  async function makeCoverFromUpload(url) {
+    const tree = window.LT41?.tree;
+    if (!tree) throw Error('책을 먼저 불러와 주세요. 내 보관 파일에서 다시 고를 수 있어요.');
+    const root = tree.moments.find(moment => moment.parentId === null);
+    const title = $('tree-cover-title').value.trim();
+    let added;
+    try {
+      added = getMember().apply('add', { url, ...(title ? { title } : {}) }, { treeId: tree.id, momentId: root.id });
+    } catch (error) { throw Error('사진은 보관 파일로 남았어요. 순간으로 만들지는 못했어요 — ' + error.message); }
+    try {
+      getMember().apply('editTree', { title: tree.title, subject: tree.subject, coverMomentId: added.momentId, coverDesign: tree.coverDesign || '' }, { treeId: tree.id });
+    } catch (error) {
+      fillTreeCoverOptions(window.LT41?.tree || tree);
+      throw Error('사진은 순간으로 남았지만 표지 지정은 실패했어요 — ' + error.message + ' · 위 “책 표지”에서 직접 골라 저장할 수 있어요.');
+    }
+    const updated = window.LT41?.tree;
+    if (updated && updated.id === tree.id) { fillTreeCoverOptions(updated); $('tree-cover').value = added.momentId; }
+    updateTreeCoverHint();
+    $('tree-cover-title').value = '';
+    treeBaseline = new URLSearchParams(new FormData($('tree-form'))).toString();
+    if (coverUploadStatus()) coverUploadStatus().textContent = '새 사진 순간을 표지로 만들었어요. 창 아래 저장하기를 누르지 않아도 저장됐어요.';
+    notify('새 사진 순간을 표지로 만들었어요.');
+  }
+  const coverUploads = mountPrivateUpload({
+    form: $('tree-form'), assets: null, imagesOnly: true,
+    getSubject: () => getSource() === 'server' && getMember()?.snapshot().writable ? getMember().snapshot().subject : null,
+    getState: () => getMember()?.state() || null,
+    onChange: () => {},
+    onUploaded: url => makeCoverFromUpload(url)
+  });
   $('tree-form').onsubmit = e => {
     e.preventDefault();
     try {

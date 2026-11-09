@@ -198,3 +198,9 @@ html[data-v41-screen=book] .tools .ui-btn::after,html[data-v41-screen=board] hea
 #tree-design .cover-design-option input:checked+.cover-design-chip{box-shadow:inset 8px 0 0 rgba(0,0,0,.13),0 0 0 2px var(--lt-gold-deep)}
 #tree-design .cover-design-option input:focus-visible+.cover-design-chip{outline:2px solid var(--lt-gold);outline-offset:3px}
 #tree-design .cover-design-name{display:block;margin-top:5px;font-size:11px;color:var(--lt-muted)}
+/* 이슈 256-3 2단계: 책 정보 관리 창의 새 사진 표지 만들기 블록. --lt-* 토큰만 쓴다. */
+#tree-cover-upload{border:0;padding:0;margin:16px 0 0}
+#tree-cover-upload legend{font-size:13px;color:var(--lt-muted);padding:0}
+#tree-cover-upload .file-label{display:block;font-size:12px;color:var(--lt-muted);margin:10px 0 0}
+#tree-cover-upload input{min-height:44px;margin-top:8px;padding:11px 12px;border:1px solid rgba(255,255,255,.22);border-radius:12px;background:rgba(255,255,255,.04);color:var(--lt-pearl);line-height:1.6;font-size:16px}
+#tree-cover-upload .stop-upload{min-height:44px;padding:0 14px;border-radius:var(--lt-r-pill);border:1px solid rgba(255,255,255,.3);background:none}

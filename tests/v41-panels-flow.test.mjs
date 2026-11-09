@@ -59,6 +59,13 @@ function harness({
     for (const name of Object.keys(elements['moment-form'].values)) elements['moment-form'].values[name] = '';
   };
   elements['tree-form'] = fakeEl({ values: {}, elements: { title: fakeEl({ value: '' }) } });
+  // #256-3 2단계: 책 정보 창에 사진 업로더가 실린다 — 최소 미디어 슬롯 흉내.
+  const coverSlotParts = { '[data-media-file]': fakeEl(), '[data-upload-status]': fakeEl(), '[data-stop]': fakeEl() };
+  const coverSlot = fakeEl({ innerHTML: '' });
+  coverSlot.querySelector = sel => coverSlotParts[sel] || null;
+  elements['tree-form'].querySelector = sel => sel === '[data-media-slot]' ? coverSlot : null;
+  elements['tree-cover-upload'] = fakeEl({ hidden: true });
+  elements['tree-cover-title'] = fakeEl({ value: '' });
 
   const modeButtons = [fakeEl({ dataset: { mode: 'add' } }), fakeEl({ dataset: { mode: 'edit' } })];
 
