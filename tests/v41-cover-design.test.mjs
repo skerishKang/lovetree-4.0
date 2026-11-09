@@ -129,6 +129,16 @@ test('디자인 표지 질감은 identity.css 한 곳에 있고 6종 모두 책�
   assert.doesNotMatch(shelfExtra, /data-cover-design/, '질감 사본이 shelf-extra.css에 남지 않는다');
 });
 
+test('이어 읽기 칸 표지도 같은 판정(book.design)을 쓰고 질감 규칙을 같이 쓴다(구조 검사)', () => {
+  const shelf = readFileSync('public/v41/views/shelf/shelf.js', 'utf8');
+  assert.match(shelf, /if\(info\.book\.design\)cover\.setAttribute\('data-cover-design',info\.book\.design\)/, '이어 읽기 칸은 book.design을 그대로 쓴다');
+  assert.doesNotMatch(shelf, /resume.*coverDesign/, '이어 읽기 칸에 판정 사본이 없다');
+  const css = readFileSync('public/v41/identity.css', 'utf8');
+  for (const id of serverDomain.COVER_DESIGN_IDS) {
+    assert.match(css, new RegExp('\\.resume-cover\\[data-cover-design="' + id + '"\\]'), id + ' 질감은 이어 읽기 칸에서도 같은 규칙을 재사용한다');
+  }
+});
+
 test('책 정보 관리 창: 디자인 표지 라디오와 사진 표지 안내·사진 빼기가 있고 패널이 저장값을 반영한다(구조 검사)', () => {
   const shell = readFileSync('public/v41/index.html', 'utf8');
   assert.match(shell, /<fieldset id="tree-design"><legend>디자인 표지<\/legend>/, '기존 창 안에 디자인 표지 줄을 추가한다');

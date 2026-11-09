@@ -13,6 +13,7 @@
 - 캡처(가짜 세션, `out/cover-design-261109/`): 기본(변화 0)·디자인(texture-1·4·6)·사진 우선 × 밤/정원 × 1440/390 = 12장. 실측: 디자인 속성·배경색·질감이 카드에 적용되고 사진이 있으면 사진이 이기고(photoLoaded true), 가로 넘침 0, 콘솔 오류 0.
 - **배포 순서 주의**: 서버(Pages 프록시 뒤 COM2)도 `src/domain.js`를 쓴다. 머지되면 COM2 autodeploy(10분 타이머)가 서버를 재기동하기 전까지는 운영 서버가 `coverDesign`을 잘라낸다(디자인 표지가 기본으로 돌아옴). 프런트는 머지 즉시 CI가 배포한다. 머지 후 실계정 왕복 확인은 이어서 한다.
 - 계정 01: 검증 후 트리 0개·보관 파일 0개로 정리 완료.
+- **리베이스(#307·#308 머지 후)**: shelf-extra.css 충돌만 손으로 합치고 나머지는 자동 합병(#308의 renderSpines·syncSpines·spineScrollLeft, #307의 resumeCard·renderResumeCard 보존). 이어 읽기 칸 표지(`#resumeCover`)도 같은 판정(`book.design`)을 쓰고, identity.css의 같은 질감 규칙에 `.resume-cover[...]` 선택자를 재사용(복사 없음). 책등(#308)은 `spineItems`가 `book.color`를 쓰므로 디자인 색이 그대로 반영된다(질감 불필요). 시험 1건 추가(v41-cover-design 13건). 캡처 재촬영: 디자인 표지 책이 책장·이어 읽기 칸·책등에 함께 보이는 상태 12장(1440·390 × 밤·정원).
 
 ## 처음 오는 레인이 먼저 읽을 것 (10줄, 2026-11-09)
 

@@ -115,8 +115,11 @@ import { createReader } from './shelf-reader.js';
           if(info.book){
             cover.style.setProperty('--cover',info.book.color);
             cover.style.setProperty('--cover-accent',info.book.accent);
+            // #256-3: 디자인 표지는 책장 카드와 같은 판정(coverChoice 결과 book.design)을 쓴다. 없으면 속성을 뺀다.
+            // 질감은 identity.css의 같은 규칙이 resume-cover 선택자로 함께 그린다(새 사본 없음).
+            if(info.book.design)cover.setAttribute('data-cover-design',info.book.design);else cover.removeAttribute('data-cover-design');
             cover.innerHTML=(info.book.coverMedia?'<img src="'+esc(info.book.coverMedia)+'" alt="" loading="lazy" referrerpolicy="no-referrer">':'')+'<span>'+esc(info.book.symbol)+'</span><strong>'+esc(info.book.name)+'</strong>';
-          } else cover.innerHTML='';
+          } else { cover.removeAttribute('data-cover-design'); cover.innerHTML=''; }
         }
         $('#resumeTitle').textContent=info.title;
         $('#resumeAction').textContent=info.action;
