@@ -115,6 +115,16 @@
 
 - **원칙 8 자동화(2026-11-08)**: PR마다 `.github/workflows/preview-check.yml`이 Cloudflare Pages 미리보기 주소를 찾아 `tools/postdeploy`(로그아웃)를 돌리고, `tools/postdeploy/preview-gate.mjs`가 판정한다(visual·페이지 오류 0, 미리보기 Functions 503만 예외). 미리보기 배포가 없으면 실패가 아니라 건너뜀. 레인은 체크 요약만 확인한다.
 
+## 2026-11-10 — 첫 화면 카드: 내 기록 YouTube 순간을 썸네일 카드로(#340, 로컬2, ai/local2-home-youtube-cards-261110)
+
+빠른 추가(#329)로 담은 YouTube 순간이 첫 화면에서 글자 카드로만 분류돼 '사진 3장 미만' 예시로 물러나던 문제. 지난 세션에 ai-revenue-lab #7313에 잘못 올린 같은 내용은 **skerishKang/lovetree-4.0 #340**으로 옮기고(잘못 올림 댓글 후 원 이슈는 닫음) — **앞으로 러브트리 이슈는 lovetree-4.0에만 올린다**.
+
+- **CTO 결정(#340에 기록)**: 내 기록(`source==='server'`, 소유자)일 때만 YouTube 순간을 썸네일 카드로 센다. 판정은 #330의 한 벌(media-preview `autoLoadMedia`)을 재사용하고, 썸네일 주소도 `LTMedia.describe`의 `loadUrl` 한 벌에서 가져온다(quick-add와 같은 재사용 규칙). '사진·영상 3장 미만이면 예시' 기준(mix-empty, #297 보류)·예시·공유 모드는 그대로다. **표지(책장·이어 읽기 칸)는 YouTube 썸네일을 쓰지 않는다(#256 외부 이미지 표지 금지)** — 코드 변경 없이 현행 유지.
+- **계산은 home-moments 한 벌**: `v41/home-moments.js` `cardOf`가 youtube 묶음(`{describe, auto}`)을 받아 사진 이미지가 없는 YouTube 순간에 `image=loadUrl`·`type 'video'`·`youtubeThumb:true`(저장 값이 보낸 같은 이름 값은 덮어쓴다)를 붙이고 photos 배열로 세어진다. `v41/home-cards.js` `homeCardsPlan`에 `youtube` 옵션이 추가됐다. `v41/home.js`는 `LTMedia.currentContext()`로 셸 기록 상태를 읽어 `autoLoadMedia(source, owned)` 판정을 묶음으로 만들어 넘긴다(첫 화면 iframe도 media-preview.js를 함께 읽는다).
+- **궤도 렌더러**: `src/views/orbit.js`는 `youtubeThumb` 카드만 video 타입으로 세워 기존 `.card.video .playGlyph` CSS 한 벌로 재생 표시(aria-hidden ▶)를 붙이고, 썸네일 img에는 #330과 같은 `referrerpolicy=no-referrer·loading=lazy`를 붙인다. '영상 포스터 예시' 문구는 demo·example 카드에만 붙게 판정에 기록 상태를 넣었다(내 카드가 예시로 읽히지 않게). 예시·demo·인기 카드 렌더는 그대로다.
+- **시험**: `tests/v41-home-youtube-cards.test.mjs` 10건 — 사진·YouTube·글 × 소유자·예시·공유·파일 판정 매트릭스, mix 3장(내 카드)/2장(mix-empty), 2 YouTube+1 사진, 내 것만 순서, 외부 링크·다른 출처·비공개 mp4 차단, `?t=90`, 궤도·배선 글자 검사. **media-preview의 실제 `autoLoadMedia`·`describe`를 vm으로 직접 불러 쓴다.** 강도 증명: cardOf의 auto 게이트를 빼면 '소유자 판정' 시험이 실패하는 것을 확인하고 되돌렸다. 전체 `npm test` **843건 806 pass / 0 fail / 37 skip**, `npm run build` pass.
+- **실측(운영 계정 04 → PR 코드 재생, 미리보기 Functions는 로그인 불가 — 원칙 8 예외 패턴)**: 운영에서 빠른 추가(실제 UI)로 YouTube 3개(`?t=90` 포함)를 담고, 그 실제 응답을 dist 로컬 서버에 재생해 첫 화면을 실측: 내 카드 3장·ytimg 썸네일 3·재생 표시 3·no-referrer·가로 넘침 0·pageerror 0(1440·390 × 밤·정원), 카드 누름 → `#my/book?tree=…&moment=…`(기존 동작), 순간 2개로 줄이면 mix-empty(지금처럼 예시). 재생 URL에는 회원 기록 로드 마커 `?account=1`이 필요하다(빼먹으면 예시로만 렌더된다 — 프로브로 확인). 끝나고 운영 기록 **트리 0개·보관 0개** 정리 확인. 캡처: `.tmp-261109/shots-340/`(스냅숏 파일은 검증 뒤 삭제).
+
 ## 2026-11-09 — 책이 많아지면 책등 목차(#256 2번, 컴2로컬2, ai/com2-lt-shelf-toc-261109)
 
 책이 3권 이상이면 책등을 목차처럼 한 줄로 세워 아래 책장의 목차로 쓴다. 1~2권은 숨긴다.

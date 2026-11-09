@@ -1,6 +1,8 @@
 // 첫 화면 카드로 올릴 내 순간 고르기 — 순수 계산만 한다.
 // 2026-11-08 대표 지시: 사진·영상 썸네일이 있는 순간만 카드로 쓰고, 글만 있는 순간은 최대 2장.
-// 썸네일은 저장된 값 중 data: 이미지와 같은 출처 경로만 인정한다(클릭 전 외부 요청 0).
+// 썸네일은 저장된 값 중 data: 이미지와 같은 출처 경로만 인정한다. 단 내 기록(서버 기록·로그인
+// 소유자)의 YouTube 순간은 #330과 같은 판정(autoLoad)으로 ytimg 썸네일 카드를 처음부터 만든다
+// (2026-11-10 CTO 결정, lovetree-4.0 #340) — 판정·주소는 LTMedia 한 벌을 재사용한다.
 export const HOME_ORBIT_LIMIT = 40;
 export const HOME_TEXT_LIMIT = 2;
 export const HOME_PHOTO_MIN = 3;
@@ -58,9 +60,13 @@ const mediaImage = (moment, currentOrigin) => {
 const noteOf = moment => text(moment?.note) || text(moment?.memo) || text(moment?.whyNext) || text(moment?.title);
 const recent = (a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt);
 
-function cardOf(treeId, moment, currentOrigin) {
+function cardOf(treeId, moment, currentOrigin, youtube = null) {
   const image = mediaImage(moment, currentOrigin);
   const video = !image && privateMediaKind(moment?.url, currentOrigin)?.kind === 'video';
+  // #330 판정 재사용: 내 기록(서버 기록·로그인 소유자)만 YouTube 썸네일을 처음부터 카드로 쓴다.
+  // 썸네일 주소는 LTMedia.describe의 loadUrl 한 벌에서 온다 — 새로 만들지 않는다(quick-add와 같은 규칙).
+  const media = (!image && youtube?.auto) ? youtube.describe?.(text(moment?.url)) : null;
+  const thumb = media?.kind === 'youtube' && media.loadUrl ? media.loadUrl : '';
   return {
     ...moment,
     key: `${treeId}/${text(moment?.id)}`,
@@ -71,14 +77,16 @@ function cardOf(treeId, moment, currentOrigin) {
     date: text(moment?.date),
     emotion: text(moment?.emotion),
     note: noteOf(moment),
-    image,
-    type: image ? 'photo' : video ? 'video' : 'memo',
+    image: image || thumb,
+    type: image ? 'photo' : (thumb || video) ? 'video' : 'memo',
+    // 궤도 렌더러가 재생 표시를 붙일 때만 보는 표시자다. 저장 값이 보낸 같은 이름 값은 덮어쓴다.
+    youtubeThumb: thumb ? true : false,
     // orbitRecords는 createdAt 내림차순이므로 최근 수정 순서를 그대로 옮긴다.
     createdAt: new Date(stamp(moment) || 0).toISOString(),
   };
 }
 
-export function homeMomentCards(context, limit = HOME_ORBIT_LIMIT, currentOrigin = globalThis.location?.origin) {
+export function homeMomentCards(context, limit = HOME_ORBIT_LIMIT, currentOrigin = globalThis.location?.origin, youtube = null) {
   const trees = Array.isArray(context?.trees) ? context.trees : (context?.tree ? [context.tree] : []);
   const photos = [], memos = [], seen = new Set();
   for (const tree of trees) {
@@ -90,7 +98,7 @@ export function homeMomentCards(context, limit = HOME_ORBIT_LIMIT, currentOrigin
       const key = `${treeId}/${id}`;
       if (seen.has(key)) continue;
       seen.add(key);
-      const card = cardOf(treeId, moment, currentOrigin);
+      const card = cardOf(treeId, moment, currentOrigin, youtube);
       (card.image ? photos : memos).push(card);
     }
   }
