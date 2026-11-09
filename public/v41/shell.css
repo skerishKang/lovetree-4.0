@@ -215,6 +215,8 @@ html[data-v41-screen=book] .tools .ui-btn::after,html[data-v41-screen=board] hea
 .write-choice button.primary{background:var(--lt-primary);border-color:transparent;color:var(--lt-primary-ink)}
 .write-choice button strong{font-size:15px;font-weight:600}
 .write-choice button span{font-size:12px;line-height:1.6;color:inherit;opacity:.75}
+/* 정원의 1차 버튼(진한 장미 배경)에서는 옅게 태내지 않는다 — 75%로는 3.97:1로 모자라다(axe 실측). */
+html[data-lt-theme=garden] .write-choice button.primary span{opacity:1}
 .write-choice button:hover{border-color:var(--lt-gold-line)}
 #quick-form{margin-top:18px}
 #quick-form label{display:block;font-size:13px;color:var(--lt-muted)}
