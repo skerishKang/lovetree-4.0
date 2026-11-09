@@ -148,7 +148,9 @@ test('책 정보 관리 창: 디자인 표지 라디오와 사진 표지 안내�
   assert.match(shell, /사진 표지 사용 중/, '사진이 우선한다는 표시');
   assert.match(shell, /id="tree-photo-clear">사진 빼기</, '사진 빼기');
   const panels = readFileSync('public/v41/shell/panels.mjs', 'utf8');
-  assert.match(panels, /form\.elements\.coverDesign\.value = tree\.coverDesign \|\| ''/, '저장된 디자인을 라디오에 반영한다');
+  // #314: RadioNodeList.value = ''는 이전 체크를 풀지 않는다 — 라디오마다 명시적으로 정한다.
+  assert.match(panels, /for \(const radio of form\.elements\.coverDesign\) radio\.checked = radio\.value === design/, '저장값과 같은 라디오만 checked로 다시 정한다');
+  assert.doesNotMatch(panels, /elements\.coverDesign\.value\s*=/, '빈 값 대입으로 지워지지 않는 RadioNodeList.value에 기대지 않는다');
   assert.match(panels, /\$\('tree-photo-clear'\)\.onclick/, '사진 빼기 동작이 연결된다');
   assert.match(panels, /\$\('tree-photo-cover'\)\.hidden = !photoCover/, '사진 표지 안내 표시를 판정한다');
   assert.doesNotMatch(panels, /\$\('tree-design'\)\.disabled/, '디자인 줄을 disabled로 막지 않는다(막으면 저장 때 값이 빠진다)');

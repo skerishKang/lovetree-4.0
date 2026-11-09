@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 // #231 1-B③-2: 옮긴 순간 패널·편집기·책 정보 함수를 직접 불러 결과를 본다(최소 가짜 DOM).
 // 소스 글자만 보는 시험을 대신하려고 폼 기준값·저장 인자·모드 전환을 실제 값으로 확인한다.
 import { createPanels } from '../public/v41/shell/panels.mjs';
+import { fakeRadioGroup } from './helpers/fake-dom.mjs';
 
 function fakeElement(extra = {}) {
   const node = {
@@ -27,8 +28,12 @@ function harness({ owned = true, writable = true, source = 'server', busy = fals
   const els = {};
   const fields = () => ({ title: fakeElement(), note: fakeElement(), emotion: fakeElement(), date: fakeElement(), url: fakeElement(), relation: fakeElement() });
   els['moment-form'] = fakeElement({ elements: fields() });
-  // coverDesign 라디오 묶음(이슈 256-3): RadioNodeList처럼 .value를 갖는다.
-  els['tree-form'] = fakeElement({ elements: { title: fakeElement(), subject: fakeElement(), coverDesign: fakeElement() } });
+  // #314: coverDesign은 실제 RadioNodeList 동작(빈 값 대입은 무시)을 흉내 내는 묶음이다.
+  els['tree-cover'] = fakeElement();
+  els['tree-form'] = fakeElement({ elements: {
+    title: fakeElement(), subject: fakeElement(), coverMomentId: els['tree-cover'],
+    coverDesign: fakeRadioGroup(['', 'texture-1', 'texture-2', 'texture-3', 'texture-4', 'texture-5', 'texture-6'])
+  } });
   // 새 사진 표지 만들기(이슈 256-3 2단계): 업로더가 기대하는 최소 미디어 슬롯 흉내.
   const coverSlotParts = { '[data-media-file]': fakeElement(), '[data-upload-status]': fakeElement(), '[data-stop]': fakeElement() };
   const coverSlot = fakeElement({ innerHTML: '' });
@@ -371,6 +376,46 @@ test('새 사진 표지: 순간 만들기가 실패하면 사진은 보관 파�
     await driveCoverUpload(h);
     assert.equal(h.calls.length, 1, '표지 지정으로 나가지 않는다');
     assert.match(h.coverSlotParts['[data-upload-status]'].textContent, /사진은 보관 파일로 남았어요/);
+  } finally { h.restore(); }
+});
+
+// #314: A(격자) → B(디자인 없음)로 창을 바꿔 열고, 사진 표지를 만든 뒤 '책 정보 저장'을 다시 눌러도
+// 이전 책의 디자인이 따라가지 않아야 한다(운영 재현 순서 그대로의 시험 판).
+test('#314: 다른 책에서 고른 디자인이 남지 않고, 사진 표지 뒤 저장에도 섞이지 않는다', async () => {
+  const treeA = { ...sampleTree(), coverDesign: 'texture-3' };
+  const treeB = {
+    id: 'tree2', title: '겨울 정원', subject: '겨울', coverDesign: '', coverMomentId: '',
+    moments: [{ id: 'b1', title: '눈', note: '', emotion: '설렘', date: '2026-11-03', url: '', parentId: null, relation: '' }]
+  };
+  const h = harness({ tree: treeA, applyImpl: (action, input) => {
+    const tree = globalThis.window.LT41.tree;
+    if (action === 'add') {
+      globalThis.window.LT41.tree = { ...tree, moments: [...tree.moments, { id: 'new1', title: '사진으로 남긴 순간', url: input.url, parentId: 'b1', relation: '' }] };
+      return { treeId: tree.id, momentId: 'new1' };
+    }
+    if (action === 'editTree') {
+      globalThis.window.LT41.tree = { ...tree, ...input, moments: tree.moments };
+      return {};
+    }
+    return {};
+  } });
+  try {
+    globalThis.location = { origin: 'https://lovetree-4-0.pages.dev' };
+    globalThis.fetch = () => Promise.resolve({ ok: true, status: 200, text: async () => JSON.stringify({ name: 'c.png', url: 'https://lovetree-4-0.pages.dev/api/media/c.png' }) });
+    const form = h.els['tree-form'];
+    const checked = () => [...form.elements.coverDesign].filter(r => r.checked).map(r => r.value);
+    h.panels.openTreeManager();
+    assert.deepEqual(checked(), ['texture-3'], 'A에서는 저장된 격자가 선택돼 있다');
+    globalThis.window.LT41.tree = treeB;
+    h.panels.openTreeManager();
+    assert.deepEqual(checked(), [''], '디자인이 없는 B에서는 기본(빈 값)이 선택된다 — 이전 책 선택이 남지 않는다');
+    await driveCoverUpload(h);
+    assert.deepEqual(checked(), [''], '사진으로 표지를 만든 뒤에도 디자인 선택은 기본 그대로다');
+    form.onsubmit({ preventDefault() {}, target: form });
+    const saved = h.calls.at(-1);
+    assert.equal(saved[0], 'editTree', '창 아래 저장은 editTree로 나간다');
+    assert.equal(saved[1].coverDesign, '', '사진 표지 책 저장에 이전 책 디자인이 섞이지 않는다');
+    assert.equal(saved[1].coverMomentId, 'new1', '표지는 새 사진 순간으로');
   } finally { h.restore(); }
 });
 

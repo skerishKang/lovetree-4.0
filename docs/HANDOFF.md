@@ -11,6 +11,17 @@
 - 표·방법·재측정 명령: `docs/A11Y_AUDIT_20261109.md`. 첫 여정은 로그인 상태에서만 열려 로그아웃 표에는 없다.
 - 계정 01 정리: 트리 0개·보관 파일 0개.
 
+## 2026-11-09 — 책 정보 관리: 다른 책에서 고른 디자인 표지가 남던 문제(#314, 로컬2, ai/local2-lt-cover-stale-261109)
+
+책 A에서 고른 디자인 표지가, 디자인이 없는 책 B의 책 정보 창에 그대로 남아 그대로 저장되던 문제. 원인은 `openTreeManager`의 `RadioNodeList.value = tree.coverDesign || ''` — **Chromium 1254 실측**으로 빈 문자열·없는 값 대입은 아무것도 바꾸지 않고(있는 비어 있지 않은 값만 그 라디오를 체크), 이전 체크가 남는다.
+
+- `public/v41/shell/panels.mjs` `openTreeManager`: 라디오마다 `checked = (radio.value === (tree.coverDesign || ''))`로 **명시적으로** 정한다. 같은 창에서 책을 바꿔 열어도 이전 책 선택이 남지 않는다.
+- 함께 고침: 창을 열 때 `coverUploads.reset()` — 이전 책에서 고르던 파일·전송 결과 안내(`[data-upload-status]`)·진행 중 업로드를 비운다(진행 중 업로드가 다른 책에 표지로 붙는 것도 막는다). 제목·대상·표지 select·새 사진 제목 칸·사진 표지 안내·힌트 문구는 기존 코드가 이미 책마다 다시 정하고 있었고, 시험으로 전부 고정했다.
+- 시험: `tests/helpers/fake-dom.mjs`에 **`fakeRadioGroup`**(Chromium 실측 그대로: 빈 값·없는 값 대입 무시, 있는 값만 체크) 추가. `v41-panels-flow` +2(A→B→A 연속 열기 표·사진 표지 뒤 저장), `v41-shell-panels` +1(A→B→사진 업로드→저장 전체 경로), `v41-cover-design`의 옛 대입문 구조 단언을 새 루프 단언으로 교체. 강도 증명 2회: ① 루프를 옛 `.value =` 대입으로 되돌림 → 4건 실패(B가 `texture-3` 유지·저장에 섞임), ② `coverUploads.reset()` 제거 → 1건 실패(이전 책 업로드 안내 잔존). 둘 다 복구 후 `cmp`로 동일 확인.
+- 검증: `npm test` **747건 710 pass / 0 fail / 37 skip**(main 기준 744), `npm run build` pass.
+- 운영 실측(계정 03, `https://lovetree-4-0.pages.dev/v41/`, 1440): ① 배포본 그대로 A(`하루의 조각`)에 격자(texture-3) 저장 → B(`겨울 정원`) 창에서 `checked=["texture-3"]`, 그대로 저장하면 서버 `B.coverDesign="texture-3"` **(이슈 재현)**. ② 수정 본문(`panels.mjs`, sha256 `b0aa3eb2c84f…`)을 **운영 출처에만 주입**(다른 파일·서버 변경 0)하고 같은 순서: B 창 `checked=[""]`, 제목·대상·표지·제목 칸·사진 표지 안내·업로드 안내 전부 B 값 → 저장 `B.coverDesign=""`, A는 `texture-3` 유지. ③ B에서 실제 PNG 업로드(새 사진으로 표지 만들기) → `checked=[""]` 유지 → 책 정보 저장 → `B.coverDesign=""` + `coverMomentId`=새 사진 순간, A 불변. ④ A를 다시 열었다가 B를 다시 열어도 업로드 안내·파일 없음. 끝나고 트리 0개·보관 파일 0개 정리 확인. 기록 `.tmp-261109/measure-314.json`(미커밋, 23/23 PASS).
+- 배포 전 실측임을 명시한다: ②③은 배포본이 아니라 **수정 본문을 운영 출처에 주입한** 측정이다(서버·계정·API는 실운영). 머지 뒤 배포본 확인은 다음 레인 몫.
+
 ## 2026-11-09 — 표지 고르기 2단계: 창에서 새 사진을 표지로 만들기(#256-3 2단계, 로컬3, ai/lt-cover-upload-261109, PR #310 머지 `5f384d4`)
 
 “내 사진 올리기”를 (가)안으로 구현 — **스키마·서버 변경 0**. 올린 사진으로 순간을 하나 만들고 기존 `coverMomentId`(판정 1순위)로 가리킨다.

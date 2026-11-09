@@ -5,7 +5,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createPanels } from '../public/v41/shell/panels.mjs';
-import { fakeEl } from './helpers/fake-dom.mjs';
+import { fakeEl, fakeRadioGroup } from './helpers/fake-dom.mjs';
 
 const TREE = {
   id: 'tree-1',
@@ -19,8 +19,13 @@ const TREE = {
 class FakeFormData {
   constructor(form) { this.form = form; }
   * [Symbol.iterator]() {
-    const values = this.form.values || {};
-    for (const key of Object.keys(values)) yield [key, values[key]];
+    // 순간 폼은 값 표(values)를 쓴다. 책 정보 폼은 실제 폼처럼 컨트롤에서 직렬화한다
+    // (라디오는 체크된 것만 — #314가 저장 FormData로 새어 나오는지 보려면 이 경로가 필요하다).
+    if (this.form.values) {
+      for (const key of Object.keys(this.form.values)) yield [key, this.form.values[key]];
+      return;
+    }
+    for (const [name, control] of Object.entries(this.form.elements || {})) yield [name, String(control?.value ?? '')];
   }
 }
 
@@ -58,7 +63,13 @@ function harness({
   elements['moment-form'].reset = () => {
     for (const name of Object.keys(elements['moment-form'].values)) elements['moment-form'].values[name] = '';
   };
-  elements['tree-form'] = fakeEl({ values: {}, elements: { title: fakeEl({ value: '' }) } });
+  // #314: 책 정보 폼은 실제 컨트롤에서 FormData를 만든다 — 라디오 묶음은 Chromium 실측 동작을 흉내 낸다.
+  elements['tree-form'] = fakeEl({ elements: {
+    title: fakeEl({ value: '' }),
+    subject: fakeEl({ value: '' }),
+    coverMomentId: elements['tree-cover'],
+    coverDesign: fakeRadioGroup(['', 'texture-1', 'texture-2', 'texture-3', 'texture-4', 'texture-5', 'texture-6'])
+  } });
   // #256-3 2단계: 책 정보 창에 사진 업로더가 실린다 — 최소 미디어 슬롯 흉내.
   const coverSlotParts = { '[data-media-file]': fakeEl(), '[data-upload-status]': fakeEl(), '[data-stop]': fakeEl() };
   const coverSlot = fakeEl({ innerHTML: '' });
@@ -122,7 +133,7 @@ function harness({
     globalThis.queueMicrotask = saved.queueMicrotask;
     globalThis.LTMedia = saved.LTMedia;
   };
-  return { panels, elements, calls, modeButtons, restore, screen: () => screen, setScreen: (n) => { screen = n; } };
+  return { panels, elements, calls, modeButtons, coverSlotParts, lt41, restore, screen: () => screen, setScreen: (n) => { screen = n; } };
 }
 
 test('openEditor 분기 표: 로그아웃 → 로그인, 편집 불가 → 안내+기록, new → 첫 여정, add/edit → 편집기', () => {
@@ -331,5 +342,86 @@ test('편집기 저장은 같은 member.apply 경로로 나간다', () => {
     h.elements['editor'].open = true;
     h.elements['moment-form'].onsubmit({ preventDefault() {}, target: h.elements['moment-form'] });
     assert.deepEqual(h.calls.apply.map((a) => a.mode), ['add', 'edit']);
+  } finally { h.restore(); }
+});
+
+// #314 (2026-11-09): 책 정보 관리 창을 다른 책으로 바꿔 열면 이전 책의 디자인 표지가 남아
+// 그대로 저장됐다. RadioNodeList.value = ''는 체크를 풀지 않는다(Chromium 1254 실측).
+const TREE_A = {
+  id: 'tree-a', title: '하루의 조각', subject: '하루', coverDesign: 'texture-3', coverMomentId: '',
+  moments: [
+    { id: 'a1', title: '아침', note: '', emotion: '설렘', date: '2026-11-01', url: '', relation: '', parentId: null },
+    { id: 'a2', title: '사진', note: '', emotion: '설렘', date: '2026-11-02', url: 'https://example.test/a.jpg', relation: 'next', parentId: 'a1' }
+  ]
+};
+const TREE_B = {
+  id: 'tree-b', title: '겨울 정원', subject: '겨울', coverDesign: '', coverMomentId: '',
+  moments: [
+    { id: 'b1', title: '눈', note: '', emotion: '설렘', date: '2026-11-03', url: '', relation: '', parentId: null }
+  ]
+};
+
+test('#314 회귀: 책 A(격자) → B(디자인 없음) → 다시 A를 연속으로 열어도 폼이 책마다 다시 정해진다', () => {
+  const h = harness({ lt41: { tree: TREE_A, momentId: 'a1' } });
+  try {
+    const form = h.elements['tree-form'];
+    const checked = () => [...form.elements.coverDesign].filter(r => r.checked).map(r => r.value);
+    const savedValue = () => Object.fromEntries(new FormData(form)).coverDesign;
+    const open = (tree) => { h.lt41.tree = tree; h.panels.openTreeManager(); };
+
+    open(TREE_A);
+    assert.deepEqual(checked(), ['texture-3'], 'A는 저장된 격자가 선택돼 있다');
+    assert.equal(savedValue(), 'texture-3', 'A에서 저장하면 격자가 나간다');
+    assert.equal(form.elements.title.value, '하루의 조각');
+    assert.equal(form.elements.subject.value, '하루');
+
+    // 이전 책에서 남은 업로드 안내·파일이 새 책 창에 남지 않는다.
+    h.coverSlotParts['[data-upload-status]'].textContent = '이전 책에서 올린 사진 안내';
+    h.coverSlotParts['[data-media-file]'].value = 'C:\fakepath\cover.png';
+
+    open(TREE_B);
+    assert.deepEqual(checked(), [''], 'B는 디자인이 없으므로 기본(빈 값) — 이전 책의 격자가 남지 않는다');
+    assert.equal(savedValue(), '', 'B에서 그대로 저장하면 빈 값이 나간다');
+    assert.equal(form.elements.title.value, '겨울 정원', '제목도 B 값으로 바뀐다');
+    assert.equal(form.elements.subject.value, '겨울', '대상도 B 값으로 바뀐다');
+    assert.equal(h.elements['tree-cover'].value, '', '사진 표지 select도 B 값(없음)으로');
+    assert.equal(h.elements['tree-cover-title'].value, '', '새 사진 제목 칸도 빈다');
+    assert.equal(h.elements['tree-photo-cover'].hidden, true, '사진 표지 안내도 B 기준으로 숨는다');
+    assert.match(h.elements['tree-cover-hint'].textContent, /표지를 고르지 않으면/, '안내 문구도 B 기준');
+    assert.equal(h.coverSlotParts['[data-upload-status]'].textContent, '', '이전 책의 업로드 안내가 남지 않는다');
+    assert.equal(h.coverSlotParts['[data-media-file]'].value, '', '이전 책에서 고른 파일이 남지 않는다');
+
+    open(TREE_A);
+    assert.deepEqual(checked(), ['texture-3'], '다시 A를 열면 저장된 격자가 돌아온다');
+    assert.equal(h.elements['tree-cover'].value, '', 'A의 표지 select도 다시 A 값으로');
+
+    // 사진 표지가 있는 책과 없는 책의 안내가 서로 새지 않는다.
+    open({ ...TREE_A, coverMomentId: 'a2' });
+    assert.equal(h.elements['tree-photo-cover'].hidden, false, '사진 표지 책에서는 안내가 보인다');
+    assert.match(h.elements['tree-cover-hint'].textContent, /“사진”의 사진을 표지로 사용합니다/);
+    open(TREE_B);
+    assert.equal(h.elements['tree-photo-cover'].hidden, true, '사진 표지가 없는 책에서는 다시 숨는다');
+  } finally { h.restore(); }
+});
+
+test('#314 회귀: 사진으로 표지를 만든 뒤 책 정보 저장을 다시 눌러도 디자인이 섞이지 않는다', () => {
+  const photo = { id: 'b-photo', title: '사진으로 남긴 순간', note: '', emotion: '설렘', date: '2026-11-04', url: 'https://example.test/p.jpg', relation: '', parentId: 'b1' };
+  const h = harness({ lt41: { tree: TREE_A, momentId: 'a1' } });
+  try {
+    const form = h.elements['tree-form'];
+    // 이슈 재현 순서: A(격자)를 열었다가 닫고, 디자인 없는 B를 연다.
+    h.panels.openTreeManager();
+    h.lt41.tree = TREE_B;
+    h.panels.openTreeManager();
+    // 업로드 성공 직후의 상태: 모델·select에 새 사진 순간이 반영된다(makeCoverFromUpload가 하는 일).
+    h.lt41.tree = { ...TREE_B, coverMomentId: 'b-photo', moments: [...TREE_B.moments, photo] };
+    h.elements['tree-cover'].value = 'b-photo';
+    // 창 아래 '책 정보 저장'을 다시 누른다.
+    form.onsubmit({ preventDefault() {}, target: form });
+    const last = h.calls.apply.at(-1);
+    assert.equal(last.mode, 'editTree');
+    assert.equal(last.payload.coverDesign, '', '다른 책(A)의 격자가 사진 표지 저장에 섞이지 않는다');
+    assert.equal(last.payload.coverMomentId, 'b-photo', '표지는 사진 순간으로 저장된다');
+    assert.equal(last.payload.title, '겨울 정원', '저장 제목은 B 그대로다');
   } finally { h.restore(); }
 });

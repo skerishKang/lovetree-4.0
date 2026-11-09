@@ -39,6 +39,25 @@ export function fakeEl(extra = {}) {
   return el;
 }
 
+// 라디오 묶음(RadioNodeList) 흉내 — #314, 2026-11-09 Chromium 1254 실측 그대로.
+// 실측: .value에 빈 문자열이나 없는 값을 넣으면 **아무것도 바뀌지 않고**,
+// 있는 값(비어 있지 않은)을 넣을 때만 그 라디오를 체크하고 나머지를 해제한다.
+// 그래서 RadioNodeList.value = ''로는 이전 선택이 지워지지 않는다(#314의 원인).
+// 이 동작을 흉내 내야 "빈 값으로 열었는데 이전 선택이 남는" 회귀를 시험이 실제로 잡는다.
+export function fakeRadioGroup(values, { checked = values[0] } = {}) {
+  const radios = values.map((value) => fakeEl({ value, checked: value === checked }));
+  Object.defineProperty(radios, 'value', {
+    get() { return (radios.find((r) => r.checked) || {}).value ?? ''; },
+    set(next) {
+      if (next === '') return;
+      const match = radios.find((r) => r.value === next);
+      if (!match) return;
+      for (const radio of radios) radio.checked = radio === match;
+    }
+  });
+  return radios;
+}
+
 // 셸이 쓰는 탭 줄(nav) 흉내: 스크롤 폭·현재 위치·페이드 클래스·스크롤 반응 등록을 기록한다.
 export function fakeNav({scrollWidth = 400, clientWidth = 400, scrollLeft = 0, buttons = []} = {}) {
   const nav = fakeEl({
