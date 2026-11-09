@@ -17,6 +17,7 @@ import {createHeader} from './shell/header.mjs';
 import {createAuth} from './shell/auth.mjs';
 import {createPanels} from './shell/panels.mjs';
 import {createQuickAdd} from './shell/quick-add.mjs';
+import {createQuickIntake} from './shell/quick-intake.mjs';
 import {createJourney} from './shell/journey.mjs';
 import {createMessages} from './shell/messages.mjs';
 import {createCleanup} from './shell/cleanup.mjs';
@@ -99,6 +100,14 @@ const shellQuick=createQuickAdd({
   mountUpload:mountPrivateUpload
 });
 $('write-menu').onclick=()=>shellQuick.openWriteChooser();
+// 빠른 담기 입구: 붙여넣기 + 공유 시트 진입(판정·추적은 ../quick-intake.mjs 한 벌).
+const shellIntake=createQuickIntake({
+  getMember:()=>member,
+  getSource:()=>source,
+  notify:text=>notify(text),
+  openLoginStart:intent=>openLoginStart(intent),
+  describe:(url)=>globalThis.LTMedia?.describe?.(url),
+});
 // #327 2부: 모아둔 순간 정리 창. 진입은 헤더 '정리하기'(inbox 트리)와 순간 상세 '다른 트리로 옮기기'(lt41-move 메시지).
 const shellCleanup=createCleanup({
   $,
@@ -329,7 +338,8 @@ function treeDirty(){return shellPanels.treeDirty();}
 function canLeave(){return !(formDirty()||treeDirty()||member?.snapshot().dirty)||confirm('아직 저장되지 않은 입력이 있어요. 현재 기록을 백업한 뒤 이동하는 것을 권합니다. 저장하지 않고 이동할까요?');}
 function leaveMember(){if(!canLeave())return false;member?.dispose();member=null;return true;}
 function memberStatus(status){
- const failed=status.dirty&&['offline','rejected','conflict','login'].includes(status.phase);
+  shellIntake.flush();
+  const failed=status.dirty&&['offline','rejected','conflict','login'].includes(status.phase);
  $('save-feedback').hidden=!failed;
  $('save-message').textContent=failed?
   (status.phase==='login'
