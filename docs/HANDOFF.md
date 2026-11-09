@@ -2,6 +2,15 @@
 
 > **main 보호 규칙(2026-11-09, 룰셋 "main 보호 (PR·필수 검사)")**: main은 PR로만 바꾼다(직접 푸시·force push·삭제 금지, 관리자도 예외 없음 — 비상시 대표가 룰셋 enforcement를 잠깐 끈다). 필수 검사: `check (ubuntu-latest)`·`check (windows-latest)`·`미리보기 postdeploy(로그아웃)` — 셋 다 paths 필터가 없어 문서만 바뀐 PR에서도 항상 돈다. 승인 수 0(레인이 스스로 머지). Deploy Bundle Boot Test는 paths 필터가 있어 필수에 넣지 않았다.
 
+## 2026-11-09 — 접근성 자동 점검: serious·critical 155 → 16, 남은 16은 디자인 색(#319) (로컬3, ai/local3-a11y-*)
+
+- 도구: `axe-core` devDependency + `tools/a11y/a11y-run.mjs` + `npm run a11y`([PR #313](https://github.com/skerishKang/lovetree-4.0/pull/313)). 화면(셸+iframe 안쪽)·셸 대화상자·로그인 스킨 원본을 훑고 `serious`·`critical`만 `a11y.json`에 남긴다.
+- 범위: 1440·390 × 밤·정원 × 로그아웃·로그인(계정 01, 트리 3권·사진 표지) × 화면 6개 + 계정 메뉴·책 정보 관리(표지 고르기)·순간 남기기. 오늘 들어간 책등 목차·이어 읽기 칸·표지 고르기 창 포함.
+- 고침: 셸 브랜드·`#record-menu` 이름, 계정 메뉴 테마 `menuitemcheckbox`([#317](https://github.com/skerishKang/lovetree-4.0/pull/317)), 첫 화면 카드 이름([#318](https://github.com/skerishKang/lovetree-4.0/pull/318)). 각 PR `npm test` 708 pass·build pass·겉모습 24장 0.000%.
+- 남음: 정원 테마 색 대비 3곳(전 155 중 16) → [#319](https://github.com/skerishKang/lovetree-4.0/issues/319) 후보 색·대비값. 지시대로 코드로 고치지 않았다.
+- 표·방법·재측정 명령: `docs/A11Y_AUDIT_20261109.md`. 첫 여정은 로그인 상태에서만 열려 로그아웃 표에는 없다.
+- 계정 01 정리: 트리 0개·보관 파일 0개.
+
 ## 2026-11-09 — 책 정보 관리: 다른 책에서 고른 디자인 표지가 남던 문제(#314, 로컬2, ai/local2-lt-cover-stale-261109)
 
 책 A에서 고른 디자인 표지가, 디자인이 없는 책 B의 책 정보 창에 그대로 남아 그대로 저장되던 문제. 원인은 `openTreeManager`의 `RadioNodeList.value = tree.coverDesign || ''` — **Chromium 1254 실측**으로 빈 문자열·없는 값 대입은 아무것도 바꾸지 않고(있는 비어 있지 않은 값만 그 라디오를 체크), 이전 체크가 남는다.
