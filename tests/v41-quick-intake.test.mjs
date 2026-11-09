@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-// 빠른 담기 입구의 순수 계산: 파라미터 소비·분류·중복 판정·세션 보관 (docs/TESTING.md).
+// 빠른 담기 입구의 순수 계산: 파라미터 소비·추출·분류·중복 판정·세션 보관 (docs/TESTING.md).
 // DOM 배선은 tests/v41-quick-intake-flow.test.mjs가 가짜 객체로 직접 부른다.
 import {
-  INTAKE_PARAM, INTAKE_DUP_TEXT,
-  readIntakeParam, classifyIntake, canonicalUrl, isInboxDuplicate, createPendingSlot,
+  INTAKE_URL_PARAM, INTAKE_TEXT_PARAM, INTAKE_TITLE_PARAM, INTAKE_MAX_URL_LENGTH, INTAKE_DUP_TEXT,
+  readIntakeParams, classifyIntake, firstHttpUrl, resolveIntakeCandidate, canonicalUrl, isInboxDuplicate, createPendingSlot,
 } from '../public/v41/quick-intake.mjs';
 
 // LTMedia.describe와 같은 모양의 최소 판정(화면이 실제로 쓰는 전역과 같은 계약).
@@ -17,22 +17,49 @@ const describeLike = (url) => {
   return { kind: 'link', original: value, label: parsed.hostname.replace(/^www\./, ''), openUrl: parsed.href };
 };
 
-test('readIntakeParam: 없으면 없고, 있으면 읽고 지운다(다른 파라미터는 남긴다)', () => {
-  assert.deepEqual(readIntakeParam(''), { found: false, url: '', rest: '' });
-  assert.deepEqual(readIntakeParam('?intent=new-tree'), { found: false, url: '', rest: 'intent=new-tree' });
-  const row = [
-    '?quickadd=https%3A%2F%2Fexample.com%2Fa',
-    '?a=1&quickadd=https%3A%2F%2Fexample.com%2Fb&b=2',
-    '?quickadd=%20%20https%3A%2F%2Fexample.com%2Fc%20%20',
-    '?quickadd=',
+test('readIntakeParams: 없으면 없고, 있으면 세 값을 읽고 모두 지운다(다른 파라미터는 남긴다)', () => {
+  assert.deepEqual(readIntakeParams(''), { found: false, url: '', text: '', title: '', rest: '' });
+  assert.deepEqual(readIntakeParams('?intent=new-tree'), { found: false, url: '', text: '', title: '', rest: 'intent=new-tree' });
+  const rows = [
+    [`?${INTAKE_URL_PARAM}=https%3A%2F%2Fexample.com%2Fa`, { url: 'https://example.com/a', text: '', title: '', rest: '' }],
+    [`?${INTAKE_TEXT_PARAM}=제목+https%3A%2F%2Fexample.com%2Fb`, { url: '', text: '제목 https://example.com/b', title: '', rest: '' }],
+    [`?${INTAKE_TITLE_PARAM}=https%3A%2F%2Fexample.com%2Fc`, { url: '', text: '', title: 'https://example.com/c', rest: '' }],
+    [`?a=1&${INTAKE_URL_PARAM}=https%3A%2F%2Fexample.com%2Fd&${INTAKE_TEXT_PARAM}=t&${INTAKE_TITLE_PARAM}=i&b=2`, { url: 'https://example.com/d', text: 't', title: 'i', rest: 'a=1&b=2' }],
+    [`?${INTAKE_URL_PARAM}=%20%20https%3A%2F%2Fexample.com%2Fe%20%20&${INTAKE_URL_PARAM}=ignored`, { url: 'https://example.com/e', text: '', title: '', rest: '' }],
   ];
-  assert.deepEqual(readIntakeParam(row[0]), { found: true, url: 'https://example.com/a', rest: '' });
-  assert.deepEqual(readIntakeParam(row[1]), { found: true, url: 'https://example.com/b', rest: 'a=1&b=2' });
-  assert.deepEqual(readIntakeParam(row[2]), { found: true, url: 'https://example.com/c', rest: '' });
-  assert.equal(readIntakeParam(row[3]).found, true, '빈 값도 소비 대상이다(호출자가 버리고 지운다)');
+  for (const [search, shape] of rows) {
+    const got = readIntakeParams(search);
+    assert.equal(got.found, true, search);
+    assert.equal(got.url, shape.url, search);
+    assert.equal(got.text, shape.text, search);
+    assert.equal(got.title, shape.title, search);
+    assert.equal(got.rest, shape.rest, search);
+  }
+  const empty = readIntakeParams(`?${INTAKE_URL_PARAM}=`);
+  assert.equal(empty.found, true, '빈 값도 소비 대상이다(호출자가 버리고 지운다)');
+  assert.equal(empty.url, '');
 });
 
-test('classifyIntake: 기존 판정 그대로 — 빈 값/주소/그 외를 구분한다', () => {
+test('firstHttpUrl / resolveIntakeCandidate: url → text → title 순, 첫 주소만, 문구·문장부호 제거', () => {
+  assert.equal(resolveIntakeCandidate({ url: '  https://a.test/x  ', text: 'https://b.test/y', title: 'https://c.test/z' }), 'https://a.test/x');
+  assert.equal(resolveIntakeCandidate({ url: '', text: '제목 https://b.test/y', title: 'https://c.test/z' }), 'https://b.test/y');
+  assert.equal(resolveIntakeCandidate({ url: '', text: '', title: 'https://c.test/z.' }), 'https://c.test/z', '꼬리 문장부호 제거');
+  assert.equal(resolveIntakeCandidate({ url: '', text: '… https://b.test/y!', title: '' }), 'https://b.test/y');
+  assert.equal(resolveIntakeCandidate({ url: ' 첫째 https://a.test/1 둘째 https://a.test/2', text: '', title: '' }), 'https://a.test/1', '첫 주소만');
+  assert.equal(resolveIntakeCandidate({ url: '', text: 'ftp://a.test/f', title: '' }), '', 'http(s) 아님');
+  assert.equal(resolveIntakeCandidate({ url: '그냥-글자', text: '', title: '' }), '');
+  assert.equal(resolveIntakeCandidate({}), '');
+  assert.equal(resolveIntakeCandidate(), '');
+
+  const long = `https://a.test/${'a'.repeat(INTAKE_MAX_URL_LENGTH)}`;
+  assert.equal(resolveIntakeCandidate({ url: long, text: 'https://b.test/ok', title: '' }), 'https://b.test/ok', '상한 초과 url은 건너뛰고 text를 쓴다');
+  assert.equal(resolveIntakeCandidate({ url: long, text: '', title: '' }), '');
+  const ok = `https://a.test/${'a'.repeat(INTAKE_MAX_URL_LENGTH - 'https://a.test/'.length)}`;
+  assert.equal(ok.length, INTAKE_MAX_URL_LENGTH);
+  assert.equal(resolveIntakeCandidate({ url: ok, text: '', title: '' }), ok, '상한 길이는 받는다');
+});
+
+test('classifyIntake: 빈 값·주소·그 외를 구분한다', () => {
   assert.equal(classifyIntake('', describeLike).status, 'empty');
   assert.equal(classifyIntake('   ', describeLike).status, 'empty');
   assert.equal(classifyIntake('https://example.com/어떤-글', describeLike).status, 'ok');
@@ -92,5 +119,7 @@ test('createPendingSlot: 한 번 보관·덮어쓰기·지우기, 저장소를 �
   assert.equal(noop.read(), null);
   assert.equal(typeof INTAKE_DUP_TEXT, 'string');
   assert.ok(INTAKE_DUP_TEXT.length > 0);
-  assert.equal(INTAKE_PARAM, 'quickadd');
+  assert.equal(INTAKE_URL_PARAM, 'quickadd');
+  assert.equal(INTAKE_TEXT_PARAM, 'qtext');
+  assert.equal(INTAKE_TITLE_PARAM, 'qtitle');
 });
