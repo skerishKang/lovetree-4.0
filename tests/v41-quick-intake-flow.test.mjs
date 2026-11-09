@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 // 빠른 담기 입구의 셸 배선: 가짜 문서·멤버로 함수를 직접 부른다(docs/TESTING.md).
 // 실제 붙여넣기·공유 시트 노출은 실기기 확인(docs/DEVICE_CHECKLIST.md) 대상이라 여기선 분기·호출만 본다.
 import { createQuickIntake } from '../public/v41/shell/quick-intake.mjs';
+import { INTAKE_TEXT_PARAM, INTAKE_TITLE_PARAM } from '../public/v41/quick-intake.mjs';
 
 function fakeDocument() {
   const listeners = {};
@@ -112,7 +113,7 @@ test('붙여넣기: 내용 편집 칸(contentEditable·하위 트리)도 입력 
 
 test('공유 시트 진입: 부팅에 파라미터를 소비하고 로그인 필요면 보관한다', () => {
   const member = memberFixture({ owned: false, writable: false });
-  const browser = fakeBrowser({ search: '?quickadd=https%3A%2F%2Fb.test%2F1&x=2' });
+  const browser = fakeBrowser({ search: `?quickadd=https%3A%2F%2Fb.test%2F1&${INTAKE_TEXT_PARAM}=제목+https%3A%2F%2Fb.test%2F2&${INTAKE_TITLE_PARAM}=t&x=2` });
   const { intake, logins, replaced } = setup({ member, browser, source: 'example' });
   assert.deepEqual(replaced, ['/v41/?x=2']);
   assert.deepEqual(intake.pending(), { url: 'https://b.test/1' });
@@ -122,14 +123,35 @@ test('공유 시트 진입: 부팅에 파라미터를 소비하고 로그인 필
   assert.equal(intake.pending()?.url, 'https://b.test/1', '자리는 비우지 않는다(세션 수명에 맡긴다)');
 });
 
-test('공유 시트 진입: 로그인·쓰기가 되면 이어서 담는다', () => {
+test('공유 시트 진입: text만 온 주소도 담는다(앱이 문구에 주소를 싣는 모양)', () => {
   const member = memberFixture();
-  const browser = fakeBrowser({ search: '?quickadd=https%3A%2F%2Fb.test%2F1' });
+  const browser = fakeBrowser({ search: `?${INTAKE_TEXT_PARAM}=제목+https%3A%2F%2Fb.test%2F2&${INTAKE_TITLE_PARAM}=내 영상` });
   const { intake, notifies } = setup({ member, browser });
   intake.flush();
-  assert.deepEqual(member.calls.applied, [['quickAdd', { url: 'https://b.test/1' }]]);
+  assert.deepEqual(member.calls.applied, [['quickAdd', { url: 'https://b.test/2' }]]);
   assert.deepEqual(notifies, ['모아둔 순간에 담았어요']);
   assert.equal(intake.pending(), null);
+});
+
+test('공유 시트 진입: url → text → title 순, 여러 주소면 첫 주소', () => {
+  const member = memberFixture();
+  const browser = fakeBrowser({ search: `?${INTAKE_TEXT_PARAM}=제목+https%3A%2F%2Fb.test%2F2&${INTAKE_TITLE_PARAM}=https%3A%2F%2Fc.test%2F1+https%3A%2F%2Fc.test%2F2` });
+  const { intake } = setup({ member, browser });
+  intake.flush();
+  assert.deepEqual(member.calls.applied, [['quickAdd', { url: 'https://b.test/2' }]]);
+  const second = fakeBrowser({ search: `?${INTAKE_TITLE_PARAM}=https%3A%2F%2Fc.test%2F1+https%3A%2F%2Fc.test%2F2` });
+  const secondMember = memberFixture();
+  const secondRun = setup({ member: secondMember, browser: second });
+  secondRun.intake.flush();
+  assert.deepEqual(secondMember.calls.applied, [['quickAdd', { url: 'https://c.test/1' }]]);
+});
+
+test('공유 시트 진입: 주소가 아닌 문구는 안내하고 지운다', () => {
+  const member = memberFixture();
+  const { intake, notifies, replaced } = setup({ member, browser: fakeBrowser({ search: `?${INTAKE_TEXT_PARAM}=주소+없음&${INTAKE_TITLE_PARAM}=제목` }) });
+  assert.deepEqual(replaced, ['/v41/']);
+  assert.deepEqual(notifies, ['링크 형식을 확인해 주세요.']);
+  assert.equal(intake.pending(), null, '주소가 아닌 값은 보관하지 않는다');
 });
 
 test('공유 시트 진입: 이미 담아둔 주소면 막고, 새로고침 중복도 같은 규칙이다', () => {

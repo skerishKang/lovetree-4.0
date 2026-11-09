@@ -12,6 +12,10 @@
   "share_target": {
     "action": "./",
     "method": "GET",
-    "params": { "url": "quickadd" }
+    "params": {
+      "title": "qtitle",
+      "text": "qtext",
+      "url": "quickadd"
+    }
   }
 }

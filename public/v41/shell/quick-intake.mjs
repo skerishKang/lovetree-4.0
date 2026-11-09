@@ -5,7 +5,7 @@ import {
   QUICK_INVALID_ERROR, QUICK_SAVED_TEXT, DROP_LOGIN_NOTICE, DROP_READONLY_NOTICE, extractDropUrl, parseQuickUrl,
 } from '../quick-add.mjs';
 import {
-  INTAKE_DUP_TEXT, classifyIntake, isInboxDuplicate, readIntakeParam, createPendingSlot,
+  INTAKE_DUP_TEXT, classifyIntake, isInboxDuplicate, createPendingSlot, readIntakeParams, resolveIntakeCandidate,
 } from '../quick-intake.mjs';
 
 export function createQuickIntake(deps) {
@@ -64,13 +64,17 @@ export function createQuickIntake(deps) {
   function boot() {
     if (!loc) return;
     let found = null;
-    try { found = readIntakeParam(loc.search); } catch { found = null; }
+    try { found = readIntakeParams(loc.search); } catch { found = null; }
     if (!found?.found) return;
-    stripParam(found);                 // 한 번만 통하는 값 — 먼저 지운다
-    if (!found.url) return;
-    const cls = classifyIntake(found.url, describe);
+    stripParam(found);                              // 한 번만 통하는 값 — 먼저 지운다
+    const candidate = resolveIntakeCandidate(found);
+    if (!candidate) {                               // 세 값이 다 비었으면 소비만, 나머지는 안 쓸 주소다
+      if ([found.url, found.text, found.title].some((value) => value !== '')) notify(QUICK_INVALID_ERROR);
+      return;
+    }
+    const cls = classifyIntake(candidate, describe);
     if (cls.status === 'ok') slot.write(cls.url);
-    else if (cls.status === 'invalid') notify(QUICK_INVALID_ERROR);
+    else notify(QUICK_INVALID_ERROR);
   }
 
   function onPaste(event) {
