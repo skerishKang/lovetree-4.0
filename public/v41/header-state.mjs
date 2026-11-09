@@ -4,6 +4,15 @@
 
 const clean = value => (typeof value === 'string' ? value.trim() : '');
 
+// '으로/로' 조사 선택. 한글은 받침, 라틴 문자는 흔한 발음(모음 끝)만 구분한다.
+// 로그인 라벨은 이메일 또는 '내 계정'이라 이 정도면 충분하다.
+function roParticle(value) {
+  const last = Array.from(clean(value)).pop() || '';
+  const code = last.codePointAt(0) || 0;
+  if (code >= 0xac00 && code <= 0xd7a3) return (code - 0xac00) % 28 === 0 ? '로' : '으로';
+  return /[aeiouyAEIOUY]$/.test(last) ? '로' : '으로';
+}
+
 // 로그인 상태의 계정 표시: 글자 알약 대신 첫 글자 동그라미.
 // 로그아웃 상태는 기존 "로그인" 알약을 그대로 쓴다(모양이 확실히 달라야 한다).
 export function accountPresentation({ owned = false, email = '', subject = '' } = {}) {
@@ -16,7 +25,7 @@ export function accountPresentation({ owned = false, email = '', subject = '' } 
     mode: 'avatar',
     label: who,
     initial,
-    ariaLabel: `내 계정 메뉴, ${who}로 로그인됨`,
+    ariaLabel: `내 계정 메뉴, ${who}${roParticle(who)} 로그인됨`,
     title: who
   };
 }

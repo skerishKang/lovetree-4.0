@@ -25,7 +25,8 @@ test('로그아웃 상태는 기존 로그인 알약, 로그인 상태는 첫 �
   assert.equal(inState.mode, 'avatar');
   assert.equal(inState.initial, 'K');
   assert.equal(inState.label, 'kimbs5993+tutorial01@gmail.com');
-  assert.equal(inState.ariaLabel, '내 계정 메뉴, kimbs5993+tutorial01@gmail.com로 로그인됨');
+  assert.equal(inState.ariaLabel, '내 계정 메뉴, kimbs5993+tutorial01@gmail.com으로 로그인됨');
+  assert.equal(accountPresentation({owned: true, email: 'fan@love.io'}).ariaLabel, '내 계정 메뉴, fan@love.io로 로그인됨');
 });
 
 test('계정 첫 글자는 이메일 앞부분의 첫 글자이고, 없으면 점으로 둔다', () => {
@@ -42,7 +43,7 @@ test('이메일이 아직 없으면 계정 subject로 첫 글자를 만들고 �
   assert.equal(view.mode, 'avatar');
   assert.equal(view.initial, 'P');
   assert.equal(view.label, '내 계정');
-  assert.equal(view.ariaLabel, '내 계정 메뉴, 내 계정로 로그인됨');
+  assert.equal(view.ariaLabel, '내 계정 메뉴, 내 계정으로 로그인됨');
 });
 
 test('트리 선택 문구는 트리가 있으면 이름, 없으면 트리 고르기', () => {

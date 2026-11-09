@@ -227,6 +227,12 @@ test('이어 읽기 칸 표(출처·저장 위치·문구)', () => {
   assert.equal(resumeCard({ source: 'example', books }).action, '');
 });
 
+test('이어 읽기 문구는 자동 제목 끝의 마침표를 덧붙이지 않는다', () => {
+  const books = buildShelf([tree({ moments: [moment('p1', { title: '아침 커피와 함께 시작한 작은 기록.' })] })], COVER_PALETTE, (v) => v);
+  const info = resumeCard({ source: 'server', treeId: 'tree1', momentId: 'p1', books });
+  assert.equal(info.title, '지난번 아침 커피와 함께 시작한 작은 기록까지 봤어요');
+});
+
 // ── #256-1 보완(CTO 검토): 칸은 책 목록이 바뀔 때 다시 그린다 ──
 // shelf.js를 가짜 DOM으로 싣어 본다. 모델 시험만으로는 "다시 그림"이 보이지 않기 때문이다.
 test('새 책을 만들면 이어 읽기 칸을 다시 그린다 · 검색으로 좁아져도 칸은 그대로', async () => {
