@@ -157,6 +157,15 @@ test('궤도: 현재 트리가 모아둔 순간이면 궤도 첫 화면에도 �
  assert.match(home,/homeInboxFlag/);
 });
 
+test('안내 바는 첫 트리 말풍선 위에 온다(말풍선이 안내를 가리지 않는다)',()=>{
+ const css=read('../public/v41/shell.css');
+ const zOf=sel=>{const m=css.match(new RegExp(sel+'\\{[^}]*?z-index:(\\d+)'));return m?Number(m[1]):null;};
+ const tips=zOf('\\.tree-tips');
+ const move=zOf('#move-feedback');
+ assert.equal(tips,25,'말풍선 z-index 기준');
+ assert.ok(move!==null&&move>tips,'안내 바(#move-feedback)가 말풍선보다 위여야 한다');
+});
+
 test('순간 상세의 옮기기: 내 기록에서만 보이고 공유·예시는 숨긴다',()=>{
  const book=read('../public/v41/views/book/book-extra.js');
  assert.match(book,/data-detail-move/);
