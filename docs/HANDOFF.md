@@ -13,6 +13,17 @@
 - 미리보기 검사 로그의 대기 흔적: "Functions 준비 확인: 1번째 시도(74ms 경과)에서 응답 503".
 - 통합: squash 머지 `3d50c09` (#338).
 
+## 2026-11-10 — 빠른 담기 입구: 셸 붙여넣기 + 휴대폰 공유 시트(매니페스트·판정 모듈) (로컬1, PR #342 머지 `4c74868`)
+
+- 배경(대표 방향 2026-11-09 "일단 막 담고 나중에 정리"): 빠른 추가(#329)는 주소·끌어다 놓기(데스크톱)뿐, 휴대폰엔 끌어다 놓기 대응이 없었다. `member.apply('quickAdd', {url})` 재사용.
+- 조사(A): 저장소에 manifest·service worker·`share_target`·`rel=manifest`·`navigator.share`·붙여넣기 처리 **없음**(rg 전수). Web Share Target = **설치된 PWA**를 OS 공유 시트 대상에 등록(manifest `share_target`). 브라우저 매트릭스(MDN/BCD, 2026-10 확인): **Chrome Android 76+ · Chrome/Edge 데스크톱 89+ · Samsung 12+**; **Safari(iOS/macOS)·Firefox·Android WebView 미지원**("Limited availability", WebKit 미구현) → iPhone 공유 시트 연동은 원리적으로 불가, 기기 체크리스트에 한계·대안 기록.
+- 구현: `public/v41/quick-intake.mjs`(순수: 파라미터 소비·분류·주소 정규화·inbox 중복 판정·탭 단위 세션 보관) + `public/v41/shell/quick-intake.mjs`(`createQuickIntake`: 붙여넣기 리스너·부팅 소비·로그인 라운드트립 flush). 공유 타깃은 **method `GET`/action `./`/params {url:"quickadd"}** → 서비스 워커 불요 → **캐시 수명·옛 화면 표면 없음**. 로그아웃 공유 진입 = sessionStorage 단기 보관(소비 즉시 삭제, 로그·리포트 미기록) 후 기존 로그인 흐름 재사용; 신규 intent·공통 인증·서버 변경 없음. 이미 담아둔 주소·읽기 전용 소스·비주소 텍스트는 미수용/안내.
+- 시험: 18건 직접 호출 + 강도 증명(게이트·중복 판정 파괴 → 실패 확인 → 원복). `npm test` 851건 814 pass/0 fail/37 skip, `npm run build` pass, 검사 전부 초록(PR #342, 자동 배포된 미리보기 포함).
+- 아이콘: 기존 `public/favicon.svg` 마크 래스터화(192/512) — 새 그림 없음.
+- 브라우저 실측(계정 02·페이지스.dev, 이번 세션 범위): 로그아웃 상태에서 ① 공유 진입 — 파라미터 1회 소비·주소 정리 확인 ② 붙여넣기 — 기본 동작 차단 + "로그인한 뒤 순간을 담을 수 있어요." 표시, 1440·390 스크린샷(`.tmp-261109/shots-342/`). **로그인 후 담기·inbox 중복 차단은 자격값 취급 없이 라이브 자동화 불가 → 시험(상태 전이) + 기기 체크리스트로 이관**(다음 실측 후보). 아이콘/공유표시는 디바이스 확인.
+- 미검증/잔여: 실제 휴대폰 공유 시트 노출(iOS는 구조적 불가), 설치 전이 공유 시트 미노출, 매니페스트 반영 주기 — `docs/DEVICE_CHECKLIST.md` 5번에 항목 추가.
+(#327, 로컬2, ai/local2-lt-quick-add-261109, PR #329 머지 `8040276` + 정원 대비 후속 PR #332 머지 `fc14d00`)
+
 ## 2026-11-09 — 빠른 추가 ②: '순간 남기기'에서 고르고, 주소 하나로 모아둔 순간에 담는다(#327, 로컬2, ai/local2-lt-quick-add-261109, PR #329 머지 `8040276` + 정원 대비 후속 PR #332 머지 `fc14d00`)
 
 로컬1의 데이터 규칙(#328, `quickAdd`·`inbox`·`INBOX_SUBJECT`) 위에 화면을 얹었다. 이전 세션이 사용량 한도로 멈춘 지점(마크업·모듈·연결까지)에서 이어받아 시험·검증·PR까지 마쳤다.
