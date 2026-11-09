@@ -226,3 +226,51 @@ test('이어 읽기 칸 표(출처·저장 위치·문구)', () => {
   // 예시 칸은 이어 보기 문구를 쓰지 않는다
   assert.equal(resumeCard({ source: 'example', books }).action, '');
 });
+
+// ── #256-1 보완(CTO 검토): 칸은 책 목록이 바뀔 때 다시 그린다 ──
+// shelf.js를 가짜 DOM으로 싣어 본다. 모델 시험만으로는 "다시 그림"이 보이지 않기 때문이다.
+test('새 책을 만들면 이어 읽기 칸을 다시 그린다 · 검색으로 좁아져도 칸은 그대로', async () => {
+  const els = new Map();
+  const el = (selector) => {
+    if (!els.has(selector)) els.set(selector, fakeEl({
+      style: { setProperty(name, value) { this.props = { ...(this.props || {}), [name]: value }; }, props: {} },
+      innerHTML: '',
+      value: '',
+      scrollTo() {},
+      getBoundingClientRect: () => ({ left: 0, top: 0, width: 0, height: 0 }),
+      reset() {},
+      children: [],
+      scrollLeft: 0, clientWidth: 100, scrollWidth: 100
+    }));
+    return els.get(selector);
+  };
+  const library = { list: [] };
+  globalThis.window = globalThis;
+  globalThis.document = {
+    querySelector: (selector) => el(selector),
+    querySelectorAll: () => [],
+    addEventListener() {},
+    body: fakeEl()
+  };
+  globalThis.parent = { LT41: { source: 'server', tree: { id: 'tree1', title: '트리' }, momentId: 'm1' }, postMessage() {} };
+  globalThis.LTDEMO = { library: library.list, moments: [], get: () => globalThis.parent.LT41.momentId, select() {}, openBook() {} };
+  globalThis.CSS = { escape: (value) => String(value).replace(/"/g, '\\"') };
+  await import('../public/v41/views/shelf/shelf.js');
+  const title = () => el('#resumeTitle').textContent;
+  // 처음: 책이 없으면 "첫 책을 펼쳐 보세요"
+  assert.equal(el('#resumeCard').dataset.resumeKind, 'first');
+  assert.equal(title(), '첫 책을 펼쳐 보세요');
+  // 새 책 만들기 폼을 제출하면 칸이 다시 그려진다("첫 책을..."이 남지 않는다)
+  el('#newBookName').value = '가을 산책';
+  el('#newBookUrl').value = 'https://example.com/a';
+  el('#newBookForm').dispatch('submit', { preventDefault() {} });
+  assert.equal(el('#resumeCard').dataset.resumeKind, 'resume', '새 책 뒤에는 칸이 resume으로 바뀐다');
+  assert.match(title(), /^지난번 /);
+  assert.notEqual(title(), '첫 책을 펼쳐 보세요');
+  // 검색으로 레일이 좁아져도(0권) 칸은 전체 책 기준이라 그대로다
+  el('#searchInput').value = '찾을 수 없는 책 이름';
+  el('#searchInput').dispatch('input', { target: el('#searchInput') });
+  assert.equal(el('#resultCount').textContent, '0권');
+  assert.equal(el('#resumeCard').dataset.resumeKind, 'resume', '검색으로 좁아져도 칸은 바뀌지 않는다');
+  assert.match(title(), /^지난번 /);
+});
