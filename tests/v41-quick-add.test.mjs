@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 // #327 ② 빠른 추가: 판정·추출·문구·분기는 함수 직접 호출로 본다(docs/TESTING.md).
 // DOM 연결은 tests/v41-quick-add-flow.test.mjs가 fake DOM으로 확인한다.
+import { readFileSync } from 'node:fs';
 import {
   extractDropUrl, hasDropPayload, firstImageFile, parseQuickUrl, dropRoute,
   QUICK_INBOX_LABEL, QUICK_SAVED_TEXT, QUICK_REFINE_LABEL, DROP_VEIL_TEXT,
@@ -109,4 +110,11 @@ test('안내 문구는 계약 그대로다(로컬1 INBOX_SUBJECT와 같은 어�
   assert.equal(QUICK_INVALID_ERROR, '링크 형식을 확인해 주세요.');
   assert.equal(DROP_LOGIN_NOTICE, '로그인한 뒤 순간을 담을 수 있어요.');
   assert.equal(DROP_READONLY_NOTICE, '서버 편집 연결이 아직 준비되지 않았어요. 기록은 안전하게 읽을 수 있습니다.');
+});
+
+// CSS 값 검사(마크업·CSS 값은 글자로 고정한다): 정원의 고르기 창 1차 버튼 보조 글자는
+// opacity 0.75로 두면 #98505e 위 3.97:1로 모자라다(axe 운영 실측 2026-11-09). 새 hex 없이 토큰만.
+test('고르기 창 스타일: 정원 1차 버튼의 보조 글자는 옅게 하지 않는다', () => {
+  const css = readFileSync(new URL('../public/v41/shell.css', import.meta.url), 'utf8');
+  assert.match(css, /html\[data-lt-theme=garden\] \.write-choice button\.primary span\{opacity:1\}/);
 });
