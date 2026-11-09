@@ -323,3 +323,6 @@ body.typo-b .why-margin,body.typo-b .detail-why{letter-spacing:-.02em}
 .ui-btn,.detail,.archive-panel,.viewer,.branch-modal,.overview{transition-duration:.01ms!important}
 }
 .example-video-label{position:absolute;bottom:10px;left:10px;padding:5px 8px;border-radius:8px;background:rgba(24,18,25,.8);color:#fff;font:11px sans-serif}
+
+/* 이슈 327 2부: 순간 상세의 '다른 트리로 옮기기'(셸 정리 창을 연다). */
+.detail-actions .ui-btn[data-detail-move]{border-color:rgba(255,230,166,.45);color:inherit}

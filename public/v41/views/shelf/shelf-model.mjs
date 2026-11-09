@@ -40,6 +40,8 @@ export function shelfBook(tree, index, palette, namer) {
     name: treeTitleOf(tree.title, namer),
     subject: tree.subject || '',
     category: 'all',
+    // #327 2부: 모아둔 순간 트리는 책장 카드에 표시를 붙이고 맨 앞에 고정한다(shelfOrder).
+    inbox: tree.inbox === true,
     color: choice.color,
     accent: choice.accent,
     symbol: '✦',

@@ -10,6 +10,8 @@ import {applyHomeCenter} from './home-center.js';
 import {readTheme,writeTheme,appliedTheme,applyThemeAttribute} from '../public/v41/header-state.mjs';
 const shellBody=parent.document.body;
 const context=parent.LT41||{source:shellBody.dataset.recordSource,member:shellBody.dataset.member,treeCount:Number(shellBody.dataset.treeCount||0)};
+// 이슈 327 2부: 현재 트리가 '모아둔 순간'(inbox)이면 궤도 첫 화면에도 표시한다.
+try{const inboxFlag=document.getElementById('homeInboxFlag');if(inboxFlag)inboxFlag.hidden=!(context.tree&&context.tree.inbox===true);}catch(e){}
 const bridge=createHomeActions({getContext:()=>parent.LT41,send:message=>parent.postMessage(message,location.origin),gallery:true});
 const presentation=homePresentation(context);
 const loggedIn=presentation.centerState.member==='in';

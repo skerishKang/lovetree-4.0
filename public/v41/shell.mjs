@@ -19,6 +19,8 @@ import {createPanels} from './shell/panels.mjs';
 import {createQuickAdd} from './shell/quick-add.mjs';
 import {createJourney} from './shell/journey.mjs';
 import {createMessages} from './shell/messages.mjs';
+import {createCleanup} from './shell/cleanup.mjs';
+import {headerBadge, pickerLabel, isInboxTree} from './inbox-model.mjs';
 import {createDialogs} from './shell/dialogs.mjs';
 import {createLocation} from './shell/location.mjs';
 import {paintLoginLinks,paintThemeControls,applyTheme as applyThemeFor,toggleTheme as toggleThemeFor} from './shell/theme.mjs';
@@ -97,6 +99,17 @@ const shellQuick=createQuickAdd({
   mountUpload:mountPrivateUpload
 });
 $('write-menu').onclick=()=>shellQuick.openWriteChooser();
+// #327 2부: 모아둔 순간 정리 창. 진입은 헤더 '정리하기'(inbox 트리)와 순간 상세 '다른 트리로 옮기기'(lt41-move 메시지).
+const shellCleanup=createCleanup({
+  $,
+  getMember:()=>member,
+  getSource:()=>source,
+  getTrees:()=>model?.trees||[],
+  choose:(id,momentId)=>choose(id,momentId),
+  notify:text=>notify(text),
+  panel:id=>panel(id)
+});
+$('cleanup-menu').onclick=()=>shellCleanup.open({});
 function updateMediaPreview(){return shellPanels.updateMediaPreview();}
 function updateQuickEntryHint(){return shellPanels.updateQuickEntryHint();}
 // 첫 여정 연결은 shell/journey.mjs, 공유·둘러보기·lt41-* 수신은 shell/messages.mjs가 맡는다(#231 1-B③-3).
@@ -133,6 +146,7 @@ const shellMessages=createMessages({
   openEditor:(mode,parentId)=>openEditor(mode,parentId),
   openLoginStart:intent=>openLoginStart(intent),
   openAccountMenu:()=>openAccountMenu(),
+  openCleanup:options=>shellCleanup.open(options),
   sample:(selection,view)=>sample(selection,view),
   applyTheme:(theme)=>applyTheme(theme),
   paintThemeControls:()=>paintThemeControls(),
@@ -226,7 +240,7 @@ function showInFrame(url,title){return shellScreens.showInFrame(url,title);}
 function show(file,write=true){return shellScreens.show(file,write);}
 function frameLoaded(frame){return shellScreens.frameLoaded(frame);}
 
-function viewContext(){const c=window.LT41;$('view-context').hidden=!c||current==='src064-orbit.html';if(!c)return;$('context-tree').textContent=displayTreeTitle(c.tree.title);$('context-kind').textContent=source==='example'?'예시':source==='file'?'파일':source==='share'?'공유 감상':'';$('context-kind').hidden=source==='server';$('manage-tree').hidden=source!=='server'||!member?.snapshot().owned||!member.snapshot().writable;}
+function viewContext(){const c=window.LT41;const badge=c?headerBadge(c.tree):'';$('view-context').hidden=!c||current==='src064-orbit.html';if(!c)return;$('context-tree').textContent=displayTreeTitle(c.tree.title);$('context-kind').textContent=source==='server'?badge:source==='share'?'공유 감상':source==='example'?'예시':'파일';$('context-kind').hidden=source==='server'&&!badge;$('manage-tree').hidden=source!=='server'||!member?.snapshot().owned||!member.snapshot().writable;$('cleanup-menu').hidden=!(source==='server'&&member?.snapshot().owned&&member.snapshot().writable&&isInboxTree(c.tree));}
 // 연결 보기는 헤더에서 뺐다(2026-11-07). 관계 지도 화면의 도구 줄(전체 보기·사용법과 같은 자리·모양)에
 // 같은 다이얼로그를 여는 버튼을 붙인다. 원본 화면 파일은 건드리지 않는다.
 function mountConnectionTool(doc){
@@ -301,7 +315,7 @@ function load(input,kind,selection={},fallback={}){
     ?'소유자가 명시적으로 공개한 트리 · 감상 전용'
     :'선택한 파일을 메모리에서 읽는 중입니다.';
  $('trees').replaceChildren();
- for(const t of model.trees){const o=document.createElement('option');o.value=t.id;o.textContent=displayTreeTitle(t.title);$('trees').append(o);}
+ for(const t of model.trees){const o=document.createElement('option');o.value=t.id;o.textContent=pickerLabel(t);$('trees').append(o);}
  $('trees').disabled=!model.trees.length;
  const resolved=resolveAccountPosition(model.trees,selection,fallback),chosen=model.trees.find(t=>t.id===resolved.position.treeId);
  $('trees').value=chosen?.id||'';
