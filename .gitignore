@@ -16,6 +16,7 @@ __pycache__/
 
 # lovetree-postdeploy local state and output (never commit)
 tools/postdeploy/.profile/
+tools/postdeploy/.profile-03/
 tools/postdeploy/out/
 tools/postdeploy/package-lock.json
 
