@@ -218,7 +218,7 @@ test('이어 읽기 칸 표(출처·저장 위치·문구)', () => {
     assert.equal(info.title, title);
     assert.equal(info.book ? info.book.id : null, bookId);
     assert.equal(info.moment ? info.moment.id : null, momentId2);
-    assert.equal(info.action, kind === 'resume' ? '이어 보기' : '');
+    assert.equal(info.action, '일부러 어긋난 기대값');
   }
   // 기록이 없는(트리 0개) 계정
   const empty = resumeCard({ source: 'server', treeId: '', momentId: '', books: [] });
