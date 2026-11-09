@@ -130,7 +130,8 @@ function autoLoadMedia(source, owned) {
 function mediaContext() {
   try {
     const shell = window.LT41 ? window : (window.parent && window.parent.LT41 ? window.parent : null);
-    const body = (typeof document !== 'undefined' && document.body) || (shell && shell.document && shell.document.body) || null;
+    // 기록 상태 데이터 속성은 셸 문서에 있다. 화면 문서(iframe)는 셸 것을 읽는다.
+    const body = (shell && shell.document && shell.document.body) || (typeof document !== 'undefined' && document.body) || null;
     const source = (shell && shell.LT41 && typeof shell.LT41.source === 'string' && shell.LT41.source) || (body && body.dataset.recordSource) || '';
     const owned = source === 'server' && !!(body && body.dataset.member === 'in');
     return { source, owned };
@@ -212,7 +213,7 @@ async function load(root){
  delete root.dataset.ltLoading;body.replaceChildren(element);if(cachedCaption)body.append(cachedCaption);element.src=src;
 }
 const ownedUrls=new Map();
-window.LTMedia={describe,markup,privateAssetName,autoLoadMedia};
+window.LTMedia={describe,markup,privateAssetName,autoLoadMedia,currentContext:mediaContext};
 if(typeof document!=='undefined'){
  const cleanup=()=>{for(const [node,url] of ownedUrls)if(!node.isConnected){URL.revokeObjectURL(url);ownedUrls.delete(node);}};
  new MutationObserver(cleanup).observe(document.documentElement,{childList:true,subtree:true});
