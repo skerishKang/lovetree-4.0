@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { DEFAULT_EMAILS, accountSecretKeys, defaultProfileFor, laneFor, normaliseAccount } from './accounts.mjs';
+import { DEFAULT_EMAILS, accountSecretKeys, chooseTestAccount, defaultProfileFor, laneFor, normaliseAccount } from './accounts.mjs';
 import { chromium } from 'playwright-core';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -87,12 +87,13 @@ const USAGE = `lovetree-postdeploy ${TOOL_VERSION}
   --timeout <ms>      대기 시간(기본 60000)
   --strict            경고(겹침 등)도 실패로 간주
   --cdp <endpoint>    기존 크롬의 CDP 주소에 붙기(http://127.0.0.1:9222)
-  --auto-login        --account 의 시험 계정으로 env 에서 비밀번호를 읽어 PADIEM 비밀번호 폼 자동 로그인. Google 화면이면 중단. --login 과 함께 쓸 수 없음
+  --auto-login        --account 의 시험 계정으로 env 에서 비밀번호를 읽어 PADIEM 비밀번호 폼 자동 로그인. Google 화면이면 중단. --login 과 함께 쓸 수 없음. 계정 미지정(--account·LT_ACCOUNT 둘 다 없음)이면 시작하지 않는다
   -h, --help          이 도움말
 
 로그인 세션:
   수동: node postdeploy.mjs <주소> --login   (열린 창에서 로그인 후 터미널에서 Enter)
   자동: node postdeploy.mjs <주소> --auto-login --account 02 (--secrets 기본 %USERPROFILE%\\.secrets\\.env 의 PADIEM_TUTORIAL02_EMAIL/_PASSWORD 로 로그인)
+  계정 선택: --account 인자 > LT_ACCOUNT 환경변수 > 둘 다 없으면 계정을 쓰는 실행(--auto-login·--auth-flows)은 시작 전에 멈춘다(#344, 레인별 전용 계정 #300).
   이후 실행은 같은 프로필을 재사용하므로 비밀번호 없이 읽기 검사를 돌린다.
 
 종료 코드: 실패 있으면 2, 경고만 있으면 0(--strict 시 2), 전부 통과면 0.`;
@@ -114,7 +115,7 @@ function parseArgs(argv) {
     timeout: 60000,
     strict: false,
     cdp: null,
-    account: '01',
+    account: '',
     help: false
   };
   const rest = [];
@@ -136,15 +137,21 @@ function parseArgs(argv) {
       case '--cdp': opts.cdp = argv[++i]; opts.headless = false; break;
       case '--auto-login': opts.autoLogin = true; opts.headless = false; break;
       case '--auth-flows': opts.authFlows = true; break;
-      case '--account': opts.account = normaliseAccount(argv[++i]); break;
+      case '--account': opts.account = argv[++i]; break;
       default:
         if (a.startsWith('--')) throw new Error(`알 수 없는 옵션: ${a}`);
         rest.push(a);
     }
   }
   if (rest.length) opts.target = rest[0];
-  opts.account = normaliseAccount(opts.account);
-  if (!opts.profile) opts.profile = defaultProfileFor(opts.account, HERE);
+  // #344(2026-11-10) 계정 선택 한 벌(tools/account-choice.mjs): --account 인자 > LT_ACCOUNT 환경변수 >
+  // 둘 다 없으면 계정을 쓰는 실행(--auto-login·--auth-flows)은 시작 전에 멈춘다. 기본 계정으로 조용히 넘어가지 않는다.
+  // 로그인 없는 읽기·수동 로그인 검사는 계정을 쓰지 않는다(account '') — 프로필 기본값은 지금까지와 같다.
+  const chosen = chooseTestAccount({ arg: opts.account, env: process.env.LT_ACCOUNT });
+  if (chosen) opts.account = chosen;
+  else if (opts.autoLogin || opts.authFlows) throw new Error('--auto-login·--auth-flows는 시험 계정이 필요합니다: --account 01·02·04(자기 레인 계정) 또는 LT_ACCOUNT 환경변수로 지정하세요. 기본 계정으로 조용히 진행하지 않습니다.');
+  else opts.account = '';
+  if (!opts.profile) opts.profile = opts.account ? defaultProfileFor(opts.account, HERE) : `${HERE}/.profile`;
   return opts;
 }
 

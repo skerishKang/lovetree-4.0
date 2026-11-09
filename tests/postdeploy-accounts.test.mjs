@@ -15,7 +15,8 @@ test('계정 번호는 01·02·04만 받고 1·tutorial4 표기도 같은 번호
   assert.equal(normaliseAccount('1'), '01');
   assert.equal(normaliseAccount('02'), '02');
   assert.equal(normaliseAccount('tutorial04'), '04');
-  assert.equal(normaliseAccount(undefined), '01');
+  // 2026-11-11(#344): 빈 값은 더 이상 조용한 01이 아니다 — 선택 없음은 시작 전에 멈춘다(tools/account-choice.mjs).
+  assert.throws(() => normaliseAccount(undefined), /01·02·04/);
   // 03은 2026-11-09 대표 결정으로 삭제됐다(브라우저 프로필 노출 건) — 다시 쓰지 못하게 막는다.
   for (const bad of ['03', '033', '00', 'abc', '2a']) assert.throws(() => normaliseAccount(bad), /01·02·04/);
 });

@@ -57,7 +57,8 @@ node tools/postdeploy/postdeploy.mjs https://lovetree-4-0.pages.dev/v41/ --login
 | 로컬3 | **01**(기존) | `--account 01` |
 
 ```powershell
-# 자기 계정만 사용한다(기본값은 01).
+# 자기 계정만 사용한다. 계정 선택: --account 인자 > LT_ACCOUNT 환경변수 > 둘 다 없으면
+# 계정을 쓰는 실행(--auto-login·--auth-flows)은 시작 전에 멈춘다(#344, 기본값 01로 조용히 진행하지 않는다).
 node tools/postdeploy/postdeploy.mjs https://lovetree-4-0.pages.dev/v41/ --account 02 --auto-login
 ```
 
@@ -67,7 +68,7 @@ node tools/postdeploy/postdeploy.mjs https://lovetree-4-0.pages.dev/v41/ --accou
 - 작업을 마치면 **자기 계정으로** 트리 0개·보관 파일 0개 정리까지 확인합니다.
 
 ```powershell
-node tools/postdeploy/postdeploy.mjs https://lovetree-4-0.pages.dev/v41/ --auto-login --secrets C:\Users\<user>\.secrets\.env
+node tools/postdeploy/postdeploy.mjs https://lovetree-4-0.pages.dev/v41/ --auto-login --account 02 --secrets C:\Users\<user>\.secrets\.env
 ```
 
 이후 같은 `--profile`로 `--login`/`--auto-login` 없이 읽기 검사를 반복합니다.

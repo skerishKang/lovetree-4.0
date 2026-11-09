@@ -20,11 +20,14 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const AXE_PATH = require.resolve('axe-core/axe.min.js');
 const AXE_SOURCE = readFileSync(AXE_PATH, 'utf8');
+import { chooseTestAccount } from '../account-choice.mjs';
 
 const DEFAULTS = {
   base: process.env.LT_BASE || 'https://lovetree-4-0.pages.dev/v41/',
   out: path.join(os.tmpdir(), 'lovetree-a11y'),
-  account: process.env.LT_ACCOUNT || '01',
+  // #344(2026-11-10): 조용한 기본 계정 없음. 계정 선택은 account-choice 한 벌 —
+  // --account 인자 > LT_ACCOUNT 환경변수 > 둘 다 없으면 시작 전에 멈춘다(a11y 검사는 항상 시험 계정으로 로그인한다).
+  account: '',
   secrets: process.env.LT_SECRETS || path.join(os.homedir(), '.secrets', '.env'),
   width: '',
   theme: '',
@@ -92,7 +95,7 @@ async function launch(chromium) {
   });
 }
 
-function secrets(file) {
+function secrets(file, account = '') {
   const values = {};
   try {
     for (const line of readFileSync(file, 'utf8').split(/\r?\n/)) {
@@ -100,7 +103,9 @@ function secrets(file) {
       if (match) values[match[1]] = match[2].trim();
     }
   } catch {}
-  const suffix = String(DEFAULTS.account).padStart(2, '0');
+  // 계정은 chooseTestAccount(#344)가 정규화해 준다. 비어 있으면 여기서도 멈춘다(조용한 기본 계정 없음).
+  const suffix = String(account || '').padStart(2, '0');
+  if (!/^(01|02|04)$/.test(suffix)) throw new Error('시험 계정이 정해지지 않았습니다: --account 01·02·04 또는 LT_ACCOUNT 환경변수로 지정하세요.');
   const email = values[`PADIEM_TUTORIAL${suffix}_EMAIL`] || '';
   const password = values[`PADIEM_TUTORIAL${suffix}_PASSWORD`] || '';
   if (!email || !password) throw new Error(`.secrets에 PADIEM_TUTORIAL${suffix}_EMAIL/_PASSWORD가 없습니다.`);
@@ -238,7 +243,7 @@ async function loginStorage(browser, options, base) {
       await page.goto(new URL(href, base).href, { waitUntil: 'domcontentloaded' });
       await page.waitForTimeout(2500);
       if (!page.url().startsWith('https://auth.padiem.net')) throw new Error('로그인 화면으로 가지 못했습니다: ' + page.url());
-      const creds = secrets(options.secrets);
+      const creds = secrets(options.secrets, options.account);
       await page.locator('#email').fill(creds.email);
       await page.locator('#password').fill(creds.password);
       await page.click('button.primary.submit');
@@ -367,6 +372,14 @@ function totals(rows) {
 
 async function main(argv) {
   const options = { ...DEFAULTS, ...argv };
+  // #344(2026-11-10): 계정 선택 한 벌(tools/account-choice.mjs) — --account 인자 > LT_ACCOUNT 환경변수 >
+  // 둘 다 없으면 시작 전에 멈춘다. a11y 검사는 항상 시험 계정으로 로그인해 화면을 본다(기본 계정으로 조용히 진행하지 않는다).
+  const account = chooseTestAccount({ arg: options.account, env: process.env.LT_ACCOUNT });
+  if (!account) {
+    console.error('시험 계정을 정하지 못했습니다: --account 01·02·04 또는 LT_ACCOUNT 환경변수로 지정하세요. 기본 계정으로 조용히 진행하지 않습니다.');
+    return 2;
+  }
+  options.account = account;
   const out = path.resolve(options.out);
   mkdirSync(out, { recursive: true });
   const chromium = await loadChromium();
@@ -475,7 +488,7 @@ async function main(argv) {
   const report = {
     base: options.base,
     generatedAt: new Date().toISOString(),
-    account: DEFAULTS.account,
+    account: options.account,
     total: totals(summary),
     rows: summary,
     shots
