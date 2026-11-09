@@ -182,6 +182,10 @@ export function rightPageMarkup(book, index, esc = escapeShelf) {
 export const RESUME_ACTION = '이어 보기';
 export const RESUME_COPY = { example: '예시 책 펼쳐 보기', first: '첫 책을 펼쳐 보세요' };
 
+// 자동 제목이 메모의 마침표를 그대로 물려받아 "기록.까지 봤어요"가 되던 표시를 다듬는다.
+// 저장 데이터는 바꾸지 않고 이 칸의 문구만 정리한다.
+const resumeName = (value) => String(value || '').trim().replace(/[.。!?！？]+$/u, '');
+
 // source: 'server'면 실제 기록(로그인), 그 외(예시·파일·공유)는 예시 칸으로 본다.
 export function resumeCard({ source = 'server', treeId = '', momentId = '', books = [] } = {}) {
   if (source !== 'server') {
@@ -192,5 +196,5 @@ export function resumeCard({ source = 'server', treeId = '', momentId = '', book
   const book = books.find((item) => item.id === treeId) || books[0] || null;
   if (!book) return { kind: 'first', book: null, moment: null, title: RESUME_COPY.first, action: '' };
   const moment = book.chapters.find((chapter) => chapter.id === momentId) || book.chapters[0] || null;
-  return { kind: 'resume', book, moment, title: '지난번 ' + (moment ? moment.title : book.name) + '까지 봤어요', action: RESUME_ACTION };
+  return { kind: 'resume', book, moment, title: '지난번 ' + resumeName(moment ? moment.title : book.name) + '까지 봤어요', action: RESUME_ACTION };
 }
