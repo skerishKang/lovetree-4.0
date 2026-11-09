@@ -179,3 +179,22 @@ html[data-v41-screen=book] .tools .ui-btn::after,html[data-v41-screen=board] hea
 .tree-tips button{justify-self:start;min-height:44px;padding:0 16px;border-radius:var(--lt-r-pill);border:1px solid var(--lt-gold-line);background:transparent;font-size:13px}
 .tree-tips button:hover{border-color:var(--lt-gold)}
 @media(max-width:780px){.tree-tips{top:88px;left:12px;right:12px;width:auto;padding:16px 14px 12px}.tree-tips h2{font-size:16px}}
+/* 이슈 256-3, 책 정보 관리 창의 디자인 표지 줄: 사진 표지가 우선한다는 표시 + 질감 칩 6종.
+   색은 identity.css의 --lt-cover-N(tree-design 범위에도 같은 값)과 질감 규칙 한 곳을 쓴다. 새 hex 없다. */
+#tree-photo-cover{display:flex;align-items:center;gap:10px;margin:16px 0 0;padding:10px 12px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-card);background:rgba(255,230,166,.07);font-size:13px;line-height:1.6;color:var(--lt-pearl)}
+#tree-photo-cover[hidden]{display:none}
+#tree-photo-clear{flex-shrink:0;min-height:44px;padding:8px 14px;border-radius:var(--lt-r-pill);border:1px solid rgba(255,255,255,.3);background:none}
+#tree-design{border:0;padding:0;margin:16px 0 0;display:flex;flex-wrap:wrap;gap:10px}
+#tree-design legend{font-size:13px;color:var(--lt-muted);padding:0}
+#tree-design .cover-design-option{position:relative;display:block;margin:0;cursor:pointer;text-align:center}
+#tree-design .cover-design-option input{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer}
+#tree-design .cover-design-chip{display:block;width:34px;height:50px;border-radius:3px 7px 6px 3px;background-color:var(--lt-cover-1);box-shadow:inset 8px 0 0 rgba(0,0,0,.13),0 0 0 1px rgba(255,255,255,.28)}
+#tree-design .cover-design-chip[data-design="texture-1"]{background-color:var(--lt-cover-1)}
+#tree-design .cover-design-chip[data-design="texture-2"]{background-color:var(--lt-cover-2)}
+#tree-design .cover-design-chip[data-design="texture-3"]{background-color:var(--lt-cover-3)}
+#tree-design .cover-design-chip[data-design="texture-4"]{background-color:var(--lt-cover-4)}
+#tree-design .cover-design-chip[data-design="texture-5"]{background-color:var(--lt-cover-1)}
+#tree-design .cover-design-chip[data-design="texture-6"]{background-color:var(--lt-cover-2)}
+#tree-design .cover-design-option input:checked+.cover-design-chip{box-shadow:inset 8px 0 0 rgba(0,0,0,.13),0 0 0 2px var(--lt-gold-deep)}
+#tree-design .cover-design-option input:focus-visible+.cover-design-chip{outline:2px solid var(--lt-gold);outline-offset:3px}
+#tree-design .cover-design-name{display:block;margin-top:5px;font-size:11px;color:var(--lt-muted)}

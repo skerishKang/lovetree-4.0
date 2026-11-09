@@ -273,5 +273,47 @@ html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .shelf-spine-row::-webki
 html[data-v41-screen=shelf]:not([data-lt-theme=garden]) body,html[data-v41-screen=shelf]:not([data-lt-theme=garden]) button,html[data-v41-screen=shelf]:not([data-lt-theme=garden]) input{font-family:var(--lt-ui)}
 /* #212 표지 색: 밤은 장미색이 아닌 보드·지도 구분색, 정원은 지금 크림색 책장의 표지 색을 유지한다.
    책장 스크립트는 var(--lt-cover-N)만 넘기고 실제 값은 테마 여기서 정한다. */
-html[data-v41-screen=shelf]{--lt-cover-1:var(--lt-group-6);--lt-cover-2:var(--lt-group-3);--lt-cover-3:var(--lt-group-5);--lt-cover-4:var(--lt-group-2)}
-html[data-v41-screen=shelf][data-lt-theme=garden]{--lt-cover-1:#a84f5d;--lt-cover-2:#627ba2;--lt-cover-3:#8d705e;--lt-cover-4:#6d8979}
+html[data-v41-screen=shelf],#tree-design{--lt-cover-1:var(--lt-group-6);--lt-cover-2:var(--lt-group-3);--lt-cover-3:var(--lt-group-5);--lt-cover-4:var(--lt-group-2)}
+html[data-v41-screen=shelf][data-lt-theme=garden],html[data-lt-theme=garden] #tree-design{--lt-cover-1:#a84f5d;--lt-cover-2:#627ba2;--lt-cover-3:#8d705e;--lt-cover-4:#6d8979}
+/* #256-3 디자인 표지 6종(texture-1..6): 바탕색은 테마 표지 색(--cover)을 도메인 규칙(coverDesignPaletteIndex)으로 고르고,
+   여기서는 질감만 얹는다. CSS만 쓰고 외부 이미지·새 hex 없다(밤·정원 모두에서 은은하게 보이는 중성 white/black 덧칠만).
+   사진 표지(coverMedia img)가 있으면 이 질감은 보이지 않는다(사진이 우선). 책 정보 관리 창의 미리보기 칩(#tree-design)도 같은 규칙을 쓴다. */
+html[data-v41-screen=shelf] .book-card .book-cover[data-cover-design="texture-1"],.book-cover[data-cover-design="texture-1"],.book-cover-face[data-cover-design="texture-1"],#tree-design .cover-design-chip[data-design="texture-1"]{
+  background-image:
+    repeating-linear-gradient(90deg,rgba(255,255,255,.10) 0 2px,transparent 2px 9px),
+    radial-gradient(circle at 24% 20%,rgba(255,255,255,.13),transparent 55%),
+    radial-gradient(circle at 80% 85%,rgba(0,0,0,.16),transparent 60%);
+}
+html[data-v41-screen=shelf] .book-card .book-cover[data-cover-design="texture-2"],.book-cover[data-cover-design="texture-2"],.book-cover-face[data-cover-design="texture-2"],#tree-design .cover-design-chip[data-design="texture-2"]{
+  background-image:
+    repeating-linear-gradient(0deg,rgba(255,255,255,.075) 0 1px,transparent 1px 6px),
+    repeating-linear-gradient(0deg,rgba(0,0,0,.06) 0 3px,transparent 3px 24px),
+    radial-gradient(circle at 70% 22%,rgba(255,255,255,.12),transparent 55%);
+}
+html[data-v41-screen=shelf] .book-card .book-cover[data-cover-design="texture-3"],.book-cover[data-cover-design="texture-3"],.book-cover-face[data-cover-design="texture-3"],#tree-design .cover-design-chip[data-design="texture-3"]{
+  background-image:
+    repeating-linear-gradient(0deg,rgba(255,255,255,.08) 0 1px,transparent 1px 10px),
+    repeating-linear-gradient(90deg,rgba(255,255,255,.08) 0 1px,transparent 1px 10px),
+    radial-gradient(circle at 30% 80%,rgba(0,0,0,.15),transparent 60%);
+}
+html[data-v41-screen=shelf] .book-card .book-cover[data-cover-design="texture-4"],.book-cover[data-cover-design="texture-4"],.book-cover-face[data-cover-design="texture-4"],#tree-design .cover-design-chip[data-design="texture-4"]{
+  background-image:
+    radial-gradient(rgba(255,255,255,.13) 1.1px,transparent 1.3px),
+    radial-gradient(circle at 26% 18%,rgba(255,255,255,.12),transparent 52%),
+    radial-gradient(circle at 78% 84%,rgba(0,0,0,.16),transparent 58%);
+  background-size:11px 11px,100% 100%,100% 100%;
+}
+html[data-v41-screen=shelf] .book-card .book-cover[data-cover-design="texture-5"],.book-cover[data-cover-design="texture-5"],.book-cover-face[data-cover-design="texture-5"],#tree-design .cover-design-chip[data-design="texture-5"]{
+  background-image:
+    linear-gradient(115deg,transparent 0 22%,rgba(255,255,255,.13) 34%,transparent 48%,transparent 60%,rgba(0,0,0,.10) 74%,transparent 88%),
+    radial-gradient(circle at 74% 20%,rgba(255,255,255,.14),transparent 52%);
+}
+html[data-v41-screen=shelf] .book-card .book-cover[data-cover-design="texture-6"],.book-cover[data-cover-design="texture-6"],.book-cover-face[data-cover-design="texture-6"],#tree-design .cover-design-chip[data-design="texture-6"]{
+  background-image:
+    linear-gradient(0deg,rgba(0,0,0,.20),transparent 14px),
+    linear-gradient(180deg,rgba(0,0,0,.20),transparent 14px),
+    linear-gradient(90deg,rgba(0,0,0,.20),transparent 14px),
+    linear-gradient(270deg,rgba(0,0,0,.20),transparent 14px),
+    radial-gradient(circle at 40% 40%,rgba(255,255,255,.09),transparent 46%),
+    radial-gradient(circle at 62% 66%,rgba(0,0,0,.12),transparent 50%);
+}

@@ -44,6 +44,7 @@ html[data-v41-screen=shelf] .book-card .book-cover {
     radial-gradient(circle at 26% 18%,rgba(255,255,255,.16),transparent 52%),
     radial-gradient(circle at 78% 84%,rgba(0,0,0,.18),transparent 58%);
 }
+/* #256-3 디자인 표지 질감은 identity.css 한 곳에 둔다(책장·펼친 책·책 정보 관리 창이 같은 규칙을 쓴다). */
 
 /* #256-1(2026-11-09): 오른쪽 위 작은 책장 자리를 이어 읽기 칸으로 쓴다.
    마지막 위치는 셸이 저장·복원하는 계정 위치를 읽어 쓰고, 여기서 새로 저장하지 않는다. */

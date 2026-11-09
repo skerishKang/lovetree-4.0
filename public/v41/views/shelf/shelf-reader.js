@@ -14,6 +14,8 @@ export function createReader(deps) {
         cover.style.setProperty('--cover',book.color);
         cover.style.setProperty('--cover-accent',book.accent);
         cover.style.setProperty('--tilt','0deg');
+        // #256-3: 디자인 표지는 책장과 같은 판정(shelf-model coverChoice) 결과를 쓴다. 없으면 속성을 뺀다(기존 화면 변화 0).
+        if(book.design)cover.setAttribute('data-cover-design',book.design);else cover.removeAttribute('data-cover-design');
         var coverMedia=$('#coverMedia');if(book.coverMedia){coverMedia.src=book.coverMedia;coverMedia.hidden=false;}else{coverMedia.hidden=true;coverMedia.removeAttribute('src');}
         cover.querySelector('.cover-symbol span').textContent=book.symbol;
         $('#coverTitle').textContent=book.name;
@@ -115,6 +117,7 @@ export function createReader(deps) {
         var cover=document.createElement('div');
         cover.className='book-cover';
         cover.style.setProperty('--cover',getBook(state.selectedId)?.color||'#6b5873');
+        if(selected?.design)cover.setAttribute('data-cover-design',selected.design);
         var selected=getBook(state.selectedId);cover.innerHTML=(selected?.coverMedia?'<img class="book-cover-media" src="'+esc(selected.coverMedia)+'" alt="" referrerpolicy="no-referrer">':'')+'<span class="cover-symbol"><span>'+esc(selected?.symbol||'♡')+'</span></span><strong class="cover-title">'+esc(selected?.name||'LoveTree')+'</strong>';
         source.appendChild(cover);
         document.body.appendChild(source);
