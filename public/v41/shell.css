@@ -251,7 +251,7 @@ html[data-lt-theme=garden] #quick-error{color:var(--lt-rose-ink)}
 .cleanup-moment span{min-width:0;overflow-wrap:anywhere}
 #cleanup-count{margin:10px 0 0}
 #cleanup-error{color:var(--lt-rose);font-weight:600}
-#move-feedback{flex:0 0 auto;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;padding:10px 22px;background:rgba(238,190,104,.08);border-bottom:1px solid rgba(255,230,166,.35);font-size:13px;line-height:1.7}
+#move-feedback{flex:0 0 auto;position:relative;z-index:26;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;padding:10px 22px;background:rgba(238,190,104,.08);border-bottom:1px solid rgba(255,230,166,.35);font-size:13px;line-height:1.7}
 #move-feedback[hidden]{display:none}
 #move-actions{display:flex;gap:6px;flex-wrap:wrap}
 #move-actions button{min-height:44px;background:transparent;border:1px solid rgba(255,255,255,.3);border-radius:var(--lt-r-pill);padding:7px 12px;color:var(--lt-gold)}
