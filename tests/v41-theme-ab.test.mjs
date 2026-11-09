@@ -107,7 +107,7 @@ test('정원 대상: 책장·기억책·기억 보드·관계 지도(#212, 2026-
   assert.match(themeModule, /appliedTheme\(theme, themedViewFor\(file\)\)/);
 });
 
-test('전환 버튼은 누르면 갈 곳(밤/정원)과 aria-pressed를 쓴다', () => {
+test('전환 버튼은 누르면 갈 곳(밤/정원)과 aria-checked를 쓴다', () => {
   assert.equal(themeButtonLabel('night'), '정원');
   assert.equal(themeButtonLabel('garden'), '밤');
   assert.equal(themeButtonAriaLabel('night'), '정원 테마로 바꾸기');
@@ -124,13 +124,13 @@ test('전환 버튼은 누르면 갈 곳(밤/정원)과 aria-pressed를 쓴다',
   assert.match(menuJS, /kind === 'theme'\)[^\n]*writeTheme\(storage/, '메뉴에서 고른 테마를 저장한다');
   assert.match(menuJS, /sendTheme\(theme\)/, '셸에 테마를 알리는 기존 메시지를 그대로 쓴다');
   assert.match(homeJS, /sendTheme:theme=>parent\.postMessage\(\{type:'lt41-theme',theme\}/, '첫 화면이 lt41-theme를 그대로 보낸다');
-  assert.match(html, /id="account-theme" data-lt-theme-toggle aria-pressed="false"/);
+  assert.match(html, /id="account-theme" data-lt-theme-toggle aria-checked="false"/);
   // #231 1-B: 테마 버튼 반영은 shell/theme.mjs로 옮겼다(같은 선택자·같은 문구).
   assert.match(themeModule, /document\.querySelectorAll\('\[data-lt-theme-toggle\]'\)/);
 });
 
 test('워드마크는 LoveTree + 4.1이고 MEMORY ORBIT·새싹이 없다', () => {
-  assert.match(html, /<a class="brand" href="#home" aria-label="LoveTree 4\.1 첫 화면"><span class="brand-word">LoveTree<small>4\.1<\/small><\/span><\/a>/);
+  assert.match(html, /<a class="brand" href="#home" aria-label="LoveTree4\.1 첫 화면"><span class="brand-word">LoveTree<small>4\.1<\/small><\/span><\/a>/);
   assert.doesNotMatch(html, /MEMORY ORBIT/);
   assert.doesNotMatch(html, /brand-sub/);
   assert.doesNotMatch(html, /러브트리 4\.1 첫 화면/);

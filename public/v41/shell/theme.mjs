@@ -17,7 +17,8 @@ export function paintLoginLinks(theme = readTheme(localStorage)) {
 export function paintThemeControls(theme = readTheme(localStorage)) {
   for (const button of document.querySelectorAll('[data-lt-theme-toggle]')) {
     button.textContent = themeButtonLabel(theme);
-    button.setAttribute('aria-pressed', String(themePressed(theme)));
+    // 계정 메뉴 안에서는 role="menuitemcheckbox"라 aria-pressed가 아니라 aria-checked를 쓴다.
+    button.setAttribute('aria-checked', String(themePressed(theme)));
     button.setAttribute('aria-label', themeButtonAriaLabel(theme));
     button.title = themeButtonAriaLabel(theme);
   }
