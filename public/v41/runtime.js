@@ -20,7 +20,10 @@
       new MutationObserver(update).observe(document.getElementById('detailTitle'),{childList:true,subtree:true});update();
     }
   });
-  window.LTDEMO = {title:tree.title,moments,edges:tree.edges,example:!!demo,
+  // #315: 읽기 전용 판정은 여기 한 곳. 셸이 iframe에 넘기는 LT41.source에 이미 'share'가 있으므로
+  // 그걸 그대로 판정한다(공유 감상은 쓰기·편집 UI를 렌더하지 않는다).
+  const readOnly = context.source === 'share';
+  window.LTDEMO = {title:tree.title,moments,edges:tree.edges,example:!!demo,readOnly,
     get:()=>context.momentId,
     select:id=>{if(moments.some(m=>m.id===id)){context.momentId=id;parent.postMessage({type:'lt-selection',id},location.origin)}}};
 })();
