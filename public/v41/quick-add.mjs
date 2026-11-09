@@ -58,13 +58,10 @@ export function parseQuickUrl(url, describe) {
   let media = null;
   try { media = describe(value); } catch { media = null; }
   if (!media || !media.openUrl || media.kind === 'none' || media.kind === 'invalid') {
-    return { status: 'invalid', kind: 'invalid', value, videoId: '', label: '' };
+    return { status: 'invalid', kind: 'invalid', value, videoId: '', label: '', thumb: '' };
   }
-  return { status: 'ok', kind: media.kind, value, videoId: media.videoId || '', label: media.label || '' };
-}
-
-export function quickVideoThumb(videoId) {
-  return /^[A-Za-z0-9_-]{6,20}$/.test(String(videoId || '')) ? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg` : '';
+  // 썸네일 주소는 기존 판정 한 벌(LTMedia.describe의 loadUrl)을 재사용한다 — 새로 만들지 않는다.
+  return { status: 'ok', kind: media.kind, value, videoId: media.videoId || '', label: media.label || '', thumb: media.loadUrl || '' };
 }
 
 // 놓았을 때 어디로 갈지를 한 곳에서 정한다.

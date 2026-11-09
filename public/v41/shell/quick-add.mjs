@@ -2,7 +2,7 @@
 // 판정·문구·추출은 ../quick-add.mjs의 순수 함수가 맡고, 이 파일은 DOM만 만진다(docs/TESTING.md).
 // 저장은 로컬1 계약(member.apply('quickAdd', {url}))을 그대로 부른다 — 화면은 이름만 쓴다.
 import {mountPrivateUpload} from '../private-upload.mjs';
-import {extractDropUrl, hasDropPayload, firstImageFile, parseQuickUrl, quickVideoThumb, dropRoute, QUICK_SAVED_TEXT, QUICK_REFINE_LABEL, QUICK_EMPTY_ERROR, QUICK_INVALID_ERROR, DROP_LOGIN_NOTICE, DROP_READONLY_NOTICE} from '../quick-add.mjs';
+import {extractDropUrl, hasDropPayload, firstImageFile, parseQuickUrl, dropRoute, QUICK_SAVED_TEXT, QUICK_REFINE_LABEL, QUICK_EMPTY_ERROR, QUICK_INVALID_ERROR, DROP_LOGIN_NOTICE, DROP_READONLY_NOTICE} from '../quick-add.mjs';
 
 export function createQuickAdd(deps) {
   const $ = deps.$;
@@ -65,10 +65,9 @@ export function createQuickAdd(deps) {
     if (parsed.status === 'invalid') { $('quick-error').textContent = QUICK_INVALID_ERROR; return; }
     $('quick-error').textContent = '';
     if (parsed.kind === 'youtube') {
-      const thumb = quickVideoThumb(parsed.videoId);
-      if (thumb) {
+      if (parsed.thumb) {
         const image = doc.createElement('img');
-        image.alt = ''; image.referrerPolicy = 'no-referrer'; image.src = thumb;
+        image.alt = ''; image.referrerPolicy = 'no-referrer'; image.src = parsed.thumb;
         $('quick-preview').append(image);
       }
       const title = doc.createElement('p');
@@ -134,7 +133,7 @@ export function createQuickAdd(deps) {
   }
   function showSaved(url, result) {
     const parsed = parseQuickUrl(url, describe);
-    const thumb = parsed.status === 'ok' && parsed.kind === 'youtube' ? quickVideoThumb(parsed.videoId) : '';
+    const thumb = parsed.status === 'ok' && parsed.kind === 'youtube' ? parsed.thumb : '';
     if ($('quick-add').open) {
       $('quick-notice').textContent = QUICK_SAVED_TEXT;
       $('quick-notice').hidden = false;
