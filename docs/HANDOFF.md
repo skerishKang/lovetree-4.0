@@ -2,6 +2,14 @@
 
 > **main 보호 규칙(2026-11-09, 룰셋 "main 보호 (PR·필수 검사)")**: main은 PR로만 바꾼다(직접 푸시·force push·삭제 금지, 관리자도 예외 없음 — 비상시 대표가 룰셋 enforcement를 잠깐 끈다). 필수 검사: `check (ubuntu-latest)`·`check (windows-latest)`·`미리보기 postdeploy(로그아웃)` — 셋 다 paths 필터가 없어 문서만 바뀐 PR에서도 항상 돈다. 승인 수 0(레인이 스스로 머지). Deploy Bundle Boot Test는 paths 필터가 있어 필수에 넣지 않았다.
 
+## 2026-11-09 — 정원 색 대비 3곳 수정: 로그아웃 재점검 12 → 0(#319, 로컬3, ai/local3-a11y-garden-contrast-261109, PR #322 머지 `3700a58`)
+
+- 셸 `#context-kind`(**정원 한정**) `--lt-rose` → `--lt-rose-ink`(3.32 → 5.43:1), 책장 `--muted`(**정원 한정**) `#8d7d77` → `var(--lt-muted)`(소개 문단 3.79→5.78, 결과 수 3.49→5.31). 새 hex 없음, 밤 규칙·`:root` 값 그대로.
+- 같은 `--muted` 토큰을 쓰던 글자(`.crumbs`·카드 정보 줄·검색 돋보기·독자/모달 보조 글자)도 함께 진해짐 — 전부 크림 배경 위라 대비 개선(계산색 15개 요소+의사요소 1). `.filter`는 예시 화면에 없어 미실측.
+- 밤 변화 0: 계산색 변경 0건, 겉모습 비교 안정 쌍 밤 12장 0.000%(같은 빌드 재촬영 24장 0.000%).
+- 검증: 로그아웃 axe 40행 12 serious → 0, `npm test` 751건 714 pass/0 fail/37 skip, `npm run build` pass. 회귀 시험 `tests/v41-a11y-garden-contrast.test.mjs` 3건.
+- **`3700a58` Pages 배포 누락 → 다음 머지로 재배포**(CTO 확인: 이 커밋에만 "Cloudflare Pages" 검사가 없음). 로그인 몫 a11y와 `docs/A11Y_AUDIT_20261109.md`의 로그인 칸은 배포 뒤 채운다.
+
 ## 2026-11-09 — 접근성 자동 점검: serious·critical 155 → 16, 남은 16은 디자인 색(#319) (로컬3, ai/local3-a11y-*)
 
 - 도구: `axe-core` devDependency + `tools/a11y/a11y-run.mjs` + `npm run a11y`([PR #313](https://github.com/skerishKang/lovetree-4.0/pull/313)). 화면(셸+iframe 안쪽)·셸 대화상자·로그인 스킨 원본을 훑고 `serious`·`critical`만 `a11y.json`에 남긴다.
