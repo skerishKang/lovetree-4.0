@@ -166,3 +166,13 @@ test('#256-1 view-navigation 어댑터가 이어 읽기 칸의 문구·접근성
   assert.match(nav, /stage\.closest\('#resumeCard'\)/, 'stage-label 덮어쓰기는 이어 읽기 칸을 제외한다');
   assert.match(nav, /hero-stage:not\(#resumeCard\)/, 'aria-hidden은 이어 읽기 칸에 다시 붙이지 않는다');
 });
+
+// #256-1: 칸을 바꾸면서 닫는 태그를 하나 남기면 아래 책장이 밀린다(실제로 그랬었다). 균형을 검사한다.
+test('#256-1 책장 마크업 태그 균형(div·section·button)', () => {
+  const markup = shelf.slice(0, shelf.indexOf('<script'));
+  for (const tag of ['div', 'section', 'button', 'span']) {
+    const open = (markup.match(new RegExp('<' + tag + '(\\s|>)', 'g')) || []).length;
+    const close = (markup.match(new RegExp('</' + tag + '>', 'g')) || []).length;
+    assert.equal(open, close, '<' + tag + '> 열림/닫힘이 같아야 한다');
+  }
+});
