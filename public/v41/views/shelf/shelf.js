@@ -8,6 +8,7 @@ import {
   treeTitleOf, youtubeId as youtubeIdOf
 } from './shelf-model.mjs';
 import { shelfOrder, INBOX_LABEL } from '../../inbox-model.mjs';
+import { titleView } from '../../book-usability.mjs';
 import { createReader } from './shelf-reader.js';
 
 {
@@ -123,6 +124,7 @@ import { createReader } from './shelf-reader.js';
           } else { cover.removeAttribute('data-cover-design'); cover.innerHTML=''; }
         }
         $('#resumeTitle').textContent=info.title;
+        if(info.moment){const setting=(()=>{try{return parent.LT41?.prefs?.titleDisplay||'both'}catch{return 'both'}})();const main=titleView(info.moment,setting).main;if(main)$('#resumeTitle').textContent='지난번 '+main.replace(/[.。!?！？]+$/u,'')+'까지 봤어요';}
         $('#resumeAction').textContent=info.action;
         card.onclick=function(){
           if(info.kind==='first'){parent.postMessage({type:'lt41-write',mode:'new'},location.origin);return;}
@@ -240,3 +242,5 @@ import { createReader } from './shelf-reader.js';
       renderShelf();renderResumeCard();bind();
   }
 }
+
+if(typeof addEventListener==='function')addEventListener('message',e=>{if(e.data?.type==='lt41-title-display')location.reload();});

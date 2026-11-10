@@ -35,7 +35,7 @@ const spreads =Array.from({length:Math.ceil(moments.length/2)},(_,i)=>{const toP
     const next = m && moments.find((x) => x.id === m.next);
     if (!next) return null;
     const edge = edges.find((e) => e.kind === 'parent' && e.from === id && e.to === next.id);
-    const title = displayTitle ? displayTitle(next.title) : next.title;
+    const title = displayTitle ? displayTitle(next.title, next) : next.title;
     return { id: next.id, title: title || String(next.memo || '').trim(), reason: edge?.reason || '' };
   }
 
@@ -112,7 +112,7 @@ const spreads =Array.from({length:Math.ceil(moments.length/2)},(_,i)=>{const toP
       const edgeReason = String(edge?.reason ?? '').trim();
       const whyNext = String(m.whyNext ?? '').trim();
       const reason = edgeReason || (next && m.next === next.id ? whyNext : '');
-      const title = (titleOf ? titleOf(m.title) : String(m.title ?? '').trim())
+      const title = (titleOf ? titleOf(m.title, m) : String(m.title ?? '').trim())
         || String(m.mediaMetadata?.title ?? '').trim()
         || String(m.memo ?? '').trim()
         || '순간';

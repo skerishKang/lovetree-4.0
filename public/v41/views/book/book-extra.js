@@ -1,6 +1,11 @@
 // 2026-11-08 기억책 사용성 1~9 화면 보조. 데이터·저장 계약은 그대로 두고 표시만 바꾼다.
-import {displayTitle,withoutAutoTitle,titleParts,mediaSourceText,editAffordances,embedUrl,connectionLine,readLens,writeLens,detailPlacement,nextMomentMessage,NEXT_PAGE_COPY,NEXT_PAGE_ACTION,treeTitleText,isPrimaryButton,tapIntent,createOverflowRejudge} from '/v41/book-usability.mjs';
+import {displayTitle,withoutAutoTitle,titleParts,mediaSourceText,editAffordances,embedUrl,connectionLine,readLens,writeLens,detailPlacement,nextMomentMessage,NEXT_PAGE_COPY,NEXT_PAGE_ACTION,treeTitleText,isPrimaryButton,tapIntent,createOverflowRejudge,titleView,formatDisplayDate} from '/v41/book-usability.mjs';
 const $b=s=>document.querySelector(s);
+// #347 후속: 제목 보기 설정은 계정(LTDEMO.prefs)에서 읽고, 화면은 한 벌(titleView)로 그린다.
+const titleDisplay=()=>{try{return LTDEMO.prefs?.titleDisplay||'both'}catch{return 'both'}};
+const titleViewFor=m=>titleView(m,titleDisplay());
+const titleMainFor=(title,m)=>m?titleViewFor(m).main:(title||'');
+try{window.LTBookTitle={view:titleViewFor,date:formatDisplayDate}}catch{}
 // #296: 손을 뗀 순간의 판단은 book-usability.mjs의 tapIntent가 맡는다(book.js는 클래식 스크립트라 여기서 넘겨 준다).
 window.LTTapIntent=tapIntent;
 const t=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
@@ -20,7 +25,7 @@ function requestNextMoment(parentId){
 }
 /* 6. 상세 카드: 오른쪽 페이지가 비면 오른쪽 페이지에, 아니면 카드 옆 작은 패널로. */
 let detailAnchor=null;
-const nextMomentOf=id=>LT59Model.nextMomentOf(id,LTDEMO.moments,LTDEMO.edges,displayTitle);
+const nextMomentOf=id=>LT59Model.nextMomentOf(id,LTDEMO.moments,LTDEMO.edges,titleMainFor);
 function closeDetail(){
  const panel=$b('#detailSide'),card=detailAnchor;
  if(panel){panel.hidden=true;panel.replaceChildren()}
@@ -34,8 +39,9 @@ function detailMarkup(m){
  const open=m.url&&isYouTubeUrl(m.url)?'YouTube에서 열기 ↗':'원본 링크 열기 ↗';
  // #327 2부: 내 기록(서버)의 순간 상세에서 다른 트리로 옮길 수 있다. 공유·예시는 숨긴다.
  const canMove=(window.parent&&window.parent.LT41)?window.parent.LT41.source==='server':false;
- return '<div class="detail-kicker">'+t(LTLabels.type(m.kind))+' · '+t(m.date)+' · '+t(m.emotion)+'</div>'+
-  (displayTitle(m.title)?'<h2>'+t(displayTitle(m.title))+'</h2>':'')+
+ const view=titleViewFor(m);
+ return '<div class="detail-kicker">'+t(LTLabels.type(m.kind))+' · '+t(formatDisplayDate(m.date))+' · '+t(m.emotion)+'</div>'+
+  (view.main?'<h2>'+t(view.main)+'</h2>'+(view.sub?'<p class="video-title">▶ '+t(view.sub)+'</p>':''):'')+
   '<p>'+t(m.note)+' · 출처: '+t(m.source)+'</p>'+
   '<div class="chips">'+m.keywords.map(k=>'<span class="chip">#'+t(k)+'</span>').join('')+'</div>'+
   '<div class="detail-why">'+t(line||'연결 이유는 아직 적지 않았어요')+'</div>'+
@@ -53,7 +59,7 @@ function placeDetail(id,card){
   rightPage.innerHTML='<div class="page-detail">'+detailMarkup(m)+'</div>';
  }else{
   const panel=$b('#detailSide');if(!panel)return;
-  panel.innerHTML='<div class="detail-top"><span class="detail-kicker">'+t(LTLabels.type(m.kind))+' · '+t(m.date)+'</span><button type="button" class="close" data-detail-close aria-label="상세 닫기">×</button></div><div class="side-detail">'+detailMarkup(m)+'</div>';
+  panel.innerHTML='<div class="detail-top"><span class="detail-kicker">'+t(LTLabels.type(m.kind))+' · '+t(formatDisplayDate(m.date))+'</span><button type="button" class="close" data-detail-close aria-label="상세 닫기">×</button></div><div class="side-detail">'+detailMarkup(m)+'</div>';
   panel.hidden=false;
   if(window.innerWidth<=820){panel.style.top='';}
   else{
@@ -76,6 +82,7 @@ function placeDetail(id,card){
 const originalShowDetail=showDetail;
 showDetail=function(id){
  originalShowDetail(id);
+ const m=metadataFor(id);if(m){const view=titleViewFor(m);$b('#detailTitle').textContent=view.main;if(view.sub)$b('#detailTag').textContent+=' · ▶ '+view.sub;}
  $b('#detail')?.classList.remove('open');
  const card=cardFor(id);
  if(card)placeDetail(id,card);
@@ -126,20 +133,20 @@ function emotionMarkup(emotion){
  return '<span class="moment-emotion"><span class="emotion-dot" data-tone="'+window.LT59Model.emotionTone(value)+'" aria-hidden="true"></span>'+t(value)+'</span>';
 }
 function paintTitle(m){
- const parts=titleParts(withoutAutoTitle(m));
- // buildSpreads는 마음 한마디가 비면 연결 이유(whyNext)를 대신 넣는다. 면에는 실제 마음(memo)만 그린다 —
- // 빈 자리는 흐린 안내(#345). 예시/실제는 모드가 아니라 데이터 상태(마음이 비었는지)로만 갈린다.
  const source=LTDEMO.moments.find(x=>x.id===m.id);
+ const view=titleViewFor(source||m);
+ const parts={main:view.main,note:view.note,media:view.sub};
  const noteText=source?String(source.memo??'').trim():parts.note;
  parts.note=noteText;
  const hands=editAffordances({readOnly:!!LTDEMO.readOnly,synthetic:!!m.synthetic,hasTitle:!!parts.main,hasNote:!!parts.note});
- const date=m.date?'<p class="moment-date">'+t(m.date)+'</p>':'';
+ const date=m.date?'<p class="moment-date">'+t(formatDisplayDate(m.date))+'</p>':'';
+ const sub=parts.media?'<p class="video-title">▶ '+t(parts.media)+'</p>':'';
  const heading=parts.main?(hands.title
   ?'<div class="moment-heading"><button type="button" class="moment-title-button" data-title-edit="'+t(m.id)+'" aria-label="제목 고치기: '+t(parts.main)+'">'+t(parts.main)+'</button>'+(hands.hint?'<button type="button" class="title-edit-hint" data-title-edit="'+t(m.id)+'" aria-label="제목 고치기"><span aria-hidden="true">✎</span> 고치기</button>':'')+'</div>'
   :'<h3>'+t(parts.main)+'</h3>'):'';
  const guide='<button type="button" class="moment-note is-empty'+(parts.main?'':' moment-note-lead')+'" data-note-edit="'+t(m.id)+'">이 순간에 남기고 싶은 마음을 적어 보세요…</button>';
  let lead='';
- if(parts.main)lead=heading;
+ if(parts.main)lead=heading+sub;
  else if(parts.note)lead='<p class="moment-note moment-note-lead">'+t(parts.note)+'</p>';
  else if(hands.guide)lead=guide;
  const tail=parts.main?(parts.note?'<p class="moment-note">'+t(parts.note)+'</p>':(hands.guide?guide:'')):'';
@@ -164,7 +171,7 @@ momentContent=function(m,compact=false){
     :auto?'<img src="https://i.ytimg.com/vi/'+t(media.videoId)+'/hqdefault.jpg" alt="'+t(safe.title||'YouTube 영상 썸네일')+'" referrerpolicy="no-referrer" loading="lazy" decoding="async">'
     :'<span class="yt-placeholder"></span>';
    // #345: 영상 바로 아래 한 줄 — ▶ 영상 제목 · 채널 … YouTube ↗. 제목이 없으면 원본 링크만 남긴다.
-   const source=mediaSourceText(safe.mediaMetadata);
+    const source=String(safe.mediaMetadata?.channel||'').trim();
    const piece='<div class="clipping moment" data-moment="'+t(safe.id)+'">'+
     '<button type="button" class="yt-play" data-yt-play="'+t(media.videoId)+'" data-yt-start="'+t(media.startSeconds||0)+'">'+
     face+
@@ -225,7 +232,7 @@ function journeyMarkup(journey){
   return '<button type="button" class="journey-item'+(item.current?' current':'')+'" data-journey="'+item.index+'" data-focus="'+t(item.id)+'">'+
    '<span class="journey-thumb" data-tone="'+item.tone+'">'+thumb+'</span>'+
    '<span class="journey-node" aria-hidden="true"></span>'+
-   '<span class="journey-text"><span class="journey-date">'+t(item.date)+(item.first?' · 첫 순간':'')+'</span>'+
+   '<span class="journey-text"><span class="journey-date">'+t(formatDisplayDate(item.date))+(item.first?' · 첫 순간':'')+'</span>'+
    '<span class="journey-title-row"><span class="journey-title">'+t(item.title)+'</span>'+(item.current?'<span class="journey-now">지금 보는 순간</span>':'')+'</span>'+
    emotion+'</span></button>'+
    (item.reason?'<p class="journey-reason">↳ '+t(item.reason)+'</p>':'');
@@ -233,7 +240,7 @@ function journeyMarkup(journey){
 }
 function openJourney(){
  journeyOpener=document.activeElement;
- const journey=LT59Model.journeyTimeline(LTDEMO.moments,LTDEMO.edges,LTDEMO.get(),displayTitle);
+ const journey=LT59Model.journeyTimeline(LTDEMO.moments,LTDEMO.edges,LTDEMO.get(),titleMainFor);
  $b('#overviewFlow').innerHTML=journeyMarkup(journey);
  $b('#journeySummary').textContent=journey.days===null?journey.steps+'단계':journey.steps+'단계 · '+journey.days+'일';
  const overlay=$b('#overview');overlay.inert=false;overlay.classList.add('open');
@@ -282,3 +289,8 @@ window.__TRACK59__.overflowRejudge=createOverflowRejudge({judge:()=>window.__TRA
 renderSpread(current,LTDEMO.get(),false);
 syncLensClone();
 window.__BOOK_USABILITY__={titleParts,closeDetail,placeDetail,nextMomentOf,paintTitle,openJourney,get lensPref(){return lensPref}};
+
+// #347 후속: 계정 제목 보기 설정이 바뀌면 지금 펼침면·상세를 다시 그린다.
+addEventListener('message',e=>{if(e.data?.type!=='lt41-title-display')return;try{LTDEMO.prefs={...(LTDEMO.prefs||{}),titleDisplay:e.data.value}}catch{}try{renderSpread(current,false)}catch{}if($b('#detail')?.classList.contains('open')&&selectedMomentId)showDetail(selectedMomentId);});
+// book-extra는 book.js 뒤에 불러오므로, 첫 렌더 제목을 한 벌 규칙으로 다시 그린다.
+try{renderSpread(current,false)}catch{}

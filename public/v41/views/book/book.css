@@ -316,3 +316,4 @@ html[data-lt-theme=garden] .shelf-back:hover{background:var(--lt-glass-strong);b
 
 /* 이슈 327 2부: 순간 상세의 '다른 트리로 옮기기'(셸 정리 창을 연다). */
 .detail-actions .ui-btn[data-detail-move]{border-color:rgba(255,230,166,.45);color:inherit}
+.video-title{margin:3px 0 0;font-family:var(--ui-sans);font-size:11px;line-height:1.45;letter-spacing:.01em;color:var(--lt-muted,#8d7f73)}

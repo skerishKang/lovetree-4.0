@@ -60,7 +60,7 @@ test('adapter covers every target screen without editing original views', () => 
 test('첫 화면 카드 이름은 화면에 보이는 글자를 그대로 쓴다', () => {
   const orbit = read('src/views/orbit.js');
   assert.doesNotMatch(orbit, /b\.setAttribute\('aria-label'/);
-  assert.match(orbit, /<div class="memoKicker">\$\{esc\(c\.date\)\}<\/div><div class="memoText">\$\{esc\(c\.title\)\}<\/div>/);
+  assert.match(orbit, /<div class="memoKicker">\$\{esc\(dateOf\(c\)\)\}<\/div><div class="memoText">\$\{esc\(mainOf\(c\)\)\}<\/div>/);
 });
 
 // A~D(상세 패널 Esc·대화상자 Tab 순환·계정 메뉴 Esc·보관 목록 Esc)는 2026-11-09에
