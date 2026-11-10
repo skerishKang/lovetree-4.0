@@ -172,11 +172,6 @@ body:before{content:"MEMORY\A SKETCHBOOK";white-space:pre;position:fixed;left:3.
 .choice b{display:block;font:16px var(--book-serif);margin-bottom:6px}
 .choice small{color:#ae989c;line-height:1.5}
 .branch-tab{position:absolute;z-index:50;right:-119px;top:44%;width:144px;padding:11px 12px 11px 28px;border:1px solid rgba(199,155,168,.32);border-left:0;border-radius:0 10px 10px 0;background:linear-gradient(90deg,#694657,#3e2a36);color:#f8eae7;font-size:9px;line-height:1.35;cursor:pointer;box-shadow:0 10px 20px rgba(0,0,0,.2)}
-.overview-flow{display:flex;align-items:center;gap:7px;margin:24px 0 8px}
-.overview-node{flex:1;padding:12px 8px;border-radius:10px;background:#f1e6d8;color:#554640;text-align:center;min-width:0}
-.overview-node b{font:13px var(--book-serif);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.overview-node small{font-size:8px;color:#8c7377}
-.overview-line{width:28px;height:2px;background:linear-gradient(90deg,#c77895,#8270b6);box-shadow:0 0 9px rgba(199,120,149,.32)}
 .toast{position:fixed;z-index:160;left:50%;bottom:26px;transform:translate(-50%,12px);padding:9px 13px;border:1px solid rgba(255,255,255,.12);border-radius:999px;background:rgba(30,21,27,.88);color:#eaded8;font-size:10px;opacity:0;pointer-events:none;transition:.18s}
 .toast.show{opacity:1;transform:translate(-50%,0)}
 .mobile-page{display:none}
@@ -282,9 +277,6 @@ body.typo-b .why-margin,body.typo-b .detail-why{letter-spacing:-.02em}
 .viewer-card h2{font-size:22px}
 .branch-choice{grid-template-columns:1fr}
 .overview-card{width:94vw;padding:18px}
-.overview-flow{overflow-x:auto;align-items:stretch}
-.overview-node{min-width:120px}
-.overview-line{flex:0 0 22px}
 .toast{bottom:17px}
 .mobile-page .first-mark{font-size:7px}
 .mobile-page .chips{max-height:32px;overflow:hidden}

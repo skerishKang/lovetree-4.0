@@ -1,5 +1,5 @@
 // 2026-11-08 기억책 사용성 1~9 화면 보조. 데이터·저장 계약은 그대로 두고 표시만 바꾼다.
-import {displayTitle,withoutAutoTitle,titleParts,embedUrl,connectionLine,readLens,writeLens,detailPlacement,nextMomentMessage,NEXT_PAGE_COPY,NEXT_PAGE_ACTION,treeTitleText,isPrimaryButton,tapIntent,createOverflowRejudge} from '/v41/book-usability.mjs';
+import {displayTitle,withoutAutoTitle,titleParts,mediaSourceText,editAffordances,embedUrl,connectionLine,readLens,writeLens,detailPlacement,nextMomentMessage,NEXT_PAGE_COPY,NEXT_PAGE_ACTION,treeTitleText,isPrimaryButton,tapIntent,createOverflowRejudge} from '/v41/book-usability.mjs';
 const $b=s=>document.querySelector(s);
 // #296: 손을 뗀 순간의 판단은 book-usability.mjs의 tapIntent가 맡는다(book.js는 클래식 스크립트라 여기서 넘겨 준다).
 window.LTTapIntent=tapIntent;
@@ -107,10 +107,10 @@ document.addEventListener('click',e=>{
  const yt=e.target.closest('[data-yt-play]');
  if(yt){e.preventDefault();e.stopPropagation();if(!yt.parentElement||yt.parentElement.querySelector('iframe.yt-frame'))return;
   playInline(yt,{openUrl:'https://www.youtube.com/watch?v='+yt.dataset.ytPlay});return}
- const edit=e.target.closest('[data-title-edit]');
- if(edit){if(LTDEMO.readOnly)return;e.preventDefault();e.stopPropagation();if(window.parent===window){toast('제목 고치기는 러브트리 화면에서 열 수 있어요');return}
-  window.parent.postMessage({type:'lt41-select',id:edit.dataset.titleEdit},location.origin);
-  window.parent.postMessage({type:'lt41-write',mode:'edit',momentId:edit.dataset.titleEdit},location.origin);return}
+ const edit=e.target.closest('[data-title-edit],[data-note-edit]');
+ if(edit){if(LTDEMO.readOnly)return;e.preventDefault();e.stopPropagation();const id=edit.dataset.titleEdit||edit.dataset.noteEdit||'';if(window.parent===window){toast('이 순간 고치기는 러브트리 화면에서 열 수 있어요');return}
+  window.parent.postMessage({type:'lt41-select',id},location.origin);
+  window.parent.postMessage({type:'lt41-write',mode:'edit',momentId:id},location.origin);return}
  if(e.target.closest('[data-detail-viewer]')){e.preventDefault();openViewer();return}
  // #327 2부: 옮기기는 셸 정리 창이 맡는다(여기는 요청만 보낸다).
  const move=e.target.closest('[data-detail-move]');
@@ -118,17 +118,32 @@ document.addEventListener('click',e=>{
  if(e.target.closest('[data-detail-index]')){e.preventDefault();closeDetail();openArchive();return}
  if(e.target.closest('[data-detail-close]')){e.preventDefault();closeDetail();return}
 },true);
-/* 2. 자동 제목은 표시 단계에서만 거른다(데이터 그대로). 제목·영상 제목·마음 한마디를 나눠 그린다. */
+/* 2. 자동 제목은 표시 단계에서만 거른다(데이터 그대로). 제목·마음 한마디·감정을 나눠 그린다(#345).
+   날짜는 제목 위에 작게, 제목이 주인공, 감정은 색 점+글자, 마음 한마디가 비면 흐린 안내(누르면 바로 쓰기). */
+function emotionMarkup(emotion){
+ const value=String(emotion||'').trim();
+ if(!value)return '';
+ return '<span class="moment-emotion"><span class="emotion-dot" data-tone="'+window.LT59Model.emotionTone(value)+'" aria-hidden="true"></span>'+t(value)+'</span>';
+}
 function paintTitle(m){
- const parts=titleParts(m);
- return '<div class="moment-title">'+
-  (parts.main?'<h3>'+t(parts.main)+'</h3>':'<p class="moment-note">'+t(parts.note||'아직 마음 한마디를 남기지 않았어요')+'</p>')+
-  (parts.main&&parts.note?'<p class="moment-note">'+t(parts.note)+'</p>':'')+
-  (parts.media?'<p class="moment-video">'+t(parts.media)+'</p>':'')+
-  '<p>'+t(m.date)+' · '+t(m.emotion)+' · '+t(m.source)+'</p>'+
-  '<div class="chips">'+m.keywords.map(k=>'<span class="chip">#'+t(k)+'</span>').join('')+'</div>'+
-  ((m.synthetic||LTDEMO.readOnly)?'':'<button type="button" class="title-edit" data-title-edit="'+t(m.id)+'">제목 고치기</button>')+
-  '</div>';
+ const parts=titleParts(withoutAutoTitle(m));
+ // buildSpreads는 마음 한마디가 비면 연결 이유(whyNext)를 대신 넣는다. 면에는 실제 마음(memo)만 그린다 —
+ // 빈 자리는 흐린 안내(#345). 예시/실제는 모드가 아니라 데이터 상태(마음이 비었는지)로만 갈린다.
+ const source=LTDEMO.moments.find(x=>x.id===m.id);
+ const noteText=source?String(source.memo??'').trim():parts.note;
+ parts.note=noteText;
+ const hands=editAffordances({readOnly:!!LTDEMO.readOnly,synthetic:!!m.synthetic,hasTitle:!!parts.main,hasNote:!!parts.note});
+ const date=m.date?'<p class="moment-date">'+t(m.date)+'</p>':'';
+ const heading=parts.main?(hands.title
+  ?'<div class="moment-heading"><button type="button" class="moment-title-button" data-title-edit="'+t(m.id)+'" aria-label="제목 고치기: '+t(parts.main)+'">'+t(parts.main)+'</button>'+(hands.hint?'<button type="button" class="title-edit-hint" data-title-edit="'+t(m.id)+'" aria-label="제목 고치기"><span aria-hidden="true">✎</span> 고치기</button>':'')+'</div>'
+  :'<h3>'+t(parts.main)+'</h3>'):'';
+ const guide='<button type="button" class="moment-note is-empty'+(parts.main?'':' moment-note-lead')+'" data-note-edit="'+t(m.id)+'">이 순간에 남기고 싶은 마음을 적어 보세요…</button>';
+ let lead='';
+ if(parts.main)lead=heading;
+ else if(parts.note)lead='<p class="moment-note moment-note-lead">'+t(parts.note)+'</p>';
+ else if(hands.guide)lead=guide;
+ const tail=parts.main?(parts.note?'<p class="moment-note">'+t(parts.note)+'</p>':(hands.guide?guide:'')):'';
+ return '<div class="moment-title">'+date+lead+emotionMarkup(m.emotion)+tail+'</div>';
 }
 /* 3. 한 페이지에 다 들어오게 + 1. YouTube는 그 자리에서 재생(누르기 전 외부 요청 0). */
 const NEXT_TITLE='이 순간 다음 이야기를 남겨 보세요';
@@ -148,11 +163,15 @@ momentContent=function(m,compact=false){
    const face=thumb?'<img src="'+t(thumb)+'" alt="">'
     :auto?'<img src="https://i.ytimg.com/vi/'+t(media.videoId)+'/hqdefault.jpg" alt="'+t(safe.title||'YouTube 영상 썸네일')+'" referrerpolicy="no-referrer" loading="lazy" decoding="async">'
     :'<span class="yt-placeholder"></span>';
+   // #345: 영상 바로 아래 한 줄 — ▶ 영상 제목 · 채널 … YouTube ↗. 제목이 없으면 원본 링크만 남긴다.
+   const source=mediaSourceText(safe.mediaMetadata);
    const piece='<div class="clipping moment" data-moment="'+t(safe.id)+'">'+
     '<button type="button" class="yt-play" data-yt-play="'+t(media.videoId)+'" data-yt-start="'+t(media.startSeconds||0)+'">'+
     face+
     '<span class="yt-play-label">'+t(label)+'</span></button>'+
-    '<a class="ui-btn ui-link" href="'+t(media.openUrl)+'" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">YouTube에서 열기 ↗</a></div>';
+    '<div class="media-source">'+
+    (source?'<span class="media-source-mark" aria-hidden="true">▶</span><span class="media-source-text">'+t(source)+'</span><span class="media-source-sep" aria-hidden="true"></span>':'')+
+    '<a class="media-source-link" href="'+t(media.openUrl)+'" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">YouTube ↗</a></div></div>';
    return piece+paintTitle(safe);
   }
  }
@@ -170,6 +189,10 @@ renderSpread=function(idx,focusId=null,land=true){
  if(right&&right.synthetic){
   rightPage.innerHTML='<div class="next-page"><div><b>'+t(NEXT_PAGE_COPY)+'</b></div>'+(LTDEMO.readOnly?'':'<button type="button" data-next-moment="'+t(SPREADS[current].left.id)+'">'+t(NEXT_PAGE_ACTION)+'</button>')+'</div>';
  }
+ // #345: 390 한 장도 같은 규칙(날짜·제목·감정·마음 안내)으로 다시 그린다.
+ const mobileMain=!SPREADS[current].right.synthetic&&focusId===SPREADS[current].right.id?SPREADS[current].right:SPREADS[current].left;
+ const mobileTitle=mobileContent.querySelector('.moment-title');
+ if(mobileTitle&&mobileMain&&!mobileMain.synthetic)mobileTitle.outerHTML=paintTitle(mobileMain);
  paintLensButton();
 };
 /* 9. 연결 안내는 한 줄, 다음 순간이 없으면 숨긴다. 시스템 용어를 쓰지 않는다. */
@@ -192,6 +215,48 @@ mobileSpreadContent=function(s,focusId=null){
  }
  return html;
 };
+/* #345: '여기까지 온 길' — 처음 순간부터 지금 보는 순간까지의 세로 타임라인.
+   칸·단계·일수·감정 색 계산은 LT59Model.journeyTimeline(book-model.js)이 맡고 여기는 그리기만 한다. */
+let journeyOpener=null;
+function journeyMarkup(journey){
+ return journey.items.map(item=>{
+  const thumb=item.thumb?'<img src="'+t(item.thumb)+'" alt="" referrerpolicy="no-referrer" loading="lazy" decoding="async">':'';
+  const emotion=item.emotion?'<span class="journey-emotion"><span class="emotion-dot" data-tone="'+item.tone+'" aria-hidden="true"></span>'+t(item.emotion)+'</span>':'';
+  return '<button type="button" class="journey-item'+(item.current?' current':'')+'" data-journey="'+item.index+'" data-focus="'+t(item.id)+'">'+
+   '<span class="journey-thumb" data-tone="'+item.tone+'">'+thumb+'</span>'+
+   '<span class="journey-node" aria-hidden="true"></span>'+
+   '<span class="journey-text"><span class="journey-date">'+t(item.date)+(item.first?' · 첫 순간':'')+'</span>'+
+   '<span class="journey-title-row"><span class="journey-title">'+t(item.title)+'</span>'+(item.current?'<span class="journey-now">지금 보는 순간</span>':'')+'</span>'+
+   emotion+'</span></button>'+
+   (item.reason?'<p class="journey-reason">↳ '+t(item.reason)+'</p>':'');
+ }).join('');
+}
+function openJourney(){
+ journeyOpener=document.activeElement;
+ const journey=LT59Model.journeyTimeline(LTDEMO.moments,LTDEMO.edges,LTDEMO.get(),displayTitle);
+ $b('#overviewFlow').innerHTML=journeyMarkup(journey);
+ $b('#journeySummary').textContent=journey.days===null?journey.steps+'단계':journey.steps+'단계 · '+journey.days+'일';
+ const overlay=$b('#overview');overlay.inert=false;overlay.classList.add('open');
+ setTimeout(()=>$b('#overviewClose').focus(),40);
+}
+function closeJourney(){
+ const overlay=$b('#overview');overlay.classList.remove('open');overlay.inert=true;
+ if(journeyOpener&&journeyOpener.isConnected)try{journeyOpener.focus({preventScroll:true})}catch{}
+ journeyOpener=null;
+}
+$b('#overviewBtn').onclick=openJourney;
+$b('#overviewClose').onclick=closeJourney;
+$b('#overview').addEventListener('click',e=>{if(e.target===$b('#overview'))closeJourney()});
+$b('#overview').addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();closeJourney()}});
+$b('#overviewFlow').addEventListener('click',e=>{
+ const item=e.target.closest('[data-journey]');if(!item)return;
+ const momentIndex=Number(item.dataset.journey),focus=item.dataset.focus||'';
+ closeJourney();
+ const spread=Math.floor(momentIndex/2);
+ if(spread===current)renderSpread(current,focus,false);
+ else autoTurn(spread>current?'next':'prev',spread,focus);
+});
+window.__TRACK59__.openOverview=openJourney;
 /* 5. 돋보기는 도구 줄에서 켜고 끈다. */
 $b('#lensBtn').onclick=()=>{lensPref=!lensPref;writeLens(lensPref,window.localStorage);paintLensButton();if(!lensPref)hideLens()};
 paintLensButton();if(!lensPref)hideLens();
@@ -216,4 +281,4 @@ paintTreeTitles();
 window.__TRACK59__.overflowRejudge=createOverflowRejudge({judge:()=>window.__TRACK59__.rejudgeOverflow(),raf:f=>requestAnimationFrame(f),cancelRaf:id=>cancelAnimationFrame(id),addDocListener:(t,f,o)=>document.addEventListener(t,f,o),addWinListener:(t,f)=>addEventListener(t,f),ResizeObserver:typeof ResizeObserver==='undefined'?null:ResizeObserver,isPageImage:n=>n instanceof HTMLImageElement&&!!n.closest('.page-content,.mobile-content')});
 renderSpread(current,LTDEMO.get(),false);
 syncLensClone();
-window.__BOOK_USABILITY__={titleParts,closeDetail,placeDetail,nextMomentOf,paintTitle,get lensPref(){return lensPref}};
+window.__BOOK_USABILITY__={titleParts,closeDetail,placeDetail,nextMomentOf,paintTitle,openJourney,get lensPref(){return lensPref}};
