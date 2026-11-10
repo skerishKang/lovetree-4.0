@@ -18,7 +18,7 @@ const moments = [
 ];
 
 test('0. 계산 한 벌은 화면이 부르는 함수만 노출하고, 모델을 화면보다 먼저 부른다', () => {
-  assert.deepEqual(Object.keys(M).sort(), ['buildSpreads', 'connectionSummary', 'folioLabel', 'nextMomentOf', 'turnAngle']);
+  assert.deepEqual(Object.keys(M).sort(), ['buildSpreads', 'connectionSummary', 'emotionTone', 'folioLabel', 'journeyDays', 'journeyTimeline', 'nextMomentOf', 'turnAngle']);
   assert.ok(HTML.indexOf('book-model.js') < HTML.indexOf('book.js'), '모델을 화면보다 먼저 부른다');
 });
 
@@ -105,6 +105,7 @@ test('7. 화면은 같은 계산을 다시 구현하지 않고 한 벌을 부른
     assert.ok(BOOK.includes(call), call);
   }
   assert.ok(EXTRA.includes('LT59Model.nextMomentOf'));
+  assert.ok(EXTRA.includes('LT59Model.journeyTimeline'), '여기까지 온 길 계산도 한 벌을 부른다');
 });
 
 test('8. 이미 한 벌인 규칙은 그대로 둔다(book-usability.mjs)', () => {
@@ -114,4 +115,75 @@ test('8. 이미 한 벌인 규칙은 그대로 둔다(book-usability.mjs)', () =
   }
   // 화면은 그 규칙을 다시 만들지 않고 넘겨받아 쓴다.
   assert.ok(EXTRA.includes('window.LTTapIntent=tapIntent'));
+});
+
+// ── #345 '여기까지 온 길' 계산 표 ─────────────────────────────────────────────
+test('9. 여기까지 온 길: 지금 보는 순간까지의 칸·단계·일수', () => {
+  const chain = [
+    { id: 'a', title: '첫 무대', date: '2026.10.02', emotion: '설렘', next: 'b', whyNext: '이 무대 보고 직캠까지 찾아봄' },
+    { id: 'b', title: '팬미팅 영상', date: '2026.10.21', emotion: '응원', next: 'c', whyNext: '이어서 본 직캠' },
+    { id: 'c', title: '기억해 두고 싶은 순간', date: '2026.11.09', emotion: '설렘' }
+  ];
+  const part = M.journeyTimeline(chain, [], 'b', (t) => t);
+  assert.equal(part.steps, 2, '지금 보는 순간까지만');
+  assert.equal(part.days, 19, '10.02 → 10.21');
+  assert.deepEqual(part.items.map((i) => i.id), ['a', 'b']);
+  assert.equal(part.items[0].first, true);
+  assert.equal(part.items[1].current, true);
+  assert.equal(part.items[0].reason, '이 무대 보고 직캠까지 찾아봄', '바로 다음 칸을 가리키는 whyNext');
+  assert.equal(part.items[1].reason, '');
+  const all = M.journeyTimeline(chain, [], 'c', (t) => t);
+  assert.equal(all.steps, 3);
+  assert.equal(all.days, 38, '10.02 → 11.09');
+  assert.deepEqual(M.journeyTimeline([], [], 'x'), { items: [], steps: 0, days: null });
+});
+
+test('10. 여기까지 온 길: 연결 이유는 실제 연결 우선, 없으면 생략', () => {
+  const list = [
+    { id: 'a', title: 'A', date: '2026-01-01', next: 'b', whyNext: '예시 이유' },
+    { id: 'b', title: 'B', date: '2026-01-02', next: 'c' },
+    { id: 'c', title: 'C', date: '2026-01-03' }
+  ];
+  const edges = [{ kind: 'parent', from: 'a', to: 'b', reason: '실제 이유' }, { kind: 'parent', from: 'a', to: 'c', reason: '건너뛴 이유' }];
+  const journey = M.journeyTimeline(list, edges, 'c', (t) => t);
+  assert.equal(journey.items[0].reason, '실제 이유', '실제 연결의 이유가 whyNext보다 우선');
+  assert.equal(journey.items[1].reason, '', '두 칸 사이에 연결이 없으면 생략');
+  const mismatch = M.journeyTimeline(
+    [{ id: 'a', title: 'A', date: '2026-01-01', next: 'z', whyNext: '엉뚱한 이유' }, { id: 'b', title: 'B', date: '2026-01-02' }],
+    [], 'b', (t) => t);
+  assert.equal(mismatch.items[0].reason, '', 'whyNext가 다음 칸을 가리키지 않으면 쓰지 않는다');
+});
+
+test('11. 여기까지 온 길: 썸네일·감정 색·제목 대체', () => {
+  const list = [
+    { id: 'y', title: '영상', date: '2026-01-01', externalUrl: 'https://www.youtube.com/shorts/9NXOCr-T8LU', emotion: '설렘' },
+    { id: 'p', title: '사진', date: '2026-01-02', image: 'data:image/png;base64,xx', emotion: '위로' },
+    { id: 'm', title: '', date: '2026-01-03', mediaMetadata: { title: '영상 제목' }, memo: '', emotion: '그리움' }
+  ];
+  const journey = M.journeyTimeline(list, [], 'm', (t) => t);
+  assert.match(journey.items[0].thumb, /i\.ytimg\.com\/vi\/9NXOCr-T8LU\/hqdefault\.jpg/);
+  assert.equal(journey.items[1].thumb, 'data:image/png;base64,xx');
+  assert.equal(journey.items[2].thumb, '');
+  assert.equal(journey.items[2].title, '영상 제목', '표시 제목이 비면 영상 제목');
+  const privatePhoto = M.journeyTimeline([{ id: 'pp', title: 'P', date: '2026-01-01', externalUrl: '/api/media/abc.png' }], [], 'pp', () => '');
+  assert.equal(privatePhoto.items[0].thumb, '/api/media/abc.png');
+  assert.equal(privatePhoto.days, 0);
+});
+
+test('12. 감정 색·날짜 차: 아는 감정은 고정, 모르는 감정은 같은 글자=같은 색', () => {
+  assert.equal(M.emotionTone('설렘'), 1);
+  assert.equal(M.emotionTone('그리움'), 2);
+  assert.equal(M.emotionTone('위로'), 3);
+  assert.equal(M.emotionTone('벅참'), 4);
+  assert.equal(M.emotionTone('고마움'), 5);
+  assert.equal(M.emotionTone('즐거움'), 6);
+  assert.equal(M.emotionTone(''), 0);
+  const custom = M.emotionTone('응원');
+  assert.ok(custom >= 1 && custom <= 6);
+  assert.equal(M.emotionTone('응원'), custom);
+  assert.equal(M.journeyDays('2026.10.02', '2026.11.09'), 38);
+  assert.equal(M.journeyDays('2026-10-02', '2026-11-09'), 38);
+  assert.equal(M.journeyDays('2026-10-02', ''), null);
+  assert.equal(M.journeyDays('2026-02-30', '2026-03-01'), null, '없는 날짜는 세지 않는다');
+  assert.equal(M.journeyDays('2026.11.09', '2026.10.02'), 0, '거꾸로면 0일');
 });

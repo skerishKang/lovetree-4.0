@@ -39,5 +39,91 @@ const spreads =Array.from({length:Math.ceil(moments.length/2)},(_,i)=>{const toP
     return { id: next.id, title: title || String(next.memo || '').trim(), reason: edge?.reason || '' };
   }
 
-  return { buildSpreads, folioLabel, turnAngle, connectionSummary, nextMomentOf };
+  /* ── #345: '여기까지 온 길' 계산 한 벌 ─────────────────────────────────────
+     타임라인 항목·단계·일수·감정 색은 화면이 아니라 여기서 정한다. 화면(book-extra.js)은 그리기만 한다. */
+
+  // 감정 색: 기존 --lt-group-1..6 토큰 번호. 아는 감정은 고정, 모르는 감정은 글자 해시로 안정적으로 고른다.
+  const EMOTION_TONES = { 설렘: 1, 그리움: 2, 위로: 3, 벅참: 4, 고마움: 5, 즐거움: 6 };
+  function emotionTone(emotion) {
+    const value = String(emotion ?? '').trim();
+    if (!value) return 0;
+    if (EMOTION_TONES[value]) return EMOTION_TONES[value];
+    let hash = 0;
+    for (const ch of value) hash = (hash * 31 + ch.codePointAt(0)) >>> 0;
+    return (hash % 6) + 1;
+  }
+
+  // 'YYYY-MM-DD'·'YYYY.MM.DD'(뒤에 시각이 붙어도 된다)만 날짜로 읽는다. 없는 날짜·엉뚱한 값은 null.
+  function journeyDay(value) {
+    const match = String(value ?? '').trim().match(/^(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})(?=$|[ T])/);
+    if (!match) return null;
+    const year = Number(match[1]), month = Number(match[2]), day = Number(match[3]);
+    const time = Date.UTC(year, month - 1, day);
+    const date = new Date(time);
+    if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return null;
+    return time;
+  }
+  // 첫 순간~지금 날짜 차(일). 둘 중 하나라도 날짜가 아니면 null(화면은 'N단계'만 보여 준다).
+  function journeyDays(from, to) {
+    const start = journeyDay(from), end = journeyDay(to);
+    if (start === null || end === null) return null;
+    return Math.max(0, Math.round((end - start) / 86400000));
+  }
+
+  function youtubeVideoId(url) {
+    let parsed;
+    try { parsed = new URL(String(url ?? '')); } catch { return ''; }
+    const host = parsed.hostname.replace(/^www\./, '');
+    if (!['youtube.com', 'm.youtube.com', 'music.youtube.com', 'youtu.be'].includes(host)) return '';
+    if (host === 'youtu.be') {
+      const id = parsed.pathname.split('/').filter(Boolean)[0] || '';
+      return /^[A-Za-z0-9_-]{11}$/.test(id) ? id : '';
+    }
+    const v = parsed.searchParams.get('v') || '';
+    if (parsed.pathname === '/watch' && /^[A-Za-z0-9_-]{11}$/.test(v)) return v;
+    const shaped = parsed.pathname.match(/^\/(?:shorts|live|embed)\/([A-Za-z0-9_-]{11})/);
+    return shaped ? shaped[1] : '';
+  }
+  // 칸 썸네일: 사진·내 보관 파일은 그 주소, YouTube는 썸네일, 없으면 ''(화면은 감정 색 사각형).
+  function journeyThumb(m) {
+    const image = typeof m?.image === 'string' ? m.image : '';
+    if (image) return image;
+    const url = String(m?.externalUrl || m?.url || '');
+    if (/^\/api\/media\//.test(url)) return url;
+    const id = youtubeVideoId(url);
+    return id ? `https://i.ytimg.com/vi/${id}/hqdefault.jpg` : '';
+  }
+
+  /**
+   * 처음 순간부터 지금 보는 순간까지의 길. 책의 읽기 순서(배열 순서) 앞부분을 쓴다.
+   * 연결 이유는 두 칸 사이에 실제 연결(parent edge)이 있을 때만 쓰고, 없으면 그 순간의 whyNext가
+   * 바로 다음 칸을 가리킬 때만 쓴다(예시 기록). 둘 다 없으면 빈 값 — 화면은 그 줄을 생략한다.
+   */
+  function journeyTimeline(moments, edges, currentId, titleOf) {
+    const list = Array.isArray(moments) ? moments : [];
+    const safeEdges = Array.isArray(edges) ? edges : [];
+    if (!list.length) return { items: [], steps: 0, days: null };
+    let end = list.findIndex((m) => m && m.id === currentId);
+    if (end < 0) end = list.length - 1;
+    const slice = list.slice(0, end + 1);
+    const items = slice.map((m, i) => {
+      const next = slice[i + 1] || null;
+      const edge = next ? safeEdges.find((e) => e && e.kind === 'parent' && e.from === m.id && e.to === next.id) : null;
+      const edgeReason = String(edge?.reason ?? '').trim();
+      const whyNext = String(m.whyNext ?? '').trim();
+      const reason = edgeReason || (next && m.next === next.id ? whyNext : '');
+      const title = (titleOf ? titleOf(m.title) : String(m.title ?? '').trim())
+        || String(m.mediaMetadata?.title ?? '').trim()
+        || String(m.memo ?? '').trim()
+        || '순간';
+      return {
+        id: m.id, index: i, title, date: String(m.date ?? ''), emotion: String(m.emotion ?? ''),
+        thumb: journeyThumb(m), tone: emotionTone(m.emotion), reason,
+        first: i === 0, current: i === slice.length - 1
+      };
+    });
+    return { items, steps: items.length, days: journeyDays(slice[0]?.date, slice[slice.length - 1]?.date) };
+  }
+
+  return { buildSpreads, folioLabel, turnAngle, connectionSummary, nextMomentOf, emotionTone, journeyDays, journeyTimeline };
 })();

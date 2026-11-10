@@ -40,7 +40,7 @@ test('LTDEMO.readOnly는 LT41.source가 share일 때만 참이다', async () => 
 
 // ── 기억책(track59) 연결: 버튼을 렌더하지 않고, 남아도 메시지를 보내지 않는다 ──
 test('기억책: 공유에서 제목 고치기·다음 순간 남기기·링크 순간 버튼을 렌더하지 않는다', () => {
-  assert.match(bookExtra, /\(\(m\.synthetic\|\|LTDEMO\.readOnly\)\?''/, '제목 고치기 버튼은 공유에서 렌더하지 않는다');
+  assert.match(bookExtra, /editAffordances\(\{readOnly:!!LTDEMO\.readOnly,synthetic:!!m\.synthetic/, '편집 손잡이는 공유·예시에서 렌더하지 않는다(editAffordances)');
   assert.equal((bookExtra.match(/LTDEMO\.readOnly\?''/g) || []).length, 2, '다음 순간 남기기 버튼(책 끝·모바일)도 공유에서 렌더하지 않는다');
   assert.match(book, /if\(LTDEMO\.readOnly\)\{\$\('#addLinkBtn'\)\.hidden=true\}/, '+ 링크 순간 버튼은 공유에서 숨긴다');
 });

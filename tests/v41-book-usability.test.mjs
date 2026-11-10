@@ -14,7 +14,7 @@ const EXTRA = read('public/v41/views/book/book-extra.js');
 const html = Object.fromEntries(VIEWS.map(path => [path, read(path) + '\n' + BOOK_CSS + '\n' + BOOK_EXTRA_CSS + '\n' + BOOK_JS + '\n' + EXTRA]));
 
 const {
-  isUserTitle, displayTitle, withoutAutoTitle, titleParts, videoTitle,
+  isUserTitle, displayTitle, withoutAutoTitle, titleParts, videoTitle, mediaSourceText, editAffordances,
   embedUrl, connectionLine, NEXT_PAGE_COPY, NEXT_PAGE_ACTION,
   LENS_KEY, readLens, writeLens, detailPlacement, nextMomentMessage,
   BOOK_UI_FONT, BOOK_TITLE_FONT, bookTheme, bookTitleFont, treeTitleText, isPrimaryButton, tapIntent,
@@ -32,7 +32,8 @@ test('1. YouTube는 그 자리에서: nocookie embed, 시작 시점 유지, refe
     assert.ok(src.includes('data-yt-play'), path + ': 재생 단추');
     assert.ok(src.includes('document.createElement(\'iframe\')'), path + ': 누른 뒤에만 iframe 을 만든다');
     assert.ok(src.includes("setAttribute('referrerpolicy','strict-origin-when-cross-origin')"), path + ': referrerpolicy');
-    assert.ok(src.includes('YouTube에서 열기'), path + ': 원본 링크는 남긴다');
+    assert.ok(src.includes('YouTube ↗'), path + ': 원본 링크는 남긴다');
+    assert.ok(src.includes('media-source-link'), path + ': 영상 아래 출처 한 줄의 링크');
     // #327 1부(대표 결정 2026-11-09): 내 기록(서버·로그인 소유자)은 썸네일을 처음부터 보여 준다.
     // ytimg 주소는 autoLoadMedia 판정을 통과한 한 곳에서만 쓰고, 공유·예시는 여전히 요청 0이다.
     assert.equal(src.split('i.ytimg.com').length - 1, 1, path + ': ytimg 썸네일 주소는 자동 판정 한 곳에만 있다');
@@ -56,6 +57,12 @@ test('2. 자동 제목은 화면에서만 거르고, 사용자 제목 > 마음 �
   assert.deepEqual(titleParts({title: '첫인상', note: '마음', mediaMetadata: {title: '원본 영상'}}),
     {main: '첫인상', note: '마음', media: '원본 영상'});
   assert.equal(videoTitle({mediaMetadata: {title: ' 원본 영상 '}}), '원본 영상');
+  // #345: #344가 저장한 영상 제목과 같은 제목은 큰 제목에서 빼고 출처 줄에만 둔다(데이터는 그대로).
+  const videoAuto = {id: 'v1', title: 'Rick Astley - Never Gonna Give You Up', note: '', mediaMetadata: {title: 'Rick Astley - Never Gonna Give You Up', channel: 'Rick Astley'}};
+  assert.equal(withoutAutoTitle(videoAuto).title, '', '영상 제목과 같은 제목은 자동으로 본다');
+  assert.equal(videoAuto.title, 'Rick Astley - Never Gonna Give You Up', '원본 데이터는 바뀌지 않는다');
+  assert.deepEqual(titleParts(withoutAutoTitle(videoAuto)), {main: '', note: '', media: 'Rick Astley - Never Gonna Give You Up · Rick Astley'});
+  assert.equal(withoutAutoTitle({...videoAuto, title: '내가 붙인 제목'}).title, '내가 붙인 제목', '다른 제목은 사용자 제목');
 
   for (const path of VIEWS) {
     assert.ok(html[path].includes('data-title-edit'), path + ': 제목 고치기 단추');
@@ -273,4 +280,44 @@ test('좁은 화면 탭 판정: 돋보기가 켜져도 같은 자리에서 떼�
   for (const [mode, longPressed, dx, dy, hasMoment, width, cancel, expected] of cases) {
     assert.equal(tapIntent({ mode, longPressed, dx, dy, hasMoment, width, cancel }), expected, [mode, dx, dy, width, cancel].join('/'));
   }
+});
+
+// ── #345 순간 면·여기까지 온 길 표시 규칙 ───────────────────────────────────────
+test('14. 출처 줄·편집 손잡이: 표시 규칙은 함수가 정한다(#345)', () => {
+  assert.equal(mediaSourceText({title: '영상 제목', channel: '채널'}), '영상 제목 · 채널');
+  assert.equal(mediaSourceText({title: '영상 제목'}), '영상 제목');
+  assert.equal(mediaSourceText({channel: '채널'}), '', '제목이 없으면 원본 링크만');
+  assert.equal(mediaSourceText({}), '');
+  // 공유·예시(읽기 전용)에는 편집 손잡이가 하나도 없다.
+  assert.deepEqual(editAffordances({readOnly: true, hasTitle: true, hasNote: false}), {title: false, hint: false, guide: false});
+  assert.deepEqual(editAffordances({synthetic: true, hasTitle: true, hasNote: false}), {title: false, hint: false, guide: false});
+  // 내 기록: 제목이 있으면 제목 단추+✎, 마음이 비면 흐린 안내.
+  assert.deepEqual(editAffordances({hasTitle: true, hasNote: false}), {title: true, hint: true, guide: true});
+  assert.deepEqual(editAffordances({hasTitle: true, hasNote: true}), {title: true, hint: true, guide: false});
+  assert.deepEqual(editAffordances({hasTitle: false, hasNote: true}), {title: false, hint: false, guide: false});
+  assert.deepEqual(editAffordances({hasTitle: false, hasNote: false}), {title: false, hint: false, guide: true});
+});
+
+test('15. #345 마크업: 여기까지 온 길·세로 타임라인·출처 줄·감정 점·마음 안내', () => {
+  const src = html[VIEWS[0]];
+  assert.ok(!src.includes('경로 한눈에'), '옛 이름은 남기지 않는다');
+  assert.ok(src.includes('>여기까지 온 길</button>'), '도구 줄 버튼 이름');
+  assert.ok(src.includes('<h2 id="overviewTitle">여기까지 온 길</h2>'), '창 제목');
+  assert.ok(src.includes('처음 좋아하게 된 순간부터 지금 보는 순간까지예요. 누르면 그 장으로 넘어가요.'), '설명 문구');
+  assert.ok(src.includes('id="journeySummary"'), 'N단계 · N일 자리');
+  assert.ok(src.includes('class="overview" id="overview" inert'), '닫힌 창은 포커스 대상이 아니다');
+  assert.ok(src.includes('class="journey-item'), '세로 타임라인 칸');
+  assert.ok(src.includes('journey-reason'), '칸 사이 연결 이유');
+  assert.ok(src.includes('journey-now'), '지금 보는 순간');
+  assert.ok(src.includes('media-source-link'), '영상 아래 원본 링크');
+  assert.ok(src.includes('moment-emotion'), '감정 점+글자');
+  assert.ok(src.includes('moment-date'), '제목 위 날짜');
+  assert.ok(src.includes('data-note-edit'), '빈 마음 안내(누르면 쓰기)');
+  assert.ok(src.includes("data-title-edit"), '제목 바로 고치기');
+  // 세로 타임라인은 가로 흐름 스타일을 쓰지 않는다(옛 overview-flow 규칙 제거).
+  assert.ok(!src.includes('.overview-flow{display:flex'), '옛 가로 흐름 CSS 없음');
+  assert.ok(/html\[data-v41-screen=book\] \.journey\{[^}]*overflow-y:auto/.test(src), '390에서 세로 스크롤');
+  assert.ok(/html\[data-v41-screen=book\] \.journey:before\{[^}]*background:var\(--lt-gold-line\)/.test(src), '금색 선 연결');
+  assert.ok(/html\[data-v41-screen=book\] \.journey-item\.current \.journey-node\{[^}]*background:var\(--lt-gold\)/.test(src), '지금 보는 순간 금색 점');
+  assert.ok(/\.moment-title \.moment-note\.is-empty\{[^}]*border-left:2px solid var\(--lt-gold-line\)/.test(src), '흐린 마음 안내');
 });

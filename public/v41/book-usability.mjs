@@ -17,10 +17,31 @@ export function displayTitle(title) {
   return isUserTitle(title) ? String(title).trim() : '';
 }
 
-/** 저장된 자동 제목을 표시 단계에서만 걸러 낸다. 데이터는 그대로 두고 화면용 값만 바꾼다. */
+/**
+ * 저장된 자동 제목을 표시 단계에서만 걸러 낸다. 데이터는 그대로 두고 화면용 값만 바꾼다.
+ * #345: #344가 저장한 영상 제목(mediaMetadata.title과 같은 값)도 자동 제목으로 본다 —
+ * 큰 제목과 영상 아래 출처 줄이 같은 글자를 두 번 보여 주지 않게, 영상 제목은 출처 줄에만 둔다.
+ */
 export function withoutAutoTitle(moment) {
-  if (!moment || isUserTitle(moment.title)) return moment;
+  if (!moment) return moment;
+  const title = String(moment.title ?? '').trim();
+  const mediaTitle = typeof moment.mediaMetadata?.title === 'string' ? moment.mediaMetadata.title.trim() : '';
+  if (isUserTitle(title) && !(mediaTitle && title === mediaTitle)) return moment;
   return { ...moment, title: '' };
+}
+
+/**
+ * #345: 이 순간 면에 어떤 편집 손잡이를 그릴지 한 곳에서 정한다.
+ * 공유·예시(readOnly)와 동반(합성) 페이지에는 편집 손잡이를 그리지 않는다.
+ * 제목이 있으면 제목 단추+작은 ✎, 마음 한마디가 비었으면 흐린 안내(쓰기)를 그린다.
+ */
+export function editAffordances({readOnly = false, synthetic = false, hasTitle = false, hasNote = false} = {}) {
+  const writable = !readOnly && !synthetic;
+  return {
+    title: writable && hasTitle,
+    hint: writable && hasTitle,
+    guide: writable && !hasNote
+  };
 }
 
 /**
@@ -31,6 +52,17 @@ export function titleParts(moment = {}) {
   const meta = moment.mediaMetadata || {};
   const sub = [meta.title, meta.channel].filter((value) => typeof value === 'string' && value.trim()).join(' · ');
   return { main: displayTitle(moment.title), note: String(moment.note ?? '').trim(), media: sub.trim() };
+}
+
+/**
+ * #345: 영상 바로 아래 출처 한 줄의 문구. mediaMetadata.title이 없으면 빈 값 —
+ * 화면은 그때 원본 링크(YouTube ↗)만 보여 준다.
+ */
+export function mediaSourceText(mediaMetadata = {}) {
+  const title = typeof mediaMetadata?.title === 'string' ? mediaMetadata.title.trim() : '';
+  if (!title) return '';
+  const channel = typeof mediaMetadata?.channel === 'string' ? mediaMetadata.channel.trim() : '';
+  return channel ? `${title} · ${channel}` : title;
 }
 
 /** YouTube oEmbed 프록시로 이미 받아 둔 영상 제목(작은 글씨용). 받기 전에는 빈 값. */
