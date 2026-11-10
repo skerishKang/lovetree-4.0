@@ -15,7 +15,6 @@ export function createCleanup(deps) {
   const momentTitle = deps.momentTitle || (() => '');
   let fromTreeId = '';
   let noticeTimer = null;
-
   function writable() {
     const snap = getMember()?.snapshot();
     return !!snap?.owned && !!snap?.writable;
@@ -67,7 +66,8 @@ export function createCleanup(deps) {
       }
       const text = document.createElement('span');
       const title = momentTitle(moment);
-      text.textContent = moment.parentId === null && title ? `${title} · 시작 순간` : (title || String(moment.title ?? ''));
+      // 빈 값은 빈 값으로 둔다 — 원시 자동 제목("…에서 간직한 순간")은 화면에 내보내지 않는다.
+      text.textContent = moment.parentId === null && title ? `${title} · 시작 순간` : (title||'');
       label.append(box);
       if (thumbNode) label.append(thumbNode);
       label.append(text);

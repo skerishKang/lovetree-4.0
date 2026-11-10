@@ -50,7 +50,8 @@ test('3. 정리 목록은 주입된 화면 규칙으로 제목·썸네일을 그
   globalThis.window = {LT41: {tree: {id: 'inbox', inbox: true, moments: [
     {id: 'm1', title: 'youtube.com에서 간직한 순간', parentId: null, url: 'https://youtu.be/abcdefghijk', mediaMetadata: {title: '영상 제목', thumbnail: 'https://i.ytimg.com/vi/abcdefghijk/hqdefault.jpg'}},
     {id: 'm2', title: '내 제목', parentId: 'm1', url: 'https://example.com/x', mediaMetadata: {}},
-  ]}}};
+    {id: 'm3', title: 'youtu.be에서 간직한 순간', parentId: 'm2', url: 'https://youtu.be/z', mediaMetadata: {}},
+   ]}}};
   const chosen = [];
   const cleanup = createCleanup({
     $: id => els[id],
@@ -61,18 +62,20 @@ test('3. 정리 목록은 주입된 화면 규칙으로 제목·썸네일을 그
     notify: () => {},
     panel: () => {},
     treeMomentThumb: moment => moment.mediaMetadata?.thumbnail || '',
-    momentTitle: moment => titleView(moment, 'both').main,
+    momentTitle: moment => titleView(moment, 'both').main || withoutAutoTitle(moment).title,
   });
   assert.equal(cleanup.open({}), true);
   const host = els['cleanup-moments'];
-  assert.equal(host.children.length, 2, '두 순간');
-  const [first, second] = host.children;
+  assert.equal(host.children.length, 3, '세 순간');
+  const [first, second, third] = host.children;
   assert.equal(first.children[0].tagName, 'INPUT');
   assert.equal(first.children[0].checked, false);
   assert.equal(first.children[1].src, 'https://i.ytimg.com/vi/abcdefghijk/hqdefault.jpg', '썸네일 연결');
   assert.equal(first.children[2].textContent, '영상 제목 · 시작 순간', '자동 제목 대신 화면 규칙 제목');
   assert.equal(second.children.length, 2, '썸네일 없는 순간은 img 없이');
   assert.equal(second.children[1].textContent, '내 제목');
+  assert.equal(third.children.length, 2, '자동 제목·미디어 없음 → img 없이 빈 제목');
+  assert.equal(third.children[1].textContent, '');
   delete globalThis.document;
   delete globalThis.window;
 });
