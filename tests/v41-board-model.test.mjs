@@ -11,7 +11,7 @@ const BOARD = fs.readFileSync(new URL('../public/v41/views/board/board.js', impo
 const EXTRAS = fs.readFileSync(new URL('../public/v41/views/board/board-extras.js', import.meta.url), 'utf8');
 
 test('0. 보드 한 벌: 화면이 부르는 함수가 전부 있다', () => {
-  assert.deepEqual(Object.keys(M).sort(), ['cardPosition', 'cinemaBeats', 'collectPath', 'cursorEffectAllowed', 'cursorHover', 'cursorMode', 'cursorScale', 'decorationMotion', 'detailButtonState', 'editGuard', 'escapeHTML', 'filterVisible', 'fitZoom', 'maxCreatedOrder', 'nextConnections', 'removeConnection', 'threadPath', 'threadRedrawStep']);
+  assert.deepEqual(Object.keys(M).sort(), ['cardPosition', 'cinemaBeats', 'collectPath', 'cursorEffectAllowed', 'cursorHover', 'cursorMode', 'cursorPresence', 'cursorScale', 'decorationMotion', 'detailButtonState', 'editGuard', 'escapeHTML', 'filterVisible', 'fitZoom', 'maxCreatedOrder', 'nextConnections', 'removeConnection', 'threadPath', 'threadRedrawStep']);
   for (const fn of Object.keys(M)) assert.equal(typeof M[fn], 'function', fn);
 });
 
@@ -298,4 +298,19 @@ test('23. 커서 화면 배선: 위치는 translate3d·프레임당 1회, 크기
   assert.match(EXTRAS, /LT58Model\.cursorHover\(/, '반응 대상은 계산 한 벌을 쓴다');
   assert.match(EXTRAS, /LT58Model\.cursorScale\(/, '배율은 계산 한 벌을 쓴다');
   assert.match(EXTRAS, /LT58Model\.cursorEffectAllowed\(/, '효과 한도는 계산 한 벌을 쓴다');
+});
+
+test('24. 커서 표시 판정(#361 후속): 보드 밖·탭 숨김·포커스 아웃이면 숨김, 다시 들어오면 보임', () => {
+  assert.equal(M.cursorPresence({}), 'shown');
+  assert.equal(M.cursorPresence({ seen: true }), 'shown');
+  assert.equal(M.cursorPresence({ seen: false }), 'hidden');
+  assert.equal(M.cursorPresence({ outside: true }), 'hidden');
+  assert.equal(M.cursorPresence({ blurred: true }), 'hidden');
+  assert.equal(M.cursorPresence({ hidden: true }), 'hidden');
+  assert.equal(M.cursorPresence({ outside: true, seen: false }), 'hidden');
+  // 세기 증명: 밖/숨김 판정을 풀면 답이 달라진다.
+  assert.notEqual(M.cursorPresence({ outside: true }), M.cursorPresence({ outside: false }));
+  assert.notEqual(M.cursorPresence({ blurred: true }), M.cursorPresence({ blurred: false }));
+  assert.notEqual(M.cursorPresence({ hidden: true }), M.cursorPresence({ hidden: false }));
+  assert.notEqual(M.cursorPresence({ seen: false }), M.cursorPresence({ seen: true }));
 });
