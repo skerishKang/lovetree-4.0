@@ -157,5 +157,11 @@ window.LT58Model = (() => {
     return active < cap;
   }
 
-  return { escapeHTML, cardPosition, threadPath, fitZoom, removeConnection, editGuard, collectPath, nextConnections, detailButtonState, cinemaBeats, filterVisible, maxCreatedOrder, threadRedrawStep, decorationMotion, cursorMode, cursorHover, cursorScale, cursorEffectAllowed };
+  // #361 후속: 커서가 보드 밖으로 나갔거나 탭이 가려지면 숨긴다. 다시 들어오면 그 위치에서 보인다.
+  function cursorPresence({ seen = true, outside = false, blurred = false, hidden = false } = {}) {
+    if (outside || blurred || hidden) return 'hidden';
+    return seen ? 'shown' : 'hidden';
+  }
+
+  return { escapeHTML, cardPosition, threadPath, fitZoom, removeConnection, editGuard, collectPath, nextConnections, detailButtonState, cinemaBeats, filterVisible, maxCreatedOrder, threadRedrawStep, decorationMotion, cursorMode, cursorHover, cursorScale, cursorEffectAllowed, cursorPresence };
 })();
