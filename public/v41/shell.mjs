@@ -26,10 +26,29 @@ import {createDialogs} from './shell/dialogs.mjs';
 import {createLocation} from './shell/location.mjs';
 import {createNotifier} from './shell/notice.mjs';
 import {paintLoginLinks,paintThemeControls,applyTheme as applyThemeFor,toggleTheme as toggleThemeFor} from './shell/theme.mjs';
+import {normalizeTitleDisplay} from './domain.mjs';
+import {backfillVideoTitles} from './title-backfill.mjs';
 const $=id=>document.getElementById(id);
 // 안내 한 벌(#353 후속): 담기·중복·로그인 필요 안내(hold)가 상태 안내보다 먼저 일정 시간 보인다.
 const shellNotice=createNotifier({$});
 function notify(text,options){return shellNotice.notify(text,options);}
+// #347 후속: 계정 제목 보기 설정. 계정 상태(state.prefs.titleDisplay)에 저장하고 화면에 알린다.
+function currentPrefs(){try{return member?.state?.().prefs||{titleDisplay:'both'}}catch{return {titleDisplay:'both'}}}
+function titleDisplayValue(){return normalizeTitleDisplay(currentPrefs().titleDisplay)}
+function paintTitleDisplayControls(){const value=titleDisplayValue();for(const b of document.querySelectorAll('[data-title-display]'))b.setAttribute('aria-checked',String(b.dataset.titleDisplay===value));}
+function postTitleDisplay(){try{$('view').contentWindow.postMessage({type:'lt41-title-display',value:titleDisplayValue()},location.origin)}catch{}}
+function setTitleDisplay(value){
+ if(!member?.snapshot().owned){notify('로그인한 뒤 제목 보기를 바꿀 수 있어요.');return;}
+ try{member.apply('setPrefs',{titleDisplay:value});}catch(e){notify('제목 보기를 저장하지 못했어요. 잠시 뒤 다시 시도해 주세요.');return;}
+ if(window.LT41)window.LT41.prefs=member.state().prefs;
+ paintTitleDisplayControls();
+ postTitleDisplay();
+}
+let backfillStarted=false,backfillAttempted=new Set();
+async function runTitleBackfill(state,session){
+ if(source!=='server'||!session.snapshot().owned)return;
+ await backfillVideoTitles({state,source,apply:(action,input)=>session.apply(action,input),attempted:backfillAttempted});
+}
 function themedView(){return themedViewFor(current);}
 function applyTheme(theme=readTheme(localStorage)){return applyThemeFor(current,theme);}
 function toggleTheme(){return toggleThemeFor(current);}
@@ -305,7 +324,7 @@ $('tree-tips-close')?.addEventListener('click',()=>closeTreeTips());
 // 넘치는 쪽 끝에만 페이드를 켜서 잘린 것이 아니라 더 있다는 신호를 준다. 데스크톱(넓은 폭)은 스크롤이 없어 아무 일도 하지 않는다.
 const navBar=document.querySelector('.app-header nav');
 const narrowNav=()=>matchMedia('(max-width:780px)').matches;
-function choose(id,momentId){const tree=model.trees.find(t=>t.id===id);window.LT41=tree?{tree,trees:model.trees,source,momentId:tree.moments.find(m=>m.id===momentId)?.id||tree.moments.find(m=>m.parentId===null)?.id||tree.moments[0]?.id,}:null;
+function choose(id,momentId){const tree=model.trees.find(t=>t.id===id);window.LT41=tree?{tree,trees:model.trees,source,momentId:tree.moments.find(m=>m.id===momentId)?.id||tree.moments.find(m=>m.parentId===null)?.id||tree.moments[0]?.id,prefs:currentPrefs(),}:null;
  if(tree||current==='src064-orbit.html')show(current,false);else{flowNavigation();document.body.classList.remove('home-screen');hideFrames();$('empty').hidden=false;links();}}
 function load(input,kind,selection={},fallback={}){
  model=kind==='example'?{trees:[exampleTree]}:workspaceModel(input);
@@ -372,12 +391,15 @@ function memberStatus(status){
  else if(!status.dirty&&status.phase==='offline')notify(status.detail||'내 기록을 불러오지 못했어요.');
  $('write-menu').textContent=status.dirty?'미저장 기록' :'순간 남기기';$('empty-records').textContent=status.writable?'첫 트리 만들기':'내 기록 불러오기';previousDirty=status.dirty;renderAccount();flowNavigation();document.body.dataset.member=member?.snapshot().owned?'in':'out';document.body.dataset.treeCount=String(model?.trees?.length||0);
 }
-async function startMember(){setMemberRefreshStarted(true);if(!leaveMember())return;const startup=parseSelectionRoute(location.hash);if(startup.scope==='owner')stashPendingOwnerRoute(sessionStorage,location.hash);++loadGeneration;const generation=loadGeneration;clear();
+async function startMember(){setMemberRefreshStarted(true);if(!leaveMember())return;backfillStarted=false;backfillAttempted.clear();const startup=parseSelectionRoute(location.hash);if(startup.scope==='owner')stashPendingOwnerRoute(sessionStorage,location.hash);++loadGeneration;const generation=loadGeneration;clear();
  const api=createWorkspaceApi({fetchImpl:(url,init)=>fetch(init?.method==='GET'&&url==='/api/workspace'?'/api/workspace?features=bound-writes':url,init)});
  let initialized=false,startupNotice='',session;
  session=createMemberSession({api,onState:(state,selection)=>{if(generation!==loadGeneration)return;const snapshot=session.snapshot(),saved=accountPosition(localStorage,snapshot.subject)||{},active=parseSelectionRoute(location.hash),pending=!initialized&&active.scope!=='owner'?pendingOwnerRoute(sessionStorage):null,route=active.scope==='owner'?active:pending;let requested=selection||stateSelection();
    if(!initialized){if(route)requested=route;else if(!selection)requested=saved;const view=memberStartupView(active,route,saved,viewForFile(current));current=screenForView(view)[1];}
    const resolved=load({revision:0,state},'server',requested,saved);initialized=true;
+   if(window.LT41)window.LT41.prefs=state.prefs;
+   paintTitleDisplayControls();
+   if(!backfillStarted&&snapshot.owned){backfillStarted=true;void runTitleBackfill(state,session);}
    if(snapshot.owned&&resolved.position.treeId){if(viewForFile(current)!=='home')writeLocation('replace');takePendingOwnerRoute(sessionStorage);if(route?.scope==='owner'&&resolved.treeMissing)startupNotice='이 주소의 기록을 현재 계정에서 찾을 수 없어 최근 위치를 열었어요.';else if(route?.scope==='owner'&&resolved.momentMissing)startupNotice='이 주소의 순간을 찾을 수 없어 트리의 시작 순간을 열었어요.';}
  },onStatus:status=>{if(generation===loadGeneration)memberStatus(status);},
  navigate:url=>{
@@ -410,6 +432,7 @@ $('account-avatar').onclick=e=>{
  $('account-assets-open').onclick=()=>{closeAccountMenu();openAssets($('account-avatar'));};
  $('editor-assets-open').onclick=()=>openAssets($('editor-assets-open'));
  $('account-theme').onclick=()=>{toggleTheme();closeAccountMenu();};
+ for(const b of document.querySelectorAll('[data-title-display]'))b.onclick=()=>setTitleDisplay(b.dataset.titleDisplay);
  $('account-logout').onclick=async()=>{closeAccountMenu();$('logout').click();};
 document.addEventListener('click',e=>{
  if(!e.target.closest('.account-slot'))closeAccountMenu();
@@ -496,7 +519,7 @@ async function showPublicRoute(route){
 }
 document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{if(b.dataset.view==='track32-bookshelf.html'&&!member?.snapshot().owned){openLoginStart('shelf');return;}show(b.dataset.view);});
 for(const f of frames())f.addEventListener('load',()=>frameLoaded(f));
-paintThemeControls();applyTheme();
+paintThemeControls();applyTheme();paintTitleDisplayControls();
 if(initialRoute.scope==='public')showPublicRoute(initialRoute);else load(null,'example');
 
 function backup(){const data=member?.state();if(!data){notify('백업할 내 기록이 없어요.');return;}const a=document.createElement('a'),url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));a.href=url;a.download='lovetree-draft.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),0);}
