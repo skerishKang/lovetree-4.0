@@ -21,7 +21,7 @@ function fakeEl(extra = {}) {
   };
 }
 
-function harness({ owned = false, trees = 0, tree = null, source = 'example', current = 'src064-orbit.html', dirty = false } = {}) {
+function harness({ owned = false, trees = 0, tree = null, source = 'example', current = 'src064-orbit.html', dirty = false, accountApi = null, subject = 's1' } = {}) {
   const els = {
     'tree-views': fakeEl(),
     'record-menu': fakeEl(),
@@ -39,7 +39,7 @@ function harness({ owned = false, trees = 0, tree = null, source = 'example', cu
   globalThis.window = globalThis;
   globalThis.LT41 = tree ? { tree } : null;
   let tips = 0;
-  const member = { snapshot: () => ({ owned, writable: true, dirty, subject: 's1' }) };
+  const member = { snapshot: () => ({ owned, writable: true, dirty, subject }) };
   const header = createHeader({
     $: id => els[id] ?? null,
     navBar: null,
@@ -47,7 +47,7 @@ function harness({ owned = false, trees = 0, tree = null, source = 'example', cu
     getModel: () => (trees === null ? null : { trees: Array.from({ length: trees }, (_, i) => ({ id: 't' + i })) }),
     getSource: () => source,
     getCurrent: () => current,
-    accountApi: { account: async () => ({ ok: false }) },
+    accountApi: accountApi ?? { account: async () => ({ ok: false }) },
     delegate: { syncTreeTips: () => { tips += 1; } }
   });
 
@@ -133,5 +133,55 @@ test('closeAccountMenu: 열려 있을 때만 닫는다', () => {
     assert.equal(h.els['account-popover'].hidden, true);
   } finally {
     h.restore();
+  }
+});
+
+// #368 1·2: 계정 메뉴는 본인만 보는 곳이라 이메일을 가리지 않고 전체를 보여 준다.
+test('renderAccount: 이메일이 있으면 계정 메뉴에 전체 이메일을 보여 주고 가리지 않는다', async () => {
+  const email = 'kimbs5993+tutorial02@example.com';
+  const h = harness({
+    owned: true,
+    accountApi: { account: async () => ({ ok: true, confirmKind: 'email', email }) }
+  });
+  try {
+    await h.header.loadAccountEmail();
+    assert.equal(h.els['account-email'].textContent, email, '전체 이메일 표시, mask(•) 없음');
+    assert.ok(!h.els['account-email'].textContent.includes('•'), '마스킹 문자가 없다');
+    assert.equal(h.els['account-avatar'].textContent, 'K', '동그라미 글자 = 이메일 첫 글자(대문자)');
+    assert.equal(h.els['account-avatar'].getAttribute('aria-label'), `내 계정 메뉴, ${email}으로 로그인됨`);
+  } finally {
+    h.restore();
+  }
+});
+
+test('renderAccount: 이메일이 없으면 subject 첫 글자로 동그라미, 표시는 내 계정', () => {
+  const h = harness({ owned: true, subject: 'usr_member_abc' });
+  try {
+    h.header.renderAccount();
+    assert.equal(h.els['account-email'].textContent, '내 계정', '이메일 없을 때 표시는 내 계정');
+    assert.equal(h.els['account-avatar'].textContent, 'U', '이메일 없으면 subject 첫 글자 규칙');
+    assert.equal(h.els['account-avatar'].getAttribute('aria-label'), '내 계정 메뉴, 내 계정으로 로그인됨');
+  } finally {
+    h.restore();
+  }
+});
+
+test('loadAccountEmail: 계정 API가 이메일을 주면 갱신하고, 아니면 그대로 둔다', async () => {
+  const email = 'fan02@love.io';
+  const loaded = harness({ owned: true, accountApi: { account: async () => ({ ok: true, confirmKind: 'email', email }) } });
+  try {
+    await loaded.header.loadAccountEmail();
+    assert.equal(loaded.header.currentAccountEmail(), email);
+    assert.equal(loaded.els['account-email'].textContent, email);
+  } finally {
+    loaded.restore();
+  }
+  const none = harness({ owned: true, accountApi: { account: async () => ({ ok: true, confirmKind: 'phrase' }) } });
+  try {
+    await none.header.loadAccountEmail();
+    assert.equal(none.header.currentAccountEmail(), '', '이메일 없으면 빈 값 유지');
+    assert.equal(none.els['account-email'].textContent, '내 계정');
+  } finally {
+    none.restore();
   }
 });
