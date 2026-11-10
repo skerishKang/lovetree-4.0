@@ -24,8 +24,12 @@ import {createCleanup} from './shell/cleanup.mjs';
 import {headerBadge, pickerLabel, isInboxTree} from './inbox-model.mjs';
 import {createDialogs} from './shell/dialogs.mjs';
 import {createLocation} from './shell/location.mjs';
+import {createNotifier} from './shell/notice.mjs';
 import {paintLoginLinks,paintThemeControls,applyTheme as applyThemeFor,toggleTheme as toggleThemeFor} from './shell/theme.mjs';
 const $=id=>document.getElementById(id);
+// 안내 한 벌(#353 후속): 담기·중복·로그인 필요 안내(hold)가 상태 안내보다 먼저 일정 시간 보인다.
+const shellNotice=createNotifier({$});
+function notify(text,options){return shellNotice.notify(text,options);}
 function themedView(){return themedViewFor(current);}
 function applyTheme(theme=readTheme(localStorage)){return applyThemeFor(current,theme);}
 function toggleTheme(){return toggleThemeFor(current);}
@@ -50,7 +54,7 @@ document.addEventListener('keydown',event=>{
  if(event.key==='Escape'&&c.open&&![...document.querySelectorAll('dialog[open]')].some(d=>d!==c&&d.matches(':modal')))c.close();
 });
 const initialRoute=parseSelectionRoute(location.hash);
-let model=null,current=screenForView(initialRoute.view)[1],source='example',loadGeneration=0,toastTimer,previousDirty=false,member=null,handledHash=null,activeShareId=null;
+let model=null,current=screenForView(initialRoute.view)[1],source='example',loadGeneration=0,previousDirty=false,member=null,handledHash=null,activeShareId=null;
 setMemberRefreshStarted(false);
 const shareApi=createShareApi();
 const accountApi=createWorkspaceApi();
@@ -104,7 +108,8 @@ $('write-menu').onclick=()=>shellQuick.openWriteChooser();
 const shellIntake=createQuickIntake({
   getMember:()=>member,
   getSource:()=>source,
-  notify:text=>notify(text),
+  // 담기·중복·로그인 필요 안내는 방금 한 행동의 결과다 — 상태 안내가 곧바로 덮지 않게 hold로 띄운다(#353 후속).
+  notify:text=>notify(text,{hold:true}),
   openLoginStart:intent=>openLoginStart(intent),
   describe:(url)=>globalThis.LTMedia?.describe?.(url),
 });
@@ -196,7 +201,6 @@ const shellLocation=createLocation({
 });
 function writeLocation(mode){return shellLocation.writeLocation(mode);}
 function applyBrowserLocation(){return shellLocation.applyBrowserLocation();}
-function notify(text){$('record-feedback').textContent=text;$('toast').textContent=text;$('toast').hidden=$('records').open;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').hidden=true,6500);}
 const PENDING_NEW='lovetree.v41.pending-new';
 // 2026-11-07 계정 표시: 로그인 상태는 첫 글자 동그라미 + 작은 메뉴, 로그아웃 상태는 기존 로그인 알약.
 function panel(id){if(id==='records')updateAccountControls();const target=$(id);if(!target.open)target.showModal();}

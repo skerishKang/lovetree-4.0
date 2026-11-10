@@ -2,6 +2,13 @@
 
 > **main 보호 규칙(2026-11-09, 룰셋 "main 보호 (PR·필수 검사)")**: main은 PR로만 바꾼다(직접 푸시·force push·삭제 금지, 관리자도 예외 없음 — 비상시 대표가 룰셋 enforcement를 잠깐 끈다). 필수 검사: `check (ubuntu-latest)`·`check (windows-latest)`·`미리보기 postdeploy(로그아웃)` — 셋 다 paths 필터가 없어 문서만 바뀐 PR에서도 항상 돈다. 승인 수 0(레인이 스스로 머지). Deploy Bundle Boot Test는 paths 필터가 있어 필수에 넣지 않았다.
 
+## 2026-11-10 — #353 후속: 공유·붙여넣기 저장에도 영상 제목 + 담기 안내 우선 (로컬1, ai/local1-353-followup)
+
+- 배경: #353 운영 실측 2건 — ① `?qtext=`·붙여넣기 저장은 제목이 영상 제목이 아니라 도메인 규칙(`youtube.com에서 간직한 순간`)이었다(`intakeSave`가 mediaMetadata 없이 quickAdd 호출). ② 담기·중복·로그인 필요 안내가 같은 동기 상태 갱신의 상태 안내에 덮여 R3 중복·R8 재시도 문구가 최종 화면에 남지 않았다.
+- 구현: `public/v41/quick-intake.mjs` `resolveMediaMetadata`(기존 `fetchVideoTitle` oEmbed 재사용, 상한 4초·실패 시 주소만) → `shell/quick-intake.mjs`가 저장 전에 받아 `quickAdd {url, mediaMetadata}`로 넘기고 같은 주소는 기다리는 동안 한 번만 담는다(inFlight). `public/v41/shell/notice.mjs` 신규 `createNotifier` — 결과 안내(hold 3초)가 상태 안내보다 먼저 보인다(상태 안내는 다음 상태 변화에 다시 오므로 보류 큐 없이 억제만 하는 방식).
+- 시험: 함수 4건 + 가짜 DOM 5건 + 안내 4건(가짜 시계·DOM, shell 배선 글자 가드). 강도 증명 5회(mediaMetadata 제거 4실패·저장 media 전달 제거 3실패·inFlight 제거 1실패·hold 억제 제거 2실패·hold 배선 제거 1실패) 후 원복(cmp).
+- 검증: `npm test` 904건 866 pass/0 fail/37 skip, `npm run build` pass. 운영 실측은 머지·자동 배포 뒤 계정 02로 이어서 한다.
+
 ## 2026-11-10 — 미리보기 Functions 준비 대기(#337 후속): /api/account가 404가 아닌 응답까지 최대 60초 (로컬1, PR #338 머지 `3d50c09`)
 
 - 배경: #337 실측 — 미리보기 배포 직후 정적 자산만 열리고 Pages Functions가 붙기 전 /api/*가 404를 내는 창이 있어, 그 창에 검사가 걸리면 예외 허용 목록으로도 못 넘기는 진짜 실패가 된다. 미리보기 /api의 503은 의도된 상태이고, 미리보기에 `LOVETREE_API_ORIGIN`은 설정하지 않는다(운영 데이터 쓰기 위험) — 이 변경에도 설정 변경 없음.
