@@ -790,9 +790,12 @@ async function checkVisualTokens(page, target, opts, stamp) {
       const fr = ([document.getElementById('view'), document.getElementById('view-next')].find((el) => el && !el.hidden && el.getClientRects().length > 0) || document.getElementById('view'));
       const wm = document.getElementById('write-menu');
       const nav = document.querySelector('.app-header nav');
-      const navKids = nav ? [...nav.children] : [];
-      const recordIndex = navKids.findIndex((c) => c.id === 'record-menu');
-      const treeIndex = navKids.findIndex((c) => c.id === 'tree-views');
+      // #374: record-menu가 .tree-slot 안에 들어갔으므로 nav 직접 자식 인덱스 대신
+      // 문서 순서(compareDocumentPosition)로 "트리 선택이 기억책·보드·지도 앞"을 본다.
+      const recordEl = document.getElementById('record-menu');
+      const treeViewsEl = document.getElementById('tree-views');
+      const recordBeforeTreeViews = !!(recordEl && treeViewsEl
+        && (recordEl.compareDocumentPosition(treeViewsEl) & Node.DOCUMENT_POSITION_FOLLOWING));
       const avatar = document.getElementById('account-avatar');
       const login = document.getElementById('account-entry');
       const brandEl = document.querySelector('.brand');
@@ -809,7 +812,7 @@ async function checkVisualTokens(page, target, opts, stamp) {
         frameBorder: fr ? getComputedStyle(fr).borderColor : '',
         pillBorder: wm ? getComputedStyle(wm).borderColor : '',
         // 2026-11-07 상단 메뉴 재구성 기준
-        recordBeforeTreeViews: recordIndex >= 0 && treeIndex >= 0 && recordIndex < treeIndex,
+        recordBeforeTreeViews,
         recordLabel: (document.getElementById('source-label')?.textContent || '').trim(),
         writeGold: wm ? /255, 230, 166/.test(getComputedStyle(wm).borderColor) : false,
         writeBg: wm ? getComputedStyle(wm).backgroundColor : '',
@@ -1110,10 +1113,13 @@ async function checkSignedInActions(page, target, opts, stamp) {
   }
 
   // 3) 계정 메뉴: 동그라미 클릭 → 팝오버 열림, 바깥 클릭 → 닫힘.
+  // #374: 계정 메뉴가 메뉴를 정리해 테마·제목 보기·고급 기능 보기는 role="menuitemradio"·
+  // "menuitemcheckbox"가 됐으므로 [role=menuitem]만 세면 개수가 줄어든다. 메뉴 항목 전체
+  // ([role^=menuitem])를 세서 열림·닫힘을 확인한다.
   const popover = () => page.evaluate(() => ({
     hidden: document.getElementById('account-popover')?.hidden,
     expanded: document.getElementById('account-avatar')?.getAttribute('aria-expanded'),
-    items: [...(document.getElementById('account-popover')?.querySelectorAll('[role=menuitem]') || [])].map((n) => (n.textContent || '').trim())
+    items: [...(document.getElementById('account-popover')?.querySelectorAll('[role^=menuitem]') || [])].map((n) => (n.textContent || '').trim())
   })).catch(() => null);
   await clickSmart(page, '#account-avatar');
   await sleep(500);

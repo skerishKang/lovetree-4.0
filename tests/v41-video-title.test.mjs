@@ -30,7 +30,7 @@ test('우선순위: 사용자 입력 > 영상 제목 > 마음 한마디 첫 줄 
 test('영상 제목은 80자로 자르고, oEmbed를 못 받으면(빈 값) 기존 규칙으로 물러난다(두 벌 같다)', () => {
   const longTitle = '가'.repeat(90);
   const matrix = [
-    [{ url: YOUTUBE, mediaMetadata: { title: longTitle } }, '가'.repeat(80) + '…'],
+    [{ url: YOUTUBE, mediaMetadata: { title: longTitle } }, '가'.repeat(79) + '…'],
     [{ url: YOUTUBE, mediaMetadata: { title: '   ' } }, 'youtu.be에서 간직한 순간', 'oEmbed 실패·빈 값 → 기존 규칙'],
     [{ url: YOUTUBE, mediaMetadata: { title: 42 } }, 'youtu.be에서 간직한 순간', '문자열이 아닌 제목 → 기존 규칙'],
     [{ url: YOUTUBE }, 'youtu.be에서 간직한 순간'],
@@ -40,6 +40,70 @@ test('영상 제목은 80자로 자르고, oEmbed를 못 받으면(빈 값) 기�
   for (const [input, expected] of matrix) {
     assert.equal(suggestMomentTitle(input), expected, `src: ${JSON.stringify(input)}`);
     assert.equal(suggestMjs(input), expected, `mjs: ${JSON.stringify(input)}`);
+  }
+});
+
+test('긴 영상 제목: 79·80·81·82·200자 모두 80자 이하 제목이 되고 저장 검사를 통과한다(두 벌 같다)', () => {
+  const cases = [
+    ['가'.repeat(79), '가'.repeat(79)],
+    ['가'.repeat(80), '가'.repeat(80)],
+    ['가'.repeat(81), '가'.repeat(79) + '…'],
+    ['가'.repeat(82), '가'.repeat(79) + '…'],
+    ['영'.repeat(200), '영'.repeat(79) + '…'],
+  ];
+  for (const [videoTitle, expected] of cases) {
+    assert.ok(expected.length <= 80, `기대 제목도 80자 이하여야 한다: ${videoTitle.length}자 입력`);
+    for (const [suggest, quickAddFn, validate, empty] of [
+      [suggestMomentTitle, quickAdd, validateState, EMPTY_STATE],
+      [suggestMjs, quickAddMjs, validateReader, EMPTY_STATE_MJS],
+    ]) {
+      const title = suggest({ url: YOUTUBE, mediaMetadata: { title: videoTitle } });
+      assert.equal(title, expected, `${videoTitle.length}자 영상 제목`);
+      assert.ok(title.length <= 80, '80자를 넘으면 저장 검사에서 떨어진다');
+      assert.equal(title.endsWith('…'), videoTitle.length > 80, '80자를 넘는 제목은 말줄임으로 끝난다');
+      // 저장 검사(quickAdd → 서버 경계 validateState)까지 통과한다.
+      const saved = quickAddFn(empty(), { url: YOUTUBE, mediaMetadata: { title: videoTitle } });
+      assert.equal(saved.state.trees[0].moments[0].title, expected);
+      const revalidated = validate(JSON.parse(JSON.stringify(saved.state)));
+      assert.equal(revalidated.trees[0].moments[0].title, expected, '서버 재검증에서도 같은 제목');
+    }
+  }
+});
+
+test('긴 영상 제목: 한글·이모지(서로게이트 쌍)도 80자(UTF-16) 이하로 잘리고 쌍이 안 나뉜다(두 벌 같다)', () => {
+  const cases = [
+    // 한글 + 이모지 섞임: 코드포인트 80자(UTF-16 121) → 39한글 + 20이모지(79) + '…'
+    ['가'.repeat(39) + '🎤'.repeat(41), '가'.repeat(39) + '🎤'.repeat(20) + '…'],
+    // 이모지만: 코드포인트 45(UTF-16 90) → 39이모지(78) + '…'
+    ['🎤'.repeat(45), '🎤'.repeat(39) + '…'],
+    // 이모지만: 코드포인트 40(UTF-16 80) → 그대로
+    ['🎤'.repeat(40), '🎤'.repeat(40)],
+  ];
+  const noLoneSurrogates = (s) => {
+    for (let i = 0; i < s.length; i += 1) {
+      const hi = s.charCodeAt(i);
+      if (hi >= 0xd800 && hi <= 0xdbff) {
+        const lo = s.charCodeAt(i + 1);
+        if (lo < 0xdc00 || lo > 0xdfff) return false;
+        i += 1;
+      } else if (hi >= 0xdc00 && hi <= 0xdfff) return false;
+    }
+    return true;
+  };
+  for (const [videoTitle, expected] of cases) {
+    assert.ok(expected.length <= 80, 'UTF-16 길이 기준 80자 이하');
+    assert.ok(noLoneSurrogates(expected), '서로게이트 쌍이 안 나뉘어야 한다');
+    for (const [suggest, quickAddFn, validate, empty] of [
+      [suggestMomentTitle, quickAdd, validateState, EMPTY_STATE],
+      [suggestMjs, quickAddMjs, validateReader, EMPTY_STATE_MJS],
+    ]) {
+      const title = suggest({ url: YOUTUBE, mediaMetadata: { title: videoTitle } });
+      assert.equal(title, expected);
+      assert.ok(title.length <= 80, '저장 검사(UTF-16 길이)를 통과해야 한다');
+      const saved = quickAddFn(empty(), { url: YOUTUBE, mediaMetadata: { title: videoTitle } });
+      assert.equal(saved.state.trees[0].moments[0].title, expected);
+      assert.equal(validate(JSON.parse(JSON.stringify(saved.state))).trees[0].moments[0].title, expected);
+    }
   }
 });
 
