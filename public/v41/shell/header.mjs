@@ -60,15 +60,14 @@ function revealCurrentTab(){
 }
 if(navBar){navBar.addEventListener('scroll',updateNavFade,{passive:true});addEventListener('resize',()=>revealCurrentTab());}
 function closeAccountMenu(){const pop=$('account-popover');if(!pop||pop.hidden)return;pop.hidden=true;$('account-avatar').setAttribute('aria-expanded','false');}
-function maskEmail(value){const text=String(value||'').trim();const at=text.indexOf('@');if(at<=0)return text?text[0]+'•••':'내 계정';return text[0]+'•••'+text.slice(at);}
 function renderAccount(){const owned=!!getMember()?.snapshot().owned,view=accountPresentation({owned,email:accountEmail,subject:getMember()?.snapshot().subject||''});
- const login=$('account-entry'),avatar=$('account-avatar');
- if(view.mode==='login'){login.hidden=false;login.textContent='로그인';login.removeAttribute('aria-label');avatar.hidden=true;avatar.textContent='';const init=$('account-initial');if(init)init.textContent='';const mail=$('account-email');if(mail)mail.textContent='';closeAccountMenu();return;}
- login.hidden=true;avatar.hidden=false;avatar.textContent=view.initial;const masked=maskEmail(view.label);avatar.setAttribute('aria-label',`내 계정 메뉴, ${masked}로 로그인됨`);avatar.title='내 계정';
- const init=$('account-initial');if(init)init.textContent=view.initial;
- $('account-email').textContent=masked;}
+  const login=$('account-entry'),avatar=$('account-avatar');
+  if(view.mode==='login'){login.hidden=false;login.textContent='로그인';login.removeAttribute('aria-label');avatar.hidden=true;avatar.textContent='';const init=$('account-initial');if(init)init.textContent='';const mail=$('account-email');if(mail)mail.textContent='';closeAccountMenu();return;}
+  login.hidden=true;avatar.hidden=false;avatar.textContent=view.initial;avatar.setAttribute('aria-label',view.ariaLabel);avatar.title='내 계정';
+  const init=$('account-initial');if(init)init.textContent=view.initial;
+  $('account-email').textContent=view.label;}
 function openAccountMenu(){const owned=!!getMember()?.snapshot().owned;if(!owned){return;}const pop=$('account-popover');pop.hidden=false;$('account-avatar').setAttribute('aria-expanded','true');if(!accountEmail)void loadAccountEmail();}
-async function loadAccountEmail(){const answer=await accountApi.account().catch(()=>null);if(answer?.ok&&answer.email){accountEmail=answer.email;renderAccount();}}
+async function loadAccountEmail(){const answer=await accountApi.account().catch(()=>null);if(!answer?.ok)return;if(answer.email)accountEmail=answer.email;renderAccount();}
 function updateAccountControls(){const owned=!!getMember()?.snapshot().owned;document.querySelectorAll('[data-guest-login]').forEach(x=>x.hidden=owned);$('server').hidden=!owned;$('logout').hidden=!owned;$('account-settings-open').hidden=!owned;renderAccount();}
 
   return {
