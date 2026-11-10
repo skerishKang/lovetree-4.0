@@ -11,7 +11,7 @@ function setup(subjectId='usr_a',repo=createMemoryWorkspaceRepo()){
 }
 const get=(handle,query)=>handle({path:'/api/workspace',method:'GET',query:new URLSearchParams(query)});
 const put=(handle,payload)=>handle({path:'/api/workspace',method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify(payload)});
-const state=()=>({version:1,trees:[createTree({subject:'검수',title:'내 순간',note:'계정 경계 검수',emotion:'설렘',date:'2026-10-31',url:''})]});
+const state=()=>({version:1,trees:[createTree({subject:'검수',title:'내 순간',note:'계정 경계 검수',emotion:'설렘',date:'2026-10-31',url:''})],prefs:{titleDisplay:'both'}});
 test('capability is opt-in and matching subject keeps existing write contract',async()=>{
  const handle=setup();assert.equal(Object.hasOwn((await get(handle,'')).body,'writeSubjectBound'),false);
  assert.equal((await get(handle,'features=bound-writes')).body.writeSubjectBound,true);

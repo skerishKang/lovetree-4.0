@@ -12,6 +12,58 @@ export function isUserTitle(title) {
   return !AUTO_TITLE.test(value);
 }
 
+/* #347 후속(2026-11-10 대표 결정): 제목 보기 설정.
+   both = 큰 제목 내 제목 + 작은 줄 영상 제목, mine = 내 제목(없으면 영상), video = 영상 제목(없으면 내 제목). */
+export const TITLE_DISPLAYS = ['both', 'mine', 'video'];
+export function normalizeTitleDisplay(value) {
+  return TITLE_DISPLAYS.includes(value) ? value : 'both';
+}
+/** 셸 문맥(LT41)이나 화면 문맥(LTDEMO)에서 설정을 읽는다. 모르는 값은 둘 다. */
+export function readTitleDisplay(context) {
+  return normalizeTitleDisplay(context?.prefs?.titleDisplay ?? context?.titleDisplay);
+}
+
+/** 영상 제목(작은 글씨용). 받기 전에는 빈 값. */
+export function videoTitle(moment = {}) {
+  const meta = moment.mediaMetadata || {};
+  return typeof meta.title === 'string' ? meta.title.trim() : '';
+}
+
+/** 내가 쓴 제목만. 빈 값·도메인 자동 제목·#344가 채운 영상 제목과 같은 값은 '없음'. */
+export function userTitleText(moment = {}) {
+  const title = String(moment.title ?? '').trim();
+  if (!isUserTitle(title)) return '';
+  const media = videoTitle(moment);
+  if (media && title === media) return '';
+  return title;
+}
+
+/**
+ * 화면에 쓸 제목 한 벌(#347 후속). 큰 제목(main)과 작은 줄(sub)을 돌려준다.
+ * - both: main = 내 제목(없으면 영상 제목), sub = 내 제목과 영상 제목이 둘 다 있을 때만 영상 제목
+ * - mine: main = 내 제목(없으면 영상 제목), sub 없음
+ * - video: main = 영상 제목(없으면 내 제목), sub 없음
+ */
+export function titleView(moment = {}, setting = 'both') {
+  const mode = normalizeTitleDisplay(setting);
+  const mine = userTitleText(moment);
+  const video = videoTitle(moment);
+  const main = mode === 'video' ? (video || mine) : (mine || video);
+  const sub = mode === 'both' && mine && video ? video : '';
+  return { setting: mode, main, sub, mine, video, note: String(moment.note ?? '').trim() };
+}
+
+/** 화면에 보이는 날짜 표기: "2026. 11. 10". 저장 형식은 건드리지 않는다. */
+export function formatDisplayDate(value) {
+  const raw = String(value ?? '').trim();
+  if (!raw) return '';
+  const matched = raw.match(/^(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})/);
+  if (matched) return `${matched[1]}. ${matched[2].padStart(2, '0')}. ${matched[3].padStart(2, '0')}`;
+  const date = new Date(raw);
+  if (Number.isNaN(date.getTime())) return raw;
+  return `${date.getFullYear()}. ${String(date.getMonth() + 1).padStart(2, '0')}. ${String(date.getDate()).padStart(2, '0')}`;
+}
+
 /** 화면에 쓸 제목. 직접 쓴 제목이 없으면 ''(렌더러가 마음 한마디를 큰 글씨로 쓴다). */
 export function displayTitle(title) {
   return isUserTitle(title) ? String(title).trim() : '';
@@ -63,12 +115,6 @@ export function mediaSourceText(mediaMetadata = {}) {
   if (!title) return '';
   const channel = typeof mediaMetadata?.channel === 'string' ? mediaMetadata.channel.trim() : '';
   return channel ? `${title} · ${channel}` : title;
-}
-
-/** YouTube oEmbed 프록시로 이미 받아 둔 영상 제목(작은 글씨용). 받기 전에는 빈 값. */
-export function videoTitle(moment = {}) {
-  const meta = moment.mediaMetadata || {};
-  return typeof meta.title === 'string' ? meta.title.trim() : '';
 }
 
 const YT_ID = /^[A-Za-z0-9_-]{11}$/;

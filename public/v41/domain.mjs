@@ -12,7 +12,19 @@ export const MAX_LINKS = 20;
 // #327(① 데이터 규칙): 빠른 추가가 순간을 모아 두는 기본 트리. 트리 이름·대상 기본값이다.
 // src/domain.js(서버가 쓰는 같은 규칙)의 상수와 같은지 tests/v41-inbox-data.test.mjs가 확인한다.
 export const INBOX_SUBJECT = '모아둔 순간';
-export const EMPTY_STATE = () => ({ version: 1, trees: [] });
+export const TITLE_DISPLAYS = ['both', 'mine', 'video'];
+export const DEFAULT_TITLE_DISPLAY = 'both';
+// 제목 보기 설정(#347 후속): 모르는 값은 기본 '둘 다'. 상태(state.prefs)에 저장한다.
+export function normalizeTitleDisplay(value) {
+  return TITLE_DISPLAYS.includes(value) ? value : DEFAULT_TITLE_DISPLAY;
+}
+export function normalizePrefs(value) {
+  return { titleDisplay: normalizeTitleDisplay(value?.titleDisplay) };
+}
+export function updatePrefs(state, patch = {}) {
+  return { ...state, version: 1, prefs: normalizePrefs({ ...(state?.prefs || {}), ...(patch || {}) }) };
+}
+export const EMPTY_STATE = () => ({ version: 1, trees: [], prefs: normalizePrefs() });
 
 export function newId(provider = globalThis.crypto) {
   if (typeof provider?.randomUUID === 'function') return provider.randomUUID();
@@ -213,10 +225,10 @@ export function quickAdd(state, input, clock = new Date().toISOString()) {
   if (!inbox) {
     if (trees.length >= MAX_TREES) throw new Error(`트리는 ${MAX_TREES}개까지 만들 수 있어요.`);
     const tree = { id: newId(), subject: INBOX_SUBJECT, title: INBOX_SUBJECT, coverMomentId: '', coverDesign: '', inbox: true, createdAt: clock, updatedAt: clock, moments: [moment] };
-    return { state: { version: 1, trees: [...trees, tree] }, treeId: tree.id, momentId: moment.id };
+    return { state: { version: 1, trees: [...trees, tree], prefs: normalizePrefs(state.prefs) }, treeId: tree.id, momentId: moment.id };
   }
   const grown = addMoment(inbox, { url: input?.url || '', mediaMetadata: input?.mediaMetadata }, inbox.moments.find(m => m.parentId === null).id, clock);
-  return { state: { version: 1, trees: trees.map(tree => tree.id === inbox.id ? grown : tree) }, treeId: inbox.id, momentId: grown.moments.at(-1).id };
+  return { state: { version: 1, trees: trees.map(tree => tree.id === inbox.id ? grown : tree), prefs: normalizePrefs(state.prefs) }, treeId: inbox.id, momentId: grown.moments.at(-1).id };
 }
 
 // #327(① 데이터 규칙): 순간 하나를 다른 트리로 옮긴다. 자식은 함께 가지 않고 원래 트리에
@@ -238,10 +250,10 @@ export function moveMoment(state, fromTreeId, momentId, toTreeId, parentId, cloc
   const targetNext = { ...target, updatedAt: clock, moments: [...target.moments, moved] };
   const moments = detachMoments(from, new Set([momentId]));
   if (!moments.length) {
-    return { state: { version: 1, trees: state.trees.filter(tree => tree.id !== fromTreeId).map(tree => tree.id === toTreeId ? targetNext : tree) }, treeId: toTreeId, momentId };
+    return { state: { version: 1, trees: state.trees.filter(tree => tree.id !== fromTreeId).map(tree => tree.id === toTreeId ? targetNext : tree), prefs: normalizePrefs(state.prefs) }, treeId: toTreeId, momentId };
   }
   const fromNext = { ...from, coverMomentId: from.coverMomentId === momentId ? '' : from.coverMomentId || '', updatedAt: clock, moments };
-  return { state: { version: 1, trees: state.trees.map(tree => tree.id === fromTreeId ? fromNext : tree.id === toTreeId ? targetNext : tree) }, treeId: toTreeId, momentId };
+  return { state: { version: 1, trees: state.trees.map(tree => tree.id === fromTreeId ? fromNext : tree.id === toTreeId ? targetNext : tree), prefs: normalizePrefs(state.prefs) }, treeId: toTreeId, momentId };
 }
 
 // #327(① 데이터 규칙): 고른 순간들로 새 트리(inbox=false)를 만든다. 고른 순서의 첫 순간이
@@ -264,9 +276,9 @@ export function treeFromMoments(state, fromTreeId, momentIds, options = {}, cloc
   const root = { ...moving[0], parentId: null, relation: '', links: [] };
   const tree = { id: newId(), subject, title: `${subject}, 나의 순간들`, coverMomentId: '', coverDesign: '', inbox: false, createdAt: clock, updatedAt: clock, moments: [root, ...moving.slice(1).map(m => ({ ...m, parentId: root.id, relation: '', links: [] }))] };
   const moments = detachMoments(from, movedIds);
-  if (!moments.length) return { state: { version: 1, trees: [...state.trees.filter(t => t.id !== fromTreeId), tree] }, treeId: tree.id };
+  if (!moments.length) return { state: { version: 1, trees: [...state.trees.filter(t => t.id !== fromTreeId), tree], prefs: normalizePrefs(state.prefs) }, treeId: tree.id };
   const fromNext = { ...from, coverMomentId: movedIds.has(from.coverMomentId) ? '' : from.coverMomentId || '', updatedAt: clock, moments };
-  return { state: { version: 1, trees: [...state.trees.map(t => t.id === fromTreeId ? fromNext : t), tree] }, treeId: tree.id };
+  return { state: { version: 1, trees: [...state.trees.map(t => t.id === fromTreeId ? fromNext : t), tree], prefs: normalizePrefs(state.prefs) }, treeId: tree.id };
 }
 
 export function linksOf(moment) {
@@ -343,7 +355,7 @@ export function validateState(value) {
     if (inbox) inboxSeen = true;
     return { id: tree.id, subject: requireText(tree.subject, '대상', 60), title: requireText(tree.title, '트리 제목', 100), coverMomentId, coverDesign, inbox, createdAt: tree.createdAt, updatedAt: tree.updatedAt, moments };
   });
-  return { version: 1, trees };
+  return { version: 1, trees, prefs: normalizePrefs(value.prefs) };
 }
 
 // 디자인 표지가 어떤 테마 표지 색을 쓰는지. texture-1..4는 --lt-cover-1..4와 짝이고 5·6은 다시 1·2색에 다른 질감이다.
@@ -359,7 +371,7 @@ export function importTrees(current, incoming) {
     const ids = new Map(tree.moments.map(m => [m.id, newId()]));
     return { ...tree, id: newId(), coverMomentId: tree.coverMomentId ? ids.get(tree.coverMomentId) : '', moments: tree.moments.map(m => ({ ...m, id: ids.get(m.id), parentId: m.parentId === null ? null : ids.get(m.parentId), links: linksOf(m).map(link => ids.get(link)).filter(Boolean) })) };
   });
-  return { version: 1, trees: [...current.trees, ...copies] };
+  return { version: 1, trees: [...current.trees, ...copies], prefs: normalizePrefs(current.prefs) };
 }
 
 export function stemGroups(tree) {

@@ -68,3 +68,7 @@ button,a{font:inherit}button{color:inherit}.app{position:relative;width:100%;hei
 
 /* V1.2 direct-open + curated media fidelity */
 .card{outline:0}.card:after{content:"OPEN MOMENT";position:absolute;left:10px;top:10px;z-index:7;font-size:7px;letter-spacing:.14em;padding:5px 7px;border-radius:999px;background:rgba(5,5,8,.54);border:1px solid rgba(255,255,255,.18);opacity:0;transform:translateY(-4px);transition:.18s;pointer-events:none}.card.hovered:after{opacity:.92;transform:none}.card.first:after{top:38px}.card.fitContain .surface{background:radial-gradient(circle at 50% 48%,#1b1a20 0,#0b0b0f 68%,#050507 100%)}.card.fitContain img{object-fit:contain!important;transform:scale(.94)!important}.card.fitContain.hovered img{transform:scale(.98)!important}.mediaVisual img{background:#08080c}.mediaVisual.contain img{padding:clamp(10px,2vw,24px)}
+
+/* #347 후속: 카드·상세의 작은 영상 제목 줄 */
+.card .videoTitle,.detail-copy .videoTitle{display:block;margin-top:3px;font-size:8px;letter-spacing:.02em;color:#d9c9bd;font-weight:500;opacity:.92}
+.detail-copy .videoTitle{font-size:10px;margin-top:4px;color:var(--lt-muted,#9b98a6)}

@@ -22,13 +22,19 @@ let view={x:0,y:0,z:.78}
 const $=s=>document.querySelector(s), cardLayer=$('#cardLayer'), threadLayer=$('#threadLayer'), world=$('#world'), viewport=$('#viewport');
 
 const esc=LT58Model.escapeHTML;
+function titleMode(){try{return window.parent?.LT41?.prefs?.titleDisplay||'both'}catch{return 'both'}}
+function titleInfo(m){const v=window.LTTitle?.titleView?.(m,titleMode());return{main:v?.main||m?.title||'',sub:v?.sub||''}}
+function titleMain(m){return titleInfo(m).main}
+function titleSub(m){return titleInfo(m).sub}
+function titleSubMarkup(m){const sub=titleSub(m);return sub?'<div class="videoTitle">▶ '+esc(sub)+'</div>':''}
+function dateText(v){return window.LTTitle?.formatDisplayDate?.(v)||v||''}
 
 function cardHTML(m){let media='';
 if(m.url)media=LTMedia.markup(m.url,m.title,m.mediaMetadata,m.id);
 else if(m.type==='note') media=`<div class="noteText">“${esc(m.memo)}”</div>`;
 else if(m.type==='video') media=`<div class="media"><video muted playsinline loop poster="${m.asset}" src="${m.video}"></video><span class="playBadge">▶</span><span class="duration">${m.duration||'00:03'}</span></div>`;
 else media=`<div class="media ${m.type==='link'||m.type==='youtube'?'linkMedia':''}"><img src="${m.asset}" alt=""><span class="${m.type==='youtube'?'playBadge':''}">${m.type==='youtube'?'▶':''}</span></div>`;
-return `<article class="card ${m.first?'first':''} ${m.type==='note'?'noteCard':''}" data-id="${m.id}" style="left:${m.x}px;top:${m.y}px;--rot:${m.rot}deg;--pin:${colors[m.color]};--halo:${colors[m.color]}55">${m.first?'<div class="firstTag">첫 순간</div>':''}<button class="pin" data-pin="${m.id}" aria-hidden="true" tabindex="-1" disabled></button>${media}<div class="cardBody"><div class="eyebrow"><span class="emotionDot"></span>${LTLabels.type(m.originalType||m.type)} 순간 · ${esc(m.emotion)}</div><h3>${esc(m.title)}</h3><div class="meta"><span>${esc(m.date)}</span><span>${m.type==='link'||m.type==='youtube'?'↗':''}</span></div>${m.type!=='note'?`<div class="memo">${esc(m.memo)}</div>`:''}${m.url?`<div class="domain">${esc(m.source)}</div>`:''}</div></article>`}
+return `<article class="card ${m.first?'first':''} ${m.type==='note'?'noteCard':''}" data-id="${m.id}" style="left:${m.x}px;top:${m.y}px;--rot:${m.rot}deg;--pin:${colors[m.color]};--halo:${colors[m.color]}55">${m.first?'<div class="firstTag">첫 순간</div>':''}<button class="pin" data-pin="${m.id}" aria-hidden="true" tabindex="-1" disabled></button>${media}<div class="cardBody"><div class="eyebrow"><span class="emotionDot"></span>${LTLabels.type(m.originalType||m.type)} 순간 · ${esc(m.emotion)}</div><h3>${esc(titleMain(m))}</h3>${titleSubMarkup(m)}<div class="meta"><span>${esc(dateText(m.date))}</span><span>${m.type==='link'||m.type==='youtube'?'↗':''}</span></div>${m.type!=='note'?`<div class="memo">${esc(m.memo)}</div>`:''}${m.url?`<div class="domain">${esc(m.source)}</div>`:''}</div></article>`}
 
 function renderCards(){cardLayer.innerHTML=moments.map(cardHTML).join('');
 cardLayer.querySelectorAll('.card').forEach(el=>bindCard(el));
@@ -86,10 +92,10 @@ function selectMoment(id,open=true){selected=id;
 mobilePicker?.select(id);
 document.querySelectorAll('.card').forEach(c=>c.classList.toggle('selected',c.dataset.id===id));
 if(open){let m=moments.find(x=>x.id===id);
-$('#dTitle').textContent=m.title;
-$('#dBasic').innerHTML=`${esc(m.date)}<br><b>${esc(m.emotion)}</b> · ${esc(m.source)}${m.memo&&!connections.some(c=>c.a===id&&c.why===m.memo)?`<br><br>${esc(m.memo)}`:""}`;
+const _ti=titleInfo(m);$('#dTitle').textContent=_ti.main;const _ds=$('#detailSub');if(_ds){_ds.textContent=_ti.sub?'▶ '+_ti.sub:'';_ds.hidden=!_ti.sub}
+$('#dBasic').innerHTML=`${esc(dateText(m.date))}<br><b>${esc(m.emotion)}</b> · ${esc(m.source)}${m.memo&&!connections.some(c=>c.a===id&&c.why===m.memo)?`<br><br>${esc(m.memo)}`:""}`;
 let outs=connections.filter(c=>c.kind==='parent'&&c.a===id),ins=connections.filter(c=>c.kind==='parent'&&c.b===id);
-$('#dConn').innerHTML=outs.length?outs.map(c=>`→ ${esc(moments.find(x=>x.id===c.b)?.title)}<br><span style="color:#bca9c5">${esc(c.why)}</span>`).join('<br><br>'):`${ins.length}개의 이전 연결 · 아직 다음 순간 없음`;
+$('#dConn').innerHTML=outs.length?outs.map(c=>`→ ${esc(titleMain(moments.find(x=>x.id===c.b)))}<br><span style="color:#bca9c5">${esc(c.why)}</span>`).join('<br><br>'):`${ins.length}개의 이전 연결 · 아직 다음 순간 없음`;
 $('#detail').classList.add('open')}}
 
 function startConnect(e,id){if(cinema)return;
@@ -122,7 +128,7 @@ $('#whyModal').classList.add('open')}
 
 function showWhy(cid){selectedConn=cid;
 let c=connections.find(x=>x.id===cid),a=moments.find(x=>x.id===c.a),b=moments.find(x=>x.id===c.b);
-$('#whyBubble').innerHTML=`<b>${esc(a.title)} → ${esc(b.title)}</b><br>${esc(c.why)}${canEditBoard?' <button id="deleteConnBubble">연결 지우기</button>':''}`;
+$('#whyBubble').innerHTML=`<b>${esc(titleMain(a))} → ${esc(titleMain(b))}</b><br>${esc(c.why)}${canEditBoard?' <button id="deleteConnBubble">연결 지우기</button>':''}`;
 $('#whyBubble').classList.add('show');
 setTimeout(()=>{let b=$('#deleteConnBubble');if(b)b.onclick=deleteSelectedConnection},0);
 clearTimeout(showWhy.t);
@@ -184,13 +190,13 @@ addMoment(n,selected)}
 
 function openViewer(id){let m=moments.find(x=>x.id===id);
 if(!m)return;
-$('#vTitle').textContent=m.title;
+const _vi=titleInfo(m);$('#vTitle').textContent=_vi.main;
 let box=$('#viewerMedia');
 if(m.url)box.innerHTML=LTMedia.markup(m.url,m.title,m.mediaMetadata,m.id);
 else if(m.type==='video')box.innerHTML=`<video src="${m.video}" poster="${m.asset}" controls autoplay muted playsinline style="width:100%;max-height:420px;object-fit:contain"></video>`;
 else if(m.type==='note')box.innerHTML=`<div style="padding:40px;color:#f7edf8;font-size:22px;line-height:1.6">“${esc(m.memo)}”</div>`;
 else box.innerHTML=`<img src="${m.asset}" style="width:100%;max-height:420px;object-fit:cover">`;
-$('#vMeta').innerHTML=`${esc(LTLabels.type(m.originalType||m.type))} · ${esc(m.date)} · ${esc(m.emotion)}<br>출처: ${esc(m.source)}${m.url?`<br>URL: ${esc(m.url)}`:''}<br>마음 한마디: ${esc(m.memo)}`;
+$('#vMeta').innerHTML=(_vi.sub?'<div class="videoTitle">▶ '+esc(_vi.sub)+'</div>':'')+`${esc(LTLabels.type(m.originalType||m.type))} · ${esc(dateText(m.date))} · ${esc(m.emotion)}<br>출처: ${esc(m.source)}${m.url?`<br>URL: ${esc(m.url)}`:''}<br>마음 한마디: ${esc(m.memo)}`;
 $('#viewerModal').classList.add('open')}
 
 function focusMoment(id,caption){let m=moments.find(x=>x.id===id),el=cardLayer.querySelector(`[data-id="${id}"]`),cx=m.x+el.offsetWidth/2,cy=m.y+el.offsetHeight/2;
@@ -238,7 +244,7 @@ document.body.classList.remove('boardBloom');
 headerFade(true);
 await sleep(900);
 for(let i=fromIndex;i<replayPath.length;i++){let id=replayPath[i],m=moments.find(x=>x.id===id);
-focusMoment(id,`${m.emotion} · ${m.title}`);
+focusMoment(id,`${m.emotion} · ${titleMain(m)}`);
 await sleep(i===0?1500:1100);
 if(id==='m3'){let alt=connections.find(x=>x.a==='m3'&&x.b==='m7');
 let ag=alt&&threadLayer.querySelector(`[data-cid="${alt.id}"]`);

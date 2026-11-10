@@ -8,7 +8,9 @@ import {createHomeActions} from './home-actions.js';
 import {homePresentation} from './home-presentation.js';
 import {applyHomeCenter} from './home-center.js';
 import {readTheme,writeTheme,appliedTheme,applyThemeAttribute} from '../public/v41/header-state.mjs';
+import {readTitleDisplay} from '../public/v41/book-usability.mjs';
 const shellBody=parent.document.body;
+addEventListener('message',event=>{if(event.data?.type==='lt41-title-display')location.reload();});
 const context=parent.LT41||{source:shellBody.dataset.recordSource,member:shellBody.dataset.member,treeCount:Number(shellBody.dataset.treeCount||0)};
 // 이슈 327 2부: 현재 트리가 '모아둔 순간'(inbox)이면 궤도 첫 화면에도 표시한다.
 try{const inboxFlag=document.getElementById('homeInboxFlag');if(inboxFlag)inboxFlag.hidden=!(context.tree&&context.tree.inbox===true);}catch(e){}
@@ -24,10 +26,11 @@ const mediaState=globalThis.LTMedia?.currentContext?.()||{source:'',owned:false}
 const youtube={describe:url=>globalThis.LTMedia?.describe?.(url)??null,auto:globalThis.LTMedia?.autoLoadMedia?.(mediaState.source,mediaState.owned)===true};
 const cardsPlan=homeCardsPlan({mode,loggedIn,context,popular,youtube});
 const cardTrees=cardsPlan.cards.length?[{id:'home-cards',title:'첫 화면 카드',moments:cardsPlan.cards}]:[];
-const orbit=mountOrbit(document.getElementById('orbit'),{
+ const orbit=mountOrbit(document.getElementById('orbit'),{
  trees:cardTrees,examples:cardsPlan.examples?ORBIT_EXAMPLE.moments.slice(0,cardsPlan.examples):[],
  // 내 것만 0장은 예시로 대체하지 않고 빈 궤도와 첫 순간 안내를 남긴다.
  empty:cardsPlan.kind==='mine-empty',
+ titleDisplay:readTitleDisplay(parent.LT41),
  onOpen:card=>{if(card.source==='public'){parent.location.hash=`#share/${card.shareId}/${card.view||'book'}`;return;}bridge.actions.openMine(card.treeId,card.id);},
  storage:{getItem:()=>null,setItem:()=>{}},context:{...presentation.context,readOnly:cardsPlan.kind==='example'},
  authHtml:`<button class="menuBtn auth-entry" data-home-account>${presentation.accountLabel}</button>`,actions:bridge.actions
