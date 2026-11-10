@@ -2,6 +2,21 @@
 
 > **main 보호 규칙(2026-11-09, 룰셋 "main 보호 (PR·필수 검사)")**: main은 PR로만 바꾼다(직접 푸시·force push·삭제 금지, 관리자도 예외 없음 — 비상시 대표가 룰셋 enforcement를 잠깐 끈다). 필수 검사: `check (ubuntu-latest)`·`check (windows-latest)`·`미리보기 postdeploy(로그아웃)` — 셋 다 paths 필터가 없어 문서만 바뀐 PR에서도 항상 돈다. 승인 수 0(레인이 스스로 머지). Deploy Bundle Boot Test는 paths 필터가 있어 필수에 넣지 않았다.
 
+## 2026-11-10 — #362 기억책 '← 내 책장' 복귀 + 빈 타이포 알약 제거 (로컬2, ai/local2-lt-book-back-261110)
+
+- 구현: 기억책 topbar 맨 왼쪽에 `← 내 책장`(`.ui-btn.shelf-back`, 44px). 클릭은 기존 `lt41-navigate(track32-bookshelf.html)` 재사용. `LT59Model.shelfReturn({source,embedded})`가 `shelf|none`을 정하고 공유 감상(`source==='share'`)이면 버튼을 숨긴다. 정원은 `--lt-paper/--lt-ink/--lt-line-paper` 토큰.
+- 브라우저 뒤로가기(예시): `#shelf`→책 열기→`goBack` → `#shelf` 복귀·`.book-card.is-center` 1. 로그아웃에서 버튼 클릭은 기존 셸 규칙대로 로그인(`intent=shelf`)으로 보낸다(새 규칙 없음).
+- 잔여 제거: `track59` `#typoNote`, `book.js` `?typo=B`, `book.css` `body.typo-b`·`.typo-note` 2곳, `src/views/book-source.css` 동일 잔여. `reference/originals/` 미변경.
+- 시험: `v41-book-model.test.mjs` 15건(판정 표·세기·배선/CSS/타이포 부재). 강도 증명: 공유 판정 뒤집기 → 14 pass/1 fail, 원복 → 15 pass. `npm test` 936건 899 pass/0 fail/37 skip, build pass.
+- 실측(Edge, 1440·390, 밤/정원): 버튼 94×44px, x=28/12, 문서 가로 넘침 0(1438/1438·388/388), 정원 배경 `#fffdf8`·글자 `#403536`·테두리 `rgba(119,91,82,.3)`, 공유 문맥 `hidden=true`. axe 셸 0, 책 `meta-viewport` 1건은 기존 항목.
+
+## 2026-11-10 — #361 보드 커서 링 v2: 프레임당 1회 translate3d·반응·누름/끌기 (로컬2, ai/local2-lt-board-cursor-261110)
+
+- 구현: `board-extras.js` 커서를 left/top 갱신에서 rAF 1회/프레임 + `translate3d`로 바꿨다(위치 transition 없음, `elementFromPoint` 1회/프레임). 카드·핀·실·버튼 위 1.6배+내부 채움, 입력/텍스트 위 숨김, down 0.8배, up에서 물결+물방울(감소모션·동시 묶음 상한), 드래그 중 13.2px 어두운 점. 터치·coarse·시네마 끔, `prefers-reduced-motion` 위치만, `aria-hidden`. 밤/정원 `--lt-*`.
+- 판정은 `LT58Model`(`cursorMode`·`cursorHover`·`cursorScale`·`cursorEffectAllowed`)로 옮기고 시험 24건(export 목록 갱신·표·세기·효과 한도·배선/CSS 가드, 강도 증명 2회). `npm test` 929건 892 pass/0 fail/37 skip, build pass.
+- 실측(Edge headless 1440×900, 예시 카드 40, 수정 전 main 5d51e67 라우트 주입): 포인터-링 중심 오차 0/0px(전 밤 −0.007/−0.005, 정원 −0.001/−0.010). 유휴 10초 rAF 0/0(전후 동일), Script 0ms, Task 364.1ms(전 371.1ms). 패닝 rAF p50/p90 6.3/6.3ms(전후 동일, p99 단발 스파이크). 입력 위 숨김(전 유지), 끌기 13.2px(전 56px).
+- a11y(axe): 셸 0, 보드 `meta-viewport` 1건은 기존 항목. 계정 04 운영 확인(#360 2단계 로그인 반영): auto-login 성공(auth:email)·세션 pass. 빈 계정(트리 0)에서 `visual/visual-book` 1건이 iframe 미로드로 fail — 도구의 빈 계정 공백(제품 회귀 아님). pass 19/fail 1/warn 6/skip 4.
+
 ## 2026-11-10 — #346 2단계 B: 패닝·드래그 중 장식 애니메이션 정지 (로컬1, ai/local1-346b-pan-motion)
 
 - 트레이스(운영, 예시 카드 40, 1440 밤, 패닝): 장식 CSS 애니메이션 실행 중 총작업 15.1s(span 9.8s) vs 일시정지 2.45s(span 7.0s) — **-84%**, Paint 44.2→4.8ms(-89%), Raster 367.9→40.7ms(-89%), Layout 136.3→14.5ms(-89%), Composite 204.2→72.4ms(-65%). 패닝 비용의 최대 레버는 장식 애니메이션(threadFlow 점선 흐름·pinBreath)이 만드는 매 프레임 SVG 페인트였다.
