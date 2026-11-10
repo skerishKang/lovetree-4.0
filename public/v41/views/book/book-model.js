@@ -125,5 +125,12 @@ const spreads =Array.from({length:Math.ceil(moments.length/2)},(_,i)=>{const toP
     return { items, steps: items.length, days: journeyDays(slice[0]?.date, slice[slice.length - 1]?.date) };
   }
 
-  return { buildSpreads, folioLabel, turnAngle, connectionSummary, nextMomentOf, emotionTone, journeyDays, journeyTimeline };
+  // 기억책 → 내 책장: 셸 안에서 보고 있고 공유 감상이 아니면 책장으로 돌아간다.
+  function shelfReturn({ source = 'example', embedded = true } = {}) {
+    if (!embedded) return 'none';
+    if (source === 'share') return 'none';
+    return 'shelf';
+  }
+
+  return { buildSpreads, folioLabel, turnAngle, connectionSummary, nextMomentOf, emotionTone, journeyDays, journeyTimeline, shelfReturn };
 })();
