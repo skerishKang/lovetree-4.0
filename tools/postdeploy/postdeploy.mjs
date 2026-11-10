@@ -342,15 +342,55 @@ async function visibleViewFrame(page) {
 
 async function fillAuthEmailLogin(page, password, emailValue = AUTO_LOGIN_EMAIL) {
   // 2026-11-08: 공용 로그인 화면(auth.padiem.net)의 이메일 로그인 폼.
+  // 2026-11-10: 2단계(/login → /login/password)로 변경되어 한 화면과 두 화면 방식 모두 지원.
   const email = page.locator('#email');
-  if (!(await email.count())) return false;
-  await email.fill(emailValue).catch(() => {});
-  await page.locator('#password').fill(password).catch(() => {});
-  await page.locator('form button[type=submit]').first().click({ timeout: 5000 }).catch(() => {});
-  await sleep(2500);
-  if (!/auth\.padiem\.net/.test(page.url())) return { ok: true };
-  const error = await page.locator('[role=alert], .error, .form-error').first().innerText().catch(() => '');
-  return error ? { ok: false, error: error.trim() } : { ok: true };
+  if (await email.count()) {
+    const emailVisible = await email.isVisible().catch(() => false);
+    if (emailVisible) {
+      await email.fill(emailValue).catch(() => {});
+    }
+    const pw = page.locator('#password');
+    if (await pw.count()) {
+      const pwVisible = await pw.isVisible().catch(() => false);
+      if (pwVisible) {
+        await pw.fill(password).catch(() => {});
+        await page.locator('form button[type=submit]').first().click({ timeout: 5000 }).catch(() => {});
+        await sleep(2500);
+        if (!/auth\.padiem\.net/.test(page.url())) return { ok: true };
+        if (/\/login\/password/.test(page.url())) {
+          const pw2 = page.locator('#password');
+          if (await pw2.count()) await pw2.fill(password).catch(() => {});
+          await page.locator('form button[type=submit]').first().click({ timeout: 5000 }).catch(() => {});
+          await sleep(2500);
+          if (!/auth\.padiem\.net/.test(page.url())) return { ok: true };
+        }
+        const error = await page.locator('[role=alert], .error, .form-error').first().innerText().catch(() => '');
+        return error ? { ok: false, error: error.trim() } : { ok: true };
+      }
+    }
+    await page.locator('form button[type=submit]').first().click({ timeout: 5000 }).catch(() => {});
+    await sleep(2500);
+    if (!/auth\.padiem\.net/.test(page.url())) return { ok: true };
+    if (/\/login\/password/.test(page.url())) {
+      const pw2 = page.locator('#password');
+      if (await pw2.count()) await pw2.fill(password).catch(() => {});
+      await page.locator('form button[type=submit]').first().click({ timeout: 5000 }).catch(() => {});
+      await sleep(2500);
+      if (!/auth\.padiem\.net/.test(page.url())) return { ok: true };
+    }
+    const error = await page.locator('[role=alert], .error, .form-error').first().innerText().catch(() => '');
+    return error ? { ok: false, error: error.trim() } : { ok: true };
+  }
+  if (/\/login\/password/.test(page.url())) {
+    const pw2 = page.locator('#password');
+    if (await pw2.count()) await pw2.fill(password).catch(() => {});
+    await page.locator('form button[type=submit]').first().click({ timeout: 5000 }).catch(() => {});
+    await sleep(2500);
+    if (!/auth\.padiem\.net/.test(page.url())) return { ok: true };
+    const error = await page.locator('[role=alert], .error, .form-error').first().innerText().catch(() => '');
+    return error ? { ok: false, error: error.trim() } : { ok: true };
+  }
+  return false;
 }
 
 async function fillChatPasswordLogin(page, password, emailValue = AUTO_LOGIN_EMAIL) {
@@ -417,10 +457,22 @@ async function autoLogin(page, opts, target) {
       record('auto-login', 'auth', 'fail', 'Google OAuth 화면이 나와서 입력하지 않고 멈춤 — PADIEM 자체 비밀번호 폼만 사용');
       return false;
     }
-    if (/auth\.padiem\.net/.test(current) && lastStep !== 'auth:email') {
-      if (await page.locator('#email').count()) {
+    if (/auth\.padiem\.net/.test(current)) {
+      if (lastStep !== 'auth:email') {
+        if (await page.locator('#email').count()) {
+          const result = await fillAuthEmailLogin(page, secret.value, account.email).catch((error) => ({ ok: false, error: error.message }));
+          lastStep = 'auth:email';
+          if (result && result.ok === false && result.error) {
+            record('auto-login', 'auth', 'fail', `이메일 로그인 실패: ${result.error}`);
+            return false;
+          }
+          await sleep(2000);
+          continue;
+        }
+      }
+      if (await page.locator('#password').count() && !/accounts\.google\.com/.test(current)) {
         const result = await fillAuthEmailLogin(page, secret.value, account.email).catch((error) => ({ ok: false, error: error.message }));
-        lastStep = 'auth:email';
+        lastStep = lastStep || 'auth:email';
         if (result && result.ok === false && result.error) {
           record('auto-login', 'auth', 'fail', `이메일 로그인 실패: ${result.error}`);
           return false;
