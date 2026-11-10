@@ -2,6 +2,14 @@
 
 > **main 보호 규칙(2026-11-09, 룰셋 "main 보호 (PR·필수 검사)")**: main은 PR로만 바꾼다(직접 푸시·force push·삭제 금지, 관리자도 예외 없음 — 비상시 대표가 룰셋 enforcement를 잠깐 끈다). 필수 검사: `check (ubuntu-latest)`·`check (windows-latest)`·`미리보기 postdeploy(로그아웃)` — 셋 다 paths 필터가 없어 문서만 바뀐 PR에서도 항상 돈다. 승인 수 0(레인이 스스로 머지). Deploy Bundle Boot Test는 paths 필터가 있어 필수에 넣지 않았다.
 
+## 2026-11-10 — #346 기억 보드 느려짐: 상시 rAF 루프 제거 + 큰 흐림 배경 정적화 (로컬1, ai/local1-346-board-perf)
+
+- 기준 측정(운영 pages.dev, 1440×900, rAF 상한 457/3초 별도 확인): 유휴 10초 — 계정02(카드 10·연결 9) 밤 Task 0.801s·Script 0.133s·rAF 198, 정원 Task 1.179s·rAF 313 / 로그아웃 예시(40·40) 밤 Task 0.938s·rAF 73, 정원 Task 1.162s·rAF 95. 패닝 p50/p90 — 서버 밤 43.8/50.1ms·정원 31.3/37.6ms, 예시 밤 131.3/156.3ms·정원 100.1/118.8ms. 보드를 떠나면 iframe이 사라져 rAF 0(원인 6은 기준에서 재현 안 됨).
+- 계정02 자료: 카드 10·연결 9 — 트리 검증이 "시작 순간 하나"를 강제해 카드 10이면 연결 9가 최소·유일(8은 만들 수 없음).
+- 구현: `board-extras.js`의 `livingThreadLoop` 제거 → `LT58Model.threadRedrawStep`(예약 중복·숨김·시네마 → 건너뜀) + `scheduleThreadFrame`(프레임당 1회). 드래그 이동·데이터 변경·창 크기 변경 때만 다시 그리고, 실 좌표는 world 좌표라 패닝/줌은 `#world` transform이 함께 옮겨 재그리기 없음. `board.css` `.spaceGlow`의 무한 애니메이션 제거(blur(30px) 정적). 3·4·5번은 재측정으로 판정, 5번은 이미 `loading="lazy"`(media-preview.js:153).
+- 시험: `tests/v41-board-model.test.mjs` 판정 표 + 루프·애니메이션 부재 가드. 강도 증명 4회(숨김 판정·드래그 즉시 그리기·상시 루프 재도입·글로우 애니메이션 재도입 각 1실패) 후 원복(cmp). `npm test` 905건 868 pass/0 fail/37 skip, build pass. 수정 전 시각 24장 캡처(board-1440-garden은 고정 실패 = 루프 흔들림).
+- 수정 후 실측·시각 비교는 머지·자동 배포 뒤 #346 댓글에 기록한다.
+
 ## 2026-11-10 — #353 후속: 공유·붙여넣기 저장에도 영상 제목 + 담기 안내 우선 (로컬1, ai/local1-353-followup)
 
 - 배경: #353 운영 실측 2건 — ① `?qtext=`·붙여넣기 저장은 제목이 영상 제목이 아니라 도메인 규칙(`youtube.com에서 간직한 순간`)이었다(`intakeSave`가 mediaMetadata 없이 quickAdd 호출). ② 담기·중복·로그인 필요 안내가 같은 동기 상태 갱신의 상태 안내에 덮여 R3 중복·R8 재시도 문구가 최종 화면에 남지 않았다.
