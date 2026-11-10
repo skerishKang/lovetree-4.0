@@ -129,5 +129,33 @@ window.LT58Model = (() => {
     return 'draw';
   }
 
-  return { escapeHTML, cardPosition, threadPath, fitZoom, removeConnection, editGuard, collectPath, nextConnections, detailButtonState, cinemaBeats, filterVisible, maxCreatedOrder, threadRedrawStep, decorationMotion };
+  // 커서: 끔 조건(pointer:coarse·터치·시네마)과 움직임 줄임은 위치만. 판정만 여기서, 그리기는 화면이 맡는다.
+  function cursorMode({ pointerType = 'mouse', coarse = false, cinema = false, reducedMotion = false } = {}) {
+    if (pointerType === 'touch' || coarse || cinema) return 'off';
+    if (reducedMotion) return 'position';
+    return 'full';
+  }
+
+  // 커서: 입력 위는 숨김, 카드·핀·실·버튼 위는 반응(커짐). 나머지는 기본.
+  function cursorHover({ card = false, pin = false, thread = false, button = false, text = false } = {}) {
+    if (text) return 'hidden';
+    if (card || pin || thread || button) return 'interactive';
+    return 'default';
+  }
+
+  // 커서 크기 배율: 끔 0, 드래그는 작은 점(핀 느낌), 누름 0.8, 반응 위 1.6, 기본 1.
+  function cursorScale({ mode = 'full', hover = 'default', down = false, dragging = false } = {}) {
+    if (mode === 'off') return 0;
+    if (dragging) return 0.3;
+    if (down) return 0.8;
+    if (mode !== 'off' && hover === 'interactive') return 1.6;
+    return 1;
+  }
+
+  // 한 번에 켜진 클릭 효과 묶음 수 한도(물결+물방울 한 묶음). 넘으면 새 묶음을 만들지 않는다.
+  function cursorEffectAllowed(active = 0, cap = 3) {
+    return active < cap;
+  }
+
+  return { escapeHTML, cardPosition, threadPath, fitZoom, removeConnection, editGuard, collectPath, nextConnections, detailButtonState, cinemaBeats, filterVisible, maxCreatedOrder, threadRedrawStep, decorationMotion, cursorMode, cursorHover, cursorScale, cursorEffectAllowed };
 })();
