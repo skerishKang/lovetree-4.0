@@ -5,7 +5,9 @@ import {
   QUICK_INVALID_ERROR, QUICK_SAVED_TEXT, DROP_LOGIN_NOTICE, DROP_READONLY_NOTICE, extractDropUrl, parseQuickUrl,
 } from '../quick-add.mjs';
 import {
-  INTAKE_DUP_TEXT, classifyIntake, isInboxDuplicate, createPendingSlot, readIntakeParams, resolveIntakeCandidate,
+  INTAKE_DUP_TEXT, INTAKE_LOGIN_RETRY_TEXT, INTAKE_STEP_LOGIN, INTAKE_STEP_NOTICE, INTAKE_STEP_SKIP, INTAKE_STEP_WAIT,
+  classifyIntake, createLoginAttemptSlot, createPendingSlot, intakeStep, isInboxDuplicate, loginAttempted,
+  readIntakeParams, resolveIntakeCandidate,
 } from '../quick-intake.mjs';
 
 export function createQuickIntake(deps) {
@@ -14,6 +16,7 @@ export function createQuickIntake(deps) {
   const hist = deps.history || (typeof history !== 'undefined' ? history : null);
   const describe = deps.describe || ((url) => { try { return globalThis.LTMedia?.describe?.(url) ?? null; } catch { return null; } });
   const slot = createPendingSlot(deps.storage);
+  const attempts = createLoginAttemptSlot(deps.storage);
   const notify = (text) => deps.notify?.(text);
   const loginStart = () => deps.openLoginStart?.();
 
@@ -33,21 +36,37 @@ export function createQuickIntake(deps) {
     try { hist.replaceState(null, '', `${base}${found.rest ? `?${found.rest}` : ''}${hash}`); } catch { /* 정리 못 해도 담기기는 계속된다 */ }
   }
 
+  // 셸이 넘겨 준 세션 상태 — 확정 전에는 이 값들로만 판단한다(#342 후속).
+  function sessionState() {
+    const snap = deps.getMember?.()?.snapshot?.();
+    return { source: deps.getSource?.(), owned: snap?.owned === true, phase: String(snap?.phase ?? '') };
+  }
+
   function intakeSave(url, via) {
-    const member = deps.getMember?.();
-    const snap = member?.snapshot?.();
-    const source = deps.getSource?.();
-    if (source !== 'server' || !snap?.owned) {
-      if (via === 'share') { slot.write(url); loginStart(); } else { notify(DROP_LOGIN_NOTICE); }
+    const step = intakeStep(sessionState(), { attempted: loginAttempted(attempts.read(), url) });
+    if (step === INTAKE_STEP_SKIP) return;                                // 공유 감상: 담지 않는다
+    if (step === INTAKE_STEP_WAIT) {                                       // 아직 모름: 로그인도 담기도 미룬다
+      if (via !== 'paste') return;
+      if (deps.getMember?.()) slot.write(url);                           // 세션 확인 중: 확정 뒤에 담는다
+      else notify(DROP_LOGIN_NOTICE);                                   // 세션이 없으면(로그아웃 화면) 옛 계약대로 안내만
       return;
     }
-    if (!snap.writable) { notify(DROP_READONLY_NOTICE); return; }
+    if (step === INTAKE_STEP_NOTICE) {                                    // 두 번째 로그아웃: 다시 보내지 않는다(고리 차단)
+      slot.clear(); attempts.clear(); notify(INTAKE_LOGIN_RETRY_TEXT); return;
+    }
+    if (step === INTAKE_STEP_LOGIN) {
+      if (via === 'paste') { notify(DROP_LOGIN_NOTICE); return; }          // 붙여놓기는 안내만(옛 계약 그대로)
+      slot.write(url); attempts.mark(url); loginStart(); return;          // 한 번만 로그인으로
+    }
+    const member = deps.getMember?.();
+    const snap = member?.snapshot?.();
+    if (!snap?.writable) { notify(DROP_READONLY_NOTICE); return; }
     let trees = [];
     try { trees = member.state?.()?.trees ?? []; } catch { trees = []; }
-    if (isInboxDuplicate(trees, url)) { slot.clear(); notify(INTAKE_DUP_TEXT); return; }
+    if (isInboxDuplicate(trees, url)) { slot.clear(); attempts.clear(); notify(INTAKE_DUP_TEXT); return; }
     try {
       member.apply('quickAdd', { url });
-      slot.clear();
+      slot.clear(); attempts.clear();
       notify(QUICK_SAVED_TEXT);
     } catch (error) {
       notify(typeof error?.message === 'string' ? error.message : String(error));
@@ -60,7 +79,6 @@ export function createQuickIntake(deps) {
     if (deps.getSource?.() === 'share') { slot.clear(); return; }
     intakeSave(pending.url, 'share');
   }
-
   function boot() {
     if (!loc) return;
     let found = null;
@@ -95,5 +113,5 @@ export function createQuickIntake(deps) {
 
   doc?.addEventListener?.('paste', onPaste);
   boot();
-  return { flush, pending: slot.read };
+  return { flush, pending: slot.read, attempted: attempts.read };
 }

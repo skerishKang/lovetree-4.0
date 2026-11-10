@@ -508,4 +508,4 @@ function usePrivateAsset(){
 addEventListener('beforeunload',e=>{
  if(member?.snapshot().dirty||formDirty()||treeDirty()){e.preventDefault();e.returnValue='';}
 });
-if(shouldLoadMemberRecords(location.search,document.cookie,location.hash))startMember();
+if(shouldLoadMemberRecords(location.search,document.cookie,location.hash)||shellIntake.pending())startMember();
