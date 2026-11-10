@@ -11,7 +11,7 @@ const BOARD = fs.readFileSync(new URL('../public/v41/views/board/board.js', impo
 const EXTRAS = fs.readFileSync(new URL('../public/v41/views/board/board-extras.js', import.meta.url), 'utf8');
 
 test('0. 계산 한 벌은 화면이 실제로 부르는 함수만 노출한다', () => {
-  assert.deepEqual(Object.keys(M).sort(), ['cardPosition', 'cinemaBeats', 'collectPath', 'detailButtonState', 'editGuard', 'escapeHTML', 'filterVisible', 'fitZoom', 'maxCreatedOrder', 'nextConnections', 'removeConnection', 'threadPath']);
+  assert.deepEqual(Object.keys(M).sort(), ['cardPosition', 'cinemaBeats', 'collectPath', 'detailButtonState', 'editGuard', 'escapeHTML', 'filterVisible', 'fitZoom', 'maxCreatedOrder', 'nextConnections', 'removeConnection', 'threadPath', 'threadRedrawStep']);
   for (const fn of Object.keys(M)) assert.equal(typeof M[fn], 'function', fn);
 });
 
@@ -170,6 +170,29 @@ test('13. 목록 필터 판정: 미디어 × 키워드 조건을 표대로 본�
   assert.equal(M.filterVisible(m1, {}, []), true);
   // 기록 종류(예시/실제)로 갈리지 않는다: 판정 함수에 그런 입력이 없다.
   assert.deepEqual(Object.keys(M).filter((k) => /example|demo|real/i.test(k)), []);
+});
+
+test('15. 실 다시 그리기 판정(#346): 예약 중복·숨김·시네마는 건너뛰고, 그 외에만 한 프레임 그린다', () => {
+  assert.equal(M.threadRedrawStep({}), 'draw');
+  assert.equal(M.threadRedrawStep({ pending: true }), 'queued', '이미 한 프레임 예약됨');
+  assert.equal(M.threadRedrawStep({ hidden: true }), 'skip', '안 보이면 정지');
+  assert.equal(M.threadRedrawStep({ cinema: true }), 'skip', '시네마가 자기 갱신을 맡는다');
+  assert.equal(M.threadRedrawStep({ pending: true, hidden: true, cinema: true }), 'queued', '예약 판정이 먼저다');
+  assert.equal(M.threadRedrawStep({ hidden: false, cinema: false, pending: false }), 'draw');
+  assert.equal(M.threadRedrawStep(), 'draw', '입력 없음 = 그린다(기본값)');
+});
+
+test('16. 상시 루프·무한 글로우 애니메이션이 남아 있지 않다(#346 강도 가드)', () => {
+  const CSS = fs.readFileSync(new URL('../public/v41/views/board/board.css', import.meta.url), 'utf8');
+  assert.ok(!EXTRAS.includes('livingThreadLoop'), '상시 rAF 루프 이름이 남아 있으면 실패');
+  assert.ok(!/requestAnimationFrame\(livingThreadLoop\)/.test(EXTRAS), '자기 자신을 다시 거는 루프가 없어야 한다');
+  assert.ok(EXTRAS.includes('LT58Model.threadRedrawStep'), '예약 판정은 계산 한 벌을 부른다');
+  assert.ok(EXTRAS.includes('scheduleThreadFrame()'), '드래그·크기 변경은 예약 함수로 묶는다');
+  assert.doesNotMatch(EXTRAS, /el\.style\.top=m\.y\+'px';rerenderThreads\(\)/, '드래그에서 매 이동마다 바로 그리지 않는다');
+  const glow = CSS.match(/\.spaceGlow\{([^}]*)\}/)?.[1] || '';
+  assert.ok(glow, '.spaceGlow 규칙이 있어야 한다');
+  assert.doesNotMatch(glow, /animation/, '큰 흐림 배경에 무한 애니메이션을 걸지 않는다');
+  assert.ok(!CSS.includes('@keyframes spaceBreath'), 'spaceBreath 키프레임이 남아 있으면 실패');
 });
 
 test('14. board-extras.js는 필터 판정을 다시 구현하지 않고 한 벌을 부른다', () => {

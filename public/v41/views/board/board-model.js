@@ -111,5 +111,16 @@ window.LT58Model = (() => {
     return Math.max(...moments.map((m) => m.createdOrder || 0));
   }
 
-  return { escapeHTML, cardPosition, threadPath, fitZoom, removeConnection, editGuard, collectPath, nextConnections, detailButtonState, cinemaBeats, filterVisible, maxCreatedOrder };
+  // #346: 실 다시 그리기 예약 판정. 상시 rAF 루프 대신 필요할 때만, 한 프레임에 한 번 그린다.
+  // - pending: 이미 한 프레임 예약됨 → 또 걸지 않는다
+  // - hidden: 탭이 숨거나 보드 iframe이 화면 밖/숨김 → 그리지 않는다
+  // - cinema: 시네마 장면이 자기 갱신을 맡는다(예전 루프도 시네마 동안 건너뛰었다)
+  function threadRedrawStep({ pending = false, hidden = false, cinema: inCinema = false } = {}) {
+    if (pending) return 'queued';
+    if (hidden) return 'skip';
+    if (inCinema) return 'skip';
+    return 'draw';
+  }
+
+  return { escapeHTML, cardPosition, threadPath, fitZoom, removeConnection, editGuard, collectPath, nextConnections, detailButtonState, cinemaBeats, filterVisible, maxCreatedOrder, threadRedrawStep };
 })();
