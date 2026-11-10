@@ -32,8 +32,21 @@ export function createMemberSession({api,onState=()=>{},onStatus=()=>{},navigate
      sync.markLocalSave();
      return {changed:true};
    }
-   let trees=[...document.trees],tree=trees.find(t=>t.id===selection.treeId),momentId=selection.momentId,treeId=selection.treeId;
-   // #327(① 데이터 규칙): 빠른 추가·옮기기·새 트리로 정리는 상태 전체를 도메인 함수가 바꾼다.
+    let trees=[...document.trees],tree=trees.find(t=>t.id===selection.treeId),momentId=selection.momentId,treeId=selection.treeId;
+    // 4.1 기억 보드: 화면이 만든 순간·연결·배치를 통째로 받아 저장한다(셸은 iframe을 다시 그리지 않는다).
+    if(action==='boardSync'){
+      if(!tree)throw new Error('트리를 선택해 주세요.');
+      const boardMoments=Array.isArray(input?.moments)?input.moments:[];
+      if(!boardMoments.length)throw new Error('보드 기록을 확인해 주세요.');
+      const next=validateState({version:1,trees:trees.map(t=>t.id===tree.id?{...t,updatedAt:new Date().toISOString(),moments:boardMoments}:t),prefs:document.prefs});
+      document=next;
+      const chosen=next.trees.find(t=>t.id===treeId);
+      momentId=chosen?.moments.some(m=>m.id===momentId)?momentId:(chosen?.moments.find(m=>m.parentId===null)?.id||momentId);
+      onState(structuredClone(document),{treeId,momentId},{board:true});
+      sync.markLocalSave();
+      return {treeId,momentId};
+    }
+    // #327(① 데이터 규칙): 빠른 추가·옮기기·새 트리로 정리는 상태 전체를 도메인 함수가 바꾼다.
    if(action==='quickAdd'||action==='moveMoment'||action==='treeFromMoments'){
      const result=action==='quickAdd'?quickAdd(document,input)
        :action==='moveMoment'?moveMoment(document,selection.treeId,selection.momentId,input.toTreeId,input.parentId)

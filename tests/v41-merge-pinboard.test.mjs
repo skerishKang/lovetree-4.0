@@ -29,7 +29,7 @@ test('연결은 데이터(LTDEMO.edges)에서 만들고 실제 기록 문구를 
 test('예시 판본 판단은 한 곳에만 둔다(연결 지우기 동작·말풍선 버튼·연결 색이 같은 값을 본다)', () => {
   const branches = SERVER.match(/LTDEMO\.example/g) || [];
   assert.equal(branches.length, 1);
-  assert.match(SERVER, /const canEditBoard=LTDEMO\.example;/);
+  assert.match(SERVER, /const canEditBoard=LTDEMO\.example\|\|boardSaveEnabled\(\);/);
   assert.match(SERVER, /function deleteSelectedConnection\(\)\{const guard=LT58Model\.editGuard\(canEditBoard\);if\(guard\.blocked\)\{/);
   assert.match(SERVER, /\$\{canEditBoard\?' <button id="deleteConnBubble">/);
   assert.match(SERVER, /'cyan':\(canEditBoard\?\['rose','violet','cyan','amber'\]\[Math\.max\(0,moments\.findIndex/);

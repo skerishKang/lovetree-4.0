@@ -32,9 +32,19 @@ export function createMessages(deps) {
   let sharePreviewToken = '';
 
   // 화면(iframe)이 보내는 lt41-* 메시지는 이 한 곳에서만 받는다. 처리 순서·조건은 shell.mjs 그대로다.
+  // 화면 교대 중에는 보드가 #view-next에 있을 수 있어 두 iframe 모두에서 받는다.
   addEventListener('message', event => {
     const data = event.data;
-    if (event.origin !== location.origin || event.source !== $('view').contentWindow) return;
+    const fromView = event.source === $('view')?.contentWindow || event.source === $('view-next')?.contentWindow;
+    if (event.origin !== location.origin || !fromView) return;
+    // 4.1 기억 보드 저장: 화면이 만든 순간·연결·배치를 기존 워크스페이스 저장 경로로 보낸다.
+    if (data?.type === 'lt41-board-sync') {
+      const reply = (ok, error) => { try { event.source?.postMessage({type:'lt41-board-saved', ok, error}, location.origin); } catch {} };
+      if (getSource() !== 'server' || !getMember()?.snapshot().writable) { reply(false, '서버 편집 연결이 없어 저장하지 않았어요.'); return; }
+      try { getMember().apply('boardSync', {moments: data.moments}, {treeId: data.treeId}); reply(true); }
+      catch (error) { reply(false, error?.message || '저장하지 못했어요.'); }
+      return;
+    }
     if (data?.type === 'lt41-theme') { applyTheme(); paintThemeControls(); }
     if (data?.type === 'lt41-journey-step') { journey.noteJourneyStep(data.step); return; }
     if (data?.type === 'lt41-journey-save') { if (getSource() === 'share') return; journey.saveFirstJourney(data.draft); return; }
