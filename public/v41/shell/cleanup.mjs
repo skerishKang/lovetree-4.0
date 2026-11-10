@@ -10,6 +10,9 @@ export function createCleanup(deps) {
   const choose = deps.choose;
   const notify = deps.notify;
   const panel = deps.panel;
+  // 생략하면 기존처럼 원시 값만 그린다(화면 규칙 주입 지점은 셸 하나).
+  const treeMomentThumb = deps.treeMomentThumb || (() => '');
+  const momentTitle = deps.momentTitle || (() => '');
   let fromTreeId = '';
   let noticeTimer = null;
 
@@ -51,9 +54,23 @@ export function createCleanup(deps) {
       box.value = moment.id;
       box.checked = moment.id === preselect;
       box.addEventListener('change', sync);
+      // 다른 화면과 같은 표시 규칙을 그대로 쓴다: 제목(설정 반영)과 썸네일(없으면 자리만).
+      const thumb = treeMomentThumb(moment);
+      let thumbNode = null;
+      if (thumb) {
+        thumbNode = document.createElement('img');
+        thumbNode.className = 'cleanup-moment-thumb';
+        thumbNode.alt = '';
+        thumbNode.loading = 'lazy';
+        thumbNode.referrerPolicy = 'no-referrer';
+        thumbNode.src = thumb;
+      }
       const text = document.createElement('span');
-      text.textContent = moment.parentId === null ? `${moment.title} · 시작 순간` : moment.title;
-      label.append(box, text);
+      const title = momentTitle(moment);
+      text.textContent = moment.parentId === null && title ? `${title} · 시작 순간` : (title || String(moment.title ?? ''));
+      label.append(box);
+      if (thumbNode) label.append(thumbNode);
+      label.append(text);
       host.append(label);
     }
   }
