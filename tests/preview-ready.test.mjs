@@ -73,24 +73,65 @@ test('preview-url.mjs는 주소를 찾은 뒤 준비를 확인하고, 실패 요
 });
 
 test('요청이 멈춰도 기한 안에서 정리된다(남은 기한만큼 상한)', { skip: typeof AbortSignal?.timeout !== 'function' }, async () => {
-  let seenSignal = false;
+  // 실제 시계·실제 타이머에 기대지 않는다. 가짜 시계와 가짜 잠자기를 넣어
+  // 기한 경계를 매번 똑같이 밟는다(#338 뒤 CI 에서만 어쭤게 흔들렸다).
+  let clock = 1_000_000;
+  const slept = [];
+  const caps = [];
+  let answered = 0;
+
   const ok = await functionsReady('https://preview.example', {
+    now: () => clock,
+    sleep: async (ms) => { slept.push(ms); clock += ms; },
     fetcher: (url, { signal }) => {
-      seenSignal = signal instanceof AbortSignal;
-      return new Promise((resolve, reject) => {
-        // 상한 신호가 오면 즉시 정리하고, 신호가 없어도 시험이 매달리지 않게 자력으로 물러난다.
-        const fallback = setTimeout(() => reject(new Error('응답 없음')), 2000);
-        signal?.addEventListener('abort', () => {
-          clearTimeout(fallback);
-          reject(new Error('요청 시간 초과'));
-        }, { once: true });
-      });
+      const hasSignal = signal instanceof AbortSignal;
+      caps.push({ hasSignal, remaining: clock });
+      if (!hasSignal) {
+        // 상한 신호가 없으면 기한을 넘는 요청이 그대로 남는다 = 이 시험이 잡아야 하는 고장.
+        throw new Error('상한 신호 없는 시도가 있었다');
+      }
+      // 요청이 멈추지 않고 응답하듯 시계를 기한 너머로 밀어 중립을 만든 뒤 404를 준다.
+      answered += 1;
+      clock += 20;
+      return Promise.resolve({ status: 404 });
     },
     timeoutMs: 40,
     intervalMs: 10
   });
+
+  assert.equal(ok, false, '404만 오면 준비 실패로 끝난다');
+  assert.ok(answered > 1, `한 번만 보고 포기하지 않는다(시도 ${answered}번)`);
+  assert.ok(caps.every((c) => c.hasSignal), '모든 시도에 상한 신호가 실린다');
+  assert.ok(slept.length > 0, '기한 전에는 간격을 두고 다시 본다');
+  // 마지막 잠에서 깼을 때 기한을 이미 지났다면 더 시도하지 않는다(상한 신호 없는 시도 금지).
+  assert.ok(caps.length === answered, `기록된 시도와 실제 시도가 같다(${caps.length}/${answered})`);
+});
+
+test('기한이 지난 뒤에는 상한 신호 없는 시도를 하지 않는다(결정적)', async () => {
+  // 시계를 기한 경계에 딱 맞춰 두고 시험한다. 실제로는 CI 가 느릴 때만 드물게 나오던 경로다.
+  let clock = 0;
+  const seen = [];
+  const ok = await functionsReady('https://preview.example', {
+    now: () => clock,
+    sleep: async (ms) => { clock += ms; },
+    fetcher: (url, { signal }) => {
+      seen.push(signal instanceof AbortSignal);
+      clock += 10;
+      return Promise.resolve({ status: 404 });
+    },
+    timeoutMs: 25,
+    intervalMs: 10
+  });
   assert.equal(ok, false);
-  assert.equal(seenSignal, true, '시도에 상한 신호가 실린다');
+  assert.ok(seen.every(Boolean), `상한 신호 없는 시도가 없다(기록 ${JSON.stringify(seen)})`);
+});
+
+test('상한 신호를 빼면 새 시험이 잡는다(강도 증명용 대목)', () => {
+  // preview-ready.mjs 에서 상한 신호를 없애면 위 시험이 실패해야 한다.
+  const src = read('../tools/postdeploy/preview-ready.mjs');
+  assert.ok(src.includes('AbortSignal.timeout'), '상한 신호를 만든다');
+  assert.ok(/remaining > 0 \? AbortSignal\.timeout/.test(src), '남은 기한이 있을 때만 만든다');
+  assert.ok(src.includes('if (attempts > 0 && remaining <= 0) break;'), '기한이 지나면 더 시도하지 않는다');
 });
 
 test('404를 준비 성공으로 바꿔 놓으면 시험이 잡는다(강도 증명용 대목)', () => {
