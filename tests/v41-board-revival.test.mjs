@@ -104,3 +104,28 @@ test('보드 저장 다리: lt41-board-sync/boardSync가 연결되어 있다', (
   assert.match(read('public/v41/shell/messages.mjs'), /lt41-board-sync/);
   assert.match(read('public/v41/member-session.mjs'), /boardSync/);
 });
+
+// 옛 서버 호환: main의 검증기는 validateMomentInput 허용 목록이므로 모르는 칸(x·y·rot 등)을
+// 400 대신 조용히 버린다. 이 허용 목록 행동은 main과 현재가 같아야 옛 서버·새 화면이 안전하다.
+test('옛 서버 호환: 검증기 허용 목록이 모르는 배치 칸을 400 대신 버린다', async () => {
+  const mods = [await import('../public/v41/domain.mjs'), await import('../src/domain.js')];
+  for (const mod of mods) {
+    const out = mod.validateMomentInput({ title: '제목', note: '메모', emotion: '설렘', date: '2026-11-11', url: '', x: 123, y: 45, rot: 9, pinStyle: 'heart', keywords: ['a'] });
+    assert.equal('x' in out, false);
+    assert.equal('y' in out, false);
+    assert.equal('rot' in out, false);
+    assert.equal('pinStyle' in out, false);
+    assert.equal('keywords' in out, false);
+    assert.equal(out.title, '제목');
+  }
+});
+
+test('옛 서버가 저장한 문서(배치 칸 없음)도 현재 검증을 통과한다', () => {
+  for (const validate of [validateV41, validate40]) {
+    const out = validate(treeWith({}));
+    const m = out.trees[0].moments[0];
+    assert.equal('x' in m, false);
+    assert.equal('keywords' in m, false);
+    assert.equal(m.title, '순간');
+  }
+});
