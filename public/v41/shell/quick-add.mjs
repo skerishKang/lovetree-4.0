@@ -1,9 +1,10 @@
-// 빠른 추가 화면 (#빠른 추가 ②, 2026-11-09).
+// 빠른 추가 화면 (#빠른 추가 ②, 2026-11-09 · 디자인 #343, 2026-11-10).
 // 판정·문구·추출은 ../quick-add.mjs의 순수 함수가 맡고, 이 파일은 DOM만 만진다(docs/TESTING.md).
 // 저장은 로컬1 계약(member.apply('quickAdd', {url}))을 그대로 부른다 — 화면은 이름만 쓴다.
 import {mountPrivateUpload} from '../private-upload.mjs';
 import {fetchVideoTitle} from '../video-title.mjs';
-import {extractDropUrl, hasDropPayload, firstImageFile, parseQuickUrl, dropRoute, QUICK_SAVED_TEXT, QUICK_REFINE_LABEL, QUICK_EMPTY_ERROR, QUICK_INVALID_ERROR, DROP_LOGIN_NOTICE, DROP_READONLY_NOTICE} from '../quick-add.mjs';
+import {suggestMomentTitle} from '../domain.mjs';
+import {extractDropUrl, hasDropPayload, firstImageFile, parseQuickUrl, dropRoute, previewState, previewTag, savedNoticeText, QUICK_SAVED_TEXT, QUICK_EMPTY_ERROR, QUICK_INVALID_ERROR, DROP_LOGIN_NOTICE, DROP_READONLY_NOTICE, QUICK_PASTE_LABEL, QUICK_CLEAR_LABEL, QUICK_EMPTY_PREVIEW, QUICK_INVALID_PREVIEW, QUICK_PASTE_EMPTY, QUICK_PASTE_ERROR} from '../quick-add.mjs';
 
 export function createQuickAdd(deps) {
   const $ = deps.$;
@@ -49,42 +50,85 @@ export function createQuickAdd(deps) {
     queueMicrotask(() => $('quick-url').focus());
   }
   function resetQuick() {
-    previewToken += 1;
     $('quick-url').value = '';
-    $('quick-preview').replaceChildren();
-    $('quick-error').textContent = '';
-    $('quick-notice').hidden = true;
-    $('quick-notice').textContent = '';
-    $('quick-refine').hidden = true;
+    renderPreview();
   }
 
+  // 담은 뒤 안내 줄은 한 곳에서만 비운다(새 입력 시작·모달 열기). 지난 안내가 남던 문제(#343)를 여기서 막는다.
+  function clearSavedNotice() {
+    $('quick-notice').textContent = '';
+    $('quick-notice').hidden = true;
+    const refineButton = $('quick-refine');
+    refineButton.hidden = true;
+    refineButton.dataset.treeId = '';
+    refineButton.dataset.momentId = '';
+  }
+
+  function fallbackTitle(url) {
+    try { return suggestMomentTitle({url}) || ''; } catch { return ''; }
+  }
+
+  // 업로더는 전송이 끝나면 form의 [type=submit]을 무조건 다시 켠다(기존 순간 폼 계약).
+  // 사진 저장 뒤 칸이 빈 상태에서도 켜져 '주소 없으면 흐림' 규칙이 깨지므로, 전송이 끝난 다음 한 번 다시 맞춘다.
+  function syncSubmitState() {
+    const state = previewState(parseQuickUrl($('quick-url').value, describe));
+    $('quick-submit').disabled = state !== 'youtube' && state !== 'link';
+  }
+
+  // 미리보기 카드: 상태 판정은 previewState, 꼬리표는 previewTag가 정한다(순수 함수).
+  // 높이는 CSS가 고정하므로 상태가 바뀌어도 아래 버튼 자리가 움직이지 않는다.
   function renderPreview() {
-    const parsed = parseQuickUrl($('quick-url').value, describe);
+    const input = $('quick-url');
+    const parsed = parseQuickUrl(input.value, describe);
     const token = ++previewToken;
-    $('quick-preview').replaceChildren();
-    if (parsed.status === 'empty') { $('quick-error').textContent = ''; return; }
-    if (parsed.status === 'invalid') { $('quick-error').textContent = QUICK_INVALID_ERROR; return; }
+    const preview = $('quick-preview');
+    const state = previewState(parsed);
+    preview.replaceChildren();
+    preview.dataset.state = state;
+    preview.dataset.media = 'no';
+    $('quick-paste').textContent = String(input.value ?? '').trim() ? QUICK_CLEAR_LABEL : QUICK_PASTE_LABEL;
+    // 레거시 규칙 그대로: 담기 버튼은 저장 가능한 주소일 때만 눌린다(빈 칸·지원 안 함은 흐림).
+    $('quick-submit').disabled = state !== 'youtube' && state !== 'link';
+    clearSavedNotice();
     $('quick-error').textContent = '';
-    if (parsed.kind === 'youtube') {
-      if (parsed.thumb) {
-        const image = doc.createElement('img');
-        image.alt = ''; image.referrerPolicy = 'no-referrer'; image.src = parsed.thumb;
-        $('quick-preview').append(image);
-      }
-      const title = doc.createElement('p');
-      title.className = 'quick-preview-title';
-      title.textContent = 'YouTube 영상';
-      $('quick-preview').append(title);
-      void loadYouTubeTitle(parsed.videoId, title, token);
+    if (state === 'empty') {
+      const empty = doc.createElement('p');
+      empty.className = 'quick-preview-empty';
+      empty.textContent = QUICK_EMPTY_PREVIEW;
+      preview.append(empty);
       return;
     }
-    const label = doc.createElement('p');
-    label.className = 'quick-preview-label';
-    label.textContent = `${parsed.label || '링크'} · 담을 준비가 됐어요`;
-    $('quick-preview').append(label);
+    if (state === 'invalid') {
+      const guide = doc.createElement('p');
+      guide.className = 'quick-preview-invalid';
+      guide.textContent = QUICK_INVALID_PREVIEW;
+      preview.append(guide);
+      return;
+    }
+    if (parsed.thumb) {
+      const media = doc.createElement('div');
+      media.className = 'quick-preview-media';
+      const image = doc.createElement('img');
+      image.alt = ''; image.referrerPolicy = 'no-referrer'; image.src = parsed.thumb;
+      media.append(image);
+      preview.append(media);
+      preview.dataset.media = 'yes';
+    }
+    const meta = doc.createElement('div');
+    meta.className = 'quick-preview-meta';
+    const tag = doc.createElement('span');
+    tag.className = 'quick-preview-tag';
+    tag.textContent = previewTag(parsed.value, parsed.kind);
+    const title = doc.createElement('p');
+    title.className = 'quick-preview-title';
+    title.textContent = fallbackTitle(parsed.value);
+    meta.append(tag, title);
+    preview.append(meta);
+    if (state === 'youtube') void loadYouTubeTitle(parsed.videoId, title, token);
   }
   // 제목은 기존 서버 oEmbed 프록시에서만 받는다(썸네일이 200이어도 없는 영상일 수 있어 실패는 조용히 넘긴다).
   // 받아 둔 제목은 titleCache에 남고, 저장 시(#344) mediaMetadata.title로 함께 넘어가 자동 제목이 된다.
+  // 미리보기 제목과 저장 제목은 같은 값이다 — 못 받았으면 둘 다 기존 규칙(fallbackTitle)으로 물러난다.
   async function loadYouTubeTitle(videoId, node, token) {
     if (!videoId) return;
     if (titleCache.has(videoId)) { node.textContent = titleCache.get(videoId); return; }
@@ -92,6 +136,33 @@ export function createQuickAdd(deps) {
     if (!title) return;
     titleCache.set(videoId, title);
     if (token === previewToken && node.isConnected !== false) node.textContent = title;
+  }
+
+  // 붙여넣기/지우기 알약: 값이 있으면 지우기, 비었으면 클립보드에서 주소를 읽어 넣는다.
+  function readClipboardText() {
+    if (deps.readClipboard) return Promise.resolve().then(() => deps.readClipboard());
+    const clipboard = globalThis.navigator?.clipboard;
+    if (!clipboard?.readText) return Promise.reject(new Error('no-clipboard'));
+    return clipboard.readText();
+  }
+  async function togglePaste() {
+    const input = $('quick-url');
+    if (String(input.value ?? '').trim()) {
+      input.value = '';
+      renderPreview();
+      input.focus();
+      return;
+    }
+    try {
+      const text = String((await readClipboardText()) ?? '').trim();
+      if (!text) { deps.notify(QUICK_PASTE_EMPTY); input.focus(); return; }
+      input.value = text;
+      renderPreview();
+      input.focus();
+    } catch {
+      deps.notify(QUICK_PASTE_ERROR);
+      input.focus();
+    }
   }
 
   function submitQuick(event) {
@@ -115,19 +186,24 @@ export function createQuickAdd(deps) {
     return title ? { mediaMetadata: { title } } : {};
   }
 
+  // 저장될 제목(안내 줄 요약)은 저장과 같은 규칙·같은 입력으로 계산한다 — 화면과 저장이 어긋나지 않게.
+  function savedTitleFor(url) {
+    try { return suggestMomentTitle({url, mediaMetadata: quickMediaTitle(url).mediaMetadata}) || ''; } catch { return ''; }
+  }
+
   // 저장 한 번 = member.apply('quickAdd', {url, mediaMetadata?}). 성공하면 칸을 비우고 초점을 유지해 연속 추가가 된다.
+  // 칸을 비울 때 renderPreview가 지난 안내를 먼저 지우므로, 안내는 저장 직후 값으로 다시 세운다.
   function saveUrl(url) {
     let result = null;
     try { result = deps.getMember().apply('quickAdd', {url, ...quickMediaTitle(url)}) || null; }
     catch (error) { $('quick-error').textContent = error.message; return false; }
-    showSaved(url, result);
+    const savedTitle = savedTitleFor(url);
     if ($('quick-add').open) {
       $('quick-url').value = '';
-      previewToken += 1;
-      $('quick-preview').replaceChildren();
-      $('quick-error').textContent = '';
+      renderPreview();
       $('quick-url').focus();
     }
+    showSaved(url, result, savedTitle);
     return true;
   }
 
@@ -137,11 +213,11 @@ export function createQuickAdd(deps) {
     button.dataset.treeId = result?.treeId || '';
     button.dataset.momentId = result?.momentId || '';
   }
-  function showSaved(url, result) {
+  function showSaved(url, result, savedTitle = '') {
     const parsed = parseQuickUrl(url, describe);
     const thumb = parsed.status === 'ok' && parsed.kind === 'youtube' ? parsed.thumb : '';
     if ($('quick-add').open) {
-      $('quick-notice').textContent = QUICK_SAVED_TEXT;
+      $('quick-notice').textContent = savedNoticeText(savedTitle);
       $('quick-notice').hidden = false;
       setRefineTarget($('quick-refine'), result);
       return;
@@ -168,11 +244,11 @@ export function createQuickAdd(deps) {
 
   // 사진은 기존 업로더를 그대로 쓴다(#310 onUploaded·imagesOnly). 업로드가 끝나면 그 주소로 바로 담는다.
   const quickUploads = deps.mountUpload({
-    form: $('quick-form'), assets: null, imagesOnly: true, fileLabel: '사진 올리기',
+    form: $('quick-form'), assets: null, imagesOnly: true, fileLabel: '📷 사진 올리기',
     getSubject: () => deps.getSource() === 'server' && snapshot().writable ? snapshot().subject : null,
     getState: () => deps.getMember()?.state() || null,
     onChange: () => {},
-    onUploaded: url => { saveUrl(url); }
+    onUploaded: url => { saveUrl(url); setTimeout(syncSubmitState, 0); }
   });
 
   // ---- 끌어다 놓기 (데스크톱 pointer:fine) ----
@@ -255,6 +331,7 @@ export function createQuickAdd(deps) {
   $('write-detailed').onclick = chooseDetailed;
   $('quick-form').onsubmit = submitQuick;
   $('quick-url').addEventListener('input', renderPreview);
+  $('quick-paste').onclick = () => { void togglePaste(); };
   $('quick-refine').onclick = () => refine($('quick-refine'));
   $('quick-saved-refine').onclick = () => refine($('quick-saved-refine'));
   $('write-chooser').addEventListener('close', () => { if (!$('quick-add').open) $('write-menu').focus?.(); });
@@ -267,6 +344,7 @@ export function createQuickAdd(deps) {
     submitQuick,
     renderPreview,
     handleDrop,
+    togglePaste,
     mountFrame: doc => { if (isFinePointer()) mountDrop(doc); },
     saveUrl,
     refine,

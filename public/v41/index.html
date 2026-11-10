@@ -43,14 +43,16 @@
 <p class="panel-note">주소 하나면 바로 담고, 나중에 ‘지금 다듬기’로 이어 적을 수 있어요.</p>
 <div class="write-choice"><button type="button" id="write-quick" class="primary"><strong>빠른 추가</strong><span>주소만 붙여 넣기 · 모아둔 순간에 바로 담아요</span></button><button type="button" id="write-detailed"><strong>자세한 추가</strong><span>트리·제목·감정까지 적기</span></button></div></dialog>
 <dialog id="quick-add" aria-labelledby="quick-add-title"><div class="panel-heading"><div><span class="eyebrow">빠른 추가</span><h2 id="quick-add-title">주소 하나로 담아요</h2></div><button data-close="quick-add" aria-label="빠른 추가 닫기" class="close">×</button></div>
-<p class="panel-note">YouTube·사진·링크 주소를 붙여 넣으면 모아둔 순간에 담아요. 나중에 다듬어도 좋아요.</p>
-<form id="quick-form"><label>주소<input id="quick-url" name="url" type="url" maxlength="2048" placeholder="https://" autocomplete="off" spellcheck="false" aria-describedby="quick-hint"></label>
-<p id="quick-hint" class="panel-note">붙여 넣으면 지원 주소인지 바로 확인해 미리보기를 보여 줘요.</p>
-<div id="quick-preview" class="quick-preview" aria-live="polite"></div>
-<p id="quick-error" role="alert"></p>
-<div data-media-slot></div>
-<p id="quick-notice" class="quick-notice" role="status" hidden></p>
-<div class="button-row"><button class="primary" type="submit">추가</button><button type="button" id="quick-refine" hidden>지금 다듬기</button><button type="button" data-close="quick-add">닫기</button></div>
+<p class="quick-lede"><span>주소만 붙여 넣으면 모아둔 순간에 담겨요.</span><span>제목과 감상은 나중에 다듬어도 돼요.</span></p>
+<form id="quick-form"><div class="quick-input-row"><label for="quick-url"><span class="quick-sr">주소</span></label><span class="quick-input-mark" aria-hidden="true">🔗</span><input id="quick-url" name="url" type="url" maxlength="2048" placeholder="YouTube·사진·링크 주소" autocomplete="off" spellcheck="false" aria-describedby="quick-hint"><button type="button" id="quick-paste" class="quick-paste">붙여넣기</button></div>
+<p id="quick-hint" class="quick-drop-hint">여기로 끌어다 놓아도 돼요</p>
+<div id="quick-preview" class="quick-preview" data-state="empty" data-media="no" aria-live="polite"><p class="quick-preview-empty">주소를 넣으면 여기 미리보기가 보여요</p></div>
+<p id="quick-error" class="quick-error-line" role="alert"></p>
+<p class="quick-or" aria-hidden="true">또는</p>
+<div data-media-slot class="quick-photo"></div>
+<div class="quick-notice-row"><p id="quick-notice" class="quick-notice" role="status"></p><button type="button" id="quick-refine" class="quick-refine" hidden>지금 다듬기 →</button></div>
+<button class="primary quick-submit" id="quick-submit" type="submit" disabled>모아둔 순간에 담기</button>
+<p class="quick-storage-note">내 계정에만 보관 · 105MB·200개까지</p>
 </form></dialog>
 <dialog id="cleanup-panel" aria-labelledby="cleanup-title"><div class="panel-heading"><div><span class="eyebrow">모아둔 순간 정리</span><h2 id="cleanup-title">순간을 정리해요</h2></div><button data-close="cleanup-panel" aria-label="정리 창 닫기" class="close">×</button></div>
 <p id="cleanup-desc" class="panel-note"></p>

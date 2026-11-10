@@ -3,13 +3,17 @@ import assert from 'node:assert/strict';
 // #327 ② 빠른 추가: 연결은 createQuickAdd를 fake DOM으로 직접 불러 본다(docs/TESTING.md).
 // 판정·문구·추출 계산은 tests/v41-quick-add.test.mjs가 함수 호출로 고정한다.
 import { createQuickAdd } from '../public/v41/shell/quick-add.mjs';
-import { QUICK_SAVED_TEXT, QUICK_EMPTY_ERROR, QUICK_INVALID_ERROR, DROP_LOGIN_NOTICE, DROP_READONLY_NOTICE, DROP_VEIL_TEXT } from '../public/v41/quick-add.mjs';
+import {
+  QUICK_SAVED_TEXT, QUICK_EMPTY_ERROR, QUICK_INVALID_ERROR, DROP_LOGIN_NOTICE, DROP_READONLY_NOTICE, DROP_VEIL_TEXT,
+  QUICK_PASTE_LABEL, QUICK_CLEAR_LABEL, QUICK_EMPTY_PREVIEW, QUICK_INVALID_PREVIEW, QUICK_PASTE_EMPTY, QUICK_PASTE_ERROR,
+  savedNoticeText
+} from '../public/v41/quick-add.mjs';
 
 function fakeEl(extra = {}) {
   const listeners = {};
   const node = {
-    value: '', textContent: '', hidden: false, open: false, dataset: {}, src: '', alt: '',
-    listeners,
+    value: '', textContent: '', hidden: false, open: false, dataset: {}, src: '', alt: '', className: '',
+    children: [], listeners,
     addEventListener(type, fn) { listeners[type] = fn; },
     dispatchEvent(event) { this.dispatched.push(event.type); return true; },
     dispatched: [],
@@ -24,10 +28,10 @@ function fakeEl(extra = {}) {
   return Object.assign(node, extra);
 }
 
-function harness({ source = 'server', owned = true, writable = true, current = 'track59-sketchbook.html', finePointer = true, applyImpl = null, attachFiles = null } = {}) {
+function harness({ source = 'server', owned = true, writable = true, current = 'track59-sketchbook.html', finePointer = true, applyImpl = null, attachFiles = null, clipboard = null } = {}) {
   const calls = { apply: [], notify: [], panel: [], choose: [], openEditor: [], login: [], attach: [] };
   const els = {};
-  const need = ['write-chooser', 'write-quick', 'write-detailed', 'write-menu', 'quick-add', 'quick-form', 'quick-url', 'quick-preview', 'quick-error', 'quick-notice', 'quick-refine', 'quick-saved', 'quick-saved-thumb', 'quick-saved-text', 'quick-saved-refine', 'drop-veil', 'drop-veil-text', 'editor'];
+  const need = ['write-chooser', 'write-quick', 'write-detailed', 'write-menu', 'quick-add', 'quick-form', 'quick-url', 'quick-paste', 'quick-preview', 'quick-error', 'quick-submit', 'quick-notice', 'quick-refine', 'quick-saved', 'quick-saved-thumb', 'quick-saved-text', 'quick-saved-refine', 'drop-veil', 'drop-veil-text', 'editor'];
   for (const id of need) els[id] = fakeEl();
   els['quick-url'].dispatched = [];
   els['moment-form'] = fakeEl({ elements: { url: fakeEl() } });
@@ -50,7 +54,7 @@ function harness({ source = 'server', owned = true, writable = true, current = '
   globalThis.LTMedia = {
     describe: (url) => {
       const v = String(url ?? '');
-      const m = v.match(/youtube\.com\/watch\?v=([\w-]+)/) || v.match(/youtu\.be\/([\w-]+)/);
+      const m = v.match(/youtube\.com\/watch\?v=([\w-]+)/) || v.match(/youtu\.be\/([\w-]+)/) || v.match(/youtube\.com\/shorts\/([\w-]+)/);
       if (m) return { kind: 'youtube', videoId: m[1], label: 'YouTube 영상', openUrl: `https://www.youtube.com/watch?v=${m[1]}`, loadUrl: `https://i.ytimg.com/vi/${m[1]}/hqdefault.jpg` };
       try { const u = new URL(v); return ['http:', 'https:'].includes(u.protocol) ? { kind: 'link', label: u.hostname, openUrl: u.href } : { kind: 'invalid', openUrl: '' }; }
       catch { return { kind: 'none', openUrl: '' }; }
@@ -70,13 +74,25 @@ function harness({ source = 'server', owned = true, writable = true, current = '
     mountUpload: options => { uploadsCalls.push(options); return { busy: false, reset() {} }; },
     attachFiles: attachFiles || ((input, file) => { calls.attach.push([input === editorMedia ? 'editor' : 'quick', file]); return true; }),
     isFinePointer: () => finePointer,
-    fetchImpl: async () => ({ ok: false })
+    fetchImpl: async () => ({ ok: false }),
+    ...(clipboard ? { readClipboard: clipboard } : {})
   });
   const restore = () => { globalThis.LTMedia = saved.LTMedia; globalThis.Event = saved.Event; };
   return { api, els, calls, docListeners, editorMedia, quickMedia, uploadsCalls, restore };
 }
 
 const URL_OK = 'https://www.youtube.com/watch?v=abc12345678';
+const URL_SHORTS = 'https://www.youtube.com/shorts/9NXOCr-T8LU';
+const FALLBACK_TITLE = 'youtube.com에서 간직한 순간';
+
+function previewParts(els) {
+  const nodes = els['quick-preview'].children || [];
+  const media = nodes.find((node) => node.className === 'quick-preview-media') || null;
+  const meta = nodes.find((node) => node.className === 'quick-preview-meta') || null;
+  const tag = meta?.children?.find((node) => node.className === 'quick-preview-tag') || null;
+  const title = meta?.children?.find((node) => node.className === 'quick-preview-title') || null;
+  return { nodes, media, meta, tag, title };
+}
 
 test('진입: 서버·편집 가능이면 고르기 창을 열고 빠른 추가에 초점을 둔다', async () => {
   const h = harness();
@@ -115,6 +131,11 @@ test('고르기: 빠른 추가는 모달을, 자세한 추가는 책장이면 ne
     assert.equal(quick.els['write-chooser'].open, false, '고르기 창을 닫는다');
     assert.equal(quick.els['quick-add'].open, true, '빠른 추가 모달을 연다');
     assert.equal(quick.els['quick-url'].value, '', '열 때는 칸을 비운다');
+    assert.equal(quick.els['quick-preview'].dataset.state, 'empty', '빈 상태 카드');
+    assert.equal(quick.els['quick-preview'].children[0].className, 'quick-preview-empty');
+    assert.equal(quick.els['quick-preview'].children[0].textContent, QUICK_EMPTY_PREVIEW);
+    assert.equal(quick.els['quick-submit'].disabled, true, '주소가 없으면 담기 버튼은 흐림(disabled)');
+    assert.equal(quick.els['quick-paste'].textContent, QUICK_PASTE_LABEL, '알약은 붙여넣기');
   } finally { quick.restore(); }
 
   const shelf = harness({ current: 'track32-bookshelf.html' });
@@ -130,42 +151,122 @@ test('고르기: 빠른 추가는 모달을, 자세한 추가는 책장이면 ne
   } finally { book.restore(); }
 });
 
-test('미리보기: YouTube는 no-referrer 썸네일을, 링크는 라벨을 보여 준다', () => {
+test('미리보기: YouTube·Shorts는 썸네일+금테 꼬리표+제목, 링크는 꼬리표+제목, 지원 안 함은 같은 틀에 안내', () => {
   const h = harness();
   try {
     h.els['quick-url'].value = URL_OK;
     h.els['quick-url'].listeners.input();
-    const image = h.els['quick-preview'].children[0];
-    assert.equal(image.tagName, 'img');
-    assert.equal(image.referrerPolicy, 'no-referrer');
-    assert.equal(image.src, 'https://i.ytimg.com/vi/abc12345678/hqdefault.jpg', '썸네일은 기존 describe 판정을 쓴다');
+    let parts = previewParts(h.els);
+    assert.equal(h.els['quick-preview'].dataset.state, 'youtube');
+    assert.equal(parts.media.children[0].tagName, 'img');
+    assert.equal(parts.media.children[0].referrerPolicy, 'no-referrer');
+    assert.equal(parts.media.children[0].src, 'https://i.ytimg.com/vi/abc12345678/hqdefault.jpg', '썸네일은 기존 describe 판정을 쓴다');
+    assert.equal(parts.tag.textContent, 'YOUTUBE', '금테 꼬리표');
+    assert.equal(parts.title.textContent, FALLBACK_TITLE, 'oEmbed 전에는 저장 제목과 같은 기존 규칙');
+    assert.equal(h.els['quick-submit'].disabled, false, '담을 수 있는 주소면 버튼이 눌린다');
+    assert.equal(h.els['quick-paste'].textContent, QUICK_CLEAR_LABEL, '값이 생기면 알약은 지우기');
+
+    h.els['quick-url'].value = URL_SHORTS;
+    h.els['quick-url'].listeners.input();
+    parts = previewParts(h.els);
+    assert.equal(parts.tag.textContent, 'YOUTUBE · SHORTS', 'Shorts는 모양까지 보여 준다');
+
     h.els['quick-url'].value = 'https://example.com/a';
     h.els['quick-url'].listeners.input();
-    assert.match(h.els['quick-preview'].children[0].textContent, /example\.com/);
+    parts = previewParts(h.els);
+    assert.equal(parts.media, null, '일반 링크에는 썸네일이 없다');
+    assert.equal(parts.tag.textContent, 'example.com');
+    assert.equal(parts.title.textContent, 'example.com에서 간직한 순간');
+    assert.equal(h.els['quick-submit'].disabled, false);
+
     h.els['quick-url'].value = 'notaurl';
     h.els['quick-url'].listeners.input();
-    assert.equal(h.els['quick-error'].textContent, QUICK_INVALID_ERROR);
+    assert.equal(h.els['quick-preview'].dataset.state, 'invalid');
+    assert.equal(h.els['quick-preview'].children[0].className, 'quick-preview-invalid');
+    assert.equal(h.els['quick-preview'].children[0].textContent, QUICK_INVALID_PREVIEW, '같은 틀에 안내');
+    assert.equal(h.els['quick-error'].textContent, '', '미리보기 안내가 곧 오류 안내다(중복 문구 없음)');
+    assert.equal(h.els['quick-submit'].disabled, true, '지원하지 않는 주소는 담기 흐림');
+
     h.els['quick-url'].value = '';
     h.els['quick-url'].listeners.input();
+    assert.equal(h.els['quick-preview'].children[0].textContent, QUICK_EMPTY_PREVIEW, '빈 칸은 빗금 안내로 돌아간다');
     assert.equal(h.els['quick-error'].textContent, '', '빈 칸은 오류가 아니다');
   } finally { h.restore(); }
 });
 
-test('저장: apply("quickAdd",{url}) 한 번 → 안내·지금 다듬기·칸 비움·초점 유지(연속 추가)', () => {
+test('저장: apply("quickAdd",{url}) 한 번 → ✓ 안내·지금 다듬기·칸 비움·초점 유지(연속 추가)', () => {
   const h = harness();
   try {
     h.els['quick-add'].open = true;
+    h.api.renderPreview();
     h.els['quick-url'].value = URL_OK;
+    h.els['quick-url'].listeners.input();
     h.els['quick-form'].onsubmit({ preventDefault() {} });
     assert.deepEqual(h.calls.apply, [['quickAdd', { url: URL_OK }]], '로컬1 계약 그대로 한 번');
-    assert.equal(h.els['quick-notice'].textContent, QUICK_SAVED_TEXT);
+    assert.equal(h.els['quick-notice'].textContent, savedNoticeText(FALLBACK_TITLE), '✓ 담았어요 · 제목 요약');
     assert.equal(h.els['quick-notice'].hidden, false);
-    assert.equal(h.els['quick-refine'].hidden, false, '지금 다듬기가 보인다');
+    assert.equal(h.els['quick-refine'].hidden, false, '지금 다듬기가 안내 줄에 보인다');
     assert.equal(h.els['quick-refine'].dataset.treeId, 'tree-inbox');
     assert.equal(h.els['quick-refine'].dataset.momentId, 'm-new');
     assert.equal(h.els['quick-url'].value, '', '칸을 비워 연속 추가');
     assert.ok(h.els['quick-url'].focused, '초점을 유지한다');
+    assert.equal(h.els['quick-submit'].disabled, true, '칸을 비우면 다시 흐림');
+    assert.equal(h.els['quick-preview'].dataset.state, 'empty');
   } finally { h.restore(); }
+});
+
+test('저장: 새 입력을 시작하면 지난 안내가 즉시 사라진다(#343 버그)', () => {
+  const h = harness();
+  try {
+    h.els['quick-add'].open = true;
+    h.els['quick-url'].value = URL_OK;
+    h.els['quick-url'].listeners.input();
+    h.els['quick-form'].onsubmit({ preventDefault() {} });
+    assert.equal(h.els['quick-notice'].hidden, false, '저장 직후에는 보인다');
+    h.els['quick-url'].value = URL_SHORTS;
+    h.els['quick-url'].listeners.input();
+    assert.equal(h.els['quick-notice'].textContent, '', '새 입력이 시작되면 지난 안내를 비운다');
+    assert.equal(h.els['quick-notice'].hidden, true);
+    assert.equal(h.els['quick-refine'].hidden, true, '지난 순간의 다듬기 링크도 함께 비운다');
+    assert.equal(h.els['quick-refine'].dataset.momentId, '');
+  } finally { h.restore(); }
+});
+
+test('붙여넣기 알약: 값이 있으면 지우기, 비었으면 클립보드에서 읽어 미리보기를 띄운다', async () => {
+  const clear = harness();
+  try {
+    clear.els['quick-url'].value = URL_OK;
+    clear.els['quick-url'].listeners.input();
+    await clear.api.togglePaste();
+    assert.equal(clear.els['quick-url'].value, '', '값이 있으면 지운다');
+    assert.equal(clear.els['quick-paste'].textContent, QUICK_PASTE_LABEL);
+    assert.equal(clear.els['quick-preview'].dataset.state, 'empty');
+    assert.ok(clear.els['quick-url'].focused);
+  } finally { clear.restore(); }
+
+  const paste = harness({ clipboard: async () => `  ${URL_SHORTS}  ` });
+  try {
+    await paste.api.togglePaste();
+    assert.equal(paste.els['quick-url'].value, URL_SHORTS, '앞뒤 공백은 지운다');
+    assert.equal(paste.els['quick-paste'].textContent, QUICK_CLEAR_LABEL);
+    const parts = previewParts(paste.els);
+    assert.equal(parts.tag.textContent, 'YOUTUBE · SHORTS', '읽은 주소로 바로 미리보기');
+    assert.ok(paste.els['quick-url'].focused);
+  } finally { paste.restore(); }
+
+  const empty = harness({ clipboard: async () => '   ' });
+  try {
+    await empty.api.togglePaste();
+    assert.deepEqual(empty.calls.notify, [QUICK_PASTE_EMPTY]);
+    assert.equal(empty.els['quick-url'].value, '');
+  } finally { empty.restore(); }
+
+  const denied = harness({ clipboard: async () => { throw new Error('denied'); } });
+  try {
+    await denied.api.togglePaste();
+    assert.deepEqual(denied.calls.notify, [QUICK_PASTE_ERROR], '읽기 실패는 직접 붙여 넣기로 안내');
+    assert.ok(denied.els['quick-url'].focused);
+  } finally { denied.restore(); }
 });
 
 test('저장: 빈 칸·잘못된 주소는 막고, 도메인이 던지면 그 문구를 보여 준다', () => {
@@ -227,6 +328,7 @@ test('끌어다 놓기: 놓으면 바로 저장하고, 모달 위에서는 칸�
     assert.deepEqual(modal.calls.apply, [], '모달 위에서는 저장하지 않는다');
     assert.equal(modal.els['quick-url'].value, URL_OK);
     assert.ok(modal.els['quick-url'].focused);
+    assert.equal(modal.els['quick-preview'].dataset.state, 'youtube', '놓은 주소로 미리보기');
   } finally { modal.restore(); }
 
   const editor = harness();
@@ -294,7 +396,7 @@ test('연결 구조: shell.mjs는 기존 업로더를 그대로 넘기고 write-
   try {
     assert.equal(h.uploadsCalls.length, 1, 'createQuickAdd가 업로더를 하나 만든다');
     assert.equal(h.uploadsCalls[0].imagesOnly, true, '사진만 받는 인스턴스');
-    assert.equal(h.uploadsCalls[0].fileLabel, '사진 올리기');
+    assert.equal(h.uploadsCalls[0].fileLabel, '📷 사진 올리기', '점선 칸의 라벨(#343)');
     assert.equal(typeof h.uploadsCalls[0].onUploaded, 'function', 'onUploaded로 담기에 연결');
   } finally { h.restore(); }
   // shell.mjs의 연결 한 줄은 글자로 고정한다(연결이 지워지면 운영에서 무반응이 되는 #245 전례).
