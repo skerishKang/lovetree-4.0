@@ -60,7 +60,10 @@ html[data-lt-theme=garden] .filterSelect,html[data-lt-theme=garden] .field{backg
 html[data-lt-theme=garden] .chip{background:rgba(200,110,121,.12);color:var(--lt-gold-ink)}
 html[data-lt-theme=garden] .cinemaOverlay{background:radial-gradient(circle at 50% 50%,transparent 30%,rgba(75,51,42,.16) 78%,rgba(75,51,42,.3))}
 html[data-lt-theme=garden] .cinemaControls .cinCtl{background:var(--lt-glass-strong);border-color:var(--lt-line);color:var(--lt-ink)}
-html[data-lt-theme=garden] .cursorRing{border-color:var(--lt-gold-line);box-shadow:0 0 18px rgba(152,80,94,.18)}
+html[data-lt-theme=garden] .cursorRing{--cursor-ring:var(--lt-gold-line);--cursor-fill:rgba(152,80,94,.14);border-color:var(--lt-gold-line);box-shadow:0 0 18px rgba(152,80,94,.18)}
+html[data-lt-theme=garden] .cursorRing.interactive{--cursor-ring:var(--lt-rose,#d88f9c);--cursor-fill:rgba(152,80,94,.22)}
+html[data-lt-theme=garden] .cursor-ripple{border-color:var(--lt-gold-line)}
+html[data-lt-theme=garden] .cursor-drop{background:var(--lt-rose,#d88f9c)}
 /* 정원: 패널 안 보조 글자(#cdbbd5·#9987a4 같은 밤용 회보라)를 토큰으로 바꾼다. */
 html[data-lt-theme=garden] .leftPanel,html[data-lt-theme=garden] .detail,html[data-lt-theme=garden] .toolbar,
 html[data-lt-theme=garden] .postAdd,html[data-lt-theme=garden] .nextChooser,html[data-lt-theme=garden] .modal{color:var(--lt-ink)}

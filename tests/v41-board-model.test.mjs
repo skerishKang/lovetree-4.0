@@ -10,8 +10,8 @@ const M = globalThis.LT58Model;
 const BOARD = fs.readFileSync(new URL('../public/v41/views/board/board.js', import.meta.url), 'utf8');
 const EXTRAS = fs.readFileSync(new URL('../public/v41/views/board/board-extras.js', import.meta.url), 'utf8');
 
-test('0. 계산 한 벌은 화면이 실제로 부르는 함수만 노출한다', () => {
-  assert.deepEqual(Object.keys(M).sort(), ['cardPosition', 'cinemaBeats', 'collectPath', 'decorationMotion', 'detailButtonState', 'editGuard', 'escapeHTML', 'filterVisible', 'fitZoom', 'maxCreatedOrder', 'nextConnections', 'removeConnection', 'threadPath', 'threadRedrawStep']);
+test('0. 보드 한 벌: 화면이 부르는 함수가 전부 있다', () => {
+  assert.deepEqual(Object.keys(M).sort(), ['cardPosition', 'cinemaBeats', 'collectPath', 'cursorEffectAllowed', 'cursorHover', 'cursorMode', 'cursorScale', 'decorationMotion', 'detailButtonState', 'editGuard', 'escapeHTML', 'filterVisible', 'fitZoom', 'maxCreatedOrder', 'nextConnections', 'removeConnection', 'threadPath', 'threadRedrawStep']);
   for (const fn of Object.keys(M)) assert.equal(typeof M[fn], 'function', fn);
 });
 
@@ -224,4 +224,58 @@ test('14. board-extras.js는 필터 판정을 다시 구현하지 않고 한 벌
   assert.ok(EXTRAS.includes('LT58Model.maxCreatedOrder(moments)'));
   // DOM 반영(클래스 토글)은 화면에 그대로 남는다.
   assert.ok(EXTRAS.includes("el.classList.toggle('filteredOut',!ok)"));
+});
+
+test('19. 커서 동작: 끔 조건·움직임 줄임·반응 대상·크기 배율', () => {
+  // 끔 조건
+  assert.equal(M.cursorMode({ pointerType: 'touch' }), 'off');
+  assert.equal(M.cursorMode({ coarse: true }), 'off');
+  assert.equal(M.cursorMode({ cinema: true }), 'off');
+  assert.equal(M.cursorMode({ reducedMotion: true }), 'position');
+  assert.equal(M.cursorMode({}), 'full');
+  // 반응 대상: 입력 위 숨김, 카드·핀·실·버튼 위 반응
+  assert.equal(M.cursorHover({ text: true }), 'hidden');
+  assert.equal(M.cursorHover({ text: true, card: true }), 'hidden');
+  assert.equal(M.cursorHover({ card: true }), 'interactive');
+  assert.equal(M.cursorHover({ pin: true }), 'interactive');
+  assert.equal(M.cursorHover({ thread: true }), 'interactive');
+  assert.equal(M.cursorHover({ button: true }), 'interactive');
+  assert.equal(M.cursorHover({}), 'default');
+  // 크기 배율: 끔 0, 드래그 작은 점, 누름 0.8, 반응 1.6, 기본 1
+  assert.equal(M.cursorScale({ mode: 'off' }), 0);
+  assert.equal(M.cursorScale({ dragging: true }), 0.3);
+  assert.equal(M.cursorScale({ down: true }), 0.8);
+  assert.equal(M.cursorScale({ hover: 'interactive' }), 1.6);
+  assert.equal(M.cursorScale({}), 1);
+  assert.equal(M.cursorScale({ hover: 'interactive', down: true }), 0.8, '누름이 반응 확대보다 우선');
+});
+
+test('20. 커서 동작 세기 증명: 끔·숨김·축소를 풀어 버리면 답이 달라진다', () => {
+  const mode = (o) => M.cursorMode(o);
+  const hover = (o) => M.cursorHover(o);
+  const scale = (o) => M.cursorScale(o);
+  assert.notEqual(mode({ pointerType: 'touch' }), mode({ pointerType: 'mouse' }));
+  assert.notEqual(mode({ cinema: true }), mode({ cinema: false }));
+  assert.notEqual(mode({ reducedMotion: true }), mode({ reducedMotion: false }));
+  assert.notEqual(hover({ text: true }), hover({ text: false }));
+  assert.notEqual(hover({ button: true }), hover({ button: false }));
+  assert.notEqual(scale({ down: true }), scale({ down: false }));
+  assert.notEqual(scale({ dragging: true }), scale({ dragging: false }));
+  assert.notEqual(scale({ hover: 'interactive' }), scale({ hover: 'default' }));
+  assert.notEqual(scale({ mode: 'off' }), scale({ mode: 'full' }));
+});
+
+test('21. 클릭 효과 한도: 동시에 켜진 묶음이 넘으면 새 묶음을 막는다', () => {
+  assert.equal(M.cursorEffectAllowed(0, 3), true);
+  assert.equal(M.cursorEffectAllowed(2, 3), true);
+  assert.equal(M.cursorEffectAllowed(3, 3), false);
+  assert.equal(M.cursorEffectAllowed(4, 3), false);
+  assert.equal(M.cursorEffectAllowed(0, 1), true);
+  assert.equal(M.cursorEffectAllowed(1, 1), false);
+});
+
+test('22. 클릭 효과 한도 세기 증명: 한도를 풀면 넘치는 묶음도 허용해 버린다', () => {
+  assert.notEqual(M.cursorEffectAllowed(3, 3), M.cursorEffectAllowed(3, 4));
+  assert.equal(M.cursorEffectAllowed(3, 4), true);
+  assert.equal(M.cursorEffectAllowed(3, 3), false);
 });
