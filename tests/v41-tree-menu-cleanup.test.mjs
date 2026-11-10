@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {createCleanup} from '../public/v41/shell/cleanup.mjs';
-import {titleView} from '../public/v41/book-usability.mjs';
+import {titleView, withoutAutoTitle} from '../public/v41/book-usability.mjs';
 
 // #380 3·6: 드롭다운 빈 표지 기본값 + 정리 목록 제목·썸네일.
 const dir = new URL('../public/v41/', import.meta.url);
@@ -75,4 +75,10 @@ test('3. 정리 목록은 주입된 화면 규칙으로 제목·썸네일을 그
   assert.equal(second.children[1].textContent, '내 제목');
   delete globalThis.document;
   delete globalThis.window;
+});
+
+test('4. 정리 목록 제목 대체값은 자동 도메인 제목을 화면에 내보내지 않는다', () => {
+  assert.equal(withoutAutoTitle({title: 'youtu.be에서 간직한 순간'}).title, '', '자동 제목은 화면용 대체에서 빈 값');
+  assert.equal(withoutAutoTitle({title: '내가 쓴 제목'}).title, '내가 쓴 제목', '사용자가 쓴 제목은 그대로');
+  assert.match(shell, /withoutAutoTitle\(moment\)\.title/, '셸이 화면용 대체 규칙을 재사용한다');
 });
