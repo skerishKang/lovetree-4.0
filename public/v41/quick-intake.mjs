@@ -70,8 +70,29 @@ export function isInboxDuplicate(trees, url) {
 }
 
 export const INTAKE_DUP_TEXT = '이미 모아둔 순간에 있는 주소예요.';   // 같은 주소 두 번 담기 방지 안내(문구 계약).
+export const INTAKE_LOGIN_RETRY_TEXT = '로그인한 뒤 다시 공유해 주세요.';   // 두 번째 로그아웃 안내 — 로그인 고리를 끊는 자리(문구 계약, #342 후속).
+
+// 세션 상태에 따른 한 걸음 판정(#342 후속: 공유 진입 로그인 고리 차단).
+// session = {source, owned, phase} — 셸의 기록 출처, 서버 기록을 읽은 내 계정인지, 동기화 단계(phase).
+// attempt = {attempted} — 보관한 같은 주소로 이미 로그인을 시작했는지.
+// 세션이 확정되기 전(checking·offline 등)에는 '기다림'이라 아무것도 하지 않는다 — 이 한 줄이 고리를 끊는다.
+export const INTAKE_STEP_WAIT = 'wait';       // 아직 모름: 담지도, 로그인으로 보내지도 않는다
+export const INTAKE_STEP_SAVE = 'save';       // 서버 기록 load 완료(source==='server' && owned): 담는다
+export const INTAKE_STEP_LOGIN = 'login';     // 로그인 필요가 확정: 한 번만 로그인으로 보낸다
+export const INTAKE_STEP_NOTICE = 'notice';   // 이미 한 번 보냈다: 다시 보내지 않고 안내로 멈춘다
+export const INTAKE_STEP_SKIP = 'skip';       // 공유 감상 화면: 담지 않는다
+
+export function intakeStep(session = {}, attempt = {}) {
+  const source = String(session?.source ?? '');
+  const phase = String(session?.phase ?? '');
+  if (source === 'share') return INTAKE_STEP_SKIP;
+  if (source === 'server' && session?.owned === true) return INTAKE_STEP_SAVE;
+  if (source === 'server' && phase === 'login') return attempt?.attempted === true ? INTAKE_STEP_NOTICE : INTAKE_STEP_LOGIN;
+  return INTAKE_STEP_WAIT;
+}
 
 const PENDING_KEY = 'lovetree.v41.pending-share';
+const LOGIN_ATTEMPT_KEY = 'lovetree.v41.pending-share-login';
 
 function defaultPendingStorage() {
   try { return globalThis.sessionStorage || null; } catch { return null; }   // 저장소를 못 읽는 환경(프라이버시 모드 등)
@@ -84,4 +105,18 @@ export function createPendingSlot(storage = defaultPendingStorage()) {
   const write = (url) => { try { storage?.setItem(PENDING_KEY, String(url)); } catch { /* 보관 못 해도 로그인 흐름은 간다 */ } };
   const clear = () => { try { storage?.removeItem(PENDING_KEY); } catch { /* 지울 수 없으면 세션 수명에 맡긴다 */ } };
   return { read, write, clear };
+}
+
+// 이 주소로 이미 로그인을 시작했는지 — 같은 값이면 로그인 화면으로 두 번 보내지 않는다(고리 차단, #342 후속).
+export function loginAttempted(markedUrl, url) {
+  const marked = canonicalUrl(markedUrl);
+  return !!marked && marked === canonicalUrl(url);
+}
+
+// 로그인 시도 표시 보관소 — 보관한 주소와 같은 수명(탭 단위)을 쓴다. 저장소가 막히면 조용히 아무것도 않는다.
+export function createLoginAttemptSlot(storage = defaultPendingStorage()) {
+  const read = () => { try { return String(storage?.getItem(LOGIN_ATTEMPT_KEY) ?? ''); } catch { return ''; } };
+  const mark = (url) => { try { storage?.setItem(LOGIN_ATTEMPT_KEY, String(url)); } catch { /* 표시 못 해도 담기 흐름은 간다 */ } };
+  const clear = () => { try { storage?.removeItem(LOGIN_ATTEMPT_KEY); } catch { /* 표시 지우기 실패는 세션 수명에 맡긴다 */ } };
+  return { read, mark, clear };
 }
