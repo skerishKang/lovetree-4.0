@@ -11,6 +11,7 @@ import {applyViewAccessibility,connectionLabel} from './view-a11y.mjs';
 import {accountPresentation,treePickerLabel,treePickerText,treeViewsVisible,writeMenuLabel,headerState,headerPartsFor,readTipsSeen,writeTipsSeen,tipsWanted,FIRST_TREE_TIPS,homeCenterState,homeStartLoginUrl,readTheme,readLoginIntent,writeTheme,nextTheme,themeButtonLabel,themeButtonAriaLabel,themePressed,appliedTheme,applyThemeAttribute,LOGIN_INTENTS} from './header-state.mjs';
 import {parseJourneyRoute,journeyRouteDecision} from './first-journey.mjs';
 import {displayTreeTitle} from './tree-name.mjs';
+import {titleView} from './book-usability.mjs';
 import {screens,screenForView,viewForFile,themedViewFor} from './shell/navigation.mjs';
 import {createScreens} from './shell/screens.mjs';
 import {createHeader} from './shell/header.mjs';
@@ -90,7 +91,9 @@ function renderTreeMenu(){
  }).join('');
  const manage=source==='server'&&window.LT41&&member?.snapshot().owned&&member.snapshot().writable;
  treePopover.innerHTML=rows+`<div class="tree-foot" role="none"><button type="button" role="menuitem" data-tree-action="new">＋ 새 트리</button>${manage?'<button type="button" role="menuitem" data-tree-action="manage">이 트리 관리 (이름·표지)</button><button type="button" role="menuitem" data-tree-action="share">이 트리 공유</button>':''}</div>`;
- treePopover.querySelectorAll('[data-tree-id]').forEach(b=>b.onclick=()=>{const id=b.dataset.treeId;closeTreeMenu();if(id){choose(id);flowNavigation();writeLocation();}});
+  // 트리를 누르면 그 트리로 이동한다: 책·보드·지도를 보던 중이면 같은 보기로, 그 외(첫 화면·내 트리·둘러보기)에는 그 트리의 책으로. 주소도 따라오게 남긴다.
+  const TREE_VIEWS=new Set(['track59-sketchbook.html','track58-pinboard.html','track56-network.html']);
+  treePopover.querySelectorAll('[data-tree-id]').forEach(b=>b.onclick=()=>{const id=b.dataset.treeId;closeTreeMenu();if(!id)return;const wasTreeView=TREE_VIEWS.has(current);choose(id);if(!wasTreeView)show('track59-sketchbook.html',false);flowNavigation();writeLocation();});
  treePopover.querySelector('[data-tree-action="new"]')?.addEventListener('click',()=>{closeTreeMenu();if(member?.snapshot().writable)openEditor('new');else openLoginStart('new-tree');});
  treePopover.querySelector('[data-tree-action="manage"]')?.addEventListener('click',()=>{closeTreeMenu();shellPanels.openTreeManager();});
  treePopover.querySelector('[data-tree-action="share"]')?.addEventListener('click',()=>{closeTreeMenu();$('share-menu').click();});
@@ -189,7 +192,10 @@ const shellCleanup=createCleanup({
   getTrees:()=>model?.trees||[],
   choose:(id,momentId)=>choose(id,momentId),
   notify:text=>notify(text),
-  panel:id=>panel(id)
+  panel:id=>panel(id),
+  // 정리 목록도 다른 화면과 같은 제목 규칙·썸네일 규칙을 쓴다(중복 구현 금지).
+  treeMomentThumb,
+  momentTitle:moment=>titleView(moment,titleDisplayValue()).main
 });
 $('cleanup-menu').onclick=()=>shellCleanup.open({});
 function updateMediaPreview(){return shellPanels.updateMediaPreview();}
