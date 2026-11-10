@@ -3,6 +3,7 @@
 // 화면 배선(붙여넣기 리스너·진입 소비·로그인 라운드트립)은 shell/quick-intake.mjs가 맡는다(docs/TESTING.md).
 // 데이터 규칙(quickAdd·inbox)은 로컬1 계약을 쓴다 — 화면은 이름만 부른다.
 import { parseQuickUrl } from './quick-add.mjs';
+import { fetchVideoTitle } from './video-title.mjs';
 
 // share_target params 가 싣고 오는 쿼리 이름(매니페스트와 한 벌).
 export const INTAKE_URL_PARAM = 'quickadd';
@@ -29,6 +30,23 @@ export function firstHttpUrl(...values) {
 // url → text → title 순으로 첫 주소를 고른다.
 export function resolveIntakeCandidate({ url = '', text = '', title = '' } = {}) {
   return firstHttpUrl(url, text, title);
+}
+
+// 저장 전 영상 제목 확보(#344 계약): 빠른 추가 창과 같은 fetchVideoTitle(서버 oEmbed 프록시)을 쓴다.
+// 제목을 기다리는 시간에는 상한을 둔다 — 넘거나 실패하면 빈 값이라 저장은 주소만으로 계속된다(막지 않는다).
+export const INTAKE_TITLE_WAIT_MS = 4000;
+
+export async function resolveMediaMetadata(url, { describe, timeoutMs = INTAKE_TITLE_WAIT_MS, fetchImpl } = {}) {
+  const parsed = parseQuickUrl(url, describe);
+  if (parsed.status !== 'ok' || parsed.kind !== 'youtube' || !parsed.videoId) return {};
+  let timer = null;
+  const timedOut = new Promise((resolve) => { timer = setTimeout(() => resolve(''), Math.max(0, timeoutMs)); });
+  try {
+    const title = await Promise.race([fetchVideoTitle(parsed.videoId, fetchImpl), timedOut]);
+    return title ? { mediaMetadata: { title } } : {};
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 // 파라미터를 읽고 지운다 — 한 번만 통하는 값이라 부팅 때 한 번 읽고, 나머지는 그대로 둔다.

@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import {
   INTAKE_URL_PARAM, INTAKE_TEXT_PARAM, INTAKE_TITLE_PARAM, INTAKE_MAX_URL_LENGTH, INTAKE_DUP_TEXT,
   readIntakeParams, classifyIntake, firstHttpUrl, resolveIntakeCandidate, canonicalUrl, isInboxDuplicate, createPendingSlot,
+  resolveMediaMetadata, INTAKE_TITLE_WAIT_MS,
 } from '../public/v41/quick-intake.mjs';
 
 // LTMedia.describe와 같은 모양의 최소 판정(화면이 실제로 쓰는 전역과 같은 계약).
@@ -122,4 +123,49 @@ test('createPendingSlot: 한 번 보관·덮어쓰기·지우기, 저장소를 �
   assert.equal(INTAKE_URL_PARAM, 'quickadd');
   assert.equal(INTAKE_TEXT_PARAM, 'qtext');
   assert.equal(INTAKE_TITLE_PARAM, 'qtitle');
+});
+
+// LTMedia.describe처럼 YouTube를 알아보는 최소 판정(저장 전 제목 확보 시험용).
+const describeYouTube = (url) => {
+  const value = String(url ?? '');
+  const match = value.match(/youtube\.com\/watch\?v=([\w-]{11})/) || value.match(/youtu\.be\/([\w-]{11})/);
+  if (match) return { kind: 'youtube', original: value, videoId: match[1], label: 'YouTube 영상', openUrl: `https://www.youtube.com/watch?v=${match[1]}` };
+  try {
+    const parsed = new URL(value);
+    return ['http:', 'https:'].includes(parsed.protocol) ? { kind: 'link', label: parsed.hostname, openUrl: parsed.href } : { kind: 'invalid', openUrl: '' };
+  } catch { return { kind: 'none', openUrl: '' }; }
+};
+const YT = 'https://www.youtube.com/watch?v=abc12345678';
+
+test('resolveMediaMetadata: YouTube는 기존 oEmbed 한 벌로 제목을 받아 mediaMetadata로 넘긴다(#344 계약)', async () => {
+  const asked = [];
+  const fetchImpl = async (path) => { asked.push(path); return { ok: true, json: async () => ({ title: '  영상 제목  ' }) }; };
+  assert.deepEqual(await resolveMediaMetadata(YT, { describe: describeYouTube, fetchImpl }), { mediaMetadata: { title: '영상 제목' } });
+  assert.deepEqual(asked, ['/api/youtube/oembed?v=abc12345678'], '영상 제목 조회는 기존 서버 oEmbed 프록시 한 곳만 쓴다');
+  assert.ok(INTAKE_TITLE_WAIT_MS > 0 && INTAKE_TITLE_WAIT_MS <= 5000);
+});
+
+test('resolveMediaMetadata: 실패·예외·빈 제목은 빈 값(주소만 저장으로 물러남)', async () => {
+  const deny = async () => ({ ok: false, json: async () => ({ title: 'x' }) });
+  assert.deepEqual(await resolveMediaMetadata(YT, { describe: describeYouTube, fetchImpl: deny }), {});
+  const boom = async () => { throw new Error('network'); };
+  assert.deepEqual(await resolveMediaMetadata(YT, { describe: describeYouTube, fetchImpl: boom }), {});
+  const blank = async () => ({ ok: true, json: async () => ({ title: '   ' }) });
+  assert.deepEqual(await resolveMediaMetadata(YT, { describe: describeYouTube, fetchImpl: blank }), {});
+});
+
+test('resolveMediaMetadata: 제목이 늦으면 상한 시간 뒤 빈 값으로 끝난다(저장을 막지 않음)', async () => {
+  const never = () => new Promise(() => {});
+  const started = Date.now();
+  const result = await resolveMediaMetadata(YT, { describe: describeYouTube, fetchImpl: never, timeoutMs: 20 });
+  assert.deepEqual(result, {});
+  assert.ok(Date.now() - started < 1000, '상한(20ms) 뒤 돌아온다');
+});
+
+test('resolveMediaMetadata: YouTube가 아니면 oEmbed를 부르지 않는다', async () => {
+  let called = 0;
+  const fetchImpl = async () => { called += 1; return { ok: true, json: async () => ({ title: 'x' }) }; };
+  assert.deepEqual(await resolveMediaMetadata('https://example.com/a', { describe: describeYouTube, fetchImpl }), {});
+  assert.deepEqual(await resolveMediaMetadata('그냥 글자', { describe: describeYouTube, fetchImpl }), {});
+  assert.equal(called, 0);
 });

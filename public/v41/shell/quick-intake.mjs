@@ -1,13 +1,13 @@
 // 빠른 담기 입구: 셸 문서 어디서나 붙여넣기, 공유 시트로 들어온 주소 (2026-11-10).
 // 판정·문구·추적은 ../quick-intake.mjs의 순수 함수가 맡는다(docs/TESTING.md).
-// 저장은 로컬1 계약(member.apply('quickAdd', {url}))을 그대로 부른다 — 화면은 이름만 쓴다.
+// 저장은 로컬1 계약(member.apply('quickAdd', {url, mediaMetadata?}))을 그대로 부른다 — 화면은 이름만 쓴다.
 import {
   QUICK_INVALID_ERROR, QUICK_SAVED_TEXT, DROP_LOGIN_NOTICE, DROP_READONLY_NOTICE, extractDropUrl, parseQuickUrl,
 } from '../quick-add.mjs';
 import {
   INTAKE_DUP_TEXT, INTAKE_LOGIN_RETRY_TEXT, INTAKE_STEP_LOGIN, INTAKE_STEP_NOTICE, INTAKE_STEP_SKIP, INTAKE_STEP_WAIT,
   classifyIntake, createLoginAttemptSlot, createPendingSlot, intakeStep, isInboxDuplicate, loginAttempted,
-  readIntakeParams, resolveIntakeCandidate,
+  readIntakeParams, resolveIntakeCandidate, resolveMediaMetadata,
 } from '../quick-intake.mjs';
 
 export function createQuickIntake(deps) {
@@ -19,6 +19,8 @@ export function createQuickIntake(deps) {
   const attempts = createLoginAttemptSlot(deps.storage);
   const notify = (text) => deps.notify?.(text);
   const loginStart = () => deps.openLoginStart?.();
+  // 제목을 기다리는 동안 같은 주소를 두 번 담지 않는다(여러 번 흘려도 저장은 한 번).
+  const inFlight = new Set();
 
   function inField(target) {
     if (!target || typeof target !== 'object') return false;
@@ -64,13 +66,25 @@ export function createQuickIntake(deps) {
     let trees = [];
     try { trees = member.state?.()?.trees ?? []; } catch { trees = []; }
     if (isInboxDuplicate(trees, url)) { slot.clear(); attempts.clear(); notify(INTAKE_DUP_TEXT); return; }
-    try {
-      member.apply('quickAdd', { url });
-      slot.clear(); attempts.clear();
-      notify(QUICK_SAVED_TEXT);
-    } catch (error) {
-      notify(typeof error?.message === 'string' ? error.message : String(error));
-    }
+    const commit = (media) => {
+      try {
+        member.apply('quickAdd', { url, ...media });
+        slot.clear(); attempts.clear();
+        notify(QUICK_SAVED_TEXT);
+      } catch (error) {
+        notify(typeof error?.message === 'string' ? error.message : String(error));
+      }
+    };
+    // 제목은 빠른 추가 창과 같은 함수(oEmbed 프록시)로 받되, 기다림에 상한을 둔다 — 넘으면 주소만 저장한다.
+    const parsed = parseQuickUrl(url, describe);
+    const wantsTitle = parsed.status === 'ok' && parsed.kind === 'youtube' && !!parsed.videoId;
+    if (!wantsTitle) { commit({}); return; }
+    if (inFlight.has(url)) return;
+    inFlight.add(url);
+    void resolveMediaMetadata(url, { describe, timeoutMs: deps.titleWaitMs, fetchImpl: deps.fetchImpl })
+      .then((media) => commit(media))
+      .catch(() => commit({}))
+      .finally(() => { inFlight.delete(url); });
   }
 
   function flush() {

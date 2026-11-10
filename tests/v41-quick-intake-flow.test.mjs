@@ -45,7 +45,7 @@ function strictDescribe(value) {
   return { kind: 'link', original: value, label: parsed.hostname.replace(/^www\./, ''), openUrl: parsed.href };
 }
 
-function setup({ member, source = 'server', browser = fakeBrowser(), describe = strictDescribe, storage } = {}) {
+function setup({ member, source = 'server', browser = fakeBrowser(), describe = strictDescribe, storage, fetchImpl, titleWaitMs } = {}) {
   const notifies = [];
   const logins = [];
   const doc = fakeDocument();
@@ -60,8 +60,29 @@ function setup({ member, source = 'server', browser = fakeBrowser(), describe = 
     location: browser.location,
     history: browser.history,
     storage: storage ?? memoryStorage(),
+    fetchImpl,
+    titleWaitMs,
   });
   return { intake, doc, notifies, logins, state, ...browser, member };
+}
+
+// LTMedia.describe처럼 YouTube를 알아보는 최소 판정 — 저장 전 제목 확보 시험용.
+function describeYouTube(value) {
+  const url = String(value ?? '');
+  const match = url.match(/youtube\.com\/watch\?v=([\w-]{11})/) || url.match(/youtu\.be\/([\w-]{11})/);
+  if (match) return { kind: 'youtube', original: url, videoId: match[1], label: 'YouTube 영상', openUrl: `https://www.youtube.com/watch?v=${match[1]}` };
+  return strictDescribe(url);
+}
+const YT = 'https://www.youtube.com/watch?v=abc12345678';
+const titleFetch = (title) => async () => ({ ok: true, json: async () => ({ title }) });
+
+async function until(fn, ms = 1500) {
+  const end = Date.now() + ms;
+  while (Date.now() < end) {
+    if (fn()) return true;
+    await new Promise((r) => setTimeout(r, 5));
+  }
+  return false;
 }
 
 test('붙여넣기: 입력 칸 안에서는 손대지 않는다', () => {
@@ -296,4 +317,81 @@ test('붙여넣기: 판정 함수가 막혀도 안내로 끝난다', () => {
   doc.dispatch('paste', { target: {}, clipboardData: { getData: () => 'https://a.test/x' } });
   assert.deepEqual(notifies, ['링크 형식을 확인해 주세요.']);
   assert.equal(member.calls.applied.length, 0);
+});
+
+test('공유 진입: YouTube 주소는 저장 전에 oEmbed 제목을 받아 함께 넘긴다(#344 계약 공유)', async () => {
+  const member = memberFixture();
+  const asked = [];
+  const browser = fakeBrowser({ search: `?quickadd=${encodeURIComponent(YT)}` });
+  const run = setup({
+    member, browser, describe: describeYouTube,
+    fetchImpl: async (path) => { asked.push(path); return { ok: true, json: async () => ({ title: '영상 제목' }) }; },
+  });
+  run.intake.flush();
+  assert.equal(member.calls.applied.length, 0, '제목을 기다리는 동안에는 아직 담지 않는다');
+  assert.ok(await until(() => member.calls.applied.length > 0), '상한 안에 담긴다');
+  assert.deepEqual(member.calls.applied, [['quickAdd', { url: YT, mediaMetadata: { title: '영상 제목' } }]]);
+  assert.deepEqual(asked, ['/api/youtube/oembed?v=abc12345678'], '기존 서버 oEmbed 프록시 한 벌만 부른다');
+  assert.deepEqual(run.notifies, ['모아둔 순간에 담았어요']);
+  assert.equal(run.intake.pending(), null);
+});
+
+test('붙여넣기: YouTube도 같은 제목을 받아 담는다', async () => {
+  const member = memberFixture();
+  const run = setup({ member, describe: describeYouTube, fetchImpl: titleFetch('붙여넣은 영상') });
+  const event = { target: {}, clipboardData: { getData: () => YT }, preventDefault() { this.prevented = true; } };
+  run.doc.dispatch('paste', event);
+  assert.equal(event.prevented, true, '기본 붙여넣기는 막고 우리가 담는다');
+  assert.ok(await until(() => member.calls.applied.length > 0));
+  assert.deepEqual(member.calls.applied, [['quickAdd', { url: YT, mediaMetadata: { title: '붙여넣은 영상' } }]]);
+});
+
+test('제목: oEmbed 실패·시간 초과면 주소만 저장한다(저장은 막지 않음)', async () => {
+  const denied = setup({
+    member: memberFixture(), browser: fakeBrowser({ search: `?quickadd=${encodeURIComponent(YT)}` }),
+    describe: describeYouTube, fetchImpl: async () => ({ ok: false }),
+  });
+  denied.intake.flush();
+  assert.ok(await until(() => denied.member.calls.applied.length > 0));
+  assert.deepEqual(denied.member.calls.applied, [['quickAdd', { url: YT }]], 'mediaMetadata 없이 주소만');
+  assert.deepEqual(denied.notifies, ['모아둔 순간에 담았어요']);
+
+  const slow = setup({
+    member: memberFixture(), browser: fakeBrowser({ search: `?quickadd=${encodeURIComponent(YT)}` }),
+    describe: describeYouTube, fetchImpl: () => new Promise(() => {}), titleWaitMs: 25,
+  });
+  slow.intake.flush();
+  assert.ok(await until(() => slow.member.calls.applied.length > 0), '상한(25ms) 뒤에도 담긴다');
+  assert.deepEqual(slow.member.calls.applied, [['quickAdd', { url: YT }]]);
+});
+
+test('제목: 기다리는 동안 상태가 여러 번 흘러도 담기는 한 번(강도)', async () => {
+  const member = memberFixture();
+  let release;
+  const gate = new Promise((resolve) => { release = resolve; });
+  const run = setup({
+    member, browser: fakeBrowser({ search: `?quickadd=${encodeURIComponent(YT)}` }), describe: describeYouTube,
+    fetchImpl: async () => { await gate; return { ok: true, json: async () => ({ title: '영상 제목' }) }; },
+  });
+  for (let i = 0; i < 5; i += 1) run.intake.flush();
+  assert.equal(member.calls.applied.length, 0, '제목을 기다리는 동안에는 담지 않는다');
+  release();
+  assert.ok(await until(() => member.calls.applied.length > 0));
+  await new Promise((r) => setTimeout(r, 20));
+  assert.equal(member.calls.applied.length, 1, '여러 번 흘려도 한 번만 담는다');
+});
+
+test('제목: 세션 확정 전에는 oEmbed도 부르지 않고, 확정 뒤에 제목과 함께 담는다', async () => {
+  const member = memberFixture({ owned: false, writable: false, phase: 'checking' });
+  let asked = 0;
+  const run = setup({
+    member, source: 'file', browser: fakeBrowser({ search: `?quickadd=${encodeURIComponent(YT)}` }), describe: describeYouTube,
+    fetchImpl: async () => { asked += 1; return { ok: true, json: async () => ({ title: '영상 제목' }) }; },
+  });
+  run.intake.flush();
+  assert.equal(asked, 0, '확정 전에는 제목 요청도 미룬다');
+  member.flags.owned = true; member.flags.writable = true; member.flags.phase = 'synced'; run.state.source = 'server';
+  run.intake.flush();
+  assert.ok(await until(() => member.calls.applied.length > 0));
+  assert.deepEqual(member.calls.applied, [['quickAdd', { url: YT, mediaMetadata: { title: '영상 제목' } }]]);
 });
