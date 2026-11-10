@@ -101,3 +101,26 @@ html[data-lt-theme=garden][data-v41-screen=board] .lt-moment-picker button[aria-
 html[data-lt-theme=garden][data-v41-screen=board] .toast{background:var(--lt-glass-strong);border-color:var(--lt-line);color:var(--lt-ink)}
 html[data-lt-theme=garden][data-v41-screen=board] .lt-moment-picker select{background:var(--lt-paper);border:1px solid var(--lt-line);color:var(--lt-ink)}
 html[data-lt-theme=garden][data-v41-screen=board] .lt-moment-picker button{border:1px solid var(--lt-line);background:var(--lt-paper);color:var(--lt-ink)}
+
+/* #372 후속(대표 결정 1-나): 단순(기본)은 카드 끌기·잇기, 카드 추가, 전체 보기, 시네마만 보인다.
+   고급(body.lt-advanced)은 도구 패널·필터·테마·확대/축소·되돌리기·편집 도구까지 보인다.
+   숨김은 이 CSS만 담당하고 기능 코드는 그대로 둔다. */
+body:not(.lt-advanced) #undoBtn,
+body:not(.lt-advanced) .toolbar,
+body:not(.lt-advanced) #leftPanel,
+body:not(.lt-advanced) #mobileTools,
+body:not(.lt-advanced) #startPathHere,
+body:not(.lt-advanced) #editMomentBtn,
+body:not(.lt-advanced) #quickPin,
+body:not(.lt-advanced) #quickCard,
+body:not(.lt-advanced) #styleSection,
+body:not(.lt-advanced) .lt-move-btn { display: none !important; }
+@media(max-width:700px){
+  /* 단순 모드의 추가·전체 보기는 모바일에서도 쓸 수 있게 한다(기존 .headbtn 숨김보다 ID가 우선). */
+  body:not(.lt-advanced) #fitBtn,
+  body:not(.lt-advanced) #addBtn { display: inline-flex !important; align-items: center; min-height: 44px; }
+  body:not(.lt-advanced) #fitBtn { padding: 0 8px; }
+  body:not(.lt-advanced) #addBtn { padding: 0 10px; }
+  /* 고급 모드의 되돌리기는 모바일에서도 쓸 수 있게 한다(나머지 도구는 도구 드로어). */
+  body.lt-advanced #undoBtn { display: inline-flex !important; align-items: center; min-height: 44px; padding: 0 8px; }
+}

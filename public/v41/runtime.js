@@ -10,7 +10,8 @@
     return {id:m.id,title:m.title,date:m.date,emotion:m.emotion,memo:m.note,mediaMetadata:m.mediaMetadata||null,
       whyNext:outgoing.map(e=>e.reason).filter(Boolean).join(' / '),
       type:context.exampleMedia?.[m.id]?.type||(media?.kind==='photo'?'photo':media?.kind==='video'||media?.kind==='youtube'?'video':m.url?'link':'memo'),source:context.exampleMedia?'예시 이미지':media?.openUrl?new URL(media.openUrl).hostname:'불러온 기록',image:context.exampleMedia?.[m.id]?.image||'',externalUrl:m.url||'',
-      first:m.parentId===null,next:outgoing[0]?.to||null,branch:outgoing[1]?.to||null};
+      first:m.parentId===null,next:outgoing[0]?.to||null,branch:outgoing[1]?.to||null,
+      x:m.x,y:m.y,rot:m.rot,pinStyle:m.pinStyle,cardStyle:m.cardStyle,color:m.color,keywords:m.keywords||[],createdAt:m.createdAt};
   });
   if(context.source==='server')addEventListener('DOMContentLoaded',()=>{for(const label of document.querySelectorAll('#detail .section .label'))if(label.textContent==='감상 예시'){label.textContent='내 기록';label.nextElementSibling.textContent='상단에서 수정·연결을 관리할 수 있어요.';}});
   if(typeof document!=='undefined')addEventListener('DOMContentLoaded',()=>{

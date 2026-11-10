@@ -379,7 +379,7 @@ $('tree-tips-close')?.addEventListener('click',()=>closeTreeTips());
 // 넘치는 쪽 끝에만 페이드를 켜서 잘린 것이 아니라 더 있다는 신호를 준다. 데스크톱(넓은 폭)은 스크롤이 없어 아무 일도 하지 않는다.
 const navBar=document.querySelector('.app-header nav');
 const narrowNav=()=>matchMedia('(max-width:780px)').matches;
-function choose(id,momentId){const tree=model.trees.find(t=>t.id===id);window.LT41=tree?{tree,trees:model.trees,source,momentId:tree.moments.find(m=>m.id===momentId)?.id||tree.moments.find(m=>m.parentId===null)?.id||tree.moments[0]?.id,prefs:currentPrefs(),}:null;
+function choose(id,momentId){const tree=model.trees.find(t=>t.id===id);window.LT41=tree?{tree,trees:model.trees,source,momentId:tree.moments.find(m=>m.id===momentId)?.id||tree.moments.find(m=>m.parentId===null)?.id||tree.moments[0]?.id,prefs:currentPrefs(),writable:source==='server'&&!!member?.snapshot().writable,}:null;
  if(tree||current==='src064-orbit.html')show(current,false);else{flowNavigation();document.body.classList.remove('home-screen');hideFrames();$('empty').hidden=false;links();}}
 function load(input,kind,selection={},fallback={}){
  model=kind==='example'?{trees:[exampleTree]}:workspaceModel(input);
@@ -449,7 +449,9 @@ function memberStatus(status){
 async function startMember(){setMemberRefreshStarted(true);if(!leaveMember())return;backfillStarted=false;backfillAttempted.clear();const startup=parseSelectionRoute(location.hash);if(startup.scope==='owner')stashPendingOwnerRoute(sessionStorage,location.hash);++loadGeneration;const generation=loadGeneration;clear();
  const api=createWorkspaceApi({fetchImpl:(url,init)=>fetch(init?.method==='GET'&&url==='/api/workspace'?'/api/workspace?features=bound-writes':url,init)});
  let initialized=false,startupNotice='',session;
- session=createMemberSession({api,onState:(state,selection)=>{if(generation!==loadGeneration)return;const snapshot=session.snapshot(),saved=accountPosition(localStorage,snapshot.subject)||{},active=parseSelectionRoute(location.hash),pending=!initialized&&active.scope!=='owner'?pendingOwnerRoute(sessionStorage):null,route=active.scope==='owner'?active:pending;let requested=selection||stateSelection();
+ session=createMemberSession({api,onState:(state,selection,meta)=>{if(generation!==loadGeneration)return;
+  // 4.1 기억 보드 저장: 화면이 이미 자기 상태를 들고 있으므로 셸은 모델만 갱신하고 iframe을 다시 그리지 않는다.
+  if(meta?.board){const projected=workspaceModel({revision:0,state});model=projected;if(window.LT41){const tree=projected.trees.find(t=>t.id===window.LT41.tree.id);if(tree){window.LT41.tree=tree;window.LT41.trees=projected.trees;window.LT41.writable=true}}return;}const snapshot=session.snapshot(),saved=accountPosition(localStorage,snapshot.subject)||{},active=parseSelectionRoute(location.hash),pending=!initialized&&active.scope!=='owner'?pendingOwnerRoute(sessionStorage):null,route=active.scope==='owner'?active:pending;let requested=selection||stateSelection();
    if(!initialized){if(route)requested=route;else if(!selection)requested=saved;const view=memberStartupView(active,route,saved,viewForFile(current));current=screenForView(view)[1];}
    const resolved=load({revision:0,state},'server',requested,saved);initialized=true;
    if(window.LT41)window.LT41.prefs=state.prefs;
