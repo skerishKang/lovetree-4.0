@@ -193,7 +193,7 @@ export function createPanels(deps) {
   }
 
   // 계정 메뉴·편집기 버튼은 셸이 열고, 이 파일은 폼 상태만 본다.
-  $('manage-tree').onclick = openTreeManager;
+  const manageTreeButton = $('manage-tree'); if (manageTreeButton) manageTreeButton.onclick = openTreeManager;
   $('tree-cover').onchange = updateTreeCoverHint;
   // #256-3: 사진 표지를 빼면 디자인 표지(또는 기본 표지)로 돌아간다.
   $('tree-photo-clear').onclick = () => { $('tree-cover').value = ''; updateTreeCoverHint(); };
@@ -235,6 +235,7 @@ export function createPanels(deps) {
     try {
       getMember().apply('editTree', Object.fromEntries(new FormData(e.target)), selection());
       treeBaseline = new URLSearchParams(new FormData(e.target)).toString();
+      if(typeof dispatchEvent==='function')dispatchEvent(new Event('lt41-trees-changed'));
       $('tree-manager').close();
       notify('책 정보를 서버에 저장하고 있어요.');
     } catch (error) { $('tree-form-error').textContent = error.message; }
@@ -245,6 +246,7 @@ export function createPanels(deps) {
     try {
       getMember().apply('deleteTree', {}, selection());
       treeBaseline = '';
+      if(typeof dispatchEvent==='function')dispatchEvent(new Event('lt41-trees-changed'));
       $('tree-manager').close();
       notify('트리를 삭제하고 서버에 반영하고 있어요.');
     } catch (error) { $('tree-form-error').textContent = error.message; }

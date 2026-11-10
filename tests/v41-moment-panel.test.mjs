@@ -55,14 +55,18 @@ test('더 적기는 기본 접힘이고 수정 모드에서 기존 값이 있으
   // 더 적기 펼침은 함수 시험으로 옮겼다(tests/v41-panels-flow.test.mjs의 setEditorMode 표).
 });
 
-test('내 기록 백업과 보관 파일은 계정 메뉴에서 열리고 패널에서는 빠진다', () => {
+test('내 기록 백업·가져오기·탈퇴는 설정의 고급 묶음으로 이동했다', () => {
   const popover = html.slice(html.indexOf('id="account-popover"'), html.indexOf('id="mobile-more"'));
-  assert.match(popover, /id="account-backup"/);
+  assert.match(popover, /id="account-open-settings"/);
   assert.match(popover, /id="account-assets-open"/);
-  assert.match(html, /id="account-assets"/, '보관 파일은 계정 메뉴가 여는 다이얼로그다');
-  assert.match(html, /저장하지 못한 기록도 JSON 파일로 받을 수 있습니다\./, '백업 안내 문구는 남는다');
-  assert.equal(/id="backup-draft"/.test(html), false, '패널의 백업 버튼은 없앤다');
-  assert.match(shell, /\$\('account-backup'\)\.onclick=\(\)=>\{closeAccountMenu\(\);backup\(\);\}/);
+  assert.doesNotMatch(popover, /id="account-backup"/, '계정 메뉴에는 백업을 두지 않는다');
+  assert.doesNotMatch(popover, /id="account-records"/, '계정 메뉴에는 백업 패널을 두지 않는다');
+  assert.match(html, /id="account-settings-advanced"/);
+  assert.match(html, /id="advanced-backup"/);
+  assert.match(html, /id="advanced-import"/);
+  assert.match(html, /id="account-delete"/, '탈퇴는 설정 고급 안에 남는다');
+  assert.match(shell, /\$\('advanced-backup'\)\.onclick=\(\)=>backup\(\)/);
+  assert.match(shell, /\$\('advanced-import'\)\.onclick=\(\)=>\$\('file'\)\.click\(\)/);
   assert.match(shell, /\$\('account-assets-open'\)\.onclick=/);
   assert.match(shell, /assets:\$\('account-assets'\)/, '업로드 모듈이 계정 다이얼로그를 쓴다');
   assert.match(upload, /A\('\[data-refresh\]'\)\.onclick=refresh/);

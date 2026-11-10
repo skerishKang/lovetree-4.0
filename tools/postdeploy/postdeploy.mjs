@@ -730,46 +730,27 @@ async function checkResponsive(page, width, height, outDir, stamp) {
       + (m.topDoc.overflow.length ? ` — 예: ${m.topDoc.overflow.slice(0, 3).map((o) => o.el).join(', ')}` : ''),
     { top: m.topDoc.overflow, frame: m.frameOverflow });
 
-  // 헤더 탭: 좁은 폭에서 7개가 모두 스크롤로 닿고, 현재 탭이 화면 안에 보여야 한다.
+  // 2026-11-10: 좁은 폭에서는 가운데 메뉴를 접고 트리·S·접기(☰)만 남긴다.
   if (width <= 780) {
-    const tabs = await page.evaluate(async () => {
+    const tabs = await page.evaluate(() => {
       const nav = document.querySelector('.app-header nav');
-      if (!nav) return { ok: false, reason: 'no-nav' };
-      // 숨은 탭(로그아웃의 트리 보기 탭)은 세지 않는다. #213
+      const more = document.getElementById('mobile-more');
+      if (!nav || !more) return { ok: false, reason: 'no-nav-or-more' };
       const items = [...nav.querySelectorAll('button')].filter((b) => b.getClientRects().length > 0);
-      const unreachable = [];
-      for (const b of items) {
-        b.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'auto' });
-        await new Promise((r) => setTimeout(r, 80));
-        const nr = nav.getBoundingClientRect();
-        const r = b.getBoundingClientRect();
-        if (!(r.left >= nr.left - 1 && r.right <= nr.right + 1 && r.width > 2)) unreachable.push((b.textContent || '').trim().slice(0, 12));
-      }
-      nav.scrollLeft = 0;
-      const active = nav.querySelector('[aria-current="true"]');
-      let currentVisible = null;
-      if (active) {
-        const nr = nav.getBoundingClientRect();
-        const r = active.getBoundingClientRect();
-        currentVisible = r.left >= nr.left - 1 && r.right <= nr.right + 1;
-      }
-      // #213: 트리 보기 탭(기억책·기억 보드·관계 지도)은 로그인한 내 트리에서만 보인다.
-      // 탭 개수 기대값은 셸이 적어 둔 상태(body.dataset.member/treeCount)로 제품 함수에서 계산한다.
-      const avatar = document.getElementById('account-avatar');
-      const avatarVisible = !!avatar && !avatar.hidden && getComputedStyle(avatar).display !== 'none';
-      const owned = document.body.dataset.member ? document.body.dataset.member === 'in' : avatarVisible;
-      const treeCount = Number(document.body.dataset.treeCount || (window.LT41?.trees?.length ?? 0)) || 0;
-      return { ok: true, count: items.length, owned, treeCount, loggedIn: avatarVisible, unreachable, currentVisible, label: (active?.textContent || '').trim().slice(0, 12) };
+      const tree = document.getElementById('record-menu');
+      return {
+        ok: true,
+        count: items.length,
+        moreVisible: more.getClientRects().length > 0,
+        treeVisible: !!tree && tree.getClientRects().length > 0,
+        labels: items.map((b) => (b.textContent || '').trim().slice(0, 12))
+      };
     }).catch((e) => ({ ok: false, reason: e.message }));
-    if (!tabs.ok) record(`tabs-${width}`, 'layout', 'fail', `탭 확인 실패: ${tabs.reason}`);
-    else {
-      const expected = headerExpectation({ owned: tabs.owned, treeCount: tabs.treeCount });
-      const ok = tabs.count === expected.tabs && tabs.unreachable.length === 0 && tabs.currentVisible !== false;
-      record(`tabs-${width}`, 'layout', ok ? 'pass' : 'fail',
-        ok ? `${tabs.count}개 탭 모두 스크롤로 닿음, 현재 탭 "${tabs.label}" 보임 (${expected.state}${expected.source === 'fallback' ? ' · 제품 함수 없음' : ''})`
-          : `탭 ${tabs.count}개 (기대 ${expected.tabs} · ${expected.state}) / 닿지 않음: ${tabs.unreachable.join(', ') || '없음'} / 현재 탭 보임: ${tabs.currentVisible}`,
-        { ...tabs, expected });
-    }
+    if (!tabs.ok) record(`tabs-${width}`, 'layout', 'fail', `접기 메뉴 확인 실패: ${tabs.reason}`);
+    else record(`tabs-${width}`, 'layout', tabs.moreVisible ? 'pass' : 'fail',
+      tabs.moreVisible
+        ? `가운데 탭 ${tabs.count}개 접힘 · 접기 메뉴 보임${tabs.treeVisible ? ' · 트리 선택 보임' : ''}`
+        : '접기 메뉴가 보이지 않음', { ...tabs });
   }
 
   const overlapCount = m.topDoc.overlapCount + m.frameOverlaps;
@@ -901,7 +882,7 @@ async function checkVisualTokens(page, target, opts, stamp) {
       if (top.home) problems.push('home-screen 클래스가 남아 있음');
       if (!top.headerVisible) problems.push('공통 헤더가 안 보임');
       if (top.headerBg !== 'rgb(4, 4, 7)') problems.push(`헤더 배경 ${top.headerBg} (기대 rgb(4, 4, 7))`);
-      if (top.headerHeight < 88) problems.push(`헤더 높이 ${top.headerHeight} (기대 92 근처)`);
+      if (top.headerHeight < 56) problems.push(`헤더 높이 ${top.headerHeight} (기대 64 근처)`);
       if (top.tabs !== expectedTabs) problems.push(`탭 ${top.tabs}개 (기대 ${expectedTabs})`);
       if (!/255, 230, 166/.test(top.frameBorder)) problems.push(`금테 프레임 없음: ${top.frameBorder}`);
       if (!inner) problems.push('안쪽 화면 문서를 읽지 못함');

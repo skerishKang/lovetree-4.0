@@ -1,17 +1,12 @@
-// 2026-11-07: 390·360에서 헤더 탭 7개가 폭을 넘어 잘리던 문제의 회귀 시험.
-// 좁은 폭에서만 탭 줄이 가로 스크롤이 되고, 현재 탭을 가운데로 보여 주며, 넘치는 쪽에 페이드를 두는지 확인한다.
-// 데스크톱 배치(스크롤 없음)는 그대로여야 한다.
+// 2026-11-10 대표 승인: 좁은 폭에서는 가운데 메뉴를 접고 트리 ▾·S만 남긴다.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {readFileSync} from 'node:fs';
 
 const css = fs.readFileSync(new URL('../public/v41/shell.css', import.meta.url), 'utf8');
-const header = readFileSync(new URL('../public/v41/shell/header.mjs', import.meta.url), 'utf8');
-const shell = fs.readFileSync(new URL('../public/v41/shell.mjs', import.meta.url), 'utf8');
 const html = fs.readFileSync(new URL('../public/v41/index.html', import.meta.url), 'utf8');
+const shell = fs.readFileSync(new URL('../public/v41/shell.mjs', import.meta.url), 'utf8');
 
-// 주어진 미디어 블록 본문을 모두 꺼내 하나로 이어 붙인다. 같은 조건의 블록이 여러 개일 수 있다.
 function mediaBlock(source, query) {
   const bodies = [];
   let from = 0;
@@ -37,62 +32,50 @@ function mediaBlock(source, query) {
 
 const narrow = mediaBlock(css, 'max-width:780px');
 
-test('좁은 폭에서 탭 줄은 가로 스크롤이고 스크롤바를 숨긴다', () => {
-  assert.match(narrow, /nav\{[^}]*overflow-x:auto/, 'nav에 overflow-x:auto 가 있어야 한다');
-  assert.match(narrow, /nav\{[^}]*scrollbar-width:none/, '스크롤바를 숨겨야 한다');
-  assert.match(narrow, /nav\{[^}]*scroll-snap-type:x/, 'scroll-snap 이 있어야 한다');
+test('좁은 폭: 가운데 메뉴·추가 버튼은 숨기고 트리·S·접기만 남는다', () => {
+  assert.match(narrow, /\.main-nav>button\[data-view\][^{]*\{display:none!important\}/);
+  assert.match(narrow, /\.main-nav #community-menu[^{]*\{display:none!important\}/);
+  assert.match(narrow, /\.main-nav \.tree-views\{display:none!important\}/);
+  assert.match(narrow, /\.header-actions #write-menu[^{]*\{display:none!important\}/);
+  assert.match(narrow, /#mobile-more\{display:flex!important\}/);
+  assert.match(narrow, /\.app-header\{display:flex;min-height:56px/, '한 줄');
 });
 
-test('좁은 폭에서 탭은 줄어들지 않고 스크롤로 닿는다', () => {
-  // flex:1 로 눌러 담으면 7개가 다시 잘린다. 좁은 폭에서는 고정 폭이어야 한다.
-  assert.match(narrow, /nav>button\{flex:0 0 auto\}/, 'nav 직속 버튼은 flex:0 0 auto');
-  assert.match(narrow, /\.tree-views>button\{flex:0 0 auto\}/, '트리 보기 버튼도 flex:0 0 auto');
-  assert.doesNotMatch(narrow, /nav>button\{flex:1\}/, 'nav>button{flex:1} 로 되돌아가면 안 된다');
+test('접기 메뉴는 기존 화면 버튼을 복제해 같은 동작을 부른다', () => {
+  assert.match(shell, /function buildFoldMenu\(\)/);
+  assert.match(shell, /add\('첫 화면'/);
+  assert.match(shell, /add\('내 책장'/);
+  assert.match(shell, /add\('둘러보기'/);
+  assert.match(shell, /add\('기억책'/);
+  assert.match(shell, /add\('기억 보드'/);
+  assert.match(shell, /add\('관계 지도'/);
+  assert.match(shell, /if\(event\.target\.closest\('button'\)\)closeMore\(\)/);
 });
 
-test('트리 선택은 좁은 폭에서 112px 말줄임이다', () => {
-  assert.match(narrow, /nav #record-menu\{[^}]*max-width:112px/, '트리 선택 max-width 112px');
-  assert.match(css, /nav #record-menu #source-label\{[^}]*text-overflow:ellipsis/, '말줄임 규칙 유지');
-  // 420 이하에서도 112px 아래로 줄이지 않는다(더 좁히면 이름을 못 읽는다).
-  const small = mediaBlock(css, 'max-width:420px');
-  assert.match(small, /nav #record-menu\{max-width:112px\}/, '420 이하도 112px');
+test('트리 드롭다운은 버튼 아래로 펼쳐지고 좁은 폭에서는 화면 폭을 쓴다', () => {
+  assert.match(html, /id="tree-popover" class="tree-popover" role="menu"/);
+  assert.match(css, /\.tree-popover\{position:absolute;top:calc\(100% \+ 8px\);left:0/);
+  assert.match(narrow, /\.tree-popover\{position:fixed;left:10px;right:10px;top:60px/);
+  assert.match(shell, /role="menuitemradio"/);
+  assert.match(shell, /data-tree-action="new"/);
+  assert.match(shell, /data-tree-action="manage"/);
+  assert.match(shell, /data-tree-action="share"/);
 });
 
-test('넘치는 쪽 끝에만 --lt-stage 기반 페이드가 붙는다', () => {
-  const fade = mediaBlock(css, 'max-width:780px');
-  assert.match(fade, /nav\.fade-start\{mask-image:linear-gradient\(to right,transparent/, '왼쪽 페이드');
-  assert.match(fade, /nav\.fade-end\{mask-image:linear-gradient\(to left,transparent/, '오른쪽 페이드');
-  assert.match(fade, /nav\.fade-start\.fade-end\{mask-image:linear-gradient/, '양쪽 페이드');
-  assert.match(fade, /--nav-fade:28px/, '페이드 폭 토큰');
+test('맨 위 메뉴는 한 줄이고 "선택한 트리" 둘째 줄이 없다', () => {
+  assert.doesNotMatch(html, /id="view-context"/);
+  assert.match(css, /\.app-header\{min-height:64px;padding:10px 20px/);
 });
 
-test('데스크톱에는 스크롤·스냅·페이드를 걸지 않는다', () => {
-  // 미디어 블록을 모두 지운 나머지가 데스크톱 규칙이다.
-  const wide = css.replace(/@media\([^)]*\)\{/g, '@media-removed{');
-  const desktop = wide.split('@media-removed{').map((part, i) => {
-    if (i === 0) return part;
-    let depth = 1;
-    let j = 0;
-    for (; j < part.length && depth > 0; j += 1) {
-      if (part[j] === '{') depth += 1;
-      else if (part[j] === '}') depth -= 1;
-    }
-    return part.slice(j);
-  }).join('');
-  assert.doesNotMatch(desktop, /scroll-snap-type/, '데스크톱에 스냅 없음');
-  assert.doesNotMatch(desktop, /nav\.fade-start/, '데스크톱에 페이드 없음');
-  assert.doesNotMatch(desktop, /nav\{[^}]*overflow-x:auto/, '데스크톱 nav 는 스크롤이 아니다');
-});
-
-// 탭 드러내기·페이드 시험은 2026-11-09에 소스 글자에서 함수 직접 호출로 옮겼다.
-// → tests/v41-header-flow.test.mjs (가운데로 드러내기·동작 줄이기·넓은 화면·페이드 4조합·스크롤 반응)
-
-test('탭 7개가 헤더에 있다', () => {
-  const nav = html.slice(html.indexOf('<nav aria-label="화면 선택">'), html.indexOf('</nav>'));
-  const buttons = nav.match(/<button/g) || [];
-  assert.equal(buttons.length, 7, `탭 ${buttons.length}개 (기대 7)`);
-  for (const label of ['첫 화면', '내 책장', '둘러보기', '기억책', '기억 보드', '관계 지도']) {
-    assert.match(nav, new RegExp(label), `${label} 탭`);
+test('메뉴 순서: 첫 화면·내 책장·둘러보기 → 트리 ▾ → 기억책·보드·지도 → 추가 → S', () => {
+  const nav = html.slice(html.indexOf('<nav class="main-nav"'), html.indexOf('</nav>'));
+  const order = ['첫 화면', '내 책장', '둘러보기', 'id="record-menu"', '기억책', '기억 보드', '관계 지도'];
+  let at = -1;
+  for (const token of order) {
+    const next = nav.indexOf(token, at + 1);
+    assert.ok(next > at, token + ' 순서');
+    at = next;
   }
-  assert.match(nav, /id="record-menu"/, '트리 선택 탭');
+  assert.ok(html.indexOf('id="write-menu"') > html.indexOf('</nav>'), '추가 버튼은 메뉴 오른쪽');
+  assert.ok(html.indexOf('id="account-avatar"') > html.indexOf('id="write-menu"'), 'S는 맨 오른쪽');
 });

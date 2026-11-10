@@ -22,7 +22,7 @@ const STATES = [
     make: () => ({ owned: false, trees: 0, tree: null, source: 'example' }),
     expect: {
       treeViews: false, recordMenu: false, writeMenu: false, shareMenu: false,
-      picker: '트리 고르기', write: '처음 시작하기', aria: '이 트리 보기'
+      picker: '트리 고르기', write: '＋ 순간 추가', aria: '이 트리 보기'
     }
   },
   {
@@ -31,7 +31,7 @@ const STATES = [
     expect: {
       // 로그인했어도 트리가 없으면 기억책·보드·관계 지도 탭은 숨긴다(1-B 이전 동작 그대로).
       treeViews: false, recordMenu: false, writeMenu: true, shareMenu: false,
-      picker: '트리 고르기', write: '새 트리 만들기', aria: '이 트리 보기'
+      picker: '트리 고르기', write: '＋ 순간 추가', aria: '이 트리 보기'
     }
   },
   {
@@ -39,7 +39,7 @@ const STATES = [
     make: () => ({ owned: true, trees: 2, tree: { title: '리센느, 나의 순간들' }, source: 'server' }),
     expect: {
       treeViews: true, recordMenu: true, writeMenu: true, shareMenu: true,
-      picker: '트리: 리센느', write: '순간 남기기', aria: '리센느 보기'
+      picker: '트리: 리센느', write: '＋ 순간 추가', aria: '리센느 보기'
     }
   },
   {
@@ -47,7 +47,7 @@ const STATES = [
     make: () => ({ owned: true, trees: 2, tree: { title: '리센느, 나의 순간들' }, source: 'share' }),
     expect: {
       treeViews: false, recordMenu: false, writeMenu: false, shareMenu: false,
-      picker: '트리: 리센느', write: '순간 남기기', aria: '리센느 보기'
+      picker: '트리: 리센느', write: '＋ 순간 추가', aria: '리센느 보기'
     }
   }
 ];
@@ -69,8 +69,6 @@ test('상태 4 × 화면 5: 보이는 버튼·문구·접근성 이름이 표대
           aria: h.els['tree-views'].getAttribute('aria-label')
         };
         const want = { ...state.expect };
-        // 읽기 화면에서는 '순간 남기기'가 '순간 추가'가 된다(트리가 있을 때만).
-        if (reading && state.expect.write === '순간 남기기') want.write = '순간 추가';
         assert.deepEqual(got, want, `${state.name} × ${label}`);
         table.push(`${state.name} × ${label}: ${JSON.stringify(got)}`);
       } finally {
