@@ -111,6 +111,13 @@ window.LT58Model = (() => {
     return Math.max(...moments.map((m) => m.createdOrder || 0));
   }
 
+  // #346 2단계: 장식 애니메이션(실 점선 흐름·핀 숨쉬기)을 멈출 때인가.
+  // 이동·확대·카드 드래그 중에는 매 프레임 SVG 페인트가 겹치므로 잠시 멈춘다(모양은 그대로, 움직임만 멈춤).
+  // 시네마는 이 플래그를 쓰지 않는다 — 시네마 장면은 자기 갱신을 그대로 유지한다.
+  function decorationMotion({ pan = false, pinch = false, dragging = false, touches = 0 } = {}) {
+    return pan || pinch || dragging || touches > 0 ? 'paused' : 'running';
+  }
+
   // #346: 실 다시 그리기 예약 판정. 상시 rAF 루프 대신 필요할 때만, 한 프레임에 한 번 그린다.
   // - pending: 이미 한 프레임 예약됨 → 또 걸지 않는다
   // - hidden: 탭이 숨거나 보드 iframe이 화면 밖/숨김 → 그리지 않는다
@@ -122,5 +129,5 @@ window.LT58Model = (() => {
     return 'draw';
   }
 
-  return { escapeHTML, cardPosition, threadPath, fitZoom, removeConnection, editGuard, collectPath, nextConnections, detailButtonState, cinemaBeats, filterVisible, maxCreatedOrder, threadRedrawStep };
+  return { escapeHTML, cardPosition, threadPath, fitZoom, removeConnection, editGuard, collectPath, nextConnections, detailButtonState, cinemaBeats, filterVisible, maxCreatedOrder, threadRedrawStep, decorationMotion };
 })();

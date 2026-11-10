@@ -2,6 +2,13 @@
 
 > **main 보호 규칙(2026-11-09, 룰셋 "main 보호 (PR·필수 검사)")**: main은 PR로만 바꾼다(직접 푸시·force push·삭제 금지, 관리자도 예외 없음 — 비상시 대표가 룰셋 enforcement를 잠깐 끈다). 필수 검사: `check (ubuntu-latest)`·`check (windows-latest)`·`미리보기 postdeploy(로그아웃)` — 셋 다 paths 필터가 없어 문서만 바뀐 PR에서도 항상 돈다. 승인 수 0(레인이 스스로 머지). Deploy Bundle Boot Test는 paths 필터가 있어 필수에 넣지 않았다.
 
+## 2026-11-10 — #346 2단계 B: 패닝·드래그 중 장식 애니메이션 정지 (로컬1, ai/local1-346b-pan-motion)
+
+- 트레이스(운영, 예시 카드 40, 1440 밤, 패닝): 장식 CSS 애니메이션 실행 중 총작업 15.1s(span 9.8s) vs 일시정지 2.45s(span 7.0s) — **-84%**, Paint 44.2→4.8ms(-89%), Raster 367.9→40.7ms(-89%), Layout 136.3→14.5ms(-89%), Composite 204.2→72.4ms(-65%). 패닝 비용의 최대 레버는 장식 애니메이션(threadFlow 점선 흐름·pinBreath)이 만드는 매 프레임 SVG 페인트였다.
+- 구현: `board-model.js` `decorationMotion`(pan·pinch·drag·touch → paused), `board-extras.js`가 pointerdown/up에서 `body.decor-paused`를 토글(같은 판정 한 벌), `board.css`가 `.threadWave`·`.pin::after`만 `animation-play-state:paused`. 손을 떼면 다시 흐르고, 시네마·드래그·연결 동작은 그대로.
+- 시험: 판정 표 + 배선/CSS 가드(19건). 강도 증명 3회(정지 판정 제거·클래스 토글 제거·CSS 규칙 제거 각 1실패) 후 원복(cmp). `npm test` 916건 879 pass/0 fail/37 skip, build pass.
+- 수정 후 패닝 실측·시각 비교는 머지·자동 배포 뒤 기록한다.
+
 ## 2026-11-10 — #346 2단계 A: a11y 로그인 상태 안쪽 4화면 검사 복구 — 빈 계정 자동 픽스처 (로컬1, ai/local1-a11y-fixture)
 
 - 배경: a11y `--account 02` 실행에서 로그인 상태의 책장·기억책·보드·지도가 "화면이 열리지 않음"으로 빠졌다(모든 in 조건, 16행 결손). 운영에서 390·정원·로그인으로 재현: 두 iframe hidden·`#empty` 표시. 원인은 제품 버그가 아니라 **의도된 빈 상태** — 셸 `screens.mjs:120`이 트리가 없으면 안쪽 화면 대신 빈 패널을 보여 준다. a11y README의 시험 자료(트리 3권) 전제가 빠졌고, 도구가 그 건너뜀을 집계하지도 않았다(요약 '건너뜀 0').

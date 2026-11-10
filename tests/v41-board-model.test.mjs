@@ -11,7 +11,7 @@ const BOARD = fs.readFileSync(new URL('../public/v41/views/board/board.js', impo
 const EXTRAS = fs.readFileSync(new URL('../public/v41/views/board/board-extras.js', import.meta.url), 'utf8');
 
 test('0. 계산 한 벌은 화면이 실제로 부르는 함수만 노출한다', () => {
-  assert.deepEqual(Object.keys(M).sort(), ['cardPosition', 'cinemaBeats', 'collectPath', 'detailButtonState', 'editGuard', 'escapeHTML', 'filterVisible', 'fitZoom', 'maxCreatedOrder', 'nextConnections', 'removeConnection', 'threadPath', 'threadRedrawStep']);
+  assert.deepEqual(Object.keys(M).sort(), ['cardPosition', 'cinemaBeats', 'collectPath', 'decorationMotion', 'detailButtonState', 'editGuard', 'escapeHTML', 'filterVisible', 'fitZoom', 'maxCreatedOrder', 'nextConnections', 'removeConnection', 'threadPath', 'threadRedrawStep']);
   for (const fn of Object.keys(M)) assert.equal(typeof M[fn], 'function', fn);
 });
 
@@ -193,6 +193,26 @@ test('16. 상시 루프·무한 글로우 애니메이션이 남아 있지 않�
   assert.ok(glow, '.spaceGlow 규칙이 있어야 한다');
   assert.doesNotMatch(glow, /animation/, '큰 흐림 배경에 무한 애니메이션을 걸지 않는다');
   assert.ok(!CSS.includes('@keyframes spaceBreath'), 'spaceBreath 키프레임이 남아 있으면 실패');
+});
+
+test('17. 장식 애니메이션 정지 판정(#346 2단계): 이동·확대·드래그·터치 중에는 멈춘다', () => {
+  assert.equal(M.decorationMotion({}), 'running');
+  assert.equal(M.decorationMotion(), 'running', '입력 없음 = 그대로 흐른다');
+  assert.equal(M.decorationMotion({ pan: true }), 'paused');
+  assert.equal(M.decorationMotion({ pinch: true }), 'paused');
+  assert.equal(M.decorationMotion({ dragging: true }), 'paused');
+  assert.equal(M.decorationMotion({ touches: 2 }), 'paused');
+  assert.equal(M.decorationMotion({ touches: 0 }), 'running');
+  assert.equal(M.decorationMotion({ pan: true, dragging: true, touches: 1 }), 'paused');
+});
+
+test('18. 정지 배선: 셸이 decor-paused를 토글하고, CSS가 장식 애니메이션만 멈춘다', () => {
+  const CSS = fs.readFileSync(new URL('../public/v41/views/board/board.css', import.meta.url), 'utf8');
+  assert.match(EXTRAS, /LT58Model\.decorationMotion\(\{pan:!!pan,pinch:!!pinch,dragging:!!drag,touches:boardTouches\.size\}\)/, '판정 한 벌을 쓴다');
+  assert.match(EXTRAS, /classList\.toggle\('decor-paused'/, '클래스 토글이 있다');
+  assert.match(EXTRAS, /addEventListener\('pointerdown',\(\)=>queueMicrotask\(applyDecorMotion\)\)/, '손을 대면 적용');
+  assert.match(EXTRAS, /addEventListener\('pointerup',\(\)=>queueMicrotask\(applyDecorMotion\)\)/, '손을 떼면 해제');
+  assert.ok(CSS.includes('body.decor-paused .threadWave,body.decor-paused .pin::after{animation-play-state:paused}'), 'CSS 정지 규칙이 있다');
 });
 
 test('14. board-extras.js는 필터 판정을 다시 구현하지 않고 한 벌을 부른다', () => {
