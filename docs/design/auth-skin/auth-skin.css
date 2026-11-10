@@ -53,6 +53,14 @@
   --lt-r-card: 14px;
   --lt-garden-edge: #eee3d5;
   --lt-garden-shadow: 0 18px 40px rgba(75, 51, 42, .16);
+  /* #347 궤도 사진(중): 크게·밝게, 가장자리 어둡게는 넓고 옅게. 강은 body.orbit-strong. */
+  --orbit-size: clamp(220px, 30vw, 420px);
+  --orbit-alpha: .8;
+  --orbit-haze-clear: 50%;
+  --orbit-haze-end: 78%;
+  --orbit-haze-alpha: 72%;
+  --orbit-gap: 48px;
+  --orbit-card-half: 220px;
   /* Google Identity "Sign in with Google" 어두운 테마(가이드라인 고정값) */
   --lt-google-fill: #131314;
   --lt-google-stroke: #8e918f;
@@ -70,6 +78,7 @@ body.garden {
   --lt-gold-ink: #8a4b57;
   --lt-gold-line: rgba(152, 80, 94, .38);
   --lt-gold-glow: rgba(200, 110, 121, .32);
+  --orbit-alpha: .7;
   --lt-rose: #c86e79;
   --lt-rose-ink: #98505e;
   --lt-paper: #fffdf8;
@@ -85,6 +94,17 @@ body.garden {
   --lt-google-font: #1f1f1f;
   color-scheme: light;
 }
+
+/* #347 강 변형: 사진은 더 크게·더 밝게, 가장자리 어둡게는 더 넓고 더 옅게. 기본(중)은 body 클래스 없음. */
+body.orbit-strong {
+  --orbit-size: clamp(240px, 33vw, 460px);
+  --orbit-alpha: .9;
+  --orbit-haze-clear: 58%;
+  --orbit-haze-end: 72%;
+  --orbit-haze-alpha: 62%;
+  --orbit-gap: 48px;
+}
+body.garden.orbit-strong { --orbit-alpha: .8; }
 
 * { box-sizing: border-box; }
 html, body { min-height: 100%; }
@@ -116,27 +136,26 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
   content: '';
   position: absolute;
   inset: 0;
-  background: radial-gradient(ellipse 56% 52% at 50% 46%, transparent 0 42%, var(--lt-stage) 82%);
+  background: radial-gradient(ellipse 60% 56% at 50% 46%, transparent 0 var(--orbit-haze-clear), color-mix(in srgb, var(--lt-stage) var(--orbit-haze-alpha), transparent) var(--orbit-haze-end));
   pointer-events: none;
 }
 
 .orbit {
   position: absolute;
   z-index: 0;
-  height: clamp(190px, 27vw, 330px);
-  width: calc(clamp(190px, 27vw, 330px) * .76);
+  height: var(--orbit-size);
+  width: calc(var(--orbit-size) * .76);
   object-fit: cover;
   border: 2px solid var(--lt-gold-line);
   border-radius: 16px;
   box-shadow: 0 24px 60px rgba(0, 0, 0, .46), 0 0 22px var(--lt-gold-glow);
-  opacity: .58;
+  opacity: var(--orbit-alpha);
   pointer-events: none;
 }
-.o1 { left: 3.5%; top: 9%; transform: rotate(-8deg); }
-.o2 { right: 5%; top: 12%; transform: rotate(7deg); }
-.o3 { right: 14%; bottom: 5%; transform: rotate(-4deg); }
+.o1 { left: calc(50% - var(--orbit-card-half) - var(--orbit-gap) - var(--orbit-size) * .76); top: 8%; transform: rotate(-8deg); }
+.o2 { left: calc(50% + var(--orbit-card-half) + var(--orbit-gap)); top: 11%; transform: rotate(7deg); }
+.o3 { left: calc(50% + var(--orbit-card-half) + var(--orbit-gap)); bottom: 4%; transform: rotate(-4deg); }
 body.garden .orbit {
-  opacity: .48;
   box-shadow: 0 18px 40px rgba(75, 51, 42, .16), 0 0 18px var(--lt-gold-glow);
 }
 
@@ -351,11 +370,12 @@ body.garden .alt-link { color: var(--lt-ink); }
 
 @media (max-width: 680px) {
   .stage { padding: 72px 16px 30px; place-items: start center; }
+  .stage::after { background: radial-gradient(ellipse 56% 52% at 50% 46%, transparent 0 42%, var(--lt-stage) 82%); }
   .brand { left: 18px; top: 16px; }
   .orbit { width: 128px; height: 168px; opacity: .34; }
   .o1 { left: -26px; top: 6%; }
-  .o2 { right: -28px; top: 9%; }
-  .o3 { right: 8%; bottom: 2%; width: 104px; height: 137px; }
+  .o2 { left: auto; right: -28px; top: 9%; }
+  .o3 { left: auto; right: 8%; bottom: 2%; width: 104px; height: 137px; }
   .auth-card { width: 100%; padding: 25px 22px; border-radius: 18px; }
   .foot { position: static; transform: none; width: auto; max-width: none; margin-top: 20px; text-align: center; }
   .divider { margin-top: 16px; }

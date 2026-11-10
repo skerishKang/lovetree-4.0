@@ -8,7 +8,8 @@
 - `login-night.html` · `login-garden.html` — 로그인 시안(Google, 이메일, 비밀번호, 오류 문구 자리, 회원가입 링크)
 - `signup-night.html` · `signup-garden.html` — 회원가입 시안(이름 선택, 이메일, 비밀번호, 오류 문구 자리)
 - `auth-skin.css` — 두 테마의 공통 레이아웃과 토큰
-- `screenshots/` — `*-1440.png`, `*-390.png` 8장
+- `screenshots/` — `*-1440.png`, `*-390.png` 8장(기본 = 궤도 사진 "중")
+- `screenshots/compare/` — #347 전/중/강 비교(1440 밤·정원, 1920 밤)
 - `assets/` — 궤도 카드 이미지 3장(webp), Gowun Batang woff2, OFL
 - `assets/googleg-standard-color.svg` — Google이 배포하는 표준 색상 `G` 로고(가공 없음)
 - `assets/fonts/Roboto-Medium.latin.woff2` · `-latin-ext.woff2` — Google 버튼 지정 서체
@@ -100,7 +101,7 @@
 | 포커스 | `outline: 2px solid var(--lt-gold); outline-offset: 3px` (입력은 금색 테두리 + `0 0 0 3px var(--lt-gold-line)`) |
 | 제목 | 밤 `clamp(28px,4vw,34px)`, 정원 `clamp(30px,4.2vw,36px)` Gowun Batang |
 | 하단 한 줄 | `.foot` 11px, `--lt-muted`, 1440은 아래 18px 고정·390은 카드 아래 흐름 |
-| 궤도 카드 | 3장, `opacity: .58`(밤) / `.48`(정원), blur 없음 |
+| 궤도 카드 | 3장, 높이 `clamp(220px, 30vw, 420px)`·폭 0.76, opacity `.8`(밤) / `.7`(정원), blur 없음 |
 | 390 | 카드 `100%`, 바깥 여백 `16px`, 궤도 카드 가장자리 배치 |
 
 ## 공용 로그인 팀 연결
@@ -119,6 +120,27 @@
 - 로그인 직전 안내 창의 `next`에는 `intent=new-tree|shelf`만 붙습니다. 로그인·가입 뒤 `next`를 보존하면 첫 여정/내 책장으로 바로 이어집니다.
 - `next`는 로컬 경로만 허용하고, `intent`는 `new-tree`·`shelf` 외 값을 무시합니다.
 
+## 궤도 사진 단계 — 중(기본)·강 (#347)
+
+대표 요청: 카드(`width: min(440px, 100%)`)는 그대로 두고, 배경 사진을 더 크고 잘 보이게.
+기본은 **중**이고, `body.orbit-strong` 클래스를 붙이면 **강**이 된다.
+
+| 값 | 전(main) | 중(기본) | 강 |
+| --- | --- | --- | --- |
+| 사진 높이 | `clamp(190px, 27vw, 330px)` | `clamp(220px, 30vw, 420px)` | `clamp(240px, 33vw, 460px)` |
+| 사진 폭 | 높이 × 0.76 | 같음 | 같음 |
+| 투명도(밤) | `.58` | `.8` | `.9` |
+| 투명도(정원) | `.48` | `.7` | `.8` |
+| 가장자리 어둡게 · 투명 구간 | 42% | 50% | 58% |
+| 가장자리 어둡게 · 끝 | 무대색 82%(불투명) | 78% 지점 · 72% 농도 | 72% 지점 · 62% 농도 |
+| 위치 | 가장자리 기준(o1 3.5%·o2 5%·o3 14%) | 카드 양옆 48px 간격 | 같음(사진만 커짐) |
+| 카드 | `min(440px, 100%)` | 그대로 | 그대로 |
+| ≤680px | 카드 우선 | 그대로(픽셀 비교 밤 0px·정원 최대 ±1) | 그대로 |
+
+- 위치는 `calc(50% ± (카드 반폭 220px + 48px) ± 사진 폭)`으로 잡아 1280·1440·1920에서 카드와 겹치지 않는다(회전 bounding box 포함 겹침 0).
+- 카드 글자 대비는 그대로다: 밤 제목 `#f5f1e9` / 카드 `rgba(7,7,12,.9)` ≈ 17.84:1, 정원 `#403536` / `#fffdf8` ≈ 11.6:1.
+- 가장자리 어둡게는 `color-mix(in srgb, var(--lt-stage) 72%, transparent)`처럼 무대색의 농도만 낮춰 새 색을 만들지 않는다.
+
 ## 스크린샷
 
 | 화면 | 1440 | 390 |
@@ -127,6 +149,15 @@
 | 로그인·정원 | `screenshots/login-garden-1440.png` | `screenshots/login-garden-390.png` |
 | 회원가입·밤 | `screenshots/signup-night-1440.png` | `screenshots/signup-night-390.png` |
 | 회원가입·정원 | `screenshots/signup-garden-1440.png` | `screenshots/signup-garden-390.png` |
+
+위 8장은 궤도 사진 **중**(기본) 기준이다. 강은 `body.orbit-strong`으로 찍는다.
+전/중/강 비교는 `screenshots/compare/`에 있다.
+
+| 비교 | 파일 |
+| --- | --- |
+| 1440 밤 전·중·강 | `screenshots/compare/compare-1440-night.png` |
+| 1440 정원 전·중·강 | `screenshots/compare/compare-1440-garden.png` |
+| 1920 밤 중·강 | `screenshots/compare/compare-1920-night.png` |
 
 오류 문구 자리는 실제 오류가 들어올 자리를 보여 주기 위해 예시 문구를 넣었습니다.
 
@@ -138,4 +169,5 @@ node docs/design/auth-skin/tools/check-colors.mjs  # 계산된 색 검사(밤 �
 ```
 
 두 스크립트는 저장소 의존성에 playwright를 넣지 않고 전역 설치본을 씁니다. 경로가 다르면
-`PLAYWRIGHT_ROOT`에 설치 경로를 지정하고, 브라우저는 설치된 Chrome 채널을 씁니다.
+`PLAYWRIGHT_ROOT`에 설치 경로를 지정합니다. 브라우저는 기본 Chrome 채널이고,
+Chrome이 없는 환경에서는 `PW_CHANNEL=msedge`로 설치된 Edge를 씁니다.
