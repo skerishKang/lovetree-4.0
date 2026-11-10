@@ -2,6 +2,15 @@
 
 > **main 보호 규칙(2026-11-09, 룰셋 "main 보호 (PR·필수 검사)")**: main은 PR로만 바꾼다(직접 푸시·force push·삭제 금지, 관리자도 예외 없음 — 비상시 대표가 룰셋 enforcement를 잠깐 끈다). 필수 검사: `check (ubuntu-latest)`·`check (windows-latest)`·`미리보기 postdeploy(로그아웃)` — 셋 다 paths 필터가 없어 문서만 바뀐 PR에서도 항상 돈다. 승인 수 0(레인이 스스로 머지). Deploy Bundle Boot Test는 paths 필터가 있어 필수에 넣지 않았다.
 
+## 2026-11-11 — #368 1·2 계정 메뉴 이메일 가림 제거 (로컬1, ai/local1-lt-account-email-261111, PR #385)
+
+- 무엇: 계정 메뉴가 "내•••"(가림)를 보이고 동그라미가 이메일 첫 글자가 아니라 subject 첫 글자("S")가 보이던 증상. `public/v41/shell/header.mjs` `renderAccount`의 `maskEmail`을 제거해 본인만 보는 계정 메뉴에 `#account-email`이 전체 이메일(없으면 "내 계정")을 보여 준다. aria도 `accountPresentation`의 `view.ariaLabel`(가림 없음)을 쓴다. `loadAccountEmail`은 성공 응답이 없어도 렌더해 이메일 부재 시 "내 계정" 표시를 갱신.
+- 동그라미 첫 글자(#368 4): `header-state.mjs accountPresentation`이 이미 이메일 첫 글자(대문자)·없을 때 subject 폴백을 맞히므로(기존 시험 `v41-header-ia.test.mjs`) 재구현하지 않았다.
+- 끊긴 지점(외부 경계, 미수정): 계정 02로 본 주소에서 실제 access JWT(`__Host-lovetree-access`, 검증 통과) 클레임을 확인한 결과 `account_id, amr, aud, exp, iat, iss, sid, sub, token_use`이며 **email 클레임이 없다**(`aud=lovetree-4-0`, `iss=https://auth.padiem.net`). 그래서 `/api/account`가 `{confirmKind:"phrase"}`(email 없이)를 돌려 화면이 이메일을 못 받는다. 공통 로그인(auth.padiem.net)이 이메일을 안 주는 것이므로 지시대로 인증 경계(`padiem-access-verify.mjs`·`padiem-authority-auth.js`·`server/account-service.js`)는 건드리지 않고 증거만 남긴다.
+- 본 주소 확인(머지 후, 계정 02, 헤드리스): `#account-email` "내•••"→"내 계정"(가림 제거)·aria 가림 없음·동그라미 "S"=subject 첫 글자(이메일 없을 때 규칙). 4개 판정 전부 일치(maskingRemoved·ariaUnmasked·circleMatchesSubjectFirst·emailShownOrCorrectFallback). server가 이메일을 주면 전체 표시, 안 주면 "내 계정"이 옳은 표시(둘 다 가림 없음이 합격).
+- 시험: `tests/v41-shell-header.test.mjs` +3(전체 이메일/마스킹 부재·이메일 없을 때 subject 첫 글자·loadAccountEmail 갱신/부재). header+ia+account-deletion 41/41. `npm test` 985건 944 pass/4 fail/37 skip — 4 fail은 모두 `tools-account-choice.test.mjs`(a11y·postdeploy, 계정 03/04+브라우저 필요)로 변경 전 main에서도 동일 실패(기존 로컬 환경, CI 통과). `npm run build` pass.
+- 머지: squash `07817bb` (2026-11-10 22:26 UTC). 필수 검사 4개(ubuntu·windows·미리보기 postdeploy·PostgreSQL 저장·로그인 상태 검증) 전부 pass.
+
 ## 2026-11-11 — #372 후속 기억 보드 꾸미기 되살리기 (로컬1, ai/local1-board-revival-261110, PR #375)
 
 - 무엇: 보드 보기 전용 규칙 제거(숨김 인라인 스타일·`.pin` pointer-events 차단 해제), 셸 `applyAdvanced`의 `lt41-advanced` postMessage로 단순/고급 모드(`board-mode.mjs` 신규·`body.lt-advanced` CSS 게이트, 셸 미수정), 보드 배치(x·y·rot·pinStyle·cardStyle·color·keywords)를 `boardLayoutOf` 허용 목록으로 검증해 `lt41-board-sync`→셸 `boardSync` action→`PUT /api/workspace`로 저장, `#replayFrom` 제거.
