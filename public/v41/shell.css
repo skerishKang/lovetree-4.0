@@ -287,6 +287,7 @@ html[data-lt-theme=garden] .quick-error-line{color:var(--lt-rose-ink)}
 .cleanup-moment{display:flex;align-items:center;gap:12px;min-height:48px;margin:0!important;padding:8px 12px;background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:var(--lt-r-card);color:var(--lt-pearl);font-size:14px}
 .cleanup-moment input{width:22px;height:22px;margin:0;accent-color:var(--lt-primary);flex:0 0 auto}
 .cleanup-moment span{min-width:0;overflow-wrap:anywhere}
+.cleanup-moment .is-blank{color:var(--lt-muted)}
 .cleanup-moment-thumb{display:block;flex:0 0 auto;width:34px;height:34px;margin:0;border-radius:6px;object-fit:cover;background:rgba(255,255,255,.06);border:1px solid var(--line)}
 #cleanup-count{margin:10px 0 0}
 #cleanup-error{color:var(--lt-rose);font-weight:600}

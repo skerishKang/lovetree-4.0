@@ -329,6 +329,4 @@ html[data-v41-screen=shelf][data-lt-theme=garden],html[data-lt-theme=garden] #tr
 /* 이슈 327 2부: 지도·핀보드·보드 상세의 '다른 트리로 옮기기' 단추(셸 정리 창을 연다). */
 .lt-move-btn{display:inline-flex;align-items:center;min-height:44px;margin-top:10px;padding:8px 14px;border-radius:var(--lt-r-pill);border:1px solid rgba(255,230,166,.45);background:rgba(255,230,166,.08);color:var(--lt-gold,#ffe6a6);font-size:13px}
 
-/* 이슈 327 2부: 궤도 첫 화면(v41/home.html)의 모아둔 순간 표시. home.js가 판정해 보여 준다. */
-.inbox-flag{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:40;display:inline-flex;align-items:center;min-height:28px;padding:4px 14px;border-radius:999px;background:var(--lt-glass-strong);border:1px solid var(--lt-gold-line);color:var(--lt-gold);font-size:12px;font-weight:700;letter-spacing:.08em}
-.inbox-flag[hidden]{display:none}
+

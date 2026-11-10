@@ -148,12 +148,11 @@ test('정리 창: 순간 고르기·새 트리 만들기·옮기기·안내가 �
  assert.match(cleanup,/\$\('cleanup-move-box'\)\.hidden = !targets\.length/);
 });
 
-test('궤도: 현재 트리가 모아둔 순간이면 궤도 첫 화면에도 표시한다',()=>{
- const html=read('../v41/home.html');
- assert.match(html,/id="homeInboxFlag"/);
- const home=read('../v41/home.js');
- assert.match(home,/context\.tree&&context\.tree\.inbox===true/);
- assert.match(home,/homeInboxFlag/);
+test('궤도 첫 화면의 "모아둔 순간" 알약은 #380으로 제거됐다',()=>{
+  const html=read('../v41/home.html');
+  assert.doesNotMatch(html,/homeInboxFlag/);
+  const home=read('../v41/home.js');
+  assert.doesNotMatch(home,/homeInboxFlag/);
 });
 
 test('안내 바는 첫 트리 말풍선 위에 온다(말풍선이 안내를 가리지 않는다)',()=>{

@@ -66,8 +66,16 @@ export function createCleanup(deps) {
       }
       const text = document.createElement('span');
       const title = momentTitle(moment);
-      // 빈 값은 빈 값으로 둔다 — 원시 자동 제목("…에서 간직한 순간")은 화면에 내보내지 않는다.
-      text.textContent = moment.parentId === null && title ? `${title} · 시작 순간` : (title||'');
+      // 빈 값 대체: 영상(미디어 메타데이터 또는 영상 주소)이면 "제목 없는 영상", 아니면 "제목 없는 순간" — 흐린 글자.
+      const looksLikeVideo=()=>{
+        if(moment.mediaMetadata) return true;
+        try{
+          const host=new URL(String(moment.url||'')).hostname.replace(/^www\./,'');
+          return host==='youtu.be'||host.endsWith('youtube.com')||host==='vimeo.com';
+        }catch{return /youtu\.be|youtube\.com|vimeo\.com/i.test(String(moment.url||''));}
+      };
+      text.textContent = moment.parentId === null && title ? `${title} · 시작 순간` : (title || (looksLikeVideo() ? '제목 없는 영상' : '제목 없는 순간'));
+      if(!title) text.classList.add('is-blank');
       label.append(box);
       if (thumbNode) label.append(thumbNode);
       label.append(text);
