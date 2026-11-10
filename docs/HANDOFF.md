@@ -2,6 +2,13 @@
 
 > **main 보호 규칙(2026-11-09, 룰셋 "main 보호 (PR·필수 검사)")**: main은 PR로만 바꾼다(직접 푸시·force push·삭제 금지, 관리자도 예외 없음 — 비상시 대표가 룰셋 enforcement를 잠깐 끈다). 필수 검사: `check (ubuntu-latest)`·`check (windows-latest)`·`미리보기 postdeploy(로그아웃)` — 셋 다 paths 필터가 없어 문서만 바뀐 PR에서도 항상 돈다. 승인 수 0(레인이 스스로 머지). Deploy Bundle Boot Test는 paths 필터가 있어 필수에 넣지 않았다.
 
+## 2026-11-10 — #346 2단계 A: a11y 로그인 상태 안쪽 4화면 검사 복구 — 빈 계정 자동 픽스처 (로컬1, ai/local1-a11y-fixture)
+
+- 배경: a11y `--account 02` 실행에서 로그인 상태의 책장·기억책·보드·지도가 "화면이 열리지 않음"으로 빠졌다(모든 in 조건, 16행 결손). 운영에서 390·정원·로그인으로 재현: 두 iframe hidden·`#empty` 표시. 원인은 제품 버그가 아니라 **의도된 빈 상태** — 셸 `screens.mjs:120`이 트리가 없으면 안쪽 화면 대신 빈 패널을 보여 준다. a11y README의 시험 자료(트리 3권) 전제가 빠졌고, 도구가 그 건너뜀을 집계하지도 않았다(요약 '건너뜀 0').
+- 수정: `tools/a11y/fixture.mjs`(빈 계정 판정·트리 3권 상태 생성), `a11y-run.mjs`가 로그인 상태 검사 전에 빈 계정이면 자동으로 넣고 끝나면 빈 상태로 복원, `skippedScreens` 집계·보고서 기록, README 갱신.
+- 시험: `tests/v41-a11y-fixture.test.mjs` 3건(저장 규칙 통과·시작 순간 1·연결 2, 배선 글자 가드·TDZ 순서). 강도 증명 4회(빈 계정 판정 제거·시작 순간 2개·복원 호출 제거·건너뜀 집계 누락 각 1실패) 후 원복(cmp).
+- 실측: 좁힌 실행(390·정원·in)에서 이전에 빠졌던 shelf/book/board/network 4화면이 검사됨(17건 serious 0·critical 0), 픽스처 복원 put 200 → 트리 0. `npm test` 916건 879 pass/0 fail/37 skip, build pass.
+
 ## 2026-11-10 — #346 기억 보드 느려짐: 상시 rAF 루프 제거 + 큰 흐림 배경 정적화 (로컬1, ai/local1-346-board-perf)
 
 - 기준 측정(운영 pages.dev, 1440×900, rAF 상한 457/3초 별도 확인): 유휴 10초 — 계정02(카드 10·연결 9) 밤 Task 0.801s·Script 0.133s·rAF 198, 정원 Task 1.179s·rAF 313 / 로그아웃 예시(40·40) 밤 Task 0.938s·rAF 73, 정원 Task 1.162s·rAF 95. 패닝 p50/p90 — 서버 밤 43.8/50.1ms·정원 31.3/37.6ms, 예시 밤 131.3/156.3ms·정원 100.1/118.8ms. 보드를 떠나면 iframe이 사라져 rAF 0(원인 6은 기준에서 재현 안 됨).

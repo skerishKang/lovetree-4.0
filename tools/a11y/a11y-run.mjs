@@ -11,7 +11,9 @@
 //   (docs/design/auth-skin/login-*.html)을 검사한다.
 // - serious·critical만 보고한다. 색·디자인을 바꿔야 하는 대비 문제는 고치지 않고
 //   목록으로만 남긴다(디자인 판단).
-// - 계정 시험 자료는 tools/a11y/README.md의 절차(트리 3권·사진 표지)로 만든다.
+// - 계정 시험 자료(트리 3권): 빈 계정이면 검사 전에 자동으로 넣고 끝나면 되돌린다(#346 2단계).
+//   셸은 트리가 없으면 안쪽 화면을 빈 패널로 대체하므로, 이 자료가 없으면 로그인 상태의
+//   책장·기억책·보드·지도가 "화면이 열리지 않음"으로 조용히 빠진다.
 import { readFileSync, mkdirSync, writeFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -21,6 +23,7 @@ const require = createRequire(import.meta.url);
 const AXE_PATH = require.resolve('axe-core/axe.min.js');
 const AXE_SOURCE = readFileSync(AXE_PATH, 'utf8');
 import { chooseTestAccount } from '../account-choice.mjs';
+import { buildFixtureState, needsFixture } from './fixture.mjs';
 
 const DEFAULTS = {
   base: process.env.LT_BASE || 'https://lovetree-4-0.pages.dev/v41/',
@@ -262,6 +265,66 @@ async function loginStorage(browser, options, base) {
   }
 }
 
+// 로그인 상태 검사용 시험 자료(#346 2단계): 빈 계정이면 README의 트리 3권을 넣는다.
+// 셸은 트리가 없으면 안쪽 화면을 빈 패널로 대체하므로(screens.mjs hasTree 분기) 이 자료가 없으면
+// 책장·기억책·보드·지도가 "화면이 열리지 않음"으로 조용히 빠진다. 검사 뒤에는 원래(빈) 상태로 되돌린다.
+async function openDataPage(browser, options, storage) {
+  const context = await browser.newContext({
+    viewport: { width: 1440, height: 900 },
+    locale: 'ko-KR',
+    timezoneId: 'Asia/Seoul',
+    ...(storage ? { storageState: storage } : {})
+  });
+  const page = await context.newPage();
+  page.on('dialog', (dialog) => dialog.accept().catch(() => {}));
+  await page.goto(options.base, { waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(2500);
+  return { context, page };
+}
+
+async function ensureFixture(browser, options, storage) {
+  const { context, page } = await openDataPage(browser, options, storage);
+  try {
+    const read = await page.evaluate(async () => {
+      const response = await fetch('/api/workspace', { credentials: 'same-origin', headers: { accept: 'application/json' } });
+      if (!response.ok) return { status: response.status };
+      const body = await response.json();
+      return { status: 200, revision: body.revision, trees: body.state?.trees || [] };
+    });
+    if (read.status !== 200) return { seeded: false, reason: `workspace ${read.status}` };
+    if (!needsFixture(read.trees)) return { seeded: false, trees: read.trees.length };
+    const put = await page.evaluate(async ({ state, expectedRevision }) => {
+      const response = await fetch('/api/workspace', {
+        method: 'PUT', credentials: 'same-origin', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ state, expectedRevision, clientKey: `a11y-fixture-${Date.now()}` })
+      });
+      return { status: response.status };
+    }, { state: buildFixtureState(), expectedRevision: read.revision });
+    if (!(put.status >= 200 && put.status < 300)) return { seeded: false, reason: `put ${put.status}` };
+    return {
+      seeded: true,
+      restore: async () => {
+        const target = await openDataPage(browser, options, storage);
+        try {
+          const restored = await target.page.evaluate(async () => {
+            const read = await fetch('/api/workspace', { credentials: 'same-origin', headers: { accept: 'application/json' } }).then((r) => r.json());
+            const put = await fetch('/api/workspace', {
+              method: 'PUT', credentials: 'same-origin', headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({ state: { version: 1, trees: [] }, expectedRevision: read.revision, clientKey: `a11y-restore-${Date.now()}` })
+            });
+            return { status: put.status };
+          });
+          return restored.status;
+        } finally {
+          await target.context.close();
+        }
+      }
+    };
+  } finally {
+    await context.close();
+  }
+}
+
 async function readWorkspace(page, base) {
   await page.evaluate(() => { location.hash = '#shelf'; }).catch(() => {});
   await page.waitForTimeout(1200);
@@ -386,6 +449,8 @@ async function main(argv) {
   const browser = await launch(chromium);
   const results = [];
   const shots = [];
+  let fixture = null;
+  let skippedScreens = 0;
   try {
     let storage = null;
     for (let attempt = 1; attempt <= 2 && !storage; attempt += 1) {
@@ -402,6 +467,16 @@ async function main(argv) {
     const themes = options.theme ? THEMES.filter((item) => item === options.theme) : THEMES;
     const states = options.state ? STATES.filter((item) => item === options.state) : STATES;
     const screens = options.screen ? SCREENS.filter((item) => item.name === options.screen) : SCREENS;
+
+    if (states.includes('in')) {
+      try {
+        fixture = await ensureFixture(browser, options, storage);
+        if (fixture?.seeded) console.log('- 시험 자료 준비: 빈 계정에 트리 3권을 넣었습니다(검사 뒤 되돌립니다).');
+        else if (fixture?.reason) console.log(`- 시험 자료 확인: ${fixture.reason} — 기존 기록으로 검사합니다.`);
+      } catch (error) {
+        console.log(`- 시험 자료 준비 실패: ${String(error?.message || error).slice(0, 100)}`);
+      }
+    }
 
     for (const viewport of widths) {
       for (const theme of themes) {
@@ -438,6 +513,7 @@ async function main(argv) {
               if (frame) await frame.evaluate(STABILIZE).catch(() => {});
               await injectAxe(page.mainFrame());
               if (!frame) {
+                skippedScreens += 1;
                 console.log(`- ${screen.name} ${viewport.tag} ${theme} ${state}: 건너뜀(화면이 열리지 않음)`);
                 continue;
               }
@@ -473,6 +549,14 @@ async function main(argv) {
       for (const theme of themes) await auditLoginSkin(browser, options, theme, results);
     }
   } finally {
+    if (fixture?.restore) {
+      try {
+        const status = await fixture.restore();
+        console.log(`- 시험 자료 복원: 트리 0개로 되돌렸습니다(put ${status}).`);
+      } catch (error) {
+        console.log(`- 시험 자료 복원 실패: ${String(error?.message || error).slice(0, 100)}`);
+      }
+    }
     await browser.close();
   }
 
@@ -489,6 +573,7 @@ async function main(argv) {
     base: options.base,
     generatedAt: new Date().toISOString(),
     account: options.account,
+    skippedScreens,
     total: totals(summary),
     rows: summary,
     shots
@@ -497,7 +582,7 @@ async function main(argv) {
 
   const failing = summary.filter((row) => !row.skipped && (row.serious + row.critical > 0 || row.error));
   const skipped = summary.filter((row) => row.skipped).length;
-  console.log(`\n검사 ${summary.length}건(건너뜀 ${skipped}) · serious ${report.total.serious} · critical ${report.total.critical}`);
+  console.log(`\n검사 ${summary.length}건(건너뜀 ${skipped + skippedScreens}) · serious ${report.total.serious} · critical ${report.total.critical}`);
   for (const row of failing) {
     const ids = [...new Set(row.violations.map((v) => `${v.id}(${v.impact})`))].join(', ');
     console.log(`FAIL ${row.label}: ${row.serious + row.critical}${row.error ? ' [검사 실패] ' + row.error : ''} ${ids}`);

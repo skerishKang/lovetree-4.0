@@ -16,7 +16,9 @@ npm run a11y -- --screen shelf --out .tmp-261109/a11y-shelf
   브라우저가 없으면 `npx playwright install chromium`.
 - 로그인: `.secrets/.env`의 `PADIEM_TUTORIAL<NN>_EMAIL`·`_PASSWORD`를 읽는다(값은 출력하지 않는다).
 - 계정 선택(#344, 2026-11-10): `--account` 인자 > `LT_ACCOUNT` 환경변수 > 둘 다 없으면 **시작 전에 멈춘다**(기본 계정 01로 조용히 진행하지 않는다, #300 레인 계정 규칙). 선택 규칙은 `tools/account-choice.mjs` 한 벌.
-- 시험 자료(계정 01): 트리 3권 + 사진 표지 1권. `npm test`·`npm run build`와 무관한 임시 자료이며,
-  점검이 끝나면 트리 0개·보관 파일 0개로 정리한다.
+- 시험 자료: 로그인 상태 검사에 필요하다(셸은 트리가 없으면 안쪽 화면을 빈 패널로 대체한다 — `screens.mjs`의 `hasTree` 분기).
+  빈 계정이면 검사 전에 트리 3권을 자동으로 넣고, 검사가 끝나면 원래(빈) 상태로 되돌린다(`tools/a11y/fixture.mjs`).
+  기록이 이미 있으면 손대지 않는다. 건너뛴 화면은 요약의 `건너뜀 N`과 `a11y.json`의 `skippedScreens`에 센다.
+- 사진 표지는 선택이다(디자인 표지 검사는 셸 대화상자 검사에 포함).
 - 결과: `<out>/a11y.json`(라벨별 위반·대상·색 대비 값)과 화면 캡처 `<out>/<화면>-<폭>-<테마>-<상태>.png`.
 - `--width 1440|390`, `--theme night|garden`, `--state out|in`, `--screen home|shelf|book|board|network|first-journey`로 좁힐 수 있다.
