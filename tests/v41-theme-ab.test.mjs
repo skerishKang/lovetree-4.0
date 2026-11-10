@@ -107,7 +107,7 @@ test('정원 대상: 책장·기억책·기억 보드·관계 지도(#212, 2026-
   assert.match(themeModule, /appliedTheme\(theme, themedViewFor\(file\)\)/);
 });
 
-test('전환 버튼은 누르면 갈 곳(밤/정원)과 aria-checked를 쓴다', () => {
+test('전환 버튼은 밤/정원 두 칸으로 aria-checked를 쓴다', () => {
   assert.equal(themeButtonLabel('night'), '정원');
   assert.equal(themeButtonLabel('garden'), '밤');
   assert.equal(themeButtonAriaLabel('night'), '정원 테마로 바꾸기');
@@ -116,6 +116,10 @@ test('전환 버튼은 누르면 갈 곳(밤/정원)과 aria-checked를 쓴다',
   assert.equal(themePressed('garden'), true);
   assert.equal(nextTheme('night'), 'garden');
   assert.equal(nextTheme('garden'), 'night');
+  assert.match(html, /data-set-theme="night" aria-checked="true">밤/);
+  assert.match(html, /data-set-theme="garden" aria-checked="false">정원/);
+  assert.doesNotMatch(html, /id="account-theme"/);
+  assert.match(themeModule, /data-set-theme/);
   // #213 2번: 첫 화면 테마는 "보기" 메뉴 항목이 맡는다(도구 줄 버튼 하나로 묶었다).
   // 표시 문구는 계정 메뉴 항목과 같은 header-state 규칙을 그대로 쓴다.
   // 2026-11-11: 메뉴 로직은 public/v41/home-view-menu.mjs로 옮겼다(연결만 home.js).
@@ -124,7 +128,6 @@ test('전환 버튼은 누르면 갈 곳(밤/정원)과 aria-checked를 쓴다',
   assert.match(menuJS, /kind === 'theme'\)[^\n]*writeTheme\(storage/, '메뉴에서 고른 테마를 저장한다');
   assert.match(menuJS, /sendTheme\(theme\)/, '셸에 테마를 알리는 기존 메시지를 그대로 쓴다');
   assert.match(homeJS, /sendTheme:theme=>parent\.postMessage\(\{type:'lt41-theme',theme\}/, '첫 화면이 lt41-theme를 그대로 보낸다');
-  assert.match(html, /id="account-theme" data-lt-theme-toggle aria-checked="false"/);
   // #231 1-B: 테마 버튼 반영은 shell/theme.mjs로 옮겼다(같은 선택자·같은 문구).
   assert.match(themeModule, /document\.querySelectorAll\('\[data-lt-theme-toggle\]'\)/);
 });

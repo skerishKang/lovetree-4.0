@@ -108,13 +108,12 @@ test('책장: inbox 트리를 맨 앞으로 정렬해 그리고 표시를 붙인
 
 test('셸: 헤더 표시·정리하기 단추·트리 고르기 목록이 inbox-model 을 쓴다',()=>{
  const shell=read('../public/v41/shell.mjs');
- // 헤더: 서버 기록의 inbox 트리면 '모아둔 순간' 표시를 보인다.
- assert.match(shell,/headerBadge\(c\.tree\)/);
+ // 트리 드롭다운: inbox를 맨 위에 두고 '정리 전 N'으로 표시한다.
+ assert.match(shell,/tree\.inbox===true\?`정리 전 /);
+ assert.match(shell,/const ordered=trees\.sort\(\(a,b\)=>Number\(b\?\.inbox===true\)-Number\(a\?\.inbox===true\)\)/);
  assert.match(shell,/isInboxTree\(c\.tree\)/);
- assert.match(shell,/\$\('cleanup-menu'\)\.hidden=!\(source==='server'&&member\?\.snapshot\(\)\.owned&&member\.snapshot\(\)\.writable&&isInboxTree\(c\.tree\)\)/);
- // 트리 고르기 목록: pickerLabel 한 벌.
- assert.match(shell,/o\.textContent=pickerLabel\(t\)/);
- assert.doesNotMatch(shell,/o\.textContent=displayTreeTitle\(t\.title\)/);
+ assert.match(shell,/\$\('cleanup-menu'\)\.hidden=!\(c&&source==='server'&&member\?\.snapshot\(\)\.owned&&member\.snapshot\(\)\.writable&&isInboxTree\(c\.tree\)\)/);
+ assert.match(shell,/escHTML\(displayTreeTitle\(tree\.title\|\|tree\.subject\|\|'트리'\)\)/);
  // 정리 창 모듈 연결과 진입 단추.
  assert.match(shell,/createCleanup\(\{/);
  assert.match(shell,/\$\('cleanup-menu'\)\.onclick=\(\)=>shellCleanup\.open\(\{\}\)/);

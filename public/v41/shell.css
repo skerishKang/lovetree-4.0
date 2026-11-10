@@ -294,3 +294,61 @@ html[data-lt-theme=garden] .quick-error-line{color:var(--lt-rose-ink)}
 #move-actions{display:flex;gap:6px;flex-wrap:wrap}
 #move-actions button{min-height:44px;background:transparent;border:1px solid rgba(255,255,255,.3);border-radius:var(--lt-r-pill);padding:7px 12px;color:var(--lt-gold)}
 @media(max-width:780px){#move-feedback{padding:8px 12px}}
+
+/* 2026-11-10 대표 승인 메뉴 정리: 맨 위 한 줄 · 트리 드롭다운 · 계정 메뉴 */
+.app-header{min-height:64px;padding:10px 20px;gap:14px;flex-wrap:nowrap}
+.app-header .brand{min-height:40px}
+.main-nav{display:flex;align-items:center;gap:2px;flex:1;min-width:0}
+.main-nav>button{min-height:40px;padding:0 10px;font-size:13px}
+.tree-slot{position:relative;display:flex;align-items:center;flex:0 0 auto;margin-left:6px}
+nav #record-menu{min-height:40px;font-size:13px;letter-spacing:0}
+.tree-popover{position:absolute;top:calc(100% + 8px);left:0;z-index:50;min-width:340px;max-height:min(72vh,560px);overflow:auto;padding:8px;border:1px solid var(--lt-line);border-radius:var(--lt-r-card);background:var(--lt-glass-strong);backdrop-filter:blur(24px);box-shadow:0 18px 50px #0009;display:grid;gap:3px}
+.tree-popover[hidden]{display:none!important}
+.tree-item{display:flex;align-items:center;gap:10px;width:100%;min-height:52px;padding:5px 7px;border:0;border-radius:10px;background:none;color:var(--lt-pearl);text-align:left;font-size:13px}
+.tree-item:hover,.tree-item:focus-visible{background:rgba(255,255,255,.07)}
+.tree-item[aria-checked="true"]{background:rgba(255,230,166,.07);box-shadow:inset 0 0 0 1px var(--lt-gold-line)}
+.tree-cover{width:36px;height:46px;flex:0 0 auto;border-radius:6px;border:1px solid var(--lt-line);overflow:hidden;background:linear-gradient(145deg,var(--lt-stage-2),rgba(255,230,166,.22));display:block}
+.tree-cover img{width:100%;height:100%;object-fit:cover;display:block}
+.tree-cover[data-cover-design="texture-1"]{background:linear-gradient(180deg,var(--lt-stage-2),rgba(255,230,166,.34))}
+.tree-cover[data-cover-design="texture-2"]{background:linear-gradient(90deg,var(--lt-stage-2),rgba(255,230,166,.3))}
+.tree-cover[data-cover-design="texture-3"]{background:repeating-linear-gradient(0deg,var(--lt-line) 0 1px,transparent 1px 7px),repeating-linear-gradient(90deg,var(--lt-line) 0 1px,transparent 1px 7px),var(--lt-paper)}
+.tree-cover[data-cover-design="texture-4"]{background:radial-gradient(var(--lt-gold-line) 1px,transparent 1.4px),var(--lt-stage-2);background-size:7px 7px}
+.tree-cover[data-cover-design="texture-5"]{background:linear-gradient(135deg,var(--lt-stage-2),rgba(255,230,166,.55),var(--lt-stage-2))}
+.tree-cover[data-cover-design="texture-6"]{background:linear-gradient(180deg,var(--lt-gold-line),var(--lt-stage-2) 38%,var(--lt-gold-line))}
+.tree-name{min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.tree-count{font-size:11px;color:var(--lt-muted);white-space:nowrap}
+.tree-check{color:var(--lt-gold);font-weight:800}
+.tree-foot{display:grid;gap:3px;margin-top:6px;padding-top:6px;border-top:1px solid var(--lt-line)}
+.tree-foot button{min-height:44px;text-align:left;border:0;border-radius:10px;background:none;color:var(--lt-pearl);padding:0 9px;font-size:13px}
+.tree-foot button:hover,.tree-foot button:focus-visible{background:rgba(255,255,255,.07)}
+.account-head{display:flex;align-items:center;gap:10px;padding:6px 6px 10px;border-bottom:1px solid var(--lt-line)}
+.account-initial{width:40px;height:40px;flex:0 0 auto;border-radius:50%;display:grid;place-items:center;background:rgba(200,110,121,.16);border:1px solid var(--lt-gold-line);color:var(--lt-gold-ink);font-weight:800}
+.account-head strong{display:block;font-size:13px}
+#account-email{display:block;font-size:11px;color:var(--lt-muted);margin-top:2px}
+.account-theme{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:6px 0;border-bottom:1px solid var(--lt-line)}
+.account-theme button{min-height:44px;border:1px solid var(--lt-line);border-radius:10px;background:rgba(255,255,255,.04);color:var(--lt-pearl);font-size:13px}
+.account-theme button[aria-checked="true"]{background:var(--lt-primary);color:var(--lt-primary-ink);border-color:var(--lt-primary)}
+#account-advanced{justify-content:space-between}
+#account-advanced[aria-checked="true"]{background:rgba(255,230,166,.10);box-shadow:inset 0 0 0 1px var(--lt-gold-line)}
+#account-advanced:after{content:"";width:28px;height:16px;border-radius:999px;background:var(--lt-line);display:inline-block;transition:background .2s}
+#account-advanced[aria-checked="true"]:after{background:var(--lt-gold-deep)}
+#share-menu{display:none!important}
+#account-advanced summary{min-height:44px;cursor:pointer}
+#header-overflow{display:none}
+#header-overflow.is-open{display:grid;position:absolute;top:64px;right:16px;z-index:70;min-width:190px;padding:8px;border:1px solid var(--lt-line);border-radius:var(--lt-r-card);background:var(--lt-glass-strong);backdrop-filter:blur(24px);box-shadow:0 18px 50px #0009}
+#header-overflow button{min-height:44px;text-align:left;border:0;border-radius:10px;background:none;color:var(--lt-pearl);padding:0 10px;font-size:13px}
+#mobile-more{display:none;min-width:44px;justify-content:center}
+@media(max-width:1020px){.app-header{padding:9px 14px;gap:10px}.main-nav>button{padding:0 8px;font-size:12px}nav #record-menu{max-width:150px}}
+@media(max-width:780px){
+ .app-header{display:flex;min-height:56px;padding:6px 10px;gap:6px;flex-wrap:nowrap}
+ .main-nav{flex:0 0 auto}
+ .main-nav>button[data-view],.main-nav #community-menu,.main-nav .tree-views{display:none!important}
+ .header-actions #write-menu,.header-actions #cleanup-menu{display:none!important}
+ .header-actions{gap:6px}
+ #mobile-more{display:flex!important}
+ .tree-popover{position:fixed;left:10px;right:10px;top:60px;min-width:0;max-height:70vh}
+ #header-overflow.is-open{position:fixed;left:10px;right:10px;top:60px;right:10px}
+}
+html[data-lt-theme="garden"] .account-theme button[aria-checked="true"]{background:var(--lt-primary);color:var(--lt-primary-ink);border-color:var(--lt-primary)}
+html[data-lt-theme="garden"] .account-theme button[aria-checked="false"]{background:var(--lt-paper);color:var(--lt-ink);border-color:var(--lt-line)}
+html[data-lt-theme="garden"] #account-advanced[aria-checked="true"]:after{background:var(--lt-primary)}
