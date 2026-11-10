@@ -279,3 +279,23 @@ test('22. 클릭 효과 한도 세기 증명: 한도를 풀면 넘치는 묶음�
   assert.equal(M.cursorEffectAllowed(3, 4), true);
   assert.equal(M.cursorEffectAllowed(3, 3), false);
 });
+
+test('23. 커서 화면 배선: 위치는 translate3d·프레임당 1회, 크기는 transform으로만, 끌기는 작은 점', () => {
+  const CSS = fs.readFileSync(new URL('../public/v41/views/board/board.css', import.meta.url), 'utf8');
+  const ring = CSS.match(/\.cursorRing\{([^}]*)\}/)?.[1] || '';
+  assert.ok(ring, '.cursorRing 규칙이 있어야 한다');
+  assert.match(ring, /translate3d\(-100px,-100px,0\)/, '위치는 transform으로만 옮긴다(레이아웃 값 left/top 없음)');
+  assert.match(ring, /scale\(var\(--cursor-scale/, '크기는 transform 배율로만 바꾼다');
+  assert.doesNotMatch(ring, /transition:[^;}]*width/, 'width/height 전환을 두지 않는다');
+  assert.match(CSS, /\.cursorRing\.drag-dot\{width:44px;height:44px;/, '끌기 점 크기는 transform 배율과 함께 44px 기준');
+  assert.match(CSS, /@media \(pointer:coarse\)\{\.cursorRing,\.cursorFX\{display:none!important\}\}/, '거친 포인터에서는 숨긴다');
+  assert.match(CSS, /@keyframes cursorRipple[\s\S]*?@keyframes cursorDrop/, '물결·물방울 효과가 있다');
+  assert.match(EXTRAS, /translate3d\(\$\{cursorState\.x\}px,\$\{cursorState\.y\}px,0\)/, '화면이 translate3d로 위치를 쓴다');
+  assert.match(EXTRAS, /if\(!cursorState\.raf\)cursorState\.raf=requestAnimationFrame\(cursorApply\)/, '프레임당 1회만 예약한다');
+  assert.match(EXTRAS, /document\.elementFromPoint\(cursorState\.x,cursorState\.y\)/, 'elementFromPoint는 프레임당 1회');
+  assert.doesNotMatch(EXTRAS, /ring\.style\.left=/, 'left로 위치를 쓰지 않는다');
+  assert.match(EXTRAS, /LT58Model\.cursorMode\(/, '끔 조건은 계산 한 벌을 쓴다');
+  assert.match(EXTRAS, /LT58Model\.cursorHover\(/, '반응 대상은 계산 한 벌을 쓴다');
+  assert.match(EXTRAS, /LT58Model\.cursorScale\(/, '배율은 계산 한 벌을 쓴다');
+  assert.match(EXTRAS, /LT58Model\.cursorEffectAllowed\(/, '효과 한도는 계산 한 벌을 쓴다');
+});
