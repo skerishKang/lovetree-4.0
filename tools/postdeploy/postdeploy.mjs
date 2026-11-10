@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { DEFAULT_EMAILS, accountSecretKeys, chooseTestAccount, defaultProfileFor, laneFor, normaliseAccount } from './accounts.mjs';
+import { fillAuthEmailLogin } from './auth-login.mjs';
 import { chromium } from 'playwright-core';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -338,59 +339,6 @@ async function visibleViewFrame(page) {
     if (frame) return frame;
   }
   return viewFrame(page);
-}
-
-async function fillAuthEmailLogin(page, password, emailValue = AUTO_LOGIN_EMAIL) {
-  // 2026-11-08: 공용 로그인 화면(auth.padiem.net)의 이메일 로그인 폼.
-  // 2026-11-10: 2단계(/login → /login/password)로 변경되어 한 화면과 두 화면 방식 모두 지원.
-  const email = page.locator('#email');
-  if (await email.count()) {
-    const emailVisible = await email.isVisible().catch(() => false);
-    if (emailVisible) {
-      await email.fill(emailValue).catch(() => {});
-    }
-    const pw = page.locator('#password');
-    if (await pw.count()) {
-      const pwVisible = await pw.isVisible().catch(() => false);
-      if (pwVisible) {
-        await pw.fill(password).catch(() => {});
-        await page.locator('form button[type=submit]').first().click({ timeout: 5000 }).catch(() => {});
-        await sleep(2500);
-        if (!/auth\.padiem\.net/.test(page.url())) return { ok: true };
-        if (/\/login\/password/.test(page.url())) {
-          const pw2 = page.locator('#password');
-          if (await pw2.count()) await pw2.fill(password).catch(() => {});
-          await page.locator('form button[type=submit]').first().click({ timeout: 5000 }).catch(() => {});
-          await sleep(2500);
-          if (!/auth\.padiem\.net/.test(page.url())) return { ok: true };
-        }
-        const error = await page.locator('[role=alert], .error, .form-error').first().innerText().catch(() => '');
-        return error ? { ok: false, error: error.trim() } : { ok: true };
-      }
-    }
-    await page.locator('form button[type=submit]').first().click({ timeout: 5000 }).catch(() => {});
-    await sleep(2500);
-    if (!/auth\.padiem\.net/.test(page.url())) return { ok: true };
-    if (/\/login\/password/.test(page.url())) {
-      const pw2 = page.locator('#password');
-      if (await pw2.count()) await pw2.fill(password).catch(() => {});
-      await page.locator('form button[type=submit]').first().click({ timeout: 5000 }).catch(() => {});
-      await sleep(2500);
-      if (!/auth\.padiem\.net/.test(page.url())) return { ok: true };
-    }
-    const error = await page.locator('[role=alert], .error, .form-error').first().innerText().catch(() => '');
-    return error ? { ok: false, error: error.trim() } : { ok: true };
-  }
-  if (/\/login\/password/.test(page.url())) {
-    const pw2 = page.locator('#password');
-    if (await pw2.count()) await pw2.fill(password).catch(() => {});
-    await page.locator('form button[type=submit]').first().click({ timeout: 5000 }).catch(() => {});
-    await sleep(2500);
-    if (!/auth\.padiem\.net/.test(page.url())) return { ok: true };
-    const error = await page.locator('[role=alert], .error, .form-error').first().innerText().catch(() => '');
-    return error ? { ok: false, error: error.trim() } : { ok: true };
-  }
-  return false;
 }
 
 async function fillChatPasswordLogin(page, password, emailValue = AUTO_LOGIN_EMAIL) {
