@@ -11,7 +11,7 @@ import {applyViewAccessibility,connectionLabel} from './view-a11y.mjs';
 import {accountPresentation,treePickerLabel,treePickerText,treeViewsVisible,writeMenuLabel,headerState,headerPartsFor,readTipsSeen,writeTipsSeen,tipsWanted,FIRST_TREE_TIPS,homeCenterState,homeStartLoginUrl,readTheme,readLoginIntent,writeTheme,nextTheme,themeButtonLabel,themeButtonAriaLabel,themePressed,appliedTheme,applyThemeAttribute,LOGIN_INTENTS} from './header-state.mjs';
 import {parseJourneyRoute,journeyRouteDecision} from './first-journey.mjs';
 import {displayTreeTitle} from './tree-name.mjs';
-import {titleView} from './book-usability.mjs';
+import {titleView, withoutAutoTitle} from './book-usability.mjs';
 import {screens,screenForView,viewForFile,themedViewFor} from './shell/navigation.mjs';
 import {createScreens} from './shell/screens.mjs';
 import {createHeader} from './shell/header.mjs';
@@ -195,7 +195,7 @@ const shellCleanup=createCleanup({
   panel:id=>panel(id),
   // 정리 목록도 다른 화면과 같은 제목 규칙·썸네일 규칙을 쓴다(중복 구현 금지).
   treeMomentThumb,
-  momentTitle:moment=>titleView(moment,titleDisplayValue()).main
+  momentTitle:moment=>{const main=titleView(moment,titleDisplayValue()).main;return main||withoutAutoTitle(moment).title;},
 });
 $('cleanup-menu').onclick=()=>shellCleanup.open({});
 function updateMediaPreview(){return shellPanels.updateMediaPreview();}
