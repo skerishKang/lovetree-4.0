@@ -47,7 +47,7 @@
     else if(m.type==='video') media=`<div class="media"><video muted playsinline loop poster="${m.asset}" src="${m.video||''}"></video><span class="playBadge">▶</span><span class="duration">${m.duration||'00:03'}</span></div>`;
     else media=`<div class="media ${m.type==='link'?'linkMedia':''}"><img src="${m.asset}" data-fallback="${ASSET.link}" onerror="this.onerror=null;this.src=this.dataset.fallback" alt=""></div>`;
     let kws=(m.keywords||[]).slice(0,4).map(k=>`<span>${esc(k)}</span>`).join('');
-    return `<article class="card ${m.first?'first':''} ${m.type==='note'?'noteCard':''} ${pinClass(m)} ${cardClass(m)}" data-id="${m.id}" style="left:${m.x}px;top:${m.y}px;--rot:${m.rot}deg;--pin:${colors[m.color]};--halo:${colors[m.color]}55">${m.first?'<div class="firstTag">첫 순간</div>':''}<button class="pin" data-pin="${m.id}" aria-hidden="true" tabindex="-1" disabled></button>${media}<div class="cardBody"><div class="eyebrow"><span class="emotionDot"></span>${LTLabels.type(m.originalType||m.type)} 순간 · ${esc(m.emotion)}</div><h3>${esc(m.title)}</h3><div class="meta"><span>${esc(m.date)}</span><span>${m.type==='link'||isYtMoment(m)?'↗':''}</span></div>${m.type!=='note'?`<div class="memo">${esc(m.memo)}</div>`:''}<div class="keywordOnCard">${kws}</div>${(m.url||m.sourceUrl)?`<div class="domain">${esc(m.source)}</div>`:''}</div></article>`;
+    return `<article class="card ${m.first?'first':''} ${m.type==='note'?'noteCard':''} ${pinClass(m)} ${cardClass(m)}" data-id="${m.id}" style="left:${m.x}px;top:${m.y}px;--rot:${m.rot}deg;--pin:${colors[m.color]};--halo:${colors[m.color]}55">${m.first?'<div class="firstTag">첫 순간</div>':''}<button class="pin" data-pin="${m.id}" aria-hidden="true" tabindex="-1"></button>${media}<div class="cardBody"><div class="eyebrow"><span class="emotionDot"></span>${LTLabels.type(m.originalType||m.type)} 순간 · ${esc(m.emotion)}</div><h3>${esc(m.title)}</h3><div class="meta"><span>${esc(m.date)}</span><span>${m.type==='link'||isYtMoment(m)?'↗':''}</span></div>${m.type!=='note'?`<div class="memo">${esc(m.memo)}</div>`:''}<div class="keywordOnCard">${kws}</div>${(m.url||m.sourceUrl)?`<div class="domain">${esc(m.source)}</div>`:''}</div></article>`;
   };
 
   /* Composer: VIDEO supports local or YouTube source; VIDEO LINK remains a direct YouTube 순간. */
@@ -76,7 +76,7 @@
     $('#composerPreview').innerHTML=`<div class="previewCard"><span class="previewPin"></span>${media}<div style="margin-top:12px;font-size:9px;color:#8b788f">${esc(type.toUpperCase())} · ${esc(emotion)}${type==='video'?' · '+(addVideoSource()==='youtube'?'YOUTUBE':'LOCAL'):''}</div><h3 style="margin:5px 0;color:#34283d">${esc(title)}</h3><div style="font-size:10px;color:#786a7e">${esc(memo)}</div></div>`;
   };
   confirmAdd=function(){
-    let id='m'+(Math.max(...moments.map(m=>+m.id.slice(1)))+1),type=addType,title=$('#momentTitle').value||'새로운 순간',emotion=$('#addEmotion')?.value||'설렘',memo=$('#momentMemo').value||'',source=$('#addSource')?.value||'내 보관함',asset=ASSET.note,video=null,url=null,sourceUrl=null,videoSource=null,videoId='';let file=$('#mediaFile')?.files?.[0];
+    let id=newBoardId(),type=addType,title=$('#momentTitle').value||'새로운 순간',emotion=$('#addEmotion')?.value||'설렘',memo=$('#momentMemo').value||'',source=$('#addSource')?.value||'내 보관함',asset=ASSET.note,video=null,url=null,sourceUrl=null,videoSource=null,videoId='';let file=$('#mediaFile')?.files?.[0];
     if(type==='photo'&&file) asset=URL.createObjectURL(file); else if(type==='photo')asset=ASSET.glance;
     if(type==='video'){
       videoSource=addVideoSource();
@@ -86,7 +86,7 @@
     if(type==='link'){url=$('#urlField')?.value||'https://lovetree.example';asset=ASSET.link}
     if(type==='youtube'){url=$('#urlField')?.value||'';sourceUrl=url;videoId=ytId(url);asset=ytMax(url)||V12_FALLBACK(url);source=source||'YouTube'}
     if(type==='note')memo=$('#noteField')?.value||memo;
-    let n={id,type,title,emotion,date:'2026.08.11 · 지금',source,memo,x:620+(moments.length%3)*120,y:360+(moments.length%2)*100,rot:[-4,3,-2,4,2][moments.length%5],color:['rose','violet','cyan','amber'][moments.length%4],asset,video,url,sourceUrl,videoId,videoSource,duration:'00:03',keywords:selectedKeywords('add'),pinStyle:$('#addPinStyle')?.value||defaultPinStyle,cardStyle:$('#addCardStyle')?.value||defaultCardStyle,privacy:'PRIVATE',thumbnailUrl:isYtMoment({type,videoSource})?ytMax(url||sourceUrl||''):'',createdOrder:Math.max(...moments.map(m=>m.createdOrder||0))+1};
+    let n={id,type,title,emotion,date:new Date().toISOString().slice(0,10),source,memo,x:620+(moments.length%3)*120,y:360+(moments.length%2)*100,rot:[-4,3,-2,4,2][moments.length%5],color:['rose','violet','cyan','amber'][moments.length%4],asset,video,url,sourceUrl,videoId,videoSource,duration:'00:03',keywords:selectedKeywords('add'),pinStyle:$('#addPinStyle')?.value||defaultPinStyle,cardStyle:$('#addCardStyle')?.value||defaultCardStyle,privacy:'PRIVATE',thumbnailUrl:isYtMoment({type,videoSource})?ytMax(url||sourceUrl||''):'',createdOrder:Math.max(...moments.map(m=>m.createdOrder||0))+1};
     $('#addModal').classList.remove('open');addMomentV11(n,lastParentId);
   };
 
@@ -124,7 +124,7 @@
     else media=`<div class="previewMedia"><img src="${m.asset}" data-fallback="${ASSET.link}" onerror="this.onerror=null;this.src=this.dataset.fallback"></div>`;
     $('#editPreview').innerHTML=`<div class="label">LIVE PREVIEW</div><div class="previewCard" style="margin-top:12px"><span class="previewPin"></span>${media}<div style="margin-top:10px;font-size:9px;color:#8c7a91">${esc(LTLabels.type(m.originalType||m.type))} · ${esc(m.emotion)}${m.type==='video'?' · '+(m.videoSource==='youtube'?'YOUTUBE':'LOCAL'):''}</div><h3 style="color:#34283d">${esc(m.title)}</h3><div style="font-size:10px;color:#786a7e">${esc(m.memo)}</div></div>`;
   };
-  saveEdit=function(){let m=moments.find(x=>x.id===selected),n=editPreviewState();snapshot();let invariant={id:m.id,date:m.date,privacy:m.privacy,x:m.x,y:m.y,rot:m.rot,first:m.first,createdOrder:m.createdOrder};Object.assign(m,n,invariant);$('#editModal').classList.remove('open');renderCards();renderThreads();updateKeywordFilter();selectMoment(m.id,true);toast('미디어를 교체해도 순간 ID·날짜·Connection은 그대로 유지됩니다.');};
+  saveEdit=function(){let m=moments.find(x=>x.id===selected),n=editPreviewState();snapshot();let invariant={id:m.id,date:m.date,privacy:m.privacy,x:m.x,y:m.y,rot:m.rot,first:m.first,createdOrder:m.createdOrder};Object.assign(m,n,invariant);$('#editModal').classList.remove('open');renderCards();renderThreads();updateKeywordFilter();selectMoment(m.id,true);persistBoard();toast('미디어를 교체해도 순간 ID·날짜·Connection은 그대로 유지됩니다.');};
 
   openViewer=function(id){
     let m=moments.find(x=>x.id===id);if(!m)return;$('#vTitle').textContent=m.title;let box=$('#viewerMedia');

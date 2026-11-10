@@ -115,6 +115,24 @@ export function validateMomentInput(input) {
   if (mediaMetadata) result.mediaMetadata = mediaMetadata;
   return result;
 }
+// 기억 보드 배치(선택): 카드 위치·회전·핀/카드 모양·색·키워드. 4.1 보드가 저장하는 값이며,
+// 없거나 형식이 틀리면 그 항목만 버린다. 저장 계약을 넓히지 않도록 허용 목록·범위만 통과시킨다.
+const BOARD_TOKEN = /^[a-z0-9_-]{1,24}$/i;
+export function boardLayoutOf(m) {
+  const out = {};
+  const finite = (v, min, max) => typeof v === 'number' && Number.isFinite(v) && v >= min && v <= max;
+  if (finite(m.x, -10000, 10000)) out.x = Math.round(m.x);
+  if (finite(m.y, -10000, 10000)) out.y = Math.round(m.y);
+  if (finite(m.rot, -360, 360)) out.rot = m.rot;
+  if (typeof m.pinStyle === 'string' && BOARD_TOKEN.test(m.pinStyle)) out.pinStyle = m.pinStyle;
+  if (typeof m.cardStyle === 'string' && BOARD_TOKEN.test(m.cardStyle)) out.cardStyle = m.cardStyle;
+  if (typeof m.color === 'string' && BOARD_TOKEN.test(m.color)) out.color = m.color;
+  if (Array.isArray(m.keywords)) {
+    const keywords = [...new Set(m.keywords.filter(k => typeof k === 'string' && k.length > 0 && k.length <= 24 && !/[\u0000-\u001f]/.test(k)))].slice(0, 20);
+    if (keywords.length) out.keywords = keywords;
+  }
+  return out;
+}
 export function createTree(input, clock = new Date().toISOString()) {
   const subject = requireText(input.subject, '좋아하는 대상', 60);
   const moment = { ...validateMomentInput(input), id: newId(), parentId: null, relation: '', links: [], createdAt: clock };
@@ -335,7 +353,7 @@ export function validateState(value) {
       if (!Array.isArray(rawLinks) || rawLinks.length > MAX_LINKS) throw new Error('관련 순간 데이터가 올바르지 않아요.');
       for (const link of rawLinks) if (!idValid(link) || link === m.id) throw new Error('관련 순간 데이터가 올바르지 않아요.');
       ids.add(m.id);
-      return { ...validateMomentInput(m), id: m.id, parentId: m.parentId, links: [...new Set(rawLinks)], createdAt: m.createdAt };
+      return { ...validateMomentInput(m), id: m.id, parentId: m.parentId, links: [...new Set(rawLinks)], createdAt: m.createdAt, ...boardLayoutOf(m) };
     });
     if (moments.filter(m => m.parentId === null).length !== 1) throw new Error('트리의 시작 순간은 하나여야 해요.');
     const byId = new Map(moments.map(m => [m.id, m]));

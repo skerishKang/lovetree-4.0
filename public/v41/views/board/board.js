@@ -5,12 +5,23 @@ const ltVar=(n,f)=>(getComputedStyle(document.documentElement).getPropertyValue(
 const colors={rose:ltVar('--lt-thread-rose','#ff659f'),violet:ltVar('--lt-thread-violet','#a86cff'),cyan:ltVar('--lt-thread-cyan','#69dcff'),amber:ltVar('--lt-thread-amber','#ffc96b'),pearl:'#e9dff3'}
 ;
 
-// 기억 보드는 실제 기록에서는 읽기 전용이다. 데이터에 쓰기 권한 필드가 없어(순간·연결 모두
-// kind/from/to/reason만 온다) 지금은 예시 판본 여부로만 가를 수 있다. 판단은 이 한 곳에서 한다.
-const canEditBoard=LTDEMO.example;
-let moments=LTDEMO.moments.map((m,i)=>({id:m.id,type:m.type==='memo'?'note':'photo',originalType:m.type==='memo'?'note':m.type,createdOrder:i+1,title:m.title,emotion:m.emotion,date:m.date,source:m.source||'예시 기록',mediaMetadata:m.mediaMetadata||null,memo:m.memo||m.whyNext||'',...LT58Model.cardPosition(i),color:['rose','violet','cyan','amber'][i%4],asset:m.image,url:m.externalUrl||'',first:!!m.first}));
+// 기억 보드는 예시 판본과, 서버 기록을 쓰기 가능한 계정으로 연 경우에 편집할 수 있다.
+// 공유 감상(share)은 읽기 전용이다. 서버 쓰기 가능 여부는 셸이 LT41.writable로 넘긴다.
+function boardSaveEnabled(){try{return window.parent!==window&&window.parent.LT41?.source==='server'&&window.parent.LT41?.writable===true&&!LTDEMO.readOnly}catch{return false}}
+const canEditBoard=LTDEMO.example||boardSaveEnabled();
+let moments=LTDEMO.moments.map((m,i)=>{const pos=LT58Model.cardPosition(i);return{id:m.id,type:m.type==='memo'?'note':'photo',originalType:m.type==='memo'?'note':m.type,createdOrder:i+1,title:m.title,emotion:m.emotion,date:m.date,source:m.source||'예시 기록',mediaMetadata:m.mediaMetadata||null,memo:m.memo||m.whyNext||'',x:Number.isFinite(m.x)?m.x:pos.x,y:Number.isFinite(m.y)?m.y:pos.y,rot:Number.isFinite(m.rot)?m.rot:pos.rot,pinStyle:m.pinStyle,cardStyle:m.cardStyle,keywords:Array.isArray(m.keywords)?m.keywords:[],color:m.color||['rose','violet','cyan','amber'][i%4],asset:m.image,url:m.externalUrl||'',first:!!m.first}});
 
 let connections=LTDEMO.edges.map((e,i)=>({id:'c'+i,kind:e.kind,a:e.from,b:e.to,why:e.kind==='related'?'관련 순간':e.reason||'부모·자식 연결',color:e.kind==='related'?'cyan':(canEditBoard?['rose','violet','cyan','amber'][Math.max(0,moments.findIndex(m=>m.id===e.from))%4]:'rose')}));
+
+// 보드 저장(#372 후속): 바뀐 순간·연결을 셸에 넘겨 기존 워크스페이스 저장 경로(PUT /api/workspace)로 보낸다.
+// 예시·공유는 보내지 않는다. 셸이 저장하지 못하면 토스트로 알린다.
+function domainDateText(v){const s=String(v||'');if(/^\d{4}-\d{2}-\d{2}$/.test(s))return s;const m=s.match(/(\d{4})\.(\d{2})\.(\d{2})/);if(m)return `${m[1]}-${m[2]}-${m[3]}`;const d=new Date(s);return Number.isNaN(d.getTime())?new Date().toISOString().slice(0,10):d.toISOString().slice(0,10)}
+function boardPayload(){const parentOf=id=>{const c=connections.find(c=>c.kind==='parent'&&c.b===id);return c?c.a:null};
+const relatedOf=id=>[...new Set(connections.filter(c=>c.kind==='related'&&(c.a===id||c.b===id)).map(c=>c.a===id?c.b:c.a))];
+return moments.map(m=>{const pc=connections.find(c=>c.kind==='parent'&&c.b===m.id);return{id:m.id,parentId:parentOf(m.id),relation:pc?(pc.why||''):'',links:relatedOf(m.id),title:m.title,note:m.memo||'',emotion:m.emotion||'설렘',date:domainDateText(m.date),url:m.url||'',...(m.mediaMetadata?{mediaMetadata:m.mediaMetadata}:{}),createdAt:m.createdAt||new Date().toISOString(),x:m.x,y:m.y,rot:m.rot,pinStyle:m.pinStyle,cardStyle:m.cardStyle,keywords:m.keywords||[],color:m.color}})}
+function newBoardId(){let id;do{id='m'+Math.random().toString(36).slice(2,10)}while(moments.some(m=>m.id===id));return id}
+function persistBoard(){if(!boardSaveEnabled())return;try{const treeId=window.parent.LT41.tree.id;window.parent.postMessage({type:'lt41-board-sync',treeId,moments:boardPayload()},location.origin)}catch{/* 셸이 없으면 저장하지 않는다 */}}
+window.addEventListener('message',e=>{if(e.origin!==location.origin)return;if(e.data?.type!=='lt41-board-saved')return;if(e.data.ok===false)toast(e.data.error||'서버에 저장하지 못했어요. 잠시 뒤 다시 시도해 주세요.')});
 
 const replayPath=(()=>{const ids=[],seen=new Set();let m=LTDEMO.moments[0];while(m&&!seen.has(m.id)){ids.push(m.id);seen.add(m.id);m=LTDEMO.moments.find(x=>x.id===m.next)}return ids})();
 
@@ -34,7 +45,7 @@ if(m.url)media=LTMedia.markup(m.url,m.title,m.mediaMetadata,m.id);
 else if(m.type==='note') media=`<div class="noteText">“${esc(m.memo)}”</div>`;
 else if(m.type==='video') media=`<div class="media"><video muted playsinline loop poster="${m.asset}" src="${m.video}"></video><span class="playBadge">▶</span><span class="duration">${m.duration||'00:03'}</span></div>`;
 else media=`<div class="media ${m.type==='link'||m.type==='youtube'?'linkMedia':''}"><img src="${m.asset}" alt=""><span class="${m.type==='youtube'?'playBadge':''}">${m.type==='youtube'?'▶':''}</span></div>`;
-return `<article class="card ${m.first?'first':''} ${m.type==='note'?'noteCard':''}" data-id="${m.id}" style="left:${m.x}px;top:${m.y}px;--rot:${m.rot}deg;--pin:${colors[m.color]};--halo:${colors[m.color]}55">${m.first?'<div class="firstTag">첫 순간</div>':''}<button class="pin" data-pin="${m.id}" aria-hidden="true" tabindex="-1" disabled></button>${media}<div class="cardBody"><div class="eyebrow"><span class="emotionDot"></span>${LTLabels.type(m.originalType||m.type)} 순간 · ${esc(m.emotion)}</div><h3>${esc(titleMain(m))}</h3>${titleSubMarkup(m)}<div class="meta"><span>${esc(dateText(m.date))}</span><span>${m.type==='link'||m.type==='youtube'?'↗':''}</span></div>${m.type!=='note'?`<div class="memo">${esc(m.memo)}</div>`:''}${m.url?`<div class="domain">${esc(m.source)}</div>`:''}</div></article>`}
+return `<article class="card ${m.first?'first':''} ${m.type==='note'?'noteCard':''}" data-id="${m.id}" style="left:${m.x}px;top:${m.y}px;--rot:${m.rot}deg;--pin:${colors[m.color]};--halo:${colors[m.color]}55">${m.first?'<div class="firstTag">첫 순간</div>':''}<button class="pin" data-pin="${m.id}" aria-hidden="true" tabindex="-1"></button>${media}<div class="cardBody"><div class="eyebrow"><span class="emotionDot"></span>${LTLabels.type(m.originalType||m.type)} 순간 · ${esc(m.emotion)}</div><h3>${esc(titleMain(m))}</h3>${titleSubMarkup(m)}<div class="meta"><span>${esc(dateText(m.date))}</span><span>${m.type==='link'||m.type==='youtube'?'↗':''}</span></div>${m.type!=='note'?`<div class="memo">${esc(m.memo)}</div>`:''}${m.url?`<div class="domain">${esc(m.source)}</div>`:''}</div></article>`}
 
 function renderCards(){cardLayer.innerHTML=moments.map(cardHTML).join('');
 cardLayer.querySelectorAll('.card').forEach(el=>bindCard(el));
@@ -76,6 +87,7 @@ moments=o.moments;
 connections=o.connections;
 renderCards();
 renderThreads();
+persistBoard();
 toast('이전 상태로 돌아왔어요.')}
 
 function bindCard(el){let id=el.dataset.id;
@@ -120,9 +132,13 @@ window.addEventListener('pointerup',e=>{if(!connecting)return;let target=documen
 
 function endPinTap(e,id){}
 
+function wouldCycle(a,b){let cur=a,seen=new Set();while(cur){if(cur===b)return true;if(seen.has(cur))break;seen.add(cur);const c=connections.find(x=>x.kind==='parent'&&x.b===cur);cur=c?c.a:null}return false}
 function completeConnection(a,b){if(a===b)return toast('같은 순간끼리는 연결하지 않아요.');
 if(connections.some(c=>c.a===a&&c.b===b))return toast('이미 존재하는 Connection이에요.');
+if(wouldCycle(a,b))return toast('이 연결은 순간들이 원을 이뤄 저장할 수 없어요.');
 snapshot();
+// 한 순간의 이전 순간은 하나만 저장된다(도메인 계약). 새로 이으면 기존 부모 연결을 바꾼다.
+connections=connections.filter(c=>!(c.kind==='parent'&&c.b===b&&c.a!==a));
 pendingConn={a,b};
 $('#whyModal').classList.add('open')}
 
@@ -137,8 +153,11 @@ showWhy.t=setTimeout(()=>$('#whyBubble').classList.remove('show'),5200)}
 function deleteSelectedConnection(){const guard=LT58Model.editGuard(canEditBoard);if(guard.blocked){toast(guard.message);
 return}if(!selectedConn)return;
 snapshot();
+const gone=connections.find(c=>c.id===selectedConn);
+if(gone?.kind==='parent'&&!connections.some(c=>c.id!==gone.id&&c.kind==='parent'&&c.b===gone.b)){toast('시작 순간은 하나여야 해요. 이 연결은 지울 수 없어요.');return}
 connections=LT58Model.removeConnection(connections,selectedConn);
 selectedConn=null;
+persistBoard();
 renderThreads();
 $('#whyBubble').classList.remove('show');
 toast('Connection을 지웠어요. 되돌리기로 되돌릴 수 있어요.')}
@@ -177,13 +196,13 @@ else a.innerHTML='<textarea class="field" id="noteField" rows="3" placeholder="�
 function openAdd(){formFor(addType);
 $('#addModal').classList.add('open')}
 
-function confirmAdd(){let id='m'+(Math.max(...moments.map(m=>+m.id.slice(1)))+1),type=addType,title=$('#momentTitle').value||'새로운 순간',emotion=$('#momentEmotion').value||'설렘',memo=$('#momentMemo').value||'',asset=ASSET.note,video=null,url=null;
+function confirmAdd(){let id=newBoardId(),type=addType,title=$('#momentTitle').value||'새로운 순간',emotion=$('#momentEmotion').value||'설렘',memo=$('#momentMemo').value||'',asset=ASSET.note,video=null,url=null;
 let file=$('#mediaFile')?.files?.[0];
 if((type==='photo'||type==='video')&&file){asset=URL.createObjectURL(file);
 if(type==='video')video=asset}else if(type==='photo')asset=ASSET.glance;
 else if(type==='video'){asset=ASSET.first;
 video=ASSET.video}else if(type==='link'||type==='youtube'){asset=ASSET.link;
-url=$('#urlField')?.value||'https://lovetree.example'}let n={id,type,title,emotion,date:'2026.08.11 · 지금',source:type==='photo'?'Local image':type==='video'?'Local video':type==='note'?'마음 한마디':'Prototype link metadata',memo,x:620+(moments.length%3)*120,y:360+(moments.length%2)*100,rot:[-4,3,-2,4,2][moments.length%5],color:['rose','violet','cyan','amber'][moments.length%4],asset,video,url,duration:'00:03'};
+url=$('#urlField')?.value||'https://lovetree.example'}let n={id,type,title,emotion,date:new Date().toISOString().slice(0,10),source:type==='photo'?'Local image':type==='video'?'Local video':type==='note'?'마음 한마디':'Prototype link metadata',memo,x:620+(moments.length%3)*120,y:360+(moments.length%2)*100,rot:[-4,3,-2,4,2][moments.length%5],color:['rose','violet','cyan','amber'][moments.length%4],asset,video,url,duration:'00:03'};
 if(type==='note')n.memo=$('#noteField')?.value||memo;
 $('#addModal').classList.remove('open');
 addMoment(n,selected)}
@@ -298,12 +317,14 @@ document.querySelectorAll('.typeBtn').forEach(x=>x.classList.toggle('active',x==
 formFor(addType)}
 ;
 $('#saveWhy').onclick=()=>{if(!pendingConn)return;
-let c={id:'c'+(connections.length+1),a:pendingConn.a,b:pendingConn.b,why:$('#whyInput').value||'다음 순간으로 이어진 이유',color:moments.find(m=>m.id===pendingConn.a)?.color||'rose'};
-connections.push(c);
+let why=$('#whyInput').value||'다음 순간으로 이어진 이유',color=moments.find(m=>m.id===pendingConn.a)?.color||'rose';
+let c=connections.find(x=>x.kind==='parent'&&x.a===pendingConn.a&&x.b===pendingConn.b);
+if(c)c.why=why;else{c={id:'c'+(connections.length+1),kind:'parent',a:pendingConn.a,b:pendingConn.b,why,color};connections.push(c)}
 pendingConn=null;
 $('#whyModal').classList.remove('open');
 renderThreads();
 animateNewThread(c.id);
+persistBoard();
 toast('Connection이 빛의 실로 이어졌어요.');
 setTimeout(()=>showWhy(c.id),400)}
 ;
@@ -318,9 +339,6 @@ $('#viewerModal').classList.remove('open')}
 ;
 $('#nextMoment').onclick=()=>{let c=connections.find(c=>c.a===selected);
 if(c)selectMoment(c.b,true)}
-;
-$('#replayFrom').onclick=()=>{let i=replayPath.indexOf(selected);
-startCinema(Math.max(0,i))}
 ;
 $('#fitBtn').onclick=()=>fitAll(true);
 $('#resetBtn').onclick=()=>fitAll(true);

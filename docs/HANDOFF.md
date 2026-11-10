@@ -2,6 +2,15 @@
 
 > **main 보호 규칙(2026-11-09, 룰셋 "main 보호 (PR·필수 검사)")**: main은 PR로만 바꾼다(직접 푸시·force push·삭제 금지, 관리자도 예외 없음 — 비상시 대표가 룰셋 enforcement를 잠깐 끈다). 필수 검사: `check (ubuntu-latest)`·`check (windows-latest)`·`미리보기 postdeploy(로그아웃)` — 셋 다 paths 필터가 없어 문서만 바뀐 PR에서도 항상 돈다. 승인 수 0(레인이 스스로 머지). Deploy Bundle Boot Test는 paths 필터가 있어 필수에 넣지 않았다.
 
+## 2026-11-11 — #372 후속 기억 보드 꾸미기 되살리기 (로컬1, ai/local1-board-revival-261110, PR #375)
+
+- 무엇: 보드 보기 전용 규칙 제거(숨김 인라인 스타일·`.pin` pointer-events 차단 해제), 셸 `applyAdvanced`의 `lt41-advanced` postMessage로 단순/고급 모드(`board-mode.mjs` 신규·`body.lt-advanced` CSS 게이트, 셸 미수정), 보드 배치(x·y·rot·pinStyle·cardStyle·color·keywords)를 `boardLayoutOf` 허용 목록으로 검증해 `lt41-board-sync`→셸 `boardSync` action→`PUT /api/workspace`로 저장, `#replayFrom` 제거.
+- 옛 서버 호환(로컬 시뮬레이션 `.tmp-261109/old-server-compat.mjs`): 일반 저장은 배치 칸 미실림(200). 보드 저장은 배치 칸을 실어도 옛 검증기(허용 목록)가 400 대신 조용히 버려 200·데이터 무손실. 400 거절 시뮬레이션에서는 셸 '미저장 기록' 표시·보드 로컬 상태 유지·JS 오류 0.
+- 측정(CDP 1440·카드 8): idle rAF p50/p90 main 43.9/50.1·50.0/56.3 vs 분기 43.8/50.0·43.8/50.1, Long Task 0, pan p50 6.3 동일(p90는 노이즈).
+- 버튼 감사(#372 방식, `.tmp-261109/audit-buttons.mjs`): server 1440/390×단순/고급 + 예시 1440×단순/고급, 보드 수준 ERROR 0. 이전 의도(보기 전용) 항목이 고급에서 정상, 단순에서는 의도 숨김. `#fitBtn`은 단순 1440/390 기능 확인(`check-fitbtn.mjs`). saveWhy NO_CHANGE는 기존 도달 불가 한계. 390 셸 화면 전환 버튼 HIDDEN은 #374 더보기 메뉴(main 동일 행동).
+- 주의: postdeploy 시각 5건·계정 메뉴 1건은 live main(#374 헤더)과 도구 규칙 불일치로 사전 실패(본 분기 무관). CI PostgreSQL 저장·로그인 상태 검증은 main `45dcc5a`부터 동일 실패.
+- 시험: `tests/v41-board-revival.test.mjs` 9건. `npm test` 958/921 pass/0 fail/37 skip, build pass.
+
 ## 2026-11-10 — #362 기억책 '← 내 책장' 복귀 + 빈 타이포 알약 제거 (로컬2, ai/local2-lt-book-back-261110)
 
 - 구현: 기억책 topbar 맨 왼쪽에 `← 내 책장`(`.ui-btn.shelf-back`, 44px). 클릭은 기존 `lt41-navigate(track32-bookshelf.html)` 재사용. `LT59Model.shelfReturn({source,embedded})`가 `shelf|none`을 정하고 공유 감상(`source==='share'`)이면 버튼을 숨긴다. 정원은 `--lt-paper/--lt-ink/--lt-line-paper` 토큰.
