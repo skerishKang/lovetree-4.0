@@ -9,6 +9,7 @@ const M = globalThis.LT59Model;
 const BOOK = fs.readFileSync(new URL('../public/v41/views/book/book.js', import.meta.url), 'utf8');
 const EXTRA = fs.readFileSync(new URL('../public/v41/views/book/book-extra.js', import.meta.url), 'utf8');
 const HTML = fs.readFileSync(new URL('../public/v41/views/track59-sketchbook.html', import.meta.url), 'utf8');
+const BOOK_CSS = fs.readFileSync(new URL('../public/v41/views/book/book.css', import.meta.url), 'utf8');
 
 const moments = [
   { id: 'm1', type: 'photo', title: 'A', date: '2026.01.01', emotion: '끌림', next: 'm2', branch: 'm3', whyNext: 'w', first: true },
@@ -18,7 +19,7 @@ const moments = [
 ];
 
 test('0. 계산 한 벌은 화면이 부르는 함수만 노출하고, 모델을 화면보다 먼저 부른다', () => {
-  assert.deepEqual(Object.keys(M).sort(), ['buildSpreads', 'connectionSummary', 'emotionTone', 'folioLabel', 'journeyDays', 'journeyTimeline', 'nextMomentOf', 'turnAngle']);
+  assert.deepEqual(Object.keys(M).sort(), ['buildSpreads', 'connectionSummary', 'emotionTone', 'folioLabel', 'journeyDays', 'journeyTimeline', 'nextMomentOf', 'shelfReturn', 'turnAngle']);
   assert.ok(HTML.indexOf('book-model.js') < HTML.indexOf('book.js'), '모델을 화면보다 먼저 부른다');
 });
 
@@ -186,4 +187,30 @@ test('12. 감정 색·날짜 차: 아는 감정은 고정, 모르는 감정은 �
   assert.equal(M.journeyDays('2026-10-02', ''), null);
   assert.equal(M.journeyDays('2026-02-30', '2026-03-01'), null, '없는 날짜는 세지 않는다');
   assert.equal(M.journeyDays('2026.11.09', '2026.10.02'), 0, '거꾸로면 0일');
+});
+
+test('16. 책장 돌아가기 판정: 셸 안에서 보고, 공유 감상이 아니면 책장', () => {
+  assert.equal(M.shelfReturn({ source: 'example', embedded: true }), 'shelf');
+  assert.equal(M.shelfReturn({ source: 'server', embedded: true }), 'shelf');
+  assert.equal(M.shelfReturn({ source: 'share', embedded: true }), 'none');
+  assert.equal(M.shelfReturn({ source: 'example', embedded: false }), 'none');
+  assert.equal(M.shelfReturn(), 'shelf', '입력 없으면 기본은 책장');
+  // 세기 증명: 공유를 열어도 되거나, 셸 밖에서도 책장으로 보내면 시험이 잡는다.
+  assert.notEqual(M.shelfReturn({ source: 'share' }), M.shelfReturn({ source: 'server' }));
+  assert.notEqual(M.shelfReturn({ embedded: false }), M.shelfReturn({ embedded: true }));
+});
+
+test('17. 책장 돌아가기 배선: 윗줄 왼쪽 버튼·기존 셸 이동·공유 숨김, 빈 타이포 잔여 없음', () => {
+  assert.ok(HTML.includes('id="shelfBackBtn"'), '버튼이 있다');
+  assert.ok(HTML.includes('class="ui-btn shelf-back"'), '같은 ui-btn 모양을 쓴다');
+  assert.match(BOOK, /LT59Model\.shelfReturn\(\{source:parent\.LT41\?\.source,embedded:parent!==window\}\)/, '판정 한 벌을 쓴다');
+  assert.ok(BOOK.includes("postMessage({type:'lt41-navigate',view:'track32-bookshelf.html'}"), '기존 셸 이동 채널을 재사용한다');
+  assert.match(BOOK, /shelfBack\.hidden=true/, '돌아갈 수 없으면 숨긴다');
+  assert.match(BOOK_CSS, /\.shelf-back\{[^}]*min-height:44px/, '44px 이상');
+  assert.match(BOOK_CSS, /html\[data-lt-theme=garden\] \.shelf-back\{[^}]*var\(--lt-/, '정원 토큰을 쓴다');
+  assert.ok(!HTML.includes('typoNote') && !HTML.includes('typo-note'), '빈 타이포 알약이 없다');
+  assert.ok(!/typo-b|typo-note/.test(BOOK), '타이포 장치가 없다');
+  assert.ok(!/typo-b|typo-note/.test(BOOK_CSS), '타이포 CSS가 없다');
+  const SRC_CSS = fs.readFileSync(new URL('../src/views/book-source.css', import.meta.url), 'utf8');
+  assert.ok(!/typo-b|typo-note/.test(SRC_CSS), 'src 쪽도 없다');
 });
