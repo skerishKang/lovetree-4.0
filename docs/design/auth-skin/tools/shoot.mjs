@@ -31,7 +31,7 @@ const {chromium} = playwright.default ?? playwright;
 const pages = ['login-night', 'login-garden', 'signup-night', 'signup-garden'];
 const widths = [1440, 390];
 
-const browser = await chromium.launch({channel: 'chrome'});
+const browser = await chromium.launch({channel: process.env.PW_CHANNEL || 'chrome'});
 const external = [];
 
 for (const width of widths) {

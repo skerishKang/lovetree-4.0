@@ -26,7 +26,7 @@ const {chromium} = playwright.default ?? playwright;
 // --lt-rose 계열(밤/정원)과 그 파생색. 밤 화면에서는 하나도 나오면 안 된다.
 const ROSE = ['#d88f9c', '#bd5d72', '#c86e79', '#98505e', '#f3a8b6', '#e5a5af'];
 
-const browser = await chromium.launch({channel: 'chrome'});
+const browser = await chromium.launch({channel: process.env.PW_CHANNEL || 'chrome'});
 const failures = [];
 const report = [];
 
