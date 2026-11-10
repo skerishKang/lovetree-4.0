@@ -209,7 +209,12 @@ html[data-v41-screen=book] .tools .ui-btn::after,html[data-v41-screen=board] hea
 
 /* 빠른 추가 (#빠른 추가 ②, 2026-11-09): 새 hex 없이 --lt-* 토큰만 쓴다. 누르는 영역은 44px 이상. */
 #write-chooser{width:420px}
-#quick-add{width:440px}
+#quick-add{width:460px}
+/* 이슈 343(2026-11-10): 머리글은 금색이다 — 밤 테마 장미색 금지 규칙(이슈 195). 정원은 --lt-gold가 정원 토큰이다. */
+#quick-add .eyebrow{color:var(--lt-gold)}
+.quick-lede{margin:10px 0 0;font-size:13px;line-height:1.8;color:var(--lt-muted)}
+.quick-lede span{display:block}
+.quick-sr{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0}
 .write-choice{display:grid;gap:10px;margin-top:18px}
 .write-choice button{display:flex;flex-direction:column;align-items:flex-start;gap:4px;min-height:64px;padding:12px 16px;text-align:left;border:1px solid var(--lt-line);border-radius:var(--lt-r-card);background:rgba(255,255,255,.04);color:var(--lt-pearl)}
 .write-choice button.primary{background:var(--lt-primary);border-color:transparent;color:var(--lt-primary-ink)}
@@ -218,17 +223,47 @@ html[data-v41-screen=book] .tools .ui-btn::after,html[data-v41-screen=board] hea
 /* 정원의 1차 버튼(진한 장미 배경)에서는 옅게 태내지 않는다 — 75%로는 3.97:1로 모자라다(axe 실측). */
 html[data-lt-theme=garden] .write-choice button.primary span{opacity:1}
 .write-choice button:hover{border-color:var(--lt-gold-line)}
-#quick-form{margin-top:18px}
-#quick-form label{display:block;font-size:13px;color:var(--lt-muted)}
-#quick-url{display:block;width:100%;margin-top:8px;padding:11px 12px;min-height:44px;border:1px solid rgba(255,255,255,.22);border-radius:12px;background:rgba(255,255,255,.04);color:var(--lt-pearl);line-height:1.6;font-size:16px}
-.quick-preview{display:grid;gap:8px;margin-top:12px}
-.quick-preview img{display:block;width:100%;max-height:180px;object-fit:cover;border-radius:12px;border:1px solid var(--lt-line);background:var(--lt-stage-2)}
-.quick-preview p{margin:0;font-size:13px;line-height:1.6;color:var(--lt-muted);overflow-wrap:anywhere}
-#quick-error{color:var(--lt-rose)}
-/* 정원 종이 위 오류 글자는 진한 장미로 4.5:1을 넘긴다(정원 대비 수정 선례와 같은 규칙). 밤은 --lt-rose 그대로다. */
-html[data-lt-theme=garden] #quick-error{color:var(--lt-rose-ink)}
-.quick-notice{margin:12px 0 0!important;padding:10px 12px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-card);color:var(--lt-pearl)!important;background:rgba(255,230,166,.07)}
-#quick-form [data-media-slot]{margin-top:12px}
+#quick-form{margin-top:16px}
+.quick-input-row{display:flex;align-items:center;gap:8px;min-height:56px;padding:0 8px 0 14px;border:1px solid var(--lt-gold-line);border-radius:14px;background:rgba(255,255,255,.04)}
+.quick-input-row:focus-within{outline:2px solid var(--lt-gold);outline-offset:3px}
+.quick-input-mark{flex:0 0 auto;color:var(--lt-muted);font-size:15px}
+#quick-url{flex:1;min-width:0;min-height:52px;padding:0;border:0;background:none;color:var(--lt-pearl);font-size:16px;line-height:1.6}
+#quick-url:focus-visible{outline:none}
+.quick-paste{flex:0 0 auto;min-height:44px;padding:0 14px;border:1px solid rgba(255,255,255,.3);border-radius:var(--lt-r-pill);background:none;color:var(--lt-pearl);font-size:13px;white-space:nowrap}
+.quick-paste:hover{border-color:var(--lt-gold-line)}
+.quick-drop-hint{margin:8px 0 0!important;padding-left:14px;font-size:12px;color:var(--lt-muted)}
+/* 미리보기 카드: 높이 고정 — 빈 상태·입력·담은 뒤 어느 쪽이든 아래 버튼 y가 같다(이슈 343). */
+.quick-preview{position:relative;display:flex;flex-direction:column;height:300px;margin-top:12px;border:1px solid var(--lt-line);border-radius:var(--lt-r-card);background:var(--lt-stage-2);overflow:hidden}
+.quick-preview[data-state=empty]{border-style:dashed;background:repeating-linear-gradient(135deg,rgba(255,255,255,.035) 0 12px,transparent 12px 24px),var(--lt-stage-2)}
+.quick-preview-empty,.quick-preview-invalid{margin:auto;padding:0 24px;text-align:center;font-size:13px;line-height:1.8;color:var(--lt-muted)}
+.quick-preview-media{display:flex;align-items:center;justify-content:center;flex:1;min-height:0;padding:12px 12px 0;background:var(--lt-stage)}
+.quick-preview-media img{display:block;width:100%;height:100%;object-fit:contain}
+.quick-preview-meta{display:flex;flex-direction:column;gap:8px;padding:12px 14px;flex:0 0 auto}
+.quick-preview[data-media=no] .quick-preview-meta{margin:auto 0;max-height:100%;overflow:hidden}
+.quick-preview-tag{align-self:flex-start;padding:4px 10px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-pill);color:var(--lt-gold);font-size:10px;font-weight:700;letter-spacing:.12em}
+.quick-preview-title{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin:0;font-size:15px;font-weight:600;line-height:1.5;color:var(--lt-pearl);overflow-wrap:anywhere}
+/* 오류 줄도 높이 고정 — 오류 문구가 버튼 자리를 밀지 않는다. 정원 글자는 진한 장미(기존 선례). */
+.quick-error-line{margin:8px 0 0!important;min-height:18px;max-height:18px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:12px;line-height:1.5;color:var(--lt-rose)}
+html[data-lt-theme=garden] .quick-error-line{color:var(--lt-rose-ink)}
+.quick-or{display:flex;align-items:center;gap:12px;margin:12px 0!important;font-size:12px;color:var(--lt-muted)}
+.quick-or::before,.quick-or::after{content:"";flex:1;height:1px;background:var(--lt-line)}
+.quick-photo{position:relative}
+.quick-photo .file-label{position:relative;display:flex;align-items:center;gap:8px;min-height:48px;padding:0 14px;border:1px dashed var(--lt-gold-line);border-radius:var(--lt-r-card);color:var(--lt-pearl);font-size:13px;cursor:pointer}
+.quick-photo .file-label::after{content:"4MB까지";margin-left:auto;color:var(--lt-muted);font-size:12px}
+.quick-photo .file-label:focus-within{outline:2px solid var(--lt-gold);outline-offset:3px}
+.quick-photo input[type=file]{position:absolute;width:1px;height:1px;min-height:0;margin:0;padding:0;border:0;overflow:hidden;clip-path:inset(50%)}
+.quick-photo [data-upload-status]{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:21px;max-height:42px;margin:6px 0 0!important;font-size:12px;line-height:1.7;color:var(--lt-muted);overflow-wrap:anywhere}
+.quick-photo .stop-upload{position:absolute;right:8px;top:0;min-height:48px;padding:0 12px;border:1px solid rgba(255,255,255,.3);border-radius:var(--lt-r-pill);background:var(--lt-glass-strong);color:var(--lt-pearl);font-size:12px;z-index:1}
+.quick-photo .panel-note{display:none}
+/* 안내 줄: 높이 고정. 담은 뒤에만 채우고, 새 입력이 시작되면 renderPreview가 비운다(이슈 343). */
+.quick-notice-row{display:flex;align-items:center;gap:10px;min-height:44px;margin-top:8px}
+.quick-notice{flex:1;min-width:0;margin:0!important;font-size:13px;line-height:1.6;color:var(--lt-pearl);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.quick-notice:empty{display:none}
+.quick-refine{flex:0 0 auto;min-height:44px;padding:0;border:0;background:none;color:var(--lt-gold);font-size:13px;white-space:nowrap}
+.quick-refine:hover{text-decoration:underline}
+.quick-submit{width:100%;min-height:52px;margin-top:12px;border-radius:14px;font-size:15px;font-weight:600}
+.quick-storage-note{margin:10px 0 0!important;text-align:center;font-size:11px;color:var(--lt-muted)}
+@media(max-width:780px){#quick-add{width:100%}.quick-preview{height:220px}}
 #drop-veil{position:fixed;inset:0;z-index:28;display:grid;place-items:center;background:rgba(4,4,7,.62);backdrop-filter:blur(3px);pointer-events:none}
 #drop-veil[hidden]{display:none}
 #drop-veil p{margin:0;padding:16px 22px;border:1px dashed var(--lt-gold-line);border-radius:var(--lt-r-card);background:var(--lt-glass-strong);color:var(--lt-gold);font-size:15px;letter-spacing:.02em;box-shadow:0 10px 40px #0007;text-align:center}

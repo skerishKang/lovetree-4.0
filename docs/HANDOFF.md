@@ -8,6 +8,19 @@
 - 구현: `public/v41/quick-intake.mjs` `resolveMediaMetadata`(기존 `fetchVideoTitle` oEmbed 재사용, 상한 4초·실패 시 주소만) → `shell/quick-intake.mjs`가 저장 전에 받아 `quickAdd {url, mediaMetadata}`로 넘기고 같은 주소는 기다리는 동안 한 번만 담는다(inFlight). `public/v41/shell/notice.mjs` 신규 `createNotifier` — 결과 안내(hold 3초)가 상태 안내보다 먼저 보인다(상태 안내는 다음 상태 변화에 다시 오므로 보류 큐 없이 억제만 하는 방식).
 - 시험: 함수 4건 + 가짜 DOM 5건 + 안내 4건(가짜 시계·DOM, shell 배선 글자 가드). 강도 증명 5회(mediaMetadata 제거 4실패·저장 media 전달 제거 3실패·inFlight 제거 1실패·hold 억제 제거 2실패·hold 배선 제거 1실패) 후 원복(cmp).
 - 검증: `npm test` 904건 866 pass/0 fail/37 skip, `npm run build` pass. 운영 실측은 머지·자동 배포 뒤 계정 02로 이어서 한다.
+## 2026-11-10 — 빠른 추가 창 디자인: 높이 고정·미리보기 카드·버튼 하나(#343, 로컬2, ai/local2-lt-quick-add-design-261110)
+
+대표 운영 확인의 5가지 문제(미리보기가 생기면 버튼이 밀림·담기 전에도 지난 안내가 보임·머리글 분홍·설명 줄바꿈·파일 선택 기본 모양)를 CTO 시안대로 정리했다. 저장·끌어다 놓기·사진 업로드·연속 추가·로그아웃/공유 동작은 그대로다.
+
+- **머리글**: `#quick-add .eyebrow{color:var(--lt-gold)}` — 밤 테마 장미색 금지 규칙(이슈 195)을 지킨다. 정원은 같은 속성이 정원 토큰을 쓴다.
+- **높이 고정(핵심)**: 설명 두 줄, 금테 입력창+붙여넣기/지우기 알약, 미리보기 카드(1440 300px·390 220px), 오류 줄 18px, 안내 줄 44px을 모두 고정 → 빈 상태·입력(가로 영상·Shorts·지원 안 함)·담은 뒤에서 '담기' 버튼 y가 같다.
+- **순수 함수**(`public/v41/quick-add.mjs`): `previewState`(empty/invalid/youtube/link)·`previewTag`(YOUTUBE · SHORTS / YOUTUBE · LIVE / 호스트)·`savedNoticeText`(✓ 담았어요 · 32자 요약). 미리보기 제목과 저장 제목은 같은 값 — #344의 `titleCache`를 그대로 쓰고, 못 받았으면 둘 다 `suggestMomentTitle`로 물러난다(화면·저장이 어긋나지 않게 domain 한 벌 재사용).
+- **안내 줄**: 담은 뒤에만 "✓ 담았어요 · 제목 요약 · 지금 다듬기 →"(금색 링크). `renderPreview`가 새 입력마다 비운다 — 담기 전에 지난 안내가 남던 버그 수정.
+- **사진**: 기존 업로더 그대로(imagesOnly·onUploaded). label을 점선 칸으로, 실제 input은 visually hidden(포커스 유지·`:focus-within` 금테), 상태 줄 2줄 고정, 업로더 자체 보관 안내는 숨기고 맨 아래 "내 계정에만 보관 · 105MB·200개까지" 한 줄로. 업로더가 전송 뒤 submit을 다시 켜는 계약 때문에 `setTimeout(syncSubmitState,0)`으로 '주소 없으면 흐림'을 한 번 더 맞춘다.
+- **버튼**: 아래 크림색 큰 버튼 하나 '모아둔 순간에 담기'(담을 수 없는 주소면 disabled=흐림). 닫기는 오른쪽 위 ✕만(아래 닫기·별도 지금 다듬기 버튼 제거).
+- **시험**: `v41-quick-add` +10(상태 표·꼬리표 표·안내 문구·마크업/CSS 고정), `v41-quick-add-flow` +2(안내 비움·붙여넣기 알약, 미리보기/저장 갱신). 강도 증명 2회 — `previewState`의 지원 안 함 분기 파괴 → 2건 실패, `renderPreview`의 `clearSavedNotice` 제거 → 1건 실패 — 후 `cmp` 동일 확인. `npm test` 898건 861 pass / 0 fail / 37 skip, `npm run build` pass.
+- **로컬 실측(가짜 세션=계정 04 운영 스냅숏 재생, dist)**: 1440·390 × 밤·정원 4조합 × 5상태에서 담기 버튼 y 동일(1440 771.97 · 390 682.97), 카드 높이 300/220 고정, 담은 뒤 안내·새 입력 시 비움 확인, pageerror 0·가로 넘침 0. 스크린샷 `.tmp-261109/shots-343-local/`, axe serious·critical 0(`.tmp-261109/axe-343-local/`).
+- **운영 실측(계정 04, 머지·배포 뒤)**: 결과와 스크린샷은 #343 댓글에 남긴다.
 
 ## 2026-11-10 — 미리보기 Functions 준비 대기(#337 후속): /api/account가 404가 아닌 응답까지 최대 60초 (로컬1, PR #338 머지 `3d50c09`)
 
