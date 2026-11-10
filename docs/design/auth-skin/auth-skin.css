@@ -61,6 +61,8 @@
   --orbit-haze-alpha: 72%;
   --orbit-gap: 48px;
   --orbit-card-half: 220px;
+  --orbit-size-small: calc(var(--orbit-size) * .72);
+  --orbit-out: 64px;
   /* Google Identity "Sign in with Google" 어두운 테마(가이드라인 고정값) */
   --lt-google-fill: #131314;
   --lt-google-stroke: #8e918f;
@@ -152,9 +154,11 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
   opacity: var(--orbit-alpha);
   pointer-events: none;
 }
-.o1 { left: calc(50% - var(--orbit-card-half) - var(--orbit-gap) - var(--orbit-size) * .76); top: 8%; transform: rotate(-8deg); }
-.o2 { left: calc(50% + var(--orbit-card-half) + var(--orbit-gap)); top: 11%; transform: rotate(7deg); }
-.o3 { left: calc(50% + var(--orbit-card-half) + var(--orbit-gap)); bottom: 4%; transform: rotate(-4deg); }
+.o1 { left: calc(50% - var(--orbit-card-half) - var(--orbit-gap) - var(--orbit-size) * .76); top: 6%; transform: rotate(-8deg); }
+.o2 { left: calc(50% + var(--orbit-card-half) + var(--orbit-gap)); top: 6%; transform: rotate(7deg); }
+.o3 { left: calc(50% - var(--orbit-card-half) - var(--orbit-gap) - var(--orbit-out) - var(--orbit-size-small) * .76); bottom: 5%; transform: rotate(-4deg); }
+.o4 { left: calc(50% + var(--orbit-card-half) + var(--orbit-gap) + var(--orbit-out)); bottom: 5%; transform: rotate(4deg); }
+.o3, .o4 { height: var(--orbit-size-small); width: calc(var(--orbit-size-small) * .76); }
 body.garden .orbit {
   box-shadow: 0 18px 40px rgba(75, 51, 42, .16), 0 0 18px var(--lt-gold-glow);
 }
@@ -376,6 +380,7 @@ body.garden .alt-link { color: var(--lt-ink); }
   .o1 { left: -26px; top: 6%; }
   .o2 { left: auto; right: -28px; top: 9%; }
   .o3 { left: auto; right: 8%; bottom: 2%; width: 104px; height: 137px; }
+  .o4 { display: none; }
   .auth-card { width: 100%; padding: 25px 22px; border-radius: 18px; }
   .foot { position: static; transform: none; width: auto; max-width: none; margin-top: 20px; text-align: center; }
   .divider { margin-top: 16px; }
