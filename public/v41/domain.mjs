@@ -55,8 +55,18 @@ function normalizeMediaMetadata(value, url) {
   return {title, channel, source};
 }
 function shortened(value, max = 40) {
-  const letters = Array.from(value.replace(/\s+/g, ' ').trim());
-  return letters.length > max ? `${letters.slice(0, max).join('')}…` : letters.join('');
+  const text = Array.from(value.replace(/\s+/g, ' ').trim()).join('');
+  if (text.length <= max) return text;
+  // '…' 포함 max 자를 넘지 않게 한다: '…' 자리(1자)를 비우고 채운다.
+  // 저장 검사가 UTF-16 길이(.length)를 쓰므로 이모지(서로게이트 쌍)도 안 나뉘고 max 자를 넘지 않게 자른다.
+  let out = '';
+  let size = 0;
+  for (const ch of text) {
+    if (size + ch.length > max - 1) break;
+    out += ch;
+    size += ch.length;
+  }
+  return `${out}…`;
 }
 export function safeUrl(value = '') {
   if (!value.trim()) return '';
