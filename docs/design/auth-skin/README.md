@@ -9,8 +9,8 @@
 - `signup-night.html` · `signup-garden.html` — 회원가입 시안(이름 선택, 이메일, 비밀번호, 오류 문구 자리)
 - `auth-skin.css` — 두 테마의 공통 레이아웃과 토큰
 - `screenshots/` — `*-1440.png`, `*-390.png` 8장(기본 = 궤도 사진 "중")
-- `screenshots/compare/` — #347 전/중/강 비교(1440 밤·정원, 1920 밤)
-- `assets/` — 궤도 카드 이미지 3장(webp), Gowun Batang woff2, OFL
+- `screenshots/compare/` — #347 이전(3장·여성만) vs 새 구성(4장·여성 2·남성 2)
+- `assets/` — 궤도 카드 이미지 4장(webp), Gowun Batang woff2, OFL
 - `assets/googleg-standard-color.svg` — Google이 배포하는 표준 색상 `G` 로고(가공 없음)
 - `assets/fonts/Roboto-Medium.latin.woff2` · `-latin-ext.woff2` — Google 버튼 지정 서체
 - `tools/shoot.mjs` — 스크린샷 8장 재생성 + 외부 요청 0건 검사
@@ -101,7 +101,7 @@
 | 포커스 | `outline: 2px solid var(--lt-gold); outline-offset: 3px` (입력은 금색 테두리 + `0 0 0 3px var(--lt-gold-line)`) |
 | 제목 | 밤 `clamp(28px,4vw,34px)`, 정원 `clamp(30px,4.2vw,36px)` Gowun Batang |
 | 하단 한 줄 | `.foot` 11px, `--lt-muted`, 1440은 아래 18px 고정·390은 카드 아래 흐름 |
-| 궤도 카드 | 3장, 높이 `clamp(220px, 30vw, 420px)`·폭 0.76, opacity `.8`(밤) / `.7`(정원), blur 없음 |
+| 궤도 카드 | 4장(큰 2·작은 2), 큰 높이 `clamp(220px, 30vw, 420px)`·작은 높이 0.72배, 폭 0.76, opacity `.8`(밤) / `.7`(정원), blur 없음 |
 | 390 | 카드 `100%`, 바깥 여백 `16px`, 궤도 카드 가장자리 배치 |
 
 ## 공용 로그인 팀 연결
@@ -129,17 +129,32 @@
 | --- | --- | --- | --- |
 | 사진 높이 | `clamp(190px, 27vw, 330px)` | `clamp(220px, 30vw, 420px)` | `clamp(240px, 33vw, 460px)` |
 | 사진 폭 | 높이 × 0.76 | 같음 | 같음 |
+| 사진 수·성별 | 3장·여성만 | **4장(큰 2·작은 2), 여성 2·남성 2** | 같음(사진만 커짐) |
+| 작은 사진 높이 | — | 큰 사진의 0.72배 | 같음 |
 | 투명도(밤) | `.58` | `.8` | `.9` |
 | 투명도(정원) | `.48` | `.7` | `.8` |
 | 가장자리 어둡게 · 투명 구간 | 42% | 50% | 58% |
 | 가장자리 어둡게 · 끝 | 무대색 82%(불투명) | 78% 지점 · 72% 농도 | 72% 지점 · 62% 농도 |
-| 위치 | 가장자리 기준(o1 3.5%·o2 5%·o3 14%) | 카드 양옆 48px 간격 | 같음(사진만 커짐) |
+| 위치 | 가장자리 기준(o1 3.5%·o2 5%·o3 14%), 오른쪽 2장 겹침 | 큰 2장은 카드 양옆 48px, 작은 2장은 바깥 64px로 좌우 2장씩 | 같음(회전 bbox만 1280에서 미세) |
 | 카드 | `min(440px, 100%)` | 그대로 | 그대로 |
-| ≤680px | 카드 우선 | 그대로(픽셀 비교 밤 0px·정원 최대 ±1) | 그대로 |
+| ≤680px | 카드 우선 | 그대로(카드·o1~o3 위치 동일, o4 숨김) | 그대로 |
 
-- 위치는 `calc(50% ± (카드 반폭 220px + 48px) ± 사진 폭)`으로 잡아 1280·1440·1920에서 카드와 겹치지 않는다(회전 bounding box 포함 겹침 0).
+- 위치는 `calc(50% ± (카드 반폭 220px + 48px) ± 사진 폭)`으로 잡아 1280·1440·1920에서 카드와 겹치지 않는다(회전 bounding box 포함 겹침 0). 작은 사진 2장은 바깥으로 64px 더 밀어 기본(중)에서 사진끼리 AABB 겹침이 0이다(강은 1280에서 회전 bbox만 미세).
 - 카드 글자 대비는 그대로다: 밤 제목 `#f5f1e9` / 카드 `rgba(7,7,12,.9)` ≈ 17.84:1, 정원 `#403536` / `#fffdf8` ≈ 11.6:1.
 - 가장자리 어둡게는 `color-mix(in srgb, var(--lt-stage) 72%, transparent)`처럼 무대색의 농도만 낮춰 새 색을 만들지 않는다.
+
+### 사진 출처·성별 구성 (2026-11-10 대표 결정)
+
+`src/views/orbit-samples.json`의 캐릭터 사진 묶음에서 `assetSource: "캐릭터-얼굴만"`·`curationClass: "portrait"`인 항목만 골랐습니다. 실존 인물·외부 이미지는 쓰지 않았고, 원본 `public/media/orbit/*.webp`(362×362, quality 92)를 **변환 없이 그대로** 복사했습니다.
+
+| 자리 | 파일 | 원본(id·제목·파일) | 성별 |
+| --- | --- | --- | --- |
+| 왼쪽 위(큰) | `assets/card-1.webp` | m01 첫인상 · `e6d41ce3ea7e8f1a.webp` | 여 |
+| 오른쪽 위(큰) | `assets/card-3.webp` | m11 의자에 앉은 모습 · `5a0aaa877c77b8ed.webp` | 남 |
+| 왼쪽 아래(작은) | `assets/card-4.webp` | m15 트리의 빛 · `975da7dac3af8ebe.webp` | 남 |
+| 오른쪽 아래(작은) | `assets/card-2.webp` | m02 푸른 시간 · `1d36199b5642fed0.webp` | 여 |
+
+좌우 각각 여성 1·남성 1로 섞어 무게를 맞췄고, 밝은 사진과 어두운 사진을 대각으로 배치했습니다.
 
 ## 스크린샷
 
@@ -151,13 +166,13 @@
 | 회원가입·정원 | `screenshots/signup-garden-1440.png` | `screenshots/signup-garden-390.png` |
 
 위 8장은 궤도 사진 **중**(기본) 기준이다. 강은 `body.orbit-strong`으로 찍는다.
-전/중/강 비교는 `screenshots/compare/`에 있다.
+이전(3장·여성만)과 새 구성(4장·여성 2·남성 2) 비교는 `screenshots/compare/`에 있다.
 
 | 비교 | 파일 |
 | --- | --- |
-| 1440 밤 전·중·강 | `screenshots/compare/compare-1440-night.png` |
-| 1440 정원 전·중·강 | `screenshots/compare/compare-1440-garden.png` |
-| 1920 밤 중·강 | `screenshots/compare/compare-1920-night.png` |
+| 1440 밤 이전 → 새 구성 | `screenshots/compare/compare-1440-night.png` |
+| 1440 정원 이전 → 새 구성 | `screenshots/compare/compare-1440-garden.png` |
+| 1920 밤 이전 → 새 구성 | `screenshots/compare/compare-1920-night.png` |
 
 오류 문구 자리는 실제 오류가 들어올 자리를 보여 주기 위해 예시 문구를 넣었습니다.
 
