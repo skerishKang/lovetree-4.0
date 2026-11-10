@@ -12,13 +12,14 @@ test('브랜드 이름은 화면에 보이는 글자(LoveTree4.1)를 그대로 �
 });
 
 test('트리 고르기 단추는 aria-label로 화면 글자를 덮지 않는다(보이는 "트리: …"가 이름)', () => {
-  assert.match(html, /<button class="source" id="record-menu" type="button" aria-haspopup="dialog"><span id="source-label">/);
+  assert.match(html, /<button class="source" id="record-menu" type="button" aria-haspopup="menu" aria-expanded="false"><span id="source-label">/);
   assert.doesNotMatch(html, /id="record-menu"[^>]*aria-label=/);
 });
 
-test('계정 메뉴의 테마 항목은 menuitemcheckbox와 aria-checked를 쓴다', () => {
-  assert.match(html, /role="menuitemcheckbox" id="account-theme" data-lt-theme-toggle aria-checked="false"/);
-  assert.doesNotMatch(html, /id="account-theme"[^>]*aria-pressed=/);
-  assert.match(theme, /setAttribute\('aria-checked', String\(themePressed\(theme\)\)\)/);
+test('계정 메뉴의 테마 항목은 밤/정원 두 칸과 menuitemradio·aria-checked를 쓴다', () => {
+  assert.match(html, /data-set-theme="night" aria-checked="true">밤<\/button><button type="button" role="menuitemradio" data-set-theme="garden" aria-checked="false">정원/);
+  assert.doesNotMatch(html, /id="account-theme"/);
+  assert.doesNotMatch(html, /data-set-theme="night"[^>]*aria-pressed=/);
+  assert.match(theme, /setAttribute\('aria-checked', String\(button\.dataset\.setTheme === theme\)\)/);
   assert.doesNotMatch(theme, /setAttribute\('aria-pressed'/);
 });

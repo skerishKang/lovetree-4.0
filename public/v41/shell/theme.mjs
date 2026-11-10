@@ -22,6 +22,10 @@ export function paintThemeControls(theme = readTheme(localStorage)) {
     button.setAttribute('aria-label', themeButtonAriaLabel(theme));
     button.title = themeButtonAriaLabel(theme);
   }
+  // 2026-11-10: 계정 메뉴의 밤/정원 두 칸.
+  for (const button of document.querySelectorAll('[data-set-theme]')) {
+    button.setAttribute('aria-checked', String(button.dataset.setTheme === theme));
+  }
   paintLoginLinks(theme);
 }
 

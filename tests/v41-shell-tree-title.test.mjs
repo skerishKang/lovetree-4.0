@@ -74,10 +74,8 @@ test('2. 직접 쓴 이름은 그대로 둔다(정확히 일치할 때만 뗀다
 
 test('3. 셸이 트리 이름을 보여 주는 곳은 모두 displayTreeTitle을 거친다', () => {
   assert.match(shell, /import \{displayTreeTitle\} from '\.\/tree-name\.mjs';/);
-  // 선택한 트리(화면 위 문맥 줄)
-  assert.match(shell, /\$\('context-tree'\)\.textContent=displayTreeTitle\(c\.tree\.title\);/);
-  // 트리 선택 목록(#327 2부): pickerLabel 이 displayTreeTitle 을 거쳐 inbox 표시를 더한다.
-  assert.match(shell, /o\.textContent=pickerLabel\(t\);/);
+  // 트리 드롭다운: 표시 이름은 displayTreeTitle을 거친다.
+  assert.match(shell, /escHTML\(displayTreeTitle\(tree\.title\|\|tree\.subject\|\|'트리'\)\)/);
   // 공유 미리보기 요약
   assert.match(messages, /displayTreeTitle\(answer\.preview\.tree\.title\)/);
   // 삭제 확인 문구

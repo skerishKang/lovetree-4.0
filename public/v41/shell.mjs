@@ -53,21 +53,70 @@ function themedView(){return themedViewFor(current);}
 function applyTheme(theme=readTheme(localStorage)){return applyThemeFor(current,theme);}
 function toggleTheme(){return toggleThemeFor(current);}
 const moreButton=$('mobile-more'),moreMenu=$('header-overflow');
-function closeMore(){moreMenu.classList.remove('is-open');moreButton.setAttribute('aria-expanded','false');}
-moreButton.addEventListener('click',()=>{
- const open=moreMenu.classList.toggle('is-open');
- moreButton.setAttribute('aria-expanded',String(open));
+const treePopover=$('tree-popover'),treeTrigger=$('record-menu');
+function closeMore(){moreMenu.classList.remove('is-open');moreMenu.hidden=true;moreButton.setAttribute('aria-expanded','false');}
+function buildFoldMenu(){
+ moreMenu.replaceChildren();
+ const add=(label,click)=>{const b=document.createElement('button');b.type='button';b.setAttribute('role','menuitem');b.textContent=label;b.onclick=()=>{closeMore();click()};moreMenu.append(b)};
+ add('첫 화면',()=>document.querySelector('.main-nav [data-view="src064-orbit.html"]').click());
+ add('내 책장',()=>document.querySelector('.main-nav [data-view="track32-bookshelf.html"]').click());
+ add('둘러보기',()=>$('community-menu').click());
+ if(window.LT41){
+  add('기억책',()=>document.querySelector('.tree-views [data-view="track59-sketchbook.html"]').click());
+  add('기억 보드',()=>document.querySelector('.tree-views [data-view="track58-pinboard.html"]').click());
+  add('관계 지도',()=>document.querySelector('.tree-views [data-view="track56-network.html"]').click());
+ }
+ if(!$('write-menu').hidden)add('＋ 순간 추가',()=>$('write-menu').click());
+}
+const escHTML=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function treeYoutubeId(value){try{const u=new URL(String(value||''));if(u.hostname==='youtu.be')return u.pathname.slice(1);if(/youtube\.com$/.test(u.hostname)||u.hostname==='m.youtube.com'){if(u.pathname==='/watch')return u.searchParams.get('v')||'';const m=u.pathname.match(/\/(shorts|live|embed)\/([^/?#]+)/);return m?.[2]||''}}catch{}return ''}
+function treeMomentThumb(m){const md=m?.mediaMetadata||{};for(const v of [md.thumbnail,md.poster,md.image,m?.attachment?.url,m?.media?.url,m?.image])if(typeof v==='string'&&v.trim())return v.trim();const id=treeYoutubeId(m?.url);return id?`https://i.ytimg.com/vi/${id}/hqdefault.jpg`:''}
+function treeCoverMarkup(tree){
+ if(tree?.coverDesign)return `<span class="tree-cover" data-cover-design="${escHTML(tree.coverDesign)}" aria-hidden="true"></span>`;
+ const moments=Array.isArray(tree?.moments)?[...tree.moments].sort((a,b)=>String(a.createdAt||'').localeCompare(String(b.createdAt||''))):[];
+ const cover=tree?.coverMomentId?moments.find(m=>m.id===tree.coverMomentId):null;
+ const thumb=(cover&&treeMomentThumb(cover))||moments.map(treeMomentThumb).find(Boolean)||'';
+ return `<span class="tree-cover" aria-hidden="true">${thumb?`<img src="${escHTML(thumb)}" alt="" loading="lazy" referrerpolicy="no-referrer">`:''}</span>`;
+}
+function renderTreeMenu(){
+ if(!treePopover)return;
+ const trees=Array.isArray(model?.trees)?[...model.trees]:[];
+ const ordered=trees.sort((a,b)=>Number(b?.inbox===true)-Number(a?.inbox===true));
+ const currentId=window.LT41?.tree?.id||'';
+ const rows=ordered.map(tree=>{
+  const active=tree.id===currentId;
+  const count=tree.inbox===true?`정리 전 ${tree.moments?.length||0}`:`${tree.moments?.length||0}개의 순간`;
+  return `<button type="button" role="menuitemradio" class="tree-item" data-tree-id="${escHTML(tree.id)}" aria-checked="${active}">${treeCoverMarkup(tree)}<span class="tree-name">${escHTML(displayTreeTitle(tree.title||tree.subject||'트리'))}</span><span class="tree-count">${count}</span>${active?'<span class="tree-check" aria-hidden="true">✓</span>':''}</button>`;
+ }).join('');
+ const manage=source==='server'&&window.LT41&&member?.snapshot().owned&&member.snapshot().writable;
+ treePopover.innerHTML=rows+`<div class="tree-foot" role="none"><button type="button" role="menuitem" data-tree-action="new">＋ 새 트리</button>${manage?'<button type="button" role="menuitem" data-tree-action="manage">이 트리 관리 (이름·표지)</button><button type="button" role="menuitem" data-tree-action="share">이 트리 공유</button>':''}</div>`;
+ treePopover.querySelectorAll('[data-tree-id]').forEach(b=>b.onclick=()=>{const id=b.dataset.treeId;closeTreeMenu();if(id){choose(id);flowNavigation();writeLocation();}});
+ treePopover.querySelector('[data-tree-action="new"]')?.addEventListener('click',()=>{closeTreeMenu();if(member?.snapshot().writable)openEditor('new');else openLoginStart('new-tree');});
+ treePopover.querySelector('[data-tree-action="manage"]')?.addEventListener('click',()=>{closeTreeMenu();shellPanels.openTreeManager();});
+ treePopover.querySelector('[data-tree-action="share"]')?.addEventListener('click',()=>{closeTreeMenu();$('share-menu').click();});
+}
+function openTreeMenu(){if(!treePopover)return;renderTreeMenu();treePopover.hidden=false;treeTrigger.setAttribute('aria-expanded','true');treePopover.querySelector('button')?.focus();}
+function closeTreeMenu(){if(!treePopover)return;treePopover.hidden=true;treeTrigger.setAttribute('aria-expanded','false');}
+$('record-menu').addEventListener('click',event=>{event.stopPropagation();if(treePopover?.hidden)openTreeMenu();else closeTreeMenu();});
+if(treePopover)treePopover.addEventListener('keydown',event=>{const items=[...treePopover.querySelectorAll('button')];const at=items.indexOf(document.activeElement);if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();const next=event.key==='ArrowDown'?(at+1)%items.length:(at-1+items.length)%items.length;items[next]?.focus();}else if(event.key==='Home'){event.preventDefault();items[0]?.focus();}else if(event.key==='End'){event.preventDefault();items.at(-1)?.focus();}});
+document.addEventListener('click',event=>{if(treePopover&&!treePopover.hidden&&!event.target.closest('.tree-slot'))closeTreeMenu();});
+document.addEventListener('keydown',event=>{if(event.key==='Escape'&&treePopover&&!treePopover.hidden){closeTreeMenu();treeTrigger.focus();}});
+addEventListener('lt41-trees-changed',()=>{if(treePopover&&!treePopover.hidden)renderTreeMenu();});
+$('mobile-more').addEventListener('click',event=>{
+ event.stopPropagation();
+ if(moreMenu.hidden){buildFoldMenu();moreMenu.hidden=false;moreMenu.classList.add('is-open');moreButton.setAttribute('aria-expanded','true');}
+ else closeMore();
 });
 moreMenu.addEventListener('click',event=>{
  if(event.target.closest('button'))closeMore();
 });
-// 더보기 메뉴 바깥 클릭·Esc로도 닫는다(원래 같은 줄에 있던 리스너 그대로).
 document.addEventListener('click',event=>{
  if(!moreMenu.contains(event.target)&&event.target!==moreButton)closeMore();
 });
 document.addEventListener('keydown',event=>{
- if(event.key==='Escape'&&moreMenu.classList.contains('is-open')){closeMore();moreButton.focus();}
+ if(event.key==='Escape'&&!moreMenu.hidden){closeMore();moreButton.focus();}
 });
+addEventListener('resize',()=>{if(matchMedia('(min-width:781px)').matches)closeMore();});
 document.addEventListener('keydown',event=>{
  const c=$('community-panel');
  if(event.key==='Escape'&&c.open&&![...document.querySelectorAll('dialog[open]')].some(d=>d!==c&&d.matches(':modal')))c.close();
@@ -272,7 +321,7 @@ function showInFrame(url,title){return shellScreens.showInFrame(url,title);}
 function show(file,write=true){return shellScreens.show(file,write);}
 function frameLoaded(frame){return shellScreens.frameLoaded(frame);}
 
-function viewContext(){const c=window.LT41;const badge=c?headerBadge(c.tree):'';$('view-context').hidden=!c||current==='src064-orbit.html';if(!c)return;$('context-tree').textContent=displayTreeTitle(c.tree.title);$('context-kind').textContent=source==='server'?badge:source==='share'?'공유 감상':source==='example'?'예시':'파일';$('context-kind').hidden=source==='server'&&!badge;$('manage-tree').hidden=source!=='server'||!member?.snapshot().owned||!member.snapshot().writable;$('cleanup-menu').hidden=!(source==='server'&&member?.snapshot().owned&&member.snapshot().writable&&isInboxTree(c.tree));}
+function viewContext(){const c=window.LT41;const cleanup=$('cleanup-menu');if(cleanup)$('cleanup-menu').hidden=!(c&&source==='server'&&member?.snapshot().owned&&member.snapshot().writable&&isInboxTree(c.tree));}
 // 연결 보기는 헤더에서 뺐다(2026-11-07). 관계 지도 화면의 도구 줄(전체 보기·사용법과 같은 자리·모양)에
 // 같은 다이얼로그를 여는 버튼을 붙인다. 원본 화면 파일은 건드리지 않는다.
 function mountConnectionTool(doc){
@@ -389,7 +438,7 @@ function memberStatus(status){
  else if(status.phase==='synced')notify(status.writable?(previousDirty?'서버에 저장됐어요.':'내 기록을 불러왔어요.'):'기록을 읽었어요. 서버 편집 연결은 아직 준비되지 않았어요.');
  else if(status.phase==='login'&&!status.dirty)notify('로그인이 필요해요.');
  else if(!status.dirty&&status.phase==='offline')notify(status.detail||'내 기록을 불러오지 못했어요.');
- $('write-menu').textContent=status.dirty?'미저장 기록' :'순간 남기기';$('empty-records').textContent=status.writable?'첫 트리 만들기':'내 기록 불러오기';previousDirty=status.dirty;renderAccount();flowNavigation();document.body.dataset.member=member?.snapshot().owned?'in':'out';document.body.dataset.treeCount=String(model?.trees?.length||0);
+ $('write-menu').textContent=status.dirty?'미저장 기록' :'＋ 순간 추가';$('empty-records').textContent=status.writable?'첫 트리 만들기':'내 기록 불러오기';previousDirty=status.dirty;renderAccount();flowNavigation();document.body.dataset.member=member?.snapshot().owned?'in':'out';document.body.dataset.treeCount=String(model?.trees?.length||0);applyAdvanced();
 }
 async function startMember(){setMemberRefreshStarted(true);if(!leaveMember())return;backfillStarted=false;backfillAttempted.clear();const startup=parseSelectionRoute(location.hash);if(startup.scope==='owner')stashPendingOwnerRoute(sessionStorage,location.hash);++loadGeneration;const generation=loadGeneration;clear();
  const api=createWorkspaceApi({fetchImpl:(url,init)=>fetch(init?.method==='GET'&&url==='/api/workspace'?'/api/workspace?features=bound-writes':url,init)});
@@ -427,17 +476,24 @@ $('account-avatar').onclick=e=>{
  e.stopPropagation();
  if($('account-popover').hidden)openAccountMenu();else closeAccountMenu();
 };
- $('account-records').onclick=()=>{closeAccountMenu();panel('records');};
- $('account-backup').onclick=()=>{closeAccountMenu();backup();};
+const $on=(id,fn)=>{const el=$(id);if(el)el.onclick=fn;};
+function advancedKey(){try{return 'lt41.advanced.'+(member?.snapshot().subject||'')}catch{return 'lt41.advanced.'}}
+function readAdvanced(){try{return localStorage.getItem(advancedKey())==='1'}catch{return false}}
+function applyAdvanced(){const on=readAdvanced();document.body.classList.toggle('lt-advanced',on);$('account-advanced')?.setAttribute('aria-checked',String(on));try{$('view').contentWindow.postMessage({type:'lt41-advanced',value:on},location.origin)}catch{}}
+$on('account-records',()=>{closeAccountMenu();panel('records');});
+$on('account-backup',()=>{closeAccountMenu();backup();});
  $('account-assets-open').onclick=()=>{closeAccountMenu();openAssets($('account-avatar'));};
  $('editor-assets-open').onclick=()=>openAssets($('editor-assets-open'));
- $('account-theme').onclick=()=>{toggleTheme();closeAccountMenu();};
+ for(const b of document.querySelectorAll('[data-set-theme]'))b.onclick=()=>{writeTheme(localStorage,b.dataset.setTheme);applyTheme();paintThemeControls();};
+ $('account-advanced').onclick=()=>{const next=!readAdvanced();try{localStorage.setItem(advancedKey(),next?'1':'0')}catch{}applyAdvanced();};
+ $('account-open-settings').onclick=()=>{closeAccountMenu();void openAccountSettings();};
+ $('advanced-backup').onclick=()=>backup();
+ $('advanced-import').onclick=()=>$('file').click();
  for(const b of document.querySelectorAll('[data-title-display]'))b.onclick=()=>setTitleDisplay(b.dataset.titleDisplay);
  $('account-logout').onclick=async()=>{closeAccountMenu();$('logout').click();};
 document.addEventListener('click',e=>{
  if(!e.target.closest('.account-slot'))closeAccountMenu();
 });
-$('record-menu').onclick=()=>{$('record-feedback').textContent='';panel('records');};
 $('empty-records').onclick=()=>member?.snapshot().writable?openEditor():panel('records');
 $('empty-sample').onclick=sample;
 $('sample').onclick=sample;$('clear').onclick=()=>{if(!leaveMember())return;++loadGeneration;clear();$('save-feedback').hidden=true;$('file').value='';$('records').close();};
@@ -519,7 +575,7 @@ async function showPublicRoute(route){
 }
 document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{if(b.dataset.view==='track32-bookshelf.html'&&!member?.snapshot().owned){openLoginStart('shelf');return;}show(b.dataset.view);});
 for(const f of frames())f.addEventListener('load',()=>frameLoaded(f));
-paintThemeControls();applyTheme();paintTitleDisplayControls();
+paintThemeControls();applyTheme();paintTitleDisplayControls();applyAdvanced();
 if(initialRoute.scope==='public')showPublicRoute(initialRoute);else load(null,'example');
 
 function backup(){const data=member?.state();if(!data){notify('백업할 내 기록이 없어요.');return;}const a=document.createElement('a'),url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));a.href=url;a.download='lovetree-draft.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),0);}
