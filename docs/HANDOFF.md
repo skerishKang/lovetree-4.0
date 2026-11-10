@@ -126,6 +126,14 @@
 
 - **원칙 8 자동화(2026-11-08)**: PR마다 `.github/workflows/preview-check.yml`이 Cloudflare Pages 미리보기 주소를 찾아 `tools/postdeploy`(로그아웃)를 돌리고, `tools/postdeploy/preview-gate.mjs`가 판정한다(visual·페이지 오류 0, 미리보기 Functions 503만 예외). 미리보기 배포가 없으면 실패가 아니라 건너뜀. 레인은 체크 요약만 확인한다.
 
+## 2026-11-10 — 자동 제목을 영상 제목으로: 빠른 추가·자세한 추가(#344, 로컬2, ai/local2-video-title-344-261110)
+
+- **문제**: 빠른 추가로 담은 YouTube 순간 제목이 모두 "youtube.com에서 간직한 순간"이라 기억책·보드·지도·'경로 한눈에'(기억책 목차)에서 구분이 안 됐다(#344 대표 피드백의 근본 원인).
+- **규칙(도메인 두 벌 동일)**: `suggestMomentTitle` 우선순위 — 사용자 입력 > 영상 제목(`mediaMetadata.title`, 80자 자르기) > 마음 한마디 첫 줄 > 기존 도메인 규칙. oEmbed를 못 받으면(빈 값·실패) 기존 규칙으로 물러난다. 영상 제목은 저장값에 mediaMetadata로도 남아 기억책 작은 글씨(#327)와 같은 값을 쓴다. `validateMomentInput`은 mediaMetadata를 제목 판정 전에 정규화하고, `quickAdd` 입력에 mediaMetadata를 받는다(빠른 추가·드롭·붙여넣기·#350 공유 받기 공용). **기존 순간 제목은 바꾸지 않는다**(cacheMomentMediaMetadata 불변).
+- **조회 한 벌**: `public/v41/video-title.mjs fetchVideoTitle` — 서버 oEmbed 프록시(/api/youtube/oembed)만 쓰고 실패는 조용히 ''. 빠른 추가의 기존 조회(loadYouTubeTitle)도 이 한 벌로 바꿨다.
+- **배선**: 빠른 추가(`shell/quick-add.mjs`)는 미리보기 때 받아 둔 제목(titleCache)을 `apply('quickAdd', {url, mediaMetadata?})`로 넘긴다(응답이 늦으면 넘기지 않고 기존 규칙). 자세한 추가(`shell/panels.mjs`)는 편집기 미리보기에서 oEmbed 제목을 받아 두고 저장 입력에 함께 넘긴다(사용자 입력 우선은 도메인 판정, 안내 문구도 같은 규칙).
+- **시험**: `tests/v41-video-title.test.mjs` 6건(우선순위·80자·fallback 매트릭스 **두 벌 동일** 확인, quickAdd 저장값, fetchVideoTitle 안전성, **서버 경계 PUT→GET**(member session + validateState/validateReader 왕복), 배선 글자 검사). 강도 증명: 영상 제목 우선순위 제거 시 4건 실패 확인 후 복구. 전체 `npm test` **874건 837 pass / 0 fail / 37 skip**, `npm run build` pass. 실측은 머지 뒤 운영 반영(컴2 자동 배포)을 확인하고 진행(계정 04).
+
 ## 2026-11-10 — 도구 계정 선택 한 벌: --account 인자 우선·없으면 시작 전 정지(#344 대표 지시, 로컬2, ai/local2-a11y-account-arg-261110)
 
 - **문제(실측 확인)**: `tools/a11y/a11y-run.mjs`가 `--account` 인자를 무시하고 `LT_ACCOUNT` 환경변수·기본값 '01'로 시크릿 키·보고서 계정을 골랐다 — `--account 04`로 돌려도 보고서 account가 '01'이었다(실제로 계정 04 a11y 실행이 계정 01(읽기만, 기록 없음)으로 돌아간 것이 이 버그). postdeploy의 `normaliseAccount('')`도 조용한 '01'이었다.

@@ -62,7 +62,7 @@
 - **레인별 시험 계정(#300, 2026-11-09)**: `tools/postdeploy/accounts.mjs` — `tests/postdeploy-accounts.test.mjs` **4건**(배정 표·번호 정규화·계정별 `.secrets` 키·프로필 분리). 2026-11-09 밤 대표 결정으로 03 삭제·04 신설(로컬2 → 04, 03은 `normaliseAccount`가 거부).
 - **커밋 금지 경로 검사(2026-11-09)**: `tests/forbidden-paths.test.mjs` **1건** — `git ls-files`에 브라우저 프로필(`tools/postdeploy/.profile*`)·`.tmp-*`·`out/`이 트래킹되면 CI를 실패시킨다(프로필 노출 건 재발 방지).
 - **책 바꿔 열기 회귀(#314, 2026-11-09)**: 라디오 묶음은 `tests/helpers/fake-dom.mjs`의 **`fakeRadioGroup`**을 쓴다. Chromium 1254 실측대로 **빈 값·없는 값 대입은 무시**하고 있는 값만 체크하므로, 옛 `RadioNodeList.value = ''` 방식이면 시험이 실제로 실패한다. `v41-panels-flow` +2(A→B→A 연속 열기, 사진 표지 뒤 저장), `v41-shell-panels` +1(업로드→저장 전체 경로).
-- 현재 `npm test` 합계: **868건 / 831 pass / 0 fail / 37 skip**(#341 첫 화면 YouTube 썸네일 카드 10건, 도구 계정 선택 시험 7건·기존 계정 시험 갱신 포함, 2026-11-10). 글자 검사 분류 수치는 위 1~3절(2026-11-09 7차 기준)에서 그대로 유지된다(책등 목차 7건은 함수 호출 5건 + 연결·규격 글자 검사 2건).
+- 현재 `npm test` 합계: **874건 / 837 pass / 0 fail / 37 skip**(자동 제목·영상 제목 시험 6건(#344) 추가, 2026-11-10). 글자 검사 분류 수치는 위 1~3절(2026-11-09 7차 기준)에서 그대로 유지된다(책등 목차 7건은 함수 호출 5건 + 연결·규격 글자 검사 2건).
 - **빠른 추가(#327 ②, 2026-11-09)**: 판정·추출·분기·문구는 `tests/v41-quick-add.test.mjs` 8건(함수 직접 호출 + 정원 대비 CSS 값 1건), 연결은 `tests/v41-quick-add-flow.test.mjs` 12건(`createQuickAdd`를 가짜 DOM으로 직접 호출). '순간 남기기' 연결이 panels.mjs → shell.mjs(shell/quick-add.mjs)로 옮겨진 것도 두 기존 시험을 새 계약으로 갱신해 고정했다(#245 전례 — 연결 누락 방지).
 
 ## 새 시험을 쓸 때

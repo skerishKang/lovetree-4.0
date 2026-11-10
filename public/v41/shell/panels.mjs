@@ -5,6 +5,7 @@
 import {parentCandidates, suggestMomentTitle} from '../domain.mjs';
 import {displayTreeTitle} from '../tree-name.mjs';
 import {mountPrivateUpload} from '../private-upload.mjs';
+import {fetchVideoTitle} from '../video-title.mjs';
 
 export function createPanels(deps) {
   const {$} = deps;
@@ -162,15 +163,32 @@ export function createPanels(deps) {
     queueMicrotask(() => form.elements.title.focus());
   }
 
+  // 편집기가 미리보기에서 받아 둔 영상 제목(#344). videoTitleCache는 같은 영상을 다시 열 때 요청을 줄인다.
+  const videoTitleCache = new Map();
+  let editorVideoTitle = '';
+  let editorVideoUrl = '';
   function updateMediaPreview() {
     const form = $('moment-form'), url = form.elements.url.value, info = LTMedia.describe(url);
     $('url-media-hint').textContent = info.kind === 'none' ? '사진·영상은 직접 HTTPS 링크를 사용할 수 있어요. YouTube와 일반 링크도 지원해요. 사진·영상 파일도 직접 첨부할 수 있어요.' : info.kind === 'invalid' ? '링크 형식을 확인해 주세요.' : info.label;
     $('url-media-preview').innerHTML = url ? LTMedia.markup(url, form.elements.title.value) : '';
+    // #344: 미리보기 때 서버 oEmbed 프록시로 영상 제목을 받아 둔다(실패는 조용히). 저장 시 mediaMetadata.title로 함께 넘긴다.
+    editorVideoTitle = '';
+    editorVideoUrl = info.kind === 'youtube' && info.videoId ? url : '';
+    if (editorVideoUrl) {
+      const videoId = info.videoId;
+      void fetchVideoTitle(videoId).then(title => { if (title && editorVideoUrl === url) { editorVideoTitle = title; videoTitleCache.set(videoId, title); updateQuickEntryHint(); } });
+    }
+  }
+  function editorMediaTitle() {
+    if (!editorVideoUrl) return {};
+    const url = $('moment-form').elements.url.value.trim();
+    if (url !== editorVideoUrl) return {};
+    return editorVideoTitle ? { mediaMetadata: { title: editorVideoTitle } } : {};
   }
   function updateQuickEntryHint() {
     const form = $('moment-form'), title = form.elements.title.value.trim(), note = form.elements.note.value.trim(), url = form.elements.url.value.trim();
     let suggested = '';
-    try { suggested = suggestMomentTitle({title, note, url}); } catch {}
+    try { suggested = suggestMomentTitle({title, note, url, mediaMetadata: editorVideoTitle && url === editorVideoUrl ? {title: editorVideoTitle} : null}); } catch {}
     $('quick-entry-hint').textContent = title ? '입력한 제목으로 저장합니다.' : suggested ? `제목은 “${suggested}”(으)로 자동 정리됩니다.` : '제목·마음·링크나 첨부 중 하나만 남겨도 저장할 수 있어요.';
   }
 
@@ -244,7 +262,8 @@ export function createPanels(deps) {
       return;
     }
     try {
-      getMember().apply(editorMode, Object.fromEntries(new FormData(e.target)), selection());
+      // #344: 미리보기 때 받아 둔 영상 제목을 저장 입력에 함께 넘긴다(사용자 입력 제목이 항상 우선 — 도메인 판정).
+      getMember().apply(editorMode, {...Object.fromEntries(new FormData(e.target)), ...editorMediaTitle()}, selection());
       formBaseline = new URLSearchParams(new FormData(e.target)).toString();
       $('editor').close();
       if (editorMode === 'new') show('track59-sketchbook.html');
