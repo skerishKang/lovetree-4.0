@@ -126,13 +126,13 @@ test('applyHomeCenter는 실제 버튼의 문구·강조·비활성을 상태에
   const buttons = [make(), make(), make()];
   const plan = applyHomeCenter(buttons, {member: 'in', treeCount: 0});
   assert.equal(plan.state, 'in-empty');
-  assert.deepEqual(buttons.map(b => b.textContent), ['이어 보던 순간', '새 트리 만들기', '내 책장']);
-  assert.equal(buttons[0].disabled, true);
-  assert.equal(buttons[0].getAttribute('aria-disabled'), 'true');
-  assert.equal(buttons[0].title, '아직 이어 볼 순간이 없어요');
-  assert.equal(buttons[1].classList.contains('primary-cta'), true);
-  assert.equal(buttons[0].classList.contains('primary-cta'), false);
-  assert.deepEqual(buttons.map(b => b.dataset.do), ['resume', 'new', 'trees']);
+  assert.deepEqual(buttons.map(b => b.textContent), ['＋ 순간 추가', '이어 보던 순간', '둘러보기']);
+  assert.equal(buttons[1].disabled, true);
+  assert.equal(buttons[1].getAttribute('aria-disabled'), 'true');
+  assert.equal(buttons[1].title, '아직 이어 볼 순간이 없어요');
+  assert.equal(buttons[0].classList.contains('primary-cta'), true);
+  assert.equal(buttons[1].classList.contains('primary-cta'), false);
+  assert.deepEqual(buttons.map(b => b.dataset.do), ['add', 'resume', 'community']);
 });
 
 test('첫 화면 표시 상태는 로그인·트리 수를 셸 컨텍스트에서 읽는다', () => {

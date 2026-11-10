@@ -33,24 +33,29 @@ test('2. 드롭다운 트리 클릭은 위치를 옮기고 주소도 쓴다', ()
 });
 
 test('3. 정리 목록은 주입된 화면 규칙으로 제목·썸네일을 그린다', async () => {
-  const el = tag => ({
-    tagName: String(tag || 'div').toUpperCase(), children: [], className: '', textContent: '', value: '', checked: false,
-    disabled: false, hidden: false, src: '', alt: '', loading: '', referrerPolicy: '', selectedOptions: [],
-    append(...ns) { this.children.push(...ns); },
-    replaceChildren(...ns) { this.children = ns; },
-    querySelectorAll(sel) {
-      const wantsInput = sel.includes('input');
-      return this.children.filter(child => wantsInput ? child.tagName === 'INPUT' : true).filter(child => sel.includes(':checked') ? child.checked : true);
-    },
-    setAttribute() {}, addEventListener() {},
-  });
+  const el = tag => {
+    const node = {
+      tagName: String(tag || 'div').toUpperCase(), children: [], className: '', textContent: '', value: '', checked: false,
+      disabled: false, hidden: false, src: '', alt: '', loading: '', referrerPolicy: '', selectedOptions: [],
+      append(...ns) { this.children.push(...ns); },
+      replaceChildren(...ns) { this.children = ns; },
+      querySelectorAll(sel) {
+        const wantsInput = sel.includes('input');
+        return this.children.filter(child => wantsInput ? child.tagName === 'INPUT' : true).filter(child => sel.includes(':checked') ? child.checked : true);
+      },
+      setAttribute() {}, addEventListener() {},
+      classList:{add:(...names)=>{node.className=[node.className,...names].filter(Boolean).join(' ');},remove:(...names)=>{node.className=names.reduce((acc,name)=>acc.split(/\s+/).filter(w=>w&&w!==name).join(' '),node.className);},contains:name=>node.className.split(/\s+/).includes(name),toggle(){}},
+    };
+    return node;
+  };
   const ids = ['cleanup-moments','cleanup-desc','cleanup-error','cleanup-new-name','cleanup-target','cleanup-count','cleanup-create','cleanup-move','cleanup-move-box','cleanup-panel'];
   const els = Object.fromEntries(ids.map(id => [id, el()]));
   globalThis.document = {createElement: tag => el(tag)};
   globalThis.window = {LT41: {tree: {id: 'inbox', inbox: true, moments: [
     {id: 'm1', title: 'youtube.com에서 간직한 순간', parentId: null, url: 'https://youtu.be/abcdefghijk', mediaMetadata: {title: '영상 제목', thumbnail: 'https://i.ytimg.com/vi/abcdefghijk/hqdefault.jpg'}},
     {id: 'm2', title: '내 제목', parentId: 'm1', url: 'https://example.com/x', mediaMetadata: {}},
-    {id: 'm3', title: 'youtu.be에서 간직한 순간', parentId: 'm2', url: 'https://youtu.be/z', mediaMetadata: {}},
+     {id: 'm3', title: 'youtu.be에서 간직한 순간', parentId: 'm2', url: 'https://youtu.be/z', mediaMetadata: null},
+     {id: 'm4', title: '', parentId: 'm2', url: 'https://example.com/y'},
    ]}}};
   const chosen = [];
   const cleanup = createCleanup({
@@ -66,16 +71,19 @@ test('3. 정리 목록은 주입된 화면 규칙으로 제목·썸네일을 그
   });
   assert.equal(cleanup.open({}), true);
   const host = els['cleanup-moments'];
-  assert.equal(host.children.length, 3, '세 순간');
-  const [first, second, third] = host.children;
+  assert.equal(host.children.length, 4, '네 순간');
+  const [first, second, third, fourth] = host.children;
   assert.equal(first.children[0].tagName, 'INPUT');
   assert.equal(first.children[0].checked, false);
   assert.equal(first.children[1].src, 'https://i.ytimg.com/vi/abcdefghijk/hqdefault.jpg', '썸네일 연결');
   assert.equal(first.children[2].textContent, '영상 제목 · 시작 순간', '자동 제목 대신 화면 규칙 제목');
-  assert.equal(second.children.length, 2, '썸네일 없는 순간은 img 없이');
-  assert.equal(second.children[1].textContent, '내 제목');
-  assert.equal(third.children.length, 2, '자동 제목·미디어 없음 → img 없이 빈 제목');
-  assert.equal(third.children[1].textContent, '');
+    assert.equal(second.children.length, 2, '썸네일 없는 순간은 img 없이');
+    assert.equal(second.children[1].textContent, '내 제목');
+    assert.equal(third.children.length, 2, '썸네일 자리는 유지');
+    assert.equal(third.children[1].textContent, '제목 없는 영상', '영상 제목 미확보 → 흐린 대체 문구');
+    assert.equal(third.children[1].className.includes('is-blank'), true);
+    assert.equal(fourth.children.length, 2);
+    assert.equal(fourth.children[1].textContent, '제목 없는 순간', '비영상 → 다른 문구');
   delete globalThis.document;
   delete globalThis.window;
 });
