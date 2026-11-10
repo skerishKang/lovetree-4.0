@@ -7,8 +7,10 @@ export function createHomeActions({getContext,send,gallery=false}) {
  return {select,actions:{
   resume:()=>{const c=getContext();if(c?.source!=='example'&&c?.tree?.moments.some(m=>m.id===c.momentId))send({type:'lt41-navigate',view:BOOK});},
   start:()=>send({type:'lt41-start'}),
-  account:()=>send({type:'lt41-account'}),
-  community:()=>send({type:'lt41-community'}),
+   account:()=>send({type:'lt41-account'}),
+   community:()=>send({type:'lt41-community'}),
+   // #380: 정리 화면 열기(홈 둘째 줄 '정리하기').
+   cleanup:()=>send({type:'lt41-move'}),
   navigate:where=>send({type:'lt41-navigate',view:where==='trees'?SHELF:'src064-orbit.html'}),
   openMine:(treeId,id)=>{const tree=ownTree(treeId,id);if(!tree)return;send({type:'lt41-open-book',treeId:tree.id,id});},
   openBook:(treeId,id)=>{const tree=ownTree(treeId,id);if(gallery&&tree){send({type:'lt41-open-book',treeId:tree.id,id});return;}if(gallery&&getContext()?.source!=='example'){send({type:'lt41-example',view:BOOK,momentId:id});return;}if(select(id))send({type:'lt41-navigate',view:BOOK});},

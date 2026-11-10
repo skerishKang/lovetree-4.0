@@ -8,12 +8,10 @@ import {createHomeActions} from './home-actions.js';
 import {homePresentation} from './home-presentation.js';
 import {applyHomeCenter} from './home-center.js';
 import {readTheme,writeTheme,appliedTheme,applyThemeAttribute} from '../public/v41/header-state.mjs';
-import {readTitleDisplay} from '../public/v41/book-usability.mjs';
+import {readTitleDisplay,titleView} from '../public/v41/book-usability.mjs';
 const shellBody=parent.document.body;
 addEventListener('message',event=>{if(event.data?.type==='lt41-title-display')location.reload();});
 const context=parent.LT41||{source:shellBody.dataset.recordSource,member:shellBody.dataset.member,treeCount:Number(shellBody.dataset.treeCount||0)};
-// 이슈 327 2부: 현재 트리가 '모아둔 순간'(inbox)이면 궤도 첫 화면에도 표시한다.
-try{const inboxFlag=document.getElementById('homeInboxFlag');if(inboxFlag)inboxFlag.hidden=!(context.tree&&context.tree.inbox===true);}catch(e){}
 const bridge=createHomeActions({getContext:()=>parent.LT41,send:message=>parent.postMessage(message,location.origin),gallery:true});
 const presentation=homePresentation(context);
 const loggedIn=presentation.centerState.member==='in';
@@ -36,6 +34,10 @@ const cardTrees=cardsPlan.cards.length?[{id:'home-cards',title:'첫 화면 카�
  authHtml:`<button class="menuBtn auth-entry" data-home-account>${presentation.accountLabel}</button>`,actions:bridge.actions
 });
 const shadow=document.getElementById('orbit').shadowRoot;
+// #380(2026-11-11): 가운데 세 버튼 — 자리·개수 그대로, 남은 폭을 똑같이 나눠 세 폭 동일(가장 긴 글자 기준 고정), 로그인 후 상태 한 줄.
+const centerStyle=document.createElement('style');
+centerStyle.textContent='.center .actions .subtleBtn{flex:1 1 0%;min-width:0;overflow-wrap:anywhere;text-align:center;line-height:1.15}.center .center-note{min-height:2lh}.center .center-note .status-action{margin-left:8px;vertical-align:middle}@media (max-width:480px){.center .actions{flex-direction:column;align-items:stretch}.center .actions .subtleBtn{width:100%}}';
+shadow.append(centerStyle);
 // 2026-11-07 테마 A/B: 첫 화면 오른쪽 위 도구 줄의 버튼 하나로 밤/정원을 바꾼다. 저장 키는 셸과 같다(lt41.theme).
 // 정원 색은 public/v41/identity.css의 정원 블록에만 있고, 그 파일을 그림자 루트에도 넣어 :host 규칙을 쓴다.
 const themeHost=document.getElementById('orbit');
@@ -54,33 +56,62 @@ shadow.append(identity);
 const cardUI=document.createElement('style');
 cardUI.textContent=`.top-actions>.menuBtn,.top-actions>.view-menu-wrap>.menuBtn{position:relative;height:36px;min-height:36px;display:inline-flex;align-items:center;padding-block:0}.top-actions>.menuBtn:after,.top-actions>.view-menu-wrap>.menuBtn:after{content:'';position:absolute;inset:-4px;border-radius:999px}[data-home-account],.home-community{display:none}.view-menu-wrap{position:relative;display:inline-flex;align-items:center;min-height:44px}.view-menu{position:absolute;top:calc(100% + 8px);right:0;z-index:4000;min-width:188px;padding:6px;border:1px solid var(--lt-line);border-radius:14px;background:var(--lt-glass-strong);box-shadow:0 14px 34px rgba(0,0,0,.45)}.view-menu[hidden]{display:none}.view-menu button{display:block;width:100%;min-height:44px;padding:8px 12px;border:0;border-radius:10px;background:transparent;color:var(--lt-pearl);font:inherit;font-size:14px;text-align:left;cursor:pointer}.view-menu button[aria-checked=true],.view-menu button:hover{box-shadow:inset 0 0 0 1px var(--lt-gold-line)}.view-menu button[aria-checked=true]{color:var(--lt-gold)}.view-menu button:focus-visible{outline:2px solid var(--lt-gold);outline-offset:-2px}.view-menu-sep{height:1px;margin:6px 4px;background:var(--lt-line)}@media(max-width:768px){.view-menu{right:auto;left:0}}`;
 shadow.append(cardUI);
-if(presentation.canResume){
- const primary=shadow.querySelector('.primary-cta'),secondary=shadow.querySelector('.actions [data-do="continue"]');
- primary.dataset.do='member-continue';primary.textContent='이어 보던 순간';primary.onclick=bridge.actions.resume;
- secondary.dataset.do='new';secondary.textContent='새 트리 만들기';
-}
-shadow.querySelector('[data-do=trees]').textContent='내 책장';
-// 2026-11-07 대표 지시: 세 버튼의 자리·개수는 그대로 두고 강조와 첫 버튼 문구만 상태로 바꾼다.
-// 로그아웃=처음 시작하기(흰색) / 로그인·트리 0=새 트리 만들기(흰색) / 로그인·트리 있음=이어 보던 순간(흰색).
+// #380(2026-11-11): 로그인 전 [＋ 첫 순간 남기기·둘러보기·어떻게 쓰나요] / 로그인 후 [＋ 순간 추가·이어 보던 순간·둘러보기].
+// 로그인 전이면 지금 두 줄 그대로, 로그인 후면 상태에 따라 큰 제목 아래 둘째 줄도 함께 갱신한다(아래 상태 블록).
 const centerButtons=[...shadow.querySelectorAll('.center .actions button')];
 const centerPlan=applyHomeCenter(centerButtons,presentation.centerState);
 const byDo=name=>centerButtons.find(b=>b.dataset.do===name);
-const newButton=byDo('new');if(newButton)newButton.onclick=()=>bridge.actions.requestMoment('new');
-const treesButton=byDo('trees');if(treesButton)treesButton.onclick=()=>bridge.actions.navigate('trees');
+// '＋ 순간 추가' → 기존 add 흐름(requestMoment add), '이어 보던 순간' → 기존 resume, '어떻게 쓰나요'는 기존 안내가 없어 둘러보기와 같은 동작.
+const addButton=byDo('add');if(addButton)addButton.onclick=()=>bridge.actions.requestMoment('add');
+const resumeButton=byDo('resume');if(resumeButton)resumeButton.onclick=()=>bridge.actions.resume;
+const guideButton=byDo('guide');if(guideButton)guideButton.onclick=()=>bridge.actions.community;
 let loginFocusButton=null;
 centerButtons.forEach(b=>{b.addEventListener('pointerdown',()=>{loginFocusButton=b;});b.addEventListener('click',()=>{loginFocusButton=b;},true);b.addEventListener('focus',()=>{loginFocusButton=b;});});
 addEventListener('message',e=>{if(e.origin!==location.origin)return;if(e.data?.type==='lt41-login-focus'){const active=shadow.activeElement;if(active?.matches?.('button'))active.focus();else loginFocusButton?.focus();}});
-// 첫 버튼 동작: 로그아웃=로그인/가입으로, 로그인·트리 있음=이어 보던 순간, 로그인·트리 0=비활성.
+// 로그아웃 첫 버튼은 로그인/가입으로.
 {
- const first=centerButtons[0];
- if(presentation.centerState.member==='out')first.onclick=bridge.actions.start;
- else if(centerPlan.state==='in-trees')first.onclick=bridge.actions.resume;
+  const first=centerButtons[0];
+  if(presentation.centerState.member==='out')first.onclick=bridge.actions.start;
 }
 // 예시 모드는 궤도의 기존 안내를 그대로 두고, 나머지는 계획의 문구를 쓴다(빈 문자열이면 숨김).
 if(cardsPlan.note!==null)shadow.querySelector('.center-note').textContent=cardsPlan.note;
 // 2026-11-08 접근성: 카드 출처 안내가 바뀌면 화면 낭독기가 알린다.
 shadow.querySelector('.center-note')?.setAttribute('aria-live','polite');
 shadow.querySelector('.center-note')?.setAttribute('role','status');
+// #380(2026-11-11): 로그인 후 큰 제목 아래 둘째 줄 = 상태 한 줄(높이 두 줄 고정): 정리 알림 > 마지막 순간 > 첫 순간 안내.
+if(loggedIn){
+  const status=shadow.querySelector('.center-note');
+  if(status){
+    let label=null,action=null;
+    if(context.tree?.inbox===true){
+      const n=(context.tree.moments||[]).length;
+      if(n>0){label=`정리 안 된 순간 ${n}개 · 정리하기`;action='cleanup';}
+    }
+    if(label===null){
+      let m=null;
+      if(context.tree&&Array.isArray(context.tree.moments)){
+        m=context.momentId?context.tree.moments.find(x=>x.id===context.momentId)||null:null;
+        if(!m)m=[...context.tree.moments].sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')))[0]||null;
+      }
+      if(!m){label='첫 순간을 남기면 여기서 이어 볼 수 있어요';}
+      else{
+        let title=titleView(m,readTitleDisplay(context))?.main||'';
+        if(!title)title='제목 없는 순간';
+        let days=null;const raw=Date.parse(m.createdAt||'');if(!Number.isNaN(raw))days=Math.max(0,Math.floor((Date.now()-raw)/86400000));
+        label=`마지막 순간 「${title}」${days===null?'':` · ${days}일 전`}`;
+      }
+    }
+    status.textContent='';
+    if(action==='cleanup'){
+      const s=document.createElement('span');
+      s.textContent=label;
+      const b=document.createElement('button');
+      b.type='button';b.className='subtleBtn status-action';b.textContent='정리하기';
+      b.onclick=()=>bridge.actions.cleanup();
+      status.append(s,b);
+    }else{status.textContent=label;}
+  }
+}
 const mobileFit=document.createElement('style');mobileFit.textContent='@media(max-width:768px){.topbar{gap:12px;flex-wrap:wrap;align-items:center;padding:8px 12px}.top-actions{gap:6px;flex-shrink:0;flex-wrap:wrap;margin-left:auto}.topbar .menuBtn{white-space:nowrap;padding:10px 9px;font-size:14px}.actions .subtleBtn{font-size:14px}.center .center-note{font-size:14px}.hint{font-size:14px}}';shadow.append(mobileFit);
 // 2026-11-08 #213 2번: "움직임 멈춤"·"정원/밤"·"카드: ○○"를 "보기 ▾" 메뉴 하나로 묶는다.
 // 항목: 움직임 켜기/멈춤 · 테마 밤/정원 · 카드 출처(로그인 4 / 로그아웃 예시·인기). 저장값과 lt41-theme 메시지는 그대로다.
