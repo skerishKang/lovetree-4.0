@@ -233,4 +233,23 @@ for (const n of [1, 3, 12, 40]) {
   });
 }
 
+// 닿지 않는 노드 방어: 동심원 배치가 NaN 좌표를 만들 수 없다(#366).
+test('16. 동심원 배치 방어: 부모 연결로 닿지 않는 순간도 유한한 화면 안 좌표를 받는다', () => {
+  const moments = [{ id: 'a', first: true }, { id: 'b' }, { id: 'c' }];
+  const edges = [{ kind: 'parent', from: 'a', to: 'b', reason: '' }];
+  for (const [w, h] of [[1440, 900], [390, 780]]) {
+    const pad = w < 700 ? 64 : 56;
+    const L = M.concentricLayout(moments, edges, { width: w, height: h, pad, nodeR: w < 700 ? 4.2 : 4.6 });
+    assert.equal(L.levelOf.a, 0);
+    assert.equal(L.levelOf.b, 1);
+    assert.equal(L.levelOf.c, 2, '부모 연결로 닿지 않으면 바깥 단계로 물린다');
+    for (const [id, p] of Object.entries(L.points)) {
+      assert.ok(Number.isFinite(p.x) && Number.isFinite(p.y), `${id} 좌표 유한 (${w}×${h})`);
+      assert.ok(Math.hypot(p.x - L.center.x, p.y - L.center.y) <= Math.min(w, h) / 2 - pad / 2 + 0.5, `${id} 화면 안 (${w}×${h})`);
+    }
+    const r = id => Math.hypot(L.points[id].x - L.center.x, L.points[id].y - L.center.y);
+    assert.ok(r('c') > r('b'), '닿지 않는 노드가 가장 바깥');
+  }
+});
+
 function near(a, b) { return Math.abs(a - b) < 0.02; }

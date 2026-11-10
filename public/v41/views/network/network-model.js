@@ -186,7 +186,13 @@ window.LT56Model = (() => {
       let cur = a0;
       for (const c of ch) { const span = (a1 - a0) * (weight(c) / total); assign(c, cur, cur + span); cur += span; }
     };
-    assign(firstId, -Math.PI / 2, 3 * Math.PI / 2);
+     assign(firstId, -Math.PI / 2, 3 * Math.PI / 2);
+     // 부모 연결로 닿지 않는 순간(방어적으로 단계만 물린 노드)에도 각도를 준다 — 안 주면
+     // 좌표가 NaN이 되어 조용히 사라진다(#366).
+     const unangled = moments.filter(m => !(m.id in angleOf));
+     if (unangled.length) {
+       for (let i = 0; i < unangled.length; i++) angleOf[unangled[i].id] = -Math.PI / 2 + (i + 0.5) * ((2 * Math.PI) / unangled.length);
+     }
     // 3) 단계별 반지름: 이전 단계보다 링 간격 이상 + 같은 단계 이웃 각도 차로 겹침이 없는 반지름.
     const byLevel = Array.from({ length: maxLevel + 1 }, () => []);
     for (const m of moments) if (m.id !== firstId) byLevel[levelOf[m.id]].push(m.id);
