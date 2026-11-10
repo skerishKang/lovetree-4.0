@@ -16,6 +16,7 @@ export const ACCOUNT_USER_TABLES = Object.freeze([
   { table: 'lovetree_community_moderation_audit', where: 'actor_subject_id = $2' },
   { table: 'lovetree_shares', where: 'subject_id = $2' },
   { table: 'lovetree_request_claims', where: 'subject_id = $2' },
+  { table: 'lovetree_account_emails', where: 'subject_id = $2' },
   { table: 'lovetree_workspaces', where: 'subject_id = $2' },
   { table: 'lovetree_product_roles', where: 'subject_id = $2' },
   { table: 'lovetree_product_role_audit', where: 'subject_id = $2 OR actor_subject_id = $2' }
@@ -27,6 +28,26 @@ export const ACCOUNT_PRESERVED_TABLES = Object.freeze(['lovetree_login_states', 
 
 export function createAccountRepo(pool) {
   if (!pool || typeof pool.query !== 'function' || typeof pool.connect !== 'function') throw new Error('PostgreSQL pool이 필요합니다.');
+
+  async function emailFor({ productId, subjectId }) {
+    if (typeof productId !== 'string' || !productId || typeof subjectId !== 'string' || !subjectId) return null;
+    const result = await pool.query(
+      'SELECT email FROM lovetree_account_emails WHERE product_id = $1 AND subject_id = $2',
+      [productId, subjectId]
+    );
+    return result.rowCount > 0 ? result.rows[0].email : null;
+  }
+
+  async function upsertEmail({ productId, subjectId, email }) {
+    if (typeof productId !== 'string' || !productId || typeof subjectId !== 'string' || !subjectId
+        || typeof email !== 'string' || !email.trim() || email.trim().length > 320) return;
+    await pool.query(
+      `INSERT INTO lovetree_account_emails (product_id, subject_id, email, updated_at)
+       VALUES ($1, $2, $3, now())
+       ON CONFLICT (product_id, subject_id) DO UPDATE SET email = EXCLUDED.email, updated_at = now()`,
+      [productId, subjectId, email.trim()]
+    );
+  }
 
   async function isDeleted({ productId, subjectHash }) {
     const result = await pool.query(

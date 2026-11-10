@@ -191,3 +191,80 @@ test('계정 동그라미 메뉴 맨 아래에 로그아웃이 있고 기존 로
   const shell = readFileSync(new URL('../public/v41/shell.mjs', import.meta.url), 'utf8');
   assert.match(shell, /\$\('account-logout'\)\.onclick=async\(\)=>\{closeAccountMenu\(\);\$\('logout'\)\.click\(\);\}/, '기존 #logout 경로를 부른다');
 });
+
+async function pagesEnv(overrides = {}) {
+  const keys = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
+  return {
+    LOVETREE_AUTH_STATE_KEY: Buffer.alloc(32, 7).toString('base64url'),
+    LOVETREE_AUTH_CLIENT_PRIVATE_JWK: JSON.stringify(await crypto.subtle.exportKey('jwk', keys.privateKey)),
+    LOVETREE_AUTH_CLIENT_KID: 'synthetic',
+    LOVETREE_API_ORIGIN: 'https://storage.example',
+    ...overrides
+  };
+}
+
+// 로그인 시작 → 콜백까지 한꺼번에 돌려준다.
+async function callbackRound(auth, env) {
+  const begin = await auth(new Request('https://lovetree-4-0.pages.dev/auth/login'), env);
+  const target = new URL(begin.headers.get('location'));
+  const callback = new URL('https://lovetree-4-0.pages.dev/auth/callback');
+  callback.searchParams.set('state', target.searchParams.get('state'));
+  callback.searchParams.set('code', 'fake');
+  return auth(new Request(callback, { headers: { cookie: begin.headers.get('set-cookie').split(';')[0] } }), env);
+}
+
+test('콜백은 프로필 이메일을 검증된 계정의 내부 저장소로 최선 노력으로 넘긴다', async () => {
+  const calls = [];
+  const auth = createSharedPagesAuth({
+    now: () => 1000,
+    verify: async () => ({ accountId: 'sub_a', subject: 'sub_a' }),
+    fetcher: async (url, init) => {
+      calls.push({ url, init });
+      if (url === 'https://auth.padiem.net/token') {
+        return Response.json({ access_token: 'access', refresh_token: 'refresh', profile: { email: 'Owner@Example.test' } });
+      }
+      return Response.json({ ok: true });
+    }
+  });
+  const done = await callbackRound(auth, await pagesEnv());
+  assert.equal(done.status, 302);
+  const push = calls.find((call) => call.url === 'https://storage.example/internal/account/email');
+  assert.ok(push, '내부 저장소 호출이 있어야 한다');
+  assert.equal(push.init.method, 'POST');
+  assert.equal(push.init.headers.authorization, 'Bearer access');
+  assert.deepEqual(JSON.parse(push.init.body), { email: 'Owner@Example.test', canonical_subject_id: 'sub_a' });
+});
+
+test('프로필이 없으면 저장소를 더 부르지 않는다', async () => {
+  const urls = [];
+  const auth = createSharedPagesAuth({
+    now: () => 1000,
+    verify: async () => ({ accountId: 'sub_a' }),
+    fetcher: async (url) => {
+      urls.push(url);
+      return Response.json({ access_token: 'access', refresh_token: 'refresh' });
+    }
+  });
+  const done = await callbackRound(auth, await pagesEnv());
+  assert.equal(done.status, 302);
+  assert.deepEqual(urls, ['https://auth.padiem.net/token']);
+});
+
+test('저장소 호출이 실패해도 로그인은 성공한다', async () => {
+  const outcomes = [];
+  const auth = createSharedPagesAuth({
+    now: () => 1000,
+    verify: async () => ({ accountId: 'sub_a' }),
+    fetcher: async (url) => {
+      outcomes.push(url);
+      if (url === 'https://auth.padiem.net/token') {
+        return Response.json({ access_token: 'access', refresh_token: 'refresh', profile: { email: 'a@b.test' } });
+      }
+      throw new Error('storage down');
+    }
+  });
+  const done = await callbackRound(auth, await pagesEnv());
+  assert.equal(done.status, 302);
+  assert.match(done.headers.get('set-cookie'), /__Host-lovetree-access=access/);
+  assert.equal(outcomes.filter((url) => url !== 'https://auth.padiem.net/token').length, 1);
+});
