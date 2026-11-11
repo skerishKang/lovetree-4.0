@@ -35,9 +35,11 @@ test('1. YouTube는 그 자리에서: nocookie embed, 시작 시점 유지, refe
     assert.ok(src.includes('YouTube ↗'), path + ': 원본 링크는 남긴다');
     assert.ok(src.includes('media-source-link'), path + ': 영상 아래 출처 한 줄의 링크');
     // #327 1부(대표 결정 2026-11-09): 내 기록(서버·로그인 소유자)은 썸네일을 처음부터 보여 준다.
-    // ytimg 주소는 autoLoadMedia 판정을 통과한 한 곳에서만 쓰고, 공유·예시는 여전히 요청 0이다.
-    assert.equal(src.split('i.ytimg.com').length - 1, 1, path + ': ytimg 썸네일 주소는 자동 판정 한 곳에만 있다');
-    assert.ok(/:auto\?'<img src="https:\/\/i\.ytimg\.com\//.test(src), path + ': 썸네일은 내 기록 판정(auto)을 통과했을 때만 그린다');
+    // #393: ytimg 주소는 media-preview.js 의 youtubeThumbUrl/loadUrl 한 벌로 옮겼다 — 화면에는 literal 이 없고,
+    // 공유·예시는 여전히 요청 0이다(썸네일은 auto 판정을 통과한 가지에서만 그린다).
+    assert.equal(src.split('i.ytimg.com').length - 1, 0, path + ': ytimg 주소는 화면에 하드코딩하지 않는다(LTMedia 한 벌)');
+    assert.ok(/:auto\?'<img src="'\+t\(remoteThumb\)/.test(src), path + ': 썸네일은 내 기록 판정(auto)을 통과했을 때만 그린다');
+    assert.ok(src.includes('LTMedia.youtubeThumbUrl(media.videoId,true)') && src.includes('media.loadUrl'), path + ': 썸네일 주소는 LTMedia 한 벌에서 온다');
     assert.ok(/autoLoadMedia\(ctx\.source,\s*ctx\.owned\)/.test(src), path + ': 판정은 media-preview 의 한 함수를 쓴다');
   }
 });
