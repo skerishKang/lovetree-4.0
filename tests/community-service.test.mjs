@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createTree} from '../src/domain.js';
+import {createTree,editTree} from '../src/domain.js';
 import {createWorkspaceService} from '../server/workspace-service.js';
 import {createMemoryWorkspaceRepo} from '../server/testing/memory-workspace-repo.js';
 import {createMemoryShareRepo} from '../server/testing/memory-share-repo.js';
@@ -9,9 +9,13 @@ import {createCommunityHandler,createCommunityService} from '../server/community
 import {ApiError} from '../server/errors.js';
 
 const PRODUCT='lovetree-test',principal=subjectId=>({productId:PRODUCT,subjectId});
-async function setup(){
+const CLOCK='2026-11-01T00:00:00.000Z';
+const PHOTO='https://front.test/api/media/123e4567-e89b-42d3-a456-426614174000.jpg';
+function sampleTree(url=PHOTO){return createTree({subject:'윤슬',title:'첫 무대',note:'다시 보고 싶은 빛',emotion:'설렘',date:'2026-11-01',url},CLOCK);}
+async function setup({url=PHOTO,coverMode='',coverDesign=''}={}){
  const workspaceRepo=createMemoryWorkspaceRepo(),workspace=createWorkspaceService({repo:workspaceRepo,productId:PRODUCT});
- const tree=createTree({subject:'윤슬',title:'첫 무대',note:'다시 보고 싶은 빛',emotion:'설렘',date:'2026-11-01',url:'https://front.test/api/media/123e4567-e89b-42d3-a456-426614174000.jpg'},'2026-11-01T00:00:00.000Z');
+ let tree=sampleTree(url);
+ if(coverMode)tree=editTree(tree,{title:tree.title,subject:tree.subject,coverMomentId:tree.moments[0].id,coverDesign,coverMode});
  await workspace.write(principal('alice'),{state:{version:1,trees:[tree]},expectedRevision:0,clientKey:'seed'});
  const shareRepo=createMemoryShareRepo();let share=await shareRepo.create({productId:PRODUCT,shareId:'s'.repeat(24),subjectId:'alice',treeId:tree.id,entryMomentId:tree.moments[0].id,view:'book'});
  share=await shareRepo.setDiscoverable({productId:PRODUCT,subjectId:'alice',shareId:share.shareId,discoverable:true});
@@ -32,6 +36,20 @@ test('discovery exposes only the live projected share and supports search and em
  assert.equal(JSON.stringify(list.body).includes('alice'),false);assert.equal(list.body.items[0].stats.hearts,0);
  const empty=await call(handle,'GET','/api/community/shares',{query:'q=없는검색'});
  assert.deepEqual(empty.body.items,[]);
+});
+
+test('browse cover sends an address only for moment mode — photo/design/basic stay url-less (#425 2번)',async()=>{
+ const external='https://example.com/cover.jpg';
+ const momentMode=await setup({url:external,coverMode:'moment'});
+ const momentCard=(await call(momentMode.handle,'GET','/api/community/shares')).body.items[0];
+ assert.equal(momentCard.cover.url,external,'순간에서 표지는 외부 링크 주소를 보낸다');
+ assert.equal(momentCard.momentCount,1);
+ const designMode=await setup({url:external,coverMode:'design',coverDesign:'texture-3'});
+ assert.equal((await call(designMode.handle,'GET','/api/community/shares')).body.items[0].cover.url,'','디자인 표지는 주소를 보내지 않는다');
+ const photoDesign=await setup({coverMode:'photo',coverDesign:'texture-1'});
+ assert.equal((await call(photoDesign.handle,'GET','/api/community/shares')).body.items[0].cover.url,'','사진 표지는 공개에서 디자인이 되고 주소가 없다');
+ const photoBasic=await setup({coverMode:'photo'});
+ assert.equal((await call(photoBasic.handle,'GET','/api/community/shares')).body.items[0].cover.url,'','사진 표지 + 디자인 없음은 기본 색 표지');
 });
 
 test('favorites and reactions are authenticated, idempotent and remain outside workspace JSON',async()=>{
