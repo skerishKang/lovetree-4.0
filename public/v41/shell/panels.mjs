@@ -140,7 +140,7 @@ export function createPanels(deps) {
   }
   function openTreeManager() {
     if (getSource() !== 'server' || !getMember()?.snapshot().owned || !getMember().snapshot().writable || !window.LT41) {
-      notify('내 서버 기록을 불러온 뒤 책 정보를 관리해 주세요.'); return;
+      notify('내 서버 기록을 불러온 뒤 트리를 관리해 주세요.'); return;
     }
     const tree = window.LT41.tree, form = $('tree-form');
     form.elements.title.value = tree.title;
@@ -213,7 +213,7 @@ export function createPanels(deps) {
       getMember().apply('editTree', { title: tree.title, subject: tree.subject, coverMomentId: added.momentId, coverDesign: tree.coverDesign || '' }, { treeId: tree.id });
     } catch (error) {
       fillTreeCoverOptions(window.LT41?.tree || tree);
-      throw Error('사진은 순간으로 남았지만 표지 지정은 실패했어요 — ' + error.message + ' · 위 “책 표지”에서 직접 골라 저장할 수 있어요.');
+      throw Error('사진은 순간으로 남았지만 표지 지정은 실패했어요 — ' + error.message + ' · 위 “표지”에서 직접 골라 저장할 수 있어요.');
     }
     const updated = window.LT41?.tree;
     if (updated && updated.id === tree.id) { fillTreeCoverOptions(updated); $('tree-cover').value = added.momentId; }
@@ -237,7 +237,7 @@ export function createPanels(deps) {
       treeBaseline = new URLSearchParams(new FormData(e.target)).toString();
       if(typeof dispatchEvent==='function')dispatchEvent(new Event('lt41-trees-changed'));
       $('tree-manager').close();
-      notify('책 정보를 서버에 저장하고 있어요.');
+      notify('트리 정보를 서버에 저장하고 있어요.');
     } catch (error) { $('tree-form-error').textContent = error.message; }
   };
   $('tree-delete').onclick = () => {
@@ -251,7 +251,7 @@ export function createPanels(deps) {
       notify('트리를 삭제하고 서버에 반영하고 있어요.');
     } catch (error) { $('tree-form-error').textContent = error.message; }
   };
-  $('tree-manager').addEventListener('cancel', e => { if (treeDirty() && !confirm('책 정보 변경을 버리고 닫을까요?')) e.preventDefault(); });
+  $('tree-manager').addEventListener('cancel', e => { if (treeDirty() && !confirm('트리 변경을 버리고 닫을까요?')) e.preventDefault(); });
   document.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => setEditorMode(b.dataset.mode));
   // '순간 남기기'는 이제 shell/quick-add.mjs가 고르기 창을 연다(#빠른 추가 ②). 이 파일은 편집기만 맡는다.
 
