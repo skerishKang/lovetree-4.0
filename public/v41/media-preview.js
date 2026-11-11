@@ -86,8 +86,10 @@ function parseMomentLink(value = '') {
     if (videoId) {
       const startSeconds = startFrom(parsed);
       const openUrl = `https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}${startSeconds ? `&t=${startSeconds}s` : ''}`;
+      // #393: /shorts/ 주소는 세로 영상이다. 틀·썸네일 비율 판정은 이 한 곳에서 나온다.
+      const vertical = /^\/shorts\//.test(parsed.pathname || '');
       return {
-        kind: 'youtube', original, videoId, startSeconds,
+        kind: 'youtube', original, videoId, startSeconds, vertical,
         openUrl,
         label: startSeconds ? `YouTube 링크 · 시작 ${formatStart(startSeconds)}` : 'YouTube 링크',
         actionLabel: 'YouTube에서 열기'
@@ -109,11 +111,16 @@ function privateAssetName(value,currentOrigin=globalThis.location?.origin){
   return /^\/api\/media\/([a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}\.(?:png|jpg|gif|webp|mp4|webm))$/.exec(u.pathname)?.[1]||null;
  }catch{return null;}
 }
+// #393: 썸네일 주소 한 벌. 세로(쇼츠)는 원본 비율(oardefault·잘림 없음), 가로는 hqdefault.
+// oardefault 가 없는 영상(일반 가로 등)은 부르는 쪽에서 hqdefault 로 물러난다.
+function youtubeThumbUrl(videoId, vertical = false) {
+  return 'https://i.ytimg.com/vi/' + videoId + '/' + (vertical ? 'oardefault.jpg' : 'hqdefault.jpg');
+}
 // Member media is URL-derived. No request is made until an explicit load action.
 function describe(value=''){
  const link=parseMomentLink(value);
  if(!link.openUrl)return {...link,kind:link.kind==='none'?'none':'invalid'};
- if(link.kind==='youtube')return {...link,loadUrl:'https://i.ytimg.com/vi/'+link.videoId+'/hqdefault.jpg',loadLabel:'영상 썸네일 불러오기'};
+ if(link.kind==='youtube')return {...link,loadUrl:youtubeThumbUrl(link.videoId,link.vertical),loadLabel:'영상 썸네일 불러오기'};
  const u=new URL(link.openUrl);let path=u.pathname;try{path=decodeURIComponent(path)}catch{}
  const kind=/\.(?:png|jpe?g|webp|avif|gif)$/i.test(path)?'photo':/\.(?:mp4|webm|ogv)$/i.test(path)?'video':'link';
  const privateFile=!!privateAssetName(u.href);
@@ -138,6 +145,13 @@ function mediaContext() {
   } catch { return { source: '', owned: false }; }
 }
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+// #393: 세로 영상 판정 한 벌 — /shorts/ 주소 또는 영상 정보의 가로세로(세로가 더 길면 세로).
+function verticalVideo(url, mediaMetadata = null) {
+  const m = describe(url);
+  if (m.kind !== 'youtube') return false;
+  const metaVertical = Number(mediaMetadata?.width) > 0 && Number(mediaMetadata?.height) > Number(mediaMetadata?.width);
+  return !!(m.vertical || metaVertical);
+}
 function markup(url,title='',mediaMetadata=null,momentId='',context=null){
  const m=describe(url);
  if(m.kind==='none')return '';
@@ -145,15 +159,20 @@ function markup(url,title='',mediaMetadata=null,momentId='',context=null){
  const canLoad=!!m.loadUrl&&(new URL(m.loadUrl).protocol==='https:'||m.privateFile);
  const ctx=context||mediaContext();
  const auto=canLoad&&m.kind==='youtube'&&autoLoadMedia(ctx.source,ctx.owned);
+ const vertical=verticalVideo(url,mediaMetadata);
  const caption=[mediaMetadata?.title,mediaMetadata?.channel,mediaMetadata?.source].filter(value=>typeof value==='string'&&value.trim()).join(' · ');
  const cached=caption?'<p class="lt-media-title">'+esc(caption)+'</p>':'';
+ const previewSrc=vertical?youtubeThumbUrl(m.videoId,true):m.loadUrl;
+ const previewFallback=vertical?' onerror="this.onerror=null;this.src=\''+youtubeThumbUrl(m.videoId,false)+'\'"':'';
  const body=auto
   // 내 기록: 썸네일을 처음부터 보여 준다(no-referrer·lazy). 재생 표시는 썸네일 전체를 덮는 단추라
   // 썸네일 아무 곳이나 눌러도 그 자리에서 재생한다. autoplay 는 누른 뒤 만들어지는 embed 주소에만 있다.
-  ?'<figure class="lt-yt-preview"><img src="'+esc('https://i.ytimg.com/vi/'+m.videoId+'/hqdefault.jpg')+'" alt="'+esc(title||'YouTube 영상 썸네일')+'" referrerpolicy="no-referrer" loading="lazy" decoding="async"><button type="button" class="lt-yt-play" data-lt-play aria-label="여기서 재생"><span aria-hidden="true">▶</span></button></figure>'+cached
+  ?'<figure class="lt-yt-preview"><img src="'+esc(previewSrc)+'" alt="'+esc(title||'YouTube 영상 썸네일')+'"'+previewFallback+' referrerpolicy="no-referrer" loading="lazy" decoding="async"><button type="button" class="lt-yt-play" data-lt-play aria-label="여기서 재생"><span aria-hidden="true">▶</span></button></figure>'+cached
   :(canLoad?'<button type="button" data-lt-load>'+esc(m.loadLabel)+'</button>':'<span>'+esc(m.label)+'</span>')+cached;
  const status=auto?'재생을 누르면 여기서 바로 재생해요.':(canLoad?'불러오기를 누르면 원본 사이트에 연결됩니다.':'원본 사이트에서 확인할 수 있어요.');
- let html = '<div class="lt-media" data-lt-url="'+esc(url)+'" data-lt-title="'+esc(title)+'"'+(momentId?' data-lt-moment-id="'+esc(momentId)+'"':'')+(m.kind==='youtube'?' data-lt-youtube="1"':'')+'><div class="lt-media-body">'+body+'</div><p class="lt-media-status" role="status">'+status+'</p><a href="'+esc(m.openUrl)+'" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">'+esc(m.kind==='youtube'?m.actionLabel+(m.startSeconds?' · 시작 '+formatStart(m.startSeconds):''):'원본 링크 열기')+' ↗</a></div>';
+ // #393 2: 크게 보기 — 영상을 어두운 깔개 위 화면 가운데 크게 연다(바깥 클릭·Esc로 복귀).
+ const expand=canLoad&&(m.kind==='youtube'||m.kind==='video')?'<div class="lt-media-toolbar"><button type="button" data-lt-expand>크게 보기</button></div>':'';
+ let html = '<div class="lt-media" data-lt-url="'+esc(url)+'" data-lt-title="'+esc(title)+'"'+(momentId?' data-lt-moment-id="'+esc(momentId)+'"':'')+(m.kind==='youtube'?' data-lt-youtube="1"':'')+(vertical?' data-lt-vertical="1"':'')+'>'+expand+'<div class="lt-media-body">'+body+'</div><p class="lt-media-status" role="status">'+status+'</p><a href="'+esc(m.openUrl)+'" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">'+esc(m.kind==='youtube'?m.actionLabel+(m.startSeconds?' · 시작 '+formatStart(m.startSeconds):''):'원본 링크 열기')+' ↗</a></div>';
  if(m.privateFile)html=html.replace('불러오기를 누르면 원본 사이트에 연결됩니다.','내 계정에 보관한 파일입니다. 불러오기를 눌러 확인하세요.').replace(/<a href=[\s\S]*?<\/a>/,'');
  return html;
 }
@@ -202,8 +221,9 @@ async function load(root){
  const element=document.createElement(m.kind==='video'?'video':'img');
  status.textContent='불러오는 중이에요…';
   const failed=()=>{delete root.dataset.ltLoading;body.replaceChildren();if(cachedCaption)body.append(cachedCaption);const fallback=document.createElement('p');fallback.className='lt-media-fallback';fallback.textContent=(m.kind==='youtube'?'YouTube 영상':m.kind==='video'?'영상':m.kind==='photo'?'사진':'링크')+'을(를) 여기서 열지 못했어요.';body.append(fallback);const retry=document.createElement('button');retry.type='button';retry.dataset.ltLoad='';retry.textContent='다시 불러오기';body.append(retry);status.textContent='불러오지 못했어요. 아래 원본 링크에서 확인하거나 다시 시도해 주세요.';};
-  element.addEventListener('error',failed,{once:true});
-  if(m.kind==='video'){element.className='lt-user-video';element.controls=true;element.preload='metadata';element.playsInline=true;element.addEventListener('stalled',()=>{if(!element.readyState)status.textContent='영상 데이터를 받는 중이에요. 원본 링크에서도 확인할 수 있어요.';},{once:true});element.addEventListener('loadedmetadata',()=>status.textContent='영상이 준비됐어요. 재생을 눌러 보세요.',{once:true});element.addEventListener('playing',()=>status.textContent='재생 중이에요.',{once:true});element.addEventListener('canplay',()=>{if(!element.paused)status.textContent='재생 중이에요.';},{once:true});}
+  // 세로 썸네일(oardefault)이 없으면 가로 기본(hqdefault)으로 한 번 물러난 뒤 실패를 표시한다.
+  element.addEventListener('error',()=>{if(m.kind==='youtube'&&root.dataset.ltVertical==='1'&&element.src!==youtubeThumbUrl(m.videoId,false)){element.src=youtubeThumbUrl(m.videoId,false);return}failed()});
+  if(m.kind==='video'){element.className='lt-user-video';element.controls=true;element.preload='metadata';element.playsInline=true;element.addEventListener('stalled',()=>{if(!element.readyState)status.textContent='영상 데이터를 받는 중이에요. 원본 링크에서도 확인할 수 있어요.';},{once:true});element.addEventListener('loadedmetadata',()=>{status.textContent='영상이 준비됐어요. 재생을 눌러 보세요.';if(element.videoWidth>0&&element.videoHeight>element.videoWidth)root.dataset.ltVertical='1';else delete root.dataset.ltVertical;},{once:true});element.addEventListener('playing',()=>status.textContent='재생 중이에요.',{once:true});element.addEventListener('canplay',()=>{if(!element.paused)status.textContent='재생 중이에요.';},{once:true});}
   else{element.alt=root.dataset.ltTitle||'기록한 사진';element.referrerPolicy='no-referrer';element.addEventListener('load',()=>{status.textContent=m.kind==='youtube'?'썸네일을 불러왔어요. 영상은 YouTube에서 열어 보세요.':'사진을 불러왔어요.';if(m.kind==='youtube')void youtubeMeta(root,m,failed);},{once:true});}
  let src=m.loadUrl;
  if(m.privateFile){
@@ -213,12 +233,69 @@ async function load(root){
  delete root.dataset.ltLoading;body.replaceChildren(element);if(cachedCaption)body.append(cachedCaption);element.src=src;
 }
 const ownedUrls=new Map();
-window.LTMedia={describe,markup,privateAssetName,autoLoadMedia,currentContext:mediaContext};
+// #393 2: 크게 보기 — 지금 문서(책·보드 등)를 어둡게 깔고 영상을 화면 가운데 크게 연다.
+// 세로 영상은 화면 높이 가득, 가로는 폭 가득. 바깥 클릭·Esc·닫기 단추로 복귀하고,
+// 닫으면 iframe/video 를 치워 재생도 멈춘다. 유튜브 자체 전체 화면은 iframe allowFullscreen 그대로.
+let lightbox=null,lightboxOpener=null,lightboxBlob=null;
+function closeLightbox(){
+ if(!lightbox)return;
+ const node=lightbox;lightbox=null;
+ document.removeEventListener('keydown',lightboxKey,true);
+ if(lightboxBlob){URL.revokeObjectURL(lightboxBlob);lightboxBlob=null}
+ node.remove();
+ const opener=lightboxOpener;lightboxOpener=null;
+ if(opener&&opener.isConnected)try{opener.focus({preventScroll:true})}catch{}
+}
+function lightboxKey(e){if(e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();closeLightbox()}}
+async function openLightbox(url,title='',verticalHint=null){
+ const m=describe(url);
+ if(m.kind!=='youtube'&&m.kind!=='video')return;
+ closeLightbox();
+ lightboxOpener=document.activeElement;
+ const vertical=verticalHint===null?!!m.vertical:!!verticalHint;
+ const overlay=document.createElement('div');
+ overlay.className='lt-lightbox'+(vertical?' lt-lightbox-vertical':'');
+ overlay.setAttribute('role','dialog');overlay.setAttribute('aria-modal','true');overlay.setAttribute('aria-label','영상 크게 보기');
+ overlay.innerHTML='<div class="lt-lightbox-stage"></div><button type="button" class="lt-lightbox-close" aria-label="크게 보기 닫기">×</button><p class="lt-lightbox-title"></p>';
+ overlay.querySelector('.lt-lightbox-title').textContent=title||m.label||'';
+ const stage=overlay.querySelector('.lt-lightbox-stage');
+ document.body.append(overlay);
+ lightbox=overlay;
+ document.addEventListener('keydown',lightboxKey,true);
+ overlay.addEventListener('click',e=>{if(e.target===overlay)closeLightbox()});
+ overlay.querySelector('.lt-lightbox-close').addEventListener('click',closeLightbox);
+ overlay.querySelector('.lt-lightbox-close').focus();
+ const alive=()=>lightbox===overlay;
+ if(m.kind==='youtube'){
+  let embed=null;
+  try{const usability=await import('/v41/book-usability.mjs');embed=usability.embedUrl(m.videoId,m.startSeconds)}catch{}
+  if(!alive())return;
+  if(!embed){stage.innerHTML='<p class="lt-lightbox-note">여기서 재생할 수 없어요. 원본 링크에서 열어 주세요.</p>';return}
+  const frame=document.createElement('iframe');
+  frame.className='lt-lightbox-media';frame.src=embed;frame.title=title||'YouTube 영상';
+  frame.allow='accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';frame.allowFullscreen=true;
+  frame.setAttribute('referrerpolicy','no-referrer');
+  stage.replaceChildren(frame);
+ }else{
+  let src=m.loadUrl;
+  if(m.privateFile){
+   try{const {createWorkspaceApi}=await import('/v41/api.mjs');const answer=await createWorkspaceApi().fetchMedia(new URL(m.loadUrl).pathname.slice(11));if(!answer.ok)throw Error('unavailable');if(!alive())return;src=URL.createObjectURL(answer.blob);lightboxBlob=src}
+   catch{if(alive())stage.innerHTML='<p class="lt-lightbox-note">파일을 불러오지 못했어요. 로그인 확인 후 다시 시도해 주세요.</p>';return}
+  }
+  if(!alive())return;
+  const video=document.createElement('video');
+  video.className='lt-lightbox-media';video.controls=true;video.autoplay=true;video.playsInline=true;
+  // 영상 정보의 가로세로: 세로면 틀도 세로로 바꾼다.
+  video.addEventListener('loadedmetadata',()=>{if(!alive())return;overlay.classList.toggle('lt-lightbox-vertical',video.videoWidth>0&&video.videoHeight>video.videoWidth)},{once:true});
+  video.src=src;stage.replaceChildren(video);
+ }
+}
+window.LTMedia={describe,markup,privateAssetName,autoLoadMedia,currentContext:mediaContext,youtubeThumbUrl,verticalVideo,openLightbox,closeLightbox};
 if(typeof document!=='undefined'){
  const cleanup=()=>{for(const [node,url] of ownedUrls)if(!node.isConnected){URL.revokeObjectURL(url);ownedUrls.delete(node);}};
  new MutationObserver(cleanup).observe(document.documentElement,{childList:true,subtree:true});
  addEventListener('pagehide',()=>{for(const url of ownedUrls.values())URL.revokeObjectURL(url);ownedUrls.clear();});
  document.addEventListener('pointerdown',e=>{if(e.target.closest?.('.lt-media'))e.stopPropagation();},true);
- document.addEventListener('click',e=>{const root=e.target.closest?.('.lt-media');if(!root)return;e.stopImmediatePropagation();if(e.target.closest('[data-lt-play]')){e.preventDefault();void playInPlace(root);return;}if(e.target.closest('[data-lt-load]')){e.preventDefault();load(root);}},true);
+ document.addEventListener('click',e=>{const root=e.target.closest?.('.lt-media');if(!root)return;e.stopImmediatePropagation();if(e.target.closest('[data-lt-expand]')){e.preventDefault();void openLightbox(root.dataset.ltUrl,root.dataset.ltTitle,root.hasAttribute('data-lt-vertical')?true:null);return;}if(e.target.closest('[data-lt-play]')){e.preventDefault();void playInPlace(root);return;}if(e.target.closest('[data-lt-load]')){e.preventDefault();load(root);}},true);
 }
 })();

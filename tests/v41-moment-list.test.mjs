@@ -4,7 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
-import { momentListTrees, momentListEntries, filterMomentEntries, momentHeadTitle, verticalMoment } from '../v41/moment-list.js';
+import { momentListTrees, momentListEntries, filterMomentEntries, momentHeadTitle } from '../v41/moment-list.js';
 
 const read = file => fs.readFileSync(new URL(`../${file}`, import.meta.url), 'utf8');
 
@@ -73,13 +73,9 @@ test('상세 창·목록 제목 규칙(#394 3번): 자동 기본 문구는 표�
   assert.equal(momentHeadTitle({ title: '직접 쓴 제목', note: '메모' }).memoAsMain, false);
 });
 
-test('세로 영상 판정: /shorts/ 주소와 영상 정보의 가로세로(#393과 같은 규칙)', () => {
-  assert.equal(verticalMoment('https://www.youtube.com/shorts/abc123XYZ_-'), true);
-  assert.equal(verticalMoment('https://www.youtube.com/watch?v=abc123XYZ_-'), false);
-  assert.equal(verticalMoment('https://www.youtube.com/watch?v=abc123XYZ_-', { width: 1080, height: 1920 }), true);
-  assert.equal(verticalMoment('https://www.youtube.com/watch?v=abc123XYZ_-', { width: 1920, height: 1080 }), false);
-  assert.equal(verticalMoment(''), false);
-  assert.equal(verticalMoment('not a url'), false);
+test('세로 영상 판정은 #393 한 버(LTMedia.verticalVideo)을 쓴다 — 이 레인에서 새로 만들지 않는다', () => {
+  assert.doesNotMatch(read('v41/moment-list.js'), /verticalMoment/);
+  assert.match(read('public/v41/media-preview.js'), /function verticalVideo/);
 });
 
 test('셸 트리 드롭다운: 맨 아래 "내 순간 전체 보기"가 있고, 내 기록(서버)에서만 그린다', () => {

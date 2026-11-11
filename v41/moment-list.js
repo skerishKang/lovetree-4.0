@@ -4,7 +4,6 @@
 import { cardOf } from './home-moments.js';
 import { pickerLabel, isInboxTree, shelfOrder } from '../public/v41/inbox-model.mjs';
 import { titleView } from '../public/v41/book-usability.mjs';
-
 const text = value => (typeof value === 'string' ? value.trim() : '');
 
 /** 순간 목록 위 트리 고르기 칸 목록. [전체]는 화면이 붙이고, 여기서는 모아둔 순간 먼저·나머지 기존 순서다. */
@@ -55,11 +54,4 @@ export function momentHeadTitle(moment, titleDisplay = 'both') {
   if (view.main) return { main: view.main, sub: view.sub, memoAsMain: false };
   if (memo) return { main: memo, sub: '', memoAsMain: true };
   return { main: '', sub: '', memoAsMain: false };
-}
-
-/** 세로 영상 판정(#393과 같은 규칙): /shorts/ 주소 또는 영상 정보의 가로세로(세로가 더 길면 세로). */
-export function verticalMoment(url, mediaMetadata = null) {
-  const width = Number(mediaMetadata?.width), height = Number(mediaMetadata?.height);
-  if (width > 0 && height > width) return true;
-  try { return /^\/shorts\//.test(new URL(text(url)).pathname); } catch { return false; }
 }
