@@ -38,12 +38,20 @@ test('계정 첫 글자는 이메일 앞부분의 첫 글자이고, 없으면 �
   assert.equal(firstLetter('+tag@example.com'), 'T', '기호는 건너뛰고 첫 글자를 쓴다');
 });
 
-test('이메일이 아직 없으면 계정 subject로 첫 글자를 만들고 표시는 내 계정으로 둔다', () => {
+// #368 보완 1·2: 동그라미 글자는 표시 이름 → 이메일 첫 글자 순서고 subject(usr_…) 첫 글자는 쓰지 않는다.
+test('동그라미 글자는 표시 이름을 먼저 쓰고, 없으면 이메일 첫 글자를 쓴다', () => {
+  assert.equal(accountPresentation({owned: true, name: '김범수', email: 'fan@love.io'}).initial, '김', '표시 이름이 있으면 그 첫 글자');
+  assert.equal(accountPresentation({owned: true, email: 'fan@love.io'}).initial, 'F', '표시 이름이 없으면 이메일 첫 글자');
+});
+
+test('이메일이 없어도 subject 첫 글자는 쓰지 않고 점·내 계정으로 안전하게 둔다', () => {
   const view = accountPresentation({owned: true, subject: 'padiem|user-42'});
   assert.equal(view.mode, 'avatar');
-  assert.equal(view.initial, 'P');
+  assert.equal(view.initial, '·', 'subject는 동그라미 글자가 아니다');
   assert.equal(view.label, '내 계정');
   assert.equal(view.ariaLabel, '내 계정 메뉴, 내 계정으로 로그인됨');
+  const named = accountPresentation({owned: true, name: '러브트리', subject: 'usr_abc'});
+  assert.equal(named.initial, '러', 'subject가 있어도 표시 이름을 먼저 쓴다');
 });
 
 test('트리 선택 문구는 트리가 있으면 이름, 없으면 트리 고르기', () => {
