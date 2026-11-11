@@ -44,17 +44,19 @@ test('화면 묶음은 기존 항목(테마·움직임·제목·첫 화면 카�
   assert.match(write, /data-write-tab="detailed"/);
 });
 
-test('내 데이터 묶음: 백업·계정 기록 불러오기·내 보관 파일은 바로, 가져오기·백업 파일·화면 비우기·예시는 고급 접힘 안에', () => {
+test('내 데이터 묶음: 백업·계정 기록 불러오기·내 보관 파일은 바로, 가져오기·화면 비우기·예시는 고급 접힘 안에', () => {
   const data = settings.slice(settings.indexOf('account-settings-data"'), settings.indexOf('account-settings-account"'));
   assert.match(data, /id="advanced-backup"[^>]*>기록 백업 \(내보내기\)</);
   assert.match(data, /id="server"[^>]*hidden>계정 기록 불러오기</);
   assert.match(data, /id="settings-assets-open"[^>]*>내 보관 파일 열기</);
   const advanced = data.slice(data.indexOf('account-settings-advanced'));
-  assert.match(advanced, /<summary>고급 · 가져오기·백업 파일·화면 비우기<\/summary>/);
+  assert.match(advanced, /<summary>고급 · 가져오기·화면 비우기·예시<\/summary>/);
   assert.match(advanced, /id="advanced-import"/);
-  assert.match(advanced, /id="settings-open-file"/);
   assert.match(advanced, /id="clear"/);
   assert.match(advanced, /id="sample"/);
+  // CTO 결정(2026-11-12): 설정의 "백업 파일 열기"는 기록 가져오기와 같은 JSON 선택 창이라 뺀다.
+  assert.doesNotMatch(advanced, /id="settings-open-file"/);
+  assert.doesNotMatch(settings, /백업 파일 열기/);
   // JSON input은 창 밖에 숨겨 둔다 — 설정이 닫혀 있어도(빈 화면) 열 수 있어야 한다.
   assert.ok(html.indexOf('id="file" type="file"') > settingsEnd, 'file input은 account-settings 밖에 있다');
 });
@@ -94,9 +96,10 @@ test('계정 메뉴: 맨 위 이메일 전체 → 설정 → 내 보관 파일 �
   assert.doesNotMatch(popover, />내 계정</);
 });
 
-test('옮겨진 기능 연결: 보관 파일·백업 파일·예시·비우기·로그아웃·기록 불러오기', () => {
+test('옮겨진 기능 연결: 보관 파일·백업 파일(빈 화면만)·예시·비우기·로그아웃·기록 불러오기', () => {
   assert.match(shell, /\$\('settings-assets-open'\)\.onclick=\(\)=>openAssets\(\$\('settings-assets-open'\)\)/);
-  assert.match(shell, /\$\('settings-open-file'\)\.onclick=\(\)=>\$\('file'\)\.click\(\)/);
+  // CTO 결정(2026-11-12): 설정의 "백업 파일 열기" 배선은 빼고, 로그아웃 빈 화면 입구만 남긴다.
+  assert.doesNotMatch(shell, /\$\('settings-open-file'\)/);
   assert.match(shell, /\$\('empty-file'\)\.onclick=\(\)=>\$\('file'\)\.click\(\)/);
   assert.match(shell, /\$\('sample'\)\.onclick=sample;/);
   assert.match(shell, /\$\('clear'\)\.onclick=/);

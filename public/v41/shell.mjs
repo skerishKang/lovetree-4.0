@@ -545,10 +545,10 @@ $('settings-assets-open').onclick=()=>openAssets($('settings-assets-open'));
  $('account-advanced').onclick=()=>{const next=!readAdvanced();try{localStorage.setItem(advancedKey(),next?'1':'0')}catch{}applyAdvanced();};
  $('account-open-settings').onclick=()=>{closeAccountMenu();void openAccountSettings();};
  $('advanced-backup').onclick=()=>backup();
- // #368: 가져오기·백업 파일 열기는 같은 JSON 선택 input을 쓴다(옛 내 기록 창과 동작 동일). input은 창 밖에 숨겨 두어
- // 설정이 닫혀 있어도(빈 화면의 백업 파일 열기) 열린다.
+ // #368: 기록 가져오기는 JSON 선택 input을 연다. input은 창 밖에 숨겨 두어 설정이 닫혀 있어도(빈 화면의 백업 파일 열기) 열린다.
+ // CTO 결정(2026-11-12): 설정에는 "기록 가져오기" 하나만 둔다 — "백업 파일 열기"는 같은 선택 창이라 중복이고,
+ // 로그아웃 빈 화면의 "백업 파일 열기"(#empty-file)는 계정 없이 쓰는 입구로 남긴다.
  $('advanced-import').onclick=()=>$('file').click();
- $('settings-open-file').onclick=()=>$('file').click();
  $('empty-file').onclick=()=>$('file').click();
  for(const b of document.querySelectorAll('[data-title-display]'))b.onclick=()=>setTitleDisplay(b.dataset.titleDisplay);
  // #380 5번: '보기 ◐' 메뉴(테마·움직임·카드 출처)를 설정 창의 '화면' 묶음으로 옮겼다.
