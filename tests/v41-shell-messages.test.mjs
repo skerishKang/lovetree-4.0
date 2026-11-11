@@ -131,6 +131,7 @@ function messagesHarness({ owned = true, source = 'server', current = 'track59-s
   });
   return {
     messages, els, events, calls, requests, dialog, button,
+    state: () => ({current}),
     receive: data => events.message({origin: 'https://lovetree-4-0.pages.dev', source: els['view'].contentWindow, data}),
     setOwned: value => { ownedNow = value; },
     restore: () => restore(saved)
@@ -173,6 +174,23 @@ test('lt41-write·lt41-start·lt41-community·lt41-journey-save는 정해진 곳
     h.receive({type: 'lt41-open-book', treeId: 'tree1', id: 'm1'});
     assert.deepEqual(h.calls.chooses, [['tree1', 'm1']]);
     assert.equal(h.calls.writes, 1, '기억책으로 옮기며 주소를 쓴다');
+  } finally { h.restore(); }
+});
+
+test('lt41-open-view는 보드·지도에서 다른 트리를 같은 보기로 열고, 모르는 보기·없는 트리는 무시한다', () => {
+  const h = messagesHarness({current: 'track58-pinboard.html'});
+  try {
+    h.receive({type: 'lt41-open-view', treeId: 'tree1', view: 'board'});
+    assert.deepEqual(h.calls.chooses, [['tree1', undefined]], '트리를 고른다');
+    assert.equal(h.state().current, 'track58-pinboard.html', '보드는 보드로 연다');
+    assert.equal(h.calls.writes, 1, '주소를 쓴다');
+    h.receive({type: 'lt41-open-view', treeId: 'tree1', view: 'network'});
+    assert.equal(h.state().current, 'track56-network.html', '지도는 지도로 연다');
+    const after = h.calls.chooses.length;
+    h.receive({type: 'lt41-open-view', treeId: 'tree1', view: 'book'});
+    h.receive({type: 'lt41-open-view', treeId: 'nope', view: 'board'});
+    h.receive({type: 'lt41-open-view', view: 'board'});
+    assert.equal(h.calls.chooses.length, after, '허용하지 않는 보기·없는 트리는 무시한다');
   } finally { h.restore(); }
 });
 

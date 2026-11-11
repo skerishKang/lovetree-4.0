@@ -3,13 +3,14 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1"/>
-<title>러브트리 4.1 · 관계 지도</title>
+<title>러브트리 4.1 · 관계 지도</title><!-- modulepreload:start (tools/v41-modulepreload.mjs가 만든다) --><link rel="modulepreload" href="/v41/book-usability.mjs"><link rel="modulepreload" href="/v41/domain.mjs"><link rel="modulepreload" href="/v41/tree-name.mjs"><link rel="modulepreload" href="/v41/views/shelf/shelf-model.mjs"><link rel="modulepreload" href="/v41/views/tree-title.mjs"><!-- modulepreload:end -->
 <link rel="stylesheet" href="/v41/views/network/network.css">
+<link rel="stylesheet" href="/v41/views/tree-title.css">
 <style>#followPath{display:none!important}</style><link rel="stylesheet" href="/v41/identity.css"></head>
 <body>
 <div class="app">
  <canvas id="stage" aria-label="세로형 순간 관계 지도 전체 보기"></canvas><div class="paper-noise"></div>
- <header class="topbar"><div class="brand"><i class="brand-dot"></i><b>러브트리</b><span>관계 지도</span></div><div class="top-actions"><span class="mode-pill" id="modePill">전체 보기</span><button class="pill" id="overviewBtn">전체 보기</button><span class="view-switch" role="group" aria-label="보기 방식 고르기"><button class="pill switch" id="viewNet" aria-pressed="true">그물형</button><button class="pill switch" id="viewConc" aria-pressed="false">동심원형</button></span><button class="pill" id="helpBtn">사용법</button></div></header>
+ <header class="topbar"><div class="topbar-left"><button class="pill shelf-back" id="shelfBackBtn" type="button">← 내 트리</button><div class="tree-title"><button class="tree-title-btn" id="treeTitleBtn" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="treeMenuPanel"><span id="treeTitleText">관계 지도</span><span class="tree-title-caret" aria-hidden="true">▾</span></button><div class="tree-menu" id="treeMenuPanel" role="menu" aria-label="다른 트리" hidden></div></div></div><div class="top-actions"><span class="mode-pill" id="modePill">전체 보기</span><button class="pill" id="overviewBtn">전체 보기</button><span class="view-switch" role="group" aria-label="보기 방식 고르기"><button class="pill switch" id="viewNet" aria-pressed="true">그물형</button><button class="pill switch" id="viewConc" aria-pressed="false">동심원형</button></span><button class="pill" id="helpBtn">사용법</button></div></header>
  <div class="hero"><p>첫 순간에서 어떻게 이어졌는지 보는 지도예요</p></div>
  <aside class="left-rail"><div class="legend"><h3>순간 위치 그룹</h3><div class="legend-row"><i class="swatch" style="background:var(--lt-group-1,#e45d8d)"></i>01 순간 01–07</div><div class="legend-row"><i class="swatch" style="background:var(--lt-group-2,#8b69e8)"></i>02 순간 08–14</div><div class="legend-row"><i class="swatch" style="background:var(--lt-group-3,#2ca4c0)"></i>03 순간 15–21</div><div class="legend-row"><i class="swatch" style="background:var(--lt-group-4,#d49231)"></i>04 순간 22–28</div><div class="legend-row"><i class="swatch" style="background:var(--lt-group-5,#3aa27c)"></i>05 순간 29–35</div><div class="legend-row"><i class="swatch" style="background:var(--lt-group-6,#547cd0)"></i>06 순간 36–40</div></div><div class="controls"><h3>탐색 모드</h3><button class="mini origin" id="focusFirst">첫 순간 보기</button><div class="control-row"><button class="mini" id="zoomIn">확대 +</button><button class="mini" id="zoomOut">축소 −</button></div><button class="mini" id="resetFocus">전체 보기로</button></div></aside>
  <aside class="progress-rail" id="progressRail"><div class="progress-label">위에서 아래로</div><div class="progress-line" id="progressLine"><i class="progress-thumb" id="progressThumb"></i></div></aside>
@@ -20,6 +21,7 @@
 </div>
 <script src="/v41/labels.js"></script><script src="/v41/mobile-moments.js"></script><script src="/v41/media-preview.js"></script><script src="/v41/runtime.js"></script>
 <script src="/v41/views/network/network-model.js"></script><script src="/v41/views/network/network.js"></script>
+<script type="module" src="/v41/views/tree-title.mjs"></script>
 <style>@media(max-width:640px){#overviewBtn{display:inline-flex!important;align-items:center;min-height:44px}.pill{min-height:44px}.detail{max-height:55%;overflow:auto}.mobile-ribbon button{min-height:44px}}</style><style>@media(max-width:640px){.hero{top:150px}.hero h1{font-size:23px}.hero .eyebrow{display:none}.hero p{font-size:12px}.route-status{display:none}.detail{bottom:70px}.detail-block p{font-size:14px}.detail-block span,.chip{font-size:11px}.close{min-width:44px;min-height:44px}}</style><style id="lt-touch-targets">/* 2026-11-08 터치 타깃: 보이는 모양은 그대로 두고 ::after로 누르는 영역만 44px 이상으로 넓힌다. */
 #focusFirst,#zoomIn,#zoomOut,#resetFocus,#openMoment{position:relative}
 #focusFirst::after,#zoomIn::after,#zoomOut::after,#resetFocus::after{content:"";position:absolute;inset:-5px 0}

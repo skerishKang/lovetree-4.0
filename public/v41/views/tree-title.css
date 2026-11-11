@@ -1,0 +1,60 @@
+/* #417: 보드·지도 머리 — 책(#416)과 같은 왼쪽 묶음: ← 내 트리 + 지금 트리 제목(크게) + ▾.
+   구조는 책의 .topbar-left·.book-title과 같은 모양이고, 색은 각 화면 테마(board=밤, network=밝은 알약)를 따른다. */
+
+.topbar-left{display:flex;align-items:center;gap:10px;min-width:0;flex:0 1 auto}
+.tree-title{position:relative;min-width:0}
+.tree-title-btn{display:inline-flex;align-items:center;gap:7px;max-width:100%;min-width:0;min-height:44px;padding:6px 11px;border:0;border-radius:10px;background:none;font:inherit;cursor:pointer;overflow:hidden}
+.tree-title-btn:hover,.tree-title-btn:focus-visible{background:rgba(64,44,38,.22)}
+.tree-title-caret{flex:none;font-size:10px;transition:transform .15s}
+.tree-title-btn[aria-expanded=true] .tree-title-caret{transform:rotate(180deg)}
+#treeTitleText{font-weight:700;font-size:18px;letter-spacing:-.01em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* 트리 목록 — 셸의 트리 드롭다운(.tree-item·.tree-cover)과 같은 내용·같은 모양 */
+.tree-menu{position:absolute;z-index:95;top:calc(100% + 6px);left:0;min-width:300px;max-height:min(70vh,520px);overflow:auto;padding:8px;border-radius:14px}
+.tree-menu[hidden]{display:none!important}
+.tree-menu .tree-item{display:flex;align-items:center;gap:10px;width:100%;min-height:52px;padding:5px 7px;border:0;border-radius:10px;background:none;text-align:left;font:13px var(--ui-sans,system-ui);cursor:pointer}
+.tree-menu .tree-cover{width:36px;height:46px;flex:0 0 auto;border-radius:6px;overflow:hidden;display:block}
+.tree-cover img{width:100%;height:100%;object-fit:cover;display:block}
+.tree-menu .tree-name{min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.tree-menu .tree-count{flex:none;font-size:11px;white-space:nowrap}
+.tree-menu .tree-check{flex:none;font-weight:800}
+
+/* 보드(밤 테마) */
+html[data-v41-screen=board] .shelf-back{flex:0 0 auto}
+html[data-v41-screen=board] .tree-title-btn{color:#e8deee}
+html[data-v41-screen=board] .tree-title-btn:hover,html[data-v41-screen=board] .tree-title-btn:focus-visible{background:rgba(255,255,255,.08)}
+html[data-v41-screen=board] .tree-title-caret{color:#a78f92}
+html[data-v41-screen=board] .tree-menu{border:1px solid rgba(255,255,255,.14);background:rgba(28,17,38,.97);box-shadow:0 18px 40px rgba(0,0,0,.5)}
+html[data-v41-screen=board] .tree-menu .tree-item{color:#e8deee}
+html[data-v41-screen=board] .tree-menu .tree-item:hover,html[data-v41-screen=board] .tree-menu .tree-item:focus-visible{background:rgba(255,255,255,.08)}
+html[data-v41-screen=board] .tree-menu .tree-item[aria-checked=true]{background:rgba(157,90,255,.16);box-shadow:inset 0 0 0 1px rgba(207,139,255,.5)}
+html[data-v41-screen=board] .tree-menu .tree-count{color:#9b89a5}
+html[data-v41-screen=board] .tree-menu .tree-check{color:#cf8bff}
+html[data-v41-screen=board] .tree-menu .tree-cover{border:1px solid rgba(255,255,255,.2)}
+
+/* 지도(밝은 알약 테마) — .topbar는 pointer-events:none이므로 묶음을 다시 받는다 */
+html[data-v41-screen=network] .topbar-left{pointer-events:auto}
+html[data-v41-screen=network] .shelf-back{height:36px;min-height:36px;padding:0 13px;border:1px solid rgba(77,71,87,.12);border-radius:999px;background:rgba(255,255,255,.74);font-size:10px;color:rgba(51,47,57,.65);box-shadow:0 8px 24px rgba(70,60,78,.05);backdrop-filter:blur(16px)}
+html[data-v41-screen=network] .shelf-back:hover,html[data-v41-screen=network] .shelf-back:focus-visible{outline:none;border-color:rgba(79,70,91,.28);background:#fff;color:#26242d}
+html[data-v41-screen=network] .tree-title-btn{height:36px;padding:0 13px;border:1px solid rgba(77,71,87,.12);border-radius:999px;background:rgba(255,255,255,.74);color:#26242d;box-shadow:0 8px 24px rgba(70,60,78,.05);backdrop-filter:blur(16px)}
+html[data-v41-screen=network] .tree-title-btn:hover,html[data-v41-screen=network] .tree-title-btn:focus-visible{outline:none;border-color:rgba(79,70,91,.28);background:#fff}
+html[data-v41-screen=network] .tree-title-caret{color:rgba(55,50,61,.55)}
+html[data-v41-screen=network] #treeTitleText{font-size:13px}
+html[data-v41-screen=network] .tree-menu{border:1px solid rgba(70,64,79,.16);background:#fff;box-shadow:0 18px 40px rgba(68,55,72,.16)}
+html[data-v41-screen=network] .tree-menu .tree-item{color:#33333d}
+html[data-v41-screen=network] .tree-menu .tree-item:hover,html[data-v41-screen=network] .tree-menu .tree-item:focus-visible{background:rgba(70,64,79,.07)}
+html[data-v41-screen=network] .tree-menu .tree-item[aria-checked=true]{background:rgba(185,144,95,.12);box-shadow:inset 0 0 0 1px #b9905f}
+html[data-v41-screen=network] .tree-menu .tree-count{color:rgba(55,50,61,.55)}
+html[data-v41-screen=network] .tree-menu .tree-check{color:#b9905f}
+html[data-v41-screen=network] .tree-menu .tree-cover{border:1px solid rgba(120,91,62,.3)}
+
+/* 좁은 폭: 제목 단추가 줄어들되 겹치지 않는다(책 #416과 같은 원칙) */
+@media(max-width:600px){
+ .topbar-left{gap:6px}
+ .tree-title-btn{padding:4px 8px}
+ #treeTitleText{font-size:15px}
+ html[data-v41-screen=network] #treeTitleText{font-size:12px}
+}
+/* 좁은 폭(지도): 알약 단추도 44px 손끝 크기를 지킨다(기존 .pill 규칙과 같게) */
+@media(max-width:640px){
+ html[data-v41-screen=network] .shelf-back,html[data-v41-screen=network] .tree-title-btn{height:auto;min-height:44px}
+}
