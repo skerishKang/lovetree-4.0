@@ -1,4 +1,5 @@
 import { EMPTY_STATE, validateState } from './domain.mjs';
+import { readCachedWorkspace, writeCachedWorkspace, clearCachedWorkspace } from './workspace-cache.mjs';
 
 const LABELS = {
   checking: '서버 확인 중', login: '저장하려면 로그인해 주세요',
@@ -35,13 +36,15 @@ export function hasPendingDraft(storage, subject = null) {
 
 // A failed, authenticated write may cross a full-page re-login. Keep its
 // one-tab retry buffer in sessionStorage, scoped to the same account only.
-export function createSyncController({getState, replaceState, api, draftStorage = null,
+export function createSyncController({getState, replaceState, api, draftStorage = null, cacheStorage = null,
   makeClientKey = () => `front-${crypto.randomUUID()}`,
   delay = ms => new Promise(resolve => setTimeout(resolve, ms)),
   onChange = () => {}, navigate = url => globalThis.location.assign(url)}) {
   let current = status({phase:'checking'}), listener = () => {};
   let owned = false, revision = null, dirty = false, generation = 0, activeSubject = null;
   let queued = 0, inflight = false, attempt = null, seenRevision = null;
+  // 저장본 먼저 그리기는 이 컨트롤러의 첫 start()에서만 한다(재시도가 화면을 옛 기록으로 되돌리지 않게).
+  let cachePainted = false;
   const emit = value => { current = value; onChange(value); listener(value); return value; };
   const actions = { login: [{name:'login',label:'로그인'}], logout: [{name:'logout',label:'로그아웃'}],
     retry: [{name:'retry',label:'다시 시도'}] };
@@ -99,17 +102,27 @@ export function createSyncController({getState, replaceState, api, draftStorage 
   async function start() {
     const gen = generation;
     emit(status({phase:'checking'}));
+    if (!cachePainted) {
+      cachePainted = true;
+      const cached = readCachedWorkspace(cacheStorage);
+      // 저장본은 서버 응답 전 첫 화면용일 뿐이다. phase은 checking 그대로 → 편집 잠금·서버본 우선.
+      if (cached) replaceState(cached.state);
+    }
     const result = await api.get();
     if (gen !== generation) return current;
     if (!result.ok) {
       owned = false; revision = null; dirty = false; attempt = null;
       replaceState(EMPTY_STATE());
-      if (result.status === 401 || result.code === 'unauthenticated')
+      if (result.status === 401 || result.code === 'unauthenticated') {
+        // 인증이 없으면 저장본도 남기지 않는다(공용 컴퓨터).
+        clearCachedWorkspace(cacheStorage);
         return emit(status({phase:'login',actions:actions.login}));
+      }
       return emit(status({phase:'offline',detail:'서버를 확인하지 못했어요. 다시 시도해 주세요.',actions:[...actions.retry,...actions.login]}));
     }
     owned = true; revision = result.revision; dirty = false; attempt = null; seenRevision = null; activeSubject = result.subject || null;
     replaceState(validateState(result.state));
+    writeCachedWorkspace(cacheStorage, activeSubject, result.state);
     if (restorePendingDraft(activeSubject, revision)) return current;
     return emit(status({phase:'synced',actions:actions.logout}));
   }
@@ -169,6 +182,7 @@ export function createSyncController({getState, replaceState, api, draftStorage 
       revision = result.revision; dirty = false; attempt = null; seenRevision = null;
       clearPendingDraft();
       replaceState(validateState(result.state));
+      writeCachedWorkspace(cacheStorage, activeSubject, result.state);
       return emit(status({phase:'synced',actions:actions.logout}));
     }
     if (name === 'force') {
@@ -188,6 +202,7 @@ export function createSyncController({getState, replaceState, api, draftStorage 
       const gen = ++generation, answer = await api.logout();
       if (gen !== generation) return current;
       if (!answer.ok) return emit(status({phase:'rejected',detail:'로그아웃하지 못했어요.',actions:actions.logout}));
+      clearCachedWorkspace(cacheStorage, activeSubject);
       owned = false; revision = null; replaceState(EMPTY_STATE()); navigate('#start');
       return emit(status({phase:'login',actions:actions.login}));
     }
