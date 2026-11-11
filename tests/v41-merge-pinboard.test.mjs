@@ -21,8 +21,8 @@ test('런타임 한 벌만 부르고 자원 경로는 /v41/ 절대 경로', () =
 
 test('연결은 데이터(LTDEMO.edges)에서 만들고 실제 기록 문구를 기준으로 쓴다', () => {
   assert.match(SERVER, /let connections=LTDEMO\.edges\.map\(/);
-  assert.ok(SERVER.includes('감상 예시'));
-  assert.ok(SERVER.includes('읽기 전용'));
+  assert.ok(!SERVER.includes('감상 예시'));
+  assert.ok(!SERVER.includes('부모·자식 연결'));
   assert.ok(!SERVER.includes('공개 예시'));
 });
 
