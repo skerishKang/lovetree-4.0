@@ -9,16 +9,21 @@
   function isYtMoment(m){ return !!m && (m.type==='youtube' || (m.type==='video' && m.videoSource==='youtube')); }
   function originalUrl(m){ return m?.sourceUrl || m?.url || ''; }
   window.__ytThumbFail = function(img){
-    let stage=img.dataset.stage||'max', wrap=img.closest('.ytThumbWrap'), st=wrap?.querySelector('.ytLoadState');
+    let stage=img.dataset.stage||'hq', wrap=img.closest('.ytThumbWrap'), st=wrap?.querySelector('.ytLoadState');
+    if(stage==='hq' && img.dataset.mq){ img.dataset.stage='mq'; img.src=img.dataset.mq; if(st)st.textContent='YouTube 미리보기를 불러오는 중'; return; }
     if(stage==='max' && img.dataset.hq){ img.dataset.stage='hq'; img.src=img.dataset.hq; if(st)st.textContent='YouTube 미리보기를 불러오는 중'; return; }
-    if(stage==='hq'){ img.dataset.stage='fallback'; img.src=img.dataset.fallback; if(st){st.textContent='미리보기를 불러오지 못했어요 · 오프라인 미리보기';st.className='ytLoadState fail'}; return; }
+    if(stage==='hq' || stage==='mq'){ img.dataset.stage='fallback'; if(wrap&&window.LTThumbFallback){wrap.outerHTML=window.LTThumbFallback.fallbackCardMarkup({url:img.dataset.url||'',title:'',emotion:'설렘'},{writable:!LTDEMO.readOnly,videoUnavailable:true,variant:'board'});return;} img.src=img.dataset.fallback; if(st){st.textContent='미리보기를 불러오지 못했어요 · 오프라인 미리보기';st.className='ytLoadState fail'}; return; }
     if(st){st.textContent='미리보기를 불러오지 못했어요';st.className='ytLoadState fail'}
   };
-  window.__ytThumbLoad = function(img){ let wrap=img.closest('.ytThumbWrap'), st=wrap?.querySelector('.ytLoadState'); if(!st)return; if(img.dataset.stage!=='fallback'){st.textContent='실제 YouTube 썸네일';st.className='ytLoadState ok'} };
+  window.__ytThumbLoad = function(img){
+    if(img.naturalWidth===120&&img.naturalHeight===90&&img.dataset.stage!=='fallback'){window.__ytThumbFail(img);return;}
+    let wrap=img.closest('.ytThumbWrap'), st=wrap?.querySelector('.ytLoadState'); if(!st)return; if(img.dataset.stage!=='fallback'){st.textContent='실제 YouTube 썸네일';st.className='ytLoadState ok'}
+  };
   function ytMediaHTML(url, extra=''){
     let id=ytId(url), fallback=V12_FALLBACK(url||'VIDEO');
     if(!id) return `<div class="ytThumbWrap"><img src="${fallback}" alt="YouTube preview"><span class="ytLoadState fail">유효한 YouTube URL을 입력하세요</span>${extra}</div>`;
-    return `<div class="ytThumbWrap"><img src="${ytMax(url)}" data-hq="${ytHQ(url)}" data-fallback="${fallback}" data-stage="max" onload="__ytThumbLoad(this)" onerror="__ytThumbFail(this)" alt="YouTube thumbnail"><span class="ytLoadState">YouTube 미리보기를 불러오는 중</span><span class="ytSourceBadge">YOUTUBE</span>${extra}</div>`;
+    let mq=`https://i.ytimg.com/vi/${id}/mqdefault.jpg`;
+    return `<div class="ytThumbWrap"><img src="${ytHQ(url)}" data-hq="${ytHQ(url)}" data-mq="${mq}" data-url="${esc(url||'')}" data-fallback="${fallback}" data-stage="hq" onload="__ytThumbLoad(this)" onerror="__ytThumbFail(this)" alt="YouTube thumbnail" referrerpolicy="no-referrer"><span class="ytLoadState">YouTube 미리보기를 불러오는 중</span><span class="ytSourceBadge">YOUTUBE</span>${extra}</div>`;
   }
   function armYTThumbs(root=document){root.querySelectorAll('.ytThumbWrap img[data-stage]').forEach(img=>{if(img.dataset.timeoutArmed)return;img.dataset.timeoutArmed='1';setTimeout(()=>{if((!img.complete||!img.naturalWidth)&&img.dataset.stage==='max')window.__ytThumbFail(img)},1800);setTimeout(()=>{if((!img.complete||!img.naturalWidth)&&img.dataset.stage==='hq')window.__ytThumbFail(img)},3600)})}
   const ytObserver=new MutationObserver(()=>armYTThumbs());ytObserver.observe(document.body,{childList:true,subtree:true});setTimeout(()=>armYTThumbs(),50);
@@ -41,13 +46,14 @@
   const v11CardHTML=cardHTML;
   cardHTML=function(m){
     let media='';
-    if(m.url)media=LTMedia.markup(m.url,m.title,m.mediaMetadata,m.id);
+    if(m.url)media=LTMedia.markup(m.url,m.title,m.mediaMetadata,m.id,null,{emotion:m.emotion,date:m.date,note:m.memo});
     else if(m.type==='note') media=`<div class="noteText">“${esc(m.memo)}”</div>`;
     else if(isYtMoment(m)) media=`<div class="media linkMedia">${ytMediaHTML(originalUrl(m),'<span class="playBadge">▶</span>')}</div>`;
     else if(m.type==='video') media=`<div class="media"><video muted playsinline loop poster="${m.asset}" src="${m.video||''}"></video><span class="playBadge">▶</span><span class="duration">${m.duration||'00:03'}</span></div>`;
     else media=`<div class="media ${m.type==='link'?'linkMedia':''}"><img src="${m.asset}" data-fallback="${ASSET.link}" onerror="this.onerror=null;this.src=this.dataset.fallback" alt=""></div>`;
     let kws=(m.keywords||[]).slice(0,4).map(k=>`<span>${esc(k)}</span>`).join('');
-    return `<article class="card ${m.first?'first':''} ${m.type==='note'?'noteCard':''} ${pinClass(m)} ${cardClass(m)}" data-id="${m.id}" style="left:${m.x}px;top:${m.y}px;--rot:${m.rot}deg;--pin:${colors[m.color]};--halo:${colors[m.color]}55">${m.first?'<div class="firstTag">첫 순간</div>':''}<button class="pin" data-pin="${m.id}" aria-hidden="true" tabindex="-1"></button>${media}<div class="cardBody"><div class="eyebrow"><span class="emotionDot"></span>${LTLabels.type(m.originalType||m.type)} 순간 · ${esc(m.emotion)}</div><h3>${esc(m.title)}</h3><div class="meta"><span>${esc(m.date)}</span><span>${m.type==='link'||isYtMoment(m)?'↗':''}</span></div>${m.type!=='note'?`<div class="memo">${esc(m.memo)}</div>`:''}<div class="keywordOnCard">${kws}</div>${(m.url||m.sourceUrl)?`<div class="domain">${esc(m.source)}</div>`:''}</div></article>`;
+    let heading=titleMain(m);
+    return `<article class="card ${m.first?'first':''} ${m.type==='note'?'noteCard':''} ${pinClass(m)} ${cardClass(m)}" data-id="${m.id}" style="left:${m.x}px;top:${m.y}px;--rot:${m.rot}deg;--pin:${colors[m.color]};--halo:${colors[m.color]}55">${m.first?'<div class="firstTag">첫 순간</div>':''}<button class="pin" data-pin="${m.id}" aria-hidden="true" tabindex="-1"></button>${media}<div class="cardBody"><div class="eyebrow"><span class="emotionDot"></span>${LTLabels.type(m.originalType||m.type)} 순간 · ${esc(m.emotion)}</div>${heading?`<h3>${esc(heading)}</h3>`:''}${titleSubMarkup(m)}<div class="meta"><span>${esc(dateText(m.date))}</span><span>${m.type==='link'||isYtMoment(m)?'↗':''}</span></div>${m.type!=='note'?`<div class="memo">${esc(m.memo)}</div>`:''}<div class="keywordOnCard">${kws}</div>${(m.url||m.sourceUrl)?`<div class="domain">${esc(m.source)}</div>`:''}</div></article>`;
   };
 
   /* Composer: VIDEO supports local or YouTube source; VIDEO LINK remains a direct YouTube 순간. */
@@ -127,8 +133,8 @@
   saveEdit=function(){let m=moments.find(x=>x.id===selected),n=editPreviewState();snapshot();let invariant={id:m.id,date:m.date,privacy:m.privacy,x:m.x,y:m.y,rot:m.rot,first:m.first,createdOrder:m.createdOrder};Object.assign(m,n,invariant);$('#editModal').classList.remove('open');renderCards();renderThreads();updateKeywordFilter();selectMoment(m.id,true);persistBoard();toast('미디어를 교체해도 순간 ID·날짜·Connection은 그대로 유지됩니다.');};
 
   openViewer=function(id){
-    let m=moments.find(x=>x.id===id);if(!m)return;$('#vTitle').textContent=m.title;let box=$('#viewerMedia');
-    if(m.url)box.innerHTML=LTMedia.markup(m.url,m.title,m.mediaMetadata,m.id);
+    let m=moments.find(x=>x.id===id);if(!m)return;$('#vTitle').textContent=titleMain(m)||'순간';let box=$('#viewerMedia');
+    if(m.url)box.innerHTML=LTMedia.markup(m.url,m.title,m.mediaMetadata,m.id,null,{emotion:m.emotion,date:m.date,note:m.memo});
     else if(isYtMoment(m)){
       let url=originalUrl(m),embed=ytEmbed(url),vid=ytId(url);box.innerHTML=vid?`<div class="viewerYouTube"><iframe id="youtubeEmbed" src="${embed}" title="${esc(m.title)}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe><div class="viewerFallback"><span>영상 소유자 설정이나 네트워크 정책에 따라 여기서 바로 재생되지 않을 수 있어요.</span><button class="miniBtn accent" id="openYoutubeExternal">YouTube에서 재생</button></div></div>`:`<div class="viewerYouTube">${ytMediaHTML(url)}<div class="viewerFallback"><span>유효한 YouTube videoId를 찾지 못했어요.</span></div></div>`;
       setTimeout(()=>{let b=$('#openYoutubeExternal');if(b)b.onclick=()=>window.open(url,'_blank','noopener,noreferrer')},0);

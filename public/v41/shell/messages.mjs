@@ -20,6 +20,7 @@ export function createMessages(deps) {
   const writeLocation = deps.writeLocation;
   const choose = deps.choose;
   const openEditor = deps.openEditor;
+  const focusTitleInput = deps.focusTitleInput;
   const openLoginStart = deps.openLoginStart;
   const openAccountMenu = deps.openAccountMenu;
   const openCleanup = deps.openCleanup;
@@ -67,7 +68,17 @@ export function createMessages(deps) {
     }
     // #315: 공유 감상(share)은 읽기 전용이다. 안쪽 화면의 버튼 정리를 통과한 쓰기 메시지가 남아도 여기서 막는다(이중).
     if (data?.type === 'lt41-write' && getSource() === 'share') return;
+    if (data?.type === 'lt41-write' && data.mode === 'edit' && data.momentId) {
+      const targetTree = data.treeId
+        ? getModel()?.trees.find(t => t.id === data.treeId && t.moments.some(m => m.id === data.momentId))
+        : (window.LT41?.tree?.moments.some(m => m.id === data.momentId) ? window.LT41.tree : getModel()?.trees.find(t => t.moments.some(m => m.id === data.momentId)));
+      if (targetTree) {
+        if (window.LT41?.tree?.id !== targetTree.id) choose(targetTree.id, data.momentId);
+        else { window.LT41.momentId = data.momentId; links(); writeLocation(); }
+      }
+    }
     if (data?.type === 'lt41-write') openEditor(data.mode, data.parentId);
+    if (data?.type === 'lt41-write' && data.focusTitle) focusTitleInput?.();
     // #327 2부: 순간 상세의 '다른 트리로 옮기기'. 공유·예시 화면에서는 보내지 않고, 여기서도 한 번 더 막는다.
     if (data?.type === 'lt41-move' && getSource() === 'server') openCleanup({ momentId: data.momentId });
     if (data?.type === 'lt41-open-book' && getModel()?.trees.some(t => t.id === data.treeId && t.moments.some(m => m.id === data.id))) {

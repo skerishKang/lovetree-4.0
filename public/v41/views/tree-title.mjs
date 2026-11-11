@@ -4,6 +4,7 @@
 // 공유·예시(읽기 전용)에서는 ▾와 ← 내 트리를 숨긴다(셸의 트리 선택도 로그인한 내 기록에서만 보인다).
 import {treeTitleText} from '/v41/book-usability.mjs';
 import {coverChoice, COVER_PALETTE} from '/v41/views/shelf/shelf-model.mjs';
+import {thumbnailCandidates, coverFallbackAttrs, mountThumbFallback} from '/v41/thumb-fallback.mjs';
 
 const t = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
@@ -21,12 +22,15 @@ function describeUrl(value) {
 }
 // 표지 판정은 책장과 같은 규칙(shelf-model coverChoice)에 맞춘 최소 모양으로 넘긴다.
 function coverMomentOf(tree) {
-  const raw = (tree.moments || []).find(m => m.id === tree.coverMomentId) || null;
+  const moments = Array.isArray(tree.moments) ? tree.moments : [];
+  const raw = (tree.coverMomentId ? moments.find(m => m.id === tree.coverMomentId) : null) || moments[0] || null;
   if (!raw) return null;
   const media = describeUrl(raw.url || '');
+  const cands = thumbnailCandidates(raw, {autoLoad: true});
   const type = media.kind === 'photo' ? 'photo' : (media.kind === 'video' || media.kind === 'youtube') ? 'video' : raw.url ? 'link' : 'memo';
-  const image = media.kind === 'photo' && media.privateFile ? media.loadUrl : (raw.image || '');
-  return {id: raw.id, type, image};
+  const photo = media.kind === 'photo' && media.privateFile ? media.loadUrl : (raw.image || '');
+  const image = photo || cands[0] || '';
+  return {id: raw.id, type, image, youtubeThumb: !!(!photo && cands[0]), candidates: cands.length ? cands : (image ? [image] : [])};
 }
 // 셸 트리 드롭다운(#380)·책(#416)과 같은 순서: 정리 전 트리가 먼저.
 function treeRows() {
@@ -47,7 +51,8 @@ function treeRows() {
 const countText = row => row.inbox ? '정리 전 ' + row.count : row.count + '개의 순간';
 function coverSpan(row, index) {
   const choice = coverChoice({coverMode: row.coverMode, coverMomentId: row.coverMomentId, coverDesign: row.coverDesign, moments: row.cover ? [row.cover] : []}, index, COVER_PALETTE);
-  const thumb = choice.coverMedia ? '<img src="' + t(choice.coverMedia) + '" alt="" loading="lazy" referrerpolicy="no-referrer">' : '';
+  const fb = choice.coverMedia ? coverFallbackAttrs(row.cover?.candidates || [choice.coverMedia]) : '';
+  const thumb = choice.coverMedia ? '<img src="' + t(choice.coverMedia) + '"' + fb + ' alt="" loading="lazy" referrerpolicy="no-referrer">' : '';
   return '<span class="tree-cover"' + (choice.design ? ' data-cover-design="' + t(choice.design) + '"' : '') + ' style="background-color:' + t(choice.color) + '" aria-hidden="true">' + thumb + '</span>';
 }
 
@@ -108,4 +113,7 @@ export function mountTreeTitle({view}) {
 
 // 보드·지도 화면만 스스로 붙는다(책은 #416의 자기 구현을 그대로 쓴다).
 const screen = document.documentElement.dataset.v41Screen;
-if (screen === 'board' || screen === 'network') mountTreeTitle({view: screen});
+if (screen === 'board' || screen === 'network') {
+  mountThumbFallback(document);
+  mountTreeTitle({view: screen});
+}

@@ -17,7 +17,7 @@
   if(typeof document!=='undefined')addEventListener('DOMContentLoaded',()=>{
     const detail=document.querySelector('#detailNote');
     if(detail&&window.LTMedia){const host=document.createElement('div');detail.parentElement.after(host);let last=null;
-      const update=()=>{const id=context.momentId;if(id===last)return;last=id;const m=tree.moments.find(m=>m.id===id);host.innerHTML=m?.url?window.LTMedia.markup(m.url,m.title,m.mediaMetadata,m.id):'';
+      const update=()=>{const id=context.momentId;if(id===last)return;last=id;const m=tree.moments.find(m=>m.id===id);host.innerHTML=m?.url?window.LTMedia.markup(m.url,m.title,m.mediaMetadata,m.id,null,{emotion:m.emotion,date:m.date,note:m.note,treeId:tree.id}):'';
         // #327 2부: 내 기록(서버)의 순간 상세에서 다른 트리로 옮기기. 공유·예시는 숨긴다.
         if(m&&context.source==='server'){const button=document.createElement('button');button.type='button';button.className='lt-move-btn';button.textContent='다른 트리로 옮기기';button.addEventListener('click',()=>parent.postMessage({type:'lt41-move',momentId:m.id},location.origin));host.append(button);}};
       new MutationObserver(update).observe(document.getElementById('detailTitle'),{childList:true,subtree:true});update();

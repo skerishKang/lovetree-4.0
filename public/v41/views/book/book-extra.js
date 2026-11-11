@@ -1,6 +1,9 @@
 // 2026-11-08 기억책 사용성 1~9 화면 보조. 데이터·저장 계약은 그대로 두고 표시만 바꾼다.
 import {displayTitle,withoutAutoTitle,titleParts,mediaSourceText,editAffordances,embedUrl,connectionLine,readLens,writeLens,detailPlacement,nextMomentMessage,NEXT_PAGE_COPY,NEXT_PAGE_ACTION,treeTitleText,isPrimaryButton,tapIntent,createOverflowRejudge,titleView,formatDisplayDate} from '/v41/book-usability.mjs';
 import {coverChoice,COVER_PALETTE} from '/v41/views/shelf/shelf-model.mjs';
+import {coverMomentFor} from '/v41/views/shelf/shelf-model.mjs';
+import {thumbnailCandidates,thumbFallbackAttrs,coverFallbackAttrs,fallbackCardMarkup,mountThumbFallback,VIDEO_UNAVAILABLE_TEXT} from '/v41/thumb-fallback.mjs';
+mountThumbFallback(document);
 const $b=s=>document.querySelector(s);
 // #347 후속: 제목 보기 설정은 계정(LTDEMO.prefs)에서 읽고, 화면은 한 벌(titleView)로 그린다.
 const titleDisplay=()=>{try{return LTDEMO.prefs?.titleDisplay||'both'}catch{return 'both'}};
@@ -102,14 +105,16 @@ function playInline(yt,media){
 }
 document.addEventListener('pointerdown',e=>{
  if(!isPrimaryButton(e))return;
+ if(e.target.closest&&e.target.closest('[data-lt-title-edit]'))return;
  const yt=e.target.closest&&e.target.closest('[data-yt-play]');
- if(!yt)return;
+ if(!yt||yt.querySelector('.lt-fallback-card'))return;
  e.preventDefault();e.stopPropagation();
  const url=yt.dataset.ytPlay?{openUrl:'https://www.youtube.com/watch?v='+yt.dataset.ytPlay+(Number(yt.dataset.ytStart||0)?'&t='+Number(yt.dataset.ytStart||0):'')}:null;
  playInline(yt,url);
 },true);
 document.addEventListener('click',e=>{
  if(!isPrimaryButton(e))return;
+ if(e.target.closest&&e.target.closest('[data-lt-title-edit]'))return;
  // #393 2: 크게 보기 — 어두운 깔개 위 화면 가운데 크게(세로 높이 가득·가로 폭 가득). 바깥 클릭·Esc로 책 복귀.
  const expand=e.target.closest('[data-yt-expand]');
  if(expand){e.preventDefault();e.stopPropagation();const m=metadataFor(expand.dataset.ytExpand);
@@ -121,7 +126,7 @@ document.addEventListener('click',e=>{
  if(openTree){e.preventDefault();e.stopPropagation();const momentId=openTree.dataset.openMoment,treeId=openTree.dataset.openTree;if(momentId&&treeId)LTDEMO.openBook(momentId,treeId);return}
  /* 1. YouTube 그 자리 재생: 누른 뒤에만 iframe을 만든다(시작 시점 반영, referrerpolicy 엄격). */
  const yt=e.target.closest('[data-yt-play]');
- if(yt){e.preventDefault();e.stopPropagation();if(!yt.parentElement||yt.parentElement.querySelector('iframe.yt-frame'))return;
+ if(yt){if(yt.querySelector('.lt-fallback-card'))return;e.preventDefault();e.stopPropagation();if(!yt.parentElement||yt.parentElement.querySelector('iframe.yt-frame'))return;
   playInline(yt,{openUrl:'https://www.youtube.com/watch?v='+yt.dataset.ytPlay});return}
  const edit=e.target.closest('[data-title-edit],[data-note-edit]');
  if(edit){if(LTDEMO.readOnly)return;e.preventDefault();e.stopPropagation();const id=edit.dataset.titleEdit||edit.dataset.noteEdit||'';if(window.parent===window){toast('이 순간 고치기는 러브트리 화면에서 열 수 있어요');return}
@@ -167,18 +172,21 @@ function localThumb(m){const src=String(m.image||'');if(src.startsWith('data:ima
 const originalMomentContent=momentContent;
 momentContent=function(m,compact=false){
  const safe=withoutAutoTitle(m);
+ const writableBook=!LTDEMO.readOnly;
  if(safe.url&&window.LTMedia&&LTMedia.describe){
   const media=LTMedia.describe(safe.url);
+  const ctx=(typeof LTMedia.currentContext==='function')?LTMedia.currentContext():{source:'',owned:false};
   if(media.kind==='youtube'){
    // #327 1부: 내 기록(서버·로그인 소유자)은 썸네일을 처음부터 보여 준다(판정은 media-preview 의
    // autoLoadMedia 한 함수). 공유·예시는 기존 규칙 그대로 — 누르기 전 외부 요청 0.
    const thumb=localThumb(safe);
-   const ctx=(typeof LTMedia.currentContext==='function')?LTMedia.currentContext():{source:'',owned:false};
    const auto=!thumb&&LTMedia.autoLoadMedia(ctx.source,ctx.owned);
-   // #393: 세로 영상은 세로 틀(9:16)·원본 비율 썸네일(잘림 없음). 판정·주소는 LTMedia 한 벌.
+   // #393·#429: 세로 영상 틀(9:16)과 썸네일 내려가기(저장 주소 → oardefault/hqdefault → mqdefault → 글/최소 카드) 한 벌.
    const vertical=LTMedia.verticalVideo(safe.url,safe.mediaMetadata);
-   const remoteThumb=vertical?LTMedia.youtubeThumbUrl(media.videoId,true):media.loadUrl;
-   const thumbFallback=vertical?' onerror="this.onerror=null;this.src=\''+LTMedia.youtubeThumbUrl(media.videoId,false)+'\'"':'';
+   const defaultThumb=vertical?LTMedia.youtubeThumbUrl(media.videoId,true):media.loadUrl;
+   const candidates=auto?thumbnailCandidates(m,{vertical,autoLoad:true}):[];
+   const remoteThumb=candidates[0]||defaultThumb;
+   const thumbFallback=auto?thumbFallbackAttrs(m,{candidates:candidates.length?candidates:[remoteThumb],writable:writableBook,videoUnavailable:true,variant:'book',momentId:safe.id}):'';
    const label=media.startSeconds?('여기서 재생 · '+media.label.replace('YouTube 링크 · ','')):'여기서 재생';
    const face=thumb?'<img src="'+t(thumb)+'" alt="">'
     :auto?'<img src="'+t(remoteThumb)+'" alt="'+t(safe.title||'YouTube 영상 썸네일')+'"'+thumbFallback+' referrerpolicy="no-referrer" loading="lazy" decoding="async">'
@@ -187,12 +195,18 @@ momentContent=function(m,compact=false){
     const source=String(safe.mediaMetadata?.channel||'').trim();
    const piece='<div class="clipping moment" data-moment="'+t(safe.id)+'">'+
     '<div class="yt-expand"><button type="button" data-yt-expand="'+t(safe.id)+'">크게 보기</button></div>'+
-    '<button type="button" class="yt-play'+(vertical?' is-vertical':'')+'" data-yt-play="'+t(media.videoId)+'" data-yt-start="'+t(media.startSeconds||0)+'"'+(vertical?' data-yt-vertical="1"':'')+'>'+
+    '<button type="button" class="yt-play'+(vertical?' is-vertical':'')+'" data-lt-thumb-host data-yt-play="'+t(media.videoId)+'" data-yt-start="'+t(media.startSeconds||0)+'"'+(vertical?' data-yt-vertical="1"':'')+'>'+
     face+
     '<span class="yt-play-label">'+t(label)+'</span></button>'+
     '<div class="media-source">'+
     (source?'<span class="media-source-mark" aria-hidden="true">▶</span><span class="media-source-text">'+t(source)+'</span><span class="media-source-sep" aria-hidden="true"></span>':'')+
     '<a class="media-source-link" href="'+t(media.openUrl)+'" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">YouTube ↗</a></div></div>';
+   return piece+paintTitle(safe);
+  }
+  if(media.kind==='link'&&!localThumb(safe)&&LTMedia.autoLoadMedia(ctx.source,ctx.owned)){
+   const piece='<div class="clipping moment" data-moment="'+t(safe.id)+'">'+
+    fallbackCardMarkup(m,{writable:writableBook,videoUnavailable:false,variant:'book',momentId:safe.id})+
+    '<div class="media-source"><a class="media-source-link" href="'+t(media.openUrl)+'" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">원본 링크 열기 ↗</a></div></div>';
    return piece+paintTitle(safe);
   }
  }
@@ -245,7 +259,9 @@ const treeCountText=tree=>tree.inbox===true?'정리 전 '+(tree.moments?.length|
 const treeCoverSpan=(tree,index=0)=>{
  // 표지 판정은 책장과 같은 규칙(shelf-model coverChoice): 표지 사진 > 디자인 표지 > 기본 색.
  const choice=coverChoice(tree,index,COVER_PALETTE);
- const thumb=choice.coverMedia?'<img src="'+t(choice.coverMedia)+'" alt="" loading="lazy" referrerpolicy="no-referrer">':'';
+ const chosen=choice.coverMedia?coverMomentFor(tree):null;
+ const coverCands=chosen?thumbnailCandidates(chosen,{autoLoad:true}):(choice.coverMedia?[choice.coverMedia]:[]);
+ const thumb=choice.coverMedia?'<img src="'+t(choice.coverMedia)+'"'+coverFallbackAttrs(coverCands)+' alt="" loading="lazy" referrerpolicy="no-referrer">':'';
  return '<span class="tree-cover"'+(choice.design?' data-cover-design="'+t(choice.design)+'"':'')+' style="background-color:'+t(choice.color)+'" aria-hidden="true">'+thumb+'</span>';
 };
 function otherTreesBlock(){
@@ -288,13 +304,18 @@ if(treeTrigger&&treeMenu){
 let journeyOpener=null;
 function journeyMarkup(journey){
  return journey.items.map(item=>{
-  const thumb=item.thumb?'<img src="'+t(item.thumb)+'" alt="" referrerpolicy="no-referrer" loading="lazy" decoding="async">':'';
+  const raw=(LTDEMO.moments||[]).find(x=>x.id===item.id)||item;
+  const cands=item.thumb?thumbnailCandidates(raw,{autoLoad:true}):[];
+  const src=cands[0]||item.thumb;
+  const fbAttrs=src?thumbFallbackAttrs(raw,{candidates:cands.length?cands:[src],mode:'thumb-slot'}):'';
+  const thumb=src?'<img src="'+t(src)+'"'+fbAttrs+' alt="" referrerpolicy="no-referrer" loading="lazy" decoding="async">':'';
   const emotion=item.emotion?'<span class="journey-emotion"><span class="emotion-dot" data-tone="'+item.tone+'" aria-hidden="true"></span>'+t(item.emotion)+'</span>':'';
-  return '<button type="button" class="journey-item'+(item.current?' current':'')+'" data-journey="'+item.index+'" data-focus="'+t(item.id)+'">'+
+  return '<button type="button" class="journey-item'+(item.current?' current':'')+'" data-lt-moment-row data-journey="'+item.index+'" data-focus="'+t(item.id)+'">'+
    '<span class="journey-thumb" data-tone="'+item.tone+'">'+thumb+'</span>'+
    '<span class="journey-node" aria-hidden="true"></span>'+
    '<span class="journey-text"><span class="journey-date">'+t(formatDisplayDate(item.date))+(item.first?' · 첫 순간':'')+'</span>'+
    '<span class="journey-title-row"><span class="journey-title">'+t(item.title)+'</span>'+(item.current?'<span class="journey-now">지금 보는 순간</span>':'')+'</span>'+
+   '<small class="lt-row-unavailable" data-lt-row-unavailable hidden>'+VIDEO_UNAVAILABLE_TEXT+'</small>'+
    emotion+'</span></button>'+
    (item.reason?'<p class="journey-reason">↳ '+t(item.reason)+'</p>':'');
  }).join('');
