@@ -95,6 +95,16 @@ html[data-v41-screen=book] .next-page b{font-family:var(--lt-reading);font-size:
 html[data-v41-screen=book] .next-page p{margin:0;font-size:13px;line-height:1.6;color:var(--lt-muted);word-break:keep-all}
 html[data-v41-screen=book] .next-page button{min-height:44px;padding:10px 18px;border-radius:var(--lt-r-pill);border:1px solid var(--lt-gold-ink);background:var(--lt-gold-ink);color:var(--lt-paper);font-size:14px;cursor:pointer}
 html[data-v41-screen=book] .next-page button:hover{filter:brightness(1.06)}
+/* #393 5: 다른 트리 보기 — 마지막 장 아래쪽에 다른 트리 표지 2~3개. 다른 트리가 없으면 아예 그리지 않는다. */
+html[data-v41-screen=book] .other-trees{display:grid;gap:8px;margin-top:4px}
+html[data-v41-screen=book] .other-trees>b{font-family:var(--lt-reading);font-size:13px;color:var(--lt-muted)}
+html[data-v41-screen=book] .other-tree-row{display:flex;justify-content:center;gap:10px;flex-wrap:wrap}
+html[data-v41-screen=book] .next-page .other-tree{display:grid;justify-items:center;gap:4px;min-height:0;width:96px;padding:8px 6px;border:1px solid var(--lt-line-paper);border-radius:12px;background:var(--lt-paper);color:var(--lt-ink);cursor:pointer}
+html[data-v41-screen=book] .next-page .other-tree:hover,html[data-v41-screen=book] .next-page .other-tree:focus-visible{filter:none;box-shadow:0 6px 14px rgba(40,24,18,.16)}
+html[data-v41-screen=book] .other-tree .tree-cover{width:54px;height:72px}
+html[data-v41-screen=book] .other-tree-name{max-width:84px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-weight:600}
+html[data-v41-screen=book] .other-tree small{font-size:10px;color:var(--lt-muted)}
+html[data-v41-screen=book] .mobile-support.next-page .other-trees{margin-top:10px}
 html[data-v41-screen=book] .read-folio{position:absolute;right:20px;bottom:40px;display:flex;align-items:center;gap:6px;font-size:13px;color:var(--lt-muted)}
 html[data-v41-screen=book] .read-folio button[hidden]{display:none}
 html[data-v41-screen=book] .read-folio button{min-height:44px;min-width:44px;border:0;background:transparent;color:var(--lt-rose-ink);font-size:13px;cursor:pointer}
@@ -192,3 +202,5 @@ html[data-book-view=single][data-v41-screen=book] .journey-thumb{width:52px;heig
 html[data-book-view=single][data-v41-screen=book] .journey:before{left:70px;top:22px;bottom:22px}
 html[data-book-view=single][data-v41-screen=book] .journey-node{margin-top:20px}
 html[data-book-view=single][data-v41-screen=book] .journey-reason{margin-left:88px}
+/* #393 5: 좁은 폭에서는 도구 줄이 스크롤되고 제목이 자리를 얻는다(책 화면은 셸 규칙이 오른쪽 정렬이라 여기서 다룬다). */
+@media(max-width:600px){html[data-v41-screen=book] .topbar .tools{max-width:40vw}}

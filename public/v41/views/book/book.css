@@ -6,12 +6,28 @@ button:focus-visible{outline:2px solid #e7b6c6;outline-offset:2px}
 button{touch-action:manipulation}
 body:before{content:"MEMORY\A SKETCHBOOK";white-space:pre;position:fixed;left:3.5vw;top:9vh;font:600 clamp(50px,8vw,128px)/.83 var(--book-serif);letter-spacing:-.06em;color:rgba(255,240,228,.034);pointer-events:none}
 .ambient{position:fixed;inset:0;background:radial-gradient(circle at 50% 20%,rgba(132,79,111,.20),transparent 38%),radial-gradient(circle at 80% 75%,rgba(72,108,119,.12),transparent 33%),linear-gradient(135deg,#151015,#281823 56%,#171116);pointer-events:none}
-.topbar{position:fixed;z-index:80;left:0;right:0;top:0;height:70px;display:flex;align-items:center;justify-content:space-between;padding:0 28px;border-bottom:1px solid rgba(255,255,255,.06);background:linear-gradient(180deg,rgba(22,15,20,.9),rgba(22,15,20,.45),transparent);backdrop-filter:blur(12px)}
-.brand{display:flex;align-items:baseline;gap:12px}
-.brand strong{font-size:12px;letter-spacing:.25em}
-.brand span{font:18px var(--book-serif);color:#d7bbb6}
-.crumb{font-size:9px;letter-spacing:.14em;color:#a78f92;margin-left:8px}
-.tools{display:flex;gap:7px}
+.topbar{position:fixed;z-index:80;left:0;right:0;top:0;height:70px;display:flex;align-items:center;justify-content:flex-start;gap:10px;padding:0 28px;border-bottom:1px solid rgba(255,255,255,.06);background:linear-gradient(180deg,rgba(22,15,20,.9),rgba(22,15,20,.45),transparent);backdrop-filter:blur(12px)}
+/* #393 5: 지금 책 제목을 크게 + ▾ — 왼쪽 위 '← 내 트리' 옆. 누르면 트리 목록(셸 드롭다운과 같은 내용)이 열린다. */
+/* #393 5: 왼쪽 묶음(← 내 트리 + 제목 ▾) — 셸이 책 화면 topbar를 오른쪽 정렬로 둬서 묶음에 auto 마진을 둔다 */
+.topbar-left{display:flex;align-items:center;gap:10px;min-width:0;margin-right:auto}
+.book-title{position:relative;min-width:0}
+.book-title-btn{display:inline-flex;align-items:center;gap:7px;max-width:100%;min-width:0;min-height:44px;padding:6px 11px;border:0;border-radius:10px;background:none;color:#eaded8;cursor:pointer;overflow:hidden}
+.book-title-btn:hover,.book-title-btn:focus-visible{background:rgba(64,44,38,.22)}
+#bookTitleText{font:700 18px var(--book-serif);letter-spacing:-.01em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.book-title-caret{flex:none;font-size:10px;color:#a78f92;transition:transform .15s}
+.book-title-btn[aria-expanded=true] .book-title-caret{transform:rotate(180deg)}
+/* 트리 목록 — 셸의 트리 드롭다운(.tree-item·.tree-cover)과 같은 내용·같은 모양, 종이 테마 색으로 */
+.tree-menu{position:absolute;z-index:95;top:calc(100% + 6px);left:0;min-width:300px;max-height:min(70vh,520px);overflow:auto;padding:8px;border:1px solid rgba(199,155,168,.4);border-radius:14px;background:var(--paper);box-shadow:0 18px 40px rgba(40,24,18,.3)}
+.tree-menu[hidden]{display:none!important}
+.tree-menu .tree-item{display:flex;align-items:center;gap:10px;width:100%;min-height:52px;padding:5px 7px;border:0;border-radius:10px;background:none;color:var(--ink);text-align:left;font:13px var(--ui-sans);cursor:pointer}
+.tree-menu .tree-item:hover,.tree-menu .tree-item:focus-visible{background:rgba(64,44,38,.07)}
+.tree-menu .tree-item[aria-checked=true]{background:rgba(185,144,95,.12);box-shadow:inset 0 0 0 1px var(--gold)}
+.tree-cover{width:36px;height:46px;flex:0 0 auto;border-radius:6px;border:1px solid rgba(120,91,62,.3);overflow:hidden;background-color:var(--gold);box-shadow:inset 8px 0 0 rgba(0,0,0,.13);display:block}
+.tree-cover img{width:100%;height:100%;object-fit:cover;display:block}
+.tree-menu .tree-name{min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.tree-menu .tree-count{flex:none;font-size:11px;color:#8b796e;white-space:nowrap}
+.tree-menu .tree-check{flex:none;color:var(--gold);font-weight:800}
+.tools{display:flex;gap:7px;margin-left:auto}
 /* #393 4: 한 장/두 장 보기 단추 — 목차·돋보기 옆 한 벌. 눌린 쪽이 aria-pressed로 표시된다. */
 .view-toggle{display:inline-flex;flex:none}
 .view-toggle .ui-btn{min-height:44px}
@@ -231,9 +247,8 @@ html[data-lt-theme=garden] .shelf-back:hover{background:var(--lt-glass-strong);b
 .source-current{padding:8px 10px;border-radius:9px;background:#eadfd2;font:10px/1.45 var(--ui-sans);color:#705c53;margin:10px 0}
 html[data-book-view=single] body:before{font-size:46px;top:13vh;left:5vw}
 html[data-book-view=single] .topbar{height:60px;padding:0 12px}
-html[data-book-view=single] .brand strong{font-size:10px}
-html[data-book-view=single] .brand span{font-size:14px}
-html[data-book-view=single] .crumb{display:none}
+html[data-book-view=single] .book-title-btn{max-width:100%}
+html[data-book-view=single] #bookTitleText{font-size:14px}
 html[data-book-view=single] .tools{gap:4px}
 html[data-book-view=single] .tools .ui-btn{padding:7px 9px;font-size:9px}
 html[data-book-view=single] .desktop-only{display:none!important}
@@ -324,7 +339,8 @@ html[data-book-view=single] .archive-item small{font-size:10px;line-height:1.4}
 .mobile-content{padding-left:25px;padding-right:18px}
 .mobile-kicker{left:27px}
 .mobile-page .photo-piece img,.mobile-page .film-piece img{height:218px}
-.brand span{display:none}
+#bookTitleText{font-size:13px}
+.tree-menu{min-width:240px}
 .tools .ui-btn:nth-child(3){display:none}
 }
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}
