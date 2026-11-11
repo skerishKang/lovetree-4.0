@@ -126,15 +126,32 @@ export function createMessages(deps) {
       host.append(p);
       return;
     }
-    for (const item of selected) {
-      const row = document.createElement('div');
-      row.className = 'share-item' + (item.status === 'revoked' ? ' share-revoked' : '');
-      const text = document.createElement('div'), strong = document.createElement('strong'), small = document.createElement('small');
-      strong.textContent = item.status === 'active' ? (item.discoverable ? '공유 중 · 둘러보기에 올림' : '공유 중 · 주소로만 공개') : '공유 취소됨';
-      small.textContent = (item.view === 'board' ? '기억 보드' : item.view === 'network' ? '관계 지도' : '기억책') + ' · ' + new Date(item.createdAt).toLocaleString('ko-KR');
-      text.append(strong, small);
-      row.append(text);
-      if (item.status === 'active') {
+    // #369: 살아 있는 주소만 위에, 취소된 주소는 '지난 주소 N개' 접힘 안에 둔다.
+    const active = selected.filter(item => item.status === 'active');
+    const past = selected.filter(item => item.status !== 'active');
+    for (const item of active) host.append(shareRow(item));
+    if (past.length) {
+      const details = document.createElement('details');
+      details.className = 'share-past';
+      const summary = document.createElement('summary');
+      summary.textContent = `지난 주소 ${past.length}개`;
+      details.append(summary);
+      for (const item of past) details.append(sharePastRow(item));
+      host.append(details);
+    }
+  }
+  function shareLabel(item) {
+    return (item.view === 'board' ? '기억 보드' : item.view === 'network' ? '관계 지도' : '기억책') + ' · ' + new Date(item.createdAt).toLocaleDateString('ko-KR') + '에 만든 주소';
+  }
+  function shareRow(item) {
+    const row = document.createElement('div');
+    row.className = 'share-item';
+    const text = document.createElement('div'), strong = document.createElement('strong'), small = document.createElement('small');
+    strong.textContent = item.discoverable ? '공유 중 · 둘러보기에 올림' : '공유 중 · 주소로만 공개';
+    small.textContent = shareLabel(item);
+    text.append(strong, small);
+    row.append(text);
+    {
         const actions = document.createElement('div');
         actions.className = 'share-item-actions';
         const discover = document.createElement('button');
@@ -149,6 +166,17 @@ export function createMessages(deps) {
           $('share-feedback').textContent = next ? '둘러보기에 올렸어요. 둘러보기 목록에서 이 트리를 볼 수 있어요.' : '둘러보기에서 내렸어요. 공유 주소는 계속 사용할 수 있어요.';
           await loadShareList();
         };
+        const copy = document.createElement('button');
+        copy.type = 'button';
+        copy.textContent = '복사';
+        copy.onclick = async () => {
+          try {
+            await navigator.clipboard.writeText(shareUrlFor(item.id, item.view));
+            $('share-feedback').textContent = '공유 주소를 복사했어요.';
+          } catch {
+            $('share-feedback').textContent = '복사하지 못했어요. 열어 보기로 주소를 확인해 주세요.';
+          }
+        };
         const revoke = document.createElement('button');
         revoke.type = 'button';
         revoke.textContent = '공유 취소';
@@ -161,11 +189,20 @@ export function createMessages(deps) {
           if ($('share-url').dataset.shareId === item.id) { $('share-created').hidden = true; $('share-discover').checked = false; $('share-discover').disabled = true; }
           await loadShareList();
         };
-        actions.append(discover, revoke);
+        actions.append(discover, copy, revoke);
         row.append(actions);
       }
-      host.append(row);
-    }
+      return row;
+  }
+  function sharePastRow(item) {
+    const row = document.createElement('div');
+    row.className = 'share-item share-revoked';
+    const text = document.createElement('div'), strong = document.createElement('strong'), small = document.createElement('small');
+    strong.textContent = '공유 취소됨';
+    small.textContent = shareLabel(item);
+    text.append(strong, small);
+    row.append(text);
+    return row;
   }
   async function loadShareList() {
     const answer = await shareApi.list();
