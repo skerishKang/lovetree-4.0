@@ -71,11 +71,18 @@ test('큰 제목 아래 둘째 줄 상태 문구 계산(2026-11-11): 정리 알�
 
 test('홈 배선: 추가/resume/둘러보기/로그아웃 시작이 기존 액션으로 연결된다',()=>{
   assert.match(homeSrc,/bridge\.actions\.requestMoment\('add'\)/);
-  assert.match(homeSrc,/bridge\.actions\.resume/);
-  assert.match(homeSrc,/bridge\.actions\.community/);
+  assert.match(homeSrc,/bridge\.actions\.resume\(\)/);
+  assert.match(homeSrc,/communityButton\.onclick=\(\)=>bridge\.actions\.community\(\)/,'둘러보기 연결');
+  assert.match(homeSrc,/guideButton\.onclick=\(\)=>bridge\.actions\.community\(\)/,'어떻게 쓰나요 = 둘러보기 동일');
   assert.match(homeSrc,/first\.onclick=bridge\.actions\.start/);
   const centerCode=homeCenterSrc.split('\n').filter(line=>!line.trim().startsWith('//')).join('\n');
   assert.equal(/새 트리 만들기/.test(centerCode),false,'"새 트리 만들기"는 가운데 줄에서 뺀다');
+});
+
+test('큰 제목 아래 설명 둘째 줄: 높이 두 줄 고정·정리하기 한 줄 링크',()=>{
+  assert.match(homeSrc,/\.center > p:not\(\.center-note\)\{min-height:2lh\}/);
+  assert.match(homeSrc,/center-status/,'정리하기 상태 줄');
+  assert.match(homeSrc,/bridge\.actions\.cleanup\(\)/,'정리 창 연결');
 });
 
 test('가운데 위 모아둔 순간 알약은 첫 화면에서 제거됐다',()=>{
