@@ -2,7 +2,7 @@
 // 2026-11-08 리팩터링: 동작·문구·디자인·저장 계약 변경 0.
 // shell.mjs에서 조건·조회 방식·인자 형태를 바꾸지 않고 그대로 옮겼다(원칙 7).
 // 셸은 자기 상태(member·source·window.LT41·업로드)를 읽기 함수로 넘기고, 이 파일은 패널만 만진다.
-import {parentCandidates, suggestMomentTitle} from '../domain.mjs';
+import {parentCandidates, suggestMomentTitle, coverModeOf} from '../domain.mjs';
 import {displayTreeTitle} from '../tree-name.mjs';
 import {mountPrivateUpload} from '../private-upload.mjs';
 import {fetchVideoTitle} from '../video-title.mjs';
@@ -113,24 +113,58 @@ export function createPanels(deps) {
     queueMicrotask(() => $('moment-form').elements.note.focus());
   }
 
+  // #380 5번: 표지를 정하는 방법은 한 줄에서 하나만 고른다(첫 순간(기본)·순간에서·디자인·사진).
+  // 고른 방법의 내용만 아래에 보이고, 저장에는 고른 방법(coverMode)을 함께 넘긴다.
+  function treeCoverMode() {
+    const form = $('tree-form');
+    const value = form.elements.coverMode?.value || 'basic';
+    return ['basic', 'moment', 'design', 'photo'].includes(value) ? value : 'basic';
+  }
+  function firstMomentId(tree) {
+    const moments = [...(tree?.moments || [])].sort((a, b) => String(a.createdAt || '').localeCompare(String(b.createdAt || '')));
+    return moments[0]?.id || '';
+  }
+  function showTreeCoverMethod() {
+    const mode = treeCoverMode();
+    $('tree-cover-moment-box').hidden = !(mode === 'moment' || mode === 'photo');
+    $('tree-design').hidden = mode !== 'design';
+    $('tree-cover-upload').hidden = mode !== 'photo';
+    updateTreeCoverHint();
+  }
   function updateTreeCoverHint() {
-    const c = window.LT41, selected = c?.tree.moments.find(m => m.id === $('tree-cover').value);
-    // #256-3: 사진 표지가 디자인 표지보다 우선한다(coverChoice 규칙). 사진을 고르면 안내를 눈에 보이게 띄운다.
+    const c = window.LT41, mode = treeCoverMode(), tree = c?.tree;
+    const selected = tree?.moments.find(m => m.id === $('tree-cover').value);
     // 디자인 줄은 disabled로 막지 않는다 — 막으면 라디오가 전송에서 빠져 저장할 때 고른 디자인이 지워진다.
     const photoCover = !!selected && LTMedia.describe(selected.url || '').kind === 'photo';
-    $('tree-photo-cover').hidden = !photoCover;
+    $('tree-photo-cover').hidden = !((mode === 'photo' || mode === 'moment') && photoCover);
+    if (mode === 'basic') {
+      const first = tree?.moments.find(m => m.id === firstMomentId(tree));
+      $('tree-cover-hint').textContent = first
+        ? `“${first.title}” — 이 트리의 첫 순간을 표지로 씁니다. 그 순간에 사진이 있으면 사진, 없으면 기본 표지예요.`
+        : '첫 순간을 표지로 씁니다. 순간이 없으면 기본 표지예요.';
+      return;
+    }
+    if (mode === 'design') {
+      const design = $('tree-form').elements.coverDesign?.value || '';
+      $('tree-cover-hint').textContent = design ? '고른 디자인을 표지로 씁니다. 저장해 둔 사진 표지는 지우지 않고 그대로 둡니다.' : '디자인을 고르지 않으면 기본 표지를 씁니다. 저장해 둔 사진 표지는 지우지 않고 그대로 둡니다.';
+      return;
+    }
+    if (mode === 'photo') {
+      $('tree-cover-hint').textContent = photoCover ? '올린 사진을 표지로 씁니다.' : '사진을 올리면 그 사진이 이 트리의 새 순간이 되고 표지가 됩니다.';
+      return;
+    }
     if (!selected) {
-      $('tree-cover-hint').textContent = '표지를 고르지 않으면 기존 금테 장식 표지를 사용합니다.';
+      $('tree-cover-hint').textContent = '순간을 고르면 그 순간이 표지가 됩니다.';
       return;
     }
     const media = LTMedia.describe(selected.url || '');
-    $('tree-cover-hint').textContent = media.kind === 'photo' ? `“${selected.title}”의 사진을 표지로 사용합니다.` : `“${selected.title}”을 표지 순간으로 표시하고 금테 장식 표지를 사용합니다.`;
+    $('tree-cover-hint').textContent = media.kind === 'photo' ? `“${selected.title}”의 사진을 표지로 사용합니다.` : `“${selected.title}”을 표지 순간으로 표시하고 기본 표지를 사용합니다.`;
   }
   function fillTreeCoverOptions(tree) {
     // #256-3 2단계: 책 표지 선택지는 이 함수 한 곳에서 채운다(창 열기·새 사진 표지 만들기 뒤 다시 채우기 공용).
     $('tree-cover').replaceChildren();
     const fallback = document.createElement('option');
-    fallback.value = ''; fallback.textContent = '기본 금테 장식 표지';
+    fallback.value = ''; fallback.textContent = '순간을 고르지 않음';
     $('tree-cover').append(fallback);
     for (const moment of tree.moments) {
       const option = document.createElement('option'), media = LTMedia.describe(moment.url || '');
@@ -147,18 +181,19 @@ export function createPanels(deps) {
     form.elements.title.value = tree.title;
     form.elements.subject.value = tree.subject;
     fillTreeCoverOptions(tree);
-    $('tree-cover').value = tree.coverMomentId || '';
-    // #256-3 2단계: 새 사진 표지 만들기는 로그인·서버 기록에서만 보인다.
-    $('tree-cover-upload').hidden = false;
+    $('tree-cover').value = tree.coverMomentId || firstMomentId(tree);
+    // #256-3 2단계: 새 사진 표지 만들기는 로그인·서버 기록에서만 보인다(방법 '사진'을 골랐을 때만 보인다).
     // #314: 이전 책에서 고르던 파일·전송 결과 안내가 새 책 창에 남지 않게 업로드 상태를 비운다.
     coverUploads.reset();
     $('tree-cover-title').value = '';
     // #314: RadioNodeList.value = ''는 이전에 체크된 라디오를 해제하지 않는다(Chrome 실측).
-    // 모르는 값은 도메인 규칙에서 ''로 정리되므로, 저장값과 같은 라디오만 checked로 두어 이전 책의 선택을 지운다.
+    // 모르는 값은 도메인 규칙에 정리되므로, 저장값(없으면 지금 규칙)과 같은 라디오만 checked로 둔다.
+    const mode = coverModeOf(tree);
+    for (const radio of form.elements.coverMode || []) radio.checked = radio.value === mode;
     const design = tree.coverDesign || '';
-    for (const radio of form.elements.coverDesign) radio.checked = radio.value === design;
+    for (const radio of form.elements.coverDesign || []) radio.checked = radio.value === design;
     $('tree-form-error').textContent = '';
-    updateTreeCoverHint();
+    showTreeCoverMethod();
     treeBaseline = new URLSearchParams(new FormData(form)).toString();
     panel('tree-manager');
     queueMicrotask(() => form.elements.title.focus());
@@ -196,8 +231,13 @@ export function createPanels(deps) {
   // 계정 메뉴·편집기 버튼은 셸이 열고, 이 파일은 폼 상태만 본다.
   const manageTreeButton = $('manage-tree'); if (manageTreeButton) manageTreeButton.onclick = openTreeManager;
   $('tree-cover').onchange = updateTreeCoverHint;
-  // #256-3: 사진 표지를 빼면 디자인 표지(또는 기본 표지)로 돌아간다.
-  $('tree-photo-clear').onclick = () => { $('tree-cover').value = ''; updateTreeCoverHint(); };
+  for (const radio of $('tree-form').elements.coverMode || []) radio.onchange = showTreeCoverMethod;
+  for (const radio of $('tree-form').elements.coverDesign || []) radio.onchange = updateTreeCoverHint;
+  // #256-3: 사진 표지를 빼면 첫 순간(기본) 으로 돌아간다. 순간 자체는 지우지 않는다.
+  $('tree-photo-clear').onclick = () => {
+    for (const radio of $('tree-form').elements.coverMode || []) radio.checked = radio.value === 'basic';
+    showTreeCoverMethod();
+  };
   // #256-3 2단계: 창에서 새 사진을 올려 표지로 만든다. 순간 폼의 업로드와 같은 제한·문구를 쓰고(onUploaded 옵션),
   // 성공 뒤 두 번 저장한다 — 순간 추가(루트 아래) → 표지 지정. 한쪽이 실패하면 어디까지 됐는지 상태 칸에 알린다.
   function coverUploadStatus() { return $('tree-form').querySelector('[data-upload-status]'); }
@@ -211,14 +251,15 @@ export function createPanels(deps) {
       added = getMember().apply('add', { url, ...(title ? { title } : {}) }, { treeId: tree.id, momentId: root.id });
     } catch (error) { throw Error('사진은 보관 파일로 남았어요. 순간으로 만들지는 못했어요 — ' + error.message); }
     try {
-      getMember().apply('editTree', { title: tree.title, subject: tree.subject, coverMomentId: added.momentId, coverDesign: tree.coverDesign || '' }, { treeId: tree.id });
+      getMember().apply('editTree', { title: tree.title, subject: tree.subject, coverMomentId: added.momentId, coverDesign: tree.coverDesign || '', coverMode: 'photo' }, { treeId: tree.id });
     } catch (error) {
       fillTreeCoverOptions(window.LT41?.tree || tree);
       throw Error('사진은 순간으로 남았지만 표지 지정은 실패했어요 — ' + error.message + ' · 위 “표지”에서 직접 골라 저장할 수 있어요.');
     }
     const updated = window.LT41?.tree;
     if (updated && updated.id === tree.id) { fillTreeCoverOptions(updated); $('tree-cover').value = added.momentId; }
-    updateTreeCoverHint();
+    for (const radio of $('tree-form').elements.coverMode || []) radio.checked = radio.value === 'photo';
+    showTreeCoverMethod();
     $('tree-cover-title').value = '';
     treeBaseline = new URLSearchParams(new FormData($('tree-form'))).toString();
     if (coverUploadStatus()) coverUploadStatus().textContent = '새 사진 순간을 표지로 만들었어요. 창 아래 저장하기를 누르지 않아도 저장됐어요.';
@@ -234,7 +275,14 @@ export function createPanels(deps) {
   $('tree-form').onsubmit = e => {
     e.preventDefault();
     try {
-      getMember().apply('editTree', Object.fromEntries(new FormData(e.target)), selection());
+      // #380 5번: 고른 방법 하나만 표지가 된다. 고르지 않은 곳의 저장값(사진 표지 순간·디자인)은 지우지 않는다.
+      const tree = window.LT41?.tree, mode = treeCoverMode();
+      const values = Object.fromEntries(new FormData(e.target));
+      values.coverMode = mode;
+      // 고르지 않은 방법의 저장값은 덮어쓰지 않는다 — 첫 순간(기본)·디자인은 저장해 둔 표지 순간을 그대로 두고,
+      // 순간에서·사진만 지금 고른 순간으로 바꾼다(되돌리면 그대로 다시 보인다).
+      values.coverMomentId = (mode === 'basic' || mode === 'design') ? (tree?.coverMomentId || '') : ($('tree-cover').value || '');
+      getMember().apply('editTree', values, selection());
       treeBaseline = new URLSearchParams(new FormData(e.target)).toString();
       if(typeof dispatchEvent==='function')dispatchEvent(new Event('lt41-trees-changed'));
       $('tree-manager').close();

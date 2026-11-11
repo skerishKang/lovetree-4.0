@@ -41,7 +41,12 @@ test('validateState(서버 벌)는 coverDesign을 저장하고 모르는 트리 
   assert.equal(fallback.trees[0].coverDesign, '', '모르는 값은 \'\'로');
   const missing = serverDomain.validateState(stateOf(treeOf({})));
   assert.equal(missing.trees[0].coverDesign, '', '없으면 \'\'');
+  // 표지 방법은 고른 저장본에만 있다 — 방법이 없던 옛 저장본에는 빈 값을 심지 않는다.
   assert.deepEqual(Object.keys(missing.trees[0]).sort(), ['coverDesign', 'coverMomentId', 'createdAt', 'id', 'inbox', 'moments', 'subject', 'title', 'updatedAt'], '트리 필드는 이것만');
+  const chosen = serverDomain.validateState(stateOf(treeOf({ coverMode: 'design', coverDesign: 'texture-2' })));
+  assert.equal(chosen.trees[0].coverMode, 'design', '고른 방법은 그대로 남는다(되돌리면 그대로 다시 보인다)');
+  const junkMode = serverDomain.validateState(stateOf(treeOf({ coverMode: 'nope' })));
+  assert.equal(junkMode.trees[0].coverMode, undefined, '모르는 방법은 빈 값이 되어 키가 생기지 않는다');
 });
 
 test('validateState(클라이언트 벌)도 같은 규칙으로 coverDesign을 정리한다', () => {
@@ -141,7 +146,12 @@ test('이어 읽기 칸 표지도 같은 판정(book.design)을 쓰고 질감 �
 
 test('책 정보 관리 창: 디자인 표지 라디오와 사진 표지 안내·사진 빼기가 있고 패널이 저장값을 반영한다(구조 검사)', () => {
   const shell = readFileSync('public/v41/index.html', 'utf8');
-  assert.match(shell, /<fieldset id="tree-design"><legend>② 디자인으로 고르기<\/legend>/, '기존 창 안에 디자인 표지 줄을 추가한다');
+  // #380 5번: 표지 방법은 맨 위 한 줄에서 하나만 고르고, 고른 방법의 내용만 아래에 보인다.
+  assert.match(shell, /<fieldset id="tree-cover-method" class="cover-method"><legend>표지<\/legend>/, '맨 위 표지 방법 한 줄');
+  for (const [value, label] of [['basic', '첫 순간(기본)'], ['moment', '순간에서'], ['design', '디자인'], ['photo', '사진']]) {
+    assert.ok(shell.includes('name="coverMode" value="' + value + '"' + (value === 'basic' ? ' checked' : '') + '><span>' + label + '</span>'), '방법 ' + label);
+  }
+  assert.match(shell, /<fieldset id="tree-design"><legend>디자인 고르기<\/legend>/, '디자인 줄이 있다');
   assert.match(shell, /name="coverDesign" value=""/, '기본(선택 안 함) 라디오');
   assert.equal((shell.match(/name="coverDesign" value="texture-/g) || []).length, 6, '디자인 6종 라디오');
   assert.match(shell, /id="tree-photo-cover"[^>]*hidden/, '사진 표지 안내는 평소 숨겨진다');
@@ -149,25 +159,62 @@ test('책 정보 관리 창: 디자인 표지 라디오와 사진 표지 안내�
   assert.match(shell, /id="tree-photo-clear">사진 빼기</, '사진 빼기');
   const panels = readFileSync('public/v41/shell/panels.mjs', 'utf8');
   // #314: RadioNodeList.value = ''는 이전 체크를 풀지 않는다 — 라디오마다 명시적으로 정한다.
-  assert.match(panels, /for \(const radio of form\.elements\.coverDesign\) radio\.checked = radio\.value === design/, '저장값과 같은 라디오만 checked로 다시 정한다');
+  assert.match(panels, /for \(const radio of form\.elements\.coverDesign \|\| \[\]\) radio\.checked = radio\.value === design/, '저장값과 같은 라디오만 checked로 다시 정한다');
+  assert.match(panels, /for \(const radio of form\.elements\.coverMode \|\| \[\]\) radio\.checked = radio\.value === mode/, '저장된 방법과 같은 라디오만 checked로 다시 정한다');
+  assert.match(panels, /\$\('tree-design'\)\.hidden = mode !== 'design'/, '디자인 방법을 골랐을 때만 보인다');
   assert.doesNotMatch(panels, /elements\.coverDesign\.value\s*=/, '빈 값 대입으로 지워지지 않는 RadioNodeList.value에 기대지 않는다');
   assert.match(panels, /\$\('tree-photo-clear'\)\.onclick/, '사진 빼기 동작이 연결된다');
-  assert.match(panels, /\$\('tree-photo-cover'\)\.hidden = !photoCover/, '사진 표지 안내 표시를 판정한다');
+  assert.match(panels, /\$\('tree-photo-cover'\)\.hidden = !\(\(mode === 'photo' \|\| mode === 'moment'\) && photoCover\)/, '사진 표지 안내 표시를 판정한다');
   assert.doesNotMatch(panels, /\$\('tree-design'\)\.disabled/, '디자인 줄을 disabled로 막지 않는다(막으면 저장 때 값이 빠진다)');
 });
 
 test('새 사진으로 표지 만들기: 기존 창 안에 있고, 로그아웃에선 숨고, 안내 문구가 반드시 있다(마크업 검사)', () => {
   const shell = readFileSync('public/v41/index.html', 'utf8');
   assert.match(shell, /<fieldset id="tree-cover-upload" hidden>/, '기본은 숨겨진다(로그아웃·예시에서는 보이지 않는다)');
-  assert.match(shell, /<legend>③ 사진 올려서 만들기<\/legend>/);
+  assert.match(shell, /<legend>사진 올려서 만들기<\/legend>/);
   assert.match(shell, /올린 사진은 이 책의 새 순간으로도 남아요\./, '요구된 안내 한 줄');
   assert.match(shell, /id="tree-cover-title" maxlength="80"/, '순간 제목은 선택 입력');
   assert.match(shell, /placeholder="[^"]*사진으로 남긴 순간/, '비우면 기본값 안내');
   const panels = readFileSync('public/v41/shell/panels.mjs', 'utf8');
   assert.match(panels, /imagesOnly: true/, '사진만 받는다(영상은 범위 밖)');
   assert.match(panels, /'add', \{ url, \.\.\.\(title \? \{ title \} : \{\}\) \}, \{ treeId: tree\.id, momentId: root\.id \}\)/, '루트 순간 아래로 붙인다');
-  assert.match(panels, /'editTree', \{ title: tree\.title, subject: tree\.subject, coverMomentId: added\.momentId, coverDesign: tree\.coverDesign \|\| '' \}/, '표지 지정은 기존 이름·대상·디자인을 보존해 저장한다');
+  assert.match(panels, /'editTree', \{ title: tree\.title, subject: tree\.subject, coverMomentId: added\.momentId, coverDesign: tree\.coverDesign \|\| '', coverMode: 'photo' \}/, '표지 지정은 기존 이름·대상·디자인을 보존하고 방법은 사진으로 저장한다');
   assert.match(panels, /사진은 순간으로 남았지만 표지 지정은 실패했어요/, '부분 실패 안내');
   assert.match(panels, /사진은 보관 파일로 남았어요/, '순간 만들기 실패 안내');
-  assert.match(panels, /\$\('tree-cover-upload'\)\.hidden = false/, '서버 기록·창을 열 때만 보인다');
+  assert.match(panels, /\$\('tree-cover-upload'\)\.hidden = mode !== 'photo'/, '사진 방법을 골랐을 때만 보인다');
+});
+
+// #380 5번: 표지 방법은 하나만 고른다. 고른 방법 하나만 표지가 되고,
+// 고르지 않은 방법의 저장값(사진 표지 순간·디자인)은 지우지 않아 되돌리면 그대로 다시 보인다.
+test('표지 방법 하나만 표지가 된다 — 고르지 않은 방법의 저장값은 지우지 않는다', () => {
+  const photoMoment = moment('m2', { type: 'photo', image: 'https://example.test/photo.jpg' });
+  const base = { ...treeOf({ coverMomentId: 'm2', coverDesign: 'texture-3' }), moments: [moment('m1'), photoMoment] };
+  // 옛 저장본(방법 없음)은 지금 규칙 그대로 — 사진 표지가 이긴다.
+  assert.equal(coverChoice(base, 0, COVER_PALETTE).coverMedia, 'https://example.test/photo.jpg', '옛 저장본: 사진 표지 우선');
+  // 디자인을 고르면 디자인이 표지가 되고, 사진은 쓰지 않는다.
+  const design = coverChoice({ ...base, coverMode: 'design' }, 0, COVER_PALETTE);
+  assert.equal(design.design, 'texture-3');
+  assert.equal(design.coverMedia, '', '디자인을 고르면 사진 표지를 쓰지 않는다');
+  // 첫 순간(기본)은 색 표지 — 저장해 둔 사진·디자인을 쓰지 않는다.
+  const basic = coverChoice({ ...base, coverMode: 'basic' }, 0, COVER_PALETTE);
+  assert.equal(basic.coverMedia, '');
+  assert.equal(basic.design, '');
+  // 되돌리면 그대로 다시 보인다(저장값은 남아 있다).
+  assert.equal(base.coverMomentId, 'm2', '사진 표지 순간은 지우지 않는다');
+  assert.equal(base.coverDesign, 'texture-3', '디자인 표지는 지우지 않는다');
+  assert.equal(coverChoice({ ...base, coverMode: 'photo' }, 0, COVER_PALETTE).coverMedia, 'https://example.test/photo.jpg', '사진으로 되돌리면 그대로');
+  assert.equal(coverChoice({ ...base, coverMode: 'moment' }, 0, COVER_PALETTE).coverMedia, 'https://example.test/photo.jpg', '순간에서로 되돌리면 그대로');
+});
+
+test('editTree: 고르지 않은 방법의 저장값(표지 순간·디자인)을 지우지 않고 방법만 바꾼다(두 벌 같다)', () => {
+  for (const domain of [serverDomain, webDomain]) {
+    const tree = { ...treeOf({ coverMomentId: 'm2', coverDesign: 'texture-3' }), moments: [moment('m1'), moment('m2', { type: 'photo', image: 'https://example.test/p.jpg' })] };
+    const design = domain.editTree(tree, { title: tree.title, subject: tree.subject, coverMomentId: tree.coverMomentId, coverDesign: tree.coverDesign, coverMode: 'design' });
+    assert.equal(design.coverMode, 'design');
+    assert.equal(design.coverMomentId, 'm2', '표지 순간은 그대로');
+    assert.equal(design.coverDesign, 'texture-3', '디자인은 그대로');
+    const back = domain.editTree(design, { title: tree.title, subject: tree.subject, coverMomentId: tree.coverMomentId, coverDesign: tree.coverDesign, coverMode: 'photo' });
+    assert.equal(back.coverMode, 'photo');
+    assert.equal(back.coverMomentId, 'm2', '사진으로 되돌아온다(순간이 지워지지 않았다)');
+  }
 });

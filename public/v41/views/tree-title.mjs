@@ -40,12 +40,13 @@ function treeRows() {
     count: tree.moments?.length || 0,
     cover: coverMomentOf(tree),
     coverDesign: tree.coverDesign || '',
+    coverMode: tree.coverMode || '',
     coverMomentId: tree.coverMomentId || ''
   })).sort((a, b) => Number(b.inbox) - Number(a.inbox));
 }
 const countText = row => row.inbox ? '정리 전 ' + row.count : row.count + '개의 순간';
 function coverSpan(row, index) {
-  const choice = coverChoice({coverMomentId: row.coverMomentId, coverDesign: row.coverDesign, moments: row.cover ? [row.cover] : []}, index, COVER_PALETTE);
+  const choice = coverChoice({coverMode: row.coverMode, coverMomentId: row.coverMomentId, coverDesign: row.coverDesign, moments: row.cover ? [row.cover] : []}, index, COVER_PALETTE);
   const thumb = choice.coverMedia ? '<img src="' + t(choice.coverMedia) + '" alt="" loading="lazy" referrerpolicy="no-referrer">' : '';
   return '<span class="tree-cover"' + (choice.design ? ' data-cover-design="' + t(choice.design) + '"' : '') + ' style="background-color:' + t(choice.color) + '" aria-hidden="true">' + thumb + '</span>';
 }

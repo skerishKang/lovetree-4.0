@@ -205,17 +205,15 @@ test('카드 메뉴: shadow DOM 클릭은 document retarget에도 안쪽으로 �
   assert.equal(clickWithin({target: button}, null), false);
 });
 
-test('보기 메뉴 배선: 바깥 클릭은 composedPath 판정, Esc는 그대로 닫는다', () => {
+test('첫 화면 카드·움직임은 설정 창이 맡고 첫 화면은 메시지로만 받는다', () => {
   const home = readFileSync(new URL('../v41/home.js', import.meta.url), 'utf8');
-  const cards = readFileSync(new URL('../v41/home-cards.js', import.meta.url), 'utf8');
-  assert.match(cards, /export function clickWithin\(event, \.\.\.nodes\)/);
-  assert.match(home, /import \{[^}]*clickWithin[^}]*\} from '\.\/home-cards\.js';/);
-  // #213 2번: 카드 출처 메뉴는 "보기" 메뉴 안으로 들어갔지만 바깥 클릭 판정은 같은 clickWithin을 쓴다.
-  // 2026-11-11: 메뉴 배선은 public/v41/home-view-menu.mjs로 옮겼다(같은 clickWithin 규칙).
-  const menu = readFileSync(new URL('../public/v41/home-view-menu.mjs', import.meta.url), 'utf8');
-  assert.match(menu, /doc\.addEventListener\('click', e => \{ if \(!clickWithin\(e, viewWrap\)\) closeViewMenu\(\); \}\);/);
-  assert.equal(/!viewWrap\.contains\(e\.target\)/.test(menu), false, 'retarget에 취약한 target 판정을 남기지 않는다');
-  assert.equal(/!cardWrap\.contains\(e\.target\)/.test(home), false);
-  assert.match(menu, /else if \(e\.key === 'Escape'\) closeViewMenu\(\)/);
-  assert.match(menu, /if \(next\.type === 'close'\) \{ e\.preventDefault\(\); closeViewMenu\(true\); \}/);
+  const shell = readFileSync(new URL('../public/v41/shell.mjs', import.meta.url), 'utf8');
+  // #380 5번: 첫 화면의 보기 메뉴를 없앴다 — 카드 출처·움직임은 설정 창 "화면" 묶음에서 고른다.
+  assert.match(shell, /for\(const b of document\.querySelectorAll\('\[data-home-cards\]'\)\)b\.onclick=/, '설정의 카드 출처 단추');
+  assert.match(shell, /localStorage\.setItem\('lt41\.homeCards',b\.dataset\.homeCards\)/, '저장 키는 그대로');
+  assert.match(shell, /postMessage\(\{type:'lt41-home-cards'/, '첫 화면에 다시 그리라고 알린다');
+  assert.match(shell, /postMessage\(\{type:'lt41-motion'/, '첫 화면의 움직임을 멈추거나 켠다');
+  assert.match(home, /type==='lt41-home-cards'[^\n]*location\.reload\(\)/, '첫 화면은 다시 그린다');
+  assert.match(home, /type==='lt41-motion'[^\n]*orbit\?\.motion\?\.set/, '첫 화면은 궤도 움직임을 바꾼다');
+  assert.doesNotMatch(home, /createViewMenu|data-lt-view-menu/, '첫 화면에 옛 보기 메뉴가 없다');
 });
