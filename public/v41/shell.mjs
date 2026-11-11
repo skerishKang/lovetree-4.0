@@ -32,6 +32,7 @@ import {createNotifier} from './shell/notice.mjs';
 import {paintLoginLinks,paintThemeControls,applyTheme as applyThemeFor,toggleTheme as toggleThemeFor} from './shell/theme.mjs';
 import {normalizeTitleDisplay, coverModeOf, normalizeCoverDesign} from './domain.mjs';
 import {backfillVideoTitles} from './title-backfill.mjs';
+import {thumbnailCandidates, coverFallbackAttrs, fallbackCardData, emotionToneOf, mountThumbFallback, ADD_TITLE_LABEL, VIDEO_UNAVAILABLE_TEXT} from './thumb-fallback.mjs';
 const $=id=>document.getElementById(id);
 // 안내 한 벌(#353 후속): 담기·중복·로그인 필요 안내(hold)가 상태 안내보다 먼저 일정 시간 보인다.
 const shellNotice=createNotifier({$});
@@ -74,8 +75,7 @@ function buildFoldMenu(){
  if(!$('write-menu').hidden)add('＋ 순간 추가',()=>$('write-menu').click());
 }
 const escHTML=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-function treeYoutubeId(value){try{const u=new URL(String(value||''));if(u.hostname==='youtu.be')return u.pathname.slice(1);if(/youtube\.com$/.test(u.hostname)||u.hostname==='m.youtube.com'){if(u.pathname==='/watch')return u.searchParams.get('v')||'';const m=u.pathname.match(/\/(shorts|live|embed)\/([^/?#]+)/);return m?.[2]||''}}catch{}return ''}
-function treeMomentThumb(m){const md=m?.mediaMetadata||{};for(const v of [md.thumbnail,md.poster,md.image,m?.attachment?.url,m?.media?.url,m?.image])if(typeof v==='string'&&v.trim())return v.trim();const id=treeYoutubeId(m?.url);return id?`https://i.ytimg.com/vi/${id}/hqdefault.jpg`:''}
+function treeMomentThumb(m){return thumbnailCandidates(m,{autoLoad:true})[0]||''}
 function treeCoverMarkup(tree){
  // #380 5번: 드롭다운 표지도 같은 판정(coverModeOf)을 따른다 — 디자인을 고른 트리는 사진 대신 디자인 보지를 보여 준다.
  const mode=coverModeOf(tree);
@@ -85,8 +85,10 @@ function treeCoverMarkup(tree){
  }
  const moments=Array.isArray(tree?.moments)?[...tree.moments].sort((a,b)=>String(a.createdAt||'').localeCompare(String(b.createdAt||''))):[];
  const cover=mode!=='design'&&tree?.coverMomentId?moments.find(m=>m.id===tree.coverMomentId):null;
- const thumb=(cover&&treeMomentThumb(cover))||moments.map(treeMomentThumb).find(Boolean)||'';
- return `<span class="tree-cover" aria-hidden="true">${thumb?`<img src="${escHTML(thumb)}" alt="" loading="lazy" referrerpolicy="no-referrer">`:''}</span>`;
+ const chosen=(cover&&treeMomentThumb(cover)?cover:null)||moments.find(m=>Boolean(treeMomentThumb(m)))||null;
+ const thumb=chosen?treeMomentThumb(chosen):'';
+ const fallback=chosen?coverFallbackAttrs(chosen):'';
+ return `<span class="tree-cover" aria-hidden="true">${thumb?`<img src="${escHTML(thumb)}"${fallback} alt="" loading="lazy" referrerpolicy="no-referrer">`:''}</span>`;
 }
 function renderTreeMenu(){
  if(!treePopover)return;
@@ -230,7 +232,28 @@ const shellCleanup=createCleanup({
   panel:id=>panel(id),
   // 정리 목록도 다른 화면과 같은 제목 규칙·썸네일 규칙을 쓴다(중복 구현 금지).
   treeMomentThumb,
+  thumbCandidatesOf:moment=>thumbnailCandidates(moment,{autoLoad:true}),
+  fallbackCardOf:moment=>fallbackCardData(moment,{writable:!!member?.snapshot().writable}),
+  emotionToneOf,
+  addTitleLabel:ADD_TITLE_LABEL,
+  unavailableLabel:VIDEO_UNAVAILABLE_TEXT,
   momentTitle:moment=>{const main=titleView(moment,titleDisplayValue()).main;return main||withoutAutoTitle(moment).title;},
+});
+mountThumbFallback(document,{
+  isReadOnly:()=>source!=='server'||!member?.snapshot().writable,
+  onEditTitle:({treeId,momentId})=>{
+    if(source!=='server'||!member?.snapshot().writable)return;
+    if($('cleanup-panel')?.open)$('cleanup-panel').close();
+    const targetTree=treeId
+      ?model?.trees?.find(t=>t.id===treeId&&t.moments.some(m=>m.id===momentId))
+      :(window.LT41?.tree?.moments.some(m=>m.id===momentId)?window.LT41.tree:model?.trees?.find(t=>t.moments.some(m=>m.id===momentId)));
+    if(targetTree){
+      if(window.LT41?.tree?.id!==targetTree.id)choose(targetTree.id,momentId);
+      else{window.LT41.momentId=momentId;links();writeLocation();}
+    }
+    openEditor('edit');
+    shellPanels.focusTitleInput?.();
+  }
 });
 function updateMediaPreview(){return shellPanels.updateMediaPreview();}
 function updateQuickEntryHint(){return shellPanels.updateQuickEntryHint();}
@@ -268,6 +291,7 @@ const shellMessages=createMessages({
   writeLocation:(mode)=>writeLocation(mode),
   choose:(id,momentId)=>choose(id,momentId),
   openEditor:(mode,parentId)=>openEditor(mode,parentId),
+  focusTitleInput:()=>shellPanels.focusTitleInput?.(),
   openLoginStart:intent=>openLoginStart(intent),
   openAccountMenu:()=>openAccountMenu(),
   openCleanup:options=>shellCleanup.open(options),

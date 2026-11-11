@@ -32,11 +32,11 @@ test('#393 썸네일 주소 한 벌: 세로는 원본 비율(oardefault·잘림 
  assert.equal(media.describe(WATCH).loadUrl,'https://i.ytimg.com/vi/abc123DEF45/hqdefault.jpg');
 });
 
-test('#393 세로 영상 마크업: 세로 틀 표시·원본 비율 썸네일·hqdefault 물러남·크게 보기 단추',()=>{
+test('#393 세로 영상 마크업: 세로 틀 표시·원본 비율 썸네일·hqdefault/mqdefault 물러남·크게 보기 단추',()=>{
  const html=media.markup(SHORTS,'세로 영상',null,'m1',OWNER);
  assert.match(html,/data-lt-vertical="1"/);
  assert.match(html,/src="https:\/\/i\.ytimg\.com\/vi\/9NXOCr-T8LU\/oardefault\.jpg"/);
- assert.match(html,/onerror="this\.onerror=null;this\.src='https:\/\/i\.ytimg\.com\/vi\/9NXOCr-T8LU\/hqdefault\.jpg'"/);
+ assert.match(html,/data-lt-candidates="[^"]*oardefault\.jpg[^"]*hqdefault\.jpg[^"]*mqdefault\.jpg[^"]*"/);
  assert.match(html,/data-lt-expand/);
  assert.match(html,/크게 보기/);
  // 누르기 전에는 iframe·autoplay 가 없다(기존 규칙 그대로).
@@ -54,7 +54,7 @@ test('#393 가로 영상 마크업: 가로 틀 유지·잘림 없는 썸네일·
  const meta=media.markup(WATCH,'세로 정보', {width:1080,height:1920},'m1',OWNER);
  assert.match(meta,/data-lt-vertical="1"/);
  assert.match(meta,/oardefault\.jpg/);
- assert.match(meta,/hqdefault\.jpg'/);
+ assert.match(meta,/data-lt-candidates="[^"]*hqdefault\.jpg[^"]*mqdefault\.jpg/);
 });
 
 test('#393 공유·예시·로그아웃: 누르기 전 외부 요청 0 그대로 — 크게 보기는 눌렀을 때만 연다',()=>{
@@ -99,7 +99,7 @@ test('#393 기억책 연결: 세로 틀·원본 비율 썸네일·크게 보기�
  // 판정·주소는 LTMedia 한 벌(화면 하드코딩 없음).
  assert.match(extra,/LTMedia\.verticalVideo\(safe\.url,safe\.mediaMetadata\)/);
  assert.match(extra,/LTMedia\.youtubeThumbUrl\(media\.videoId,true\)/);
- assert.match(extra,/this\.src=\\''\+LTMedia\.youtubeThumbUrl\(media\.videoId,false\)\+'\\'"/,'물러남 주소도 따옴표가 닫힌 온전한 onerror 여야 한다');
+ assert.match(extra,/thumbFallbackAttrs\(m,/,'공용 썸네일 내려가기 모듈로 물러난다(#429)');
  assert.doesNotMatch(extra,/i\.ytimg\.com/);
  // 세로 표시·재생 틀.
  assert.match(extra,/class="yt-play'\+\(vertical\?' is-vertical':''\)/);

@@ -2,6 +2,7 @@
 // views/shelf/shelf.js 안에 있던 계산을 화면(DOM) 없이 시험할 수 있게 그대로 옮겼다.
 // 조건·문구·계산식 변경 0.
 import { normalizeCoverDesign, coverDesignPaletteIndex, coverModeOf } from '../../domain.mjs';
+import { thumbnailCandidates, thumbFallbackAttrs, fallbackCardMarkup } from '../../thumb-fallback.mjs';
 
 export const escapeShelf = (value) => String(value || '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' })[char]);
 
@@ -20,6 +21,18 @@ export const COVER_PALETTE = ['var(--lt-cover-1)', 'var(--lt-cover-2)', 'var(--l
 // 우선순위: coverMomentId 사진 > coverDesign(디자인 표지) > 지금 규칙(palette[index % 4] 색).
 // 책장(shelf.js)과 펼친 책(shelf-reader.js)은 이 결과(book 객체)를 같이 쓴다.
 // 사진·디자인이 둘 다 없으면 color·accent·coverMedia는 지금과 같은 값이라 기존 화면 변화가 없다.
+export function coverMomentFor(tree) {
+  if (!tree) return null;
+  const mode = coverModeOf(tree);
+  if (mode === 'design') return null;
+  if (mode === 'basic') {
+    const first = Array.isArray(tree.moments) ? tree.moments[0] : null;
+    return first && (first.type === 'photo' || first.youtubeThumb) && first.image ? first : null;
+  }
+  const cover = (tree.moments || []).find((moment) => moment.id === tree.coverMomentId);
+  return cover && (cover.type === 'photo' || cover.youtubeThumb) && cover.image ? cover : null;
+}
+
 export function coverChoice(tree, index, palette) {
   const color = palette[index % palette.length];
   // #380 5번: 표지 방법 하나만 따른다. 디자인을 고르면 사진 표지는 쓰지 않고(지우지도 않는다),
@@ -32,17 +45,19 @@ export function coverChoice(tree, index, palette) {
       return { color: designColor, accent: designColor, coverMedia: '', design };
     }
   }
-  // 첫 순간(기본)은 색 표지다. 저장해 둔 표지 순간·디자인은 지우지 않고 그대로 두어,
-  // 다른 방법을 다시 고르면 그대로 돌아온다.
-  if (mode === 'basic') return { color, accent: color, coverMedia: '', design: '' };
-  const cover = tree.moments.find((moment) => moment.id === tree.coverMomentId);
-  const coverMedia = cover && cover.type === 'photo' ? cover.image || '' : '';
+  // 첫 순간(기본)은 첫 순간에 사진/썸네일이 있으면 쓰고 없으면 색 표지다. 저장해 둔 표지 순간·디자인은 지우지 않는다.
+  const cover = coverMomentFor(tree);
+  const coverMedia = cover ? cover.image || '' : '';
   if (coverMedia) return { color, accent: color, coverMedia, design: '' };
   return { color, accent: color, coverMedia: '', design: '' };
 }
 
 export function shelfBook(tree, index, palette, namer) {
   const choice = coverChoice(tree, index, palette);
+  const chosenCover = choice.coverMedia ? coverMomentFor(tree) : null;
+  const coverCandidates = chosenCover
+    ? (() => { const list = thumbnailCandidates(chosenCover, { autoLoad: true }); return list.length ? list : [choice.coverMedia]; })()
+    : (choice.coverMedia ? [choice.coverMedia] : []);
   return {
     id: tree.id,
     name: treeTitleOf(tree.title, namer),
@@ -54,14 +69,19 @@ export function shelfBook(tree, index, palette, namer) {
     accent: choice.accent,
     symbol: '✦',
     coverMedia: choice.coverMedia,
+    coverCandidates,
     design: choice.design,
     lastDate: lastMomentDate(tree),
     description: tree.subject ? '좋아하는 대상 · ' + tree.subject : '좋아하는 대상을 기록한 책입니다.',
     tags: [tree.subject || '좋아하는 대상'],
-    chapters: tree.moments.map((m) => ({
-      title: m.title, url: m.externalUrl || '', mood: m.emotion, note: m.memo || m.whyNext || '',
-      id: m.id, type: m.type, image: m.image || ''
-    }))
+    chapters: tree.moments.map((m) => {
+      const cands = m.image ? (() => { const list = thumbnailCandidates(m, { autoLoad: true }); return list.length ? list : [m.image]; })() : [];
+      return {
+        title: m.title, url: m.externalUrl || m.url || '', mood: m.emotion, note: m.memo || m.whyNext || '',
+        id: m.id, type: m.type, image: m.image || '', date: m.date || '', mediaMetadata: m.mediaMetadata || null,
+        youtubeThumb: !!m.youtubeThumb, thumbCandidates: cands, treeId: tree.id,
+      };
+    })
   };
 }
 
@@ -180,9 +200,12 @@ export function rightPageMarkup(book, index, esc = escapeShelf) {
         var chapter=book.chapters[index];
         var type=chapter.type||'photo';
         var label=({photo:'사진',video:'영상 예시',memo:'메모',link:'링크'})[type]||'순간';
-        var art=chapter.image?'<img src="'+esc(chapter.image)+'" alt="" loading="lazy" />':'<span class="poster-caption">기록해 둔 마음</span>';
-        var info=type==='video'?'<span class="poster-caption">영상의 예시 이미지입니다</span>':'';
-        return '<div class="page-video"><span class="page-label">순간 · '+String(index+1).padStart(2,'0')+' · '+esc(chapter.mood)+'</span><div class="video-holder"><div class="video-poster">'+art+info+'</div></div><h3>'+esc(chapter.title)+'</h3><p>'+esc(chapter.note)+'</p><span class="poster-caption">'+esc(label)+' · 내 기록</span></div>';
+        var writable=!(globalThis.LTDEMO&&globalThis.LTDEMO.readOnly);
+        var momentShape={id:chapter.id,treeId:book.id,title:chapter.title,url:chapter.url||'',emotion:chapter.mood,date:chapter.date||'',note:chapter.note||'',mediaMetadata:chapter.mediaMetadata||null,youtubeThumb:!!chapter.youtubeThumb,type:type};
+        var fallbackAttrs=chapter.image?thumbFallbackAttrs(momentShape,{candidates:chapter.thumbCandidates&&chapter.thumbCandidates.length?chapter.thumbCandidates:[chapter.image],writable:writable,variant:'shelf-page',momentId:chapter.id,treeId:book.id}):'';
+        var art=chapter.image?'<img src="'+esc(chapter.image)+'"'+fallbackAttrs+' alt="" loading="lazy" referrerpolicy="no-referrer" />':(chapter.url?fallbackCardMarkup(momentShape,{writable:writable,variant:'shelf-page',momentId:chapter.id,treeId:book.id}):'<span class="poster-caption">기록해 둔 마음</span>');
+        var info=(type==='video'&&!chapter.youtubeThumb&&!chapter.url)?'<span class="poster-caption">영상의 예시 이미지입니다</span>':'';
+        return '<div class="page-video"><span class="page-label">순간 · '+String(index+1).padStart(2,'0')+' · '+esc(chapter.mood)+'</span><div class="video-holder"><div class="video-poster" data-lt-thumb-host>'+art+info+'</div></div><h3>'+esc(chapter.title)+'</h3><p>'+esc(chapter.note)+'</p><span class="poster-caption">'+esc(label)+' · 내 기록</span></div>';
       }
 
 // ── 이어 읽기 칸(#256-1, 2026-11-09) ────────────────────────────────────────

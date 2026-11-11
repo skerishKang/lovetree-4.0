@@ -35,7 +35,7 @@ const $=s=>document.querySelector(s), cardLayer=$('#cardLayer'), threadLayer=$('
 
 const esc=LT58Model.escapeHTML;
 function titleMode(){try{return window.parent?.LT41?.prefs?.titleDisplay||'both'}catch{return 'both'}}
-function titleInfo(m){const v=window.LTTitle?.titleView?.(m,titleMode());return{main:v?.main||m?.title||'',sub:v?.sub||''}}
+function titleInfo(m){const v=window.LTTitle?.titleView?.(m,titleMode());return{main:v?v.main:(m?.title||''),sub:v?.sub||''}}
 function titleMain(m){return titleInfo(m).main}
 function titleSub(m){return titleInfo(m).sub}
 function titleSubMarkup(m){const sub=titleSub(m);return sub?'<div class="videoTitle">▶ '+esc(sub)+'</div>':''}

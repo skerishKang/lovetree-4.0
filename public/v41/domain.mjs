@@ -62,15 +62,30 @@ function optionalText(value, name, max) {
   if (typeof value !== 'string' || value.length > max) throw new Error(`${name}을(를) 1~${max}자로 적어 주세요.`);
   return value.trim();
 }
+function safeMediaThumbnail(value) {
+  if (value === undefined || value === null || value === '') return '';
+  if (typeof value !== 'string' || value.length > 2048) return '';
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+  try {
+    const parsed = new URL(trimmed);
+    return parsed.protocol === 'https:' && !parsed.username && !parsed.password && /(?:^|\.)ytimg\.com$/i.test(parsed.hostname) ? parsed.href : '';
+  } catch {
+    return '';
+  }
+}
 function normalizeMediaMetadata(value, url) {
   if (value === undefined || value === null) return null;
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('미디어 정보를 확인해 주세요.');
   const title = optionalText(value.title, '미디어 제목', 240);
   const channel = optionalText(value.channel, '미디어 채널', 160);
-  if (!title && !channel) return null;
+  const thumbnail = safeMediaThumbnail(value.thumbnail);
+  if (!title && !channel && !thumbnail) return null;
   const source = url ? new URL(url).hostname : '';
   if (!source) return null;
-  return {title, channel, source};
+  const result = {title, channel, source};
+  if (thumbnail) result.thumbnail = thumbnail;
+  return result;
 }
 function shortened(value, max = 40) {
   const text = Array.from(value.replace(/\s+/g, ' ').trim()).join('');

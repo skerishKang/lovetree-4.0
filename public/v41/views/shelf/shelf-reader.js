@@ -2,6 +2,7 @@
 // views/shelf/shelf.js 안에 있던 함수를 그대로 옮겼다 — 조건·문구·id·순서 변경 0.
 // 화면(DOM)을 다루므로 node에서는 createReader(가짜 DOM)로 시험한다.
 import { escapeShelf, leftPageMarkup, pageMeta, pageTarget, rightPageMarkup, youtubeId as youtubeIdOf } from './shelf-model.mjs';
+import { coverFallbackAttrs } from '../../thumb-fallback.mjs';
 
 export function createReader(deps) {
   const { $, $$, state, getBook, showToast, save, renderShelf, getShelfCard } = deps;
@@ -16,7 +17,7 @@ export function createReader(deps) {
         cover.style.setProperty('--tilt','0deg');
         // #256-3: 디자인 표지는 책장과 같은 판정(shelf-model coverChoice) 결과를 쓴다. 없으면 속성을 뺀다(기존 화면 변화 0).
         if(book.design)cover.setAttribute('data-cover-design',book.design);else cover.removeAttribute('data-cover-design');
-        var coverMedia=$('#coverMedia');if(book.coverMedia){coverMedia.src=book.coverMedia;coverMedia.hidden=false;}else{coverMedia.hidden=true;coverMedia.removeAttribute('src');}
+        var coverMedia=$('#coverMedia');if(book.coverMedia){var cands=book.coverCandidates&&book.coverCandidates.length?book.coverCandidates:[book.coverMedia];coverMedia.setAttribute('data-lt-candidates',JSON.stringify(cands));coverMedia.setAttribute('data-lt-cand-index','0');coverMedia.setAttribute('data-lt-fallback-mode','cover');if(coverMedia.dataset)delete coverMedia.dataset.ltThumbSettled;coverMedia.src=book.coverMedia;coverMedia.hidden=false;}else{coverMedia.hidden=true;coverMedia.removeAttribute('src');coverMedia.removeAttribute('data-lt-candidates');}
         cover.querySelector('.cover-symbol span').textContent=book.symbol;
         $('#coverTitle').textContent=book.name;
         $('#coverTitle').textContent=book.name;
@@ -118,7 +119,7 @@ export function createReader(deps) {
         cover.className='book-cover';
         cover.style.setProperty('--cover',getBook(state.selectedId)?.color||'#6b5873');
         if(selected?.design)cover.setAttribute('data-cover-design',selected.design);
-        var selected=getBook(state.selectedId);cover.innerHTML=(selected?.coverMedia?'<img class="book-cover-media" src="'+esc(selected.coverMedia)+'" alt="" referrerpolicy="no-referrer">':'')+'<span class="cover-symbol"><span>'+esc(selected?.symbol||'♡')+'</span></span><strong class="cover-title">'+esc(selected?.name||'LoveTree')+'</strong>';
+        var selected=getBook(state.selectedId);cover.innerHTML=(selected?.coverMedia?'<img class="book-cover-media" src="'+esc(selected.coverMedia)+'"'+coverFallbackAttrs(selected.coverCandidates||[selected.coverMedia])+' alt="" referrerpolicy="no-referrer">':'')+'<span class="cover-symbol"><span>'+esc(selected?.symbol||'♡')+'</span></span><strong class="cover-title">'+esc(selected?.name||'LoveTree')+'</strong>';
         source.appendChild(cover);
         document.body.appendChild(source);
         function place(rect){source.style.left=rect.left+'px';source.style.top=rect.top+'px';source.style.width=rect.width+'px';source.style.height=rect.height+'px';}

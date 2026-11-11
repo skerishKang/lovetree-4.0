@@ -368,9 +368,20 @@ export function createPanels(deps) {
     updateQuickEntryHint();
   }
 
+  function focusTitleInput() {
+    const more = $('more-fields');
+    if (more) more.open = true;
+    queueMicrotask(() => {
+      const titleInput = $('moment-form')?.elements?.title;
+      titleInput?.focus?.();
+      titleInput?.select?.();
+    });
+  }
+
   return {
     setEditorMode,
     openEditor,
+    focusTitleInput,
     openTreeManager,
     updateTreeCoverHint,
     updateMediaPreview,

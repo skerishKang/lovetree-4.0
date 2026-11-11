@@ -3,6 +3,7 @@
 // 썸네일은 저장된 값 중 data: 이미지와 같은 출처 경로만 인정한다. 단 내 기록(서버 기록·로그인
 // 소유자)의 YouTube 순간은 #330과 같은 판정(autoLoad)으로 ytimg 썸네일 카드를 처음부터 만든다
 // (2026-11-10 CTO 결정, lovetree-4.0 #340) — 판정·주소는 LTMedia 한 벌을 재사용한다.
+import { thumbnailCandidates } from '../public/v41/thumb-fallback.mjs';
 export const HOME_ORBIT_LIMIT = 40;
 export const HOME_TEXT_LIMIT = 2;
 export const HOME_PHOTO_MIN = 3;
@@ -66,7 +67,11 @@ export function cardOf(treeId, moment, currentOrigin, youtube = null) {
   // #330 판정 재사용: 내 기록(서버 기록·로그인 소유자)만 YouTube 썸네일을 처음부터 카드로 쓴다.
   // 썸네일 주소는 LTMedia.describe의 loadUrl 한 벌에서 온다 — 새로 만들지 않는다(quick-add와 같은 규칙).
   const media = (!image && youtube?.auto) ? youtube.describe?.(text(moment?.url)) : null;
-  const thumb = media?.kind === 'youtube' && media.loadUrl ? media.loadUrl : '';
+  const ytCandidates = (media?.kind === 'youtube' && media.loadUrl)
+    ? thumbnailCandidates(moment, { autoLoad: true, currentOrigin })
+    : [];
+  const thumb = ytCandidates[0] || (media?.kind === 'youtube' && media.loadUrl ? media.loadUrl : '');
+  const thumbCandidates = image ? [image] : ytCandidates;
   return {
     ...moment,
     key: `${treeId}/${text(moment?.id)}`,
@@ -78,6 +83,7 @@ export function cardOf(treeId, moment, currentOrigin, youtube = null) {
     emotion: text(moment?.emotion),
     note: noteOf(moment),
     image: image || thumb,
+    thumbCandidates,
     type: image ? 'photo' : (thumb || video) ? 'video' : 'memo',
     // 궤도 렌더러가 재생 표시를 붙일 때만 보는 표시자다. 저장 값이 보낸 같은 이름 값은 덮어쓴다.
     youtubeThumb: thumb ? true : false,

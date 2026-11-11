@@ -13,6 +13,11 @@ export function createCleanup(deps) {
   // 생략하면 기존처럼 원시 값만 그린다(화면 규칙 주입 지점은 셸 하나).
   const treeMomentThumb = deps.treeMomentThumb || (() => '');
   const momentTitle = deps.momentTitle || (() => '');
+  const thumbCandidatesOf = deps.thumbCandidatesOf || null;
+  const fallbackCardOf = deps.fallbackCardOf || null;
+  const emotionToneOf = deps.emotionToneOf || (() => 1);
+  const addTitleLabel = deps.addTitleLabel || '제목 달기';
+  const unavailableLabel = deps.unavailableLabel || '영상을 볼 수 없어요';
   let fromTreeId = '';
   let noticeTimer = null;
   function writable() {
@@ -55,7 +60,8 @@ export function createCleanup(deps) {
       box.checked = moment.id === preselect;
       box.addEventListener('change', sync);
       // 다른 화면과 같은 표시 규칙을 그대로 쓴다: 제목(설정 반영)과 썸네일(없으면 자리만).
-      const thumb = treeMomentThumb(moment);
+      const candidates = thumbCandidatesOf ? thumbCandidatesOf(moment) : [];
+      const thumb = candidates[0] || treeMomentThumb(moment);
       let thumbNode = null;
       if (thumb) {
         thumbNode = document.createElement('img');
@@ -64,7 +70,20 @@ export function createCleanup(deps) {
         thumbNode.loading = 'lazy';
         thumbNode.referrerPolicy = 'no-referrer';
         thumbNode.src = thumb;
+        if (candidates.length) {
+          const tone = emotionToneOf(moment.emotion);
+          thumbNode.setAttribute('data-lt-candidates', JSON.stringify(candidates));
+          thumbNode.setAttribute('data-lt-cand-index', '0');
+          thumbNode.setAttribute('data-lt-fallback-mode', 'thumb-slot');
+          thumbNode.setAttribute('data-lt-fallback-html', `<span class="lt-thumb-tone" data-tone="${tone}" aria-hidden="true"></span>`);
+        }
+      } else if (fallbackCardOf) {
+        thumbNode = document.createElement('span');
+        thumbNode.className = 'lt-thumb-tone';
+        thumbNode.setAttribute('data-tone', String(emotionToneOf(moment.emotion)));
+        thumbNode.setAttribute('aria-hidden', 'true');
       }
+      label.setAttribute('data-lt-moment-row', '');
       const text = document.createElement('span');
       const title = momentTitle(moment);
       // 빈 값 대체: 영상(미디어 메타데이터 또는 영상 주소)이면 "제목 없는 영상", 아니면 "제목 없는 순간" — 흐린 글자.
@@ -75,11 +94,33 @@ export function createCleanup(deps) {
           return host==='youtu.be'||host.endsWith('youtube.com')||host==='vimeo.com';
         }catch{return /youtu\.be|youtube\.com|vimeo\.com/i.test(String(moment.url||''));}
       };
-      text.textContent = moment.parentId === null && title ? `${title} · 시작 순간` : (title || (looksLikeVideo() ? '제목 없는 영상' : '제목 없는 순간'));
+      const fallbackInfo = (!title && fallbackCardOf) ? fallbackCardOf(moment) : null;
+      const blankCopy = fallbackInfo
+        ? [fallbackInfo.siteName, fallbackInfo.date, fallbackInfo.emotion].filter(Boolean).join(' · ')
+        : (looksLikeVideo() ? '제목 없는 영상' : '제목 없는 순간');
+      text.textContent = moment.parentId === null && title ? `${title} · 시작 순간` : (title || blankCopy || (looksLikeVideo() ? '제목 없는 영상' : '제목 없는 순간'));
       if(!title) text.classList.add('is-blank');
       label.append(box);
       if (thumbNode) label.append(thumbNode);
       label.append(text);
+      if (candidates.length) {
+        const unavailable = document.createElement('small');
+        unavailable.className = 'lt-row-unavailable';
+        unavailable.setAttribute('data-lt-row-unavailable', '');
+        unavailable.hidden = true;
+        unavailable.textContent = unavailableLabel;
+        label.append(unavailable);
+      }
+      if (fallbackInfo && fallbackInfo.canAddTitle && moment.id) {
+        const editBtn = document.createElement('span');
+        editBtn.className = 'lt-fallback-action';
+        editBtn.setAttribute('role', 'button');
+        editBtn.setAttribute('tabindex', '0');
+        editBtn.setAttribute('data-lt-title-edit', moment.id);
+        editBtn.setAttribute('data-lt-tree-id', tree.id);
+        editBtn.textContent = addTitleLabel;
+        label.append(editBtn);
+      }
       host.append(label);
     }
   }
