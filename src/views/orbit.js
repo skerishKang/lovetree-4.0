@@ -123,6 +123,8 @@ export function mountOrbit(host,{trees,storage,context,actions,authHtml='',onSel
  // #429 2/2: 카드 기본 폭·높이는 한 번만 잰다(프레임마다 offsetWidth를 읽으면 레이아웃을 강제한다 — #400 속도 유지).
  const cardSizes=elements.map(el=>({w:el.offsetWidth||180,h:el.offsetHeight||232}));
  function frame(now){raf=0;const dt=Math.min(40,now-previous||16);previous=now;if(!paused&&!dialog.open&&!drag&&!hoveredCard)phase+=.000006*dt;const w=app.clientWidth,h=app.clientHeight;
+  // 밀어낼 때는 프레임 사이 각도·위상 변화를 덮는 12px 여유를 더 붙인다(실측 침범 0 유지).
+  const zs=safeZone?{l:safeZone.l-12,t:safeZone.t-12,r:safeZone.r+12,b:safeZone.b+12}:null;
   cards.forEach((c,i)=>{const cfg=rings[c.ring],th=c.baseAngle+phase*cfg.speed+c.phaseOffset;let x=Math.cos(th)*cfg.rx,y=Math.sin(th)*cfg.ry+cfg.band+Math.sin(th*1.7+c.phaseOffset*3)*45,z=Math.sin(th+1.1+c.phaseOffset*4)*cfg.zAmp+cfg.zBase+c.zOffset;if(!demo&&cards.length<=8){const angle=i*Math.PI*2/cards.length+phase;x=Math.cos(angle)*Math.min(w*.34,420);y=Math.sin(angle)*Math.min(h*.3,250)+(i%2===0?80:-80);z=0;}const sc=Math.max(.18,Math.min(1.82,1050/(1050-z))),fit=Math.min(1,w/780,h/850);const placementFit=!demo&&cards.length<=8?1:fit;const el=elements[i];
    // #429 2/2: 폭별 상한을 넘는 카드는 숨긴다(가로 넘침·과밀 방지). 창이 넓어지면 다시 보인다.
    if(i>=cardCapFor(w)){el.style.display='none';return;}
@@ -130,9 +132,24 @@ export function mountOrbit(host,{trees,storage,context,actions,authHtml='',onSel
    // #429 2/2: 가운데 안전 구역(제목·문구·버튼 묶음+여백)과 카드 사각형이 겹치면 겹침이 0이 되도록 가장 얇은 쪽으로 민다.
    // 카드는 소각 회전을 하므로 폭·높이에 18% 여유를 두고 사각형으로 판정한다.
    let px=(x+camera.x*(.45+sc*.3))*sc*placementFit-90,py=(y+camera.y*(.38+sc*.24))*sc*placementFit-116;
-   if(safeZone){const cw=cardSizes[i].w*sc*1.18,ch=cardSizes[i].h*sc*1.18;
-    if(px+cw>safeZone.l&&px<safeZone.r&&py+ch>safeZone.t&&py<safeZone.b){
-     const pushL=px+cw-safeZone.l,pushR=safeZone.r-px,pushT=py+ch-safeZone.t,pushB=safeZone.b-py,m=Math.min(pushL,pushR,pushT,pushB);
+   if(safeZone){const size=cardSizes[i];
+    // 카드 사각형을 정확히: rotateX·Y·Z 합성 회전 → scale → 원근(1200px) 투영까지 네 귀퉁이로 계산한다.
+    // 원근은 월드 중심 원점 기준이므로 카드 중심 위치(Cx0·Cy0)도 함께 투영된다.
+    const AX=(c.tiltX+Math.sin(th)*9)*Math.PI/180,AY=(c.tiltY+Math.cos(th)*18)*Math.PI/180,AZ=(c.tiltZ+Math.sin(th*.6)*7)*Math.PI/180;
+    const rX=Math.cos(AX),uX=Math.sin(AX),rY=Math.cos(AY),uY=Math.sin(AY),rZ=Math.cos(AZ),uZ=Math.sin(AZ);
+    const Cx0=w/2+px+size.w/2,Cy0=h/2+py+size.h/2;
+    let minX=1e9,maxX=-1e9,minY=1e9,maxY=-1e9;
+    for(const corner of [[-1,-1],[1,-1],[-1,1],[1,1]]){
+     const X=size.w/2*corner[0],Y=size.h/2*corner[1];
+     const x1=X*rZ-Y*uZ,y1=X*uZ+Y*rZ;              // rotateZ
+     const x2=x1*rY,y2=y1,z2=-x1*uY;               // rotateY
+     const y3=y2*rX-z2*uX,z3=y2*uX+z2*rX;          // rotateX
+     const k=1200/(1200-z3);
+     const sxp=w/2+(Cx0-w/2+x2*sc)*k,syp=h/2+(Cy0-h/2+y3*sc)*k;    // 원근 원점(화면 중심) 기준으로 투영
+     if(sxp<minX)minX=sxp;if(sxp>maxX)maxX=sxp;if(syp<minY)minY=syp;if(syp>maxY)maxY=syp;
+    }
+    if(maxX>zs.l&&minX<zs.r&&maxY>zs.t&&minY<zs.b){
+     const pushL=maxX-zs.l,pushR=zs.r-minX,pushT=maxY-zs.t,pushB=zs.b-minY,m=Math.min(pushL,pushR,pushT,pushB);
      if(m===pushL)px-=pushL;else if(m===pushR)px+=pushR;else if(m===pushT)py-=pushT;else py+=pushB;
     }}
    el.style.transform=`translate3d(${px}px,${py}px,0) scale(${sc*Math.max(.58,fit)}) rotateX(${c.tiltX+Math.sin(th)*9}deg) rotateY(${c.tiltY+Math.cos(th)*18}deg) rotateZ(${c.tiltZ+Math.sin(th*.6)*7}deg)`;

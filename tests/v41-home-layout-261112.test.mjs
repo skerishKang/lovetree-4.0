@@ -55,8 +55,8 @@ test('가운데 안전 구역: 제목·버튼 묶음 사각형+여백을 재고,
   assert.match(orbit, /fitNotice=\(\)=>\{host\.style\.height=`calc\(100dvh - \$\{noticeOuter\(\)\}px\)`;measureSafeZone\(\);schedule\(\);/, '창 크기 변경(fitNotice)마다 다시 잰다');
   assert.match(orbit, /document\.fonts\?\.ready\?\.then\(\(\)=>\{measureSafeZone\(\);schedule\(\);\}/, '글꼴 도착 뒤에도 다시 잰다');
   // 카드 사각형(회전 여유 18%)과 겹치면 가장 얇은 쪽으로 민다 — 겹침 0 보장.
-  assert.match(orbit, /cardSizes\[i\]\.w\*sc\*1\.18/);
-  assert.match(orbit, /const pushL=px\+cw-safeZone\.l,pushR=safeZone\.r-px,pushT=py\+ch-safeZone\.t,pushB=safeZone\.b-py/);
+  assert.match(orbit, /const sxp=\(Cx0\+x2\*sc\)\*k,syp=\(Cy0\+y3\*sc\)\*k/, '카드 위치까지 포함한 원근 투영 계산');
+  assert.match(orbit, /const pushL=left\+cw-safeZone\.l,pushR=safeZone\.r-left,pushT=top\+ch-safeZone\.t,pushB=safeZone\.b-top/);
   // 옛 고정 타원 밀어내기는 안전 구역 판정으로 대체됐다.
   assert.doesNotMatch(orbit, /Math\.hypot\(x\/520,y\/260\)/);
 });
