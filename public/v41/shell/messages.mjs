@@ -71,6 +71,8 @@ export function createMessages(deps) {
     if (data?.type === 'lt41-open-book' && getModel()?.trees.some(t => t.id === data.treeId && t.moments.some(m => m.id === data.id))) {
       setCurrent('track59-sketchbook.html'); choose(data.treeId, data.id); writeLocation();
     }
+    // #394: 첫 화면이 순간 목록을 열었다(시작 트리 전달 완료) — 요청 플래그를 치워 다음 화면 이동에 되풀이하지 않게 한다.
+    if (data?.type === 'lt41-moments-opened') delete window.LT41_MOMENTS_OPEN;
     if (data?.type === 'lt41-start') { openLoginStart('first'); return; }
     if (data?.type === 'lt41-account') {
       if (getMember()?.snapshot().owned) openAccountMenu(); else $('account-entry').click();

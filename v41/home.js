@@ -9,6 +9,7 @@ import {homePresentation} from './home-presentation.js';
 import {applyHomeCenter} from './home-center.js';
 import {readTheme,writeTheme,appliedTheme,applyThemeAttribute} from '../public/v41/header-state.mjs';
 import {readTitleDisplay,titleView} from '../public/v41/book-usability.mjs';
+import {momentListEntries, momentListTrees} from './moment-list.js';
 const shellBody=parent.document.body;
 addEventListener('message',event=>{if(event.data?.type==='lt41-title-display')location.reload();});
 const context=parent.LT41||{source:shellBody.dataset.recordSource,member:shellBody.dataset.member,treeCount:Number(shellBody.dataset.treeCount||0)};
@@ -24,15 +25,27 @@ const mediaState=globalThis.LTMedia?.currentContext?.()||{source:'',owned:false}
 const youtube={describe:url=>globalThis.LTMedia?.describe?.(url)??null,auto:globalThis.LTMedia?.autoLoadMedia?.(mediaState.source,mediaState.owned)===true};
 const cardsPlan=homeCardsPlan({mode,loggedIn,context,popular,youtube});
 const cardTrees=cardsPlan.cards.length?[{id:'home-cards',title:'첫 화면 카드',moments:cardsPlan.cards}]:[];
+// #394: 순간 목록은 모든 트리의 순간을 최근 순으로 보는 곳. 트리 드롭다운의 "내 순간 전체 보기"로
+// 열릴 때는 셸이 남긴 요청(LT41_MOMENTS_OPEN)의 트리가 골라진 상태로 시작한다.
+const momentsRequest=parent.LT41_MOMENTS_OPEN??null;
+const momentList=loggedIn?{
+ trees:momentListTrees(context.trees),
+ entries:momentListEntries({trees:context.trees,youtube}),
+ initialTreeId:momentsRequest?.treeId||'all',
+ initialOpen:!!momentsRequest
+}:null;
  const orbit=mountOrbit(document.getElementById('orbit'),{
  trees:cardTrees,examples:cardsPlan.examples?ORBIT_EXAMPLE.moments.slice(0,cardsPlan.examples):[],
  // 내 것만 0장은 예시로 대체하지 않고 빈 궤도와 첫 순간 안내를 남긴다.
  empty:cardsPlan.kind==='mine-empty',
+ momentList,
  titleDisplay:readTitleDisplay(parent.LT41),
  onOpen:card=>{if(card.source==='public'){parent.location.hash=`#share/${card.shareId}/${card.view||'book'}`;return;}bridge.actions.openMine(card.treeId,card.id);},
  storage:{getItem:()=>null,setItem:()=>{}},context:{...presentation.context,readOnly:cardsPlan.kind==='example'},
  authHtml:`<button class="menuBtn auth-entry" data-home-account>${presentation.accountLabel}</button>`,actions:bridge.actions
 });
+// #394: 순간 목록 열기 요청을 받았다고 셸에 알린다 — 셸은 요청 플래그를 치워 다음 화면 이동에 되풀이하지 않게 한다.
+if(momentsRequest){try{parent.postMessage({type:'lt41-moments-opened'},location.origin)}catch{}}
 const shadow=document.getElementById('orbit').shadowRoot;
 // #380(2026-11-11): 가운데 세 버튼 — 자리·개수 그대로, 남은 폭을 똑같이 나눠 세 폭 동일(가장 긴 글자 기준 고정), 로그인 후 상태 한 줄.
 const centerStyle=document.createElement('style');
