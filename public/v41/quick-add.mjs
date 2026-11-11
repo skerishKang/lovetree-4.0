@@ -109,14 +109,13 @@ export function savedNoticeText(title) {
 // 놓았을 때 어디로 갈지를 한 곳에서 정한다.
 // share는 아무것도 받지 않고(#315 읽기 전용), 예시·파일·비로그인은 기존 로그인 안내를 쓴다.
 // 자세한 추가가 열려 있으면 주소 칸으로, 빠른 추가가 열려 있으면 그 모달로, 아니면 바로 저장한다.
-// 사진 파일은 자세한 추가가 열려 있으면 그 화면의 업로더로, 아니면 빠른 추가 업로더로 보낸다.
+// 사진 파일(#425 2번: 올린 사진은 나만 보기)은 늘 자세한 추가의 업로더로 보낸다 —
+// 쉬운 추가 탭에는 사진 올리기가 없으므로 빠른 추가가 열려 있어도 자세한 추가로 옮긴다.
 export function dropRoute({ source = 'example', owned = false, writable = false, quickOpen = false, editorOpen = false, image = false } = {}) {
   if (source === 'share') return { kind: 'ignore', target: '', veil: '' };
   if (source !== 'server' || !owned) return { kind: 'login', target: '', veil: '' };
   if (!writable) return { kind: 'readonly', target: '', veil: '' };
-  if (image) return editorOpen
-    ? { kind: 'photo', target: 'editor', veil: '놓으면 이 순간에 사진을 붙여요' }
-    : { kind: 'photo', target: 'quick', veil: '놓으면 모아둔 순간에 사진을 담아요' };
+  if (image) return { kind: 'photo', target: 'editor', veil: '놓으면 이 순간에 사진을 붙여요' };
   if (quickOpen) return { kind: 'modal', target: 'quick', veil: '놓으면 빠른 추가에 담아요' };
   if (editorOpen) return { kind: 'editor', target: 'editor', veil: '놓으면 이 순간의 주소 칸에 들어가요' };
   return { kind: 'quick', target: 'quick', veil: DROP_VEIL_TEXT };
