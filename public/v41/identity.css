@@ -89,6 +89,26 @@ html[data-lt-theme=garden] .lt-media-body button{color:var(--lt-paper)}
 .lt-yt-preview .lt-yt-play{position:absolute;inset:0;width:100%;min-height:44px;min-width:44px;border:0;padding:0;background:transparent;cursor:pointer;display:grid;place-items:center}
 .lt-yt-preview .lt-yt-play>span{display:grid;place-items:center;min-width:56px;min-height:56px;border-radius:50%;background:#1a1620d9;color:#ffffff;border:1px solid rgba(255,255,255,.4);font-size:22px;line-height:1}
 .lt-yt-frame{display:block;width:100%;aspect-ratio:16/9;border:0;border-radius:8px;background:#000}
+/* #393 1: 세로 영상(쇼츠 주소·세로 비율 정보)은 세로 틀(9:16). 썸네일·재생 모두 같은 비율, 잘림 없음. */
+.lt-media-toolbar{display:flex;justify-content:flex-end;margin:0 0 8px}
+.lt-media-toolbar button{min-height:44px;padding:8px 14px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-pill);background:rgba(255,230,166,.08);color:inherit;font-size:13px;cursor:pointer}
+.lt-media-toolbar button:hover{background:rgba(255,230,166,.18)}
+.lt-media[data-lt-vertical="1"] .lt-media-body{height:360px}
+.lt-media[data-lt-vertical="1"] .lt-yt-preview{width:auto;height:100%;max-width:100%;aspect-ratio:9/16}
+.lt-media[data-lt-vertical="1"] .lt-media-body img{width:100%!important;height:100%!important;max-height:none!important;object-fit:contain!important}
+.lt-media[data-lt-vertical="1"] .lt-yt-frame{width:auto;height:100%;max-width:100%;aspect-ratio:9/16}
+.lt-media[data-lt-vertical="1"] .lt-media-body video{width:auto!important;height:100%!important;max-height:none!important;object-fit:contain!important}
+/* #393 2: 크게 보기 — 어두운 깔개 위 화면 가운데 크게(세로 높이 가득·가로 폭 가득). 바깥 클릭·Esc로 복귀. */
+.lt-lightbox{position:fixed;inset:0;z-index:400;display:grid;place-items:center;padding:24px;background:rgba(4,4,7,.93);backdrop-filter:blur(10px)}
+.lt-lightbox-stage{display:grid;place-items:center;max-width:100%;max-height:100%}
+.lt-lightbox-media{display:block;border:0;border-radius:12px;background:#000;width:min(94vw,calc((100dvh - 96px)*16/9));max-height:calc(100dvh - 96px);aspect-ratio:16/9}
+video.lt-lightbox-media{object-fit:contain}
+.lt-lightbox-vertical .lt-lightbox-media{width:auto;height:min(calc(100dvh - 72px),calc(94vw*16/9));max-width:94vw;max-height:calc(100dvh - 72px);aspect-ratio:9/16}
+.lt-lightbox-close{position:absolute;top:14px;right:16px;min-width:44px;min-height:44px;border:1px solid var(--lt-line);border-radius:50%;background:var(--lt-glass);color:var(--lt-pearl);font-size:20px;line-height:1;cursor:pointer}
+.lt-lightbox-close:hover{border-color:var(--lt-gold-line);color:var(--lt-gold)}
+.lt-lightbox-title{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);max-width:90vw;margin:0;color:var(--lt-muted);font-size:13px;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lt-lightbox-note{margin:0;padding:20px;color:var(--lt-pearl);font-size:14px;line-height:1.7;text-align:center}
+@media(prefers-reduced-motion:reduce){.lt-lightbox{backdrop-filter:none}}
 
 .private-upload{margin:16px 0;padding:16px;border:1px solid var(--lt-line);border-radius:var(--lt-r-card)}.private-upload p{font-size:13px;line-height:1.6;overflow-wrap:anywhere}.private-upload input[type=file]{width:100%;min-height:44px}.private-upload button,.private-upload summary{min-height:44px}.upload-asset{padding:12px 0;border-top:1px solid var(--lt-line)}.upload-asset button{margin:4px 8px 4px 0}.private-upload details{margin-top:12px}
 

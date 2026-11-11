@@ -87,13 +87,13 @@ showDetail=function(id){
  const card=cardFor(id);
  if(card)placeDetail(id,card);
 };
-document.addEventListener('keydown',e=>{if(e.key!=='Escape')return;const panel=$b('#detailSide');if(panel&&!panel.hidden){e.preventDefault();closeDetail();}},true);
+document.addEventListener('keydown',e=>{if(e.key!=='Escape')return;if(document.querySelector('.lt-lightbox'))return;const panel=$b('#detailSide');if(panel&&!panel.hidden){e.preventDefault();closeDetail();}},true);
 /* 1. 실제 기록에서 재생 단추가 눌리지 않던 문제(2026-11-08): 카드 위 겹침·다른 리스너의 전파 차단에
    영향받지 않도록 pointerdown에서 먼저 잡고, 재생 주소를 못 만들면 원본 링크를 새 창으로 연다. */
 function playInline(yt,media){
  const url=embedUrl(yt.dataset.ytPlay,Number(yt.dataset.ytStart||0));
  if(!url){if(media&&media.openUrl)window.open(media.openUrl,'_blank','noopener');return}
- const frame=document.createElement('iframe');frame.className='yt-frame';frame.src=url;frame.title='YouTube 영상 재생';
+ const frame=document.createElement('iframe');frame.className='yt-frame'+(yt.dataset.ytVertical==='1'?' is-vertical':'');frame.src=url;frame.title='YouTube 영상 재생';
  frame.allow='accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';frame.allowFullscreen=true;
  frame.setAttribute('referrerpolicy','strict-origin-when-cross-origin');
  const host=yt.parentElement;if(!host)return;host.replaceChildren(frame);
@@ -108,6 +108,10 @@ document.addEventListener('pointerdown',e=>{
 },true);
 document.addEventListener('click',e=>{
  if(!isPrimaryButton(e))return;
+ // #393 2: 크게 보기 — 어두운 깔개 위 화면 가운데 크게(세로 높이 가득·가로 폭 가득). 바깥 클릭·Esc로 책 복귀.
+ const expand=e.target.closest('[data-yt-expand]');
+ if(expand){e.preventDefault();e.stopPropagation();const m=metadataFor(expand.dataset.ytExpand);
+  if(m&&m.url&&window.LTMedia&&LTMedia.openLightbox)LTMedia.openLightbox(m.url,titleViewFor(m).main,LTMedia.verticalVideo(m.url,m.mediaMetadata));return}
  const next=e.target.closest('[data-next-moment]');
  if(next){if(LTDEMO.readOnly)return;e.preventDefault();e.stopPropagation();requestNextMoment(next.dataset.nextMoment||selectedMomentId);return}
  /* 1. YouTube 그 자리 재생: 누른 뒤에만 iframe을 만든다(시작 시점 반영, referrerpolicy 엄격). */
@@ -166,14 +170,19 @@ momentContent=function(m,compact=false){
    const thumb=localThumb(safe);
    const ctx=(typeof LTMedia.currentContext==='function')?LTMedia.currentContext():{source:'',owned:false};
    const auto=!thumb&&LTMedia.autoLoadMedia(ctx.source,ctx.owned);
+   // #393: 세로 영상은 세로 틀(9:16)·원본 비율 썸네일(잘림 없음). 판정·주소는 LTMedia 한 벌.
+   const vertical=LTMedia.verticalVideo(safe.url,safe.mediaMetadata);
+   const remoteThumb=vertical?LTMedia.youtubeThumbUrl(media.videoId,true):media.loadUrl;
+   const thumbFallback=vertical?' onerror="this.onerror=null;this.src=\''+LTMedia.youtubeThumbUrl(media.videoId,false)+'\'"':'';
    const label=media.startSeconds?('여기서 재생 · '+media.label.replace('YouTube 링크 · ','')):'여기서 재생';
    const face=thumb?'<img src="'+t(thumb)+'" alt="">'
-    :auto?'<img src="https://i.ytimg.com/vi/'+t(media.videoId)+'/hqdefault.jpg" alt="'+t(safe.title||'YouTube 영상 썸네일')+'" referrerpolicy="no-referrer" loading="lazy" decoding="async">'
+    :auto?'<img src="'+t(remoteThumb)+'" alt="'+t(safe.title||'YouTube 영상 썸네일')+'"'+thumbFallback+' referrerpolicy="no-referrer" loading="lazy" decoding="async">'
     :'<span class="yt-placeholder"></span>';
    // #345: 영상 바로 아래 한 줄 — ▶ 영상 제목 · 채널 … YouTube ↗. 제목이 없으면 원본 링크만 남긴다.
     const source=String(safe.mediaMetadata?.channel||'').trim();
    const piece='<div class="clipping moment" data-moment="'+t(safe.id)+'">'+
-    '<button type="button" class="yt-play" data-yt-play="'+t(media.videoId)+'" data-yt-start="'+t(media.startSeconds||0)+'">'+
+    '<div class="yt-expand"><button type="button" data-yt-expand="'+t(safe.id)+'">크게 보기</button></div>'+
+    '<button type="button" class="yt-play'+(vertical?' is-vertical':'')+'" data-yt-play="'+t(media.videoId)+'" data-yt-start="'+t(media.startSeconds||0)+'"'+(vertical?' data-yt-vertical="1"':'')+'>'+
     face+
     '<span class="yt-play-label">'+t(label)+'</span></button>'+
     '<div class="media-source">'+

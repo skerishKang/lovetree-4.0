@@ -94,8 +94,10 @@ export function parseMomentLink(value = '') {
     if (videoId) {
       const startSeconds = startFrom(parsed);
       const openUrl = `https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}${startSeconds ? `&t=${startSeconds}s` : ''}`;
+      // #393: /shorts/ 주소는 세로 영상(media-preview.js 와 같은 판정).
+      const vertical = /^\/shorts\//.test(parsed.pathname || '');
       return {
-        kind: 'youtube', original, videoId, startSeconds,
+        kind: 'youtube', original, videoId, startSeconds, vertical,
         openUrl,
         label: startSeconds ? `YouTube 링크 · 시작 ${formatStart(startSeconds)}` : 'YouTube 링크',
         actionLabel: 'YouTube에서 열기'
