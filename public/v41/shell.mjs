@@ -5,6 +5,7 @@ import {createWorkspaceApi, setMemberRefreshStarted} from './api.mjs';
 import {createShareApi} from './share-api.mjs';
 import {createMemberSession} from './member-session.mjs';
 import {hasPendingDraft} from './sync-controller.mjs';
+import {clearCachedWorkspace} from './workspace-cache.mjs';
 import {exampleTree} from './example.mjs';
 import {parseSelectionRoute,memberStartupView,ownerSelectionRoute,accountPosition,rememberAccountPosition,resolveAccountPosition,stashPendingOwnerRoute,pendingOwnerRoute,takePendingOwnerRoute} from './selection-location.mjs';
 import {applyViewAccessibility,connectionLabel} from './view-a11y.mjs';
@@ -545,7 +546,7 @@ $('account-form').onsubmit=async event=>{
  notify(answer.commonAccountDeleted
   ? '러브트리 탈퇴와 함께 공통 로그인 계정과 인증 세션을 폐기했습니다.'
   : '러브트리에서 탈퇴했습니다. 다른 서비스 연결이 남아 있어 공통 계정은 유지됩니다.');
-};$('logout').onclick=async()=>{if(member){await member.act('logout');if(member.snapshot().dirty)notify('미저장 기록이 있어 로그아웃하지 않았어요. 다시 저장하거나 백업해 주세요.');}else{const answer=await createWorkspaceApi().logout();notify(answer.ok?'로그아웃했습니다.':'로그아웃하지 못했어요. 다시 시도해 주세요.');}};
+};$('logout').onclick=async()=>{if(member){await member.act('logout');if(member.snapshot().dirty)notify('미저장 기록이 있어 로그아웃하지 않았어요. 다시 저장하거나 백업해 주세요.');}else{const answer=await createWorkspaceApi().logout();if(answer.ok)clearCachedWorkspace(localStorage);notify(answer.ok?'로그아웃했습니다.':'로그아웃하지 못했어요. 다시 시도해 주세요.');}};
 $('file').onchange=async()=>{
  const f=$('file').files[0];
  if(!f)return;
