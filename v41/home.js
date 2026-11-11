@@ -36,7 +36,7 @@ const cardTrees=cardsPlan.cards.length?[{id:'home-cards',title:'첫 화면 카�
 const shadow=document.getElementById('orbit').shadowRoot;
 // #380(2026-11-11): 가운데 세 버튼 — 자리·개수 그대로, 남은 폭을 똑같이 나눠 세 폭 동일(가장 긴 글자 기준 고정), 로그인 후 상태 한 줄.
 const centerStyle=document.createElement('style');
-centerStyle.textContent='.center .actions .subtleBtn{flex:1 1 0%;min-width:0;overflow-wrap:anywhere;text-align:center;line-height:1.15}.center .center-note{min-height:2lh}.center .center-note .status-action{margin-left:8px;vertical-align:middle}@media (max-width:480px){.center .actions{flex-direction:column;align-items:stretch}.center .actions .subtleBtn{width:100%}}';
+centerStyle.textContent='.center .actions .subtleBtn{flex:1 1 0%;min-width:0;overflow-wrap:anywhere;text-align:center;line-height:1.15}.center > p:not(.center-note){min-height:2lh}.center > p:not(.center-note) .center-status{pointer-events:auto;cursor:pointer;text-decoration:underline;text-underline-offset:3px}@media (max-width:480px){.center .actions{flex-direction:column;align-items:stretch}.center .actions .subtleBtn{width:100%}}';
 shadow.append(centerStyle);
 // 2026-11-07 테마 A/B: 첫 화면 오른쪽 위 도구 줄의 버튼 하나로 밤/정원을 바꾼다. 저장 키는 셸과 같다(lt41.theme).
 // 정원 색은 public/v41/identity.css의 정원 블록에만 있고, 그 파일을 그림자 루트에도 넣어 :host 규칙을 쓴다.
@@ -61,10 +61,11 @@ shadow.append(cardUI);
 const centerButtons=[...shadow.querySelectorAll('.center .actions button')];
 const centerPlan=applyHomeCenter(centerButtons,presentation.centerState);
 const byDo=name=>centerButtons.find(b=>b.dataset.do===name);
-// '＋ 순간 추가' → 기존 add 흐름(requestMoment add), '이어 보던 순간' → 기존 resume, '어떻게 쓰나요'는 기존 안내가 없어 둘러보기와 같은 동작.
+// '＋ 순간 추가' → 기존 add 흐름(requestMoment add), '이어 보던 순간' → 기존 resume, 둘러보기/어떻게 쓰나요 → 기존 community(둘러보기와 동일 — 별도 사용법 안내 없음).
 const addButton=byDo('add');if(addButton)addButton.onclick=()=>bridge.actions.requestMoment('add');
-const resumeButton=byDo('resume');if(resumeButton)resumeButton.onclick=()=>bridge.actions.resume;
-const guideButton=byDo('guide');if(guideButton)guideButton.onclick=()=>bridge.actions.community;
+const resumeButton=byDo('resume');if(resumeButton)resumeButton.onclick=()=>bridge.actions.resume();
+const communityButton=byDo('community');if(communityButton)communityButton.onclick=()=>bridge.actions.community();
+const guideButton=byDo('guide');if(guideButton)guideButton.onclick=()=>bridge.actions.community();
 let loginFocusButton=null;
 centerButtons.forEach(b=>{b.addEventListener('pointerdown',()=>{loginFocusButton=b;});b.addEventListener('click',()=>{loginFocusButton=b;},true);b.addEventListener('focus',()=>{loginFocusButton=b;});});
 addEventListener('message',e=>{if(e.origin!==location.origin)return;if(e.data?.type==='lt41-login-focus'){const active=shadow.activeElement;if(active?.matches?.('button'))active.focus();else loginFocusButton?.focus();}});
@@ -78,10 +79,10 @@ if(cardsPlan.note!==null)shadow.querySelector('.center-note').textContent=cardsP
 // 2026-11-08 접근성: 카드 출처 안내가 바뀌면 화면 낭독기가 알린다.
 shadow.querySelector('.center-note')?.setAttribute('aria-live','polite');
 shadow.querySelector('.center-note')?.setAttribute('role','status');
-// #380(2026-11-11): 로그인 후 큰 제목 아래 둘째 줄 = 상태 한 줄(높이 두 줄 고정): 정리 알림 > 마지막 순간 > 첫 순간 안내.
+// #380(2026-11-11): 로그인 후 큰 제목 아래 설명 둘째 줄 = 상태(높이 두 줄 고정): 정리 알림 > 마지막 순간 > 첫 순간 안내. 로그인 전 문구는 그대로 둔다.
 if(loggedIn){
-  const status=shadow.querySelector('.center-note');
-  if(status){
+  const target=shadow.querySelector('.center > p:not(.center-note)');
+  if(target){
     let label=null,action=null;
     if(context.tree?.inbox===true){
       const n=(context.tree.moments||[]).length;
@@ -101,15 +102,17 @@ if(loggedIn){
         label=`마지막 순간 「${title}」${days===null?'':` · ${days}일 전`}`;
       }
     }
-    status.textContent='';
+    target.textContent='';
+    target.append('기억은 아직 여기에서 이어지고 있어요.');
+    target.append(document.createElement('br'));
     if(action==='cleanup'){
-      const s=document.createElement('span');
-      s.textContent=label;
-      const b=document.createElement('button');
-      b.type='button';b.className='subtleBtn status-action';b.textContent='정리하기';
-      b.onclick=()=>bridge.actions.cleanup();
-      status.append(s,b);
-    }else{status.textContent=label;}
+      const sp=document.createElement('span');
+      sp.className='center-status';sp.setAttribute('role','button');sp.setAttribute('tabindex','0');
+      sp.textContent=label;sp.title='모아둔 순간 정리 열기';
+      sp.onclick=()=>bridge.actions.cleanup();
+      sp.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();bridge.actions.cleanup();}};
+      target.append(sp);
+    }else{target.append(label);}
   }
 }
 const mobileFit=document.createElement('style');mobileFit.textContent='@media(max-width:768px){.topbar{gap:12px;flex-wrap:wrap;align-items:center;padding:8px 12px}.top-actions{gap:6px;flex-shrink:0;flex-wrap:wrap;margin-left:auto}.topbar .menuBtn{white-space:nowrap;padding:10px 9px;font-size:14px}.actions .subtleBtn{font-size:14px}.center .center-note{font-size:14px}.hint{font-size:14px}}';shadow.append(mobileFit);

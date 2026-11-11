@@ -108,8 +108,9 @@ test('로그인이 필요한 진입점은 안내 창 없이 바로 /auth/login�
   assert.match(authModule, /pendingLoginIntent/);
   assert.match(authModule, /showScreen\('track32-bookshelf\.html'\)/);
   assert.match(home, /addButton\.onclick=\(\)=>bridge\.actions\.requestMoment\('add'\)/);
-  assert.match(home, /resumeButton\.onclick=\(\)=>bridge\.actions\.resume/);
-  assert.match(home, /guideButton\.onclick=\(\)=>bridge\.actions\.community/);
+  assert.match(home, /resumeButton\.onclick=\(\)=>bridge\.actions\.resume\(\)/);
+  assert.match(home, /communityButton\.onclick=\(\)=>bridge\.actions\.community\(\)/);
+  assert.match(home, /guideButton\.onclick=\(\)=>bridge\.actions\.community\(\)/);
 });
 
 test('밤·정원 안내 창 글자 대비는 4.5:1 이상이다', () => {
