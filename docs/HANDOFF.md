@@ -2,6 +2,13 @@
 
 > **main 보호 규칙(2026-11-09, 룰셋 "main 보호 (PR·필수 검사)")**: main은 PR로만 바꾼다(직접 푸시·force push·삭제 금지, 관리자도 예외 없음 — 비상시 대표가 룰셋 enforcement를 잠깐 끈다). 필수 검사: `check (ubuntu-latest)`·`check (windows-latest)`·`미리보기 postdeploy(로그아웃)` — 셋 다 paths 필터가 없어 문서만 바뀐 PR에서도 항상 돈다. 승인 수 0(레인이 스스로 머지). Deploy Bundle Boot Test는 paths 필터가 있어 필수에 넣지 않았다.
 
+## 2026-11-12 — #369 공유 창 쉽게: 단계 표시·복사 안내·둘러보기 스위치·지난 주소 접기 (로컬2, ai/local2-lt-369-share-261112, PR #434)
+
+- 무엇: 공유 창(#share-panel)을 단계 중심으로 바꿨다. ① 보여 줄 것 고르기 ② 미리보기 ③ 링크 만들기를 `#share-steps`(①②③·현재 금테·끝난 ✓)와 "다음에 할 일" 안내 줄(`#share-next`, role=status)로 보여 주고, 링크 만들기가 막힌 이유("먼저 미리보기를 확인해 주세요.")를 버튼 옆에 띄운다. 링크가 생기면 복사·열어 보기 버튼을 바로 보여 주고 복사하면 "복사했어요."(role=status `#share-copy-note`). "둘러보기에도 올리기"는 링크를 만든 뒤 켜는 스위치(role=switch, 기본 꺼짐·켤 때 확인 1회)로 바꾸고 공유 창의 "발견" 문구를 모두 "둘러보기"로 통일했다. "공개되는 범위"는 한두 줄 + "자세히" 접힘("올린 사진은 나만 볼 수 있어요" 포함). 주소 목록은 살아 있는 주소만 위에, 취소된 주소는 "지난 주소 N개" 접힘 안에, 살아 있는 주소마다 만든 날짜·처음 열 보기·복사·취소(확인 1회).
+- 유지: 서버 코드 변경 0(share-service·community-service 그대로, discovery PUT/DELETE 재사용), #315 공유 읽기 전용·#432 사진 비공개·공통 틀 닫기 규칙(`isShareDirty` 그대로)·`--lt-*` 토큰.
+- 시험: `npm test` 1157건 1120 pass/0 fail/37 skip(문구 기대값 1건 갱신: `tests/v41-share-api.test.mjs`), build·modulepreload pass. 로컬 DOM(dist+가짜 API 계정 04 역할, 크롬 1회·4236 포트): 1440·390에서 37/37 — 단계 판정·이유 문구·키보드 미리보기→링크 만들기·복사 안내·스위치 기본 꺼짐→PUT discovery·지난 주소 접힘·취소 확인 1회→DELETE·가로 넘침 0·페이지 오류 0·axe serious·critical 0(공유 창).
+- 남은 것: 둘러보기 화면 쪽 `community-panel.mjs`의 "내 발견 목록에서 숨기기"(감상자 차단 문구)와 설정 탈퇴 안내의 "발견 목록 노출"은 이번 범위(공유 창) 밖 — 말 통일 후속이 필요하면 별도 이슈로. 본 주소(계정 04)에서 실제 링크 생성·취소 확인은 머지·배포 뒤 한다.
+
 ## 2026-11-12 — 러브트리 #425 PR 2: 올린 사진 나만 보기·쉬운 추가 사진 칸 정리 (로컬2, ai/local2-lt-425-photo-261112)
 
 - 무엇: #425 2번 마감. 쉬운 추가 탭의 '또는' 구분선·사진 올리기 칸을 없애 사진 드롭은 늘 자세한 추가 업로더로 간다(`dropRoute` image → editor 고정, `shell/quick-add.mjs`의 quickUploads 제거). 자세한 추가에 '직접 찍었거나 쓸 권리가 있는 사진만 올려 주세요 · 사진은 나만 볼 수 있어요' 안내. 서버는 `projectSharedTree`가 사진 표지(coverMode=photo)를 공개 응답에서만 디자인/기본으로 바꾸고(저장본 무손), `community-service.js card()`는 coverModeOf 판정으로 '순간에서'일 때만 표지 주소를 보낸다. 공유 감상 화면에 '올린 사진 N장은 나만 볼 수 있어요' 안내.
