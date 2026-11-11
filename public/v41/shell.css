@@ -5,7 +5,7 @@ dialog[data-lt-panel=center]{inset:0;margin:auto;width:min(460px,calc(100vw - 32
 
 .feedback:empty{display:none}.feedback{padding:12px;border:1px solid rgba(255,230,166,.3);border-radius:12px;background:rgba(255,230,166,.06);color:var(--lt-pearl)!important}
 
-#save-feedback{flex:0 0 auto;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;padding:10px 22px;background:rgba(238,190,104,.08);border-bottom:1px solid rgba(255,230,166,.35);font-size:13px;line-height:1.7}#save-feedback[hidden]{display:none}#save-actions{display:flex;gap:6px;flex-wrap:wrap}#save-actions button{min-height:44px;background:transparent;border:1px solid rgba(255,255,255,.3);border-radius:var(--lt-r-pill);padding:7px 12px}#moment-form,#tree-form{margin-top:24px}#tree-form label{display:block;font-size:13px;color:var(--lt-muted);margin:16px 0}#tree-form input,#tree-form select{display:block;width:100%;margin-top:8px;padding:11px 12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.22);border-radius:12px;color:var(--lt-pearl);min-height:44px;line-height:1.6}#tree-form-error{color:#f3a8b6}#moment-form{margin-top:24px}#moment-form label{display:block;font-size:13px;color:var(--lt-muted);margin:16px 0}#moment-form input,#moment-form textarea{display:block;width:100%;margin-top:8px;padding:11px 12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.22);border-radius:12px;color:var(--lt-pearl);min-height:44px;line-height:1.6}#moment-form textarea{resize:vertical}.form-pair{display:grid;grid-template-columns:1fr 1fr;gap:12px}#moment-form label[hidden]{display:none}.editor-modes button[aria-current=true]{background:var(--lt-primary);color:var(--lt-primary-ink)}.danger{color:#e5a5af}#form-error{color:#f3a8b6}#backup-draft{min-height:44px;padding:8px 14px;border:1px solid rgba(255,255,255,.3);border-radius:var(--lt-r-pill);background:none}#moment-management[hidden]{display:none}@media(max-width:780px){.header-actions{gap:6px}.header-actions button,.header-actions .login{padding:0 9px;font-size:12px}#record-menu{max-width:none}#save-feedback{padding:8px 12px}#save-feedback button{font-size:12px}}
+#save-feedback{flex:0 0 auto;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;padding:10px 22px;background:rgba(238,190,104,.08);border-bottom:1px solid rgba(255,230,166,.35);font-size:13px;line-height:1.7}#save-feedback[hidden]{display:none}#save-actions{display:flex;gap:6px;flex-wrap:wrap}#save-actions button{min-height:44px;background:transparent;border:1px solid rgba(255,255,255,.3);border-radius:var(--lt-r-pill);padding:7px 12px}#moment-form,#tree-form{margin-top:24px}#tree-form label{display:block;font-size:13px;color:var(--lt-muted);margin:16px 0}#tree-form input,#tree-form select{display:block;width:100%;margin-top:8px;padding:11px 12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.22);border-radius:12px;color:var(--lt-pearl);min-height:44px;line-height:1.6}#tree-form-error{color:#f3a8b6}#moment-form{margin-top:24px}#moment-form label{display:block;font-size:13px;color:var(--lt-muted);margin:16px 0}#moment-form input,#moment-form textarea{display:block;width:100%;margin-top:8px;padding:11px 12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.22);border-radius:12px;color:var(--lt-pearl);min-height:44px;line-height:1.6}#moment-form textarea{resize:vertical}.form-pair{display:grid;grid-template-columns:1fr 1fr;gap:12px}#moment-form label[hidden]{display:none}.editor-modes button[aria-current=true]{background:var(--lt-primary);color:var(--lt-primary-ink)}.danger{color:#e5a5af}#form-error,#profile-error{color:#f3a8b6}#backup-draft{min-height:44px;padding:8px 14px;border:1px solid rgba(255,255,255,.3);border-radius:var(--lt-r-pill);background:none}#moment-management[hidden]{display:none}@media(max-width:780px){.header-actions{gap:6px}.header-actions button,.header-actions .login{padding:0 9px;font-size:12px}#record-menu{max-width:none}#save-feedback{padding:8px 12px}#save-feedback button{font-size:12px}}
 @media(max-width:780px){#moment-form input,#moment-form textarea{font-size:16px}}
 
 #connections button strong{display:block;font-weight:600}.connection-reason{display:block;margin-top:5px;color:var(--muted);font-size:12px;line-height:1.7}#connections button small{min-width:48px}
@@ -202,7 +202,32 @@ html[data-v41-screen=book] .tools .ui-btn::after,html[data-v41-screen=board] hea
 .settings-profile .account-initial{width:48px;height:48px;font-size:18px}
 .settings-profile-text{min-width:0}
 .settings-profile-text strong{display:block;font-size:15px;line-height:1.5;overflow-wrap:anywhere}
+.settings-profile-text span{display:block;font-size:12px;color:var(--lt-muted);overflow-wrap:anywhere}
 .settings-profile-text .panel-note{margin:4px 0 0}
+/* 이슈 368 2차: 설정 항목의 저장 위치 표시(계정에 저장 / 이 기기에만) — 행 끝 작은 글씨. */
+.settings-scope{margin-left:auto;flex:0 0 auto;font-size:11px;color:var(--lt-muted);white-space:nowrap}
+/* 이슈 368 2차: 프로필 폼(표시 이름·동그라미 색). 이름 칸은 고르기 버튼과 같은 높이·모양. */
+#profile-name{flex:1 1 200px;min-width:0;min-height:34px;padding:0 12px;border:1px solid var(--lt-line);border-radius:9px;background:rgba(255,255,255,.04);color:var(--lt-pearl);font-size:13px}
+#profile-error:empty{display:none}
+#profile-error{font-size:12px}
+#profile-color button{width:34px;min-width:34px;height:34px;padding:0;border-radius:50%;border:1px solid rgba(255,255,255,.3)}
+#profile-color button[aria-checked="true"]{background:inherit;box-shadow:0 0 0 2px var(--lt-gold);border-color:var(--lt-gold)}
+#profile-color [data-accent-color=""]{background:var(--lt-stage-2)}
+#profile-color [data-accent-color="rose"]{background:var(--lt-accent-rose)}
+#profile-color [data-accent-color="gold"]{background:var(--lt-accent-gold)}
+#profile-color [data-accent-color="green"]{background:var(--lt-accent-green)}
+#profile-color [data-accent-color="blue"]{background:var(--lt-accent-blue)}
+#profile-color [data-accent-color="purple"]{background:var(--lt-accent-purple)}
+#profile-color [data-accent-color="orange"]{background:var(--lt-accent-orange)}
+#profile-color [data-accent-color="teal"]{background:var(--lt-accent-teal)}
+/* 이슈 368 2차: 고른 동그라미 색 — 맨 위 계정 버튼·계정 메뉴·설정 프로필이 같은 팔레트를 쓴다. 글자는 진주색. */
+.account-avatar[data-accent="rose"],.account-initial[data-accent="rose"]{background:var(--lt-accent-rose);border-color:var(--lt-accent-rose);color:var(--lt-pearl)}
+.account-avatar[data-accent="gold"],.account-initial[data-accent="gold"]{background:var(--lt-accent-gold);border-color:var(--lt-accent-gold);color:var(--lt-pearl)}
+.account-avatar[data-accent="green"],.account-initial[data-accent="green"]{background:var(--lt-accent-green);border-color:var(--lt-accent-green);color:var(--lt-pearl)}
+.account-avatar[data-accent="blue"],.account-initial[data-accent="blue"]{background:var(--lt-accent-blue);border-color:var(--lt-accent-blue);color:var(--lt-pearl)}
+.account-avatar[data-accent="purple"],.account-initial[data-accent="purple"]{background:var(--lt-accent-purple);border-color:var(--lt-accent-purple);color:var(--lt-pearl)}
+.account-avatar[data-accent="orange"],.account-initial[data-accent="orange"]{background:var(--lt-accent-orange);border-color:var(--lt-accent-orange);color:var(--lt-pearl)}
+.account-avatar[data-accent="teal"],.account-initial[data-accent="teal"]{background:var(--lt-accent-teal);border-color:var(--lt-accent-teal);color:var(--lt-pearl)}
 .settings-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px}
 .settings-actions button{min-height:44px;padding:10px 14px;border:1px solid rgba(255,255,255,.18);border-radius:var(--lt-r-pill);background:rgba(255,255,255,.04)}
 .settings-group details{margin-top:14px}

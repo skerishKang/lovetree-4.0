@@ -38,7 +38,7 @@ function fakeBook() {
   const selected = [];
   const LTDEMO = {
     moments,
-    prefs: { titleDisplay: 'both' },
+    prefs: { titleDisplay: 'both', displayName: '', accentColor: '' },
     get: () => state.momentId,
     select: id => { if (moments.some(m => m.id === id)) { state.momentId = id; selected.push(id); } }
   };

@@ -9,7 +9,7 @@ import {clearCachedWorkspace} from './workspace-cache.mjs';
 import {exampleTree} from './example.mjs';
 import {parseSelectionRoute,memberStartupView,ownerSelectionRoute,accountPosition,rememberAccountPosition,resolveAccountPosition,stashPendingOwnerRoute,pendingOwnerRoute,takePendingOwnerRoute} from './selection-location.mjs';
 import {applyViewAccessibility,connectionLabel} from './view-a11y.mjs';
-import {accountPresentation,treePickerLabel,treePickerText,treeViewsVisible,writeMenuLabel,headerState,headerPartsFor,readTipsSeen,writeTipsSeen,tipsWanted,FIRST_TREE_TIPS,homeCenterState,homeStartLoginUrl,readTheme,readLoginIntent,writeTheme,nextTheme,themeButtonLabel,themeButtonAriaLabel,themePressed,appliedTheme,applyThemeAttribute,LOGIN_INTENTS} from './header-state.mjs';
+import {accountPresentation,treePickerLabel,treePickerText,treeViewsVisible,writeMenuLabel,headerState,headerPartsFor,readTipsSeen,writeTipsSeen,tipsWanted,FIRST_TREE_TIPS,homeCenterState,homeStartLoginUrl,readTheme,readLoginIntent,writeTheme,nextTheme,themeButtonLabel,themeButtonAriaLabel,themePressed,appliedTheme,applyThemeAttribute,LOGIN_INTENTS,readPageTurn,writePageTurn} from './header-state.mjs';
 import {parseJourneyRoute,journeyRouteDecision} from './first-journey.mjs';
 import {displayTreeTitle} from './tree-name.mjs';
 import {titleView, withoutAutoTitle} from './book-usability.mjs';
@@ -30,7 +30,7 @@ import {connectionSignature} from './shell/panel-dirty.mjs';
 import {createLocation} from './shell/location.mjs';
 import {createNotifier} from './shell/notice.mjs';
 import {paintLoginLinks,paintThemeControls,applyTheme as applyThemeFor,toggleTheme as toggleThemeFor} from './shell/theme.mjs';
-import {normalizeTitleDisplay, coverModeOf, normalizeCoverDesign} from './domain.mjs';
+import {normalizeTitleDisplay, normalizeAccentColor, coverModeOf, normalizeCoverDesign} from './domain.mjs';
 import {backfillVideoTitles} from './title-backfill.mjs';
 const $=id=>document.getElementById(id);
 // 안내 한 벌(#353 후속): 담기·중복·로그인 필요 안내(hold)가 상태 안내보다 먼저 일정 시간 보인다.
@@ -330,6 +330,8 @@ const shellDialogs=createDialogs({
   // #380 4 마지막: 빠른 추가는 주소를 적어 두고 아직 담지 않았을 때, 공유는 공개 범위를 미리 봤는데 링크를 아직 만들지 않았을 때만 더러움이다.
   // 설정·내 보관 파일·둘러보기·추가 방식 고르기는 입력을 적어 두지 않으므로 바로 닫힌다.
   isShareDirty:()=>{const create=$('share-create');return $('share-panel').open&&!!create&&!create.disabled&&$('share-created').hidden;},
+  // #368 2차: 설정의 프로필 폼은 쓰다 만 이름·색이 있으면 공통 틀이 한 번 묻는다. 다른 설정 항목은 누르는 즉시 적용되어 더러움이 없다.
+  isSettingsDirty:()=>profileDirty(),
   // 편집기 규칙이 공통 틀보다 우선한다: 업로드 중에는 Esc·바깥 클릭·× 모두 닫지 않고 이유를 알린다.
   // 빠른 추가의 사진 올리기도 같은 규칙을 쓴다(업로드가 끝나면 곧바로 담기므로 중간에 닫으면 사라진다).
   panelBlocked:id=>id==='write-panel'&&(uploads.busy||shellQuick.uploads?.busy)?'파일 전송을 마치거나 취소해 주세요.':'',
@@ -371,6 +373,8 @@ const shellScreens=createScreens({
   onFrameReady:frame=>{
     const d=frame.contentDocument;if(!d)return;
     mountConnectionTool(d);applyViewAccessibility(d);shellQuick.mountFrame(d);
+    // #368 2차: 새로 열린 화면(기억책)에 페이지 넘김 값을 알린다(테마와 같은 시점).
+    applyPageTurnToFrame(frame);
     d.addEventListener('click',e=>{const b=e.target.closest('button,a');if(!b)return;let file;if(b.matches('[data-action="tree"],[data-menu="tree"]'))file='track32-bookshelf.html';if(b.matches('#storyBook,[data-menu="book"]'))file='track59-sketchbook.html';if(current==='track56-network.html'&&b.id==='openMoment')file='track59-sketchbook.html';if(file){e.preventDefault();e.stopImmediatePropagation();show(file);}},true);
   }
 });
@@ -601,12 +605,62 @@ function focusSettingsSection(section='profile'){
  const target=$(SETTINGS_SECTIONS[section]||SETTINGS_SECTIONS.profile);if(!target)return;
  queueMicrotask(()=>{target.scrollIntoView({block:'start'});const heading=target.querySelector('h3');if(heading)heading.focus({preventScroll:true});});
 }
-// #368: 프로필 묶음 표시. 이메일이 없으면 "내 계정"(header-state 규칙 그대로, 가리지 않는다).
+// #368: 프로필 묶음 표시. 동그라미 글자는 표시 이름 첫 글자 → 이메일 첫 글자 → 나(#368 2차, header-state 규칙),
+// 색은 고른 색이고 고르지 않으면 지금 기본색이다. 이메일은 가리지 않는다(자기 계정 화면).
+function savedPrefs(){try{return member?.state?.()?.prefs||{}}catch{return {}}}
 function paintSettingsProfile(email=shellHeader.currentAccountEmail()){
- const view=accountPresentation({owned:!!member?.snapshot().owned,email});
- const initial=$('settings-profile-initial');if(initial)initial.textContent=view.initial;
- const mail=$('settings-profile-email');if(mail)mail.textContent=view.label;
+ const prefs=savedPrefs();
+ const view=accountPresentation({owned:!!member?.snapshot().owned,email,name:prefs.displayName});
+ const accent=normalizeAccentColor(prefs.accentColor);
+ const initial=$('settings-profile-initial');if(initial){initial.textContent=view.initial;initial.dataset.accent=accent;}
+ const name=$('settings-profile-name');if(name)name.textContent=(typeof prefs.displayName==='string'&&prefs.displayName.trim())?prefs.displayName:(email||'내 계정');
+ const mail=$('settings-profile-email');if(mail){mail.textContent=email||'';mail.hidden=!email;}
 }
+// #368 2차: 프로필 편집 — 계정 기록의 설정 칸(state.prefs)에 저장한다(새 API 없음, setPrefs 재사용).
+// 쓰다 만 입력이 있으면 공통 틀(shell/dialogs.mjs PANEL_DIRTY)이 "저장하지 않고 닫을까요?"를 한 번 묻는다.
+let profileBaseline='';
+function profileFormValue(){return JSON.stringify({name:$('profile-name')?.value??'',color:$('profile-color')?.querySelector('[aria-checked="true"]')?.dataset.accentColor??''});}
+function profileDirty(){if(!$('account-settings').open)return false;if(!profileBaseline)return false;return profileFormValue()!==profileBaseline;}
+function fillProfileForm(){
+ const prefs=savedPrefs();
+ if($('profile-name'))$('profile-name').value=typeof prefs.displayName==='string'?prefs.displayName:'';
+ for(const b of document.querySelectorAll('[data-accent-color]'))b.setAttribute('aria-checked',String(b.dataset.accentColor===normalizeAccentColor(prefs.accentColor)));
+ profileBaseline=profileFormValue();
+ if($('profile-error'))$('profile-error').textContent='';
+}
+$('profile-color')?.addEventListener('click',event=>{const b=event.target.closest('[data-accent-color]');if(!b)return;for(const x of document.querySelectorAll('[data-accent-color]'))x.setAttribute('aria-checked',String(x===b));});
+$('profile-reset').onclick=()=>{fillProfileForm();};
+$('profile-form').onsubmit=event=>{
+ event.preventDefault();
+ if(!member?.snapshot().owned){notify('로그인한 뒤 프로필을 저장할 수 있어요.');return;}
+ const submit=$('profile-form').querySelector('button[type="submit"]');
+ const patch={displayName:$('profile-name').value,accentColor:$('profile-color').querySelector('[aria-checked="true"]')?.dataset.accentColor||''};
+ if(submit)submit.disabled=true;
+ let saved=null;
+ try{saved=member.apply('setPrefs',patch);}catch(e){saved=null;}
+ if(submit)submit.disabled=false;
+ if(!saved){$('profile-error').textContent='프로필을 저장하지 못했어요. 저장 연결을 확인한 뒤 다시 시도해 주세요.';return;}
+ renderAccount();
+ paintSettingsProfile();
+ fillProfileForm();
+ notify('프로필을 저장했어요. 계정에 저장됩니다.');
+};
+// #368 2차: 페이지 넘김 — 이 기기에만 저장한다(localStorage lt41.pageTurn). 기본은 종이처럼이고,
+// 시스템 움직임 줄이기가 켜져 있으면 기억책이 고른 값과 상관없이 부드럽게로 읽는다. 전달은 테마와 같은 방식
+// (프레임 문서 속성 + lt41-page-turn 메시지)이다.
+function currentPageTurn(){return readPageTurn(localStorage);}
+function applyPageTurnToFrame(frame){
+ try{frame.contentDocument?.documentElement?.setAttribute('data-lt-page-turn',currentPageTurn());}catch{}
+ try{frame.contentWindow?.postMessage({type:'lt41-page-turn',value:currentPageTurn()},location.origin);}catch{}
+}
+function paintPageTurnControls(){const value=currentPageTurn();for(const b of document.querySelectorAll('[data-page-turn]'))b.setAttribute('aria-checked',String(b.dataset.pageTurn===value));}
+for(const b of document.querySelectorAll('[data-page-turn]'))b.onclick=()=>{
+ const next=writePageTurn(localStorage,b.dataset.pageTurn);
+ paintPageTurnControls();
+ for(const f of frames())applyPageTurnToFrame(f);
+ notify(next==='smooth'?'페이지 넘김을 부드럽게 바꿨어요.':'페이지 넘김을 종이처럼 바꿨어요.');
+};
+paintPageTurnControls();
 // #368: 옛 내 기록 창을 여던 입구(읽기 전용 안내·빈 화면)의 공통 행선지. 로그아웃이면 로그인으로 보낸다.
 function openAccountData(intent='first'){
  if(!member?.snapshot().owned){openLoginStart(intent);return;}
@@ -617,6 +671,7 @@ async function openAccountSettings({section='profile'}={}){
  // 로그아웃·공유·예시 상태에서는 설정 입구가 없다(기존 규칙). 여기서도 열지 않는다.
  if(!member?.snapshot().owned){notify('로그인한 뒤 설정을 열 수 있어요.');return;}
  paintSettingsProfile();
+ fillProfileForm();
  panel('account-settings');
  focusSettingsSection(section);
  const answer=await accountApi.account();

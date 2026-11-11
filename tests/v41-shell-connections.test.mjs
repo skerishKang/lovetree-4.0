@@ -11,9 +11,9 @@ const SHELL_CONNECTIONS = [
   'account-entry', 'account-form', 'account-logout', 'account-open-settings',
   'advanced-backup', 'advanced-import', 'change-parent', 'clear', 'delete-moment', 'editor-assets-open',
   'editor-cancel', 'empty-file', 'empty-records', 'empty-sample', 'file', 'logout', 'mobile-more', 'moment-form',
-  'record-menu', 'sample', 'server', 'settings-assets-open', 'share-copy', 'share-create',
-  'share-menu', 'share-moment', 'share-preview', 'share-view', 'tree-cover', 'tree-delete', 'tree-form',
-  'tree-tips-close', 'write-menu'
+  'profile-color', 'profile-form', 'profile-reset', 'record-menu', 'sample', 'server', 'settings-assets-open',
+  'share-copy', 'share-create', 'share-menu', 'share-moment', 'share-preview', 'share-view', 'tree-cover',
+  'tree-delete', 'tree-form', 'tree-tips-close', 'write-menu'
 ];
 
 const dir = new URL('../public/v41/', import.meta.url);
@@ -33,5 +33,5 @@ test('셸이 연결하던 요소는 지금도 셸·shell/ 안에서 연결을 �
   // 그래서 세 id는 이 목록에서 빼고, 공통 틀 계약은 tests/v41-panel-mode.test.mjs·v41-shell-dialogs.test.mjs가 고정한다.
   const missing = SHELL_CONNECTIONS.filter(id => !new RegExp(`\\$\\('${id}'\\)\\??\\.(onclick|onchange|onsubmit|oninput|addEventListener)`).test(source));
   assert.deepEqual(missing, [], '연결이 사라진 요소: ' + missing.join(', '));
-  assert.equal(SHELL_CONNECTIONS.length, 37);
+  assert.equal(SHELL_CONNECTIONS.length, 40);
 });

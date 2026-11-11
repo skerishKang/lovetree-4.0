@@ -62,7 +62,7 @@ test('schema is repeatable and the first save lands on revision 1', { skip }, as
     const handle = buildHandle(repo, subject);
     const state = sampleState();
     // #371: 빈 상태에도 prefs 기본값(titleDisplay)이 함께 온다(EMPTY_STATE 계약, tests/v41-title-prefs.test.mjs).
-    assert.deepEqual(await read(handle), { status: 200, body: { revision: 0, savedAt: null, state: { version: 1, trees: [], prefs: { titleDisplay: 'both' } }, subject } });
+    assert.deepEqual(await read(handle), { status: 200, body: { revision: 0, savedAt: null, state: { version: 1, trees: [], prefs: { titleDisplay: 'both', displayName: '', accentColor: '' } }, subject } });
     assert.equal((await put(handle, { state, expectedRevision: 0, clientKey: `ck-${suffix()}` })).body.revision, 1);
     const loaded = await read(handle);
     assert.deepEqual(loaded.body.state, validateState(state));
