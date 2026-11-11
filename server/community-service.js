@@ -2,6 +2,7 @@ import {randomUUID} from 'node:crypto';
 import {ApiError} from './errors.js';
 import {parsePrincipal} from './principal.js';
 import {projectSharedTree} from './share-service.js';
+import {coverModeOf} from '../src/domain.js';
 
 export const REACTION_KINDS=Object.freeze(['heart','like','love','laugh','wow','sad','angry']);
 const isReactionKind=value=>typeof value==='string'&&REACTION_KINDS.includes(value);
@@ -38,9 +39,12 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,pr
   let projected;try{projected=projectSharedTree(stored.doc,share.treeId);}catch{return null;}
   if(!projected.tree.moments.length)return null;
   const tree=projected.tree,cover=tree.moments.find(moment=>moment.id===tree.coverMomentId)||tree.moments.find(moment=>moment.id===share.entryMomentId)||tree.moments[0];
+  // #425 2번: 표지 주소는 '순간에서(moment)'일 때만 보낸다. 사진 표지는 공개 판정에서
+  // 디자인/기본으로 바뀌고(projectSharedTree), 디자인·기본 표지에는 주소가 없다.
+  const coverUrl=coverModeOf(tree)==='moment'?(cover?.url||''):'';
   const emotions=[...new Set(tree.moments.map(moment=>moment.emotion).filter(Boolean))];
   const stats=statsOverride||await communityRepo.stats({productId,shareId:share.shareId,viewerSubjectId});
-  return {shareId:share.shareId,title:tree.title,subject:tree.subject,summary:clean(cover?.note,160),emotions,momentCount:tree.moments.length,entryMomentId:share.entryMomentId,view:share.view,cover:{title:cover?.title||tree.title,url:cover?.url||'',emotion:cover?.emotion||''},createdAt:share.createdAt,lastActivityAt:lastActivityAt||share.createdAt,stats};
+  return {shareId:share.shareId,title:tree.title,subject:tree.subject,summary:clean(cover?.note,160),emotions,momentCount:tree.moments.length,entryMomentId:share.entryMomentId,view:share.view,cover:{title:cover?.title||tree.title,url:coverUrl,emotion:cover?.emotion||''},createdAt:share.createdAt,lastActivityAt:lastActivityAt||share.createdAt,stats};
  }
  return {
   async discover({query='',emotion='',cursor='',limit=12,viewerSubjectId=null}={}){

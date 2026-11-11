@@ -7,7 +7,7 @@ import { createNotifier, NOTICE_HOLD_MS, NOTICE_HIDE_MS } from '../public/v41/sh
 
 function harness() {
   const els = {};
-  for (const id of ['record-feedback', 'toast', 'records']) els[id] = { textContent: '', hidden: false, open: false };
+  for (const id of ['settings-feedback', 'toast', 'account-settings']) els[id] = { textContent: '', hidden: false, open: false };
   let clock = 1000;
   let nextId = 1;
   const timers = [];
@@ -20,16 +20,16 @@ function harness() {
   return { els, notifier, timers, advance: (ms) => { clock += ms; } };
 }
 
-test('상태 안내: 토스트·기록 줄에 함께 뜨고 숨김 타이머를 다시 건다', () => {
+test('상태 안내: 토스트·설정 상태 줄에 함께 뜨고 숨김 타이머를 다시 건다', () => {
   const h = harness();
   assert.equal(h.notifier.notify('내 기록을 불러왔어요.'), true);
   assert.equal(h.els['toast'].textContent, '내 기록을 불러왔어요.');
-  assert.equal(h.els['record-feedback'].textContent, '내 기록을 불러왔어요.');
+  assert.equal(h.els['settings-feedback'].textContent, '내 기록을 불러왔어요.');
   assert.equal(h.els['toast'].hidden, false);
   assert.equal(h.timers.length, 1);
   assert.equal(h.timers[0].ms, NOTICE_HIDE_MS);
 
-  h.els['records'].open = true;
+  h.els['account-settings'].open = true;
   assert.equal(h.notifier.notify('기록 창이 열려 있으면 토스트는 숨는다'), true);
   assert.equal(h.els['toast'].hidden, true);
   assert.equal(h.timers[0].cleared, true, '이전 숨김 타이머를 지운다');
@@ -43,11 +43,11 @@ test('담기 안내 우선: hold 동안 상태 안내가 와도 덮지 않고, h
   h.advance(2000);
   assert.equal(h.notifier.notify('서버에 저장됐어요.'), false, 'hold 동안 상태 안내는 미룬다');
   assert.equal(h.els['toast'].textContent, '모아둔 순간에 담았어요');
-  assert.equal(h.els['record-feedback'].textContent, '모아둔 순간에 담았어요');
+  assert.equal(h.els['settings-feedback'].textContent, '모아둔 순간에 담았어요');
   h.advance(NOTICE_HOLD_MS - 2000 + 1);
   assert.equal(h.notifier.notify('내 기록을 불러왔어요.'), true, 'hold가 지나면 상태 안내가 보인다');
   assert.equal(h.els['toast'].textContent, '내 기록을 불러왔어요.');
-  assert.equal(h.els['record-feedback'].textContent, '내 기록을 불러왔어요.');
+  assert.equal(h.els['settings-feedback'].textContent, '내 기록을 불러왔어요.');
 });
 
 test('중복·로그인 필요 안내도 같은 규칙으로 지켜진다', () => {
@@ -61,7 +61,7 @@ test('중복·로그인 필요 안내도 같은 규칙으로 지켜진다', () =
   assert.equal(retry.notifier.notify('로그인한 뒤 다시 공유해 주세요.', { hold: true }), true);
   retry.advance(1000);
   assert.equal(retry.notifier.notify('로그인이 필요해요.'), false, '재시도 안내가 상태 안내에 덮이지 않는다');
-  assert.equal(retry.els['record-feedback'].textContent, '로그인한 뒤 다시 공유해 주세요.');
+  assert.equal(retry.els['settings-feedback'].textContent, '로그인한 뒤 다시 공유해 주세요.');
 });
 
 test('배선: shell.mjs가 입구 안내를 hold로 보내고 안내 한 벌을 쓴다', () => {

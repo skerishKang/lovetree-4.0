@@ -22,7 +22,10 @@ test('1. 드롭다운 빈 표지 기본값은 트리 관리 "기본" 칩과 같�
   assert.match(base, /box-shadow:inset 8px 0 0 rgba\(0,0,0,\.13\)/, '같은 책등 그림자');
   assert.doesNotMatch(base, /linear-gradient|145deg/, '기존 그라데이션 제거');
   assert.match(base, /width:36px;height:46px/, '드롭다운 크기 유지');
-  assert.match(shell, /data-cover-design="\$\{escHTML\(tree\.coverDesign\)\}"/, '디자인 표지 경로는 그대로');
+  // #380 5번: 표지 판정은 coverModeOf 한 벌을 따르고, 디자인 보지는 같은 토큰을 그대로 쓴다.
+  assert.match(shell, /const mode=coverModeOf\(tree\);/);
+  assert.match(shell, /if\(mode==='design'\)\{/, '디자인을 고른 트리는 디자인 보지를 보여 준다');
+  assert.match(shell, /data-cover-design="\$\{escHTML\(design\)\}"/, '디자인 표지 경로는 그대로');
 });
 
 test('2. 드롭다운 트리 클릭은 위치를 옮기고 주소도 쓴다', () => {

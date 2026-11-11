@@ -33,13 +33,15 @@ function harness({
   source = 'server', owned = true, writable = true, current = 'track32-bookshelf.html',
   busy = false, confirmAnswer = true, lt41 = { tree: TREE, momentId: 'm1' }
 } = {}) {
-  const calls = { login: [], notify: [], panel: [], firstJourney: 0, reset: 0, apply: [] };
+  const calls = { login: [], notify: [], panel: [], firstJourney: 0, reset: 0, apply: [], writeOpen: [], writeShow: [] };
   const elements = {};
   const ids = [
-    'change-parent', 'delete-moment', 'editor', 'editor-cancel', 'link-moment', 'manage-tree',
+    'change-parent', 'delete-moment', 'editor-cancel', 'link-moment', 'manage-tree',
     'tree-cover', 'tree-delete', 'tree-manager', 'unlink-moment', 'write-menu',
+    'tree-cover-method', 'tree-cover-moment-box', 'tree-photo-cover',
     'parent-target', 'parent-relation', 'parent-management', 'parent-current',
-    'editor-title', 'editor-context', 'relation-label', 'more-fields', 'form-error',
+    'write-panel', 'write-tabs', 'write-tab-easy', 'write-tab-detailed', 'write-easy', 'write-detailed',
+    'write-panel-title', 'write-eyebrow', 'editor-context', 'relation-label', 'more-fields', 'form-error',
     'moment-management', 'tree-cover-hint', 'media-preview', 'quick-entry-hint', 'tree-form-error',
     'related-target', 'url-media-hint', 'media-preview-image', 'media-preview-text', 'quick-entry-hint-text'
   ];
@@ -51,7 +53,7 @@ function harness({
     elements[id].append = () => {};
   }
   elements['tree-manager'].open = false;
-  elements['editor'].open = false;
+  elements['write-panel'].open = false;
   elements['moment-form'] = fakeEl({
     values: { title: '', note: '', url: '', emotion: '설렘', date: '2026-11-01', relation: '' },
     elements: {}
@@ -68,6 +70,8 @@ function harness({
     title: fakeEl({ value: '' }),
     subject: fakeEl({ value: '' }),
     coverMomentId: elements['tree-cover'],
+    // #380 5번: 표지 방법 한 줄(첫 순간(기본)·순간에서·디자인·사진).
+    coverMode: fakeRadioGroup(['basic', 'moment', 'design', 'photo']),
     coverDesign: fakeRadioGroup(['', 'texture-1', 'texture-2', 'texture-3', 'texture-4', 'texture-5', 'texture-6'])
   } });
   // #256-3 2단계: 책 정보 창에 사진 업로더가 실린다 — 최소 미디어 슬롯 흉내.
@@ -78,7 +82,6 @@ function harness({
   elements['tree-cover-upload'] = fakeEl({ hidden: true });
   elements['tree-cover-title'] = fakeEl({ value: '' });
 
-  const modeButtons = [fakeEl({ dataset: { mode: 'add' } }), fakeEl({ dataset: { mode: 'edit' } })];
 
   const saved = {
     document: globalThis.document, window: globalThis.window, LT41: globalThis.LT41,
@@ -96,7 +99,7 @@ function harness({
   globalThis.confirm = () => confirmAnswer;
   globalThis.queueMicrotask = (fn) => fn();
   globalThis.document = {
-    querySelectorAll: (sel) => (sel === '[data-mode]' ? modeButtons : []),
+    querySelectorAll: () => [],
     createElement: () => fakeEl({ value: '' })
   };
 
@@ -118,10 +121,17 @@ function harness({
     getUploads: () => ({ busy, reset: () => { calls.reset += 1; } }),
     notify: (msg) => calls.notify.push(msg),
     panel: (name) => calls.panel.push(name),
+    openSettingsData: () => { calls.settingsData = (calls.settingsData || 0) + 1; },
     show: (next) => { screen = next; },
     selection: () => ({ treeId: 'tree-1', momentId: 'm1' }),
     openFirstJourney: () => { calls.firstJourney += 1; },
-    openLoginStart: (kind) => calls.login.push(kind)
+    openLoginStart: (kind) => calls.login.push(kind),
+    // #425: 한 창의 탭 — 어느 구역을 보여 줬는지 기록한다.
+    writePanel: {
+      open: (tab) => { calls.writeOpen.push(tab ?? 'from-settings'); },
+      show: (tab) => { calls.writeShow.push(tab); },
+      setTabsVisible: (visible) => { calls.writeTabsVisible = visible; }
+    }
   });
 
   const restore = () => {
@@ -133,10 +143,10 @@ function harness({
     globalThis.queueMicrotask = saved.queueMicrotask;
     globalThis.LTMedia = saved.LTMedia;
   };
-  return { panels, elements, calls, modeButtons, coverSlotParts, lt41, restore, screen: () => screen, setScreen: (n) => { screen = n; } };
+  return { panels, elements, calls, coverSlotParts, lt41, restore, screen: () => screen, setScreen: (n) => { screen = n; } };
 }
 
-test('openEditor 분기 표: 로그아웃 → 로그인, 편집 불가 → 안내+기록, new → 첫 여정, add/edit → 편집기', () => {
+test('openEditor 분기 표: 로그아웃 → 로그인, 편집 불가 → 안내+설정 내 데이터, new → 첫 여정, add/edit → 편집기', () => {
   const cases = [
     {
       name: '로그아웃(예시 화면)',
@@ -154,7 +164,7 @@ test('openEditor 분기 표: 로그아웃 → 로그인, 편집 불가 → 안�
       name: '로그인·편집 불가',
       opts: { owned: true, writable: false },
       mode: 'add',
-      expect: { login: [], panel: ['records'], firstJourney: 0, editorMode: 'add' }
+      expect: { login: [], panel: [], settingsData: 1, firstJourney: 0, editorMode: 'add' }
     },
     {
       name: '새 트리 요청',
@@ -166,13 +176,13 @@ test('openEditor 분기 표: 로그아웃 → 로그인, 편집 불가 → 안�
       name: '순간 추가',
       opts: {},
       mode: 'add',
-      expect: { login: [], panel: ['editor'], firstJourney: 0, editorMode: 'add' }
+      expect: { login: [], panel: ['write-panel'], firstJourney: 0, editorMode: 'add' }
     },
     {
       name: '순간 수정',
       opts: {},
       mode: 'edit',
-      expect: { login: [], panel: ['editor'], firstJourney: 0, editorMode: 'edit' }
+      expect: { login: [], panel: ['write-panel'], firstJourney: 0, editorMode: 'edit' }
     }
   ];
   for (const c of cases) {
@@ -181,9 +191,10 @@ test('openEditor 분기 표: 로그아웃 → 로그인, 편집 불가 → 안�
       h.panels.openEditor(c.mode);
       assert.deepEqual(h.calls.login, c.expect.login, `${c.name}: 로그인 이동`);
       assert.deepEqual(h.calls.panel, c.expect.panel, `${c.name}: 패널`);
+      assert.equal(h.calls.settingsData || 0, c.expect.settingsData || 0, `${c.name}: 설정 내 데이터`);
       assert.equal(h.calls.firstJourney, c.expect.firstJourney, `${c.name}: 첫 여정`);
       assert.equal(h.panels.editorMode(), c.expect.editorMode, `${c.name}: 편집기 모드`);
-      if (c.expect.panel.includes('editor')) {
+      if (c.expect.panel.includes('write-panel')) {
         assert.equal(h.calls.noteFocused, 1, `${c.name}: 마음 한마디 칸에 초점`);
       }
     } finally { h.restore(); }
@@ -195,7 +206,7 @@ test('openEditor: 모르는 요청은 트리가 있으면 추가, 없으면 새 
   try {
     withTree.panels.openEditor('bogus');
     assert.equal(withTree.panels.editorMode(), 'add');
-    assert.deepEqual(withTree.calls.panel, ['editor']);
+    assert.deepEqual(withTree.calls.panel, ['write-panel']);
   } finally { withTree.restore(); }
 
   const withoutTree = harness({ lt41: null });
@@ -227,7 +238,7 @@ test('setEditorMode 표: 파일 전송 중·입력 있음이면 바꾸지 않고
 
   const dirty = harness({ confirmAnswer: false });
   try {
-    dirty.elements['editor'].open = true;
+    dirty.elements['write-panel'].open = true;
     dirty.elements['moment-form'].values.note = '쓰던 글';
     dirty.panels.setEditorMode('edit');
     assert.equal(dirty.panels.editorMode(), 'add', '확인을 거절하면 그대로');
@@ -236,7 +247,7 @@ test('setEditorMode 표: 파일 전송 중·입력 있음이면 바꾸지 않고
   const add = harness({});
   try {
     add.panels.setEditorMode('add');
-    assert.equal(add.elements['editor-title'].textContent, '순간 추가');
+    assert.equal(add.elements['write-panel-title'].textContent, '순간 추가');
     assert.equal(add.elements['relation-label'].hidden, false, '추가일 때만 연결 이유를 보여 준다');
     assert.equal(add.elements['more-fields'].open, false);
     assert.equal(add.elements['moment-management'].hidden, true);
@@ -247,7 +258,7 @@ test('setEditorMode 표: 파일 전송 중·입력 있음이면 바꾸지 않고
   const edit = harness({});
   try {
     edit.panels.setEditorMode('edit');
-    assert.equal(edit.elements['editor-title'].textContent, '순간 수정');
+    assert.equal(edit.elements['write-panel-title'].textContent, '순간 수정');
     assert.equal(edit.elements['relation-label'].hidden, true);
     assert.equal(edit.elements['more-fields'].open, true, '이미 적은 값이 있으면 더 적기를 펼친다');
     assert.equal(edit.elements['moment-management'].hidden, false);
@@ -268,7 +279,7 @@ test('setEditorMode·formDirty: 편집기를 닫았으면 입력이 남아도 �
     h.panels.setEditorMode('add');
     const baseline = h.elements['moment-form'].values;
     assert.equal(h.panels.formDirty(), false, '편집기가 닫혀 있으면 항상 false');
-    h.elements['editor'].open = true;
+    h.elements['write-panel'].open = true;
     baseline.note = '새로 쓴 글';
     assert.equal(h.panels.formDirty(), true, '닫힌 뒤 열고 값을 넣으면 변경');
     baseline.note = '';
@@ -280,7 +291,7 @@ test('formDirty: 이전 순간을 바꾸면 본문이 그대로여도 변경으�
   const h = harness({});
   try {
     h.panels.setEditorMode('edit');
-    h.elements['editor'].open = true;
+    h.elements['write-panel'].open = true;
     assert.equal(h.panels.formDirty(), false);
     h.elements['parent-management'].hidden = false;
     h.elements['parent-target'].value = 'm1';
@@ -299,25 +310,27 @@ test('write-menu 연결은 shell/quick-add.mjs가 맡는다 — panels가 다시
   } finally { shelf.restore(); }
 });
 
-test('패널 탭 버튼은 각자 모드로 편집기를 바꾼다', () => {
-  const h = harness({});
+test('순간 추가 한 창(#425): 더하기는 자세한 추가 구역을, 수정은 탭 없이 제목 "순간 수정"으로 연다', () => {
+  const add = harness({});
   try {
-    assert.equal(h.modeButtons.length, 2);
-    for (const b of h.modeButtons) {
-      assert.equal(typeof b.onclick, 'function', `${b.dataset.mode} 탭이 연결돼 있다`);
-    }
-    h.modeButtons[1].onclick();
-    assert.equal(h.panels.editorMode(), 'edit');
-    h.modeButtons[0].onclick();
-    assert.equal(h.panels.editorMode(), 'add');
-  } finally { h.restore(); }
+    add.panels.setEditorMode('add');
+    assert.deepEqual(add.calls.writeShow, ['detailed'], '더하기는 탭을 보여 주고 자세한 추가 구역');
+    assert.equal(add.calls.writeTabsVisible, true, '탭 줄이 보인다');
+  } finally { add.restore(); }
+
+  const edit = harness({});
+  try {
+    edit.panels.setEditorMode('edit');
+    assert.equal(edit.calls.writeTabsVisible, false, '수정에는 탭 줄이 없다');
+    assert.equal(edit.elements['write-panel-title'].textContent, '순간 수정');
+  } finally { edit.restore(); }
 });
 
 test('편집기 저장은 같은 member.apply 경로로 나간다', () => {
   const h = harness({});
   try {
     h.panels.setEditorMode('add');
-    h.elements['editor'].open = true;
+    h.elements['write-panel'].open = true;
     h.elements['moment-form'].values.note = '저장할 글';
     let prevented = false;
     h.elements['moment-form'].onsubmit({ preventDefault() { prevented = true; }, target: h.elements['moment-form'] });
@@ -329,7 +342,7 @@ test('편집기 저장은 같은 member.apply 경로로 나간다', () => {
 
     // 수정 모드에서는 같은 폼이 'edit'으로 나가야 한다(모드가 add로 굳으면 여기서 잡힌다).
     h.panels.setEditorMode('edit');
-    h.elements['editor'].open = true;
+    h.elements['write-panel'].open = true;
     h.elements['moment-form'].onsubmit({ preventDefault() {}, target: h.elements['moment-form'] });
     assert.deepEqual(h.calls.apply.map((a) => a.mode), ['add', 'edit']);
   } finally { h.restore(); }
@@ -374,20 +387,23 @@ test('#314 회귀: 책 A(격자) → B(디자인 없음) → 다시 A를 연속�
     assert.equal(savedValue(), '', 'B에서 그대로 저장하면 빈 값이 나간다');
     assert.equal(form.elements.title.value, '겨울 정원', '제목도 B 값으로 바뀐다');
     assert.equal(form.elements.subject.value, '겨울', '대상도 B 값으로 바뀐다');
-    assert.equal(h.elements['tree-cover'].value, '', '사진 표지 select도 B 값(없음)으로');
+    assert.equal(h.elements['tree-cover'].value, 'b1', '사진 표지 select도 B 기준(첫 순간)으로');
     assert.equal(h.elements['tree-cover-title'].value, '', '새 사진 제목 칸도 빈다');
     assert.equal(h.elements['tree-photo-cover'].hidden, true, '사진 표지 안내도 B 기준으로 숨는다');
-    assert.match(h.elements['tree-cover-hint'].textContent, /표지를 고르지 않으면/, '안내 문구도 B 기준');
+    assert.match(h.elements['tree-cover-hint'].textContent, /첫 순간/, '안내 문구도 B 기준');
     assert.equal(h.coverSlotParts['[data-upload-status]'].textContent, '', '이전 책의 업로드 안내가 남지 않는다');
     assert.equal(h.coverSlotParts['[data-media-file]'].value, '', '이전 책에서 고른 파일이 남지 않는다');
 
     open(TREE_A);
     assert.deepEqual(checked(), ['texture-3'], '다시 A를 열면 저장된 격자가 돌아온다');
-    assert.equal(h.elements['tree-cover'].value, '', 'A의 표지 select도 다시 A 값으로');
+    assert.equal(h.elements['tree-cover'].value, 'a1', 'A의 표지 select도 다시 A 값(첫 순간)으로');
 
     // 사진 표지가 있는 책과 없는 책의 안내가 서로 새지 않는다.
-    open({ ...TREE_A, coverMomentId: 'a2' });
-    assert.equal(h.elements['tree-photo-cover'].hidden, false, '사진 표지 책에서는 안내가 보인다');
+    // #380 5번: 사진 표지는 '순간에서'(사진 순간) 또는 '사진' 방법일 때 안내가 보인다.
+    // 실제 저장본의 순간처럼 type='photo'·image를 가진 순간을 표지로 고른 경우.
+    const photoTree = { ...TREE_A, coverDesign: '', coverMomentId: 'a2', moments: TREE_A.moments.map(m => m.id === 'a2' ? { ...m, type: 'photo', image: m.url } : m) };
+    open(photoTree);
+    assert.equal(h.elements['tree-photo-cover'].hidden, false, '사진 순간을 표지로 쓰는 책에서는 안내가 보인다');
     assert.match(h.elements['tree-cover-hint'].textContent, /“사진”의 사진을 표지로 사용합니다/);
     open(TREE_B);
     assert.equal(h.elements['tree-photo-cover'].hidden, true, '사진 표지가 없는 책에서는 다시 숨는다');
@@ -406,6 +422,7 @@ test('#314 회귀: 사진으로 표지를 만든 뒤 책 정보 저장을 다시
     // 업로드 성공 직후의 상태: 모델·select에 새 사진 순간이 반영된다(makeCoverFromUpload가 하는 일).
     h.lt41.tree = { ...TREE_B, coverMomentId: 'b-photo', moments: [...TREE_B.moments, photo] };
     h.elements['tree-cover'].value = 'b-photo';
+    for (const radio of form.elements.coverMode) radio.checked = radio.value === 'photo';
     // 창 아래 '책 정보 저장'을 다시 누른다.
     form.onsubmit({ preventDefault() {}, target: form });
     const last = h.calls.apply.at(-1);

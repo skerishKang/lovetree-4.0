@@ -21,7 +21,9 @@ function roParticle(value) {
 export function accountPresentation({ owned = false, email = '', name = '' } = {}) {
   if (!owned) return { mode: 'login', label: '로그인', initial: '', ariaLabel: null, title: '로그인' };
   const address = clean(email);
-  const initial = firstLetter(clean(name) || address);
+  // 이름·이메일이 아직 없으면(공통 로그인이 이메일을 주기 전) 점 대신 '나'를 보여 준다.
+  const letter = firstLetter(clean(name) || address);
+  const initial = letter === '·' ? '나' : letter;
   const who = address || '내 계정';
   return {
     mode: 'avatar',

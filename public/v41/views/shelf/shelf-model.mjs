@@ -1,7 +1,7 @@
 // 내 책장의 순수 계산 (#231 후속, 2026-11-09).
 // views/shelf/shelf.js 안에 있던 계산을 화면(DOM) 없이 시험할 수 있게 그대로 옮겼다.
 // 조건·문구·계산식 변경 0.
-import { normalizeCoverDesign, coverDesignPaletteIndex } from '../../domain.mjs';
+import { normalizeCoverDesign, coverDesignPaletteIndex, coverModeOf } from '../../domain.mjs';
 
 export const escapeShelf = (value) => String(value || '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' })[char]);
 
@@ -22,14 +22,22 @@ export const COVER_PALETTE = ['var(--lt-cover-1)', 'var(--lt-cover-2)', 'var(--l
 // 사진·디자인이 둘 다 없으면 color·accent·coverMedia는 지금과 같은 값이라 기존 화면 변화가 없다.
 export function coverChoice(tree, index, palette) {
   const color = palette[index % palette.length];
+  // #380 5번: 표지 방법 하나만 따른다. 디자인을 고르면 사진 표지는 쓰지 않고(지우지도 않는다),
+  // 순간·사진을 고르면 디자인 표지를 쓰지 않는다. 옛 저장본은 coverModeOf가 지금 규칙으로 읽는다.
+  const mode = coverModeOf(tree);
+  if (mode === 'design') {
+    const design = normalizeCoverDesign(tree.coverDesign);
+    if (design) {
+      const designColor = palette[Math.max(0, coverDesignPaletteIndex(design)) % palette.length];
+      return { color: designColor, accent: designColor, coverMedia: '', design };
+    }
+  }
+  // 첫 순간(기본)은 색 표지다. 저장해 둔 표지 순간·디자인은 지우지 않고 그대로 두어,
+  // 다른 방법을 다시 고르면 그대로 돌아온다.
+  if (mode === 'basic') return { color, accent: color, coverMedia: '', design: '' };
   const cover = tree.moments.find((moment) => moment.id === tree.coverMomentId);
   const coverMedia = cover && cover.type === 'photo' ? cover.image || '' : '';
   if (coverMedia) return { color, accent: color, coverMedia, design: '' };
-  const design = normalizeCoverDesign(tree.coverDesign);
-  if (design) {
-    const designColor = palette[Math.max(0, coverDesignPaletteIndex(design)) % palette.length];
-    return { color: designColor, accent: designColor, coverMedia: '', design };
-  }
   return { color, accent: color, coverMedia: '', design: '' };
 }
 

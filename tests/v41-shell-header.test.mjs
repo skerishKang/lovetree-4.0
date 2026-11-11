@@ -33,8 +33,7 @@ function harness({ owned = false, trees = 0, tree = null, source = 'example', cu
     'account-email': fakeEl(),
     'account-popover': fakeEl({ hidden: true }),
     'server': fakeEl(),
-    'logout': fakeEl(),
-    'account-settings-open': fakeEl()
+    'logout': fakeEl()
   };
   const saved = { document: globalThis.document, sessionStorage: globalThis.sessionStorage };
   globalThis.sessionStorage = { getItem: () => null, setItem() {}, removeItem() {} };
@@ -164,7 +163,7 @@ test('renderAccount: 이메일이 없으면 subject를 쓰지 않고 점·내 �
   try {
     h.header.renderAccount();
     assert.equal(h.els['account-email'].textContent, '내 계정', '이메일 없을 때 표시는 내 계정');
-    assert.equal(h.els['account-avatar'].textContent, '·', 'subject 첫 글자는 동그라미가 아니다');
+    assert.equal(h.els['account-avatar'].textContent, '나', 'subject 첫 글자는 동그라미가 아니다 — 이름·이메일이 없으면 나');
     assert.equal(h.els['account-avatar'].getAttribute('aria-label'), '내 계정 메뉴, 내 계정으로 로그인됨');
   } finally {
     h.restore();

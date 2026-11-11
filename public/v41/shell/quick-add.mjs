@@ -18,36 +18,23 @@ export function createQuickAdd(deps) {
 
   function snapshot() { return deps.getMember()?.snapshot() || {}; }
 
-  // 진입 가드는 기존 openEditor와 같은 문구·같은 순서다(예시 → 로그인, 읽기 전용 → 안내+기록).
+  // 진입 가드는 기존 openEditor와 같은 문구·같은 순서다(예시 → 로그인, 읽기 전용 → 안내+설정 "내 데이터").
   function ensureWritable() {
     const member = deps.getMember();
     if (deps.getSource() !== 'server' || !member?.snapshot().owned) { deps.openLoginStart('new-tree'); return false; }
-    if (!member.snapshot().writable) { deps.notify(DROP_READONLY_NOTICE); deps.panel('records'); return false; }
+    if (!member.snapshot().writable) { deps.notify(DROP_READONLY_NOTICE); deps.openSettingsData?.(); return false; }
     return true;
   }
 
-  function openWriteChooser() {
+  // #425: 입구는 하나다 — 같은 창(write-panel)을 열고, 먼저 보일 탭은 설정값(없으면 쉬운 추가)이 정한다.
+  function openWrite() {
     if (!ensureWritable()) return;
-    const chooser = $('write-chooser');
-    if (!chooser.open) chooser.showModal();
-    queueMicrotask(() => $('write-quick').focus());
+    deps.writePanel.open();
   }
-  function chooseQuick() {
-    $('write-chooser').close();
-    openQuick();
-  }
-  // 자세한 추가는 기존 순간 남기기와 같다 — 책장에서는 새 트리 흐름, 다른 화면에서는 추가 편집기.
-  function chooseDetailed() {
-    $('write-chooser').close();
-    deps.openEditor(deps.getCurrent() === 'track32-bookshelf.html' ? 'new' : undefined);
-  }
-
+  // 쉬운 추가 탭으로 연다(끌어다 놓기·'지금 다듬기'처럼 쉬운 추가로 되돌아오는 길).
   function openQuick() {
     if (!ensureWritable()) return;
-    resetQuick();
-    const dialog = $('quick-add');
-    if (!dialog.open) dialog.showModal();
-    queueMicrotask(() => $('quick-url').focus());
+    deps.writePanel.open('easy');
   }
   function resetQuick() {
     $('quick-url').value = '';
@@ -167,7 +154,6 @@ export function createQuickAdd(deps) {
 
   function submitQuick(event) {
     event?.preventDefault?.();
-    if (quickUploads?.busy) return;
     const parsed = parseQuickUrl($('quick-url').value, describe);
     if (parsed.status !== 'ok') {
       $('quick-error').textContent = parsed.status === 'empty' ? QUICK_EMPTY_ERROR : QUICK_INVALID_ERROR;
@@ -198,7 +184,7 @@ export function createQuickAdd(deps) {
     try { result = deps.getMember().apply('quickAdd', {url, ...quickMediaTitle(url)}) || null; }
     catch (error) { $('quick-error').textContent = error.message; return false; }
     const savedTitle = savedTitleFor(url);
-    if ($('quick-add').open) {
+    if ($('write-panel').open) {
       $('quick-url').value = '';
       renderPreview();
       $('quick-url').focus();
@@ -216,7 +202,7 @@ export function createQuickAdd(deps) {
   function showSaved(url, result, savedTitle = '') {
     const parsed = parseQuickUrl(url, describe);
     const thumb = parsed.status === 'ok' && parsed.kind === 'youtube' ? parsed.thumb : '';
-    if ($('quick-add').open) {
+    if ($('write-panel').open) {
       $('quick-notice').textContent = savedNoticeText(savedTitle);
       $('quick-notice').hidden = false;
       setRefineTarget($('quick-refine'), result);
@@ -235,21 +221,14 @@ export function createQuickAdd(deps) {
   function refine(button) {
     const treeId = button.dataset.treeId;
     const momentId = button.dataset.momentId;
-    if ($('quick-add').open) $('quick-add').close();
+    if ($('write-panel').open) deps.requestClose?.('write-panel');
     $('quick-saved').hidden = true;
     if (!treeId || !momentId) { deps.notify('모아둔 순간에서 그 순간을 직접 열어 주세요.'); return; }
     deps.choose(treeId, momentId);
     deps.openEditor('edit');
   }
 
-  // 사진은 기존 업로더를 그대로 쓴다(#310 onUploaded·imagesOnly). 업로드가 끝나면 그 주소로 바로 담는다.
-  const quickUploads = deps.mountUpload({
-    form: $('quick-form'), assets: null, imagesOnly: true, fileLabel: '📷 사진 올리기',
-    getSubject: () => deps.getSource() === 'server' && snapshot().writable ? snapshot().subject : null,
-    getState: () => deps.getMember()?.state() || null,
-    onChange: () => {},
-    onUploaded: url => { saveUrl(url); setTimeout(syncSubmitState, 0); }
-  });
+  // #425 2번: 쉬운 추가 탭에는 사진 올리기가 없다(자세한 추가의 업로더만 쓴다).
 
   // ---- 끌어다 놓기 (데스크톱 pointer:fine) ----
   const isFinePointer = deps.isFinePointer || (() => globalThis.matchMedia?.('(pointer:fine)').matches === true);
@@ -257,7 +236,7 @@ export function createQuickAdd(deps) {
   function routeFor(image) {
     return dropRoute({
       source: deps.getSource(), owned: !!snapshot().owned, writable: !!snapshot().writable,
-      quickOpen: !!$('quick-add').open, editorOpen: !!$('editor').open, image
+      quickOpen: !!$('write-panel').open && !$('write-easy').hidden, editorOpen: !!$('write-panel').open && $('write-easy').hidden === true, image
     });
   }
   function showVeil(text) {
@@ -316,8 +295,9 @@ export function createQuickAdd(deps) {
     if (route.kind === 'login') { deps.notify(DROP_LOGIN_NOTICE); return; }
     if (route.kind === 'readonly') { deps.notify(DROP_READONLY_NOTICE); return; }
     if (route.kind === 'photo') {
-      if (route.target === 'editor') feedFiles($('moment-form')?.querySelector?.('[data-media-file]'), image);
-      else { openQuick(); feedFiles($('quick-form')?.querySelector?.('[data-media-file]'), image); }
+      // #425 2번: 올린 사진은 자세한 추가에서만 받는다 — 쉬운 추가 탭이 열려 있어도 자세한 추가로 옮긴다.
+      deps.openEditor?.('add');
+      feedFiles($('moment-form')?.querySelector?.('[data-media-file]'), image);
       return;
     }
     const url = extractDropUrl(dataTransfer);
@@ -327,19 +307,16 @@ export function createQuickAdd(deps) {
     saveUrl(url);
   }
 
-  $('write-quick').onclick = chooseQuick;
-  $('write-detailed').onclick = chooseDetailed;
   $('quick-form').onsubmit = submitQuick;
   $('quick-url').addEventListener('input', renderPreview);
   $('quick-paste').onclick = () => { void togglePaste(); };
   $('quick-refine').onclick = () => refine($('quick-refine'));
   $('quick-saved-refine').onclick = () => refine($('quick-saved-refine'));
-  $('write-chooser').addEventListener('close', () => { if (!$('quick-add').open) $('write-menu').focus?.(); });
-  $('quick-add').addEventListener('close', () => { if (!$('write-chooser').open && !$('editor').open) $('write-menu').focus?.(); });
+  // 닫기는 공통 틀(shell/dialogs.mjs)이 초점까지 되돌린다 — 여기서는 따로 만지지 않는다.
   if (isFinePointer()) mountDrop(doc);
 
   return {
-    openWriteChooser,
+    openWrite,
     openQuick,
     submitQuick,
     renderPreview,
@@ -348,7 +325,6 @@ export function createQuickAdd(deps) {
     mountFrame: doc => { if (isFinePointer()) mountDrop(doc); },
     saveUrl,
     refine,
-    uploads: quickUploads,
     reset: resetQuick,
     state: () => ({ savedTimer: savedTimerBox.timer, titleCache: titleCache.size })
   };

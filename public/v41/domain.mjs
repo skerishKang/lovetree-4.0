@@ -6,6 +6,24 @@ export const COVER_DESIGN_IDS = ['texture-1', 'texture-2', 'texture-3', 'texture
 export function normalizeCoverDesign(value) {
   return COVER_DESIGN_IDS.includes(value) ? value : '';
 }
+// #380 5번: 표지를 정하는 방법은 하나만 고른다 — 첫 순간(기본) / 순간에서 / 디자인 / 사진.
+// 고른 방법 하나만 표지가 되고, 고르지 않은 방법의 저장값(사진 표지 순간·디자인)은 지우지 않고 그대로 둔다
+// (되돌리면 그대로 다시 보인다). ''는 옛 저장본이라 아래 coverModeOf가 지금 규칙으로 읽는다.
+// src/domain.js(서버가 쓰는 같은 규칙)의 목록과 같은지 tests/v41-cover-method.test.mjs가 확인한다.
+export const COVER_MODES = ['basic', 'moment', 'design', 'photo'];
+export function normalizeCoverMode(value) {
+  return COVER_MODES.includes(value) ? value : '';
+}
+// 표지 방법 판정 한 곳: 저장된 방법이 있으면 그것, 없으면 지금 규칙(사진 표지 > 디자인 표지 > 기본 표지).
+// 책장(shelf-model coverChoice)·책 제목 ▾·마지막 장·트리 관리 창이 모두 이 함수를 쓴다.
+export function coverModeOf(tree) {
+  const explicit = normalizeCoverMode(tree?.coverMode);
+  if (explicit) return explicit;
+  const cover = (tree?.moments || []).find(moment => moment.id === tree?.coverMomentId);
+  if (cover && cover.type === 'photo' && cover.image) return 'moment';
+  if (normalizeCoverDesign(tree?.coverDesign)) return 'design';
+  return tree?.coverMomentId ? 'moment' : 'basic';
+}
 export const MAX_MOMENTS = 300;
 export const MAX_TREES = 50;
 export const MAX_LINKS = 20;
@@ -145,8 +163,14 @@ export function editTree(tree, input, clock = new Date().toISOString()) {
   const coverMomentId = input.coverMomentId === undefined || input.coverMomentId === null || input.coverMomentId === '' ? '' : input.coverMomentId;
   if (typeof coverMomentId !== 'string' || (coverMomentId && !tree.moments.some(moment => moment.id === coverMomentId))) throw new Error('이 트리에서 표지 순간을 선택해 주세요.');
   const coverDesign = normalizeCoverDesign(input.coverDesign);
-  if (tree.title === title && tree.subject === subject && (tree.coverMomentId || '') === coverMomentId && (tree.coverDesign || '') === coverDesign) return tree;
-  return { ...tree, title, subject, coverMomentId, coverDesign, updatedAt: clock };
+  // #380 5번: 표지 방법(basic·moment·design·photo)은 따로 저장한다. 고른 방법 하나만 표지가 되고,
+  // 고르지 않은 곳의 저장값은 지우지 않는다(되돌리면 그대로 다시 보인다).
+  const coverMode = normalizeCoverMode(input.coverMode);
+  if (tree.title === title && tree.subject === subject && (tree.coverMomentId || '') === coverMomentId && (tree.coverDesign || '') === coverDesign && (tree.coverMode || '') === coverMode) return tree;
+  const next = { ...tree, title, subject, coverMomentId, coverDesign, updatedAt: clock };
+  // 방법을 고르지 않은 옛 저장본에는 빈 값을 새로 심지 않는다(모양을 그대로 둔다).
+  if (coverMode) next.coverMode = coverMode; else delete next.coverMode;
+  return next;
 }
 export function addMoment(tree, input, parentId, clock = new Date().toISOString()) {
   if (tree.moments.length >= MAX_MOMENTS) throw new Error(`한 트리에는 ${MAX_MOMENTS}개의 순간까지 담을 수 있어요.`);
@@ -379,9 +403,12 @@ export function validateState(value) {
     const coverMomentId = tree.coverMomentId ?? '';
     if (typeof coverMomentId !== 'string' || (coverMomentId && !byId.has(coverMomentId))) throw new Error('표지 순간이 트리에 없어요.');
     const coverDesign = normalizeCoverDesign(tree.coverDesign);
+    const coverMode = normalizeCoverMode(tree.coverMode);
     const inbox = tree.inbox === true && !inboxSeen;
     if (inbox) inboxSeen = true;
-    return { id: tree.id, subject: requireText(tree.subject, '대상', 60), title: requireText(tree.title, '트리 제목', 100), coverMomentId, coverDesign, inbox, createdAt: tree.createdAt, updatedAt: tree.updatedAt, moments };
+    const out = { id: tree.id, subject: requireText(tree.subject, '대상', 60), title: requireText(tree.title, '트리 제목', 100), coverMomentId, coverDesign, inbox, createdAt: tree.createdAt, updatedAt: tree.updatedAt, moments };
+    if (coverMode) out.coverMode = coverMode;
+    return out;
   });
   return { version: 1, trees, prefs: normalizePrefs(value.prefs) };
 }

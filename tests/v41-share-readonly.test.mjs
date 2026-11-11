@@ -12,6 +12,7 @@ const book = read('public/v41/views/book/book.js');
 const boardExtras = read('public/v41/views/board/board-extras.js');
 const network = read('public/v41/views/network/network.js');
 const messages = read('public/v41/shell/messages.mjs');
+const shell = read('public/v41/shell.mjs');
 const runtime = read('public/v41/runtime.js');
 
 // ── 판정: runtime.js가 LT41.source에서 readOnly를 한 곳에서 내린다 ──
@@ -70,4 +71,37 @@ test('지도: 쓰기 메시지를 보내는 코드가 없다', () => {
 test('셸: share 모드의 lt41-write·lt41-journey-save 메시지를 무시한다', () => {
   assert.match(messages, /data\?\.type === 'lt41-write' && getSource\(\) === 'share'\) return;/, '쓰기 메시지 이중 가드');
   assert.match(messages, /lt41-journey-save'\) \{ if \(getSource\(\) === 'share'\) return;/, '첫 여정 저장 메시지도 공유에서 막는다');
+});
+
+// ── #425 2번: 올린 사진은 공개 화면에서 주소가 빠지고, 내 화면에서는 그대로 보인다 ──
+test('공유 렌더: 공개 응답을 runtime에 넘기면 올린 사진 주소가 0건, 내 화면에는 그대로', async () => {
+  const vm = await import('node:vm');
+  const { createTree } = await import('../src/domain.js');
+  const { projectSharedTree } = await import('../server/share-service.js');
+  const photo = 'https://front.test/api/media/123e4567-e89b-42d3-a456-426614174000.jpg';
+  const tree = createTree({ subject: '윤슬', title: '사진 순간', note: '첫 장면', emotion: '설렘', date: '2026-11-01', url: photo }, '2026-11-01T00:00:00.000Z');
+  const run = (sourceTree, source) => {
+    const document = { querySelectorAll: () => [], getElementById: () => null, addEventListener: () => {} };
+    const scope = {
+      window: {}, document,
+      parent: { LT41: { source, tree: { ...sourceTree, edges: [] } } },
+      addEventListener: () => {}, setTimeout, clearTimeout
+    };
+    scope.window = scope;
+    vm.runInNewContext(runtime, scope);
+    return scope.window.LTDEMO;
+  };
+  const shared = run(projectSharedTree({ version: 1, trees: [tree] }, tree.id).tree, 'share');
+  assert.equal(JSON.stringify(shared).includes('/api/media/'), false, '공개 화면 렌더에 올린 사진 주소가 없다');
+  assert.equal(shared.moments.length, 1, '순간 개수는 그대로');
+  assert.equal(shared.moments[0].title, tree.moments[0].title, '순간 제목은 그대로');
+  assert.equal(shared.moments[0].emotion, tree.moments[0].emotion, '감정은 그대로');
+  assert.equal(shared.moments[0].date, tree.moments[0].date, '날짜는 그대로');
+  assert.equal(shared.moments[0].externalUrl, '', '공개에서는 주소만 빠진다');
+  const mine = run(tree, 'server');
+  assert.equal(mine.moments[0].externalUrl, photo, '내 화면에서는 올린 사진 주소를 그대로 쓴다');
+});
+
+test('공유 감상 안내(#425 2번): 올린 사진 N장은 나만 볼 수 있어요', () => {
+  assert.match(shell, /answer\.omittedPrivateMedia\?' 올린 사진 '\+answer\.omittedPrivateMedia\+'장은 나만 볼 수 있어요\.'/, '공유 감상 화면 안내 문구');
 });

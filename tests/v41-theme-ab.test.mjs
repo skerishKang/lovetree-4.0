@@ -15,7 +15,6 @@ const html = read('public/v41/index.html');
 const css = read('public/v41/identity.css');
 const shell = read('public/v41/shell.mjs');
 const homeJS = read('v41/home.js');
-const menuJS = read('public/v41/home-view-menu.mjs');
 const homeHTML = read('v41/home.html');
 
 function memoryStorage(initial = {}) {
@@ -107,7 +106,7 @@ test('정원 대상: 책장·기억책·기억 보드·관계 지도(#212, 2026-
   assert.match(themeModule, /appliedTheme\(theme, themedViewFor\(file\)\)/);
 });
 
-test('전환 버튼은 밤/정원 두 칸으로 aria-checked를 쓴다', () => {
+test('화면 테마는 설정 창의 "화면" 묶음에 있고 밤/정원 두 칸으로 aria-checked를 쓴다', () => {
   assert.equal(themeButtonLabel('night'), '정원');
   assert.equal(themeButtonLabel('garden'), '밤');
   assert.equal(themeButtonAriaLabel('night'), '정원 테마로 바꾸기');
@@ -116,18 +115,20 @@ test('전환 버튼은 밤/정원 두 칸으로 aria-checked를 쓴다', () => {
   assert.equal(themePressed('garden'), true);
   assert.equal(nextTheme('night'), 'garden');
   assert.equal(nextTheme('garden'), 'night');
-  assert.match(html, /data-set-theme="night" aria-checked="true">밤/);
-  assert.match(html, /data-set-theme="garden" aria-checked="false">정원/);
+  // #380 5번: 테마는 계정 메뉴가 아니라 설정 창의 "화면" 묶음에 있다(같은 저장 키·같은 aria-checked).
+  assert.match(html, /id="settings-screen-title"[^>]*>화면<\/h3>/);
+  assert.match(html, /aria-checked="true" data-set-theme="night">밤/);
+  assert.match(html, /aria-checked="false" data-set-theme="garden">정원/);
   assert.doesNotMatch(html, /id="account-theme"/);
+  assert.doesNotMatch(html, /class="account-theme"/, '계정 메뉴의 옛 테마 칸은 없다');
+  assert.match(html, /data-title-display="both"/, '제목 보기도 설정 화면 묶음에 있다');
+  assert.match(html, /data-home-cards="mix"/, '첫 화면 카드도 설정 화면 묶음에 있다');
   assert.match(themeModule, /data-set-theme/);
-  // #213 2번: 첫 화면 테마는 "보기" 메뉴 항목이 맡는다(도구 줄 버튼 하나로 묶었다).
-  // 표시 문구는 계정 메뉴 항목과 같은 header-state 규칙을 그대로 쓴다.
-  // 2026-11-11: 메뉴 로직은 public/v41/home-view-menu.mjs로 옮겼다(연결만 home.js).
-  assert.match(menuJS, /viewButton\.dataset\.ltViewMenu = ''/);
-  assert.match(menuJS, /shadow\.querySelector\('\.top-actions'\)\.append\(viewWrap\)/);
-  assert.match(menuJS, /kind === 'theme'\)[^\n]*writeTheme\(storage/, '메뉴에서 고른 테마를 저장한다');
-  assert.match(menuJS, /sendTheme\(theme\)/, '셸에 테마를 알리는 기존 메시지를 그대로 쓴다');
-  assert.match(homeJS, /sendTheme:theme=>parent\.postMessage\(\{type:'lt41-theme',theme\}/, '첫 화면이 lt41-theme를 그대로 보낸다');
+  // 로그아웃에는 설정 입구가 없으므로 첫 화면 오른쪽 위 작은 ◐ 단추만 남는다(테마 저장 키 그대로).
+  assert.match(homeJS, /data-theme-quick/);
+  assert.match(homeJS, /writeTheme\(localStorage,readTheme\(localStorage\)==='garden'\?'night':'garden'\)/, '◐ 단추는 밤↔정원 전환·저장');
+  assert.match(homeJS, /parent\.postMessage\(\{type:'lt41-theme',theme:next\}/, '첫 화면이 lt41-theme를 그대로 보낸다');
+  assert.doesNotMatch(homeJS, /createViewMenu/, '첫 화면에 보기 메뉴 배선이 없다');
   // #231 1-B: 테마 버튼 반영은 shell/theme.mjs로 옮겼다(같은 선택자·같은 문구).
   assert.match(themeModule, /document\.querySelectorAll\('\[data-lt-theme-toggle\]'\)/);
 });

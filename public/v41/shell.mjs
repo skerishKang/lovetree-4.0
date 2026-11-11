@@ -19,17 +19,18 @@ import {createHeader} from './shell/header.mjs';
 import {createAuth} from './shell/auth.mjs';
 import {createPanels} from './shell/panels.mjs';
 import {createQuickAdd} from './shell/quick-add.mjs';
+import {createWritePanel, readWriteTab, writeWriteTab} from './shell/write-panel.mjs';
 import {createQuickIntake} from './shell/quick-intake.mjs';
 import {createJourney} from './shell/journey.mjs';
 import {createMessages} from './shell/messages.mjs';
 import {createCleanup} from './shell/cleanup.mjs';
-import {headerBadge, pickerLabel, isInboxTree} from './inbox-model.mjs';
+import {headerBadge, cleanupAvailable} from './inbox-model.mjs';
 import {createDialogs} from './shell/dialogs.mjs';
 import {connectionSignature} from './shell/panel-dirty.mjs';
 import {createLocation} from './shell/location.mjs';
 import {createNotifier} from './shell/notice.mjs';
 import {paintLoginLinks,paintThemeControls,applyTheme as applyThemeFor,toggleTheme as toggleThemeFor} from './shell/theme.mjs';
-import {normalizeTitleDisplay} from './domain.mjs';
+import {normalizeTitleDisplay, coverModeOf, normalizeCoverDesign} from './domain.mjs';
 import {backfillVideoTitles} from './title-backfill.mjs';
 const $=id=>document.getElementById(id);
 // 안내 한 벌(#353 후속): 담기·중복·로그인 필요 안내(hold)가 상태 안내보다 먼저 일정 시간 보인다.
@@ -76,9 +77,14 @@ const escHTML=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>
 function treeYoutubeId(value){try{const u=new URL(String(value||''));if(u.hostname==='youtu.be')return u.pathname.slice(1);if(/youtube\.com$/.test(u.hostname)||u.hostname==='m.youtube.com'){if(u.pathname==='/watch')return u.searchParams.get('v')||'';const m=u.pathname.match(/\/(shorts|live|embed)\/([^/?#]+)/);return m?.[2]||''}}catch{}return ''}
 function treeMomentThumb(m){const md=m?.mediaMetadata||{};for(const v of [md.thumbnail,md.poster,md.image,m?.attachment?.url,m?.media?.url,m?.image])if(typeof v==='string'&&v.trim())return v.trim();const id=treeYoutubeId(m?.url);return id?`https://i.ytimg.com/vi/${id}/hqdefault.jpg`:''}
 function treeCoverMarkup(tree){
- if(tree?.coverDesign)return `<span class="tree-cover" data-cover-design="${escHTML(tree.coverDesign)}" aria-hidden="true"></span>`;
+ // #380 5번: 드롭다운 표지도 같은 판정(coverModeOf)을 따른다 — 디자인을 고른 트리는 사진 대신 디자인 보지를 보여 준다.
+ const mode=coverModeOf(tree);
+ if(mode==='design'){
+  const design=normalizeCoverDesign(tree?.coverDesign);
+  if(design)return `<span class="tree-cover" data-cover-design="${escHTML(design)}" aria-hidden="true"></span>`;
+ }
  const moments=Array.isArray(tree?.moments)?[...tree.moments].sort((a,b)=>String(a.createdAt||'').localeCompare(String(b.createdAt||''))):[];
- const cover=tree?.coverMomentId?moments.find(m=>m.id===tree.coverMomentId):null;
+ const cover=mode!=='design'&&tree?.coverMomentId?moments.find(m=>m.id===tree.coverMomentId):null;
  const thumb=(cover&&treeMomentThumb(cover))||moments.map(treeMomentThumb).find(Boolean)||'';
  return `<span class="tree-cover" aria-hidden="true">${thumb?`<img src="${escHTML(thumb)}" alt="" loading="lazy" referrerpolicy="no-referrer">`:''}</span>`;
 }
@@ -92,16 +98,21 @@ function renderTreeMenu(){
   const count=tree.inbox===true?`정리 전 ${tree.moments?.length||0}`:`${tree.moments?.length||0}개의 순간`;
   return `<button type="button" role="menuitemradio" class="tree-item" data-tree-id="${escHTML(tree.id)}" aria-checked="${active}">${treeCoverMarkup(tree)}<span class="tree-name">${escHTML(displayTreeTitle(tree.title||tree.subject||'트리'))}</span><span class="tree-count">${count}</span>${active?'<span class="tree-check" aria-hidden="true">✓</span>':''}</button>`;
  }).join('');
+ // #380 5번: '정리하기' 입구는 여기 한 곳(지금 트리가 모아둔 순간일 때 '정리 전 N' 바로 아래)뿐이다.
+ const currentTree=window.LT41?.tree||null;
+ const cleanupRow=cleanupAvailable({source,owned:!!member?.snapshot().owned,tree:currentTree})&&member?.snapshot().writable
+  ? `<button type="button" role="menuitem" class="tree-item tree-cleanup" data-tree-action="cleanup"><span class="tree-name">정리 전 ${currentTree?.moments?.length||0}개 정리하기</span></button>` : '';
  const manage=source==='server'&&window.LT41&&member?.snapshot().owned&&member.snapshot().writable;
  // #394: 트리 드롭다운 맨 아래 "내 순간 전체 보기"(#380의 "내 트리 전체 보기" 자리 옆). 내 기록(서버)에서만 보인다.
  const momentsEntry=source==='server'&&window.LT41?'<button type="button" role="menuitem" data-tree-action="moments">내 순간 전체 보기</button>':'';
  // #380 2번: 맨 아래 "내 트리 전체 보기" — 지금의 책장 화면(모든 트리의 책장)을 연다. 로그인 상태에서만 보인다.
  const shelfEntry=member?.snapshot().owned?'<button type="button" role="menuitem" data-tree-action="shelf">내 트리 전체 보기</button>':'';
- treePopover.innerHTML=rows+`<div class="tree-foot" role="none"><button type="button" role="menuitem" data-tree-action="new">＋ 새 트리</button>${manage?'<button type="button" role="menuitem" data-tree-action="manage">이 트리 관리 (이름·표지)</button><button type="button" role="menuitem" data-tree-action="share">이 트리 공유</button>':''}${shelfEntry}${momentsEntry}</div>`;
+ treePopover.innerHTML=rows+`<div class="tree-foot" role="none">${cleanupRow}<button type="button" role="menuitem" data-tree-action="new">＋ 새 트리</button>${manage?'<button type="button" role="menuitem" data-tree-action="manage">이 트리 관리 (이름·표지)</button><button type="button" role="menuitem" data-tree-action="share">이 트리 공유</button>':''}${shelfEntry}${momentsEntry}</div>`;
   // 트리를 누르면 그 트리로 이동한다: 책·보드·지도를 보던 중이면 같은 보기로, 그 외(첫 화면·내 트리·둘러보기)에는 그 트리의 책으로. 주소도 따라오게 남긴다.
   const TREE_VIEWS=new Set(['track59-sketchbook.html','track58-pinboard.html','track56-network.html']);
   treePopover.querySelectorAll('[data-tree-id]').forEach(b=>b.onclick=()=>{const id=b.dataset.treeId;closeTreeMenu();if(!id)return;const wasTreeView=TREE_VIEWS.has(current);choose(id);if(!wasTreeView)show('track59-sketchbook.html',false);flowNavigation();writeLocation();});
  treePopover.querySelector('[data-tree-action="new"]')?.addEventListener('click',()=>{closeTreeMenu();if(member?.snapshot().writable)openEditor('new');else openLoginStart('new-tree');});
+ treePopover.querySelector('[data-tree-action="cleanup"]')?.addEventListener('click',()=>{closeTreeMenu();shellCleanup.open({});});
  treePopover.querySelector('[data-tree-action="manage"]')?.addEventListener('click',()=>{shellPanels.openTreeManager();closeTreeMenu();});
  treePopover.querySelector('[data-tree-action="share"]')?.addEventListener('click',()=>{closeTreeMenu();$('share-menu').click();});
  // #394: 첫 화면 순간 목록을 지금 트리가 골라진 상태로 연다. 화면을 다시 불러오므로 요청을 전역 플래그로 남긴다.
@@ -133,7 +144,8 @@ document.addEventListener('keydown',event=>{
 addEventListener('resize',()=>{if(matchMedia('(min-width:781px)').matches)closeMore();});
 document.addEventListener('keydown',event=>{
  const c=$('community-panel');
- if(event.key==='Escape'&&c.open&&![...document.querySelectorAll('dialog[open]')].some(d=>d!==c&&d.matches(':modal')))c.close();
+ // #380 4 마지막: 둘러보기도 공통 틀의 닫기 규칙(×·바같 클릭·Esc·초점 복귀)을 쓴다.
+ if(event.key==='Escape'&&c.open&&![...document.querySelectorAll('dialog[open]')].some(d=>d!==c&&d.matches(':modal')))shellDialogs.requestClose('community-panel');
 });
 const initialRoute=parseSelectionRoute(location.hash);
 let model=null,current=screenForView(initialRoute.view)[1],source='example',loadGeneration=0,previousDirty=false,member=null,handledHash=null,activeShareId=null;
@@ -151,6 +163,8 @@ const shellAuth=createAuth({
 });
 function startLogin(intent=''){return shellAuth.startLogin(intent);}
 function openLoginStart(intent='first'){return shellAuth.openLoginStart(intent);}
+// #425: 순간 추가 한 창 — 쉬운 추가·자세한 추가를 한 창의 탭으로 오간다(shell/write-panel.mjs).
+const shellWrite=createWritePanel({$});
 // 헤더·계정 메뉴는 shell/header.mjs가 맡는다(#231 1-B②-2). 셸은 자기 상태를 읽기 함수로 넘긴다.
 addEventListener('lovetree-auth-required',()=>shellAuth.authRequired());
 window.LT41=null;
@@ -164,16 +178,20 @@ const shellPanels=createPanels({
   getUploads:()=>uploads,
   notify:text=>notify(text),
   panel:id=>panel(id),
+  // #368: 읽기 전용 안내는 내 기록 창 대신 설정 "내 데이터" 묶음으로 연다.
+  openSettingsData:intent=>openAccountData(intent),
   show:(file,write)=>show(file,write),
   selection:()=>stateSelection(),
   openFirstJourney:options=>openFirstJourney(options),
   openLoginStart:intent=>openLoginStart(intent),
+  // #425: 같은 창의 탭(쉬운 추가·자세한 추가)과 제목을 이 모듈이 정한다.
+  writePanel:shellWrite,
   // #380 4 2차: 편집기의 취소 버튼도 공통 닫기 규칙(×·바깥·Esc와 같은 확인·업로드 중 막기)을 쓴다.
   requestClose:id=>shellDialogs.requestClose(id)
 });
 function openEditor(mode,parentId=''){return shellPanels.openEditor(mode,parentId);}
-// 빠른 추가(#빠른 추가 ②): 고르기 창·모달·끌어다 놓기는 shell/quick-add.mjs가 맡는다.
-// 진입(순간 남기기)만 여기서 연결하고, 나머지 화면 분기는 그 모듈의 판정 함수가 정한다.
+// 쉬운 추가(#빠른 추가 ②): 창 열기·끌어다 놓기는 shell/quick-add.mjs가 맡는다.
+// #425부터 입구는 하나다 — 같은 창을 열고 먼저 보일 탭만 설정값(lt41.writeTab)이 정한다.
 const shellQuick=createQuickAdd({
   $,
   getMember:()=>member,
@@ -181,13 +199,16 @@ const shellQuick=createQuickAdd({
   getCurrent:()=>current,
   notify:text=>notify(text),
   panel:id=>panel(id),
+  openSettingsData:intent=>openAccountData(intent),
   choose:(id,momentId)=>choose(id,momentId),
   openEditor:(mode,parentId)=>openEditor(mode,parentId),
   openLoginStart:intent=>openLoginStart(intent),
+  writePanel:shellWrite,
+  requestClose:id=>shellDialogs.requestClose(id),
   // 사진 올리기는 기존 업로더(#310 onUploaded·imagesOnly)를 그대로 쓴다.
   mountUpload:mountPrivateUpload
 });
-$('write-menu').onclick=()=>shellQuick.openWriteChooser();
+$('write-menu').onclick=()=>shellQuick.openWrite();
 // 빠른 담기 입구: 붙여넣기 + 공유 시트 진입(판정·추적은 ../quick-intake.mjs 한 벌).
 const shellIntake=createQuickIntake({
   getMember:()=>member,
@@ -197,7 +218,8 @@ const shellIntake=createQuickIntake({
   openLoginStart:intent=>openLoginStart(intent),
   describe:(url)=>globalThis.LTMedia?.describe?.(url),
 });
-// #327 2부: 모아둔 순간 정리 창. 진입은 헤더 '정리하기'(inbox 트리)와 순간 상세 '다른 트리로 옮기기'(lt41-move 메시지).
+// #327 2부: 모아둔 순간 정리 창. #380 5번: 입구는 트리 ▾ 드롭다운의 '정리 전 N개 정리하기' 한 곳뿐이고,
+// 순간 상세의 '다른 트리로 옮기기'(lt41-move 메시지)는 그 순간을 옮기는 별개 동작으로 남는다.
 const shellCleanup=createCleanup({
   $,
   getMember:()=>member,
@@ -210,7 +232,6 @@ const shellCleanup=createCleanup({
   treeMomentThumb,
   momentTitle:moment=>{const main=titleView(moment,titleDisplayValue()).main;return main||withoutAutoTitle(moment).title;},
 });
-$('cleanup-menu').onclick=()=>shellCleanup.open({});
 function updateMediaPreview(){return shellPanels.updateMediaPreview();}
 function updateQuickEntryHint(){return shellPanels.updateQuickEntryHint();}
 // 첫 여정 연결은 shell/journey.mjs, 공유·둘러보기·lt41-* 수신은 shell/messages.mjs가 맡는다(#231 1-B③-3).
@@ -222,6 +243,7 @@ const shellJourney=createJourney({
   getSource:()=>source,
   notify:text=>notify(text),
   panel:id=>panel(id),
+  openSettingsData:intent=>openAccountData(intent),
   show:(file,write)=>show(file,write),
   screens,
   choose:(id,momentId)=>choose(id,momentId),
@@ -240,6 +262,7 @@ const shellMessages=createMessages({
   shareApi,
   notify:text=>notify(text),
   panel:id=>panel(id),
+  openSettingsData:intent=>openAccountData(intent),
   show:(file,write)=>show(file,write),
   links:()=>links(),
   writeLocation:(mode)=>writeLocation(mode),
@@ -290,7 +313,7 @@ function writeLocation(mode){return shellLocation.writeLocation(mode);}
 function applyBrowserLocation(){return shellLocation.applyBrowserLocation();}
 const PENDING_NEW='lovetree.v41.pending-new';
 // 2026-11-07 계정 표시: 로그인 상태는 첫 글자 동그라미 + 작은 메뉴, 로그아웃 상태는 기존 로그인 알약.
-function panel(id){if(id==='records')updateAccountControls();const target=$(id);if(!target.open){if(target.dataset.ltPanel){shellDialogs.noteOpener(id);if(target.dataset.ltPanel==='full')shellDialogs.syncPanelTop();}target.showModal();}}
+function panel(id){const target=$(id);if(!target.open){if(target.dataset.ltPanel){shellDialogs.noteOpener(id);if(target.dataset.ltPanel==='full')shellDialogs.syncPanelTop();}target.showModal();}}
 // 대화상자 접근성(Tab 순환·Esc 복귀·포커스 되돌리기)은 shell/dialogs.mjs가 맡는다(#231 1-B 후속).
 const shellDialogs=createDialogs({
   $,
@@ -300,10 +323,16 @@ const shellDialogs=createDialogs({
   isTreeDirty:()=>shellPanels.treeDirty(),
   // #380 4 2차: 편집기는 입력(제목·메모·주소·사진·고른 연결)이 바뀌었으면 더러움,
   // 순간 잇기는 고른 연결이 저장 전이면 더러움이다. 어느 쪽이든 공통 틀이 한 번 묻고 닫는다.
-  isEditorDirty:()=>shellPanels.formDirty(),
+  // #425: 한 창에서 보이는 구역만 본다 — 쉬운 추가는 주소를 적고 아직 담지 않았을 때,
+  // 자세한 추가는 폼(제목·마음·주소·첨부·연결)이 기준값과 다를 때 더러움이다.
+  isEditorDirty:()=>($('write-easy').hidden?shellPanels.detailedDirty():$('quick-url').value.trim()!==''),
   isConnectionDirty:()=>connectionDirty(),
+  // #380 4 마지막: 빠른 추가는 주소를 적어 두고 아직 담지 않았을 때, 공유는 공개 범위를 미리 봤는데 링크를 아직 만들지 않았을 때만 더러움이다.
+  // 설정·내 보관 파일·둘러보기·추가 방식 고르기는 입력을 적어 두지 않으므로 바로 닫힌다.
+  isShareDirty:()=>{const create=$('share-create');return $('share-panel').open&&!!create&&!create.disabled&&$('share-created').hidden;},
   // 편집기 규칙이 공통 틀보다 우선한다: 업로드 중에는 Esc·바깥 클릭·× 모두 닫지 않고 이유를 알린다.
-  panelBlocked:id=>id==='editor'&&uploads.busy?'파일 전송을 마치거나 취소해 주세요.':'',
+  // 빠른 추가의 사진 올리기도 같은 규칙을 쓴다(업로드가 끝나면 곧바로 담기므로 중간에 닫으면 사라진다).
+  panelBlocked:id=>id==='write-panel'&&(uploads.busy||shellQuick.uploads?.busy)?'파일 전송을 마치거나 취소해 주세요.':'',
   notify:text=>notify(text)
 });
 
@@ -315,6 +344,8 @@ const shellHeader=createHeader({
   getSource:()=>source,
   getCurrent:()=>current,
   accountApi,
+  // #368: 이메일을 불러오거나 지울 때마다 설정 "프로필" 표시도 같이 칠한다.
+  onEmailChange:email=>paintSettingsProfile(email),
   delegate:{syncTreeTips:()=>syncTreeTips()}
 });
 function flowNavigation(){return shellHeader.flowNavigation();}
@@ -349,7 +380,8 @@ function showInFrame(url,title){return shellScreens.showInFrame(url,title);}
 function show(file,write=true){return shellScreens.show(file,write);}
 function frameLoaded(frame){return shellScreens.frameLoaded(frame);}
 
-function viewContext(){const c=window.LT41;const cleanup=$('cleanup-menu');if(cleanup)$('cleanup-menu').hidden=!(c&&source==='server'&&member?.snapshot().owned&&member.snapshot().writable&&isInboxTree(c.tree));}
+// #380 5번: '정리하기' 입구는 트리 ▾ 드롭다운 한 곳에서만 그린다(renderTreeMenu). 헤더 단추는 없앴다.
+function viewContext(){}
 // 연결 보기는 헤더에서 뺐다(2026-11-07). 관계 지도 화면의 도구 줄(전체 보기·사용법과 같은 자리·모양)에
 // 같은 다이얼로그를 여는 버튼을 붙인다. 원본 화면 파일은 건드리지 않는다.
 function mountConnectionTool(doc){
@@ -362,6 +394,8 @@ function mountConnectionTool(doc){
 }function setConnectionCount(n){const b=$('connection-count');if(b)b.textContent=String(n);const t=$('connection-tool');if(t){t.textContent=connectionLabel(n);t.removeAttribute('aria-label');}const h=$('connection-menu');if(h)h.textContent=connectionLabel(n);}
 // #380 4 2차: 순간 잇기 패널이 보여 준 연결 목록(고른 연결)을 기억해 두고, 그 뒤로 트리의 연결이 달라졌으면 더러움이다.
 // 패널 자체는 연결을 만들지 않으므로 보통은 확인 없이 닫힌다(보여 준 것과 저장본이 같기 때문).
+// #380 5번: 첫 화면 움직임 멈춤 상태(메모리에만 둔다 — 보기 메뉴 때와 같다. 화면을 다시 열면 처음 상태).
+let motionPaused=false;
 let connectionShown='';
 function connectionDirty(){return $('connection-panel').open&&connectionSignature(window.LT41?.tree,window.LT41?.momentId)!==connectionShown;}
 function links(){viewContext();const c=window.LT41;$('connections').replaceChildren();if(!c){setConnectionCount(0);$('selection-label').textContent='트리를 먼저 불러오세요.';connectionShown='';return;}
@@ -420,23 +454,12 @@ function load(input,kind,selection={},fallback={}){
  document.body.dataset.recordSource=kind;
  document.body.dataset.member=member?.snapshot().owned?'in':'out';
  document.body.dataset.treeCount=String(model?.trees?.length||0);
- $('source-label').textContent='트리 선택';
- $('record-description').textContent=kind==='example'
-  ?'실제 회원 데이터와 무관한 예시입니다.'
-  :kind==='server'
-   ?'로그인한 계정의 서버 기록 · 작성·수정 후 자동 저장'
-   :kind==='share'
-    ?'소유자가 명시적으로 공개한 트리 · 감상 전용'
-    :'선택한 파일을 메모리에서 읽는 중입니다.';
- $('trees').replaceChildren();
- for(const t of model.trees){const o=document.createElement('option');o.value=t.id;o.textContent=pickerLabel(t);$('trees').append(o);}
- $('trees').disabled=!model.trees.length;
+ // #368: 트리 고르기는 맨 위 트리 ▾ 드롭다운 한 곳이다(옛 내 기록 창의 select는 없앴다).
  const resolved=resolveAccountPosition(model.trees,selection,fallback),chosen=model.trees.find(t=>t.id===resolved.position.treeId);
- $('trees').value=chosen?.id||'';
  choose(chosen?.id,resolved.position.momentId);
  return resolved;
 }
-function clear(){load({revision:0,state:{version:1,trees:[]}},'file');$('source-label').textContent='트리 선택';$('record-description').textContent='펼쳐 볼 트리를 선택하세요.';}
+function clear(){load({revision:0,state:{version:1,trees:[]}},'file');}
 function stateSelection(){return {treeId:window.LT41?.tree.id,momentId:window.LT41?.momentId};}
 function formDirty(){return shellPanels.formDirty();}
 function treeDirty(){return shellPanels.treeDirty();}
@@ -494,7 +517,6 @@ async function startMember(){setMemberRefreshStarted(true);if(!leaveMember())ret
  member=session;
  await session.start();
  if(generation===loadGeneration&&session.snapshot().owned){
-  if($('records').open)$('records').close();
   updateAccountControls();
   if(session.snapshot().writable&&sessionStorage.getItem(PENDING_NEW)==='1'){sessionStorage.removeItem(PENDING_NEW);openEditor('new');}
   shellAuth.consumeLoginIntent(session.snapshot());
@@ -502,7 +524,7 @@ async function startMember(){setMemberRefreshStarted(true);if(!leaveMember())ret
  }
  if(generation===loadGeneration){const startupJourney=parseJourneyRoute(location.hash);if(startupJourney){if(session.snapshot().owned&&session.snapshot().writable)openFirstJourney({step:startupJourney.step,route:true});else{history.replaceState(null,'','#home');handledHash='#home';}}}
 }
-function sample(selection={},view){if(!leaveMember())return;++loadGeneration;if(view)current=view;load(null,'example',selection);if(view)writeLocation();$('save-feedback').hidden=true;$('records').close();}
+function sample(selection={},view){if(!leaveMember())return;++loadGeneration;if(view)current=view;load(null,'example',selection);if(view)writeLocation();$('save-feedback').hidden=true;if($('account-settings').open)$('account-settings').close();}
 $('account-entry').onclick=e=>{
  if(member?.snapshot().owned){e.preventDefault();openAccountMenu();}
  else if(parseSelectionRoute(location.hash).scope==='owner')stashPendingOwnerRoute(sessionStorage,location.hash);
@@ -515,23 +537,55 @@ const $on=(id,fn)=>{const el=$(id);if(el)el.onclick=fn;};
 function advancedKey(){try{return 'lt41.advanced.'+(member?.snapshot().subject||'')}catch{return 'lt41.advanced.'}}
 function readAdvanced(){try{return localStorage.getItem(advancedKey())==='1'}catch{return false}}
 function applyAdvanced(){const on=readAdvanced();document.body.classList.toggle('lt-advanced',on);$('account-advanced')?.setAttribute('aria-checked',String(on));try{$('view').contentWindow.postMessage({type:'lt41-advanced',value:on},location.origin)}catch{}}
-$on('account-records',()=>{closeAccountMenu();panel('records');});
-$on('account-backup',()=>{closeAccountMenu();backup();});
  $('account-assets-open').onclick=()=>{closeAccountMenu();openAssets($('account-avatar'));};
+// #368: 설정 "내 데이터"의 내 보관 파일 열기. 창 위에 보관 파일 창이 열리고 닫으면 이 버튼으로 초점이 돌아온다.
+$('settings-assets-open').onclick=()=>openAssets($('settings-assets-open'));
  $('editor-assets-open').onclick=()=>openAssets($('editor-assets-open'));
  for(const b of document.querySelectorAll('[data-set-theme]'))b.onclick=()=>{writeTheme(localStorage,b.dataset.setTheme);applyTheme();paintThemeControls();};
  $('account-advanced').onclick=()=>{const next=!readAdvanced();try{localStorage.setItem(advancedKey(),next?'1':'0')}catch{}applyAdvanced();};
  $('account-open-settings').onclick=()=>{closeAccountMenu();void openAccountSettings();};
  $('advanced-backup').onclick=()=>backup();
+ // #368: 기록 가져오기는 JSON 선택 input을 연다. input은 창 밖에 숨겨 두어 설정이 닫혀 있어도(빈 화면의 백업 파일 열기) 열린다.
+ // CTO 결정(2026-11-12): 설정에는 "기록 가져오기" 하나만 둔다 — "백업 파일 열기"는 같은 선택 창이라 중복이고,
+ // 로그아웃 빈 화면의 "백업 파일 열기"(#empty-file)는 계정 없이 쓰는 입구로 남긴다.
  $('advanced-import').onclick=()=>$('file').click();
+ $('empty-file').onclick=()=>$('file').click();
  for(const b of document.querySelectorAll('[data-title-display]'))b.onclick=()=>setTitleDisplay(b.dataset.titleDisplay);
+ // #380 5번: '보기 ◐' 메뉴(테마·움직임·카드 출처)를 설정 창의 '화면' 묶음으로 옮겼다.
+ // 저장 키(lt41.theme·lt41.homeCards)와 기본값은 그대로다.
+ const HOME_CARD_MODES=['example','popular','mine','mix'];
+ function readHomeCardsMode(){try{const v=localStorage.getItem('lt41.homeCards');return HOME_CARD_MODES.includes(v)?v:''}catch{return ''}}
+ function paintScreenControls(){
+  const mode=readHomeCardsMode()||'example';
+  for(const b of document.querySelectorAll('[data-home-cards]'))b.setAttribute('aria-checked',String(b.dataset.homeCards===mode));
+  // #425: '순간 추가 먼저 보일 탭' — 저장값이 없으면 쉬운 추가가 켜져 있다.
+  const tab=readWriteTab(localStorage);
+  for(const b of document.querySelectorAll('[data-write-tab]'))b.setAttribute('aria-checked',String(b.dataset.writeTab===tab));
+  const motion=$('settings-motion');
+  if(motion){motion.setAttribute('aria-pressed',String(motionPaused));motion.textContent=motionPaused?'켜기':'멈추기';}
+ }
+ for(const b of document.querySelectorAll('[data-home-cards]'))b.onclick=()=>{
+  if(!HOME_CARD_MODES.includes(b.dataset.homeCards))return;
+  try{localStorage.setItem('lt41.homeCards',b.dataset.homeCards)}catch{}
+  paintScreenControls();
+  try{$('view').contentWindow.postMessage({type:'lt41-home-cards',mode:b.dataset.homeCards},location.origin)}catch{}
+  notify('첫 화면 카드를 바꿨어요. 첫 화면으로 돌아가면 그대로 보입니다.');
+ };
+ for(const b of document.querySelectorAll('[data-write-tab]'))b.onclick=()=>{
+  const tab=writeWriteTab(localStorage,b.dataset.writeTab);
+  paintScreenControls();
+  notify(tab==='detailed'?'순간 추가를 자세한 추가로 엽니다.':'순간 추가를 쉬운 추가로 엽니다.');
+ };
+ $on('settings-motion',()=>{motionPaused=!motionPaused;paintScreenControls();try{$('view').contentWindow.postMessage({type:'lt41-motion',paused:motionPaused},location.origin)}catch{}notify(motionPaused?'첫 화면 움직임을 멈췄어요.':'첫 화면 움직임을 다시 켰어요.');});
+ paintScreenControls();
  $('account-logout').onclick=async()=>{closeAccountMenu();$('logout').click();};
 document.addEventListener('click',e=>{
  if(!e.target.closest('.account-slot'))closeAccountMenu();
 });
-$('empty-records').onclick=()=>member?.snapshot().writable?openEditor():panel('records');
+// #368: 빈 화면의 "내 기록 불러오기" — 로그아웃이면 로그인으로, 읽기 전용이면 설정 "내 데이터"로, 평소엔 순간 추가(새 트리)로.
+$('empty-records').onclick=()=>{if(!member?.snapshot().owned){openLoginStart('first');return;}member.snapshot().writable?openEditor():openAccountData();};
 $('empty-sample').onclick=sample;
-$('sample').onclick=sample;$('clear').onclick=()=>{if(!leaveMember())return;++loadGeneration;clear();$('save-feedback').hidden=true;$('file').value='';$('records').close();};
+$('sample').onclick=sample;$('clear').onclick=()=>{if(!leaveMember())return;++loadGeneration;clear();$('save-feedback').hidden=true;$('file').value='';if($('account-settings').open)$('account-settings').close();};
 $('server').onclick=startMember;
 const ACCOUNT_DELETE_PHRASE='탈퇴합니다';
 let accountExpected=null;
@@ -540,18 +594,39 @@ function accountConfirmMatches(){
  if(!accountExpected||!typed)return false;
  return accountExpected.kind==='email'?typed.toLowerCase()===accountExpected.value:typed===accountExpected.value;
 }
-async function openAccountSettings(){
- accountExpected=null;$('account-feedback').textContent='';$('account-confirm').value='';$('account-delete').disabled=true;
- if(!member?.snapshot().owned){$('account-confirm-hint').textContent='로그인한 뒤 이용할 수 있어요.';panel('account-settings');return;}
+// #368: 설정 창 묶음 — 입구는 묶음 이름으로 열고 해당 묶음(제목)으로 초점과 스크롤을 옮긴다.
+const SETTINGS_SECTIONS={profile:'account-settings-profile',screen:'account-settings-screen',write:'account-settings-write',data:'account-settings-data',account:'account-settings-account'};
+function focusSettingsSection(section='profile'){
+ const box=$('account-settings');if(!box?.open)return;
+ const target=$(SETTINGS_SECTIONS[section]||SETTINGS_SECTIONS.profile);if(!target)return;
+ queueMicrotask(()=>{target.scrollIntoView({block:'start'});const heading=target.querySelector('h3');if(heading)heading.focus({preventScroll:true});});
+}
+// #368: 프로필 묶음 표시. 이메일이 없으면 "내 계정"(header-state 규칙 그대로, 가리지 않는다).
+function paintSettingsProfile(email=shellHeader.currentAccountEmail()){
+ const view=accountPresentation({owned:!!member?.snapshot().owned,email});
+ const initial=$('settings-profile-initial');if(initial)initial.textContent=view.initial;
+ const mail=$('settings-profile-email');if(mail)mail.textContent=view.label;
+}
+// #368: 옛 내 기록 창을 여던 입구(읽기 전용 안내·빈 화면)의 공통 행선지. 로그아웃이면 로그인으로 보낸다.
+function openAccountData(intent='first'){
+ if(!member?.snapshot().owned){openLoginStart(intent);return;}
+ void openAccountSettings({section:'data'});
+}
+async function openAccountSettings({section='profile'}={}){
+ accountExpected=null;$('account-feedback').textContent='';$('account-confirm').value='';$('account-delete').disabled=true;$('account-confirm-hint').textContent='';
+ // 로그아웃·공유·예시 상태에서는 설정 입구가 없다(기존 규칙). 여기서도 열지 않는다.
+ if(!member?.snapshot().owned){notify('로그인한 뒤 설정을 열 수 있어요.');return;}
+ paintSettingsProfile();
+ panel('account-settings');
+ focusSettingsSection(section);
  const answer=await accountApi.account();
- if(!answer.ok){$('account-confirm-hint').textContent='계정 정보를 확인하지 못했어요. 잠시 뒤 다시 시도해 주세요.';panel('account-settings');return;}
+ if(!answer.ok){$('account-confirm-hint').textContent='계정 정보를 확인하지 못했어요. 잠시 뒤 다시 시도해 주세요.';return;}
+ if(answer.email)paintSettingsProfile(answer.email);
  const byEmail=answer.confirmKind==='email';
  accountExpected=byEmail?{kind:'email',value:String(answer.email||'').trim().toLowerCase()}:{kind:'phrase',value:ACCOUNT_DELETE_PHRASE};
  $('account-confirm-label').textContent=byEmail?'계정 이메일':'확인 문구';
  $('account-confirm-hint').textContent=byEmail?'계정 이메일을 입력하세요. 일치할 때만 버튼이 열려요.':"확인을 위해 '탈퇴합니다'를 입력하세요. 그대로 일치할 때만 버튼이 열려요.";
- panel('account-settings');queueMicrotask(()=>$('account-confirm').focus());
 }
-$('account-settings-open').onclick=()=>{void openAccountSettings();};
 $('account-confirm').oninput=()=>{$('account-delete').disabled=!accountConfirmMatches();};
 $('account-form').onsubmit=async event=>{
  event.preventDefault();
@@ -583,13 +658,13 @@ $('file').onchange=async()=>{
   const d=JSON.parse(await f.text());
   if(generation!==loadGeneration)return;
   load(d.state?d:{revision:0,state:d},'file');
-  $('records').close();
+  if($('account-settings').open)$('account-settings').close();
   notify('파일을 열었어요. 서버에는 저장하지 않습니다.');
  }catch(e){
   if(generation===loadGeneration)notify('불러오기 실패: '+e.message);
  }
 };
-$('trees').onchange=()=>{choose($('trees').value);writeLocation();$('records').close();};
+// #368: #trees select는 옛 내 기록 창의 것으로 함께 없앴다. 트리 고르기는 트리 ▾ 드롭다운(renderTreeMenu)이 맡는다.
 // #380 4 2차: 전체 화면·가운데 창 공통 틀을 쓰는 대화상자(편집기·순간 잇기·트리 관리)는 × 도 바깥 클릭·Esc와 같은 규칙을 쓴다.
 document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>{const target=$(b.dataset.close);if(target?.dataset?.ltPanel){shellDialogs.requestClose(b.dataset.close);return;}target.close();});
 function publicProblem(answer){
@@ -607,7 +682,7 @@ async function showPublicRoute(route){
  $('empty').querySelector('p').textContent='소유자가 공개한 트리 한 개만 확인합니다.';
  $('empty-sample').hidden=true;$('empty-records').hidden=true;$('view').hidden=true;$('empty').hidden=false;
  const answer=await shareApi.read(route.shareId||'');if(generation!==loadGeneration)return;if(!answer.ok){publicProblem(answer);return;}
- activeShareId=answer.share.id;const view=['book','board','network'].includes(route.view)?route.view:answer.share.view;current=screenForView(view)[1];load({revision:0,state:{version:1,trees:[answer.tree]}},'share',{treeId:answer.tree.id,momentId:answer.share.entryMomentId});activeShareId=answer.share.id;show(current,false);writeLocation('replace');notify('소유자가 명시적으로 공유한 트리입니다. 감상만 할 수 있어요.');
+ activeShareId=answer.share.id;const view=['book','board','network'].includes(route.view)?route.view:answer.share.view;current=screenForView(view)[1];load({revision:0,state:{version:1,trees:[answer.tree]}},'share',{treeId:answer.tree.id,momentId:answer.share.entryMomentId});activeShareId=answer.share.id;show(current,false);writeLocation('replace');notify('소유자가 명시적으로 공유한 트리입니다. 감상만 할 수 있어요.'+(answer.omittedPrivateMedia?' 올린 사진 '+answer.omittedPrivateMedia+'장은 나만 볼 수 있어요.':''));
 }
 document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{if(b.dataset.view==='track32-bookshelf.html'&&!member?.snapshot().owned){openLoginStart('shelf');return;}show(b.dataset.view);});
 for(const f of frames())f.addEventListener('load',()=>frameLoaded(f));
@@ -618,11 +693,11 @@ function backup(){const data=member?.state();if(!data){notify('백업할 내 기
 function openAssets(opener=document.activeElement){if(!member?.snapshot().owned){notify('로그인한 뒤 내 보관 파일을 확인할 수 있어요.');return;}shellDialogs.rememberOpener(opener);panel('account-assets');uploads.openAssets();}
 function usePrivateAsset(){
  if(source!=='server'||!member?.snapshot().owned){openLoginStart('new-tree');return false;}
- if(!member.snapshot().writable){notify('서버 편집 연결이 아직 준비되지 않았어요. 기록은 안전하게 읽을 수 있습니다.');panel('records');return false;}
+ if(!member.snapshot().writable){notify('서버 편집 연결이 아직 준비되지 않았어요. 기록은 안전하게 읽을 수 있습니다.');openAccountData();return false;}
  if(!window.LT41){openEditor();notify('새 트리를 만든 뒤 순간에 파일을 첨부할 수 있어요.');return false;}
  if(!window.LT41.momentId){notify('순간을 먼저 연 뒤 내 보관 파일을 첨부할 수 있어요.');return false;}
- if(!$('editor').open)openEditor('add');
- return $('editor').open;
+ if(!$('write-panel').open)openEditor('add');
+ return $('write-panel').open;
 }
 addEventListener('beforeunload',e=>{
  if(member?.snapshot().dirty||formDirty()||treeDirty()){e.preventDefault();e.returnValue='';}
