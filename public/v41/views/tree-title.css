@@ -31,8 +31,10 @@ html[data-v41-screen=board] .tree-menu .tree-count{color:#9b89a5}
 html[data-v41-screen=board] .tree-menu .tree-check{color:#cf8bff}
 html[data-v41-screen=board] .tree-menu .tree-cover{border:1px solid rgba(255,255,255,.2)}
 
-/* 지도(밝은 알약 테마) — .topbar는 pointer-events:none이므로 묶음을 다시 받는다 */
-html[data-v41-screen=network] .topbar-left{pointer-events:auto}
+/* 지도(밝은 알약 테마) — .topbar는 pointer-events:none이므로 묶음을 다시 받는다.
+   #421: identity.css가 .topbar를 justify-content:flex-end로 두므로(도구만 있던 시절 규칙)
+   묶음이 오른쪽으로 밀린다. 책의 book.css와 같게 margin-right:auto로 왼쪽을 지킨다. */
+html[data-v41-screen=network] .topbar-left{pointer-events:auto;margin-right:auto}
 html[data-v41-screen=network] .shelf-back{height:36px;min-height:36px;padding:0 13px;border:1px solid rgba(77,71,87,.12);border-radius:999px;background:rgba(255,255,255,.74);font-size:10px;color:rgba(51,47,57,.65);box-shadow:0 8px 24px rgba(70,60,78,.05);backdrop-filter:blur(16px)}
 html[data-v41-screen=network] .shelf-back:hover,html[data-v41-screen=network] .shelf-back:focus-visible{outline:none;border-color:rgba(79,70,91,.28);background:#fff;color:#26242d}
 html[data-v41-screen=network] .tree-title-btn{height:36px;padding:0 13px;border:1px solid rgba(77,71,87,.12);border-radius:999px;background:rgba(255,255,255,.74);color:#26242d;box-shadow:0 8px 24px rgba(70,60,78,.05);backdrop-filter:blur(16px)}
@@ -54,7 +56,13 @@ html[data-v41-screen=network] .tree-menu .tree-cover{border:1px solid rgba(120,9
  #treeTitleText{font-size:15px}
  html[data-v41-screen=network] #treeTitleText{font-size:12px}
 }
-/* 좁은 폭(지도): 알약 단추도 44px 손끝 크기를 지킨다(기존 .pill 규칙과 같게) */
+/* 좁은 폭(지도): 알약 단추도 44px 손끝 크기를 지킨다(기존 .pill 규칙과 같게).
+   #421: 글자가 세로로 쪼개지는(두 줄·세로 쌓임) 것을 막고 한 줄로 유지한다. */
 @media(max-width:640px){
  html[data-v41-screen=network] .shelf-back,html[data-v41-screen=network] .tree-title-btn{height:auto;min-height:44px}
+ html[data-v41-screen=network] .shelf-back,html[data-v41-screen=network] .tree-title-btn,html[data-v41-screen=network] .top-actions .pill{white-space:nowrap}
+ html[data-v41-screen=network] .shelf-back{padding:0 10px;font-size:9px}
+ html[data-v41-screen=network] .tree-title-btn{padding:4px 8px}
+ html[data-v41-screen=network] .top-actions{gap:5px}
+ html[data-v41-screen=network] .top-actions .pill{padding:0 9px;font-size:9px}
 }
