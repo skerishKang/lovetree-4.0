@@ -133,7 +133,8 @@ document.addEventListener('keydown',event=>{
 addEventListener('resize',()=>{if(matchMedia('(min-width:781px)').matches)closeMore();});
 document.addEventListener('keydown',event=>{
  const c=$('community-panel');
- if(event.key==='Escape'&&c.open&&![...document.querySelectorAll('dialog[open]')].some(d=>d!==c&&d.matches(':modal')))c.close();
+ // #380 4 마지막: 둘러보기도 공통 틀의 닫기 규칙(×·바같 클릭·Esc·초점 복귀)을 쓴다.
+ if(event.key==='Escape'&&c.open&&![...document.querySelectorAll('dialog[open]')].some(d=>d!==c&&d.matches(':modal')))shellDialogs.requestClose('community-panel');
 });
 const initialRoute=parseSelectionRoute(location.hash);
 let model=null,current=screenForView(initialRoute.view)[1],source='example',loadGeneration=0,previousDirty=false,member=null,handledHash=null,activeShareId=null;
@@ -302,8 +303,13 @@ const shellDialogs=createDialogs({
   // 순간 잇기는 고른 연결이 저장 전이면 더러움이다. 어느 쪽이든 공통 틀이 한 번 묻고 닫는다.
   isEditorDirty:()=>shellPanels.formDirty(),
   isConnectionDirty:()=>connectionDirty(),
+  // #380 4 마지막: 빠른 추가는 주소를 적어 두고 아직 담지 않았을 때, 공유는 공개 범위를 미리 봤는데 링크를 아직 만들지 않았을 때만 더러움이다.
+  // 설정·내 보관 파일·둘러보기·추가 방식 고르기는 입력을 적어 두지 않으므로 바로 닫힌다.
+  isQuickAddDirty:()=>$('quick-add').open&&$('quick-url').value.trim()!=='',
+  isShareDirty:()=>{const create=$('share-create');return $('share-panel').open&&!!create&&!create.disabled&&$('share-created').hidden;},
   // 편집기 규칙이 공통 틀보다 우선한다: 업로드 중에는 Esc·바깥 클릭·× 모두 닫지 않고 이유를 알린다.
-  panelBlocked:id=>id==='editor'&&uploads.busy?'파일 전송을 마치거나 취소해 주세요.':'',
+  // 빠른 추가의 사진 올리기도 같은 규칙을 쓴다(업로드가 끝나면 곧바로 담기므로 중간에 닫으면 사라진다).
+  panelBlocked:id=>(id==='editor'&&uploads.busy)||(id==='quick-add'&&shellQuick.uploads?.busy)?'파일 전송을 마치거나 취소해 주세요.':'',
   notify:text=>notify(text)
 });
 
