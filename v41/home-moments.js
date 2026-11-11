@@ -60,7 +60,7 @@ const mediaImage = (moment, currentOrigin) => {
 const noteOf = moment => text(moment?.note) || text(moment?.memo) || text(moment?.whyNext) || text(moment?.title);
 const recent = (a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt);
 
-function cardOf(treeId, moment, currentOrigin, youtube = null) {
+export function cardOf(treeId, moment, currentOrigin, youtube = null) {
   const image = mediaImage(moment, currentOrigin);
   const video = !image && privateMediaKind(moment?.url, currentOrigin)?.kind === 'video';
   // #330 판정 재사용: 내 기록(서버 기록·로그인 소유자)만 YouTube 썸네일을 처음부터 카드로 쓴다.
