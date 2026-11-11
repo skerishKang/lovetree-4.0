@@ -61,7 +61,7 @@ test('7. 첫 트리 말풍선: 2~3개, 순간 남기기·보기 전환을 알려
   assert.ok(FIRST_TREE_TIPS.length >= 2 && FIRST_TREE_TIPS.length <= 3, `말풍선 ${FIRST_TREE_TIPS.length}개`);
   const titles = FIRST_TREE_TIPS.map((tip) => tip.title).join(' ');
   assert.match(titles, /순간/);
-  assert.match(titles, /기억책|보드|관계 지도/);
+  assert.match(titles, /책·보드·지도/);
   for (const tip of FIRST_TREE_TIPS) {
     assert.ok(tip.anchor === 'write-menu' || tip.anchor === 'tree-views', tip.anchor);
     assert.ok(tip.body.length > 10 && tip.body.length < 120, `${tip.id} 설명 길이`);

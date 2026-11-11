@@ -44,12 +44,12 @@ try {
   headerPartsFor = null;
   treePickerText = null;
 }
-// 첫 화면·내 책장·둘러보기는 모든 상태에서 남는 기본 탭이다.
-const BASE_HEADER_TABS = 3;
+// 둘러보기는 모든 상태에서 남는 기본 탭이다(#380 2번: 첫 화면은 로고, 내 책장은 트리 드롭다운 맨 아래로 옮겨 갔다).
+const BASE_HEADER_TABS = 1;
 function headerExpectation({ owned = false, treeCount = 0, publicReading = false } = {}) {
   if (!headerPartsFor) {
     const state = owned ? (Number(treeCount) > 0 ? 'in-trees' : 'in-empty') : 'out';
-    return { state, treePicker: state === 'in-trees', treeViews: state === 'in-trees', write: owned, tabs: state === 'in-trees' ? 7 : 3, source: 'fallback' };
+    return { state, treePicker: state === 'in-trees', treeViews: state === 'in-trees', write: owned, tabs: state === 'in-trees' ? 5 : 1, source: 'fallback' };
   }
   const parts = headerPartsFor({ owned, treeCount, publicReading });
   const tabs = BASE_HEADER_TABS + (parts.treePicker ? 1 : 0) + (parts.treeViews ? 3 : 0);
@@ -791,7 +791,7 @@ async function checkVisualTokens(page, target, opts, stamp) {
       const wm = document.getElementById('write-menu');
       const nav = document.querySelector('.app-header nav');
       // #374: record-menu가 .tree-slot 안에 들어갔으므로 nav 직접 자식 인덱스 대신
-      // 문서 순서(compareDocumentPosition)로 "트리 선택이 기억책·보드·지도 앞"을 본다.
+      // 문서 순서(compareDocumentPosition)로 "트리 선택이 책·보드·지도 앞"을 본다.
       const recordEl = document.getElementById('record-menu');
       const treeViewsEl = document.getElementById('tree-views');
       const recordBeforeTreeViews = !!(recordEl && treeViewsEl
@@ -847,7 +847,7 @@ async function checkVisualTokens(page, target, opts, stamp) {
     }
     const problems = [];
     // #213 3번: 로그아웃(out)은 트리 선택·트리 보기가 없고, 로그인해도 트리가 없으면(in-empty) 같은 모양이다.
-    // 트리가 있을 때(in-trees)만 트리 선택 + 기억책·보드·지도가 붙는다. 기대값은 header-state.mjs 가 계산한다.
+    // 트리가 있을 때(in-trees)만 트리 선택 + 책·보드·지도가 붙는다. 기대값은 header-state.mjs 가 계산한다.
     const owned = top.member ? top.member === 'in' : !top.loginVisible;
     const headerExpected = headerExpectation({ owned, treeCount: top.treeCount });
     const expectedTabs = headerExpected.tabs;
@@ -869,7 +869,7 @@ async function checkVisualTokens(page, target, opts, stamp) {
       if (!/^트리: /.test(top.recordLabel)) problems.push(`로그인 트리 선택 글자 "${top.recordLabel}" (기대 "트리: <이름>")`);
     }
     // 2026-11-07: 트리 선택은 뒤쪽 탭 묶음 바로 앞, 주 버튼은 #write-menu 하나(금색), 연결 보기는 헤더에 없다.
-    if (!top.treeViewsHidden && !top.recordBeforeTreeViews) problems.push('트리 선택이 기억책·보드·지도 탭 앞에 있지 않음');
+    if (!top.treeViewsHidden && !top.recordBeforeTreeViews) problems.push('트리 선택이 접·보드·지도 탭 앞에 있지 않음');
     if (!top.writeMenuHidden && !top.writeGold) problems.push(`주 버튼 금색 강조 없음: ${top.pillBorder}`);
     if (top.connectionInHeader) problems.push('연결 보기가 아직 헤더에 있음');
     if (!/^LoveTree\s*4\.1$/.test(top.brand.replace(/\s+/g, ' ').trim())) problems.push(`워드마크 "${top.brand}" (기대 LoveTree 4.1)`);
@@ -1403,11 +1403,14 @@ async function runAuthFlows(target, opts, stamp) {
     // A2-1 먼저: 빈 계정 기대값(트리 0). 뒤 검사들이 트리를 만들기 때문에 순서가 중요하다.
     await withFlow('flow-status-a2-shelf-intent-empty', async (page) => {
       await openShell(page);
-      await page.click('nav button[data-view="track32-bookshelf.html"]', { timeout: 5000 }).catch(() => {});
+      // #380 2번: nav의 내 책장 탭은 없어졌다(트리 ▾ 드롭다운 맨 아래로). 로그아웃 상태의 들어가는 길은 좁은 폭 접기 메뉴다.
+      await page.setViewportSize({ width: 390, height: 844 }).catch(() => {});
+      await page.click('#mobile-more', { timeout: 5000 }).catch(() => {});
+      await page.locator('#header-overflow button').filter({ hasText: '내 트리 전체 보기' }).click({ timeout: 5000 }).catch(() => {});
       await sleep(2500);
       const loginUrl = page.url();
       const wentToLogin = new URL(loginUrl).host !== target.host || /\/auth\/login|\/login\?client_id=/.test(loginUrl);
-      if (!wentToLogin) return { ok: false, detail: `내 책장 클릭이 로그인으로 이어지지 않음 (${loginUrl})` };
+      if (!wentToLogin) return { ok: false, detail: `내 트리 전체 보기 클릭이 로그인으로 이어지지 않음 (${loginUrl})` };
       const login = await completeGateLogin(page, secret.value, target, opts.timeout);
       if (!login.ok) return { ok: false, detail: `로그인 실패: ${login.reason}` };
       await sleep(5000);
@@ -1473,11 +1476,14 @@ async function runAuthFlows(target, opts, stamp) {
         await setupContext.close();
       }
       await openShell(page);
-      await page.click('nav button[data-view="track32-bookshelf.html"]', { timeout: 5000 }).catch(() => {});
+      // #380 2번: 같은 클릭 흐름을 접기 메뉴의 "내 트리 전체 보기"로 검사한다(로그아웃 상태).
+      await page.setViewportSize({ width: 390, height: 844 }).catch(() => {});
+      await page.click('#mobile-more', { timeout: 5000 }).catch(() => {});
+      await page.locator('#header-overflow button').filter({ hasText: '내 트리 전체 보기' }).click({ timeout: 5000 }).catch(() => {});
       await sleep(2500);
       const loginUrl = page.url();
       const wentToLogin = new URL(loginUrl).host !== target.host || /\/auth\/login|\/login\?client_id=/.test(loginUrl);
-      if (!wentToLogin) return { ok: false, detail: '트리 있는 계정의 책장 클릭이 로그인으로 이어지지 않음' };
+      if (!wentToLogin) return { ok: false, detail: '트리 있는 계정의 내 트리 전체 보기 클릭이 로그인으로 이어지지 않음' };
       if (wentToLogin) {
         const login2 = await completeGateLogin(page, secret.value, target, opts.timeout);
         if (!login2.ok) return { ok: false, detail: `로그인 실패: ${login2.reason}` };

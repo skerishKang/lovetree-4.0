@@ -60,14 +60,15 @@ function closeMore(){moreMenu.classList.remove('is-open');moreMenu.hidden=true;m
 function buildFoldMenu(){
  moreMenu.replaceChildren();
  const add=(label,click)=>{const b=document.createElement('button');b.type='button';b.setAttribute('role','menuitem');b.textContent=label;b.onclick=()=>{closeMore();click()};moreMenu.append(b)};
- add('첫 화면',()=>document.querySelector('.main-nav [data-view="src064-orbit.html"]').click());
- add('내 책장',()=>document.querySelector('.main-nav [data-view="track32-bookshelf.html"]').click());
+ // #380 2번: 접기 메뉴도 맨 위 메뉴와 같은 구조 — 첫 화면(로고)·둘러보기 · 책·보드·지도 · 내 트리 전체 보기 · 순간 추가.
+ add('첫 화면',()=>document.querySelector('.brand').click());
  add('둘러보기',()=>$('community-menu').click());
  if(window.LT41){
-  add('기억책',()=>document.querySelector('.tree-views [data-view="track59-sketchbook.html"]').click());
-  add('기억 보드',()=>document.querySelector('.tree-views [data-view="track58-pinboard.html"]').click());
-  add('관계 지도',()=>document.querySelector('.tree-views [data-view="track56-network.html"]').click());
+  add('책',()=>document.querySelector('.tree-views [data-view="track59-sketchbook.html"]').click());
+  add('보드',()=>document.querySelector('.tree-views [data-view="track58-pinboard.html"]').click());
+  add('지도',()=>document.querySelector('.tree-views [data-view="track56-network.html"]').click());
  }
+ add('내 트리 전체 보기',()=>{member?.snapshot().owned?show('track32-bookshelf.html'):openLoginStart('shelf')});
  if(!$('write-menu').hidden)add('＋ 순간 추가',()=>$('write-menu').click());
 }
 const escHTML=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -93,7 +94,9 @@ function renderTreeMenu(){
  const manage=source==='server'&&window.LT41&&member?.snapshot().owned&&member.snapshot().writable;
  // #394: 트리 드롭다운 맨 아래 "내 순간 전체 보기"(#380의 "내 트리 전체 보기" 자리 옆). 내 기록(서버)에서만 보인다.
  const momentsEntry=source==='server'&&window.LT41?'<button type="button" role="menuitem" data-tree-action="moments">내 순간 전체 보기</button>':'';
- treePopover.innerHTML=rows+`<div class="tree-foot" role="none"><button type="button" role="menuitem" data-tree-action="new">＋ 새 트리</button>${manage?'<button type="button" role="menuitem" data-tree-action="manage">이 트리 관리 (이름·표지)</button><button type="button" role="menuitem" data-tree-action="share">이 트리 공유</button>':''}${momentsEntry}</div>`;
+ // #380 2번: 맨 아래 "내 트리 전체 보기" — 지금의 책장 화면(모든 트리의 책장)을 연다. 로그인 상태에서만 보인다.
+ const shelfEntry=member?.snapshot().owned?'<button type="button" role="menuitem" data-tree-action="shelf">내 트리 전체 보기</button>':'';
+ treePopover.innerHTML=rows+`<div class="tree-foot" role="none"><button type="button" role="menuitem" data-tree-action="new">＋ 새 트리</button>${manage?'<button type="button" role="menuitem" data-tree-action="manage">이 트리 관리 (이름·표지)</button><button type="button" role="menuitem" data-tree-action="share">이 트리 공유</button>':''}${shelfEntry}${momentsEntry}</div>`;
   // 트리를 누르면 그 트리로 이동한다: 책·보드·지도를 보던 중이면 같은 보기로, 그 외(첫 화면·내 트리·둘러보기)에는 그 트리의 책으로. 주소도 따라오게 남긴다.
   const TREE_VIEWS=new Set(['track59-sketchbook.html','track58-pinboard.html','track56-network.html']);
   treePopover.querySelectorAll('[data-tree-id]').forEach(b=>b.onclick=()=>{const id=b.dataset.treeId;closeTreeMenu();if(!id)return;const wasTreeView=TREE_VIEWS.has(current);choose(id);if(!wasTreeView)show('track59-sketchbook.html',false);flowNavigation();writeLocation();});
@@ -102,6 +105,8 @@ function renderTreeMenu(){
  treePopover.querySelector('[data-tree-action="share"]')?.addEventListener('click',()=>{closeTreeMenu();$('share-menu').click();});
  // #394: 첫 화면 순간 목록을 지금 트리가 골라진 상태로 연다. 화면을 다시 불러오므로 요청을 전역 플래그로 남긴다.
  treePopover.querySelector('[data-tree-action="moments"]')?.addEventListener('click',()=>{closeTreeMenu();window.LT41_MOMENTS_OPEN={treeId:window.LT41?.tree?.id||''};show('src064-orbit.html');});
+ // #380 2번: 드롭다운 맨 아래 "내 트리 전체 보기" → 책장 화면. 로그인 상태에서만 이 버튼이 그려진다.
+ treePopover.querySelector('[data-tree-action="shelf"]')?.addEventListener('click',()=>{closeTreeMenu();show('track32-bookshelf.html');});
 }
 function openTreeMenu(){if(!treePopover)return;renderTreeMenu();treePopover.hidden=false;treeTrigger.setAttribute('aria-expanded','true');treePopover.querySelector('button')?.focus();}
 function closeTreeMenu(){if(!treePopover)return;treePopover.hidden=true;treeTrigger.setAttribute('aria-expanded','false');}
