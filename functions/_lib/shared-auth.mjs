@@ -19,7 +19,7 @@ const ACCOUNT_EMAIL_PATH = '/internal/account/email';
 // 적어 둔다. 로그인 흐름을 막지 않도록 최선 노력(best effort)으로 보내고 실패는 삼킨다.
 export async function recordAccountEmail(env, fetcher, tokens, verified) {
   try {
-    const email = typeof tokens?.profile?.email === 'string' ? tokens.profile.email.trim() : '';
+    const email = emailFromExchange(tokens);
     const accountId = verified?.accountId ?? verified?.subject;
     const origin = upstreamOrigin(env);
     if (!email || !accountId || !origin) return false;
