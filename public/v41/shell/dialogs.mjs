@@ -55,8 +55,44 @@ export function createDialogs(deps) {
     if (pop && !pop.hidden) { closeAccountMenu(); $('account-avatar').focus(); }
   });
 
+  // 2026-11-11 #380 4: 오른쪽 패널을 두 모양으로 띄우는 공통 틀 — data-lt-panel="full"(맨 위 메뉴 아래 내용 자리)·"center"(가운데 작은 창).
+  // 컴퓨터와 모바일이 같은 모양이다. 공통 닫기 규칙: ×·바깥 클릭·Esc 모두, 쓰던 내용이 있으면 "저장하지 않고 닫을까요?"를 한 번 묻고(기존 편집기·트리 관리 규칙 재사용),
+  // 닫으면 연 버튼으로 초점을 돌려준다. 이번 틀을 쓰는 패널: 순간 정리(full)·트리 관리(center). 나머지는 다음 단계.
+  const PANEL_DIRTY = { 'tree-manager': () => deps.isTreeDirty?.() === true };
+  function panelConfirmClose(d) {
+    if (PANEL_DIRTY[d.id]?.() && !confirm('저장하지 않고 닫을까요?')) return false;
+    return true;
+  }
+  function syncPanelTop() {
+    const header = document.querySelector('.app-header');
+    const top = header ? Math.round(header.getBoundingClientRect().height) : 66;
+    document.documentElement.style.setProperty('--lt-panel-top', `${top}px`);
+  }
+  document.defaultView?.addEventListener?.('resize', () => { if (document.querySelector('dialog[data-lt-panel][open]')) syncPanelTop(); });
+  // 연 버튼 기록: dialog 'open' 이벤트는 환경마다 걸리는 시점이 달라 쓰지 않고, 셸 panel()이 showModal 직전에
+  // noteOpener(id)로 그 순간의 활성 요소를 적둔다. 닫히면 연 버튼으로(사라졌으면 data-lt-return) 초점을 돌려준다.
+  const openers = new Map();
+  for (const d of document.querySelectorAll('dialog[data-lt-panel]')) {
+    d.addEventListener('close', () => {
+      const opener = openers.get(d);
+      openers.delete(d);
+      const fallback = d.dataset.ltReturn ? document.getElementById(d.dataset.ltReturn) : null;
+      const target = focusReturnTarget(opener, fallback);
+      setTimeout(() => target?.focus?.(), 0);
+    });
+    d.addEventListener('cancel', event => { if (!panelConfirmClose(d)) event.preventDefault(); else d.close(); });
+    d.addEventListener('click', event => {
+      if (event.target !== d) return;
+      const r = d.getBoundingClientRect();
+      if (event.clientX < r.left || event.clientX > r.right || event.clientY < r.top || event.clientY > r.bottom) {
+        if (panelConfirmClose(d)) d.close();
+      }
+    });
+  }
+
   // 다이얼로그 바깥(어두운 배경) 클릭으로 닫기. 편집기·책 정보는 실수로 닫히지 않게 뺀다.
-  for (const d of document.querySelectorAll('dialog')) d.addEventListener('click', e => {
+  // data-lt-panel 대화상자는 위 공통 틀이 닫기를 맡으므로 여기서는 건드리지 않는다.
+  for (const d of document.querySelectorAll('dialog:not([data-lt-panel])')) d.addEventListener('click', e => {
     if (e.target !== d || ['editor', 'tree-manager', 'quick-add', 'write-chooser'].includes(d.id)) return;
     const r = d.getBoundingClientRect();
     if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) d.close();
@@ -65,6 +101,9 @@ export function createDialogs(deps) {
   return {
     shellFocusables,
     trapShellTab,
-    rememberOpener: opener => { assetsOpener = opener; }
+    rememberOpener: opener => { assetsOpener = opener; },
+    // #380 4: 셸 panel()이 showModal 직전에 부른다 — 연 버튼 기록과 전체 화면 모양의 맨 위 메뉴 높이 측정.
+    noteOpener: id => { const d = $(id); if (d?.dataset?.ltPanel) openers.set(d, document.activeElement); },
+    syncPanelTop
   };
 }

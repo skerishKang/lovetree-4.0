@@ -251,7 +251,8 @@ export function createPanels(deps) {
       notify('트리를 삭제하고 서버에 반영하고 있어요.');
     } catch (error) { $('tree-form-error').textContent = error.message; }
   };
-  $('tree-manager').addEventListener('cancel', e => { if (treeDirty() && !confirm('트리 변경을 버리고 닫을까요?')) e.preventDefault(); });
+  // #380 4: 트리 관리 Esc·바깥 클릭 닫기와 "저장하지 않고 닫을까요?" 확인은 shell/dialogs.mjs 공통 틀이 맡는다.
+  // × 버튼(data-close)은 shell.mjs의 기존 규칙(바쁠 때·바뀐 값이 있으면 확인)을 그대로 쓴다.
   document.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => setEditorMode(b.dataset.mode));
   // '순간 남기기'는 이제 shell/quick-add.mjs가 고르기 창을 연다(#빠른 추가 ②). 이 파일은 편집기만 맡는다.
 
