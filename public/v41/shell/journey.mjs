@@ -10,7 +10,6 @@ export function createJourney(deps) {
   const getMember = deps.getMember;
   const getSource = deps.getSource;
   const notify = deps.notify;
-  const panel = deps.panel;
   const show = deps.show;
   const screens = deps.screens;
   const choose = deps.choose;
@@ -18,6 +17,8 @@ export function createJourney(deps) {
   const openLoginStart = deps.openLoginStart;
   const flowNavigation = deps.flowNavigation;
   const setHandled = deps.setHandled;
+  // #368: 읽기 전용 게이트의 행선지 — 설정 "내 데이터" 묶음.
+  const openSettingsData = deps.openSettingsData;
 
   let journeyReturn = 'src064-orbit.html';
   let journeyStep = 0;
@@ -77,10 +78,10 @@ export function createJourney(deps) {
       if (routed) { history.replaceState(null, '', '#home'); setHandled('#home'); }
       openLoginStart('new-tree'); return;
     }
-    if (gate.screen === 'records') {
+    if (gate.screen === 'settings') {
       if (routed) { history.replaceState(null, '', '#home'); setHandled('#home'); }
       notify('서버 편집 연결이 아직 준비되지 않았어요. 기록은 안전하게 읽을 수 있습니다.');
-      panel('records'); return;
+      openSettingsData?.(); return;
     }
     if (screens.some(screen => screen[1] === getCurrent())) journeyReturn = getCurrent();
     if ($('community-panel').open) $('community-panel').close();

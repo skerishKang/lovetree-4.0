@@ -74,7 +74,7 @@ function harness({
     getMember: () => member,
     getSource: () => source,
     notify: (msg) => calls.notify.push(msg),
-    panel: (name) => calls.panel.push(name),
+    openSettingsData: () => { calls.settingsData = (calls.settingsData || 0) + 1; },
     show: (next) => { calls.show.push([next]); if (typeof next === 'string') screen = next; },
     screens: SCREENS,
     choose: (...args) => { calls.choose.push(args); },
@@ -93,7 +93,7 @@ function harness({
   return { journey, els, calls, restore, screen: () => screen };
 }
 
-test('새 트리 진입: 로그아웃이면 로그인으로, 편집 불가면 안내+기록 패널로 보낸다', () => {
+test('새 트리 진입: 로그아웃이면 로그인으로, 편집 불가면 안내+설정 내 데이터로 보낸다', () => {
   const out = harness({ owned: false });
   try {
     out.journey.openFirstJourney();
@@ -105,7 +105,7 @@ test('새 트리 진입: 로그아웃이면 로그인으로, 편집 불가면 �
   const readOnly = harness({ owned: true, writable: false });
   try {
     readOnly.journey.openFirstJourney();
-    assert.deepEqual(readOnly.calls.panel, ['records']);
+    assert.equal(readOnly.calls.settingsData, 1, '설정 "내 데이터"를 연다');
     assert.equal(readOnly.calls.notify.length, 1);
     assert.match(readOnly.calls.notify[0], /편집 연결이 아직 준비되지 않았어요/);
   } finally { readOnly.restore(); }

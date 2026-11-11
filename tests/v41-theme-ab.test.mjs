@@ -116,7 +116,7 @@ test('화면 테마는 설정 창의 "화면" 묶음에 있고 밤/정원 두 �
   assert.equal(nextTheme('night'), 'garden');
   assert.equal(nextTheme('garden'), 'night');
   // #380 5번: 테마는 계정 메뉴가 아니라 설정 창의 "화면" 묶음에 있다(같은 저장 키·같은 aria-checked).
-  assert.match(html, /id="settings-screen-title">화면<\/h3>/);
+  assert.match(html, /id="settings-screen-title"[^>]*>화면<\/h3>/);
   assert.match(html, /aria-checked="true" data-set-theme="night">밤/);
   assert.match(html, /aria-checked="false" data-set-theme="garden">정원/);
   assert.doesNotMatch(html, /id="account-theme"/);

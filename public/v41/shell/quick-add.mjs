@@ -18,11 +18,11 @@ export function createQuickAdd(deps) {
 
   function snapshot() { return deps.getMember()?.snapshot() || {}; }
 
-  // 진입 가드는 기존 openEditor와 같은 문구·같은 순서다(예시 → 로그인, 읽기 전용 → 안내+기록).
+  // 진입 가드는 기존 openEditor와 같은 문구·같은 순서다(예시 → 로그인, 읽기 전용 → 안내+설정 "내 데이터").
   function ensureWritable() {
     const member = deps.getMember();
     if (deps.getSource() !== 'server' || !member?.snapshot().owned) { deps.openLoginStart('new-tree'); return false; }
-    if (!member.snapshot().writable) { deps.notify(DROP_READONLY_NOTICE); deps.panel('records'); return false; }
+    if (!member.snapshot().writable) { deps.notify(DROP_READONLY_NOTICE); deps.openSettingsData?.(); return false; }
     return true;
   }
 

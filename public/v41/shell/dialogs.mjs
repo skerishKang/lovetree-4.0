@@ -53,8 +53,9 @@ export function createDialogs(deps) {
   // 2026-11-11 #380 4: 오른쪽 패널을 두 모양으로 띄우는 공통 틀 — data-lt-panel="full"(맨 위 메뉴 아래 내용 자리)·"center"(가운데 작은 창).
   // 컴퓨터와 모바일이 같은 모양이다. 공통 닫기 규칙: ×·바깥 클릭·Esc 모두, 쓰던 내용이 있으면 "저장하지 않고 닫을까요?"를 한 번 묻고(기존 편집기·트리 관리 규칙 재사용),
   // 닫으면 연 버튼으로 초점을 돌려준다.
-  // #380 4 마지막: 오른쪽에 붙던 패널이 모두 이 틀로 옮겨졌다. 전체 화면 = 순간 정리·순간 잇기·
-  // 설정·내 보관 파일·공유·둘러보기, 가운데 창 = 트리 관리·순간 추가(한 창, #425). 남은 것은 내 기록(records) 하나다.
+  // #380 4 마지막: 오른쪽에 붭던 패널이 모두 이 틀로 옮겨졌다. 전체 화면 = 순간 정리·순간 잇기·
+  // 설정·내 보관 파일·공유·둘러보기, 가운데 창 = 트리 관리·순간 추가(한 창, #425).
+  // #368: 옛 내 기록(records)도 설정으로 옮겨져 공통 틀 밖 대화상자는 이제 없다.
   const PANEL_DIRTY = { 'tree-manager': () => deps.isTreeDirty?.() === true };
   // 2026-11-11 #380 4 2차: 더러움 판정을 편집기·순간 잇기까지 넓힌다. 판정 자체는 셸·패널 모듈이 들고 있고
   // (편집기는 제목·메모·주소·사진·고른 연결, 순간 잇기는 고른 연결이 저장 전), 공통 틀은 "한 번 묻고 닫을지"만 정한다.
@@ -126,13 +127,8 @@ export function createDialogs(deps) {
     });
   }
 
-  // 다이얼로그 바깥(어두운 배경) 클릭으로 닫기. 내 기록(records)만 남은 옛 규칙이다.
-  // data-lt-panel 대화상자는 위 공통 틀이 닫기를 맡으므로 여기서는 건드리지 않는다.
-  for (const d of document.querySelectorAll('dialog:not([data-lt-panel])')) d.addEventListener('click', e => {
-    if (e.target !== d) return;
-    const r = d.getBoundingClientRect();
-    if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) d.close();
-  });
+  // #368: 공통 틀 밖 대화상자가 없어졌으므로 옛 바깥 클릭 규칙(dialog:not([data-lt-panel]))도 함께 지웠다.
+  // 모든 dialog는 위 공통 틀(×·바깥 클릭·Esc·초점 복귀)이 닫는다.
 
   return {
     shellFocusables,

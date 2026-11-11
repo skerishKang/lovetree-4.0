@@ -137,10 +137,10 @@ test('#380 4 마지막: 남은 오른쪽 패널이 공통 틀 태그를 받고, 
   assert.match(html, /<dialog id="write-panel" data-lt-panel="center" data-lt-return="write-menu" aria-labelledby="write-panel-title">/);
   assert.equal(html.includes('id="write-chooser"'), false, '고르기 창은 없다');
   assert.equal(html.includes('id="quick-add"'), false, '빠른 추가는 한 창의 탭이다');
-  // 오른쪽에 붙는 패널은 이제 없다. 남는 공통 틀 밖 대화상자는 내 기록(records)뿐이고, 그것도 오른쪽 패널이 아니다.
+  // 오른쪽에 붙는 패널도, 공통 틀 밖 대화상자도 없다(#368: 내 기록(records)은 설정으로 옮겨졌다).
   const tags = [...html.matchAll(/<dialog id="([a-z-]+)"[^>]*>/g)].map(m => [m[1], /data-lt-panel="(full|center)"/.test(m[0]) ? m[1] : '']);
   const nonFrame = tags.filter(([, f]) => !f).map(([id]) => id);
-  assert.deepEqual(nonFrame, ['records']);
+  assert.deepEqual(nonFrame, []);
   // 오른쪽 패널 시절 id 고정 폭은 빠져야 한다(id 선택자가 공통 틀 규칙을 이긴다).
   assert.doesNotMatch(css, /#write-chooser\{width:420px\}|#quick-add\{width:460px\}/);
 });

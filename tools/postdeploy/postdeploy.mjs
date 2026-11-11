@@ -1079,7 +1079,7 @@ async function checkSignedInActions(page, target, opts, stamp) {
       editorOpen: !!document.getElementById('write-panel')?.open,
       editorTitle: document.getElementById('write-panel-title')?.textContent || '',
       journey: /first-journey/.test((([document.getElementById('view'), document.getElementById('view-next')].find((el) => el && !el.hidden && el.getClientRects().length > 0) || document.getElementById('view'))?.contentWindow?.location?.href || '')),
-      feedback: document.getElementById('record-feedback')?.textContent || ''
+      feedback: document.getElementById('settings-feedback')?.textContent || ''
     })).catch(() => ({}));
     // 트리가 없으면 같은 버튼이 편집기 대신 첫 여정(새 트리 흐름)을 연다 — 둘 다 정상이다.
     const newTreeFlow = /#journey/.test(detail.hash || '') || !!detail.journey;
@@ -1557,7 +1557,7 @@ async function runAuthFlows(target, opts, stamp) {
       await sleep(1500);
       const bState = await flowState(tabB);
       const notice = await tabB.evaluate(() => {
-        const picks = ['#save-feedback', '#record-feedback', '#toast', '#account-notice', '#notice'];
+        const picks = ['#save-feedback', '#settings-feedback', '#toast', '#account-notice', '#notice'];
         return picks.map((id) => ({ id, text: (document.getElementById(id)?.textContent || '').trim().slice(0, 80), hidden: document.getElementById(id)?.hidden })).filter((row) => row.text);
       }).catch(() => []);
       diagnostics.tabBMember = bState.member;
@@ -1597,7 +1597,7 @@ async function runAuthFlows(target, opts, stamp) {
       const bState = await flowState(tabB);
       steps.push(`탭 B 로그아웃 시도 ${logoutB.attempts}회`);
       diagnostics.tabBMember = bState.member || 'out';
-      diagnostics.tabBMessages = await tabB.evaluate(() => ['#save-feedback', '#record-feedback', '#toast', '#account-notice'].map((id) => ({ id, text: (document.getElementById(id)?.textContent || '').trim().slice(0, 60) })).filter((row) => row.text)).catch(() => []);
+      diagnostics.tabBMessages = await tabB.evaluate(() => ['#save-feedback', '#settings-feedback', '#toast', '#account-notice'].map((id) => ({ id, text: (document.getElementById(id)?.textContent || '').trim().slice(0, 60) })).filter((row) => row.text)).catch(() => []);
       diagnostics.cookieNames = (await context.cookies(target.href).catch(() => [])).map((cookie) => cookie.name).sort();
       diagnostics.sessionStatus = await sessionStatus(page);
       diagnostics.tabAMember = (await flowState(page)).member || '';

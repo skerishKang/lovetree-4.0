@@ -2,6 +2,20 @@
 
 > **main 보호 규칙(2026-11-09, 룰셋 "main 보호 (PR·필수 검사)")**: main은 PR로만 바꾼다(직접 푸시·force push·삭제 금지, 관리자도 예외 없음 — 비상시 대표가 룰셋 enforcement를 잠깐 끈다). 필수 검사: `check (ubuntu-latest)`·`check (windows-latest)`·`미리보기 postdeploy(로그아웃)` — 셋 다 paths 필터가 없어 문서만 바뀐 PR에서도 항상 돈다. 승인 수 0(레인이 스스로 머지). Deploy Bundle Boot Test는 paths 필터가 있어 필수에 넣지 않았다.
 
+## 2026-11-12 — #368 1차: 설정 창 5묶음 + 내 기록 창 폐지 + 계정 메뉴 정리 (로컬3, ai/local3-lt-368-settings-261112, main eee95a8 기준)
+
+- 무엇: 설정 창(`dialog#account-settings`, 전체 화면 공통 틀)을 **프로필 → 화면 → 순간 추가 → 내 데이터 → 계정** 순서의 묶음 5개로 재구성했다. 저장 키·기본값·동작은 전부 기존 그대로(자리 이동만).
+  - **프로필**: 동그라미 + 이메일 전체(없으면 "내 계정") 표시만 한다. 이름·색 편집은 다음 PR. `header.mjs renderAccount`가 `onEmailChange` 콜백으로 설정 프로필도 같이 칠한다.
+  - **화면**: 테마·움직임·제목 보기·첫 화면 카드 유지. **순간 추가**: "먼저 보일 탭"(data-write-tab)을 화면 묶음에서 이리로 옮김.
+  - **내 데이터**: 기록 백업(내보내기)·계정 기록 불러오기(#server)·내 보관 파일 열기(#settings-assets-open)가 바로, 고급 접힘 안에 기록 가져오기·백업 파일 열기(#settings-open-file)·화면 비우기(#clear)·예시로 돌아가기(#sample). `#file` input은 창 밖으로 꺼내 설정이 닫혀 있어도 선택 창이 열린다.
+  - **계정**: 로그아웃(#logout) + 맨 아래 접힌 계정 탈퇴(기존 확인 문구 흐름·form 그대로). `openAccountSettings({section})`가 해당 묶음 제목으로 스크롤·초점을 옮기고, 로그아웃 상태에서는 열지 않는다(기존 숨김 규칙 유지).
+- **내 기록 창(`dialog#records`) 폐지**: 트리 고르기(#trees select·record-description)는 트리 ▾ 드롭다운이 이미 하므로 삭제. 남은 기능의 행선지 — 읽기 전용 안내(panels·quick-add·journey 게이트·usePrivateAsset·빈 화면 "내 기록 불러오기")는 `openAccountData()`로: 로그인 상태면 설정 "내 데이터", 로그아웃이면 로그인(둘러보기 "내 기록 새로 시작"은 intent=new-tree). 순수 게이트 `journeyEntry`의 screen 값도 `records`→`settings`로 바꿨다. 공지 줄(#record-feedback)은 설정 창 안 `#settings-feedback` + 토스트 한 벌로 통합(notice·auth).
+- **계정 메뉴 순서**: 맨 위 이메일 전체(#account-email, strong) → 설정 → 내 보관 파일 → 고급 기능 보기 → 로그아웃. "내 계정" 정적 라벨·옛 `account-records`/`account-backup`/`account-settings-open` 흔적 제거. 로그아웃·공유·예시에서는 계정 동그라미 자체가 없어 설정 입구도 없다(규칙 유지). 로그아웃 테마 전환은 첫 화면 ◐ 단추(PR #423 그대로).
+- 로그아웃 상태 보전: 빈 화면에 "백업 파일 열기"(#empty-file)를 추가해 계정 없이도 4.0 JSON을 열 수 있다. "예시로 돌아가기"는 설정 내 데이터(고급)에 있고, 로그아웃에서는 빈 화면 "예시 둘러보기"가 같은 동작(sample)을 한다.
+- 시험: 신규 `tests/v41-account-settings.test.mjs` 12건(묶음 순서·프로필·항목 배치·records 잔재 없음·메뉴 순서·배선·입구 행선지). 갱신: shell-notice(설정 상태 줄)·shell-auth·first-journey/journey-flow(settings 게이트)·panel-mode(공통 틀 밖 dialog 0)·panels-flow/quick-add-flow/shell-panels(openSettingsData)·shell-connections(id 목록 38개)·shell-dialogs(옛 바깥 클릭 규칙 제거)·theme-ab·shell-header. `npm test` 1151건 1113 pass/0 fail/37 skip(preview-ready 1건은 부하 시 간헐 타이밍 — 단독·main 모두 통과, PR #418과 같은 기존 건), `npm run build` 통과.
+- 실측(로컬 vite 4301 + Playwright 스텁 `/api/workspace`·`/api/account`, 1440·390): 22/22 — 계정 메뉴 이메일·순서, 설정 5묶음·프로필 이메일/초점, 고급·탈퇴 접힘, 내 보관 파일 겹침→닫으면 설정 버튼 초점 복귀, 내 데이터 스크롤·초점, 테마 전환·저장, 예시 복귀, 빈 화면 3버튼, 로그아웃→로그인 이동, 가로 넘침 0, 페이지 오류 0. 이 과정에서 `updateAccountControls`가 없어진 `#account-settings-open`을 만지던 결함을 찾아 수정.
+- 남은 것(다음 PR): 프로필 이름·동그라미 색 편집, 댓글 2의 "페이지 넘김: 종이처럼 / 부드럽게"(#393 후속) 설정 "화면" 항목 추가, 기록 가져오기와 백업 파일 열기가 같은 JSON 선택을 쓰는 점 정리 여부.
+
 ## 2026-11-11 — 컴2 러브트리 DB 실제 구성 문서화 (로컬4, ai/local4-lt-db-docs-261111, 이슈 #403 → PR #405)
 
 - 무엇: 컴2 러브트리 Postgres는 compose 컨테이너가 아니라 **WSL Ubuntu 네이티브 PostgreSQL 16**(127.0.0.1:5432, DB `lovetree`, 소유자·앱 역할 `lovetree_owner`, Docker 데몬 꺼짐 — 컨테이너 없음)이다. `AUTODEPLOY.md`에 실제 구성과 migration 수동 적용 → `--accept-migrations` 1회까지 한 흐름으로 기록했다. `postgres.compose.yml`·`postgres.env.example`은 "지금 미사용·참고용" 머리 주석을 붙였다(삭제하지 않음).

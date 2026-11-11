@@ -226,10 +226,10 @@ export function journeySavePlan(draft = {}) {
   return {first, second, treeId, momentId: savedMomentId};
 }
 
-// 진입 경로: 로그아웃=로그인 창, 편집 연결 없음=기록 패널, 새 트리=첫 여정, 추가·수정=기존 패널.
+// 진입 경로: 로그아웃=로그인 창, 편집 연결 없음=설정 "내 데이터"(#368 — 옛 내 기록 창 자리), 새 트리=첫 여정, 추가·수정=기존 패널.
 export function journeyEntry({owned = false, writable = false, mode = 'new'} = {}) {
   if (!owned) return {screen: 'login', reason: 'signed-out'};
-  if (!writable) return {screen: 'records', reason: 'not-writable'};
+  if (!writable) return {screen: 'settings', reason: 'not-writable'};
   if (mode !== 'new') return {screen: 'panel', reason: 'panel-mode', mode};
   return {screen: 'journey', reason: 'new-tree'};
 }

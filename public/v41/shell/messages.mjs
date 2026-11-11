@@ -13,6 +13,8 @@ export function createMessages(deps) {
   const shareApi = deps.shareApi;
   const notify = deps.notify;
   const panel = deps.panel;
+  // #368: 읽기 전용·로그아웃 안내의 행선지 — 설정 "내 데이터" 묶음(로그아웃이면 로그인).
+  const openSettingsData = deps.openSettingsData || (() => {});
   const show = deps.show;
   const links = deps.links;
   const writeLocation = deps.writeLocation;
@@ -240,13 +242,14 @@ export function createMessages(deps) {
     onShareOwn: () => {
       $('community-panel').close();
       if (getSource() === 'server' && getMember()?.snapshot().owned && window.LT41) openSharePanel();
-      else { notify('로그인하고 공유할 내 트리를 먼저 선택해 주세요.'); panel('records'); }
+      else { notify('로그인하고 공유할 내 트리를 먼저 선택해 주세요.'); openSettingsData(); }
     },
     onStartRecord: subject => {
       $('community-panel').close();
       if (getSource() !== 'server' || !getMember()?.snapshot().owned) {
         notify('로그인한 뒤 내 계정에 새 트리를 시작할 수 있어요. 원본 공개 트리는 복사하지 않아요.');
-        panel('records'); return;
+        // #368: 로그인 상태면 설정 "내 데이터", 로그아웃이면 로그인(돌아오면 새 트리 흐름)으로 보낸다.
+        openSettingsData('new-tree'); return;
       }
       journey.openFirstJourney({subject: subject || ''});
     }

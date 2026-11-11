@@ -69,6 +69,7 @@ function harness({ source = 'server', owned = true, writable = true, current = '
     getCurrent: () => current,
     notify: text => calls.notify.push(text),
     panel: id => calls.panel.push(id),
+    openSettingsData: () => { calls.settingsData = (calls.settingsData || 0) + 1; },
     choose: (treeId, momentId) => calls.choose.push([treeId, momentId]),
     openEditor: (mode, parentId) => calls.openEditor.push([mode, parentId]),
     openLoginStart: intent => calls.login.push(intent),
@@ -109,7 +110,7 @@ test('진입(#425): 서버·편집 가능이면 한 창을 열고, 탭은 설정
   } finally { h.restore(); }
 });
 
-test('진입: 예시·로그아웃은 기존 로그인 안내, 읽기 전용은 안내+기록 패널이다', () => {
+test('진입: 예시·로그아웃은 기존 로그인 안내, 읽기 전용은 안내+설정 내 데이터다', () => {
   for (const source of ['example', 'file', 'share']) {
     const h = harness({ source });
     try {
@@ -123,7 +124,7 @@ test('진입: 예시·로그아웃은 기존 로그인 안내, 읽기 전용은 
     h.api.openWrite();
     assert.equal(h.els['write-panel'].open, false);
     assert.deepEqual(h.calls.notify, [DROP_READONLY_NOTICE]);
-    assert.deepEqual(h.calls.panel, ['records']);
+    assert.equal(h.calls.settingsData, 1, '설정 "내 데이터"를 연다');
   } finally { h.restore(); }
 });
 

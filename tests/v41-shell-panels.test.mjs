@@ -65,7 +65,7 @@ function harness({ owned = true, writable = true, source = 'server', busy = fals
 
   const member = { snapshot: () => ({ owned, writable, dirty: false, subject: 'sub_test0001' }), apply: (...args) => { calls.push(args); return applyImpl ? applyImpl(...args) : {}; }, dispose() {} };
   const uploads = { busy, resets: 0, reset() { this.resets += 1; } };
-  let openedJourney = 0, loginIntent = null, editorPanel = 0, recordsPanel = 0, tabsVisible = null;
+  let openedJourney = 0, loginIntent = null, editorPanel = 0, settingsData = 0, tabsVisible = null;
   const panels = createPanels({
     $: id => (els[id] ||= fakeElement()),
     getMember: () => member,
@@ -73,7 +73,8 @@ function harness({ owned = true, writable = true, source = 'server', busy = fals
     getSource: () => source,
     getUploads: () => uploads,
     notify: text => notes.push(text),
-    panel: id => { if (id === 'write-panel') editorPanel += 1; if (id === 'records') recordsPanel += 1; els[id] && (els[id].open = true); },
+    panel: id => { if (id === 'write-panel') editorPanel += 1; els[id] && (els[id].open = true); },
+    openSettingsData: () => { settingsData += 1; },
     // #425: 한 창의 탭 — 보여 준 구역 기록.
     writePanel: { show: tab => { tabsVisible = tab; }, setTabsVisible: v => { tabsVisible = v ? 'tabs' : 'none'; } },
     show: () => {},
@@ -92,7 +93,7 @@ function harness({ owned = true, writable = true, source = 'server', busy = fals
   };
   return {
     panels, els, calls, notes, uploads, coverSlotParts, coverSlot,
-    counts: () => ({ openedJourney, loginIntent, editorPanel, recordsPanel, tabsVisible }),
+    counts: () => ({ openedJourney, loginIntent, editorPanel, settingsData, tabsVisible }),
     restore
   };
 }
@@ -182,7 +183,7 @@ test('openEditor는 로그인·쓰기 권한·새 트리 분기를 그대로 지
   const readOnly = harness({ tree: sampleTree(), writable: false });
   try {
     readOnly.panels.openEditor('add');
-    assert.equal(readOnly.counts().recordsPanel, 1, '읽기 전용이면 기록 안내를 연다');
+    assert.equal(readOnly.counts().settingsData, 1, '읽기 전용이면 설정 내 데이터를 연다');
     assert.deepEqual(readOnly.notes, ['서버 편집 연결이 아직 준비되지 않았어요. 기록은 안전하게 읽을 수 있습니다.']);
   } finally { readOnly.restore(); }
   const fresh = harness({ tree: sampleTree() });

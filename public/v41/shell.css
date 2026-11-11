@@ -193,9 +193,19 @@ html[data-v41-screen=book] .tools .ui-btn::after,html[data-v41-screen=board] hea
 #tree-cover-method .cover-method-option span{position:relative}
 #tree-cover-method .cover-method-option:has(input:checked){border-color:var(--lt-gold);background:rgba(255,230,166,.1)}
 #tree-cover-method .cover-method-option:has(input:focus-visible){outline:2px solid var(--lt-gold);outline-offset:2px}
-/* 설정 창의 "화면" 묶음(테마·움직임·제목·첫 화면 카드) — 이름 + 고르기 한 줄, 좁으면 접힌다. */
-.settings-screen{margin:18px 0 0}
-.settings-screen h3{font-size:14px;color:var(--lt-gold);margin:0 0 8px}
+/* 이슈 368: 설정 창의 묶음(프로필·화면·순간 추가·내 데이터·계정) — 각 묶음은 이름 + 내용 한 칸. */
+.settings-group{padding:16px 0 0}
+.settings-group:first-of-type{padding-top:0}
+.settings-group>h3{font-size:14px;color:var(--lt-gold);margin:0 0 8px}
+.settings-group>h3:focus-visible{outline-offset:6px}
+.settings-profile{display:flex;align-items:center;gap:12px;min-height:56px}
+.settings-profile .account-initial{width:48px;height:48px;font-size:18px}
+.settings-profile-text{min-width:0}
+.settings-profile-text strong{display:block;font-size:15px;line-height:1.5;overflow-wrap:anywhere}
+.settings-profile-text .panel-note{margin:4px 0 0}
+.settings-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px}
+.settings-actions button{min-height:44px;padding:10px 14px;border:1px solid rgba(255,255,255,.18);border-radius:var(--lt-r-pill);background:rgba(255,255,255,.04)}
+.settings-group details{margin-top:14px}
 .settings-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:6px 0;border-top:1px solid var(--lt-line)}
 .settings-row:first-of-type{border-top:0}
 .settings-label{flex:0 0 auto;min-width:72px;font-size:13px;color:var(--lt-muted)}
@@ -353,7 +363,9 @@ nav #record-menu{min-height:40px;font-size:13px;letter-spacing:0}
 .account-head{display:flex;align-items:center;gap:10px;padding:6px 6px 10px;border-bottom:1px solid var(--lt-line)}
 .account-initial{width:40px;height:40px;flex:0 0 auto;border-radius:50%;display:grid;place-items:center;background:rgba(200,110,121,.16);border:1px solid var(--lt-gold-line);color:var(--lt-gold-ink);font-weight:800}
 .account-head strong{display:block;font-size:13px}
-#account-email{display:block;font-size:11px;color:var(--lt-muted);margin-top:2px}
+/* 이슈 368: 계정 메뉴 맨 위는 이메일 전체(자기 계정 메뉴는 가리지 않는다). */
+.account-identity{min-width:0}
+#account-email{display:block;font-size:13px;font-weight:600;color:var(--lt-pearl);line-height:1.4;overflow-wrap:anywhere}
 #account-advanced{justify-content:space-between}
 #account-advanced[aria-checked="true"]{background:rgba(255,230,166,.10);box-shadow:inset 0 0 0 1px var(--lt-gold-line)}
 #account-advanced:after{content:"";width:28px;height:16px;border-radius:999px;background:var(--lt-line);display:inline-block;transition:background .2s}
