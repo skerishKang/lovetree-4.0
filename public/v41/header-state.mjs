@@ -89,7 +89,7 @@ export function headerPartsFor(input = {}) {
 export const TIPS_KEY = 'lt41.tips.firstTree';
 export const FIRST_TREE_TIPS = Object.freeze([
   { id: 'write', anchor: 'write-menu', title: '여기서 순간을 더 남겨요', body: '오른쪽 위 "순간 남기기"를 누르면 오늘의 순간이 이 트리에 쌓입니다.' },
-  { id: 'views', anchor: 'tree-views', title: '기억책·보드·관계 지도로 다르게 봐요', body: '같은 기록을 책처럼, 카드처럼, 이어진 선처럼 볼 수 있어요.' }
+  { id: 'views', anchor: 'tree-views', title: '책·보드·지도로 다르게 봐요', body: '같은 기록을 책처럼, 카드처럼, 이어진 선처럼 볼 수 있어요.' }
 ]);
 
 export function readTipsSeen(storage) {

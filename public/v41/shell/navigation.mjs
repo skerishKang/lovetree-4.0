@@ -6,9 +6,9 @@
 export const screens = [
   ['home', 'src064-orbit.html', '첫 화면'],
   ['shelf', 'track32-bookshelf.html', '내 책장'],
-  ['book', 'track59-sketchbook.html', '기억책'],
-  ['board', 'track58-pinboard.html', '기억 보드'],
-  ['network', 'track56-network.html', '관계 지도']
+  ['book', 'track59-sketchbook.html', '책'],
+  ['board', 'track58-pinboard.html', '보드'],
+  ['network', 'track56-network.html', '지도']
 ];
 
 export const screenForView = view => screens.find(screen => screen[0] === view) || screens[0];
