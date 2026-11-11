@@ -1,3 +1,7 @@
+# [2026-11-11] 컴2 운영에서는 지금 이 파일을 쓰지 않는다 — 새 PC에서 컨테이너로 시작할 때의 참고용으로 남긴다(이슈 #403).
+# 실제 컴2 러브트리 DB는 WSL Ubuntu 네이티브 PostgreSQL 16(127.0.0.1:5432, DB lovetree, 소유자 lovetree_owner)이고
+# Docker 데몬은 꺼져 있다(컨테이너 없음). 실제 구성·migration 수동 적용 흐름은 같은 폴더 AUTODEPLOY.md를 본다.
+#
 # 러브트리 전용 PostgreSQL 한 개 — 격리의 최소 형태.
 #
 # 기존 `n8n-postgres`에는 DB·역할을 추가하지도, 포트를 열어 재시작하지도 않는다.
