@@ -57,9 +57,22 @@ export function createDialogs(deps) {
 
   // 2026-11-11 #380 4: 오른쪽 패널을 두 모양으로 띄우는 공통 틀 — data-lt-panel="full"(맨 위 메뉴 아래 내용 자리)·"center"(가운데 작은 창).
   // 컴퓨터와 모바일이 같은 모양이다. 공통 닫기 규칙: ×·바깥 클릭·Esc 모두, 쓰던 내용이 있으면 "저장하지 않고 닫을까요?"를 한 번 묻고(기존 편집기·트리 관리 규칙 재사용),
-  // 닫으면 연 버튼으로 초점을 돌려준다. 이번 틀을 쓰는 패널: 순간 정리(full)·트리 관리(center). 나머지는 다음 단계.
+  // 닫으면 연 버튼으로 초점을 돌려준다. 이번 틀을 쓰는 패널: 전체 화면 = 순간 정리·순간 잇기·자세히 추가·수정(편집기),
+  // 가운데 창 = 트리 관리. 나머지는 다음 단계.
   const PANEL_DIRTY = { 'tree-manager': () => deps.isTreeDirty?.() === true };
+  // 2026-11-11 #380 4 2차: 더러움 판정을 편집기·순간 잇기까지 넓힌다. 판정 자체는 셸·패널 모듈이 들고 있고
+  // (편집기는 제목·메모·주소·사진·고른 연결, 순간 잇기는 고른 연결이 저장 전), 공통 틀은 "한 번 묻고 닫을지"만 정한다.
+  PANEL_DIRTY['editor'] = () => deps.isEditorDirty?.() === true;
+  PANEL_DIRTY['connection-panel'] = () => deps.isConnectionDirty?.() === true;
+  // 닫기 자체를 막아야 하는 상태(편집기 업로드 중)는 문구를 돌려준다. 이때는 확인을 묻지 않고 닫지 않는다 —
+  // 편집기 규칙이 공통 틀보다 우선한다(업로드 중 닫기 방지).
+  function panelBlockedMessage(d) {
+    const message = deps.panelBlocked?.(d.id) || '';
+    if (message) deps.notify?.(message);
+    return message;
+  }
   function panelConfirmClose(d) {
+    if (panelBlockedMessage(d)) return false;
     if (PANEL_DIRTY[d.id]?.() && !confirm('저장하지 않고 닫을까요?')) return false;
     return true;
   }
@@ -104,6 +117,8 @@ export function createDialogs(deps) {
     rememberOpener: opener => { assetsOpener = opener; },
     // #380 4: 셸 panel()이 showModal 직전에 부른다 — 연 버튼 기록과 전체 화면 모양의 맨 위 메뉴 높이 측정.
     noteOpener: id => { const d = $(id); if (d?.dataset?.ltPanel) openers.set(d, document.activeElement); },
+    // #380 4 2차: × 버튼도 바깥 클릭·Esc와 같은 규칙을 쓴다(막을 상태면 막고, 더러우면 한 번 묻고, 닫으면 초점 복귀).
+    requestClose: id => { const d = $(id); if (!d) return false; if (!panelConfirmClose(d)) return false; d.close(); return true; },
     syncPanelTop
   };
 }

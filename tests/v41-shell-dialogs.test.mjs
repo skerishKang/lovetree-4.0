@@ -21,7 +21,7 @@ function fakeElement(props = {}) {
   return el;
 }
 
-function setup({focusables = [], popoverHidden = true, treeDirty = false} = {}) {
+function setup({focusables = [], popoverHidden = true, treeDirty = false, editorDirty = false, editorBusy = false, connectionDirty = false} = {}) {
   const elements = {
     'account-assets': fakeElement({id: 'account-assets'}),
     'editor': fakeElement({id: 'editor'}),
@@ -29,8 +29,16 @@ function setup({focusables = [], popoverHidden = true, treeDirty = false} = {}) 
     'account-popover': fakeElement({id: 'account-popover', hidden: popoverHidden}),
     'tree-tips': fakeElement({id: 'tree-tips', hidden: false}),
   };
+  // #380 4 2차: 편집기·순간 잇기도 전체 화면 공통 틀을 쓴다.
+  const dialogs = [
+    fakeElement({id: 'records'}),
+    fakeElement({id: 'editor', dataset: {ltPanel: 'full', ltReturn: 'write-menu'}}),
+    fakeElement({id: 'tree-manager', dataset: {ltPanel: 'center'}}),
+    fakeElement({id: 'connection-panel', dataset: {ltPanel: 'full'}})
+  ];
+  // 브라우저와 같이 $('editor')와 공통 틀이 묶은 dialog가 같은 요소가 되게 한다(초점 복귀 기록 확인용).
+  elements['editor'] = dialogs[1];
   elements['editor'].querySelectorAll = () => focusables;
-  const dialogs = [fakeElement({id: 'records'}), fakeElement({id: 'editor'}), fakeElement({id: 'tree-manager', dataset: {ltPanel: 'center'}})];
   const keydown = [], clicks = [];
   const doc = {
     activeElement: null,
@@ -43,6 +51,7 @@ function setup({focusables = [], popoverHidden = true, treeDirty = false} = {}) 
       return [];
     },
     contains() { return true; },
+    getElementById(id) { return elements[id] || null; },
   };
   const calls = [];
   globalThis.document = doc;
@@ -52,6 +61,11 @@ function setup({focusables = [], popoverHidden = true, treeDirty = false} = {}) 
     closeTreeTips: () => calls.push('closeTreeTips'),
     closeAccountMenu: () => calls.push('closeAccountMenu'),
     isTreeDirty: () => treeDirty,
+    // #380 4 2차: 편집기는 입력이 바뀌면, 순간 잇기는 고른 연결이 저장 전이면 더러움이다.
+    isEditorDirty: () => editorDirty,
+    isConnectionDirty: () => connectionDirty,
+    panelBlocked: id => (id === 'editor' && editorBusy ? '파일 전송을 마치거나 취소해 주세요.' : ''),
+    notify: message => calls.push('notify:' + message),
   });
   return {elements, dialogs, keydown, api, calls};
 }
@@ -175,14 +189,109 @@ test('보관 파일 취소(Esc)는 연 버튼으로, 연 버튼이 없으면 계
   assert.equal(opener.focusCount, 1, '연 버튼으로 돌아간다');
 });
 
-test('바깥 클릭은 대화상자를 닫지만 편집기·책 정보는 실수로 닫지 않는다', () => {
-  const {dialogs} = setup();
+test('바깥 클릭은 대화상자를 닫는다 — 전체 화면 편집기도 공통 틀에서 같은 규칙을 쓴다', () => {
+  const {dialogs, calls} = setup();
   const records = dialogs[0], editor = dialogs[1];
   records.open = editor.open = true;
   records.listeners.click({target: records, clientX: 500, clientY: 500});
   assert.equal(records.open, false, '배경 클릭은 닫는다');
+  // 깨끗한 편집기는 묻지 않고 닫는다(#380 4 2차: 바깥 클릭도 공통 닫기 규칙).
   editor.listeners.click({target: editor, clientX: 500, clientY: 500});
-  assert.equal(editor.open, true, '편집기는 배경 클릭으로 닫히지 않는다');
+  assert.equal(editor.open, false, '깨끗하면 닫는다');
+  assert.deepEqual(calls, [], '깨끗하면 묻지 않는다');
+  editor.open = true;
   editor.listeners.click({target: {}, clientX: 500, clientY: 500});
   assert.equal(editor.open, true, '안쪽 클릭은 무시한다');
+});
+
+// #380 4 2차: 편집기·순간 잇기의 공통 틀 계약 — ng·바깥·Esc 세 길이 모두 같은 확인/차단을 지난다.
+test('편집기 Esc: 쓰던 입력이 있으면 한 번 묻고, 아니오면 열어 둔다', () => {
+  const {dialogs} = setup({editorDirty: true});
+  const editor = dialogs[1];
+  editor.open = true;
+  const realConfirm = globalThis.confirm;
+  try {
+    let asked = 0;
+    globalThis.confirm = () => { asked += 1; return false; };
+    const cancel = {preventDefault() { cancel.prevented = true; }};
+    editor.listeners.cancel(cancel);
+    assert.equal(asked, 1, '한 번만 묻는다');
+    assert.equal(cancel.prevented, true, '아니오면 닫지 않는다');
+    assert.equal(editor.open, true, '열린 상태 유지');
+    globalThis.confirm = () => true;
+    editor.listeners.cancel({preventDefault() {}});
+    assert.equal(editor.open, false, '예를 고르면 닫는다');
+  } finally { globalThis.confirm = realConfirm; }
+});
+
+test('편집기 바깥 클릭: 더러우면 한 번 묻고, 아니오면 열어 둔다', () => {
+  const {dialogs} = setup({editorDirty: true});
+  const editor = dialogs[1];
+  editor.open = true;
+  const realConfirm = globalThis.confirm;
+  try {
+    let asked = 0;
+    globalThis.confirm = () => { asked += 1; return false; };
+    editor.listeners.click({target: editor, clientX: 500, clientY: 500});
+    assert.equal(asked, 1);
+    assert.equal(editor.open, true);
+    globalThis.confirm = () => { asked += 1; return true; };
+    editor.listeners.click({target: editor, clientX: 500, clientY: 500});
+    assert.equal(asked, 2);
+    assert.equal(editor.open, false);
+  } finally { globalThis.confirm = realConfirm; }
+});
+
+test('편집기 업로드 중에는 Esc·바깥 클릭·× 모두 닫지 않고 이유를 알린다(편집기 규칙이 이긴다)', () => {
+  const {dialogs, api, calls} = setup({editorDirty: true, editorBusy: true});
+  const editor = dialogs[1];
+  const realConfirm = globalThis.confirm;
+  try {
+    let asked = 0;
+    globalThis.confirm = () => { asked += 1; return true; };
+    // 업로드 중에는 더러움 확인조차 묻지 않고 닫지 않는다.
+    for (const close of [
+      () => { const cancel = {preventDefault() { cancel.prevented = true; }}; editor.listeners.cancel(cancel); return cancel.prevented; },
+      () => { editor.listeners.click({target: editor, clientX: 500, clientY: 500}); return editor.open; },
+      () => !api.requestClose('editor'),
+    ]) {
+      editor.open = true;
+      assert.equal(close(), true, '닫지 않는다');
+      assert.equal(editor.open, true);
+    }
+    assert.equal(asked, 0, '더러움 확인을 묻지 않는다');
+    assert.equal(calls.filter(c => c.startsWith('notify:파일 전송')).length, 3, '세 길 모두 같은 문구로 알린다');
+  } finally { globalThis.confirm = realConfirm; }
+});
+
+test('편집기 ×·취소(requestClose)는 깨끗하면 묻지 않고 닫고 연 버튼으로 초점을 돌린다', async () => {
+  const {dialogs, api} = setup({editorDirty: false});
+  const editor = dialogs[1];
+  const opener = {isConnected: true, getClientRects: () => [{}], focusCount: 0, focus() { this.focusCount += 1; }};
+  api.noteOpener('editor');
+  document.activeElement = opener;
+  api.noteOpener('editor');
+  editor.open = true;
+  assert.equal(api.requestClose('editor'), true, '닫는다');
+  editor.listeners.close();
+  await new Promise(r => setTimeout(r, 5));
+  assert.equal(opener.focusCount, 1, '연 버튼으로 초점이 돌아온다');
+});
+
+test('순간 잇기 Esc: 고른 연결이 저장 전이면 한 번 묻는다', () => {
+  const {dialogs} = setup({connectionDirty: true});
+  const connection = dialogs[3];
+  connection.open = true;
+  const realConfirm = globalThis.confirm;
+  try {
+    let asked = 0;
+    globalThis.confirm = () => { asked += 1; return false; };
+    const cancel = {preventDefault() { cancel.prevented = true; }};
+    connection.listeners.cancel(cancel);
+    assert.equal(asked, 1, '한 번만 묻는다');
+    assert.equal(cancel.prevented, true);
+    globalThis.confirm = () => true;
+    connection.listeners.cancel({preventDefault() {}});
+    assert.equal(connection.open, false, '예를 고르면 닫는다');
+  } finally { globalThis.confirm = realConfirm; }
 });

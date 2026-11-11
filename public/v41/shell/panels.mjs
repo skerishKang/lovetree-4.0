@@ -15,6 +15,7 @@ export function createPanels(deps) {
   const getUploads = deps.getUploads;
   const notify = deps.notify;
   const panel = deps.panel;
+  const requestClose = deps.requestClose;
   const show = deps.show;
   const selection = deps.selection;
   const openFirstJourney = deps.openFirstJourney;
@@ -273,14 +274,9 @@ export function createPanels(deps) {
       notify('서버에 저장하고 있어요.');
     } catch (error) { $('form-error').textContent = error.message; }
   };
-  $('editor').addEventListener('cancel', e => {
-    if (getUploads().busy) { e.preventDefault(); return; }
-    if (formDirty() && !confirm('작성 중인 입력을 버리고 닫을까요?')) e.preventDefault();
-  });
-  $('editor-cancel').onclick = () => {
-    if (getUploads().busy) { notify('파일 전송을 마치거나 취소해 주세요.'); return; }
-    if (!formDirty() || confirm('작성 중인 입력을 버리고 닫을까요?')) $('editor').close();
-  };
+  // #380 4 2차: Esc·바깥 클릭·× 닫기와 "저장하지 않고 닫을까요?" 확인은 shell/dialogs.mjs 공통 틀이 맡는다
+  // (트리 관리와 같은 규칙). 편집기만의 규칙은 공통 틀보다 우선한다 — 업로드 중이면 닫지 않는다.
+  $('editor-cancel').onclick = () => { requestClose?.('editor'); };
   $('change-parent').onclick = () => {
     try {
       getMember().apply('reparent', {targetId: $('parent-target').value, relation: $('parent-relation').value}, selection());
