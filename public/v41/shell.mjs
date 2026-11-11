@@ -25,6 +25,7 @@ import {createMessages} from './shell/messages.mjs';
 import {createCleanup} from './shell/cleanup.mjs';
 import {headerBadge, pickerLabel, isInboxTree} from './inbox-model.mjs';
 import {createDialogs} from './shell/dialogs.mjs';
+import {connectionSignature} from './shell/panel-dirty.mjs';
 import {createLocation} from './shell/location.mjs';
 import {createNotifier} from './shell/notice.mjs';
 import {paintLoginLinks,paintThemeControls,applyTheme as applyThemeFor,toggleTheme as toggleThemeFor} from './shell/theme.mjs';
@@ -166,7 +167,9 @@ const shellPanels=createPanels({
   show:(file,write)=>show(file,write),
   selection:()=>stateSelection(),
   openFirstJourney:options=>openFirstJourney(options),
-  openLoginStart:intent=>openLoginStart(intent)
+  openLoginStart:intent=>openLoginStart(intent),
+  // #380 4 2차: 편집기의 취소 버튼도 공통 닫기 규칙(×·바깥·Esc와 같은 확인·업로드 중 막기)을 쓴다.
+  requestClose:id=>shellDialogs.requestClose(id)
 });
 function openEditor(mode,parentId=''){return shellPanels.openEditor(mode,parentId);}
 // 빠른 추가(#빠른 추가 ②): 고르기 창·모달·끌어다 놓기는 shell/quick-add.mjs가 맡는다.
@@ -294,7 +297,14 @@ const shellDialogs=createDialogs({
   closeTreeTips:()=>closeTreeTips(),
   closeAccountMenu:()=>closeAccountMenu(),
   // #380 4: 공통 틀이 닫을 때 "저장하지 않고 닫을까요?"를 묻는 판정 — 트리 관리는 폼 기준값과 비교한다.
-  isTreeDirty:()=>shellPanels.treeDirty()
+  isTreeDirty:()=>shellPanels.treeDirty(),
+  // #380 4 2차: 편집기는 입력(제목·메모·주소·사진·고른 연결)이 바뀌었으면 더러움,
+  // 순간 잇기는 고른 연결이 저장 전이면 더러움이다. 어느 쪽이든 공통 틀이 한 번 묻고 닫는다.
+  isEditorDirty:()=>shellPanels.formDirty(),
+  isConnectionDirty:()=>connectionDirty(),
+  // 편집기 규칙이 공통 틀보다 우선한다: 업로드 중에는 Esc·바깥 클릭·× 모두 닫지 않고 이유를 알린다.
+  panelBlocked:id=>id==='editor'&&uploads.busy?'파일 전송을 마치거나 취소해 주세요.':'',
+  notify:text=>notify(text)
 });
 
 const shellHeader=createHeader({
@@ -350,7 +360,11 @@ function mountConnectionTool(doc){
  const count=$('connection-count')?.textContent||'0';
  button.textContent=connectionLabel(count);button.removeAttribute('aria-label');
 }function setConnectionCount(n){const b=$('connection-count');if(b)b.textContent=String(n);const t=$('connection-tool');if(t){t.textContent=connectionLabel(n);t.removeAttribute('aria-label');}const h=$('connection-menu');if(h)h.textContent=connectionLabel(n);}
-function links(){viewContext();const c=window.LT41;$('connections').replaceChildren();if(!c){setConnectionCount(0);$('selection-label').textContent='트리를 먼저 불러오세요.';return;}
+// #380 4 2차: 순간 잇기 패널이 보여 준 연결 목록(고른 연결)을 기억해 두고, 그 뒤로 트리의 연결이 달라졌으면 더러움이다.
+// 패널 자체는 연결을 만들지 않으므로 보통은 확인 없이 닫힌다(보여 준 것과 저장본이 같기 때문).
+let connectionShown='';
+function connectionDirty(){return $('connection-panel').open&&connectionSignature(window.LT41?.tree,window.LT41?.momentId)!==connectionShown;}
+function links(){viewContext();const c=window.LT41;$('connections').replaceChildren();if(!c){setConnectionCount(0);$('selection-label').textContent='트리를 먼저 불러오세요.';connectionShown='';return;}
  const moment=c.tree.moments.find(m=>m.id===c.momentId);$('selection-label').textContent=moment?.title||'';
  const edges=c.tree.edges.filter(e=>e.from===c.momentId||e.to===c.momentId);setConnectionCount(edges.length);
  if(!edges.length){const p=document.createElement('p');p.textContent='아직 연결된 다른 순간이 없어요.';$('connections').append(p);}
@@ -365,6 +379,7 @@ function links(){viewContext();const c=window.LT41;$('connections').replaceChild
   b.onclick=()=>{c.momentId=id;$('connection-panel').close();show(current,false);writeLocation();};
   $('connections').append(b);
  }
+ connectionShown=connectionSignature(c.tree,c.momentId);
 }
 // #213 3번: 첫 트리 안내 말풍선. 한 번만 보여 주고, 닫으면 기억한다(저장소가 막히면 다시 보여 준다).
 let tipsReturnFocus=null;
@@ -575,7 +590,8 @@ $('file').onchange=async()=>{
  }
 };
 $('trees').onchange=()=>{choose($('trees').value);writeLocation();$('records').close();};
-document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>{if(b.dataset.close==='editor'&&uploads.busy){notify('파일 전송을 마치거나 취소해 주세요.');return;}if(b.dataset.close==='editor'&&formDirty()&&!confirm('작성 중인 입력을 버리고 닫을까요?'))return;if(b.dataset.close==='tree-manager'&&treeDirty()&&!confirm('저장하지 않고 닫을까요?'))return;$(b.dataset.close).close();});
+// #380 4 2차: 전체 화면·가운데 창 공통 틀을 쓰는 대화상자(편집기·순간 잇기·트리 관리)는 × 도 바깥 클릭·Esc와 같은 규칙을 쓴다.
+document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>{const target=$(b.dataset.close);if(target?.dataset?.ltPanel){shellDialogs.requestClose(b.dataset.close);return;}target.close();});
 function publicProblem(answer){
  source='share';activeShareId=null;model={trees:[]};window.LT41=null;document.body.dataset.recordSource='share';flowNavigation();document.body.classList.remove('home-screen');hideFrames();$('empty').hidden=false;$('empty-sample').hidden=true;$('empty-records').hidden=true;
  const messages={share_invalid:['공유 주소를 찾을 수 없어요.','주소를 다시 확인해 주세요.'],share_not_found:['공유 주소를 찾을 수 없어요.','주소가 잘못되었거나 존재하지 않아요.'],share_revoked:['공유가 취소됐어요.','소유자가 이 공유 주소를 회수했습니다.'],share_removed:['공유된 트리가 없어졌어요.','트리가 삭제되었거나 더 이상 공개할 수 없어요.'],share_empty:['아직 공개할 순간이 없어요.','소유자가 순간을 남긴 뒤 다시 열어 주세요.'],share_forbidden:['이 공유는 볼 수 없어요.','접근 권한을 확인해 주세요.']};
