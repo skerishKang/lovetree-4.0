@@ -145,7 +145,7 @@ test('쉬운 추가로 열면 한 창의 쉬운 추가 탭이고, 칸은 비어 
 
 });
 
-test('끌어다 놓기(#425): 자세한 추가 탭에서는 주소 칸에 넣고, 쉬운 추가 탭에서는 그 칸에 넣는다', () => {
+test('끌어다 놓기(#425 2번): 사진은 늘 자세한 추가로 가고, 주소는 열려 있는 화면을 따른다', () => {
   const image = { type: 'image/png' };
   const withEditor = harness();
   try {
@@ -158,8 +158,8 @@ test('끌어다 놓기(#425): 자세한 추가 탭에서는 주소 칸에 넣고
   const plain = harness();
   try {
     plain.docListeners.drop({ dataTransfer: { types: ['Files'], files: [image], getData: () => '' }, preventDefault() {} });
-    assert.equal(plain.els['write-panel'].open, true, '한 창을 열어 사진을 받는다');
-    assert.deepEqual(plain.calls.attach, [['quick', image]]);
+    assert.deepEqual(plain.calls.openEditor, [['add', undefined]], '쉬운 추가가 열려 있어도 자세한 추가를 연다');
+    assert.deepEqual(plain.calls.attach, [['editor', image]], '사진은 자세한 추가 업로더로만 간다');
     assert.deepEqual(plain.calls.apply, [], '사진은 업로드가 끝난 뒤에 담는다(onUploaded)');
   } finally { plain.restore(); }
 });
@@ -354,7 +354,7 @@ test('끌어다 놓기: 놓으면 바로 저장하고, 모달 위에서는 칸�
   } finally { editor.restore(); }
 });
 
-test('끌어다 놓기: 이미지 파일은 사진 업로더로, 로그아웃·공유는 받지 않는다', () => {
+test('끌어다 놓기: 이미지 파일은 자세한 추가 업로더로, 로그아웃·공유는 받지 않는다', () => {
   const image = { type: 'image/png' };
   const withEditor = harness();
   try {
@@ -367,8 +367,8 @@ test('끌어다 놓기: 이미지 파일은 사진 업로더로, 로그아웃·�
   const plain = harness();
   try {
     plain.docListeners.drop({ dataTransfer: { types: ['Files'], files: [image], getData: () => '' }, preventDefault() {} });
-    assert.equal(plain.els['write-panel'].open, true, '한 창을 열어 사진을 받는다');
-    assert.deepEqual(plain.calls.attach, [['quick', image]]);
+    assert.deepEqual(plain.calls.openEditor, [['add', undefined]], '한 창을 자세한 추가로 열어 사진을 받는다');
+    assert.deepEqual(plain.calls.attach, [['editor', image]]);
     assert.deepEqual(plain.calls.apply, [], '사진은 업로드가 끝난 뒤에 담는다(onUploaded)');
   } finally { plain.restore(); }
 
@@ -404,18 +404,16 @@ test('덮개: 끌기가 들어오면 문구를 보여 주고 나가면 거둔다
   } finally { h.restore(); }
 });
 
-test('연결 구조: shell.mjs는 기존 업로더를 그대로 넘기고 write-menu를 고르기 창에 연다', async () => {
+test('연결 구조(#425 2번): 쉬운 추가는 업로더를 만들지 않고 write-menu를 한 창에 연다', async () => {
   const h = harness();
   try {
-    assert.equal(h.uploadsCalls.length, 1, 'createQuickAdd가 업로더를 하나 만든다');
-    assert.equal(h.uploadsCalls[0].imagesOnly, true, '사진만 받는 인스턴스');
-    assert.equal(h.uploadsCalls[0].fileLabel, '📷 사진 올리기', '점선 칸의 라벨(#343)');
-    assert.equal(typeof h.uploadsCalls[0].onUploaded, 'function', 'onUploaded로 담기에 연결');
+    // 사진 올리기는 자세한 추가 탭의 업로더만 쓴다 — 쉬운 추가는 업로더를 만들지 않는다.
+    assert.equal(h.uploadsCalls.length, 0, 'createQuickAdd는 업로더를 만들지 않는다');
   } finally { h.restore(); }
-  // shell.mjs의 연결 한 줄은 글자로 고정한다(연결이 지워지면 운영에서 무반응이 되는 #245 전례).
+  // shell.mjs의 연결은 글자로 고정한다(연결이 지워지면 운영에서 무반응이 되는 #245 전례).
   const fs = await import('node:fs');
   const shell = fs.readFileSync(new URL('../public/v41/shell.mjs', import.meta.url), 'utf8');
-  assert.match(shell, /mountUpload:mountPrivateUpload/, 'shell.mjs가 기존 업로더를 quick-add에 넘긴다');
+  assert.match(shell, /mountUpload:mountPrivateUpload/, 'shell.mjs는 기존 업로더를 quick-add에 그대로 넘긴다(호출 시그니처 유지)');
   // #425: 순간 남기기는 한 창(write-panel)을 연다 — 고르기 창은 없다.
   assert.match(shell, /\$\('write-menu'\)\.onclick=\(\)=>shellQuick\.openWrite\(\)/, '순간 남기기는 한 창을 연다');
   assert.doesNotMatch(shell, /openWriteChooser/, '옛 고르기 창 진입이 남지 않는다');

@@ -2,6 +2,12 @@
 
 > **main 보호 규칙(2026-11-09, 룰셋 "main 보호 (PR·필수 검사)")**: main은 PR로만 바꾼다(직접 푸시·force push·삭제 금지, 관리자도 예외 없음 — 비상시 대표가 룰셋 enforcement를 잠깐 끈다). 필수 검사: `check (ubuntu-latest)`·`check (windows-latest)`·`미리보기 postdeploy(로그아웃)` — 셋 다 paths 필터가 없어 문서만 바뀐 PR에서도 항상 돈다. 승인 수 0(레인이 스스로 머지). Deploy Bundle Boot Test는 paths 필터가 있어 필수에 넣지 않았다.
 
+## 2026-11-12 — 러브트리 #425 PR 2: 올린 사진 나만 보기·쉬운 추가 사진 칸 정리 (로컬2, ai/local2-lt-425-photo-261112)
+
+- 무엇: #425 2번 마감. 쉬운 추가 탭의 '또는' 구분선·사진 올리기 칸을 없애 사진 드롭은 늘 자세한 추가 업로더로 간다(`dropRoute` image → editor 고정, `shell/quick-add.mjs`의 quickUploads 제거). 자세한 추가에 '직접 찍었거나 쓸 권리가 있는 사진만 올려 주세요 · 사진은 나만 볼 수 있어요' 안내. 서버는 `projectSharedTree`가 사진 표지(coverMode=photo)를 공개 응답에서만 디자인/기본으로 바꾸고(저장본 무손), `community-service.js card()`는 coverModeOf 판정으로 '순간에서'일 때만 표지 주소를 보낸다. 공유 감상 화면에 '올린 사진 N장은 나만 볼 수 있어요' 안내.
+- 시험: `npm test` 1143(1106 pass·37 skip·0 fail — a11y·postdeploy 가드 4건은 공유 node_modules에 axe-core·playwright-core가 없어 실패하던 기존 환경 문제, `--no-save`로 잠금 버전 설치해 통과), `npm run build` pass, `node tools/v41-modulepreload.mjs --check` pass, 로컬 DOM(크롬·격리 컨텍스트·포트 4200): 쉬운 추가 사진 칸 0·안내 문구·드롭→자세한 추가·1440/390 넘침 0. 스크린샷 `.tmp-261112/`.
+- 주의: 로컬1 #431(views css)·#429(썸네일 공용 모듈)와 책장·표지·둘러보기 카드가 겹칠 수 있어 PR 전에 main을 다시 받았다.
+
 ## 2026-11-11 — 컴2 러브트리 DB 실제 구성 문서화 (로컬4, ai/local4-lt-db-docs-261111, 이슈 #403 → PR #405)
 
 - 무엇: 컴2 러브트리 Postgres는 compose 컨테이너가 아니라 **WSL Ubuntu 네이티브 PostgreSQL 16**(127.0.0.1:5432, DB `lovetree`, 소유자·앱 역할 `lovetree_owner`, Docker 데몬 꺼짐 — 컨테이너 없음)이다. `AUTODEPLOY.md`에 실제 구성과 migration 수동 적용 → `--accept-migrations` 1회까지 한 흐름으로 기록했다. `postgres.compose.yml`·`postgres.env.example`은 "지금 미사용·참고용" 머리 주석을 붙였다(삭제하지 않음).
