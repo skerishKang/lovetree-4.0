@@ -47,7 +47,7 @@ test('동그라미 글자는 표시 이름을 먼저 쓰고, 없으면 이메일
 test('이메일이 없어도 subject 첫 글자는 쓰지 않고 점·내 계정으로 안전하게 둔다', () => {
   const view = accountPresentation({owned: true, subject: 'padiem|user-42'});
   assert.equal(view.mode, 'avatar');
-  assert.equal(view.initial, '·', 'subject는 동그라미 글자가 아니다');
+  assert.equal(view.initial, '나', 'subject는 동그라미 글자가 아니다 — 이름·이메일이 없으면 나');
   assert.equal(view.label, '내 계정');
   assert.equal(view.ariaLabel, '내 계정 메뉴, 내 계정으로 로그인됨');
   const named = accountPresentation({owned: true, name: '러브트리', subject: 'usr_abc'});

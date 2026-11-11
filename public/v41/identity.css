@@ -192,6 +192,10 @@ html[data-lt-theme=garden] .account-popover{background:var(--lt-glass-strong);bo
 html[data-lt-theme=garden] .account-popover button{color:var(--lt-ink)}
 html[data-lt-theme=garden] .account-popover button:hover{background:rgba(152,80,94,.08)}
 html[data-lt-theme=garden] .account-email{color:var(--lt-muted);border-bottom-color:var(--lt-line)}
+/* 2026-11-12 #414 한 틀(트리 ▾│책│보드│지도)이 밝은 테마에서 어두운 회색으로 보이던 것: 밝은 바탕·진한 글자로 */
+html[data-lt-theme=garden] .tree-frame{background:rgba(255,253,248,.9);border-color:rgba(119,91,82,.3)}
+html[data-lt-theme=garden] .tree-frame .tree-views>button{border-left-color:rgba(119,91,82,.22)}
+html[data-lt-theme=garden] .tree-frame button{color:var(--lt-ink)}
 html[data-lt-theme=garden] .header-actions #header-overflow{background:var(--lt-glass-strong);border-color:var(--lt-line)}
 html[data-lt-theme=garden] body,html[data-lt-theme=garden] .app-header{transition:background-color .28s ease,color .28s ease,border-color .28s ease}
 @media(prefers-reduced-motion:reduce){html[data-lt-theme=garden] body,html[data-lt-theme=garden] .app-header{transition:none}}
