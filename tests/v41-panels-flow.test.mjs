@@ -121,6 +121,7 @@ function harness({
     getUploads: () => ({ busy, reset: () => { calls.reset += 1; } }),
     notify: (msg) => calls.notify.push(msg),
     panel: (name) => calls.panel.push(name),
+    openSettingsData: () => { calls.settingsData = (calls.settingsData || 0) + 1; },
     show: (next) => { screen = next; },
     selection: () => ({ treeId: 'tree-1', momentId: 'm1' }),
     openFirstJourney: () => { calls.firstJourney += 1; },
@@ -145,7 +146,7 @@ function harness({
   return { panels, elements, calls, coverSlotParts, lt41, restore, screen: () => screen, setScreen: (n) => { screen = n; } };
 }
 
-test('openEditor 분기 표: 로그아웃 → 로그인, 편집 불가 → 안내+기록, new → 첫 여정, add/edit → 편집기', () => {
+test('openEditor 분기 표: 로그아웃 → 로그인, 편집 불가 → 안내+설정 내 데이터, new → 첫 여정, add/edit → 편집기', () => {
   const cases = [
     {
       name: '로그아웃(예시 화면)',
@@ -163,7 +164,7 @@ test('openEditor 분기 표: 로그아웃 → 로그인, 편집 불가 → 안�
       name: '로그인·편집 불가',
       opts: { owned: true, writable: false },
       mode: 'add',
-      expect: { login: [], panel: ['records'], firstJourney: 0, editorMode: 'add' }
+      expect: { login: [], panel: [], settingsData: 1, firstJourney: 0, editorMode: 'add' }
     },
     {
       name: '새 트리 요청',
@@ -190,6 +191,7 @@ test('openEditor 분기 표: 로그아웃 → 로그인, 편집 불가 → 안�
       h.panels.openEditor(c.mode);
       assert.deepEqual(h.calls.login, c.expect.login, `${c.name}: 로그인 이동`);
       assert.deepEqual(h.calls.panel, c.expect.panel, `${c.name}: 패널`);
+      assert.equal(h.calls.settingsData || 0, c.expect.settingsData || 0, `${c.name}: 설정 내 데이터`);
       assert.equal(h.calls.firstJourney, c.expect.firstJourney, `${c.name}: 첫 여정`);
       assert.equal(h.panels.editorMode(), c.expect.editorMode, `${c.name}: 편집기 모드`);
       if (c.expect.panel.includes('write-panel')) {

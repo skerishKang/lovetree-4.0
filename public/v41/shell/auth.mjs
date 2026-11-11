@@ -41,7 +41,7 @@ export function createAuth(deps) {
     $('account-entry').hidden = false;
     $('account-avatar').hidden = true;
     closeAccountMenu();
-    $('record-feedback').textContent = '로그인 확인이 필요해요. 다시 로그인해 주세요.';
+    // #368: 안내 줄은 설정 창 상태 줄·토스트(notify)가 한 벌로 맡는다.
     notify('로그인 확인이 필요해요. 다시 로그인해 주세요.');
   }
 

@@ -8,7 +8,7 @@ function harness({ search = '', owned = false, writable = true } = {}) {
   const replaced = [];
   const els = {};
   const el = () => ({ hidden: false, textContent: '', setAttribute() {}, removeAttribute() {} });
-  for (const id of ['account-entry', 'account-avatar', 'record-feedback']) els[id] = el();
+  for (const id of ['account-entry', 'account-avatar']) els[id] = el();
   const saved = {
     location: globalThis.location,
     history: globalThis.history,
@@ -82,14 +82,14 @@ test('startLogin은 테마와 의도를 담은 로그인 주소로 이동한다'
   }
 });
 
-test('401·만료는 로그아웃 화면으로 되돌리고 안내 줄을 남긴다', () => {
+test('401·만료는 로그아웃 화면으로 되돌리고 안내를 남긴다', () => {
   const h = harness({ owned: true });
   try {
     h.auth.authRequired();
     assert.equal(h.els['account-entry'].hidden, false, '로그인 알약을 다시 보여 준다');
     assert.equal(h.els['account-entry'].textContent, '로그인');
     assert.equal(h.els['account-avatar'].hidden, true, '계정 동그라미는 숨긴다');
-    assert.equal(h.els['record-feedback'].textContent, '로그인 확인이 필요해요. 다시 로그인해 주세요.');
+    // #368: 안내 줄은 설정 상태 줄·토스트(notify) 한 벌이 맡는다 — 옛 기록 줄은 없다.
     assert.deepEqual(h.counts(), { notified: 1, closed: 1 });
   } finally {
     h.restore();

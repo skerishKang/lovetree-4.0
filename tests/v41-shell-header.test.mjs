@@ -33,8 +33,7 @@ function harness({ owned = false, trees = 0, tree = null, source = 'example', cu
     'account-email': fakeEl(),
     'account-popover': fakeEl({ hidden: true }),
     'server': fakeEl(),
-    'logout': fakeEl(),
-    'account-settings-open': fakeEl()
+    'logout': fakeEl()
   };
   const saved = { document: globalThis.document, sessionStorage: globalThis.sessionStorage };
   globalThis.sessionStorage = { getItem: () => null, setItem() {}, removeItem() {} };

@@ -15,6 +15,8 @@ export function createPanels(deps) {
   const getUploads = deps.getUploads;
   const notify = deps.notify;
   const panel = deps.panel;
+  // #368: 읽기 전용 안내는 설정 "내 데이터" 묶음으로 연다(옛 내 기록 창 자리).
+  const openSettingsData = deps.openSettingsData;
   const requestClose = deps.requestClose;
   const show = deps.show;
   const selection = deps.selection;
@@ -114,7 +116,7 @@ export function createPanels(deps) {
       openLoginStart('new-tree'); return;
     }
     if (!getMember().snapshot().writable) {
-      notify('서버 편집 연결이 아직 준비되지 않았어요. 기록은 안전하게 읽을 수 있습니다.'); panel('records'); return;
+      notify('서버 편집 연결이 아직 준비되지 않았어요. 기록은 안전하게 읽을 수 있습니다.'); openSettingsData?.(); return;
     }
     const mode = ['new', 'add', 'edit'].includes(requestedMode) ? requestedMode : window.LT41 ? 'add' : 'new';
     if (mode === 'new') { openFirstJourney(); return; }

@@ -13,9 +13,10 @@ export function createNotifier({ $, now = () => Date.now(), holdMs = NOTICE_HOLD
     const at = now();
     if (hold) holdUntil = at + holdMs;
     else if (at < holdUntil) return false;
-    $('record-feedback').textContent = text;
+    // #368: 설정 창이 열려 있으면 창 안 상태 줄에, 아니면 토스트로 보여 준다.
+    if ($('settings-feedback')) $('settings-feedback').textContent = text;
     $('toast').textContent = text;
-    $('toast').hidden = !!$('records')?.open;
+    $('toast').hidden = !!$('account-settings')?.open;
     clearTimer(timer);
     timer = setTimer(() => { $('toast').hidden = true; }, hideMs);
     return true;

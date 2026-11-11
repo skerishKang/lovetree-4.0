@@ -89,9 +89,9 @@ test('이미 저장된 트리에서는 다시 트리를 만들지 않고 이어�
   assert.equal(plan.second.relation, '댓글을 따라 찾아봤어요');
 });
 
-test('진입 경로: 로그아웃=로그인, 편집 불가=기록 패널, 새 트리=첫 여정, 추가·수정=기존 패널', () => {
+test('진입 경로: 로그아웃=로그인, 편집 불가=설정 내 데이터, 새 트리=첫 여정, 추가·수정=기존 패널', () => {
   assert.deepEqual(journeyEntry({owned: false}), {screen: 'login', reason: 'signed-out'});
-  assert.deepEqual(journeyEntry({owned: true, writable: false}), {screen: 'records', reason: 'not-writable'});
+  assert.deepEqual(journeyEntry({owned: true, writable: false}), {screen: 'settings', reason: 'not-writable'});
   assert.equal(journeyEntry({owned: true, writable: true, mode: 'new'}).screen, 'journey');
   assert.equal(journeyEntry({owned: true, writable: true, mode: 'add'}).screen, 'panel');
   assert.equal(journeyEntry({owned: true, writable: true, mode: 'edit'}).screen, 'panel');

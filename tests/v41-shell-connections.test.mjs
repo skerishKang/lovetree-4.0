@@ -8,12 +8,12 @@ import {readFileSync, readdirSync} from 'node:fs';
 // (로그인 상태에서만 보이는 버튼이라 로그아웃 postdeploy가 잡지 못했다).
 const SHELL_CONNECTIONS = [
   'account-advanced', 'account-assets-open', 'account-avatar', 'account-confirm',
-  'account-entry', 'account-form', 'account-logout', 'account-open-settings', 'account-settings-open',
+  'account-entry', 'account-form', 'account-logout', 'account-open-settings',
   'advanced-backup', 'advanced-import', 'change-parent', 'clear', 'delete-moment', 'editor-assets-open',
-  'editor-cancel', 'empty-records', 'empty-sample', 'file', 'logout', 'mobile-more', 'moment-form',
-  'record-menu', 'sample', 'server', 'share-copy', 'share-create', 'share-menu', 'share-moment',
-  'share-preview', 'share-view', 'tree-cover', 'tree-delete', 'tree-form',
-  'tree-tips-close', 'trees', 'write-menu'
+  'editor-cancel', 'empty-file', 'empty-records', 'empty-sample', 'file', 'logout', 'mobile-more', 'moment-form',
+  'record-menu', 'sample', 'server', 'settings-assets-open', 'share-copy', 'share-create',
+  'share-menu', 'share-moment', 'share-preview', 'share-view', 'tree-cover', 'tree-delete', 'tree-form',
+  'tree-tips-close', 'write-menu'
 ];
 
 const dir = new URL('../public/v41/', import.meta.url);

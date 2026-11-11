@@ -24,7 +24,7 @@ import {createQuickIntake} from './shell/quick-intake.mjs';
 import {createJourney} from './shell/journey.mjs';
 import {createMessages} from './shell/messages.mjs';
 import {createCleanup} from './shell/cleanup.mjs';
-import {headerBadge, pickerLabel, cleanupAvailable} from './inbox-model.mjs';
+import {headerBadge, cleanupAvailable} from './inbox-model.mjs';
 import {createDialogs} from './shell/dialogs.mjs';
 import {connectionSignature} from './shell/panel-dirty.mjs';
 import {createLocation} from './shell/location.mjs';
@@ -178,6 +178,8 @@ const shellPanels=createPanels({
   getUploads:()=>uploads,
   notify:text=>notify(text),
   panel:id=>panel(id),
+  // #368: 읽기 전용 안내는 내 기록 창 대신 설정 "내 데이터" 묶음으로 연다.
+  openSettingsData:intent=>openAccountData(intent),
   show:(file,write)=>show(file,write),
   selection:()=>stateSelection(),
   openFirstJourney:options=>openFirstJourney(options),
@@ -197,6 +199,7 @@ const shellQuick=createQuickAdd({
   getCurrent:()=>current,
   notify:text=>notify(text),
   panel:id=>panel(id),
+  openSettingsData:intent=>openAccountData(intent),
   choose:(id,momentId)=>choose(id,momentId),
   openEditor:(mode,parentId)=>openEditor(mode,parentId),
   openLoginStart:intent=>openLoginStart(intent),
@@ -240,6 +243,7 @@ const shellJourney=createJourney({
   getSource:()=>source,
   notify:text=>notify(text),
   panel:id=>panel(id),
+  openSettingsData:intent=>openAccountData(intent),
   show:(file,write)=>show(file,write),
   screens,
   choose:(id,momentId)=>choose(id,momentId),
@@ -258,6 +262,7 @@ const shellMessages=createMessages({
   shareApi,
   notify:text=>notify(text),
   panel:id=>panel(id),
+  openSettingsData:intent=>openAccountData(intent),
   show:(file,write)=>show(file,write),
   links:()=>links(),
   writeLocation:(mode)=>writeLocation(mode),
@@ -308,7 +313,7 @@ function writeLocation(mode){return shellLocation.writeLocation(mode);}
 function applyBrowserLocation(){return shellLocation.applyBrowserLocation();}
 const PENDING_NEW='lovetree.v41.pending-new';
 // 2026-11-07 계정 표시: 로그인 상태는 첫 글자 동그라미 + 작은 메뉴, 로그아웃 상태는 기존 로그인 알약.
-function panel(id){if(id==='records')updateAccountControls();const target=$(id);if(!target.open){if(target.dataset.ltPanel){shellDialogs.noteOpener(id);if(target.dataset.ltPanel==='full')shellDialogs.syncPanelTop();}target.showModal();}}
+function panel(id){const target=$(id);if(!target.open){if(target.dataset.ltPanel){shellDialogs.noteOpener(id);if(target.dataset.ltPanel==='full')shellDialogs.syncPanelTop();}target.showModal();}}
 // 대화상자 접근성(Tab 순환·Esc 복귀·포커스 되돌리기)은 shell/dialogs.mjs가 맡는다(#231 1-B 후속).
 const shellDialogs=createDialogs({
   $,
@@ -339,6 +344,8 @@ const shellHeader=createHeader({
   getSource:()=>source,
   getCurrent:()=>current,
   accountApi,
+  // #368: 이메일을 불러오거나 지울 때마다 설정 "프로필" 표시도 같이 칠한다.
+  onEmailChange:email=>paintSettingsProfile(email),
   delegate:{syncTreeTips:()=>syncTreeTips()}
 });
 function flowNavigation(){return shellHeader.flowNavigation();}
@@ -447,23 +454,12 @@ function load(input,kind,selection={},fallback={}){
  document.body.dataset.recordSource=kind;
  document.body.dataset.member=member?.snapshot().owned?'in':'out';
  document.body.dataset.treeCount=String(model?.trees?.length||0);
- $('source-label').textContent='트리 선택';
- $('record-description').textContent=kind==='example'
-  ?'실제 회원 데이터와 무관한 예시입니다.'
-  :kind==='server'
-   ?'로그인한 계정의 서버 기록 · 작성·수정 후 자동 저장'
-   :kind==='share'
-    ?'소유자가 명시적으로 공개한 트리 · 감상 전용'
-    :'선택한 파일을 메모리에서 읽는 중입니다.';
- $('trees').replaceChildren();
- for(const t of model.trees){const o=document.createElement('option');o.value=t.id;o.textContent=pickerLabel(t);$('trees').append(o);}
- $('trees').disabled=!model.trees.length;
+ // #368: 트리 고르기는 맨 위 트리 ▾ 드롭다운 한 곳이다(옛 내 기록 창의 select는 없앴다).
  const resolved=resolveAccountPosition(model.trees,selection,fallback),chosen=model.trees.find(t=>t.id===resolved.position.treeId);
- $('trees').value=chosen?.id||'';
  choose(chosen?.id,resolved.position.momentId);
  return resolved;
 }
-function clear(){load({revision:0,state:{version:1,trees:[]}},'file');$('source-label').textContent='트리 선택';$('record-description').textContent='펼쳐 볼 트리를 선택하세요.';}
+function clear(){load({revision:0,state:{version:1,trees:[]}},'file');}
 function stateSelection(){return {treeId:window.LT41?.tree.id,momentId:window.LT41?.momentId};}
 function formDirty(){return shellPanels.formDirty();}
 function treeDirty(){return shellPanels.treeDirty();}
@@ -521,7 +517,6 @@ async function startMember(){setMemberRefreshStarted(true);if(!leaveMember())ret
  member=session;
  await session.start();
  if(generation===loadGeneration&&session.snapshot().owned){
-  if($('records').open)$('records').close();
   updateAccountControls();
   if(session.snapshot().writable&&sessionStorage.getItem(PENDING_NEW)==='1'){sessionStorage.removeItem(PENDING_NEW);openEditor('new');}
   shellAuth.consumeLoginIntent(session.snapshot());
@@ -529,7 +524,7 @@ async function startMember(){setMemberRefreshStarted(true);if(!leaveMember())ret
  }
  if(generation===loadGeneration){const startupJourney=parseJourneyRoute(location.hash);if(startupJourney){if(session.snapshot().owned&&session.snapshot().writable)openFirstJourney({step:startupJourney.step,route:true});else{history.replaceState(null,'','#home');handledHash='#home';}}}
 }
-function sample(selection={},view){if(!leaveMember())return;++loadGeneration;if(view)current=view;load(null,'example',selection);if(view)writeLocation();$('save-feedback').hidden=true;$('records').close();}
+function sample(selection={},view){if(!leaveMember())return;++loadGeneration;if(view)current=view;load(null,'example',selection);if(view)writeLocation();$('save-feedback').hidden=true;if($('account-settings').open)$('account-settings').close();}
 $('account-entry').onclick=e=>{
  if(member?.snapshot().owned){e.preventDefault();openAccountMenu();}
  else if(parseSelectionRoute(location.hash).scope==='owner')stashPendingOwnerRoute(sessionStorage,location.hash);
@@ -542,15 +537,19 @@ const $on=(id,fn)=>{const el=$(id);if(el)el.onclick=fn;};
 function advancedKey(){try{return 'lt41.advanced.'+(member?.snapshot().subject||'')}catch{return 'lt41.advanced.'}}
 function readAdvanced(){try{return localStorage.getItem(advancedKey())==='1'}catch{return false}}
 function applyAdvanced(){const on=readAdvanced();document.body.classList.toggle('lt-advanced',on);$('account-advanced')?.setAttribute('aria-checked',String(on));try{$('view').contentWindow.postMessage({type:'lt41-advanced',value:on},location.origin)}catch{}}
-$on('account-records',()=>{closeAccountMenu();panel('records');});
-$on('account-backup',()=>{closeAccountMenu();backup();});
  $('account-assets-open').onclick=()=>{closeAccountMenu();openAssets($('account-avatar'));};
+// #368: 설정 "내 데이터"의 내 보관 파일 열기. 창 위에 보관 파일 창이 열리고 닫으면 이 버튼으로 초점이 돌아온다.
+$('settings-assets-open').onclick=()=>openAssets($('settings-assets-open'));
  $('editor-assets-open').onclick=()=>openAssets($('editor-assets-open'));
  for(const b of document.querySelectorAll('[data-set-theme]'))b.onclick=()=>{writeTheme(localStorage,b.dataset.setTheme);applyTheme();paintThemeControls();};
  $('account-advanced').onclick=()=>{const next=!readAdvanced();try{localStorage.setItem(advancedKey(),next?'1':'0')}catch{}applyAdvanced();};
  $('account-open-settings').onclick=()=>{closeAccountMenu();void openAccountSettings();};
  $('advanced-backup').onclick=()=>backup();
+ // #368: 기록 가져오기는 JSON 선택 input을 연다. input은 창 밖에 숨겨 두어 설정이 닫혀 있어도(빈 화면의 백업 파일 열기) 열린다.
+ // CTO 결정(2026-11-12): 설정에는 "기록 가져오기" 하나만 둔다 — "백업 파일 열기"는 같은 선택 창이라 중복이고,
+ // 로그아웃 빈 화면의 "백업 파일 열기"(#empty-file)는 계정 없이 쓰는 입구로 남긴다.
  $('advanced-import').onclick=()=>$('file').click();
+ $('empty-file').onclick=()=>$('file').click();
  for(const b of document.querySelectorAll('[data-title-display]'))b.onclick=()=>setTitleDisplay(b.dataset.titleDisplay);
  // #380 5번: '보기 ◐' 메뉴(테마·움직임·카드 출처)를 설정 창의 '화면' 묶음으로 옮겼다.
  // 저장 키(lt41.theme·lt41.homeCards)와 기본값은 그대로다.
@@ -583,9 +582,10 @@ $on('account-backup',()=>{closeAccountMenu();backup();});
 document.addEventListener('click',e=>{
  if(!e.target.closest('.account-slot'))closeAccountMenu();
 });
-$('empty-records').onclick=()=>member?.snapshot().writable?openEditor():panel('records');
+// #368: 빈 화면의 "내 기록 불러오기" — 로그아웃이면 로그인으로, 읽기 전용이면 설정 "내 데이터"로, 평소엔 순간 추가(새 트리)로.
+$('empty-records').onclick=()=>{if(!member?.snapshot().owned){openLoginStart('first');return;}member.snapshot().writable?openEditor():openAccountData();};
 $('empty-sample').onclick=sample;
-$('sample').onclick=sample;$('clear').onclick=()=>{if(!leaveMember())return;++loadGeneration;clear();$('save-feedback').hidden=true;$('file').value='';$('records').close();};
+$('sample').onclick=sample;$('clear').onclick=()=>{if(!leaveMember())return;++loadGeneration;clear();$('save-feedback').hidden=true;$('file').value='';if($('account-settings').open)$('account-settings').close();};
 $('server').onclick=startMember;
 const ACCOUNT_DELETE_PHRASE='탈퇴합니다';
 let accountExpected=null;
@@ -594,18 +594,39 @@ function accountConfirmMatches(){
  if(!accountExpected||!typed)return false;
  return accountExpected.kind==='email'?typed.toLowerCase()===accountExpected.value:typed===accountExpected.value;
 }
-async function openAccountSettings(){
- accountExpected=null;$('account-feedback').textContent='';$('account-confirm').value='';$('account-delete').disabled=true;
- if(!member?.snapshot().owned){$('account-confirm-hint').textContent='로그인한 뒤 이용할 수 있어요.';panel('account-settings');return;}
+// #368: 설정 창 묶음 — 입구는 묶음 이름으로 열고 해당 묶음(제목)으로 초점과 스크롤을 옮긴다.
+const SETTINGS_SECTIONS={profile:'account-settings-profile',screen:'account-settings-screen',write:'account-settings-write',data:'account-settings-data',account:'account-settings-account'};
+function focusSettingsSection(section='profile'){
+ const box=$('account-settings');if(!box?.open)return;
+ const target=$(SETTINGS_SECTIONS[section]||SETTINGS_SECTIONS.profile);if(!target)return;
+ queueMicrotask(()=>{target.scrollIntoView({block:'start'});const heading=target.querySelector('h3');if(heading)heading.focus({preventScroll:true});});
+}
+// #368: 프로필 묶음 표시. 이메일이 없으면 "내 계정"(header-state 규칙 그대로, 가리지 않는다).
+function paintSettingsProfile(email=shellHeader.currentAccountEmail()){
+ const view=accountPresentation({owned:!!member?.snapshot().owned,email});
+ const initial=$('settings-profile-initial');if(initial)initial.textContent=view.initial;
+ const mail=$('settings-profile-email');if(mail)mail.textContent=view.label;
+}
+// #368: 옛 내 기록 창을 여던 입구(읽기 전용 안내·빈 화면)의 공통 행선지. 로그아웃이면 로그인으로 보낸다.
+function openAccountData(intent='first'){
+ if(!member?.snapshot().owned){openLoginStart(intent);return;}
+ void openAccountSettings({section:'data'});
+}
+async function openAccountSettings({section='profile'}={}){
+ accountExpected=null;$('account-feedback').textContent='';$('account-confirm').value='';$('account-delete').disabled=true;$('account-confirm-hint').textContent='';
+ // 로그아웃·공유·예시 상태에서는 설정 입구가 없다(기존 규칙). 여기서도 열지 않는다.
+ if(!member?.snapshot().owned){notify('로그인한 뒤 설정을 열 수 있어요.');return;}
+ paintSettingsProfile();
+ panel('account-settings');
+ focusSettingsSection(section);
  const answer=await accountApi.account();
- if(!answer.ok){$('account-confirm-hint').textContent='계정 정보를 확인하지 못했어요. 잠시 뒤 다시 시도해 주세요.';panel('account-settings');return;}
+ if(!answer.ok){$('account-confirm-hint').textContent='계정 정보를 확인하지 못했어요. 잠시 뒤 다시 시도해 주세요.';return;}
+ if(answer.email)paintSettingsProfile(answer.email);
  const byEmail=answer.confirmKind==='email';
  accountExpected=byEmail?{kind:'email',value:String(answer.email||'').trim().toLowerCase()}:{kind:'phrase',value:ACCOUNT_DELETE_PHRASE};
  $('account-confirm-label').textContent=byEmail?'계정 이메일':'확인 문구';
  $('account-confirm-hint').textContent=byEmail?'계정 이메일을 입력하세요. 일치할 때만 버튼이 열려요.':"확인을 위해 '탈퇴합니다'를 입력하세요. 그대로 일치할 때만 버튼이 열려요.";
- panel('account-settings');queueMicrotask(()=>$('account-confirm').focus());
 }
-$('account-settings-open').onclick=()=>{void openAccountSettings();};
 $('account-confirm').oninput=()=>{$('account-delete').disabled=!accountConfirmMatches();};
 $('account-form').onsubmit=async event=>{
  event.preventDefault();
@@ -637,13 +658,13 @@ $('file').onchange=async()=>{
   const d=JSON.parse(await f.text());
   if(generation!==loadGeneration)return;
   load(d.state?d:{revision:0,state:d},'file');
-  $('records').close();
+  if($('account-settings').open)$('account-settings').close();
   notify('파일을 열었어요. 서버에는 저장하지 않습니다.');
  }catch(e){
   if(generation===loadGeneration)notify('불러오기 실패: '+e.message);
  }
 };
-$('trees').onchange=()=>{choose($('trees').value);writeLocation();$('records').close();};
+// #368: #trees select는 옛 내 기록 창의 것으로 함께 없앴다. 트리 고르기는 트리 ▾ 드롭다운(renderTreeMenu)이 맡는다.
 // #380 4 2차: 전체 화면·가운데 창 공통 틀을 쓰는 대화상자(편집기·순간 잇기·트리 관리)는 × 도 바깥 클릭·Esc와 같은 규칙을 쓴다.
 document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>{const target=$(b.dataset.close);if(target?.dataset?.ltPanel){shellDialogs.requestClose(b.dataset.close);return;}target.close();});
 function publicProblem(answer){
@@ -672,7 +693,7 @@ function backup(){const data=member?.state();if(!data){notify('백업할 내 기
 function openAssets(opener=document.activeElement){if(!member?.snapshot().owned){notify('로그인한 뒤 내 보관 파일을 확인할 수 있어요.');return;}shellDialogs.rememberOpener(opener);panel('account-assets');uploads.openAssets();}
 function usePrivateAsset(){
  if(source!=='server'||!member?.snapshot().owned){openLoginStart('new-tree');return false;}
- if(!member.snapshot().writable){notify('서버 편집 연결이 아직 준비되지 않았어요. 기록은 안전하게 읽을 수 있습니다.');panel('records');return false;}
+ if(!member.snapshot().writable){notify('서버 편집 연결이 아직 준비되지 않았어요. 기록은 안전하게 읽을 수 있습니다.');openAccountData();return false;}
  if(!window.LT41){openEditor();notify('새 트리를 만든 뒤 순간에 파일을 첨부할 수 있어요.');return false;}
  if(!window.LT41.momentId){notify('순간을 먼저 연 뒤 내 보관 파일을 첨부할 수 있어요.');return false;}
  if(!$('write-panel').open)openEditor('add');
