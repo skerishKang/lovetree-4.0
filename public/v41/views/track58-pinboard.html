@@ -45,7 +45,9 @@ mobilePicker=LTMobileMoments({moments:LTDEMO.moments,selected:LTDEMO.get(),onSel
 addEventListener('resize',()=>{if(innerWidth<700&&!cinema)focusBoardMoment(LTDEMO.get(),false);});
 matchMedia('(max-width:699px)').addEventListener('change',e=>{if(e.matches){focusBoardMoment(LTDEMO.get(),false);document.getElementById('detail').classList.remove('open');}});
 </script><style id="lt-touch-targets">/* 2026-11-08 터치 타깃: 보이는 모양은 그대로 두고 ::after로 누르는 영역만 44px 이상으로 넓힌다. */
-#minusBtn,#plusBtn,#resetBtn,#openMoment,#nextMoment,#cinemaFromMoment,#startPathHere,#pathModeBtn,#toolCinema,#toolFit,#detailClose{position:relative}
+#minusBtn,#plusBtn,#resetBtn,#openMoment,#nextMoment,#cinemaFromMoment,#startPathHere,#pathModeBtn,#toolCinema,#toolFit{position:relative}
+/* #421: 닫기(×) 단추는 board.css의 position:absolute(오른쪽 위)를 지켜야 한다. relative로
+   덮어 쓰면 ×가 "순간 상세" 글자 위에 앉는다. absolute여도 ::after 터치 영역은 그대로 동작한다. */
 #minusBtn::after{content:"";position:absolute;inset:-3px -5px}
 #plusBtn::after{content:"";position:absolute;inset:-3px -2px}
 #resetBtn::after,#openMoment::after,#nextMoment::after,#cinemaFromMoment::after,#startPathHere::after,#pathModeBtn::after,#toolCinema::after,#toolFit::after{content:"";position:absolute;inset:-5px 0}

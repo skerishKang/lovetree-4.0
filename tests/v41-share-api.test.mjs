@@ -8,5 +8,5 @@ test('share client uses only fixed same-origin endpoints',async()=>{
 test('4.1 shell gates link creation behind preview and public reading behind the public endpoint',()=>{
  const shell=fs.readFileSync(new URL('../public/v41/shell.mjs',import.meta.url),'utf8')+fs.readFileSync(new URL('../public/v41/shell/messages.mjs',import.meta.url),'utf8'),html=fs.readFileSync(new URL('../public/v41/index.html',import.meta.url),'utf8'),css=fs.readFileSync(new URL('../public/v41/shell.css',import.meta.url),'utf8');
  assert.match(shell,/sharePreviewKey !== JSON\.stringify\(payload\)/);assert.match(shell,/shareApi\.read\(route\.shareId/);assert.match(shell,/source='share'/);assert.match(shell,/share_revoked:\['공유가 취소됐어요/);
- assert.match(html,/id="share-create"[^>]*disabled/);assert.match(html,/비공개 업로드 파일은 제외/);assert.match(html,/발견 목록에 나오지 않으며/);assert.match(shell,/shareApi\.setDiscoverable/);assert.match(html,/이미 받은 사본·캡처/);assert.match(css,/\[hidden\]\{display:none!important\}/);
+ assert.match(html,/id="share-create"[^>]*disabled/);assert.match(html,/비공개 업로드 파일은 제외/);assert.match(html,/둘러보기에도 올리기’를 켜지 않으면/);assert.match(shell,/shareApi\.setDiscoverable/);assert.match(html,/이미 받은 사본·캡처/);assert.match(css,/\[hidden\]\{display:none!important\}/);
 });
