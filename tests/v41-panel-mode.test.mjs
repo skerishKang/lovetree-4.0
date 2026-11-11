@@ -31,8 +31,12 @@ test('공통 틀은 열 때 연 버튼을 기억하고 닫히면 초점을 돌�
   assert.match(html, /data-lt-return="cleanup-menu"/);
   assert.match(html, /data-lt-return="record-menu"/);
   // dialog 'open' 이벤트는 환경마다 시점이 달라 쓰지 않는다 — 셸 panel()이 showModal 직전에 기록한다.
-  assert.match(dialogs, /noteOpener: id => \{ const d = \$\(id\); if \(d\?\.dataset\?\.ltPanel\) openers\.set\(d, document\.activeElement\); \}/);
-  assert.match(dialogs, /const opener = openers\.get\(d\);/);
+  assert.match(dialogs, /noteOpener: id => \{/);
+  assert.match(dialogs, /openers\.set\(d, assetsOpener\?\.isConnected \? assetsOpener : document\.activeElement\);/);
+  // panel()을 지나지 않고 패널 모듈이 직접 showModal로 여는 창(빠른 추가·고르기·둘러보기)도 연 버튼을 안다.
+  assert.match(dialogs, /let lastControl = null;/);
+  assert.match(dialogs, /const outside = lastControl \? !\(d\.contains\?\.\(lastControl\) \?\? false\) : false;/);
+  assert.match(dialogs, /const opener = recorded \|\| \(outside \? lastControl : null\);/);
   assert.match(dialogs, /const fallback = d\.dataset\.ltReturn \? document\.getElementById\(d\.dataset\.ltReturn\) : null;/);
   assert.match(dialogs, /const target = focusReturnTarget\(opener, fallback\);/);
   assert.match(dialogs, /setTimeout\(\(\) => target\?\.focus\?\.\(\), 0\)/);
@@ -88,7 +92,8 @@ test('공통 틀은 편집기·순간 잇기의 더러움 판정을 셸에서 �
 test('편집기 규칙이 공통 틀보다 우선한다 — 업로드 중에는 Esc·바깥 클릭·× 모두 닫지 않는다', () => {
   assert.match(dialogs, /const message = deps\.panelBlocked\?\.\(d\.id\) \|\| '';/);
   assert.match(dialogs, /if \(panelBlockedMessage\(d\)\) return false;/);
-  assert.match(shell, /panelBlocked:id=>id==='editor'&&uploads\.busy\?'파일 전송을 마치거나 취소해 주세요\.':''/);
+  // 업로드 중 닫기 막기는 편집기와 빠른 추가(사진 올리기) 두 곳에 걸린다.
+  assert.match(shell, /panelBlocked:id=>\(id==='editor'&&uploads\.busy\)\|\|\(id==='quick-add'&&shellQuick\.uploads\?\.busy\)\?'파일 전송을 마치거나 취소해 주세요\.':''/);
   // 저장 중 이중 저장 방지(업로드·저장 중 제출 무시)는 그대로다.
   assert.match(panels, /if \(getUploads\(\)\.busy\) return;/);
   // 편집기 Esc 확인은 공통 틀 한 벌만 남는다(두 번 묻지 않게).
@@ -114,4 +119,49 @@ test('내 기록 저장본을 보는 동안의 편집 잠금은 그대로다', (
   assert.match(panels, /if \(!getMember\(\)\.snapshot\(\)\.writable\) \{/);
   assert.match(panels, /setEditorMode\(mode, parentId\);\n    panel\('editor'\);/);
   assert.match(shell, /writable:source==='server'&&!!member\?\.snapshot\(\)\.writable/);
+});
+
+test('#380 4 마지막: 남은 오른쪽 패널이 공통 틀 태그를 받고, 오른쪽에 붙는 패널이 남지 않는다', () => {
+  // 전체 화면: 설정·내 보관 파일·공유·둘러보기. 가운데 창: 빠른 추가·추가 방식 고르기.
+  assert.match(html, /<dialog id="share-panel" data-lt-panel="full" data-lt-return="share-menu" aria-labelledby="share-title">/);
+  assert.match(html, /<dialog id="account-assets" data-lt-panel="full" data-lt-return="account-avatar" aria-labelledby="account-assets-title">/);
+  assert.match(html, /<dialog id="account-settings" data-lt-panel="full" data-lt-return="account-avatar" aria-labelledby="account-title">/);
+  assert.match(html, /<dialog id="community-panel" data-lt-panel="full" data-lt-return="community-menu" aria-labelledby="community-title">/);
+  assert.match(html, /<dialog id="write-chooser" data-lt-panel="center" data-lt-return="write-menu" aria-labelledby="write-chooser-title">/);
+  assert.match(html, /<dialog id="quick-add" data-lt-panel="center" data-lt-return="write-menu" aria-labelledby="quick-add-title">/);
+  // 오른쪽에 붙는 패널은 이제 없다. 남는 공통 틀 밖 대화상자는 내 기록(records)뿐이고, 그것도 오른쪽 패널이 아니다.
+  const tags = [...html.matchAll(/<dialog id="([a-z-]+)"[^>]*>/g)].map(m => [m[1], /data-lt-panel="(full|center)"/.test(m[0]) ? m[1] : '']);
+  const nonFrame = tags.filter(([, f]) => !f).map(([id]) => id);
+  assert.deepEqual(nonFrame, ['records']);
+  // 오른쪽 패널 시절 id 고정 폭은 빠져야 한다(id 선택자가 공통 틀 규칙을 이긴다).
+  assert.doesNotMatch(css, /#write-chooser\{width:420px\}|#quick-add\{width:460px\}/);
+});
+
+test('둘러보기의 위치·크기 고정은 공통 전체 화면 틀로 통일한다(모바일 inset 6px 제거)', () => {
+  assert.match(css, /dialog\[data-lt-panel=full]\{inset:var\(--lt-panel-top,66px\) 0 0 0;/);
+  // 모바일 전용 inset·둥근 테두리 고정이 없고, 안쪽 여백만 남는다.
+  assert.doesNotMatch(css, /#community-panel\{inset:6px 6px 8px/);
+  assert.doesNotMatch(css, /#community-panel\{position:absolute;inset:10px 14px 14px/);
+  assert.doesNotMatch(css, /body\.home-screen #community-panel\{inset:/);
+  assert.match(css, /#community-panel\{padding:20px clamp\(16px,3vw,48px\) 40px;/);
+});
+
+test('더러움 판정은 빠른 추가(주소)와 공유(설정 바꿈, 링크 안 만듦)에만 붙는다', () => {
+  assert.match(dialogs, /PANEL_DIRTY\['quick-add'\] = \(\) => deps\.isQuickAddDirty\?\.\(\) === true;/);
+  assert.match(dialogs, /PANEL_DIRTY\['share-panel'\] = \(\) => deps\.isShareDirty\?\.\(\) === true;/);
+  // 설정·내 보관 파일·둘러보기·추가 방식 고르기는 PANEL_DIRTY에 없다.
+  for (const id of ['account-settings', 'account-assets', 'community-panel', 'write-chooser']) {
+    assert.ok(!dialogs.includes(`PANEL_DIRTY['${id}']`), `${id}는 묻지 않고 닫는다`);
+  }
+  assert.match(shell, /isQuickAddDirty:\(\)=>\$\([^)]*quick-add'\)\.open&&\$\([^)]*quick-url'\)\.value\.trim\(\)!==''/);
+  assert.match(shell, /isShareDirty:\(\)=>\{const create=\$\([^)]*share-create'\);/);
+  assert.match(shell, /!create\.disabled&&\$\([^)]*share-created'\)\.hidden/);
+});
+
+test('빠른 추가의 사진 올리기 중에도 편집기와 같은 닫기 막기 규칙을 쓴다', () => {
+  assert.match(shell, /id==='quick-add'&&shellQuick\.uploads\?\.busy/);
+  assert.match(shell, /id==='editor'&&uploads\.busy/);
+  // 공통 틀의 머리 높이 측정은 panel() 호출 없이 직접 열 때도 맞는다(관찰자 + 항상 동기화).
+  assert.match(dialogs, /syncPanelTop\(\);\n  document\.defaultView\?\.addEventListener\?\.\('resize', syncPanelTop\);/);
+  assert.match(dialogs, /new ResizeObserver\(syncPanelTop\)\.observe\(headerBox\);/);
 });

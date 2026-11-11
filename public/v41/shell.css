@@ -30,13 +30,12 @@ html[data-lt-theme=garden] #context-kind{color:var(--lt-rose-ink)}
 .management-block{padding-bottom:22px}.management-block+.management-block{padding-top:22px;border-top:1px solid var(--line)}.management-block label{display:block;margin:14px 0;font-size:13px;color:var(--lt-muted)}.management-block input{display:block;width:100%;min-height:44px;margin-top:8px;padding:11px 12px;border:1px solid rgba(255,255,255,.22);border-radius:12px;background:rgba(255,255,255,.04);color:var(--lt-pearl);line-height:1.6}#parent-current{margin:0;color:var(--lt-pearl);font-weight:600}#parent-management[hidden]{display:none}@media(max-width:780px){.management-block input,#tree-form input,#tree-form select{font-size:16px}}
 
 /* Explicit sharing keeps the established dark rose panels and 44px controls. */
-#share-panel{width:min(620px,calc(100vw - 24px))}.share-warning{margin:16px 0;padding:14px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-card);background:rgba(255,230,166,.06)}.share-warning p{margin:6px 0 0}.share-url{display:flex;gap:8px}.share-url input{flex:1;min-width:0}.share-url button{flex:0 0 auto}.share-item{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line)}.share-item small{display:block;color:var(--muted);margin-top:4px}.share-item button{min-height:44px}.share-item-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.share-item-actions button{min-width:112px}.share-revoked{opacity:.62}#share-preview-moments{max-height:220px;overflow:auto;padding-left:22px}#share-preview-moments li{margin:8px 0;color:#e8dce4}@media(max-width:780px){#share-menu{min-width:44px}.share-url{display:grid;grid-template-columns:1fr}.share-url button{width:100%}.share-item{grid-template-columns:1fr}.share-item-actions{justify-content:flex-start}.share-item-actions button{flex:1 1 140px}}
+.share-warning{margin:16px 0;padding:14px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-card);background:rgba(255,230,166,.06)}.share-warning p{margin:6px 0 0}.share-url{display:flex;gap:8px}.share-url input{flex:1;min-width:0}.share-url button{flex:0 0 auto}.share-item{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line)}.share-item small{display:block;color:var(--muted);margin-top:4px}.share-item button{min-height:44px}.share-item-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.share-item-actions button{min-width:112px}.share-revoked{opacity:.62}#share-preview-moments{max-height:220px;overflow:auto;padding-left:22px}#share-preview-moments li{margin:8px 0;color:#e8dce4}@media(max-width:780px){#share-menu{min-width:44px}.share-url{display:grid;grid-template-columns:1fr}.share-url button{width:100%}.share-item{grid-template-columns:1fr}.share-item-actions{justify-content:flex-start}.share-item-actions button{flex:1 1 140px}}
 
 /* The HTML hidden state must win over shared button/display rules. */
 [hidden]{display:none!important}
 
 /* Explicit-public discovery keeps Track59 paper/rose language without changing SRC064. */
-#community-panel{width:min(940px,calc(100vw - 24px));max-height:min(880px,calc(100dvh - 24px));overflow:auto}
 #community-search-form{display:grid;grid-template-columns:minmax(180px,1fr) minmax(150px,.5fr) auto;gap:10px;align-items:end;margin:18px 0}
 #community-search-form label{font-size:12px;color:var(--muted)}
 #community-search-form input{display:block;width:100%;min-height:44px;margin-top:7px;padding:10px 12px;border:1px solid rgba(255,255,255,.22);border-radius:12px;background:rgba(255,255,255,.04);color:var(--lt-pearl)}
@@ -55,7 +54,7 @@ html[data-lt-theme=garden] #context-kind{color:var(--lt-rose-ink)}
 .community-comment-edit{display:grid;gap:7px;margin-top:6px}.community-comment-edit textarea{width:100%;min-height:44px;padding:10px;border:1px solid rgba(255,255,255,.22);border-radius:12px;background:rgba(255,255,255,.04);color:var(--lt-pearl)}
 .community-details{margin-top:12px;border-top:1px solid #ffffff17;padding-top:10px}.community-details summary{color:#cdbec8;font-size:11px}.community-comment{padding:10px 0;border-bottom:1px solid #ffffff13}.community-comment p{margin:4px 0;color:#eee2e8!important}.community-comment-form{display:grid;gap:7px;margin-top:10px}.community-comment-form textarea,.community-report-form input{width:100%;min-height:44px;padding:10px;border:1px solid rgba(255,255,255,.22);border-radius:12px;background:rgba(255,255,255,.04);color:var(--lt-pearl)}.community-report-form{display:grid;grid-template-columns:1fr auto;gap:7px;margin-top:14px}.community-link{background:transparent!important;color:#d9bdc8!important}.community-empty{grid-column:1/-1;padding:40px 18px;text-align:center;border:1px dashed rgba(255,255,255,.2);border-radius:var(--lt-r-panel);color:var(--muted)!important}
 #community-more{display:block;margin:16px auto 0}#community-more[hidden]{display:none!important}
-@media(max-width:780px){#community-menu{min-width:44px}#community-panel{inset:6px 6px 8px;border-radius:12px;padding:14px 14px 28px}#community-search-form{grid-template-columns:1fr}.community-policy{font-size:12px}#community-list{grid-template-columns:1fr}.community-card{grid-template-columns:112px minmax(0,1fr)}.community-cover{min-height:210px}.community-copy{padding:12px}.community-actions button{flex:1 1 44%}.community-reaction-group{flex-wrap:wrap}.community-reaction-group .community-reaction{flex:0 1 auto}.community-report-form{grid-template-columns:1fr}.community-report-form button{width:100%}}
+@media(max-width:780px){#community-menu{min-width:44px}#community-panel{padding:14px 14px 28px}#community-search-form{grid-template-columns:1fr}.community-policy{font-size:12px}#community-list{grid-template-columns:1fr}.community-card{grid-template-columns:112px minmax(0,1fr)}.community-cover{min-height:210px}.community-copy{padding:12px}.community-actions button{flex:1 1 44%}.community-reaction-group{flex-wrap:wrap}.community-reaction-group .community-reaction{flex:0 1 auto}.community-report-form{grid-template-columns:1fr}.community-report-form button{width:100%}}
 @media(max-width:390px){.community-actions button{flex:1 1 100%}.community-reaction-group{gap:4px}.community-reaction-group .community-reaction{min-height:44px}.community-comment-tools button{flex:1 1 auto}.community-comment-edit textarea{min-height:44px;width:100%}}
 
 /* Compact mobile actions without changing desktop controls. */
@@ -64,7 +63,7 @@ html[data-lt-theme=garden] #context-kind{color:var(--lt-rose-ink)}
 
 /* Full-size discovery, retaining the V2 card + paper preview composition. */
 .tree-views[hidden]{display:none!important}
-#community-panel{position:absolute;inset:10px 14px 14px;width:auto;max-width:none;height:auto;max-height:none;margin:0;padding:20px clamp(16px,3vw,48px) 40px;border:1px solid var(--lt-gold-line);border-radius:16px;box-shadow:0 0 0 1px rgba(255,230,166,.1),0 0 32px rgba(238,190,104,.16),0 24px 60px rgba(0,0,0,.5);background:radial-gradient(ellipse at 80% 0,#17121f,transparent 45%),var(--lt-stage);color:var(--lt-pearl);z-index:6}body.home-screen #community-panel{inset:12px 14px 14px}
+#community-panel{padding:20px clamp(16px,3vw,48px) 40px;background:radial-gradient(ellipse at 80% 0,#17121f,transparent 45%),var(--lt-stage);color:var(--lt-pearl)}
 #community-panel .panel-heading{max-width:1500px;margin:auto}
 #community-panel .panel-heading h2{font-family:var(--lt-font-display);font-size:clamp(25px,3vw,40px);line-height:1.35}
 #community-panel>.panel-note,#community-search-form,.community-layout,#community-panel>.community-policy{max-width:1500px;margin-left:auto;margin-right:auto}
@@ -143,7 +142,6 @@ html[data-lt-theme="garden"] .account-pref button[aria-checked="true"]{backgroun
 .more-fields{margin:18px 0;padding:0 14px 8px;border:1px solid var(--lt-line);border-radius:var(--lt-r-card);background:var(--lt-stage-2)}
 .more-fields summary{padding:12px 0;color:var(--lt-muted)}
 .more-fields label:first-of-type{margin-top:2px}
-#account-assets{width:min(520px,calc(100vw - 24px))}
 .upload-assets{display:grid}
 .upload-asset{display:grid;gap:6px;padding:12px 0;border-bottom:1px solid var(--lt-line)}
 .upload-asset p{margin:0;font-size:12px;color:var(--lt-muted)}
@@ -214,8 +212,6 @@ html[data-v41-screen=book] .tools .ui-btn::after,html[data-v41-screen=board] hea
 #tree-cover-upload .stop-upload{min-height:44px;padding:0 14px;border-radius:var(--lt-r-pill);border:1px solid rgba(255,255,255,.3);background:none}
 
 /* 빠른 추가 (#빠른 추가 ②, 2026-11-09): 새 hex 없이 --lt-* 토큰만 쓴다. 누르는 영역은 44px 이상. */
-#write-chooser{width:420px}
-#quick-add{width:460px}
 /* 이슈 343(2026-11-10): 머리글은 금색이다 — 밤 테마 장미색 금지 규칙(이슈 195). 정원은 --lt-gold가 정원 토큰이다. */
 #quick-add .eyebrow{color:var(--lt-gold)}
 .quick-lede{margin:10px 0 0;font-size:13px;line-height:1.8;color:var(--lt-muted)}
