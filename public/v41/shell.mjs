@@ -101,7 +101,7 @@ function renderTreeMenu(){
   const TREE_VIEWS=new Set(['track59-sketchbook.html','track58-pinboard.html','track56-network.html']);
   treePopover.querySelectorAll('[data-tree-id]').forEach(b=>b.onclick=()=>{const id=b.dataset.treeId;closeTreeMenu();if(!id)return;const wasTreeView=TREE_VIEWS.has(current);choose(id);if(!wasTreeView)show('track59-sketchbook.html',false);flowNavigation();writeLocation();});
  treePopover.querySelector('[data-tree-action="new"]')?.addEventListener('click',()=>{closeTreeMenu();if(member?.snapshot().writable)openEditor('new');else openLoginStart('new-tree');});
- treePopover.querySelector('[data-tree-action="manage"]')?.addEventListener('click',()=>{closeTreeMenu();shellPanels.openTreeManager();});
+ treePopover.querySelector('[data-tree-action="manage"]')?.addEventListener('click',()=>{shellPanels.openTreeManager();closeTreeMenu();});
  treePopover.querySelector('[data-tree-action="share"]')?.addEventListener('click',()=>{closeTreeMenu();$('share-menu').click();});
  // #394: 첫 화면 순간 목록을 지금 트리가 골라진 상태로 연다. 화면을 다시 불러오므로 요청을 전역 플래그로 남긴다.
  treePopover.querySelector('[data-tree-action="moments"]')?.addEventListener('click',()=>{closeTreeMenu();window.LT41_MOMENTS_OPEN={treeId:window.LT41?.tree?.id||''};show('src064-orbit.html');});
@@ -287,12 +287,14 @@ function writeLocation(mode){return shellLocation.writeLocation(mode);}
 function applyBrowserLocation(){return shellLocation.applyBrowserLocation();}
 const PENDING_NEW='lovetree.v41.pending-new';
 // 2026-11-07 계정 표시: 로그인 상태는 첫 글자 동그라미 + 작은 메뉴, 로그아웃 상태는 기존 로그인 알약.
-function panel(id){if(id==='records')updateAccountControls();const target=$(id);if(!target.open)target.showModal();}
+function panel(id){if(id==='records')updateAccountControls();const target=$(id);if(!target.open){if(target.dataset.ltPanel){shellDialogs.noteOpener(id);if(target.dataset.ltPanel==='full')shellDialogs.syncPanelTop();}target.showModal();}}
 // 대화상자 접근성(Tab 순환·Esc 복귀·포커스 되돌리기)은 shell/dialogs.mjs가 맡는다(#231 1-B 후속).
 const shellDialogs=createDialogs({
   $,
   closeTreeTips:()=>closeTreeTips(),
-  closeAccountMenu:()=>closeAccountMenu()
+  closeAccountMenu:()=>closeAccountMenu(),
+  // #380 4: 공통 틀이 닫을 때 "저장하지 않고 닫을까요?"를 묻는 판정 — 트리 관리는 폼 기준값과 비교한다.
+  isTreeDirty:()=>shellPanels.treeDirty()
 });
 
 const shellHeader=createHeader({
@@ -573,7 +575,7 @@ $('file').onchange=async()=>{
  }
 };
 $('trees').onchange=()=>{choose($('trees').value);writeLocation();$('records').close();};
-document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>{if(b.dataset.close==='editor'&&uploads.busy){notify('파일 전송을 마치거나 취소해 주세요.');return;}if(b.dataset.close==='editor'&&formDirty()&&!confirm('작성 중인 입력을 버리고 닫을까요?'))return;if(b.dataset.close==='tree-manager'&&treeDirty()&&!confirm('책 정보 변경을 버리고 닫을까요?'))return;$(b.dataset.close).close();});
+document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>{if(b.dataset.close==='editor'&&uploads.busy){notify('파일 전송을 마치거나 취소해 주세요.');return;}if(b.dataset.close==='editor'&&formDirty()&&!confirm('작성 중인 입력을 버리고 닫을까요?'))return;if(b.dataset.close==='tree-manager'&&treeDirty()&&!confirm('저장하지 않고 닫을까요?'))return;$(b.dataset.close).close();});
 function publicProblem(answer){
  source='share';activeShareId=null;model={trees:[]};window.LT41=null;document.body.dataset.recordSource='share';flowNavigation();document.body.classList.remove('home-screen');hideFrames();$('empty').hidden=false;$('empty-sample').hidden=true;$('empty-records').hidden=true;
  const messages={share_invalid:['공유 주소를 찾을 수 없어요.','주소를 다시 확인해 주세요.'],share_not_found:['공유 주소를 찾을 수 없어요.','주소가 잘못되었거나 존재하지 않아요.'],share_revoked:['공유가 취소됐어요.','소유자가 이 공유 주소를 회수했습니다.'],share_removed:['공유된 트리가 없어졌어요.','트리가 삭제되었거나 더 이상 공개할 수 없어요.'],share_empty:['아직 공개할 순간이 없어요.','소유자가 순간을 남긴 뒤 다시 열어 주세요.'],share_forbidden:['이 공유는 볼 수 없어요.','접근 권한을 확인해 주세요.']};

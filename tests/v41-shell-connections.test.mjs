@@ -12,7 +12,7 @@ const SHELL_CONNECTIONS = [
   'advanced-backup', 'advanced-import', 'change-parent', 'clear', 'delete-moment', 'editor', 'editor-assets-open',
   'editor-cancel', 'empty-records', 'empty-sample', 'file', 'logout', 'mobile-more', 'moment-form',
   'record-menu', 'sample', 'server', 'share-copy', 'share-create', 'share-menu', 'share-moment',
-  'share-preview', 'share-view', 'tree-cover', 'tree-delete', 'tree-form', 'tree-manager',
+  'share-preview', 'share-view', 'tree-cover', 'tree-delete', 'tree-form',
   'tree-tips-close', 'trees', 'write-menu'
 ];
 
@@ -25,9 +25,11 @@ const shellSource = () => {
   return source.replace(/\s+/g, '');
 };
 
-test('셸이 연결하던 40개 요소는 지금도 셸·shell/ 안에서 연결을 갖는다', () => {
+test('셸이 연결하던 요소는 지금도 셸·shell/ 안에서 연결을 갖는다', () => {
   const source = shellSource();
+  // #380 4: tree-manager의 연결은 shell/dialogs.mjs의 dialog[data-lt-panel] 공통 틀(열기·닫기·Esc·바깥 클릭)로 옮겨갔다.
+  // 그래서 이 목록에서는 빼고, 공통 틀 계약은 tests/v41-panel-mode.test.mjs가 고정한다.
   const missing = SHELL_CONNECTIONS.filter(id => !new RegExp(`\\$\\('${id}'\\)\\??\\.(onclick|onchange|onsubmit|oninput|addEventListener)`).test(source));
   assert.deepEqual(missing, [], '연결이 사라진 요소: ' + missing.join(', '));
-  assert.equal(SHELL_CONNECTIONS.length, 40);
+  assert.equal(SHELL_CONNECTIONS.length, 39);
 });

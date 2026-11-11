@@ -7,6 +7,7 @@ import {createDialogs} from '../public/v41/shell/dialogs.mjs';
 function fakeElement(props = {}) {
   const el = {
     open: false, hidden: false, disabled: false, id: props.id || '',
+    dataset: props.dataset || {},
     focusCount: 0,
     focus() { el.focusCount += 1; },
     close() { el.open = false; },
@@ -20,7 +21,7 @@ function fakeElement(props = {}) {
   return el;
 }
 
-function setup({focusables = [], popoverHidden = true} = {}) {
+function setup({focusables = [], popoverHidden = true, treeDirty = false} = {}) {
   const elements = {
     'account-assets': fakeElement({id: 'account-assets'}),
     'editor': fakeElement({id: 'editor'}),
@@ -29,12 +30,18 @@ function setup({focusables = [], popoverHidden = true} = {}) {
     'tree-tips': fakeElement({id: 'tree-tips', hidden: false}),
   };
   elements['editor'].querySelectorAll = () => focusables;
-  const dialogs = [fakeElement({id: 'records'}), fakeElement({id: 'editor'}), fakeElement({id: 'tree-manager'})];
+  const dialogs = [fakeElement({id: 'records'}), fakeElement({id: 'editor'}), fakeElement({id: 'tree-manager', dataset: {ltPanel: 'center'}})];
   const keydown = [], clicks = [];
   const doc = {
     activeElement: null,
     addEventListener(type, fn) { if (type === 'keydown') keydown.push(fn); else clicks.push([type, fn]); },
-    querySelectorAll(sel) { return sel === 'dialog' ? dialogs : []; },
+    querySelectorAll(sel) {
+      if (sel === 'dialog') return dialogs;
+      // #380 4: 공통 틀은 data-lt-panel 대화상자만, 옛 바깥 클릭 규칙은 나머지만 묶는다.
+      if (sel === 'dialog:not([data-lt-panel])') return dialogs.filter(d => !d.dataset.ltPanel);
+      if (sel === 'dialog[data-lt-panel]') return dialogs.filter(d => d.dataset.ltPanel);
+      return [];
+    },
     contains() { return true; },
   };
   const calls = [];
@@ -44,6 +51,7 @@ function setup({focusables = [], popoverHidden = true} = {}) {
     $: id => elements[id],
     closeTreeTips: () => calls.push('closeTreeTips'),
     closeAccountMenu: () => calls.push('closeAccountMenu'),
+    isTreeDirty: () => treeDirty,
   });
   return {elements, dialogs, keydown, api, calls};
 }
@@ -52,6 +60,42 @@ function key(extra) {
   const e = {key: 'Tab', shiftKey: false, prevented: false, preventDefault() { e.prevented = true; }, ...extra};
   return e;
 }
+
+// #380 4: 공통 틀의 Esc 규칙 — 쓰던 내용이 있으면 한 번 묻고, 아니오를 고르면 닫지 않는다.
+test('트리 관리 Esc: 더러우면 한 번 묻고, 아니오면 열어 둔다', () => {
+  const {dialogs, api} = setup({treeDirty: true});
+  const manager = dialogs[2];
+  manager.open = true;
+  const realConfirm = globalThis.confirm;
+  try {
+    let asked = 0;
+    globalThis.confirm = () => { asked += 1; return false; };
+    const cancel = {preventDefault() { cancel.prevented = true; }};
+    manager.listeners.cancel(cancel);
+    assert.equal(asked, 1, '한 번만 묻는다');
+    assert.equal(cancel.prevented, true, '아니오면 닫지 않는다');
+    assert.equal(manager.open, true, '열린 상태 유지');
+    globalThis.confirm = () => true;
+    const cancel2 = {preventDefault() {}};
+    manager.listeners.cancel(cancel2);
+    assert.equal(manager.open, false, '예를 고르면 닫는다');
+  } finally { globalThis.confirm = realConfirm; }
+});
+
+test('트리 관리 Esc: 깨끗하면 묻지 않고 바로 닫는다', () => {
+  const {dialogs, api} = setup({treeDirty: false});
+  const manager = dialogs[2];
+  manager.open = true;
+  const realConfirm = globalThis.confirm;
+  try {
+    let asked = 0;
+    globalThis.confirm = () => { asked += 1; return false; };
+    const cancel = {preventDefault() {}};
+    manager.listeners.cancel(cancel);
+    assert.equal(asked, 0, '묻지 않는다');
+    assert.equal(manager.open, false, '바로 닫는다');
+  } finally { globalThis.confirm = realConfirm; }
+});
 
 test('편집기 대화상자에서 Tab은 마지막에서 처음으로, Shift+Tab은 처음에서 마지막으로 순환한다', () => {
   const first = fakeElement(), last = fakeElement();
