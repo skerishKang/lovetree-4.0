@@ -26,11 +26,12 @@ function sampleState(cover = {}) {
 
 test('서버 저장 경계: coverDesign을 PUT→GET 왕복에 유지한다', async () => {
   const { service, principal } = build();
-  const write = await service.write(principal, { state: sampleState({ coverDesign: 'texture-3' }), expectedRevision: 0, clientKey: 'cover-create-1' });
+  const write = await service.write(principal, { state: sampleState({ coverDesign: 'texture-3', coverMode: 'design' }), expectedRevision: 0, clientKey: 'cover-create-1' });
   assert.equal(write.revision, 1);
   const read = await service.read(principal);
   assert.equal(read.state.trees[0].coverDesign, 'texture-3', '저장한 디자인 표지가 읽기에서 유지된다');
-  assert.deepEqual(Object.keys(read.state.trees[0]).sort(), ['coverDesign', 'coverMomentId', 'createdAt', 'id', 'inbox', 'moments', 'subject', 'title', 'updatedAt'], '트리 필드는 이것만');
+  assert.equal(read.state.trees[0].coverMode, 'design', '고른 표지 방법도 왕복에서 유지된다');
+  assert.deepEqual(Object.keys(read.state.trees[0]).sort(), ['coverDesign', 'coverMode', 'coverMomentId', 'createdAt', 'id', 'inbox', 'moments', 'subject', 'title', 'updatedAt'], '트리 필드는 이것만');
 });
 
 test('서버 저장 경계: 목록 밖 값은 저장 거부가 아니라 \'\'로 정리된다', async () => {

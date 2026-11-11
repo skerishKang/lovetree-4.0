@@ -16,9 +16,12 @@ test('트리 고르기 단추는 aria-label로 화면 글자를 덮지 않는다
   assert.doesNotMatch(html, /id="record-menu"[^>]*aria-label=/);
 });
 
-test('계정 메뉴의 테마 항목은 밤/정원 두 칸과 menuitemradio·aria-checked를 쓴다', () => {
-  assert.match(html, /data-set-theme="night" aria-checked="true">밤<\/button><button type="button" role="menuitemradio" data-set-theme="garden" aria-checked="false">정원/);
+test('설정 창 "화면" 묶음의 테마 항목은 밤/정원 두 칸과 radio·aria-checked를 쓴다', () => {
+  // #380 5번: 테마는 계정 메뉴가 아니라 설정 창(전체 화면)의 "화면" 묶음에 있다.
+  assert.match(html, /aria-checked="true" data-set-theme="night">밤<\/button><button type="button" role="radio" aria-checked="false" data-set-theme="garden">정원/);
   assert.doesNotMatch(html, /id="account-theme"/);
+  assert.doesNotMatch(html, /class="account-theme"/);
+  assert.doesNotMatch(html, /role="menuitemradio" data-set-theme/, '계정 메뉴 안 옛 테마 항목이 남지 않는다');
   assert.doesNotMatch(html, /data-set-theme="night"[^>]*aria-pressed=/);
   assert.match(theme, /setAttribute\('aria-checked', String\(button\.dataset\.setTheme === theme\)\)/);
   assert.doesNotMatch(theme, /setAttribute\('aria-pressed'/);

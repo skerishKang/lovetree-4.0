@@ -1,7 +1,6 @@
 import '../src/styles.css';
 import {mountOrbit,ORBIT_EXAMPLE} from '../src/views/orbit.js';
-import {homeCardsPlan,readHomeCardsMode,writeHomeCardsMode,clickWithin} from './home-cards.js';
-import {createViewMenu} from '../public/v41/home-view-menu.mjs';
+import {homeCardsPlan,readHomeCardsMode} from './home-cards.js';
 import {HOME_ORBIT_LIMIT} from './home-moments.js';
 import {fetchPopularCards} from './home-popular.js';
 import {createHomeActions} from './home-actions.js';
@@ -49,7 +48,7 @@ if(momentsRequest){try{parent.postMessage({type:'lt41-moments-opened'},location.
 const shadow=document.getElementById('orbit').shadowRoot;
 // #380(2026-11-11): 가운데 세 버튼 — 자리·개수 그대로, 남은 폭을 똑같이 나눠 세 폭 동일(가장 긴 글자 기준 고정), 로그인 후 상태 한 줄.
 const centerStyle=document.createElement('style');
-centerStyle.textContent='.center .actions .subtleBtn{flex:1 1 0%;min-width:0;overflow-wrap:anywhere;text-align:center;line-height:1.15}.center > p:not(.center-note){min-height:2lh}.center > p:not(.center-note) .center-status{pointer-events:auto;cursor:pointer;text-decoration:underline;text-underline-offset:3px}@media (max-width:480px){.center .actions{flex-direction:column;align-items:stretch}.center .actions .subtleBtn{width:100%}}';
+centerStyle.textContent='.center .actions .subtleBtn{flex:1 1 0%;min-width:0;overflow-wrap:anywhere;text-align:center;line-height:1.15}.center > p:not(.center-note){min-height:2lh}@media (max-width:480px){.center .actions{flex-direction:column;align-items:stretch}.center .actions .subtleBtn{width:100%}}';
 shadow.append(centerStyle);
 // 2026-11-07 테마 A/B: 첫 화면 오른쪽 위 도구 줄의 버튼 하나로 밤/정원을 바꾼다. 저장 키는 셸과 같다(lt41.theme).
 // 정원 색은 public/v41/identity.css의 정원 블록에만 있고, 그 파일을 그림자 루트에도 넣어 :host 규칙을 쓴다.
@@ -96,10 +95,11 @@ shadow.querySelector('.center-note')?.setAttribute('role','status');
 if(loggedIn){
   const target=shadow.querySelector('.center > p:not(.center-note)');
   if(target){
-    let label=null,action=null;
+    let label=null;
     if(context.tree?.inbox===true){
       const n=(context.tree.moments||[]).length;
-      if(n>0){label=`정리 안 된 순간 ${n}개 · 정리하기`;action='cleanup';}
+      // #380 5번: 정리하기 입구는 트리 ▾ 드롭다운 한 곳만 — 첫 화면은 몇 개인지만 알린다.
+      if(n>0){label=`정리 안 된 순간 ${n}개`;}
     }
     if(label===null){
       let m=null;
@@ -118,26 +118,43 @@ if(loggedIn){
     target.textContent='';
     target.append('기억은 아직 여기에서 이어지고 있어요.');
     target.append(document.createElement('br'));
-    if(action==='cleanup'){
-      const sp=document.createElement('span');
-      sp.className='center-status';sp.setAttribute('role','button');sp.setAttribute('tabindex','0');
-      sp.textContent=label;sp.title='모아둔 순간 정리 열기';
-      sp.onclick=()=>bridge.actions.cleanup();
-      sp.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();bridge.actions.cleanup();}};
-      target.append(sp);
-    }else{target.append(label);}
+    target.append(label);
   }
 }
 const mobileFit=document.createElement('style');mobileFit.textContent='@media(max-width:768px){.topbar{gap:12px;flex-wrap:wrap;align-items:center;padding:8px 12px}.top-actions{gap:6px;flex-shrink:0;flex-wrap:wrap;margin-left:auto}.topbar .menuBtn{white-space:nowrap;padding:10px 9px;font-size:14px}.actions .subtleBtn{font-size:14px}.center .center-note{font-size:14px}.hint{font-size:14px}}';shadow.append(mobileFit);
-// 2026-11-08 #213 2번: "움직임 멈춤"·"정원/밤"·"카드: ○○"를 "보기 ▾" 메뉴 하나로 묶는다.
-// 항목: 움직임 켜기/멈춤 · 테마 밤/정원 · 카드 출처(로그인 4 / 로그아웃 예시·인기). 저장값과 lt41-theme 메시지는 그대로다.
-// 2026-11-11 #231 후속: 위 메뉴 로직은 public/v41/home-view-menu.mjs의 createViewMenu로 옮겼다(조건·문구·id 그대로).
-createViewMenu({
- document,shadow,storage:localStorage,readTheme,writeTheme,applyTheme,clickWithin,
- getCardsMode:()=>cardsPlan.mode,isLoggedIn:()=>loggedIn,getMotion:()=>orbit?.motion,
- sendTheme:theme=>parent.postMessage({type:'lt41-theme',theme},location.origin),
- writeCardsMode:writeHomeCardsMode,reload:()=>location.reload()
+// #380 5번: 첫 화면 오른쪽 위 "보기 ▾" 메뉴(테마·움직임·카드 출처)는 없앴다.
+// 로그인 상태의 같은 항목은 설정 창(셸)의 '화면' 묶음에 있고, 셸이 아래 두 메시지로 알려 준다.
+// 로그아웃에는 설정 입구가 없으므로 테마만 오른쪽 위 작은 ◐ 단추로 남긴다(저장 키 lt41.theme 그대로).
+addEventListener('message',event=>{
+ if(event.origin!==location.origin)return;
+ const type=event.data?.type;
+ if(type==='lt41-motion'){orbit?.motion?.set?.(!!event.data.paused);}
+ else if(type==='lt41-home-cards'){location.reload();}
 });
+if(!loggedIn){
+ const topActions=shadow.querySelector('.top-actions');
+ if(topActions){
+  const quick=document.createElement('button');
+  quick.type='button';
+  quick.className='menuBtn theme-quick';
+  quick.setAttribute('data-theme-quick','');
+  const paint=()=>{
+   const now=readTheme(localStorage);
+   quick.textContent='◐';
+   const label=now==='garden'?'화면 테마 바꾸기: 지금 정원, 누르면 밤':'화면 테마 바꾸기: 지금 밤, 누르면 정원';
+   quick.setAttribute('aria-label',label);
+   quick.title=label;
+  };
+  quick.onclick=()=>{
+   const next=writeTheme(localStorage,readTheme(localStorage)==='garden'?'night':'garden');
+   applyTheme(next);
+   paint();
+   parent.postMessage({type:'lt41-theme',theme:next},location.origin);
+  };
+  paint();
+  topActions.append(quick);
+ }
+}
 // 2026-11-08 #213 2번: 도구 줄 버튼은 "보기"·"순간 목록" 둘만 남긴다. 공통 헤더가 이미 둘러보기·로그인을 맡으므로
 // 첫 화면 안의 중복 버튼은 만들지 않고, 궤도가 넣어 둔 계정 자리도 지운다(화면 낭독기 순서에서도 사라진다).
 shadow.querySelector('[data-home-account]')?.remove();

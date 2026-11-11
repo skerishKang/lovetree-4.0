@@ -105,9 +105,13 @@ test('메뉴 선택은 기존 저장값을 그대로 쓴다(테마·카드 출�
 //    (public/v41/home-view-menu.mjs의 createViewMenu를 가짜 shadowRoot로 띄운다)
 //  · 궤도의 dispose.motion 읽기/뒤집기 → 같은 파일의 '메뉴 선택' 시험
 // 첫 화면 쪽은 연결만 남았는지 한 줄로 확인한다(메뉴 로직이 다시 home.js에 들어가지 않게).
-test('첫 화면은 메뉴 모듈을 연결만 한다(로직이 다시 인라인으로 돌아가지 않는다)', () => {
-  assert.match(homeJS, /createViewMenu\(\{/);
-  assert.doesNotMatch(homeJS, /viewMenuKey\(|renderViewMenu\(/, '메뉴 규칙·그리기는 모듈 안에 있다');
+test('첫 화면은 화면 설정을 셸 메시지와 ◐ 단추로만 연결한다(로직이 다시 인라인으로 돌아가지 않는다)', () => {
+  // #380 5번: 로그인 상태의 화면 항목(테마·움직임·카드)은 설정 창이 맡고, 첫 화면은 메시지로만 받는다.
+  assert.doesNotMatch(homeJS, /createViewMenu\(/, '첫 화면에 보기 메뉴 배선이 없다');
+  assert.doesNotMatch(homeJS, /viewMenuKey\(|renderViewMenu\(/, '메뉴 규칙·그리기는 첫 화면에 없다');
+  assert.match(homeJS, /type==='lt41-motion'/, '설정의 움직임을 메시지로 받는다');
+  assert.match(homeJS, /type==='lt41-home-cards'/, '설정의 첫 화면 카드를 메시지로 받는다');
+  assert.match(homeJS, /data-theme-quick/, '로그아웃에는 ◐ 단추 하나만 남는다');
 });
 
 // ── 7차(2026-11-09): 동작 표를 함수로 넓힌다 ─────────────────────────────────

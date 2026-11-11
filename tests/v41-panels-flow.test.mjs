@@ -38,6 +38,7 @@ function harness({
   const ids = [
     'change-parent', 'delete-moment', 'editor', 'editor-cancel', 'link-moment', 'manage-tree',
     'tree-cover', 'tree-delete', 'tree-manager', 'unlink-moment', 'write-menu',
+    'tree-cover-method', 'tree-cover-moment-box', 'tree-photo-cover',
     'parent-target', 'parent-relation', 'parent-management', 'parent-current',
     'editor-title', 'editor-context', 'relation-label', 'more-fields', 'form-error',
     'moment-management', 'tree-cover-hint', 'media-preview', 'quick-entry-hint', 'tree-form-error',
@@ -68,6 +69,8 @@ function harness({
     title: fakeEl({ value: '' }),
     subject: fakeEl({ value: '' }),
     coverMomentId: elements['tree-cover'],
+    // #380 5번: 표지 방법 한 줄(첫 순간(기본)·순간에서·디자인·사진).
+    coverMode: fakeRadioGroup(['basic', 'moment', 'design', 'photo']),
     coverDesign: fakeRadioGroup(['', 'texture-1', 'texture-2', 'texture-3', 'texture-4', 'texture-5', 'texture-6'])
   } });
   // #256-3 2단계: 책 정보 창에 사진 업로더가 실린다 — 최소 미디어 슬롯 흉내.
@@ -374,20 +377,23 @@ test('#314 회귀: 책 A(격자) → B(디자인 없음) → 다시 A를 연속�
     assert.equal(savedValue(), '', 'B에서 그대로 저장하면 빈 값이 나간다');
     assert.equal(form.elements.title.value, '겨울 정원', '제목도 B 값으로 바뀐다');
     assert.equal(form.elements.subject.value, '겨울', '대상도 B 값으로 바뀐다');
-    assert.equal(h.elements['tree-cover'].value, '', '사진 표지 select도 B 값(없음)으로');
+    assert.equal(h.elements['tree-cover'].value, 'b1', '사진 표지 select도 B 기준(첫 순간)으로');
     assert.equal(h.elements['tree-cover-title'].value, '', '새 사진 제목 칸도 빈다');
     assert.equal(h.elements['tree-photo-cover'].hidden, true, '사진 표지 안내도 B 기준으로 숨는다');
-    assert.match(h.elements['tree-cover-hint'].textContent, /표지를 고르지 않으면/, '안내 문구도 B 기준');
+    assert.match(h.elements['tree-cover-hint'].textContent, /첫 순간/, '안내 문구도 B 기준');
     assert.equal(h.coverSlotParts['[data-upload-status]'].textContent, '', '이전 책의 업로드 안내가 남지 않는다');
     assert.equal(h.coverSlotParts['[data-media-file]'].value, '', '이전 책에서 고른 파일이 남지 않는다');
 
     open(TREE_A);
     assert.deepEqual(checked(), ['texture-3'], '다시 A를 열면 저장된 격자가 돌아온다');
-    assert.equal(h.elements['tree-cover'].value, '', 'A의 표지 select도 다시 A 값으로');
+    assert.equal(h.elements['tree-cover'].value, 'a1', 'A의 표지 select도 다시 A 값(첫 순간)으로');
 
     // 사진 표지가 있는 책과 없는 책의 안내가 서로 새지 않는다.
-    open({ ...TREE_A, coverMomentId: 'a2' });
-    assert.equal(h.elements['tree-photo-cover'].hidden, false, '사진 표지 책에서는 안내가 보인다');
+    // #380 5번: 사진 표지는 '순간에서'(사진 순간) 또는 '사진' 방법일 때 안내가 보인다.
+    // 실제 저장본의 순간처럼 type='photo'·image를 가진 순간을 표지로 고른 경우.
+    const photoTree = { ...TREE_A, coverDesign: '', coverMomentId: 'a2', moments: TREE_A.moments.map(m => m.id === 'a2' ? { ...m, type: 'photo', image: m.url } : m) };
+    open(photoTree);
+    assert.equal(h.elements['tree-photo-cover'].hidden, false, '사진 순간을 표지로 쓰는 책에서는 안내가 보인다');
     assert.match(h.elements['tree-cover-hint'].textContent, /“사진”의 사진을 표지로 사용합니다/);
     open(TREE_B);
     assert.equal(h.elements['tree-photo-cover'].hidden, true, '사진 표지가 없는 책에서는 다시 숨는다');
@@ -406,6 +412,7 @@ test('#314 회귀: 사진으로 표지를 만든 뒤 책 정보 저장을 다시
     // 업로드 성공 직후의 상태: 모델·select에 새 사진 순간이 반영된다(makeCoverFromUpload가 하는 일).
     h.lt41.tree = { ...TREE_B, coverMomentId: 'b-photo', moments: [...TREE_B.moments, photo] };
     h.elements['tree-cover'].value = 'b-photo';
+    for (const radio of form.elements.coverMode) radio.checked = radio.value === 'photo';
     // 창 아래 '책 정보 저장'을 다시 누른다.
     form.onsubmit({ preventDefault() {}, target: form });
     const last = h.calls.apply.at(-1);

@@ -63,7 +63,8 @@ test('가운데 세 폭 동일·두 줄 높이 고정·좁은 화면 세로 스�
 
 test('큰 제목 아래 둘째 줄 상태 문구 계산(2026-11-11): 정리 알림 > 마지막 순간 > 첫 순간 안내',()=>{
   assert.equal(homeSecondLine({member:'out'}),null);
-  assert.deepEqual(homeSecondLine({member:'in',unorganizedCount:3}),{text:'정리 안 된 순간 3개 · 정리하기',action:'cleanup'});
+  // #380 5번: 정리 입구는 트리 ▾ 드롭다운 한 곳뿐 — 첫 화면은 몇 개인지만 알린다.
+  assert.deepEqual(homeSecondLine({member:'in',unorganizedCount:3}),{text:'정리 안 된 순간 3개',action:'none'});
   assert.deepEqual(homeSecondLine({member:'in',unorganizedCount:0,hasMoment:false}),{text:'첫 순간을 남기면 여기서 이어 볼 수 있어요',action:'none'});
   assert.deepEqual(homeSecondLine({member:'in',last:{title:'GANGNAM STYLE',days:2}}),{text:'마지막 순간 「GANGNAM STYLE」 · 2일 전',action:'none'});
   assert.deepEqual(homeSecondLine({member:'in',last:{title:'GANGNAM STYLE'}}),{text:'마지막 순간 「GANGNAM STYLE」',action:'none'});
@@ -79,10 +80,11 @@ test('홈 배선: 추가/resume/둘러보기/로그아웃 시작이 기존 액�
   assert.equal(/새 트리 만들기/.test(centerCode),false,'"새 트리 만들기"는 가운데 줄에서 뺀다');
 });
 
-test('큰 제목 아래 설명 둘째 줄: 높이 두 줄 고정·정리하기 한 줄 링크',()=>{
+test('큰 제목 아래 설명 둘째 줄: 높이 두 줄 고정·정리 입구는 첫 화면에 없다',()=>{
   assert.match(homeSrc,/\.center > p:not\(\.center-note\)\{min-height:2lh\}/);
-  assert.match(homeSrc,/center-status/,'정리하기 상태 줄');
-  assert.match(homeSrc,/bridge\.actions\.cleanup\(\)/,'정리 창 연결');
+  // #380 5번: 첫 화면의 정리 링크(center-status)를 없앴다 — 입구는 트리 ▾ 드롭다운 하나뿐이다.
+  assert.equal(homeSrc.includes('center-status'),false,'첫 화면 정리 링크 없음');
+  assert.equal(homeSrc.includes('actions.cleanup('),false,'첫 화면에서 정리 창을 열지 않는다');
 });
 
 test('가운데 위 모아둔 순간 알약은 첫 화면에서 제거됐다',()=>{

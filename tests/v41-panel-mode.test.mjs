@@ -13,7 +13,8 @@ const shell = read('public/v41/shell.mjs');
 const panels = read('public/v41/shell/panels.mjs');
 
 test('순간 정리는 전체 화면 모양, 트리 관리는 가운데 창 모양을 태그로 받는다', () => {
-  assert.match(html, /<dialog id="cleanup-panel" data-lt-panel="full" data-lt-return="cleanup-menu" aria-labelledby="cleanup-title">/);
+  // #380 5번: 정리 창 입구는 트리 ▾ 드롭다운이라, 닫은 뒤 초점은 그 단추(record-menu)로 돌아간다.
+  assert.match(html, /<dialog id="cleanup-panel" data-lt-panel="full" data-lt-return="record-menu" aria-labelledby="cleanup-title">/);
   assert.match(html, /<dialog id="tree-manager" data-lt-panel="center" data-lt-return="record-menu" aria-labelledby="tree-manager-title">/);
 });
 
@@ -28,7 +29,7 @@ test('가운데 창 모양은 화면 중앙에 놓이고 좁은 화면에서는 
 });
 
 test('공통 틀은 열 때 연 버튼을 기억하고 닫히면 초점을 돌려준다', () => {
-  assert.match(html, /data-lt-return="cleanup-menu"/);
+  assert.match(html, /data-lt-return="record-menu"/);
   assert.match(html, /data-lt-return="record-menu"/);
   // dialog 'open' 이벤트는 환경마다 시점이 달라 쓰지 않는다 — 셸 panel()이 showModal 직전에 기록한다.
   assert.match(dialogs, /noteOpener: id => \{/);

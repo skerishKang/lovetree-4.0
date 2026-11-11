@@ -32,6 +32,8 @@ function harness({ owned = true, writable = true, source = 'server', busy = fals
   els['tree-cover'] = fakeElement();
   els['tree-form'] = fakeElement({ elements: {
     title: fakeElement(), subject: fakeElement(), coverMomentId: els['tree-cover'],
+    // #380 5번: 표지 방법 한 줄(첫 순간(기본)·순간에서·디자인·사진).
+    coverMode: fakeRadioGroup(['basic', 'moment', 'design', 'photo']),
     coverDesign: fakeRadioGroup(['', 'texture-1', 'texture-2', 'texture-3', 'texture-4', 'texture-5', 'texture-6'])
   } });
   // 새 사진 표지 만들기(이슈 256-3 2단계): 업로더가 기대하는 최소 미디어 슬롯 흉내.
@@ -283,12 +285,16 @@ test('새 사진 표지: 업로드 성공 뒤 순간 추가 → 표지 지정 �
     globalThis.location = { origin: 'https://lovetree-4-0.pages.dev' };
     globalThis.fetch = () => { uploaded += 1; return Promise.resolve({ ok: true, status: 200, text: async () => JSON.stringify({ name: 'c.png', url: 'https://lovetree-4-0.pages.dev/api/media/c.png' }) }); };
     h.panels.openTreeManager();
-    assert.equal(h.els['tree-cover-upload'].hidden, false, '서버·쓰기 가능이면 보인다');
+    // #380 5번: 올리기 칸은 표지 방법에서 '사진'을 골랐을 때만 보인다.
+    assert.equal(h.els['tree-cover-upload'].hidden, true, '처음에는 첫 순간(기본)이라 올리기 칸이 숨는다');
+    for (const radio of h.els['tree-form'].elements.coverMode) radio.checked = radio.value === 'photo';
+    h.els['tree-form'].elements.coverMode[3].onchange?.();
+    assert.equal(h.els['tree-cover-upload'].hidden, false, '사진 방법을 고르면 보인다');
     await driveCoverUpload(h);
     assert.equal(h.calls.length, 2, '순간 추가 + 표지 지정');
     assert.equal(h.calls[0][0], 'add');
     assert.equal(h.calls[1][0], 'editTree');
-    assert.deepEqual(h.calls[1][1], { title: '윤슬', subject: '윤슬', coverMomentId: 'new1', coverDesign: '' }, '이름·대상은 저장된 값, 표지는 새 순간, 디자인은 보존');
+    assert.deepEqual(h.calls[1][1], { title: '윤슬', subject: '윤슬', coverMomentId: 'new1', coverDesign: '', coverMode: 'photo' }, '이름·대상은 저장된 값, 표지는 새 순간, 방법은 사진, 디자인은 보존');
     assert.equal(h.els['tree-cover'].value, 'new1', '선택지가 새 순간으로 채워지고 고른다');
     assert.equal(h.els['tree-cover'].children.length, 4, '기본 + 기존 2 + 새 사진');
     assert.match(h.notes.join(' '), /새 사진 순간을 표지로 만들었어요/);

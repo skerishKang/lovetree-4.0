@@ -19,7 +19,8 @@ export function createCleanup(deps) {
     const snap = getMember()?.snapshot();
     return !!snap?.owned && !!snap?.writable;
   }
-  // 헤더 '정리하기'는 모아둔 순간 트리에서만 보인다. 순간 상세의 옮기기는 일반 트리에서도 연다.
+  // #380 5번: 입구는 트리 ▾ 드롭다운의 '정리 전 N개 정리하기' 한 곳이다(이전 헤더 '정리하기' 단추는 없앴다).
+  // 순간 상세의 옮기기(lt41-move)는 일반 트리에서도 연다.
   function headerAvailable() {
     return cleanupAvailable({ source: getSource(), owned: !!getMember()?.snapshot().owned, tree: window.LT41?.tree || null });
   }

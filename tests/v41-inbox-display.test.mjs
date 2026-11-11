@@ -106,17 +106,19 @@ test('책장: inbox 트리를 맨 앞으로 정렬해 그리고 표시를 붙인
  assert.match(nav,/inbox:t\.inbox===true/);
 });
 
-test('셸: 헤더 표시·정리하기 단추·트리 고르기 목록이 inbox-model 을 쓴다',()=>{
+test('셸: 헤더 표시·정리 입구·트리 고르기 목록이 inbox-model 을 쓴다',()=>{
  const shell=read('../public/v41/shell.mjs');
  // 트리 드롭다운: inbox를 맨 위에 두고 '정리 전 N'으로 표시한다.
  assert.match(shell,/tree\.inbox===true\?`정리 전 /);
  assert.match(shell,/const ordered=trees\.sort\(\(a,b\)=>Number\(b\?\.inbox===true\)-Number\(a\?\.inbox===true\)\)/);
- assert.match(shell,/isInboxTree\(c\.tree\)/);
- assert.match(shell,/\$\('cleanup-menu'\)\.hidden=!\(c&&source==='server'&&member\?\.snapshot\(\)\.owned&&member\.snapshot\(\)\.writable&&isInboxTree\(c\.tree\)\)/);
+ // #380 5번: 정리 입구는 트리 ▾ 드롭다운 한 곳뿐(모아둔 순간일 때만) — 헤더 단추는 없앴다.
+ assert.match(shell,/cleanupAvailable\(\{source,owned:!!member\?\.snapshot\(\)\.owned,tree:currentTree\}\)/);
+ assert.doesNotMatch(shell,/\$\('cleanup-menu'\)/, '옛 헤더 정리 단추 조회가 남지 않는다');
  assert.match(shell,/escHTML\(displayTreeTitle\(tree\.title\|\|tree\.subject\|\|'트리'\)\)/);
- // 정리 창 모듈 연결과 진입 단추.
+ // 정리 창 모듈 연결과 진입(드롭다운 항목).
  assert.match(shell,/createCleanup\(\{/);
- assert.match(shell,/\$\('cleanup-menu'\)\.onclick=\(\)=>shellCleanup\.open\(\{\}\)/);
+ assert.match(shell,/data-tree-action="cleanup"/);
+ assert.ok(shell.includes(`[data-tree-action="cleanup"]')?.addEventListener('click',()=>{closeTreeMenu();shellCleanup.open({});})`),'드롭다운 정리 항목이 정리 창을 연다');
  // 보기 메시지: 옮기기 요청은 서버 기록에서만 받는다.
  const messages=read('../public/v41/shell/messages.mjs');
  assert.match(messages,/lt41-move' && getSource\(\) === 'server'\) openCleanup\(\{ momentId: data\.momentId \}\)/);
@@ -124,7 +126,8 @@ test('셸: 헤더 표시·정리하기 단추·트리 고르기 목록이 inbox-
 
 test('정리 창: 순간 고르기·새 트리 만들기·옮기기·안내가 화면에 있다',()=>{
  const html=read('../public/v41/index.html');
- assert.match(html,/id="cleanup-menu"/);
+ // #380 5번: 옛 헤더 '정리하기' 단추는 없다 — 입구는 트리 ▾ 드롭다운뿐이다.
+ assert.equal(html.includes('id="cleanup-menu"'),false,'옛 헤더 단추 없음');
  assert.match(html,/id="cleanup-panel"/);
  assert.match(html,/id="cleanup-moments"/);
  assert.match(html,/id="cleanup-new-name"/);

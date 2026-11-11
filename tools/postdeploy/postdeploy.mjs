@@ -914,110 +914,115 @@ async function checkVisualTokens(page, target, opts, stamp) {
   return seen;
 }
 
-async function checkHomeCardMenuMouse(page, target, opts, stamp) {
-  // 2026-11-08 #213 2번: 첫 화면 도구 줄의 "보기 ▾" 메뉴를 마우스로 열어 1440/390에서 유지되는지,
-  // 바깥 클릭·Esc로 닫히는지 운영에서 확인한다(shadow DOM retarget 회귀 방지).
-  // 메뉴 하나에 움직임·테마(밤/정원)·카드 출처가 함께 있고, "순간 목록"은 메뉴 밖에 따로 남는다.
-  // 기대 항목 수는 로그인 상태에 따라 다르다(로그아웃 5 = 움직임 1 + 테마 2 + 카드 2,
-  // 로그인 7 = 움직임 1 + 테마 2 + 카드 4). 제품 함수 viewMenuItems 로 계산해 숫자를 두 번 적지 않는다.
+async function checkScreenSettings(page, target, opts, stamp) {
+  // #380 5번: 첫 화면 오른쪽 위 "보기 ▾" 메뉴(테마·움직임·카드 출처)를 없앴다.
+  //  - 로그아웃: 오른쪽 위 작은 ◐ 하나만 남고, 누르면 밤↔정원이 바뀐다(설정 입구가 없기 때문).
+  //  - 로그인: 같은 항목이 설정 창의 "화면" 묶음에 있다(테마 2 · 움직임 1 · 제목 3 · 첫 화면 카드 4).
+  // 기대 항목 수는 제품 함수 viewMenuItems 로 계산해 숫자를 두 번 적지 않는다.
   const problems = [];
   const base = new URL(target.href);
-  // 러너(headless chromium)에서 바깥 클릭 직후 shadow root 읽기가 한 번 비는 경우가 있어 3회까지 다시 읽는다.
-  const readMenuOnce = () => page.evaluate(() => {
+  const readOnce = () => page.evaluate(() => {
     const frame = ([document.getElementById('view'), document.getElementById('view-next')].find((el) => el && !el.hidden && el.getClientRects().length > 0) || document.getElementById('view'));
     const doc = frame?.contentDocument;
     const sh = doc?.getElementById('orbit')?.shadowRoot;
-    const menu = sh?.querySelector('#home-view-menu');
+    const quick = sh?.querySelector('[data-theme-quick]');
     const avatar = document.getElementById('account-avatar');
+    const box = document.getElementById('account-settings');
+    const labels = (sel) => box ? [...box.querySelectorAll(sel)].map((b) => b.textContent.trim()) : [];
     return {
-      hidden: menu?.hidden,
-      expanded: sh?.querySelector('[data-lt-view-menu]')?.getAttribute('aria-expanded'),
-      items: menu ? [...menu.querySelectorAll('[role^=menuitem]')].map((b) => b.textContent.trim()) : [],
-      toolButtons: sh ? [...sh.querySelectorAll('.top-actions > button, .top-actions > span > button')].filter((b) => b.getClientRects().length > 0).map((b) => b.textContent.trim()) : [],
+      theme: document.documentElement.dataset.ltTheme || '',
+      quick: quick ? { text: quick.textContent.trim(), label: quick.getAttribute('aria-label') || '' } : null,
+      viewMenu: !!sh?.querySelector('#home-view-menu') || !!sh?.querySelector('[data-lt-view-menu]'),
+      toolButtons: sh ? [...sh.querySelectorAll('.top-actions > button')].filter((b) => b.getClientRects().length > 0).map((b) => b.textContent.trim()) : [],
+      settingsOpen: !!box?.open,
+      settingsTheme: labels('[data-set-theme]'),
+      settingsTitle: labels('[data-title-display]'),
+      settingsCards: labels('[data-home-cards]'),
+      settingsMotion: !!document.getElementById('settings-motion'),
+      settingsOverflow: box ? box.scrollWidth - box.clientWidth : 0,
+      oldCleanupButton: !!document.getElementById('cleanup-menu'),
       loggedIn: !!avatar && !avatar.hidden && getComputedStyle(avatar).display !== 'none'
     };
   }).catch(() => null);
-  const readMenu = async () => {
-    let last = await readMenuOnce();
-    // 러너에서 iframe 문서가 잠깐 비어 읽히므로 최대 3초까지 다시 읽는다.
-    for (let attempt = 0; attempt < 6 && (!last || (last.hidden === undefined && !last.items.length)); attempt += 1) {
+  const read = async () => {
+    let last = await readOnce();
+    for (let attempt = 0; attempt < 6 && (!last || !last.toolButtons.length); attempt += 1) {
       await sleep(500);
-      last = await readMenuOnce();
+      last = await readOnce();
     }
     return last;
   };
-  const expectedItems = (loggedIn) => {
-    if (!viewMenuItems) return { count: loggedIn ? 7 : 5, labels: [], source: 'fallback' };
-    const items = viewMenuItems({ loggedIn });
-    return {
-      count: items.length,
-      labels: items.map((item) => item.label),
-      source: 'v41/home-view-menu.js'
-    };
+  const expected = (loggedIn) => {
+    if (!viewMenuItems) return { count: loggedIn ? 7 : 5, source: 'fallback' };
+    return { count: viewMenuItems({ loggedIn }).length, source: 'v41/home-view-menu.js' };
   };
   for (const [width, height] of [[1440, 900], [390, 844]]) {
     await page.setViewportSize({ width, height }).catch(() => {});
     const url = new URL(base.href);
-    url.search = `?cardmenu=${Date.now()}`;
+    url.search = `?screensettings=${Date.now()}`;
     url.hash = '';
     await page.goto(url.href, { waitUntil: 'load', timeout: opts.timeout }).catch(() => {});
-    await sleep(2500);
-    // 첫 방문 안내(tree-tips)가 열려 있으면 클릭을 가로막으므로 먼저 닫고 진행한다.
+    await sleep(2000);
     const tips = await page.evaluate(() => {
       const box = document.getElementById('tree-tips');
       if (!box || box.hidden || !box.getClientRects().length) return null;
-      const title = box.querySelector('h2')?.textContent?.trim() || '안내';
       document.getElementById('tree-tips-close')?.click();
-      return { title, closed: !!box.hidden };
+      return { closed: !!box.hidden };
     }).catch(() => null);
-    if (tips) {
+    if (tips) await sleep(300);
+    const seen = await read();
+    if (!seen) { problems.push(`${width}: 화면 상태를 읽지 못함`); continue; }
+    if (seen.oldCleanupButton) problems.push(`${width}: 헤더에 옛 '정리하기' 단추가 남아 있음`);
+    if (seen.viewMenu) problems.push(`${width}: 첫 화면에 옛 "보기" 메뉴가 남아 있음`);
+    if (seen.loggedIn) {
+      // 로그인: 첫 화면에는 ◐도 보기 메뉴도 없다 — 설정 창의 "화면" 묶음 한 곳만 쓴다.
+      if (seen.quick) problems.push(`${width}: 로그인인데 첫 화면에 ◐ 단추가 보임`);
+      await page.click('#account-avatar', { timeout: opts.timeout }).catch((error) => problems.push(`${width}: 계정 메뉴 열기 실패 ${error.message}`));
+      await sleep(200);
+      await page.click('#account-open-settings', { timeout: opts.timeout }).catch((error) => problems.push(`${width}: 설정 열기 실패 ${error.message}`));
+      await sleep(600);
+      const panel = await read();
+      const count = (panel?.settingsTheme?.length || 0) + (panel?.settingsMotion ? 1 : 0) + (panel?.settingsTitle?.length || 0) + (panel?.settingsCards?.length || 0);
+      const want = expected(true);
+      if (!panel?.settingsOpen) problems.push(`${width}: 설정 창이 열리지 않음`);
+      if (count !== want.count) problems.push(`${width}: 설정 "화면" 항목 ${count}개 (기대 ${want.count}${want.source === 'fallback' ? ' · 제품 함수 없음' : ''})`);
+      for (const label of ['밤', '정원']) if (!panel?.settingsTheme?.includes(label)) problems.push(`${width}: 설정에 테마 "${label}" 없음 ${JSON.stringify(panel?.settingsTheme)}`);
+      for (const label of ['예시', '인기', '내 것만', '섞어서']) if (!panel?.settingsCards?.includes(label)) problems.push(`${width}: 설정에 카드 "${label}" 없음 ${JSON.stringify(panel?.settingsCards)}`);
+      if ((panel?.settingsOverflow || 0) > 1) problems.push(`${width}: 설정 창 가로 넘침 ${panel.settingsOverflow}px`);
+      await page.locator('#account-settings [data-set-theme="garden"]').click({ timeout: opts.timeout }).catch((error) => problems.push(`${width}: 정원 테마 클릭 실패 ${error.message}`));
       await sleep(300);
-      recordInfo(`card-menu-tips-${width}`, 'visual',
-        `${width}: 첫 방문 안내(${tips.title})를 닫고 메뉴 검사를 진행${tips.closed ? '' : ' — 닫힘 확인 실패'}`, tips);
+      const garden = await read();
+      if (garden?.theme !== 'garden') problems.push(`${width}: 정원을 골랐는데 테마가 ${garden?.theme}`);
+      await page.locator('#account-settings [data-set-theme="night"]').click({ timeout: opts.timeout }).catch(() => {});
+      await sleep(200);
+      await page.keyboard.press('Escape').catch(() => {});
+      await sleep(200);
+    } else {
+      // 로그아웃: ◐ 단추 하나만 남고, 누르면 저장된 테마가 밤↔정원으로 바뀐다.
+      if (!seen.quick) problems.push(`${width}: 로그아웃인데 ◐ 단추가 없음 ${JSON.stringify(seen.toolButtons)}`);
+      else {
+        const before = seen.theme;
+        await page.evaluate(() => {
+          const frame = ([document.getElementById('view'), document.getElementById('view-next')].find((el) => el && !el.hidden && el.getClientRects().length > 0) || document.getElementById('view'));
+          frame?.contentDocument?.getElementById('orbit')?.shadowRoot?.querySelector('[data-theme-quick]')?.click();
+        }).catch((error) => problems.push(`${width}: ◐ 클릭 실패 ${error.message}`));
+        await sleep(500);
+        const after = await read();
+        if (after?.theme === before) problems.push(`${width}: ◐를 눌렀는데 테마가 그대로 ${before}`);
+        if (!after?.quick?.label) problems.push(`${width}: ◐ 단추에 이름이 없음`);
+        await page.evaluate(() => {
+          const frame = ([document.getElementById('view'), document.getElementById('view-next')].find((el) => el && !el.hidden && el.getClientRects().length > 0) || document.getElementById('view'));
+          frame?.contentDocument?.getElementById('orbit')?.shadowRoot?.querySelector('[data-theme-quick]')?.click();
+        }).catch(() => {});
+        await sleep(300);
+      }
     }
-    const frame = await visibleViewFrame(page);
-    const button = frame?.locator('[data-lt-view-menu]').first();
-    if (!button || !(await button.count().catch(() => 0))) {
-      problems.push(`${width}: 보기 메뉴 버튼 없음`);
-      continue;
-    }
-    await button.click().catch((error) => problems.push(`${width}: 열기 클릭 실패 ${error.message}`));
-    await sleep(900);
-    const opened = await readMenu();
-    if (!opened || opened.hidden !== false || opened.expanded !== 'true') {
-      problems.push(`${width}: 마우스 클릭 후 닫힘 ${JSON.stringify(opened)}`);
-      continue;
-    }
-    const expected = expectedItems(opened.loggedIn);
-    const state = opened.loggedIn ? '로그인' : '로그아웃';
-    if (!opened.items.includes('밤') || !opened.items.includes('정원')) problems.push(`${width}: 메뉴에 테마 항목 없음 ${JSON.stringify(opened.items)}`);
-    if (!opened.items.some((label) => label.startsWith('움직임'))) problems.push(`${width}: 메뉴에 움직임 항목 없음 ${JSON.stringify(opened.items)}`);
-    if (opened.items.length !== expected.count) problems.push(`${width}: ${state} 메뉴 항목 ${opened.items.length}개 (기대 ${expected.count}${expected.source === 'fallback' ? ' · 제품 함수 없음' : ''})`);
-    for (const label of expected.labels) {
-      const found = opened.items.some((actual) => actual === label || (label.startsWith('움직임') && actual.startsWith('움직임')));
-      if (!found) problems.push(`${width}: ${state} 메뉴에 "${label}" 없음 ${JSON.stringify(opened.items)}`);
-    }
-    if (!opened.toolButtons.includes('순간 목록')) problems.push(`${width}: "순간 목록"이 도구 줄에 없음 ${JSON.stringify(opened.toolButtons)}`);
-    if (opened.toolButtons.filter((label) => label && label !== '순간 목록').length !== 1) problems.push(`${width}: 도구 줄 버튼 ${JSON.stringify(opened.toolButtons)} (기대 보기·순간 목록 2개)`);
-    await page.screenshot({ path: path.join(opts.out, `${stamp}-card-menu-mouse-${width}.png`) }).catch(() => {});
-    // 바깥 클릭은 좌상단(2,2)을 피한다. 러너에서는 그 자리에 "화면으로 건너뛰기" 링크가 걸려
-    // 클릭이 화면 이동이 되어 버린다(2026-11-08 진단: 실패 시 보이는 iframe이 track59-sketchbook).
-    await frame.locator('body').click({ position: { x: 8, y: Math.min(700, Math.round(height * 0.85)) } }).catch((error) => problems.push(`${width}: 바깥 클릭 실패 ${error.message}`));
-    await sleep(400);
-    const closed = await readMenu();
-    if (!closed || (closed.hidden !== true && closed.expanded !== 'false')) problems.push(`${width}: 바깥 클릭 후에도 열림 ${JSON.stringify(closed)}`);
-    await button.click().catch(() => {});
-    await sleep(300);
-    await page.keyboard.press('Escape').catch(() => {});
-    await sleep(300);
-    const escaped = await readMenu();
-    if (!escaped || (escaped.hidden !== true && escaped.expanded !== 'false')) problems.push(`${width}: Esc 후에도 열림 ${JSON.stringify(escaped)}`);
+    await page.screenshot({ path: path.join(opts.out, `${stamp}-screen-settings-${width}.png`) }).catch(() => {});
   }
   await page.setViewportSize({ width: 1440, height: 900 }).catch(() => {});
-  // 실패하면 두 iframe의 hidden·주소·readyState를 함께 남긴다(숨은 문서를 읽었는지 바로 알 수 있게).
   const frames = problems.length ? await viewFrameInfo(page) : null;
-  record('home-card-menu-mouse', 'visual', problems.length ? 'fail' : 'pass',
-    problems.length ? `${problems.join('; ')} [프레임 ${JSON.stringify(frames)}]` : '보기 메뉴: 열림 유지·항목(움직임·밤/정원·카드, 로그인 상태별)·바깥 클릭/Esc 닫힘 (1440/390)', { problems, frames });
+  record('screen-settings', 'visual', problems.length ? 'fail' : 'pass',
+    problems.length ? `${problems.join('; ')} [프레임 ${JSON.stringify(frames)}]` : '화면 설정: 첫 화면 보기 메뉴 없음·로그아웃 ◐ 테마 전환·로그인 설정 "화면" 묶음(테마·움직임·제목·카드) (1440/390)', { problems, frames });
 }
 
 // 로그인 상태에서만 보이는 헤더 버튼 검사(2026-11-08).
@@ -1838,47 +1843,52 @@ async function checkThemeRoundTrip(page, base, opts, stamp) {
     stored: (() => { try { return localStorage.getItem('lt41.theme') || ''; } catch { return 'n/a'; } })(),
     headerBg: getComputedStyle(document.querySelector('.app-header')).backgroundColor
   })).catch(() => ({ theme: '?', stored: '?', headerBg: '?' }));
-  // #213 2번: 테마는 "보기 ▾" 메뉴의 밤/정원 항목이 맡는다(도구 줄 버튼 토글은 없어졌다).
-  const homeFrame = () => page.frames().find((x) => x.name() === 'view' || /\/v41\/home/.test(x.url())) || null;
-  const menuButton = () => homeFrame()?.locator('[data-lt-view-menu]').first() || null;
-  const openMenu = async () => {
-    const b = menuButton();
-    if (!b || !(await b.count().catch(() => 0))) return false;
-    if ((await b.getAttribute('aria-expanded').catch(() => '')) !== 'true') {
-      await b.click().catch(() => {});
-      await sleep(250);
-    }
+  // #380 5번: 첫 화면 "보기 ▾" 메뉴를 없앴다 — 로그아웃은 오른쪽 위 ◐ 단추, 로그인은 설정 창의 "화면" 묶음이 테마를 맡는다.
+  const loggedIn = () => page.evaluate(() => {
+    const avatar = document.getElementById('account-avatar');
+    return !!avatar && !avatar.hidden && getComputedStyle(avatar).display !== 'none';
+  }).catch(() => false);
+  const staleMenu = () => page.evaluate(() => {
+    const frame = ([document.getElementById('view'), document.getElementById('view-next')].find((el) => el && !el.hidden && el.getClientRects().length > 0) || document.getElementById('view'));
+    const sh = frame?.contentDocument?.getElementById('orbit')?.shadowRoot;
+    return !!(sh?.querySelector('#home-view-menu') || sh?.querySelector('[data-lt-view-menu]'));
+  }).catch(() => true);
+  const quickTheme = () => page.evaluate(() => {
+    const frame = ([document.getElementById('view'), document.getElementById('view-next')].find((el) => el && !el.hidden && el.getClientRects().length > 0) || document.getElementById('view'));
+    const btn = frame?.contentDocument?.getElementById('orbit')?.shadowRoot?.querySelector('[data-theme-quick]');
+    if (!btn) return false;
+    btn.click();
     return true;
-  };
-  const themeChecked = async (value) => {
-    if (!(await openMenu())) return null;
-    const f = homeFrame();
-    if (!f) return null;
-    const item = f.locator(`#home-view-menu [data-lt-view-item="theme:${value}"]`).first();
-    const checked = await item.getAttribute('aria-checked').catch(() => null);
+  }).catch(() => false);
+  const settingsTheme = async (value) => {
+    await page.click('#account-avatar', { timeout: opts.timeout }).catch(() => {});
+    await sleep(200);
+    await page.click('#account-open-settings', { timeout: opts.timeout }).catch(() => {});
+    await sleep(600);
+    await page.locator(`#account-settings [data-set-theme="${value}"]`).click({ timeout: opts.timeout }).catch(() => {});
+    await sleep(400);
     await page.keyboard.press('Escape').catch(() => {});
-    await sleep(150);
-    return checked;
+    await sleep(200);
   };
+  // 원하는 테마가 될 때까지 두 길 중 하나로 바꾼다(로그인=설정 창, 로그아웃=◐ 단추).
   const pickTheme = async (value) => {
-    if (!(await openMenu())) return false;
-    const f = homeFrame();
-    if (!f) return false;
-    const item = f.locator(`#home-view-menu [data-lt-view-item="theme:${value}"]`).first();
-    if (!(await item.count().catch(() => 0))) return false;
-    await item.click().catch(() => {});
-    await sleep(800);
-    return true;
+    const want = value === 'night' ? '' : 'garden';
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      if ((await state()).theme === want) return true;
+      if (await loggedIn()) await settingsTheme(value);
+      else if (!(await quickTheme())) return false;
+      await sleep(900);
+    }
+    return (await state()).theme === want;
   };
   const u = new URL(base.href); u.search = `?vt=${Date.now()}`; u.hash = '';
   await page.goto(u.href, { waitUntil: 'load', timeout: opts.timeout }).catch(() => {});
   await sleep(2500);
-  const before = await themeChecked('night');
-  if (before === null) problems.push('첫 화면 "보기" 메뉴([data-lt-view-menu]) 없음');
-  else {
-    if (before !== 'true') problems.push(`테마 초기 밤 항목 aria-checked=${before} (기대 true)`);
-    if ((await themeChecked('garden')) !== 'false') problems.push('테마 초기 정원 항목이 켜져 있음(기대 밤)');
-    if (!(await pickTheme('garden'))) problems.push('정원 항목을 고르지 못함');
+  if (await staleMenu()) problems.push('첫 화면에 옛 "보기" 메뉴([data-lt-view-menu]) 가 남아 있음');
+  const initial = await state();
+  if (initial.theme !== '') problems.push(`첫 화면 기본 테마 ${JSON.stringify(initial)} (기대 밤)`);
+  {
+    if (!(await pickTheme('garden'))) problems.push('정원으로 바꾸지 못함');
     const b = await state();
     if (b.theme !== 'garden' || b.stored !== 'garden') problems.push(`정원 전환 ${JSON.stringify(b)}`);
     await page.screenshot({ path: path.join(opts.out, `${stamp}-visual-theme-garden.png`) }).catch(() => {});
@@ -2332,7 +2342,7 @@ async function main() {
       await checkResponsive(page, 360, 800, opts.out, stamp);
       await page.screenshot({ path: path.join(opts.out, `${stamp}-community-360.png`) }).catch(() => {});
       await checkVisualTokens(page, target, opts, stamp);
-      await checkHomeCardMenuMouse(page, target, opts, stamp);
+      await checkScreenSettings(page, target, opts, stamp);
       await checkSignedInActions(page, target, opts, stamp);
 
       await page.setViewportSize({ width: 1440, height: 900 }).catch(() => {});
