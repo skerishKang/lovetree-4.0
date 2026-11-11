@@ -2,6 +2,16 @@
 
 > **main 보호 규칙(2026-11-09, 룰셋 "main 보호 (PR·필수 검사)")**: main은 PR로만 바꾼다(직접 푸시·force push·삭제 금지, 관리자도 예외 없음 — 비상시 대표가 룰셋 enforcement를 잠깐 끈다). 필수 검사: `check (ubuntu-latest)`·`check (windows-latest)`·`미리보기 postdeploy(로그아웃)` — 셋 다 paths 필터가 없어 문서만 바뀐 PR에서도 항상 돈다. 승인 수 0(레인이 스스로 머지). Deploy Bundle Boot Test는 paths 필터가 있어 필수에 넣지 않았다.
 
+## 2026-11-11 — 계정 이메일 저장: 공통 로그인 이메일을 계정 테이블로 (로컬1, ai/local1-lt-account-email-store-261111, PR #389 → 0c4ce9f)
+
+- 무엇: 토큰 교환 응답이 실어 오는 `profile.email`을 로그인 콜백에서 모아 계정 단위로 저장하고, `/api/account`의 확인 값·표시에 쓴다. #368 가림 제거(PR #385)로 "이메일 전체가 본인 화면에 보이는" 단계까지 열렸으니, 이제 "이메일이 오는 경로"를 마감.
+- 구현: `server/db/schema.sql` + 마이그레이션 `account-emails-261111.sql`의 `lovetree_account_emails(product_id, subject_id, email, updated_at)`. 새 내부 경로 `/internal/account/email`(공개 프록시 목록 밖)는 access 토큰(JWKS)을 검증해 그 토큰이 인증한 accountId와 본문 subject가 일치할 때만 기록한다. 계정 삭제 시 표를 함께 지운다(`ACCOUNT_USER_TABLES` + 메모리 모형). `describe`/탈퇴 확인 값은 검증 패스너드 → 저장값 → 고정 문구 순으로 고른다. 콜백 반영은 최선 노력이고 실패해도 로그인을 막지 않는다.
+- 전제: access 토큰에는 email 클레임이 없어(2026-11-11 확인) 저장값이 있어야 동작하고, 그 값은 공통 로그인의 프로필 클레임 허용 설정이 켜져야 콜백에 닿는다. 꺼져 있으면 표가 빈 채 기존 흐름이 그대로 맞다.
+- 검증: `npm test` 963 pass/0 fail/37 skip(로컬 PostgreSQL·릴레이 환경 없음), `npm run build` 통과. 신규·갱신 테스트: 서버 핸들러 계약, 저장·삭제 통합, Pages 콜백, 스키마 컬럼/업서트 검사. CI 검사(ubuntu·windows·미리보기 postdeploy(로그아웃)·PostgreSQL 저장·로그인 상태 검증·마이그레이션 실행 시험) 통과.
+- 참고: `Deploy Bundle Boot Test`가 PR #389에서 실패한 것은 실행 환경 문제가 아니라 실제 결함이었다 — `server/db/account-postgres.js`의 반환 객체에 `emailFor`/`upsertEmail`이 빠져 서버 시작 때 `server/account-email-store.js` 가드에서 죽었다. 서비스 시험이 메모리 repo만 써서 놓쳤다.
+- 후속 수정(같은 날, ai/local1-lt-account-email-fix-261111): 반환 객체에 두 함수를 넣고, `createAccountRepo` 반환값 기준으로 두 서비스가 요구하는 함수가 모두 있는지 확인하는 계약 시험(`tests/account-repo-contract.test.mjs`)과 내부 경로가 그 repo로 실제 기록하는 시험을 추가했다.
+- 남은 것: 프로필 클레임 동의 후 다음 로그인에서 실제 저장 확인(계정 02, 헤드리스). 동의 전 빈 값은 정상이며 기존 표시·탈퇴 흐름 그대로다. 임시 작업장/브랜치 정리 예정.
+
 ## 2026-11-11 — #368 1·2 계정 메뉴 이메일 가림 제거 (로컬1, ai/local1-lt-account-email-261111, PR #385)
 
 - 무엇: 계정 메뉴가 "내•••"(가림)를 보이고 동그라미가 이메일 첫 글자가 아니라 subject 첫 글자("S")가 보이던 증상. `public/v41/shell/header.mjs` `renderAccount`의 `maskEmail`을 제거해 본인만 보는 계정 메뉴에 `#account-email`이 전체 이메일(없으면 "내 계정")을 보여 준다. aria도 `accountPresentation`의 `view.ariaLabel`(가림 없음)을 쓴다. `loadAccountEmail`은 성공 응답이 없어도 렌더해 이메일 부재 시 "내 계정" 표시를 갱신.

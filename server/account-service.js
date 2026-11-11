@@ -21,10 +21,11 @@ function normalize(kind, value) {
 /**
  * 계정 탈퇴 서비스.
  *
- * 확인 문자열은 공통 로그인이 이 제품에 넘겨 준 이메일이 있으면 그 이메일, 없으면 고정 문구
- * "탈퇴합니다"다. canonical subject는 사용자가 알 수 없는 내부 값이라 확인 값으로 쓰지 않는다
- * (2026-11-03 CTO 판정). 러브트리는 이메일을 저장하지 않고 공유 access 토큰도 sub/account_id/sid만
- * 실으므로, 기본 배포의 확인 방식은 고정 문구다. 되돌릴 수 없는 작업의 1회 확인 게이트다.
+ * 확인 문자열은 "지금 아는 이메일"이 있으면 그 이메일, 없으면 고정 문구 "탈퇴합니다"다.
+ * canonical subject는 사용자가 알 수 없는 내부 값이라 확인 값으로 쓰지 않는다
+ * (2026-11-03 CTO 판정). 이메일은 공통 로그인 콜백이 토큰 교환 응답의 사용자 정보에서 꺼내
+ * 계정 테이블에 저장한 것이라, 계정 삭제 시 그 표도 함께 지워진다. 저장값이 없으면 고정 문구다.
+ * 되돌릴 수 없는 작업의 1회 확인 게이트다.
  *
  * 제품 데이터는 저장소의 한 트랜잭션에서 삭제한다. 관리자 계정은 실행 전에 거부한다.
  * 서명된 완료 경로가 제품 연결을 해제하고 마지막 연결이면 공통 계정 삭제를 마무리한다.
@@ -35,7 +36,21 @@ export function createAccountService({ repo, productId, admin = null, mediaStore
   function principalOf(verified) {
     const base = parsePrincipal(verified, productId);
     const email = typeof verified?.email === 'string' ? verified.email.trim() : '';
-    return Object.freeze({ ...base, email });
+    return { ...base, email };
+  }
+
+  // 확인 값은 "지금 아는 이메일"이다. 검증 페이로드에 이미 있으면 그것을 쓰고, 없으면 저장소에서
+  // 찾는다. 저장소가 아직 준비되지 않았으면 빈 값(고정 문구 확인)으로도 흔들리지 않는다.
+  async function principalEmail(verified) {
+    const principal = principalOf(verified);
+    if (principal.email) return Object.freeze(principal);
+    if (typeof repo.emailFor !== 'function') return Object.freeze(principal);
+    try {
+      const stored = await repo.emailFor({ productId, subjectId: principal.subjectId });
+      return Object.freeze(stored ? { ...principal, email: stored } : principal);
+    } catch {
+      return Object.freeze(principal);
+    }
   }
 
   function confirmation(principal) {
@@ -74,7 +89,7 @@ export function createAccountService({ repo, productId, admin = null, mediaStore
     principalOf,
 
     async describe(verified) {
-      const principal = principalOf(verified);
+      const principal = await principalEmail(verified);
       const expected = confirmation(principal);
       // 확인 방식만 알려 준다. subject 같은 내부 식별자는 응답에 넣지 않는다.
       return {
@@ -90,7 +105,7 @@ export function createAccountService({ repo, productId, admin = null, mediaStore
     },
 
     async deleteAccount(verified, { confirm } = {}) {
-      const principal = principalOf(verified);
+      const principal = await principalEmail(verified);
       const expected = confirmation(principal);
       const typed = normalize(expected.kind, confirm);
       if (!typed || (typeof confirm === 'string' && confirm.length > MAX_CONFIRM_LENGTH) || !same(typed, expected.value)) {

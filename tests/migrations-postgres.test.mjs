@@ -90,6 +90,39 @@ test('migrations apply cleanly to empty DB and are re-runnable', { skip }, async
       ),
       /check|violates/i
     );
+
+    // ④ 계정 이메일: 표가 스키마에 있고, 같은 계정에 다시 쓰면 덮어쓴다(업서트).
+    const emailColumns = await pool.query(
+      `SELECT column_name, is_nullable, data_type
+         FROM information_schema.columns
+        WHERE table_name = 'lovetree_account_emails'
+        ORDER BY ordinal_position`
+    );
+    assert.deepEqual(
+      emailColumns.rows.map((row) => ({ column: row.column_name, nullable: row.is_nullable, type: row.data_type })),
+      [
+        { column: 'product_id', nullable: 'NO', type: 'text' },
+        { column: 'subject_id', nullable: 'NO', type: 'text' },
+        { column: 'email', nullable: 'NO', type: 'text' },
+        { column: 'updated_at', nullable: 'NO', type: 'timestamp with time zone' }
+      ],
+      'lovetree_account_emails 컬럼이 스키마대로다'
+    );
+    await pool.query(
+      `INSERT INTO lovetree_account_emails (product_id, subject_id, email) VALUES ($1, $2, $3)
+       ON CONFLICT (product_id, subject_id) DO UPDATE SET email = EXCLUDED.email`,
+      [productId, 'sub_owner', 'First@Example.test']
+    );
+    await pool.query(
+      `INSERT INTO lovetree_account_emails (product_id, subject_id, email) VALUES ($1, $2, $3)
+       ON CONFLICT (product_id, subject_id) DO UPDATE SET email = EXCLUDED.email`,
+      [productId, 'sub_owner', 'second@example.test']
+    );
+    const emailRow = await pool.query(
+      'SELECT email FROM lovetree_account_emails WHERE product_id = $1 AND subject_id = $2',
+      [productId, 'sub_owner']
+    );
+    assert.equal(emailRow.rows[0].email, 'second@example.test');
   } finally {
     await pool.end();
   }

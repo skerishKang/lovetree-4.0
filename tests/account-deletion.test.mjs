@@ -198,6 +198,25 @@ test('이메일 없는 토큰은 "탈퇴합니다"가 정확히 일치할 때만
   assert.equal(repo.rowCount('lovetree_workspaces', OTHER), 1);
 });
 
+test('저장된 이메일이 확인 값이 되고, 삭제하면 함께 지워진다', async () => {
+  const repo = createMemoryAccountRepo();
+  seedAll(repo);
+  await repo.upsertEmail({ productId: PRODUCT, subjectId: USER, email: 'Owner@Example.test' });
+  const { handle } = build({ repo, verified: { productId: PRODUCT, subjectId: USER } });
+
+  const described = await getAccount(handle);
+  assert.equal(described.status, 200);
+  assert.equal(described.body.confirmKind, 'email');
+  assert.equal(described.body.email, 'Owner@Example.test');
+  assert.equal('subject' in described.body, false);
+
+  // 대소문자·앞뒤 공백 차이만 인정한다.
+  const ok = await post(handle, { confirm: '  owner@example.TEST ' });
+  assert.equal(ok.status, 200);
+  assert.equal(ok.body.deleted, true);
+  assert.equal(await repo.emailFor({ productId: PRODUCT, subjectId: USER }), null, '삭제 시 저장된 이메일도 지운다');
+});
+
 test('GET /api/account는 확인 방식만 알려 주고 사용자 식별자를 내보내지 않는다', async () => {
   const { handle } = build({});
   const described = await getAccount(handle);
