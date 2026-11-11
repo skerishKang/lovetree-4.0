@@ -43,11 +43,10 @@ function harness({ owned = true, writable = true, source = 'server', busy = fals
   els['tree-form'].querySelector = sel => sel === '[data-media-slot]' ? coverSlot : sel === '[type=submit]' ? null : coverSlot.querySelector(sel);
   els['tree-cover-upload'] = fakeElement({ hidden: true });
   els['tree-cover-title'] = fakeElement({ value: '' });
-  els['editor'] = fakeElement();
+  els['write-panel'] = fakeElement();
   els['tree-manager'] = fakeElement();
   els['parent-target'] = fakeElement();
   els['related-target'] = fakeElement();
-  const modeButtons = [fakeElement({ dataset: { mode: 'add' } }), fakeElement({ dataset: { mode: 'edit' } })];
 
   const saved = {
     document: globalThis.document, window: globalThis.window,
@@ -55,7 +54,7 @@ function harness({ owned = true, writable = true, source = 'server', busy = fals
   };
   const LT41 = tree ? { tree, momentId: tree.moments[0]?.id, trees: [tree] } : null;
   globalThis.window = { LT41 };
-  globalThis.document = { createElement: () => fakeElement(), querySelectorAll: () => modeButtons };
+  globalThis.document = { createElement: () => fakeElement(), querySelectorAll: () => [] };
   // 패널은 HTMLFormElement를 그대로 FormData로 만든다. 최소 폼 데이터로 같은 경로를 태운다.
   globalThis.FormData = class {
     constructor(form) { this.pairs = Object.entries(form.elements).map(([key, field]) => [key, field.value ?? '']); }
@@ -66,7 +65,7 @@ function harness({ owned = true, writable = true, source = 'server', busy = fals
 
   const member = { snapshot: () => ({ owned, writable, dirty: false, subject: 'sub_test0001' }), apply: (...args) => { calls.push(args); return applyImpl ? applyImpl(...args) : {}; }, dispose() {} };
   const uploads = { busy, resets: 0, reset() { this.resets += 1; } };
-  let openedJourney = 0, loginIntent = null, editorPanel = 0, recordsPanel = 0;
+  let openedJourney = 0, loginIntent = null, editorPanel = 0, recordsPanel = 0, tabsVisible = null;
   const panels = createPanels({
     $: id => (els[id] ||= fakeElement()),
     getMember: () => member,
@@ -74,7 +73,9 @@ function harness({ owned = true, writable = true, source = 'server', busy = fals
     getSource: () => source,
     getUploads: () => uploads,
     notify: text => notes.push(text),
-    panel: id => { if (id === 'editor') editorPanel += 1; if (id === 'records') recordsPanel += 1; els[id] && (els[id].open = true); },
+    panel: id => { if (id === 'write-panel') editorPanel += 1; if (id === 'records') recordsPanel += 1; els[id] && (els[id].open = true); },
+    // #425: 한 창의 탭 — 보여 준 구역 기록.
+    writePanel: { show: tab => { tabsVisible = tab; }, setTabsVisible: v => { tabsVisible = v ? 'tabs' : 'none'; } },
     show: () => {},
     selection: () => ({ treeId: tree?.id, momentId: tree?.moments[0]?.id }),
     openFirstJourney: () => { openedJourney += 1; },
@@ -90,8 +91,8 @@ function harness({ owned = true, writable = true, source = 'server', busy = fals
     globalThis.location = saved.location;
   };
   return {
-    panels, els, calls, notes, modeButtons, uploads, coverSlotParts, coverSlot,
-    counts: () => ({ openedJourney, loginIntent, editorPanel, recordsPanel }),
+    panels, els, calls, notes, uploads, coverSlotParts, coverSlot,
+    counts: () => ({ openedJourney, loginIntent, editorPanel, recordsPanel, tabsVisible }),
     restore
   };
 }
@@ -110,16 +111,15 @@ test('setEditorMode(add)는 추가 모드 기본값과 폼 기준값을 세운�
   const h = harness({ tree: sampleTree() });
   try {
     h.panels.setEditorMode('add');
-    assert.equal(h.els['editor-title'].textContent, '순간 추가');
+    assert.equal(h.els['write-panel-title'].textContent, '순간 추가');
     assert.equal(h.els['relation-label'].hidden, false, '추가 모드에는 연결 이유를 보여 준다');
     assert.equal(h.els['moment-management'].hidden, true);
     assert.equal(h.els['moment-form'].elements.emotion.value, '설렘', '기본 감정');
     assert.match(h.els['moment-form'].elements.date.value, /^\d{4}-\d{2}-\d{2}$/, '오늘 날짜');
     assert.equal(h.els['editor-context'].textContent, '새 순간 추가 · 첫 순간에서 이어집니다.');
-    assert.equal(h.modeButtons[0].attrs['aria-current'], 'true');
-    assert.equal(h.modeButtons[1].attrs['aria-current'], 'false');
+    assert.equal(h.counts().tabsVisible, 'detailed', '더하기는 자세한 추가 구역을 보여 준다');
     assert.equal(h.uploads.resets, 1, '모드를 바꾸면 업로드 상태를 비운다');
-    h.els['editor'].open = true;
+    h.els['write-panel'].open = true;
     assert.equal(h.panels.formDirty(), false, '막 연 폼은 깨끗하다');
     h.els['moment-form'].elements.note.value = '새로 쓴 마음';
     assert.equal(h.panels.formDirty(), true, '값을 쓰면 미저장으로 본다');
@@ -132,7 +132,7 @@ test('setEditorMode(edit)는 기존 값을 채우고 이전 순간 관리와 더
     window.LT41.momentId = 'm2';
     h.panels.setEditorMode('edit');
     const form = h.els['moment-form'].elements;
-    assert.equal(h.els['editor-title'].textContent, '순간 수정');
+    assert.equal(h.els['write-panel-title'].textContent, '순간 수정');
     assert.equal(form.title.value, '둘째 순간');
     assert.equal(form.url.value, 'https://example.test/a.jpg');
     assert.equal(form.relation.value, 'next');
@@ -143,7 +143,7 @@ test('setEditorMode(edit)는 기존 값을 채우고 이전 순간 관리와 더
     assert.equal(h.els['parent-target'].value, 'm1');
     assert.equal(h.els['relation-label'].hidden, true);
     assert.equal(h.els['editor-context'].textContent, '수정할 순간 · 둘째 순간 · 현재 이전 순간: 첫 순간');
-    assert.equal(h.modeButtons[1].attrs['aria-current'], 'true');
+    assert.equal(h.counts().tabsVisible, 'none', '수정에는 탭 줄이 없다');
     assert.deepEqual(h.calls, [], '모드 전환은 저장하지 않는다');
   } finally { h.restore(); }
 });
@@ -162,14 +162,14 @@ test('파일 전송 중이거나 순간이 없으면 모드를 바꾸지 않는�
   const busy = harness({ tree: sampleTree(), busy: true });
   try {
     busy.panels.setEditorMode('edit');
-    assert.equal(busy.els['editor-title'], undefined, '전송 중에는 모드를 바꾸지 않는다');
+    assert.equal(busy.els['write-panel-title'], undefined, '전송 중에는 모드를 바꾸지 않는다');
     assert.deepEqual(busy.notes, ['파일 전송을 마치거나 취소한 뒤 작업을 바꿔 주세요.']);
   } finally { busy.restore(); }
   const empty = harness({ tree: { id: 't', title: '빈', moments: [] } });
   try {
     empty.panels.setEditorMode('add');
     assert.deepEqual(empty.notes, ['먼저 순간을 선택해 주세요.']);
-    assert.equal(empty.els['editor-title']?.textContent ?? '', '', '편집기 제목을 건드리지 않는다');
+    assert.equal(empty.els['write-panel-title']?.textContent ?? '', '', '편집기 제목을 건드리지 않는다');
   } finally { empty.restore(); }
 });
 
@@ -194,7 +194,7 @@ test('openEditor는 로그인·쓰기 권한·새 트리 분기를 그대로 지
   const add = harness({ tree: sampleTree() });
   try {
     add.panels.openEditor();
-    assert.equal(add.els['editor-title'].textContent, '순간 추가', '트리가 있으면 추가 모드');
+    assert.equal(add.els['write-panel-title'].textContent, '순간 추가', '트리가 있으면 추가 모드');
     assert.equal(add.counts().editorPanel, 1);
   } finally { add.restore(); }
 });
@@ -208,13 +208,13 @@ test('편집기 저장은 editorMode와 폼 값·선택을 member.apply에 그�
     form.elements.url.value = 'https://example.test/b.jpg';
     form.open = true;
     h.panels.formDirty();
-    h.els['editor'].open = true;
+    h.els['write-panel'].open = true;
     form.onsubmit({ preventDefault() {}, target: form });
     assert.equal(h.calls.length, 1);
     assert.equal(h.calls[0][0], 'add', '편집 모드를 그대로 쓴다');
     assert.equal(h.calls[0][1].note, '저장할 마음');
     assert.equal(h.calls[0][2].treeId, 'tree1', '선택을 그대로 넘긴다');
-    assert.equal(h.els['editor'].open, false, '저장하면 닫는다');
+    assert.equal(h.els['write-panel'].open, false, '저장하면 닫는다');
     assert.deepEqual(h.notes, ['서버에 저장하고 있어요.']);
   } finally { h.restore(); }
 });

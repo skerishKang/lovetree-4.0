@@ -29,9 +29,10 @@ function fakeEl(extra = {}) {
 }
 
 function harness({ source = 'server', owned = true, writable = true, current = 'track59-sketchbook.html', finePointer = true, applyImpl = null, attachFiles = null, clipboard = null } = {}) {
-  const calls = { apply: [], notify: [], panel: [], choose: [], openEditor: [], login: [], attach: [] };
+  const calls = { apply: [], notify: [], panel: [], choose: [], openEditor: [], login: [], attach: [], writeOpen: [], writeShow: [], requestClose: [] };
   const els = {};
-  const need = ['write-chooser', 'write-quick', 'write-detailed', 'write-menu', 'quick-add', 'quick-form', 'quick-url', 'quick-paste', 'quick-preview', 'quick-error', 'quick-submit', 'quick-notice', 'quick-refine', 'quick-saved', 'quick-saved-thumb', 'quick-saved-text', 'quick-saved-refine', 'drop-veil', 'drop-veil-text', 'editor'];
+  // #425: 고르기 창·빠른 추가·편집기가 한 창(write-panel)으로 합쳐졌다.
+  const need = ['write-panel', 'write-tabs', 'write-tab-easy', 'write-tab-detailed', 'write-easy', 'write-detailed', 'write-menu', 'quick-form', 'quick-url', 'quick-paste', 'quick-preview', 'quick-error', 'quick-submit', 'quick-notice', 'quick-refine', 'quick-saved', 'quick-saved-thumb', 'quick-saved-text', 'quick-saved-refine', 'drop-veil', 'drop-veil-text', 'moment-form'];
   for (const id of need) els[id] = fakeEl();
   els['quick-url'].dispatched = [];
   els['moment-form'] = fakeEl({ elements: { url: fakeEl() } });
@@ -71,6 +72,10 @@ function harness({ source = 'server', owned = true, writable = true, current = '
     choose: (treeId, momentId) => calls.choose.push([treeId, momentId]),
     openEditor: (mode, parentId) => calls.openEditor.push([mode, parentId]),
     openLoginStart: intent => calls.login.push(intent),
+    // #425: 한 창의 탭 — 어떤 탭으로 열었는지 기록한다.
+    // #425: 한 창 — 탭 기록과 창 열림 흉내를 함께 둔다.
+    writePanel: { open: (tab) => { calls.writeOpen.push(tab ?? 'from-settings'); els['write-panel'].open = true; }, show: (tab) => { calls.writeShow.push(tab); }, tab: () => 'easy' },
+    requestClose: (id) => calls.requestClose.push(id),
     mountUpload: options => { uploadsCalls.push(options); return { busy: false, reset() {} }; },
     attachFiles: attachFiles || ((input, file) => { calls.attach.push([input === editorMedia ? 'editor' : 'quick', file]); return true; }),
     isFinePointer: () => finePointer,
@@ -94,13 +99,12 @@ function previewParts(els) {
   return { nodes, media, meta, tag, title };
 }
 
-test('진입: 서버·편집 가능이면 고르기 창을 열고 빠른 추가에 초점을 둔다', async () => {
+test('진입(#425): 서버·편집 가능이면 한 창을 열고, 탭은 설정값(없으면 쉬운 추가)으로 둔다', async () => {
   const h = harness();
   try {
-    h.api.openWriteChooser();
-    assert.equal(h.els['write-chooser'].open, true, '고르기 창이 열린다');
-    await new Promise(r => queueMicrotask(r));
-    assert.ok(h.els['write-quick'].focused, '빠른 추가 버튼으로 초점을 옮긴다');
+    h.api.openWrite();
+    assert.equal(h.els['write-panel'].open, true, '한 창이 열린다');
+    assert.deepEqual(h.calls.writeOpen, ['from-settings'], '먼저 보일 탭은 설정값이 정한다');
     assert.deepEqual(h.calls.login, []);
   } finally { h.restore(); }
 });
@@ -109,27 +113,28 @@ test('진입: 예시·로그아웃은 기존 로그인 안내, 읽기 전용은 
   for (const source of ['example', 'file', 'share']) {
     const h = harness({ source });
     try {
-      h.api.openWriteChooser();
-      assert.equal(h.els['write-chooser'].open, false, `${source}: 창을 열지 않는다`);
+      h.api.openWrite();
+      assert.equal(h.els['write-panel'].open, false, `${source}: 창을 열지 않는다`);
       assert.deepEqual(h.calls.login, ['new-tree'], `${source}: 기존 로그인 안내로 보낸다`);
     } finally { h.restore(); }
   }
   const h = harness({ writable: false });
   try {
-    h.api.openWriteChooser();
-    assert.equal(h.els['write-chooser'].open, false);
+    h.api.openWrite();
+    assert.equal(h.els['write-panel'].open, false);
     assert.deepEqual(h.calls.notify, [DROP_READONLY_NOTICE]);
     assert.deepEqual(h.calls.panel, ['records']);
   } finally { h.restore(); }
 });
 
-test('고르기: 빠른 추가는 모달을, 자세한 추가는 책장이면 new·나머지는 add 편집기를 연다', () => {
+test('쉬운 추가로 열면 한 창의 쉬운 추가 탭이고, 칸은 비어 있다', () => {
   const quick = harness();
   try {
-    quick.els['write-chooser'].open = true;
-    quick.els['write-quick'].onclick();
-    assert.equal(quick.els['write-chooser'].open, false, '고르기 창을 닫는다');
-    assert.equal(quick.els['quick-add'].open, true, '빠른 추가 모달을 연다');
+    quick.els['quick-url'].value = '';
+    quick.els['quick-url'].listeners.input();
+    quick.api.openQuick();
+    assert.deepEqual(quick.calls.writeOpen, ['easy'], '탭은 쉬운 추가로 열린다');
+    assert.equal(quick.els['write-panel'].open, true, '한 창을 연다');
     assert.equal(quick.els['quick-url'].value, '', '열 때는 칸을 비운다');
     assert.equal(quick.els['quick-preview'].dataset.state, 'empty', '빈 상태 카드');
     assert.equal(quick.els['quick-preview'].children[0].className, 'quick-preview-empty');
@@ -138,17 +143,25 @@ test('고르기: 빠른 추가는 모달을, 자세한 추가는 책장이면 ne
     assert.equal(quick.els['quick-paste'].textContent, QUICK_PASTE_LABEL, '알약은 붙여넣기');
   } finally { quick.restore(); }
 
-  const shelf = harness({ current: 'track32-bookshelf.html' });
-  try {
-    shelf.els['write-detailed'].onclick();
-    assert.deepEqual(shelf.calls.openEditor, [['new', undefined]], '내 책장에서는 새 트리 흐름');
-  } finally { shelf.restore(); }
+});
 
-  const book = harness({ current: 'track59-sketchbook.html' });
+test('끌어다 놓기(#425): 자세한 추가 탭에서는 주소 칸에 넣고, 쉬운 추가 탭에서는 그 칸에 넣는다', () => {
+  const image = { type: 'image/png' };
+  const withEditor = harness();
   try {
-    book.els['write-detailed'].onclick();
-    assert.deepEqual(book.calls.openEditor, [[undefined, undefined]], '다른 화면에서는 추가 편집기');
-  } finally { book.restore(); }
+    withEditor.els['write-panel'].open = true; withEditor.els['write-easy'].hidden = true;
+    withEditor.docListeners.drop({ dataTransfer: { types: ['Files'], files: [image], getData: () => '' }, preventDefault() {} });
+    assert.deepEqual(withEditor.calls.apply, []);
+    assert.deepEqual(withEditor.calls.attach, [['editor', image]], '자세한 추가 탭의 사진 칸으로 넣는다');
+  } finally { withEditor.restore(); }
+
+  const plain = harness();
+  try {
+    plain.docListeners.drop({ dataTransfer: { types: ['Files'], files: [image], getData: () => '' }, preventDefault() {} });
+    assert.equal(plain.els['write-panel'].open, true, '한 창을 열어 사진을 받는다');
+    assert.deepEqual(plain.calls.attach, [['quick', image]]);
+    assert.deepEqual(plain.calls.apply, [], '사진은 업로드가 끝난 뒤에 담는다(onUploaded)');
+  } finally { plain.restore(); }
 });
 
 test('미리보기: YouTube·Shorts는 썸네일+금테 꼬리표+제목, 링크는 꼬리표+제목, 지원 안 함은 같은 틀에 안내', () => {
@@ -197,7 +210,7 @@ test('미리보기: YouTube·Shorts는 썸네일+금테 꼬리표+제목, 링크
 test('저장: apply("quickAdd",{url}) 한 번 → ✓ 안내·지금 다듬기·칸 비움·초점 유지(연속 추가)', () => {
   const h = harness();
   try {
-    h.els['quick-add'].open = true;
+    h.els['write-panel'].open = true;
     h.api.renderPreview();
     h.els['quick-url'].value = URL_OK;
     h.els['quick-url'].listeners.input();
@@ -218,7 +231,7 @@ test('저장: apply("quickAdd",{url}) 한 번 → ✓ 안내·지금 다듬기·
 test('저장: 새 입력을 시작하면 지난 안내가 즉시 사라진다(#343 버그)', () => {
   const h = harness();
   try {
-    h.els['quick-add'].open = true;
+    h.els['write-panel'].open = true;
     h.els['quick-url'].value = URL_OK;
     h.els['quick-url'].listeners.input();
     h.els['quick-form'].onsubmit({ preventDefault() {} });
@@ -287,7 +300,7 @@ test('저장: 빈 칸·잘못된 주소는 막고, 도메인이 던지면 그 �
 test('저장: 도메인이 던지면 그 문구를 그대로 보여 주고 안내는 내지 않는다', () => {
   const h = harness({ applyImpl: () => { throw new Error('트리는 50개까지 만들 수 있어요.'); } });
   try {
-    h.els['quick-add'].open = true;
+    h.els['write-panel'].open = true;
     h.els['quick-notice'].hidden = true;
     h.els['quick-url'].value = URL_OK;
     h.els['quick-form'].onsubmit({ preventDefault() {} });
@@ -323,7 +336,7 @@ test('끌어다 놓기: 놓으면 바로 저장하고, 모달 위에서는 칸�
 
   const modal = harness();
   try {
-    modal.els['quick-add'].open = true;
+    modal.els['write-panel'].open = true;
     modal.docListeners.drop({ dataTransfer: { types: ['text/uri-list'], getData: t => t === 'text/uri-list' ? URL_OK : '' }, preventDefault() {} });
     assert.deepEqual(modal.calls.apply, [], '모달 위에서는 저장하지 않는다');
     assert.equal(modal.els['quick-url'].value, URL_OK);
@@ -333,7 +346,7 @@ test('끌어다 놓기: 놓으면 바로 저장하고, 모달 위에서는 칸�
 
   const editor = harness();
   try {
-    editor.els['editor'].open = true;
+    editor.els['write-panel'].open = true; editor.els['write-easy'].hidden = true;
     editor.docListeners.drop({ dataTransfer: { types: ['text/plain'], getData: t => t === 'text/plain' ? URL_OK : '' }, preventDefault() {} });
     assert.deepEqual(editor.calls.apply, [], '자세한 추가 화면에서는 저장하지 않는다');
     assert.equal(editor.els['moment-form'].elements.url.value, URL_OK, '주소 칸에 넣는다');
@@ -345,7 +358,7 @@ test('끌어다 놓기: 이미지 파일은 사진 업로더로, 로그아웃·�
   const image = { type: 'image/png' };
   const withEditor = harness();
   try {
-    withEditor.els['editor'].open = true;
+    withEditor.els['write-panel'].open = true; withEditor.els['write-easy'].hidden = true;
     withEditor.docListeners.drop({ dataTransfer: { types: ['Files'], files: [image], getData: () => '' }, preventDefault() {} });
     assert.deepEqual(withEditor.calls.apply, []);
     assert.deepEqual(withEditor.calls.attach, [['editor', image]], '자세한 추가 화면의 사진 칸으로 넣는다');
@@ -354,7 +367,7 @@ test('끌어다 놓기: 이미지 파일은 사진 업로더로, 로그아웃·�
   const plain = harness();
   try {
     plain.docListeners.drop({ dataTransfer: { types: ['Files'], files: [image], getData: () => '' }, preventDefault() {} });
-    assert.equal(plain.els['quick-add'].open, true, '빠른 추가를 열어 사진을 받는다');
+    assert.equal(plain.els['write-panel'].open, true, '한 창을 열어 사진을 받는다');
     assert.deepEqual(plain.calls.attach, [['quick', image]]);
     assert.deepEqual(plain.calls.apply, [], '사진은 업로드가 끝난 뒤에 담는다(onUploaded)');
   } finally { plain.restore(); }
@@ -403,5 +416,7 @@ test('연결 구조: shell.mjs는 기존 업로더를 그대로 넘기고 write-
   const fs = await import('node:fs');
   const shell = fs.readFileSync(new URL('../public/v41/shell.mjs', import.meta.url), 'utf8');
   assert.match(shell, /mountUpload:mountPrivateUpload/, 'shell.mjs가 기존 업로더를 quick-add에 넘긴다');
-  assert.match(shell, /\$\('write-menu'\)\.onclick=\(\)=>shellQuick\.openWriteChooser\(\)/, '순간 남기기는 고르기 창을 연다');
+  // #425: 순간 남기기는 한 창(write-panel)을 연다 — 고르기 창은 없다.
+  assert.match(shell, /\$\('write-menu'\)\.onclick=\(\)=>shellQuick\.openWrite\(\)/, '순간 남기기는 한 창을 연다');
+  assert.doesNotMatch(shell, /openWriteChooser/, '옛 고르기 창 진입이 남지 않는다');
 });

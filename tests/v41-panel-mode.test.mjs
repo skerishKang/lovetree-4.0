@@ -73,28 +73,34 @@ test('트리 관리는 메뉴를 닫기 전에 열어 연 버튼이 초점 기�
 // #380 4 2차: 편집기(자세히 추가·수정)·순간 잇기(connection-panel)를 같은 전체 화면 틀로 옮긴다.
 // 편집기 자체 규칙(업로드 중 닫기 방지·저장 중 이중 저장 방지·내 기록 저장본을 보는 동안의 편집 잠금)은 그대로 이긴다.
 
-test('편집기와 순간 잇기는 전체 화면 모양을 태그로 받는다', () => {
-  assert.match(html, /<dialog id="editor" data-lt-panel="full" data-lt-return="write-menu" aria-labelledby="editor-title">/);
+test('순간 잇기는 전체 화면 모양을 태그로 받고, 순간 추가는 한 창(가운데)으로 모인다', () => {
+  // #425: 편집기(자세한 추가)는 고르기 창·빠른 추가와 한 창(write-panel)으로 합쳐졌다 — 가운데 창 태그.
+  assert.match(html, /<dialog id="write-panel" data-lt-panel="center" data-lt-return="write-menu" aria-labelledby="write-panel-title">/);
   assert.match(html, /<dialog id="connection-panel" data-lt-panel="full" aria-labelledby="connection-title">/);
-  // 전체 화면이 된 뒤에도 오른쪽 패널 시절의 고정 폭이 남으면 안 된다(id 선택자가 data-lt-panel 규칙을 이긴다).
-  assert.doesNotMatch(css, /#editor\{width:480px\}/);
+  // 한 창은 두 탭이 같은 폭(540px)이고, 길면 창 안에서 세로로 스크롤한다.
+  assert.match(css, /#write-panel\{width:min\(540px,calc\(100vw - 32px\)\);/);
+  assert.match(css, /#write-panel\{[^}]*overflow-y:auto/);
+  // 모바일은 화면을 꽉 채운다.
+  assert.match(css, /@media\(max-width:780px\)\{\n #write-panel\{inset:0;width:100vw;/);
   assert.match(css, /dialog\[data-lt-panel=full]\{inset:var\(--lt-panel-top,66px\) 0 0 0;/);
 });
 
-test('공통 틀은 편집기·순간 잇기의 더러움 판정을 셸에서 받는다', () => {
-  assert.match(dialogs, /PANEL_DIRTY\['editor'\] = \(\) => deps\.isEditorDirty\?\.\(\) === true;/);
+test('공통 틀은 한 창(순간 추가)·순간 잇기의 더러움 판정을 셸에서 받는다', () => {
+  assert.match(dialogs, /PANEL_DIRTY\['write-panel'\] = \(\) => deps\.isEditorDirty\?\.\(\) === true;/);
   assert.match(dialogs, /PANEL_DIRTY\['connection-panel'\] = \(\) => deps\.isConnectionDirty\?\.\(\) === true;/);
-  assert.match(shell, /isEditorDirty:\(\)=>shellPanels\.formDirty\(\)/);
+  assert.match(shell, /isEditorDirty:\(\)=>\(\$\('write-easy'\)\.hidden\?shellPanels\.detailedDirty\(\):\$\('quick-url'\)\.value\.trim\(\)!==''\)/);
   assert.match(shell, /isConnectionDirty:\(\)=>connectionDirty\(\)/);
-  // 편집기 더러움은 제목·메모·주소·사진·고른 연결이 모두 들어 있는 폼 기준값 비교(formDirty)를 그대로 쓴다.
+  // 자세한 추가 더러움은 제목·메모·주소·사진·고른 연결이 모두 들어 있는 폼 기준값 비교를 그대로 쓴다.
   assert.match(panels, /new URLSearchParams\(new FormData\(\$\('moment-form'\)\)\)\.toString\(\) !== formBaseline/);
+  // 한 창은 보이는 구역만 본다 — 쉬운 추가 탭은 주소, 자세한 추가 탭은 폼 기준값.
+  assert.match(shell, /isEditorDirty:\(\)=>\(\$\('write-easy'\)\.hidden\?shellPanels\.detailedDirty\(\):\$\('quick-url'\)\.value\.trim\(\)!==''\)/);
 });
 
 test('편집기 규칙이 공통 틀보다 우선한다 — 업로드 중에는 Esc·바깥 클릭·× 모두 닫지 않는다', () => {
   assert.match(dialogs, /const message = deps\.panelBlocked\?\.\(d\.id\) \|\| '';/);
   assert.match(dialogs, /if \(panelBlockedMessage\(d\)\) return false;/);
   // 업로드 중 닫기 막기는 편집기와 빠른 추가(사진 올리기) 두 곳에 걸린다.
-  assert.match(shell, /panelBlocked:id=>\(id==='editor'&&uploads\.busy\)\|\|\(id==='quick-add'&&shellQuick\.uploads\?\.busy\)\?'파일 전송을 마치거나 취소해 주세요\.':''/);
+  assert.match(shell, /panelBlocked:id=>id==='write-panel'&&\(uploads\.busy\|\|shellQuick\.uploads\?\.busy\)\?'파일 전송을 마치거나 취소해 주세요\.':''/);
   // 저장 중 이중 저장 방지(업로드·저장 중 제출 무시)는 그대로다.
   assert.match(panels, /if \(getUploads\(\)\.busy\) return;/);
   // 편집기 Esc 확인은 공통 틀 한 벌만 남는다(두 번 묻지 않게).
@@ -103,7 +109,7 @@ test('편집기 규칙이 공통 틀보다 우선한다 — 업로드 중에는 
 });
 
 test('편집기의 취소 버튼도 공통 닫기 규칙을 쓴다', () => {
-  assert.match(panels, /\$\('editor-cancel'\)\.onclick = \(\) => \{ requestClose\?\.\('editor'\); \};/);
+  assert.match(panels, /\$\('editor-cancel'\)\.onclick = \(\) => \{ requestClose\?\.\('write-panel'\); \};/);
   assert.match(shell, /requestClose:id=>shellDialogs\.requestClose\(id\)/);
   assert.match(dialogs, /requestClose: id => \{ const d = \$\(id\); if \(!d\) return false; if \(!panelConfirmClose\(d\)\) return false; d\.close\(\); return true; \}/);
 });
@@ -118,18 +124,19 @@ test('순간 잇기는 고른 연결이 저장 전이면 더러움이다', () =>
 test('내 기록 저장본을 보는 동안의 편집 잠금은 그대로다', () => {
   // 서버 확인 전(checking)에는 writable이 false라 편집기를 열지 않고 기록 패널로 보낸다 — 전체 화면 이동은 이 관문을 지난다.
   assert.match(panels, /if \(!getMember\(\)\.snapshot\(\)\.writable\) \{/);
-  assert.match(panels, /setEditorMode\(mode, parentId\);\n    panel\('editor'\);/);
+  assert.match(panels, /setEditorMode\(mode, parentId\);\n    panel\('write-panel'\);/);
   assert.match(shell, /writable:source==='server'&&!!member\?\.snapshot\(\)\.writable/);
 });
 
 test('#380 4 마지막: 남은 오른쪽 패널이 공통 틀 태그를 받고, 오른쪽에 붙는 패널이 남지 않는다', () => {
-  // 전체 화면: 설정·내 보관 파일·공유·둘러보기. 가운데 창: 빠른 추가·추가 방식 고르기.
+  // 전체 화면: 설정·내 보관 파일·공유·둘러보기. 가운데 창: 트리 관리·순간 추가(한 창, #425).
   assert.match(html, /<dialog id="share-panel" data-lt-panel="full" data-lt-return="share-menu" aria-labelledby="share-title">/);
   assert.match(html, /<dialog id="account-assets" data-lt-panel="full" data-lt-return="account-avatar" aria-labelledby="account-assets-title">/);
   assert.match(html, /<dialog id="account-settings" data-lt-panel="full" data-lt-return="account-avatar" aria-labelledby="account-title">/);
   assert.match(html, /<dialog id="community-panel" data-lt-panel="full" data-lt-return="community-menu" aria-labelledby="community-title">/);
-  assert.match(html, /<dialog id="write-chooser" data-lt-panel="center" data-lt-return="write-menu" aria-labelledby="write-chooser-title">/);
-  assert.match(html, /<dialog id="quick-add" data-lt-panel="center" data-lt-return="write-menu" aria-labelledby="quick-add-title">/);
+  assert.match(html, /<dialog id="write-panel" data-lt-panel="center" data-lt-return="write-menu" aria-labelledby="write-panel-title">/);
+  assert.equal(html.includes('id="write-chooser"'), false, '고르기 창은 없다');
+  assert.equal(html.includes('id="quick-add"'), false, '빠른 추가는 한 창의 탭이다');
   // 오른쪽에 붙는 패널은 이제 없다. 남는 공통 틀 밖 대화상자는 내 기록(records)뿐이고, 그것도 오른쪽 패널이 아니다.
   const tags = [...html.matchAll(/<dialog id="([a-z-]+)"[^>]*>/g)].map(m => [m[1], /data-lt-panel="(full|center)"/.test(m[0]) ? m[1] : '']);
   const nonFrame = tags.filter(([, f]) => !f).map(([id]) => id);
@@ -147,21 +154,19 @@ test('둘러보기의 위치·크기 고정은 공통 전체 화면 틀로 통�
   assert.match(css, /#community-panel\{padding:20px clamp\(16px,3vw,48px\) 40px;/);
 });
 
-test('더러움 판정은 빠른 추가(주소)와 공유(설정 바꿈, 링크 안 만듦)에만 붙는다', () => {
-  assert.match(dialogs, /PANEL_DIRTY\['quick-add'\] = \(\) => deps\.isQuickAddDirty\?\.\(\) === true;/);
+test('더러움 판정은 한 창(순간 추가)과 공유(설정 바꿈, 링크 안 만듦)에 붙는다', () => {
+  assert.match(dialogs, /PANEL_DIRTY\['write-panel'\] = \(\) => deps\.isEditorDirty\?\.\(\) === true;/);
   assert.match(dialogs, /PANEL_DIRTY\['share-panel'\] = \(\) => deps\.isShareDirty\?\.\(\) === true;/);
-  // 설정·내 보관 파일·둘러보기·추가 방식 고르기는 PANEL_DIRTY에 없다.
-  for (const id of ['account-settings', 'account-assets', 'community-panel', 'write-chooser']) {
+  // 설정·내 보관 파일·둘러보기는 PANEL_DIRTY에 없다(묻지 않고 닫는다).
+  for (const id of ['account-settings', 'account-assets', 'community-panel']) {
     assert.ok(!dialogs.includes(`PANEL_DIRTY['${id}']`), `${id}는 묻지 않고 닫는다`);
   }
-  assert.match(shell, /isQuickAddDirty:\(\)=>\$\([^)]*quick-add'\)\.open&&\$\([^)]*quick-url'\)\.value\.trim\(\)!==''/);
   assert.match(shell, /isShareDirty:\(\)=>\{const create=\$\([^)]*share-create'\);/);
   assert.match(shell, /!create\.disabled&&\$\([^)]*share-created'\)\.hidden/);
 });
 
-test('빠른 추가의 사진 올리기 중에도 편집기와 같은 닫기 막기 규칙을 쓴다', () => {
-  assert.match(shell, /id==='quick-add'&&shellQuick\.uploads\?\.busy/);
-  assert.match(shell, /id==='editor'&&uploads\.busy/);
+test('한 창의 사진 올리기 중에도 같은 닫기 막기 규칙을 쓴다', () => {
+  assert.match(shell, /panelBlocked:id=>id==='write-panel'&&\(uploads\.busy\|\|shellQuick\.uploads\?\.busy\)/);
   // 공통 틀의 머리 높이 측정은 panel() 호출 없이 직접 열 때도 맞는다(관찰자 + 항상 동기화).
   assert.match(dialogs, /syncPanelTop\(\);\n  document\.defaultView\?\.addEventListener\?\.\('resize', syncPanelTop\);/);
   assert.match(dialogs, /new ResizeObserver\(syncPanelTop\)\.observe\(headerBox\);/);

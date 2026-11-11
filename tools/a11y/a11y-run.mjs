@@ -380,27 +380,18 @@ async function auditDialogs(page, browser, options, base, storage, width, theme,
     if (write && !write.hidden) write.click();
   }).catch(() => {});
   await page.waitForTimeout(900);
-  const chooserOpen = await page.evaluate(() => Boolean(document.getElementById('write-chooser')?.open));
-  if (chooserOpen) {
-    results.push(await runAxe(page.mainFrame(), `shell:write-chooser:${width}:${theme}`));
-    await page.evaluate(() => document.getElementById('write-quick')?.click()).catch(() => {});
-    await page.waitForTimeout(700);
-    const quickOpen = await page.evaluate(() => Boolean(document.getElementById('quick-add')?.open));
-    if (quickOpen) {
-      results.push(await runAxe(page.mainFrame(), `shell:quick-add:${width}:${theme}`));
-      await page.evaluate(() => document.getElementById('quick-add')?.close()).catch(() => {});
-    }
-    await page.evaluate(() => document.getElementById('write-chooser')?.close()).catch(() => {});
-    // 자세한 추가(기존 편집기)도 같은 화면에서 연다.
-    await page.evaluate(() => document.getElementById('write-menu')?.click()).catch(() => {});
-    await page.waitForTimeout(700);
-    await page.evaluate(() => document.getElementById('write-detailed')?.click()).catch(() => {});
+  // #425: 순간 추가는 한 창(write-panel)의 탭이다 — 쉬운 추가·자세한 추가를 같은 화면에서 검사한다.
+  const panelOpen = await page.evaluate(() => Boolean(document.getElementById('write-panel')?.open));
+  if (panelOpen) {
+    results.push(await runAxe(page.mainFrame(), `shell:write-easy:${width}:${theme}`));
+    await page.evaluate(() => document.getElementById('write-tab-detailed')?.click()).catch(() => {});
     await page.waitForTimeout(900);
-  }
-  const editorOpen = await page.evaluate(() => Boolean(document.getElementById('editor')?.open));
-  if (editorOpen) {
-    results.push(await runAxe(page.mainFrame(), `shell:editor:${width}:${theme}`));
-    await page.evaluate(() => document.getElementById('editor')?.close()).catch(() => {});
+    const detailedOpen = await page.evaluate(() => Boolean(document.getElementById('write-panel')?.open)
+      && !document.getElementById('write-detailed')?.hidden);
+    if (detailedOpen) {
+      results.push(await runAxe(page.mainFrame(), `shell:write-detailed:${width}:${theme}`));
+    }
+    await page.evaluate(() => document.getElementById('write-panel')?.close()).catch(() => {});
   }
 }
 
