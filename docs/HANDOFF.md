@@ -2,6 +2,15 @@
 
 > **main 보호 규칙(2026-11-09, 룰셋 "main 보호 (PR·필수 검사)")**: main은 PR로만 바꾼다(직접 푸시·force push·삭제 금지, 관리자도 예외 없음 — 비상시 대표가 룰셋 enforcement를 잠깐 끈다). 필수 검사: `check (ubuntu-latest)`·`check (windows-latest)`·`미리보기 postdeploy(로그아웃)` — 셋 다 paths 필터가 없어 문서만 바뀐 PR에서도 항상 돈다. 승인 수 0(레인이 스스로 머지). Deploy Bundle Boot Test는 paths 필터가 있어 필수에 넣지 않았다.
 
+## 2026-11-12 — #429 PR 2: 첫 화면 카드 겹침 — 불투명·크기·밝기 깊이·가운데 안전 구역·폭별 카드 수 상한 (로컬2, ai/local2-lt-429-layout-261112, main b64e8ee 기준)
+
+- 무엇: 첫 화면 궤도(`src/views/orbit.js`)만 고쳤다. ① 카드는 언제나 불투명 — 프레임마다 `el.style.opacity`로 깊이를 내던 것을 없애고(opacity 인라인 0), blur도 쓰지 않는다(재생 표식의 `backdrop-filter`까지 제거). ② 깊이는 크기(기존 scale)와 밝기로만 — 뒤쪽 카드는 `brightness(0.78~1)`(원형 배치 8장 이하는 밝기 1). ③ 카드끼리 살짝 겹치는 것은 그대로 허용. ④ 가운데 안전 구역: 제목·문구·버튼 묶음(`.center`) 사각형+여백 32px을 재어(`measureSafeZone`, 창 크기·글꼴 도착 뒤 다시 측정) 카드 사각형이 겹치면 가장 얇은 쪽으로 민다. 카드 사각형은 rotateX·Y·Z 합성 회전→scale→원근(1200px) 투영을 네 귀퉁이로 계산(원근 원점은 화면 중심 — 카드 중심도 함께 투영됨)하고, 프레임 사이 변화를 덮는 12px 여유를 더 둔다. 옛 고정 타원 밀어내기(`Math.hypot(x/520,y/260)`)는 대체. ⑤ 폭별 카드 수 상한 `CARD_CAPS`: 1280 이상 28장 / 900~1279 20장 / 650~899 14장 / 그 아래(390 포함) 10장 — frame마다 폭으로 다시 판정해 넘치는 카드는 `display:none`(창이 넓어지면 다시 보임). ⑥ 둘러보기 감상자 차단 문구의 "발견"을 "둘러보기"로(`community-panel.mjs` 확인·완료 메시지 2곳).
+- 성능 보호(#400): 카드 크기 측정(`offsetWidth`)·안전 구역 측정(`getBoundingClientRect`)은 강제 레이아웃이라 첫 프레임에서만 하고(둘째 프레임부터 밀어내기 적용), `document.fonts.ready` 접근은 뼈대 완성(DCL)을 ~90ms 늦추는 것을 실측해 1.5초 타이머로 대체했다.
+- 시험: `npm test` 1188건 1151 pass/0 fail/37 skip, `npm run build` pass, `node tools/v41-modulepreload.mjs --check` exit 0. 신규 `tests/v41-home-layout-261112.test.mjs` 5건(상한표·숨김/복원·불투명·밝기·안전 구역·문구), `tests/v41-home-cards.test.mjs` 궤도 계약 갱신(opacity 인라인 금지·brightness·카드 규칙 blur 금지).
+- 실측(dist 단독 home.html + `window.LT41` 주입 40순간, 크롬 1회·4242 포트, try/finally): 1440·390 × 밤·정원 36/36 — 안전 구역 침범 0(드래그로 궤도를 돌린 3시점씩), 카드 opacity<1 0개, 카드 blur 0개, 보이는 카드 수=상한(1440 28·390 10), 밝기 최소 0.78·최대 0.99, 가로 넘침 0, FIRST 표식·금빛 내 카드·드래그·움직임 줄이기(숨긴 카드 제외 전부 배치) 유지, 페이지 오류 0.
+- 성능 전/후(b64e8ee vs 이 브랜치, dist/v41/home.html 단독, 서버 첫 응답 뺀 3회 중앙값, 번갈아 2회): 뼈대 완성(DCL) 44/36ms vs 42/47ms, 전부 로드(load) 301/238ms vs 275/275ms — 나빠지지 않음.
+- 남은 것: 없음(이슈 #429 두 PR로 마감). 카드 수 상한 값은 위 ⑤의 값으로 PR 본문에도 적는다.
+
 ## 2026-11-12 — #368 2차: 프로필 편집·페이지 넘김·저장 위치 표시 (로컬3, ai/local3-lt-368-2nd-261112, PR #436, main 6613f3a→b9f8960 병합 기준)
 
 - 무엇: ① 설정 "프로필"에서 표시 이름(20자·공백 정리)·동그라미 색(기본+7색) 편집 — 저장은 새 API 없이 계정 기록의 설정 칸(`state.prefs`, setPrefs 재사용). 서버 `src/domain.js`·클라이언트 `public/v41/domain.mjs` 두 벌의 `normalizePrefs`에 `displayName`·`accentColor` 규칙을 추가했고 옛 저장본(값 없음)은 빈 값으로 그대로 읽힌다. 동그라미 글자는 표시 이름 첫 글자→이메일 첫 글자→나(#424), 색은 고른 색(없으면 기본색)이며 맨 위 계정 버튼·계정 메뉴·설정 프로필에 즉시 반영. 색 토큰은 `identity.css`의 `--lt-accent-*` 7색. 쓰다 만 프로필은 공통 틀이 "저장하지 않고 닫을까요?"를 한 번 묻는다(`PANEL_DIRTY['account-settings']` — 브라우저 실측에서 등록 누락을 잡아 수정).
