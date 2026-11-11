@@ -31,7 +31,10 @@ function harness({ owned = false, trees = 0, tree = null, source = 'example', cu
     'account-entry': fakeEl(),
     'account-avatar': fakeEl({ hidden: true }),
     'account-email': fakeEl(),
-    'account-popover': fakeEl({ hidden: true })
+    'account-popover': fakeEl({ hidden: true }),
+    'server': fakeEl(),
+    'logout': fakeEl(),
+    'account-settings-open': fakeEl()
   };
   const saved = { document: globalThis.document, sessionStorage: globalThis.sessionStorage };
   globalThis.sessionStorage = { getItem: () => null, setItem() {}, removeItem() {} };
@@ -39,7 +42,8 @@ function harness({ owned = false, trees = 0, tree = null, source = 'example', cu
   globalThis.window = globalThis;
   globalThis.LT41 = tree ? { tree } : null;
   let tips = 0;
-  const member = { snapshot: () => ({ owned, writable: true, dirty, subject }) };
+  let ownedState = owned;
+  const member = { snapshot: () => ({ owned: ownedState, writable: true, dirty, subject }) };
   const header = createHeader({
     $: id => els[id] ?? null,
     navBar: null,
@@ -57,7 +61,7 @@ function harness({ owned = false, trees = 0, tree = null, source = 'example', cu
     if (saved.sessionStorage === undefined) delete globalThis.sessionStorage;
     delete globalThis.LT41;
   };
-  return { header, els, tips: () => tips, restore };
+  return { header, els, tips: () => tips, setOwned: (value) => { ownedState = value; }, restore };
 }
 
 test('flowNavigation: 로그아웃이면 트리 탭을 숨기고 "트리 고르기"를 보여 준다', () => {
@@ -154,13 +158,77 @@ test('renderAccount: 이메일이 있으면 계정 메뉴에 전체 이메일을
   }
 });
 
-test('renderAccount: 이메일이 없으면 subject 첫 글자로 동그라미, 표시는 내 계정', () => {
+// #368 보완 2: subject(usr_…) 첫 글자는 동그라미에 쓰지 않는다 — 이메일이 없으면 점으로 안전하게 둔다.
+test('renderAccount: 이메일이 없으면 subject를 쓰지 않고 점·내 계정으로 둔다', () => {
   const h = harness({ owned: true, subject: 'usr_member_abc' });
   try {
     h.header.renderAccount();
     assert.equal(h.els['account-email'].textContent, '내 계정', '이메일 없을 때 표시는 내 계정');
-    assert.equal(h.els['account-avatar'].textContent, 'U', '이메일 없으면 subject 첫 글자 규칙');
+    assert.equal(h.els['account-avatar'].textContent, '·', 'subject 첫 글자는 동그라미가 아니다');
     assert.equal(h.els['account-avatar'].getAttribute('aria-label'), '내 계정 메뉴, 내 계정으로 로그인됨');
+  } finally {
+    h.restore();
+  }
+});
+
+// #368 보완 1: 이메일을 메뉴를 열 때가 아니라 로그인 직후(updateAccountControls) 불러온다.
+test('updateAccountControls: 로그인 직후 계정 API를 불러 동그라미·라벨이 이메일을 쓰게 한다', async () => {
+  const email = 'fan02@love.io';
+  let calls = 0;
+  const h = harness({ owned: true, accountApi: { account: async () => { calls += 1; return { ok: true, confirmKind: 'email', email }; } } });
+  try {
+    h.header.updateAccountControls();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.equal(calls, 1, '메뉴를 열기 전에 한 번 부른다');
+    assert.equal(h.els['account-email'].textContent, email, '메뉴를 열지 않아도 전체 이메일이 먼저 놓인다');
+    assert.equal(h.els['account-avatar'].textContent, 'F');
+    h.header.openAccountMenu();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.equal(calls, 1, '이미 받았으면 메뉴를 열 때 다시 부르지 않는다');
+  } finally {
+    h.restore();
+  }
+});
+
+test('updateAccountControls: 이메일 없는 계정은 한 번만 부르고, 실패했을 때는 다시 시험한다', async () => {
+  let calls = 0;
+  const none = harness({ owned: true, accountApi: { account: async () => { calls += 1; return { ok: true, confirmKind: 'phrase' }; } } });
+  try {
+    none.header.updateAccountControls();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.equal(none.els['account-email'].textContent, '내 계정');
+    none.header.openAccountMenu();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.equal(calls, 1, '이메일이 없는 계정(옛 계정)은 로그인마다 다시 부르지 않는다');
+  } finally {
+    none.restore();
+  }
+  let failed = 0;
+  const down = harness({ owned: true, accountApi: { account: async () => { failed += 1; throw new Error('down'); } } });
+  try {
+    down.header.updateAccountControls();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    down.header.openAccountMenu();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.equal(failed, 2, '불러오기가 실패하면 메뉴를 열 때 다시 시험한다');
+    assert.equal(down.els['account-email'].textContent, '내 계정', '실패해도 표시는 안전하게 유지된다');
+  } finally {
+    down.restore();
+  }
+});
+
+test('updateAccountControls: 로그아웃하면 이메일을 지워 다음 계정에 남기지 않는다', async () => {
+  const email = 'fan02@love.io';
+  const h = harness({ owned: true, accountApi: { account: async () => ({ ok: true, confirmKind: 'email', email }) } });
+  try {
+    h.header.updateAccountControls();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.equal(h.header.currentAccountEmail(), email);
+    h.setOwned(false);
+    h.header.updateAccountControls();
+    assert.equal(h.header.currentAccountEmail(), '', '로그아웃 시 이메일을 지운다');
+    assert.equal(h.els['account-email'].textContent, '');
+    assert.equal(h.els['account-avatar'].hidden, true);
   } finally {
     h.restore();
   }

@@ -60,15 +60,18 @@ function revealCurrentTab(){
 }
 if(navBar){navBar.addEventListener('scroll',updateNavFade,{passive:true});addEventListener('resize',()=>revealCurrentTab());}
 function closeAccountMenu(){const pop=$('account-popover');if(!pop||pop.hidden)return;pop.hidden=true;$('account-avatar').setAttribute('aria-expanded','false');}
-function renderAccount(){const owned=!!getMember()?.snapshot().owned,view=accountPresentation({owned,email:accountEmail,subject:getMember()?.snapshot().subject||''});
+function renderAccount(){const owned=!!getMember()?.snapshot().owned,view=accountPresentation({owned,email:accountEmail});
   const login=$('account-entry'),avatar=$('account-avatar');
   if(view.mode==='login'){login.hidden=false;login.textContent='로그인';login.removeAttribute('aria-label');avatar.hidden=true;avatar.textContent='';const init=$('account-initial');if(init)init.textContent='';const mail=$('account-email');if(mail)mail.textContent='';closeAccountMenu();return;}
   login.hidden=true;avatar.hidden=false;avatar.textContent=view.initial;avatar.setAttribute('aria-label',view.ariaLabel);avatar.title='내 계정';
   const init=$('account-initial');if(init)init.textContent=view.initial;
   $('account-email').textContent=view.label;}
-function openAccountMenu(){const owned=!!getMember()?.snapshot().owned;if(!owned){return;}const pop=$('account-popover');pop.hidden=false;$('account-avatar').setAttribute('aria-expanded','true');if(!accountEmail)void loadAccountEmail();}
-async function loadAccountEmail(){const answer=await accountApi.account().catch(()=>null);if(!answer?.ok)return;if(answer.email)accountEmail=answer.email;renderAccount();}
-function updateAccountControls(){const owned=!!getMember()?.snapshot().owned;document.querySelectorAll('[data-guest-login]').forEach(x=>x.hidden=owned);$('server').hidden=!owned;$('logout').hidden=!owned;$('account-settings-open').hidden=!owned;renderAccount();}
+function openAccountMenu(){const owned=!!getMember()?.snapshot().owned;if(!owned){return;}const pop=$('account-popover');pop.hidden=false;$('account-avatar').setAttribute('aria-expanded','true');if(!accountEmail&&!emailTried)void loadAccountEmail();}
+// #368 보완 1·2: 이메일을 메뉴를 열 때가 아니라 로그인 직후 불러와 동그라미·라벨이 처음부터 이메일을 쓰게 한다.
+// 한 번 시험한 뒤에는 성공해도(이메일 없는 계정) 다시 부르지 않고, 실패했을 때만 다시 시험한다.
+let emailTried=false;
+async function loadAccountEmail(){emailTried=true;const answer=await accountApi.account().catch(()=>null);if(!answer?.ok){emailTried=false;return;}if(answer.email)accountEmail=answer.email;renderAccount();}
+function updateAccountControls(){const owned=!!getMember()?.snapshot().owned;if(!owned){accountEmail='';emailTried=false;}document.querySelectorAll('[data-guest-login]').forEach(x=>x.hidden=owned);$('server').hidden=!owned;$('logout').hidden=!owned;$('account-settings-open').hidden=!owned;renderAccount();if(owned&&!accountEmail&&!emailTried)void loadAccountEmail();}
 
   return {
     flowNavigation,
