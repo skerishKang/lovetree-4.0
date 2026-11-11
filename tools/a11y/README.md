@@ -22,3 +22,4 @@ npm run a11y -- --screen shelf --out .tmp-261109/a11y-shelf
 - 사진 표지는 선택이다(디자인 표지 검사는 셸 대화상자 검사에 포함).
 - 결과: `<out>/a11y.json`(라벨별 위반·대상·색 대비 값)과 화면 캡처 `<out>/<화면>-<폭>-<테마>-<상태>.png`.
 - `--width 1440|390`, `--theme night|garden`, `--state out|in`, `--screen home|shelf|book|board|network|first-journey`로 좁힐 수 있다.
+- 숨은 다음 화면 iframe(`#view-next`, 화면 교대용 #219)은 대부분 `about:blank`이다. 셸은 `about:blank` 여부로 "빈 화면"을 판단하므로(shell/screens.mjs) 빈 문서에 제목·lang을 넣지 않는다. 이 도구는 `about:blank` 프레임과 lang·title·본문이 없는 준비 전 문서를 검사에서 뺀다(`runAxe`). 다른 도구로 axe를 iframe까지 돌리면 이 프레임에서 `document-title`·`html-has-lang`이 나오는데, 이는 사용자에게 보이지 않는 빈 프레임이라 위반으로 세지 않는다(#407).
