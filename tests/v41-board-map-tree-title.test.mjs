@@ -57,5 +57,5 @@ test('#417: 좁은 폭에서 제목이 줄어들고 겹치지 않는다 — 보�
  assert.match(CSS,/#treeTitleText\{font-weight:700;font-size:18px;/,'제목은 크고');
  assert.match(CSS,/overflow:hidden;text-overflow:ellipsis;white-space:nowrap\}/,'넘치면 줄임표');
  assert.match(BOARD_CSS,/\.headbtn\{display:none\}\.headbtn\.primary\{display:block[^}]*\}#shelfBackBtn\{display:inline-flex;min-height:44px;height:auto\}/,'보드 폰 폭에서 되돌리기 등은 숨기되 ← 내 트리는 남긴다');
- assert.match(CSS,/html\[data-v41-screen=network\] \.topbar-left\{pointer-events:auto\}/,'지도 topbar는 클릭을 막아 두었으므로 묶음을 다시 받는다');
+ assert.match(CSS,/html\[data-v41-screen=network\] \.topbar-left\{pointer-events:auto;margin-right:auto\}/,'지도 topbar는 클릭을 막아 두었으므로 묶음을 다시 받고(#421) 왼쪽을 지킨다');
 });
