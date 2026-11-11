@@ -141,7 +141,7 @@ test('이어 읽기 칸 표지도 같은 판정(book.design)을 쓰고 질감 �
 
 test('책 정보 관리 창: 디자인 표지 라디오와 사진 표지 안내·사진 빼기가 있고 패널이 저장값을 반영한다(구조 검사)', () => {
   const shell = readFileSync('public/v41/index.html', 'utf8');
-  assert.match(shell, /<fieldset id="tree-design"><legend>디자인 표지<\/legend>/, '기존 창 안에 디자인 표지 줄을 추가한다');
+  assert.match(shell, /<fieldset id="tree-design"><legend>② 디자인으로 고르기<\/legend>/, '기존 창 안에 디자인 표지 줄을 추가한다');
   assert.match(shell, /name="coverDesign" value=""/, '기본(선택 안 함) 라디오');
   assert.equal((shell.match(/name="coverDesign" value="texture-/g) || []).length, 6, '디자인 6종 라디오');
   assert.match(shell, /id="tree-photo-cover"[^>]*hidden/, '사진 표지 안내는 평소 숨겨진다');
@@ -159,7 +159,7 @@ test('책 정보 관리 창: 디자인 표지 라디오와 사진 표지 안내�
 test('새 사진으로 표지 만들기: 기존 창 안에 있고, 로그아웃에선 숨고, 안내 문구가 반드시 있다(마크업 검사)', () => {
   const shell = readFileSync('public/v41/index.html', 'utf8');
   assert.match(shell, /<fieldset id="tree-cover-upload" hidden>/, '기본은 숨겨진다(로그아웃·예시에서는 보이지 않는다)');
-  assert.match(shell, /<legend>새 사진으로 표지 만들기<\/legend>/);
+  assert.match(shell, /<legend>③ 사진 올려서 만들기<\/legend>/);
   assert.match(shell, /올린 사진은 이 책의 새 순간으로도 남아요\./, '요구된 안내 한 줄');
   assert.match(shell, /id="tree-cover-title" maxlength="80"/, '순간 제목은 선택 입력');
   assert.match(shell, /placeholder="[^"]*사진으로 남긴 순간/, '비우면 기본값 안내');
