@@ -45,7 +45,7 @@ test('#393 4: 폰 폭에서는 두 장 단추를 숨기고, 태블릿 가로에�
 test('#393 4: 넘김과 상세·돋보기 판정은 폭이 아니라 보기 모드를 따른다',()=>{
  assert.match(BOOK,/if\(single\(\)&&\(land\|\|focusId\)\)window\.scrollTo/,'한 장 착지 시 맨 위로');
  assert.match(BOOK,/else if\(!single\(\)\)\{front\.innerHTML=dir==='next'\?pageFace/,'두 장 넘김 면 준비');
- assert.match(BOOK,/if\(!single\(\)\)\{if\(reduced\)\{leftPage\.innerHTML/,'두 장 아래 페이지 준비');
+ assert.match(BOOK,/if\(!single\(\)\)\{if\(smoothTurn\(\)\)\{leftPage\.innerHTML/,'두 장 아래 페이지 준비');
  assert.match(BOOK,/if\(single\(\)\|\|!lensOn\|\|!\['IDLE','INSPECTING'\]\.includes\(machineState\)\)return/,'돋보기는 두 장에서만');
  assert.match(BOOK,/bookWrap\.addEventListener\('pointerdown',e=>\{if\(!single\(\)\|\|e\.pointerType==='mouse'\)return/,'한 장 터치 넘김');
  assert.match(BOOK,/mobile:single\(\),view:single\(\)\?'single':'double'\}/,'상태 노출에 보기 모드');

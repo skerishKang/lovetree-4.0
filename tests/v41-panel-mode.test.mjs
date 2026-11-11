@@ -154,11 +154,13 @@ test('둘러보기의 위치·크기 고정은 공통 전체 화면 틀로 통�
   assert.match(css, /#community-panel\{padding:20px clamp\(16px,3vw,48px\) 40px;/);
 });
 
-test('더러움 판정은 한 창(순간 추가)과 공유(설정 바꿈, 링크 안 만듦)에 붙는다', () => {
+test('더러움 판정은 한 창(순간 추가)과 공유·설정(프로필 폼)에 붙는다', () => {
   assert.match(dialogs, /PANEL_DIRTY\['write-panel'\] = \(\) => deps\.isEditorDirty\?\.\(\) === true;/);
   assert.match(dialogs, /PANEL_DIRTY\['share-panel'\] = \(\) => deps\.isShareDirty\?\.\(\) === true;/);
-  // 설정·내 보관 파일·둘러보기는 PANEL_DIRTY에 없다(묻지 않고 닫는다).
-  for (const id of ['account-settings', 'account-assets', 'community-panel']) {
+  // #368 2차: 설정은 프로필(표시 이름·동그라미 색)을 쓰다 두었을 때만 묻는다.
+  assert.match(dialogs, /PANEL_DIRTY\['account-settings'\] = \(\) => deps\.isSettingsDirty\?\.\(\) === true;/);
+  // 내 보관 파일·둘러보기는 PANEL_DIRTY에 없다(묻지 않고 닫는다).
+  for (const id of ['account-assets', 'community-panel']) {
     assert.ok(!dialogs.includes(`PANEL_DIRTY['${id}']`), `${id}는 묻지 않고 닫는다`);
   }
   assert.match(shell, /isShareDirty:\(\)=>\{const create=\$\([^)]*share-create'\);/);

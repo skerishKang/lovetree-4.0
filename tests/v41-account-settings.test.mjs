@@ -25,10 +25,26 @@ test('설정 창은 묶음 다섯 개(프로필·화면·순간 추가·내 데�
 test('프로필 묶음: 동그라미 + 이메일 전체(없으면 내 계정), 편집 입구는 아직 없다', () => {
   const profile = settings.slice(settings.indexOf('account-settings-profile'), settings.indexOf('account-settings-screen'));
   assert.match(profile, /id="settings-profile-initial"/);
+  assert.match(profile, /id="settings-profile-name"/);
   assert.match(profile, /id="settings-profile-email"/);
-  assert.doesNotMatch(profile, /<button/, '이번 PR은 표시만 한다(이름·색 편집은 다음 작업)');
-  // 이메일은 header-state의 accountPresentation 규칙(가리기 없음)을 그대로 쓴다.
-  assert.match(shell, /function paintSettingsProfile\(email=shellHeader\.currentAccountEmail\(\)\)\{[\s\S]*?accountPresentation\(\{owned:!!member\?\.snapshot\(\)\.owned,email\}\)/);
+  // #368 2차: 프로필 편집 폼 — 표시 이름(20자)·동그라미 색 8칸(기본+7색). 저장 위치는 계정.
+  assert.match(profile, /id="profile-form"/);
+  assert.match(profile, /id="profile-name" maxlength="20"/);
+  const colorIds = [...profile.matchAll(/data-accent-color="([a-z]*)"/g)].map(m => m[1]);
+  assert.deepEqual(colorIds, ['', 'rose', 'gold', 'green', 'blue', 'purple', 'orange', 'teal']);
+  assert.match(profile, /id="profile-reset"[^>]*>되돌리기</);
+  assert.match(profile, /계정에 저장/);
+  // 동그라미 글자 규칙: 표시 이름 첫 글자 → 이메일 첫 글자 → 나(accountPresentation이 이미 1차에 채택).
+  assert.match(shell, /function paintSettingsProfile\(email=shellHeader\.currentAccountEmail\(\)\)\{[\s\S]*?accountPresentation\(\{owned:!!member\?\.snapshot\(\)\.owned,email,name:prefs\.displayName\}\)/);
+  // 저장은 setPrefs(계정 기록 경로) 재사용 — 새 API 없음. 저장 뒤 맨 위 동그라미와 설정 프로필을 다시 칠한다.
+  assert.match(shell, /member\.apply\('setPrefs',patch\);/);
+  assert.match(shell, /renderAccount\(\);\s*paintSettingsProfile\(\);\s*fillProfileForm\(\);/);
+  // 쓰다 만 이름·색이 있으면 공통 틀이 한 번 묻는다(PANEL_DIRTY).
+  assert.match(shell, /isSettingsDirty:\(\)=>profileDirty\(\),/);
+  assert.match(shell, /function profileDirty\(\)\{if\(!\$\('account-settings'\)\.open\)return false;if\(!profileBaseline\)return false;return profileFormValue\(\)!==profileBaseline;\}/);
+  // 공통 틀 등록: dialogs.mjs의 PANEL_DIRTY에 account-settings가 있어야 ×·바깥 클릭·Esc 모두 같은 확인을 지난다.
+  const dialogs = read('public/v41/shell/dialogs.mjs');
+  assert.match(dialogs, /PANEL_DIRTY\['account-settings'\]\s*=\s*\(\)\s*=>\s*deps\.isSettingsDirty\?\.\(\)\s*===\s*true;/);
 });
 
 test('화면 묶음은 기존 항목(테마·움직임·제목·첫 화면 카드)을 유지하고, 먼저 보일 탭은 순간 추가 묶음으로 간다', () => {
@@ -37,6 +53,10 @@ test('화면 묶음은 기존 항목(테마·움직임·제목·첫 화면 카�
   assert.match(screen, /id="settings-motion"/);
   assert.match(screen, /data-title-display="both"/);
   assert.match(screen, /data-home-cards="example"/);
+  // #368 2차(댓글 2): 페이지 넘김 — 종이처럼(기본) / 부드럽게.
+  assert.match(screen, /id="settings-page-turn-label">페이지 넘김</);
+  assert.match(screen, /data-page-turn="paper"[^>]*>종이처럼</);
+  assert.match(screen, /data-page-turn="smooth"[^>]*>부드럽게</);
   assert.doesNotMatch(screen, /data-write-tab/, '먼저 보일 탭은 화면 묶음에 없다');
   const write = settings.slice(settings.indexOf('account-settings-write"'), settings.indexOf('account-settings-data"'));
   assert.match(write, /id="settings-write-tab-label">먼저 보일 탭</);
@@ -111,7 +131,7 @@ test('설정 입구는 로그인 상태에서만 열리고, 묶음 이름으로 
   assert.match(shell, /if\(!member\?\.snapshot\(\)\.owned\)\{notify\('로그인한 뒤 설정을 열 수 있어요\.'\);return;\}/);
   assert.match(shell, /function focusSettingsSection\(section='profile'\)\{[\s\S]*?scrollIntoView\(\{block:'start'\}\)[\s\S]*?heading\.focus\(\{preventScroll:true\}\)/);
   assert.match(shell, /void openAccountSettings\(\{section:'data'\}\);/);
-  assert.match(shell, /paintSettingsProfile\(\);\s*panel\('account-settings'\);\s*focusSettingsSection\(section\);/);
+  assert.match(shell, /paintSettingsProfile\(\);\s*fillProfileForm\(\);\s*panel\('account-settings'\);\s*focusSettingsSection\(section\);/);
 });
 
 test('옛 내 기록 입구는 설정 "내 데이터"(로그아웃이면 로그인)로 열린다', () => {

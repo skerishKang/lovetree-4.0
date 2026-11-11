@@ -19,6 +19,10 @@
  /* 보드 실·핀, 지도 그룹색: 원본 네온/인포그래픽 6색을 첫 화면 색상으로 옮긴 값. JS가 읽는다. */
  --lt-thread-rose:#d88f9c;--lt-thread-violet:#a99ac9;--lt-thread-cyan:#7892c9;--lt-thread-amber:#e6b14c;
  --lt-group-1:#c9748a;--lt-group-2:#8f7fc0;--lt-group-3:#5a9aa6;--lt-group-4:#c59a3c;--lt-group-5:#6f9a7a;--lt-group-6:#6b86c2;
+ /* 이슈 368 2차: 계정 동그라미 색 팔레트(domain의 ACCENT_COLORS와 같은 7색). 밤 무대·정원 종이 모두에서
+    가운데 톤으로 잘 보이게 골랐다. 글자는 --lt-pearl을 얹는다. */
+ --lt-accent-rose:#b4576b;--lt-accent-gold:#b08a2e;--lt-accent-green:#4e7d5f;--lt-accent-blue:#4a6d9e;
+ --lt-accent-purple:#7c5fa3;--lt-accent-orange:#bf7840;--lt-accent-teal:#3f7d78;
 }
 body{font-family:var(--lt-ui)}
 button,input,select,textarea,summary{font-family:var(--lt-ui)!important}

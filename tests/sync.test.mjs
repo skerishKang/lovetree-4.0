@@ -4,10 +4,10 @@ import { createSyncController, createWorkspaceApi, mountSync } from '../src/sync
 import { createTree } from '../src/domain.js';
 
 const CLOCK = '2026-10-28T00:00:00.000Z';
-const EMPTY = { version: 1, trees: [], prefs: { titleDisplay: 'both' } };
+const EMPTY = { version: 1, trees: [], prefs: { titleDisplay: 'both', displayName: '', accentColor: '' } };
 
 // createTree는 id를 무작위로 발급한다. 문서 객체는 한 번만 만들어 비교·검증이 들리지 않게 한다.
-const doc = (...titles) => ({ version: 1, prefs: { titleDisplay: 'both' }, trees: titles.map((title) => createTree({ subject: '윤슬', title, note: '기록', emotion: '설렘', date: '2026-10-28', url: '' }, CLOCK)) });
+const doc = (...titles) => ({ version: 1, prefs: { titleDisplay: 'both', displayName: '', accentColor: '' }, trees: titles.map((title) => createTree({ subject: '윤슬', title, note: '기록', emotion: '설렘', date: '2026-10-28', url: '' }, CLOCK)) });
 
 const okGet = (revision, state) => ({ ok: true, status: 200, revision, state, savedAt: CLOCK });
 const okPut = (revision) => ({ ok: true, status: 200, revision, savedAt: CLOCK });

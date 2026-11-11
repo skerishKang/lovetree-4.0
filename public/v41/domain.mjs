@@ -32,12 +32,30 @@ export const MAX_LINKS = 20;
 export const INBOX_SUBJECT = '모아둔 순간';
 export const TITLE_DISPLAYS = ['both', 'mine', 'video'];
 export const DEFAULT_TITLE_DISPLAY = 'both';
+// #368 2차: 프로필(표시 이름·동그라미 색). 계정 기록의 설정 칸(state.prefs)에 함께 저장한다(#371).
+// 표시 이름은 공백을 한 칸으로 모으고 20자(문자 단위)까지만 남긴다. 값이 없으면 ''라 이전 저장본도 그대로 읽힌다.
+// src/domain.js(서버가 쓰는 같은 규칙)와 값이 같은지 tests/v41-title-prefs.test.mjs가 확인한다.
+export const MAX_DISPLAY_NAME = 20;
+// 동그라미 색 팔레트 — 밤(어두운 무대)·정원(밝은 종이) 모두에서 잘 보이는 가운데 톤 7색. ''는 기본색이다.
+export const ACCENT_COLORS = ['', 'rose', 'gold', 'green', 'blue', 'purple', 'orange', 'teal'];
+export function normalizeDisplayName(value) {
+  if (typeof value !== 'string') return '';
+  const trimmed = value.replace(/\s+/g, ' ').trim();
+  return Array.from(trimmed).slice(0, MAX_DISPLAY_NAME).join('');
+}
+export function normalizeAccentColor(value) {
+  return ACCENT_COLORS.includes(value) ? value : '';
+}
 // 제목 보기 설정(#347 후속): 모르는 값은 기본 '둘 다'. 상태(state.prefs)에 저장한다.
 export function normalizeTitleDisplay(value) {
   return TITLE_DISPLAYS.includes(value) ? value : DEFAULT_TITLE_DISPLAY;
 }
 export function normalizePrefs(value) {
-  return { titleDisplay: normalizeTitleDisplay(value?.titleDisplay) };
+  return {
+    titleDisplay: normalizeTitleDisplay(value?.titleDisplay),
+    displayName: normalizeDisplayName(value?.displayName),
+    accentColor: normalizeAccentColor(value?.accentColor)
+  };
 }
 export function updatePrefs(state, patch = {}) {
   return { ...state, version: 1, prefs: normalizePrefs({ ...(state?.prefs || {}), ...(patch || {}) }) };

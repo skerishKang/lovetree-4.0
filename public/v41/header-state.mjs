@@ -168,6 +168,33 @@ export const THEME_KEY = 'lt41.theme';
 export const THEME_NIGHT = 'night';
 export const THEME_GARDEN = 'garden';
 
+// #368 2차: 페이지 넘김 — '종이처럼'은 기억책 종이 넘김(#411), '부드럽게'는 움직임 줄이기와 같은 0.35초 교차 페이드.
+// 기기에 저장한다(localStorage). 기본은 종이처럼이고, 시스템 움직임 줄이기가 켜져 있으면 기억책이 고른 값과
+// 상관없이 부드럽게로 읽는다(기억책 쪽 판정). 저장소는 인자로 받는다(테마와 같은 규칙).
+export const PAGE_TURN_KEY = 'lt41.pageTurn';
+export const PAGE_TURNS = ['paper', 'smooth'];
+export const DEFAULT_PAGE_TURN = 'paper';
+
+export function normalizePageTurn(value) {
+  return PAGE_TURNS.includes(value) ? value : DEFAULT_PAGE_TURN;
+}
+
+export function readPageTurn(storage) {
+  try {
+    return normalizePageTurn(storage?.getItem(PAGE_TURN_KEY));
+  } catch {
+    return DEFAULT_PAGE_TURN;
+  }
+}
+
+export function writePageTurn(storage, value) {
+  const next = normalizePageTurn(value);
+  try {
+    storage?.setItem(PAGE_TURN_KEY, next);
+  } catch {}
+  return next;
+}
+
 export function normalizeTheme(value) {
   return value === THEME_GARDEN ? THEME_GARDEN : THEME_NIGHT;
 }

@@ -1,5 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';import {readFileSync} from 'node:fs';
 const BOOK=readFileSync(new URL('../public/v41/views/book/book.js',import.meta.url),'utf8');
+const EXTRA=readFileSync(new URL('../public/v41/views/book/book-extra.js',import.meta.url),'utf8');
 const CSS=readFileSync(new URL('../public/v41/views/book/book.css',import.meta.url),'utf8');
 const HTML=readFileSync(new URL('../public/v41/views/track59-sketchbook.html',import.meta.url),'utf8');
 const between=(s,a,b)=>s.slice(s.indexOf(a),s.indexOf(b));
@@ -64,16 +65,22 @@ test('#393 3: 재생 중인 영상은 넘길 때 잠깐 멈추고 면은 썸네�
  assert.match(prepare,/pageFace\(\{\.\.\.tar\.left,spread:t\},'left'\)/);
 });
 
-test('#393 3: 움직임 줄이기 — 종이 넘김 대신 0.35초 페이드',()=>{
+test('#393 3 + #368 2차: 움직임 줄이기·페이지 넘김(부드럽게) — 0.35초 페이드',()=>{
+ // #368 2차: 페이지 넘김은 이 기기 저장값(lt41.pageTurn)을 따르고, 시스템 움직임 줄이기가 있으면 무조건 부드럽게다.
+ assert.match(BOOK,/const PAGE_TURN_KEY='lt41\.pageTurn';/);
+ assert.match(BOOK,/let pageTurn='paper';try\{pageTurn=localStorage\.getItem\(PAGE_TURN_KEY\)==='smooth'\?'smooth':'paper'\}catch\{\}/,'기본은 종이처럼, 읽지 못해도 종이처럼');
+ assert.match(BOOK,/function smoothTurn\(\)\{return reduced\|\|pageTurn==='smooth'\}/,'움직임 줄이기가 우선한다');
+ assert.match(BOOK,/function setPageTurnMode\(value\)\{pageTurn=value==='smooth'\?'smooth':'paper'\}/,'설정 바꾸면 메시지로 받는다');
+ assert.match(EXTRA,/type!=='lt41-page-turn'/,'book-extra가 lt41-page-turn을 받는다');
  const prepare=between(BOOK,'function prepareTurn','function finishTurn');
  const finish=between(BOOK,'function finishTurn','function autoTurn');
- assert.match(prepare,/reduced\?' reduced':''/,'줄임 모드에서는 페이드 전용 면을 쓴다');
+ assert.match(prepare,/smoothTurn\(\)\?' reduced':''/,'페이드 모드(움직임 줄이기·부드럽게)에서는 페이드 전용 면을 쓴다');
  assert.match(prepare,/reduced-faces/,'컴퓨터는 펼침 두 면을 한 장의 덮개로');
- assert.match(finish,/reduced\?350:/,'페이드 0.35초');
+ assert.match(finish,/smoothTurn\(\)\?350:/,'페이드 0.35초');
  assert.match(CSS,/\.flip-sheet\.reduced\{width:100%;left:0!important;filter:none\}/);
  assert.match(CSS,/\.reduced-faces\{display:grid;grid-template-columns:1fr 1fr/);
  const setTurn=between(BOOK,'function setTurnProgress','function prepareTurn');
- assert.match(setTurn,/if\(reduced\)\{sh\.style\.opacity=\(1-p\)\.toFixed\(3\);return\}/,'줄임 모드는 opacity만 바꾼다');
+ assert.match(setTurn,/if\(smoothTurn\(\)\)\{sh\.style\.opacity=\(1-p\)\.toFixed\(3\);return\}/,'페이드 모드는 opacity만 바꾼다');
 });
 
 test('#393 3: 모바일 한 장 넘김은 손가락을 미는 만큼 따라온다(기존 스와이프 경로 유지)',()=>{
