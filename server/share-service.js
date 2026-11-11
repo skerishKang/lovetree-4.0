@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto';
-import { validateState } from '../src/domain.js';
+import { validateState, coverModeOf, normalizeCoverDesign } from '../src/domain.js';
 import { ApiError } from './errors.js';
 import { parsePrincipal } from './principal.js';
 
@@ -35,6 +35,9 @@ export function projectSharedTree(document, treeId) {
       return { ...moment, url, links: [...moment.links] };
     })
   };
+  // #425 2번: 올린 사진 표지(coverMode=photo)는 공개 응답에서만 디자인 표지로,
+  // 디자인이 없으면 기본 색 표지로 바꾼다. 저장본은 건드리지 않는다.
+  if (coverModeOf(source) === 'photo') tree.coverMode = normalizeCoverDesign(source.coverDesign) ? 'design' : 'basic';
   return { tree, omittedPrivateMedia };
 }
 function selectEntry(tree, value) {

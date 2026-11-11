@@ -279,16 +279,6 @@ html[data-lt-theme="garden"] .settings-choice button[aria-checked="true"],html[d
 /* 오류 줄도 높이 고정 — 오류 문구가 버튼 자리를 밀지 않는다. 정원 글자는 진한 장미(기존 선례). */
 .quick-error-line{margin:8px 0 0!important;min-height:18px;max-height:18px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:12px;line-height:1.5;color:var(--lt-rose)}
 html[data-lt-theme=garden] .quick-error-line{color:var(--lt-rose-ink)}
-.quick-or{display:flex;align-items:center;gap:12px;margin:12px 0!important;font-size:12px;color:var(--lt-muted)}
-.quick-or::before,.quick-or::after{content:"";flex:1;height:1px;background:var(--lt-line)}
-.quick-photo{position:relative}
-.quick-photo .file-label{position:relative;display:flex;align-items:center;gap:8px;min-height:48px;padding:0 14px;border:1px dashed var(--lt-gold-line);border-radius:var(--lt-r-card);color:var(--lt-pearl);font-size:13px;cursor:pointer}
-.quick-photo .file-label::after{content:"4MB까지";margin-left:auto;color:var(--lt-muted);font-size:12px}
-.quick-photo .file-label:focus-within{outline:2px solid var(--lt-gold);outline-offset:3px}
-.quick-photo input[type=file]{position:absolute;width:1px;height:1px;min-height:0;margin:0;padding:0;border:0;overflow:hidden;clip-path:inset(50%)}
-.quick-photo [data-upload-status]{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:21px;max-height:42px;margin:6px 0 0!important;font-size:12px;line-height:1.7;color:var(--lt-muted);overflow-wrap:anywhere}
-.quick-photo .stop-upload{position:absolute;right:8px;top:0;min-height:48px;padding:0 12px;border:1px solid rgba(255,255,255,.3);border-radius:var(--lt-r-pill);background:var(--lt-glass-strong);color:var(--lt-pearl);font-size:12px;z-index:1}
-.quick-photo .panel-note{display:none}
 /* 안내 줄: 높이 고정. 담은 뒤에만 채우고, 새 입력이 시작되면 renderPreview가 비운다(이슈 343). */
 .quick-notice-row{display:flex;align-items:center;gap:10px;min-height:44px;margin-top:8px}
 .quick-notice{flex:1;min-width:0;margin:0!important;font-size:13px;line-height:1.6;color:var(--lt-pearl);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}

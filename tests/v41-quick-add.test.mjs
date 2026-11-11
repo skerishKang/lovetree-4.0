@@ -97,9 +97,11 @@ test('dropRoute: 어디로 갈지 한 표로 고정한다', () => {
     [{ source: 'server', owned: true, writable: true, image: true, quickOpen: true }, 'photo']
   ];
   for (const [input, kind] of rows) assert.equal(dropRoute(input).kind, kind, JSON.stringify(input));
-  // 사진은 열려 있는 화면을 따른다: 편집기가 열려 있으면 그 업로더, 아니면 빠른 추가 업로더.
-  assert.equal(dropRoute({ source: 'server', owned: true, writable: true, image: true, editorOpen: true }).target, 'editor');
-  assert.equal(dropRoute({ source: 'server', owned: true, writable: true, image: true }).target, 'quick');
+  // #425 2번: 올린 사진은 나만 보기 — 사진은 어느 탭이 열려 있어도 자세한 추가 업로더로 간다.
+  for (const input of rows.map(([value]) => value).filter(value => value.image)) {
+    assert.equal(dropRoute(input).target, 'editor', JSON.stringify(input));
+    assert.equal(dropRoute(input).veil, '놓으면 이 순간에 사진을 붙여요', JSON.stringify(input));
+  }
   // 공유 모드는 덮개 문구도 없다(#315 읽기 전용 — 받지 않는다).
   assert.equal(dropRoute({ source: 'share' }).veil, '');
 });
@@ -174,19 +176,22 @@ test('#343 마크업: 두 줄 설명·크림 버튼 하나·고정 안내 줄·�
   assert.doesNotMatch(html, /data-close="quick-add">닫기</, '아래 닫기 버튼은 두지 않는다(오른쪽 위 ✕만)');
   assert.match(html, /id="quick-notice"[^>]*role="status"/, '담은 뒤 안내 줄은 상태 안내');
   assert.match(html, /id="quick-refine"[^>]*>지금 다듬기 →</, '지금 다듬기는 안내 줄 안의 금색 링크');
-  assert.match(html, /<p class="quick-or" aria-hidden="true">또는<\/p>/, '또는 구분선');
+  // #425 2번: 쉬운 추가 탭에는 '또는' 구분선과 사진 올리기 칸이 없다 — 사진은 자세한 추가에서만 받는다.
+  const quickForm = html.match(/<form id="quick-form">[\s\S]*?<\/form>/)?.[0] || '';
+  assert.doesNotMatch(quickForm, /quick-or|quick-photo|data-media-slot|type="file"/, '쉬운 추가 탭에는 사진 올리기가 없다');
+  assert.match(html, /class="panel-note media-private-note">직접 찍었거나 쓸 권리가 있는 사진만 올려 주세요 · 사진은 나만 볼 수 있어요<\/p>/, '자세한 추가의 사진 안내');
   assert.match(html, /placeholder="YouTube·사진·링크 주소"/, '금테 입력창 안내');
 });
 
-test('#343 CSS: 머리글 금색·미리보기/안내 줄 높이 고정·점선 사진 칸·숨긴 파일 input', () => {
+test('#343 CSS: 머리글 금색·미리보기/안내 줄 높이 고정·크림 버튼 폭', () => {
   const css = readFileSync(new URL('../public/v41/shell.css', import.meta.url), 'utf8');
   // #425: 빠른 추가는 한 창(write-panel)의 쉬운 추가 탭이다 — 머리글 금색 규칙도 한 창 선택자로 옮겼다.
   assert.match(css, /#write-panel \.eyebrow\{color:var\(--lt-gold\)\}/, '밤 테마 머리글은 금색');
   assert.match(css, /\.quick-preview\{[^}]*height:300px/, '미리보기 카드 높이 고정');
   assert.match(css, /@media\(max-width:780px\)\{\.quick-preview\{height:220px\}\}/, '좁은 화면도 높이 고정');
   assert.match(css, /\.quick-notice-row\{[^}]*min-height:44px/, '안내 줄 높이 고정');
-  assert.match(css, /\.quick-photo \.file-label\{[^}]*border:1px dashed var\(--lt-gold-line\)/, '점선 사진 칸');
-  assert.match(css, /\.quick-photo input\[type=file\]\{[^}]*clip-path:inset\(50%\)/, '실제 파일 input은 숨기되 폼에는 남긴다');
+  // #425 2번: 쉬운 추가의 사진 칸을 없앴으니 그 스타일도 남지 않는다.
+  assert.equal(/\.quick-or|\.quick-photo/.test(css), false, '쉬운 추가의 또는·사진 칸 스타일은 없다');
   assert.match(css, /\.quick-submit\{[^}]*width:100%/, '크림 버튼은 폭 전체');
 });
 

@@ -154,7 +154,6 @@ export function createQuickAdd(deps) {
 
   function submitQuick(event) {
     event?.preventDefault?.();
-    if (quickUploads?.busy) return;
     const parsed = parseQuickUrl($('quick-url').value, describe);
     if (parsed.status !== 'ok') {
       $('quick-error').textContent = parsed.status === 'empty' ? QUICK_EMPTY_ERROR : QUICK_INVALID_ERROR;
@@ -229,14 +228,7 @@ export function createQuickAdd(deps) {
     deps.openEditor('edit');
   }
 
-  // 사진은 기존 업로더를 그대로 쓴다(#310 onUploaded·imagesOnly). 업로드가 끝나면 그 주소로 바로 담는다.
-  const quickUploads = deps.mountUpload({
-    form: $('quick-form'), assets: null, imagesOnly: true, fileLabel: '📷 사진 올리기',
-    getSubject: () => deps.getSource() === 'server' && snapshot().writable ? snapshot().subject : null,
-    getState: () => deps.getMember()?.state() || null,
-    onChange: () => {},
-    onUploaded: url => { saveUrl(url); setTimeout(syncSubmitState, 0); }
-  });
+  // #425 2번: 쉬운 추가 탭에는 사진 올리기가 없다(자세한 추가의 업로더만 쓴다).
 
   // ---- 끌어다 놓기 (데스크톱 pointer:fine) ----
   const isFinePointer = deps.isFinePointer || (() => globalThis.matchMedia?.('(pointer:fine)').matches === true);
@@ -303,8 +295,9 @@ export function createQuickAdd(deps) {
     if (route.kind === 'login') { deps.notify(DROP_LOGIN_NOTICE); return; }
     if (route.kind === 'readonly') { deps.notify(DROP_READONLY_NOTICE); return; }
     if (route.kind === 'photo') {
-      if (route.target === 'editor') feedFiles($('moment-form')?.querySelector?.('[data-media-file]'), image);
-      else { openQuick(); feedFiles($('quick-form')?.querySelector?.('[data-media-file]'), image); }
+      // #425 2번: 올린 사진은 자세한 추가에서만 받는다 — 쉬운 추가 탭이 열려 있어도 자세한 추가로 옮긴다.
+      deps.openEditor?.('add');
+      feedFiles($('moment-form')?.querySelector?.('[data-media-file]'), image);
       return;
     }
     const url = extractDropUrl(dataTransfer);
@@ -332,7 +325,6 @@ export function createQuickAdd(deps) {
     mountFrame: doc => { if (isFinePointer()) mountDrop(doc); },
     saveUrl,
     refine,
-    uploads: quickUploads,
     reset: resetQuick,
     state: () => ({ savedTimer: savedTimerBox.timer, titleCache: titleCache.size })
   };
