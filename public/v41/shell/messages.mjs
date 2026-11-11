@@ -97,6 +97,27 @@ export function createMessages(deps) {
   function shareFailure(answer) {
     return answer.status === 401 ? '로그인이 필요해요.' : answer.code === 'timeout' ? '서버 응답 시간이 초과됐어요.' : answer.message || '공유 요청을 처리하지 못했어요.';
   }
+  // #369: 단계를 눈에 보이게 — ① 보여 줄 것 고르기 ② 미리보기 ③ 링크 만들기.
+  // 지금 단계와 다음에 할 일을 #share-steps·#share-next에 그린다.
+  const SHARE_STAGES = {
+    choose: {current: 1, next: '보여 줄 순간과 처음 열 보기를 고른 뒤, 공개 내용을 미리 봐 주세요.'},
+    ready: {current: 3, next: '미리보기를 확인했어요. 이 내용으로 링크를 만들어 주세요.'},
+    done: {current: 0, next: '링크를 복사하거나 열어 보세요. 새 링크는 다시 미리 본 뒤 만들 수 있어요.'}
+  };
+  function paintShareSteps(stage) {
+    const stageInfo = SHARE_STAGES[stage] || SHARE_STAGES.choose;
+    for (const li of $('share-steps').children) {
+      const step = Number(li.dataset.step);
+      li.dataset.state = stageInfo.current === 0 || step < stageInfo.current ? 'done' : step === stageInfo.current ? 'current' : 'todo';
+    }
+    $('share-next').textContent = stageInfo.next;
+    // '링크 만들기'가 눌리지 않는 이유를 버튼 옆에 보여 준다.
+    $('share-create-reason').hidden = !$('share-create').disabled;
+  }
+  function shareUrlFor(id, view) {
+    const shareBase = location.hostname === 'lovetree.padiem.net' ? '/' : '/v41/';
+    return new URL(`${shareBase}#share/${id}/${view}`, location.origin).href;
+  }
   function renderShareList(shares = []) {
     const host = $('share-list'), treeId = window.LT41?.tree.id;
     host.replaceChildren();
@@ -107,46 +128,83 @@ export function createMessages(deps) {
       host.append(p);
       return;
     }
-    for (const item of selected) {
-      const row = document.createElement('div');
-      row.className = 'share-item' + (item.status === 'revoked' ? ' share-revoked' : '');
-      const text = document.createElement('div'), strong = document.createElement('strong'), small = document.createElement('small');
-      strong.textContent = item.status === 'active' ? (item.discoverable ? '공유 중 · 발견 공개' : '공유 중 · 주소로만 공개') : '공유 취소됨';
-      small.textContent = (item.view === 'board' ? '기억 보드' : item.view === 'network' ? '관계 지도' : '기억책') + ' · ' + new Date(item.createdAt).toLocaleString('ko-KR');
-      text.append(strong, small);
-      row.append(text);
-      if (item.status === 'active') {
+    // #369: 살아 있는 주소만 위에, 취소된 주소는 '지난 주소 N개' 접힘 안에 둔다.
+    const active = selected.filter(item => item.status === 'active');
+    const past = selected.filter(item => item.status !== 'active');
+    for (const item of active) host.append(shareRow(item));
+    if (past.length) {
+      const details = document.createElement('details');
+      details.className = 'share-past';
+      const summary = document.createElement('summary');
+      summary.textContent = `지난 주소 ${past.length}개`;
+      details.append(summary);
+      for (const item of past) details.append(sharePastRow(item));
+      host.append(details);
+    }
+  }
+  function shareLabel(item) {
+    return (item.view === 'board' ? '기억 보드' : item.view === 'network' ? '관계 지도' : '기억책') + ' · ' + new Date(item.createdAt).toLocaleDateString('ko-KR') + '에 만든 주소';
+  }
+  function shareRow(item) {
+    const row = document.createElement('div');
+    row.className = 'share-item';
+    const text = document.createElement('div'), strong = document.createElement('strong'), small = document.createElement('small');
+    strong.textContent = item.discoverable ? '공유 중 · 둘러보기에 올림' : '공유 중 · 주소로만 공개';
+    small.textContent = shareLabel(item);
+    text.append(strong, small);
+    row.append(text);
+    {
         const actions = document.createElement('div');
         actions.className = 'share-item-actions';
         const discover = document.createElement('button');
         discover.type = 'button';
-        discover.textContent = item.discoverable ? '발견에서 내리기' : '발견에 공개';
+        discover.textContent = item.discoverable ? '둘러보기에서 내리기' : '둘러보기에 올리기';
         discover.onclick = async () => {
           const next = !item.discoverable;
-          if (next && !confirm('이 트리를 누구나 검색할 수 있는 발견 목록에 공개할까요? 공유 주소만 만든 상태와 달리 제목·대상·공개 순간이 목록에 나타납니다.')) return;
+          if (next && !confirm('이 트리를 둘러보기 목록에 올릴까요? 주소만 만든 상태와 달리 제목·대상·공개 순간이 둘러보기에 나타납니다.')) return;
           discover.disabled = true;
           const answer = await shareApi.setDiscoverable(item.id, next);
           if (!answer.ok) { $('share-feedback').textContent = shareFailure(answer); discover.disabled = false; return; }
-          $('share-feedback').textContent = next ? '발견 목록 공개를 켰어요.' : '발견 목록에서 내렸어요. 공유 주소는 계속 사용할 수 있어요.';
+          $('share-feedback').textContent = next ? '둘러보기에 올렸어요. 둘러보기 목록에서 이 트리를 볼 수 있어요.' : '둘러보기에서 내렸어요. 공유 주소는 계속 사용할 수 있어요.';
           await loadShareList();
+        };
+        const copy = document.createElement('button');
+        copy.type = 'button';
+        copy.textContent = '복사';
+        copy.onclick = async () => {
+          try {
+            await navigator.clipboard.writeText(shareUrlFor(item.id, item.view));
+            $('share-feedback').textContent = '공유 주소를 복사했어요.';
+          } catch {
+            $('share-feedback').textContent = '복사하지 못했어요. 열어 보기로 주소를 확인해 주세요.';
+          }
         };
         const revoke = document.createElement('button');
         revoke.type = 'button';
         revoke.textContent = '공유 취소';
         revoke.onclick = async () => {
-          if (!confirm('이 공유 주소를 지금 회수할까요? 발견 목록에서도 즉시 내려갑니다.')) return;
+          if (!confirm('이 공유 주소를 지금 회수할까요? 둘러보기에 올렸다면 목록에서도 즉시 내려갑니다.')) return;
           revoke.disabled = true;
           const answer = await shareApi.revoke(item.id);
           if (!answer.ok) { $('share-feedback').textContent = shareFailure(answer); revoke.disabled = false; return; }
           $('share-feedback').textContent = '공유를 취소했어요. 새 요청은 즉시 차단됩니다.';
-          if ($('share-url').dataset.shareId === item.id) $('share-created').hidden = true;
+          if ($('share-url').dataset.shareId === item.id) { $('share-created').hidden = true; $('share-discover').checked = false; $('share-discover').disabled = true; }
           await loadShareList();
         };
-        actions.append(discover, revoke);
+        actions.append(discover, copy, revoke);
         row.append(actions);
       }
-      host.append(row);
-    }
+      return row;
+  }
+  function sharePastRow(item) {
+    const row = document.createElement('div');
+    row.className = 'share-item share-revoked';
+    const text = document.createElement('div'), strong = document.createElement('strong'), small = document.createElement('small');
+    strong.textContent = '공유 취소됨';
+    small.textContent = shareLabel(item);
+    text.append(strong, small);
+    row.append(text);
+    return row;
   }
   async function loadShareList() {
     const answer = await shareApi.list();
@@ -157,6 +215,7 @@ export function createMessages(deps) {
     $('share-create').disabled = true;
     $('share-preview-result').hidden = true;
     $('share-feedback').textContent = '선택이 바뀌었어요. 공개 내용을 다시 미리 봐 주세요.';
+    paintShareSteps('choose');
   }
   async function openSharePanel() {
     if (getSource() !== 'server' || !getMember()?.snapshot().owned || !window.LT41) {
@@ -179,6 +238,10 @@ export function createMessages(deps) {
     $('share-preview-result').hidden = true;
     $('share-created').hidden = true;
     $('share-feedback').textContent = '';
+    $('share-copy-note').textContent = '';
+    $('share-discover').checked = false;
+    $('share-discover').disabled = true;
+    paintShareSteps('choose');
     panel('share-panel');
     void loadShareList();
   }
@@ -205,6 +268,7 @@ export function createMessages(deps) {
     $('share-preview-result').hidden = false;
     $('share-create').disabled = false;
     $('share-feedback').textContent = '미리보기를 확인한 뒤 링크를 만들 수 있어요.';
+    paintShareSteps('ready');
   };
   $('share-create').onclick = async () => {
     const payload = sharePayload();
@@ -214,24 +278,44 @@ export function createMessages(deps) {
     $('share-feedback').textContent = '공유 주소를 만들고 있어요.';
     const answer = await shareApi.create({...payload, previewToken: sharePreviewToken});
     if (!answer.ok) { $('share-feedback').textContent = shareFailure(answer); button.disabled = false; return; }
-    const shareBase = location.hostname === 'lovetree.padiem.net' ? '/' : '/v41/';
-    const url = new URL(`${shareBase}#share/${answer.share.id}/${answer.share.view}`, location.origin).href;
+    const url = shareUrlFor(answer.share.id, answer.share.view);
     $('share-url').value = url;
     $('share-url').dataset.shareId = answer.share.id;
+    $('share-open').href = url;
+    $('share-open').hidden = false;
     $('share-created').hidden = false;
+    $('share-copy-note').textContent = '';
+    $('share-discover').checked = false;
+    $('share-discover').disabled = false;
     $('share-feedback').textContent = '명시적으로 공유 주소를 만들었어요.';
     sharePreviewKey = ''; sharePreviewToken = '';
+    paintShareSteps('done');
     await loadShareList();
   };
   $('share-copy').onclick = async () => {
     const input = $('share-url');
     try {
       await navigator.clipboard.writeText(input.value);
+      $('share-copy-note').textContent = '복사했어요.';
       $('share-feedback').textContent = '공유 주소를 복사했어요.';
     } catch {
       input.select();
+      $('share-copy-note').textContent = '';
       $('share-feedback').textContent = '주소를 선택했어요. 복사해 주세요.';
     }
+  };
+  // #369: '둘러보기에도 올리기'는 링크를 만든 뒤 켜는 스위치(기본 꺼짐).
+  $('share-discover').onchange = async () => {
+    const box = $('share-discover'), shareId = $('share-url').dataset.shareId;
+    if (!shareId) { box.checked = false; return; }
+    const next = box.checked;
+    if (next && !confirm('이 트리를 둘러보기 목록에 올릴까요? 주소만 만든 상태와 달리 제목·대상·공개 순간이 둘러보기에 나타납니다.')) { box.checked = false; return; }
+    box.disabled = true;
+    const answer = await shareApi.setDiscoverable(shareId, next);
+    box.disabled = false;
+    if (!answer.ok) { box.checked = !next; $('share-feedback').textContent = shareFailure(answer); return; }
+    $('share-feedback').textContent = next ? '둘러보기에 올렸어요. 둘러보기 목록에서 이 트리를 볼 수 있어요.' : '둘러보기에서 내렸어요. 공유 주소는 계속 사용할 수 있어요.';
+    await loadShareList();
   };
 
   // 둘러보기(공개 목록) 연결. 항목을 열면 공유 주소로, 내 기록 새로 시작은 첫 여정으로 간다.
