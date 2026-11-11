@@ -25,8 +25,10 @@ import { ApiError } from './errors.js';
 import { createAccountRepo } from './db/account-postgres.js';
 import { createAccountDeleteRpcRepo } from './db/account-delete-rpc-postgres.js';
 import { createAccountService } from './account-service.js';
+import { createAccountEmailStore } from './account-email-store.js';
 import { createDeletedAccountGuard } from './account-guard.js';
 import { createTrustedAccountDeleteHandler, createSharedAccountDeletionWorkflow } from './shared-account-deletion.js';
+import { createVerifier } from './padiem-access-verify.mjs';
 
 const {
   LOVETREE_SHARED_AUTH_ENABLED = '',
@@ -162,6 +164,11 @@ const trustedAccountDelete = createTrustedAccountDeleteHandler({
   secret: LOVETREE_ACCOUNT_DELETE_RPC_SECRET,
   claimServiceRequest: (entry) => accountDeleteRpcRepo.claimServiceRequest(entry)
 });
+const trustedAccountEmail = createAccountEmailStore({
+  repo: accountRepo,
+  productId: LOVETREE_PRODUCT_ID,
+  verify: createVerifier({ audience: LOVETREE_PRODUCT_ID })
+});
 void accountDeleteRpcRepo.pruneExpiredAccountDeletionAudits().catch(() => {});
 const accountDeletionRetentionTimer = setInterval(() => {
   void accountDeleteRpcRepo.pruneExpiredAccountDeletionAudits().catch(() => {});
@@ -208,6 +215,7 @@ const mediaHandler = createMediaHandler({
 const requestHandler = async (request) => {
   const path = String(request.path ?? '');
   if (path === '/internal/account/delete') return trustedAccountDelete(request);
+  if (path === '/internal/account/email') return trustedAccountEmail(request);
   if (path.startsWith('/auth/')) return loginRoute(login, request);
   if (path.startsWith('/api/media')) return mediaHandler(request);
   if (path.startsWith('/api/shares') || path.startsWith('/api/public/shares/')) return shareHandler(request);

@@ -208,6 +208,17 @@ CREATE TABLE IF NOT EXISTS lovetree_account_deletions (
   PRIMARY KEY (product_id, subject_hash)
 );
 
+-- 2026-11-11 계정 이메일. 공통 로그인 토큰 교환 응답의 사용자 정보(profile.email)를
+-- 로그인 콜백이 검증된 access 토큰의 account_id와 함께 이 표에 모아 둔다(서버끼리만 쓰는
+-- 내부 경로 /internal/account/email, 공개 프록시 목록 밖). 확인·복구에 쓰고, 삭제 시 함께 지운다.
+CREATE TABLE IF NOT EXISTS lovetree_account_emails (
+  product_id text NOT NULL,
+  subject_id text NOT NULL,
+  email text NOT NULL,
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (product_id, subject_id)
+);
+
 -- Short-lived replay IDs for signed cross-service deletion calls. No account identifier is stored.
 CREATE TABLE IF NOT EXISTS lovetree_account_delete_rpc_requests (
   service_id text PRIMARY KEY,

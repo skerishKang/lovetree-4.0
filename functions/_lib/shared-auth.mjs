@@ -1,4 +1,5 @@
 import { createVerifier } from './padiem-access-verify.mjs';
+import { upstreamOrigin } from './proxy.js';
 const AUTH = 'https://auth.padiem.net';
 const CLIENT = 'lovetree-4-0';
 const CALLBACKS = ['https://lovetree-4-0.pages.dev/auth/callback', 'https://lovetree.padiem.net/auth/callback'];
@@ -10,6 +11,38 @@ const j64 = x => b64(enc.encode(JSON.stringify(x)));
 const cookies = request => Object.fromEntries((request.headers.get('cookie') || '').split(';').map(x => x.trim().split(/=(.*)/s).slice(0, 2)).filter(x => x.length === 2));
 const attrs = 'Secure; HttpOnly; SameSite=Lax';
 const json = (status, error) => new Response(JSON.stringify({ error }), { status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' } });
+// 토큰 교환 응답의 사용자 정보(profile.email)를 러브트리 서버 DB에 담는 서버-간 내부 경로.
+// 브라우저가 임의로 자기 이메일을 써 놓을 수 없게, 로그인 콜백 처리에서 받은 access 토큰과
+// 토큰 서명에 실린 sub만 보내고 COM2는 같은 토큰을 JWKS로 검증한 뒤 sub가 일치해야 저장한다.
+const ACCOUNT_EMAIL_PATH = '/internal/account/email';
+// 프로필 클레임이 켜져 있으면 콜백에서 이메일을 모아 두고, 검증된 토큰이 인증한 계정에 한 번만
+// 적어 둔다. 로그인 흐름을 막지 않도록 최선 노력(best effort)으로 보내고 실패는 삼킨다.
+export async function recordAccountEmail(env, fetcher, tokens, verified) {
+  try {
+    const email = typeof tokens?.profile?.email === 'string' ? tokens.profile.email.trim() : '';
+    const accountId = verified?.accountId ?? verified?.subject;
+    const origin = upstreamOrigin(env);
+    if (!email || !accountId || !origin) return false;
+    const signal = typeof AbortSignal === 'function' && typeof AbortSignal.timeout === 'function'
+      ? AbortSignal.timeout(4000)
+      : undefined;
+    const response = await fetcher(`${origin}${ACCOUNT_EMAIL_PATH}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${tokens.access_token}` },
+      body: JSON.stringify({ email, canonical_subject_id: accountId }),
+      redirect: 'manual',
+      ...(signal ? { signal } : {})
+    });
+    return response?.ok === true;
+  } catch {
+    return false;
+  }
+}
+// 토큰 교환 응답의 사용자 정보에서 이메일만 꺼낸다. 사용자 정보가 없거나(공통 로그인 쪽
+// 설정이 꺼져 있을 때) 이메일이 비어 있으면 ''를 돌려주고 로그인 자체는 실패하지 않는다.
+function emailFromExchange(body) {
+  return body?.profile && typeof body.profile.email === 'string' && body.profile.email.trim() ? body.profile.email.trim() : '';
+}
 // 로그인 뒤 돌아갈 자리. 기본값은 사이트 루트가 아니라 4.1 첫 화면이다.
 const NEXT_DEFAULT = '/v41/';
 const NEXT_ORIGIN = 'https://lovetree-4-0.pages.dev';
@@ -103,8 +136,9 @@ export function createSharedPagesAuth({ fetcher = fetch, now = () => Math.floor(
         const state = await unseal(env, jar.lovetree_auth_state);
         if (state.callback !== callbackFor(request, env) || state.exp <= current || !state.state || state.state !== url.searchParams.get('state') || !url.searchParams.get('code') || validNext(state.next) !== state.next) return json(401, 'invalid_state');
         const tokens = await exchange(env, { grant_type: 'authorization_code', code: url.searchParams.get('code'), redirect_uri: callbackFor(request, env), code_verifier: state.verifier }, fetcher, current);
-        await verify(tokens.access_token);
+        const verified = await verify(tokens.access_token);
         if (typeof tokens.refresh_token !== 'string') throw new Error('missing refresh');
+        await recordAccountEmail(env, fetcher, tokens, verified);
         const h = issueCookies(tokens); h.set('location', state.next); return new Response(null, { status: 302, headers: h });
       }
       if ((path === '/auth/refresh' || path === '/auth/logout') && request.method === 'POST') {
