@@ -9,9 +9,10 @@ const colors={rose:ltVar('--lt-thread-rose','#ff659f'),violet:ltVar('--lt-thread
 // 공유 감상(share)은 읽기 전용이다. 서버 쓰기 가능 여부는 셸이 LT41.writable로 넘긴다.
 function boardSaveEnabled(){try{return window.parent!==window&&window.parent.LT41?.source==='server'&&window.parent.LT41?.writable===true&&!LTDEMO.readOnly}catch{return false}}
 const canEditBoard=LTDEMO.example||boardSaveEnabled();
-let moments=LTDEMO.moments.map((m,i)=>{const pos=LT58Model.cardPosition(i);return{id:m.id,type:m.type==='memo'?'note':'photo',originalType:m.type==='memo'?'note':m.type,createdOrder:i+1,title:m.title,emotion:m.emotion,date:m.date,source:m.source||'예시 기록',mediaMetadata:m.mediaMetadata||null,memo:m.memo||m.whyNext||'',x:Number.isFinite(m.x)?m.x:pos.x,y:Number.isFinite(m.y)?m.y:pos.y,rot:Number.isFinite(m.rot)?m.rot:pos.rot,pinStyle:m.pinStyle,cardStyle:m.cardStyle,keywords:Array.isArray(m.keywords)?m.keywords:[],color:m.color||['rose','violet','cyan','amber'][i%4],asset:m.image,url:m.externalUrl||'',first:!!m.first}});
+const spread=LT58Model.treeSpread(LTDEMO.moments.map(m=>m.id),LTDEMO.edges);
+let moments=LTDEMO.moments.map((m,i)=>{const pos=spread.get(m.id)||LT58Model.cardPosition(i);return{id:m.id,type:m.type==='memo'?'note':'photo',originalType:m.type==='memo'?'note':m.type,createdOrder:i+1,title:m.title,emotion:m.emotion,date:m.date,source:m.source||'예시 기록',mediaMetadata:m.mediaMetadata||null,memo:m.memo||m.whyNext||'',x:Number.isFinite(m.x)?m.x:pos.x,y:Number.isFinite(m.y)?m.y:pos.y,rot:Number.isFinite(m.rot)?m.rot:pos.rot,pinStyle:m.pinStyle,cardStyle:m.cardStyle,keywords:Array.isArray(m.keywords)?m.keywords:[],color:m.color||['rose','violet','cyan','amber'][i%4],asset:m.image,url:m.externalUrl||'',first:!!m.first}});
 
-let connections=LTDEMO.edges.map((e,i)=>({id:'c'+i,kind:e.kind,a:e.from,b:e.to,why:e.kind==='related'?'관련 순간':e.reason||'부모·자식 연결',color:e.kind==='related'?'cyan':(canEditBoard?['rose','violet','cyan','amber'][Math.max(0,moments.findIndex(m=>m.id===e.from))%4]:'rose')}));
+let connections=LTDEMO.edges.map((e,i)=>({id:'c'+i,kind:e.kind,a:e.from,b:e.to,why:e.kind==='related'?'관련 순간':e.reason||'',color:e.kind==='related'?'cyan':(canEditBoard?['rose','violet','cyan','amber'][Math.max(0,moments.findIndex(m=>m.id===e.from))%4]:'rose')}));
 
 // 보드 저장(#372 후속): 바뀐 순간·연결을 셸에 넘겨 기존 워크스페이스 저장 경로(PUT /api/workspace)로 보낸다.
 // 예시·공유는 보내지 않는다. 셸이 저장하지 못하면 토스트로 알린다.
@@ -105,9 +106,11 @@ mobilePicker?.select(id);
 document.querySelectorAll('.card').forEach(c=>c.classList.toggle('selected',c.dataset.id===id));
 if(open){let m=moments.find(x=>x.id===id);
 const _ti=titleInfo(m);$('#dTitle').textContent=_ti.main;const _ds=$('#detailSub');if(_ds){_ds.textContent=_ti.sub?'▶ '+_ti.sub:'';_ds.hidden=!_ti.sub}
-$('#dBasic').innerHTML=`${esc(dateText(m.date))}<br><b>${esc(m.emotion)}</b> · ${esc(m.source)}${m.memo&&!connections.some(c=>c.a===id&&c.why===m.memo)?`<br><br>${esc(m.memo)}`:""}`;
+const _md=m.mediaMetadata||{},_src=[_md.title||_ti.sub,_md.channel].filter(x=>typeof x==='string'&&x.trim()),_srcText=_src.length?(_src.length>1?_src[0]+' ('+_src[1]+')':_src[0]):m.source;
+$('#dBasic').innerHTML=`${esc(dateText(m.date))}${m.first?' <span class="firstMark" title="첫 순간">●</span>':''}<br><b>${esc(m.emotion)}</b> · ${esc(_srcText)}${m.memo&&!connections.some(c=>c.a===id&&c.why===m.memo)?`<br><br>${esc(m.memo)}`:""}`;
 let outs=connections.filter(c=>c.kind==='parent'&&c.a===id),ins=connections.filter(c=>c.kind==='parent'&&c.b===id);
-$('#dConn').innerHTML=outs.length?outs.map(c=>`→ ${esc(titleMain(moments.find(x=>x.id===c.b)))}<br><span style="color:#bca9c5">${esc(c.why)}</span>`).join('<br><br>'):`${ins.length}개의 이전 연결 · 아직 다음 순간 없음`;
+const _nx=outs.map(c=>({t:esc(titleMain(moments.find(x=>x.id===c.b))),why:(c.why&&c.why!=='관련 순간')?esc(c.why):''})),_row=n=>`→ ${n.t}${n.why?'<br><span style="color:#bca9c5">'+n.why+'</span>':''}`;
+$('#dConn').innerHTML=_nx.length?_nx.slice(0,3).map(_row).join('<br><br>')+(_nx.length>3?`<details><summary>나머지 ${_nx.length-3}개 보기</summary>${_nx.slice(3).map(_row).join('<br><br>')}</details>`:''):'아직 다음 순간이 없어요';
 $('#detail').classList.add('open')}}
 
 function startConnect(e,id){if(cinema)return;
@@ -144,7 +147,7 @@ $('#whyModal').classList.add('open')}
 
 function showWhy(cid){selectedConn=cid;
 let c=connections.find(x=>x.id===cid),a=moments.find(x=>x.id===c.a),b=moments.find(x=>x.id===c.b);
-$('#whyBubble').innerHTML=`<b>${esc(titleMain(a))} → ${esc(titleMain(b))}</b><br>${esc(c.why)}${canEditBoard?' <button id="deleteConnBubble">연결 지우기</button>':''}`;
+$('#whyBubble').innerHTML=`<b>${esc(titleMain(a))} → ${esc(titleMain(b))}</b>${c.why?'<br>'+esc(c.why):''}${canEditBoard?' <button id="deleteConnBubble">연결 지우기</button>':''}`;
 $('#whyBubble').classList.add('show');
 setTimeout(()=>{let b=$('#deleteConnBubble');if(b)b.onclick=deleteSelectedConnection},0);
 clearTimeout(showWhy.t);

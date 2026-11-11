@@ -11,6 +11,41 @@ window.LT58Model = (() => {
     return { x: 150 + (i % 8) * 280, y: 150 + Math.floor(i / 8) * 400, rot: (i % 3 - 1) * 2 };
   }
 
+  // 처음 배치(#395): 자리를 정한 적 없는 순간을 이야기 순서대로 펼친다.
+  // 첫 순간은 왼쪽, 이어진 순간은 오른쪽으로 가지 치듯(가로 300px, 세로 420px 간격 = 카드끼리 겹치지 않음).
+  // 무대(2400x2200)를 넘으면 남는 순간은 아래쪽 새 줄에 이어 놓는다. 회전은 cardPosition과 같은 -2·0·2도.
+  function treeSpread(ids, edges) {
+    const known = new Set(ids);
+    const kids = new Map(ids.map((id) => [id, []]));
+    const hasParent = new Set();
+    for (const e of edges || []) {
+      if (e.kind !== 'parent' || !known.has(e.from) || !known.has(e.to) || hasParent.has(e.to)) continue;
+      kids.get(e.from).push(e.to);
+      hasParent.add(e.to);
+    }
+    const out = new Map();
+    let nextRow = 0;
+    const cols = 7;
+    function visit(id, depth, stack) {
+      stack.add(id);
+      const rows = kids.get(id).filter((k) => !stack.has(k) && !out.has(k)).map((k) => visit(k, depth + 1, stack));
+      stack.delete(id);
+      const row = rows.length ? (rows[0] + rows[rows.length - 1]) / 2 : nextRow++;
+      out.set(id, { depth, row });
+      return row;
+    }
+    for (const id of ids) if (!hasParent.has(id) && !out.has(id)) visit(id, 0, new Set());
+    for (const id of ids) if (!out.has(id)) visit(id, 0, new Set());
+    const result = new Map();
+    let i = 0;
+    for (const id of ids) {
+      const { depth, row } = out.get(id);
+      const wrap = Math.floor(depth / cols);
+      result.set(id, { x: 150 + (depth % cols) * 300, y: 150 + (row + wrap * (nextRow + 1)) * 420, rot: (i++ % 3 - 1) * 2 });
+    }
+    return result;
+  }
+
   // 실(연결선) 베지에: 두 핀 사이를 아래로 늘어뜨린다. dx가 클수록 처짐이 커지되 140px까지.
   function threadPath(a, b) {
     const dx = b.x - a.x;
@@ -163,5 +198,5 @@ window.LT58Model = (() => {
     return seen ? 'shown' : 'hidden';
   }
 
-  return { escapeHTML, cardPosition, threadPath, fitZoom, removeConnection, editGuard, collectPath, nextConnections, detailButtonState, cinemaBeats, filterVisible, maxCreatedOrder, threadRedrawStep, decorationMotion, cursorMode, cursorHover, cursorScale, cursorEffectAllowed, cursorPresence };
+  return { escapeHTML, cardPosition, treeSpread, threadPath, fitZoom, removeConnection, editGuard, collectPath, nextConnections, detailButtonState, cinemaBeats, filterVisible, maxCreatedOrder, threadRedrawStep, decorationMotion, cursorMode, cursorHover, cursorScale, cursorEffectAllowed, cursorPresence };
 })();
