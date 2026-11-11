@@ -30,7 +30,7 @@ import {connectionSignature} from './shell/panel-dirty.mjs';
 import {createLocation} from './shell/location.mjs';
 import {createNotifier} from './shell/notice.mjs';
 import {paintLoginLinks,paintThemeControls,applyTheme as applyThemeFor,toggleTheme as toggleThemeFor} from './shell/theme.mjs';
-import {normalizeTitleDisplay, normalizeAccentColor, coverModeOf, normalizeCoverDesign} from './domain.mjs';
+import {normalizeTitleDisplay, normalizeAccentColor, normalizeDateStyle, normalizeStartPlace, normalizeShareView, normalizeShareDiscover, coverModeOf, normalizeCoverDesign} from './domain.mjs';
 import {backfillVideoTitles} from './title-backfill.mjs';
 import {thumbnailCandidates, coverFallbackAttrs, fallbackCardData, emotionToneOf, mountThumbFallback, ADD_TITLE_LABEL, VIDEO_UNAVAILABLE_TEXT} from './thumb-fallback.mjs';
 const $=id=>document.getElementById(id);
@@ -300,7 +300,9 @@ const shellMessages=createMessages({
   paintThemeControls:()=>paintThemeControls(),
   viewForFile:file=>viewForFile(file),
   exampleTree,
-  journey:shellJourney
+  journey:shellJourney,
+  // #368 3차: 공유 창 시작값(처음 열 보기·둘러보기 올림 기본)은 계정 설정에서 온다.
+  getShareDefaults:()=>({view:currentShareView(),discover:currentShareDiscover()})
 });
 function openSharePanel(){return shellMessages.openSharePanel();}
 function noteJourneyStep(step,options){return shellJourney.noteJourneyStep(step,options);}
@@ -397,8 +399,8 @@ const shellScreens=createScreens({
   onFrameReady:frame=>{
     const d=frame.contentDocument;if(!d)return;
     mountConnectionTool(d);applyViewAccessibility(d);shellQuick.mountFrame(d);
-    // #368 2차: 새로 열린 화면(기억책)에 페이지 넘김 값을 알린다(테마와 같은 시점).
-    applyPageTurnToFrame(frame);
+    // #368 2차·3차: 새로 열린 화면에 페이지 넘김·날짜 표기 값을 알린다(테마와 같은 시점).
+    applyPageTurnToFrame(frame);applyDateStyleToFrame(frame);
     d.addEventListener('click',e=>{const b=e.target.closest('button,a');if(!b)return;let file;if(b.matches('[data-action="tree"],[data-menu="tree"]'))file='track32-bookshelf.html';if(b.matches('#storyBook,[data-menu="book"]'))file='track59-sketchbook.html';if(current==='track56-network.html'&&b.id==='openMoment')file='track59-sketchbook.html';if(file){e.preventDefault();e.stopImmediatePropagation();show(file);}},true);
   }
 });
@@ -530,7 +532,13 @@ async function startMember(){setMemberRefreshStarted(true);if(!leaveMember())ret
  session=createMemberSession({api,onState:(state,selection,meta)=>{if(generation!==loadGeneration)return;
   // 4.1 기억 보드 저장: 화면이 이미 자기 상태를 들고 있으므로 셸은 모델만 갱신하고 iframe을 다시 그리지 않는다.
   if(meta?.board){const projected=workspaceModel({revision:0,state});model=projected;if(window.LT41){const tree=projected.trees.find(t=>t.id===window.LT41.tree.id);if(tree){window.LT41.tree=tree;window.LT41.trees=projected.trees;window.LT41.writable=true}}return;}const snapshot=session.snapshot(),saved=accountPosition(localStorage,snapshot.subject)||{},active=parseSelectionRoute(location.hash),pending=!initialized&&active.scope!=='owner'?pendingOwnerRoute(sessionStorage):null,route=active.scope==='owner'?active:pending;let requested=selection||stateSelection();
-   if(!initialized){if(route)requested=route;else if(!selection)requested=saved;const view=memberStartupView(active,route,saved,viewForFile(current));current=screenForView(view)[1];}
+   if(!initialized){if(route)requested=route;else if(!selection)requested=saved;
+    // #368 3차: 로그인 후 처음 보여 줄 곳(첫 화면/내 트리 전체 보기/이어 읽기). resume이 지금 동작이라 기본값이고,
+    // 주소(#my/…·#share/…·#home 등)가 있으면 그 주소가 이긴다(기존 규칙 그대로).
+    const startPlace=(()=>{try{return normalizeStartPlace(state.prefs?.startPlace)}catch{return 'resume'}})();
+    let view=memberStartupView(active,route,saved,viewForFile(current));
+    if(startPlace!=='resume'&&!route&&active?.scope!=='owner'&&!(active?.scope==='screen'&&active.explicit)&&!pending)view=startPlace==='shelf'?'shelf':'home';
+    current=screenForView(view)[1];}
    const resolved=load({revision:0,state},'server',requested,saved);initialized=true;
    if(window.LT41)window.LT41.prefs=state.prefs;
    paintTitleDisplayControls();
@@ -623,7 +631,7 @@ function accountConfirmMatches(){
  return accountExpected.kind==='email'?typed.toLowerCase()===accountExpected.value:typed===accountExpected.value;
 }
 // #368: 설정 창 묶음 — 입구는 묶음 이름으로 열고 해당 묶음(제목)으로 초점과 스크롤을 옮긴다.
-const SETTINGS_SECTIONS={profile:'account-settings-profile',screen:'account-settings-screen',write:'account-settings-write',data:'account-settings-data',account:'account-settings-account'};
+const SETTINGS_SECTIONS={profile:'account-settings-profile',screen:'account-settings-screen',look:'account-settings-look',share:'account-settings-share',write:'account-settings-write',data:'account-settings-data',account:'account-settings-account'};
 function focusSettingsSection(section='profile'){
  const box=$('account-settings');if(!box?.open)return;
  const target=$(SETTINGS_SECTIONS[section]||SETTINGS_SECTIONS.profile);if(!target)return;
@@ -678,6 +686,68 @@ function applyPageTurnToFrame(frame){
  try{frame.contentWindow?.postMessage({type:'lt41-page-turn',value:currentPageTurn()},location.origin);}catch{}
 }
 function paintPageTurnControls(){const value=currentPageTurn();for(const b of document.querySelectorAll('[data-page-turn]'))b.setAttribute('aria-checked',String(b.dataset.pageTurn===value));}
+// #368 3차: 날짜 표기·처음 보여 줄 곳·공유 기본값은 계정(state.prefs), 관계 지도 기본 보기는 이 기기(lt41.network.view — network.js와 같은 키).
+// 날짜 표기는 책·보드·지도·첫 화면이 같은 한 벌(formatDisplayDate)로 따르고, 셸은 프레임 속성+lt41-date-style 메시지로 알린다.
+function currentDateStyle(){try{return normalizeDateStyle(member?.state?.().prefs?.dateStyle)}catch{return 'dot'}}
+function applyDateStyleToFrame(frame){
+ try{frame.contentDocument?.documentElement?.setAttribute('data-lt-date-style',currentDateStyle());}catch{}
+ try{frame.contentWindow?.postMessage({type:'lt41-date-style',value:currentDateStyle()},location.origin);}catch{}
+}
+function paintDateStyleControls(){const value=currentDateStyle();for(const b of document.querySelectorAll('[data-date-style]'))b.setAttribute('aria-checked',String(b.dataset.dateStyle===value));}
+for(const b of document.querySelectorAll('[data-date-style]'))b.onclick=()=>{
+ if(!member?.snapshot().owned){notify('로그인한 뒤 날짜 표기를 바꿀 수 있어요.');return;}
+ try{member.apply('setPrefs',{dateStyle:b.dataset.dateStyle});}catch(e){notify('날짜 표기를 저장하지 못했어요. 잠시 뒤 다시 시도해 주세요.');return;}
+ paintDateStyleControls();for(const f of frames())applyDateStyleToFrame(f);
+ notify(b.dataset.dateStyle==='long'?'날짜를 11월 10일로 보여요.':b.dataset.dateStyle==='dash'?'날짜를 2026-11-10으로 보여요.':'날짜를 2026. 11. 10으로 보여요.');
+};
+paintDateStyleControls();
+function currentStartPlace(){try{return normalizeStartPlace(member?.state?.().prefs?.startPlace)}catch{return 'resume'}}
+function paintStartPlaceControls(){const value=currentStartPlace();for(const b of document.querySelectorAll('[data-start-place]'))b.setAttribute('aria-checked',String(b.dataset.startPlace===value));}
+for(const b of document.querySelectorAll('[data-start-place]'))b.onclick=()=>{
+ if(!member?.snapshot().owned){notify('로그인한 뒤 처음 보여 줄 곳을 바꿀 수 있어요.');return;}
+ try{member.apply('setPrefs',{startPlace:b.dataset.startPlace});}catch(e){notify('처음 보여 줄 곳을 저장하지 못했어요. 잠시 뒤 다시 시도해 주세요.');return;}
+ paintStartPlaceControls();
+ notify('처음 보여 줄 곳을 저장했어요. 다음에 로그인하면 그곳부터 열어요.');
+};
+paintStartPlaceControls();
+const NETWORK_VIEW_KEY='lt41.network.view';
+function currentNetworkView(){try{return localStorage.getItem(NETWORK_VIEW_KEY)==='concentric'?'concentric':'network'}catch{return 'network'}}
+function paintNetworkViewControls(){const value=currentNetworkView();for(const b of document.querySelectorAll('[data-network-view]'))b.setAttribute('aria-checked',String(b.dataset.networkView===value));}
+function applyNetworkViewToFrame(frame){try{frame.contentWindow?.postMessage({type:'lt41-network-view',value:currentNetworkView()},location.origin);}catch{}}
+for(const b of document.querySelectorAll('[data-network-view]'))b.onclick=()=>{
+ try{localStorage.setItem(NETWORK_VIEW_KEY,b.dataset.networkView)}catch{}
+ paintNetworkViewControls();for(const f of frames())applyNetworkViewToFrame(f);
+ notify(b.dataset.networkView==='concentric'?'지도를 동심원 보기로 열어요.':'지도를 그물 보기로 열어요.');
+};
+paintNetworkViewControls();
+function currentShareView(){try{return normalizeShareView(member?.state?.().prefs?.shareView)}catch{return 'book'}}
+function currentShareDiscover(){try{return normalizeShareDiscover(member?.state?.().prefs?.shareDiscover)}catch{return false}}
+function paintShareControls(){
+ const view=currentShareView(),discover=currentShareDiscover();
+ for(const b of document.querySelectorAll('[data-share-view]'))b.setAttribute('aria-checked',String(b.dataset.shareView===view));
+ for(const b of document.querySelectorAll('[data-share-discover]'))b.setAttribute('aria-checked',String((b.dataset.shareDiscover==='on')===discover));
+}
+for(const b of document.querySelectorAll('[data-share-view]'))b.onclick=()=>{
+ if(!member?.snapshot().owned){notify('로그인한 뒤 공유 기본값을 바꿀 수 있어요.');return;}
+ try{member.apply('setPrefs',{shareView:b.dataset.shareView});}catch(e){notify('공유 기본값을 저장하지 못했어요. 잠시 뒤 다시 시도해 주세요.');return;}
+ paintShareControls();notify('공유 창이 이 보기로 열려요.');
+};
+for(const b of document.querySelectorAll('[data-share-discover]'))b.onclick=()=>{
+ if(!member?.snapshot().owned){notify('로그인한 뒤 공유 기본값을 바꿀 수 있어요.');return;}
+ try{member.apply('setPrefs',{shareDiscover:b.dataset.shareDiscover==='on'});}catch(e){notify('공유 기본값을 저장하지 못했어요. 잠시 뒤 다시 시도해 주세요.');return;}
+ paintShareControls();notify(b.dataset.shareDiscover==='on'?'새 공유를 둘러보기에 올리는 것으로 시작해요.':'새 공유를 주소로만 공개하는 것으로 시작해요.');
+};
+paintShareControls();
+// 보관 파일 용량 보기 — 보관 파일 창과 같은 값(/api/media)을 같은 형식으로 보여 준다. 새 API 없음.
+async function paintSettingsUsage(){
+ const el=$('settings-usage');if(!el)return;
+ el.hidden=false;el.textContent='보관 파일 사용량을 불러오고 있어요…';
+ const answer=await accountApi.listMedia().catch(()=>null);
+ if(!$('settings-usage'))return;
+ const data=answer?.media;
+ if(!answer?.ok||!data){el.hidden=true;el.textContent='';return;}
+ el.textContent=(data.usedBytes/1000000).toFixed(1)+' / '+(data.quotaBytes/1000000)+' MB · '+data.items.length+' / '+data.maxItems+'개';
+}
 for(const b of document.querySelectorAll('[data-page-turn]'))b.onclick=()=>{
  const next=writePageTurn(localStorage,b.dataset.pageTurn);
  paintPageTurnControls();
@@ -696,6 +766,8 @@ async function openAccountSettings({section='profile'}={}){
  if(!member?.snapshot().owned){notify('로그인한 뒤 설정을 열 수 있어요.');return;}
  paintSettingsProfile();
  fillProfileForm();
+ paintDateStyleControls();paintStartPlaceControls();paintNetworkViewControls();paintShareControls();
+ void paintSettingsUsage();
  panel('account-settings');
  focusSettingsSection(section);
  const answer=await accountApi.account();
