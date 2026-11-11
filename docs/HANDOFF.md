@@ -2,7 +2,7 @@
 
 > **main 보호 규칙(2026-11-09, 룰셋 "main 보호 (PR·필수 검사)")**: main은 PR로만 바꾼다(직접 푸시·force push·삭제 금지, 관리자도 예외 없음 — 비상시 대표가 룰셋 enforcement를 잠깐 끈다). 필수 검사: `check (ubuntu-latest)`·`check (windows-latest)`·`미리보기 postdeploy(로그아웃)` — 셋 다 paths 필터가 없어 문서만 바뀐 PR에서도 항상 돈다. 승인 수 0(레인이 스스로 머지). Deploy Bundle Boot Test는 paths 필터가 있어 필수에 넣지 않았다.
 
-## 2026-11-11 — 컴2 러브트리 DB 실제 구성 문서화 (로컬4, ai/local4-lt-db-docs-261111, 이슈 #403)
+## 2026-11-11 — 컴2 러브트리 DB 실제 구성 문서화 (로컬4, ai/local4-lt-db-docs-261111, 이슈 #403 → PR #405)
 
 - 무엇: 컴2 러브트리 Postgres는 compose 컨테이너가 아니라 **WSL Ubuntu 네이티브 PostgreSQL 16**(127.0.0.1:5432, DB `lovetree`, 소유자·앱 역할 `lovetree_owner`, Docker 데몬 꺼짐 — 컨테이너 없음)이다. `AUTODEPLOY.md`에 실제 구성과 migration 수동 적용 → `--accept-migrations` 1회까지 한 흐름으로 기록했다. `postgres.compose.yml`·`postgres.env.example`은 "지금 미사용·참고용" 머리 주석을 붙였다(삭제하지 않음).
 - 배경: 이날 `account-emails-261111.sql`을 실제 DB에 적용하고 `--accept-migrations` 1회로 `1b23ed68` 설치를 끝냈다. 로그인 → 콜백 → `/internal/account/email` → 표 적재 → `/api/account` 이메일 제공까지 동작 확인(자세한 증거는 PR #402 코멘트).
