@@ -54,14 +54,15 @@ function cardFor(id){return [...document.querySelectorAll('.moment[data-moment]'
 function placeDetail(id,card){
  const m=metadataFor(id);if(!m)return;
  // 390에서는 오른쪽 페이지가 화면에 없으므로 카드 옆 패널을 쓴다.
- const rightEmpty=!!SPREADS[current].right?.synthetic&&window.innerWidth>820;
+ /* #393 4: 한 장/두 장은 폭이 아니라 보기 모드가 정한다(book.js의 single()). */
+  const rightEmpty=!!SPREADS[current].right?.synthetic&&!single();
  if(detailPlacement(rightEmpty)==='right-page'){
   rightPage.innerHTML='<div class="page-detail">'+detailMarkup(m)+'</div>';
  }else{
   const panel=$b('#detailSide');if(!panel)return;
   panel.innerHTML='<div class="detail-top"><span class="detail-kicker">'+t(LTLabels.type(m.kind))+' · '+t(formatDisplayDate(m.date))+'</span><button type="button" class="close" data-detail-close aria-label="상세 닫기">×</button></div><div class="side-detail">'+detailMarkup(m)+'</div>';
   panel.hidden=false;
-  if(window.innerWidth<=820){panel.style.top='';}
+  if(single()){panel.style.top='';}
   else{
   // 카드가 놓인 페이지의 바깥쪽 여백에 세운다. 자리가 없으면 페이지 안쪽으로 붙인다.
   const page=card.closest('.page'),rect=card.getBoundingClientRect();
