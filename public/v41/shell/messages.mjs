@@ -71,6 +71,11 @@ export function createMessages(deps) {
     if (data?.type === 'lt41-open-book' && getModel()?.trees.some(t => t.id === data.treeId && t.moments.some(m => m.id === data.id))) {
       setCurrent('track59-sketchbook.html'); choose(data.treeId, data.id); writeLocation();
     }
+    // #417: 보드·지도 화면의 트리 ▾ — 다른 트리를 같은 보기로 열 때 쓴다. 책(lt41-open-book)과 같은 규칙이고,
+    // 보기는 board·network만 허용하며(그 밖은 무시), 없는 트리도 무시한다.
+    if (data?.type === 'lt41-open-view' && ['board', 'network'].includes(data.view) && getModel()?.trees.some(t => t.id === data.treeId)) {
+      setCurrent(data.view === 'board' ? 'track58-pinboard.html' : 'track56-network.html'); choose(data.treeId); writeLocation();
+    }
     // #394: 첫 화면이 순간 목록을 열었다(시작 트리 전달 완료) — 요청 플래그를 치워 다음 화면 이동에 되풀이하지 않게 한다.
     if (data?.type === 'lt41-moments-opened') delete window.LT41_MOMENTS_OPEN;
     if (data?.type === 'lt41-start') { openLoginStart('first'); return; }

@@ -35,9 +35,10 @@ test('#400 [book/board/shelf] 목록에 화면 진입 모듈이 있다', () => {
   assert.ok(collect(byName.shelf).includes('views/shelf/shelf.js'));
 });
 
-test('#400 [network] 지금은 모듈 스크립트가 없다 — 생기면 목록 갱신이 필요하다', () => {
+test('#400 [network] 화면 진입 모듈이 생기면 목록도 따라간다(#417 tree-title)', () => {
   const byName = Object.fromEntries(SCREENS.map(s => [s.name, s]));
-  assert.deepEqual(collect(byName.network), []);
+  const files = collect(byName.network);
+  assert.ok(files.includes('views/tree-title.mjs'), '지도 진입 모듈이 목록에 있다');
 });
 
 // home.html은 vite 진입점이라 빌드가 번들+modulepreload를 만든다.
