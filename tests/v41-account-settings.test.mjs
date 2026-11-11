@@ -42,6 +42,9 @@ test('프로필 묶음: 동그라미 + 이메일 전체(없으면 내 계정), �
   // 쓰다 만 이름·색이 있으면 공통 틀이 한 번 묻는다(PANEL_DIRTY).
   assert.match(shell, /isSettingsDirty:\(\)=>profileDirty\(\),/);
   assert.match(shell, /function profileDirty\(\)\{if\(!\$\('account-settings'\)\.open\)return false;if\(!profileBaseline\)return false;return profileFormValue\(\)!==profileBaseline;\}/);
+  // 공통 틀 등록: dialogs.mjs의 PANEL_DIRTY에 account-settings가 있어야 ×·바깥 클릭·Esc 모두 같은 확인을 지난다.
+  const dialogs = read('public/v41/shell/dialogs.mjs');
+  assert.match(dialogs, /PANEL_DIRTY\['account-settings'\]\s*=\s*\(\)\s*=>\s*deps\.isSettingsDirty\?\.\(\)\s*===\s*true;/);
 });
 
 test('화면 묶음은 기존 항목(테마·움직임·제목·첫 화면 카드)을 유지하고, 먼저 보일 탭은 순간 추가 묶음으로 간다', () => {

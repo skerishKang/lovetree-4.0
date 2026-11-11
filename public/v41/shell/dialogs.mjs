@@ -65,6 +65,9 @@ export function createDialogs(deps) {
   // #380 4 마지막: 빠른 추가는 주소를 적어 두고 아직 담지 않은 상태, 공유는 공개 범위를 미리 봤는데 링크를 아직 만들지 않은 상태만 묻는다.
   // 설정·내 보관 파일·둘러보기·추가 방식 고르기는 적어 두는 입력이 없어 그대로 닫는다.
   PANEL_DIRTY['share-panel'] = () => deps.isShareDirty?.() === true;
+  // #368 2차: 설정은 프로필(표시 이름·동그라미 색)을 쓰다 두었을 때만 묻는다. 나머지 설정 항목은 누르는 즉시
+  // 적용되어 더러움이 없고, 내 보관 파일·둘러보기도 적어 두는 입력이 없어 그대로 닫는다.
+  PANEL_DIRTY['account-settings'] = () => deps.isSettingsDirty?.() === true;
   // 닫기 자체를 막아야 하는 상태(편집기 업로드 중)는 문구를 돌려준다. 이때는 확인을 묻지 않고 닫지 않는다 —
   // 편집기 규칙이 공통 틀보다 우선한다(업로드 중 닫기 방지).
   function panelBlockedMessage(d) {
