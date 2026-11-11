@@ -52,8 +52,8 @@ test('카드는 언제나 불투명하고, blur 대신 밝기로 깊이를 낸�
 test('가운데 안전 구역: 제목·버튼 묶음 사각형+여백을 재고, 창이 바뀌면 다시 잰다', () => {
   assert.match(orbit, /const measureSafeZone=\(\)=>\{const c=shadow\.querySelector\('\.center'\)/);
   assert.match(orbit, /,M=32;/, '안전 구역 여백 32px');
-  assert.match(orbit, /fitNotice=\(\)=>\{host\.style\.height=`calc\(100dvh - \$\{noticeOuter\(\)\}px\)`;measureSafeZone\(\);schedule\(\);/, '창 크기 변경(fitNotice)마다 다시 잰다');
-  assert.match(orbit, /document\.fonts\?\.ready\?\.then\(\(\)=>\{measureSafeZone\(\);schedule\(\);\}/, '글꼴 도착 뒤에도 다시 잰다');
+  assert.match(orbit, /fitNotice=\(\)=>\{host\.style\.height=`calc\(100dvh - \$\{noticeOuter\(\)\}px\)`;safeZoneDirty=true;schedule\(\);/, '창 크기 변경(fitNotice)마다 다시 잰다');
+  assert.match(orbit, /setTimeout\(\(\)=>\{safeZoneDirty=true;schedule\(\);\},1500\)/, '글꼴 도착 뒤에도 다시 잰다(fonts.ready 접근은 뼈대 완성을 늦추므로 타이머를 쓴다)');
   // 카드 사각형(회전 여유 18%)과 겹치면 가장 얇은 쪽으로 민다 — 겹침 0 보장.
   assert.match(orbit, /const sxp=w\/2\+\(Cx0-w\/2\+x2\*sc\)\*k/, '카드 위치까지 포함한 원근 투영 계산');
   assert.match(orbit, /const pushL=maxX-zs\.l,pushR=zs\.r-minX,pushT=maxY-zs\.t,pushB=zs\.b-minY/, '가장 얇은 쪽으로 밀어낸다');
