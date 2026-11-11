@@ -41,7 +41,11 @@ export function mountOrbit(host,{trees,storage,context,actions,authHtml='',onSel
   // #379: 궤도마다 카드 수를 세어 각도를 같은 간격으로 나눈다 — 같은 궤도에 카드가 몰리면 서로 포개진다.
   // 간격은 여기서 한 번만 정하고(회전 중에도 유지), 프레임 계산은 더하지 않는다.
   if(!demo){const ringNames=Object.keys(rings);const perRing={},slot={};for(const c of all)perRing[c.ring]=(perRing[c.ring]||0)+1;for(const c of all){const k=slot[c.ring]||0;slot[c.ring]=k+1;c.baseAngle=(k/perRing[c.ring])*Math.PI*2;c.phaseOffset=ringNames.indexOf(c.ring)*.42;}}
-  const cards=all.slice(0,48), last=demo?all[0]:resume(storage,trees);
+  // #429 2/2: 화면 폭별 카드 수 상한 — 1280 이상 28장, 900~1279 20장, 650~899 14장, 그 아래(390 포함) 10장.
+ // 값은 마운트 때 정하지 않고 frame마다 폭으로 다시 판정해 창 크기가 바뀌면 따라간다(넘치는 카드는 숨긴다).
+ const CARD_CAPS=[[1280,28],[900,20],[650,14],[0,10]];
+ const cardCapFor=w=>{for(const [min,cap] of CARD_CAPS)if(w>=min)return cap;return 10;};
+ const cards=all.slice(0,48), last=demo?all[0]:resume(storage,trees);
  const lastCard=demo?all[0]:all.find(c=>c.treeId===last?.tree.id&&c.id===last?.moment.id)||all[0];
  shadow.innerHTML=`<style>${originalCSS}${extraCSS}.auth-entry{white-space:nowrap}</style><section class="app" aria-label="${SERVICE} 첫 화면"><div class="topbar"><span class="brand">${SERVICE} · MEMORY ORBIT</span><div class="top-actions"><button class="menuBtn" data-do="index">순간 목록</button>${authHtml}</div></div><div class="world"></div><div class="center-scrim" aria-hidden="true"></div><div class="center"><div class="eyebrow">${demo?'나의 첫 순간':'WELCOME BACK'}</div><h1>${demo?'좋아하는 순간부터.':'다시, 그 순간으로.'}</h1><p>${demo?'간직하고 싶은 장면에 마음을 남겨 보세요.<br>지금 떠오르는 순간 하나면 충분해요.':'기억은 아직 여기에서 이어지고 있어요.'}</p><div class="actions"><button class="subtleBtn primary-cta" data-do="${demo?'new':'continue'}">${demo?NEW_TREE:'이어 보던 순간'}</button><button class="subtleBtn" data-do="${demo?'continue':'new'}">${demo?'예시 순간 감상':NEW_TREE}</button><button class="subtleBtn" data-do="trees">${GO_TREES}</button></div><p class="center-note">${demo?'감상 예시 · 내 기록에는 저장되지 않아요':esc(recordNote??`${all.length}개의 순간 · 서버에 보관`)}</p></div><div class="hint">드래그 · 금테 카드를 눌러 감상</div></section><dialog class="orbit-dialog" aria-label="순간 감상"></dialog>`;
  const app=shadow.querySelector('.app'),world=shadow.querySelector('.world'),dialog=shadow.querySelector('dialog');
@@ -116,8 +120,27 @@ export function mountOrbit(host,{trees,storage,context,actions,authHtml='',onSel
  });
  track(disposeThumb);
  const elements=cards.map(c=>{const b=document.createElement('button');b.className=`card ${c.type} ${c.sizeClass}${c.example?' example':''}${c.source==='mine'?' mine':''}`;b.dataset.example=c.example?'1':'';b.innerHTML=`<div class="surface" data-lt-thumb-host>${c.image?`<img src="${esc(c.image)}" alt="" draggable="false" style="object-fit:${c.fitMode==='contain'?'contain':'cover'}"${thumbFallbackAttrs(c,{candidates:c.thumbCandidates||[c.image],writable:!demo&&!c.example,variant:'orbit'})}${c.youtubeThumb?' referrerpolicy="no-referrer" loading="lazy" decoding="async"':''}>`:(!demo&&!c.example&&needsFallbackCard(c,{autoLoad:false})?fallbackCardMarkup(c,{writable:!demo&&!c.example,variant:'orbit'}):`<div class="memoKicker">${esc(dateOf(c))}</div><div class="memoText">${esc(mainOf(c))}</div><div class="memoFoot">${esc(c.emotion)}</div>`)}</div>${c.youtubeThumb&&c.image?'<span class="playGlyph" aria-hidden="true">▶</span>':''}${c.first?'<div class="firstMark">FIRST</div>':''}<div class="caption"><span>${esc(mainOf(c))}${subMarkup(c)}</span></div>`;b.addEventListener('pointerenter',e=>{if(e.pointerType==='mouse'&&!drag)hoveredCard=b;},{signal});b.addEventListener('pointerleave',()=>{if(hoveredCard===b)hoveredCard=null;},{signal});b.onclick=e=>{if(e.target?.closest?.('[data-lt-title-edit]'))return;if(e.detail===0||moved<9){if(onOpen&&!c.example){onOpen(c);return;}focus(c)}};world.append(b);return b;});
+ // #429 2/2: 카드 기본 폭·높이는 한 번만 잰다(프레임마다 offsetWidth를 읽으면 레이아웃을 강제한다 — #400 속도 유지).
+ const cardSizes=elements.map(el=>({w:el.offsetWidth||180,h:el.offsetHeight||232}));
  function frame(now){raf=0;const dt=Math.min(40,now-previous||16);previous=now;if(!paused&&!dialog.open&&!drag&&!hoveredCard)phase+=.000006*dt;const w=app.clientWidth,h=app.clientHeight;
-  cards.forEach((c,i)=>{const cfg=rings[c.ring],th=c.baseAngle+phase*cfg.speed+c.phaseOffset;let x=Math.cos(th)*cfg.rx,y=Math.sin(th)*cfg.ry+cfg.band+Math.sin(th*1.7+c.phaseOffset*3)*45,z=Math.sin(th+1.1+c.phaseOffset*4)*cfg.zAmp+cfg.zBase+c.zOffset;const d=Math.hypot(x/520,y/260);if(d<1&&z<260){x+=(x>=0?1:-1)*(1-d)*280;y+=(y>=0?1:-1)*(1-d)*56;}if(!demo&&cards.length<=8){const angle=i*Math.PI*2/cards.length+phase;x=Math.cos(angle)*Math.min(w*.34,420);y=Math.sin(angle)*Math.min(h*.3,250)+(i%2===0?80:-80);z=0;}const sc=Math.max(.18,Math.min(1.82,1050/(1050-z))),fit=Math.min(1,w/780,h/850);const placementFit=!demo&&cards.length<=8?1:fit;const el=elements[i];el.style.transform=`translate3d(${(x+camera.x*(.45+sc*.3))*sc*placementFit-90}px,${(y+camera.y*(.38+sc*.24))*sc*placementFit-116}px,0) scale(${sc*Math.max(.58,fit)}) rotateX(${c.tiltX+Math.sin(th)*9}deg) rotateY(${c.tiltY+Math.cos(th)*18}deg) rotateZ(${c.tiltZ+Math.sin(th*.6)*7}deg)`;  el.style.opacity=Math.max(.4,Math.min(1,(z+500)/640));el.style.zIndex=Math.round(1000+z);});
+  cards.forEach((c,i)=>{const cfg=rings[c.ring],th=c.baseAngle+phase*cfg.speed+c.phaseOffset;let x=Math.cos(th)*cfg.rx,y=Math.sin(th)*cfg.ry+cfg.band+Math.sin(th*1.7+c.phaseOffset*3)*45,z=Math.sin(th+1.1+c.phaseOffset*4)*cfg.zAmp+cfg.zBase+c.zOffset;if(!demo&&cards.length<=8){const angle=i*Math.PI*2/cards.length+phase;x=Math.cos(angle)*Math.min(w*.34,420);y=Math.sin(angle)*Math.min(h*.3,250)+(i%2===0?80:-80);z=0;}const sc=Math.max(.18,Math.min(1.82,1050/(1050-z))),fit=Math.min(1,w/780,h/850);const placementFit=!demo&&cards.length<=8?1:fit;const el=elements[i];
+   // #429 2/2: 폭별 상한을 넘는 카드는 숨긴다(가로 넘침·과밀 방지). 창이 넓어지면 다시 보인다.
+   if(i>=cardCapFor(w)){el.style.display='none';return;}
+   if(el.style.display==='none')el.style.display='';
+   // #429 2/2: 가운데 안전 구역(제목·문구·버튼 묶음+여백)과 카드 사각형이 겹치면 겹침이 0이 되도록 가장 얇은 쪽으로 민다.
+   // 카드는 소각 회전을 하므로 폭·높이에 18% 여유를 두고 사각형으로 판정한다.
+   let px=(x+camera.x*(.45+sc*.3))*sc*placementFit-90,py=(y+camera.y*(.38+sc*.24))*sc*placementFit-116;
+   if(safeZone){const cw=cardSizes[i].w*sc*1.18,ch=cardSizes[i].h*sc*1.18;
+    if(px+cw>safeZone.l&&px<safeZone.r&&py+ch>safeZone.t&&py<safeZone.b){
+     const pushL=px+cw-safeZone.l,pushR=safeZone.r-px,pushT=py+ch-safeZone.t,pushB=safeZone.b-py,m=Math.min(pushL,pushR,pushT,pushB);
+     if(m===pushL)px-=pushL;else if(m===pushR)px+=pushR;else if(m===pushT)py-=pushT;else py+=pushB;
+    }}
+   el.style.transform=`translate3d(${px}px,${py}px,0) scale(${sc*Math.max(.58,fit)}) rotateX(${c.tiltX+Math.sin(th)*9}deg) rotateY(${c.tiltY+Math.cos(th)*18}deg) rotateZ(${c.tiltZ+Math.sin(th*.6)*7}deg)`;
+   // #429 2/2: 깊이는 크기와 밝기로만 — 카드는 언제나 불투명(opacity 1, 비침 없음), blur는 쓰지 않는다.
+   // 대표: "흐리게 처리한 카드는 별로, 선명한 게 좋다"(2026-11-08). 뒤쪽 카드는 밝기 0.78까지 조금 어둡게.
+   const depth=(!demo&&cards.length<=8)?1:Math.max(0,Math.min(1,(z+520)/1040));
+   el.style.filter=`brightness(${(0.78+0.22*depth).toFixed(3)})`;
+   el.style.zIndex=Math.round(1000+z);});
   if(motionOn()){camera={x:camera.x+(cameraTarget.x-camera.x)*CAMERA_LERP,y:camera.y+(cameraTarget.y-camera.y)*CAMERA_LERP};}
   if(!paused&&!document.hidden&&!dialog.open)raf=requestAnimationFrame(frame);
  }
@@ -132,13 +155,18 @@ export function mountOrbit(host,{trees,storage,context,actions,authHtml='',onSel
  // 나머지 화면(책장·기억책·작업공간)은 본문 자연 높이 뒤에 안내가 오도록 건드리지 않는다.
  // 가리는 방식(overflow)은 쓰지 않고, 안내가 자라면 첫 화면이 그 만큼 줄어든다.
  const noticeOuter=()=>{const bar=document.getElementById("sync-bar");if(!bar)return 0;const cs=getComputedStyle(bar);return Math.round(bar.getBoundingClientRect().height+parseFloat(cs.marginTop||0)+parseFloat(cs.marginBottom||0));};
- const fitNotice=()=>{host.style.height=`calc(100dvh - ${noticeOuter()}px)`;schedule();};
+ // #429 2/2: 가운데 안전 구역 = 제목·문구·버튼 묶음(.center) 사각형 + 여백 32px. 창 크기가 바뀌면 다시 잰다.
+ let safeZone=null;
+ const measureSafeZone=()=>{const c=shadow.querySelector('.center');if(!c){safeZone=null;return;}const box=app.getBoundingClientRect(),r=c.getBoundingClientRect(),M=32;safeZone={l:r.left-box.left-M,t:r.top-box.top-M,r:r.right-box.left+M,b:r.bottom-box.top+M};};
+ const fitNotice=()=>{host.style.height=`calc(100dvh - ${noticeOuter()}px)`;measureSafeZone();schedule();};
  const noticeResize=typeof ResizeObserver==="function"?new ResizeObserver(fitNotice):null;
  const barNow=document.getElementById("sync-bar");
  if(noticeResize&&barNow)noticeResize.observe(barNow);
  const barWatch=typeof MutationObserver==="function"?new MutationObserver(()=>{if(noticeResize){noticeResize.disconnect();const bar=document.getElementById("sync-bar");if(bar)noticeResize.observe(bar);}fitNotice();}):null;
  if(barWatch)barWatch.observe(document.body,{childList:true});
  window.addEventListener("resize",fitNotice,{signal});
+ // 글꼴이 늦게 도착해 제목 묶음 크기가 바뀌면 안전 구역을 다시 잰다.
+ document.fonts?.ready?.then(()=>{measureSafeZone();schedule();});
  track(()=>noticeResize?.disconnect());
  track(()=>barWatch?.disconnect());
  // #394: 트리 드롭다운의 "내 순간 전체 보기"로 열렸으면 순간 목록을 처음부터 연다(트리 골라진 상태).

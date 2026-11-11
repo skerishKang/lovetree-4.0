@@ -168,7 +168,10 @@ test('공식 별칭의 보관 파일도 현재 출처 경로로만 쓴다', () =
 test('궤도 어댑터: 예시 불투명도를 낮추지 않고 내 카드에만 금빛 표시를 쓴다', () => {
   const orbit = readFileSync(new URL('../src/views/orbit.js', import.meta.url), 'utf8');
   assert.equal(/c\.example\?\.\d/.test(orbit), false, '예시 카드 불투명도 보정이 없다');
-  assert.match(orbit, /el\.style\.opacity=Math\.max\(\.4,Math\.min\(1,\(z\+500\)\/640\)\);/);
+  // #429 2/2: 카드는 언제나 불투명(opacity를 인라인으로 낮추지 않는다), 깊이는 밝기로만 낸다.
+  assert.doesNotMatch(orbit, /el\.style\.opacity=/, '카드 opacity를 인라인으로 쓰지 않는다');
+  assert.match(orbit, /el\.style\.filter=`brightness\(/, '깊이를 밝기(brightness)로 낸다');
+  assert.doesNotMatch(orbit, /\.card[^{]*\{[^}]*blur/, '카드 규칙에 blur가 없다');
   assert.match(orbit, /\.card\.mine\{/);
   assert.match(orbit, /var\(--lt-gold/);
   for (const start of [orbit.indexOf('.card.mine{'), orbit.indexOf('.card.mine:after{')]) {
