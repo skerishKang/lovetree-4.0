@@ -59,6 +59,8 @@ export function createAccountRepo(pool) {
 
   return {
     isDeleted,
+    emailFor,
+    upsertEmail,
     async deleteAll({ productId, subjectId, subjectHash, at = null }) {
       const client = await pool.connect();
       try {
