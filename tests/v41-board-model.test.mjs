@@ -11,7 +11,7 @@ const BOARD = fs.readFileSync(new URL('../public/v41/views/board/board.js', impo
 const EXTRAS = fs.readFileSync(new URL('../public/v41/views/board/board-extras.js', import.meta.url), 'utf8');
 
 test('0. 보드 한 벌: 화면이 부르는 함수가 전부 있다', () => {
-  assert.deepEqual(Object.keys(M).sort(), ['cardPosition', 'cinemaBeats', 'collectPath', 'cursorEffectAllowed', 'cursorHover', 'cursorMode', 'cursorPresence', 'cursorScale', 'decorationMotion', 'detailButtonState', 'editGuard', 'escapeHTML', 'filterVisible', 'fitZoom', 'maxCreatedOrder', 'nextConnections', 'removeConnection', 'threadPath', 'threadRedrawStep']);
+  assert.deepEqual(Object.keys(M).sort(), ['cardPosition', 'cinemaBeats', 'collectPath', 'cursorEffectAllowed', 'cursorHover', 'cursorMode', 'cursorPresence', 'cursorScale', 'decorationMotion', 'detailButtonState', 'editGuard', 'escapeHTML', 'filterVisible', 'fitZoom', 'maxCreatedOrder', 'nextConnections', 'removeConnection', 'threadPath', 'threadRedrawStep', 'treeSpread']);
   for (const fn of Object.keys(M)) assert.equal(typeof M[fn], 'function', fn);
 });
 
@@ -313,4 +313,20 @@ test('24. 커서 표시 판정(#361 후속): 보드 밖·탭 숨김·포커스 �
   assert.notEqual(M.cursorPresence({ blurred: true }), M.cursorPresence({ blurred: false }));
   assert.notEqual(M.cursorPresence({ hidden: true }), M.cursorPresence({ hidden: false }));
   assert.notEqual(M.cursorPresence({ seen: false }), M.cursorPresence({ seen: true }));
+});
+
+test('처음 배치(#395): 첫 순간은 왼쪽, 이어진 순간은 오른쪽으로 펼치고 카드끼리 겹치지 않는다', () => {
+  const ids = Array.from({ length: 14 }, (_, i) => 'm' + i);
+  const edges = ids.slice(1).map((id, i) => ({ kind: 'parent', from: i < 6 ? ids[i] : ids[i - 5], to: id }));
+  const r = M.treeSpread(ids, edges);
+  assert.equal(r.size, 14);
+  assert.ok(r.get('m0').x < r.get('m1').x && r.get('m1').x < r.get('m2').x);
+  const list = [...r.values()];
+  for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) {
+    const a = list[i], b = list[j];
+    assert.ok(Math.abs(a.x - b.x) >= 242 || Math.abs(a.y - b.y) >= 340, `겹침 ${i} ${j}`);
+  }
+  // 이어진 선이 없어도(전부 따로) 모두 자리를 받고 겹치지 않는다.
+  const flat = M.treeSpread(ids, []);
+  assert.equal(flat.size, 14);
 });
