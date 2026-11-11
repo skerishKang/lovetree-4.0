@@ -19,8 +19,9 @@ export function createDialogs(deps) {
   }
   function trapShellTab(event) {
     if (event.key !== 'Tab') return;
-    const quick = $('quick-add'), chooser = $('write-chooser'), assets = $('account-assets'), editor = $('editor');
-    const dialog = quick?.open ? quick : chooser?.open ? chooser : assets?.open ? assets : editor?.open ? editor : null;
+    // #425: 순간 추가는 한 창(write-panel)이다 — 고르기 창·빠른 추가·편집기가 하나로 합쳐졌다.
+    const write = $('write-panel'), assets = $('account-assets');
+    const dialog = write?.open ? write : assets?.open ? assets : null;
     if (!dialog) return;
     const list = shellFocusables(dialog);
     if (!list.length) { event.preventDefault(); return; }
@@ -52,16 +53,16 @@ export function createDialogs(deps) {
   // 2026-11-11 #380 4: 오른쪽 패널을 두 모양으로 띄우는 공통 틀 — data-lt-panel="full"(맨 위 메뉴 아래 내용 자리)·"center"(가운데 작은 창).
   // 컴퓨터와 모바일이 같은 모양이다. 공통 닫기 규칙: ×·바깥 클릭·Esc 모두, 쓰던 내용이 있으면 "저장하지 않고 닫을까요?"를 한 번 묻고(기존 편집기·트리 관리 규칙 재사용),
   // 닫으면 연 버튼으로 초점을 돌려준다.
-  // #380 4 마지막: 오른쪽에 붙던 패널이 모두 이 틀로 옮겨졌다. 전체 화면 = 순간 정리·순간 잇기·자세히 추가·수정(편집기)·
-  // 설정·내 보관 파일·공유·둘러보기, 가운데 창 = 트리 관리·빠른 추가·추가 방식 고르기. 남은 것은 내 기록(records) 하나다.
+  // #380 4 마지막: 오른쪽에 붙던 패널이 모두 이 틀로 옮겨졌다. 전체 화면 = 순간 정리·순간 잇기·
+  // 설정·내 보관 파일·공유·둘러보기, 가운데 창 = 트리 관리·순간 추가(한 창, #425). 남은 것은 내 기록(records) 하나다.
   const PANEL_DIRTY = { 'tree-manager': () => deps.isTreeDirty?.() === true };
   // 2026-11-11 #380 4 2차: 더러움 판정을 편집기·순간 잇기까지 넓힌다. 판정 자체는 셸·패널 모듈이 들고 있고
   // (편집기는 제목·메모·주소·사진·고른 연결, 순간 잇기는 고른 연결이 저장 전), 공통 틀은 "한 번 묻고 닫을지"만 정한다.
-  PANEL_DIRTY['editor'] = () => deps.isEditorDirty?.() === true;
+  // #425: 순간 추가 한 창 — 쉬운 추가(주소를 적고 아직 담지 않음)와 자세한 추가(폼이 기준값과 다름) 모두 같은 판정을 쓴다.
+  PANEL_DIRTY['write-panel'] = () => deps.isEditorDirty?.() === true;
   PANEL_DIRTY['connection-panel'] = () => deps.isConnectionDirty?.() === true;
   // #380 4 마지막: 빠른 추가는 주소를 적어 두고 아직 담지 않은 상태, 공유는 공개 범위를 미리 봤는데 링크를 아직 만들지 않은 상태만 묻는다.
   // 설정·내 보관 파일·둘러보기·추가 방식 고르기는 적어 두는 입력이 없어 그대로 닫는다.
-  PANEL_DIRTY['quick-add'] = () => deps.isQuickAddDirty?.() === true;
   PANEL_DIRTY['share-panel'] = () => deps.isShareDirty?.() === true;
   // 닫기 자체를 막아야 하는 상태(편집기 업로드 중)는 문구를 돌려준다. 이때는 확인을 묻지 않고 닫지 않는다 —
   // 편집기 규칙이 공통 틀보다 우선한다(업로드 중 닫기 방지).

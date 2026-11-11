@@ -14,14 +14,17 @@ const form = html.slice(formStart, html.indexOf('</form>', formStart));
 
 // 2026-11-08 순간 추가·수정 패널 정리: 탭 2개, 링크·사진 먼저, '더 적기' 접힘, 백업·보관 파일은 계정 메뉴.
 
-test('패널 탭은 순간 추가·이 순간 수정 두 개이고 새 트리 탭이 없다', () => {
-  const modes = [...html.matchAll(/editor-modes">([\s\S]*?)<\/div>/g)][0][1];
-  assert.deepEqual([...modes.matchAll(/data-mode="([a-z]+)"/g)].map(m => m[1]), ['add', 'edit']);
-  assert.match(modes, />순간 추가</);
-  assert.match(modes, />이 순간 수정</);
-  assert.equal(/data-mode="new"/.test(html), false, '패널에서 새 트리 탭을 없앤다');
+test('순간 추가 한 창(#425): 탭은 쉬운 추가·자세한 추가 두 개이고, 수정은 탭 없이 제목만 바꾼다', () => {
+  // #425: 옛 모드 탭(순간 추가·이 순간 수정)은 없다 — 위쪽 탭 [쉬운 추가 | 자세한 추가]가 그 자리를 쓴다.
+  assert.equal(/editor-modes/.test(html), false, '옛 모드 탭 줄은 없다');
+  assert.deepEqual([...html.matchAll(/id="write-tab-([a-z]+)"/g)].map(m => m[1]), ['easy', 'detailed'], '탭은 두 개');
+  assert.match(html, />쉬운 추가</);
+  assert.match(html, />자세한 추가</);
+  assert.equal(/data-mode="new"/.test(html), false, '새 트리 탭은 없다');
   assert.equal(/새 트리<\/button>/.test(html), false);
-  // 새 트리 → 첫 여정 분기는 2026-11-09에 함수 시험으로 옮겼다(tests/v41-panels-flow.test.mjs).
+  // 수정은 탭 줄을 숨기고 제목만 '순간 수정'으로 바꾼다(panels.mjs).
+  assert.match(panels, /dwrite\.setTabsVisible\(mode !== 'edit'\)/);
+  assert.match(panels, /mode === 'edit' \? '순간 수정' : '순간 추가'/);
 });
 
 test('입력 순서는 링크·사진 → 마음 한마디 → 더 적기(제목·감정·날짜)다', () => {

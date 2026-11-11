@@ -22,7 +22,8 @@ test('편집기 링크·사진 묶음에 보관 파일 선택 버튼이 있고 �
   assert.match(shell, /\$\('editor-assets-open'\)\.onclick=\(\)=>openAssets\(\$\('editor-assets-open'\)\)/);
   assert.match(shell, /function openAssets\(opener=document\.activeElement\)\{[\s\S]*?panel\('account-assets'\);uploads\.openAssets\(\);/);
   assert.match(shell, /onUseAsset:\(\)=>usePrivateAsset\(\)/);
-  assert.match(shell, /function usePrivateAsset\(\)\{[\s\S]*?if\(!\$\('editor'\)\.open\)openEditor\('add'\);[\s\S]*?return \$\('editor'\)\.open;/);
+  // #425: 편집기는 한 창(write-panel)의 자세한 추가 구역이다.
+  assert.match(shell, /function usePrivateAsset\(\)\{[\s\S]*?if\(!\$\('write-panel'\)\.open\)openEditor\('add'\);[\s\S]*?return \$\('write-panel'\)\.open;/);
   assert.match(shell, /if\(!window\.LT41\)\{openEditor\(\);notify\('새 트리를 만든 뒤 순간에 파일을 첨부할 수 있어요\.'\);return false;\}/, '선택된 트리가 없으면 첫 여정으로 안내한다');
 });
 

@@ -19,6 +19,7 @@ import {createHeader} from './shell/header.mjs';
 import {createAuth} from './shell/auth.mjs';
 import {createPanels} from './shell/panels.mjs';
 import {createQuickAdd} from './shell/quick-add.mjs';
+import {createWritePanel, readWriteTab, writeWriteTab} from './shell/write-panel.mjs';
 import {createQuickIntake} from './shell/quick-intake.mjs';
 import {createJourney} from './shell/journey.mjs';
 import {createMessages} from './shell/messages.mjs';
@@ -162,6 +163,8 @@ const shellAuth=createAuth({
 });
 function startLogin(intent=''){return shellAuth.startLogin(intent);}
 function openLoginStart(intent='first'){return shellAuth.openLoginStart(intent);}
+// #425: 순간 추가 한 창 — 쉬운 추가·자세한 추가를 한 창의 탭으로 오간다(shell/write-panel.mjs).
+const shellWrite=createWritePanel({$});
 // 헤더·계정 메뉴는 shell/header.mjs가 맡는다(#231 1-B②-2). 셸은 자기 상태를 읽기 함수로 넘긴다.
 addEventListener('lovetree-auth-required',()=>shellAuth.authRequired());
 window.LT41=null;
@@ -179,12 +182,14 @@ const shellPanels=createPanels({
   selection:()=>stateSelection(),
   openFirstJourney:options=>openFirstJourney(options),
   openLoginStart:intent=>openLoginStart(intent),
+  // #425: 같은 창의 탭(쉬운 추가·자세한 추가)과 제목을 이 모듈이 정한다.
+  writePanel:shellWrite,
   // #380 4 2차: 편집기의 취소 버튼도 공통 닫기 규칙(×·바깥·Esc와 같은 확인·업로드 중 막기)을 쓴다.
   requestClose:id=>shellDialogs.requestClose(id)
 });
 function openEditor(mode,parentId=''){return shellPanels.openEditor(mode,parentId);}
-// 빠른 추가(#빠른 추가 ②): 고르기 창·모달·끌어다 놓기는 shell/quick-add.mjs가 맡는다.
-// 진입(순간 남기기)만 여기서 연결하고, 나머지 화면 분기는 그 모듈의 판정 함수가 정한다.
+// 쉬운 추가(#빠른 추가 ②): 창 열기·끌어다 놓기는 shell/quick-add.mjs가 맡는다.
+// #425부터 입구는 하나다 — 같은 창을 열고 먼저 보일 탭만 설정값(lt41.writeTab)이 정한다.
 const shellQuick=createQuickAdd({
   $,
   getMember:()=>member,
@@ -195,10 +200,12 @@ const shellQuick=createQuickAdd({
   choose:(id,momentId)=>choose(id,momentId),
   openEditor:(mode,parentId)=>openEditor(mode,parentId),
   openLoginStart:intent=>openLoginStart(intent),
+  writePanel:shellWrite,
+  requestClose:id=>shellDialogs.requestClose(id),
   // 사진 올리기는 기존 업로더(#310 onUploaded·imagesOnly)를 그대로 쓴다.
   mountUpload:mountPrivateUpload
 });
-$('write-menu').onclick=()=>shellQuick.openWriteChooser();
+$('write-menu').onclick=()=>shellQuick.openWrite();
 // 빠른 담기 입구: 붙여넣기 + 공유 시트 진입(판정·추적은 ../quick-intake.mjs 한 벌).
 const shellIntake=createQuickIntake({
   getMember:()=>member,
@@ -311,15 +318,16 @@ const shellDialogs=createDialogs({
   isTreeDirty:()=>shellPanels.treeDirty(),
   // #380 4 2차: 편집기는 입력(제목·메모·주소·사진·고른 연결)이 바뀌었으면 더러움,
   // 순간 잇기는 고른 연결이 저장 전이면 더러움이다. 어느 쪽이든 공통 틀이 한 번 묻고 닫는다.
-  isEditorDirty:()=>shellPanels.formDirty(),
+  // #425: 한 창에서 보이는 구역만 본다 — 쉬운 추가는 주소를 적고 아직 담지 않았을 때,
+  // 자세한 추가는 폼(제목·마음·주소·첨부·연결)이 기준값과 다를 때 더러움이다.
+  isEditorDirty:()=>($('write-easy').hidden?shellPanels.detailedDirty():$('quick-url').value.trim()!==''),
   isConnectionDirty:()=>connectionDirty(),
   // #380 4 마지막: 빠른 추가는 주소를 적어 두고 아직 담지 않았을 때, 공유는 공개 범위를 미리 봤는데 링크를 아직 만들지 않았을 때만 더러움이다.
   // 설정·내 보관 파일·둘러보기·추가 방식 고르기는 입력을 적어 두지 않으므로 바로 닫힌다.
-  isQuickAddDirty:()=>$('quick-add').open&&$('quick-url').value.trim()!=='',
   isShareDirty:()=>{const create=$('share-create');return $('share-panel').open&&!!create&&!create.disabled&&$('share-created').hidden;},
   // 편집기 규칙이 공통 틀보다 우선한다: 업로드 중에는 Esc·바깥 클릭·× 모두 닫지 않고 이유를 알린다.
   // 빠른 추가의 사진 올리기도 같은 규칙을 쓴다(업로드가 끝나면 곧바로 담기므로 중간에 닫으면 사라진다).
-  panelBlocked:id=>(id==='editor'&&uploads.busy)||(id==='quick-add'&&shellQuick.uploads?.busy)?'파일 전송을 마치거나 취소해 주세요.':'',
+  panelBlocked:id=>id==='write-panel'&&(uploads.busy||shellQuick.uploads?.busy)?'파일 전송을 마치거나 취소해 주세요.':'',
   notify:text=>notify(text)
 });
 
@@ -551,6 +559,9 @@ $on('account-backup',()=>{closeAccountMenu();backup();});
  function paintScreenControls(){
   const mode=readHomeCardsMode()||'example';
   for(const b of document.querySelectorAll('[data-home-cards]'))b.setAttribute('aria-checked',String(b.dataset.homeCards===mode));
+  // #425: '순간 추가 먼저 보일 탭' — 저장값이 없으면 쉬운 추가가 켜져 있다.
+  const tab=readWriteTab(localStorage);
+  for(const b of document.querySelectorAll('[data-write-tab]'))b.setAttribute('aria-checked',String(b.dataset.writeTab===tab));
   const motion=$('settings-motion');
   if(motion){motion.setAttribute('aria-pressed',String(motionPaused));motion.textContent=motionPaused?'켜기':'멈추기';}
  }
@@ -560,6 +571,11 @@ $on('account-backup',()=>{closeAccountMenu();backup();});
   paintScreenControls();
   try{$('view').contentWindow.postMessage({type:'lt41-home-cards',mode:b.dataset.homeCards},location.origin)}catch{}
   notify('첫 화면 카드를 바꿨어요. 첫 화면으로 돌아가면 그대로 보입니다.');
+ };
+ for(const b of document.querySelectorAll('[data-write-tab]'))b.onclick=()=>{
+  const tab=writeWriteTab(localStorage,b.dataset.writeTab);
+  paintScreenControls();
+  notify(tab==='detailed'?'순간 추가를 자세한 추가로 엽니다.':'순간 추가를 쉬운 추가로 엽니다.');
  };
  $on('settings-motion',()=>{motionPaused=!motionPaused;paintScreenControls();try{$('view').contentWindow.postMessage({type:'lt41-motion',paused:motionPaused},location.origin)}catch{}notify(motionPaused?'첫 화면 움직임을 멈췄어요.':'첫 화면 움직임을 다시 켰어요.');});
  paintScreenControls();
@@ -659,8 +675,8 @@ function usePrivateAsset(){
  if(!member.snapshot().writable){notify('서버 편집 연결이 아직 준비되지 않았어요. 기록은 안전하게 읽을 수 있습니다.');panel('records');return false;}
  if(!window.LT41){openEditor();notify('새 트리를 만든 뒤 순간에 파일을 첨부할 수 있어요.');return false;}
  if(!window.LT41.momentId){notify('순간을 먼저 연 뒤 내 보관 파일을 첨부할 수 있어요.');return false;}
- if(!$('editor').open)openEditor('add');
- return $('editor').open;
+ if(!$('write-panel').open)openEditor('add');
+ return $('write-panel').open;
 }
 addEventListener('beforeunload',e=>{
  if(member?.snapshot().dirty||formDirty()||treeDirty()){e.preventDefault();e.returnValue='';}

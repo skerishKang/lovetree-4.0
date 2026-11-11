@@ -27,15 +27,14 @@ function setup({focusables = [], popoverHidden = true, treeDirty = false, editor
   // 남은 옛 규칙(바깥 클릭) 대상은 내 기록(records) 하나다.
   const dialogs = [
     fakeElement({id: 'records'}),
-    fakeElement({id: 'editor', dataset: {ltPanel: 'full', ltReturn: 'write-menu'}}),
+    // #425: 순간 추가는 한 창(write-panel, 가운데)이다 — 고르기 창·빠른 추가·편집기가 하나로 합쳐졌다.
+    fakeElement({id: 'write-panel', dataset: {ltPanel: 'center', ltReturn: 'write-menu'}}),
     fakeElement({id: 'tree-manager', dataset: {ltPanel: 'center', ltReturn: 'record-menu'}}),
     fakeElement({id: 'connection-panel', dataset: {ltPanel: 'full'}}),
     fakeElement({id: 'share-panel', dataset: {ltPanel: 'full', ltReturn: 'share-menu'}}),
     fakeElement({id: 'account-settings', dataset: {ltPanel: 'full', ltReturn: 'account-avatar'}}),
     fakeElement({id: 'account-assets', dataset: {ltPanel: 'full', ltReturn: 'account-avatar'}}),
-    fakeElement({id: 'community-panel', dataset: {ltPanel: 'full', ltReturn: 'community-menu'}}),
-    fakeElement({id: 'quick-add', dataset: {ltPanel: 'center', ltReturn: 'write-menu'}}),
-    fakeElement({id: 'write-chooser', dataset: {ltPanel: 'center', ltReturn: 'write-menu'}})
+    fakeElement({id: 'community-panel', dataset: {ltPanel: 'full', ltReturn: 'community-menu'}})
   ];
   const elements = {
     'account-avatar': fakeElement({id: 'account-avatar'}),
@@ -45,7 +44,7 @@ function setup({focusables = [], popoverHidden = true, treeDirty = false, editor
     // 브라우저와 같이 $('id')와 공통 틀이 묶은 dialog가 같은 요소가 되게 한다(초점 복귀 기록 확인용).
   };
   for (const d of dialogs) elements[d.id] = d;
-  elements['editor'].querySelectorAll = () => focusables;
+  elements['write-panel'].querySelectorAll = () => focusables;
   const keydown = [], clicks = [];
   const doc = {
     activeElement: null,
@@ -73,9 +72,10 @@ function setup({focusables = [], popoverHidden = true, treeDirty = false, editor
     isEditorDirty: () => editorDirty,
     isConnectionDirty: () => connectionDirty,
     // #380 4 마지막: 빠른 추가(주소)·공유(설정 바꿈)만 더러움 판정을 받는다.
-    isQuickAddDirty: () => quickDirty,
+    // #425: 한 창의 더러움(쉬운 추가 주소·자세한 추가 폼)은 isEditorDirty 한 벌로 온다.
+    isEditorDirty: () => editorDirty || quickDirty,
     isShareDirty: () => shareDirty,
-    panelBlocked: id => (id === 'editor' && editorBusy ? '파일 전송을 마치거나 취소해 주세요.' : ''),
+    panelBlocked: id => (id === 'write-panel' && editorBusy ? '파일 전송을 마치거나 취소해 주세요.' : ''),
     notify: message => calls.push('notify:' + message),
   });
   return {elements, dialogs, keydown, clicks, api, calls};
@@ -125,7 +125,7 @@ test('트리 관리 Esc: 깨끗하면 묻지 않고 바로 닫는다', () => {
 test('편집기 대화상자에서 Tab은 마지막에서 처음으로, Shift+Tab은 처음에서 마지막으로 순환한다', () => {
   const first = fakeElement(), last = fakeElement();
   const {elements, keydown, api} = setup({focusables: [first, last]});
-  elements['editor'].open = true;
+  elements['write-panel'].open = true;
   const trap = api.trapShellTab;
   assert.ok(keydown.includes(trap), 'keydown에 잡아 둔다');
 
@@ -265,7 +265,7 @@ test('편집기 업로드 중에는 Esc·바깥 클릭·× 모두 닫지 않고 
     for (const close of [
       () => { const cancel = {preventDefault() { cancel.prevented = true; }}; editor.listeners.cancel(cancel); return cancel.prevented; },
       () => { editor.listeners.click({target: editor, clientX: 500, clientY: 500}); return editor.open; },
-      () => !api.requestClose('editor'),
+      () => !api.requestClose('write-panel'),
     ]) {
       editor.open = true;
       assert.equal(close(), true, '닫지 않는다');
@@ -280,11 +280,11 @@ test('편집기 ×·취소(requestClose)는 깨끗하면 묻지 않고 닫고 �
   const {dialogs, api} = setup({editorDirty: false});
   const editor = dialogs[1];
   const opener = {isConnected: true, getClientRects: () => [{}], focusCount: 0, focus() { this.focusCount += 1; }};
-  api.noteOpener('editor');
+  api.noteOpener('write-panel');
   document.activeElement = opener;
-  api.noteOpener('editor');
+  api.noteOpener('write-panel');
   editor.open = true;
-  assert.equal(api.requestClose('editor'), true, '닫는다');
+  assert.equal(api.requestClose('write-panel'), true, '닫는다');
   editor.listeners.close();
   await new Promise(r => setTimeout(r, 5));
   assert.equal(opener.focusCount, 1, '연 버튼으로 초점이 돌아온다');
@@ -310,7 +310,7 @@ test('순간 잇기 Esc: 고른 연결이 저장 전이면 한 번 묻는다', (
 
 test('빠른 추가 Esc: 주소를 적어 두었으면 한 번 묻고, 비어 있으면 그대로 닫는다', () => {
   const dirty = setup({quickDirty: true});
-  const quick = dirty.dialogs[8];
+  const quick = dirty.dialogs[1]; // write-panel
   quick.open = true;
   const realConfirm = globalThis.confirm;
   try {
@@ -323,7 +323,7 @@ test('빠른 추가 Esc: 주소를 적어 두었으면 한 번 묻고, 비어 �
     assert.equal(quick.open, true);
 
     const clean = setup({quickDirty: false});
-    const cleanQuick = clean.dialogs[8];
+    const cleanQuick = clean.dialogs[1]; // write-panel
     cleanQuick.open = true;
     globalThis.confirm = () => { throw new Error('깨끗하면 묻지 않는다'); };
     cleanQuick.listeners.cancel({preventDefault() {}});
@@ -350,7 +350,7 @@ test('설정·둘러보기·고르기 창은 묻지 않고 바로 닫는다', ()
   const realConfirm = globalThis.confirm;
   try {
     globalThis.confirm = () => { throw new Error('묻지 않는다'); };
-    for (const index of [5, 7, 9]) { // account-settings · community-panel · write-chooser
+    for (const index of [5, 7]) { // account-settings · community-panel
       const dialog = dialogs[index];
       dialog.open = true;
       dialog.listeners.cancel({preventDefault() {}});
@@ -362,7 +362,7 @@ test('설정·둘러보기·고르기 창은 묻지 않고 바로 닫는다', ()
 
 test('패널 모듈이 직접 연 창도 마지막으로 누른 버튼으로 초점을 돌린다(noteOpener 없이)', async () => {
   const {dialogs, clicks} = setup();
-  const quick = dialogs[8];
+  const quick = dialogs[1]; // write-panel
   const opener = {isConnected: true, getClientRects: () => [{}], focusCount: 0, focus() { this.focusCount += 1; }};
   // 공통 틀이 적어 두는 "마지막으로 누른 조작 요소" 기록을 흉내 낸다.
   for (const [type, fn] of clicks) if (type === 'click') fn({target: {closest: () => opener}});

@@ -26,28 +26,15 @@ export function createQuickAdd(deps) {
     return true;
   }
 
-  function openWriteChooser() {
+  // #425: 입구는 하나다 — 같은 창(write-panel)을 열고, 먼저 보일 탭은 설정값(없으면 쉬운 추가)이 정한다.
+  function openWrite() {
     if (!ensureWritable()) return;
-    const chooser = $('write-chooser');
-    if (!chooser.open) chooser.showModal();
-    queueMicrotask(() => $('write-quick').focus());
+    deps.writePanel.open();
   }
-  function chooseQuick() {
-    $('write-chooser').close();
-    openQuick();
-  }
-  // 자세한 추가는 기존 순간 남기기와 같다 — 책장에서는 새 트리 흐름, 다른 화면에서는 추가 편집기.
-  function chooseDetailed() {
-    $('write-chooser').close();
-    deps.openEditor(deps.getCurrent() === 'track32-bookshelf.html' ? 'new' : undefined);
-  }
-
+  // 쉬운 추가 탭으로 연다(끌어다 놓기·'지금 다듬기'처럼 쉬운 추가로 되돌아오는 길).
   function openQuick() {
     if (!ensureWritable()) return;
-    resetQuick();
-    const dialog = $('quick-add');
-    if (!dialog.open) dialog.showModal();
-    queueMicrotask(() => $('quick-url').focus());
+    deps.writePanel.open('easy');
   }
   function resetQuick() {
     $('quick-url').value = '';
@@ -198,7 +185,7 @@ export function createQuickAdd(deps) {
     try { result = deps.getMember().apply('quickAdd', {url, ...quickMediaTitle(url)}) || null; }
     catch (error) { $('quick-error').textContent = error.message; return false; }
     const savedTitle = savedTitleFor(url);
-    if ($('quick-add').open) {
+    if ($('write-panel').open) {
       $('quick-url').value = '';
       renderPreview();
       $('quick-url').focus();
@@ -216,7 +203,7 @@ export function createQuickAdd(deps) {
   function showSaved(url, result, savedTitle = '') {
     const parsed = parseQuickUrl(url, describe);
     const thumb = parsed.status === 'ok' && parsed.kind === 'youtube' ? parsed.thumb : '';
-    if ($('quick-add').open) {
+    if ($('write-panel').open) {
       $('quick-notice').textContent = savedNoticeText(savedTitle);
       $('quick-notice').hidden = false;
       setRefineTarget($('quick-refine'), result);
@@ -235,7 +222,7 @@ export function createQuickAdd(deps) {
   function refine(button) {
     const treeId = button.dataset.treeId;
     const momentId = button.dataset.momentId;
-    if ($('quick-add').open) $('quick-add').close();
+    if ($('write-panel').open) deps.requestClose?.('write-panel');
     $('quick-saved').hidden = true;
     if (!treeId || !momentId) { deps.notify('모아둔 순간에서 그 순간을 직접 열어 주세요.'); return; }
     deps.choose(treeId, momentId);
@@ -257,7 +244,7 @@ export function createQuickAdd(deps) {
   function routeFor(image) {
     return dropRoute({
       source: deps.getSource(), owned: !!snapshot().owned, writable: !!snapshot().writable,
-      quickOpen: !!$('quick-add').open, editorOpen: !!$('editor').open, image
+      quickOpen: !!$('write-panel').open && !$('write-easy').hidden, editorOpen: !!$('write-panel').open && $('write-easy').hidden === true, image
     });
   }
   function showVeil(text) {
@@ -327,19 +314,16 @@ export function createQuickAdd(deps) {
     saveUrl(url);
   }
 
-  $('write-quick').onclick = chooseQuick;
-  $('write-detailed').onclick = chooseDetailed;
   $('quick-form').onsubmit = submitQuick;
   $('quick-url').addEventListener('input', renderPreview);
   $('quick-paste').onclick = () => { void togglePaste(); };
   $('quick-refine').onclick = () => refine($('quick-refine'));
   $('quick-saved-refine').onclick = () => refine($('quick-saved-refine'));
-  $('write-chooser').addEventListener('close', () => { if (!$('quick-add').open) $('write-menu').focus?.(); });
-  $('quick-add').addEventListener('close', () => { if (!$('write-chooser').open && !$('editor').open) $('write-menu').focus?.(); });
+  // 닫기는 공통 틀(shell/dialogs.mjs)이 초점까지 되돌린다 — 여기서는 따로 만지지 않는다.
   if (isFinePointer()) mountDrop(doc);
 
   return {
-    openWriteChooser,
+    openWrite,
     openQuick,
     submitQuick,
     renderPreview,

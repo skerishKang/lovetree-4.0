@@ -1045,21 +1045,20 @@ async function checkSignedInActions(page, target, opts, stamp) {
     if (!button) return null;
     return { hidden: !!button.hidden, visible: button.getClientRects().length > 0, label: (button.textContent || '').trim() };
   }).catch(() => null);
-  const editorOpen = () => page.waitForFunction(() => document.getElementById('editor')?.open === true, { timeout: 3000 })
+  // #425: #write-menu는 한 창(#write-panel)을 열고, 기본 탭은 설정값(없으면 쉬운 추가)이다.
+  const editorOpen = () => page.waitForFunction(() => document.getElementById('write-panel')?.open === true, { timeout: 3000 })
     .then(() => true).catch(() => false);
-  // #327②부터 #write-menu는 고르기 창(#write-chooser)을 열고, 거기서 빠른 추가·자세한 추가를 고른다.
-  const chooserOpen = () => page.waitForFunction(() => document.getElementById('write-chooser')?.open === true, { timeout: 3000 })
-    .then(() => true).catch(() => false);
-  // 고르기 창에서 “자세한 추가”를 누른 뒤 편집기 또는 첫 여정이 열리는지 기다린다.
+  const chooserOpen = () => editorOpen();
+  // 한 창에서 “자세한 추가” 탭을 누른 뒤 폼이 보이는지(또는 첫 여정으로 보내지는지) 확인한다.
   const chooseDetailed = async () => {
-    await page.evaluate(() => document.getElementById('write-detailed')?.click()).catch(() => {});
+    await page.evaluate(() => document.getElementById('write-tab-detailed')?.click()).catch(() => {});
     const opened = await editorOpen();
     if (opened) return { editor: true };
     await page.waitForFunction(() => /#journey/.test(location.hash || ''), { timeout: 3000 }).catch(() => {});
     return { editor: false };
   };
   const closeEditor = async () => {
-    await page.evaluate(() => document.getElementById('editor')?.close()).catch(() => {});
+    await page.evaluate(() => document.getElementById('write-panel')?.close()).catch(() => {});
     await sleep(300);
   };
 
@@ -1076,9 +1075,9 @@ async function checkSignedInActions(page, target, opts, stamp) {
     const opened = chooser ? (await chooseDetailed()).editor : false;
     const detail = await page.evaluate(() => ({
       hash: location.hash,
-      chooserOpen: !!document.getElementById('write-chooser')?.open,
-      editorOpen: !!document.getElementById('editor')?.open,
-      editorTitle: document.getElementById('editor-title')?.textContent || '',
+      chooserOpen: !!document.getElementById('write-panel')?.open,
+      editorOpen: !!document.getElementById('write-panel')?.open,
+      editorTitle: document.getElementById('write-panel-title')?.textContent || '',
       journey: /first-journey/.test((([document.getElementById('view'), document.getElementById('view-next')].find((el) => el && !el.hidden && el.getClientRects().length > 0) || document.getElementById('view'))?.contentWindow?.location?.href || '')),
       feedback: document.getElementById('record-feedback')?.textContent || ''
     })).catch(() => ({}));
@@ -1087,8 +1086,8 @@ async function checkSignedInActions(page, target, opts, stamp) {
     record('write-menu-editor', 'auth', chooser && (opened || newTreeFlow) ? 'pass' : 'fail',
       chooser && opened ? `"${button.label}" 클릭 → 고르기 창 → 자세한 추가로 편집기 열림 (${detail.editorTitle || detail.hash})`
         : chooser && newTreeFlow ? `"${button.label}" 클릭 → 고르기 창 → 자세한 추가로 새 트리 흐름 (${detail.hash || 'first-journey'})`
-        : chooser ? `"${button.label}" 클릭 → 고르기 창은 열렸지만 자세한 추가 뒤 3초 안에 #editor·첫 여정이 열리지 않음 (hash=${detail.hash || ''} journey=${detail.journey} 안내="${(detail.feedback || '').slice(0, 60)}")`
-        : `"${button.label}" 클릭 뒤 3초 안에 고르기 창(#write-chooser)이 열리지 않음 (hash=${detail.hash || ''})`,
+        : chooser ? `"${button.label}" 클릭 → 한 창은 열렸지만 자세한 추가 탭 뒤 3초 안에 폼·첫 여정이 열리지 않음 (hash=${detail.hash || ''} journey=${detail.journey} 안내="${(detail.feedback || '').slice(0, 60)}")`
+        : `"${button.label}" 클릭 뒤 3초 안에 순간 추가 한 창(#write-panel)이 열리지 않음 (hash=${detail.hash || ''})`,
       { button, detail });
     await page.screenshot({ path: path.join(opts.out, `${stamp}-write-menu-1440.png`) }).catch(() => {});
     if (opened) await closeEditor();
@@ -1101,16 +1100,16 @@ async function checkSignedInActions(page, target, opts, stamp) {
     const chosen = shelfChooser ? await chooseDetailed() : { editor: false };
     const after = await page.evaluate(() => ({
       hash: location.hash,
-      chooserOpen: !!document.getElementById('write-chooser')?.open,
-      editorOpen: !!document.getElementById('editor')?.open,
-      editorTitle: document.getElementById('editor-title')?.textContent || '',
+      chooserOpen: !!document.getElementById('write-panel')?.open,
+      editorOpen: !!document.getElementById('write-panel')?.open,
+      editorTitle: document.getElementById('write-panel-title')?.textContent || '',
       journey: /first-journey/.test((([document.getElementById('view'), document.getElementById('view-next')].find((el) => el && !el.hidden && el.getClientRects().length > 0) || document.getElementById('view'))?.contentWindow?.location?.href || ''))
     })).catch(() => ({}));
     const newFlow = /#journey/.test(after.hash || '') || after.journey || (after.editorOpen && /새|추가/.test(after.editorTitle || ''));
     record('write-menu-shelf-new-tree', 'auth', shelfChooser && newFlow ? 'pass' : 'fail',
-      shelfChooser && newFlow ? `책장에서 클릭 → 고르기 창 → 자세한 추가 → 새 트리 흐름 (${after.hash || after.editorTitle})`
-        : shelfChooser ? `책장에서 클릭 → 고르기 창 → 자세한 추가 뒤 새 트리 흐름이 열리지 않음 ${JSON.stringify(after)}`
-        : `책장에서 클릭 뒤 고르기 창(#write-chooser)이 열리지 않음 ${JSON.stringify(after)}`, { after });
+      shelfChooser && newFlow ? `책장에서 클릭 → 한 창 → 자세한 추가 탭 → 새 트리 흐름 (${after.hash || after.editorTitle})`
+        : shelfChooser ? `책장에서 클릭 → 한 창 → 자세한 추가 탭 뒤 새 트리 흐름이 열리지 않음 ${JSON.stringify(after)}`
+        : `책장에서 클릭 뒤 순간 추가 한 창(#write-panel)이 열리지 않음 ${JSON.stringify(after)}`, { after });
     if (after.editorOpen) await closeEditor();
     await page.goto(target.href, { waitUntil: 'domcontentloaded', timeout: opts.timeout }).catch(() => {});
     await page.waitForSelector('#community-menu', { timeout: opts.timeout }).catch(() => {});
@@ -1390,7 +1389,8 @@ async function runAuthFlows(target, opts, stamp) {
   const openEditor = async (page) => {
     await page.click('#write-menu', { timeout: 5000 }).catch(() => {});
     await sleep(2500);
-    return page.evaluate(() => !!document.getElementById('editor')?.open).catch(() => false);
+    // #425: 순간 추가 한 창(#write-panel).
+    return page.evaluate(() => !!document.getElementById('write-panel')?.open).catch(() => false);
   };
   const fillMoment = (page, title) => page.evaluate((value) => {
     window.__lt41AuthRequired = window.__lt41AuthRequired || 0;

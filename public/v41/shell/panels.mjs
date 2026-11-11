@@ -20,6 +20,8 @@ export function createPanels(deps) {
   const selection = deps.selection;
   const openFirstJourney = deps.openFirstJourney;
   const openLoginStart = deps.openLoginStart;
+  // #425: 순간 추가 한 창의 탭(쉬운 추가·자세한 추가)은 shell/write-panel.mjs가 맡는다.
+  const dwrite = deps.writePanel;
 
   // 편집기 모드와 폼 기준값은 이 파일이 들고 있는다(셸은 formDirty·treeDirty만 묻는다).
   let editorMode = 'add';
@@ -36,8 +38,13 @@ export function createPanels(deps) {
   function parentDirty() {
     return !$('parent-management').hidden && parentValue() !== parentBaseline;
   }
+  // #425: 더러움은 한 창 두 구역을 모두 본다 — 자세한 추가(폼·연결)와 쉬운 추가(주소를 적고 아직 담지 않음).
+  function detailedDirty() {
+    return $('write-panel').open && $('write-easy').hidden
+      && (new URLSearchParams(new FormData($('moment-form'))).toString() !== formBaseline || parentDirty());
+  }
   function formDirty() {
-    return $('editor').open
+    return $('write-panel').open
       && (new URLSearchParams(new FormData($('moment-form'))).toString() !== formBaseline || parentDirty());
   }
   function treeDirty() {
@@ -64,7 +71,11 @@ export function createPanels(deps) {
       return;
     }
     editorMode = mode;
-    $('editor-title').textContent = mode === 'add' ? '순간 추가' : '순간 수정';
+    // #425: 같은 창이다. 더하기는 위쪽 탭 [쉬운 추가 | 자세한 추가]가 있고, 수정은 탭 없이 제목만 '순간 수정'.
+    $('write-panel-title').textContent = mode === 'edit' ? '순간 수정' : '순간 추가';
+    $('write-eyebrow').textContent = mode === 'edit' ? '나의 순간' : '순간 남기기';
+    dwrite.setTabsVisible(mode !== 'edit');
+    if (mode !== 'edit') dwrite.show('detailed');
     const form = $('moment-form');
     form.reset();
     $('relation-label').hidden = mode !== 'add';
@@ -93,7 +104,6 @@ export function createPanels(deps) {
       o.textContent = (m?.links?.includes(other.id) ? '연결됨 · ' : '') + other.title;
       $('related-target').append(o);
     }
-    document.querySelectorAll('[data-mode]').forEach(b => b.setAttribute('aria-current', String(b.dataset.mode === mode)));
     updateMediaPreview(); updateQuickEntryHint();
     formBaseline = new URLSearchParams(new FormData(form)).toString();
     parentBaseline = parentValue();
@@ -109,7 +119,7 @@ export function createPanels(deps) {
     const mode = ['new', 'add', 'edit'].includes(requestedMode) ? requestedMode : window.LT41 ? 'add' : 'new';
     if (mode === 'new') { openFirstJourney(); return; }
     setEditorMode(mode, parentId);
-    panel('editor');
+    panel('write-panel');
     queueMicrotask(() => $('moment-form').elements.note.focus());
   }
 
@@ -302,7 +312,6 @@ export function createPanels(deps) {
   };
   // #380 4: 트리 관리 Esc·바깥 클릭 닫기와 "저장하지 않고 닫을까요?" 확인은 shell/dialogs.mjs 공통 틀이 맡는다.
   // × 버튼(data-close)은 shell.mjs의 기존 규칙(바쁠 때·바뀐 값이 있으면 확인)을 그대로 쓴다.
-  document.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => setEditorMode(b.dataset.mode));
   // '순간 남기기'는 이제 shell/quick-add.mjs가 고르기 창을 연다(#빠른 추가 ②). 이 파일은 편집기만 맡는다.
 
   for (const name of ['title', 'note', 'url']) $('moment-form').elements[name].addEventListener('input', () => { if (name === 'url' || name === 'title') updateMediaPreview(); updateQuickEntryHint(); });
@@ -317,14 +326,14 @@ export function createPanels(deps) {
       // #344: 미리보기 때 받아 둔 영상 제목을 저장 입력에 함께 넘긴다(사용자 입력 제목이 항상 우선 — 도메인 판정).
       getMember().apply(editorMode, {...Object.fromEntries(new FormData(e.target)), ...editorMediaTitle()}, selection());
       formBaseline = new URLSearchParams(new FormData(e.target)).toString();
-      $('editor').close();
+      $('write-panel').close();
       if (editorMode === 'new') show('track59-sketchbook.html');
       notify('서버에 저장하고 있어요.');
     } catch (error) { $('form-error').textContent = error.message; }
   };
   // #380 4 2차: Esc·바깥 클릭·× 닫기와 "저장하지 않고 닫을까요?" 확인은 shell/dialogs.mjs 공통 틀이 맡는다
   // (트리 관리와 같은 규칙). 편집기만의 규칙은 공통 틀보다 우선한다 — 업로드 중이면 닫지 않는다.
-  $('editor-cancel').onclick = () => { requestClose?.('editor'); };
+  $('editor-cancel').onclick = () => { requestClose?.('write-panel'); };
   $('change-parent').onclick = () => {
     try {
       getMember().apply('reparent', {targetId: $('parent-target').value, relation: $('parent-relation').value}, selection());
@@ -347,7 +356,7 @@ export function createPanels(deps) {
     if (!confirm('이 순간을 삭제할까요? 자식 순간은 이전 순간으로 이어지고 관련 연결은 해제됩니다.')) return;
     try {
       getMember().apply('delete', {}, selection());
-      $('editor').close();
+      $('write-panel').close();
     } catch (e) { $('form-error').textContent = e.message; }
   };
 
@@ -366,6 +375,7 @@ export function createPanels(deps) {
     updateQuickEntryHint,
     uploadsChanged,
     formDirty,
+    detailedDirty,
     treeDirty,
     editorMode: () => editorMode
   };

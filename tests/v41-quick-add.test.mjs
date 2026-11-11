@@ -180,9 +180,10 @@ test('#343 마크업: 두 줄 설명·크림 버튼 하나·고정 안내 줄·�
 
 test('#343 CSS: 머리글 금색·미리보기/안내 줄 높이 고정·점선 사진 칸·숨긴 파일 input', () => {
   const css = readFileSync(new URL('../public/v41/shell.css', import.meta.url), 'utf8');
-  assert.match(css, /#quick-add \.eyebrow\{color:var\(--lt-gold\)\}/, '밤 테마 머리글은 금색');
+  // #425: 빠른 추가는 한 창(write-panel)의 쉬운 추가 탭이다 — 머리글 금색 규칙도 한 창 선택자로 옮겼다.
+  assert.match(css, /#write-panel \.eyebrow\{color:var\(--lt-gold\)\}/, '밤 테마 머리글은 금색');
   assert.match(css, /\.quick-preview\{[^}]*height:300px/, '미리보기 카드 높이 고정');
-  assert.match(css, /@media\(max-width:780px\)\{#quick-add\{width:100%\}\.quick-preview\{height:220px\}\}/, '좁은 화면도 높이 고정');
+  assert.match(css, /@media\(max-width:780px\)\{\.quick-preview\{height:220px\}\}/, '좁은 화면도 높이 고정');
   assert.match(css, /\.quick-notice-row\{[^}]*min-height:44px/, '안내 줄 높이 고정');
   assert.match(css, /\.quick-photo \.file-label\{[^}]*border:1px dashed var\(--lt-gold-line\)/, '점선 사진 칸');
   assert.match(css, /\.quick-photo input\[type=file\]\{[^}]*clip-path:inset\(50%\)/, '실제 파일 input은 숨기되 폼에는 남긴다');
@@ -191,7 +192,8 @@ test('#343 CSS: 머리글 금색·미리보기/안내 줄 높이 고정·점선 
 
 // CSS 값 검사(마크업·CSS 값은 글자로 고정한다): 정원의 고르기 창 1차 버튼 보조 글자는
 // opacity 0.75로 두면 #98505e 위 3.97:1로 모자라다(axe 운영 실측 2026-11-09). 새 hex 없이 토큰만.
-test('고르기 창 스타일: 정원 1차 버튼의 보조 글자는 옅게 하지 않는다', () => {
+test('한 창 탭 스타일(#425): 두 탭은 같은 폭이고 고르기 창 스타일은 남지 않는다', () => {
   const css = readFileSync(new URL('../public/v41/shell.css', import.meta.url), 'utf8');
-  assert.match(css, /html\[data-lt-theme=garden\] \.write-choice button\.primary span\{opacity:1\}/);
+  assert.equal(/write-choice/.test(css), false, '옛 고르기 창 스타일은 없다');
+  assert.match(css, /\.write-tabs \[role=tab\]\{[^}]*flex:1 1 0/, '두 탭이 폭을 나눈다');
 });
