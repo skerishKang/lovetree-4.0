@@ -250,6 +250,24 @@ test('프로필이 없으면 저장소를 더 부르지 않는다', async () => 
   assert.deepEqual(urls, ['https://auth.padiem.net/token']);
 });
 
+test('프로필의 이메일이 빈 값이면 저장소를 부르지 않고 로그인은 성공한다', async () => {
+  for (const empty of ['', '   ']) {
+    const urls = [];
+    const auth = createSharedPagesAuth({
+      now: () => 1000,
+      verify: async () => ({ accountId: 'sub_a' }),
+      fetcher: async (url) => {
+        urls.push(url);
+        return Response.json({ access_token: 'access', refresh_token: 'refresh', profile: { email: empty } });
+      }
+    });
+    const done = await callbackRound(auth, await pagesEnv());
+    assert.equal(done.status, 302, `빈 이메일(${JSON.stringify(empty)})에서도 로그인은 성공해야 한다`);
+    assert.match(done.headers.get('set-cookie'), /__Host-lovetree-access=access/);
+    assert.deepEqual(urls, ['https://auth.padiem.net/token'], `빈 이메일(${JSON.stringify(empty)})에서는 내부 저장소를 부르지 않는다`);
+  }
+});
+
 test('저장소 호출이 실패해도 로그인은 성공한다', async () => {
   const outcomes = [];
   const auth = createSharedPagesAuth({
