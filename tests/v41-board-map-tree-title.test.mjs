@@ -59,3 +59,10 @@ test('#417: 좁은 폭에서 제목이 줄어들고 겹치지 않는다 — 보�
  assert.match(BOARD_CSS,/\.headbtn\{display:none\}\.headbtn\.primary\{display:block[^}]*\}#shelfBackBtn\{display:inline-flex;min-height:44px;height:auto\}/,'보드 폰 폭에서 되돌리기 등은 숨기되 ← 내 트리는 남긴다');
  assert.match(CSS,/html\[data-v41-screen=network\] \.topbar-left\{pointer-events:auto;margin-right:auto\}/,'지도 topbar는 클릭을 막아 두었으므로 묶음을 다시 받고(#421) 왼쪽을 지킨다');
 });
+
+test('#421: 지도 390 — 왼쪽 묶음은 0으로 눌리지 않고, 제목은 줄임표, 도구 줄은 책(#431)과 같이 가로 스크롤로 넘침을 막는다',()=>{
+ assert.match(CSS,/html\[data-v41-screen=network\] \.topbar-left\{flex:0 0 auto\}/,'← 내 트리가 들어간 묶음은 0으로 눌리지 않는다');
+ assert.match(CSS,/html\[data-v41-screen=network\] \.tree-title-btn\{max-width:30vw\}/,'제목은 30vw 안에서 줄어든다(책 #431과 같은 원칙)');
+ assert.match(CSS,/html\[data-v41-screen=network\] \.top-actions\{flex:0 1 auto;min-width:0;overflow-x:auto;justify-content:flex-start;scrollbar-width:none\}/,'도구 줄은 책(#431)과 같이 가로 스크롤로 넘침을 막는다');
+ assert.match(CSS,/html\[data-v41-screen=network\] \.top-actions::-webkit-scrollbar\{display:none\}/,'스크롤 막대는 보이지 않게 한다');
+});

@@ -65,4 +65,11 @@ html[data-v41-screen=network] .tree-menu .tree-cover{border:1px solid rgba(120,9
  html[data-v41-screen=network] .tree-title-btn{padding:4px 8px}
  html[data-v41-screen=network] .top-actions{gap:5px}
  html[data-v41-screen=network] .top-actions .pill{padding:0 9px;font-size:9px}
+ /* #421: 좁은 폭에서 왼쪽 묶음이 0으로 눌려 ← 내 트리가 화면 왼쪽 밖으로 나가지 않게 한다.
+    ← 내 트리는 줄지 않고(flex-shrink:0), 제목은 30vw 안에서 줄임표로 줄어든다(책 #431과 같은 원칙).
+    오른쪽 도구 줄은 책(#431)과 같이 남은 폭 안에서 가로 스크롤로 넘침을 막는다. */
+ html[data-v41-screen=network] .topbar-left{flex:0 0 auto}
+ html[data-v41-screen=network] .tree-title-btn{max-width:30vw}
+ html[data-v41-screen=network] .top-actions{flex:0 1 auto;min-width:0;overflow-x:auto;justify-content:flex-start;scrollbar-width:none}
+ html[data-v41-screen=network] .top-actions::-webkit-scrollbar{display:none}
 }
