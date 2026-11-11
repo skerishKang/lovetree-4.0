@@ -72,6 +72,42 @@ journalctl -u lovetree-api-autodeploy.service -n 50 --no-pager
 systemctl disable --now lovetree-api-autodeploy.timer
 ```
 
+## 실제 DB 구성(2026-11-11 실측)과 migration 수동 적용 한 흐름
+
+컴2의 러브트리 Postgres는 **컨테이너가 아니라 WSL Ubuntu 안 네이티브 PostgreSQL 16**이다.
+Docker 데몬은 꺼져 있고 `postgres.compose.yml`의 `lovetree-postgres`(127.0.0.1:5433) 컨테이너는 없다.
+API가 부르는 DB는 `/opt/padiem/lovetree-api/.env`의 `LOVETREE_DATABASE_URL`이 가리키는
+WSL 내부 `127.0.0.1:5432`의 `lovetree` DB이고, 표 소유자·앱 역할은 `lovetree_owner` 하나다.
+이 절의 명령은 모두 컴2 WSL Ubuntu에서 root로 실행한다. 값·비밀번호·접속 문자열은 어디에도 적지 않는다.
+
+```bash
+# 1) 상태 확인(읽기만) — needs_manual_migration이면 아래로 계속한다.
+/usr/local/sbin/lovetree-api-autodeploy status
+
+# 2) 대상 표 확인(적용 전) — 대상 표가 없고, 기존 러브트리 표가 이 DB에 있는지 본다.
+sudo -u postgres psql -d lovetree -Atc "SELECT to_regclass('lovetree_account_emails');"
+sudo -u postgres psql -d lovetree -Atc "SELECT tableowner FROM pg_tables WHERE tablename='lovetree_workspaces';"
+
+# 3) migration 파일을 컴2로 옮긴다(main의 server/db/migrations/<파일>.sql을 그대로 —
+#    원본과 byte 동일해야 한다. md5sum으로 저장소 파일과 비교한다).
+md5sum /tmp/<파일>.sql
+
+# 4) 적용(1회, 재실행 안전 — 마이그레이션 파일이 IF NOT EXISTS로만 쓴다).
+#    표 소유자를 앱 역할과 같게 하려고 SET ROLE로 실행한다. psql은 WSL 안에서 돈다.
+sudo -u postgres psql -d lovetree -v ON_ERROR_STOP=1 -c "SET ROLE lovetree_owner;" -f /tmp/<파일>.sql
+
+# 5) 적용 확인 — 열 4개·소유자 lovetree_owner여야 한다.
+sudo -u postgres psql -d lovetree -Atc "SELECT column_name FROM information_schema.columns WHERE table_name='lovetree_account_emails' ORDER BY ordinal_position;"
+sudo -u postgres psql -d lovetree -Atc "SELECT tableowner FROM pg_tables WHERE tablename='lovetree_account_emails';"
+
+# 6) accept-migrations 1회(위의 사람 확인이 선행 조건) — result=installed와 설치 SHA를 본다.
+AUTODEPLOY_ACCEPT_MIGRATIONS=1 /usr/local/sbin/lovetree-api-autodeploy run
+/usr/local/sbin/lovetree-api-autodeploy status
+```
+
+2026-11-11 실제 적용 기록: `account-emails-261111.sql`을 이 흐름으로 적용하고
+`--accept-migrations` 1회로 `1b23ed68` 설치가 끝났다(로그인 이메일 저장 전 구간 동작 확인).
+
 ## migration 보류를 푸는 법
 
 `needs_manual_migration`은 DB 변경을 자동 적용하지 않았다는 뜻이다.
