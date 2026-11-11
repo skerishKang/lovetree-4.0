@@ -14,12 +14,14 @@ function roParticle(value) {
 }
 
 // 로그인 상태의 계정 표시: 글자 알약 대신 첫 글자 동그라미.
+// 동그라미 글자는 표시 이름 → 이메일 첫 글자 순서로 고르고(#368), subject(usr_…) 첫 글자는 쓰지 않는다.
+// 이메일 표시 규칙: 자기 계정 메뉴는 본인만 보는 곳이라 전체를 보여 주고, 가리기(maskEmail)는
+// 공유 화면 등 남이 보는 곳에서만 쓴다 — 지금 이메일을 남이 보는 화면에 쓰는 곳은 없다(2026-11-11 확인).
 // 로그아웃 상태는 기존 "로그인" 알약을 그대로 쓴다(모양이 확실히 달라야 한다).
-export function accountPresentation({ owned = false, email = '', subject = '' } = {}) {
+export function accountPresentation({ owned = false, email = '', name = '' } = {}) {
   if (!owned) return { mode: 'login', label: '로그인', initial: '', ariaLabel: null, title: '로그인' };
   const address = clean(email);
-  const source = address || clean(subject);
-  const initial = firstLetter(source);
+  const initial = firstLetter(clean(name) || address);
   const who = address || '내 계정';
   return {
     mode: 'avatar',
