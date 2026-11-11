@@ -1,5 +1,6 @@
 // 2026-11-08 기억책 사용성 1~9 화면 보조. 데이터·저장 계약은 그대로 두고 표시만 바꾼다.
 import {displayTitle,withoutAutoTitle,titleParts,mediaSourceText,editAffordances,embedUrl,connectionLine,readLens,writeLens,detailPlacement,nextMomentMessage,NEXT_PAGE_COPY,NEXT_PAGE_ACTION,treeTitleText,isPrimaryButton,tapIntent,createOverflowRejudge,titleView,formatDisplayDate} from '/v41/book-usability.mjs';
+import {coverChoice,COVER_PALETTE} from '/v41/views/shelf/shelf-model.mjs';
 const $b=s=>document.querySelector(s);
 // #347 후속: 제목 보기 설정은 계정(LTDEMO.prefs)에서 읽고, 화면은 한 벌(titleView)로 그린다.
 const titleDisplay=()=>{try{return LTDEMO.prefs?.titleDisplay||'both'}catch{return 'both'}};
@@ -115,6 +116,9 @@ document.addEventListener('click',e=>{
   if(m&&m.url&&window.LTMedia&&LTMedia.openLightbox)LTMedia.openLightbox(m.url,titleViewFor(m).main,LTMedia.verticalVideo(m.url,m.mediaMetadata));return}
  const next=e.target.closest('[data-next-moment]');
  if(next){if(LTDEMO.readOnly)return;e.preventDefault();e.stopPropagation();requestNextMoment(next.dataset.nextMoment||selectedMomentId);return}
+ // #393 5: 마지막 장의 다른 트리 표지 — 셸이 이미 듣고 있는 lt41-open-book(view-navigation의 openBook)으로 그 트리 책으로 간다.
+ const openTree=e.target.closest('[data-open-tree]');
+ if(openTree){e.preventDefault();e.stopPropagation();const momentId=openTree.dataset.openMoment,treeId=openTree.dataset.openTree;if(momentId&&treeId)LTDEMO.openBook(momentId,treeId);return}
  /* 1. YouTube 그 자리 재생: 누른 뒤에만 iframe을 만든다(시작 시점 반영, referrerpolicy 엄격). */
  const yt=e.target.closest('[data-yt-play]');
  if(yt){e.preventDefault();e.stopPropagation();if(!yt.parentElement||yt.parentElement.querySelector('iframe.yt-frame'))return;
@@ -204,7 +208,7 @@ renderSpread=function(idx,focusId=null,land=true){
  }
  const right=SPREADS[current].right;
  if(right&&right.synthetic){
-  rightPage.innerHTML='<div class="next-page"><div><b>'+t(NEXT_PAGE_COPY)+'</b></div>'+(LTDEMO.readOnly?'':'<button type="button" data-next-moment="'+t(SPREADS[current].left.id)+'">'+t(NEXT_PAGE_ACTION)+'</button>')+'</div>';
+  rightPage.innerHTML='<div class="next-page"><div><b>'+t(NEXT_PAGE_COPY)+'</b></div>'+(LTDEMO.readOnly?'':'<button type="button" data-next-moment="'+t(SPREADS[current].left.id)+'">'+t(NEXT_PAGE_ACTION)+'</button>')+otherTreesBlock()+'</div>';
  }
  // #345: 390 한 장도 같은 규칙(날짜·제목·감정·마음 안내)으로 다시 그린다.
  const mobileMain=!SPREADS[current].right.synthetic&&focusId===SPREADS[current].right.id?SPREADS[current].right:SPREADS[current].left;
@@ -228,10 +232,57 @@ mobileSpreadContent=function(s,focusId=null){
  if(s.right&&s.right.synthetic){
   const at=html.lastIndexOf('<div class="mobile-support">');
   if(at>=0){const close=html.indexOf('</div>',at);
-   if(close>at)html=html.slice(0,at)+'<div class="mobile-support next-page"><b>'+t(NEXT_TITLE)+'</b>'+(LTDEMO.readOnly?'':'<button type="button" data-next-moment="'+t(s.left.id)+'">'+t(NEXT_PAGE_ACTION)+'</button>')+'</div>'+html.slice(close+6);}
+   if(close>at)html=html.slice(0,at)+'<div class="mobile-support next-page"><b>'+t(NEXT_TITLE)+'</b>'+(LTDEMO.readOnly?'':'<button type="button" data-next-moment="'+t(s.left.id)+'">'+t(NEXT_PAGE_ACTION)+'</button>')+otherTreesBlock()+'</div>'+html.slice(close+6);}
  }
  return html;
 };
+/* #393 5: 다른 트리로 가는 길. 목록 내용·이동 규칙은 셸의 트리 드롭다운을 따른다.
+   내용은 셸이 넣어 준 LTDEMO.library(부모 LT41.trees에서 온다)를 그대로 쓰고, 이동은 셸이 이미 듣고 있는
+   lt41-open-book 메시지(view-navigation.js의 LTDEMO.openBook)로 한다 — 셸 파일은 고치지 않는다. */
+const currentTreeId=()=>{try{return parent.LT41?.tree?.id||''}catch{return ''}};
+const orderedTrees=()=>{const list=Array.isArray(LTDEMO.library)?[...LTDEMO.library]:[];return list.sort((a,b)=>Number(b?.inbox===true)-Number(a?.inbox===true))};
+const treeCountText=tree=>tree.inbox===true?'정리 전 '+(tree.moments?.length||0):((tree.moments?.length||0)+'개의 순간');
+const treeCoverSpan=(tree,index=0)=>{
+ // 표지 판정은 책장과 같은 규칙(shelf-model coverChoice): 표지 사진 > 디자인 표지 > 기본 색.
+ const choice=coverChoice(tree,index,COVER_PALETTE);
+ const thumb=choice.coverMedia?'<img src="'+t(choice.coverMedia)+'" alt="" loading="lazy" referrerpolicy="no-referrer">':'';
+ return '<span class="tree-cover"'+(choice.design?' data-cover-design="'+t(choice.design)+'"':'')+' style="background-color:'+t(choice.color)+'" aria-hidden="true">'+thumb+'</span>';
+};
+function otherTreesBlock(){
+ if(LTDEMO.readOnly)return;/* 공유·예시에서는 다른 트리로 갈 수 없다(셸의 이동 규칙도 막힌다) */
+ const others=orderedTrees().filter(tree=>tree.id!==currentTreeId()).slice(0,3);
+ if(!others.length)return '';
+ return '<div class="other-trees"><b>다른 트리 보기</b><div class="other-tree-row">'+others.map((tree,index)=>'<button type="button" class="other-tree" data-open-tree="'+t(tree.id)+'" data-open-moment="'+t(tree.moments?.[0]?.id||'')+'">'+treeCoverSpan(tree,index)+'<span class="other-tree-name">'+t(treeTitleText(tree.title))+'</span><small>'+t(treeCountText(tree))+'</small></button>').join('')+'</div></div>';
+}
+const treeMenu=$b('#treeMenuPanel'),treeTrigger=$b('#bookTitleBtn');
+function closeTreeMenu(){if(!treeMenu||treeMenu.hidden)return;treeMenu.hidden=true;treeTrigger.setAttribute('aria-expanded','false')}
+function openTreeMenu(){
+ if(!treeMenu||LTDEMO.readOnly)return;/* 공유·예시에서는 트리를 고르지 못한다(셸과 같다) */
+ const currentId=currentTreeId();
+ treeMenu.innerHTML=orderedTrees().map((tree,index)=>'<button type="button" role="menuitemradio" class="tree-item" data-tree-id="'+t(tree.id)+'" aria-checked="'+(tree.id===currentId)+'">'+treeCoverSpan(tree,index)+'<span class="tree-name">'+t(treeTitleText(tree.title))+'</span><span class="tree-count">'+t(treeCountText(tree))+'</span>'+(tree.id===currentId?'<span class="tree-check" aria-hidden="true">✓</span>':'')+'</button>').join('');
+ treeMenu.hidden=false;treeTrigger.setAttribute('aria-expanded','true');treeMenu.querySelector('button')?.focus();
+}
+if(treeTrigger&&treeMenu){
+ if(LTDEMO.readOnly){const caret=treeTrigger.querySelector('.book-title-caret');if(caret)caret.hidden=true}
+ treeTrigger.addEventListener('click',e=>{e.stopPropagation();if(treeMenu.hidden)openTreeMenu();else closeTreeMenu()});
+ treeMenu.addEventListener('click',e=>{
+  const row=e.target.closest('[data-tree-id]');if(!row)return;
+  closeTreeMenu();
+  const id=row.dataset.treeId;if(!id||id===currentTreeId())return;
+  const tree=LTDEMO.library.find(tr=>tr.id===id),first=tree?.moments?.[0]?.id;
+  if(first)LTDEMO.openBook(first,id);
+ });
+ document.addEventListener('click',e=>{if(!treeMenu.hidden&&!e.target.closest('.book-title'))closeTreeMenu()});
+ document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'&&!treeMenu.hidden){e.preventDefault();e.stopPropagation();closeTreeMenu();treeTrigger.focus();return}
+  if(treeMenu.hidden)return;
+  const items=[...treeMenu.querySelectorAll('button')],at=items.indexOf(document.activeElement);
+  if(at<0)return;
+  if(e.key==='ArrowDown'||e.key==='Down'){e.preventDefault();e.stopPropagation();items[(at+1)%items.length].focus()}
+  else if(e.key==='ArrowUp'||e.key==='Up'){e.preventDefault();e.stopPropagation();items[(at-1+items.length)%items.length].focus()}
+ });
+}
+/* #393 5: 마지막 장의 다른 트리 표지도 같은 이동 규칙(openBook)으로 간다. */
 /* #345: '여기까지 온 길' — 처음 순간부터 지금 보는 순간까지의 세로 타임라인.
    칸·단계·일수·감정 색 계산은 LT59Model.journeyTimeline(book-model.js)이 맡고 여기는 그리기만 한다. */
 let journeyOpener=null;
@@ -281,6 +332,8 @@ paintLensButton();if(!lensPref)hideLens();
 function paintTreeTitles(){
  const name=treeTitleText(LTDEMO&&LTDEMO.title);
  if(!name)return;
+ const titleText=document.getElementById('bookTitleText');
+ if(titleText&&titleText.textContent!==name)titleText.textContent=name;
  for(const el of document.querySelectorAll('.crumb')){if(el.textContent!==name)el.textContent=name;}
  const head=document.querySelector('.archive-head');
  if(head){
