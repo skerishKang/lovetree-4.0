@@ -54,7 +54,9 @@ html[data-lt-theme=garden] .shelf-back:hover{background:var(--lt-glass-strong);b
 .turn-why b{display:block;font-size:8px;letter-spacing:.2em;color:#d39ab0;margin-bottom:7px}
 .turn-why span{font:15px/1.5 var(--book-serif);color:#f5e9e3}
 /* Physical flip sheet — front/back paper anchored to center binding */
-.flip-sheet{position:absolute;z-index:55;top:0;width:50%;height:100%;transform-style:preserve-3d;display:none;will-change:transform;filter:drop-shadow(calc((.5 - var(--turn))*24px) 10px 18px rgba(33,23,22,.25))}
+/* #393 3: 넘김 그림자는 매 프레임 filter를 다시 계산하지 않고 — 미리 만든 그림자 층의 opacity만 바꾼다. */
+.flip-sheet{position:absolute;z-index:55;top:0;width:50%;height:100%;transform-style:preserve-3d;display:none;will-change:transform}
+.flip-sheet .flip-shadow{position:absolute;inset:0;pointer-events:none;box-shadow:0 10px 18px rgba(33,23,22,.26);opacity:0}
 .flip-sheet.active{display:block}
 .flip-sheet.next{left:50%;transform-origin:left center}
 .flip-sheet.prev{left:0;transform-origin:right center}
@@ -64,10 +66,19 @@ html[data-lt-theme=garden] .shelf-back:hover{background:var(--lt-glass-strong);b
 .flip-face.back{transform:rotateY(180deg);background-color:var(--paperBack);filter:saturate(.95)}
 .flip-sheet.next .flip-face.back{border-radius:12px 2px 2px 12px}
 .flip-sheet.prev .flip-face.back{border-radius:2px 12px 12px 2px}
-.flip-face:after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(90deg,rgba(68,45,37,calc(var(--turn)*.18)),transparent 28%,rgba(255,255,255,calc((1 - var(--turn))*.12)) 75%,rgba(63,42,35,.12))}
+/* #393 3: 들어 올린 면의 어둠·광도 var() 계산 대신 미리 만든 층의 opacity로만 — 정적 가장자리 그늘만 :after에 남는다. */
+.flip-face:after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(90deg,transparent 75%,rgba(63,42,35,.12))}
+.flip-sheet .flip-shade{position:absolute;inset:0;pointer-events:none;background:linear-gradient(90deg,rgba(68,45,37,.2),transparent 30%);opacity:0}
+.flip-sheet .flip-sheen{position:absolute;inset:0;pointer-events:none;background:linear-gradient(90deg,transparent 62%,rgba(255,255,255,.14) 78%,rgba(63,42,35,.1));opacity:0}
 .flip-sheet.curl{border-radius:4px 18px 18px 4px}
-.flip-sheet.next.curl{clip-path:polygon(calc(var(--turn)*4%) 0,100% 1.5%,calc(100% - var(--turn)*3%) 98.5%,calc(var(--turn)*2%) 100%)}
-.flip-sheet.prev.curl{clip-path:polygon(0 1.5%,calc(100% - var(--turn)*4%) 0,calc(100% - var(--turn)*2%) 100%,0 98.5%)}
+/* #393 3: 휘어짐 clip-path는 var() 계산 대신 고정 형태 — 넘기는 동안 다시 계산하지 않는다. */
+.flip-sheet.next.curl{clip-path:polygon(2% 0,100% 1.5%,97% 98.5%,1% 100%)}
+.flip-sheet.prev.curl{clip-path:polygon(0 1.5%,98% 0,99% 100%,0 98.5%)}
+/* #393 3: 움직임 줄이기 — 종이 넘김 대신 0.35초 교차 페이드. 낡은 펼침 면 전체를 덮고 opacity만 1→0. */
+.flip-sheet.reduced{width:100%;left:0!important;filter:none}
+.flip-sheet.reduced .flip-face{backface-visibility:visible}
+.flip-sheet.reduced .flip-face.back{display:none}
+.reduced-faces{display:grid;grid-template-columns:1fr 1fr;width:100%;height:100%}
 .moment{position:relative;cursor:zoom-in;transition:filter .2s,transform .2s}
 .moment:hover{filter:brightness(1.035)}
 .moment.focused{outline:2px solid rgba(199,110,139,.55);outline-offset:6px;border-radius:5px}

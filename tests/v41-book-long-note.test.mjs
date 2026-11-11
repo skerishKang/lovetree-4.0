@@ -29,7 +29,9 @@ test('#295 화면 연결: 넘침 판정을 페이지 렌더링 때마다 다시 
   // 판정 함수는 렌더 지점마다 다시 실행돼야 페이지를 넘겨도 상태가 따라간다
   assert.ok(BOOK_JS.includes('function markOverflowPages'), 'book.js에 markOverflowPages가 있다');
   assert.ok(/renderArchive\(\);syncLensClone\(\);markOverflowPages\(\);/.test(BOOK_JS), 'renderSpread가 페이지를 다 그린 뒤 판정한다');
-  assert.ok(/mobileSpreadContent\(SPREADS\[turn\.target\]\)\}markOverflowPages\(\)\}/.test(BOOK_JS), '페이지 넘김 중간 그림에도 다시 판정한다');
+  // #393 3: 넘김 중에는 다시 그리지 않는다 — 아래 페이지는 prepareTurn에서 한 번 그리고, 그 직후 판정한다.
+  assert.ok(/mobileSpreadContent\(tar\)\}\s*\n?markOverflowPages\(\);turn\.frontFace=front/.test(BOOK_JS), '넘김 준비에서 아래 페이지를 다 그린 뒤 판정한다(넘기는 동안 재그림 없음)');
+  assert.ok(!/setTurnProgress[\s\S]*markOverflowPages\(\)\}/.test(BOOK_JS.slice(BOOK_JS.indexOf('function setTurnProgress'), BOOK_JS.indexOf('function prepareTurn'))), 'setTurnProgress는 매 프레임 판정하지 않는다');
   // 같은 임계값(4px)을 book.js도 쓴다 — book-usability.mjs의 pageOverflows와 한 값
   assert.ok(BOOK_JS.includes('scrollHeight-el.clientHeight>4'), 'book.js 판정 임계값 4px');
   // 모바일: 넘친 쪽이 현재 쪽일 때만 book-wrap에 세로 스크롤을 허용한다
