@@ -26,7 +26,8 @@ const NETWORK_HTML = readFileSync(new URL('../public/v41/views/track56-network.h
 test('lt41-date-style 고리(2026-11-12 사고)가 다시 생기지 않는다 — 흐름 시험', () => {
   // 셸은 프레임이 뜰 때마다(그리고 1.6초 뒤 한 번 더) 같은 값을 보낸다(shell.mjs onFrameReady).
   assert.match(SHELL, /applyPageTurnToFrame\(frame\);applyDateStyleToFrame\(frame\);/);
-  assert.match(SHELL, /setTimeout\(\(\)=>applyDateStyleToFrame\(frame\),1600\);/);
+  // #481 T6: 반복 전송도 frameReadyMessages 목록으로 돈다.
+  assert.match(SHELL, /for\(const message of ready\.repeats\)setTimeout\(\(\)=>sendToFrame\(frame,message\),1600\);/);
   // 첫 화면은 값이 실제로 바뀌었을 때만 다시 띄운다. "뜰 때마다 보내는 쪽"과 짝이어도 멈춘다.
   assert.match(HOME, /shouldReloadForDateStyle\(\{value:event\.data\.value,rendered:renderedDateStyle,mirror\}\)\)location\.reload\(\)/);
   assert.doesNotMatch(HOME, /type==='lt41-date-style'\)\{location\.reload\(\);\}/);

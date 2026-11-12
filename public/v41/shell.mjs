@@ -13,6 +13,8 @@ import {accountPresentation,treePickerLabel,treePickerText,treeViewsVisible,writ
 import {parseJourneyRoute,journeyRouteDecision} from './first-journey.mjs';
 import {displayTreeTitle} from './tree-name.mjs';
 import {titleView, withoutAutoTitle} from './book-usability.mjs';
+// #481 T6: 프레임에 값을 알리는 배선(보내는 시점·받는 쪽 판정)을 한 모듈에 모은다 — 실행 시험이 이 코드를 그대로 돈다.
+import {frameMessage, frameReadyMessages, FRAME_MESSAGE_TYPES} from './frame-wiring.mjs';
 import {screens,screenForView,viewForFile,themedViewFor} from './shell/navigation.mjs';
 import {createScreens} from './shell/screens.mjs';
 import {createHeader} from './shell/header.mjs';
@@ -41,7 +43,7 @@ function notify(text,options){return shellNotice.notify(text,options);}
 function currentPrefs(){try{return member?.state?.().prefs||{titleDisplay:'both'}}catch{return {titleDisplay:'both'}}}
 function titleDisplayValue(){return normalizeTitleDisplay(currentPrefs().titleDisplay)}
 function paintTitleDisplayControls(){const value=titleDisplayValue();for(const b of document.querySelectorAll('[data-title-display]'))b.setAttribute('aria-checked',String(b.dataset.titleDisplay===value));}
-function postTitleDisplay(){try{$('view').contentWindow.postMessage({type:'lt41-title-display',value:titleDisplayValue()},location.origin)}catch{}}
+function postTitleDisplay(){try{$('view').contentWindow.postMessage(frameMessage('titleDisplay',titleDisplayValue()),location.origin)}catch{}}
 // #481: 화면(iframe)은 그려지는 시점에 계정 값을 모른다. 날짜 표기와 같이 마지막 값을 기기에 함께 둔다 —
 // 받는 쪽은 '지금 그린 값'과 '미러'를 비교해, 다시 뜨면 정말 새 값으로 그려질 때만 다시 띄운다.
 function rememberTitleDisplay(value){try{localStorage.setItem('lt41.titleDisplay',normalizeTitleDisplay(value));}catch{}}
@@ -414,9 +416,13 @@ const shellScreens=createScreens({
     const d=frame.contentDocument;if(!d)return;
     mountConnectionTool(d);applyViewAccessibility(d);shellQuick.mountFrame(d);
     // #368 2차·3차: 새로 열린 화면에 페이지 넘김·날짜 표기 값을 알린다(테마와 같은 시점).
+    // #481 T6: 무엇을 뜰 때마다 보내는지는 frameReadyMessages가 정한다(보내는 시점을 실행 시험으로 고정한다).
+    // 무엇을 뜰 때마다 보내는지는 frameReadyMessages가 정하고, 여기서는 그것을 순서대로 보낸다
+    // (보내는 시점·값·순서를 실행 시험이 같은 함수로 확인한다).
+    const ready=frameReadyMessages({dateStyle:currentDateStyle(),pageTurn:currentPageTurn()==='on'});
     applyPageTurnToFrame(frame);applyDateStyleToFrame(frame);
     // 화면 교대(두 장 앞뒤 바꿈)가 늦게 끝나는 경우를 위해 한 번 더 알린다(같은 값을 또 보내는 건 무해하다).
-    setTimeout(()=>applyDateStyleToFrame(frame),1600);
+    for(const message of ready.repeats)setTimeout(()=>sendToFrame(frame,message),1600);
     d.addEventListener('click',e=>{const b=e.target.closest('button,a');if(!b)return;let file;if(b.matches('[data-action="tree"],[data-menu="tree"]'))file='track32-bookshelf.html';if(b.matches('#storyBook,[data-menu="book"]'))file='track59-sketchbook.html';if(current==='track56-network.html'&&b.id==='openMoment')file='track59-sketchbook.html';if(file){e.preventDefault();e.stopImmediatePropagation();show(file);}},true);
   }
 });
@@ -718,16 +724,22 @@ $('profile-form').onsubmit=event=>{
 // (프레임 문서 속성 + lt41-page-turn 메시지)이다.
 function currentPageTurn(){return readPageTurn(localStorage);}
 function applyPageTurnToFrame(frame){
+ const message=frameMessage('pageTurn',currentPageTurn()==='on');
  try{frame.contentDocument?.documentElement?.setAttribute('data-lt-page-turn',currentPageTurn());}catch{}
- try{frame.contentWindow?.postMessage({type:'lt41-page-turn',value:currentPageTurn()},location.origin);}catch{}
+ sendToFrame(frame,message);
 }
 function paintPageTurnControls(){const value=currentPageTurn();for(const b of document.querySelectorAll('[data-page-turn]'))b.setAttribute('aria-checked',String(b.dataset.pageTurn===value));}
 // #368 3차: 날짜 표기·처음 보여 줄 곳·공유 기본값은 계정(state.prefs), 관계 지도 기본 보기는 이 기기(lt41.network.view — network.js와 같은 키).
 // 날짜 표기는 책·보드·지도·첫 화면이 같은 한 벌(formatDisplayDate)로 따르고, 셸은 프레임 속성+lt41-date-style 메시지로 알린다.
 function currentDateStyle(){try{return normalizeDateStyle(member?.state?.().prefs?.dateStyle)}catch{return 'dot'}}
+function sendToFrame(frame,message){
+ try{frame.contentWindow?.postMessage(message,location.origin);}catch{}
+}
+// #481 T6: 실제로 보내는 값도 frame-wiring 한 곳에서 만든다(시험이 그 목록을 그대로 돈다).
 function applyDateStyleToFrame(frame){
- try{frame.contentDocument?.documentElement?.setAttribute('data-lt-date-style',currentDateStyle());}catch{}
- try{frame.contentWindow?.postMessage({type:'lt41-date-style',value:currentDateStyle()},location.origin);}catch{}
+ const message=frameMessage('dateStyle',currentDateStyle());
+ try{frame.contentDocument?.documentElement?.setAttribute('data-lt-date-style',message.value);}catch{}
+ sendToFrame(frame,message);
 }
 function paintDateStyleControls(){const value=currentDateStyle();for(const b of document.querySelectorAll('[data-date-style]'))b.setAttribute('aria-checked',String(b.dataset.dateStyle===value));}
 for(const b of document.querySelectorAll('[data-date-style]'))b.onclick=()=>{

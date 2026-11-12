@@ -75,7 +75,9 @@ test('첫 화면은 이 판정을 쓰고, 셸은 프레임이 뜰 때마다 값�
   assert.doesNotMatch(HOME, /type==='lt41-date-style'\)\{location\.reload\(\);\}/);
   // 전제: 셸이 프레임 준비 때마다 + 1.6초 뒤 보낸다. 이 전제가 바뀌면 위 흐름 시험도 같이 본다.
   assert.match(SHELL, /applyPageTurnToFrame\(frame\);applyDateStyleToFrame\(frame\);/);
-  assert.match(SHELL, /setTimeout\(\(\)=>applyDateStyleToFrame\(frame\),1600\);/);
+  // #481 T6: 무엇을 뜰 때마다 보내는지는 frameReadyMessages가 정하고, 반복 전송도 그 목록으로 돈다.
+  assert.match(SHELL, /const ready=frameReadyMessages\(\{dateStyle:currentDateStyle\(\),pageTurn:currentPageTurn\(\)==='on'\}\);/);
+  assert.match(SHELL, /for\(const message of ready\.repeats\)setTimeout\(\(\)=>sendToFrame\(frame,message\),1600\);/);
   // 셸은 사용자가 바꿀 때 미러를 먼저 쓰고 알린다(다시 뜬 문서가 새 값으로 그려지는 근거).
   assert.match(SHELL, /localStorage\.setItem\('lt41\.dateStyle',b\.dataset\.dateStyle\)\}catch\{\}\s*\n\s*paintDateStyleControls\(\);for\(const f of frames\(\)\)applyDateStyleToFrame\(f\);/);
 });

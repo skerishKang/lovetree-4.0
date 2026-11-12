@@ -1,8 +1,36 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
 import {createDialogs} from '../public/v41/shell/dialogs.mjs';
 
 // #231 1-B 후속: shell/dialogs.mjs를 직접 호출해 Tab 순환·Esc 복귀·포커스 되돌림을 고정한다.
+
+// index.html의 <dialog> 명부(id + data-lt-panel · data-lt-return)를 그대로 읽는다.
+function dialogsFromHtml(html) {
+  const out = [];
+  let i = 0;
+  while (true) {
+    const at = html.indexOf('<dialog', i);
+    if (at < 0) break;
+    const end = html.indexOf('>', at);
+    if (end < 0) break;
+    const tag = html.slice(at, end + 1);
+    i = end + 1;
+    const id = (tag.match(/\bid="([^"]+)"/) || [])[1];
+    if (!id) continue;
+    const dataset = {};
+    for (const attr of ['lt-panel', 'lt-return']) {
+      const v = (tag.match(new RegExp('data-' + attr + '="([^"]*)"')) || [])[1];
+      if (v !== undefined) dataset[attr.replace(/-([a-z])/g, (_, c) => c.toUpperCase())] = v;
+    }
+    out.push({ id, dataset });
+  }
+  return out;
+}
+
+const HTML = readFileSync(new URL('../public/v41/index.html', import.meta.url), 'utf8');
+const HTML_DIALOGS = dialogsFromHtml(HTML);
+
 
 function fakeElement(props = {}) {
   const el = {
@@ -25,16 +53,9 @@ function fakeElement(props = {}) {
 function setup({focusables = [], popoverHidden = true, treeDirty = false, editorDirty = false, editorBusy = false, connectionDirty = false, quickDirty = false, shareDirty = false} = {}) {
   // #380 4 2차·마지막: 편집기·순간 잇기·설정·보관 파일·공유·둘러보기·빠른 추가·고르기가 공통 틀을 쓴다.
   // #368: 내 기록(records)도 설정으로 옮겨져 공통 틀 밖 대화상자(옛 바깥 클릭 규칙)는 없다.
-  const dialogs = [
-    // #425: 순간 추가는 한 창(write-panel, 가운데)이다 — 고르기 창·빠른 추가·편집기가 하나로 합쳐졌다.
-    fakeElement({id: 'write-panel', dataset: {ltPanel: 'center', ltReturn: 'write-menu'}}),
-    fakeElement({id: 'tree-manager', dataset: {ltPanel: 'center', ltReturn: 'record-menu'}}),
-    fakeElement({id: 'connection-panel', dataset: {ltPanel: 'full'}}),
-    fakeElement({id: 'share-panel', dataset: {ltPanel: 'full', ltReturn: 'share-menu'}}),
-    fakeElement({id: 'account-settings', dataset: {ltPanel: 'full', ltReturn: 'account-avatar'}}),
-    fakeElement({id: 'account-assets', dataset: {ltPanel: 'full', ltReturn: 'account-avatar'}}),
-    fakeElement({id: 'community-panel', dataset: {ltPanel: 'full', ltReturn: 'community-menu'}})
-  ];
+  // #481 T8: 대화상자 명부를 손으로 복제하지 않고 index.html에서 읽는다 — 화면에 창을 더하거나 빼면
+  // 이 시험이 저절로 따라간다(명부가 어긋나 '없는 창'을 시험하던 일이 없어진다).
+  const dialogs = HTML_DIALOGS.map((d) => fakeElement({id: d.id, dataset: d.dataset}));
   const elements = {
     'account-avatar': fakeElement({id: 'account-avatar'}),
     'mobile-more': fakeElement({id: 'mobile-more'}),
@@ -77,7 +98,9 @@ function setup({focusables = [], popoverHidden = true, treeDirty = false, editor
     panelBlocked: id => (id === 'write-panel' && editorBusy ? '파일 전송을 마치거나 취소해 주세요.' : ''),
     notify: message => calls.push('notify:' + message),
   });
-  return {elements, dialogs, keydown, clicks, api, calls};
+  // #481 T8: 순서(index)가 아니라 id로 창을 찾는다 — index.html의 순서가 바뀌어도 시험이 흔들리지 않는다.
+  const byId = (id, bag) => (bag ? bag.dialogs : dialogs).find((d) => d.id === id);
+  return {elements, dialogs, byId, keydown, clicks, api, calls};
 }
 
 function key(extra) {
@@ -87,8 +110,8 @@ function key(extra) {
 
 // #380 4: 공통 틀의 Esc 규칙 — 쓰던 내용이 있으면 한 번 묻고, 아니오를 고르면 닫지 않는다.
 test('트리 관리 Esc: 더러우면 한 번 묻고, 아니오면 열어 둔다', () => {
-  const {dialogs, api} = setup({treeDirty: true});
-  const manager = dialogs[1];
+  const {byId, api} = setup({treeDirty: true});
+  const manager = byId('tree-manager');
   manager.open = true;
   const realConfirm = globalThis.confirm;
   try {
@@ -107,8 +130,8 @@ test('트리 관리 Esc: 더러우면 한 번 묻고, 아니오면 열어 둔다
 });
 
 test('트리 관리 Esc: 깨끗하면 묻지 않고 바로 닫는다', () => {
-  const {dialogs, api} = setup({treeDirty: false});
-  const manager = dialogs[1];
+  const {byId, api} = setup({treeDirty: false});
+  const manager = byId('tree-manager');
   manager.open = true;
   const realConfirm = globalThis.confirm;
   try {
@@ -201,10 +224,10 @@ test('보관 파일도 공통 틀에서 Esc로 닫히고 연 버튼으로 초점
 });
 
 test('바깥 클릭은 대화상자를 닫는다 — 전체 화면 편집기도 공통 틀에서 같은 규칙을 쓴다', () => {
-  const {dialogs, calls, clicks} = setup();
+  const {byId, dialogs, calls, clicks} = setup();
   // #368: 공통 틀 밖 dialog(옛 records 바깥 클릭 규칙)는 없다 — 남는 규칙은 data-lt-panel 한 벌뿐이다.
   assert.ok(dialogs.every(d => d.dataset.ltPanel), '모든 dialog가 공통 틀을 쓴다');
-  const editor = dialogs[0];
+  const editor = byId('write-panel');
   editor.open = true;
   // 깨끗한 편집기는 묻지 않고 닫는다(#380 4 2차: 바깥 클릭도 공통 닫기 규칙).
   editor.listeners.click({target: editor, clientX: 500, clientY: 500});
@@ -217,8 +240,8 @@ test('바깥 클릭은 대화상자를 닫는다 — 전체 화면 편집기도 
 
 // #380 4 2차: 편집기·순간 잇기의 공통 틀 계약 — ng·바깥·Esc 세 길이 모두 같은 확인/차단을 지난다.
 test('편집기 Esc: 쓰던 입력이 있으면 한 번 묻고, 아니오면 열어 둔다', () => {
-  const {dialogs} = setup({editorDirty: true});
-  const editor = dialogs[0];
+  const {byId, dialogs} = setup({editorDirty: true});
+  const editor = byId('write-panel');
   editor.open = true;
   const realConfirm = globalThis.confirm;
   try {
@@ -236,8 +259,8 @@ test('편집기 Esc: 쓰던 입력이 있으면 한 번 묻고, 아니오면 열
 });
 
 test('편집기 바깥 클릭: 더러우면 한 번 묻고, 아니오면 열어 둔다', () => {
-  const {dialogs} = setup({editorDirty: true});
-  const editor = dialogs[0];
+  const {byId, dialogs} = setup({editorDirty: true});
+  const editor = byId('write-panel');
   editor.open = true;
   const realConfirm = globalThis.confirm;
   try {
@@ -254,8 +277,8 @@ test('편집기 바깥 클릭: 더러우면 한 번 묻고, 아니오면 열어 
 });
 
 test('편집기 업로드 중에는 Esc·바깥 클릭·× 모두 닫지 않고 이유를 알린다(편집기 규칙이 이긴다)', () => {
-  const {dialogs, api, calls} = setup({editorDirty: true, editorBusy: true});
-  const editor = dialogs[0];
+  const {byId, dialogs, api, calls} = setup({editorDirty: true, editorBusy: true});
+  const editor = byId('write-panel');
   const realConfirm = globalThis.confirm;
   try {
     let asked = 0;
@@ -276,8 +299,8 @@ test('편집기 업로드 중에는 Esc·바깥 클릭·× 모두 닫지 않고 
 });
 
 test('편집기 ×·취소(requestClose)는 깨끗하면 묻지 않고 닫고 연 버튼으로 초점을 돌린다', async () => {
-  const {dialogs, api} = setup({editorDirty: false});
-  const editor = dialogs[0];
+  const {byId, api} = setup({editorDirty: false});
+  const editor = byId('write-panel');
   const opener = {isConnected: true, getClientRects: () => [{}], focusCount: 0, focus() { this.focusCount += 1; }};
   api.noteOpener('write-panel');
   document.activeElement = opener;
@@ -290,8 +313,8 @@ test('편집기 ×·취소(requestClose)는 깨끗하면 묻지 않고 닫고 �
 });
 
 test('순간 잇기 Esc: 고른 연결이 저장 전이면 한 번 묻는다', () => {
-  const {dialogs} = setup({connectionDirty: true});
-  const connection = dialogs[2];
+  const {byId, dialogs} = setup({connectionDirty: true});
+  const connection = byId('connection-panel');
   connection.open = true;
   const realConfirm = globalThis.confirm;
   try {
@@ -309,7 +332,7 @@ test('순간 잇기 Esc: 고른 연결이 저장 전이면 한 번 묻는다', (
 
 test('빠른 추가 Esc: 주소를 적어 두었으면 한 번 묻고, 비어 있으면 그대로 닫는다', () => {
   const dirty = setup({quickDirty: true});
-  const quick = dirty.dialogs[0]; // write-panel
+  const quick = dirty.byId('write-panel'); // write-panel
   quick.open = true;
   const realConfirm = globalThis.confirm;
   try {
@@ -320,9 +343,8 @@ test('빠른 추가 Esc: 주소를 적어 두었으면 한 번 묻고, 비어 �
     assert.equal(asked, 1, '한 번만 묻는다');
     assert.equal(cancel.prevented, true, '아니오면 열어 둔다');
     assert.equal(quick.open, true);
-
     const clean = setup({quickDirty: false});
-    const cleanQuick = clean.dialogs[0]; // write-panel
+    const cleanQuick = clean.byId('write-panel'); // write-panel
     cleanQuick.open = true;
     globalThis.confirm = () => { throw new Error('깨끗하면 묻지 않는다'); };
     cleanQuick.listeners.cancel({preventDefault() {}});
@@ -331,8 +353,8 @@ test('빠른 추가 Esc: 주소를 적어 두었으면 한 번 묻고, 비어 �
 });
 
 test('공유 Esc: 설정을 바꿔 링크를 아직 만들지 않았으면 한 번 묻는다', () => {
-  const {dialogs} = setup({shareDirty: true});
-  const share = dialogs[3];
+  const {byId, dialogs} = setup({shareDirty: true});
+  const share = byId('share-panel');
   share.open = true;
   const realConfirm = globalThis.confirm;
   try {
@@ -360,8 +382,8 @@ test('설정·둘러보기·고르기 창은 묻지 않고 바로 닫는다', ()
 });
 
 test('패널 모듈이 직접 연 창도 마지막으로 누른 버튼으로 초점을 돌린다(noteOpener 없이)', async () => {
-  const {dialogs, clicks} = setup();
-  const quick = dialogs[0]; // write-panel
+  const {byId, dialogs, clicks} = setup();
+  const quick = byId('write-panel'); // write-panel
   const opener = {isConnected: true, getClientRects: () => [{}], focusCount: 0, focus() { this.focusCount += 1; }};
   // 공통 틀이 적어 두는 "마지막으로 누른 조작 요소" 기록을 흉내 낸다.
   for (const [type, fn] of clicks) if (type === 'click') fn({target: {closest: () => opener}});
@@ -372,13 +394,13 @@ test('패널 모듈이 직접 연 창도 마지막으로 누른 버튼으로 초
 });
 
 test('연 버튼이 모바일 메뉴에 접혀 보이지 않으면 더보기 버튼으로 초점을 돌린다', async () => {
-  const {elements, dialogs} = setup();
+  const {byId, elements, dialogs} = setup();
   // 연 버튼(#community-menu)이 화면에 없고, 더보기 버튼은 보이는 모바일 상태를 흉내 낸다.
   elements['mobile-more'].getClientRects = () => [{}];
   globalThis.document.getElementById = id => (id === 'community-menu'
     ? {isConnected: true, getClientRects: () => [], focusCount: 0, focus() { this.focusCount = (this.focusCount || 0) + 1; }}
     : elements[id] || null);
-  const community = dialogs[6];
+  const community = byId('community-panel');
   community.open = true;
   community.close();
   await new Promise(r => setTimeout(r, 5));
@@ -386,11 +408,11 @@ test('연 버튼이 모바일 메뉴에 접혀 보이지 않으면 더보기 버
 });
 
 test('보이는 연 버튼(data-lt-return)이 있으면 더보기 버튼으로 보내지 않는다', async () => {
-  const {elements, dialogs} = setup();
+  const {byId, elements, dialogs} = setup();
   elements['mobile-more'].getClientRects = () => [{}];
   const fallback = {isConnected: true, getClientRects: () => [{}], focusCount: 0, focus() { this.focusCount += 1; }};
   globalThis.document.getElementById = id => (id === 'community-menu' ? fallback : elements[id] || null);
-  const community = dialogs[6];
+  const community = byId('community-panel');
   community.open = true;
   community.close();
   await new Promise(r => setTimeout(r, 5));
