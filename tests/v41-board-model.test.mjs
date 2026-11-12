@@ -413,7 +413,9 @@ test('#460 화면은 처음 자리·전체 보기·기억을 이 계산으로 �
   assert.match(BOARD, /LT58Model\.startView\(/);
   assert.match(BOARD, /LT58Model\.contentBox\(/);
   assert.match(BOARD, /LT58Model\.rememberView\(/);
-  assert.match(BOARD, /function boardStartView\(\)\{if\(innerWidth<700\)\{fitAll\(false\);return\}/);
+  assert.match(BOARD, /function boardStartView\(\)\{if\(innerWidth<700\)\{fitAll\(false\);viewMode='start';return\}/);
+  // #490: 숨은 프레임(폭 0)에서 한 맞춤은 '전체 보기'가 아니다 — 드러난 뒤 resize가 처음 자리(또는 기억한 자리)를 다시 계산한다.
+  assert.match(BOARD, /function boardResize\(\)\{if\(innerWidth<700\|\|cinema\)return;if\(viewMode==='fit'\)fitAll\(false\);else boardStartView\(\)\}/);
   assert.match(DETAIL, /boardStartView\(\);applyPathHighlight\(\)/);
   assert.match(EXTRAS, /setTimeout\(boardStartView,40\)/);
   assert.match(EXTRAS, /addEventListener\('resize',boardResize\)/);
