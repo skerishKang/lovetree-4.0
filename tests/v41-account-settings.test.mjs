@@ -129,7 +129,8 @@ test('옮겨진 기능 연결: 보관 파일·백업 파일(빈 화면만)·예�
 
 test('설정 입구는 로그인 상태에서만 열리고, 묶음 이름으로 열면 해당 묶음으로 초점을 옮긴다', () => {
   assert.match(shell, /if\(!member\?\.snapshot\(\)\.owned\)\{notify\('로그인한 뒤 설정을 열 수 있어요\.'\);return;\}/);
-  assert.match(shell, /function focusSettingsSection\(section='profile'\)\{[\s\S]*?scrollIntoView\(\{block:'start'\}\)[\s\S]*?heading\.focus\(\{preventScroll:true\}\)/);
+  // #453 C1: 기본은 맨 위에서 열고, 구역을 지정했을 때만 그 묶음으로 내려간다.
+  assert.match(shell, /function focusSettingsSection\(section=''\)\{[\s\S]*?if\(!section\)return;[\s\S]*?scrollIntoView\(\{block:'start'\}\)[\s\S]*?heading\.focus\(\{preventScroll:true\}\)/);
   assert.match(shell, /void openAccountSettings\(\{section:'data'\}\);/);
   assert.match(shell, /paintSettingsProfile\(\);\s*fillProfileForm\(\);\s*paintDateStyleControls\(\);paintStartPlaceControls\(\);paintNetworkViewControls\(\);paintShareControls\(\);\s*void paintSettingsUsage\(\);\s*panel\('account-settings'\);\s*focusSettingsSection\(section\);/);
 });
@@ -167,7 +168,8 @@ test('빈 화면에는 로그아웃 상태에서도 백업 파일 열기와 예�
 test('공지·로그인 만료 안내는 설정 상태 줄 한 벌을 쓴다', () => {
   const notice = read('public/v41/shell/notice.mjs');
   const auth = read('public/v41/shell/auth.mjs');
-  assert.match(notice, /if \(\$\('settings-feedback'\)\) \$\('settings-feedback'\)\.textContent = text;/);
+  // #453 C2: 설정이 닫혀 있을 때 온 안내가 창 안에 쌓이지 않는다(열려 있을 때만 그 줄에 쓴다).
+  assert.match(notice, /if \(\$\('settings-feedback'\) && \$\('account-settings'\)\?\.open\) \$\('settings-feedback'\)\.textContent = text;/);
   assert.match(notice, /\$\('toast'\)\.hidden = !!\$\('account-settings'\)\?\.open;/);
   assert.doesNotMatch(auth, /record-feedback/);
 });

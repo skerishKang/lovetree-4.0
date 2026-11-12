@@ -92,7 +92,11 @@ test('보기 기본값 묶음: 관계 지도 기본 보기(이 기기)만 두고
 
 test('공유 기본값: 공유 창이 처음 열 보기·둘러보기 올림을 설정값으로 시작한다(서버 API 변경 없음)', () => {
   assert.match(html, /id="settings-share-title"[^>]*>공유</);
-  assert.match(html, /data-share-view="book"[^>]*>기억책</);
+  // #453 C5: 설정의 공유 이름은 화면 탭과 같은 말(책·보드·지도)을 쓴다.
+  assert.match(html, /data-share-view="book"[^>]*>책</);
+  assert.match(html, /data-share-view="board"[^>]*>보드</);
+  assert.match(html, /data-share-view="network"[^>]*>지도</);
+  assert.doesNotMatch(html, />기억책</);
   assert.match(html, /data-share-discover="off"[^>]*>기본 꺼짐</);
   assert.match(html, /data-share-discover="on"[^>]*>기본 켬</);
   assert.equal(normalizeShareView(undefined), 'book');
@@ -110,7 +114,8 @@ test('내 데이터: 보관 파일 용량은 보관 파일 창과 같은 값·�
   assert.match(html, /id="settings-usage" class="panel-note" hidden/);
   // private-upload.mjs의 사용량 줄과 같은 형식(usedBytes/quotaBytes · items/maxItems).
   assert.match(read('public/v41/private-upload.mjs'), /\(data\.usedBytes\/1000000\)\.toFixed\(1\)\+' \/ '\+\(data\.quotaBytes\/1000000\)\+' MB · '\+data\.items\.length\+' \/ '\+data\.maxItems\+'개'/);
-  assert.match(shell, /async function paintSettingsUsage\(\)\{[\s\S]*?accountApi\.listMedia\(\)[\s\S]*?\(data\.usedBytes\/1000000\)\.toFixed\(1\)\+' \/ '\+\(data\.quotaBytes\/1000000\)\+' MB · '\+data\.items\.length\+' \/ '\+data\.maxItems\+'개'/);
+  // #453 C4: 설정 용량은 '0 MB / 105 MB 사용 · n / 200개'로 읽힌다(보관 파일 창과 같은 값).
+  assert.match(shell, /async function paintSettingsUsage\(\)\{[\s\S]*?accountApi\.listMedia\(\)[\s\S]*?Math\.round\(data\.usedBytes\/1000000\)\+' MB \/ '\+Math\.round\(data\.quotaBytes\/1000000\)\+' MB 사용 · '\+data\.items\.length\+' \/ '\+data\.maxItems\+'개'/);
   assert.match(shell, /void paintSettingsUsage\(\);/);
 });
 

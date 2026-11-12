@@ -24,14 +24,16 @@ test('상태 안내: 토스트·설정 상태 줄에 함께 뜨고 숨김 타이
   const h = harness();
   assert.equal(h.notifier.notify('내 기록을 불러왔어요.'), true);
   assert.equal(h.els['toast'].textContent, '내 기록을 불러왔어요.');
-  assert.equal(h.els['settings-feedback'].textContent, '내 기록을 불러왔어요.');
+  // #453 C2: 설정이 닫혀 있을 때 온 안내는 창 안 줄에 쌓이지 않는다.
+  assert.equal(h.els['settings-feedback'].textContent, '', '닫힌 설정 창에는 쓰지 않는다');
   assert.equal(h.els['toast'].hidden, false);
   assert.equal(h.timers.length, 1);
   assert.equal(h.timers[0].ms, NOTICE_HIDE_MS);
 
   h.els['account-settings'].open = true;
-  assert.equal(h.notifier.notify('기록 창이 열려 있으면 토스트는 숨는다'), true);
-  assert.equal(h.els['toast'].hidden, true);
+  assert.equal(h.notifier.notify('설정 창이 열려 있을 때의 안내'), true);
+  assert.equal(h.els['settings-feedback'].textContent, '설정 창이 열려 있을 때의 안내');
+  assert.equal(h.els['toast'].hidden, true, '설정이 열려 있으면 토스트는 숨는다');
   assert.equal(h.timers[0].cleared, true, '이전 숨김 타이머를 지운다');
   h.timers[1].fn();
   assert.equal(h.els['toast'].hidden, true);
@@ -39,6 +41,7 @@ test('상태 안내: 토스트·설정 상태 줄에 함께 뜨고 숨김 타이
 
 test('담기 안내 우선: hold 동안 상태 안내가 와도 덮지 않고, hold가 지나면 다시 보인다(#353 후속)', () => {
   const h = harness();
+  h.els['account-settings'].open = true;
   assert.equal(h.notifier.notify('모아둔 순간에 담았어요', { hold: true }), true);
   h.advance(2000);
   assert.equal(h.notifier.notify('서버에 저장됐어요.'), false, 'hold 동안 상태 안내는 미룬다');
@@ -58,6 +61,7 @@ test('중복·로그인 필요 안내도 같은 규칙으로 지켜진다', () =
   assert.equal(dup.els['toast'].textContent, '이미 모아둔 순간에 있는 주소예요.');
 
   const retry = harness();
+  retry.els['account-settings'].open = true;
   assert.equal(retry.notifier.notify('로그인한 뒤 다시 공유해 주세요.', { hold: true }), true);
   retry.advance(1000);
   assert.equal(retry.notifier.notify('로그인이 필요해요.'), false, '재시도 안내가 상태 안내에 덮이지 않는다');
