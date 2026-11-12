@@ -26,7 +26,7 @@ function headerHarness(tree) {
   };
   const saved = {document: globalThis.document, sessionStorage: globalThis.sessionStorage};
   globalThis.sessionStorage = {getItem: () => null, setItem() {}, removeItem() {}};
-  globalThis.document = {querySelectorAll: () => []};
+  globalThis.document = {querySelectorAll: () => [], body: { classList: { add() {}, remove() {}, toggle() {}, contains: () => false }, dataset: {} } };
   globalThis.window = globalThis;
   globalThis.LT41 = tree ? {tree} : null;
   const header = createHeader({

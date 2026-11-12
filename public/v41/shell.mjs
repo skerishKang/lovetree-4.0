@@ -68,16 +68,17 @@ const treePopover=$('tree-popover'),treeTrigger=$('record-menu');
 function closeMore(){moreMenu.classList.remove('is-open');moreMenu.hidden=true;moreButton.setAttribute('aria-expanded','false');}
 function buildFoldMenu(){
  moreMenu.replaceChildren();
- const add=(label,click)=>{const b=document.createElement('button');b.type='button';b.setAttribute('role','menuitem');b.textContent=label;b.onclick=()=>{closeMore();click()};moreMenu.append(b)};
+ const add=(label,click,mark)=>{const b=document.createElement('button');b.type='button';b.setAttribute('role','menuitem');b.textContent=label;if(mark)b.setAttribute('aria-current','true');b.onclick=()=>{closeMore();click()};moreMenu.append(b)};
  // #380 2번: 접기 메뉴도 맨 위 메뉴와 같은 구조 — 첫 화면(로고)·둘러보기 · 책·보드·지도 · 내 트리 전체 보기 · 순간 추가.
- add('첫 화면',()=>document.querySelector('.brand').click());
+ // #458: 지금 보고 있는 화면 항목에 aria-current를 남긴다(메뉴를 열 때마다 다시 만들어 지금 상태를 반영한다).
+ add('첫 화면',()=>document.querySelector('.brand').click(),current==='src064-orbit.html');
  add('둘러보기',()=>$('community-menu').click());
  if(window.LT41){
-  add('책',()=>document.querySelector('.tree-views [data-view="track59-sketchbook.html"]').click());
-  add('보드',()=>document.querySelector('.tree-views [data-view="track58-pinboard.html"]').click());
-  add('지도',()=>document.querySelector('.tree-views [data-view="track56-network.html"]').click());
+  add('책',()=>document.querySelector('.tree-views [data-view="track59-sketchbook.html"]').click(),current==='track59-sketchbook.html');
+  add('보드',()=>document.querySelector('.tree-views [data-view="track58-pinboard.html"]').click(),current==='track58-pinboard.html');
+  add('지도',()=>document.querySelector('.tree-views [data-view="track56-network.html"]').click(),current==='track56-network.html');
  }
- add('내 트리 전체 보기',()=>{member?.snapshot().owned?show('track32-bookshelf.html'):openLoginStart('shelf')});
+ add('내 트리 전체 보기',()=>{member?.snapshot().owned?show('track32-bookshelf.html'):openLoginStart('shelf')},current==='track32-bookshelf.html');
  if(!$('write-menu').hidden)add('＋ 순간 추가',()=>$('write-menu').click());
 }
 const escHTML=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -150,6 +151,8 @@ document.addEventListener('keydown',event=>{
  if(event.key==='Escape'&&!moreMenu.hidden){closeMore();moreButton.focus();}
 });
 addEventListener('resize',()=>{if(matchMedia('(min-width:781px)').matches)closeMore();});
+// #458: 화상 키보드가 올라오면(시각 창이 눌리면) 떠 있는 단추가 입력 칸을 가리지 않게 숨긴다.
+if(window.visualViewport){const fabKbd=()=>document.body.classList.toggle('lt-kbd',window.visualViewport.height<window.innerHeight-120);window.visualViewport.addEventListener('resize',fabKbd);fabKbd();}
 document.addEventListener('keydown',event=>{
  const c=$('community-panel');
  // #380 4 마지막: 둘러보기도 공통 틀의 닫기 규칙(×·바같 클릭·Esc·초점 복귀)을 쓴다.
@@ -223,6 +226,8 @@ const shellQuick=createQuickAdd({
   mountUpload:mountPrivateUpload
 });
 $('write-menu').onclick=()=>{if(source!=='server'&&member?.snapshot().owned){void resumeMember('write');return;}shellQuick.openWrite();};
+// #458: 모바일 떠 있는 ＋ 단추 — 헤더의 ＋ 순간 추가와 같은 길(같은 창)을 연다. 단추는 body.lt-fab-ok일 때만 보인다.
+$('mobile-add').addEventListener('click',()=>$('write-menu').click());
 // 빠른 담기 입구: 붙여넣기 + 공유 시트 진입(판정·추적은 ../quick-intake.mjs 한 벌).
 const shellIntake=createQuickIntake({
   getMember:()=>member,
@@ -414,7 +419,10 @@ const shellScreens=createScreens({
   links,
   onFrameReady:frame=>{
     const d=frame.contentDocument;if(!d)return;
-    mountConnectionTool(d);applyViewAccessibility(d);shellQuick.mountFrame(d);
+    mountConnectionTool(d);applyViewAccessibility(d);shellQuick.mountFrame(d);watchFrameSheet(frame);
+    /* 이슈 458: 모바일(781px 미만)에서는 셸의 ＋ 단추가 오른쪽 아래에 뜬다 — 첫 화면 궤도가 그 자리를 비끼게
+       프레임 html에 표시를 남긴다(궤도 쪽 좁은 화면 배치가 이 표시를 읽는다). */
+    if(matchMedia('(max-width:780px)').matches)d.documentElement.dataset.ltFab='1';else delete d.documentElement.dataset.ltFab;
     // #368 2차·3차: 새로 열린 화면에 페이지 넘김·날짜 표기 값을 알린다(테마와 같은 시점).
     // #481 T6: 무엇을 뜰 때마다 보내는지는 frameReadyMessages가 정한다(보내는 시점을 실행 시험으로 고정한다).
     // 무엇을 뜰 때마다 보내는지는 frameReadyMessages가 정하고, 여기서는 그것을 순서대로 보낸다
@@ -429,6 +437,25 @@ const shellScreens=createScreens({
     d.addEventListener('click',e=>{const b=e.target.closest('button,a');if(!b)return;let file;if(b.matches('[data-action="tree"],[data-menu="tree"]'))file='track32-bookshelf.html';if(b.matches('#storyBook,[data-menu="book"]'))file='track59-sketchbook.html';if(current==='track56-network.html'&&b.id==='openMoment')file='track59-sketchbook.html';if(file){e.preventDefault();e.stopImmediatePropagation();show(file);}},true);
   }
 });
+// 이슈 458: 화면 안의 아래쪽 큰 창(지도 상세 #detail·책 링크 창 #linkModal)이 열림/닫힘을 셸이 알아채
+// body.lt-sheet-open에 옮긴다 — 떠 있는 ＋ 단추는 창이 열려 있는 동안 숨는다(shell.css).
+const sheetObservers=new Map();
+function watchFrameSheet(frame){
+  const d=frame.contentDocument;if(!d)return;
+  const old=sheetObservers.get(frame);if(old){old.disconnect();sheetObservers.delete(frame);}
+  // 지도 상세(#detail)·책 순간 자세(#detail)·책 링크 창(#linkModal) — 아래쪽을 덮는 창은 화면마다 이름이 같아도 다르다.
+  const els=['detail','linkModal'].map(id=>d.getElementById(id)).filter(Boolean);
+  if(!els.length)return;
+  // 지금 보이는 장(#view)의 창 상태만을 반영한다 — 옛 장이 about:blank로 바뀌며 load가 걸려도 흔들리지 않는다.
+  const sync=()=>{const cur=[...document.querySelectorAll('iframe')].find(f=>f.id==='view');
+    const doc=cur&&cur.contentDocument;
+    const open=!!doc&&['detail','linkModal'].some(id=>{const el=doc.getElementById(id);return !!el&&el.classList.contains('open');});
+    document.body.classList.toggle('lt-sheet-open',open);};
+  const observer=new MutationObserver(sync);
+  for(const el of els)observer.observe(el,{attributes:true,attributeFilter:['class']});
+  sheetObservers.set(frame,observer);
+  sync();
+}
 function frames(){return shellScreens.frames();}
 function hideFrames(){return shellScreens.hideFrames();}
 function showInFrame(url,title){return shellScreens.showInFrame(url,title);}
