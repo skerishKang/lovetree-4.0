@@ -2,6 +2,16 @@
 
 > **main 보호 규칙(2026-11-09, 룰셋 "main 보호 (PR·필수 검사)")**: main은 PR로만 바꾼다(직접 푸시·force push·삭제 금지, 관리자도 예외 없음 — 비상시 대표가 룰셋 enforcement를 잠깐 끈다). 필수 검사: `check (ubuntu-latest)`·`check (windows-latest)`·`미리보기 postdeploy(로그아웃)` — 셋 다 paths 필터가 없어 문서만 바뀐 PR에서도 항상 돈다. 승인 수 0(레인이 스스로 머지). Deploy Bundle Boot Test는 paths 필터가 있어 필수에 넣지 않았다.
 
+## 2026-11-12 — #366 관계 지도 다듬기: 안내 한 줄·연결 이유·키보드·길 강조 (로컬2, ai/local2-lt-366-map-261112, main 1d309f2→55aadb2 병합 기준)
+
+- 점검(둘 다 보기 × 1440/390 × 밤/정원 × 로그아웃(예시)/로그인, 실측 209항목): 7항목 중 ② 첫 순간 강조(크게·금빛 후광·"여기서 시작"·자리 고정)·⑤ 동심원(첫 순간 가운데, 바깥으로 단계)·⑥ 보기 버튼과 기억(`lt41.network.view`)·⑦ 배치 한 벌(`LT56Model.networkLayout`·`concentricLayout`·`originPath`·`relationText`)은 이미 됨. ①·③·④는 안 됨/일부여서 고쳤다.
+- ① 안내 한 줄: 첫 로드에 부팅 코드가 `centerOn`(자동 맞춤)을 불러 `.hero`("첫 순간에서 어떻게 이어졌는지 보는 지도예요")가 opacity 0.07로 흐려졌다 — 자동 맞춤만 뺐다(선택은 그대로 두어 길 강조·상세는 이전과 같다).
+- ③ 연결 이유: 화면이 `LTDEMO.edges`를 그래프로 옮길 때 `reason`을 버려 툴팁이 늘 비어 있었다(부모 선 5개 중 이유 0개) — 옮길 때 `reason`을 함께 넘긴다. 그리고 동심원처럼 선이 짧은 배치에서는 선 위에 정확히 올리기 어려워 노드가 먼저 잡히므로, **순간에 올리거나 눌러도 그 순간으로 들어온 선의 이유**를 띄운다(같은 `edges`·`relationText` 한 벌, 이유가 비면 표시 생략). 캔버스에 `tabindex="0"`·`aria-describedby="mapKbHint"`(sr-only 안내)·툴팁을 `role="status" aria-live="polite"`로 바꾸고 초점 테두리를 더했다. 키보드: Esc(풀기)·Home/End·방향키(순간 이동, 감싸 돎)·Enter/Space(그 순간 열기) — 이동할 때마다 들어온 선의 이유를 툴팁과 낭독기로 함께 알린다. 키보드는 `scheduleDraw` 한 번만 쓴다(#346 유휴 rAF 0 유지).
+- ④ 지나온 길: 두 보기가 같은 `originPath`·`pathEmphasis` 한 벌을 쓴다는 계약을 시험으로 고정(동심원에서도 밝은 노드·선 수가 경로와 정확히 일치). 구현 변경은 없다.
+- 시험: `npm test` 1214건 1177 pass/0 fail/37 skip(main #443 병합 후), `npm run build` pass, `node tools/v41-modulepreload.mjs --check` exit 0. 신규 `tests/v41-map-366-261112.test.mjs` 5건(① 자동 맞춤 없음·③ reason 전달/호버·터치·순간 위 이유·키보드/낭독, ④ 같은 계산 한 벌, 유휴 rAF 0).
+- 실측(.tmp-366, dist 단독 + `window.LT41` 6순간 주입, 크롬 1회·4249 포트, try/finally): **209/209** — 2보기 × 1440/390 × 밤/정원 × 로그아웃/로그인마다 ① 안내 opacity 1·문구 일치 ② 첫 순간 r 10>나머지 ③ 마우스(선 위/순간 위)·누름(터치)·키보드(Home→m1, →→m2, 이유 표시, Enter로 열림) ④ 밝은 노드·선 수=경로 길이(3선 모두 부모) ⑤ 첫 순간 중심·단계 3 ⑥ 버튼 aria-pressed·기억 ⑦ 모델 함수 한 벌, 가로 넘침 0·유휴 rAF 0·페이지 오류 0.
+- 남은 것: 없음. 나무형 보기는 이슈에 적힌 대로 "나중에"(이번에 하지 않음).
+
 ## 2026-11-12 — #426 첫 화면 "마지막 순간"을 YouTube 썸네일 카드로 (로컬2, ai/local2-lt-426-recent-261112, main 41d97c6→a2c8d7c 병합 기준)
 
 - 무엇: 로그인 첫 화면 제목 아래 두 줄 안내("마지막 순간 「…」 · N일 전")를 최근 순간 카드 한 장으로 바꿨다. `src/views/orbit.js`의 `recentMarkup` — 썸네일 크게(16:9·세로 9:16), 아래 "마지막 순간 · N일 전"·한 줄 제목·"트리 이름 · 이어 보기 →", 테두리·이중선·금빛 번짐은 궤도의 금빛 내 카드(`.card.mine`)와 같은 토큰. 데이터원은 순간 목록 한 벌(`momentList.entries[0]`, 최신순·트리 이름 포함) — 궤도가 예시 모드(섞어서·사진 3장 미만)여도 순간만 있으면 카드가 나오고, 로그아웃은 momentList가 없어 카드가 없다. 썸네일은 공용 모듈(#435) 그대로(thumbFallbackAttrs·fallbackCardMarkup·needsFallbackCard) — 지워진 영상은 글 카드·최소 카드로 내려간다. ▶를 누르면 그때만 embed iframe(autoplay, book-usability `embedUrl`)을 만들고, 다시 누르면 정지(썸네일 복귀·▶/■·aria-label 재생/정지). 첫 화면이 열릴 때는 플레이어 요청 0건(썸네일 그림만). 카드 본문 클릭·Enter·Space는 그 순간 열기(궤도 카드와 같은 onOpen→lt41-open-book 경로), ▶ 클릭은 stopPropagation으로 분리. "이어 보던 순간" 버튼은 뺐다 — 로그인 후 버튼은 [＋ 순간 추가·둘러보기] 두 개(home-center LABELS/KEYS·header-state homeCenterState·applyHomeCenter는 남는 자리 hidden), home.js의 resume 배선 제거, 둘째 줄은 안내 한 줄만(label이 null이면 br·문구를 아예 붙이지 않게 고침 — append(null) 버그 함께 수정). 사진은 ▶ 없는 사진 카드, 글은 글 카드, 순간이 없으면 카드 없음(기존 첫 순간 안내·버튼 흐름 그대로).
