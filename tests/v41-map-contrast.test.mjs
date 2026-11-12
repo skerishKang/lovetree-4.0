@@ -6,7 +6,7 @@ import { createReadStream, existsSync } from 'node:fs';
 import { stat, mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { installMapPaintProbe, measureMap, worstMapRoles } from './helpers/map-contrast.mjs';
+import { installMapPaintProbe, measureMap, worstMapRoles, settleMap } from './helpers/map-contrast.mjs';
 
 const ROOT = path.resolve(process.env.LT_MAP_CONTRAST_ROOT || fileURLToPath(new URL('../public', import.meta.url)));
 const REQUIRE = process.env.LT_MAP_CONTRAST_REQUIRE === '1';
@@ -51,18 +51,18 @@ test('지도 실제 대비: 앱 2 × 판 2 × 1440·390, 두 보기·선택 상�
         await page.waitForTimeout(500);
         const results = [];
         for (const view of ['network', 'concentric']) {
-          if (view === 'concentric') { await frame.locator('#viewConc').click(); await page.waitForTimeout(120); }
+          if (view === 'concentric') { await frame.locator('#viewConc').click(); await settleMap(frame); }
           for (const state of view === 'network' ? ['overview', 'focus', 'cluster'] : ['overview', 'focus']) {
             if (state === 'focus') {
               const dot = await frame.evaluate(() => window.__lt.dots().find(d => !d.first));
               await frame.locator('#stage').click({ position: { x: dot.x, y: dot.y } });
-              await page.waitForTimeout(180);
+              await settleMap(frame);
               assert.ok(await frame.locator('#detail').evaluate(el => el.classList.contains('open')), '점을 누르면 상세가 열려야 함');
             }
             if (state === 'cluster') {
               const hub = await frame.evaluate(() => window.__lt.hubs()[0]);
               await frame.locator('#stage').click({ position: { x: hub.x, y: hub.y } });
-              await page.waitForTimeout(120);
+              await settleMap(frame);
               assert.equal(await frame.evaluate(() => window.__lt.state.mode), 'CLUSTER_PATH_OVERVIEW', '묶음을 누르면 묶음 보기');
               await frame.waitForFunction(() => performance.now() - window.__lt.state.revealStart > 1700);
             }
@@ -75,8 +75,8 @@ test('지도 실제 대비: 앱 2 × 판 2 × 1440·390, 두 보기·선택 상�
             for (const row of measured.dom) if (row.ratio < 4.5) failures.push(`${tag} DOM ${row.role}(${row.id}) ${row.fg}/${row.bg} ${row.ratio}:1 < 4.5`);
             evidence.push({ tag, canvas: measured.canvas, dom: measured.dom });
             if (OUT) await writeFile(path.join(OUT, `${tag}.png`), measured.screenshot);
-            if (state === 'focus') { await frame.locator('#detailClose').click(); await frame.locator('#overviewBtn').click(); await page.waitForTimeout(100); }
-            if (state === 'cluster') { await frame.locator('#overviewBtn').click(); await page.waitForTimeout(100); }
+            if (state === 'focus') { await frame.locator('#detailClose').click(); await frame.locator('#overviewBtn').click(); await settleMap(frame); }
+            if (state === 'cluster') { await frame.locator('#overviewBtn').click(); await settleMap(frame); }
           }
         }
         const worst = worstMapRoles(results), canvasRoles = new Set(worst.filter(r => r.kind === 'canvas').map(r => r.role)), domRoles = new Set(worst.filter(r => r.kind === 'dom').map(r => r.role));

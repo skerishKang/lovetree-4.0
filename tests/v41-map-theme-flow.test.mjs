@@ -2,6 +2,7 @@
 // 계정 입구는 열지 않는다. 설정 dialog만 showModal()로 드러낸 뒤 실제 선택 단추를 누른다.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { settleMap } from './helpers/map-contrast.mjs';
 import { createServer } from 'node:http';
 import { createReadStream, existsSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
@@ -107,6 +108,7 @@ async function assertIdle(frame, page, plate) {
 }
 
 async function clickMapObject(frame, kind) {
+  await settleMap(frame); // 연출이 끝난 좌표를 읽는다(느린 CI에서 클릭이 빗나갔다)
   const point = await frame.evaluate(kind => {
     const candidates = kind === 'hub' ? window.__lt.hubs() : window.__lt.dots().filter(n => !n.first);
     return candidates.find(n => document.elementFromPoint(n.x, n.y)?.id === 'stage');

@@ -212,3 +212,21 @@ export function worstMapRoles(results) {
   }
   return [...map.values()];
 }
+
+
+// 지도 화면이 멈출 때까지 기다린다(확대·이동 연출이 끝나 점·묶음 좌표가 연속 3번 같을 때).
+// 고정 대기(100~180ms)는 느린 CI에서 연출이 끝나기 전에 좌표를 읽어 클릭이 빗나가거나 캡처가 비었다(2026-11-13 간헐 실패).
+export async function settleMap(frame, { timeout = 6000, gap = 90 } = {}) {
+  const snap = () => frame.evaluate(() => {
+    const lt = window.__lt; if (!lt) return '';
+    const pts = [...(lt.hubs?.() || []), ...(lt.dots?.() || [])];
+    return pts.map(n => `${Math.round(n.x * 2)},${Math.round(n.y * 2)}`).join('|') + '#' + (lt.state?.mode || '');
+  });
+  const start = Date.now(); let prev = await snap(), same = 0;
+  while (Date.now() - start < timeout) {
+    await new Promise(r => setTimeout(r, gap));
+    const cur = await snap();
+    if (cur && cur === prev) { if (++same >= 3) return true; } else { same = 0; prev = cur; }
+  }
+  return false;
+}
