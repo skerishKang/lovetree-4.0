@@ -364,6 +364,8 @@ const shellDialogs=createDialogs({
   isShareDirty:()=>{const create=$('share-create');return $('share-panel').open&&!!create&&!create.disabled&&$('share-created').hidden;},
   // #368 2차: 설정의 프로필 폼은 쓰다 만 이름·색이 있으면 공통 틀이 한 번 묻는다. 다른 설정 항목은 누르는 즉시 적용되어 더러움이 없다.
   isSettingsDirty:()=>profileDirty(),
+  // #480 M8: 정리 창 — 새 트리 이름을 적었거나 순간 고름·옮길 트리가 열 때와 달라졌으면 한 번 묻는다.
+  isCleanupDirty:()=>shellCleanup.dirty(),
   // 편집기 규칙이 공통 틀보다 우선한다: 업로드 중에는 Esc·바깥 클릭·× 모두 닫지 않고 이유를 알린다.
   // 빠른 추가의 사진 올리기도 같은 규칙을 쓴다(업로드가 끝나면 곧바로 담기므로 중간에 닫으면 사라진다).
   panelBlocked:id=>id==='write-panel'&&(uploads.busy||shellQuick.uploads?.busy)?'파일 전송을 마치거나 취소해 주세요.':'',

@@ -29,6 +29,8 @@ export function createCleanup(deps) {
   function headerAvailable() {
     return cleanupAvailable({ source: getSource(), owned: !!getMember()?.snapshot().owned, tree: window.LT41?.tree || null });
   }
+  // #480 M8: 창을 연 순간의 상태(새 트리 이름·순간 고름·옮길 트리). 닫을 때 물을지 판정하는 기준이다.
+  let baseState = { picked: '', name: '', target: '' };
   function openAvailable() {
     return moveAvailable({ source: getSource(), owned: !!getMember()?.snapshot().owned }) && writable();
   }
@@ -44,6 +46,9 @@ export function createCleanup(deps) {
     renderTargets(tree);
     $('cleanup-new-name').value = '';
     $('cleanup-error').textContent = '';
+    // #480 M8: 창을 열 때의 상태를 기억한다. 순간 상세에서 '옮기기'로 열면 그 순간이 미리 골라져 있고
+    // 대상 트리가 처음부터 골라져 있는데, 그것까지 '쓰다 만 입력'으로 세면 열자마자 닫을 때도 묻는다.
+    baseState = readState();
     sync();
     panel('cleanup-panel');
     return true;
@@ -145,6 +150,19 @@ export function createCleanup(deps) {
   function pickedIds() {
     return [...$('cleanup-moments').querySelectorAll('input:checked')].map(box => box.value);
   }
+  // #480 M8: 쓰다 만 입력 = 창을 열 때와 달라진 것. 새 트리 이름을 적었거나, 순간 고름이 바뀌었거나,
+  // 옮길 트리를 바꿨을 때다. 이름 칸만 보면 미리 골라진 순간을 놓치고, 고름만 보면 이름을 놓친다.
+  function readState() {
+    return {
+      picked: pickedIds().slice().sort().join(','),
+      name: $('cleanup-new-name').value.trim(),
+      target: $('cleanup-target')?.value || ''
+    };
+  }
+  function dirty() {
+    const now = readState();
+    return now.picked !== baseState.picked || now.name !== baseState.name || now.target !== baseState.target;
+  }
   function sync() {
     const target = $('cleanup-target');
     const state = cleanupState({
@@ -187,6 +205,8 @@ export function createCleanup(deps) {
   }
   // 적용 뒤 셸은 결과 트리로 옮겨 간다(member-session 규칙). 정리 흐름에서는 원래 트리에 머문다(트리가 남아 있을 때).
   function finish({ treeId, targetLabel, isNew }) {
+    // #480 M8: 일을 마쳤으니 '쓰다 만 입력'을 지운다 — 여기서 닫을 때는 묻지 않는다.
+    baseState = readState();
     $('cleanup-panel').close();
     const stillThere = getTrees().some(t => t.id === fromTreeId);
     if (stillThere && window.LT41?.tree?.id !== fromTreeId) choose(fromTreeId);
@@ -212,5 +232,5 @@ export function createCleanup(deps) {
   $('cleanup-target').addEventListener('change', sync);
   $('cleanup-create').addEventListener('click', onCreate);
   $('cleanup-move').addEventListener('click', onMove);
-  return { open, sync, headerAvailable, hideMoveNotice, pickerLabel };
+  return { open, sync, dirty, headerAvailable, hideMoveNotice, pickerLabel };
 }
