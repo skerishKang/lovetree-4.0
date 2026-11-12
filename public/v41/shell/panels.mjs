@@ -44,8 +44,26 @@ export function createPanels(deps) {
   // #453 B: ＋ 순간 추가(쉬운 추가)로 연 창은 자세한 폼의 기준값이 없었다. 탭을 처음 보일 때 기본값을 한 번 채우고
   // 그 상태를 기준값으로 삼아, 아무것도 안 바꿨으면 닫을 때 묻지 않는다.
   function startQuickSession() {
+    // #462: ＋ 순간 추가는 늘 새 순간이다. 직전에 '이 순간 수정'으로 연 상태(제목 '순간 수정'·그 순간의 값·
+    // 수정 전용 묶음)가 남아, 자세한 추가에서 저장하면 그 순간을 고쳐 버리던 것을 여기서 비운다.
+    if (editorMode === 'edit') resetToAdd();
     formBaseline = '';
     parentBaseline = parentValue();
+  }
+  function resetToAdd() {
+    editorMode = 'add';
+    parentChoice = '';
+    getUploads()?.reset?.();
+    $('moment-form').reset();
+    $('write-panel-title').textContent = '순간 추가';
+    $('write-eyebrow').textContent = '순간 남기기';
+    $('relation-label').hidden = false;
+    $('moment-management').hidden = true;
+    $('parent-management').hidden = true;
+    $('more-fields').open = false;
+    $('editor-context').textContent = '';
+    $('form-error').textContent = '';
+    updateMediaPreview(); updateQuickEntryHint();
   }
   function onWriteTab(tab) {
     if (tab !== 'detailed' || formBaseline) return;
@@ -233,7 +251,8 @@ export function createPanels(deps) {
   let editorVideoUrl = '';
   function updateMediaPreview() {
     const form = $('moment-form'), url = form.elements.url.value, info = LTMedia.describe(url);
-    $('url-media-hint').textContent = info.kind === 'none' ? '사진·영상은 직접 HTTPS 링크를 사용할 수 있어요. YouTube와 일반 링크도 지원해요. 사진·영상 파일도 직접 첨부할 수 있어요.' : info.kind === 'invalid' ? '링크 형식을 확인해 주세요.' : info.label;
+    // #462: 주소가 비었을 때의 긴 안내는 칸 이름·파일 고르기와 같은 말이라 비운다(주소를 넣으면 종류·형식만 알린다).
+    $('url-media-hint').textContent = info.kind === 'none' ? '' : info.kind === 'invalid' ? '링크 형식을 확인해 주세요.' : info.label;
     $('url-media-preview').innerHTML = url ? LTMedia.markup(url, form.elements.title.value) : '';
     // #344: 미리보기 때 서버 oEmbed 프록시로 영상 제목을 받아 둔다(실패는 조용히). 저장 시 mediaMetadata.title로 함께 넘긴다.
     editorVideoTitle = '';
