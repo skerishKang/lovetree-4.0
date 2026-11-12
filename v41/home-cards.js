@@ -63,7 +63,7 @@ export function homeCardsPlan({mode, loggedIn = false, context = null, popular =
       kind: cards.length ? 'mine' : 'mine-empty',
       cards,
       examples: 0,
-      note: cards.length ? '' : '아직 남긴 순간이 없어요 · 첫 순간 남기기',
+      note: cards.length ? '' : '아직 남긴 순간이 없어요 · 첫 순간 추가',
     };
   }
   // mix: 사진·영상 순간이 3장 미만이면 내 카드를 올리지 않고 예시만 보여 준다.

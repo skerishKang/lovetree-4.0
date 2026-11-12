@@ -56,7 +56,7 @@ export function createPanels(deps) {
     getUploads()?.reset?.();
     $('moment-form').reset();
     $('write-panel-title').textContent = '순간 추가';
-    $('write-eyebrow').textContent = '순간 남기기';
+    $('write-eyebrow').textContent = '순간 추가';
     $('relation-label').hidden = false;
     $('moment-management').hidden = true;
     $('parent-management').hidden = true;
@@ -86,7 +86,7 @@ export function createPanels(deps) {
       && new URLSearchParams(new FormData($('tree-form'))).toString() !== treeBaseline;
   }
 
-  // 2026-11-08 기억책 오른쪽 페이지 '다음 순간 남기기': 부모가 될 순간을 지정해 편집기를 연다.
+  // 2026-11-08 책 오른쪽 페이지 '다음 순간 추가': 부모가 될 순간을 지정해 편집기를 연다.
   // 선택 순간을 부모로 쓰는 기존 경로(선택 순간 + '순간 추가')와 같은 저장 계약이며, 부모만 명시한다.
   let parentChoice = '';
   function setEditorMode(mode, parentId = '') {
@@ -107,7 +107,7 @@ export function createPanels(deps) {
     editorMode = mode;
     // #425: 같은 창이다. 더하기는 위쪽 탭 [쉬운 추가 | 자세한 추가]가 있고, 수정은 탭 없이 제목만 '순간 수정'.
     $('write-panel-title').textContent = mode === 'edit' ? '순간 수정' : '순간 추가';
-    $('write-eyebrow').textContent = mode === 'edit' ? '나의 순간' : '순간 남기기';
+    $('write-eyebrow').textContent = mode === 'edit' ? '나의 순간' : '순간 추가';
     dwrite.setTabsVisible(mode !== 'edit');
     if (mode !== 'edit') dwrite.show('detailed');
     const form = $('moment-form');
@@ -349,7 +349,7 @@ export function createPanels(deps) {
   };
   // #380 4: 트리 관리 Esc·바깥 클릭 닫기와 "저장하지 않고 닫을까요?" 확인은 shell/dialogs.mjs 공통 틀이 맡는다.
   // × 버튼(data-close)은 shell.mjs의 기존 규칙(바쁠 때·바뀐 값이 있으면 확인)을 그대로 쓴다.
-  // '순간 남기기'는 이제 shell/quick-add.mjs가 고르기 창을 연다(#빠른 추가 ②). 이 파일은 편집기만 맡는다.
+  // '순간 추가'는 이제 shell/quick-add.mjs가 고르기 창을 연다(#빠른 추가 ②). 이 파일은 편집기만 맡는다.
 
   for (const name of ['title', 'note', 'url']) $('moment-form').elements[name].addEventListener('input', () => { if (name === 'url' || name === 'title') updateMediaPreview(); updateQuickEntryHint(); });
   $('moment-form').onsubmit = e => {

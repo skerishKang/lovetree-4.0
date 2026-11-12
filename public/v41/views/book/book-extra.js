@@ -1,4 +1,4 @@
-// 2026-11-08 기억책 사용성 1~9 화면 보조. 데이터·저장 계약은 그대로 두고 표시만 바꾼다.
+// 2026-11-08 책 사용성 1~9 화면 보조. 데이터·저장 계약은 그대로 두고 표시만 바꾼다.
 import {displayTitle,withoutAutoTitle,titleParts,mediaSourceText,editAffordances,embedUrl,connectionLine,readLens,writeLens,detailPlacement,nextMomentMessage,NEXT_PAGE_COPY,NEXT_PAGE_ACTION,treeTitleText,isPrimaryButton,tapIntent,createOverflowRejudge,titleView,formatDisplayDate} from '/v41/book-usability.mjs';
 import {coverChoice,COVER_PALETTE} from '/v41/views/shelf/shelf-model.mjs';
 import {coverMomentFor} from '/v41/views/shelf/shelf-model.mjs';
@@ -24,7 +24,7 @@ const t=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt
 let lensPref=readLens(window.localStorage);
 try{lensOn=lensPref}catch{}
 function paintLensButton(){const b=$b('#lensBtn');if(!b)return;b.classList.toggle('active',lensPref);b.textContent=lensPref?'돋보기 켜짐':'돋보기';b.setAttribute('aria-pressed',String(lensPref))}
-/* 4. '다음 순간 남기기': 이 순간을 부모로 기존 순간 추가 편집기를 연다. */
+/* 4. '다음 순간 추가': 이 순간을 부모로 기존 순간 추가 편집기를 연다. */
 function requestNextMoment(parentId){
  if(!parentId)return;
  // #315: 공유 감상은 쓰기를 열지 않는다(버튼이 남아도 메시지를 보내지 않는다).

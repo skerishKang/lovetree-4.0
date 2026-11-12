@@ -85,11 +85,11 @@ test('3. 1440·390에서 페이지 안 스크롤이 없다', () => {
 
 test('4. 오른쪽 빈 페이지는 다음 순간 안내 + 현재 순간을 부모로 여는 단추', () => {
   assert.equal(NEXT_PAGE_COPY, '이 순간 다음 이야기를 남겨 보세요');
-  assert.equal(NEXT_PAGE_ACTION, '다음 순간 남기기');
+  assert.equal(NEXT_PAGE_ACTION, '다음 순간 추가');
   assert.deepEqual(nextMomentMessage('m01'), {type: 'lt41-write', mode: 'add', parentId: 'm01'});
   for (const path of VIEWS) {
     const src = html[path];
-    assert.ok(src.includes('data-next-moment'), path + ': 다음 순간 남기기 단추');
+    assert.ok(src.includes('data-next-moment'), path + ': 다음 순간 추가 단추');
     assert.ok(src.includes('nextMomentMessage('), path + ': 부모 순간을 함께 보낸다');
     assert.ok(src.includes("type:'lt41-select'"), path + ': 편집기가 이 순간을 기준으로 열린다');
   }

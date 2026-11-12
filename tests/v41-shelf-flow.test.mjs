@@ -276,7 +276,7 @@ test('새 책을 만들면 이어 읽기 칸을 다시 그린다 · 검색으로
   // 검색으로 레일이 좁아져도(0권) 칸은 전체 책 기준이라 그대로다
   el('#searchInput').value = '찾을 수 없는 책 이름';
   el('#searchInput').dispatch('input', { target: el('#searchInput') });
-  assert.equal(el('#resultCount').textContent, '0권');
+  assert.equal(el('#resultCount').textContent, '트리 0개');
   assert.equal(el('#resumeCard').dataset.resumeKind, 'resume', '검색으로 좁아져도 칸은 바뀌지 않는다');
   assert.match(title(), /^지난번 /);
 });
