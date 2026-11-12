@@ -12,15 +12,6 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const BROWSER_CHANNEL = process.env.LOVETREE_POSTDEPLOY_BROWSER === 'chromium' ? undefined : 'chrome';
 
 const TOOL_VERSION = '0.1.2';
-// 보기 메뉴의 기대 항목은 제품 함수에서 계산한다(로그아웃 5 · 로그인 7).
-// 도구를 저장소 밖에서 단독 실행하면 파일이 없을 수 있으므로 실패하면 숫자 기대값으로 돌아간다.
-let viewMenuItems = null;
-try {
-  ({ viewMenuItems } = await import(new URL('../../v41/home-view-menu.js', import.meta.url).href));
-} catch {
-  viewMenuItems = null;
-}
-
 // 테마 기대값도 제품 함수에서 계산한다(#238·#242 방식). 화면별 목록을 도구에 박지 않는다.
 // 도구를 저장소 밖에서 단독 실행하면 파일이 없을 수 있으므로 그때만 안전한 기본값(밤)으로 물러난다.
 let appliedTheme = null;
@@ -918,7 +909,9 @@ async function checkScreenSettings(page, target, opts, stamp) {
   // #380 5번: 첫 화면 오른쪽 위 "보기 ▾" 메뉴(테마·움직임·카드 출처)를 없앴다.
   //  - 로그아웃: 오른쪽 위 작은 ◐ 하나만 남고, 누르면 밤↔정원이 바뀐다(설정 입구가 없기 때문).
   //  - 로그인: 같은 항목이 설정 창의 "화면" 묶음에 있다(테마 2 · 움직임 1 · 제목 3 · 첫 화면 카드 4).
-  // 기대 항목 수는 제품 함수 viewMenuItems 로 계산해 숫자를 두 번 적지 않는다.
+  // #366 뒤로 "화면" 묶음은 테마·움직임·제목·페이지 넘김·날짜 표기·처음 보여 줄 곳·첫 화면 카드 7행이다.
+  // 예전에는 보기 메뉴 항목 수로 기대값을 만들었는데, 설정 묶음이 늘 때마다 어긋났다 — 화면에 있는 행 이름을 그대로 센다.
+  const SCREEN_SETTINGS_ROWS = ['테마', '움직임', '제목', '페이지 넘김', '날짜 표기', '처음 보여 줄 곳', '첫 화면 카드'];
   const problems = [];
   const base = new URL(target.href);
   const readOnce = () => page.evaluate(() => {
@@ -936,6 +929,7 @@ async function checkScreenSettings(page, target, opts, stamp) {
       toolButtons: sh ? [...sh.querySelectorAll('.top-actions > button')].filter((b) => b.getClientRects().length > 0).map((b) => b.textContent.trim()) : [],
       settingsOpen: !!box?.open,
       settingsTheme: labels('[data-set-theme]'),
+      settingsRows: box ? [...box.querySelectorAll('#account-settings-screen .settings-row .settings-label')].map((el) => el.textContent.trim()) : [],
       settingsTitle: labels('[data-title-display]'),
       settingsCards: labels('[data-home-cards]'),
       settingsMotion: !!document.getElementById('settings-motion'),
@@ -951,10 +945,6 @@ async function checkScreenSettings(page, target, opts, stamp) {
       last = await readOnce();
     }
     return last;
-  };
-  const expected = (loggedIn) => {
-    if (!viewMenuItems) return { count: loggedIn ? 7 : 5, source: 'fallback' };
-    return { count: viewMenuItems({ loggedIn }).length, source: 'v41/home-view-menu.js' };
   };
   for (const [width, height] of [[1440, 900], [390, 844]]) {
     await page.setViewportSize({ width, height }).catch(() => {});
@@ -982,10 +972,10 @@ async function checkScreenSettings(page, target, opts, stamp) {
       await page.click('#account-open-settings', { timeout: opts.timeout }).catch((error) => problems.push(`${width}: 설정 열기 실패 ${error.message}`));
       await sleep(600);
       const panel = await read();
-      const count = (panel?.settingsTheme?.length || 0) + (panel?.settingsMotion ? 1 : 0) + (panel?.settingsTitle?.length || 0) + (panel?.settingsCards?.length || 0);
-      const want = expected(true);
+      const rows = panel?.settingsRows || [];
       if (!panel?.settingsOpen) problems.push(`${width}: 설정 창이 열리지 않음`);
-      if (count !== want.count) problems.push(`${width}: 설정 "화면" 항목 ${count}개 (기대 ${want.count}${want.source === 'fallback' ? ' · 제품 함수 없음' : ''})`);
+      for (const label of SCREEN_SETTINGS_ROWS) if (!rows.includes(label)) problems.push(`${width}: 설정 "화면"에 "${label}" 행이 없음 ${JSON.stringify(rows)}`);
+      if (rows.length !== SCREEN_SETTINGS_ROWS.length) problems.push(`${width}: 설정 "화면" 항목 ${rows.length}개 (기대 ${SCREEN_SETTINGS_ROWS.length}) ${JSON.stringify(rows)}`);
       for (const label of ['밤', '정원']) if (!panel?.settingsTheme?.includes(label)) problems.push(`${width}: 설정에 테마 "${label}" 없음 ${JSON.stringify(panel?.settingsTheme)}`);
       for (const label of ['예시', '인기', '내 것만', '섞어서']) if (!panel?.settingsCards?.includes(label)) problems.push(`${width}: 설정에 카드 "${label}" 없음 ${JSON.stringify(panel?.settingsCards)}`);
       if ((panel?.settingsOverflow || 0) > 1) problems.push(`${width}: 설정 창 가로 넘침 ${panel.settingsOverflow}px`);
