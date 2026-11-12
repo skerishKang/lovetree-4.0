@@ -1,7 +1,7 @@
 import '../src/styles.css';
 import {mountOrbit,ORBIT_EXAMPLE} from '../src/views/orbit.js';
 import {homeCardsPlan,readHomeCardsMode} from './home-cards.js';
-import {HOME_ORBIT_LIMIT} from './home-moments.js';
+import {HOME_ORBIT_LIMIT, ltDateStyle} from './home-moments.js';
 import {fetchPopularCards} from './home-popular.js';
 import {createHomeActions} from './home-actions.js';
 import {homePresentation} from './home-presentation.js';
@@ -39,6 +39,7 @@ const momentList=loggedIn?{
  empty:cardsPlan.kind==='mine-empty',
  momentList,
  titleDisplay:readTitleDisplay(parent.LT41),
+ dateStyle:ltDateStyle(),
  onOpen:card=>{if(card.source==='public'){parent.location.hash=`#share/${card.shareId}/${card.view||'book'}`;return;}bridge.actions.openMine(card.treeId,card.id);},
  storage:{getItem:()=>null,setItem:()=>{}},context:{...presentation.context,readOnly:cardsPlan.kind==='example'},
  authHtml:`<button class="menuBtn auth-entry" data-home-account>${presentation.accountLabel}</button>`,actions:bridge.actions
@@ -125,6 +126,8 @@ addEventListener('message',event=>{
  const type=event.data?.type;
  if(type==='lt41-motion'){orbit?.motion?.set?.(!!event.data.paused);}
  else if(type==='lt41-home-cards'){location.reload();}
+ // #441 후속: 날짜 표기도 책·보드·지도처럼 열린 채 바로 반영한다(궤도는 셸 iframe이라 다시 그려야 한다).
+ else if(type==='lt41-date-style'){location.reload();}
 });
 if(!loggedIn){
  const topActions=shadow.querySelector('.top-actions');
