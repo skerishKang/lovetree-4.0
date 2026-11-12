@@ -27,3 +27,16 @@ test('#465 5: 둘러보기 안내를 사람 말로 — 0개면 아직 없다는 
   assert.doesNotMatch(community, /공개 허용된 트리/);
   assert.doesNotMatch(community, /인기·추천 순위가 아니에요/);
 });
+
+test('#465 2: 설정 "움직임"은 켬/끔 스위치(role=switch)와 설명 한 줄을 가진다', () => {
+  const html = read('public/v41/index.html');
+  assert.match(html, /<button type="button" role="switch" id="settings-motion" aria-checked="true" aria-describedby="settings-motion-desc">켬<\/button>/);
+  assert.match(html, /id="settings-motion-desc">카드 움직임을 멈추거나 다시 재생해요/);
+  const shell = read('public/v41/shell.mjs');
+  assert.match(shell, /motion\.setAttribute\('aria-checked',String\(!motionPaused\)\)/);
+  assert.match(shell, /motion\.textContent=motionPaused\?'끔':'켬';/);
+  // 프레임 알림(첫 화면 카드 멈춤)은 기존 배선을 그대로 쓴다 — 새로운 reload 유발 코드 없다.
+  assert.match(shell, /postMessage\(\{type:'lt41-motion',paused:motionPaused\},location\.origin\)/);
+  assert.match(read('public/v41/shell.css'), /\.settings-choice button\[role=switch\]\{min-width:76px;justify-content:center\}/);
+});
+

@@ -671,7 +671,8 @@ $('settings-assets-open').onclick=()=>openAssets($('settings-assets-open'));
   const tab=readWriteTab(localStorage);
   for(const b of document.querySelectorAll('[data-write-tab]'))b.setAttribute('aria-checked',String(b.dataset.writeTab===tab));
   const motion=$('settings-motion');
-  if(motion){motion.setAttribute('aria-pressed',String(motionPaused));motion.textContent=motionPaused?'켜기':'멈추기';}
+  // #465 2: 움직임은 켬/끔 스위치(role=switch) — 켬(기본, aria-checked=true)·끔(멈춤)으로 상태가 보인다.
+ if(motion){motion.setAttribute('aria-checked',String(!motionPaused));motion.textContent=motionPaused?'끔':'켬';}
  }
  for(const b of document.querySelectorAll('[data-home-cards]'))b.onclick=()=>{
   if(!HOME_CARD_MODES.includes(b.dataset.homeCards))return;
