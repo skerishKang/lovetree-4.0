@@ -12,7 +12,7 @@ function setBoardTheme(theme){
   const v=theme==='night'?'night':'paper';
   document.documentElement.setAttribute('data-lt-board-theme',v);
   for(const k of ['rose','violet','cyan','amber'])colors[k]=ltVar('--lt-thread-'+k,colors[k]);
-  document.querySelectorAll('button[data-board-theme]').forEach(b=>b.setAttribute('aria-checked',String(b.dataset.boardTheme===v)));
+  document.querySelectorAll('button[data-board-theme]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.boardTheme===v)));
   // 처음 부를 때는 아직 moments·connections가 없다(let 선언 전) — 첫 그림이 위 colors로 그려진다.
   try{document.querySelectorAll('#threadLayer .threadGroup').forEach(g=>{const c=connections.find(x=>x.id===g.dataset.cid);if(c)g.querySelectorAll('path[stroke]').forEach(p=>p.setAttribute('stroke',colors[c.color]))})}catch{}
   try{document.querySelectorAll('#cardLayer .card[data-id]').forEach(el=>{const m=moments.find(x=>x.id===el.dataset.id);if(m){el.style.setProperty('--pin',colors[m.color]);el.style.setProperty('--halo',colors[m.color]+'55')}})}catch{}
