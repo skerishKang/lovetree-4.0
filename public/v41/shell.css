@@ -271,7 +271,6 @@ html[data-v41-screen=book] .tools .ui-btn::after,html[data-v41-screen=board] hea
 .settings-choice{display:flex;flex-wrap:wrap;gap:6px;min-width:0}
 .settings-choice button{min-height:34px;padding:0 12px;border:1px solid var(--lt-line);border-radius:9px;background:rgba(255,255,255,.04);color:var(--lt-pearl);font-size:13px}
 .settings-choice button[aria-checked="true"],.settings-choice button[aria-pressed="true"]{background:var(--lt-primary);color:var(--lt-primary-ink);border-color:var(--lt-primary)}
-html[data-lt-theme="garden"] .settings-choice button[aria-checked="true"],html[data-lt-theme="garden"] .settings-choice button[aria-pressed="true"]{background:var(--lt-primary);color:var(--lt-primary-ink)}
 #tree-cover-moment-box{margin:12px 0 0}
 #tree-cover-moment-box[hidden]{display:none}
 #tree-photo-cover{display:flex;align-items:center;gap:10px;margin:16px 0 0;padding:10px 12px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-card);background:rgba(255,230,166,.07);font-size:13px;line-height:1.6;color:var(--lt-pearl)}
