@@ -11,7 +11,7 @@ const BOARD = fs.readFileSync(new URL('../public/v41/views/board/board.js', impo
 const EXTRAS = fs.readFileSync(new URL('../public/v41/views/board/board-extras.js', import.meta.url), 'utf8');
 
 test('0. 보드 한 벌: 화면이 부르는 함수가 전부 있다', () => {
-  assert.deepEqual(Object.keys(M).sort(), ['cardPosition', 'cinemaBeats', 'collectPath', 'cursorEffectAllowed', 'cursorHover', 'cursorMode', 'cursorPresence', 'cursorScale', 'decorationMotion', 'detailButtonState', 'editGuard', 'escapeHTML', 'filterVisible', 'fitZoom', 'maxCreatedOrder', 'nextConnections', 'removeConnection', 'threadPath', 'threadRedrawStep', 'treeSpread']);
+  assert.deepEqual(Object.keys(M).sort(), ['boardSize', 'cardPosition', 'cinemaBeats', 'clampView', 'collectPath', 'contentBox', 'cursorEffectAllowed', 'cursorHover', 'cursorMode', 'cursorPresence', 'cursorScale', 'decorationMotion', 'detailButtonState', 'editGuard', 'escapeHTML', 'filterVisible', 'fitBox', 'fitZoom', 'maxCreatedOrder', 'nextConnections', 'rememberView', 'removeConnection', 'savedView', 'startView', 'threadPath', 'threadRedrawStep', 'treeSpread', 'visibleCards']);
   for (const fn of Object.keys(M)) assert.equal(typeof M[fn], 'function', fn);
 });
 
@@ -329,4 +329,114 @@ test('처음 배치(#395): 첫 순간은 왼쪽, 이어진 순간은 오른쪽�
   // 이어진 선이 없어도(전부 따로) 모두 자리를 받고 겹치지 않는다.
   const flat = M.treeSpread(ids, []);
   assert.equal(flat.size, 14);
+});
+
+// #460 컴퓨터에서 보드를 읽을 수 있는 크기로 연다.
+const chain = (n) => Array.from({ length: n }, (_, i) => ({ id: 'm' + i, x: 150 + i * 300, y: 150, w: 242, h: 300 }));
+const grid = (n) => Array.from({ length: n }, (_, i) => ({ id: 'm' + i, x: 150 + (i % 7) * 300, y: 150 + Math.floor(i / 7) * 420, w: 242, h: 300 }));
+const VP1440 = { w: 1440, h: 834 }, SAFE1440 = { x: 244, y: 12, w: 810, h: 810 };
+const onScreen = (v, c) => ({ x: c.x * v.z + v.x, y: c.y * v.z + v.y, w: c.w * v.z, h: c.h * v.z });
+const inside = (r, a) => r.x >= a.x - 0.5 && r.y >= a.y - 0.5 && r.x + r.w <= a.x + a.w + 0.5 && r.y + r.h <= a.y + a.h + 0.5;
+
+test('#460 카드 묶음 사각형과 맞춤: 실제 순간이 있는 곳만 기준으로 한다', () => {
+  assert.equal(M.contentBox([]), null);
+  assert.deepEqual(M.contentBox([{ x: 100, y: 200, w: 242, h: 300 }, { x: 700, y: 200, w: 242, h: 300 }]), { x: 60, y: 160, w: 922, h: 380 });
+  const v = M.fitBox({ x: 0, y: 0, w: 1000, h: 500 }, { x: 0, y: 0, w: 500, h: 500 }, 1);
+  assert.equal(v.z, 0.5);
+  assert.equal(v.y, 125); // 세로 가운데
+  assert.equal(M.fitBox({ x: 0, y: 0, w: 100, h: 100 }, { x: 0, y: 0, w: 1000, h: 1000 }, 0.92).z, 0.92);
+});
+
+test('#460 처음 열 때(1440): 많은 트리는 0.8배(제목 12.8px)로 그 순간 근처, 적은 트리는 한눈에', () => {
+  for (const n of [15, 40]) {
+    const cards = grid(n);
+    const v = M.startView({ viewport: VP1440, safe: SAFE1440, cards, focusId: 'm0' });
+    assert.equal(v.mode, 'focus');
+    assert.equal(v.z, 0.8);
+    assert.ok(16 * v.z >= 12, '카드 제목 12px 이상');
+    assert.ok(inside(onScreen(v, cards[0]), SAFE1440), '첫 순간이 도구·상세 창에 가리지 않는다');
+    assert.ok(M.visibleCards(v, SAFE1440, cards) >= 6, '보이는 칸에 여러 장');
+    // 판(흰 판)이 화면을 채운다: 위·아래·오른쪽 빈 띠 없음(왼쪽은 도구 창 뒤).
+    assert.ok(48 * v.z + v.y <= 0 && 2152 * v.z + v.y >= VP1440.h && 2352 * v.z + v.x >= VP1440.w);
+  }
+  for (const n of [1, 3]) {
+    const cards = chain(n);
+    const v = M.startView({ viewport: VP1440, safe: SAFE1440, cards, focusId: 'm0' });
+    assert.equal(v.mode, 'fit');
+    assert.ok(v.z >= 0.8 && v.z <= 1, `${n}개: ${v.z}`);
+    for (const c of cards) assert.ok(inside(onScreen(v, c), SAFE1440), `${n}개 모두 보인다`);
+  }
+  // 마지막으로 보던 순간(가운데쯤)이 있으면 그 근처를 연다.
+  const cards = grid(40);
+  const v = M.startView({ viewport: VP1440, safe: SAFE1440, cards, focusId: 'm24' });
+  assert.ok(inside(onScreen(v, cards[24]), SAFE1440));
+  // 세기 증명: 예전 전체 맞춤(무대 2400x2200)은 33%라 제목이 6px도 안 됐다.
+  assert.ok(16 * M.fitZoom(1440, 834) < 6);
+});
+
+test('#460 처음 열 때(1024·순간 없음): 좁아도 그 순간은 보이고, 순간이 없으면 무대 전체', () => {
+  const safe = { x: 244, y: 12, w: 394, h: 676 };
+  const cards = chain(5);
+  const v = M.startView({ viewport: { w: 1024, h: 700 }, safe, cards, focusId: 'm0' });
+  assert.equal(v.z, 0.8);
+  assert.ok(inside(onScreen(v, cards[0]), safe));
+  const e = M.startView({ viewport: VP1440, safe: SAFE1440, cards: [] });
+  assert.equal(e.mode, 'empty');
+  assert.equal(e.z, M.fitZoom(1440, 834));
+});
+
+test('#460 판 채우기: 판이 칸보다 크면 빈 곳이 드러나지 않게 밀고, 작으면 그대로 둔다', () => {
+  const rect = { x: 0, y: 0, w: 1000, h: 1000 }, area = { x: 0, y: 0, w: 500, h: 500 };
+  assert.deepEqual(M.clampView({ z: 1, x: 100, y: -900 }, rect, area), { z: 1, x: 0, y: -500 });
+  assert.deepEqual(M.clampView({ z: 0.2, x: 100, y: 50 }, rect, area), { z: 0.2, x: 100, y: 50 });
+});
+
+test('#460 보던 자리 기억: 트리별로 남기고, 최근 20개만, 이상한 값은 버린다', () => {
+  let all = {};
+  for (let i = 0; i < 25; i++) all = M.rememberView(all, 't' + i, { cx: 100.4, cy: 200.6, z: 0.8333 }, i);
+  assert.equal(Object.keys(all).length, 20);
+  assert.ok(!('t0' in all) && 't24' in all);
+  assert.deepEqual(all.t24, { cx: 100, cy: 201, z: 0.833, t: 24 });
+  assert.deepEqual(M.savedView(all.t24), { cx: 100, cy: 201, z: 0.833 });
+  assert.equal(M.savedView(null), null);
+  assert.equal(M.savedView({ cx: 1, cy: 2, z: 9 }), null);
+  assert.equal(M.savedView({ cx: 'a', cy: 2, z: 1 }), null);
+  // 같은 트리를 다시 쓰면 한 개로 남는다.
+  all = M.rememberView(all, 't24', { cx: 5, cy: 6, z: 1 }, 99);
+  assert.equal(Object.keys(all).length, 20);
+  assert.deepEqual(M.savedView(all.t24), { cx: 5, cy: 6, z: 1 });
+  assert.equal(M.visibleCards({ z: 1, x: 0, y: 0 }, { x: 0, y: 0, w: 500, h: 500 }, chain(5)), 2);
+});
+
+test('#460 화면은 처음 자리·전체 보기·기억을 이 계산으로 하고, 휴대폰(700 미만)은 그대로 둔다', () => {
+  const DETAIL = fs.readFileSync(new URL('../public/v41/views/board/board-detail.js', import.meta.url), 'utf8');
+  assert.match(BOARD, /LT58Model\.startView\(/);
+  assert.match(BOARD, /LT58Model\.contentBox\(/);
+  assert.match(BOARD, /LT58Model\.rememberView\(/);
+  assert.match(BOARD, /function boardStartView\(\)\{if\(innerWidth<700\)\{fitAll\(false\);return\}/);
+  assert.match(DETAIL, /boardStartView\(\);applyPathHighlight\(\)/);
+  assert.match(EXTRAS, /setTimeout\(boardStartView,40\)/);
+  assert.match(EXTRAS, /addEventListener\('resize',boardResize\)/);
+  // 저장소는 try로 감싼다(사생활 창·차단에서도 화면은 뜬다).
+  assert.match(BOARD, /function readBoardView\(\)\{[^\n]*try\{/);
+  assert.match(BOARD, /function writeBoardView\(v\)\{[^\n]*try\{/);
+  // 확대 단추는 화면 가운데 기준.
+  assert.match(BOARD, /\$\('#plusBtn'\)\.onclick=\(\)=>zoomAtCenter\(/);
+});
+
+test('#460 판 크기: 순간이 기본 무대 아래까지 놓이면 판을 늘려 카드가 판 밖에 떨어지지 않는다', () => {
+  assert.deepEqual(M.boardSize([]), { w: 2400, h: 2200 });
+  assert.deepEqual(M.boardSize(grid(15)), { w: 2400, h: 2200 });
+  // 예시 트리처럼 아래로 길게 펼쳐진 경우(세로 5610까지)
+  assert.deepEqual(M.boardSize([{ x: 150, y: 5610, w: 242, h: 300 }, { x: 1950, y: 360, w: 242, h: 300 }]), { w: 2400, h: 6100 });
+  const cards = [...grid(7), { id: 'far', x: 150, y: 5610, w: 242, h: 300 }];
+  const world = M.boardSize(cards);
+  const v = M.startView({ viewport: VP1440, safe: SAFE1440, cards, world, focusId: 'm0' });
+  assert.ok(2 * 48 + 0 <= world.h && (world.h - 48) * v.z + v.y >= VP1440.h, '판이 아래까지 채운다');
+});
+
+test('#460 상세 창이 열릴 때 초점은 옮기되 화면(.app)은 굴리지 않는다', () => {
+  const a11y = fs.readFileSync(new URL('../public/v41/view-a11y.mjs', import.meta.url), 'utf8');
+  assert.match(a11y, /\(focusables\(el\)\[0\] \|\| el\)\.focus\?\.\(\{ preventScroll: true \}\)/);
+  assert.match(a11y, /entry\.opener\.focus\?\.\(\{ preventScroll: true \}\)/);
 });

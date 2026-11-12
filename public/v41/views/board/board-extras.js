@@ -1,9 +1,9 @@
-window.addEventListener('resize',()=>fitAll(false));
+window.addEventListener('resize',boardResize);
 
 renderCards();
 renderThreads();
 formFor(addType);
-setTimeout(()=>fitAll(false),40);
+setTimeout(boardStartView,40);
 setTimeout(()=>toast('순간을 선택해 연결된 기록을 살펴보세요.'),900);
 
 window.__LT58={moments,connections,get state(){return{moments:moments.length,connections:connections.length,view:{...view},selected,cinema}},fitAll,startCinema,selectMoment,addDemo:(type='photo')=>{addType=type;
@@ -74,7 +74,7 @@ function updateDetailButtons(m,ins,outs){const st=LT58Model.detailButtonState(in
 let editBtn=[...$('#detail').querySelectorAll('button')].find(b=>b.textContent.trim()==='편집');if(editBtn)editBtn.id='editMomentBtn';
 /* #315: 공유 감상은 쓰기·편집 도구(순간 꽂기·되돌리기·편집)를 렌더하지 않는다. */
 if(LTDEMO.readOnly){if(editBtn)editBtn.hidden=true;for(const id of ['addBtn','undoBtn']){const b=document.getElementById(id);if(b)b.hidden=true;}}let prevBtn=document.createElement('button');prevBtn.className='miniBtn';prevBtn.id='prevMoment';prevBtn.textContent='이전 순간 보기';$('#openMoment').before(prevBtn);let startBtn=document.createElement('button');startBtn.className='miniBtn';startBtn.id='startPathHere';startBtn.textContent='이 순간에서 경로 시작';$('#nextMoment').after(startBtn);let cinHere=document.createElement('button');cinHere.className='miniBtn';cinHere.id='cinemaFromMoment';cinHere.textContent='이 순간부터 시네마 보기';$('#nextMoment').after(cinHere);
-function focusBoardMoment(id,open=true){let m=moments.find(x=>x.id===id),el=cardLayer.querySelector(`[data-id="${id}"]`);if(!m||!el)return;let cx=m.x+el.offsetWidth/2,cy=m.y+el.offsetHeight/2,vw=viewport.clientWidth,vh=viewport.clientHeight;view.z=Math.min(vw<700?1.0:1.06,1.15);view.x=vw/2-cx*view.z;view.y=vw<700?156-m.y*view.z:vh/2-cy*view.z;applyView(open);if(!open)LTDEMO.select(id);selectMoment(id,open)}
+function focusBoardMoment(id,open=true){let m=moments.find(x=>x.id===id),el=cardLayer.querySelector(`[data-id="${id}"]`);if(!m||!el)return;let cx=m.x+el.offsetWidth/2,cy=m.y+el.offsetHeight/2,vw=viewport.clientWidth,vh=viewport.clientHeight;view.z=Math.min(vw<700?1.0:1.06,1.15);view.x=vw/2-cx*view.z;view.y=vw<700?156-m.y*view.z:vh/2-cy*view.z;applyView(open);noteUserView();if(!open)LTDEMO.select(id);selectMoment(id,open)}
 function pulseConnection(c,after){let g=threadLayer.querySelector(`[data-cid="${c.id}"]`);if(!g){after?.();return}g.classList.add('selectedPath');let p=g.querySelector('.threadColor');animateHotTip(p,760).then(()=>{setTimeout(()=>g.classList.remove('selectedPath'),600);after?.()})}
 function moveViaConnection(c){$('#nextChooser').classList.remove('open');pulseConnection(c,()=>focusBoardMoment(c.b))}
 let chooserOrigin=null;function chooseNext(dir='next'){chooserOrigin=dir==='next'?$('#nextMoment'):$('#prevMoment');$('#nextChooserTitle').textContent=dir==='next'?'다음 경로 선택':'이전 경로 선택';let list=LT58Model.nextConnections(dir,selected,connections);if(!list.length)return toast(dir==='next'?'다음으로 연결된 순간이 없어요.':'이전으로 연결된 순간이 없어요.');if(list.length===1){let c=list[0];if(dir==='next')moveViaConnection(c);else{pulseConnection(c,()=>focusBoardMoment(c.a))}return}let box=$('#nextChoices');box.innerHTML=list.map(c=>{let target=dir==='next'?moments.find(m=>m.id===c.b):moments.find(m=>m.id===c.a);return `<button class="routeChoice" data-cid="${c.id}" data-dir="${dir}">${esc(titleMain(target))}<small>${esc(c.why)}</small></button>`}).join('');$('#nextChooser').classList.add('open')}

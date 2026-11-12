@@ -146,6 +146,6 @@
 
   /* Wire overwritten handlers and render actual YouTube source. */
   $('#editMomentBtn').onclick=openEdit;$('#editSave').onclick=saveEdit;$('#confirmAdd').onclick=()=>confirmAdd();
-  renderCards();renderThreads();updateKeywordFilter();formFor(addType);fitAll(false);applyPathHighlight();setTimeout(()=>{if(innerWidth<700){focusBoardMoment(LTDEMO.get(),false);$('#detail').classList.remove('open');}else selectMoment(LTDEMO.get(),true)},100);
+  renderCards();renderThreads();updateKeywordFilter();formFor(addType);boardStartView();applyPathHighlight();setTimeout(()=>{if(innerWidth<700){focusBoardMoment(LTDEMO.get(),false);$('#detail').classList.remove('open');}else selectMoment(LTDEMO.get(),true)},100);
   window.__LT58V12={...window.__LT58V11,ytId,ytMax,ytHQ,ytEmbed,isYtMoment,openViewer,openEdit,saveEdit,get cinema(){return typeof cinemaV11!=='undefined'?{...cinemaV11}:null},get state(){return{moments:moments.length,connections:connections.length,selected,theme:document.body.dataset.theme,ytMoments:moments.filter(isYtMoment).map(m=>({id:m.id,url:originalUrl(m),videoId:ytId(originalUrl(m)),thumb:ytMax(originalUrl(m)),source:m.videoSource||m.type}))}}};
 })();

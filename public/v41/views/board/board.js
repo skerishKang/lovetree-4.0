@@ -64,16 +64,46 @@ threadLayer.querySelectorAll('.threadGroup').forEach(g=>g.addEventListener('poin
 
 function rerenderThreads(){threadLayer.querySelectorAll('.threadGroup').forEach(g=>{let c=connections.find(x=>x.id===g.dataset.cid);g.querySelectorAll('path').forEach(p=>p.setAttribute('d',pathD(c)))})}
 
-function applyView(animated=false){world.style.transition=animated?'transform 1s cubic-bezier(.22,.8,.2,1)':'none';
+function applyView(animated=false){growBoard();world.style.transition=animated?'transform 1s cubic-bezier(.22,.8,.2,1)':'none';
 world.style.transform=`translate(${view.x}px,${view.y}px) scale(${view.z})`;
 $('#zoomLabel').textContent=Math.round(view.z*100)+'%'}
 
-function fitAll(animated=true){let vw=viewport.clientWidth,vh=viewport.clientHeight;
-let z=LT58Model.fitZoom(vw,vh);
-view.z=z;
-view.x=(vw-2400*z)/2;
-view.y=(vh-2200*z)/2;
-applyView(animated)}
+/* #460 컴퓨터에서 처음 열 때 읽을 수 있는 크기(0.8배 이상)로, 전체 보기는 실제 순간이 있는 곳에 맞춘다.
+   사용자가 옮기거나 확대한 자리는 트리별로 기억해 같은 트리로 돌아오면 그대로 연다(컴퓨터만, 휴대폰은 지금처럼 고른 순간). */
+let viewMode='start',userView=null,viewSaveTimer=0,worldSize={w:2400,h:2200};
+// 순간이 기본 무대 밖(아래 줄)까지 놓이면 판을 늘린다. DOM을 읽지 않는 가벼운 계산이라 화면을 옮길 때마다 불러도 된다.
+function growBoard(){let s=LT58Model.boardSize(moments);if(s.w===worldSize.w&&s.h===worldSize.h)return;worldSize=s;world.style.width=s.w+'px';world.style.height=s.h+'px'}
+const BOARD_VIEW_KEY='lt41.boardView';
+function boardCards(){return moments.map(m=>{let el=cardLayer.querySelector(`[data-id="${m.id}"]`);return{id:m.id,x:m.x,y:m.y,w:el?.offsetWidth||242,h:el?.offsetHeight||260}})}
+// 보이는 칸: 왼쪽 도구 창·오른쪽 상세 창(열려 있거나 곧 열릴 때)을 뺀 자리. 좁은 화면(760 미만)은 두 창이 아래에서 올라오므로 빼지 않는다.
+function boardSafeArea(expectDetail=false){let vw=viewport.clientWidth,vh=viewport.clientHeight,left=16,right=16;
+if(innerWidth>=760){let lp=$('#leftPanel'),dt=$('#detail'),vr=viewport.getBoundingClientRect();
+if(lp){let r=lp.getBoundingClientRect();if(r.width&&r.right-vr.left<vw/2)left=Math.max(16,r.right-vr.left+12)}
+if(dt&&(expectDetail||dt.classList.contains('open')))right=dt.offsetWidth+32}
+let w=vw-left-right;if(w<260){left=16;w=vw-32}
+return{x:left,y:12,w:Math.max(1,w),h:Math.max(1,vh-24)}}
+function boardTreeId(){try{return String(window.parent.LT41?.tree?.id||'')}catch{return ''}}
+function readBoardView(){let id=boardTreeId();if(!id)return null;try{return LT58Model.savedView(JSON.parse(localStorage.getItem(BOARD_VIEW_KEY)||'{}')[id])}catch{return null}}
+function writeBoardView(v){let id=boardTreeId();if(!id)return;try{let all=JSON.parse(localStorage.getItem(BOARD_VIEW_KEY)||'{}');if(v)all=LT58Model.rememberView(all,id,v,Date.now());else delete all[id];localStorage.setItem(BOARD_VIEW_KEY,JSON.stringify(all))}catch{/* 저장소를 못 쓰면 이번 화면에서만 기억 */}}
+// 사용자가 옮기거나 확대한 뒤 부른다. 화면 가운데의 무대 좌표와 배율을 기억한다.
+function noteUserView(){if(innerWidth<700||cinema)return;let vw=viewport.clientWidth,vh=viewport.clientHeight;
+userView={cx:(vw/2-view.x)/view.z,cy:(vh/2-view.y)/view.z,z:view.z};viewMode='user';
+clearTimeout(viewSaveTimer);viewSaveTimer=setTimeout(()=>writeBoardView(userView),400)}
+function boardStartView(){if(innerWidth<700){fitAll(false);return}
+let vw=viewport.clientWidth,vh=viewport.clientHeight,cards=boardCards(),saved=userView||readBoardView();
+if(saved){let v={z:saved.z,x:vw/2-saved.cx*saved.z,y:vh/2-saved.cy*saved.z};
+if(!cards.length||LT58Model.visibleCards(v,{x:0,y:0,w:vw,h:vh},cards)>0){userView=saved;viewMode='user';Object.assign(view,{x:v.x,y:v.y,z:v.z});applyView(false);return}}
+growBoard();let v=LT58Model.startView({viewport:{w:vw,h:vh},safe:boardSafeArea(true),cards,world:worldSize,focusId:LTDEMO.get?.(),firstId:moments.find(m=>m.first)?.id});
+viewMode='start';Object.assign(view,{x:v.x,y:v.y,z:v.z});applyView(false)}
+// 전체 보기: 순간이 있는 곳 전부를 보이는 칸에 맞춘다(최대 0.92배). 순간이 없으면 무대 전체.
+function fitAll(animated=true){let vw=viewport.clientWidth,vh=viewport.clientHeight,box=LT58Model.contentBox(boardCards());
+if(!box){let z=LT58Model.fitZoom(vw,vh);view.z=z;view.x=(vw-2400*z)/2;view.y=(vh-2200*z)/2}
+else{let v=LT58Model.fitBox(box,boardSafeArea(),.92);view.z=v.z;view.x=v.x;view.y=v.y}
+viewMode='fit';applyView(animated)}
+// 창 크기가 바뀌면: 전체 보기 중이면 다시 맞추고, 아니면 처음 자리(또는 기억한 자리)를 다시 계산한다.
+function boardResize(){if(innerWidth<700||cinema)return;if(viewMode==='fit')fitAll(false);else boardStartView()}
+// 확대·축소 단추는 화면 가운데를 기준으로 한다(예전에는 무대 왼쪽 위 기준이라 보던 곳이 밀려났다).
+function zoomAtCenter(nz){let vw=viewport.clientWidth,vh=viewport.clientHeight,cx=(vw/2-view.x)/view.z,cy=(vh/2-view.y)/view.z;view.z=nz;view.x=vw/2-cx*nz;view.y=vh/2-cy*nz;applyView();noteUserView()}
 
 function screenToWorld(cx,cy){let r=viewport.getBoundingClientRect();
 return{x:(cx-r.left-view.x)/view.z,y:(cy-r.top-view.y)/view.z}}
@@ -302,13 +332,14 @@ $('#cinemaBtn').style.opacity=on?'0':'1'}
 let boardTouches=new Map(),pinch=null;
 viewport.addEventListener('pointerdown',e=>{if(cinema||e.target.closest('.card'))return;if(e.pointerType==='touch'){boardTouches.set(e.pointerId,{x:e.clientX,y:e.clientY});if(boardTouches.size===1){pan={x:e.clientX,y:e.clientY,vx:view.x,vy:view.y}}else if(boardTouches.size===2){let a=[...boardTouches.values()],dx=a[1].x-a[0].x,dy=a[1].y-a[0].y;pinch={dist:Math.hypot(dx,dy),z:view.z,x:view.x,y:view.y,cx:(a[0].x+a[1].x)/2,cy:(a[0].y+a[1].y)/2};pan=null}return}pan={x:e.clientX,y:e.clientY,vx:view.x,vy:view.y};viewport.setPointerCapture?.(e.pointerId)});
 viewport.addEventListener('pointermove',e=>{if(e.pointerType==='touch'&&boardTouches.has(e.pointerId)){boardTouches.set(e.pointerId,{x:e.clientX,y:e.clientY});if(boardTouches.size===2&&pinch){let a=[...boardTouches.values()],d=Math.hypot(a[1].x-a[0].x,a[1].y-a[0].y),nz=Math.max(.38,Math.min(1.45,pinch.z*d/pinch.dist)),r=viewport.getBoundingClientRect(),wx=(pinch.cx-r.left-pinch.x)/pinch.z,wy=(pinch.cy-r.top-pinch.y)/pinch.z;view.z=nz;view.x=pinch.cx-r.left-wx*nz;view.y=pinch.cy-r.top-wy*nz;applyView(false)}else if(pan){view.x=pan.vx+(e.clientX-pan.x);view.y=pan.vy+(e.clientY-pan.y);applyView(false)}return}if(!pan)return;view.x=pan.vx+(e.clientX-pan.x);view.y=pan.vy+(e.clientY-pan.y);applyView(false)});
-function endBoardPointer(e){if(e.pointerType==='touch'){boardTouches.delete(e.pointerId);
+function endBoardPointer(e){let moved=(pan&&(view.x!==pan.vx||view.y!==pan.vy))||!!pinch;if(e.pointerType==='touch'){boardTouches.delete(e.pointerId);
 if(boardTouches.size<2)pinch=null;
 if(boardTouches.size===0)pan=null;
-return}pan=null}
+if(moved&&!boardTouches.size)noteUserView();
+return}pan=null;if(moved)noteUserView()}
 viewport.addEventListener('pointerup',endBoardPointer);
 viewport.addEventListener('pointercancel',endBoardPointer);
-viewport.addEventListener('wheel',e=>{if(cinema)return;e.preventDefault();let before=screenToWorld(e.clientX,e.clientY),factor=Math.exp(-e.deltaY*.0012),nz=Math.max(.38,Math.min(1.45,view.z*factor));let r=viewport.getBoundingClientRect();view.z=nz;view.x=e.clientX-r.left-before.x*nz;view.y=e.clientY-r.top-before.y*nz;applyView(false)},{passive:false});
+viewport.addEventListener('wheel',e=>{if(cinema)return;e.preventDefault();let before=screenToWorld(e.clientX,e.clientY),factor=Math.exp(-e.deltaY*.0012),nz=Math.max(.38,Math.min(1.45,view.z*factor));let r=viewport.getBoundingClientRect();view.z=nz;view.x=e.clientX-r.left-before.x*nz;view.y=e.clientY-r.top-before.y*nz;applyView(false);noteUserView()},{passive:false});
 
 $('#addBtn').onclick=openAdd;
 $('#cancelAdd').onclick=()=>$('#addModal').classList.remove('open');
@@ -343,15 +374,13 @@ $('#viewerModal').classList.remove('open')}
 $('#nextMoment').onclick=()=>{let c=connections.find(c=>c.a===selected);
 if(c)selectMoment(c.b,true)}
 ;
-$('#fitBtn').onclick=()=>fitAll(true);
-$('#resetBtn').onclick=()=>fitAll(true);
+// 전체 보기는 '처음으로' 돌아가는 단추이기도 하다: 기억한 자리를 지운다(다음에 열면 읽을 수 있는 처음 자리).
+function fitAllByUser(){userView=null;clearTimeout(viewSaveTimer);writeBoardView(null);fitAll(true)}
+$('#fitBtn').onclick=fitAllByUser;
+$('#resetBtn').onclick=fitAllByUser;
 $('#undoBtn').onclick=undo;
-$('#minusBtn').onclick=()=>{view.z=Math.max(.38,view.z-.1);
-applyView()}
-;
-$('#plusBtn').onclick=()=>{view.z=Math.min(1.45,view.z+.1);
-applyView()}
-;
+$('#minusBtn').onclick=()=>zoomAtCenter(Math.max(.38,view.z-.1));
+$('#plusBtn').onclick=()=>zoomAtCenter(Math.min(1.45,view.z+.1));
 $('#cinemaBtn').onclick=()=>startCinema(0);
 $('#walkAgain').onclick=()=>{cinema=false;
 document.body.classList.remove('boardBloom');
