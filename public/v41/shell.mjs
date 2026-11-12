@@ -421,6 +421,9 @@ const shellScreens=createScreens({
     // (보내는 시점·값·순서를 실행 시험이 같은 함수로 확인한다).
     const ready=frameReadyMessages({dateStyle:currentDateStyle(),pageTurn:currentPageTurn()==='on'});
     applyPageTurnToFrame(frame);applyDateStyleToFrame(frame);
+    // #478: 고급 기능 보기 값도 새로 열린 화면에 알린다. applyAdvanced는 지금 화면(#view)에만 보내므로
+    // 화면을 옮긴 뒤 열린 프레임은 단순 모드로 남았다(보드 도구가 숨는 결함).
+    try{frame.contentWindow.postMessage({type:'lt41-advanced',value:readAdvanced()},location.origin)}catch{}
     // 화면 교대(두 장 앞뒤 바꿈)가 늦게 끝나는 경우를 위해 한 번 더 알린다(같은 값을 또 보내는 건 무해하다).
     for(const message of ready.repeats)setTimeout(()=>sendToFrame(frame,message),1600);
     d.addEventListener('click',e=>{const b=e.target.closest('button,a');if(!b)return;let file;if(b.matches('[data-action="tree"],[data-menu="tree"]'))file='track32-bookshelf.html';if(b.matches('#storyBook,[data-menu="book"]'))file='track59-sketchbook.html';if(current==='track56-network.html'&&b.id==='openMoment')file='track59-sketchbook.html';if(file){e.preventDefault();e.stopImmediatePropagation();show(file);}},true);
