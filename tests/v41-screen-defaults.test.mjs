@@ -36,8 +36,14 @@ test('날짜 표기 3종: 한 벌(formatDisplayDate)이 2026. 11. 10 / 2026-11-1
 
 test('날짜 표기 배선: 책·보드·지도·첫 화면 목록이 같은 한 벌을 따르고, 바꾸면 다시 그린다', () => {
   // 책: book-extra가 스타일을 attribute에서 읽어 창 함수에 심고, 메시지로 다시 그린다.
-  assert.match(bookExtra, /let dateStyle=\(\(\)=>\{try\{return document\.documentElement\.getAttribute\('data-lt-date-style'\)\|\|'dot'\}catch\{return 'dot'\}\}\)\(\);/);
-  assert.match(bookExtra, /const styledDate=v=>formatDisplayDate\(v,dateStyle\);/);
+  // 스타일은 프레임 속성 → 기기 캐시(lt41.dateStyle) → 기본 순으로 읽는다. 첫 그림(파싱 시점)에도 올바르고,
+  // 이후 바뀌면 lt41-date-style 메시지로 다시 그린다(보드·지도·첫 화면 목록과 같은 순서).
+  assert.match(bookExtra, /const cached=localStorage\.getItem\('lt41\.dateStyle'\);if\(cached\)return cached;/);
+  assert.match(bookExtra, /const styledDate=v=>formatDisplayDate\(v,ltDateStyle\(\)\);/);
+  // momentContent 재정의(제목 고치기 칸)의 날짜칸도 같은 스타일을 따른다.
+  assert.equal((bookExtra.match(/formatDisplayDate\(m\.date\)/g) || []).length, 0, '스타일 없는 날짜 호출 잔재 없다');
+  assert.ok(bookExtra.includes('formatDisplayDate(m.date,ltDateStyle())'), '재정의 템플릿도 스타일을 따른다');
+  assert.match(shell, /localStorage\.setItem\('lt41\.dateStyle',b\.dataset\.dateStyle\)/);
   assert.match(bookExtra, /window\.LTBookTitle=\{view:titleViewFor,date:styledDate\}/);
   assert.match(bookExtra, /type!=='lt41-date-style'/);
   assert.match(bookExtra, /renderSpread\(current,LTDEMO\.get\(\),false\)/);

@@ -401,6 +401,8 @@ const shellScreens=createScreens({
     mountConnectionTool(d);applyViewAccessibility(d);shellQuick.mountFrame(d);
     // #368 2차·3차: 새로 열린 화면에 페이지 넘김·날짜 표기 값을 알린다(테마와 같은 시점).
     applyPageTurnToFrame(frame);applyDateStyleToFrame(frame);
+    // 화면 교대(두 장 앞뒤 바꿈)가 늦게 끝나는 경우를 위해 한 번 더 알린다(같은 값을 또 보내는 건 무해하다).
+    setTimeout(()=>applyDateStyleToFrame(frame),1600);
     d.addEventListener('click',e=>{const b=e.target.closest('button,a');if(!b)return;let file;if(b.matches('[data-action="tree"],[data-menu="tree"]'))file='track32-bookshelf.html';if(b.matches('#storyBook,[data-menu="book"]'))file='track59-sketchbook.html';if(current==='track56-network.html'&&b.id==='openMoment')file='track59-sketchbook.html';if(file){e.preventDefault();e.stopImmediatePropagation();show(file);}},true);
   }
 });
@@ -697,6 +699,8 @@ function paintDateStyleControls(){const value=currentDateStyle();for(const b of 
 for(const b of document.querySelectorAll('[data-date-style]'))b.onclick=()=>{
  if(!member?.snapshot().owned){notify('로그인한 뒤 날짜 표기를 바꿀 수 있어요.');return;}
  try{member.apply('setPrefs',{dateStyle:b.dataset.dateStyle});}catch(e){notify('날짜 표기를 저장하지 못했어요. 잠시 뒤 다시 시도해 주세요.');return;}
+ // 기기 캐시: 화면(iframe)은 그려지는 시점에 계정 값을 모르므로 마지막 표기를 같이 둔다(어긋나면 메시지로 바로 고쳐 그린다).
+ try{localStorage.setItem('lt41.dateStyle',b.dataset.dateStyle)}catch{}
  paintDateStyleControls();for(const f of frames())applyDateStyleToFrame(f);
  notify(b.dataset.dateStyle==='long'?'날짜를 11월 10일로 보여요.':b.dataset.dateStyle==='dash'?'날짜를 2026-11-10으로 보여요.':'날짜를 2026. 11. 10으로 보여요.');
 };

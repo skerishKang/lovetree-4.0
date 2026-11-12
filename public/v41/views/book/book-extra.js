@@ -11,8 +11,11 @@ const titleViewFor=m=>titleView(m,titleDisplay());
 const titleMainFor=(title,m)=>m?titleViewFor(m).main:(title||'');
 /* #368 3차: 날짜 표기는 계정 설정(state.prefs.dateStyle). 셸이 프레임 속성(data-lt-date-style)과
    lt41-date-style 메시지로 알려 주고, 바뀌면 열려 있는 펼침면·상세를 다시 그린다. */
-let dateStyle=(()=>{try{return document.documentElement.getAttribute('data-lt-date-style')||'dot'}catch{return 'dot'}})();
-const styledDate=v=>formatDisplayDate(v,dateStyle);
+const ltDateStyle=()=>{
+ try{const attr=document.documentElement.getAttribute('data-lt-date-style');if(attr)return attr;
+  const cached=localStorage.getItem('lt41.dateStyle');if(cached)return cached;}catch{}
+ return 'dot';};
+const styledDate=v=>formatDisplayDate(v,ltDateStyle());
 try{window.LTBookTitle={view:titleViewFor,date:styledDate}}catch{}
 // #296: 손을 뗀 순간의 판단은 book-usability.mjs의 tapIntent가 맡는다(book.js는 클래식 스크립트라 여기서 넘겨 준다).
 window.LTTapIntent=tapIntent;
@@ -48,7 +51,7 @@ function detailMarkup(m){
  // #327 2부: 내 기록(서버)의 순간 상세에서 다른 트리로 옮길 수 있다. 공유·예시는 숨긴다.
  const canMove=(window.parent&&window.parent.LT41)?window.parent.LT41.source==='server':false;
  const view=titleViewFor(m);
- return '<div class="detail-kicker">'+t(LTLabels.type(m.kind))+' · '+t(formatDisplayDate(m.date))+' · '+t(m.emotion)+'</div>'+
+ return '<div class="detail-kicker">'+t(LTLabels.type(m.kind))+' · '+t(formatDisplayDate(m.date,ltDateStyle()))+' · '+t(m.emotion)+'</div>'+
   (view.main?'<h2>'+t(view.main)+'</h2>'+(view.sub?'<p class="video-title">▶ '+t(view.sub)+'</p>':''):'')+
   '<p>'+t(m.note)+' · 출처: '+t(m.source)+'</p>'+
   '<div class="chips">'+m.keywords.map(k=>'<span class="chip">#'+t(k)+'</span>').join('')+'</div>'+
@@ -68,7 +71,7 @@ function placeDetail(id,card){
   rightPage.innerHTML='<div class="page-detail">'+detailMarkup(m)+'</div>';
  }else{
   const panel=$b('#detailSide');if(!panel)return;
-  panel.innerHTML='<div class="detail-top"><span class="detail-kicker">'+t(LTLabels.type(m.kind))+' · '+t(formatDisplayDate(m.date))+'</span><button type="button" class="close" data-detail-close aria-label="상세 닫기">×</button></div><div class="side-detail">'+detailMarkup(m)+'</div>';
+  panel.innerHTML='<div class="detail-top"><span class="detail-kicker">'+t(LTLabels.type(m.kind))+' · '+t(formatDisplayDate(m.date,ltDateStyle()))+'</span><button type="button" class="close" data-detail-close aria-label="상세 닫기">×</button></div><div class="side-detail">'+detailMarkup(m)+'</div>';
   panel.hidden=false;
   if(single()){panel.style.top='';}
   else{
@@ -157,7 +160,7 @@ function paintTitle(m){
  const noteText=source?String(source.memo??'').trim():parts.note;
  parts.note=noteText;
  const hands=editAffordances({readOnly:!!LTDEMO.readOnly,synthetic:!!m.synthetic,hasTitle:!!parts.main,hasNote:!!parts.note});
- const date=m.date?'<p class="moment-date">'+t(formatDisplayDate(m.date))+'</p>':'';
+ const date=m.date?'<p class="moment-date">'+t(formatDisplayDate(m.date,ltDateStyle()))+'</p>':'';
  const sub=parts.media?'<p class="video-title">▶ '+t(parts.media)+'</p>':'';
  const heading=parts.main?(hands.title
   ?'<div class="moment-heading"><button type="button" class="moment-title-button" data-title-edit="'+t(m.id)+'" aria-label="제목 고치기: '+t(parts.main)+'">'+t(parts.main)+'</button>'+(hands.hint?'<button type="button" class="title-edit-hint" data-title-edit="'+t(m.id)+'" aria-label="제목 고치기"><span aria-hidden="true">✎</span> 고치기</button>':'')+'</div>'
@@ -383,7 +386,7 @@ addEventListener('message',e=>{if(e.data?.type!=='lt41-title-display')return;try
 // #368 2차: 설정의 페이지 넘김(종이처럼/부드럽게)이 바뀌면 다음 넘김부터 적용한다. book.js가 노출한
 // setPageTurnMode로만 값을 바꾼다(모르는 값은 book.js 쪽 기본 규칙으로 돌아간다).
 addEventListener('message',e=>{if(e.data?.type!=='lt41-page-turn')return;if(typeof window.setPageTurnMode==='function')window.setPageTurnMode(e.data.value);});
-addEventListener('message',e=>{if(e.data?.type!=='lt41-date-style')return;dateStyle=e.data.value==='dash'||e.data.value==='long'?e.data.value:'dot';try{renderSpread(current,LTDEMO.get(),false)}catch{}if($b('#detail')?.classList.contains('open')&&selectedMomentId)showDetail(selectedMomentId);});
+addEventListener('message',e=>{if(e.data?.type!=='lt41-date-style')return;try{document.documentElement.setAttribute('data-lt-date-style',e.data.value==='dash'||e.data.value==='long'?e.data.value:'dot')}catch{}try{renderSpread(current,LTDEMO.get(),false)}catch{}if($b('#detail')?.classList.contains('open')&&selectedMomentId)showDetail(selectedMomentId);});
 // book-extra는 book.js 뒤에 불러오므로, 첫 렌더 제목을 한 벌 규칙으로 다시 그린다.
 // #379 후속: 재그림은 현재 선택 순간(LTDEMO.get())을 유지해, 펼침면 오른쪽 페이지의 순간을 열면
 // 왼쪽 페이지 순간으로 선택이 돌아가는 문제를 막는다(renderSpread의 land가 기본 true여 focusId 없으면 left.id로 재선택).
