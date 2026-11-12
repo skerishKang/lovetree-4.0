@@ -52,7 +52,7 @@
 
 - **기억 보드 계산 전부 한 벌(2026-11-09)**: 기억 보드의 순수 계산(카드 자리·실·맞춤 배율·경로 수집·시네마 비트·필터 판정 등)은 `views/board/board-model.js`의 `window.LT58Model` 한 벌만 쓰고, 화면(`board.js`·`board-extras.js`)은 DOM 반영만 한다. 시험은 같은 파일을 `await import`해 `globalThis.LT58Model`을 검사하며, 옛 계산이 화면에 남아 있지 않은지도 함께 본다(`tests/v41-board-model.test.mjs`).
 
-- **관계 지도 계산 전부 한 벌(2026-11-09)**: 관계 지도의 순수 계산(갈래 점·묶음 나누기·작은 트리 보정·연결선 조절점·손가락 맞춤·경로 순서)은 `views/network/network-model.js`의 `window.LT56Model` 한 벌만 쓰고, 화면(`network.js`)은 그리기·상태 반영만 한다. 시험은 같은 파일을 `await import`해 `globalThis.LT56Model`을 검사하고 옛 계산 부재도 함께 본다(`tests/v41-network-model.test.mjs`).
+- **관계 지도 계산 전부 한 벌(2026-11-09)**: 관계 지도의 순수 계산(갈래 점·묶음 나누기·화면 상자·묶음 칸·그물/동심원 배치·이름표 자리·연결선 조절점·경로 순서 — #461부터 화면 좌표로 상자에 맞춘다)은 `views/network/network-model.js`의 `window.LT56Model` 한 벌만 쓰고, 화면(`network.js`)은 그리기·상태 반영만 한다. 시험은 같은 파일을 `await import`해 `globalThis.LT56Model`을 검사하고 옛 계산 부재도 함께 본다(`tests/v41-network-model.test.mjs`).
 
 - **기억책 계산 전부 한 벌(2026-11-09)**: 기억책의 순수 계산(펼침면·쪽번호·넘김 각도·연결 요약·다음 순간)은 `views/book/book-model.js`의 `window.LT59Model` 한 벌만 쓰고, 표시 규칙은 `book-usability.mjs`(`tapIntent`·`pageOverflows` 포함)가 계속 맡는다. 시험은 같은 파일을 `await import`해 `globalThis.LT59Model`을 검사하고 옛 계산 부재도 함께 본다(`tests/v41-book-model.test.mjs`).
 - **여섯 화면 계산 모두 화면이 쓰는 한 벌(2026-11-09)**: 홈·책장·기억책·기억 보드·관계 지도·계정의 순수 계산은 각 화면이 실제로 부르는 모델 파일(보드 `LT58Model`·지도 `LT56Model`·기억책 `LT59Model`)에만 있고, 화면에는 그리기·상태 반영만 남는다.
