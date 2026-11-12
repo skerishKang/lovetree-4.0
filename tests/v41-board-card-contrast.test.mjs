@@ -4,6 +4,8 @@
 // 제목·메모·날짜·표식의 getComputedStyle 글자색과 카드 바탕(반투명이면 판 위에 겹친 색)으로 대비를 낸다.
 // 크롬(Playwright chromium)이 없는 곳에서는 건너뛴다 — 이유를 남긴다.
 // LT_BOARD_CONTRAST_ROOT=<dist 폴더>로 다른 빌드(예: 고치기 전 커밋)를 대조해 볼 수 있다.
+// #504: CI(미리보기 검사 잡)에서는 LT_BOARD_CONTRAST_REQUIRE=1로 돌려 건너뜀을 실패로 본다 —
+// 이 시험이 막아야 할 회귀(밤 판 제목 1.0:1)가 다시 들어와도 건너뜀으로 조용히 지나가지 않게.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
@@ -22,6 +24,9 @@ try {
 } catch {
   skip = 'playwright 패키지가 없어 실제 화면 대비 시험을 건너뜀';
 }
+
+// #504: CI에서는 건너뜀을 실패로 본다(로컬에서는 지금처럼 건너뜀).
+const REQUIRE = process.env.LT_BOARD_CONTRAST_REQUIRE === '1';
 
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.woff2': 'font/woff2' };
 function serve(root) {
@@ -55,7 +60,8 @@ async function openBoard(browser, base, { plate, appTheme }) {
   return { ctx, page, frame, errors };
 }
 
-test('보드 카드: 종이·밤 판 × 밤·정원 테마, 카드 종류마다 제목·메모·날짜·표식 대비 4.5:1 이상(실제 그려진 색)', { skip, timeout: 120000 }, async () => {
+test('보드 카드: 종이·밤 판 × 밤·정원 테마, 카드 종류마다 제목·메모·날짜·표식 대비 4.5:1 이상(실제 그려진 색)', { skip: REQUIRE ? false : skip, timeout: 120000 }, async () => {
+  if (skip) assert.fail(`CI에서는 화면 대비 시험 건너뜀이 실패다(#504) — ${skip}`);
   const server = await serve(ROOT);
   const base = `http://127.0.0.1:${server.address().port}`;
   let browser;
@@ -86,7 +92,8 @@ test('보드 카드: 종이·밤 판 × 밤·정원 테마, 카드 종류마다 
   }
 });
 
-test('보드 안 클릭(카드·전체 보기)은 판을 바꾸지 않는다 — [종이|밤] 단추만 바꾼다', { skip, timeout: 60000 }, async () => {
+test('보드 안 클릭(카드·전체 보기)은 판을 바꾸지 않는다 — [종이|밤] 단추만 바꾼다', { skip: REQUIRE ? false : skip, timeout: 60000 }, async () => {
+  if (skip) assert.fail(`CI에서는 화면 대비 시험 건너뜀이 실패다(#504) — ${skip}`);
   const server = await serve(ROOT);
   const base = `http://127.0.0.1:${server.address().port}`;
   let browser;

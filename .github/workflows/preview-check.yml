@@ -46,6 +46,16 @@ jobs:
             npx playwright install --with-deps chromium
           fi
           node -e "import('playwright-core').then(()=>console.log('playwright-core 확인')).catch(e=>{console.error(e.message);process.exit(1)})"
+      # #504: 화면 대비 시험을 CI에서 실제로 돌린다(check 잡엔 크롬이 없어 건너뛰던 것).
+      # 크롬을 캐시로 이미 준비하는 이 잡에서 돌리는 쪽이 check 잡(ubuntu+windows 둘 다 설치)보다 필수 검사 시간이 덜 늘어난다.
+      # LT_BOARD_CONTRAST_REQUIRE=1 — 건너뜀을 실패로 본다(조용히 지나가지 않게).
+      - name: 보드 카드 대비 시험(CI에서 실제로, 건너뜀=실패 — #504)
+        env:
+          LT_BOARD_CONTRAST_REQUIRE: '1'
+        run: |
+          start=$(date +%s)
+          node --test tests/v41-board-card-contrast.test.mjs
+          echo "보드 카드 대비 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
       - name: 미리보기 주소 찾기
         id: preview
         run: node tools/postdeploy/preview-url.mjs "$GITHUB_REPOSITORY" "$PR_SHA" --wait 600
