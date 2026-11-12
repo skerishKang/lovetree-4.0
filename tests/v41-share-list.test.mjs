@@ -2,6 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 // #369 5: 이 트리의 공유 주소 목록 — 살아 있는 주소 위, 취소된 주소는 '지난 주소 N개' 접힘.
 import { createMessages } from '../public/v41/shell/messages.mjs';
+import { createTree } from '../src/domain.js';
+import { createWorkspaceService } from '../server/workspace-service.js';
+import { createMemoryWorkspaceRepo } from '../server/testing/memory-workspace-repo.js';
+import { createMemoryShareRepo } from '../server/testing/memory-share-repo.js';
+import { createShareHandler, createShareService } from '../server/share-service.js';
 
 function fakeElement(extra = {}) {
   const node = {
@@ -147,5 +152,46 @@ test('만든 공유가 없으면 안내 한 줄만 남는다', async () => {
     await h.messages.openSharePanel();
     assert.equal(h.els['share-list'].children.length, 1);
     assert.equal(h.els['share-list'].children[0].textContent, '아직 만든 공유 주소가 없어요.');
+  } finally { h.restore(); }
+});
+
+// 이슈 #466 T2: 위 시험들의 share()는 클라이언트가 스스로 날조한 모양(ISO createdAt 등)을 쓴다.
+// 서버가 createdAt 형식이나 status/discoverable 값의 이름을 바꿔도 클라 시험(날조)과 서버 시험(필드 존재만)이
+// 각각 따로 통과할 수 있어, 실배포에서만 깨질 수 있다. 여기서는 실제 share-service(메모리 저장소)가
+// 만든 진짜 GET /api/shares 응답을 그대로 클라 렌더러에 먹여 한 줄 왕복을 고정한다.
+test('실제 서버(share-service)가 만든 목록 응답을 클라 렌더러가 그대로 그린다(서버↔클라 교차 검증)', async () => {
+  const PRODUCT = 'lovetree-test', CLOCK = '2026-11-12T09:00:00.000Z';
+  const tree = createTree({subject: '윤슬', title: '첫 장면', note: '마음', emotion: '설렘', date: '2026-11-12', url: ''}, CLOCK);
+  const workspaceRepo = createMemoryWorkspaceRepo();
+  const workspace = createWorkspaceService({repo: workspaceRepo, productId: PRODUCT});
+  await workspace.write({productId: PRODUCT, subjectId: 'alice'}, {state: {version: 1, trees: [tree]}, expectedRevision: 0, clientKey: 'seed'});
+  const shareRepo = createMemoryShareRepo();
+  let n = 0;
+  const service = createShareService({shareRepo, workspaceRepo, productId: PRODUCT, makeId: () => String(++n).padStart(24, 's')});
+  const handle = createShareHandler({authenticate: async () => ({productId: PRODUCT, subjectId: 'alice'}), service, productId: PRODUCT});
+  const request = (method, path, body) => handle({method, path, headers: body ? {'content-type': 'application/json'} : {}, body: body ? JSON.stringify(body) : ''});
+
+  const input = {treeId: tree.id, entryMomentId: tree.moments[0].id, view: 'network'};
+  const preview = await request('POST', '/api/shares/preview', input);
+  const created = await request('POST', '/api/shares', {...input, previewToken: preview.body.preview.previewToken});
+  assert.equal(created.status, 201);
+  const listed = await request('GET', '/api/shares');
+  assert.equal(listed.status, 200);
+  const [realShare] = listed.body.shares;
+  // 서버 산출물 그대로(날조 없음) — status·view·discoverable·createdAt 전부 서버가 준 값.
+  assert.equal(realShare.id, created.body.share.id);
+  assert.equal(realShare.status, 'active');
+  assert.equal(realShare.view, 'network');
+  assert.equal(realShare.discoverable, false);
+
+  const h = listHarness({shares: listed.body.shares});
+  try {
+    globalThis.window.LT41.tree.id = tree.id; // 목록은 window.LT41.tree.id와 같은 treeId만 보여 준다
+    await h.messages.openSharePanel();
+    const row = h.els['share-list'].children[0];
+    assert.match(row.className, /share-item/, '서버가 준 status="active"를 살아 있는 주소로 그린다(지난 주소 접힘 아님)');
+    assert.equal(row.children[0].children[0].textContent, '공유 중 · 주소로만 공개');
+    assert.match(row.children[0].children[1].textContent, /관계 지도 · .+에 만든 주소/, '서버의 createdAt을 Invalid Date 없이 날짜로 그린다');
+    assert.doesNotMatch(row.children[0].children[1].textContent, /Invalid Date/);
   } finally { h.restore(); }
 });

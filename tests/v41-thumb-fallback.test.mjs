@@ -347,6 +347,9 @@ test('#429 도메인 두 벌은 oEmbed ytimg 썸네일 주소만 저장하고 �
 });
 
 test('#429 전 화면이 같은 공용 모듈(thumb-fallback.mjs)을 쓰고, 표지 속성도 공용 함수를 거친다', () => {
+  // 이슈 #466 T1: 파일에 'thumb-fallback.mjs' 글자만 있으면(죽은 import·주석 포함) 통과하던 시험을
+  // 실제 호출부(함수 이름 뒤 '(' )가 있는지로 강화한다 — 화면이 import만 남기고 호출을 끊어도 잡는다.
+  const CALLS = /thumbFallbackAttrs\(|fallbackCardMarkup\(|needsFallbackCard\(|coverFallbackAttrs\(|thumbnailCandidates\(|mountThumbFallback\(/;
   for (const file of [
     'v41/home-moments.js',
     'src/views/orbit.js',
@@ -357,7 +360,9 @@ test('#429 전 화면이 같은 공용 모듈(thumb-fallback.mjs)을 쓰고, 표
     'public/v41/views/book/book-extra.js',
     'public/v41/views/tree-title.mjs',
   ]) {
-    assert.match(read(file), /thumb-fallback\.mjs/, `${file} 공용 모듈 연결`);
+    const source = read(file);
+    assert.match(source, /thumb-fallback\.mjs/, `${file} 공용 모듈 연결`);
+    assert.match(source, CALLS, `${file}가 공용 모듈 함수를 실제로 호출한다(import만 남은 죽은 배선이 아니다)`);
   }
   assert.match(coverFallbackAttrs(['https://i.ytimg.com/vi/abc123DEF45/hqdefault.jpg']), /data-lt-fallback-mode="cover"/);
   assert.match(thumbFallbackAttrs({ id: 'm1', url: 'https://youtu.be/abc123DEF45' }), /hqdefault\.jpg.*mqdefault\.jpg/);
