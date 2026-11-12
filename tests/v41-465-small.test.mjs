@@ -40,3 +40,10 @@ test('#465 2: 설정 "움직임"은 켬/끔 스위치(role=switch)와 설명 한
   assert.match(read('public/v41/shell.css'), /\.settings-choice button\[role=switch\]\{min-width:76px;justify-content:center\}/);
 });
 
+test('#465 3: 계정 메뉴 "고급 기능 보기"에 무엇이 달라지는지 한 줄 설명이 있다', () => {
+  const html = read('public/v41/index.html');
+  assert.match(html, /id="account-advanced" aria-checked="false"><span class="account-item-text">고급 기능 보기<\/span><span class="account-item-desc">보드에서 편집 도구·되돌리기·이어 그리기가 늘어나요<\/span>/);
+  assert.match(read('public/v41/shell.css'), /\.account-popover \.account-item-desc\{display:block;font-size:11px/);
+  // 설명 내용은 실제 고급 모드가 여는 것과 일치한다(보드 편집 도구·이어 그리기).
+  assert.match(read('public/v41/views/board/board-extra.css'), /lt-advanced/);
+});
