@@ -320,7 +320,7 @@ function journeyMarkup(journey){
   return '<button type="button" class="journey-item'+(item.current?' current':'')+'" data-lt-moment-row data-journey="'+item.index+'" data-focus="'+t(item.id)+'">'+
    '<span class="journey-thumb" data-tone="'+item.tone+'">'+thumb+'</span>'+
    '<span class="journey-node" aria-hidden="true"></span>'+
-   '<span class="journey-text"><span class="journey-date">'+t(formatDisplayDate(item.date))+(item.first?' · 첫 순간':'')+'</span>'+
+   '<span class="journey-text"><span class="journey-date">'+t(styledDate(item.date))+(item.first?' · 첫 순간':'')+'</span>'+
    '<span class="journey-title-row"><span class="journey-title">'+t(item.title)+'</span>'+(item.current?'<span class="journey-now">지금 보는 순간</span>':'')+'</span>'+
    '<small class="lt-row-unavailable" data-lt-row-unavailable hidden>'+VIDEO_UNAVAILABLE_TEXT+'</small>'+
    emotion+'</span></button>'+

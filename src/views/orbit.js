@@ -17,7 +17,7 @@ let extraCSS=`:host{display:block;height:100dvh;min-height:540px;font-family:var
 // #426: 최근 순간 카드 — 궤도의 금빛 내 카드(.card.mine)와 같은 결(테두리·이중선·금빛 번짐). 390에서는 폭=화면-32px, 세로 썸네일 높이 제한.
 extraCSS+=`.recent-card{pointer-events:auto;position:relative;display:block;width:min(430px,86vw);margin:24px auto 0;padding:0;text-align:left;border:3px solid var(--lt-gold-deep);border-radius:16px;background:rgba(10,9,14,.82);box-shadow:0 24px 60px rgba(0,0,0,.38),0 0 0 1px var(--lt-gold-line),0 0 22px var(--lt-gold-glow);cursor:pointer;overflow:hidden;font:inherit;color:inherit}.recent-card:after{content:'';position:absolute;inset:2px;border:1px solid var(--lt-gold-line);border-radius:inherit;pointer-events:none}.recent-card:hover,.recent-card:focus-visible{border-color:#ffe6a6;box-shadow:0 24px 60px rgba(0,0,0,.4),0 0 0 2px rgba(255,224,158,.75),0 0 26px rgba(238,190,104,.68);outline:none}.recent-card:hover:after,.recent-card:focus-visible:after{border-color:#fff0c7}.recent-media{position:relative;display:block;width:100%;aspect-ratio:16/9;background:#0b0a10;overflow:hidden}.recent-media.vertical{width:min(100%,calc(min(300px,38dvh)*9/16));aspect-ratio:9/16;margin:0 auto}.recent-media img{width:100%;height:100%;object-fit:cover;display:block}.recent-play{position:absolute;inset:0;width:100%;min-height:44px;min-width:44px;border:0;padding:0;background:transparent;cursor:pointer;display:grid;place-items:center}.recent-play>span{display:grid;place-items:center;min-width:52px;min-height:52px;border-radius:50%;background:#1a1620d9;color:#fff;border:1px solid rgba(255,255,255,.4);font-size:20px;line-height:1}.recent-frame{position:absolute;inset:0;width:100%;height:100%;border:0;background:#000}.recent-meta{display:block;padding:10px 14px 12px}.recent-meta small{display:block;font-size:11px;letter-spacing:.04em;color:#b9b2c4}.recent-meta strong{display:block;margin:3px 0 2px;font-size:15px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.recent-media--memo{aspect-ratio:auto;display:grid;place-items:center;padding:16px;min-height:96px}.recent-media--slot{aspect-ratio:auto}.recent-memo{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;font-size:14px;line-height:1.7;color:#e6ddef;overflow-wrap:anywhere}@media(max-width:650px){.center{width:calc(100vw - 16px);max-width:calc(100vw - 16px)}.recent-card{width:calc(100vw - 32px)}.recent-media.vertical{width:min(100%,calc(38dvh*9/16))}}`;
 
-export function mountOrbit(host,{trees,storage,context,actions,authHtml='',onSelect=()=>{},recordNote=null,examples=[],onOpen=null,empty=false,titleDisplay='both',momentList=null}) {
+export function mountOrbit(host,{trees,storage,context,actions,authHtml='',onSelect=()=>{},recordNote=null,examples=[],onOpen=null,empty=false,titleDisplay='both',momentList=null,dateStyle='dot'}) {
  performance.mark('m0');
  const example=context.readOnly;
  const {root:shadow, signal, track, dispose}=createView(host);
@@ -27,7 +27,9 @@ export function mountOrbit(host,{trees,storage,context,actions,authHtml='',onSel
  const titleMode=titleDisplay;
  const titleOf=m=>titleView(m,titleMode);
  const mainOf=m=>titleOf(m).main||m.title||'';
- const dateOf=m=>formatDisplayDate(m.date);
+ // #441 후속: 첫 화면 날짜도 책·보드·지도와 같은 계정 설정(dateStyle)을 따른다. 이 화면은 저장소를
+ // 직접 읽지 않으므로(server-only-contract) 호출하는 쪽(v41/home.js)이 미리 읽어 넘긴다.
+ const dateOf=m=>formatDisplayDate(m.date,dateStyle);
  const subMarkup=m=>{const sub=titleOf(m).sub;return sub?'<span class="videoTitle">▶ '+esc(sub)+'</span>':''};
  // 2026-11-08: 내 순간이 궤도 수보다 적으면 남는 자리만 예시로 채운다(흐린 카드).
  // 2026-11-10(#340): 내 기록 YouTube 썸네일 카드(youtubeThumb)는 사진 카드 모양에 재생 표시(.card.video .playGlyph)를 붙인다.
@@ -62,7 +64,7 @@ export function mountOrbit(host,{trees,storage,context,actions,authHtml='',onSel
   const vertical=isVerticalMoment(c);
   const media=c.image
    ?`<span class="recent-media${vertical?' vertical':''}"><img src="${esc(c.image)}" alt="" draggable="false"${thumbFallbackAttrs(c,{candidates:c.thumbCandidates||[c.image],writable,variant:'orbit'})}${c.youtubeThumb?' referrerpolicy="no-referrer"':''} decoding="async">${c.youtubeThumb&&c.url?`<button type="button" class="recent-play" data-recent-play aria-label="여기서 재생"><span aria-hidden="true">▶</span></button>`:''}</span>`
-   :(!c.example&&needsFallbackCard(c,{autoLoad:false})?`<span class="recent-media recent-media--slot">${fallbackCardMarkup(c,{writable,variant:'orbit'})}</span>`:`<span class="recent-media recent-media--memo"><span class="recent-memo">${esc(c.note||head)}</span></span>`);
+   :(!c.example&&needsFallbackCard(c,{autoLoad:false})?`<span class="recent-media recent-media--slot">${fallbackCardMarkup(c,{writable,variant:'orbit',dateStyle})}</span>`:`<span class="recent-media recent-media--memo"><span class="recent-memo">${esc(c.note||head)}</span></span>`);
   return `<div class="recent-card mine" role="button" tabindex="0" data-do="recent">${media}<span class="recent-meta"><small>마지막 순간${days===null?'':` · ${days}일 전`}</small><strong>${esc(head)}</strong><small>${esc(c.subject||'내 트리')} · 이어 보기 →</small></span></div>`;
  };
  performance.mark('m1');shadow.innerHTML=`<style>${originalCSS}${extraCSS}.auth-entry{white-space:nowrap}</style><section class="app" aria-label="${SERVICE} 첫 화면"><div class="topbar"><span class="brand">${SERVICE} · MEMORY ORBIT</span><div class="top-actions"><button class="menuBtn" data-do="index">순간 목록</button>${authHtml}</div></div><div class="world"></div><div class="center-scrim" aria-hidden="true"></div><div class="center"><div class="eyebrow">${demo?'나의 첫 순간':'WELCOME BACK'}</div><h1>${demo?'좋아하는 순간부터.':'다시, 그 순간으로.'}</h1><p>${demo?'간직하고 싶은 장면에 마음을 남겨 보세요.<br>지금 떠오르는 순간 하나면 충분해요.':'기억은 아직 여기에서 이어지고 있어요.'}</p>${recentMoment?recentMarkup(recentMoment):''}<div class="actions"><button class="subtleBtn primary-cta" data-do="${demo?'new':'continue'}">${demo?NEW_TREE:'이어 보던 순간'}</button><button class="subtleBtn" data-do="${demo?'continue':'new'}">${demo?'예시 순간 감상':NEW_TREE}</button><button class="subtleBtn" data-do="trees">${GO_TREES}</button></div><p class="center-note">${demo?'감상 예시 · 내 기록에는 저장되지 않아요':esc(recordNote??`${all.length}개의 순간 · 서버에 보관`)}</p></div><div class="hint">드래그 · 금테 카드를 눌러 감상</div></section><dialog class="orbit-dialog" aria-label="순간 감상"></dialog>`;
@@ -95,7 +97,7 @@ export function mountOrbit(host,{trees,storage,context,actions,authHtml='',onSel
   // 표시하지 않고, 직접 쓴 제목이 없으면 마음 한마디를 큰 글씨로 쓴다(둘 다 없으면 제목 칸을 비워 둔다).
   const head=momentHeadTitle(c,titleMode);
   const nav=hasNav?`<button class="detail-nav detail-nav--prev" data-do="prev" aria-label="이전 순간"${atStart?' disabled':''}>←</button><button class="detail-nav detail-nav--next" data-do="next" aria-label="다음 순간"${atEnd?' disabled':''}>→</button>${atStart||atEnd?`<p class="detail-nav-note" role="status">${atStart?'처음 순간':'마지막 순간'}</p>`:''}`:'';
-  dialog.innerHTML=`<button class="close" data-do="close" aria-label="순간 닫기">닫기 ×</button>${nav}<div class="detail-grid"><div data-lt-thumb-host>${c.image?`<img class="detail-image${vertical?' detail-image--vertical':''}" src="${esc(c.image)}" alt="${esc(head.main||c.title)}"${thumbFallbackAttrs(c,{candidates:c.thumbCandidates||[c.image],writable:!demo&&!c.example,variant:'detail'})} referrerpolicy="no-referrer">`:(!demo&&!c.example&&needsFallbackCard(c,{autoLoad:false})?fallbackCardMarkup(c,{writable:!demo&&!c.example,variant:'detail'}):`<div class="detail-paper">${esc(c.note)}</div>`)}</div><div class="detail-copy"><small>${demo||c.example?'감상 예시':esc(c.subject||'내 순간')} · ${esc(c.emotion)}</small>${head.main?`<h2>${esc(head.main)}</h2>`:''}${head.sub?`<span class="videoTitle">▶ ${esc(head.sub)}</span>`:''}<small>${esc(dateOf(c))}${(demo||c.example)&&c.type==='video'?' · 영상 포스터 예시':''}</small>${head.memoAsMain?'':`<p>${esc(c.note)}</p>`}${c.relation?`<small>이전 순간에서 이어진 이유</small><p>${esc(c.relation)}</p>`:''}<div class="detail-buttons"><button data-do="book" title="${BOOK_IS_READING}">${READ_BOOK}</button><button data-do="work">${demo||c.example?NEW_TREE:VIEW_TREE}</button>${link ? (link.kind === 'invalid' ? `<span class="media-unrecognized" role="note">${esc(link.text)}</span>` : `<a href="${esc(link.href)}" target="_blank" rel="noopener noreferrer">${esc(link.text)} ↗</a>`) : ''}</div>${children.length?`<p>다음으로 이어진 순간</p><div class="detail-buttons">${children.map(x=>`<button data-next="${esc(x.key)}">${esc(mainOf(x))}</button>`).join('')}</div>`:'<p>다음 이야기를 기다리는 순간이에요.</p>'}</div></div>`;
+  dialog.innerHTML=`<button class="close" data-do="close" aria-label="순간 닫기">닫기 ×</button>${nav}<div class="detail-grid"><div data-lt-thumb-host>${c.image?`<img class="detail-image${vertical?' detail-image--vertical':''}" src="${esc(c.image)}" alt="${esc(head.main||c.title)}"${thumbFallbackAttrs(c,{candidates:c.thumbCandidates||[c.image],writable:!demo&&!c.example,variant:'detail'})} referrerpolicy="no-referrer">`:(!demo&&!c.example&&needsFallbackCard(c,{autoLoad:false})?fallbackCardMarkup(c,{writable:!demo&&!c.example,variant:'detail',dateStyle}):`<div class="detail-paper">${esc(c.note)}</div>`)}</div><div class="detail-copy"><small>${demo||c.example?'감상 예시':esc(c.subject||'내 순간')} · ${esc(c.emotion)}</small>${head.main?`<h2>${esc(head.main)}</h2>`:''}${head.sub?`<span class="videoTitle">▶ ${esc(head.sub)}</span>`:''}<small>${esc(dateOf(c))}${(demo||c.example)&&c.type==='video'?' · 영상 포스터 예시':''}</small>${head.memoAsMain?'':`<p>${esc(c.note)}</p>`}${c.relation?`<small>이전 순간에서 이어진 이유</small><p>${esc(c.relation)}</p>`:''}<div class="detail-buttons"><button data-do="book" title="${BOOK_IS_READING}">${READ_BOOK}</button><button data-do="work">${demo||c.example?NEW_TREE:VIEW_TREE}</button>${link ? (link.kind === 'invalid' ? `<span class="media-unrecognized" role="note">${esc(link.text)}</span>` : `<a href="${esc(link.href)}" target="_blank" rel="noopener noreferrer">${esc(link.text)} ↗</a>`) : ''}</div>${children.length?`<p>다음으로 이어진 순간</p><div class="detail-buttons">${children.map(x=>`<button data-next="${esc(x.key)}">${esc(mainOf(x))}</button>`).join('')}</div>`:'<p>다음 이야기를 기다리는 순간이에요.</p>'}</div></div>`;
   dialog.querySelector('[data-do=book]').onclick=()=>{dialog.close();if(onOpen&&!c.example)onOpen(c);else actions.openBook(c.treeId,c.id,demo)};
   dialog.querySelector('[data-do=work]').onclick=()=>{dialog.close();demo?actions.requestMoment('new'):actions.openWorkspace(c.treeId,c.id)};
   dialog.querySelector('[data-do=prev]')?.addEventListener('click',()=>stepDetail(-1));
@@ -113,7 +115,7 @@ export function mountOrbit(host,{trees,storage,context,actions,authHtml='',onSel
    const head=momentHeadTitle(c,titleMode).main;
    const thumb=c.image?`<span class="index-row-thumb"><img src="${esc(c.image)}" alt=""${thumbFallbackAttrs(c,{candidates:c.thumbCandidates||[c.image],mode:'thumb-slot'})} referrerpolicy="no-referrer" loading="lazy" decoding="async"></span>`:'';
    if(!head&&!demo&&!c.example){
-    return `<button data-next="${esc(c.key)}" data-lt-moment-row class="index-row-card">${thumb}<span class="index-row-body">${fallbackCardMarkup(c,{writable:!demo&&!c.example,variant:'row'})}${listFilter==='all'&&c.treeLabel?`<small>${esc(c.treeLabel)}</small>`:''}</span></button>`;
+    return `<button data-next="${esc(c.key)}" data-lt-moment-row class="index-row-card">${thumb}<span class="index-row-body">${fallbackCardMarkup(c,{writable:!demo&&!c.example,variant:'row',dateStyle})}${listFilter==='all'&&c.treeLabel?`<small>${esc(c.treeLabel)}</small>`:''}</span></button>`;
    }
    return `<button data-next="${esc(c.key)}" data-lt-moment-row>${thumb}<span class="index-row-body">${head?esc(head):''}<small class="lt-row-unavailable" data-lt-row-unavailable hidden>${VIDEO_UNAVAILABLE_TEXT}</small><small>${listFilter==='all'&&c.treeLabel?esc(c.treeLabel)+' · ':''}${esc(dateOf(c))} · ${esc(c.emotion)}</small></span></button>`;
   };
@@ -146,7 +148,7 @@ shadow.addEventListener('keydown',e=>{if(e.key!=='Enter'&&e.key!==' ')return;if(
   }
  });
  track(disposeThumb);
-performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElement('button');b.className=`card ${c.type} ${c.sizeClass}${c.example?' example':''}${c.source==='mine'?' mine':''}`;b.dataset.example=c.example?'1':'';b.innerHTML=`<div class="surface" data-lt-thumb-host>${c.image?`<img src="${esc(c.image)}" alt="" draggable="false" style="object-fit:${c.fitMode==='contain'?'contain':'cover'}"${thumbFallbackAttrs(c,{candidates:c.thumbCandidates||[c.image],writable:!demo&&!c.example,variant:'orbit'})}${c.youtubeThumb?' referrerpolicy="no-referrer" loading="lazy" decoding="async"':''}>`:(!demo&&!c.example&&needsFallbackCard(c,{autoLoad:false})?fallbackCardMarkup(c,{writable:!demo&&!c.example,variant:'orbit'}):`<div class="memoKicker">${esc(dateOf(c))}</div><div class="memoText">${esc(mainOf(c))}</div><div class="memoFoot">${esc(c.emotion)}</div>`)}</div>${c.youtubeThumb&&c.image?'<span class="playGlyph" aria-hidden="true">▶</span>':''}${c.first?'<div class="firstMark">FIRST</div>':''}<div class="caption"><span>${esc(mainOf(c))}${subMarkup(c)}</span></div>`;b.addEventListener('pointerenter',e=>{if(e.pointerType==='mouse'&&!drag)hoveredCard=b;},{signal});b.addEventListener('pointerleave',()=>{if(hoveredCard===b)hoveredCard=null;},{signal});b.onclick=e=>{if(e.target?.closest?.('[data-lt-title-edit]'))return;if(e.detail===0||moved<9){if(onOpen&&!c.example){onOpen(c);return;}focus(c)}};world.append(b);return b;});performance.mark('m3');
+performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElement('button');b.className=`card ${c.type} ${c.sizeClass}${c.example?' example':''}${c.source==='mine'?' mine':''}`;b.dataset.example=c.example?'1':'';b.innerHTML=`<div class="surface" data-lt-thumb-host>${c.image?`<img src="${esc(c.image)}" alt="" draggable="false" style="object-fit:${c.fitMode==='contain'?'contain':'cover'}"${thumbFallbackAttrs(c,{candidates:c.thumbCandidates||[c.image],writable:!demo&&!c.example,variant:'orbit'})}${c.youtubeThumb?' referrerpolicy="no-referrer" loading="lazy" decoding="async"':''}>`:(!demo&&!c.example&&needsFallbackCard(c,{autoLoad:false})?fallbackCardMarkup(c,{writable:!demo&&!c.example,variant:'orbit',dateStyle}):`<div class="memoKicker">${esc(dateOf(c))}</div><div class="memoText">${esc(mainOf(c))}</div><div class="memoFoot">${esc(c.emotion)}</div>`)}</div>${c.youtubeThumb&&c.image?'<span class="playGlyph" aria-hidden="true">▶</span>':''}${c.first?'<div class="firstMark">FIRST</div>':''}<div class="caption"><span>${esc(mainOf(c))}${subMarkup(c)}</span></div>`;b.addEventListener('pointerenter',e=>{if(e.pointerType==='mouse'&&!drag)hoveredCard=b;},{signal});b.addEventListener('pointerleave',()=>{if(hoveredCard===b)hoveredCard=null;},{signal});b.onclick=e=>{if(e.target?.closest?.('[data-lt-title-edit]'))return;if(e.detail===0||moved<9){if(onOpen&&!c.example){onOpen(c);return;}focus(c)}};world.append(b);return b;});performance.mark('m3');
  // #429 2/2: 카드 기본 폭·높이와 안전 구역은 둘째 프레임에서 한 번만 잰다. 첫 프레임에서 강제 레이아웃을
  // 하면 뼈대 완성(DOMContentLoaded)이 그 만큼 늦어진다(#400 뼈대 완성 보호 — 첫 프레임은 밀어내기 없이 그린다).
  let cardSizes=null,warmups=0;
@@ -155,7 +157,10 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
   warmups+=1;
   // 밀어낼 때는 프레임 사이 각도·위상 변화를 덮는 12px 여유를 더 붙인다(실측 침범 0 유지).
   const zs=safeZone?{l:safeZone.l-12,t:safeZone.t-12,r:safeZone.r+12,b:safeZone.b+12}:null;
-  cards.forEach((c,i)=>{const cfg=rings[c.ring],th=c.baseAngle+phase*cfg.speed+c.phaseOffset;let x=Math.cos(th)*cfg.rx,y=Math.sin(th)*cfg.ry+cfg.band+Math.sin(th*1.7+c.phaseOffset*3)*45,z=Math.sin(th+1.1+c.phaseOffset*4)*cfg.zAmp+cfg.zBase+c.zOffset;if(!demo&&cards.length<=8){const angle=i*Math.PI*2/cards.length+phase;x=Math.cos(angle)*Math.min(w*.34,420);y=Math.sin(angle)*Math.min(h*.3,250)+(i%2===0?80:-80);z=0;}const sc=Math.max(.18,Math.min(1.82,1050/(1050-z))),fit=Math.min(1,w/780,h/850);const placementFit=!demo&&cards.length<=8?1:fit;const el=elements[i];
+  cards.forEach((c,i)=>{const cfg=rings[c.ring],th=c.baseAngle+phase*cfg.speed+c.phaseOffset;let x=Math.cos(th)*cfg.rx,y=Math.sin(th)*cfg.ry+cfg.band+Math.sin(th*1.7+c.phaseOffset*3)*45,z=Math.sin(th+1.1+c.phaseOffset*4)*cfg.zAmp+cfg.zBase+c.zOffset;if(!demo&&cards.length<=8){const angle=i*Math.PI*2/cards.length+phase;x=Math.cos(angle)*Math.min(w*.34,420);y=Math.sin(angle)*Math.min(h*.3,250)+(i%2===0?80:-80);z=0;}const narrow=w<=650;
+   // #457: 좁은 화면은 깊이 상한을 낮추고(가까운 카드가 너무 커지지 않게) 궤도 반지름도 더 좁혀,
+   // 안전 구역을 피해 밀어내기 전부터 카드가 화면에 가깝게 놓이게 한다(민 뒤 화면 밖으로 밀리는 양을 줄인다).
+   const sc=Math.max(.18,Math.min(narrow?1.1:1.82,1050/(1050-z))),fit=Math.min(1,w/780,h/850)*(narrow?.5:1);const placementFit=!demo&&cards.length<=8?1:fit;const el=elements[i];
    // #429 2/2: 폭별 상한을 넘는 카드는 숨긴다(가로 넘침·과밀 방지). 창이 넓어지면 다시 보인다.
    if(i>=cardCapFor(w)){el.style.display='none';return;}
    if(el.style.display==='none')el.style.display='';
@@ -178,10 +183,27 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
      const sxp=w/2+(Cx0-w/2+x2*sc)*k,syp=h/2+(Cy0-h/2+y3*sc)*k;    // 원근 원점(화면 중심) 기준으로 투영
      if(sxp<minX)minX=sxp;if(sxp>maxX)maxX=sxp;if(syp<minY)minY=syp;if(syp>maxY)maxY=syp;
     }
-    if(maxX>zs.l&&minX<zs.r&&maxY>zs.t&&minY<zs.b){
+    if(narrow){
+     // #457: 좁은 화면은 안전 구역이 폭 대부분을 차지해 옆으로는 못 피한다. 가로는 먼저 화면 안(0..w)으로
+     // 당기고(옆으로 못 미니 화면 밖 자체를 막는다), 그 가로 위치로 안전 구역과 겹치는지 다시 본 뒤
+     // 겹치면 위·아래 띠로만 민다 — 가로를 당기고 나서 봐야 겹침을 제대로 판정한다(당기기 전 기준으로 겹침이 없다고
+     // 넘겼다가 당긴 뒤에 겹치는 경우를 막는다).
+     if(minX<0){px-=minX;maxX-=minX;minX=0;}else if(maxX>w){const over=maxX-w;px-=over;maxX-=over;minX-=over;}
+     if(maxX>zs.l&&minX<zs.r&&maxY>zs.t&&minY<zs.b){
+      const pushT=maxY-zs.t,pushB=zs.b-minY,upFits=minY-pushT>=0,downFits=maxY+pushB<=h;
+      // 띠 둘 다에 안 들어가는 카드(너무 큼)는 보여 주는 대신 숨긴다 — "띠가 좁으면 카드 수를 줄인다".
+      if(!upFits&&!downFits){el.style.display='none';return;}
+      if(upFits&&downFits?pushT<=pushB:upFits){py-=pushT;minY-=pushT;maxY-=pushT;}else{py+=pushB;minY+=pushB;maxY+=pushB;}
+     }
+     if(minY<0){py-=minY;maxY-=minY;minY=0;}else if(maxY>h){const over=maxY-h;py-=over;maxY-=over;minY-=over;}
+     // 마지막 안전망: 그래도 안전 구역과 겹치면(위 보정이 다 못 막은 극단 경우) 보여 주는 대신 숨긴다.
+     if(maxX>zs.l&&minX<zs.r&&maxY>zs.t&&minY<zs.b){el.style.display='none';return;}
+    } else if(maxX>zs.l&&minX<zs.r&&maxY>zs.t&&minY<zs.b){
+     // #429 2/2: 가운데 안전 구역과 카드 사각형이 겹치면 겹침이 0이 되도록 네 쪽 중 가장 얇은 쪽으로 민다(그대로).
      const pushL=maxX-zs.l,pushR=zs.r-minX,pushT=maxY-zs.t,pushB=zs.b-minY,m=Math.min(pushL,pushR,pushT,pushB);
      if(m===pushL)px-=pushL;else if(m===pushR)px+=pushR;else if(m===pushT)py-=pushT;else py+=pushB;
-    }}
+    }
+   }
    el.style.transform=`translate3d(${px}px,${py}px,0) scale(${sc*Math.max(.58,fit)}) rotateX(${c.tiltX+Math.sin(th)*9}deg) rotateY(${c.tiltY+Math.cos(th)*18}deg) rotateZ(${c.tiltZ+Math.sin(th*.6)*7}deg)`;
    // #429 2/2: 깊이는 크기와 밝기로만 — 카드는 언제나 불투명(opacity 1, 비침 없음), blur는 쓰지 않는다.
    // 대표: "흐리게 처리한 카드는 별로, 선명한 게 좋다"(2026-11-08). 뒤쪽 카드는 밝기 0.78까지 조금 어둡게.
