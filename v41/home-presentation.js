@@ -27,7 +27,6 @@ export function homePresentation(context) {
   trees: [],
   context: {treeId: null, momentId: null, readOnly: true},
   accountLabel: member === 'in' ? '내 계정' : '로그인',
-  canResume: context?.source !== 'example' && !!context?.tree?.moments?.some(m => m.id === context.momentId),
   centerState: {member, treeCount}
  };
 }

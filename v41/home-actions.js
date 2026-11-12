@@ -5,7 +5,6 @@ export function createHomeActions({getContext,send,gallery=false}) {
   // 카드의 treeId 는 합성 래퍼('home-cards')일 수 있으니 셸 트리에서 실제 트리를 다시 찾는다.
   const ownTree=(treeId,id)=>{const trees=getContext()?.trees;if(!Array.isArray(trees))return null;return (treeId?trees.find(t=>t.id===treeId&&t.moments?.some(m=>m.id===id)):null)||trees.find(t=>t.moments?.some(m=>m.id===id))||null;};
  return {select,actions:{
-  resume:()=>{const c=getContext();if(c?.source!=='example'&&c?.tree?.moments.some(m=>m.id===c.momentId))send({type:'lt41-navigate',view:BOOK});},
   start:()=>send({type:'lt41-start'}),
    account:()=>send({type:'lt41-account'}),
    community:()=>send({type:'lt41-community'}),

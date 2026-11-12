@@ -67,18 +67,16 @@ const identity=document.createElement('style');
 identity.textContent=`:host{--ui:'Pretendard Variable',Pretendard,system-ui,sans-serif}.app{font-family:var(--ui)}.actions .subtleBtn{font-size:14px}.center .center-note{font-size:12px}.menuBtn{font-size:14px}.topbar .brand{display:none}.topbar{justify-content:flex-end;padding:12px 28px}.top-actions>.home-community,.top-actions>[data-home-account]{display:none}`;
 shadow.append(identity);
 // 2026-11-08 #213 2번: 도구 줄 버튼은 둘(보기·순간 목록)이고, 시각 높이 36·누르는 영역 44로 맞춘다.
-// 메뉴 항목은 44px 이상이고, 바깥 클릭·Esc로 닫힌다.
 const cardUI=document.createElement('style');
-cardUI.textContent=`.top-actions>.menuBtn,.top-actions>.view-menu-wrap>.menuBtn{position:relative;height:36px;min-height:36px;display:inline-flex;align-items:center;padding-block:0}.top-actions>.menuBtn:after,.top-actions>.view-menu-wrap>.menuBtn:after{content:'';position:absolute;inset:-4px;border-radius:999px}[data-home-account],.home-community{display:none}.view-menu-wrap{position:relative;display:inline-flex;align-items:center;min-height:44px}.view-menu{position:absolute;top:calc(100% + 8px);right:0;z-index:4000;min-width:188px;padding:6px;border:1px solid var(--lt-line);border-radius:14px;background:var(--lt-glass-strong);box-shadow:0 14px 34px rgba(0,0,0,.45)}.view-menu[hidden]{display:none}.view-menu button{display:block;width:100%;min-height:44px;padding:8px 12px;border:0;border-radius:10px;background:transparent;color:var(--lt-pearl);font:inherit;font-size:14px;text-align:left;cursor:pointer}.view-menu button[aria-checked=true],.view-menu button:hover{box-shadow:inset 0 0 0 1px var(--lt-gold-line)}.view-menu button[aria-checked=true]{color:var(--lt-gold)}.view-menu button:focus-visible{outline:2px solid var(--lt-gold);outline-offset:-2px}.view-menu-sep{height:1px;margin:6px 4px;background:var(--lt-line)}@media(max-width:768px){.view-menu{right:auto;left:0}}`;
+cardUI.textContent=`.top-actions>.menuBtn{position:relative;height:36px;min-height:36px;display:inline-flex;align-items:center;padding-block:0}.top-actions>.menuBtn:after{content:'';position:absolute;inset:-4px;border-radius:999px}[data-home-account],.home-community{display:none}`;
 shadow.append(cardUI);
-// #380(2026-11-11): 로그인 전 [＋ 첫 순간 남기기·둘러보기·어떻게 쓰나요] / 로그인 후 [＋ 순간 추가·이어 보던 순간·둘러보기].
+// #380(2026-11-11): 로그인 전 [＋ 첫 순간 남기기·둘러보기·어떻게 쓰나요] / 로그인 후 [＋ 순간 추가·둘러보기](#426: 세 번째 자리는 숨김, 최근 순간 카드가 "이어 보기"를 대신).
 // 로그인 전이면 지금 두 줄 그대로, 로그인 후면 상태에 따라 큰 제목 아래 둘째 줄도 함께 갱신한다(아래 상태 블록).
 const centerButtons=[...shadow.querySelectorAll('.center .actions button')];
 const centerPlan=applyHomeCenter(centerButtons,presentation.centerState);
 const byDo=name=>centerButtons.find(b=>b.dataset.do===name);
-// '＋ 순간 추가' → 기존 add 흐름(requestMoment add), '이어 보던 순간' → 기존 resume, 둘러보기/어떻게 쓰나요 → 기존 community(둘러보기와 동일 — 별도 사용법 안내 없음).
+// '＋ 순간 추가' → 기존 add 흐름(requestMoment add), 둘러보기/어떻게 쓰나요 → 기존 community(둘러보기와 동일 — 별도 사용법 안내 없음).
 const addButton=byDo('add');if(addButton)addButton.onclick=()=>bridge.actions.requestMoment('add');
-// #426: '이어 보던 순간' 버튼은 최근 순간 카드가 대신한다(버튼 없음).
 const communityButton=byDo('community');if(communityButton)communityButton.onclick=()=>bridge.actions.community();
 const guideButton=byDo('guide');if(guideButton)guideButton.onclick=()=>bridge.actions.community();
 let loginFocusButton=null;

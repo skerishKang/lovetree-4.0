@@ -49,20 +49,15 @@ test('member homes with zero, one, or many records keep the same read-only origi
   const c={source:'server',tree:{id:'member-tree',moments:Array.from({length:count},(_,i)=>({id:'m'+i}))},momentId:count?'m0':null};
   const before=JSON.stringify(c),p=homePresentation(c);
   assert.deepEqual(p.trees,[]);assert.equal(p.context.readOnly,true);assert.equal(p.context.treeId,null);
-  assert.equal(p.accountLabel,'내 계정');assert.equal(p.canResume,count>0);assert.equal(JSON.stringify(c),before);
+  assert.equal(p.accountLabel,'내 계정');assert.equal(JSON.stringify(c),before);
  }
- assert.equal(homePresentation({source:'example',...context}).canResume,false);
 });
-test('gallery clicks never select a member moment, even when IDs overlap; resume keeps member selection',()=>{
+test('gallery clicks never select a member moment, even when IDs overlap; navigate keeps member selection',()=>{
  const c={source:'server',...context,momentId:'m02'},sent=[];
  const f=createHomeActions({getContext:()=>c,send:m=>sent.push(m),gallery:true});
- assert.equal(f.select('m01'),false);f.actions.openBook('orbit-example','m01');f.actions.resume();f.actions.navigate('trees');
- assert.deepEqual(sent,[{type:'lt41-example',view:'track59-sketchbook.html',momentId:'m01'},{type:'lt41-navigate',view:'track59-sketchbook.html'},{type:'lt41-navigate',view:'track32-bookshelf.html'}]);
+ assert.equal(f.select('m01'),false);f.actions.openBook('orbit-example','m01');f.actions.navigate('trees');
+ assert.deepEqual(sent,[{type:'lt41-example',view:'track59-sketchbook.html',momentId:'m01'},{type:'lt41-navigate',view:'track32-bookshelf.html'}]);
  assert.equal(c.momentId,'m02');
-});
-test('gallery resume does nothing for empty or example records',()=>{
- const sent=[];for(const c of [null,{source:'server',tree:null},{source:'example',...context,momentId:'m01'}])createHomeActions({getContext:()=>c,send:m=>sent.push(m),gallery:true}).actions.resume();
- assert.deepEqual(sent,[]);
 });
 
 test('member gallery board action opens the matching example, leaving member selection untouched',()=>{

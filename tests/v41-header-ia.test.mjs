@@ -154,10 +154,6 @@ test('첫 화면 표시 상태는 로그인·트리 수를 셸 컨텍스트에�
   const withTree = homePresentation({source: 'server', tree: {id: 't1', moments: [{id: 'm1'}]}, trees: [{id: 't1'}, {id: 't2'}]});
   assert.equal(withTree.centerState.member, 'in');
   assert.equal(withTree.centerState.treeCount, 2);
-  assert.equal(withTree.canResume, false, '선택된 순간이 없으면 이어 보기를 켜지 않는다');
-
-  const resumable = homePresentation({source: 'server', tree: {id: 't1', moments: [{id: 'm1'}]}, trees: [{id: 't1'}], momentId: 'm1'});
-  assert.equal(resumable.canResume, true, '선택된 순간이 있으면 이어 보기가 가능하다');
 });
 
 test('첫 화면 로그아웃 첫 버튼은 셸에 로그인 시작을 요청한다', () => {
