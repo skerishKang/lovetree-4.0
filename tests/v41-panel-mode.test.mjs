@@ -124,7 +124,7 @@ test('순간 잇기는 고른 연결이 저장 전이면 더러움이다', () =>
 test('내 기록 저장본을 보는 동안의 편집 잠금은 그대로다', () => {
   // 서버 확인 전(checking)에는 writable이 false라 편집기를 열지 않고 기록 패널로 보낸다 — 전체 화면 이동은 이 관문을 지난다.
   assert.match(panels, /if \(!getMember\(\)\.snapshot\(\)\.writable\) \{/);
-  assert.match(panels, /setEditorMode\(mode, parentId\);\n    panel\('write-panel'\);/);
+  assert.match(panels, /setEditorMode\(mode, parentId\);\r?\n    panel\('write-panel'\);/);
   assert.match(shell, /writable:source==='server'&&!!member\?\.snapshot\(\)\.writable/);
 });
 

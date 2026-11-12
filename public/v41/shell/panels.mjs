@@ -41,6 +41,20 @@ export function createPanels(deps) {
     return !$('parent-management').hidden && parentValue() !== parentBaseline;
   }
   // #425: 더러움은 한 창 두 구역을 모두 본다 — 자세한 추가(폼·연결)와 쉬운 추가(주소를 적고 아직 담지 않음).
+  // #453 B: ＋ 순간 추가(쉬운 추가)로 연 창은 자세한 폼의 기준값이 없었다. 탭을 처음 보일 때 기본값을 한 번 채우고
+  // 그 상태를 기준값으로 삼아, 아무것도 안 바꿨으면 닫을 때 묻지 않는다.
+  function startQuickSession() {
+    formBaseline = '';
+    parentBaseline = parentValue();
+  }
+  function onWriteTab(tab) {
+    if (tab !== 'detailed' || formBaseline) return;
+    const form = $('moment-form');
+    if (!form.elements.date.value) form.elements.date.value = new Date().toISOString().slice(0, 10);
+    if (!form.elements.emotion.value) form.elements.emotion.value = '설렘';
+    formBaseline = new URLSearchParams(new FormData(form)).toString();
+    parentBaseline = parentValue();
+  }
   function detailedDirty() {
     return $('write-panel').open && $('write-easy').hidden
       && (new URLSearchParams(new FormData($('moment-form'))).toString() !== formBaseline || parentDirty());
@@ -112,9 +126,11 @@ export function createPanels(deps) {
   }
 
   function openEditor(requestedMode, parentId = '') {
-    if (getSource() !== 'server' || !getMember()?.snapshot().owned) {
+    if (!getMember()?.snapshot().owned) {
       openLoginStart('new-tree'); return;
     }
+    // #453 A: 예시를 둘러보는 중이면 로그인 화면 대신 내 기록으로 돌아와 같은 동작을 이어 간다.
+    if (getSource() !== 'server') { deps.resumeMember?.(requestedMode === 'edit' ? 'write' : requestedMode || 'write'); return; }
     if (!getMember().snapshot().writable) {
       notify('서버 편집 연결이 아직 준비되지 않았어요. 기록은 안전하게 읽을 수 있습니다.'); openSettingsData?.(); return;
     }
@@ -389,6 +405,8 @@ export function createPanels(deps) {
     uploadsChanged,
     formDirty,
     detailedDirty,
+    startQuickSession,
+    onWriteTab,
     treeDirty,
     editorMode: () => editorMode
   };
