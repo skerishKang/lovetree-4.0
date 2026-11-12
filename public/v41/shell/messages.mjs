@@ -2,6 +2,8 @@
 // 2026-11-08 리팩터링: 동작·문구·주소 형식 변경 0. shell.mjs에서 조건·조회 방식·인자 형태를 바꾸지 않고 그대로 옮겼다.
 import {mountCommunity} from '../community-panel.mjs';
 import {displayTreeTitle} from '../tree-name.mjs';
+// #480 L13: 날짜는 책·보드·지도·첫 화면과 같은 한 벌(formatDisplayDate)로만 적는다.
+import {formatDisplayDate} from '../book-usability.mjs';
 
 export function createMessages(deps) {
   const {$} = deps;
@@ -10,6 +12,8 @@ export function createMessages(deps) {
   const getModel = deps.getModel;
   const getSource = deps.getSource;
   const getMember = deps.getMember;
+  // #480 L13: 계정 설정의 날짜 표기. 셸이 넘겨 주지 않으면 기본(dot)으로 적는다 — 새로 만드는 규칙 아님.
+  const getDateStyle = deps.getDateStyle || (() => 'dot');
   const shareApi = deps.shareApi;
   const notify = deps.notify;
   const panel = deps.panel;
@@ -156,7 +160,8 @@ export function createMessages(deps) {
     }
   }
   function shareLabel(item) {
-    return (item.view === 'board' ? '기억 보드' : item.view === 'network' ? '관계 지도' : '기억책') + ' · ' + new Date(item.createdAt).toLocaleDateString('ko-KR') + '에 만든 주소';
+    // 예전에는 toLocaleDateString('ko-KR')이라 세 표기(점·줄표·한글) 어디에도 맞지 않았다.
+    return (item.view === 'board' ? '기억 보드' : item.view === 'network' ? '관계 지도' : '기억책') + ' · ' + formatDisplayDate(item.createdAt, getDateStyle()) + '에 만든 주소';
   }
   function shareRow(item) {
     const row = document.createElement('div');
@@ -276,7 +281,7 @@ export function createMessages(deps) {
     $('share-preview-moments').replaceChildren();
     for (const moment of answer.preview.tree.moments) {
       const li = document.createElement('li');
-      li.textContent = `${moment.title} · ${moment.emotion} · ${moment.date}`;
+      li.textContent = `${moment.title} · ${moment.emotion} · ${formatDisplayDate(moment.date, getDateStyle())}`;
       $('share-preview-moments').append(li);
     }
     $('share-preview-result').hidden = false;
@@ -349,6 +354,8 @@ export function createMessages(deps) {
   mountCommunity({
     button: $('community-menu'),
     dialog: $('community-panel'),
+    // #480 L13: 둘러보기 카드·댓글의 날짜도 계정 설정 한 벌을 따른다.
+    getDateStyle: () => getDateStyle(),
     onOpenShare: item => { $('community-panel').close(); location.hash = `#share/${item.shareId}/${item.view || 'book'}`; },
     // 이슈 457 5번: 공유할 내 트리가 있어야 "내 트리 공유하기" — 로그아웃·트리 0개는 "첫 트리 만들기"로 바뀐다.
     hasOwnTree: () => getSource() === 'server' && !!getMember()?.snapshot().owned && (getModel()?.trees?.length || 0) > 0,

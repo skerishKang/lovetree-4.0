@@ -288,6 +288,8 @@ const shellMessages=createMessages({
   getModel:()=>model,
   getSource:()=>source,
   getMember:()=>member,
+  // #480 L13: 공유 목록·공유 미리보기의 날짜도 계정 설정 한 벌을 따른다(책·보드·지도·첫 화면과 같음).
+  getDateStyle:()=>currentDateStyle(),
   shareApi,
   notify:text=>notify(text),
   panel:id=>panel(id),
