@@ -110,3 +110,14 @@ test('정리 화면 열기 메시지가 홈 액션에 준비됐다',()=>{
   createHomeActions({getContext:()=>null,send:m=>sent.push(m)}).actions.cleanup();
   assert.deepEqual(sent,[{type:'lt41-move'}]);
 });
+
+test('첫 화면 가운데 버튼 폭(대표 2026-11-13): 두 개여도 늘어나지 않고, 휴대폰에서는 줄을 꽉 채우지 않는다', () => {
+  const home = src('v41/home.js');
+  // 세 개일 때 폭(약 176px)을 상한으로 — 두 개면 265px씩 늘어나던 것을 막는다.
+  assert.match(home, /\.center \.actions \.subtleBtn\{flex:1 1 0%;max-width:176px;/);
+  // 휴대폰: 두 개는 나란히(각 150px까지), 세 개는 세로로 쌓되 240px까지만. 줄 전체로 늘리던 규칙은 없다.
+  assert.match(home, /@media \(max-width:480px\)\{[^']*\.subtleBtn\{max-width:150px\}[^']*\[data-count="3"\]\{flex-direction:column;align-items:center\}[^']*max-width:240px\}/);
+  assert.doesNotMatch(home, /align-items:stretch\}\.center \.actions \.subtleBtn\{width:100%\}\}/);
+  // 보이는 버튼 수를 표시한다.
+  assert.match(home, /setAttribute\('data-count',String\(centerButtons\.filter\(b=>!b\.hidden/);
+});
