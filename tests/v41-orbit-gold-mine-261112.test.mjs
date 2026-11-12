@@ -36,15 +36,16 @@ test('내 카드는 진한 금 테두리 3px + 은은한 금빛 바깥빛이다(
 
 test('정원에서도 .card.mine 규칙이 이긴다(구체성 0-3-1 > 정원 일반 규칙 0-2-1)', () => {
   const gardenMine = ruleOf(orbit, ':host([data-lt-theme=garden]) .card.mine{');
-  assert.match(gardenMine, /border-color:var\(--lt-gold-deep\)/, '정원에서도 진한 금(장밋) 테두리');
+  assert.match(gardenMine, /border-color:var\(--lt-rose\)/, '정원 내 카드는 강조 장밋 테두리(일반 #98505e 1px와 색·두께 모두 다름)');
   assert.match(gardenMine, /box-shadow:var\(--lt-garden-shadow\),0 0 0 1px var\(--lt-gold-line\),0 0 20px var\(--lt-gold-glow\)/, '정원 깊이 그림자 + 금빛 링·바깥빛');
+  assert.match(ruleOf(orbit, ':host([data-lt-theme=garden]) .recent-card{'), /border-color:var\(--lt-rose\)/, '마지막 순간 카드도 같은 장밋');
   // identity.css의 정원 일반 규칙(.card·.card.memo)보다 선택자가 길어 이긴다.
   assert.match(identity, /:host\(\[data-lt-theme=garden\]\) \.card\{border-color:var\(--lt-gold-deep\)/);
   assert.match(identity, /:host\(\[data-lt-theme=garden\]\) \.card\.memo\{border-color:var\(--lt-ink\)\}/);
 });
 
 test('"마지막 순간" 카드도 내 카드와 같은 진한 금 테두리를 쓴다', () => {
-  const recent = ruleOf(orbit, '.recent-card{');
+  const recent = ruleOf(orbit, '.recent-card{pointer-events:auto');
   assert.match(recent, /border:3px solid var\(--lt-gold-deep\)/);
   assert.match(recent, /0 0 0 1px var\(--lt-gold-line\)/);
   assert.match(recent, /0 0 22px var\(--lt-gold-glow\)/);
