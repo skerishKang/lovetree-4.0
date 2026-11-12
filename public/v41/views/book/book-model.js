@@ -1,4 +1,4 @@
-// 기억책의 순수 계산 한 벌. 화면(book.js·book-extra.js)이 실제로 이 함수들을 부른다.
+// 책의 순수 계산 한 벌. 화면(book.js·book-extra.js)이 실제로 이 함수들을 부른다.
 // 일반 스크립트로 불러오고(node 시험은 import), window.LT59Model 하나로 노출한다.
 // 표시 규칙(제목·연결 문구·넘침 판정·tapIntent)은 이미 book-usability.mjs가 한 벌로 갖고 있다.
 window.LT59Model = (() => {
@@ -127,7 +127,7 @@ const spreads =Array.from({length:Math.ceil(moments.length/2)},(_,i)=>{const toP
     return { items, steps: items.length, days: journeyDays(slice[0]?.date, slice[slice.length - 1]?.date) };
   }
 
-  // 기억책 → 내 책장: 셸 안에서 보고 있고 공유 감상이 아니면 책장으로 돌아간다.
+  // 책 → 내 트리: 셸 안에서 보고 있고 공유 감상이 아니면 내 트리로 돌아간다.
   function shelfReturn({ source = 'example', embedded = true } = {}) {
     if (!embedded) return 'none';
     if (source === 'share') return 'none';

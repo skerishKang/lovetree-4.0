@@ -72,7 +72,7 @@ test('화면은 목차 계산을 shelf-model 한 벌에서 불러 쓰고, 목차
   // 레일이 움직이면 목차 선택도 함께 맞춘다.
   assert.match(shelfJs, /syncSpines\(\);\n        setShelfAtmosphere/);
   const html = read('public/v41/views/track32-bookshelf.html');
-  assert.match(html, /<nav class="shelf-spines" id="shelfSpines" aria-label="책장 목차" hidden>/);
+  assert.match(html, /<nav class="shelf-spines" id="shelfSpines" aria-label="트리 목차" hidden>/);
   assert.match(html, /<div class="shelf-spine-row" id="shelfSpineRow"><\/div>/);
 });
 

@@ -191,7 +191,7 @@ test('실제 서버(share-service)가 만든 목록 응답을 클라 렌더러�
     const row = h.els['share-list'].children[0];
     assert.match(row.className, /share-item/, '서버가 준 status="active"를 살아 있는 주소로 그린다(지난 주소 접힘 아님)');
     assert.equal(row.children[0].children[0].textContent, '공유 중 · 주소로만 공개');
-    assert.match(row.children[0].children[1].textContent, /관계 지도 · .+에 만든 주소/, '서버의 createdAt을 Invalid Date 없이 날짜로 그린다');
+    assert.match(row.children[0].children[1].textContent, /지도 · .+에 만든 주소/, '서버의 createdAt을 Invalid Date 없이 날짜로 그린다');
     assert.doesNotMatch(row.children[0].children[1].textContent, /Invalid Date/);
   } finally { h.restore(); }
 });

@@ -1,4 +1,4 @@
-// 내 책장의 순수 계산 (#231 후속, 2026-11-09).
+// 내 트리(책장 화면)의 순수 계산 (#231 후속, 2026-11-09).
 // views/shelf/shelf.js 안에 있던 계산을 화면(DOM) 없이 시험할 수 있게 그대로 옮겼다.
 // 조건·문구·계산식 변경 0.
 import { normalizeCoverDesign, coverDesignPaletteIndex, coverModeOf } from '../../domain.mjs';

@@ -65,7 +65,7 @@ test('트리 선택 문구는 트리가 있으면 이름, 없으면 트리 고�
 test('헤더 주 버튼 문구는 로그인·트리·읽기 상태를 따른다', () => {
   assert.equal(writeMenuLabel({owned: false}), '처음 시작하기');
   assert.equal(writeMenuLabel({owned: true, hasTree: false}), '새 트리 만들기');
-  assert.equal(writeMenuLabel({owned: true, hasTree: true, reading: false}), '순간 남기기');
+  assert.equal(writeMenuLabel({owned: true, hasTree: true, reading: false}), '순간 추가');
   assert.equal(writeMenuLabel({owned: true, hasTree: true, reading: true}), '순간 추가');
   assert.equal(writeMenuLabel({owned: true, hasTree: true, reading: true, dirty: true}), '미저장 기록');
   assert.equal(writeMenuLabel({owned: false, dirty: true}), '처음 시작하기', '로그아웃 상태에서는 미저장 표시를 쓰지 않는다');
@@ -75,7 +75,7 @@ test('첫 화면 로그아웃: 첫 버튼만 흰색 강조이고 문구는 처�
   const plan = homeCenterState({member: 'out', treeCount: 0});
   assert.equal(plan.state, 'out');
   assert.equal(plan.buttons.length, 3, '버튼 개수는 그대로 3개');
-  assert.deepEqual(plan.buttons.map(b => b.label), ['처음 시작하기', '새 트리 만들기', '내 책장']);
+  assert.deepEqual(plan.buttons.map(b => b.label), ['처음 시작하기', '새 트리 만들기', '내 트리']);
   assert.deepEqual(plan.buttons.map(b => b.emphasis), [true, false, false]);
   assert.deepEqual(plan.buttons.map(b => b.disabled), [false, false, false]);
 });

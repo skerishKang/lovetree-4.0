@@ -63,7 +63,7 @@ export function treeViewsVisible({ owned = false, publicReading = false } = {}) 
 }
 
 // 상태별 헤더 노출(대표 결정 2026-11-08, #213 3번).
-// "비활성으로 보이기" 대신 "아예 숨기기"로 정리한다: 로그아웃이면 트리 탭·트리 선택·순간 남기기·공유가 없다.
+// "비활성으로 보이기" 대신 "아예 숨기기"로 정리한다: 로그아웃이면 트리 탭·트리 선택·순간 추가·공유가 없다.
 export function headerState({ owned = false, treeCount = 0, publicReading = false } = {}) {
   if (publicReading) return 'share';
   if (!owned) return 'out';
@@ -124,7 +124,7 @@ export function writeMenuLabel({ owned = false, dirty = false, reading = false, 
   if (dirty) return '미저장 기록';
   if (!hasTree) return '새 트리 만들기';
   if (reading) return '순간 추가';
-  return '순간 남기기';
+  return '순간 추가';
 }
 
 // 첫 화면 가운데 버튼 3개. 자리와 개수는 그대로 두고 강조와 첫 버튼 문구만 상태로 바꾼다.
@@ -138,7 +138,7 @@ export function homeCenterState({ member = 'out', treeCount = 0 } = {}) {
       buttons: [
         { key: 'start', label: '처음 시작하기', emphasis: true, disabled: false, title: '로그인하거나 가입하고 첫 순간을 남겨 보세요.' },
         { key: 'new', label: '새 트리 만들기', emphasis: false, disabled: false, title: '로그인한 뒤 새 트리를 만들 수 있어요.' },
-        { key: 'trees', label: '내 책장', emphasis: false, disabled: false, title: '내 책장을 엽니다.' }
+        { key: 'trees', label: '내 트리', emphasis: false, disabled: false, title: '내 트리를 엽니다.' }
       ]
     };
   }
@@ -237,7 +237,7 @@ export function themePressed(theme) {
   return normalizeTheme(theme) === THEME_GARDEN;
 }
 
-// 2단계 범위: 공통 헤더·첫 화면·첫 여정은 B를 쓴다. 내 책장은 #212, 기억책은 2026-11-08 대표 확인으로 B를 받는다.
+// 2단계 범위: 공통 헤더·첫 화면·첫 여정은 B를 쓴다. 내 트리는 #212, 책은 2026-11-08 대표 확인으로 B를 받는다.
 // 기억 보드·관계 지도는 계속 A다(대표 결정: 책만 테마를 따라간다).
 export function appliedTheme(theme, view) {
   return view === 'home' || view === 'journey' || view === 'shelf' || view === 'book' || view === 'board' || view === 'network' ? normalizeTheme(theme) : THEME_NIGHT;

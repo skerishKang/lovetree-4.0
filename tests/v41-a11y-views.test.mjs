@@ -6,9 +6,9 @@ import {connectionLabel, filterLabel, isSmallTarget, nodeStep, focusWrap, focusR
 const read = path => fs.readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 
 test('connection control name includes its visible count', () => {
-  assert.equal(connectionLabel(4), '연결 보기 4');
-  assert.equal(connectionLabel('7'), '연결 보기 7');
-  assert.equal(connectionLabel(undefined), '연결 보기 0');
+  assert.equal(connectionLabel(4), '이어진 선 4개');
+  assert.equal(connectionLabel('7'), '이어진 선 7개');
+  assert.equal(connectionLabel(undefined), '이어진 선 0개');
 });
 
 test('board filter labels name both native selects', () => {

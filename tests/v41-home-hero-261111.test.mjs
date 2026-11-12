@@ -31,7 +31,7 @@ const makeButton=()=>{
 test('로그인 전: [＋ 첫 순간 남기기·둘러보기·어떻게 쓰나요], 첫 버튼만 흰색',()=>{
   const btns=[makeButton(),makeButton(),makeButton()];
   const plan=applyHomeCenter(btns,{member:'out',treeCount:0});
-  assert.deepEqual(btns.map(b=>b.textContent),['＋ 첫 순간 남기기','둘러보기','어떻게 쓰나요']);
+  assert.deepEqual(btns.map(b=>b.textContent),['＋ 첫 순간 추가','둘러보기','어떻게 쓰나요']);
   assert.deepEqual(btns.map(b=>b.dataset.do),['start','community','guide']);
   assert.deepEqual([...btns].map(b=>b.classList.contains('primary-cta')),[true,false,false]);
   assert.equal(plan.state,'out');
