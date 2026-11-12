@@ -50,19 +50,19 @@ export function mountOrbit(host,{trees,storage,context,actions,authHtml='',onSel
  const cardCapFor=w=>{for(const [min,cap] of CARD_CAPS)if(w>=min)return cap;return 10;};
  const cards=all.slice(0,48), last=demo?all[0]:resume(storage,trees);
  const lastCard=demo?all[0]:all.find(c=>c.treeId===last?.tree.id&&c.id===last?.moment.id)||all[0];
- // #426: 첫 화면 가운데 "최근 순간 카드" — 모든 트리의 최근 순간 한 장. 궤도 카드(memberCards)는 '섞어서'에서 사진 3장 미만이면 비지만(mix-empty),
- // 최근 순간 카드는 순간만 있으면 나와야 하므로 순간 목록 한 벌(momentList.entries — 최신순·트리 이름 포함)을 쓴다. 예시 화면·로그아웃에는 없다.
+ // #426: 첫 화면 가운데 "최근 순간 카드" — 모든 트리의 최근 순간 한 장. 궤도가 예시 모드(로그인 후 '섞어서'에서 사진 3장 미만·mix-empty, 또는 예시 고름)여도
+ // 순간만 있으면 내 최근 순간 카드를 보여 준다(둘째 줄 안내를 대신한다). 로그아웃은 momentList가 없어 자동으로 카드가 없다.
  // 썸네일은 썸네일 공용 모듈(#435) 그대로: 회색이면 글 카드·최소 카드로 내려간다. 플레이어는 ▶를 누른 뒤에만 만든다.
- const recentMoment=!demo&&Array.isArray(momentList?.entries)&&momentList.entries.length?momentList.entries[0]:null;
+ const recentMoment=(Array.isArray(momentList?.entries)&&momentList.entries.length)?momentList.entries[0]:null;
  const recentMarkup=c=>{
   const raw=Date.parse(c.createdAt||c.date||'');
   const days=Number.isNaN(raw)?null:Math.max(0,Math.floor((Date.now()-raw)/86400000));
   const head=mainOf(c)||'제목 없는 순간';
-  const writable=!demo&&!c.example;
+  const writable=!c.example;
   const vertical=isVerticalMoment(c);
   const media=c.image
    ?`<span class="recent-media${vertical?' vertical':''}"><img src="${esc(c.image)}" alt="" draggable="false"${thumbFallbackAttrs(c,{candidates:c.thumbCandidates||[c.image],writable,variant:'orbit'})}${c.youtubeThumb?' referrerpolicy="no-referrer"':''} decoding="async">${c.youtubeThumb&&c.url?`<button type="button" class="recent-play" data-recent-play aria-label="여기서 재생"><span aria-hidden="true">▶</span></button>`:''}</span>`
-   :(!demo&&!c.example&&needsFallbackCard(c,{autoLoad:false})?`<span class="recent-media recent-media--slot">${fallbackCardMarkup(c,{writable,variant:'orbit'})}</span>`:`<span class="recent-media recent-media--memo"><span class="recent-memo">${esc(c.note||head)}</span></span>`);
+   :(!c.example&&needsFallbackCard(c,{autoLoad:false})?`<span class="recent-media recent-media--slot">${fallbackCardMarkup(c,{writable,variant:'orbit'})}</span>`:`<span class="recent-media recent-media--memo"><span class="recent-memo">${esc(c.note||head)}</span></span>`);
   return `<div class="recent-card mine" role="button" tabindex="0" data-do="recent" aria-label="마지막 순간 열기: ${esc(head)}">${media}<span class="recent-meta"><small>마지막 순간${days===null?'':` · ${days}일 전`}</small><strong>${esc(head)}</strong><small>${esc(c.subject||'내 트리')} · 이어 보기 →</small></span></div>`;
  };
  performance.mark('m1');shadow.innerHTML=`<style>${originalCSS}${extraCSS}.auth-entry{white-space:nowrap}</style><section class="app" aria-label="${SERVICE} 첫 화면"><div class="topbar"><span class="brand">${SERVICE} · MEMORY ORBIT</span><div class="top-actions"><button class="menuBtn" data-do="index">순간 목록</button>${authHtml}</div></div><div class="world"></div><div class="center-scrim" aria-hidden="true"></div><div class="center"><div class="eyebrow">${demo?'나의 첫 순간':'WELCOME BACK'}</div><h1>${demo?'좋아하는 순간부터.':'다시, 그 순간으로.'}</h1><p>${demo?'간직하고 싶은 장면에 마음을 남겨 보세요.<br>지금 떠오르는 순간 하나면 충분해요.':'기억은 아직 여기에서 이어지고 있어요.'}</p>${recentMoment?recentMarkup(recentMoment):''}<div class="actions"><button class="subtleBtn primary-cta" data-do="${demo?'new':'continue'}">${demo?NEW_TREE:'이어 보던 순간'}</button><button class="subtleBtn" data-do="${demo?'continue':'new'}">${demo?'예시 순간 감상':NEW_TREE}</button><button class="subtleBtn" data-do="trees">${GO_TREES}</button></div><p class="center-note">${demo?'감상 예시 · 내 기록에는 저장되지 않아요':esc(recordNote??`${all.length}개의 순간 · 서버에 보관`)}</p></div><div class="hint">드래그 · 금테 카드를 눌러 감상</div></section><dialog class="orbit-dialog" aria-label="순간 감상"></dialog>`;

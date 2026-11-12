@@ -109,8 +109,11 @@ if(loggedIn){
     }
     target.textContent='';
     target.append('기억은 아직 여기에서 이어지고 있어요.');
-    target.append(document.createElement('br'));
-    target.append(label);
+    // #426: 순간이 있으면 둘째 줄은 안내 한 줄만(카드가 마지막 순간을 대신 보여 준다).
+    if(label){
+      target.append(document.createElement('br'));
+      target.append(label);
+    }
   }
 }
 const mobileFit=document.createElement('style');mobileFit.textContent='@media(max-width:768px){.topbar{gap:12px;flex-wrap:wrap;align-items:center;padding:8px 12px}.top-actions{gap:6px;flex-shrink:0;flex-wrap:wrap;margin-left:auto}.topbar .menuBtn{white-space:nowrap;padding:10px 9px;font-size:14px}.actions .subtleBtn{font-size:14px}.center .center-note{font-size:14px}.hint{font-size:14px}}';shadow.append(mobileFit);

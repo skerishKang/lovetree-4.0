@@ -10,10 +10,10 @@ const homeCenter=src('v41/home-center.js');
 const home=src('v41/home.js');
 const homePresentation=src('v41/home-presentation.js');
 
-test('#426 최근 순간 카드는 내 기록 최신 순간 한 장(예시·로그아웃에는 없다)',()=>{
-  // orbitRecords가 최신순 정렬이므로 첫 장이 최근 순간이다 — 카드는 순간 목록 한 벌(momentList.entries)에서 읽는다(섞어서·사진 3장 미만 사용자도 받는다).
-  assert.match(orbit,/const recentMoment=!demo&&Array\.isArray\(momentList\?\.entries\)&&momentList\.entries\.length\?momentList\.entries\[0\]:null;/);
-  // 예시(데모)·빈 궤도(로그아웃)에서는 카드 마크업 자체가 없다.
+test('#426 최근 순간 카드는 내 기록 최신 순간 한 장(로그아웃에는 없다)',()=>{
+  // 카드는 순간 목록 한 벌(momentList.entries)에서 읽는다 — 예시 모드(사진 3장 미만 등)에서도 순간이 있으면 카드가 나오고, 로그아웃은 momentList가 없어 없다.
+  assert.match(orbit,/const recentMoment=\(Array\.isArray\(momentList\?\.entries\)&&momentList\.entries\.length\)\?momentList\.entries\[0\]:null;/);
+  // 예시(데모)·빈 궤도(로그아웃)에서는 카드 마크업 자체가 없다 — 로그아웃은 momentList가 없다.
   assert.match(orbit,/\$\{recentMoment\?recentMarkup\(recentMoment\):''\}/);
 });
 
