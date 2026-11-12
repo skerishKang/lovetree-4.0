@@ -40,7 +40,10 @@ test('공통 틀은 열 때 연 버튼을 기억하고 닫히면 초점을 돌�
   assert.match(dialogs, /const opener = recorded \|\| \(outside \? lastControl : null\);/);
   assert.match(dialogs, /const fallback = d\.dataset\.ltReturn \? document\.getElementById\(d\.dataset\.ltReturn\) : null;/);
   assert.match(dialogs, /const target = focusReturnTarget\(opener, fallback\);/);
-  assert.match(dialogs, /setTimeout\(\(\) => target\?\.focus\?\.\(\), 0\)/);
+  // #481 L14: 화면(iframe) 안 버튼이 열었으면 그 안으로 초점을 돌려주고, 아니면 셸의 연 버튼으로 돌려준다.
+  assert.match(dialogs, /const openedFromFrame = opener && typeof opener\.contentWindow !== 'undefined' && opener\.tagName === 'IFRAME';/);
+  assert.match(dialogs, /if \(openedFromFrame && focusIntoFrame\(opener\)\) return;/);
+  assert.match(dialogs, /target\?\.focus\?\.\(\);/);
   assert.match(shell, /if\(!target\.open\)\{if\(target\.dataset\.ltPanel\)\{shellDialogs\.noteOpener\(id\);if\(target\.dataset\.ltPanel==='full'\)shellDialogs\.syncPanelTop\(\);\}target\.showModal\(\);\}/);
 });
 

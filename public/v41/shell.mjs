@@ -431,9 +431,10 @@ function mountConnectionTool(doc){
  let button=doc.getElementById('connection-tool');
  if(!button){button=doc.createElement('button');button.id='connection-tool';button.type='button';button.className='pill';button.setAttribute('aria-haspopup','dialog');host.append(button);}
  button.onclick=()=>panel('connection-panel');
- const count=$('connection-count')?.textContent||'0';
- button.textContent=connectionLabel(count);button.removeAttribute('aria-label');
-}function setConnectionCount(n){const b=$('connection-count');if(b)b.textContent=String(n);const t=$('connection-tool');if(t){t.textContent=connectionLabel(n);t.removeAttribute('aria-label');}const h=$('connection-menu');if(h)h.textContent=connectionLabel(n);}
+ // #481 L15: #connection-count·#connection-menu는 index.html에 없다(죽은 가드) — 읽지 않고 0에서 시작한다.
+ // 값은 곧 links()의 setConnectionCount가 실제 연결 수로 채운다.
+ button.textContent=connectionLabel(0);button.removeAttribute('aria-label');
+}function setConnectionCount(n){const t=$('connection-tool');if(t){t.textContent=connectionLabel(n);t.removeAttribute('aria-label');}}
 // #380 4 2차: 순간 잇기 패널이 보여 준 연결 목록(고른 연결)을 기억해 두고, 그 뒤로 트리의 연결이 달라졌으면 더러움이다.
 // 패널 자체는 연결을 만들지 않으므로 보통은 확인 없이 닫힌다(보여 준 것과 저장본이 같기 때문).
 // #380 5번: 첫 화면 움직임 멈춤 상태(메모리에만 둔다 — 보기 메뉴 때와 같다. 화면을 다시 열면 처음 상태).
