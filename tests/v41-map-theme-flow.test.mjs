@@ -108,13 +108,21 @@ async function assertIdle(frame, page, plate) {
 }
 
 async function clickMapObject(frame, kind) {
-  await settleMap(frame); // 연출이 끝난 좌표를 읽는다(느린 CI에서 클릭이 빗나갔다)
-  const point = await frame.evaluate(kind => {
-    const candidates = kind === 'hub' ? window.__lt.hubs() : window.__lt.dots().filter(n => !n.first);
-    return candidates.find(n => document.elementFromPoint(n.x, n.y)?.id === 'stage');
-  }, kind);
-  assert.ok(point, `${kind}: 실제 누를 수 있는 좌표가 있다`);
-  await frame.locator('#stage').click({ position: { x: point.x, y: point.y } });
+  // 연출이 끝난 좌표를 읽고 누른다. 느린 CI에서는 그래도 누르는 사이 화면이 움직여 빗나갈 수 있어,
+  // 눌린 결과(고른 순간·묶음)가 기대와 다르면 다시 멈추기를 기다려 누른다(최대 4번). 그래도 다르면 호출한 쪽 단언이 잡는다.
+  let point = null;
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    await settleMap(frame);
+    point = await frame.evaluate(kind => {
+      const candidates = kind === 'hub' ? window.__lt.hubs() : window.__lt.dots().filter(n => !n.first);
+      return candidates.find(n => document.elementFromPoint(n.x, n.y)?.id === 'stage');
+    }, kind);
+    assert.ok(point, `${kind}: 실제 누를 수 있는 좌표가 있다`);
+    await frame.locator('#stage').click({ position: { x: point.x, y: point.y } });
+    const hit = await frame.evaluate(({ kind, id }) => (kind === 'hub' ? window.__lt.state.cluster?.id : window.__lt.state.selected?.id) === id, { kind, id: point.id });
+    if (hit) return point;
+    await new Promise(r => setTimeout(r, 400));
+  }
   return point;
 }
 
