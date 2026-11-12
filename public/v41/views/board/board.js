@@ -4,6 +4,30 @@ const ASSET={first:'',glance:'',night:'',interview:'',note:'',link:'',video:'dat
 const ltVar=(n,f)=>(getComputedStyle(document.documentElement).getPropertyValue(n).trim()||f);
 const colors={rose:ltVar('--lt-thread-rose','#ff659f'),violet:ltVar('--lt-thread-violet','#a86cff'),cyan:ltVar('--lt-thread-cyan','#69dcff'),amber:ltVar('--lt-thread-amber','#ffc96b'),pearl:'#e9dff3'}
 ;
+// #467 보드 판 테마(종이/밤). 판·카드 색은 CSS만 정하고(board-extra.css 끝 html[data-lt-board-theme=night]),
+// 여기서는 html 속성을 붙이고 실·핀 색(--lt-thread-*)을 다시 읽어 칠한다 — 같은 색 값을 JS에 따로 두지 않는다.
+// 원본 보드 테마(body[data-theme], 고급 도구의 진주빛·코르크·…)와는 따로다. 기본은 종이.
+function readBoardTheme(){try{const a=document.documentElement.getAttribute('data-lt-board-theme');if(a==='night'||a==='paper')return a;return localStorage.getItem('lt41.boardTheme')==='night'?'night':'paper'}catch{return 'paper'}}
+function setBoardTheme(theme){
+  const v=theme==='night'?'night':'paper';
+  document.documentElement.setAttribute('data-lt-board-theme',v);
+  for(const k of ['rose','violet','cyan','amber'])colors[k]=ltVar('--lt-thread-'+k,colors[k]);
+  document.querySelectorAll('button[data-board-theme]').forEach(b=>b.setAttribute('aria-checked',String(b.dataset.boardTheme===v)));
+  // 처음 부를 때는 아직 moments·connections가 없다(let 선언 전) — 첫 그림이 위 colors로 그려진다.
+  try{document.querySelectorAll('#threadLayer .threadGroup').forEach(g=>{const c=connections.find(x=>x.id===g.dataset.cid);if(c)g.querySelectorAll('path[stroke]').forEach(p=>p.setAttribute('stroke',colors[c.color]))})}catch{}
+  try{document.querySelectorAll('#cardLayer .card[data-id]').forEach(el=>{const m=moments.find(x=>x.id===el.dataset.id);if(m){el.style.setProperty('--pin',colors[m.color]);el.style.setProperty('--halo',colors[m.color]+'55')}})}catch{}
+  return v;
+}
+setBoardTheme(readBoardTheme());
+addEventListener('message',e=>{if(e.origin!==location.origin||e.data?.type!=='lt41-board-theme')return;setBoardTheme(e.data.value)});
+// 판 바꾸기는 [종이|밤] 단추(button[data-board-theme])만 받는다. 다른 클릭(카드·판·전체 보기)은 지나간다.
+document.addEventListener('click',e=>{
+  const b=e.target.closest?.('button[data-board-theme]');if(!b)return;
+  const v=setBoardTheme(b.dataset.boardTheme);
+  try{localStorage.setItem('lt41.boardTheme',v)}catch{}
+  toast(v==='night'?'밤 판으로 바꿨어요.':'종이 판으로 바꿨어요.');
+  try{if(window.parent!==window)window.parent.postMessage({type:'lt41-board-theme',value:v},location.origin)}catch{}
+});
 
 // 기억 보드는 예시 판본과, 서버 기록을 쓰기 가능한 계정으로 연 경우에 편집할 수 있다.
 // 공유 감상(share)은 읽기 전용이다. 서버 쓰기 가능 여부는 셸이 LT41.writable로 넘긴다.

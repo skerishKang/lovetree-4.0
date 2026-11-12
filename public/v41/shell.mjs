@@ -430,7 +430,7 @@ const shellScreens=createScreens({
     // 무엇을 뜰 때마다 보내는지는 frameReadyMessages가 정하고, 여기서는 그것을 순서대로 보낸다
     // (보내는 시점·값·순서를 실행 시험이 같은 함수로 확인한다).
     const ready=frameReadyMessages({dateStyle:currentDateStyle(),pageTurn:currentPageTurn()==='on'});
-    applyPageTurnToFrame(frame);applyDateStyleToFrame(frame);
+    applyPageTurnToFrame(frame);applyDateStyleToFrame(frame);applyBoardThemeToFrame(frame);
     // #478: 고급 기능 보기 값도 새로 열린 화면에 알린다. applyAdvanced는 지금 화면(#view)에만 보내므로
     // 화면을 옮긴 뒤 열린 프레임은 단순 모드로 남았다(보드 도구가 숨는 결함).
     try{frame.contentWindow.postMessage({type:'lt41-advanced',value:readAdvanced()},location.origin)}catch{}
@@ -838,6 +838,32 @@ for(const b of document.querySelectorAll('[data-page-turn]'))b.onclick=()=>{
  notify(next==='smooth'?'페이지 넘김을 부드럽게 바꿨어요.':'페이지 넘김을 종이처럼 바꿨어요.');
 };
 paintPageTurnControls();
+// #467: 보드 판 테마(종이/밤) — 이 기기에만 저장한다(localStorage lt41.boardTheme). 기본은 종이이고,
+// 바꾸면 열린 보드에 바로 반영한다(프레임 속성 + lt41-board-theme 메시지).
+const BOARD_THEME_KEY='lt41.boardTheme';
+function currentBoardTheme(){try{return localStorage.getItem(BOARD_THEME_KEY)==='night'?'night':'paper'}catch{return 'paper'}}
+function paintBoardThemeControls(){const value=currentBoardTheme();for(const b of document.querySelectorAll('[data-board-theme]'))b.setAttribute('aria-checked',String(b.dataset.boardTheme===value));}
+function applyBoardThemeToFrame(frame){
+ const message=frameMessage('boardTheme',currentBoardTheme());
+ try{frame.contentDocument?.documentElement?.setAttribute('data-lt-board-theme',message.value);}catch{}
+ sendToFrame(frame,message);
+}
+for(const b of document.querySelectorAll('[data-board-theme]'))b.onclick=()=>{
+ const next=b.dataset.boardTheme==='night'?'night':'paper';
+ try{localStorage.setItem(BOARD_THEME_KEY,next)}catch{}
+ paintBoardThemeControls();
+ for(const f of frames())applyBoardThemeToFrame(f);
+ notify(next==='night'?'보드 판을 밤 테마로 바꿨어요.':'보드 판을 종이 테마로 바꿨어요.');
+};
+paintBoardThemeControls();
+window.addEventListener('message',e=>{
+ if(e.origin!==location.origin)return;
+ if(e.data?.type==='lt41-board-theme'){
+  const next=e.data.value==='night'?'night':'paper';
+  try{localStorage.setItem(BOARD_THEME_KEY,next)}catch{}
+  paintBoardThemeControls();
+ }
+});
 // #368: 옛 내 기록 창을 여던 입구(읽기 전용 안내·빈 화면)의 공통 행선지. 로그아웃이면 로그인으로 보낸다.
 function openAccountData(intent='first'){
  if(!member?.snapshot().owned){openLoginStart(intent);return;}
