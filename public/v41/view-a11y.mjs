@@ -8,7 +8,7 @@ export const DIALOGS = Object.freeze([
   ['#nextChooser', 'open'], ['#postAdd', 'show'], ['#branchChooser', 'open']
 ]);
 
-export const connectionLabel = count => `연결 보기 ${Number.isSafeInteger(Number(count)) ? Number(count) : 0}`;
+export const connectionLabel = count => { const n = Number.isSafeInteger(Number(count)) ? Number(count) : 0; return `이어진 선 ${n}개`; };
 export const filterLabel = kind => kind === 'media' ? '미디어 필터' : kind === 'keyword' ? '키워드 필터' : '';
 export const isSmallTarget = (width, height) => width < 44 || height < 44;
 

@@ -71,6 +71,10 @@ html[data-lt-theme=garden] .leftPanel small,html[data-lt-theme=garden] .leftPane
 html[data-lt-theme=garden] .detail small,html[data-lt-theme=garden] .detail .label,html[data-lt-theme=garden] .detail p,
 html[data-lt-theme=garden] .netNote,html[data-lt-theme=garden] .themeBadge,html[data-lt-theme=garden] .detail .kv,
 html[data-lt-theme=garden] .modal .hint,html[data-lt-theme=garden] .minihint{color:var(--lt-muted)}
+/* #504: 순간 추가 창의 종류 단추는 밤용 밝은 글자(#e9dfee)라 정원의 밝은 창 위에서 1.1:1로 읽히지 않는다. 정원에서는 잉크색으로 */
+html[data-lt-theme=garden] .typeBtn{color:var(--lt-ink);border-color:var(--lt-line-paper);background:var(--lt-paper)}
+/* #504: 창 안내 글(#aa97b2)도 정원의 밝은 창 위에서 2.66:1로 미달 — 보조 글자 토큰으로 */
+html[data-lt-theme=garden] .modalIntro{color:var(--lt-muted)!important}
 html[data-lt-theme=garden] .detail h3,html[data-lt-theme=garden] .detail b,html[data-lt-theme=garden] .leftPanel b{color:var(--lt-ink)}
 html[data-lt-theme=garden][data-v41-screen=board] header .headbtn{background:var(--lt-paper);border-color:var(--lt-line);color:var(--lt-ink);box-shadow:none}
 html[data-lt-theme=garden][data-v41-screen=board] header .headbtn.primary{background:var(--lt-primary);border-color:var(--lt-primary);color:var(--lt-primary-ink)}
@@ -136,6 +140,8 @@ html[data-v41-screen=board][data-lt-board-theme="night"] body .surface:after{opa
 html[data-v41-screen=board][data-lt-board-theme="night"] body .boardTitle,
 html[data-v41-screen=board][data-lt-board-theme="night"] body .boardTitle h1{color:#ffe6a6}
 html[data-v41-screen=board][data-lt-board-theme="night"] body .boardTitle p{color:#c9c1d4}
+/* #504: 판 이름표(#6c5c73)는 밤 판 표면(#15131f)에서 2.98:1로 미달 — 밤 판의 부제 색과 같은 #c9c1d4(10.5:1)로 */
+html[data-v41-screen=board][data-lt-board-theme="night"] body .themeBadge{color:#c9c1d4}
 html[data-v41-screen=board][data-lt-board-theme="night"] body .private{color:#ffe6a6;background:rgba(255,230,166,.1)}
 html[data-v41-screen=board][data-lt-board-theme="night"] body .card{background:linear-gradient(145deg,#fffdf9,#f4eee6);border-color:rgba(255,230,166,.5);color:#21182d;box-shadow:0 20px 45px rgba(0,0,0,.55),0 0 22px rgba(238,190,104,.14)}
 html[data-v41-screen=board][data-lt-board-theme="night"] body .card.first{background:linear-gradient(145deg,#fffdf4,#f6eee3);box-shadow:0 24px 55px rgba(0,0,0,.6),0 0 40px rgba(255,230,166,.22)}
