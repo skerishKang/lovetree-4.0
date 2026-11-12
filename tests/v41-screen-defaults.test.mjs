@@ -59,7 +59,12 @@ test('날짜 표기 배선: 책·보드·지도·첫 화면 목록이 같은 한
   assert.match(homeMoments, /import \{ formatDisplayDate \} from '\.\.\/public\/v41\/book-usability\.mjs';/);
   assert.match(homeMoments, /date: text\(formatDisplayDate\(moment\?\.date, ltDateStyle\(\)\)\)/);
   // 셸: 프레임 속성+메시지(페이지 넘김과 같은 방식), 새 화면에도 알린다.
-  assert.match(shell, /function applyDateStyleToFrame\(frame\)\{[\s\S]*?setAttribute\('data-lt-date-style',currentDateStyle\(\)\)[\s\S]*?postMessage\(\{type:'lt41-date-style',value:currentDateStyle\(\)\}/);
+  // #481 T6: 셸은 날짜 표기 메시지를 frame-wiring 한 곳에서 만들고(문자열 직접 작성 없음),
+  // 보내는 시점·받는 쪽 동작은 tests/v41-settings-wiring-flow.test.mjs가 실행으로 확인한다.
+  assert.match(shell, /function applyDateStyleToFrame\(frame\)\{/);
+  assert.match(shell, /const message=frameMessage\('dateStyle',currentDateStyle\(\)\);/);
+  assert.match(shell, /setAttribute\('data-lt-date-style',message\.value\)/);
+  assert.match(shell, /sendToFrame\(frame,message\)/);
   assert.match(shell, /applyPageTurnToFrame\(frame\);applyDateStyleToFrame\(frame\);/);
   assert.match(shell, /try\{member\.apply\('setPrefs',\{dateStyle:b\.dataset\.dateStyle\}\);/);
   // 이슈 #466 M5: 로그인 onState에서 기기 미러(localStorage lt41.dateStyle)를 계정값으로 채운다 —

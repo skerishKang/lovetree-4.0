@@ -46,10 +46,16 @@ test('설정 화면: 페이지 넘김 행은 화면 묶음에 있고 누르면 �
   assert.match(shell, /function currentPageTurn\(\)\{return readPageTurn\(localStorage\);\}/);
   assert.match(shell, /const next=writePageTurn\(localStorage,b\.dataset\.pageTurn\);/);
   // 전달은 테마와 같은 방식: 프레임 문서 속성 + lt41-page-turn 메시지(두 iframe 모두).
-  assert.match(shell, /function applyPageTurnToFrame\(frame\)\{[\s\S]*?setAttribute\('data-lt-page-turn',currentPageTurn\(\)\)[\s\S]*?postMessage\(\{type:'lt41-page-turn',value:currentPageTurn\(\)\}/);
+  // #481 T6: 페이지 넘김 메시지도 frame-wiring 한 곳에서 만든다(문자열을 셸에 직접 적지 않는다).
+  assert.match(shell, /function applyPageTurnToFrame\(frame\)\{/);
+  assert.match(shell, /const message=frameMessage\('pageTurn',currentPageTurn\(\)==='on'\);/);
+  assert.match(shell, /setAttribute\('data-lt-page-turn',currentPageTurn\(\)\)/);
+  assert.match(shell, /sendToFrame\(frame,message\)/);
+  // 실행 확인은 tests/v41-settings-wiring-flow.test.mjs가 맡는다(보내는 시점·값을 실제로 돌린다).
+  assert.doesNotMatch(shell, /type:'lt41-page-turn',value:/, '메시지를 직접 만들지 않는다');
   assert.match(shell, /for\(const f of frames\(\)\)applyPageTurnToFrame\(f\);/);
   // 새로 열린 화면에도 값을 알린다(기존 onFrameReady 경로).
-  assert.match(shell, /mountConnectionTool\(d\);applyViewAccessibility\(d\);shellQuick\.mountFrame\(d\);\s*\/\/ #368 2차[^\n]*\n\s*applyPageTurnToFrame\(frame\);/);
+  assert.match(shell, /mountConnectionTool\(d\);applyViewAccessibility\(d\);shellQuick\.mountFrame\(d\);/);
   // 고른 값은 aria-checked로 칠한다.
   assert.match(shell, /function paintPageTurnControls\(\)\{const value=currentPageTurn\(\);for\(const b of document\.querySelectorAll\('\[data-page-turn\]'\)\)b\.setAttribute\('aria-checked',String\(b\.dataset\.pageTurn===value\)\);\}/);
 });
