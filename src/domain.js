@@ -42,6 +42,29 @@ export function normalizeDisplayName(value) {
 export function normalizeAccentColor(value) {
   return ACCENT_COLORS.includes(value) ? value : '';
 }
+// #368 3차: 화면·시작·공유 기본값. 모르는 값은 기본으로, 값이 없으면(옛 저장본) 지금 동작 그대로다.
+//  - dateStyle: 순간 날짜 표기 — 'dot'(2026. 11. 10, 지금 기본)·'dash'(2026-11-10)·'long'(11월 10일)
+//  - startPlace: 로그인 후 처음 보여 줄 곳 — 'home'(첫 화면)·'shelf'(내 트리 전체 보기)·'resume'(이어 읽기, 지금 동작)
+//  - shareView: 공유 링크가 처음에 열 보기 — 'book'(기억책, 지금 기본)·'board'·'network'
+//  - shareDiscover: 새 공유를 둘러보기에도 올릴지 기본값 — false(꺼짐, 지금 기본)
+export const DATE_STYLES = ['dot', 'dash', 'long'];
+export const DEFAULT_DATE_STYLE = 'dot';
+export const START_PLACES = ['home', 'shelf', 'resume'];
+export const DEFAULT_START_PLACE = 'resume';
+export const SHARE_VIEWS = ['book', 'board', 'network'];
+export const DEFAULT_SHARE_VIEW = 'book';
+export function normalizeDateStyle(value) {
+  return DATE_STYLES.includes(value) ? value : DEFAULT_DATE_STYLE;
+}
+export function normalizeStartPlace(value) {
+  return START_PLACES.includes(value) ? value : DEFAULT_START_PLACE;
+}
+export function normalizeShareView(value) {
+  return SHARE_VIEWS.includes(value) ? value : DEFAULT_SHARE_VIEW;
+}
+export function normalizeShareDiscover(value) {
+  return value === true;
+}
 // 제목 보기 설정(#347 후속): 모르는 값은 기본 '둘 다'. 상태(state.prefs)에 저장한다.
 export function normalizeTitleDisplay(value) {
   return TITLE_DISPLAYS.includes(value) ? value : DEFAULT_TITLE_DISPLAY;
@@ -50,7 +73,11 @@ export function normalizePrefs(value) {
   return {
     titleDisplay: normalizeTitleDisplay(value?.titleDisplay),
     displayName: normalizeDisplayName(value?.displayName),
-    accentColor: normalizeAccentColor(value?.accentColor)
+    accentColor: normalizeAccentColor(value?.accentColor),
+    dateStyle: normalizeDateStyle(value?.dateStyle),
+    startPlace: normalizeStartPlace(value?.startPlace),
+    shareView: normalizeShareView(value?.shareView),
+    shareDiscover: normalizeShareDiscover(value?.shareDiscover)
   };
 }
 export function updatePrefs(state, patch = {}) {

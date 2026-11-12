@@ -30,6 +30,8 @@ export function createMessages(deps) {
   const viewForFile = deps.viewForFile;
   const exampleTree = deps.exampleTree;
   const journey = deps.journey;
+  // #368 3차: 공유 창 시작값(처음 열 보기·둘러보기 올림 기본)은 계정 설정에서 온다.
+  const getShareDefaults = deps.getShareDefaults || (() => ({view: 'book', discover: false}));
 
   let sharePreviewKey = '';
   let sharePreviewToken = '';
@@ -243,7 +245,8 @@ export function createMessages(deps) {
       $('share-moment').append(o);
     }
     $('share-moment').value = window.LT41.momentId;
-    $('share-view').value = ['book', 'board', 'network'].includes(viewForFile(getCurrent())) ? viewForFile(getCurrent()) : 'book';
+    // #368 3차: 처음 열 보기는 설정의 공유 기본값으로 시작한다(공유마다 바꿀 수 있다).
+    $('share-view').value = getShareDefaults().view;
     sharePreviewKey = ''; sharePreviewToken = '';
     $('share-create').disabled = true;
     $('share-preview-result').hidden = true;
@@ -296,7 +299,7 @@ export function createMessages(deps) {
     $('share-open').hidden = false;
     $('share-created').hidden = false;
     $('share-copy-note').textContent = '';
-    $('share-discover').checked = false;
+    $('share-discover').checked = getShareDefaults().discover;
     $('share-discover').disabled = false;
     $('share-feedback').textContent = '명시적으로 공유 주소를 만들었어요.';
     sharePreviewKey = ''; sharePreviewToken = '';

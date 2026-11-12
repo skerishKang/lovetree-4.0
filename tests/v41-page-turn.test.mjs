@@ -79,10 +79,20 @@ test('설정 항목마다 저장 위치 표시가 있다(계정에 저장 / 이 
   // 표시: 제목 보기·프로필 행은 "계정에 저장", 나머지 설정 행은 "이 기기에만". 여섯 행 모두 표시가 있다.
   const rows = [...html.matchAll(/<div class="settings-row"[\s\S]*?class="settings-scope">([^<]+)<\/span>/g)]
     .map(m => `${m[0]}|${m[1]}`);
-  // 프로필 2(이름·색) + 화면 5(테마·움직임·제목·페이지 넘김·카드) + 순간 추가 1 = 8행.
-  assert.equal(rows.length, 8, '여덟 설정 행마다 표시가 있다');
+  // 계정에 저장: 제목 보기·날짜 표기·처음 보여 줄 곳·프로필(이름·색)·공유 2행. 나머지는 이 기기에만.
+  const accountRows = rows.filter(r => r.endsWith('|계정에 저장'));
+  assert.equal(accountRows.length, 7, '계정에 저장 7행(제목·날짜·처음·이름·색·공유 2)');
+  for (const frag of ['data-title-display', 'data-date-style', 'data-start-place', 'id="profile-name"', 'id="profile-color"', 'data-share-view', 'data-share-discover']) {
+    assert.ok(rows.some(r => r.includes(frag)), `행이 있어야 한다: ${frag}`);
+  }
+  assert.ok(rows.some(r => r.includes('data-date-style') && r.endsWith('|계정에 저장')), '날짜 표기는 계정에 저장');
+  assert.ok(rows.some(r => r.includes('data-start-place') && r.endsWith('|계정에 저장')), '처음 보여 줄 곳은 계정에 저장');
+  assert.ok(rows.some(r => r.includes('data-network-view') && r.endsWith('|이 기기에만')), '관계 지도 기본 보기는 이 기기에만');
+  // 프로필 2 + 화면 7(테마·움직임·제목·페이지 넘김·날짜·처음·카드) + 보기 1 + 공유 2 + 순간 추가 1 = 13행.
+  assert.equal(rows.length, 13, '열세 설정 행마다 표시가 있다');
   for (const row of rows) {
-    const isAccount = /data-title-display=/.test(row) || /id="profile-name"/.test(row) || /id="profile-color"/.test(row);
+    const isAccount = /data-title-display=/.test(row) || /id="profile-name"/.test(row) || /id="profile-color"/.test(row)
+      || /data-date-style=/.test(row) || /data-start-place=/.test(row) || /data-share-view=/.test(row) || /data-share-discover=/.test(row);
     const want = isAccount ? '계정에 저장' : '이 기기에만';
     assert.ok(row.endsWith('|' + want), `저장 위치 표시(${want}): ${row.slice(0, 70)}…`);
   }

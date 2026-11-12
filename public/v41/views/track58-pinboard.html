@@ -31,7 +31,7 @@
 <script src="/v41/views/board/board-model.js"></script><script src="/v41/views/board/board.js"></script><script src="/v41/views/board/board-extras.js"></script><script type="module" src="/v41/views/board/board-mode.mjs"></script><script type="module" src="/v41/views/tree-title.mjs"></script>
 <link rel="stylesheet" href="/v41/views/board/board-extra.css">
 <script src="/v41/views/board/board-detail.js"></script>
-<script type="module">import {titleView,formatDisplayDate,normalizeTitleDisplay} from '/v41/book-usability.mjs';window.LTTitle={titleView,formatDisplayDate,normalizeTitleDisplay};dispatchEvent(new Event('lt-title-ready'));</script>
+<script type="module">import {titleView,formatDisplayDate,normalizeTitleDisplay} from '/v41/book-usability.mjs';/* #368 3차: 날짜 표기는 계정 설정 — 셸이 프레임 속성·lt41-date-style 메시지로 알려 준다. */const ltDateStyle=()=>{let v=null;try{v=document.documentElement.getAttribute('data-lt-date-style')||localStorage.getItem('lt41.dateStyle')}catch{}return v==='dash'||v==='long'?v:'dot';};window.LTTitle={titleView,formatDisplayDate:v=>formatDisplayDate(v,ltDateStyle()),normalizeTitleDisplay};addEventListener('message',e=>{if(e.data?.type!=='lt41-date-style')return;try{document.documentElement.setAttribute('data-lt-date-style',e.data.value==='dash'||e.data.value==='long'?e.data.value:'dot')}catch{}dispatchEvent(new Event('lt-date-style-changed'));});dispatchEvent(new Event('lt-title-ready'));</script>
 
 <style>
 .mobileTools{display:none}

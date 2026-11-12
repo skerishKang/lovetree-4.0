@@ -1,4 +1,5 @@
 import {displayTreeTitle} from './tree-name.mjs';
+import {normalizeDateStyle} from './domain.mjs';
 // 기억책 사용성 규칙(2026-11-08 대표 피드백 1~9). 화면(iframe)과 셸이 같은 규칙을 쓰고,
 // 시험은 이 파일을 직접 불러 확인한다. 데이터는 읽기만 하고 바꾸지 않는다(표시 단계에서만 거른다).
 
@@ -53,15 +54,25 @@ export function titleView(moment = {}, setting = 'both') {
   return { setting: mode, main, sub, mine, video, note: String(moment.note ?? '').trim() };
 }
 
-/** 화면에 보이는 날짜 표기: "2026. 11. 10". 저장 형식은 건드리지 않는다. */
-export function formatDisplayDate(value) {
+/** 화면에 보이는 날짜 표기. 스타일은 계정 설정(#368 3차): 'dot'(2026. 11. 10, 기본)·'dash'(2026-11-10)·'long'(11월 10일).
+    저장 형식은 건드리지 않는다. style을 주지 않으면 기본 표기(지금과 같다). */
+export function formatDisplayDate(value, style) {
+  const chosen = normalizeDateStyle(style);
   const raw = String(value ?? '').trim();
   if (!raw) return '';
   const matched = raw.match(/^(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})/);
-  if (matched) return `${matched[1]}. ${matched[2].padStart(2, '0')}. ${matched[3].padStart(2, '0')}`;
+  if (matched) {
+    const y = matched[1], m = matched[2].padStart(2, '0'), d = matched[3].padStart(2, '0');
+    if (chosen === 'dash') return `${y}-${m}-${d}`;
+    if (chosen === 'long') return `${Number(matched[2])}월 ${Number(matched[3])}일`;
+    return `${y}. ${m}. ${d}`;
+  }
   const date = new Date(raw);
   if (Number.isNaN(date.getTime())) return raw;
-  return `${date.getFullYear()}. ${String(date.getMonth() + 1).padStart(2, '0')}. ${String(date.getDate()).padStart(2, '0')}`;
+  const y = date.getFullYear(), m = String(date.getMonth() + 1).padStart(2, '0'), d = String(date.getDate()).padStart(2, '0');
+  if (chosen === 'dash') return `${y}-${m}-${d}`;
+  if (chosen === 'long') return `${date.getMonth() + 1}월 ${date.getDate()}일`;
+  return `${y}. ${m}. ${d}`;
 }
 
 /** 화면에 쓸 제목. 직접 쓴 제목이 없으면 ''(렌더러가 마음 한마디를 큰 글씨로 쓴다). */
