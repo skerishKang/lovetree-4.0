@@ -22,7 +22,10 @@ test('▶ 재생 단추는 자기 이름을 따로 유지한다(여기서 재생
 });
 
 test('키보드(Enter·Space)로 열기 · 카드 누르면 그 순간 열기 동작을 유지한다', () => {
-  assert.match(orbit, /shadow\.addEventListener\('keydown',e=>\{if\(e\.key!=='Enter'&&e\.key!==' '\)return;if\(e\.target\.matches\?\.\('\[data-do=recent\]'\)\)\{e\.preventDefault\(\);openRecent\(\);\}\}/);
+  // 이슈 #466 M6: 열기는 실제 <button>(recent-open)이 전담해 Enter·Space는 네이티브 동작으로 처리된다
+  // — div에 역할을 주고 수동으로 Enter·Space를 가로채던 것(중첩 상호작용의 원인)은 없앴다.
+  assert.match(orbit, /<button type="button" class="recent-open" data-do="recent"/);
+  assert.doesNotMatch(orbit, /shadow\.addEventListener\('keydown',e=>\{if\(e\.key!=='Enter'&&e\.key!==' '\)/);
   assert.match(orbit, /e\.target\.closest\?\.\('\[data-do=recent\]'\)\)openRecent\(\);return;/);
   assert.match(orbit, /const openRecent=\(\)=>\{if\(!recentMoment\)return;if\(onOpen&&!recentMoment\.example\)\{onOpen\(recentMoment\);return;\}/);
 });

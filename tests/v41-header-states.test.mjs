@@ -85,6 +85,19 @@ test('8. 말풍선은 한 번만 — 닫으면 저장하고, 저장소가 막히
   assert.equal(tipsWanted({owned: true, treeCount: 1, seen: true}), false, '두 번째부터는 안 나온다');
   assert.equal(tipsWanted({owned: false, treeCount: 1, seen: false}), false);
   assert.equal(tipsWanted({owned: true, treeCount: 0, seen: false}), false);
+  // 이슈 457 2번: pauseMember()가 로그인한 member를 dispose만 하고 null로 안 돌려 owned가 예시 모드에서도
+  // true로 남는다 — source로 한 번 더 막아 예시·공유(읽기 전용)를 "내 첫 트리"로 보지 않게 한다.
+  assert.equal(tipsWanted({owned: true, treeCount: 1, seen: false, source: 'example'}), false, '예시 둘러보기는 안 뜬다');
+  assert.equal(tipsWanted({owned: true, treeCount: 1, seen: false, source: 'share'}), false, '공유(읽기 전용)는 안 뜬다');
+  assert.equal(tipsWanted({owned: true, treeCount: 1, seen: false, source: 'server'}), true, '실제 내 트리는 그대로 뜬다');
+  // shell.mjs가 현재 source를 넘긴다(예시·공유를 가리키지 않게).
+  assert.match(shell, /tipsWanted\(\{owned:!!member\?\.snapshot\(\)\.owned,treeCount:model\?\.trees\?\.length\|\|0,seen:readTipsSeen\(localStorage\),source\}\)/);
+});
+
+test('이슈 457 2번: 안내 문구는 지금 버튼 이름("＋ 순간 추가")을 쓴다', () => {
+  const body = FIRST_TREE_TIPS.find((tip) => tip.anchor === 'write-menu').body;
+  assert.match(body, /＋ 순간 추가/);
+  assert.doesNotMatch(body, /순간 남기기/, '지금 이름이 아닌 옛 문구가 남지 않는다');
 });
 
 test('9. 말풍선 마크업·스타일: Esc·포커스 되돌림, 밤·정원 공통 토큰, 390·360 넘침 없음', () => {

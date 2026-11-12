@@ -14,7 +14,8 @@ body:before{content:"MEMORY\A SKETCHBOOK";white-space:pre;position:fixed;left:3.
 .book-title-btn{display:inline-flex;align-items:center;gap:7px;max-width:100%;min-width:0;min-height:44px;padding:6px 11px;border:0;border-radius:10px;background:none;color:#eaded8;cursor:pointer;overflow:hidden}
 .book-title-btn:hover,.book-title-btn:focus-visible{background:rgba(64,44,38,.22)}
 #bookTitleText{font:700 18px var(--book-serif);letter-spacing:-.01em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.book-title-caret{flex:none;font-size:10px;color:#a78f92;transition:transform .15s}
+/* 이슈 456: 10px는 점처럼 보인다 — 제목 옆에서 알아볼 수 있는 크기로. 누르는 영역은 .book-title-btn의 44px 그대로. */
+.book-title-caret{flex:none;font-size:14px;color:#a78f92;transition:transform .15s}
 .book-title-btn[aria-expanded=true] .book-title-caret{transform:rotate(180deg)}
 /* 트리 목록 — 셸의 트리 드롭다운(.tree-item·.tree-cover)과 같은 내용·같은 모양, 종이 테마 색으로 */
 .tree-menu{position:absolute;z-index:95;top:calc(100% + 6px);left:0;min-width:300px;max-height:min(70vh,520px);overflow:auto;padding:8px;border:1px solid rgba(199,155,168,.4);border-radius:14px;background:var(--paper);box-shadow:0 18px 40px rgba(40,24,18,.3)}

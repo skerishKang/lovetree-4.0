@@ -40,6 +40,12 @@ test('좁은 폭: 가운데 메뉴·추가 버튼은 숨기고 트리·S·접기
   assert.match(narrow, /\.app-header\{display:flex;min-height:56px/, '한 줄');
 });
 
+test('#457 3번: 계정·☰는 트리 틀 유무와 상관없이 오른쪽 끝에 붙는다', () => {
+  // .main-nav가 더 안 자라므로(flex:0 0 auto), 트리 틀이 숨겨져 nav 내용이 줄어도
+  // header-actions가 로고 쪽으로 붙지 않게 margin-left:auto로 오른쪽 끝에 고정한다.
+  assert.match(narrow, /\.header-actions\{gap:6px;margin-left:auto\}/);
+});
+
 test('접기 메뉴는 기존 화면 버튼을 복제해 같은 동작을 부른다', () => {
   assert.match(shell, /function buildFoldMenu\(\)/);
   // #380 2번: 접기 메뉴도 같은 구조 — 첫 화면(로고)·둘러보기 · 책·보드·지도 · 내 트리 전체 보기 · 순간 추가.

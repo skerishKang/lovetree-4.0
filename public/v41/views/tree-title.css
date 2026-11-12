@@ -5,7 +5,8 @@
 .tree-title{position:relative;min-width:0}
 .tree-title-btn{display:inline-flex;align-items:center;gap:7px;max-width:100%;min-width:0;min-height:44px;padding:6px 11px;border:0;border-radius:10px;background:none;font:inherit;cursor:pointer;overflow:hidden}
 .tree-title-btn:hover,.tree-title-btn:focus-visible{background:rgba(64,44,38,.22)}
-.tree-title-caret{flex:none;font-size:10px;transition:transform .15s}
+/* 이슈 456: 10px는 점처럼 보인다 — 제목 옆에서 알아볼 수 있는 크기로. 누르는 영역은 .tree-title-btn의 44px 그대로. */
+.tree-title-caret{flex:none;font-size:14px;transition:transform .15s}
 .tree-title-btn[aria-expanded=true] .tree-title-caret{transform:rotate(180deg)}
 #treeTitleText{font-weight:700;font-size:18px;letter-spacing:-.01em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* 트리 목록 — 셸의 트리 드롭다운(.tree-item·.tree-cover)과 같은 내용·같은 모양 */
