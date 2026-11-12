@@ -90,7 +90,7 @@ export function headerPartsFor(input = {}) {
 // 닫으면 저장소에 남겨 다시 보여 주지 않는다. 저장소가 막히면 그냥 다시 보여 준다.
 export const TIPS_KEY = 'lt41.tips.firstTree';
 export const FIRST_TREE_TIPS = Object.freeze([
-  { id: 'write', anchor: 'write-menu', title: '여기서 순간을 더 남겨요', body: '오른쪽 위 "순간 남기기"를 누르면 오늘의 순간이 이 트리에 쌓입니다.' },
+  { id: 'write', anchor: 'write-menu', title: '여기서 순간을 더 남겨요', body: '오른쪽 위 "＋ 순간 추가"를 누르면 오늘의 순간이 이 트리에 쌓입니다.' },
   { id: 'views', anchor: 'tree-views', title: '책·보드·지도로 다르게 봐요', body: '같은 기록을 책처럼, 카드처럼, 이어진 선처럼 볼 수 있어요.' }
 ]);
 
@@ -111,8 +111,11 @@ export function writeTipsSeen(storage) {
   }
 }
 
-export function tipsWanted({ owned = false, treeCount = 0, seen = false } = {}) {
-  return !!owned && Number(treeCount) > 0 && !seen;
+// #457 2번: 예시 둘러보기·공유(읽기 전용)는 source가 'server'가 아니다 — pauseMember()가 로그인한
+// member 참조를 그대로 두고 dispose만 해서(owned가 예시 모드에서도 true로 남는다), model.trees가
+// 예시 트리로 바뀌어도 "내 첫 트리"로 잘못 보지 않게 source로 한 번 더 막는다.
+export function tipsWanted({ owned = false, treeCount = 0, seen = false, source = 'server' } = {}) {
+  return source === 'server' && !!owned && Number(treeCount) > 0 && !seen;
 }
 
 // 헤더 주 버튼(#write-menu) 문구. 첫 화면 가운데 첫 버튼과 어긋나지 않게 같은 규칙을 쓴다.

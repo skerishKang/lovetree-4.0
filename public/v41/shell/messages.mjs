@@ -337,6 +337,8 @@ export function createMessages(deps) {
     button: $('community-menu'),
     dialog: $('community-panel'),
     onOpenShare: item => { $('community-panel').close(); location.hash = `#share/${item.shareId}/${item.view || 'book'}`; },
+    // 이슈 457 5번: 공유할 내 트리가 있어야 "내 트리 공유하기" — 로그아웃·트리 0개는 "첫 트리 만들기"로 바뀐다.
+    hasOwnTree: () => getSource() === 'server' && !!getMember()?.snapshot().owned && (getModel()?.trees?.length || 0) > 0,
     onShareOwn: () => {
       $('community-panel').close();
       if (getSource() === 'server' && getMember()?.snapshot().owned && window.LT41) openSharePanel();

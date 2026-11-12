@@ -470,7 +470,7 @@ function showTreeTips(){
   $('tree-tips-close')?.focus();
 }
 function syncTreeTips(){
-  const wanted=tipsWanted({owned:!!member?.snapshot().owned,treeCount:model?.trees?.length||0,seen:readTipsSeen(localStorage)});
+  const wanted=tipsWanted({owned:!!member?.snapshot().owned,treeCount:model?.trees?.length||0,seen:readTipsSeen(localStorage),source});
   if(wanted)showTreeTips();else closeTreeTips(false);
 }
 $('tree-tips-close')?.addEventListener('click',()=>closeTreeTips());

@@ -434,7 +434,9 @@ nav #record-menu{min-height:40px;font-size:13px;letter-spacing:0}
  .main-nav{flex:0 0 auto}
  .main-nav #community-menu,.main-nav .tree-views{display:none!important}
  .header-actions #write-menu{display:none!important}
- .header-actions{gap:6px}
+ /* 이슈 457 3번: .main-nav가 더 안 자라(flex:0 0 auto) 트리 틀이 없으면(로그인·트리 0개) nav 내용이
+    줄어 계정·☰가 로고 바로 옆에 붙는다. 오른쪽 끝에 고정해 트리 틀 유무와 상관없이 같은 자리에 있게 한다. */
+ .header-actions{gap:6px;margin-left:auto}
  #mobile-more{display:flex!important}
  .tree-popover{position:fixed;left:10px;right:10px;top:60px;min-width:0;max-height:70vh}
  #header-overflow.is-open{position:fixed;left:10px;right:10px;top:60px;right:10px}
