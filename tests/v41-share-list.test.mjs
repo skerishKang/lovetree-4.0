@@ -107,7 +107,7 @@ test('살아 있는 주소마다 만든 날짜·처음 열 보기·복사·취�
     await h.messages.openSharePanel();
     const row = h.els['share-list'].children[0];
     assert.equal(row.children[0].children[0].textContent, '공유 중 · 둘러보기에 올림');
-    assert.match(row.children[0].children[1].textContent, /기억 보드 · 2026\. 11\. 12\.에 만든 주소/);
+    // #480 L13: 날짜는 책·보드·지도와 같은 한 벌(formatDisplayDate)을 지난다 — 늘 dot이면 \"2026. 11. 12\"(끝에 점 없음).\n    assert.match(row.children[0].children[1].textContent, /기억 보드 · 2026\. 11\. 12에 만든 주소/);
     const actions = row.children[1];
     assert.deepEqual(actions.children.map(b => b.textContent), ['둘러보기에서 내리기', '복사', '공유 취소']);
   } finally { h.restore(); }

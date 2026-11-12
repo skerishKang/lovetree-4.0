@@ -21,7 +21,8 @@ test('이슈 457 4번: 390 첫 화면 ".hint" 안내는 셸 토스트(#toast, �
 });
 
 test('이슈 457 5번: 공유할 내 트리가 없으면(로그아웃·트리 0개) "내 트리 공유하기"가 "첫 트리 만들기"로 바뀐다', () => {
-  assert.match(communityPanel, /export function mountCommunity\(\{button,dialog,onOpenShare,onStartRecord,onShareOwn,hasOwnTree\}\)/);
+  // #480 L13: 둘러보기 카드·댓글 날짜도 계정 설정을 따르도록 getDateStyle을 받는다.
+  assert.match(communityPanel, /export function mountCommunity\(\{button,dialog,onOpenShare,onStartRecord,onShareOwn,hasOwnTree,getDateStyle\}\)/);
   assert.match(communityPanel, /const canShare=!!hasOwnTree\?\.\(\);/);
   assert.match(communityPanel, /canShare\?'내 트리 공유하기':'첫 트리 만들기'/);
   // 공유할 트리가 있을 때만 공유 흐름(onShareOwn), 없을 때는 첫 트리 만들기 흐름(onStartRecord)으로 보낸다.

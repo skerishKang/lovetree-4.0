@@ -1,4 +1,6 @@
 import {createWorkspaceApi} from './api.mjs';
+// #480 L13: 보관 파일의 날짜도 책·보드·지도와 같은 한 벌로 적는다.
+import {formatDisplayDate} from './book-usability.mjs';
 const TYPES=new Set(['image/png','image/jpeg','image/gif','image/webp','video/mp4','video/webm']);
 const SIZE_PROBLEM='PNG·JPEG·GIF·WebP(약 4.2MB), MP4·WebM(약 8.4MB)만 올릴 수 있어요.';
 // 2026-11-08 순간 추가·수정 패널: 링크와 사진을 한 묶음으로 두고, 파일은 선택하면 바로 올린다.
@@ -69,7 +71,9 @@ export function mountPrivateUpload({form,assets,getSubject,getState,onChange,onU
   for(const asset of data.items){
    const row=document.createElement('div');row.className='upload-asset';
    const label=document.createElement('p');const references=(getState()?.trees||[]).flatMap(t=>t.moments).filter(m=>assetName(m.url)===asset.name).length;
-   label.textContent=(asset.mime.startsWith('image/')?'사진':'영상')+' · '+Math.ceil(asset.size/1000)+' KB · '+new Date(asset.createdAt).toLocaleString('ko-KR')+' · '+(references?references+'개 순간에서 사용':'연결된 순간 없음');row.append(label);
+   // #480 L13: 예전에는 toLocaleString('ko-KR')이었다(세 표기 어디에도 맞지 않음). 이제 계정 설정을 따른다.
+   const uploadedDate=formatDisplayDate(asset.createdAt,getState()?.prefs?.dateStyle);
+   label.textContent=(asset.mime.startsWith('image/')?'사진':'영상')+' · '+Math.ceil(asset.size/1000)+' KB · '+(uploadedDate?uploadedDate+' · ':'')+(references?references+'개 순간에서 사용':'연결된 순간 없음');row.append(label);
    const use=document.createElement('button');use.type='button';use.textContent='이 파일 첨부';use.onclick=()=>{if(busy||getSubject()!==subject)return;const url=location.origin+'/api/media/'+asset.name;assets.close();const accepted=onUseAsset?onUseAsset(url):true;if(accepted===false)return;form.elements.url.value=url;onChange();form.elements.url.focus?.();status.textContent='첨부할 파일을 골랐어요. 순간을 저장해 주세요.';};
    const remove=document.createElement('button');remove.type='button';remove.textContent='파일 삭제';remove.className='danger';
    remove.onclick=async()=>{if(busy||getSubject()!==subject||!confirm((references?references+'개 순간에서 사용 중입니다. 삭제하면 해당 사진·영상이 사라집니다. ':'')+'이 파일을 영구 삭제할까요? 순간의 글과 연결은 유지됩니다.'))return;remove.disabled=true;const result=await api.removeMedia(asset.name,subject);if(getSubject()!==subject)return;if(result.ok){if(assetName(form.elements.url.value)===asset.name){form.elements.url.value='';onChange();}await refresh();}else{status.textContent=result.message||'삭제하지 못했어요. 다시 시도해 주세요.';remove.disabled=false;}};
