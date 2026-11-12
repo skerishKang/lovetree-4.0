@@ -144,6 +144,22 @@ for (const screen of SCREENS) {
   });
 }
 
+test('#481 T3 적힌 href에 상위(..) 경로가 없다 — 배포에서 열리는 경로만 적는다', () => {
+  // 배포에서 실제로 난 결함: 셸이 public/v41 밖 모듈(v41/home-moments.js)을 부르자, 목록이
+  // '../../public/v41/domain.mjs' 같은 경로를 적었다. 서버에는 그 경로가 없어 전부 HTML로 떨어졌고
+  // (MIME text/html), 모듈 로딩 오류 133건이 났다. 목록의 href는 화면이 놓인 자리에서 여는 상대 경로여야 한다.
+  for (const screen of SCREENS) {
+    const html = fs.readFileSync(path.join(repoRoot, screen.html), 'utf8');
+    const start = html.indexOf('<!-- modulepreload:start');
+    const end = html.indexOf('<!-- modulepreload:end -->');
+    const block = html.slice(start, end);
+    const hrefs = [...block.matchAll(/<link\b[^>]*href="([^"]+)"/g)].map((m) => m[1]);
+    // '/v41/...' 절대 경로는 배포에서 실제로 열린다. 깨지는 것은 상위로 올라가는 '..' 경로뿐이다.
+    const bad = hrefs.filter((h) => h.includes('..'));
+    assert.deepEqual(bad, [], screen.name + ': 브라우저가 못 여는 경로: ' + bad.join(', '));
+  }
+});
+
 test('#481 T3 셸 목록에는 셸 본체와 대표 모듈이 들어 있다(독립 순회로 확인)', () => {
   const files = walkScreen(SCREENS[0]);
   for (const must of ['shell.mjs', 'shell/panels.mjs', 'domain.mjs', 'frame-wiring.mjs']) {

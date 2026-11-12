@@ -297,6 +297,15 @@ export function createOverflowRejudge({ judge, raf, cancelRaf = () => {}, addDoc
    다시 띄우는 조건 둘(날짜 표기와 같은 판정):
    ① 지금 그려진 값과 다르다 ② 기기 미러(lt41.titleDisplay)가 이미 그 값이다 — 다시 뜨면 새 값으로 그려진다는 보장.
    미러를 못 읽는 창(저장소 차단)이나 셸이 아직 계정 값을 못 읽어 기본값을 보낸 경우는 그대로 둔다. */
+// #481 T6: 날짜 표기 판정도 여기 둔다 — 셸(frame-wiring.mjs)과 첫 화면(v41/home-moments.js)이 같은 한 벌을 쓴다.
+// (예전에는 v41/home-moments.js에만 있었는데, 셸이 public/v41 밖 모듈을 부르면 modulepreload 목록이
+//  브라우저가 못 여는 '../../public/v41/...' 경로를 적게 된다 — 배포에서 모듈 로딩 오류가 났다.)
+export const dateStyleOf = (value) => (value === 'dash' || value === 'long' ? value : 'dot');
+export function shouldReloadForDateStyle({ value, rendered, mirror } = {}) {
+  const next = dateStyleOf(value);
+  if (next === dateStyleOf(rendered)) return false;
+  return mirror != null && mirror !== '' && dateStyleOf(mirror) === next;
+}
 export const titleDisplayOf = (value) => normalizeTitleDisplay(value);
 export function shouldReloadForTitleDisplay({ value, rendered, mirror } = {}) {
   const next = titleDisplayOf(value);

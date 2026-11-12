@@ -3,8 +3,10 @@
 // 2026-11-12 사고(#476/#477)의 교훈: 보내는 시점과 받는 쪽 동작을 따로 고정하면 둘이 어긋난 틈이 남는다.
 // 여기서는 한 곳에서 둘을 함께 돌려 "같은 값을 여러 번 받아도 다시 뜨지 않는다"를 실행으로 확인한다.
 import { normalizeDateStyle } from './domain.mjs';
-import { normalizeTitleDisplay, shouldReloadForTitleDisplay } from './book-usability.mjs';
-import { shouldReloadForDateStyle, dateStyleOf } from '../../v41/home-moments.js';
+import {
+  normalizeTitleDisplay, shouldReloadForTitleDisplay,
+  dateStyleOf, shouldReloadForDateStyle
+} from './book-usability.mjs';
 
 /** 셸이 프레임에 보내는 메시지 타입(한 곳에서만 적는다). */
 export const FRAME_MESSAGE_TYPES = Object.freeze({
