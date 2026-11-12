@@ -108,3 +108,6 @@ html[data-lt-theme=garden][data-v41-screen=network] .view-switch button[aria-pre
 html[data-lt-theme=garden][data-v41-screen=network] .edge-tip{box-shadow:var(--lt-garden-shadow)}
 /* 동심원 보기: 묶음 안내·세로 레일은 그물 보기 전용. 왼쪽 조작(확대·첫 순간)은 유지. */
 body[data-lt-view=concentric] .legend,body[data-lt-view=concentric] .progress-rail{display:none}
+/* #366 키보드: 지도 캔버스에 초점이 오면 테두리로 알리고, 안내 문구는 화면 낭독기만 읽는다. */
+#stage:focus-visible{outline:2px solid var(--lt-gold-line,rgba(230,177,76,.9));outline-offset:-3px}
+.sr-only{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
