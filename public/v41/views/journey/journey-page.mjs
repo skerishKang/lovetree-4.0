@@ -124,7 +124,7 @@ export function createJourneyPage(env = {}) {
     for (const pane of document.querySelectorAll('[data-pane]')) pane.hidden = Number(pane.dataset.pane) !== state.step || state.phase !== 'form';
     if (state.step === 4) $('finish-note').textContent = state.saved.momentId && state.draft.skipped
       ? '첫 순간이 트리에 뿌리내렸어요. 다음 순간은 나중에 순간 추가로 이어 붙일 수 있어요.'
-      : '첫 순간과 다음 순간이 한 트리로 이어졌어요. 이제 기억책에서 다시 볼 수 있어요.';
+      : '첫 순간과 다음 순간이 한 트리로 이어졌어요. 이제 책에서 다시 볼 수 있어요.';
   }
 
   function primaryLabel() {

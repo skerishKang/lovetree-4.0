@@ -10,7 +10,7 @@ test('#393 5: "← 내 책장"이 "← 내 트리"가 되고, 그 옆에 지금 
  assert.match(HTML,/id="shelfBackBtn" type="button">← 내 트리</,'왼쪽 위 단추 이름');
  assert.match(HTML,/class="topbar-left".*id="shelfBackBtn"/s,'← 내 트리와 제목은 한 묶음(왼쪽)');
  assert.match(HTML,/id="bookTitleBtn" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="treeMenuPanel"/,'제목 단추는 팝업 단추로 자신을 알린다');
- assert.match(HTML,/id="bookTitleText">기억책</,'제목 글자 자리');
+ assert.match(HTML,/id="bookTitleText">책</,'제목 글자 자리');
  assert.match(HTML,/class="book-title-caret" aria-hidden="true">▾</,'▾ 표시');
  assert.match(CSS,/\.topbar-left\{display:flex;align-items:center;gap:10px;min-width:0;margin-right:auto\}/,'셸이 책 화면 topbar를 오른쪽 정렬로 둬서 묶음이 왼쪽에 붙는다');
  assert.match(EXTRA,/const titleText=document\.getElementById\('bookTitleText'\);/,'제목은 #212 이름 규칙으로 칠한다');
@@ -31,7 +31,7 @@ test('#393 5: 제목 ▾의 트리 목록은 셸의 드롭다운과 같은 내�
 test('#393 5: 마지막 장에 "다른 트리 보기"와 다른 트리 표지가 둔다 — 없으면 그리지 않는다',()=>{
  assert.match(EXTRA,/function otherTreesBlock\(\)\{\n if\(LTDEMO\.readOnly\)return;/,'공유·예시에서는 다른 트리로 갈 수 없으므로 숨긴다');
  assert.match(EXTRA,/const others=orderedTrees\(\)\.filter\(tree=>tree\.id!==currentTreeId\(\)\)\.slice\(0,3\)/,'다른 트리 표지 2~3개');
- assert.match(EXTRA,/rightPage\.innerHTML='<div class="next-page">[^;]*otherTreesBlock\(\)/,'빈 오른쪽 페이지의 다음 순간 남기기 아래');
+ assert.match(EXTRA,/rightPage\.innerHTML='<div class="next-page">[^;]*otherTreesBlock\(\)/,'빈 오른쪽 페이지의 다음 순간 추가 아래');
  assert.match(EXTRA,/mobile-support next-page[^;]*otherTreesBlock\(\)/,'한 장(모바일)에서도 같은 자리');
  assert.match(EXTRA,/class="other-trees"><b>다른 트리 보기<\/b>/,'이름표');
  assert.ok(EXTRA.includes(`data-open-tree="'+t(tree.id)+'" data-open-moment="'+t(tree.moments?.[0]?.id||'')+'"`),'표지에는 그 트리 첫 순간으로 가는 근거를 남긴다');

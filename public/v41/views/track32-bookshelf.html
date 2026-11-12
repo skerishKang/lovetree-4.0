@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>러브트리 4.1 · 내 책장</title><!-- modulepreload:start (tools/v41-modulepreload.mjs가 만든다) --><link rel="modulepreload" href="/v41/book-usability.mjs"><link rel="modulepreload" href="/v41/domain.mjs"><link rel="modulepreload" href="/v41/inbox-model.mjs"><link rel="modulepreload" href="/v41/thumb-fallback.mjs"><link rel="modulepreload" href="/v41/tree-name.mjs"><link rel="modulepreload" href="/v41/views/shelf/shelf-model.mjs"><link rel="modulepreload" href="/v41/views/shelf/shelf-reader.js"><link rel="modulepreload" href="/v41/views/shelf/shelf.js"><!-- modulepreload:end -->
+  <title>러브트리 4.1 · 내 트리</title><!-- modulepreload:start (tools/v41-modulepreload.mjs가 만든다) --><link rel="modulepreload" href="/v41/book-usability.mjs"><link rel="modulepreload" href="/v41/domain.mjs"><link rel="modulepreload" href="/v41/inbox-model.mjs"><link rel="modulepreload" href="/v41/thumb-fallback.mjs"><link rel="modulepreload" href="/v41/tree-name.mjs"><link rel="modulepreload" href="/v41/views/shelf/shelf-model.mjs"><link rel="modulepreload" href="/v41/views/shelf/shelf-reader.js"><link rel="modulepreload" href="/v41/views/shelf/shelf.js"><!-- modulepreload:end -->
   <link rel="stylesheet" href="/v41/views/shelf/shelf.css" />
   <link rel="stylesheet" href="/v41/views/shelf/shelf-reader.css" />
 <style>#newBookButton{display:none!important}</style><link rel="stylesheet" href="/v41/reader-layout.css"><link rel="stylesheet" href="/v41/identity.css"><link rel="stylesheet" href="/v41/views/shelf/shelf-extra.css" /></head>
@@ -14,7 +14,7 @@
         <span class="brand-mark" aria-hidden="true"><i></i><b></b></span>
         <span><strong>러브트리</strong><small>LoveTree · 순간의 기록</small></span>
       </a>
-      <div class="crumbs"><span id="crumbLabel">내 책장</span></div>
+      <div class="crumbs"><span id="crumbLabel">내 트리</span></div>
       <div class="top-actions"><button class="ghost" id="newBookButton" type="button">새 책 만들기 +</button></div>
     </header>
 
@@ -22,7 +22,7 @@
       <section class="shelf-screen" id="shelfScreen">
         <section class="hero">
           <div class="hero-copy">
-            <p class="eyebrow">내 책장</p>
+            <p class="eyebrow">내 트리</p>
             <h1>좋아하는 순간들을<br /><em>한 권의 책</em>으로.</h1>
             <p>불러온 트리의 책을 선택하고 표지를 열어 보세요.</p>
             <div class="hero-note"><strong>선택한 트리</strong><span>다른 화면에서도 같은 순간을 이어서 볼 수 있어요.</span></div>
@@ -41,10 +41,10 @@
           <span class="count" id="resultCount"></span>
         </div>
         <!-- #256 2번: 책이 3권부터 책등을 목차처럼 한 줄로 세운다. 책등을 누르면 아래 넘기기가 그 책으로 이동한다. -->
-        <nav class="shelf-spines" id="shelfSpines" aria-label="책장 목차" hidden>
+        <nav class="shelf-spines" id="shelfSpines" aria-label="트리 목차" hidden>
           <div class="shelf-spine-row" id="shelfSpineRow"></div>
         </nav>
-        <section class="shelf-viewport" id="shelfViewport" aria-label="내 책장">
+        <section class="shelf-viewport" id="shelfViewport" aria-label="내 트리">
           <button class="shelf-arrow left" id="shelfPrev" type="button" aria-label="이전 책">‹</button>
           <div class="shelf-rail" id="shelfRail"></div>
           <button class="shelf-arrow right" id="shelfNext" type="button" aria-label="다음 책">›</button>
@@ -90,7 +90,7 @@
               <button class="reader-control" id="prevPage" type="button" aria-label="이전 장">‹</button>
               <span class="page-counter" id="pageCounter">CLOSED</span>
               <button class="reader-control" id="nextPage" type="button" aria-label="다음 장">›</button>
-              <button class="reader-control wide" id="openBookButton" type="button">기억책 열기</button>
+              <button class="reader-control wide" id="openBookButton" type="button">책 열기</button>
               <button class="reader-control wide hidden" id="closeBookButton" type="button">CLOSE BOOK</button>
             </div>
           </section>
