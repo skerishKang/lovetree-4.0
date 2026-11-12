@@ -480,14 +480,22 @@ const navBar=document.querySelector('.app-header nav');
 const narrowNav=()=>matchMedia('(max-width:780px)').matches;
 function choose(id,momentId){const tree=model.trees.find(t=>t.id===id);window.LT41=tree?{tree,trees:model.trees,source,momentId:tree.moments.find(m=>m.id===momentId)?.id||tree.moments.find(m=>m.parentId===null)?.id||tree.moments[0]?.id,prefs:currentPrefs(),writable:source==='server'&&!!member?.snapshot().writable,}:null;
  if(tree||current==='src064-orbit.html')show(current,false);else{flowNavigation();document.body.classList.remove('home-screen');hideFrames();$('empty').hidden=false;links();}}
+// #453 D2: 빈 화면 문구·단추는 계정 상태에 맞춘다. 로그인한 사람에게 '로그인한 계정의 기록을 불러오세요'는 어색하고,
+// 백업 파일 열기는 계정 없이 쓰는 입구라 로그인 상태에서는 숨긴다(로그아웃은 지금 그대로 둔다).
+function paintEmptyCopy(){
+ const owned=!!member?.snapshot().owned;
+ $('empty').querySelector('h1').textContent=owned?'아직 트리가 없어요.':'다시 펼칠 순간을 기다리고 있어요.';
+ $('empty').querySelector('p').textContent=owned?'예시를 둘러보거나 첫 트리를 만들어 보세요.':'예시를 둘러보거나 로그인한 계정의 기록을 불러오세요.';
+ $('empty-sample').hidden=false;$('empty-records').hidden=false;
+ $('empty-records').textContent=owned?'첫 트리 만들기':'내 기록 불러오기';
+ $('empty-file').hidden=owned;
+}
 function load(input,kind,selection={},fallback={}){
  model=kind==='example'?{trees:[exampleTree]}:workspaceModel(input);
  source=kind;
  if(kind!=='share'){
   activeShareId=null;
-  $('empty').querySelector('h1').textContent='다시 펼칠 순간을 기다리고 있어요.';
-  $('empty').querySelector('p').textContent='예시를 둘러보거나 로그인한 계정의 기록을 불러오세요.';
-  $('empty-sample').hidden=false;$('empty-records').hidden=false;
+  paintEmptyCopy();
  }
  document.body.dataset.recordSource=kind;
  document.body.dataset.member=member?.snapshot().owned?'in':'out';
@@ -646,8 +654,10 @@ function accountConfirmMatches(){
 }
 // #368: 설정 창 묶음 — 입구는 묶음 이름으로 열고 해당 묶음(제목)으로 초점과 스크롤을 옮긴다.
 const SETTINGS_SECTIONS={profile:'account-settings-profile',screen:'account-settings-screen',look:'account-settings-look',share:'account-settings-share',write:'account-settings-write',data:'account-settings-data',account:'account-settings-account'};
-function focusSettingsSection(section='profile'){
+function focusSettingsSection(section=''){
  const box=$('account-settings');if(!box?.open)return;
+ // #453 C1: 기본은 맨 위에서 연다. 입구가 구역을 지정했을 때만 그 묶음으로 내려간다.
+ if(!section)return;
  const target=$(SETTINGS_SECTIONS[section]||SETTINGS_SECTIONS.profile);if(!target)return;
  queueMicrotask(()=>{target.scrollIntoView({block:'start'});const heading=target.querySelector('h3');if(heading)heading.focus({preventScroll:true});});
 }
@@ -659,7 +669,7 @@ function paintSettingsProfile(email=shellHeader.currentAccountEmail()){
  const view=accountPresentation({owned:!!member?.snapshot().owned,email,name:prefs.displayName});
  const accent=normalizeAccentColor(prefs.accentColor);
  const initial=$('settings-profile-initial');if(initial){initial.textContent=view.initial;initial.dataset.accent=accent;}
- const name=$('settings-profile-name');if(name)name.textContent=(typeof prefs.displayName==='string'&&prefs.displayName.trim())?prefs.displayName:(email||'내 계정');
+ const name=$('settings-profile-name');if(name)name.textContent=(typeof prefs.displayName==='string'&&prefs.displayName.trim())?prefs.displayName.trim():(email?'이름 없음':'내 계정');
  const mail=$('settings-profile-email');if(mail){mail.textContent=email||'';mail.hidden=!email;}
 }
 // #368 2차: 프로필 편집 — 계정 기록의 설정 칸(state.prefs)에 저장한다(새 API 없음, setPrefs 재사용).
@@ -762,7 +772,7 @@ async function paintSettingsUsage(){
  if(!$('settings-usage'))return;
  const data=answer?.media;
  if(!answer?.ok||!data){el.hidden=true;el.textContent='';return;}
- el.textContent=(data.usedBytes/1000000).toFixed(1)+' / '+(data.quotaBytes/1000000)+' MB · '+data.items.length+' / '+data.maxItems+'개';
+ el.textContent=Math.round(data.usedBytes/1000000)+' MB / '+Math.round(data.quotaBytes/1000000)+' MB 사용 · '+data.items.length+' / '+data.maxItems+'개';
 }
 for(const b of document.querySelectorAll('[data-page-turn]'))b.onclick=()=>{
  const next=writePageTurn(localStorage,b.dataset.pageTurn);
@@ -776,8 +786,10 @@ function openAccountData(intent='first'){
  if(!member?.snapshot().owned){openLoginStart(intent);return;}
  void openAccountSettings({section:'data'});
 }
-async function openAccountSettings({section='profile'}={}){
- accountExpected=null;$('account-feedback').textContent='';$('account-confirm').value='';$('account-delete').disabled=true;$('account-confirm-hint').textContent='';
+async function openAccountSettings({section=''}={}){
+ accountExpected=null;$('account-feedback').textContent='';
+ // #453 C2: 지난번에 뜬 '내 기록을 불러왔어요.' 같은 안내가 창 안에 남지 않는다.
+ if($('settings-feedback'))$('settings-feedback').textContent='';$('account-confirm').value='';$('account-delete').disabled=true;$('account-confirm-hint').textContent='';
  // 로그아웃·공유·예시 상태에서는 설정 입구가 없다(기존 규칙). 여기서도 열지 않는다.
  if(!member?.snapshot().owned){notify('로그인한 뒤 설정을 열 수 있어요.');return;}
  paintSettingsProfile();
