@@ -16,8 +16,7 @@ renderThreads()},undo,refs:{moments,connections}}
 
 
 /* === V1.1 PRODUCTIZATION PATCH === */
-document.body.dataset.theme = (typeof readBoardTheme === 'function' && readBoardTheme() === 'night') ? 'night' : 'pearl';
-if (typeof setBoardTheme === 'function') setBoardTheme(typeof readBoardTheme === 'function' ? readBoardTheme() : 'paper');
+document.body.dataset.theme='pearl';
 
 const LT_KEYWORDS=['첫만남','무대','표정','목소리','계절','밤','이동','저장','다시보기','추천','우연','위로','벚꽃','드라이브','편지','여행','팬심'];
 
@@ -109,7 +108,7 @@ $('#startPathHere').onclick=()=>{pathOnly=true;highlightPath(selected);$('#pathM
 function updateKeywordFilter(){let vals=[...new Set(moments.flatMap(m=>m.keywords||[]))].sort();$('#keywordFilter').innerHTML='<option value="all">모든 키워드</option>'+vals.map(v=>`<option value="${esc(v)}">#${esc(v)}</option>`).join('')}
 function applyFilters(){const state={mediaFilter:$('#mediaFilter')?.value||'all',keywordFilter:$('#keywordFilter')?.value||'all',maxOrder:LT58Model.maxCreatedOrder(moments)};document.querySelectorAll('.card').forEach(el=>{const m=moments.find(x=>x.id===el.dataset.id);const ok=LT58Model.filterVisible(m,state,connections);el.classList.toggle('filteredOut',!ok)});threadLayer?.querySelectorAll('.threadGroup').forEach(g=>{let c=connections.find(x=>x.id===g.dataset.cid),a=cardLayer.querySelector(`[data-id="${c?.a}"]`),b=cardLayer.querySelector(`[data-id="${c?.b}"]`);g.classList.toggle('threadFiltered',a?.classList.contains('filteredOut')||b?.classList.contains('filteredOut'))})}
 $('#mediaFilter').onchange=applyFilters;$('#keywordFilter').onchange=applyFilters;updateKeywordFilter();
-$('#themeGrid').onclick=e=>{let b=e.target.closest('[data-board-theme],.themeBtn');if(!b)return;const theme=b.dataset.boardTheme||b.dataset.theme;const next=theme==='night'?'night':'paper';if(typeof setBoardTheme==='function')setBoardTheme(next);else{document.body.dataset.theme=next==='night'?'night':'pearl';document.body.dataset.boardTheme=next;}try{localStorage.setItem('lt41.boardTheme',next)}catch{}try{window.parent?.postMessage?.({type:'lt41-board-theme',value:next},location.origin)}catch{}toast(`${next==='night'?'밤':'종이'} 판으로 바꿨어요.`)};$('#defaultPin').onchange=e=>defaultPinStyle=e.target.value;$('#defaultCard').onchange=e=>defaultCardStyle=e.target.value;
+$('#themeGrid').onclick=e=>{let b=e.target.closest('.themeBtn');if(!b)return;document.body.dataset.theme=b.dataset.theme;document.querySelectorAll('.themeBtn').forEach(x=>x.classList.toggle('active',x===b));$('#themeBadge').textContent=b.textContent+' 보드 · 읽기 전용';toast(`${b.textContent} 테마로 바꿨어요.`)};$('#defaultPin').onchange=e=>defaultPinStyle=e.target.value;$('#defaultCard').onchange=e=>defaultCardStyle=e.target.value;
 $('#leftCollapse').onclick=()=>{if(innerWidth<760)$('#leftPanel').classList.toggle('mobileOpen');else $('#leftPanel').classList.toggle('collapsed')};$('#toolAdd').onclick=()=>openAdd();$('#toolCinema').onclick=()=>startCinemaV11(0);$('#toolFit').onclick=()=>fitAll(true);
 const ring=$('#cursorRing'), ringInner=ring.querySelector('.cursorInner'), cursorFX=document.getElementById('cursorFX');
 const cursorState={x:0,y:0,pointer:'mouse',coarse:matchMedia('(pointer:coarse)').matches,reduced:matchMedia('(prefers-reduced-motion:reduce)').matches,down:false,dragging:false,hover:'default',raf:0,activeFX:0,seen:false,outside:false,blurred:false};

@@ -39,7 +39,7 @@ html[data-lt-theme=garden] .crumb,html[data-lt-theme=garden] .themeBadge{color:v
 html[data-lt-theme=garden] .headbtn{background:var(--lt-paper);border-color:var(--lt-line);color:var(--lt-ink)}
 html[data-lt-theme=garden] .headbtn:hover{background:#fff;border-color:var(--lt-line-paper)}
 html[data-lt-theme=garden] .headbtn.primary{background:var(--lt-primary);border-color:var(--lt-primary);color:var(--lt-primary-ink)}
-html[data-lt-theme=garden][data-v41-screen=board] body:not([data-board-theme="night"]) .surface{background:linear-gradient(145deg,var(--lt-paper),var(--lt-garden-edge));box-shadow:var(--lt-garden-shadow)}
+html[data-lt-theme=garden][data-v41-screen=board] body .surface{background:linear-gradient(145deg,var(--lt-paper),var(--lt-garden-edge));box-shadow:var(--lt-garden-shadow)}
 html[data-lt-theme=garden] .surface:before{opacity:.18}
 html[data-lt-theme=garden] .boardTitle h1{font-family:var(--lt-font-display);color:var(--lt-ink);letter-spacing:-.02em}
 html[data-lt-theme=garden] .boardTitle p{color:var(--lt-muted)}
@@ -124,3 +124,37 @@ body:not(.lt-advanced) .lt-move-btn { display: none !important; }
   /* 고급 모드의 되돌리기는 모바일에서도 쓸 수 있게 한다(나머지 도구는 도구 드로어). */
   body.lt-advanced #undoBtn { display: inline-flex !important; align-items: center; min-height: 44px; padding: 0 8px; white-space: nowrap; }
 }
+
+/* === #467 밤 판 (판 테마 = 밤). 종이 판(기본)은 이 블록에 걸리지 않는다. ===
+   셸·보드가 html[data-lt-board-theme="night"]를 붙인다. 판만 어두워지고 카드는 모든 종류(보통·첫 순간·마음 한마디·
+   포스트잇·메모지·둥근·필름·티켓)가 밝은 종이 카드로 남는다. 글씨는 짙은 잉크 한 벌.
+   앞의 어떤 규칙(원본 "밤" 보드 테마 body[data-theme=night], 정원 html[data-lt-theme=garden] …)보다 위에 서도록
+   html[화면][판] body 로 시작하고 이 파일 맨 끝에 둔다. 도구 창·상세 창·머리는 앱 테마(밤·정원) 그대로 둔다. */
+html[data-v41-screen=board][data-lt-board-theme="night"] body .surface{background:linear-gradient(145deg,#15131f,#0b0a12);box-shadow:0 45px 90px rgba(0,0,0,.7),inset 0 0 0 1px rgba(255,230,166,.22),inset 0 0 90px rgba(0,0,0,.5)}
+html[data-v41-screen=board][data-lt-board-theme="night"] body .surface:before{opacity:.12}
+html[data-v41-screen=board][data-lt-board-theme="night"] body .surface:after{opacity:.16}
+html[data-v41-screen=board][data-lt-board-theme="night"] body .boardTitle,
+html[data-v41-screen=board][data-lt-board-theme="night"] body .boardTitle h1{color:#ffe6a6}
+html[data-v41-screen=board][data-lt-board-theme="night"] body .boardTitle p{color:#c9c1d4}
+html[data-v41-screen=board][data-lt-board-theme="night"] body .private{color:#ffe6a6;background:rgba(255,230,166,.1)}
+html[data-v41-screen=board][data-lt-board-theme="night"] body .card{background:linear-gradient(145deg,#fffdf9,#f4eee6);border-color:rgba(255,230,166,.5);color:#21182d;box-shadow:0 20px 45px rgba(0,0,0,.55),0 0 22px rgba(238,190,104,.14)}
+html[data-v41-screen=board][data-lt-board-theme="night"] body .card.first{background:linear-gradient(145deg,#fffdf4,#f6eee3);box-shadow:0 24px 55px rgba(0,0,0,.6),0 0 40px rgba(255,230,166,.22)}
+html[data-v41-screen=board][data-lt-board-theme="night"] body .card.noteCard{background:linear-gradient(150deg,#fffaf0,#f7ede9)}
+html[data-v41-screen=board][data-lt-board-theme="night"] body .card:hover,
+html[data-v41-screen=board][data-lt-board-theme="night"] body .card.selected{box-shadow:0 28px 60px rgba(0,0,0,.6),0 0 0 1px rgba(255,230,166,.6),0 0 38px var(--halo,rgba(255,230,166,.3))}
+html[data-v41-screen=board][data-lt-board-theme="night"] body .card.cinemaFocus{box-shadow:0 34px 75px rgba(0,0,0,.6),0 0 0 2px rgba(255,255,255,.75),0 0 55px var(--pin)}
+html[data-v41-screen=board][data-lt-board-theme="night"] body .card h3,
+html[data-v41-screen=board][data-lt-board-theme="night"] body .card .mTitle,
+html[data-v41-screen=board][data-lt-board-theme="night"] body .card .title{color:#21182d}
+html[data-v41-screen=board][data-lt-board-theme="night"] body .card .memo{color:#3f3244;border-top-color:rgba(96,72,104,.16)}
+html[data-v41-screen=board][data-lt-board-theme="night"] body .card .meta,
+html[data-v41-screen=board][data-lt-board-theme="night"] body .card .momentDate,
+html[data-v41-screen=board][data-lt-board-theme="night"] body .card .eyebrow,
+html[data-v41-screen=board][data-lt-board-theme="night"] body .card .videoTitle,
+html[data-v41-screen=board][data-lt-board-theme="night"] body .card .domain,
+html[data-v41-screen=board][data-lt-board-theme="night"] body .card small{color:#584a60}
+html[data-v41-screen=board][data-lt-board-theme="night"] body .card .firstTag{color:#5a3e5c}
+html[data-v41-screen=board][data-lt-board-theme="night"] body .card .noteText{color:#3f2f44}
+html[data-v41-screen=board][data-lt-board-theme="night"] body .card .keywordOnCard span{color:#584a60;background:rgba(92,67,101,.08)}
+/* 정원 도구 줄 위 [종이|밤] 눌린 쪽 표시 */
+html[data-lt-theme=garden] .toolbar .themeSwitchBtn[aria-checked="true"]{background:rgba(200,110,121,.14);color:var(--lt-gold-ink);box-shadow:inset 0 0 0 1px var(--lt-gold-line)}

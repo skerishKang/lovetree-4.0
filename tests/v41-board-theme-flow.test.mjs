@@ -53,59 +53,31 @@ test('셸 배선: 보드 판 테마를 프레임에 알리고 메시지를 주�
   assert.match(shell, /lt41-board-theme/);
 });
 
-function srgbLuminance(hex) {
-  const clean = hex.replace('#', '');
-  const r = parseInt(clean.slice(0, 2), 16) / 255;
-  const g = parseInt(clean.slice(2, 4), 16) / 255;
-  const b = parseInt(clean.slice(4, 6), 16) / 255;
-  const toLinear = c => (c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
-  return 0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b);
-}
+// 대비는 tests/v41-board-card-contrast.test.mjs가 실제 그려진 화면에서 카드 종류별로 잰다(변수 값끼리 계산하지 않는다).
 
-function contrastRatio(hex1, hex2) {
-  const l1 = srgbLuminance(hex1);
-  const l2 = srgbLuminance(hex2);
-  const lighter = Math.max(l1, l2);
-  const darker = Math.min(l1, l2);
-  return (lighter + 0.05) / (darker + 0.05);
-}
+test('보드 배선: 판 바꾸기는 [종이|밤] 단추만 받고, 원본 보드 테마(body[data-theme])는 건드리지 않는다', () => {
+  const board = read('public/v41/views/board/board.js');
+  const extras = read('public/v41/views/board/board-extras.js');
+  assert.match(board, /closest\?\.\('button\[data-board-theme\]'\)/, '문서 클릭은 button[data-board-theme]에만 반응한다');
+  assert.doesNotMatch(board, /closest\('\[data-board-theme\]'\)/, '속성만 보는 closest는 body·html 속성에 걸려 모든 클릭을 판 바꾸기로 읽는다');
+  assert.match(extras, /document\.body\.dataset\.theme='pearl';/, '원본 보드 테마 기본(진주빛) 그대로');
+  assert.doesNotMatch(extras, /dataset\.theme\s*=\s*[^;]*'night'/, '밤 판이라고 원본 "밤" 보드 테마(어두운 카드)를 켜지 않는다');
+  assert.doesNotMatch(board, /#ff7da7|#7ee4ff|#ffd67d|#c4b0ff/, '밤 실 색은 CSS 한 곳(board.css)에만 둔다');
+});
 
-test('색상 접근성: 본문·제목·날짜·메모 모든 글자 대비 4.5:1 이상(WCAG AA 충족)', () => {
-  // 카드 배경: 종이/밤 카드 공통 밝은 종이 (#fdfbf7)
-  const cardBg = '#fdfbf7';
-  const cardTitle = '#21182d';
-  const cardMemo = '#382b3d';
-  const cardMeta = '#61526a';
-  const cardFirstTag = '#5a3e5c';
+test('고급 도구의 보드 테마 6종은 그대로 있다', () => {
+  const html = read('public/v41/views/track58-pinboard.html');
+  for (const [k, label] of [['pearl', '진주빛'], ['cork', '따뜻한 코르크'], ['letter', '편지'], ['blossom', '꽃잎'], ['night', '밤'], ['mint', '민트']]) {
+    assert.match(html, new RegExp(`class="themeBtn[^"]*" data-theme="${k}">${label}</button>`));
+  }
+});
 
-  const titleRatio = contrastRatio(cardTitle, cardBg);
-  const memoRatio = contrastRatio(cardMemo, cardBg);
-  const metaRatio = contrastRatio(cardMeta, cardBg);
-  const firstTagRatio = contrastRatio(cardFirstTag, cardBg);
-
-  assert.ok(titleRatio >= 4.5, `카드 제목 대비 ${titleRatio.toFixed(2)}:1 >= 4.5:1`);
-  assert.ok(memoRatio >= 4.5, `카드 메모 대비 ${memoRatio.toFixed(2)}:1 >= 4.5:1`);
-  assert.ok(metaRatio >= 4.5, `카드 메타·날짜 대비 ${metaRatio.toFixed(2)}:1 >= 4.5:1`);
-  assert.ok(firstTagRatio >= 4.5, `첫 순간 태그 대비 ${firstTagRatio.toFixed(2)}:1 >= 4.5:1`);
-
-  // 종이 판 제목 (바탕 #f7f2ea)
-  const paperSurfaceBg = '#f7f2ea';
-  const paperTitleH1 = '#34283d';
-  const paperTitleP = '#61526a';
-  assert.ok(contrastRatio(paperTitleH1, paperSurfaceBg) >= 4.5, '종이 판 제목 대비 >= 4.5:1');
-  assert.ok(contrastRatio(paperTitleP, paperSurfaceBg) >= 4.5, '종이 판 설명 대비 >= 4.5:1');
-
-  // 밤 판 제목 (바탕 #100f1c)
-  const nightSurfaceBg = '#100f1c';
-  const nightTitleH1 = '#ffe6a6';
-  const nightTitleP = '#b8b2c4';
-  assert.ok(contrastRatio(nightTitleH1, nightSurfaceBg) >= 4.5, '밤 판 제목 대비 >= 4.5:1');
-  assert.ok(contrastRatio(nightTitleP, nightSurfaceBg) >= 4.5, '밤 판 설명 대비 >= 4.5:1');
-
-  // 상세/도구 패널 (바탕 #140e1c)
-  const panelBg = '#140e1c';
-  const panelValue = '#f5f1e9';
-  const panelLabel = '#bfaec8';
-  assert.ok(contrastRatio(panelValue, panelBg) >= 4.5, '패널 값 대비 >= 4.5:1');
-  assert.ok(contrastRatio(panelLabel, panelBg) >= 4.5, '패널 라벨 대비 >= 4.5:1');
+test('밤 판 CSS: 카드는 밝은 종이 카드, 판 규칙은 board-extra.css 맨 끝 한 덩어리', () => {
+  const css = read('public/v41/views/board/board-extra.css');
+  const at = css.indexOf('=== #467 밤 판');
+  assert.ok(at > 0, '밤 판 블록이 있다');
+  const block = css.slice(at);
+  assert.match(block, /\[data-lt-board-theme="night"\] body \.card\{background:linear-gradient\(145deg,#fffdf9,#f4eee6\)/);
+  assert.match(block, /\[data-lt-board-theme="night"\] body \.card h3,/);
+  assert.equal(css.lastIndexOf('[data-lt-board-theme') >= at, true);
 });
