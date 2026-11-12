@@ -219,6 +219,9 @@ test('첫 화면 카드·움직임은 설정 창이 맡고 첫 화면은 메시�
   assert.match(home, /type==='lt41-home-cards'[^\n]*location\.reload\(\)/, '첫 화면은 다시 그린다');
   assert.match(home, /type==='lt41-motion'[^\n]*orbit\?\.motion\?\.set/, '첫 화면은 궤도 움직임을 바꾼다');
   // 이슈 #466 M2: 책·보드·지도는 lt41-date-style로 즉시 반영되는데 첫 화면만 안 되던 결함 — 다시 그린다.
-  assert.match(home, /type==='lt41-date-style'[^\n]*location\.reload\(\)/, '날짜 표기가 바뀌면 첫 화면도 다시 그린다');
+  // 2026-11-12 사고: 받을 때마다 새로고침하면 셸이 프레임이 뜰 때마다 보내는 같은 값 때문에 끝없이 이어진다.
+  // 값이 실제로 바뀌었을 때만 다시 띄운다(판정은 shouldReloadForDateStyle — tests/v41-home-date-style-loop.test.mjs).
+  assert.match(home, /type==='lt41-date-style'\)\{[\s\S]{0,200}shouldReloadForDateStyle\(\{value:event\.data\.value,rendered:renderedDateStyle,mirror\}\)\)location\.reload\(\)/, '날짜 표기가 바뀌면 첫 화면도 다시 그린다');
+  assert.doesNotMatch(home, /type==='lt41-date-style'\)\{location\.reload\(\);\}/, '받을 때마다 무조건 새로고침하지 않는다');
   assert.doesNotMatch(home, /createViewMenu|data-lt-view-menu/, '첫 화면에 옛 보기 메뉴가 없다');
 });
