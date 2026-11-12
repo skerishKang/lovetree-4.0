@@ -62,6 +62,9 @@ test('날짜 표기 배선: 책·보드·지도·첫 화면 목록이 같은 한
   assert.match(shell, /function applyDateStyleToFrame\(frame\)\{[\s\S]*?setAttribute\('data-lt-date-style',currentDateStyle\(\)\)[\s\S]*?postMessage\(\{type:'lt41-date-style',value:currentDateStyle\(\)\}/);
   assert.match(shell, /applyPageTurnToFrame\(frame\);applyDateStyleToFrame\(frame\);/);
   assert.match(shell, /try\{member\.apply\('setPrefs',\{dateStyle:b\.dataset\.dateStyle\}\);/);
+  // 이슈 #466 M5: 로그인 onState에서 기기 미러(localStorage lt41.dateStyle)를 계정값으로 채운다 —
+  // 다른 기기의 첫 그림이 기본(dot)에서 멈춰 있던 결함.
+  assert.match(shell, /try\{localStorage\.setItem\('lt41\.dateStyle',normalizeDateStyle\(state\.prefs\?\.dateStyle\)\);\}catch\{\}/);
 });
 
 test('처음 보여 줄 곳: 첫 화면·내 트리 전체 보기·이어 읽기(기본), 주소가 이기면 그 주소다', () => {
