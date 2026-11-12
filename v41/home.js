@@ -7,7 +7,7 @@ import {createHomeActions} from './home-actions.js';
 import {homePresentation} from './home-presentation.js';
 import {applyHomeCenter} from './home-center.js';
 import {readTheme,writeTheme,appliedTheme,applyThemeAttribute} from '../public/v41/header-state.mjs';
-import {readTitleDisplay,titleView} from '../public/v41/book-usability.mjs';
+import {readTitleDisplay} from '../public/v41/book-usability.mjs';
 import {momentListEntries, momentListTrees} from './moment-list.js';
 const shellBody=parent.document.body;
 addEventListener('message',event=>{if(event.data?.type==='lt41-title-display')location.reload();});
@@ -103,16 +103,9 @@ if(loggedIn){
       if(n>0){label=`정리 안 된 순간 ${n}개`;}
     }
     if(label===null){
-      let m=null;
-      if(context.tree&&Array.isArray(context.tree.moments)){
-        m=context.momentId?context.tree.moments.find(x=>x.id===context.momentId)||null:null;
-        if(!m)m=[...context.tree.moments].sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')))[0]||null;
-      }
-      if(!m){label='첫 순간을 남기면 여기서 이어 볼 수 있어요';}
-      else{
-        // #426(2026-11-12): 최근 순간 카드가 '마지막 순간 · 제목 · 이어 보기'를 대신 보여 준다 — 둘째 줄은 안내 한 줄만 남긴다.
-        label=null;
-      }
+      // #426(2026-11-12): 순간이 하나라도 있으면 최근 순간 카드가 이어 보기를 대신한다 — 둘째 줄은 안내 한 줄만.
+      const hasAnyMoment=(Array.isArray(context.trees)?context.trees:[]).some(t=>Array.isArray(t?.moments)&&t.moments.length>0);
+      if(!hasAnyMoment)label='첫 순간을 남기면 여기서 이어 볼 수 있어요';
     }
     target.textContent='';
     target.append('기억은 아직 여기에서 이어지고 있어요.');

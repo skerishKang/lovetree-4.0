@@ -11,8 +11,8 @@ const home=src('v41/home.js');
 const homePresentation=src('v41/home-presentation.js');
 
 test('#426 최근 순간 카드는 내 기록 최신 순간 한 장(예시·로그아웃에는 없다)',()=>{
-  // orbitRecords가 최신순 정렬이므로 첫 장이 최근 순간이다.
-  assert.match(orbit,/const recentMoment=!demo&&memberCards\.length\?memberCards\[0\]:null;/);
+  // orbitRecords가 최신순 정렬이므로 첫 장이 최근 순간이다 — 카드는 순간 목록 한 벌(momentList.entries)에서 읽는다(섞어서·사진 3장 미만 사용자도 받는다).
+  assert.match(orbit,/const recentMoment=!demo&&Array\.isArray\(momentList\?\.entries\)&&momentList\.entries\.length\?momentList\.entries\[0\]:null;/);
   // 예시(데모)·빈 궤도(로그아웃)에서는 카드 마크업 자체가 없다.
   assert.match(orbit,/\$\{recentMoment\?recentMarkup\(recentMoment\):''\}/);
 });
@@ -67,7 +67,7 @@ test('#426 이어 보던 순간 버튼은 없다 — 로그인 후 버튼은 추
   // 둘째 줄에서도 마지막 순간 문구를 뺀다(카드가 대신) — 안내 문구에는 마지막 순간 표기가 남지 않는다.
   assert.doesNotMatch(homePresentation,/마지막 순간 「/);
   assert.doesNotMatch(homePresentation,/`마지막 순간 ·/);
-  assert.match(home,/#426\(2026-11-12\): 최근 순간 카드가/);
+  assert.match(home,/최근 순간 카드가 이어 보기를 대신/);
 });
 
 test('#426 390: 카드 폭=화면-32px, 세로 썸네일 높이 제한',()=>{

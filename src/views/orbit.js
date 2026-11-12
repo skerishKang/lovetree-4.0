@@ -50,9 +50,10 @@ export function mountOrbit(host,{trees,storage,context,actions,authHtml='',onSel
  const cardCapFor=w=>{for(const [min,cap] of CARD_CAPS)if(w>=min)return cap;return 10;};
  const cards=all.slice(0,48), last=demo?all[0]:resume(storage,trees);
  const lastCard=demo?all[0]:all.find(c=>c.treeId===last?.tree.id&&c.id===last?.moment.id)||all[0];
- // #426: 첫 화면 가운데 "최근 순간 카드" — 내 기록에서 가장 최근 순간 한 장(orbitRecords가 최신순). 예시 화면·로그아웃(빈 궤도)에는 없다.
+ // #426: 첫 화면 가운데 "최근 순간 카드" — 모든 트리의 최근 순간 한 장. 궤도 카드(memberCards)는 '섞어서'에서 사진 3장 미만이면 비지만(mix-empty),
+ // 최근 순간 카드는 순간만 있으면 나와야 하므로 순간 목록 한 벌(momentList.entries — 최신순·트리 이름 포함)을 쓴다. 예시 화면·로그아웃에는 없다.
  // 썸네일은 썸네일 공용 모듈(#435) 그대로: 회색이면 글 카드·최소 카드로 내려간다. 플레이어는 ▶를 누른 뒤에만 만든다.
- const recentMoment=!demo&&memberCards.length?memberCards[0]:null;
+ const recentMoment=!demo&&Array.isArray(momentList?.entries)&&momentList.entries.length?momentList.entries[0]:null;
  const recentMarkup=c=>{
   const raw=Date.parse(c.createdAt||c.date||'');
   const days=Number.isNaN(raw)?null:Math.max(0,Math.floor((Date.now()-raw)/86400000));
