@@ -1,5 +1,5 @@
 {
-  "reference": "a861b8c5976132a6343b6e92c7d5f313833e6dd7",
+  "reference": "9685f5c820768726727982a926e8bef36265a9a1",
   "sceneCount": 40,
   "minimums": [
     {
@@ -1175,12 +1175,12 @@
     {
       "name": "1440-night-paper-network",
       "total": 1296000,
-      "exact": 44175,
-      "exactPercent": 3.408564814814815,
+      "exact": 44197,
+      "exactPercent": 3.4102623456790124,
       "significant": 24035,
       "significantPercent": 1.8545524691358024,
       "repeatDiff": 0,
-      "meanChannelDelta": 0.7519395576131688
+      "meanChannelDelta": 0.7519490740740741
     },
     {
       "name": "1440-night-paper-concentric",
@@ -1215,12 +1215,12 @@
     {
       "name": "390-night-paper-network",
       "total": 329160,
-      "exact": 30019,
-      "exactPercent": 9.119880908980434,
+      "exact": 30050,
+      "exactPercent": 9.12929882124195,
       "significant": 12948,
       "significantPercent": 3.9336492890995256,
       "repeatDiff": 0,
-      "meanChannelDelta": 1.6097855146433346
+      "meanChannelDelta": 1.6100194434317656
     },
     {
       "name": "390-night-paper-concentric",
