@@ -104,11 +104,14 @@ test('공유 기본값: 공유 창이 처음 열 보기·둘러보기 올림을 
   assert.match(html, /data-share-discover="on"[^>]*>기본 켬</);
   assert.equal(normalizeShareView(undefined), 'book');
   assert.equal(normalizeShareDiscover(undefined), false, '옛 저장본도 둘러보기 기본 꺼짐이다');
-  // 셸이 설정값을 공급하고, 공유 창 열기·링크 만들기 뒤 스위치 시작값이 그 값을 따른다.
+  // 셸이 설정값을 공급하고, 공유 창 열기 때 처음 열 보기가 그 값을 따른다.
   assert.match(shell, /getShareDefaults:\(\)=>\(\{view:currentShareView\(\),discover:currentShareDiscover\(\)\}\)/);
   assert.match(messages, /const getShareDefaults = deps\.getShareDefaults \|\| \(\(\) => \(\{view: 'book', discover: false\}\)\);/);
   assert.match(messages, /\$\('share-view'\)\.value = getShareDefaults\(\)\.view;/);
-  assert.match(messages, /\$\('share-discover'\)\.checked = getShareDefaults\(\)\.discover;/);
+  // #480 M7: 둘러보기 올림은 링크를 만든 뒤에 정한다. '기본 켬'은 확인창을 한 번 띄우는 제안이고,
+  // 확인 없이 체크박스만 켜지 않는다(켜짐인데 실제로는 주소로만 공개이던 거짓 상태를 없앴다).
+  assert.doesNotMatch(messages, /\$\('share-discover'\)\.checked = getShareDefaults\(\)\.discover;/);
+  assert.match(messages, /if \(getShareDefaults\(\)\.discover\) await setDiscoverable\(answer\.share\.id, true, \{ask: true\}\);/);
   assert.match(shell, /try\{member\.apply\('setPrefs',\{shareView:b\.dataset\.shareView\}\);/);
   assert.match(shell, /member\.apply\('setPrefs',\{shareDiscover:b\.dataset\.shareDiscover==='on'\}\);/);
 });
