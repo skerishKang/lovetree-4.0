@@ -22,8 +22,8 @@ test('#426 카드 모양: 썸네일 크게 + 마지막 순간·지난 날 + 한 
   assert.match(orbit,/<strong>\$\{esc\(head\)\}<\/strong>/,'한 줄 제목');
   assert.match(orbit,/· 이어 보기 →<\/small>/,'트리 이름·이어 보기');
   assert.match(orbit,/aria-label="마지막 순간 열기: \$\{esc\(head\)\}"/,'카드 접근성 이름');
-  // 금빛 내 카드와 같은 결 — .card.mine과 같은 토큰(테두리·이중선·번짐)을 쓴다.
-  assert.match(orbit,/\.recent-card\{[^}]*border:3px solid var\(--lt-gold-line\)/);
+  // 금빛 내 카드와 같은 결 — .card.mine과 같은 진한 금 테두리(--lt-gold-deep)·이중선·번짐 토큰을 쓴다(#443).
+  assert.match(orbit,/\.recent-card\{[^}]*border:3px solid var\(--lt-gold-deep\)/);
   assert.match(orbit,/\.recent-card:after\{[^}]*border:1px solid var\(--lt-gold-line\)/);
 });
 
