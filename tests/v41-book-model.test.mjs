@@ -178,7 +178,9 @@ test('12. 감정 색·날짜 차: 아는 감정은 고정, 모르는 감정은 �
   assert.equal(M.emotionTone('벅참'), 4);
   assert.equal(M.emotionTone('고마움'), 5);
   assert.equal(M.emotionTone('즐거움'), 6);
-  assert.equal(M.emotionTone(''), 0);
+  // #481 L11: 빈 감정은 썸네일 한 벌(thumb-fallback.mjs emotionToneOf)과 같이 1 — 0은 CSS 규칙이 없어 무색이었다.
+  assert.equal(M.emotionTone(''), 1);
+  assert.equal(M.emotionTone(undefined), 1);
   const custom = M.emotionTone('응원');
   assert.ok(custom >= 1 && custom <= 6);
   assert.equal(M.emotionTone('응원'), custom);

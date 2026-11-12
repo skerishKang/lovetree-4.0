@@ -46,7 +46,9 @@ const spreads =Array.from({length:Math.ceil(moments.length/2)},(_,i)=>{const toP
   const EMOTION_TONES = { 설렘: 1, 그리움: 2, 위로: 3, 벅참: 4, 고마움: 5, 즐거움: 6 };
   function emotionTone(emotion) {
     const value = String(emotion ?? '').trim();
-    if (!value) return 0;
+    // #481 L11: 빈 감정은 썸네일 한 벌(thumb-fallback.mjs emotionToneOf)과 같이 1로 둔다.
+    // 0은 CSS 규칙이 없어 점이 무색으로 그려졌다(같은 값이 화면마다 다르게 보임).
+    if (!value) return 1;
     if (EMOTION_TONES[value]) return EMOTION_TONES[value];
     let hash = 0;
     for (const ch of value) hash = (hash * 31 + ch.codePointAt(0)) >>> 0;

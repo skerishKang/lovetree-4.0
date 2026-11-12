@@ -92,6 +92,21 @@ export function createDialogs(deps) {
     if (more?.getClientRects?.().length) return more;
     return target;
   }
+  // #481 L14: 화면(iframe) 안의 버튼이 창을 열면 셸의 activeElement는 <iframe>이라, 닫을 때 초점이 프레임 테두리로만
+  // 간다(누른 버튼으로 돌아가지 않음). 프레임이 연 경우에는 프레임에 알려, 그 안에서 마지막으로 누른 버튼으로 돌려준다.
+  function focusIntoFrame(frame) {
+    try {
+      const win = frame?.contentWindow;
+      const doc = frame?.contentDocument;
+      if (!win || !doc) return false;
+      const last = doc.activeElement;
+      if (last && last !== doc.body && last.matches?.('button,a,[role="button"],input,select,textarea')) { last.focus?.(); return true; }
+      const first = doc.querySelector?.('.top-actions button, main button, button');
+      if (first) { first.focus?.(); return true; }
+      win.focus?.();
+      return true;
+    } catch { return false; }
+  }
   function syncPanelTop() {
     const header = document.querySelector?.('.app-header');
     const top = header ? Math.round(header.getBoundingClientRect().height) : 66;
@@ -120,8 +135,13 @@ export function createDialogs(deps) {
       const outside = lastControl ? !(d.contains?.(lastControl) ?? false) : false;
       const opener = recorded || (outside ? lastControl : null);
       const fallback = d.dataset.ltReturn ? document.getElementById(d.dataset.ltReturn) : null;
-      const target = panelReturnFocus(opener, fallback);
-      setTimeout(() => target?.focus?.(), 0);
+      // #481 L14: 연 곳이 화면(iframe)이면 그 안으로 초점을 돌려준다(셸 안 버튼으로 억지로 옮기지 않는다).
+      const openedFromFrame = opener && typeof opener.contentWindow !== 'undefined' && opener.tagName === 'IFRAME';
+      const target = panelReturnFocus(openedFromFrame ? null : opener, fallback);
+      setTimeout(() => {
+        if (openedFromFrame && focusIntoFrame(opener)) return;
+        target?.focus?.();
+      }, 0);
     });
     d.addEventListener('cancel', event => { if (!panelConfirmClose(d)) event.preventDefault(); else d.close(); });
     d.addEventListener('click', event => {
