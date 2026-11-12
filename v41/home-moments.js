@@ -15,6 +15,16 @@ export const ltDateStyle = () => {
   } catch {}
   return 'dot';
 };
+// 첫 화면(궤도)은 날짜 표기가 바뀌면 문서를 다시 띄워야 한다. 그런데 셸은 프레임이 뜰 때마다(1.6초 뒤 한 번 더)
+// 같은 값을 lt41-date-style로 보낸다 — 받을 때마다 새로고침하면 끝없이 이어진다(2026-11-12 본 주소 사고, 초당 6회).
+// 다시 띄우는 조건 둘: ① 지금 그려진 값과 다르다 ② 기기 미러(lt41.dateStyle)가 이미 그 값이다(다시 뜨면 새 값으로
+// 그려진다는 보장). 저장소를 못 쓰는 창(mirror 없음)이나 셸이 계정 값을 아직 못 읽고 기본값을 보낸 경우는 그대로 둔다.
+export const dateStyleOf = (v) => (v === 'dash' || v === 'long' ? v : 'dot');
+export function shouldReloadForDateStyle({ value, rendered, mirror } = {}) {
+  const next = dateStyleOf(value);
+  if (next === dateStyleOf(rendered)) return false;
+  return mirror != null && mirror !== '' && dateStyleOf(mirror) === next;
+}
 export const HOME_ORBIT_LIMIT = 40;
 export const HOME_TEXT_LIMIT = 2;
 export const HOME_PHOTO_MIN = 3;

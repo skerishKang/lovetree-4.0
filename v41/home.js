@@ -1,7 +1,7 @@
 import '../src/styles.css';
 import {mountOrbit,ORBIT_EXAMPLE} from '../src/views/orbit.js';
 import {homeCardsPlan,readHomeCardsMode} from './home-cards.js';
-import {HOME_ORBIT_LIMIT, ltDateStyle} from './home-moments.js';
+import {HOME_ORBIT_LIMIT, ltDateStyle, dateStyleOf, shouldReloadForDateStyle} from './home-moments.js';
 import {fetchPopularCards} from './home-popular.js';
 import {createHomeActions} from './home-actions.js';
 import {homePresentation} from './home-presentation.js';
@@ -33,13 +33,15 @@ const momentList=loggedIn?{
  initialTreeId:momentsRequest?.treeId||'all',
  initialOpen:!!momentsRequest
 }:null;
+// 이 문서가 그려질 때 쓴 날짜 표기. 셸이 같은 값을 다시 보내면 새로고침하지 않는다(아래 메시지 처리).
+const renderedDateStyle=dateStyleOf(ltDateStyle());
  const orbit=mountOrbit(document.getElementById('orbit'),{
  trees:cardTrees,examples:cardsPlan.examples?ORBIT_EXAMPLE.moments.slice(0,cardsPlan.examples):[],
  // 내 것만 0장은 예시로 대체하지 않고 빈 궤도와 첫 순간 안내를 남긴다.
  empty:cardsPlan.kind==='mine-empty',
  momentList,
  titleDisplay:readTitleDisplay(parent.LT41),
- dateStyle:ltDateStyle(),
+ dateStyle:renderedDateStyle,
  onOpen:card=>{if(card.source==='public'){parent.location.hash=`#share/${card.shareId}/${card.view||'book'}`;return;}bridge.actions.openMine(card.treeId,card.id);},
  storage:{getItem:()=>null,setItem:()=>{}},context:{...presentation.context,readOnly:cardsPlan.kind==='example'},
  authHtml:`<button class="menuBtn auth-entry" data-home-account>${presentation.accountLabel}</button>`,actions:bridge.actions
@@ -127,7 +129,11 @@ addEventListener('message',event=>{
  if(type==='lt41-motion'){orbit?.motion?.set?.(!!event.data.paused);}
  else if(type==='lt41-home-cards'){location.reload();}
  // #441 후속: 날짜 표기도 책·보드·지도처럼 열린 채 바로 반영한다(궤도는 셸 iframe이라 다시 그려야 한다).
- else if(type==='lt41-date-style'){location.reload();}
+ // 셸은 프레임이 뜰 때마다 같은 값을 보내므로, 값이 실제로 바뀌었을 때만 다시 띄운다(shouldReloadForDateStyle).
+ else if(type==='lt41-date-style'){
+  let mirror=null;try{mirror=localStorage.getItem('lt41.dateStyle');}catch{}
+  if(shouldReloadForDateStyle({value:event.data.value,rendered:renderedDateStyle,mirror}))location.reload();
+ }
 });
 if(!loggedIn){
  const topActions=shadow.querySelector('.top-actions');
