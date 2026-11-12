@@ -52,7 +52,9 @@ if(momentsRequest){try{parent.postMessage({type:'lt41-moments-opened'},location.
 const shadow=document.getElementById('orbit').shadowRoot;
 // #380(2026-11-11): 가운데 세 버튼 — 자리·개수 그대로, 남은 폭을 똑같이 나눠 세 폭 동일(가장 긴 글자 기준 고정), 로그인 후 상태 한 줄.
 const centerStyle=document.createElement('style');
-centerStyle.textContent='.center .actions .subtleBtn{flex:1 1 0%;min-width:0;overflow-wrap:anywhere;text-align:center;line-height:1.15}.center > p:not(.center-note){min-height:2lh}@media (max-width:480px){.center .actions{flex-direction:column;align-items:stretch}.center .actions .subtleBtn{width:100%}}';
+// 버튼 폭(대표 2026-11-13): 세 개일 때의 폭(약 176px)을 넘지 않게 묶는다 — 두 개면 265px씩 늘어나 둔해 보였다.
+// 휴대폰: 줄을 꽉 채우지 않는다. 두 개는 나란히(사이 10px), 세 개는 세로로 쌓되 폭 240px까지만 — 양옆과 버튼 사이에 여백을 둔다.
+centerStyle.textContent='.center .actions{gap:10px}.center .actions .subtleBtn{flex:1 1 0%;max-width:176px;min-width:0;overflow-wrap:anywhere;text-align:center;line-height:1.15}.center > p:not(.center-note){min-height:2lh}@media (max-width:480px){.center .actions{gap:10px}.center .actions .subtleBtn{max-width:150px}.center .actions[data-count="3"]{flex-direction:column;align-items:center}.center .actions[data-count="3"] .subtleBtn{flex:0 0 auto;width:100%;max-width:240px}}';
 shadow.append(centerStyle);
 // 2026-11-07 테마 A/B: 첫 화면 오른쪽 위 도구 줄의 버튼 하나로 밤/정원을 바꾼다. 저장 키는 셸과 같다(lt41.theme).
 // 정원 색은 public/v41/identity.css의 정원 블록에만 있고, 그 파일을 그림자 루트에도 넣어 :host 규칙을 쓴다.
@@ -76,6 +78,8 @@ shadow.append(cardUI);
 const centerButtons=[...shadow.querySelectorAll('.center .actions button')];
 const centerPlan=applyHomeCenter(centerButtons,presentation.centerState);
 const byDo=name=>centerButtons.find(b=>b.dataset.do===name);
+// 보이는 버튼 수를 표시한다(위 버튼 폭 규칙이 쓴다).
+shadow.querySelector('.center .actions')?.setAttribute('data-count',String(centerButtons.filter(b=>!b.hidden&&b.style.display!=='none').length));
 // '＋ 순간 추가' → 기존 add 흐름(requestMoment add), 둘러보기/어떻게 쓰나요 → 기존 community(둘러보기와 동일 — 별도 사용법 안내 없음).
 const addButton=byDo('add');if(addButton)addButton.onclick=()=>bridge.actions.requestMoment('add');
 const communityButton=byDo('community');if(communityButton)communityButton.onclick=()=>bridge.actions.community();
