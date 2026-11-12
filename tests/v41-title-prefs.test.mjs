@@ -16,6 +16,14 @@ test('0. 설정 값·기본값·정규화가 두 벌에서 같다', () => {
   for (const value of [undefined, null, {}, { titleDisplay: 'mine' }, { titleDisplay: 'evil' }, { titleDisplay: 'video', extra: 1 }]) {
     assert.deepEqual(src.normalizePrefs(value), pub.normalizePrefs(value));
   }
+  // 이슈 #466 T5: 위 입력은 모두 dateStyle·startPlace·shareView·shareDiscover가 기본값 경로만 지난다.
+  // normalizePrefs 안에서 이 네 키의 배선이 서로 바뀌거나 오타나면(예: shareView가 shareDiscover를 읽음)
+  // 개별 정규화 함수(normalizeDateStyle 등) 직접 비교로는 못 잡으므로, 비기본값으로 왕복까지 고정한다.
+  const nonDefault = { titleDisplay: 'mine', dateStyle: 'dash', startPlace: 'shelf', shareView: 'network', shareDiscover: true };
+  assert.deepEqual(src.normalizePrefs(nonDefault), pub.normalizePrefs(nonDefault));
+  assert.deepEqual(src.normalizePrefs(nonDefault), {
+    titleDisplay: 'mine', displayName: '', accentColor: '', dateStyle: 'dash', startPlace: 'shelf', shareView: 'network', shareDiscover: true,
+  });
   assert.deepEqual(src.EMPTY_STATE().prefs, { titleDisplay: 'both', displayName: '', accentColor: '', dateStyle: 'dot', startPlace: 'resume', shareView: 'book', shareDiscover: false });
   assert.deepEqual(pub.EMPTY_STATE().prefs, { titleDisplay: 'both', displayName: '', accentColor: '', dateStyle: 'dot', startPlace: 'resume', shareView: 'book', shareDiscover: false });
 });
