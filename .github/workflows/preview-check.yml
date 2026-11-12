@@ -94,11 +94,14 @@ jobs:
           cp -r "$RUNNER_TEMP/preview-out" ./preview-out 2>/dev/null || true
           echo "postdeploy 채점은 다음 단계(preview-gate)에서 한다(미리보기 Functions 503 예외)."
           exit 0
-      - name: 판정(visual·페이지 오류 0, 미리보기 503 예외)
+      - name: 판정(제품 결함 / 환경 문제 나눠 적기)
         if: steps.preview.outputs.url != ''
         run: |
           if [ ! -d ./preview-out ]; then echo "리포트 폴더가 없습니다"; exit 2; fi
-          node tools/postdeploy/preview-gate.mjs ./preview-out --summary "$GITHUB_STEP_SUMMARY"
+          # #496: 준비 단계가 'cold'(기한 안에 404·503만)면 판정기가 환경 문제로 나눈다.
+          node tools/postdeploy/preview-gate.mjs ./preview-out \
+            --summary "$GITHUB_STEP_SUMMARY" \
+            --readiness "${{ steps.preview.outputs.readiness || 'unknown' }}"
       # ---- 겉모습 비교(visual-baseline, 2026-11-08): 알림만 하고 실패로 만들지 않는다 ----
       - name: 기준 커밋 화면 캡처 — before
         if: steps.preview.outputs.url != ''

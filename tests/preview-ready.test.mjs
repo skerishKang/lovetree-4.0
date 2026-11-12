@@ -3,30 +3,59 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { functionsReady, READY_TIMEOUT_MS, READY_INTERVAL_MS } from '../tools/postdeploy/preview-ready.mjs';
+import { functionsReady, isNotYetUp, READY_TIMEOUT_MS, READY_INTERVAL_MS } from '../tools/postdeploy/preview-ready.mjs';
 
 const read = (p) => readFileSync(new URL(p, import.meta.url), 'utf8');
 
-test('404만 오다가 404가 아닌 응답이 오면 준비된 것으로 본다', async () => {
-  const codes = [404, 404, 503];
+test('#496 404만 오다가 401(응답하는 Functions)이 오면 준비된 것으로 본다', async () => {
+  const codes = [404, 404, 401];
   let calls = 0;
-  const ok = await functionsReady('https://preview.example', {
+  const ready = await functionsReady('https://preview.example', {
     fetcher: async () => ({ status: codes[Math.min(calls++, codes.length - 1)] }),
     timeoutMs: 5000,
     intervalMs: 1
   });
-  assert.equal(ok, true);
+  assert.equal(ready, 'ready');
   assert.ok(calls >= 3, `404 두 번을 건너뛰지 않아야 한다(호출 ${calls}번)`);
 });
 
-test('기한 안에 404만 계속 오면 준비 실패 — 호출자는 그대로 진행한다', async () => {
+test('#496 배포 직후의 503은 준비 완료가 아니라 \'cold\'다 — 예전에는 이걸 ready로 읽어 채점에 들어갔다', async () => {
+  // #493 실패 2건(e102493·9a1488a)의 실제 모양: "1번째 시도에서 응답 503" 뒤 채점 → 환경/제품 구분 불가.
   let calls = 0;
-  const ok = await functionsReady('https://preview.example', {
+  const ready = await functionsReady('https://preview.example', {
+    fetcher: async () => { calls += 1; return { status: 503 }; },
+    timeoutMs: 60,
+    intervalMs: 10
+  });
+  assert.equal(ready, 'cold', '503만 오면 아직 안 뜬 것(환경 준비 안 됨)');
+  assert.notEqual(ready, 'ready');
+  assert.ok(calls > 1, `503을 한 번 보고 포기하지 않고 기한까지 다시 본다(시도 ${calls}번)`);
+});
+
+test('#496 502·504도 아직 안 뜬 것으로 본다(엣지가 뒷단을 못 찾는 응답)', async () => {
+  for (const status of [502, 504]) {
+    const ready = await functionsReady('https://preview.example', {
+      fetcher: async () => ({ status }),
+      timeoutMs: 30,
+      intervalMs: 10
+    });
+    assert.equal(ready, 'cold', `status ${status}`);
+  }
+});
+
+test('#496 준비된 응답의 범위: 401·403·200은 ready, 404·502·503·504는 아직 안 뜸', () => {
+  for (const ok of [200, 401, 403]) assert.equal(isNotYetUp(ok), false, `status ${ok}`);
+  for (const no of [404, 502, 503, 504]) assert.equal(isNotYetUp(no), true, `status ${no}`);
+});
+
+test('#496 기한 안에 404만 계속 오면 \'cold\' — 호출자는 그대로 진행하되 환경 문제로 나눈다', async () => {
+  let calls = 0;
+  const ready = await functionsReady('https://preview.example', {
     fetcher: async () => { calls += 1; return { status: 404 }; },
     timeoutMs: 60,
     intervalMs: 10
   });
-  assert.equal(ok, false);
+  assert.equal(ready, 'cold');
   assert.ok(calls > 1, '한 번만 보고 포기하지 않는다');
 });
 
@@ -35,14 +64,14 @@ test('기본 기한은 60초, 간격은 짧게 둔다', () => {
   assert.ok(READY_INTERVAL_MS > 0 && READY_INTERVAL_MS <= 5000);
 });
 
-test('네트워크 오류는 다음 시도로 넘기고, 404가 아니면 준비된 것으로 본다', async () => {
+test('#496 네트워크 오류는 다음 시도로 넘기고, 응답이 오면 ready', async () => {
   let calls = 0;
-  const ok = await functionsReady('https://preview.example', {
+  const ready = await functionsReady('https://preview.example', {
     fetcher: async () => { calls += 1; if (calls === 1) throw new Error('연결 실패'); return { status: 401 }; },
     timeoutMs: 5000,
     intervalMs: 1
   });
-  assert.equal(ok, true);
+  assert.equal(ready, 'ready');
   assert.equal(calls, 2);
 });
 
@@ -99,7 +128,7 @@ test('요청이 멈춰도 기한 안에서 정리된다(남은 기한만큼 상�
     intervalMs: 10
   });
 
-  assert.equal(ok, false, '404만 오면 준비 실패로 끝난다');
+  assert.equal(ok, 'cold', '404만 오면 아직 안 뜬 것으로 끝난다');
   assert.ok(answered > 1, `한 번만 보고 포기하지 않는다(시도 ${answered}번)`);
   assert.ok(caps.every((c) => c.hasSignal), '모든 시도에 상한 신호가 실린다');
   assert.ok(slept.length > 0, '기한 전에는 간격을 두고 다시 본다');
@@ -122,7 +151,7 @@ test('기한이 지난 뒤에는 상한 신호 없는 시도를 하지 않는다
     timeoutMs: 25,
     intervalMs: 10
   });
-  assert.equal(ok, false);
+  assert.equal(ok, 'cold');
   assert.ok(seen.every(Boolean), `상한 신호 없는 시도가 없다(기록 ${JSON.stringify(seen)})`);
 });
 
@@ -134,8 +163,10 @@ test('상한 신호를 빼면 새 시험이 잡는다(강도 증명용 대목)',
   assert.ok(src.includes('if (attempts > 0 && remaining <= 0) break;'), '기한이 지나면 더 시도하지 않는다');
 });
 
-test('404를 준비 성공으로 바꿔 놓으면 시험이 잡는다(강도 증명용 대목)', () => {
+test('#496 503을 준비 성공으로 되돌리면 시험이 잡는다(강도 증명용 대목)', () => {
   const src = read('../tools/postdeploy/preview-ready.mjs');
-  assert.ok(src.includes('res.status !== 404'), '404는 아직 준비 아님으로 본다');
-  assert.ok(!/status !== 404[^;\n]*\?\? *true/.test(src));
+  assert.ok(src.includes('NOT_YET_STATUSES'), '아직 안 뜬 응답 목록을 둔다');
+  assert.ok(/NOT_YET_STATUSES\s*=\s*Object\.freeze\(\[[^\]]*404[^\]]*503/.test(src), '404와 503이 함께 목록에 있다');
+  assert.ok(src.includes('isNotYetUp(res.status)'), '판정이 그 목록을 쓴다 — 404만 보지 않는다');
+  assert.ok(!/res\.status\s*!==\s*404/.test(src), '옛 방식(404만 보기)이 남아 있지 않다');
 });
