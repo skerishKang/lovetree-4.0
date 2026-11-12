@@ -5,6 +5,7 @@ import { chromium } from 'playwright-core';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { FRAME_LOAD_COUNTER, FRAME_RELOAD_LIMIT, HOME_CARD_STATE, RELOAD_SCREENS, reloadCheckId } from './frame-reload.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 // 러너에는 Google Chrome이 없을 수 있다. LOVETREE_POSTDEPLOY_BROWSER=chromium 이면 함께 설치한
@@ -80,6 +81,7 @@ const USAGE = `lovetree-postdeploy ${TOOL_VERSION}
   --strict            경고(겹침 등)도 실패로 간주
   --cdp <endpoint>    기존 크롬의 CDP 주소에 붙기(http://127.0.0.1:9222)
   --auto-login        --account 의 시험 계정으로 env 에서 비밀번호를 읽어 PADIEM 비밀번호 폼 자동 로그인. Google 화면이면 중단. --login 과 함께 쓸 수 없음. 계정 미지정(--account·LT_ACCOUNT 둘 다 없음)이면 시작하지 않는다
+  --frame-reload      #477 프레임 다시 뜨기 검사만 한다(로그아웃, 계정 불필요). 화면마다 5초 동안 안쪽 프레임이 다시 뜬 횟수와 첫 화면 카드 배치를 본다
   -h, --help          이 도움말
 
 로그인 세션:
@@ -101,6 +103,7 @@ function parseArgs(argv) {
     login: false,
     autoLogin: false,
     authFlows: false,
+    frameReload: false,
     write: false,
     share: null,
     youtube: 'dQw4w9WgXcQ',
@@ -129,6 +132,7 @@ function parseArgs(argv) {
       case '--cdp': opts.cdp = argv[++i]; opts.headless = false; break;
       case '--auto-login': opts.autoLogin = true; opts.headless = false; break;
       case '--auth-flows': opts.authFlows = true; break;
+      case '--frame-reload': opts.frameReload = true; break;
       case '--account': opts.account = argv[++i]; break;
       default:
         if (a.startsWith('--')) throw new Error(`알 수 없는 옵션: ${a}`);
@@ -751,6 +755,61 @@ async function checkResponsive(page, width, height, outDir, stamp) {
 
   await page.screenshot({ path: path.join(outDir, `${stamp}-${label}.png`) }).catch(() => {});
   return m;
+}
+
+// #477: 프레임 다시 뜨기(무한 새로고침) 검사 — 로그아웃 미리보기에서도 돈다(계정 불필요).
+// 화면을 각각 연 뒤 5초 동안 안쪽 프레임(#view·#view-next)이 몇 번 다시 떴는지 센다. 2회 넘으면 fail.
+// 첫 화면은 5초 뒤 카드 중 transform이 빈 카드 0장, 가운데 안전 구역 침범 0도 함께 본다.
+// 2026-11-12 사고(초당 약 6회 다시 뜸)를 배포 직후에 잡는 것이 목적이다. 근거: 4055286 빌드는 fail, 0693a8e(수리) 다음은 pass.
+async function checkFrameReloads(page, target, opts, stamp) {
+  const base = new URL(target.href);
+  const WATCH_MS = 5000;
+  const results = [];
+  for (const screen of RELOAD_SCREENS) {
+    const url = new URL(base.href);
+    url.search = `?rl=${Date.now()}-${screen.key}`;
+    url.hash = screen.key === 'home' ? '' : `#${screen.tab}`;
+    await page.goto(url.href, { waitUntil: 'domcontentloaded', timeout: opts.timeout }).catch(() => {});
+    // 세는 장치를 화면 문서보다 먼저 심는다(이미 지난 load는 1로 잡고, 이후 load만 더한다).
+    await page.evaluate(FRAME_LOAD_COUNTER).catch(() => {});
+    // 화면이 실제로 그려진 뒤부터 5초를 잰다 — 안쪽 문서가 준비되지 않으면 다시 잰다.
+    const opened = await page.waitForFunction(() => {
+      const el = document.getElementById('view');
+      const d = el?.contentDocument;
+      return !!(d && d.readyState !== 'loading' && d.body && d.body.children.length > 0);
+    }, { timeout: 20000 }).then(() => true).catch(() => false);
+    const startLoads = await page.evaluate(() => window.__ltFrameLoads?.total ?? 0).catch(() => 0);
+    await sleep(WATCH_MS);
+    const info = await page.evaluate(() => ({
+      loads: { ...(window.__ltFrameLoads || { view: 0, 'view-next': 0, total: 0 }) },
+      href: ([document.getElementById('view'), document.getElementById('view-next')].find((el) => el && !el.hidden && el.getClientRects().length > 0) || document.getElementById('view'))?.contentWindow?.location?.href || ''
+    })).catch(() => ({ loads: { view: 0, 'view-next': 0, total: 0 }, href: '' }));
+    const reloads = Math.max(0, (info.loads.total || 0) - startLoads);
+    const extra = { opened, reloads, loads: info.loads, href: String(info.href || '').replace(base.origin, '') };
+    if (screen.key === 'home') {
+      await sleep(500);
+      extra.cards = await page.evaluate(HOME_CARD_STATE).catch(() => ({ ready: false }));
+    }
+    results.push({ screen, reloads, extra });
+  }
+  // 화면별 판정. 한 화면이라도 2회를 넘거나 첫 화면 카드가 어긋나면 fail.
+  for (const { screen, reloads, extra } of results) {
+    const okReload = reloads <= FRAME_RELOAD_LIMIT;
+    // 검사 이름 예: stability/frame-reload-home (record()가 area/id를 붙이므로 id에는 접두사를 넣지 않는다).
+    const id = reloadCheckId(screen.key);
+    let status = okReload ? 'pass' : 'fail';
+    let detail = `${WATCH_MS / 1000}초 동안 프레임 다시 뜸 ${reloads}회 (기준 ${FRAME_RELOAD_LIMIT}회 이하)`;
+    if (screen.key === 'home') {
+      const c = extra.cards || {};
+      const cardsOk = !!c.ready && c.cards > 0 && c.unplaced === 0 && c.inSafeZone === 0;
+      if (!okReload || !cardsOk) status = 'fail';
+      detail += ` · 카드 ${c.cards ?? 0}장 중 배치 안 된 카드 ${c.unplaced ?? '-'}장 / 가운데 안전 구역 침범 ${c.inSafeZone ?? '-'}장`;
+    }
+    if (!extra.opened) { status = 'fail'; detail = '안쪽 프레임이 열리지 않아 다시 뜨기를 셀 수 없음 · ' + detail; }
+    record(id, 'stability', status, detail, extra);
+  }
+  const worst = results.reduce((a, b) => (b.reloads > a.reloads ? b : a), results[0]);
+  return { screens: results.length, worst: { screen: worst.screen.key, reloads: worst.reloads }, results };
 }
 
 async function checkVisualTokens(page, target, opts, stamp) {
@@ -2298,6 +2357,10 @@ async function main() {
           await cleanupAuthFlows(target, opts, stamp);
         }
         console.log(`\n로그인 흐름 검사 완료 (검사용 트리 생성=${flows.createdTrees})`);
+      } else if (opts.frameReload) {
+        // --frame-reload: #477 검사만 한다. 로그아웃 상태 그대로라 계정·세션이 필요 없다.
+        console.log('\n프레임 다시 뜨기 검사(로그아웃) ...');
+        await checkFrameReloads(page, target, opts, stamp);
       } else if (opts.autoLogin) {
         console.log('\n시험 계정으로 자동 로그인 시도 중...');
         const logged = await autoLogin(page, opts, target);
@@ -2318,13 +2381,19 @@ async function main() {
         record('login', 'auth', 'pass', '수동 로그인 완료, 이 프로필을 다음 실행에서 재사용');
       }
 
-      if (!opts.authFlows) {
+      if (!opts.authFlows && !opts.frameReload) {
       probe = await probeLogin(page, opts.timeout);
       const probeOk = Object.values(probe).some((v) => v && (v.status === 200 || v.status === 204));
       record('session-probe', 'auth', probeOk ? 'pass' : 'warn',
         probeOk ? '로그인 세션 응답 확인' : '계정 확인 경로에서 200을 못 봄(비로그인일 수 있음)', probe);
 
       await checkCommunity(page, opts);
+      // #477: 다른 검사가 화면을 돌린 끝에 중복으로 돌지 않게, 아직 로그아웃일 때만 여기서 돈다.
+      if (!oembed.loggedIn && !(await sessionLoggedIn(page, 2000).catch(() => false))) {
+        await checkFrameReloads(page, target, opts, stamp);
+      } else {
+        record('frame-reload', 'stability', 'skip', '로그인 세션에서는 프레임 다시 뜨기 검사를 건너뜀(--frame-reload 로 실행)');
+      }
       await checkResponsive(page, 1440, 900, opts.out, stamp);
       await page.screenshot({ path: path.join(opts.out, `${stamp}-community-1440.png`) }).catch(() => {});
       await checkResponsive(page, 390, 844, opts.out, stamp);

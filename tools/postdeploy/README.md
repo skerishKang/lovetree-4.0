@@ -36,6 +36,36 @@ node tools/postdeploy/postdeploy.mjs https://lovetree-4-0.pages.dev/v41/ --profi
 기대 결과: `fail=0` (경고·건너뜀은 허용), 종료 코드 0. `--strict`를 주면 경고도
 실패로 계산합니다. 실패가 있으면 종료 코드 2입니다.
 
+### 프레임 다시 뜨기 검사 (#477, `--frame-reload`)
+
+2026-11-12 본 주소 사고: 첫 화면이 5초 동안 30회 가까이 다시 떠서 카드가 자리를 못 잡았습니다
+(셸이 프레임이 뜰 때마다 보내는 `lt41-date-style`을 첫 화면이 받을 때마다 `location.reload()`).
+그 고장을 배포 직후에 잡는 검사입니다. **계정이 필요 없습니다**(로그아웃으로 돕니다).
+
+```powershell
+node tools/postdeploy/postdeploy.mjs https://<미리보기>.pages.dev/v41/ --frame-reload
+```
+
+- 화면마다(첫 화면·책·보드·지도·책장) 연 뒤 **5초 동안 안쪽 프레임(`#view`·`#view-next`)이 다시 뜬 횟수**를 셉니다.
+  검사 이름은 `stability/frame-reload-<화면>`(`home`·`book`·`board`·`map`·`shelf`)이고 **2회를 넘으면 fail**입니다.
+- 첫 화면은 5초 뒤 카드까지 봅니다: transform이 빈 카드 **0장**, 가운데 안전 구역(`.center` + 32px) 침범 **0장**.
+- `about:blank`로 이전 장을 비우는 순간(screens.mjs의 화면 교대)은 '다시 뜬 것'으로 세지 않습니다.
+- 기본 실행(읽기 검사)에서도 아직 로그아웃일 때 함께 돕니다. 로그인 세션이면 `skip`으로 남깁니다.
+
+**세기 증명(2026-11-12)**: 수리 전 빌드(**4055286**, `4055286` 커밋 = #476 이전)에서는 첫 화면이
+5초 동안 **14~17회** 다시 떠서 fail(사고 눈금 초당 약 6회 = 5초에 약 30회), 수리 뒤 지금 main
+(**0693a8e** 이후)에서는 **0~1회**로 pass, 가운데 안전 구역 침범 0장입니다.
+
+### 로컬에서 미리보기처럼 돌리기 (배포 전 확인)
+
+```powershell
+npx vite build
+node tools/postdeploy/serve-dist.mjs dist 4173   # 서버만 띄운다(브라우저·프로필 없음)
+node tools/postdeploy/postdeploy.mjs http://127.0.0.1:4173/v41/ --frame-reload
+```
+
+정적 서버는 API를 맡지 않으므로 로그아웃 상태로 돕니다. 끝낼 때는 출력된 PID만 종료합니다.
+
 ## 로그인 실행
 
 수동 로그인은 열린 Chrome 창에서 직접 로그인한 뒤 터미널에서 Enter를 누릅니다.
