@@ -5,7 +5,7 @@
 
 export const screens = [
   ['home', 'src064-orbit.html', '첫 화면'],
-  ['shelf', 'track32-bookshelf.html', '내 책장'],
+  ['shelf', 'track32-bookshelf.html', '내 트리'],
   ['book', 'track59-sketchbook.html', '책'],
   ['board', 'track58-pinboard.html', '보드'],
   ['network', 'track56-network.html', '지도']
@@ -15,7 +15,7 @@ export const screenForView = view => screens.find(screen => screen[0] === view) 
 export const viewForFile = file => screens.find(screen => screen[1] === file)?.[0] || 'home';
 export const screenTitle = file => screens.find(screen => screen[1] === file)?.[2] || '';
 
-// 테마는 화면마다 다르게 칠한다(2026-11-08 정원 2단계). 첫 화면·첫 여정·책장·기억책만 정원을 받고
+// 테마는 화면마다 다르게 칠한다(2026-11-08 정원 2단계). 첫 화면·첫 여정·내 트리·책만 정원을 받고
 // 나머지 안쪽 화면은 밤으로 고정된다.
 export function themedViewFor(file) {
   if (file === 'src064-orbit.html') return 'home';

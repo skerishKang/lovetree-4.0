@@ -45,7 +45,7 @@ export function createAuth(deps) {
     notify('로그인 확인이 필요해요. 다시 로그인해 주세요.');
   }
 
-  // 로그인하고 돌아왔을 때 의도한 화면으로 이어 준다(new-tree → 첫 여정, shelf → 내 책장).
+  // 로그인하고 돌아왔을 때 의도한 화면으로 이어 준다(new-tree → 첫 여정, shelf → 내 트리).
   function consumeLoginIntent(snapshot) {
     if (!pendingLoginIntent) return '';
     const intent = pendingLoginIntent;

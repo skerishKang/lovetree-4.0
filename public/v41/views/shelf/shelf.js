@@ -1,4 +1,4 @@
-// 내 책장 동작 (#231 후속, 2026-11-09).
+// 내 트리(책장) 동작 (#231 후속, 2026-11-09).
 // 계산(표지 색·이름·정보 줄·검색·카드 배치·페이지)은 shelf-model.mjs로 옮기고 여기서는 화면만 다룬다.
 // 조건·문구·id·순서 변경 0. #291(궤도)와 같이 모듈로 불러 쓴다.
 import {
@@ -55,7 +55,7 @@ import { createReader } from './shelf-reader.js';
         var list=filterShelf(allBooks(), state.filter, state.query);
         state.shelfList=list;
         state.shelfIndex=resolveShelfIndex(list, state.selectedId, state.shelfIndex);
-        $('#resultCount').textContent=list.length+'권';
+        $('#resultCount').textContent='트리 '+list.length+'개';
         renderSpines(list);
         // #465: 넘길 책이 없으면(1권 이하) 좌우 넘김 화살표를 숨기고, 책이 1~2권이면
         // 소개 상자(hero)를 낮게 둔다 — 책등 목차가 3권부터인 것과 같은 기준이다.
@@ -69,7 +69,7 @@ import { createReader } from './shelf-reader.js';
         $('#shelfRail').innerHTML=list.length?list.map(function(book,index){
           // #212: 표지에 이름 한 번만. 표지 아래는 "순간 N개 · 마지막 YYYY-MM-DD" 하나만. "책 · 02"·"기본 표지" 같은 내부 표시는 없다.
           // #256-3: 디자인 표지는 shelf-model coverChoice 판정(book.design)을 그대로 쓴다. 없으면 속성도 없다(기존 화면 변화 0).
-          return '<article class="book-card" data-book-index="'+index+'"><button type="button" data-book-id="'+esc(book.id)+'" aria-label="'+esc(book.name)+' 기억책 열기">'+
+          return '<article class="book-card" data-book-index="'+index+'"><button type="button" data-book-id="'+esc(book.id)+'" aria-label="'+esc(book.name)+' 책 열기">'+
             '<div class="book-cover"'+(book.design?' data-cover-design="'+esc(book.design)+'"':'')+' style="'+coverStyle(book)+'">'+(book.inbox?'<span class="inbox-chip">'+INBOX_LABEL+'</span>':'')+(book.coverMedia?'<img class="book-cover-media" src="'+esc(book.coverMedia)+'"'+coverFallbackAttrs(book.coverCandidates||[book.coverMedia])+' alt="" loading="lazy" referrerpolicy="no-referrer">':'')+'<span class="cover-symbol"><span>'+esc(book.symbol)+'</span></span><strong class="cover-title">'+esc(book.name)+'</strong></div>'+
             '<span class="book-card-meta"><span>'+esc(bookMeta(book))+'</span></span></button></article>';
         }).join(''):'<div class="empty"><strong>찾는 책이 없어요.</strong><span>트리 이름·좋아하는 대상·순간 제목으로 검색해 보세요.</span></div>';

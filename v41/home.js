@@ -73,7 +73,7 @@ shadow.append(identity);
 const cardUI=document.createElement('style');
 cardUI.textContent=`.top-actions>.menuBtn{position:relative;height:36px;min-height:36px;display:inline-flex;align-items:center;padding-block:0}.top-actions>.menuBtn:after{content:'';position:absolute;inset:-4px;border-radius:999px}[data-home-account],.home-community{display:none}`;
 shadow.append(cardUI);
-// #380(2026-11-11): 로그인 전 [＋ 첫 순간 남기기·둘러보기·어떻게 쓰나요] / 로그인 후 [＋ 순간 추가·둘러보기](#426: 세 번째 자리는 숨김, 최근 순간 카드가 "이어 보기"를 대신).
+// #380(2026-11-11): 로그인 전 [＋ 첫 순간 추가·둘러보기·어떻게 쓰나요] / 로그인 후 [＋ 순간 추가·둘러보기](#426: 세 번째 자리는 숨김, 최근 순간 카드가 "이어 보기"를 대신).
 // 로그인 전이면 지금 두 줄 그대로, 로그인 후면 상태에 따라 큰 제목 아래 둘째 줄도 함께 갱신한다(아래 상태 블록).
 const centerButtons=[...shadow.querySelectorAll('.center .actions button')];
 const centerPlan=applyHomeCenter(centerButtons,presentation.centerState);
@@ -172,7 +172,7 @@ if(!loggedIn){
 shadow.querySelector('[data-home-account]')?.remove();
 shadow.querySelectorAll('.firstMark').forEach(e=>e.textContent='첫 순간');
 const dialog=shadow.querySelector('dialog');
-const labels=new MutationObserver(()=>{const b=dialog.querySelector('[data-do=book]');if(b&&b.textContent!=='기억책 열기')b.textContent='기억책 열기';});
+const labels=new MutationObserver(()=>{const b=dialog.querySelector('[data-do=book]');if(b&&b.textContent!=='책 열기')b.textContent='책 열기';});
 labels.observe(dialog,{childList:true,subtree:true});
 addEventListener('pagehide',()=>labels.disconnect(),{once:true});
 addEventListener('pagehide',()=>orbit(),{once:true});
