@@ -13,7 +13,7 @@ window.LT58Model = (() => {
 
   // 처음 배치(#395): 자리를 정한 적 없는 순간을 이야기 순서대로 펼친다.
   // 첫 순간은 왼쪽, 이어진 순간은 오른쪽으로 가지 치듯(가로 300px, 세로 420px 간격 = 카드끼리 겹치지 않음).
-  // 무대(2400x2200)를 넘으면 남는 순간은 아래쪽 새 줄에 이어 놓는다. 회전은 cardPosition과 같은 -2·0·2도.
+  // 회전은 cardPosition과 같은 -2·0·2도. 자리를 저장한 순간(x·y)은 board.js가 저장값을 그대로 쓴다.
   function treeSpread(ids, edges) {
     const known = new Set(ids);
     const kids = new Map(ids.map((id) => [id, []]));
@@ -25,7 +25,8 @@ window.LT58Model = (() => {
     }
     const out = new Map();
     let nextRow = 0;
-    const cols = 7;
+    // #469: 7칸 고정 대신 12칸으로 넓게 펼친다 — 긴 트리의 세로 길이를 줄인다.
+    const cols = 12;
     function visit(id, depth, stack) {
       stack.add(id);
       const rows = kids.get(id).filter((k) => !stack.has(k) && !out.has(k)).map((k) => visit(k, depth + 1, stack));
@@ -36,12 +37,30 @@ window.LT58Model = (() => {
     }
     for (const id of ids) if (!hasParent.has(id) && !out.has(id)) visit(id, 0, new Set());
     for (const id of ids) if (!out.has(id)) visit(id, 0, new Set());
+    // #469: 밴드(깊이 12칸 구간)별로 실제로 쓴 줄 범위를 재고, 위 밴드가 쓴 줄 수만큼만 내려 쌓는다 —
+    // 옛 규칙('전체 잎 줄 수 + 1' 간격)이 만들던 줄 사이 빈 칸을 없앤다. 각 밴드는 제일 윗 줄부터 시작한다.
+    const bandRows = new Map();
+    for (const { depth, row } of out.values()) {
+      const b = Math.floor(depth / cols);
+      const cur = bandRows.get(b) || [Infinity, -Infinity];
+      cur[0] = Math.min(cur[0], row);
+      cur[1] = Math.max(cur[1], row);
+      bandRows.set(b, cur);
+    }
+    const bandTop = new Map();
+    let acc = 0;
+    for (const b of [...bandRows.keys()].sort((x, y) => x - y)) {
+      bandTop.set(b, acc);
+      const [minR, maxR] = bandRows.get(b);
+      acc += (maxR - minR) + 1;
+    }
     const result = new Map();
     let i = 0;
     for (const id of ids) {
       const { depth, row } = out.get(id);
       const wrap = Math.floor(depth / cols);
-      result.set(id, { x: 150 + (depth % cols) * 300, y: 150 + (row + wrap * (nextRow + 1)) * 420, rot: (i++ % 3 - 1) * 2 });
+      const minR = (bandRows.get(wrap) || [0])[0];
+      result.set(id, { x: 150 + (depth % cols) * 300, y: 150 + (row - minR + (bandTop.get(wrap) || 0)) * 420, rot: (i++ % 3 - 1) * 2 });
     }
     return result;
   }
