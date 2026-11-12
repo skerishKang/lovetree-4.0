@@ -532,9 +532,17 @@ function choose(id,momentId){const tree=model.trees.find(t=>t.id===id);window.LT
 function paintEmptyCopy(){
  const owned=!!member?.snapshot().owned;
  $('empty').querySelector('h1').textContent=owned?'아직 트리가 없어요.':'다시 펼칠 순간을 기다리고 있어요.';
- $('empty').querySelector('p').textContent=owned?'예시를 둘러보거나 첫 트리를 만들어 보세요.':'예시를 둘러보거나 로그인한 계정의 기록을 불러오세요.';
+ // #463(2026-11-13): 트리 0개(로그인)는 처음 온 사람용 한 줄로. 예전 문구는 다시 온 사람용이었고
+ // ("예시를 둘러보거나..."), 떠 있는 카드가 예시라는 것도 모호했다.
+ $('empty').querySelector('p').textContent=owned
+   ? '좋아하는 영상 주소 하나면 시작돼요. 지금 보이는 카드는 예시예요.'
+   : '예시를 둘러보거나 로그인한 계정의 기록을 불러오세요.';
  $('empty-sample').hidden=false;$('empty-records').hidden=false;
- $('empty-records').textContent=owned?'첫 트리 만들기':'내 기록 불러오기';
+ // #463: 로그인(트리 0개)에서는 ＋ 첫 트리 만들기가 주 버튼, 예시 둘러보기는 보조.
+ // 로그아웃은 2026-11-07 첫 화면 시작 버튼 방침대로 지금 그대로 둔다.
+ $('empty-records').textContent=owned?'＋ 첫 트리 만들기':'내 기록 불러오기';
+ $('empty-records').classList.toggle('primary',owned);
+ $('empty-sample').classList.toggle('primary',!owned);
  $('empty-file').hidden=owned;
 }
 function load(input,kind,selection={},fallback={}){
@@ -592,7 +600,7 @@ function memberStatus(status){
  else if(status.phase==='synced')notify(status.writable?(previousDirty?'서버에 저장됐어요.':'내 기록을 불러왔어요.'):'기록을 읽었어요. 서버 편집 연결은 아직 준비되지 않았어요.');
  else if(status.phase==='login'&&!status.dirty)notify('로그인이 필요해요.');
  else if(!status.dirty&&status.phase==='offline')notify(status.detail||'내 기록을 불러오지 못했어요.');
- $('write-menu').textContent=status.dirty?'미저장 기록' :'＋ 순간 추가';$('empty-records').textContent=status.writable?'첫 트리 만들기':'내 기록 불러오기';previousDirty=status.dirty;renderAccount();flowNavigation();document.body.dataset.member=member?.snapshot().owned?'in':'out';document.body.dataset.treeCount=String(model?.trees?.length||0);applyAdvanced();
+ $('write-menu').textContent=status.dirty?'미저장 기록' :'＋ 순간 추가';$('empty-records').textContent=status.writable?'＋ 첫 트리 만들기':'내 기록 불러오기';/* #463: 이름을 한 곳에서 정한다(paintEmptyCopy와 같은 글자) *//* #463: 주 버튼 표시도 같이 유지한다(쓸 상태가 바뀌도 강조가 엉키지 않게). */$('empty-records').classList.toggle('primary',!!status.writable);$('empty-sample').classList.toggle('primary',!status.writable);previousDirty=status.dirty;renderAccount();flowNavigation();document.body.dataset.member=member?.snapshot().owned?'in':'out';document.body.dataset.treeCount=String(model?.trees?.length||0);applyAdvanced();
 }
 async function startMember(){setMemberRefreshStarted(true);if(!leaveMember())return;backfillStarted=false;backfillAttempted.clear();const startup=parseSelectionRoute(location.hash);if(startup.scope==='owner')stashPendingOwnerRoute(sessionStorage,location.hash);++loadGeneration;const generation=loadGeneration;clear();
  const api=createWorkspaceApi({fetchImpl:(url,init)=>fetch(init?.method==='GET'&&url==='/api/workspace'?'/api/workspace?features=bound-writes':url,init)});

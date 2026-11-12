@@ -52,7 +52,8 @@ test('D1: 빈 화면에서는 어느 탭도 "지금 보는 곳"이 아니다', (
 test('D2: 빈 화면 문구·단추는 계정 상태에 맞춘다', () => {
   assert.match(shell, /function paintEmptyCopy\(\)/);
   assert.match(shell, /owned\?'아직 트리가 없어요\.':'다시 펼칠 순간을 기다리고 있어요\.'/);
-  assert.match(shell, /\$\('empty-records'\)\.textContent=owned\?'첫 트리 만들기':'내 기록 불러오기'/);
+  // #463: 트리 0개(로그인)는 ＋ 첫 트리 만들기가 주 버튼이다.
+  assert.match(shell, /\$\('empty-records'\)\.textContent=owned\?'＋ 첫 트리 만들기':'내 기록 불러오기'/);
   assert.match(shell, /\$\('empty-file'\)\.hidden=owned;/, '로그인 상태에서는 백업 파일 열기를 숨긴다');
   assert.match(shell, /if\(kind!=='share'\)\{[\s\S]{0,120}?paintEmptyCopy\(\);/);
 });
