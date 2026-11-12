@@ -56,6 +56,13 @@ jobs:
           start=$(date +%s)
           node --test tests/v41-board-card-contrast.test.mjs
           echo "보드 카드 대비 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+      - name: 지도 실제 대비·판 전환 시험(건너뜀=실패)
+        env:
+          LT_MAP_CONTRAST_REQUIRE: '1'
+        run: |
+          start=$(date +%s)
+          node --test tests/v41-map-contrast.test.mjs tests/v41-map-theme-flow.test.mjs
+          echo "지도 실제 대비·판 전환 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
       - name: 미리보기 주소 찾기
         id: preview
         run: node tools/postdeploy/preview-url.mjs "$GITHUB_REPOSITORY" "$PR_SHA" --wait 600
