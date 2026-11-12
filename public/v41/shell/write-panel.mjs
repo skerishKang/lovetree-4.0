@@ -25,6 +25,9 @@ export function createWritePanel(deps) {
   const $ = deps.$;
   const storage = deps.storage || globalThis.localStorage;
   let current = 'easy';
+  // #453 B: 탭을 열 때마다 셸이 편집기 기준값을 다시 잡을 수 있게 알린다(탭만 눌렀는데 더러움으로 보던 문제).
+  let onTab = () => {};
+  function setTabHook(fn) { onTab = typeof fn === 'function' ? fn : () => {}; }
 
   function paint() {
     $('write-easy').hidden = current !== 'easy';
@@ -47,6 +50,7 @@ export function createWritePanel(deps) {
     current = normalizeWriteTab(tab);
     $('write-tabs').hidden = false;
     paint();
+    onTab(current);
     return current;
   }
 
@@ -76,5 +80,5 @@ export function createWritePanel(deps) {
   });
   paint();
 
-  return {open, show, choose, setTabsVisible, paint, tab: () => current};
+  return {open, show, choose, setTabsVisible, paint, tab: () => current, setTabHook};
 }

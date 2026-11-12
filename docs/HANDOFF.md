@@ -2,6 +2,18 @@
 
 > **main 보호 규칙(2026-11-09, 룰셋 "main 보호 (PR·필수 검사)")**: main은 PR로만 바꾼다(직접 푸시·force push·삭제 금지, 관리자도 예외 없음 — 비상시 대표가 룰셋 enforcement를 잠깐 끈다). 필수 검사: `check (ubuntu-latest)`·`check (windows-latest)`·`미리보기 postdeploy(로그아웃)` — 셋 다 paths 필터가 없어 문서만 바뀐 PR에서도 항상 돈다. 승인 수 0(레인이 스스로 머지). Deploy Bundle Boot Test는 paths 필터가 있어 필수에 넣지 않았다.
 
+## 2026-11-12 — CTO 점검 1차(#453): PR 1 A·B, PR 2 C·B-2·D
+
+- **PR 1 A(예시 둘러보기에서 화면 틀·순간 추가가 숨던 문제)**: 예시 입구 `sample()`이 `leaveMember()`로 로그인 세션 자체를 버려 body가 `out`이 되고, #431 "빈 틀 숨김" 규칙에 걸려 `.tree-frame`·`#write-menu`가 함께 숨었다(규칙 문제 아님). `pauseMember()`(저장 연결만 dispose, 계정 표시 유지)로 바꾸고, 예시 상태에서 순간 추가·편집기를 누르면 로그인 화면 대신 `resumeMember(intent)`로 계정을 되살린 뒤 이어서 창을 연다(`panels.openEditor`·`quick-add.ensureWritable` 가드).
+- **PR 1 B(자세한 추가 탭만 눌러도 "저장하지 않고 닫을까요?"가 뜨던 문제)**: ＋ 순간 추가는 쉬운 추가 탭으로 열려 자세한 폼의 기준값이 비어 늘 더러움 판정이 났다. `write-panel.mjs`에 `onTab`/`setTabHook`, `panels.mjs`에 `startQuickSession()`·`onWriteTab(tab)` — 처음 자세한 탭이 보일 때 기본값(감정 설렘·오늘 날짜)을 채우고 그때 기준값을 잡는다(기준값이 없을 때만). 탭 전환·편집기 초기화 때 `resetEditorBaseline`. 실제로 쓴 뒤 닫으면 한 번 묻는 규칙은 그대로.
+- **PR 2 C(설정 창)**: 맨 위에서 열기(`openAccountSettings({section:''})`, `focusSettingsSection`은 구역 지정 때만 스크롤 — 내 데이터 입구만 그 묶음으로), 열 때 지난 안내 비움(`settings-feedback`) + 안내는 설정이 열려 있을 때만 그 줄에, 이름 없으면 '이름 없음'(이메일 한 번), 용량 '0 MB / 105 MB 사용 · n / 200개', 공유 "처음 열 보기" 이름을 화면 탭과 같은 책·보드·지도, 900px 이상에서 내용 폭 720px 안팎 가운데(390은 꽉).
+- **PR 2 B-2**: 자세한 추가의 사진·영상 파일 칸을 디자인 단추('파일 고르기')+고른 파일 이름으로 바꿨다. 실제 `input[type=file]`은 같은 칸 안에 두고 `display:none`, 단추(`button[data-file-open]`)가 그 input을 연다(키보드 가능, 44px).
+- **PR 2 D**: 빈 화면(`#book` 등)에서 맨 위 탭의 '지금 보는 곳' 표시를 지운다(둘러보기 창을 닫을 때도 되살리지 않음). 로그인 빈 화면 문구는 "아직 트리가 없어요." + 예시 둘러보기·첫 트리 만들기(백업 파일 열기는 로그아웃에만). 공개 트리가 0개면 둘러보기 오른쪽 미리보기 칸을 숨기고 빈 안내만 가운데.
+- **E(예시 책 제목 뒤 "·")**: 재현하지 못했다 — 로그인 상태 예시 책(DOM)에서 `topbar innerText`가 "← 내 트리 / 좋아하는 순간들 / ▾ / …"이고, 보이는 글자 중 '·'로 끝나는 노드가 0건이었다(책 iframe 전체 스캔). 근거를 이슈에 남기고 손대지 않았다.
+- 시험: `npm test` 1230건 1193 pass/0 fail/37 skip, `npm run build` pass, `node tools/v41-modulepreload.mjs --check` exit 0. 신규 `tests/v41-cto-453-a-b.test.mjs` 3건·`tests/v41-cto-453-cde.test.mjs` 6건, 갱신 `v41-quick-add-flow`·`v41-panel-mode`·`v41-account-settings`·`v41-screen-defaults`·`v41-shell-notice`.
+- 실측: PR 1 `.tmp-453/check-pr1.mjs` **56/56**(1440·390 × 밤·정원, 로그아웃 예시는 숨김 유지·로그인 예시는 트리 틀(▾="좋아하는 순간들")·책/보드/지도 전환·순간 추가 보임, 예시→순간 추가 시 source=server 복귀, 탭만+Esc confirm 0·메모 쓴 뒤 1, 390 동그라미 261~305px·☰ 311~355px, 넘침 0·오류 0). PR 2 `.tmp-453/check-pr2.mjs` **66/66**(빈 화면 탭 표시 0·문구·단추, 둘러보기 미리보기 숨김·빈 안내 가운데 ±40px, 설정 맨 위·지난 안내 없음·용량 형식·이름 한 번·720px·390 꽉, 파일 단추 44px·input 숨김, 넘침 0·오류 0).
+- 계정 04: 이번 두 PR은 mock 서버 계정만 써서 실제 계정 04에는 시험 데이터를 만들지 않았다(원복 불필요).
+
 ## 2026-11-12 — 하루 전체 점검(#449): postdeploy 기대값·접근성·속도·화면 오류 (ai/local2-lt-audit-261112, main e38f51a)
 
 - 점검 범위: 본 주소 로그아웃 + 계정 04 로그인. postdeploy(로그아웃 20 pass/0 fail, 로그인 1 fail), a11y 104건(serious 2·critical 0), 속도(1440 5화면 × 3회 중앙값 + 전환 3회 + `/api/workspace` 3회), 화면 5종 × 1440·390 + 설정·순간 추가 창 열고 닫기.

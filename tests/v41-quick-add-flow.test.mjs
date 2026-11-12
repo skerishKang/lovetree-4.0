@@ -29,7 +29,7 @@ function fakeEl(extra = {}) {
 }
 
 function harness({ source = 'server', owned = true, writable = true, current = 'track59-sketchbook.html', finePointer = true, applyImpl = null, attachFiles = null, clipboard = null } = {}) {
-  const calls = { apply: [], notify: [], panel: [], choose: [], openEditor: [], login: [], attach: [], writeOpen: [], writeShow: [], requestClose: [] };
+  const calls = { apply: [], notify: [], panel: [], choose: [], openEditor: [], login: [], resume: [], attach: [], writeOpen: [], writeShow: [], requestClose: [], reset: 0 };
   const els = {};
   // #425: 고르기 창·빠른 추가·편집기가 한 창(write-panel)으로 합쳐졌다.
   const need = ['write-panel', 'write-tabs', 'write-tab-easy', 'write-tab-detailed', 'write-easy', 'write-detailed', 'write-menu', 'quick-form', 'quick-url', 'quick-paste', 'quick-preview', 'quick-error', 'quick-submit', 'quick-notice', 'quick-refine', 'quick-saved', 'quick-saved-thumb', 'quick-saved-text', 'quick-saved-refine', 'drop-veil', 'drop-veil-text', 'moment-form'];
@@ -72,6 +72,10 @@ function harness({ source = 'server', owned = true, writable = true, current = '
     openSettingsData: () => { calls.settingsData = (calls.settingsData || 0) + 1; },
     choose: (treeId, momentId) => calls.choose.push([treeId, momentId]),
     openEditor: (mode, parentId) => calls.openEditor.push([mode, parentId]),
+    // #453 A: 예시·백업 파일을 보던 중이면 로그인 화면 대신 내 기록으로 돌아온다.
+    resumeMember: intent => calls.resume.push(intent),
+    // #453 B: 창을 열 때 편집기 기준값을 비운다.
+    resetEditorBaseline: () => { calls.reset += 1; },
     openLoginStart: intent => calls.login.push(intent),
     // #425: 한 창의 탭 — 어떤 탭으로 열었는지 기록한다.
     // #425: 한 창 — 탭 기록과 창 열림 흉내를 함께 둔다.
@@ -110,13 +114,23 @@ test('진입(#425): 서버·편집 가능이면 한 창을 열고, 탭은 설정
   } finally { h.restore(); }
 });
 
-test('진입: 예시·로그아웃은 기존 로그인 안내, 읽기 전용은 안내+설정 내 데이터다', () => {
+test('진입: 로그인했으면 예시·백업 파일에서도 내 기록으로 돌아와 열고, 로그아웃은 기존 로그인 안내다', () => {
+  // #453 A: 로그인한 계정이 예시를 둘러보는 중이면 ＋ 순간 추가가 로그인 화면으로 보내지 않는다.
   for (const source of ['example', 'file', 'share']) {
     const h = harness({ source });
     try {
       h.api.openWrite();
-      assert.equal(h.els['write-panel'].open, false, `${source}: 창을 열지 않는다`);
-      assert.deepEqual(h.calls.login, ['new-tree'], `${source}: 기존 로그인 안내로 보낸다`);
+      assert.equal(h.els['write-panel'].open, false, `${source}: 내 기록을 불러오기 전에는 창을 열지 않는다`);
+      assert.deepEqual(h.calls.resume, ['write'], `${source}: 내 기록으로 돌아온 뒤 다시 연다`);
+      assert.deepEqual(h.calls.login, [], `${source}: 로그인 화면으로 보내지 않는다`);
+    } finally { h.restore(); }
+  }
+  for (const source of ['example', 'file', 'share']) {
+    const h = harness({ source, owned: false });
+    try {
+      h.api.openWrite();
+      assert.deepEqual(h.calls.login, ['new-tree'], `${source}: 로그아웃 상태는 기존 로그인 안내로 보낸다`);
+      assert.deepEqual(h.calls.resume, [], `${source}: 돌아올 계정이 없다`);
     } finally { h.restore(); }
   }
   const h = harness({ writable: false });
@@ -416,6 +430,6 @@ test('연결 구조(#425 2번): 쉬운 추가는 업로더를 만들지 않고 w
   const shell = fs.readFileSync(new URL('../public/v41/shell.mjs', import.meta.url), 'utf8');
   assert.match(shell, /mountUpload:mountPrivateUpload/, 'shell.mjs는 기존 업로더를 quick-add에 그대로 넘긴다(호출 시그니처 유지)');
   // #425: 순간 남기기는 한 창(write-panel)을 연다 — 고르기 창은 없다.
-  assert.match(shell, /\$\('write-menu'\)\.onclick=\(\)=>shellQuick\.openWrite\(\)/, '순간 남기기는 한 창을 연다');
+  assert.match(shell, /\$\('write-menu'\)\.onclick=\(\)=>\{if\(source!=='server'&&member\?\.snapshot\(\)\.owned\)\{void resumeMember\('write'\);return;\}shellQuick\.openWrite\(\);\}/, '순간 남기기는 한 창을 연다(예시면 내 기록으로 돌아온 뒤)');
   assert.doesNotMatch(shell, /openWriteChooser/, '옛 고르기 창 진입이 남지 않는다');
 });

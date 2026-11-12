@@ -14,7 +14,8 @@ export function createNotifier({ $, now = () => Date.now(), holdMs = NOTICE_HOLD
     if (hold) holdUntil = at + holdMs;
     else if (at < holdUntil) return false;
     // #368: 설정 창이 열려 있으면 창 안 상태 줄에, 아니면 토스트로 보여 준다.
-    if ($('settings-feedback')) $('settings-feedback').textContent = text;
+    // #453 C2: 설정과 무관한 지난 안내가 창 안에 남지 않도록, 설정이 열려 있을 때만 그 줄에 쓴다.
+    if ($('settings-feedback') && $('account-settings')?.open) $('settings-feedback').textContent = text;
     $('toast').textContent = text;
     $('toast').hidden = !!$('account-settings')?.open;
     clearTimer(timer);
