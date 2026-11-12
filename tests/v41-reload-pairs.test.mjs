@@ -7,6 +7,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dateStyleOf, shouldReloadForDateStyle } from '../v41/home-moments.js';
+import { titleDisplayOf, shouldReloadForTitleDisplay } from '../public/v41/book-usability.mjs';
 
 const HOME = readFileSync(new URL('../v41/home.js', import.meta.url), 'utf8');
 const SHELL = readFileSync(new URL('../public/v41/shell.mjs', import.meta.url), 'utf8');
@@ -54,19 +55,49 @@ test('lt41-date-style 고리(2026-11-12 사고)가 다시 생기지 않는다 �
   assert.equal(run(['dot'], null, () => true), 50, '세기 증명: 무조건 다시 띄우는 판정은 멈추지 않는다');
 });
 
-test('lt41-title-display — 값 비교 없이 다시 띄우는 두 곳이 "뜰 때마다 보내는 쪽"과 짝이다 (위험)', () => {
-  // 셸: 이 값은 프레임이 뜰 때마다가 아니라 설정에서 바꿀 때만 보낸다(#347 후속, setTitleDisplay → postTitleDisplay).
-  // 2026-11-08 리팩터링에서 onFrameReady의 각종 알림에 lt41-title-display는 포함되지 않는다 — 전제 고정.
-  const SENDER = 'function postTitleDisplay(){try{$(\'view\').contentWindow.postMessage({type:\'lt41-title-display\',value:titleDisplayValue()},location.origin)}catch{}}';
+test('#481 lt41-title-display — 값 비교가 있어 "뜰 때마다 보내는 쪽"과 짝이어도 멈춘다', () => {
+  // 셸: 지금은 설정에서 바꿀 때만 보내고, 프레임이 뜰 때마다는 보내지 않는다(전제 고정).
   assert.match(SHELL, /function postTitleDisplay\(\)\{/);
-  assert.ok(SHELL.indexOf(SENDER) >= 0, 'postTitleDisplay는 #view 한 장에만 보낸다');
-  assert.doesNotMatch(SHELL, /onFrameReady[\s\S]{0,400}lt41-title-display/, '프레임이 뜰 때마다 lt41-title-display를 보내지 않는다');
-  // 첫 화면·책장: 무조건 location.reload(). 셸이 한 번만 보내므로 평상시엔 무해하지만,
-  // 셸이 "뜰 때마다" 보내도록 바뀌면(위 SENDER를 onFrameReady로 옮기면) 이 두 곳이 고리를 만든다.
-  assert.match(HOME, /type==='lt41-title-display'\)location\.reload\(\)/);
-  assert.match(SHELF, /type==='lt41-title-display'\)location\.reload\(\)/);
-  assert.doesNotMatch(BOOK, /type==='lt41-title-display'\)location\.reload\(\)/, '책은 다시 그리지 않고 열린 채로 그린다');
+  assert.doesNotMatch(SHELL, /onFrameReady[\s\S]{0,400}lt41-title-display/, '프레임이 뜰 때마다 보내지 않는다');
+  // 첫 화면·책장: 받으면 무조건이 아니라 '값이 바뀌었을 때만' 다시 띄운다(#481).
+  assert.doesNotMatch(HOME, /type==='lt41-title-display'\)location\.reload\(\)/, '첫 화면: 무조건 다시 띄우지 않는다');
+  assert.doesNotMatch(SHELF, /type==='lt41-title-display'\)location\.reload\(\)/, '책장: 무조건 다시 띄우지 않는다');
+  assert.match(HOME, /shouldReloadForTitleDisplay\(\{value:event\.data\.value,rendered:renderedTitleDisplay,mirror:titleMirror\}\)\)location\.reload\(\)/);
+  assert.match(SHELF, /shouldReloadForTitleDisplay\(\{value:e\.data\.value,rendered:renderedTitleDisplay,mirror\}\)\)location\.reload\(\)/);
+  // 셸은 기기 미러를 남긴다(다시 뜨면 새 값으로 그려진다는 보장 — 날짜 표기와 같은 방식).
+  assert.match(SHELL, /localStorage\.setItem\('lt41\.titleDisplay',normalizeTitleDisplay\(value\)\)/);
+  assert.match(SHELL, /rememberTitleDisplay\(state\.prefs\?\.titleDisplay\);/);
+  // 책·보드는 다시 띄우지 않고 열린 채로 그린다.
+  assert.doesNotMatch(BOOK, /type==='lt41-title-display'\)location\.reload\(\)/, '책은 열린 채로 그린다');
   assert.doesNotMatch(BOARD, /type==='lt41-title-display'\)location\.reload\(\)/, '보드도 다시 그리지 않는다');
+});
+
+test('#481 lt41-title-display — 흐름 시험: 셸이 뜰 때마다 보내도 다시 뜸은 한 번을 넘지 않는다', () => {
+  // 셸이 (가정상) 프레임이 뜰 때마다 두 번씩 같은 값을 보내는 흐름을 그대로 돌린다.
+  const run = (shellValues, mirror, renderedAt, judge = shouldReloadForTitleDisplay, maxLoads = 50) => {
+    let loads = 0, i = 0, rendered = renderedAt;
+    while (loads < maxLoads) {
+      loads += 1;
+      let reloaded = false;
+      for (let k = 0; k < 2 && !reloaded; k += 1) { // 뜰 때 + 1.6초 뒤
+        const value = shellValues[Math.min(i, shellValues.length - 1)];
+        i += 1;
+        if (judge({ value, rendered, mirror })) { reloaded = true; rendered = titleDisplayOf(mirror ?? value); }
+      }
+      if (!reloaded) break;
+    }
+    return loads;
+  };
+  // 세 값 모두, 미러가 같으면 한 번 뜨고 끝(받을 때마다 다시 뜨지 않는다).
+  for (const v of ['both', 'mine', 'video']) {
+    assert.equal(run([v], v, v), 1, `${v}: 한 번 뜨고 끝`);
+  }
+  // 값이 실제로 바뀌면 딱 한 번 더 뜨고 멈춘다(설정을 바꾸면 한 번 다시 그려진다).
+  assert.equal(run(['mine'], 'mine', 'both'), 2, '바뀐 값을 만나면 한 번 더 뜬다');
+  // 미러가 없으면(저장소 차단·계정 값 미확인) 다시 띄우지 않는다.
+  assert.equal(run(['video'], null, 'both'), 1, '미러 없음: 다시 띄우지 않는다');
+  // 예전 판정(받으면 무조건)은 같은 흐름에서 상한까지 돈다 = 사고 그대로(세기 증명).
+  assert.equal(run(['both'], 'both', 'both', () => true), 50, '무조건 다시 띄우는 판정은 멈추지 않는다');
 });
 
 test('lt41-home-cards — "한 번만 보내는 쪽"이라 위험하지 않다', () => {

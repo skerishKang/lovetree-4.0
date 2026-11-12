@@ -7,10 +7,9 @@ import {createHomeActions} from './home-actions.js';
 import {homePresentation} from './home-presentation.js';
 import {applyHomeCenter} from './home-center.js';
 import {readTheme,writeTheme,appliedTheme,applyThemeAttribute} from '../public/v41/header-state.mjs';
-import {readTitleDisplay} from '../public/v41/book-usability.mjs';
+import {readTitleDisplay, titleDisplayOf, shouldReloadForTitleDisplay} from '../public/v41/book-usability.mjs';
 import {momentListEntries, momentListTrees} from './moment-list.js';
 const shellBody=parent.document.body;
-addEventListener('message',event=>{if(event.data?.type==='lt41-title-display')location.reload();});
 const context=parent.LT41||{source:shellBody.dataset.recordSource,member:shellBody.dataset.member,treeCount:Number(shellBody.dataset.treeCount||0)};
 const bridge=createHomeActions({getContext:()=>parent.LT41,send:message=>parent.postMessage(message,location.origin),gallery:true});
 const presentation=homePresentation(context);
@@ -35,6 +34,8 @@ const momentList=loggedIn?{
 }:null;
 // 이 문서가 그려질 때 쓴 날짜 표기. 셸이 같은 값을 다시 보내면 새로고침하지 않는다(아래 메시지 처리).
 const renderedDateStyle=dateStyleOf(ltDateStyle());
+// #481: 이 문서가 그릴 때 쓴 제목 보기. 받은 값이 이것과 다를 때만 다시 띄운다.
+const renderedTitleDisplay=titleDisplayOf(readTitleDisplay(parent.LT41));
  const orbit=mountOrbit(document.getElementById('orbit'),{
  trees:cardTrees,examples:cardsPlan.examples?ORBIT_EXAMPLE.moments.slice(0,cardsPlan.examples):[],
  // 내 것만 0장은 예시로 대체하지 않고 빈 궤도와 첫 순간 안내를 남긴다.
@@ -126,6 +127,12 @@ addEventListener('message',event=>{
  const type=event.data?.type;
  if(type==='lt41-motion'){orbit?.motion?.set?.(!!event.data.paused);}
  else if(type==='lt41-home-cards'){location.reload();}
+ // #481: 제목 보기도 궤도가 그릴 때 값을 박아 두므로(orbit의 titleMode) 바뀌면 다시 떠야 한다.
+ // 날짜 표기와 같은 판정 — 지금 그린 값과 다르고, 기기 미러가 이미 그 값일 때만(다시 뜨면 새 값으로 그려진다).
+ else if(type==='lt41-title-display'){
+  let titleMirror=null;try{titleMirror=localStorage.getItem('lt41.titleDisplay');}catch{}
+  if(shouldReloadForTitleDisplay({value:event.data.value,rendered:renderedTitleDisplay,mirror:titleMirror}))location.reload();
+ }
  // #441 후속: 날짜 표기도 책·보드·지도처럼 열린 채 바로 반영한다(궤도는 셸 iframe이라 다시 그려야 한다).
  // 셸은 프레임이 뜰 때마다 같은 값을 보내므로, 값이 실제로 바뀌었을 때만 다시 띄운다(shouldReloadForDateStyle).
  else if(type==='lt41-date-style'){
