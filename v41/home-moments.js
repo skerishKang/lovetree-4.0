@@ -4,6 +4,17 @@
 // 소유자)의 YouTube 순간은 #330과 같은 판정(autoLoad)으로 ytimg 썸네일 카드를 처음부터 만든다
 // (2026-11-10 CTO 결정, lovetree-4.0 #340) — 판정·주소는 LTMedia 한 벌을 재사용한다.
 import { thumbnailCandidates } from '../public/v41/thumb-fallback.mjs';
+// #368 3차: 첫 화면 순간 목록의 날짜 표기도 같은 한 벌(formatDisplayDate)을 따른다. 스타일은 프레임 속성(셸이 심는다).
+import { formatDisplayDate } from '../public/v41/book-usability.mjs';
+const ltDateStyle = () => {
+  try {
+    const attr = document.documentElement.getAttribute('data-lt-date-style');
+    if (attr) return attr;
+    const cached = localStorage.getItem('lt41.dateStyle');
+    if (cached) return cached;
+  } catch {}
+  return 'dot';
+};
 export const HOME_ORBIT_LIMIT = 40;
 export const HOME_TEXT_LIMIT = 2;
 export const HOME_PHOTO_MIN = 3;
@@ -79,7 +90,7 @@ export function cardOf(treeId, moment, currentOrigin, youtube = null) {
     treeId,
     id: text(moment?.id),
     title: text(moment?.title),
-    date: text(moment?.date),
+    date: text(formatDisplayDate(moment?.date, ltDateStyle())),
     emotion: text(moment?.emotion),
     note: noteOf(moment),
     image: image || thumb,

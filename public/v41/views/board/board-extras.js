@@ -164,3 +164,6 @@ window.__LT58V11={youtubeId,youtubeThumb,youtubeThumbUrl,openEdit,saveEdit,choos
 
 addEventListener('message',e=>{if(e.data?.type==='lt41-title-display'){if(typeof renderCards==='function')renderCards();if(typeof renderThreads==='function')renderThreads();if(selected)selectMoment(selected,true);}});
 addEventListener('lt-title-ready',()=>{if(typeof renderCards==='function')renderCards();if(typeof renderThreads==='function')renderThreads();if(selected)selectMoment(selected,true);});
+
+// #368 3차: 설정의 날짜 표기가 바뀌면 카드·실을 다시 그린다(상세는 다음에 열 때 새 표기).
+addEventListener('lt-date-style-changed',()=>{try{renderCards()}catch{}try{renderThreads()}catch{}});

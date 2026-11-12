@@ -131,7 +131,7 @@ test('설정 입구는 로그인 상태에서만 열리고, 묶음 이름으로 
   assert.match(shell, /if\(!member\?\.snapshot\(\)\.owned\)\{notify\('로그인한 뒤 설정을 열 수 있어요\.'\);return;\}/);
   assert.match(shell, /function focusSettingsSection\(section='profile'\)\{[\s\S]*?scrollIntoView\(\{block:'start'\}\)[\s\S]*?heading\.focus\(\{preventScroll:true\}\)/);
   assert.match(shell, /void openAccountSettings\(\{section:'data'\}\);/);
-  assert.match(shell, /paintSettingsProfile\(\);\s*fillProfileForm\(\);\s*panel\('account-settings'\);\s*focusSettingsSection\(section\);/);
+  assert.match(shell, /paintSettingsProfile\(\);\s*fillProfileForm\(\);\s*paintDateStyleControls\(\);paintStartPlaceControls\(\);paintNetworkViewControls\(\);paintShareControls\(\);\s*void paintSettingsUsage\(\);\s*panel\('account-settings'\);\s*focusSettingsSection\(section\);/);
 });
 
 test('옛 내 기록 입구는 설정 "내 데이터"(로그아웃이면 로그인)로 열린다', () => {
