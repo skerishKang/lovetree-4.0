@@ -80,20 +80,19 @@ test('첫 화면 로그아웃: 첫 버튼만 흰색 강조이고 문구는 처�
   assert.deepEqual(plan.buttons.map(b => b.disabled), [false, false, false]);
 });
 
-test('첫 화면 로그인·트리 0: 이어 보던 순간은 비활성, 새 트리 만들기가 흰색', () => {
+test('첫 화면 로그인·트리 0: 버튼 두 개(#426 이어 보기는 카드가 대신), 추가가 흰색', () => {
   const plan = homeCenterState({member: 'in', treeCount: 0});
   assert.equal(plan.state, 'in-empty');
-  assert.deepEqual(plan.buttons.map(b => b.label), ['이어 보던 순간', '새 트리 만들기', '내 책장']);
-  assert.deepEqual(plan.buttons.map(b => b.emphasis), [false, true, false]);
-  assert.equal(plan.buttons[0].disabled, true);
-  assert.equal(plan.buttons[0].title, '아직 이어 볼 순간이 없어요');
+  assert.deepEqual(plan.buttons.map(b => b.label), ['＋ 순간 추가', '둘러보기']);
+  assert.deepEqual(plan.buttons.map(b => b.emphasis), [true, false]);
+  assert.deepEqual(plan.buttons.map(b => b.disabled), [false, false]);
 });
 
-test('첫 화면 로그인·트리 있음: 이어 보던 순간이 흰색, 나머지는 보조', () => {
+test('첫 화면 로그인·트리 있음: 추가가 흰색, 둘러보기는 보조(#426)', () => {
   const plan = homeCenterState({member: 'in', treeCount: 2});
   assert.equal(plan.state, 'in-trees');
-  assert.deepEqual(plan.buttons.map(b => b.emphasis), [true, false, false]);
-  assert.deepEqual(plan.buttons.map(b => b.disabled), [false, false, false]);
+  assert.deepEqual(plan.buttons.map(b => b.emphasis), [true, false]);
+  assert.deepEqual(plan.buttons.map(b => b.disabled), [false, false]);
 });
 
 test('흰색 강조는 세 상태 모두에서 정확히 하나다', () => {
@@ -134,13 +133,13 @@ test('applyHomeCenter는 실제 버튼의 문구·강조·비활성을 상태에
   const buttons = [make(), make(), make()];
   const plan = applyHomeCenter(buttons, {member: 'in', treeCount: 0});
   assert.equal(plan.state, 'in-empty');
-  assert.deepEqual(buttons.map(b => b.textContent), ['＋ 순간 추가', '이어 보던 순간', '둘러보기']);
-  assert.equal(buttons[1].disabled, true);
-  assert.equal(buttons[1].getAttribute('aria-disabled'), 'true');
-  assert.equal(buttons[1].title, '아직 이어 볼 순간이 없어요');
+  assert.deepEqual(buttons.map(b => b.textContent), ['＋ 순간 추가', '둘러보기', '']);
+  assert.equal(buttons[2].hidden, true, '남는 셋째 자리는 숨긴다(#426)');
+  assert.equal(buttons.some(b => b.disabled), false, '이어 보기 버튼이 없어 비활성 표시도 없다');
   assert.equal(buttons[0].classList.contains('primary-cta'), true);
   assert.equal(buttons[1].classList.contains('primary-cta'), false);
-  assert.deepEqual(buttons.map(b => b.dataset.do), ['add', 'resume', 'community']);
+  assert.deepEqual([buttons[0].dataset.do, buttons[1].dataset.do], ['add', 'community']);
+  assert.equal(buttons[2].dataset.do, undefined, '숨긴 버튼은 역할도 없다');
 });
 
 test('첫 화면 표시 상태는 로그인·트리 수를 셸 컨텍스트에서 읽는다', () => {

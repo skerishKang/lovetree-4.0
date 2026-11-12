@@ -75,7 +75,7 @@ const centerPlan=applyHomeCenter(centerButtons,presentation.centerState);
 const byDo=name=>centerButtons.find(b=>b.dataset.do===name);
 // '＋ 순간 추가' → 기존 add 흐름(requestMoment add), '이어 보던 순간' → 기존 resume, 둘러보기/어떻게 쓰나요 → 기존 community(둘러보기와 동일 — 별도 사용법 안내 없음).
 const addButton=byDo('add');if(addButton)addButton.onclick=()=>bridge.actions.requestMoment('add');
-const resumeButton=byDo('resume');if(resumeButton)resumeButton.onclick=()=>bridge.actions.resume();
+// #426: '이어 보던 순간' 버튼은 최근 순간 카드가 대신한다(버튼 없음).
 const communityButton=byDo('community');if(communityButton)communityButton.onclick=()=>bridge.actions.community();
 const guideButton=byDo('guide');if(guideButton)guideButton.onclick=()=>bridge.actions.community();
 let loginFocusButton=null;
@@ -91,7 +91,8 @@ if(cardsPlan.note!==null)shadow.querySelector('.center-note').textContent=cardsP
 // 2026-11-08 접근성: 카드 출처 안내가 바뀌면 화면 낭독기가 알린다.
 shadow.querySelector('.center-note')?.setAttribute('aria-live','polite');
 shadow.querySelector('.center-note')?.setAttribute('role','status');
-// #380(2026-11-11): 로그인 후 큰 제목 아래 설명 둘째 줄 = 상태(높이 두 줄 고정): 정리 알림 > 마지막 순간 > 첫 순간 안내. 로그인 전 문구는 그대로 둔다.
+// #380(2026-11-11): 로그인 후 큰 제목 아래 설명 둘째 줄 = 상태(높이 두 줄 고정): 정리 알림 > 첫 순간 안내. 로그인 전 문구는 그대로 둔다.
+// #426(2026-11-12): 마지막 순간 안내는 최근 순간 카드가 대신 보여 준다(둘째 줄에서 뺐다).
 if(loggedIn){
   const target=shadow.querySelector('.center > p:not(.center-note)');
   if(target){
@@ -109,10 +110,8 @@ if(loggedIn){
       }
       if(!m){label='첫 순간을 남기면 여기서 이어 볼 수 있어요';}
       else{
-        let title=titleView(m,readTitleDisplay(context))?.main||'';
-        if(!title)title='제목 없는 순간';
-        let days=null;const raw=Date.parse(m.createdAt||'');if(!Number.isNaN(raw))days=Math.max(0,Math.floor((Date.now()-raw)/86400000));
-        label=`마지막 순간 「${title}」${days===null?'':` · ${days}일 전`}`;
+        // #426(2026-11-12): 최근 순간 카드가 '마지막 순간 · 제목 · 이어 보기'를 대신 보여 준다 — 둘째 줄은 안내 한 줄만 남긴다.
+        label=null;
       }
     }
     target.textContent='';

@@ -13,14 +13,14 @@ const identityCss=src('public/v41/identity.css');
 const cleanupSrc=src('public/v41/shell/cleanup.mjs');
 const shellCss=src('public/v41/shell.css');
 
-// #380 2026-11-11: 가운데 세 버튼 — 로그인 전 [＋ 첫 순간 남기기·둘러보기·어떻게 쓰나요] / 로그인 후 [＋ 순간 추가·이어 보던 순간·둘러보기].
-// 왼쪽 첫 버튼만 흰색 채움(primary-cta), 나머지 테두리. 자리·개수 그대로 3개.
+// #380 2026-11-11: 가운데 버튼 — 로그인 전 [＋ 첫 순간 남기기·둘러보기·어떻게 쓰나요] / 로그인 후 [＋ 순간 추가·둘러보기] 두 개(#426: 이어 보던 순간 버튼을 뺴고 최근 순간 카드가 대신한다).
+// 왼쪽 첫 버튼만 흰색 채움(primary-cta), 나머지 테두리. 로그인 후에는 버튼 2개라 셋째 자리는 숨긴다.
 
 const makeButton=()=>{
   const attrs={};
   const set=new Set();
   return {
-    textContent:'',dataset:{},disabled:false,className:'',attrs,set,
+    textContent:'',dataset:{},disabled:false,hidden:false,className:'',attrs,set,
     classList:{toggle(name,on){if(on)set.add(name);else set.delete(name);return on},contains:name=>set.has(name)},
     setAttribute:(k,v)=>{attrs[k]=String(v)},
     getAttribute:k=>attrs[k]??null,
@@ -37,20 +37,22 @@ test('로그인 전: [＋ 첫 순간 남기기·둘러보기·어떻게 쓰나�
   assert.equal(plan.state,'out');
 });
 
-test('로그인·트리 있음: [＋ 순간 추가·이어 보던 순간·둘러보기], 첫 버튼만 흰색',()=>{
+test('로그인·트리 있음: [＋ 순간 추가·둘러보기] 두 개(#426), 첫 버튼만 흰색',()=>{
   const btns=[makeButton(),makeButton(),makeButton()];
   applyHomeCenter(btns,{member:'in',treeCount:2});
-  assert.deepEqual(btns.map(b=>b.textContent),['＋ 순간 추가','이어 보던 순간','둘러보기']);
-  assert.deepEqual(btns.map(b=>b.dataset.do),['add','resume','community']);
+  assert.deepEqual(btns.map(b=>b.textContent),['＋ 순간 추가','둘러보기','']);
+  assert.deepEqual([btns[0].dataset.do, btns[1].dataset.do], ['add', 'community']);
+  assert.equal(btns[2].dataset.do, undefined, '숨긴 버튼은 역할도 없다');
   assert.deepEqual([...btns].map(b=>b.classList.contains('primary-cta')),[true,false,false]);
+  assert.equal(btns[2].hidden,true,'남는 셋째 자리는 숨긴다');
 });
 
-test('로그인·트리 0: 둘째(이어 보던 순간) 비활성 표시',()=>{
+test('로그인·트리 0: 버튼 두 개(이어 보기는 카드가 대신), 비활성 표시 없음',()=>{
   const btns=[makeButton(),makeButton(),makeButton()];
   applyHomeCenter(btns,{member:'in',treeCount:0});
-  assert.deepEqual(btns.map(b=>b.textContent),['＋ 순간 추가','이어 보던 순간','둘러보기']);
-  assert.equal(btns[1].disabled,true);
-  assert.equal(btns[1].attrs['aria-disabled'],'true');
+  assert.deepEqual(btns.map(b=>b.textContent),['＋ 순간 추가','둘러보기','']);
+  assert.equal(btns.some(b=>b.disabled),false);
+  assert.equal(btns[2].hidden,true);
 });
 
 test('가운데 세 폭 동일·두 줄 높이 고정·좁은 화면 세로 스택 규칙이 첫 화면에 있다',()=>{
@@ -61,18 +63,19 @@ test('가운데 세 폭 동일·두 줄 높이 고정·좁은 화면 세로 스�
   assert.match(homeSrc,/flex-direction:column/);
 });
 
-test('큰 제목 아래 둘째 줄 상태 문구 계산(2026-11-11): 정리 알림 > 마지막 순간 > 첫 순간 안내',()=>{
+test('큰 제목 아래 둘째 줄 상태 문구 계산(2026-11-11·#426 2026-11-12): 정리 알림 > 첫 순간 안내, 마지막 순간은 카드가 대신',()=>{
   assert.equal(homeSecondLine({member:'out'}),null);
   // #380 5번: 정리 입구는 트리 ▾ 드롭다운 한 곳뿐 — 첫 화면은 몇 개인지만 알린다.
   assert.deepEqual(homeSecondLine({member:'in',unorganizedCount:3}),{text:'정리 안 된 순간 3개',action:'none'});
   assert.deepEqual(homeSecondLine({member:'in',unorganizedCount:0,hasMoment:false}),{text:'첫 순간을 남기면 여기서 이어 볼 수 있어요',action:'none'});
-  assert.deepEqual(homeSecondLine({member:'in',last:{title:'GANGNAM STYLE',days:2}}),{text:'마지막 순간 「GANGNAM STYLE」 · 2일 전',action:'none'});
-  assert.deepEqual(homeSecondLine({member:'in',last:{title:'GANGNAM STYLE'}}),{text:'마지막 순간 「GANGNAM STYLE」',action:'none'});
+  // #426: 순간이 있으면 둘째 줄은 안내 한 줄만 — 마지막 순간은 최근 순간 카드가 보여 준다.
+  assert.equal(homeSecondLine({member:'in',last:{title:'GANGNAM STYLE',days:2}}),null);
+  assert.equal(homeSecondLine({member:'in',last:{title:'GANGNAM STYLE'}}),null);
 });
 
-test('홈 배선: 추가/resume/둘러보기/로그아웃 시작이 기존 액션으로 연결된다',()=>{
+test('홈 배선: 추가/둘러보기/로그아웃 시작이 기존 액션으로 연결되고 resume 버튼은 없다(#426)',()=>{
   assert.match(homeSrc,/bridge\.actions\.requestMoment\('add'\)/);
-  assert.match(homeSrc,/bridge\.actions\.resume\(\)/);
+  assert.doesNotMatch(homeSrc,/bridge\.actions\.resume\(\)/,'이어 보던 순간 버튼 배선 제거');
   assert.match(homeSrc,/communityButton\.onclick=\(\)=>bridge\.actions\.community\(\)/,'둘러보기 연결');
   assert.match(homeSrc,/guideButton\.onclick=\(\)=>bridge\.actions\.community\(\)/,'어떻게 쓰나요 = 둘러보기 동일');
   assert.match(homeSrc,/first\.onclick=bridge\.actions\.start/);
