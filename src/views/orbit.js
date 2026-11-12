@@ -163,7 +163,7 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
   cards.forEach((c,i)=>{const cfg=rings[c.ring],th=c.baseAngle+phase*cfg.speed+c.phaseOffset;let x=Math.cos(th)*cfg.rx,y=Math.sin(th)*cfg.ry+cfg.band+Math.sin(th*1.7+c.phaseOffset*3)*45,z=Math.sin(th+1.1+c.phaseOffset*4)*cfg.zAmp+cfg.zBase+c.zOffset;if(!demo&&cards.length<=8){const angle=i*Math.PI*2/cards.length+phase;x=Math.cos(angle)*Math.min(w*.34,420);y=Math.sin(angle)*Math.min(h*.3,250)+(i%2===0?80:-80);z=0;}const narrow=w<=650;
    // #457: 좁은 화면은 깊이 상한을 낮추고(가까운 카드가 너무 커지지 않게) 궤도 반지름도 더 좁혀,
    // 안전 구역을 피해 밀어내기 전부터 카드가 화면에 가깝게 놓이게 한다(민 뒤 화면 밖으로 밀리는 양을 줄인다).
-   const sc=Math.max(.18,Math.min(narrow?1.1:1.82,1050/(1050-z))),fit=Math.min(1,w/780,h/850)*(narrow?.5:1);const placementFit=!demo&&cards.length<=8?1:fit;const el=elements[i];
+   const sc=Math.max(.18,Math.min(narrow?1.1:1.82,1050/(1050-z))),fit=Math.min(1,w/780,h/850)*(narrow?.5:1);const placementFit=!demo&&cards.length<=8?1:fit;const el=elements[i];let drawShrink=1;
    // #429 2/2: 폭별 상한을 넘는 카드는 숨긴다(가로 넘침·과밀 방지). 창이 넓어지면 다시 보인다.
    if(i>=cardCapFor(w)){el.style.display='none';return;}
    if(el.style.display==='none')el.style.display='';
@@ -176,6 +176,9 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
     const AX=(c.tiltX+Math.sin(th)*9)*Math.PI/180,AY=(c.tiltY+Math.cos(th)*18)*Math.PI/180,AZ=(c.tiltZ+Math.sin(th*.6)*7)*Math.PI/180;
     const rX=Math.cos(AX),uX=Math.sin(AX),rY=Math.cos(AY),uY=Math.sin(AY),rZ=Math.cos(AZ),uZ=Math.sin(AZ);
     const Cx0=w/2+px+size.w/2,Cy0=h/2+py+size.h/2;
+    // #491: 좁은 화면에서는 실제로 그려지는 배율(sc×max(.58,fit))로 판정한다. sc만 쓰면 실제보다 최대 1.7배 큰
+    // 사각형으로 판정해, 띠에 들어갈 카드까지 "못 들어간다"고 숨겼다(390에서 카드 0~2장). 넓은 화면은 fit이 1이라 같은 값이다.
+    const cScale=narrow?sc*Math.max(.58,fit):sc;
     let minX=1e9,maxX=-1e9,minY=1e9,maxY=-1e9;
     for(const corner of [[-1,-1],[1,-1],[-1,1],[1,1]]){
      const X=size.w/2*corner[0],Y=size.h/2*corner[1];
@@ -183,7 +186,7 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
      const x2=x1*rY,y2=y1,z2=-x1*uY;               // rotateY
      const y3=y2*rX-z2*uX,z3=y2*uX+z2*rX;          // rotateX
      const k=1200/(1200-z3);
-     const sxp=w/2+(Cx0-w/2+x2*sc)*k,syp=h/2+(Cy0-h/2+y3*sc)*k;    // 원근 원점(화면 중심) 기준으로 투영
+     const sxp=w/2+(Cx0-w/2+x2*cScale)*k,syp=h/2+(Cy0-h/2+y3*cScale)*k;    // 원근 원점(화면 중심) 기준으로 투영
      if(sxp<minX)minX=sxp;if(sxp>maxX)maxX=sxp;if(syp<minY)minY=syp;if(syp>maxY)maxY=syp;
     }
     if(narrow){
@@ -194,9 +197,17 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
      if(minX<0){px-=minX;maxX-=minX;minX=0;}else if(maxX>w){const over=maxX-w;px-=over;maxX-=over;minX-=over;}
      if(maxX>zs.l&&minX<zs.r&&maxY>zs.t&&minY<zs.b){
       const pushT=maxY-zs.t,pushB=zs.b-minY,upFits=minY-pushT>=0,downFits=maxY+pushB<=h;
-      // 띠 둘 다에 안 들어가는 카드(너무 큼)는 보여 주는 대신 숨긴다 — "띠가 좁으면 카드 수를 줄인다".
-      if(!upFits&&!downFits){el.style.display='none';return;}
-      if(upFits&&downFits?pushT<=pushB:upFits){py-=pushT;minY-=pushT;maxY-=pushT;}else{py+=pushB;minY+=pushB;maxY+=pushB;}
+      // #491: 띠 둘 다에 안 들어가는 카드는 숨기는 대신, 더 큰 쪽 띠에 맞춰 그림 배율을 줄인다(390에서 카드 0장은 안 된다).
+      // 줄인 뒤에는 줄어든 사각형으로 다시 밀어 넣는다. 바닥값 .5로 카드가 지나치게 작아지지 않게 둔다.
+      if(!upFits&&!downFits){
+       const band=Math.max(zs.t,h-zs.b),rectH=maxY-minY,rectW=maxX-minX,shrink=Math.max(.5,Math.min(1,band/rectH));
+       drawShrink*=shrink;
+       const cx=(minX+maxX)/2,cy=(minY+maxY)/2,nw=rectW*shrink,nh=rectH*shrink;
+       minX=cx-nw/2;maxX=cx+nw/2;minY=cy-nh/2;maxY=cy+nh/2;
+       const pushT2=maxY-zs.t,pushB2=zs.b-minY;
+       if(pushT2<=pushB2){py-=pushT2;minY-=pushT2;maxY-=pushT2;}else{py+=pushB2;minY+=pushB2;maxY+=pushB2;}
+      }
+      else if(upFits&&downFits?pushT<=pushB:upFits){py-=pushT;minY-=pushT;maxY-=pushT;}else{py+=pushB;minY+=pushB;maxY+=pushB;}
      }
      if(minY<0){py-=minY;maxY-=minY;minY=0;}else if(maxY>h){const over=maxY-h;py-=over;maxY-=over;minY-=over;}
      // 마지막 안전망: 그래도 안전 구역과 겹치면(위 보정이 다 못 막은 극단 경우) 보여 주는 대신 숨긴다.
@@ -207,7 +218,7 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
      if(m===pushL)px-=pushL;else if(m===pushR)px+=pushR;else if(m===pushT)py-=pushT;else py+=pushB;
     }
    }
-   el.style.transform=`translate3d(${px}px,${py}px,0) scale(${sc*Math.max(.58,fit)}) rotateX(${c.tiltX+Math.sin(th)*9}deg) rotateY(${c.tiltY+Math.cos(th)*18}deg) rotateZ(${c.tiltZ+Math.sin(th*.6)*7}deg)`;
+   el.style.transform=`translate3d(${px}px,${py}px,0) scale(${sc*Math.max(.58,fit)*drawShrink}) rotateX(${c.tiltX+Math.sin(th)*9}deg) rotateY(${c.tiltY+Math.cos(th)*18}deg) rotateZ(${c.tiltZ+Math.sin(th*.6)*7}deg)`;
    // #429 2/2: 깊이는 크기와 밝기로만 — 카드는 언제나 불투명(opacity 1, 비침 없음), blur는 쓰지 않는다.
    // 대표: "흐리게 처리한 카드는 별로, 선명한 게 좋다"(2026-11-08). 뒤쪽 카드는 밝기 0.78까지 조금 어둡게.
    const depth=(!demo&&cards.length<=8)?1:Math.max(0,Math.min(1,(z+520)/1040));
