@@ -33,7 +33,7 @@ test('#426 카드 모양: 썸네일 크게 + 마지막 순간·지난 날 + 한 
 test('#426 썸네일은 공용 모듈(#435) 그대로 — 회색이면 글 카드·최소 카드로 내려간다',()=>{
   // 카드 썸네일은 thumbFallbackAttrs(후보 사슬)를 쓰고, 썸네일이 없으면 fallbackCardMarkup(글·최소 카드), 글은 글 카드 모양.
   assert.match(orbit,/recent-media[^`]*\$\{thumbFallbackAttrs\(c,\{candidates:c\.thumbCandidates\|\|\[c\.image\],writable,variant:'orbit'\}\)\}/);
-  assert.match(orbit,/needsFallbackCard\(c,\{autoLoad:false\}\)\?\`<span class="recent-media recent-media--slot">\$\{fallbackCardMarkup\(c,\{writable,variant:'orbit'\}\)\}/);
+  assert.match(orbit,/needsFallbackCard\(c,\{autoLoad:false\}\)\?\`<span class="recent-media recent-media--slot">\$\{fallbackCardMarkup\(c,\{writable,variant:'orbit',dateStyle\}\)\}/);
   assert.match(orbit,/recent-media--memo/);
   // 세로 영상은 9:16(#409), 가로는 16:9.
   assert.match(orbit,/isVerticalMoment\(c\)/);

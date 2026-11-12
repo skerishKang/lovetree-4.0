@@ -212,13 +212,13 @@ export function needsFallbackCard(moment, { autoLoad = true, currentOrigin = glo
  * - 제목(사용자 제목 → 저장된 영상 제목·채널)이 있으면 글 카드(kind: 'text')
  * - 제목도 없으면 최소 카드(kind: 'minimal', 사이트 이름 + 저장 날짜 + 감정 색 + "제목 달기")
  */
-export function fallbackCardData(moment, { writable = false, videoUnavailable = null } = {}) {
+export function fallbackCardData(moment, { writable = false, videoUnavailable = null, dateStyle } = {}) {
   const mine = userTitleText(moment);
   const video = trimText(moment?.mediaMetadata?.title);
   const channel = trimText(moment?.mediaMetadata?.channel || moment?.mediaMetadata?.authorName);
   const emotion = trimText(moment?.emotion) || '설렘';
   const tone = emotionToneOf(emotion);
-  const date = formatDisplayDate(moment?.date || moment?.createdAt || '');
+  const date = formatDisplayDate(moment?.date || moment?.createdAt || '', dateStyle);
   const url = trimText(moment?.url) || trimText(moment?.externalUrl);
   const rawSource = trimText(moment?.domain) || trimText(moment?.source);
   const siteName = siteNameOf(url)
@@ -264,8 +264,9 @@ export function fallbackCardMarkup(moment, {
   variant = 'card',
   momentId = '',
   treeId = '',
+  dateStyle,
 } = {}) {
-  const info = fallbackCardData(moment, { writable, videoUnavailable });
+  const info = fallbackCardData(moment, { writable, videoUnavailable, dateStyle });
   const id = trimText(momentId) || trimText(moment?.id);
   const tid = trimText(treeId) || trimText(moment?.treeId);
   const action = info.canAddTitle && id
@@ -298,12 +299,13 @@ export function thumbFallbackAttrs(moment, {
   treeId = '',
   autoLoad = true,
   vertical = null,
+  dateStyle,
 } = {}) {
   const list = Array.isArray(candidates) ? candidates.filter(Boolean) : thumbnailCandidates(moment, { autoLoad, vertical });
   if (!list.length) return '';
   let fallbackHtml = '';
   if (mode === 'card') {
-    fallbackHtml = fallbackCardMarkup(moment, { writable, videoUnavailable, variant, momentId, treeId });
+    fallbackHtml = fallbackCardMarkup(moment, { writable, videoUnavailable, variant, momentId, treeId, dateStyle });
   } else if (mode === 'thumb-slot') {
     const tone = emotionToneOf(moment?.emotion);
     fallbackHtml = `<span class="lt-thumb-tone" data-tone="${tone}" aria-hidden="true"></span>`;

@@ -6,7 +6,7 @@
 import { thumbnailCandidates } from '../public/v41/thumb-fallback.mjs';
 // #368 3차: 첫 화면 순간 목록의 날짜 표기도 같은 한 벌(formatDisplayDate)을 따른다. 스타일은 프레임 속성(셸이 심는다).
 import { formatDisplayDate } from '../public/v41/book-usability.mjs';
-const ltDateStyle = () => {
+export const ltDateStyle = () => {
   try {
     const attr = document.documentElement.getAttribute('data-lt-date-style');
     if (attr) return attr;

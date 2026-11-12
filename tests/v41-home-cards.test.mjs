@@ -218,5 +218,7 @@ test('첫 화면 카드·움직임은 설정 창이 맡고 첫 화면은 메시�
   assert.match(shell, /postMessage\(\{type:'lt41-motion'/, '첫 화면의 움직임을 멈추거나 켠다');
   assert.match(home, /type==='lt41-home-cards'[^\n]*location\.reload\(\)/, '첫 화면은 다시 그린다');
   assert.match(home, /type==='lt41-motion'[^\n]*orbit\?\.motion\?\.set/, '첫 화면은 궤도 움직임을 바꾼다');
+  // 이슈 #466 M2: 책·보드·지도는 lt41-date-style로 즉시 반영되는데 첫 화면만 안 되던 결함 — 다시 그린다.
+  assert.match(home, /type==='lt41-date-style'[^\n]*location\.reload\(\)/, '날짜 표기가 바뀌면 첫 화면도 다시 그린다');
   assert.doesNotMatch(home, /createViewMenu|data-lt-view-menu/, '첫 화면에 옛 보기 메뉴가 없다');
 });
