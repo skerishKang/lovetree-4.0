@@ -1,6 +1,13 @@
 /* === V1.2 ACTUAL YOUTUBE MEDIA / SOURCE-SWITCH PATCH === */
 (function(){
-  const V12_FALLBACK = youtubePreviewAsset;
+  // #480 L12: 썸네일은 공용 한 벌(thumb-fallback.mjs)만 쓴다. 예전에는 이 파일이 자체 SVG(youtubePreviewAsset)를
+  // 돌려줬는데, board-extras.js에서 그 함수를 없애며 여기 남은 참조가 페이지 오류를 냈다. 이제 공용 후보를 쓴다.
+  const V12_FALLBACK = (url) => {
+    const api = window.LTThumbFallback;
+    if (!api) return '';
+    const list = api.thumbnailCandidates({ url: String(url || '') }, { autoLoad: true });
+    return list[0] || '';
+  };
   const REAL_YT_TEST = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
   function ytId(url=''){ return youtubeId(url); }
   function ytMax(url=''){ let id=ytId(url); return id?`https://i.ytimg.com/vi/${id}/maxresdefault.jpg`:''; }
@@ -28,8 +35,8 @@
   function armYTThumbs(root=document){root.querySelectorAll('.ytThumbWrap img[data-stage]').forEach(img=>{if(img.dataset.timeoutArmed)return;img.dataset.timeoutArmed='1';setTimeout(()=>{if((!img.complete||!img.naturalWidth)&&img.dataset.stage==='max')window.__ytThumbFail(img)},1800);setTimeout(()=>{if((!img.complete||!img.naturalWidth)&&img.dataset.stage==='hq')window.__ytThumbFail(img)},3600)})}
   const ytObserver=new MutationObserver(()=>armYTThumbs());ytObserver.observe(document.body,{childList:true,subtree:true});setTimeout(()=>armYTThumbs(),50);
   window.__LT58YT={id:ytId,max:ytMax,hq:ytHQ,embed:ytEmbed,mediaHTML:ytMediaHTML,isYtMoment,originalUrl,armYTThumbs};
-  youtubeThumbUrl=function(url){return ytMax(url)||ytHQ(url)};
-  youtubeThumb=function(url){return ytMax(url)||V12_FALLBACK(url)};
+  // #480 L12: 보드가 다시 정의하지 않고 board-extras.js의 한 벌(공용 후보의 첫 주소)을 그대로 쓴다.
+  // (이 두 줄이 있으면 썸네일 주소가 화면마다 달라진다 — board-extras.js에서 온 공용 값을 덮어쓰지 않는다.)
 
   /* Existing sample YouTube moment now uses a real source URL. */
   moments.forEach(m=>{
