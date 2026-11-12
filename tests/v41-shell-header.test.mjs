@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 // #231 1-B②-2: 옮긴 헤더 함수를 직접 불러 결과를 본다(소스 글자 시험이 아니라 최소 가짜 DOM).
+import fs from 'node:fs';
 import { createHeader } from '../public/v41/shell/header.mjs';
 
 function fakeEl(extra = {}) {
@@ -21,7 +22,7 @@ function fakeEl(extra = {}) {
   };
 }
 
-function harness({ owned = false, trees = 0, tree = null, source = 'example', current = 'src064-orbit.html', dirty = false, accountApi = null, subject = 's1' } = {}) {
+function harness({ owned = false, trees = 0, tree = null, source = 'example', current = 'src064-orbit.html', dirty = false, accountApi = null, subject = 's1', cachedName = '' } = {}) {
   const els = {
     'tree-views': fakeEl(),
     'record-menu': fakeEl(),
@@ -51,6 +52,7 @@ function harness({ owned = false, trees = 0, tree = null, source = 'example', cu
     getSource: () => source,
     getCurrent: () => current,
     accountApi: accountApi ?? { account: async () => ({ ok: false }) },
+    getCachedName: () => cachedName,
     delegate: { syncTreeTips: () => { tips += 1; } }
   });
 
@@ -252,3 +254,35 @@ test('loadAccountEmail: 계정 API가 이메일을 주면 갱신하고, 아니�
     none.restore();
   }
 });
+
+test('#465 4: 계정 정보를 부르는 동안에도 동그라미가 깜빡이지 않는다 — 저장본 표시 이름으로 먼저 그린다', async () => {
+  // API가 실패해(이메일 없음) 저장본 표시 이름의 첫 글자로 동그라미를 그린다('나'가 안 보인다).
+  const h = harness({ owned: true, cachedName: '루미', accountApi: { account: async () => ({ ok: false }) } });
+  h.header.renderAccount();
+  assert.equal(h.els['account-avatar'].textContent, '루', '저장본 표시 이름 첫 글자');
+  assert.equal(h.els['account-avatar'].hidden, false);
+  await h.header.loadAccountEmail();
+  assert.equal(h.els['account-avatar'].textContent, '루', '이메일이 오지 않으면 저장본 글자 유지');
+});
+
+test('#465 4: 저장본·직전 글자가 없으면 지금처럼 나였다가 이메일 글자로 바뀐다', async () => {
+  const email = 'fan02@love.io';
+  const h = harness({ owned: true, accountApi: { account: async () => ({ ok: true, confirmKind: 'email', email }) } });
+  h.header.renderAccount();
+  assert.equal(h.els['account-avatar'].textContent, '나', '다른 근거가 없으면 나로 시작(기존 동작)');
+  await h.header.loadAccountEmail();
+  assert.equal(h.els['account-avatar'].textContent, 'F', '이메일이 오면 첫 글자로 갱신');
+  // 직전 글자는 한 글자만 저장하며(전체 이메일 저장 금지), 로그인 알약으로 돌아가면 지운다.
+  assert.match(HEADER_SRC(), /lt41\.avatarLetter/);
+  assert.match(HEADER_SRC(), /rememberLetter\(shown\)/);
+  assert.match(HEADER_SRC(), /removeItem\('lt41\.avatarLetter'\)/);
+});
+
+test('#465 4: 저장본 표시 이름이 있으면 이메일과 무관하게 표시 이름 첫 글자를 유지한다', async () => {
+  const h = harness({ owned: true, cachedName: '윤슬지기', accountApi: { account: async () => ({ ok: true, confirmKind: 'email', email: 'fan02@love.io' }) } });
+  await h.header.loadAccountEmail();
+  assert.equal(h.els['account-avatar'].textContent, '윤', '표시 이름 첫 글자가 이메일 글자보다 우선(#368 규칙)');
+});
+
+
+function HEADER_SRC() { return fs.readFileSync(new URL('../public/v41/shell/header.mjs', import.meta.url), 'utf8'); }
