@@ -185,8 +185,12 @@ export function applyViewAccessibility(doc, win = doc?.defaultView) {
   doc.addEventListener('keydown', tabHandler, true);
   // 2026-11-08 #202 후속: 상세 패널은 Esc로도 닫는다. 닫기는 화면의 기존 닫기 버튼과 같은 경로를 타서
   // updateDialogs가 연 곳으로 포커스를 되돌리게 한다. 위에 다른 대화상자가 있으면 건드리지 않는다.
+  // #428: 트리 제목 메뉴(tree-title.mjs)가 열려 있으면 그쪽이 맨 위 겹이다 — 등록 순서에 의존하지 않고
+  // 여기서 명시적으로 양보한다(메뉴의 캡처 Esc가 preventDefault한 뒤에 이 위임이 돌아도 무해하다).
   doc.addEventListener('keydown', event => {
     if (event.key !== 'Escape' || event.defaultPrevented) return;
+    const menu = doc.getElementById('treeMenuPanel');
+    if (menu && !menu.hidden) return;
     const current = traps[traps.length - 1];
     if (!current || current.el.id !== 'detail') return;
     const close = current.el.querySelector('.close');

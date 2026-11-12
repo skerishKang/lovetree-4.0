@@ -69,12 +69,8 @@ export function mountTreeTitle({view}) {
   if (name) title.textContent = name;
   // ← 내 트리: 내 트리 전체 보기(책장). 셸이 이미 듣고 있는 lt41-navigate 메시지로 간다.
   if (back && !ro) back.addEventListener('click', () => { parent.postMessage({type: 'lt41-navigate', view: 'track32-bookshelf.html'}, location.origin); });
-  // 이 화면을 감춘 채(#view-next) 불러올 때 셸의 접근성 도구가 상세 닫기 단추에 초점을 옮기면,
-  // 브라우저가 초점을 '보이는 자리'로 가져오겠다고 .app(overflow:hidden)을 몰래 굴린다. 그러면
-  // 머리(← 내 트리·제목)가 화면 위쪽 밖으로 밀려난다. .app은 원래 굴리지 않는 자리이므로
-  // 굴림이 생기면 0으로 되돌린다. 근본 고침(숨은 화면에는 초점을 옮기지 않기)은 셸 쪽 몫.
-  const app = document.querySelector('.app');
-  if (app) app.addEventListener('scroll', () => { if (app.scrollLeft || app.scrollTop) app.scrollTo(0, 0); });
+  // (#420의 '.app 굴림 0 복귀' 임시 가드는 #428에서 숨은 프레임을 inert로 막으면서 걷어냈다 —
+  //  숨은 프레임 문서가 초점을 청해도 초점 자체가 일어나지 않아 .app이 굴러가지 않는다.)
   if (ro) return; /* 공유·예시에서는 트리를 고르지 못한다(셸과 같다) */
   const currentId = () => context()?.tree?.id || '';
   function close() { if (menu.hidden) return; menu.hidden = true; trigger.setAttribute('aria-expanded', 'false'); }

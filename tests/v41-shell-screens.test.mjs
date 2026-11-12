@@ -14,6 +14,8 @@ test('show()는 화면 파일 이름을 받아 그 화면의 iframe 경로로 �
     contentWindow: { location: { href: 'about:blank', replace: url => replaced.push(url) } },
     addEventListener() {},
     setAttribute() {},
+    removeAttribute() {},
+    inert: false,
     ...extra
   });
   const elements = {
@@ -63,7 +65,7 @@ test('show()는 화면 파일 이름을 받아 그 화면의 iframe 경로로 �
 
 test('실제 기록(source=server)이면 views/ 판본, 트리가 없으면 빈 화면을 보여 준다', () => {
   const replaced = [];
-  const blank = { hidden: false, title: '', classList: { add() {}, remove() {}, toggle() {}, contains: () => false }, style: {}, contentWindow: { location: { href: 'about:blank', replace: url => replaced.push(url) } }, addEventListener() {} };
+  const blank = { hidden: false, title: '', classList: { add() {}, remove() {}, toggle() {}, contains: () => false }, style: {}, contentWindow: { location: { href: 'about:blank', replace: url => replaced.push(url) } }, addEventListener() {}, setAttribute() {}, removeAttribute() {}, inert: false };
   const elements = { view: blank, 'view-next': null, empty: { ...blank, hidden: true }, 'community-panel': { open: false, close() {} } };
   const saved = { document: globalThis.document, location: globalThis.location };
   globalThis.location = { origin: 'https://lovetree-4-0.pages.dev' };
