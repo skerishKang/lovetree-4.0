@@ -23,6 +23,12 @@ test('숨은 프레임은 inert·aria-hidden·tabindex=-1로 두고, 보여 줄 
   assert.match(screens, /\/\/ #428: 뒤에서 불러오는 동안 이 장은 초점을 받지 않는다\.\n    setFrameFocusGuard\(next, true\);/);
   assert.match(screens, /\/\/ #428: 보여 주는 순간에만 초점 이동을 허용한다 — 새 장은 풀고, 가려지는 장은 막는다\.\n    setFrameFocusGuard\(next, false\);/);
   assert.match(screens, /setFrameFocusGuard\(active, true\);/);
+  // 보여 주는 순간에만 초점 이동을 허용하고, 안쪽 문서가 autofocus로 밀어 놓은 .app 굴림은
+  // 보여 준 딱 그 순간 한 번만 되돌린다(숨은 장의 스크롤 리스너 가드 대신, 뷰 코드는 건드리지 않는다).
+  assert.match(screens, /const unroll = \(\) => \{/);
+  assert.match(screens, /if \(app && \(app\.scrollLeft \|\| app\.scrollTop\)\) app\.scrollTo\(0, 0\);/);
+  assert.match(screens, /setTimeout\(unroll, 0\);/);
+  assert.match(screens, /setTimeout\(unroll, 150\);/);
 });
 
 test('about:blank 빈 화면 판정(#219·#415)은 그대로고, 그 자리가 곧바로 보일 때는 가드를 푼다', () => {

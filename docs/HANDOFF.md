@@ -39,6 +39,15 @@
 - 검사: 필수 4개(check ubuntu·windows, 미리보기 postdeploy(로그아웃), PostgreSQL 저장·로그인 상태 검증) + PostgreSQL migrations 시험 + Deploy Bundle Boot Test(lovetree-api bundle-only boot) 전부 pass.
 - **#368 마감 가능**: 대표 정의 항목 전부 채움. 남은 것은 고급 설정(#330 등)과 각자 이슈인 "나중" 항목(#364·#367)뿐.
 
+## 2026-11-12 — #428 숨은 다음 화면 iframe의 초점 침입으로 .app이 밀림 — 셸 근본 수정 (로컬3, ai/local3-lt-428-frame-focus-261112, PR #443)
+
+- 무엇: 화면 교대용 숨은 iframe(#view-next, #219 두 장 교대)이 불러오는 동안 안쪽 문서가 autofocus·focus()로 초점을 청하면 크로미움이 .app(overflow:hidden)을 몰래 굴려 머리가 밀렸다(#420에서 보드·지도에 '.app 굴림 0 복귀' 가드를 임시 방지).
+- 근본 수정(shell/screens.mjs): 숨은 프레임은 inert+aria-hidden+tabindex=-1로 두고, 보여 주는 순간(revealFrame)에만 풀어 가려지는 장은 다시 막는다. 불러온 문서가 아무리 focus()를 해도 초점 자체가 일어나지 않아 .app이 굴지 않는다. about:blank 빈 화면 판정(#219·#415)과 두 장 교대 규칙은 그대로다. reveal 직후 안쪽 autofocus가 자리 잡아 밀 수 있는 잔여 경로를 위해 보여 준 딱 그 순간 한 번만 .app을 0으로 되돌린다(setTimeout 0·150, 뷰 코드 미수정).
+- #420 임시 가드(tree-title.mjs의 .app scroll 리스너) 걷음. view-a11y의 상세 Esc 위임이 열린 트리 제목 메뉴에 명시적으로 양보(등록 순서 의존 제거; 메뉴의 캡처 Esc는 그대로).
+- 재현·수치(로컬 vite 4300, 헤드리스 크롬 1회): 고치기 전 — 자연 전환 10회에서 .app 스크롤 0(#420 가드가 증상을 가림), 숨은 장에서 상세 열림 2/4·focus() 호출 가능(초점 침입 경로 열림), 상위 activeElement가 프레임 호스트인 샘플 136/213(클릭 경로 포함). 고친 뒤 — 전환 10회(보드·지도·책·책장·트리 전환 포함) .app/문서 스크롤 0, 초점이 숨은 프레임으로 들어간 샘플 0, 숨은 장 inert 228/228 샘플 참, 로드 중 안쪽 focus() 차단(inert) 실측, 390도 동일, 페이지 오류 0. 1440·390 가로 넘침 0.
+- 시험: 신규 tests/v41-frame-focus.test.mjs 4건(inert 가드·reveal 해제·빈 화면 판정 유지·가드 제거), v41-shell-screens의 가짜 프레임에 setAttribute/removeAttribute/inert 추가. `npm test` 1200건 1163 pass/0 fail/37 skip, build·modulepreload --check 통과.
+- 주의: 셸 바깥 iframe(원본 화면들)의 구조는 건드리지 않았다. 숨은 장의 inert는 셸이 관리한다.
+
 ## 2026-11-12 — #369 공유 창 쉽게: 단계 표시·복사 안내·둘러보기 스위치·지난 주소 접기 (로컬2, ai/local2-lt-369-share-261112, PR #434)
 
 - 무엇: 공유 창(#share-panel)을 단계 중심으로 바꿨다. ① 보여 줄 것 고르기 ② 미리보기 ③ 링크 만들기를 `#share-steps`(①②③·현재 금테·끝난 ✓)와 "다음에 할 일" 안내 줄(`#share-next`, role=status)로 보여 주고, 링크 만들기가 막힌 이유("먼저 미리보기를 확인해 주세요.")를 버튼 옆에 띄운다. 링크가 생기면 복사·열어 보기 버튼을 바로 보여 주고 복사하면 "복사했어요."(role=status `#share-copy-note`). "둘러보기에도 올리기"는 링크를 만든 뒤 켜는 스위치(role=switch, 기본 꺼짐·켤 때 확인 1회)로 바꾸고 공유 창의 "발견" 문구를 모두 "둘러보기"로 통일했다. "공개되는 범위"는 한두 줄 + "자세히" 접힘("올린 사진은 나만 볼 수 있어요" 포함). 주소 목록은 살아 있는 주소만 위에, 취소된 주소는 "지난 주소 N개" 접힘 안에, 살아 있는 주소마다 만든 날짜·처음 열 보기·복사·취소(확인 1회).
