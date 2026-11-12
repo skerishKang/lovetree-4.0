@@ -55,7 +55,9 @@ test('가운데 안전 구역: 제목·버튼 묶음 사각형+여백을 재고,
   assert.match(orbit, /fitNotice=\(\)=>\{host\.style\.height=`calc\(100dvh - \$\{noticeOuter\(\)\}px\)`;safeZoneDirty=true;schedule\(\);/, '창 크기 변경(fitNotice)마다 다시 잰다');
   assert.match(orbit, /setTimeout\(\(\)=>\{safeZoneDirty=true;schedule\(\);\},1500\)/, '글꼴 도착 뒤에도 다시 잰다(fonts.ready 접근은 뼈대 완성을 늦추므로 타이머를 쓴다)');
   // 카드 사각형(회전 여유 18%)과 겹치면 가장 얇은 쪽으로 민다 — 겹침 0 보장.
-  assert.match(orbit, /const sxp=w\/2\+\(Cx0-w\/2\+x2\*sc\)\*k/, '카드 위치까지 포함한 원근 투영 계산');
+  // #491: 좁은 화면에서는 그려지는 배율(cScale)로 투영한다(넓은 화면은 fit=1이라 cScale===sc).
+  assert.match(orbit, /const cScale=narrow\?sc\*Math\.max\(\.58,fit\):sc;/, '판정 배율은 좁은 화면에서만 그림 배율을 따른다');
+  assert.match(orbit, /const sxp=w\/2\+\(Cx0-w\/2\+x2\*cScale\)\*k/, '카드 위치까지 포함한 원근 투영 계산');
   assert.match(orbit, /const pushL=maxX-zs\.l,pushR=zs\.r-minX,pushT=maxY-zs\.t,pushB=zs\.b-minY/, '가장 얇은 쪽으로 밀어낸다');
   // 옛 고정 타원 밀어내기는 안전 구역 판정으로 대체됐다.
   assert.doesNotMatch(orbit, /Math\.hypot\(x\/520,y\/260\)/);
@@ -72,8 +74,11 @@ test('#457 좁은 화면(≤650): 가로는 먼저 화면 안으로 당기고, �
   // 가로로 당긴 뒤의 위치로 안전 구역과 겹치는지 다시 보고, 겹치면 위·아래 띠로만 민다(가로는 더 건드리지 않는다).
   assert.match(narrowBlock, /const pushT=maxY-zs\.t,pushB=zs\.b-minY,upFits=minY-pushT>=0,downFits=maxY\+pushB<=h;/);
   assert.doesNotMatch(narrowBlock.split('pushT=maxY-zs.t')[1], /\bpx-=|\bpx\+=/, '겹침을 다시 민 뒤에는 px(가로)를 건드리지 않는다');
-  // 띠 둘 다 못 담는 카드는 보여 주는 대신 숨긴다("카드 수를 줄인다").
-  assert.match(narrowBlock, /if\(!upFits&&!downFits\)\{el\.style\.display='none';return;\}/);
+  // #491: 띠 둘 다 못 담는 카드는 숨기는 대신 더 큰 쪽 띠에 맞춰 그림 배율을 줄인다(390에서 카드 0장은 안 된다).
+  assert.match(narrowBlock, /if\(!upFits&&!downFits\)\{/, '못 담을 때 분기');
+  assert.match(narrowBlock, /band\/rectH/, '띠 높이에 맞춰 줄인다');
+  assert.match(narrowBlock, /drawShrink\*=shrink;/, '줄임 배율을 그림에 반영한다');
+  assert.doesNotMatch(narrowBlock, /!upFits&&!downFits\)\{el\.style\.display='none';return;\}/, '옛 즉시 숨김이 남지 않는다');
   // 민 뒤에도 화면 세로 안(0..h)에 남게 마지막으로 다듬고, 그래도 안전 구역과 겹치면 숨긴다(안전 구역 침범 0 보장).
   assert.match(narrowBlock, /if\(minY<0\)\{py-=minY;maxY-=minY;minY=0;\}else if\(maxY>h\)/);
   assert.match(narrowBlock, /if\(maxX>zs\.l&&minX<zs\.r&&maxY>zs\.t&&minY<zs\.b\)\{el\.style\.display='none';return;\}/);
