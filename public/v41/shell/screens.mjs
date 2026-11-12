@@ -22,6 +22,25 @@ export function createScreens(deps) {
   // 준비(load + 글꼴 준비)가 끝나면 두 장의 앞뒤만 바꾼다. 이전 화면은 그 순간까지 그대로 보인다.
   let viewToken = 0;
 
+  // #428: 숨은 프레임은 초점을 받지 않게 둔다(inert + aria-hidden + tabindex=-1). 불러온 문서가
+  // autofocus·focus()·접근성 트랩으로 초점을 청해도 크로미움이 그 자리로 가려고 .app(overflow:hidden)을
+  // 몰래 굴리는 일이 없다. 보여 주는 순간(revealFrame)에만 푼다. #219의 두 장 교대와 #415의
+  // about:blank 빈 화면 판정은 그대로다.
+  function setFrameFocusGuard(frame, on) {
+    if (!frame) return;
+    try { frame.inert = on; } catch { /* 오래된 브라우저: 속성만으로 둔다 */ }
+    if (on) {
+      frame.setAttribute('inert', '');
+      frame.setAttribute('aria-hidden', 'true');
+      frame.setAttribute('tabindex', '-1');
+    } else {
+      frame.removeAttribute('inert');
+      frame.removeAttribute('aria-hidden');
+      frame.removeAttribute('tabindex');
+    }
+  }
+  setFrameFocusGuard($('view-next'), true);
+
   function frames() {
     return [$('view'), $('view-next')].filter(Boolean);
   }
@@ -29,6 +48,7 @@ export function createScreens(deps) {
   function hideFrames() {
     for (const f of frames()) {
       f.hidden = true;
+      setFrameFocusGuard(f, true);
       try { f.contentWindow.location.replace('about:blank'); } catch {}
     }
   }
@@ -36,12 +56,26 @@ export function createScreens(deps) {
   function revealFrame(next) {
     const active = $('view');
     if (!next || next === active) return;
+    // #428: 보여 주는 순간에만 초점 이동을 허용한다 — 새 장은 풀고, 가려지는 장은 막는다.
+    setFrameFocusGuard(next, false);
     next.hidden = false;
     active.hidden = true;
     next.id = 'view';
     active.id = 'view-next';
     next.style.zIndex = '2';
     active.style.zIndex = '1';
+    setFrameFocusGuard(active, true);
+    // #428: 보여 주는 순간에만 초점 이동을 허용한다 — 숨은 장에서 온 초점 청구가
+    // reveal 직후에 자리 잡아 .app(overflow:hidden)을 밀 수 있다. 그 밀림은 보여 준
+    // 딱 그 순간 한 번만 되돌린다(숨은 장의 스크롤 리스너 가드(#420) 대신, 뷰 코드는 건드리지 않는다).
+    const unroll = () => {
+      try {
+        const app = next.contentDocument?.querySelector('.app');
+        if (app && (app.scrollLeft || app.scrollTop)) app.scrollTo(0, 0);
+      } catch {}
+    };
+    setTimeout(unroll, 0);
+    setTimeout(unroll, 150);
   }
 
   function showInFrame(url, title) {
@@ -58,10 +92,14 @@ export function createScreens(deps) {
     if (blank) {
       if (next) next.hidden = true;
       active.hidden = false;
+      // #428: 이 자리는 곧바로 보이는 장이므로 초점 가드를 푼다(이전 hideFrames에서 막혔을 수 있다).
+      setFrameFocusGuard(active, false);
       active.title = title;
       active.contentWindow.location.replace(url);
       return;
     }
+    // #428: 뒤에서 불러오는 동안 이 장은 초점을 받지 않는다.
+    setFrameFocusGuard(next, true);
     const token = ++viewToken;
     let settled = false;
     const done = () => {
