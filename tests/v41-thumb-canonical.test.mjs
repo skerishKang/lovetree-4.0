@@ -71,6 +71,18 @@ test('보드: 공용 한 벌을 먼저 불러 온다(일반 script보다 앞서 
   assert.match(shimSrc, /export \* from '\/v41\/thumb-fallback\.mjs';/);
 });
 
+test('보드 상세도 자체 SVG가 아니라 공용 한 벌을 쓴다(전: youtubePreviewAsset 참조 → 페이지 오류)', () => {
+  const detail = read('public/v41/views/board/board-detail.js');
+  const code = detail.split('\n').filter((line) => !line.trim().startsWith('//')).join('\n');
+  // board-extras.js에서 youtubePreviewAsset을 없앴는데 detail이 그 이름을 부르면 즉시 페이지 오류가 난다(실제로 났다).
+  assert.doesNotMatch(code, /youtubePreviewAsset/, '없앤 이름을 코드에서 부르지 않는다');
+  assert.match(code, /const V12_FALLBACK = \(url\) => \{/, '공용 후보를 쓰는 대체 함수로 바뀌었다');
+  assert.match(code, /api\.thumbnailCandidates\(\{ url: String\(url \|\| ''\) \}, \{ autoLoad: true \}\)/, '공용 후보에서 받는다');
+  // 이 파일이 youtubeThumb·youtubeThumbUrl을 다시 정의하면 화면마다 주소가 달라진다 — 정의하지 않는다.
+  assert.doesNotMatch(code, /youtubeThumbUrl\s*=/, '공용 값을 덮어쓰지 않는다');
+  assert.doesNotMatch(code, /youtubeThumb\s*=/, '공용 값을 덮어쓰지 않는다');
+});
+
 test('책: 쓰기 미리보기는 이미 공용 한 벌을 쓴다(중복 없음)', () => {
   const bookExtra = read('public/v41/views/book/book-extra.js');
   assert.match(bookExtra, /import \{[^}]*thumbnailCandidates[^}]*\} from '\/v41\/thumb-fallback\.mjs';/);
