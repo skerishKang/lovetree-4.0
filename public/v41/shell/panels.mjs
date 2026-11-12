@@ -257,7 +257,7 @@ export function createPanels(deps) {
   }
 
   // 계정 메뉴·편집기 버튼은 셸이 열고, 이 파일은 폼 상태만 본다.
-  const manageTreeButton = $('manage-tree'); if (manageTreeButton) manageTreeButton.onclick = openTreeManager;
+  // #481 L15: #manage-tree는 index.html에 없는 죽은 가드였다 — 열기 버튼은 셸이 직접 openTreeManager를 부른다.
   $('tree-cover').onchange = updateTreeCoverHint;
   for (const radio of $('tree-form').elements.coverMode || []) radio.onchange = showTreeCoverMethod;
   for (const radio of $('tree-form').elements.coverDesign || []) radio.onchange = updateTreeCoverHint;

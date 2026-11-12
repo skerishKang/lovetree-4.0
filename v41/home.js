@@ -80,9 +80,8 @@ const byDo=name=>centerButtons.find(b=>b.dataset.do===name);
 const addButton=byDo('add');if(addButton)addButton.onclick=()=>bridge.actions.requestMoment('add');
 const communityButton=byDo('community');if(communityButton)communityButton.onclick=()=>bridge.actions.community();
 const guideButton=byDo('guide');if(guideButton)guideButton.onclick=()=>bridge.actions.community();
-let loginFocusButton=null;
-centerButtons.forEach(b=>{b.addEventListener('pointerdown',()=>{loginFocusButton=b;});b.addEventListener('click',()=>{loginFocusButton=b;},true);b.addEventListener('focus',()=>{loginFocusButton=b;});});
-addEventListener('message',e=>{if(e.origin!==location.origin)return;if(e.data?.type==='lt41-login-focus'){const active=shadow.activeElement;if(active?.matches?.('button'))active.focus();else loginFocusButton?.focus();}});
+// #481 L10: lt41-login-focus는 보내는 쪽이 없는 고아 수신기였다(셸에 postMessage 없음) —
+// 그 수신기와, 그 수신기만 쓰던 loginFocusButton 추적을 함께 지운다.
 // 로그아웃 첫 버튼은 로그인/가입으로.
 {
   const first=centerButtons[0];
