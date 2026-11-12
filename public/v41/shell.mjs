@@ -763,7 +763,7 @@ for(const b of document.querySelectorAll('[data-share-view]'))b.onclick=()=>{
 for(const b of document.querySelectorAll('[data-share-discover]'))b.onclick=()=>{
  if(!member?.snapshot().owned){notify('로그인한 뒤 공유 기본값을 바꿀 수 있어요.');return;}
  try{member.apply('setPrefs',{shareDiscover:b.dataset.shareDiscover==='on'});}catch(e){notify('공유 기본값을 저장하지 못했어요. 잠시 뒤 다시 시도해 주세요.');return;}
- paintShareControls();notify(b.dataset.shareDiscover==='on'?'새 공유를 둘러보기에 올리는 것으로 시작해요.':'새 공유를 주소로만 공개하는 것으로 시작해요.');
+ paintShareControls();notify(b.dataset.shareDiscover==='on'?'링크를 만들면 둘러보기에 올릴지 한 번 물어봐요.':'새 공유를 주소로만 공개하는 것으로 시작해요.');
 };
 paintShareControls();
 // 보관 파일 용량 보기 — 보관 파일 창과 같은 값(/api/media)을 같은 형식으로 보여 준다. 새 API 없음.

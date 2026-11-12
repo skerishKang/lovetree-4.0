@@ -299,12 +299,16 @@ export function createMessages(deps) {
     $('share-open').hidden = false;
     $('share-created').hidden = false;
     $('share-copy-note').textContent = '';
-    $('share-discover').checked = getShareDefaults().discover;
     $('share-discover').disabled = false;
     $('share-feedback').textContent = '명시적으로 공유 주소를 만들었어요.';
     sharePreviewKey = ''; sharePreviewToken = '';
     paintShareSteps('done');
     await loadShareList();
+    // #480 M7: 설정이 '둘러보기에도 올림'이어도 확인 없이 공개하지 않는다. 링크를 만든 직후 스위치를 켤 때와
+    // 같은 확인창을 한 번 띄우고, 승인하면 실제 setDiscoverable까지 간다. 거절하면 스위치 꺼짐으로 맞춘다.
+    // (예전에는 확인 없이 체크박스만 켜서 '켜짐인데 주소로만 공개'인 거짓 상태가 됐다.)
+    if (getShareDefaults().discover) await setDiscoverable(answer.share.id, true, {ask: true});
+    else { $('share-discover').checked = false; }
   };
   $('share-copy').onclick = async () => {
     const input = $('share-url');
@@ -318,18 +322,27 @@ export function createMessages(deps) {
       $('share-feedback').textContent = '주소를 선택했어요. 복사해 주세요.';
     }
   };
-  // #369: '둘러보기에도 올리기'는 링크를 만든 뒤 켜는 스위치(기본 꺼짐).
-  $('share-discover').onchange = async () => {
-    const box = $('share-discover'), shareId = $('share-url').dataset.shareId;
-    if (!shareId) { box.checked = false; return; }
-    const next = box.checked;
-    if (next && !confirm('이 트리를 둘러보기 목록에 올릴까요? 주소만 만든 상태와 달리 제목·대상·공개 순간이 둘러보기에 나타납니다.')) { box.checked = false; return; }
+  // #369·#480 M7: '둘러보기에도 올리기'는 링크를 만든 뒤 켜는 스위치(기본 꺼짐).
+  // 켜는 길은 둘(사용자가 스위치를 누름 · 설정이 '기본 켬'이라 링크 만든 직후 제안)이고, 둘 다 같은 확인창을
+  // 지나야 실제 공개(setDiscoverable)가 된다. 프로그램으로 체크만 켜는 길은 없다.
+  const DISCOVER_CONFIRM = '이 트리를 둘러보기 목록에 올릴까요? 주소만 만든 상태와 달리 제목·대상·공개 순간이 둘러보기에 나타납니다.';
+  async function setDiscoverable(shareId, next, {ask = false} = {}) {
+    const box = $('share-discover');
+    if (!shareId) { box.checked = false; return false; }
+    if (next && ask && !confirm(DISCOVER_CONFIRM)) { box.checked = false; return false; }
     box.disabled = true;
     const answer = await shareApi.setDiscoverable(shareId, next);
     box.disabled = false;
-    if (!answer.ok) { box.checked = !next; $('share-feedback').textContent = shareFailure(answer); return; }
+    if (!answer.ok) { box.checked = !next; $('share-feedback').textContent = shareFailure(answer); return false; }
+    box.checked = next;
     $('share-feedback').textContent = next ? '둘러보기에 올렸어요. 둘러보기 목록에서 이 트리를 볼 수 있어요.' : '둘러보기에서 내렸어요. 공유 주소는 계속 사용할 수 있어요.';
     await loadShareList();
+    return true;
+  }
+  $('share-discover').onchange = async () => {
+    const shareId = $('share-url').dataset.shareId;
+    const next = $('share-discover').checked;
+    await setDiscoverable(shareId, next, {ask: next});
   };
 
   // 둘러보기(공개 목록) 연결. 항목을 열면 공유 주소로, 내 기록 새로 시작은 첫 여정으로 간다.
