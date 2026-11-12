@@ -970,7 +970,7 @@ async function checkScreenSettings(page, target, opts, stamp) {
   //  - 로그인: 같은 항목이 설정 창의 "화면" 묶음에 있다(테마 2 · 움직임 1 · 제목 3 · 첫 화면 카드 4).
   // #366 뒤로 "화면" 묶음은 테마·움직임·제목·페이지 넘김·날짜 표기·처음 보여 줄 곳·첫 화면 카드 7행이다.
   // 예전에는 보기 메뉴 항목 수로 기대값을 만들었는데, 설정 묶음이 늘 때마다 어긋났다 — 화면에 있는 행 이름을 그대로 센다.
-  const SCREEN_SETTINGS_ROWS = ['테마', '움직임', '제목', '페이지 넘김', '날짜 표기', '처음 보여 줄 곳', '첫 화면 카드'];
+  const SCREEN_SETTINGS_ROWS = ['테마', '보드 판', '움직임', '제목', '페이지 넘김', '날짜 표기', '처음 보여 줄 곳', '첫 화면 카드'];
   const problems = [];
   const base = new URL(target.href);
   const readOnce = () => page.evaluate(() => {

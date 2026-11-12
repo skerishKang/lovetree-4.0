@@ -12,7 +12,8 @@ import {
 export const FRAME_MESSAGE_TYPES = Object.freeze({
   dateStyle: 'lt41-date-style',
   titleDisplay: 'lt41-title-display',
-  pageTurn: 'lt41-page-turn'
+  pageTurn: 'lt41-page-turn',
+  boardTheme: 'lt41-board-theme'
 });
 
 /**
@@ -23,6 +24,7 @@ export function frameMessage(kind, rawValue) {
   if (kind === 'dateStyle') return { type: FRAME_MESSAGE_TYPES.dateStyle, value: normalizeDateStyle(rawValue) };
   if (kind === 'titleDisplay') return { type: FRAME_MESSAGE_TYPES.titleDisplay, value: normalizeTitleDisplay(rawValue) };
   if (kind === 'pageTurn') return { type: FRAME_MESSAGE_TYPES.pageTurn, value: rawValue ? 'true' : 'false' };
+  if (kind === 'boardTheme') return { type: FRAME_MESSAGE_TYPES.boardTheme, value: rawValue === 'night' ? 'night' : 'paper' };
   throw new Error(`알 수 없는 메시지 종류: ${kind}`);
 }
 
@@ -50,6 +52,9 @@ export function shouldReloadOnFrameMessage(screen, message, { rendered, mirror }
   if (type === FRAME_MESSAGE_TYPES.titleDisplay) {
     if (screen !== 'home' && screen !== 'shelf') return false; // 책·보드는 열린 채로 그린다
     return shouldReloadForTitleDisplay({ value: message.value, rendered, mirror });
+  }
+  if (type === FRAME_MESSAGE_TYPES.boardTheme) {
+    return false; // 보드는 열린 채로 그린다 (다시 띄우기 없음)
   }
   return false; // 페이지 넘김은 다시 띄우지 않는다
 }

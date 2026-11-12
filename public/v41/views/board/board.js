@@ -5,6 +5,72 @@ const ltVar=(n,f)=>(getComputedStyle(document.documentElement).getPropertyValue(
 const colors={rose:ltVar('--lt-thread-rose','#ff659f'),violet:ltVar('--lt-thread-violet','#a86cff'),cyan:ltVar('--lt-thread-cyan','#69dcff'),amber:ltVar('--lt-thread-amber','#ffc96b'),pearl:'#e9dff3'}
 ;
 
+// #467: 보드 판 테마(종이/밤) 배선
+function readBoardTheme(){
+  try{
+    const attr=document.documentElement.getAttribute('data-lt-board-theme');
+    if(attr==='night'||attr==='paper')return attr;
+    const cached=localStorage.getItem('lt41.boardTheme');
+    if(cached==='night'||cached==='paper')return cached;
+  }catch{}
+  return 'paper';
+}
+function updateThemeColors(theme){
+  const isNight=(theme||document.body.dataset.boardTheme)==='night';
+  colors.rose=isNight?'#ff7da7':ltVar('--board-thread-rose',ltVar('--lt-thread-rose','#d88f9c'));
+  colors.violet=isNight?'#c4b0ff':ltVar('--board-thread-violet',ltVar('--lt-thread-violet','#a99ac9'));
+  colors.cyan=isNight?'#7ee4ff':ltVar('--board-thread-cyan',ltVar('--lt-thread-cyan','#5aa9c7'));
+  colors.amber=isNight?'#ffd67d':ltVar('--board-thread-amber',ltVar('--lt-thread-amber','#d9982a'));
+}
+function setBoardTheme(theme){
+  const valid=theme==='night'?'night':'paper';
+  document.body.dataset.boardTheme=valid;
+  document.documentElement.dataset.ltBoardTheme=valid;
+  document.documentElement.setAttribute('data-lt-board-theme',valid);
+  updateThemeColors(valid);
+  const badge=document.getElementById('themeBadge');
+  if(badge)badge.textContent=valid==='night'?'밤 판 · 읽기 전용':'종이 판 · 읽기 전용';
+  document.querySelectorAll('[data-board-theme]').forEach(b=>{
+    const active=b.dataset.boardTheme===valid;
+    b.classList.toggle('active',active);
+    b.setAttribute('aria-checked',String(active));
+  });
+  const tl=document.getElementById('threadLayer');
+  if(tl && typeof connections!=='undefined' && Array.isArray(connections)){
+    tl.querySelectorAll('.threadGroup').forEach(g=>{
+      const c=connections.find(x=>x.id===g.dataset.cid);
+      if(!c)return;
+      const col=colors[c.color];
+      g.querySelectorAll('.threadGlow, .threadColor').forEach(p=>p.setAttribute('stroke',col));
+    });
+  }
+}
+window.setBoardTheme=setBoardTheme;
+window.readBoardTheme=readBoardTheme;
+function initBoardTheme(){
+  setBoardTheme(readBoardTheme());
+}
+if(document.readyState==='loading'){
+  document.addEventListener('DOMContentLoaded',initBoardTheme);
+}else{
+  initBoardTheme();
+}
+window.addEventListener('message',e=>{
+  if(e.origin!==location.origin)return;
+  if(e.data?.type==='lt41-board-theme'){
+    setBoardTheme(e.data.value);
+  }
+});
+document.addEventListener('click',e=>{
+  const b=e.target.closest('[data-board-theme]');
+  if(!b)return;
+  const next=b.dataset.boardTheme==='night'?'night':'paper';
+  try{localStorage.setItem('lt41.boardTheme',next)}catch{}
+  setBoardTheme(next);
+  if(typeof toast==='function')toast(`${next==='night'?'밤':'종이'} 판으로 바꿨어요.`);
+  try{window.parent?.postMessage?.({type:'lt41-board-theme',value:next},location.origin)}catch{}
+});
+
 // 기억 보드는 예시 판본과, 서버 기록을 쓰기 가능한 계정으로 연 경우에 편집할 수 있다.
 // 공유 감상(share)은 읽기 전용이다. 서버 쓰기 가능 여부는 셸이 LT41.writable로 넘긴다.
 function boardSaveEnabled(){try{return window.parent!==window&&window.parent.LT41?.source==='server'&&window.parent.LT41?.writable===true&&!LTDEMO.readOnly}catch{return false}}
