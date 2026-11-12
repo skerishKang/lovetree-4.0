@@ -67,10 +67,11 @@ function renderAccount(){const owned=!!getMember()?.snapshot().owned;
  const view=accountPresentation({owned,email:accountEmail,name:prefs.displayName});
  const accent=owned?normalizeAccentColor(prefs.accentColor):'';
  const login=$('account-entry'),avatar=$('account-avatar');
- if(view.mode==='login'){login.hidden=false;login.textContent='로그인';login.removeAttribute('aria-label');avatar.hidden=true;avatar.textContent='';avatar.removeAttribute('data-accent');const init=$('account-initial');if(init){init.textContent='';init.removeAttribute('data-accent');}const mail=$('account-email');if(mail)mail.textContent='';closeAccountMenu();}
- else{login.hidden=true;avatar.hidden=false;avatar.textContent=view.initial;avatar.setAttribute('aria-label',view.ariaLabel);avatar.title='내 계정';avatar.dataset.accent=accent;
- const init=$('account-initial');if(init){init.textContent=view.initial;init.dataset.accent=accent;}
- $('account-email').textContent=view.label;}
+ if(view.mode==='login'){login.hidden=false;login.textContent='로그인';login.removeAttribute('aria-label');avatar.hidden=true;avatar.textContent='';avatar.removeAttribute('data-accent');const init=$('account-initial');if(init){init.textContent='';init.removeAttribute('data-accent');}const mail=$('account-email');if(mail)mail.textContent='';closeAccountMenu();try{localStorage.removeItem('lt41.avatarLetter')}catch{}}
+ else{const shown=view.initial==='나'?lastLetter():view.initial;
+ login.hidden=true;avatar.hidden=false;avatar.textContent=shown;avatar.setAttribute('aria-label',view.ariaLabel);avatar.title='내 계정';avatar.dataset.accent=accent;
+ const init=$('account-initial');if(init){init.textContent=shown;init.dataset.accent=accent;}
+ $('account-email').textContent=view.label;rememberLetter(shown);}
   // #368: 설정 "프로필" 묶음도 같은 이메일 값을 쓴다(셸이 넘긴 콜백).
   deps.onEmailChange?.(accountEmail);}
 function openAccountMenu(){const owned=!!getMember()?.snapshot().owned;if(!owned){return;}const pop=$('account-popover');pop.hidden=false;$('account-avatar').setAttribute('aria-expanded','true');if(!accountEmail&&!emailTried)void loadAccountEmail();}
