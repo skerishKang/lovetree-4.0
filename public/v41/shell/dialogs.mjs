@@ -68,6 +68,9 @@ export function createDialogs(deps) {
   // #368 2차: 설정은 프로필(표시 이름·동그라미 색)을 쓰다 두었을 때만 묻는다. 나머지 설정 항목은 누르는 즉시
   // 적용되어 더러움이 없고, 내 보관 파일·둘러보기도 적어 두는 입력이 없어 그대로 닫는다.
   PANEL_DIRTY['account-settings'] = () => deps.isSettingsDirty?.() === true;
+  // #480 M8: 정리 창은 새 트리 이름을 적었거나 순간 고름·옮길 트리가 창을 열 때와 달라졌을 때 묻는다.
+  // 미리 골라진 순간(순간 상세의 '옮기기')만으로는 묻지 않는다 — 열자마자 닫아도 되게.
+  PANEL_DIRTY['cleanup-panel'] = () => deps.isCleanupDirty?.() === true;
   // 닫기 자체를 막아야 하는 상태(편집기 업로드 중)는 문구를 돌려준다. 이때는 확인을 묻지 않고 닫지 않는다 —
   // 편집기 규칙이 공통 틀보다 우선한다(업로드 중 닫기 방지).
   function panelBlockedMessage(d) {
