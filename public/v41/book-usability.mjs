@@ -288,3 +288,18 @@ export function createOverflowRejudge({ judge, raf, cancelRaf = () => {}, addDoc
     }
   };
 }
+
+/* #481: 제목 보기 설정도 날짜 표기와 같은 방식으로 '값이 실제로 바뀌었을 때만' 문서를 다시 띄운다.
+   2026-11-12 사고(lt41-date-style 고리)와 같은 모양이 두 화면에 남아 있었다 — 첫 화면(v41/home.js)과
+   책장(public/v41/views/shelf/shelf.js)이 lt41-title-display를 받으면 값과 무관하게 location.reload() 했다.
+   셸이 지금은 설정에서 바꿀 때만 보내므로 평상시엔 무해하지만, 보내는 시점이 '뜰 때마다'로 바뀌면 곧바로 고리가 된다.
+
+   다시 띄우는 조건 둘(날짜 표기와 같은 판정):
+   ① 지금 그려진 값과 다르다 ② 기기 미러(lt41.titleDisplay)가 이미 그 값이다 — 다시 뜨면 새 값으로 그려진다는 보장.
+   미러를 못 읽는 창(저장소 차단)이나 셸이 아직 계정 값을 못 읽어 기본값을 보낸 경우는 그대로 둔다. */
+export const titleDisplayOf = (value) => normalizeTitleDisplay(value);
+export function shouldReloadForTitleDisplay({ value, rendered, mirror } = {}) {
+  const next = titleDisplayOf(value);
+  if (next === titleDisplayOf(rendered)) return false;
+  return mirror != null && mirror !== '' && titleDisplayOf(mirror) === next;
+}

@@ -42,10 +42,14 @@ function currentPrefs(){try{return member?.state?.().prefs||{titleDisplay:'both'
 function titleDisplayValue(){return normalizeTitleDisplay(currentPrefs().titleDisplay)}
 function paintTitleDisplayControls(){const value=titleDisplayValue();for(const b of document.querySelectorAll('[data-title-display]'))b.setAttribute('aria-checked',String(b.dataset.titleDisplay===value));}
 function postTitleDisplay(){try{$('view').contentWindow.postMessage({type:'lt41-title-display',value:titleDisplayValue()},location.origin)}catch{}}
+// #481: 화면(iframe)은 그려지는 시점에 계정 값을 모른다. 날짜 표기와 같이 마지막 값을 기기에 함께 둔다 —
+// 받는 쪽은 '지금 그린 값'과 '미러'를 비교해, 다시 뜨면 정말 새 값으로 그려질 때만 다시 띄운다.
+function rememberTitleDisplay(value){try{localStorage.setItem('lt41.titleDisplay',normalizeTitleDisplay(value));}catch{}}
 function setTitleDisplay(value){
  if(!member?.snapshot().owned){notify('로그인한 뒤 제목 보기를 바꿀 수 있어요.');return;}
  try{member.apply('setPrefs',{titleDisplay:value});}catch(e){notify('제목 보기를 저장하지 못했어요. 잠시 뒤 다시 시도해 주세요.');return;}
  if(window.LT41)window.LT41.prefs=member.state().prefs;
+ rememberTitleDisplay(titleDisplayValue());
  paintTitleDisplayControls();
  postTitleDisplay();
 }
@@ -411,6 +415,9 @@ const shellScreens=createScreens({
     mountConnectionTool(d);applyViewAccessibility(d);shellQuick.mountFrame(d);
     // #368 2차·3차: 새로 열린 화면에 페이지 넘김·날짜 표기 값을 알린다(테마와 같은 시점).
     applyPageTurnToFrame(frame);applyDateStyleToFrame(frame);
+    // #478: 고급 기능 보기 값도 새로 열린 화면에 알린다. applyAdvanced는 지금 화면(#view)에만 보내므로
+    // 화면을 옮긴 뒤 열린 프레임은 단순 모드로 남았다(보드 도구가 숨는 결함).
+    try{frame.contentWindow.postMessage({type:'lt41-advanced',value:readAdvanced()},location.origin)}catch{}
     // 화면 교대(두 장 앞뒤 바꿈)가 늦게 끝나는 경우를 위해 한 번 더 알린다(같은 값을 또 보내는 건 무해하다).
     setTimeout(()=>applyDateStyleToFrame(frame),1600);
     d.addEventListener('click',e=>{const b=e.target.closest('button,a');if(!b)return;let file;if(b.matches('[data-action="tree"],[data-menu="tree"]'))file='track32-bookshelf.html';if(b.matches('#storyBook,[data-menu="book"]'))file='track59-sketchbook.html';if(current==='track56-network.html'&&b.id==='openMoment')file='track59-sketchbook.html';if(file){e.preventDefault();e.stopImmediatePropagation();show(file);}},true);
@@ -569,6 +576,8 @@ async function startMember(){setMemberRefreshStarted(true);if(!leaveMember())ret
    if(window.LT41)window.LT41.prefs=state.prefs;
    // #441 후속: 다른 기기의 첫 그림도 계정 날짜 표기를 따르도록, 로그인 때 기기 미러 캐시를 계정값으로 채운다.
    try{localStorage.setItem('lt41.dateStyle',normalizeDateStyle(state.prefs?.dateStyle));}catch{}
+   // #481: 제목 보기도 같은 이유로 기기 미러를 계정값으로 채운다.
+   rememberTitleDisplay(state.prefs?.titleDisplay);
    paintTitleDisplayControls();
    if(!backfillStarted&&snapshot.owned){backfillStarted=true;void runTitleBackfill(state,session);}
    if(snapshot.owned&&resolved.position.treeId){if(viewForFile(current)!=='home')writeLocation('replace');takePendingOwnerRoute(sessionStorage);if(route?.scope==='owner'&&resolved.treeMissing)startupNotice='이 주소의 기록을 현재 계정에서 찾을 수 없어 최근 위치를 열었어요.';else if(route?.scope==='owner'&&resolved.momentMissing)startupNotice='이 주소의 순간을 찾을 수 없어 트리의 시작 순간을 열었어요.';}

@@ -8,7 +8,7 @@ import {
   treeTitleOf, youtubeId as youtubeIdOf
 } from './shelf-model.mjs';
 import { shelfOrder, INBOX_LABEL } from '../../inbox-model.mjs';
-import { titleView } from '../../book-usability.mjs';
+import { titleView, titleDisplayOf, shouldReloadForTitleDisplay } from '../../book-usability.mjs';
 import { coverFallbackAttrs, mountThumbFallback } from '../../thumb-fallback.mjs';
 import { createReader } from './shelf-reader.js';
 
@@ -245,4 +245,11 @@ import { createReader } from './shelf-reader.js';
   }
 }
 
-if(typeof addEventListener==='function')addEventListener('message',e=>{if(e.data?.type==='lt41-title-display')location.reload();});
+// #481: 제목 보기가 바뀌면 책장의 제목(이어 읽기·표지)도 다시 그려야 한다. 다만 날짜 표기와 같은 판정으로
+// '지금 그린 값과 다르고, 기기 미러가 이미 그 값일 때'만 다시 띄운다 — 받을 때마다 새로고침하면 고리가 된다.
+const renderedTitleDisplay=titleDisplayOf((()=>{try{return parent.LT41?.prefs?.titleDisplay||'both'}catch{return 'both'}})());
+if(typeof addEventListener==='function')addEventListener('message',e=>{
+ if(e.data?.type!=='lt41-title-display')return;
+ let mirror=null;try{mirror=localStorage.getItem('lt41.titleDisplay');}catch{}
+ if(shouldReloadForTitleDisplay({value:e.data.value,rendered:renderedTitleDisplay,mirror}))location.reload();
+});
