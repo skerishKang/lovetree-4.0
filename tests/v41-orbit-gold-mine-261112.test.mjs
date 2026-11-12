@@ -60,6 +60,12 @@ test('첫 순간 표식은 12px 글자에 진한 배경·금색 긐자로 읽힌
   assert.doesNotMatch(mark, /216,143,156/, '옛 분홍 테두리를 쓰지 않는다');
 });
 
+test('좁은 화면(≤650px)에서 마지막 순간 카드가 화면 안에 온전히 들어온다', () => {
+  // 카드 폭은 calc(100vw - 32px)인데 가운데 묶음(.center)이 78vw(700px 이하 규칙)라 카드가 오른쪽으로 넘쳤다(#443 눈 확인).
+  // ≤650px에서 .center 폭을 화면-16px로 맞춰 카드(화면-32px)가 가운데에 온전히 들어오게 한다.
+  assert.match(orbit, /@media\(max-width:650px\)\{\.center\{width:calc\(100vw - 16px\);max-width:calc\(100vw - 16px\)\}\.recent-card\{width:calc\(100vw - 32px\)\}/);
+});
+
 test('불투명·blur 없음·밝기 깊이는 그대로 유지한다(#440 계약)', () => {
   assert.doesNotMatch(orbit, /el\.style\.opacity=/);
   assert.match(orbit, /el\.style\.filter=`brightness\(/);
