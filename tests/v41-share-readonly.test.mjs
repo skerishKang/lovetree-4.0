@@ -16,9 +16,10 @@ const shell = read('public/v41/shell.mjs');
 const runtime = read('public/v41/runtime.js');
 
 // ── 판정: runtime.js가 LT41.source에서 readOnly를 한 곳에서 내린다 ──
-test('LTDEMO.readOnly는 LT41.source가 share일 때만 참이다', async () => {
+// #464(2026-11-13): 예시(example)도 읽기 전용이다 — 고칠 수 없는 화면인데 '고치기'·마음 안내가 떴다.
+test('LTDEMO.readOnly는 공유(share)와 예시(example)에서 참이다', async () => {
   const vm = await import('node:vm');
-  for (const [source, expected] of [['share', true], ['server', false], ['example', false], ['file', false]]) {
+  for (const [source, expected] of [['share', true], ['server', false], ['example', true], ['file', false]]) {
     const document = {
       querySelectorAll: () => [],
       getElementById: () => null,
@@ -36,6 +37,24 @@ test('LTDEMO.readOnly는 LT41.source가 share일 때만 참이다', async () => 
     vm.runInNewContext(runtime, scope);
     assert.equal(typeof scope.window.LTDEMO.readOnly, 'boolean', source + ': readOnly는 참/거짓을 낸다');
     assert.equal(scope.window.LTDEMO.readOnly, expected, source + ': 기대한 판정');
+  }
+});
+
+test('#464 예시 트리(demoData)는 source와 무관하게 읽기 전용이다', async () => {
+  // 셸이 예시를 띄울 때 트리에 demoData를 붙인다 — 그 자체가 '고칠 수 없다'는 표시다.
+  const vm = await import('node:vm');
+  for (const source of ['server', 'example']) {
+    const scope = {
+      window: {},
+      document: { querySelectorAll: () => [], getElementById: () => null, addEventListener: () => {} },
+      parent: { LT41: { source, tree: { id: 'e', title: '예시', moments: [], edges: [], demoData: { moments: [], edges: [] } } } },
+      addEventListener: () => {},
+      setTimeout, clearTimeout
+    };
+    scope.window = scope;
+    vm.runInNewContext(runtime, scope);
+    assert.equal(scope.window.LTDEMO.readOnly, true, source + ': demoData가 있으면 읽기 전용');
+    assert.equal(scope.window.LTDEMO.example, true, source + ': 예시 표시는 그대로');
   }
 });
 

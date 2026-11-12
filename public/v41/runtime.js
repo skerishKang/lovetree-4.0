@@ -25,7 +25,9 @@
   });
   // #315: 읽기 전용 판정은 여기 한 곳. 셸이 iframe에 넘기는 LT41.source에 이미 'share'가 있으므로
   // 그걸 그대로 판정한다(공유 감상은 쓰기·편집 UI를 렌더하지 않는다).
-  const readOnly = context.source === 'share';
+  // #464(2026-11-13): 예시(demoData)도 읽기 전용이다 — 고칠 수 없는 화면이다. 예전에는 source==='share'만
+  // 보아 예시 책에 "이 순간에 남기고 싶은 마음을 적어 보세요…"와 "✎ 고치기"가 보였다(CTO 지적).
+  const readOnly = context.source === 'share' || context.source === 'example' || !!demo;
   window.LTDEMO = {title:tree.title,moments,edges:tree.edges,example:!!demo,readOnly,prefs:context.prefs||{titleDisplay:'both'},
     get:()=>context.momentId,
     select:id=>{if(moments.some(m=>m.id===id)){context.momentId=id;parent.postMessage({type:'lt-selection',id},location.origin)}}};
