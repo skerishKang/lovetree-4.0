@@ -89,7 +89,9 @@ function writeBoardView(v){let id=boardTreeId();if(!id)return;try{let all=JSON.p
 function noteUserView(){if(innerWidth<700||cinema)return;let vw=viewport.clientWidth,vh=viewport.clientHeight;
 userView={cx:(vw/2-view.x)/view.z,cy:(vh/2-view.y)/view.z,z:view.z};viewMode='user';
 clearTimeout(viewSaveTimer);viewSaveTimer=setTimeout(()=>writeBoardView(userView),400)}
-function boardStartView(){if(innerWidth<700){fitAll(false);return}
+// #490: 화면 전환(두 장 앞뒤 바꿈)에서는 이 문서가 숨은 프레임(폭 0)에서 먼저 뜬다. 그때 한 맞춤을 '전체 보기'로
+// 기억하면 드러난 뒤 resize가 맞춤(55%)을 다시 적용해 처음 80%·기억한 자리가 무시됐다 → 처음 자리 대기로 둔다.
+function boardStartView(){if(innerWidth<700){fitAll(false);viewMode='start';return}
 let vw=viewport.clientWidth,vh=viewport.clientHeight,cards=boardCards(),saved=userView||readBoardView();
 if(saved){let v={z:saved.z,x:vw/2-saved.cx*saved.z,y:vh/2-saved.cy*saved.z};
 if(!cards.length||LT58Model.visibleCards(v,{x:0,y:0,w:vw,h:vh},cards)>0){userView=saved;viewMode='user';Object.assign(view,{x:v.x,y:v.y,z:v.z});applyView(false);return}}
