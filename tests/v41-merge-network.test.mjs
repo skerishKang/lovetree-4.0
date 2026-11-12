@@ -27,7 +27,8 @@ test('깊이가 다른 두 폴더에서도 같은 파일을 쓰도록 자원 경
 });
 
 test('실제 기록 판본 문구를 기준으로 통일했다(범례 제목·재생 안내)', () => {
-  assert.ok(SERVER.includes('순간 위치 그룹'));
+  assert.ok(SERVER.includes('순간 묶음'), '#461 범례 제목은 "순간 묶음"');
+  assert.ok(!SERVER.includes('순간 위치 그룹'), '#461 알기 어려운 "위치 그룹"은 쓰지 않는다');
   assert.ok(SERVER.includes('먼저 순간을 선택하세요.'));
   assert.ok(!SERVER.includes('주요 경로 그룹'));
   assert.ok(!SERVER.includes('경로 안의 순간를 선택하세요'));
@@ -39,14 +40,14 @@ test('재생 안내는 source가 아니라 데이터 상태(예시 여부)로 �
   assert.match(RUNTIME, /example:!!demo/);
 });
 
-test('작은 트리 보정은 트리 크기(데이터) 조건으로 한 벌(network-model.js)이 맡는다', () => {
+test('트리 크기에 맞춘 배치는 한 벌(network-model.js)이 맡는다', () => {
   // 2026-11-09: 계산은 LT56Model 한 벌로 옮기고, 화면은 범례 행만 갱신한다.
+  // #461: 작은 트리 고정 보정(smallTreeLayout) 대신 화면 상자(fitBox)에 맞춘 배치(networkLayout)가 크기를 맡는다.
   const MODEL = fs.readFileSync(new URL('../public/v41/views/network/network-model.js', import.meta.url), 'utf8');
-  assert.ok(MODEL.includes('function smallTreeLayout(count) {'));
-  assert.ok(MODEL.includes('return count <= 36 ? { spacing: 220, baseY: 250, worldHeight: 1600 } : null;'));
-  assert.ok(SERVER.includes('LT56Model.smallTreeLayout(LTDEMO.moments.length)'));
+  assert.ok(!MODEL.includes('function smallTreeLayout('), '고정 무대 보정은 없앴다');
+  assert.ok(SERVER.includes('LT56Model.networkLayout(LTDEMO.moments,{box:BOX'));
   assert.ok(SERVER.includes("document.querySelectorAll('.legend-row').forEach"));
-  assert.ok(SERVER.includes('LT56Model.clusterSpan(i,groupSize,LTDEMO.moments.length)'));
+  assert.ok(SERVER.includes('LT56Model.clusterSpan(i,groupSize,LTDEMO.moments.length,LTDEMO.moments)'));
 });
 
 test('runtime.js는 예시 모드에서 demoData를 그대로 쓴다(design/shared.js와 같은 모양)', () => {
