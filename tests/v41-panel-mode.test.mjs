@@ -84,7 +84,8 @@ test('순간 잇기는 전체 화면 모양을 태그로 받고, 순간 추가�
   assert.match(css, /#write-panel\{width:min\(540px,calc\(100vw - 32px\)\);/);
   assert.match(css, /#write-panel\{[^}]*overflow-y:auto/);
   // 모바일은 화면을 꽉 채운다.
-  assert.match(css, /@media\(max-width:780px\)\{\n #write-panel\{inset:0;width:100vw;/);
+  // #462: 모바일 한 창은 '보이는 화면'(키보드가 올라오면 줄어드는 높이)을 따른다 — 변수가 없으면 지금처럼 화면 전체.
+  assert.match(css, /@media\(max-width:780px\)\{\n \/\*.*?\*\/\n #write-panel\{inset:var\(--lt-vv-top,0px\) 0 auto 0;width:100vw;max-width:none;height:var\(--lt-vv-h,100dvh\);/);
   assert.match(css, /dialog\[data-lt-panel=full]\{inset:var\(--lt-panel-top,66px\) 0 0 0;/);
 });
 

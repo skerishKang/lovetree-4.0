@@ -318,6 +318,12 @@ export function createQuickAdd(deps) {
   $('quick-saved-refine').onclick = () => refine($('quick-saved-refine'));
   // 닫기는 공통 틀(shell/dialogs.mjs)이 초점까지 되돌린다 — 여기서는 따로 만지지 않는다.
   if (isFinePointer()) mountDrop(doc);
+  // #462: 끌어다 놓기를 받지 않는 기기(휴대폰·터치)에서는 "여기로 끌어다 놓아도 돼요"를 보이지도 읽어 주지도 않는다.
+  else {
+    const hint = $('quick-hint');
+    if (hint) hint.hidden = true;
+    $('quick-url').removeAttribute?.('aria-describedby');
+  }
 
   return {
     openWrite,
