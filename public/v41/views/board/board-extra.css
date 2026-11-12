@@ -145,7 +145,7 @@ html[data-v41-screen=board][data-lt-board-theme="night"] body .card.selected{box
 html[data-v41-screen=board][data-lt-board-theme="night"] body .card.cinemaFocus{box-shadow:0 34px 75px rgba(0,0,0,.6),0 0 0 2px rgba(255,255,255,.75),0 0 55px var(--pin)}
 html[data-v41-screen=board][data-lt-board-theme="night"] body .card h3,
 html[data-v41-screen=board][data-lt-board-theme="night"] body .card .mTitle,
-html[data-v41-screen=board][data-lt-board-theme="night"] body .card .title{color:#e8dfd6}
+html[data-v41-screen=board][data-lt-board-theme="night"] body .card .title{color:#21182d}
 html[data-v41-screen=board][data-lt-board-theme="night"] body .card .memo{color:#3f3244;border-top-color:rgba(96,72,104,.16)}
 html[data-v41-screen=board][data-lt-board-theme="night"] body .card .meta,
 html[data-v41-screen=board][data-lt-board-theme="night"] body .card .momentDate,
