@@ -30,6 +30,10 @@ test('#366 ③ 연결 이유: 저장된 relation이 화면 그래프(reason)까�
   assert.match(js,/paintEdgeTip\(he,e\.clientX,e\.clientY,true\)/,'누름(터치)');
   // 이유가 비면 표시를 생략한다(모델 규칙 그대로).
   assert.match(js,/if\(!text\)\{hideEdgeTip\(\);return\}/);
+  // 동심원처럼 선이 짧은 배치에서는 선 위에 정확히 올리기 어렵다 — 순간에 올려도 그 순간으로 들어온 이유를 보여 준다.
+  assert.match(js,/if\(h\.kind==='moment'\)\{const inc=edges\.find\(x=>x\.b===h\.id&&LT56Model\.relationText\(x\)\)/,'순간에 올리면 들어온 이유');
+  // 누름(탭)으로 순간을 고를 때도 같은 이유를 pinned로 띄운다.
+  assert.match(js,/selectMoment\(h\);\/\* #366 누름\(탭\)으로도[^*]*\*\/const inc=edges\.find\(/,'탭으로 고른 순간의 이유');
 });
 
 test('#366 ③ 키보드: 캔버스에 초점이 오고, 연결 이유는 낭독기로도 읽힌다',()=>{
