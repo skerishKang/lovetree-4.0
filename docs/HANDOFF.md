@@ -2,6 +2,17 @@
 
 > **main 보호 규칙(2026-11-09, 룰셋 "main 보호 (PR·필수 검사)")**: main은 PR로만 바꾼다(직접 푸시·force push·삭제 금지, 관리자도 예외 없음 — 비상시 대표가 룰셋 enforcement를 잠깐 끈다). 필수 검사: `check (ubuntu-latest)`·`check (windows-latest)`·`미리보기 postdeploy(로그아웃)` — 셋 다 paths 필터가 없어 문서만 바뀐 PR에서도 항상 돈다. 승인 수 0(레인이 스스로 머지). Deploy Bundle Boot Test는 paths 필터가 있어 필수에 넣지 않았다.
 
+## 2026-11-12 — PR #396~#452 레인 사이 교차 결함 깊은 리뷰(이슈 #466, ai/local5-lt-crossreview-261112 외)
+
+- 범위: 2026-11-11~12 머지분(약 35개 PR)을 7관점(중복 코드·CSS 누출·죽은 배선·설정 전달 경로·공통 틀 규칙·서버/클라 두 벌·약한 시험)으로 리뷰. 표는 이슈 #466. #453(빈 틀 숨김·write-panel 가짜 더러움·설정 창 다듬기 등)은 로컬2가 수리 중이라 범위에서 뺐다.
+- 발견: 높음 0 · 중간 9 · 낮음 15. 서버/클라(`src/domain.js`↔`public/v41/domain.mjs`) 두 벌은 오늘 추가분 전부 동일 — 어긋남 없음.
+- **PR A**(#470, 머지): 날짜 표기(dateStyle) 설정이 첫 화면·공용 썸네일 fallback 카드·새 기기 첫 그림에서 무시되던 결함 한 벌 마감. `src/views/orbit.js`가 server-only-contract 때문에 localStorage를 직접 못 읽어, 읽기는 `v41/home-moments.js`의 `ltDateStyle()`(새 export)이 맡고 `mountOrbit`에 `dateStyle` 옵션으로 주입.
+- **PR B**(#472, 머지): 첫 화면 "최근 순간 카드"의 `role="button"` div가 안의 ▶ 재생 단추·"제목 달기"와 중첩 상호작용(axe nested-interactive)이 되던 구조를 해소 — 뒤에 깔린 투명 `<button class="recent-open">`가 열기를 전담, 모양·클릭·Enter·Space 동작은 그대로.
+- **PR C**(#474): 고아 모듈 `v41/home-view-menu.js`+전용 시험, 이어 보던 순간 제거 뒤 남은 `actions.resume`/`canResume`, #417 머리 개편 뒤 남은 죽은 `.brand`/`.crumb` CSS, 특이도에서 항상 밀리는 중복 규칙 정리. 동작·화면 무변경(헤드리스 크롬으로 가로 넘침 0 확인).
+- **PR D**(#475, 머지): 약한 시험 보강 — 썸네일 공용 모듈 배선 시험을 문자열 포함에서 실제 호출부 검사로, 공유 목록 시험에 실제 share-service 산출물 왕복 추가, normalizePrefs 두 벌 비교에 비기본값 조합 추가.
+- 결정 필요(이슈 #466에 남김): 공유 "둘러보기에도 올리기" 기본값이 실제 적용 안 됨(표시만 켜짐), 정리 창(cleanup-panel) 더러움 확인 미등록, 책 컴포저 썸네일 호스트 드리프트(`img.youtube.com` vs 정본 `i.ytimg.com`), 책장·둘러보기·공유 목록의 자체 날짜 포맷(통일하면 기본 화면도 바뀜).
+- 참고: 2026-11-12 오후 미리보기 postdeploy(로그아웃) 검사가 `visual/visual-theme`(테마 전환 왕복)에서 간헐적으로 실패했다 — 매번 다른 단계(garden 전환·밤 복귀)에서 멈췄고 코드 diff와 무관한 화면(이미 머지된 PR A/B/D는 1~2회 재시도로 통과). Cloudflare Pages 미리보기 Functions 콜드스타트로 보이며, PR 본문에 재시도 기록을 남겼다.
+
 ## 2026-11-12 — CTO 점검 1차(#453): PR 1 A·B, PR 2 C·B-2·D
 
 - **PR 1 A(예시 둘러보기에서 화면 틀·순간 추가가 숨던 문제)**: 예시 입구 `sample()`이 `leaveMember()`로 로그인 세션 자체를 버려 body가 `out`이 되고, #431 "빈 틀 숨김" 규칙에 걸려 `.tree-frame`·`#write-menu`가 함께 숨었다(규칙 문제 아님). `pauseMember()`(저장 연결만 dispose, 계정 표시 유지)로 바꾸고, 예시 상태에서 순간 추가·편집기를 누르면 로그인 화면 대신 `resumeMember(intent)`로 계정을 되살린 뒤 이어서 창을 연다(`panels.openEditor`·`quick-add.ensureWritable` 가드).
