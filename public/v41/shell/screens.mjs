@@ -158,6 +158,8 @@ export function createScreens(deps) {
     if (!hasTree() && file !== 'src064-orbit.html') {
       document.body.classList.remove('home-screen');
       hideFrames();
+      // #453 D1: 빈 화면은 어느 탭도 '지금 보는 곳'이 아니다. 남아 있던 금테 표시를 지운다.
+      document.querySelectorAll('[data-view]').forEach(b => b.setAttribute('aria-current', 'false'));
       $('empty').hidden = false;
       if (write) writeLocation();
       links();

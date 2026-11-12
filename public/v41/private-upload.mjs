@@ -9,10 +9,14 @@ const SIZE_PROBLEM='PNG·JPEG·GIF·WebP(약 4.2MB), MP4·WebM(약 8.4MB)만 올
 export function mountPrivateUpload({form,assets,getSubject,getState,onChange,onUseAsset,onUploaded,imagesOnly=false,fileLabel='표지 사진'}){
  const api=createWorkspaceApi(),slot=form.querySelector('[data-media-slot]');
  const slotMarkup=imagesOnly
-  ?`<label class="file-label">${fileLabel}<input type="file" accept="image/png,image/jpeg,image/gif,image/webp" data-media-file></label><p role="status" data-upload-status></p><button type="button" data-stop class="stop-upload" hidden>전송 취소</button><p class="panel-note">내 계정에만 보관합니다. 사진 약 4.2MB, 계정당 약 105MB·200개까지.</p>`
-  :'<label class="file-label">사진·영상 파일<input type="file" accept="image/png,image/jpeg,image/gif,image/webp,video/mp4,video/webm" data-media-file></label><p role="status" data-upload-status></p><button type="button" data-stop class="stop-upload" hidden>전송 취소</button><p class="panel-note">내 계정에만 보관합니다. 사진 약 4.2MB · 영상 약 8.4MB, 계정당 약 105MB·200개까지.</p>';
+  ?`<span class="file-pick"><button type="button" class="file-pick-button" data-file-open>파일 고르기</button><span class="file-pick-name" data-file-name>${fileLabel} · 고른 파일 없음</span><input type="file" accept="image/png,image/jpeg,image/gif,image/webp" data-media-file hidden></span><p role="status" data-upload-status></p><button type="button" data-stop class="stop-upload" hidden>전송 취소</button><p class="panel-note">내 계정에만 보관합니다. 사진 약 4.2MB, 계정당 약 105MB·200개까지.</p>`
+  :`<span class="file-pick"><button type="button" class="file-pick-button" data-file-open>파일 고르기</button><span class="file-pick-name" data-file-name>사진·영상</span><input type="file" accept="image/png,image/jpeg,image/gif,image/webp,video/mp4,video/webm" data-media-file hidden></span><p role="status" data-upload-status></p><button type="button" data-stop class="stop-upload" hidden>전송 취소</button><p class="panel-note">내 계정에만 보관합니다. 사진 약 4.2MB · 영상 약 8.4MB, 계정당 약 105MB·200개까지.</p>`;
  slot.innerHTML=slotMarkup;
- const $=s=>slot.querySelector(s),A=s=>assets.querySelector(s),fileInput=$('[data-media-file]'),status=$('[data-upload-status]'),stop=$('[data-stop]'),submit=form.querySelector('[type=submit]');
+ const $=s=>slot.querySelector(s),A=s=>assets.querySelector(s),fileInput=$('[data-media-file]'),fileName=$('[data-file-name]'),status=$('[data-upload-status]'),stop=$('[data-stop]'),submit=form.querySelector('[type=submit]');
+ // #453 B-2: 브라우저 기본 파일 칸('파일 선택 / 선택된 파일 없음') 대신 디자인 단추를 쓰고, 고른 파일 이름을 단추 옆에 보여 준다.
+ const fileEmptyName=fileName?fileName.textContent:'';
+ function setName(text){if(fileName)fileName.textContent=text||fileEmptyName;}
+ $('[data-file-open]')?.addEventListener('click',()=>{if(!busy)fileInput.click();});
  let file=null,id=null,busy=false,controller=null,version=0,listRequest=0;
  function setBusy(value){busy=value;fileInput.disabled=value;stop.hidden=!value;if(submit)submit.disabled=value;}
  function fileProblem(chosen){
@@ -35,19 +39,20 @@ export function mountPrivateUpload({form,assets,getSubject,getState,onChange,onU
    if(typeof result.media?.url!=='string'||!result.media.url.startsWith(location.origin+'/api/media/')){status.textContent='파일 보관 응답을 확인하지 못했어요. 내 보관 파일을 확인해 주세요.';return;}
    if(onUploaded){
     // #256-3 2단계: 주소만 넘겨 후속을 맡긴다. 순간 폼의 링크 칸은 건드리지 않는다.
-    const url=result.media.url;fileInput.value='';file=null;id=null;onChange();
+    const url=result.media.url;fileInput.value='';file=null;id=null;setName('');onChange();
     try{await onUploaded(url);}catch(error){status.textContent=error?.message||'표지 만들기를 마치지 못했어요. 내 보관 파일에서 다시 고를 수 있어요.';}
     return;
    }
-   form.elements.url.value=result.media.url;onChange();status.textContent='첨부 파일을 보관했어요. 아래 저장하기를 눌러 순간에 연결해 주세요.';fileInput.value='';file=null;id=null;
+   form.elements.url.value=result.media.url;onChange();status.textContent='첨부 파일을 보관했어요. 아래 저장하기를 눌러 순간에 연결해 주세요.';fileInput.value='';file=null;id=null;setName('');
   }finally{controller=null;setBusy(false);}
  }
  // 파일을 고르는 즉시 검증하고 올린다. 따로 '파일 올리기'를 누르지 않는다.
  fileInput.addEventListener('change',()=>{
   file=fileInput.files[0]||null;id=crypto.randomUUID();
-  if(!file)return;
+  if(!file){setName('');return;}
+  setName(file.name);
   const problem=fileProblem(file);
-  if(problem){status.textContent=problem;fileInput.value='';file=null;id=null;return;}
+  if(problem){status.textContent=problem;fileInput.value='';file=null;id=null;setName('');return;}
   status.textContent=file.name+' · '+Math.ceil(file.size/1000)+' KB';
   void upload();
  });
@@ -74,7 +79,7 @@ export function mountPrivateUpload({form,assets,getSubject,getState,onChange,onU
  if(assets)A('[data-refresh]').onclick=refresh;
  return {
   openAssets(){if(!assets)return;A('[data-assets]').replaceChildren();A('[data-usage]').textContent='';void refresh();},
-  reset(){++version;++listRequest;controller?.abort();file=null;id=null;fileInput.value='';status.textContent='';if(assets){A('[data-assets]').replaceChildren();A('[data-usage]').textContent='';}},
+  reset(){++version;++listRequest;controller?.abort();file=null;id=null;fileInput.value='';setName('');status.textContent='';if(assets){A('[data-assets]').replaceChildren();A('[data-usage]').textContent='';}},
   get busy(){return busy;}
  };
 }
