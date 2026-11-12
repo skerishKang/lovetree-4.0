@@ -17,13 +17,13 @@
    '.topbar .ui-btn,#archiveClose{min-height:44px;min-width:44px}.archive-panel,.detail{transition-property:transform}.archive-panel:not(.open),.detail:not(.open){visibility:hidden;pointer-events:none}.topbar .brand strong,.topbar .brand .crumb{display:none}.topbar .brand span{max-width:32vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}@media(max-width:820px){.topbar .brand{display:none}.topbar .tools{width:100%;justify-content:flex-end}}';
   document.head.append(style);
   if(shelf){
-   const p=document.querySelector('.hero-copy>p:not(.eyebrow)');if(p)p.textContent='책을 누르면 읽던 순간부터 기억책이 열려요.';
-   const jump=document.getElementById('shelfJump');if(jump)jump.textContent='기억책 열기';
+   const p=document.querySelector('.hero-copy>p:not(.eyebrow)');if(p)p.textContent='책을 누르면 읽던 순간부터 책이 열려요.';
+   const jump=document.getElementById('shelfJump');if(jump)jump.textContent='책 열기';
    // #256-1: .stage-label은 이어 읽기 칸(#resumeCard) 안의 것을 그대로 두고, 장식 단계가 아니면 덮어쓰지 않는다.
-   const stage=document.querySelector('.stage-label');if(stage&&!stage.closest('#resumeCard'))stage.textContent='내 책장';
+   const stage=document.querySelector('.stage-label');if(stage&&!stage.closest('#resumeCard'))stage.textContent='내 트리';
    const art=document.querySelector('.hero-stage:not(#resumeCard)');if(art){art.setAttribute('aria-hidden','true');}
   }else{
-   const name=document.querySelector('.topbar .brand span');if(name)name.textContent=c?.tree.title||'기억책';
+   const name=document.querySelector('.topbar .brand span');if(name)name.textContent=c?.tree.title||'책';
    const index=document.getElementById('archiveBtn');if(index)index.textContent='목차';
    const title=document.querySelector('#archivePanel h2');if(title)title.textContent='순간 목차';
   }

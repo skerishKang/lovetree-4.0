@@ -152,7 +152,7 @@ export function connectionLine(nextTitle, reason) {
 
 /** 오른쪽 페이지가 비었을 때의 다음 안내(대표 지시 2026-11-08: "상단"은 무엇인지 알 수 없다). */
 export const NEXT_PAGE_COPY = '이 순간 다음 이야기를 남겨 보세요';
-export const NEXT_PAGE_ACTION = '다음 순간 남기기';
+export const NEXT_PAGE_ACTION = '다음 순간 추가';
 
 /** 돋보기 선택값 저장 키. 기본은 꺼짐. 실패하면 꺼짐으로 둔다. */
 export const LENS_KEY = 'lt41.bookLens';
@@ -207,7 +207,7 @@ export function tapIntent({mode, longPressed, dx = 0, dy = 0, hasMoment = false,
   return 'none';
 }
 
-/** 오른쪽 페이지의 '다음 순간 남기기'는 이 순간을 부모로 편집기를 연다. */
+/** 오른쪽 페이지의 '다음 순간 추가'는 이 순간을 부모로 편집기를 연다. */
 export function nextMomentMessage(parentId) {
   return { type: 'lt41-write', mode: 'add', parentId: String(parentId ?? '') };
 }

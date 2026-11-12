@@ -136,9 +136,10 @@ test('#449 실행: 파일에서 뽑은 진짜 drawHub를 음수 배율로 불러
     hexRgb: (hex) => [139, 108, 240]
   };
   const drawHub = new Function(
-    'ctx', 'state', 'COLORS', 'w2s', 'visible', 'colorOf', 'hexRgb',
+    'ctx', 'state', 'COLORS', 'w2s', 'visible', 'colorOf', 'hexRgb', 'paint', 'paintAlpha',
     fnSource + String.fromCharCode(10) + 'return drawHub;'
-  )(stub.ctx, stub.state, stub.COLORS, stub.w2s, stub.visible, stub.colorOf, stub.hexRgb);
+  )(stub.ctx, stub.state, stub.COLORS, stub.w2s, stub.visible, stub.colorOf, stub.hexRgb,
+    () => '#fff', (alpha) => alpha);
   // 결함이 났던 조건들: 창이 낮아 배율이 음수·0·극소인 경우.
   for (const scale of [-2.6, -0.7, -0.05, 0, 0.001, 0.12]) {
     state.scale = scale;

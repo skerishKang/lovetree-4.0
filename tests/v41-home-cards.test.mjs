@@ -93,7 +93,7 @@ test('내 것만 0장: 예시로 대체하지 않고 첫 순간 안내를 쓴다
   assert.equal(plan.kind, 'mine-empty');
   assert.deepEqual(plan.cards, []);
   assert.equal(plan.examples, 0);
-  assert.equal(plan.note, '아직 남긴 순간이 없어요 · 첫 순간 남기기');
+  assert.equal(plan.note, '아직 남긴 순간이 없어요 · 첫 순간 추가');
 });
 
 test('인기: 10장 미만이면 예시로 채우고 안내, 10장 이상이면 예시 없이 공개 카드만', () => {

@@ -1,4 +1,4 @@
-// 내 책장 읽기(펼침·장 넘김·끌기) 화면 동작 (#231 후속, 2026-11-09).
+// 내 트리(책장) 읽기(펼침·장 넘김·끌기) 화면 동작 (#231 후속, 2026-11-09).
 // views/shelf/shelf.js 안에 있던 함수를 그대로 옮겼다 — 조건·문구·id·순서 변경 0.
 // 화면(DOM)을 다루므로 node에서는 createReader(가짜 DOM)로 시험한다.
 import { escapeShelf, leftPageMarkup, pageMeta, pageTarget, rightPageMarkup, youtubeId as youtubeIdOf } from './shelf-model.mjs';
@@ -22,9 +22,9 @@ export function createReader(deps) {
         $('#coverTitle').textContent=book.name;
         $('#coverTitle').textContent=book.name;
         $('#coverBack').innerHTML='순간의 기록<br /><small>'+esc(book.name)+'의 다음 장으로</small>';
-        $('#readerLabel').textContent='기억책';
+        $('#readerLabel').textContent='책';
         $('#stageBookCode').textContent='순간의 기록';
-        $('#readerEyebrow').textContent='기억책';
+        $('#readerEyebrow').textContent='책';
         $('#readerTitle').textContent=book.name+'의 LoveTree';
         $('#readerDescription').textContent=book.description;
         $('#chapterCount').textContent=book.chapters.length+'개 순간';
@@ -165,7 +165,7 @@ export function createReader(deps) {
         animateSharedBook(sourceRect,targetRect,function(){
           $('#readerScreen').classList.remove('active','is-preparing');
           state.selectedId=null;save();
-          $('#crumbLabel').textContent='내 책장';
+          $('#crumbLabel').textContent='내 트리';
           window.scrollTo({top:0,behavior:'smooth'});
         });
       }

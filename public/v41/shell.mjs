@@ -848,21 +848,21 @@ for(const b of document.querySelectorAll('[data-page-turn]'))b.onclick=()=>{
 };
 paintPageTurnControls();
 // #467: 보드 판 테마(종이/밤) — 이 기기에만 저장한다(localStorage lt41.boardTheme). 기본은 종이이고,
-// 바꾸면 열린 보드에 바로 반영한다(프레임 속성 + lt41-board-theme 메시지).
+// 바꾸면 열린 보드·지도에 바로 반영한다(프레임 속성 + lt41-board-theme 메시지).
 const BOARD_THEME_KEY='lt41.boardTheme';
 function currentBoardTheme(){try{return localStorage.getItem(BOARD_THEME_KEY)==='night'?'night':'paper'}catch{return 'paper'}}
-function paintBoardThemeControls(){const value=currentBoardTheme();for(const b of document.querySelectorAll('[data-board-theme]'))b.setAttribute('aria-checked',String(b.dataset.boardTheme===value));}
+function paintBoardThemeControls(){const value=currentBoardTheme();for(const b of document.querySelectorAll('button[data-board-theme]'))b.setAttribute('aria-checked',String(b.dataset.boardTheme===value));}
 function applyBoardThemeToFrame(frame){
  const message=frameMessage('boardTheme',currentBoardTheme());
  try{frame.contentDocument?.documentElement?.setAttribute('data-lt-board-theme',message.value);}catch{}
  sendToFrame(frame,message);
 }
-for(const b of document.querySelectorAll('[data-board-theme]'))b.onclick=()=>{
+for(const b of document.querySelectorAll('button[data-board-theme]'))b.onclick=()=>{
  const next=b.dataset.boardTheme==='night'?'night':'paper';
  try{localStorage.setItem(BOARD_THEME_KEY,next)}catch{}
  paintBoardThemeControls();
  for(const f of frames())applyBoardThemeToFrame(f);
- notify(next==='night'?'보드 판을 밤 테마로 바꿨어요.':'보드 판을 종이 테마로 바꿨어요.');
+ notify(next==='night'?'보드·지도 판을 밤 테마로 바꿨어요.':'보드·지도 판을 종이 테마로 바꿨어요.');
 };
 paintBoardThemeControls();
 window.addEventListener('message',e=>{
@@ -871,6 +871,7 @@ window.addEventListener('message',e=>{
   const next=e.data.value==='night'?'night':'paper';
   try{localStorage.setItem(BOARD_THEME_KEY,next)}catch{}
   paintBoardThemeControls();
+  for(const f of frames())applyBoardThemeToFrame(f);
  }
 });
 // #368: 옛 내 기록 창을 여던 입구(읽기 전용 안내·빈 화면)의 공통 행선지. 로그아웃이면 로그인으로 보낸다.

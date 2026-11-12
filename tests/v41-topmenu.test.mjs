@@ -95,7 +95,7 @@ test('화면 제목과 안내 글도 줄인 이름을 쓴다', () => {
   assert.match(navigation, /\['book', 'track59-sketchbook\.html', '책'\]/);
   assert.match(navigation, /\['board', 'track58-pinboard\.html', '보드'\]/);
   assert.match(navigation, /\['network', 'track56-network\.html', '지도'\]/);
-  assert.match(navigation, /\['shelf', 'track32-bookshelf\.html', '내 책장'\]/);
+  assert.match(navigation, /\['shelf', 'track32-bookshelf\.html', '내 트리'\]/);
   assert.match(headerState, /title: '책·보드·지도로 다르게 봐요'/);
 });
 

@@ -1,0 +1,1290 @@
+{
+  "reference": "9685f5c820768726727982a926e8bef36265a9a1",
+  "sceneCount": 40,
+  "minimums": [
+    {
+      "combination": "1440-night-paper",
+      "scenes": 5,
+      "dom": 5.06,
+      "canvasText": 6.73,
+      "points": 3.09,
+      "lines": 3.41,
+      "rings": 3.63,
+      "byRole": {
+        "dom:toolbar": {
+          "role": "toolbar",
+          "id": "modePill",
+          "text": "전체 보기",
+          "ratio": 6.66,
+          "fg": "#65566e",
+          "bg": "#fefdfd",
+          "kind": "dom"
+        },
+        "dom:hint": {
+          "role": "hint",
+          "id": "p.",
+          "text": "첫 순간에서 어떻게 이어졌는지 보는 지도예요",
+          "ratio": 5.06,
+          "fg": "#74667c",
+          "bg": "#faf9f7",
+          "kind": "dom"
+        },
+        "dom:legend": {
+          "role": "legend",
+          "id": "h3.",
+          "text": "순간 묶음",
+          "ratio": 6.65,
+          "fg": "#65566e",
+          "bg": "#fefdfd",
+          "kind": "dom"
+        },
+        "dom:explorer": {
+          "role": "explorer",
+          "id": "h3.",
+          "text": "탐색 모드",
+          "ratio": 6.56,
+          "fg": "#65566e",
+          "bg": "#fcfcfc",
+          "kind": "dom"
+        },
+        "dom:detail": {
+          "role": "detail",
+          "id": "detailWhy",
+          "text": "짧은 장면이 끝난 뒤에도 소리가 남아 다음 영상을 눌렀다.",
+          "ratio": 5.54,
+          "fg": "#68656c",
+          "bg": "#fcfbfc",
+          "kind": "dom"
+        },
+        "dom:route": {
+          "role": "route",
+          "id": "routeStatusText",
+          "text": "첫 순간에서 1단계 지나온 길을 밝힙니다.",
+          "ratio": 6.66,
+          "fg": "#65566e",
+          "bg": "#fdfdfe",
+          "kind": "dom"
+        },
+        "canvas:hub-number": {
+          "role": "hub-number",
+          "id": "1:02",
+          "ratio": 6.73,
+          "fg": "#59555d",
+          "bg": "#f7f5f9",
+          "samples": 147,
+          "kind": "canvas"
+        },
+        "canvas:label": {
+          "role": "label",
+          "id": "15:기억해 둔 …",
+          "ratio": 7.72,
+          "fg": "#4f4b52",
+          "bg": "#f6f3f1",
+          "samples": 555,
+          "kind": "canvas"
+        },
+        "canvas:first-dot": {
+          "role": "first-dot",
+          "id": "m01",
+          "ratio": 3.09,
+          "fg": "#bf7c7e",
+          "bg": "#f9f8f6",
+          "samples": 1201,
+          "kind": "canvas"
+        },
+        "canvas:first-inner-ring": {
+          "role": "first-inner-ring",
+          "id": "m01",
+          "ratio": 3.63,
+          "fg": "#9e7a2e",
+          "bg": "#f7f4f2",
+          "samples": 64,
+          "kind": "canvas"
+        },
+        "canvas:first-ring": {
+          "role": "first-ring",
+          "id": "m01",
+          "ratio": 4.08,
+          "fg": "#b05e75",
+          "bg": "#f7f4f2",
+          "samples": 64,
+          "kind": "canvas"
+        },
+        "canvas:dot": {
+          "role": "dot",
+          "id": "m18",
+          "ratio": 3.73,
+          "fg": "#4a838e",
+          "bg": "#f1eff4",
+          "samples": 300,
+          "kind": "canvas"
+        },
+        "canvas:line": {
+          "role": "line",
+          "id": "47",
+          "ratio": 3.41,
+          "fg": "#538a95",
+          "bg": "#f2f0f5",
+          "samples": 19,
+          "kind": "canvas"
+        },
+        "canvas:arrow": {
+          "role": "arrow",
+          "id": "48",
+          "ratio": 3.67,
+          "fg": "#4a8591",
+          "bg": "#f2f0f5",
+          "samples": 1,
+          "kind": "canvas"
+        },
+        "canvas:guide-ring": {
+          "role": "guide-ring",
+          "id": "3",
+          "ratio": 4.68,
+          "fg": "#74697f",
+          "bg": "#f6f3f3",
+          "samples": 93,
+          "kind": "canvas"
+        }
+      }
+    },
+    {
+      "combination": "1440-night-night",
+      "scenes": 5,
+      "dom": 7.92,
+      "canvasText": 11.07,
+      "points": 5.38,
+      "lines": 4.28,
+      "rings": 4.89,
+      "byRole": {
+        "dom:toolbar": {
+          "role": "toolbar",
+          "id": "viewNet",
+          "text": "그물형",
+          "ratio": 12.06,
+          "fg": "#211b2b",
+          "bg": "#f6d892",
+          "kind": "dom"
+        },
+        "dom:hint": {
+          "role": "hint",
+          "id": "p.",
+          "text": "첫 순간에서 어떻게 이어졌는지 보는 지도예요",
+          "ratio": 10.93,
+          "fg": "#c9bdd4",
+          "bg": "#0b0b13",
+          "kind": "dom"
+        },
+        "dom:legend": {
+          "role": "legend",
+          "id": "h3.",
+          "text": "순간 묶음",
+          "ratio": 9.32,
+          "fg": "#c9bdd4",
+          "bg": "#211b2b",
+          "kind": "dom"
+        },
+        "dom:explorer": {
+          "role": "explorer",
+          "id": "h3.",
+          "text": "탐색 모드",
+          "ratio": 9.32,
+          "fg": "#c9bdd4",
+          "bg": "#211b2b",
+          "kind": "dom"
+        },
+        "dom:detail": {
+          "role": "detail",
+          "id": "span.",
+          "text": "연결 이유 · 다음 순간으로 이어진 이유",
+          "ratio": 7.92,
+          "fg": "#c9bdd4",
+          "bg": "#30273b",
+          "kind": "dom"
+        },
+        "dom:route": {
+          "role": "route",
+          "id": "routeStatusText",
+          "text": "첫 순간에서 1단계 지나온 길을 밝힙니다.",
+          "ratio": 9.32,
+          "fg": "#c9bdd4",
+          "bg": "#211b2b",
+          "kind": "dom"
+        },
+        "canvas:hub-number": {
+          "role": "hub-number",
+          "id": "0:01",
+          "ratio": 11.35,
+          "fg": "#fff5dc",
+          "bg": "#3a3145",
+          "samples": 119,
+          "kind": "canvas"
+        },
+        "canvas:label": {
+          "role": "label",
+          "id": "0:여기서 시작 · 첫인상",
+          "ratio": 11.07,
+          "fg": "#ccc5ce",
+          "bg": "#13111c",
+          "samples": 734,
+          "kind": "canvas"
+        },
+        "canvas:first-dot": {
+          "role": "first-dot",
+          "id": "m01",
+          "ratio": 9.23,
+          "fg": "#eaa4a9",
+          "bg": "#13111c",
+          "samples": 642,
+          "kind": "canvas"
+        },
+        "canvas:first-inner-ring": {
+          "role": "first-inner-ring",
+          "id": "m01",
+          "ratio": 11.41,
+          "fg": "#e4c789",
+          "bg": "#13111c",
+          "samples": 64,
+          "kind": "canvas"
+        },
+        "canvas:first-ring": {
+          "role": "first-ring",
+          "id": "m01",
+          "ratio": 8.86,
+          "fg": "#e89eb2",
+          "bg": "#13111c",
+          "samples": 64,
+          "kind": "canvas"
+        },
+        "canvas:dot": {
+          "role": "dot",
+          "id": "m36",
+          "ratio": 5.38,
+          "fg": "#948a9a",
+          "bg": "#1a1623",
+          "samples": 869,
+          "kind": "canvas"
+        },
+        "canvas:line": {
+          "role": "line",
+          "id": "48",
+          "ratio": 4.28,
+          "fg": "#807887",
+          "bg": "#171420",
+          "samples": 6,
+          "kind": "canvas"
+        },
+        "canvas:arrow": {
+          "role": "arrow",
+          "id": "61",
+          "ratio": 5.33,
+          "fg": "#918797",
+          "bg": "#16131f",
+          "samples": 1,
+          "kind": "canvas"
+        },
+        "canvas:guide-ring": {
+          "role": "guide-ring",
+          "id": "2",
+          "ratio": 4.89,
+          "fg": "#897f96",
+          "bg": "#14121d",
+          "samples": 85,
+          "kind": "canvas"
+        }
+      }
+    },
+    {
+      "combination": "1440-garden-paper",
+      "scenes": 5,
+      "dom": 5.6,
+      "canvasText": 6.73,
+      "points": 3.61,
+      "lines": 3.44,
+      "rings": 3.68,
+      "byRole": {
+        "dom:toolbar": {
+          "role": "toolbar",
+          "id": "viewNet",
+          "text": "그물형",
+          "ratio": 5.67,
+          "fg": "#fffdf8",
+          "bg": "#98505e",
+          "kind": "dom"
+        },
+        "dom:hint": {
+          "role": "hint",
+          "id": "p.",
+          "text": "첫 순간에서 어떻게 이어졌는지 보는 지도예요",
+          "ratio": 8.3,
+          "fg": "#534949",
+          "bg": "#faf9f7",
+          "kind": "dom"
+        },
+        "dom:legend": {
+          "role": "legend",
+          "id": "h3.",
+          "text": "순간 묶음",
+          "ratio": 6.64,
+          "fg": "#65566e",
+          "bg": "#fffdf8",
+          "kind": "dom"
+        },
+        "dom:explorer": {
+          "role": "explorer",
+          "id": "h3.",
+          "text": "탐색 모드",
+          "ratio": 6.63,
+          "fg": "#65566e",
+          "bg": "#fffdf8",
+          "kind": "dom"
+        },
+        "dom:detail": {
+          "role": "detail",
+          "id": "detailWhy",
+          "text": "짧은 장면이 끝난 뒤에도 소리가 남아 다음 영상을 눌렀다.",
+          "ratio": 5.6,
+          "fg": "#69666c",
+          "bg": "#fffefc",
+          "kind": "dom"
+        },
+        "dom:route": {
+          "role": "route",
+          "id": "routeStatusText",
+          "text": "첫 순간에서 1단계 지나온 길을 밝힙니다.",
+          "ratio": 6.66,
+          "fg": "#65566e",
+          "bg": "#fdfdfe",
+          "kind": "dom"
+        },
+        "canvas:hub-number": {
+          "role": "hub-number",
+          "id": "1:02",
+          "ratio": 6.73,
+          "fg": "#59555d",
+          "bg": "#f7f5f9",
+          "samples": 147,
+          "kind": "canvas"
+        },
+        "canvas:label": {
+          "role": "label",
+          "id": "15:기억해 둔 …",
+          "ratio": 7.72,
+          "fg": "#4f4b52",
+          "bg": "#f6f3f1",
+          "samples": 555,
+          "kind": "canvas"
+        },
+        "canvas:first-dot": {
+          "role": "first-dot",
+          "id": "m01",
+          "ratio": 3.61,
+          "fg": "#b46e81",
+          "bg": "#f9f8f6",
+          "samples": 1201,
+          "kind": "canvas"
+        },
+        "canvas:first-inner-ring": {
+          "role": "first-inner-ring",
+          "id": "m01",
+          "ratio": 3.68,
+          "fg": "#9d792f",
+          "bg": "#f7f4f2",
+          "samples": 64,
+          "kind": "canvas"
+        },
+        "canvas:first-ring": {
+          "role": "first-ring",
+          "id": "m01",
+          "ratio": 4.08,
+          "fg": "#b05e75",
+          "bg": "#f7f4f2",
+          "samples": 64,
+          "kind": "canvas"
+        },
+        "canvas:dot": {
+          "role": "dot",
+          "id": "m18",
+          "ratio": 3.73,
+          "fg": "#49838f",
+          "bg": "#f0eff4",
+          "samples": 300,
+          "kind": "canvas"
+        },
+        "canvas:line": {
+          "role": "line",
+          "id": "45",
+          "ratio": 3.44,
+          "fg": "#538a95",
+          "bg": "#f3f1f4",
+          "samples": 18,
+          "kind": "canvas"
+        },
+        "canvas:arrow": {
+          "role": "arrow",
+          "id": "46",
+          "ratio": 3.74,
+          "fg": "#4a8490",
+          "bg": "#f3f1f4",
+          "samples": 1,
+          "kind": "canvas"
+        },
+        "canvas:guide-ring": {
+          "role": "guide-ring",
+          "id": "3",
+          "ratio": 4.68,
+          "fg": "#74697f",
+          "bg": "#f6f3f3",
+          "samples": 93,
+          "kind": "canvas"
+        }
+      }
+    },
+    {
+      "combination": "1440-garden-night",
+      "scenes": 5,
+      "dom": 7.92,
+      "canvasText": 11.07,
+      "points": 5.38,
+      "lines": 4.28,
+      "rings": 4.89,
+      "byRole": {
+        "dom:toolbar": {
+          "role": "toolbar",
+          "id": "viewNet",
+          "text": "그물형",
+          "ratio": 12.06,
+          "fg": "#211b2b",
+          "bg": "#f6d892",
+          "kind": "dom"
+        },
+        "dom:hint": {
+          "role": "hint",
+          "id": "p.",
+          "text": "첫 순간에서 어떻게 이어졌는지 보는 지도예요",
+          "ratio": 10.93,
+          "fg": "#c9bdd4",
+          "bg": "#0b0b13",
+          "kind": "dom"
+        },
+        "dom:legend": {
+          "role": "legend",
+          "id": "h3.",
+          "text": "순간 묶음",
+          "ratio": 9.32,
+          "fg": "#c9bdd4",
+          "bg": "#211b2b",
+          "kind": "dom"
+        },
+        "dom:explorer": {
+          "role": "explorer",
+          "id": "h3.",
+          "text": "탐색 모드",
+          "ratio": 9.32,
+          "fg": "#c9bdd4",
+          "bg": "#211b2b",
+          "kind": "dom"
+        },
+        "dom:detail": {
+          "role": "detail",
+          "id": "span.",
+          "text": "연결 이유 · 다음 순간으로 이어진 이유",
+          "ratio": 7.92,
+          "fg": "#c9bdd4",
+          "bg": "#30273b",
+          "kind": "dom"
+        },
+        "dom:route": {
+          "role": "route",
+          "id": "routeStatusText",
+          "text": "첫 순간에서 1단계 지나온 길을 밝힙니다.",
+          "ratio": 9.32,
+          "fg": "#c9bdd4",
+          "bg": "#211b2b",
+          "kind": "dom"
+        },
+        "canvas:hub-number": {
+          "role": "hub-number",
+          "id": "0:01",
+          "ratio": 11.35,
+          "fg": "#fff5dc",
+          "bg": "#3a3145",
+          "samples": 119,
+          "kind": "canvas"
+        },
+        "canvas:label": {
+          "role": "label",
+          "id": "0:여기서 시작 · 첫인상",
+          "ratio": 11.07,
+          "fg": "#ccc5ce",
+          "bg": "#13111c",
+          "samples": 734,
+          "kind": "canvas"
+        },
+        "canvas:first-dot": {
+          "role": "first-dot",
+          "id": "m01",
+          "ratio": 9.23,
+          "fg": "#eaa4a9",
+          "bg": "#13111c",
+          "samples": 642,
+          "kind": "canvas"
+        },
+        "canvas:first-inner-ring": {
+          "role": "first-inner-ring",
+          "id": "m01",
+          "ratio": 11.41,
+          "fg": "#e4c789",
+          "bg": "#13111c",
+          "samples": 64,
+          "kind": "canvas"
+        },
+        "canvas:first-ring": {
+          "role": "first-ring",
+          "id": "m01",
+          "ratio": 8.86,
+          "fg": "#e89eb2",
+          "bg": "#13111c",
+          "samples": 64,
+          "kind": "canvas"
+        },
+        "canvas:dot": {
+          "role": "dot",
+          "id": "m36",
+          "ratio": 5.38,
+          "fg": "#948a9a",
+          "bg": "#1a1623",
+          "samples": 869,
+          "kind": "canvas"
+        },
+        "canvas:line": {
+          "role": "line",
+          "id": "48",
+          "ratio": 4.28,
+          "fg": "#807887",
+          "bg": "#171420",
+          "samples": 6,
+          "kind": "canvas"
+        },
+        "canvas:arrow": {
+          "role": "arrow",
+          "id": "61",
+          "ratio": 5.33,
+          "fg": "#918797",
+          "bg": "#16131f",
+          "samples": 1,
+          "kind": "canvas"
+        },
+        "canvas:guide-ring": {
+          "role": "guide-ring",
+          "id": "2",
+          "ratio": 4.89,
+          "fg": "#897f96",
+          "bg": "#14121d",
+          "samples": 85,
+          "kind": "canvas"
+        }
+      }
+    },
+    {
+      "combination": "390-night-paper",
+      "scenes": 5,
+      "dom": 5,
+      "canvasText": 6.73,
+      "points": 3.33,
+      "lines": 3.44,
+      "rings": 3.63,
+      "byRole": {
+        "dom:toolbar": {
+          "role": "toolbar",
+          "id": "viewConc",
+          "text": "동심원형",
+          "ratio": 9.5,
+          "fg": "#ece7f1",
+          "bg": "#39383d",
+          "kind": "dom"
+        },
+        "dom:hint": {
+          "role": "hint",
+          "id": "p.",
+          "text": "첫 순간에서 어떻게 이어졌는지 보는 지도예요",
+          "ratio": 5,
+          "fg": "#74667c",
+          "bg": "#f9f7f5",
+          "kind": "dom"
+        },
+        "dom:ribbon": {
+          "role": "ribbon",
+          "id": "button.origin",
+          "text": "첫 순간 보기",
+          "ratio": 9.66,
+          "fg": "#413749",
+          "bg": "#f0ecfb",
+          "kind": "dom"
+        },
+        "dom:picker": {
+          "role": "picker",
+          "id": "span.",
+          "text": "선택한 순간",
+          "ratio": 13.89,
+          "fg": "#302a35",
+          "bg": "#ffffff",
+          "kind": "dom"
+        },
+        "dom:detail": {
+          "role": "detail",
+          "id": "detailWhy",
+          "text": "짧은 장면이 끝난 뒤에도 소리가 남아 다음 영상을 눌렀다.",
+          "ratio": 5.42,
+          "fg": "#67646b",
+          "bg": "#f8f6f8",
+          "kind": "dom"
+        },
+        "dom:tooltip": {
+          "role": "tooltip",
+          "id": "edgeTip",
+          "text": "이 표정이 계속 생각나서 다음 라이브까지 찾아봤다.",
+          "ratio": 14.57,
+          "fg": "#f5f1e9",
+          "bg": "#1f1f23",
+          "kind": "dom"
+        },
+        "canvas:hub-number": {
+          "role": "hub-number",
+          "id": "1:02",
+          "ratio": 6.73,
+          "fg": "#59555d",
+          "bg": "#f7f5f9",
+          "samples": 147,
+          "kind": "canvas"
+        },
+        "canvas:label": {
+          "role": "label",
+          "id": "3:기억해 둔 …",
+          "ratio": 7.8,
+          "fg": "#4f4b52",
+          "bg": "#f7f4f3",
+          "samples": 555,
+          "kind": "canvas"
+        },
+        "canvas:first-dot": {
+          "role": "first-dot",
+          "id": "m01",
+          "ratio": 3.33,
+          "fg": "#bc7376",
+          "bg": "#f8f6f4",
+          "samples": 1201,
+          "kind": "canvas"
+        },
+        "canvas:first-inner-ring": {
+          "role": "first-inner-ring",
+          "id": "m01",
+          "ratio": 3.63,
+          "fg": "#9e7a2e",
+          "bg": "#f7f4f2",
+          "samples": 64,
+          "kind": "canvas"
+        },
+        "canvas:first-ring": {
+          "role": "first-ring",
+          "id": "m01",
+          "ratio": 4.08,
+          "fg": "#b05e75",
+          "bg": "#f7f4f2",
+          "samples": 64,
+          "kind": "canvas"
+        },
+        "canvas:dot": {
+          "role": "dot",
+          "id": "m15",
+          "ratio": 3.76,
+          "fg": "#49838f",
+          "bg": "#f2f0f2",
+          "samples": 169,
+          "kind": "canvas"
+        },
+        "canvas:line": {
+          "role": "line",
+          "id": "45",
+          "ratio": 3.44,
+          "fg": "#538a95",
+          "bg": "#f4f1f3",
+          "samples": 20,
+          "kind": "canvas"
+        },
+        "canvas:arrow": {
+          "role": "arrow",
+          "id": "46",
+          "ratio": 3.74,
+          "fg": "#4a8490",
+          "bg": "#f3f1f3",
+          "samples": 1,
+          "kind": "canvas"
+        },
+        "canvas:guide-ring": {
+          "role": "guide-ring",
+          "id": "4",
+          "ratio": 4.68,
+          "fg": "#74697f",
+          "bg": "#f6f3f3",
+          "samples": 89,
+          "kind": "canvas"
+        }
+      }
+    },
+    {
+      "combination": "390-night-night",
+      "scenes": 5,
+      "dom": 7.92,
+      "canvasText": 11.35,
+      "points": 5.95,
+      "lines": 3.98,
+      "rings": 4.2,
+      "byRole": {
+        "dom:toolbar": {
+          "role": "toolbar",
+          "id": "viewNet",
+          "text": "그물형",
+          "ratio": 12.06,
+          "fg": "#211b2b",
+          "bg": "#f6d892",
+          "kind": "dom"
+        },
+        "dom:hint": {
+          "role": "hint",
+          "id": "p.",
+          "text": "첫 순간에서 어떻게 이어졌는지 보는 지도예요",
+          "ratio": 10.84,
+          "fg": "#c9bdd4",
+          "bg": "#0d0c15",
+          "kind": "dom"
+        },
+        "dom:ribbon": {
+          "role": "ribbon",
+          "id": "button.origin",
+          "text": "첫 순간 보기",
+          "ratio": 12.06,
+          "fg": "#211b2b",
+          "bg": "#f6d892",
+          "kind": "dom"
+        },
+        "dom:picker": {
+          "role": "picker",
+          "id": "select.",
+          "text": "1. 첫인상2. 푸른 시간3. 무대 뒤의 빛4. 비가 그친 뒤5. 고요한 초상6. 도시의 창7. 무대 끝에서8. 진주빛 밤9. 은빛 방10. 벤치의 기억11. 의자에 앉은 모습12. 돌아보다13. 장면 사이14. 목소리를 듣다15. 트리의 빛16. 마지막 열차17. 부드러운 초점18. 아침의 기록19. 첫 라이브20. 춤추는 순간21. 라이브 방송22. 인터뷰 장면23. 사진 속 이야기24. 연습 영상25. 밤의 무대26. 목소리 한 조각27. 무대 뒤의 순간28. 팬 촬영 영상29. 기억해 둔 표정30. 한 번 더 보고 싶었다31. 소리가 남았다32. 그날의 공기33. 다음 영상을 찾은 이유34. 멈춘 시간35. 아직 이어지는 문장36. 공식 무대 원본37. 인터뷰 아카이브38. 라이브 클립39. 포토 에디토리얼40. 팬 기록 링크",
+          "ratio": 12.08,
+          "fg": "#f2eaf5",
+          "bg": "#30273b",
+          "kind": "dom"
+        },
+        "dom:detail": {
+          "role": "detail",
+          "id": "span.",
+          "text": "연결 이유 · 다음 순간으로 이어진 이유",
+          "ratio": 7.92,
+          "fg": "#c9bdd4",
+          "bg": "#30273b",
+          "kind": "dom"
+        },
+        "dom:tooltip": {
+          "role": "tooltip",
+          "id": "edgeTip",
+          "text": "이 표정이 계속 생각나서 다음 라이브까지 찾아봤다.",
+          "ratio": 14.22,
+          "fg": "#f2eaf5",
+          "bg": "#211b2b",
+          "kind": "dom"
+        },
+        "canvas:hub-number": {
+          "role": "hub-number",
+          "id": "0:01",
+          "ratio": 11.35,
+          "fg": "#fff5dc",
+          "bg": "#3a3145",
+          "samples": 119,
+          "kind": "canvas"
+        },
+        "canvas:label": {
+          "role": "label",
+          "id": "7:푸른 시간",
+          "ratio": 12.21,
+          "fg": "#d4ccd6",
+          "bg": "#100e18",
+          "samples": 584,
+          "kind": "canvas"
+        },
+        "canvas:first-dot": {
+          "role": "first-dot",
+          "id": "m01",
+          "ratio": 9.81,
+          "fg": "#f1a9af",
+          "bg": "#13111c",
+          "samples": 497,
+          "kind": "canvas"
+        },
+        "canvas:first-inner-ring": {
+          "role": "first-inner-ring",
+          "id": "m01",
+          "ratio": 12.31,
+          "fg": "#ebcf8d",
+          "bg": "#13111c",
+          "samples": 64,
+          "kind": "canvas"
+        },
+        "canvas:first-ring": {
+          "role": "first-ring",
+          "id": "m01",
+          "ratio": 9.66,
+          "fg": "#f2a5ba",
+          "bg": "#13111c",
+          "samples": 64,
+          "kind": "canvas"
+        },
+        "canvas:dot": {
+          "role": "dot",
+          "id": "m07",
+          "ratio": 5.95,
+          "fg": "#948b9b",
+          "bg": "#0d0c14",
+          "samples": 349,
+          "kind": "canvas"
+        },
+        "canvas:line": {
+          "role": "line",
+          "id": "14",
+          "ratio": 3.98,
+          "fg": "#7b6c7a",
+          "bg": "#0c0b13",
+          "samples": 13,
+          "kind": "canvas"
+        },
+        "canvas:arrow": {
+          "role": "arrow",
+          "id": "15",
+          "ratio": 4.82,
+          "fg": "#847b89",
+          "bg": "#0c0b13",
+          "samples": 1,
+          "kind": "canvas"
+        },
+        "canvas:guide-ring": {
+          "role": "guide-ring",
+          "id": "1",
+          "ratio": 4.2,
+          "fg": "#7c7287",
+          "bg": "#100e17",
+          "samples": 9,
+          "kind": "canvas"
+        }
+      }
+    },
+    {
+      "combination": "390-garden-paper",
+      "scenes": 5,
+      "dom": 5.57,
+      "canvasText": 6.67,
+      "points": 3.76,
+      "lines": 3.44,
+      "rings": 3.68,
+      "byRole": {
+        "dom:toolbar": {
+          "role": "toolbar",
+          "id": "viewNet",
+          "text": "그물형",
+          "ratio": 5.67,
+          "fg": "#fffdf8",
+          "bg": "#98505e",
+          "kind": "dom"
+        },
+        "dom:hint": {
+          "role": "hint",
+          "id": "p.",
+          "text": "첫 순간에서 어떻게 이어졌는지 보는 지도예요",
+          "ratio": 8.2,
+          "fg": "#534849",
+          "bg": "#f9f7f5",
+          "kind": "dom"
+        },
+        "dom:ribbon": {
+          "role": "ribbon",
+          "id": "button.origin",
+          "text": "첫 순간 보기",
+          "ratio": 9.66,
+          "fg": "#413749",
+          "bg": "#f0ecfb",
+          "kind": "dom"
+        },
+        "dom:picker": {
+          "role": "picker",
+          "id": "span.",
+          "text": "선택한 순간",
+          "ratio": 11.59,
+          "fg": "#403536",
+          "bg": "#fffdf8",
+          "kind": "dom"
+        },
+        "dom:detail": {
+          "role": "detail",
+          "id": "detailWhy",
+          "text": "짧은 장면이 끝난 뒤에도 소리가 남아 다음 영상을 눌렀다.",
+          "ratio": 5.57,
+          "fg": "#69666c",
+          "bg": "#fefdfb",
+          "kind": "dom"
+        },
+        "dom:tooltip": {
+          "role": "tooltip",
+          "id": "edgeTip",
+          "text": "이 표정이 계속 생각나서 다음 라이브까지 찾아봤다.",
+          "ratio": 11.59,
+          "fg": "#403536",
+          "bg": "#fffdf8",
+          "kind": "dom"
+        },
+        "canvas:hub-number": {
+          "role": "hub-number",
+          "id": "1:02",
+          "ratio": 6.67,
+          "fg": "#59555d",
+          "bg": "#f6f4f8",
+          "samples": 147,
+          "kind": "canvas"
+        },
+        "canvas:label": {
+          "role": "label",
+          "id": "3:기억해 둔 …",
+          "ratio": 7.8,
+          "fg": "#4f4b52",
+          "bg": "#f7f4f3",
+          "samples": 555,
+          "kind": "canvas"
+        },
+        "canvas:first-dot": {
+          "role": "first-dot",
+          "id": "m01",
+          "ratio": 3.89,
+          "fg": "#b16579",
+          "bg": "#f8f6f4",
+          "samples": 1201,
+          "kind": "canvas"
+        },
+        "canvas:first-inner-ring": {
+          "role": "first-inner-ring",
+          "id": "m01",
+          "ratio": 3.68,
+          "fg": "#9d7a2f",
+          "bg": "#f8f5f3",
+          "samples": 64,
+          "kind": "canvas"
+        },
+        "canvas:first-ring": {
+          "role": "first-ring",
+          "id": "m01",
+          "ratio": 4.08,
+          "fg": "#b05e75",
+          "bg": "#f7f4f2",
+          "samples": 64,
+          "kind": "canvas"
+        },
+        "canvas:dot": {
+          "role": "dot",
+          "id": "m15",
+          "ratio": 3.76,
+          "fg": "#49838f",
+          "bg": "#f2f0f2",
+          "samples": 169,
+          "kind": "canvas"
+        },
+        "canvas:line": {
+          "role": "line",
+          "id": "45",
+          "ratio": 3.44,
+          "fg": "#538a95",
+          "bg": "#f4f1f3",
+          "samples": 20,
+          "kind": "canvas"
+        },
+        "canvas:arrow": {
+          "role": "arrow",
+          "id": "46",
+          "ratio": 3.74,
+          "fg": "#4a8490",
+          "bg": "#f3f1f3",
+          "samples": 1,
+          "kind": "canvas"
+        },
+        "canvas:guide-ring": {
+          "role": "guide-ring",
+          "id": "1",
+          "ratio": 4.67,
+          "fg": "#70657a",
+          "bg": "#f0eceb",
+          "samples": 9,
+          "kind": "canvas"
+        }
+      }
+    },
+    {
+      "combination": "390-garden-night",
+      "scenes": 5,
+      "dom": 7.92,
+      "canvasText": 11.35,
+      "points": 5.95,
+      "lines": 3.98,
+      "rings": 4.2,
+      "byRole": {
+        "dom:toolbar": {
+          "role": "toolbar",
+          "id": "viewNet",
+          "text": "그물형",
+          "ratio": 12.06,
+          "fg": "#211b2b",
+          "bg": "#f6d892",
+          "kind": "dom"
+        },
+        "dom:hint": {
+          "role": "hint",
+          "id": "p.",
+          "text": "첫 순간에서 어떻게 이어졌는지 보는 지도예요",
+          "ratio": 10.84,
+          "fg": "#c9bdd4",
+          "bg": "#0d0c15",
+          "kind": "dom"
+        },
+        "dom:ribbon": {
+          "role": "ribbon",
+          "id": "button.origin",
+          "text": "첫 순간 보기",
+          "ratio": 12.06,
+          "fg": "#211b2b",
+          "bg": "#f6d892",
+          "kind": "dom"
+        },
+        "dom:picker": {
+          "role": "picker",
+          "id": "select.",
+          "text": "1. 첫인상2. 푸른 시간3. 무대 뒤의 빛4. 비가 그친 뒤5. 고요한 초상6. 도시의 창7. 무대 끝에서8. 진주빛 밤9. 은빛 방10. 벤치의 기억11. 의자에 앉은 모습12. 돌아보다13. 장면 사이14. 목소리를 듣다15. 트리의 빛16. 마지막 열차17. 부드러운 초점18. 아침의 기록19. 첫 라이브20. 춤추는 순간21. 라이브 방송22. 인터뷰 장면23. 사진 속 이야기24. 연습 영상25. 밤의 무대26. 목소리 한 조각27. 무대 뒤의 순간28. 팬 촬영 영상29. 기억해 둔 표정30. 한 번 더 보고 싶었다31. 소리가 남았다32. 그날의 공기33. 다음 영상을 찾은 이유34. 멈춘 시간35. 아직 이어지는 문장36. 공식 무대 원본37. 인터뷰 아카이브38. 라이브 클립39. 포토 에디토리얼40. 팬 기록 링크",
+          "ratio": 12.08,
+          "fg": "#f2eaf5",
+          "bg": "#30273b",
+          "kind": "dom"
+        },
+        "dom:detail": {
+          "role": "detail",
+          "id": "span.",
+          "text": "연결 이유 · 다음 순간으로 이어진 이유",
+          "ratio": 7.92,
+          "fg": "#c9bdd4",
+          "bg": "#30273b",
+          "kind": "dom"
+        },
+        "dom:tooltip": {
+          "role": "tooltip",
+          "id": "edgeTip",
+          "text": "이 표정이 계속 생각나서 다음 라이브까지 찾아봤다.",
+          "ratio": 14.22,
+          "fg": "#f2eaf5",
+          "bg": "#211b2b",
+          "kind": "dom"
+        },
+        "canvas:hub-number": {
+          "role": "hub-number",
+          "id": "0:01",
+          "ratio": 11.35,
+          "fg": "#fff5dc",
+          "bg": "#3a3145",
+          "samples": 119,
+          "kind": "canvas"
+        },
+        "canvas:label": {
+          "role": "label",
+          "id": "7:푸른 시간",
+          "ratio": 12.21,
+          "fg": "#d4ccd6",
+          "bg": "#100e18",
+          "samples": 584,
+          "kind": "canvas"
+        },
+        "canvas:first-dot": {
+          "role": "first-dot",
+          "id": "m01",
+          "ratio": 9.81,
+          "fg": "#f1a9af",
+          "bg": "#13111c",
+          "samples": 497,
+          "kind": "canvas"
+        },
+        "canvas:first-inner-ring": {
+          "role": "first-inner-ring",
+          "id": "m01",
+          "ratio": 12.31,
+          "fg": "#ebcf8d",
+          "bg": "#13111c",
+          "samples": 64,
+          "kind": "canvas"
+        },
+        "canvas:first-ring": {
+          "role": "first-ring",
+          "id": "m01",
+          "ratio": 9.66,
+          "fg": "#f2a5ba",
+          "bg": "#13111c",
+          "samples": 64,
+          "kind": "canvas"
+        },
+        "canvas:dot": {
+          "role": "dot",
+          "id": "m07",
+          "ratio": 5.95,
+          "fg": "#948b9b",
+          "bg": "#0d0c14",
+          "samples": 349,
+          "kind": "canvas"
+        },
+        "canvas:line": {
+          "role": "line",
+          "id": "14",
+          "ratio": 3.98,
+          "fg": "#7b6c7a",
+          "bg": "#0c0b13",
+          "samples": 13,
+          "kind": "canvas"
+        },
+        "canvas:arrow": {
+          "role": "arrow",
+          "id": "15",
+          "ratio": 4.82,
+          "fg": "#847b89",
+          "bg": "#0c0b13",
+          "samples": 1,
+          "kind": "canvas"
+        },
+        "canvas:guide-ring": {
+          "role": "guide-ring",
+          "id": "1",
+          "ratio": 4.2,
+          "fg": "#7c7287",
+          "bg": "#100e17",
+          "samples": 9,
+          "kind": "canvas"
+        }
+      }
+    }
+  ],
+  "paperPixelComparison": [
+    {
+      "name": "1440-night-paper-network",
+      "total": 1296000,
+      "exact": 44197,
+      "exactPercent": 3.4102623456790124,
+      "significant": 24035,
+      "significantPercent": 1.8545524691358024,
+      "repeatDiff": 0,
+      "meanChannelDelta": 0.7519490740740741
+    },
+    {
+      "name": "1440-night-paper-concentric",
+      "total": 1296000,
+      "exact": 82610,
+      "exactPercent": 6.374228395061729,
+      "significant": 59357,
+      "significantPercent": 4.580015432098765,
+      "repeatDiff": 0,
+      "meanChannelDelta": 2.6734611625514404
+    },
+    {
+      "name": "1440-garden-paper-network",
+      "total": 1296000,
+      "exact": 44176,
+      "exactPercent": 3.408641975308642,
+      "significant": 24028,
+      "significantPercent": 1.8540123456790125,
+      "repeatDiff": 0,
+      "meanChannelDelta": 0.7541671810699588
+    },
+    {
+      "name": "1440-garden-paper-concentric",
+      "total": 1296000,
+      "exact": 77705,
+      "exactPercent": 5.995756172839506,
+      "significant": 59362,
+      "significantPercent": 4.580401234567901,
+      "repeatDiff": 0,
+      "meanChannelDelta": 2.672463477366255
+    },
+    {
+      "name": "390-night-paper-network",
+      "total": 329160,
+      "exact": 30050,
+      "exactPercent": 9.12929882124195,
+      "significant": 12948,
+      "significantPercent": 3.9336492890995256,
+      "repeatDiff": 0,
+      "meanChannelDelta": 1.6100194434317656
+    },
+    {
+      "name": "390-night-paper-concentric",
+      "total": 329160,
+      "exact": 50736,
+      "exactPercent": 15.413780532263946,
+      "significant": 29401,
+      "significantPercent": 8.93213027099283,
+      "repeatDiff": 0,
+      "meanChannelDelta": 5.154169198363511
+    },
+    {
+      "name": "390-garden-paper-network",
+      "total": 329160,
+      "exact": 29662,
+      "exactPercent": 9.011423016162352,
+      "significant": 12743,
+      "significantPercent": 3.871369546724997,
+      "repeatDiff": 0,
+      "meanChannelDelta": 1.6014592700611658
+    },
+    {
+      "name": "390-garden-paper-concentric",
+      "total": 329160,
+      "exact": 50039,
+      "exactPercent": 15.202029408190546,
+      "significant": 28997,
+      "significantPercent": 8.809393607971808,
+      "repeatDiff": 0,
+      "meanChannelDelta": 5.071071819176084
+    }
+  ],
+  "geometry": [
+    {
+      "name": "before-1440-night-paper-network",
+      "equal": true
+    },
+    {
+      "name": "before-1440-night-paper-concentric",
+      "equal": true
+    },
+    {
+      "name": "before-1440-garden-paper-network",
+      "equal": true
+    },
+    {
+      "name": "before-1440-garden-paper-concentric",
+      "equal": true
+    },
+    {
+      "name": "before-390-night-paper-network",
+      "equal": true
+    },
+    {
+      "name": "before-390-night-paper-concentric",
+      "equal": true
+    },
+    {
+      "name": "before-390-garden-paper-network",
+      "equal": true
+    },
+    {
+      "name": "before-390-garden-paper-concentric",
+      "equal": true
+    }
+  ]
+}

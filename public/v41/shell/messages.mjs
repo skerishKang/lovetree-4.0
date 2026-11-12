@@ -161,7 +161,7 @@ export function createMessages(deps) {
   }
   function shareLabel(item) {
     // 예전에는 toLocaleDateString('ko-KR')이라 세 표기(점·줄표·한글) 어디에도 맞지 않았다.
-    return (item.view === 'board' ? '기억 보드' : item.view === 'network' ? '관계 지도' : '기억책') + ' · ' + formatDisplayDate(item.createdAt, getDateStyle()) + '에 만든 주소';
+    return (item.view === 'board' ? '보드' : item.view === 'network' ? '지도' : '책') + ' · ' + formatDisplayDate(item.createdAt, getDateStyle()) + '에 만든 주소';
   }
   function shareRow(item) {
     const row = document.createElement('div');
