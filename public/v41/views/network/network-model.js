@@ -13,23 +13,52 @@ window.LT56Model = (() => {
     };
   }
 
-  // 묶음 나누기: 순간을 6묶음으로 나눈다(최소 1개, 올림).
+  // 묶음 나누기: 한 묶음에 7개 안팎, 묶음은 최대 6개(색 6가지). 작은 트리는 묶음을 억지로 6개로 쪼개지 않는다(#461).
+  // 40개 → 7개씩 6묶음, 36개 → 6개씩 6묶음, 15개 → 5개씩 3묶음, 5개 → 한 묶음.
   function groupSizeFor(total) {
-    return Math.max(1, Math.ceil(total / 6));
+    const groups = Math.min(6, Math.ceil(Math.max(0, total) / 7));
+    return Math.max(1, Math.ceil(total / Math.max(1, groups)));
   }
 
-  // 묶음 하나의 이름·개수: "순간 01–06" 처럼 앞뒤 순번을 붙인다.
-  function clusterSpan(index, groupSize, total) {
-    return {
-      name: `순간 ${String(index * groupSize + 1).padStart(2, '0')}–${String(Math.min((index + 1) * groupSize, total)).padStart(2, '0')}`,
-      sub: '순간의 연결',
-      count: Math.max(0, Math.min(groupSize, total - index * groupSize))
-    };
+  // 짧은 제목: 길면 잘라 '…'을 붙인다.
+  function shortTitle(text, max = 8) {
+    const t = String(text ?? '').trim();
+    return t.length > max ? `${t.slice(0, Math.max(1, max - 1))}…` : t;
   }
 
-  // 작은 트리 보정: 순간이 36개 이하면 묶음을 세로로 촘촘히(220px 간격) 놓고 무대 높이를 1600으로 줄인다.
-  function smallTreeLayout(count) {
-    return count <= 36 ? { spacing: 220, baseY: 250, worldHeight: 1600 } : null;
+  // 묶음 하나의 이름·개수(#461): 번호 범위 대신 묶음 첫 순간의 제목으로 — "첫인상부터 7개".
+  // moments가 없으면(예전 호출) 번호 범위로 남긴다.
+  function clusterSpan(index, groupSize, total, moments) {
+    const count = Math.max(0, Math.min(groupSize, total - index * groupSize));
+    const head = moments?.[index * groupSize];
+    const name = head
+      ? (count > 1 ? `${shortTitle(head.title, 7)}부터 ${count}개` : shortTitle(head.title, 9))
+      : `순간 ${String(index * groupSize + 1).padStart(2, '0')}–${String(Math.min((index + 1) * groupSize, total)).padStart(2, '0')}`;
+    return { name, sub: '', count };
+  }
+
+  // #461 지도를 펼칠 빈 곳: 창에서 지도를 덮는 도구(위 머리·안내 문구, 왼쪽 패널, 아래 순간 줄)를 뺀 상자.
+  // 창이 아주 좁거나 낮아(준비 중인 iframe 등) 남는 곳이 거의 없으면 덮개를 무시하고 창 전체를 쓴다 — 배율·반지름이 음수가 되지 않는다.
+  function fitBox(vw, vh, insets = {}, pad = 16) {
+    const side = k => Math.max(0, Number(insets[k]) || 0);
+    let box = { x: side('left') + pad, y: side('top') + pad, w: vw - side('left') - side('right') - 2 * pad, h: vh - side('top') - side('bottom') - 2 * pad };
+    if (!(box.w >= 120) || !(box.h >= 120)) box = { x: 8, y: 8, w: vw - 16, h: vh - 16 };
+    box.w = Math.max(40, box.w || 0);
+    box.h = Math.max(40, box.h || 0);
+    return box;
+  }
+
+  // 묶음 칸 나누기: 칸이 정사각형에 가깝고 빈 칸이 적은 열×행을 고른다 — 가로로 넓은 화면은 가로로, 세로로 긴 화면은 세로로 펼쳐진다.
+  function gridFor(k, w, h) {
+    if (!(k > 0) || !(w > 0) || !(h > 0)) return { cols: 1, rows: 1 };
+    let best = null;
+    for (let cols = 1; cols <= k; cols++) {
+      const rows = Math.ceil(k / cols), empty = cols * rows - k;
+      if (empty >= cols) continue;
+      const score = Math.abs(Math.log((w / cols) / (h / rows))) + 0.35 * empty / k;
+      if (!best || score < best.score - 1e-9) best = { cols, rows, score };
+    }
+    return { cols: best.cols, rows: best.rows };
   }
 
   // 연결선 베지에: 화면 좌표 두 점과 연결 종류로 조절점을 만든다.
@@ -44,12 +73,6 @@ window.LT56Model = (() => {
       cp1: { x: A.x + dx * 0.34 + sign * bend, y: A.y + dy * 0.28 },
       cp2: { x: B.x - dx * 0.30 - sign * bend * 0.55, y: B.y - dy * 0.26 }
     };
-  }
-
-  // 손가락 화면의 묶음 맞춤 배율: 0.40~0.62 사이로 묶는다.
-  function mobileFit(vw, vh, spread) {
-    const raw = Math.min((vw - 26) / (spread * 1.75), (vh - 190) / (spread * 1.25));
-    return Math.max(0.40, Math.min(0.62, raw));
   }
 
   // 경로에 실제로 놓인 연결: 이웃한 두 순간을 잇는 연결을 순서대로 고른다.
@@ -132,95 +155,200 @@ window.LT56Model = (() => {
     return typeof edge?.reason === 'string' ? edge.reason.trim() : '';
   }
 
-  // 그물형 배치: 지금의 묶음 나선 공식을 그대로 옮긴 것(겉모습 유지).
-  // 첫 순간만 묶음 0 허브 옆 고정 자리에 앉는다 — 순간 수가 늘어도 시작점 자리가 흔들리지 않는다(#366).
+  // 그물형 배치(#461): 화면에 맞게 펼친다. 결과는 화면 좌표(배율 1 = 전체 보기)다.
+  // ① 묶음을 화면 비율에 맞는 칸(gridFor)에 나눠 앉힌다 — 넓은 화면은 가로로, 좁고 긴 화면은 세로로.
+  //    칸은 지그재그 순서(1줄 왼→오, 2줄 오→왼)라 이웃 묶음이 붙어 있고, 덜 찬 마지막 줄은 가운데로 모은다(빈 띠 쏠림 방지).
+  // ② 묶음 안 순간은 칸에 맞춘 타원 위에 순서대로(12시부터 시계 방향). 묶음 점은 타원 가운데.
+  // ③ 점 반지름은 가장 가까운 이웃·묶음 점과 겹치지 않을 만큼만(최대 dotR). 첫 순간은 고리까지 firstR로 본다.
   // opts.candidates는 나중에 AI가 제안하는 흐린 후보 점이 들어올 자리(이슈 #366 기록) — 지금은 받기만 한다.
-  function networkLayout(moments, centers, opts = {}) {
+  function networkLayout(moments, opts = {}) {
     void opts.candidates;
-    const gs = groupSizeFor(moments.length);
-    const points = {};
+    const box = opts.box || { x: 0, y: 0, w: opts.width || 1200, h: opts.height || 800 };
+    const n = moments.length, gs = groupSizeFor(n), k = Math.max(1, Math.ceil(n / gs));
+    const { cols, rows } = gridFor(k, box.w, box.h);
+    const cw = box.w / cols, ch = box.h / rows;
+    const maxR = opts.dotR ?? 5, firstR = opts.firstR ?? 20, gap = opts.gap ?? 8, hubR = opts.hubR ?? 9, inset = opts.inset ?? 12;
+    const hubs = [];
+    for (let i = 0; i < k; i++) {
+      const row = Math.floor(i / cols), inRow = Math.min(cols, k - row * cols);
+      let col = i - row * cols;
+      if (row % 2) col = inRow - 1 - col;
+      const shift = (cols - inRow) / 2;
+      hubs.push({ x: box.x + (col + shift + 0.5) * cw, y: box.y + (row + 0.5) * ch, w: cw, h: ch });
+    }
+    // 칸 안 타원: 가장자리에서 inset+점 반지름만큼 들어오고(위아래는 맨 위에 앉는 첫 순간의 고리 firstR까지), 납작함은 2배까지만.
+    let rx = Math.max(6, cw / 2 - inset - maxR), ry = Math.max(6, ch / 2 - Math.max(inset + maxR, firstR + 2));
+    rx = Math.min(rx, ry * 2); ry = Math.min(ry, rx * 2);
+    const points = {}, firstIdx = Math.max(0, moments.findIndex(m => m.first));
     moments.forEach((m, i) => {
-      const c = centers[Math.min(centers.length - 1, Math.floor(i / gs))];
-      const j = i % gs;
-      const a = -2.8 + j * .78, dist = 100 + j * 38;
-      points[m.id] = i === 0
-        ? { x: c.x - 34, y: c.y + 18 }
-        : { x: c.x + Math.cos(a) * dist, y: c.y + Math.sin(a) * dist };
+      const g = Math.min(k - 1, Math.floor(i / gs)), j = i - g * gs, size = Math.min(gs, n - g * gs), c = hubs[g];
+      const th = -Math.PI / 2 + (2 * Math.PI * j) / size;
+      const f = size === 1 ? 0.55 : 1;
+      points[m.id] = { x: c.x + Math.cos(th) * rx * f, y: c.y + Math.sin(th) * ry * f };
     });
-    return { points, groupSize: gs };
+    // 점 반지름: 이웃(같은 칸)·묶음 점과 gap 이상 떨어지는 가장 큰 값(2.5~maxR).
+    const ids = moments.map(m => m.id);
+    const firstId = moments[firstIdx]?.id;
+    let dotR = maxR;
+    const fits = r => {
+      for (let i = 0; i < ids.length; i++) {
+        const a = points[ids[i]], ra = ids[i] === firstId ? Math.max(firstR, r) : r;
+        const g = Math.min(k - 1, Math.floor(i / gs));
+        if (Math.hypot(a.x - hubs[g].x, a.y - hubs[g].y) < ra + hubR + gap) return false;
+        for (let j = i + 1; j < ids.length && Math.floor(j / gs) === Math.floor(i / gs); j++) {
+          const b = points[ids[j]], rb = ids[j] === firstId ? Math.max(firstR, r) : r;
+          if (Math.hypot(a.x - b.x, a.y - b.y) < ra + rb + gap) return false;
+        }
+      }
+      return true;
+    };
+    while (dotR > 2.5 && !fits(dotR)) dotR -= 0.25;
+    return { points, hubs, groupSize: gs, cols, rows, cell: { w: cw, h: ch }, rx, ry, dotR, hubR, box };
   }
 
   // 동심원형 배치: 첫 순간을 가운데, 1단계·2단계… 순서대로 바깥 원에(#366).
   // 같은 부모의 자식은 부모의 부채꼴 안에 하위 무게만큼 나눠 붙이고(부모 근처에 모임),
-  // 같은 단계 이웃끼리 직선거리가 겹치지 않을 최소 반지름을 단계별로 계산한 뒤
-  // 화면에 맞춰 균일 축척으로 줄인다 — 점 크기도 축척을 따라가므로 겹침이 남지 않는다.
+  // 같은 단계 이웃끼리 직선거리가 겹치지 않을 최소 반지름을 단계별로 계산한다.
+  // #461 화면 맞춤:
+  //  - 부모 연결이 없는 다른 시작 순간은 첫 순간에 기대어 자기 갈래를 갖는다(예전엔 하나마다 바깥 원을 새로 차지해 40개 예시가 30겹이 됐다).
+  //  - 자식이 하나뿐인 순간은 부채꼴 안에서 조금씩 돌아가며 놓는다 — 한 줄로 이어진 트리도 한 방향 바늘처럼 몰리지 않는다.
+  //  - 화면 상자(opts.box)에 맞춰 키운다(작은 트리도 작게 남지 않는다). 가로·세로는 따로 맞추되 납작함은 2배까지만.
+  //    점 간격은 작은 쪽 축척 이상으로만 늘어나므로, 점 반지름(nodeR×min(1,축척))과 겹치지 않는다.
   // opts.candidates는 나중에 AI가 제안하는 흐린 후보 점이 들어올 자리(이슈 #366 기록) — 지금은 받기만 한다.
   function concentricLayout(moments, edges, opts = {}) {
     const width = opts.width || 1200, height = opts.height || 800;
     const pad = opts.pad ?? 46;
+    const box = opts.box || { x: pad, y: pad, w: Math.max(20, width - 2 * pad), h: Math.max(20, height - 2 * pad) };
     const nodeR = opts.nodeR ?? 4.5;
     const gap = opts.gap ?? 8;
+    const firstR = opts.firstR ?? nodeR;
     void opts.candidates;
     const minGap = 2 * nodeR + gap;
-    const { firstId, levelOf, maxLevel, childrenOf } = treeLevels(moments, edges);
-    const center = { x: opts.cx ?? width / 2, y: opts.cy ?? height / 2 };
+    const t = treeLevels(moments, edges);
+    const firstId = t.firstId;
+    const center = { x: opts.cx ?? box.x + box.w / 2, y: opts.cy ?? box.y + box.h / 2 };
     const points = {};
-    const empty = { points, center, radii: [0], scale: 1, levelOf, maxLevel, firstId, dotR: 0 };
-    if (!firstId) return empty;
+    if (!firstId) return { points, center, radii: [0], scale: 1, sx: 1, sy: 1, levelOf: t.levelOf, maxLevel: t.maxLevel, firstId, dotR: 0, firstDotR: 0 };
+    // 0) 배치용 나무: 부모 연결 + (부모 없는 다른 시작 순간 → 첫 순간). 한 순간은 먼저 닿은 부모 하나에만 매단다.
+    const ids = new Set(moments.map(m => m.id));
+    const hasParent = new Set(edges.filter(e => e.kind === 'parent' && ids.has(e.from)).map(e => e.to));
+    const linkOf = {};
+    for (const [from, kids] of Object.entries(t.childrenOf)) linkOf[from] = kids.slice();
+    for (const m of moments) if (m.id !== firstId && !hasParent.has(m.id)) (linkOf[firstId] = linkOf[firstId] || []).push(m.id);
+    const levelOf = { [firstId]: 0 }, kidsOf = {};
+    let frontier = [firstId], maxLevel = 0;
+    while (frontier.length) {
+      const next = [];
+      for (const id of frontier) for (const c of linkOf[id] || []) {
+        if (!ids.has(c) || c in levelOf) continue;
+        levelOf[c] = levelOf[id] + 1; maxLevel = Math.max(maxLevel, levelOf[c]);
+        (kidsOf[id] = kidsOf[id] || []).push(c); next.push(c);
+      }
+      frontier = next;
+    }
+    // 서로만 가리키는 고리처럼 그래도 닿지 않는 순간: 가장 바깥 단계에, 첫 순간에 기대 둔다(좌표가 NaN이 되지 않게).
+    for (const m of moments) if (!(m.id in levelOf)) { maxLevel += 1; levelOf[m.id] = maxLevel; (kidsOf[firstId] = kidsOf[firstId] || []).push(m.id); }
     // 1) 하위 무게: 자신 + 자손 수. 부채꼴을 나누는 기준.
     const weightOf = {};
     const weight = id => {
       if (weightOf[id]) return weightOf[id];
       let w = 1;
-      for (const c of childrenOf[id] || []) w += weight(c);
-      weightOf[id] = w;
-      return w;
+      for (const c of kidsOf[id] || []) w += weight(c);
+      return (weightOf[id] = w);
     };
     // 2) 각도 배분: 부모의 부채꼴을 자식 무게만큼 나눠 물려준다. 첫 순간은 위(12시)에서 시작.
+    //    자식이 하나면 같은 부채꼴을 물려주되 부채꼴 폭의 0.3만큼 돌린 자리에 둔다(부채꼴 안에서 감아 돈다).
     const angleOf = {};
-    const assign = (id, a0, a1) => {
-      angleOf[id] = (a0 + a1) / 2;
-      const ch = childrenOf[id] || [];
+    const assign = (id, a0, a1, at) => {
+      angleOf[id] = at;
+      const ch = kidsOf[id] || [];
       if (!ch.length) return;
+      const span = a1 - a0;
+      if (ch.length === 1) {
+        const turn = span > 0.6 ? a0 + ((at - a0 + span * 0.3) % span + span) % span : at;
+        assign(ch[0], a0, a1, turn);
+        return;
+      }
       const total = ch.reduce((s, c) => s + weight(c), 0);
       let cur = a0;
-      for (const c of ch) { const span = (a1 - a0) * (weight(c) / total); assign(c, cur, cur + span); cur += span; }
+      for (const c of ch) { const part = span * (weight(c) / total); assign(c, cur, cur + part, cur + part / 2); cur += part; }
     };
-     assign(firstId, -Math.PI / 2, 3 * Math.PI / 2);
-     // 부모 연결로 닿지 않는 순간(방어적으로 단계만 물린 노드)에도 각도를 준다 — 안 주면
-     // 좌표가 NaN이 되어 조용히 사라진다(#366).
-     const unangled = moments.filter(m => !(m.id in angleOf));
-     if (unangled.length) {
-       for (let i = 0; i < unangled.length; i++) angleOf[unangled[i].id] = -Math.PI / 2 + (i + 0.5) * ((2 * Math.PI) / unangled.length);
-     }
-    // 3) 단계별 반지름: 이전 단계보다 링 간격 이상 + 같은 단계 이웃 각도 차로 겹침이 없는 반지름.
+    assign(firstId, -Math.PI / 2, 3 * Math.PI / 2, -Math.PI / 2);
+    // 3) 단계별 반지름: 이전 단계보다 링 간격 이상 + 같은 단계 이웃 각도 차로 겹침이 없는 반지름. 1단계는 첫 순간 고리 바깥.
     const byLevel = Array.from({ length: maxLevel + 1 }, () => []);
     for (const m of moments) if (m.id !== firstId) byLevel[levelOf[m.id]].push(m.id);
     const radii = [0];
     for (let L = 1; L <= maxLevel; L++) {
       const items = byLevel[L].slice().sort((a, b) => angleOf[a] - angleOf[b]);
-      let r = radii[L - 1] + minGap;
+      let r = Math.max(radii[L - 1] + minGap, L === 1 ? firstR + nodeR + gap : 0);
       for (let i = 0; i < items.length; i++) {
         const prev = items[(i - 1 + items.length) % items.length];
         const raw = Math.abs(angleOf[items[i]] - angleOf[prev]);
         const d = Math.min(raw, 2 * Math.PI - raw); // 이웃은 감김 방향의 짧은 호 기준
+        if (items.length < 2) continue;
         if (d > 1e-9) r = Math.max(r, minGap / (2 * Math.sin(d / 2)));
         else r = Math.max(r, (items.length * minGap) / (2 * Math.PI));
       }
       radii[L] = r;
     }
-    // 4) 화면 맞춤: 균일 축척 — 간격과 점이 같이 줄어들어 겹침 비율이 유지된다.
-    const rMax = radii[maxLevel] + nodeR;
-    const available = Math.max(20, Math.min(width, height) / 2 - pad);
-    const scale = Math.min(1, available / rMax);
+    // 4) 화면 맞춤: 실제로 뻗은 가로·세로 범위(첫 순간 포함)를 상자에 맞추고, 그 범위의 가운데를 상자 가운데에 둔다.
+    //    원의 중심(첫 순간)은 범위 가운데에서 비켜설 수 있다 — 한쪽으로만 뻗은 트리가 상자 한쪽에 빈 띠를 남기지 않게.
+    //    범위가 아주 좁으면(한 줄로만 뻗음) 바닥(바깥 원 반지름의 0.7배)을 두어 지나치게 늘이지 않는다.
+    const rMax = radii[maxLevel] || minGap;
+    let x0 = 0, x1 = 0, y0 = 0, y1 = 0;
     for (const m of moments) {
-      const L = levelOf[m.id];
-      const r = L === 0 ? 0 : radii[L] * scale;
-      const th = angleOf[m.id];
-      points[m.id] = { x: center.x + Math.cos(th) * r, y: center.y + Math.sin(th) * r };
+      const r = radii[levelOf[m.id]] || 0, th = angleOf[m.id];
+      x0 = Math.min(x0, Math.cos(th) * r); x1 = Math.max(x1, Math.cos(th) * r);
+      y0 = Math.min(y0, Math.sin(th) * r); y1 = Math.max(y1, Math.sin(th) * r);
     }
-    return { points, center, radii, scale, levelOf, maxLevel, firstId, dotR: nodeR * scale, minGap: minGap * scale };
+    const spanX = Math.max(x1 - x0, rMax * 0.7), spanY = Math.max(y1 - y0, rMax * 0.7);
+    const ax = Math.max(8, box.w - 2 * (nodeR + 2)), ay = Math.max(8, box.h - 2 * (nodeR + 2));
+    let sx = ax / spanX, sy = ay / spanY;
+    const scale = Math.min(sx, sy);
+    sx = Math.min(sx, scale * 2); sy = Math.min(sy, scale * 2);
+    if (opts.cx == null) center.x = box.x + box.w / 2 - ((x0 + x1) / 2) * sx;
+    if (opts.cy == null) center.y = box.y + box.h / 2 - ((y0 + y1) / 2) * sy;
+    for (const m of moments) {
+      const r = radii[levelOf[m.id]] || 0, th = angleOf[m.id];
+      points[m.id] = { x: center.x + Math.cos(th) * r * sx, y: center.y + Math.sin(th) * r * sy };
+    }
+    const k = Math.min(1, scale);
+    return { points, center, radii, scale, sx, sy, levelOf, maxLevel, firstId, dotR: nodeR * k, firstDotR: firstR * k, minGap: minGap * scale };
   }
 
-  return { branchPoint, groupSizeFor, clusterSpan, smallTreeLayout, bezierGeometry, mobileFit, routeEdges, bezierPoint, treeLevels, originPath, pathEmphasis, relationText, networkLayout, concentricLayout };
+  // #461 이름표 자리 고르기: 우선순위 순서대로, 상자 안 + 다른 이름표·점과 겹치지 않는 자리에만 붙인다(못 붙이면 뺀다).
+  // cands: [{id, text, x, y, r, w, h, dir:{x,y}}] — dir은 바깥 방향(그쪽 자리를 먼저 본다). 점 기준 오른쪽·왼쪽·위·아래 네 자리.
+  // obstacles: [{id, x, y, r}] 그려진 점·묶음 점. 결과: [{id, text, x, y, rect}] — x,y는 왼쪽 정렬 글자 기준선.
+  function placeLabels(cands, obstacles, bounds, opts = {}) {
+    const g = opts.gap ?? 4, space = opts.space ?? 2;
+    const rects = [], out = [];
+    const overlaps = (a, b) => a.l < b.r + space && a.r > b.l - space && a.t < b.b + space && a.b > b.t - space;
+    const onDot = (a, o) => {
+      const cx = Math.max(a.l, Math.min(o.x, a.r)), cy = Math.max(a.t, Math.min(o.y, a.b));
+      return Math.hypot(o.x - cx, o.y - cy) < o.r + 1;
+    };
+    for (const c of cands) {
+      const spots = {
+        right: { l: c.x + c.r + g, t: c.y - c.h / 2 },
+        left: { l: c.x - c.r - g - c.w, t: c.y - c.h / 2 },
+        above: { l: c.x - c.w / 2, t: c.y - c.r - g - c.h },
+        below: { l: c.x - c.w / 2, t: c.y + c.r + g }
+      };
+      const dx = c.dir?.x ?? 1, dy = c.dir?.y ?? 0;
+      const first = dx > 0.35 ? 'right' : dx < -0.35 ? 'left' : dy < 0 ? 'above' : 'below';
+      const order = [first, ...['right', 'left', 'above', 'below'].filter(k => k !== first)];
+      for (const key of (c.only ? [first] : order)) {
+        const s = spots[key], rect = { l: s.l, t: s.t, r: s.l + c.w, b: s.t + c.h };
+        if (rect.l < bounds.x || rect.r > bounds.x + bounds.w || rect.t < bounds.y || rect.b > bounds.y + bounds.h) continue;
+        if (rects.some(r => overlaps(rect, r))) continue;
+        if (obstacles.some(o => onDot(rect, o))) continue;
+        rects.push(rect);
+        out.push({ id: c.id, text: c.text, x: rect.l, y: rect.t + c.h * 0.77, rect });
+        break;
+      }
+    }
+    return out;
+  }
+
+  return { branchPoint, groupSizeFor, shortTitle, clusterSpan, fitBox, gridFor, bezierGeometry, routeEdges, bezierPoint, treeLevels, originPath, pathEmphasis, relationText, networkLayout, concentricLayout, placeLabels };
 })();

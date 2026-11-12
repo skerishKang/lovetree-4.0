@@ -103,7 +103,8 @@ function hubDrawSource() {
 test('#449 고침의 핵심 두 가지가 코드에 있다 — 배율 바닥값과 반지름 하한', () => {
   // 이 두 줄이 사라지면 아래 실행 시험이 재현하지 못할 수 있으므로 함께 고정한다.
   assert.match(source, /Math\.max\(\.5,c\.hubR\*state\.scale\)/, '허브 반지름은 0.5 이상으로 자른다');
-  assert.match(source, /Math\.max\(\.12,/, '배율에 바닥값 0.12가 있다');
+  // #461: 전체 보기는 배율 1(화면 상자에 맞춘 배치), 확대·축소는 0.5배 바닥.
+  assert.match(source, /Math\.max\(\.5,Math\.min\(4,state\.scale\*f\)\)/, '배율에 바닥값 0.5가 있다');
 });
 
 test('#449 실행: 후광 반지름 실제 계산이 어떤 배율에서도 음수가 되지 않는다', () => {

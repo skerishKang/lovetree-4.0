@@ -109,3 +109,13 @@ body[data-lt-view=concentric] .legend,body[data-lt-view=concentric] .progress-ra
 /* #366 키보드: 지도 캔버스에 초점이 오면 테두리로 알리고, 안내 문구는 화면 낭독기만 읽는다. */
 #stage:focus-visible{outline:2px solid var(--lt-gold-line,rgba(230,177,76,.9));outline-offset:-3px}
 .sr-only{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+
+/* === #461 지도를 화면에 맞게(2026-11-13) === */
+/* 지도가 처음부터 화면 상자 안에 다 들어오므로 세로 진행 막대는 쓰지 않는다(오른쪽 빈 띠도 함께 없어진다). */
+.progress-rail{display:none}
+/* 지금 고른 보기(그물형/동심원형)는 다른 화면의 눌린 버튼과 같은 토큰(--lt-primary)으로 채운다.
+   identity.css의 도구 줄 알약 규칙(어두운 알약)보다 구체적이어야 보인다. */
+html[data-v41-screen=network] .top-actions .view-switch .pill[aria-pressed=true],
+html[data-lt-theme=garden][data-v41-screen=network] .top-actions .view-switch .pill[aria-pressed=true]{background:var(--lt-primary);border-color:var(--lt-primary);color:var(--lt-primary-ink);box-shadow:none}
+/* 범례 행: 색 점 + "01 첫인상부터 7개" */
+.legend-row .swatch{flex:0 0 auto}
