@@ -67,3 +67,9 @@ html[data-v41-screen=shelf] .book-card .book-cover {
   .hero-stage.resume .stage-label { position: static; flex-shrink: 0; white-space: nowrap; }
   .resume-cover { width: 56px; height: 80px; }
 }
+
+/* #465: 넘길 책이 없으면 화살표를 숨기고, 책이 1~2권이면 소개 상자(hero)를 낮게 둔다. */
+#shelfPrev[hidden],#shelfNext[hidden]{display:none!important}
+.hero.compact{min-height:0;padding:16px 26px}
+.hero.compact .hero-copy{align-self:start}
+.hero.compact h1{font-size:clamp(24px,2.4vw,34px);margin:0 0 8px}
