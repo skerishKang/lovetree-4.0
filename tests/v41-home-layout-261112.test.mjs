@@ -61,6 +61,24 @@ test('가운데 안전 구역: 제목·버튼 묶음 사각형+여백을 재고,
   assert.doesNotMatch(orbit, /Math\.hypot\(x\/520,y\/260\)/);
 });
 
+test('#457 좁은 화면(≤650): 가로는 먼저 화면 안으로 당기고, 안전 구역과 겹치면 위·아래 띠로만 민다', () => {
+  // 넓은 화면은 네 쪽 중 가장 얇은 쪽(가로 포함)으로 민다 — 기존 동작(#440) 유지.
+  assert.match(orbit, /const pushL=maxX-zs\.l,pushR=zs\.r-minX,pushT=maxY-zs\.t,pushB=zs\.b-minY,m=Math\.min\(pushL,pushR,pushT,pushB\);/, '넓은 화면은 그대로');
+  assert.match(orbit, /if\(m===pushL\)px-=pushL;else if\(m===pushR\)px\+=pushR;else if\(m===pushT\)py-=pushT;else py\+=pushB;/);
+  // 좁은 화면 분기: 가로를 먼저 화면 안(0..w)으로 당긴다.
+  assert.match(orbit, /if\(narrow\)\{/);
+  const narrowBlock = orbit.split('if(narrow){')[1]?.split('} else if(maxX>zs.l')[0] || '';
+  assert.match(narrowBlock, /if\(minX<0\)\{px-=minX;maxX-=minX;minX=0;\}else if\(maxX>w\)\{const over=maxX-w;px-=over;maxX-=over;minX-=over;\}/, '가로 클램프가 세로 밀기보다 먼저');
+  // 가로로 당긴 뒤의 위치로 안전 구역과 겹치는지 다시 보고, 겹치면 위·아래 띠로만 민다(가로는 더 건드리지 않는다).
+  assert.match(narrowBlock, /const pushT=maxY-zs\.t,pushB=zs\.b-minY,upFits=minY-pushT>=0,downFits=maxY\+pushB<=h;/);
+  assert.doesNotMatch(narrowBlock.split('pushT=maxY-zs.t')[1], /\bpx-=|\bpx\+=/, '겹침을 다시 민 뒤에는 px(가로)를 건드리지 않는다');
+  // 띠 둘 다 못 담는 카드는 보여 주는 대신 숨긴다("카드 수를 줄인다").
+  assert.match(narrowBlock, /if\(!upFits&&!downFits\)\{el\.style\.display='none';return;\}/);
+  // 민 뒤에도 화면 세로 안(0..h)에 남게 마지막으로 다듬고, 그래도 안전 구역과 겹치면 숨긴다(안전 구역 침범 0 보장).
+  assert.match(narrowBlock, /if\(minY<0\)\{py-=minY;maxY-=minY;minY=0;\}else if\(maxY>h\)/);
+  assert.match(narrowBlock, /if\(maxX>zs\.l&&minX<zs\.r&&maxY>zs\.t&&minY<zs\.b\)\{el\.style\.display='none';return;\}/);
+});
+
 test('둘러보기 감상자 차단 문구에 "발견"이 남지 않는다', () => {
   assert.match(community, /내 둘러보기 목록에서 숨길까요\?/);
   assert.match(community, /내 둘러보기 목록에서 숨겼어요\./);

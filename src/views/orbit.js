@@ -157,7 +157,10 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
   warmups+=1;
   // 밀어낼 때는 프레임 사이 각도·위상 변화를 덮는 12px 여유를 더 붙인다(실측 침범 0 유지).
   const zs=safeZone?{l:safeZone.l-12,t:safeZone.t-12,r:safeZone.r+12,b:safeZone.b+12}:null;
-  cards.forEach((c,i)=>{const cfg=rings[c.ring],th=c.baseAngle+phase*cfg.speed+c.phaseOffset;let x=Math.cos(th)*cfg.rx,y=Math.sin(th)*cfg.ry+cfg.band+Math.sin(th*1.7+c.phaseOffset*3)*45,z=Math.sin(th+1.1+c.phaseOffset*4)*cfg.zAmp+cfg.zBase+c.zOffset;if(!demo&&cards.length<=8){const angle=i*Math.PI*2/cards.length+phase;x=Math.cos(angle)*Math.min(w*.34,420);y=Math.sin(angle)*Math.min(h*.3,250)+(i%2===0?80:-80);z=0;}const sc=Math.max(.18,Math.min(1.82,1050/(1050-z))),fit=Math.min(1,w/780,h/850);const placementFit=!demo&&cards.length<=8?1:fit;const el=elements[i];
+  cards.forEach((c,i)=>{const cfg=rings[c.ring],th=c.baseAngle+phase*cfg.speed+c.phaseOffset;let x=Math.cos(th)*cfg.rx,y=Math.sin(th)*cfg.ry+cfg.band+Math.sin(th*1.7+c.phaseOffset*3)*45,z=Math.sin(th+1.1+c.phaseOffset*4)*cfg.zAmp+cfg.zBase+c.zOffset;if(!demo&&cards.length<=8){const angle=i*Math.PI*2/cards.length+phase;x=Math.cos(angle)*Math.min(w*.34,420);y=Math.sin(angle)*Math.min(h*.3,250)+(i%2===0?80:-80);z=0;}const narrow=w<=650;
+   // #457: 좁은 화면은 깊이 상한을 낮추고(가까운 카드가 너무 커지지 않게) 궤도 반지름도 더 좁혀,
+   // 안전 구역을 피해 밀어내기 전부터 카드가 화면에 가깝게 놓이게 한다(민 뒤 화면 밖으로 밀리는 양을 줄인다).
+   const sc=Math.max(.18,Math.min(narrow?1.1:1.82,1050/(1050-z))),fit=Math.min(1,w/780,h/850)*(narrow?.5:1);const placementFit=!demo&&cards.length<=8?1:fit;const el=elements[i];
    // #429 2/2: 폭별 상한을 넘는 카드는 숨긴다(가로 넘침·과밀 방지). 창이 넓어지면 다시 보인다.
    if(i>=cardCapFor(w)){el.style.display='none';return;}
    if(el.style.display==='none')el.style.display='';
@@ -180,10 +183,27 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
      const sxp=w/2+(Cx0-w/2+x2*sc)*k,syp=h/2+(Cy0-h/2+y3*sc)*k;    // 원근 원점(화면 중심) 기준으로 투영
      if(sxp<minX)minX=sxp;if(sxp>maxX)maxX=sxp;if(syp<minY)minY=syp;if(syp>maxY)maxY=syp;
     }
-    if(maxX>zs.l&&minX<zs.r&&maxY>zs.t&&minY<zs.b){
+    if(narrow){
+     // #457: 좁은 화면은 안전 구역이 폭 대부분을 차지해 옆으로는 못 피한다. 가로는 먼저 화면 안(0..w)으로
+     // 당기고(옆으로 못 미니 화면 밖 자체를 막는다), 그 가로 위치로 안전 구역과 겹치는지 다시 본 뒤
+     // 겹치면 위·아래 띠로만 민다 — 가로를 당기고 나서 봐야 겹침을 제대로 판정한다(당기기 전 기준으로 겹침이 없다고
+     // 넘겼다가 당긴 뒤에 겹치는 경우를 막는다).
+     if(minX<0){px-=minX;maxX-=minX;minX=0;}else if(maxX>w){const over=maxX-w;px-=over;maxX-=over;minX-=over;}
+     if(maxX>zs.l&&minX<zs.r&&maxY>zs.t&&minY<zs.b){
+      const pushT=maxY-zs.t,pushB=zs.b-minY,upFits=minY-pushT>=0,downFits=maxY+pushB<=h;
+      // 띠 둘 다에 안 들어가는 카드(너무 큼)는 보여 주는 대신 숨긴다 — "띠가 좁으면 카드 수를 줄인다".
+      if(!upFits&&!downFits){el.style.display='none';return;}
+      if(upFits&&downFits?pushT<=pushB:upFits){py-=pushT;minY-=pushT;maxY-=pushT;}else{py+=pushB;minY+=pushB;maxY+=pushB;}
+     }
+     if(minY<0){py-=minY;maxY-=minY;minY=0;}else if(maxY>h){const over=maxY-h;py-=over;maxY-=over;minY-=over;}
+     // 마지막 안전망: 그래도 안전 구역과 겹치면(위 보정이 다 못 막은 극단 경우) 보여 주는 대신 숨긴다.
+     if(maxX>zs.l&&minX<zs.r&&maxY>zs.t&&minY<zs.b){el.style.display='none';return;}
+    } else if(maxX>zs.l&&minX<zs.r&&maxY>zs.t&&minY<zs.b){
+     // #429 2/2: 가운데 안전 구역과 카드 사각형이 겹치면 겹침이 0이 되도록 네 쪽 중 가장 얇은 쪽으로 민다(그대로).
      const pushL=maxX-zs.l,pushR=zs.r-minX,pushT=maxY-zs.t,pushB=zs.b-minY,m=Math.min(pushL,pushR,pushT,pushB);
      if(m===pushL)px-=pushL;else if(m===pushR)px+=pushR;else if(m===pushT)py-=pushT;else py+=pushB;
-    }}
+    }
+   }
    el.style.transform=`translate3d(${px}px,${py}px,0) scale(${sc*Math.max(.58,fit)}) rotateX(${c.tiltX+Math.sin(th)*9}deg) rotateY(${c.tiltY+Math.cos(th)*18}deg) rotateZ(${c.tiltZ+Math.sin(th*.6)*7}deg)`;
    // #429 2/2: 깊이는 크기와 밝기로만 — 카드는 언제나 불투명(opacity 1, 비침 없음), blur는 쓰지 않는다.
    // 대표: "흐리게 처리한 카드는 별로, 선명한 게 좋다"(2026-11-08). 뒤쪽 카드는 밝기 0.78까지 조금 어둡게.
