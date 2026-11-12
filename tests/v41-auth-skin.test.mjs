@@ -108,7 +108,8 @@ test('로그인이 필요한 진입점은 안내 창 없이 바로 /auth/login�
   assert.match(authModule, /pendingLoginIntent/);
   assert.match(authModule, /showScreen\('track32-bookshelf\.html'\)/);
   assert.match(home, /addButton\.onclick=\(\)=>bridge\.actions\.requestMoment\('add'\)/);
-  assert.match(home, /resumeButton\.onclick=\(\)=>bridge\.actions\.resume\(\)/);
+  // #426: '이어 보던 순간' 버튼은 최근 순간 카드가 대신한다 — resume 배선도 뺐다.
+  assert.doesNotMatch(home, /bridge\.actions\.resume\(\)/);
   assert.match(home, /communityButton\.onclick=\(\)=>bridge\.actions\.community\(\)/);
   assert.match(home, /guideButton\.onclick=\(\)=>bridge\.actions\.community\(\)/);
 });

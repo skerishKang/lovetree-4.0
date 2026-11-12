@@ -143,18 +143,16 @@ export function homeCenterState({ member = 'out', treeCount = 0 } = {}) {
     return {
       state: 'in-empty',
       buttons: [
-        { key: 'resume', label: '이어 보던 순간', emphasis: false, disabled: true, title: '아직 이어 볼 순간이 없어요' },
-        { key: 'new', label: '새 트리 만들기', emphasis: true, disabled: false, title: '새 트리의 첫 순간을 기록합니다.' },
-        { key: 'trees', label: '내 책장', emphasis: false, disabled: false, title: '내 책장을 엽니다.' }
+        { key: 'add', label: '＋ 순간 추가', emphasis: true, disabled: false, title: '새 순간을 남깁니다.' },
+        { key: 'community', label: '둘러보기', emphasis: false, disabled: false, title: '다른 사람의 순간을 둘러봅니다.' }
       ]
     };
   }
   return {
     state: 'in-trees',
     buttons: [
-      { key: 'resume', label: '이어 보던 순간', emphasis: true, disabled: false, title: '마지막으로 보던 순간을 엽니다.' },
-      { key: 'new', label: '새 트리 만들기', emphasis: false, disabled: false, title: '새 트리의 첫 순간을 기록합니다.' },
-      { key: 'trees', label: '내 책장', emphasis: false, disabled: false, title: '내 책장을 엽니다.' }
+      { key: 'add', label: '＋ 순간 추가', emphasis: true, disabled: false, title: '새 순간을 남깁니다.' },
+      { key: 'community', label: '둘러보기', emphasis: false, disabled: false, title: '다른 사람의 순간을 둘러봅니다.' }
     ]
   };
 }

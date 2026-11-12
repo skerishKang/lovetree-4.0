@@ -7,7 +7,7 @@ import {createHomeActions} from './home-actions.js';
 import {homePresentation} from './home-presentation.js';
 import {applyHomeCenter} from './home-center.js';
 import {readTheme,writeTheme,appliedTheme,applyThemeAttribute} from '../public/v41/header-state.mjs';
-import {readTitleDisplay,titleView} from '../public/v41/book-usability.mjs';
+import {readTitleDisplay} from '../public/v41/book-usability.mjs';
 import {momentListEntries, momentListTrees} from './moment-list.js';
 const shellBody=parent.document.body;
 addEventListener('message',event=>{if(event.data?.type==='lt41-title-display')location.reload();});
@@ -75,7 +75,7 @@ const centerPlan=applyHomeCenter(centerButtons,presentation.centerState);
 const byDo=name=>centerButtons.find(b=>b.dataset.do===name);
 // '＋ 순간 추가' → 기존 add 흐름(requestMoment add), '이어 보던 순간' → 기존 resume, 둘러보기/어떻게 쓰나요 → 기존 community(둘러보기와 동일 — 별도 사용법 안내 없음).
 const addButton=byDo('add');if(addButton)addButton.onclick=()=>bridge.actions.requestMoment('add');
-const resumeButton=byDo('resume');if(resumeButton)resumeButton.onclick=()=>bridge.actions.resume();
+// #426: '이어 보던 순간' 버튼은 최근 순간 카드가 대신한다(버튼 없음).
 const communityButton=byDo('community');if(communityButton)communityButton.onclick=()=>bridge.actions.community();
 const guideButton=byDo('guide');if(guideButton)guideButton.onclick=()=>bridge.actions.community();
 let loginFocusButton=null;
@@ -91,7 +91,8 @@ if(cardsPlan.note!==null)shadow.querySelector('.center-note').textContent=cardsP
 // 2026-11-08 접근성: 카드 출처 안내가 바뀌면 화면 낭독기가 알린다.
 shadow.querySelector('.center-note')?.setAttribute('aria-live','polite');
 shadow.querySelector('.center-note')?.setAttribute('role','status');
-// #380(2026-11-11): 로그인 후 큰 제목 아래 설명 둘째 줄 = 상태(높이 두 줄 고정): 정리 알림 > 마지막 순간 > 첫 순간 안내. 로그인 전 문구는 그대로 둔다.
+// #380(2026-11-11): 로그인 후 큰 제목 아래 설명 둘째 줄 = 상태(높이 두 줄 고정): 정리 알림 > 첫 순간 안내. 로그인 전 문구는 그대로 둔다.
+// #426(2026-11-12): 마지막 순간 안내는 최근 순간 카드가 대신 보여 준다(둘째 줄에서 뺐다).
 if(loggedIn){
   const target=shadow.querySelector('.center > p:not(.center-note)');
   if(target){
@@ -102,23 +103,17 @@ if(loggedIn){
       if(n>0){label=`정리 안 된 순간 ${n}개`;}
     }
     if(label===null){
-      let m=null;
-      if(context.tree&&Array.isArray(context.tree.moments)){
-        m=context.momentId?context.tree.moments.find(x=>x.id===context.momentId)||null:null;
-        if(!m)m=[...context.tree.moments].sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')))[0]||null;
-      }
-      if(!m){label='첫 순간을 남기면 여기서 이어 볼 수 있어요';}
-      else{
-        let title=titleView(m,readTitleDisplay(context))?.main||'';
-        if(!title)title='제목 없는 순간';
-        let days=null;const raw=Date.parse(m.createdAt||'');if(!Number.isNaN(raw))days=Math.max(0,Math.floor((Date.now()-raw)/86400000));
-        label=`마지막 순간 「${title}」${days===null?'':` · ${days}일 전`}`;
-      }
+      // #426(2026-11-12): 순간이 하나라도 있으면 최근 순간 카드가 이어 보기를 대신한다 — 둘째 줄은 안내 한 줄만.
+      const hasAnyMoment=(Array.isArray(context.trees)?context.trees:[]).some(t=>Array.isArray(t?.moments)&&t.moments.length>0);
+      if(!hasAnyMoment)label='첫 순간을 남기면 여기서 이어 볼 수 있어요';
     }
     target.textContent='';
     target.append('기억은 아직 여기에서 이어지고 있어요.');
-    target.append(document.createElement('br'));
-    target.append(label);
+    // #426: 순간이 있으면 둘째 줄은 안내 한 줄만(카드가 마지막 순간을 대신 보여 준다).
+    if(label){
+      target.append(document.createElement('br'));
+      target.append(label);
+    }
   }
 }
 const mobileFit=document.createElement('style');mobileFit.textContent='@media(max-width:768px){.topbar{gap:12px;flex-wrap:wrap;align-items:center;padding:8px 12px}.top-actions{gap:6px;flex-shrink:0;flex-wrap:wrap;margin-left:auto}.topbar .menuBtn{white-space:nowrap;padding:10px 9px;font-size:14px}.actions .subtleBtn{font-size:14px}.center .center-note{font-size:14px}.hint{font-size:14px}}';shadow.append(mobileFit);
