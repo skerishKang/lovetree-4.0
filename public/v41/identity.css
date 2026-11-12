@@ -407,3 +407,33 @@ html[data-v41-screen=book] .tools .view-toggle .ui-btn[aria-pressed="true"]{back
 html[data-v41-screen=book] .tools .view-toggle .ui-btn[aria-pressed=true]:hover{background:var(--lt-gold);border-color:var(--lt-gold);transform:none}
 /* 눌리지 않은 쪽은 그대로 두되, 눌린 쪽과 대비가 보이게 살짝 눌러 둔다. */
 html[data-v41-screen=book] .tools .view-toggle .ui-btn[aria-pressed=false]{color:var(--lt-muted);background:rgba(9,8,14,.35);border-color:rgba(255,255,255,.22)}
+
+/* #463(2026-11-13): 트리 0개 빈 화면의 '빈 트리 미리보기' 그림 — 점선 빈 카드 3장 + 금빛 실.
+   '순간이 이어져 트리가 된다'를 장식으로 보여 준다(대표 결정 2026-11-12 18:19).
+   - 바탕은 첫 화면과 같은 가운데 금빛 빛무리.
+   - 흐림(blur)·반투명 겹침 없음(2026-11-08 대표: 흐린 카드 별로).
+   - 움직임은 CSS만(첫 카드 반짝임). JS 애니메이션 고리 없음 → 가만히 있을 때 화면 그리기 호출 0.
+   - 장식이라 화면 읽기 프로그램에는 숨긴다(aria-hidden, index.html).
+   - 넓은 화면은 가로 3장(.eta-wide), 좁은 화면은 세로 3장(.eta-tall) — 같은 그림, 다른 방향. */
+.empty-tree-art{position:relative;display:block;width:min(420px,100%);margin:0 auto 6px}
+.empty-tree-art svg{width:100%;height:auto;display:block;overflow:visible}
+.empty-tree-art .eta-tall{display:none}
+.empty-tree-art .eta-card rect{fill:none;stroke:var(--lt-gold);stroke-width:1.6;stroke-dasharray:7 6;stroke-linecap:round}
+.empty-tree-art .eta-card text{fill:var(--lt-gold);font-family:var(--lt-ui);font-size:13px;font-weight:600;text-anchor:middle;dominant-baseline:middle;opacity:.92}
+.empty-tree-art .eta-thread{fill:none;stroke:var(--lt-gold);stroke-width:1.6;stroke-linecap:round;opacity:.55}
+/* 가운데 금빛 빛무리 — 첫 화면과 같은 결. */
+.empty-tree-art::before{content:"";position:absolute;inset:-16% -8% -4%;border-radius:50%;background:radial-gradient(ellipse at 50% 45%,color-mix(in srgb,var(--lt-gold) 13%,transparent),transparent 68%);pointer-events:none;z-index:0}
+.empty-tree-art svg{position:relative;z-index:1}
+/* 첫 카드만 은은하게 반짝여 '여기서 시작'을 알린다. */
+.empty-tree-art .eta-card-1{animation:eta-breathe 3.6s ease-in-out infinite}
+@keyframes eta-breathe{0%,100%{opacity:.72}50%{opacity:1}}
+/* 모바일(390): 카드 3장을 세로로 이어 화면 위쪽을 채운다. 가로 넘침 0. */
+@media(max-width:600px){
+ .empty-tree-art{width:min(232px,100%);margin:0 auto 2px}
+ .empty-tree-art .eta-wide{display:none}
+ .empty-tree-art .eta-tall{display:block}
+}
+/* 움직임 줄이기 — 반짝임을 멈춘다(가만한 그림). */
+@media(prefers-reduced-motion:reduce){
+ .empty-tree-art .eta-card-1{animation:none;opacity:.9}
+}
