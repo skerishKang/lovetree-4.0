@@ -57,6 +57,13 @@ import { createReader } from './shelf-reader.js';
         state.shelfIndex=resolveShelfIndex(list, state.selectedId, state.shelfIndex);
         $('#resultCount').textContent=list.length+'권';
         renderSpines(list);
+        // #465: 넘길 책이 없으면(1권 이하) 좌우 넘김 화살표를 숨기고, 책이 1~2권이면
+        // 소개 상자(hero)를 낮게 둔다 — 책등 목차가 3권부터인 것과 같은 기준이다.
+        var prevArrow=$('#shelfPrev'),nextArrow=$('#shelfNext');
+        if(prevArrow)prevArrow.hidden=list.length<=1;
+        if(nextArrow)nextArrow.hidden=list.length<=1;
+        var hero=document.querySelector('.hero');
+        if(hero)hero.classList.toggle('compact',!spineVisible(list.length));
         // #256-1: 목록이 바뀔 때마다 다시 그린다. 칸은 검색·필터와 무관하게 전체 책(allBooks) 기준이라 좁아져도 그대로다.
         renderResumeCard();
         $('#shelfRail').innerHTML=list.length?list.map(function(book,index){
