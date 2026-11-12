@@ -21,8 +21,11 @@ test('#426 카드 모양: 썸네일 크게 + 마지막 순간·지난 날 + 한 
   assert.match(orbit,/마지막 순간\$\{days===null\?'':` · \$\{days\}일 전`\}/,'첫 줄 안내');
   assert.match(orbit,/<strong>\$\{esc\(head\)\}<\/strong>/,'한 줄 제목');
   assert.match(orbit,/· 이어 보기 →<\/small>/,'트리 이름·이어 보기');
-  assert.match(orbit,/class="recent-card mine" role="button" tabindex="0" data-do="recent">/,'카드 접근성 이름은 보이는 글자에서 온다(#449 — aria-label 없음)');
-  assert.doesNotMatch(orbit,/class="recent-card[^>]*aria-label/,'aria-label로 보이는 글자와 어긋나지 않게 한다(#449 label-content-name-mismatch)');
+  // 이슈 #466 M6: 카드 자체는 role="button"이 아니다(안의 ▶ 재생·제목 달기와 중첩되면 axe
+  // nested-interactive). 뒤에 깔린 투명 단추(recent-open)가 열기를 맡고, 자기 이름은 aria-label로 준다.
+  assert.match(orbit,/class="recent-card mine" data-do="recent">/,'카드 자체는 역할·초점 대상이 아니다(M6)');
+  assert.doesNotMatch(orbit,/class="recent-card[^>]*role="button"/,'카드 div에 더는 role=button을 주지 않는다(M6)');
+  assert.match(orbit,/class="recent-open" data-do="recent" aria-label="\$\{esc\(head\)\} 이어 보기">/,'열기 전담 투명 단추가 따로 있다');
   assert.match(orbit,/aria-label="여기서 재생"/,'▶ 재생 단추는 자기 이름을 유지한다');
   assert.match(orbit,/setAttribute\('aria-label','정지'\)/,'재생 중에는 정지 이름');
   // 금빛 내 카드와 같은 결 — .card.mine과 같은 진한 금 테두리(--lt-gold-deep)·이중선·번짐 토큰을 쓴다(#443).
@@ -44,9 +47,10 @@ test('#426 썸네일은 공용 모듈(#435) 그대로 — 회색이면 글 카�
 test('#426 카드 누르면 그 순간 열기 — 궤도 카드와 같은 onOpen 경로, Enter·Space도 같다',()=>{
   assert.match(orbit,/case'recent':if\(!e\.target\.closest\?\.\('\[data-lt-title-edit\]'\)\)openRecent\(\);break;/);
   assert.match(orbit,/const openRecent=\(\)=>\{if\(!recentMoment\)return;if\(onOpen&&\!recentMoment\.example\)\{onOpen\(recentMoment\);return;\}actions\.openBook\(recentMoment\.treeId,recentMoment\.id,demo\);\};/);
-  assert.match(orbit,/shadow\.addEventListener\('keydown',e=>\{if\(e\.key!=='Enter'&&e\.key!==' '\)return;if\(e\.target\.matches\?\.\('\[data-do=recent\]'\)\)\{e\.preventDefault\(\);openRecent\(\);\}\}/);
-  // role=button·tabindex=0으로 키보드 진입을 보장한다.
-  assert.match(orbit,/class="recent-card mine" role="button" tabindex="0"/);
+  // 이슈 #466 M6: recent-open이 실제 <button>이라 Enter·Space는 네이티브 동작으로 처리된다
+  // (카드 div 자체의 수동 keydown 가로채기는 더 이상 없다 — 중첩 상호작용 구조를 없앴기 때문).
+  assert.doesNotMatch(orbit,/shadow\.addEventListener\('keydown',e=>\{if\(e\.key!=='Enter'&&e\.key!==' '\)/,'카드 전용 수동 Enter·Space 가로채기를 두지 않는다(네이티브 버튼이 처리)');
+  assert.match(orbit,/<button type="button" class="recent-open" data-do="recent"/,'네이티브 버튼이 키보드 진입을 보장한다');
 });
 
 test('#426 ▶ 재생은 누른 뒤에만 — 첫 화면이 열릴 때는 플레이어 요청이 없다',()=>{
