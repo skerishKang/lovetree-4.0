@@ -1,4 +1,4 @@
-// #467: 보드 판 테마(종이/밤) 배선 및 대비(contrast) 검증 시험
+// #467: 보드·지도 판 테마(종이/밤) 배선 및 대비(contrast) 검증 시험
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -8,7 +8,7 @@ import {
 
 const read = file => fs.readFileSync(new URL(`../${file}`, import.meta.url), 'utf8');
 
-test('보드 판 테마 메시지: night/paper 정규화 및 모르는 값은 paper 기본', () => {
+test('보드·지도 판 테마 메시지: night/paper 정규화 및 모르는 값은 paper 기본', () => {
   assert.equal(FRAME_MESSAGE_TYPES.boardTheme, 'lt41-board-theme');
   assert.deepEqual(frameMessage('boardTheme', 'night'), { type: 'lt41-board-theme', value: 'night' });
   assert.deepEqual(frameMessage('boardTheme', 'paper'), { type: 'lt41-board-theme', value: 'paper' });
@@ -16,21 +16,21 @@ test('보드 판 테마 메시지: night/paper 정규화 및 모르는 값은 pa
   assert.deepEqual(frameMessage('boardTheme', undefined), { type: 'lt41-board-theme', value: 'paper' });
 });
 
-test('보드 판 테마 수신: 어떤 화면에서도 다시 띄우지 않는다(location.reload 없음, 인플레이스 반영)', () => {
+test('보드·지도 판 테마 수신: 어떤 화면에서도 다시 띄우지 않는다(location.reload 없음, 인플레이스 반영)', () => {
   const msg = frameMessage('boardTheme', 'night');
   for (const screen of ['home', 'shelf', 'book', 'board', 'network']) {
     assert.equal(
       shouldReloadOnFrameMessage(screen, msg, { rendered: 'paper', mirror: 'night' }),
       false,
-      `${screen}: 보드 판 테마로 다시 띄우지 않고 열린 채로 그린다`
+      `${screen}: 보드·지도 판 테마로 다시 띄우지 않고 열린 채로 그린다`
     );
   }
 });
 
-test('설정 창 화면 묶음: 보드 판(종이/밤) 행이 있고 이 기기에만 저장된다', () => {
+test('설정 창 화면 묶음: 보드·지도 판(종이/밤) 행이 있고 이 기기에만 저장된다', () => {
   const html = read('public/v41/index.html');
   const screen = html.slice(html.indexOf('account-settings-screen"'), html.indexOf('account-settings-write"'));
-  assert.match(screen, /id="settings-board-theme-label">보드 판<\/span>/);
+  assert.match(screen, /id="settings-board-theme-label">보드·지도 판<\/span>/);
   assert.match(screen, /data-board-theme="paper"[^>]*>종이<\/button>/);
   assert.match(screen, /data-board-theme="night"[^>]*>밤<\/button>/);
   assert.match(screen, /aria-labelledby="settings-board-theme-label"[\s\S]*?class="settings-scope">이 기기에만<\/span>/);
@@ -44,7 +44,7 @@ test('보드 화면 마크업: 도구 줄 및 패널에 종이/밤 전환 단추
   assert.match(boardHtml, /id="themeBadge"/);
 });
 
-test('셸 배선: 보드 판 테마를 프레임에 알리고 메시지를 주고받는다', () => {
+test('셸 배선: 보드·지도 판 테마를 프레임에 알리고 메시지를 주고받는다', () => {
   const shell = read('public/v41/shell.mjs');
   assert.match(shell, /applyBoardThemeToFrame\(frame\)/);
   assert.match(shell, /const message=frameMessage\('boardTheme',currentBoardTheme\(\)\)/);

@@ -54,7 +54,7 @@ export function shouldReloadOnFrameMessage(screen, message, { rendered, mirror }
     return shouldReloadForTitleDisplay({ value: message.value, rendered, mirror });
   }
   if (type === FRAME_MESSAGE_TYPES.boardTheme) {
-    return false; // 보드는 열린 채로 그린다 (다시 띄우기 없음)
+    return false; // 보드·지도는 열린 채로 그린다 (다시 띄우기 없음)
   }
   return false; // 페이지 넘김은 다시 띄우지 않는다
 }

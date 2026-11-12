@@ -119,3 +119,61 @@ html[data-v41-screen=network] .top-actions .view-switch .pill[aria-pressed=true]
 html[data-lt-theme=garden][data-v41-screen=network] .top-actions .view-switch .pill[aria-pressed=true]{background:var(--lt-primary);border-color:var(--lt-primary);color:var(--lt-primary-ink);box-shadow:none}
 /* 범례 행: 색 점 + "01 첫인상부터 7개" */
 .legend-row .swatch{flex:0 0 auto}
+
+/* 보드·지도 판: 캔버스도 이 색 한 벌을 읽는다. 종이의 바탕은 기존 그대로다.
+   좌표·반지름·글꼴·이름표 계산에는 판 선택이 들어가지 않는다. */
+html[data-v41-screen=network]{
+ --lt-map-bg-top:#fbfaf8;--lt-map-bg-middle:#f7f4f2;--lt-map-bg-bottom:#f1eff5;
+ /* 실제 화면에서 옅은 점·선이 3:1에 못 미쳤다. 색 계열은 두고 명도·투명도만 보정한다. */
+ --lt-map-group-1:#b05e75;--lt-map-group-2:#7a67ab;--lt-map-group-3:#4a8590;
+ --lt-map-group-4:#9a7425;--lt-map-group-5:#588367;--lt-map-group-6:#536ea7;
+ --lt-map-related:#8564b1;--lt-map-edge:#77717e;--lt-map-selected:#fff;--lt-map-context:#706576;
+ --lt-map-first-glow:var(--lt-gold-deep);--lt-map-first-inner:#9a7425;
+ --lt-map-anchor-text:#65566e;--lt-map-hub:rgba(255,255,255,.94);--lt-map-hub-active:#514359;
+ --lt-map-hub-text:rgba(45,40,50,.78);--lt-map-hub-active-text:#fff;
+ --lt-map-label-outline:rgba(251,250,248,.92);--lt-map-cluster-text:rgba(41,37,45,.72);--lt-map-text:rgba(40,36,45,.9);
+ --lt-map-ring:#74697f;--lt-map-orb:#fff;
+ --lt-map-edge-alpha-min:.95;--lt-map-node-alpha-min:.95;--lt-map-first-alpha-min:1;
+ --lt-map-hub-alpha-min:1;--lt-map-hub-border-alpha-min:.95;--lt-map-label-alpha-min:.9;
+ --lt-map-paper-muted:#65566e;
+}
+/* 종이 상세 창의 설명·표식(기존 2.26:1), 경로 안내(3.29:1)만 짙게 한다. */
+html[data-v41-screen=network]:not([data-lt-board-theme=night]) body :is(.detail-kicker,.detail-block span,.chip,.route-status span,.mode-pill){color:var(--lt-map-paper-muted)}
+html[data-v41-screen=network]:not([data-lt-board-theme=night]) body .hero.dim{opacity:.9}
+/* 밤 판은 앱의 밤/정원 선택과 독립이다. 같은 선택으로 새로 열어도 이 규칙만 쓴다. */
+html[data-v41-screen=network][data-lt-board-theme=night]{
+ color-scheme:dark;
+ --lt-map-bg-top:#0a0a11;--lt-map-bg-middle:#12101b;--lt-map-bg-bottom:#191522;
+ --lt-map-group-1:#f2a5ba;--lt-map-group-2:#bfadef;--lt-map-group-3:#89cbd8;
+ --lt-map-group-4:#e8c46f;--lt-map-group-5:#9bceb0;--lt-map-group-6:#a2bbee;
+ --lt-group-1:var(--lt-map-group-1);--lt-group-2:var(--lt-map-group-2);--lt-group-3:var(--lt-map-group-3);
+ --lt-group-4:var(--lt-map-group-4);--lt-group-5:var(--lt-map-group-5);--lt-group-6:var(--lt-map-group-6);
+ --lt-map-related:#c4afea;--lt-map-edge:#bbb0c7;--lt-map-selected:#fff5dc;--lt-map-context:#a69bad;
+ --lt-map-first-glow:#e8c46f;--lt-map-first-inner:#f6d892;
+ --lt-map-anchor-text:#cec3d9;--lt-map-hub:#252030;--lt-map-hub-active:#393044;
+ --lt-map-hub-text:#f5e9ce;--lt-map-hub-active-text:#fff5dc;
+ --lt-map-label-outline:#12101b;--lt-map-cluster-text:#e8ddec;--lt-map-text:#f6edf8;
+ --lt-map-ring:#897e96;--lt-map-orb:#fff5dc;
+ --lt-map-edge-alpha-min:.8;--lt-map-node-alpha-min:.82;--lt-map-first-alpha-min:1;
+ --lt-map-hub-alpha-min:1;--lt-map-hub-border-alpha-min:.9;--lt-map-label-alpha-min:1;
+ --lt-map-panel:#211b2b;--lt-map-control:#30273b;--lt-map-control-hover:#41344d;
+ --lt-map-ui-text:#f2eaf5;--lt-map-ui-muted:#c9bdd4;--lt-map-ui-border:#897156;
+ --lt-map-ui-accent:#f6d892;--lt-map-ui-accent-ink:#211b2b;
+ --bg:var(--lt-map-bg-top);--bg2:var(--lt-map-bg-bottom);--ink:var(--lt-map-ui-text);--muted:var(--lt-map-ui-muted);
+}
+html[data-v41-screen=network][data-lt-board-theme=night] body .app{background:var(--lt-map-bg-top);color:var(--lt-map-ui-text)}
+html[data-v41-screen=network][data-lt-board-theme=night] body .paper-noise{opacity:.06;mix-blend-mode:screen}
+html[data-v41-screen=network][data-lt-board-theme=night] body :is(.legend,.controls,.detail,.route-status,.branch-chooser,.mobile-ribbon,.lt-moment-picker,.tree-menu,.edge-tip,.toast){background:var(--lt-map-panel);border-color:var(--lt-map-ui-border);color:var(--lt-map-ui-text);box-shadow:0 14px 40px rgba(0,0,0,.28)}
+html[data-v41-screen=network][data-lt-board-theme=night] body :is(.hero h1,.detail h2,.legend-row,.route-status b,.branch-chooser h3,.tree-menu .tree-item){color:var(--lt-map-ui-text)}
+html[data-v41-screen=network][data-lt-board-theme=night] body :is(.hero p,.hero .eyebrow,.legend h3,.controls h3,.detail-kicker,.detail-block span,.detail-block p,.route-status span,.branch-chooser p,.tree-title-caret,.tree-menu .tree-count){color:var(--lt-map-ui-muted)}
+html[data-v41-screen=network][data-lt-board-theme=night] body .hero.dim{opacity:1}
+html[data-v41-screen=network][data-lt-board-theme=night] body :is(.pill,.mode-pill,.mini,.action,.close,.tree-title-btn,.branch-options button,.lt-moment-picker select,.lt-moment-picker button,.mobile-ribbon button,.chip,.detail-block){background:var(--lt-map-control);border-color:var(--lt-map-ui-border);color:var(--lt-map-ui-text);box-shadow:none}
+html[data-v41-screen=network][data-lt-board-theme=night] body .top-actions .pill{background:var(--lt-map-control);border-color:var(--lt-map-ui-border);color:var(--lt-map-ui-text)}
+html[data-v41-screen=network][data-lt-board-theme=night] body :is(.pill,.mini,.action,.close,.tree-title-btn,.branch-options button,.lt-moment-picker button):hover,
+html[data-v41-screen=network][data-lt-board-theme=night] body .top-actions .pill:hover,
+html[data-v41-screen=network][data-lt-board-theme=night] body .tree-menu .tree-item:hover{background:var(--lt-map-control-hover);color:var(--lt-map-ui-text)}
+html[data-v41-screen=network][data-lt-board-theme=night] body .top-actions .view-switch .pill[aria-pressed=true],
+html[data-v41-screen=network][data-lt-board-theme=night] body :is(.action.primary,.mobile-ribbon button.active,.mobile-ribbon button.origin,.lt-moment-picker .primary){background:var(--lt-map-ui-accent);border-color:var(--lt-map-ui-accent);color:var(--lt-map-ui-accent-ink)}
+html[data-v41-screen=network][data-lt-board-theme=night] body .tree-menu .tree-check{color:var(--lt-map-ui-accent)}
+html[data-v41-screen=network][data-lt-board-theme=night] body :is(button,select):focus-visible{outline:2px solid var(--lt-map-ui-accent);outline-offset:2px}
+html[data-v41-screen=network][data-lt-board-theme=night] body #stage:focus-visible{outline-color:var(--lt-map-ui-accent)}
