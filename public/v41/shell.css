@@ -448,3 +448,28 @@ nav #record-menu{min-height:40px;font-size:13px;letter-spacing:0}
  #header-overflow.is-open{position:fixed;left:10px;right:10px;top:60px;right:10px}
 }
 html[data-lt-theme="garden"] #account-advanced[aria-checked="true"]:after{background:var(--lt-primary)}
+/* 이슈 458: 모바일에서 늘 떠 있는 ＋ 순간 추가(아래 오른쪽, 엄지 닿는 자리). 쓰기 가능한 내 기록(body.lt-fab-ok)에서만 뜬다 —
+   공유·예시 화면·로그아웃·읽기 전용·창(dialog)이 열려 있을 때·화상 키보드가 올라올 때는 숨긴다. 781px 이상에는 영향이 없다. */
+#mobile-add{display:none}
+@media(max-width:780px){
+ #mobile-add{position:fixed;right:14px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:40;width:56px;height:56px;display:none;align-items:center;justify-content:center;border-radius:50%;border:1px solid var(--lt-gold-line);background:var(--lt-primary);color:var(--lt-primary-ink);font-size:26px;line-height:1;box-shadow:0 10px 30px #0008;cursor:pointer}
+ body.lt-fab-ok #mobile-add{display:flex}
+ body.lt-fab-ok:has(dialog[open]) #mobile-add{display:none}
+ body.lt-fab-ok.lt-kbd #mobile-add{display:none}
+ /* 화면 안의 큰 창(지도 상세 #detail·책 링크 창 #linkModal)이 열려 있으면 화면 아래를 통째로 덮으므로 단추도 숨긴다. */
+ body.lt-fab-ok.lt-sheet-open #mobile-add{display:none}
+ /* 화면마다 아래쪽에 이미 있는 단추·탭 위로 올린다(390·360 실측값 — 겹침 0 근거는 이슈 458 보고).
+    책: 갈라치기 탭(아래 99px) 위, 보드: 시네마 보기(아래 68px) 위, 지도: 이동 리본(아래 76px) 위, 책장: 넘김 화살표(아래 28px) 위. */
+ body.lt-fab-ok[data-fab-lift="book"] #mobile-add{bottom:calc(104px + env(safe-area-inset-bottom))}
+ body.lt-fab-ok[data-fab-lift="board"] #mobile-add{bottom:calc(68px + env(safe-area-inset-bottom))}
+ body.lt-fab-ok[data-fab-lift="network"] #mobile-add{bottom:calc(76px + env(safe-area-inset-bottom))}
+ /* 책장의 넘김 화살표(›)는 내용 높이를 따라 붙는다(390×844 실측 724~768). 화면이 낮으면(749px 이하)
+    단추가 화살표에 닿으므로 그때만 올린다(360×740 실측 기준 24px). */
+ @media(max-width:780px) and (max-height:749px){
+  body.lt-fab-ok[data-fab-lift="shelf"] #mobile-add{bottom:calc(24px + env(safe-area-inset-bottom))}
+ }
+ /* 알림 줄(#toast)이 떠 있는 단추 위에 닿지 않게 오른쪽 76px을 비워 둔다(단추 56px+여백 20px). */
+ body.lt-fab-ok #toast{max-width:calc(100% - 104px);transform:translateX(calc(-50% - 38px))}
+}
+/* 이슈 458: 접기 메뉴(☰)에서 지금 보고 있는 화면 표시 — 금테(테마 토큰). */
+#header-overflow button[aria-current="true"]{box-shadow:inset 0 0 0 1px var(--lt-gold-deep);font-weight:600}

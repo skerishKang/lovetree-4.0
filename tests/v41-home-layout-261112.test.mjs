@@ -70,7 +70,7 @@ test('#457 좁은 화면(≤650): 가로는 먼저 화면 안으로 당기고, �
   // 좁은 화면 분기: 가로를 먼저 화면 안(0..w)으로 당긴다.
   assert.match(orbit, /if\(narrow\)\{/);
   const narrowBlock = orbit.split('if(narrow){')[1]?.split('} else if(maxX>zs.l')[0] || '';
-  assert.match(narrowBlock, /if\(minX<0\)\{px-=minX;maxX-=minX;minX=0;\}else if\(maxX>w\)\{const over=maxX-w;px-=over;maxX-=over;minX-=over;\}/, '가로 클램프가 세로 밀기보다 먼저');
+  assert.match(narrowBlock, /if\(minX<0\)\{px-=minX;maxX-=minX;minX=0;\}else if\(maxX>w-fabPad\)\{const over=maxX-\(w-fabPad\);px-=over;maxX-=over;minX-=over;\}/, '가로 클램프가 세로 밀기보다 먼저(셸 ＋ 단추 자리 data-lt-fab만큼 더 비낀다)');
   // 가로로 당긴 뒤의 위치로 안전 구역과 겹치는지 다시 보고, 겹치면 위·아래 띠로만 민다(가로는 더 건드리지 않는다).
   assert.match(narrowBlock, /const pushT=maxY-zs\.t,pushB=zs\.b-minY,upFits=minY-pushT>=0,downFits=maxY\+pushB<=h;/);
   assert.doesNotMatch(narrowBlock.split('pushT=maxY-zs.t')[1], /\bpx-=|\bpx\+=/, '겹침을 다시 민 뒤에는 px(가로)를 건드리지 않는다');

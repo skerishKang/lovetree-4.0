@@ -116,7 +116,7 @@ export function createHeaderHarness({
   };
   const store = storage || { getItem: () => null, setItem() {}, removeItem() {} };
   globalThis.sessionStorage = store;
-  globalThis.document = { querySelectorAll: () => [] };
+  globalThis.document = { querySelectorAll: () => [], body: { classList: { add() {}, remove() {}, toggle() {}, contains: () => false }, dataset: {} } };
   globalThis.window = globalThis;
   globalThis.addEventListener = () => {};
   globalThis.matchMedia = (query) => ({

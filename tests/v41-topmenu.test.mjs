@@ -72,7 +72,7 @@ test('모바일 접기 메뉴(메뉴 더보기)도 같은 구조다', () => {
     at = next;
   }
   // 첫 화면은 로고 클릭과 같은 동작, 책장은 로그인 상태에 따라 로그인 시작 또는 책장 화면.
-  assert.match(fold, /add\('첫 화면',\(\)=>document\.querySelector\('\.brand'\)\.click\(\)\)/);
+  assert.match(fold, /add\('첫 화면',\(\)=>document\.querySelector\('\.brand'\)\.click\(\),current==='src064-orbit\.html'\)/);
   assert.match(fold, /member\?\.snapshot\(\)\.owned\?show\('track32-bookshelf\.html'\):openLoginStart\('shelf'\)/);
 });
 

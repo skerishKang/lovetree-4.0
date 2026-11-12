@@ -42,6 +42,10 @@ function flowNavigation(){
   $('write-menu').hidden=!parts.write||publicReading;$('share-menu').hidden=!parts.share||getSource()!=='server'||!window.LT41;
   if(!getMember()?.snapshot().dirty)$('write-menu').textContent='＋ 순간 추가';
   $('write-menu').title=getSource()==='server'?(reading?'선택한 순간에서 이어지는 새 순간을 기록합니다.':'새 트리의 첫 순간을 기록합니다.'):'로그인한 계정에 내 트리를 만듭니다. 예시에는 저장하지 않아요.';
+  // #458: 모바일 떠 있는 ＋ 단추는 로그인한 내 기록(서버·쓰기 가능)에서만 뜬다. 공유·예시 화면·로그아웃·읽기 전용에서는 숨긴다.
+  document.body.classList.toggle('lt-fab-ok',!$('write-menu').hidden&&getSource()==='server'&&owned);
+  /* 이슈 458: 화면마다 아래쪽에 이미 있는 단추·탭 높이가 다르므로 화면별로 단추를 얼마나 올릴지 셸 CSS가 쓴다. */
+  document.body.dataset.fabLift={'track59-sketchbook.html':'book','track58-pinboard.html':'board','track56-network.html':'network','track32-bookshelf.html':'shelf'}[getCurrent()]||'';
   delegate.syncTreeTips();
   revealCurrentTab();
 }
