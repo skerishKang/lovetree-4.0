@@ -208,12 +208,14 @@ export function applyViewAccessibility(doc, win = doc?.defaultView) {
         const entry = { el, opener: doc.activeElement };
         traps.push(entry);
         if (el.getAttribute('role') === 'dialog' && !el.hasAttribute('aria-modal')) el.setAttribute('aria-modal', 'true');
+        // #460: 초점만 옮기고 화면은 굴리지 않는다(preventScroll). 상세 창이 옆에서 미끄러져 들어오는 동안
+        // 초점을 주면 크로미움이 그 자리를 보이려고 .app(overflow:hidden)을 288px 밀어 보드 오른쪽이 비었다.
         setTimeout(() => {
-          if (traps.includes(entry)) (focusables(el)[0] || el).focus?.();
+          if (traps.includes(entry)) (focusables(el)[0] || el).focus?.({ preventScroll: true });
         }, 0);
       } else if (!open && at >= 0) {
         const [entry] = traps.splice(at, 1);
-        if (!traps.length && entry.opener?.isConnected) setTimeout(() => entry.opener.focus?.(), 0);
+        if (!traps.length && entry.opener?.isConnected) setTimeout(() => entry.opener.focus?.({ preventScroll: true }), 0);
       }
     }
   };
