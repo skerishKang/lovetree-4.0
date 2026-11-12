@@ -2,6 +2,16 @@
 
 > **main 보호 규칙(2026-11-09, 룰셋 "main 보호 (PR·필수 검사)")**: main은 PR로만 바꾼다(직접 푸시·force push·삭제 금지, 관리자도 예외 없음 — 비상시 대표가 룰셋 enforcement를 잠깐 끈다). 필수 검사: `check (ubuntu-latest)`·`check (windows-latest)`·`미리보기 postdeploy(로그아웃)` — 셋 다 paths 필터가 없어 문서만 바뀐 PR에서도 항상 돈다. 승인 수 0(레인이 스스로 머지). Deploy Bundle Boot Test는 paths 필터가 있어 필수에 넣지 않았다.
 
+## 2026-11-12 — 하루 전체 점검(#449): postdeploy 기대값·접근성·속도·화면 오류 (ai/local2-lt-audit-261112, main e38f51a)
+
+- 점검 범위: 본 주소 로그아웃 + 계정 04 로그인. postdeploy(로그아웃 20 pass/0 fail, 로그인 1 fail), a11y 104건(serious 2·critical 0), 속도(1440 5화면 × 3회 중앙값 + 전환 3회 + `/api/workspace` 3회), 화면 5종 × 1440·390 + 설정·순간 추가 창 열고 닫기.
+- **고친 것 ①(도구 기대값)**: postdeploy `screen-settings`가 설정 "화면" 묶음 행 수를 `home-view-menu.js`의 보기 메뉴 항목(7)으로 계산해, #368·#441 뒤 실제 7행(테마·움직임·제목·페이지 넘김·날짜 표기·처음 보여 줄 곳·첫 화면 카드)을 10개 버튼으로 세며 실패했다. 화면의 `.settings-row .settings-label`을 그대로 세도록 바꾸고 `SCREEN_SETTINGS_ROWS` 한 곳에 이름을 적었다(보기 메뉴 함수 의존 제거).
+- **고친 것 ②(제품 결함, 한 파일)**: 관계 지도에서 창이 낮을 때(준비 중 iframe 높이 < 300px) `overview`/`mobileOverview`의 `Math.min(...)`이 음수 배율을 내고, 그 값이 `drawHub`의 `createRadialGradient` 반지름(`hubR*scale*2.5`)까지 가 `r1 provided is less than 0` 페이지 오류가 났다(390·1440 모두). 배율 바닥값 `.12`·허브 반지름 바닥값 `.5`로 고쳤다. 짧은 창(390×260·1440×240) 배율 0.12·오류 0 확인. 시험 `tests/v41-network-fit-261112.test.mjs` 2건.
+- 실측: 같은 조건 재측정 — `npm test` 1216건 0 fail(37 skip), `npm run build` pass, `node tools/v41-modulepreload.mjs --check` exit 0. postdeploy 로그인 실행은 이 PR 배포 뒤 `console-errors`까지 0이 되는 것을 머지 후 확인한다.
+- 속도(본 주소, 1440, 3회 중앙값): 뼈대/전부 로드 = 첫 화면 149/448, 책 156/447, 보드 130/568, 지도 136/325, 책장 124/286ms. `/api/workspace` 40ms. 화면 전환 책→보드 278ms·보드→지도 216ms·지도→책 195ms. #400 기록은 로컬 dist 값이라 재는 자리가 달라 절대비교하지 않는다.
+- 남긴 것(다른 레인 몫, 이슈 #449에 적음): 최근 순간 카드 `label-content-name-mismatch`(serious, `src/views/orbit.js` = 로컬1 #443 몫), 보드·지도 머리 임시 가드 정리(로컬3 #428 몫).
+- 계정 04: 점검용 시험 트리(a11y 3권·속도/오류 1권)를 만들었다가 모두 지웠다(마지막 트리 0개·revision 191).
+
 ## 2026-11-12 — #366 관계 지도 다듬기: 안내 한 줄·연결 이유·키보드·길 강조 (로컬2, ai/local2-lt-366-map-261112, main 1d309f2→55aadb2 병합 기준)
 
 - 점검(둘 다 보기 × 1440/390 × 밤/정원 × 로그아웃(예시)/로그인, 실측 209항목): 7항목 중 ② 첫 순간 강조(크게·금빛 후광·"여기서 시작"·자리 고정)·⑤ 동심원(첫 순간 가운데, 바깥으로 단계)·⑥ 보기 버튼과 기억(`lt41.network.view`)·⑦ 배치 한 벌(`LT56Model.networkLayout`·`concentricLayout`·`originPath`·`relationText`)은 이미 됨. ①·③·④는 안 됨/일부여서 고쳤다.
