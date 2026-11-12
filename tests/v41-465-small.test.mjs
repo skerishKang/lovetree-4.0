@@ -1,0 +1,29 @@
+// #465 작은 것 묶음 — 실행 계약 (1 책장·4 동그라미·5 둘러보기 말투).
+// 2(설정 움직임)·3(계정 메뉴 설명)은 #458·#467(PR #499)가 고치는 index.html·설정 창 파일, 4는 헤더 시험 파일(v41-shell-header)로 옮겼다. 6(밤 테마 보드 판)은 대표 결정 전이라 이슈대로 손대지 않았다.
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+
+const read = file => fs.readFileSync(new URL(`../${file}`, import.meta.url), 'utf8');
+const shelf = read('public/v41/views/shelf/shelf.js');
+const shelfExtraCss = read('public/v41/views/shelf/shelf-extra.css');
+const community = read('public/v41/community-panel.mjs');
+
+test('#465 1: 책장 — 넘길 책이 없으면 화살표를 숨기고, 책 1~2권이면 소개 상자를 낮게 둔다', () => {
+  // 렌더 때 목록 길이로 화살표를 숨긴다(검색 필터가 1권으로 줄어도 같다).
+  assert.match(shelf, /var prevArrow=\$\('#shelfPrev'\),nextArrow=\$\('#shelfNext'\);/);
+  assert.match(shelf, /if\(prevArrow\)prevArrow\.hidden=list\.length<=1;/);
+  assert.match(shelf, /if\(nextArrow\)nextArrow\.hidden=list\.length<=1;/);
+  // 소개 상자는 책등 목차 기준(3권부터)을 그대로 쓴다 — 1~2권이면 낮게.
+  assert.match(shelf, /hero\.classList\.toggle\('compact',!spineVisible\(list\.length\)\)/);
+  // 숨김 확실 가드와 낮은 소개 상자 스타일.
+  assert.match(shelfExtraCss, /#shelfPrev\[hidden\],#shelfNext\[hidden\]\{display:none!important\}/);
+  assert.match(shelfExtraCss, /\.hero\.compact\{min-height:0;padding:16px 26px\}/);
+});
+
+test('#465 5: 둘러보기 안내를 사람 말로 — 0개면 아직 없다는 말, 있으면 새로 공개된 순서', () => {
+  assert.match(community, /'아직 공개된 트리가 없어요\. 트리를 공개하면 여기에 나타나요\.'/);
+  assert.match(community, /`공개된 트리 \$\{answer\.totalVisible\}개를 찾았어요\. 새로 공개된 순서예요\.`/);
+  assert.doesNotMatch(community, /공개 허용된 트리/);
+  assert.doesNotMatch(community, /인기·추천 순위가 아니에요/);
+});

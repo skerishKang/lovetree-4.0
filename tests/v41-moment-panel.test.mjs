@@ -48,7 +48,9 @@ test('파일은 선택하면 바로 올라가고 파일 올리기 2단계 버튼
   assert.equal(/data-upload>/.test(html), false);
   assert.match(upload, /fileInput\.addEventListener\('change',[\s\S]*?void upload\(\);/);
   assert.match(upload, /const SIZE_PROBLEM='PNG·JPEG·GIF·WebP\(약 4\.2MB\), MP4·WebM\(약 8\.4MB\)만 올릴 수 있어요\.'/, '검증 문구는 그대로다');
-  assert.match(upload, /내 계정에만 보관합니다\. 사진 약 4\.2MB · 영상 약 8\.4MB/, '용량 안내는 그대로다');
+  // #462: 자세한 추가의 용량 안내는 한 줄 — 어색한 '약 4.2MB · 계정당 약 105MB·200개'를 쓰지 않는다.
+  assert.match(upload, /<p class="panel-note media-limit-note">사진 4MB, 영상 8MB까지 · 사진은 나만 볼 수 있어요<\/p>/, '용량 안내 한 줄');
+  assert.doesNotMatch(upload, /사진 약 4\.2MB · 영상 약 8\.4MB/, '순간 폼에는 옛 용량 문구가 없다');
   assert.match(upload, /data-stop/, '전송 취소는 남긴다');
   assert.match(form, /사진·영상 파일|data-media-slot/, '파일 선택은 링크와 한 묶음이다');
 });

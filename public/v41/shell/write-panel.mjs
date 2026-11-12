@@ -1,6 +1,7 @@
 // 순간 추가 한 창(#425, 2026-11-12) — 쉬운 추가와 자세한 추가를 한 창 안의 탭으로 오간다.
 // 두 구역은 DOM에 그대로 남고 보이기만 바뀌므로, 탭을 바꿔도 적어 둔 값(주소·제목·마음 등)이 따라간다.
-// 어느 탭을 먼저 보일지는 설정 "화면"의 값(lt41.writeTab)이 정하고, 값이 없으면 쉬운 추가다.
+// 어느 탭을 먼저 보일지는 설정 "순간 추가 › 먼저 보일 탭"의 값(lt41.writeTab)이 정하고, 값이 없으면 쉬운 추가다.
+// #462: 그 값은 설정에서만 바뀐다. 탭을 눌러 보거나 저장까지 해도 이번 열림에만 적용되고 기본 탭은 그대로다.
 
 export const WRITE_TAB_KEY = 'lt41.writeTab';
 export const WRITE_TABS = ['easy', 'detailed'];
@@ -21,10 +22,32 @@ export function writeWriteTab(storage, tab) {
   return next;
 }
 
+// #462: 휴대폰 키보드가 올라오면 '보이는 화면'(visualViewport)만 줄고 창(100dvh)은 그대로라 아래 저장 단추가 가렸다.
+// 보이는 화면의 위치·높이를 창에 CSS 변수로 넘기고(모바일 CSS만 쓴다), 저장 단추는 창 아래에 붙여 둔다.
+export function viewportBox(vv) {
+  const height = Number(vv?.height);
+  if (!Number.isFinite(height) || height <= 0) return null;
+  const top = Number(vv?.offsetTop);
+  return {top: Number.isFinite(top) && top > 0 ? Math.round(top) : 0, height: Math.round(height)};
+}
+
 export function createWritePanel(deps) {
   const $ = deps.$;
   const storage = deps.storage || globalThis.localStorage;
+  const vv = deps.visualViewport === undefined ? globalThis.visualViewport : deps.visualViewport;
   let current = 'easy';
+  function syncViewport() {
+    const box = viewportBox(vv);
+    const style = $('write-panel')?.style;
+    if (!box || !style?.setProperty) return;
+    style.setProperty('--lt-vv-top', `${box.top}px`);
+    style.setProperty('--lt-vv-h', `${box.height}px`);
+  }
+  if (vv?.addEventListener) {
+    vv.addEventListener('resize', syncViewport);
+    vv.addEventListener('scroll', syncViewport);
+    syncViewport();
+  }
   // #453 B: 탭을 열 때마다 셸이 편집기 기준값을 다시 잡을 수 있게 알린다(탭만 눌렀는데 더러움으로 보던 문제).
   let onTab = () => {};
   function setTabHook(fn) { onTab = typeof fn === 'function' ? fn : () => {}; }
@@ -60,11 +83,10 @@ export function createWritePanel(deps) {
     show(tab ?? readWriteTab(storage));
   }
 
-  // 탭을 고르면 마지막으로 쓴 탭으로 기억한다(다음에 열 때 그 탭부터).
+  // #462: 탭을 고르면 이번 열림에만 그 탭을 보인다. 기본 탭(lt41.writeTab)은 저장하지 않는다 —
+  // 설정의 '먼저 보일 탭'(shell.mjs의 data-write-tab → writeWriteTab)만 바꾼다.
   function choose(tab) {
-    const next = show(tab);
-    writeWriteTab(storage, next);
-    return next;
+    return show(tab);
   }
 
   $('write-tab-easy').onclick = () => choose('easy');
@@ -80,5 +102,5 @@ export function createWritePanel(deps) {
   });
   paint();
 
-  return {open, show, choose, setTabsVisible, paint, tab: () => current, setTabHook};
+  return {open, show, choose, setTabsVisible, paint, tab: () => current, setTabHook, syncViewport};
 }

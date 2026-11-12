@@ -17,6 +17,10 @@ export function createHeader(deps) {
   const navBar = deps.navBar;
   const narrowNav = () => matchMedia('(max-width:780px)').matches;
   let accountEmail = '';
+  // #465 4: 동그라미 깜빡임 — 계정 정보를 불러오는 동안 '나'였다가 글자로 바뀐다.
+  // 저장본(#408)의 표시 이름과 직전에 그린 글자(localStorage 한 글자, 로그아웃 때 지움)로 먼저 그린다.
+   const lastLetter = () => { try { return localStorage.getItem('lt41.avatarLetter') || ''; } catch { return ''; } };
+  const rememberLetter = (letter) => { try { if (letter && letter !== '나') localStorage.setItem('lt41.avatarLetter', letter); else localStorage.removeItem('lt41.avatarLetter'); } catch { /* 저장소 접근 불가 */ } };
 
 function flowNavigation(){
   const owned=!!getMember()?.snapshot().owned;
@@ -64,13 +68,14 @@ function closeAccountMenu(){const pop=$('account-popover');if(!pop||pop.hidden)r
 function renderAccount(){const owned=!!getMember()?.snapshot().owned;
  // #368 2차: 동그라미 글자는 표시 이름 첫 글자 → 이메일 첫 글자 → 나, 색은 계정 설정 칸의 고른 색(없으면 기본색).
  const prefs=(()=>{try{return getMember()?.state?.()?.prefs||{}}catch{return {}}})();
- const view=accountPresentation({owned,email:accountEmail,name:prefs.displayName});
+ const view=accountPresentation({owned,email:accountEmail,name:prefs.displayName||deps.getCachedName?.()||''});
  const accent=owned?normalizeAccentColor(prefs.accentColor):'';
  const login=$('account-entry'),avatar=$('account-avatar');
- if(view.mode==='login'){login.hidden=false;login.textContent='로그인';login.removeAttribute('aria-label');avatar.hidden=true;avatar.textContent='';avatar.removeAttribute('data-accent');const init=$('account-initial');if(init){init.textContent='';init.removeAttribute('data-accent');}const mail=$('account-email');if(mail)mail.textContent='';closeAccountMenu();}
- else{login.hidden=true;avatar.hidden=false;avatar.textContent=view.initial;avatar.setAttribute('aria-label',view.ariaLabel);avatar.title='내 계정';avatar.dataset.accent=accent;
- const init=$('account-initial');if(init){init.textContent=view.initial;init.dataset.accent=accent;}
- $('account-email').textContent=view.label;}
+ if(view.mode==='login'){login.hidden=false;login.textContent='로그인';login.removeAttribute('aria-label');avatar.hidden=true;avatar.textContent='';avatar.removeAttribute('data-accent');const init=$('account-initial');if(init){init.textContent='';init.removeAttribute('data-accent');}const mail=$('account-email');if(mail)mail.textContent='';closeAccountMenu();try{localStorage.removeItem('lt41.avatarLetter')}catch{}}
+ else{const shown=view.initial==='나'?(lastLetter()||view.initial):view.initial;
+ login.hidden=true;avatar.hidden=false;avatar.textContent=shown;avatar.setAttribute('aria-label',view.ariaLabel);avatar.title='내 계정';avatar.dataset.accent=accent;
+ const init=$('account-initial');if(init){init.textContent=shown;init.dataset.accent=accent;}
+ $('account-email').textContent=view.label;rememberLetter(shown);}
   // #368: 설정 "프로필" 묶음도 같은 이메일 값을 쓴다(셸이 넘긴 콜백).
   deps.onEmailChange?.(accountEmail);}
 function openAccountMenu(){const owned=!!getMember()?.snapshot().owned;if(!owned){return;}const pop=$('account-popover');pop.hidden=false;$('account-avatar').setAttribute('aria-expanded','true');if(!accountEmail&&!emailTried)void loadAccountEmail();}
