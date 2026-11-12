@@ -21,7 +21,10 @@ test('#426 카드 모양: 썸네일 크게 + 마지막 순간·지난 날 + 한 
   assert.match(orbit,/마지막 순간\$\{days===null\?'':` · \$\{days\}일 전`\}/,'첫 줄 안내');
   assert.match(orbit,/<strong>\$\{esc\(head\)\}<\/strong>/,'한 줄 제목');
   assert.match(orbit,/· 이어 보기 →<\/small>/,'트리 이름·이어 보기');
-  assert.match(orbit,/aria-label="마지막 순간 열기: \$\{esc\(head\)\}"/,'카드 접근성 이름');
+  assert.match(orbit,/class="recent-card mine" role="button" tabindex="0" data-do="recent">/,'카드 접근성 이름은 보이는 글자에서 온다(#449 — aria-label 없음)');
+  assert.doesNotMatch(orbit,/class="recent-card[^>]*aria-label/,'aria-label로 보이는 글자와 어긋나지 않게 한다(#449 label-content-name-mismatch)');
+  assert.match(orbit,/aria-label="여기서 재생"/,'▶ 재생 단추는 자기 이름을 유지한다');
+  assert.match(orbit,/setAttribute\('aria-label','정지'\)/,'재생 중에는 정지 이름');
   // 금빛 내 카드와 같은 결 — .card.mine과 같은 진한 금 테두리(--lt-gold-deep)·이중선·번짐 토큰을 쓴다(#443).
   assert.match(orbit,/\.recent-card\{[^}]*border:3px solid var\(--lt-gold-deep\)/);
   assert.match(orbit,/\.recent-card:after\{[^}]*border:1px solid var\(--lt-gold-line\)/);
