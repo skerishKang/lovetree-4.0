@@ -150,7 +150,7 @@ document.addEventListener('keydown',event=>{
  if(event.key==='Escape'&&c.open&&![...document.querySelectorAll('dialog[open]')].some(d=>d!==c&&d.matches(':modal')))shellDialogs.requestClose('community-panel');
 });
 const initialRoute=parseSelectionRoute(location.hash);
-let model=null,current=screenForView(initialRoute.view)[1],source='example',loadGeneration=0,previousDirty=false,member=null,handledHash=null,activeShareId=null;
+let model=null,current=screenForView(initialRoute.view)[1],source='example',loadGeneration=0,previousDirty=false,member=null,handledHash=null,activeShareId=null,resumeAfterStart=null;
 setMemberRefreshStarted(false);
 const shareApi=createShareApi();
 const accountApi=createWorkspaceApi();
@@ -185,6 +185,8 @@ const shellPanels=createPanels({
   show:(file,write)=>show(file,write),
   selection:()=>stateSelection(),
   openFirstJourney:options=>openFirstJourney(options),
+  // #453 A: 예시를 둘러보는 중에 편집기를 열려 하면 로그인 화면 대신 내 기록으로 돌아온다.
+  resumeMember:intent=>resumeMember(intent),
   openLoginStart:intent=>openLoginStart(intent),
   // #425: 같은 창의 탭(쉬운 추가·자세한 추가)과 제목을 이 모듈이 정한다.
   writePanel:shellWrite,
@@ -192,6 +194,8 @@ const shellPanels=createPanels({
   requestClose:id=>shellDialogs.requestClose(id)
 });
 function openEditor(mode,parentId=''){return shellPanels.openEditor(mode,parentId);}
+// #453 B: 탭을 보일 때(그리고 창을 여는 두 길 모두에서) 편집기 기준값을 다시 잡는다.
+shellWrite.setTabHook(tab=>shellPanels.onWriteTab(tab));
 // 쉬운 추가(#빠른 추가 ②): 창 열기·끌어다 놓기는 shell/quick-add.mjs가 맡는다.
 // #425부터 입구는 하나다 — 같은 창을 열고 먼저 보일 탭만 설정값(lt41.writeTab)이 정한다.
 const shellQuick=createQuickAdd({
@@ -204,13 +208,15 @@ const shellQuick=createQuickAdd({
   openSettingsData:intent=>openAccountData(intent),
   choose:(id,momentId)=>choose(id,momentId),
   openEditor:(mode,parentId)=>openEditor(mode,parentId),
+  resumeMember:intent=>resumeMember(intent),
+  resetEditorBaseline:()=>shellPanels.startQuickSession(),
   openLoginStart:intent=>openLoginStart(intent),
   writePanel:shellWrite,
   requestClose:id=>shellDialogs.requestClose(id),
   // 사진 올리기는 기존 업로더(#310 onUploaded·imagesOnly)를 그대로 쓴다.
   mountUpload:mountPrivateUpload
 });
-$('write-menu').onclick=()=>shellQuick.openWrite();
+$('write-menu').onclick=()=>{if(source!=='server'&&member?.snapshot().owned){void resumeMember('write');return;}shellQuick.openWrite();};
 // 빠른 담기 입구: 붙여넣기 + 공유 시트 진입(판정·추적은 ../quick-intake.mjs 한 벌).
 const shellIntake=createQuickIntake({
   getMember:()=>member,
@@ -497,6 +503,11 @@ function formDirty(){return shellPanels.formDirty();}
 function treeDirty(){return shellPanels.treeDirty();}
 function canLeave(){return !(formDirty()||treeDirty()||member?.snapshot().dirty)||confirm('아직 저장되지 않은 입력이 있어요. 현재 기록을 백업한 뒤 이동하는 것을 권합니다. 저장하지 않고 이동할까요?');}
 function leaveMember(){if(!canLeave())return false;member?.dispose();member=null;return true;}
+// #453 A: 예시를 둘러보는 동안에도 "로그인한 계정"은 그대로 둔다. 저장 연결만 끊어(dispose) 예시 내용이 계정에 섞이지 않게 하고,
+// 다시 내 기록으로 돌아올 때는 startMember()가 새 연결을 연다. 로그아웃 상태면 지금처럼 셸 상태를 비운다.
+function pauseMember(){if(!canLeave())return false;if(!member?.snapshot().owned){member?.dispose();member=null;return true;}member.dispose();return true;}
+// #453 A: 예시를 둘러보는 중에 순간 추가·새 트리를 누르면 내 기록으로 돌아와서 이어 간다(로그인 화면으로 보내지 않는다).
+function resumeMember(intent){resumeAfterStart=intent||'write';return startMember();}
 function memberStatus(status){
   shellIntake.flush();
   const failed=status.dirty&&['offline','rejected','conflict','login'].includes(status.phase);
@@ -558,11 +569,12 @@ async function startMember(){setMemberRefreshStarted(true);if(!leaveMember())ret
   updateAccountControls();
   if(session.snapshot().writable&&sessionStorage.getItem(PENDING_NEW)==='1'){sessionStorage.removeItem(PENDING_NEW);openEditor('new');}
   shellAuth.consumeLoginIntent(session.snapshot());
+  if(resumeAfterStart){const intent=resumeAfterStart;resumeAfterStart=null;if(intent==='write')shellQuick.openWrite();else openEditor(intent);}
   if(startupNotice)notify(startupNotice);
  }
  if(generation===loadGeneration){const startupJourney=parseJourneyRoute(location.hash);if(startupJourney){if(session.snapshot().owned&&session.snapshot().writable)openFirstJourney({step:startupJourney.step,route:true});else{history.replaceState(null,'','#home');handledHash='#home';}}}
 }
-function sample(selection={},view){if(!leaveMember())return;++loadGeneration;if(view)current=view;load(null,'example',selection);if(view)writeLocation();$('save-feedback').hidden=true;if($('account-settings').open)$('account-settings').close();}
+function sample(selection={},view){if(!pauseMember())return;++loadGeneration;if(view)current=view;load(null,'example',selection);if(view)writeLocation();$('save-feedback').hidden=true;if($('account-settings').open)$('account-settings').close();}
 $('account-entry').onclick=e=>{
  if(member?.snapshot().owned){e.preventDefault();openAccountMenu();}
  else if(parseSelectionRoute(location.hash).scope==='owner')stashPendingOwnerRoute(sessionStorage,location.hash);

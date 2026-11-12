@@ -21,7 +21,9 @@ export function createQuickAdd(deps) {
   // 진입 가드는 기존 openEditor와 같은 문구·같은 순서다(예시 → 로그인, 읽기 전용 → 안내+설정 "내 데이터").
   function ensureWritable() {
     const member = deps.getMember();
-    if (deps.getSource() !== 'server' || !member?.snapshot().owned) { deps.openLoginStart('new-tree'); return false; }
+    if (!member?.snapshot().owned) { deps.openLoginStart('new-tree'); return false; }
+    // #453 A: 예시를 둘러보는 중이면 내 기록으로 돌아와 같은 창을 열어 준다.
+    if (deps.getSource() !== 'server') { deps.resumeMember?.('write'); return false; }
     if (!member.snapshot().writable) { deps.notify(DROP_READONLY_NOTICE); deps.openSettingsData?.(); return false; }
     return true;
   }
@@ -29,11 +31,13 @@ export function createQuickAdd(deps) {
   // #425: 입구는 하나다 — 같은 창(write-panel)을 열고, 먼저 보일 탭은 설정값(없으면 쉬운 추가)이 정한다.
   function openWrite() {
     if (!ensureWritable()) return;
+    deps.resetEditorBaseline?.();
     deps.writePanel.open();
   }
   // 쉬운 추가 탭으로 연다(끌어다 놓기·'지금 다듬기'처럼 쉬운 추가로 되돌아오는 길).
   function openQuick() {
     if (!ensureWritable()) return;
+    deps.resetEditorBaseline?.();
     deps.writePanel.open('easy');
   }
   function resetQuick() {
