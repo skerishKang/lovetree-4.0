@@ -47,7 +47,7 @@ export function createFeedbackRepo(pool) {
         'SELECT * FROM lovetree_feedback WHERE product_id = $1 AND id = $2',
         [productId, numeric]
       );
-      return feedbackRow(rows[0]);
+      return rows[0] ? feedbackRow(rows[0]) : null;
     },
 
     async update({ productId, id, status, memo, issueNumber }) {
@@ -63,7 +63,7 @@ export function createFeedbackRepo(pool) {
           RETURNING *`,
         [productId, numeric, status ?? null, memo ?? null, issueNumber ?? null]
       );
-      return feedbackRow(rows[0]);
+      return rows[0] ? feedbackRow(rows[0]) : null;
     }
   };
 }
