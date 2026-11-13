@@ -61,6 +61,13 @@ export async function measureMapPixelsInPage(png) {
     const el = document.elementFromPoint(x, y);
     return el === stage || el?.classList.contains('paper-noise');
   };
+  // 배경색 행 훑기용: 알려진 겉요소(overlays)만 사각형으로 피하고 elementFromPoint는 하지 않는다.
+  // 배경은 행에서 가장 많은 색을 고르므로(최다 bin) 가려진 점이 섞여도 배경 추정이 바뀌지 않고,
+  // 이 행 훑기가 측정당 수만 번의 elementFromPoint를 만들어 해석 시간의 대부분이었다(2026-11-14 실측).
+  const visibleRect = (x, y) => {
+    if (x < 3 || y < 3 || x >= stage.clientWidth - 3 || y >= stage.clientHeight - 3) return false;
+    return !overlays.some(r => x >= r.left - 1 && x <= r.right + 1 && y >= r.top - 1 && y <= r.bottom + 1);
+  };
   // The backdrop is a vertical gradient. Use the modal visible background in
   // nearby rows, rather than a single edge pixel (ellipse crossings) or a row
   // median (a long horizontal edge can cover over half a narrow viewport).
@@ -69,7 +76,7 @@ export async function measureMapPixelsInPage(png) {
     const row = Math.round(y * scale);
     if (!backdrops.has(row)) {
       const bins = new Map();
-      for (const dy of [-3, 0, 3]) for (let x = 3; x < stage.clientWidth - 3; x += 11) if (visible(x, y + dy)) {
+      for (const dy of [-3, 0, 3]) for (let x = 3; x < stage.clientWidth - 3; x += 11) if (visibleRect(x, y + dy)) {
         const c = rgb(x, y + dy), key = c.map(v => Math.round(v / 4)).join(',');
         if (!bins.has(key)) bins.set(key, []); bins.get(key).push(c);
       }
