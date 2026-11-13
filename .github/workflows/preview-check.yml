@@ -65,6 +65,15 @@ jobs:
           start=$(date +%s)
           node --test tests/v41-board-readonly-520-521.test.mjs
           echo "보드 읽기 전용·겹침 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+      # #514: 남은 접근성 항목(moderate 이하)을 실제 화면에서 잰다 — 확대 막기·랜드마크·제목 단계·
+      # 모바일 선택 줄 top. axe-core·Chromium이 필요한 실행형 시험이라 크롬이 준비된 이 잡에서 돈다.
+      - name: 남은 접근성 항목 시험(#514, 건너뜀=실패)
+        env:
+          LT_A11Y514_REQUIRE: '1'
+        run: |
+          start=$(date +%s)
+          node --test tests/v41-a11y-514-remaining.test.mjs
+          echo "남은 접근성 항목 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
       - name: 지도 실제 대비·판 전환 시험(건너뜀=실패)
         env:
           LT_MAP_CONTRAST_REQUIRE: '1'

@@ -131,7 +131,8 @@ body:not(.lt-advanced) .lt-move-btn { display: none !important; }
   body.lt-advanced #undoBtn:not([hidden]) { display: inline-flex !important; align-items: center; min-height: 44px; padding: 0 8px; white-space: nowrap; }
   /* #521: 모바일 순간 선택 패널(top 64px)이 '진주빛 보드 · 읽기 전용' 표시(top 78~89px)를 덮던 것을
      패널을 96px로 내려 표시가 온전히 보이게 한다(겹침 0). 보드 화면에만 적용한다. */
-  html[data-v41-screen=board] .lt-moment-picker { top: 96px; }
+  /* #514 메모: 고정 96px 대신 머리줄·테마 표시의 실제 아래끝에서 계산한 값을 쓴다(board-extras.js syncMomentPickerTop). */
+  html[data-v41-screen=board] .lt-moment-picker { top: var(--lt-board-picker-top, 96px); }
 }
 
 /* === #467 밤 판 (판 테마 = 밤). 종이 판(기본)은 이 블록에 걸리지 않는다. ===
