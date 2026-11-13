@@ -10,7 +10,7 @@ globalThis.window = globalThis;
 await import('../public/v41/views/board/board-model.js');
 const LT58Model = globalThis.LT58Model;
 
-const CARD_W = 242, CARD_H = 260, GAP_W = 300, GAP_H = 420;
+const CARD_W = 242, CARD_H = 260, GAP_W = 300, GAP_H = 460; // #548: 카드 글자 기준선 올림에 따라 세로 간격 420→460
 
 function boxOf(pos) {
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
@@ -57,7 +57,7 @@ test('#469 예시 40순간: 12칸·실사용 줄 간격으로 펼쳐 전체 보�
   assert.deepEqual(overlapPairs(pos), [], '카드끼리 겹치지 않는다(#395)');
   const box = boxOf(pos);
   assert.ok(box.w <= 3692 + 1, `판 가로 ${Math.round(box.w)} (12칸)`);
-  assert.ok(box.h <= 2780 + 1, `판 세로 ${Math.round(box.h)} (실사용 줄 간격 — 옛 배치 5910)`);
+  assert.ok(box.h <= 3040 + 1, `판 세로 ${Math.round(box.h)} (실사용 줄 간격 460px — 옛 배치 5910)`);
   const z = overviewZoom(pos);
   assert.ok(z >= 0.25, `전체 보기 배율 ${(z * 100).toFixed(1)}% ≥ 25% (옛 배치 13~16%)`);
   assert.equal(detachedCount(pos), 0, '동떨어진 카드 0장');
@@ -92,14 +92,14 @@ test('#469 순간 5개·15개 트리: 지금과 같거나 더 낫다(겹침 0·�
   assert.equal(flat.size, 5);
   assert.deepEqual(overlapPairs(flat), []);
   const flatBox = boxOf(flat);
-  assert.ok(flatBox.h <= 1940 + 1, `따로 5 세로 ${Math.round(flatBox.h)} (지금 1940)`);
+  assert.ok(flatBox.h <= 2120 + 1, `따로 5 세로 ${Math.round(flatBox.h)} (#548 간격 460px 기준 2120)`);
 
   const treeIds = Array.from({ length: 15 }, (_, i) => 's' + i);
   const treeEdges = treeIds.slice(1).map((id, i) => ({ kind: 'parent', from: i < 5 ? treeIds[i] : treeIds[i - 5], to: id }));
   const spread = LT58Model.treeSpread(treeIds, treeEdges);
   assert.deepEqual(overlapPairs(spread), []);
   const treeBox = boxOf(spread);
-  assert.ok(treeBox.h <= 2360 + 1, `트리 15 세로 ${Math.round(treeBox.h)} (지금 2360)`);
+  assert.ok(treeBox.h <= 2580 + 1, `트리 15 세로 ${Math.round(treeBox.h)} (#548 간격 460px 기준 2580)`);
   assert.ok(treeBox.w >= 2042 - 1 && treeBox.w <= 3692 + 1);
 });
 

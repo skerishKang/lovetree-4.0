@@ -7,7 +7,7 @@
 .ytSourceBadge{position:absolute;right:8px;top:8px;z-index:4;background:rgba(14,9,20,.78);color:#fff;border:1px solid rgba(255,255,255,.18);padding:4px 6px;border-radius:999px;font-size:8px;font-weight:750;letter-spacing:.06em}
 .viewerYouTube{width:100%;display:grid;gap:10px;padding:10px}
 .viewerYouTube iframe{width:100%;aspect-ratio:16/9;min-height:220px;border:0;border-radius:14px;background:#0b0810;display:block}
-.viewerFallback{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:8px 4px 2px;color:#bdaec7;font-size:10px}
+.viewerFallback{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:8px 4px 2px;color:#bdaec7;font-size:12px}
 .viewerFallback .miniBtn{margin-left:auto}
 .videoSourceChoice{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
 .videoSourceChoice label{display:flex;align-items:center;gap:7px;padding:9px 10px;border:1px solid rgba(255,255,255,.09);border-radius:12px;color:#d7c8df;font-size:11px;background:rgba(255,255,255,.035)}
@@ -19,7 +19,7 @@
 
   #viewerModal .modal{width:calc(100vw - 16px)!important;max-width:none!important;max-height:92vh;overflow:auto;padding:16px!important}
   .viewerYouTube{padding:0;gap:8px}.viewerYouTube iframe{min-height:0;width:100%;aspect-ratio:16/9;max-height:46vh}
-  .viewerFallback{font-size:9px;padding:4px 0}.viewerFallback .miniBtn{width:100%;margin:0}
+  .viewerFallback{font-size:12px;padding:4px 0}.viewerFallback .miniBtn{width:100%;margin:0}
   .videoSourceChoice{grid-template-columns:1fr}.typeGrid{grid-template-columns:repeat(2,1fr)!important}
   #addModal .modal,#editModal .modal{padding:15px!important;width:calc(100vw - 12px)!important;max-height:94vh!important}
   #composerPreviewWrap,#editPreview{position:static!important;max-width:100%;overflow:hidden}
@@ -172,7 +172,7 @@ html[data-v41-screen=board][data-lt-board-theme="night"] body .card .keywordOnCa
    기본 화면에서도 찾는다. 한 벌만 있으니 고급 모드에서 두 벌로 보이지 않는다. 값은 같은
    lt41.boardTheme(설정 '보드·지도 판'과 같은 값)를 쓴다. === */
 .boardThemeSwitch{display:inline-flex;align-items:center;flex:none;border:1px solid rgba(255,255,255,.12);border-radius:18px;overflow:hidden;background:rgba(28,17,38,.75)}
-.boardThemeSwitch .themeSwitchBtn{border:0;border-radius:0;background:transparent;height:36px;min-height:0;min-width:0;padding:0 12px;font-size:12px;color:#cbbcd4}
+.boardThemeSwitch .themeSwitchBtn{border:0;border-radius:0;background:transparent;height:36px;min-height:0;min-width:0;padding:0 12px;font-size:13px;color:#cbbcd4}
 .boardThemeSwitch .themeSwitchBtn[aria-pressed="true"]{background:rgba(255,255,255,.1);color:#fff}
 /* 정원에서 머리줄 [종이|밤] 눌린 쪽 표시(전 규칙은 도구 줄 안을 가리켰다 — 자리를 옮겼으니 함께 옮긴다) */
 html[data-lt-theme=garden] .boardThemeSwitch{border-color:var(--lt-line);background:var(--lt-paper)}
@@ -184,12 +184,12 @@ html[data-lt-theme=garden] .boardThemeSwitch .themeSwitchBtn[aria-pressed="true"
   .tree-title-btn{max-width:96px}
   .tree-title-btn #treeTitleText{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .boardThemeSwitch{border-radius:16px}
-  .boardThemeSwitch .themeSwitchBtn{height:44px;padding:0 9px;font-size:11px}
+  .boardThemeSwitch .themeSwitchBtn{height:44px;padding:0 9px;font-size:13px}
 }
 @media(max-width:420px){
   header{gap:6px;padding:0 8px}
   .tree-title-btn{max-width:72px}
-  .boardThemeSwitch .themeSwitchBtn{padding:0 7px;font-size:10px;position:relative}
+  .boardThemeSwitch .themeSwitchBtn{padding:0 7px;font-size:13px;position:relative}
   /* #421 방식: 보이는 모양은 줄이고 ::after로 누르는 영역을 44px 이상으로 넓힌다. */
   .boardThemeSwitch .themeSwitchBtn::after{content:"";position:absolute;inset:-3px -2px}
 }
