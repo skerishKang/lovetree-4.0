@@ -2,6 +2,7 @@
 // 계정 입구는 열지 않는다. 설정 dialog만 showModal()로 드러낸 뒤 실제 선택 단추를 누른다.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { settleMap } from './helpers/map-contrast.mjs';
 import { createServer } from 'node:http';
 import { createReadStream, existsSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
@@ -78,6 +79,17 @@ async function fingerprint(frame) {
   });
 }
 
+// 그려진 화면 지문은 연출·글꼴이 다 끝난 뒤에야 같아진다. 느린 환경에서는 한 번 읽어 비교하면 가끔 어긋나므로,
+// 같아질 때까지 잠깐씩 다시 읽는다(최대 약 4초). 끝내 다르면 마지막 값으로 단언이 실패한다.
+async function fingerprintMatching(frame, expected) {
+  let got = await fingerprint(frame);
+  for (let i = 0; i < 12 && JSON.stringify(got) !== JSON.stringify(expected); i += 1) {
+    await new Promise(r => setTimeout(r, 350));
+    got = await fingerprint(frame);
+  }
+  return got;
+}
+
 async function settingsPlate(page, frame, plate) {
   await page.evaluate(() => document.getElementById('account-settings').showModal());
   await page.locator(`#account-settings button[data-board-theme="${plate}"]`).scrollIntoViewIfNeeded();
@@ -107,13 +119,34 @@ async function assertIdle(frame, page, plate) {
 }
 
 async function clickMapObject(frame, kind) {
-  const point = await frame.evaluate(kind => {
-    const candidates = kind === 'hub' ? window.__lt.hubs() : window.__lt.dots().filter(n => !n.first);
-    return candidates.find(n => document.elementFromPoint(n.x, n.y)?.id === 'stage');
-  }, kind);
-  assert.ok(point, `${kind}: 실제 누를 수 있는 좌표가 있다`);
-  await frame.locator('#stage').click({ position: { x: point.x, y: point.y } });
-  return point;
+  // 연출이 끝난 좌표를 읽고 누른다. 느린 CI에서는 그래도 누르는 사이 화면이 움직여 빗나갈 수 있어,
+  // 눌린 결과(고른 순간·묶음)가 기대와 다르면 다시 멈추기를 기다려 누른다(최대 4번). 그래도 다르면 호출한 쪽 단언이 잡는다.
+  let point = null;
+  const tries = [];
+  await frame.evaluate(() => {
+    if (window.__mapPointerLog) return;
+    window.__mapPointerLog = [];
+    for (const type of ['pointerdown', 'pointerup', 'pointercancel']) document.addEventListener(type, e => window.__mapPointerLog.push(`${type}@${Math.round(e.clientX)},${Math.round(e.clientY)}>${e.target?.id || e.target?.tagName}`), true);
+  });
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    await settleMap(frame);
+    point = await frame.evaluate(kind => {
+      const candidates = kind === 'hub' ? window.__lt.hubs() : window.__lt.dots().filter(n => !n.first);
+      return candidates.find(n => document.elementFromPoint(n.x, n.y)?.id === 'stage');
+    }, kind);
+    assert.ok(point, `${kind}: 실제 누를 수 있는 좌표가 있다`);
+    await frame.evaluate(() => { window.__mapPointerLog.length = 0; });
+    await frame.locator('#stage').click({ position: { x: point.x, y: point.y } });
+    const hit = await frame.evaluate(({ kind, id }) => (kind === 'hub' ? window.__lt.state.cluster?.id : window.__lt.state.selected?.id) === id, { kind, id: point.id });
+    if (hit) return point;
+    // 빗나간 까닭을 남긴다(실패 글에 그대로 나온다): 누른 자리, 실제로 온 누름, 누른 뒤 상태와 그 묶음·점의 지금 자리.
+    tries.push(await frame.evaluate(({ kind, point }) => {
+      const s = window.__lt.state, now = (kind === 'hub' ? window.__lt.hubs() : window.__lt.dots()).find(n => n.id === point.id), r = document.getElementById('stage').getBoundingClientRect();
+      return { at: [Math.round(point.x), Math.round(point.y)], now: now ? [Math.round(now.x), Math.round(now.y)] : null, mode: s.mode, view: s.view, selected: s.selected?.id || null, cluster: s.cluster?.id || null, drag: !!s.drag, stage: [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)], inner: [innerWidth, innerHeight], pointer: window.__mapPointerLog.splice(0) };
+    }, { kind, point }));
+    await new Promise(r => setTimeout(r, 400));
+  }
+  assert.fail(`${kind} 누르기가 네 번 모두 빗나감: ${JSON.stringify(tries)}`);
 }
 
 async function interactions({ page, frame, width }) {
@@ -131,6 +164,13 @@ async function interactions({ page, frame, width }) {
   await frame.waitForFunction(() => document.getElementById('detail').classList.contains('open'));
   await frame.locator('#detailClose').click();
   assert.equal(await frame.locator('#detail').evaluate(el => el.classList.contains('open')), false, '상세 닫기');
+  // #529: 닫힌 상세 창 안으로 초점이 가도 지도 겹이 옆으로 밀리지 않는다(밀리면 이후 누르기가 전부 395px 빗나갔다).
+  assert.deepEqual(await frame.evaluate(() => {
+    document.getElementById('detailClose').focus();
+    const app = document.querySelector('.app'), left = Math.round(document.getElementById('stage').getBoundingClientRect().left);
+    document.activeElement?.blur?.();
+    return [left, app.scrollLeft, app.scrollTop];
+  }), [0, 0, 0], '닫힌 상세 창에 초점이 가도 지도가 밀리지 않는다');
   await frame.locator('#overviewBtn').click();
   const hub = await clickMapObject(frame, 'hub');
   assert.equal(await frame.evaluate(() => window.__lt.state.cluster?.id), hub.id, '묶음 클릭');
@@ -205,11 +245,11 @@ test('지도 판 실제 흐름: 설정·저장 복원·두 보기·누르기·�
           assert.notEqual(switched.canvas, paper.canvas, '밤 판은 실제 그려진 픽셀이 달라진다');
           const fresh = await openMap(browser, base, { width, appTheme, plate: 'night' });
           try {
-            assert.deepEqual(switched, await fingerprint(fresh.frame), '바로 바꾼 밤 판 = 저장 후 처음 연 밤 판 (캔버스 픽셀·패널 색·점 자리)');
+            assert.deepEqual(await fingerprintMatching(fresh.frame, switched), switched, '바로 바꾼 밤 판 = 저장 후 처음 연 밤 판 (캔버스 픽셀·패널 색·점 자리)');
             assert.deepEqual(fresh.errors, [], '저장 복원 페이지 오류 0');
           } finally { await fresh.context.close(); }
           await settingsPlate(live.page, live.frame, 'paper');
-          assert.deepEqual(await fingerprint(live.frame), paper, '바로 바꾼 종이 판 = 저장 후 처음 연 종이 판');
+          assert.deepEqual(await fingerprintMatching(live.frame, paper), paper, '바로 바꾼 종이 판 = 저장 후 처음 연 종이 판');
           await settingsPlate(live.page, live.frame, 'night');
           await assertIdle(live.frame, live.page, 'night');
           await interactions({ ...live, width });
