@@ -27,6 +27,19 @@ html[data-v41-screen=book] .next-page button{background:var(--lt-gold-ink);borde
 html[data-v41-screen=book][data-lt-theme=garden] .ambient{background:linear-gradient(135deg,var(--lt-stage),var(--lt-stage-2) 56%,var(--lt-garden-edge))}
 html[data-v41-screen=book][data-lt-theme=garden] .next-page button{background:var(--lt-primary);border-color:var(--lt-primary);color:var(--lt-primary-ink)}
 html[data-v41-screen=book][data-lt-theme=garden] .yt-placeholder{background:var(--lt-paper);color:var(--lt-ink)}
+/* #515(2026-11-13): 정원 책 아래 '다음 순간으로 이어진 이유'가 밝은 배경 위 밝은 글자로 1.1:1이었다.
+   종이 알약을 깔고 정원 잉크로 쓴다 — 1440·1024(밝은 무대)와 390(책 표지 위) 모두에서 같은 규칙으로 읽힌다.
+   밤 테마는 이 규칙을 받지 않아 지금 모습 그대로다. */
+html[data-v41-screen=book][data-lt-theme=garden] .why-margin{color:var(--lt-ink);opacity:1;padding:5px 14px;border:1px solid var(--lt-line-paper);border-radius:999px;background:rgba(255,253,248,.94);box-shadow:0 2px 8px rgba(75,51,42,.10)}
+html[data-v41-screen=book][data-lt-theme=garden] .why-margin span{color:var(--lt-rose-ink)}
+/* 390 한 장 보기(reader-layout.css)는 이 줄을 normal flow로 내리는데, 책 표지(z-auto positioned)가 위에 그려져 줄이 가려졌다.
+   정원에서만 흐름은 그대로 두고 쌓임만 올려 알약이 보이게 한다(밤은 지금처럼 둔다). */
+html[data-book-view=single][data-v41-screen=book][data-lt-theme=garden] .why-margin{position:relative;left:auto;z-index:45}
+/* #516(2026-11-13): 정원 책 머리 '한 장'(안 고른 쪽)이 어두운 유리 위 --lt-muted(어두운 색)로 2.7:1이었다.
+   안 고른 쪽은 밝은 종이색, 고른 쪽은 지금 규칙 그대로(금빛 바탕 + --lt-stage 글자)로 둔다. */
+html[data-v41-screen=book][data-lt-theme=garden] .tools .view-toggle .ui-btn[aria-pressed=false]{color:var(--lt-paper);background:rgba(9,8,14,.5);border-color:rgba(255,253,248,.4)}
+/* #516: 아래 책장 넘김 줄의 페이지 수 — 밝은 글자로 올려 어떤 바탕(무대·표지)에서도 4.5:1 이상. */
+html[data-v41-screen=book][data-lt-theme=garden] .page-label{color:var(--lt-paper)}
 /* 8. 책 가운데 머리 표시("01 · 날짜")를 없앤다. 날짜는 카드 아래 정보 줄에만, 페이지 번호는 아래 모서리에만. */
 html[data-v41-screen=book] .eyebrow{display:none}
 /* 모바일 머리 표시도 같은 이유로 감춘다(날짜는 정보 줄에만, 페이지 위치는 아래 이동 줄에). */
