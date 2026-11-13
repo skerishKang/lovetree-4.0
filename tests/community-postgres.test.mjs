@@ -69,7 +69,7 @@ test('#538 둘러보기 SQL: 순간 3개 이상·트리당 한 행·비공개 �
   const sid=prefix=>(prefix+tag).padEnd(24,'x').slice(0,24);
   await insert(sid('auto3'),'own-a','tree-a',{});                       // 자동 공개 3개 → 나온다
   await insert(sid('own3'),'own-b','tree-b',{origin:'owner',discoverable:true}); // 옛 스위치 행 3개 → 나온다
-  await insert(sid('two'),'own-c','tree-c',{});                         // 순간 2개 → 안 나온다
+  await insert(sid('two'),'own-c','tree-c',{momentCount:2});            // 순간 2개 → 안 나온다
   await insert(sid('priv'),'own-d','tree-d',{});                        // 비공개 지정 → 안 나온다
   await visibility.set({productId,subjectId:'own-d',treeId:'tree-d',visibility:'private'});
   await insert(sid('dupO'),'own-e','tree-e',{origin:'owner',discoverable:true}); // 같은 트리에

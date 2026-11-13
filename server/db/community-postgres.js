@@ -34,6 +34,10 @@ export function createCommunityRepo(pool){
        WHERE s2.product_id=s.product_id AND s2.tree_id=s.tree_id
          AND EXISTS (SELECT 1 FROM lovetree_community_hidden_shares h WHERE h.product_id=s2.product_id AND h.share_id=s2.share_id)
      )
+       AND NOT EXISTS (
+         SELECT 1 FROM lovetree_tree_visibility v
+         WHERE v.product_id=s.product_id AND v.subject_id=s.subject_id AND v.tree_id=s.tree_id AND v.visibility='private'
+       )
        AND ($2::text IS NULL OR NOT EXISTS (
          SELECT 1 FROM lovetree_community_blocks b
          WHERE b.product_id=s.product_id AND b.blocker_subject_id=$2 AND b.blocked_subject_id=s.subject_id
@@ -65,6 +69,10 @@ export function createCommunityRepo(pool){
        WHERE s2.product_id=s.product_id AND s2.tree_id=s.tree_id
          AND EXISTS (SELECT 1 FROM lovetree_community_hidden_shares h WHERE h.product_id=s2.product_id AND h.share_id=s2.share_id)
      )
+       AND NOT EXISTS (
+         SELECT 1 FROM lovetree_tree_visibility v
+         WHERE v.product_id=s.product_id AND v.subject_id=s.subject_id AND v.tree_id=s.tree_id AND v.visibility='private'
+       )
        AND ($2::text IS NULL OR NOT EXISTS (
          SELECT 1 FROM lovetree_community_blocks b
          WHERE b.product_id=s.product_id AND b.blocker_subject_id=$2 AND b.blocked_subject_id=s.subject_id
