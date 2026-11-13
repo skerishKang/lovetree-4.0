@@ -61,6 +61,7 @@ export function createWorkspaceApi({ fetchImpl = (...args) => globalThis.fetch(.
         subject: typeof payload?.subject === 'string' && payload.subject ? payload.subject : null,
         confirmKind: typeof payload?.confirmKind === 'string' ? payload.confirmKind : null,
         email: typeof payload?.email === 'string' ? payload.email : null,
+        aiCustomer: payload?.aiCustomer === true,
         deleted: payload?.deleted === true,
         commonAccountDeleted: payload?.commonAccountDeleted === true,
         savedAt: payload?.savedAt ?? null,
