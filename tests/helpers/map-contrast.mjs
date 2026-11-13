@@ -80,8 +80,8 @@ export async function measureMapPixelsInPage(png) {
   };
   const sample = (x, y, bg = backdrop(y)) => ({ ratio: ratio(rgb(x, y), bg), fg: hex(rgb(x, y)), bg: hex(bg), x, y });
   const rows = [];
-  const add = (role, id, samples, q = .85) => {
-    if (!samples.length) { rows.push({ role, id, ratio: 0, fg: 'missing', bg: 'missing', samples: 0 }); return; }
+  const add = (role, id, samples, q = .85, why = null) => {
+    if (!samples.length) { rows.push({ role, id, ratio: 0, fg: 'missing', bg: 'missing', samples: 0, why }); return; }
     const r = quantile(samples, q); rows.push({ role, id, ratio: Math.round(r.ratio * 100) / 100, fg: r.fg, bg: r.bg, samples: samples.length });
   };
   const mask = document.createElement('canvas'); mask.width = img.width; mask.height = img.height;
@@ -103,17 +103,21 @@ export async function measureMapPixelsInPage(png) {
     const w = Math.min(mask.width - x0, Math.ceil((t.right - t.left + 1) * scale)), h = Math.min(mask.height - y0, Math.ceil((t.bottom - t.top + 1) * scale));
     if (w <= 0 || h <= 0) continue;
     const data = mc.getImageData(x0, y0, w, h).data, samples = [];
+    // 표본이 하나도 없을 때 까닭을 남긴다(글자 속이 안 그려졌는지, 가려졌는지 — 실패 글에 그대로 나온다).
+    const why = { box: [x0, y0, w, h], font: t.font, darkest: 255, ink: 0, hidden: 0 };
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-      const mi = (y * w + x) * 4;
-      if (Math.max(data[mi], data[mi + 1], data[mi + 2]) > 10) continue; // opaque glyph interiors, not antialias edges
+      const mi = (y * w + x) * 4, v = Math.max(data[mi], data[mi + 1], data[mi + 2]);
+      if (v < why.darkest) why.darkest = v;
+      if (v > 10) continue; // opaque glyph interiors, not antialias edges
+      why.ink++;
       const px = (x0 + x) / scale, py = (y0 + y) / scale;
-      if (!visible(px, py)) continue;
+      if (!visible(px, py)) { why.hidden++; continue; }
       // Hub numbers sit on a coloured/white disc. The centre of its upper
       // inner rim is a rendered background pixel, away from the two digits.
       const bg = t.role === 'hub-number' ? rgb(t.x, t.y - 9) : backdrop(py);
       samples.push(sample(px, py, bg));
     }
-    add(t.role, `${i}:${t.text}`, samples, .1); textBounds.push(t);
+    add(t.role, `${i}:${t.text}`, samples, .1, why); textBounds.push(t);
   }
   const dots = window.__lt.dots(), hubs = window.__lt.hubs();
   for (const d of dots) {

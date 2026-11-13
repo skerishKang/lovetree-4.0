@@ -72,7 +72,7 @@ test('지도 실제 대비: 앱 2 × 판 2 × 1440·390, 두 보기·선택 상�
             results.push(measured);
             for (const row of measured.canvas.rows) {
               const threshold = ['label', 'hub-number'].includes(row.role) ? 4.5 : 3;
-              if (row.ratio < threshold) failures.push(`${tag} canvas ${row.role}(${row.id}) ${row.fg}/${row.bg} ${row.ratio}:1 < ${threshold}`);
+              if (row.ratio < threshold) failures.push(`${tag} canvas ${row.role}(${row.id}) ${row.fg}/${row.bg} ${row.ratio}:1 < ${threshold}${row.why ? ' ' + JSON.stringify(row.why) : ''}`);
             }
             for (const row of measured.dom) if (row.ratio < 4.5) failures.push(`${tag} DOM ${row.role}(${row.id}) ${row.fg}/${row.bg} ${row.ratio}:1 < 4.5`);
             evidence.push({ tag, canvas: measured.canvas, dom: measured.dom });
