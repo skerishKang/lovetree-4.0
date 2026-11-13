@@ -53,7 +53,7 @@ html[data-lt-theme=garden] .shelf-back:hover{background:var(--lt-glass-strong);b
 .page.right:after{right:1%;transform:skewX(3deg)}
 .page-content{position:absolute;inset:0;padding:43px 46px 37px;display:flex;flex-direction:column;overflow:hidden}
 .eyebrow{position:absolute;z-index:37;top:18px;left:50%;transform:translateX(-50%);color:#9b8c80;font-size:9px;letter-spacing:.2em;white-space:nowrap}
-.folio{position:absolute;bottom:14px;color:#a29284;font:12px var(--book-serif)}
+.folio{position:absolute;bottom:14px;color:#6f605a;font:12px var(--book-serif)}
 .left .folio{left:23px}
 .right .folio{right:23px}
 .edge-zone{position:absolute;z-index:42;top:5%;bottom:5%;width:38px;cursor:ew-resize}

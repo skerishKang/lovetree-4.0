@@ -162,6 +162,36 @@ test('#295 보완: 창 크기 변경·페이지 크기 변화(ResizeObserver) �
 
 function rejudgeStopped() { return false; }
 
+// 관찰 등록을 기록하는 관찰자: 재등록 계약(같은 요소면 다시 등록하지 않는다)을 세는 데 쓴다
+class RecordingRO extends FakeRO {
+  constructor(cb) { super(cb); RecordingRO.last = this; this.registrations = []; }
+  observe(el) { this.registrations.push(['observe', el]); super.observe(el); }
+  unobserve(el) { this.registrations.push(['unobserve', el]); super.unobserve(el); }
+}
+
+test('재측정(레인C): 같은 요소를 다시 observe해도 재등록하지 않는다 — 재등록은 초기 발화를 내고 판정 무한 루프가 된다', () => {
+  const t = fakeRaf(), d = fakeDocs();
+  const page = fakePage();
+  let judged = 0;
+  const rejudge = createOverflowRejudge({
+    judge: () => { judged++; judgeWith(page)(); },
+    raf: t.raf, cancelRaf: t.cancelRaf,
+    addDocListener: d.addDocListener, addWinListener: d.addWinListener,
+    ResizeObserver: RecordingRO,
+    isPageImage: n => n instanceof FakeImg
+  });
+  rejudge.observe([page]);
+  const ro = RecordingRO.last;
+  assert.equal(ro.registrations.length, 1, '처음에는 한 번 등록한다');
+  // 실제 연결(markOverflowPages)은 판정할 때마다 observe를 다시 부른다 — 같은 요소면 재등록이 없어야 한다
+  rejudge.observe([page]);
+  assert.equal(ro.registrations.length, 1, '같은 요소의 observe는 재등록하지 않는다');
+  // 렌더로 요소가 갈아 끼기면(다른 노드) 다시 등록한다 — 넘침 판정은 새 요소에도 이어진다
+  const p2 = fakePage();
+  rejudge.observe([p2]);
+  assert.deepEqual(ro.registrations, [['observe', page], ['unobserve', page], ['observe', p2]], '요소가 바뀌었을 때만 떼고 다시 붙인다');
+});
+
 test('#295 보완 강도: book-extra의 실제 연결 코드로 이미지 로드 → 재판정이 이어진다(연결을 빼면 이 시험이 실패한다)', () => {
   // book-extra.js의 연결 한 줄을 그대로 가져와 가짜 환경에서 실행한다 — 소스와 시험이 같은 코드를 쓴다
   const wiring = BOOK_EXTRA_JS.match(/^window\.__TRACK59__\.overflowRejudge=createOverflowRejudge\(\{.*?\}\);/m);

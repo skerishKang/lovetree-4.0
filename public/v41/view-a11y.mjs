@@ -203,9 +203,17 @@ export function applyViewAccessibility(doc, win = doc?.defaultView) {
       const el = doc.querySelector(selector);
       if (!el) continue;
       const open = isOpen(el, mode);
+      // 닫힌 겹은 초점 대상에서 뺀다. 이 화면의 겹 몇몇은 display:none 대신 transform·opacity로
+      // 치워 둔다(보드·책의 #detail, 책의 #overview, 보드 #postAdd) — 닫혀도 눈에 보이지 않을 뿐
+      // 탭이 들어와 초점이 보이지 않는 단추에 남는다. inert는 그리기·본문 동작에 영향이 없다.
+      if (open) el.removeAttribute('inert');
+      else if (!el.hasAttribute('inert')) el.setAttribute('inert', '');
       const at = traps.findIndex(item => item.el === el);
       if (open && at < 0) {
-        const entry = { el, opener: doc.activeElement };
+        // 화면이 뜰 때 저절로 열린 겹(보드 첫 순간 상세)은 연 곳이 없다 — body를 연 곳으로 기록하지 않는다.
+        const active = doc.activeElement;
+        const opener = active && active !== doc.body && active !== doc.documentElement ? active : null;
+        const entry = { el, opener };
         traps.push(entry);
         if (el.getAttribute('role') === 'dialog' && !el.hasAttribute('aria-modal')) el.setAttribute('aria-modal', 'true');
         // #460: 초점만 옮기고 화면은 굴리지 않는다(preventScroll). 상세 창이 옆에서 미끄러져 들어오는 동안
@@ -215,7 +223,13 @@ export function applyViewAccessibility(doc, win = doc?.defaultView) {
         }, 0);
       } else if (!open && at >= 0) {
         const [entry] = traps.splice(at, 1);
-        if (!traps.length && entry.opener?.isConnected) setTimeout(() => entry.opener.focus?.({ preventScroll: true }), 0);
+        if (!traps.length) {
+          // 연 곳으로 돌아간다. 연 곳이 없었으면(저절로 열린 겹) 지금 고른 순간 카드로 돌려
+          // 키보드가 닫힌 겹 안이나 빈 몸통에 남지 않게 한다.
+          const fallback = doc.querySelector('#cardLayer article.card.selected');
+          const target = focusReturnTarget(entry.opener, fallback);
+          if (target) setTimeout(() => target.focus?.({ preventScroll: true }), 0);
+        }
       }
     }
   };
