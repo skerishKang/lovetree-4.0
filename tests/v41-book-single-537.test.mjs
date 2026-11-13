@@ -103,8 +103,8 @@ test('#537 8: 한 장 아래 작은 줄(.mobile-support)은 그리지 않는다'
   assert.doesNotMatch(LAYOUT, /\.mobile-support/, 'reader-layout.css 규칙도 지운다');
   // 마지막 순간 뒤의 '다음 순간' 안내는 두 장의 빈 오른쪽 페이지와 같은 자리에 흐름으로 붙는다.
   assert.match(EXTRA, /insertAdjacentHTML\('beforeend','<div class="next-page">/, '한 장에서도 다음 순간 안내');
-  assert.match(USE_CSS, /html\[data-book-shape=phone\]\[data-book-view=single\]\[data-v41-screen=book\] \.next-page\{position:static/, '휴대폰 한 장에서만 페이지 흐름에 놓는다');
-  assert.match(USE_CSS, /html\[data-v41-screen=book\] \.next-page\{position:absolute;inset:0 0 56px\}/, '넓은 화면 한 장은 두 장의 빈 쪽처럼 쪽 전체를 쓴다');
+  assert.match(USE_CSS, /html\[data-book-view=single\]\[data-v41-screen=book\] \.next-page\{position:static/, '한 장에서는 그 순간 글 아래 흐름에 놓는다(쪽을 덮지 않는다)');
+  assert.match(USE_CSS, /html\[data-v41-screen=book\] \.next-page\{position:absolute;inset:0 0 56px\}/, '두 장은 빈 오른쪽 페이지를 그대로 채운다');
 });
 
 test('#537 10: 목차·여기까지 온 길에서 들어와도 그 순간이 바로 크게 나온다', () => {

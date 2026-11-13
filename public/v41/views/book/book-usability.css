@@ -228,6 +228,6 @@ html[data-book-shape=phone][data-v41-screen=book] .journey-reason{margin-left:88
  html[data-v41-screen=book] .book-title-btn{max-width:30vw}
  html[data-v41-screen=book] .topbar .tools::-webkit-scrollbar{display:none}
 }
-/* #537: 마지막 순간 뒤의 '다음 순간' 안내 — 넓은 화면 한 장은 두 장의 빈 오른쪽 페이지와 같은 자리(쪽 전체)를 쓰고,
-   휴대폰 한 장(세로로 이어 읽는 흐름)에서만 페이지 흐름 끝에 놓는다. */
-html[data-book-shape=phone][data-book-view=single][data-v41-screen=book] .next-page{position:static;inset:auto;height:auto;min-height:120px;margin-top:18px;padding:16px 12px}
+/* #537: 마지막 순간 뒤의 '다음 순간' 안내 — 한 장(휴대폰·넓은 화면)에서는 그 순간 글 아래 흐름에 놓는다.
+   쪽 위에 겹쳐 놓으면 그 순간의 카드·단추를 가린다. 두 장은 지금처럼 빈 오른쪽 페이지를 채운다(위 규칙). */
+html[data-book-view=single][data-v41-screen=book] .next-page{position:static;inset:auto;height:auto;min-height:120px;margin-top:18px;padding:16px 12px}

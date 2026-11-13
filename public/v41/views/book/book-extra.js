@@ -227,10 +227,13 @@ renderSpread=function(idx,focusId=null,land=true){
  if(one){
   const host=narrow()?mobileContent:rightPage;
   const old=host.querySelector('.moment-title');if(old&&!one.synthetic)old.outerHTML=paintTitle(one);
-  // 마지막 순간 뒤에는 두 장의 빈 오른쪽 페이지와 같은 자리(다음 순간 안내·다른 트리)를 이어 붙인다.
+  /* 마지막 순간 뒤의 '다음 순간' 안내는 그 순간 글 아래에 이어 붙인다(쪽을 덮지 않는다).
+     안내를 쪽 위에 겹쳐 놓으면 그 순간의 카드·단추를 가린다 — 순간 내용 상자 안 끝에 놓는다. */
   const spread=currentSpread();
   if(spread?.right?.synthetic&&current===pageCount()-1){
-   host.insertAdjacentHTML('beforeend','<div class="next-page"><div><b>'+t(NEXT_PAGE_COPY)+'</b></div>'+(LTDEMO.readOnly?'':'<button type="button" data-next-moment="'+t(one.id)+'">'+t(NEXT_PAGE_ACTION)+'</button>')+otherTreesBlock()+'</div>');
+   const flow=host.querySelector('.page-content')||host;
+   flow.insertAdjacentHTML('beforeend','<div class="next-page"><div><b>'+t(NEXT_PAGE_COPY)+'</b></div>'+(LTDEMO.readOnly?'':'<button type="button" data-next-moment="'+t(one.id)+'">'+t(NEXT_PAGE_ACTION)+'</button>')+otherTreesBlock()+'</div>');
+   try{window.__TRACK59__?.rejudgeOverflow?.()}catch{}
   }
  }else{
   for(const [host,side] of [[leftPage,'left'],[rightPage,'right']]){
