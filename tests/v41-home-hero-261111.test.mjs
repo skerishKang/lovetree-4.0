@@ -13,7 +13,7 @@ const identityCss=src('public/v41/identity.css');
 const cleanupSrc=src('public/v41/shell/cleanup.mjs');
 const shellCss=src('public/v41/shell.css');
 
-// #380 2026-11-11: 가운데 버튼 — 로그인 전 [＋ 첫 순간 남기기·둘러보기·어떻게 쓰나요] / 로그인 후 [＋ 순간 추가·둘러보기] 두 개(#426: 이어 보던 순간 버튼을 뺴고 최근 순간 카드가 대신한다).
+// #380 2026-11-11: 가운데 버튼 — 로그인 전 [＋ 첫 순간 남기기·둘러보기·어떻게 쓰나요] / 로그인 후 [＋ 순간 추가·둘러보기·내 트리](2026-11-14 대표 결정으로 셋째 자리를 채운다).
 // 왼쪽 첫 버튼만 흰색 채움(primary-cta), 나머지 테두리. 로그인 후에는 버튼 2개라 셋째 자리는 숨긴다.
 
 const makeButton=()=>{
@@ -37,22 +37,22 @@ test('로그인 전: [＋ 첫 순간 남기기·둘러보기·어떻게 쓰나�
   assert.equal(plan.state,'out');
 });
 
-test('로그인·트리 있음: [＋ 순간 추가·둘러보기] 두 개(#426), 첫 버튼만 흰색',()=>{
+// 2026-11-14 대표 결정: 로그인한 첫 화면도 로그아웃과 같은 세 자리를 쓴다(#426 의 '셋째 자리는 숨김'을 대신한다).
+test('로그인·트리 있음: [＋ 순간 추가·둘러보기·내 트리] 세 개, 첫 버튼만 흰색',()=>{
   const btns=[makeButton(),makeButton(),makeButton()];
   applyHomeCenter(btns,{member:'in',treeCount:2});
-  assert.deepEqual(btns.map(b=>b.textContent),['＋ 순간 추가','둘러보기','']);
-  assert.deepEqual([btns[0].dataset.do, btns[1].dataset.do], ['add', 'community']);
-  assert.equal(btns[2].dataset.do, undefined, '숨긴 버튼은 역할도 없다');
+  assert.deepEqual(btns.map(b=>b.textContent),['＋ 순간 추가','둘러보기','내 트리']);
+  assert.deepEqual(btns.map(b=>b.dataset.do), ['add','community','trees']);
   assert.deepEqual([...btns].map(b=>b.classList.contains('primary-cta')),[true,false,false]);
-  assert.equal(btns[2].hidden,true,'남는 셋째 자리는 숨긴다');
+  assert.deepEqual(btns.map(b=>b.hidden),[false,false,false]);
 });
 
-test('로그인·트리 0: 버튼 두 개(이어 보기는 카드가 대신), 비활성 표시 없음',()=>{
+test('로그인·트리 0: 세 자리 모두 채운다, 비활성 표시 없음',()=>{
   const btns=[makeButton(),makeButton(),makeButton()];
   applyHomeCenter(btns,{member:'in',treeCount:0});
-  assert.deepEqual(btns.map(b=>b.textContent),['＋ 순간 추가','둘러보기','']);
+  assert.deepEqual(btns.map(b=>b.textContent),['＋ 순간 추가','둘러보기','내 트리']);
   assert.equal(btns.some(b=>b.disabled),false);
-  assert.equal(btns[2].hidden,true);
+  assert.deepEqual(btns.map(b=>b.hidden),[false,false,false]);
 });
 
 test('가운데 세 폭 동일·두 줄 높이 고정·좁은 화면 세로 스택 규칙이 첫 화면에 있다',()=>{

@@ -66,11 +66,12 @@ test('#426 ▶ 재생은 누른 뒤에만 — 첫 화면이 열릴 때는 플레
   assert.match(orbit,/if\(play\)\{e\.stopPropagation\(\);toggleRecentPlay\(play\);return;\}/);
 });
 
-test('#426 이어 보던 순간 버튼은 없다 — 로그인 후 버튼은 추가·둘러보기 두 개',()=>{
+test('#426 이어 보던 순간 버튼은 없다 — 로그인 후 버튼은 추가·둘러보기·내 트리',()=>{
   assert.doesNotMatch(homeCenter,/resume/);
-  assert.match(homeCenter,/'in-trees':\['add','community'\]/);
-  assert.match(homeCenter,/'in-empty':\['add','community'\]/);
-  assert.match(homeCenter,/button\.hidden = true/,'남는 자리는 숨긴다');
+  // 2026-11-14 대표 결정: 셋째 자리에 '내 트리'(trees)를 둔다. 순서·문구는 header-state 한 곳에서 온다.
+  assert.match(homeCenter,/button\.hidden = true/,'자리가 모자라면 숨긴다');
+  assert.match(homeCenter,/'in-trees':\['add','community','trees'\]/);
+  assert.match(homeCenter,/'in-empty':\['add','community','trees'\]/);
   // 둘째 줄에서도 마지막 순간 문구를 뺀다(카드가 대신) — 안내 문구에는 마지막 순간 표기가 남지 않는다.
   assert.doesNotMatch(homePresentation,/마지막 순간 「/);
   assert.doesNotMatch(homePresentation,/`마지막 순간 ·/);
