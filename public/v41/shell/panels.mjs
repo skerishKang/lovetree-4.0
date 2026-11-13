@@ -3,6 +3,7 @@
 // shell.mjs에서 조건·조회 방식·인자 형태를 바꾸지 않고 그대로 옮겼다(원칙 7).
 // 셸은 자기 상태(member·source·window.LT41·업로드)를 읽기 함수로 넘기고, 이 파일은 패널만 만진다.
 import {parentCandidates, suggestMomentTitle, coverModeOf} from '../domain.mjs';
+import {localDateOnly} from '../local-date.mjs';
 import {displayTreeTitle} from '../tree-name.mjs';
 import {mountPrivateUpload} from '../private-upload.mjs';
 import {fetchVideoTitle} from '../video-title.mjs';
@@ -68,7 +69,7 @@ export function createPanels(deps) {
   function onWriteTab(tab) {
     if (tab !== 'detailed' || formBaseline) return;
     const form = $('moment-form');
-    if (!form.elements.date.value) form.elements.date.value = new Date().toISOString().slice(0, 10);
+    if (!form.elements.date.value) form.elements.date.value = localDateOnly(); // #547: 기기의 오늘(UTC 아님)
     if (!form.elements.emotion.value) form.elements.emotion.value = '설렘';
     formBaseline = new URLSearchParams(new FormData(form)).toString();
     parentBaseline = parentValue();
@@ -113,7 +114,7 @@ export function createPanels(deps) {
     const form = $('moment-form');
     form.reset();
     $('relation-label').hidden = mode !== 'add';
-    for (const name of ['title', 'note', 'emotion', 'date', 'url', 'relation']) form.elements[name].value = mode === 'edit' ? m[name] || '' : name === 'emotion' ? '설렘' : name === 'date' ? new Date().toISOString().slice(0, 10) : '';
+    for (const name of ['title', 'note', 'emotion', 'date', 'url', 'relation']) form.elements[name].value = mode === 'edit' ? m[name] || '' : name === 'emotion' ? '설렘' : name === 'date' ? localDateOnly() : ''; // #547: 기기의 오늘
     // 2026-11-08 수정 모드에서 이미 적어 둔 제목·감정·날짜가 있으면 '더 적기'를 펼친 상태로 연다.
     $('more-fields').open = mode === 'edit' && Boolean((m.title || '').trim() || (m.emotion || '').trim() || (m.date || '').trim());
     const parent = mode === 'edit' && m.parentId ? c.tree.moments.find(moment => moment.id === m.parentId) : null;
