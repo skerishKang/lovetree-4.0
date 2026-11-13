@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 // #541 공유 링크 미리보기 카드(/t/<id>)와 검색 준비(robots.txt·sitemap.xml) 시험.
 // 함수는 순수 조립으로 만들어 fetch 를 가짜로 갈아 끼워 서버 응답별 동작을 확인한다.
 import { createTreePreview, shareCardFromRead, cardImageFor, youtubeVideoId } from '../functions/_lib/tree-preview.mjs';
-import { createRobots, createSitemap, collectSitemapShares, CARD_IMAGE_URL, PRODUCTION_HOST } from '../functions/_lib/search-meta.mjs';
+import { createRobots, createSitemap, collectSitemapShares, CARD_IMAGE_URL, PRODUCTION_HOST, SEARCH_OPEN } from '../functions/_lib/search-meta.mjs';
 import { youtubeIdFrom } from '../public/v41/thumb-fallback.mjs';
 import { onRequest as prodRoot } from '../functions/index.js';
 import { onRequest as v41Root } from '../functions/v41/index.js';
@@ -58,6 +58,7 @@ test('링크 미리보기 봇에게는 og 카드 HTML 을 돌려준다', async (
   assert.match(html, new RegExp(`<meta property="og:url" content="${PROD}/t/${SHARE_ID}">`));
   assert.match(html, new RegExp(`<link rel="canonical" href="${PROD}/t/${SHARE_ID}">`));
   assert.match(html, /<meta name="twitter:card" content="summary_large_image">/);
+  assert.match(html, /<meta name="robots" content="noindex">/, '검색을 열기 전에는 공유 카드도 noindex(미리보기는 그대로)');
   assert.match(html, /<meta name="twitter:image" content="https:\/\/i\.ytimg\.com/);
   assert.match(html, /#share\/LtShareId1234567890ab\/board/, '스크립트 넘기기도 지금 공유 주소 형식을 쓴다');
 });
@@ -185,8 +186,20 @@ test('youtubeVideoId 는 thumb-fallback youtubeIdFrom 과 같은 판정이다', 
   }
 });
 
-test('robots.txt — 운영 주소는 허용 + sitemap 안내, 개발 주소는 전면 차단', async () => {
+test('검색 열기 스위치는 서비스 시작 전이라 닫혀 있다(2026-11-14)', () => {
+  assert.equal(SEARCH_OPEN, false, '서비스를 열 때만 true 로 바꾼다');
+});
+
+test('robots.txt — 검색을 열기 전에는 운영 주소도 전면 차단', async () => {
   const robots = createRobots();
+  for (const origin of [PROD, DEV]) {
+    const response = await robots({ request: new Request(`${origin}/robots.txt`) });
+    assert.equal(await response.text(), 'User-agent: *\nDisallow: /\n', origin);
+  }
+});
+
+test('robots.txt — 검색을 열면 운영 주소는 허용 + sitemap 안내, 개발 주소는 전면 차단', async () => {
+  const robots = createRobots({ searchOpen: true });
   const prod = await robots({ request: new Request(`${PROD}/robots.txt`) });
   const prodBody = await prod.text();
   assert.match(prodBody, /User-agent: \*\nAllow: \//);
@@ -207,7 +220,7 @@ test('sitemap.xml — 둘러보기에 공개된 공유만 운영 주소에서 �
     `${UPSTREAM}/api/community/shares?limit=24`,
     `${UPSTREAM}/api/community/shares?limit=24&cursor=Bbbbbbbbbbbbbbbbbbb2`
   ]);
-  const sitemap = createSitemap({ fetcher });
+  const sitemap = createSitemap({ fetcher, searchOpen: true });
   const response = await sitemap({ request: new Request(`${PROD}/sitemap.xml`), env: ENV });
   assert.equal(response.status, 200);
   assert.match(response.headers.get('content-type') || '', /application\/xml/);
@@ -217,14 +230,21 @@ test('sitemap.xml — 둘러보기에 공개된 공유만 운영 주소에서 �
   assert.doesNotMatch(xml, /<lastmod>bad-date<\/lastmod>/);
 });
 
+test('sitemap.xml — 검색을 열기 전에는 운영 주소도 404 이고 서버를 부르지 않는다', async () => {
+  const fetcher = recorder(jsonReply({ items: [] }));
+  const closed = createSitemap({ fetcher });
+  assert.equal((await closed({ request: new Request(`${PROD}/sitemap.xml`), env: ENV })).status, 404);
+  assert.equal(fetcher.calls.length, 0);
+});
+
 test('sitemap.xml — 공개된 공유가 없으면 빈 urlset, 개발 주소는 404, 서버가 죽으면 503', async () => {
-  const empty = createSitemap({ fetcher: recorder(jsonReply({ items: [], nextCursor: null })) });
+  const empty = createSitemap({ fetcher: recorder(jsonReply({ items: [], nextCursor: null })), searchOpen: true });
   const emptyResponse = await empty({ request: new Request(`${PROD}/sitemap.xml`), env: ENV });
   assert.equal(emptyResponse.status, 200);
   assert.match(await emptyResponse.text(), /<urlset xmlns="http:\/\/www\.sitemaps\.org\/schemas\/sitemap\/0\.9">\s*<\/urlset>/);
-  const dev = createSitemap({ fetcher: recorder(jsonReply({ items: [] })) });
+  const dev = createSitemap({ fetcher: recorder(jsonReply({ items: [] })), searchOpen: true });
   assert.equal((await dev({ request: new Request(`${DEV}/sitemap.xml`), env: ENV })).status, 404);
-  const broken = createSitemap({ fetcher: recorder(() => { throw new Error('down'); }) });
+  const broken = createSitemap({ fetcher: recorder(() => { throw new Error('down'); }), searchOpen: true });
   assert.equal((await broken({ request: new Request(`${PROD}/sitemap.xml`), env: ENV })).status, 503);
 });
 
@@ -235,20 +255,20 @@ test('_routes.json 이 새 경로를 함수로 보낸다', async () => {
   }
 });
 
-test('개발 주소 문서에는 X-Robots-Tag noindex, 운영 주소는 검색 대상 그대로(#541)', async () => {
+test('검색을 열기 전에는 개발·운영 주소 문서 모두 X-Robots-Tag noindex(#541)', async () => {
   const assets = (html) => ({ ASSETS: { fetch: async () => new Response(html, { status: 200, headers: { 'content-type': 'text/html' } }) } });
   const nextStatic = () => new Response('static');
-  // 루트(/): 개발 주소는 4.0 문서에 noindex 를 붙이고, 운영 주소는 /v41/ 문서로 바꿔 serve 한다.
+  // 루트(/): 개발 주소는 4.0 문서, 운영 주소는 /v41/ 문서로 바꿔 serve 하고 둘 다 noindex 를 붙인다.
   const devRoot = await prodRoot({ request: new Request(`${DEV}/`), env: assets('<html>4.0</html>'), next: nextStatic });
   assert.equal(devRoot.headers.get('x-robots-tag'), 'noindex');
   const prodRootResponse = await prodRoot({ request: new Request(`${PROD}/`), env: assets('<html><link href="shell.css"><link href="identity.css"><script src="shell.mjs"></html>'), next: nextStatic });
   const rootHtml = await prodRootResponse.text();
   assert.match(rootHtml, /href="\/v41\/shell\.css"/, '운영 주소 루트는 기존처럼 자산 주소를 바꾼다');
-  assert.equal(prodRootResponse.headers.get('x-robots-tag'), null, '운영 주소에 noindex 를 붙이지 않는다');
-  // /v41/: 운영 주소는 next() 로 그대로, 개발 주소는 noindex 를 붙인다.
+  assert.equal(prodRootResponse.headers.get('x-robots-tag'), 'noindex', '서비스 시작 전에는 운영 주소도 noindex');
+  // /v41/: 검색을 열기 전에는 운영·개발 주소 모두 noindex 를 붙인다.
   const prodV41 = await v41Root({ request: new Request(`${PROD}/v41/`), env: assets('<html>app</html>'), next: nextStatic });
-  assert.equal(await prodV41.text(), 'static');
-  assert.equal(prodV41.headers.get('x-robots-tag'), null);
+  assert.equal(await prodV41.text(), '<html>app</html>');
+  assert.equal(prodV41.headers.get('x-robots-tag'), 'noindex');
   const devV41 = await v41Root({ request: new Request(`${DEV}/v41/`), env: assets('<html>app</html>'), next: nextStatic });
   assert.equal(await devV41.text(), '<html>app</html>');
   assert.equal(devV41.headers.get('x-robots-tag'), 'noindex');

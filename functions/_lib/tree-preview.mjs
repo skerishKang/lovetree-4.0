@@ -14,7 +14,7 @@
  */
 import { jsonError, upstreamOrigin } from './proxy.js';
 import {
-  CARD_IMAGE_URL, PRODUCTION_HOST, SHARE_ID, SITE_TAGLINE, SITE_TITLE,
+  CARD_IMAGE_URL, PRODUCTION_HOST, SEARCH_OPEN, SHARE_ID, SITE_TAGLINE, SITE_TITLE,
   appHomeUrl, appShareUrl, escapeHtml, isBotUserAgent, isProductionHost, oneLine
 } from './search-meta.mjs';
 
@@ -165,7 +165,7 @@ async function readShare(fetcher, origin, shareId, timeoutMs) {
   }
 }
 
-export function createTreePreview({ fetcher = (...args) => fetch(...args), timeoutMs = 10_000 } = {}) {
+export function createTreePreview({ fetcher = (...args) => fetch(...args), timeoutMs = 10_000, searchOpen = SEARCH_OPEN } = {}) {
   return async function onRequest({ request, env }) {
     const url = new URL(request.url);
     if (request.method !== 'GET' && request.method !== 'HEAD') {
@@ -228,7 +228,9 @@ export function createTreePreview({ fetcher = (...args) => fetch(...args), timeo
           defaultImage: card.image === CARD_IMAGE_URL,
           canonical,
           appHref: appShareUrl(url, shareId, card.view),
-          redirectJs: shareRedirectJs(shareId, card.view)
+          redirectJs: shareRedirectJs(shareId, card.view),
+          // 검색을 열기 전에는 공유 카드도 noindex(링크 미리보기는 그대로 보인다).
+          noindex: searchOpen !== true
         });
         return respondHtml(request, html);
       }

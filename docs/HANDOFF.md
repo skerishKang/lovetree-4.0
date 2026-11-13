@@ -4,6 +4,13 @@
 
 > **빨간 필수 검사 규칙(2026-11-12 사고 뒤)**: 필수 검사가 빨강이면 **재실행은 1회까지**. 같은 항목이 또 빨강이면 멈추고 원인을 찾는다 — 재실행·빈 커밋으로 초록을 만들지 않는다. "간헐적·환경 탓"이라고 적으려면 **같은 시각 이 변경이 없는 브랜치(main 또는 다른 PR)** 에서도 같은 실패가 나는지 대조한 결과를 함께 적는다. 메시지를 받아 화면을 다시 띄우는 코드는 '뜰 때마다 보내는 쪽'과 짝으로 흐름 시험을 하고, 머지 전 미리보기 첫 화면을 5초 이상 직접 본다.
 
+## 2026-11-14 — 서비스 시작 전 검색 닫기 (CTO, #541 후속)
+
+- **대표 결정**: 서비스 시작 전이라 운영 주소도 검색에 걸리지 않게 막는다. `functions/_lib/search-meta.mjs` 의 **`SEARCH_OPEN = false`** 한 줄이 스위치다.
+- false 동안: robots.txt 는 운영·개발 주소 모두 `Disallow: /`, sitemap.xml 은 모두 404(서버도 부르지 않음), 루트·/v41/ 문서와 `/t/<id>` 공유 카드에 noindex.
+- **링크 미리보기(카톡·페이스북 등 og 카드)는 검색과 별개라 그대로 나간다.**
+- 서비스를 열 때: 이 한 줄을 true 로 바꾸는 PR → 배포 확인 → 대표가 서치어드바이저·서치 콘솔 등록·sitemap 제출. 아래 #541 항목의 '운영 주소는 Allow' 설명은 그때부터 적용된다.
+
 ## 2026-11-14 — 공유 링크 미리보기 카드 + 검색 준비 1차 (이슈 #541, 로컬5 레인)
 
 - **/t/<공유 id>**: `functions/t/[[path]].js` + `functions/_lib/tree-preview.mjs`. 사람은 지금 공유 주소 형식(`#share/<id>/<view>`, 운영 주소 루트·그 밖은 /v41/)으로 302, 링크 미리보기·검색 봇(facebookexternalhit·Twitterbot·Discordbot·kakao·Googlebot 등)은 og 메타 HTML. 카드 내용은 서버 공개 공유 읽기(GET /api/public/shares/:id): 제목=트리 제목, 설명='순간 N개 · 좋아하는 대상'+'“첫 순간 제목”'(첫 순간 기준은 entryMomentId→루트→첫 카드, community-service card()와 같은 순서), 그림=저장 ytimg 썸네일→첫 순간 링크 YouTube hqdefault→기본 카드 그림. 취소·삭제·없음(404/410/422)·형식 밖은 '공유가 취소되었어요' 카드(noindex)+사람은 첫 화면, 서버 응답 실패는 중립 기본 카드(noindex)+사람은 공유 주소. og:url·canonical 은 운영 주소 고정. 계정 이름·아이디·이메일·내부 id(트리/순간 id·subjectId)는 HTML 어디에도 없음, /api/media/ 사진은 ytimg만 허용하는 그림 규칙으로 차단. 시험 `tests/pages-search-preview.test.mjs`(17건).
