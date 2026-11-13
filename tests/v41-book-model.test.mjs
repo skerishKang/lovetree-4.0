@@ -19,7 +19,7 @@ const moments = [
 ];
 
 test('0. 계산 한 벌은 화면이 부르는 함수만 노출하고, 모델을 화면보다 먼저 부른다', () => {
-  assert.deepEqual(Object.keys(M).sort(), ['buildSpreads', 'connectionSummary', 'emotionTone', 'folioLabel', 'journeyDays', 'journeyTimeline', 'nextMomentOf', 'shelfReturn', 'turnAngle']);
+  assert.deepEqual(Object.keys(M).sort(), ['buildSpreads', 'connectionSummary', 'emotionTone', 'folioLabel', 'journeyDays', 'journeyTimeline', 'nextMomentOf', 'pageSteps', 'posOfMoment', 'shelfReturn', 'spreadOfPos', 'turnAngle']);
   assert.ok(HTML.indexOf('book-model.js') < HTML.indexOf('book.js'), '모델을 화면보다 먼저 부른다');
 });
 

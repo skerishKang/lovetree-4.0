@@ -9,6 +9,36 @@ const spreads =Array.from({length:Math.ceil(moments.length/2)},(_,i)=>{const toP
     return spreads;
   }
 
+  /* #537: 한 장 보기는 펼침면이 아니라 순간 하나를 한 쪽으로 넘긴다(순간 26개면 1/26 … 26/26).
+     두 장 보기는 지금처럼 펼침면 하나(1/13 … 13/13)다. 화면의 '위치'는 한 장이면 순간 순번,
+     두 장이면 펼침면 순번이므로, 두 뜻을 오가는 변환을 여기 한 벌로 둔다.
+     pageSteps: 실제 순간만 순서대로 편 것(합성 동반 쪽은 빠진다) — 한 장의 쪽 순서와 같다. */
+  function pageSteps(spreads) {
+    const list = [];
+    (spreads || []).forEach((spread, index) => {
+      for (const side of ['left', 'right']) {
+        const moment = spread && spread[side];
+        if (moment && !moment.synthetic) list.push({ id: moment.id, spread: index, side });
+      }
+    });
+    return list;
+  }
+
+  // 위치 → 펼침면 번호. 두 장에서는 위치가 곧 펼침면 번호다.
+  function spreadOfPos(spreads, pos, single) {
+    if (!single) return pos;
+    const step = pageSteps(spreads)[pos];
+    return step ? step.spread : 0;
+  }
+
+  // 순간 id → 위치. 한 장에서는 순간 순번, 두 장에서는 그 순간이 든 펼침면 번호(보기 전환에서 쓰는 한 벌).
+  function posOfMoment(spreads, id, single) {
+    const steps = pageSteps(spreads);
+    const at = steps.findIndex((step) => step.id === id);
+    if (at < 0) return 0;
+    return single ? at : steps[at].spread;
+  }
+
   // 쪽번호: 펼침 번호 × 2 + (왼쪽 1 / 오른쪽 2), 두 자리.
   function folioLabel(spreadIndex, side) {
     return String(spreadIndex * 2 + (side === 'left' ? 1 : 2)).padStart(2, '0');
@@ -134,5 +164,5 @@ const spreads =Array.from({length:Math.ceil(moments.length/2)},(_,i)=>{const toP
     return 'shelf';
   }
 
-  return { buildSpreads, folioLabel, turnAngle, connectionSummary, nextMomentOf, emotionTone, journeyDays, journeyTimeline, shelfReturn };
+  return { buildSpreads, folioLabel, turnAngle, connectionSummary, nextMomentOf, emotionTone, journeyDays, journeyTimeline, shelfReturn, pageSteps, spreadOfPos, posOfMoment };
 })();
