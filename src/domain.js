@@ -173,6 +173,14 @@ export function normalizeEmotion(value) {
   const custom = typeof value === 'string' ? value.trim() : '';
   return custom && custom.length <= 12 && !/[\u0000-\u001f]/.test(custom) ? custom : '설렘';
 }
+// #547: 지역 연·월·일로 'YYYY-MM-DD'를 만든다(클라이언트 public/v41/local-date.mjs와 같은 규칙).
+// toISOString은 UTC 날짜라 한국 시간 0시~9시에 하루 전이 됐다.
+export function localDateOnly(clock = new Date()) {
+  const at = clock instanceof Date ? clock : new Date(clock);
+  const date = Number.isNaN(at.getTime()) ? new Date() : at;
+  const pad = (value) => String(value).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
 export function validateMomentInput(input) {
   const note = optionalText(input.note, '마음 한마디', 500);
   const url = safeUrl(input.url || '');
@@ -181,7 +189,8 @@ export function validateMomentInput(input) {
   const title = suggestMomentTitle({ title: input.title, note, url, mediaMetadata });
   if (!title) throw new Error('순간 제목, 마음 한마디, 링크나 첨부 중 하나는 남겨 주세요.');
   const emotion = normalizeEmotion(input.emotion);
-  const date = input.date || new Date().toISOString().slice(0, 10);
+  // #547: '오늘'은 이 기기의 지역 날짜다(UTC가 아니다). public/v41/local-date.mjs와 같은 규칙이다.
+  const date = input.date || localDateOnly();
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(date)) || new Date(date).toISOString().slice(0, 10) !== date) throw new Error('날짜를 확인해 주세요.');
   const relation = typeof input.relation === 'string' ? input.relation.trim() : '';
   if (relation.length > 100) throw new Error('연결 이유는 100자까지 적을 수 있어요.');
