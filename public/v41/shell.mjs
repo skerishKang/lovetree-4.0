@@ -28,6 +28,7 @@ import {createMessages} from './shell/messages.mjs';
 import {createCleanup} from './shell/cleanup.mjs';
 import {headerBadge, cleanupAvailable} from './inbox-model.mjs';
 import {createDialogs} from './shell/dialogs.mjs';
+import {createFeedbackDialog} from './feedback.mjs';
 import {connectionSignature} from './shell/panel-dirty.mjs';
 import {createLocation} from './shell/location.mjs';
 import {createNotifier} from './shell/notice.mjs';
@@ -79,8 +80,9 @@ function buildFoldMenu(){
   add('지도',()=>document.querySelector('.tree-views [data-view="track56-network.html"]').click(),current==='track56-network.html');
  }
  add('내 트리 전체 보기',()=>{member?.snapshot().owned?show('track32-bookshelf.html'):openLoginStart('shelf')},current==='track32-bookshelf.html');
- if(!$('write-menu').hidden)add('＋ 순간 추가',()=>$('write-menu').click());
-}
+  if(!$('write-menu').hidden)add('＋ 순간 추가',()=>$('write-menu').click());
+  add('의견 보내기',()=>feedbackDialog.open());
+ }
 const escHTML=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function treeMomentThumb(m){return thumbnailCandidates(m,{autoLoad:true})[0]||''}
 function treeCoverMarkup(tree){
@@ -661,6 +663,17 @@ $('settings-assets-open').onclick=()=>openAssets($('settings-assets-open'));
  for(const b of document.querySelectorAll('[data-set-theme]'))b.onclick=()=>{writeTheme(localStorage,b.dataset.setTheme);applyTheme();paintThemeControls();};
  $('account-advanced').onclick=()=>{const next=!readAdvanced();try{localStorage.setItem(advancedKey(),next?'1':'0')}catch{}applyAdvanced();};
  $('account-open-settings').onclick=()=>{closeAccountMenu();void openAccountSettings();};
+ // 고객 의견 창구 (#540): 로그인=계정 메뉴, 로그아웃=첫 화면 아래 작은 링크·접기 메뉴. 모두 같은 창을 쓴다.
+ const FEEDBACK_SCREEN={'src064-orbit.html':'첫 화면','track59-sketchbook.html':'책','track58-pinboard.html':'보드','track56-network.html':'지도','track32-bookshelf.html':'내 트리'};
+ function feedbackContext(){
+  const owned=!!member?.snapshot().owned;
+  const screen=$('community-panel')?.open?'둘러보기':$('account-settings')?.open?'설정':(FEEDBACK_SCREEN[current]||'첫 화면');
+  const treeId=owned&&source==='server'&&window.LT41?.tree?.id?String(window.LT41.tree.id):'';
+  return {screen,viewport:window.innerWidth+'x'+window.innerHeight,theme:readTheme(localStorage),version:'4.1',loggedIn:owned,treeId};
+ }
+ const feedbackDialog=createFeedbackDialog({$,notify,getContext:feedbackContext,show:()=>panel('feedback-panel')});
+ $('account-feedback').onclick=()=>{closeAccountMenu();feedbackDialog.open();};
+ $('feedback-link').onclick=()=>feedbackDialog.open();
  $('advanced-backup').onclick=()=>backup();
  // #368: 기록 가져오기는 JSON 선택 input을 연다. input은 창 밖에 숨겨 두어 설정이 닫혀 있어도(빈 화면의 백업 파일 열기) 열린다.
  // CTO 결정(2026-11-12): 설정에는 "기록 가져오기" 하나만 둔다 — "백업 파일 열기"는 같은 선택 창이라 중복이고,

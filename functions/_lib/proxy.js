@@ -22,6 +22,7 @@ const PUBLIC_SHARE_ITEM = /^\/api\/public\/shares\/[A-Za-z0-9_-]{1,128}$/;
 const COMMUNITY_SHARE_ACTION = /^\/api\/community\/shares\/[A-Za-z0-9_-]{1,128}\/(comments|favorite|reaction|report|block)$/;
 const COMMUNITY_COMMENT_ITEM = /^\/api\/community\/comments\/[A-Za-z0-9_-]{1,128}$/;
 const COMMUNITY_REPORT_ITEM = /^\/api\/community\/admin\/reports\/[A-Za-z0-9_-]{1,128}$/;
+const ADMIN_FEEDBACK_ITEM = /^\/api\/admin\/feedback\/[0-9]{1,20}$/;
 function communityMethods(path) {
   const action=path.match(COMMUNITY_SHARE_ACTION)?.[1];
   if(action==='comments')return new Set(['GET','POST']);
@@ -41,6 +42,8 @@ const ALLOWED = new Map([
   ['/api/community/shares', new Set(['GET'])],
   ['/api/community/me/favorites', new Set(['GET'])],
   ['/api/community/admin/reports', new Set(['GET'])],
+  ['/api/feedback', new Set(['POST'])],
+  ['/api/admin/feedback', new Set(['GET'])],
   ['/api/youtube/oembed', new Set(['GET'])],
   ['/api/admin/session', new Set(['GET'])],
   ['/api/admin/roles', new Set(['GET'])],
@@ -121,6 +124,7 @@ export function createProxy({ fetcher = (...args) => fetch(...args), timeoutMs =
       || (SHARE_ITEM.test(incoming.pathname) ? new Set(['DELETE']) : null)
       || (SHARE_DISCOVERY.test(incoming.pathname) ? new Set(['PUT','DELETE']) : null)
       || (PUBLIC_SHARE_ITEM.test(incoming.pathname) ? new Set(['GET']) : null)
+      || (ADMIN_FEEDBACK_ITEM.test(incoming.pathname) ? new Set(['PATCH']) : null)
       || communityMethods(incoming.pathname);
     if (!methods) return jsonError(404, 'not_proxied', '이 경로는 서버로 넘기지 않아요.');
     if (!methods.has(request.method)) return jsonError(405, 'method_not_allowed', '이 요청은 지원하지 않아요.');
@@ -133,6 +137,10 @@ export function createProxy({ fetcher = (...args) => fetch(...args), timeoutMs =
       const value = request.headers.get(name);
       if (value) headers.set(name, value);
     }
+    // 로그아웃 의견의 '같은 곳' 제한용. Cloudflare가 붙인 접속 IP를 서버에 알린다 —
+    // 브라우저가 보낸 값으로 덮어쓸 수 없게 여기서 마지막에 설정한다(#540).
+    const clientIp = String(request.headers.get('cf-connecting-ip') || (request.headers.get('x-forwarded-for') || '').split(',')[0] || '').trim();
+    if (clientIp) headers.set('x-lovetree-client-ip', clientIp.slice(0, 64));
 
     // 타이머는 응답 본문까지 읽고 나서야 해제한다. 만료되면 업스트림 요청과 읽기를 함께 취소한다.
     const controller = new AbortController();

@@ -98,3 +98,39 @@
 .admin-report button {
   min-height: 44px;
 }
+
+.admin-feedback-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0 4px;
+}
+
+.admin-feedback-filters select {
+  min-height: 40px;
+  border-radius: 10px;
+  border: 1px solid #d7c8d244;
+  background: #ffffff0a;
+  color: inherit;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.admin-feedback-field {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+  font-size: 12px;
+}
+
+.admin-feedback-field textarea,
+.admin-feedback-field input {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid #d7c8d244;
+  background: #ffffff0a;
+  color: inherit;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 12px;
+}

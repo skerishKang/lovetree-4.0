@@ -4,6 +4,16 @@
 
 > **빨간 필수 검사 규칙(2026-11-12 사고 뒤)**: 필수 검사가 빨강이면 **재실행은 1회까지**. 같은 항목이 또 빨강이면 멈추고 원인을 찾는다 — 재실행·빈 커밋으로 초록을 만들지 않는다. "간헐적·환경 탓"이라고 적으려면 **같은 시각 이 변경이 없는 브랜치(main 또는 다른 PR)** 에서도 같은 실패가 나는지 대조한 결과를 함께 적는다. 메시지를 받아 화면을 다시 띄우는 코드는 '뜰 때마다 보내는 쪽'과 짝으로 흐름 시험을 하고, 머지 전 미리보기 첫 화면을 5초 이상 직접 본다.
 
+## 2026-11-14 — 고객 의견 창구 1차 (이슈 #540, 로컬3 레인)
+
+- **표**: `lovetree_feedback`(id, product_id, subject_id[로그아웃이면 NULL], category[bug/inconvenient/feature/other], body[1~2000], context jsonb, status[received/reviewing/fixed/later], memo, issue_number, created_at, updated_at). `schema.sql` + `server/db/migrations/feedback-261114.sql`(둘 다 IF NOT EXISTS). 계정 탈퇴 경로 `ACCOUNT_USER_TABLES`에 `lovetree_feedback`(subject_id) 추가.
+- **서버**: `server/feedback-service.js`(검사·개인정보 가림·로그아웃 10분 3회 제한·관리자 권한), `server/db/feedback-postgres.js`, `server/index.js` 배선. 경로 `POST /api/feedback`(로그인·로그아웃), `GET /api/admin/feedback`, `PATCH /api/admin/feedback/:id`(관리자). `functions/_lib/proxy.js` 허용 목록 추가 + Cloudflare 접속 IP를 `x-lovetree-client-ip`로 서버에 전달(로그아웃 제한용).
+- **운영센터**: `src/admin.js`에 '고객 의견' 칸(최신 순·종류/상태 거르기·상태 변경·운영 메모·연결 이슈 번호·'GitHub 이슈 글 만들기' 복사 — 계정·트리 내용 제외). `src/admin.css`에 입력样式.
+- **사이트 창**: `public/v41/feedback.mjs`(창·API), `public/v41/index.html`(계정 메뉴 '의견 보내기'·첫 화면 아래 작은 링크·`feedback-panel` 창), `public/v41/shell.mjs`(배선·자동 정보), `shell.css`. 자동 정보(지금 화면·화면 크기·테마·앱 버전·로그인 여부·내 트리 id)는 보내기 전에 보이고 끌 수 있다.
+- **시험**: `tests/feedback-service.test.mjs` 8건(저장·검사·PII 가림·로그아웃 제한·관리자 목록/변경), `tests/feedback-postgres.test.mjs` 2건(저장·거르기·업데이트·컬럼·빈 context). CI `ci.yml` postgres job에 `tests/feedback-postgres.test.mjs` 추가, `scripts/apply-schema.mjs` TABLES에 `lovetree_feedback` 추가.
+- **실화면(모의 서버, 로그아웃)**: 390·1440에서 작은 링크→창 열림→보내기→'받았어요. 살펴보고 고칠게요.' 확인. 390 창 358×756(화면 안, 스크롤), 1440 460×812(화면 안). 자동 정보 `screen/viewport/theme/version/loggedIn` 전송, 로그아웃이라 treeId 없음. 계정 메뉴 '의견 보내기'·로그아웃 링크 DOM 확인. **로그인 상태·실서버 전송·관리자 화면은 미확인**(시험 계정 05 없음·컴2 서버·DB 필요).
+- **남긴 것/주의**: 로그인 흐름·실 PostgreSQL 검사·배포·머지는 이 레인 권한 밖(CI/컴2). 로컬 5→3 경로 수정. `v41/home.js`·`src/views/orbit.js`(로컬2)·`board.*`(로컬4)·`book.*`(로컬1)는 건드리지 않음. 겹침 없음. `v41-map-contrast.test.mjs`는 이 환경에서 Chromium 렌더링이 300초를 넘어 타임아웃(내 변경과 무관, 다른 1,415건 통과).
+
 ## 2026-11-13 — 전 화면 접근성 재점검(레인 B): 닫힌 겹이 탭으로 들어가던 것 수리
 
 - **점검**: 로그아웃 예시 + 로컬 빌드(dist)에서 첫 화면·책장·책·보드(판 종이/밤)·지도(그물/동심원)·둘러보기·설정·순간 추가·공유 창을 1440·390 × 밤·정원 전 조합으로 axe 점검(72행, tools/a11y와 같은 판정) — **serious 0 · critical 0**(#510 수리 뒤 기준). 설정·순간 추가·공유 창은 로그아웃 메뉴에 입장이 없어 showModal로 강제해 열어 검사했다(#462 선례).
