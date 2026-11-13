@@ -15,13 +15,13 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  preview:
-    name: 미리보기 postdeploy(로그아웃)
+  # 2026-11-14: 화면 시험이 한 잡에 줄지어 18분 걸리던 것을 잡 여러 개로 나눠 동시에 돌린다.
+  # 필수 검사 이름 '미리보기 postdeploy(로그아웃)'은 맨 아래 모음 잡이 그대로 쓴다 — 아래 잡이 하나라도
+  # 실패·취소되면 모음 잡도 실패한다. 새 화면 시험은 가장 짧은 잡에 단계로 붙인다(각 잡 소요는 요약에 적힌다).
+  screen-board:
+    name: 화면 시험 — 보드·접근성·날짜
     runs-on: ubuntu-latest
-    timeout-minutes: 40
-    env:
-      PR_SHA: ${{ github.event.pull_request.head.sha }}
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
         with:
@@ -82,6 +82,45 @@ jobs:
           start=$(date +%s)
           node --test tests/v41-a11y-514-remaining.test.mjs
           echo "남은 접근성 항목 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+      # #547: 새벽에 남긴 순간이 하루 전 날짜로 찍히던 문제 — '오늘'은 기기의 지역 날짜다.
+      # 시간대 경계(Asia/Seoul 00:30·08:59·09:00·23:59, America/Los_Angeles)를 고정해 서버·브라우저 양쪽에서
+      # 기본 날짜를 확인한다. 건너뜀=실패(크롬이 준비된 이 잡에서 돈다).
+      - name: 지역 날짜(오늘) 시험(시간대 경계, 건너뜀=실패 — #547)
+        env:
+          LT_LOCAL_DATE_REQUIRE: '1'
+        run: |
+          start=$(date +%s)
+          node --test --test-concurrency=1 tests/v41-local-date-547.test.mjs
+          echo "지역 날짜 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+
+  screen-home-book:
+    name: 화면 시험 — 첫 화면·책
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ms-playwright-${{ runner.os }}-1.49.1
+      - name: 브라우저 준비(Playwright Chromium, 캐시)
+        id: browser
+        run: |
+          # 모듈은 항상 설치한다(캐시는 브라우저 바이너리에만 걸린다). 캐시가 있어도 모듈이 없으면 실행이 안 된다.
+          npm i --no-save --no-package-lock playwright@1.49.1
+          if ls "$HOME/.cache/ms-playwright" 2>/dev/null | grep -q chromium; then
+            echo "캐시된 Chromium 사용"
+          else
+            npx playwright install --with-deps chromium
+          fi
+          node -e "import('playwright-core').then(()=>console.log('playwright-core 확인')).catch(e=>{console.error(e.message);process.exit(1)})"
       # #535: 첫 화면 카드의 '떠 있음'(이동 폭·동작 줄이기), 카드끼리 겹친 면적, 가운데 단추 세 자리,
       # 끄는 동안의 레이어 승격·관성을 실제 화면에서 잰다. 첫 화면은 vite 번들이라 먼저 build 한다.
       - name: 첫 화면 떠 있음·겹침 시험(#535, 건너뜀=실패)
@@ -101,16 +140,35 @@ jobs:
           start=$(date +%s)
           node --test --test-concurrency=1 tests/v41-book-single-537.test.mjs
           echo "책 한 장 보기 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
-      # #547: 새벽에 남긴 순간이 하루 전 날짜로 찍히던 문제 — '오늘'은 기기의 지역 날짜다.
-      # 시간대 경계(Asia/Seoul 00:30·08:59·09:00·23:59, America/Los_Angeles)를 고정해 서버·브라우저 양쪽에서
-      # 기본 날짜를 확인한다. 건너뜀=실패(크롬이 준비된 이 잡에서 돈다).
-      - name: 지역 날짜(오늘) 시험(시간대 경계, 건너뜀=실패 — #547)
-        env:
-          LT_LOCAL_DATE_REQUIRE: '1'
+
+  screen-map-a:
+    name: 화면 시험 — 지도 대비·판 전환
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ms-playwright-${{ runner.os }}-1.49.1
+      - name: 브라우저 준비(Playwright Chromium, 캐시)
+        id: browser
         run: |
-          start=$(date +%s)
-          node --test --test-concurrency=1 tests/v41-local-date-547.test.mjs
-          echo "지역 날짜 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+          # 모듈은 항상 설치한다(캐시는 브라우저 바이너리에만 걸린다). 캐시가 있어도 모듈이 없으면 실행이 안 된다.
+          npm i --no-save --no-package-lock playwright@1.49.1
+          if ls "$HOME/.cache/ms-playwright" 2>/dev/null | grep -q chromium; then
+            echo "캐시된 Chromium 사용"
+          else
+            npx playwright install --with-deps chromium
+          fi
+          node -e "import('playwright-core').then(()=>console.log('playwright-core 확인')).catch(e=>{console.error(e.message);process.exit(1)})"
       - name: 지도 실제 대비·판 전환 시험(건너뜀=실패)
         env:
           LT_MAP_CONTRAST_REQUIRE: '1'
@@ -125,13 +183,99 @@ jobs:
           echo "한글 글꼴 $(fc-list :lang=ko | wc -l)개 · 대표 $(fc-match 'sans-serif:lang=ko' | head -1)"
           # 두 시험은 차례로 돌린다(브라우저 둘이 동시에 뜨면 느린 실행기에서 서로의 시간을 흔든다).
           node --test --test-concurrency=1 tests/v41-map-contrast.test.mjs tests/v41-map-theme-flow.test.mjs
+          echo "지도 실제 대비·판 전환 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+
+  screen-map-b:
+    name: 화면 시험 — 지도 도구 줄·책 이동
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ms-playwright-${{ runner.os }}-1.49.1
+      - name: 브라우저 준비(Playwright Chromium, 캐시)
+        id: browser
+        run: |
+          # 모듈은 항상 설치한다(캐시는 브라우저 바이너리에만 걸린다). 캐시가 있어도 모듈이 없으면 실행이 안 된다.
+          npm i --no-save --no-package-lock playwright@1.49.1
+          if ls "$HOME/.cache/ms-playwright" 2>/dev/null | grep -q chromium; then
+            echo "캐시된 Chromium 사용"
+          else
+            npx playwright install --with-deps chromium
+          fi
+          node -e "import('playwright-core').then(()=>console.log('playwright-core 확인')).catch(e=>{console.error(e.message);process.exit(1)})"
+      - name: 지도 도구 줄·책 이동 시험(#517·#518, 건너뜀=실패)
+        env:
+          LT_MAP_CONTRAST_REQUIRE: '1'
+        run: |
+          start=$(date +%s)
+          # #529: 이름표 대비는 실제로 그려진 한글 글자를 잰다. 실행기에 한글 글꼴이 없으면 준비한다(있으면 건너뜀).
+          if ! fc-list :lang=ko | grep -q .; then
+            echo "한글 글꼴 없음 — fonts-noto-cjk 설치"
+            sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends fonts-noto-cjk
+          fi
+          fc-cache -f >/dev/null 2>&1 || true
+          echo "한글 글꼴 $(fc-list :lang=ko | wc -l)개 · 대표 $(fc-match 'sans-serif:lang=ko' | head -1)"
           # #517·#518: 390·360 지도 도구 줄 넘침·겹침과 상세 '기억책에서 보기'의 책 이동을 실제 화면에서 잰다.
           node --test --test-concurrency=1 tests/v41-network-toolbar-517.test.mjs tests/v41-map-open-book-518.test.mjs
-          echo "지도 실제 대비·판 전환 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+          echo "지도 도구 줄·책 이동 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+
+  deploy:
+    name: 미리보기 배포 검사(postdeploy·겉모습 비교)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      PR_SHA: ${{ github.event.pull_request.head.sha }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ms-playwright-${{ runner.os }}-1.49.1
+      - name: 브라우저 준비(Playwright Chromium, 캐시)
+        id: browser
+        run: |
+          # 모듈은 항상 설치한다(캐시는 브라우저 바이너리에만 걸린다). 캐시가 있어도 모듈이 없으면 실행이 안 된다.
+          npm i --no-save --no-package-lock playwright@1.49.1
+          if ls "$HOME/.cache/ms-playwright" 2>/dev/null | grep -q chromium; then
+            echo "캐시된 Chromium 사용"
+          else
+            npx playwright install --with-deps chromium
+          fi
+          node -e "import('playwright-core').then(()=>console.log('playwright-core 확인')).catch(e=>{console.error(e.message);process.exit(1)})"
       - name: 미리보기 주소 찾기
         id: preview
         run: node tools/postdeploy/preview-url.mjs "$GITHUB_REPOSITORY" "$PR_SHA" --wait 600
+      # 겉모습 비교(알림용)는 화면 파일이 바뀐 PR에서만 돈다 — 문서·서버·시험만 바뀐 PR은 3~4분을 아낀다.
+      - name: 화면 파일 바뀜 확인
+        id: changes
+        run: |
+          BASE_SHA=$(git merge-base "$PR_SHA" origin/main)
+          if git diff --name-only "$BASE_SHA" "$PR_SHA" | grep -Eq '^(public/|src/|index\.html$|vite\.config|package\.json$)'; then
+            echo "ui=true" >> "$GITHUB_OUTPUT"; echo "화면 파일 바뀜 — 겉모습 비교를 돈다"
+          else
+            echo "ui=false" >> "$GITHUB_OUTPUT"; echo "화면 파일 안 바뀜 — 겉모습 비교 건너뜀"
+            echo "## 겉모습 비교 건너뜀 — 화면 파일(public/·src/ 등)이 바뀌지 않은 PR" >> "$GITHUB_STEP_SUMMARY"
+          fi
       - name: 기준 커밋 찾기(merge-base 배포본)
+        if: steps.changes.outputs.ui == 'true'
         id: base
         run: |
           BASE_SHA=$(git merge-base "$PR_SHA" origin/main)
@@ -186,7 +330,7 @@ jobs:
             --readiness "${{ steps.preview.outputs.readiness || 'unknown' }}"
       # ---- 겉모습 비교(visual-baseline, 2026-11-08): 알림만 하고 실패로 만들지 않는다 ----
       - name: 기준 커밋 화면 캡처 — before
-        if: steps.preview.outputs.url != ''
+        if: steps.preview.outputs.url != '' && steps.changes.outputs.ui == 'true'
         id: capture-before
         continue-on-error: true
         env:
@@ -199,7 +343,7 @@ jobs:
           echo "seconds=$(( $(date +%s) - start ))" >> "$GITHUB_OUTPUT"
           tail -5 "$RUNNER_TEMP/before.log" || true
       - name: 미리보기 화면 캡처 — after
-        if: steps.preview.outputs.url != ''
+        if: steps.preview.outputs.url != '' && steps.changes.outputs.ui == 'true'
         id: capture-after
         continue-on-error: true
         env:
@@ -212,7 +356,7 @@ jobs:
           echo "seconds=$(( $(date +%s) - start ))" >> "$GITHUB_OUTPUT"
           tail -5 "$RUNNER_TEMP/after.log" || true
       - name: 화면 비교(장별 차이 %)
-        if: steps.preview.outputs.url != ''
+        if: steps.preview.outputs.url != '' && steps.changes.outputs.ui == 'true'
         id: compare
         continue-on-error: true
         run: |
@@ -224,7 +368,7 @@ jobs:
           echo "seconds=$(( $(date +%s) - start ))" >> "$GITHUB_OUTPUT"
           tail -12 "$RUNNER_TEMP/compare.log" || true
       - name: 겉모습 비교 요약 표
-        if: steps.preview.outputs.url != ''
+        if: steps.preview.outputs.url != '' && steps.changes.outputs.ui == 'true'
         continue-on-error: true
         run: |
           if [ ! -f visual-diff.json ]; then
@@ -261,3 +405,20 @@ jobs:
             visual-diff
             visual-diff.json
           retention-days: 14
+
+  preview:
+    name: 미리보기 postdeploy(로그아웃)
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [screen-board, screen-home-book, screen-map-a, screen-map-b, deploy]
+    steps:
+      - name: 모든 화면 시험·배포 검사 결과 모으기
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          echo "$RESULTS" | node -e '
+            let t="";process.stdin.on("data",d=>t+=d).on("end",()=>{
+              const needs=JSON.parse(t);let bad=0;
+              for(const [k,v] of Object.entries(needs)){console.log(`${k}: ${v.result}`);if(v.result!=="success")bad++;}
+              if(bad){console.error(`실패·취소된 잡 ${bad}개`);process.exit(1);}
+            });'
