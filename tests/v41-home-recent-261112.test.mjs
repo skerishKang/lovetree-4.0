@@ -18,7 +18,8 @@ test('#426 최근 순간 카드는 내 기록 최신 순간 한 장(로그아웃
 });
 
 test('#426 카드 모양: 썸네일 크게 + 마지막 순간·지난 날 + 한 줄 제목 + 트리 이름·이어 보기',()=>{
-  assert.match(orbit,/마지막 순간\$\{days===null\?'':` · \$\{days\}일 전`\}/,'첫 줄 안내');
+  assert.match(orbit,/마지막 순간\$\{days===null\?'':` · \$\{relativeDayLabel\(days\)\}`\}/,'첫 줄 안내(#549: 오늘·어제·N일 전)');
+  assert.match(orbit,/localDaysBetween\(undefined,raw\)/,'일수는 기기 지역 날짜(#547) 기준');
   assert.match(orbit,/<strong>\$\{esc\(head\)\}<\/strong>/,'한 줄 제목');
   assert.match(orbit,/· 이어 보기 →<\/small>/,'트리 이름·이어 보기');
   // 이슈 #466 M6: 카드 자체는 role="button"이 아니다(안의 ▶ 재생·제목 달기와 중첩되면 axe

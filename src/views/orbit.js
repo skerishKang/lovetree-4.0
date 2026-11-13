@@ -1,5 +1,6 @@
 import originalCSS from './orbit-source.css?inline';
 import {titleView, formatDisplayDate, embedUrl} from '../../public/v41/book-usability.mjs';
+import {localDaysBetween, relativeDayLabel} from '../../public/v41/local-date.mjs';
 import {filterMomentEntries, momentHeadTitle} from '../../v41/moment-list.js';
 import {fallbackCardMarkup, thumbFallbackAttrs, needsFallbackCard, mountThumbFallback, VIDEO_UNAVAILABLE_TEXT, isVerticalMoment, youtubeIdFrom} from '../../public/v41/thumb-fallback.mjs';
 import samples from './orbit-samples.json';
@@ -61,7 +62,8 @@ export function mountOrbit(host,{trees,storage,context,actions,authHtml='',onSel
  const recentMoment=(Array.isArray(momentList?.entries)&&momentList.entries.length)?momentList.entries[0]:null;
  const recentMarkup=c=>{
   const raw=Date.parse(c.createdAt||c.date||'');
-  const days=Number.isNaN(raw)?null:Math.max(0,Math.floor((Date.now()-raw)/86400000));
+  // #549: '0일 전' 대신 '오늘'·'어제'. 일수는 기기 지역 날짜(#547 local-date) 기준으로 세어 UTC 계산으로 하루가 밀리지 않게 한다.
+  const days=Number.isNaN(raw)?null:Math.max(0,localDaysBetween(undefined,raw));
   const head=mainOf(c)||'제목 없는 순간';
   const writable=!c.example;
   const vertical=isVerticalMoment(c);
@@ -72,7 +74,7 @@ export function mountOrbit(host,{trees,storage,context,actions,authHtml='',onSel
   // 중첩 상호작용(axe nested-interactive)이 된다. 카드는 평범한 div로 두고, 뒤에 깔린 투명 단추
   // (recent-open)가 카드 전체의 클릭·키보드 열기를 맡는다 — media·meta가 그 위(z-index 1)에 있어
   // ▶ 단추·제목 달기는 그대로 따로 눌린다(마우스 클릭 범위·Enter·Space는 이전과 같다).
-  return `<div class="recent-card mine" data-do="recent"><button type="button" class="recent-open" data-do="recent" aria-label="${esc(head)} 이어 보기"></button>${media}<span class="recent-meta"><small>마지막 순간${days===null?'':` · ${days}일 전`}</small><strong>${esc(head)}</strong><small>${esc(c.subject||'내 트리')} · 이어 보기 →</small></span></div>`;
+  return `<div class="recent-card mine" data-do="recent"><button type="button" class="recent-open" data-do="recent" aria-label="${esc(head)} 이어 보기"></button>${media}<span class="recent-meta"><small>마지막 순간${days===null?'':` · ${relativeDayLabel(days)}`}</small><strong>${esc(head)}</strong><small>${esc(c.subject||'내 트리')} · 이어 보기 →</small></span></div>`;
  };
  performance.mark('m1');shadow.innerHTML=`<style>${originalCSS}${extraCSS}.auth-entry{white-space:nowrap}</style><section class="app" aria-label="${SERVICE} 첫 화면"><div class="topbar"><span class="brand">${SERVICE} · MEMORY ORBIT</span><div class="top-actions"><button class="menuBtn" data-do="index">순간 목록</button>${authHtml}</div></div><div class="world"></div><div class="center-scrim" aria-hidden="true"></div><div class="center"><div class="eyebrow">${demo?'나의 첫 순간':'WELCOME BACK'}</div><h1>${demo?'좋아하는 순간부터.':'다시, 그 순간으로.'}</h1><p>${demo?'간직하고 싶은 장면에 마음을 남겨 보세요.<br>지금 떠오르는 순간 하나면 충분해요.':'기억은 아직 여기에서 이어지고 있어요.'}</p>${recentMoment?recentMarkup(recentMoment):''}<div class="actions"><button class="subtleBtn primary-cta" data-do="${demo?'new':'continue'}">${demo?NEW_TREE:'이어 보던 순간'}</button><button class="subtleBtn" data-do="${demo?'continue':'new'}">${demo?'예시 순간 감상':NEW_TREE}</button><button class="subtleBtn" data-do="trees">${GO_TREES}</button></div><p class="center-note">${demo?'감상 예시 · 내 기록에는 저장되지 않아요':esc(recordNote??`${all.length}개의 순간 · 서버에 보관`)}</p></div><div class="hint">드래그 · 금테 카드를 눌러 감상</div></section><dialog class="orbit-dialog" aria-label="순간 감상"></dialog>`;
  const app=shadow.querySelector('.app'),world=shadow.querySelector('.world'),dialog=shadow.querySelector('dialog');

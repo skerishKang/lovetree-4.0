@@ -5,6 +5,14 @@
 export const NOTICE_HOLD_MS = 3000;
 export const NOTICE_HIDE_MS = 6500;
 
+// #549: 'synced' 상태 안내 문구 한 벌. 기록(순간)이 0개인 새 계정에 '내 기록을 불러왔어요.'는
+// 어색하므로 첫 순간 안내로 바꾼다. momentCount는 모든 트리의 순간 수 합계다.
+export function syncedNoticeText({ writable = false, previousDirty = false, momentCount = 0 } = {}) {
+  if (!writable) return '기록을 읽었어요. 서버 편집 연결은 아직 준비되지 않았어요.';
+  if (previousDirty) return '서버에 저장됐어요.';
+  return momentCount > 0 ? '내 기록을 불러왔어요.' : '반가워요. 첫 순간을 남겨 보세요.';
+}
+
 export function createNotifier({ $, now = () => Date.now(), holdMs = NOTICE_HOLD_MS, hideMs = NOTICE_HIDE_MS, setTimer = setTimeout, clearTimer = clearTimeout } = {}) {
   let holdUntil = 0;
   let timer = null;
