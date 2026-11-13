@@ -165,17 +165,64 @@ const SETTLE_SHELL = `(() => {
   for (const animation of document.getAnimations?.() || []) { try { animation.finish(); } catch {} }
 })();`;
 
+// 그림·글꼴이 다 익을 때까지 기다린다(#347 조사: font-display:swap 때문에 글꼴이 늦게 오면
+// 대체 글꼴 상태 그대로 두 장이 같아져 저장되고, 그림도 마찬가지라 실행마다 다른 그림이 나온다).
+const WAIT_ASSETS = `(async () => {
+  const withTimeout = (promise, ms) => Promise.race([promise, new Promise((resolve) => setTimeout(resolve, ms))]);
+  try { await withTimeout(document.fonts.ready, 8000); } catch {}
+  const seen = new Set();
+  const collect = (root) => {
+    for (const img of root.querySelectorAll('img')) seen.add(img);
+    for (const el of root.querySelectorAll('*')) if (el.shadowRoot) collect(el.shadowRoot);
+  };
+  try { collect(document); } catch {}
+  await Promise.all([...seen].map((img) => (img.decode ? withTimeout(img.decode().catch(() => {}), 8000) : Promise.resolve())));
+})()`;
+
+// 아직 내려받는 중인 그림·글꼴이 남아 있으면 0보다 크게 나온다(그림은 완료·실패 모두 complete가 된다).
+const ASSETS_PENDING = `(() => {
+  let pending = 0;
+  const collect = (root) => {
+    for (const img of root.querySelectorAll('img')) if (!img.complete) pending += 1;
+    for (const el of root.querySelectorAll('*')) if (el.shadowRoot) collect(el.shadowRoot);
+  };
+  try { collect(document); } catch {}
+  try { pending += [...document.fonts].filter((face) => face.status === 'loading').length; } catch {}
+  return pending;
+})()`;
+
 async function settleInside(frame, page) {
   // 화면 교체 애니메이션이 소수점 배율로 남으면 같은 화면도 픽셀이 흔들리므로, 다 열린 뒤 배율을 1로 고정한다.
   await page.evaluate(SETTLE_SHELL).catch(() => {});
   await frame.evaluate(STABILIZE).catch(() => {});
+  // 글꼴·그림을 먼저 다 읽혀 둔다. 읽는 중 상태도 "두 장이 같은" 안정 상태라 그대로 저장될 수 있다.
+  await frame.evaluate(WAIT_ASSETS).catch(() => {});
+  await page.evaluate(WAIT_ASSETS).catch(() => {});
   await page.waitForTimeout(200);
 }
 
+// 남은 그림·글꼴이 없고, 자료 요청도 새로 늘어나지 않을 때까지 기다린다(최대 6초). true면 자료 다 익음.
+async function assetsReady(frame, page) {
+  for (let attempt = 0; attempt < 24; attempt += 1) {
+    const inside = await frame.evaluate(ASSETS_PENDING).catch(() => 0);
+    const shell = await page.evaluate(ASSETS_PENDING).catch(() => 0);
+    const before = await page.evaluate(() => performance.getEntriesByType('resource').length).catch(() => 0);
+    await page.waitForTimeout(300);
+    const after = await page.evaluate(() => performance.getEntriesByType('resource').length).catch(() => 0);
+    if (inside === 0 && shell === 0 && before === after) return true;
+  }
+  return false;
+}
+
 async function stableShot(frame, page, file) {
+  // 데이터 요청도 기다린다 — 늦게 도착한 데이터는 패널 높이를 바꿔 지도 배치를 다시 그린다.
+  // (캡처당 한 번만 기다린다. 매 settle마다 기다리면 계속 연결이 남는 화면에서 8초씩 반복된다.)
+  await page.waitForLoadState('networkidle', { timeout: 8000 }).catch(() => {});
   await settleInside(frame, page);
   let previous = null;
   for (let attempt = 0; attempt < 8; attempt += 1) {
+    // 자료가 다 익지 않았으면 찍지 않고 기다린다 — 읽는 중 화면도 "안정"으로 둔갑하기 때문.
+    if (!(await assetsReady(frame, page))) { previous = null; await settleInside(frame, page); continue; }
     const buffer = await page.screenshot();
     if (previous && buffer.equals(previous)) {
       writeFileSync(file, buffer);
@@ -183,6 +230,7 @@ async function stableShot(frame, page, file) {
     }
     previous = buffer;
     await settleInside(frame, page);
+    if (!(await assetsReady(frame, page))) { previous = null; continue; }
     await page.waitForTimeout(250);
   }
   writeFileSync(file, previous);
