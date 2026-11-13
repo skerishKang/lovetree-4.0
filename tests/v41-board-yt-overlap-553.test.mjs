@@ -77,7 +77,9 @@ const hostHTML = (tree) => `<!doctype html><html lang="ko"><head><meta charset="
 async function openHost(browser, url, { width, height } = {}) {
   const context = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
   const page = await context.newPage();
-  await page.goto(url, { waitUntil: 'load' });
+  // #553: load 대신 domcontentloaded — 썸네일(i.ytimg.com)은 화면이 뜬 뒤 늦게 실리며, 외부 그림까지
+  // 기다리면 CI에서 load가 30초를 넘는다. 겹침 판정은 예약 높이로 보장되므로 썸네일 도착과 무관하다.
+  await page.goto(url, { waitUntil: 'domcontentloaded' });
   let frame = null;
   for (let i = 0; i < 80 && !frame; i++) {
     frame = page.frames().find((f) => f !== page.mainFrame() && /views\/track58-pinboard/.test(f.url()));
