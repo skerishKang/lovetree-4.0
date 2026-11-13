@@ -74,11 +74,18 @@ const hostHTML = (tree) => `<!doctype html><html lang="ko"><head><meta charset="
 <script>window.LT41={source:'server',writable:true,owned:true,momentId:${JSON.stringify(tree.moments[0].id)},prefs:{},tree:${JSON.stringify(tree)}};</script>
 <iframe src="/v41/views/track58-pinboard.html" style="position:fixed;inset:0;width:100vw;height:100vh;border:0"></iframe></body></html>`;
 
+// 썸네일을 외부(i.ytimg.com)에서 받지 않는다 — 16:9 그림을 즉시 대답해 실제와 같은 높은 카드(가로 약 465px)를 만든다.
+// CI 네트워크에서 외부 그림이 늦거나 막혀도 시험이 흔들리지 않고, 긴 카드 상황을 항상 재현한다.
+const YT_THUMB_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1200"><rect width="1600" height="1200" fill="#8a7a92"/><path d="M700 350 L700 850 L1050 600 Z" fill="#fff"/></svg>';
+
 async function openHost(browser, url, { width, height } = {}) {
   const context = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
+  await context.route('**/i.ytimg.com/**', (route) => route.fulfill({ contentType: 'image/svg+xml', body: YT_THUMB_SVG }));
+  const problems = [];
   const page = await context.newPage();
-  // #553: load 대신 domcontentloaded — 썸네일(i.ytimg.com)은 화면이 뜬 뒤 늦게 실리며, 외부 그림까지
-  // 기다리면 CI에서 load가 30초를 넘는다. 겹침 판정은 예약 높이로 보장되므로 썸네일 도착과 무관하다.
+  page.on('pageerror', (e) => problems.push('pageerror: ' + String(e).slice(0, 300)));
+  page.on('console', (m) => { if (m.type() === 'error') problems.push('console: ' + m.text().slice(0, 300)); });
+  // load 대신 domcontentloaded — 화면이 뜬 뒤 남은 그림을 기다리지 않는다.
   await page.goto(url, { waitUntil: 'domcontentloaded' });
   let frame = null;
   for (let i = 0; i < 80 && !frame; i++) {
@@ -86,11 +93,15 @@ async function openHost(browser, url, { width, height } = {}) {
     if (!frame) await page.waitForTimeout(250);
   }
   assert.ok(frame, '보드 프레임이 열린다');
-  await frame.waitForSelector('.surface', { timeout: 20000 });
-  await frame.waitForFunction(() => document.querySelectorAll('#cardLayer .card').length > 0, null, { timeout: 20000 });
-  await frame.waitForFunction(() => [...document.querySelectorAll('.lt-yt-preview img')].every((i) => i.complete), null, { timeout: 15000 }).catch(() => {});
+  try {
+    await frame.waitForSelector('.surface', { timeout: 20000 });
+    await frame.waitForFunction(() => document.querySelectorAll('#cardLayer .card').length > 0, null, { timeout: 20000 });
+    await frame.waitForFunction(() => [...document.querySelectorAll('.lt-yt-preview img')].every((i) => i.complete), null, { timeout: 15000 }).catch(() => {});
+  } catch (e) {
+    throw new Error(`보드 화면이 열리지 않았다(${width}×${height}): ${String(e).slice(0, 200)} / 화면 문제: ${problems.join(' | ') || '없음'}`);
+  }
   await page.waitForTimeout(1200);
-  return { context, page, frame };
+  return { context, page, frame, problems };
 }
 
 // 겹친 쌍 수·면적(화면 좌표, 회전 포함)과 같은 열 위아래 간격.
@@ -116,7 +127,7 @@ const geometry = (frame) => frame.evaluate(() => {
     list.sort((a, b) => a.y - b.y);
     for (let i = 1; i < list.length; i++) minColumnGap = Math.min(minColumnGap, list[i].y - list[i - 1].y);
   }
-  return { pairs, area: Math.round(area), minColumnGap: Math.round(minColumnGap), zoom: document.getElementById('zoomLabel').textContent, ys: [...new Set(cards.map((c) => c.y))].sort((a, b) => a - b) };
+  return { pairs, area: Math.round(area), minColumnGap: Math.round(minColumnGap), zoom: document.getElementById('zoomLabel').textContent, ys: [...new Set(cards.map((c) => c.y))].sort((a, b) => a - b), maxH: Math.max(...cards.map((c) => c.h)), thumbs: [...document.querySelectorAll('.lt-yt-preview img')].filter((i) => i.complete && i.naturalWidth > 0).length };
 });
 
 test('#553 모델: 줄 간격이 카드 종류별 최대 높이를 따른다 — YouTube 카드 열은 위아래 간격이 예약 높이 이상', () => {
@@ -178,6 +189,8 @@ test('#553 화면: 썸네일이 실린 모아둔 순간 26 — 인접 겹침 0�
       const g = await geometry(frame);
       assert.equal(g.pairs, 0, `${w}: 겹친 카드 쌍 0 (전: 22쌍)`);
       assert.equal(g.area, 0, `${w}: 겹친 면적 0px² (전: 390 153,337px²·1440 98,136px²)`);
+      assert.ok(g.thumbs >= 25, `${w}: 썸네일 ${g.thumbs}장이 실려 긴 카드 상황을 재현한다`);
+      assert.ok(g.maxH >= 440, `${w}: YouTube 카드 높이 ${g.maxH}px ≥ 440px — 줄 간격 420px를 넘는 긴 카드가 실제로 있다`);
       assert.ok(g.minColumnGap >= YT_RESERVED_H, `${w}: 같은 열 위아래 간격 ${g.minColumnGap}px ≥ YouTube 예약 높이 ${YT_RESERVED_H}px (전: 420px)`);
       if (w === 1440) assert.equal(g.zoom, '80%', '읽을 수 있는 0.8배 처음 보기 유지');
       await context.close();
