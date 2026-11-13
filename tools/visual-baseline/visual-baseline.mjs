@@ -198,8 +198,6 @@ async function settleInside(frame, page) {
   // 글꼴·그림을 먼저 다 읽혀 둔다. 읽는 중 상태도 "두 장이 같은" 안정 상태라 그대로 저장될 수 있다.
   await frame.evaluate(WAIT_ASSETS).catch(() => {});
   await page.evaluate(WAIT_ASSETS).catch(() => {});
-  // 데이터 요청도 기다린다 — 늦게 도착한 데이터는 패널 높이를 바꿔 지도 배치를 다시 그린다.
-  await page.waitForLoadState('networkidle', { timeout: 8000 }).catch(() => {});
   await page.waitForTimeout(200);
 }
 
@@ -217,6 +215,9 @@ async function assetsReady(frame, page) {
 }
 
 async function stableShot(frame, page, file) {
+  // 데이터 요청도 기다린다 — 늦게 도착한 데이터는 패널 높이를 바꿔 지도 배치를 다시 그린다.
+  // (캡처당 한 번만 기다린다. 매 settle마다 기다리면 계속 연결이 남는 화면에서 8초씩 반복된다.)
+  await page.waitForLoadState('networkidle', { timeout: 8000 }).catch(() => {});
   await settleInside(frame, page);
   let previous = null;
   for (let attempt = 0; attempt < 8; attempt += 1) {
