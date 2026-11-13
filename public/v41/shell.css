@@ -218,6 +218,8 @@ html[data-v41-screen=book] .tools .ui-btn::after,html[data-v41-screen=board] hea
 .tree-tips li span{font-size:12px;line-height:1.75;color:var(--lt-muted)}
 .tree-tips button{justify-self:start;min-height:44px;padding:0 16px;border-radius:var(--lt-r-pill);border:1px solid var(--lt-gold-line);background:transparent;font-size:13px}
 .tree-tips button:hover{border-color:var(--lt-gold)}
+/* 이슈 549: 모달 창이 열려 있는 동안은 창 밖이 눌리지 않으므로, 안내를 창 안 맨 위에 붙여 띄운다(닫히면 제자리). */
+.tree-tips.lt-tips-embedded{position:static;width:auto;margin:0 0 12px}
 @media(max-width:780px){.tree-tips{top:88px;left:12px;right:12px;width:auto;padding:16px 14px 12px}.tree-tips h2{font-size:16px}}
 /* 이슈 256-3, 책 정보 관리 창의 디자인 표지 줄: 사진 표지가 우선한다는 표시 + 질감 칩 6종.
    색은 identity.css의 --lt-cover-N(tree-design 범위에도 같은 값)과 질감 규칙 한 곳을 쓴다. 새 hex 없다. */

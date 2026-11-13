@@ -9,3 +9,20 @@ import './local-date.js';
 export function localDateOnly(clock) {
   return globalThis.LTLocalDate.localDateOnly(clock);
 }
+
+/**
+ * #549: 두 시각 사이가 기기 지역 날짜(#547) 기준으로 며칠 차이인지 돌려준다.
+ * @param {Date|number|string} [fromClock] 기준 시각(기본값: 지금)
+ * @param {Date|number|string} toClock 비교할 시각
+ */
+export function localDaysBetween(fromClock, toClock) {
+  return globalThis.LTLocalDate.localDaysBetween(fromClock, toClock);
+}
+
+/**
+ * #549: 일수를 사람 말로 ('오늘'·'어제'·'N일 전').
+ * @param {number} days 지역 날짜 기준 일수
+ */
+export function relativeDayLabel(days) {
+  return globalThis.LTLocalDate.relativeDayLabel(days);
+}

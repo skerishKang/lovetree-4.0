@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 // #353 후속: 담기·중복·로그인 필요 안내가 상태 안내보다 먼저 일정 시간 보이는지 가짜 DOM·가짜 시계로 직접 부른다.
 // shell.mjs 배선(입구 안내를 hold로 보내는 한 줄)은 글자로 고정한다(#245 전례와 같은 이유).
-import { createNotifier, NOTICE_HOLD_MS, NOTICE_HIDE_MS } from '../public/v41/shell/notice.mjs';
+import { createNotifier, NOTICE_HOLD_MS, NOTICE_HIDE_MS, syncedNoticeText } from '../public/v41/shell/notice.mjs';
 
 function harness() {
   const els = {};
@@ -51,6 +51,22 @@ test('담기 안내 우선: hold 동안 상태 안내가 와도 덮지 않고, h
   assert.equal(h.notifier.notify('내 기록을 불러왔어요.'), true, 'hold가 지나면 상태 안내가 보인다');
   assert.equal(h.els['toast'].textContent, '내 기록을 불러왔어요.');
   assert.equal(h.els['settings-feedback'].textContent, '내 기록을 불러왔어요.');
+});
+
+test('synced 안내 문구(#549): 기록 0개 새 계정은 첫 순간 안내로, 기록이 있으면 예전 문구', () => {
+  assert.equal(syncedNoticeText({ writable: true, previousDirty: false, momentCount: 0 }), '반가워요. 첫 순간을 남겨 보세요.');
+  assert.equal(syncedNoticeText({ writable: true, previousDirty: false, momentCount: 1 }), '내 기록을 불러왔어요.');
+  assert.equal(syncedNoticeText({ writable: true, previousDirty: false, momentCount: 12 }), '내 기록을 불러왔어요.');
+  assert.equal(syncedNoticeText({ writable: true, previousDirty: true, momentCount: 0 }), '서버에 저장됐어요.', '방금 저장한 뒤라면 저장 안내가 우선');
+  assert.equal(syncedNoticeText({ writable: false, previousDirty: false, momentCount: 0 }), '기록을 읽었어요. 서버 편집 연결은 아직 준비되지 않았어요.');
+});
+
+// 셸 배선을 글자로 고정한다(#245 전례) — 문구 한 벌을 지나가지 않는 회귀를 막는다.
+test('셸은 synced 안내를 notice.mjs의 한 벌에서 가져온다(#549)', () => {
+  const shell = readFileSync(new URL('../public/v41/shell.mjs', import.meta.url), 'utf8');
+  assert.match(shell, /import \{createNotifier, syncedNoticeText\} from '\.\/shell\/notice\.mjs';/);
+  assert.match(shell, /syncedNoticeText\(\{writable:status\.writable,previousDirty,momentCount\}\)/);
+  assert.doesNotMatch(shell, /notify\([^\n]*'내 기록을 불러왔어요\.'/, '안내 문구는 notice.mjs 한 벌에서만 온다');
 });
 
 test('중복·로그인 필요 안내도 같은 규칙으로 지켜진다', () => {

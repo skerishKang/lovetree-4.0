@@ -10,7 +10,8 @@ const orbit = readFileSync(new URL('../src/views/orbit.js', import.meta.url), 'u
 test('마지막 순간 카드: aria-label 없음 — 접근 이름은 보이는 글자(마지막 순간 · N일 전 · 제목 · 이어 보기)에서 온다', () => {
   assert.doesNotMatch(orbit, /class="recent-card[^>]*aria-label/, '카드에 aria-label을 다시 붙이지 않는다');
   // 보이는 글자가 그대로 이름이 되려면 안쪽 글자가 마크업에 있어야 한다.
-  assert.match(orbit, /<small>마지막 순간\$\{days===null\?'':` · \$\{days\}일 전`\}<\/small>/);
+  // #549: 'N일 전'은 '오늘'·'어제'로 바뀌었고(relativeDayLabel), 접근 이름은 여전히 보이는 글자에서 온다.
+  assert.match(orbit, /<small>마지막 순간\$\{days===null\?'':` · \$\{relativeDayLabel\(days\)\}`\}<\/small>/);
   assert.match(orbit, /<strong>\$\{esc\(head\)\}<\/strong>/);
   assert.match(orbit, / · 이어 보기 →<\/small>/);
 });

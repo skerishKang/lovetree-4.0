@@ -32,7 +32,7 @@ import {createFeedbackDialog} from './feedback.mjs';
 import {createFeedbackBoard} from './feedback-board.mjs';
 import {connectionSignature} from './shell/panel-dirty.mjs';
 import {createLocation} from './shell/location.mjs';
-import {createNotifier} from './shell/notice.mjs';
+import {createNotifier, syncedNoticeText} from './shell/notice.mjs';
 import {paintLoginLinks,paintThemeControls,applyTheme as applyThemeFor,toggleTheme as toggleThemeFor} from './shell/theme.mjs';
 import {normalizeTitleDisplay, normalizeAccentColor, normalizeDateStyle, normalizeStartPlace, normalizeShareView, coverModeOf, normalizeCoverDesign} from './domain.mjs';
 import {backfillVideoTitles} from './title-backfill.mjs';
@@ -178,7 +178,7 @@ const shellAuth=createAuth({
 function startLogin(intent=''){return shellAuth.startLogin(intent);}
 function openLoginStart(intent='first'){return shellAuth.openLoginStart(intent);}
 // #425: 순간 추가 한 창 — 쉬운 추가·자세한 추가를 한 창의 탭으로 오간다(shell/write-panel.mjs).
-const shellWrite=createWritePanel({$});
+const shellWrite=createWritePanel({$,onModalShown:()=>placeTreeTips()});
 // 헤더·계정 메뉴는 shell/header.mjs가 맡는다(#231 1-B②-2). 셸은 자기 상태를 읽기 함수로 넘긴다.
 addEventListener('lovetree-auth-required',()=>shellAuth.authRequired());
 window.LT41=null;
@@ -361,7 +361,10 @@ function writeLocation(mode){return shellLocation.writeLocation(mode);}
 function applyBrowserLocation(){return shellLocation.applyBrowserLocation();}
 const PENDING_NEW='lovetree.v41.pending-new';
 // 2026-11-07 계정 표시: 로그인 상태는 첫 글자 동그라미 + 작은 메뉴, 로그아웃 상태는 기존 로그인 알약.
-function panel(id){const target=$(id);if(!target.open){if(target.dataset.ltPanel){shellDialogs.noteOpener(id);if(target.dataset.ltPanel==='full')shellDialogs.syncPanelTop();}target.showModal();}}
+function panel(id){const target=$(id);if(!target.open){if(target.dataset.ltPanel){shellDialogs.noteOpener(id);if(target.dataset.ltPanel==='full')shellDialogs.syncPanelTop();}target.showModal();}
+ // #549: 창을 새로 띄울 때 첫 트리 안내가 이미 떠 있으면 창 안 맨 위로 옮긴다 —
+ // 모달 창이 열려 있는 동안에는 창 밖 안내가 눌리지 않기 때문이다.
+ placeTreeTips();}
 // 대화상자 접근성(Tab 순환·Esc 복귀·포커스 되돌리기)은 shell/dialogs.mjs가 맡는다(#231 1-B 후속).
 const shellDialogs=createDialogs({
   $,
@@ -504,9 +507,29 @@ function links(){viewContext();const c=window.LT41;$('connections').replaceChild
  connectionShown=connectionSignature(c.tree,c.momentId);
 }
 // #213 3번: 첫 트리 안내 말풍선. 한 번만 보여 주고, 닫으면 기억한다(저장소가 막히면 다시 보여 준다).
+// #549: 순간 추가 창(showModal)이 열려 있는 동안에는 창 밖 요소가 전부 inert가 되어 '알겠어요'가
+// 눌리지 않았다(빈 알림 요소가 가로채는 것이 아니라 모달 창 자체가 누름을 막는다. 창 위에 popover로
+// 띄워도 이 크롬은 누름을 창에 막았다). 그래서 모달 창이 열려 있는 동안은 안내를 창 안 맨 위로
+// 옮겨 띄우고(placeTreeTips), 창이 닫히면 제자리로 돌려 놓는다.
 let tipsReturnFocus=null;
+const tipsBox=$('tree-tips');
+const tipsNextSibling=tipsBox?tipsBox.nextElementSibling:null;
+function tipsRestore(){
+  if(!tipsBox||!tipsBox.classList.contains('lt-tips-embedded'))return;
+  tipsBox.classList.remove('lt-tips-embedded');
+  if(tipsNextSibling&&tipsNextSibling.isConnected)document.body.insertBefore(tipsBox,tipsNextSibling);
+  else document.body.append(tipsBox);
+}
+function modalDialogOpen(){return [...document.querySelectorAll('dialog[open]')].find(d=>d.matches(':modal'))||null;}
+function placeTreeTips(){
+  const box=$('tree-tips');if(!box||box.hidden)return;
+  const dialog=modalDialogOpen();
+  if(dialog&&box.parentElement!==dialog){box.classList.add('lt-tips-embedded');dialog.prepend(box);}
+  else if(!dialog)tipsRestore();
+}
 function closeTreeTips(remember=true){
   const box=$('tree-tips');if(!box||box.hidden)return;
+  tipsRestore();
   box.hidden=true;if(remember)writeTipsSeen(localStorage);
   const back=tipsReturnFocus||$('tree-views')?.querySelector('button')||$('mobile-more');tipsReturnFocus=null;
   if(back&&document.contains(back)&&!back.hidden)back.focus();
@@ -517,12 +540,15 @@ function showTreeTips(){
   if(list&&!list.children.length)for(const tip of FIRST_TREE_TIPS){const li=document.createElement('li');const strong=document.createElement('strong');const span=document.createElement('span');strong.textContent=tip.title;span.textContent=tip.body;li.append(strong,span);list.append(li);}
   if(!tipsReturnFocus)tipsReturnFocus=document.activeElement;
   box.hidden=false;
+  placeTreeTips();
   $('tree-tips-close')?.focus();
 }
 function syncTreeTips(){
   const wanted=tipsWanted({owned:!!member?.snapshot().owned,treeCount:model?.trees?.length||0,seen:readTipsSeen(localStorage),source});
   if(wanted)showTreeTips();else closeTreeTips(false);
 }
+// 모달 창이 열리거나 닫힐 때 안내의 자리를 다시 맞춘다(창이 열려 있으면 창 안, 없으면 제자리).
+document.addEventListener('close',()=>placeTreeTips(),true);
 $('tree-tips-close')?.addEventListener('click',()=>closeTreeTips());
 // 2026-11-07: 390·360에서 탭 7개가 폭을 넘는다. 탭 줄은 가로 스크롤이고, 화면을 바꿀 때 현재 탭을 가운데로 당겨 보이게 한다.
 // 넘치는 쪽 끝에만 페이드를 켜서 잘린 것이 아니라 더 있다는 신호를 준다. 데스크톱(넓은 폭)은 스크롤이 없어 아무 일도 하지 않는다.
@@ -601,7 +627,9 @@ function memberStatus(status){
  }
  if(status.phase==='checking')notify('내 기록을 불러오고 있어요.');
  else if(status.phase==='synced'){
-  notify(status.writable?(previousDirty?'서버에 저장됐어요.':'내 기록을 불러왔어요.'):'기록을 읽었어요. 서버 편집 연결은 아직 준비되지 않았어요.');
+  // #549: 기록(순간)이 0개인 새 계정의 첫 안내는 '불러왔어요' 대신 첫 순간 안내로(문구는 notice.mjs 한 벌).
+  const momentCount=(model?.trees||[]).reduce((n,tree)=>n+((tree.moments||[]).length),0);
+  notify(syncedNoticeText({writable:status.writable,previousDirty,momentCount}));
   // #538: 첫 순간을 담은 뒤 한 번, 공개 기본과 익명성을 알린다. 기기당 1회(localStorage).
   if(previousDirty&&status.writable&&(model?.trees||[]).some(tree=>tree.moments.length>0)){
    let shown=false;try{shown=localStorage.getItem('lt41.publicNoticeShown')==='1';}catch{}
