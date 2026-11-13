@@ -57,8 +57,9 @@ test('#464 편집 손잡이는 읽기 전용에서 하나도 나오지 않는다
 test('#464 책 렌더는 editAffordances 한 곳으로만 손잡이를 정한다(다른 경로가 남아 있지 않다)', () => {
   assert.match(bookExtra, /const hands=editAffordances\(\{readOnly:!!LTDEMO\.readOnly,/, '판정은 한 곳에서');
   // 안내 문구와 '고치기'는 hands를 통해서만 붙는다 — 예전처럼 무조건 붙는 자리가 없어야 한다.
-  assert.match(bookExtra, /else if\(hands\.guide\)lead=guide;/, '안내는 hands.guide일 때만');
-  assert.match(bookExtra, /hands\.guide\?guide:''/, '오른쪽 페이지 안내도 hands.guide일 때만');
+  // #537: 마음 한마디가 비었을 때의 흐린 안내("…적어 보세요")는 내용처럼 읽혀 아예 그리지 않는다.
+  // (판정 자체는 그대로 editAffordances 한 곳이 맡는다 — hands.guide는 다른 곳에서 쓸 수 있게 남겨 둔다.)
+  assert.doesNotMatch(bookExtra, /class="moment-note is-empty/, '빈 마음 안내는 그리지 않는다(#537)');
   assert.match(bookExtra, /hands\.hint\?'<button type="button" class="title-edit-hint"/, '"고치기"는 hands.hint일 때만');
 });
 

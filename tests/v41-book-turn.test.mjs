@@ -13,7 +13,7 @@ test('#393 3: 넘기는 동안 아래 페이지를 다시 그리지 않는다 �
  // 아래 페이지 그림 한 번 + 판정 한 번
  assert.match(prepare,/rightPage\.innerHTML=momentContent\(\{\.\.\.tar\.right,spread:t\}\)/,'next: 아래 오른쪽 페이지를 준비에서 한 번 그린다');
  assert.match(prepare,/leftPage\.innerHTML=momentContent\(\{\.\.\.tar\.left,spread:t\}\)/,'prev: 아래 왼쪽 페이지를 준비에서 한 번 그린다');
- assert.match(prepare,/mobileContent\.innerHTML=mobileSpreadContent\(tar\)/,'모바일: 아래 한 장을 준비에서 한 번 그린다');
+ assert.match(prepare,/mobileContent\.innerHTML=singlePageContent\(tarM,t,total\)/,'한 장(휴대폰): 아래 한 쪽을 준비에서 한 번 그린다');
  assert.match(prepare,/markOverflowPages\(\);turn\.frontFace=front/,'그린 직후 넘침 판정 한 번');
  // 그림자·어둠·광은 미리 만든 층의 opacity만
  assert.match(setTurn,/shadowLayer\.style\.opacity/,'그림자 층 opacity');
@@ -61,7 +61,7 @@ test('#393 3: 재생 중인 영상은 넘길 때 잠깐 멈추고 면은 썸네�
  const prepare=between(BOOK,'function prepareTurn','function finishTurn');
  assert.match(prepare,/for\(const v of book\.querySelectorAll\('video'\)\)try\{v\.pause\(\)\}catch\{\}/,'살아 있는 페이지의 video 일시정지');
  // 면은 momentContent(썸네일)로 새로 그려진다 — #409 세로·가로 틀 규칙을 그대로 탄다
- assert.match(prepare,/pageFace\(\{\.\.\.cur\.right,spread:current\},'right'\)/);
+ assert.match(prepare,/pageFace\(\{\.\.\.cur\.right,spread:curPos\},'right'\)/);
  assert.match(prepare,/pageFace\(\{\.\.\.tar\.left,spread:t\},'left'\)/);
 });
 
