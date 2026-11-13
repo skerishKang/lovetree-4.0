@@ -8,8 +8,10 @@
 
 - **주소가 곧 화면**: 운영센터(src/admin.js)를 순수 모듈 src/admin-view.js의 조각으로 고쳤다. `#board`·`#feedback/<id>`·`#persona/<id>`·`#reports`·`#issues` — 뒤로 가기·새로 고침·링크 공유가 화면 상태를 그대로 따른다. 화면이 직접 가지는 상태는 종류·상태 거르기뿐이다.
 - **#564 항목 반영**: 날짜 '11.14 06:31'(초 없음), 본문·답글 줄바꿈 유지, '닫음'(closed) 상태 추가 + 목록 기본에서 숨김(상태를 골랐을 때는 서버 결과 그대로), 상태 바꿈 알림 문구('으로/로' 받침), GitHub 이슈는 본문 복사 대신 '새 이슈' 쓰기 화면 열기(제목·본문만, 계정·트리 정보 없음), 연결 이슈 번호를 숫자일 때만 GitHub 링크로. 모르는 해시는 게시판으로 돌린다.
-- **시험**: 신규 `tests/admin-view.test.mjs` 10건(주소 왕복·탭 표시·날짜·줄바꿈·'닫음' 거르기·문구·이슈 주소·이슈 링크). `npm test` 1540건 fail 0, `npm run build` 통과. 커밋 d930216, push 완료. 브라우저 실화면 확인(컴2)은 아직 못 했다.
-- **남긴 것**: PR 만들기·머지, 컴2 브라우저로 해시 뒤로 가기·새로 고침·'닫음' 숨김 실화면 확인.
+- **시험**: 신규 `tests/admin-view.test.mjs` 10건(주소 왕복·탭 표시·날짜·줄바꿈·'닫음' 거르기·문구·이슈 주소·이슈 링크). `npm test` fail 0, `npm run build` 통과. 서버 쪽 `FEEDBACK_STATUSES`에 closed 추가 + `tests/feedback-service.test.mjs` closed 시험, `schema.sql` CHECK에 closed, `server/db/migrations/feedback-closed-261114.sql`(CHECK 교체, md5 `5a1c08de7509966b928de06e7fd91d80`). 고객 '내 의견' 화면(`public/v41/feedback-board.mjs`)에 closed='처리 끝' 표시 + closed에도 이슈 번호 표시. 12번 배경은 첫 커밋에서 `html` 선택자가 styles.css `:root` 명시도에 못 이겨 `:root,body` 무대색으로 고친 뒤 브라우저에서 `rgb(4,4,7)` 재확인(커밋 353da67).
+- **머지·배포 완료(2026-11-14)**: PR #565 머지 → main `b2c986b`. 필수 검사 전부 초록. 컴2 백엔드: autodeploy `needs_manual_migration` 확인 → 마이그레이션 /tmp 전송·md5 일치 → `SET ROLE lovetree_owner` + `ON_ERROR_STOP=1` 적용(ALTER 2) → `lovetree_feedback_status_check`가 closed 포함·표 소유자 `lovetree_owner` 확인 → `AUTODEPLOY_ACCEPT_MIGRATIONS=1` 1회 → `result=installed` sha `b2c986b` = main, 서비스 active. 라이브 프런트(pages.dev) `feedback-board.mjs`에 closed='처리 끝' 확인. 운영 DB id=1 '[시험] 의견 창구 확인'을 closed로 바꿈(UPDATE 통과 = CHECK 실동작).
+- **실화면 확인(모의 관리자 API, 컴2 tabbit)**: 실세션 401을 우회하려고 이전 레인(#540) 방식의 모의 admin API 로컬 서버로 before(main d6c0f69)/after(이 브랜치)를 비교했다. 해시 뒤로 가기 3단계(`#persona/yunje`→`#feedback/6`→`#board`→앱 밖), 새로 고침 상세 유지, '닫음' 목록 기본 숨김+거르기에서 보임, '← 목록' 금테 단축·머리줄 높이 31px, '메모·이슈 저장'·운영 메모 설명·답글 종류 큰 선택 두 개+안내·'답글 남기기' 오른쪽 정렬, 페르소나 textarea+저장 단추 아래로, 390 진짜 렌더 가로 넘침 0(scrollWidth=clientWidth=390) — 모두 확인. 스크린샷 `E:\lovetree-qa\admin-ui-564\{before,after}\`(1440·390 × 목록·상세·페르소나, 헤드리스 playwright로 픽셀 정확하게 다시 찍음 — tabbit 창 최소폭이 약 260 CSS px라 창 스크린샷은 390 렌더를 못 만든다). 확인 결과는 PR #565 댓글로 남김.
+- **남긴 것**: 대표 관리자 세션(컴2)으로 라이브 운영센터에서 '닫음' 글이 목록에 안 보이는 눈 확인 — DB·모의 화면·시험으로는 확인됐다. 라이브 id=1은 closed 상태로 남겨 두었다(대표 확인용).
 
 ## 2026-11-14 — 운영 시작 준비: 관리자 권한·운영센터 입구·디자인 통일·AI 고객 등록·매일 내보내기 (이슈 #540 마무리, 로컬3 레인, ai/local3-lt-540c-ops-261114, main 69cb042 기준)
 
