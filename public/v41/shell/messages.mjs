@@ -132,8 +132,9 @@ export function createMessages(deps) {
     $('share-create-reason').hidden = !$('share-create').disabled;
   }
   function shareUrlFor(id, view) {
-    const shareBase = location.hostname === 'lovetree.padiem.net' ? '/' : '/v41/';
-    return new URL(`${shareBase}#share/${id}/${view}`, location.origin).href;
+    // #541: 복사할 주소는 미리보기 카드가 붙는 /t/<id>. view 는 서버가 주소에서 정하고,
+    // 기존 #share/<id>/<view> 주소도 계속 열린다(앱 안 이동은 그 형식을 그대로 쓴다).
+    return new URL(`/t/${encodeURIComponent(id)}`, location.origin).href;
   }
   function renderShareList(shares = []) {
     const host = $('share-list'), treeId = window.LT41?.tree.id;
