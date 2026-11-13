@@ -224,7 +224,7 @@ test('공유는 미리보기 없이는 만들지 않고, 미리보기 뒤에만 
     await h.els['share-create'].onclick();
     assert.equal(h.requests[1][0], 'create');
     assert.equal(h.requests[1][1].previewToken, 'tok-1', '미리보기 토큰을 그대로 넘긴다');
-    assert.equal(h.els['share-url'].value, 'https://lovetree-4-0.pages.dev/v41/#share/share-1/book');
+    assert.equal(h.els['share-url'].value, 'https://lovetree-4-0.pages.dev/t/share-1');
     assert.equal(h.els['share-created'].hidden, false);
   } finally { h.restore(); }
 });
