@@ -48,6 +48,17 @@ test('지도 실제 대비: 앱 2 × 판 2 × 1440·390, 두 보기·선택 상�
         const frame = page.frames().find(f => /track56-network/.test(f.url()));
         assert.ok(frame, '지도 프레임을 찾지 못함');
         await frame.evaluate(() => document.fonts.ready);
+        // 환경 확인: 한글 글꼴이 없는 실행기에서는 이름표가 가는 대체 글리프로 그려져 '글자 속' 표본이 0이 된다(#529).
+        // 제품 대비 미달과 섞이지 않게, 재기 전에 환경 문제로 분명히 멈춘다.
+        const inkDark = await frame.evaluate(() => {
+          const c = document.createElement('canvas'); c.width = 96; c.height = 48; c.lang = document.documentElement.lang;
+          const x = c.getContext('2d', { alpha: false, willReadFrequently: true });
+          x.fillStyle = '#fff'; x.fillRect(0, 0, 96, 48); x.scale(2, 2); x.font = '600 12px Pretendard, sans-serif'; x.fillStyle = '#000'; x.fillText('도시의 창', 2, 16);
+          const d = x.getImageData(0, 0, 96, 48).data; let n = 0;
+          for (let i = 0; i < d.length; i += 4) if (Math.max(d[i], d[i + 1], d[i + 2]) <= 10) n++;
+          return n;
+        });
+        assert.ok(inkDark > 20, `환경 문제: 이 실행기에 한글 글꼴이 없어 이름표 글자를 잴 수 없음(글자 속 픽셀 ${inkDark}) — 제품 대비 문제가 아님. 작업 흐름의 한글 글꼴 준비 단계를 확인`);
         await page.waitForTimeout(500);
         const results = [];
         for (const view of ['network', 'concentric']) {

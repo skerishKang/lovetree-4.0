@@ -164,6 +164,13 @@ async function interactions({ page, frame, width }) {
   await frame.waitForFunction(() => document.getElementById('detail').classList.contains('open'));
   await frame.locator('#detailClose').click();
   assert.equal(await frame.locator('#detail').evaluate(el => el.classList.contains('open')), false, '상세 닫기');
+  // #529: 닫힌 상세 창 안으로 초점이 가도 지도 겹이 옆으로 밀리지 않는다(밀리면 이후 누르기가 전부 395px 빗나갔다).
+  assert.deepEqual(await frame.evaluate(() => {
+    document.getElementById('detailClose').focus();
+    const app = document.querySelector('.app'), left = Math.round(document.getElementById('stage').getBoundingClientRect().left);
+    document.activeElement?.blur?.();
+    return [left, app.scrollLeft, app.scrollTop];
+  }), [0, 0, 0], '닫힌 상세 창에 초점이 가도 지도가 밀리지 않는다');
   await frame.locator('#overviewBtn').click();
   const hub = await clickMapObject(frame, 'hub');
   assert.equal(await frame.evaluate(() => window.__lt.state.cluster?.id), hub.id, '묶음 클릭');

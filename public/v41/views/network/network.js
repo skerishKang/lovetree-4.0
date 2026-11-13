@@ -216,7 +216,7 @@ $('zoomIn').onclick=()=>{zoomAt(1.18);scheduleDraw()};$('zoomOut').onclick=()=>{
 window.__lovetreeStats={moments:nodes.length,paths:paths.length,edges:edges.length,clusters:CLUSTERS.map(c=>({name:c.name,count:c.count,primaryPaths:paths.filter(p=>p.cluster===c.index&&p.kind==='primary').length})),edgeKinds:edges.reduce((a,e)=>(a[e.kind]=(a[e.kind]||0)+1,a),{})};
 window.__lt={dots:()=>nodes.filter(n=>n.kind==='moment'&&shouldDrawNode(n)).map(n=>{const p=w2s(n.x,n.y);return {id:n.id,x:p.x,y:p.y,r:dotRadius(n),first:!!n.first}}),hubs:()=>state.view==='concentric'?[]:CLUSTERS.filter(shouldDrawNode).map(c=>{const p=w2s(c.x,c.y);return {id:c.id,x:p.x,y:p.y,r:Math.max(8,c.hubR*state.scale)}}),box:()=>BOX,labels:()=>LAST_LABELS,overview,originReveal,selectCluster,selectMoment,startPlayback,chooseBranch,state,CLUSTERS,nodes,edges,paths,pathById,FIRST};
 mobilePicker=LTMobileMoments({moments:LTDEMO.moments,selected:LTDEMO.get(),onSelect:id=>selectMoment(byId[id],true),onOpen:id=>{selectMoment(byId[id],true);$('openMoment').click();},openLabel:'책 열기'});
-addEventListener('resize',resize);
+addEventListener('resize',resize);/* #529: 지도 겹은 스크롤하지 않는다 — 화면 밖 창 안으로 초점이 가도 .app이 밀리지 않게 바로 되돌린다(overflow:clip을 모르는 브라우저용). */(function(){const app=document.querySelector('.app');if(!app)return;app.addEventListener('scroll',()=>{if(app.scrollLeft||app.scrollTop){app.scrollLeft=0;app.scrollTop=0}})})();
 /* 지도를 덮는 도구(머리·안내·순간 고르기·왼쪽 창·아래 줄)의 크기가 처음 맞춘 뒤에 바뀌면(셸이 순간 고르기 줄을 늦게 붙이거나 글자가 줄바꿈될 때)
    빈 곳이 달라진다. 그때 한 번 다시 맞춘다 — 그러지 않으면 여는 타이밍에 따라 지도가 16px쯤 다르게 놓였다. 크기가 실제로 바뀔 때만 돌아 유휴 그리기는 0. */
 (()=>{if(typeof ResizeObserver==='undefined')return;let seen='';const SEL=['.topbar','.hero p','.lt-moment-picker','.left-rail','.mobile-ribbon'],watched=new WeakSet();
