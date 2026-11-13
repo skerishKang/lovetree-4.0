@@ -226,3 +226,25 @@ CREATE TABLE IF NOT EXISTS lovetree_account_delete_rpc_requests (
 );
 CREATE INDEX IF NOT EXISTS lovetree_account_delete_rpc_requests_expiry_idx
   ON lovetree_account_delete_rpc_requests (expires_at);
+
+-- 2026-11-14 고객 의견 창구 (#540). 로그인·로그아웃 모두 보낼 수 있고, 로그아웃이면 subject_id를 비운다.
+-- 개인 정보(이메일·전화번호 꼴)는 저장 전에 가린다. 화면 그림 첨부는 2차로 미룬다.
+-- 상태: 받음(received) / 확인 중(reviewing) / 고침(fixed) / 다음에(later).
+-- 종류: 이상해요(bug) / 불편해요(inconvenient) / 기능 제안(feature) / 그 밖에(other).
+CREATE TABLE IF NOT EXISTS lovetree_feedback (
+  id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  product_id text NOT NULL,
+  subject_id text,
+  category text NOT NULL CHECK (category IN ('bug','inconvenient','feature','other')),
+  body text NOT NULL CHECK (char_length(body) BETWEEN 1 AND 2000),
+  context jsonb NOT NULL DEFAULT '{}'::jsonb,
+  status text NOT NULL DEFAULT 'received' CHECK (status IN ('received','reviewing','fixed','later')),
+  memo text,
+  issue_number text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS lovetree_feedback_recent_idx
+  ON lovetree_feedback (product_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS lovetree_feedback_status_idx
+  ON lovetree_feedback (product_id, status, created_at DESC);
