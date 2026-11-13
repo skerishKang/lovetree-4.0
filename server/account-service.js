@@ -91,10 +91,12 @@ export function createAccountService({ repo, productId, admin = null, mediaStore
     async describe(verified) {
       const principal = await principalEmail(verified);
       const expected = confirmation(principal);
+      const role = admin ? await admin.roleFor(principal) : null;
       // 확인 방식만 알려 준다. subject 같은 내부 식별자는 응답에 넣지 않는다.
       return {
         confirmKind: expected.kind,
         ...(expected.kind === 'email' ? { email: principal.email } : {}),
+        aiCustomer: role === 'ai_customer',
         deleted: await repo.isDeleted({ productId, subjectHash: subjectHash(principal.subjectId) })
       };
     },

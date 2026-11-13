@@ -4,6 +4,16 @@
 
 > **빨간 필수 검사 규칙(2026-11-12 사고 뒤)**: 필수 검사가 빨강이면 **재실행은 1회까지**. 같은 항목이 또 빨강이면 멈추고 원인을 찾는다 — 재실행·빈 커밋으로 초록을 만들지 않는다. "간헐적·환경 탓"이라고 적으려면 **같은 시각 이 변경이 없는 브랜치(main 또는 다른 PR)** 에서도 같은 실패가 나는지 대조한 결과를 함께 적는다. 메시지를 받아 화면을 다시 띄우는 코드는 '뜰 때마다 보내는 쪽'과 짝으로 흐름 시험을 하고, 머지 전 미리보기 첫 화면을 5초 이상 직접 본다.
 
+## 2026-11-14 — 고객 의견 2차: 관리자 게시판 + AI 고객 사용 일지 (이슈 #540, 로컬3 레인)
+
+- **DB**: `server/db/migrations/board-261114.sql` + `schema.sql`. `lovetree_product_roles` CHECK 에 `ai_customer` 추가. `lovetree_feedback` 에 `kind`(opinion/journal)·`title`·`score`(1~5)·`journal_date` 추가. 신규 `lovetree_feedback_replies`(customer/internal)·`lovetree_ai_personas`(이름+intro jsonb). 계정 탈퇴 경로에 replies·personas 포함.
+- **서버**: `server/feedback-service.js` 확장 — `POST /api/board`(AI 고객 하루 1건, 다시 쓰면 고침)·`GET /api/board/mine`·`GET /api/board/journal/today`·`GET /api/admin/feedback`(목록, kind·status 거르기)·`GET /api/admin/feedback/:id`(상세+답글+페르소나)·`POST /api/admin/feedback/:id/reply`·`GET·PUT /api/admin/persona/:id`. `admin-roles.js` 에 `ai_customer` 역할. `account-service.describe` 에 `aiCustomer`. proxy 허용 목록·라우팅 추가.
+- **운영센터**: `src/admin.js` 를 게시판으로 재작성(목록→상세→답글[고객 답변/내부 메모]→글쓴이 페르소나·이슈 탭[GitHub 공개 저장소]). 신고 검토 칸 유지. `admin.css` 를 --lt-* 토큰·검은 무대·금테 카드로. `admin.html` 에 identity.css 로드.
+- **사이트**: `public/v41/feedback-board.mjs`(AI 고객 '오늘 사용 일지' 글쓰기 + '내 의견'), 계정 메뉴 버튼(AI 고객 전용 '오늘 사용 일지', 로그인 사용자 '내 의견'). `shell.mjs` 배선.
+- **내보내기**: `tools/export-ai-customer.mjs`(컴1 node, 관리자 API) — AI 고객별 `일지_YYMMDD.md`·`소개.md`. 예약 등록은 대표 확인 뒤.
+- **시험**: `tests/board-service.test.mjs` 9건, `tests/export-ai-customer.test.mjs` 4건, `tests/feedback-postgres.test.mjs` +1(게시판). `npm test` 1,439 pass/0 fail(브라우저 지도 대비 제외), build·modulepreload 통과. 관리자 게시판 실화면(모의 관리자 API): 390·1440 목록·상세+답글·페르소나, 가로 넘침 0.
+- **남긴 것**: 실 PTgreSQL·배포·머지는 CI/컴2. 내보내기 실데이터 실행은 AI 고객·일지 데이터가 아직 없어 미실행(스크립트·포맷 시험만). 로그인 상태 사이트 플로우는 OAuth·비밀값 필요해 미확인.
+
 ## 2026-11-14 — #536 보드: 넓은 화면 판 쏠림·별 모양 기둥 배치·머리줄 [종이|밤]·읽기 전용 표시 (로컬3, ai/local3-lt536-boardwide-261114, main 3c21387 기준)
 
 - **판이 오른쪽에만 차는 원인**: `startView`의 `clampAxis`는 판(흰 판 ∪ 순간 묶음)이 화면보다 좁은 축에서는 아무 정렬을 하지 않아, `fitBox`가 순간 묶음을 보이는 칸에 가운데 둔 자리가 그대로 남았다 — 2560에서 순간 1개면 판 left 863px(화면의 34%). 고침: `coverView` — 덮을 수 있으면 clamp(빈 곳 없이), 못 덮으면 그 축은 화면 가운데. 기억한 자리(저장된 보기)도 같은 규칙을 거치게 `LT58Model.startView({saved})`로 넘긴다(배율·자리 기억 #490·#492는 유지 — 판이 화면을 덮으면 밀고, 덮지 못하면 가운데).

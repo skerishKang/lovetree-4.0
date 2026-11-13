@@ -85,9 +85,11 @@ function renderAccount(){const owned=!!getMember()?.snapshot().owned;
 function openAccountMenu(){const owned=!!getMember()?.snapshot().owned;if(!owned){return;}const pop=$('account-popover');pop.hidden=false;$('account-avatar').setAttribute('aria-expanded','true');if(!accountEmail&&!emailTried)void loadAccountEmail();}
 // #368 보완 1·2: 이메일을 메뉴를 열 때가 아니라 로그인 직후 불러와 동그라미·라벨이 처음부터 이메일을 쓰게 한다.
 // 한 번 시험한 뒤에는 성공해도(이메일 없는 계정) 다시 부르지 않고, 실패했을 때만 다시 시험한다.
-let emailTried=false;
-async function loadAccountEmail(){emailTried=true;const answer=await accountApi.account().catch(()=>null);if(!answer?.ok){emailTried=false;return;}if(answer.email)accountEmail=answer.email;renderAccount();}
-function updateAccountControls(){const owned=!!getMember()?.snapshot().owned;if(!owned){accountEmail='';emailTried=false;}document.querySelectorAll('[data-guest-login]').forEach(x=>x.hidden=owned);$('server').hidden=!owned;$('logout').hidden=!owned;renderAccount();if(owned&&!accountEmail&&!emailTried)void loadAccountEmail();}
+ let emailTried=false;
+ let aiCustomer=false;
+ function applyAiCustomer(){const j=$('account-journal');if(j)j.hidden=!aiCustomer;const p=$('account-my-posts');if(p)p.hidden=false;}
+async function loadAccountEmail(){emailTried=true;const answer=await accountApi.account().catch(()=>null);if(!answer?.ok){emailTried=false;return;}if(answer.email)accountEmail=answer.email;aiCustomer=!!answer.aiCustomer;applyAiCustomer();renderAccount();}
+function updateAccountControls(){const owned=!!getMember()?.snapshot().owned;if(!owned){accountEmail='';emailTried=false;aiCustomer=false;}document.querySelectorAll('[data-guest-login]').forEach(x=>x.hidden=owned);$('server').hidden=!owned;$('logout').hidden=!owned;applyAiCustomer();renderAccount();if(owned&&!accountEmail&&!emailTried)void loadAccountEmail();}
 
   return {
     flowNavigation,
