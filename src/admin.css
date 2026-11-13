@@ -100,6 +100,8 @@ body {
 .lt-status-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
 .lt-status-row button { min-height: 40px; padding: 0 14px; border-radius: var(--lt-r-pill); border: 1px solid var(--lt-line); background: rgba(255,255,255,.03); color: var(--lt-pearl); font: inherit; font-size: 12px; cursor: pointer; }
 .lt-status-row button.is-on { border-color: var(--lt-gold); color: var(--lt-gold); }
+.lt-issue-link { color: var(--lt-gold); text-decoration: underline; text-underline-offset: 3px; }
+.lt-issue-link:hover { color: var(--lt-pearl); }
 .lt-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
 .lt-btn { min-height: 44px; padding: 0 16px; border-radius: var(--lt-r-pill); border: 1px solid var(--lt-line); background: rgba(255,255,255,.04); color: var(--lt-pearl); font: inherit; font-size: 13px; cursor: pointer; }
 .lt-btn.primary { background: var(--lt-primary); color: var(--lt-primary-ink); border-color: transparent; font-weight: 600; }
