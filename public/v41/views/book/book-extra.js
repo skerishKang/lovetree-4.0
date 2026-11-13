@@ -66,14 +66,14 @@ function placeDetail(id,card){
  const m=metadataFor(id);if(!m)return;
  // 390에서는 오른쪽 페이지가 화면에 없으므로 카드 옆 패널을 쓴다.
  /* #393 4: 한 장/두 장은 폭이 아니라 보기 모드가 정한다(book.js의 single()). */
-  const rightEmpty=!!SPREADS[current].right?.synthetic&&!single();
+  const rightEmpty=!!currentSpread()?.right?.synthetic&&!single();
  if(detailPlacement(rightEmpty)==='right-page'){
   rightPage.innerHTML='<div class="page-detail">'+detailMarkup(m)+'</div>';
  }else{
   const panel=$b('#detailSide');if(!panel)return;
   panel.innerHTML='<div class="detail-top"><span class="detail-kicker">'+t(LTLabels.type(m.kind))+' · '+t(formatDisplayDate(m.date,ltDateStyle()))+'</span><button type="button" class="close" data-detail-close aria-label="상세 닫기">×</button></div><div class="side-detail">'+detailMarkup(m)+'</div>';
   panel.hidden=false;
-  if(single()){panel.style.top='';}
+  if(narrow()){panel.style.top='';}
   else{
   // 카드가 놓인 페이지의 바깥쪽 여백에 세운다. 자리가 없으면 페이지 안쪽으로 붙인다.
   const page=card.closest('.page'),rect=card.getBoundingClientRect();
@@ -165,16 +165,15 @@ function paintTitle(m){
  const heading=parts.main?(hands.title
   ?'<div class="moment-heading"><button type="button" class="moment-title-button" data-title-edit="'+t(m.id)+'" aria-label="제목 고치기: '+t(parts.main)+'">'+t(parts.main)+'</button>'+(hands.hint?'<button type="button" class="title-edit-hint" data-title-edit="'+t(m.id)+'" aria-label="제목 고치기"><span aria-hidden="true">✎</span> 고치기</button>':'')+'</div>'
   :'<h3>'+t(parts.main)+'</h3>'):'';
- const guide='<button type="button" class="moment-note is-empty'+(parts.main?'':' moment-note-lead')+'" data-note-edit="'+t(m.id)+'">이 순간에 남기고 싶은 마음을 적어 보세요…</button>';
+ /* #537: 마음 한마디가 비었을 때 '이 순간에 남기고 싶은 마음을 적어 보세요…' 안내를 내용처럼 그리지 않는다.
+    (감상 화면에서 안내 글과 실제 마음이 같은 모양이라 내용으로 읽혔다 — 비면 아무것도 그리지 않는다.) */
  let lead='';
  if(parts.main)lead=heading+sub;
  else if(parts.note)lead='<p class="moment-note moment-note-lead">'+t(parts.note)+'</p>';
- else if(hands.guide)lead=guide;
- const tail=parts.main?(parts.note?'<p class="moment-note">'+t(parts.note)+'</p>':(hands.guide?guide:'')):'';
+ const tail=parts.main&&parts.note?'<p class="moment-note">'+t(parts.note)+'</p>':'';
  return '<div class="moment-title">'+date+lead+emotionMarkup(m.emotion)+tail+'</div>';
 }
 /* 3. 한 페이지에 다 들어오게 + 1. YouTube는 그 자리에서 재생(누르기 전 외부 요청 0). */
-const NEXT_TITLE='이 순간 다음 이야기를 남겨 보세요';
 function localThumb(m){const src=String(m.image||'');if(src.startsWith('data:image/'))return src;if(src.startsWith('/api/media/'))return src;return ''}
 const originalMomentContent=momentContent;
 momentContent=function(m,compact=false){
@@ -223,18 +222,26 @@ momentContent=function(m,compact=false){
 const originalRenderSpread=renderSpread;
 renderSpread=function(idx,focusId=null,land=true){
  originalRenderSpread(idx,focusId,land);
- for(const [host,side] of [[leftPage,'left'],[rightPage,'right']]){
-  const m=SPREADS[current][side];if(!m||m.synthetic)continue;
-  const old=host.querySelector('.moment-title');if(old)old.outerHTML=paintTitle(m);
+ // #537: 한 장은 순간 하나가 한 쪽 전체다 — 그 순간의 제목 한 벌만 다시 그리고, 두 장은 지금처럼 양쪽 페이지를 고친다.
+ const one=single()?momentAtPos(current):null;
+ if(one){
+  const host=narrow()?mobileContent:rightPage;
+  const old=host.querySelector('.moment-title');if(old&&!one.synthetic)old.outerHTML=paintTitle(one);
+  // 마지막 순간 뒤에는 두 장의 빈 오른쪽 페이지와 같은 자리(다음 순간 안내·다른 트리)를 이어 붙인다.
+  const spread=currentSpread();
+  if(spread?.right?.synthetic&&current===pageCount()-1){
+   host.insertAdjacentHTML('beforeend','<div class="next-page"><div><b>'+t(NEXT_PAGE_COPY)+'</b></div>'+(LTDEMO.readOnly?'':'<button type="button" data-next-moment="'+t(one.id)+'">'+t(NEXT_PAGE_ACTION)+'</button>')+otherTreesBlock()+'</div>');
+  }
+ }else{
+  for(const [host,side] of [[leftPage,'left'],[rightPage,'right']]){
+   const m=SPREADS[current][side];if(!m||m.synthetic)continue;
+   const old=host.querySelector('.moment-title');if(old)old.outerHTML=paintTitle(m);
+  }
+  const right=SPREADS[current].right;
+  if(right&&right.synthetic){
+   rightPage.innerHTML='<div class="next-page"><div><b>'+t(NEXT_PAGE_COPY)+'</b></div>'+(LTDEMO.readOnly?'':'<button type="button" data-next-moment="'+t(SPREADS[current].left.id)+'">'+t(NEXT_PAGE_ACTION)+'</button>')+otherTreesBlock()+'</div>';
+  }
  }
- const right=SPREADS[current].right;
- if(right&&right.synthetic){
-  rightPage.innerHTML='<div class="next-page"><div><b>'+t(NEXT_PAGE_COPY)+'</b></div>'+(LTDEMO.readOnly?'':'<button type="button" data-next-moment="'+t(SPREADS[current].left.id)+'">'+t(NEXT_PAGE_ACTION)+'</button>')+otherTreesBlock()+'</div>';
- }
- // #345: 390 한 장도 같은 규칙(날짜·제목·감정·마음 안내)으로 다시 그린다.
- const mobileMain=!SPREADS[current].right.synthetic&&focusId===SPREADS[current].right.id?SPREADS[current].right:SPREADS[current].left;
- const mobileTitle=mobileContent.querySelector('.moment-title');
- if(mobileTitle&&mobileMain&&!mobileMain.synthetic)mobileTitle.outerHTML=paintTitle(mobileMain);
  paintLensButton();
 };
 /* 9. 연결 안내는 한 줄, 다음 순간이 없으면 숨긴다. 시스템 용어를 쓰지 않는다. */
@@ -246,17 +253,8 @@ updateConnectionSummary=function(id){
  host.hidden=false;
  host.innerHTML='<span></span>'+t(line);
 };
-/* 4. 모바일에서도 같은 문구·버튼. */
-const originalMobileSpreadContent=mobileSpreadContent;
-mobileSpreadContent=function(s,focusId=null){
- let html=originalMobileSpreadContent(s,focusId);
- if(s.right&&s.right.synthetic){
-  const at=html.lastIndexOf('<div class="mobile-support">');
-  if(at>=0){const close=html.indexOf('</div>',at);
-   if(close>at)html=html.slice(0,at)+'<div class="mobile-support next-page"><b>'+t(NEXT_TITLE)+'</b>'+(LTDEMO.readOnly?'':'<button type="button" data-next-moment="'+t(s.left.id)+'">'+t(NEXT_PAGE_ACTION)+'</button>')+otherTreesBlock()+'</div>'+html.slice(close+6);}
- }
- return html;
-};
+/* #537: 한 장의 작은 '탭하여 보기' 줄은 없앴다(순간마다 한 쪽 전체). 마지막 순간 뒤의 다음 순간 안내는
+   renderSpread가 두 장의 빈 오른쪽 페이지와 같은 자리에 붙인다. */
 /* #393 5: 다른 트리로 가는 길. 목록 내용·이동 규칙은 셸의 트리 드롭다운을 따른다.
    내용은 셸이 넣어 준 LTDEMO.library(부모 LT41.trees에서 온다)를 그대로 쓰고, 이동은 셸이 이미 듣고 있는
    lt41-open-book 메시지(view-navigation.js의 LTDEMO.openBook)로 한다 — 셸 파일은 고치지 않는다. */
@@ -346,15 +344,16 @@ $b('#overview').addEventListener('click',e=>{if(e.target===$b('#overview'))close
 $b('#overview').addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();closeJourney()}});
 $b('#overviewFlow').addEventListener('click',e=>{
  const item=e.target.closest('[data-journey]');if(!item)return;
- const momentIndex=Number(item.dataset.journey),focus=item.dataset.focus||'';
+ const focus=item.dataset.focus||'';
  closeJourney();
- const spread=Math.floor(momentIndex/2);
- if(spread===current)renderSpread(current,focus,false);
- else autoTurn(spread>current?'next':'prev',spread,focus);
+ // #537: 가는 자리는 보기 모드가 정한다(한 장은 그 순간, 두 장은 그 순간이 든 펼침면).
+ const target=posOfMoment(focus);
+ if(target===current)renderSpread(target,focus,false);
+ else autoTurn(target>current?'next':'prev',target,focus);
 });
 window.__TRACK59__.openOverview=openJourney;
 /* 5. 돋보기는 도구 줄에서 켜고 끈다. */
-$b('#lensBtn').onclick=()=>{lensPref=!lensPref;writeLens(lensPref,window.localStorage);paintLensButton();if(!lensPref)hideLens()};
+$b('#lensBtn').onclick=()=>{lensPref=!lensPref;/* #537: 단추와 책의 돋보기 상태를 한 값으로 맞춘다(예전에는 단추 글자만 바뀌어 따라오지 않았다). */lensOn=lensPref;writeLens(lensPref,window.localStorage);paintLensButton();if(!lensPref)hideLens()};
 paintLensButton();if(!lensPref)hideLens();
 /* #212: 책 위쪽 갈래 글자와 목차 머리에 트리 이름을 보여 준다(자동 접미사는 표시 단계에서만 뺀다). */
 function paintTreeTitles(){

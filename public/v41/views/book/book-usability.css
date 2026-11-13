@@ -34,7 +34,7 @@ html[data-v41-screen=book][data-lt-theme=garden] .why-margin{color:var(--lt-ink)
 html[data-v41-screen=book][data-lt-theme=garden] .why-margin span{color:var(--lt-rose-ink)}
 /* 390 한 장 보기(reader-layout.css)는 이 줄을 normal flow로 내리는데, 책 표지(z-auto positioned)가 위에 그려져 줄이 가려졌다.
    정원에서만 흐름은 그대로 두고 쌓임만 올려 알약이 보이게 한다(밤은 지금처럼 둔다). */
-html[data-book-view=single][data-v41-screen=book][data-lt-theme=garden] .why-margin{position:relative;left:auto;z-index:45}
+html[data-book-shape=phone][data-v41-screen=book][data-lt-theme=garden] .why-margin{position:relative;left:auto;z-index:45}
 /* #516(2026-11-13): 정원 책 머리 '한 장'(안 고른 쪽)이 어두운 유리 위 --lt-muted(어두운 색)로 2.7:1이었다.
    안 고른 쪽은 밝은 종이색, 고른 쪽은 지금 규칙 그대로(금빛 바탕 + --lt-stage 글자)로 둔다. */
 html[data-v41-screen=book][data-lt-theme=garden] .tools .view-toggle .ui-btn[aria-pressed=false]{color:var(--lt-paper);background:rgba(9,8,14,.5);border-color:rgba(255,253,248,.4)}
@@ -49,15 +49,11 @@ html[data-v41-screen=book] .mobile-page .note-piece{padding:18px 16px 16px;margi
 html[data-v41-screen=book] .mobile-page .clipping{margin:6px 0 0;padding:14px 15px 15px}
 html[data-v41-screen=book] .mobile-page .note-piece h2,html[data-v41-screen=book] .mobile-page .clipping h2{font-size:20px;margin-bottom:8px}
 html[data-v41-screen=book] .mobile-page .note-piece p{font-size:14px;line-height:1.7}
-html[data-v41-screen=book] .mobile-support{margin-top:12px;padding:8px 10px}
 html[data-v41-screen=book] .mobile-page .moment-title{margin:8px 0 0}
 html[data-v41-screen=book] .mobile-page .moment-title h3{font-size:18px}
 html[data-v41-screen=book] .mobile-page .moment-title .moment-note{font-size:15px;-webkit-line-clamp:2}
-html[data-v41-screen=book] .mobile-support.next-page{position:static;inset:auto;display:block;height:auto;text-align:center;padding:14px 12px}
-html[data-v41-screen=book] .mobile-support.next-page b{font-family:var(--lt-reading);font-size:15px}
 /* 390에서는 상세를 아래에서 올라오는 카드로 보여 준다(넘겨도 닫기·Esc 그대로). */
-html[data-book-view=single][data-v41-screen=book] #detailSide{position:fixed;left:8px;right:8px;bottom:8px;top:auto;max-height:70vh;overflow:auto;z-index:70;box-shadow:0 18px 48px rgba(20,8,16,.45)}
-html[data-v41-screen=book] .mobile-support.next-page button{margin-top:10px;min-height:44px;padding:9px 16px;border-radius:var(--lt-r-pill);border:1px solid var(--lt-gold-ink);background:var(--lt-gold-ink);color:var(--lt-paper);font-size:14px;cursor:pointer}
+html[data-book-shape=phone][data-v41-screen=book] #detailSide{position:fixed;left:8px;right:8px;bottom:8px;top:auto;max-height:70vh;overflow:auto;z-index:70;box-shadow:0 18px 48px rgba(20,8,16,.45)}
 /* 3. 한 순간이 한 페이지에 다 들어오게: 페이지 안 스크롤 없이 썸네일 최대 높이와 여백을 줄인다. */
 html[data-v41-screen=book] .page-content{overflow:hidden;overscroll-behavior:auto}
 html[data-v41-screen=book] .page-content>.moment{display:block;margin-top:auto;margin-bottom:auto;max-height:100%}
@@ -100,8 +96,8 @@ html[data-v41-screen=book] .yt-frame.is-vertical{width:auto;height:clamp(240px,5
 html[data-v41-screen=book] .yt-expand{display:flex;justify-content:flex-end;margin:0 0 8px}
 html[data-v41-screen=book] .yt-expand button{min-height:44px;padding:8px 14px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-pill);background:rgba(255,230,166,.1);color:var(--lt-gold-ink);font-size:13px;cursor:pointer}
 html[data-v41-screen=book] .yt-expand button:hover{background:rgba(255,230,166,.22)}
-html[data-book-view=single][data-v41-screen=book] .yt-play.is-vertical,
-html[data-book-view=single][data-v41-screen=book] .yt-frame.is-vertical{height:clamp(220px,44vh,360px)}
+html[data-book-shape=phone][data-v41-screen=book] .yt-play.is-vertical,
+html[data-book-shape=phone][data-v41-screen=book] .yt-frame.is-vertical{height:clamp(220px,44vh,360px)}
 /* 4·5. 오른쪽 빈 페이지 안내와 '다음 순간 남기기' */
 html[data-v41-screen=book] .next-page{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;height:100%;padding:24px 18px;text-align:center}
 html[data-v41-screen=book] .next-page b{font-family:var(--lt-reading);font-size:19px;font-weight:400;color:var(--lt-ink);word-break:keep-all}
@@ -117,7 +113,6 @@ html[data-v41-screen=book] .next-page .other-tree:hover,html[data-v41-screen=boo
 html[data-v41-screen=book] .other-tree .tree-cover{width:54px;height:72px}
 html[data-v41-screen=book] .other-tree-name{max-width:84px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-weight:600}
 html[data-v41-screen=book] .other-tree small{font-size:10px;color:var(--lt-muted)}
-html[data-v41-screen=book] .mobile-support.next-page .other-trees{margin-top:10px}
 html[data-v41-screen=book] .read-folio{position:absolute;right:20px;bottom:40px;display:flex;align-items:center;gap:6px;font-size:13px;color:var(--lt-muted)}
 html[data-v41-screen=book] .read-folio button[hidden]{display:none}
 html[data-v41-screen=book] .read-folio button{min-height:44px;min-width:44px;border:0;background:transparent;color:var(--lt-rose-ink);font-size:13px;cursor:pointer}
@@ -140,12 +135,12 @@ html[data-v41-screen=book] .detail-panel h2{font-family:var(--lt-reading);font-s
 html[data-v41-screen=book] .detail-panel .detail-why{font-size:12px;line-height:1.5;padding:7px 9px;border-left:2px solid var(--lt-rose-ink);background:rgba(189,93,114,.07);color:var(--lt-ink)}
 html[data-v41-screen=book] .detail-panel .detail-actions button,html[data-v41-screen=book] .detail-panel .detail-actions a{min-height:44px;padding:6px 10px;border-radius:var(--lt-r-pill);border:1px solid var(--lt-line-paper);background:transparent;color:var(--lt-ink);font-size:12px;cursor:pointer}
 html[data-v41-screen=book] .detail-panel .close{width:44px;height:44px;border:0;border-radius:50%;background:transparent;color:var(--lt-ink);font-size:17px;cursor:pointer}
-html[data-book-view=single][data-v41-screen=book] .page-content{overflow:hidden}
-html[data-book-view=single][data-v41-screen=book] .mobile-content{overflow:hidden}
-html[data-book-view=single][data-v41-screen=book] .mobile-page .photo-piece img{height:clamp(150px,30vh,240px)}
-html[data-book-view=single][data-v41-screen=book] .mobile-page .film-piece img{height:clamp(140px,28vh,226px)}
-html[data-book-view=single][data-v41-screen=book] .mobile-page .note-piece{min-height:0}
-html[data-book-view=single][data-v41-screen=book] .detail-panel{left:8px;right:8px;width:auto;bottom:8px;max-height:62%}
+html[data-book-shape=phone][data-v41-screen=book] .page-content{overflow:hidden}
+html[data-book-shape=phone][data-v41-screen=book] .mobile-content{overflow:hidden}
+html[data-book-shape=phone][data-v41-screen=book] .mobile-page .photo-piece img{height:clamp(150px,30vh,240px)}
+html[data-book-shape=phone][data-v41-screen=book] .mobile-page .film-piece img{height:clamp(140px,28vh,226px)}
+html[data-book-shape=phone][data-v41-screen=book] .mobile-page .note-piece{min-height:0}
+html[data-book-shape=phone][data-v41-screen=book] .detail-panel{left:8px;right:8px;width:auto;bottom:8px;max-height:62%}
 
 /* A closed mobile detail panel must not cover the page navigation. */
 @media(max-width:430px){
@@ -173,10 +168,15 @@ html[data-v41-screen=book] .moment-title .moment-note{margin:6px 0 0}
 html[data-v41-screen=book] .moment-title .moment-note-lead{font-size:18px;line-height:1.5}
 html[data-v41-screen=book] .moment-title .moment-note.is-empty{pointer-events:auto;display:block;width:100%;margin:6px 0 0;padding:2px 0 2px 12px;border:0;border-left:2px solid var(--lt-gold-line);background:none;text-align:left;color:var(--lt-ink);opacity:.75;font:italic 15px/1.6 var(--lt-reading);white-space:normal;cursor:text}
 html[data-v41-screen=book] .moment-title .moment-note.is-empty.moment-note-lead{font-size:18px}
-html[data-book-view=double][data-v41-screen=book] .title-edit-hint{opacity:0;pointer-events:none}
+/* #537 4: '고치기'는 두 장·한 장 같은 규칙 — 제목 위에 마우스를 올리거나 초점이 갈 때만 보인다(넓은 화면 한 장도 같다). */
+html[data-book-view=double][data-v41-screen=book] .title-edit-hint,
+html[data-book-view=single][data-book-shape=wide][data-v41-screen=book] .title-edit-hint{opacity:0;pointer-events:none}
 html[data-book-view=double][data-v41-screen=book] .moment-heading:hover .title-edit-hint,
 html[data-book-view=double][data-v41-screen=book] .moment-heading:focus-within .title-edit-hint,
-html[data-book-view=double][data-v41-screen=book] .title-edit-hint:focus-visible{opacity:.72;pointer-events:auto}
+html[data-book-view=double][data-v41-screen=book] .title-edit-hint:focus-visible,
+html[data-book-view=single][data-book-shape=wide][data-v41-screen=book] .moment-heading:hover .title-edit-hint,
+html[data-book-view=single][data-book-shape=wide][data-v41-screen=book] .moment-heading:focus-within .title-edit-hint,
+html[data-book-view=single][data-book-shape=wide][data-v41-screen=book] .title-edit-hint:focus-visible{opacity:.72;pointer-events:auto}
 html[data-v41-screen=book] .media-source{display:flex;align-items:center;gap:8px;margin:10px 0 2px;min-width:0;font-size:12px;line-height:1.5;color:var(--lt-ink)}
 html[data-v41-screen=book] .media-source-mark{flex:0 0 auto;font-size:10px;color:var(--lt-ink)}
 html[data-v41-screen=book] .media-source-text{flex:0 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -209,12 +209,12 @@ html[data-v41-screen=book] .overview-foot{display:flex;align-items:center;justif
 html[data-v41-screen=book] .journey-summary{font-size:12px;color:var(--lt-muted)}
 html[data-v41-screen=book] .overview-foot .ui-btn{flex:0 0 auto;padding:10px 16px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-pill);background:transparent;color:var(--lt-pearl)}
 html[data-v41-screen=book] .overview-foot .ui-btn:hover{border-color:var(--lt-gold);color:var(--lt-pearl)}
-html[data-book-view=single][data-v41-screen=book] .overview-card{width:94vw;max-height:86vh;padding:18px 14px 12px}
-html[data-book-view=single][data-v41-screen=book] .journey-item{grid-template-columns:52px 16px minmax(0,1fr);gap:10px}
-html[data-book-view=single][data-v41-screen=book] .journey-thumb{width:52px;height:52px;border-radius:10px}
-html[data-book-view=single][data-v41-screen=book] .journey:before{left:70px;top:22px;bottom:22px}
-html[data-book-view=single][data-v41-screen=book] .journey-node{margin-top:20px}
-html[data-book-view=single][data-v41-screen=book] .journey-reason{margin-left:88px}
+html[data-book-shape=phone][data-v41-screen=book] .overview-card{width:94vw;max-height:86vh;padding:18px 14px 12px}
+html[data-book-shape=phone][data-v41-screen=book] .journey-item{grid-template-columns:52px 16px minmax(0,1fr);gap:10px}
+html[data-book-shape=phone][data-v41-screen=book] .journey-thumb{width:52px;height:52px;border-radius:10px}
+html[data-book-shape=phone][data-v41-screen=book] .journey:before{left:70px;top:22px;bottom:22px}
+html[data-book-shape=phone][data-v41-screen=book] .journey-node{margin-top:20px}
+html[data-book-shape=phone][data-v41-screen=book] .journey-reason{margin-left:88px}
 /* #393 5: 좁은 폭에서는 도구 줄이 스크롤되고 제목이 자리를 얻는다(책 화면은 셸 규칙이 오른쪽 정렬이라 여기서 다룬다). */
 @media(max-width:600px){html[data-v41-screen=book] .topbar .tools{max-width:40vw}}
 /* #421: ← 내 트리+제목이 들어온 뒤 좁은 폭에서 도구 단추 글자가 세로로 쌓여(높이 114px)
@@ -228,3 +228,6 @@ html[data-book-view=single][data-v41-screen=book] .journey-reason{margin-left:88
  html[data-v41-screen=book] .book-title-btn{max-width:30vw}
  html[data-v41-screen=book] .topbar .tools::-webkit-scrollbar{display:none}
 }
+/* #537: 마지막 순간 뒤의 '다음 순간' 안내 — 넓은 화면 한 장은 두 장의 빈 오른쪽 페이지와 같은 자리(쪽 전체)를 쓰고,
+   휴대폰 한 장(세로로 이어 읽는 흐름)에서만 페이지 흐름 끝에 놓는다. */
+html[data-book-shape=phone][data-book-view=single][data-v41-screen=book] .next-page{position:static;inset:auto;height:auto;min-height:120px;margin-top:18px;padding:16px 12px}
