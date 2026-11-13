@@ -1,6 +1,6 @@
 // #540 2차 — AI 고객 '오늘 사용 일지' 글쓰기 + '내 의견'(보낸 의견·답변).
 const KIND_LABEL = {opinion: '의견', journal: '일지'};
-const STATUS_LABEL = {received: '받음', reviewing: '확인 중', fixed: '고침', later: '다음에'};
+const STATUS_LABEL = {received: '받음', reviewing: '확인 중', fixed: '고침', later: '다음에', closed: '처리 끝'};
 const esc = value => String(value ?? '').replace(/[&<>"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
 const time = value => { const d = new Date(value); return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString('ko-KR', {hour12: false}); };
 
@@ -69,7 +69,7 @@ export function createFeedbackBoard({$, notify, show, showFull}) {
       const replyHtml = replies.length
         ? `<div class="myposts-replies">${replies.map(r => `<div class="myposts-reply"><span>답변</span><p>${esc(r.body)}</p></div>`).join('')}</div>`
         : '';
-      const issue = post.status === 'fixed' && post.issueNumber ? `<span class="myposts-issue">이슈 ${esc(post.issueNumber)}</span>` : '';
+      const issue = (post.status === 'fixed' || post.status === 'closed') && post.issueNumber ? `<span class="myposts-issue">이슈 ${esc(post.issueNumber)}</span>` : '';
       return `<article class="myposts-item">
         <div class="myposts-head"><span class="myposts-kind">${esc(KIND_LABEL[post.kind] || post.kind)}</span><span class="myposts-status">${esc(STATUS_LABEL[post.status] || post.status)}</span><span class="myposts-date">${esc(time(post.createdAt))}</span></div>
         <h3 class="myposts-title">${esc(post.displayTitle || '(제목 없음)')}</h3>
