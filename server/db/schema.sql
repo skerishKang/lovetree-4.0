@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS lovetree_login_states (
 CREATE TABLE IF NOT EXISTS lovetree_product_roles (
   product_id text NOT NULL,
   subject_id text NOT NULL,
-  role text NOT NULL CHECK (role IN ('admin')),
+  role text NOT NULL CHECK (role IN ('admin','ai_customer')),
   granted_by text,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
@@ -273,8 +273,12 @@ CREATE TABLE IF NOT EXISTS lovetree_feedback (
   id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   product_id text NOT NULL,
   subject_id text,
+  kind text NOT NULL DEFAULT 'opinion' CHECK (kind IN ('opinion','journal')),
   category text NOT NULL CHECK (category IN ('bug','inconvenient','feature','other')),
+  title text,
   body text NOT NULL CHECK (char_length(body) BETWEEN 1 AND 2000),
+  score smallint CHECK (score IS NULL OR (score BETWEEN 1 AND 5)),
+  journal_date date,
   context jsonb NOT NULL DEFAULT '{}'::jsonb,
   status text NOT NULL DEFAULT 'received' CHECK (status IN ('received','reviewing','fixed','later')),
   memo text,
@@ -286,3 +290,30 @@ CREATE INDEX IF NOT EXISTS lovetree_feedback_recent_idx
   ON lovetree_feedback (product_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS lovetree_feedback_status_idx
   ON lovetree_feedback (product_id, status, created_at DESC);
+CREATE INDEX IF NOT EXISTS lovetree_feedback_kind_idx
+  ON lovetree_feedback (product_id, kind, created_at DESC);
+CREATE INDEX IF NOT EXISTS lovetree_feedback_journal_idx
+  ON lovetree_feedback (product_id, subject_id, journal_date);
+
+-- 게시판 답글. 고객에게 보이는 답변(customer)과 내부 메모(internal).
+CREATE TABLE IF NOT EXISTS lovetree_feedback_replies (
+  id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  product_id text NOT NULL,
+  post_id bigint NOT NULL,
+  author_type text NOT NULL CHECK (author_type IN ('customer','internal')),
+  author_subject_id text,
+  body text NOT NULL CHECK (char_length(body) BETWEEN 1 AND 4000),
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS lovetree_feedback_replies_post_idx
+  ON lovetree_feedback_replies (product_id, post_id, created_at);
+
+-- AI 고객 페르소나 소개. 관리자가 쓰고 고친다.
+CREATE TABLE IF NOT EXISTS lovetree_ai_personas (
+  product_id text NOT NULL,
+  subject_id text NOT NULL,
+  name text NOT NULL,
+  intro jsonb NOT NULL DEFAULT '{}'::jsonb,
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (product_id, subject_id)
+);

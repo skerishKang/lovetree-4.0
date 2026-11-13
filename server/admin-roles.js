@@ -16,7 +16,8 @@ import { ApiError } from './errors.js';
  */
 
 export const ROLE_ADMIN = 'admin';
-export const ROLES = Object.freeze([ROLE_ADMIN]);
+export const ROLE_AI_CUSTOMER = 'ai_customer';
+export const ROLES = Object.freeze([ROLE_ADMIN, ROLE_AI_CUSTOMER]);
 
 // 권위가 만드는 canonical subject 모양. 이 밖의 값은 역할 자리에 받지 않는다.
 const SUBJECT = /^sub_[0-9a-f]{16,80}$/;

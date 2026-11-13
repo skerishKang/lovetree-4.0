@@ -500,3 +500,20 @@ html[data-lt-theme="garden"] #account-advanced[aria-checked="true"]:after{backgr
 .settings-choice .settings-current{display:inline-flex;align-items:center;min-height:34px;padding:0 12px;border:1px solid var(--lt-primary);border-radius:9px;background:var(--lt-primary);color:var(--lt-primary-ink);font-size:13px}
 .settings-choice button[aria-disabled="true"]{opacity:.6}
 .settings-choice .settings-lock{display:inline-flex;align-items:center;min-height:34px;padding:0 10px;border:1px dashed var(--lt-gold-line);border-radius:9px;color:var(--lt-gold);font-size:11px;white-space:nowrap}
+
+/* 2차: AI 고객 사용 일지·내 의견 (이슈 540). */
+#journal-form label{display:grid;gap:6px;margin-top:14px;font-size:13px;color:var(--lt-pearl)}
+#journal-form input,#journal-form textarea,#journal-form select{width:100%;border-radius:12px;border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.04);color:inherit;padding:10px 12px;font:inherit}
+#journal-form textarea{min-height:140px;resize:vertical}
+.myposts-list{display:grid;gap:12px;margin-top:12px}
+.myposts-item{border:1px solid var(--lt-line);border-radius:var(--lt-r-card);padding:14px 16px;background:var(--lt-glass)}
+.myposts-head{display:flex;gap:8px;align-items:center;font-size:11px;color:var(--lt-muted)}
+.myposts-kind{color:var(--lt-gold)}
+.myposts-date{margin-left:auto}
+.myposts-title{font-size:15px;margin:6px 0;font-weight:600;overflow-wrap:anywhere}
+.myposts-body{font-size:13px;line-height:1.8;color:var(--lt-pearl);overflow-wrap:anywhere;white-space:pre-wrap}
+.myposts-issue{display:inline-block;margin-top:6px;font-size:11px;color:var(--lt-rose)}
+.myposts-replies{margin-top:10px;display:grid;gap:8px}
+.myposts-reply{border-left:3px solid var(--lt-gold);padding:6px 10px;background:rgba(255,230,166,.06);border-radius:8px}
+.myposts-reply span{font-size:11px;color:var(--lt-gold)}
+.myposts-reply p{margin:4px 0 0;font-size:13px;line-height:1.7;overflow-wrap:anywhere}

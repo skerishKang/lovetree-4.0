@@ -4,6 +4,7 @@
 
 > **빨간 필수 검사 규칙(2026-11-12 사고 뒤)**: 필수 검사가 빨강이면 **재실행은 1회까지**. 같은 항목이 또 빨강이면 멈추고 원인을 찾는다 — 재실행·빈 커밋으로 초록을 만들지 않는다. "간헐적·환경 탓"이라고 적으려면 **같은 시각 이 변경이 없는 브랜치(main 또는 다른 PR)** 에서도 같은 실패가 나는지 대조한 결과를 함께 적는다. 메시지를 받아 화면을 다시 띄우는 코드는 '뜰 때마다 보내는 쪽'과 짝으로 흐름 시험을 하고, 머지 전 미리보기 첫 화면을 5초 이상 직접 본다.
 
+
 ## 2026-11-14 — 공개가 기본 (#538, 로컬4 레인, ai/local4-lt-538-public-default-261114, main 4351565 기준)
 
 - **방침**: 트리는 공개가 기본. 저장 성공 뒤 같은 훅에서 공유 행의 `moment_count`를 갱신하고, 둘러보기 SQL이 `moment_count>=3`으로 거른다(서비스층 LIMIT 뒤 거르기 없음). 직접 올린 사진만 있는 순간도 순간 수에 세고, 공개 카드 대표 그림은 공개 가능한 것(YouTube 썸네일 등)만 쓰며 없으면 기본 표지(#427 전까지 올린 사진은 계속 제외). 비공개는 Plus 전용 — 판단은 서버가 한다(화면 잠금만으로 막지 않는다).
@@ -12,6 +13,16 @@
 - **화면(v41)**: 공유 창에 순간 수 안내(`share-moment-hint`)와 공개 상태 칸(`share-visibility`, 비공개 전환 단추 — 403이면 Plus 안내), '둘러보기에도 올리기' 스위치·확인창 제거, 공유 목록에서 auto 행 비표시, 설정의 공유 행을 '트리 공개(공개(기본)·비공개 잠금 Plus 전용)'로 교체, 둘러보기 목록 설명 문구 변경, 첫 순간 저장 뒤 안내 1회는 localStorage(`lt41.publicNoticeShown`).
 - **시험**: 신규 `tests/public-default-538.test.mjs` 8건(공개 기본·자동 행, 2개/3개 경계·올린 사진 순간 포함, 비공개 403, 트리 삭제 즉시 내림, moment_count 추가·삭제 갱신·주인 만든 행 포함, 신고·차단 유지, 계정 이름·아이디·이메일 미노출, auto 행 스위치 거부). `tests/community-postgres.test.mjs`에 둘러보기 SQL 시험 1건 추가(기존 2건의 INSERT에 moment_count 3 반영). 스위치 시험 `v41-share-discover-confirm.test.mjs`는 기능 제거로 삭제, `v41-share-steps`·`v41-share-list`·`v41-share-api`·`v41-community`·`v41-screen-defaults`·`v41-page-turn`·`v41-shell-messages`를 새 계약에 맞게 갱신. `npm test` fail 5 — 모두 main 4351565 워크트리 대조에서 같게 실패하는 기존 실패(a11y 2·postdeploy 2·#400 home 빌드 1, 환경성), 신규 실패 0.
 - **배포 주의**: 머지 뒤 autodeploy가 `needs_manual_migration`으로 멈춘다 → 컴2에서 `tree-visibility-261114.sql` 수동 적용(SET ROLE lovetree_owner) → `AUTODEPLOY_ACCEPT_MIGRATIONS=1` 1회. 배포 뒤 계정 01로 순간 3개/2개 경계·비공개 403·안내 문구 4곳 확인 필요(컴2 브라우저).
+
+## 2026-11-14 — 고객 의견 2차: 관리자 게시판 + AI 고객 사용 일지 (이슈 #540, 로컬3 레인)
+
+- **DB**: `server/db/migrations/board-261114.sql` + `schema.sql`. `lovetree_product_roles` CHECK 에 `ai_customer` 추가. `lovetree_feedback` 에 `kind`(opinion/journal)·`title`·`score`(1~5)·`journal_date` 추가. 신규 `lovetree_feedback_replies`(customer/internal)·`lovetree_ai_personas`(이름+intro jsonb). 계정 탈퇴 경로에 replies·personas 포함.
+- **서버**: `server/feedback-service.js` 확장 — `POST /api/board`(AI 고객 하루 1건, 다시 쓰면 고침)·`GET /api/board/mine`·`GET /api/board/journal/today`·`GET /api/admin/feedback`(목록, kind·status 거르기)·`GET /api/admin/feedback/:id`(상세+답글+페르소나)·`POST /api/admin/feedback/:id/reply`·`GET·PUT /api/admin/persona/:id`. `admin-roles.js` 에 `ai_customer` 역할. `account-service.describe` 에 `aiCustomer`. proxy 허용 목록·라우팅 추가.
+- **운영센터**: `src/admin.js` 를 게시판으로 재작성(목록→상세→답글[고객 답변/내부 메모]→글쓴이 페르소나·이슈 탭[GitHub 공개 저장소]). 신고 검토 칸 유지. `admin.css` 를 --lt-* 토큰·검은 무대·금테 카드로. `admin.html` 에 identity.css 로드.
+- **사이트**: `public/v41/feedback-board.mjs`(AI 고객 '오늘 사용 일지' 글쓰기 + '내 의견'), 계정 메뉴 버튼(AI 고객 전용 '오늘 사용 일지', 로그인 사용자 '내 의견'). `shell.mjs` 배선.
+- **내보내기**: `tools/export-ai-customer.mjs`(컴1 node, 관리자 API) — AI 고객별 `일지_YYMMDD.md`·`소개.md`. 예약 등록은 대표 확인 뒤.
+- **시험**: `tests/board-service.test.mjs` 9건, `tests/export-ai-customer.test.mjs` 4건, `tests/feedback-postgres.test.mjs` +1(게시판). `npm test` 1,439 pass/0 fail(브라우저 지도 대비 제외), build·modulepreload 통과. 관리자 게시판 실화면(모의 관리자 API): 390·1440 목록·상세+답글·페르소나, 가로 넘침 0.
+- **남긴 것**: 실 PTgreSQL·배포·머지는 CI/컴2. 내보내기 실데이터 실행은 AI 고객·일지 데이터가 아직 없어 미실행(스크립트·포맷 시험만). 로그인 상태 사이트 플로우는 OAuth·비밀값 필요해 미확인.
 
 ## 2026-11-14 — #536 보드: 넓은 화면 판 쏠림·별 모양 기둥 배치·머리줄 [종이|밤]·읽기 전용 표시 (로컬3, ai/local3-lt536-boardwide-261114, main 3c21387 기준)
 

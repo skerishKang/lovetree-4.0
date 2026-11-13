@@ -24,6 +24,8 @@ const COMMUNITY_SHARE_ACTION = /^\/api\/community\/shares\/[A-Za-z0-9_-]{1,128}\
 const COMMUNITY_COMMENT_ITEM = /^\/api\/community\/comments\/[A-Za-z0-9_-]{1,128}$/;
 const COMMUNITY_REPORT_ITEM = /^\/api\/community\/admin\/reports\/[A-Za-z0-9_-]{1,128}$/;
 const ADMIN_FEEDBACK_ITEM = /^\/api\/admin\/feedback\/[0-9]{1,20}$/;
+const ADMIN_FEEDBACK_REPLY = /^\/api\/admin\/feedback\/[0-9]{1,20}\/reply$/;
+const ADMIN_PERSONA_ITEM = /^\/api\/admin\/persona\/[A-Za-z0-9_-]{1,128}$/;
 function communityMethods(path) {
   const action=path.match(COMMUNITY_SHARE_ACTION)?.[1];
   if(action==='comments')return new Set(['GET','POST']);
@@ -44,6 +46,9 @@ const ALLOWED = new Map([
   ['/api/community/me/favorites', new Set(['GET'])],
   ['/api/community/admin/reports', new Set(['GET'])],
   ['/api/feedback', new Set(['POST'])],
+  ['/api/board', new Set(['POST'])],
+  ['/api/board/mine', new Set(['GET'])],
+  ['/api/board/journal/today', new Set(['GET'])],
   ['/api/admin/feedback', new Set(['GET'])],
   ['/api/youtube/oembed', new Set(['GET'])],
   ['/api/admin/session', new Set(['GET'])],
@@ -126,7 +131,9 @@ export function createProxy({ fetcher = (...args) => fetch(...args), timeoutMs =
       || (SHARE_DISCOVERY.test(incoming.pathname) ? new Set(['PUT','DELETE']) : null)
       || (TREE_VISIBILITY.test(incoming.pathname) ? new Set(['GET','PUT']) : null)
       || (PUBLIC_SHARE_ITEM.test(incoming.pathname) ? new Set(['GET']) : null)
-      || (ADMIN_FEEDBACK_ITEM.test(incoming.pathname) ? new Set(['PATCH']) : null)
+      || (ADMIN_FEEDBACK_ITEM.test(incoming.pathname) ? new Set(['GET','PATCH']) : null)
+      || (ADMIN_FEEDBACK_REPLY.test(incoming.pathname) ? new Set(['POST']) : null)
+      || (ADMIN_PERSONA_ITEM.test(incoming.pathname) ? new Set(['GET','PUT']) : null)
       || communityMethods(incoming.pathname);
     if (!methods) return jsonError(404, 'not_proxied', '이 경로는 서버로 넘기지 않아요.');
     if (!methods.has(request.method)) return jsonError(405, 'method_not_allowed', '이 요청은 지원하지 않아요.');
