@@ -39,6 +39,13 @@ button{font:inherit;color:inherit;cursor:pointer}
  .topbar{left:8px;right:8px;top:8px}.top-actions > .pill:first-of-type{display:none}.hero{top:58px;width:calc(100vw - 28px)}.hero h1{font-size:26px}.hero p{font-size:11px;line-height:1.5;max-width:345px}.progress-rail{display:none}
  /* #421: 좁은 폭에서 단추 글자가 세로로 쪼개지는(두 줄로 쌓이는) 것을 막는다. */
  .pill,.shelf-back{white-space:nowrap}.shelf-back{padding:0 10px;font-size:9px}.top-actions{gap:5px}
+ /* #517: 390·360에서 도구 줄이 오른쪽으로 넘치던 것(사용법 9px 잘림·이어진 선 n개 화면 밖 404~504px)을
+    제목 줄 + 단추 줄 두 줄로 내려 보내 없앤다. 모든 단추가 흐름 없이 화면 안에 있고 누름 높이는 44px(문서 style)을 유지한다. */
+ .topbar{flex-wrap:wrap;row-gap:6px}.spacer{display:none}.top-actions{flex-wrap:wrap;justify-content:flex-start;width:100%}
+ .pill{padding-left:9px;padding-right:9px}
+ /* #517: 내려온 도구 줄 아래에 순간 선택 패널이 오게 한다 — 패널 top은 measureInsets가 재어 넘긴
+    머리 아래 끝(--lt-picker-top)을 따른다(도구 줄이 한 줄이든 두 줄이든 겹침 0). */
+ html[data-v41-screen=network] .lt-moment-picker{top:var(--lt-picker-top,118px)}
  .detail{left:6px;right:6px;top:auto;bottom:6px;width:auto;max-height:67svh;border-radius:23px 23px 17px 17px;padding:16px;padding-bottom:max(16px,env(safe-area-inset-bottom));transform:translateY(calc(100% + 40px))}.detail.open{transform:translateY(0);z-index:35}.detail h2{font-size:21px}.path-actions{grid-template-columns:1fr}.action{min-height:48px}
  .mobile-ribbon{display:flex;position:absolute;left:8px;right:8px;bottom:10px;z-index:29;gap:6px;padding:6px;overflow-x:auto;scrollbar-width:none;border:1px solid rgba(73,65,83,.10);border-radius:16px;background:rgba(255,255,255,.90);box-shadow:0 12px 32px rgba(55,44,64,.12);backdrop-filter:blur(18px)}.mobile-ribbon::-webkit-scrollbar{display:none}.mobile-ribbon button{flex:0 0 auto;height:42px;padding:0 12px;border-radius:12px;border:0;background:transparent;font-size:10px;color:rgba(47,43,52,.56)}.mobile-ribbon button.active{background:#302c35;color:#fff}.mobile-ribbon button.origin{background:linear-gradient(135deg,rgba(228,93,141,.12),rgba(139,105,232,.12));color:#403847;font-weight:700}
  .route-status{left:8px;right:8px;bottom:64px;transform:none;min-width:0;max-width:none}.route-status span{white-space:normal}.toast{top:54px;bottom:auto;max-width:calc(100vw - 22px);border-radius:15px;text-align:center}.branch-chooser{top:auto;bottom:70px;transform:translate(-50%,16px) scale(.96)}.branch-chooser.open{transform:translate(-50%,0) scale(1)}
@@ -87,9 +94,10 @@ html[data-lt-theme=garden][data-v41-screen=network] .hero .eyebrow,
 html[data-lt-theme=garden][data-v41-screen=network] .hero p{color:var(--lt-ink)}
 html[data-lt-theme=garden][data-v41-screen=network] .progress-label,
 html[data-lt-theme=garden][data-v41-screen=network] .progress-rail .label{color:var(--lt-muted)}
-/* 정원 좁은 화면: 순간 선택 줄(64~144px) 아래에서 제목이 시작하게 한다(밤은 그대로). */
+/* 정원 좁은 화면: 순간 선택 줄 아래에서 제목이 시작하게 한다(#517 — 패널 top은 measureInsets가 넘긴
+   머리 아래 끝(--lt-picker-top)을 따르고, 안내 문구는 그 아래 88px 지점에서 시작한다. 밤·정원 같은 규칙). */
 @media(max-width:430px){
- html[data-lt-theme=garden][data-v41-screen=network] .hero{top:166px}
+ html[data-lt-theme=garden][data-v41-screen=network] .hero{top:calc(var(--lt-picker-top,118px) + 88px)}
  html[data-lt-theme=garden][data-v41-screen=network] .hero h1{font-size:21px}
 }
 /* 정원: 순간 선택 줄의 '기억책 열기'를 옆 칸과 같은 알약 단추로(테두리 있는 종이 표면). */
