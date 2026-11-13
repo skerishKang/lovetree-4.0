@@ -34,8 +34,13 @@ document.addEventListener('click',e=>{
 // 공유 감상(share)은 읽기 전용이다. 서버 쓰기 가능 여부는 셸이 LT41.writable로 넘긴다.
 function boardSaveEnabled(){try{return window.parent!==window&&window.parent.LT41?.source==='server'&&window.parent.LT41?.writable===true&&!LTDEMO.readOnly}catch{return false}}
 const canEditBoard=LTDEMO.example||boardSaveEnabled();
-const spread=LT58Model.treeSpread(LTDEMO.moments.map(m=>m.id),LTDEMO.edges);
-let moments=LTDEMO.moments.map((m,i)=>{const pos=spread.get(m.id)||LT58Model.cardPosition(i);return{id:m.id,type:m.type==='memo'?'note':'photo',originalType:m.type==='memo'?'note':m.type,createdOrder:i+1,title:m.title,emotion:m.emotion,date:m.date,source:m.source||'예시 기록',mediaMetadata:m.mediaMetadata||null,memo:m.memo||m.whyNext||'',x:Number.isFinite(m.x)?m.x:pos.x,y:Number.isFinite(m.y)?m.y:pos.y,rot:Number.isFinite(m.rot)?m.rot:pos.rot,pinStyle:m.pinStyle,cardStyle:m.cardStyle,keywords:Array.isArray(m.keywords)?m.keywords:[],color:m.color||['rose','violet','cyan','amber'][i%4],asset:m.image,url:m.externalUrl||'',first:!!m.first}});
+// #553: 카드 종류별 예약 높이 — CSS가 정한 최대 높이에 여유를 더한 값(실측: 썸네일이 실린 YouTube 카드
+// 465px·세로 Shorts 648px, 기본 카드 210~260px). 링크가 실린 순간만 크므로 링크 없는 트리(예시 40순간)
+// 은 예약 높이가 기본이라 줄 간격 420px이 그대로다.
+const YT_RESERVED_H=480,YT_VERTICAL_RESERVED_H=680,BASE_RESERVED_H=260;
+const reservedHeights=new Map(LTDEMO.moments.map(m=>[m.id,m.externalUrl?(LTMedia.verticalVideo(m.externalUrl,m.mediaMetadata)?YT_VERTICAL_RESERVED_H:YT_RESERVED_H):BASE_RESERVED_H]));
+const spread=LT58Model.treeSpread(LTDEMO.moments.map(m=>m.id),LTDEMO.edges,reservedHeights);
+let moments=LTDEMO.moments.map((m,i)=>{const pos=spread.get(m.id)||LT58Model.cardPosition(i);return{id:m.id,type:m.type==='memo'?'note':'photo',originalType:m.type==='memo'?'note':m.type,createdOrder:i+1,title:m.title,emotion:m.emotion,date:m.date,source:m.source||'예시 기록',mediaMetadata:m.mediaMetadata||null,memo:m.memo||m.whyNext||'',x:Number.isFinite(m.x)?m.x:pos.x,y:Number.isFinite(m.y)?m.y:pos.y,rot:Number.isFinite(m.rot)?m.rot:pos.rot,savedPos:Number.isFinite(m.x)&&Number.isFinite(m.y),pinStyle:m.pinStyle,cardStyle:m.cardStyle,keywords:Array.isArray(m.keywords)?m.keywords:[],color:m.color||['rose','violet','cyan','amber'][i%4],asset:m.image,url:m.externalUrl||'',first:!!m.first}});
 
 let connections=LTDEMO.edges.map((e,i)=>({id:'c'+i,kind:e.kind,a:e.from,b:e.to,why:e.kind==='related'?'관련 순간':e.reason||'',color:e.kind==='related'?'cyan':(canEditBoard?['rose','violet','cyan','amber'][Math.max(0,moments.findIndex(m=>m.id===e.from))%4]:'rose')}));
 
@@ -75,7 +80,28 @@ return `<article class="card ${m.first?'first':''} ${m.type==='note'?'noteCard':
 
 function renderCards(){cardLayer.innerHTML=moments.map(cardHTML).join('');
 cardLayer.querySelectorAll('.card').forEach(el=>bindCard(el));
+settlePlacedCards();
 if(selected)selectMoment(selected,false)}
+
+// #553: 배치가 정한 자리(treeSpread·cardPosition)는 카드를 그린 뒤 실제 높이를 재어 같은 열 위아래
+// 카드가 겹치지 않게 벌린다. innerHTML을 다시 쓰지 않고 top만 고치므로 다시 그리기·깜빡임이 늘지 않는다.
+// 자리를 저장한 순간은 그대로 둔다(#395 계약). 썸네일은 늦게 실리므로 종류별 예약 높이로 자리를
+// 미리 벌려 두고, 실린 뒤에도 한 번만 다시 잰다(예약 높이를 넘친 경우만 움직인다).
+let thumbSettleWaiting=false;
+function settlePlacedCards(){
+  const els=new Map([...cardLayer.querySelectorAll('.card')].map(el=>[el.dataset.id,el]));
+  const list=moments.filter(m=>els.has(m.id)).map(m=>({id:m.id,x:m.x,y:m.y,h:els.get(m.id).offsetHeight}));
+  const moved=LT58Model.settleColumnGaps(list,new Set(moments.filter(m=>!m.savedPos).map(m=>m.id)),24);
+  let changed=false;
+  for(const m of moments){const y=moved.get(m.id);if(!Number.isFinite(y)||y===m.y)continue;m.y=y;els.get(m.id).style.top=y+'px';changed=true}
+  if(changed)rerenderThreads();
+  const thumbs=cardLayer.querySelectorAll('.lt-yt-preview img');
+  if(thumbs.length&&!thumbSettleWaiting){thumbSettleWaiting=true;
+    Promise.all([...thumbs].map(img=>img.complete?Promise.resolve():new Promise(r=>{img.addEventListener('load',r,{once:true});img.addEventListener('error',r,{once:true})})))
+      .then(()=>{thumbSettleWaiting=false;settlePlacedCards()})
+      .catch(()=>{thumbSettleWaiting=false});
+  }
+}
 
 function pinPoint(id){const m=moments.find(x=>x.id===id);
 const card=cardLayer.querySelector(`[data-id="${id}"]`);

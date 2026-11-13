@@ -11,7 +11,7 @@ const BOARD = fs.readFileSync(new URL('../public/v41/views/board/board.js', impo
 const EXTRAS = fs.readFileSync(new URL('../public/v41/views/board/board-extras.js', import.meta.url), 'utf8');
 
 test('0. 보드 한 벌: 화면이 부르는 함수가 전부 있다', () => {
-  assert.deepEqual(Object.keys(M).sort(), ['boardSize', 'cardPosition', 'cinemaBeats', 'clampView', 'collectPath', 'contentBox', 'cursorEffectAllowed', 'cursorHover', 'cursorMode', 'cursorPresence', 'cursorScale', 'decorationMotion', 'detailButtonState', 'editGuard', 'escapeHTML', 'filterVisible', 'fitBox', 'fitZoom', 'maxCreatedOrder', 'nextConnections', 'rememberView', 'removeConnection', 'savedView', 'startView', 'threadPath', 'threadRedrawStep', 'treeSpread', 'visibleCards']);
+  assert.deepEqual(Object.keys(M).sort(), ['boardSize', 'cardPosition', 'cinemaBeats', 'clampView', 'collectPath', 'contentBox', 'cursorEffectAllowed', 'cursorHover', 'cursorMode', 'cursorPresence', 'cursorScale', 'decorationMotion', 'detailButtonState', 'editGuard', 'escapeHTML', 'filterVisible', 'fitBox', 'fitZoom', 'maxCreatedOrder', 'nextConnections', 'rememberView', 'removeConnection', 'savedView', 'settleColumnGaps', 'startView', 'threadPath', 'threadRedrawStep', 'treeSpread', 'visibleCards']);
   for (const fn of Object.keys(M)) assert.equal(typeof M[fn], 'function', fn);
 });
 
