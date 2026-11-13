@@ -56,6 +56,15 @@ jobs:
           start=$(date +%s)
           node --test tests/v41-board-card-contrast.test.mjs
           echo "보드 카드 대비 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+      # #520·#521: 읽기 전용 보드의 '＋ 순간 꽂기' 숨김·'읽기 전용' 표시 겹침을 실제 화면에서 잰다.
+      # 건너뜀=실패 — 위 대비 시험과 같은 이유(크롬이 이미 준비된 이 잡에서 돈다).
+      - name: 보드 읽기 전용·겹침 시험(390·1440 × 밤·정원 × 판, 건너뜀=실패 — #520·#521)
+        env:
+          LT_BOARD_CONTRAST_REQUIRE: '1'
+        run: |
+          start=$(date +%s)
+          node --test tests/v41-board-readonly-520-521.test.mjs
+          echo "보드 읽기 전용·겹침 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
       - name: 지도 실제 대비·판 전환 시험(건너뜀=실패)
         env:
           LT_MAP_CONTRAST_REQUIRE: '1'
