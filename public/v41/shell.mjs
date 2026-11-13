@@ -29,6 +29,7 @@ import {createCleanup} from './shell/cleanup.mjs';
 import {headerBadge, cleanupAvailable} from './inbox-model.mjs';
 import {createDialogs} from './shell/dialogs.mjs';
 import {createFeedbackDialog} from './feedback.mjs';
+import {createFeedbackBoard} from './feedback-board.mjs';
 import {connectionSignature} from './shell/panel-dirty.mjs';
 import {createLocation} from './shell/location.mjs';
 import {createNotifier} from './shell/notice.mjs';
@@ -674,6 +675,10 @@ $('settings-assets-open').onclick=()=>openAssets($('settings-assets-open'));
  const feedbackDialog=createFeedbackDialog({$,notify,getContext:feedbackContext,show:()=>panel('feedback-panel')});
  $('account-feedback').onclick=()=>{closeAccountMenu();feedbackDialog.open();};
  $('feedback-link').onclick=()=>feedbackDialog.open();
+ // 2차: AI 고객 '오늘 사용 일지'·모든 로그인 사용자 '내 의견'.
+ const feedbackBoard=createFeedbackBoard({$,notify,show:()=>panel('journal-panel'),showFull:()=>panel('myposts-panel')});
+ $('account-journal').onclick=()=>{closeAccountMenu();feedbackBoard.openJournal();};
+ $('account-my-posts').onclick=()=>{closeAccountMenu();feedbackBoard.openMyPosts();};
  $('advanced-backup').onclick=()=>backup();
  // #368: 기록 가져오기는 JSON 선택 input을 연다. input은 창 밖에 숨겨 두어 설정이 닫혀 있어도(빈 화면의 백업 파일 열기) 열린다.
  // CTO 결정(2026-11-12): 설정에는 "기록 가져오기" 하나만 둔다 — "백업 파일 열기"는 같은 선택 창이라 중복이고,
