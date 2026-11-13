@@ -141,7 +141,7 @@ test('복사는 그 주소의 공유 주소를 클립보드에 넣는다', async
     await h.messages.openSharePanel();
     const copy = h.els['share-list'].children[0].children[1].children[0];
     await copy.onclick();
-    assert.deepEqual(written, ['https://lovetree-4-0.pages.dev/v41/#share/live-1/network']);
+    assert.deepEqual(written, ['https://lovetree-4-0.pages.dev/t/live-1']);
     assert.match(h.els['share-feedback'].textContent, /복사했어요/);
   } finally { h.restore(); }
 });

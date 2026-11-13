@@ -132,7 +132,7 @@ test('링크를 만들면 열어 보기 주소가 채워진다(#538: 둘러보�
     await h.messages.openSharePanel();
     await h.els['share-preview'].onclick();
     await h.els['share-create'].onclick();
-    assert.equal(h.els['share-open'].href, 'https://lovetree-4-0.pages.dev/v41/#share/share-1/book');
+    assert.equal(h.els['share-open'].href, 'https://lovetree-4-0.pages.dev/t/share-1');
     assert.equal(h.els['share-open'].hidden, false);
     assert.equal(h.stage(), 'done,done,done', '세 단계 모두 끝');
     assert.match(h.next(), /복사하거나 열어 보세요/);

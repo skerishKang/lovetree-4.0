@@ -1,21 +1,20 @@
 // 첫 화면(SRC064) 가운데 버튼의 상태별 표시 (대표 지시 2026-11-07 · #380 2026-11-11 댓글 반영 · #426 2026-11-12).
-// #426: '이어 보던 순간' 버튼을 뺀다 — 최근 순간 카드가 이어 보기 역할을 맡아 로그인 후 버튼은 [＋ 순간 추가·둘러보기] 두 개. 자리가 남으면 숨긴다.
-// 흰 강조(primary-cta)는 언제나 첫째 하나.
-// 로그인 전 [＋ 첫 순간 추가·둘러보기·어떻게 쓰나요] / 로그인 후 [＋ 순간 추가·둘러보기].
-// '새 트리 만들기'·'내 트리 보기'는 이 줄에서 뺀다(헤더·도구 줄 소관).
+// 2026-11-14 대표 결정: 로그인한 첫 화면도 세 자리를 쓴다 — [＋ 순간 추가·둘러보기·내 트리].
+// 로그아웃의 세 자리[＋ 첫 순간 추가·둘러보기·어떻게 쓰나요]와 같은 폭·여백(#505 의 .center .actions data-count)을 쓴다.
+// 흰 강조(primary-cta)는 언제나 첫째 하나. 자리가 남으면 숨긴다.
+// 로그아웃 문구는 이 화면이 쓴다(4.0 첫 화면의 말투 그대로). 로그인 상태 문구는 header-state 의 homeCenterState 와 같게 둔다.
 
 import {homeCenterState, homeStartLoginUrl, readTheme} from '../public/v41/header-state.mjs';
 
-const KEY_TO_DO={start:'start',add:'add',community:'community',guide:'guide'};
 const LABELS={
   out:['＋ 첫 순간 추가','둘러보기','어떻게 쓰나요'],
-  'in-empty':['＋ 순간 추가','둘러보기'],
-  'in-trees':['＋ 순간 추가','둘러보기']
+  'in-empty':['＋ 순간 추가','둘러보기','내 트리'],
+  'in-trees':['＋ 순간 추가','둘러보기','내 트리']
 };
 const KEYS={
   out:['start','community','guide'],
-  'in-empty':['add','community'],
-  'in-trees':['add','community']
+  'in-empty':['add','community','trees'],
+  'in-trees':['add','community','trees']
 };
 
 // mountOrbit이 만든 버튼에 상태를 입힌다. buttons: 순서대로의 실제 DOM 버튼. 라벨 수가 적으면 남은 버튼은 숨긴다.
@@ -28,8 +27,8 @@ export function applyHomeCenter(buttons, state) {
     if (!button) return;
     if (index >= labels.length) { button.hidden = true; button.removeAttribute('title'); return; }
     button.hidden = false;
-    button.textContent = labels[index] || button.textContent;
-    button.dataset.do = KEY_TO_DO[keys[index]] || keys[index];
+    button.textContent = labels[index];
+    button.dataset.do = keys[index];
     button.classList.toggle('primary-cta', index === 0);
     button.removeAttribute('title');
   });

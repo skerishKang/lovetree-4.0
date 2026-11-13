@@ -142,12 +142,15 @@ export function homeCenterState({ member = 'out', treeCount = 0 } = {}) {
       ]
     };
   }
+  // 2026-11-14 대표 결정: 로그인한 첫 화면도 로그아웃과 같은 세 자리를 쓴다 — [＋ 순간 추가·둘러보기·내 트리].
+  // 폭·여백은 #505 의 .center .actions 규칙이 그대로 맡으므로, 두 상태의 단추 크기·간격이 같아진다.
   if (!hasTree) {
     return {
       state: 'in-empty',
       buttons: [
         { key: 'add', label: '＋ 순간 추가', emphasis: true, disabled: false, title: '새 순간을 남깁니다.' },
-        { key: 'community', label: '둘러보기', emphasis: false, disabled: false, title: '다른 사람의 순간을 둘러봅니다.' }
+        { key: 'community', label: '둘러보기', emphasis: false, disabled: false, title: '다른 사람의 순간을 둘러봅니다.' },
+        { key: 'trees', label: '내 트리', emphasis: false, disabled: false, title: '내 트리 목록을 엽니다.' }
       ]
     };
   }
@@ -155,7 +158,8 @@ export function homeCenterState({ member = 'out', treeCount = 0 } = {}) {
     state: 'in-trees',
     buttons: [
       { key: 'add', label: '＋ 순간 추가', emphasis: true, disabled: false, title: '새 순간을 남깁니다.' },
-      { key: 'community', label: '둘러보기', emphasis: false, disabled: false, title: '다른 사람의 순간을 둘러봅니다.' }
+      { key: 'community', label: '둘러보기', emphasis: false, disabled: false, title: '다른 사람의 순간을 둘러봅니다.' },
+      { key: 'trees', label: '내 트리', emphasis: false, disabled: false, title: '내 트리 목록을 엽니다.' }
     ]
   };
 }

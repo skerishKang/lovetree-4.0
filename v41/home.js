@@ -84,6 +84,8 @@ shadow.querySelector('.center .actions')?.setAttribute('data-count',String(cente
 const addButton=byDo('add');if(addButton)addButton.onclick=()=>bridge.actions.requestMoment('add');
 const communityButton=byDo('community');if(communityButton)communityButton.onclick=()=>bridge.actions.community();
 const guideButton=byDo('guide');if(guideButton)guideButton.onclick=()=>bridge.actions.community();
+// 2026-11-14 대표 결정: 로그인한 첫 화면 셋째 단추 '내 트리'는 내 트리 목록(책장)으로 간다.
+const treesButton=byDo('trees');if(treesButton)treesButton.onclick=()=>bridge.actions.navigate('trees');
 // #481 L10: lt41-login-focus는 보내는 쪽이 없는 고아 수신기였다(셸에 postMessage 없음) —
 // 그 수신기와, 그 수신기만 쓰던 loginFocusButton 추적을 함께 지운다.
 // 로그아웃 첫 버튼은 로그인/가입으로.
