@@ -34,6 +34,7 @@
 - 같은 기능을 두 모델이 맡으면 담당 파일/범위를 먼저 정한다. 하위 에이전트 실행 권한을 자동 부여하지 않는다.
 - 커밋·push는 맡은 작업의 일부로 진행한다. `main` 병합·외부 배포는 해당 작업의 Owner 지시 범위에서 한다.
 - 강제 push, `git reset --hard`, `git clean`으로 타 작업을 지우지 않는다.
+- **컴1에서 Docker·WSL 사용 금지(대표 결정).** `docker`, `docker compose`, Docker Desktop, `wsl` 을 실행하지 않는다(Docker Desktop 은 WSL2 를 깨운다). 로컬 PostgreSQL 이 필요하면 띄우지 말고 서버 시험의 가짜/메모리 저장소로 확인한 뒤, 실제 PostgreSQL 확인은 필수 검사 'PostgreSQL 저장·로그인 상태 검증'에 맡긴다. `deploy/host-com2/lovetree-api/postgres.compose.yml` 은 미사용 참고용이다(2026-11-14 레인이 로컬 확인용으로 Docker Desktop 을 켠 일).
 
 ## 검증과 보고
 - `npm test`와 `npm run build`를 실행한다. UI 변경은 가능한 환경에서 실제 브라우저로 확인한다.
