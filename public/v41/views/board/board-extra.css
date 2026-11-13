@@ -120,13 +120,18 @@ body:not(.lt-advanced) #quickCard,
 body:not(.lt-advanced) #styleSection,
 body:not(.lt-advanced) .lt-move-btn { display: none !important; }
 @media(max-width:700px){
-  /* 단순 모드의 추가·전체 보기는 모바일에서도 쓸 수 있게 한다(기존 .headbtn 숨김보다 ID가 우선). */
+  /* 단순 모드의 추가·전체 보기는 모바일에서도 쓸 수 있게 한다(기존 .headbtn 숨김보다 ID가 우선).
+     #520: 읽기 전용(예시·공유)에서는 board-extras.js가 addBtn·undoBtn에 hidden 속성을 붙인다 —
+     !important 강제 표시가 hidden을 이기지 않게 :not([hidden])로 좁혀, 1440과 같이 읽기 전용에서는 숨긴다. */
   body:not(.lt-advanced) #fitBtn,
-  body:not(.lt-advanced) #addBtn { display: inline-flex !important; align-items: center; min-height: 44px; white-space: nowrap; }
+  body:not(.lt-advanced) #addBtn:not([hidden]) { display: inline-flex !important; align-items: center; min-height: 44px; white-space: nowrap; }
   body:not(.lt-advanced) #fitBtn { padding: 0 8px; }
-  body:not(.lt-advanced) #addBtn { padding: 0 10px; }
-  /* 고급 모드의 되돌리기는 모바일에서도 쓸 수 있게 한다(나머지 도구는 도구 드로어). */
-  body.lt-advanced #undoBtn { display: inline-flex !important; align-items: center; min-height: 44px; padding: 0 8px; white-space: nowrap; }
+  body:not(.lt-advanced) #addBtn:not([hidden]) { padding: 0 10px; }
+  /* 고급 모드의 되돌리기는 모바일에서도 쓸 수 있게 한다(나머지 도구는 도구 드로어). 읽기 전용에서는 hidden을 유지한다. */
+  body.lt-advanced #undoBtn:not([hidden]) { display: inline-flex !important; align-items: center; min-height: 44px; padding: 0 8px; white-space: nowrap; }
+  /* #521: 모바일 순간 선택 패널(top 64px)이 '진주빛 보드 · 읽기 전용' 표시(top 78~89px)를 덮던 것을
+     패널을 96px로 내려 표시가 온전히 보이게 한다(겹침 0). 보드 화면에만 적용한다. */
+  html[data-v41-screen=board] .lt-moment-picker { top: 96px; }
 }
 
 /* === #467 밤 판 (판 테마 = 밤). 종이 판(기본)은 이 블록에 걸리지 않는다. ===

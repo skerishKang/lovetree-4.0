@@ -6,7 +6,7 @@ import { createReadStream, existsSync } from 'node:fs';
 import { stat, mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { installMapPaintProbe, measureMap, worstMapRoles } from './helpers/map-contrast.mjs';
+import { installMapPaintProbe, measureMap, worstMapRoles, settleMap } from './helpers/map-contrast.mjs';
 
 const ROOT = path.resolve(process.env.LT_MAP_CONTRAST_ROOT || fileURLToPath(new URL('../public', import.meta.url)));
 const REQUIRE = process.env.LT_MAP_CONTRAST_REQUIRE === '1';
@@ -48,21 +48,34 @@ test('지도 실제 대비: 앱 2 × 판 2 × 1440·390, 두 보기·선택 상�
         const frame = page.frames().find(f => /track56-network/.test(f.url()));
         assert.ok(frame, '지도 프레임을 찾지 못함');
         await frame.evaluate(() => document.fonts.ready);
+        // 환경 확인: 한글 글꼴이 없는 실행기에서는 이름표가 가는 대체 글리프로 그려져 '글자 속' 표본이 0이 된다(#529).
+        // 제품 대비 미달과 섞이지 않게, 재기 전에 환경 문제로 분명히 멈춘다.
+        const inkDark = await frame.evaluate(() => {
+          const c = document.createElement('canvas'); c.width = 96; c.height = 48; c.lang = document.documentElement.lang;
+          const x = c.getContext('2d', { alpha: false, willReadFrequently: true });
+          x.fillStyle = '#fff'; x.fillRect(0, 0, 96, 48); x.scale(2, 2); x.font = '600 12px Pretendard, sans-serif'; x.fillStyle = '#000'; x.fillText('도시의 창', 2, 16);
+          const d = x.getImageData(0, 0, 96, 48).data; let n = 0;
+          for (let i = 0; i < d.length; i += 4) if (Math.max(d[i], d[i + 1], d[i + 2]) <= 10) n++;
+          return n;
+        });
+        assert.ok(inkDark > 20, `환경 문제: 이 실행기에 한글 글꼴이 없어 이름표 글자를 잴 수 없음(글자 속 픽셀 ${inkDark}) — 제품 대비 문제가 아님. 작업 흐름의 한글 글꼴 준비 단계를 확인`);
         await page.waitForTimeout(500);
         const results = [];
         for (const view of ['network', 'concentric']) {
-          if (view === 'concentric') { await frame.locator('#viewConc').click(); await page.waitForTimeout(120); }
+          if (view === 'concentric') { await frame.locator('#viewConc').click(); await settleMap(frame); }
           for (const state of view === 'network' ? ['overview', 'focus', 'cluster'] : ['overview', 'focus']) {
             if (state === 'focus') {
+              await settleMap(frame);
               const dot = await frame.evaluate(() => window.__lt.dots().find(d => !d.first));
               await frame.locator('#stage').click({ position: { x: dot.x, y: dot.y } });
-              await page.waitForTimeout(180);
+              await settleMap(frame);
               assert.ok(await frame.locator('#detail').evaluate(el => el.classList.contains('open')), '점을 누르면 상세가 열려야 함');
             }
             if (state === 'cluster') {
+              await settleMap(frame);
               const hub = await frame.evaluate(() => window.__lt.hubs()[0]);
               await frame.locator('#stage').click({ position: { x: hub.x, y: hub.y } });
-              await page.waitForTimeout(120);
+              await settleMap(frame);
               assert.equal(await frame.evaluate(() => window.__lt.state.mode), 'CLUSTER_PATH_OVERVIEW', '묶음을 누르면 묶음 보기');
               await frame.waitForFunction(() => performance.now() - window.__lt.state.revealStart > 1700);
             }
@@ -70,13 +83,13 @@ test('지도 실제 대비: 앱 2 × 판 2 × 1440·390, 두 보기·선택 상�
             results.push(measured);
             for (const row of measured.canvas.rows) {
               const threshold = ['label', 'hub-number'].includes(row.role) ? 4.5 : 3;
-              if (row.ratio < threshold) failures.push(`${tag} canvas ${row.role}(${row.id}) ${row.fg}/${row.bg} ${row.ratio}:1 < ${threshold}`);
+              if (row.ratio < threshold) failures.push(`${tag} canvas ${row.role}(${row.id}) ${row.fg}/${row.bg} ${row.ratio}:1 < ${threshold}${row.why ? ' ' + JSON.stringify(row.why) : ''}`);
             }
             for (const row of measured.dom) if (row.ratio < 4.5) failures.push(`${tag} DOM ${row.role}(${row.id}) ${row.fg}/${row.bg} ${row.ratio}:1 < 4.5`);
             evidence.push({ tag, canvas: measured.canvas, dom: measured.dom });
             if (OUT) await writeFile(path.join(OUT, `${tag}.png`), measured.screenshot);
-            if (state === 'focus') { await frame.locator('#detailClose').click(); await frame.locator('#overviewBtn').click(); await page.waitForTimeout(100); }
-            if (state === 'cluster') { await frame.locator('#overviewBtn').click(); await page.waitForTimeout(100); }
+            if (state === 'focus') { await frame.locator('#detailClose').click(); await frame.locator('#overviewBtn').click(); await settleMap(frame); }
+            if (state === 'cluster') { await frame.locator('#overviewBtn').click(); await settleMap(frame); }
           }
         }
         const worst = worstMapRoles(results), canvasRoles = new Set(worst.filter(r => r.kind === 'canvas').map(r => r.role)), domRoles = new Set(worst.filter(r => r.kind === 'dom').map(r => r.role));

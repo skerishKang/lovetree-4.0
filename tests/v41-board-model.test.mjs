@@ -440,5 +440,6 @@ test('#460 판 크기: 순간이 기본 무대 아래까지 놓이면 판을 늘
 test('#460 상세 창이 열릴 때 초점은 옮기되 화면(.app)은 굴리지 않는다', () => {
   const a11y = fs.readFileSync(new URL('../public/v41/view-a11y.mjs', import.meta.url), 'utf8');
   assert.match(a11y, /\(focusables\(el\)\[0\] \|\| el\)\.focus\?\.\(\{ preventScroll: true \}\)/);
-  assert.match(a11y, /entry\.opener\.focus\?\.\(\{ preventScroll: true \}\)/);
+  // 닫힐 때의 초점 복귀(연 곳 또는 고른 순간 카드)도 화면을 굴리지 않는다.
+  assert.match(a11y, /target\.focus\?\.\(\{ preventScroll: true \}\)/);
 });

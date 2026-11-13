@@ -41,7 +41,7 @@ function closeDetail(){
  const panel=$b('#detailSide'),card=detailAnchor;
  if(panel){panel.hidden=true;panel.replaceChildren()}
  detailAnchor=null;
- $b('#detail')?.classList.remove('open');
+ setBookOpen($b('#detail'),false);
  if(card&&card.isConnected){card.classList.remove('detail-open');card.setAttribute('tabindex','-1');try{card.focus({preventScroll:true})}catch{}}
 }
 function detailMarkup(m){
@@ -95,7 +95,7 @@ const originalShowDetail=showDetail;
 showDetail=function(id){
  originalShowDetail(id);
  const m=metadataFor(id);if(m){const view=titleViewFor(m);$b('#detailTitle').textContent=view.main;if(view.sub)$b('#detailTag').textContent+=' · ▶ '+view.sub;}
- $b('#detail')?.classList.remove('open');
+ setBookOpen($b('#detail'),false);
  const card=cardFor(id);
  if(card)placeDetail(id,card);
 };

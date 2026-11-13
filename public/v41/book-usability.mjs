@@ -276,9 +276,15 @@ export function createOverflowRejudge({ judge, raf, cancelRaf = () => {}, addDoc
       }
       const list = [...els];
       if (observer) {
-        targets.forEach((el) => observer.unobserve(el));
-        targets = list;
-        list.forEach((el) => observer.observe(el));
+        // 재측정(레인C): 같은 요소라도 unobserve→observe로 다시 등록하면 관찰자가 매번 초기 발화를 내고,
+        // judge가 다시 observe를 부르는 무한 루프가 된다(책 화면 가만히 있을 때 rAF 60회/초 — 렌즈 루프와 더불어).
+        // 렌더로 페이지 요소가 갈아 끼워져 목록이 실제로 바뀐 때만 다시 등록한다.
+        const unchanged = targets.length === list.length && list.every((el, i) => el === targets[i]);
+        if (!unchanged) {
+          targets.forEach((el) => observer.unobserve(el));
+          targets = list;
+          list.forEach((el) => observer.observe(el));
+        }
       }
     },
     stop() {

@@ -56,12 +56,29 @@ jobs:
           start=$(date +%s)
           node --test tests/v41-board-card-contrast.test.mjs
           echo "보드 카드 대비 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+      # #520·#521: 읽기 전용 보드의 '＋ 순간 꽂기' 숨김·'읽기 전용' 표시 겹침을 실제 화면에서 잰다.
+      # 건너뜀=실패 — 위 대비 시험과 같은 이유(크롬이 이미 준비된 이 잡에서 돈다).
+      - name: 보드 읽기 전용·겹침 시험(390·1440 × 밤·정원 × 판, 건너뜀=실패 — #520·#521)
+        env:
+          LT_BOARD_CONTRAST_REQUIRE: '1'
+        run: |
+          start=$(date +%s)
+          node --test tests/v41-board-readonly-520-521.test.mjs
+          echo "보드 읽기 전용·겹침 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
       - name: 지도 실제 대비·판 전환 시험(건너뜀=실패)
         env:
           LT_MAP_CONTRAST_REQUIRE: '1'
         run: |
           start=$(date +%s)
-          node --test tests/v41-map-contrast.test.mjs tests/v41-map-theme-flow.test.mjs
+          # #529: 이름표 대비는 실제로 그려진 한글 글자를 잰다. 실행기에 한글 글꼴이 없으면 준비한다(있으면 건너뜀).
+          if ! fc-list :lang=ko | grep -q .; then
+            echo "한글 글꼴 없음 — fonts-noto-cjk 설치"
+            sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends fonts-noto-cjk
+          fi
+          fc-cache -f >/dev/null 2>&1 || true
+          echo "한글 글꼴 $(fc-list :lang=ko | wc -l)개 · 대표 $(fc-match 'sans-serif:lang=ko' | head -1)"
+          # 두 시험은 차례로 돌린다(브라우저 둘이 동시에 뜨면 느린 실행기에서 서로의 시간을 흔든다).
+          node --test --test-concurrency=1 tests/v41-map-contrast.test.mjs tests/v41-map-theme-flow.test.mjs
           echo "지도 실제 대비·판 전환 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
       - name: 미리보기 주소 찾기
         id: preview
