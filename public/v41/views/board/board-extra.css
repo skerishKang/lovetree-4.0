@@ -168,5 +168,28 @@ html[data-v41-screen=board][data-lt-board-theme="night"] body .card small{color:
 html[data-v41-screen=board][data-lt-board-theme="night"] body .card .firstTag{color:#5a3e5c}
 html[data-v41-screen=board][data-lt-board-theme="night"] body .card .noteText{color:#3f2f44}
 html[data-v41-screen=board][data-lt-board-theme="night"] body .card .keywordOnCard span{color:#584a60;background:rgba(92,67,101,.08)}
-/* 정원 도구 줄 위 [종이|밤] 눌린 쪽 표시 */
-html[data-lt-theme=garden] .toolbar .themeSwitchBtn[aria-pressed="true"]{background:rgba(200,110,121,.14);color:var(--lt-gold-ink);box-shadow:inset 0 0 0 1px var(--lt-gold-line)}
+/* === #536: [종이|밤] 전환을 도구 줄에서 머리줄('전체 보기' 옆)로 옮겼다 — 고급 기능을 켜지 않은
+   기본 화면에서도 찾는다. 한 벌만 있으니 고급 모드에서 두 벌로 보이지 않는다. 값은 같은
+   lt41.boardTheme(설정 '보드·지도 판'과 같은 값)를 쓴다. === */
+.boardThemeSwitch{display:inline-flex;align-items:center;flex:none;border:1px solid rgba(255,255,255,.12);border-radius:18px;overflow:hidden;background:rgba(28,17,38,.75)}
+.boardThemeSwitch .themeSwitchBtn{border:0;border-radius:0;background:transparent;height:36px;min-height:0;min-width:0;padding:0 12px;font-size:12px;color:#cbbcd4}
+.boardThemeSwitch .themeSwitchBtn[aria-pressed="true"]{background:rgba(255,255,255,.1);color:#fff}
+/* 정원에서 머리줄 [종이|밤] 눌린 쪽 표시(전 규칙은 도구 줄 안을 가리켰다 — 자리를 옮겼으니 함께 옮긴다) */
+html[data-lt-theme=garden] .boardThemeSwitch{border-color:var(--lt-line);background:var(--lt-paper)}
+html[data-lt-theme=garden] .boardThemeSwitch .themeSwitchBtn{color:var(--lt-muted)}
+html[data-lt-theme=garden] .boardThemeSwitch .themeSwitchBtn[aria-pressed="true"]{background:rgba(200,110,121,.14);color:var(--lt-gold-ink);box-shadow:inset 0 0 0 1px var(--lt-gold-line)}
+/* 좁은 화면: 머리줄이 넘치지 않게 스위치를 줄인다(#531의 표시·선택 줄 겹침 0은 그대로 — 아래쪽 요소와 무관). */
+@media(max-width:760px){
+  header{gap:8px;padding:0 10px}
+  .tree-title-btn{max-width:96px}
+  .tree-title-btn #treeTitleText{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .boardThemeSwitch{border-radius:16px}
+  .boardThemeSwitch .themeSwitchBtn{height:44px;padding:0 9px;font-size:11px}
+}
+@media(max-width:420px){
+  header{gap:6px;padding:0 8px}
+  .tree-title-btn{max-width:72px}
+  .boardThemeSwitch .themeSwitchBtn{padding:0 7px;font-size:10px;position:relative}
+  /* #421 방식: 보이는 모양은 줄이고 ::after로 누르는 영역을 44px 이상으로 넓힌다. */
+  .boardThemeSwitch .themeSwitchBtn::after{content:"";position:absolute;inset:-3px -2px}
+}

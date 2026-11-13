@@ -5,7 +5,7 @@ import {createScreenRegistry} from './views/registry.js';
 import { mountBook } from './views/book.js';
 import { mountShelf } from './views/shelf.js';
 import { lastRead, remember } from './views/memory.js';
-import { EMPTY_STATE, validateState, createTree, addMoment, editMoment, removeMoment, importTrees, MAX_TREES, MAX_LINKS, EMOTIONS, treeLayout, pathTo, stemGroups, linkMoments, unlinkMoments, relatedMoments } from './domain.js';
+import { EMPTY_STATE, validateState, createTree, addMoment, editMoment, removeMoment, importTrees, MAX_TREES, MAX_LINKS, EMOTIONS, treeLayout, pathTo, stemGroups, linkMoments, unlinkMoments, relatedMoments, localDateOnly } from './domain.js';
 import { createSyncController, createWorkspaceApi, mountSync } from './sync.js';
 import { authEntry, refreshAuthEntries } from './auth-entry.js';
 import { EXAMPLES } from './examples.js';
@@ -288,7 +288,7 @@ function openMoment(mode, id) {
   if (mode !== 'new' && (!tree || isDemo())) return;
   const m = mode === 'edit' ? tree.moments.find(m => m.id === id) : null;
   if (mode === 'edit' && !m) return;
-  const today = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0,10);
+  const today = localDateOnly(); // #547: 기기의 지역 날짜
   const emotion = m?.emotion || '설렘';
   const emotionOptions = EMOTIONS.includes(emotion) ? EMOTIONS : [emotion, ...EMOTIONS];
   const urlHint = describeLinkForField(m?.url || '');
@@ -466,7 +466,7 @@ function libraryAction(action, id) {
       commit({ ...state, trees: state.trees.filter(t => t.id !== id) }); render();
     }
     else if (action === 'export-tree') { const tree = state.trees.find(t => t.id === id); if (tree) download({ version: 1, trees: [tree] }, `lovetree-${id.slice(0, 8)}.json`); }
-    else if (action === 'export-all') download(state, `lovetree-backup-${new Date().toISOString().slice(0,10)}.json`);
+    else if (action === 'export-all') download(state, `lovetree-backup-${localDateOnly()}.json`);
     else if (action === 'import') $('#import-file').click();
   } catch (error) { toast(error.message); }
 }

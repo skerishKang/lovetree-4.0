@@ -10,6 +10,7 @@ import {
 import { shelfOrder, INBOX_LABEL } from '../../inbox-model.mjs';
 import { titleView, titleDisplayOf, shouldReloadForTitleDisplay } from '../../book-usability.mjs';
 import { coverFallbackAttrs, mountThumbFallback } from '../../thumb-fallback.mjs';
+import { localDateOnly } from '../../local-date.mjs';
 import { createReader } from './shelf-reader.js';
 
 {
@@ -243,7 +244,7 @@ import { createReader } from './shelf-reader.js';
           event.preventDefault();
           var name=$('#newBookName').value.trim(),url=$('#newBookUrl').value.trim();
           if(!name||!url)return;
-          state.customBooks.push({id:'custom-'+Date.now(),name:name,category:'all',color:palette[0],accent:palette[0],symbol:'♡',description:'새롭게 기록하기 시작한 트리.',tags:['새 책','첫 마음'],lastDate:new Date().toISOString().slice(0,10),chapters:[{title:$('#newBookChapter').value.trim()||'처음 마음이 움직인 장면',url:url,mood:'첫 마음',note:'이 사람을 처음 책으로 만들게 된 순간'}]});
+          state.customBooks.push({id:'custom-'+Date.now(),name:name,category:'all',color:palette[0],accent:palette[0],symbol:'♡',description:'새롭게 기록하기 시작한 트리.',tags:['새 책','첫 마음'],lastDate:localDateOnly(),chapters:[{title:$('#newBookChapter').value.trim()||'처음 마음이 움직인 장면',url:url,mood:'첫 마음',note:'이 사람을 처음 책으로 만들게 된 순간'}]});
           save();closeModal('newBookModal');$('#newBookForm').reset();renderShelf();showToast(name+'의 책을 만들었어요.');
         });
       }

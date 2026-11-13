@@ -1,3 +1,5 @@
+// #547: '오늘' 날짜는 기기의 지역 날짜로 만든다(UTC 날짜였을 때 새벽 순간이 하루 전으로 찍혔다).
+import { localDateOnly } from './local-date.mjs';
 export const EMOTIONS = ['설렘', '위로', '벅참', '그리움', '고마움', '즐거움'];
 // #256-3: 책(트리)마다 고르는 디자인 표지. 테마 표지 색(--lt-cover-N) 위의 질감 변형 6종.
 // 값은 이 목록뿐이다. 모르는 값·타입은 저장 거부가 아니라 ''(기본 표지)로 되돌린다.
@@ -185,7 +187,8 @@ export function validateMomentInput(input) {
   const title = suggestMomentTitle({ title: input.title, note, url, mediaMetadata });
   if (!title) throw new Error('순간 제목, 마음 한마디, 링크나 첨부 중 하나는 남겨 주세요.');
   const emotion = normalizeEmotion(input.emotion);
-  const date = input.date || new Date().toISOString().slice(0, 10);
+  // #547: '오늘'은 사용자 기기의 지역 날짜다(UTC가 아니다) — 새벽에 남긴 순간이 하루 전으로 찍히던 자리.
+  const date = input.date || localDateOnly();
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(date)) || new Date(date).toISOString().slice(0, 10) !== date) throw new Error('날짜를 확인해 주세요.');
   const relation = typeof input.relation === 'string' ? input.relation.trim() : '';
   if (relation.length > 100) throw new Error('연결 이유는 100자까지 적을 수 있어요.');

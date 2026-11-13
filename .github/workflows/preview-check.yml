@@ -65,6 +65,14 @@ jobs:
           start=$(date +%s)
           node --test tests/v41-board-readonly-520-521.test.mjs
           echo "보드 읽기 전용·겹침 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+      # #536: 넓은 화면 판 채움·별 모양 펼침·기억한 자리 판 규칙·머리줄 [종이|밤]·읽기 전용 표시를 실제 화면에서 잰다.
+      - name: 보드 넓은 화면·머리줄 판 전환 시험(건너뜀=실패 — #536)
+        env:
+          LT_BOARD_WIDE_REQUIRE: '1'
+        run: |
+          start=$(date +%s)
+          node --test tests/v41-board-wide-view-536.test.mjs
+          echo "보드 넓은 화면·머리줄 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
       # #514: 남은 접근성 항목(moderate 이하)을 실제 화면에서 잰다 — 확대 막기·랜드마크·제목 단계·
       # 모바일 선택 줄 top. axe-core·Chromium이 필요한 실행형 시험이라 크롬이 준비된 이 잡에서 돈다.
       - name: 남은 접근성 항목 시험(#514, 건너뜀=실패)
@@ -83,6 +91,16 @@ jobs:
           start=$(date +%s)
           node --test --test-concurrency=1 tests/v41-book-single-537.test.mjs
           echo "책 한 장 보기 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+      # #547: 새벽에 남긴 순간이 하루 전 날짜로 찍히던 문제 — '오늘'은 기기의 지역 날짜다.
+      # 시간대 경계(Asia/Seoul 00:30·08:59·09:00·23:59, America/Los_Angeles)를 고정해 서버·브라우저 양쪽에서
+      # 기본 날짜를 확인한다. 건너뜀=실패(크롬이 준비된 이 잡에서 돈다).
+      - name: 지역 날짜(오늘) 시험(시간대 경계, 건너뜀=실패 — #547)
+        env:
+          LT_LOCAL_DATE_REQUIRE: '1'
+        run: |
+          start=$(date +%s)
+          node --test --test-concurrency=1 tests/v41-local-date-547.test.mjs
+          echo "지역 날짜 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
       - name: 지도 실제 대비·판 전환 시험(건너뜀=실패)
         env:
           LT_MAP_CONTRAST_REQUIRE: '1'

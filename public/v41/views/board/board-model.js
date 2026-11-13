@@ -47,20 +47,41 @@ window.LT58Model = (() => {
       cur[1] = Math.max(cur[1], row);
       bandRows.set(b, cur);
     }
+    // #536: 한 밴드가 줄을 임계치보다 많이 쓰면 세로 기둥 하나에 쌓인다 — 모아둔 순간(빠른 추가)·
+    // '새 트리로 만들기'는 순간이 전부 한 뿌리의 자식(별 모양)이라 깊이가 1뿐이고, 열=깊이 규칙(#498)이
+    // 먹지 않아 26장이 폭 242px 기둥이 됐다. 그 밴드는 DFS 순서대로 열 우선(column-major) 칸에 나눠 담아
+    // 판 폭을 고르게 쓴다. 예시 40순간(7줄)·사슬(1줄)·#395 14순간(7줄)은 임계치에 걸리지 않아 그대로다.
+    const ROWS_PER_COLUMN = 7;
+    const wrapped = new Map(); // 밴드 → Map(id → {col,row}) : 열 우선으로 나눈 자리
     const bandTop = new Map();
     let acc = 0;
     for (const b of [...bandRows.keys()].sort((x, y) => x - y)) {
       bandTop.set(b, acc);
       const [minR, maxR] = bandRows.get(b);
-      acc += (maxR - minR) + 1;
+      if ((maxR - minR) + 1 > ROWS_PER_COLUMN) {
+        const slots = new Map();
+        let s = 0;
+        for (const [nid, np] of out) {
+          if (Math.floor(np.depth / cols) !== b) continue;
+          slots.set(nid, { col: Math.floor(s / ROWS_PER_COLUMN), row: s % ROWS_PER_COLUMN });
+          s++;
+        }
+        wrapped.set(b, slots);
+        acc += ROWS_PER_COLUMN;
+      } else {
+        acc += (maxR - minR) + 1;
+      }
     }
     const result = new Map();
     let i = 0;
     for (const id of ids) {
       const { depth, row } = out.get(id);
       const wrap = Math.floor(depth / cols);
-      const minR = (bandRows.get(wrap) || [0])[0];
-      result.set(id, { x: 150 + (depth % cols) * 300, y: 150 + (row - minR + (bandTop.get(wrap) || 0)) * 420, rot: (i++ % 3 - 1) * 2 });
+      const top = bandTop.get(wrap) || 0;
+      const slot = wrapped.get(wrap)?.get(id);
+      const col = slot ? slot.col : (depth % cols);
+      const rel = slot ? slot.row : row - (bandRows.get(wrap) || [0])[0];
+      result.set(id, { x: 150 + col * 300, y: 150 + (rel + top) * 420, rot: (i++ % 3 - 1) * 2 });
     }
     return result;
   }
@@ -124,6 +145,28 @@ window.LT58Model = (() => {
   function clampView(view, rect, area) {
     return { z: view.z, x: clampAxis(view.x, view.z, rect.x, rect.w, area.x, area.w), y: clampAxis(view.y, view.z, rect.y, rect.h, area.y, area.h) };
   }
+  // #536: 판(흰 판 ∪ 순간 묶음)이 화면보다 좁은 축은 화면 가운데에 둔다. 덮을 수 있는 축은
+  // clampAxis 그대로 민다(빈 곳 없이). 넓은 화면(2560)에서 순간이 적거나 한 줄로 길 때 판이
+  // 오른쪽에만 그려지고 왼쪽 절반이 어두운 바탕으로 남은 것을 고친다.
+  function coverAxis(t, z, start, size, areaStart, areaSize) {
+    if (size * z >= areaSize) return clampAxis(t, z, start, size, areaStart, areaSize);
+    return areaStart + (areaSize - size * z) / 2 - start * z;
+  }
+  function coverView(view, rect, area) {
+    return {
+      z: view.z,
+      x: coverAxis(view.x, view.z, rect.x, rect.w, area.x, area.w),
+      y: coverAxis(view.y, view.z, rect.y, rect.h, area.y, area.h)
+    };
+  }
+  // 흰 판(.surface — 무대 안쪽 48px)과 순간 묶음을 합친 사각형. 이 판이 화면을 덮거나 가운데에 선다.
+  function boardRect(box, world) {
+    const surface = { x: SURFACE_INSET, y: SURFACE_INSET, w: world.w - SURFACE_INSET * 2, h: world.h - SURFACE_INSET * 2 };
+    if (!box) return surface;
+    const sx = Math.min(surface.x, box.x), sy = Math.min(surface.y, box.y);
+    return { x: sx, y: sy, w: Math.max(surface.x + surface.w, box.x + box.w) - sx, h: Math.max(surface.y + surface.h, box.y + box.h) - sy };
+  }
+
   // 순간 묶음 box와 보이는 칸 safe: box가 더 크면 칸을 채우고(빈 곳 없이), 작으면 칸 안에 다 들어오게 한다.
   function settleAxis(t, z, start, size, areaStart, areaSize) {
     const a = areaStart - start * z, b = areaStart + areaSize - (start + size) * z;
@@ -136,8 +179,17 @@ window.LT58Model = (() => {
   // 처음 보이는 자리. viewport={w,h}, safe=왼쪽 도구·오른쪽 상세 창을 뺀 보이는 칸,
   // cards=[{id,x,y,w,h}], focusId=마지막으로 보던 순간(없으면 firstId → 첫 카드).
   // 다 들어와도 읽을 수 있으면(0.8배 이상) 한눈에, 아니면 0.8배로 그 순간 근처를 보여 준다.
-  function startView({ viewport, safe, cards, focusId = null, firstId = null, world = boardSize(cards) }) {
+  // saved=기억한 자리({cx,cy,z}) — 같은 판 규칙(덮거나 가운데)을 거쳐 연다(#536).
+  function startView({ viewport, safe, cards, focusId = null, firstId = null, world = boardSize(cards), saved = null }) {
     const box = contentBox(cards);
+    // #536: 기억한 자리도 판 규칙을 따른다. 전에는 저장된 배율·자리를 그대로 써서 넓은 화면에서
+    // 판이 한쪽으로 쏠렸다. 순간이 하나도 안 보이는 자리는 버린다(예전 규칙).
+    if (saved) {
+      const raw = { z: saved.z, x: viewport.w / 2 - saved.cx * saved.z, y: viewport.h / 2 - saved.cy * saved.z };
+      if (!cards.length || visibleCards(raw, { x: 0, y: 0, w: viewport.w, h: viewport.h }, cards) > 0) {
+        return { ...coverView(raw, boardRect(box, world), { x: 0, y: 0, w: viewport.w, h: viewport.h }), mode: 'user' };
+      }
+    }
     if (!box) {
       const z = fitZoom(viewport.w, viewport.h);
       return { z, x: (viewport.w - 2400 * z) / 2, y: (viewport.h - 2200 * z) / 2, mode: 'empty' };
@@ -150,11 +202,10 @@ window.LT58Model = (() => {
       v = { z, x: safe.x + safe.w / 2 - (f.x + (f.w || 242) / 2) * z, y: safe.y + safe.h / 2 - (f.y + (f.h || 260) / 2) * z };
       mode = 'focus';
     }
-    // 판이 화면을 채우게(양옆·위아래 빈 띠 없이) 민 다음, 순간 묶음이 보이는 칸에 맞게 한 번 더 민다(순간이 우선).
-    const surface = { x: SURFACE_INSET, y: SURFACE_INSET, w: world.w - SURFACE_INSET * 2, h: world.h - SURFACE_INSET * 2 };
-    const sx = Math.min(surface.x, box.x), sy = Math.min(surface.y, box.y);
-    const board = { x: sx, y: sy, w: Math.max(surface.x + surface.w, box.x + box.w) - sx, h: Math.max(surface.y + surface.h, box.y + box.h) - sy };
-    v = clampView(v, board, { x: 0, y: 0, w: viewport.w, h: viewport.h });
+    // 판이 화면을 채우게(양옆·위아래 빈 띠 없이) 민다 — 판이 화면보다 좁은 축은 가운데 둔다(#536).
+    // 그다음 순간 묶음이 보이는 칸에 맞게 한 번 더 민다(순간이 우선).
+    const board = boardRect(box, world);
+    v = coverView(v, board, { x: 0, y: 0, w: viewport.w, h: viewport.h });
     v = settleView(v, box, safe);
     // 그 순간 카드는 도구·상세 창에 가리지 않고 보이는 칸 안에 있어야 한다(마지막으로 한 번 더).
     if (f) v = settleView(v, { x: f.x, y: f.y, w: f.w || 242, h: f.h || 260 }, safe);
@@ -276,8 +327,9 @@ window.LT58Model = (() => {
   // #346 2단계: 장식 애니메이션(실 점선 흐름·핀 숨쉬기)을 멈출 때인가.
   // 이동·확대·카드 드래그 중에는 매 프레임 SVG 페인트가 겹치므로 잠시 멈춘다(모양은 그대로, 움직임만 멈춤).
   // 시네마는 이 플래그를 쓰지 않는다 — 시네마 장면은 자기 갱신을 그대로 유지한다.
-  function decorationMotion({ pan = false, pinch = false, dragging = false, touches = 0 } = {}) {
-    return pan || pinch || dragging || touches > 0 ? 'paused' : 'running';
+  function decorationMotion({ pan = false, pinch = false, dragging = false, zooming = false, touches = 0 } = {}) {
+    // #536: zooming = 휠 확대. 전에는 핀치만 '확대'로 보아 휠 확대 중 실 점선 흐름이 계속 칠해졌다.
+    return pan || pinch || dragging || zooming || touches > 0 ? 'paused' : 'running';
   }
 
   // #346: 실 다시 그리기 예약 판정. 상시 rAF 루프 대신 필요할 때만, 한 프레임에 한 번 그린다.
