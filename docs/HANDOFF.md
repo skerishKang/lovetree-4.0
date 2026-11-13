@@ -21,6 +21,16 @@
 - 겉모습 비교(알림용 before/after 캡처)는 `public/`·`src/`·`index.html`·`vite.config`·`package.json`이 바뀐 PR에서만 돈다.
 - **새 화면 시험을 붙일 때**: 가장 짧은 잡에 단계로 붙인다(각 잡 요약에 초가 적힌다). 한 잡이 6분을 넘으면 잡을 하나 더 나눈다.
 
+
+## 2026-11-14 — 공개가 기본 (#538, 로컬4 레인, ai/local4-lt-538-public-default-261114, main 4351565 기준)
+
+- **방침**: 트리는 공개가 기본. 저장 성공 뒤 같은 훅에서 공유 행의 `moment_count`를 갱신하고, 둘러보기 SQL이 `moment_count>=3`으로 거른다(서비스층 LIMIT 뒤 거르기 없음). 직접 올린 사진만 있는 순간도 순간 수에 세고, 공개 카드 대표 그림은 공개 가능한 것(YouTube 썸네일 등)만 쓰며 없으면 기본 표지(#427 전까지 올린 사진은 계속 제외). 비공개는 Plus 전용 — 판단은 서버가 한다(화면 잠금만으로 막지 않는다).
+- **표**: `lovetree_shares`에 `origin`('owner'|'auto', CHECK `lovetree_shares_origin_check`)·`moment_count` 칸 추가, 트리당 자동 공개 행 1개 제약 `lovetree_shares_auto_unique_idx`(origin='auto' 부분 유니크). 새 표 `lovetree_tree_visibility`(product·subject·tree 키, visibility public/private — **행이 없으면 공개**인 스파스 운용). `schema.sql` + `server/db/migrations/tree-visibility-261114.sql` 한 벌, 기존 공유 행의 moment_count를 저장 문서에서 채우는 UPDATE 포함(이전 — 기존 트리도 공개). 계정 탈퇴 `ACCOUNT_USER_TABLES`에 `lovetree_tree_visibility` 추가. `scripts/apply-schema.mjs` TABLES에 추가.
+- **서버**: `share-service.js` — `syncSharesAfterSave`(살아 있는 공유 행 moment_count 갱신 → 공유 행 없는 트리에 origin='auto' 행 생성 → 문서에서 사라진 트리의 auto 행 즉시 내림), `setTreeVisibility`(비공개 지정 시 plusEntitled 아니면 403 `plus_required_private`), `getTreeVisibility`, auto 행의 discovery PUT/DELETE는 409 `share_auto_managed`, 공개 읽기에서 비공개 트리 403 `share_private`. `workspace-service.js` — 저장·트리 삭제 성공 뒤 `onCommit` 훅(실패해도 응답을 막지 않고 로그만). `community-service.js` — 비공개 트리의 댓글·반응·신고·차단 경로 전체를 404로 차단. 둘러보기 SQL(community-postgres)은 `moment_count>=3 AND (origin='auto' OR discoverable=true)` + 트리당 한 행(DISTINCT ON, auto 우선) + 숨김은 트리 단위 + 비공개 트리 제외. `discoverable` 열은 보존만 하고 참조는 '옛 스위치 행' 호환용으로만 남김. `functions/_lib/proxy.js`에 `/api/trees/:id/visibility` GET/PUT 추가.
+- **화면(v41)**: 공유 창에 순간 수 안내(`share-moment-hint`)와 공개 상태 칸(`share-visibility`, 비공개 전환 단추 — 403이면 Plus 안내), '둘러보기에도 올리기' 스위치·확인창 제거, 공유 목록에서 auto 행 비표시, 설정의 공유 행을 '트리 공개(공개(기본)·비공개 잠금 Plus 전용)'로 교체, 둘러보기 목록 설명 문구 변경, 첫 순간 저장 뒤 안내 1회는 localStorage(`lt41.publicNoticeShown`).
+- **시험**: 신규 `tests/public-default-538.test.mjs` 8건(공개 기본·자동 행, 2개/3개 경계·올린 사진 순간 포함, 비공개 403, 트리 삭제 즉시 내림, moment_count 추가·삭제 갱신·주인 만든 행 포함, 신고·차단 유지, 계정 이름·아이디·이메일 미노출, auto 행 스위치 거부). `tests/community-postgres.test.mjs`에 둘러보기 SQL 시험 1건 추가(기존 2건의 INSERT에 moment_count 3 반영). 스위치 시험 `v41-share-discover-confirm.test.mjs`는 기능 제거로 삭제, `v41-share-steps`·`v41-share-list`·`v41-share-api`·`v41-community`·`v41-screen-defaults`·`v41-page-turn`·`v41-shell-messages`를 새 계약에 맞게 갱신. `npm test` fail 5 — 모두 main 4351565 워크트리 대조에서 같게 실패하는 기존 실패(a11y 2·postdeploy 2·#400 home 빌드 1, 환경성), 신규 실패 0.
+- **배포 주의**: 머지 뒤 autodeploy가 `needs_manual_migration`으로 멈춘다 → 컴2에서 `tree-visibility-261114.sql` 수동 적용(SET ROLE lovetree_owner) → `AUTODEPLOY_ACCEPT_MIGRATIONS=1` 1회. 배포 뒤 계정 01로 순간 3개/2개 경계·비공개 403·안내 문구 4곳 확인 필요(컴2 브라우저).
+
 ## 2026-11-14 — 서비스 시작 전 검색 닫기 (CTO, #541 후속)
 
 - **대표 결정**: 서비스 시작 전이라 운영 주소도 검색에 걸리지 않게 막는다. `functions/_lib/search-meta.mjs` 의 **`SEARCH_OPEN = false`** 한 줄이 스위치다.

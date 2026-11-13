@@ -29,7 +29,14 @@ function parseWriteInput(payload) {
   return { validated, expectedRevision, clientKey };
 }
 
-export function createWorkspaceService({ repo, productId }) {
+export function createWorkspaceService({ repo, productId, onCommit = null }) {
+  // #538: 저장이 성공한 뒤 같은 훅에서 공유 행(자동 공개·moment_count)을 동기화한다.
+  // 저장 자체는 이미 끝났으므로 동기화 실패는 응답을 막지 않고 로그만 남긴다.
+  async function afterCommit(subjectId, doc) {
+    if (!onCommit) return;
+    try { await onCommit({ subjectId, doc }); }
+    catch { console.error('[lovetree-workspace] 저장 뒤 공유 동기화 실패'); }
+  }
   return {
     async read(principal) {
       const stored = await repo.load({ productId: principal.productId, subjectId: principal.subjectId });
@@ -59,6 +66,7 @@ export function createWorkspaceService({ repo, productId }) {
       if (outcome.status === 'keyConflict') {
         throw new ApiError(409, 'client_key_conflict', '같은 요청 키로 다른 내용을 보내려 해요. 새 키로 다시 시도해 주세요.');
       }
+      await afterCommit(principal.subjectId, validated);
       return { revision: outcome.revision, savedAt: outcome.savedAt };
     },
 
@@ -89,6 +97,7 @@ export function createWorkspaceService({ repo, productId }) {
       if (outcome.status === 'keyConflict') {
         throw new ApiError(409, 'client_key_conflict', '같은 요청 키로 다른 내용을 보내려 해요. 새 키로 다시 시도해 주세요.');
       }
+      await afterCommit(principal.subjectId, next);
       return { deleted: true, treeId, revision: outcome.revision, savedAt: outcome.savedAt };
     }
   };

@@ -98,27 +98,27 @@ test('보기 기본값 묶음: 관계 지도 기본 보기(이 기기)만 두고
   assert.equal(/data-board-theme/.test(look), false, '보드 기본 테마 행은 없다');
 });
 
-test('공유 기본값: 공유 창이 처음 열 보기·둘러보기 올림을 설정값으로 시작한다(서버 API 변경 없음)', () => {
+test('공유 기본값: 공유 창이 처음 열 보기를 설정값으로 시작한다(#538: 둘러보기 올림 설정은 공개 기본으로 정리)', () => {
   assert.match(html, /id="settings-share-title"[^>]*>공유</);
   // #453 C5: 설정의 공유 이름은 화면 탭과 같은 말(책·보드·지도)을 쓴다.
   assert.match(html, /data-share-view="book"[^>]*>책</);
   assert.match(html, /data-share-view="board"[^>]*>보드</);
   assert.match(html, /data-share-view="network"[^>]*>지도</);
   assert.doesNotMatch(html, />기억책</);
-  assert.match(html, /data-share-discover="off"[^>]*>기본 꺼짐</);
-  assert.match(html, /data-share-discover="on"[^>]*>기본 켬</);
+  // #538: '둘러보기에도 올리기' 행은 정리됐고, 트리 공개 행은 공개 기본 + Plus 전용 비공개 잠금이다.
+  assert.doesNotMatch(html, /data-share-discover/);
+  assert.match(html, /id="settings-share-public-label"[^>]*>트리 공개</);
+  assert.match(html, /data-share-private-lock>비공개</);
+  assert.match(html, /Plus 전용/);
+  assert.match(html, /공개돼도 내 이름·아이디·이메일은 다른 사람에게 보이지 않아요/);
   assert.equal(normalizeShareView(undefined), 'book');
-  assert.equal(normalizeShareDiscover(undefined), false, '옛 저장본도 둘러보기 기본 꺼짐이다');
+  assert.equal(normalizeShareDiscover(undefined), false, '옛 저장본의 shareDiscover 값은 읽기만 하고 화면은 없다');
   // 셸이 설정값을 공급하고, 공유 창 열기 때 처음 열 보기가 그 값을 따른다.
-  assert.match(shell, /getShareDefaults:\(\)=>\(\{view:currentShareView\(\),discover:currentShareDiscover\(\)\}\)/);
-  assert.match(messages, /const getShareDefaults = deps\.getShareDefaults \|\| \(\(\) => \(\{view: 'book', discover: false\}\)\);/);
+  assert.match(shell, /getShareDefaults:\(\)=>\(\{view:currentShareView\(\)\}\)/);
+  assert.match(messages, /const getShareDefaults = deps\.getShareDefaults \|\| \(\(\) => \(\{view: 'book'\}\)\);/);
   assert.match(messages, /\$\('share-view'\)\.value = getShareDefaults\(\)\.view;/);
-  // #480 M7: 둘러보기 올림은 링크를 만든 뒤에 정한다. '기본 켬'은 확인창을 한 번 띄우는 제안이고,
-  // 확인 없이 체크박스만 켜지 않는다(켜짐인데 실제로는 주소로만 공개이던 거짓 상태를 없앴다).
-  assert.doesNotMatch(messages, /\$\('share-discover'\)\.checked = getShareDefaults\(\)\.discover;/);
-  assert.match(messages, /if \(getShareDefaults\(\)\.discover\) await setDiscoverable\(answer\.share\.id, true, \{ask: true\}\);/);
   assert.match(shell, /try\{member\.apply\('setPrefs',\{shareView:b\.dataset\.shareView\}\);/);
-  assert.match(shell, /member\.apply\('setPrefs',\{shareDiscover:b\.dataset\.shareDiscover==='on'\}\);/);
+  assert.doesNotMatch(shell, /shareDiscover:b\.dataset\.shareDiscover/);
 });
 
 test('내 데이터: 보관 파일 용량은 보관 파일 창과 같은 값·같은 형식이고, 새 API는 없다', () => {

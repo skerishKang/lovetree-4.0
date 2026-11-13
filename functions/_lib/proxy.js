@@ -18,6 +18,7 @@
 const MEDIA_ITEM = /^\/api\/media\/[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}\.(?:png|jpg|gif|webp|mp4|webm)$/;
 const SHARE_ITEM = /^\/api\/shares\/[A-Za-z0-9_-]{1,128}$/;
 const SHARE_DISCOVERY = /^\/api\/shares\/[A-Za-z0-9_-]{1,128}\/discovery$/;
+const TREE_VISIBILITY = /^\/api\/trees\/[A-Za-z0-9_-]{1,80}\/visibility$/;
 const PUBLIC_SHARE_ITEM = /^\/api\/public\/shares\/[A-Za-z0-9_-]{1,128}$/;
 const COMMUNITY_SHARE_ACTION = /^\/api\/community\/shares\/[A-Za-z0-9_-]{1,128}\/(comments|favorite|reaction|report|block)$/;
 const COMMUNITY_COMMENT_ITEM = /^\/api\/community\/comments\/[A-Za-z0-9_-]{1,128}$/;
@@ -128,6 +129,7 @@ export function createProxy({ fetcher = (...args) => fetch(...args), timeoutMs =
       || (MEDIA_ITEM.test(incoming.pathname) ? new Set(['GET','DELETE']) : null)
       || (SHARE_ITEM.test(incoming.pathname) ? new Set(['DELETE']) : null)
       || (SHARE_DISCOVERY.test(incoming.pathname) ? new Set(['PUT','DELETE']) : null)
+      || (TREE_VISIBILITY.test(incoming.pathname) ? new Set(['GET','PUT']) : null)
       || (PUBLIC_SHARE_ITEM.test(incoming.pathname) ? new Set(['GET']) : null)
       || (ADMIN_FEEDBACK_ITEM.test(incoming.pathname) ? new Set(['GET','PATCH']) : null)
       || (ADMIN_FEEDBACK_REPLY.test(incoming.pathname) ? new Set(['POST']) : null)

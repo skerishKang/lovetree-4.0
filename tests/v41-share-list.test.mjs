@@ -106,10 +106,10 @@ test('살아 있는 주소마다 만든 날짜·처음 열 보기·복사·취�
   try {
     await h.messages.openSharePanel();
     const row = h.els['share-list'].children[0];
-    assert.equal(row.children[0].children[0].textContent, '공유 중 · 둘러보기에 올림');
+    assert.equal(row.children[0].children[0].textContent, '공유 중');
     // #480 L13: 날짜는 책·보드·지도와 같은 한 벌(formatDisplayDate)을 지난다 — 늘 dot이면 \"2026. 11. 12\"(끝에 점 없음).\n    assert.match(row.children[0].children[1].textContent, /기억 보드 · 2026\. 11\. 12에 만든 주소/);
     const actions = row.children[1];
-    assert.deepEqual(actions.children.map(b => b.textContent), ['둘러보기에서 내리기', '복사', '공유 취소']);
+    assert.deepEqual(actions.children.map(b => b.textContent), ['복사', '공유 취소'], '#538: 둘러보기 스위치는 자동 소개로 정리됐다');
   } finally { h.restore(); }
 });
 
@@ -117,7 +117,7 @@ test('취소는 한 번 확인하고, 거절하면 서버에 보내지 않는다
   const h = listHarness({shares: [share('live-1', 'active')], confirmAnswer: false});
   try {
     await h.messages.openSharePanel();
-    const revoke = h.els['share-list'].children[0].children[1].children[2];
+    const revoke = h.els['share-list'].children[0].children[1].children[1];
     await revoke.onclick();
     assert.deepEqual(h.requests.filter(r => r[0] === 'revoke'), [], '거절하면 보내지 않는다');
   } finally { h.restore(); }
@@ -127,7 +127,7 @@ test('취소를 확인하면 회수하고 안내를 남긴다', async () => {
   const h = listHarness({shares: [share('live-1', 'active')]});
   try {
     await h.messages.openSharePanel();
-    const revoke = h.els['share-list'].children[0].children[1].children[2];
+    const revoke = h.els['share-list'].children[0].children[1].children[1];
     await revoke.onclick();
     assert.deepEqual(h.requests.filter(r => r[0] === 'revoke'), [['revoke', 'live-1']]);
     assert.match(h.els['share-feedback'].textContent, /공유를 취소했어요/);
@@ -139,7 +139,7 @@ test('복사는 그 주소의 공유 주소를 클립보드에 넣는다', async
   const h = listHarness({shares: [share('live-1', 'active', 'network')], clipboard: {writeText: async value => written.push(value)}});
   try {
     await h.messages.openSharePanel();
-    const copy = h.els['share-list'].children[0].children[1].children[1];
+    const copy = h.els['share-list'].children[0].children[1].children[0];
     await copy.onclick();
     assert.deepEqual(written, ['https://lovetree-4-0.pages.dev/t/live-1']);
     assert.match(h.els['share-feedback'].textContent, /복사했어요/);
@@ -151,7 +151,7 @@ test('만든 공유가 없으면 안내 한 줄만 남는다', async () => {
   try {
     await h.messages.openSharePanel();
     assert.equal(h.els['share-list'].children.length, 1);
-    assert.equal(h.els['share-list'].children[0].textContent, '아직 만든 공유 주소가 없어요.');
+    assert.match(h.els['share-list'].children[0].textContent, /아직 만든 공유 주소가 없어요\. 트리는 공개가 기본이라 순간 3개부터 둘러보기에 소개돼요\./);
   } finally { h.restore(); }
 });
 
@@ -190,7 +190,7 @@ test('실제 서버(share-service)가 만든 목록 응답을 클라 렌더러�
     await h.messages.openSharePanel();
     const row = h.els['share-list'].children[0];
     assert.match(row.className, /share-item/, '서버가 준 status="active"를 살아 있는 주소로 그린다(지난 주소 접힘 아님)');
-    assert.equal(row.children[0].children[0].textContent, '공유 중 · 주소로만 공개');
+    assert.equal(row.children[0].children[0].textContent, '공유 중');
     assert.match(row.children[0].children[1].textContent, /지도 · .+에 만든 주소/, '서버의 createdAt을 Invalid Date 없이 날짜로 그린다');
     assert.doesNotMatch(row.children[0].children[1].textContent, /Invalid Date/);
   } finally { h.restore(); }

@@ -3,6 +3,7 @@ import { createServer } from 'node:http';
 import { pathToFileURL } from 'node:url';
 import { createPool, createWorkspaceRepo } from './db/postgres.js';
 import { createShareRepo } from './db/shares-postgres.js';
+import { createTreeVisibilityRepo } from './db/tree-visibility-postgres.js';
 import { createCommunityRepo } from './db/community-postgres.js';
 import { createAdminRoleRepo } from './db/admin-roles-postgres.js';
 import { createAdminRoleService } from './admin-roles.js';
@@ -144,7 +145,23 @@ async function loginRoute(login, request) {
 const maxBodyBytes = Number(LOVETREE_MAX_BODY_BYTES || 0) || undefined;
 const pool = await createPool(LOVETREE_DATABASE_URL);
 const repo = createWorkspaceRepo(pool);
-const service = createWorkspaceService({ repo, productId: LOVETREE_PRODUCT_ID });
+// #538 공개가 기본: 공유 행이 트리의 공개 핸들이다. 저장 성공 뒤 같은 훅에서 자동 공개 행과
+// moment_count 를 동기화하고, 둘러보기 SQL 은 moment_count>=3 으로 거른다.
+// 결제는 아직 없으므로 Plus 자격은 항상 false — 비공개 지정은 서버가 403 으로 거절한다.
+const shareRepo = createShareRepo(pool);
+const visibilityRepo = createTreeVisibilityRepo(pool);
+const shareService = createShareService({
+  shareRepo,
+  workspaceRepo: repo,
+  visibilityRepo,
+  productId: LOVETREE_PRODUCT_ID,
+  plusEntitled: () => false
+});
+const service = createWorkspaceService({
+  repo,
+  productId: LOVETREE_PRODUCT_ID,
+  onCommit: ({ subjectId, doc }) => shareService.syncSharesAfterSave(subjectId, doc)
+});
 const legacyAuthenticate = await buildAuthenticate();
 const authenticate = createSharedAccessAuth({ enabled: sharedAuthEnabled(LOVETREE_SHARED_AUTH_ENABLED), legacy: legacyAuthenticate });
 // #67 제품 역할. 표가 아직 없거나 저장이 망가진 자리에서는 역할 없음으로 닫힌다(fail-closed).
@@ -191,16 +208,15 @@ const storageHandler = createApiHandler({
   account: accountService,
   allowedOrigins: publicOrigins
 });
-const shareRepo = createShareRepo(pool);
 const shareHandler = createShareHandler({
  authenticate: guardedAuthenticate,
- service: createShareService({ shareRepo, workspaceRepo: repo, productId: LOVETREE_PRODUCT_ID }),
+ service: shareService,
  productId: LOVETREE_PRODUCT_ID
 });
 const communityHandler = createCommunityHandler({
  authenticate: guardedAuthenticate,
  service: createCommunityService({
-  communityRepo: createCommunityRepo(pool), shareRepo, workspaceRepo: repo,
+  communityRepo: createCommunityRepo(pool), shareRepo, workspaceRepo: repo, visibilityRepo,
   productId: LOVETREE_PRODUCT_ID, admin
  }),
  productId: LOVETREE_PRODUCT_ID
@@ -227,7 +243,7 @@ const requestHandler = async (request) => {
   if (path === '/internal/account/email') return trustedAccountEmail(request);
   if (path.startsWith('/auth/')) return loginRoute(login, request);
   if (path.startsWith('/api/media')) return mediaHandler(request);
-  if (path.startsWith('/api/shares') || path.startsWith('/api/public/shares/')) return shareHandler(request);
+  if (path.startsWith('/api/shares') || path.startsWith('/api/public/shares/') || path.startsWith('/api/trees/')) return shareHandler(request);
  if (path.startsWith('/api/community/')) return communityHandler(request);
  if (path === '/api/feedback' || path.startsWith('/api/admin/feedback') || path === '/api/board' || path.startsWith('/api/board/') || path.startsWith('/api/admin/persona/')) return feedbackHandler(request);
  if (path === '/api/youtube/oembed') return youtubeOembedHandler(request);

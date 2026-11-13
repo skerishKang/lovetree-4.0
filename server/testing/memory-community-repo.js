@@ -1,15 +1,36 @@
-export function createMemoryCommunityRepo(){
+export function createMemoryCommunityRepo({isPrivateTree=null}={}){
  const favorites=new Set(),reactionSet=new Set(),comments=new Map(),reports=new Map(),blocks=new Set(),hiddenShares=new Set(),audits=[];
  const key=(...parts)=>parts.join('\0'),copy=value=>structuredClone(value),now=()=>new Date().toISOString();
  const reactionKeys=()=>[...reactionSet];
+ // #538: 둘러보기 후보는 활성 공유 행 가운데 moment_count>=3(직접 올린 사진만 있는 순간도 센다)이고,
+ // 자동 공개 행이 있으면 그 행으로, 없으면 예전 스위치를 켠 행으로 트리당 하나만 뽑는다.
+ // 숨김은 행이 아니라 트리 단위로 판단한다(어느 행이 숨겨져도 그 트리는 둘러보기에서 내려간다).
+ const candidates=async function*(productId,viewerSubjectId){
+  const picked=new Map();
+  for(const row of (this.shares||[])){
+   if(row.productId!==productId||row.status!=='active')continue;
+   if(Number(row.momentCount??0)<3)continue;
+   if(row.origin!=='auto'&&row.discoverable!==true)continue;
+   const prev=picked.get(row.treeId);
+   if(!prev||(row.origin==='auto'&&prev.origin!=='auto'))picked.set(row.treeId,row);
+  }
+  for(const row of picked.values()){
+   let hiddenAny=false;
+   for(const other of (this.shares||[]))if(other.productId===productId&&other.treeId===row.treeId&&hiddenShares.has(key(productId,other.shareId))){hiddenAny=true;break;}
+   if(hiddenAny)continue;
+   if(isPrivateTree&&await isPrivateTree(productId,row.subjectId,row.treeId))continue;
+   if(blocks.has(key(productId,viewerSubjectId,row.subjectId)))continue;
+   yield row;
+  }
+ };
  const self={};
  return {
   queryCount:0,
-  async listDiscoverable({productId,viewerSubjectId}){this.queryCount+=1;const shares=this.shares||[];return shares.filter(row=>row.productId===productId&&row.status==='active'&&row.discoverable===true&&!hiddenShares.has(key(productId,row.shareId))&&!blocks.has(key(productId,viewerSubjectId,row.subjectId))).map(copy);},
+  async listDiscoverable({productId,viewerSubjectId}){this.queryCount+=1;const out=[];for await(const row of candidates.call(this,productId,viewerSubjectId))out.push(copy(row));return out;},
   async listDiscoverableSummaries({productId,viewerSubjectId}){
    this.queryCount+=1;
-   const shares=this.shares||[];
-   const filtered=shares.filter(row=>row.productId===productId&&row.status==='active'&&row.discoverable===true&&!hiddenShares.has(key(productId,row.shareId))&&!blocks.has(key(productId,viewerSubjectId,row.subjectId)));
+   const filtered=[];
+   for await(const row of candidates.call(this,productId,viewerSubjectId))filtered.push(row);
    return filtered.map(share=>{
     const prefix=key(productId,share.shareId)+'\0';
     const reqs=reactionKeys().filter(v=>v.startsWith(prefix));

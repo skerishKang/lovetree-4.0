@@ -68,7 +68,7 @@ function idsAskedBy(source) {
 const HARNESS_FILES = [
   'tests/v41-share-steps.test.mjs',
   'tests/v41-share-list.test.mjs',
-  'tests/v41-share-discover-confirm.test.mjs',
+  'tests/public-default-538.test.mjs',
   'tests/v41-shell-messages.test.mjs',
   'tests/v41-shell-dialogs.test.mjs'
 ];

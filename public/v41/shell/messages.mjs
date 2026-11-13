@@ -34,8 +34,8 @@ export function createMessages(deps) {
   const viewForFile = deps.viewForFile;
   const exampleTree = deps.exampleTree;
   const journey = deps.journey;
-  // #368 3차: 공유 창 시작값(처음 열 보기·둘러보기 올림 기본)은 계정 설정에서 온다.
-  const getShareDefaults = deps.getShareDefaults || (() => ({view: 'book', discover: false}));
+  // #368 3차: 공유 창 시작값(처음 열 보기)은 계정 설정에서 온다. #538: 둘러보기 올림 기본 설정은 공개 기본으로 정리됐다.
+  const getShareDefaults = deps.getShareDefaults || (() => ({view: 'book'}));
 
   let sharePreviewKey = '';
   let sharePreviewToken = '';
@@ -139,10 +139,12 @@ export function createMessages(deps) {
   function renderShareList(shares = []) {
     const host = $('share-list'), treeId = window.LT41?.tree.id;
     host.replaceChildren();
-    const selected = shares.filter(item => item.treeId === treeId);
+    // #538: 둘러보기 소개는 서버가 자동으로 판단한다(공개 && 순간 3개 이상). 소유자 목록에는
+    // 주인이 만든 링크만 보여 주고, 자동 공개 행(origin='auto')은 숨긴다 — 공개 상태는 위의 안내가 대신한다.
+    const selected = shares.filter(item => item.treeId === treeId && item.origin !== 'auto');
     if (!selected.length) {
       const p = document.createElement('p');
-      p.textContent = '아직 만든 공유 주소가 없어요.';
+      p.textContent = '아직 만든 공유 주소가 없어요. 트리는 공개가 기본이라 순간 3개부터 둘러보기에 소개돼요.';
       host.append(p);
       return;
     }
@@ -168,25 +170,13 @@ export function createMessages(deps) {
     const row = document.createElement('div');
     row.className = 'share-item';
     const text = document.createElement('div'), strong = document.createElement('strong'), small = document.createElement('small');
-    strong.textContent = item.discoverable ? '공유 중 · 둘러보기에 올림' : '공유 중 · 주소로만 공개';
+    strong.textContent = '공유 중';
     small.textContent = shareLabel(item);
     text.append(strong, small);
     row.append(text);
     {
         const actions = document.createElement('div');
         actions.className = 'share-item-actions';
-        const discover = document.createElement('button');
-        discover.type = 'button';
-        discover.textContent = item.discoverable ? '둘러보기에서 내리기' : '둘러보기에 올리기';
-        discover.onclick = async () => {
-          const next = !item.discoverable;
-          if (next && !confirm('이 트리를 둘러보기 목록에 올릴까요? 주소만 만든 상태와 달리 제목·대상·공개 순간이 둘러보기에 나타납니다.')) return;
-          discover.disabled = true;
-          const answer = await shareApi.setDiscoverable(item.id, next);
-          if (!answer.ok) { $('share-feedback').textContent = shareFailure(answer); discover.disabled = false; return; }
-          $('share-feedback').textContent = next ? '둘러보기에 올렸어요. 둘러보기 목록에서 이 트리를 볼 수 있어요.' : '둘러보기에서 내렸어요. 공유 주소는 계속 사용할 수 있어요.';
-          await loadShareList();
-        };
         const copy = document.createElement('button');
         copy.type = 'button';
         copy.textContent = '복사';
@@ -207,10 +197,10 @@ export function createMessages(deps) {
           const answer = await shareApi.revoke(item.id);
           if (!answer.ok) { $('share-feedback').textContent = shareFailure(answer); revoke.disabled = false; return; }
           $('share-feedback').textContent = '공유를 취소했어요. 새 요청은 즉시 차단됩니다.';
-          if ($('share-url').dataset.shareId === item.id) { $('share-created').hidden = true; $('share-discover').checked = false; $('share-discover').disabled = true; }
+          if ($('share-url').dataset.shareId === item.id) { $('share-created').hidden = true; }
           await loadShareList();
         };
-        actions.append(discover, copy, revoke);
+        actions.append(copy, revoke);
         row.append(actions);
       }
       return row;
@@ -259,8 +249,8 @@ export function createMessages(deps) {
     $('share-created').hidden = true;
     $('share-feedback').textContent = '';
     $('share-copy-note').textContent = '';
-    $('share-discover').checked = false;
-    $('share-discover').disabled = true;
+    paintShareMomentHint();
+    paintShareVisibility();
     paintShareSteps('choose');
     panel('share-panel');
     void loadShareList();
@@ -305,16 +295,10 @@ export function createMessages(deps) {
     $('share-open').hidden = false;
     $('share-created').hidden = false;
     $('share-copy-note').textContent = '';
-    $('share-discover').disabled = false;
     $('share-feedback').textContent = '명시적으로 공유 주소를 만들었어요.';
     sharePreviewKey = ''; sharePreviewToken = '';
     paintShareSteps('done');
     await loadShareList();
-    // #480 M7: 설정이 '둘러보기에도 올림'이어도 확인 없이 공개하지 않는다. 링크를 만든 직후 스위치를 켤 때와
-    // 같은 확인창을 한 번 띄우고, 승인하면 실제 setDiscoverable까지 간다. 거절하면 스위치 꺼짐으로 맞춘다.
-    // (예전에는 확인 없이 체크박스만 켜서 '켜짐인데 주소로만 공개'인 거짓 상태가 됐다.)
-    if (getShareDefaults().discover) await setDiscoverable(answer.share.id, true, {ask: true});
-    else { $('share-discover').checked = false; }
   };
   $('share-copy').onclick = async () => {
     const input = $('share-url');
@@ -328,27 +312,27 @@ export function createMessages(deps) {
       $('share-feedback').textContent = '주소를 선택했어요. 복사해 주세요.';
     }
   };
-  // #369·#480 M7: '둘러보기에도 올리기'는 링크를 만든 뒤 켜는 스위치(기본 꺼짐).
-  // 켜는 길은 둘(사용자가 스위치를 누름 · 설정이 '기본 켬'이라 링크 만든 직후 제안)이고, 둘 다 같은 확인창을
-  // 지나야 실제 공개(setDiscoverable)가 된다. 프로그램으로 체크만 켜는 길은 없다.
-  const DISCOVER_CONFIRM = '이 트리를 둘러보기 목록에 올릴까요? 주소만 만든 상태와 달리 제목·대상·공개 순간이 둘러보기에 나타납니다.';
-  async function setDiscoverable(shareId, next, {ask = false} = {}) {
-    const box = $('share-discover');
-    if (!shareId) { box.checked = false; return false; }
-    if (next && ask && !confirm(DISCOVER_CONFIRM)) { box.checked = false; return false; }
-    box.disabled = true;
-    const answer = await shareApi.setDiscoverable(shareId, next);
-    box.disabled = false;
-    if (!answer.ok) { box.checked = !next; $('share-feedback').textContent = shareFailure(answer); return false; }
-    box.checked = next;
-    $('share-feedback').textContent = next ? '둘러보기에 올렸어요. 둘러보기 목록에서 이 트리를 볼 수 있어요.' : '둘러보기에서 내렸어요. 공유 주소는 계속 사용할 수 있어요.';
-    await loadShareList();
-    return true;
+  // #538: 순간 수 안내 — 3개 미만이면 '순간 3개를 모으면 둘러보기에 소개돼요'.
+  function paintShareMomentHint() {
+    const hint = $('share-moment-hint');
+    if (!hint) return;
+    const count = window.LT41?.tree?.moments?.length || 0;
+    hint.textContent = count >= 3
+      ? `이 트리의 순간 ${count}개 · 둘러보기에 소개되고 있어요.`
+      : `이 트리의 순간 ${count}개 · 순간 3개를 모으면 둘러보기에 소개돼요.`;
   }
-  $('share-discover').onchange = async () => {
-    const shareId = $('share-url').dataset.shareId;
-    const next = $('share-discover').checked;
-    await setDiscoverable(shareId, next, {ask: next});
+  // #538: 공개 상태 표시. 비공개 전환은 Plus 전용 — 판단은 서버가 한다(403 plus_required_private).
+  function paintShareVisibility() {
+    const state = $('share-visibility-state');
+    if (state) state.textContent = '공개 상태 · 공개(기본)';
+  }
+  $('share-private').onclick = async () => {
+    const treeId = window.LT41?.tree?.id;
+    if (!treeId) { $('share-feedback').textContent = '공개 상태를 바꿀 트리를 먼저 열어 주세요.'; return; }
+    const answer = await shareApi.setTreeVisibility(treeId, 'private');
+    $('share-feedback').textContent = answer.ok
+      ? '비공개로 바꿨어요.'
+      : (answer.code === 'plus_required_private' ? '비공개는 Plus 전용이에요. 지금은 모든 트리가 공개로 유지돼요.' : (answer.message || '공개 상태를 바꾸지 못했어요.'));
   };
 
   // 둘러보기(공개 목록) 연결. 항목을 열면 공유 주소로, 내 기록 새로 시작은 첫 여정으로 간다.

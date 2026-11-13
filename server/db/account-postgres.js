@@ -16,6 +16,7 @@ export const ACCOUNT_USER_TABLES = Object.freeze([
   { table: 'lovetree_community_moderation_audit', where: 'actor_subject_id = $2' },
   { table: 'lovetree_feedback_replies', where: 'author_subject_id = $2 OR post_id IN (SELECT id FROM lovetree_feedback WHERE product_id = $1 AND subject_id = $2)' },
   { table: 'lovetree_shares', where: 'subject_id = $2' },
+  { table: 'lovetree_tree_visibility', where: 'subject_id = $2' },
   { table: 'lovetree_request_claims', where: 'subject_id = $2' },
   { table: 'lovetree_account_emails', where: 'subject_id = $2' },
   { table: 'lovetree_workspaces', where: 'subject_id = $2' },
