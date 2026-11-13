@@ -18,6 +18,12 @@ renderThreads()},undo,refs:{moments,connections}}
 /* === V1.1 PRODUCTIZATION PATCH === */
 document.body.dataset.theme='pearl';
 
+/* #536: '진주빛 보드 · 읽기 전용' 표시는 예시·공유(읽기 전용)에서만 '읽기 전용'을 붙인다.
+   전에는 자기 기록(쓰기 가능)인데도 HTML에 박힌 '읽기 전용'이 그대로 보였다. */
+function boardThemeNameOf(){const b=document.querySelector('.themeBtn.active');return (b?.textContent||'진주빛').trim()}
+function paintThemeBadge(){const el=document.getElementById('themeBadge');if(!el)return;el.textContent=boardThemeNameOf()+' 보드'+(LTDEMO.readOnly?' · 읽기 전용':'')}
+paintThemeBadge();
+
 const LT_KEYWORDS=['첫만남','무대','표정','목소리','계절','밤','이동','저장','다시보기','추천','우연','위로','벚꽃','드라이브','편지','여행','팬심'];
 
 const LT_EMOTIONS=['설렘','행복','그리움','위로','놀람','몰입','울컥함','아쉬움','감사','각성','궁금함','확신'];
@@ -66,9 +72,16 @@ function pinClass(m){return `pinStyle-${m.pinStyle||'pearl'}`}
 function cardClass(m){return `cardStyle-${m.cardStyle||'photo'}`}
 cardHTML=function(m){let media='';if(m.url)media=LTMedia.markup(m.url,m.title,m.mediaMetadata,m.id);else if(m.type==='note') media=`<div class="noteText">“${esc(m.memo)}”</div>`;else if(m.type==='video') media=`<div class="media"><video muted playsinline loop poster="${m.asset}" src="${m.video||''}"></video><span class="playBadge">▶</span><span class="duration">${m.duration||'00:03'}</span></div>`;else {let img=m.type==='youtube'?youtubeThumb(m.url||''):m.asset;media=`<div class="media ${m.type==='link'||m.type==='youtube'?'linkMedia':''}"><img src="${img}" data-fallback="${ASSET.link}" ${thumbRetryAttrs(m)} alt=""><span class="${m.type==='youtube'?'playBadge':''}">${m.type==='youtube'?'▶':''}</span></div>`}let kws=(m.keywords||[]).slice(0,4).map(k=>`<span>${esc(k)}</span>`).join('');return `<article class="card ${m.first?'first':''} ${m.type==='note'?'noteCard':''} ${pinClass(m)} ${cardClass(m)}" data-id="${m.id}" style="left:${m.x}px;top:${m.y}px;--rot:${m.rot}deg;--pin:${colors[m.color]};--halo:${colors[m.color]}55">${m.first?'<div class="firstTag">첫 순간</div>':''}<button class="pin" data-pin="${m.id}" aria-hidden="true" tabindex="-1"></button>${media}<div class="cardBody"><div class="eyebrow"><span class="emotionDot"></span>${LTLabels.type(m.originalType||m.type)} 순간 · ${esc(m.emotion)}</div><h3>${esc(titleMain(m))}</h3>${titleSubMarkup(m)}<div class="meta"><span>${esc(dateText(m.date))}</span><span>${m.type==='link'||m.type==='youtube'?'↗':''}</span></div>${m.type!=='note'?`<div class="memo">${esc(m.memo)}</div>`:''}<div class="keywordOnCard">${kws}</div>${m.url?`<div class="domain">${esc(m.source)}</div>`:''}</div></article>`}
 const _renderCardsV1=renderCards;renderCards=function(){cardLayer.innerHTML=moments.map(cardHTML).join('');cardLayer.querySelectorAll('.card').forEach(el=>bindCardV11(el));if(selected)selectMoment(selected,false);applyFilters()}
-function pathDLive(c,t=performance.now()){const a=pinPoint(c.a),b=pinPoint(c.b),dx=b.x-a.x;let idx=Math.max(0,connections.findIndex(x=>x.id===c.id)),amp=drag?10:4.5,w=Math.sin(t/630+idx*1.7)*amp,sag=Math.min(140,55+Math.abs(dx)*.08)+w;const cy=Math.max(a.y,b.y)+sag;return `M ${a.x} ${a.y} C ${a.x+dx*.32} ${cy-w*.6}, ${a.x+dx*.68} ${cy+w*.7}, ${b.x} ${b.y}`}
+function pathDLiveFrom(a,b,c,t=performance.now()){const dx=b.x-a.x;let idx=Math.max(0,connections.findIndex(x=>x.id===c.id)),amp=drag?10:4.5,w=Math.sin(t/630+idx*1.7)*amp,sag=Math.min(140,55+Math.abs(dx)*.08)+w;const cy=Math.max(a.y,b.y)+sag;return `M ${a.x} ${a.y} C ${a.x+dx*.32} ${cy-w*.6}, ${a.x+dx*.68} ${cy+w*.7}, ${b.x} ${b.y}`}
+function pathDLive(c,t=performance.now()){return pathDLiveFrom(pinPoint(c.a),pinPoint(c.b),c,t)}
 renderThreads=function(){threadLayer.innerHTML=connections.map(c=>{let col=colors[c.color];return `<g class="threadGroup" data-cid="${c.id}"><path class="threadGlow" d="${pathDLive(c)}" stroke="${col}"/><path class="threadColor" d="${pathDLive(c)}" stroke="${col}"/><path class="threadCore" d="${pathDLive(c)}"/><path class="threadWave" d="${pathDLive(c)}" stroke="${col}"/><path class="threadHit" d="${pathDLive(c)}"/></g>`}).join('');threadLayer.querySelectorAll('.threadGroup').forEach(g=>g.addEventListener('pointerdown',e=>{e.stopPropagation();selectedConn=g.dataset.cid;highlightPathFromConnection(selectedConn);showWhy(g.dataset.cid)}));applyFilters();applyPathHighlight()}
-rerenderThreads=function(){let now=performance.now();threadLayer.querySelectorAll('.threadGroup').forEach(g=>{let c=connections.find(x=>x.id===g.dataset.cid);if(!c)return;g.querySelectorAll('path').forEach(p=>p.setAttribute('d',pathDLive(c,now)))})}
+// #536: 카드 끌기의 매 프레임 다시 그리기에서 핀 읽기(querySelector·offsetWidth)와 d 쓰기가 섞여
+// 연결 수만큼 판 배치를 강제로 다시 계산했다(순간 26 = 프레임당 25회). 핀 자리를 먼저 다 읽고
+// d 속성을 나중에 한 번에 써서 프레임당 강제 배치를 1회로 줄인다.
+rerenderThreads=function(){let now=performance.now();
+const geo=[...threadLayer.querySelectorAll('.threadGroup')].map(g=>{const c=connections.find(x=>x.id===g.dataset.cid);return c?{g,c,paths:[...g.querySelectorAll('path')]}:null}).filter(Boolean);
+const pins=new Map();for(const {c} of geo){if(!pins.has(c.a))pins.set(c.a,pinPoint(c.a));if(!pins.has(c.b))pins.set(c.b,pinPoint(c.b))}
+for(const {g,c,paths} of geo){const d=pathDLiveFrom(pins.get(c.a),pins.get(c.b),c,now);for(const p of paths)p.setAttribute('d',d)}}
 // #346: 상시 rAF 루프를 없앤다. 실 좌표는 world 좌표라 이동·확대는 #world transform이 함께 옮기므로
 // 다시 그릴 필요가 없다. 다시 그리는 때는 카드 드래그·데이터 변경(renderThreads)·창 크기 변경뿐이고,
 // 한 프레임에 한 번으로 묶으며 안 보일 때(탭 숨김·iframe 숨김/화면 밖)는 예약하지 않는다.
@@ -81,7 +94,12 @@ addEventListener('resize',()=>scheduleThreadFrame());
 // #346 2단계: 이동·확대·드래그 중에는 장식 애니메이션(실 점선 흐름·핀 숨쉬기)을 멈춘다.
 // 트레이스 실측: 패닝 중 장식 애니메이션이 Paint·Raster·Layout 작업의 대부분을 차지했다.
 // 모양은 그대로고 움직임만 잠시 멈추며, 손을 떼면 다시 흐른다.
-function applyDecorMotion(){document.body.classList.toggle('decor-paused',LT58Model.decorationMotion({pan:!!pan,pinch:!!pinch,dragging:!!drag,touches:boardTouches.size})==='paused')}
+function applyDecorMotion(){
+  // #536: 휠 확대는 #346 판정의 입력에 없던 것이라 같은 한 벌로 따로 묶는다(이동·드래그 판정은 그대로).
+  const zoomPause=typeof wheelZooming!=='undefined'&&LT58Model.decorationMotion({zooming:!!wheelZooming})==='paused';
+  const movePause=LT58Model.decorationMotion({pan:!!pan,pinch:!!pinch,dragging:!!drag,touches:boardTouches.size})==='paused';
+  document.body.classList.toggle('decor-paused',zoomPause||movePause);
+}
 addEventListener('pointerdown',()=>queueMicrotask(applyDecorMotion));
 addEventListener('pointerup',()=>queueMicrotask(applyDecorMotion));
 addEventListener('pointercancel',()=>queueMicrotask(applyDecorMotion));
@@ -108,7 +126,7 @@ $('#startPathHere').onclick=()=>{pathOnly=true;highlightPath(selected);$('#pathM
 function updateKeywordFilter(){let vals=[...new Set(moments.flatMap(m=>m.keywords||[]))].sort();$('#keywordFilter').innerHTML='<option value="all">모든 키워드</option>'+vals.map(v=>`<option value="${esc(v)}">#${esc(v)}</option>`).join('')}
 function applyFilters(){const state={mediaFilter:$('#mediaFilter')?.value||'all',keywordFilter:$('#keywordFilter')?.value||'all',maxOrder:LT58Model.maxCreatedOrder(moments)};document.querySelectorAll('.card').forEach(el=>{const m=moments.find(x=>x.id===el.dataset.id);const ok=LT58Model.filterVisible(m,state,connections);el.classList.toggle('filteredOut',!ok)});threadLayer?.querySelectorAll('.threadGroup').forEach(g=>{let c=connections.find(x=>x.id===g.dataset.cid),a=cardLayer.querySelector(`[data-id="${c?.a}"]`),b=cardLayer.querySelector(`[data-id="${c?.b}"]`);g.classList.toggle('threadFiltered',a?.classList.contains('filteredOut')||b?.classList.contains('filteredOut'))})}
 $('#mediaFilter').onchange=applyFilters;$('#keywordFilter').onchange=applyFilters;updateKeywordFilter();
-$('#themeGrid').onclick=e=>{let b=e.target.closest('.themeBtn');if(!b)return;document.body.dataset.theme=b.dataset.theme;document.querySelectorAll('.themeBtn').forEach(x=>x.classList.toggle('active',x===b));$('#themeBadge').textContent=b.textContent+' 보드 · 읽기 전용';toast(`${b.textContent} 테마로 바꿨어요.`)};$('#defaultPin').onchange=e=>defaultPinStyle=e.target.value;$('#defaultCard').onchange=e=>defaultCardStyle=e.target.value;
+$('#themeGrid').onclick=e=>{let b=e.target.closest('.themeBtn');if(!b)return;document.body.dataset.theme=b.dataset.theme;document.querySelectorAll('.themeBtn').forEach(x=>x.classList.toggle('active',x===b));paintThemeBadge();toast(`${b.textContent} 테마로 바꿨어요.`)};$('#defaultPin').onchange=e=>defaultPinStyle=e.target.value;$('#defaultCard').onchange=e=>defaultCardStyle=e.target.value;
 $('#leftCollapse').onclick=()=>{if(innerWidth<760)$('#leftPanel').classList.toggle('mobileOpen');else $('#leftPanel').classList.toggle('collapsed')};$('#toolAdd').onclick=()=>openAdd();$('#toolCinema').onclick=()=>startCinemaV11(0);$('#toolFit').onclick=()=>fitAll(true);
 const ring=$('#cursorRing'), ringInner=ring.querySelector('.cursorInner'), cursorFX=document.getElementById('cursorFX');
 const cursorState={x:0,y:0,pointer:'mouse',coarse:matchMedia('(pointer:coarse)').matches,reduced:matchMedia('(prefers-reduced-motion:reduce)').matches,down:false,dragging:false,hover:'default',raf:0,activeFX:0,seen:false,outside:false,blurred:false};

@@ -117,10 +117,11 @@ clearTimeout(viewSaveTimer);viewSaveTimer=setTimeout(()=>writeBoardView(userView
 // 기억하면 드러난 뒤 resize가 맞춤(55%)을 다시 적용해 처음 80%·기억한 자리가 무시됐다 → 처음 자리 대기로 둔다.
 function boardStartView(){if(innerWidth<700){fitAll(false);viewMode='start';return}
 let vw=viewport.clientWidth,vh=viewport.clientHeight,cards=boardCards(),saved=userView||readBoardView();
-if(saved){let v={z:saved.z,x:vw/2-saved.cx*saved.z,y:vh/2-saved.cy*saved.z};
-if(!cards.length||LT58Model.visibleCards(v,{x:0,y:0,w:vw,h:vh},cards)>0){userView=saved;viewMode='user';Object.assign(view,{x:v.x,y:v.y,z:v.z});applyView(false);return}}
-growBoard();let v=LT58Model.startView({viewport:{w:vw,h:vh},safe:boardSafeArea(true),cards,world:worldSize,focusId:LTDEMO.get?.(),firstId:moments.find(m=>m.first)?.id});
-viewMode='start';Object.assign(view,{x:v.x,y:v.y,z:v.z});applyView(false)}
+// #536: 기억한 자리의 적용·버림 판정까지 모델(LT58Model.startView)이 맡는다 — 처음 자리와 같은
+// 판 규칙(덮거나 가운데)을 함께 거치게 해 넓은 화면에서 판이 한쪽으로 쏠리지 않게 한다.
+growBoard();let v=LT58Model.startView({viewport:{w:vw,h:vh},safe:boardSafeArea(true),cards,world:worldSize,focusId:LTDEMO.get?.(),firstId:moments.find(m=>m.first)?.id,saved});
+viewMode=v.mode==='user'?'user':'start';if(v.mode==='user')userView=saved;
+Object.assign(view,{x:v.x,y:v.y,z:v.z});applyView(false)}
 // 전체 보기: 순간이 있는 곳 전부를 보이는 칸에 맞춘다(최대 0.92배). 순간이 없으면 무대 전체.
 function fitAll(animated=true){let vw=viewport.clientWidth,vh=viewport.clientHeight,box=LT58Model.contentBox(boardCards());
 if(!box){let z=LT58Model.fitZoom(vw,vh);view.z=z;view.x=(vw-2400*z)/2;view.y=(vh-2200*z)/2}
@@ -365,7 +366,11 @@ if(moved&&!boardTouches.size)noteUserView();
 return}pan=null;if(moved)noteUserView()}
 viewport.addEventListener('pointerup',endBoardPointer);
 viewport.addEventListener('pointercancel',endBoardPointer);
-viewport.addEventListener('wheel',e=>{if(cinema)return;e.preventDefault();let before=screenToWorld(e.clientX,e.clientY),factor=Math.exp(-e.deltaY*.0012),nz=Math.max(.38,Math.min(1.45,view.z*factor));let r=viewport.getBoundingClientRect();view.z=nz;view.x=e.clientX-r.left-before.x*nz;view.y=e.clientY-r.top-before.y*nz;applyView(false);noteUserView()},{passive:false});
+// #536: 휠 확대 중에도 장식 애니메이션을 잠시 멈춘다(#346의 '확대 중' 판정에 휠이 빠져 있었다) —
+// 확대로 판을 다시 칠할 때 실 점선 흐름·핀 숨쉬기 칠이 겹치지 않게 한다. 마지막 휠 뒤 160ms에 푼다.
+let wheelZooming=false,wheelPause=0;
+function zoomDecorPause(){wheelZooming=true;if(typeof applyDecorMotion==='function')applyDecorMotion();clearTimeout(wheelPause);wheelPause=setTimeout(()=>{wheelZooming=false;if(typeof applyDecorMotion==='function')applyDecorMotion()},160)}
+viewport.addEventListener('wheel',e=>{if(cinema)return;e.preventDefault();let before=screenToWorld(e.clientX,e.clientY),factor=Math.exp(-e.deltaY*.0012),nz=Math.max(.38,Math.min(1.45,view.z*factor));let r=viewport.getBoundingClientRect();view.z=nz;view.x=e.clientX-r.left-before.x*nz;view.y=e.clientY-r.top-before.y*nz;applyView(false);noteUserView();zoomDecorPause()},{passive:false});
 
 $('#addBtn').onclick=openAdd;
 $('#cancelAdd').onclick=()=>$('#addModal').classList.remove('open');
