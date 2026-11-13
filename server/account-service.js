@@ -97,6 +97,7 @@ export function createAccountService({ repo, productId, admin = null, mediaStore
         confirmKind: expected.kind,
         ...(expected.kind === 'email' ? { email: principal.email } : {}),
         aiCustomer: role === 'ai_customer',
+        admin: role === 'admin',
         deleted: await repo.isDeleted({ productId, subjectHash: subjectHash(principal.subjectId) })
       };
     },

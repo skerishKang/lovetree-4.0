@@ -87,9 +87,12 @@ function openAccountMenu(){const owned=!!getMember()?.snapshot().owned;if(!owned
 // 한 번 시험한 뒤에는 성공해도(이메일 없는 계정) 다시 부르지 않고, 실패했을 때만 다시 시험한다.
  let emailTried=false;
  let aiCustomer=false;
- function applyAiCustomer(){const j=$('account-journal');if(j)j.hidden=!aiCustomer;const p=$('account-my-posts');if(p)p.hidden=false;}
-async function loadAccountEmail(){emailTried=true;const answer=await accountApi.account().catch(()=>null);if(!answer?.ok){emailTried=false;return;}if(answer.email)accountEmail=answer.email;aiCustomer=!!answer.aiCustomer;applyAiCustomer();renderAccount();}
-function updateAccountControls(){const owned=!!getMember()?.snapshot().owned;if(!owned){accountEmail='';emailTried=false;aiCustomer=false;}document.querySelectorAll('[data-guest-login]').forEach(x=>x.hidden=owned);$('server').hidden=!owned;$('logout').hidden=!owned;applyAiCustomer();renderAccount();if(owned&&!accountEmail&&!emailTried)void loadAccountEmail();}
+ let isAdmin=false;
+ // #540 마무리: 서버가 알려 준 역할로만 입구를 보인다 — AI 고객에게는 '오늘 사용 일지',
+ // 관리자에게는 '운영센터'(/admin.html). 관리자가 아니면 운영센터 항목이 보이지 않는다.
+ function applyAccountRoles(){const j=$('account-journal');if(j)j.hidden=!aiCustomer;const ops=$('account-ops');if(ops)ops.hidden=!isAdmin;const p=$('account-my-posts');if(p)p.hidden=false;}
+async function loadAccountEmail(){emailTried=true;const answer=await accountApi.account().catch(()=>null);if(!answer?.ok){emailTried=false;return;}if(answer.email)accountEmail=answer.email;aiCustomer=!!answer.aiCustomer;isAdmin=!!answer.admin;applyAccountRoles();renderAccount();}
+function updateAccountControls(){const owned=!!getMember()?.snapshot().owned;if(!owned){accountEmail='';emailTried=false;aiCustomer=false;isAdmin=false;}document.querySelectorAll('[data-guest-login]').forEach(x=>x.hidden=owned);$('server').hidden=!owned;$('logout').hidden=!owned;applyAccountRoles();renderAccount();if(owned&&!accountEmail&&!emailTried)void loadAccountEmail();}
 
   return {
     flowNavigation,

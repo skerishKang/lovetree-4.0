@@ -679,6 +679,11 @@ $('settings-assets-open').onclick=()=>openAssets($('settings-assets-open'));
  const feedbackBoard=createFeedbackBoard({$,notify,show:()=>panel('journal-panel'),showFull:()=>panel('myposts-panel')});
  $('account-journal').onclick=()=>{closeAccountMenu();feedbackBoard.openJournal();};
  $('account-my-posts').onclick=()=>{closeAccountMenu();feedbackBoard.openMyPosts();};
+ // #540 마무리: 운영센터 입구. 계정 메뉴·설정의 '운영' 묶음에서 같은 화면을 새 탭으로 연다.
+ // 항목 자체는 서버가 알려 준 관리자 역할로만 보인다(header.mjs).
+ const openOpsCenter=()=>{const win=window.open('/admin.html','_blank','noopener');if(!win)location.assign('/admin.html');};
+ $('account-ops').onclick=()=>{closeAccountMenu();openOpsCenter();};
+ $('settings-ops-open').onclick=()=>openOpsCenter();
  $('advanced-backup').onclick=()=>backup();
  // #368: 기록 가져오기는 JSON 선택 input을 연다. input은 창 밖에 숨겨 두어 설정이 닫혀 있어도(빈 화면의 백업 파일 열기) 열린다.
  // CTO 결정(2026-11-12): 설정에는 "기록 가져오기" 하나만 둔다 — "백업 파일 열기"는 같은 선택 창이라 중복이고,
@@ -909,7 +914,10 @@ async function openAccountSettings({section=''}={}){
  void paintSettingsUsage();
  panel('account-settings');
  focusSettingsSection(section);
+ // #540 마무리: '운영' 묶음은 관리자 계정에만 보인다(서버가 알려 준 역할). 열림 때마다 다시 판정한다.
+ const opsSection=$('account-settings-ops');if(opsSection)opsSection.hidden=true;
  const answer=await accountApi.account();
+ if(opsSection)opsSection.hidden=!(answer.ok&&answer.admin);
  if(!answer.ok){$('account-confirm-hint').textContent='계정 정보를 확인하지 못했어요. 잠시 뒤 다시 시도해 주세요.';return;}
  if(answer.email)paintSettingsProfile(answer.email);
  const byEmail=answer.confirmKind==='email';
