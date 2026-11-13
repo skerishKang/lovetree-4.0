@@ -20,7 +20,8 @@ const TABLES = [
   'lovetree_community_reports',
   'lovetree_community_blocks',
   'lovetree_community_hidden_shares',
-  'lovetree_community_moderation_audit'
+  'lovetree_community_moderation_audit',
+  'lovetree_feedback'
 ];
 
 const url = String(process.env.LOVETREE_DATABASE_URL ?? '').trim();
