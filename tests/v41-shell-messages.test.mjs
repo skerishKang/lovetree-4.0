@@ -243,7 +243,7 @@ test('공유 목록은 이 트리에 만든 공유만 보여 주고, 없으면 �
   try {
     await h.messages.openSharePanel();
     assert.equal(h.els['share-list'].children.length, 1, '공유가 없으면 안내 한 줄');
-    assert.equal(h.els['share-list'].children[0].textContent, '아직 만든 공유 주소가 없어요.');
+    assert.equal(h.els['share-list'].children[0].textContent, '아직 만든 공유 주소가 없어요. 트리는 공개가 기본이라 순간 3개부터 둘러보기에 소개돼요.');
   } finally { h.restore(); }
 });
 

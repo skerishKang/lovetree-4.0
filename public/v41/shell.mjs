@@ -33,7 +33,7 @@ import {connectionSignature} from './shell/panel-dirty.mjs';
 import {createLocation} from './shell/location.mjs';
 import {createNotifier} from './shell/notice.mjs';
 import {paintLoginLinks,paintThemeControls,applyTheme as applyThemeFor,toggleTheme as toggleThemeFor} from './shell/theme.mjs';
-import {normalizeTitleDisplay, normalizeAccentColor, normalizeDateStyle, normalizeStartPlace, normalizeShareView, normalizeShareDiscover, coverModeOf, normalizeCoverDesign} from './domain.mjs';
+import {normalizeTitleDisplay, normalizeAccentColor, normalizeDateStyle, normalizeStartPlace, normalizeShareView, coverModeOf, normalizeCoverDesign} from './domain.mjs';
 import {backfillVideoTitles} from './title-backfill.mjs';
 import {thumbnailCandidates, coverFallbackAttrs, fallbackCardData, emotionToneOf, mountThumbFallback, ADD_TITLE_LABEL, VIDEO_UNAVAILABLE_TEXT} from './thumb-fallback.mjs';
 const $=id=>document.getElementById(id);
@@ -323,7 +323,7 @@ const shellMessages=createMessages({
   exampleTree,
   journey:shellJourney,
   // #368 3차: 공유 창 시작값(처음 열 보기·둘러보기 올림 기본)은 계정 설정에서 온다.
-  getShareDefaults:()=>({view:currentShareView(),discover:currentShareDiscover()})
+  getShareDefaults:()=>({view:currentShareView()})
 });
 function openSharePanel(){return shellMessages.openSharePanel();}
 function noteJourneyStep(step,options){return shellJourney.noteJourneyStep(step,options);}
@@ -599,7 +599,14 @@ function memberStatus(status){
   const b=document.createElement('button');b.textContent='현재 기록 백업';b.onclick=backup;$('save-actions').append(b);
  }
  if(status.phase==='checking')notify('내 기록을 불러오고 있어요.');
- else if(status.phase==='synced')notify(status.writable?(previousDirty?'서버에 저장됐어요.':'내 기록을 불러왔어요.'):'기록을 읽었어요. 서버 편집 연결은 아직 준비되지 않았어요.');
+ else if(status.phase==='synced'){
+  notify(status.writable?(previousDirty?'서버에 저장됐어요.':'내 기록을 불러왔어요.'):'기록을 읽었어요. 서버 편집 연결은 아직 준비되지 않았어요.');
+  // #538: 첫 순간을 담은 뒤 한 번, 공개 기본과 익명성을 알린다. 기기당 1회(localStorage).
+  if(previousDirty&&status.writable&&(model?.trees||[]).some(tree=>tree.moments.length>0)){
+   let shown=false;try{shown=localStorage.getItem('lt41.publicNoticeShown')==='1';}catch{}
+   if(!shown){notify('내 트리는 다른 사람도 볼 수 있어요(순간 3개부터 둘러보기에 소개). 내 이름·아이디는 보이지 않아요.');try{localStorage.setItem('lt41.publicNoticeShown','1');}catch{}}
+  }
+ }
  else if(status.phase==='login'&&!status.dirty)notify('로그인이 필요해요.');
  else if(!status.dirty&&status.phase==='offline')notify(status.detail||'내 기록을 불러오지 못했어요.');
  $('write-menu').textContent=status.dirty?'미저장 기록' :'＋ 순간 추가';$('empty-records').textContent=status.writable?'＋ 첫 트리 만들기':'내 기록 불러오기';/* #463: 이름을 한 곳에서 정한다(paintEmptyCopy와 같은 글자) *//* #463: 주 버튼 표시도 같이 유지한다(쓸 상태가 바뀌도 강조가 엉키지 않게). */$('empty-records').classList.toggle('primary',!!status.writable);$('empty-sample').classList.toggle('primary',!status.writable);previousDirty=status.dirty;renderAccount();flowNavigation();document.body.dataset.member=member?.snapshot().owned?'in':'out';document.body.dataset.treeCount=String(model?.trees?.length||0);applyAdvanced();
@@ -826,21 +833,19 @@ for(const b of document.querySelectorAll('[data-network-view]'))b.onclick=()=>{
 };
 paintNetworkViewControls();
 function currentShareView(){try{return normalizeShareView(member?.state?.().prefs?.shareView)}catch{return 'book'}}
-function currentShareDiscover(){try{return normalizeShareDiscover(member?.state?.().prefs?.shareDiscover)}catch{return false}}
 function paintShareControls(){
- const view=currentShareView(),discover=currentShareDiscover();
+ const view=currentShareView();
  for(const b of document.querySelectorAll('[data-share-view]'))b.setAttribute('aria-checked',String(b.dataset.shareView===view));
- for(const b of document.querySelectorAll('[data-share-discover]'))b.setAttribute('aria-checked',String((b.dataset.shareDiscover==='on')===discover));
 }
 for(const b of document.querySelectorAll('[data-share-view]'))b.onclick=()=>{
  if(!member?.snapshot().owned){notify('로그인한 뒤 공유 기본값을 바꿀 수 있어요.');return;}
  try{member.apply('setPrefs',{shareView:b.dataset.shareView});}catch(e){notify('공유 기본값을 저장하지 못했어요. 잠시 뒤 다시 시도해 주세요.');return;}
  paintShareControls();notify('공유 창이 이 보기로 열려요.');
 };
-for(const b of document.querySelectorAll('[data-share-discover]'))b.onclick=()=>{
- if(!member?.snapshot().owned){notify('로그인한 뒤 공유 기본값을 바꿀 수 있어요.');return;}
- try{member.apply('setPrefs',{shareDiscover:b.dataset.shareDiscover==='on'});}catch(e){notify('공유 기본값을 저장하지 못했어요. 잠시 뒤 다시 시도해 주세요.');return;}
- paintShareControls();notify(b.dataset.shareDiscover==='on'?'링크를 만들면 둘러보기에 올릴지 한 번 물어봐요.':'새 공유를 주소로만 공개하는 것으로 시작해요.');
+// #538: '둘러보기에도 올리기' 설정은 공개 기본으로 바뀌면서 정리됐다. 비공개는 Plus 전용 —
+// 잠금 표시만 남기고, 누르면 안내를 보여 준다(실제 판단은 서버가 한다).
+for(const b of document.querySelectorAll('[data-share-private-lock]'))b.onclick=()=>{
+ notify('비공개는 Plus 전용이에요. 지금은 모든 트리가 공개로 유지돼요.');
 };
 paintShareControls();
 // 보관 파일 용량 보기 — 보관 파일 창과 같은 값(/api/media)을 같은 형식으로 보여 준다. 새 API 없음.
@@ -967,7 +972,7 @@ async function showPublicRoute(route){
  $('empty').querySelector('p').textContent='소유자가 공개한 트리 한 개만 확인합니다.';
  $('empty-sample').hidden=true;$('empty-records').hidden=true;$('view').hidden=true;$('empty').hidden=false;
  const answer=await shareApi.read(route.shareId||'');if(generation!==loadGeneration)return;if(!answer.ok){publicProblem(answer);return;}
- activeShareId=answer.share.id;const view=['book','board','network'].includes(route.view)?route.view:answer.share.view;current=screenForView(view)[1];load({revision:0,state:{version:1,trees:[answer.tree]}},'share',{treeId:answer.tree.id,momentId:answer.share.entryMomentId});activeShareId=answer.share.id;show(current,false);writeLocation('replace');notify('소유자가 명시적으로 공유한 트리입니다. 감상만 할 수 있어요.'+(answer.omittedPrivateMedia?' 올린 사진 '+answer.omittedPrivateMedia+'장은 나만 볼 수 있어요.':''));
+ activeShareId=answer.share.id;const view=['book','board','network'].includes(route.view)?route.view:answer.share.view;current=screenForView(view)[1];load({revision:0,state:{version:1,trees:[answer.tree]}},'share',{treeId:answer.tree.id,momentId:answer.share.entryMomentId});activeShareId=answer.share.id;show(current,false);writeLocation('replace');notify('공개된 트리를 감상하는 화면이에요. 감상만 할 수 있어요.'+(answer.omittedPrivateMedia?' 올린 사진 '+answer.omittedPrivateMedia+'장은 나만 볼 수 있어요.':''));
 }
 document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{if(b.dataset.view==='track32-bookshelf.html'&&!member?.snapshot().owned){openLoginStart('shelf');return;}show(b.dataset.view);});
 for(const f of frames())f.addEventListener('load',()=>frameLoaded(f));

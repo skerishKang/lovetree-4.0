@@ -20,7 +20,7 @@ function jsonBody(request){
 function clientKey(request){const value=String(request?.headers?.['idempotency-key']||'');if(!IDEMPOTENCY.test(value))throw new ApiError(400,'idempotency_key_required','안전한 중복 방지 키가 필요해요.');return value;}
 function publicComment(row,viewer,isAdmin=false){const mine=!!viewer&&row.subjectId===viewer;const edited=!!(row.editedAt||(row.updatedAt&&row.createdAt&&String(row.updatedAt)>String(row.createdAt)));return {id:row.id,body:row.body,createdAt:row.createdAt,updatedAt:row.updatedAt,edited,mine,canDelete:mine||isAdmin,canEdit:mine,authorLabel:mine?'나':'기록한 사람'};}
 
-export function createCommunityService({communityRepo,shareRepo,workspaceRepo,productId,admin=null,now=()=>Date.now(),makeId=()=>randomUUID()}){
+export function createCommunityService({communityRepo,shareRepo,workspaceRepo,visibilityRepo=null,productId,admin=null,now=()=>Date.now(),makeId=()=>randomUUID()}){
  const writes=new Map();
  function rate(subjectId,kind,limit=20){
   const key=subjectId+'\0'+kind,cut=now()-60_000,list=(writes.get(key)||[]).filter(at=>at>cut);
@@ -31,6 +31,8 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,pr
   if(!SHARE_ID.test(shareId))throw new ApiError(404,'share_not_found','공개 트리를 찾을 수 없어요.');
   const share=await shareRepo.load({productId,shareId});
   if(!share||share.status!=='active')throw new ApiError(404,'share_not_found','공개 트리를 찾을 수 없어요.');
+  // #538: 비공개 트리는 댓글·반응·신고·차단 등 커뮤니티 경로에서도 서버가 막는다(없는 것과 같이).
+  if(visibilityRepo){const visibility=(await visibilityRepo.get({productId,subjectId:share.subjectId,treeId:share.treeId})).visibility;if(visibility==='private')throw new ApiError(404,'share_not_found','공개 트리를 찾을 수 없어요.');}
   return share;
  }
  async function card(share,viewerSubjectId,statsOverride=null,lastActivityAt=null){

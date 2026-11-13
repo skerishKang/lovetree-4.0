@@ -490,3 +490,13 @@ html[data-lt-theme="garden"] #account-advanced[aria-checked="true"]:after{backgr
 #feedback-form label{display:grid;gap:6px;margin-top:14px;font-size:13px;color:var(--lt-pearl)}
 #feedback-form textarea,#feedback-form select{width:100%;border-radius:12px;border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.04);color:inherit;padding:10px 12px;font:inherit}
 #feedback-form textarea{min-height:120px;resize:vertical}
+
+/* 이슈 538 공개가 기본: 공유 창의 공개 상태 표시와 Plus 잠금, 설정의 현재값 표시 */
+.share-visibility{margin:12px 0;padding:12px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-card)}
+.share-visibility-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:8px 0 0}
+.share-visibility-row #share-visibility-state{font-size:13px;color:var(--lt-pearl)}
+.share-visibility-row #share-private{min-height:44px}
+.share-visibility-lock{display:inline-flex;align-items:center;min-height:34px;padding:0 12px;border:1px dashed var(--lt-gold-line);border-radius:9px;color:var(--lt-gold);font-size:11px;white-space:nowrap}
+.settings-choice .settings-current{display:inline-flex;align-items:center;min-height:34px;padding:0 12px;border:1px solid var(--lt-primary);border-radius:9px;background:var(--lt-primary);color:var(--lt-primary-ink);font-size:13px}
+.settings-choice button[aria-disabled="true"]{opacity:.6}
+.settings-choice .settings-lock{display:inline-flex;align-items:center;min-height:34px;padding:0 10px;border:1px dashed var(--lt-gold-line);border-radius:9px;color:var(--lt-gold);font-size:11px;white-space:nowrap}

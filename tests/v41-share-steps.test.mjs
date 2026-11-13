@@ -27,7 +27,7 @@ function fakeElement(extra = {}) {
   return Object.assign(node, extra);
 }
 
-function shareHarness({ confirmAnswer = true, clipboard = null } = {}) {
+function shareHarness({ confirmAnswer = true, clipboard = null, visibilityAnswer = null } = {}) {
   const saved = {window: globalThis.window, document: globalThis.document, location: globalThis.location, addEventListener: globalThis.addEventListener, confirm: globalThis.confirm};
   for (const key of ['window', 'document', 'location', 'addEventListener', 'confirm']) delete globalThis[key];
   const els = {};
@@ -53,6 +53,7 @@ function shareHarness({ confirmAnswer = true, clipboard = null } = {}) {
     create: async payload => { requests.push(['create', payload]); return {ok: true, share: {id: 'share-1', view: 'book'}}; },
     list: async () => ({ok: true, shares: requests.filter(r => r[0] === 'list').length ? {id: 'share-1', treeId: 'tree1', status: 'active', view: 'book', createdAt: '2026-11-12T09:00:00Z', discoverable: false} : []}),
     setDiscoverable: async (id, next) => { requests.push(['discoverable', id, next]); return {ok: true}; },
+    setTreeVisibility: async (treeId, visibility) => { requests.push(['visibility', treeId, visibility]); return visibilityAnswer; },
     revoke: async id => { requests.push(['revoke', id]); return {ok: true}; }
   };
   const messages = createMessages({
@@ -125,7 +126,7 @@ test('선택을 바꾸면 단계가 고르기로 돌아가고 이유 문구가 �
   } finally { h.restore(); }
 });
 
-test('링크를 만들면 열어 보기 주소가 채워지고, 둘러보기 스위치는 기본 꺼짐·켤 수 있게 된다', async () => {
+test('링크를 만들면 열어 보기 주소가 채워진다(#538: 둘러보기 스위치는 자동 소개로 정리됐다)', async () => {
   const h = shareHarness();
   try {
     await h.messages.openSharePanel();
@@ -133,8 +134,6 @@ test('링크를 만들면 열어 보기 주소가 채워지고, 둘러보기 스
     await h.els['share-create'].onclick();
     assert.equal(h.els['share-open'].href, 'https://lovetree-4-0.pages.dev/v41/#share/share-1/book');
     assert.equal(h.els['share-open'].hidden, false);
-    assert.equal(h.els['share-discover'].checked, false, '기본 꺼짐');
-    assert.equal(h.els['share-discover'].disabled, false, '링크를 만든 뒤 켠다');
     assert.equal(h.stage(), 'done,done,done', '세 단계 모두 끝');
     assert.match(h.next(), /복사하거나 열어 보세요/);
   } finally { h.restore(); }
@@ -151,34 +150,19 @@ test('복사하면 복사했어요 안내를 role=status 자리에 띄운다', a
   } finally { h.restore(); }
 });
 
-test('둘러보기 스위치를 켜면 한 번 확인하고 setDiscoverable(true)를 보낸다', async () => {
-  const h = shareHarness();
+test('#538: 비공개로 전환하려 하면 서버가 Plus 전용으로 거절하고 안내를 남긴다', async () => {
+  const h = shareHarness({visibilityAnswer: {ok: false, status: 403, code: 'plus_required_private', message: '비공개는 Plus 전용이에요.'}});
   try {
     await h.messages.openSharePanel();
-    await h.els['share-preview'].onclick();
-    await h.els['share-create'].onclick();
-    h.els['share-discover'].checked = true;
-    await h.els['share-discover'].onchange();
-    assert.deepEqual(h.requests.at(-1), ['discoverable', 'share-1', true]);
-    assert.match(h.els['share-feedback'].textContent, /둘러보기에 올렸어요/);
+    await h.els['share-private'].onclick();
+    assert.deepEqual(h.requests.filter(r => r[0] === 'visibility'), [['visibility', 'tree1', 'private']], '판단은 서버에 맡긴다');
+    assert.match(h.els['share-feedback'].textContent, /비공개는 Plus 전용이에요/);
   } finally { h.restore(); }
 });
 
-test('확인을 거절하면 스위치를 다시 끄고 서버에 보내지 않는다', async () => {
-  const h = shareHarness({confirmAnswer: false});
-  try {
-    await h.messages.openSharePanel();
-    await h.els['share-preview'].onclick();
-    await h.els['share-create'].onclick();
-    const before = h.requests.length;
-    h.els['share-discover'].checked = true;
-    await h.els['share-discover'].onchange();
-    assert.equal(h.requests.length, before);
-    assert.equal(h.els['share-discover'].checked, false);
-  } finally { h.restore(); }
-});
-
-test('공유 창 화면에는 발견이라는 말이 없고, 단계·이유·스위치 틀이 있다', () => {
+// #538: '둘러보기에도 올리기' 스위치와 확인창 흐름은 공개 기본으로 바뀌면서 정리됐다.
+// 둘러보기 소개는 서버가 조건(공개 && 순간 3개 이상)으로 자동 판단한다.
+test('공유 창 화면에는 발견이라는 말이 없고, 단계·이유·공개 상태 틀이 있다', () => {
   assert.equal(shareHtml.includes('발견'), false, '발견 글자 0건');
   assert.match(shareHtml, /<ol id="share-steps"[^>]*aria-label="공유 단계"/);
   assert.match(shareHtml, /<li data-step="1" data-state="current">보여 줄 것 고르기<\/li>/);
@@ -187,7 +171,11 @@ test('공유 창 화면에는 발견이라는 말이 없고, 단계·이유·스
   assert.match(shareHtml, /<p id="share-create-reason"[^>]*hidden>먼저 미리보기를 확인해 주세요\.<\/p>/);
   assert.match(shareHtml, /<a id="share-open" class="share-open" target="_blank" rel="noopener" hidden>열어 보기<\/a>/);
   assert.match(shareHtml, /<p id="share-copy-note" role="status"><\/p>/);
-  assert.match(shareHtml, /<input id="share-discover" type="checkbox" role="switch" disabled>둘러보기에도 올리기/);
+  assert.match(shareHtml, /<p id="share-moment-hint" class="panel-note" role="status"><\/p>/, '순간 수 안내 자리');
+  assert.match(shareHtml, /<button id="share-private" type="button">비공개로 전환<\/button>/);
+  assert.match(shareHtml, /Plus 전용/);
+  assert.match(shareHtml, /트리는 공개가 기본이에요/);
+  assert.equal(shareHtml.includes('둘러보기에도 올리기'), false, '스위치 문구는 정리됐다');
   assert.match(shareHtml, /<details class="share-scope-more"><summary>자세히<\/summary>/);
   assert.match(shareHtml, /올린 사진은 나만 볼 수 있어요/);
 });

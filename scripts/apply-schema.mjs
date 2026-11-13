@@ -14,6 +14,7 @@ const TABLES = [
   'lovetree_product_roles',
   'lovetree_product_role_audit',
   'lovetree_shares',
+  'lovetree_tree_visibility',
   'lovetree_community_favorites',
   'lovetree_community_reactions',
   'lovetree_community_comments',
