@@ -166,10 +166,12 @@ s('#535 가만히 있을 때 그리기 횟수는 크게 늘지 않는다', async
 });
 
 // 겹침: 움직이므로 여러 번 재서 최댓값을 쓴다. 가운데 안전 구역 침범은 언제나 0.
+// 측정은 움직임을 멈춘 상태(동작 줄이기)로 한다 — 움직이는 화면을 몇 번 재는 방식은
+// 회차마다 값이 달라져 CI에서 흔들린다. 떠 있는 폭은 위 시험이 따로 잰다.
 const LIMITS = {
-  '1440x900': { pairs: 30, area: 280000 },
-  '1920x1080': { pairs: 30, area: 285000 },
-  '390x844': { pairs: 14, area: 46000 }
+  '1440x900': { pairs: 26, area: 265000 },
+  '1920x1080': { pairs: 29, area: 280000 },
+  '390x844': { pairs: 12, area: 46000 }
 };
 
 s('#535 카드끼리 겹친 면적을 줄였다(1440·1920·390, 안전 구역 침범 0)', async () => {
@@ -178,9 +180,9 @@ s('#535 카드끼리 겹친 면적을 줄였다(1440·1920·390, 안전 구역 �
     for (const [tag, limit] of Object.entries(LIMITS)) {
       const [w, h] = tag.split('x').map(Number);
       for (const member of ['out', 'in']) {
-        const { context, page, frame } = await openHome(browser, lib.base, { width: w, height: h, member });
+        const { context, page, frame } = await openHome(browser, lib.base, { width: w, height: h, member, reducedMotion: 'reduce' });
         let best = { pairs: 0, area: 0, intrude: 0, cards: 0 };
-        for (let round = 0; round < 8; round++) {
+        for (let round = 0; round < 3; round++) {
           const d = await frame.evaluate(() => {
             const sr = document.querySelector('main#orbit').shadowRoot;
             const rects = [];
