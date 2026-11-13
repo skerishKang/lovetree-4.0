@@ -74,6 +74,15 @@ jobs:
           start=$(date +%s)
           node --test tests/v41-a11y-514-remaining.test.mjs
           echo "남은 접근성 항목 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+      # #537: 책의 한 장 보기가 순간 하나씩 넘어가는지, 넓은 화면에서 두 장 책의 한 쪽 크기·같은 높이로
+      # 나오는지, 390 휴대폰 모양이 그대로인지를 실제 화면에서 잰다. 건너뜀=실패(크롬이 준비된 이 잡에서 돈다).
+      - name: 책 한 장 보기 시험(1440·390 순간 하나씩, 건너뜀=실패 — #537)
+        env:
+          LT_BOOK_SINGLE_REQUIRE: '1'
+        run: |
+          start=$(date +%s)
+          node --test --test-concurrency=1 tests/v41-book-single-537.test.mjs
+          echo "책 한 장 보기 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
       - name: 지도 실제 대비·판 전환 시험(건너뜀=실패)
         env:
           LT_MAP_CONTRAST_REQUIRE: '1'
