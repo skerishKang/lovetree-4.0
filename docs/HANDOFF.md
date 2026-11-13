@@ -2,7 +2,17 @@
 
 > **main 보호 규칙(2026-11-09, 룰셋 "main 보호 (PR·필수 검사)")**: main은 PR로만 바꾼다(직접 푸시·force push·삭제 금지, 관리자도 예외 없음 — 비상시 대표가 룰셋 enforcement를 잠깐 끈다). 필수 검사: `check (ubuntu-latest)`·`check (windows-latest)`·`미리보기 postdeploy(로그아웃)` — 셋 다 paths 필터가 없어 문서만 바뀐 PR에서도 항상 돈다. 승인 수 0(레인이 스스로 머지). Deploy Bundle Boot Test는 paths 필터가 있어 필수에 넣지 않았다.
 
-> **빨간 필수 검사 규칙(2026-11-12 사고 뒤)**: 필수 검사가 빨강이면 **재실행은 1회까지**. 같은 항목이 또 빨강이면 멈추고 원인을 찾는다 — 재실행·빈 커밋으로 초록을 만들지 않는다. "간헐적·환경 탓"이라고 적으려면 **같은 시각 이 변경이 없는 브랜치(main 또는 다른 PR)** 에서도 같은 실패가 나는지 대조한 결과를 함께 적는다. 메시지를 받아 화면을 다시 띄우는 코드는 '뜰 때마다 보내는 쪽'과 짝으로 흐름 시험을 하고, 머지 전 미리보기 첫 화면을 5초 이상 직접 본다.
+> **빨간 필수 검사 규칭(2026-11-12 사고 뒤)**: 필수 검사가 빨강이면 **재실행은 1회까지**. 같은 항목이 또 빨강이면 멈추고 원인을 찾는다 — 재실행·빈 커밋으로 초록을 만들지 않는다. "간헐적·환경 탓"이라고 적으려면 **같은 시각 이 변경이 없는 브랜치(main 또는 다른 PR)** 에서도 같은 실패가 나는지 대조한 결과를 함께 적는다. 메시지를 받아 화면을 다시 띄우는 코드는 '뜰 때마다 보내는 쪽'과 짝으로 흐름 시험을 하고, 머지 전 미리보기 첫 화면을 5초 이상 직접 본다.
+
+## 2026-11-14 — 운영 시작 준비: 관리자 권한·운영센터 입구·디자인 통일·AI 고객 등록·매일 내보내기 (이슈 #540 마무리, 로컬3 레인, ai/local3-lt-540c-ops-261114, main 69cb042 기준)
+
+- **관리자·AI 고객 역할 부여(컴2 운영 작업)**: 대표 계정 1개에 `admin`, AI 고객(윤제) 계정 1개에 `ai_customer` 역할을 부여했다. 둘 다 `createAdminRoleRepo(pool).assign(...)` 저장소 호출로만 — `lovetree_product_roles` 2행 + `lovetree_product_role_audit` 2행(이메일·subject 값은 어디에도 기록하지 않았다). 대표가 관리자 화면을 열면 게시판이 보이는지는 대표 로그인 확인 몫이다.
+- **운영센터 입구(앱 안)**: `server/account-service.describe` 가 `admin` 플래그를 더 돌려주고(`public/v41/api.mjs` 파싱), 오른쪽 위 계정 메뉴와 설정 화면에 '운영' 항목이 생겼다 — 계정 메뉴 '운영센터'(관리자에게만 보임, `/admin.html` 새 탭), 설정 '운영' 묶음 '운영센터 열기'(같은 판정, 열림 때마다 서버 응답으로 다시 판정). 관리자가 아니면 둘 다 보이지 않는다.
+- **관리자 화면 디자인 통일**: 머리줄을 앱(shell.css의 `.app-header`·`.brand`)과 같은 모양으로 — 'app으로'는 '러브트리로 돌아가기', 제목 옆 점(brand-dot) 제거. 권한 없음·로그인 필요 화면의 4.0 연베이지 상자·초록 글씨(`storage-notice`·`notice`)를 금테 카드 + `--lt-*` 안내 모양으로 바꾸고, 권한 없음 문구는 '운영센터는 관리자 계정만 볼 수 있어요' + '러브트리로 돌아가기' 단추. 전·후 스크린샷(390·1440 × 목록·상세·답글·페르소나·이슈 탭·권한 없음)은 `E:\lovetree-qa\admin-ui-261114\{before,after}\`(저장소 밖) — '전'은 pages.dev 라이브 화면에서 대표가 지적한 4가지(연베이지 상자·초록 글씨·제목 옆 점·'app으로')가 모두 보임을 확인.
+- **AI 고객 윤제 등록(컴2, 저장소 호출)**: `lovetree_ai_personas`에 윤제 페르소나(소개.md 내용을 who/why/how/satisfied/disappointed/now 키로). `lovetree_feedback`에 일지 1건(kind=journal, journal_date 2026-11-14, 다시 올 점수 4, 제목 '첫날 — 가입하고 리센느·하츠투하츠 트리 만들기')과 의견 4건(새벽 날짜→#547·고침, 작은 글씨→#548·확인 중, '감상 없이' 문구→#548·확인 중, '0일 전'→#549·확인 중). 일지 아래 '운영센터 답글'은 '감상 없이' 문구 의견의 고객에게 보이는 답변(customer reply)으로. 원본 일지·소개는 거버넌스 `_원본보관\\`에 보관.
+- **내보내기·예약**: 거버넌스 윤제 폴더 원본을 `_원본보관\\`로 복사한 뒤 `tools/export-ai-customer.mjs` 실데이터 1회 실행 — `일지_261114.md`·`소개.md`가 사이트 내용으로 다시 써짐을 확인. 컴1 작업 스케줄러에 매일 07:00 등록, 로그 `E:\lovetree-qa\\export-log\\`. 관리자 세션 쿠키는 계정비밀_대장 규칙대로 파일로만 보관(출력·커밋 금지).
+- **시험**: `npm test` 전부 통과(브라우저 지도 대비 제외 환경), `npm run build`·`node tools/v41-modulepreload.mjs --check` 통과. 설정 '운영' 묶음·계정 메뉴 항목은 서버 응답 기반 표시라 모의 `/api/account`로 DOM 확인.
+- **남긴 것**: 대표의 실제 관리자 화면 확인(게시판 보임)·`skerish@naver.com` 계정 관리자 권한은 대표 지시 대기. 내보내기 예약의 쿠키 만료(세션 최대 나이) 시 갱신 절차 필요.
 
 ## 2026-11-14 — 미리보기 검사 동시 실행 (CTO)
 
@@ -54,8 +64,11 @@
 - **운영센터**: `src/admin.js`에 '고객 의견' 칸(최신 순·종류/상태 거르기·상태 변경·운영 메모·연결 이슈 번호·'GitHub 이슈 글 만들기' 복사 — 계정·트리 내용 제외). `src/admin.css`에 입력样式.
 - **사이트 창**: `public/v41/feedback.mjs`(창·API), `public/v41/index.html`(계정 메뉴 '의견 보내기'·첫 화면 아래 작은 링크·`feedback-panel` 창), `public/v41/shell.mjs`(배선·자동 정보), `shell.css`. 자동 정보(지금 화면·화면 크기·테마·앱 버전·로그인 여부·내 트리 id)는 보내기 전에 보이고 끌 수 있다.
 - **시험**: `tests/feedback-service.test.mjs` 8건(저장·검사·PII 가림·로그아웃 제한·관리자 목록/변경), `tests/feedback-postgres.test.mjs` 2건(저장·거르기·업데이트·컬럼·빈 context). CI `ci.yml` postgres job에 `tests/feedback-postgres.test.mjs` 추가, `scripts/apply-schema.mjs` TABLES에 `lovetree_feedback` 추가.
-- **실화면(모의 서버, 로그아웃)**: 390·1440에서 작은 링크→창 열림→보내기→'받았어요. 살펴보고 고칠게요.' 확인. 390 창 358×756(화면 안, 스크롤), 1440 460×812(화면 안). 자동 정보 `screen/viewport/theme/version/loggedIn` 전송, 로그아웃이라 treeId 없음. 계정 메뉴 '의견 보내기'·로그아웃 링크 DOM 확인. **로그인 상태·실서버 전송·관리자 화면은 미확인**(시험 계정 05 없음·컴2 서버·DB 필요).
-- **남긴 것/주의**: 로그인 흐름·실 PostgreSQL 검사·배포·머지는 이 레인 권한 밖(CI/컴2). 로컬 5→3 경로 수정. `v41/home.js`·`src/views/orbit.js`(로컬2)·`board.*`(로컬4)·`book.*`(로컬1)는 건드리지 않음. 겹침 없음. `v41-map-contrast.test.mjs`는 이 환경에서 Chromium 렌더링이 300초를 넘어 타임아웃(내 변경과 무관, 다른 1,415건 통과).
+- **실화면(모의 서버, 로그아웃)**: 390·1440에서 작은 링크→창 열림→보내기→'받았어요. 살펴보고 고칠게요.' 확인. 390 창 358×756(화면 안, 스크롤), 1440 460×812(화면 안). 자동 정보 `screen/viewport/theme/version/loggedIn` 전송, 로그아웃이라 treeId 없음. 계정 메뉴 '의견 보내기'·로그아웃 링크 DOM 확인. 라이브 프런트(pages.dev) 배포 후 `feedback-link`·`feedback-panel`·`account-feedback`·`feedback.mjs` 확인.
+- **머지/배포(2026-11-14)**: PR #543 스쿼시 머지 → main `51b39e9`. 필수 검사 4개(ubuntu·windows·미리보기 postdeploy·PostgreSQL 저장·로그인 상태 검증) 초록. **프런트(Cloudflare Pages) 배포 완료** — pages.dev/v41/ 에 `feedback-link`·`feedback-panel`·`account-feedback`·`feedback.mjs` 라이브.
+- **백엔드(컴2) 배포 완료(2026-11-14)**: SSH(컴1→컴2, `id_rsa`)로 `lovetree-api-autodeploy status` → `needs_manual_migration` 확인. 적용 전 `lovetree_feedback` MISSING·`lovetree_workspaces` 소유자 `lovetree_owner` 확인. `feedback-261114.sql`(md5 `38757e3a7e6f4439f1dda25d11017e2f`) /tmp 전송·일치 확인 후 `SET ROLE lovetree_owner` + `ON_ERROR_STOP=1`로 적용(CREATE TABLE·INDEX 2), 열 11·소유자 `lovetree_owner`·색인 3 확인. `AUTODEPLOY_ACCEPT_MIGRATIONS=1 ... run` 1회 → `result=installed`, installed_sha `51b39e9` = main.
+- **실동작(로그아웃)**: 라이브 `POST /api/feedback` '[시험] 의견 창구 확인' → 201(id=1, received). DB 확인(건수 1, category=other, anon=t). 관리자 받은함은 로그인 권한이 없어 DB 조회로 확인(본문·계정 미출력). id=1 상태를 '다음에'(later)로 변경.
+- **남긴 것/주의**: 로그인 상태 1건·관리자 화면 UI 실확인은 **미확인**(시험 계정 05 로그인은 OAuth·비밀값 취급이 필요해 이 레인에서 진행하지 않음 — 로그아웃 흐름만 확인). 2차(관리자 게시판·AI 고객 일지·페르소나·내보내기)는 별도 작업. 로컬 5→3 경로 수정. `v41/home.js`·`src/views/orbit.js`(로컬2)·`board.*`(로컬4)·`book.*`(로컬1)는 건드리지 않음(겹침 없음). `v41-map-contrast.test.mjs`는 이 환경에서 Chromium 렌더링이 300초를 넘어 타임아웃(내 변경과 무관, 다른 1,415건 통과).
 
 ## 2026-11-13 — 전 화면 접근성 재점검(레인 B): 닫힌 겹이 탭으로 들어가던 것 수리
 

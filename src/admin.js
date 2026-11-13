@@ -39,13 +39,15 @@ const sessionRes = await read('/api/admin/session');
 const session = sessionRes.payload ?? (sessionRes.status === 401 ? {} : null);
 
 function head() {
-  return `<header class="site-header"><a href="/" class="brand">${text('러브트리')}<span class="brand-dot">.</span></a><nav aria-label="주 메뉴"><a href="/">app으로</a><button type="button" data-tab="board" class="${state.tab === 'board' ? 'is-active' : ''}">게시판</button><button type="button" data-tab="reports" class="${state.tab === 'reports' ? 'is-active' : ''}">신고</button><button type="button" data-tab="issues" class="${state.tab === 'issues' ? 'is-active' : ''}">이슈</button></nav></header>`;
+  // #540 마무리: 머리줄을 러브트리 앱(public/v41/shell.css의 .app-header·.brand)과 같은 모양으로.
+  // 'app으로'는 '러브트리로 돌아가기'이고, 제목 옆 점(brand-dot)은 앱 머리줄에 없어 뺐다.
+  return `<header class="app-header"><a class="brand" href="/v41/"><span>LoveTree</span><small>4.1</small></a><nav aria-label="관리자 메뉴"><a class="back-app" href="/v41/">러브트리로 돌아가기</a><button type="button" data-tab="board" class="${state.tab === 'board' ? 'is-active' : ''}">게시판</button><button type="button" data-tab="reports" class="${state.tab === 'reports' ? 'is-active' : ''}">신고</button><button type="button" data-tab="issues" class="${state.tab === 'issues' ? 'is-active' : ''}">이슈</button></nav></header>`;
 }
 
 function renderLogin() {
   const authenticated = session?.ok && session.authenticated;
   if (authenticated) return false;
-  host.innerHTML = `${head()}<div class="admin-shell"><section class="storage-notice admin-card"><div class="admin-card-head"><strong>${session ? '로그인이 필요해요' : '관리자 상태를 확인하지 못했어요'}</strong><span class="notice">${session ? 'PADIEM 계정으로 로그인한 뒤 다시 열어 주세요. 관리자 여부는 서버가 확인한 신원으로만 정해집니다.' : '서버에 닿지 못했습니다.'}</span></div><div class="admin-actions"><a class="button primary" href="/auth/login?next=/admin.html">로그인</a></div></section></div>`;
+  host.innerHTML = `${head()}<div class="admin-shell"><section class="admin-card"><div class="admin-card-head"><strong>${session ? '로그인이 필요해요' : '관리자 상태를 확인하지 못했어요'}</strong><span class="admin-note">${session ? 'PADIEM 계정으로 로그인한 뒤 다시 열어 주세요. 관리자 여부는 서버가 확인한 신원으로만 정해집니다.' : '서버에 닿지 못했습니다.'}</span></div><div class="admin-actions"><a class="button primary" href="/auth/login?next=/admin.html">로그인</a><a class="button" href="/v41/">러브트리로 돌아가기</a></div></section></div>`;
   return true;
 }
 
@@ -58,7 +60,8 @@ async function render() {
   const authenticated = session?.ok && session.authenticated;
   const admin = authenticated && session.admin;
   if (!admin) {
-    host.innerHTML = `${head()}<div class="admin-shell"><section class="storage-notice admin-card"><div class="admin-card-head"><strong>일반 사용자 상태</strong><span class="notice">이 계정에는 러브트리 관리자 역할이 없습니다.</span></div></section></div>`;
+    // #540 마무리: 권한 없음 화면도 러브트리 안내 모양으로 — 4.0의 연베이지 상자·초록 글씨(storage-notice·notice)를 쓰지 않는다.
+    host.innerHTML = `${head()}<div class="admin-shell"><section class="admin-card"><div class="admin-card-head"><strong>운영센터는 관리자 계정만 볼 수 있어요</strong><span class="admin-note">이 계정에는 러브트리 관리자 역할이 없습니다. 관리자 여부는 서버가 확인한 신원으로만 정해집니다.</span></div><div class="admin-actions"><a class="button primary" href="/v41/">러브트리로 돌아가기</a></div></section></div>`;
     return;
   }
   if (state.tab === 'issues') { await renderIssues(); return; }
