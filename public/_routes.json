@@ -3,7 +3,11 @@
   "include": [
     "/api/*",
     "/auth/*",
-    "/"
+    "/",
+    "/v41/",
+    "/t/*",
+    "/robots.txt",
+    "/sitemap.xml"
   ],
   "exclude": []
 }

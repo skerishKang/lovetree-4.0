@@ -131,7 +131,7 @@ test('링크를 만들면 열어 보기 주소가 채워지고, 둘러보기 스
     await h.messages.openSharePanel();
     await h.els['share-preview'].onclick();
     await h.els['share-create'].onclick();
-    assert.equal(h.els['share-open'].href, 'https://lovetree-4-0.pages.dev/v41/#share/share-1/book');
+    assert.equal(h.els['share-open'].href, 'https://lovetree-4-0.pages.dev/t/share-1');
     assert.equal(h.els['share-open'].hidden, false);
     assert.equal(h.els['share-discover'].checked, false, '기본 꺼짐');
     assert.equal(h.els['share-discover'].disabled, false, '링크를 만든 뒤 켠다');
