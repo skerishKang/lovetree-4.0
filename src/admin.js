@@ -174,3 +174,171 @@ async function mountCommunityModeration(sessionState) {
 }
 
 await mountCommunityModeration(session.payload);
+
+const FEEDBACK_CATEGORY_LABEL = { bug: '이상해요', inconvenient: '불편해요', feature: '기능 제안', other: '그 밖에' };
+const FEEDBACK_STATUS_LABEL = { received: '받음', reviewing: '확인 중', fixed: '고침', later: '다음에' };
+
+function feedbackIssueBody(row) {
+  const ctx = row.context && typeof row.context === 'object' ? row.context : {};
+  const env = [
+    ctx.viewport ? '화면 ' + ctx.viewport : '',
+    ctx.theme ? '테마 ' + ctx.theme : '',
+    ctx.version ? '앱 버전 ' + ctx.version : '',
+    typeof ctx.loggedIn === 'boolean' ? '로그인 ' + (ctx.loggedIn ? '예' : '아니오') : ''
+  ].filter(Boolean).join(' · ');
+  return [
+    '## 증상',
+    String(row.body || ''),
+    '',
+    '## 화면',
+    '- ' + (ctx.screen || '알 수 없음'),
+    '',
+    '## 환경',
+    env ? '- ' + env : '- (표시할 환경 정보 없음)',
+    '',
+    '> 고객 의견 창구에서 만든 글입니다. 보낸 계정·트리 내용은 넣지 않았습니다.'
+  ].join('\n');
+}
+
+async function mountFeedback(sessionState) {
+  if (!sessionState?.authenticated || !sessionState?.admin) return;
+  const shell = document.querySelector('.admin-shell');
+  if (!shell) return;
+
+  const section = document.createElement('section');
+  section.className = 'storage-notice admin-card admin-feedback';
+
+  const heading = document.createElement('div');
+  heading.className = 'admin-card-head';
+  const title = document.createElement('strong');
+  title.textContent = '고객 의견';
+  const note = document.createElement('span');
+  note.className = 'notice';
+  note.textContent = '사이트 ‘의견 보내기’로 들어온 의견입니다. 상태·메모·연결 이슈 번호를 적고, GitHub 이슈 글을 만들어 씁니다.';
+  heading.append(title, note);
+
+  const filters = document.createElement('div');
+  filters.className = 'admin-feedback-filters';
+  const statusSel = document.createElement('select');
+  statusSel.setAttribute('aria-label', '상태 거르기');
+  statusSel.append(new Option('상태 전체', ''), ...Object.entries(FEEDBACK_STATUS_LABEL).map(([value, label]) => new Option(label, value)));
+  const catSel = document.createElement('select');
+  catSel.setAttribute('aria-label', '종류 거르기');
+  catSel.append(new Option('종류 전체', ''), ...Object.entries(FEEDBACK_CATEGORY_LABEL).map(([value, label]) => new Option(label, value)));
+  filters.append(statusSel, catSel);
+
+  const status = document.createElement('p');
+  status.className = 'admin-community-status';
+  status.setAttribute('role', 'status');
+  const list = document.createElement('div');
+  list.className = 'admin-report-list';
+  section.append(heading, filters, status, list);
+  shell.append(section);
+
+  async function act(id, patch, okText) {
+    const result = await communityRequest('/api/admin/feedback/' + encodeURIComponent(id), {
+      method: 'PATCH',
+      body: JSON.stringify(patch)
+    });
+    status.textContent = result.ok ? okText : (result.payload?.error?.message || '변경에 실패했어요.');
+    if (result.ok) await load();
+    return result.ok;
+  }
+
+  function item(row) {
+    const article = document.createElement('article');
+    article.className = 'admin-report';
+
+    const top = document.createElement('div');
+    top.className = 'admin-report-head';
+    const state = document.createElement('strong');
+    state.textContent = FEEDBACK_STATUS_LABEL[row.status] || row.status;
+    const who = document.createElement('span');
+    who.textContent = (FEEDBACK_CATEGORY_LABEL[row.category] || row.category) + ' · ' + (row.subjectId ? '회원' : '로그아웃');
+    top.append(state, who);
+
+    const body = document.createElement('p');
+    body.textContent = row.body;
+
+    const meta = document.createElement('small');
+    const ctx = row.context && typeof row.context === 'object' ? row.context : {};
+    const envBits = [ctx.screen, ctx.viewport, ctx.theme, ctx.version].filter(Boolean).join(' · ');
+    meta.textContent = '#' + row.id + ' · ' + time(row.createdAt) + (envBits ? ' · ' + envBits : '');
+
+    const statusRow = document.createElement('div');
+    statusRow.className = 'admin-actions';
+    for (const [value, label] of Object.entries(FEEDBACK_STATUS_LABEL)) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = label;
+      button.disabled = row.status === value;
+      button.onclick = () => act(row.id, { status: value }, '상태를 ‘' + label + '’(으)로 바꿨어요.');
+      statusRow.append(button);
+    }
+
+    const memoLabel = document.createElement('label');
+    memoLabel.className = 'admin-feedback-field';
+    memoLabel.textContent = '운영 메모';
+    const memo = document.createElement('textarea');
+    memo.rows = 2;
+    memo.value = row.memo || '';
+    memo.setAttribute('aria-label', '#' + row.id + ' 운영 메모');
+    memoLabel.append(memo);
+
+    const issueLabel = document.createElement('label');
+    issueLabel.className = 'admin-feedback-field';
+    issueLabel.textContent = '연결 이슈 번호';
+    const issue = document.createElement('input');
+    issue.value = row.issueNumber || '';
+    issue.placeholder = '예: 541';
+    issue.setAttribute('aria-label', '#' + row.id + ' 연결 이슈 번호');
+    issueLabel.append(issue);
+
+    const saveRow = document.createElement('div');
+    saveRow.className = 'admin-actions';
+    const save = document.createElement('button');
+    save.type = 'button';
+    save.textContent = '메모·이슈 저장';
+    save.onclick = () => act(row.id, { memo: memo.value, issueNumber: issue.value }, '메모·이슈 번호를 저장했어요.');
+    const copy = document.createElement('button');
+    copy.type = 'button';
+    copy.textContent = 'GitHub 이슈 글 만들기';
+    copy.onclick = async () => {
+      const text = feedbackIssueBody(row);
+      try {
+        await navigator.clipboard.writeText(text);
+        status.textContent = '이슈 본문을 복사했어요. GitHub에 붙여 넣으세요(계정·트리 내용은 빠졌습니다).';
+      } catch {
+        status.textContent = '복사가 막혔어요. 화면에서 직접 선택해 복사해 주세요.';
+      }
+    };
+    saveRow.append(save, copy);
+
+    article.append(top, body, meta, statusRow, memoLabel, issueLabel, saveRow);
+    return article;
+  }
+
+  async function load() {
+    status.textContent = '의견을 불러오는 중입니다.';
+    const result = await communityRequest('/api/admin/feedback?status=' + encodeURIComponent(statusSel.value) + '&category=' + encodeURIComponent(catSel.value));
+    list.replaceChildren();
+    if (!result.ok) {
+      status.textContent = result.payload?.error?.message || '의견을 불러오지 못했어요.';
+      return;
+    }
+    const rows = Array.isArray(result.payload?.feedback) ? result.payload.feedback : [];
+    for (const row of rows) list.append(item(row));
+    if (!rows.length) {
+      const empty = document.createElement('p');
+      empty.textContent = '접수된 의견이 없습니다.';
+      list.append(empty);
+    }
+    status.textContent = '의견 ' + rows.length + '건 · 최신 순.';
+  }
+
+  statusSel.onchange = load;
+  catSel.onchange = load;
+  await load();
+}
+
+await mountFeedback(session.payload);
