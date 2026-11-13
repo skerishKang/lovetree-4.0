@@ -35,6 +35,16 @@ export function isProductionHost(hostname) {
   return hostname === PRODUCTION_HOST;
 }
 
+// 검색 열기 스위치 — 서비스 시작 전이라 닫아 둔다(대표 결정 2026-11-14).
+// false 동안은 운영 주소도 개발 주소처럼 robots 전면 차단·sitemap 404·문서 noindex 다.
+// 링크 미리보기 카드(/t/<id>, 카톡·페이스북 등)는 검색과 별개라 그대로 나간다.
+// 서비스를 열 때 이 한 줄만 true 로 바꾸고, 그 뒤 서치어드바이저·서치 콘솔에 등록한다.
+export const SEARCH_OPEN = false;
+
+export function isSearchOpenHost(hostname, searchOpen = SEARCH_OPEN) {
+  return searchOpen === true && isProductionHost(hostname);
+}
+
 // 운영 주소는 루트(/)에서 4.1 앱을 serve 한다(functions/index.js). 나머지는 /v41/.
 export function appBasePath(hostname) {
   return isProductionHost(hostname) ? '/' : '/v41/';
@@ -56,11 +66,11 @@ export function isBotUserAgent(ua) {
   return BOT_UA.test(String(ua || ''));
 }
 
-// robots.txt — 운영 주소는 허용 + sitemap 안내, 개발 주소는 전면 차단(#541).
-export function createRobots() {
+// robots.txt — 검색이 열린 운영 주소만 허용 + sitemap 안내, 그 밖은 전면 차단(#541).
+export function createRobots({ searchOpen = SEARCH_OPEN } = {}) {
   return function onRequest({ request }) {
     const url = new URL(request.url);
-    const body = isProductionHost(url.hostname)
+    const body = isSearchOpenHost(url.hostname, searchOpen)
       ? `User-agent: *\nAllow: /\nSitemap: https://${PRODUCTION_HOST}/sitemap.xml\n`
       : 'User-agent: *\nDisallow: /\n';
     return new Response(body, {
@@ -118,11 +128,11 @@ export async function collectSitemapShares({ fetcher = (...args) => fetch(...arg
   return entries.slice(0, maxEntries);
 }
 
-// sitemap.xml — 운영 주소에서만 내보낸다. 개발 주소는 404 로 끊는다.
-export function createSitemap({ fetcher = (...args) => fetch(...args), timeoutMs = 10_000 } = {}) {
+// sitemap.xml — 검색이 열린 운영 주소에서만 내보낸다. 그 밖은 404 로 끊는다.
+export function createSitemap({ fetcher = (...args) => fetch(...args), timeoutMs = 10_000, searchOpen = SEARCH_OPEN } = {}) {
   return async function onRequest({ request, env }) {
     const url = new URL(request.url);
-    if (!isProductionHost(url.hostname)) return jsonError(404, 'not_found', '이 주소에는 사이트맵이 없어요.');
+    if (!isSearchOpenHost(url.hostname, searchOpen)) return jsonError(404, 'not_found', '이 주소에는 사이트맵이 없어요.');
     const origin = upstreamOrigin(env);
     if (!origin) return jsonError(503, 'storage_unavailable', '서버 저장 주소가 설정되지 않았어요.');
     let entries;
