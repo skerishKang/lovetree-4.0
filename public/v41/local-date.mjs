@@ -1,15 +1,11 @@
-// #547: '오늘' 날짜는 사용자 기기의 지역 날짜로 만든다.
-// 예전에는 new Date().toISOString().slice(0, 10) 으로 만들었는데, toISOString은 UTC 날짜라
-// 한국 시간 0시~9시(UTC 전날 15시~24시)에는 하루 전 날짜가 됐다(새벽에 남긴 순간이 어제로 찍힘).
-// 지역 연·월·일을 그대로 읽어 'YYYY-MM-DD'로 적는다 — 기기 시간대가 어디든 그 기기의 오늘이 된다.
-const pad2 = (value) => String(value).padStart(2, '0');
+// #547: 지역 날짜 규칙은 local-date.js 한 벌에 있다(클래식 스크립트 보드도 같은 파일을 읽는다).
+// 모듈들은 이 파일을 통해서만 그 한 벌을 쓴다 — 규칙이 두 벌로 갈라지지 않게.
+import './local-date.js';
 
 /**
  * 기기의 지역 날짜를 'YYYY-MM-DD'로 돌려준다.
  * @param {Date|number|string} [clock] 기준 시각(기본값: 지금). 잘못된 값이면 지금으로 본다.
  */
-export function localDateOnly(clock = new Date()) {
-  const at = clock instanceof Date ? clock : new Date(clock);
-  const date = Number.isNaN(at.getTime()) ? new Date() : at;
-  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+export function localDateOnly(clock) {
+  return globalThis.LTLocalDate.localDateOnly(clock);
 }

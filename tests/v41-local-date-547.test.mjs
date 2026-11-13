@@ -101,10 +101,27 @@ test('#547 날짜 형식 검사는 그대로다(오늘 계산이 아니라 입�
   assert.equal(webDomain.validateMomentInput({ title: 'x', date: '2026-11-14' }).date, '2026-11-14', '맞는 날짜는 그대로');
 });
 
-test('#547 보드는 이번에 건드리지 않았다(로컬4 #536 뒤 후속 PR)', () => {
+test('#547 보드도 같은 한 벌을 쓴다 — 클래식 스크립트는 local-date.js(window.LTLocalDate)', () => {
+  // 보드 화면은 클래식 스크립트라 모듈 대신 window.LTLocalDate를 읽는다. 규칙은 같은 파일 한 벌이다.
+  const board = read('public/v41/views/board/board.js');
+  assert.match(board, /date:LTLocalDate\.localDateOnly\(\),source:type==='photo'/, '새 순간 기본 날짜');
+  assert.match(board, /Number\.isNaN\(d\.getTime\(\)\)\?LTLocalDate\.localDateOnly\(\):LTLocalDate\.localDateOnly\(d\)\}/, '날짜 표기의 오늘 기본값도 지역 날짜');
+  assert.match(read('public/v41/views/board/board-extras.js'), /date:LTLocalDate\.localDateOnly\(\),source,memo/, '보드 추가 창');
+  assert.match(read('public/v41/views/board/board-detail.js'), /date:LTLocalDate\.localDateOnly\(\)/, '보드 상세');
   for (const file of ['public/v41/views/board/board.js', 'public/v41/views/board/board-extras.js', 'public/v41/views/board/board-detail.js']) {
-    if (!existsSync(path.join(ROOT, file))) continue;
-    assert.doesNotMatch(read(file), /local-date\.mjs/, `${file}는 이번 PR에서 손대지 않는다`);
+    assert.doesNotMatch(read(file), /new Date\(\)\.toISOString\(\)\.slice\(0, ?10\)/, `${file}에 UTC 오늘 계산이 남아 있다`);
+  }
+  assert.match(read('public/v41/views/track58-pinboard.html'), /<script src="\/v41\/local-date\.js"><\/script><script src="\/v41\/views\/board\/board-model\.js">/, '클래식 스크립트보다 먼저 읽는다');
+});
+
+test('#547 규칙은 한 벌이다 — 클래식(local-date.js)과 모듈(local-date.mjs)이 같은 답', () => {
+  const classic = read('public/v41/local-date.js');
+  assert.doesNotMatch(classic, /^\s*(import|export)\s/m, '클래식 스크립트로도 읽히는 문법이어야 한다');
+  assert.match(classic, /root\.LTLocalDate = \{localDateOnly\};/);
+  assert.match(read('public/v41/local-date.mjs'), /import '\.\/local-date\.js';/, '모듈은 클래식 한 벌을 그대로 쓴다');
+  // 실제로 두 경로가 같은 답을 내는지 이 프로세스에서 확인한다(모듈이 클래식 파일을 먼저 읽는다).
+  for (const at of [new Date(2026, 10, 14, 0, 30), new Date(2026, 10, 14, 23, 59)]) {
+    assert.equal(globalThis.LTLocalDate.localDateOnly(at), localDateOnly(at), '클래식과 모듈 같은 답');
   }
 });
 
@@ -114,7 +131,10 @@ test('#547 오늘을 UTC로 만드는 자리가 남아 있지 않다(보드 제�
     'public/v41/shell/panels.mjs',
     'public/v41/views/shelf/shelf.js',
     'src/domain.js',
-    'src/main.js'
+    'src/main.js',
+    'public/v41/views/board/board.js',
+    'public/v41/views/board/board-extras.js',
+    'public/v41/views/board/board-detail.js'
   ];
   for (const file of files) {
     const src = read(file);
@@ -174,8 +194,15 @@ test('#547 실제 브라우저(Asia/Seoul·America/Los_Angeles): 그 기기의 �
         const at = new Date(iso);
         return { local: mod.localDateOnly(at), utc: at.toISOString().slice(0, 10) };
       }, { iso });
+      // 보드 화면의 클래식 스크립트 경로(window.LTLocalDate)도 같은 답인지 본다.
+      await page.goto(`${base}/v41/views/track58-pinboard.html`, { waitUntil: 'domcontentloaded' });
+      const classic = await page.evaluate(({ iso }) => {
+        const api = globalThis.LTLocalDate;
+        return api ? api.localDateOnly(new Date(iso)) : 'none';
+      }, { iso });
       await ctx.close();
       assert.equal(answer.local, expected, `${timezoneId} ${iso}`);
+      assert.equal(classic, expected, `보드 화면 ${timezoneId} ${iso}`);
     }
   } finally {
     await browser.close();
