@@ -11,6 +11,8 @@ import { createApiHandler, createNodeHandler } from './http.js';
 import { createWorkspaceService } from './workspace-service.js';
 import { createShareService, createShareHandler } from './share-service.js';
 import { createCommunityService, createCommunityHandler } from './community-service.js';
+import { createFeedbackRepo } from './db/feedback-postgres.js';
+import { createFeedbackService, createFeedbackHandler } from './feedback-service.js';
 import { createYoutubeOembedHandler } from './youtube-oembed.js';
 import { createPadiemAuthorityAuth } from './padiem-authority-auth.js';
 import { createSharedAccessAuth, sharedAuthEnabled } from './padiem-access-auth.mjs';
@@ -203,6 +205,13 @@ const communityHandler = createCommunityHandler({
  }),
  productId: LOVETREE_PRODUCT_ID
 });
+// 고객 의견 창구 (#540). 로그인·로그아웃 모두 받는다 — 그래서 인증 경계는 guardedAuthenticate를 그대로 쓰되,
+// 핸들러가 401을 '로그아웃'으로 받아들인다.
+const feedbackHandler = createFeedbackHandler({
+ authenticate: guardedAuthenticate,
+ service: createFeedbackService({ feedbackRepo: createFeedbackRepo(pool), productId: LOVETREE_PRODUCT_ID, admin }),
+ productId: LOVETREE_PRODUCT_ID
+});
 const youtubeOembedHandler = createYoutubeOembedHandler({ authenticate: guardedAuthenticate, productId: LOVETREE_PRODUCT_ID });
 const login = await buildLogin(pool);
 const mediaHandler = createMediaHandler({
@@ -219,8 +228,9 @@ const requestHandler = async (request) => {
   if (path.startsWith('/auth/')) return loginRoute(login, request);
   if (path.startsWith('/api/media')) return mediaHandler(request);
   if (path.startsWith('/api/shares') || path.startsWith('/api/public/shares/')) return shareHandler(request);
-  if (path.startsWith('/api/community/')) return communityHandler(request);
-  if (path === '/api/youtube/oembed') return youtubeOembedHandler(request);
+ if (path.startsWith('/api/community/')) return communityHandler(request);
+ if (path === '/api/feedback' || path.startsWith('/api/admin/feedback')) return feedbackHandler(request);
+ if (path === '/api/youtube/oembed') return youtubeOembedHandler(request);
   return storageHandler(request);
 };
 
