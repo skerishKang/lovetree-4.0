@@ -12,7 +12,8 @@
 - **사이트**: `public/v41/feedback-board.mjs`(AI 고객 '오늘 사용 일지' 글쓰기 + '내 의견'), 계정 메뉴 버튼(AI 고객 전용 '오늘 사용 일지', 로그인 사용자 '내 의견'). `shell.mjs` 배선.
 - **내보내기**: `tools/export-ai-customer.mjs`(컴1 node, 관리자 API) — AI 고객별 `일지_YYMMDD.md`·`소개.md`. 예약 등록은 대표 확인 뒤.
 - **시험**: `tests/board-service.test.mjs` 9건, `tests/export-ai-customer.test.mjs` 4건, `tests/feedback-postgres.test.mjs` +1(게시판). `npm test` 1,439 pass/0 fail(브라우저 지도 대비 제외), build·modulepreload 통과. 관리자 게시판 실화면(모의 관리자 API): 390·1440 목록·상세+답글·페르소나, 가로 넘침 0.
-- **남긴 것**: 실 PTgreSQL·배포·머지는 CI/컴2. 내보내기 실데이터 실행은 AI 고객·일지 데이터가 아직 없어 미실행(스크립트·포맷 시험만). 로그인 상태 사이트 플로우는 OAuth·비밀값 필요해 미확인.
+- **배포(2026-11-14)**: PR #552 스쿼시 머지 → main `69cb042`. 필수 검사 4개 초록. 프런트(pages.dev) 자동 배포. 백엔드(컴2): `board-261114.sql`(md5 `3454cf157f8bfe1b501fe3969f6f24c5`) /tmp 전송·일치 후 `SET ROLE lovetree_owner` + `ON_ERROR_STOP=1` 적용(열 15·역할 `admin/ai_customer`·`lovetree_feedback_replies`·`lovetree_ai_personas·소유자 lovetree_owner). `AUTODEPLOY_ACCEPT_MIGRATIONS=1 ... run` → `result=installed`, installed_sha `69cb042`. 라이브 `/api/admin/feedback`·`/api/board/mine`·`/api/board` 401(로그인 필요=라우트 배포 확인).
+- **남긴 것**: 실 PTgreSQL·배포·머지는 CI/컴2. 내보내기 실데이터 실행은 AI 고객·일지 데이터가 아직 없어 미실행(스크립트·포맷 시험만). 로그인 상태 사이트 플로우는 OAuth·비밀값 필요해 미확인. AI 고객 계정·역할·페르소나는 운영자 등록 필요.
 
 ## 2026-11-14 — #536 보드: 넓은 화면 판 쏠림·별 모양 기둥 배치·머리줄 [종이|밤]·읽기 전용 표시 (로컬3, ai/local3-lt536-boardwide-261114, main 3c21387 기준)
 
