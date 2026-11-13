@@ -35,6 +35,7 @@
 - 커밋·push는 맡은 작업의 일부로 진행한다. `main` 병합·외부 배포는 해당 작업의 Owner 지시 범위에서 한다.
 - 강제 push, `git reset --hard`, `git clean`으로 타 작업을 지우지 않는다.
 - **컴1에서 Docker·WSL 사용 금지(대표 결정).** `docker`, `docker compose`, Docker Desktop, `wsl` 을 실행하지 않는다(Docker Desktop 은 WSL2 를 깨운다). 로컬 PostgreSQL 이 필요하면 띄우지 말고 서버 시험의 가짜/메모리 저장소로 확인한 뒤, 실제 PostgreSQL 확인은 필수 검사 'PostgreSQL 저장·로그인 상태 검증'에 맡긴다. `deploy/host-com2/lovetree-api/postgres.compose.yml` 은 미사용 참고용이다(2026-11-14 레인이 로컬 확인용으로 Docker Desktop 을 켠 일).
+- **브라우저는 컴2에서(대표 결정 2026-11-14).** 화면 확인·로그인 확인·AI 고객(페르소나) 사용처럼 브라우저로 사이트를 직접 쓰는 일은 컴2 에 접속해 컴2 의 브라우저(주로 tabbit)로 한다. 대표가 '컴1 사용'이라고 분명히 말할 때만 컴1 브라우저를 쓴다. 계정이 필요하면 대표가 직접 로그인하거나, 시험 계정 또는 AI 고객 계정(정해진 것만)을 쓴다. npm test·미리보기 검사의 헤드리스 자동 시험은 지금처럼 돌린다. 컴2 브라우저에 붙는 방법이 정해져 있지 않으면 컴1 브라우저로 대신하지 말고 멈추고 묻는다.
 
 ## 검증과 보고
 - `npm test`와 `npm run build`를 실행한다. UI 변경은 가능한 환경에서 실제 브라우저로 확인한다.
