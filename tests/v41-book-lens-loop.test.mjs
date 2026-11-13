@@ -6,7 +6,7 @@ const BOOK=readFileSync(new URL('../public/v41/views/book/book.js',import.meta.u
 // 게이트가 그리기 조건과 같은 식이므로 화면 결과는 그대로다.
 
 test('책 돋보기: 다음 프레임 예약은 렌즈가 실제로 움직일 때만 한다 — 게이트는 그리기 조건과 같다',()=>{
- assert.match(BOOK,/function lensActive\(\)\{return overBook&&lensOn&&!single\(\)&&machineState==='INSPECTING'\}/,'게이트는 한 곳에 모은다');
+ assert.match(BOOK,/function lensActive\(\)\{return overBook&&lensOn&&!narrow\(\)&&machineState==='INSPECTING'\}/,'게이트는 한 곳에 모은다(휴대폰 폭에서만 돋보기 대신 길게 누르기)');
  assert.match(BOOK,/lensFrame=lensActive\(\)\?requestAnimationFrame\(lensLoopTick\):0/,'게이트가 거짓이면 다음 프레임을 예약하지 않는다');
 });
 
