@@ -11,8 +11,9 @@
 - **운영센터**: `src/admin.js`에 '고객 의견' 칸(최신 순·종류/상태 거르기·상태 변경·운영 메모·연결 이슈 번호·'GitHub 이슈 글 만들기' 복사 — 계정·트리 내용 제외). `src/admin.css`에 입력样式.
 - **사이트 창**: `public/v41/feedback.mjs`(창·API), `public/v41/index.html`(계정 메뉴 '의견 보내기'·첫 화면 아래 작은 링크·`feedback-panel` 창), `public/v41/shell.mjs`(배선·자동 정보), `shell.css`. 자동 정보(지금 화면·화면 크기·테마·앱 버전·로그인 여부·내 트리 id)는 보내기 전에 보이고 끌 수 있다.
 - **시험**: `tests/feedback-service.test.mjs` 8건(저장·검사·PII 가림·로그아웃 제한·관리자 목록/변경), `tests/feedback-postgres.test.mjs` 2건(저장·거르기·업데이트·컬럼·빈 context). CI `ci.yml` postgres job에 `tests/feedback-postgres.test.mjs` 추가, `scripts/apply-schema.mjs` TABLES에 `lovetree_feedback` 추가.
-- **실화면(모의 서버, 로그아웃)**: 390·1440에서 작은 링크→창 열림→보내기→'받았어요. 살펴보고 고칠게요.' 확인. 390 창 358×756(화면 안, 스크롤), 1440 460×812(화면 안). 자동 정보 `screen/viewport/theme/version/loggedIn` 전송, 로그아웃이라 treeId 없음. 계정 메뉴 '의견 보내기'·로그아웃 링크 DOM 확인. **로그인 상태·실서버 전송·관리자 화면은 미확인**(시험 계정 05 없음·컴2 서버·DB 필요).
-- **남긴 것/주의**: 로그인 흐름·실 PostgreSQL 검사·배포·머지는 이 레인 권한 밖(CI/컴2). 로컬 5→3 경로 수정. `v41/home.js`·`src/views/orbit.js`(로컬2)·`board.*`(로컬4)·`book.*`(로컬1)는 건드리지 않음. 겹침 없음. `v41-map-contrast.test.mjs`는 이 환경에서 Chromium 렌더링이 300초를 넘어 타임아웃(내 변경과 무관, 다른 1,415건 통과).
+- **실화면(모의 서버, 로그아웃)**: 390·1440에서 작은 링크→창 열림→보내기→'받았어요. 살펴보고 고칠게요.' 확인. 390 창 358×756(화면 안, 스크롤), 1440 460×812(화면 안). 자동 정보 `screen/viewport/theme/version/loggedIn` 전송, 로그아웃이라 treeId 없음. 계정 메뉴 '의견 보내기'·로그아웃 링크 DOM 확인. 라이브 프런트(pages.dev) 배포 후 `feedback-link`·`feedback-panel`·`account-feedback`·`feedback.mjs` 확인.
+- **머지/배포(2026-11-14)**: PR #543 스쿼시 머지 → main `51b39e9`. 필수 검사 4개(ubuntu·windows·미리보기 postdeploy·PostgreSQL 저장·로그인 상태 검증) 초록. **프런트(Cloudflare Pages) 배포 완료**. **백엔드(컴2) 미배포**: `server/db/migrations/feedback-261114.sql`·`schema.sql` 변경으로 autodeploy가 `needs_manual_migration`에서 멈춘다 → 컴2 WSL에서 마이그레이션 수동 적용 + `AUTODEPLOY_ACCEPT_MIGRATIONS=1 /usr/local/sbin/lovetree-api-autodeploy run` 필요(이 레인은 컴2 접근·WSL 사용 불가로 미시행). 라이브 `POST /api/feedback`는 구 백엔드에서 401 — 아직 실동작 안 함. '[시험] 의견 창구 확인' 전송·관리자 받은함 확인은 백엔드 배포 후 가능.
+- **남긴 것/주의**: 로그인 상태·관리자 화면 실확인·라이브 전송은 백엔드 배포 후. 로컬 5→3 경로 수정. `v41/home.js`·`src/views/orbit.js`(로컬2)·`board.*`(로컬4)·`book.*`(로컬1)는 건드리지 않음(겹침 없음). `v41-map-contrast.test.mjs`는 이 환경에서 Chromium 렌더링이 300초를 넘어 타임아웃(내 변경과 무관, 다른 1,415건 통과).
 
 ## 2026-11-13 — 전 화면 접근성 재점검(레인 B): 닫힌 겹이 탭으로 들어가던 것 수리
 
