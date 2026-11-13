@@ -151,3 +151,22 @@ test('상태·메모·이슈 번호는 관리자만 바꾼다', async () => {
   const missing = await call('PATCH', '/api/admin/feedback/999999', {account: 'admin', body: {status: 'fixed'}});
   assert.equal(missing.status, 404);
 });
+
+test("'닫음' 상태를 관리자가 저장하고 계약 목록에도 있다(#564 10)", async () => {
+  const {call} = setup();
+  // 서비스 계약: statuses 목록에 'closed'가 있다.
+  const {service} = setup();
+  assert.ok(service.statuses.includes('closed'));
+  const res = await call('POST', '/api/feedback', {account: 'alice', body: {category: 'bug', body: '정리할 글'}});
+  const id = res.body.id;
+
+  const closed = await call('PATCH', '/api/admin/feedback/' + id, {account: 'admin', body: {status: 'closed'}});
+  assert.equal(closed.status, 200);
+  assert.equal(closed.body.feedback.status, 'closed');
+
+  // 목록은 그대로 돌려 주고(숨김은 화면 몫), 상태별 거르기에서 closed가 읽힌다.
+  const list = await call('GET', '/api/admin/feedback', {account: 'admin'});
+  assert.equal(list.body.feedback[0].status, 'closed');
+  const byClosed = await call('GET', '/api/admin/feedback', {account: 'admin', query: 'status=closed'});
+  assert.equal(byClosed.body.feedback.length, 1);
+});

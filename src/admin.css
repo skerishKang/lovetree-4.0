@@ -1,12 +1,13 @@
 /* 러브트리 관리자 — 고객 의견 게시판(#540 2차). 검은 무대 + 금테 카드, --lt-* 토큰만 쓴다. */
 
-/* 4.0 styles.css의 :root 크림 배경이 밑에 비치지 않게 무대 색으로 덮는다. */
-html { background: var(--lt-stage); }
+/* #564 12: 긴 페이지 맨 아래까지 무대색으로 — 4.0 styles.css의 :root 크림(#f7f5ef)이 밑에 비치지 않게 html·body 배경과 min-height를 무대색으로 고정한다. */
+html, body { min-height: 100%; background-color: var(--lt-stage); }
 
 body {
   margin: 0;
-  min-height: 100dvh;
-  background: radial-gradient(circle at 50% 0, var(--lt-stage-2), var(--lt-stage) 60%, #000);
+  background-image: radial-gradient(circle at 50% 0, var(--lt-stage-2), var(--lt-stage) 60%, #000);
+  background-repeat: no-repeat;
+  background-attachment: fixed;
   color: var(--lt-pearl);
   font-family: Pretendard, "Noto Sans KR", system-ui, sans-serif;
 }
@@ -30,6 +31,8 @@ body {
 .app-header nav { display: flex; align-items: center; gap: 4px; flex: 1; min-width: 0; flex-wrap: wrap; }
 .app-header nav a,
 .app-header nav button {
+  display: inline-flex; /* #564 3: a는 min-height가 먹지 않아 단추와 높이가 어긋났다 */
+  align-items: center;
   color: var(--lt-muted);
   text-decoration: none;
   background: none;
@@ -81,11 +84,14 @@ body {
 .lt-badge[data-kind="journal"] { color: var(--lt-gold); border-color: var(--lt-gold-line); }
 .lt-badge[data-status="received"] { color: var(--lt-rose); border-color: var(--lt-rose-ink); }
 .lt-badge[data-status="fixed"] { color: #8fd0a0; border-color: #3f6b4c; }
+.lt-badge[data-status="closed"] { color: var(--lt-muted); border-color: var(--lt-line); }
+.lt-post-issue { font-size: 12px; }
 
 .lt-card { border: 1px solid var(--lt-gold-line); border-radius: var(--lt-r-panel); background: var(--lt-glass-strong); padding: 20px 22px; box-shadow: 0 18px 50px #0006; }
 .lt-body { margin: 12px 0 0; line-height: 1.9; font-size: 14px; overflow-wrap: anywhere; }
-.lt-back { justify-self: start; background: none; border: 0; color: var(--lt-muted); font: inherit; font-size: 13px; cursor: pointer; padding: 6px 0; }
-.lt-back:hover { color: var(--lt-pearl); }
+/* #564 2: 뒤로 단추는 눈에 띄는 러브트리 단추 모양(금테 pill)으로 키운다. */
+.lt-back { justify-self: start; display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px; border-radius: var(--lt-r-pill); border: 1px solid var(--lt-gold-line); background: rgba(255,230,166,.08); color: var(--lt-gold); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.lt-back:hover { background: rgba(255,230,166,.16); color: var(--lt-pearl); }
 .lt-author-link { background: none; border: 0; padding: 0; color: var(--lt-gold); font: inherit; font-size: 13px; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
 
 .lt-reply-list { display: grid; gap: 10px; margin-bottom: 12px; }
@@ -95,8 +101,16 @@ body {
 .lt-reply p { margin: 0; font-size: 13px; line-height: 1.7; overflow-wrap: anywhere; }
 
 .lt-reply-form { display: grid; gap: 8px; }
-.lt-reply-form select, .lt-reply-form textarea, .lt-field input, .lt-field textarea { width: 100%; border-radius: 10px; border: 1px solid var(--lt-line); background: rgba(255,255,255,.04); color: var(--lt-pearl); padding: 9px 11px; font: inherit; font-size: 13px; }
+/* #564 8: 답글 종류를 큰 선택 두 개로 */
+.lt-reply-kind { display: flex; gap: 8px; flex-wrap: wrap; }
+.lt-reply-kind button { min-height: 44px; padding: 0 16px; border-radius: var(--lt-r-pill); border: 1px solid var(--lt-line); background: rgba(255,255,255,.03); color: var(--lt-muted); font: inherit; font-size: 13px; cursor: pointer; }
+.lt-reply-kind button.is-on { border-color: var(--lt-gold); color: var(--lt-gold); background: rgba(255,230,166,.07); }
+.lt-reply-note { margin: 0; color: var(--lt-gold); font-size: 12px; }
+/* #564 9: '답글 남기기'는 오른쪽 정렬 보통 크기 */
+.lt-reply-form button[type="submit"] { justify-self: end; }
+.lt-reply-form textarea, .lt-field input, .lt-field textarea { width: 100%; border-radius: 10px; border: 1px solid var(--lt-line); background: rgba(255,255,255,.04); color: var(--lt-pearl); padding: 9px 11px; font: inherit; font-size: 13px; }
 .lt-field { display: grid; gap: 6px; margin-top: 12px; font-size: 12px; color: var(--lt-muted); }
+.lt-field-note { font-size: 11px; color: var(--lt-muted); }
 .lt-status-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
 .lt-status-row button { min-height: 40px; padding: 0 14px; border-radius: var(--lt-r-pill); border: 1px solid var(--lt-line); background: rgba(255,255,255,.03); color: var(--lt-pearl); font: inherit; font-size: 12px; cursor: pointer; }
 .lt-status-row button.is-on { border-color: var(--lt-gold); color: var(--lt-gold); }

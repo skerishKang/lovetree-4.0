@@ -10,7 +10,7 @@ import {ROLE_ADMIN, ROLE_AI_CUSTOMER} from './admin-roles.js';
  *      관리자 화면은 게시판 — 목록·상세·답글(고객 답변/내부 메모)·페르소나.
  */
 export const FEEDBACK_CATEGORIES = Object.freeze(['bug', 'inconvenient', 'feature', 'other']);
-export const FEEDBACK_STATUSES = Object.freeze(['received', 'reviewing', 'fixed', 'later']);
+export const FEEDBACK_STATUSES = Object.freeze(['received', 'reviewing', 'fixed', 'later', 'closed']);
 export const FEEDBACK_KINDS = Object.freeze(['opinion', 'journal']);
 const CONTEXT_KEYS = Object.freeze(['screen', 'viewport', 'theme', 'version', 'loggedIn', 'treeId']);
 const MAX_BODY = 2000;

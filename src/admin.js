@@ -17,9 +17,10 @@ import {
  * - 이슈 탭: GitHub 이슈 목록·상태만(공개 저장소, 토큰 없이).
  */
 
-// 화면이 직접 가지는 상태는 거르기뿐이다. 나머지는 주소(해시)에서 온다.
+// 화면이 직접 가지는 상태는 거르기와 답글 종류뿐이다. 나머지는 주소(해시)에서 온다.
 const state = {kind: '', status: ''};
 let route = parseHash(globalThis.location?.hash);
+let replyKind = 'internal'; // 상세 화면에서만 쓰는 답글 종류(#564 8). 기본은 내부 메모.
 
 async function read(path, init = {}) {
   try {
@@ -91,7 +92,7 @@ async function renderList() {
     ? rows.map(row => `<article class="lt-post" data-open="${escapeText(row.id)}" tabindex="0" role="button">
         <div class="lt-post-top">${kindBadge(row.kind)}${statusBadge(row.status)}<span class="lt-post-date">${escapeText(formatTime(row.createdAt))}</span></div>
         <h3 class="lt-post-title">${escapeText(row.displayTitle || '(제목 없음)')}</h3>
-        <div class="lt-post-meta"><span class="lt-post-author" data-author="${escapeText(row.subjectId || '')}">${escapeText(authorLabel(row))}</span><span>답글 ${row.replyCount || 0}</span></div>
+        <div class="lt-post-meta"><span class="lt-post-author" data-author="${escapeText(row.subjectId || '')}">${escapeText(authorLabel(row))}</span>${issueLink(row.issueNumber) ? `<span class="lt-post-issue">이슈 ${issueLink(row.issueNumber)}</span>` : ''}<span>답글 ${row.replyCount || 0}</span></div>
       </article>`).join('')
     : '<p class="lt-empty">접수된 글이 없습니다.</p>';
   host.innerHTML = `${head()}<div class="admin-shell lt-board">
@@ -105,6 +106,7 @@ async function renderDetail(id) {
   const res = await read('/api/admin/feedback/' + encodeURIComponent(id));
   const post = res.ok ? res.payload?.feedback : null;
   if (!post) { navigate('board'); return; }
+  replyKind = 'internal'; // 글을 다시 열면 내부 메모부터(#564 8).
   const replies = Array.isArray(post.replies) ? post.replies : [];
   const persona = post.persona && post.persona.name ? post.persona : null;
   const replyRows = replies.length
@@ -116,6 +118,11 @@ async function renderDetail(id) {
   const statusBtns = STATUS_ORDER.map(s => `<button type="button" data-set-status="${s}" class="${post.status === s ? 'is-on' : ''}">${STATUS_LABEL[s]}</button>`).join('');
   const journalOnly = post.kind === 'journal';
   const issue = String(post.issueNumber || '').trim();
+  const authorName = persona?.name || authorLabel(post);
+  // #564 8: 답글 종류를 select 대신 큰 선택 두 개로. 고객 쪽을 고르면 누구에게 보이는지 안내한다.
+  const replyKindBtns = journalOnly
+    ? '<div class="lt-reply-kind"><button type="button" data-reply-kind="internal" class="is-on" aria-pressed="true">내부 메모</button></div>'
+    : `<div class="lt-reply-kind" role="group" aria-label="답글 종류"><button type="button" data-reply-kind="internal" class="is-on" aria-pressed="true">내부 메모</button><button type="button" data-reply-kind="customer" aria-pressed="false">고객에게 보이는 답변</button></div><p class="lt-reply-note" data-reply-note hidden>${escapeText(authorName)}에게 보입니다</p>`;
   host.innerHTML = `${head()}<div class="admin-shell lt-board">
     <button type="button" class="lt-back" data-back>← 목록</button>
     <article class="lt-card">
@@ -128,22 +135,19 @@ async function renderDetail(id) {
       <h2 class="lt-h2">답글</h2>
       <div class="lt-reply-list">${replyRows}</div>
       <form class="lt-reply-form" data-reply-form>
-        <select name="authorType" aria-label="답글 종류"${journalOnly ? ' disabled' : ''}>
-          <option value="internal">내부 메모</option>
-          ${journalOnly ? '' : '<option value="customer">고객에게 보이는 답변</option>'}
-        </select>
+        ${replyKindBtns}
         <textarea name="body" rows="3" maxlength="4000" placeholder="${journalOnly ? '내부 메모만 남길 수 있어요' : '답글을 입력하세요'}" aria-label="답글 본문"></textarea>
-        <button type="submit" class="lt-btn primary">답글 남기기</button>
+        <button type="submit" class="lt-btn">답글 남기기</button>
       </form>
       <p class="lt-status" role="status"></p>
     </section>
     <section class="lt-card">
       <h2 class="lt-h2">처리</h2>
       <div class="lt-status-row">${statusBtns}</div>
-      <label class="lt-field">운영 메모<textarea data-memo rows="2" maxlength="2000">${escapeText(post.memo || '')}</textarea></label>
+      <label class="lt-field">운영 메모<textarea data-memo rows="2" maxlength="2000">${escapeText(post.memo || '')}</textarea><small class="lt-field-note">이 글 전체에 대한 메모예요. 고객에게 보이지 않아요.</small></label>
       <label class="lt-field">연결 이슈 번호<input data-issue value="${escapeText(issue)}" placeholder="예: 541"></label>
       ${issueLink(issue) ? `<p class="lt-post-meta">연결 이슈 ${issueLink(issue)}</p>` : ''}
-      <div class="lt-actions"><button type="button" class="lt-btn primary" data-save>저장</button><button type="button" class="lt-btn" data-make-issue>GitHub 이슈 글 만들기</button></div>
+      <div class="lt-actions"><button type="button" class="lt-btn primary" data-save>메모·이슈 저장</button><button type="button" class="lt-btn" data-make-issue>GitHub 이슈 글 만들기</button></div>
       <p class="lt-status" data-save-status role="status"></p>
     </section>
   </div>`;
@@ -155,7 +159,13 @@ async function renderPersona(subjectId) {
   const postsRes = await read('/api/admin/feedback');
   const posts = visibleRows(postsRes.ok ? postsRes.payload?.feedback : [], 'all').filter(p => p.subjectId === subjectId);
   const intro = persona.intro || {};
-  const form = PERSONA_FIELDS.map(([key, label]) => `<label class="lt-field">${label}<input data-intro="${key}" value="${escapeText(intro[key] || '')}"></label>`).join('');
+  // #564 13: 소개는 길어 잘리지 않게 여러 줄 칸으로. 내용 줄 수에 따라 높이를 정한다.
+  const rowsFor = value => {
+    const lines = String(value || '').split('\n');
+    const wrapped = lines.reduce((sum, line) => sum + Math.max(1, Math.ceil(line.length / 40)), 0);
+    return Math.min(14, Math.max(2, wrapped));
+  };
+  const form = PERSONA_FIELDS.map(([key, label]) => `<label class="lt-field">${label}<textarea data-intro="${key}" rows="${rowsFor(intro[key])}">${escapeText(intro[key] || '')}</textarea></label>`).join('');
   const postRows = posts.length
     ? posts.map(p => `<button type="button" class="lt-post lt-post-row" data-open="${escapeText(p.id)}"><span>${kindBadge(p.kind)}</span><span class="lt-post-title">${escapeText(p.displayTitle || '')}</span><span class="lt-post-date">${escapeText(formatTime(p.createdAt))}</span></button>`).join('')
     : '<p class="lt-empty">쓴 글이 없습니다.</p>';
@@ -163,9 +173,9 @@ async function renderPersona(subjectId) {
     <button type="button" class="lt-back" data-back-list>← 게시판</button>
     <section class="lt-card">
       <h1 class="lt-h1">페르소나 · ${escapeText(persona.name || '이름 없음')}</h1>
-      <div class="lt-actions"><button type="button" class="lt-btn primary" data-persona-save>소개 저장</button></div>
       <label class="lt-field">이름<input data-persona-name value="${escapeText(persona.name || '')}" maxlength="120"></label>
       ${form}
+      <div class="lt-actions"><button type="button" class="lt-btn primary" data-persona-save>소개 저장</button></div>
       <p class="lt-status" data-persona-status role="status"></p>
     </section>
     <section class="lt-card"><h2 class="lt-h2">이 고객의 글</h2><div class="lt-post-list">${postRows}</div></section>
@@ -233,6 +243,18 @@ document.addEventListener('click', async (event) => {
   if (persona && persona.dataset.persona) { navigate('persona', persona.dataset.persona); return; }
   if (event.target.closest('[data-back]')) { navigate('board'); return; }
   if (event.target.closest('[data-back-list]')) { navigate('board'); return; }
+  const replyKindBtn = event.target.closest('[data-reply-kind]');
+  if (replyKindBtn) {
+    replyKind = replyKindBtn.dataset.replyKind;
+    document.querySelectorAll('[data-reply-kind]').forEach(btn => {
+      const on = btn === replyKindBtn;
+      btn.classList.toggle('is-on', on);
+      btn.setAttribute('aria-pressed', String(on));
+    });
+    const note = document.querySelector('[data-reply-note]');
+    if (note) note.hidden = replyKind !== 'customer';
+    return;
+  }
   const setStatus = event.target.closest('[data-set-status]');
   if (setStatus) {
     const res = await read('/api/admin/feedback/' + encodeURIComponent(route.id), {method: 'PATCH', body: JSON.stringify({status: setStatus.dataset.setStatus})});
@@ -283,7 +305,7 @@ document.addEventListener('submit', async (event) => {
   if (!form) return;
   event.preventDefault();
   const body = form.querySelector('[name="body"]').value;
-  const authorType = form.querySelector('[name="authorType"]').value;
+  const authorType = replyKind;
   const res = await read('/api/admin/feedback/' + encodeURIComponent(route.id) + '/reply', {method: 'POST', body: JSON.stringify({authorType, body})});
   if (res.ok) await renderDetail(route.id);
 });
