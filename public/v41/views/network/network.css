@@ -46,6 +46,9 @@ button{font:inherit;color:inherit;cursor:pointer}
  /* #517: 내려온 도구 줄 아래에 순간 선택 패널이 오게 한다 — 패널 top은 measureInsets가 재어 넘긴
     머리 아래 끝(--lt-picker-top)을 따른다(도구 줄이 한 줄이든 두 줄이든 겹침 0). */
  html[data-v41-screen=network] .lt-moment-picker{top:var(--lt-picker-top,118px)}
+ /* #517 후속: 390 동심원에서 안내 문구가 지도 링 위에 투명 배경으로 얹혀 글자 대비가 1.62~2.83:1로 떨어졌다.
+    여백을 줄이면 위의 선택 패널과 겹치므로, 안내 문구에 판 바탕을 주어 지도 위에서도 읽히게 한다(밤·정원 같은 규칙). */
+ .hero p{display:inline-block;padding:2px 10px;border-radius:999px;background:var(--lt-map-bg-top)}
  .detail{left:6px;right:6px;top:auto;bottom:6px;width:auto;max-height:67svh;border-radius:23px 23px 17px 17px;padding:16px;padding-bottom:max(16px,env(safe-area-inset-bottom));transform:translateY(calc(100% + 40px))}.detail.open{transform:translateY(0);z-index:35}.detail h2{font-size:21px}.path-actions{grid-template-columns:1fr}.action{min-height:48px}
  .mobile-ribbon{display:flex;position:absolute;left:8px;right:8px;bottom:10px;z-index:29;gap:6px;padding:6px;overflow-x:auto;scrollbar-width:none;border:1px solid rgba(73,65,83,.10);border-radius:16px;background:rgba(255,255,255,.90);box-shadow:0 12px 32px rgba(55,44,64,.12);backdrop-filter:blur(18px)}.mobile-ribbon::-webkit-scrollbar{display:none}.mobile-ribbon button{flex:0 0 auto;height:42px;padding:0 12px;border-radius:12px;border:0;background:transparent;font-size:10px;color:rgba(47,43,52,.56)}.mobile-ribbon button.active{background:#302c35;color:#fff}.mobile-ribbon button.origin{background:linear-gradient(135deg,rgba(228,93,141,.12),rgba(139,105,232,.12));color:#403847;font-weight:700}
  .route-status{left:8px;right:8px;bottom:64px;transform:none;min-width:0;max-width:none}.route-status span{white-space:normal}.toast{top:54px;bottom:auto;max-width:calc(100vw - 22px);border-radius:15px;text-align:center}.branch-chooser{top:auto;bottom:70px;transform:translate(-50%,16px) scale(.96)}.branch-chooser.open{transform:translate(-50%,0) scale(1)}

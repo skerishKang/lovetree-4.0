@@ -79,6 +79,8 @@ jobs:
           echo "한글 글꼴 $(fc-list :lang=ko | wc -l)개 · 대표 $(fc-match 'sans-serif:lang=ko' | head -1)"
           # 두 시험은 차례로 돌린다(브라우저 둘이 동시에 뜨면 느린 실행기에서 서로의 시간을 흔든다).
           node --test --test-concurrency=1 tests/v41-map-contrast.test.mjs tests/v41-map-theme-flow.test.mjs
+          # #517·#518: 390·360 지도 도구 줄 넘침·겹침과 상세 '기억책에서 보기'의 책 이동을 실제 화면에서 잰다.
+          node --test --test-concurrency=1 tests/v41-network-toolbar-517.test.mjs tests/v41-map-open-book-518.test.mjs
           echo "지도 실제 대비·판 전환 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
       - name: 미리보기 주소 찾기
         id: preview
