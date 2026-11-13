@@ -99,7 +99,7 @@
     if(type==='link'){url=$('#urlField')?.value||'https://lovetree.example';asset=ASSET.link}
     if(type==='youtube'){url=$('#urlField')?.value||'';sourceUrl=url;videoId=ytId(url);asset=ytMax(url)||V12_FALLBACK(url);source=source||'YouTube'}
     if(type==='note')memo=$('#noteField')?.value||memo;
-    let n={id,type,title,emotion,date:new Date().toISOString().slice(0,10),source,memo,x:620+(moments.length%3)*120,y:360+(moments.length%2)*100,rot:[-4,3,-2,4,2][moments.length%5],color:['rose','violet','cyan','amber'][moments.length%4],asset,video,url,sourceUrl,videoId,videoSource,duration:'00:03',keywords:selectedKeywords('add'),pinStyle:$('#addPinStyle')?.value||defaultPinStyle,cardStyle:$('#addCardStyle')?.value||defaultCardStyle,privacy:'PRIVATE',thumbnailUrl:isYtMoment({type,videoSource})?ytMax(url||sourceUrl||''):'',createdOrder:Math.max(...moments.map(m=>m.createdOrder||0))+1};
+    let n={id,type,title,emotion,date:LTLocalDate.localDateOnly(),source,memo,x:620+(moments.length%3)*120,y:360+(moments.length%2)*100,rot:[-4,3,-2,4,2][moments.length%5],color:['rose','violet','cyan','amber'][moments.length%4],asset,video,url,sourceUrl,videoId,videoSource,duration:'00:03',keywords:selectedKeywords('add'),pinStyle:$('#addPinStyle')?.value||defaultPinStyle,cardStyle:$('#addCardStyle')?.value||defaultCardStyle,privacy:'PRIVATE',thumbnailUrl:isYtMoment({type,videoSource})?ytMax(url||sourceUrl||''):'',createdOrder:Math.max(...moments.map(m=>m.createdOrder||0))+1};
     $('#addModal').classList.remove('open');addMomentV11(n,lastParentId);
   };
 
