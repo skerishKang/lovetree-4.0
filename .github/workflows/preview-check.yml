@@ -74,6 +74,16 @@ jobs:
           start=$(date +%s)
           node --test tests/v41-a11y-514-remaining.test.mjs
           echo "남은 접근성 항목 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+      # #535: 첫 화면 카드의 '떠 있음'(이동 폭·동작 줄이기), 카드끼리 겹친 면적, 가운데 단추 세 자리,
+      # 끄는 동안의 레이어 승격·관성을 실제 화면에서 잰다. 첫 화면은 vite 번들이라 먼저 build 한다.
+      - name: 첫 화면 떠 있음·겹침 시험(#535, 건너뜀=실패)
+        env:
+          LT_ORBIT535_REQUIRE: '1'
+        run: |
+          start=$(date +%s)
+          npx vite build > /dev/null
+          node --test tests/v41-orbit-535-float-overlap.test.mjs
+          echo "첫 화면 떠 있음·겹침 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
       - name: 지도 실제 대비·판 전환 시험(건너뜀=실패)
         env:
           LT_MAP_CONTRAST_REQUIRE: '1'
