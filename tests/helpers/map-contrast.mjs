@@ -84,7 +84,7 @@ export async function measureMapPixelsInPage(png) {
     if (!samples.length) { rows.push({ role, id, ratio: 0, fg: 'missing', bg: 'missing', samples: 0, why }); return; }
     const r = quantile(samples, q); rows.push({ role, id, ratio: Math.round(r.ratio * 100) / 100, fg: r.fg, bg: r.bg, samples: samples.length });
   };
-  const mask = document.createElement('canvas'); mask.width = img.width; mask.height = img.height;
+  const mask = document.createElement('canvas');
   // Keep the document's Korean language and font-synthesis rules. A detached
   // canvas otherwise picks different fallback glyph metrics on Windows.
   mask.lang = document.documentElement.lang;
@@ -93,16 +93,25 @@ export async function measureMapPixelsInPage(png) {
   // The map context uses alpha:false. Match that here so Chromium uses the
   // same opaque-canvas glyph rasterisation (transparent masks use different
   // hinting/subpixel coverage and can mistake surrounding pixels for ink).
-  const mc = mask.getContext('2d', { alpha: false, willReadFrequently: true });
+  let mc = null, maskW = 0, maskH = 0;
+  // 각 글자마다 상자 크기의 마스크를 새로 만든다(예전에는 전체 캔버스를 글자마다 흰 칠해 2880×1800 ×
+  // 글자 수만큼 다시 칠했다). 상자 밖은 어차피 읽지 않으므로 읽는 픽셀은 완전히 같다.
+  const maskFor = (w, h) => {
+    if (mc && maskW === w && maskH === h) { mc.setTransform(1, 0, 0, 1, 0, 0); mc.fillStyle = '#fff'; mc.fillRect(0, 0, w, h); return mc; }
+    mask.width = w; mask.height = h; maskW = w; maskH = h;
+    mc = mask.getContext('2d', { alpha: false, willReadFrequently: true });
+    mc.fillStyle = '#fff'; mc.fillRect(0, 0, w, h);
+    return mc;
+  };
   const textBounds = [];
   for (const [i, t] of window.__mapPaint.texts.entries()) {
     if (!visible((t.left + t.right) / 2, (t.top + t.bottom) / 2)) continue;
-    mc.setTransform(1, 0, 0, 1, 0, 0); mc.fillStyle = '#fff'; mc.fillRect(0, 0, mask.width, mask.height);
-    mc.setTransform(scale, 0, 0, scale, 0, 0); mc.font = t.font; mc.textAlign = t.align; mc.textBaseline = t.baseline; mc.fillStyle = '#000'; mc.fillText(t.text, t.x, t.y);
     const x0 = Math.max(0, Math.floor(t.left * scale)), y0 = Math.max(0, Math.floor(t.top * scale));
-    const w = Math.min(mask.width - x0, Math.ceil((t.right - t.left + 1) * scale)), h = Math.min(mask.height - y0, Math.ceil((t.bottom - t.top + 1) * scale));
+    const w = Math.min(img.width - x0, Math.ceil((t.right - t.left + 1) * scale)), h = Math.min(img.height - y0, Math.ceil((t.bottom - t.top + 1) * scale));
     if (w <= 0 || h <= 0) continue;
-    const data = mc.getImageData(x0, y0, w, h).data, samples = [];
+    const mc = maskFor(w, h);
+    mc.setTransform(scale, 0, 0, scale, -x0, -y0); mc.font = t.font; mc.textAlign = t.align; mc.textBaseline = t.baseline; mc.fillStyle = '#000'; mc.fillText(t.text, t.x, t.y);
+    const data = mc.getImageData(0, 0, w, h).data, samples = [];
     // 표본이 하나도 없을 때 까닭을 남긴다(글자 속이 안 그려졌는지, 가려졌는지 — 실패 글에 그대로 나온다).
     const why = { box: [x0, y0, w, h], font: t.font, darkest: 255, ink: 0, hidden: 0 };
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
@@ -202,10 +211,18 @@ export function measureMapDOMInPage() {
 }
 
 export async function measureMap(frame) {
-  const screenshot = await frame.locator('#stage').screenshot({ animations: 'disabled' });
-  const canvas = await frame.evaluate(measureMapPixelsInPage, `data:image/png;base64,${screenshot.toString('base64')}`);
-  const dom = await frame.evaluate(measureMapDOMInPage);
-  return { canvas, dom, screenshot };
+  // 스크린샷과 픽셀 해석 사이에 지도가 다시 그려지면(이행 중 페이드 등) 스크린샷 픽셀과 그리기 기록이
+  // 어긋나 이행 중 색을 잘못 잰다(간헐 실패). 잴 때마다 앞·뒤 그리기 기록이 같은지 확인하고,
+  // 어긋나면 화면이 멈출 때까지 기다렸다 다시 잰다(최대 3번). 멈춰 있으면 검사가 추가로 걸리지 않는다.
+  for (let attempt = 0; ; attempt += 1) {
+    const before = await frame.evaluate(() => JSON.stringify(window.__mapPaint));
+    const screenshot = await frame.locator('#stage').screenshot({ animations: 'disabled' });
+    const canvas = await frame.evaluate(measureMapPixelsInPage, `data:image/png;base64,${screenshot.toString('base64')}`);
+    const dom = await frame.evaluate(measureMapDOMInPage);
+    const after = await frame.evaluate(() => JSON.stringify(window.__mapPaint));
+    if (before === after || attempt >= 2) return { canvas, dom, screenshot };
+    await settleMap(frame);
+  }
 }
 
 export function worstMapRoles(results) {
