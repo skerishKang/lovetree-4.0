@@ -92,6 +92,15 @@ jobs:
           start=$(date +%s)
           node --test --test-concurrency=1 tests/v41-board-pinboard2-601.test.mjs
           echo "보드 핀보드 2차 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+      # #619-5: 쌓기 배치 — 열마다 차곡차곡 쌓고, 폭이 바뀌면 칸 수만 바뀌어 순서는 같아야 한다.
+      # 모델 + 실제 화면(390·1440·1980)을 잰다. 건너뜀=실패(크롬이 준비된 이 잡에서 돈다).
+      - name: 보드 쌓기 배치 시험(건너뜀=실패 — #619-5)
+        env:
+          LT_BOARD_STACK_619_REQUIRE: '1'
+        run: |
+          start=$(date +%s)
+          node --test --test-concurrency=1 tests/v41-board-stack-619.test.mjs
+          echo "보드 쌓기 배치 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
       # #514: 남은 접근성 항목(moderate 이하)을 실제 화면에서 잰다 — 확대 막기·랜드마크·제목 단계·
       # 모바일 선택 줄 top. axe-core·Chromium이 필요한 실행형 시험이라 크롬이 준비된 이 잡에서 돈다.
       - name: 남은 접근성 항목 시험(#514, 건너뜀=실패)

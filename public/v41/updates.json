@@ -24,4 +24,11 @@
       {"kind": "fix", "text": "보드에서도 순간 날짜를 바꿀 수 있어요", "source": "ai_tester", "tester": "윤제", "issue": "#608"}
     ]
   }
+  ,{
+    "version": "4.1.4",
+    "date": "2026.11.15",
+    "items": [
+      {"kind": "new", "text": "보드가 칸마다 차곡차곡 쌓여요. 긴 카드 아래가 비지 않아요", "source": "team", "issue": "#619"}
+    ]
+  }
 ]
