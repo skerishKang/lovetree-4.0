@@ -212,20 +212,23 @@ momentContent=function(m,compact=false){
   const ctx=(typeof LTMedia.currentContext==='function')?LTMedia.currentContext():{source:'',owned:false};
   if(media.kind==='youtube'){
    // #327 1부: 내 기록(서버·로그인 소유자)은 썸네일을 처음부터 보여 준다(판정은 media-preview 의
-   // autoLoadMedia 한 함수). 공유·예시는 기존 규칙 그대로 — 누르기 전 외부 요청 0.
+   // autoLoadMedia 한 함수). #635 PR B(대표 결정): 감상 화면의 영상 칸은 빈 크림 상자였다 — 보관된 썸네일을
+   // 먼저 보이게 한다(재생 임베드는 여전히 누르기 전까지 없다). 썸네일이 없거나 깨지면 #393 내려가기 틀로
+   // 제목 글 카드가 된다(회색·빈 상자 금지). 보관 썸네일(data:·/api/media/)이 있으면 그것이 먼저다.
    const thumb=localThumb(safe);
-   const auto=!thumb&&LTMedia.autoLoadMedia(ctx.source,ctx.owned);
-   // #393·#429: 세로 영상 틀(9:16)과 썸네일 내려가기(저장 주소 → oardefault/hqdefault → mqdefault → 글/최소 카드) 한 벌.
    const vertical=LTMedia.verticalVideo(safe.url,safe.mediaMetadata);
    const defaultThumb=vertical?LTMedia.youtubeThumbUrl(media.videoId,true):media.loadUrl;
-   const candidates=auto?thumbnailCandidates(m,{vertical,autoLoad:true}):[];
+   const candidates=thumbnailCandidates(m,{vertical,autoLoad:true});
    const remoteThumb=candidates[0]||defaultThumb;
-   const thumbFallback=auto?thumbFallbackAttrs(m,{candidates:candidates.length?candidates:[remoteThumb],writable:writableBook,videoUnavailable:true,variant:'book',momentId:safe.id}):'';
+   const thumbFallback=thumbFallbackAttrs(m,{candidates:candidates.length?candidates:[remoteThumb],writable:writableBook,videoUnavailable:true,variant:'book',momentId:safe.id});
    // #584: 단추 이름을 '▶ 재생'으로 줄인다. 시작 시점이 있으면 '▶ 재생 · 1:23'.
    const label=media.startSeconds?('▶ 재생 · '+media.label.replace('YouTube 링크 · ','')):'▶ 재생';
-   const face=thumb?'<img src="'+t(thumb)+'" alt="">'
-    :auto?'<img src="'+t(remoteThumb)+'" alt="'+t(safe.title||'YouTube 영상 썸네일')+'"'+thumbFallback+' referrerpolicy="no-referrer" loading="lazy" decoding="async">'
-    :'<span class="yt-placeholder"></span>';
+   /* #635 PR B: 재생 전 칸이 빈 크림 상자(yt-placeholder)였다 — 감상에서 특히 티가 났다.
+      보관된 썸네일(data:·/api/media/)을 먼저 보이고, 없으면 유튜브 보관 썸네일을 부른다(#635 PR B 대표 결정 —
+      재생 임베드가 아니라 썸네일 <img> 하나다). 어느 쪽이든 깨지면 #393 내려가기 틀로 제목 글 카드가 된다 —
+      빈 상자는 이제 어디에도 나오지 않는다. */
+   const face=thumb?'<img src="'+t(thumb)+'" alt=""'+(thumb.startsWith('/api/media/')?thumbFallbackAttrs(safe,{candidates:[thumb],writable:writableBook,videoUnavailable:false,variant:'book',momentId:safe.id}):'')+'>'
+    :'<img src="'+t(remoteThumb)+'" alt="'+t(safe.title||'YouTube 영상 썸네일')+'"'+thumbFallback+' referrerpolicy="no-referrer" loading="lazy" decoding="async">';
    /* #345: 영상 바로 아래 한 줄 — ▶ 채널. 이슈 584에서 YouTube ↗·크게 보기는 그 아래 .media-links 한 줄로 옮겼다. */
     const source=String(safe.mediaMetadata?.channel||'').trim();
    // #584: 채널 줄은 정보만 남기고, YouTube ↗(왼쪽)·크게 보기(오른쪽)를 카드 아래 한 줄(.media-links)에 둔다.
