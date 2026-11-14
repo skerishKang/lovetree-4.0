@@ -489,3 +489,49 @@ test('#601 화면: 카드 높이 상한·마지막 줄이 판 안, 상세는 플
     await context.close();
   } finally { await browser.close(); server.close(); }
 });
+
+test('#644 화면: 보드 상세의 다른 트리로 옮기기 — 단추가 보이고 누르면 옮기기 요청이 셸에 간다(1440·390)', { skip: REQUIRE ? false : skip, timeout: 300000 }, async () => {
+  if (skip) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip}`);
+  const tree = starTree(6);
+  const server = await serve({ '/__host-644.html': hostHTML(tree) });
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch({ headless: true });
+  try {
+    for (const [width, height] of [[1440, 900], [390, 844]]) {
+      const { context, page, frame, problems } = await openHost(browser, `${base}/__host-644.html`, { width, height });
+      try {
+        // 화면 안에 온전히 보이는 카드를 골라 상세를 연다.
+        const card = await frame.evaluate(() => {
+          for (const c of document.querySelectorAll('#cardLayer .card')) {
+            const r = c.getBoundingClientRect();
+            if (r.left >= 0 && r.right <= innerWidth && r.top >= 60 && r.bottom <= innerHeight - 60) {
+              return { id: c.dataset.id, x: (r.left + r.right) / 2, y: (r.top + r.bottom) / 2 };
+            }
+          }
+          return null;
+        });
+        assert.ok(card, `${width}px에서 누를 카드가 화면 안에 있다`);
+        await page.mouse.click(card.x, card.y);
+        await page.waitForTimeout(700);
+        // 상세의 '다른 트리로 옮기기' — 누르는 자리(44px)와 보임을 수치로 판정한다.
+        const btn = await frame.evaluate(() => {
+          const b = document.getElementById('detailMoveBtn');
+          if (!b) return { found: false };
+          b.scrollIntoViewIfNeeded?.();
+          const r = b.getBoundingClientRect();
+          return { found: true, text: b.textContent.trim(), hidden: !!b.hidden, h: Math.round(r.height), onScreen: r.top < innerHeight && r.bottom > 0 && r.width > 0 };
+        });
+        assert.equal(btn.found && !btn.hidden, true, `${width}px: 상세에 '다른 트리로 옮기기'가 있다`);
+        assert.equal(btn.text, '다른 트리로 옮기기');
+        assert.ok(btn.h >= 44, `${width}px: 누르는 자리 44px 이상(${btn.h}px)`);
+        assert.equal(btn.onScreen, true, `${width}px: 단추가 화면에 보인다`);
+        // 누르면 셸로 lt41-move(그 순간의 옮기기 요청)가 간다 — 셸이 트리 목록을 열어 옮긴다.
+        await frame.click('#detailMoveBtn');
+        await page.waitForTimeout(400);
+        const sent = await page.evaluate(() => window.LT41_MESSAGES.filter((m) => m.type === 'lt41-move').at(-1));
+        assert.equal(sent?.momentId, card.id, `${width}px: 옮기기 요청이 그 순간으로 간다`);
+        assert.equal(problems.length, 0, `${width}px: 화면 문제 없음 (${problems.join(' | ') || '없음'})`);
+      } finally { await context.close(); }
+    }
+  } finally { await browser.close(); server.close(); }
+});

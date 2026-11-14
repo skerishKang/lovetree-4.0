@@ -112,7 +112,9 @@ html[data-lt-theme=garden][data-v41-screen=board] .lt-moment-picker button{borde
 
 /* #372 후속(대표 결정 1-나): 단순(기본)은 카드 끌기·잇기, 카드 추가, 전체 보기, 시네마만 보인다.
    고급(body.lt-advanced)은 도구 패널·필터·테마·확대/축소·되돌리기·편집 도구까지 보인다.
-   숨김은 이 CSS만 담당하고 기능 코드는 그대로 둔다. */
+   숨김은 이 CSS만 담당하고 기능 코드는 그대로 둔다.
+   #644: '다른 트리로 옮기기'(.lt-move-btn)는 고급이 아니어도 보인다 — 지도 상세와 같고,
+   순간을 보다가 바로 옮길 길이 필요하다는 #644 대표 지적이다. */
 body:not(.lt-advanced) #undoBtn,
 body:not(.lt-advanced) .toolbar,
 body:not(.lt-advanced) #leftPanel,
@@ -121,8 +123,7 @@ body:not(.lt-advanced) #startPathHere,
 body:not(.lt-advanced) #editMomentBtn,
 body:not(.lt-advanced) #quickPin,
 body:not(.lt-advanced) #quickCard,
-body:not(.lt-advanced) #styleSection,
-body:not(.lt-advanced) .lt-move-btn { display: none !important; }
+body:not(.lt-advanced) #styleSection { display: none !important; }
 @media(max-width:700px){
   /* 단순 모드의 추가·전체 보기는 모바일에서도 쓸 수 있게 한다(기존 .headbtn 숨김보다 ID가 우선).
      #520: 읽기 전용(예시·공유)에서는 board-extras.js가 addBtn·undoBtn에 hidden 속성을 붙인다 —

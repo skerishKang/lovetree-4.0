@@ -80,6 +80,10 @@ html[data-v41-screen] .lt-moment-picker label>span{font-size:12px}
 .lt-media-body button{min-height:44px;max-width:100%;border:1px solid rgba(255,255,255,.14);border-radius:var(--lt-r-pill);padding:8px 14px;background:#1a1620;color:var(--lt-pearl);font-size:14px;cursor:pointer}
 .lt-media-body img,.lt-media-body video{position:static!important;display:block;width:100%;max-height:240px;height:auto!important;object-fit:contain!important;transform:none!important;mix-blend-mode:normal!important}
 .lt-media .lt-media-status{font:12px/1.5 var(--lt-ui)!important;color:inherit!important;margin:8px 0}
+/* #632: 사라진 영상(삭제·비공개) 표시 — 배지와 안내 한 줄. 보관된 제목·채널·그림은 그대로 둔다. */
+.lt-media .lt-media-vanished-note{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:8px 0 0;font:13px/1.5 var(--lt-ui)!important;color:inherit!important}
+.lt-media .lt-media-vanished-badge{display:inline-flex;align-items:center;min-height:24px;padding:2px 10px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-pill);background:rgba(255,230,166,.14);font:12px/1.4 var(--lt-ui)!important;letter-spacing:.02em}
+.lt-media-vanished .lt-yt-preview img{filter:saturate(.6) brightness(.92)}
 .lt-media a{display:inline-flex;align-items:center;min-height:44px;color:inherit;text-decoration:underline;text-underline-offset:3px}
 html[data-v41-screen=board] .lt-media{color:#57425e;background:#fff7fc}
 html[data-v41-screen=network] .lt-media{color:#49344f}

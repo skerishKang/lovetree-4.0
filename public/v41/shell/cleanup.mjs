@@ -224,6 +224,86 @@ export function createCleanup(deps) {
     noticeTimer = setTimeout(hideMoveNotice, 8000);
     notify(notice.text);
   }
+  // #644 1: 순간 상세의 '다른 트리로 옮기기' — 트리 목록에서 고르면 바로 옮긴다.
+  // 트리가 하나뿐이면(옮길 대상이 없으면) 목록 대신 기존 정리 창('새 트리 만들어 옮기기', treeFromMoments)을 연다.
+  function openMove({ momentId = '' } = {}) {
+    if (!openAvailable()) { notify('내 기록을 불러온 뒤 옮길 수 있어요.'); return false; }
+    const tree = window.LT41?.tree;
+    if (!tree) { notify('트리를 먼저 불러와 주세요.'); return false; }
+    if (!tree.moments.some(m => m.id === momentId)) { notify('이 순간을 찾을 수 없어요.'); return false; }
+    const targets = cleanupTargets(getTrees(), tree.id);
+    if (!targets.length) return open({ momentId });
+    renderMovePicker(tree, momentId, targets);
+    panel('move-picker');
+    return true;
+  }
+  // 되돌리기에 쓰는 원래 자리: 원래 트리·원래 부모. 옮기기(moveMoment)는 링크·연결 이유를 비우고
+  // 대상 트리 맨 뒤에 붙이므로, 되돌리기는 원래 트리의 원래 부모 아래로 다시 옮기는 길(moveMoment)뿐이다.
+  let moveUndo = null;
+  function renderMovePicker(tree, momentId, targets) {
+    const host = $('move-picker-list');
+    host.replaceChildren();
+    for (const target of targets) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'move-picker-item';
+      button.textContent = target.label;
+      button.addEventListener('click', () => { $('move-picker').close(); moveNow(tree, momentId, target); });
+      host.append(button);
+    }
+    $('move-picker-error').textContent = '';
+  }
+  function moveNow(tree, momentId, target) {
+    const original = tree.moments.find(m => m.id === momentId);
+    moveUndo = { fromTreeId: tree.id, momentId, parentId: original?.parentId ?? null, toTreeId: target.id, targetLabel: target.label };
+    try {
+      getMember().apply('moveMoment', { toTreeId: target.id }, { treeId: tree.id, momentId });
+    } catch (error) {
+      moveUndo = null;
+      notify(error?.message || '옮기지 못했어요. 다시 시도해 주세요.');
+      return;
+    }
+    // 적용 뒤 셸은 결과 트리로 옮겨 간다(member-session 규칙) — 옮겨진 자리를 바로 보여 준다.
+    choose(target.id, momentId);
+    showMoveNotice();
+  }
+  function showMoveNotice() {
+    const undo = moveUndo;
+    if (!undo) return;
+    // 원래 트리가 사라졌으면(옮긴 뒤 비어 지워진 트리) 되돌릴 길이 없다 — 안내만 보인다.
+    const canUndo = getTrees().some(t => t.id === undo.fromTreeId);
+    const notice = movedNotice({ targetLabel: undo.targetLabel, action: canUndo ? '되돌리기' : '' });
+    $('move-message').textContent = notice.text;
+    const actions = $('move-actions');
+    actions.replaceChildren();
+    if (notice.action) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = notice.action;
+      button.onclick = onUndoMove;
+      actions.append(button);
+    }
+    $('move-feedback').hidden = false;
+    clearTimeout(noticeTimer);
+    noticeTimer = setTimeout(hideMoveNotice, 8000);
+    notify(notice.text);
+  }
+  function onUndoMove() {
+    const undo = moveUndo;
+    if (!undo) { hideMoveNotice(); return; }
+    const targetStillHas = getTrees().some(t => t.id === undo.toTreeId && t.moments.some(m => m.id === undo.momentId));
+    const fromStillThere = getTrees().some(t => t.id === undo.fromTreeId);
+    if (!targetStillHas || !fromStillThere) { hideMoveNotice(); return; }
+    try {
+      getMember().apply('moveMoment', { toTreeId: undo.fromTreeId, parentId: undo.parentId || undefined }, { treeId: undo.toTreeId, momentId: undo.momentId });
+    } catch (error) {
+      notify(error?.message || '되돌리지 못했어요. 다시 시도해 주세요.');
+      return;
+    }
+    moveUndo = null;
+    hideMoveNotice();
+    choose(undo.fromTreeId, undo.momentId);
+  }
   function hideMoveNotice() {
     clearTimeout(noticeTimer);
     $('move-feedback').hidden = true;
@@ -232,5 +312,5 @@ export function createCleanup(deps) {
   $('cleanup-target').addEventListener('change', sync);
   $('cleanup-create').addEventListener('click', onCreate);
   $('cleanup-move').addEventListener('click', onMove);
-  return { open, sync, dirty, headerAvailable, hideMoveNotice, pickerLabel };
+  return { open, openMove, sync, dirty, headerAvailable, hideMoveNotice, pickerLabel };
 }

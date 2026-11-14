@@ -30,7 +30,7 @@ export function createFeedbackApi({fetchImpl = (...args) => fetch(...args)} = {}
 
 // getContext(): {screen, viewport, theme, version, loggedIn, treeId} — 셸이 넘긴다.
 // show(): 창을 여는 함수(셸의 공통 틀 panel()).
-export function createFeedbackDialog({$, notify, getContext, show, api = createFeedbackApi()}) {
+export function createFeedbackDialog({$, notify, getContext, show, openMyPosts, api = createFeedbackApi()}) {
   const dialog = $('feedback-panel');
   if (!dialog) return {open() {}};
   const form = $('feedback-form');
@@ -40,6 +40,19 @@ export function createFeedbackDialog({$, notify, getContext, show, api = createF
   const count = $('feedback-count');
   const send = $('feedback-send');
   const treeField = $('feedback-tree-field');
+  const category = $('feedback-category');
+  const title = $('feedback-title');
+  const note = $('feedback-note');
+  const doneLoggedIn = $('feedback-done-logged-in');
+  const doneLoggedOut = $('feedback-done-logged-out');
+  const myPosts = $('feedback-open-myposts');
+  const TITLE_FORM = '의견 보내기';
+  const TITLE_DONE = '의견을 보냈어요';
+
+  function loggedIn() {
+    const base = (typeof getContext === 'function' ? getContext() : {}) || {};
+    return Boolean(base.loggedIn);
+  }
 
   function selectedContext() {
     const base = (typeof getContext === 'function' ? getContext() : {}) || {};
@@ -58,6 +71,12 @@ export function createFeedbackDialog({$, notify, getContext, show, api = createF
     done.hidden = true;
     form.hidden = false;
     if (send) send.disabled = false;
+    // #631: 보낸 뒤 화면이 남지 않게 제목·안내·단추 글자를 보내기 전 모양으로 되돌린다.
+    if (title) title.textContent = TITLE_FORM;
+    if (note) note.hidden = false;
+    const signed = loggedIn();
+    if (doneLoggedIn) doneLoggedIn.hidden = !signed;
+    if (doneLoggedOut) doneLoggedOut.hidden = signed;
     // 내 트리를 보던 중이 아니면(트리 id가 없으면) 트리 id 칸을 숨긴다.
     const base = (typeof getContext === 'function' ? getContext() : {}) || {};
     if (treeField) treeField.hidden = !base.treeId;
@@ -70,15 +89,19 @@ export function createFeedbackDialog({$, notify, getContext, show, api = createF
   }
 
   body?.addEventListener('input', () => { if (count) count.textContent = String(body.value.length); });
+  // #631: 보낸 뒤 '내 의견' 바로가기 — 창을 닫고 내 의견 목록을 연다(닫기는 셸이 맡는다).
+  myPosts?.addEventListener('click', () => { if (typeof openMyPosts === 'function') openMyPosts(); });
 
   form?.addEventListener('submit', async event => {
     event.preventDefault();
-    const category = form.querySelector('[name="category"]')?.value || '';
+    const kind = category?.value || '';
     const text = body.value.trim();
-    if (!text) { error.textContent = '의견을 입력해 주세요.'; body.focus(); return; }
+    // #631: 처음에는 아무것도 골라져 있지 않다 — 고르지 않았으면 무엇을 고를지 알려 준다.
+    if (!kind) { error.textContent = '어떤 의견인지 골라 주세요.'; category?.focus(); return; }
+    if (!text) { error.textContent = '내용을 입력해 주세요.'; body.focus(); return; }
     send.disabled = true;
     error.textContent = '';
-    const result = await api.send({category, body: text, context: selectedContext()});
+    const result = await api.send({category: kind, body: text, context: selectedContext()});
     send.disabled = false;
     if (!result.ok) {
       error.textContent = result.message || '보내지 못했어요. 잠시 뒤 다시 시도해 주세요.';
@@ -86,7 +109,13 @@ export function createFeedbackDialog({$, notify, getContext, show, api = createF
     }
     form.hidden = true;
     done.hidden = false;
-    done.querySelector('button')?.focus();
+    // #631: 보낸 뒤에는 제목을 바꾸고 보내기 전 안내('함께 보낼 정보를 고를 수 있어요')를 감춘다.
+    if (title) title.textContent = TITLE_DONE;
+    if (note) note.hidden = true;
+    const signed = loggedIn();
+    if (doneLoggedIn) doneLoggedIn.hidden = !signed;
+    if (doneLoggedOut) doneLoggedOut.hidden = signed;
+    done.querySelector('.button-row .primary')?.focus();
     if (typeof notify === 'function') notify('의견을 보냈어요. 고마워요.');
   });
 
