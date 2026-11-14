@@ -150,6 +150,8 @@ const repo = createWorkspaceRepo(pool);
 // 결제는 아직 없으므로 Plus 자격은 항상 false — 비공개 지정은 서버가 403 으로 거절한다.
 const shareRepo = createShareRepo(pool);
 const visibilityRepo = createTreeVisibilityRepo(pool);
+// #67 제품 역할. 표가 아직 없거나 저장이 망가진 자리에서는 역할 없음으로 닫힌다(fail-closed).
+const admin = createAdminRoleService({ store: createAdminRoleRepo(pool), productId: LOVETREE_PRODUCT_ID });
 const shareService = createShareService({
   shareRepo,
   workspaceRepo: repo,
@@ -165,8 +167,6 @@ const service = createWorkspaceService({
 });
 const legacyAuthenticate = await buildAuthenticate();
 const authenticate = createSharedAccessAuth({ enabled: sharedAuthEnabled(LOVETREE_SHARED_AUTH_ENABLED), legacy: legacyAuthenticate });
-// #67 제품 역할. 표가 아직 없거나 저장이 망가진 자리에서는 역할 없음으로 닫힌다(fail-closed).
-const admin = createAdminRoleService({ store: createAdminRoleRepo(pool), productId: LOVETREE_PRODUCT_ID });
 // 계정 탈퇴 (2026-11-03). 파일 저장소는 미디어 경로와 같은 인스턴스를 쓴다 — 삭제가 같은 폴더를 정리한다.
 const mediaStore = process.env.LOVETREE_MEDIA_DIR ? createPrivateMediaStore({ directory: process.env.LOVETREE_MEDIA_DIR }) : null;
 const accountRepo = createAccountRepo(pool);
