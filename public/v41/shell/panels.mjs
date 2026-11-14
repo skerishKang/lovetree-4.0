@@ -69,7 +69,7 @@ export function createPanels(deps) {
   function onWriteTab(tab) {
     if (tab !== 'detailed' || formBaseline) return;
     const form = $('moment-form');
-    if (!form.elements.date.value) form.elements.date.value = localDateOnly(); // #547: 기기의 오늘(UTC 아님)
+    if (!form.elements.date.value) { form.elements.date.value = localDateOnly(); $('stage-date-hint').hidden = false; } // #547: 기기의 오늘(UTC 아님); #627: 자동으로 채운 무대 날짜에는 안내를 붙인다
     if (!form.elements.emotion.value) form.elements.emotion.value = '설렘';
     formBaseline = new URLSearchParams(new FormData(form)).toString();
     parentBaseline = parentValue();
@@ -127,6 +127,8 @@ export function createPanels(deps) {
     form.reset();
     $('relation-label').hidden = mode !== 'add';
     for (const name of ['title', 'note', 'emotion', 'date', 'url', 'relation']) form.elements[name].value = mode === 'edit' ? m[name] || '' : name === 'emotion' ? '설렘' : name === 'date' ? localDateOnly() : ''; // #547: 기기의 오늘
+    // #627: 추가 모드는 날짜를 자동으로 채워 두므로 무대 날짜 안내를 보인다; 수정 모드의 날짜는 이미 정해진 값이다.
+    $('stage-date-hint').hidden = mode !== 'add';
     // 2026-11-08 수정 모드에서 이미 적어 둔 제목·감정·날짜가 있으면 '더 적기'를 펼친 상태로 연다.
     $('more-fields').open = mode === 'edit' && Boolean((m.title || '').trim() || (m.emotion || '').trim() || (m.date || '').trim());
     const parent = mode === 'edit' && m.parentId ? c.tree.moments.find(moment => moment.id === m.parentId) : null;
@@ -365,6 +367,8 @@ export function createPanels(deps) {
   // '순간 추가'는 이제 shell/quick-add.mjs가 고르기 창을 연다(#빠른 추가 ②). 이 파일은 편집기만 맡는다.
 
   for (const name of ['title', 'note', 'url']) $('moment-form').elements[name].addEventListener('input', () => { if (name === 'url' || name === 'title') updateMediaPreview(); updateQuickEntryHint(); });
+  // #627: 사용자가 무대 날짜를 직접 고치면 자동 채움 안내를 감춘다.
+  $('moment-form').elements.date.addEventListener('input', () => { $('stage-date-hint').hidden = true; });
   $('moment-form').onsubmit = e => {
     e.preventDefault();
     if (getUploads().busy) return;
