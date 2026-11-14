@@ -34,7 +34,7 @@ if [[ ${LOVETREE_DEPLOY_LOCK_HELD:-0} != 1 ]]; then
   flock -w 300 9 || fail DEPLOY_LOCKED
 fi
 [[ ${EUID} -eq 0 ]] || fail ROOT_REQUIRED
-[[ -f "$source_root/server/index.js" && -f "$source_root/src/domain.js" && -f "$source_root/package-lock.json" ]] || fail SOURCE_MISSING
+[[ -f "$source_root/server/index.js" && -f "$source_root/src/domain.js" && -f "$source_root/package-lock.json" && -f "$source_root/tools/export-ai-customer-db.mjs" ]] || fail SOURCE_MISSING
 [[ -x "$node_bin" ]] || fail NODE_MISSING
 "$node_bin" -e 'const[m,i]=process.versions.node.split(".").map(Number);process.exit(m>22||(m===22&&i>=13)?0:1)' || fail NODE_TOO_OLD
 command -v npm >/dev/null || fail NPM_MISSING
@@ -49,6 +49,10 @@ cp -a "$source_root/server" "$app/server"
 # 이 한 파일이 없으면 서비스는 시작한 직후 ERR_MODULE_NOT_FOUND로 죽는다.
 install -d -m 0755 "$app/src"
 install -m 0644 "$source_root/src/domain.js" "$app/src/domain.js"
+# 컴1 내보내기가 ssh 로 부르는 읽기 전용 DB 판독기(tools/export-ai-customer-db.mjs).
+# 접속 값은 실행 시점에 읽는다 — 설치 트리에는 비밀 값이 없다.
+install -d -m 0755 "$app/tools"
+install -m 0644 "$source_root/tools/export-ai-customer-db.mjs" "$app/tools/export-ai-customer-db.mjs"
 install -m 0644 "$source_root/package.json" "$app/package.json"
 install -m 0644 "$source_root/package-lock.json" "$app/package-lock.json"
 install -m 0644 "$here/check_config.mjs" "$app/check_config.mjs"
@@ -59,7 +63,7 @@ install -m 0644 "$here/preflight_imports.mjs" "$app/preflight_imports.mjs"
 # .env·backups는 건드리지 않는다(.env는 아래에서 0600으로 닫힌다).
 chmod 0755 "$app"
 chmod -R a+rX "$app/server" "$app/src" "$app/node_modules"
-chmod a+r "$app/check_config.mjs" "$app/preflight_imports.mjs" "$app/package.json" "$app/package-lock.json"
+chmod a+r "$app/check_config.mjs" "$app/preflight_imports.mjs" "$app/package.json" "$app/package-lock.json" "$app/tools/export-ai-customer-db.mjs"
 # 사전점검: server/index.js의 import 그래프가 실제 파일로 해석되는지 확인한다.
 # 누락된 파일(src/domain.js 등)이 있으면 ESM 로더가 ERR_MODULE_NOT_FOUND를 낸다.
 # 이 시점에 설치를 중단해야 systemd가 재시작 루프에 빠지지 않는다(2026-10-28 재발 방지).
