@@ -4,7 +4,12 @@ import { createApiHandler } from '../server/http.js';
 import { createWorkspaceService } from '../server/workspace-service.js';
 import { createMemoryWorkspaceRepo } from '../server/testing/memory-workspace-repo.js';
 import { createModelAdminRoleStore } from '../server/testing/model-admin-role-store.js';
-import { createAdminRoleService, ROLE_ADMIN } from '../server/admin-roles.js';
+import { createAdminRoleService, ROLE_ADMIN, ROLE_AI_CUSTOMER } from '../server/admin-roles.js';
+import { createAdminStatsService } from '../server/admin-stats.js';
+import { createMemoryStatsRepo } from '../server/testing/memory-stats-repo.js';
+import { createMemoryShareRepo } from '../server/testing/memory-share-repo.js';
+import { createMemoryFeedbackRepo } from '../server/testing/memory-feedback-repo.js';
+import { createMemoryTreeVisibilityRepo } from '../server/testing/memory-tree-visibility-repo.js';
 import { createPadiemAuthorityAuth } from '../server/padiem-authority-auth.js';
 import { ApiError } from '../server/errors.js';
 
@@ -24,7 +29,10 @@ function authorityStub(sessions) {
   };
 }
 
-function build({ sessions = new Map(), roleStore = createModelAdminRoleStore(), withAdmin = true } = {}) {
+function build({
+  sessions = new Map(), roleStore = createModelAdminRoleStore(), withAdmin = true,
+  shareRepo = null, feedbackRepo = null, visibilityRepo = null, statsNow = null
+} = {}) {
   const credential = {
     async verify(request) {
       const cookie = String(request?.headers?.cookie ?? '');
@@ -35,9 +43,22 @@ function build({ sessions = new Map(), roleStore = createModelAdminRoleStore(), 
   const authenticate = createPadiemAuthorityAuth({ credential, authority: authorityStub(sessions), productId: PRODUCT });
   const admin = withAdmin ? createAdminRoleService({ store: roleStore, productId: PRODUCT }) : null;
   const repo = createMemoryWorkspaceRepo();
-  const handle = createApiHandler({ authenticate, service: createWorkspaceService({ repo, productId: PRODUCT }), productId: PRODUCT, admin });
+  // #655 2차: 숫자 세기는 실제 저장 경로로 쌓은 메모리 저장소를 그대로 읽는다(숫자를 손으로 넣지 않는다).
+  const adminStats = shareRepo
+    ? createAdminStatsService({
+        repo: createMemoryStatsRepo({ workspaceRepo: repo, shareRepo, feedbackRepo, roleStore, visibilityRepo }),
+        productId: PRODUCT,
+        ...(statsNow ? { now: statsNow } : {})
+      })
+    : null;
+  const service = createWorkspaceService({ repo, productId: PRODUCT });
+  const handleFor = (statsService) => createApiHandler({ authenticate, service, productId: PRODUCT, admin, adminStats: statsService });
+  const handle = handleFor(adminStats);
   const as = (sessionId) => ({ headers: { cookie: `lovetree_session=${sessionId}` } });
-  return { handle, admin, roleStore, as };
+  // 숫자 시험용: 저장 경로(문서 쓰기)와 다른 집계 서비스를 끼운 핸들러.
+  let writes = 0;
+  const writeDoc = (subjectId, doc) => repo.commit({ productId: PRODUCT, subjectId, doc, expectedRevision: 0, clientKey: `stats-${subjectId}-${++writes}`, requestHash: 'a'.repeat(64) });
+  return { handle, admin, roleStore, as, writeDoc, handleWithStats: handleFor };
 }
 
 const ok = (response) => ({ status: response.status, body: response.body });
@@ -149,4 +170,99 @@ test('부여·회수는 이력으로 남고, 행이 고쳐지거나 저장이 �
   await assert.rejects(() => admin.assign({ actorPrincipal: target, targetSubjectId: MEMBER_SUBJECT }), (error) => error.status === 403 && error.code === 'admin_forbidden');
   await assert.rejects(() => admin.assign({ actorPrincipal: actor, targetSubjectId: 'usr_이메일주체' }), (error) => error.status === 400 && error.code === 'invalid_admin_subject');
   await assert.rejects(() => admin.assign({ actorPrincipal: actor, targetSubjectId: MEMBER_SUBJECT, role: 'OWNER' }), (error) => error.status === 400 && error.code === 'invalid_role');
+});
+
+test('운영센터 전체 숫자(#655 2차): 계정·트리·순간·공개·둘러보기를 서버가 세고 실제 사용자와 AI 테스터를 나눈다', async () => {
+  const ADMIN2 = `sub_${'a'.repeat(32)}`;
+  const REAL_ONE = `sub_${'1'.repeat(32)}`;
+  const REAL_TWO = `sub_${'2'.repeat(32)}`;
+  const AI_ONE = `sub_${'3'.repeat(32)}`;
+  const sessions = new Map([
+    ['sess_admin', { productId: PRODUCT, subjectId: ADMIN2, state: 'active', expiresAt: FUTURE }],
+    ['sess_member', { productId: PRODUCT, subjectId: REAL_ONE, state: 'active', expiresAt: FUTURE }]
+  ]);
+  const roleStore = createModelAdminRoleStore();
+  await roleStore.assign({ productId: PRODUCT, subjectId: ADMIN2, role: ROLE_ADMIN, grantedBy: null });
+  await roleStore.assign({ productId: PRODUCT, subjectId: AI_ONE, role: ROLE_AI_CUSTOMER, grantedBy: null });
+  // 공유 행은 창(7일) 밖인 10-01 에, 고객 글은 창 안인 11-18 에 쌓인다 — '새 계정' 판정을 가른다.
+  const shareRepo = createMemoryShareRepo({ now: Date.UTC(2026, 9, 1) });
+  const feedbackRepo = createMemoryFeedbackRepo({ now: Date.UTC(2026, 10, 18) });
+  const visibilityRepo = createMemoryTreeVisibilityRepo();
+  const made = build({ sessions, roleStore, shareRepo, feedbackRepo, visibilityRepo, statsNow: () => new Date('2026-11-20T00:00:00.000Z') });
+  const repos = made;
+
+  const tree = (id, moments) => ({
+    id, subject: '윤슬', title: '나무 ' + id, coverMomentId: '', coverDesign: '', inbox: false,
+    createdAt: '2026-10-01T00:00:00.000Z', updatedAt: '2026-10-01T00:00:00.000Z',
+    moments: moments.map((createdAt, index) => ({
+      id: `${id}-m${index}`, parentId: null, links: [], title: '순간', note: '', emotion: '설렘',
+      date: '2026-10-01', url: '', createdAt
+    }))
+  });
+  const write = (subjectId, trees) => repos.writeDoc(subjectId, { version: 1, trees });
+
+  // 실제 사용자 1: 트리 2(순간 3, 그중 1개가 창 안) + 자동 공개(순간 3) → 공개·둘러보기 1
+  await write(REAL_ONE, [
+    tree('ta', ['2026-11-18T10:00:00.000Z', '2026-10-01T00:00:00.000Z']),
+    tree('tb', ['2026-10-02T00:00:00.000Z'])
+  ]);
+  await shareRepo.upsertAutoShare({ productId: PRODUCT, subjectId: REAL_ONE, shareId: 'auto-' + 'a'.repeat(20), treeId: 'ta', entryMomentId: 'ta-m0', momentCount: 3 });
+  // 실제 사용자 2: 트리 1(순간 1), 공유 없음. 고객 글만 창 안 → '새 계정'
+  await write(REAL_TWO, [tree('tc', ['2026-10-03T00:00:00.000Z'])]);
+  await feedbackRepo.create({ productId: PRODUCT, subjectId: REAL_TWO, category: 'opinion', body: '새로 왔어요' });
+  // AI 테스터: 트리 1(순간 3) + 자동 공개 → 공개·둘러보기 1(AI 쪽 숫자도 따로 센다)
+  await write(AI_ONE, [tree('td', ['2026-10-04T00:00:00.000Z', '2026-10-05T00:00:00.000Z', '2026-10-06T00:00:00.000Z'])]);
+  await shareRepo.upsertAutoShare({ productId: PRODUCT, subjectId: AI_ONE, shareId: 'auto-' + 'b'.repeat(20), treeId: 'td', entryMomentId: 'td-m0', momentCount: 3 });
+  // 비공개 트리는 공개·둘러보기에서 빠진다(활성 공유 행이 있어도).
+  await write(`sub_${'4'.repeat(32)}`, [tree('te', ['2026-10-06T00:00:00.000Z', '2026-10-07T00:00:00.000Z', '2026-10-08T00:00:00.000Z'])]);
+  await shareRepo.upsertAutoShare({ productId: PRODUCT, subjectId: `sub_${'4'.repeat(32)}`, shareId: 'auto-' + 'c'.repeat(20), treeId: 'te', entryMomentId: 'te-m0', momentCount: 3 });
+  await visibilityRepo.set({ productId: PRODUCT, subjectId: `sub_${'4'.repeat(32)}`, treeId: 'te', visibility: 'private' });
+
+  const response = await made.handle({ method: 'GET', path: '/api/admin/stats', ...made.as('sess_admin') });
+  assert.equal(response.status, 200);
+  assert.equal(response.body.ok, true);
+  const stats = response.body.stats;
+  // 계정 4(실제 3 · AI 1). 새 계정은 가장 오래된 흔적이 창 안인 실제 사용자 2 한 명.
+  assert.deepEqual(stats.accounts, { total: 4, real: 3, aiTester: 1, new: { total: 1, real: 1, aiTester: 0 } });
+  // 트리 5(실제 4 · AI 1). 공개 2(실제 1 · AI 1) — 비공개 트리는 빠진다.
+  assert.deepEqual(stats.trees, {
+    total: 5, real: 4, aiTester: 1,
+    public: { total: 2, real: 1, aiTester: 1 },
+    featured: { total: 2, real: 1, aiTester: 1 }
+  });
+  // 순간 10(실제 7 · AI 3), 그중 창 안은 실제 1개뿐.
+  assert.deepEqual(stats.moments, { total: 10, real: 7, aiTester: 3, new: { total: 1, real: 1, aiTester: 0 } });
+  assert.equal(stats.window.days, 7);
+  assert.equal(stats.window.since, '2026-11-13T00:00:00.000Z');
+  assert.equal(response.headers['cache-control'], 'private, no-store');
+
+  // 개인정보는 싣지 않는다 — 개인정보 칸도, subject·이메일 글자도 응답에 없다.
+  const text = JSON.stringify(response.body);
+  for (const word of ['sub_', '@', 'email', 'name', 'subject', 'subjectId']) assert.ok(!text.includes(word), `응답에 ${word} 가 실렸다`);
+  const keys = new Set(Object.keys(stats));
+  assert.deepEqual([...keys].sort(), ['accounts', 'checkedAt', 'moments', 'trees', 'window']);
+
+  // 관리자가 아니면 403, 로그인 확인이 없으면 401, GET 이 아니면 405.
+  const refused = await made.handle({ method: 'GET', path: '/api/admin/stats', ...made.as('sess_member') });
+  assert.equal(refused.status, 403);
+  assert.equal(refused.body.error.code, 'admin_forbidden');
+  const anonymous = await made.handle({ method: 'GET', path: '/api/admin/stats' });
+  assert.equal(anonymous.status, 401);
+  const wrongMethod = await made.handle({ method: 'POST', path: '/api/admin/stats', ...made.as('sess_admin') });
+  assert.equal(wrongMethod.status, 405);
+});
+
+test('운영센터 전체 숫자: 집계 저장소가 망가지면 503으로 닫고 숫자를 지어내지 않는다', async () => {
+  const sessions = new Map([['sess_admin', { productId: PRODUCT, subjectId: ADMIN_SUBJECT, state: 'active', expiresAt: FUTURE }]]);
+  const roleStore = createModelAdminRoleStore();
+  await roleStore.assign({ productId: PRODUCT, subjectId: ADMIN_SUBJECT, role: ROLE_ADMIN, grantedBy: null });
+  const made = build({ sessions, roleStore, shareRepo: createMemoryShareRepo() });
+  const broken = createAdminStatsService({ repo: { async aggregate() { throw new Error('집계 실패'); } }, productId: PRODUCT });
+  await assert.rejects(() => broken.stats(), (error) => error.status === 503 && error.code === 'admin_stats_unavailable');
+
+  // 핸들러에도 같은 서비스가 물려 있을 때 503 본문이 나간다.
+  const handle = made.handleWithStats(broken);
+  const response = await handle({ method: 'GET', path: '/api/admin/stats', ...made.as('sess_admin') });
+  assert.equal(response.status, 503);
+  assert.equal(response.body.error.code, 'admin_stats_unavailable');
 });

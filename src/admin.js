@@ -5,7 +5,7 @@ import {
   escapeText, richParagraph, formatTime, parseHash, viewHash, viewToTab,
   filterRows, statusTabs, kindTabs, linkedIssueNumbers, normalizeIssueNumber, issueStateLabel, needsFixButton,
   statusChangeMessage, buildIssueUrl, issueLink, journalsSummary, journalRowsByCustomer,
-  isPendingStatus, overviewModel
+  isPendingStatus, overviewModel, statsCards
 } from './admin-view.js';
 
 /**
@@ -87,7 +87,9 @@ async function render() {
 /** #655 '한눈에' 탭 — 이미 있는 탭이 부르는 API만 모아 처리할 일을 숫자로 보여 준다. 서버를 바꾸지 않는다.
  *  하나라도 못 불러오면 그 카드만 '불러오지 못했어요'로 두고 나머지는 그린다. */
 async function renderOverview() {
-  const [feedbackRes, journalsRes, reportsRes] = await Promise.all([read('/api/admin/feedback'), read('/api/admin/journals'), read('/api/community/admin/reports')]);
+  // #655 2차: 맨 위 전체 숫자는 서버가 집계한다(계정·트리·순간·공개·둘러보기·AI 테스터).
+  // 이 응답이 실패해도 나머지 카드는 그대로 그린다 — 그 줄만 '불러오지 못했어요'.
+  const [feedbackRes, journalsRes, reportsRes, statsRes] = await Promise.all([read('/api/admin/feedback'), read('/api/admin/journals'), read('/api/community/admin/reports'), read('/api/admin/stats')]);
   const posts = feedbackRes.ok && Array.isArray(feedbackRes.payload?.feedback) ? feedbackRes.payload.feedback : [];
   // 고치는 일: 고객 글의 연결 이슈 상태만('고치는 일' 탭과 같은 공개 읽기 경로). 하나가 실패해도 나머지 카드는 그린다.
   const numbers = linkedIssueNumbers(posts);
@@ -127,8 +129,17 @@ async function renderOverview() {
     : (model.todos.length
         ? model.todos.map(row => `<article class="lt-post lt-post-row" data-open="${escapeText(row.id)}" tabindex="0" role="button"><span class="lt-post-title">${escapeText(row.title)}</span>${row.issueNumber ? `<span class="lt-post-issue">이슈 ${issueLink(row.issueNumber)}</span>` : '<span class="lt-post-issue"></span>'}<span class="lt-post-date">${escapeText(formatTime(row.createdAt))}</span></article>`).join('')
         : '<p class="lt-empty">답을 기다리는 글이 없습니다.</p>');
+  // 전체 숫자 줄(#655 2차). '실제 사용자'를 크게, 'AI 테스터'를 작게 나란히 적는다.
+  const statModel = statsCards(statsRes);
+  const statCell = (item) => item.error
+    ? `<div class="lt-stat" data-stat="${escapeText(item.key)}"><span class="lt-stat-value">—</span><span class="lt-stat-label">${escapeText(item.label)}</span><span class="lt-stat-fail">불러오지 못했어요</span></div>`
+    : `<div class="lt-stat" data-stat="${escapeText(item.key)}"><span class="lt-stat-value">${escapeText(item.real)}</span><span class="lt-stat-label">${escapeText(item.label)}</span><span class="lt-stat-ai">AI 테스터 ${escapeText(item.aiTester)}</span></div>`;
+  const statsRow = statModel.error
+    ? '<div class="lt-stats" aria-label="전체 숫자"><p class="lt-empty">불러오지 못했어요</p></div>'
+    : `<div class="lt-stats" aria-label="전체 숫자 · 실제 사용자 / AI 테스터">${statModel.cards.map(statCell).join('')}</div>`;
   host.innerHTML = `${head()}<div class="admin-shell lt-board">
     <div class="lt-board-head"><h1 class="lt-h1">한눈에</h1><p class="lt-sub">지금 쌓인 처리할 일 · 숫자를 누르면 그 탭이 그 조건으로 열립니다</p></div>
+    ${statsRow}
     <div class="lt-ov-cards" role="group" aria-label="처리할 일 숫자">${cards}</div>
     ${journalSection}
     <section class="lt-card"><h2 class="lt-h2">오늘 할 일 · 답 안 단 글 오래된 순</h2><div class="lt-post-list">${todosBlock}</div></section>
