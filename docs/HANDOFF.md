@@ -12,6 +12,7 @@
 - **컴1 실행 스크립트** `tools/run-ai-customer-export.ps1`(신규): Git 번들 ssh(Windows 내장 ssh.exe 가 깨져 있음 — `ssh -V` 도 255·무출력, 2026-11-14 실측) → comp2 → `wsl -e /usr/local/bin/node 판독기 --b64`(인용·파이프 없는 명령 — powershell.exe 5.1 예약 작업이 겹따옴표·| 를 깨뜨려 판독기에 --b64 모드를 넣음, 실측) → 디코드해 임시 JSON → md 작성 → 임시 삭제. 로그 `E:\lovetree-qa\export-log\ai-customer-YYMMDD.log` 맨 윗줄이 이유 한 줄(성공 요약/실패 이유), 실패 시 종료 코드 1.
 - **설치 목록**: `install.sh` 가 판독기를 `/opt/padiem/lovetree-api/tools/` 에 넣고, `autodeploy.sh` 의 API 변경 판정에 `tools/export-ai-customer-db.mjs` 를 추가(이 파일만 바뀌어도 설치). migration 변경 없음 — 자동 설치 대상.
 - **시험** `tests/export-ai-customer.test.mjs` 12건(문장 READ ONLY·쓰기 키워드 없음, subject·이메일 없음, 가림, JSON→md, 이름 중복 폴더). `npm test` 전체는 PR당 1회 실행(결과는 PR 본문).
+- **수정(2026-11-14, 머지 cf5ad94 뒤 실데이터 실행에서 발견)**: 판독기 posts SELECT에 `subject_id` 칼럼이 빠져 받아온 글을 고객에 묶지 못해 일지가 비었음(posts=0) — 칼럼을 결과에 추가하고 시험에 SELECT 절 단언을 넣음(테스트 입력에 subject_id 가 있어 미쳐지지 않았던 빠짐).
 - **주의**: 컴2 ssh 는 Windows 셸(cmd)이고 예약 작업은 powershell.exe 5.1 — 겹따옴표·`|`·작은따옴표가 원격 전달에서 깨진다(2026-11-14 실측) → 원격 명령은 인용·파이프 없이 `wsl -e node 판독기 --b64` 한 줄(base64 는 판독기가 출력). WSL 기본 사용자 root — .env 읽기 가능. JSON 은 base64 한 줄로만 전달(한글·줄바꿈 안전). 판독기 오류 이유는 값 없이 한 줄만 stderr 로.
 
 ## 2026-11-14 — 운영센터 2차 다듬기: 탭 거르기·고치는 일 (#570, 로컬3 레인, ai/local3-admin-570-261115, main f605e81 기준)
