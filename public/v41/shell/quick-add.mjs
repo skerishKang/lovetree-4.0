@@ -4,7 +4,8 @@
 import {mountPrivateUpload} from '../private-upload.mjs';
 import {fetchVideoTitle} from '../video-title.mjs';
 import {suggestMomentTitle} from '../domain.mjs';
-import {extractDropUrl, hasDropPayload, firstImageFile, parseQuickUrl, dropRoute, previewState, previewTag, savedNoticeText, QUICK_SAVED_TEXT, QUICK_EMPTY_ERROR, QUICK_INVALID_ERROR, DROP_LOGIN_NOTICE, DROP_READONLY_NOTICE, QUICK_PASTE_LABEL, QUICK_CLEAR_LABEL, QUICK_EMPTY_PREVIEW, QUICK_INVALID_PREVIEW, QUICK_PASTE_EMPTY, QUICK_PASTE_ERROR} from '../quick-add.mjs';
+import {displayTreeTitle} from '../tree-name.mjs';
+import {extractDropUrl, hasDropPayload, firstImageFile, parseQuickUrl, dropRoute, previewState, previewTag, savedNoticeText, quickTreeLineText, quickSubmitText, quickSavedTreeText, QUICK_INBOX_LABEL, QUICK_EMPTY_ERROR, QUICK_INVALID_ERROR, DROP_LOGIN_NOTICE, DROP_READONLY_NOTICE, QUICK_PASTE_LABEL, QUICK_CLEAR_LABEL, QUICK_EMPTY_PREVIEW, QUICK_INVALID_PREVIEW, QUICK_PASTE_EMPTY, QUICK_PASTE_ERROR} from '../quick-add.mjs';
 
 export function createQuickAdd(deps) {
   const $ = deps.$;
@@ -15,6 +16,10 @@ export function createQuickAdd(deps) {
   const savedTimerBox = {timer: null};
   let titleCache = new Map();
   let previewToken = 0;
+  // #638: 담을 트리(고른 트리 우선)와, 저장 뒤에 도착한 영상 제목을 채울 대상 한 개.
+  let quickTreeId = '';
+  let pendingTitleFill = null;
+  const inflightTitles = new Map();
 
   function snapshot() { return deps.getMember()?.snapshot() || {}; }
 
@@ -33,12 +38,14 @@ export function createQuickAdd(deps) {
     if (!ensureWritable()) return;
     deps.resetEditorBaseline?.();
     deps.writePanel.open();
+    renderTreeLine();
   }
   // 쉬운 추가 탭으로 연다(끌어다 놓기·'지금 다듬기'처럼 쉬운 추가로 되돌아오는 길).
   function openQuick() {
     if (!ensureWritable()) return;
     deps.resetEditorBaseline?.();
     deps.writePanel.open('easy');
+    renderTreeLine();
   }
   function resetQuick() {
     $('quick-url').value = '';
@@ -59,6 +66,49 @@ export function createQuickAdd(deps) {
     try { return suggestMomentTitle({url}) || ''; } catch { return ''; }
   }
 
+  // ---- 담을 트리 한 줄(#638, 고른 트리 우선) ----
+  // 트리 목록은 트리 메뉴(renderTreeMenu)와 같은 재료(LT41.trees)와 같은 이름 규칙(displayTreeTitle)을 쓰고,
+  // 순서도 같게 inbox('모아둔 순간')를 먼저 놓는다.
+  function treeChoices() {
+    const trees = deps.listTrees?.() || [];
+    return trees.map(tree => ({ id: String(tree?.id || ''), name: displayTreeTitle(String(tree?.title || tree?.subject || '') || '트리'), inbox: tree?.inbox === true })).filter(tree => tree.id);
+  }
+  function resolveQuickTreeId(choices) {
+    const current = String(deps.currentTreeId?.() || '');
+    if (current && choices.some(tree => tree.id === current)) return current;
+    return (choices.find(tree => tree.inbox) || choices[0])?.id || '';
+  }
+  function selectedTreeName() {
+    const choices = treeChoices();
+    const found = choices.find(tree => tree.id === quickTreeId) || choices.find(tree => tree.inbox) || choices[0];
+    return found?.name || QUICK_INBOX_LABEL;
+  }
+  // 담기 창의 트리 한 줄: '○○ 트리에 담겨요' + 그 자리에서 바꾸는 고르기. 트리가 하나뿐(또는 0개)이면
+  // 바꿀 것이 없으므로 고르기는 숨긴다. 트리가 0개면 기본 트리('모아둔 순간')가 새로 만들어진다(#638).
+  function renderTreeLine() {
+    const choices = treeChoices();
+    if (!quickTreeId || !choices.some(tree => tree.id === quickTreeId)) quickTreeId = resolveQuickTreeId(choices);
+    const name = selectedTreeName();
+    const line = $('quick-tree-line');
+    if (line) line.textContent = quickTreeLineText(name);
+    const submit = $('quick-submit');
+    if (submit) submit.textContent = quickSubmitText(name);
+    const select = $('quick-tree-select');
+    if (!select) return;
+    const signature = choices.map(tree => tree.id).join('|');
+    if (select.dataset.choices !== signature) {
+      select.dataset.choices = signature;
+      select.replaceChildren(...choices.map(tree => {
+        const option = doc.createElement('option');
+        option.value = tree.id;
+        option.textContent = tree.name;
+        return option;
+      }));
+    }
+    select.value = quickTreeId;
+    select.hidden = choices.length < 2;
+  }
+
   // 업로더는 전송이 끝나면 form의 [type=submit]을 무조건 다시 켠다(기존 순간 폼 계약).
   // 사진 저장 뒤 칸이 빈 상태에서도 켜져 '주소 없으면 흐림' 규칙이 깨지므로, 전송이 끝난 다음 한 번 다시 맞춘다.
   function syncSubmitState() {
@@ -74,6 +124,7 @@ export function createQuickAdd(deps) {
     const token = ++previewToken;
     const preview = $('quick-preview');
     const state = previewState(parsed);
+    renderTreeLine();
     preview.replaceChildren();
     preview.dataset.state = state;
     preview.dataset.media = 'no';
@@ -120,13 +171,38 @@ export function createQuickAdd(deps) {
   // 제목은 기존 서버 oEmbed 프록시에서만 받는다(썸네일이 200이어도 없는 영상일 수 있어 실패는 조용히 넘긴다).
   // 받아 둔 제목은 titleCache에 남고, 저장 시(#344) mediaMetadata.title로 함께 넘어가 자동 제목이 된다.
   // 미리보기 제목과 저장 제목은 같은 값이다 — 못 받았으면 둘 다 기존 규칙(fallbackTitle)으로 물러난다.
+  // #638: 같은 영상 제목 요청은 한 번만 보낸다(저장 뒤 채움과 미리보기가 경합해도). 노드가 없는 부름(저장 뒤 채움)도 받는다.
   async function loadYouTubeTitle(videoId, node, token) {
     if (!videoId) return;
-    if (titleCache.has(videoId)) { node.textContent = titleCache.get(videoId); return; }
-    const title = await fetchVideoTitle(videoId, fetchImpl);
+    if (titleCache.has(videoId)) { if (node) node.textContent = titleCache.get(videoId); return; }
+    let running = inflightTitles.get(videoId);
+    if (!running) {
+      running = fetchVideoTitle(videoId, fetchImpl).then(title => {
+        inflightTitles.delete(videoId);
+        if (title) {
+          titleCache.set(videoId, title);
+          fillPendingTitle(videoId, title);
+        }
+        return title;
+      });
+      inflightTitles.set(videoId, running);
+    }
+    const title = await running;
     if (!title) return;
-    titleCache.set(videoId, title);
-    if (token === previewToken && node.isConnected !== false) node.textContent = title;
+    if (node && token === previewToken && node.isConnected !== false) node.textContent = title;
+  }
+
+  // #638 제목 경합: 제목이 도착하기 전에 담았으면 저장한 순간을 기록해 두었다가, 제목이 도착하면
+  // 그 순간의 영상 제목(mediaMetadata)을 채운다. backfillTitles(#347 후속 B)는 mediaMetadata만 채우고
+  // title은 건드리지 않으므로 사용자가 직접 쓴 제목은 덮이지 않고, 이 화면에서 방금 담은 순간만 채운다
+  // (이미 저장된 다른 순간은 자동으로 고치지 않는다 — 그 길은 기존 title-backfill이 맡는다).
+  function fillPendingTitle(videoId, title) {
+    const pending = pendingTitleFill;
+    if (!pending || pending.videoId !== videoId || !title) return;
+    pendingTitleFill = null;
+    try {
+      deps.getMember().apply('backfillTitles', { items: [{ treeId: pending.treeId, momentId: pending.momentId, url: pending.url, mediaMetadata: { title } }] });
+    } catch { /* 저장 연결이 끊겼으면 조용히 둔다 — 다음 불러오기 때 title-backfill이 채운다 */ }
   }
 
   // 붙여넣기/지우기 알약: 값이 있으면 지우기, 비었으면 클립보드에서 주소를 읽어 넣는다.
@@ -181,12 +257,23 @@ export function createQuickAdd(deps) {
     try { return suggestMomentTitle({url, mediaMetadata: quickMediaTitle(url).mediaMetadata}) || ''; } catch { return ''; }
   }
 
-  // 저장 한 번 = member.apply('quickAdd', {url, mediaMetadata?}). 성공하면 칸을 비우고 초점을 유지해 연속 추가가 된다.
-  // 칸을 비울 때 renderPreview가 지난 안내를 먼저 지우므로, 안내는 저장 직후 값으로 다시 세운다.
+  // 저장 한 번 = member.apply('quickAdd', {url, treeId?, mediaMetadata?}). #638: 지금 고른 트리(quickTreeId)에 담는다 —
+  // 트리가 0개거나 고르지 못했으면 treeId를 빼 기존 규칙(기본 트리 생성·inbox)으로 물러난다. 성공하면 칸을 비우고
+  // 초점을 유지해 연속 추가가 된다. 칸을 비울 때 renderPreview가 지난 안내를 먼저 지우므로, 안내는 저장 직후 값으로 다시 세운다.
   function saveUrl(url) {
+    const parsed = parseQuickUrl(url, describe);
+    // #638: 담을 트리는 저장 시점에 정한다 — 창을 열지 않고 끌어다 놓기로 바로 담는 길에서도 지금 고른 트리에 담긴다.
+    if (!quickTreeId || !treeChoices().some(tree => tree.id === quickTreeId)) quickTreeId = resolveQuickTreeId(treeChoices());
+    const input = { url, ...(quickTreeId ? { treeId: quickTreeId } : {}), ...quickMediaTitle(url) };
     let result = null;
-    try { result = deps.getMember().apply('quickAdd', {url, ...quickMediaTitle(url)}) || null; }
+    try { result = deps.getMember().apply('quickAdd', input) || null; }
     catch (error) { $('quick-error').textContent = error.message; return false; }
+    // #638 제목 경합: 제목을 못 받은 채 담았으면(저장 제목이 기본 문구로 떨어짐) 저장한 순간을 기록해 두고,
+    // 제목이 도착하면 그 순간의 영상 제목을 채운다. 미리보기 때 요청이 이미 달리고 있으면 그 응답이 채운다.
+    if (parsed.status === 'ok' && parsed.kind === 'youtube' && parsed.videoId && !titleCache.has(parsed.videoId) && result?.treeId && result?.momentId) {
+      pendingTitleFill = { treeId: result.treeId, momentId: result.momentId, videoId: parsed.videoId, url };
+      void loadYouTubeTitle(parsed.videoId, null, -1);
+    }
     const savedTitle = savedTitleFor(url);
     if ($('write-panel').open) {
       $('quick-url').value = '';
@@ -215,7 +302,8 @@ export function createQuickAdd(deps) {
     const image = $('quick-saved-thumb');
     if (thumb) { image.src = thumb; image.hidden = false; }
     else { image.removeAttribute('src'); image.hidden = true; }
-    $('quick-saved-text').textContent = QUICK_SAVED_TEXT;
+    // #638: 담은 트리 이름을 따라 안내한다(고른 트리 우선). 이름을 못 찾으면 기존 문구('모아둔 순간에 담았어요').
+    $('quick-saved-text').textContent = quickSavedTreeText(selectedTreeName());
     $('quick-saved').hidden = false;
     setRefineTarget($('quick-saved-refine'), result);
     clearTimeout(savedTimerBox.timer);
@@ -314,6 +402,11 @@ export function createQuickAdd(deps) {
   $('quick-form').onsubmit = submitQuick;
   $('quick-url').addEventListener('input', renderPreview);
   $('quick-paste').onclick = () => { void togglePaste(); };
+  // #638: 트리 고르기를 바꾸면 그 자리에서 담을 트리가 바뀐다(문구·단추도 같이).
+  $('quick-tree-select')?.addEventListener('change', () => {
+    quickTreeId = $('quick-tree-select').value || quickTreeId;
+    renderTreeLine();
+  });
   $('quick-refine').onclick = () => refine($('quick-refine'));
   $('quick-saved-refine').onclick = () => refine($('quick-saved-refine'));
   // 닫기는 공통 틀(shell/dialogs.mjs)이 초점까지 되돌린다 — 여기서는 따로 만지지 않는다.
@@ -330,13 +423,14 @@ export function createQuickAdd(deps) {
     openQuick,
     submitQuick,
     renderPreview,
+    renderTreeLine,
     handleDrop,
     togglePaste,
     mountFrame: doc => { if (isFinePointer()) mountDrop(doc); },
     saveUrl,
     refine,
     reset: resetQuick,
-    state: () => ({ savedTimer: savedTimerBox.timer, titleCache: titleCache.size })
+    state: () => ({ savedTimer: savedTimerBox.timer, titleCache: titleCache.size, quickTreeId })
   };
 }
 

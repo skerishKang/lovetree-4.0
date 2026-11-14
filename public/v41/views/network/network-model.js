@@ -55,12 +55,16 @@ window.LT56Model = (() => {
   // 월별 묶음(#601 '데이터에 맞는 쪽'): 사슬·깊은 나무는 시간 순서가 모양과 일치하므로 월별이 어긋나지 않는다.
   // 같은 월은 날짜 순서에서 본디 연속이다. 월이 6개를 넘으면 이어지는 월을 합쳐 색 6벌 이하로 뭉친다.
   function monthGroups(moments) {
-    const key = m => String(m?.date || '').slice(0, 7);
-    const list = (moments || []).slice().sort((a, b) => String(a?.date || '').localeCompare(String(b?.date || '')) || String(a?.createdAt || '').localeCompare(String(b?.createdAt || '')));
+    // #638: 순간 날짜는 실제 기록의 'YYYY-MM-DD'와 예시 판본의 'YYYY.MM.DD' 두 모양이 있다.
+    // 예전에는 키를 slice(0,7)로 만들어 두고('2026-11') 이름을 '.'로 나눴으므로 실제 기록에서
+    // '2026-11년 NaN월'이 됐다. 키를 'YYYY-MM' 한 벌로 정규화하고 이름도 같은 키에서 읽는다 —
+    // 두 모양이 한 트리에 섞여도 같은 월로 묶인다.
+    const key = m => { const matched = String(m?.date || '').trim().match(/^(\d{4})[.\-/](\d{1,2})/); return matched ? `${matched[1]}-${matched[2].padStart(2, '0')}` : ''; };
+    const list = (moments || []).slice().sort((a, b) => key(a).localeCompare(key(b)) || String(a?.createdAt || '').localeCompare(String(b?.createdAt || '')));
     const months = [...new Set(list.map(key))].filter(Boolean).sort();
     if (!months.length) return [{ name: '기억', ids: list.map(m => m.id) }];
     const per = Math.ceil(months.length / 6), groups = [];
-    const ym = s => { const [y, m] = s.split('.'); return { y, m: String(Number(m)) }; };
+    const ym = s => { const [y, m] = s.split('-'); return { y, m: String(Number(m)) }; };
     const monthName = chunk => {
       if (chunk.length === 1) { const { y, m } = ym(chunk[0]); return `${y}년 ${m}월`; }
       const a = ym(chunk[0]), b = ym(chunk[chunk.length - 1]);

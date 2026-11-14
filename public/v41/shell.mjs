@@ -236,6 +236,9 @@ const shellQuick=createQuickAdd({
   openLoginStart:intent=>openLoginStart(intent),
   writePanel:shellWrite,
   requestClose:id=>shellDialogs.requestClose(id),
+  // #638: 쉬운 추가가 지금 고른 트리에 담기게 — 지금 트리·트리 목록은 트리 메뉴와 같은 재료(window.LT41)에서 읽는다.
+  currentTreeId: () => window.LT41?.tree?.id || '',
+  listTrees: () => (Array.isArray(window.LT41?.trees) ? window.LT41.trees : []),
   // 사진 올리기는 기존 업로더(#310 onUploaded·imagesOnly)를 그대로 쓴다.
   mountUpload:mountPrivateUpload
 });

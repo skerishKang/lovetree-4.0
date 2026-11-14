@@ -304,3 +304,34 @@ test('17. 동심원 배치(#461): 한 줄 트리는 돌아가며 놓여 가로·
 });
 
 function near(a, b) { return Math.abs(a - b) < 0.02; }
+
+// ---- 이슈 638: 월 묶음 이름은 실제 기록의 'YYYY-MM-DD' 날짜에서도 NaN이 없다(예시 판본 'YYYY.MM.DD'와 섞여도 같은 월) ----
+test('월 묶음 이름은 실제 기록 날짜(YYYY-MM-DD)에서도 NaN이 없다(이슈 638)', () => {
+  const moments = [
+    { id: 'a', date: '2026-11-03', emotion: '설렘' },
+    { id: 'b', date: '2026-11-15', emotion: '설렘' },
+    { id: 'c', date: '2026-12-01', emotion: '몰입' },
+    { id: 'd', date: '2027-01-09', emotion: '그리움' }
+  ];
+  const groups = M.monthGroups(moments);
+  assert.deepEqual(groups.map(group => group.name), ['2026년 11월', '2026년 12월', '2027년 1월']);
+  for (const group of groups) assert.doesNotMatch(group.name, /NaN|undefined/);
+  assert.deepEqual(groups.map(group => group.ids.length), [2, 1, 1]);
+});
+
+test('예시 판본(YYYY.MM.DD)과 실제 기록(YYYY-MM-DD)이 섞여도 같은 월로 묶인다(이슈 638)', () => {
+  const groups = M.monthGroups([
+    { id: 'a', date: '2026.11.05', emotion: '설렘' },
+    { id: 'b', date: '2026-11-20', emotion: '몰입' }
+  ]);
+  assert.equal(groups.length, 1);
+  assert.equal(groups[0].name, '2026년 11월');
+  assert.deepEqual(groups[0].ids, ['a', 'b']);
+});
+
+test('월이 여섯 개를 넘으면 이어 붙이는데도 NaN이 없다(이슈 638)', () => {
+  const moments = Array.from({ length: 8 }, (_, i) => ({ id: `m${i}`, date: `2026-${String(i + 1).padStart(2, '0')}-10`, emotion: '설렘' }));
+  const groups = M.monthGroups(moments);
+  assert.ok(groups.length <= 6);
+  for (const group of groups) assert.doesNotMatch(group.name, /NaN|undefined/);
+});
