@@ -80,10 +80,10 @@ test('611 실행: 새 소식은 로그아웃 상태에서도 보이고, 알림 �
     const link = page.locator('#updates-link');
     await link.waitFor({ state: 'visible', timeout: 8000 });
     assert.equal(await link.textContent(), '새 소식');
-    // 첫 접속: 작은 카드 "러브트리가 새로워졌어요 — 4.1.3"가 한 번 뜬다.
+    // 첫 접속: 작은 카드 "러브트리가 새로워졌어요 — 4.1.4"가 한 번 뜬다.
     const card = page.locator('#updates-card');
     await card.waitFor({ state: 'visible', timeout: 8000 });
-    assert.match(await page.locator('#updates-card-text').textContent(), /4\.1\.3/);
+    assert.match(await page.locator('#updates-card-text').textContent(), /4\.1\.4/);
     assert.equal(await page.evaluate(() => document.getElementById('account-avatar').classList.contains('has-dot')), true, '계정 단추에 작은 점이 뜬다');
     // 닫으면 그 버전은 다시 안 뜬다.
     await page.click('#updates-dismiss');
@@ -94,11 +94,12 @@ test('611 실행: 새 소식은 로그아웃 상태에서도 보이고, 알림 �
     await panel.waitFor({ state: 'attached' });
     await page.waitForFunction(() => document.getElementById('updates-panel').open, null, { timeout: 5000 });
     const text = await page.locator('#updates-list').textContent();
-    assert.match(text, /러브트리 4\.1\.3/, '버전 제목');
+    assert.match(text, /러브트리 4\.1\.4/, '버전 제목');
     assert.match(text, /새로워진 것/, '새로워진 것');
     assert.match(text, /고친 것/, '고친 것');
     assert.match(text, /AI 테스터가 찾아 준 것 · 윤제/, '출처 표시');
     assert.match(text, /핀보드/, '첫 노트 항목');
+    assert.match(text, /칸마다 차곡차곡/i, '다음 버전(4.1.4) 항목이 함께 보인다');
     assert.doesNotMatch(text, /여러분이/, '금지 문국이 없다');
     assert.doesNotMatch(text, /이슈 #|#[0-9]{2,}/, '이슈 번호를 보여 주지 않는다');
     assert.equal(await page.evaluate(() => document.getElementById('account-avatar').classList.contains('has-dot')), false, '새 소식을 보면 점이 사라진다');

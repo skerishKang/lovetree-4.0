@@ -35,7 +35,8 @@ test('611: 첫 버전(4.1.3)은 새로워진 것·고친 것을 쉬운 말 한 �
   const fixed = entry.items.filter(i => i.kind === 'fix');
   assert.ok(fresh.length >= 8, `새로워진 것 줄이 넉넉히 있다(${fresh.length})`);
   assert.ok(fixed.length >= 8, `고친 것 줄이 넉넉히 있다(${fixed.length})`);
-  assert.ok(fixed.every(i => i.source === 'ai_tester' && i.tester === '윤제'), '첫 고친 것은 AI 테스터 윤제가 찾아 준 것이다');
+  // #625: 390 카드 위치 수정 한 줄은 팀 출처(source: team)다 — 나머지 고친 것은 AI 테스터 윤제.
+  assert.ok(fixed.every(i => (i.source === 'ai_tester' && i.tester === '윤제') || i.source === 'team'), '고친 것은 AI 테스터 윤제 또는 팀 출처다');
   const joined = entry.items.map(i => i.text).join(' ');
   assert.match(joined, /핀보드/, '핀보드');
   assert.match(joined, /재생/, '재생');
@@ -99,15 +100,16 @@ test('611: 닫으면 그 버전은 다시 안 띄운다(브라우저 저장, try
   });
   await mount.start();
   assert.equal(els['updates-card'].hidden, false, '새 버전이면 한 번 작은 카드를 보인다');
-  assert.match(els['updates-card-text'].textContent, /4\.1\.3/, '카드에 버전이 적힌다');
+  const latest = latestEntry(UPDATES).version; // #619: 다음 버전(4.1.4)이 오면 그 버전이 카드에 뜬다고 시험한다
+  assert.match(els['updates-card-text'].textContent, new RegExp(latest.replaceAll('.', '\\.')), '카드에 최신 버전이 적힌다');
   await els['updates-dismiss'].listeners.click();
   assert.equal(els['updates-card'].hidden, true, '닫으면 카드가 사라진다');
-  assert.equal(readSeen(storage), '4.1.3', '본 버전을 저장한다');
+  assert.equal(readSeen(storage), latest, '본 버전을 저장한다');
   const again = mountUpdates({ $, showPanel: () => {}, storage, onDot: () => {}, fetchJson: async () => UPDATES });
   const r = await again.start();
   assert.equal(r.newer, false, '다시 접속하면 안 보인다');
   await again.openUpdates();
-  assert.equal(readSeen(storage), '4.1.3', '창을 열어도 같은 Versions 로 유지된다');
+  assert.equal(readSeen(storage), latest, '창을 열어도 같은 버전으로 유지된다');
 });
 
 test('611: 저장소가 막혀도 화면이 멈추지 않는다', async () => {
