@@ -492,7 +492,17 @@ function mountConnectionTool(doc){
  // #481 L15: #connection-count·#connection-menu는 index.html에 없다(죽은 가드) — 읽지 않고 0에서 시작한다.
  // 값은 곧 links()의 setConnectionCount가 실제 연결 수로 채운다.
  button.textContent=connectionLabel(0);button.removeAttribute('aria-label');
-}function setConnectionCount(n){const t=$('connection-tool');if(t){t.textContent=connectionLabel(n);t.removeAttribute('aria-label');}}
+ // #601: 지도 화면의 '이어진 선' 버튼을 기억해 둔다 — links()가 매번 프레임 문서를 다시 찾지 않고
+ // 같은 버튼을 고친다(지도를 다시 열거나 화면을 옮겨 다니면 0으로 돌아가던 버그의 뿌리).
+ // show()는 프레임이 뜨기 전에 links()를 부르므로, 버튼이 생긴 뒤 다시 세어 처음부터 올바른 수를 보인다.
+ connectionToolButton=button;links();
+}
+let connectionToolButton=null;
+function setConnectionCount(n){
+ // #601: 기억해 둔 지도 화면의 버튼이 살아 있으면 그 버튼을 고친다. 없으면(예전 부름) 프레임 문서에서 찾는다.
+ if(connectionToolButton?.isConnected){connectionToolButton.textContent=connectionLabel(n);connectionToolButton.removeAttribute('aria-label');return;}
+ const t=$('connection-tool');if(t){t.textContent=connectionLabel(n);t.removeAttribute('aria-label');}
+}
 // #380 4 2차: 순간 잇기 패널이 보여 준 연결 목록(고른 연결)을 기억해 두고, 그 뒤로 트리의 연결이 달라졌으면 더러움이다.
 // 패널 자체는 연결을 만들지 않으므로 보통은 확인 없이 닫힌다(보여 준 것과 저장본이 같기 때문).
 // #380 5번: 첫 화면 움직임 멈춤 상태(메모리에만 둔다 — 보기 메뉴 때와 같다. 화면을 다시 열면 처음 상태).
@@ -501,7 +511,11 @@ let connectionShown='';
 function connectionDirty(){return $('connection-panel').open&&connectionSignature(window.LT41?.tree,window.LT41?.momentId)!==connectionShown;}
 function links(){viewContext();const c=window.LT41;$('connections').replaceChildren();if(!c){setConnectionCount(0);$('selection-label').textContent='트리를 먼저 불러오세요.';connectionShown='';return;}
  const moment=c.tree.moments.find(m=>m.id===c.momentId);$('selection-label').textContent=moment?.title||'';
- const edges=c.tree.edges.filter(e=>e.from===c.momentId||e.to===c.momentId);setConnectionCount(edges.length);
+ // #601: '이어진 선 N개'는 지도에 실제 그린 연결 선 개수다 — 양 끝 순간이 모두 있는 연결을 센다.
+ // (예전에는 선택한 순간에 닿는 선만 세어 대표 계정에서 '이어진 선 0개'로 나왔다.)
+ const has=id=>c.tree.moments.some(m=>m.id===id);
+ const all=c.tree.edges.filter(e=>has(e.from)&&has(e.to));setConnectionCount(all.length);
+ const edges=c.tree.edges.filter(e=>e.from===c.momentId||e.to===c.momentId);
  if(!edges.length){const p=document.createElement('p');p.textContent='아직 연결된 다른 순간이 없어요.';$('connections').append(p);}
  for(const e of edges){
   const id=e.from===c.momentId?e.to:e.from,m=c.tree.moments.find(m=>m.id===id),b=document.createElement('button'),kind=document.createElement('small'),title=document.createElement('span');

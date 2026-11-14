@@ -26,6 +26,61 @@ window.LT56Model = (() => {
     return t.length > max ? `${t.slice(0, Math.max(1, max - 1))}…` : t;
   }
 
+  // 묶음 나누기(#601 '순간 묶음' 다시 정하기): 7개씩 자르기를 버리고 감정별로 묶는다.
+  // 감정은 순간에 저장된 값(도메인 6감정 + 가져온 기록의 커스텀 감정)이고, 색도 6벌이라 묶음도 최대 6개 —
+  // 남는 감정은 여섯 번째 묶음에 합친다('여러 감정'). 순서는 데이터에 처음 나온 순서(같은 데이터면 같은 묶음).
+  function emotionGroups(moments) {
+    const nameOf = m => String(m?.emotion ?? '').trim() || '감정 없음';
+    const names = [], indexOf = {};
+    for (const m of moments || []) if (!(nameOf(m) in indexOf)) { indexOf[nameOf(m)] = names.length; names.push(nameOf(m)); }
+    const groups = names.map(name => ({ name, ids: [] }));
+    for (const m of moments || []) groups[indexOf[nameOf(m)]].ids.push(m.id);
+    if (groups.length > 6) return [...groups.slice(0, 5), { name: '여러 감정', ids: groups.slice(5).flatMap(g => g.ids) }];
+    return groups;
+  }
+
+  // 점 이름표의 제목(#601): 빠른 추가의 자동 제목('youtube.com에서 간직한 순간')은 제목이 아니라
+  // 사이트 이름이므로, 영상 제목(mediaMetadata.title)·마음 한마디를 먼저 쓰고 정말 없을 때만 사이트 이름을 보인다.
+  function labelTitle(m) {
+    const raw = String(m?.title ?? '').trim();
+    const auto = /^(?:[a-z0-9-]+\.)+[a-z]{2,}(?::\d{1,5})?에서 간직한 순간$/i;
+    if (auto.test(raw)) {
+      const better = String(m?.mediaMetadata?.title || '').trim() || String(m?.note ?? m?.memo ?? '').trim();
+      if (better) return better;
+      return raw.replace(/에서 간직한 순간$/, '') || raw;
+    }
+    return raw;
+  }
+
+  // 월별 묶음(#601 '데이터에 맞는 쪽'): 사슬·깊은 나무는 시간 순서가 모양과 일치하므로 월별이 어긋나지 않는다.
+  // 같은 월은 날짜 순서에서 본디 연속이다. 월이 6개를 넘으면 이어지는 월을 합쳐 색 6벌 이하로 뭉친다.
+  function monthGroups(moments) {
+    const key = m => String(m?.date || '').slice(0, 7);
+    const list = (moments || []).slice().sort((a, b) => String(a?.date || '').localeCompare(String(b?.date || '')) || String(a?.createdAt || '').localeCompare(String(b?.createdAt || '')));
+    const months = [...new Set(list.map(key))].filter(Boolean).sort();
+    if (!months.length) return [{ name: '기억', ids: list.map(m => m.id) }];
+    const per = Math.ceil(months.length / 6), groups = [];
+    const ym = s => { const [y, m] = s.split('.'); return { y, m: String(Number(m)) }; };
+    const monthName = chunk => {
+      if (chunk.length === 1) { const { y, m } = ym(chunk[0]); return `${y}년 ${m}월`; }
+      const a = ym(chunk[0]), b = ym(chunk[chunk.length - 1]);
+      return a.y === b.y ? `${a.y}년 ${a.m}–${b.m}월` : `${a.y}년 ${a.m}월 – ${b.y}년 ${b.m}월`;
+    };
+    for (let i = 0; i < months.length; i += per) {
+      const chunk = months.slice(i, i + per);
+      groups.push({ name: monthName(chunk), ids: list.filter(m => chunk.includes(key(m))).map(m => m.id) });
+    }
+    return groups;
+  }
+
+  // 데이터에 맞는 묶음 고르기(#601): 한 순간에 8개 이상 이어진 부채꼴 나무(대표 트리 모양)는 공간 묶음이
+  // 없어 색으로 감정을 보인다 — 감정별. 사슬·깊은 나무는 감정이 사슬을 따라 섞여 있어 감정별로 흩어지므로
+  // 시간이 모양과 일치하는 월별로 묶는다. 고른 쪽이 한 묶음뿐이면 그대로 돌려 판을 숨긴다(감정으로 억지로 나누지 않는다).
+  function pickGroups(moments, edges) {
+    const fan = bfsOrder(moments || [], edges || []).fanHeavy;
+    return fan ? emotionGroups(moments) : monthGroups(moments);
+  }
+
   // 묶음 하나의 이름·개수(#461): 번호 범위 대신 묶음 첫 순간의 제목으로 — "첫인상부터 7개".
   // moments가 없으면(예전 호출) 번호 범위로 남긴다.
   function clusterSpan(index, groupSize, total, moments) {
@@ -186,7 +241,14 @@ window.LT56Model = (() => {
   function networkLayout(moments, opts = {}) {
     void opts.candidates;
     const box = opts.box || { x: 0, y: 0, w: opts.width || 1200, h: opts.height || 800 };
-    const n = moments.length, gs = groupSizeFor(n), k = Math.max(1, Math.ceil(n / gs));
+    // #601: 묶음은 감정별(opts.groups — 순간 id 배열의 배열)이다. 없으면(옛 부름) 예전처럼 순서대로 7개씩 자른다.
+    const groups = Array.isArray(opts.groups) && opts.groups.some(g => Array.isArray(g) && g.length) ? opts.groups : null;
+    const n = moments.length;
+    const gs = groups ? Math.max(1, ...groups.map(g => (g || []).length)) : groupSizeFor(n);
+    const k = groups ? groups.length : Math.max(1, Math.ceil(n / gs));
+    const slot = {};
+    if (groups) groups.forEach((ids, g) => (ids || []).forEach((id, j) => { slot[id] = { g: Math.min(k - 1, g), j, size: Math.max(1, (ids || []).length) }; }));
+    else moments.forEach((m, i) => { const g = Math.min(k - 1, Math.floor(i / gs)); slot[m.id] = { g, j: i - g * gs, size: Math.min(gs, n - g * gs) }; });
     const { cols, rows } = gridFor(k, box.w, box.h);
     const cw = box.w / cols, ch = box.h / rows;
     const maxR = opts.dotR ?? 5, firstR = opts.firstR ?? 20, gap = opts.gap ?? 8, hubR = opts.hubR ?? 9, inset = opts.inset ?? 12;
@@ -208,24 +270,28 @@ window.LT56Model = (() => {
     let rx = Math.max(6, cw / 2 - inset - maxR), ry = Math.max(6, ch / 2 - Math.max(inset + maxR, firstR + 2));
     rx = Math.min(rx, ry * 2); ry = Math.min(ry, rx * 2);
     const points = {}, firstIdx = Math.max(0, moments.findIndex(m => m.first));
-    moments.forEach((m, i) => {
-      const g = Math.min(k - 1, Math.floor(i / gs)), j = i - g * gs, size = Math.min(gs, n - g * gs), c = hubs[g];
+    moments.forEach((m) => {
+      const { g, j, size } = slot[m.id] || { g: 0, j: 0, size: 1 }, c = hubs[g];
       const th = -Math.PI / 2 + (2 * Math.PI * j) / size;
       const f = size === 1 ? 0.55 : 1;
       points[m.id] = { x: c.x + Math.cos(th) * rx * f, y: c.y + Math.sin(th) * ry * f };
     });
-    // 점 반지름: 이웃(같은 칸)·묶음 점과 gap 이상 떨어지는 가장 큰 값(2.5~maxR).
+    // 점 반지름: 이웃(같은 묶음)·묶음 점과 gap 이상 떨어지는 가장 큰 값(2.5~maxR).
     const ids = moments.map(m => m.id);
     const firstId = moments[firstIdx]?.id;
+    const byGroup = [];
+    for (const id of ids) { const g = slot[id]?.g ?? 0; (byGroup[g] = byGroup[g] || []).push(id); }
     let dotR = maxR;
     const fits = r => {
-      for (let i = 0; i < ids.length; i++) {
-        const a = points[ids[i]], ra = ids[i] === firstId ? Math.max(firstR, r) : r;
-        const g = Math.min(k - 1, Math.floor(i / gs));
-        if (Math.hypot(a.x - hubs[g].x, a.y - hubs[g].y) < ra + hubR + gap) return false;
-        for (let j = i + 1; j < ids.length && Math.floor(j / gs) === Math.floor(i / gs); j++) {
-          const b = points[ids[j]], rb = ids[j] === firstId ? Math.max(firstR, r) : r;
-          if (Math.hypot(a.x - b.x, a.y - b.y) < ra + rb + gap) return false;
+      for (let g = 0; g < k; g++) {
+        const list = byGroup[g] || [];
+        for (let i = 0; i < list.length; i++) {
+          const a = points[list[i]], ra = list[i] === firstId ? Math.max(firstR, r) : r;
+          if (hubs[g] && Math.hypot(a.x - hubs[g].x, a.y - hubs[g].y) < ra + hubR + gap) return false;
+          for (let j = i + 1; j < list.length; j++) {
+            const b = points[list[j]], rb = list[j] === firstId ? Math.max(firstR, r) : r;
+            if (Math.hypot(a.x - b.x, a.y - b.y) < ra + rb + gap) return false;
+          }
         }
       }
       return true;
@@ -408,12 +474,12 @@ window.LT56Model = (() => {
         if (rects.some(r => overlaps(rect, r))) continue;
         if (obstacles.some(o => onDot(rect, o))) continue;
         rects.push(rect);
-        out.push({ id: c.id, text: c.text, x: rect.l, y: rect.t + c.h * 0.77, rect });
+        out.push({ id: c.id, text: c.text, x: rect.l, y: rect.t + c.h * 0.77, rect, tw: c.tw || 0 });
         break;
       }
     }
     return out;
   }
 
-  return { branchPoint, groupSizeFor, shortTitle, clusterSpan, fitBox, gridFor, bezierGeometry, routeEdges, bezierPoint, treeLevels, originPath, pathEmphasis, relationText, networkLayout, concentricLayout, placeLabels };
+  return { branchPoint, groupSizeFor, shortTitle, clusterSpan, emotionGroups, monthGroups, pickGroups, labelTitle, fitBox, gridFor, bezierGeometry, routeEdges, bezierPoint, treeLevels, originPath, pathEmphasis, relationText, networkLayout, concentricLayout, placeLabels };
 })();

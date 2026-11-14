@@ -304,7 +304,18 @@ jobs:
           fc-cache -f >/dev/null 2>&1 || true
           echo "한글 글꼴 $(fc-list :lang=ko | wc -l)개 · 대표 $(fc-match 'sans-serif:lang=ko' | head -1)"
           # #517·#518: 390·360 지도 도구 줄 넘침·겹침과 상세 '기억책에서 보기'의 책 이동을 실제 화면에서 잰다.
-          node --test --test-concurrency=1 tests/v41-network-toolbar-517.test.mjs tests/v41-map-open-book-518.test.mjs
+          # #601: 관계 지도 다듬기 시험(새 순간 기본 연결·점 이름표·묶음·두 보기 판 일치·이어진 선)을 나란히 돌린다
+          # (지도 대비 잡의 나란히 돌리기와 같은 요령 — 종료 코드를 받아 두고 로그를 항상 출력한 뒤 판정한다).
+          node --test --test-concurrency=1 tests/v41-network-toolbar-517.test.mjs tests/v41-map-open-book-518.test.mjs > /tmp/map-517.log 2>&1 & p1=$!
+          LT_MAP_RELATIONS_REQUIRE=1 node --test --test-concurrency=1 tests/v41-map-relations-601.test.mjs > /tmp/map-relations.log 2>&1 & p2=$!
+          r1=0; wait $p1 || r1=$?
+          r2=0; wait $p2 || r2=$?
+          echo "map-517 exit=$r1 · map-relations exit=$r2"
+          echo '— 지도 도구 줄·책 이동 시험 출력(마지막 60줄) —'
+          tail -60 /tmp/map-517.log || true
+          echo '— 지도 관계 시험(#601) 출력 —'
+          cat /tmp/map-relations.log || true
+          [ $r1 -eq 0 ] && [ $r2 -eq 0 ] || exit 1
           echo "지도 도구 줄·책 이동 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
       # 지도 판 흐름(설정·저장 복원·두 보기·누르기·유휴 0)은 지도 대비 잡에서 여기로 옮겼다(지도 잡 시간 단축).
       # 브라우저 준비·한글 글꼴은 같은 잡의 앞 단계에서 이미 끝난 것을 쓴다.

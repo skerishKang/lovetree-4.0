@@ -167,7 +167,8 @@ test('배선: 빠른 추가·자세한 추가가 미리보기 제목을 저장�
   assert.match(quickDom, /return title \? \{ mediaMetadata: \{ title \} \} : \{\};/);
   assert.match(quickDom, /import \{fetchVideoTitle\} from '\.\.\/video-title\.mjs';/);
   // 자세한 추가: 미리보기 때 받아 둔 제목을 저장 입력에 함께 넘긴다(사용자 입력 우선은 도메인 판정).
-  assert.match(panels, /apply\(editorMode, \{\.\.\.Object\.fromEntries\(new FormData\(e\.target\)\), \.\.\.editorMediaTitle\(\)\}, selection\(\)\)/);
+  // #601 '가' 결정: 자세한 추가의 부모는 편집기를 열 때 정한 이전 순간(고르지 않았으면 가장 최근 순간)이다.
+  assert.match(panels, /apply\(editorMode, \{\.\.\.Object\.fromEntries\(new FormData\(e\.target\)\), \.\.\.editorMediaTitle\(\)\}, editorMode === 'add' \? \{ \.\.\.selection\(\), momentId: addParentMomentId\(\) \} : selection\(\)\)/);
   assert.match(panels, /import \{fetchVideoTitle\} from '\.\.\/video-title\.mjs';/);
   assert.match(panels, /suggestMomentTitle\(\{title, note, url, mediaMetadata: editorVideoTitle && url === editorVideoUrl \? \{title: editorVideoTitle\} : null\}\)/, '안내 문구도 같은 규칙을 따른다');
   // 조회 한 벌: 서버 oEmbed 프록시만 쓴다.
