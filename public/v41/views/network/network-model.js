@@ -155,6 +155,28 @@ window.LT56Model = (() => {
     return typeof edge?.reason === 'string' ? edge.reason.trim() : '';
   }
 
+  // #583 부채꼴 나무 판정과 배치 순서: 첫 순간부터 부모 연결을 따라 너비 우선(BFS)으로 순서를 세고,
+  // 한 순간의 자식이 fanMin(기본 8)개 이상이면 '부채꼴 나무'로 본다 — 대표 트리처럼 첫 순간 하나에
+  // 순간 대부분이 이어진 평평한 나무다. 닿지 않는 순간은 순서 맨 뒤에 붙인다(빠짐없이).
+  function bfsOrder(moments, edges, fanMin = 8) {
+    const ids = new Set(moments.map(m => m.id));
+    const childrenOf = {};
+    for (const e of edges) if (e.kind === 'parent' && ids.has(e.from) && ids.has(e.to)) (childrenOf[e.from] = childrenOf[e.from] || []).push(e.to);
+    const first = moments.find(m => m.first) || moments[0];
+    const order = [], seen = new Set();
+    if (first) { order.push(first.id); seen.add(first.id); }
+    let frontier = first ? [first.id] : [];
+    while (frontier.length) {
+      const next = [];
+      for (const id of frontier) for (const c of childrenOf[id] || []) if (!seen.has(c)) { seen.add(c); order.push(c); next.push(c); }
+      frontier = next;
+    }
+    for (const m of moments) if (!seen.has(m.id)) order.push(m.id);
+    const fanHub = Object.keys(childrenOf).reduce((best, id) => childrenOf[id].length > (childrenOf[best]?.length || 0) ? id : best, null);
+    const fanOut = fanHub ? childrenOf[fanHub].length : 0;
+    return { order, childrenOf, fanHub, fanHeavy: fanOut >= fanMin };
+  }
+
   // 그물형 배치(#461): 화면에 맞게 펼친다. 결과는 화면 좌표(배율 1 = 전체 보기)다.
   // ① 묶음을 화면 비율에 맞는 칸(gridFor)에 나눠 앉힌다 — 넓은 화면은 가로로, 좁고 긴 화면은 세로로.
   //    칸은 지그재그 순서(1줄 왼→오, 2줄 오→왼)라 이웃 묶음이 붙어 있고, 덜 찬 마지막 줄은 가운데로 모은다(빈 띠 쏠림 방지).
@@ -168,6 +190,12 @@ window.LT56Model = (() => {
     const { cols, rows } = gridFor(k, box.w, box.h);
     const cw = box.w / cols, ch = box.h / rows;
     const maxR = opts.dotR ?? 5, firstR = opts.firstR ?? 20, gap = opts.gap ?? 8, hubR = opts.hubR ?? 9, inset = opts.inset ?? 12;
+    // #583 부채꼴 나무(한 순간에 8개 이상 이어짐): 묶음 칸으로 쪼개지 않고 한 고리에 펼친다 —
+    // 첫 순간에서 뻗는 선이 여러 묶음을 가로지르며 엉키던 모양(평평한 26순간 트리)을 없앤다.
+    // 순간은 첫 순간부터 BFS 순서로 고리 위에 앉히고(형제가 이웃해 부채꼴로 읽힌다), 묶음 점은
+    // 색·범례가 뜻하는 대상이 없어 화면에 내지 않는다(network.js가 hubs가 비었을 때 치운다).
+    const tree = bfsOrder(moments, edgesOf(opts), opts.fanMin ?? 8);
+    if (tree.fanHeavy) return fanLayout(moments, box, opts, tree, { maxR, firstR, gap, hubR, inset });
     const hubs = [];
     for (let i = 0; i < k; i++) {
       const row = Math.floor(i / cols), inRow = Math.min(cols, k - row * cols);
@@ -205,6 +233,43 @@ window.LT56Model = (() => {
     while (dotR > 2.5 && !fits(dotR)) dotR -= 0.25;
     return { points, hubs, groupSize: gs, cols, rows, cell: { w: cw, h: ch }, rx, ry, dotR, hubR, box };
   }
+
+  // #583 부채꼴 배치: 가장 많이 이어진 순간(첫 순간)을 상자 가운데에 두고, 나머지 순간을 상자에 맞춘
+  // 타원 고리 위에 BFS 순서로 앉힌다(12시부터 시계 방향 — 형제가 이웃해 부채꼴로 읽힌다). 선은
+  // 가운데에서 고리로 뻗는 방사형이 되어 서로 교차하지 않는다. 결과는 그물형과 같은 모양(points·cell·dotR)이고
+  // fan:true·fanHub(가운데 순간)·center·order를 덜어 준다 — 화면이 이름표 방향·묶음 점 처리에 쓴다.
+  function fanLayout(moments, box, opts, tree, sizes) {
+    const { maxR, firstR, gap, hubR, inset } = sizes, n = moments.length;
+    let rx = Math.max(6, box.w / 2 - inset - maxR), ry = Math.max(6, box.h / 2 - Math.max(inset + maxR, firstR + 2));
+    rx = Math.min(rx, ry * 2); ry = Math.min(ry, rx * 2);
+    const center = { x: box.x + box.w / 2, y: box.y + box.h / 2 };
+    const points = {};
+    tree.order.forEach((id, j) => {
+      if (j === 0) { points[id] = { x: center.x, y: center.y }; return; }
+      const th = -Math.PI / 2 + (2 * Math.PI * (j - 1)) / Math.max(1, n - 1);
+      points[id] = { x: center.x + Math.cos(th) * rx, y: center.y + Math.sin(th) * ry };
+    });
+    // 점 반지름: 고리 위 이웃과 gap 이상 떨어지는 가장 큰 값(2.5~maxR) — 그물형과 같은 규칙.
+    const ids = tree.order.slice(1), firstId = tree.order[0];
+    let dotR = maxR;
+    const fits = r => {
+      for (let i = 0; i < ids.length; i++) {
+        const a = points[ids[i]];
+        if (Math.hypot(a.x - points[firstId].x, a.y - points[firstId].y) < Math.max(firstR, r) + r + gap) return false;
+        for (let j = i + 1; j < ids.length; j++) {
+          const b = points[ids[j]];
+          if (Math.hypot(a.x - b.x, a.y - b.y) < r + r + gap) return false;
+        }
+      }
+      return true;
+    };
+    while (dotR > 2.5 && !fits(dotR)) dotR -= 0.25;
+    return { points, hubs: [], groupSize: n, cols: 1, rows: 1, cell: { w: box.w, h: box.h }, rx, ry, dotR, hubR, box, center, fan: true, fanHub: tree.fanHub, order: tree.order.slice() };
+  }
+
+  // 부채꼴 판정에 쓸 parent 연결: opts.edges(화면이 넘겨 주는 실제 연결)가 없으면 빈 연결로 본다 —
+  // 연결 없이 배치만 부를 때(옛 부름)도 예전 동작을 그대로 유지한다.
+  function edgesOf(opts) { return Array.isArray(opts.edges) ? opts.edges : []; }
 
   // 동심원형 배치: 첫 순간을 가운데, 1단계·2단계… 순서대로 바깥 원에(#366).
   // 같은 부모의 자식은 부모의 부채꼴 안에 하위 무게만큼 나눠 붙이고(부모 근처에 모임),

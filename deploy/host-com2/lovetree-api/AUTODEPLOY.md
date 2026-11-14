@@ -14,6 +14,12 @@
 상태·백업·저장소 사본은 `/var/lib/lovetree-api-autodeploy/`에 있다.
 잠금 파일은 `/run/lock/lovetree-api-deploy.lock` 하나이며 수동 `install.sh`도 같은 파일을 쓴다.
 
+**autodeploy.sh 를 고치면 컴2의 `/usr/local/sbin` 사본도 같이 갱신한다** — 자동 설치는 이 파일 자체를 옮기지 않는다(설치 스크립트라서). 사본이 옛 판정을 쓰면 새 규칙(tools 판독기 설치 목록 등)이 무시된다(2026-11-14 실측 — ee8172a 가 skipped 로 지나가 수동 설치로 회복). 갱신 방법 한 줄:
+
+```bash
+git -C /var/lib/lovetree-api-autodeploy/repo fetch origin && git -C /var/lib/lovetree-api-autodeploy/repo checkout --force --detach origin/main && install -m 0755 /var/lib/lovetree-api-autodeploy/repo/deploy/host-com2/lovetree-api/autodeploy.sh /usr/local/sbin/lovetree-api-autodeploy
+```
+
 ## 한 번 돌 때의 판정
 
 1. `flock`으로 잠근다. 이미 돌고 있으면 `SKIPPED reason=locked`.

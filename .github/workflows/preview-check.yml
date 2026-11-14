@@ -160,6 +160,14 @@ jobs:
           node --test --test-concurrency=1 tests/v41-book-single-537.test.mjs
           echo "책 한 장 보기 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
 
+      - name: 책 YouTube 재생·두 장 모드 시험(건너뜀=실패 — 이슈 584)
+        env:
+          LT_BOOK_584_REQUIRE: '1'
+        run: |
+          start=$(date +%s)
+          node --test --test-concurrency=1 tests/v41-book-play-584.test.mjs
+          echo "책 재생·두 장 모드 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+
   screen-map-a:
     name: 화면 시험 — 지도 대비
     runs-on: ubuntu-latest
@@ -202,8 +210,16 @@ jobs:
           echo "한글 글꼴 $(fc-list :lang=ko | wc -l)개 · 대표 $(fc-match 'sans-serif:lang=ko' | head -1)"
           # 시험 안에서 조합(크기×테마×판 8개)을 둘씩 동시에 돌린다(지도 잡 시간 단축 — 픽셀 해석이
           # 렌더러 프로세스별로 나뉜다). 판 흐름 시험은 지도 도구 줄 잡으로 옮겼다(지도 잡이 3분 안에 들도록).
-          node --test --test-concurrency=1 tests/v41-map-contrast.test.mjs
-          echo "지도 실제 대비 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+          # #583 부채꼴·'이 순간 열기' 시험(약 10초)은 대비 시험과 나란히 돌린다 — 실행기 코어 4개에
+          # 대비 시험 워커 2개 + 이 시험 브라우저 1개가 함께 도는다. 잡이 2분 안에 들도록 순서로 쌓지 않는다.
+          node --test --test-concurrency=1 tests/v41-map-contrast.test.mjs > /tmp/map-contrast.log 2>&1 & p1=$!
+          LT_MAP_FAN_REQUIRE=1 node --test --test-concurrency=1 tests/v41-map-fan-open.test.mjs > /tmp/map-fan.log 2>&1 & p2=$!
+          wait $p1; r1=$?; wait $p2; r2=$?
+          # 실패하면 원인을 그대로 보인다(#529 흔들림 진단 출력 유지).
+          if [ $r1 -ne 0 ]; then echo '— 지도 대비 시험 출력 —'; tail -60 /tmp/map-contrast.log; fi
+          if [ $r2 -ne 0 ]; then echo '— 지도 부채꼴·열기 시험 출력 —'; cat /tmp/map-fan.log; fi
+          [ $r1 -eq 0 ] && [ $r2 -eq 0 ] || exit 1
+          echo "지도 실제 대비·부채꼴 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
 
   screen-map-b:
     name: 화면 시험 — 지도 도구 줄·판 흐름·책 이동

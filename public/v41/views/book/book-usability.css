@@ -92,10 +92,12 @@ html[data-v41-screen=book] .yt-placeholder{display:grid;place-items:center;width
 html[data-v41-screen=book] .yt-placeholder .yt-play-label{position:static;transform:none}
 html[data-v41-screen=book] .yt-frame{display:block;width:100%;aspect-ratio:16/9;border:0;background:#000}
 html[data-v41-screen=book] .yt-frame.is-vertical{width:auto;height:clamp(240px,52vh,400px);max-width:100%;aspect-ratio:9/16;margin:0 auto}
-/* #393 2: 크게 보기 단추 — 영상 위. 누르면 어두운 깔개 위 화면 가운데 크게 연다. */
-html[data-v41-screen=book] .yt-expand{display:flex;justify-content:flex-end;margin:0 0 8px}
-html[data-v41-screen=book] .yt-expand button{min-height:44px;padding:8px 14px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-pill);background:rgba(255,230,166,.1);color:var(--lt-gold-ink);font-size:13px;cursor:pointer}
-html[data-v41-screen=book] .yt-expand button:hover{background:rgba(255,230,166,.22)}
+/* 이슈 584: 크게 보기 단추를 영상 위(yt-expand)에서 카드 아래 한 줄로 옮긴다.
+   왼쪽 YouTube ↗(원본 링크), 오른쪽 크게 보기 — 영상 위에는 단추가 겹치지 않는다. */
+html[data-v41-screen=book] .media-links{display:flex;align-items:center;gap:8px;margin:6px 0 2px;min-width:0}
+html[data-v41-screen=book] .media-links .media-source-link{font-size:13px}
+html[data-v41-screen=book] .media-links button{margin-left:auto;flex:0 0 auto;min-height:44px;padding:8px 14px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-pill);background:rgba(255,230,166,.1);color:var(--lt-gold-ink);font-size:13px;cursor:pointer}
+html[data-v41-screen=book] .media-links button:hover{background:rgba(255,230,166,.22)}
 html[data-book-shape=phone][data-v41-screen=book] .yt-play.is-vertical,
 html[data-book-shape=phone][data-v41-screen=book] .yt-frame.is-vertical{height:clamp(220px,44vh,360px)}
 /* 4·5. 오른쪽 빈 페이지 안내와 '다음 순간 남기기' */
@@ -180,11 +182,14 @@ html[data-book-view=single][data-book-shape=wide][data-v41-screen=book] .title-e
 html[data-v41-screen=book] .media-source{display:flex;align-items:center;gap:8px;margin:10px 0 2px;min-width:0;font-size:12px;line-height:1.5;color:var(--lt-ink)}
 html[data-v41-screen=book] .media-source-mark{flex:0 0 auto;font-size:10px;color:var(--lt-ink)}
 html[data-v41-screen=book] .media-source-text{flex:0 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-html[data-v41-screen=book] .media-source-sep{flex:1 1 24px;min-width:12px;height:1px;border-bottom:1px dotted var(--lt-line-paper);transform:translateY(3px)}
 html[data-v41-screen=book] .media-source-link{flex:0 0 auto;color:var(--lt-ink);font-weight:700;text-decoration:underline;text-decoration-color:var(--lt-gold-line);text-underline-offset:3px}
 html[data-v41-screen=book] .media-source-link:hover{text-decoration-color:var(--lt-ink)}
 
-/* ── #345 '여기까지 온 길' — 세로 타임라인. 카드·글자는 토큰만 쓴다. ─────────────── */
+/* 이슈 584(6번): 머리줄 단추 설명 말풍선 — 브라우저 기본 title 대신 러브트리 모양 작은 알약.
+   마우스 올림·키보드 초점·휴대폰 길게 누름에 뜬다(뜨는 동작은 book-extra.js mountTips). */
+.lt-tip-bubble{position:fixed;z-index:80;max-width:min(320px,80vw);padding:6px 10px;border-radius:10px;border:1px solid var(--lt-gold);background:rgba(20,16,10,.94);color:var(--lt-pearl,#f5ece6);font-size:13px;line-height:1.45;pointer-events:none;box-shadow:0 6px 18px rgba(0,0,0,.35)}
+
+/* ── #345 '이어진 순간'(이슈 584에서 개명) — 세로 타임라인. 카드·글자는 토큰만 쓴다. ── */
 html[data-v41-screen=book] .overview-card{width:min(560px,92vw);max-height:min(86vh,760px);display:flex;flex-direction:column;overflow:hidden;padding:24px 24px 16px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-panel);background:var(--lt-glass-strong);color:var(--lt-pearl);box-shadow:0 24px 55px rgba(0,0,0,.4)}
 html[data-v41-screen=book] .overview-card h2{margin:0 0 6px;color:var(--lt-pearl);font:500 26px/1.25 var(--lt-reading)}
 html[data-v41-screen=book] .overview-card>p{margin:0 0 14px;color:var(--lt-muted);font-size:13px;line-height:1.6;word-break:keep-all}

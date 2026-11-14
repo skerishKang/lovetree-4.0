@@ -12,6 +12,13 @@
 - **시험**: tests/v41-orbit-586-perf.test.mjs(신규, 소스 계약 4 + 실행 계약 3 — 유휴 4초 z-index 쓰기 수, pointermove 40번에 rect 재기 0회, 글꼴 토큰 유지). preview-check screen-home-book 잡에 LT_ORBIT586_REQUIRE=1 단계 추가. #535 시험 6/6, 전체 npm test 초록(한 개 소스 계약을 #586 변경에 맞게 갱신).
 - **남은 것**: 대표 실기기 확인(끄는 흐름·hover 사라짐이 눈에 띄지 않는지), 근본 해법 이슈 작성.
 
+## 2026-11-15 — 보드 마감: 금색 커서 동그라미 제거 + 상세 다음·이전 순간 단추화 (로컬2 레인, ai/com2-lt-cursor-detail-20261115-0830-3a7c, main 8092d28 기준)
+
+- **커서 동그라미 완전 제거**: 따라오는 금색 동그라미(`cursorRing`·`cursorInner`·`cursorFX`·`cursor-burst/ripple/drop`)를 HTML 요소·board.css 스타일·board-extras.js 배선·board-model.js 판정 함수(`cursorMode`·`cursorHover`·`cursorScale`·`cursorEffectAllowed`·`cursorPresence`)까지 치웠다. 원래 마우스 커서를 쓰고, 상태는 CSS cursor로 알린다 — 판 `grab`(끌 때 `grabbing`, `#viewport.panning`), 카드 `grab`(끌 때 `grabbing`, `.card.dragLift`), 핀 연결 중 `crosshair`(`#cardLayer.linking`), 핀·단추 `pointer`. `public/v41` 전체에 `cursor:none` 없음(시험이 검사).
+- **상세 다음·이전 순간 단추화**: `#dConn`의 '→ 순간 제목' 목차 글씨를 실제 `<button class="connLink" data-cid data-dir>`로 바꿨다(board.js open()과 board-extras selectMoment 둘 다, `connRow` 한 벌). 누르면 이벤트 위임(#dConn.onclick)으로 다음은 `moveViaConnection`(실을 따라 흐른 뒤 `focusBoardMoment`)·이전은 `pulseConnection`→`focusBoardMoment(c.a)` — 판이 그 카드로 부드럽게 이동하고 카드가 선택되며 상세가 바뀐다. 이유(why) 글은 단추 아래 작은 글씨(`.connWhy`)로 그대로, 3개 넘으면 '나머지 N개 보기' `<details>`도 그대로. 실제 button이라 Tab·Enter 접근 가능.
+- **시험**: 신규 `tests/v41-board-cursor-detail.test.mjs` 4건 — (1) 커서 흔적 없음(5개 파일·public/v41 전체 `cursor:none` 걷기) + 상태 커서 규칙, (2) 단추 규칙, (3) 실제 브라우저 다음 단추 클릭 → 판 이동(transform 변화)·선택·상세 전환 + Enter, (4) 이전 단추. board-model 시험의 커서 시험 5건(19~24)은 함수 소멸로 함께 거둠. 관련 시험 49건 통과(board-model·신규·#553 겹침·#536 넓게·터치 영역), build·modulepreload 유지 확인.
+- **fps(1440, 사슬 40순간, 헤드리스 playwright)**: 판 끌기 40→43~44, 확대 56→58 — 같거나 소폭 빠름(동그라미 그리기·기억을 덜어서). 스크린샷·수치: `E:\lovetree-qaoard-cursor\`(detail-next-button.png, fps 기록).
+- **머지**: PR #583 → main. 보드 배치(treeSpread·cardPosition)는 건드리지 않았다.
 ## 2026-11-14 — AI 고객 내보내기: 쿠키 없이 컴2 DB에서 (로컬5 레인, ai/local5-lt-ai-export-db-261114, main b79752d 기준)
 
 - **무엇**: 매일 07:00 AI 고객 내보내기의 원본을 컴2 운영 DB(읽기만)로 바꿨다. 관리자 세션 쿠키 방식은 폐지(쿠키 만료로 조용히 멈추는 문제·쿠키 파일 보관 문제).
@@ -20,6 +27,8 @@
 - **컴1 실행 스크립트** `tools/run-ai-customer-export.ps1`(신규): Git 번들 ssh(Windows 내장 ssh.exe 가 깨져 있음 — `ssh -V` 도 255·무출력, 2026-11-14 실측) → comp2 → `wsl -e /usr/local/bin/node 판독기 --b64`(인용·파이프 없는 명령 — powershell.exe 5.1 예약 작업이 겹따옴표·| 를 깨뜨려 판독기에 --b64 모드를 넣음, 실측) → 디코드해 임시 JSON → md 작성 → 임시 삭제. 로그 `E:\lovetree-qa\export-log\ai-customer-YYMMDD.log` 맨 윗줄이 이유 한 줄(성공 요약/실패 이유), 실패 시 종료 코드 1.
 - **설치 목록**: `install.sh` 가 판독기를 `/opt/padiem/lovetree-api/tools/` 에 넣고, `autodeploy.sh` 의 API 변경 판정에 `tools/export-ai-customer-db.mjs` 를 추가(이 파일만 바뀌어도 설치). migration 변경 없음 — 자동 설치 대상.
 - **시험** `tests/export-ai-customer.test.mjs` 12건(문장 READ ONLY·쓰기 키워드 없음, subject·이메일 없음, 가림, JSON→md, 이름 중복 폴더). `npm test` 전체는 PR당 1회 실행(결과는 PR 본문).
+- **수정(2026-11-14, 머지 cf5ad94 뒤 실데이터 실행에서 발견)**: 판독기 posts SELECT에 `subject_id` 칼럼이 빠져 받아온 글을 고객에 묶지 못해 일지가 비었음(posts=0) — 칼럼을 결과에 추가하고 시험에 SELECT 절 단언을 넣음(테스트 입력에 subject_id 가 있어 미쳐지지 않았던 빠짐).
+- **컴1 고정 위치(2026-11-14 마무리)**: 예약 작업 `LoveTreeAICustomerExport0700`은 레인 작업 폴더가 아니라 `E:\lovetree-qa\export-tool\`(ps1+mjs 복사본 — export-ai-customer.mjs 는 node 내장만 import 해 두 파일이면 충분, ps1 은 $PSScriptRoot 기준이라 스크립트 수정 없음)에서 돈다. 저장소 tools 스크립트를 고치면 그 폴더에 다시 복사해 둔다.
 - **주의**: 컴2 ssh 는 Windows 셸(cmd)이고 예약 작업은 powershell.exe 5.1 — 겹따옴표·`|`·작은따옴표가 원격 전달에서 깨진다(2026-11-14 실측) → 원격 명령은 인용·파이프 없이 `wsl -e node 판독기 --b64` 한 줄(base64 는 판독기가 출력). WSL 기본 사용자 root — .env 읽기 가능. JSON 은 base64 한 줄로만 전달(한글·줄바꿈 안전). 판독기 오류 이유는 값 없이 한 줄만 stderr 로.
 
 ## 2026-11-14 — 운영센터 2차 다듬기: 탭 거르기·고치는 일 (#570, 로컬3 레인, ai/local3-admin-570-261115, main f605e81 기준)
@@ -50,6 +59,13 @@
 - **내보내기·예약**: 거버넌스 윤제 폴더 원본을 `_원본보관\\`로 복사한 뒤 `tools/export-ai-customer.mjs` 실데이터 1회 실행 — `일지_261114.md`·`소개.md`가 사이트 내용으로 다시 써짐을 확인. 컴1 작업 스케줄러에 매일 07:00 등록, 로그 `E:\lovetree-qa\\export-log\\`. 관리자 세션 쿠키는 계정비밀_대장 규칙대로 파일로만 보관(출력·커밋 금지).
 - **시험**: `npm test` 전부 통과(브라우저 지도 대비 제외 환경), `npm run build`·`node tools/v41-modulepreload.mjs --check` 통과. 설정 '운영' 묶음·계정 메뉴 항목은 서버 응답 기반 표시라 모의 `/api/account`로 DOM 확인.
 - **남긴 것**: 대표의 실제 관리자 화면 확인(게시판 보임)·`skerish@naver.com` 계정 관리자 권한은 대표 지시 대기. 내보내기 예약의 쿠키 만료(세션 최대 나이) 시 갱신 절차 필요.
+
+## 2026-11-15 — 지도 부채꼴·'이 순간 열기' 주소 약속 (로컬4, ai/local4-map-relations-261115, main cf5ad94 기준)
+
+- **주소 약속(보드 레인이 쓰는 것)**: 셸 주소 `#my/network?tree=<treeId>&moment=<momentId>`(기존 selection-location 규칙 그대로)로 지도를 열면, 셸이 지도 프레임 주소에 `?open=<momentId>`를 붙여 보내고(`shell/screens.mjs` show(), 요청은 `shell.mjs`의 networkOpen 플래그로 한 번만) 지도는 그 순간을 **선택 상태(상세 판 열림)·화면 가운데·배율 맞춤**으로 연다(`views/network/network.js` 시작 부분). 주소의 순간을 못 찾으면 기존대로 시작 순간 안내만 하고, `?open=`이 없으면 예전대로 전체 보기(배율 1)로 뜬다. `#my/network?moment=…` → 요청 연결은 `shell/location.mjs`, 프레임 주소 붙임은 `shell/screens.mjs` — 소자 시험 `tests/v41-shell-location.test.mjs`·`tests/v41-shell-screens.test.mjs`.
+- **평평한 나무의 부채꼴 배치**: 한 순간에 8개 이상 이어진 그물형 나무(대표 트리 '모아둔 순간'과 같은 모양)는 묶음 칸으로 쪼개지 않고, **가장 많이 이어진 순간(첫 순간)을 상자 가운데 두고 나머지를 상자에 맞춘 타원 고리 위에 BFS 순서(12시부터)로 펼친다**(`network-model.js` `fanLayout` — `networkLayout`이 `fanHeavy`면 쓴다). 선은 가운데에서 고리로 뻗는 방사형이라 서로 교차하지 않고, 묶음 점·범례는 치운다. 처음 보기는 화면 맞춤(배율 1). 동심원형·작은 나무·40개 예시는 예전 배치 그대로.
+- **진단·수정 결과**: 세 모양(평평한 26·사슬 10단·섞인 3×4) × 1440·390 × 밤·정원 × 두 보기 24행 측정 — 수정 전 flat26 그물형은 첫 순간에서 뻗는 25개 선이 화면을 가로지르며 엉킴(390 특히), 수정 후 24행 모두 노드·이름표 겹침·잘림·밖점·선교차 0. 스크린샷 `E:\lovetree-qa\map-relations\{before,after}\`(측정 스크립트·도우미는 `tests/helpers/map-shapes.mjs`만 저장소에 남긴다).
+- **시험**: 신규 `tests/v41-map-fan-open.test.mjs`(실행형 2건 — 평평한 26순간 부채꼴 겹침 0·화면 맞춤, `?open=`로 열면 선택·가운데)을 미리보기 검사 '지도 대비' 잡에서 대비 시험과 **나란히** 실행(`LT_MAP_FAN_REQUIRE=1`, 잡 2분 안). #366 시작 줄 소자 시험은 주소 열기 예외를 반영해 갱신(평소 뜰 때 자동 맞춤 금지 가드 유지). 대비 시험 첫 그리기 대기 15→30초(전체 자리 붐빔 대비, 단언·측정 그대로). `npm test` 전체는 전 레인 기준 1회 실행 — 지도 소자·흐름 시험 전부 통과, 대비 시험은 단독·나란히 통과(전체 자리에서 첫 그리기 15초 초과 1회 — 대기 넉네히 함), build·modulepreload --check 통과.
 
 ## 2026-11-14 — 미리보기 검사 동시 실행 (CTO)
 

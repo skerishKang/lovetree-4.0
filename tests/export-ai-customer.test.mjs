@@ -55,6 +55,8 @@ test('판독기 문장은 READ ONLY 트랜잭션과 SELECT 뿐이다', () => {
   assert.match(QUERIES.customers, /lovetree_ai_personas/);
   assert.match(QUERIES.customers, /ai_customer/);
   assert.match(QUERIES.posts, /lovetree_feedback/);
+  // 받아온 글을 고객(subject)에 묶으려면 subject_id 칼럼이 결과에 있어야 한다(2026-11-14 빈 일지 사고).
+  assert.match(QUERIES.posts, /SELECT f\.id, f\.subject_id/);
   assert.match(QUERIES.replies, /lovetree_feedback_replies/);
 });
 

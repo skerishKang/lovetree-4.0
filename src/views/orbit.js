@@ -70,7 +70,7 @@ export function mountOrbit(host,{trees,storage,context,actions,authHtml='',onSel
   const writable=!c.example;
   const vertical=isVerticalMoment(c);
   const media=c.image
-   ?`<span class="recent-media${vertical?' vertical':''}"><img src="${esc(c.image)}" alt="" draggable="false"${thumbFallbackAttrs(c,{candidates:c.thumbCandidates||[c.image],writable,variant:'orbit'})}${c.youtubeThumb?' referrerpolicy="no-referrer"':''} decoding="async">${c.youtubeThumb&&c.url?`<button type="button" class="recent-play" data-recent-play aria-label="여기서 재생"><span aria-hidden="true">▶</span></button>`:''}</span>`
+   ?`<span class="recent-media${vertical?' vertical':''}"><img src="${esc(c.image)}" alt="" draggable="false"${thumbFallbackAttrs(c,{candidates:c.thumbCandidates||[c.image],writable,variant:'orbit'})}${c.youtubeThumb?' referrerpolicy="no-referrer"':''} decoding="async">${c.youtubeThumb&&c.url?`<button type="button" class="recent-play" data-recent-play aria-label="바로 재생"><span aria-hidden="true">▶</span></button>`:''}</span>`
    :(!c.example&&needsFallbackCard(c,{autoLoad:false})?`<span class="recent-media recent-media--slot">${fallbackCardMarkup(c,{writable,variant:'orbit',dateStyle})}</span>`:`<span class="recent-media recent-media--memo"><span class="recent-memo">${esc(c.note||head)}</span></span>`);
   // #466 M6: 카드 전체를 role="button"으로 감싸면 안의 ▶ 재생 단추(또는 글 카드의 "제목 달기")가
   // 중첩 상호작용(axe nested-interactive)이 된다. 카드는 평범한 div로 두고, 뒤에 깔린 투명 단추
@@ -144,7 +144,7 @@ export function mountOrbit(host,{trees,storage,context,actions,authHtml='',onSel
  // #426: 최근 순간 카드 — 본문을 누르면(클릭·Enter·Space) 그 순간을 연다(궤도 카드와 같은 onOpen 경로). ▶는 카드 안 재생/정지로 구분하고, 플레이어는 누른 뒤에만 만든다(첫 화면 열 때 YouTube 요청 0건).
 const openRecent=()=>{if(!recentMoment)return;if(onOpen&&!recentMoment.example){onOpen(recentMoment);return;}actions.openBook(recentMoment.treeId,recentMoment.id,demo);};
 let recentFrame=null;
-const toggleRecentPlay=btn=>{if(!recentMoment)return;const card=shadow.querySelector('.recent-card');if(!card)return;const media=card.querySelector('.recent-media');if(!media)return;if(recentFrame){recentFrame.remove();recentFrame=null;media.querySelector('img')?.removeAttribute('hidden');btn.setAttribute('aria-label','여기서 재생');const glyph=btn.querySelector('span');if(glyph)glyph.textContent='▶';return;}
+const toggleRecentPlay=btn=>{if(!recentMoment)return;const card=shadow.querySelector('.recent-card');if(!card)return;const media=card.querySelector('.recent-media');if(!media)return;if(recentFrame){recentFrame.remove();recentFrame=null;media.querySelector('img')?.removeAttribute('hidden');btn.setAttribute('aria-label','바로 재생');const glyph=btn.querySelector('span');if(glyph)glyph.textContent='▶';return;}
  const id=youtubeIdFrom(recentMoment.url)||(globalThis.LTMedia?.describe?.(recentMoment.url)||{}).videoId;
  const embed=id?embedUrl(id):null;
  if(!embed)return;
