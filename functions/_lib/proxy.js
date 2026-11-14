@@ -25,6 +25,7 @@ const COMMUNITY_COMMENT_ITEM = /^\/api\/community\/comments\/[A-Za-z0-9_-]{1,128
 const COMMUNITY_REPORT_ITEM = /^\/api\/community\/admin\/reports\/[A-Za-z0-9_-]{1,128}$/;
 const ADMIN_FEEDBACK_ITEM = /^\/api\/admin\/feedback\/[0-9]{1,20}$/;
 const ADMIN_FEEDBACK_REPLY = /^\/api\/admin\/feedback\/[0-9]{1,20}\/reply$/;
+const MY_POST_FOLLOWUP = /^\/api\/board\/mine\/[0-9]{1,20}\/followup$/;
 const ADMIN_PERSONA_ITEM = /^\/api\/admin\/persona\/[A-Za-z0-9_-]{1,128}$/;
 function communityMethods(path) {
   const action=path.match(COMMUNITY_SHARE_ACTION)?.[1];
@@ -134,6 +135,7 @@ export function createProxy({ fetcher = (...args) => fetch(...args), timeoutMs =
       || (PUBLIC_SHARE_ITEM.test(incoming.pathname) ? new Set(['GET']) : null)
       || (ADMIN_FEEDBACK_ITEM.test(incoming.pathname) ? new Set(['GET','PATCH']) : null)
       || (ADMIN_FEEDBACK_REPLY.test(incoming.pathname) ? new Set(['POST']) : null)
+      || (MY_POST_FOLLOWUP.test(incoming.pathname) ? new Set(['POST']) : null)
       || (ADMIN_PERSONA_ITEM.test(incoming.pathname) ? new Set(['GET','PUT']) : null)
       || communityMethods(incoming.pathname);
     if (!methods) return jsonError(404, 'not_proxied', '이 경로는 서버로 넘기지 않아요.');

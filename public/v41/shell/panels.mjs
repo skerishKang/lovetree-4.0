@@ -2,7 +2,7 @@
 // 2026-11-08 리팩터링: 동작·문구·디자인·저장 계약 변경 0.
 // shell.mjs에서 조건·조회 방식·인자 형태를 바꾸지 않고 그대로 옮겼다(원칙 7).
 // 셸은 자기 상태(member·source·window.LT41·업로드)를 읽기 함수로 넘기고, 이 파일은 패널만 만진다.
-import {parentCandidates, suggestMomentTitle, coverModeOf} from '../domain.mjs';
+import {parentCandidates, suggestMomentTitle, coverModeOf, latestMomentId} from '../domain.mjs';
 import {localDateOnly} from '../local-date.mjs';
 import {displayTreeTitle} from '../tree-name.mjs';
 import {mountPrivateUpload} from '../private-upload.mjs';
@@ -73,6 +73,9 @@ export function createPanels(deps) {
     if (!form.elements.emotion.value) form.elements.emotion.value = '설렘';
     formBaseline = new URLSearchParams(new FormData(form)).toString();
     parentBaseline = parentValue();
+    // '가' 결정: 쉬운 추가 탭에서 자세한 추가로 바꾸면 어디에 이어지는지 보여 준다(빈 줄만 채운다).
+    const parent = window.LT41?.tree?.moments.find(moment => moment.id === addParentMomentId());
+    if (parent && !$('editor-context').textContent) $('editor-context').textContent = `새 순간 추가 · ${parent.title}에서 이어집니다.`;
   }
   function detailedDirty() {
     return $('write-panel').open && $('write-easy').hidden
@@ -90,6 +93,13 @@ export function createPanels(deps) {
   // 2026-11-08 책 오른쪽 페이지 '다음 순간 추가': 부모가 될 순간을 지정해 편집기를 연다.
   // 선택 순간을 부모로 쓰는 기존 경로(선택 순간 + '순간 추가')와 같은 저장 계약이며, 부모만 명시한다.
   let parentChoice = '';
+  // '가' 결정(2026-11-15, 지도 #601): 자세한 추가에서 사용자가 이전 순간을 고르지 않으면(책의 '다음 순간 추가'처럼
+  // 부모를 정해 열지 않았으면) 첫 순간이 아니라 가장 최근 순간 다음에 잇는다. 고른 이전 순간은 그대로다.
+  function addParentMomentId() {
+    const c = window.LT41;
+    if (parentChoice && c?.tree?.moments.some(moment => moment.id === parentChoice)) return parentChoice;
+    return (c?.tree && latestMomentId(c.tree)) || c?.momentId || '';
+  }
   function setEditorMode(mode, parentId = '') {
     const uploads = getUploads();
     if (uploads.busy) {
@@ -99,8 +109,10 @@ export function createPanels(deps) {
     if (formDirty() && !confirm('현재 입력을 비우고 작업을 바꿀까요?')) return;
     uploads.reset();
     const c = window.LT41;
-    parentChoice = mode === 'add' && parentId && c?.tree.moments.some(moment => moment.id === parentId) && c.tree.moments.some(moment => moment.id === c.momentId) ? parentId : '';
-    const m = parentChoice ? c.tree.moments.find(moment => moment.id === parentChoice) : c?.tree.moments.find(moment => moment.id === c.momentId);
+    parentChoice = mode === 'add' && parentId && c?.tree.moments.some(moment => moment.id === parentId) ? parentId : '';
+    const m = mode === 'add'
+      ? c?.tree.moments.find(moment => moment.id === addParentMomentId())
+      : c?.tree.moments.find(moment => moment.id === c.momentId);
     if (!m) {
       notify('먼저 순간을 선택해 주세요.');
       return;
@@ -362,7 +374,8 @@ export function createPanels(deps) {
     }
     try {
       // #344: 미리보기 때 받아 둔 영상 제목을 저장 입력에 함께 넘긴다(사용자 입력 제목이 항상 우선 — 도메인 판정).
-      getMember().apply(editorMode, {...Object.fromEntries(new FormData(e.target)), ...editorMediaTitle()}, selection());
+      // '가' 결정: 자세한 추가의 부모는 편집기를 열 때 정한 이전 순간(고르지 않았으면 가장 최근 순간)이다.
+      getMember().apply(editorMode, {...Object.fromEntries(new FormData(e.target)), ...editorMediaTitle()}, editorMode === 'add' ? { ...selection(), momentId: addParentMomentId() } : selection());
       formBaseline = new URLSearchParams(new FormData(e.target)).toString();
       $('write-panel').close();
       if (editorMode === 'new') show('track59-sketchbook.html');

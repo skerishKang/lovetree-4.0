@@ -88,7 +88,9 @@ export function shareCardFromRead(read) {
   const subject = oneLine(tree.subject, 40);
   const base = `순간 ${moments.length}개${subject ? ` · 좋아하는 대상 ${subject}` : ''}`;
   const firstTitle = entry ? oneLine(entry.title, 60) : '';
-  const description = oneLine(firstTitle ? `${base} · “${firstTitle}”` : base, 160);
+  // #611 3번: AI 테스터 기록은 미리보기 카드 문구에도 'AI 테스터'로 알린다(계정 정보는 여전히 넣지 않는다).
+  const aiNote = read && typeof read === 'object' && read.aiTester === true ? ' · AI 테스터' : '';
+  const description = oneLine(firstTitle ? `${base} · “${firstTitle}”${aiNote}` : `${base}${aiNote}`, 160);
   const image = cardImageFor(entry) || CARD_IMAGE_URL;
   return { title, description, image, view: VIEWS.has(share.view) ? share.view : 'book' };
 }

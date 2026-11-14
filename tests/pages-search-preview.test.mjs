@@ -154,6 +154,11 @@ test('shareCardFromRead — 첫 순간 기준은 공유가 처음 여는 순간(
   const card = shareCardFromRead(READ);
   assert.equal(card.view, 'board');
   assert.match(card.description, /“첫 만남 스테이지”/);
+  assert.doesNotMatch(card.description, /AI 테스터/, '일반 트리에는 표시하지 않는다');
+  // #611 3번: AI 테스터 기록의 미리보기 카드 문구에는 'AI 테스터'를 알린다(계정 정보는 넣지 않는다).
+  const aiCard = shareCardFromRead({ ...READ, aiTester: true });
+  assert.match(aiCard.description, /AI 테스터/, 'AI 테스터 표시');
+  assert.doesNotMatch(aiCard.description, /@/i, '이메일을 넣지 않는다');
   const fallen = shareCardFromRead({ share: { view: 'etc' }, tree: { title: '  ', subject: '', moments: [{ id: 'a', parentId: null, title: '혼자 남은 순간', url: '' }] } });
   assert.equal(fallen.view, 'book', '알 수 없는 view 는 책으로');
   assert.equal(fallen.title, '러브트리', '제목이 비면 서비스 이름으로');

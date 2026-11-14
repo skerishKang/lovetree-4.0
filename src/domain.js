@@ -324,6 +324,19 @@ function detachMoments(tree, movedIds) {
 // #327(① 데이터 규칙): 빠른 추가 — 주소 하나만으로 순간을 바로 저장한다. inbox 트리가 없으면
 // 만들고 그 순간이 시작 순간이 되고, 있으면 시작 순간 아래에 붙인다. 제목·감정은 기존 자동
 // 규칙(suggestMomentTitle·기본 감정)을 쓴다. 트리·순간 한도를 넘으면 기존 문구로 막는다.
+// '가' 결정(2026-11-15, 지도 #601): 사용자가 이전 순간을 고르지 않으면 새 순간은 첫 순간이 아니라
+// 가장 최근 순간 다음에 이어진다. 가장 최근 = 날짜가 가장 늦은 순간, 같은 날짜면 만든 순서(createdAt)
+// 가 가장 늦은 순간. 순간이 하나뿐이면 그 순간(첫 순간)이 나온다. 이미 저장된 연결은 바꾸지 않는다.
+export function latestMomentId(tree) {
+  let best = null;
+  for (const m of tree?.moments || []) {
+    if (!best) { best = m; continue; }
+    const byDate = String(m.date || '').localeCompare(String(best.date || ''));
+    if (byDate > 0 || (byDate === 0 && String(m.createdAt || '') > String(best.createdAt || ''))) best = m;
+  }
+  return best?.id || '';
+}
+
 export function quickAdd(state, input, clock = new Date().toISOString()) {
   // #344: 빠른 추가도 미리보기 때 받은 영상 제목(mediaMetadata)을 저장에 함께 넘긴다.
   const moment = { ...validateMomentInput({ url: input?.url || '', mediaMetadata: input?.mediaMetadata }), id: newId(), parentId: null, relation: '', links: [], createdAt: clock };
@@ -334,7 +347,8 @@ export function quickAdd(state, input, clock = new Date().toISOString()) {
     const tree = { id: newId(), subject: INBOX_SUBJECT, title: INBOX_SUBJECT, coverMomentId: '', coverDesign: '', inbox: true, createdAt: clock, updatedAt: clock, moments: [moment] };
     return { state: { version: 1, trees: [...trees, tree], prefs: normalizePrefs(state.prefs) }, treeId: tree.id, momentId: moment.id };
   }
-  const grown = addMoment(inbox, { url: input?.url || '', mediaMetadata: input?.mediaMetadata }, inbox.moments.find(m => m.parentId === null).id, clock);
+  // '가' 결정: 빠른 추가는 이전 순간을 고를 길이 없으므로 가장 최근 순간 다음에 잇는다(첫 순간 하나뿐이면 첫 순간).
+  const grown = addMoment(inbox, { url: input?.url || '', mediaMetadata: input?.mediaMetadata }, latestMomentId(inbox) || inbox.moments.find(m => m.parentId === null).id, clock);
   return { state: { version: 1, trees: trees.map(tree => tree.id === inbox.id ? grown : tree), prefs: normalizePrefs(state.prefs) }, treeId: inbox.id, momentId: grown.moments.at(-1).id };
 }
 

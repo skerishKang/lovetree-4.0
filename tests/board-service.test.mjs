@@ -142,6 +142,57 @@ test('일지 본문 한도 8000(#596) — 초과분은 한도까지 저장, 의�
   assert.equal(opinion.body.length, 2000);
 });
 
+test('#611 4번: 본인 의견에 짧게 덧붙인다 — 고침·닫음이면 다시 열림(reviewing)', async () => {
+  const {call} = setup();
+  const sent = await call('POST', '/api/feedback', {account: USER, body: {category: 'bug', body: '아픈 곳을 적는다'}});
+  const id = sent.body.id;
+  // 운영센터가 고침으로 처리한다.
+  const fixed = await call('PATCH', `/api/admin/feedback/${id}`, {account: ADMIN, body: {status: 'fixed', issueNumber: '#608'}});
+  assert.equal(fixed.status, 200);
+  assert.equal(fixed.body.feedback.status, 'fixed');
+  // 본인이 덧붙이면 답글이 남고 상태가 다시 열림으로 바뀐다.
+  const appended = await call('POST', `/api/board/mine/${id}/followup`, {account: USER, body: {body: '아까 말한 곳은 아직도 그래요'}});
+  assert.equal(appended.status, 201);
+  assert.equal(appended.body.followup.status, 'reviewing');
+  // 내 글 보기에는 덧붙임(mine)과 운영센터 답글이 구분되어 나온다.
+  await call('POST', `/api/admin/feedback/${id}/reply`, {account: ADMIN, body: {authorType: 'customer', body: '살펴볼게요'}});
+  const mine = await call('GET', '/api/board/mine', {account: USER});
+  const post = mine.body.posts.find(p => p.id === id);
+  assert.equal(post.status, 'reviewing');
+  assert.equal(post.replies.length, 2);
+  assert.deepEqual(post.replies.map(r => r.mine), [true, false]);
+  assert.equal('authorSubjectId' in post.replies[0], false, '답변자 신원은 내리지 않는다');
+  // 운영센터 상세에는 같은 줄로 붙어, 고객 덧붙임으로 알린다.
+  const detail = await call('GET', `/api/admin/feedback/${id}`, {account: ADMIN});
+  assert.deepEqual(detail.body.feedback.replies.map(r => r.fromCustomer), [true, false]);
+});
+
+test('#611 4번: 남의 글·일지에는 덧붙일 수 없고, 빈 말은 400', async () => {
+  const {call} = setup();
+  const sent = await call('POST', '/api/feedback', {account: USER, body: {category: 'other', body: '내 의견'}});
+  const id = sent.body.id;
+  const other = await call('POST', `/api/board/mine/${id}/followup`, {account: AI, body: {body: '엉뚱한 계정'}});
+  assert.equal(other.status, 404, '남의 글은 없는 것과 같이');
+  const empty = await call('POST', `/api/board/mine/${id}/followup`, {account: USER, body: {body: '  '}});
+  assert.equal(empty.status, 400);
+  const anon = await call('POST', `/api/board/mine/${id}/followup`, {body: {body: '로그아웃'}});
+  assert.equal(anon.status, 401);
+  // 일지에는 덧붙이지 않는다.
+  const journal = await call('POST', '/api/board', {account: AI, body: {title: '일지', body: '내용', score: 3}});
+  const denied = await call('POST', `/api/board/mine/${journal.body.id}/followup`, {account: AI, body: {body: '일지에 덧붙임'}});
+  assert.equal(denied.status, 404);
+});
+
+test('#611 3번: 운영센터 글쓴이 이름 앞에 AI를 단다', async () => {
+  const {call} = setup();
+  await call('PUT', `/api/admin/persona/${AI}`, {account: ADMIN, body: {name: '윤제', intro: {}}});
+  await call('POST', '/api/feedback', {account: AI, body: {category: 'bug', body: 'AI 의견'}});
+  await call('POST', '/api/feedback', {account: USER, body: {category: 'bug', body: '사용자 의견'}});
+  const list = await call('GET', '/api/admin/feedback', {account: ADMIN});
+  assert.equal(list.body.feedback.find(r => r.authorName === '윤제')?.authorRole, 'ai_customer');
+  assert.equal(list.body.feedback.find(r => r.authorName !== '윤제')?.authorRole, null);
+});
+
 test('관리자 일지 탭 읽기 API(#596): 일지만 날짜 내림차순, 관리자만', async () => {
   const {call} = setup();
   await call('PUT', `/api/admin/persona/${AI}`, {account: ADMIN, body: {name: '윤제', intro: {}}});

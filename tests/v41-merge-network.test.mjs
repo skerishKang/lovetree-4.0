@@ -47,7 +47,9 @@ test('트리 크기에 맞춘 배치는 한 벌(network-model.js)이 맡는다',
   assert.ok(!MODEL.includes('function smallTreeLayout('), '고정 무대 보정은 없앴다');
   assert.ok(SERVER.includes('LT56Model.networkLayout(LTDEMO.moments,{box:BOX'));
   assert.ok(SERVER.includes("document.querySelectorAll('.legend-row').forEach"));
-  assert.ok(SERVER.includes('LT56Model.clusterSpan(i,groupSize,LTDEMO.moments.length,LTDEMO.moments)'));
+  // #601: 묶음은 감정별(LT56Model.emotionGroups) — 묶음 이름을 화면에서 다시 만들지 않는다.
+  assert.ok(SERVER.includes('LT56Model.pickGroups(LTDEMO.moments,LTDEMO.edges)'));
+  assert.ok(!SERVER.includes('LT56Model.clusterSpan('), '묶음 이름은 모델의 감정 묶음 한 벌로 대체됐다');
 });
 
 test('runtime.js는 예시 모드에서 demoData를 그대로 쓴다(design/shared.js와 같은 모양)', () => {

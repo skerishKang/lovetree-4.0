@@ -83,16 +83,32 @@ test('quickAdd: inbox 트리가 없으면 만들고 그 순간이 시작 순간�
   }
 });
 
-test('quickAdd: inbox 트리가 있으면 시작 순간 아래에 붙인다', () => {
+test('quickAdd: inbox 트리가 있으면 가장 최근 순간 다음에 붙는다(가 결정, 2026-11-15 #601)', () => {
   for (const d of [serverDomain, webDomain]) {
     const first = d.quickAdd({ version: 1, trees: [] }, { url: URL }, CLOCK);
     const second = d.quickAdd(first.state, { url: 'https://example.com/next' }, '2026-11-09T11:00:00.000Z');
     assert.equal(second.treeId, first.treeId, '같은 inbox 트리');
     const inbox = second.state.trees[0];
     assert.equal(inbox.moments.length, 2);
-    assert.equal(inbox.moments[1].parentId, inbox.moments[0].id, '시작 순간 아래');
+    assert.equal(inbox.moments[1].parentId, inbox.moments[0].id, '순간이 하나뿐이면 시작 순간(=가장 최근) 아래');
     assert.equal(inbox.updatedAt, '2026-11-09T11:00:00.000Z', '트리 갱신 시각');
     assert.doesNotThrow(() => validate(d)(second.state));
+    // '가' 결정: 세 번째 빠른 추가는 첫 순간이 아니라 가장 최근(두 번째) 순간 다음에 잇는다.
+    const third = d.quickAdd(second.state, { url: 'https://example.com/third' }, '2026-11-10T09:00:00.000Z');
+    const inbox3 = third.state.trees[0];
+    assert.equal(inbox3.moments[2].parentId, inbox3.moments[1].id, '가장 최근 순간 아래(별 모양이 되지 않는다)');
+    assert.doesNotThrow(() => validate(d)(third.state));
+  }
+});
+
+test('latestMomentId: 가장 최근 = 날짜가 가장 늦은 순간, 같은 날짜면 만든 순서(#601 가 결정)', () => {
+  for (const d of [serverDomain, webDomain]) {
+    // b는 만든 순서는 늦지만 날짜가 하루 이르다 — 가장 최근은 날짜가 늦은 a다.
+    const t = tree('t1', [moment('ma', null, '늦은 날짜', { seq: 1, fields: { date: '2026-11-10' } }), moment('mb', 'ma', '이른 날짜', { seq: 2, fields: { date: '2026-11-09' } })]);
+    assert.equal(d.latestMomentId(t), 'ma', '날짜가 가장 늦은 순간');
+    const t2 = tree('t2', [moment('mx', null, '먼저', { seq: 1, fields: { date: '2026-11-10' } }), moment('my', 'mx', '나중', { seq: 2, fields: { date: '2026-11-10' } })]);
+    assert.equal(d.latestMomentId(t2), 'my', '같은 날짜면 만든 순서가 늦은 순간');
+    assert.equal(d.latestMomentId(tree('t3', [])), '', '빈 트리는 빈 값');
   }
 });
 

@@ -12,7 +12,7 @@ const PRODUCT='lovetree-test',principal=subjectId=>({productId:PRODUCT,subjectId
 const CLOCK='2026-11-01T00:00:00.000Z';
 const PHOTO='https://front.test/api/media/123e4567-e89b-42d3-a456-426614174000.jpg';
 function sampleTree(url=PHOTO){return createTree({subject:'윤슬',title:'첫 무대',note:'다시 보고 싶은 빛',emotion:'설렘',date:'2026-11-01',url},CLOCK);}
-async function setup({url=PHOTO,coverMode='',coverDesign=''}={}){
+async function setup({url=PHOTO,coverMode='',coverDesign='',admin=null}={}){
  const workspaceRepo=createMemoryWorkspaceRepo(),workspace=createWorkspaceService({repo:workspaceRepo,productId:PRODUCT});
  let tree=sampleTree(url);
  if(coverMode)tree=editTree(tree,{title:tree.title,subject:tree.subject,coverMomentId:tree.moments[0].id,coverDesign,coverMode});
@@ -20,9 +20,9 @@ async function setup({url=PHOTO,coverMode='',coverDesign=''}={}){
  const shareRepo=createMemoryShareRepo();let share=await shareRepo.create({productId:PRODUCT,shareId:'s'.repeat(24),subjectId:'alice',treeId:tree.id,entryMomentId:tree.moments[0].id,view:'book',momentCount:3});
  share=await shareRepo.setDiscoverable({productId:PRODUCT,subjectId:'alice',shareId:share.shareId,discoverable:true});
  const communityRepo=createMemoryCommunityRepo();communityRepo.seedShares([share]);
- const admin={roleFor:async value=>value.subjectId==='admin'?'admin':null};
+ const adminStub=admin||{roleFor:async value=>value.subjectId==='admin'?'admin':null};
  let id=0;
- const service=createCommunityService({communityRepo,shareRepo,workspaceRepo,productId:PRODUCT,admin,makeId:()=>String(++id).padStart(24,'c'),now:()=>Date.UTC(2026,10,1)});
+ const service=createCommunityService({communityRepo,shareRepo,workspaceRepo,productId:PRODUCT,admin:adminStub,makeId:()=>String(++id).padStart(24,'c'),now:()=>Date.UTC(2026,10,1)});
  const authenticate=async request=>{const subjectId=request.headers?.account;if(!subjectId)throw new ApiError(401,'unauthenticated','login');return principal(subjectId);};
  return {tree,workspaceRepo,shareRepo,communityRepo,service,handle:createCommunityHandler({authenticate,service,productId:PRODUCT})};
 }
@@ -50,6 +50,20 @@ test('browse cover sends an address only for moment mode — photo/design/basic 
  assert.equal((await call(photoDesign.handle,'GET','/api/community/shares')).body.items[0].cover.url,'','사진 표지는 공개에서 디자인이 되고 주소가 없다');
  const photoBasic=await setup({coverMode:'photo'});
  assert.equal((await call(photoBasic.handle,'GET','/api/community/shares')).body.items[0].cover.url,'','사진 표지 + 디자인 없음은 기본 색 표지');
+});
+
+test('#611 3번: AI 테스터 기록은 둘러보기 카드에 aiTester 한 비트만 내린다',async()=>{
+ const {handle}=await setup();
+ // 보통 기록(alice)은 표지가 없고 계정 정보도 없다.
+ const plain=await call(handle,'GET','/api/community/shares');
+ assert.equal(plain.status,200);assert.equal(plain.body.items[0].aiTester,undefined);
+ assert.equal(JSON.stringify(plain.body).includes('alice'),false);
+ // ai_customer 역할이면 aiTester:true만 있고, 이메일·subject 등 계정 정보는 없다.
+ const ai=await setup({admin:{roleFor:async value=>value.subjectId==='alice'?'ai_customer':null}});
+ const tester=await call(ai.handle,'GET','/api/community/shares');
+ assert.equal(tester.body.items[0].aiTester,true);
+ assert.equal(JSON.stringify(tester.body).includes('alice'),false);
+ assert.equal(JSON.stringify(tester.body).includes('@'),false);
 });
 
 test('favorites and reactions are authenticated, idempotent and remain outside workspace JSON',async()=>{
