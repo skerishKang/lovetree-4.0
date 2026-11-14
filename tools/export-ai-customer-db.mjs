@@ -9,7 +9,8 @@
 // 값·접속 문자열·이메일·subject 는 stdout·stderr 어디에도 출력하지 않는다.
 // 트랜잭션은 READ ONLY 로 열고 문장은 SELECT 뿐이다(고객 글 상태 등은 절대 바꾸지 않는다).
 //
-// 실행: /usr/local/bin/node /opt/padiem/lovetree-api/tools/export-ai-customer-db.mjs
+// 실행: /usr/local/bin/node /opt/padiem/lovetree-api/tools/export-ai-customer-db.mjs [--b64]
+//   --b64 : JSON 을 base64 한 줄로 출력한다(컴1 ssh 경로에서 한글·줄바꿈·cmd 파이프 깨짐 없이).
 // 환경변수: LOVETREE_API_ENV (기본 /opt/padiem/lovetree-api/.env)
 
 import { readFile } from 'node:fs/promises';
@@ -174,7 +175,12 @@ async function main() {
     const replyRows = postIds.length ? (await client.query(QUERIES.replies, [productId, postIds])).rows : [];
     await client.query(TXN_COMMIT);
     const json = buildExportJson({ personas: personaRows, posts: postRows, replies: replyRows });
-    process.stdout.write(JSON.stringify(json, null, 2) + '\n');
+    const text = JSON.stringify(json, null, 2);
+    if (process.argv.includes('--b64')) {
+      process.stdout.write(Buffer.from(text, 'utf8').toString('base64') + '\n');
+    } else {
+      process.stdout.write(text + '\n');
+    }
   } catch (error) {
     await client.query(TXN_ROLLBACK).catch(() => {});
     const message = String(error?.message || error)

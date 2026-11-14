@@ -39,11 +39,11 @@ try {
   if (-not $node) { throw 'node 실행 파일을 찾을 수 없습니다.' }
   if (-not (Test-Path $MdScript)) { throw "md 스크립트가 없습니다: $MdScript" }
 
-  # 1) 컴2 판독기 — JSON 을 base64 한 줄로 받는다(한글·줄바꿈 깨짐 없이). 이유는 stderr 한 줄뿐.
+  # 1) 컴2 판독기 — JSON 을 base64 한 줄로 받는다(한글·줄바꿈 안전). 인용·파이프 없는 명령만 쓴다:
+  #    powershell.exe 5.1(예약 작업)은 겹따옴표·| 를 전달에서 깨뜨린다(2026-11-14 실측).
+  $remote = 'wsl -e /usr/local/bin/node ' + $ReaderOnComp2 + ' --b64'
   $sshErrFile = [System.IO.Path]::GetTempFileName()
   try {
-    # cmd 가 | 를 파이프로 해석하지 않도록 겹따옴표+wsl -e 로 — 2026-11-14 실측(작은따옴표는 cmd 가 무시해 빈 출력).
-  $remote = 'wsl -e bash -c "/usr/local/bin/node ' + $ReaderOnComp2 + ' | base64 -w 0"'
     $b64 = (& $ssh -o BatchMode=yes -o ConnectTimeout=15 comp2 $remote 2>$sshErrFile) -join ''
     $sshExit = $LASTEXITCODE
     $sshErr = [string](Get-Content $sshErrFile -Raw -ErrorAction SilentlyContinue)
