@@ -26,20 +26,22 @@ test('연결은 데이터(LTDEMO.edges)에서 만들고 실제 기록 문구를 
   assert.ok(!SERVER.includes('공개 예시'));
 });
 
-test('예시 판본 판단은 한 곳에만 둔다(연결 지우기 동작·말풍선 버튼·연결 색이 같은 값을 본다)', () => {
+test('예시 판본 판단은 한 곳에만 둔다(연결 색이 같은 값을 본다)', () => {
+  // #582: 보드에서 줄을 만들거나 지우지 않으므로 지우기 동작·말풍선 단추는 함께 거뒀다.
   const branches = SERVER.match(/LTDEMO\.example/g) || [];
   assert.equal(branches.length, 1);
   assert.match(SERVER, /const canEditBoard=LTDEMO\.example\|\|boardSaveEnabled\(\);/);
-  assert.match(SERVER, /function deleteSelectedConnection\(\)\{const guard=LT58Model\.editGuard\(canEditBoard\);if\(guard\.blocked\)\{/);
-  assert.match(SERVER, /\$\{canEditBoard\?' <button id="deleteConnBubble">/);
   assert.match(SERVER, /'cyan':\(canEditBoard\?\['rose','violet','cyan','amber'\]\[Math\.max\(0,moments\.findIndex/);
   assert.doesNotMatch(SERVER, /source===['"]example['"]/);
+  assert.ok(!SERVER.includes('deleteConnBubble'), '연결 말풍선 단추는 없다');
 });
 
-test('읽기 전용에서는 연결 변경 안내만 하고 지우지 않는다', () => {
+test('읽기 전용에서는 바꾸지 않는다(정렬 되돌리기도 같은 문구를 쓴다)', () => {
   // 안내 문구는 계산 한 벌(board-model.js)이 갖고, 화면은 그 문구를 그대로 띄운다.
+  // #582: 줄 지우기는 사라졌지만 판 자리 바꾸기(끌어 꽂기·정렬 되돌리기)는 같은 가드를 쓴다.
   const MODEL = fs.readFileSync(new URL('../public/v41/views/board/board-model.js', import.meta.url), 'utf8');
   assert.match(MODEL, /'읽기 전용에서는 연결을 변경할 수 없어요\.'/);
   assert.match(SERVER, /if\(guard\.blocked\)\{toast\(guard\.message\);/);
-  assert.match(SERVER, /connections=LT58Model\.removeConnection\(connections,selectedConn\)/);
+  assert.match(SERVER, /LT58Model\.editGuard\(canEditBoard\)/);
+  assert.doesNotMatch(SERVER, /LT58Model\.removeConnection/);
 });

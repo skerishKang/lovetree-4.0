@@ -39,8 +39,41 @@ const canEditBoard=LTDEMO.example||boardSaveEnabled();
 // 나오므로 링크 없는 트리(예시 40순간)는 기본 간격 460px(#548과 같다), YouTube 밴드는 그보다 크게 벌어진다.
 const YT_RESERVED_H=480,YT_VERTICAL_RESERVED_H=680,BASE_RESERVED_H=424;
 const reservedHeights=new Map(LTDEMO.moments.map(m=>[m.id,m.externalUrl?(LTMedia.verticalVideo(m.externalUrl,m.mediaMetadata)?YT_VERTICAL_RESERVED_H:YT_RESERVED_H):BASE_RESERVED_H]));
-const spread=LT58Model.treeSpread(LTDEMO.moments.map(m=>m.id),LTDEMO.edges,reservedHeights);
-let moments=LTDEMO.moments.map((m,i)=>{const pos=spread.get(m.id)||LT58Model.cardPosition(i,reservedHeights.get(m.id));return{id:m.id,type:m.type==='memo'?'note':'photo',originalType:m.type==='memo'?'note':m.type,createdOrder:i+1,title:m.title,emotion:m.emotion,date:m.date,source:m.source||'예시 기록',mediaMetadata:m.mediaMetadata||null,memo:m.memo||m.whyNext||'',x:Number.isFinite(m.x)?m.x:pos.x,y:Number.isFinite(m.y)?m.y:pos.y,rot:Number.isFinite(m.rot)?m.rot:pos.rot,savedPos:Number.isFinite(m.x)&&Number.isFinite(m.y),pinStyle:m.pinStyle,cardStyle:m.cardStyle,keywords:Array.isArray(m.keywords)?m.keywords:[],color:m.color||['rose','violet','cyan','amber'][i%4],asset:m.image,url:m.externalUrl||'',first:!!m.first}});
+// #582: 보드는 핀보드 — 날짜 최신순 바둑판에 꽂는다. 사람이 옮긴 자리(x·y가 저장된 순간)는 그 칸을
+// 그대로 쓰고(#395 계약), 나머지를 빈 칸에 채운다. 칸 수는 화면 폭이 정한다(1440 4칸, 390 1칸).
+const GRID_COL_PITCH=300,GRID_MARGIN=150;
+// 현재 판의 줄 top 값들 — 꽂힌 카드의 y가 곧 줄의 top이다(줄 간격이 줄마다 다르므로 균일 공식 대신 실제 값을 본다).
+function rowTopsNow(exceptId=null){return[...new Set(moments.filter(o=>o.id!==exceptId&&Number.isFinite(o.y)).map(o=>o.y))].sort((a,b)=>a-b)}
+function rowIndexOf(y,ys=rowTopsNow()){if(!ys.length)return 0;let best=0;for(let i=1;i<ys.length;i++)if(Math.abs(ys[i]-y)<Math.abs(ys[best]-y))best=i;return best}
+function colOf(x){return Math.max(0,Math.round(((Number(x)||0)-GRID_MARGIN)/GRID_COL_PITCH))}
+function savedSlotsOf(list){const ys=rowTopsNow();const out=new Map();for(const m of list)if(m.savedPos&&Number.isFinite(m.x)&&Number.isFinite(m.y))out.set(m.id,{col:colOf(m.x),row:rowIndexOf(m.y,ys)});return out}
+// 전체 판 계획: 저장 자리는 그대로 두고(#395 계약) 나머지를 날짜 최신순으로 빈 칸에 채운 뒤,
+// 줄의 y는 그 줄의 최대 예약 높이로 정한다(#553 규칙 — 큰 카드가 있는 줄은 그만큼 벌어진다).
+function gridPlan(vw){const slots=LT58Model.pinboardSpread(LT58Model.dateDescOrder(moments),{cols:LT58Model.gridColumns(vw),saved:savedSlotsOf(moments)});
+const tops=LT58Model.gridRowTops(slots,(id)=>reservedHeights.get(id)||BASE_RESERVED_H);return{slots,tops}}
+let moments=LTDEMO.moments.map((m,i)=>{const saved=Number.isFinite(m.x)&&Number.isFinite(m.y);return{id:m.id,type:m.type==='memo'?'note':'photo',originalType:m.type==='memo'?'note':m.type,createdOrder:i+1,title:m.title,emotion:m.emotion,date:m.date,source:m.source||'예시 기록',mediaMetadata:m.mediaMetadata||null,memo:m.memo||m.whyNext||'',x:saved?m.x:0,y:saved?m.y:0,rot:saved?(Number.isFinite(m.rot)?m.rot:0):0,savedPos:saved,pinStyle:m.pinStyle,cardStyle:m.cardStyle,keywords:Array.isArray(m.keywords)?m.keywords:[],color:m.color||['rose','violet','cyan','amber'][i%4],asset:m.image,url:m.externalUrl||'',first:!!m.first}});
+// 저장 자리가 없는 카드를 바둑판에 꽂는다(처음 열기·창 크기 변경·정렬 되돌리기가 함께 쓴다).
+function placeAll(){const{slots,tops}=gridPlan(innerWidth);let i=0;
+for(const m of moments){if(m.savedPos)continue;const s=slots.get(m.id);if(!s)continue;
+const pos=LT58Model.gridPosition(s.col,tops[s.row]??GRID_MARGIN,i++);
+m.x=pos.x;m.y=pos.y;m.rot=pos.rot;
+const el=cardLayer.querySelector(`[data-id="${m.id}"]`);
+if(el){el.style.left=pos.x+'px';el.style.top=pos.y+'px';el.style.setProperty('--rot',pos.rot+'deg')}}}
+// 끌어 꽂기: 놓은 자리에서 가장 가까운 빈 칸에 꽂는다(같은 칸에 두 카드가 겹치지 않게).
+function snapToFreeSlot(m){const ys=rowTopsNow(m.id);
+const taken=new Set();for(const o of moments){if(o.id===m.id)continue;taken.add(colOf(o.x)+':'+rowIndexOf(o.y,ys))}
+const wantC=colOf(m.x);
+// 마지막 줄보다 한 칸 아래로 놓았으면 새 줄로 본다.
+const last=ys.length?ys[ys.length-1]:GRID_MARGIN;
+const wantR=m.y>last+230?ys.length:rowIndexOf(m.y,ys);
+if(!taken.has(wantC+':'+wantR))return{col:wantC,row:wantR};
+for(let r=0;r<ys.length+40;r++)for(let c=0;c<LT58Model.gridColumns(innerWidth);c++)if(!taken.has(c+':'+r))return{col:c,row:r};
+return{col:wantC,row:wantR}}
+// 꽂은 줄의 y: 그 줄의 최대 예약 높이로 정한다(위 줄들의 높이를 모두 더한 자리).
+function rowTopAt(slot,m){const ys=rowTopsNow(m.id);
+const rowH=new Map();for(const o of moments){if(o.id===m.id)continue;const r=rowIndexOf(o.y,ys);rowH.set(r,Math.max(rowH.get(r)||0,reservedHeights.get(o.id)||BASE_RESERVED_H))}
+rowH.set(slot.row,Math.max(rowH.get(slot.row)||0,reservedHeights.get(m.id)||BASE_RESERVED_H));
+let y=GRID_MARGIN;for(let r=0;r<slot.row;r++)y+=(rowH.get(r)||BASE_RESERVED_H)+36;return y}
 
 let connections=LTDEMO.edges.map((e,i)=>({id:'c'+i,kind:e.kind,a:e.from,b:e.to,why:e.kind==='related'?'관련 순간':e.reason||'',color:e.kind==='related'?'cyan':(canEditBoard?['rose','violet','cyan','amber'][Math.max(0,moments.findIndex(m=>m.id===e.from))%4]:'rose')}));
 
@@ -59,9 +92,13 @@ const replayPath=(()=>{const ids=[],seen=new Set();let m=LTDEMO.moments[0];while
 let mobilePicker=null;
 
 let view={x:0,y:0,z:.78}
-,selected=LTDEMO.get(),drag=null,pan=null,connecting=null,pendingConn=null,undoStack=[],cinema=false,addType='photo',pinTap=null,selectedConn=null;
+,selected=LTDEMO.get(),drag=null,pan=null,undoStack=[],cinema=false,addType='photo';
 
-const $=s=>document.querySelector(s), cardLayer=$('#cardLayer'), threadLayer=$('#threadLayer'), world=$('#world'), viewport=$('#viewport');
+const $=s=>document.querySelector(s), cardLayer=$('#cardLayer'), world=$('#world'), viewport=$('#viewport');
+// #582: 관계도(줄)는 지도가 맡는다 — 보드에서 실을 그리지 않는다. threadLayer는 옛 배선(시네마·필터)이
+// 안전하게 건너뛰도록 두는 빈 대체자다(DOM에 붙지 않는다).
+const threadLayer=document.createElement('g');
+const renderThreads=()=>{},rerenderThreads=()=>{},scheduleThreadFrame=()=>{},cancelThreadFrame=()=>{};
 
 const esc=LT58Model.escapeHTML;
 function titleMode(){try{return window.parent?.LT41?.prefs?.titleDisplay||'both'}catch{return 'both'}}
@@ -76,7 +113,7 @@ if(m.url)media=LTMedia.markup(m.url,m.title,m.mediaMetadata,m.id);
 else if(m.type==='note') media=`<div class="noteText">“${esc(m.memo)}”</div>`;
 else if(m.type==='video') media=`<div class="media"><video muted playsinline loop poster="${m.asset}" src="${m.video}"></video><span class="playBadge">▶</span><span class="duration">${m.duration||'00:03'}</span></div>`;
 else media=`<div class="media ${m.type==='link'||m.type==='youtube'?'linkMedia':''}"><img src="${m.asset}" alt=""><span class="${m.type==='youtube'?'playBadge':''}">${m.type==='youtube'?'▶':''}</span></div>`;
-return `<article class="card ${m.first?'first':''} ${m.type==='note'?'noteCard':''}" data-id="${m.id}" style="left:${m.x}px;top:${m.y}px;--rot:${m.rot}deg;--pin:${colors[m.color]};--halo:${colors[m.color]}55">${m.first?'<div class="firstTag">첫 순간</div>':''}<button class="pin" data-pin="${m.id}" aria-hidden="true" tabindex="-1"></button>${media}<div class="cardBody"><div class="eyebrow"><span class="emotionDot"></span>${LTLabels.type(m.originalType||m.type)} 순간 · ${esc(m.emotion)}</div><h3>${esc(titleMain(m))}</h3>${titleSubMarkup(m)}<div class="meta"><span>${esc(dateText(m.date))}</span><span>${m.type==='link'||m.type==='youtube'?'↗':''}</span></div>${m.type!=='note'?`<div class="memo">${esc(m.memo)}</div>`:''}${m.url?`<div class="domain">${esc(m.source)}</div>`:''}</div></article>`}
+return `<article class="card ${m.first?'first':''} ${m.type==='note'?'noteCard':''}" data-id="${m.id}" title="끌어서 자리 옮기기" style="left:${m.x}px;top:${m.y}px;--rot:${m.rot}deg;--pin:${colors[m.color]};--halo:${colors[m.color]}55">${m.first?'<div class="firstTag">첫 순간</div>':''}<button class="pin" data-pin="${m.id}" aria-hidden="true" tabindex="-1"></button>${media}<div class="cardBody"><div class="eyebrow"><span class="emotionDot"></span>${LTLabels.type(m.originalType||m.type)} 순간 · ${esc(m.emotion)}</div><h3>${esc(titleMain(m))}</h3>${titleSubMarkup(m)}<div class="meta"><span>${esc(dateText(m.date))}</span><span>${m.type==='link'||m.type==='youtube'?'↗':''}</span></div>${m.type!=='note'?`<div class="memo">${esc(m.memo)}</div>`:''}${m.url?`<div class="domain">${esc(m.source)}</div>`:''}</div></article>`}
 
 function renderCards(){cardLayer.innerHTML=moments.map(cardHTML).join('');
 cardLayer.querySelectorAll('.card').forEach(el=>bindCard(el));
@@ -106,18 +143,6 @@ function settlePlacedCards(){
       .catch(()=>{thumbSettleWaiting=false});
   }
 }
-
-function pinPoint(id){const m=moments.find(x=>x.id===id);
-const card=cardLayer.querySelector(`[data-id="${id}"]`);
-let w=card?.offsetWidth||242;
-return {x:m.x+w/2,y:m.y-13}}
-
-function pathD(c){const a=pinPoint(c.a),b=pinPoint(c.b);return LT58Model.threadPath(a,b).d}
-
-function renderThreads(){threadLayer.innerHTML=connections.map(c=>{let col=colors[c.color];return `<g class="threadGroup" data-cid="${c.id}"><path class="threadGlow" d="${pathD(c)}" stroke="${col}"/><path class="threadColor" d="${pathD(c)}" stroke="${col}"/><path class="threadCore" d="${pathD(c)}"/><path class="threadHit" d="${pathD(c)}"/></g>`}).join('');
-threadLayer.querySelectorAll('.threadGroup').forEach(g=>g.addEventListener('pointerdown',e=>{e.stopPropagation();showWhy(g.dataset.cid)}))}
-
-function rerenderThreads(){threadLayer.querySelectorAll('.threadGroup').forEach(g=>{let c=connections.find(x=>x.id===g.dataset.cid);g.querySelectorAll('path').forEach(p=>p.setAttribute('d',pathD(c)))})}
 
 function applyView(animated=false){growBoard();world.style.transition=animated?'transform 1s cubic-bezier(.22,.8,.2,1)':'none';
 world.style.transform=`translate(${view.x}px,${view.y}px) scale(${view.z})`;
@@ -159,7 +184,7 @@ if(!box){let z=LT58Model.fitZoom(vw,vh);view.z=z;view.x=(vw-2400*z)/2;view.y=(vh
 else{let v=LT58Model.fitBox(box,boardSafeArea(),.92);view.z=v.z;view.x=v.x;view.y=v.y}
 viewMode='fit';applyView(animated)}
 // 창 크기가 바뀌면: 전체 보기 중이면 다시 맞추고, 아니면 처음 자리(또는 기억한 자리)를 다시 계산한다.
-function boardResize(){if(innerWidth<700||cinema)return;if(viewMode==='fit')fitAll(false);else boardStartView()}
+function boardResize(){if(innerWidth<700||cinema)return;if(moments.some(m=>!m.savedPos))placeAll();if(viewMode==='fit')fitAll(false);else boardStartView()}
 // 확대·축소 단추는 화면 가운데를 기준으로 한다(예전에는 무대 왼쪽 위 기준이라 보던 곳이 밀려났다).
 function zoomAtCenter(nz){let vw=viewport.clientWidth,vh=viewport.clientHeight,cx=(vw/2-view.x)/view.z,cy=(vh/2-view.y)/view.z;view.z=nz;view.x=vw/2-cx*nz;view.y=vh/2-cy*nz;applyView();noteUserView()}
 
@@ -183,9 +208,6 @@ function bindCard(el){let id=el.dataset.id;
 el.addEventListener('pointerdown',e=>{if(e.target.classList.contains('pin'))return;if(cinema)return;e.stopPropagation();snapshot();let m=moments.find(x=>x.id===id),p=screenToWorld(e.clientX,e.clientY);drag={id,dx:p.x-m.x,dy:p.y-m.y};el.setPointerCapture?.(e.pointerId);selectMoment(id,true)});
 el.addEventListener('pointermove',e=>{if(!drag||drag.id!==id)return;let p=screenToWorld(e.clientX,e.clientY),m=moments.find(x=>x.id===id);m.x=Math.max(70,Math.min(1320,p.x-drag.dx));m.y=Math.max(120,Math.min(760,p.y-drag.dy));el.style.left=m.x+'px';el.style.top=m.y+'px';rerenderThreads()});
 el.addEventListener('pointerup',e=>{if(drag?.id===id){let m=moments.find(x=>x.id===id);for(const o of moments){if(o.id===id)continue;if(Math.abs(o.x-m.x)<165&&Math.abs(o.y-m.y)<165){m.x+=34;m.y+=28;el.style.left=m.x+'px';el.style.top=m.y+'px';rerenderThreads();break}}drag=null;el.releasePointerCapture?.(e.pointerId)}});
-let pin=el.querySelector('.pin');
-pin.addEventListener('pointerdown',e=>startConnect(e,id));
-pin.addEventListener('pointerup',e=>endPinTap(e,id));
 el.addEventListener('mouseenter',()=>{let v=el.querySelector('video:not(.lt-user-video)');if(v&&!cinema)v.play().catch(()=>{})});
 el.addEventListener('mouseleave',()=>{let v=el.querySelector('video:not(.lt-user-video)');if(v&&!el.classList.contains('cinemaFocus')){v.pause();v.currentTime=0}})}
 
@@ -205,67 +227,6 @@ const _rows=outs.map(c=>_row(c,'next'));
 $('#dConn').innerHTML=_rows.length?_rows.slice(0,3).join('<br><br>')+(_rows.length>3?`<details><summary>나머지 ${_rows.length-3}개 보기</summary>${_rows.slice(3).join('<br><br>')}</details>`:''):(ins.length?ins.map(c=>_row(c,'prev')).join('<br><br>'):'아직 다음 순간이 없어요');
 $('#detail').classList.add('open')}}
 
-function startConnect(e,id){if(cinema)return;
-e.stopPropagation();
-let isTouch=e.pointerType==='touch';
-if(isTouch){if(pinTap&&pinTap!==id){completeConnection(pinTap,id);
-pinTap=null;
-document.querySelectorAll('.pin').forEach(p=>p.classList.remove('connecting'));
-cardLayer.classList.remove('linking');
-return}pinTap=id;
-e.currentTarget.classList.add('connecting');
-cardLayer.classList.add('linking');
-toast('연결할 다음 Memory Pin을 탭하세요.');
-return}connecting={from:id,pointer:e.pointerId};
-e.currentTarget.classList.add('connecting');
-cardLayer.classList.add('linking');
-let p=pinPoint(id);
-$('#draftThread').setAttribute('d',`M ${p.x} ${p.y} L ${p.x} ${p.y}`);
-$('#draftThread').setAttribute('opacity','1');
-e.currentTarget.setPointerCapture?.(e.pointerId)}
-
-window.addEventListener('pointermove',e=>{if(!connecting)return;let a=pinPoint(connecting.from),b=screenToWorld(e.clientX,e.clientY);$('#draftThread').setAttribute('d',`M ${a.x} ${a.y} C ${a.x+(b.x-a.x)*.3} ${Math.max(a.y,b.y)+70}, ${a.x+(b.x-a.x)*.7} ${Math.max(a.y,b.y)+70}, ${b.x} ${b.y}`)});
-
-window.addEventListener('pointerup',e=>{if(!connecting)return;let target=document.elementFromPoint(e.clientX,e.clientY)?.closest?.('.pin');let from=connecting.from;document.querySelectorAll('.pin').forEach(p=>p.classList.remove('connecting'));connecting=null;cardLayer.classList.remove('linking');$('#draftThread').setAttribute('opacity','0');if(target&&target.dataset.pin!==from)completeConnection(from,target.dataset.pin)});
-
-function endPinTap(e,id){}
-
-function wouldCycle(a,b){let cur=a,seen=new Set();while(cur){if(cur===b)return true;if(seen.has(cur))break;seen.add(cur);const c=connections.find(x=>x.kind==='parent'&&x.b===cur);cur=c?c.a:null}return false}
-function completeConnection(a,b){if(a===b)return toast('같은 순간끼리는 연결하지 않아요.');
-if(connections.some(c=>c.a===a&&c.b===b))return toast('이미 존재하는 Connection이에요.');
-if(wouldCycle(a,b))return toast('이 연결은 순간들이 원을 이뤄 저장할 수 없어요.');
-snapshot();
-// 한 순간의 이전 순간은 하나만 저장된다(도메인 계약). 새로 이으면 기존 부모 연결을 바꾼다.
-connections=connections.filter(c=>!(c.kind==='parent'&&c.b===b&&c.a!==a));
-pendingConn={a,b};
-$('#whyModal').classList.add('open')}
-
-function showWhy(cid){selectedConn=cid;
-let c=connections.find(x=>x.id===cid),a=moments.find(x=>x.id===c.a),b=moments.find(x=>x.id===c.b);
-$('#whyBubble').innerHTML=`<b>${esc(titleMain(a))} → ${esc(titleMain(b))}</b>${c.why?'<br>'+esc(c.why):''}${canEditBoard?' <button id="deleteConnBubble">연결 지우기</button>':''}`;
-$('#whyBubble').classList.add('show');
-setTimeout(()=>{let b=$('#deleteConnBubble');if(b)b.onclick=deleteSelectedConnection},0);
-clearTimeout(showWhy.t);
-showWhy.t=setTimeout(()=>$('#whyBubble').classList.remove('show'),5200)}
-
-function deleteSelectedConnection(){const guard=LT58Model.editGuard(canEditBoard);if(guard.blocked){toast(guard.message);
-return}if(!selectedConn)return;
-snapshot();
-const gone=connections.find(c=>c.id===selectedConn);
-if(gone?.kind==='parent'&&!connections.some(c=>c.id!==gone.id&&c.kind==='parent'&&c.b===gone.b)){toast('시작 순간은 하나여야 해요. 이 연결은 지울 수 없어요.');return}
-connections=LT58Model.removeConnection(connections,selectedConn);
-selectedConn=null;
-persistBoard();
-renderThreads();
-$('#whyBubble').classList.remove('show');
-toast('Connection을 지웠어요. 되돌리기로 되돌릴 수 있어요.')}
-
-function animateNewThread(cid){let g=threadLayer.querySelector(`[data-cid="${cid}"]`);
-if(!g)return;
-let p=g.querySelector('.threadColor'),core=g.querySelector('.threadCore'),len=p.getTotalLength();
-[p,core].forEach(x=>{x.style.strokeDasharray=len;x.style.strokeDashoffset=len;x.style.transition='stroke-dashoffset .9s cubic-bezier(.2,.75,.2,1)';requestAnimationFrame(()=>x.style.strokeDashoffset='0')});
-setTimeout(()=>[p,core].forEach(x=>{x.style.strokeDasharray='';x.style.strokeDashoffset='';x.style.transition=''}),1000)}
-
 function toast(t){let el=$('#toast');
 el.textContent=t;
 el.classList.add('show');
@@ -281,9 +242,9 @@ el.classList.add('landing');
 el.querySelector('.pin').classList.add('pinImpact');
 setTimeout(()=>{el.classList.remove('landing');el.querySelector('.pin').classList.remove('pinImpact')},1000);
 selectMoment(m.id,true);
-toast('순간이 꽂혔어요.');
-if(connectFrom){pendingConn={a:connectFrom,b:m.id};
-setTimeout(()=>$('#whyModal').classList.add('open'),950)}}
+toast('순간이 추가되었어요.');
+if(connectFrom){/* #582: '이어진 이유' 창은 없앴다 — 이어 주기는 순간 추가의 이전 순간 고르기와 지도에서 한다 */}}
+placeAll();
 
 function formFor(type){let a=$('#formArea');
 if(type==='photo')a.innerHTML='<input class="field" id="mediaFile" type="file" accept="image/*"><div style="font-size:10px;color:#9b89a5;margin-top:6px">로컬 이미지는 브라우저 안에서만 미리 봅니다.</div>';
@@ -332,25 +293,6 @@ function sleep(ms){return new Promise(r=>setTimeout(r,ms))}
 
 function animateHotTip(path,dur=1900){return new Promise(resolve=>{let tip=$('#hotTip'),len=path.getTotalLength(),st=performance.now();tip.setAttribute('opacity','1');function f(now){let t=Math.min(1,(now-st)/dur),pt=path.getPointAtLength(len*t);tip.setAttribute('cx',pt.x);tip.setAttribute('cy',pt.y);tip.setAttribute('r',String(4+2*Math.sin(t*Math.PI)));if(t<1)requestAnimationFrame(f);else{tip.setAttribute('opacity','0');resolve()}}requestAnimationFrame(f)})}
 
-async function travelConnection(a,b){let c=connections.find(x=>x.a===a&&x.b===b);
-if(!c)return;
-let g=threadLayer.querySelector(`[data-cid="${c.id}"]`),path=g.querySelector('.threadColor'),len=path.getTotalLength();
-path.style.strokeDasharray=len;
-path.style.strokeDashoffset=len;
-path.style.transition='none';
-path.getBoundingClientRect();
-path.style.transition='stroke-dashoffset 1.7s cubic-bezier(.3,.7,.2,1)';
-path.style.strokeDashoffset='0';
-g.querySelector('.threadGlow').style.opacity='.75';
-$('#cinemaCaption').textContent=c.why;
-$('#cinemaCaption').classList.add('show');
-await animateHotTip(path,1700);
-g.querySelector('.threadGlow').style.opacity='.25';
-path.style.strokeDasharray='';
-path.style.strokeDashoffset='';
-path.style.transition='';
-}
-
 async function startCinema(fromIndex=0){if(cinema)return;
 cinema=true;
 $('#detail').classList.remove('open');
@@ -362,19 +304,11 @@ headerFade(true);
 await sleep(900);
 for(let i=fromIndex;i<replayPath.length;i++){let id=replayPath[i],m=moments.find(x=>x.id===id);
 focusMoment(id,`${m.emotion} · ${titleMain(m)}`);
-await sleep(i===0?1500:1100);
-if(id==='m3'){let alt=connections.find(x=>x.a==='m3'&&x.b==='m7');
-let ag=alt&&threadLayer.querySelector(`[data-cid="${alt.id}"]`);
-if(ag){ag.querySelector('.threadGlow').style.opacity='.9';
-$('#cinemaCaption').textContent='여기서 다른 경로도 열렸어요.';
-await sleep(550);
-ag.querySelector('.threadGlow').style.opacity='.25'}}if(i<replayPath.length-1){await travelConnection(id,replayPath[i+1]);
-await sleep(450)}}$('#cinemaCaption').classList.remove('show');
+await sleep(i===0?1500:1100)}$('#cinemaCaption').classList.remove('show');
 document.querySelectorAll('.card').forEach(c=>{c.classList.remove('cinemaDim','cinemaFocus')});
 fitAll(true);
 await sleep(900);
 document.body.classList.add('boardBloom');
-threadLayer.querySelectorAll('.threadGlow').forEach(p=>p.style.opacity='.85');
 await sleep(450);
 $('#finalCTA').classList.add('show')}
 
@@ -384,7 +318,6 @@ $('#cinemaTitle').classList.remove('show');
 $('#cinemaCaption').classList.remove('show');
 $('#finalCTA').classList.remove('show');
 document.body.classList.remove('boardBloom');
-threadLayer.querySelectorAll('.threadGlow').forEach(p=>p.style.opacity='');
 document.querySelectorAll('.card video').forEach(v=>{v.pause();v.currentTime=0});
 document.querySelectorAll('.card').forEach(c=>c.classList.remove('cinemaDim','cinemaFocus'));
 headerFade(false);
@@ -419,21 +352,6 @@ addType=b.dataset.type;
 document.querySelectorAll('.typeBtn').forEach(x=>x.classList.toggle('active',x===b));
 formFor(addType)}
 ;
-$('#saveWhy').onclick=()=>{if(!pendingConn)return;
-let why=$('#whyInput').value||'다음 순간으로 이어진 이유',color=moments.find(m=>m.id===pendingConn.a)?.color||'rose';
-let c=connections.find(x=>x.kind==='parent'&&x.a===pendingConn.a&&x.b===pendingConn.b);
-if(c)c.why=why;else{c={id:'c'+(connections.length+1),kind:'parent',a:pendingConn.a,b:pendingConn.b,why,color};connections.push(c)}
-pendingConn=null;
-$('#whyModal').classList.remove('open');
-renderThreads();
-animateNewThread(c.id);
-persistBoard();
-toast('Connection이 빛의 실로 이어졌어요.');
-setTimeout(()=>showWhy(c.id),400)}
-;
-$('#cancelWhy').onclick=()=>{pendingConn=null;
-$('#whyModal').classList.remove('open')}
-;
 $('#detailClose').onclick=()=>$('#detail').classList.remove('open');
 $('#openMoment').onclick=()=>openViewer(selected);
 $('#closeViewer').onclick=()=>{let v=$('#viewerMedia video');
@@ -447,6 +365,10 @@ if(c)selectMoment(c.b,true)}
 function fitAllByUser(){userView=null;clearTimeout(viewSaveTimer);writeBoardView(null);fitAll(true)}
 $('#fitBtn').onclick=fitAllByUser;
 $('#resetBtn').onclick=fitAllByUser;
+// #582: '정렬 되돌리기' — 사람이 옮긴 자리를 지우고 날짜 최신순 바둑판으로 돌아간다. 자리 저장 방식은 그대로(x·y 저장).
+function sortReset(){const guard=LT58Model.editGuard(canEditBoard);if(guard.blocked){toast(guard.message);return}
+snapshot();for(const m of moments)m.savedPos=false;placeAll();settlePlacedCards();persistBoard();fitAllByUser();toast('날짜 최신순 바둑판으로 돌아왔어요.')}
+$('#sortResetBtn').onclick=sortReset;
 $('#undoBtn').onclick=undo;
 $('#minusBtn').onclick=()=>zoomAtCenter(Math.max(.38,view.z-.1));
 $('#plusBtn').onclick=()=>zoomAtCenter(Math.min(1.45,view.z+.1));

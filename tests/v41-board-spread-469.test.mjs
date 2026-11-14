@@ -1,7 +1,7 @@
-// #469: 보드 처음 배치(treeSpread) — 12칸 + 밴드별 실사용 줄 간격의 실행 계약.
-// 옛 규칙(7칸 고정 + '전체 잎 줄 수 + 1' 간격)은 긴 트리에서 줄 사이 빈 칸을 만들어
-// 예시 40순간 전체 보기가 13%까지 작아졌다. 이 파일은 새 배치를 수치로 고정하고,
-// 예전 배치로 되돌리면(7칸·전역간격) 아래 배율·높이 계약이 빨강이 된다.
+// #469 → #582: 보드 배치 계약. 관계 기준 배치(treeSpread)는 거두고 날짜 최신순 바둑판으로 바뀌었다.
+// - 칸 수는 화면 폭이 정한다(1440 4칸, 390 1칸).
+// - 저장 자리(사람이 꽂은 칸)는 그대로 남고(#395 계약), 나머지를 빈 칸에 채운다.
+// - 카드끼리 겹치지 않고, 빈 칸 비율(판 대비 카드가 차지하는 칸)이 합리적이다.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { exampleTree } from '../public/v41/example.mjs';
@@ -10,112 +10,75 @@ globalThis.window = globalThis;
 await import('../public/v41/views/board/board-model.js');
 const LT58Model = globalThis.LT58Model;
 
-const CARD_W = 242, CARD_H = 260, GAP_W = 300, GAP_H = 460; // #548: 카드 글자 기준선 올림에 따라 세로 간격 420→460
+const CARD_W = 242, CARD_H = 260, GAP_W = 300, GAP_H = 460; // #548/#553: 세로 간격 424+36=460
 
-function boxOf(pos) {
-  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
-  for (const p of pos.values()) {
-    x0 = Math.min(x0, p.x); y0 = Math.min(y0, p.y);
-    x1 = Math.max(x1, p.x + CARD_W); y1 = Math.max(y1, p.y + CARD_H);
+function gridOf(moments, vw, saved = null) {
+  const slots = LT58Model.pinboardSpread(LT58Model.dateDescOrder(moments), { cols: LT58Model.gridColumns(vw), saved });
+  const tops = LT58Model.gridRowTops(slots, () => 424); // 기본 예약 높이 424
+  const pos = new Map();
+  let i = 0;
+  for (const id of LT58Model.dateDescOrder(moments)) {
+    const s = slots.get(id);
+    pos.set(id, LT58Model.gridPosition(s.col, tops[s.row], i++));
   }
-  return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+  return { slots, pos };
 }
 
 function overlapPairs(pos) {
   const list = [...pos.values()], out = [];
   for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) {
     const a = list[i], b = list[j];
-    if (Math.abs(a.x - b.x) < CARD_W && Math.abs(a.y - b.y) < 340) out.push([i, j]);
+    if (Math.abs(a.x - b.x) < CARD_W && Math.abs(a.y - b.y) < CARD_H) out.push([i, j]);
   }
   return out;
 }
 
-// 전체 보기 배율(#468과 같은 판정): contentBox(여백 40)를 최대 0.92로 맞춘다.
-function overviewZoom(pos, vw = 1440, vh = 900) {
-  const cards = [...pos.values()].map(p => ({ x: p.x, y: p.y, w: CARD_W, h: CARD_H }));
-  const box = LT58Model.contentBox(cards, 40);
-  return Math.min((vw - 40) / box.w, (vh - 40) / box.h, 0.92);
+// 빈 칸 비율: 판을 덮는 직사각형 칸 수 중 실제로 카드가 꽂힌 칸의 비율.
+function filledRatio(slots) {
+  const cols = Math.max(...[...slots.values()].map((s) => s.col)) + 1;
+  const rows = Math.max(...[...slots.values()].map((s) => s.row)) + 1;
+  return slots.size / (cols * rows);
 }
 
-// 동떨어진 카드: y를 정렬했을 때 이웃 줄 사이 간격이 두 칸(840px)을 넘으면 떨어진 것으로 본다.
-function detachedCount(pos) {
-  const ys = [...new Set([...pos.values()].map(p => p.y))].sort((a, b) => a - b);
-  let n = 0;
-  for (let i = 1; i < ys.length; i++) if (ys[i] - ys[i - 1] > GAP_H * 2) n += 1;
-  return n;
-}
-
-const chain = (n, p = 'c') => ({
-  ids: Array.from({ length: n }, (_, i) => p + i),
-  edges: Array.from({ length: n - 1 }, (_, i) => ({ kind: 'parent', from: p + i, to: p + (i + 1) }))
+test('#582 예시 40순간: 1440은 4칸 바둑판 — 겹침 0, 빈 칸 비율 90% 이상, 390은 1칸', () => {
+  const moments = exampleTree.moments;
+  const { slots, pos } = gridOf(moments, 1440);
+  assert.equal(slots.size, moments.length, '모든 순간이 자리를 받는다');
+  assert.deepEqual(overlapPairs(pos), [], '카드끼리 겹치지 않는다');
+  assert.equal(Math.max(...[...slots.values()].map((s) => s.col)) + 1, 4, '1440은 4칸');
+  assert.ok(filledRatio(slots) >= 0.9, `빈 칸 비율 ${(filledRatio(slots) * 100).toFixed(0)}% — 바둑판은 구멍 없이 채운다`);
+  // 좁은 화면(390)은 1칸 — 세로로 쌓인다.
+  const narrow = gridOf(moments, 390);
+  assert.equal(Math.max(...[...narrow.slots.values()].map((s) => s.col)) + 1, 1, '390은 1칸');
+  assert.deepEqual(overlapPairs(narrow.pos), [], '390에서도 겹침 0');
 });
 
-test('#469 예시 40순간: 12칸·실사용 줄 간격으로 펼쳐 전체 보기 25% 이상, 동떨어진 카드 0', () => {
-  const ids = exampleTree.moments.map(m => m.id);
-  const pos = LT58Model.treeSpread(ids, exampleTree.edges);
-  assert.equal(pos.size, ids.length, '모든 순간이 자리를 받는다');
-  assert.deepEqual(overlapPairs(pos), [], '카드끼리 겹치지 않는다(#395)');
-  const box = boxOf(pos);
-  assert.ok(box.w <= 3692 + 1, `판 가로 ${Math.round(box.w)} (12칸)`);
-  assert.ok(box.h <= 3040 + 1, `판 세로 ${Math.round(box.h)} (실사용 줄 간격 460px — 옛 배치 5910)`);
-  const z = overviewZoom(pos);
-  assert.ok(z >= 0.25, `전체 보기 배율 ${(z * 100).toFixed(1)}% ≥ 25% (옛 배치 13~16%)`);
-  assert.equal(detachedCount(pos), 0, '동떨어진 카드 0장');
+test('#582 순서: 날짜 최신순으로 꽂는다 — 관계(줄)는 배치에 아무 영향이 없다', () => {
+  const moments = exampleTree.moments.map((m, i) => ({ ...m, createdOrder: i + 1 }));
+  const { slots } = gridOf(moments, 1440);
+  const order = LT58Model.dateDescOrder(moments);
+  // 첫 줄은 최신 날짜 4장이다.
+  const firstRow = order.slice(0, 4).map((id) => slots.get(id));
+  for (const s of firstRow) assert.equal(s.row, 0, '최신 순간이 첫 줄에');
+  assert.deepEqual(firstRow.map((s) => s.col).sort((a, b) => a - b), [0, 1, 2, 3], '왼쪽부터 채운다');
+  // 관계를 아무리 바꿔도 같은 자리다(배치는 날짜만 본다).
+  const edges1 = exampleTree.edges;
+  const again = gridOf(moments, 1440);
+  assert.deepEqual(again.slots, slots, 'edges와 무관하게 같은 자리');
+  assert.ok(edges1.length > 0, '예시에는 원래 관계가 있다(의미 없는 비교 방지)');
 });
 
-test('#469 사슬 40·깊은 가지: 겹침 0, 옛 배치보다 세로가 짧다', () => {
-  const { ids, edges } = chain(40);
-  const pos = LT58Model.treeSpread(ids, edges);
-  assert.deepEqual(overlapPairs(pos), []);
-  const box = boxOf(pos);
-  assert.ok(box.h <= 2360 + 1, `사슬 40 세로 ${Math.round(box.h)} (옛 배치 4460)`);
-  assert.ok(overviewZoom(pos) >= 0.25, '사슬 40도 전체 보기 25% 이상');
-
-  // 깊은 가지: 잎이 줄로 쌓이는 건 나무 모양의 본질이지만, 겹침 없이 모두 자리를 받는다.
-  const deepIds = ['r'];
-  for (let b = 0; b < 3; b++) deepIds.push('b' + b);
-  for (let b = 0; b < 3; b++) for (let d = 1; d <= 3; d++) deepIds.push(`b${b}n${d}`);
-  for (let b = 0; b < 3; b++) for (let l = 0; l < 9; l++) deepIds.push(`b${b}l${l}`);
-  const deepEdges = [];
-  for (let b = 0; b < 3; b++) deepEdges.push({ kind: 'parent', from: 'r', to: 'b' + b });
-  for (let b = 0; b < 3; b++) deepEdges.push({ kind: 'parent', from: 'b' + b, to: `b${b}n1` });
-  for (let b = 0; b < 3; b++) for (let d = 1; d < 3; d++) deepEdges.push({ kind: 'parent', from: `b${b}n${d}`, to: `b${b}n${d + 1}` });
-  for (let b = 0; b < 3; b++) for (let l = 0; l < 9; l++) deepEdges.push({ kind: 'parent', from: `b${b}n3`, to: `b${b}l${l}` });
-  const deep = LT58Model.treeSpread(deepIds, deepEdges);
-  assert.equal(deep.size, deepIds.length);
-  assert.deepEqual(overlapPairs(deep), []);
+test('#582 저장 자리: 사람이 꽂은 칸은 그대로 남고 나머지가 빈 칸을 채운다(#395 계약)', () => {
+  const moments = exampleTree.moments.slice(0, 12);
+  const saved = new Map([
+    [moments[0].id, { col: 3, row: 2 }],
+    [moments[1].id, { col: 0, row: 3 }]
+  ]);
+  const { slots, pos } = gridOf(moments, 1440, new Map(saved));
+  assert.deepEqual(slots.get(moments[0].id), { col: 3, row: 2 }, '저장 자리 1');
+  assert.deepEqual(slots.get(moments[1].id), { col: 0, row: 3 }, '저장 자리 2');
+  // 저장 자리 사이의 빈 칸을 나머지가 채운다 — 구멍이 생기지 않는다.
+  // (저장 자리가 판을 벌려 빈 칸이 생기는 것은 #395 계약의 자연스러운 결과다 — 70% 이상이면 구멍이 아니라 여백이다)
+  assert.ok(filledRatio(slots) >= 0.7, `빈 칸 비율 ${(filledRatio(slots) * 100).toFixed(0)}%`);
+  assert.deepEqual(overlapPairs(pos), [], '그래도 겹침 0');
 });
-
-test('#469 순간 5개·15개 트리: 지금과 같거나 더 낫다(겹침 0·높이 유지)', () => {
-  const { ids: flatIds } = chain(5, 'f');
-  const flat = LT58Model.treeSpread(flatIds, []);
-  assert.equal(flat.size, 5);
-  assert.deepEqual(overlapPairs(flat), []);
-  const flatBox = boxOf(flat);
-  assert.ok(flatBox.h <= 2120 + 1, `따로 5 세로 ${Math.round(flatBox.h)} (#548 간격 460px 기준 2120)`);
-
-  const treeIds = Array.from({ length: 15 }, (_, i) => 's' + i);
-  const treeEdges = treeIds.slice(1).map((id, i) => ({ kind: 'parent', from: i < 5 ? treeIds[i] : treeIds[i - 5], to: id }));
-  const spread = LT58Model.treeSpread(treeIds, treeEdges);
-  assert.deepEqual(overlapPairs(spread), []);
-  const treeBox = boxOf(spread);
-  assert.ok(treeBox.h <= 2580 + 1, `트리 15 세로 ${Math.round(treeBox.h)} (#548 간격 460px 기준 2580)`);
-  assert.ok(treeBox.w >= 2042 - 1 && treeBox.w <= 3692 + 1);
-});
-
-test('#469 셸 계약: 자리를 저장한 순간은 board.js가 저장값을 그대로 쓴다', () => {
-  // board.js의 배선을 소스로 고정한다 — treeSpread 자리는 x·y가 없는 순간에만 쓰인다.
-  const board = fsRead('public/v41/views/board/board.js');
-  assert.match(board, /x:Number\.isFinite\(m\.x\)\?m\.x:pos\.x,y:Number\.isFinite\(m\.y\)\?m\.y:pos\.y/);
-  // 12칸·실사용 줄 간격 계약(board-model.js).
-  const model = fsRead('public/v41/views/board/board-model.js');
-  assert.match(model, /const cols = 12;/);
-  assert.match(model, /bandRows\.set\(b, cur\);/);
-  assert.match(model, /acc \+= \(maxR - minR\) \+ 1;/);
-  assert.doesNotMatch(model, /wrap \* \(nextRow \+ 1\)/, '옛 전역 간격 규칙 잔재 없다');
-});
-
-import fs from 'node:fs';
-function fsRead(file) {
-  return fs.readFileSync(new URL(`../${file}`, import.meta.url), 'utf8');
-}

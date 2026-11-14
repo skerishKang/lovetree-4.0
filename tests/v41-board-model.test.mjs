@@ -11,31 +11,52 @@ const BOARD = fs.readFileSync(new URL('../public/v41/views/board/board.js', impo
 const EXTRAS = fs.readFileSync(new URL('../public/v41/views/board/board-extras.js', import.meta.url), 'utf8');
 
 test('0. 보드 한 벌: 화면이 부르는 함수가 전부 있다', () => {
-  assert.deepEqual(Object.keys(M).sort(), ['boardSize', 'cardPosition', 'cinemaBeats', 'clampView', 'collectPath', 'contentBox', 'decorationMotion', 'detailButtonState', 'editGuard', 'escapeHTML', 'filterVisible', 'fitBox', 'fitZoom', 'maxCreatedOrder', 'nextConnections', 'rememberView', 'removeConnection', 'savedView', 'settleColumnGaps', 'startView', 'threadPath', 'threadRedrawStep', 'treeSpread', 'visibleCards']);
+  assert.deepEqual(Object.keys(M).sort(), ['boardSize', 'cinemaBeats', 'clampView', 'collectPath', 'contentBox', 'dateDescOrder', 'decorationMotion', 'detailButtonState', 'editGuard', 'escapeHTML', 'filterVisible', 'fitBox', 'fitZoom', 'gridColumns', 'gridPosition', 'gridRowTops', 'maxCreatedOrder', 'nextConnections', 'pinboardSpread', 'rememberView', 'savedView', 'settleColumnGaps', 'slotOf', 'startView', 'visibleCards']);
   for (const fn of Object.keys(M)) assert.equal(typeof M[fn], 'function', fn);
 });
 
-test('1. 카드 자리: 8장씩 줄바꿈, 세로 간격은 예약 높이+여백(#553 — 기본 424+36=460px, #548의 고정 440px를 대신한다), 회전 -2·0·2도', () => {
-  assert.deepEqual(M.cardPosition(0), { x: 150, y: 150, rot: -2 });
-  assert.deepEqual(M.cardPosition(1), { x: 430, y: 150, rot: 0 });
-  assert.deepEqual(M.cardPosition(8), { x: 150, y: 610, rot: 2 });
-  assert.deepEqual(Array.from({ length: 8 }, (_, i) => M.cardPosition(i).x), [150, 430, 710, 990, 1270, 1550, 1830, 2110]);
-  // 예약 높이를 넘기면 그 카드 줄은 더 벌어진다(세로 Shorts 680px → 간격 716px).
-  assert.deepEqual(M.cardPosition(8, 680), { x: 150, y: 866, rot: 2 });
-  assert.deepEqual(M.cardPosition(16, 680), { x: 150, y: 1582, rot: 0 });
+test('1. 바둑판 칸 수: 화면 폭이 정한다(#582) — 1440은 4칸, 390은 1칸, 1920은 6칸(상한)', () => {
+  assert.equal(M.gridColumns(1440), 4);
+  assert.equal(M.gridColumns(390), 1);
+  assert.equal(M.gridColumns(1920), 6);
+  assert.equal(M.gridColumns(0), 1);
 });
 
-test('2. 실(연결선): 두 핀을 아래로 늘어뜨리고, dx가 크면 처짐이 커지되 140px에서 멈춘다', () => {
-  const near = M.threadPath({ x: 0, y: 0 }, { x: 100, y: 50 });
-  assert.equal(near.sag, 63);
-  assert.equal(near.cy, 113);
-  assert.equal(near.d, 'M 0 0 C 32 113, 68 113, 100 50');
-  assert.equal(M.threadPath({ x: 0, y: 0 }, { x: 5000, y: 0 }).sag, 140);
+test('2. 바둑판 순서: 날짜 최신순, 같은 날짜면 최근에 만든 순간부터(#582)', () => {
+  const ms = [
+    { id: 'a', date: '2026-01-02', createdOrder: 1 },
+    { id: 'b', date: '2026-01-05', createdOrder: 2 },
+    { id: 'c', date: '2026-01-02', createdOrder: 3 },
+    { id: 'd', date: '', createdOrder: 9 }
+  ];
+  assert.deepEqual(M.dateDescOrder(ms), ['b', 'c', 'a', 'd']);
 });
 
-test('3. 실(연결선): 위로 가는 연결도 처짐 기준점은 항상 아래쪽 핀이다', () => {
-  assert.equal(M.threadPath({ x: 0, y: 300 }, { x: 100, y: 50 }).cy, 363);
-  assert.equal(M.threadPath({ x: 10, y: 10 }, { x: 10, y: 10 }).d, 'M 10 10 C 10 65, 10 65, 10 10');
+test('3. 바둑판 자리: 저장 자리는 그대로 남고(#395 계약) 나머지를 빈 칸에 채운다, 세로 간격은 예약 높이+여백(#553)', () => {
+  const ids = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i'];
+  const saved = new Map([['a', { col: 2, row: 0 }]]);
+  const r = M.pinboardSpread(ids, { cols: 4, saved });
+  // a는 사람이 꽂은 자리(2,0)에 그대로, b·c·d가 나머지 첫 줄을 채운다.
+  assert.deepEqual(r.get('a'), { col: 2, row: 0 });
+  assert.deepEqual(r.get('b'), { col: 0, row: 0 });
+  assert.deepEqual(r.get('c'), { col: 1, row: 0 });
+  assert.deepEqual(r.get('d'), { col: 3, row: 0 });
+  assert.deepEqual(r.get('e'), { col: 0, row: 1 });
+  assert.deepEqual(r.get('i'), { col: 0, row: 2 });
+  // 자리가 겹치지 않는다.
+  const keys = [...r.values()].map((s) => s.col + ':' + s.row);
+  assert.equal(new Set(keys).size, keys.length);
+  // 줄의 y: 그 줄의 최대 예약 높이 + 여백(#553 규칙) — YouTube(480)가 있는 줄은 516px 간격이 된다.
+  const slots2 = new Map([['a', { col: 0, row: 0 }], ['b', { col: 0, row: 1 }], ['c', { col: 1, row: 1 }]]);
+  const tops = M.gridRowTops(slots2, (id) => (id === 'a' ? 480 : 424));
+  assert.deepEqual(tops, [150, 666], '첫 줄은 480+36 간격으로 벌어진다');
+  assert.deepEqual(M.gridPosition(0, tops[0], 0), { x: 150, y: 150, rot: -2 });
+  assert.deepEqual(M.gridPosition(1, tops[1], 1), { x: 450, y: 666, rot: 0 });
+  // 같은 열 위아래 간격은 위 카드의 예약 높이 이상이다(겹침 없음).
+  assert.ok(tops[1] - tops[0] >= 480);
+  // 픽셀 → 슬롯(끌어 꽂기): 같은 규칙으로 되새긴다.
+  assert.deepEqual(M.slotOf(460, 610), { col: 1, row: 1 });
+  assert.deepEqual(M.slotOf(-50, -50), { col: 0, row: 0 });
 });
 
 test('4. 전체 맞춤 배율: 여백 40px·최대 0.92배', () => {
@@ -44,20 +65,12 @@ test('4. 전체 맞춤 배율: 여백 40px·최대 0.92배', () => {
   assert.equal(M.fitZoom(6000, 6000), 0.92);
 });
 
-test('5. 연결 지우기 계산: 고른 연결 하나만 빠지고 원본은 그대로다', () => {
-  const list = [{ id: 'c1' }, { id: 'c2' }, { id: 'c3' }];
-  assert.deepEqual(M.removeConnection(list, 'c2').map((c) => c.id), ['c1', 'c3']);
-  assert.equal(list.length, 3);
-  assert.deepEqual(M.removeConnection(list, 'nope').map((c) => c.id), ['c1', 'c2', 'c3']);
-});
-
 test('6. 지우기 분기: 예시 판본은 지우고, 실제 기록은 읽기 전용 안내만 한다', () => {
   assert.deepEqual(M.editGuard(true), { blocked: false, message: '' });
   const guard = M.editGuard(false);
   assert.equal(guard.blocked, true);
   assert.equal(guard.message, '읽기 전용에서는 연결을 변경할 수 없어요.');
-  const list = [{ id: 'c1' }];
-  assert.equal((guard.blocked ? list : M.removeConnection(list, 'c1')).length, 1);
+  // #582: 연결 지우기는 지도가 맡는다 — 보드 모델은 지우기 허용 판단만 남긴다.
 });
 
 test('7. 화면(board.js)은 같은 계산을 다시 구현하지 않고 이 한 벌을 부른다', () => {
@@ -68,9 +81,11 @@ test('7. 화면(board.js)은 같은 계산을 다시 구현하지 않고 이 한
   assert.doesNotMatch(BOARD, /connections\.filter\(c=>c\.id!==selectedConn\)/);
   assert.doesNotMatch(BOARD, /function esc\(s\)/);
   // 부르는 자리(6곳)가 있다.
-  for (const call of ['LT58Model.escapeHTML', 'LT58Model.cardPosition', 'LT58Model.threadPath', 'LT58Model.fitZoom', 'LT58Model.removeConnection', 'LT58Model.editGuard']) {
+  for (const call of ['LT58Model.escapeHTML', 'LT58Model.gridColumns', 'LT58Model.pinboardSpread', 'LT58Model.gridPosition', 'LT58Model.fitZoom', 'LT58Model.editGuard']) {
     assert.ok(BOARD.includes(call), call);
   }
+  // #582: 줄 그리기는 사라진다 — 실 계산(threadPath)을 부르는 곳도 없다.
+  assert.doesNotMatch(BOARD, /LT58Model\.threadPath/);
   assert.match(BOARD, /toast\(guard\.message\)/);
 });
 
@@ -175,21 +190,11 @@ test('13. 목록 필터 판정: 미디어 × 키워드 조건을 표대로 본�
   assert.deepEqual(Object.keys(M).filter((k) => /example|demo|real/i.test(k)), []);
 });
 
-test('15. 실 다시 그리기 판정(#346): 예약 중복·숨김·시네마는 건너뛰고, 그 외에만 한 프레임 그린다', () => {
-  assert.equal(M.threadRedrawStep({}), 'draw');
-  assert.equal(M.threadRedrawStep({ pending: true }), 'queued', '이미 한 프레임 예약됨');
-  assert.equal(M.threadRedrawStep({ hidden: true }), 'skip', '안 보이면 정지');
-  assert.equal(M.threadRedrawStep({ cinema: true }), 'skip', '시네마가 자기 갱신을 맡는다');
-  assert.equal(M.threadRedrawStep({ pending: true, hidden: true, cinema: true }), 'queued', '예약 판정이 먼저다');
-  assert.equal(M.threadRedrawStep({ hidden: false, cinema: false, pending: false }), 'draw');
-  assert.equal(M.threadRedrawStep(), 'draw', '입력 없음 = 그린다(기본값)');
-});
-
 test('16. 상시 루프·무한 글로우 애니메이션이 남아 있지 않다(#346 강도 가드)', () => {
   const CSS = fs.readFileSync(new URL('../public/v41/views/board/board.css', import.meta.url), 'utf8');
   assert.ok(!EXTRAS.includes('livingThreadLoop'), '상시 rAF 루프 이름이 남아 있으면 실패');
   assert.ok(!/requestAnimationFrame\(livingThreadLoop\)/.test(EXTRAS), '자기 자신을 다시 거는 루프가 없어야 한다');
-  assert.ok(EXTRAS.includes('LT58Model.threadRedrawStep'), '예약 판정은 계산 한 벌을 부른다');
+  assert.ok(!EXTRAS.includes('LT58Model.threadRedrawStep'), '#582: 줄이 없으므로 실 다시 그리기 예약 판정도 함께 거둔다');
   assert.ok(EXTRAS.includes('scheduleThreadFrame()'), '드래그·크기 변경은 예약 함수로 묶는다');
   assert.doesNotMatch(EXTRAS, /el\.style\.top=m\.y\+'px';rerenderThreads\(\)/, '드래그에서 매 이동마다 바로 그리지 않는다');
   const glow = CSS.match(/\.spaceGlow\{([^}]*)\}/)?.[1] || '';
@@ -229,20 +234,17 @@ test('14. board-extras.js는 필터 판정을 다시 구현하지 않고 한 벌
   assert.ok(EXTRAS.includes("el.classList.toggle('filteredOut',!ok)"));
 });
 
-test('처음 배치(#395): 첫 순간은 왼쪽, 이어진 순간은 오른쪽으로 펼치고 카드끼리 겹치지 않는다', () => {
+test('처음 배치(#395 → #582 바둑판): 관계를 버려도 처음 꽂힌 자리는 남는다 — 저장 자리가 있으면 그 칸을 쓴다', () => {
   const ids = Array.from({ length: 14 }, (_, i) => 'm' + i);
-  const edges = ids.slice(1).map((id, i) => ({ kind: 'parent', from: i < 6 ? ids[i] : ids[i - 5], to: id }));
-  const r = M.treeSpread(ids, edges);
-  assert.equal(r.size, 14);
-  assert.ok(r.get('m0').x < r.get('m1').x && r.get('m1').x < r.get('m2').x);
-  const list = [...r.values()];
-  for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) {
-    const a = list[i], b = list[j];
-    assert.ok(Math.abs(a.x - b.x) >= 242 || Math.abs(a.y - b.y) >= 340, `겹침 ${i} ${j}`);
-  }
-  // 이어진 선이 없어도(전부 따로) 모두 자리를 받고 겹치지 않는다.
-  const flat = M.treeSpread(ids, []);
-  assert.equal(flat.size, 14);
+  // 관계(줄)는 이제 배치에 아무 영향이 없다: 같은 입력이면 edges와 무관하게 같은 자리.
+  const saved = new Map([['m0', { col: 0, row: 0 }], ['m1', { col: 3, row: 1 }]]);
+  const withEdges = M.pinboardSpread(ids, { cols: 4, saved: new Map(saved) });
+  const noEdges = M.pinboardSpread(ids, { cols: 4, saved: new Map(saved) });
+  assert.deepEqual(withEdges.get('m1'), noEdges.get('m1'));
+  assert.deepEqual(withEdges.get('m1'), { col: 3, row: 1 });
+  // 나머지는 빈 칸에 순서대로 채워진다.
+  assert.deepEqual(withEdges.get('m2'), { col: 1, row: 0 });
+  assert.equal(withEdges.size, 14);
 });
 
 // #460 컴퓨터에서 보드를 읽을 수 있는 크기로 연다.
@@ -329,7 +331,7 @@ test('#460 화면은 처음 자리·전체 보기·기억을 이 계산으로 �
   assert.match(BOARD, /LT58Model\.rememberView\(/);
   assert.match(BOARD, /function boardStartView\(\)\{if\(innerWidth<700\)\{fitAll\(false\);viewMode='start';return\}/);
   // #490: 숨은 프레임(폭 0)에서 한 맞춤은 '전체 보기'가 아니다 — 드러난 뒤 resize가 처음 자리(또는 기억한 자리)를 다시 계산한다.
-  assert.match(BOARD, /function boardResize\(\)\{if\(innerWidth<700\|\|cinema\)return;if\(viewMode==='fit'\)fitAll\(false\);else boardStartView\(\)\}/);
+  assert.ok(BOARD.includes("function boardResize(){if(innerWidth<700||cinema)return;if(moments.some(m=>!m.savedPos))placeAll();if(viewMode==='fit')fitAll(false);else boardStartView()}"), "boardResize: 저장 자리 없는 카드 재꽂기 포함")
   assert.match(DETAIL, /boardStartView\(\);applyPathHighlight\(\)/);
   assert.match(EXTRAS, /setTimeout\(boardStartView,40\)/);
   assert.match(EXTRAS, /addEventListener\('resize',boardResize\)/);
