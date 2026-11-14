@@ -415,6 +415,8 @@ function applyVanished(root, doc = (typeof document !== 'undefined' ? document :
 }
 function scheduleVanishedCheck(root){
  if(!root||root.dataset?.ltAuto!=='1'||root.dataset.ltVanishedChecked==='1')return;
+ // 썸네일이 아직 실패하지 않은 카드는 표시를 남기지 않고 나중에 다시 본다(지금 검사해도 '영상 있음'이 된다).
+ if(!thumbFailed(root))return;
  root.dataset.ltVanishedChecked='1';
  vanishedQueue.add(root);
  void runVanishedQueue();
@@ -442,7 +444,8 @@ async function checkVanished(root, hooks = null){
   if(status!=='unknown'&&root.isConnected)mod.writeVideoStatusCache?.(store,m.videoId,status);
  }
  // 404(삭제 확정)와 502(비공개·일시 오류 — 썸네일 실패가 짝 신호)는 표시하고, 200은 그대로 둔다.
- if(status!=='ok'&&root.isConnected)applyVanished(root,hooks&&hooks.doc);
+ // hooks.doc는 undefined를 지나야 기본 문서(document)에 닿는다 — null을 넘기지 않게 한다.
+ if(status!=='ok'&&root.isConnected)applyVanished(root,hooks?hooks.doc:undefined);
 }
 function watchVanished(){
  // 이미 '사라진 영상'으로 정해진 칸에 썸네일 내려가기가 나중에 글 카드를 놓으면 기존 안내가 따로 붙는다 — 겹침을 치운다.

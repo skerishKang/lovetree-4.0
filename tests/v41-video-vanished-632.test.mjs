@@ -112,7 +112,21 @@ test('#632 요청: 프록시 주소는 한 벌(/api/youtube/oembed?v=), 실패·
 });
 
 // media-preview.js 는 클래식 스크립트(IIFE)라 vm 으로 읽어 window.LTMedia 를 본다(기존 시험과 같은 방법).
-const scope = { window: {}, URL, URLSearchParams, setTimeout, clearTimeout };
+// 바닥에 도는 화면 연결(document·MutationObserver·addEventListener)도 최소 흉내를 둔다 — #632 표시 기본 문서 경로 시험용.
+const docStub = {
+  documentElement: {},
+  querySelectorAll: () => [],
+  querySelector: () => null,
+  createElement: (tag) => fakeNode(tag),
+  createTextNode: (text) => ({ text: String(text) }),
+  addEventListener: () => {}
+};
+const scope = {
+  window: {}, URL, URLSearchParams, setTimeout, clearTimeout,
+  document: docStub,
+  MutationObserver: function () { this.observe = () => {}; this.disconnect = () => {}; },
+  addEventListener: () => {}
+};
 vm.runInNewContext(readFileSync(new URL('../public/v41/media-preview.js', import.meta.url), 'utf8'), scope);
 const media = scope.window.LTMedia;
 
@@ -279,6 +293,27 @@ test('#632 표시: 썸네일이 실패한 카드만 묻고, 404·502는 표시(2
     await media.checkVanished(notYt, { doc: fakeDoc(), store });
     assert.deepEqual(fetches, []);
     assert.equal(notYt.dataset.ltVanished, undefined);
+  } finally {
+    media.setVideoStatusLoader(null);
+  }
+});
+
+test('#632 표시: 시험 문서(doc)를 끼우지 않아도 기본 문서로 표시한다(null은 기본 값을 무효로 만들지 않는다)', async () => {
+  const store = fakeStorage();
+  writeVideoStatusCache(store, 'R5mpcDWpYSA', 'gone');
+  media.setVideoStatusLoader(() => ({
+    readVideoStatusCache: (s, id) => readVideoStatusCache(s, id),
+    writeVideoStatusCache: () => {},
+    fetchVideoStatus: async () => 'unknown'
+  }));
+  try {
+    const root = vanishedRoot();
+    // hooks에 doc을 끼우지 않는다 — 운영에서는 이 경로로 불린다.
+    await media.checkVanished(root, { store });
+    assert.equal(root.dataset.ltVanished, '1');
+    const note = root.body.afterArgs && root.body.afterArgs[0];
+    assert.ok(note, '기본 문서로 안내를 놓는다');
+    assert.equal(note.children[0].textContent, '사라진 영상');
   } finally {
     media.setVideoStatusLoader(null);
   }
