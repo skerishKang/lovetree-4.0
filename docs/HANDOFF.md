@@ -23,6 +23,18 @@
 - **머지·배포**: PR #588 머지 → main `f0fb5c4`, 필수 검사 전부 초록. 스크린샷 전/후 1440·1920·2560 × 밤·정원 + 세로 사례 + 실제 재생 2장 → `E:\lovetree-qa84\`. 이슈 #584 보고 댓글 후 닫음.
 - **남긴 것**: 실기기(컴2 tabbit) 재생 확인은 이쪽에서 못 했다 — 로컬 Chromium(headed playwright) 실측으로 대체했고 같은 엔진이라 같은 결과를 기대하지만, 배포 뒤 컴2에서 한 번 열어 보는 것을 권한다.
 
+## 2026-11-15 — 보드를 핀보드로: 바둑판 배치·끌어 꽂기·줄은 지도에 (#582, 로컬2 레인, ai/com2-lt582-pinboard-grid-20261115, main ee8172a 기준)
+
+- **배치**: treeSpread(관계 기준 펼치기)를 버리고 날짜 최신순 바둑판. 칸 수는 화면 폭이 정한다(1440 4칸·390 1칸·1920 6칸 상한), 카드 크기는 #548 기준선 그대로. 저장 자리(#395 계약)는 그대로 남고 나머지를 빈 칸에 채운다.
+- **끌어 꽂기**: 카드를 끌면 가장 가까운 빈 칸에 스냅되고 x·y를 기존 저장 방식(lt41-board-sync) 그대로 저장. '정렬 되돌리기' 단추로 날짜순 바둑판 복귀. 판 끌기 중 카드 pointer-events 를 꺼 성능 확보.
+- **줄 없음**: 보드에서 실·핀 연결·'이어진 이유' 창·연결 배너 제거 — 관계도는 지도가 맡는다. 이어 주기는 순간 추가의 '이전 순간 고르기'와 지도에서.
+- **상세**: 이전·다음 순간 링크 유지(#583), '지도에서 관계 보기' 단추 신설 — 셸 메시지 lt41-open-network 로 `#my/network?tree=…&moment=…` 약속대로 열기(messages.mjs 한 조각, 지도 파일 미수정). extras selectMoment 의 다음 순간 목록을 board.js 와 같은 3개 규칙으로 통일.
+- **용어**(이슈 댓글 반영): '＋ 순간 꽂기'→'＋ 순간 추가', '기억판에 꽂기'→'보드에 추가', 토스트·기본값·이어진 이유 기본 문자열도 '추가'로. 카드 끌기 설명은 '끌어서 자리 옮기기'(title). 숨김 고급 도구(DEFAULT PIN·CARD)는 화면에 안 남아 유지.
+- **시험**: 신규 `tests/v41-board-pinboard-582.test.mjs` 7건. 관계 배치에 묶였던 기존 시험을 바둑판 기준으로 갱신(spread-469·board-model·553·536·cursor-detail·merge-pinboard·touch-targets — board-model 의 실 3건·연결 지우기는 기능 소멸로 삭제). 서버·DB 변경 없음.
+- **fps(1440, 26순간, 헤드리스)**: 판 끌기 17.9~36.3 → 45.1~49.5, 확대 25.5~58.6 → 58.7~60.5. 스크린샷(1440·390 × 종이·밤 전/후 + 상대): `E:\lovetree-qa\582\`
+- **트러블슈팅 기록**: (1) 이전 세션 전체 npm test 의 2건 실패는 환경 탓 — #548 글자 기준선은 worktree 의 `dist/` 가 지워진 상태(빈 페이지 → dialog null), 지도 대비는 오래된 dist 기준. 재빌드 후 둘 다 통과. (2) 첫 CI 실패 3건은 브랜치가 main 뒤쳐져 새 시험 파일(v41-orbit-586-perf·v41-map-fan-open)이 없었던 것 — 워크플로우는 PR head 를 체크아웃하므로 main 병합으로 해소. (3) 미리보기 postdeploy 의 503(youtube-oembed·콘솔)은 미리보기 Functions 미준비 — 운영은 401/200 정상 대조로 #582 무관 확인.
+- **머지**: PR #594 → main `ab21965`, 필수 검사 전부 초록. 이슈 #582 보고 댓글 후 닫음.
+
 ## 2026-11-15 — 보드 마감: 금색 커서 동그라미 제거 + 상세 다음·이전 순간 단추화 (로컬2 레인, ai/com2-lt-cursor-detail-20261115-0830-3a7c, main 8092d28 기준)
 
 - **커서 동그라미 완전 제거**: 따라오는 금색 동그라미(`cursorRing`·`cursorInner`·`cursorFX`·`cursor-burst/ripple/drop`)를 HTML 요소·board.css 스타일·board-extras.js 배선·board-model.js 판정 함수(`cursorMode`·`cursorHover`·`cursorScale`·`cursorEffectAllowed`·`cursorPresence`)까지 치웠다. 원래 마우스 커서를 쓰고, 상태는 CSS cursor로 알린다 — 판 `grab`(끌 때 `grabbing`, `#viewport.panning`), 카드 `grab`(끌 때 `grabbing`, `.card.dragLift`), 핀 연결 중 `crosshair`(`#cardLayer.linking`), 핀·단추 `pointer`. `public/v41` 전체에 `cursor:none` 없음(시험이 검사).
@@ -30,6 +42,18 @@
 - **시험**: 신규 `tests/v41-board-cursor-detail.test.mjs` 4건 — (1) 커서 흔적 없음(5개 파일·public/v41 전체 `cursor:none` 걷기) + 상태 커서 규칙, (2) 단추 규칙, (3) 실제 브라우저 다음 단추 클릭 → 판 이동(transform 변화)·선택·상세 전환 + Enter, (4) 이전 단추. board-model 시험의 커서 시험 5건(19~24)은 함수 소멸로 함께 거둠. 관련 시험 49건 통과(board-model·신규·#553 겹침·#536 넓게·터치 영역), build·modulepreload 유지 확인.
 - **fps(1440, 사슬 40순간, 헤드리스 playwright)**: 판 끌기 40→43~44, 확대 56→58 — 같거나 소폭 빠름(동그라미 그리기·기억을 덜어서). 스크린샷·수치: `E:\lovetree-qaoard-cursor\`(detail-next-button.png, fps 기록).
 - **머지**: PR #583 → main. 보드 배치(treeSpread·cardPosition)는 건드리지 않았다.
+## 2026-11-14 — AI 고객 페르소나 '자주 쓰는 곳·익숙한 디자인' + 일지 디자인 느낌 틀 (#590, 로컬5 레인)
+
+- **운영센터**: `PERSONA_FIELDS`(src/admin-view.js)에 `habits`('자주 쓰는 곳·익숙한 디자인', 여러 줄 칸)를 '쓰는 모습' 뒤에 추가 — admin.js 폼은 PERSONA_FIELDS 공용(row 높이 자동 계산)이라 코드 무변경. 운영센터·내보내기 md 가 같은 순서 7항목.
+- **서버 무변경 확인**: intro 는 jsonb 통과 — `savePersona`가 키를 거르지 않아(DB 변경 없음). `board-service` 시험에 habits 저장→불러오기 왕복 단언 추가.
+- **일지 쓰기 창**: `public/v41/index.html` journal-panel 내용 칸 뒤에 '(선택) 디자인 느낌 — 내가 자주 쓰는 ○○와 비교해서: 익숙했던 점 / 어색했던 점' 안내 한 줄(본문 틀 예시). 시험 `v41-journal-design-hint-590`(마크업 글자).
+- **내보내기**: `renderIntroMarkdown` 같은 항목 — 시험 갱신(7개 항목·여러 줄 값·빈 값 '—'). 머지 뒤 `E:\lovetree-qa\export-tool\` 사본 재복사 + `schtasks /run` 0 확인. 윤제 소개의 habits 내용은 페르소나 레인 몫(여기서 채우지 않음).
+## 2026-11-14 — 지도 대비 시험 간헐 실패 수리: 말풍선 시차 + CI 진단 출력 (#591, 로컬5 레인)
+
+- **원인(로컬 재현·dbg 실측)**: 점을 누르면 '연결 이유' 말풍선(#366)이 3.2초 고정되고 토스트는 2.3초 — 스크린샷(표시 중)과 겹침 계산(사라진 뒤) 사이가 워커 병렬 부하로 벌어지면 말풍선 밑 선을 패널색(#211b2b, 1.08~1.16:1)으로 재서 실패. 어느 조합·선이 떨어지는지는 타이밍마다 달랐다(02:38 CI 실패·로컬 2회 — 02:38 실패는 wait 가 bash -e 로 죽어 진단이 안 남았다).
+- **수리**: `tests/helpers/map-contrast.mjs` — 겹침 사각형을 스크린샷 직전에 재서(overlayRectsInPage → measureMapPixelsInPage 전달) 스크린샷 시점과 같은 겹침으로 거른다. 제품(말풍선·토스트) 변경 없음 — 측정 조건 수리.
+- **CI**: `preview-check.yml` 지도 대비 잡의 `wait $p1; r1=$?` 가 bash -e 에서 즉시 사망해 진단이 안 남던 것 — 종료 코드를 받아 두고 두 로그를 항상 출력한 뒤 마지막에 판정. 같은 모양 다른 잡 없음(전수 확인).
+
 ## 2026-11-14 — AI 고객 내보내기: 쿠키 없이 컴2 DB에서 (로컬5 레인, ai/local5-lt-ai-export-db-261114, main b79752d 기준)
 
 - **무엇**: 매일 07:00 AI 고객 내보내기의 원본을 컴2 운영 DB(읽기만)로 바꿨다. 관리자 세션 쿠키 방식은 폐지(쿠키 만료로 조용히 멈추는 문제·쿠키 파일 보관 문제).

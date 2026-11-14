@@ -105,19 +105,18 @@ test('1. 커서 동그라미의 흔적이 남지 않는다(요소·스타일·�
     return hits;
   };
   assert.deepEqual(await walk(PUB), [], 'public/v41에 cursor:none 없음');
-  // 상태 커서: 판 끌기 grab→grabbing, 카드 grab→끌 때 grabbing, 핀 연결 중 crosshair.
+  // 상태 커서: 판 끌기 grab→grabbing, 카드 grab→끌 때 grabbing.
+  // (#582: 핀 연결을 보드에서 없앴으므로 crosshair 연결 커서도 함께 거둔다)
   const css = read('public/v41/views/board/board.css');
   assert.match(css, /#viewport\{cursor:grab\}/);
   assert.match(css, /#viewport\.panning\{cursor:grabbing\}/);
   assert.match(css, /\.card\{cursor:grab\}/);
   assert.match(css, /\.card\.dragLift\{cursor:grabbing\}/);
-  assert.match(css, /#cardLayer\.linking[^}]*\{cursor:crosshair\}/);
+  assert.ok(!css.includes('crosshair'), '연결이 없으므로 crosshair 커서도 없다');
   // 상태 클래스를 실제로 켜고 끈다.
   const board = read('public/v41/views/board/board.js');
   assert.match(board, /viewport\.classList\.add\('panning'\)/);
   assert.match(board, /viewport\.classList\.remove\('panning'\)/);
-  assert.match(board, /cardLayer\.classList\.add\('linking'\)/);
-  assert.match(board, /cardLayer\.classList\.remove\('linking'\)/);
 });
 
 test('2. 상세의 다음·이전 순간은 단추다 — board.js의 열기와 extras의 다시 그리기가 같은 규칙', () => {
