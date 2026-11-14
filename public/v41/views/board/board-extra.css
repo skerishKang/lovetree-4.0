@@ -193,3 +193,6 @@ html[data-lt-theme=garden] .boardThemeSwitch .themeSwitchBtn[aria-pressed="true"
   /* #421 방식: 보이는 모양은 줄이고 ::after로 누르는 영역을 44px 이상으로 넓힌다. */
   .boardThemeSwitch .themeSwitchBtn::after{content:"";position:absolute;inset:-3px -2px}
 }
+
+/* #582: '지도에서 관계 보기' — 관계는 지도가 맡는다. 고급 도구와 상관 없이 항상 보인다(lt-move-btn은 고급 전용이라 나눴다). */
+#detailMapBtn{display:inline-flex;align-items:center;min-height:44px;margin-top:10px;padding:8px 14px;border-radius:var(--lt-r-pill,999px);border:1px solid var(--lt-gold-line,rgba(255,230,166,.45));background:rgba(255,230,166,.08);color:var(--lt-gold,#c9a86a);font-size:13px}

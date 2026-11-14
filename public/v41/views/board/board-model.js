@@ -6,113 +6,67 @@ window.LT58Model = (() => {
     return String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   }
 
-  // 카드 자리: 8장씩 줄을 바꾸고, 회전은 -2·0·2도.
-  // 세로 간격(#553 — #548의 고정 440px를 대신한다): 카드 종류별 예약 높이에 여백(ROW_GAP)을 더한 값.
-  // 예약 높이를 넘기지 않으면 기본 카드(최대 424px) 기준 460px — treeSpread의 기본 간격과 같다.
-  // 화면(board.js)은 순간의 예약 높이를 넘겨 큰 카드(YouTube 등)가 있는 줄은 더 벌린다.
-  const BASE_CARD_H = 424, ROW_GAP = 36;
-  function cardPosition(i, reserveH) {
-    const pitch = (Number.isFinite(reserveH) && reserveH > 0 ? reserveH : BASE_CARD_H) + ROW_GAP;
-    return { x: 150 + (i % 8) * 280, y: 150 + Math.floor(i / 8) * pitch, rot: (i % 3 - 1) * 2 };
+  // === 바둑판 배치(#582): 보드는 핀보드다 — 관계 기준 배치를 버리고 날짜 최신순 바둑판에 꽂는다. ===
+  // 관계도(줄)는 지도가 맡는다. 보드의 자리는 '칸(col)×줄(row)' 슬롯이다.
+  const BASE_CARD_H = 424, ROW_GAP = 36, COL_PITCH = 300, GRID_MARGIN = 150;
+  // 칸 수는 화면 폭이 정한다: 1440에서 4칸, 390에서 1칸, 2560에서 8칸. 카드 폭 242px + 사이 여백.
+  function gridColumns(vw) {
+    return Math.max(1, Math.floor(((Number(vw) || 0) - 32) / COL_PITCH));
   }
-
-  // 처음 배치(#395): 자리를 정한 적 없는 순간을 이야기 순서대로 펼친다.
-  // 첫 순간은 왼쪽, 이어진 순간은 오른쪽으로 가지 치듯(가로 300px 간격).
-  // 세로 간격(#553): 밴드별로 '그 밴드 카드의 최대 예약 높이 + 여백'이 줄 간격이 된다 — 썸네일이
-  // 실린 YouTube 카드처럼 큰 카드가 같은 열 위아래 카드와 겹치지 않게 한다. 기본 카드는 #548이
-  // 글자 기준선을 올려 최대 424px까지 자랐고 간격도 420→460으로 벌렸으므로, 기본 예약 높이
-  // 424px + 여백 36px = 460px로 #548과 같다. 기본 카드뿐인 트리(예시 40순간)는 간격이 460px로
-  // #548과 같으므로 배치가 그대로다. 자리를 저장한 순간(x·y)은 board.js가 저장값을 그대로 쓴다.
-  function treeSpread(ids, edges, heights) {
-    const known = new Set(ids);
-    const kids = new Map(ids.map((id) => [id, []]));
-    const hasParent = new Set();
-    for (const e of edges || []) {
-      if (e.kind !== 'parent' || !known.has(e.from) || !known.has(e.to) || hasParent.has(e.to)) continue;
-      kids.get(e.from).push(e.to);
-      hasParent.add(e.to);
+  // 기본 순서: 날짜 최신순. 같은 날짜면 최근에 만든 순간부터(createdOrder 내림).
+  function dateDescOrder(moments) {
+    return [...(moments || [])].sort((a, b) => {
+      const d = String(b?.date || '').localeCompare(String(a?.date || ''));
+      if (d) return d;
+      return (Number(b?.createdOrder) || 0) - (Number(a?.createdOrder) || 0);
+    }).map((m) => m.id);
+  }
+  // 저장한 자리(사람이 꽂은 칸)는 비켜 놓고, 나머지를 줄어든 순서대로 빈 칸에 채운다(왼쪽→오른쪽, 위→아래).
+  // saved: Map(id → {col,row}) — 화면이 저장된 x·y에서 되새겨 넘긴다. 저장 자리는 원친대로 남는다(#395 계약).
+  function pinboardSpread(ids, { cols = 4, saved = null } = {}) {
+    const taken = new Set();
+    const norm = new Map();
+    if (saved) for (const [id, s] of saved) {
+      if (!ids.includes(id)) continue;
+      const slot = { col: Math.max(0, Math.floor(Number(s?.col) || 0)), row: Math.max(0, Math.floor(Number(s?.row) || 0)) };
+      norm.set(id, slot);
+      taken.add(slot.col + ':' + slot.row);
     }
     const out = new Map();
-    let nextRow = 0;
-    // #469: 7칸 고정 대신 12칸으로 넓게 펼친다 — 긴 트리의 세로 길이를 줄인다.
-    const cols = 12;
-    function visit(id, depth, stack) {
-      stack.add(id);
-      const rows = kids.get(id).filter((k) => !stack.has(k) && !out.has(k)).map((k) => visit(k, depth + 1, stack));
-      stack.delete(id);
-      const row = rows.length ? (rows[0] + rows[rows.length - 1]) / 2 : nextRow++;
-      out.set(id, { depth, row });
-      return row;
-    }
-    for (const id of ids) if (!hasParent.has(id) && !out.has(id)) visit(id, 0, new Set());
-    for (const id of ids) if (!out.has(id)) visit(id, 0, new Set());
-    // #469: 밴드(깊이 12칸 구간)별로 실제로 쓴 줄 범위를 재고, 위 밴드가 쓴 줄 수만큼만 내려 쌓는다 —
-    // 옛 규칙('전체 잎 줄 수 + 1' 간격)이 만들던 줄 사이 빈 칸을 없앤다. 각 밴드는 제일 윗 줄부터 시작한다.
-    const bandRows = new Map();
-    for (const { depth, row } of out.values()) {
-      const b = Math.floor(depth / cols);
-      const cur = bandRows.get(b) || [Infinity, -Infinity];
-      cur[0] = Math.min(cur[0], row);
-      cur[1] = Math.max(cur[1], row);
-      bandRows.set(b, cur);
-    }
-    // #553: 밴드의 줄 간격 = 그 밴드에 실제로 놓이는 카드의 최대 예약 높이 + 여백. 화면(board.js)은
-    // 카드 종류별로 CSS가 정한 최대 높이(YouTube 가로 480·세로 680, 기본 260)를 heights로 넘긴다.
-    const reserved = (id) => {
-      const v = heights instanceof Map ? heights.get(id) : heights?.[id];
-      return Number.isFinite(v) && v > 0 ? v : BASE_CARD_H;
-    };
-    const bandMaxH = new Map(); // 밴드 → 카드 최대 예약 높이(px)
-    for (const [id, p] of out) {
-      const b = Math.floor(p.depth / cols);
-      bandMaxH.set(b, Math.max(bandMaxH.get(b) || 0, reserved(id)));
-    }
-    const bandPitch = new Map(); // 밴드 → 줄 간격(px) = 최대 카드 높이 + 여백
-    for (const [b, h] of bandMaxH) bandPitch.set(b, h + ROW_GAP);
-    // #536: 한 밴드가 줄을 임계치보다 많이 쓰면 세로 기둥 하나에 쌓인다 — 모아둔 순간(빠른 추가)·
-    // '새 트리로 만들기'는 순간이 전부 한 뿌리의 자식(별 모양)이라 깊이가 1뿐이고, 열=깊이 규칙(#498)이
-    // 먹지 않아 26장이 폭 242px 기둥이 됐다. 그 밴드는 DFS 순서대로 열 우선(column-major) 칸에 나눠 담아
-    // 판 폭을 고르게 쓴다. 예시 40순간(7줄)·사슬(1줄)·#395 14순간(7줄)은 임계치에 걸리지 않아 그대로다.
-    const ROWS_PER_COLUMN = 7;
-    const wrapped = new Map(); // 밴드 → Map(id → {col,row}) : 열 우선으로 나눈 자리
-    const bandTop = new Map(); // 밴드 위까지 쓴 줄 수(#469)
-    const bandTopPx = new Map(); // 밴드 위까지의 세로 픽셀(#553 — 밴드마다 줄 간격이 다르다)
-    let acc = 0;
-    let accPx = 0;
-    for (const b of [...bandRows.keys()].sort((x, y) => x - y)) {
-      bandTop.set(b, acc);
-      bandTopPx.set(b, accPx);
-      const [minR, maxR] = bandRows.get(b);
-      const pitch = bandPitch.get(b) || BASE_CARD_H + ROW_GAP;
-      if ((maxR - minR) + 1 > ROWS_PER_COLUMN) {
-        const slots = new Map();
-        let s = 0;
-        for (const [nid, np] of out) {
-          if (Math.floor(np.depth / cols) !== b) continue;
-          slots.set(nid, { col: Math.floor(s / ROWS_PER_COLUMN), row: s % ROWS_PER_COLUMN });
-          s++;
-        }
-        wrapped.set(b, slots);
-        acc += ROWS_PER_COLUMN;
-        accPx += ROWS_PER_COLUMN * pitch;
-      } else {
-        acc += (maxR - minR) + 1;
-        accPx += ((maxR - minR) + 1) * pitch;
-      }
-    }
-    const result = new Map();
-    let i = 0;
+    let next = 0;
     for (const id of ids) {
-      const { depth, row } = out.get(id);
-      const wrap = Math.floor(depth / cols);
-      const slot = wrapped.get(wrap)?.get(id);
-      const col = slot ? slot.col : (depth % cols);
-      const rel = slot ? slot.row : row - (bandRows.get(wrap) || [0])[0];
-      // #553: 밴드마다 줄 간격이 다르므로 위 밴드까지의 세로 픽셀(bandTopPx)에서 시작한다.
-      // 기본 카드뿐인 밴드는 간격이 460px(#548)이라 main의 (rel+top)*460과 같은 자리가 나온다.
-      result.set(id, { x: 150 + col * 300, y: 150 + (bandTopPx.get(wrap) || 0) + rel * (bandPitch.get(wrap) || BASE_CARD_H + ROW_GAP), rot: (i++ % 3 - 1) * 2 });
+      if (norm.has(id)) { out.set(id, norm.get(id)); continue; }
+      let s = next;
+      while (taken.has((s % cols) + ':' + Math.floor(s / cols))) s++;
+      next = s + 1;
+      const slot = { col: s % cols, row: Math.floor(s / cols) };
+      taken.add(slot.col + ':' + slot.row);
+      out.set(id, slot);
     }
-    return result;
+    return out;
+  }
+  // 줄의 y: 그 줄에 꽂힌 카드 중 가장 큰 예약 높이 + 여백(#553 규칙을 바둑판에도 같은 원리로).
+  // slots: Map(id → {col,row}), reserveOf(id) → 그 카드의 예약 높이. 큰 카드(YouTube)가 있는 줄은 그만큼 벌어진다.
+  function gridRowTops(slots, reserveOf) {
+    const list = [...slots.values()];
+    const maxRow = list.length ? Math.max(...list.map((s) => s.row)) : 0;
+    const rowH = new Array(maxRow + 1).fill(0);
+    for (const [id, s] of slots) rowH[s.row] = Math.max(rowH[s.row], Number(reserveOf?.(id)) || 0);
+    const tops = [];
+    let y = GRID_MARGIN;
+    for (let r = 0; r <= maxRow; r++) { tops.push(y); y += (rowH[r] || BASE_CARD_H) + ROW_GAP; }
+    return tops;
+  }
+  // 슬롯 → 픽셀 자리. 줄의 y는 gridRowTops가 정한 값을 그대로 쓴다.
+  function gridPosition(col, rowY, i) {
+    return { x: GRID_MARGIN + col * COL_PITCH, y: rowY, rot: ((Number(i) || 0) % 3 - 1) * 2 };
+  }
+  // 픽셀 자리 → 가장 가까운 슬롯(끌어 꽂기). 저장된 x·y든 끌다 놓은 x·y든 같은 규칙으로 되새긴다.
+  function slotOf(x, y) {
+    return {
+      col: Math.max(0, Math.round(((Number(x) || 0) - GRID_MARGIN) / COL_PITCH)),
+      row: Math.max(0, Math.round(((Number(y) || 0) - GRID_MARGIN) / (BASE_CARD_H + ROW_GAP)))
+    };
   }
 
   // #553: 같은 열(같은 x)의 위아래 카드가 겹치지 않게 세로로 벌린다. 화면이 카드를 그린 뒤 실제
@@ -140,15 +94,6 @@ window.LT58Model = (() => {
     return out;
   }
 
-  // 실(연결선) 베지에: 두 핀 사이를 아래로 늘어뜨린다. dx가 클수록 처짐이 커지되 140px까지.
-  function threadPath(a, b) {
-    const dx = b.x - a.x;
-    const sag = Math.min(140, 55 + Math.abs(dx) * 0.08);
-    const cy = Math.max(a.y, b.y) + sag;
-    return { sag, cy, d: `M ${a.x} ${a.y} C ${a.x + dx * 0.32} ${cy}, ${a.x + dx * 0.68} ${cy}, ${b.x} ${b.y}` };
-  }
-
-  // 전체 맞춤 배율: 무대 여백 40px, 최대 0.92배.
   function fitZoom(vw, vh) {
     return Math.min((vw - 40) / 2400, (vh - 40) / 2200, 0.92);
   }
@@ -291,12 +236,7 @@ window.LT58Model = (() => {
     return { cx: e.cx, cy: e.cy, z: e.z };
   }
 
-  // 연결 지우기: 목록에서 id 하나만 뺀 새 배열을 준다(원본은 건드리지 않는다).
-  function removeConnection(list, id) {
-    return list.filter((c) => c.id !== id);
-  }
-
-  // 지우기 허용 판단: 실제 기록(읽기 전용)이면 안내 문구를 함께 준다.
+  // 지우기 허용 판단: 실제 기록(읽기 전용)이면 안내 문구를 함께 준다. (#582: 보드에서 줄을 만들거나 지우지 않으므로 연결 지우기는 지도가 맡는다)
   function editGuard(canEdit) {
     return canEdit ? { blocked: false, message: '' } : { blocked: true, message: '읽기 전용에서는 연결을 변경할 수 없어요.' };
   }
@@ -386,16 +326,6 @@ window.LT58Model = (() => {
     return pan || pinch || dragging || zooming || touches > 0 ? 'paused' : 'running';
   }
 
-  // #346: 실 다시 그리기 예약 판정. 상시 rAF 루프 대신 필요할 때만, 한 프레임에 한 번 그린다.
-  // - pending: 이미 한 프레임 예약됨 → 또 걸지 않는다
-  // - hidden: 탭이 숨거나 보드 iframe이 화면 밖/숨김 → 그리지 않는다
-  // - cinema: 시네마 장면이 자기 갱신을 맡는다(예전 루프도 시네마 동안 건너뛰었다)
-  function threadRedrawStep({ pending = false, hidden = false, cinema: inCinema = false } = {}) {
-    if (pending) return 'queued';
-    if (hidden) return 'skip';
-    if (inCinema) return 'skip';
-    return 'draw';
-  }
-
-  return { escapeHTML, cardPosition, treeSpread, settleColumnGaps, threadPath, fitZoom, boardSize, contentBox, fitBox, clampView, startView, visibleCards, rememberView, savedView, removeConnection, editGuard, collectPath, nextConnections, detailButtonState, cinemaBeats, filterVisible, maxCreatedOrder, threadRedrawStep, decorationMotion };
+  // 지우기 허용 판단: 실제 기록(읽기 전용)이면 안내 문구를 함께 준다. (#582: 보드에서 줄을 만들거나 지우지 않으므로 연결 지우기는 지도가 맡는다)
+  return { escapeHTML, gridColumns, dateDescOrder, pinboardSpread, gridRowTops, gridPosition, slotOf, settleColumnGaps, fitZoom, boardSize, contentBox, fitBox, clampView, startView, visibleCards, rememberView, savedView, editGuard, collectPath, nextConnections, detailButtonState, cinemaBeats, filterVisible, maxCreatedOrder, decorationMotion };
 })();
