@@ -301,6 +301,15 @@ jobs:
           start=$(date +%s)
           node --test --test-concurrency=1 tests/v41-book-contrast-515-516.test.mjs tests/v41-book-folio-contrast-522.test.mjs tests/v41-book-closed-focus-519.test.mjs
           echo "책 대비·초점 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+      # 보드·책 겹(패널)의 키보드 초점 계약(inert·초점 복귀)도 지금까지 check 잡에서만 건너뛰어졌다(#575와 같은 빈틈).
+      # 브라우저 준비는 같은 잡의 앞 단계에서 이미 끝난 것을 쓴다(로컬 REQUIRE=1 10초).
+      - name: 겹(패널) 초점 계약 시험(건너뜀=실패)
+        env:
+          LT_VIEW_A11Y_REQUIRE: '1'
+        run: |
+          start=$(date +%s)
+          node --test tests/v41-view-a11y-panel.test.mjs
+          echo "겹 초점 계약 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
 
   deploy:
     name: 미리보기 배포 검사(postdeploy·겉모습 비교)
