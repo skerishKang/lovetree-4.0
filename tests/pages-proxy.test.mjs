@@ -17,6 +17,22 @@ function recorder(reply) {
   return fetcher;
 }
 
+test('#611 4번: 내 의견 덧붙이기 경로는 서버로 넘기고, 딴 글 번호·메서드는 막는다', async () => {
+  const fetcher = recorder(new Response('{"followup":{"id":9}}', { headers: { 'content-type': 'application/json' } }));
+  const proxy = createProxy({ fetcher });
+  const ok = await onRequest(proxy, 'https://lovetree.example/api/board/mine/42/followup', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
+  assert.equal(ok.status, 200, '덧붙이기 POST는 넘긴다');
+  assert.equal(fetcher.calls.at(-1).url, `${UPSTREAM}/api/board/mine/42/followup`);
+  // 허용 경로는 메서드가 밖이면 405, 번호 모양·경로 밖은 404다.
+  for (const [path, method, expected] of [['/api/board/mine/42/followup', 'GET', 405], ['/api/board/mine/abc/followup', 'POST', 404], ['/api/board/mine/42/append', 'POST', 404]]) {
+    const before = fetcher.calls.length;
+    const init = method === 'GET' ? {method} : {method, headers: {'content-type': 'application/json'}, body: '{}'};
+    const response = await onRequest(proxy, `https://lovetree.example${path}`, init);
+    assert.equal(response.status, expected, `${method} ${path}: ${expected}`);
+    assert.equal(fetcher.calls.length, before, '업스트림 호출 없음');
+  }
+});
+
 test('허용한 경로만 업스트림으로 넘기고 나머지는 404 JSON 이다', async () => {
   const allowed = [['/api/account', 'GET'], ['/api/account/delete', 'POST'], ['/api/workspace', 'GET'], ['/api/admin/session', 'GET'], ['/api/admin/roles', 'GET'], ['/api/youtube/oembed', 'GET'], ['/auth/login', 'GET'], ['/auth/callback', 'GET'], ['/auth/logout', 'POST']];
   for (const [path, method] of allowed) {

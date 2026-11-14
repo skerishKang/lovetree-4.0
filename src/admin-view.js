@@ -171,7 +171,7 @@ export function journalRowsByCustomer(journals) {
   const map = new Map();
   for (const row of Array.isArray(journals) ? journals : []) {
     const key = row?.subjectId || `anon:${row?.id}`;
-    if (!map.has(key)) map.set(key, {subjectId: row?.subjectId || '', name: row?.authorName || '고객', journals: []});
+    if (!map.has(key)) map.set(key, {subjectId: row?.subjectId || '', name: (row?.authorRole === 'ai_customer' ? 'AI ' : '') + (row?.authorName || '고객'), journals: []});
     map.get(key).journals.push(row);
   }
   const rows = [...map.values()].map(entry => {

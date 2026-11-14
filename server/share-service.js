@@ -2,6 +2,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { validateState, coverModeOf, normalizeCoverDesign } from '../src/domain.js';
 import { ApiError } from './errors.js';
 import { parsePrincipal } from './principal.js';
+import { ROLE_AI_CUSTOMER } from './admin-roles.js';
 
 const SHARE_ID = /^[A-Za-z0-9_-]{20,64}$/;
 const RECORD_ID = /^[A-Za-z0-9_-]{1,80}$/;
@@ -49,7 +50,7 @@ function shareSummary(row) {
   return { id: row.shareId, treeId: row.treeId, entryMomentId: row.entryMomentId, view: row.view, status: row.status, createdAt: row.createdAt, revokedAt: row.revokedAt || null, discoverable: row.discoverable === true, discoverableAt: row.discoverableAt || null, origin: row.origin || 'owner', momentCount: Number(row.momentCount ?? 0) };
 }
 
-export function createShareService({ shareRepo, workspaceRepo, visibilityRepo = null, productId, plusEntitled = () => false, makeId = () => randomBytes(18).toString('base64url') }) {
+export function createShareService({ shareRepo, workspaceRepo, visibilityRepo = null, admin = null, productId, plusEntitled = () => false, makeId = () => randomBytes(18).toString('base64url') }) {
   async function projection(subjectId, input) {
     if (!input || typeof input !== 'object' || !RECORD_ID.test(input.treeId || ''))
       throw new ApiError(400, 'invalid_share_request', '공유할 트리를 다시 선택해 주세요.');
@@ -111,7 +112,11 @@ export function createShareService({ shareRepo, workspaceRepo, visibilityRepo = 
       if (!stored) throw new ApiError(410, 'share_removed', '공유된 트리가 삭제되었거나 더 이상 존재하지 않아요.');
       const { tree, omittedPrivateMedia } = projectSharedTree(stored.doc, row.treeId);
       if (!tree.moments.length) throw new ApiError(422, 'share_empty', '공유할 순간이 아직 없어요.');
-      return { share: shareSummary(row), tree, omittedPrivateMedia };
+      const shared = { share: shareSummary(row), tree, omittedPrivateMedia };
+      // #611 3번: AI 테스터 기록은 공개 읽기 결과에 'AI 테스터' 배지 한 비트만 내린다.
+      // 사본 화면(내 트리)에서는 붙이지 않는다 — 여기 read()는 남에게 보이는 공개 응답뿐이다.
+      if (admin && await admin.roleFor({ productId, subjectId: row.subjectId }) === ROLE_AI_CUSTOMER) shared.aiTester = true;
+      return shared;
     },
     // #538: /api/workspace 저장 성공 뒤 같은 훅에서 부른다.
     // ① 살아 있는 공유 행(주인 만든 행 포함)의 moment_count 를 갱신하고,

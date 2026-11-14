@@ -13,6 +13,8 @@ const feedbackRow = value => value && ({
   memo: value.memo || null,
   issueNumber: value.issue_number || null,
   authorName: value.author_name || null,
+  // #611 3번: 운영센터에서는 AI 고객 이름을 'AI 윤제'처럼 알린다. 역할 한 칸만 읽는다.
+  authorRole: value.author_role || null,
   replyCount: value.reply_count === undefined ? undefined : Number(value.reply_count || 0),
   createdAt: iso(value.created_at),
   updatedAt: iso(value.updated_at)
@@ -50,7 +52,8 @@ export function createFeedbackRepo(pool) {
       const { rows } = await pool.query(
         `SELECT f.*,
           (SELECT count(*)::int FROM lovetree_feedback_replies r WHERE r.product_id = f.product_id AND r.post_id = f.id) AS reply_count,
-          (SELECT p.name FROM lovetree_ai_personas p WHERE p.product_id = f.product_id AND p.subject_id = f.subject_id) AS author_name
+          (SELECT p.name FROM lovetree_ai_personas p WHERE p.product_id = f.product_id AND p.subject_id = f.subject_id) AS author_name,
+          (SELECT r.role FROM lovetree_product_roles r WHERE r.product_id = f.product_id AND r.subject_id = f.subject_id) AS author_role
          FROM lovetree_feedback f
          WHERE ${where.join(' AND ')}
          ORDER BY f.created_at DESC, f.id DESC LIMIT $${params.length}`,
@@ -75,7 +78,8 @@ export function createFeedbackRepo(pool) {
       const { rows } = await pool.query(
         `SELECT f.*,
           (SELECT count(*)::int FROM lovetree_feedback_replies r WHERE r.product_id = f.product_id AND r.post_id = f.id) AS reply_count,
-          (SELECT p.name FROM lovetree_ai_personas p WHERE p.product_id = f.product_id AND p.subject_id = f.subject_id) AS author_name
+          (SELECT p.name FROM lovetree_ai_personas p WHERE p.product_id = f.product_id AND p.subject_id = f.subject_id) AS author_name,
+          (SELECT r.role FROM lovetree_product_roles r WHERE r.product_id = f.product_id AND r.subject_id = f.subject_id) AS author_role
          FROM lovetree_feedback f
          WHERE f.product_id = $1 AND f.kind = 'journal'
          ORDER BY f.journal_date DESC, f.created_at DESC, f.id DESC
@@ -91,7 +95,8 @@ export function createFeedbackRepo(pool) {
       const { rows } = await pool.query(
         `SELECT f.*,
           (SELECT count(*)::int FROM lovetree_feedback_replies r WHERE r.product_id = f.product_id AND r.post_id = f.id) AS reply_count,
-          (SELECT p.name FROM lovetree_ai_personas p WHERE p.product_id = f.product_id AND p.subject_id = f.subject_id) AS author_name
+          (SELECT p.name FROM lovetree_ai_personas p WHERE p.product_id = f.product_id AND p.subject_id = f.subject_id) AS author_name,
+          (SELECT r.role FROM lovetree_product_roles r WHERE r.product_id = f.product_id AND r.subject_id = f.subject_id) AS author_role
          FROM lovetree_feedback f WHERE f.product_id = $1 AND f.id = $2`,
         [productId, numeric]
       );
