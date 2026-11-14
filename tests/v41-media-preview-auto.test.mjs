@@ -25,7 +25,7 @@ test('내 기록의 YouTube 순간은 처음부터 썸네일을 보여 주고 �
  assert.match(html,/alt="바다 산책"/);
  // 재생 표시: 썸네일 위 단추. 누르기 전에는 iframe 이 없다(autoplay 는 누른 뒤에만).
  assert.match(html,/data-lt-play/);
- assert.match(html,/aria-label="여기서 재생"/);
+ assert.match(html,/aria-label="바로 재생"/);
  assert.doesNotMatch(html,/<iframe/i);
  assert.doesNotMatch(html,/autoplay/);
  // 원본 링크는 그대로 남고, 시작 시간도 안내에 유지된다.

@@ -165,10 +165,55 @@ function mediaContext() {
 }
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 // #393: 세로 영상 판정 한 벌 — /shorts/ 주소 또는 영상 정보의 가로세로(세로가 더 길면 세로).
+// #584: 주소·정보만으로 못 정하면 썸네일 실측으로 보강한다(oardefault 가로세로).
+//   oEmbed의 가로세로는 watch 주소 기준 항상 200×113(가로)이라 신호로 못 쓴다(2026-11-14 실측).
+//   oardefault는 세로 영상에만 있고(가로는 404) 세로는 높이가 더 크다 — Image 요소의
+//   naturalWidth/naturalHeight 읽기는 CORS 없이도 가능하다(픽셀 읽기와 달리 오염되지 않음).
+const verticalProbed = new Map();
+const verticalPending = new Map();
+function verticalFromProbe(data) {
+  const w = Number(data?.width), h = Number(data?.height);
+  return Number.isFinite(w) && Number.isFinite(h) && w > 0 && h > 0 && h > w;
+}
+function probeVertical(url) {
+  const m = describe(url);
+  if (m.kind !== 'youtube') return Promise.resolve(false);
+  const id = m.videoId;
+  if (verticalProbed.has(id)) return Promise.resolve(verticalProbed.get(id));
+  if (verticalPending.has(id)) return verticalPending.get(id);
+  const p = new Promise((resolve) => {
+    if (typeof Image === 'undefined') return resolve(false);
+    const img = new Image();
+    img.onload = () => resolve(verticalFromProbe({ width: img.naturalWidth, height: img.naturalHeight }));
+    img.onerror = () => resolve(false);
+    img.src = 'https://i.ytimg.com/vi/' + encodeURIComponent(id) + '/oardefault.jpg';
+  });
+  verticalPending.set(id, p);
+  return p.then((v) => { verticalProbed.set(id, v); verticalPending.delete(id); return v; });
+}
+// #584: 이미 그린 재생 칸을 세로 판정 결과로 올려 고친다. 책 화면이 넘긴 뒤에 부른다.
+function upgradeVerticals(root = (typeof document !== 'undefined' ? document : null)) {
+  if (!root?.querySelectorAll) return;
+  for (const el of root.querySelectorAll('.yt-play[data-yt-play]:not([data-yt-probed])')) {
+    el.dataset.ytProbed = '1';
+    if (el.dataset.ytVertical === '1') continue;
+    const id = el.dataset.ytPlay;
+    void probeVertical('https://www.youtube.com/watch?v=' + id).then((v) => {
+      if (!v || !el.isConnected) return;
+      el.classList.add('is-vertical');
+      el.dataset.ytVertical = '1';
+      const img = el.querySelector('img');
+      if (img && /hqdefault\.jpg/.test(img.getAttribute('src') || '')) img.src = youtubeThumbUrl(id, true);
+      if (typeof window !== 'undefined' && window.__TRACK59__?.rejudgeOverflow) window.__TRACK59__.rejudgeOverflow();
+    });
+  }
+}
 function verticalVideo(url, mediaMetadata = null) {
   const m = describe(url);
   if (m.kind !== 'youtube') return false;
   const metaVertical = Number(mediaMetadata?.width) > 0 && Number(mediaMetadata?.height) > Number(mediaMetadata?.width);
+  // #584: 썸네일 실측으로 세로가 밝혀진 영상도 세로로 답한다(크게 보기·그 자리 재생이 같은 판정을 쓰게).
+  if (verticalProbed.get(m.videoId) === true) return true;
   return !!(m.vertical || metaVertical);
 }
 function markup(url,title='',mediaMetadata=null,momentId='',context=null,momentMeta=null){
@@ -197,7 +242,7 @@ function markup(url,title='',mediaMetadata=null,momentId='',context=null,momentM
  const body=auto
   // 내 기록: 썸네일을 처음부터 보여 준다(no-referrer·lazy). 재생 표시는 썸네일 전체를 덮는 단추라
   // 썸네일 아무 곳이나 눌러도 그 자리에서 재생한다. autoplay 는 누른 뒤 만들어지는 embed 주소에만 있다.
-  ?'<figure class="lt-yt-preview" data-lt-thumb-host><img src="'+esc(previewSrc)+'" alt="'+esc(title||'YouTube 영상 썸네일')+'"'+previewFallback+' referrerpolicy="no-referrer" loading="lazy" decoding="async"><button type="button" class="lt-yt-play" data-lt-play aria-label="여기서 재생"><span aria-hidden="true">▶</span></button></figure>'+cached
+  ?'<figure class="lt-yt-preview" data-lt-thumb-host><img src="'+esc(previewSrc)+'" alt="'+esc(title||'YouTube 영상 썸네일')+'"'+previewFallback+' referrerpolicy="no-referrer" loading="lazy" decoding="async"><button type="button" class="lt-yt-play" data-lt-play aria-label="바로 재생"><span aria-hidden="true">▶</span></button></figure>'+cached
   :(linkCard?linkCard:(canLoad?'<button type="button" data-lt-load>'+esc(m.loadLabel)+'</button>':'<span>'+esc(m.label)+'</span>')+cached);
  const status=auto?'재생을 누르면 여기서 바로 재생해요.':(canLoad?'불러오기를 누르면 원본 사이트에 연결됩니다.':'원본 사이트에서 확인할 수 있어요.');
  // #393 2: 크게 보기 — 영상을 어두운 깔개 위 화면 가운데 크게 연다(바깥 클릭·Esc로 복귀).
@@ -215,12 +260,14 @@ async function playInPlace(root){
  const body=root.querySelector('.lt-media-body'),status=root.querySelector('.lt-media-status');
  let embed=null;
  try{const usability=await import('/v41/book-usability.mjs');embed=usability.embedUrl(m.videoId,m.startSeconds);}catch{}
- if(!embed){delete root.dataset.ltPlaying;if(status)status.textContent='여기서 재생할 수 없어요. 아래 원본 링크에서 열어 주세요.';return;}
+ if(!embed){delete root.dataset.ltPlaying;if(status)status.textContent='바로 재생할 수 없어요. 아래 원본 링크에서 열어 주세요.';return;}
  if(!root.isConnected){delete root.dataset.ltPlaying;return;}
  const frame=document.createElement('iframe');
  frame.className='lt-yt-frame';frame.src=embed;frame.title=root.dataset.ltTitle||'YouTube 영상';
  frame.allow='accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';frame.allowFullscreen=true;
- frame.setAttribute('referrerpolicy','no-referrer');
+ // #584: no-referrer 는 YouTube 플레이어 구성 오류(오류 153)를 낸다(2026-11-14 실측).
+ // strict-origin-when-cross-origin 으로 같은 영상이 그 자리에서 재생된다.
+ frame.setAttribute('referrerpolicy','strict-origin-when-cross-origin');
  body.replaceChildren(frame);
  delete root.dataset.ltPlaying;
  if(status)status.textContent='재생 중이에요. 아래 원본 링크로도 열 수 있어요.';
@@ -303,11 +350,12 @@ async function openLightbox(url,title='',verticalHint=null){
   let embed=null;
   try{const usability=await import('/v41/book-usability.mjs');embed=usability.embedUrl(m.videoId,m.startSeconds)}catch{}
   if(!alive())return;
-  if(!embed){stage.innerHTML='<p class="lt-lightbox-note">여기서 재생할 수 없어요. 원본 링크에서 열어 주세요.</p>';return}
+  if(!embed){stage.innerHTML='<p class="lt-lightbox-note">바로 재생할 수 없어요. 원본 링크에서 열어 주세요.</p>';return}
   const frame=document.createElement('iframe');
   frame.className='lt-lightbox-media';frame.src=embed;frame.title=title||'YouTube 영상';
   frame.allow='accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';frame.allowFullscreen=true;
-  frame.setAttribute('referrerpolicy','no-referrer');
+  // #584: 그 자리 재생과 같은 이유(오류 153)로 no-referrer 를 쓰지 않는다.
+  frame.setAttribute('referrerpolicy','strict-origin-when-cross-origin');
   stage.replaceChildren(frame);
  }else{
   let src=m.loadUrl;
@@ -323,7 +371,7 @@ async function openLightbox(url,title='',verticalHint=null){
   video.src=src;stage.replaceChildren(video);
  }
 }
-window.LTMedia={describe,markup,privateAssetName,autoLoadMedia,currentContext:mediaContext,youtubeThumbUrl,youtubeCandidates,verticalVideo,openLightbox,closeLightbox};
+window.LTMedia={describe,markup,privateAssetName,autoLoadMedia,currentContext:mediaContext,youtubeThumbUrl,youtubeCandidates,verticalVideo,probeVertical,upgradeVerticals,openLightbox,closeLightbox};
 if(typeof document!=='undefined'){
  const cleanup=()=>{for(const [node,url] of ownedUrls)if(!node.isConnected){URL.revokeObjectURL(url);ownedUrls.delete(node);}};
  new MutationObserver(cleanup).observe(document.documentElement,{childList:true,subtree:true});

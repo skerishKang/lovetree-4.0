@@ -151,6 +151,14 @@ jobs:
           node --test --test-concurrency=1 tests/v41-book-single-537.test.mjs
           echo "책 한 장 보기 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
 
+      - name: 책 YouTube 재생·두 장 모드 시험(건너뜀=실패 — 이슈 584)
+        env:
+          LT_BOOK_584_REQUIRE: '1'
+        run: |
+          start=$(date +%s)
+          node --test --test-concurrency=1 tests/v41-book-play-584.test.mjs
+          echo "책 재생·두 장 모드 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+
   screen-map-a:
     name: 화면 시험 — 지도 대비
     runs-on: ubuntu-latest

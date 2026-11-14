@@ -27,7 +27,7 @@ test('#426 카드 모양: 썸네일 크게 + 마지막 순간·지난 날 + 한 
   assert.match(orbit,/class="recent-card mine" data-do="recent">/,'카드 자체는 역할·초점 대상이 아니다(M6)');
   assert.doesNotMatch(orbit,/class="recent-card[^>]*role="button"/,'카드 div에 더는 role=button을 주지 않는다(M6)');
   assert.match(orbit,/class="recent-open" data-do="recent" aria-label="\$\{esc\(head\)\} 이어 보기">/,'열기 전담 투명 단추가 따로 있다');
-  assert.match(orbit,/aria-label="여기서 재생"/,'▶ 재생 단추는 자기 이름을 유지한다');
+  assert.match(orbit,/aria-label="바로 재생"/,'▶ 재생 단추는 자기 이름을 유지한다(이슈 584: 바로 재생)');
   assert.match(orbit,/setAttribute\('aria-label','정지'\)/,'재생 중에는 정지 이름');
   // 금빛 내 카드와 같은 결 — .card.mine과 같은 진한 금 테두리(--lt-gold-deep)·이중선·번짐 토큰을 쓴다(#443).
   assert.match(orbit,/\.recent-card\{[^}]*border:3px solid var\(--lt-gold-deep\)/);
@@ -62,7 +62,7 @@ test('#426 ▶ 재생은 누른 뒤에만 — 첫 화면이 열릴 때는 플레
   assert.match(orbit,/embedUrl\(id\)/,'embed 주소는 누른 뒤에 만든다');
   // ▶ 영역은 재생/정지로 구분한다(라벨·표시).
   assert.match(playBlock,/btn\.setAttribute\('aria-label','정지'\)/);
-  assert.match(playBlock,/btn\.setAttribute\('aria-label','여기서 재생'\)/);
+  assert.match(playBlock,/btn\.setAttribute\('aria-label','바로 재생'\)/);
   // 카드의 다른 곳을 누르면 순간 열기 — ▶ 클릭이 카드 열기로 새지 않는다.
   assert.match(orbit,/if\(play\)\{e\.stopPropagation\(\);toggleRecentPlay\(play\);return;\}/);
 });
