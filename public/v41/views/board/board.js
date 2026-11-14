@@ -207,7 +207,11 @@ userView={cx:(vw/2-view.x)/view.z,cy:(vh/2-view.y)/view.z,z:view.z};viewMode='us
 clearTimeout(viewSaveTimer);viewSaveTimer=setTimeout(()=>writeBoardView(userView),400)}
 // #490: 화면 전환(두 장 앞뒤 바꿈)에서는 이 문서가 숨은 프레임(폭 0)에서 먼저 뜬다. 그때 한 맞춤을 '전체 보기'로
 // 기억하면 드러난 뒤 resize가 맞춤(55%)을 다시 적용해 처음 80%·기억한 자리가 무시됐다 → 처음 자리 대기로 둔다.
-function boardStartView(){if(innerWidth<700){fitAll(false);viewMode='start';return}
+// #662(CTO 지시): 좁은 판(<700)에서도 전체 맞춤은 순간이 많으면 카드를 손톱만 하게 몰아 넣는다 — 예전처럼 지금(또는 첫)
+// 순간 카드가 읽히는 배율(카드 폭 ≥ 화면의 6할)로 크게 보이게 초점을 맞춘다. 머리글·탐색 판 비켜 두기는
+// focusBoardMoment가 판 아래끝을 실측해 해준다(#662). 초점 보기는 캔버스 설계상 이웃 카드가 도구 밑으로 슬라이드된다 —
+// 검사기는 보드의 도구×캔버스 겹침을 설계대로 제외하고 대신 '작은카드' 기준으로 읽히는 배율을 지킨다.
+function boardStartView(){if(innerWidth<700){if(typeof focusBoardMoment==='function')focusBoardMoment(LTDEMO.get(),false);else fitAll(false);viewMode='start';return}
 let vw=viewport.clientWidth,vh=viewport.clientHeight,cards=boardCards(),saved=userView||readBoardView();
 // #536: 기억한 자리의 적용·버림 판정까지 모델(LT58Model.startView)이 맡는다 — 처음 자리와 같은
 // 판 규칙(덮거나 가운데)을 함께 거치게 해 넓은 화면에서 판이 한쪽으로 쏠리지 않게 한다.

@@ -117,6 +117,13 @@ export const AUDIT_FN = function audit() {
   const vis = all.filter((el) => inTop(el) && visible(el) && !el.closest('.flip-sheet') && !el.closest('[hidden]'));
   // 토스트는 위에 잠깐 뜨는 것이 정상인 오버레이라 겹침·가려짐 판정에서 뺀다(타이밍에 따라 결과가 달라지는 소음을 줄인다).
   const isToast = (el) => chain(el).some((n) => n.id === 'toast' || /\btoast\b/.test(String(n.className || '')));
+  /* #662(CTO 지시): 기억 보드는 판nable 캔버스 위에 고정 도구(머리글·탐색 판·도구줄·시네마 단추·테마 표시)가 뜨는 모양이다 —
+     캔버스 내용(#world)이 도구 밑으로 슬라이드되는 것은 설계대로다(첫 화면은 초점 카드를 도구 밖에 세워 검사기의 '작은카드' 기준이 지킨다).
+     도구끼리·캔버스 내용끼리의 겹침은 그대로 잡는다. */
+  const CHROME_SEL = 'header,.lt-moment-picker,.toolbar,.cinemaBtn,#themeBadge';
+  const inChrome = (el) => chain(el).some((n) => n.matches && n.matches(CHROME_SEL));
+  const inWorld = (el) => chain(el).some((n) => n.id === 'world');
+  const chromeVsWorld = (a, b) => (inChrome(a) && inWorld(b)) || (inWorld(a) && inChrome(b));
   const pairable = vis.filter((el) => !isToast(el));
   const rects = pairable.map((el) => ({ el, r: clipRect(el) }));
 
@@ -125,6 +132,7 @@ export const AUDIT_FN = function audit() {
   for (let i = 0; i < rects.length; i++) for (let j = i + 1; j < rects.length; j++) {
     const a = rects[i], b = rects[j];
     if (a.el === b.el || a.el.contains(b.el) || b.el.contains(a.el)) continue;
+    if (chromeVsWorld(a.el, b.el)) continue;
     const ox = Math.min(a.r.right, b.r.right) - Math.max(a.r.left, b.r.left);
     const oy = Math.min(a.r.bottom, b.r.bottom) - Math.max(a.r.top, b.r.top);
     if (ox > 4 && oy > 4) issues.push({ a: sel(a.el), b: sel(b.el), x: Math.round(Math.max(a.r.left, b.r.left)), y: Math.round(Math.max(a.r.top, b.r.top)) });
@@ -139,6 +147,7 @@ export const AUDIT_FN = function audit() {
     if (isToast(top)) continue;
     if (top === el || chain(top).includes(el) || chain(el).includes(top)) continue;
     if (chain(top).some((n) => LENS.has(n.id))) continue;
+    if ((inChrome(el) && inWorld(top)) || (inWorld(el) && inChrome(top))) continue;
     covered.push({ el: sel(el), by: sel(top), x: Math.round(cx), y: Math.round(cy) });
   }
 
@@ -161,11 +170,25 @@ export const AUDIT_FN = function audit() {
     if (px < 12 || (interactive && px < 13)) small.push({ el: sel(el), px, 단추: interactive, text: el.textContent.trim().replace(/\s+/g, ' ').slice(0, 30) });
   }
 
-  return { issues, covered, bad, overflow, clipped, small };
+  // #662(CTO 지시): 보드 전용 — 카드가 읽히는 배율인지. 보이는 카드(화면과 4px 넘게 걸치는) 중 가장 넓은 카드의 폭.
+  // 좁은 판 200px·넓은 판 180px 미만이면 '너무 작게 맞춰졌다'로 실패(겹침·잘림만으로는 못 잡는 쓸 수 없는 화면).
+  let cards = null;
+  const cardLayer = document.getElementById('cardLayer');
+  if (cardLayer) {
+    let maxW = 0, n = 0;
+    for (const c of cardLayer.querySelectorAll('.card')) {
+      const r = clipRect(c);
+      const w = Math.min(r.right, innerWidth) - Math.max(r.left, 0);
+      const h = Math.min(r.bottom, innerHeight) - Math.max(r.top, 0);
+      if (w > 4 && h > 4) { n++; if (w > maxW) maxW = Math.round(w); }
+    }
+    cards = { n, maxW };
+  }
+  return { issues, covered, bad, overflow, clipped, small, cards };
 };
 
 // 페이지와 그 안의 모든 프레임(같은 출처)에 검사를 돌려 한 묶음으로 모은다.
-const EMPTY = () => ({ issues: [], covered: [], bad: [], clipped: [], small: [], overflowList: [], errors: [] });
+const EMPTY = () => ({ issues: [], covered: [], bad: [], clipped: [], small: [], overflowList: [], errors: [], cardsList: [] });
 export async function auditPage(page, screen) {
   const out = EMPTY();
   for (const frame of page.frames()) {
@@ -178,6 +201,7 @@ export async function auditPage(page, screen) {
     const url = frame.url().replace(/^https?:\/\/[^/]+/, '');
     for (const key of ['issues', 'covered', 'clipped', 'small']) for (const item of res[key] || []) out[key].push({ 화면: screen, 프레임: url, ...item });
     for (const b of res.bad || []) out.bad.push({ 화면: screen, 프레임: url, 값: b });
+    if (res.cards) out.cardsList.push({ 화면: screen, 프레임: url, ...res.cards });
     if ((res.overflow || 0) > 0) out.overflowList.push({ 화면: screen, 프레임: url, overflow: res.overflow });
   }
   return out;
@@ -204,5 +228,9 @@ export function failuresOf(res, 크기, 테마) {
   for (const c of res.covered) rows.push(['가려짐', lineOf({ 항목: '가려짐', ...c })]);
   for (const c of res.clipped) rows.push(['잘림', lineOf({ 항목: '잘림', ...c })]);
   for (const s of res.small) rows.push(['작은글자', lineOf({ 항목: '작은글자', ...s })]);
+  for (const c of res.cardsList || []) {
+    const 기준 = 크기 < 700 ? 200 : 180;
+    if (c.화면 === '보드' && c.maxW < 기준) rows.push(['작은카드', `${c.화면} 작은카드 보이는 카드 ${c.n}장 중 가장 넓은 폭 ${c.maxW}px < ${기준}px`]);
+  }
   return rows.map(([항목, 줄]) => ({ 항목, 줄: `${줄} · ${크기}·${테마}` }));
 }
