@@ -140,3 +140,30 @@ body {
   .admin-shell { width: calc(100% - 20px); margin: 18px auto 48px; }
   .lt-post-row { grid-template-columns: 1fr; }
 }
+/* 사용 일지 탭(#596) — 오늘 요약 + 고객별 줄. --lt-* 토큰만 쓰고 html:root 무대색(#595)은 건드리지 않는다. */
+.lt-jsum { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin-bottom: 14px; }
+.lt-jsum-item { display: grid; gap: 2px; padding: 12px 14px; border: 1px solid var(--lt-line); border-radius: var(--lt-r-panel); background: var(--lt-glass); }
+.lt-jsum-value { font-size: 20px; font-weight: 700; color: var(--lt-gold); }
+.lt-jsum-label { font-size: 12px; color: var(--lt-muted); }
+.lt-jrow-wrap { display: grid; }
+.lt-jrow { display: block; width: 100%; text-align: left; border: 1px solid var(--lt-line); border-radius: var(--lt-r-card); background: var(--lt-glass); padding: 10px 14px; cursor: pointer; }
+.lt-jrow:hover, .lt-jrow.is-open { border-color: var(--lt-gold-line); }
+.lt-jrow-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.lt-jrow-name { font-weight: 700; color: var(--lt-pearl); }
+.lt-jrow-score { color: var(--lt-gold); }
+.lt-jrow-count { color: var(--lt-muted); }
+.lt-jrow-flow { display: inline-flex; align-items: flex-end; gap: 4px; }
+.lt-flow-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--lt-muted); display: inline-block; }
+.lt-flow-dot[data-score="1"] { height: 8px; background: var(--lt-rose); }
+.lt-flow-dot[data-score="2"] { height: 10px; background: var(--lt-rose); opacity: .8; }
+.lt-flow-dot[data-score="3"] { height: 12px; background: var(--lt-gold-line); }
+.lt-flow-dot[data-score="4"] { height: 14px; background: var(--lt-gold); }
+.lt-flow-dot[data-score="5"] { height: 16px; background: var(--lt-gold); }
+.lt-flow-dot[data-score=""] { opacity: .35; }
+.lt-jdetail { display: grid; gap: 10px; padding: 10px 12px 12px 16px; border-left: 2px solid var(--lt-gold-line); margin: 6px 0 12px; }
+.lt-jdetail[hidden] { display: none; }
+.lt-journal { border: 1px solid var(--lt-line); border-radius: var(--lt-r-card); padding: 10px 14px; display: grid; gap: 6px; background: var(--lt-glass); }
+.lt-journal-links { display: flex; flex-wrap: wrap; gap: 8px; }
+.lt-journal-opinion { color: var(--lt-gold); text-decoration: none; border-bottom: 1px solid var(--lt-gold-line); }
+.lt-journal-opinion:hover { color: var(--lt-pearl); }
+.lt-badge.warn { border-color: var(--lt-rose); color: var(--lt-rose-ink); }

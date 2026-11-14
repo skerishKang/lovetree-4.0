@@ -41,6 +41,13 @@ export function createMemoryFeedbackRepo() {
         .slice(0, 200)
         .map(row => ({...clone(row), replyCount: replyCount(row.id), authorName: authorName(row.subjectId)}));
     },
+    async listJournals({productId, limit = 300}) {
+      return rows
+        .filter(row => row.productId === productId && row.kind === 'journal')
+        .sort((a, b) => String(b.journalDate || '').localeCompare(String(a.journalDate || '')) || b.id - a.id)
+        .slice(0, Math.max(1, Math.min(500, Number(limit) || 300)))
+        .map(row => ({...clone(row), replyCount: replyCount(row.id), authorName: authorName(row.subjectId)}));
+    },
     async get({productId, id}) {
       const row = rows.find(item => item.productId === productId && item.id === Number(id));
       return row ? {...clone(row), replyCount: replyCount(row.id), authorName: authorName(row.subjectId)} : null;

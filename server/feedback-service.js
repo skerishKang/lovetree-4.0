@@ -14,6 +14,7 @@ export const FEEDBACK_STATUSES = Object.freeze(['received', 'reviewing', 'fixed'
 export const FEEDBACK_KINDS = Object.freeze(['opinion', 'journal']);
 const CONTEXT_KEYS = Object.freeze(['screen', 'viewport', 'theme', 'version', 'loggedIn', 'treeId']);
 const MAX_BODY = 2000;
+const MAX_JOURNAL_BODY = 8000; // #596: 일지는 같은 날 2회차를 덧붙여 쓰므로 의견(2000)과 한도를 나눈다.
 const MAX_TITLE = 120;
 const MAX_MEMO = 2000;
 const MAX_ISSUE = 40;
@@ -103,7 +104,7 @@ export function createFeedbackService({feedbackRepo,productId,admin=null,now=()=
     if(!await isAiCustomer(principal))throw new ApiError(403,'ai_customer_only','AI 고객만 사용 일지를 쓸 수 있어요.');
     const text=clean(title,MAX_TITLE);
     if(!text)throw new ApiError(400,'title_required','제목을 입력해 주세요.');
-    const content=clean(body,MAX_BODY);
+    const content=clean(body,MAX_JOURNAL_BODY);
     if(!content)throw new ApiError(400,'body_required','오늘 사용한 내용을 적어 주세요.');
     let value=null;
     if(score!==undefined&&score!==null&&score!==''){value=Number(score);if(!Number.isInteger(value)||value<1||value>5)throw new ApiError(400,'score_invalid','다시 올 점수는 1~5로 골라 주세요.');}
@@ -197,6 +198,13 @@ export function createFeedbackService({feedbackRepo,productId,admin=null,now=()=
     return boardRow(row);
    },
 
+   /** 관리자: 사용 일지 탭(#596) — 일지만 날짜 내림차순으로 읽는다. 상태·본문은 여기서 바꾸지 않는다. */
+   async adminJournals(principal,{limit=300}={}){
+    await requireAdmin(principal);
+    const rows=await feedbackRepo.listJournals({productId,limit});
+    return rows.map(boardRow);
+   },
+
    /** 관리자: 글쓴이(AI 고객) 페르소나 소개. */
    async persona(principal,subjectId){
     await requireAdmin(principal);
@@ -247,6 +255,10 @@ export function createFeedbackHandler({authenticate,service,productId}){
   if(path==='/api/admin/feedback'&&method==='GET'){
    const who=await requiredPrincipal(request);
    return {status:200,body:{feedback:await service.list(who,{kind:query.get('kind')||'',status:query.get('status')||'',category:query.get('category')||''})},headers:NO_STORE};
+  }
+  if(path==='/api/admin/journals'&&method==='GET'){
+   const who=await requiredPrincipal(request);
+   return {status:200,body:{journals:await service.adminJournals(who,{limit:Number(query.get('limit'))||300})},headers:NO_STORE};
   }
   const item=path.match(/^\/api\/admin\/feedback\/([^/]+)$/);
   if(item&&method==='GET'){
