@@ -5,8 +5,9 @@
 // SQL 을 직접 쓰지 않고, 검사·개인정보 가림·감사 기록까지 운영센터와 동일하게 적용된다.
 // 접속 설정은 API 서비스와 같은 .env 에서만 읽고, 이메일·subject·접속 문자열은 출력하지 않는다.
 //
-// 입력: --id <의견 번호> --reply <답변 파일> --status <received|reviewing|fixed|later|closed> --issue <연결 이슈> [--env <경로>]
+// 입력: --id <의견 번호> [--reply <답변 파일>] --status <received|reviewing|fixed|later|closed> --issue <연결 이슈> [--status-only] [--env <경로>]
 // 규칙: 대상 의견에 이미 답글이 있으면 아무 것도 하지 않고 끝난다(종료 코드 3 — 건너뜀).
+//       --status-only(#611 5번)면 답변 파일 없이 상태·연결 이슈만 바꾼다(답글이 이미 있어도 처리).
 //       답변은 고객에게 보이는 답변(authorType=customer)으로 남고, 상태·연결 이슈 번호를 함께 바꾼다.
 //
 // 실행: node /opt/padiem/lovetree-api/tools/ops-reply.mjs --id 7 --reply /tmp/reply.txt --status fixed --issue 584
@@ -18,10 +19,11 @@ const STATUSES = ['received', 'reviewing', 'fixed', 'later', 'closed'];
 
 /** 인자 검사(순수) — 잘못된 값은 한 줄 이유로 거부한다. */
 export function parseOpsArgs(argv) {
-  const args = {id: null, replyFile: null, status: null, issue: null, envPath: '/opt/padiem/lovetree-api/.env'};
+  const args = {id: null, replyFile: null, status: null, issue: null, statusOnly: false, envPath: '/opt/padiem/lovetree-api/.env'};
   for (let i = 0; i < argv.length; i++) {
     const key = argv[i];
-    if (key === '--id') args.id = argv[++i] ?? '';
+    if (key === '--status-only') args.statusOnly = true;
+    else if (key === '--id') args.id = argv[++i] ?? '';
     else if (key === '--reply') args.replyFile = argv[++i] ?? '';
     else if (key === '--status') args.status = argv[++i] ?? '';
     else if (key === '--issue') args.issue = argv[++i] ?? '';
@@ -29,7 +31,7 @@ export function parseOpsArgs(argv) {
     else throw new Error(`모르는 인자: ${key}`);
   }
   if (!/^\d{1,20}$/.test(String(args.id ?? ''))) throw new Error('의견 번호(--id)가 필요합니다.');
-  if (!args.replyFile) throw new Error('답변 파일(--reply)이 필요합니다.');
+  if (!args.statusOnly && !args.replyFile) throw new Error('답변 파일(--reply)이 필요합니다. --status-only면 생략할 수 있어요.');
   if (!STATUSES.includes(args.status)) throw new Error(`상태(--status)는 ${STATUSES.join('|')} 중 하나여야 합니다.`);
   if (!/^#?[0-9A-Za-z._-]{1,20}$/.test(String(args.issue ?? ''))) throw new Error('연결 이슈 번호(--issue)가 필요합니다.');
   if (!args.issue.startsWith('#')) args.issue = '#' + args.issue;
@@ -52,8 +54,8 @@ async function main() {
   const productId = parsed.LOVETREE_PRODUCT_ID || '';
   if (!databaseUrl) fail('DB 연결 설정(LOVETREE_DATABASE_URL)이 비어 있습니다.', 2);
   if (!productId) fail('제품 설정(LOVETREE_PRODUCT_ID)이 비어 있습니다.', 2);
-  const replyText = String(await readFile(args.replyFile, 'utf8')).trim();
-  if (!replyText) fail('답변 파일이 비어 있습니다.', 2);
+  const replyText = args.statusOnly ? '' : String(await readFile(args.replyFile, 'utf8')).trim();
+  if (!args.statusOnly && !replyText) fail('답변 파일이 비어 있습니다.', 2);
 
   const pg = await import('pg');
   const pool = new (pg.default ?? pg).Pool({ connectionString: databaseUrl, max: 2, connectionTimeoutMillis: 8000 });
@@ -70,7 +72,7 @@ async function main() {
     const current = await repo.get({ productId, id: Number(args.id) });
     if (!current) fail('의견을 찾을 수 없습니다(번호 확인).', 4);
     if (current.kind !== 'opinion') fail('사용 일지에는 고객 답변을 남길 수 없습니다.', 4);
-    if (shouldSkip(current)) {
+    if (shouldSkip(current) && !args.statusOnly) {
       console.log(`skipped id=${current.id} status=${current.status} replies=${current.replyCount}`);
       return;
     }
@@ -81,9 +83,10 @@ async function main() {
     if (!adminSubject) fail('관리자 역할 계정을 찾을 수 없습니다.', 4);
     const principal = { productId, subjectId: adminSubject };
 
-    const reply = await service.reply(principal, String(args.id), {authorType: 'customer', body: replyText});
+    const reply = args.statusOnly ? null : await service.reply(principal, String(args.id), {authorType: 'customer', body: replyText});
     const updated = await service.update(principal, String(args.id), {status: args.status, issueNumber: args.issue});
-    console.log(`replied id=${updated.id} replyId=${reply.id} authorType=customer status=${updated.status} issue=${updated.issueNumber || ''} replies=${updated.replyCount}`);
+    if (args.statusOnly) console.log(`updated id=${updated.id} status=${updated.status} issue=${updated.issueNumber || ''} replies=${updated.replyCount}`);
+    else console.log(`replied id=${updated.id} replyId=${reply.id} authorType=customer status=${updated.status} issue=${updated.issueNumber || ''} replies=${updated.replyCount}`);
   } finally {
     await pool.end().catch(() => {});
   }

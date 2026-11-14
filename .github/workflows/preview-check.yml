@@ -195,6 +195,16 @@ jobs:
           node --test --test-concurrency=1 tests/v41-book-play-584.test.mjs
           echo "책 재생·두 장 모드 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
 
+      # #611: 새 소식(업데이트 노트) 화면 — 알림 카드 한 번만·계정 단추 점·로그아웃 입구·출처 문구.
+      # 크롬이 필요한 실행형 시험이라 이 잡에서 돈다. 건너뜀=실패.
+      - name: 새 소식 화면 시험(건너뜀=실패 — #611)
+        env:
+          LT_UPDATES_611_REQUIRE: '1'
+        run: |
+          start=$(date +%s)
+          node --test --test-concurrency=1 tests/updates-screen-611.test.mjs
+          echo "새 소식 화면 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+
   screen-map-a:
     name: 화면 시험 — 지도 대비
     runs-on: ubuntu-latest
