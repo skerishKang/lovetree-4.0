@@ -115,12 +115,12 @@
 <dialog id="updates-panel" data-lt-panel="full" data-lt-return="account-updates" aria-labelledby="updates-title"><div class="panel-heading"><div><span class="eyebrow">새 소식</span><h2 id="updates-title">새 소식</h2></div><button data-close="updates-panel" aria-label="새 소식 닫기" class="close">×</button></div>
 <div id="updates-list" class="updates-list"></div>
 </dialog>
-<dialog id="feedback-panel" data-lt-panel="center" data-lt-return="feedback-link" aria-labelledby="feedback-title"><div class="panel-heading"><div><span class="eyebrow">의견</span><h2 id="feedback-title">의견 보내기</h2></div><button data-close="feedback-panel" aria-label="의견 창 닫기" class="close">×</button></div>
-<p class="panel-note">불편한 점이나 바라는 점을 알려 주세요. 보내기 전에 함께 보낼 정보를 고를 수 있어요.</p>
+<dialog id="feedback-panel" data-lt-panel="center" data-lt-return="feedback-link" aria-labelledby="feedback-title"><div class="panel-heading"><div><h2 id="feedback-title">의견 보내기</h2></div><button data-close="feedback-panel" aria-label="의견 창 닫기" class="close">×</button></div>
+<p class="panel-note" id="feedback-note">불편한 점이나 바라는 점을 알려 주세요. 보내기 전에 함께 보낼 정보를 고를 수 있어요.</p>
 <form id="feedback-form">
-<label>어떤 의견인가요<select name="category" id="feedback-category" required><option value="bug">이상해요</option><option value="inconvenient">불편해요</option><option value="feature">이런 기능이 있으면 좋겠어요</option><option value="other">그 밖에</option></select></label>
-<label>의견<textarea name="body" id="feedback-body" maxlength="2000" rows="5" required placeholder="어떤 점이 불편했는지, 어떤 기능이 있으면 좋을지 적어 주세요."></textarea></label>
-<p class="panel-note"><span id="feedback-count">0</span>/2000자</p>
+<label>어떤 의견인가요<select name="category" id="feedback-category"><option value="" selected>골라 주세요</option><option value="bug">이상해요</option><option value="inconvenient">불편해요</option><option value="feature">이런 기능이 있으면 좋겠어요</option><option value="other">그 밖에</option></select></label>
+<label>내용<textarea name="body" id="feedback-body" maxlength="2000" rows="5" placeholder="어떤 점이 불편했는지, 어떤 기능이 있으면 좋을지 적어 주세요."></textarea></label>
+<p class="panel-note feedback-count-row"><span id="feedback-count">0</span>/2000자</p>
 <fieldset id="feedback-context-fields"><legend>함께 보낼 정보 (필요 없으면 끄세요)</legend>
 <label><input type="checkbox" data-ctx="screen" checked> 지금 화면</label>
 <label><input type="checkbox" data-ctx="viewport" checked> 화면 크기</label>
@@ -130,8 +130,14 @@
 <label id="feedback-tree-field" hidden><input type="checkbox" data-ctx="treeId" checked> 내 트리 id</label>
 </fieldset>
 <p id="feedback-error" role="alert"></p>
-<div class="button-row"><button class="primary" type="submit" id="feedback-send">보내기</button><button type="button" data-close="feedback-panel">취소</button></div>
+<div class="button-row" id="feedback-actions"><button type="button" data-close="feedback-panel">취소</button><button class="primary" type="submit" id="feedback-send">보내기</button></div>
 </form>
-<div id="feedback-done" hidden><p>받았어요. 살펴보고 고칠게요.</p><button type="button" data-close="feedback-panel">닫기</button></div>
+<div id="feedback-done" hidden>
+<p class="feedback-done-line"><span class="feedback-check" aria-hidden="true">✓</span><strong>보내 주셔서 고마워요</strong></p>
+<p class="panel-note">살펴보고 고칠게요.</p>
+<p class="panel-note" id="feedback-done-logged-out">로그인하면 답을 받아 볼 수 있어요</p>
+<p class="panel-note" id="feedback-done-logged-in" hidden>답이 달리면 메뉴의 ‘내 의견’에서 알려 드려요. <button type="button" class="feedback-myposts" id="feedback-open-myposts">내 의견 열기</button></p>
+<div class="button-row"><button type="button" class="primary" data-close="feedback-panel" id="feedback-done-close">닫기</button></div>
+</div>
 </dialog>
 <script src="media-preview.js"></script><script type="module" src="shell.mjs"></script></body></html>
