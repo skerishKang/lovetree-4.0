@@ -487,7 +487,9 @@ test('#635 PR C 규칙(정적): 시작 입구·첫날 표기·크게 보기 대�
   assert.match(useCss, /html\[data-lt-theme=garden\] \.media-links button\{background:var\(--lt-paper\);color:var\(--lt-gold-ink\)\}/, "정원 '크게 보기'는 종이 바탕·잉크 글자다");
   // 11. 간격·안내 자리.
   const layout = read('public/v41/reader-layout.css');
-  assert.match(layout, /padding:24px 14px 60px/, '390 책 화면: 아래 고정 링크 줄과 16px 이상 띄울 여백을 둔다');
+  /* #book-dup2: 여백 60→68px — 보라색 책 테두리(.book-cover)가 wrap 아래로 14px 내려와 60px로는
+     테두리 아래끝이 링크 줄 위 11px(정원에서는 10px 겹침)이었다. 68px로 테두리 아래끝을 링크 줄 위 17px에 둔다. */
+  assert.match(layout, /padding:24px 14px 68px/, '390 책 화면: 아래 고정 링크 줄과 책 테두리가 겹치지 않게 16px 이상 띄울 여백을 둔다');
   const orbit = read('src/views/orbit.js');
   assert.match(orbit, /<span class="center-hint">드래그 · 금테 카드를 눌러 감상<\/span>/, '첫 화면 안내는 안내 줄 옆에 함께 그린다');
   assert.ok(!orbit.includes('<div class="hint">드래그'), '첫 화면 오른쪽 아래 고정 안내(링크 줄과 겹치던)는 치웠다');
