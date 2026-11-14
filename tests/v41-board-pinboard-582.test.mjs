@@ -131,8 +131,10 @@ test('#601 배치 모드 전환이 있고, 읽기 전용 가드를 끌어 꽂기
   assert.match(html, /data-board-mode="date"[^>]*>날짜순</);
   assert.match(html, /data-board-mode="mine"[^>]*>내 배치</);
   assert.match(board, /function setBoardMode\(mode,\{save=true,replace=true\}/);
-  assert.match(board, /saved:boardMode==='mine'\?savedSlotsOf\(moments\):null/);
-  assert.match(board, /if\(boardMode==='mine'&&m\.savedPos\)continue/);
+  // #619-6: '내 배치'는 저장 자리의 칸(슬롯)이 아니라 순서(순위)로 배치한다. 낡은 슬롯 꽂기는 없다.
+  assert.match(board, /boardMode==='date'\?LT58Model\.dateDescOrder\(moments\):momentOrder/);
+  assert.doesNotMatch(board, /if\(boardMode==='mine'&&m\.savedPos\)continue/);
+  assert.match(board, /LT58Model\.orderOfMoments\(LTDEMO\.moments\)/);
   // 끌어 꽂기는 같은 가드를 쓴다(읽기 전용에서는 판 자리를 바꾸지 않는다).
   assert.match(board, /function dragGuard\(\)\{const guard=LT58Model\.editGuard\(canEditBoard\)/);
   assert.match(board, /if\(guard\.blocked\)\{toast\(guard\.message\);/);
