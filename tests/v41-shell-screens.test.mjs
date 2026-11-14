@@ -104,3 +104,50 @@ test('실제 기록(source=server)이면 views/ 판본, 트리가 없으면 빈 
     else globalThis.location = saved.location;
   }
 });
+
+// #583 '이 순간 열기': 지도를 특정 순간을 가운데 두고 열 요청이 있으면 show()가 프레임 주소에
+// ?open=<순간>을 붙이고, 요청은 한 번 쓰면 지운다. 다른 화면에는 붙이지 않는다.
+test("show()는 '이 순간 열기' 요청을 지도 프레임 주소 ?open=으로 옮기고 한 번만 쓴다", () => {
+  const replaced = [];
+  const fakeEl = () => ({
+    hidden: false, title: '', dataset: {}, style: {},
+    classList: { add() {}, remove() {}, toggle() {}, contains: () => false },
+    contentWindow: { location: { href: 'about:blank', replace: url => replaced.push(url) } },
+    addEventListener() {}, setAttribute() {}, removeAttribute() {}, inert: false
+  });
+  const elements = { view: fakeEl(), 'view-next': fakeEl(), empty: fakeEl(), 'community-panel': { open: false, close() {} } };
+  const saved = { document: globalThis.document, location: globalThis.location };
+  globalThis.location = { origin: 'https://lovetree-4-0.pages.dev' };
+  globalThis.document = {
+    body: { classList: { add() {}, remove() {}, toggle() {}, contains: () => false } },
+    querySelectorAll: () => []
+  };
+  try {
+    let pending = 'm9';
+    const screens = createScreens({
+      $: id => elements[id] ?? null,
+      screens: [['network', 'track56-network.html', '관계 지도'], ['book', 'track59-sketchbook.html', '책']],
+      getCurrent: () => 'src064-orbit.html',
+      setCurrent() {},
+      getSource: () => 'example',
+      hasTree: () => true,
+      flowNavigation() {},
+      applyTheme() {},
+      writeLocation() {},
+      links() {},
+      takeNetworkOpen: () => { const v = pending; pending = null; return v; },
+      onFrameReady() {}
+    });
+    screens.show('track56-network.html');
+    assert.equal(replaced.at(-1), 'https://lovetree-4-0.pages.dev/v41/views/track56-network.html?open=m9', '지도 프레임 주소에 ?open=을 붙인다');
+    // 요청은 한 번 소비된다 — 다음 지도 화면(탭으로 다시 열기)에는 붙지 않는다.
+    screens.show('track59-sketchbook.html');
+    assert.equal(replaced.at(-1), 'https://lovetree-4-0.pages.dev/v41/views/track59-sketchbook.html', '다른 화면 주소에는 붙지 않는다');
+    screens.show('track56-network.html');
+    assert.equal(replaced.at(-1), 'https://lovetree-4-0.pages.dev/v41/views/track56-network.html', '쓴 요청은 두 번 붙지 않는다');
+  } finally {
+    globalThis.document = saved.document;
+    if (saved.location === undefined) delete globalThis.location;
+    else globalThis.location = saved.location;
+  }
+});

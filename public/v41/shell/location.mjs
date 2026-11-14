@@ -18,6 +18,7 @@ export function createLocation(deps) {
   const notify = deps.notify;
   const startMember = deps.startMember;
   const showPublicRoute = deps.showPublicRoute;
+  const requestNetworkOpen = deps.requestNetworkOpen;
   const journey = deps.journey;
   const gotoJourneyStep = deps.gotoJourneyStep;
   const openFirstJourney = deps.openFirstJourney;
@@ -53,6 +54,10 @@ export function createLocation(deps) {
     if (route.scope === 'owner') {
       if (getSource() !== 'server' || !getMember()?.snapshot().owned) { show(getCurrent(), false); void startMember(); return; }
       const saved = accountPosition(localStorage, getMember().snapshot().subject) || {}, resolved = resolveAccountPosition(deps.getModel()?.trees || [], route, saved);
+      // #583 '이 순간 열기': 주소가 지도(network)의 특정 순간을 가리키고 그 순간을 실제로 찾았을 때만
+      // 지도가 그 순간을 가운데 두고 열리게 한다(찾지 못했으면 시작 순간 안내만 — 가운데 뜸 없음).
+      // choose()가 안에서 show()로 지도 프레임을 새로 띄우므로, 표시는 choose 전에 남긴다.
+      if (route.view === 'network' && route.momentId && resolved.position.momentId === route.momentId) requestNetworkOpen(route.momentId);
       choose(resolved.position.treeId, resolved.position.momentId);
       if (resolved.treeMissing || resolved.momentMissing) {
         writeLocation('replace');

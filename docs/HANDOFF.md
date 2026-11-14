@@ -43,6 +43,13 @@
 - **시험**: `npm test` 전부 통과(브라우저 지도 대비 제외 환경), `npm run build`·`node tools/v41-modulepreload.mjs --check` 통과. 설정 '운영' 묶음·계정 메뉴 항목은 서버 응답 기반 표시라 모의 `/api/account`로 DOM 확인.
 - **남긴 것**: 대표의 실제 관리자 화면 확인(게시판 보임)·`skerish@naver.com` 계정 관리자 권한은 대표 지시 대기. 내보내기 예약의 쿠키 만료(세션 최대 나이) 시 갱신 절차 필요.
 
+## 2026-11-15 — 지도 부채꼴·'이 순간 열기' 주소 약속 (로컬4, ai/local4-map-relations-261115, main cf5ad94 기준)
+
+- **주소 약속(보드 레인이 쓰는 것)**: 셸 주소 `#my/network?tree=<treeId>&moment=<momentId>`(기존 selection-location 규칙 그대로)로 지도를 열면, 셸이 지도 프레임 주소에 `?open=<momentId>`를 붙여 보내고(`shell/screens.mjs` show(), 요청은 `shell.mjs`의 networkOpen 플래그로 한 번만) 지도는 그 순간을 **선택 상태(상세 판 열림)·화면 가운데·배율 맞춤**으로 연다(`views/network/network.js` 시작 부분). 주소의 순간을 못 찾으면 기존대로 시작 순간 안내만 하고, `?open=`이 없으면 예전대로 전체 보기(배율 1)로 뜬다. `#my/network?moment=…` → 요청 연결은 `shell/location.mjs`, 프레임 주소 붙임은 `shell/screens.mjs` — 소자 시험 `tests/v41-shell-location.test.mjs`·`tests/v41-shell-screens.test.mjs`.
+- **평평한 나무의 부채꼴 배치**: 한 순간에 8개 이상 이어진 그물형 나무(대표 트리 '모아둔 순간'과 같은 모양)는 묶음 칸으로 쪼개지 않고, **가장 많이 이어진 순간(첫 순간)을 상자 가운데 두고 나머지를 상자에 맞춘 타원 고리 위에 BFS 순서(12시부터)로 펼친다**(`network-model.js` `fanLayout` — `networkLayout`이 `fanHeavy`면 쓴다). 선은 가운데에서 고리로 뻗는 방사형이라 서로 교차하지 않고, 묶음 점·범례는 치운다. 처음 보기는 화면 맞춤(배율 1). 동심원형·작은 나무·40개 예시는 예전 배치 그대로.
+- **진단·수정 결과**: 세 모양(평평한 26·사슬 10단·섞인 3×4) × 1440·390 × 밤·정원 × 두 보기 24행 측정 — 수정 전 flat26 그물형은 첫 순간에서 뻗는 25개 선이 화면을 가로지르며 엉킴(390 특히), 수정 후 24행 모두 노드·이름표 겹침·잘림·밖점·선교차 0. 스크린샷 `E:\lovetree-qa\map-relations\{before,after}\`(측정 스크립트·도우미는 `tests/helpers/map-shapes.mjs`만 저장소에 남긴다).
+- **시험**: 신규 `tests/v41-map-fan-open.test.mjs`(실행형 2건 — 평평한 26순간 부채꼴 겹침 0·화면 맞춤, `?open=`로 열면 선택·가운데)을 미리보기 검사 '지도 대비' 잡에서 대비 시험과 **나란히** 실행(`LT_MAP_FAN_REQUIRE=1`, 잡 2분 안). #366 시작 줄 소자 시험은 주소 열기 예외를 반영해 갱신(평소 뜰 때 자동 맞춤 금지 가드 유지). 대비 시험 첫 그리기 대기 15→30초(전체 자리 붐빔 대비, 단언·측정 그대로). `npm test` 전체는 전 레인 기준 1회 실행 — 지도 소자·흐름 시험 전부 통과, 대비 시험은 단독·나란히 통과(전체 자리에서 첫 그리기 15초 초과 1회 — 대기 넉네히 함), build·modulepreload --check 통과.
+
 ## 2026-11-14 — 미리보기 검사 동시 실행 (CTO)
 
 - 화면 시험이 한 잡에 줄지어 18분 걸려서, `.github/workflows/preview-check.yml`을 잡 6개(보드·접근성·날짜 / 첫 화면·책 / 지도 대비 / 지도 도구 줄·판 흐름·책 이동 / 책 대비·초점 / 미리보기 배포 검사)로 나눠 동시에 돌린다. 시험 단계 내용은 그대로 옮겼다.
