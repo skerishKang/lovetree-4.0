@@ -119,9 +119,7 @@ test('셸: 헤더 표시·정리 입구·트리 고르기 목록이 inbox-model 
  assert.match(shell,/createCleanup\(\{/);
  assert.match(shell,/data-tree-action="cleanup"/);
  assert.ok(shell.includes(`[data-tree-action="cleanup"]')?.addEventListener('click',()=>{closeTreeMenu();shellCleanup.open({});})`),'드롭다운 정리 항목이 정리 창을 연다');
- // 보기 메시지: 옮기기 요청은 서버 기록에서만 받는다.
- const messages=read('../public/v41/shell/messages.mjs');
- assert.match(messages,/lt41-move' && getSource\(\) === 'server'\) openCleanup\(\{ momentId: data\.momentId \}\)/);
+ // 보기 메시지의 옮기기 요청(lt41-move)은 소스 글자 대신 동작으로 본다 — tests/v41-shell-messages.test.mjs.
 });
 
 test('정리 창: 순간 고르기·새 트리 만들기·옮기기·안내가 화면에 있다',()=>{

@@ -96,6 +96,11 @@
 <fieldset id="cleanup-move-box"><legend>다른 트리로 옮기기</legend><label>대상 트리<select id="cleanup-target"></select></label><div class="button-row"><button type="button" id="cleanup-move">옮기기</button></div></fieldset>
 <p id="cleanup-error" role="alert"></p>
 </dialog>
+<dialog id="move-picker" data-lt-panel="full" data-lt-return="record-menu" aria-labelledby="move-picker-title"><div class="panel-heading"><div><span class="eyebrow">순간 옮기기</span><h2 id="move-picker-title">어느 트리로 옮길까요?</h2></div><button data-close="move-picker" aria-label="옮기기 창 닫기" class="close">×</button></div>
+<p class="panel-note">고르면 바로 그 트리로 옮겨요. 옮긴 뒤에는 되돌릴 수 있어요.</p>
+<div id="move-picker-list" class="move-picker-list"></div>
+<p id="move-picker-error" role="alert"></p>
+</dialog>
 <div id="drop-veil" hidden><p id="drop-veil-text">놓으면 모아둔 순간에 담아요</p></div>
 <div id="quick-saved" role="status" hidden><img id="quick-saved-thumb" alt="" referrerpolicy="no-referrer" hidden><span id="quick-saved-text">모아둔 순간에 담았어요</span><button type="button" id="quick-saved-refine" hidden>지금 다듬기</button></div>
 <dialog id="journal-panel" data-lt-panel="center" data-lt-return="account-journal" aria-labelledby="journal-title"><div class="panel-heading"><div><span class="eyebrow">오늘 사용 일지</span><h2 id="journal-title">오늘 사용 일지</h2></div><button data-close="journal-panel" aria-label="사용 일지 닫기" class="close">×</button></div>

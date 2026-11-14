@@ -395,6 +395,11 @@ html[data-lt-theme=garden] .quick-error-line{color:var(--lt-rose-ink)}
 #move-actions{display:flex;gap:6px;flex-wrap:wrap}
 #move-actions button{min-height:44px;background:transparent;border:1px solid rgba(255,255,255,.3);border-radius:var(--lt-r-pill);padding:7px 12px;color:var(--lt-gold)}
 @media(max-width:780px){#move-feedback{padding:8px 12px}}
+/* 이슈 644 1: 순간 상세의 '다른 트리로 옮기기' 목록 — 고르면 바로 옮긴다. */
+#move-picker .move-picker-list{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+#move-picker .move-picker-list button{min-height:44px;padding:10px 14px;text-align:left;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.22);border-radius:12px;color:var(--lt-pearl);font-size:14px;line-height:1.6}
+#move-picker .move-picker-list button:hover{border-color:rgba(255,230,166,.5)}
+#move-picker-error{color:var(--lt-rose);font-weight:600}
 
 /* 2026-11-10 대표 승인 메뉴 정리: 맨 위 한 줄 · 트리 드롭다운 · 계정 메뉴 */
 .app-header{min-height:64px;padding:10px 20px;gap:14px;flex-wrap:nowrap}
