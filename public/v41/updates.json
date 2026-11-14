@@ -1,0 +1,27 @@
+[
+  {
+    "version": "4.1.3",
+    "date": "2026.11.14",
+    "items": [
+      {"kind": "new", "text": "핀보드 — 모은 순간을 바둑판으로 한눈에 보고, 끌어서 자리를 바꿀 수 있어요", "source": "team", "issue": "#582"},
+      {"kind": "new", "text": "책에서 ▶ 재생이 바로 재생되고, 크게 보기도 바로 재생돼요", "source": "team", "issue": "#584"},
+      {"kind": "new", "text": "책이 한 쪽에 스크롤 없이 한 장씩 보여요", "source": "team"},
+      {"kind": "new", "text": "책 1장 | 2장 묶음으로 바꿔 볼 수 있어요", "source": "team", "issue": "#584"},
+      {"kind": "new", "text": "‘이어진 순간’을 한눈에 보여 줘요", "source": "team", "issue": "#584"},
+      {"kind": "new", "text": "지도 — 많이 이어진 트리를 부채꼴로 펼쳐 보여 줘요", "source": "team", "issue": "#601"},
+      {"kind": "new", "text": "썸네일에 이름표가 붙었어요", "source": "team"},
+      {"kind": "new", "text": "첫 화면 — 카드가 떠 있고 가운데 단추가 3개예요", "source": "team"},
+      {"kind": "new", "text": "공개가 기본이에요 — 순간 3개를 모으면 둘러보기에 소개돼요. 이름은 안 보여요", "source": "team"},
+      {"kind": "new", "text": "공유 미리보기 카드 — 다른 앱에 붙여 넣을 때 예쁜 카드로 보여요", "source": "team"},
+      {"kind": "fix", "text": "새벽에 남긴 순간 날짜가 하루 전으로 찍히던 문제를 고쳤어요", "source": "ai_tester", "tester": "윤제", "issue": "#547"},
+      {"kind": "fix", "text": "‘오늘·어제’ 날짜 표기가 새벽 시간에도 맞게 고쳐졌어요", "source": "ai_tester", "tester": "윤제", "issue": "#547"},
+      {"kind": "fix", "text": "작던 글씨를 화면 전체에서 키웠어요", "source": "ai_tester", "tester": "윤제"},
+      {"kind": "fix", "text": "안내 단추가 눌리지 않던 문제를 고쳤어요", "source": "ai_tester", "tester": "윤제"},
+      {"kind": "fix", "text": "첫 트리 이름 바꾸기가 안 되던 문제를 고쳤어요", "source": "ai_tester", "tester": "윤제"},
+      {"kind": "fix", "text": "크게 보기에서 재생이 안 되던 문제를 고쳤어요", "source": "ai_tester", "tester": "윤제", "issue": "#584"},
+      {"kind": "fix", "text": "‘이어진 순간’ 이름·설명이 바뀌었어요", "source": "ai_tester", "tester": "윤제", "issue": "#584"},
+      {"kind": "fix", "text": "보드 말이 ‘보드·순간 추가’로 바뀌었어요", "source": "ai_tester", "tester": "윤제", "issue": "#582"},
+      {"kind": "fix", "text": "보드에서도 순간 날짜를 바꿀 수 있어요", "source": "ai_tester", "tester": "윤제", "issue": "#608"}
+    ]
+  }
+]

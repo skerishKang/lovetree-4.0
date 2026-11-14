@@ -30,6 +30,7 @@ import {headerBadge, cleanupAvailable} from './inbox-model.mjs';
 import {createDialogs} from './shell/dialogs.mjs';
 import {createFeedbackDialog} from './feedback.mjs';
 import {createFeedbackBoard} from './feedback-board.mjs';
+import {mountUpdates} from './updates.mjs';
 import {connectionSignature} from './shell/panel-dirty.mjs';
 import {createLocation} from './shell/location.mjs';
 import {createNotifier, syncedNoticeText} from './shell/notice.mjs';
@@ -735,6 +736,15 @@ $('settings-assets-open').onclick=()=>openAssets($('settings-assets-open'));
  const openOpsCenter=()=>{const win=window.open('/admin.html','_blank','noopener');if(!win)location.assign('/admin.html');};
  $('account-ops').onclick=()=>{closeAccountMenu();openOpsCenter();};
  $('settings-ops-open').onclick=()=>openOpsCenter();
+ // #611 새 소식: 계정 메뉴·설정 아래쪽·로그아웃 작은 링크 모두 같은 창을 쓴다.
+ // 단추 점은 새 소식과 새 답글(#611 4번)이 같은 자리를 쓴다.
+ const dotState={updates:false,replies:false};
+ function paintAvatarDot(){const avatar=$('account-avatar');if(avatar)avatar.classList.toggle('has-dot',!!(dotState.updates||dotState.replies));}
+ const updatesMount=mountUpdates({$,showPanel:id=>panel(id),onDot:unread=>{dotState.updates=!!unread;paintAvatarDot();}});
+ $('account-updates').onclick=()=>{closeAccountMenu();void updatesMount.openUpdates();};
+ $('updates-link').onclick=()=>{void updatesMount.openUpdates();};
+ $('settings-updates-open').onclick=()=>{$('account-settings').close();void updatesMount.openUpdates();};
+ void updatesMount.start();
  $('advanced-backup').onclick=()=>backup();
  // #368: 기록 가져오기는 JSON 선택 input을 연다. input은 창 밖에 숨겨 두어 설정이 닫혀 있어도(빈 화면의 백업 파일 열기) 열린다.
  // CTO 결정(2026-11-12): 설정에는 "기록 가져오기" 하나만 둔다 — "백업 파일 열기"는 같은 선택 창이라 중복이고,
