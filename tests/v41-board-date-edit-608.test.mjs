@@ -104,7 +104,8 @@ test('#608 보드 수정 창에 날짜 입력이 있고, 책과 같은 규칙으
   // 날짜가 바뀌면 '날짜순' 자리를 다시 꽂는다. '내 배치'의 저장 자리는 placeAll이 건드리지 않는다(#395).
   assert.match(detail, /if\(editBase&&m\.date!==editBase\.date\)placeAll\(\)/, '날짜 변화 때 다시 꽂기');
   const board = read('public/v41/views/board/board.js');
-  assert.match(board, /boardMode==='mine'&&m\.savedPos\)continue/, "'내 배치'는 저장 자리를 유지한다");
+  // #619-6: 내 배치는 저장 자리가 아니라 저장된 순서를 유지한다(순서대로 다시 쌓는다).
+  assert.match(board, /boardMode==='date'\?LT58Model\.dateDescOrder\(moments\):momentOrder/, "내 배치는 저장 순서를 유지한다");
   // 순간 신원은 그대로다 — 관계도 시절의 invariant에서 날짜만 뺀다(id·privacy·x·y·rot·first·createdOrder 유지).
   assert.match(detail, /invariant=\{id:m\.id,privacy:m\.privacy/, '신원 보존은 유지한다');
   assert.doesNotMatch(detail, /date:m\.date,privacy:m\.privacy/, '날짜는 더 이상 고정하지 않는다');

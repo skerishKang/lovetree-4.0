@@ -161,5 +161,114 @@ test('공통 틀 배선: 정리 창이 PANEL_DIRTY에 들어 있고 셸이 판�
   assert.match(cleanup, /let baseState = \{ picked: '', name: '', target: '' \};/);
   assert.match(cleanup, /baseState = readState\(\);\s*\n\s*sync\(\);\s*\n\s*panel\('cleanup-panel'\);/);
   assert.match(cleanup, /baseState = readState\(\);\s*\n\s*\$\('cleanup-panel'\)\.close\(\);/);
-  assert.match(cleanup, /return \{ open, sync, dirty, headerAvailable, hideMoveNotice, pickerLabel \};/);
+  // 반환 모양(open·openMove…)은 소스 글자 대신 동작 시험으로 본다 — #644 옮기기 함수 시험.
+});
+
+// ── #644 1: 순간 상세의 '다른 트리로 옮기기' — 트리 목록에서 고르면 바로 옮긴다 ──
+// 적용은 기존 member.apply('moveMoment') 한 길이고, 이 하네스는 상태를 실제로 바꾸어
+// 옮김·되돌림이 기록(트리)에 반대되는지까지 본다.
+function moveHarness({ moments = [{ id: 'm1', title: '첫 순간', parentId: null }, { id: 'm2', title: '둘째 순간', parentId: 'm1' }], others = [{ id: 'tree2', title: '다른 트리', moments: [{ id: 'x1', title: '다른 트리 시작', parentId: null }] }] } = {}) {
+  const saved = {};
+  for (const key of ['window', 'document']) { saved[key] = globalThis[key]; delete globalThis[key]; }
+  const els = {};
+  const applied = [], chosen = [], notices = [], panels = [];
+  const state = { trees: [
+    { id: 'tree1', title: '윤슬', moments: moments.map(m => ({ ...m })) },
+    ...others.map(t => ({ ...t, moments: (t.moments || []).map(m => ({ ...m })) }))
+  ] };
+  globalThis.window = { LT41: { tree: state.trees[0], momentId: state.trees[0].moments[0].id } };
+  globalThis.document = {
+    createElement: (tag) => fakeElement({ tagName: tag.toUpperCase() }),
+    getElementById: (id) => (els[id] ||= fakeElement({ id })),
+    querySelectorAll: () => [],
+    addEventListener() {}
+  };
+  const member = {
+    snapshot: () => ({ owned: true, writable: true }),
+    apply: (action, input, selection) => {
+      applied.push([action, input, selection]);
+      if (action === 'moveMoment') {
+        const from = state.trees.find(t => t.id === selection.treeId);
+        const to = state.trees.find(t => t.id === input.toTreeId);
+        const moving = from.moments.find(m => m.id === selection.momentId);
+        from.moments = from.moments.filter(m => m.id !== moving.id);
+        const attach = input.parentId || to.moments.find(m => m.parentId === null)?.id || null;
+        to.moments = [...to.moments, { ...moving, parentId: attach }];
+        if (!from.moments.length) state.trees = state.trees.filter(t => t.id !== from.id);
+      }
+      return { treeId: input.toTreeId, momentId: selection.momentId };
+    }
+  };
+  const cleanup = createCleanup({
+    $: id => { const el = els[id] ||= fakeElement({ id }); if (id === 'cleanup-target' && !el.selectedOptions) el.selectedOptions = [{ textContent: '' }]; return el; },
+    getMember: () => member,
+    getSource: () => 'server',
+    getTrees: () => state.trees,
+    choose: (id, momentId) => chosen.push([id, momentId]),
+    notify: text => notices.push(text),
+    panel: id => { panels.push(id); (els[id] ||= fakeElement({ id })).showModal(); },
+    treeMomentThumb: () => '', thumbCandidatesOf: () => [], fallbackCardOf: () => null, emotionToneOf: () => 'tone'
+  });
+  return {
+    els, applied, chosen, notices, panels, cleanup, state,
+    pickerButtons: () => (els['move-picker-list']?.children || []),
+    restore() { for (const key of Object.keys(saved)) { if (saved[key] === undefined) delete globalThis[key]; else globalThis[key] = saved[key]; } }
+  };
+}
+
+test('#644 옮기기: 상세의 옮기기는 다른 트리 목록을 보리고, 지금 트리는 뺀다', () => {
+  const h = moveHarness();
+  try {
+    assert.equal(h.cleanup.openMove({ momentId: 'm1' }), true);
+    assert.ok(h.panels.includes('move-picker'), '옮기기 목록 창을 연다');
+    assert.deepEqual(h.pickerButtons().map(b => b.textContent), ['다른 트리'], '지금 트리는 목록에 없다');
+  } finally { h.restore(); }
+});
+
+test('#644 옮기기: 고르면 바로 옮겨지고(대상 트리에 들어가고 원래 트리에서 빠진다) 안내가 뜬다', () => {
+  const h = moveHarness();
+  try {
+    h.cleanup.openMove({ momentId: 'm2' });
+    h.pickerButtons()[0].dispatch('click');
+    assert.deepEqual(h.applied[0], ['moveMoment', { toTreeId: 'tree2' }, { treeId: 'tree1', momentId: 'm2' }], '기존 moveMoment 한 길');
+    assert.deepEqual(h.chosen, [['tree2', 'm2']], '옮겨진 트리의 그 순간을 보여 준다');
+    const inTarget = h.state.trees.find(t => t.id === 'tree2').moments.some(m => m.id === 'm2');
+    const outOfFrom = !h.state.trees.find(t => t.id === 'tree1').moments.some(m => m.id === 'm2');
+    assert.equal(inTarget && outOfFrom, true, '대상 트리에 들어가고 원래 트리에서 빠진다');
+    assert.match(h.els['move-message'].textContent, /다른 트리로 옮겼어요\./);
+    assert.equal(h.els['move-actions'].children[0].textContent, '되돌리기');
+  } finally { h.restore(); }
+});
+
+test('#644 되돌리기: 원래 트리의 원래 부모 아래로 돌린다', () => {
+  const h = moveHarness();
+  try {
+    h.cleanup.openMove({ momentId: 'm2' });
+    h.pickerButtons()[0].dispatch('click');
+    h.els['move-actions'].children[0].onclick();
+    assert.deepEqual(h.applied[1], ['moveMoment', { toTreeId: 'tree1', parentId: 'm1' }, { treeId: 'tree2', momentId: 'm2' }], '원래 부모(m1) 아래로');
+    const back = h.state.trees.find(t => t.id === 'tree1').moments.find(m => m.id === 'm2');
+    assert.equal(back.parentId, 'm1', '원래 자리(원래 부모 아래)로 돌아온다');
+    assert.equal(h.els['move-feedback'].hidden, true, '안내를 거둔다');
+    assert.deepEqual(h.chosen.at(-1), ['tree1', 'm2'], '원래 트리로 되돌아가 본다');
+  } finally { h.restore(); }
+});
+
+test('#644 옮기기: 트리가 하나뿐이면 목록 대신 새 트리 만들어 옮기기(정리 창)를 연다', () => {
+  const h = moveHarness({ moments: [{ id: 'm1', title: '첫 순간', parentId: null }], others: [] });
+  try {
+    assert.equal(h.cleanup.openMove({ momentId: 'm1' }), true);
+    assert.ok(h.panels.includes('cleanup-panel'), '기존 정리 창(treeFromMoments 길)을 연다');
+    assert.equal(h.panels.includes('move-picker'), false, '목록은 열지 않는다');
+  } finally { h.restore(); }
+});
+
+test('#644 되돌리기: 원래 트리가 사라졌으면(비어 지워졌으면) 되돌리기 없이 안내만 띄운다', () => {
+  const h = moveHarness({ moments: [{ id: 'm1', title: '첫 순간', parentId: null }] });  try {
+    h.cleanup.openMove({ momentId: 'm1' });
+    h.pickerButtons()[0].dispatch('click');
+    assert.equal(h.state.trees.some(t => t.id === 'tree1'), false, '빈 트리는 지워진다(domain 규칙)');
+    assert.match(h.els['move-message'].textContent, /옮겼어요\./);
+    assert.equal(h.els['move-actions'].children.length, 0, '되돌릴 길이 없으면 단추를 놓지 않는다');
+  } finally { h.restore(); }
 });

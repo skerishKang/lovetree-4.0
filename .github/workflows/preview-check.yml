@@ -101,6 +101,15 @@ jobs:
           start=$(date +%s)
           node --test --test-concurrency=1 tests/v41-board-stack-619.test.mjs
           echo "보드 쌓기 배치 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+      # #619-6: 내 배치 = 끌어서 끼워 넣기 + 순서(순위) 저장. 저장 경로는 서버 문서 PUT 그대로(y에 순위) — 서버·DB 변경 없음.
+      # 모델 + 실제 화면(순서 저장 트리·끼워 넣기 저장·390 순서 유지·옛 x·y 트리 세로 한 줄 방지)을 잰다.
+      - name: 보드 순서 끼워 넣기 시험(건너뜀=실패 — #619-6)
+        env:
+          LT_BOARD_ORDER_619_REQUIRE: '1'
+        run: |
+          start=$(date +%s)
+          node --test --test-concurrency=1 tests/v41-board-order-619.test.mjs
+          echo "보드 순서 끼워 넣기 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
       # #514: 남은 접근성 항목(moderate 이하)을 실제 화면에서 잰다 — 확대 막기·랜드마크·제목 단계·
       # 모바일 선택 줄 top. axe-core·Chromium이 필요한 실행형 시험이라 크롬이 준비된 이 잡에서 돈다.
       - name: 남은 접근성 항목 시험(#514, 건너뜀=실패)
@@ -223,6 +232,28 @@ jobs:
           start=$(date +%s)
           node --test --test-concurrency=1 tests/updates-card-611-followup.test.mjs
           echo "새 소식 카드 겹침 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+
+      # #635: 감상 화면(공유 링크·예시)의 책에서 undefined·null·NaN 흔적이 없는지 첫 장~마지막 장 전부 넘기며 검사하고,
+      # 첫 화면 '어떻게 쓰나요'가 안내 패널을 여는지(둘러보기가 같이 열리지 않는지) 실제 화면에서 본다.
+      # 첫 화면은 vite 번들이라 먼저 build 한다. 건너뜀=실패(크롬이 준비된 이 잡에서 돈다).
+      - name: 감상 화면 흔적 값·어떻게 쓰나요 안내 시험(건너뜀=실패 — #635)
+        env:
+          LT_635A_REQUIRE: '1'
+        run: |
+          start=$(date +%s)
+          npx vite build > /dev/null
+          node --test --test-concurrency=1 tests/v41-share-guest-635.test.mjs
+          echo "감상 화면 흔적 값·어떻게 쓰나요 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+
+      # #631: 의견 보내기 창 — 1440×900 에서 스크롤 없이 들어오고, 체크 상자와 글자가 같은 줄이며,
+      # 보낸 뒤 제목·주 단추·안내가 바뀌는지 수치로 잰다. 건너뜀=실패(크롬이 준비된 이 잡에서 돈다).
+      - name: 의견 보내기 창 배치·보낸 뒤 화면 시험(건너뜀=실패 — #631)
+        env:
+          LT_FEEDBACK_631_REQUIRE: '1'
+        run: |
+          start=$(date +%s)
+          node --test --test-concurrency=1 tests/v41-shell-dialogs.test.mjs
+          echo "의견 보내기 창 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
 
   screen-map-a:
     name: 화면 시험 — 지도 대비

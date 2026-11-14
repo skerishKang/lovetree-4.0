@@ -1,4 +1,8 @@
 /* === V1.2 FOCUSED REVISION: ACTUAL YOUTUBE MEDIA + MOBILE HARDENING === */
+/* #619-6: 끼워 넣기 자리 표시 — 들어갈 카드의 앞(왼쪽) 또는 뒤(오른쪽)에 테두리를 두른다. */
+.card.insert-target{box-shadow:0 0 0 3px var(--lt-accent, #d9a05b);outline:none}
+.card.insert-target::after{content:"";position:absolute;top:-4px;bottom:-4px;left:-9px;width:4px;border-radius:2px;background:var(--lt-accent, #d9a05b)}
+.card.insert-after::after{left:auto;right:-9px}
 .ytThumbWrap{position:relative;width:100%;height:100%;overflow:hidden;background:#17111f;display:grid;place-items:center}
 .ytThumbWrap>img{width:100%;height:100%;object-fit:cover;display:block}
 .ytLoadState{position:absolute;left:8px;right:8px;bottom:8px;z-index:3;padding:6px 8px;border-radius:9px;background:rgba(20,13,29,.78);color:#f0e7f6;font-size:9px;letter-spacing:.02em;backdrop-filter:blur(8px);pointer-events:none}
@@ -108,7 +112,9 @@ html[data-lt-theme=garden][data-v41-screen=board] .lt-moment-picker button{borde
 
 /* #372 후속(대표 결정 1-나): 단순(기본)은 카드 끌기·잇기, 카드 추가, 전체 보기, 시네마만 보인다.
    고급(body.lt-advanced)은 도구 패널·필터·테마·확대/축소·되돌리기·편집 도구까지 보인다.
-   숨김은 이 CSS만 담당하고 기능 코드는 그대로 둔다. */
+   숨김은 이 CSS만 담당하고 기능 코드는 그대로 둔다.
+   #644: '다른 트리로 옮기기'(.lt-move-btn)는 고급이 아니어도 보인다 — 지도 상세와 같고,
+   순간을 보다가 바로 옮길 길이 필요하다는 #644 대표 지적이다. */
 body:not(.lt-advanced) #undoBtn,
 body:not(.lt-advanced) .toolbar,
 body:not(.lt-advanced) #leftPanel,
@@ -117,8 +123,7 @@ body:not(.lt-advanced) #startPathHere,
 body:not(.lt-advanced) #editMomentBtn,
 body:not(.lt-advanced) #quickPin,
 body:not(.lt-advanced) #quickCard,
-body:not(.lt-advanced) #styleSection,
-body:not(.lt-advanced) .lt-move-btn { display: none !important; }
+body:not(.lt-advanced) #styleSection { display: none !important; }
 @media(max-width:700px){
   /* 단순 모드의 추가·전체 보기는 모바일에서도 쓸 수 있게 한다(기존 .headbtn 숨김보다 ID가 우선).
      #520: 읽기 전용(예시·공유)에서는 board-extras.js가 addBtn·undoBtn에 hidden 속성을 붙인다 —

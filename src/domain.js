@@ -341,6 +341,14 @@ export function quickAdd(state, input, clock = new Date().toISOString()) {
   // #344: 빠른 추가도 미리보기 때 받은 영상 제목(mediaMetadata)을 저장에 함께 넘긴다.
   const moment = { ...validateMomentInput({ url: input?.url || '', mediaMetadata: input?.mediaMetadata }), id: newId(), parentId: null, relation: '', links: [], createdAt: clock };
   const trees = state.trees;
+  // #638(고른 트리 우선, CTO 결정 2026-11-15): 지금 고른 트리(input.treeId)에 담는다(#327의 '모아둔 순간 고정'을 바꾼 결정).
+  // 트리가 0개면 기본 트리('모아둔 순간')를 만들고, 고른 트리를 찾지 못하면 기존 규칙(inbox)으로 물러난다.
+  // public/v41/domain.mjs와 같은 규칙을 유지한다(#327 두 벌 같게).
+  const chosen = trees.find(tree => tree.id === input?.treeId);
+  if (chosen) {
+    const grown = addMoment(chosen, { url: input?.url || '', mediaMetadata: input?.mediaMetadata }, latestMomentId(chosen) || chosen.moments.find(m => m.parentId === null).id, clock);
+    return { state: { version: 1, trees: trees.map(tree => tree.id === chosen.id ? grown : tree), prefs: normalizePrefs(state.prefs) }, treeId: chosen.id, momentId: grown.moments.at(-1).id };
+  }
   const inbox = trees.find(tree => tree.inbox === true);
   if (!inbox) {
     if (trees.length >= MAX_TREES) throw new Error(`트리는 ${MAX_TREES}개까지 만들 수 있어요.`);

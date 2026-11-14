@@ -76,7 +76,7 @@ function messagesHarness({ owned = true, source = 'server', current = 'track59-s
   const saved = globals();
   const els = {};
   const events = {};
-  const calls = {notify: [], panels: [], shown: [], editors: [], logins: [], links: 0, writes: 0, chooses: [], samples: [], journeys: [], menus: []};
+  const calls = {notify: [], panels: [], shown: [], editors: [], logins: [], links: 0, writes: 0, chooses: [], samples: [], journeys: [], menus: [], moves: []};
   const requests = [];
   globalThis.addEventListener = (type, fn) => { events[type] = fn; };
   globalThis.location = {origin: 'https://lovetree-4-0.pages.dev', hostname: 'lovetree-4-0.pages.dev', hash: ''};
@@ -122,6 +122,7 @@ function messagesHarness({ owned = true, source = 'server', current = 'track59-s
     openEditor: (mode, parentId) => calls.editors.push([mode, parentId]),
     openLoginStart: intent => calls.logins.push(intent),
     openAccountMenu: () => calls.menus.push('account'),
+    openMovePicker: options => calls.moves.push(options),
     sample: (selection, view) => calls.samples.push([selection, view]),
     applyTheme: () => {},
     paintThemeControls: () => {},
@@ -148,6 +149,20 @@ test('lt41-select는 화면이 보낸 순간으로 선택을 옮기고 주소를
     // 모르는 순간이면 아무것도 하지 않는다.
     h.receive({type: 'lt41-select', id: 'nope'});
     assert.equal(h.calls.links, 1);
+  } finally { h.restore(); }
+});
+
+test('lt41-move(상세의 다른 트리로 옮기기)는 내 기록에서만 트리 목록 입구를 연다', () => {
+  const h = messagesHarness();
+  try {
+    h.receive({type: 'lt41-move', momentId: 'm1'});
+    assert.deepEqual(h.calls.moves, [{momentId: 'm1'}], '셸 cleanup 모듈의 openMove를 momentId로 연다');
+    // 공유·예시 기록에서는 옮기지 않는다(#327 — 공유 감상은 쓰기 도구가 없다).
+    const shared = messagesHarness({source: 'share'});
+    try {
+      shared.receive({type: 'lt41-move', momentId: 'm1'});
+      assert.deepEqual(shared.calls.moves, []);
+    } finally { shared.restore(); }
   } finally { h.restore(); }
 });
 

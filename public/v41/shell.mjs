@@ -72,6 +72,9 @@ function closeMore(){moreMenu.classList.remove('is-open');moreMenu.hidden=true;m
 function buildFoldMenu(){
  moreMenu.replaceChildren();
  const add=(label,click,mark)=>{const b=document.createElement('button');b.type='button';b.setAttribute('role','menuitem');b.textContent=label;if(mark)b.setAttribute('aria-current','true');b.onclick=()=>{closeMore();click()};moreMenu.append(b)};
+ // #635 PR C: 로그아웃 상태 메뉴(≡) 맨 위에 시작 입구 — 첫 화면의 '첫 순간 추가'와 같은 시작 흐름(openLoginStart('first'))으로 간다.
+ // 로그인 상태 메뉴는 바꾸지 않는다.
+ if(!member?.snapshot().owned)add('내 러브트리 시작하기',()=>openLoginStart('first'));
  // #380 2번: 접기 메뉴도 맨 위 메뉴와 같은 구조 — 첫 화면(로고)·둘러보기 · 책·보드·지도 · 내 트리 전체 보기 · 순간 추가.
  // #458: 지금 보고 있는 화면 항목에 aria-current를 남긴다(메뉴를 열 때마다 다시 만들어 지금 상태를 반영한다).
  add('첫 화면',()=>document.querySelector('.brand').click(),current==='src064-orbit.html');
@@ -233,6 +236,9 @@ const shellQuick=createQuickAdd({
   openLoginStart:intent=>openLoginStart(intent),
   writePanel:shellWrite,
   requestClose:id=>shellDialogs.requestClose(id),
+  // #638: 쉬운 추가가 지금 고른 트리에 담기게 — 지금 트리·트리 목록은 트리 메뉴와 같은 재료(window.LT41)에서 읽는다.
+  currentTreeId: () => window.LT41?.tree?.id || '',
+  listTrees: () => (Array.isArray(window.LT41?.trees) ? window.LT41.trees : []),
   // 사진 올리기는 기존 업로더(#310 onUploaded·imagesOnly)를 그대로 쓴다.
   mountUpload:mountPrivateUpload
 });
@@ -325,6 +331,7 @@ const shellMessages=createMessages({
   openLoginStart:intent=>openLoginStart(intent),
   openAccountMenu:()=>openAccountMenu(),
   openCleanup:options=>shellCleanup.open(options),
+  openMovePicker:options=>shellCleanup.openMove(options),
   sample:(selection,view)=>sample(selection,view),
   applyTheme:(theme)=>applyTheme(theme),
   paintThemeControls:()=>paintThemeControls(),
@@ -739,7 +746,7 @@ $('settings-assets-open').onclick=()=>openAssets($('settings-assets-open'));
   const treeId=owned&&source==='server'&&window.LT41?.tree?.id?String(window.LT41.tree.id):'';
   return {screen,viewport:window.innerWidth+'x'+window.innerHeight,theme:readTheme(localStorage),version:'4.1',loggedIn:owned,treeId};
  }
- const feedbackDialog=createFeedbackDialog({$,notify,getContext:feedbackContext,show:()=>panel('feedback-panel')});
+ const feedbackDialog=createFeedbackDialog({$,notify,getContext:feedbackContext,show:()=>panel('feedback-panel'),openMyPosts:()=>{shellDialogs.requestClose('feedback-panel');panel('myposts-panel');}});
  $('account-feedback').onclick=()=>{closeAccountMenu();feedbackDialog.open();};
  $('feedback-link').onclick=()=>feedbackDialog.open();
  // 2차: AI 고객 '오늘 사용 일지'·모든 로그인 사용자 '내 의견'.

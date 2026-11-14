@@ -30,12 +30,13 @@ export function videoTitle(moment = {}) {
   return typeof meta.title === 'string' ? meta.title.trim() : '';
 }
 
-/** 내가 쓴 제목만. 빈 값·도메인 자동 제목·#344가 채운 영상 제목과 같은 값은 '없음'. */
+/** 내가 쓴 제목만. 빈 값·도메인 자동 제목·#344가 채운 영상 제목과 같은 값은 '없음'.
+ *  #635: 같음 판정은 앞뒤 공백·대소문자를 무시한다 — 'Super shy'와 'SUPER SHY'는 같은 제목이다. */
 export function userTitleText(moment = {}) {
   const title = String(moment.title ?? '').trim();
   if (!isUserTitle(title)) return '';
   const media = videoTitle(moment);
-  if (media && title === media) return '';
+  if (media && title.toLowerCase() === media.toLowerCase()) return '';
   return title;
 }
 
@@ -142,11 +143,14 @@ export function embedUrl(videoId, startSeconds = 0) {
   return `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0${t ? `&start=${t}` : ''}`;
 }
 
-/** 연결 안내 한 줄. 다음 순간이 없으면 null(줄 자체를 숨긴다). 시스템 용어는 쓰지 않는다. */
-export function connectionLine(nextTitle, reason) {
+/** 연결 안내 한 줄. 다음 순간이 없으면 null(줄 자체를 숨긴다). 시스템 용어는 쓰지 않는다.
+ *  #635: hideEmptyWhy — 감상 화면(남의 트리·공유 링크)에서는 이유가 비었을 때의 안내가 필요 없다.
+ *  이유가 비었으면 null(줄 자체를 숨긴다). 내 트리는 예전 그대로 안내 문장을 돌려준다. */
+export function connectionLine(nextTitle, reason, { hideEmptyWhy = false } = {}) {
   const title = String(nextTitle ?? '').trim();
   if (!title) return null;
   const why = String(reason ?? '').trim();
+  if (hideEmptyWhy && !why) return null;
   return `다음 순간으로 이어진 이유: ${why || '이어진 이유를 아직 적지 않았어요'}`;
 }
 

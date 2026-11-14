@@ -36,7 +36,7 @@ assert.match(CSS,/html\[data-book-shape=phone\] \.page\.left,\nhtml\[data-book-s
 assert.match(CSS,/html\[data-book-view=single\]\[data-book-shape=wide\] \.page\.left,\nhtml\[data-book-view=single\]\[data-book-shape=wide\] \.mobile-page,\nhtml\[data-book-view=single\]\[data-book-shape=wide\] \.mobile-inspect,\nhtml\[data-book-view=single\]\[data-book-shape=wide\] \.eyebrow\{display:none\}/,'넓은 화면 한 장: 오른쪽 한 쪽만 남긴다');
 assert.match(CSS,/html\[data-book-view=single\]\[data-book-shape=wide\] \.book-wrap\{width:calc\(min\(1160px,80vw\)\/2\);height:min\(920px,calc\(100vh - 215px\)\);min-height:380px\}/,'넓은 화면 한 장: 두 장 책 한 쪽 크기·같은 높이(이슈 584와 같은 식)');
  assert.match(CSS,/html\[data-book-shape=phone\] \.mobile-page\{display:block/,'휴대폰 한 장: 한 장 페이지 펼치기');
- assert.match(LAYOUT,/html\[data-book-shape=phone\]\[data-v41-screen=book\] \.book\{position:relative;inset:auto;transform:none;display:block\}/,'휴대폰 한 장: 책 종이도 세로 흐름으로');
+  assert.match(LAYOUT,/html\[data-book-shape=phone\]\[data-v41-screen=book\] \.book\{position:relative;inset:auto;transform:none;display:flex/, '휴대폰 한 장: 책 종이도 세로 흐름으로(#635 PR B: 남은 화면을 쓰도록 세로 채움)');
  assert.match(CSS,/html\[data-book-shape=phone\] \.desktop-only\{display:none!important\}/,'휴대폰 한 장에서만 돋보기(데스크톱 전용)를 숨긴다 — 넓은 화면 한 장은 쓸 수 있다(#537 3)');
 });
 

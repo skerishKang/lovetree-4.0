@@ -129,10 +129,20 @@ export function buildIssueUrl({title, body} = {}) {
   return `https://github.com/${GITHUB_REPO}/issues/new?${params.toString()}`;
 }
 
+/**
+ * 연결 이슈 번호를 숫자 글자로 맞춘다(#636). 앞의 '#'은 뜻이 아니라 표시일 뿐인데, 예전에는 '#'이 붙은 값
+ * (`#584`)을 숫자가 아니라고 버려서 운영센터 '고치는 일' 탭이 비어 보였다. 읽는 쪽은 모두 이 함수를 거친다.
+ * 숫자로 볼 수 없으면 빈 문자열을 돌려준다(잘못된 값은 조용히 무시).
+ */
+export function normalizeIssueNumber(value) {
+  const raw = String(value ?? '').trim().replace(/^#/, '').trim();
+  return /^\d{1,20}$/.test(raw) ? raw : '';
+}
+
 /** 연결 이슈 번호를 GitHub 이슈 링크로(#564 14). 숫자가 아니면 링크를 만들지 않는다. */
 export function issueLink(issueNumber) {
-  const raw = String(issueNumber ?? '').trim();
-  if (!/^\d+$/.test(raw)) return '';
+  const raw = normalizeIssueNumber(issueNumber);
+  if (!raw) return '';
   return `<a class="lt-issue-link" href="https://github.com/${GITHUB_REPO}/issues/${raw}" target="_blank" rel="noopener">#${escapeText(raw)}</a>`;
 }
 
@@ -140,8 +150,8 @@ export function issueLink(issueNumber) {
 export function linkedIssueNumbers(rows) {
   const numbers = new Set();
   for (const row of Array.isArray(rows) ? rows : []) {
-    const raw = String(row?.issueNumber ?? '').trim();
-    if (/^\d+$/.test(raw)) numbers.add(Number(raw));
+    const raw = normalizeIssueNumber(row?.issueNumber);
+    if (raw) numbers.add(Number(raw));
   }
   return [...numbers].sort((a, b) => b - a);
 }

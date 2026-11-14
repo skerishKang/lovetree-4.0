@@ -11,8 +11,8 @@ const BOARD = fs.readFileSync(new URL('../public/v41/views/board/board.js', impo
 const EXTRAS = fs.readFileSync(new URL('../public/v41/views/board/board-extras.js', import.meta.url), 'utf8');
 
 test('0. 보드 한 벌: 화면이 부르는 함수가 전부 있다', () => {
-  assert.deepEqual(Object.keys(M).sort(), ['boardSize', 'cinemaBeats', 'clampView', 'collectPath', 'contentBox', 'dateDescOrder', 'decorationMotion', 'detailButtonState', 'editGuard', 'escapeHTML', 'filterVisible', 'fitBox', 'fitZoom', 'gridColumns', 'gridPosition', 'gridRowTops', 'isPinboardSlot', 'maxCreatedOrder', 'nextConnections', 'pinboardSpread', 'rememberView', 'savedView', 'settleColumnGaps', 'slotOf', 'stackLayout', 'startView', 'visibleCards']);
-  for (const fn of Object.keys(M)) assert.equal(typeof M[fn], 'function', fn);
+  assert.deepEqual(Object.keys(M).sort(), ['ORDER_Y_BASE', 'boardSize', 'cinemaBeats', 'clampView', 'collectPath', 'contentBox', 'dateDescOrder', 'decorationMotion', 'detailButtonState', 'editGuard', 'escapeHTML', 'filterVisible', 'fitBox', 'fitZoom', 'gridColumns', 'gridPosition', 'gridRowTops', 'isOrderY', 'isPinboardSlot', 'maxCreatedOrder', 'nextConnections', 'orderFromSaved', 'orderOfMoments', 'pinboardSpread', 'rememberView', 'savedView', 'settleColumnGaps', 'slotOf', 'stackLayout', 'startView', 'visibleCards']);
+  for (const fn of Object.keys(M)) assert.ok(typeof M[fn] === 'function' || fn === 'ORDER_Y_BASE', fn); // #619-6: ORDER_Y_BASE는 순서 상수(함수가 아니다)
 });
 
 test('1. 바둑판 칸 수: 화면 폭이 정한다(#582) — 1440은 4칸, 390은 1칸, 1920은 6칸(상한)', () => {
@@ -331,7 +331,7 @@ test('#460 화면은 처음 자리·전체 보기·기억을 이 계산으로 �
   assert.match(BOARD, /LT58Model\.rememberView\(/);
   assert.match(BOARD, /function boardStartView\(\)\{if\(innerWidth<700\)\{fitAll\(false\);viewMode='start';return\}/);
   // #490: 숨은 프레임(폭 0)에서 한 맞춤은 '전체 보기'가 아니다 — 드러난 뒤 resize가 처음 자리(또는 기억한 자리)를 다시 계산한다.
-  assert.ok(BOARD.includes("function boardResize(){if(innerWidth<700||cinema)return;if(moments.some(m=>!m.savedPos))placeAll();if(viewMode==='fit')fitAll(false);else boardStartView()}"), "boardResize: 저장 자리 없는 카드 재꽂기 포함")
+  assert.ok(BOARD.includes("function boardResize(){if(innerWidth<700||cinema)return;placeAll();if(viewMode==='fit')fitAll(false);else boardStartView()}"), "boardResize: 저장 자리 없는 카드 재꽂기 포함")
   assert.match(DETAIL, /boardStartView\(\);applyPathHighlight\(\)/);
   assert.match(EXTRAS, /setTimeout\(boardStartView,40\)/);
   assert.match(EXTRAS, /addEventListener\('resize',boardResize\)/);

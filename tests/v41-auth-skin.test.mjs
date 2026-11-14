@@ -111,7 +111,8 @@ test('로그인이 필요한 진입점은 안내 창 없이 바로 /auth/login�
   // #426: '이어 보던 순간' 버튼은 최근 순간 카드가 대신한다 — resume 배선도 뺐다.
   assert.doesNotMatch(home, /bridge\.actions\.resume\(\)/);
   assert.match(home, /communityButton\.onclick=\(\)=>bridge\.actions\.community\(\)/);
-  assert.match(home, /guideButton\.onclick=\(\)=>bridge\.actions\.community\(\)/);
+  // #635: '어떻게 쓰나요'는 같은 첫 화면의 안내 패널을 연다(별도 사용법 안내 화면은 없다 — #388).
+  assert.match(home, /guideButton\.onclick=openGuide/);
 });
 
 test('밤·정원 안내 창 글자 대비는 4.5:1 이상이다', () => {

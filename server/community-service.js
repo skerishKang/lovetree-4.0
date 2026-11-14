@@ -51,6 +51,11 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
   // #611 3번: AI 테스터 기록은 남에게 보이는 카드에 'AI 테스터' 배지 한 비트만 내린다
   // (계정·이메일·subject는 공개 응답에 넣지 않는다).
   if(aiTesterLookup&&await aiTesterLookup(share.subjectId))card.aiTester=true;
+  // #627: 둘러보기 검색에 이 트리 순간들의 제목(사용자 제목 + 영상 제목)도 넣는다. 트리 이름이 자동 이름
+  // ('모아둔 순간')이어도 영상 제목에 있는 그룹 이름으로 찾을 수 있게 하려는 것이다. 순간은 카드를 만들 때
+  // 이미 읽은 공개 사본(projectSharedTree)에서 가져오므로 쿼리는 늘지 않는다. 응답에 내보내지 않도록
+  // 열거하지 않는 속성(non-enumerable)으로 붙인다 — JSON.stringify 와 펼침({...card})에 섞이지 않는다.
+  Object.defineProperty(card,'searchText',{value:tree.moments.slice(0,200).map(moment=>[clean(moment.title,120),clean(moment.mediaMetadata?.title,120)].filter(Boolean).join(' ')).filter(Boolean).join(' '),enumerable:false});
   return card;
  }
  return {
@@ -76,7 +81,7 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
     entries=await Promise.all(shares.map(share=>card(share,viewerSubjectId,null,null,aiTesterLookup)));
    }
    const cards=[];
-   for(const item of entries){if(!item)continue;const haystack=(item.title+' '+item.subject+' '+item.summary).toLocaleLowerCase('ko-KR');if(q&&!haystack.includes(q))continue;if(tag&&!item.emotions.includes(tag))continue;cards.push(item);}
+   for(const item of entries){if(!item)continue;const haystack=(item.title+' '+item.subject+' '+item.summary+' '+(item.searchText||'')).toLocaleLowerCase('ko-KR');if(q&&!haystack.includes(q))continue;if(tag&&!item.emotions.includes(tag))continue;cards.push(item);}
    const start=cursor?Math.max(0,cards.findIndex(item=>item.shareId===cursor)+1):0,items=cards.slice(start,start+size),next=start+size<cards.length?items.at(-1)?.shareId||null:null;
    return {items,nextCursor:next,totalVisible:cards.length};
   },

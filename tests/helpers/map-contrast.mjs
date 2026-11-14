@@ -12,9 +12,13 @@ export function installMapPaintProbe() {
     const fn = proto[name];
     proto[name] = function (...args) { if (active(this)) before.call(this, args); return fn.apply(this, args); };
   };
-  window.__mapPaint = { texts: [], paths: [] };
+  // #628: 재그리기 판정은 '세대 번호'로 한다 — 예전에는 그리기 기록 전체(글자·경로)를 문자열로 만들어
+  // 두 번 주고받았다. 캔버스를 통째로 지우는 순간이 곧 새 그리기의 시작이므로 그때 번호를 올리면 충분하다.
+  window.__mapPaint = { gen: 0, texts: [], paths: [] };
   wrap('fillRect', function ([x, y, w, h]) {
-    if (x === 0 && y === 0 && w >= this.canvas.clientWidth && h >= this.canvas.clientHeight) window.__mapPaint = { texts: [], paths: [] };
+    if (x === 0 && y === 0 && w >= this.canvas.clientWidth && h >= this.canvas.clientHeight) {
+      window.__mapPaint = { gen: (window.__mapPaint.gen || 0) + 1, texts: [], paths: [] };
+    }
   });
   wrap('beginPath', () => { path = []; });
   wrap('moveTo', function ([x, y]) { path.push(point(this, x, y)); });
@@ -56,20 +60,27 @@ export async function measureMapPixelsInPage([png, overlaysArg]) {
   // 실행되어 가려진 어두운 패널 픽셀을 선 색으로 오인했다(2026-11-14 실측 — #591).
   // 스크린샷에는 토스트가 남아 있고 그 아래 지도는 backdrop-filter로 뿌옇다 — 좌표와 픽셀의
   // 시점을 맞추지 않으면 뿌연 픽셀을 가리개 없이 재어 line(43) 1.08:1 < 3 가 나왔다(#591 실측).
-  const overlays = (overlaysArg || []).map(r => ({ left: r.left, top: r.top, right: r.right, bottom: r.bottom }));
-  const visible = (x, y) => {
-    if (x < 3 || y < 3 || x >= stage.clientWidth - 3 || y >= stage.clientHeight - 3) return false;
-    if (overlays.some(r => x >= r.left - 1 && x <= r.right + 1 && y >= r.top - 1 && y <= r.bottom + 1)) return false;
-    const el = document.elementFromPoint(x, y);
-    return el === stage || el?.classList.contains('paper-noise');
-  };
-  // 배경색 행 훑기용: 알려진 겉요소(overlays)만 사각형으로 피하고 elementFromPoint는 하지 않는다.
-  // 배경은 행에서 가장 많은 색을 고르므로(최다 bin) 가려진 점이 섞여도 배경 추정이 바뀌지 않고,
-  // 이 행 훑기가 측정당 수만 번의 elementFromPoint를 만들어 해석 시간의 대부분이었다(2026-11-14 실측).
-  const visibleRect = (x, y) => {
-    if (x < 3 || y < 3 || x >= stage.clientWidth - 3 || y >= stage.clientHeight - 3) return false;
-    return !overlays.some(r => x >= r.left - 1 && x <= r.right + 1 && y >= r.top - 1 && y <= r.bottom + 1);
-  };
+  // #628: 가림 판정을 elementFromPoint 에서 '겹침 격자'로 바꿨다. 표본마다 히트 테스트를 하면(글자 속 픽셀·
+  // 점 둘레·선 중간점 — 재기 한 번에 수만 번) 재기 시간의 대부분이 여기서 나왔다(실측 1,517ms/회).
+  // 겹치는 요소의 사각형은 스크린샷 직전에 이미 재 두므로(overlayRectsInPage), 그 사각형을 2px 격자에
+  // 한 번만 칠해 두고 표본은 격자만 본다. 가리는 요소의 범위는 예전보다 넓어지기만 한다(더 보수적).
+  const CELL = 2, cw = stage.clientWidth, ch = stage.clientHeight;
+  const gw = Math.ceil(cw / CELL) + 1, gh = Math.ceil(ch / CELL) + 1;
+  const cover = new Uint8Array(gw * gh);
+  {
+    const origin = stage.getBoundingClientRect();
+    for (const r of overlaysArg || []) {
+      const l = r.left - origin.left, t = r.top - origin.top, rr = r.right - origin.left, b = r.bottom - origin.top;
+      const x0 = Math.max(0, Math.floor((l - 1) / CELL)), x1 = Math.min(gw - 1, Math.ceil((rr + 1) / CELL));
+      const y0 = Math.max(0, Math.floor((t - 1) / CELL)), y1 = Math.min(gh - 1, Math.ceil((b + 1) / CELL));
+      for (let y = y0; y <= y1 && y < gh; y++) cover.fill(1, y * gw + x0, y * gw + x1 + 1);
+    }
+  }
+  const inside = (x, y) => x >= 3 && y >= 3 && x < cw - 3 && y < ch - 3;
+  const covered = (x, y) => cover[Math.min(gh - 1, Math.floor(y / CELL)) * gw + Math.min(gw - 1, Math.floor(x / CELL))] === 1;
+  const visible = (x, y) => inside(x, y) && !covered(x, y);
+  // 배경색 행 훑기도 같은 격자를 쓴다(예전에는 사각형 목록을 매 표본마다 훑었다).
+  const visibleRect = visible;
   // The backdrop is a vertical gradient. Use the modal visible background in
   // nearby rows, rather than a single edge pixel (ellipse crossings) or a row
   // median (a long horizontal edge can cover over half a narrow viewport).
@@ -162,7 +173,33 @@ export async function measureMapPixelsInPage([png, overlaysArg]) {
   }
   // #601: 점 썸네일(이름표 앞 16px 사진)도 점과 같은 불투명 요소다 — 사진 뒤를 지나는 선은 가린 것으로 본다.
   const thumbRects = (typeof window !== 'undefined' && window.__lt?.thumbRects?.()) || [];
-  const clearPoint = (p) => visible(p.x, p.y) && ![...dots, ...hubs].some(d => Math.hypot(p.x - d.x, p.y - d.y) < d.r + (d.first ? 12 : 3)) && !textBounds.some(t => p.x > t.left - 2 && p.x < t.right + 2 && p.y > t.top - 2 && p.y < t.bottom + 2) && !thumbRects.some(r => p.x > r.x - 2 && p.x < r.x + r.w + 2 && p.y > r.y - 2 && p.y < r.y + r.h + 2);
+  // #628: 선 위의 점을 고를 때 점·이름표·썸네일과 겹치는지 확인한다. 예전에는 표본마다 목록 전체를 훑었다
+  // (이름표 130여 개 × 선 위 점 수천 개 = 100만 번 비교, 재기 시간의 절반 이상). 같은 판정을 격자에 한 번
+  // 칠해 두고 표본은 격자만 본다 — 격자 칸 2px 이라 경계 오차는 1px 안쪽이다.
+  const block = new Uint8Array(gw * gh);
+  const markRect = (l, t, r, b) => {
+    const x0 = Math.max(0, Math.floor(l / CELL)), x1 = Math.min(gw - 1, Math.ceil(r / CELL));
+    const y0 = Math.max(0, Math.floor(t / CELL)), y1 = Math.min(gh - 1, Math.ceil(b / CELL));
+    for (let y = y0; y <= y1; y++) block.fill(1, y * gw + x0, y * gw + x1 + 1);
+  };
+  const markCircle = (cx, cy, rad) => {
+    const x0 = Math.max(0, Math.floor((cx - rad - 1) / CELL)), x1 = Math.min(gw - 1, Math.ceil((cx + rad + 1) / CELL));
+    const y0 = Math.max(0, Math.floor((cy - rad - 1) / CELL)), y1 = Math.min(gh - 1, Math.ceil((cy + rad + 1) / CELL));
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+      const dx = x * CELL - cx, dy = y * CELL - cy;
+      if (dx * dx + dy * dy <= (rad + 1) * (rad + 1)) block[y * gw + x] = 1;
+    }
+  };
+  for (const t of textBounds) markRect(t.left - 2, t.top - 2, t.right + 2, t.bottom + 2);
+  for (const d of [...dots, ...hubs]) markCircle(d.x, d.y, d.r + (d.first ? 12 : 3));
+  for (const r of thumbRects) markRect(r.x - 2, r.y - 2, r.x + r.w + 2, r.y + r.h + 2);
+  const blocked = (x, y) => [...dots, ...hubs].some(d => Math.hypot(x - d.x, y - d.y) < d.r + (d.first ? 12 : 3)) || textBounds.some(t => x > t.left - 2 && x < t.right + 2 && y > t.top - 2 && y < t.bottom + 2) || thumbRects.some(r => x > r.x - 2 && x < r.x + r.w + 2 && y > r.y - 2 && y < r.y + r.h + 2);
+  const clearPoint = (p) => {
+    if (!visible(p.x, p.y)) return false;
+    // 격자에 안 칠해진 칸은 '확실히 비었다'(격자는 넉넉히 칠했다) — 칠해진 칸만 예전과 같은 정확한 판정을 한다.
+    if (block[Math.min(gh - 1, Math.floor(p.y / CELL)) * gw + Math.min(gw - 1, Math.floor(p.x / CELL))] === 0) return true;
+    return !blocked(p.x, p.y);
+  };
   for (const [i, p] of window.__mapPaint.paths.entries()) {
     const samples = [];
     const points = p.closed ? [{ x: p.points.reduce((n, q) => n + q.x, 0) / p.points.length, y: p.points.reduce((n, q) => n + q.y, 0) / p.points.length }] : p.points.slice(1).map((q, j) => ({ x: (q.x + p.points[j].x) / 2, y: (q.y + p.points[j].y) / 2 }));
@@ -182,6 +219,7 @@ export async function measureMapPixelsInPage([png, overlaysArg]) {
 }
 
 /** 겹침 사각형 — 스크린샷 직전에 frame.evaluate 로 부른다(measureMap 첫 줄). */
+// 좌표는 화면 기준(getBoundingClientRect)이고, 가림 격자로 옮길 때 캔버스 원점을 뺀다.
 export function overlayRectsInPage() {
   return [...document.querySelectorAll('.topbar button,.mode-pill,.hero,.legend,.controls,.detail.open,.route-status.show,.toast.show,.edge-tip.show,.mobile-ribbon,.lt-moment-picker')]
     .filter(el => { const r = el.getBoundingClientRect(), s = getComputedStyle(el); return r.width > 0 && r.height > 0 && s.visibility === 'visible' && Number(s.opacity) > .01; })
@@ -236,14 +274,16 @@ export async function measureMap(frame) {
   // 점을 누르면 고정되는 '연결 이유' 말풍선(3.2초)·토스트(2.3초)가 스크린샷 뒤에 사라지면 겹침 계산이
   // 사라진 뒤에 실행되어 가려진 어두운 패널 픽셀을 선 색으로 오인했다(2026-11-14 실측 — #591).
   // 직전에 잰 사각형으로 스크린샷 시점과 같은 겹침으로 거른다.
+  await settlePaint(frame);
   for (let attempt = 0; ; attempt += 1) {
-    const before = await frame.evaluate(() => JSON.stringify(window.__mapPaint));
+    // #628: 그리기 기록 전체(문자열) 대신 세대 번호만 본다 — 뜻은 같고 비용은 거의 0이다.
+    const before = await frame.evaluate(() => window.__mapPaint?.gen || 0);
     const { screenshot, overlays } = await freshScreenshot(frame);
     const canvas = await frame.evaluate(measureMapPixelsInPage, [`data:image/png;base64,${screenshot.toString('base64')}`, overlays]);
     const dom = await frame.evaluate(measureMapDOMInPage);
-    const after = await frame.evaluate(() => JSON.stringify(window.__mapPaint));
+    const after = await frame.evaluate(() => window.__mapPaint?.gen || 0);
     if (before === after || attempt >= 2) return { canvas, dom, screenshot };
-    await settleMap(frame);
+    await settlePaint(frame, { quiet: 150 });
   }
 }
 
@@ -269,7 +309,10 @@ async function freshScreenshot(frame) {
     });
     let screenshot;
     try {
-      screenshot = await frame.locator('#stage').screenshot({ animations: 'disabled' });
+      // #628: animations:'disabled' 는 캡처 때 스타일시트를 주입해 CSS 애니메이션을 끝내는데, 이 화면은
+      // reducedMotion('reduce')으로 이미 애니메이션이 꺼져 있고 지도 그림은 캔버스라 CSS 애니메이션이 아니다.
+      // 주입이 화면 상태를 건드리지 않도록 옵션을 뺀다(캡처 앞뒤 세대 번호가 같은지로 계속 확인한다).
+      screenshot = await frame.locator('#stage').screenshot();
     } finally {
       await frame.evaluate(() => { const s = document.getElementById('stage'); s.style.transform = s.dataset.ltPrevTransform || ''; delete s.dataset.ltPrevTransform; });
     }
@@ -282,7 +325,7 @@ async function freshScreenshot(frame) {
       return r <= 5 && g <= 6 && b <= 7; // 신호가 찍힌 값(실측 0,0,0). 스틸 프레임의 모서리는 주변과 섞여 밝다(실측 10,8,7).
     }, `data:image/png;base64,${screenshot.toString('base64')}`);
     if (fresh) return { screenshot, overlays };
-    if (i >= 9) throw new Error('스크린샷이 최신 그리기를 보여 주지 않는다(모서리 신호 픽셀 10번 재시도에도 없음) — 표시 지연이 길다. 이 재면 이행 전 색을 잊므로 실패로 멈춘다');
+    if (i >= 9) throw new Error('스크린샷이 최신 그리기를 보여 주지 않는다(모서리 신호 픽셀 10번 재시도에도 없음) — 표시 지연이 길다. 이 재면 이행 전 색을 잊으므로 실패로 멈춘다');
     await settleMap(frame);
   }
 }
@@ -299,7 +342,23 @@ export function worstMapRoles(results) {
 
 // 지도 화면이 멈출 때까지 기다린다(확대·이동 연출이 끝나 점·묶음 좌표가 연속 3번 같을 때).
 // 고정 대기(100~180ms)는 느린 CI에서 연출이 끝나기 전에 좌표를 읽어 클릭이 빗나가거나 캡처가 비었다(2026-11-13 간헐 실패).
-export async function settleMap(frame, { timeout = 6000, gap = 90 } = {}) {
+// #628: 재기 직전에 '그리기까지 멈춘' 순간을 기다린다(세대 번호가 quiet 250ms 동안 그대로). 지도는 연출(1.6초 밝히기)·카메라 이동·썸네일 도착 때
+// 다시 그리는데, 기계가 바쁘면 그 간격이 100ms 까지 벌어져 캡처 도중에 다시 그려졌다(실측 40회 중 17회 =
+// 스크린샷을 두 번 찍어 시간이 절반 더 들고, 스크린샷과 픽셀 해석의 시점도 어긋났다). 세대 번호가
+// quiet ms 동안 그대로일 때만 잰다(화면 코드는 손대지 않는다).
+export async function settlePaint(frame, { timeout = 6000, gap = 25, quiet = 250 } = {}) {
+  const snap = () => frame.evaluate(() => (window.__mapPaint?.gen || 0) + '#' + (window.__imgPending || 0));
+  const start = Date.now(); let prev = await snap(), last = Date.now();
+  while (Date.now() - start < timeout) {
+    await new Promise(r => setTimeout(r, gap));
+    const cur = await snap();
+    if (cur !== prev) { prev = cur; last = Date.now(); }
+    else if (Date.now() - last >= quiet) return true;
+  }
+  return true;
+}
+
+export async function settleMap(frame, { timeout = 6000, gap = 20 } = {}) {
   const snap = () => frame.evaluate(() => {
     const lt = window.__lt; if (!lt) return '';
     const pts = [...(lt.hubs?.() || []), ...(lt.dots?.() || [])];

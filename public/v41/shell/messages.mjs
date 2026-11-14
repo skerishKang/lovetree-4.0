@@ -28,6 +28,9 @@ export function createMessages(deps) {
   const openLoginStart = deps.openLoginStart;
   const openAccountMenu = deps.openAccountMenu;
   const openCleanup = deps.openCleanup;
+  // #644 1: 상세의 옮기기는 트리 목록(셸 cleanup 모듈의 openMove)으로 바로 연다 — 트리가 하나뿐이면
+  // 그 모듈이 기존 정리 창('새 트리 만들어 옮기기')을 연다. 셸이 넘겨 주지 않으면 예전 동작(정리 창)으로라도 연다.
+  const openMovePicker = deps.openMovePicker || openCleanup;
   const sample = deps.sample;
   const applyTheme = deps.applyTheme;
   const paintThemeControls = deps.paintThemeControls;
@@ -86,7 +89,7 @@ export function createMessages(deps) {
     if (data?.type === 'lt41-write') openEditor(data.mode, data.parentId);
     if (data?.type === 'lt41-write' && data.focusTitle) focusTitleInput?.();
     // #327 2부: 순간 상세의 '다른 트리로 옮기기'. 공유·예시 화면에서는 보내지 않고, 여기서도 한 번 더 막는다.
-    if (data?.type === 'lt41-move' && getSource() === 'server') openCleanup({ momentId: data.momentId });
+    if (data?.type === 'lt41-move' && getSource() === 'server') openMovePicker({ momentId: data.momentId });
     if (data?.type === 'lt41-open-book' && getModel()?.trees.some(t => t.id === data.treeId && t.moments.some(m => m.id === data.id))) {
       setCurrent('track59-sketchbook.html'); choose(data.treeId, data.id); writeLocation();
     }

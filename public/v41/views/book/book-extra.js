@@ -72,16 +72,17 @@ function closeDetail(){
 }
 function detailMarkup(m){
  const nextInfo=nextMomentOf(m.id);
- const line=connectionLine(nextInfo?.title,nextInfo?.reason);
+ /* #635: 감상 화면에서는 이유가 비었을 때의 안내를 감춘다 — 내 트리는 예전 그대로 둔다. */
+ const line=connectionLine(nextInfo?.title,nextInfo?.reason,{hideEmptyWhy:!!LTDEMO.readOnly});
  const open=m.url&&isYouTubeUrl(m.url)?'YouTube에서 열기 ↗':'원본 링크 열기 ↗';
  // #327 2부: 내 기록(서버)의 순간 상세에서 다른 트리로 옮길 수 있다. 공유·예시는 숨긴다.
  const canMove=(window.parent&&window.parent.LT41)?window.parent.LT41.source==='server':false;
  const view=titleViewFor(m);
  return '<div class="detail-kicker">'+t(LTLabels.type(m.kind))+' · '+t(formatDisplayDate(m.date,ltDateStyle()))+' · '+t(m.emotion)+'</div>'+
-  (view.main?'<h2>'+t(view.main)+'</h2>'+(view.sub?'<p class="video-title">▶ '+t(view.sub)+'</p>':''):'')+
+  (view.main?'<h2>'+t(view.main)+'</h2>'+(view.sub&&view.sub.toLowerCase()!==view.main.trim().toLowerCase()?'<p class="video-title">▶ '+t(view.sub)+'</p>':''):'')+
   '<p>'+t(m.note)+' · 출처: '+t(m.source)+'</p>'+
   '<div class="chips">'+m.keywords.map(k=>'<span class="chip">#'+t(k)+'</span>').join('')+'</div>'+
-  '<div class="detail-why">'+t(line||'연결 이유는 아직 적지 않았어요')+'</div>'+
+  (line?'<div class="detail-why">'+t(line)+'</div>':(LTDEMO.readOnly?'':'<div class="detail-why">연결 이유는 아직 적지 않았어요</div>'))+
   '<div class="detail-actions"><button type="button" data-detail-viewer>순간 열기</button>'+
   (m.url?'<a href="'+t(m.url)+'" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">'+open+'</a>':'')+
   '<button type="button" data-detail-index>목차에서 보기</button>'+
@@ -187,7 +188,8 @@ function paintTitle(m){
  parts.note=noteText;
  const hands=editAffordances({readOnly:!!LTDEMO.readOnly,synthetic:!!m.synthetic,hasTitle:!!parts.main,hasNote:!!parts.note});
  const date=m.date?'<p class="moment-date">'+t(formatDisplayDate(m.date,ltDateStyle()))+'</p>':'';
- const sub=parts.media?'<p class="video-title">▶ '+t(parts.media)+'</p>':'';
+ /* #635: 유튜브 제목이 사용자 제목과 같으면(앞뒤 공백·대소문자 무시) '▶ 제목' 줄은 두 번 보이지 않게 감춘다. */
+ const sub=parts.media&&parts.media.trim().toLowerCase()!==String(parts.main||'').trim().toLowerCase()?'<p class="video-title">▶ '+t(parts.media)+'</p>':'';
  const heading=parts.main?(hands.title
   ?'<div class="moment-heading"><button type="button" class="moment-title-button" data-title-edit="'+t(m.id)+'" aria-label="제목 고치기: '+t(parts.main)+'">'+t(parts.main)+'</button>'+(hands.hint?'<button type="button" class="title-edit-hint" data-title-edit="'+t(m.id)+'" aria-label="제목 고치기"><span aria-hidden="true">✎</span> 고치기</button>':'')+'</div>'
   :'<h3>'+t(parts.main)+'</h3>'):'';
@@ -210,20 +212,23 @@ momentContent=function(m,compact=false){
   const ctx=(typeof LTMedia.currentContext==='function')?LTMedia.currentContext():{source:'',owned:false};
   if(media.kind==='youtube'){
    // #327 1부: 내 기록(서버·로그인 소유자)은 썸네일을 처음부터 보여 준다(판정은 media-preview 의
-   // autoLoadMedia 한 함수). 공유·예시는 기존 규칙 그대로 — 누르기 전 외부 요청 0.
+   // autoLoadMedia 한 함수). #635 PR B(대표 결정): 감상 화면의 영상 칸은 빈 크림 상자였다 — 보관된 썸네일을
+   // 먼저 보이게 한다(재생 임베드는 여전히 누르기 전까지 없다). 썸네일이 없거나 깨지면 #393 내려가기 틀로
+   // 제목 글 카드가 된다(회색·빈 상자 금지). 보관 썸네일(data:·/api/media/)이 있으면 그것이 먼저다.
    const thumb=localThumb(safe);
-   const auto=!thumb&&LTMedia.autoLoadMedia(ctx.source,ctx.owned);
-   // #393·#429: 세로 영상 틀(9:16)과 썸네일 내려가기(저장 주소 → oardefault/hqdefault → mqdefault → 글/최소 카드) 한 벌.
    const vertical=LTMedia.verticalVideo(safe.url,safe.mediaMetadata);
    const defaultThumb=vertical?LTMedia.youtubeThumbUrl(media.videoId,true):media.loadUrl;
-   const candidates=auto?thumbnailCandidates(m,{vertical,autoLoad:true}):[];
+   const candidates=thumbnailCandidates(m,{vertical,autoLoad:true});
    const remoteThumb=candidates[0]||defaultThumb;
-   const thumbFallback=auto?thumbFallbackAttrs(m,{candidates:candidates.length?candidates:[remoteThumb],writable:writableBook,videoUnavailable:true,variant:'book',momentId:safe.id}):'';
+   const thumbFallback=thumbFallbackAttrs(m,{candidates:candidates.length?candidates:[remoteThumb],writable:writableBook,videoUnavailable:true,variant:'book',momentId:safe.id});
    // #584: 단추 이름을 '▶ 재생'으로 줄인다. 시작 시점이 있으면 '▶ 재생 · 1:23'.
    const label=media.startSeconds?('▶ 재생 · '+media.label.replace('YouTube 링크 · ','')):'▶ 재생';
-   const face=thumb?'<img src="'+t(thumb)+'" alt="">'
-    :auto?'<img src="'+t(remoteThumb)+'" alt="'+t(safe.title||'YouTube 영상 썸네일')+'"'+thumbFallback+' referrerpolicy="no-referrer" loading="lazy" decoding="async">'
-    :'<span class="yt-placeholder"></span>';
+   /* #635 PR B: 재생 전 칸이 빈 크림 상자(yt-placeholder)였다 — 감상에서 특히 티가 났다.
+      보관된 썸네일(data:·/api/media/)을 먼저 보이고, 없으면 유튜브 보관 썸네일을 부른다(#635 PR B 대표 결정 —
+      재생 임베드가 아니라 썸네일 <img> 하나다). 어느 쪽이든 깨지면 #393 내려가기 틀로 제목 글 카드가 된다 —
+      빈 상자는 이제 어디에도 나오지 않는다. */
+   const face=thumb?'<img src="'+t(thumb)+'" alt=""'+(thumb.startsWith('/api/media/')?thumbFallbackAttrs(safe,{candidates:[thumb],writable:writableBook,videoUnavailable:false,variant:'book',momentId:safe.id}):'')+'>'
+    :'<img src="'+t(remoteThumb)+'" alt="'+t(safe.title||'YouTube 영상 썸네일')+'"'+thumbFallback+' referrerpolicy="no-referrer" loading="lazy" decoding="async">';
    /* #345: 영상 바로 아래 한 줄 — ▶ 채널. 이슈 584에서 YouTube ↗·크게 보기는 그 아래 .media-links 한 줄로 옮겼다. */
     const source=String(safe.mediaMetadata?.channel||'').trim();
    // #584: 채널 줄은 정보만 남기고, YouTube ↗(왼쪽)·크게 보기(오른쪽)를 카드 아래 한 줄(.media-links)에 둔다.
@@ -262,9 +267,13 @@ renderSpread=function(idx,focusId=null,land=true){
      안내를 쪽 위에 겹쳐 놓으면 그 순간의 카드·단추를 가린다 — 순간 내용 상자 안 끝에 놓는다. */
   const spread=currentSpread();
   if(spread?.right?.synthetic&&current===pageCount()-1){
-   const flow=host.querySelector('.page-content')||host;
-   flow.insertAdjacentHTML('beforeend','<div class="next-page"><div><b>'+t(NEXT_PAGE_COPY)+'</b></div>'+(LTDEMO.readOnly?'':'<button type="button" data-next-moment="'+t(one.id)+'">'+t(NEXT_PAGE_ACTION)+'</button>')+otherTreesBlock()+'</div>');
-   try{window.__TRACK59__?.rejudgeOverflow?.()}catch{}
+   /* #635: 감상 화면(공유·예시)에서는 '다음 이야기' 안내 자체를 감춘다 — 남의 트리를 보는 사람에게
+      다음 순간을 남기라는 말은 맞지 않다. 내 트리에서는 값이 비면 안내 문장+단추를 그대로 둔다. */
+   if(!LTDEMO.readOnly){
+    const flow=host.querySelector('.page-content')||host;
+    flow.insertAdjacentHTML('beforeend','<div class="next-page"><div><b>'+t(NEXT_PAGE_COPY)+'</b></div><button type="button" data-next-moment="'+t(one.id)+'">'+t(NEXT_PAGE_ACTION)+'</button>'+otherTreesBlock()+'</div>');
+    try{window.__TRACK59__?.rejudgeOverflow?.()}catch{}
+   }
   }
  }else{
   for(const [host,side] of [[leftPage,'left'],[rightPage,'right']]){
@@ -273,7 +282,9 @@ renderSpread=function(idx,focusId=null,land=true){
   }
   const right=SPREADS[current].right;
   if(right&&right.synthetic){
-   rightPage.innerHTML='<div class="next-page"><div><b>'+t(NEXT_PAGE_COPY)+'</b></div>'+(LTDEMO.readOnly?'':'<button type="button" data-next-moment="'+t(SPREADS[current].left.id)+'">'+t(NEXT_PAGE_ACTION)+'</button>')+otherTreesBlock()+'</div>';
+   /* #635: 감상 화면에서는 '다음 이야기' 안내를 감춘다 — 마지막 장은 깨끗하게 끝난다.
+      (예전에는 여기에 otherTreesBlock()의 맨 return이 undefined로 그대로 찍혔다.) */
+   rightPage.innerHTML=LTDEMO.readOnly?'':'<div class="next-page"><div><b>'+t(NEXT_PAGE_COPY)+'</b></div><button type="button" data-next-moment="'+t(SPREADS[current].left.id)+'">'+t(NEXT_PAGE_ACTION)+'</button>'+otherTreesBlock()+'</div>';
   }
  }
  paintLensButton();
@@ -282,7 +293,9 @@ renderSpread=function(idx,focusId=null,land=true){
 const originalUpdateConnectionSummary=updateConnectionSummary;
 updateConnectionSummary=function(id){
  const next=nextMomentOf(id),host=$b('#whyMargin');
- const line=connectionLine(next&&next.title,next&&next.reason);
+ /* #635: 감상 화면에서는 이유가 비었을 때의 안내를 감춘다 — 남의 트리를 보는 사람에게 필요 없는 말이다.
+    이유가 있으면 감상 화면에서도 그대로 보여 준다(내 트리는 예전 그대로). */
+ const line=connectionLine(next&&next.title,next&&next.reason,{hideEmptyWhy:!!LTDEMO.readOnly});
  if(!line){host.hidden=true;host.replaceChildren();return}
  host.hidden=false;
  host.innerHTML='<span></span>'+t(line);
@@ -304,7 +317,7 @@ const treeCoverSpan=(tree,index=0)=>{
  return '<span class="tree-cover"'+(choice.design?' data-cover-design="'+t(choice.design)+'"':'')+' style="background-color:'+t(choice.color)+'" aria-hidden="true">'+thumb+'</span>';
 };
 function otherTreesBlock(){
- if(LTDEMO.readOnly)return;/* 공유·예시에서는 다른 트리로 갈 수 없다(셸의 이동 규칙도 막힌다) */
+ if(LTDEMO.readOnly)return '';/* 공유·예시에서는 다른 트리로 갈 수 없다(셸의 이동 규칙도 막힌다) — #635: 빈 문자열을 돌려준다(맨 return은 undefined가 문자열에 그대로 붙었다) */
  const others=orderedTrees().filter(tree=>tree.id!==currentTreeId()).slice(0,3);
  if(!others.length)return '';
  return '<div class="other-trees"><b>다른 트리 보기</b><div class="other-tree-row">'+others.map((tree,index)=>'<button type="button" class="other-tree" data-open-tree="'+t(tree.id)+'" data-open-moment="'+t(tree.moments?.[0]?.id||'')+'">'+treeCoverSpan(tree,index)+'<span class="other-tree-name">'+t(treeTitleText(tree.title))+'</span><small>'+t(treeCountText(tree))+'</small></button>').join('')+'</div></div>';
@@ -363,7 +376,7 @@ function openJourney(){
  journeyOpener=document.activeElement;
  const journey=LT59Model.journeyTimeline(LTDEMO.moments,LTDEMO.edges,LTDEMO.get(),titleMainFor);
  $b('#overviewFlow').innerHTML=journeyMarkup(journey);
- $b('#journeySummary').textContent=journey.days===null?journey.steps+'단계':journey.steps+'단계 · '+journey.days+'일';
+ $b('#journeySummary').textContent=journey.days===null?journey.steps+'단계':journey.steps+'단계 · '+(journey.days===0?'첫날':journey.days+'일째');
  const overlay=$b('#overview');overlay.inert=false;overlay.classList.add('open');
  setTimeout(()=>$b('#overviewClose').focus(),40);
 }

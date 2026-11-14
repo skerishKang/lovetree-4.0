@@ -86,7 +86,8 @@ test('보드 상세도 자체 SVG가 아니라 공용 한 벌을 쓴다(전: you
 test('책: 쓰기 미리보기는 이미 공용 한 벌을 쓴다(중복 없음)', () => {
   const bookExtra = read('public/v41/views/book/book-extra.js');
   assert.match(bookExtra, /import \{[^}]*thumbnailCandidates[^}]*\} from '\/v41\/thumb-fallback\.mjs';/);
-  assert.match(bookExtra, /const candidates=auto\?thumbnailCandidates\(m,\{vertical,autoLoad:true\}\):\[\];/);
+  // #635 PR B(대표 결정): 썸네일 후보는 감상에서도 쓴다(빈 상자 대신 보관 썸네일) — auto 묶음을 뗐다.
+  assert.match(bookExtra, /const candidates=thumbnailCandidates\(m,\{vertical,autoLoad:true\}\);/);
   // 책 미리보기는 media-preview의 markup을 거치고, 그 함수는 공용 한 벌이 있으면 그것을 쓴다.
   const mediaPreview = read('public/v41/media-preview.js');
   assert.match(mediaPreview, /const fb=globalThis\.LTThumbFallback\|\|null;/);

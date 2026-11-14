@@ -50,9 +50,11 @@ test('지도 실제 대비: 앱 2 × 판 2 × 1440·390, 두 보기·선택 상�
         page.on('pageerror', e => errors.push(String(e.message || e)));
         await page.goto(`${base}/v41/#network`, { waitUntil: 'load' });
         // #583: 전체 자리(npm test)에서는 여러 브라우저 시험이 함께 도는 — 첫 그리기 대기만 넉넉히(단언·측정은 그대로).
-        await page.waitForFunction(() => [...document.querySelectorAll('iframe')].some(f => f.contentWindow?.__lt?.dots?.().length > 0), null, { timeout: 30000 });
+        await page.waitForFunction(() => [...document.querySelectorAll('iframe')].some(f => f.contentWindow?.__lt?.dots?.().length > 0), null, { timeout: 30000, polling: 100 });
         const frame = page.frames().find(f => /track56-network/.test(f.url()));
         assert.ok(frame, '지도 프레임을 찾지 못함');
+        // #628: 폴링을 rAF 가 아니라 시간 간격으로 한다 — 다른 브라우저 시험이 함께 도는 실행기에서 프레임이
+        // 늦게 돌아 rAF 폴링이 늘어지는 일이 있었다. 재기 전 '조용해질 때까지 기다리기'는 helper 의 settlePaint 가 한다.
         await frame.evaluate(() => document.fonts.ready);
         // 환경 확인: 한글 글꼴이 없는 실행기에서는 이름표가 가는 대체 글리프로 그려져 '글자 속' 표본이 0이 된다(#529).
         // 제품 대비 미달과 섞이지 않게, 재기 전에 환경 문제로 분명히 멈춘다.
@@ -83,7 +85,7 @@ test('지도 실제 대비: 앱 2 × 판 2 × 1440·390, 두 보기·선택 상�
               await frame.locator('#stage').click({ position: { x: hub.x, y: hub.y } });
               await settleMap(frame);
               assert.equal(await frame.evaluate(() => window.__lt.state.mode), 'CLUSTER_PATH_OVERVIEW', '묶음을 누르면 묶음 보기');
-              await frame.waitForFunction(() => performance.now() - window.__lt.state.revealStart > 1700);
+              await frame.waitForFunction(() => performance.now() - window.__lt.state.revealStart > 1700, null, { timeout: 30000, polling: 200 });
             }
             const measured = await measureMap(frame), tag = `${width}-${appTheme}-${plate}-${view}-${state}`;
             results.push(measured);

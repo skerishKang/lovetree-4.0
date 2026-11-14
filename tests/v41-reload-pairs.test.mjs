@@ -123,6 +123,7 @@ test('lt41-network-view·lt41-page-turn·lt41-motion·lt41-advanced — 다시 �
   assert.doesNotMatch(BOOK, /lt41-page-turn[\s\S]{0,120}location\.reload/, '책 페이지 넘김은 다시 띄우지 않는다');
   // 첫 화면의 메시지 처리는 한 블록(lt41-motion → lt41-home-cards → lt41-date-style)이다. 움직임 갈래 바로 뒤에는
   // 다시 띄우기가 붙지 않는다(카드 출처 갈래에만 붙는다 — 위 시험에서 확인).
-  assert.match(HOME, /type==='lt41-motion'\)\{orbit\?\.motion\?\.set\?\.\(!!event\.data\.paused\);\}/, '움직임은 궤도에 바로 넘긴다');
+  // #635: 움직임 값은 motionPaused에 남겨 안내 패널이 닫힐 때 원래 값으로 되돌린다(궤도에 바로 넘긴다).
+  assert.match(HOME, /type==='lt41-motion'\)\{motionPaused=!!event\.data\.paused;orbit\?\.motion\?\.set\?\.\(motionPaused\);\}/, '움직임은 궤도에 바로 넘긴다');
   assert.doesNotMatch(readFileSync(new URL('../public/v41/views/board/board-mode.mjs', import.meta.url), 'utf8'), /location\.reload/, '보드 고급 보기는 다시 띄우지 않는다');
 });
