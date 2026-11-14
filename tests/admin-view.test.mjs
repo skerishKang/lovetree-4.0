@@ -5,7 +5,8 @@ import {
   richParagraph, formatTime, parseHash, viewHash, viewToTab,
   filterRows, statusTabs, kindTabs, STATUS_LABEL,
   linkedIssueNumbers, issueStateLabel, needsFixButton,
-  statusChangeMessage, buildIssueUrl, issueLink, escapeText
+  statusChangeMessage, buildIssueUrl, issueLink, escapeText,
+  journalsSummary, journalRowsByCustomer, journalStage
 } from '../src/admin-view.js';
 
 test('주소 해시를 화면 상태로 바꾼다(#564 2)', () => {
@@ -119,7 +120,36 @@ test('종류 탭 줄은 전체·의견·일지 숫자를 센다(#570 2)', () => 
 test("'받음'은 운영센터에서 '새 글'로 부른다(서버 값은 received 그대로, #570 2)", () => {
   assert.equal(STATUS_LABEL.received, '새 글');
   assert.ok(STATUS_ORDER.includes('closed'));
-  assert.equal(PERSONA_FIELDS.length, 6);
+  assert.equal(PERSONA_FIELDS.length, 7);
+  // #590: '자주 쓰는 곳·익숙한 디자인' 칸 — '쓰는 모습' 뒤 순서 고정(내보내기 md 와 같은 순서).
+  assert.deepEqual(PERSONA_FIELDS[3], ['habits', '자주 쓰는 곳·익숙한 디자인']);
+});
+
+test('#596 사용 일지 탭 주소: #journals 왕복', () => {
+  assert.deepEqual(parseHash('#journals'), {view: 'journals', id: null, status: '', kind: ''});
+  assert.equal(viewHash('journals'), '#journals');
+  assert.equal(viewToTab('journals'), 'journals');
+});
+
+test('#596 오늘 요약·고객별 줄·떠남 위험(이틀 연속 2 이하)', () => {
+  const journals = [
+    {id: 1, subjectId: 'a', authorName: '윤제', kind: 'journal', journalDate: '2026-11-13', score: 2, createdAt: '2026-11-13T01:00:00Z', displayTitle: '13일'},
+    {id: 2, subjectId: 'a', authorName: '윤제', kind: 'journal', journalDate: '2026-11-14', score: 2, createdAt: '2026-11-14T01:00:00Z', displayTitle: '14일'},
+    {id: 3, subjectId: 'b', authorName: '다른', kind: 'journal', journalDate: '2026-11-14', score: 1, createdAt: '2026-11-14T02:00:00Z', displayTitle: '14일 b'}
+  ];
+  const summary = journalsSummary(journals, '2026-11-14');
+  assert.deepEqual(summary, {activeCustomers: 2, journalCount: 2, avgScore: 1.5, atRisk: 1});
+  const rows = journalRowsByCustomer(journals);
+  assert.deepEqual(rows.map(row => row.name), ['윤제', '다른']); // 최근 기록일 내림차순(같으면 고정 순서)
+  assert.equal(rows[0].stage, '꾸준'); // 2일
+  assert.equal(rows[1].stage, '시작'); // 1일
+  assert.deepEqual(rows[0].flow, [{day: '2026-11-13', score: 2}, {day: '2026-11-14', score: 2}]);
+  assert.equal(rows[0].atRisk, true); // 이틀 연속 2 이하
+  assert.equal(rows[1].atRisk, false); // 하루뿐이라 판정 불가
+  assert.equal(rows[0].journals[0].journalDate, '2026-11-14'); // 펼칠 일지도 날짜 내림차순
+  assert.equal(journalStage(1), '시작');
+  assert.equal(journalStage(4), '꾸준');
+  assert.equal(journalStage(5), '정착');
 });
 
 test("상태 알림 문구는 받침에 따라 '으로/로'를 고른다(#564 6)", () => {

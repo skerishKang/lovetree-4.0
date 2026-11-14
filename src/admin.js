@@ -4,7 +4,7 @@ import {
   GITHUB_REPO, KIND_LABEL, STATUS_LABEL, STATUS_ORDER, PERSONA_FIELDS,
   escapeText, richParagraph, formatTime, parseHash, viewHash, viewToTab,
   filterRows, statusTabs, kindTabs, linkedIssueNumbers, issueStateLabel, needsFixButton,
-  statusChangeMessage, buildIssueUrl, issueLink
+  statusChangeMessage, buildIssueUrl, issueLink, journalsSummary, journalRowsByCustomer
 } from './admin-view.js';
 
 /**
@@ -49,7 +49,7 @@ function head() {
   // #570 3: 탭 이름 — 게시판→고객 글, 이슈→고치는 일. 신고는 그대로.
   const tab = viewToTab(route.view);
   const tabBtn = (name, label) => `<button type="button" data-tab="${name}" class="${tab === name ? 'is-active' : ''}">${label}</button>`;
-  return `<header class="app-header"><a class="brand" href="/v41/" title="러브트리로" aria-label="러브트리로"><span>LoveTree</span><small>4.1</small></a><nav aria-label="관리자 메뉴">${tabBtn('board', '고객 글')}${tabBtn('reports', '신고')}${tabBtn('issues', '고치는 일')}</nav></header>`;
+  return `<header class="app-header"><a class="brand" href="/v41/" title="러브트리로" aria-label="러브트리로"><span>LoveTree</span><small>4.1</small></a><nav aria-label="관리자 메뉴">${tabBtn('board', '고객 글')}${tabBtn('journals', '사용 일지')}${tabBtn('reports', '신고')}${tabBtn('issues', '고치는 일')}</nav></header>`;
 }
 
 function renderLogin() {
@@ -74,6 +74,7 @@ async function render() {
   }
   if (route.view === 'issues') { await renderIssues(); return; }
   if (route.view === 'reports') { await renderReports(); return; }
+  if (route.view === 'journals') { await renderJournals(); return; }
   if (route.view === 'feedback' && route.id) { await renderDetail(route.id); return; }
   if (route.view === 'persona' && route.id) { await renderPersona(route.id); return; }
   await renderList();
@@ -184,6 +185,73 @@ async function renderPersona(subjectId) {
   </div>`;
 }
 
+/** #596 사용 일지 탭 — 오늘 요약 + 고객별 줄(누르면 그 고객 일지를 날짜 내림차순으로 펼쳐 읽는다). */
+async function renderJournals() {
+  const [journalsRes, feedbackRes] = await Promise.all([read('/api/admin/journals'), read('/api/admin/feedback')]);
+  const journals = journalsRes.ok && Array.isArray(journalsRes.payload?.journals) ? journalsRes.payload.journals : [];
+  const feedback = feedbackRes.ok && Array.isArray(feedbackRes.payload?.feedback) ? feedbackRes.payload.feedback : [];
+  // 오늘(운영 기준 KST 날짜) 요약. 일지 날짜는 journal_date(운영 기준 날짜), 의견 날짜는 만든 시각의 KST 날짜로 잡는다.
+  const today = new Date().toLocaleDateString('sv-SE', {timeZone: 'Asia/Seoul'});
+  const kstDay = value => new Date(value).toLocaleDateString('sv-SE', {timeZone: 'Asia/Seoul'});
+  const summary = journalsSummary(journals, today);
+  const rows = journalRowsByCustomer(journals);
+  // 그날 그 고객이 보낸 의견(같은 KST 날짜) — 펼친 일지 안에서 그날 의견으로 바로 가는 링크(#596).
+  const opinionsByCustomerDay = new Map();
+  for (const row of feedback) {
+    if (row.kind !== 'opinion' || !row.subjectId) continue;
+    const key = `${row.subjectId}|${kstDay(row.createdAt)}`;
+    if (!opinionsByCustomerDay.has(key)) opinionsByCustomerDay.set(key, []);
+    opinionsByCustomerDay.get(key).push(row);
+  }
+  window.__ltJournalsData = {journals, rows, opinionsByCustomerDay};
+  const summaryItem = (label, value) => `<div class="lt-jsum-item"><span class="lt-jsum-value">${escapeText(value)}</span><span class="lt-jsum-label">${escapeText(label)}</span></div>`;
+  const flowDots = row => row.flow.map(point => `<i class="lt-flow-dot" data-score="${escapeText(point.score ?? '')}" title="${escapeText(point.day)}${point.score == null ? '' : ' · ' + escapeText(point.score)}점" aria-hidden="true"></i>`).join('');
+  const customerRows = rows.length
+    ? rows.map(row => `<div class="lt-jrow-wrap">
+        <article class="lt-jrow" data-customer="${escapeText(row.subjectId)}" tabindex="0" role="button" aria-expanded="false">
+          <div class="lt-jrow-head">
+            <span class="lt-jrow-name">${escapeText(row.name)}</span>
+            <span class="lt-badge">${escapeText(row.stage)}</span>
+            ${row.atRisk ? '<span class="lt-badge warn">떠남 위험</span>' : ''}
+            <span class="lt-jrow-score">최근 ${escapeText(row.latestScore ?? '—')}점</span>
+            <span class="lt-jrow-flow" role="img" aria-label="날짜별 점수 흐름 ${escapeText(row.flow.map(point => point.day.slice(5) + ' ' + (point.score ?? '없음') + '점').join(', '))}">${flowDots(row)}</span>
+            <span class="lt-post-date">${escapeText(row.lastDay || '—')}</span>
+            <span class="lt-jrow-count">일지 ${row.journals.length}건</span>
+          </div>
+        </article>
+        <div class="lt-jdetail" hidden data-customer-body="${escapeText(row.subjectId)}"></div>
+      </div>`).join('')
+    : '<p class="lt-empty">아직 사용 일지가 없습니다.</p>';
+  host.innerHTML = `${head()}<div class="admin-shell lt-board">
+    <div class="lt-board-head"><h1 class="lt-h1">사용 일지</h1><p class="lt-sub">고객별로 날짜 내림차순 · 줄을 누르면 펼쳐 읽기</p></div>
+    <div class="lt-jsum" role="group" aria-label="오늘 요약">
+      ${summaryItem('오늘 활동 고객', summary.activeCustomers)}
+      ${summaryItem('오늘 일지', summary.journalCount)}
+      ${summaryItem('평균 다시 올 점수', summary.avgScore ?? '—')}
+      ${summaryItem('떠남 위험(이틀 연속 2 이하)', summary.atRisk)}
+    </div>
+    <div class="lt-post-list">${customerRows}</div>
+  </div>`;
+}
+
+/** 펼친 고객 일지(#596) — 날짜 내림차순, 본문 줄바꿈 유지, 그날 의견 링크. */
+function journalDetailHtml(subjectId) {
+  const data = window.__ltJournalsData;
+  const row = data?.rows.find(entry => entry.subjectId === subjectId);
+  if (!row) return '<p class="lt-empty">일지를 찾지 못했습니다.</p>';
+  return row.journals.map(journal => {
+    const day = String(journal.journalDate || '');
+    const opinions = data.opinionsByCustomerDay.get(`${subjectId}|${day}`) || [];
+    const links = opinions.map(op => `<a class="lt-journal-opinion" href="#feedback/${escapeText(op.id)}">그날 의견 · ${escapeText(op.displayTitle || '(제목 없음)')}</a>`).join('');
+    return `<article class="lt-journal">
+      <div class="lt-post-top"><span class="lt-post-date">${escapeText(day)}</span>${statusBadge(journal.status)}<span class="lt-badge">다시 올 점수 ${escapeText(journal.score ?? '—')}</span></div>
+      <h3 class="lt-post-title">${escapeText(journal.displayTitle || '(제목 없음)')}</h3>
+      <p class="lt-body">${richParagraph(journal.body)}</p>
+      ${links ? `<div class="lt-journal-links">${links}</div>` : ''}
+    </article>`;
+  }).join('');
+}
+
 async function renderReports() {
   const res = await read('/api/community/admin/reports');
   const reports = res.ok && Array.isArray(res.payload?.reports) ? res.payload.reports : [];
@@ -284,6 +352,18 @@ document.addEventListener('click', async (event) => {
   }
   const open = event.target.closest('[data-open]');
   if (open && !event.target.closest('[data-persona]')) { navigate('feedback', open.dataset.open); return; }
+  // #596: 고객 줄을 누르면 그 고객 일지를 날짜 내림차순으로 펼쳐 읽는다. 본문 줄바꿈 유지, 그날 의견 링크.
+  const jrow = event.target.closest('[data-customer]');
+  if (jrow && !event.target.closest('a')) {
+    const body = document.querySelector(`[data-customer-body="${CSS.escape(jrow.dataset.customer)}"]`);
+    if (body) {
+      if (!body.dataset.filled) body.innerHTML = journalDetailHtml(jrow.dataset.customer);
+      body.hidden = !body.hidden;
+      jrow.setAttribute('aria-expanded', String(!body.hidden));
+      jrow.classList.toggle('is-open', !body.hidden);
+    }
+    return;
+  }
   const persona = event.target.closest('[data-persona]');
   if (persona && persona.dataset.persona) { navigate('persona', persona.dataset.persona); return; }
   if (event.target.closest('[data-back]')) { navigate('board'); return; }

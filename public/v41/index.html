@@ -99,6 +99,7 @@
 <form id="journal-form">
 <label>제목<input name="title" maxlength="120" required autocomplete="off" placeholder="오늘 무엇을 했나요"></label>
 <label>내용<textarea name="body" maxlength="2000" rows="6" required placeholder="오늘 사용하며 좋았던 점, 막힌 점을 적어 주세요."></textarea></label>
+<p class="panel-note">(선택) 디자인 느낌도 한 줄 남겨 주세요 — 내가 자주 쓰는 ○○와 비교해서: 익숙했던 점 / 어색했던 점</p>
 <label>다시 올 점수<select name="score"><option value="">안 정함</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option></select></label>
 <p id="journal-error" role="alert"></p>
 <div class="button-row"><button class="primary" type="submit" id="journal-save">저장</button><button type="button" data-close="journal-panel">취소</button></div>
