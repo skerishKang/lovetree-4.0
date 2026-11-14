@@ -180,7 +180,10 @@ function emotionMarkup(emotion){
  if(!value)return '';
  return '<span class="moment-emotion"><span class="emotion-dot" data-tone="'+window.LT59Model.emotionTone(value)+'" aria-hidden="true"></span>'+t(value)+'</span>';
 }
-function paintTitle(m){
+/* #635 이후 발견(#book-dup): 메모(.note-piece)·링크 장은 본문 조각이 이미 제목(h2)과 본문을 그린다.
+   pieceHasStory가 참이면 아래 .moment-title은 날짜·감정만 남긴다 — 제목·본문을 두 번 쓰지 않게.
+   paintTitle(m) 하나만 쓰는 곳(유튜브·링크 카드 조각)은 조각에 제목이 없어 그대로 제목·본문을 그린다. */
+function paintTitle(m,pieceHasStory=false){
  const source=LTDEMO.moments.find(x=>x.id===m.id);
  const view=titleViewFor(source||m);
  const parts={main:view.main,note:view.note,media:view.sub};
@@ -198,6 +201,7 @@ function paintTitle(m){
  let lead='';
  if(parts.main)lead=heading+sub;
  else if(parts.note)lead='<p class="moment-note moment-note-lead">'+t(parts.note)+'</p>';
+ if(pieceHasStory)return '<div class="moment-title">'+date+emotionMarkup(m.emotion)+'</div>';
  const tail=parts.main&&parts.note?'<p class="moment-note">'+t(parts.note)+'</p>':'';
  return '<div class="moment-title">'+date+lead+emotionMarkup(m.emotion)+tail+'</div>';
 }
@@ -262,7 +266,7 @@ renderSpread=function(idx,focusId=null,land=true){
  const one=single()?momentAtPos(current):null;
  if(one){
   const host=narrow()?mobileContent:rightPage;
-  const old=host.querySelector('.moment-title');if(old&&!one.synthetic)old.outerHTML=paintTitle(one);
+  const old=host.querySelector('.moment-title');if(old&&!one.synthetic)old.outerHTML=paintTitle(one,!!host.querySelector('.moment h2'));
   /* 마지막 순간 뒤의 '다음 순간' 안내는 그 순간 글 아래에 이어 붙인다(쪽을 덮지 않는다).
      안내를 쪽 위에 겹쳐 놓으면 그 순간의 카드·단추를 가린다 — 순간 내용 상자 안 끝에 놓는다. */
   const spread=currentSpread();
@@ -278,7 +282,7 @@ renderSpread=function(idx,focusId=null,land=true){
  }else{
   for(const [host,side] of [[leftPage,'left'],[rightPage,'right']]){
    const m=SPREADS[current][side];if(!m||m.synthetic)continue;
-   const old=host.querySelector('.moment-title');if(old)old.outerHTML=paintTitle(m);
+   const old=host.querySelector('.moment-title');if(old)old.outerHTML=paintTitle(m,!!host.querySelector('.moment h2'));
   }
   const right=SPREADS[current].right;
   if(right&&right.synthetic){

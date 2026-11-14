@@ -509,7 +509,9 @@ html[data-lt-theme="garden"] #account-advanced[aria-checked="true"]:after{backgr
 .updates-card-actions{display:flex;gap:6px;align-items:center}
 .updates-card-actions button{min-height:40px;padding:0 14px;border-radius:var(--lt-r-pill);border:1px solid var(--lt-gold-line);background:rgba(255,230,166,.08);color:var(--lt-gold);font-size:13px;cursor:pointer}
 .updates-card-actions button:last-child{min-width:40px;padding:0;border-radius:50%;font-size:18px;line-height:1}
-@media(max-width:780px){.updates-card{left:16px;right:16px;top:76px;bottom:auto;max-width:none}}
+/* #book-dup: 좁은 폭에서 카드를 머리줄 바로 아래(top:76px)에 붙이면 '순간 목록'·테마 단추를 가렸다(390 실측).
+   화면 아래, 링크 줄(.home-links, 아래 10px~42px)과 ＋ 단추(오른쪽 아래 12~68px) 위로 올린다. */
+@media(max-width:780px){.updates-card{left:16px;right:16px;top:auto;bottom:calc(max(10px, env(safe-area-inset-bottom)) + 76px);max-width:none}}
 /* 이슈 611: 새 소식 화면. */
 .updates-list{display:grid;gap:18px;margin-top:14px}
 .updates-version{border:1px solid var(--lt-line);border-radius:var(--lt-r-card);padding:16px;background:var(--lt-glass)}
