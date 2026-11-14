@@ -592,6 +592,16 @@ test('#635 PR C 화면: 메뉴 시작 입구·첫날 표기·크게 보기 대�
         {
           const { context, page, frame, problems } = await openShell(browser, base, '', { width, height, theme });
           assert.equal(problems.length, 0, `첫 화면 ${width}·${theme}: 화면 오류 ${problems.join(' | ')}`);
+          // #book-dup2. 첫 화면이 실제로 그려졌는지 먼저 확인한다 — 첫 화면 문서(/v41/home.html)는 빌드 산출물(dist)에만
+          // 있어서 시험 서버가 소스(public)를 서빙하면 404('nf')가 그려지고, 이후 측정이 전부 무의미해진다.
+          const drawn = await frame.evaluate(() => {
+            const root = document.getElementById('orbit');
+            const sr = root && root.shadowRoot ? root.shadowRoot : document;
+            const text = document.body ? document.body.textContent : '';
+            return { nf: /Not Found/i.test(text) || text.trim() === 'nf', cards: sr.querySelectorAll('.card').length, center: !!sr.querySelector('.center') };
+          });
+          assert.equal(drawn.nf, false, `${width}·${theme}: 첫 화면이 404('nf')로 그려졌다 — 시험 서버가 dist(빌드 산출물)를 서빙하는지 확인`);
+          assert.ok(drawn.cards > 0 || drawn.center, `${width}·${theme}: 첫 화면(궤도)이 그려지지 않았다(카드 0개)`);
           const noteBox = await frame.locator('.center-note').first().boundingBox();
           const linksBox = await page.locator('.home-links').boundingBox();
           assert.ok(noteBox && linksBox, `${width}·${theme}: 안내 줄·링크 줄 자리를 못 읽었다`);

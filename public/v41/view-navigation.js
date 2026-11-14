@@ -26,6 +26,9 @@
    const name=document.querySelector('.topbar .brand span');if(name)name.textContent=c?.tree.title||'책';
    const index=document.getElementById('archiveBtn');if(index)index.textContent='목차';
    const title=document.querySelector('#archivePanel h2');if(title)title.textContent='순간 목차';
+   // #book-dup2: 좁은 폭에서 '이어진 순간' 단추가 도구 줄 오른쪽에서 잘렸다(390 실측 6px). 짧은 말로 바꾸고
+   // 전체 뜻은 aria-label·data-lt-tip이 그대로 안낸다. ('순간 목차'→'목차'와 같은 요령.)
+   const overview=document.getElementById('overviewBtn');if(overview&&matchMedia('(max-width:600px)').matches)overview.textContent='이어진 길';
   }
  };
  if(document.readyState==='loading')addEventListener('DOMContentLoaded',apply,{once:true});else apply();

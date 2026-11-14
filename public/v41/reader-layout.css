@@ -34,8 +34,13 @@ html[data-book-shape=phone][data-v41-screen=book] .mobile-page .moment-title p{f
 html[data-book-shape=phone][data-v41-screen=book] .nav-pill{position:sticky;left:auto;bottom:12px;transform:none;width:max-content;margin:22px auto 0;z-index:48}
 html[data-book-shape=phone][data-v41-screen=book] .nav-pill button{width:44px;height:44px}
 html[data-book-shape=phone][data-v41-screen=book] .why-margin{position:static;transform:none;width:auto;margin:16px 10px 0;line-height:1.7}
-html[data-book-shape=phone][data-v41-screen=book] .branch-tab{position:static;display:block;width:100%;min-height:44px;margin-top:12px;border-radius:10px}
+html[data-book-shape=phone][data-v41-screen=book] .branch-tab{position:static;display:block;width:100%;min-height:44px;margin-top:4px;border-radius:10px}
 html[data-book-shape=phone][data-v41-screen=book] .branch-tab[hidden]{display:none}
+/* #book-dup2: 갈라짐 띠가 있는 장에서는 아래 묶음(이동 알약·연결 안내·띠)의 간격을 줄여
+   띠 아래끝이 셸의 고정 링크 줄('새 소식 · 의견 보내기', 화면 아래 10~42px)에 닿지 않게 한다.
+   390 실측: 띠 아래끝(셸 좌표 817)이 링크 줄 위(807)와 10px 겹쳤다. 간격을 26px 줄여 16px 띄운다. */
+html[data-book-shape=phone][data-v41-screen=book] .book-wrap:has(.branch-tab:not([hidden])) .nav-pill{margin-top:12px}
+html[data-book-shape=phone][data-v41-screen=book] .book-wrap:has(.branch-tab:not([hidden])) .why-margin{margin-top:8px}
 
 html[data-v41-screen=shelf] .hero{min-height:0;height:auto}
 html[data-v41-screen=book] .binding-light{pointer-events:none}

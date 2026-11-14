@@ -51,7 +51,8 @@
       {"kind": "fix", "text": "쉬운 추가로 담으면 지금 보고 있는 트리에 담겨요. 담기 창에서 트리를 바로 바꿀 수도 있어요", "source": "ai_tester", "tester": "윤제", "issue": "#638"},
       {"kind": "fix", "text": "휴대폰 유튜브 주소(m.youtube.com·youtu.be·쇼츠·음악)를 붙여 넣어도 영상 제목이 제대로 담겨요", "source": "ai_tester", "tester": "윤제", "issue": "#638"},
       {"kind": "fix", "text": "지도에 'NaN월'로 나타나던 날짜를 제대로 고쳤어요", "source": "ai_tester", "tester": "윤제", "issue": "#638"},
-      {"kind": "fix", "text": "책의 메모 장에 제목이 두 번 보이던 것을 고쳤어요. 작은 화면에서 글자나 알림 카드가 단추를 가리지 않아요", "source": "team", "issue": "#658"}
+      {"kind": "fix", "text": "책의 메모 장에 제목이 두 번 보이던 것을 고쳤어요. 작은 화면에서 글자나 알림 카드가 단추를 가리지 않아요", "source": "team", "issue": "#658"},
+      {"kind": "fix", "text": "책의 갈라짐 안내 띠가 아래 링크를 가리지 않게 띄웠어요. 작은 화면 책 머리글의 단추도 잘리지 않아요", "source": "team"}
     ]
   }
 ]

@@ -366,3 +366,75 @@ test('#book-dup 실제 화면: 메모 장에서 제목·본문을 두 번 쓰지
     server.close();
   }
 });
+
+/* ── #book-dup2(2026-11-15): 390에서 갈라짐 띠가 링크 줄을 덮지 않고, 머리줄 단추가 화면 안에 있다 ── */
+
+// 갈라짐 띠(.branch-tab)가 보이는 장까지 넘긴다.
+const walkToBranch = async (frame) => {
+  for (let guard = 0; guard < 60; guard++) {
+    const has = await frame.evaluate(() => {
+      const tab = document.querySelector('.branch-tab');
+      return !!(tab && !tab.hidden && tab.getBoundingClientRect().height > 0);
+    });
+    if (has) return true;
+    const done = await frame.evaluate(() => document.getElementById('nextBtn').disabled);
+    if (done) return false;
+    const label = await frame.evaluate(() => document.getElementById('pageLabel').textContent);
+    await frame.evaluate(() => document.getElementById('nextBtn').click());
+    await frame.waitForFunction((prev) => document.getElementById('pageLabel').textContent !== prev, label, { timeout: 5000 });
+    await frame.waitForTimeout(60);
+  }
+  return false;
+};
+
+test('#book-dup2 실제 화면: 390에서 갈라짐 띠가 링크 줄과 겹치지 않고, 머리줄 단추가 화면 밖으로 넘치지 않는다', { skip: REQUIRE ? false : skip, timeout: 180000 }, async () => {
+  if (skip) assert.fail(`미리보기 검사에서는 이 시험의 건너뜀이 실패다 — ${skip}`);
+  const server = await serve(ROOT);
+  const base = `http://127.0.0.1:${server.address().port}`;
+  let browser;
+  try {
+    browser = await chromium.launch({ headless: true });
+    const phone = await openBook(browser, base, 390, 844, 'single');
+    assert.ok(await walkToBranch(phone.frame), '390에서 갈라짐 띠가 있는 장을 찾지 못했다');
+    await phone.page.waitForTimeout(300);
+
+    // 띠(책 안 좌표)를 셸 좌표로 옮겨 고정 링크 줄('새 소식 · 의견 보내기')과 겹침을 잰다.
+    const iframeBox = await phone.page.locator('#view').boundingBox();
+    assert.ok(iframeBox, '책 iframe 자리를 못 읽었다');
+    const row = await phone.frame.evaluate(() => {
+      const box = (el) => { const b = el.getBoundingClientRect(); return { l: b.left, t: b.top, r: b.right, b: b.bottom }; };
+      const tools = document.querySelector('.topbar .tools');
+      const btns = [...document.querySelectorAll('.topbar .tools .ui-btn')]
+        .map((b) => ({ rect: b.getBoundingClientRect(), text: (b.textContent || '').trim() }))
+        .filter((b) => b.rect.width > 0 && b.rect.height > 0)
+        .map((b) => ({ text: b.text, l: Math.round(b.rect.left), r: Math.round(b.rect.right) }));
+      return {
+        tab: box(document.querySelector('.branch-tab')),
+        tools: { scrollW: tools.scrollWidth, clientW: tools.clientWidth },
+        btns, vw: innerWidth,
+      };
+    });
+    const tabShell = {
+      t: Math.round(row.tab.t + iframeBox.y), b: Math.round(row.tab.b + iframeBox.y),
+      l: Math.round(row.tab.l + iframeBox.x), r: Math.round(row.tab.r + iframeBox.x),
+    };
+    const links = await phone.page.evaluate(() => {
+      const b = document.querySelector('.home-links').getBoundingClientRect();
+      return { l: b.left, t: b.top, r: b.right, b: b.bottom };
+    });
+    const overlap = Math.max(0, Math.min(tabShell.b, links.b) - Math.max(tabShell.t, links.t))
+      * Math.max(0, Math.min(tabShell.r, links.r) - Math.max(tabShell.l, links.l));
+    assert.equal(Math.round(overlap), 0, `갈라짐 띠(${JSON.stringify(tabShell)})가 링크 줄(${JSON.stringify(links)})과 ${Math.round(overlap)}px² 겹친다`);
+    assert.ok(links.t - tabShell.b >= 8, `갈라짐 띠와 링크 줄 사이가 ${Math.round(links.t - tabShell.b)}px다(8px 이상)`);
+
+    // 머리줄: 보이는 단추가 전부 화면 안(오른쪽 여백 8px 이상)이고 도구 줄이 잘리지 않는다.
+    assert.ok(row.tools.scrollW <= row.tools.clientW, `도구 줄이 ${row.tools.scrollW - row.tools.clientW}px 잘린다(scrollWidth ${row.tools.scrollW} > clientWidth ${row.tools.clientW})`);
+    for (const b of row.btns) {
+      assert.ok(b.r <= row.vw - 8, `머리줄 단추 '${b.text}'가 오른쪽 여백 ${row.vw - b.r}px로 화면 밖으로 넘친다(8px 이상이어야)`);
+    }
+    await phone.ctx.close();
+  } finally {
+    if (browser) await browser.close().catch(() => {});
+    server.close();
+  }
+});
