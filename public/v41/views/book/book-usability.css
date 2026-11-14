@@ -46,9 +46,13 @@ html[data-v41-screen=book] .eyebrow{display:none}
 html[data-v41-screen=book] .mobile-kicker{display:none}
 html[data-v41-screen=book] .mobile-content{padding:22px 22px 26px 26px}
 html[data-v41-screen=book] .mobile-page .note-piece{padding:18px 16px 16px;margin:6px 0 0}
+/* #635 PR B: 모바일 공책 카드는 패딩이 18px라 첫 줄바닥도 18+31px다. */
+html[data-v41-screen=book] .mobile-page .note-piece:before{top:49px}
 html[data-v41-screen=book] .mobile-page .clipping{margin:6px 0 0;padding:14px 15px 15px}
 html[data-v41-screen=book] .mobile-page .note-piece h2,html[data-v41-screen=book] .mobile-page .clipping h2{font-size:20px;margin-bottom:8px}
-html[data-v41-screen=book] .mobile-page .note-piece p{font-size:14px;line-height:1.7}
+/* #635 PR B: 모바일 공책 카드도 줄 간격(31px) 격자를 쓴다 — h2 아래 여백도 한 칸(31px)으로. */
+html[data-v41-screen=book] .mobile-page .note-piece h2{margin-bottom:31px}
+html[data-v41-screen=book] .mobile-page .note-piece p{font-size:14px;line-height:31px}
 html[data-v41-screen=book] .mobile-page .moment-title{margin:8px 0 0}
 html[data-v41-screen=book] .mobile-page .moment-title h3{font-size:18px}
 html[data-v41-screen=book] .mobile-page .moment-title .moment-note{font-size:15px;-webkit-line-clamp:2}
@@ -89,6 +93,8 @@ html[data-v41-screen=book] .yt-play.is-vertical{width:auto;height:clamp(240px,52
 html[data-v41-screen=book] .yt-play.is-vertical img{object-fit:contain}
 html[data-v41-screen=book] .yt-play .yt-play-label{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);white-space:nowrap;padding:7px 14px;border-radius:var(--lt-r-pill);border:1px solid var(--lt-gold-line);background:rgba(7,7,12,.7);color:var(--lt-pearl);font-size:13px}
 html[data-v41-screen=book] .yt-placeholder{display:grid;place-items:center;width:100%;height:100%;background:var(--lt-paper);color:var(--lt-ink)}
+/* #635 PR B: 썸네일이 없거나 깨진 영상 칸은 제목 글 카드로 대신한다(회색·빈 상자 금지). 재생 단추 안에서 카드가 칸을 채운다. */
+html[data-v41-screen=book] .yt-play .lt-fallback-card{width:100%;height:100%;display:flex;flex-direction:column;justify-content:center}
 html[data-v41-screen=book] .yt-placeholder .yt-play-label{position:static;transform:none}
 html[data-v41-screen=book] .yt-frame{display:block;width:100%;aspect-ratio:16/9;border:0;background:#000}
 html[data-v41-screen=book] .yt-frame.is-vertical{width:auto;height:clamp(240px,52vh,400px);max-width:100%;aspect-ratio:9/16;margin:0 auto}

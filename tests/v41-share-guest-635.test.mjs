@@ -1,4 +1,11 @@
 // #635 PR A: 감상 화면(공유 링크·예시)의 고장 2개 + 문구 정리 — 데이터·규칙은 그대로, 화면만.
+// #635 PR B(2026-11-15, 대표 캡처 지적 3가지)를 같은 잡에서 검사한다:
+//   5. 안내 패널 다듬기 — 패널 여백이 네 방향 같게(#guidePanel id 누락 수리), 열자마자 닫기 포커스 테두리 없음(초점은 제목),
+//      word-break:keep-all, 단추는 오른쪽 아래·주 단추가 오른쪽 끝.
+//   6. 공유 책 마지막 장 — 책장 넘기기 힌트 상자(.turn-why)가 글 위에 반투명으로 겹치지 않는다(감상에서는 내지 않는다),
+//      공책 줄이 글 줄 높이(31px 격자)와 맞고, 390에서 책이 남은 화면을 쓴다.
+//   7. 영상 칸 — 재생 전 빈 크림 상자 금지: 보관 썸네일을 먼저, 없거나 깨지면 제목 글 카드.
+//   좌표·DOM 검사(elementFromPoint)로 확인한다 — 눈 확인에 기대지 않는다.
 // 1. 책 마지막 장 'undefined': otherTreesBlock()이 readOnly에서 맨 return(=undefined)을 문자열에 붙였다.
 //    감상 화면에서는 '다음 이야기' 안내 자체를 감추고, 내 트리에서는 안내 문장+단추를 그대로 둔다.
 // 2. 첫 화면 '어떻게 쓰나요': 별도 사용법 안내 화면이 없다(home.js #388 주석 — "기존 안내가 없어 둘러보기와 같은 동작").
@@ -71,12 +78,13 @@ const homeHostHTML = `<!doctype html><html lang="ko"><head><meta charset="utf-8"
 <script>window.LT41={source:'file',member:'out',treeCount:0,trees:[],prefs:{}};window.LT41_MESSAGES=[];addEventListener('message',(e)=>{if(e.data&&String(e.data.type||'').startsWith('lt41-'))window.LT41_MESSAGES.push(e.data.type)});</script>
 <iframe src="/v41/home.html" style="position:fixed;inset:0;width:100vw;height:100vh;border:0"></iframe></body></html>`;
 
-const CAPTURE_DIR = 'E:\\lovetree-qa\\lane\\local1-635a';
+const CAPTURE_DIR = 'E:\\lovetree-qa\\lane\\local1-635b';
 const shot = (page, name) => { mkdirSync(CAPTURE_DIR, { recursive: true }); return page.screenshot({ path: path.join(CAPTURE_DIR, name + '.png'), fullPage: false }); };
 
-async function openBook(browser, url, { width = 1440, height = 900, theme = 'night' } = {}) {
+async function openBook(browser, url, { width = 1440, height = 900, theme = 'night', route = null } = {}) {
   const context = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
   await context.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); } catch {} }, theme);
+  if (route) await context.route('**://i.ytimg.com/**', route);
   const problems = [];
   const page = await context.newPage();
   page.on('pageerror', (e) => problems.push('pageerror: ' + String(e).slice(0, 200)));
@@ -111,6 +119,59 @@ async function sweepPages(frame, { expectGuide = null } = {}) {
   }
   return found;
 }
+
+// #635 PR B: 겹침 검사 — 보이는 글자 요소끼리 겹치거나, 다른 요소에 가려지면(점 검사) 실패다.
+// 판정은 좌표·DOM으로 한다(눈 확인 금지). 부모-자식 관계는 겹침이 아니다.
+const scanOverlap = (frame) => frame.evaluate(() => {
+  const seen = (el) => {
+    // 요소 자신뿐 아니라 조상 사슬도 본다 — 렌즈 복제본(#lens)·닫힌 패널은 opacity:0로만 숨겨져 있어
+    // 요소 하나만 보면 '보이는 것'으로 잘못 잡힌다(#635 PR B).
+    for (let n = el; n; n = n.parentElement) {
+      const cs = getComputedStyle(n);
+      if (cs.display === 'none' || cs.visibility === 'hidden' || Number(cs.opacity) < 0.05) return false;
+    }
+    const r = el.getBoundingClientRect();
+    if (!(r.width > 2 && r.height > 2)) return false;
+    // 화면 밖(닫힌 패널이 transform으로 치워진 것 등)은 겹침 판정에서 뺀다.
+    return r.right > 0 && r.bottom > 0 && r.left < innerWidth && r.top < innerHeight;
+  };
+  const texts = [...document.querySelectorAll('h1,h2,h3,h4,p,span,b,strong,small,li,button,a,label')]
+    .filter((el) => !el.closest('#lens,#mobileLensStage') && seen(el) && (el.textContent || '').trim() && !el.closest('.flip-sheet,[hidden]'));
+  const issues = [];
+  const related = (a, b) => a === b || a.contains(b) || b.contains(a);
+  for (let i = 0; i < texts.length; i++) for (let j = i + 1; j < texts.length; j++) {
+    const a = texts[i], b = texts[j];
+    if (related(a, b)) continue;
+    const ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect();
+    const ox = Math.min(ra.right, rb.right) - Math.max(ra.left, rb.left);
+    const oy = Math.min(ra.bottom, rb.bottom) - Math.max(ra.top, rb.top);
+    if (ox > 4 && oy > 4) issues.push({ a: String(a.className || a.tagName).slice(0, 40), b: String(b.className || b.tagName).slice(0, 40) });
+  }
+  const covered = [];
+  for (const el of texts) {
+    const r = el.getBoundingClientRect();
+    const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    if (!top || related(top, el)) continue;
+    // 렌즈 복제본(#lens·#mobileLensStage, 보이지 않는 거울)은 실제로 가리는 것이 아니다.
+    if (top.closest('#lens,#mobileLensStage')) continue;
+    covered.push({ el: String(el.className || el.tagName).slice(0, 40), by: String(top.className || top.tagName).slice(0, 40) });
+  }
+  return { issues, covered };
+});
+
+// #635 PR B: 책장 넘기기 힌트 상자가 감상에서는 보이지 않는다 + 390에서 책이 남은 화면을 쓴다.
+const scanBookLayout = (frame) => frame.evaluate(() => {
+  const tw = document.querySelector('#turnWhy');
+  const mp = document.querySelector('.mobile-page')?.getBoundingClientRect();
+  const wrap = document.querySelector('.book-wrap')?.getBoundingClientRect();
+  return {
+    turnWhyShown: tw ? tw.classList.contains('show') : null,
+    turnWhyOpacity: tw ? Number(getComputedStyle(tw).opacity) : null,
+    pageBottom: mp ? Math.round(mp.bottom) : null,
+    wrapBottom: wrap ? Math.round(wrap.bottom) : null,
+    viewport: innerHeight
+  };
+});
 
 test('#635 규칙(정적): 감상 화면에서 다음 이야기 안내를 감추고, undefined의 근원을 끊는다', () => {
   const extra = read('public/v41/views/book/book-extra.js');
@@ -155,6 +216,46 @@ test('#635 규칙(단위): connectionLine·userTitleText가 감상·중복 규�
   assert.equal(titleView({ title: '우리의 첫 콘서트', mediaMetadata: { title: VIDEO_TITLE } }).sub, VIDEO_TITLE);
 });
 
+test('#635 PR B 규칙(정적): 안내 패널 여백·포커스·줄바꿈·단추 자리와 힌트 상자·영상 칸 규칙', () => {
+  const home = read('v41/home.js');
+  // guideStyle의 규칙은 전부 #guidePanel로 적혀 있다 — id가 없으면 패딩·테마 규칙이 통째로 무시됐다(내용이 테두리에 붙은 원인).
+  assert.match(home, /guideDialog\.id='guidePanel';/, '안내 패널에 #guidePanel id를 준다');
+  assert.match(home, /#guidePanel\{word-break:keep-all\}/, '단어 중간 줄바꿈 금지(keep-all)');
+  assert.match(home, /#guidePanel \.guide-body\{padding:42px/, '패널 안쪽 여백은 다른 창과 같은 42px');
+  assert.match(home, /#guidePanel \.detail-buttons\{margin-top:24px;justify-content:flex-end\}/, '단추를 오른쪽 아래로 모은다');
+  // 주 단추('첫 순간 추가')가 오른쪽 끝 — DOM 순서(탭 순서)도 보이는 순서와 같다.
+  const buttons = home.indexOf('data-do="guide-community"'), primary = home.indexOf('data-do="guide-new"');
+  assert.ok(buttons > -1 && primary > buttons, '주 단추가 DOM에서 뒤(오른쪽 끝)에 있다');
+  // 열자마자 포커스 테두리가 보이지 않게: 처음 포커스는 닫기가 아니라 패널 제목(tabindex=-1)이다.
+  assert.match(home, /<h2 tabindex="-1">/, '패널 제목이 포커스를 받을 수 있다');
+  assert.match(home, /guideDialog\.querySelector\('h2'\)\?\.focus\(\);/, '처음 포커스는 패널 제목이다');
+  assert.ok(!/querySelector\('\.close'\)\?\.focus\(\)/.test(home.split('guideDialog.addEventListener')[0]), '닫기 단추에 프로그램 포커스를 주지 않는다');
+  // 책장 넘기기 힌트 상자: 감상 화면에서는 내지 않는다(내 트리는 그대로).
+  const book = read('public/v41/views/book/book.js');
+  assert.match(book, /classList\.toggle\('show',p>\.16&&!LTDEMO\.readOnly\)/, '힌트 상자는 감상 화면에서 나오지 않는다');
+  // 공책 줄: 줄 간격(31px)과 글 줄 높이를 맞춘다.
+  const bookCss = read('public/v41/views/book/book.css');
+  assert.match(bookCss, /\.note-piece h2\{font-size:28px;line-height:31px;margin:0 0 31px/, '공책 제목 줄 높이 = 줄 간격');
+  assert.match(bookCss, /\.note-piece p\{font-size:16px;line-height:31px\}/, '공책 본문 줄 높이 = 줄 간격');
+  assert.match(bookCss, /\.note-piece:before\{[^}]*top:66px;bottom:0;background:repeating-linear-gradient/, '첫 줄은 윗줄바닥(35+31px)에 두고 줄은 카드 아래까지 그린다');
+  const usabilityCss = read('public/v41/views/book/book-usability.css');
+  assert.match(usabilityCss, /\.mobile-page \.note-piece:before\{top:49px\}/, '모바일 첫 줄도 패딩+31px');
+  assert.match(usabilityCss, /\.mobile-page \.note-piece h2\{margin-bottom:31px\}/, '모바일 제목 아래 여백도 한 칸');
+  assert.match(usabilityCss, /\.mobile-page \.note-piece p\{font-size:14px;line-height:31px\}/, '모바일 본문 줄 높이 = 줄 간격');
+  // 390에서 책이 남은 화면을 쓴다.
+  const reader = read('public/v41/reader-layout.css');
+  assert.match(reader, /phone\]\[data-v41-screen=book\] \.stage\{[^}]*display:flex;flex-direction:column[^}]*min-height:calc\(100dvh - 60px\)/, 'stage가 남은 화면 높이를 세운다');
+  assert.match(reader, /phone\]\[data-v41-screen=book\] \.book-wrap\{[^}]*flex:1 1 auto/, '책이 남은 칸을 채운다');
+  assert.match(reader, /phone\]\[data-v41-screen=book\] \.mobile-page\{[^}]*flex:1 1 auto/, '쪽이 책 높이를 채운다');
+  // 영상 칸: 빈 상자 금지 — 보관 썸네일 먼저, 없으면 유튜브 보관 썸네일(#635 PR B 대표 결정), 깨지면 카드로 내려간다.
+  const extra = read('public/v41/views/book/book-extra.js');
+  assert.match(extra, /const candidates=thumbnailCandidates\(m,\{vertical,autoLoad:true\}\);/, '감상에서도 보관된(유튜브) 썸네일을 부른다');
+  assert.match(extra, /thumbFallbackAttrs\(safe,\{candidates:\[thumb\]/, '보관 썸네일(/api/media/)이 깨지면 카드로 내려간다(#393 내려가기 틀)');
+  assert.match(extra, /:'<img src="'\+t\(remoteThumb\)/, '썸네일이 없으면 유튜브 보관 썸네일을 보린다');
+  assert.ok(!extra.includes("'<span class=\"yt-placeholder\"></span>'"), '빈 크림 상자를 그리는 코드는 없다');
+  assert.match(usabilityCss, /\.yt-play \.lt-fallback-card\{width:100%;height:100%/, '글 카드가 영상 칸을 채운다');
+});
+
 test('#635 화면: 공유 링크 책(로그아웃) 전 장에서 undefined·null·NaN 흔적이 없고, 마지막 장은 깨끗하다', { skip: REQUIRE ? false : skip, timeout: 240000 }, async () => {
   if (skip) assert.fail(`미리보기 검사에서는 화면 시험 건너뜀이 실패다 — ${skip}`);
   const server = await serve();
@@ -164,10 +265,32 @@ test('#635 화면: 공유 링크 책(로그아웃) 전 장에서 undefined·null
     browser = await chromium.launch({ headless: true });
     for (const [width, height] of [[1440, 900], [390, 844]]) {
       for (const theme of ['night', 'garden']) {
-        const { context, page, frame, problems } = await openBook(browser, `${base}/share-host.html?w=${width}&t=${theme}`, { width, height, theme });
+        const { context, page, frame, problems } = await openBook(browser, `${base}/share-host.html?w=${width}&t=${theme}`, { width, height, theme, route: (r) => r.abort() });
         const found = await sweepPages(frame);
         assert.deepEqual(found, [], `${width}·${theme}: 화면 흔적 값 ${JSON.stringify(found)}`);
         assert.equal(problems.length, 0, `${width}·${theme}: 화면 오류 ${problems.join(' | ')}`);
+        // #635 PR B: 매 장에서 글자 겹침·가려짐이 없고, 책장 넘기기 힌트 상자가 보이지 않는다.
+        const overlap = await scanOverlap(frame);
+        assert.deepEqual(overlap.issues, [], `${width}·${theme}: 글자 겹침 ${JSON.stringify(overlap.issues)}`);
+        assert.deepEqual(overlap.covered, [], `${width}·${theme}: 가려진 글자 ${JSON.stringify(overlap.covered)}`);
+        const layout = await scanBookLayout(frame);
+        assert.equal(layout.turnWhyShown, false, `${width}·${theme}: 감상 화면에 책장 넘기기 힌트 상자가 보인다`);
+        assert.equal(layout.turnWhyOpacity, 0, `${width}·${theme}: 힌트 상자가 반투명으로 남는다`);
+        // #635 PR B: 영상 칸은 빈 상자가 아니다(영상이 있는 장에서) — 썸네일 또는 제목 글 카드다.
+        const videoCell = await frame.evaluate(() => {
+          const btn = document.querySelector('.yt-play');
+          if (!btn) return { kind: '없음' };
+          const img = btn.querySelector('img');
+          const card = btn.querySelector('.lt-fallback-card');
+          const empty = btn.querySelector('.yt-placeholder');
+          return { kind: img ? '썸네일' : card ? '글카드' : empty ? '빈상자' : '기타', imgOk: img ? img.naturalWidth > 0 : null };
+        });
+        if (videoCell.kind !== '없음') assert.equal(videoCell.kind, '글카드', `${width}·${theme}: 재생 전 영상 칸이 빈 상자다(${JSON.stringify(videoCell)})`);
+        // #635 PR B: 390에서 책 아래 빈 공간이 화면의 1/5를 넘지 않는다(예전 1/4 → 책이 남은 화면을 쓴다).
+        if (width === 390) {
+          const emptyRatio = (layout.viewport - layout.wrapBottom) / layout.viewport;
+          assert.ok(emptyRatio <= 0.2, `390·${theme}: 책 아래 빈 공간이 화면의 ${Math.round(emptyRatio * 100)}%다`);
+        }
         // 감상 화면에서는 '다음 이야기' 안내가 어디에도 없다.
         const copy = await frame.evaluate(() => document.body.textContent.includes('이 순간 다음 이야기를 남겨 보세요'));
         assert.equal(copy, false, `${width}·${theme}: 감상 화면에 다음 이야기 안내가 보인다`);
@@ -243,6 +366,35 @@ test('#635 화면: 첫 화면 어떻게 쓰나요 → 안내 패널이 열리고
         for (const line of ['영상 링크를 붙여 넣으면', '트리로 묶여요', '책·보드·지도로', '둘러보기에서 다른 팬도 볼 수 있어요']) {
           assert.ok(guideText.includes(line), `${width}·${theme}: 안내 줄 누락 — ${line}`);
         }
+        // #635 PR B: 패널 여백이 네 방향 같고(첫 글자·단추 기준), 열자마자 포커스 테두리가 없으며, 단어 중간 줄바꿈이 없고, 단추는 오른쪽 아래(주 단추가 오른쪽 끝)다.
+        const geo = await frame.evaluate(() => {
+          const r = document.getElementById('orbit').shadowRoot;
+          const d = r.querySelector('#guidePanel');
+          const db = d.getBoundingClientRect();
+          const h2 = d.querySelector('h2').getBoundingClientRect();
+          const list = d.querySelector('.guide-list').getBoundingClientRect();
+          const btns = [...d.querySelectorAll('.detail-buttons button')];
+          const last = btns[btns.length - 1].getBoundingClientRect();
+          const active = r.activeElement;
+          return {
+            top: Math.round(h2.top - db.top), left: Math.round(list.left - db.left), right: Math.round(db.right - list.right), bottom: Math.round(db.bottom - last.bottom),
+            focusTag: active ? active.tagName + '.' + (active.className || '') : 'none',
+            closeFocused: active === d.querySelector('.close'),
+            keepAll: getComputedStyle(d.querySelector('.guide-list li')).wordBreak,
+            btns: btns.map((b) => ({ text: b.textContent.trim(), primary: b.classList.contains('primary-cta'), x: Math.round(b.getBoundingClientRect().x) }))
+          };
+        });
+        const sides = [geo.top, geo.left, geo.right, geo.bottom];
+        // #635 PR B: 패딩 자체가 네 방향 같은 값(42px — 첫 화면 다른 창과 같다)이고, 첫 글자·단추에서 테두리까지 거리가 네 방향 모두 그 값 이상이다.
+        // 좌우 여백은 본문 최대 폭(620px)을 가운데 둔 여분이니 패딩과 같거나 그보다 크면 된다.
+        const bodyPad = await frame.evaluate(() => getComputedStyle(document.getElementById('orbit').shadowRoot.querySelector('#guidePanel .guide-body')).padding);
+        assert.equal(bodyPad, '42px', `${width}·${theme}: 패널 안쪽 여백이 네 방향 같지 않다(${bodyPad})`);
+        assert.ok(Math.min(...sides) >= 40, `${width}·${theme}: 패널 여백이 작다 ${JSON.stringify(sides)}`);
+        assert.ok(Math.abs(sides[1] - sides[2]) <= 3 && Math.abs(sides[0] - sides[3]) <= 3, `${width}·${theme}: 패널 여백이 좌우/위아래가 다르다 ${JSON.stringify(sides)}`);
+        assert.equal(geo.closeFocused, false, `${width}·${theme}: 열자마자 닫기 단추에 포커스가 있다(포커스 테두리가 보인다)`);
+        assert.ok(/H2/.test(geo.focusTag), `${width}·${theme}: 처음 포커스가 패널 제목이 아니다(${geo.focusTag})`);
+        assert.equal(geo.keepAll, 'keep-all', `${width}·${theme}: 단어 중간 줄바꿈 허용됨`);
+        assert.ok(geo.btns.length >= 2 && geo.btns[geo.btns.length - 1].primary && geo.btns[geo.btns.length - 1].x > geo.btns[0].x, `${width}·${theme}: 주 단추가 오른쪽 끝이 아니다 ${JSON.stringify(geo.btns)}`);
         // 후: 패널이 열린 모습.
         await shot(page, `home-after-${width}-${theme}`);
         // 둘러보기는 열리지 않았다(셸에 lt41-community를 보내지 않았다).
@@ -271,3 +423,42 @@ test('#635 화면: 첫 화면 어떻게 쓰나요 → 안내 패널이 열리고
 
 // 호스트 페이지: 셸이 iframe에 LT41을 넘기는 것과 같은 틀(공유 감상·내 트리·첫 화면). 저장소 파일을 더럽히지 않는다.
 const EXTRA_ROUTES = { '/share-host.html': hostHTML('share', false), '/own-host.html': hostHTML('server', true), '/home-host.html': homeHostHTML };
+
+// #635 PR B: 영상 칸 세 상태 — 유튜브 보관 썸네일이 있으면 그것이 먼저고, 못 부르면(없음·깨짐) 제목 글 카드다.
+// 보관 썸네일 요청은 i.ytimg.com — 시험에서는 경로 가로채기(route)로 있음/없음을 정한다(외부 회선에 기대지 않는다).
+const TINY_PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+
+test('#635 PR B 화면: 영상 칸 — 보관 썸네일을 먼저 보이고, 없거나 깨지면 제목 글 카드다(빈 상자 금지)', { skip: REQUIRE ? false : skip, timeout: 240000 }, async () => {
+  if (skip) assert.fail(`미리보기 검사에서는 화면 시험 건너뜀이 실패다 — ${skip}`);
+  const server = await serve();
+  const base = `http://127.0.0.1:${server.address().port}`;
+  let browser;
+  try {
+    browser = await chromium.launch({ headless: true });
+    const thumbOk = (r) => r.fulfill({ status: 200, contentType: 'image/png', body: Buffer.from(TINY_PNG, 'base64') });
+    for (const [route, expect, options] of [
+      ['/share-host.html', '썸네일', { route: thumbOk }],          // 유튜브 보관 썸네일 있음 → 썸네일이 먼저
+      ['/share-host.html', '글카드', { route: (r) => r.abort() }]  // 썸네일이 없거나 깨지면 → 제목 글 카드
+    ]) {
+      const { context, frame, problems } = await openBook(browser, `${base}${route}`, { width: 390, height: 844, theme: 'garden', ...options });
+      assert.equal(problems.length, 0, `${route}: 화면 오류 ${problems.join(' | ')}`);
+      const cell = await frame.evaluate(() => {
+        const btn = document.querySelector('.yt-play');
+        if (!btn) return { kind: '버튼 없음' };
+        const img = btn.querySelector('img');
+        const card = btn.querySelector('.lt-fallback-card');
+        const empty = btn.querySelector('.yt-placeholder');
+        const r = btn.getBoundingClientRect();
+        return { kind: img ? '썸네일' : card ? '글카드' : empty ? '빈상자' : '기타', imgOk: img ? img.naturalWidth > 0 : null, w: Math.round(r.width), h: Math.round(r.height), title: (btn.textContent || '').includes('Super Shy — Official MV') };
+      });
+      assert.equal(cell.kind, expect, `${route}: 영상 칸이 ${expect}가 아니다(${JSON.stringify(cell)})`);
+      if (expect === '썸네일') assert.equal(cell.imgOk, true, `${route}: 썸네일이 실제로 그려지지 않았다`);
+      if (expect === '글카드') assert.equal(cell.title, true, `${route}: 글 카드에 제목이 없다`);
+      assert.ok(cell.w > 100 && cell.h > 60, `${route}: 영상 칸이 너무 작다 ${JSON.stringify(cell)}`);
+      await context.close();
+    }
+  } finally {
+    if (browser) await browser.close().catch(() => {});
+    server.close();
+  }
+});

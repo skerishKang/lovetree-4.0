@@ -36,9 +36,11 @@ test('1. YouTube는 그 자리에서: nocookie embed, 시작 시점 유지, refe
     assert.ok(src.includes('media-source-link'), path + ': 영상 아래 출처 한 줄의 링크');
     // #327 1부(대표 결정 2026-11-09): 내 기록(서버·로그인 소유자)은 썸네일을 처음부터 보여 준다.
     // #393: ytimg 주소는 media-preview.js 의 youtubeThumbUrl/loadUrl 한 벌로 옮겼다 — 화면에는 literal 이 없고,
-    // 공유·예시는 여전히 요청 0이다(썸네일은 auto 판정을 통과한 가지에서만 그린다).
+    // #635 PR B(대표 결정): 감상 화면의 빈 크림 상자를 없애기 위해 썸네일 <img>는 감상에서도 부른다 —
+    // 재생 임베드(iframe)는 여전히 누르기 전까지 없다. 깨지면 #393 내려가기 틀로 제목 글 카드가 된다.
     assert.equal(src.split('i.ytimg.com').length - 1, 0, path + ': ytimg 주소는 화면에 하드코딩하지 않는다(LTMedia 한 벌)');
-    assert.ok(/:auto\?'<img src="'\+t\(remoteThumb\)/.test(src), path + ': 썸네일은 내 기록 판정(auto)을 통과했을 때만 그린다');
+    assert.ok(/:'<img src="'\+t\(remoteThumb\)/.test(src), path + ': 썸네일이 없으면 보관된(유튜브) 썸네일을 보린다 — 빈 상자 금지(#635 PR B)');
+    assert.ok(!src.includes("'<span class=\"yt-placeholder\"></span>'"), path + ': 빈 상자를 그리는 갈래는 없다');
     assert.ok(src.includes('LTMedia.youtubeThumbUrl(media.videoId,true)') && src.includes('media.loadUrl'), path + ': 썸네일 주소는 LTMedia 한 벌에서 온다');
     assert.ok(/autoLoadMedia\(ctx\.source,\s*ctx\.owned\)/.test(src), path + ': 판정은 media-preview 의 한 함수를 쓴다');
   }
