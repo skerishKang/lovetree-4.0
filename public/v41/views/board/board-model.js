@@ -35,6 +35,38 @@ window.LT58Model = (() => {
     }
     return out;
   }
+  // === 순서 저장(#619-6): '내 배치'는 좌표가 아니라 순서로 저장한다. ===
+  // 저장 경로는 기존 워크스페이스 문서 PUT 그대로 — 좌표 y 값에 순위를 실어 보낸다.
+  // y = -10000 + rank (rank 0부터). boardLayoutOf가 y를 ±10000 정수로 통과시키므로 문서 합법 값이며,
+  // x는 옛 자리가 그대로 남는다(지우지 않는다). 서버·DB 변경 없이 동작한다.
+  const ORDER_Y_BASE = -10000;
+  function isOrderY(y) {
+    const v = Number(y);
+    return Number.isInteger(v) && v >= ORDER_Y_BASE && v < ORDER_Y_BASE + 7000;
+  }
+  // 순서 데이터가 실린 순간 목록 → 사용자 순서(id 배열). 실린 게 하나도 없으면 null(옛 좌표 방식).
+  // 일부만 실렸으면(순간 추가 직후) 실린 순서 + 나머지(날짜순)를 이어 붙인다. 중복 순위는 id 비교로 가른다.
+  function orderOfMoments(moments) {
+    const list = Array.isArray(moments) ? moments : [];
+    const ranked = [], rest = [];
+    for (const m of list) {
+      if (m && typeof m.id === 'string' && isOrderY(m.y)) ranked.push({ id: m.id, rank: Number(m.y) - ORDER_Y_BASE });
+      else if (m && typeof m.id === 'string') rest.push(m);
+    }
+    if (!ranked.length) return null;
+    ranked.sort((a, b) => a.rank - b.rank || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+    // 거짓 양성 방지: 순위들이 0부터 끊김 없이 이어져야 순서로 본다(옛 좌표의 음수 y는 우연히 0부터 이어지기 어렵다).
+    for (let i = 0; i < ranked.length; i++) if (ranked[i].rank !== i) return null;
+    return [...ranked.map((r) => r.id), ...dateDescOrder(rest)];
+  }
+  // 옛 x·y(핀보드 칸 자리)를 순서로 한 번 바꿔 읽는다: 저장 자리(칸×줄)는 줄→칸 순으로,
+  // 저장 자리가 없는 순간은 날짜순을 뒤에 붙인다. 좌표는 지우지 않고 이 순서만으로 배치를 정한다.
+  function orderFromSaved(savedSlots, restIds) {
+    const saved = [...(savedSlots instanceof Map ? savedSlots.entries() : Object.entries(savedSlots || {}))]
+      .map(([id, s]) => ({ id, col: Number(s?.col) || 0, row: Number(s?.row) || 0 }))
+      .sort((a, b) => a.row - b.row || a.col - b.col);
+    return [...saved.map((s) => s.id), ...(Array.isArray(restIds) ? restIds : [])];
+  }
   // 저장한 자리(사람이 꽂은 칸)는 비켜 놓고, 나머지를 줄어든 순서대로 빈 칸에 채운다(왼쪽→오른쪽, 위→아래).
   // saved: Map(id → {col,row}) — 화면이 저장된 x·y에서 되새겨 넘긴다. 저장 자리는 원친대로 남는다(#395 계약).
   function pinboardSpread(ids, { cols = 4, saved = null } = {}) {
@@ -351,5 +383,5 @@ window.LT58Model = (() => {
   }
 
   // 지우기 허용 판단: 실제 기록(읽기 전용)이면 안내 문구를 함께 준다. (#582: 보드에서 줄을 만들거나 지우지 않으므로 연결 지우기는 지도가 맡는다)
-  return { escapeHTML, gridColumns, dateDescOrder, stackLayout, pinboardSpread, gridRowTops, gridPosition, slotOf, isPinboardSlot, settleColumnGaps, fitZoom, boardSize, contentBox, fitBox, clampView, startView, visibleCards, rememberView, savedView, editGuard, collectPath, nextConnections, detailButtonState, cinemaBeats, filterVisible, maxCreatedOrder, decorationMotion };
+  return { escapeHTML, gridColumns, dateDescOrder, stackLayout, ORDER_Y_BASE, isOrderY, orderOfMoments, orderFromSaved, pinboardSpread, gridRowTops, gridPosition, slotOf, isPinboardSlot, settleColumnGaps, fitZoom, boardSize, contentBox, fitBox, clampView, startView, visibleCards, rememberView, savedView, editGuard, collectPath, nextConnections, detailButtonState, cinemaBeats, filterVisible, maxCreatedOrder, decorationMotion };
 })();
