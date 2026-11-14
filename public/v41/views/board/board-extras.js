@@ -99,17 +99,18 @@ function detailKeywords(m){return `<div class="keywordRow">${(m.keywords||[]).ma
 // #601: 상세 플레이어 — 맨 위에서 바로 재생한다. YouTube는 썸네일을 그린 뒤 재생 단추를 눌러 임베드로,
 // 로컬 영상은 controls·autoplay, 사진은 크게, 기록은 큰 글씨로 보여 준다.
 function detailPlayerHTML(m){
- const _yt=window.__LT58YT;if(_yt?.isYtMoment?.(m)){const u=_yt.originalUrl(m)||m.url;if(u)return LTMedia.markup(u,m.title,m.mediaMetadata,m.id,null,null)}
- if(m.url)return LTMedia.markup(m.url,m.title,m.mediaMetadata,m.id,null,null);
- if(m.type==='note')return `<div class="detailNoteMedia">“${esc(m.memo)}”</div>`;
- if(m.type==='video')return `<video class="detailVideo" src="${m.video||''}" poster="${m.asset||''}" controls autoplay muted playsinline></video>`;
- return `<img class="detailPhoto" src="${m.asset||''}" data-fallback="${ASSET.link}" onerror="this.onerror=null;this.src=this.dataset.fallback" alt="">`;
+  const _yt=window.__LT58YT;if(_yt?.isYtMoment?.(m)){const u=_yt.originalUrl(m)||m.url;if(u)return LTMedia.markup(u,m.title,m.mediaMetadata,m.id,null,null)}
+  if(m.url)return LTMedia.markup(m.url,m.title,m.mediaMetadata,m.id,null,null);
+  if(m.type==='note')return `<div class="detailNoteMedia">"${esc(m.memo)}"</div>`;
+  if(m.type==='video')return `<video class="detailVideo" src="${m.video||''}" poster="${m.asset||''}" controls muted playsinline></video>`;
+  return `<img class="detailPhoto" src="${m.asset||''}" data-fallback="${ASSET.link}" onerror="this.onerror=null;this.src=this.dataset.fallback" alt="">`;
 }
 // 이어진 순간 작은 카드: 썸네일 + 제목. 누르면 판이 그 순간으로 부드럽게 이동한다(#583 규칙 그대로).
-function connThumb(t){if(!t)return '';if(t.url&&typeof youtubeId==='function'&&youtubeId(t.url))return `<span class="connThumb"><img src="${youtubeThumb(t.url)}" alt="" loading="lazy"></span>`;if(t.asset)return `<span class="connThumb"><img src="${t.asset}" alt="" loading="lazy"></span>`;return `<span class="connThumb connThumbText">“${esc(String(t.memo||'').slice(0,60))}”</span>`}
+// 썸네일이 없으면 '…'를 보인다.
+function connThumb(t){if(!t)return '';if(t.url&&typeof youtubeId==='function'&&youtubeId(t.url))return `<span class="connThumb"><img src="${youtubeThumb(t.url)}" alt="" loading="lazy"></span>`;if(t.asset)return `<span class="connThumb"><img src="${t.asset}" alt="" loading="lazy"></span>`;return `<span class="connThumb connThumbText">…</span>`}
 selectMoment=function(id,open=true){if(open)LTDEMO.select(id);selected=id;mobilePicker?.select(id);document.querySelectorAll('.card').forEach(c=>c.classList.toggle('selected',c.dataset.id===id));if(open){let m=moments.find(x=>x.id===id);if(!m)return;const _ti=titleInfo(m);$('#dTitle').textContent=_ti.main;const _ds=$('#detailSub');if(_ds){_ds.textContent=_ti.sub?'▶ '+_ti.sub:'';_ds.hidden=!_ti.sub}
 // #601: 플레이어가 맨 위, 내 마음은 크게(비어 있으면 입력칸), 감정·날짜·트리 한 줄.
-$('#detailPlayer').innerHTML=detailPlayerHTML(m);setTimeout(()=>{const b=$('#detailPlayer').querySelector('[data-lt-play]');if(b)b.click()},30);
+$('#detailPlayer').innerHTML=detailPlayerHTML(m);
 const _heart=$('#dHeart'),_input=$('#dHeartInput'),_save=$('#dHeartSave');
 if(_heart){if(m.memo){_heart.hidden=false;_heart.textContent=m.memo;if(_input)_input.hidden=true;if(_save)_save.hidden=true}else{_heart.hidden=true;_heart.textContent='';if(_input){_input.hidden=false;_input.value=''}if(_save)_save.hidden=false}}
 const _treeName=document.getElementById('treeTitleText')?.textContent||'';

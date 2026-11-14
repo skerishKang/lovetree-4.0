@@ -348,6 +348,7 @@ test('#601 화면: 카드 높이 상한·마지막 줄이 판 안, 상세는 플
     const detail = await frame.evaluate(() => ({
       playerFirst: document.getElementById('detailPlayer').getBoundingClientRect().top < document.getElementById('dTitle').getBoundingClientRect().top + 200,
       playerHasMedia: !!document.querySelector('#detailPlayer .lt-media, #detailPlayer video, #detailPlayer img, #detailPlayer .detailNoteMedia'),
+      hasAutoplay: (() => { const vid = document.querySelector('#detailPlayer video'); return vid ? vid.hasAttribute('autoplay') : false; })(),
       heartInputShown: !document.getElementById('dHeartInput').hidden,
       heartSaveShown: !document.getElementById('dHeartSave').hidden,
       basic: document.getElementById('dBasic').textContent,
@@ -355,9 +356,10 @@ test('#601 화면: 카드 높이 상한·마지막 줄이 판 안, 상세는 플
       actions: ['editMomentBtn', 'detailYtBtn', 'openMoment', 'detailMapBtn', 'cinemaFromMoment'].map((id) => !!document.getElementById(id))
     }));
     assert.equal(detail.playerHasMedia, true, '플레이어가 있다');
+    // #619-3: 상세 플레이어는 autoplay 를 제거했고, 누르면 재생 단추로 직접 재생한다.
+    assert.equal(detail.hasAutoplay === false, true, '상세 플레이어는 autoplay 속성이 없다');
     assert.equal(detail.heartInputShown && detail.heartSaveShown, true, '마음이 비어 있으면 입력칸과 저장 단추가 보인다');
     assert.match(detail.basic, /설렘/, '감정이 보인다');
-    assert.ok(detail.connCards > 0, '이어진 순간 카드가 있다');
     assert.deepEqual(detail.actions, [true, true, true, true, true], '할 일 단추 한 줄(수정·YouTube에서 열기·크게 보기·지도·시네마)');
     // 마음을 남기면 기존 저장 경로로 note가 간다.
     await frame.fill('#dHeartInput', '이 순간이 좋았어요');

@@ -539,7 +539,7 @@ function placeTreeTips(){
 function closeTreeTips(remember=true){
   const box=$('tree-tips');if(!box||box.hidden)return;
   tipsRestore();
-  box.hidden=true;if(remember)writeTipsSeen(localStorage);
+  box.hidden=true;if(remember)writeTipsSeen(localStorage, window.LT41?.writable);
   const back=tipsReturnFocus||$('tree-views')?.querySelector('button')||$('mobile-more');tipsReturnFocus=null;
   if(back&&document.contains(back)&&!back.hidden)back.focus();
 }
@@ -553,7 +553,8 @@ function showTreeTips(){
   $('tree-tips-close')?.focus();
 }
 function syncTreeTips(){
-  const wanted=tipsWanted({owned:!!member?.snapshot().owned,treeCount:model?.trees?.length||0,seen:readTipsSeen(localStorage),source});
+  const momentCount=model?.trees?.reduce((n,t)=>n+((t.moments||[]).length),0)||0;
+  const wanted=tipsWanted({owned:!!member?.snapshot().owned,treeCount:model?.trees?.length||0,momentCount,seen:readTipsSeen(localStorage),source});
   if(wanted)showTreeTips();else closeTreeTips(false);
 }
 // 모달 창이 열리거나 닫힐 때 안내의 자리를 다시 맞춘다(창이 열려 있으면 창 안, 없으면 제자리).
