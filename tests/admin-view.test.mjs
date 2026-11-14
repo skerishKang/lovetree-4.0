@@ -182,3 +182,10 @@ test('연결 이슈 번호가 숫자일 때만 링크를 만든다(#564 14)', ()
   assert.equal(issueLink('541;alert(1)'), '');
   assert.equal(issueLink(null), '');
 });
+
+test('운영센터 배경 — 빌드 순서와 상관없이 무대색이 styles.css :root 크림을 이긴다(html:root 명시도)', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const css = await readFile(new URL('../src/admin.css', import.meta.url), 'utf8');
+  assert.match(css, /html:root\s*\{[^}]*background-color:\s*var\(--lt-stage\)/);
+  assert.match(css, /body\s*\{[^}]*min-height:\s*100vh/);
+});
