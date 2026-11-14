@@ -245,13 +245,14 @@ test('#601 화면: 끌면 내 배치로 자동 전환하고, 날짜순↔내 배
   const browser = await chromium.launch({ headless: true });
   try {
     const { context, page, frame, problems } = await openHost(browser, `${base}/__host-601b.html`, { width: 1440, height: 900 });
-    // 보이는 카드를 골라 오른쪽 빈 칸으로 끌어 꽂는다. #601: 그림이 대부분인 카드도 그림 가운데에서 끌 수 있어야 한다(재생 단추는 모서리 작은 표).
+    // 보이는 카드를 골라 오른쪽 빈 칸으로 끌어 꽂는다. #601: 그림이 대부분인 카드도 그림 가운데에서 끌 수 있어야 한다 —
+    // 그림 위 끌기는 브라우저 기본 끌기(pointercancel)에 잡아먹히지 않게 막아 둔다(재생 단추는 모서리 작은 표).
     const from = await frame.evaluate(() => {
       for (const c of document.querySelectorAll('#cardLayer .card')) {
         const r = c.getBoundingClientRect();
         if (!(r.top > 80 && r.bottom < 880 && r.left > 0 && r.right < 1100)) continue;
-        const media = c.querySelector('.lt-yt-preview');
-        const mr = media ? media.getBoundingClientRect() : null;
+        const img = c.querySelector('.lt-yt-preview img');
+        const mr = img ? img.getBoundingClientRect() : null;
         const x = mr ? (mr.left + mr.right) / 2 : (r.left + r.right) / 2;
         const y = mr ? (mr.top + mr.bottom) / 2 : (r.top + r.bottom) / 2;
         const hit = document.elementFromPoint(x, y);
@@ -261,6 +262,17 @@ test('#601 화면: 끌면 내 배치로 자동 전환하고, 날짜순↔내 배
     });
     assert.ok(from, '끌 카드가 보인다');
     assert.equal(from.onButton, false, '카드 그림 가운데는 단추가 아니어야 끌 수 있다(#601)');
+    // #601: 그림 위 끌기는 브라우저 기본 끌기(pointercancel)에 잡아먹힌다 — 기본 끌기는 막혀 있어야 한다.
+    // headless chromium은 실제 마우스 입력으로 기본 끌기를 재현하지 못하므로, 막음 자체를 계약으로 잰다.
+    const noNativeDrag = await frame.evaluate(() => {
+      const img = document.querySelector('#cardLayer .card .lt-yt-preview img');
+      if (!img) return { hasImg: false };
+      const ev = new DragEvent('dragstart', { bubbles: true, cancelable: true });
+      img.dispatchEvent(ev);
+      return { hasImg: true, prevented: ev.defaultPrevented };
+    });
+    assert.equal(noNativeDrag.hasImg, true, '영상 카드 그림이 그려져 있다');
+    assert.equal(noNativeDrag.prevented, true, '카드 그림의 기본 끌기(dragstart)는 막혀야 한다(#601)');
     const to = await frame.evaluate(() => {
       const c = document.querySelector('#cardLayer .card');
       const r = c.getBoundingClientRect(), z = r.width / c.offsetWidth;

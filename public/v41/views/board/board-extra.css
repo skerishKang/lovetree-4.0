@@ -216,6 +216,10 @@ html[data-lt-theme=garden] .boardModeSwitch .modeSwitchBtn[aria-pressed="true"]{
 /* #601: 카드 한가운데 재생 단추가 끌기를 가로막지 않게 — 보드 카드에서는 모서리 작은 표로 줄인다(상세·책은 그대로). */
 .card .lt-yt-preview .lt-yt-play{inset:auto;top:10px;right:10px;width:56px;height:56px}
 
+/* #601: 그림 위에서 끌면 브라우저 기본 끌기가 pointercancel로 보드 끌기를 취소하고, 놓으면 기본 동작이 화면을 갈아끊는다 — 기본 끌기·글자 선택을 막는다. */
+.card img{-webkit-user-drag:none}
+.card{user-select:none}
+
 .card .media{height:200px}
 /* 세로 영상은 9:16 모양 그대로, 높이 상한 300px — 가운데 세운다. */
 .card .lt-media[data-lt-vertical="1"] .lt-yt-preview,
