@@ -28,7 +28,7 @@ test('A: 예시를 둘러봐도 로그인한 계정은 남는다(메뉴가 사�
 
 test('A: 예시에서 순간 추가를 누르면 로그인 화면 대신 내 기록으로 돌아와 같은 창을 연다', () => {
   assert.match(shell, /function resumeMember\(intent\)\{resumeAfterStart=intent\|\|'write';return startMember\(\);\}/);
-  assert.match(shell, /\$\('write-menu'\)\.onclick=\(\)=>\{if\(source!=='server'&&member\?\.snapshot\(\)\.owned\)\{void resumeMember\('write'\);return;\}shellQuick\.openWrite\(\);\}/);
+  assert.match(shell, /\$\('write-menu'\)\.onclick=\(\)=>\{if\(source!=='server'&&member\?\.snapshot\(\)\.owned\)\{void resumeMember\('write'\);return;\}if\(member\?\.snapshot\(\)\.dirty\)\{explainSaveState\(\);return;\}shellQuick\.openWrite\(\);\}/);
   assert.match(shell, /if\(resumeAfterStart\)\{const intent=resumeAfterStart;resumeAfterStart=null;if\(intent==='write'\)shellQuick\.openWrite\(\);else openEditor\(intent\);\}/, '내 기록을 불러온 뒤에 이어서 연다');
   assert.match(quickAdd, /if \(deps\.getSource\(\) !== 'server'\) \{ deps\.resumeMember\?\.\('write'\); return false; \}/, '쉬운 추가 입구도 로그인으로 보내지 않는다');
   assert.match(panels, /if \(getSource\(\) !== 'server'\) \{ deps\.resumeMember\?\.\(requestedMode === 'edit' \? 'write' : requestedMode \|\| 'write'\); return; \}/, '자세한 추가 입구도 같다');

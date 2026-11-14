@@ -7,8 +7,8 @@ const LABELS = {
   offline: '서버 연결을 확인할 수 없어요', conflict: '서버 기록이 먼저 바뀌었어요',
   rejected: '서버가 이 저장을 받지 않았어요'
 };
-function status({ phase, detail = null, actions = [] }) {
-  return { phase, label: LABELS[phase], detail, actions };
+function status({ phase, detail = null, actions = [], changes = 0 }) {
+  return { phase, label: LABELS[phase], detail, actions, changes };
 }
 
 const PENDING_DRAFT_PREFIX = 'lovetree.v41.pending-write:';
@@ -43,6 +43,12 @@ export function createSyncController({getState, replaceState, api, draftStorage 
   let current = status({phase:'checking'}), listener = () => {};
   let owned = false, revision = null, dirty = false, generation = 0, activeSubject = null;
   let queued = 0, inflight = false, attempt = null, seenRevision = null;
+  // 이슈 644 3번: 마지막으로 서버에 저장된 뒤 이 화면에서 고친 횟수. 충돌 띠가 "고친 N개"로 알릴 때 쓴다.
+  let editCount = 0;
+  // 이슈 644 3번: 충돌 띠 문구는 쉬운 말 한 벌만 쓴다 — 고친 개수가 있으면 개수를, 없으면 내용만 말한다.
+  const conflictDetail = () => editCount > 0
+    ? `다른 곳에서 기록이 바뀌었어요. 이 화면에서 고친 ${editCount}개는 따로 보관해 둘게요.`
+    : '다른 곳에서 기록이 바뀌었어요. 이 화면에서 고친 내용은 따로 보관해 둘게요.';
   // 저장본 먼저 그리기는 이 컨트롤러의 첫 start()에서만 한다(재시도가 화면을 옛 기록으로 되돌리지 않게).
   let cachePainted = false;
   const emit = value => { current = value; onChange(value); listener(value); return value; };
@@ -95,8 +101,8 @@ export function createSyncController({getState, replaceState, api, draftStorage 
       return emit(status({phase:'rejected',detail:'로그인 전에 저장하지 못한 내용을 복원했어요. 다시 저장해 주세요.',actions:actions.retry}));
     }
     seenRevision = serverRevision;
-    return emit(status({phase:'conflict',detail:'로그인 전에 저장하지 못한 내용을 복원했어요. 서버 기록을 확인한 뒤 선택해 주세요.',
-      actions:[{name:'pull',label:'서버 기록 열기'},{name:'force',label:'복원한 내용으로 덮어쓰기'}]}));
+    return emit(status({phase:'conflict',detail:'로그인 전에 저장하지 못한 내용을 복원했어요. 서버 기록을 확인한 뒤 선택해 주세요.',changes:editCount,
+      actions:[{name:'pull',label:'최신 기록 불러오기'},{name:'force',label:'복원한 내용으로 덮어쓰기'}]}));
   }
 
   async function start() {
@@ -120,7 +126,7 @@ export function createSyncController({getState, replaceState, api, draftStorage 
       }
       return emit(status({phase:'offline',detail:'서버를 확인하지 못했어요. 다시 시도해 주세요.',actions:[...actions.retry,...actions.login]}));
     }
-    owned = true; revision = result.revision; dirty = false; attempt = null; seenRevision = null; activeSubject = result.subject || null;
+    owned = true; revision = result.revision; dirty = false; attempt = null; seenRevision = null; editCount = 0; activeSubject = result.subject || null;
     replaceState(validateState(result.state));
     writeCachedWorkspace(cacheStorage, activeSubject, result.state);
     if (restorePendingDraft(activeSubject, revision)) return current;
@@ -142,7 +148,7 @@ export function createSyncController({getState, replaceState, api, draftStorage 
     inflight = false;
     if (gen !== generation) return current;
     if (answer.ok) {
-      revision = answer.revision; attempt = null;
+      revision = answer.revision; attempt = null; editCount = 0;
       clearPendingDraft();
       dirty = JSON.stringify(getState()) !== sent.serial;
       if (dirty) return push();
@@ -155,18 +161,33 @@ export function createSyncController({getState, replaceState, api, draftStorage 
     }
     if (answer.status === 409 && answer.code === 'revision_conflict') {
       seenRevision = answer.currentRevision;
-      return emit(status({phase:'conflict',detail:'서버 기록이 바뀌었어요. 서버 기록을 열거나 현재 입력으로 덮어쓰기를 선택해 주세요.',
-        actions:[{name:'pull',label:'서버 기록 열기'},{name:'force',label:'현재 입력으로 덮어쓰기'}]}));
+      // 이슈 644 3번: 띠는 쉬운 말로, 고친 개수를 함께 알린다. 주 단추는 하나(최신 기록 불러오기)이고
+      // 덮어쓰기는 셸이 '자세히' 안에 넣는다 — 저장 규칙(개정 번호·충돌 판정)은 그대로다.
+      return emit(status({phase:'conflict',detail:conflictDetail(),changes:editCount,
+        actions:[{name:'pull',label:'최신 기록 불러오기'},{name:'force',label:'이 화면 것으로 덮어쓰기'}]}));
     }
     if (answer.status === 409 && answer.code === 'client_key_conflict') attempt = null;
     return emit(status({phase:answer.status === 0 ? 'offline' : 'rejected',
       detail:'서버에 저장되지 않았어요. 이 화면을 닫기 전에 다시 시도해 주세요.',actions:actions.retry}));
   }
 
+  // 이슈 644 3번: 다른 곳에서 기록이 바뀌었는지 조용히 확인한다. 이 화면에서 고친 게 없을 때만 서버 기록을
+  // 그대로 받아 온다(띠·확인 없음). 고친 게 있으면 아무것도 하지 않는다 — 충돌 판정은 저장(push) 때 그대로 한다.
+  async function check() {
+    if (!owned || revision === null || dirty || inflight || current.phase === 'conflict') return current;
+    const gen = generation, result = await api.get();
+    if (gen !== generation || dirty || inflight) return current;
+    if (!result.ok || result.revision === revision) return current;
+    revision = result.revision; seenRevision = null;
+    replaceState(validateState(result.state));
+    writeCachedWorkspace(cacheStorage, activeSubject, result.state);
+    return emit(status({phase:'synced',actions:actions.logout}));
+  }
+
   function markLocalSave() {
     if (!owned || revision === null) return emit(status({phase:'login',actions:actions.login}));
-    if (current.phase === 'conflict') { dirty = true; return emit(current); }
-    dirty = true; const gen = generation, ticket = ++queued;
+    if (current.phase === 'conflict') { dirty = true; editCount += 1; return emit(current); }
+    dirty = true; editCount += 1; const gen = generation, ticket = ++queued;
     emit(status({phase:'syncing'}));
     void (async () => { await delay(900); if(gen === generation && ticket === queued) await push(); })();
     return current;
@@ -174,12 +195,13 @@ export function createSyncController({getState, replaceState, api, draftStorage 
 
   async function act(name) {
     if (name === 'login') { generation++; navigate('/auth/login?next=/'); return current; }
+    if (name === 'check') return check();
     if (name === 'retry') return dirty ? push() : start();
     if (name === 'pull') {
       const gen = generation, result = await api.get();
       if (gen !== generation) return current;
       if (!result.ok) return emit(status({phase:'offline',detail:'서버 기록을 불러오지 못했어요.',actions:actions.retry}));
-      revision = result.revision; dirty = false; attempt = null; seenRevision = null;
+      revision = result.revision; dirty = false; attempt = null; seenRevision = null; editCount = 0;
       clearPendingDraft();
       replaceState(validateState(result.state));
       writeCachedWorkspace(cacheStorage, activeSubject, result.state);
@@ -191,9 +213,10 @@ export function createSyncController({getState, replaceState, api, draftStorage 
       if (!result.ok) return emit(status({phase:'conflict',detail:'서버 기록을 다시 확인하지 못했어요.',actions:[{name:'force',label:'다시 확인'}]}));
       if (Number.isSafeInteger(seenRevision) && result.revision !== seenRevision) {
         seenRevision = result.revision;
-        return emit(status({phase:'conflict',detail:'확인하는 동안 서버가 다시 바뀌었어요.',actions:[{name:'pull',label:'서버 기록 열기'},{name:'force',label:'현재 입력으로 덮어쓰기'}]}));
+        return emit(status({phase:'conflict',detail:'확인하는 동안 서버가 다시 바뀌었어요. 이 화면에서 고친 내용은 따로 보관해 둘게요.',changes:editCount,
+          actions:[{name:'pull',label:'최신 기록 불러오기'},{name:'force',label:'이 화면 것으로 덮어쓰기'}]}));
       }
-      revision = result.revision; attempt = null;
+      revision = result.revision; attempt = null; editCount = 0;
       emit(status({phase:'rejected'}));
       return push();
     }
@@ -203,11 +226,10 @@ export function createSyncController({getState, replaceState, api, draftStorage 
       if (gen !== generation) return current;
       if (!answer.ok) return emit(status({phase:'rejected',detail:'로그아웃하지 못했어요.',actions:actions.logout}));
       clearCachedWorkspace(cacheStorage, activeSubject);
-      owned = false; revision = null; replaceState(EMPTY_STATE()); navigate('#start');
-      return emit(status({phase:'login',actions:actions.login}));
+      owned = false; revision = null; editCount = 0; replaceState(EMPTY_STATE()); navigate('#start');
     }
     return current;
   }
-  return {start, act, markLocalSave, status:() => current,
+  return {start, act, check, markLocalSave, status:() => current,
     subscribe:fn => {listener=fn}, snapshot:() => ({owned,revision,dirty})};
 }
