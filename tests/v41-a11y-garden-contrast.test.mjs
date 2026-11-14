@@ -59,6 +59,42 @@ test('셸 맥락 표시는 정원에서만 --lt-rose-ink를 쓴다 — 밤은 --
   assert.equal(/#[0-9a-fA-F]{3,8}\b/.test(rule), false, '새 hex 색을 쓰지 않는다');
 });
 
+// 이슈 644: 대비 3가지 중 두 가지를 토큰 수치로 고정한다.
+// (b) 보드 머리줄 트리 이름 — 정원의 밝은 머리줄 위 잉크색. 밤은 어두운 머리줄 위 연분홍(#e8deee)으로 이미 충분하다.
+// (c) '서버에 저장됐어요' 토스트 — 밤·정원 모두 어두운 판(rgba(7,7,12,.94)) 위 글자. 정원에서 --lt-pearl은 어두운 잉크라 미달이므로 --lt-paper를 쓴다.
+function blend(fgHex, alpha, bgHex) {
+  const hex = n => Number.parseInt(n, 16);
+  const f = [1, 3, 5].map(i => hex(fgHex.slice(i, i + 2)));
+  const b = [1, 3, 5].map(i => hex(bgHex.slice(i, i + 2)));
+  return '#' + f.map((v, i) => Math.round(alpha * v + (1 - alpha) * b[i]).toString(16).padStart(2, '0')).join('');
+}
+
+test('이슈 644: 정원 보드 트리 이름(--lt-ink)은 머리줄 배경에서 4.5:1을 넘는다', () => {
+  const ink = gardenToken('--lt-ink');
+  const stage = gardenToken('--lt-stage');
+  const edge = gardenToken('--lt-garden-edge');
+  assert.equal(ink, '#403536');
+  // 머리줄 배경: rgba(255,253,248,.58)이 정원 무대 가장자리(#eee3d5=garden-edge) 위까지 덮는다 — 가장 어두운 조합이 최악의 case다.
+  const worst = blend('fffdf8', 0.58, edge);
+  const ratio = contrast(ink, worst);
+  assert.ok(ratio >= 4.5, `정원 트리 이름 ${ink} on ${worst} = ${ratio.toFixed(2)}:1`);
+  // 고치기 전 값(밤의 연분홍 #e8deee)은 같은 바탕에서 미달이었다 — 수정 근거.
+  assert.ok(contrast('#e8deee', worst) < 4.5, `이전 값 #e8deee on ${worst} = ${contrast('#e8deee', worst).toFixed(2)}:1 (미달)`);
+  assert.ok(contrast(ink, stage) >= 4.5);
+});
+
+test('이슈 644: 토스트 글자는 밤·정원 모두 어두운 판 위에서 4.5:1을 넘는다', () => {
+  // 토스트 판 rgba(7,7,12,.94)는 밤 무대(#040407)·정원 무대(#f7f0e8) 위에서 각각 섞인다.
+  const nightBg = blend('07070c', 0.94, '#040407');
+  const gardenBg = blend('07070c', 0.94, gardenToken('--lt-stage'));
+  const night = contrast('#f5f1e9', nightBg);
+  const garden = contrast(gardenToken('--lt-paper'), gardenBg);
+  assert.ok(night >= 4.5, `밤 토스트 = ${night.toFixed(2)}:1 (on ${nightBg})`);
+  assert.ok(garden >= 4.5, `정원 토스트 = ${garden.toFixed(2)}:1 (on ${gardenBg})`);
+  // 고치기 전 값(정원 --lt-pearl #403536)은 미달이었다 — 수정 근거.
+  assert.ok(contrast('#403536', gardenBg) < 4.5, `이전 값 = ${contrast('#403536', gardenBg).toFixed(2)}:1 (미달)`);
+});
+
 test('책장 --muted는 정원에서만 --lt-muted로 바뀐다 — :root 값은 그대로(밤 변화 0)', () => {
   assert.match(shelfCss, /:root \{[^}]*--muted: #8d7d77;/, ':root 기본값은 그대로다');
   assert.match(shelfCss, /html\[data-lt-theme=garden\] \{ --muted: var\(--lt-muted\); \}/, '정원만 토큰으로 덮는다');

@@ -127,10 +127,19 @@ export function tipsWanted({ owned = false, treeCount = 0, seen = false, source 
   return source === 'server' && !!owned && Number(treeCount) === 1 && Number(momentCount) <= 1 && !seen;
 }
 
+// 이슈 644 3번: 머리줄의 '저장 안 됨' 표시를 누르면 같은 설명을 연다. 저장 실패 떠는 이미 떠 있으므로
+// 띠가 숨어 있는 동안(저장 중)에만 이 문구를 쓴다.
+export function unsavedNoticeText(phase = '') {
+  return phase === 'syncing'
+    ? '바뀐 내용을 서버에 저장하고 있어요. 잠시 뒤 저절로 저장돼요.'
+    : '서버에 저장하지 못했어요. 저장 안내를 확인해 주세요.';
+}
+
 // 헤더 주 버튼(#write-menu) 문구. 첫 화면 가운데 첫 버튼과 어긋나지 않게 같은 규칙을 쓴다.
+// 이슈 644 3번: '미저장 기록'은 '저장 안 됨'으로 부른다 — 누르면 같은 설명을 연다.
 export function writeMenuLabel({ owned = false, dirty = false, reading = false, hasTree = false } = {}) {
   if (!owned) return '처음 시작하기';
-  if (dirty) return '미저장 기록';
+  if (dirty) return '저장 안 됨';
   if (!hasTree) return '새 트리 만들기';
   if (reading) return '순간 추가';
   return '순간 추가';
