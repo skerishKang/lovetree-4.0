@@ -108,7 +108,8 @@ test('4. 둘러보기(공개 목록)도 같은 이름 규칙을 쓴다', () => {
 });
 
 test('5. 긴 이름은 말줄임 — 헤더 트리 이름과 문맥 줄이 폭을 넘지 않는다', () => {
-  assert.match(css, /nav #record-menu\{flex:0 0 auto;max-width:190px;/, '헤더 트리 선택 최대 폭');
+  // #601: 트리를 바꿔도 탭이 흔들리지 않게 칸 폭을 고정한다(11em) — 넘치면 말줄임.
+  assert.match(css, /nav #record-menu{flex:0 0 auto;width:11em;/, '헤더 트리 선택 고정 폭');
   assert.match(css, /nav #record-menu #source-label\{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap\}/);
   const context = css.slice(css.indexOf('#context-tree'));
   assert.ok(context.length > 0, '#context-tree 스타일이 있다');

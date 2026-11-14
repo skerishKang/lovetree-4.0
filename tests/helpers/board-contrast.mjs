@@ -52,7 +52,9 @@ export function measureBoardCardsInPage() {
     return compose(l.image, compose(l.color, surface));
   };
   const ROLES = [
+    ['title', '.cardTitle'],
     ['title', 'h3'],
+    ['date', '.cardMeta'],
     ['memo', '.memo'],
     ['date', '.meta > span:first-child'],
     ['mark', '.eyebrow'],
@@ -89,7 +91,9 @@ export function measureBoardCardsInPage() {
   // 실제로 그려진 카드 전부
   const real = cards.map((card) => ({ id: card.dataset.id, variant: variantOf(card), rows: measureCard(card) }));
   // 카드 색 변형 전부: 글이 다 있는 카드 한 장을 복제해 변형 클래스를 붙여 같은 판 위(화면 밖)에서 잰다.
-  const sample = cards.find((c) => !c.classList.contains('noteCard') && c.querySelector('h3') && c.querySelector('.memo') && c.querySelector('.meta'))
+  // #601: 간소화된 카드(제목 .cardTitle·감정·날짜 .cardMeta)를 우선 고르고, 옛 빌드(.memo·.meta)도 고를 수 있다.
+  const sample = cards.find((c) => !c.classList.contains('noteCard') && c.querySelector('.cardTitle') && c.querySelector('.cardMeta'))
+    || cards.find((c) => !c.classList.contains('noteCard') && c.querySelector('h3') && c.querySelector('.memo') && c.querySelector('.meta'))
     || cards.find((c) => !c.classList.contains('noteCard') && c.querySelector('h3') && c.querySelector('.meta'));
   const noteSample = cards.find((c) => c.classList.contains('noteCard'));
   const STYLES = ['photo', 'postit', 'memo', 'rounded', 'film', 'ticket'];

@@ -49,7 +49,7 @@ const chainTree = (n) => {
 };
 
 // 화면이 넘기는 카드 종류별 예약 높이(board.js의 상수와 같은 값).
-const YT_RESERVED_H = 480, YT_VERTICAL_RESERVED_H = 680, BASE_RESERVED_H = 424;
+const YT_RESERVED_H = 330, YT_VERTICAL_RESERVED_H = 440, BASE_RESERVED_H = 330;
 const reservedHeights = (tree) => new Map(tree.moments.map((m) => [m.id, m.url ? (m.url.includes('/shorts/') ? YT_VERTICAL_RESERVED_H : YT_RESERVED_H) : BASE_RESERVED_H]));
 
 function serve(extra = {}) {
@@ -146,8 +146,8 @@ test('#553 모델 → #582 바둑판: 기본 카드뿐인 트리(예시 40순간
   const tree = chainTree(40);
   const slots = LT58Model.pinboardSpread(LT58Model.dateDescOrder(tree.moments), { cols: LT58Model.gridColumns(1440) });
   const tops = LT58Model.gridRowTops(slots, (id) => reservedHeights(tree).get(id));
-  // 전부 기본 카드(424px)이므로 모든 줄이 460px 간격(#548이 정한 값)이다.
-  assert.deepEqual(tops, Array.from({ length: Math.ceil(40 / 4) }, (_, r) => 150 + r * 460));
+  // 전부 기본 카드(330px 예약)이므로 모든 줄이 366px 간격이다(#601 — 간소화된 카드 높이에 맞춘 값).
+  assert.deepEqual(tops, Array.from({ length: Math.ceil(40 / 4) }, (_, r) => 150 + r * 366));
 });
 
 test('#553 모델: settleColumnGaps — 겹친 카드만 아래로 밀리고 저장 자리는 그대로다', () => {
@@ -189,8 +189,9 @@ test('#553 화면: 썸네일이 실린 모아둔 순간 26 — 인접 겹침 0�
       assert.equal(g.pairs, 0, `${w}: 겹친 카드 쌍 0 (전: 22쌍)`);
       assert.equal(g.area, 0, `${w}: 겹친 면적 0px² (전: 390 153,337px²·1440 98,136px²)`);
       assert.ok(g.thumbs >= 25, `${w}: 썸네일 ${g.thumbs}장이 실려 긴 카드 상황을 재현한다`);
-      assert.ok(g.maxH >= 440, `${w}: YouTube 카드 높이 ${g.maxH}px ≥ 440px — 줄 간격 420px를 넘는 긴 카드가 실제로 있다`);
-      assert.ok(g.minColumnGap >= YT_RESERVED_H, `${w}: 같은 열 위아래 간격 ${g.minColumnGap}px ≥ YouTube 예약 높이 ${YT_RESERVED_H}px (전: 420px)`);
+      // #601: 카드 높이 상한 — 썸네일이 실려도 카드는 460px를 넘지 않는다(세로 영상 9:16 상한 300px 포함).
+      assert.ok(g.maxH >= 260 && g.maxH <= 460, `${w}: YouTube 카드 높이 ${g.maxH}px — 260px 이상 460px 이하(상한)`);
+      assert.ok(g.minColumnGap >= YT_RESERVED_H, `${w}: 같은 열 위아래 간격 ${g.minColumnGap}px ≥ YouTube 예약 높이 ${YT_RESERVED_H}px`);
       if (w === 1440) assert.equal(g.zoom, '80%', '읽을 수 있는 0.8배 처음 보기 유지');
       await context.close();
     }
@@ -207,8 +208,8 @@ test('#553 화면: 예시 40순간(사슬) 처음 보기는 그대로다 — 0.8
     const { context, frame } = await openHost(browser, `${base}/__host-40.html`, { width: 1440, height: 900 });
     const g = await geometry(frame);
     assert.equal(g.zoom, '80%', '읽을 수 있는 0.8배 처음 보기 유지(#460·#536)');
-    // #582 바둑판: 4칸 × 10줄 — 줄 간격은 그대로 460px(#548이 벌린 값).
-    assert.deepEqual(g.ys, Array.from({ length: 10 }, (_, r) => 150 + r * 460), '카드 줄 위치는 460px 간격 10줄이다');
+    // #582 바둑판: 4칸 × 10줄 — 줄 간격은 간소화된 카드 높이의 366px(#601).
+    assert.deepEqual(g.ys, Array.from({ length: 10 }, (_, r) => 150 + r * 366), '카드 줄 위치는 366px 간격 10줄이다');
     assert.equal(g.pairs, 0, '겹침 0 유지');
     await context.close();
   } finally { await browser.close(); server.close(); }

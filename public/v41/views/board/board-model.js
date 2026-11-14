@@ -61,6 +61,16 @@ window.LT58Model = (() => {
   function gridPosition(col, rowY, i) {
     return { x: GRID_MARGIN + col * COL_PITCH, y: rowY, rot: ((Number(i) || 0) % 3 - 1) * 2 };
   }
+  // #601: 이 x가 핀보드가 저장한 칸 자리인가 — 카드 x는 칸 위치(GRID_MARGIN+col*300)에 스냅되어 저장된다.
+  // 옛 관계 배치의 x·y는 아무 값이나 있으므로(±2px 안에 칸 위치가 거의 없다),
+  // 이 판정을 통과한 x만 '내 배치'의 저장 자리로 센다. 옛 값은 지우지 않고(#395 계약) 배치 계산에서만 무시한다.
+  function isPinboardSlot(x) {
+    const v = Number(x);
+    if (!Number.isFinite(v)) return false;
+    const col = Math.max(0, Math.round((v - GRID_MARGIN) / COL_PITCH));
+    return Math.abs(v - (GRID_MARGIN + col * COL_PITCH)) <= 2;
+  }
+
   // 픽셀 자리 → 가장 가까운 슬롯(끌어 꽂기). 저장된 x·y든 끌다 놓은 x·y든 같은 규칙으로 되새긴다.
   function slotOf(x, y) {
     return {
@@ -327,5 +337,5 @@ window.LT58Model = (() => {
   }
 
   // 지우기 허용 판단: 실제 기록(읽기 전용)이면 안내 문구를 함께 준다. (#582: 보드에서 줄을 만들거나 지우지 않으므로 연결 지우기는 지도가 맡는다)
-  return { escapeHTML, gridColumns, dateDescOrder, pinboardSpread, gridRowTops, gridPosition, slotOf, settleColumnGaps, fitZoom, boardSize, contentBox, fitBox, clampView, startView, visibleCards, rememberView, savedView, editGuard, collectPath, nextConnections, detailButtonState, cinemaBeats, filterVisible, maxCreatedOrder, decorationMotion };
+  return { escapeHTML, gridColumns, dateDescOrder, pinboardSpread, gridRowTops, gridPosition, slotOf, isPinboardSlot, settleColumnGaps, fitZoom, boardSize, contentBox, fitBox, clampView, startView, visibleCards, rememberView, savedView, editGuard, collectPath, nextConnections, detailButtonState, cinemaBeats, filterVisible, maxCreatedOrder, decorationMotion };
 })();

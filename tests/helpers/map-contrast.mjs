@@ -54,6 +54,8 @@ export async function measureMapPixelsInPage([png, overlaysArg]) {
   // 겹침 사각형은 스크린샷 직전(overlayRectsInPage)에 잰 것을 넘겨 받는다. 점을 누르면 고정되는
   // '연결 이유' 말풍선(3.2초)·토스트(2.3초)가 스크린샷 뒤에 사라지면, 겹침 계산이 사라진 뒤에
   // 실행되어 가려진 어두운 패널 픽셀을 선 색으로 오인했다(2026-11-14 실측 — #591).
+  // 스크린샷에는 토스트가 남아 있고 그 아래 지도는 backdrop-filter로 뿌옇다 — 좌표와 픽셀의
+  // 시점을 맞추지 않으면 뿌연 픽셀을 가리개 없이 재어 line(43) 1.08:1 < 3 가 나왔다(#591 실측).
   const overlays = (overlaysArg || []).map(r => ({ left: r.left, top: r.top, right: r.right, bottom: r.bottom }));
   const visible = (x, y) => {
     if (x < 3 || y < 3 || x >= stage.clientWidth - 3 || y >= stage.clientHeight - 3) return false;
@@ -230,17 +232,57 @@ export async function measureMap(frame) {
   // 스크린샷과 픽셀 해석 사이에 지도가 다시 그려지면(이행 중 페이드 등) 스크린샷 픽셀과 그리기 기록이
   // 어긋나 이행 중 색을 잘못 잰다(간헐 실패). 잴 때마다 앞·뒤 그리기 기록이 같은지 확인하고,
   // 어긋나면 화면이 멈출 때까지 기다렸다 다시 잰다(최대 3번). 멈춰 있으면 검사가 추가로 걸리지 않는다.
-  // 겹침 사각형은 스크린샷 직전에 잰다(overlayRectsInPage) — 점을 누르면 고정되는 '연결 이유' 말풍선(3.2초)·
-  // 토스트(2.3초)가 스크린샷 뒤에 사라지면 겹침 계산이 사라진 뒤에 실행되어 가려진 어두운 패널 픽셀을
-  // 선 색으로 오인했다(2026-11-14 실측 — #591). 직전에 잰 사각형으로 스크린샷 시점과 같은 겹침으로 거른다.
+  // 겹침 사각형은 스크린샷 직전에 잰다(freshScreenshot이 overlayRectsInPage를 같은 시점에 부른다) —
+  // 점을 누르면 고정되는 '연결 이유' 말풍선(3.2초)·토스트(2.3초)가 스크린샷 뒤에 사라지면 겹침 계산이
+  // 사라진 뒤에 실행되어 가려진 어두운 패널 픽셀을 선 색으로 오인했다(2026-11-14 실측 — #591).
+  // 직전에 잰 사각형으로 스크린샷 시점과 같은 겹침으로 거른다.
   for (let attempt = 0; ; attempt += 1) {
-    const overlays = await frame.evaluate(overlayRectsInPage);
     const before = await frame.evaluate(() => JSON.stringify(window.__mapPaint));
-    const screenshot = await frame.locator('#stage').screenshot({ animations: 'disabled' });
+    const { screenshot, overlays } = await freshScreenshot(frame);
     const canvas = await frame.evaluate(measureMapPixelsInPage, [`data:image/png;base64,${screenshot.toString('base64')}`, overlays]);
     const dom = await frame.evaluate(measureMapDOMInPage);
     const after = await frame.evaluate(() => JSON.stringify(window.__mapPaint));
     if (before === after || attempt >= 2) return { canvas, dom, screenshot };
+    await settleMap(frame);
+  }
+}
+
+// #594: 헤드리스 크로미움은 캔버스를 그린 뒤 곧바로 화면(present)에 올리지 않을 때가 있다(실측 0.6~2.4초+, 실행기가
+// 바쁠수록 길다). 올라가지 않은 옛날 프레임을 재면 그리기 기록(지금 상태)과 픽셀이 어긋나 이행 전 색을 잰다 — #591
+// 지도 잡 간헐 실패의 원인(동심원 보기 focus에서 클릭 전 프레임의 흐린 선 alpha .16이 잠깼다: line(43) 1.08:1).
+// 기존의 앞·뒤 기록 비교는 기하만 보므로 알파만 달라진 재그리기와 스틸 프레임을 가리지 못한다.
+// 그래서 두 가지를 한다. ① #stage에 번역 없는 transform(translateZ(0))을 걸었다가 캡처 뒤 되돌려 합성을 다시
+// 하게 한다(부하 아래 실측 — 이것만이 확실히 새 프레임을 올렸다: 스틸 8회 연속 → 토글 뒤 즉시 신선).
+// ② 모서리 한 픽셀(CSS 0.5,0.5 — 측정은 가장자리 3px 안을 표본에서 제외하므로 값에 영향이 없다)에 심은
+// 신호 색(#010203)이 스크린샷에 찍혔는지 확인한다. 신호가 없으면 여전히 옛날 프레임이라는 뜻이므로
+// 화면이 멈춘 뒤 다시 시도(최대 10번)하고, 끝내 안 찍히면 잘못된 재보다 실패가 낫다 — 이유를 남긴다.
+async function freshScreenshot(frame) {
+  for (let i = 0; ; i += 1) {
+    // 겉요소(토스트 포함) 사각형을 캡처 직전에 읽는다(overlayRectsInPage) — 스크린샷과 좌표의 시점을 맞추기 위해서다(#594).
+    const overlays = await frame.evaluate(overlayRectsInPage);
+    await frame.evaluate(() => {
+      const s = document.getElementById('stage');
+      const c = s.getContext('2d');
+      c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.fillStyle = '#010203'; c.fillRect(0, 0, 1, 1); c.restore();
+      s.dataset.ltPrevTransform = s.style.transform || '';
+      s.style.transform = 'translateZ(0)';
+    });
+    let screenshot;
+    try {
+      screenshot = await frame.locator('#stage').screenshot({ animations: 'disabled' });
+    } finally {
+      await frame.evaluate(() => { const s = document.getElementById('stage'); s.style.transform = s.dataset.ltPrevTransform || ''; delete s.dataset.ltPrevTransform; });
+    }
+    const fresh = await frame.evaluate(async png => {
+      const img = new Image(); img.src = png; await img.decode();
+      const scratch = document.createElement('canvas'); scratch.width = 1; scratch.height = 1;
+      const sc = scratch.getContext('2d', { willReadFrequently: true });
+      sc.drawImage(img, 0, 0, 1, 1, 0, 0, 1, 1);
+      const [r, g, b] = sc.getImageData(0, 0, 1, 1).data;
+      return r <= 5 && g <= 6 && b <= 7; // 신호가 찍힌 값(실측 0,0,0). 스틸 프레임의 모서리는 주변과 섞여 밝다(실측 10,8,7).
+    }, `data:image/png;base64,${screenshot.toString('base64')}`);
+    if (fresh) return { screenshot, overlays };
+    if (i >= 9) throw new Error('스크린샷이 최신 그리기를 보여 주지 않는다(모서리 신호 픽셀 10번 재시도에도 없음) — 표시 지연이 길다. 이 재면 이행 전 색을 잊므로 실패로 멈춘다');
     await settleMap(frame);
   }
 }

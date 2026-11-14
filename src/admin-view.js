@@ -45,6 +45,7 @@ export function parseHash(hash) {
   const kind = params.get('kind') in KIND_LABEL ? params.get('kind') : '';
   if (name === 'feedback' && id) return {view: 'feedback', id, status: '', kind: ''};
   if (name === 'persona' && id) return {view: 'persona', id, status: '', kind: ''};
+  if (name === 'journals') return {view: 'journals', id: null, status: '', kind: ''};
   if (name === 'reports') return {view: 'reports', id: null, status: '', kind: ''};
   if (name === 'issues') return {view: 'issues', id: null, status: '', kind: ''};
   return {view: 'board', id: null, status, kind};
@@ -61,14 +62,16 @@ export function viewHash(view, id = null, filters = {}) {
   }
   if (view === 'feedback' && id != null) return '#feedback/' + encodeURIComponent(id);
   if (view === 'persona' && id != null) return '#persona/' + encodeURIComponent(id);
+  if (view === 'journals') return '#journals';
   if (view === 'reports') return '#reports';
   if (view === 'issues') return '#issues';
   return '#board';
 }
 
 /** 머리줄 탭 표시용: 글·페르소나 화면은 게시판 탭이 눌려 있다. */
+/** 탭: 고객 글 · 사용 일지(#596) · 신고 · 고치는 일. 나머지 화면(상세·페르소나)은 고객 글 탭 소속으로 본다. */
 export function viewToTab(view) {
-  return view === 'reports' || view === 'issues' ? view : 'board';
+  return view === 'reports' || view === 'issues' || view === 'journals' ? view : 'board';
 }
 
 /** 탭 거르기(#570 2). 상태 탭을 고르면 그 상태만(닫음 포함), 고르지 않으면 '닫음'을 뺀 전체. 종류 탭도 같은 식. */
@@ -151,4 +154,58 @@ export function issueStateLabel(state) {
 /** 고침 완료 이슈에 연결됐지만 아직 '고침'이 아닌 고객 글에만 [고침으로 바꾸기]를 보여 준다(#570 4). 자동으로 바꾸지 않는다. */
 export function needsFixButton(post, issueState) {
   return Boolean(post) && issueState === 'closed' && post.status !== 'fixed';
+}
+
+// ── 사용 일지 탭(#596) — 날짜·고객 묶음·오늘 요약·떠남 위험. 순수 계산(node 시험에서 바로 쓴다). ──
+
+/** 일지의 날짜(운영 기준 journal_date, 비어 있으면 만든 날짜). */
+const journalDayOf = row => String(row?.journalDate || String(row?.createdAt || '').slice(0, 10));
+
+/** 일지 날짜 수로 보는 단계: 1일 '시작', 2~4일 '꾸준', 5일 이상 '정착'. */
+export function journalStage(dayCount) {
+  return dayCount >= 5 ? '정착' : dayCount >= 2 ? '꾸준' : '시작';
+}
+
+/** 고객별 줄(#596): 이름·단계·최근 점수·날짜별 점수 흐름·마지막 기록일. 최근 기록일 내림차순. */
+export function journalRowsByCustomer(journals) {
+  const map = new Map();
+  for (const row of Array.isArray(journals) ? journals : []) {
+    const key = row?.subjectId || `anon:${row?.id}`;
+    if (!map.has(key)) map.set(key, {subjectId: row?.subjectId || '', name: row?.authorName || '고객', journals: []});
+    map.get(key).journals.push(row);
+  }
+  const rows = [...map.values()].map(entry => {
+    const sorted = entry.journals.slice().sort((a, b) => (journalDayOf(b) + String(b.createdAt || '')).localeCompare(journalDayOf(a) + String(a.createdAt || '')));
+    const byDay = new Map();
+    for (const row of sorted) if (!byDay.has(journalDayOf(row))) byDay.set(journalDayOf(row), row);
+    const days = [...byDay.keys()].sort();
+    const lastScore = days.length ? (byDay.get(days[days.length - 1])?.score ?? null) : null;
+    const prevScore = days.length >= 2 ? (byDay.get(days[days.length - 2])?.score ?? null) : null;
+    return {
+      subjectId: entry.subjectId,
+      name: entry.name,
+      journals: sorted,
+      dayCount: days.length,
+      stage: journalStage(days.length),
+      latestScore: lastScore,
+      lastDay: days.length ? days[days.length - 1] : '',
+      flow: days.map(day => ({day, score: byDay.get(day)?.score ?? null})),
+      atRisk: lastScore != null && prevScore != null && lastScore <= 2 && prevScore <= 2
+    };
+  });
+  return rows.sort((a, b) => String(b.lastDay).localeCompare(String(a.lastDay)));
+}
+
+/** 오늘 요약(#596): 활동 고객 수·오늘 일지 수·평균 다시 올 점수·떠남 위험(이틀 연속 2 이하) 수. */
+export function journalsSummary(journals, day) {
+  const today = Array.isArray(journals) ? journals.filter(row => journalDayOf(row) === day) : [];
+  const subjects = new Set(today.map(row => row?.subjectId).filter(Boolean));
+  const scores = today.map(row => row?.score).filter(score => score != null);
+  const rows = journalRowsByCustomer(journals);
+  return {
+    activeCustomers: subjects.size,
+    journalCount: today.length,
+    avgScore: scores.length ? Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length * 10) / 10 : null,
+    atRisk: rows.filter(row => row.atRisk).length
+  };
 }

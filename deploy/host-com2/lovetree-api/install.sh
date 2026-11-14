@@ -56,6 +56,10 @@ if [[ -f "$source_root/tools/export-ai-customer-db.mjs" ]]; then
   install -d -m 0755 "$app/tools"
   install -m 0644 "$source_root/tools/export-ai-customer-db.mjs" "$app/tools/export-ai-customer-db.mjs"
 fi
+if [[ -f "$source_root/tools/ops-reply.mjs" ]]; then
+  install -d -m 0755 "$app/tools"
+  install -m 0644 "$source_root/tools/ops-reply.mjs" "$app/tools/ops-reply.mjs"
+fi
 install -m 0644 "$source_root/package.json" "$app/package.json"
 install -m 0644 "$source_root/package-lock.json" "$app/package-lock.json"
 install -m 0644 "$here/check_config.mjs" "$app/check_config.mjs"
@@ -68,6 +72,7 @@ chmod 0755 "$app"
 chmod -R a+rX "$app/server" "$app/src" "$app/node_modules"
 chmod a+r "$app/check_config.mjs" "$app/preflight_imports.mjs" "$app/package.json" "$app/package-lock.json"
 if [[ -f "$app/tools/export-ai-customer-db.mjs" ]]; then chmod a+r "$app/tools/export-ai-customer-db.mjs"; fi
+if [[ -f "$app/tools/ops-reply.mjs" ]]; then chmod a+r "$app/tools/ops-reply.mjs"; fi
 # 사전점검: server/index.js의 import 그래프가 실제 파일로 해석되는지 확인한다.
 # 누락된 파일(src/domain.js 등)이 있으면 ESM 로더가 ERR_MODULE_NOT_FOUND를 낸다.
 # 이 시점에 설치를 중단해야 systemd가 재시작 루프에 빠지지 않는다(2026-10-28 재발 방지).

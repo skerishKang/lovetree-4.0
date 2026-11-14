@@ -123,13 +123,19 @@ test('#582 보드에서 줄이 사라졌다 — 실·핀 연결·이유 창·연
   assert.match(board, /let connections=LTDEMO\.edges\.map\(/);
 });
 
-test('#582 정렬 되돌리기 단추가 있고, 읽기 전용 가드를 쓴다', () => {
+test('#601 배치 모드 전환이 있고, 읽기 전용 가드를 끌어 꽂기가 쓴다', () => {
   const html = read('views/track58-pinboard.html');
   const board = read('views/board/board.js');
-  assert.match(html, /id="sortResetBtn"[^>]*>정렬 되돌리기</);
-  assert.match(board, /function sortReset\(\)\{const guard=LT58Model\.editGuard\(canEditBoard\)/);
-  assert.match(board, /for\(const m of moments\)m\.savedPos=false;placeAll\(\)/);
-  assert.match(board, /persistBoard\(\);fitAllByUser\(\);toast\('날짜 최신순 바둑판으로 돌아왔어요\.'\)/);
+  // '정렬 되돌리기'는 '날짜순 | 내 배치' 전환으로 대체됐다(#601). 전환은 저장 자리를 지우지 않는다.
+  assert.doesNotMatch(html, /id="sortResetBtn"/);
+  assert.match(html, /data-board-mode="date"[^>]*>날짜순</);
+  assert.match(html, /data-board-mode="mine"[^>]*>내 배치</);
+  assert.match(board, /function setBoardMode\(mode,\{save=true,replace=true\}/);
+  assert.match(board, /saved:boardMode==='mine'\?savedSlotsOf\(moments\):null/);
+  assert.match(board, /if\(boardMode==='mine'&&m\.savedPos\)continue/);
+  // 끌어 꽂기는 같은 가드를 쓴다(읽기 전용에서는 판 자리를 바꾸지 않는다).
+  assert.match(board, /function dragGuard\(\)\{const guard=LT58Model\.editGuard\(canEditBoard\)/);
+  assert.match(board, /if\(guard\.blocked\)\{toast\(guard\.message\);/);
 });
 
 test('#582 상세에 지도 단추가 있고 셸 화면 이동 메시지를 보낸다(#583의 이전·다음 단추는 유지)', () => {
@@ -208,11 +214,13 @@ test('#582 화면: 끌어 꽂기 — 빈 칸에 스냅되고 저장 방식은 �
     }, from.id);
     if (after.pairs) console.log('OVERLAP DETAIL', JSON.stringify(await frame.evaluate(() => { const cards = [...document.querySelectorAll('#cardLayer .card')].map((c) => ({ id: c.dataset.id, x: c.offsetLeft, y: c.offsetTop, w: c.offsetWidth, h: c.offsetHeight })); const out = []; for (let i = 0; i < cards.length; i++) for (let j = i + 1; j < cards.length; j++) { const a = cards[i], b = cards[j]; if (Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x) > 2 && Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y) > 2) out.push([a, b]); } return out; })));
     assert.equal(after.pairs, 0, '꽂은 뒤에도 겹침 0');
+    // #601: 카드를 옮기면 '내 배치'로 자동 전환된다.
+    assert.equal(await frame.evaluate(() => document.querySelector('[data-board-mode="mine"]').getAttribute('aria-pressed')), 'true', '끌면 내 배치로 자동 전환');
     // 저장: 부모 프레임에 lt41-board-sync가 도착하고, 그 순간의 x·y가 칸 자리(300의 배수 오프셋)다.
     const sync = await page.evaluate(() => window.LT41_MESSAGES.filter((m) => m.type === 'lt41-board-sync'));
     assert.ok(sync.length > 0, '보드 저장 메시지가 간다');
-    // 정렬 되돌리기: 저장 자리를 지우고 날짜 최신순 바둑판으로 돌아간다.
-    await frame.evaluate(() => document.getElementById('sortResetBtn').click());
+    // #601: '날짜순' 전환 — 저장 자리를 지우지 않고 날짜 최신순 바둑판으로 돌아간다.
+    await frame.evaluate(() => document.querySelector('[data-board-mode="date"]').click());
     await page.waitForTimeout(1200);
     const reset = await frame.evaluate(() => {
       const cards = [...document.querySelectorAll('#cardLayer .card')].map((c) => ({ x: c.offsetLeft, y: c.offsetTop, w: c.offsetWidth, h: c.offsetHeight }));
@@ -253,7 +261,7 @@ test('#582 화면: 상세의 지도 단추가 셸 메시지를 보내고, 다음
     assert.equal(msgs.at(-1).treeId, tree.id, '그 나무로 열린다');
     // 다음 순간 단추(#583): 판이 움직이고 상세가 바뀐다.
     const before = await frame.evaluate(() => ({ t: document.getElementById('world').style.transform, title: document.getElementById('dTitle')?.textContent }));
-    await frame.evaluate(() => document.querySelector('#dConn .connLink[data-dir="next"]')?.click());
+    await frame.evaluate(() => document.querySelector('#dConn .connCard[data-dir="next"]')?.click());
     await page.waitForTimeout(1400);
     const after = await frame.evaluate(() => ({ t: document.getElementById('world').style.transform, title: document.getElementById('dTitle')?.textContent }));
     assert.notEqual(after.t, before.t, '다음 순간 단추가 판을 옮긴다');

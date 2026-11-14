@@ -53,14 +53,14 @@
   const v11CardHTML=cardHTML;
   cardHTML=function(m){
     let media='';
-    if(m.url)media=LTMedia.markup(m.url,m.title,m.mediaMetadata,m.id,null,{emotion:m.emotion,date:m.date,note:m.memo});
+    if(m.url)media=LTMedia.markup(m.url,m.title,m.mediaMetadata,m.id,null,{emotion:m.emotion,date:m.date,note:m.memo},{compact:true});
     else if(m.type==='note') media=`<div class="noteText">“${esc(m.memo)}”</div>`;
     else if(isYtMoment(m)) media=`<div class="media linkMedia">${ytMediaHTML(originalUrl(m),'<span class="playBadge">▶</span>')}</div>`;
     else if(m.type==='video') media=`<div class="media"><video muted playsinline loop poster="${m.asset}" src="${m.video||''}"></video><span class="playBadge">▶</span><span class="duration">${m.duration||'00:03'}</span></div>`;
     else media=`<div class="media ${m.type==='link'?'linkMedia':''}"><img src="${m.asset}" data-fallback="${ASSET.link}" onerror="this.onerror=null;this.src=this.dataset.fallback" alt=""></div>`;
-    let kws=(m.keywords||[]).slice(0,4).map(k=>`<span>${esc(k)}</span>`).join('');
+    // #601: 카드는 훑기용 — 큰 썸네일 + 제목 2줄 + 감정·날짜 한 줄만. 마음·출처·키워드·크게 보기는 상세가 맡는다.
     let heading=titleMain(m);
-    return `<article class="card ${m.first?'first':''} ${m.type==='note'?'noteCard':''} ${pinClass(m)} ${cardClass(m)}" data-id="${m.id}" style="left:${m.x}px;top:${m.y}px;--rot:${m.rot}deg;--pin:${colors[m.color]};--halo:${colors[m.color]}55">${m.first?'<div class="firstTag">첫 순간</div>':''}<button class="pin" data-pin="${m.id}" aria-hidden="true" tabindex="-1"></button>${media}<div class="cardBody"><div class="eyebrow"><span class="emotionDot"></span>${LTLabels.type(m.originalType||m.type)} 순간 · ${esc(m.emotion)}</div>${heading?`<h3>${esc(heading)}</h3>`:''}${titleSubMarkup(m)}<div class="meta"><span>${esc(dateText(m.date))}</span><span>${m.type==='link'||isYtMoment(m)?'↗':''}</span></div>${m.type!=='note'?`<div class="memo">${esc(m.memo)}</div>`:''}<div class="keywordOnCard">${kws}</div>${(m.url||m.sourceUrl)?`<div class="domain">${esc(m.source)}</div>`:''}</div></article>`;
+    return `<article class="card ${m.first?'first':''} ${m.type==='note'?'noteCard':''} ${pinClass(m)} ${cardClass(m)}" data-id="${m.id}" style="left:${m.x}px;top:${m.y}px;--rot:${m.rot}deg;--pin:${colors[m.color]};--halo:${colors[m.color]}55">${m.first?'<div class="firstTag">첫 순간</div>':''}<button class="pin" data-pin="${m.id}" aria-hidden="true" tabindex="-1"></button>${media}<div class="cardBody"><h3 class="cardTitle">${esc(heading)}</h3><div class="cardMeta"><span class="emotionDot"></span>${esc(m.emotion)} · ${esc(dateText(m.date))}</div></div></article>`;
   };
 
   /* Composer: VIDEO supports local or YouTube source; VIDEO LINK remains a direct YouTube 순간. */
@@ -114,7 +114,7 @@
   function editVideoSource(){return document.querySelector('input[name="editVideoSource"]:checked')?.value||'local'}
   openEdit=function(){
     let m=moments.find(x=>x.id===selected);if(!m)return;editBase=JSON.parse(JSON.stringify(m));removePhotoFlag=false;editTempAsset=null;
-    let f=$('#editFields');f.innerHTML=`${editMediaFields(m)}<input class="field" id="editTitle" value="${esc(m.title)}"><textarea class="field" id="editMemo" rows="3">${esc(m.memo)}</textarea>${styleFieldsHTML('edit',m)}<div class="netNote">DATE · ${esc(m.date)} &nbsp; PRIVACY · ${esc(m.privacy||'PRIVATE')} · 순간 ID ${esc(m.id)}</div>`;
+    let f=$('#editFields');f.innerHTML=`${editMediaFields(m)}<input class="field" id="editTitle" value="${esc(m.title)}"><textarea class="field" id="editMemo" rows="3">${esc(m.memo)}</textarea>${styleFieldsHTML('edit',m)}<div class="label" style="margin-top:12px">DATE</div><input class="field" id="editDate" type="date" value="${esc(m.date||'')}" aria-label="순간 날짜"><div class="netNote">PRIVACY · ${esc(m.privacy||'PRIVATE')} · 순간 ID ${esc(m.id)}</div>`;
     bindKeywordPicker('edit',updateEditPreview);f.querySelectorAll('input,textarea,select').forEach(x=>x.addEventListener('input',updateEditPreview));$('#editMediaFile')?.addEventListener('change',updateEditPreview);$('#editUrl')?.addEventListener('input',updateEditPreview);$('#editVideoUrl')?.addEventListener('input',updateEditPreview);$('#removePhoto')?.addEventListener('click',()=>{removePhotoFlag=true;updateEditPreview()});
     f.querySelectorAll('input[name="editVideoSource"]').forEach(r=>r.addEventListener('change',()=>{let yt=r.value==='youtube'&&r.checked;$('#editVideoLocal').hidden=yt;$('#editVideoYoutube').hidden=!yt;updateEditPreview()}));
     $('#editModal').classList.add('open');updateEditPreview();
@@ -127,7 +127,7 @@
       else {sourceUrl='';url=null;videoId='';if(file){editTempAsset=URL.createObjectURL(file);video=editTempAsset;asset=ASSET.first}}
     }else if(file){editTempAsset=URL.createObjectURL(file);asset=editTempAsset}
     if(removePhotoFlag&&type==='photo')asset=ASSET.note;if(type==='youtube'){sourceUrl=url;videoId=ytId(url||'');asset=ytMax(url||'')||V12_FALLBACK(url||'')}
-    return{...m,title:$('#editTitle')?.value||m.title,memo:$('#editNoteBody')?.value||$('#editMemo')?.value||m.memo,emotion:$('#editEmotion')?.value||m.emotion,source:$('#editSource')?.value||m.source,pinStyle:$('#editPinStyle')?.value||m.pinStyle,cardStyle:$('#editCardStyle')?.value||m.cardStyle,keywords:selectedKeywords('edit'),asset,video,url,sourceUrl,videoSource,videoId,thumbnailUrl:(type==='youtube'||(type==='video'&&videoSource==='youtube'))?ytMax(sourceUrl||url||''):m.thumbnailUrl||''};
+    return{...m,title:$('#editTitle')?.value||m.title,memo:$('#editNoteBody')?.value||$('#editMemo')?.value||m.memo,emotion:$('#editEmotion')?.value||m.emotion,date:$('#editDate')?$('#editDate').value:m.date,source:$('#editSource')?.value||m.source,pinStyle:$('#editPinStyle')?.value||m.pinStyle,cardStyle:$('#editCardStyle')?.value||m.cardStyle,keywords:selectedKeywords('edit'),asset,video,url,sourceUrl,videoSource,videoId,thumbnailUrl:(type==='youtube'||(type==='video'&&videoSource==='youtube'))?ytMax(sourceUrl||url||''):m.thumbnailUrl||''};
   };
   updateEditPreview=function(){
     let m=editPreviewState(),media='';
@@ -137,7 +137,11 @@
     else media=`<div class="previewMedia"><img src="${m.asset}" data-fallback="${ASSET.link}" onerror="this.onerror=null;this.src=this.dataset.fallback"></div>`;
     $('#editPreview').innerHTML=`<div class="label">LIVE PREVIEW</div><div class="previewCard" style="margin-top:12px"><span class="previewPin"></span>${media}<div style="margin-top:10px;font-size:9px;color:#64566f">${esc(LTLabels.type(m.originalType||m.type))} · ${esc(m.emotion)}${m.type==='video'?' · '+(m.videoSource==='youtube'?'YOUTUBE':'LOCAL'):''}</div><h3 style="color:#34283d">${esc(m.title)}</h3><div style="font-size:10px;color:#5d4f66">${esc(m.memo)}</div></div>`;
   };
-  saveEdit=function(){let m=moments.find(x=>x.id===selected),n=editPreviewState();snapshot();let invariant={id:m.id,date:m.date,privacy:m.privacy,x:m.x,y:m.y,rot:m.rot,first:m.first,createdOrder:m.createdOrder};Object.assign(m,n,invariant);$('#editModal').classList.remove('open');renderCards();renderThreads();updateKeywordFilter();selectMoment(m.id,true);persistBoard();toast('미디어를 교체해도 순간 ID·날짜·Connection은 그대로 유지됩니다.');};
+  saveEdit=function(){let m=moments.find(x=>x.id===selected),n=editPreviewState();// #608: 날짜는 책의 수정 경로(editMoment→validateMomentInput)와 같은 규칙으로 미리 걷는다 — 도메인도 저장 때 boardSync→validateState에서 같은 규칙으로 거른다.
+    const _d=String(n.date||'');if(!/^\d{4}-\d{2}-\d{2}$/.test(_d)||Number.isNaN(Date.parse(_d))||new Date(_d).toISOString().slice(0,10)!==_d){toast('날짜를 확인해 주세요.');return}
+    snapshot();let invariant={id:m.id,privacy:m.privacy,x:m.x,y:m.y,rot:m.rot,first:m.first,createdOrder:m.createdOrder};Object.assign(m,n,invariant);$('#editModal').classList.remove('open');// #608: 날짜는 이제 바꿀 수 있다(#608) — 신원(invariant)에서 날짜만 뺀다.
+    // #608: 날짜가 바뀌면 '날짜순' 바둑판 자리를 새 날짜에 맞게 다시 꽂는다(#582). '내 배치'의 저장 자리는 그대로 둔다(#395 계약 — placeAll은 저장 자리가 있는 카드를 건드리지 않는다).
+    if(editBase&&m.date!==editBase.date)placeAll();renderCards();renderThreads();updateKeywordFilter();selectMoment(m.id,true);persistBoard();toast('순간을 저장했어요. 순간 ID·Connection과 provenance는 그대로 유지됩니다.')};
 
   openViewer=function(id){
     let m=moments.find(x=>x.id===id);if(!m)return;$('#vTitle').textContent=titleMain(m)||'순간';let box=$('#viewerMedia');
