@@ -4,6 +4,14 @@
 
 > **빨간 필수 검사 규칭(2026-11-12 사고 뒤)**: 필수 검사가 빨강이면 **재실행은 1회까지**. 같은 항목이 또 빨강이면 멈추고 원인을 찾는다 — 재실행·빈 커밋으로 초록을 만들지 않는다. "간헐적·환경 탓"이라고 적으려면 **같은 시각 이 변경이 없는 브랜치(main 또는 다른 PR)** 에서도 같은 실패가 나는지 대조한 결과를 함께 적는다. 메시지를 받아 화면을 다시 띄우는 코드는 '뜰 때마다 보내는 쪽'과 짝으로 흐름 시험을 하고, 머지 전 미리보기 첫 화면을 5초 이상 직접 본다.
 
+## 2026-11-15 — 첫 화면 끌기 성능: 원인 규명과 저위험 완화 (#586, 로컬3 레인, ai/local3-orbit-fps-261115, main cf5ad94 기준)
+
+- **측정으로 밝힌 정확한 원인(Performance.getMetrics·CDP 트레이스, 도구·기록 E:\lovetree-qa\orbit-fps)**: 첫 화면은 가만히 있어도 렌더러 메인 스레드가 코어 하나의 80~100%를 씁니다(RecalcStyleDuration ~850–1000ms/s). 프레임마다 카드 28장의 transform·z-index·filter 를 다시 쓰기 때문이고, 이때 스타일 재계산이 카드 하나당 ~1.2ms(28장 한 배치 ~16–37ms) 걸립니다 — 같은 쓰기를 그림자 스타일시트를 떼면 ~0.03ms 로 떨어져, 규칙 일치·재계산 자체가 병목입니다. 유휴와 끄기의 CPU 가 같아 "끄는 동안만 무거운 것"이 아니라 "항상 이만큼 쓰는 것"이 끌기 44fps 의 한계였습니다.
+- **이번 PR(저위험 완화)**: ① z-index 를 64 단계 밴드로만 다시 쓰기(매 프레임 z 쓰기는 재계산을 몇 배로 무겁게 만드는 상태를 이어갔음 — 실측) ② 끄는 동안(data-lt-busy) hover 모양 고정(테두리·번짐·그림자 다시 계산·다시 칠하기 억제) ③ 패럴랙스 rect 캐시(pointermove마다 getBoundingClientRect 하지 않음) ④ 첫 화면 문서가 src/styles.css 를 통째로 읽지 않게(--ui 토큰만 home.html 인라인, 문서 스타일시트 수 축소).
+- **정직한 결과**: 이 기계(CPU 100% 부하 상태) 실측 A/B 에서 fps·CPU 개선이 소음 범위였습니다(1440 drag 전 ~35–41 / 후 ~31–48fps, 1920 drag 전 ~53.9 / 후 ~55.0fps). 근본 해법은 매 프레임 스타일 쓰기를 없애는 구조(CSS/WAAPI 애니메이션으로 유휴 부유를 돌리고 끌기 때만 JS 쓰기)이고, 이는 별도 이슈로 합니다 — #429/#457/#491/#535 의 겹침·밀어내기·상한 계약을 지키며 손대야 하는 큰 작업입니다.
+- **시험**: tests/v41-orbit-586-perf.test.mjs(신규, 소스 계약 4 + 실행 계약 3 — 유휴 4초 z-index 쓰기 수, pointermove 40번에 rect 재기 0회, 글꼴 토큰 유지). preview-check screen-home-book 잡에 LT_ORBIT586_REQUIRE=1 단계 추가. #535 시험 6/6, 전체 npm test 초록(한 개 소스 계약을 #586 변경에 맞게 갱신).
+- **남은 것**: 대표 실기기 확인(끄는 흐름·hover 사라짐이 눈에 띄지 않는지), 근본 해법 이슈 작성.
+
 ## 2026-11-15 — 보드 마감: 금색 커서 동그라미 제거 + 상세 다음·이전 순간 단추화 (로컬2 레인, ai/com2-lt-cursor-detail-20261115-0830-3a7c, main 8092d28 기준)
 
 - **커서 동그라미 완전 제거**: 따라오는 금색 동그라미(`cursorRing`·`cursorInner`·`cursorFX`·`cursor-burst/ripple/drop`)를 HTML 요소·board.css 스타일·board-extras.js 배선·board-model.js 판정 함수(`cursorMode`·`cursorHover`·`cursorScale`·`cursorEffectAllowed`·`cursorPresence`)까지 치웠다. 원래 마우스 커서를 쓰고, 상태는 CSS cursor로 알린다 — 판 `grab`(끌 때 `grabbing`, `#viewport.panning`), 카드 `grab`(끌 때 `grabbing`, `.card.dragLift`), 핀 연결 중 `crosshair`(`#cardLayer.linking`), 핀·단추 `pointer`. `public/v41` 전체에 `cursor:none` 없음(시험이 검사).

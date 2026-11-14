@@ -1,4 +1,5 @@
-import '../src/styles.css';
+// #586: 첫 화면 문서는 src/styles.css 를 읽지 않는다(vite가 styles-*.css link를 주입해 궤도 그림자의
+// 스타일 재계산이 프레임당 수십 ms가 걸렸다). 그림자가 쓰는 --ui 토큰은 v41/home.html 의 style에 둔다.
 import {mountOrbit,ORBIT_EXAMPLE} from '../src/views/orbit.js';
 import {homeCardsPlan,readHomeCardsMode} from './home-cards.js';
 import {HOME_ORBIT_LIMIT, ltDateStyle, dateStyleOf, shouldReloadForDateStyle} from './home-moments.js';
