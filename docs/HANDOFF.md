@@ -42,6 +42,12 @@
 - **시험**: 신규 `tests/v41-board-cursor-detail.test.mjs` 4건 — (1) 커서 흔적 없음(5개 파일·public/v41 전체 `cursor:none` 걷기) + 상태 커서 규칙, (2) 단추 규칙, (3) 실제 브라우저 다음 단추 클릭 → 판 이동(transform 변화)·선택·상세 전환 + Enter, (4) 이전 단추. board-model 시험의 커서 시험 5건(19~24)은 함수 소멸로 함께 거둠. 관련 시험 49건 통과(board-model·신규·#553 겹침·#536 넓게·터치 영역), build·modulepreload 유지 확인.
 - **fps(1440, 사슬 40순간, 헤드리스 playwright)**: 판 끌기 40→43~44, 확대 56→58 — 같거나 소폭 빠름(동그라미 그리기·기억을 덜어서). 스크린샷·수치: `E:\lovetree-qaoard-cursor\`(detail-next-button.png, fps 기록).
 - **머지**: PR #583 → main. 보드 배치(treeSpread·cardPosition)는 건드리지 않았다.
+## 2026-11-14 — AI 고객 페르소나 '자주 쓰는 곳·익숙한 디자인' + 일지 디자인 느낌 틀 (#590, 로컬5 레인)
+
+- **운영센터**: `PERSONA_FIELDS`(src/admin-view.js)에 `habits`('자주 쓰는 곳·익숙한 디자인', 여러 줄 칸)를 '쓰는 모습' 뒤에 추가 — admin.js 폼은 PERSONA_FIELDS 공용(row 높이 자동 계산)이라 코드 무변경. 운영센터·내보내기 md 가 같은 순서 7항목.
+- **서버 무변경 확인**: intro 는 jsonb 통과 — `savePersona`가 키를 거르지 않아(DB 변경 없음). `board-service` 시험에 habits 저장→불러오기 왕복 단언 추가.
+- **일지 쓰기 창**: `public/v41/index.html` journal-panel 내용 칸 뒤에 '(선택) 디자인 느낌 — 내가 자주 쓰는 ○○와 비교해서: 익숙했던 점 / 어색했던 점' 안내 한 줄(본문 틀 예시). 시험 `v41-journal-design-hint-590`(마크업 글자).
+- **내보내기**: `renderIntroMarkdown` 같은 항목 — 시험 갱신(7개 항목·여러 줄 값·빈 값 '—'). 머지 뒤 `E:\lovetree-qa\export-tool\` 사본 재복사 + `schtasks /run` 0 확인. 윤제 소개의 habits 내용은 페르소나 레인 몫(여기서 채우지 않음).
 ## 2026-11-14 — 지도 대비 시험 간헐 실패 수리: 말풍선 시차 + CI 진단 출력 (#591, 로컬5 레인)
 
 - **원인(로컬 재현·dbg 실측)**: 점을 누르면 '연결 이유' 말풍선(#366)이 3.2초 고정되고 토스트는 2.3초 — 스크린샷(표시 중)과 겹침 계산(사라진 뒤) 사이가 워커 병렬 부하로 벌어지면 말풍선 밑 선을 패널색(#211b2b, 1.08~1.16:1)으로 재서 실패. 어느 조합·선이 떨어지는지는 타이밍마다 달랐다(02:38 CI 실패·로컬 2회 — 02:38 실패는 wait 가 bash -e 로 죽어 진단이 안 남았다).

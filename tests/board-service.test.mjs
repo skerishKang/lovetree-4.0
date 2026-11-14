@@ -117,11 +117,13 @@ test('상태를 고침으로 바꾸면 연결 이슈 번호가 내 글에 보인
 
 test('페르소나 소개는 관리자가 쓰고 고친다', async () => {
   const {call} = setup();
-  const saved = await call('PUT', `/api/admin/persona/${AI}`, {account: ADMIN, body: {name: '윤제', intro: {who: '팬', why: '기록', how: '매일', satisfied: '좋음', disappointed: '없음', now: '쓰는 중'}}});
+  const saved = await call('PUT', `/api/admin/persona/${AI}`, {account: ADMIN, body: {name: '윤제', intro: {who: '팬', why: '기록', how: '매일', habits: '매일 쓰는 곳: 유튜브·네이버 카페', satisfied: '좋음', disappointed: '없음', now: '쓰는 중'}}});
   assert.equal(saved.status, 200);
   assert.equal(saved.body.persona.name, '윤제');
   const got = await call('GET', `/api/admin/persona/${AI}`, {account: ADMIN});
   assert.equal(got.body.persona.intro.who, '팬');
+  // #590: intro 는 jsonb 통과 — 서버가 키를 거르지 않아 새 칸(habits)도 저장·불러오기 된다.
+  assert.equal(got.body.persona.intro.habits, '매일 쓰는 곳: 유튜브·네이버 카페');
   const denied = await call('PUT', `/api/admin/persona/${AI}`, {account: USER, body: {name: 'x', intro: {}}});
   assert.equal(denied.status, 403);
 });

@@ -21,11 +21,15 @@ test('isOnDay 는 KST 날짜로 견준다', () => {
   assert.equal(isOnDay('2026-11-13T10:00:00Z', '2026-11-14'), false);
 });
 
-test('소개.md 형식: 이름 + 6개 항목', () => {
-  const md = renderIntroMarkdown({ name: '윤제', intro: { who: '팬', why: '기록', how: '매일', satisfied: '좋음', disappointed: '없음', now: '쓰는 중' } });
+test('소개.md 형식: 이름 + 7개 항목(#590 habits 포함, 운영센터와 같은 순서)', () => {
+  const md = renderIntroMarkdown({ name: '윤제', intro: { who: '팬', why: '기록', how: '매일', habits: '매일 쓰는 곳: 유튜브, 네이버 카페\n익숙한 화면: 목록이 왼쪽', satisfied: '좋음', disappointed: '없음', now: '쓰는 중' } });
   assert.match(md, /# 윤제 소개/);
-  for (const label of ['누구', '왜 쓰나', '쓰는 모습', '만족한 점', '실망한 점', '지금 상태']) assert.ok(md.includes(label), label);
+  for (const label of ['누구', '왜 쓰나', '쓰는 모습', '자주 쓰는 곳·익숙한 디자인', '만족한 점', '실망한 점', '지금 상태']) assert.ok(md.includes(label), label);
   assert.ok(md.includes('팬'));
+  // habits 는 여러 줄 칸 — 줄바꿈이 살아 나온다(운영센터 폼의 rows 계산과 같은 값).
+  assert.match(md, /\*\*자주 쓰는 곳·익숙한 디자인\*\*: 매일 쓰는 곳: 유튜브, 네이버 카페\n익숙한 화면: 목록이 왼쪽/);
+  const empty = renderIntroMarkdown({ name: '빈고객', intro: {} });
+  assert.match(empty, /\*\*자주 쓰는 곳·익숙한 디자인\*\*: —/);
 });
 
 test('일지.md 형식: 일지·의견·답글·이슈', () => {
