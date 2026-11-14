@@ -49,7 +49,7 @@ const chainTree = (n) => {
 };
 
 // 화면이 넘기는 카드 종류별 예약 높이(board.js의 상수와 같은 값).
-const YT_RESERVED_H = 480, YT_VERTICAL_RESERVED_H = 680, BASE_RESERVED_H = 260;
+const YT_RESERVED_H = 480, YT_VERTICAL_RESERVED_H = 680, BASE_RESERVED_H = 424;
 const reservedHeights = (tree) => new Map(tree.moments.map((m) => [m.id, m.url ? (m.url.includes('/shorts/') ? YT_VERTICAL_RESERVED_H : YT_RESERVED_H) : BASE_RESERVED_H]));
 
 function serve(extra = {}) {
@@ -208,7 +208,7 @@ test('#553 화면: 예시 40순간(사슬) 처음 보기는 그대로다 — 0.8
     const { context, frame } = await openHost(browser, `${base}/__host-40.html`, { width: 1440, height: 900 });
     const g = await geometry(frame);
     assert.equal(g.zoom, '80%', '읽을 수 있는 0.8배 처음 보기 유지(#460·#536)');
-    assert.deepEqual(g.ys, [150, 570, 990, 1410], '카드 줄 위치는 이전 배치와 같다(420px 간격 4밴드)');
+    assert.deepEqual(g.ys, [150, 610, 1070, 1530], '카드 줄 위치는 이전 배치와 같다(460px 간격 4밴드 — #548이 420→460으로 벌린 값)');
     assert.equal(g.pairs, 0, '겹침 0 유지');
     await context.close();
   } finally { await browser.close(); server.close(); }
