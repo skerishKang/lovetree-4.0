@@ -41,13 +41,17 @@ export function parseHash(hash) {
   const params = new URLSearchParams(query);
   const [name, ...rest] = path.split('/');
   const id = decodeURIComponent(rest.join('/') || '');
-  const status = STATUS_ORDER.includes(params.get('status')) ? params.get('status') : '';
+  // #655: 'pending'은 받음·확인 중을 한 번에 보는 보조 조건이다('한눈에' 카드에서 쓴다).
+  const status = [...STATUS_ORDER, PENDING_STATUS].includes(params.get('status')) ? params.get('status') : '';
   const kind = params.get('kind') in KIND_LABEL ? params.get('kind') : '';
+  if (name === 'overview') return {view: 'overview', id: null, status: '', kind: ''};
   if (name === 'feedback' && id) return {view: 'feedback', id, status: '', kind: ''};
   if (name === 'persona' && id) return {view: 'persona', id, status: '', kind: ''};
   if (name === 'journals') return {view: 'journals', id: null, status: '', kind: ''};
   if (name === 'reports') return {view: 'reports', id: null, status: '', kind: ''};
   if (name === 'issues') return {view: 'issues', id: null, status: '', kind: ''};
+  // #655: 운영센터를 열면(주소 없이) '한눈에'가 기본이다. 기존 주소(#board 등)는 그대로다.
+  if (!name) return {view: 'overview', id: null, status: '', kind: ''};
   return {view: 'board', id: null, status, kind};
 }
 
@@ -65,20 +69,27 @@ export function viewHash(view, id = null, filters = {}) {
   if (view === 'journals') return '#journals';
   if (view === 'reports') return '#reports';
   if (view === 'issues') return '#issues';
+  if (view === 'overview') return '#overview';
   return '#board';
 }
 
 /** 머리줄 탭 표시용: 글·페르소나 화면은 게시판 탭이 눌려 있다. */
-/** 탭: 고객 글 · 사용 일지(#596) · 신고 · 고치는 일. 나머지 화면(상세·페르소나)은 고객 글 탭 소속으로 본다. */
+/** 탭: 한눈에(#655) · 고객 글 · 사용 일지(#596) · 신고 · 고치는 일. 나머지 화면(상세·페르소나)은 고객 글 탭 소속으로 본다. */
 export function viewToTab(view) {
-  return view === 'reports' || view === 'issues' || view === 'journals' ? view : 'board';
+  return view === 'overview' || view === 'reports' || view === 'issues' || view === 'journals' ? view : 'board';
 }
 
-/** 탭 거르기(#570 2). 상태 탭을 고르면 그 상태만(닫음 포함), 고르지 않으면 '닫음'을 뺀 전체. 종류 탭도 같은 식. */
+/** 탭 거르기(#570 2). 상태 탭을 고르면 그 상태만(닫음 포함), 고르지 않으면 '닫음'을 뺀 전체. 종류 탭도 같은 식.
+ *  #655: 'pending'(처리 대기)은 받음·확인 중을 한 번에 보는 보조 조건이다 — 주소 #board?status=pending. */
+export const PENDING_STATUS = 'pending';
+export function isPendingStatus(status) {
+  return status === 'received' || status === 'reviewing';
+}
 export function filterRows(rows, {kind = '', status = ''} = {}) {
   let list = Array.isArray(rows) ? rows : [];
   if (kind) list = list.filter(row => row?.kind === kind);
-  if (status) list = list.filter(row => row?.status === status);
+  if (status === PENDING_STATUS) list = list.filter(row => isPendingStatus(row?.status));
+  else if (status) list = list.filter(row => row?.status === status);
   else list = list.filter(row => row?.status !== 'closed');
   return list;
 }
@@ -218,4 +229,54 @@ export function journalsSummary(journals, day) {
     avgScore: scores.length ? Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length * 10) / 10 : null,
     atRisk: rows.filter(row => row.atRisk).length
   };
+}
+
+// ── '한눈에' 탭(#655) — 이미 있는 API의 응답만 모아 처리할 일을 숫자로 낸다. 서버를 바꾸지 않는다. ──
+
+/** '오늘 할 일'(#655): 답이 없는 글(답글 0) 중 오래된 순 5개. 닫은 글은 처리가 끝난 것이므로 세지 않는다.
+ *  연결 이슈 번호는 '#584' 같은 표시도 숫자로 맞춰 돌려준다(#636). */
+export function overviewTodos(posts, limit = 5) {
+  if (!Array.isArray(posts)) return [];
+  return posts
+    .filter(row => (row?.replyCount || 0) === 0 && row?.status !== 'closed')
+    .slice()
+    .sort((a, b) => String(a?.createdAt || '').localeCompare(String(b?.createdAt || '')))
+    .slice(0, limit)
+    .map(row => ({id: row?.id, title: row?.displayTitle || '(제목 없음)', createdAt: row?.createdAt, issueNumber: normalizeIssueNumber(row?.issueNumber)}));
+}
+
+/**
+ * '한눈에' 카드 모델(#655). 각 탭이 이미 부르는 응답({ok, payload})만 받아 숫자를 낸다.
+ * 하나가 실패하면 그 카드만 {error:true}를 내고 나머지는 그대로 계산한다(화면은 카드마다 따로 그린다).
+ * issues는 {ok, states} — states는 연결 이슈 번호 → 'open'/'closed'(GitHub 공개 읽기 결과).
+ */
+export function overviewModel({feedback, journals, reports, issues} = {}) {
+  const posts = feedback?.ok && Array.isArray(feedback.payload?.feedback) ? feedback.payload.feedback : null;
+  const journalRows = journals?.ok && Array.isArray(journals.payload?.journals) ? journalRowsByCustomer(journals.payload.journals) : null;
+  const reportRows = reports?.ok && Array.isArray(reports.payload?.reports) ? reports.payload.reports : null;
+  const feedbackCard = posts ? {
+    pending: posts.filter(row => isPendingStatus(row?.status)).length,
+    fixed: posts.filter(row => row?.status === 'fixed').length,
+    total: posts.length,
+    unanswered: posts.filter(row => (row?.replyCount || 0) === 0 && row?.status !== 'closed').length
+  } : {error: true};
+  const reportCard = reportRows
+    ? {pending: reportRows.filter(row => row?.status === 'open').length, total: reportRows.length}
+    : {error: true};
+  const issueCard = posts && issues?.ok && issues.states instanceof Map ? (() => {
+    let open = 0, closed = 0;
+    for (const number of linkedIssueNumbers(posts)) {
+      const state = issues.states.get(number);
+      if (state === 'open') open += 1;
+      else if (state === 'closed') closed += 1;
+    }
+    return {open, closed};
+  })() : {error: true};
+  const journalCard = journalRows
+    ? {
+        total: journalRows.length,
+        rows: journalRows.slice(0, 6).map(row => ({name: row.name, subjectId: row.subjectId, lastDay: row.lastDay, latestScore: row.latestScore}))
+      }
+    : {error: true};
+  return {feedbackCard, reportCard, issueCard, journalCard, todos: overviewTodos(posts)};
 }
