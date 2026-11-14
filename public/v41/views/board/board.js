@@ -113,7 +113,7 @@ if(m.url)media=LTMedia.markup(m.url,m.title,m.mediaMetadata,m.id);
 else if(m.type==='note') media=`<div class="noteText">“${esc(m.memo)}”</div>`;
 else if(m.type==='video') media=`<div class="media"><video muted playsinline loop poster="${m.asset}" src="${m.video}"></video><span class="playBadge">▶</span><span class="duration">${m.duration||'00:03'}</span></div>`;
 else media=`<div class="media ${m.type==='link'||m.type==='youtube'?'linkMedia':''}"><img src="${m.asset}" alt=""><span class="${m.type==='youtube'?'playBadge':''}">${m.type==='youtube'?'▶':''}</span></div>`;
-return `<article class="card ${m.first?'first':''} ${m.type==='note'?'noteCard':''}" data-id="${m.id}" style="left:${m.x}px;top:${m.y}px;--rot:${m.rot}deg;--pin:${colors[m.color]};--halo:${colors[m.color]}55">${m.first?'<div class="firstTag">첫 순간</div>':''}<button class="pin" data-pin="${m.id}" aria-hidden="true" tabindex="-1"></button>${media}<div class="cardBody"><div class="eyebrow"><span class="emotionDot"></span>${LTLabels.type(m.originalType||m.type)} 순간 · ${esc(m.emotion)}</div><h3>${esc(titleMain(m))}</h3>${titleSubMarkup(m)}<div class="meta"><span>${esc(dateText(m.date))}</span><span>${m.type==='link'||m.type==='youtube'?'↗':''}</span></div>${m.type!=='note'?`<div class="memo">${esc(m.memo)}</div>`:''}${m.url?`<div class="domain">${esc(m.source)}</div>`:''}</div></article>`}
+return `<article class="card ${m.first?'first':''} ${m.type==='note'?'noteCard':''}" data-id="${m.id}" title="끌어서 자리 옮기기" style="left:${m.x}px;top:${m.y}px;--rot:${m.rot}deg;--pin:${colors[m.color]};--halo:${colors[m.color]}55">${m.first?'<div class="firstTag">첫 순간</div>':''}<button class="pin" data-pin="${m.id}" aria-hidden="true" tabindex="-1"></button>${media}<div class="cardBody"><div class="eyebrow"><span class="emotionDot"></span>${LTLabels.type(m.originalType||m.type)} 순간 · ${esc(m.emotion)}</div><h3>${esc(titleMain(m))}</h3>${titleSubMarkup(m)}<div class="meta"><span>${esc(dateText(m.date))}</span><span>${m.type==='link'||m.type==='youtube'?'↗':''}</span></div>${m.type!=='note'?`<div class="memo">${esc(m.memo)}</div>`:''}${m.url?`<div class="domain">${esc(m.source)}</div>`:''}</div></article>`}
 
 function renderCards(){cardLayer.innerHTML=moments.map(cardHTML).join('');
 cardLayer.querySelectorAll('.card').forEach(el=>bindCard(el));
@@ -242,7 +242,7 @@ el.classList.add('landing');
 el.querySelector('.pin').classList.add('pinImpact');
 setTimeout(()=>{el.classList.remove('landing');el.querySelector('.pin').classList.remove('pinImpact')},1000);
 selectMoment(m.id,true);
-toast('순간이 꽂혔어요.');
+toast('순간이 추가되었어요.');
 if(connectFrom){/* #582: '이어진 이유' 창은 없앴다 — 이어 주기는 순간 추가의 이전 순간 고르기와 지도에서 한다 */}}
 placeAll();
 
