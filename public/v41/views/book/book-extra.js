@@ -72,16 +72,17 @@ function closeDetail(){
 }
 function detailMarkup(m){
  const nextInfo=nextMomentOf(m.id);
- const line=connectionLine(nextInfo?.title,nextInfo?.reason);
+ /* #635: 감상 화면에서는 이유가 비었을 때의 안내를 감춘다 — 내 트리는 예전 그대로 둔다. */
+ const line=connectionLine(nextInfo?.title,nextInfo?.reason,{hideEmptyWhy:!!LTDEMO.readOnly});
  const open=m.url&&isYouTubeUrl(m.url)?'YouTube에서 열기 ↗':'원본 링크 열기 ↗';
  // #327 2부: 내 기록(서버)의 순간 상세에서 다른 트리로 옮길 수 있다. 공유·예시는 숨긴다.
  const canMove=(window.parent&&window.parent.LT41)?window.parent.LT41.source==='server':false;
  const view=titleViewFor(m);
  return '<div class="detail-kicker">'+t(LTLabels.type(m.kind))+' · '+t(formatDisplayDate(m.date,ltDateStyle()))+' · '+t(m.emotion)+'</div>'+
-  (view.main?'<h2>'+t(view.main)+'</h2>'+(view.sub?'<p class="video-title">▶ '+t(view.sub)+'</p>':''):'')+
+  (view.main?'<h2>'+t(view.main)+'</h2>'+(view.sub&&view.sub.toLowerCase()!==view.main.trim().toLowerCase()?'<p class="video-title">▶ '+t(view.sub)+'</p>':''):'')+
   '<p>'+t(m.note)+' · 출처: '+t(m.source)+'</p>'+
   '<div class="chips">'+m.keywords.map(k=>'<span class="chip">#'+t(k)+'</span>').join('')+'</div>'+
-  '<div class="detail-why">'+t(line||'연결 이유는 아직 적지 않았어요')+'</div>'+
+  (line?'<div class="detail-why">'+t(line)+'</div>':(LTDEMO.readOnly?'':'<div class="detail-why">연결 이유는 아직 적지 않았어요</div>'))+
   '<div class="detail-actions"><button type="button" data-detail-viewer>순간 열기</button>'+
   (m.url?'<a href="'+t(m.url)+'" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">'+open+'</a>':'')+
   '<button type="button" data-detail-index>목차에서 보기</button>'+
@@ -187,7 +188,8 @@ function paintTitle(m){
  parts.note=noteText;
  const hands=editAffordances({readOnly:!!LTDEMO.readOnly,synthetic:!!m.synthetic,hasTitle:!!parts.main,hasNote:!!parts.note});
  const date=m.date?'<p class="moment-date">'+t(formatDisplayDate(m.date,ltDateStyle()))+'</p>':'';
- const sub=parts.media?'<p class="video-title">▶ '+t(parts.media)+'</p>':'';
+ /* #635: 유튜브 제목이 사용자 제목과 같으면(앞뒤 공백·대소문자 무시) '▶ 제목' 줄은 두 번 보이지 않게 감춘다. */
+ const sub=parts.media&&parts.media.trim().toLowerCase()!==String(parts.main||'').trim().toLowerCase()?'<p class="video-title">▶ '+t(parts.media)+'</p>':'';
  const heading=parts.main?(hands.title
   ?'<div class="moment-heading"><button type="button" class="moment-title-button" data-title-edit="'+t(m.id)+'" aria-label="제목 고치기: '+t(parts.main)+'">'+t(parts.main)+'</button>'+(hands.hint?'<button type="button" class="title-edit-hint" data-title-edit="'+t(m.id)+'" aria-label="제목 고치기"><span aria-hidden="true">✎</span> 고치기</button>':'')+'</div>'
   :'<h3>'+t(parts.main)+'</h3>'):'';
@@ -262,9 +264,13 @@ renderSpread=function(idx,focusId=null,land=true){
      안내를 쪽 위에 겹쳐 놓으면 그 순간의 카드·단추를 가린다 — 순간 내용 상자 안 끝에 놓는다. */
   const spread=currentSpread();
   if(spread?.right?.synthetic&&current===pageCount()-1){
-   const flow=host.querySelector('.page-content')||host;
-   flow.insertAdjacentHTML('beforeend','<div class="next-page"><div><b>'+t(NEXT_PAGE_COPY)+'</b></div>'+(LTDEMO.readOnly?'':'<button type="button" data-next-moment="'+t(one.id)+'">'+t(NEXT_PAGE_ACTION)+'</button>')+otherTreesBlock()+'</div>');
-   try{window.__TRACK59__?.rejudgeOverflow?.()}catch{}
+   /* #635: 감상 화면(공유·예시)에서는 '다음 이야기' 안내 자체를 감춘다 — 남의 트리를 보는 사람에게
+      다음 순간을 남기라는 말은 맞지 않다. 내 트리에서는 값이 비면 안내 문장+단추를 그대로 둔다. */
+   if(!LTDEMO.readOnly){
+    const flow=host.querySelector('.page-content')||host;
+    flow.insertAdjacentHTML('beforeend','<div class="next-page"><div><b>'+t(NEXT_PAGE_COPY)+'</b></div><button type="button" data-next-moment="'+t(one.id)+'">'+t(NEXT_PAGE_ACTION)+'</button>'+otherTreesBlock()+'</div>');
+    try{window.__TRACK59__?.rejudgeOverflow?.()}catch{}
+   }
   }
  }else{
   for(const [host,side] of [[leftPage,'left'],[rightPage,'right']]){
@@ -273,7 +279,9 @@ renderSpread=function(idx,focusId=null,land=true){
   }
   const right=SPREADS[current].right;
   if(right&&right.synthetic){
-   rightPage.innerHTML='<div class="next-page"><div><b>'+t(NEXT_PAGE_COPY)+'</b></div>'+(LTDEMO.readOnly?'':'<button type="button" data-next-moment="'+t(SPREADS[current].left.id)+'">'+t(NEXT_PAGE_ACTION)+'</button>')+otherTreesBlock()+'</div>';
+   /* #635: 감상 화면에서는 '다음 이야기' 안내를 감춘다 — 마지막 장은 깨끗하게 끝난다.
+      (예전에는 여기에 otherTreesBlock()의 맨 return이 undefined로 그대로 찍혔다.) */
+   rightPage.innerHTML=LTDEMO.readOnly?'':'<div class="next-page"><div><b>'+t(NEXT_PAGE_COPY)+'</b></div><button type="button" data-next-moment="'+t(SPREADS[current].left.id)+'">'+t(NEXT_PAGE_ACTION)+'</button>'+otherTreesBlock()+'</div>';
   }
  }
  paintLensButton();
@@ -282,7 +290,9 @@ renderSpread=function(idx,focusId=null,land=true){
 const originalUpdateConnectionSummary=updateConnectionSummary;
 updateConnectionSummary=function(id){
  const next=nextMomentOf(id),host=$b('#whyMargin');
- const line=connectionLine(next&&next.title,next&&next.reason);
+ /* #635: 감상 화면에서는 이유가 비었을 때의 안내를 감춘다 — 남의 트리를 보는 사람에게 필요 없는 말이다.
+    이유가 있으면 감상 화면에서도 그대로 보여 준다(내 트리는 예전 그대로). */
+ const line=connectionLine(next&&next.title,next&&next.reason,{hideEmptyWhy:!!LTDEMO.readOnly});
  if(!line){host.hidden=true;host.replaceChildren();return}
  host.hidden=false;
  host.innerHTML='<span></span>'+t(line);
@@ -304,7 +314,7 @@ const treeCoverSpan=(tree,index=0)=>{
  return '<span class="tree-cover"'+(choice.design?' data-cover-design="'+t(choice.design)+'"':'')+' style="background-color:'+t(choice.color)+'" aria-hidden="true">'+thumb+'</span>';
 };
 function otherTreesBlock(){
- if(LTDEMO.readOnly)return;/* 공유·예시에서는 다른 트리로 갈 수 없다(셸의 이동 규칙도 막힌다) */
+ if(LTDEMO.readOnly)return '';/* 공유·예시에서는 다른 트리로 갈 수 없다(셸의 이동 규칙도 막힌다) — #635: 빈 문자열을 돌려준다(맨 return은 undefined가 문자열에 그대로 붙었다) */
  const others=orderedTrees().filter(tree=>tree.id!==currentTreeId()).slice(0,3);
  if(!others.length)return '';
  return '<div class="other-trees"><b>다른 트리 보기</b><div class="other-tree-row">'+others.map((tree,index)=>'<button type="button" class="other-tree" data-open-tree="'+t(tree.id)+'" data-open-moment="'+t(tree.moments?.[0]?.id||'')+'">'+treeCoverSpan(tree,index)+'<span class="other-tree-name">'+t(treeTitleText(tree.title))+'</span><small>'+t(treeCountText(tree))+'</small></button>').join('')+'</div></div>';

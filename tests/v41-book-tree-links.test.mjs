@@ -29,10 +29,10 @@ test('#393 5: 제목 ▾의 트리 목록은 셸의 드롭다운과 같은 내�
 });
 
 test('#393 5: 마지막 장에 "다른 트리 보기"와 다른 트리 표지가 둔다 — 없으면 그리지 않는다',()=>{
- assert.match(EXTRA,/function otherTreesBlock\(\)\{\n if\(LTDEMO\.readOnly\)return;/,'공유·예시에서는 다른 트리로 갈 수 없으므로 숨긴다');
+ assert.match(EXTRA,/function otherTreesBlock\(\)\{\n if\(LTDEMO\.readOnly\)return '';/,'공유·예시에서는 다른 트리로 갈 수 없으므로 숨긴다(#635: 맨 return은 undefined가 문자열에 붙었다 — 빈 문자열을 돌려준다');
  assert.match(EXTRA,/const others=orderedTrees\(\)\.filter\(tree=>tree\.id!==currentTreeId\(\)\)\.slice\(0,3\)/,'다른 트리 표지 2~3개');
- assert.match(EXTRA,/rightPage\.innerHTML='<div class="next-page">[^;]*otherTreesBlock\(\)/,'빈 오른쪽 페이지의 다음 순간 추가 아래');
- assert.match(EXTRA,/insertAdjacentHTML\('beforeend','<div class="next-page">[^;]*otherTreesBlock\(\)/,'한 장에서도 마지막 순간 뒤 같은 자리에 붙인다');
+ assert.match(EXTRA,/rightPage\.innerHTML=LTDEMO\.readOnly\?'':'<div class="next-page">[^;]*otherTreesBlock\(\)/,'빈 오른쪽 페이지의 다음 순간 추가 아래(#635: 감상 화면에서는 아예 감춘다)');
+ assert.match(EXTRA,/if\(!LTDEMO\.readOnly\)\{[\s\S]*?insertAdjacentHTML\('beforeend','<div class="next-page">[^;]*otherTreesBlock\(\)/,'한 장에서도 마지막 순간 뒤 같은 자리에 붙인다(#635: 감상 화면에서는 붙이지 않는다)');
  assert.match(EXTRA,/class="other-trees"><b>다른 트리 보기<\/b>/,'이름표');
  assert.ok(EXTRA.includes(`data-open-tree="'+t(tree.id)+'" data-open-moment="'+t(tree.moments?.[0]?.id||'')+'"`),'표지에는 그 트리 첫 순간으로 가는 근거를 남긴다');
  assert.match(USE_CSS,/html\[data-v41-screen=book\] \.next-page \.other-tree\{display:grid/,'표지 단추 모양(다음 순간 단추와 섞이지 않게)');
