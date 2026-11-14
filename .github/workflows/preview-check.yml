@@ -120,6 +120,15 @@ jobs:
           start=$(date +%s)
           node --test --test-concurrency=1 tests/v41-board-pinboard-582.test.mjs tests/v41-board-cursor-detail.test.mjs
           echo "핀보드·상세 단추 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+      # #608: 보드 순간 수정 창에서 날짜를 바꾸는 시험 — 책과 같은 규칙·경로, 날짜순 재배치·내 배치 유지.
+      # 크롬이 필요한 실행형 시험이라 이 잡에서 돈다. 건너뜀=실패.
+      - name: 보드 날짜 수정 시험(건너뜀=실패 — #608)
+        env:
+          LT_BOARD_608_REQUIRE: '1'
+        run: |
+          start=$(date +%s)
+          node --test --test-concurrency=1 tests/v41-board-date-edit-608.test.mjs
+          echo "보드 날짜 수정 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
 
   screen-home-book:
     name: 화면 시험 — 첫 화면·책
