@@ -199,7 +199,7 @@ let server, base;
 test.before(async () => { server = await serve(ROOT); base = `http://127.0.0.1:${server.address().port}`; });
 test.after(() => new Promise((ok) => server.close(ok)));
 
-async function openBook(browser, width, height) {
+async function openBook(browser, width, height, extraRoutes = []) {
   const ctx = await browser.newContext({ viewport: { width, height } });
   await ctx.addInitScript((tree) => { window.__TREE__ = tree; }, tree26());
   const page = await ctx.newPage();
@@ -212,6 +212,7 @@ async function openBook(browser, width, height) {
   await page.route(external, (route) => route.abort());
   await page.route('**/api/youtube/oembed*', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ videoId: 'x', title: '영상', authorName: '채널', thumbnailUrl: '' }) }));
   await page.route('**/i.ytimg.com/vi/v0000000001/oardefault.jpg*', (route) => route.fulfill({ status: 200, contentType: 'image/png', body: VERTICAL_PNG }));
+  for (const [pattern, handler] of extraRoutes) await page.route(pattern, handler);
   await page.goto(`${base}/host584`, { waitUntil: 'load' });
   let frame = null;
   for (let i = 0; i < 80 && !frame; i++) {
@@ -394,6 +395,74 @@ test('584 실행: 머리줄 — 1장|2장 한 묶음, 돋보기 아이콘, 말�
       await frame.waitForSelector('#overview.open', { timeout: 5000 });
       const title = await frame.evaluate(() => document.getElementById('overviewTitle').textContent);
       assert.equal(title, '이어진 순간', '창 제목');
+    } finally { await ctx.close(); }
+  } finally { await browser.close(); }
+});
+
+/* ── #642: 재생 중 창 크기 바꾸기 — 전체 화면·resize 가 재생을 끊지 않는다 ── */
+// 썸네일이 살아 있는 영상(내 기록과 같은 상태)은 사라진 영상 판정 없이 ▶ 재생이 눌린다.
+const H_THUMB_PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+
+test('642 실행: 재생 중에 창 크기를 바꿔도 그 자리 iframe이 같은 요소로 살아 있다', { skip }, async () => {
+  const browser = await chromium.launch();
+  try {
+    const { ctx, page, frame, errors } = await openBook(browser, 1440, 900, [
+      ['**/i.ytimg.com/vi/h0000000001/*.jpg*', (route) => route.fulfill({ status: 200, contentType: 'image/png', body: H_THUMB_PNG })],
+    ]);
+    try {
+      // 책 안에서 재생: 첫 펼침면의 ▶ 재생을 누른다. 외부 요청은 막혀도 iframe 요소는 그 자리에 만들어진다.
+      await frame.waitForFunction(() => { const b = document.querySelector('.yt-play'); return b && !b.querySelector('.lt-fallback-card'); }, null, { timeout: 10000 });
+      await frame.click('.yt-play');
+      await frame.waitForSelector('iframe.yt-frame', { state: 'attached', timeout: 10000 });
+      // iframe 요소에 표식을 남겨 '다시 만들어진 것'과 구별한다.
+      await frame.evaluate(() => { document.querySelector('iframe.yt-frame').__lt642 = 'same'; });
+      // 창 크기 1440 → 1000 → 1440 → 500(휴대폰 폭 — 세로↔가로 돌리기와 같은 resize 경로).
+      for (const size of [{ width: 1000, height: 800 }, { width: 1440, height: 900 }, { width: 500, height: 850 }]) {
+        await page.setViewportSize(size);
+        await frame.waitForTimeout(200);
+      }
+      const alive = await frame.evaluate(() => { const f = document.querySelector('iframe.yt-frame'); return f ? { same: f.__lt642 === 'same', attached: f.isConnected } : null; });
+      assert.ok(alive?.attached, '재생 중에는 창 크기를 바꿔도 iframe이 붙어 있다');
+      assert.ok(alive?.same, '같은 iframe 요소다(다시 만들지 않았다)');
+      // 전체 화면을 흉내 낸다(헤드리스에서 진짜 전체 화면이 안 되므로 fullscreenchange 이벤트로 같은 경로를 건드린다).
+      await frame.evaluate(() => document.dispatchEvent(new Event('fullscreenchange')));
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await frame.waitForTimeout(1000); // 전체 화면 직후 보호(800ms)와 다시 확인 타이머(850ms)가 모두 지나도록.
+      const afterFs = await frame.evaluate(() => { const f = document.querySelector('iframe.yt-frame'); return f ? { same: f.__lt642 === 'same', attached: f.isConnected } : null; });
+      assert.ok(afterFs?.attached && afterFs?.same, '전체 화면 흉내 뒤에도 같은 iframe으로 재생이 이어진다');
+      assert.deepEqual(errors, [], '페이지 오류 없음');
+    } finally { await ctx.close(); }
+  } finally { await browser.close(); }
+});
+
+test('642 실행: 재생하지 않은 상태 — 전체 화면 직후는 다시 그리지 않고, 나온 뒤에는 다시 배치한다', { skip }, async () => {
+  const browser = await chromium.launch();
+  try {
+    const { ctx, page, frame } = await openBook(browser, 1440, 900);
+    try {
+      await frame.evaluate(() => { const el = document.querySelector('#leftPage .moment'); el.__lt642 = 'old'; });
+      // 전체 화면을 흉내 내고 바로 창 크기를 바꾼다 — 직후에는 다시 그리지 않는다.
+      await frame.evaluate(() => document.dispatchEvent(new Event('fullscreenchange')));
+      await page.setViewportSize({ width: 1000, height: 800 });
+      await frame.waitForTimeout(300);
+      const kept = await frame.evaluate(() => { const el = document.querySelector('#leftPage .moment'); return !!el && el.__lt642 === 'old'; });
+      assert.ok(kept, '전체 화면 직후의 resize 로는 장을 다시 그리지 않는다');
+      // 보호 시간이 지나면(전체 화면에서 나온 뒤) 다시 배치된다(기존 동작 회복).
+      await frame.waitForFunction(() => { const el = document.querySelector('#leftPage .moment'); return !el || el.__lt642 !== 'old'; }, null, { timeout: 5000 });
+    } finally { await ctx.close(); }
+  } finally { await browser.close(); }
+});
+
+test('642 실행: 재생하지 않은 상태에서 창 크기를 바꾸면 장을 다시 배치한다(기존 동작 유지)', { skip }, async () => {
+  const browser = await chromium.launch();
+  try {
+    const { ctx, page, frame } = await openBook(browser, 1440, 900);
+    try {
+      await frame.evaluate(() => { const el = document.querySelector('#leftPage .moment'); el.__lt642 = 'old'; });
+      await page.setViewportSize({ width: 1000, height: 800 });
+      await frame.waitForTimeout(250);
+      const kept = await frame.evaluate(() => { const el = document.querySelector('#leftPage .moment'); return !!el && el.__lt642 === 'old'; });
+      assert.ok(!kept, '재생하지 않으면 창 크기에 맞춰 다시 배치된다(낡은 요소가 남지 않음)');
     } finally { await ctx.close(); }
   } finally { await browser.close(); }
 });

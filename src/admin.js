@@ -1,10 +1,11 @@
 import './styles.css';
 import './admin.css';
 import {
-  GITHUB_REPO, KIND_LABEL, STATUS_LABEL, STATUS_ORDER, PERSONA_FIELDS,
+  GITHUB_REPO, KIND_LABEL, STATUS_LABEL, STATUS_ORDER, PERSONA_FIELDS, PENDING_STATUS,
   escapeText, richParagraph, formatTime, parseHash, viewHash, viewToTab,
   filterRows, statusTabs, kindTabs, linkedIssueNumbers, normalizeIssueNumber, issueStateLabel, needsFixButton,
-  statusChangeMessage, buildIssueUrl, issueLink, journalsSummary, journalRowsByCustomer
+  statusChangeMessage, buildIssueUrl, issueLink, journalsSummary, journalRowsByCustomer,
+  isPendingStatus, overviewModel
 } from './admin-view.js';
 
 /**
@@ -49,7 +50,8 @@ function head() {
   // #570 3: 탭 이름 — 게시판→고객 글, 이슈→고치는 일. 신고는 그대로.
   const tab = viewToTab(route.view);
   const tabBtn = (name, label) => `<button type="button" data-tab="${name}" class="${tab === name ? 'is-active' : ''}">${label}</button>`;
-  return `<header class="app-header"><a class="brand" href="/v41/" title="러브트리로" aria-label="러브트리로"><span>LoveTree</span><small>4.1</small></a><nav aria-label="관리자 메뉴">${tabBtn('board', '고객 글')}${tabBtn('journals', '사용 일지')}${tabBtn('reports', '신고')}${tabBtn('issues', '고치는 일')}</nav></header>`;
+  // #655: '한눈에'가 맨 앞 탭이다(운영센터를 열면 기본). 기존 탭·주소는 그대로 둔다.
+  return `<header class="app-header"><a class="brand" href="/v41/" title="러브트리로" aria-label="러브트리로"><span>LoveTree</span><small>4.1</small></a><nav aria-label="관리자 메뉴">${tabBtn('overview', '한눈에')}${tabBtn('board', '고객 글')}${tabBtn('journals', '사용 일지')}${tabBtn('reports', '신고')}${tabBtn('issues', '고치는 일')}</nav></header>`;
 }
 
 function renderLogin() {
@@ -73,12 +75,64 @@ async function render() {
     host.innerHTML = `${head()}<div class="admin-shell"><section class="admin-card"><div class="admin-card-head"><strong>운영센터는 관리자 계정만 볼 수 있어요</strong><span class="admin-note">이 계정에는 러브트리 관리자 역할이 없습니다. 관리자 여부는 서버가 확인한 신원으로만 정해집니다.</span></div><div class="admin-actions"><a class="button primary" href="/v41/">러브트리로 돌아가기</a></div></section></div>`;
     return;
   }
+  if (route.view === 'overview') { await renderOverview(); return; }
   if (route.view === 'issues') { await renderIssues(); return; }
   if (route.view === 'reports') { await renderReports(); return; }
   if (route.view === 'journals') { await renderJournals(); return; }
   if (route.view === 'feedback' && route.id) { await renderDetail(route.id); return; }
   if (route.view === 'persona' && route.id) { await renderPersona(route.id); return; }
   await renderList();
+}
+
+/** #655 '한눈에' 탭 — 이미 있는 탭이 부르는 API만 모아 처리할 일을 숫자로 보여 준다. 서버를 바꾸지 않는다.
+ *  하나라도 못 불러오면 그 카드만 '불러오지 못했어요'로 두고 나머지는 그린다. */
+async function renderOverview() {
+  const [feedbackRes, journalsRes, reportsRes] = await Promise.all([read('/api/admin/feedback'), read('/api/admin/journals'), read('/api/community/admin/reports')]);
+  const posts = feedbackRes.ok && Array.isArray(feedbackRes.payload?.feedback) ? feedbackRes.payload.feedback : [];
+  // 고치는 일: 고객 글의 연결 이슈 상태만('고치는 일' 탭과 같은 공개 읽기 경로). 하나가 실패해도 나머지 카드는 그린다.
+  const numbers = linkedIssueNumbers(posts);
+  let issuesOk = true;
+  const states = new Map();
+  if (numbers.length) {
+    const results = await Promise.allSettled(numbers.map(async number => {
+      const r = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/issues/${number}`, {headers: {accept: 'application/vnd.github+json'}});
+      if (!r.ok) throw new Error(String(r.status));
+      const issue = await r.json();
+      return issue.pull_request ? null : issue;
+    }));
+    results.forEach((result, index) => {
+      if (result.status === 'fulfilled' && result.value) states.set(numbers[index], result.value.state);
+      else if (result.status === 'rejected') issuesOk = false;
+    });
+  }
+  const model = overviewModel({feedback: feedbackRes, journals: journalsRes, reports: reportsRes, issues: {ok: issuesOk, states}});
+  const fb = model.feedbackCard, rp = model.reportCard, is = model.issueCard, jr = model.journalCard;
+  const card = (value, label, view, status = '', failed = false) => failed
+    ? `<button type="button" class="lt-ov-card" disabled><span class="lt-ov-value">—</span><span class="lt-ov-label">${escapeText(label)}</span><span class="lt-ov-fail">불러오지 못했어요</span></button>`
+    : `<button type="button" class="lt-ov-card" data-ov-view="${escapeText(view)}"${status ? ` data-ov-status="${escapeText(status)}"` : ''}><span class="lt-ov-value">${escapeText(value)}</span><span class="lt-ov-label">${escapeText(label)}</span></button>`;
+  const cards = [
+    card(fb.pending, '고객 글 · 처리 대기(받음·확인 중)', 'board', PENDING_STATUS, Boolean(fb.error)),
+    card(fb.fixed, '고객 글 · 고침', 'board', 'fixed', Boolean(fb.error)),
+    card(fb.total, '고객 글 · 전체', 'board', '', Boolean(fb.error)),
+    card(fb.unanswered, '답을 아직 안 단 글(답글 0)', 'board', '', Boolean(fb.error)),
+    card(rp.pending, '신고 · 검토 대기', 'reports', '', Boolean(rp.error)),
+    card(is.open, '고치는 일 · 열린 이슈', 'issues', '', Boolean(is.error)),
+    card(is.closed, '고치는 일 · 닫힌 이슈', 'issues', '', Boolean(is.error))
+  ].join('');
+  const journalSection = jr.error
+    ? `<section class="lt-card"><h2 class="lt-h2">사용 일지</h2><p class="lt-empty">불러오지 못했어요</p></section>`
+    : `<section class="lt-card"><h2 class="lt-h2">사용 일지 · 고객별 최근 기록</h2><div class="lt-post-list">${jr.rows.length ? jr.rows.map(row => `<button type="button" class="lt-post lt-post-row" data-ov-view="journals"><span class="lt-post-title">${escapeText(row.name)}</span><span class="lt-post-meta">최근 ${escapeText(row.lastDay || '—')}</span>${row.latestScore == null ? '<span class="lt-badge">점수 없음</span>' : `<span class="lt-badge">다시 올 ${escapeText(row.latestScore)}점</span>`}</button>`).join('') : '<p class="lt-empty">아직 사용 일지가 없습니다.</p>'}</div></section>`;
+  const todosBlock = fb.error
+    ? '<p class="lt-empty">불러오지 못했어요</p>'
+    : (model.todos.length
+        ? model.todos.map(row => `<article class="lt-post lt-post-row" data-open="${escapeText(row.id)}" tabindex="0" role="button"><span class="lt-post-title">${escapeText(row.title)}</span>${row.issueNumber ? `<span class="lt-post-issue">이슈 ${issueLink(row.issueNumber)}</span>` : '<span class="lt-post-issue"></span>'}<span class="lt-post-date">${escapeText(formatTime(row.createdAt))}</span></article>`).join('')
+        : '<p class="lt-empty">답을 기다리는 글이 없습니다.</p>');
+  host.innerHTML = `${head()}<div class="admin-shell lt-board">
+    <div class="lt-board-head"><h1 class="lt-h1">한눈에</h1><p class="lt-sub">지금 쌓인 처리할 일 · 숫자를 누르면 그 탭이 그 조건으로 열립니다</p></div>
+    <div class="lt-ov-cards" role="group" aria-label="처리할 일 숫자">${cards}</div>
+    ${journalSection}
+    <section class="lt-card"><h2 class="lt-h2">오늘 할 일 · 답 안 단 글 오래된 순</h2><div class="lt-post-list">${todosBlock}</div></section>
+  </div>`;
 }
 
 async function renderList() {
@@ -333,6 +387,9 @@ document.addEventListener('click', async (event) => {
   }
   const tab = event.target.closest('[data-tab]');
   if (tab) { navigate(tab.dataset.tab); return; }
+  // #655: '한눈에' 카드 — 그 조건이 열린 탭 주소로 이동한다(예: #board?status=pending).
+  const ovCard = event.target.closest('[data-ov-view]');
+  if (ovCard) { navigate(ovCard.dataset.ovView, null, {status: ovCard.dataset.ovStatus || '', kind: ''}); return; }
   // 탭 거르기(#570 2): 다시 누르면 해제한다. 상태는 주소(#board?status=..&kind=..)에 남는다.
   const statusTab = event.target.closest('[data-status-tab]');
   if (statusTab) {

@@ -17,6 +17,11 @@ export const QUICK_PASTE_EMPTY = '붙여 넣을 주소가 없어요.';
 export const QUICK_PASTE_ERROR = '주소를 읽지 못했어요. 직접 붙여 넣어 주세요.';
 export const DROP_LOGIN_NOTICE = '로그인한 뒤 순간을 담을 수 있어요.';
 export const DROP_READONLY_NOTICE = '서버 편집 연결이 아직 준비되지 않았어요. 기록은 안전하게 읽을 수 있습니다.';
+// #638(고른 트리 우선): 담기 창의 트리 한 줄·단추·담은 안내는 고른 트리 이름을 따른다.
+// 트리가 0개일 때는 기본 트리('모아둔 순간')가 새로 만들어지므로 QUICK_INBOX_LABEL을 쓴다.
+export function quickTreeLineText(name) { return `${name} 트리에 담겨요`; }
+export function quickSubmitText(name) { return `${name}에 담기`; }
+export function quickSavedTreeText(name) { return `${name}에 담았어요`; }
 
 function httpUrl(value) {
   try {

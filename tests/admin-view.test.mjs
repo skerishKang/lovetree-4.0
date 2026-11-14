@@ -6,11 +6,14 @@ import {
   filterRows, statusTabs, kindTabs, STATUS_LABEL,
   linkedIssueNumbers, normalizeIssueNumber, issueStateLabel, needsFixButton,
   statusChangeMessage, buildIssueUrl, issueLink, escapeText,
-  journalsSummary, journalRowsByCustomer, journalStage
+  journalsSummary, journalRowsByCustomer, journalStage,
+  isPendingStatus, overviewModel, overviewTodos
 } from '../src/admin-view.js';
 
 test('주소 해시를 화면 상태로 바꾼다(#564 2)', () => {
-  assert.deepEqual(parseHash(''), {view: 'board', id: null, status: '', kind: ''});
+  // #655: 운영센터를 열면(주소 없이) '한눈에'가 기본이다. 기존 주소(#board 등)는 그대로다.
+  assert.deepEqual(parseHash(''), {view: 'overview', id: null, status: '', kind: ''});
+  assert.deepEqual(parseHash('#overview'), {view: 'overview', id: null, status: '', kind: ''});
   assert.deepEqual(parseHash('#board'), {view: 'board', id: null, status: '', kind: ''});
   assert.deepEqual(parseHash('#reports'), {view: 'reports', id: null, status: '', kind: ''});
   assert.deepEqual(parseHash('#issues'), {view: 'issues', id: null, status: '', kind: ''});
@@ -36,7 +39,7 @@ test('탭 거르기를 주소에 남기고 되돌린다(#570 2)', () => {
   assert.equal(viewHash('board', null, {status: 'closed'}), '#board?status=closed');
   assert.equal(viewHash('board', null, {}), '#board');
   // 왕복: 해시 → 상태 → 해시가 같다.
-  for (const hash of ['#board', '#board?status=reviewing', '#board?kind=journal', '#board?status=closed&kind=opinion', '#reports', '#issues', '#feedback/p1', '#persona/x']) {
+  for (const hash of ['#overview', '#board', '#board?status=reviewing', '#board?status=pending', '#board?kind=journal', '#board?status=closed&kind=opinion', '#reports', '#issues', '#feedback/p1', '#persona/x']) {
     const view = parseHash(hash);
     assert.equal(viewHash(view.view, view.id, view), hash);
   }
@@ -234,4 +237,71 @@ test('운영센터 배경 — 빌드 순서와 상관없이 무대색이 styles.
   const css = await readFile(new URL('../src/admin.css', import.meta.url), 'utf8');
   assert.match(css, /html:root\s*\{[^}]*background-color:\s*var\(--lt-stage\)/);
   assert.match(css, /body\s*\{[^}]*min-height:\s*100vh/);
+});
+
+/* ── #655 '한눈에' 탭 — 이미 있는 API의 응답만 모아 숫자를 낸다 ── */
+
+test("#655 '한눈에' 카드 숫자 — 가짜 응답으로 각 카드 계산이 맞다('#584'·'584' 섞인 이슈 번호 포함)", () => {
+  const feedback = {ok: true, payload: {feedback: [
+    {id: 'a1', kind: 'opinion', status: 'received', createdAt: '2026-11-10T01:00:00Z', replyCount: 0, issueNumber: '#584'},
+    {id: 'a2', kind: 'bug', status: 'reviewing', createdAt: '2026-11-11T02:00:00Z', replyCount: 2},
+    {id: 'a3', kind: 'opinion', status: 'fixed', createdAt: '2026-11-12T03:00:00Z', replyCount: 1, issueNumber: '584'},
+    {id: 'a4', kind: 'journal', status: 'later', createdAt: '2026-11-13T04:00:00Z', replyCount: 0},
+    {id: 'a5', kind: 'opinion', status: 'closed', createdAt: '2026-11-09T05:00:00Z', replyCount: 0}
+  ]}};
+  const reports = {ok: true, payload: {reports: [{id: 'r1', status: 'open'}, {id: 'r2', status: 'resolved'}, {id: 'r3', status: 'open'}]}};
+  const journals = {ok: true, payload: {journals: [
+    {id: 'j1', subjectId: 'c1', authorName: '고객1', authorRole: 'ai_customer', journalDate: '2026-11-14', score: 4, createdAt: '2026-11-14T01:00:00Z'},
+    {id: 'j2', subjectId: 'c1', authorName: '고객1', journalDate: '2026-11-15', score: 2, createdAt: '2026-11-15T01:00:00Z'},
+    {id: 'j3', subjectId: 'c2', authorName: '고객2', journalDate: '2026-11-15', createdAt: '2026-11-15T02:00:00Z'}
+  ]}};
+  const model = overviewModel({feedback, journals, reports, issues: {ok: true, states: new Map([[584, 'open']])}});
+  assert.deepEqual(model.feedbackCard, {pending: 2, fixed: 1, total: 5, unanswered: 2});
+  assert.deepEqual(model.reportCard, {pending: 2, total: 3});
+  // '#584'와 '584'는 같은 이슈다(#636 정규화) — 열린 1로 센다.
+  assert.deepEqual(model.issueCard, {open: 1, closed: 0});
+  assert.equal(model.journalCard.total, 2);
+  assert.equal(model.journalCard.rows[0].name, 'AI 고객1');
+  assert.equal(model.journalCard.rows[0].lastDay, '2026-11-15');
+  assert.equal(model.journalCard.rows[0].latestScore, 2);
+  // 오늘 할 일: 답 안 단 글 오래된 순, 닫은 글은 빠지고, 이슈 번호는 숫자로 돌아온다.
+  assert.deepEqual(model.todos.map(t => t.id), ['a1', 'a4']);
+  assert.equal(model.todos[0].issueNumber, '584');
+  assert.equal(model.todos[1].issueNumber, '');
+});
+
+test('#655 오늘 할 일 — 오래된 순 5개로 자르고 닫은 글은 뺀다', () => {
+  const posts = Array.from({length: 7}, (_, i) => ({
+    id: 'p' + i, status: i === 6 ? 'closed' : 'received', replyCount: 0,
+    createdAt: `2026-11-${String(8 + i).padStart(2, '0')}T00:00:00Z`, displayTitle: i === 6 ? '닫은 글' : `글 ${i}`, issueNumber: ''
+  }));
+  const todos = overviewTodos(posts);
+  assert.equal(todos.length, 5, '5개로 자른다');
+  assert.deepEqual(todos.map(t => t.id), ['p0', 'p1', 'p2', 'p3', 'p4'], '오래된 순, 닫은 글(p6)은 빠진다');
+  assert.equal(overviewTodos(null).length, 0, '응답이 없으면 빈 목록');
+});
+
+test('#655 한 API가 실패해도 나머지 카드는 계산된다', () => {
+  const model = overviewModel({
+    feedback: {ok: false, payload: null},
+    journals: {ok: true, payload: {journals: []}},
+    reports: {ok: true, payload: {reports: []}},
+    issues: {ok: false, states: new Map()}
+  });
+  assert.ok(model.feedbackCard.error, '고객 글 카드만 실패');
+  assert.deepEqual(model.reportCard, {pending: 0, total: 0}, '신고 카드는 그대로');
+  assert.deepEqual(model.journalCard, {total: 0, rows: []}, '사용 일지 카드는 그대로');
+  assert.ok(model.issueCard.error, '이슈 상태를 못 가져오면 고치는 일 카드도 실패');
+  assert.deepEqual(model.todos, [], '고객 글을 못 가져오면 오늘 할 일도 비운다');
+});
+
+test('#655 처리 대기(pending) 조건 — 받음·확인 중을 한 번에 거르고 주소에 남긴다', () => {
+  assert.deepEqual(parseHash('#board?status=pending'), {view: 'board', id: null, status: 'pending', kind: ''});
+  assert.equal(viewHash('board', null, {status: 'pending'}), '#board?status=pending');
+  assert.equal(viewToTab('overview'), 'overview');
+  const rows = [{status: 'received'}, {status: 'reviewing'}, {status: 'fixed'}, {status: 'closed'}];
+  assert.deepEqual(filterRows(rows, {status: 'pending'}), [{status: 'received'}, {status: 'reviewing'}]);
+  // 기존 조건은 그대로다.
+  assert.deepEqual(filterRows(rows, {status: 'fixed'}), [{status: 'fixed'}]);
+  assert.equal(filterRows(rows, {}).length, 3, '조건 없으면 닫음을 뺀 전체(#564 10)');
 });
