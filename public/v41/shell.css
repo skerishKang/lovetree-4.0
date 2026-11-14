@@ -216,7 +216,10 @@ html[data-v41-screen=book] .tools .ui-btn::after,html[data-v41-screen=board] hea
 .tree-tips li{display:grid;gap:4px;padding-left:12px;border-left:2px solid var(--lt-gold-line)}
 .tree-tips li strong{font-size:13px;font-weight:600;line-height:1.6}
 .tree-tips li span{font-size:12px;line-height:1.75;color:var(--lt-muted)}
-.tree-tips button{justify-self:start;min-height:44px;padding:0 16px;border-radius:var(--lt-r-pill);border:1px solid var(--lt-gold-line);background:transparent;font-size:13px}
+.tree-tips button{min-height:44px;padding:0 16px;border-radius:var(--lt-r-pill);border:1px solid var(--lt-gold-line);background:transparent;font-size:13px}
+/* 이슈 571: 안내의 두 단추는 한 줄에 나란히 둔다(그림 549-mock-na-390.png). [이름 바꾸기]는 금테로 강조한다. */
+.tree-tips-btns{display:flex;gap:8px;justify-self:start}
+.tree-tips button.rename{border-color:var(--lt-gold);color:var(--lt-gold);font-weight:600}
 .tree-tips button:hover{border-color:var(--lt-gold)}
 /* 이슈 549: 모달 창이 열려 있는 동안은 창 밖이 눌리지 않으므로, 안내를 창 안 맨 위에 붙여 띄운다(닫히면 제자리). */
 .tree-tips.lt-tips-embedded{position:static;width:auto;margin:0 0 12px}
