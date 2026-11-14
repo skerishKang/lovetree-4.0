@@ -21,7 +21,8 @@
       {"kind": "fix", "text": "크게 보기에서 재생이 안 되던 문제를 고쳤어요", "source": "ai_tester", "tester": "윤제", "issue": "#584"},
       {"kind": "fix", "text": "‘이어진 순간’ 이름·설명이 바뀌었어요", "source": "ai_tester", "tester": "윤제", "issue": "#584"},
       {"kind": "fix", "text": "보드 말이 ‘보드·순간 추가’로 바뀌었어요", "source": "ai_tester", "tester": "윤제", "issue": "#582"},
-      {"kind": "fix", "text": "보드에서도 순간 날짜를 바꿀 수 있어요", "source": "ai_tester", "tester": "윤제", "issue": "#608"}
+      {"kind": "fix", "text": "보드에서도 순간 날짜를 바꿀 수 있어요", "source": "ai_tester", "tester": "윤제", "issue": "#608"},
+      {"kind": "fix", "text": "휴대폰(390)에서 새 소식 알림이 책의 ‘순간 목차’ 단추를 가리지 않게 했어요", "source": "team", "issue": "#625"}
     ]
   }
 ]

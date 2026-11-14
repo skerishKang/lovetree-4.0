@@ -115,6 +115,16 @@ export function mountUpdates({ $, showPanel, fetchJson, storage, onDot }) {
     if (card) card.hidden = true;
   }
 
+  // #625: 카드는 첫 화면(빈 주소·#home) 전용이다. 안쪽 화면(책·보드·지도·내 트리)은 상단 도구 줄과
+  // 아래 컨트롤이 화면을 채워, 어떤 고정 위치도 단추를 가린다(390 실측: 카드 76~132 vs 책 '순간 목차' 64~110).
+  // 첫 화면을 벗어나면 카드를 숨기고, 다시 첫 화면으로 와도 '접속 때 한 번' 규칙대로 다시 띄우지 않는다.
+  const onHome = () => {
+    const hash = globalThis.location?.hash || '';
+    return !hash || hash === '#home';
+  };
+  const hideCardOffHome = () => { if (cardShown && !onHome()) hideCard(); };
+  globalThis.addEventListener?.('hashchange', hideCardOffHome);
+
   async function start() {
     const list = await ensure();
     const latest = latestEntry(list);
@@ -123,9 +133,8 @@ export function mountUpdates({ $, showPanel, fetchJson, storage, onDot }) {
     if (typeof onDot === 'function') onDot(newer);
     // 첫 화면(빈 주소·#home)에서만 작은 카드를 보인다 — 책·보드·지도 같은 안쪽 화면의
     // 단추를 가려 막지 않는다. 점과 '새 소식' 입구는 그대로 남는다(지도 화면 시험이 막혔던 자리).
-    const hash = globalThis.location?.hash || '';
-    const onHome = !hash || hash === '#home';
-    if (newer && latest && onHome) showCard(latest);
+    const atHome = onHome();
+    if (newer && latest && atHome) showCard(latest);
     return { latest: latest?.version || null, newer };
   }
 
