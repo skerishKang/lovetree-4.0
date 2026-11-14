@@ -4,6 +4,13 @@
 
 > **빨간 필수 검사 규칭(2026-11-12 사고 뒤)**: 필수 검사가 빨강이면 **재실행은 1회까지**. 같은 항목이 또 빨강이면 멈추고 원인을 찾는다 — 재실행·빈 커밋으로 초록을 만들지 않는다. "간헐적·환경 탓"이라고 적으려면 **같은 시각 이 변경이 없는 브랜치(main 또는 다른 PR)** 에서도 같은 실패가 나는지 대조한 결과를 함께 적는다. 메시지를 받아 화면을 다시 띄우는 코드는 '뜰 때마다 보내는 쪽'과 짝으로 흐름 시험을 하고, 머지 전 미리보기 첫 화면을 5초 이상 직접 본다.
 
+## 2026-11-15 — 보드 마감: 금색 커서 동그라미 제거 + 상세 다음·이전 순간 단추화 (로컬2 레인, ai/com2-lt-cursor-detail-20261115-0830-3a7c, main 8092d28 기준)
+
+- **커서 동그라미 완전 제거**: 따라오는 금색 동그라미(`cursorRing`·`cursorInner`·`cursorFX`·`cursor-burst/ripple/drop`)를 HTML 요소·board.css 스타일·board-extras.js 배선·board-model.js 판정 함수(`cursorMode`·`cursorHover`·`cursorScale`·`cursorEffectAllowed`·`cursorPresence`)까지 치웠다. 원래 마우스 커서를 쓰고, 상태는 CSS cursor로 알린다 — 판 `grab`(끌 때 `grabbing`, `#viewport.panning`), 카드 `grab`(끌 때 `grabbing`, `.card.dragLift`), 핀 연결 중 `crosshair`(`#cardLayer.linking`), 핀·단추 `pointer`. `public/v41` 전체에 `cursor:none` 없음(시험이 검사).
+- **상세 다음·이전 순간 단추화**: `#dConn`의 '→ 순간 제목' 목차 글씨를 실제 `<button class="connLink" data-cid data-dir>`로 바꿨다(board.js open()과 board-extras selectMoment 둘 다, `connRow` 한 벌). 누르면 이벤트 위임(#dConn.onclick)으로 다음은 `moveViaConnection`(실을 따라 흐른 뒤 `focusBoardMoment`)·이전은 `pulseConnection`→`focusBoardMoment(c.a)` — 판이 그 카드로 부드럽게 이동하고 카드가 선택되며 상세가 바뀐다. 이유(why) 글은 단추 아래 작은 글씨(`.connWhy`)로 그대로, 3개 넘으면 '나머지 N개 보기' `<details>`도 그대로. 실제 button이라 Tab·Enter 접근 가능.
+- **시험**: 신규 `tests/v41-board-cursor-detail.test.mjs` 4건 — (1) 커서 흔적 없음(5개 파일·public/v41 전체 `cursor:none` 걷기) + 상태 커서 규칙, (2) 단추 규칙, (3) 실제 브라우저 다음 단추 클릭 → 판 이동(transform 변화)·선택·상세 전환 + Enter, (4) 이전 단추. board-model 시험의 커서 시험 5건(19~24)은 함수 소멸로 함께 거둠. 관련 시험 49건 통과(board-model·신규·#553 겹침·#536 넓게·터치 영역), build·modulepreload 유지 확인.
+- **fps(1440, 사슬 40순간, 헤드리스 playwright)**: 판 끌기 40→43~44, 확대 56→58 — 같거나 소폭 빠름(동그라미 그리기·기억을 덜어서). 스크린샷·수치: `E:\lovetree-qaoard-cursor\`(detail-next-button.png, fps 기록).
+- **머지**: PR #583 → main. 보드 배치(treeSpread·cardPosition)는 건드리지 않았다.
 ## 2026-11-14 — AI 고객 내보내기: 쿠키 없이 컴2 DB에서 (로컬5 레인, ai/local5-lt-ai-export-db-261114, main b79752d 기준)
 
 - **무엇**: 매일 07:00 AI 고객 내보내기의 원본을 컴2 운영 DB(읽기만)로 바꿨다. 관리자 세션 쿠키 방식은 폐지(쿠키 만료로 조용히 멈추는 문제·쿠키 파일 보관 문제).
@@ -12,6 +19,8 @@
 - **컴1 실행 스크립트** `tools/run-ai-customer-export.ps1`(신규): Git 번들 ssh(Windows 내장 ssh.exe 가 깨져 있음 — `ssh -V` 도 255·무출력, 2026-11-14 실측) → comp2 → `wsl -e /usr/local/bin/node 판독기 --b64`(인용·파이프 없는 명령 — powershell.exe 5.1 예약 작업이 겹따옴표·| 를 깨뜨려 판독기에 --b64 모드를 넣음, 실측) → 디코드해 임시 JSON → md 작성 → 임시 삭제. 로그 `E:\lovetree-qa\export-log\ai-customer-YYMMDD.log` 맨 윗줄이 이유 한 줄(성공 요약/실패 이유), 실패 시 종료 코드 1.
 - **설치 목록**: `install.sh` 가 판독기를 `/opt/padiem/lovetree-api/tools/` 에 넣고, `autodeploy.sh` 의 API 변경 판정에 `tools/export-ai-customer-db.mjs` 를 추가(이 파일만 바뀌어도 설치). migration 변경 없음 — 자동 설치 대상.
 - **시험** `tests/export-ai-customer.test.mjs` 12건(문장 READ ONLY·쓰기 키워드 없음, subject·이메일 없음, 가림, JSON→md, 이름 중복 폴더). `npm test` 전체는 PR당 1회 실행(결과는 PR 본문).
+- **수정(2026-11-14, 머지 cf5ad94 뒤 실데이터 실행에서 발견)**: 판독기 posts SELECT에 `subject_id` 칼럼이 빠져 받아온 글을 고객에 묶지 못해 일지가 비었음(posts=0) — 칼럼을 결과에 추가하고 시험에 SELECT 절 단언을 넣음(테스트 입력에 subject_id 가 있어 미쳐지지 않았던 빠짐).
+- **컴1 고정 위치(2026-11-14 마무리)**: 예약 작업 `LoveTreeAICustomerExport0700`은 레인 작업 폴더가 아니라 `E:\lovetree-qa\export-tool\`(ps1+mjs 복사본 — export-ai-customer.mjs 는 node 내장만 import 해 두 파일이면 충분, ps1 은 $PSScriptRoot 기준이라 스크립트 수정 없음)에서 돈다. 저장소 tools 스크립트를 고치면 그 폴더에 다시 복사해 둔다.
 - **주의**: 컴2 ssh 는 Windows 셸(cmd)이고 예약 작업은 powershell.exe 5.1 — 겹따옴표·`|`·작은따옴표가 원격 전달에서 깨진다(2026-11-14 실측) → 원격 명령은 인용·파이프 없이 `wsl -e node 판독기 --b64` 한 줄(base64 는 판독기가 출력). WSL 기본 사용자 root — .env 읽기 가능. JSON 은 base64 한 줄로만 전달(한글·줄바꿈 안전). 판독기 오류 이유는 값 없이 한 줄만 stderr 로.
 
 ## 2026-11-14 — 운영센터 2차 다듬기: 탭 거르기·고치는 일 (#570, 로컬3 레인, ai/local3-admin-570-261115, main f605e81 기준)

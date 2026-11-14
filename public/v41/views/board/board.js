@@ -197,8 +197,12 @@ const _ti=titleInfo(m);$('#dTitle').textContent=_ti.main;const _ds=$('#detailSub
 const _md=m.mediaMetadata||{},_src=[_md.title||_ti.sub,_md.channel].filter(x=>typeof x==='string'&&x.trim()),_srcText=_src.length?(_src.length>1?_src[0]+' ('+_src[1]+')':_src[0]):m.source;
 $('#dBasic').innerHTML=`${esc(dateText(m.date))}${m.first?' <span class="firstMark" title="첫 순간">●</span>':''}<br><b>${esc(m.emotion)}</b> · ${esc(_srcText)}${m.memo&&!connections.some(c=>c.a===id&&c.why===m.memo)?`<br><br>${esc(m.memo)}`:""}`;
 let outs=connections.filter(c=>c.kind==='parent'&&c.a===id),ins=connections.filter(c=>c.kind==='parent'&&c.b===id);
-const _nx=outs.map(c=>({t:esc(titleMain(moments.find(x=>x.id===c.b))),why:(c.why&&c.why!=='관련 순간')?esc(c.why):''})),_row=n=>`→ ${n.t}${n.why?'<br><span style="color:#bca9c5">'+n.why+'</span>':''}`;
-$('#dConn').innerHTML=_nx.length?_nx.slice(0,3).map(_row).join('<br><br>')+(_nx.length>3?`<details><summary>나머지 ${_nx.length-3}개 보기</summary>${_nx.slice(3).map(_row).join('<br><br>')}</details>`:''):'아직 다음 순간이 없어요';
+// #553 뒤: '다음 순간'·'이전 순간'을 목차 글씨가 아니라 누르는 단추로 내놓는다(키보드 Tab·Enter도).
+// 누르면 판이 그 카드로 부드럽게 이동하고 카드가 선택되며 상세가 그 순간으로 바뀐다(focusBoardMoment).
+// 이유(why) 글은 단추 아래 작은 글씨로 그대로. 3개 넘으면 '나머지 N개 보기'를 유지한다.
+const _row=(c,dir)=>`<button type="button" class="connLink" data-cid="${c.id}" data-dir="${dir}">${dir==='next'?'→':'←'} ${esc(titleMain(moments.find(x=>x.id===(dir==='next'?c.b:c.a))))}</button>${(c.why&&c.why!=='관련 순간')?`<span class="connWhy">${esc(c.why)}</span>`:''}`;
+const _rows=outs.map(c=>_row(c,'next'));
+$('#dConn').innerHTML=_rows.length?_rows.slice(0,3).join('<br><br>')+(_rows.length>3?`<details><summary>나머지 ${_rows.length-3}개 보기</summary>${_rows.slice(3).join('<br><br>')}</details>`:''):(ins.length?ins.map(c=>_row(c,'prev')).join('<br><br>'):'아직 다음 순간이 없어요');
 $('#detail').classList.add('open')}}
 
 function startConnect(e,id){if(cinema)return;
@@ -207,11 +211,14 @@ let isTouch=e.pointerType==='touch';
 if(isTouch){if(pinTap&&pinTap!==id){completeConnection(pinTap,id);
 pinTap=null;
 document.querySelectorAll('.pin').forEach(p=>p.classList.remove('connecting'));
+cardLayer.classList.remove('linking');
 return}pinTap=id;
 e.currentTarget.classList.add('connecting');
+cardLayer.classList.add('linking');
 toast('연결할 다음 Memory Pin을 탭하세요.');
 return}connecting={from:id,pointer:e.pointerId};
 e.currentTarget.classList.add('connecting');
+cardLayer.classList.add('linking');
 let p=pinPoint(id);
 $('#draftThread').setAttribute('d',`M ${p.x} ${p.y} L ${p.x} ${p.y}`);
 $('#draftThread').setAttribute('opacity','1');
@@ -219,7 +226,7 @@ e.currentTarget.setPointerCapture?.(e.pointerId)}
 
 window.addEventListener('pointermove',e=>{if(!connecting)return;let a=pinPoint(connecting.from),b=screenToWorld(e.clientX,e.clientY);$('#draftThread').setAttribute('d',`M ${a.x} ${a.y} C ${a.x+(b.x-a.x)*.3} ${Math.max(a.y,b.y)+70}, ${a.x+(b.x-a.x)*.7} ${Math.max(a.y,b.y)+70}, ${b.x} ${b.y}`)});
 
-window.addEventListener('pointerup',e=>{if(!connecting)return;let target=document.elementFromPoint(e.clientX,e.clientY)?.closest?.('.pin');let from=connecting.from;document.querySelectorAll('.pin').forEach(p=>p.classList.remove('connecting'));connecting=null;$('#draftThread').setAttribute('opacity','0');if(target&&target.dataset.pin!==from)completeConnection(from,target.dataset.pin)});
+window.addEventListener('pointerup',e=>{if(!connecting)return;let target=document.elementFromPoint(e.clientX,e.clientY)?.closest?.('.pin');let from=connecting.from;document.querySelectorAll('.pin').forEach(p=>p.classList.remove('connecting'));connecting=null;cardLayer.classList.remove('linking');$('#draftThread').setAttribute('opacity','0');if(target&&target.dataset.pin!==from)completeConnection(from,target.dataset.pin)});
 
 function endPinTap(e,id){}
 
@@ -388,13 +395,13 @@ document.querySelector('.toolbar').style.opacity=on?'0':'1';
 $('#cinemaBtn').style.opacity=on?'0':'1'}
 
 let boardTouches=new Map(),pinch=null;
-viewport.addEventListener('pointerdown',e=>{if(cinema||e.target.closest('.card'))return;if(e.pointerType==='touch'){boardTouches.set(e.pointerId,{x:e.clientX,y:e.clientY});if(boardTouches.size===1){pan={x:e.clientX,y:e.clientY,vx:view.x,vy:view.y}}else if(boardTouches.size===2){let a=[...boardTouches.values()],dx=a[1].x-a[0].x,dy=a[1].y-a[0].y;pinch={dist:Math.hypot(dx,dy),z:view.z,x:view.x,y:view.y,cx:(a[0].x+a[1].x)/2,cy:(a[0].y+a[1].y)/2};pan=null}return}pan={x:e.clientX,y:e.clientY,vx:view.x,vy:view.y};viewport.setPointerCapture?.(e.pointerId)});
+viewport.addEventListener('pointerdown',e=>{if(cinema||e.target.closest('.card'))return;if(e.pointerType==='touch'){boardTouches.set(e.pointerId,{x:e.clientX,y:e.clientY});if(boardTouches.size===1){pan={x:e.clientX,y:e.clientY,vx:view.x,vy:view.y}}else if(boardTouches.size===2){let a=[...boardTouches.values()],dx=a[1].x-a[0].x,dy=a[1].y-a[0].y;pinch={dist:Math.hypot(dx,dy),z:view.z,x:view.x,y:view.y,cx:(a[0].x+a[1].x)/2,cy:(a[0].y+a[1].y)/2};pan=null}return}pan={x:e.clientX,y:e.clientY,vx:view.x,vy:view.y};viewport.setPointerCapture?.(e.pointerId);viewport.classList.add('panning')});
 viewport.addEventListener('pointermove',e=>{if(e.pointerType==='touch'&&boardTouches.has(e.pointerId)){boardTouches.set(e.pointerId,{x:e.clientX,y:e.clientY});if(boardTouches.size===2&&pinch){let a=[...boardTouches.values()],d=Math.hypot(a[1].x-a[0].x,a[1].y-a[0].y),nz=Math.max(.38,Math.min(1.45,pinch.z*d/pinch.dist)),r=viewport.getBoundingClientRect(),wx=(pinch.cx-r.left-pinch.x)/pinch.z,wy=(pinch.cy-r.top-pinch.y)/pinch.z;view.z=nz;view.x=pinch.cx-r.left-wx*nz;view.y=pinch.cy-r.top-wy*nz;applyView(false)}else if(pan){view.x=pan.vx+(e.clientX-pan.x);view.y=pan.vy+(e.clientY-pan.y);applyView(false)}return}if(!pan)return;view.x=pan.vx+(e.clientX-pan.x);view.y=pan.vy+(e.clientY-pan.y);applyView(false)});
 function endBoardPointer(e){let moved=(pan&&(view.x!==pan.vx||view.y!==pan.vy))||!!pinch;if(e.pointerType==='touch'){boardTouches.delete(e.pointerId);
 if(boardTouches.size<2)pinch=null;
-if(boardTouches.size===0)pan=null;
+if(boardTouches.size===0){pan=null;viewport.classList.remove('panning')}
 if(moved&&!boardTouches.size)noteUserView();
-return}pan=null;if(moved)noteUserView()}
+return}pan=null;viewport.classList.remove('panning');if(moved)noteUserView()}
 viewport.addEventListener('pointerup',endBoardPointer);
 viewport.addEventListener('pointercancel',endBoardPointer);
 // #536: 휠 확대 중에도 장식 애니메이션을 잠시 멈춘다(#346의 '확대 중' 판정에 휠이 빠져 있었다) —
