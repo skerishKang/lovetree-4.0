@@ -13,8 +13,8 @@ const TARGETS = {
   },
   'public/v41/views/track58-pinboard.html': {
     '#minusBtn': [35, 38], '#plusBtn': [41, 38], '#resetBtn': [99, 38], '#openMoment': [63, 34],
-    '#nextMoment': [85, 34], '#cinemaFromMoment': [125, 34], '#startPathHere': [116, 34],
-    '#pathModeBtn': [184, 34], '#toolCinema': [184, 34], '#toolFit': [184, 34], '#detailClose': [23, 23],
+    '#nextMoment': [85, 34], '#cinemaFromMoment': [125, 34], '#sortResetBtn': [105, 34],
+    '#toolCinema': [184, 34], '#toolFit': [184, 34], '#detailClose': [23, 23],
   },
   'public/v41/views/track56-network.html': {
     '#focusFirst': [194, 35], '#zoomIn': [94, 35], '#zoomOut': [94, 35], '#resetFocus': [194, 35],
