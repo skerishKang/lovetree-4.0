@@ -90,8 +90,12 @@ test('8. 말풍선은 한 번만 — 닫으면 저장하고, 저장소가 막히
   assert.equal(tipsWanted({owned: true, treeCount: 1, seen: false, source: 'example'}), false, '예시 둘러보기는 안 뜬다');
   assert.equal(tipsWanted({owned: true, treeCount: 1, seen: false, source: 'share'}), false, '공유(읽기 전용)는 안 뜬다');
   assert.equal(tipsWanted({owned: true, treeCount: 1, seen: false, source: 'server'}), true, '실제 내 트리는 그대로 뜬다');
+  // #619-5: '첫 트리를 막 만든 직후'만 — 트리 2 개이거나 순간이 2 개 이상이면 안 뜬다.
+  assert.equal(tipsWanted({owned: true, treeCount: 1, seen: false, source: 'server', momentCount: 1}), true, '첫 트리·첫 순간은 뜬다');
+  assert.equal(tipsWanted({owned: true, treeCount: 1, seen: false, source: 'server', momentCount: 2}), false, '순간이 2 개 이상이면 안 뜬다');
+  assert.equal(tipsWanted({owned: true, treeCount: 2, seen: false, source: 'server', momentCount: 0}), false, '트리가 2 개 이상이면 안 뜬다');
   // shell.mjs가 현재 source를 넘긴다(예시·공유를 가리키지 않게).
-  assert.match(shell, /tipsWanted\(\{owned:!!member\?\.snapshot\(\)\.owned,treeCount:model\?\.trees\?\.length\|\|0,seen:readTipsSeen\(localStorage\),source\}\)/);
+  assert.match(shell, /tipsWanted\(\{owned:!!member\?\.snapshot\(\)\.owned,treeCount:model\?\.trees\?\.length\|\|0,momentCount,seen:readTipsSeen\(localStorage\),source\}\)/);
 });
 
 test('이슈 571: 첫 항목은 자동 이름("모아둔 순간")을 말해 주고 이름 바꾸기로 안내한다', () => {

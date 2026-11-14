@@ -58,6 +58,35 @@ const WORKSPACE = {
   },
 };
 
+// #619-5: 트리가 2개고 순간이 26개인 계정. 첫 트리 안내가 뜨지 않아야 한다.
+const WORKSPACE_TWO_TREES_26_MOMENTS = {
+  revision: 1,
+  subject: 'trial-subject',
+  writeSubjectBound: true,
+  state: {
+    version: 1,
+    prefs: {},
+    trees: [
+      {
+        id: 'tree1', subject: '윤제', title: '모아둔 순간', coverMomentId: '', inbox: false,
+        createdAt: '2026-11-01T00:00:00.000Z', updatedAt: '2026-11-15T00:00:00.000Z',
+        moments: Array.from({ length: 13 }, (_, i) => ({
+          id: `m${i + 1}`, parentId: null, links: [], createdAt: `2026-11-${(i % 28) + 1 < 10 ? '0' + (i % 28) + 1 : i % 28 + 1}T00:00:00.000Z`,
+          title: `순간 ${i + 1}`, note: '', emotion: '기쁨', date: `2026-11-${(i % 28) + 1}`, relation: '', url: '',
+        })),
+      },
+      {
+        id: 'tree2', subject: '윤제', title: '리센느', coverMomentId: '', inbox: false,
+        createdAt: '2026-11-01T00:00:00.000Z', updatedAt: '2026-11-15T00:00:00.000Z',
+        moments: Array.from({ length: 13 }, (_, i) => ({
+          id: `m${i + 14}`, parentId: null, links: [], createdAt: `2026-11-${(i % 28) + 1 < 10 ? '0' + (i % 28) + 1 : i % 28 + 1}T00:00:00.000Z`,
+          title: `리센느 순간 ${i + 1}`, note: '', emotion: '설렘', date: `2026-11-${(i % 28) + 1}`, relation: '', url: '',
+        })),
+      },
+    ],
+  },
+};
+
 async function openWithFirstTree(page) {
   await page.route('**/api/workspace*', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(WORKSPACE) }));
   await page.goto(`${base}/v41/?account=1`, { waitUntil: 'load' });
@@ -66,6 +95,17 @@ async function openWithFirstTree(page) {
     const tips = document.getElementById('tree-tips');
     return tips && tips.hidden === false;
   }, null, { timeout: 20000 });
+}
+
+// #619-5: 트리가 2개이고 순간이 26개인 계정은 첫 트리 안내가 뜨지 않아야 한다.
+async function openWithTwoTrees26(page) {
+  await page.route('**/api/workspace*', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(WORKSPACE_TWO_TREES_26_MOMENTS) }));
+  await page.goto(`${base}/v41/?account=1`, { waitUntil: 'load' });
+  // 첫 트리 안내가 절대로 뜨지 않아야 한다.
+  await page.waitForFunction(() => {
+    const tips = document.getElementById('tree-tips');
+    return tips && tips.hidden === true;
+  }, null, { timeout: 5000 });
 }
 
 let server, base;
@@ -116,5 +156,24 @@ test('#549 알겠어요를 누르면 다시 보여 주지 않는다(기억)', { 
     assert.equal(closed, true, '알겠어요를 누르면 안내가 닫히고 제자리로 돌아온다');
     const seen = await page.evaluate(() => localStorage.getItem('lt41.tips.firstTree'));
     assert.equal(seen, '1', '닫으면 기억한다');
+  } finally { await browser.close(); }
+});
+
+// #619-5: 트리가 2 개고 순간이 26 개인 계정은 첫 트리 안내가 뜨지 않는다.
+test('#619-5 트리가 2 개·순간이 26 개여도 첫 트리 안내는 뜨지 않는다', { skip: REQUIRE ? false : skip }, async () => {
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    await openWithTwoTrees26(page);
+    const tips = await page.$('#tree-tips');
+    const hidden = await page.evaluate((el) => el && el.hidden === true, tips);
+    assert.equal(hidden, true, '트리 2 개·순간 26 개여도 첫 트리 안내는 뜨지 않는다');
+    const seen = await page.evaluate(() => localStorage.getItem('lt41.tips.firstTree'));
+    assert.equal(seen, null, 'localStorage 에도 기록되지 않는다');
+    // 보드를 여도 다시 뜨지 않는다.
+    await page.goto(`${base}/v41/?view=board`, { waitUntil: 'load' });
+    const tipsAgain = await page.$('#tree-tips');
+    const hiddenAgain = await page.evaluate((el) => el && el.hidden === true, tipsAgain);
+    assert.equal(hiddenAgain, true, '보드 전환 후에도 첫 트리 안내는 뜨지 않는다');
   } finally { await browser.close(); }
 });

@@ -1550,6 +1550,8 @@ COM2에는 merge `6900df8aa446dfe0201d01997457fae04c4abe16`의 변경 서버 파
   - `share`: 트리 관련 전부 숨김.
 - 셸은 이 표를 그대로 적용한다(`flowNavigation`). 예전처럼 트리 탭을 `disabled`로 두지 않고 아예 숨긴다.
 - 첫 트리를 만든 직후 한 번만 뜨는 말풍선(`#tree-tips`, role=dialog) 2개: "여기서 순간을 더 남겨요", "기억책·보드·관계 지도로 다르게 봐요". 닫으면 `localStorage['lt41.tips.firstTree']='1'`(try/catch), Esc로 닫고 포커스는 보던 곳으로 돌아간다(#204 규칙). 밤·정원 모두 `--lt-*` 토큰만 쓰고 390·360에서 좌우 12px로 붙는다.
+- #619-5: 트리 26개·순간 26개인 계정에서도 보드 전환마다 안내가 반복되던 것. `tipsWanted` 조건에 '트리 1개 & 해당 트리 순간 1 개 이하'를 추가해 '첫 트리를 막 만든 직후'로 좁혔다. 닫으면 localStorage에 남긴다(서버 저장 경로는 없다).
+- #619-3·4·6: 상세 플레이어는 `autoplay`·자동 재생 단추를 없애고 누를 때만 재생한다. 배치 모드(날짜순↔내 배치)를 바꾼 뒤 화면에 카드가 하나도 없으면 `fitAll`로 자동 맞춘다(`visibleCardCount`). 꾸밈 카드 스타일(필름의 5px 검은 테두리)은 예시 보드에서만 자동 배정하고 서버 기록은 기본 photo로 둔다 — 1980 폭 마지막 열 검은 테두리 원인. 이어진 순간 썸네일은 공용 `thumbnailCandidates`(저장 주소 → oardefault/hqdefault → mqdefault)와 `mountThumbFallback`(회색 120×90 판정)을 써서 쇼츠의 회색 '…'를 실제 썸네일로 내려 준다.
 - 시험: `tests/v41-header-states.test.mjs` 9개(상태 표·숨김/표시 배선·말풍선 1회·저장 실패·넘침). `npm test` 450 pass / 0 fail, build 성공.
 - `tools/postdeploy`: 로그아웃 탭 기대값 4 → 3, 트리 선택·순간 남기기가 로그아웃에 보이면 fail로 잡게 했다.
 ## 2026-11-08 첫 화면 도구 줄 "보기" 메뉴 (#213 2번)

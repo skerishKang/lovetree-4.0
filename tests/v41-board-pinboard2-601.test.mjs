@@ -35,10 +35,13 @@ const read = (file) => fs.readFileSync(new URL(`../public/v41/${file}`, import.m
 
 // 26순간 평평한 트리. old=true면 옛 관계 배치 시절의 x·y(스냅되지 않은 무작위 소수)를 남긴다 —
 // #601 근본 수리의 대상: 이 값들이 '저장 자리'로 세어지면 처음 화면이 뭉개진다.
-const starTree = (n, old = false) => {
+// mixed=true면 가로·세로(쇼츠)를 섞는다 — 대표 트리와 같은 구조(#619-6).
+const starTree = (n, old = false, mixed = false) => {
   const moments = Array.from({ length: n }, (_, i) => ({
     id: 's' + i, title: '모은 순간 ' + (i + 1), date: '2026-0' + ((i % 9) + 1) + '-1' + (i % 9), emotion: '설렘', note: '메모 ' + (i + 1),
-    parentId: i ? 's0' : null, relation: '', url: i ? 'https://youtu.be/dQw4w9WgXcQ' : '', keywords: [],
+    parentId: i ? 's0' : null, relation: '',
+    url: i ? (mixed && i % 2 === 0 ? 'https://www.youtube.com/shorts/dQw4w9WgXcQ' : 'https://youtu.be/dQw4w9WgXcQ') : '',
+    keywords: [],
     ...(old ? { x: 173.5 + i * 37.13, y: 218.7 + (i % 7) * 53.9, rot: (i % 5) - 2 } : { x: null, y: null, rot: 0 }), color: 'violet'
   }));
   const edges = [];
@@ -68,10 +71,15 @@ const hostHTML = (tree) => `<!doctype html><html lang="ko"><head><meta charset="
 <iframe src="/v41/views/track58-pinboard.html" style="position:fixed;inset:0;width:100vw;height:100vh;border:0"></iframe></body></html>`;
 
 const YT_THUMB_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1200"><rect width="1600" height="1200" fill="#8a7a92"/><path d="M700 350 L700 850 L1050 600 Z" fill="#fff"/></svg>';
+// 쇼츠의 oardefault 자리에 오는 회색 120×90 그림(#429 판정 대상).
+const GRAY_THUMB_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="90"><rect width="120" height="90" fill="#bcbcc0"/></svg>';
 
-async function openHost(browser, url, { width, height } = {}) {
+async function openHost(browser, url, { width, height, grayOardefault = false } = {}) {
   const context = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
-  await context.route('**/i.ytimg.com/**', (route) => route.fulfill({ contentType: 'image/svg+xml', body: YT_THUMB_SVG }));
+  await context.route('**/i.ytimg.com/**', (route) => {
+    const u = route.request().url();
+    return route.fulfill({ contentType: 'image/svg+xml', body: grayOardefault && u.includes('oardefault') ? GRAY_THUMB_SVG : YT_THUMB_SVG });
+  });
   const problems = [];
   const page = await context.newPage();
   page.on('pageerror', (e) => problems.push('pageerror: ' + String(e).slice(0, 300)));
@@ -91,6 +99,15 @@ async function openHost(browser, url, { width, height } = {}) {
   await page.waitForTimeout(1500);
   return { context, page, frame, problems };
 }
+
+// 화면(보이는 칸)에 걸친 카드 수 — #619-4 '전환 뒤 카드 안 보임' 판정.
+const visibleCards = (frame) => frame.evaluate(() => {
+  const vp = document.getElementById('viewport').getBoundingClientRect();
+  return [...document.querySelectorAll('#cardLayer .card')].filter((c) => {
+    const r = c.getBoundingClientRect();
+    return r.right > vp.left + 4 && r.left < vp.right - 4 && r.bottom > vp.top + 4 && r.top < vp.bottom - 4;
+  }).length;
+});
 
 const geometry = (frame) => frame.evaluate(() => {
   const cards = [...document.querySelectorAll('#cardLayer .card')].map((c) => ({ id: c.dataset.id, x: c.offsetLeft, y: c.offsetTop, w: c.offsetWidth, h: c.offsetHeight }));
@@ -133,6 +150,24 @@ test('#601 화면: 저장 자리 판정·보존·복원이 한 벌을 쓴다', (
   assert.match(board, /function boardModeKey\(\)\{const id=boardTreeId\(\);return id\?BOARD_MODE_KEY\+':'\+id:BOARD_MODE_KEY\}/);
   // 판 크기: 카드 예약 높이로 자란다(마지막 줄이 판 밖으로 나가지 않는다).
   assert.match(board, /LT58Model\.boardSize\(moments\.map\(m=>\(\{x:m\.x,y:m\.y,h:reservedHeights\.get\(m\.id\)\|\|BASE_RESERVED_H\}\)\)\)/);
+});
+
+test('#619 약속: 자동 재생 없음·전환 뒤 자동 맞춤·꾸밈 스타일은 예시만·썸네일 내려가기', () => {
+  const board = read('views/board/board.js');
+  const extras = read('views/board/board-extras.js');
+  // 3: 상세 플레이어는 autoplay 없이, 누를 때만 재생한다.
+  assert.doesNotMatch(extras, /class="detailVideo"[^>]*autoplay/);
+  assert.doesNotMatch(extras, /querySelector\('\[data-lt-play\]'\);if\(b\)b\.click\(\)/);
+  // 4: 배치 모드를 바꾼 뒤 화면에 카드가 없으면 자동으로 전체 맞춤.
+  assert.match(board, /function visibleCardCount\(\)/);
+  assert.match(board, /if\(replace&&!visibleCardCount\(\)\)fitAll\(false\)/);
+  // 6a: 꾸밈 카드 스타일(필름의 검은 테두리 등)은 예시 보드에서만 돌아가며 붙인다(exampleBoard 한 곳 판단).
+  assert.match(extras, /m\.cardStyle=m\.cardStyle\|\|\(exampleBoard\?LT_CARD_STYLES\[i%LT_CARD_STYLES\.length\]:'photo'\)/);
+  // 6b: 이어진 순간 썸네일은 공용 후보(저장 주소 → oardefault/hqdefault → mqdefault)와 내려가기 속성을 쓴다.
+  assert.match(extras, /function connThumb\(t\)\{/);
+  assert.match(extras, /api\.thumbnailCandidates\(moment,\{autoLoad:true\}\)/);
+  assert.match(extras, /api\.coverFallbackAttrs\(list\)/);
+  assert.match(extras, /thumbApi\(\)\?\.mountThumbFallback\?\.\(document\)/);
 });
 
 test('#601 화면: 카드는 훑기용 — 큰 썸네일·제목 2줄·감정·날짜 한 줄', () => {
@@ -180,9 +215,10 @@ test('#601 상세: 플레이어가 맨 위, 내 마음은 크게, 이어진 순�
   assert.match(html, /id="cinemaFromMoment"[^>]*>여기부터 시네마</);
   assert.doesNotMatch(html, /id="nextMoment"/, "'다음 순간 보기' 단추는 이어진 순간 카드로 대체됐다");
   assert.doesNotMatch(html, /id="prevMoment"/);
-  // 플레이어가 맨 위에서 바로 재생된다(재생 단추를 누른다).
+  // #619-3: 플레이어는 자동 재생하지 않는다. 재생 단추를 눌러야 재생된다.
   assert.match(extras, /function detailPlayerHTML\(m\)/);
-  assert.match(extras, /querySelector\('\[data-lt-play\]'\);if\(b\)b\.click\(\)/);
+  assert.doesNotMatch(extras, /querySelector\('\[data-lt-play\]'\);if\(b\)b\.click\(\)/, '상세를 열 때 자동으로 재생 단추를 누르지 않는다');
+  assert.match(extras, /controls muted playsinline>/, '영상은 controls 로 두고 사용자가 누를 때 재생한다');
   // 내 마음 저장은 기존 저장 경로(persistBoard → lt41-board-sync)로 간다.
   assert.match(extras, /\$\('#dHeartSave'\)\.onclick=[\s\S]{0,200}m\.memo=v;persistBoard\(\)/);
   // 이어진 순간: 작은 썸네일 카드(connCard), 누르면 판이 이동한다(#583 규칙 유지).
@@ -288,6 +324,7 @@ test('#601 화면: 끌면 내 배치로 자동 전환하고, 날짜순↔내 배
       return { x: el.offsetLeft, y: el.offsetTop };
     }, from.id);
     assert.equal(await frame.evaluate(() => document.querySelector('[data-board-mode="mine"]').getAttribute('aria-pressed')), 'true', '끌면 내 배치로 자동 전환');
+    assert.ok(await visibleCards(frame) >= 1, '#619-4: 내 배치로 바뀐 직후에도 화면에 카드가 보인다');
     const g1 = await geometry(frame);
     assert.equal(g1.pairs, 0, '꽂은 뒤에도 겹침 0');
     // '날짜순'으로 돌아갔다가 다시 '내 배치' — 꽂은 자리가 그대로다(전환은 배치를 지우지 않는다).
@@ -296,6 +333,7 @@ test('#601 화면: 끌면 내 배치로 자동 전환하고, 날짜순↔내 배
     const g2 = await geometry(frame);
     assert.equal(g2.cols, 4, '날짜순은 4칸 바둑판');
     assert.equal(g2.pairs, 0, '날짜순에서도 겹침 0');
+    assert.ok(await visibleCards(frame) >= 1, '#619-4: 날짜순으로 바뀐 직후에도 화면에 카드가 보인다');
     await frame.evaluate(() => document.querySelector('[data-board-mode="mine"]').click());
     await page.waitForTimeout(900);
     const back = await frame.evaluate((id) => {
@@ -304,6 +342,7 @@ test('#601 화면: 끌면 내 배치로 자동 전환하고, 날짜순↔내 배
     }, from.id);
     assert.equal(back.x, dropped.x, '내 배치로 돌리면 꽂은 칸으로 돌아온다');
     assert.equal(back.y, dropped.y, '내 배치로 돌리면 꽂은 줄로 돌아온다');
+    assert.ok(await visibleCards(frame) >= 1, '#619-4: 내 배치로 되돌린 직후에도 화면에 카드가 보인다');
     // 저장 값: '날짜순'에서 보내는 x·y는 화면 자리가 아니라 꽂은 자리다(원본 보존).
     await frame.evaluate(() => document.querySelector('[data-board-mode="date"]').click());
     await page.waitForTimeout(600);
@@ -313,6 +352,64 @@ test('#601 화면: 끌면 내 배치로 자동 전환하고, 날짜순↔내 배
     assert.ok(sent, '저장 목록에 끌 카드가 있다');
     assert.equal(sent.x, dropped.x, '날짜순 화면 자리가 아니라 꽂은 자리를 저장한다');
     assert.equal(sent.y, dropped.y, '날짜순 화면 자리가 아니라 꽂은 자리를 저장한다');
+    assert.equal(problems.length, 0, `화면 문제 없음 (${problems.join(' | ') || '없음'})`);
+    await context.close();
+  } finally { await browser.close(); server.close(); }
+});
+
+test('#619 화면: 1980 폭 26순간(가로·세로·옛 x·y) — 검은 테두리 없음·전환 뒤 카드 보임·썸네일 내려가기', { skip: REQUIRE ? false : skip, timeout: 300000 }, async () => {
+  if (skip) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip}`);
+  const tree = starTree(26, true, true);
+  const server = await serve({ '/__host-619.html': hostHTML(tree) });
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const { context, page, frame, problems } = await openHost(browser, `${base}/__host-619.html`, { width: 1980, height: 1080, grayOardefault: true });
+    assert.equal(await frame.evaluate(() => document.querySelectorAll('#cardLayer .card').length), 26, '26장이 모두 꽂힌다');
+    assert.equal(await frame.evaluate(() => new Set([...document.querySelectorAll('#cardLayer .card')].map((c) => c.offsetLeft)).size), 6, '1980은 6칸 바둑판');
+    // 5: 마지막 열 검은 테두리 — 꾸밈 카드 스타일(필름의 검은 테두리)은 서버 기록에 자동 배정하지 않는다.
+    const blackFrames = await frame.evaluate(() => [...document.querySelectorAll('#cardLayer .card')]
+      .map((c) => ({ id: c.dataset.id, cls: c.className, border: getComputedStyle(c).borderColor }))
+      .filter((c) => /cardStyle-film/.test(c.cls) || c.border === 'rgb(39, 32, 45)'));
+    assert.deepEqual(blackFrames, [], '검은 테두리(필름) 카드가 없다');
+    assert.ok(await visibleCards(frame) >= 1, '처음 화면에 카드가 보인다');
+    // 4: 화면을 멀리 옮겨 카드가 하나도 안 보이게 만든 뒤 배치 모드를 바꾼다 → 자동 맞춤으로 카드가 다시 보인다.
+    for (let i = 0; i < 8 && (await visibleCards(frame)) > 0; i++) {
+      const at = await frame.evaluate(() => {
+        for (let y = 1070; y > 880; y -= 15) for (let x = 520; x < 1300; x += 60) {
+          const el = document.elementFromPoint(x, y);
+          if (!el || el.closest('.card,.toolbar,.cinemaBtn,button,a,aside')) continue;
+          if (el.closest('#viewport') || el.classList.contains('surface')) return { x, y };
+        }
+        return null;
+      });
+      assert.ok(at, '옮길 빈 자리가 있다');
+      await page.mouse.move(at.x, at.y);
+      await page.mouse.down();
+      await page.mouse.move(Math.max(40, at.x - 700), Math.max(80, at.y - 500), { steps: 8 });
+      await page.mouse.up();
+      await page.waitForTimeout(200);
+    }
+    assert.equal(await visibleCards(frame), 0, '재현: 화면을 옮기면 카드가 하나도 안 보인다');
+    await frame.evaluate(() => document.querySelector('[data-board-mode="mine"]').click());
+    await page.waitForTimeout(700);
+    assert.ok(await visibleCards(frame) >= 1, '#619-4: 내 배치로 바꾼 직후 자동 맞춤으로 카드가 보인다');
+    await frame.evaluate(() => document.querySelector('[data-board-mode="date"]').click());
+    await page.waitForTimeout(700);
+    assert.ok(await visibleCards(frame) >= 1, '#619-4: 날짜순으로 되돌린 직후에도 카드가 보인다');
+    // 3·6: 이어진 순간 썸네일 — 쇼츠의 회색 120×90에서 실제 썸네일(hqdefault)로 내려간다.
+    await frame.evaluate(() => selectMoment('s0', true));
+    await page.waitForTimeout(1500);
+    const conn = await frame.evaluate(() => [...document.querySelectorAll('#dConn .connCard')].map((b) => {
+      const img = b.querySelector('.connThumb img');
+      return { id: b.dataset.cid, has: !!img, src: img?.getAttribute('src') || '', nw: img?.naturalWidth || 0, idx: img?.getAttribute('data-lt-cand-index') || '', cands: img?.getAttribute('data-lt-candidates') || '' };
+    }).filter((c) => c.has && c.nw > 0));
+    assert.ok(conn.length > 0, '이어진 순간 카드에 썸네일이 실린다(보이는 카드)');
+    for (const c of conn) {
+      assert.match(c.cands, /i\.ytimg\.com/, `공용 후보 목록이 붙는다(${c.id})`);
+      assert.ok(c.nw > 120, `회색 120×90에 머물지 않는다(${c.id}: ${c.src})`);
+    }
+    assert.ok(conn.some((c) => c.src.includes('hqdefault.jpg') && Number(c.idx) >= 1), '쇼츠의 회색 그림은 다음 주소(hqdefault)로 내려간다');
     assert.equal(problems.length, 0, `화면 문제 없음 (${problems.join(' | ') || '없음'})`);
     await context.close();
   } finally { await browser.close(); server.close(); }
@@ -348,6 +445,7 @@ test('#601 화면: 카드 높이 상한·마지막 줄이 판 안, 상세는 플
     const detail = await frame.evaluate(() => ({
       playerFirst: document.getElementById('detailPlayer').getBoundingClientRect().top < document.getElementById('dTitle').getBoundingClientRect().top + 200,
       playerHasMedia: !!document.querySelector('#detailPlayer .lt-media, #detailPlayer video, #detailPlayer img, #detailPlayer .detailNoteMedia'),
+      hasAutoplay: (() => { const vid = document.querySelector('#detailPlayer video'); return vid ? vid.hasAttribute('autoplay') : false; })(),
       heartInputShown: !document.getElementById('dHeartInput').hidden,
       heartSaveShown: !document.getElementById('dHeartSave').hidden,
       basic: document.getElementById('dBasic').textContent,
@@ -355,9 +453,10 @@ test('#601 화면: 카드 높이 상한·마지막 줄이 판 안, 상세는 플
       actions: ['editMomentBtn', 'detailYtBtn', 'openMoment', 'detailMapBtn', 'cinemaFromMoment'].map((id) => !!document.getElementById(id))
     }));
     assert.equal(detail.playerHasMedia, true, '플레이어가 있다');
+    // #619-3: 상세 플레이어는 autoplay 를 제거했고, 누르면 재생 단추로 직접 재생한다.
+    assert.equal(detail.hasAutoplay === false, true, '상세 플레이어는 autoplay 속성이 없다');
     assert.equal(detail.heartInputShown && detail.heartSaveShown, true, '마음이 비어 있으면 입력칸과 저장 단추가 보인다');
     assert.match(detail.basic, /설렘/, '감정이 보인다');
-    assert.ok(detail.connCards > 0, '이어진 순간 카드가 있다');
     assert.deepEqual(detail.actions, [true, true, true, true, true], '할 일 단추 한 줄(수정·YouTube에서 열기·크게 보기·지도·시네마)');
     // 마음을 남기면 기존 저장 경로로 note가 간다.
     await frame.fill('#dHeartInput', '이 순간이 좋았어요');
