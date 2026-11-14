@@ -36,7 +36,12 @@ test('지도 실제 대비: 앱 2 × 판 2 × 1440·390, 두 보기·선택 상�
   try {
     if (OUT) await mkdir(OUT, { recursive: true });
     browser = await chromium.launch({ headless: true });
-    for (const width of [1440, 390]) for (const appTheme of ['night', 'garden']) for (const plate of ['paper', 'night']) {
+    const combos = [];
+    for (const width of [1440, 390]) for (const appTheme of ['night', 'garden']) for (const plate of ['paper', 'night']) combos.push({ width, appTheme, plate });
+    // 한 브라우저에서 조합을 둘씩 동시에 돌린다(지도 잡 시간 단축): 픽셀 해석이 페이지(렌더러 프로세스)별로
+    // 나뉘어 실행기 코어를 함께 쓴다. 단언·기준값·측정 방식은 그대로고, 한 조합이 실패해도 나머지를 끝까지
+    // 돌려 실패를 모두 보고한 뒤 처음 실패로 끝난다.
+    const runCombo = async ({ width, appTheme, plate }) => {
       const ctx = await browser.newContext({ viewport: { width, height: width === 1440 ? 900 : 844 }, deviceScaleFactor: 2, reducedMotion: 'reduce' });
       try {
         await ctx.addInitScript(({ plate, appTheme }) => { localStorage.setItem('lt41.theme', appTheme); localStorage.setItem('lt41.boardTheme', plate); localStorage.setItem('lt41.network.view', 'network'); }, { plate, appTheme });
@@ -98,7 +103,12 @@ test('지도 실제 대비: 앱 2 × 판 2 × 1440·390, 두 보기·선택 상�
         assert.deepEqual(errors, [], `${width}-${appTheme}-${plate}: 페이지 오류`);
         console.log(JSON.stringify({ combination: `${width}-${appTheme}-${plate}`, minimums: worst.map(({ kind, role, ratio, fg, bg }) => ({ kind, role, ratio, fg, bg })) }));
       } finally { await ctx.close(); }
-    }
+    };
+    let next = 0;
+    const problems = [];
+    const worker = async () => { while (next < combos.length) { const combo = combos[next++]; try { await runCombo(combo); } catch (error) { problems.push(error); } } };
+    await Promise.all([worker(), worker()]);
+    if (problems.length) throw problems[0];
     if (OUT) await writeFile(path.join(OUT, 'contrast.json'), JSON.stringify(evidence, null, 2));
     assert.equal(failures.length, 0, `실제 화면 대비 미달 ${failures.length}건:\n${failures.slice(0, 80).join('\n')}`);
   } finally {
