@@ -266,13 +266,10 @@ test('#635 화면: 공유 링크 책(로그아웃) 전 장에서 undefined·null
     for (const [width, height] of [[1440, 900], [390, 844]]) {
       for (const theme of ['night', 'garden']) {
         const { context, page, frame, problems } = await openBook(browser, `${base}/share-host.html?w=${width}&t=${theme}`, { width, height, theme, route: (r) => r.abort() });
-        const found = await sweepPages(frame);
-        assert.deepEqual(found, [], `${width}·${theme}: 화면 흔적 값 ${JSON.stringify(found)}`);
+        // 책장을 끝까지 넘기기만 한다 — 매 장의 흔적 값·겹침·가려짐은 화면 공통 검사기(#657)가 같은 규칙으로 잡는다.
+        await sweepPages(frame);
         assert.equal(problems.length, 0, `${width}·${theme}: 화면 오류 ${problems.join(' | ')}`);
-        // #635 PR B: 매 장에서 글자 겹침·가려짐이 없고, 책장 넘기기 힌트 상자가 보이지 않는다.
-        const overlap = await scanOverlap(frame);
-        assert.deepEqual(overlap.issues, [], `${width}·${theme}: 글자 겹침 ${JSON.stringify(overlap.issues)}`);
-        assert.deepEqual(overlap.covered, [], `${width}·${theme}: 가려진 글자 ${JSON.stringify(overlap.covered)}`);
+        // #635 PR B: 책장 넘기기 힌트 상자가 보이지 않는다(겹침·가려짐 판정은 #657 검사기가 잡는다).
         const layout = await scanBookLayout(frame);
         assert.equal(layout.turnWhyShown, false, `${width}·${theme}: 감상 화면에 책장 넘기기 힌트 상자가 보인다`);
         assert.equal(layout.turnWhyOpacity, 0, `${width}·${theme}: 힌트 상자가 반투명으로 남는다`);
