@@ -167,6 +167,8 @@ test('#608 화면: 날짜를 바꾸면 카드 글·날짜순 자리가 바뀌고
   // '날짜순' 바둑판: 새 날짜가 가장 최신이므로 m1이 첫 칸(옛 m6 자리)으로 옮겨 앉는다.
   await frame.waitForFunction((want) => { const el = document.querySelector('.card[data-id="m1"]'); return el && el.offsetLeft === want.x && el.offsetTop === want.y; }, firstSlot, { timeout: 8000 });
   // 저장 메시지: 같은 순간 ID에 바뀐 날짜가 실린다 — 책이 이 값을 받아 같은 날짜로 보인다(위 도메인 시험).
+  // 위치 갱신이 persistBoard보다 먼저 보일 수 있으므로 메시지 도착을 기다린다.
+  await page.waitForFunction(() => window.LT41_MESSAGES.some((m) => m.type === 'lt41-board-sync' && m.moments?.some((x) => x.id === 'm1' && x.date === '2026-12-31')), null, { timeout: 8000 });
   const sync = await page.evaluate(() => window.LT41_MESSAGES);
   assert.ok(sync.length > 0, '보드 저장 메시지가 간다');
   const sent = sync.at(-1).moments.find((m) => m.id === 'm1');
@@ -181,6 +183,7 @@ test('#608 화면: 날짜를 바꾸면 카드 글·날짜순 자리가 바뀌고
     return null;
   });
   assert.ok(dragId, '끌 카드가 보인다');
+  const syncCountBefore = await page.evaluate(() => window.LT41_MESSAGES.length);
   const from = await frame.evaluate((id) => { const r = document.querySelector(`.card[data-id="${id}"]`).getBoundingClientRect(); return { x: (r.left + r.right) / 2, y: (r.top + r.bottom) / 2 }; }, dragId);
   const drop = await frame.evaluate((id) => { const c = document.querySelector(`.card[data-id="${id}"]`); const r = c.getBoundingClientRect(), z = r.width / c.offsetWidth; return { x: r.right + 242 * z * 0.6, y: (r.top + r.bottom) / 2 }; }, dragId);
   await page.mouse.move(from.x, from.y);
@@ -190,6 +193,7 @@ test('#608 화면: 날짜를 바꾸면 카드 글·날짜순 자리가 바뀌고
   await page.waitForTimeout(1200);
   assert.equal(await frame.evaluate(() => document.querySelector('[data-board-mode="mine"]').getAttribute('aria-pressed')), 'true', '끌면 내 배치로 자동 전환(#601)');
   const minePos = await cardPos(frame, dragId);
+  await page.waitForFunction((n) => window.LT41_MESSAGES.length > n, syncCountBefore, { timeout: 8000 });
   const dragSync = (await page.evaluate(() => window.LT41_MESSAGES)).at(-1).moments.find((m) => m.id === dragId);
   await frame.click(`.card[data-id="${dragId}"]`);
   await frame.waitForSelector('#editMomentBtn', { timeout: 5000 });
@@ -203,7 +207,8 @@ test('#608 화면: 날짜를 바꾸면 카드 글·날짜순 자리가 바뀌고
   await page.waitForTimeout(800);
   assert.deepEqual(await cardPos(frame, dragId), minePos, "'내 배치'에서는 날짜를 바꿔도 자리가 그대로다");
   const sync2 = await page.evaluate(() => window.LT41_MESSAGES);
-  const sent2 = sync2.at(-1).moments.find((m) => m.id === dragId);
+  const sent2 = sync2.filter((m) => m.moments?.some((x) => x.id === dragId && x.date === '2026-11-30')).at(-1)?.moments.find((m) => m.id === dragId);
+  assert.ok(sent2, '두 번째 저장 메시지가 간다');
   assert.equal(sent2.date, '2026-11-30', '두 번째 저장의 날짜');
   assert.deepEqual({ x: sent2.x, y: sent2.y }, { x: dragSync.x, y: dragSync.y }, '저장 메시지의 자리(x·y)도 그대로다');
   assert.equal(problems.length, 0, `화면 문제 없음 (${problems.join(' | ') || '없음'})`);
