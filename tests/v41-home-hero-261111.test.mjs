@@ -77,7 +77,11 @@ test('홈 배선: 추가/둘러보기/로그아웃 시작이 기존 액션으로
   assert.match(homeSrc,/bridge\.actions\.requestMoment\('add'\)/);
   assert.doesNotMatch(homeSrc,/bridge\.actions\.resume\(\)/,'이어 보던 순간 버튼 배선 제거');
   assert.match(homeSrc,/communityButton\.onclick=\(\)=>bridge\.actions\.community\(\)/,'둘러보기 연결');
-  assert.match(homeSrc,/guideButton\.onclick=\(\)=>bridge\.actions\.community\(\)/,'어떻게 쓰나요 = 둘러보기 동일');
+  // #635: '어떻게 쓰나요'는 같은 첫 화면의 안내 패널을 연다(별도 사용법 안내 화면은 없다 — #388).
+  assert.match(homeSrc,/guideButton\.onclick=openGuide/,'어떻게 쓰나요 = 안내 패널');
+  assert.match(homeSrc,/guideDialog\.setAttribute\('aria-label','어떻게 쓰나요'\)/,'안내 패널은 기존 orbit-dialog 틀을 쓴다');
+  assert.match(homeSrc,/data-do="guide-new"/,'안내 패널의 첫 순간 추가 단추');
+  assert.match(homeSrc,/data-do="guide-community"/,'안내 패널의 둘러보기 단추');
   assert.match(homeSrc,/first\.onclick=bridge\.actions\.start/);
   const centerCode=homeCenterSrc.split('\n').filter(line=>!line.trim().startsWith('//')).join('\n');
   assert.equal(/새 트리 만들기/.test(centerCode),false,'"새 트리 만들기"는 가운데 줄에서 뺀다');

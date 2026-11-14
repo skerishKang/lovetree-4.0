@@ -143,8 +143,9 @@ test('#601 화면: 저장 자리 판정·보존·복원이 한 벌을 쓴다', (
   // '날짜순'에서 재꽂아도 저장 값을 지우지 않는다(savedXY 보존 → 저장 메시지는 원본 x·y).
   assert.match(board, /savedXY:saved\?\{x:m\.x,y:m\.y,rot:/);
   assert.match(board, /m\.savedPos&&m\.savedXY&&boardMode==='date'\?\{x:m\.savedXY\.x,y:m\.savedXY\.y,rot:m\.savedXY\.rot\}/);
-  // '내 배치'로 돌아오면 저장 자리를 복원한다.
-  assert.match(board, /if\(mode==='mine'\)for\(const m of moments\)\{if\(m\.savedPos&&m\.savedXY\)\{m\.x=m\.savedXY\.x/);
+  // '내 배치'는 좌표 복원이 아니라 순서 배치다(#619-6) — 옛 저장 자리 restore는 없다.
+  assert.doesNotMatch(board, /if\(mode==='mine'\)for\(const m of moments\)\{if\(m\.savedPos&&m\.savedXY\)\{m\.x=m\.savedXY\.x/);
+  assert.match(board, /LT58Model\.orderOfMoments\(LTDEMO\.moments\)/);
   // 모드는 트리별로 기억한다.
   assert.match(board, /const BOARD_MODE_KEY='lt41\.boardMode'/);
   assert.match(board, /function boardModeKey\(\)\{const id=boardTreeId\(\);return id\?BOARD_MODE_KEY\+':'\+id:BOARD_MODE_KEY\}/);
@@ -343,15 +344,18 @@ test('#601 화면: 끌면 내 배치로 자동 전환하고, 날짜순↔내 배
     assert.equal(back.x, dropped.x, '내 배치로 돌리면 꽂은 칸으로 돌아온다');
     assert.equal(back.y, dropped.y, '내 배치로 돌리면 꽂은 줄로 돌아온다');
     assert.ok(await visibleCards(frame) >= 1, '#619-4: 내 배치로 되돌린 직후에도 화면에 카드가 보인다');
-    // 저장 값: '날짜순'에서 보내는 x·y는 화면 자리가 아니라 꽂은 자리다(원본 보존).
+    // 저장 값: #619-6 — 좌표가 아니라 순서(순위)로 저장한다. y는 순위 값이고 0부터 끊김 없이 간다.
     await frame.evaluate(() => document.querySelector('[data-board-mode="date"]').click());
     await page.waitForTimeout(600);
     const sync = await page.evaluate(() => window.LT41_MESSAGES.filter((m) => m.type === 'lt41-board-sync').at(-1));
     assert.ok(sync, '저장 메시지가 간다');
     const sent = sync.moments?.find((m) => m.id === from.id);
     assert.ok(sent, '저장 목록에 끌 카드가 있다');
-    assert.equal(sent.x, dropped.x, '날짜순 화면 자리가 아니라 꽂은 자리를 저장한다');
-    assert.equal(sent.y, dropped.y, '날짜순 화면 자리가 아니라 꽂은 자리를 저장한다');
+    const sentRank = sent.y + 10000;
+    assert.ok(Number.isInteger(sentRank) && sentRank >= 0 && sentRank < 26, `끈 카드의 순위가 있다(${sent.y})`);
+    const all = new Set(sync.moments.map((m) => m.y));
+    assert.equal(all.size, 26, '순위가 겹치지 않는다');
+    assert.equal(Math.min(...all), -10000, '순위 0부터 시작한다');
     assert.equal(problems.length, 0, `화면 문제 없음 (${problems.join(' | ') || '없음'})`);
     await context.close();
   } finally { await browser.close(); server.close(); }
