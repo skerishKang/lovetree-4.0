@@ -80,6 +80,7 @@ return `<article class="card ${m.first?'first':''} ${m.type==='note'?'noteCard':
 
 function renderCards(){cardLayer.innerHTML=moments.map(cardHTML).join('');
 cardLayer.querySelectorAll('.card').forEach(el=>bindCard(el));
+thumbSettleDone=false;
 settlePlacedCards();
 if(selected)selectMoment(selected,false)}
 
@@ -87,7 +88,9 @@ if(selected)selectMoment(selected,false)}
 // 카드가 겹치지 않게 벌린다. innerHTML을 다시 쓰지 않고 top만 고치므로 다시 그리기·깜빡임이 늘지 않는다.
 // 자리를 저장한 순간은 그대로 둔다(#395 계약). 썸네일은 늦게 실리므로 종류별 예약 높이로 자리를
 // 미리 벌려 두고, 실린 뒤에도 한 번만 다시 잰다(예약 높이를 넘친 경우만 움직인다).
-let thumbSettleWaiting=false;
+// 다시 재는 것은 썸네일 도착 뒤 '한 번'뿐이다 — 매번 다시 기다리면 썸네일이 전부 실린 상태에서
+// 기다림이 곧바로 끝나며 끝없는 되잡기 사슬이 생겨 화면이 얼어 붙는다(CI #553 2·3차 빨강 원인).
+let thumbSettleWaiting=false,thumbSettleDone=false;
 function settlePlacedCards(){
   const els=new Map([...cardLayer.querySelectorAll('.card')].map(el=>[el.dataset.id,el]));
   const list=moments.filter(m=>els.has(m.id)).map(m=>({id:m.id,x:m.x,y:m.y,h:els.get(m.id).offsetHeight}));
@@ -96,9 +99,10 @@ function settlePlacedCards(){
   for(const m of moments){const y=moved.get(m.id);if(!Number.isFinite(y)||y===m.y)continue;m.y=y;els.get(m.id).style.top=y+'px';changed=true}
   if(changed)rerenderThreads();
   const thumbs=cardLayer.querySelectorAll('.lt-yt-preview img');
-  if(thumbs.length&&!thumbSettleWaiting){thumbSettleWaiting=true;
-    Promise.all([...thumbs].map(img=>img.complete?Promise.resolve():new Promise(r=>{img.addEventListener('load',r,{once:true});img.addEventListener('error',r,{once:true})})))
-      .then(()=>{thumbSettleWaiting=false;settlePlacedCards()})
+  if(thumbs.length&&!thumbSettleWaiting&&!thumbSettleDone){thumbSettleWaiting=true;
+    // 그림 하나가 영영 오지 않아도(회선 끊김·방화벽) 8초 뒤에는 잰다 — 기다림이 남는 일이 없게.
+    Promise.all([...thumbs].map(img=>img.complete?Promise.resolve():new Promise(r=>{img.addEventListener('load',r,{once:true});img.addEventListener('error',r,{once:true});setTimeout(r,8000)})))
+      .then(()=>{thumbSettleWaiting=false;thumbSettleDone=true;settlePlacedCards()})
       .catch(()=>{thumbSettleWaiting=false});
   }
 }
