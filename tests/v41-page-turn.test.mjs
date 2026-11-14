@@ -104,5 +104,5 @@ test('설정 항목마다 저장 위치 표시가 있다(계정에 저장 / 이 
     const want = isAccount ? '계정에 저장' : (/data-share-private-lock/.test(row) ? '전 트리 공개' : '이 기기에만');
     assert.ok(row.endsWith('|' + want), `저장 위치 표시(${want}): ${row.slice(0, 70)}…`);
   }
-  assert.match(css, /\.settings-scope\{margin-left:auto;flex:0 0 auto;font-size:11px;color:var\(--lt-muted\);white-space:nowrap\}/);
+  assert.match(css, /\.settings-scope\{margin-left:auto;flex:0 0 auto;font-size:12px;color:var\(--lt-muted\);white-space:nowrap\}/, '#548: 부수 글자 12px');
 });

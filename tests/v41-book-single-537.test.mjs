@@ -74,7 +74,7 @@ test('#537 1·2: 넓은 화면 한 장은 두 장 책의 한 쪽 크기·같은 
   // 휴대폰 모양(좁은 책·작은 머리줄)은 폰 폭에만 남는다.
   assert.match(CSS, /html\[data-book-shape=phone\] \.book-wrap\{width:min\(92vw,430px\)/, '휴대폰 책 폭');
   assert.match(CSS, /html\[data-book-shape=phone\] \.topbar\{height:60px;padding:0 12px\}/, '휴대폰 머리줄');
-  assert.match(CSS, /html\[data-book-shape=phone\] \.tools \.ui-btn\{padding:7px 9px;font-size:9px\}/, '휴대폰 단추 크기');
+  assert.match(CSS, /html\[data-book-shape=phone\] \.tools \.ui-btn\{padding:7px 9px;font-size:13px\}/, '휴대폰 단추 크기(#548 기준선: 단추 13px)');
   assert.doesNotMatch(CSS, /html\[data-book-view=single\] \.topbar\{/, '넓은 화면 한 장은 두 장 머리줄을 그대로 쓴다');
   // 세로 흐름(스크롤) 한 장도 폰 폭 전용이다.
   assert.match(LAYOUT, /html\[data-book-shape=phone\]\[data-v41-screen=book\]\{height:auto;min-height:100%;overflow-x:hidden;overflow-y:auto\}/);
