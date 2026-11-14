@@ -10,7 +10,8 @@
       {"kind": "fix", "text": "영상 칸이 빈 상자로 남지 않아요 — 썸네일을 먼저 보이고, 없으면 제목 카드로 보여요", "source": "ai_tester", "tester": "테스터", "issue": "#635"},
       {"kind": "new", "text": "로그아웃 화면의 ≡ 메뉴 맨 위에 '내 러브트리 시작하기'를 두었어요", "source": "ai_tester", "tester": "테스터", "issue": "#635"},
       {"kind": "fix", "text": "이어진 순간의 '0일' 표기를 '첫날·N일째'로 바꾸었어요", "source": "ai_tester", "tester": "테스터", "issue": "#635"},
-      {"kind": "fix", "text": "작은 화면에서 책 아래 링크 줄과 첫 화면 안내가 겹치지 않게 띄웠어요", "source": "ai_tester", "tester": "테스터", "issue": "#635"}
+      {"kind": "fix", "text": "작은 화면에서 책 아래 링크 줄과 첫 화면 안내가 겹치지 않게 띄웠어요", "source": "ai_tester", "tester": "테스터", "issue": "#635"},
+      {"kind": "fix", "text": "책에서 영상을 재생한 채 전체 화면으로 바꿔도 재생이 끊기지 않아요", "source": "user", "issue": "#642"}
     ]
   },
   {

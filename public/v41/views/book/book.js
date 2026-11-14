@@ -181,7 +181,16 @@ let archiveOpener=null;function closeArchive(){const panel=$('#archivePanel');pa
 /* Branch chooser */
 function openBranch(){const s=currentSpread();if(!s.branch)return;const source=LTDEMO.moments.find(m=>m.id===s.branch.source);const targets=LTDEMO.edges.filter(e=>e.kind==='parent'&&e.from===source.id).map(e=>e.to).map(id=>LTDEMO.moments.find(m=>m.id===id));if(targets.some(m=>!m))return;$('#branchChoices').innerHTML=targets.map((m,i)=>`<button class="choice" data-branch-target="${posOfMoment(m.id)}" data-focus="${esc(m.id)}"><b>${i?'다른 경로':'현재 경로 계속'} · ${esc(titleMainOf(m))}</b><small>${esc(LTDEMO.edges.find(e=>e.kind==='parent'&&e.from===source.id&&e.to===m.id)?.reason||'연결된 다음 순간')}</small></button>`).join('');setBookOpen($('#branchModal'),true)}$('#branchTab').onclick=openBranch;$('#branchClose').onclick=()=>setBookOpen($('#branchModal'),false);$('#branchChoices').onclick=e=>{const b=e.target.closest('[data-branch-target]');if(!b)return;const t=+b.dataset.branchTarget;setBookOpen($('#branchModal'),false);t===current?renderSpread(t,b.dataset.focus,false):autoTurn(t>current?'next':'prev',t,b.dataset.focus)};
 $('#lensBtn').onclick=()=>{lensOn=!lensOn;$('#lensBtn').classList.toggle('active',lensOn);if(!lensOn)hideLens()};
-window.addEventListener('resize',()=>{applyViewAttr();if(machineState==='IDLE'){renderSpread(current,null,false);setTimeout(syncLensClone,70)}});
+/* #642: 전체 화면 단추로도 resize 가 일어난다. 그때 renderSpread 가 장을 처음부터 다시 그려
+   재생 중이던 iframe 을 지우므로 재생이 끊기고 썸네일로 되돌아갔다. 그래서 ① 전체 화면 중
+   (document.fullscreenElement)과 fullscreenchange 직후의 resize 는 장을 다시 그리지 않고
+   ② 책 안에서 재생 중(그 자리 iframe · 재생 중 video)일 때도 창 크기가 바뀌어도
+   배치 속성(applyViewAttr)만 바꾼다. 재생하지 않는 상태에서는 창 크기에 맞춰 다시
+   배치된다(기존 동작). 휴대폰 세로↔가로 돌리기도 같은 resize 경로다. */
+let fullscreenGuardUntil=0,fullscreenRecheck=0;
+document.addEventListener('fullscreenchange',()=>{fullscreenGuardUntil=Date.now()+800;clearTimeout(fullscreenRecheck);fullscreenRecheck=setTimeout(()=>{fullscreenGuardUntil=0;if(machineState==='IDLE'&&!document.fullscreenElement&&!playingInBook())renderSpread(current,null,false)},850)});
+const playingInBook=()=>book.querySelector('.yt-frame,.lt-yt-frame')||[...book.querySelectorAll('video.lt-user-video')].some(v=>!v.paused);
+window.addEventListener('resize',()=>{applyViewAttr();if(machineState!=='IDLE')return;if(document.fullscreenElement||Date.now()<fullscreenGuardUntil||playingInBook())return;renderSpread(current,null,false);setTimeout(syncLensClone,70)});
 /* #393 4: 한 장/두 장 보기 단추 — 고른 값은 기억되고, 지금 보던 순간은 그대로 둔다. 첫 그림 전에 속성부터 정한다. */
 applyViewAttr();
 $('#singleViewBtn').onclick=()=>setViewChoice('single');
