@@ -23,6 +23,18 @@
 - **머지·배포**: PR #588 머지 → main `f0fb5c4`, 필수 검사 전부 초록. 스크린샷 전/후 1440·1920·2560 × 밤·정원 + 세로 사례 + 실제 재생 2장 → `E:\lovetree-qa84\`. 이슈 #584 보고 댓글 후 닫음.
 - **남긴 것**: 실기기(컴2 tabbit) 재생 확인은 이쪽에서 못 했다 — 로컬 Chromium(headed playwright) 실측으로 대체했고 같은 엔진이라 같은 결과를 기대하지만, 배포 뒤 컴2에서 한 번 열어 보는 것을 권한다.
 
+## 2026-11-15 — 보드를 핀보드로: 바둑판 배치·끌어 꽂기·줄은 지도에 (#582, 로컬2 레인, ai/com2-lt582-pinboard-grid-20261115, main ee8172a 기준)
+
+- **배치**: treeSpread(관계 기준 펼치기)를 버리고 날짜 최신순 바둑판. 칸 수는 화면 폭이 정한다(1440 4칸·390 1칸·1920 6칸 상한), 카드 크기는 #548 기준선 그대로. 저장 자리(#395 계약)는 그대로 남고 나머지를 빈 칸에 채운다.
+- **끌어 꽂기**: 카드를 끌면 가장 가까운 빈 칸에 스냅되고 x·y를 기존 저장 방식(lt41-board-sync) 그대로 저장. '정렬 되돌리기' 단추로 날짜순 바둑판 복귀. 판 끌기 중 카드 pointer-events 를 꺼 성능 확보.
+- **줄 없음**: 보드에서 실·핀 연결·'이어진 이유' 창·연결 배너 제거 — 관계도는 지도가 맡는다. 이어 주기는 순간 추가의 '이전 순간 고르기'와 지도에서.
+- **상세**: 이전·다음 순간 링크 유지(#583), '지도에서 관계 보기' 단추 신설 — 셸 메시지 lt41-open-network 로 `#my/network?tree=…&moment=…` 약속대로 열기(messages.mjs 한 조각, 지도 파일 미수정). extras selectMoment 의 다음 순간 목록을 board.js 와 같은 3개 규칙으로 통일.
+- **용어**(이슈 댓글 반영): '＋ 순간 꽂기'→'＋ 순간 추가', '기억판에 꽂기'→'보드에 추가', 토스트·기본값·이어진 이유 기본 문자열도 '추가'로. 카드 끌기 설명은 '끌어서 자리 옮기기'(title). 숨김 고급 도구(DEFAULT PIN·CARD)는 화면에 안 남아 유지.
+- **시험**: 신규 `tests/v41-board-pinboard-582.test.mjs` 7건. 관계 배치에 묶였던 기존 시험을 바둑판 기준으로 갱신(spread-469·board-model·553·536·cursor-detail·merge-pinboard·touch-targets — board-model 의 실 3건·연결 지우기는 기능 소멸로 삭제). 서버·DB 변경 없음.
+- **fps(1440, 26순간, 헤드리스)**: 판 끌기 17.9~36.3 → 45.1~49.5, 확대 25.5~58.6 → 58.7~60.5. 스크린샷(1440·390 × 종이·밤 전/후 + 상대): `E:\lovetree-qa\582\`
+- **트러블슈팅 기록**: (1) 이전 세션 전체 npm test 의 2건 실패는 환경 탓 — #548 글자 기준선은 worktree 의 `dist/` 가 지워진 상태(빈 페이지 → dialog null), 지도 대비는 오래된 dist 기준. 재빌드 후 둘 다 통과. (2) 첫 CI 실패 3건은 브랜치가 main 뒤쳐져 새 시험 파일(v41-orbit-586-perf·v41-map-fan-open)이 없었던 것 — 워크플로우는 PR head 를 체크아웃하므로 main 병합으로 해소. (3) 미리보기 postdeploy 의 503(youtube-oembed·콘솔)은 미리보기 Functions 미준비 — 운영은 401/200 정상 대조로 #582 무관 확인.
+- **머지**: PR #594 → main `ab21965`, 필수 검사 전부 초록. 이슈 #582 보고 댓글 후 닫음.
+
 ## 2026-11-15 — 보드 마감: 금색 커서 동그라미 제거 + 상세 다음·이전 순간 단추화 (로컬2 레인, ai/com2-lt-cursor-detail-20261115-0830-3a7c, main 8092d28 기준)
 
 - **커서 동그라미 완전 제거**: 따라오는 금색 동그라미(`cursorRing`·`cursorInner`·`cursorFX`·`cursor-burst/ripple/drop`)를 HTML 요소·board.css 스타일·board-extras.js 배선·board-model.js 판정 함수(`cursorMode`·`cursorHover`·`cursorScale`·`cursorEffectAllowed`·`cursorPresence`)까지 치웠다. 원래 마우스 커서를 쓰고, 상태는 CSS cursor로 알린다 — 판 `grab`(끌 때 `grabbing`, `#viewport.panning`), 카드 `grab`(끌 때 `grabbing`, `.card.dragLift`), 핀 연결 중 `crosshair`(`#cardLayer.linking`), 핀·단추 `pointer`. `public/v41` 전체에 `cursor:none` 없음(시험이 검사).
