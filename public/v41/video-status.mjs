@@ -8,20 +8,22 @@
 //   임베드 금지·영상은 있음(3xlegeyULX8·P6qXFavZplE) 유튜브 401 → 프록시 502 · 썸네일 200
 //   없는 id(aaaaaaaaaaa) 유튜브 400 → 프록시 502
 // 그래서 프록시 404는 '삭제' 확정 신호고, 프록시 502는 비공개·임베드 금지·일시 오류가 섞여 있어
-// 혼자로는 사라졌다고 말할 수 없다(썸네일 실패 신호와 짝으로 쓴다 — media-preview.js 쪽 규칙).
-// 결과는 이 기기에 하루 기억한다(화면을 열 때마다 같은 영상을 다시 묻지 않게, #632). 판정을
-// 못 내린 값(unknown)은 기억하지 않는다 — 다음에 화면에 보일 때 다시 묻는다.
+// 답은 왔지만 혼자로는 사라졌다고 말할 수 없다('held' 보류 — 썸네일 실패 신호와 짝으로 쓴다, media-preview.js 쪽 규칙).
+// 응답 자체가 없으면(끊김·시간 초과·기기가 오프라인) 'unknown'으로 돌려 표시를 바꾸지 않는다.
+// 결과는 이 기기에 하루 기억한다(화면을 열 때마다 같은 영상을 다시 묻지 않게, #632). 확정 판정(ok·gone)만
+// 기억한다 — held·unknown은 기억하지 않아 다음에 화면에 보일 때 다시 묻는다.
 
 export const VIDEO_STATUS_TTL_MS = 24 * 60 * 60 * 1000;
 export const VIDEO_STATUS_CACHE_KEY = 'lt41.video-status.v1';
 export const VIDEO_STATUS_CACHE_LIMIT = 500;
 
-/** 프록시 응답 코드 → 'ok' | 'gone' | 'unknown'. 404(삭제)만 확정이고 나머지는 보류다. */
+/** 프록시 응답 코드 → 'ok' | 'gone' | 'held'. 404(삭제)만 확정이고, 답은 왔지만 판정을 못 하는 나머지는 보류다. */
 export function classifyOembedStatus(httpStatus) {
   const code = Number(httpStatus);
   if (code === 200) return 'ok';
   if (code === 404) return 'gone';
-  return 'unknown';
+  // 상태 코드가 있는 답(403·401·400·502 같은)은 보류고, 상태 코드조차 없으면 응답이 없는 것이다.
+  return Number.isFinite(code) && code > 0 ? 'held' : 'unknown';
 }
 
 function readMap(storage) {
@@ -68,10 +70,12 @@ export function writeVideoStatusCache(storage, videoId, status, now = Date.now()
   return true;
 }
 
-/** 프록시에 실제로 물어 본다. 실패·시간 초과는 'unknown' — 사라졌다고 말하지 않는다. */
+/** 프록시에 실제로 물어 본다. 답이 오면 ok·gone·held, 응답이 없으면(끊김·시간 초과·오프라인) 'unknown' — 사라졌다고 말하지 않는다. */
 export async function fetchVideoStatus(videoId, { fetchImpl = (...args) => globalThis.fetch(...args), timeoutMs = 5000 } = {}) {
   const id = String(videoId ?? '').trim();
   if (!id) return 'unknown';
+  // 기기가 오프라인이면 물어 볼 길이 없다 — 응답 없음으로 본다(사라진 영상으로 세지 않는다).
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return 'unknown';
   const controller = typeof AbortController === 'function' ? new AbortController() : null;
   const timer = controller && Number.isFinite(timeoutMs) && timeoutMs > 0 ? setTimeout(() => controller.abort(), timeoutMs) : null;
   try {

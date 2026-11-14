@@ -28,27 +28,29 @@ function fakeStorage(initial = {}) {
   };
 }
 
-test('#632 분류: 프록시 200=정상, 404=삭제 확정, 그 밖(403·401·400·502)은 보류 — 실측 응답 표', () => {
+test('#632 분류: 프록시 200=정상, 404=삭제 확정, 답은 왔지만 판정을 못 하는 나머지(403·401·400·502)는 보류(held) — 실측 응답 표', () => {
   // 실측(2026-11-15): 정상 200 / 삭제 404 / 비공개 403·임베드 금지 401·없는 id 400 은 서버가 502로 뭉개 보낸다.
   const rows = [
     [200, 'ok'],
     [404, 'gone'],
-    [403, 'unknown'], // 비공개 — 프록시가 502로 바꿔 보내므로 클라이언트가 단정하지 않는다
-    [401, 'unknown'], // 임베드 금지 — 영상이 아직 있으므로 사라진 영상이 아니다
-    [400, 'unknown'],
-    [502, 'unknown'],
-    [500, 'unknown'],
-    ['', 'unknown'],
+    [403, 'held'], // 비공개 — 프록시가 502로 바꿔 보내므로 답은 왔지만 단정하지 않는다
+    [401, 'held'], // 임베드 금지 — 영상이 아직 있으므로 사라진 영상이 아니다
+    [400, 'held'],
+    [502, 'held'],
+    [500, 'held'],
+    ['', 'unknown'], // 상태 코드가 없으면 답이 온 것이 아니다
     [undefined, 'unknown'],
+    [0, 'unknown'],
   ];
   for (const [status, want] of rows) assert.equal(classifyOembedStatus(status), want, `status=${String(status)}`);
 });
 
-test('#632 기억: 확정 판정만 하루 기억하고, 보류(unknown)는 기억하지 않는다', () => {
+test('#632 기억: 확정 판정만 하루 기억하고, 보류(held)·응답 없음(unknown)은 기억하지 않는다', () => {
   const store = fakeStorage();
   assert.equal(writeVideoStatusCache(store, 'abc123DEF45', 'gone'), true);
   assert.equal(writeVideoStatusCache(store, 'kFenGaDfuI4', 'ok'), true);
-  assert.equal(writeVideoStatusCache(store, '3xlegeyULX8', 'unknown'), false, '보류는 기억하지 않는다');
+  assert.equal(writeVideoStatusCache(store, 'yZIXLfi8CZQ', 'held'), false, '보류(held)는 기억하지 않는다');
+  assert.equal(writeVideoStatusCache(store, '3xlegeyULX8', 'unknown'), false, '응답 없음도 기억하지 않는다');
   assert.equal(readVideoStatusCache(store, 'abc123DEF45'), 'gone');
   assert.equal(readVideoStatusCache(store, 'kFenGaDfuI4'), 'ok');
   assert.equal(readVideoStatusCache(store, '3xlegeyULX8'), null, '기억된 값이 없어 다시 묻는다');
@@ -88,7 +90,7 @@ test('#632 기억: 한도(500)를 넘치면 오래된 것부터 버리고, 깨�
   assert.equal(writeVideoStatusCache(null, 'abc123DEF45', 'gone'), false);
 });
 
-test('#632 요청: 프록시 주소는 한 벌(/api/youtube/oembed?v=), 실패·시간 초과는 보류', async () => {
+test('#632 요청: 프록시 주소는 한 벌(/api/youtube/oembed?v=), 답이 오면 ok·gone·held, 응답이 없으면 unknown', async () => {
   const calls = [];
   const ok = await fetchVideoStatus('abc123DEF45', {
     fetchImpl: async (url, init) => {
@@ -100,19 +102,37 @@ test('#632 요청: 프록시 주소는 한 벌(/api/youtube/oembed?v=), 실패·
   assert.deepEqual(calls, [{ url: '/api/youtube/oembed?v=abc123DEF45', accept: 'application/json' }]);
 
   assert.equal(await fetchVideoStatus('R5mpcDWpYSA', { fetchImpl: async () => ({ status: 404 }) }), 'gone', '삭제');
-  assert.equal(await fetchVideoStatus('yZIXLfi8CZQ', { fetchImpl: async () => ({ status: 502 }) }), 'unknown', '비공개는 프록시가 502로 뭉개 보낸다');
-  assert.equal(await fetchVideoStatus('3xlegeyULX8', { fetchImpl: async () => ({ status: 502 }) }), 'unknown', '임베드 금지도 보류');
-  assert.equal(await fetchVideoStatus('abc123DEF45', { fetchImpl: async () => { throw new Error('끊김'); } }), 'unknown');
+  assert.equal(await fetchVideoStatus('yZIXLfi8CZQ', { fetchImpl: async () => ({ status: 502 }) }), 'held', '비공개는 프록시가 502로 뭉개 보낸다 — 답은 온 보류');
+  assert.equal(await fetchVideoStatus('3xlegeyULX8', { fetchImpl: async () => ({ status: 502 }) }), 'held', '임베드 금지도 보류');
+  assert.equal(await fetchVideoStatus('abc123DEF45', { fetchImpl: async () => { throw new Error('끊김'); } }), 'unknown', '응답이 없으면 사라졌다고 말하지 않는다');
   assert.equal(await fetchVideoStatus('', { fetchImpl: async () => ({ status: 200 }) }), 'unknown');
-  await assert.doesNotReject(fetchVideoStatus('abc123DEF45', {
-    // signal 을 지키는 호출자 흉내 — 끊긴 요청이 끝내지 못하면 보류로 끝나야 한다.
+  // 시간 초과도 응답이 없는 것이다.
+  assert.equal(await fetchVideoStatus('abc123DEF45', {
+    // signal 을 지키는 호출자 흉내 — 끊긴 요청이 끝내지 못하면 응답 없음으로 끝나야 한다.
     fetchImpl: (url, init) => new Promise((resolve, reject) => { init?.signal?.addEventListener('abort', () => reject(new Error('시간 초과'))); }),
     timeoutMs: 20
-  }), '시간 초과는 보류로 끝난다');
+  }), 'unknown', '시간 초과는 응답 없음');
+  // 기기가 오프라인이면 묻지도 않는다 — 응답 없음(unknown).
+  const desc = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+  Object.defineProperty(globalThis, 'navigator', { value: { onLine: false }, configurable: true });
+  try {
+    let asked = 0;
+    const off = await fetchVideoStatus('abc123DEF45', { fetchImpl: async () => { asked += 1; return { status: 200 }; } });
+    assert.equal(off, 'unknown', '오프라인에는 사라진 영상으로 세지 않는다');
+    assert.equal(asked, 0, '오프라인에는 요청을 보내지 않는다');
+    Object.defineProperty(globalThis, 'navigator', { value: { onLine: true }, configurable: true });
+    const on = await fetchVideoStatus('abc123DEF45', { fetchImpl: async () => { asked += 1; return { status: 200 }; } });
+    assert.equal(on, 'ok', '온라인이면 다시 묻는다');
+    assert.equal(asked, 1);
+  } finally {
+    if (desc) Object.defineProperty(globalThis, 'navigator', desc);
+  }
 });
 
 // media-preview.js 는 클래식 스크립트(IIFE)라 vm 으로 읽어 window.LTMedia 를 본다(기존 시험과 같은 방법).
 // 바닥에 도는 화면 연결(document·MutationObserver·addEventListener)도 최소 흉내를 둔다 — #632 표시 기본 문서 경로 시험용.
+// 창 이벤트(online 등)는 밖에서 누르게 기록해 둔다.
+const listeners = [];
 const docStub = {
   documentElement: {},
   querySelectorAll: () => [],
@@ -125,7 +145,13 @@ const scope = {
   window: {}, URL, URLSearchParams, setTimeout, clearTimeout,
   document: docStub,
   MutationObserver: function () { this.observe = () => {}; this.disconnect = () => {}; },
-  addEventListener: () => {}
+  // 화면에 보이는 판정을 흉내 낸다 — 관찰하는 순간 보이는 것으로 알려 준다(online 재검사 시험용).
+  IntersectionObserver: function (cb) {
+    this.observe = (el) => cb([{ target: el, isIntersecting: true }], this);
+    this.unobserve = () => {};
+    this.disconnect = () => {};
+  },
+  addEventListener: (type, fn) => { listeners.push({ type, fn }); }
 };
 vm.runInNewContext(readFileSync(new URL('../public/v41/media-preview.js', import.meta.url), 'utf8'), scope);
 const media = scope.window.LTMedia;
@@ -236,7 +262,7 @@ test('#632 표시: 사라진 영상 칸은 재생·크게 보기·기존 안내�
   assert.equal(doc.created.filter((el) => el.className === 'lt-media-vanished-note').length, 1);
 });
 
-test('#632 표시: 썸네일이 실패한 카드만 묻고, 404·502는 표시(200은 그대로), 썸네일이 살아 있으면 묻지 않는다', async () => {
+test('#632 표시: 썸네일이 실패한 카드만 묻고, gone·held는 표시(ok는 그대로), 썸네일이 살아 있으면 묻지 않는다', async () => {
   const fetches = [];
   const store = fakeStorage();
   media.setVideoStatusLoader(() => ({
@@ -244,7 +270,7 @@ test('#632 표시: 썸네일이 실패한 카드만 묻고, 404·502는 표시(2
     writeVideoStatusCache: (s, id, status) => writeVideoStatusCache(s, id, status),
     fetchVideoStatus: async (id) => {
       fetches.push(id);
-      return id === 'R5mpcDWpYSA' ? 'gone' : id === 'kFenGaDfuI4' ? 'ok' : 'unknown';
+      return id === 'R5mpcDWpYSA' ? 'gone' : id === 'kFenGaDfuI4' ? 'ok' : 'held';
     }
   }));
   try {
@@ -264,12 +290,12 @@ test('#632 표시: 썸네일이 실패한 카드만 묻고, 404·502는 표시(2
     assert.equal(fine.dataset.ltVanished, undefined);
     assert.equal(readVideoStatusCache(store, 'kFenGaDfuI4'), 'ok', '정상 판정도 기억된다');
 
-    // 비공개(썸네일 실패 + 프록시 502 보류) — 썸네일 실패가 짝 신호이므로 표시한다(기억은 하지 않는다).
+    // 비공개(썸네일 실패 + 프록시 502 보류 held) — 썸네일 실패가 짝 신호이므로 표시한다(기억은 하지 않는다).
     const held = vanishedRoot();
     held.dataset.ltUrl = 'https://www.youtube.com/watch?v=yZIXLfi8CZQ';
     await media.checkVanished(held, { doc: fakeDoc(), store });
     assert.equal(held.dataset.ltVanished, '1');
-    assert.equal(readVideoStatusCache(store, 'yZIXLfi8CZQ'), null, '보류는 기억하지 않는다');
+    assert.equal(readVideoStatusCache(store, 'yZIXLfi8CZQ'), null, '보류(held)는 기억하지 않는다');
 
     // 썸네일이 살아 있는 카드(임베드 금지 — 영상이 아직 있음)는 묻지도 않는다.
     fetches.length = 0;
@@ -298,13 +324,70 @@ test('#632 표시: 썸네일이 실패한 카드만 묻고, 404·502는 표시(2
   }
 });
 
+test('#632 표시: 응답이 없으면(unknown) 표시하지 않고, 검사 표시를 지워 다시 묻는다', async () => {
+  const fetches = [];
+  const store = fakeStorage();
+  media.setVideoStatusLoader(() => ({
+    readVideoStatusCache: (s, id) => readVideoStatusCache(s, id),
+    writeVideoStatusCache: (s, id, status) => writeVideoStatusCache(s, id, status),
+    fetchVideoStatus: async (id) => {
+      fetches.push(id);
+      return 'unknown';
+    }
+  }));
+  try {
+    // 지하철·기내 모드처럼 응답이 없으면 멀쩡한 영상을 사라진 영상으로 세지 않는다.
+    const root = vanishedRoot();
+    await media.checkVanished(root, { doc: fakeDoc(), store });
+    assert.equal(root.dataset.ltVanished, undefined, '끊김은 사라진 영상이 아니다');
+    assert.equal(root.dataset.ltVanishedChecked, undefined, '검사 표시를 지워 다시 묻는다');
+    assert.equal(readVideoStatusCache(store, 'abc123DEF45'), null, '기억하지 않는다');
+    // 검사 표시가 지워졌으니 다시 청하면 다시 묻는다(다시 보일 때·online 때와 같은 길).
+    const before = fetches.length;
+    media.scheduleVanishedCheck(root);
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    assert.ok(fetches.length > before, '다시 검사한다');
+  } finally {
+    media.setVideoStatusLoader(null);
+  }
+});
+
+test('#632 표시: unknown 뒤 online 이벤트가 오면 다시 검사한다', async () => {
+  const fetches = [];
+  media.setVideoStatusLoader(() => ({
+    readVideoStatusCache: () => null,
+    writeVideoStatusCache: () => {},
+    fetchVideoStatus: async (id) => {
+      fetches.push(id);
+      return 'unknown';
+    }
+  }));
+  const online = listeners.find((l) => l.type === 'online');
+  assert.ok(online, '화면 연결이 online 이벤트를 듣는다');
+  try {
+    const root = vanishedRoot();
+    await media.checkVanished(root, { doc: fakeDoc(), store: fakeStorage() });
+    assert.equal(root.dataset.ltVanishedChecked, undefined, 'unknown은 검사 표시를 지운다');
+    const before = fetches.length;
+    // online → 300ms 뒤 watchVanished → 보이는 카드를 다시 청한다(화면 흉내가 카드를 내민다).
+    docStub.querySelectorAll = (selector) => (selector.includes('data-lt-auto') ? [root] : []);
+    online.fn();
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    assert.ok(fetches.length > before, '연결이 돌아오면 다시 묻는다');
+    assert.equal(root.dataset.ltVanished, undefined, '여전히 응답이 없으면 표시하지 않는다');
+  } finally {
+    docStub.querySelectorAll = () => [];
+    media.setVideoStatusLoader(null);
+  }
+});
+
 test('#632 표시: 시험 문서(doc)를 끼우지 않아도 기본 문서로 표시한다(null은 기본 값을 무효로 만들지 않는다)', async () => {
   const store = fakeStorage();
   writeVideoStatusCache(store, 'R5mpcDWpYSA', 'gone');
   media.setVideoStatusLoader(() => ({
     readVideoStatusCache: (s, id) => readVideoStatusCache(s, id),
     writeVideoStatusCache: () => {},
-    fetchVideoStatus: async () => 'unknown'
+    fetchVideoStatus: async () => 'gone'
   }));
   try {
     const root = vanishedRoot();

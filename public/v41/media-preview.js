@@ -377,11 +377,13 @@ async function openLightbox(url,title='',verticalHint=null){
 }
 // #632: 사라진 영상 감지·표시 — 내 기록(auto) YouTube 카드만, 보이는 카드만 검사하고 결과는 하루 기억한다.
 // 신호 두 개를 짝으로 쓴다: ① 썸네일 내려가기 카드(삭제·비공개는 i.ytimg.com 그림도 함께 사라진다 — 실측 404)
-// ② oEmbed 프록시(#344) — 404는 삭제 확정, 200은 영상이 있음, 502는 비공개·임베드 금지·일시 오류가 섞인 보류.
+// ② oEmbed 프록시(#344) — 404는 삭제 확정('gone'), 200은 영상이 있음('ok'), 502는 비공개·임베드 금지·일시 오류가
+// 섞인 보류('held'). 응답 자체가 없으면(끊김·시간 초과·오프라인) 'unknown' — 사라졌다고 말하지 않는다.
 // 썸네일이 살아 있는 카드는 영상이 있는 것이므로 묻지 않는다(임베드 금지를 사라진 영상으로 세지 않게,
-// 정상 카드마다 요청을 보내지 않게). 썸네일이 실패한 카드만 프록시에 물어 보고, 404(하루 기억)와
-// 502(기억하지 않음 — 다음 화면에 다시 판정)일 때 '사라진 영상'으로 정한다. 200이면 썸네일만
-// 잠깐 실패한 것이므로 기존 안내('영상을 볼 수 없어요')를 그대로 둔다.
+// 정상 카드마다 요청을 보내지 않게). 썸네일이 실패한 카드만 프록시에 물어 보고, gone(하루 기억)과
+// held(기억하지 않음 — 다음 화면에 다시 판정)일 때 '사라진 영상'으로 정한다. ok면 썸네일만
+// 잠깐 실패한 것이므로 기존 안내('영상을 볼 수 없어요')를 그대로 두고, unknown이면 검사 표시를 지워
+// 연결이 돌아오면(online) 다시 묻는다.
 const VANISHED_TEXT='영상이 삭제되었거나 비공개예요';
 const VANISHED_BADGE='사라진 영상';
 const VANISHED_CONCURRENCY=3;
@@ -441,11 +443,18 @@ async function checkVanished(root, hooks = null){
  let status=mod.readVideoStatusCache?mod.readVideoStatusCache(store,m.videoId):null;
  if(!status){
   status=await mod.fetchVideoStatus(m.videoId);
-  if(status!=='unknown'&&root.isConnected)mod.writeVideoStatusCache?.(store,m.videoId,status);
+  // 확정 판정(ok·gone)만 기억한다 — held·unknown은 다음에 다시 묻는다.
+  if((status==='ok'||status==='gone')&&root.isConnected)mod.writeVideoStatusCache?.(store,m.videoId,status);
  }
- // 404(삭제 확정)와 502(비공개·일시 오류 — 썸네일 실패가 짝 신호)는 표시하고, 200은 그대로 둔다.
+ // gone(삭제 확정)과 held(보류 — 썸네일 실패가 짝 신호)는 표시하고, ok는 그대로 둔다.
+ // unknown(응답 없음 — 지하철·기내 모드 같은 끊김)은 표시하지 않고 검사 표시를 지워
+ // 다음에 화면에 보일 때(online 포함) 다시 묻는다.
  // hooks.doc는 undefined를 지나야 기본 문서(document)에 닿는다 — null을 넘기지 않게 한다.
- if(status!=='ok'&&root.isConnected)applyVanished(root,hooks?hooks.doc:undefined);
+ if(status==='gone'||status==='held'){
+  if(root.isConnected)applyVanished(root,hooks?hooks.doc:undefined);
+ }else if(status==='unknown'&&root.isConnected){
+  delete root.dataset.ltVanishedChecked;
+ }
 }
 function watchVanished(){
  // 이미 '사라진 영상'으로 정해진 칸에 썸네일 내려가기가 나중에 글 카드를 놓으면 기존 안내가 따로 붙는다 — 겹침을 치운다.
@@ -480,6 +489,8 @@ if(typeof document!=='undefined'){
  const cleanup=()=>{for(const [node,url] of ownedUrls)if(!node.isConnected){URL.revokeObjectURL(url);ownedUrls.delete(node);}};
  new MutationObserver(()=>{cleanup();queueWatchVanished();}).observe(document.documentElement,{childList:true,subtree:true});
  addEventListener('pagehide',()=>{for(const url of ownedUrls.values())URL.revokeObjectURL(url);ownedUrls.clear();});
+ // 끊겼던 연결이 돌아오면 unknown으로 되돌려 둔 카드를 다시 묻는다.
+ addEventListener('online',queueWatchVanished);
  watchVanished();
  // #601: 보드 카드의 그림은 카드를 끄는 자리다 — 카드 안에서는 이 막음을 풀어 준다(다른 화면은 그대로).
  document.addEventListener('pointerdown',e=>{if(e.target.closest?.('.lt-media')&&!e.target.closest?.('.card'))e.stopPropagation();},true);
