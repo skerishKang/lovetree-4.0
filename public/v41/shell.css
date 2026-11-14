@@ -137,7 +137,7 @@ body:not(.home-screen) iframe.lt-arrive{animation:lt-arrive .28s cubic-bezier(.2
 
 /* 2026-11-07 상단 메뉴 재구성(대표 결정): 배치와 버튼 무게만 바꾼다. 색·금테·무대·알약 모양은 --lt-* 토큰 그대로. */
 /* 왼쪽: 워드마크 │ 첫 화면 · 내 책장 · 둘러보기 │ [트리명 ▾] 기억책 · 기억 보드 · 관계 지도 ─ 오른쪽: 주 버튼 · 계정 */
-nav #record-menu{flex:0 0 auto;max-width:190px;margin-left:12px;padding-left:12px;border-left:1px solid var(--line);border-right:0;border-top:0;border-bottom:0;border-radius:0;background:none;backdrop-filter:none;min-height:44px;display:flex;align-items:center;gap:6px;font-size:14px;letter-spacing:.02em;color:var(--lt-pearl)}
+nav #record-menu{flex:0 0 auto;width:11em;max-width:190px;margin-left:12px;padding-left:12px;border-left:1px solid var(--line);border-right:0;border-top:0;border-bottom:0;border-radius:0;background:none;backdrop-filter:none;min-height:44px;display:flex;align-items:center;gap:6px;font-size:14px;letter-spacing:.02em;color:var(--lt-pearl)}
 nav #record-menu:hover{background:rgba(255,255,255,.06);border-radius:var(--lt-r-pill)}
 nav #record-menu #source-label{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 nav #record-menu svg{flex:0 0 auto;opacity:.7}
@@ -192,7 +192,7 @@ html[data-v41-screen=book] .tools .ui-btn::after,html[data-v41-screen=board] hea
  nav>button{flex:0 0 auto}
  .tree-views{flex:0 0 auto}
  .tree-views>button{flex:0 0 auto}
- nav #record-menu{max-width:112px;margin-left:6px;padding-left:6px;font-size:12px}
+ nav #record-menu{width:auto;max-width:112px;margin-left:6px;padding-left:6px;font-size:12px}
  .header-actions #write-menu.primary-action{max-width:112px;overflow:hidden;text-overflow:ellipsis}
  .account-avatar{width:44px;height:44px}
  .account-popover{right:-4px;min-width:210px}
