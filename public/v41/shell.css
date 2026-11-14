@@ -581,7 +581,7 @@ html[data-lt-theme="garden"] #account-advanced[aria-checked="true"]:after{backgr
 .myposts-head{display:flex;gap:8px;align-items:center;font-size:11px;color:var(--lt-muted)}
 .myposts-kind{color:var(--lt-gold)}
 .myposts-date{margin-left:auto}
-.myposts-title{font-size:15px;margin:6px 0;font-weight:600;overflow-wrap:anywhere}
+.myposts-title{font-size:15px;margin:6px 0;font-weight:600;overflow-wrap:anywhere;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
 .myposts-body{font-size:13px;line-height:1.8;color:var(--lt-pearl);overflow-wrap:anywhere;white-space:pre-wrap}
 .myposts-issue{display:inline-block;margin-top:6px;font-size:11px;color:var(--lt-rose)}
 .myposts-replies{margin-top:10px;display:grid;gap:8px}
@@ -598,8 +598,10 @@ html[data-lt-theme="garden"] #account-advanced[aria-checked="true"]:after{backgr
 .save-extra{display:flex;gap:6px;flex-wrap:wrap;flex-basis:100%;align-items:center}
 .save-extra[hidden]{display:none}
 .myposts-updates-link{display:inline-block;margin-top:8px;min-height:44px;padding:0 14px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-pill);background:rgba(255,230,166,.08);color:var(--lt-gold);font-size:13px;cursor:pointer}
-.myposts-followup{display:flex;gap:8px;align-items:end;margin-top:12px}
-.myposts-followup label{display:grid;gap:6px;flex:1;font-size:12px;color:var(--lt-muted)}
+.myposts-followup{display:flex;flex-wrap:wrap;gap:8px;align-items:end;margin-top:12px}
+.myposts-followup label{display:grid;gap:6px;flex:1 1 12em;font-size:12px;color:var(--lt-muted)}
 .myposts-followup input{width:100%;min-height:44px;border-radius:12px;border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.04);color:inherit;padding:10px 12px;font:inherit}
 .myposts-followup-submit{min-height:44px;padding:0 14px;border-radius:var(--lt-r-pill);border:1px solid var(--lt-gold-line);background:rgba(255,230,166,.08);color:var(--lt-gold);font-size:13px;cursor:pointer}
+/* 이슈 638: 오류 줄은 자기 줄을 통째로 쓰게 한다(감싸기). 감싸기가 없으면 빈 오류 줄의 flex-basis:100%가
+   라벨·입력칸을 손가락 하나 폭까지 짜부라뜨리고, 좁은 입력칸에서는 조합 입력이 거꾸로 저장되기까지 했다. */
 .myposts-followup-error{flex-basis:100%;margin:0;font-size:12px;color:var(--lt-rose)}
