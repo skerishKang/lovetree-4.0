@@ -6,17 +6,24 @@ window.LT58Model = (() => {
     return String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   }
 
-  // 카드 자리: 8장씩 줄을 바꾸고, 세로는 400px 간격, 회전은 -2·0·2도.
-  function cardPosition(i) {
-    // #548: 카드 글자를 기준선(부수 12px·본문 13px)으로 올리면서 카드가 최대 424px까지 자랐다 —
-    // 세로 간격도 400px에서 440px로 벌려 카드끼리 겹치지 않게 한다.
-    return { x: 150 + (i % 8) * 280, y: 150 + Math.floor(i / 8) * 440, rot: (i % 3 - 1) * 2 };
+  // 카드 자리: 8장씩 줄을 바꾸고, 회전은 -2·0·2도.
+  // 세로 간격(#553 — #548의 고정 440px를 대신한다): 카드 종류별 예약 높이에 여백(ROW_GAP)을 더한 값.
+  // 예약 높이를 넘기지 않으면 기본 카드(최대 424px) 기준 460px — treeSpread의 기본 간격과 같다.
+  // 화면(board.js)은 순간의 예약 높이를 넘겨 큰 카드(YouTube 등)가 있는 줄은 더 벌린다.
+  const BASE_CARD_H = 424, ROW_GAP = 36;
+  function cardPosition(i, reserveH) {
+    const pitch = (Number.isFinite(reserveH) && reserveH > 0 ? reserveH : BASE_CARD_H) + ROW_GAP;
+    return { x: 150 + (i % 8) * 280, y: 150 + Math.floor(i / 8) * pitch, rot: (i % 3 - 1) * 2 };
   }
 
   // 처음 배치(#395): 자리를 정한 적 없는 순간을 이야기 순서대로 펼친다.
-  // 첫 순간은 왼쪽, 이어진 순간은 오른쪽으로 가지 치듯(가로 300px, 세로 460px 간격 = 카드끼리 겹치지 않음. #548에서 420→460).
-  // 회전은 cardPosition과 같은 -2·0·2도. 자리를 저장한 순간(x·y)은 board.js가 저장값을 그대로 쓴다.
-  function treeSpread(ids, edges) {
+  // 첫 순간은 왼쪽, 이어진 순간은 오른쪽으로 가지 치듯(가로 300px 간격).
+  // 세로 간격(#553): 밴드별로 '그 밴드 카드의 최대 예약 높이 + 여백'이 줄 간격이 된다 — 썸네일이
+  // 실린 YouTube 카드처럼 큰 카드가 같은 열 위아래 카드와 겹치지 않게 한다. 기본 카드는 #548이
+  // 글자 기준선을 올려 최대 424px까지 자랐고 간격도 420→460으로 벌렸으므로, 기본 예약 높이
+  // 424px + 여백 36px = 460px로 #548과 같다. 기본 카드뿐인 트리(예시 40순간)는 간격이 460px로
+  // #548과 같으므로 배치가 그대로다. 자리를 저장한 순간(x·y)은 board.js가 저장값을 그대로 쓴다.
+  function treeSpread(ids, edges, heights) {
     const known = new Set(ids);
     const kids = new Map(ids.map((id) => [id, []]));
     const hasParent = new Set();
@@ -49,17 +56,34 @@ window.LT58Model = (() => {
       cur[1] = Math.max(cur[1], row);
       bandRows.set(b, cur);
     }
+    // #553: 밴드의 줄 간격 = 그 밴드에 실제로 놓이는 카드의 최대 예약 높이 + 여백. 화면(board.js)은
+    // 카드 종류별로 CSS가 정한 최대 높이(YouTube 가로 480·세로 680, 기본 260)를 heights로 넘긴다.
+    const reserved = (id) => {
+      const v = heights instanceof Map ? heights.get(id) : heights?.[id];
+      return Number.isFinite(v) && v > 0 ? v : BASE_CARD_H;
+    };
+    const bandMaxH = new Map(); // 밴드 → 카드 최대 예약 높이(px)
+    for (const [id, p] of out) {
+      const b = Math.floor(p.depth / cols);
+      bandMaxH.set(b, Math.max(bandMaxH.get(b) || 0, reserved(id)));
+    }
+    const bandPitch = new Map(); // 밴드 → 줄 간격(px) = 최대 카드 높이 + 여백
+    for (const [b, h] of bandMaxH) bandPitch.set(b, h + ROW_GAP);
     // #536: 한 밴드가 줄을 임계치보다 많이 쓰면 세로 기둥 하나에 쌓인다 — 모아둔 순간(빠른 추가)·
     // '새 트리로 만들기'는 순간이 전부 한 뿌리의 자식(별 모양)이라 깊이가 1뿐이고, 열=깊이 규칙(#498)이
     // 먹지 않아 26장이 폭 242px 기둥이 됐다. 그 밴드는 DFS 순서대로 열 우선(column-major) 칸에 나눠 담아
     // 판 폭을 고르게 쓴다. 예시 40순간(7줄)·사슬(1줄)·#395 14순간(7줄)은 임계치에 걸리지 않아 그대로다.
     const ROWS_PER_COLUMN = 7;
     const wrapped = new Map(); // 밴드 → Map(id → {col,row}) : 열 우선으로 나눈 자리
-    const bandTop = new Map();
+    const bandTop = new Map(); // 밴드 위까지 쓴 줄 수(#469)
+    const bandTopPx = new Map(); // 밴드 위까지의 세로 픽셀(#553 — 밴드마다 줄 간격이 다르다)
     let acc = 0;
+    let accPx = 0;
     for (const b of [...bandRows.keys()].sort((x, y) => x - y)) {
       bandTop.set(b, acc);
+      bandTopPx.set(b, accPx);
       const [minR, maxR] = bandRows.get(b);
+      const pitch = bandPitch.get(b) || BASE_CARD_H + ROW_GAP;
       if ((maxR - minR) + 1 > ROWS_PER_COLUMN) {
         const slots = new Map();
         let s = 0;
@@ -70,8 +94,10 @@ window.LT58Model = (() => {
         }
         wrapped.set(b, slots);
         acc += ROWS_PER_COLUMN;
+        accPx += ROWS_PER_COLUMN * pitch;
       } else {
         acc += (maxR - minR) + 1;
+        accPx += ((maxR - minR) + 1) * pitch;
       }
     }
     const result = new Map();
@@ -79,14 +105,39 @@ window.LT58Model = (() => {
     for (const id of ids) {
       const { depth, row } = out.get(id);
       const wrap = Math.floor(depth / cols);
-      const top = bandTop.get(wrap) || 0;
       const slot = wrapped.get(wrap)?.get(id);
       const col = slot ? slot.col : (depth % cols);
       const rel = slot ? slot.row : row - (bandRows.get(wrap) || [0])[0];
-      // #548: 세로 간격 420px → 460px(카드 글자 기준선 올림에 따른 카드 높이 증가분).
-      result.set(id, { x: 150 + col * 300, y: 150 + (rel + top) * 460, rot: (i++ % 3 - 1) * 2 });
+      // #553: 밴드마다 줄 간격이 다르므로 위 밴드까지의 세로 픽셀(bandTopPx)에서 시작한다.
+      // 기본 카드뿐인 밴드는 간격이 460px(#548)이라 main의 (rel+top)*460과 같은 자리가 나온다.
+      result.set(id, { x: 150 + col * 300, y: 150 + (bandTopPx.get(wrap) || 0) + rel * (bandPitch.get(wrap) || BASE_CARD_H + ROW_GAP), rot: (i++ % 3 - 1) * 2 });
     }
     return result;
+  }
+
+  // #553: 같은 열(같은 x)의 위아래 카드가 겹치지 않게 세로로 벌린다. 화면이 카드를 그린 뒤 실제
+  // 높이(offsetHeight)를 재서 불러 준다. moving에 있는 카드(배치가 정한 자리 — 저장 자리가 없는
+  // 순간)만 아래로 밀리고, 저장 자리 카드는 그대로다(그 아래 배치 카드가 저장 카드를 피해 내려간다).
+  // 위에서부터 차례로 훑으므로 한 번의 통과로 끝난다. 반환: Map(id → 새 y).
+  function settleColumnGaps(cards, moving, gap = 24) {
+    const byColumn = new Map();
+    for (const c of cards || []) {
+      if (!Number.isFinite(c?.x) || !Number.isFinite(c?.y) || !Number.isFinite(c?.h)) continue;
+      const list = byColumn.get(c.x) || [];
+      list.push(c);
+      byColumn.set(c.x, list);
+    }
+    const out = new Map();
+    for (const list of byColumn.values()) {
+      list.sort((a, b) => a.y - b.y || (a.id < b.id ? -1 : 1));
+      let bottom = null;
+      for (const c of list) {
+        const y = moving?.has(c.id) && bottom !== null ? Math.max(c.y, bottom + gap) : c.y;
+        out.set(c.id, y);
+        bottom = y + c.h;
+      }
+    }
+    return out;
   }
 
   // 실(연결선) 베지에: 두 핀 사이를 아래로 늘어뜨린다. dx가 클수록 처짐이 커지되 140px까지.
@@ -380,5 +431,5 @@ window.LT58Model = (() => {
     return seen ? 'shown' : 'hidden';
   }
 
-  return { escapeHTML, cardPosition, treeSpread, threadPath, fitZoom, boardSize, contentBox, fitBox, clampView, startView, visibleCards, rememberView, savedView, removeConnection, editGuard, collectPath, nextConnections, detailButtonState, cinemaBeats, filterVisible, maxCreatedOrder, threadRedrawStep, decorationMotion, cursorMode, cursorHover, cursorScale, cursorEffectAllowed, cursorPresence };
+  return { escapeHTML, cardPosition, treeSpread, settleColumnGaps, threadPath, fitZoom, boardSize, contentBox, fitBox, clampView, startView, visibleCards, rememberView, savedView, removeConnection, editGuard, collectPath, nextConnections, detailButtonState, cinemaBeats, filterVisible, maxCreatedOrder, threadRedrawStep, decorationMotion, cursorMode, cursorHover, cursorScale, cursorEffectAllowed, cursorPresence };
 })();

@@ -11,15 +11,18 @@ const BOARD = fs.readFileSync(new URL('../public/v41/views/board/board.js', impo
 const EXTRAS = fs.readFileSync(new URL('../public/v41/views/board/board-extras.js', import.meta.url), 'utf8');
 
 test('0. 보드 한 벌: 화면이 부르는 함수가 전부 있다', () => {
-  assert.deepEqual(Object.keys(M).sort(), ['boardSize', 'cardPosition', 'cinemaBeats', 'clampView', 'collectPath', 'contentBox', 'cursorEffectAllowed', 'cursorHover', 'cursorMode', 'cursorPresence', 'cursorScale', 'decorationMotion', 'detailButtonState', 'editGuard', 'escapeHTML', 'filterVisible', 'fitBox', 'fitZoom', 'maxCreatedOrder', 'nextConnections', 'rememberView', 'removeConnection', 'savedView', 'startView', 'threadPath', 'threadRedrawStep', 'treeSpread', 'visibleCards']);
+  assert.deepEqual(Object.keys(M).sort(), ['boardSize', 'cardPosition', 'cinemaBeats', 'clampView', 'collectPath', 'contentBox', 'cursorEffectAllowed', 'cursorHover', 'cursorMode', 'cursorPresence', 'cursorScale', 'decorationMotion', 'detailButtonState', 'editGuard', 'escapeHTML', 'filterVisible', 'fitBox', 'fitZoom', 'maxCreatedOrder', 'nextConnections', 'rememberView', 'removeConnection', 'savedView', 'settleColumnGaps', 'startView', 'threadPath', 'threadRedrawStep', 'treeSpread', 'visibleCards']);
   for (const fn of Object.keys(M)) assert.equal(typeof M[fn], 'function', fn);
 });
 
-test('1. 카드 자리: 8장씩 줄바꿈, 세로 440px 간격(#548: 카드 글자 기준선 올림에 따른 여유), 회전 -2·0·2도', () => {
+test('1. 카드 자리: 8장씩 줄바꿈, 세로 간격은 예약 높이+여백(#553 — 기본 424+36=460px, #548의 고정 440px를 대신한다), 회전 -2·0·2도', () => {
   assert.deepEqual(M.cardPosition(0), { x: 150, y: 150, rot: -2 });
   assert.deepEqual(M.cardPosition(1), { x: 430, y: 150, rot: 0 });
-  assert.deepEqual(M.cardPosition(8), { x: 150, y: 590, rot: 2 });
+  assert.deepEqual(M.cardPosition(8), { x: 150, y: 610, rot: 2 });
   assert.deepEqual(Array.from({ length: 8 }, (_, i) => M.cardPosition(i).x), [150, 430, 710, 990, 1270, 1550, 1830, 2110]);
+  // 예약 높이를 넘기면 그 카드 줄은 더 벌어진다(세로 Shorts 680px → 간격 716px).
+  assert.deepEqual(M.cardPosition(8, 680), { x: 150, y: 866, rot: 2 });
+  assert.deepEqual(M.cardPosition(16, 680), { x: 150, y: 1582, rot: 0 });
 });
 
 test('2. 실(연결선): 두 핀을 아래로 늘어뜨리고, dx가 크면 처짐이 커지되 140px에서 멈춘다', () => {
