@@ -204,6 +204,25 @@ function upgradeVerticals(root = (typeof document !== 'undefined' ? document : n
       el.dataset.ytVertical = '1';
       const img = el.querySelector('img');
       if (img && /hqdefault\.jpg/.test(img.getAttribute('src') || '')) img.src = youtubeThumbUrl(id, true);
+      else if (!img) {
+        // #635 PR C: 썸네일이 몇 번 실패해 내려가기 틀(제목 글 카드)로 정해진 뒤에 실측이 세로를 밝히는 경우 —
+        // 실측은 oardefault를 실제로 불러 온 뒤의 답이라 그림이 있다는 뜻이다. 칸을 원래 모양(그림+재생 글자)으로 되돌린다.
+        const card = el.querySelector('.lt-fallback-card');
+        if (card) {
+          const start = Number(el.dataset.ytStart || 0);
+          const restored = document.createElement('img');
+          restored.src = youtubeThumbUrl(id, true);
+          restored.alt = '';
+          restored.referrerPolicy = 'no-referrer';
+          restored.loading = 'lazy';
+          restored.decoding = 'async';
+          const label = document.createElement('span');
+          label.className = 'yt-play-label';
+          label.textContent = '▶ 재생' + (start > 0 ? ' · 시작 ' + formatStart(start) : '');
+          card.replaceWith(restored);
+          el.append(label);
+        }
+      }
       if (typeof window !== 'undefined' && window.__TRACK59__?.rejudgeOverflow) window.__TRACK59__.rejudgeOverflow();
     });
   }
