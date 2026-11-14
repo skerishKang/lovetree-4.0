@@ -167,3 +167,19 @@ body {
 .lt-journal-opinion { color: var(--lt-gold); text-decoration: none; border-bottom: 1px solid var(--lt-gold-line); }
 .lt-journal-opinion:hover { color: var(--lt-pearl); }
 .lt-badge.warn { border-color: var(--lt-rose); color: var(--lt-rose-ink); }
+
+/* '한눈에' 탭(#655) — 숫자 카드 + 오늘 할 일. 기존 --lt-* 토큰과 카드 모양을 그대로 쓴다. */
+.lt-ov-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; }
+.lt-ov-card { display: grid; gap: 3px; justify-items: start; align-content: start; text-align: left; padding: 14px 16px; border: 1px solid var(--lt-line); border-radius: var(--lt-r-panel); background: var(--lt-glass); color: inherit; font: inherit; cursor: pointer; }
+.lt-ov-card:hover, .lt-ov-card:focus-visible { border-color: var(--lt-gold-line); outline: none; }
+.lt-ov-card[disabled] { cursor: default; }
+.lt-ov-card[disabled]:hover { border-color: var(--lt-line); }
+.lt-ov-value { font-size: 22px; font-weight: 700; color: var(--lt-gold); }
+.lt-ov-label { font-size: 12px; color: var(--lt-muted); overflow-wrap: anywhere; }
+.lt-ov-fail { font-size: 11px; color: var(--lt-rose-ink); }
+/* 390에서 카드 두 줄 셀의 긴 이름이 잘리지 않게 — 라벨은 두 줄까지 늘어난다. */
+.lt-ov-cards .lt-ov-label { min-height: 2.6em; }
+@media (max-width: 480px) {
+  .lt-ov-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .lt-ov-value { font-size: 20px; }
+}
