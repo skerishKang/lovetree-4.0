@@ -213,6 +213,9 @@ html[data-lt-theme=garden] .boardModeSwitch .modeSwitchBtn[aria-pressed="true"]{
 .card .cardMeta{font-size:12px;color:#61526a;display:flex;align-items:center;white-space:nowrap;overflow:hidden}
 .card .cardMeta .emotionDot{flex:0 0 auto}
 .card .cardMeta{gap:0}
+/* #601: 카드 한가운데 재생 단추가 끌기를 가로막지 않게 — 보드 카드에서는 모서리 작은 표로 줄인다(상세·책은 그대로). */
+.card .lt-yt-preview .lt-yt-play{inset:auto;top:10px;right:10px;width:56px;height:56px}
+
 .card .media{height:200px}
 /* 세로 영상은 9:16 모양 그대로, 높이 상한 300px — 가운데 세운다. */
 .card .lt-media[data-lt-vertical="1"] .lt-yt-preview,

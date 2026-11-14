@@ -245,15 +245,22 @@ test('#601 화면: 끌면 내 배치로 자동 전환하고, 날짜순↔내 배
   const browser = await chromium.launch({ headless: true });
   try {
     const { context, page, frame, problems } = await openHost(browser, `${base}/__host-601b.html`, { width: 1440, height: 900 });
-    // 보이는 카드를 골라 오른쪽 빈 칸으로 끌어 꽂는다.
+    // 보이는 카드를 골라 오른쪽 빈 칸으로 끌어 꽂는다. #601: 그림이 대부분인 카드도 그림 가운데에서 끌 수 있어야 한다(재생 단추는 모서리 작은 표).
     const from = await frame.evaluate(() => {
       for (const c of document.querySelectorAll('#cardLayer .card')) {
         const r = c.getBoundingClientRect();
-        if (r.top > 80 && r.bottom < 880 && r.left > 0 && r.right < 1100) return { id: c.dataset.id, x: (r.left + r.right) / 2, y: (r.top + r.bottom) / 2 };
+        if (!(r.top > 80 && r.bottom < 880 && r.left > 0 && r.right < 1100)) continue;
+        const media = c.querySelector('.lt-yt-preview');
+        const mr = media ? media.getBoundingClientRect() : null;
+        const x = mr ? (mr.left + mr.right) / 2 : (r.left + r.right) / 2;
+        const y = mr ? (mr.top + mr.bottom) / 2 : (r.top + r.bottom) / 2;
+        const hit = document.elementFromPoint(x, y);
+        return { id: c.dataset.id, x, y, onButton: !!hit?.closest('button') };
       }
       return null;
     });
     assert.ok(from, '끌 카드가 보인다');
+    assert.equal(from.onButton, false, '카드 그림 가운데는 단추가 아니어야 끌 수 있다(#601)');
     const to = await frame.evaluate(() => {
       const c = document.querySelector('#cardLayer .card');
       const r = c.getBoundingClientRect(), z = r.width / c.offsetWidth;
