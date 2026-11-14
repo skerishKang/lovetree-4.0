@@ -30,6 +30,7 @@ import {headerBadge, cleanupAvailable} from './inbox-model.mjs';
 import {createDialogs} from './shell/dialogs.mjs';
 import {createFeedbackDialog} from './feedback.mjs';
 import {createFeedbackBoard} from './feedback-board.mjs';
+import {mountUpdates} from './updates.mjs';
 import {connectionSignature} from './shell/panel-dirty.mjs';
 import {createLocation} from './shell/location.mjs';
 import {createNotifier, syncedNoticeText} from './shell/notice.mjs';
@@ -491,7 +492,17 @@ function mountConnectionTool(doc){
  // #481 L15: #connection-count·#connection-menu는 index.html에 없다(죽은 가드) — 읽지 않고 0에서 시작한다.
  // 값은 곧 links()의 setConnectionCount가 실제 연결 수로 채운다.
  button.textContent=connectionLabel(0);button.removeAttribute('aria-label');
-}function setConnectionCount(n){const t=$('connection-tool');if(t){t.textContent=connectionLabel(n);t.removeAttribute('aria-label');}}
+ // #601: 지도 화면의 '이어진 선' 버튼을 기억해 둔다 — links()가 매번 프레임 문서를 다시 찾지 않고
+ // 같은 버튼을 고친다(지도를 다시 열거나 화면을 옮겨 다니면 0으로 돌아가던 버그의 뿌리).
+ // show()는 프레임이 뜨기 전에 links()를 부르므로, 버튼이 생긴 뒤 다시 세어 처음부터 올바른 수를 보인다.
+ connectionToolButton=button;links();
+}
+let connectionToolButton=null;
+function setConnectionCount(n){
+ // #601: 기억해 둔 지도 화면의 버튼이 살아 있으면 그 버튼을 고친다. 없으면(예전 부름) 프레임 문서에서 찾는다.
+ if(connectionToolButton?.isConnected){connectionToolButton.textContent=connectionLabel(n);connectionToolButton.removeAttribute('aria-label');return;}
+ const t=$('connection-tool');if(t){t.textContent=connectionLabel(n);t.removeAttribute('aria-label');}
+}
 // #380 4 2차: 순간 잇기 패널이 보여 준 연결 목록(고른 연결)을 기억해 두고, 그 뒤로 트리의 연결이 달라졌으면 더러움이다.
 // 패널 자체는 연결을 만들지 않으므로 보통은 확인 없이 닫힌다(보여 준 것과 저장본이 같기 때문).
 // #380 5번: 첫 화면 움직임 멈춤 상태(메모리에만 둔다 — 보기 메뉴 때와 같다. 화면을 다시 열면 처음 상태).
@@ -500,7 +511,11 @@ let connectionShown='';
 function connectionDirty(){return $('connection-panel').open&&connectionSignature(window.LT41?.tree,window.LT41?.momentId)!==connectionShown;}
 function links(){viewContext();const c=window.LT41;$('connections').replaceChildren();if(!c){setConnectionCount(0);$('selection-label').textContent='트리를 먼저 불러오세요.';connectionShown='';return;}
  const moment=c.tree.moments.find(m=>m.id===c.momentId);$('selection-label').textContent=moment?.title||'';
- const edges=c.tree.edges.filter(e=>e.from===c.momentId||e.to===c.momentId);setConnectionCount(edges.length);
+ // #601: '이어진 선 N개'는 지도에 실제 그린 연결 선 개수다 — 양 끝 순간이 모두 있는 연결을 센다.
+ // (예전에는 선택한 순간에 닿는 선만 세어 대표 계정에서 '이어진 선 0개'로 나왔다.)
+ const has=id=>c.tree.moments.some(m=>m.id===id);
+ const all=c.tree.edges.filter(e=>has(e.from)&&has(e.to));setConnectionCount(all.length);
+ const edges=c.tree.edges.filter(e=>e.from===c.momentId||e.to===c.momentId);
  if(!edges.length){const p=document.createElement('p');p.textContent='아직 연결된 다른 순간이 없어요.';$('connections').append(p);}
  for(const e of edges){
   const id=e.from===c.momentId?e.to:e.from,m=c.tree.moments.find(m=>m.id===id),b=document.createElement('button'),kind=document.createElement('small'),title=document.createElement('span');
@@ -703,7 +718,7 @@ $('account-entry').onclick=e=>{
 };
 $('account-avatar').onclick=e=>{
  e.stopPropagation();
- if($('account-popover').hidden)openAccountMenu();else closeAccountMenu();
+ if($('account-popover').hidden){openAccountMenu();void feedbackBoard.refreshReplyDot();}else closeAccountMenu();
 };
 const $on=(id,fn)=>{const el=$(id);if(el)el.onclick=fn;};
 function advancedKey(){try{return 'lt41.advanced.'+(member?.snapshot().subject||'')}catch{return 'lt41.advanced.'}}
@@ -728,7 +743,11 @@ $('settings-assets-open').onclick=()=>openAssets($('settings-assets-open'));
  $('account-feedback').onclick=()=>{closeAccountMenu();feedbackDialog.open();};
  $('feedback-link').onclick=()=>feedbackDialog.open();
  // 2차: AI 고객 '오늘 사용 일지'·모든 로그인 사용자 '내 의견'.
- const feedbackBoard=createFeedbackBoard({$,notify,show:()=>panel('journal-panel'),showFull:()=>panel('myposts-panel')});
+ // #611 4번: 새 답글 알림 — 단추 점과 '내 의견' 옆 숫자를 함께 갱신한다.
+ const dotState={updates:false,replies:false};
+ function paintAvatarDot(){const avatar=$('account-avatar');if(avatar)avatar.classList.toggle('has-dot',!!(dotState.updates||dotState.replies));}
+ function onReplyCount(count){const badge=$('account-my-posts-count');if(badge){badge.hidden=!(count>0);if(count>0)badge.textContent=String(count);}dotState.replies=count>0;paintAvatarDot();}
+ const feedbackBoard=createFeedbackBoard({$,notify,show:()=>panel('journal-panel'),showFull:()=>panel('myposts-panel'),onReplyCount,onOpenUpdates:version=>{void updatesMount.openUpdates(version);}});
  $('account-journal').onclick=()=>{closeAccountMenu();feedbackBoard.openJournal();};
  $('account-my-posts').onclick=()=>{closeAccountMenu();feedbackBoard.openMyPosts();};
  // #540 마무리: 운영센터 입구. 계정 메뉴·설정의 '운영' 묶음에서 같은 화면을 새 탭으로 연다.
@@ -736,6 +755,13 @@ $('settings-assets-open').onclick=()=>openAssets($('settings-assets-open'));
  const openOpsCenter=()=>{const win=window.open('/admin.html','_blank','noopener');if(!win)location.assign('/admin.html');};
  $('account-ops').onclick=()=>{closeAccountMenu();openOpsCenter();};
  $('settings-ops-open').onclick=()=>openOpsCenter();
+ // #611 새 소식: 계정 메뉴·설정 아래쪽·로그아웃 작은 링크 모두 같은 창을 쓴다.
+ const updatesMount=mountUpdates({$,showPanel:id=>panel(id),onDot:unread=>{dotState.updates=!!unread;paintAvatarDot();}});
+ $('account-updates').onclick=()=>{closeAccountMenu();void updatesMount.openUpdates();};
+ $('updates-link').onclick=()=>{void updatesMount.openUpdates();};
+ $('settings-updates-open').onclick=()=>{$('account-settings').close();void updatesMount.openUpdates();};
+ void updatesMount.start();
+ if(member?.snapshot?.().owned)void feedbackBoard.refreshReplyDot();
  $('advanced-backup').onclick=()=>backup();
  // #368: 기록 가져오기는 JSON 선택 input을 연다. input은 창 밖에 숨겨 두어 설정이 닫혀 있어도(빈 화면의 백업 파일 열기) 열린다.
  // CTO 결정(2026-11-12): 설정에는 "기록 가져오기" 하나만 둔다 — "백업 파일 열기"는 같은 선택 창이라 중복이고,
@@ -1030,7 +1056,7 @@ async function showPublicRoute(route){
  $('empty').querySelector('p').textContent='소유자가 공개한 트리 한 개만 확인합니다.';
  $('empty-sample').hidden=true;$('empty-records').hidden=true;$('view').hidden=true;$('empty').hidden=false;
  const answer=await shareApi.read(route.shareId||'');if(generation!==loadGeneration)return;if(!answer.ok){publicProblem(answer);return;}
- activeShareId=answer.share.id;const view=['book','board','network'].includes(route.view)?route.view:answer.share.view;current=screenForView(view)[1];load({revision:0,state:{version:1,trees:[answer.tree]}},'share',{treeId:answer.tree.id,momentId:answer.share.entryMomentId});activeShareId=answer.share.id;show(current,false);writeLocation('replace');notify('공개된 트리를 감상하는 화면이에요. 감상만 할 수 있어요.'+(answer.omittedPrivateMedia?' 올린 사진 '+answer.omittedPrivateMedia+'장은 나만 볼 수 있어요.':''));
+ activeShareId=answer.share.id;const view=['book','board','network'].includes(route.view)?route.view:answer.share.view;current=screenForView(view)[1];load({revision:0,state:{version:1,trees:[answer.tree]}},'share',{treeId:answer.tree.id,momentId:answer.share.entryMomentId});activeShareId=answer.share.id;show(current,false);writeLocation('replace');notify('공개된 트리를 감상하는 화면이에요. 감상만 할 수 있어요.'+(answer.aiTester?' AI 테스터가 만든 트리예요.':'')+(answer.omittedPrivateMedia?' 올린 사진 '+answer.omittedPrivateMedia+'장은 나만 볼 수 있어요.':''));
 }
 document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{if(b.dataset.view==='track32-bookshelf.html'&&!member?.snapshot().owned){openLoginStart('shelf');return;}show(b.dataset.view);});
 for(const f of frames())f.addEventListener('load',()=>frameLoaded(f));

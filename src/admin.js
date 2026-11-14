@@ -61,7 +61,8 @@ function renderLogin() {
 
 function statusBadge(status) { return `<span class="lt-badge" data-status="${escapeText(status)}">${escapeText(STATUS_LABEL[status] || status)}</span>`; }
 function kindBadge(kind) { return `<span class="lt-badge" data-kind="${escapeText(kind)}">${escapeText(KIND_LABEL[kind] || kind)}</span>`; }
-function authorLabel(row) { return row.authorName || (row.subjectId ? '고객' : '익명'); }
+// #611 3번: 운영센터에서는 AI 고객 이름을 'AI 윤제'처럼 알린다(남에게 보이는 곳의 'AI 테스터' 표시와 같은 결정).
+function authorLabel(row) { const name = row.authorName || (row.subjectId ? '고객' : '익명'); return row.authorRole === 'ai_customer' ? `AI ${name}` : name; }
 
 async function render() {
   if (renderLogin()) return;
@@ -113,7 +114,7 @@ async function renderDetail(id) {
   const replies = Array.isArray(post.replies) ? post.replies : [];
   const persona = post.persona && post.persona.name ? post.persona : null;
   const replyRows = replies.length
-    ? replies.map(r => `<div class="lt-reply" data-type="${r.authorType}"><div class="lt-reply-head"><span>${r.authorType === 'customer' ? '고객 답변' : '내부 메모'}</span><span>${escapeText(formatTime(r.createdAt))}</span></div><p>${richParagraph(r.body)}</p></div>`).join('')
+    ? replies.map(r => `<div class="lt-reply" data-type="${r.authorType}"><div class="lt-reply-head"><span>${r.fromCustomer ? '고객 덧붙임' : (r.authorType === 'customer' ? '고객 답변' : '내부 메모')}</span><span>${escapeText(formatTime(r.createdAt))}</span></div><p>${richParagraph(r.body)}</p></div>`).join('')
     : '<p class="lt-empty">아직 답글이 없습니다.</p>';
   const author = post.subjectId
     ? `<button type="button" class="lt-author-link" data-persona="${escapeText(post.subjectId)}">${escapeText(authorLabel(post))}${persona ? ' · 페르소나' : ''}</button>`

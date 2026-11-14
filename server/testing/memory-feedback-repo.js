@@ -31,7 +31,7 @@ export function createMemoryFeedbackRepo() {
         .filter(row => !category || row.category === category)
         .sort((a, b) => b.id - a.id)
         .slice(0, Math.max(1, Math.min(200, Number(limit) || 100)))
-        .map(row => ({...clone(row), replyCount: replyCount(row.id), authorName: authorName(row.subjectId)}));
+        .map(row => ({...clone(row), replyCount: replyCount(row.id), authorName: authorName(row.subjectId), authorRole: row.subjectId && personas.has(row.subjectId) ? 'ai_customer' : null}));
     },
     async listBySubject({productId, subjectId, kind = ''}) {
       return rows
@@ -39,18 +39,18 @@ export function createMemoryFeedbackRepo() {
         .filter(row => !kind || row.kind === kind)
         .sort((a, b) => b.id - a.id)
         .slice(0, 200)
-        .map(row => ({...clone(row), replyCount: replyCount(row.id), authorName: authorName(row.subjectId)}));
+        .map(row => ({...clone(row), replyCount: replyCount(row.id), authorName: authorName(row.subjectId), authorRole: row.subjectId && personas.has(row.subjectId) ? 'ai_customer' : null}));
     },
     async listJournals({productId, limit = 300}) {
       return rows
         .filter(row => row.productId === productId && row.kind === 'journal')
         .sort((a, b) => String(b.journalDate || '').localeCompare(String(a.journalDate || '')) || b.id - a.id)
         .slice(0, Math.max(1, Math.min(500, Number(limit) || 300)))
-        .map(row => ({...clone(row), replyCount: replyCount(row.id), authorName: authorName(row.subjectId)}));
+        .map(row => ({...clone(row), replyCount: replyCount(row.id), authorName: authorName(row.subjectId), authorRole: row.subjectId && personas.has(row.subjectId) ? 'ai_customer' : null}));
     },
     async get({productId, id}) {
       const row = rows.find(item => item.productId === productId && item.id === Number(id));
-      return row ? {...clone(row), replyCount: replyCount(row.id), authorName: authorName(row.subjectId)} : null;
+      return row ? {...clone(row), replyCount: replyCount(row.id), authorName: authorName(row.subjectId), authorRole: row.subjectId && personas.has(row.subjectId) ? 'ai_customer' : null} : null;
     },
     async todayJournal({productId, subjectId}) {
       const row = rows.filter(item => item.productId === productId && item.subjectId === subjectId && item.kind === 'journal').sort((a, b) => b.id - a.id)[0];
@@ -66,7 +66,7 @@ export function createMemoryFeedbackRepo() {
       if (body) row.body = body;
       if (score !== undefined && score !== null) row.score = score;
       row.updatedAt = '2026-11-14T00:01:00.000Z';
-      return {...clone(row), replyCount: replyCount(row.id), authorName: authorName(row.subjectId)};
+      return {...clone(row), replyCount: replyCount(row.id), authorName: authorName(row.subjectId), authorRole: row.subjectId && personas.has(row.subjectId) ? 'ai_customer' : null};
     },
     async addReply({productId, postId, authorType, authorSubjectId = null, body}) {
       const reply = {id: nextReplyId++, productId, postId: Number(postId), authorType, authorSubjectId, body, createdAt: '2026-11-14T00:02:00.000Z'};

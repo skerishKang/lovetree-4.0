@@ -136,13 +136,34 @@ export function createFeedbackService({feedbackRepo,productId,admin=null,now=()=
      const item=boardRow(post);
      if(item.kind==='opinion'){
       const replies=await feedbackRepo.listReplies({productId,postId:item.id});
-      item.replies=replies.filter(reply=>reply.authorType==='customer');
+      // #611 4번: 고객이 직접 덧붙인 줄과 운영센터 답글을 구분한다(mine).
+      // 답변자 신원은 고객에게 내리지 않는다 — 본인 글인지 여부만 알린다.
+      item.replies=replies.filter(reply=>reply.authorType==='customer')
+        .map(reply=>({id:reply.id,authorType:reply.authorType,body:reply.body,createdAt:reply.createdAt,mine:reply.authorSubjectId===principal.subjectId}));
      }else{
       item.replies=[];
      }
      out.push(item);
     }
     return out;
+   },
+
+   /** #611 4번: 고객이 자기 의견 아래에 짧게 덧붙인다. 상태가 고침·닫음이면 '다시 열림'으로 바뀐다. */
+   async append({principal,id,body}={}){
+    requirePrincipal(principal);
+    const post=await feedbackRepo.get({productId,id});
+    // 본인 의견인지, 남의 글·일지인지는 밖으로 알리지 않는다(없는 것과 같이 404).
+    if(!post||post.subjectId!==principal.subjectId||post.kind!=='opinion')throw new ApiError(404,'feedback_not_found','글을 찾을 수 없어요.');
+    const text=clean(body,MAX_BODY);
+    if(!text)throw new ApiError(400,'body_required','덧붙일 말을 입력해 주세요.');
+    rate('followup:'+principal.subjectId,20,10*60_000,'잠시 뒤 다시 시도해 주세요.');
+    const reply=await feedbackRepo.addReply({productId,postId:post.id,authorType:'customer',authorSubjectId:principal.subjectId,body:maskPersonal(text)});
+    let status=post.status;
+    if(status==='fixed'||status==='closed'){
+     const reopened=await feedbackRepo.update({productId,id:post.id,status:'reviewing',memo:null,issueNumber:null,title:null,body:null,score:null});
+     status=reopened?.status||'reviewing';
+    }
+    return {id:reply.id,postId:post.id,status,createdAt:reply.createdAt};
    },
 
    /** 관리자 목록(최신 순). 종류·상태·종류(의견/일지) 거르기. */
@@ -160,7 +181,7 @@ export function createFeedbackService({feedbackRepo,productId,admin=null,now=()=
     await requireAdmin(principal);
     const row=await feedbackRepo.get({productId,id});
     if(!row)throw new ApiError(404,'feedback_not_found','글을 찾을 수 없어요.');
-    const replies=await feedbackRepo.listReplies({productId,postId:row.id});
+    const replies=(await feedbackRepo.listReplies({productId,postId:row.id})).map(reply=>({...reply,fromCustomer:reply.authorType==='customer'&&reply.authorSubjectId===row.subjectId}));
     const persona=row.subjectId?await feedbackRepo.getPersona({productId,subjectId:row.subjectId}):null;
     return {...boardRow(row),replies,persona};
    },
@@ -247,6 +268,12 @@ export function createFeedbackHandler({authenticate,service,productId}){
   if(path==='/api/board/mine'&&method==='GET'){
    const who=await requiredPrincipal(request);
    return {status:200,body:{posts:await service.myPosts({principal:who})},headers:NO_STORE};
+  }
+  const followup=path.match(/^\/api\/board\/mine\/([^/]+)\/followup$/);
+  if(followup&&method==='POST'){
+   const who=await requiredPrincipal(request);
+   const body=jsonBody(request);
+   return {status:201,body:{followup:await service.append({principal:who,id:decodeURIComponent(followup[1]),body:body?.body})},headers:NO_STORE};
   }
   if(path==='/api/board/journal/today'&&method==='GET'){
    const who=await requiredPrincipal(request);
