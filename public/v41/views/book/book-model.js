@@ -69,7 +69,7 @@ const spreads =Array.from({length:Math.ceil(moments.length/2)},(_,i)=>{const toP
     return { id: next.id, title: title || String(next.memo || '').trim(), reason: edge?.reason || '' };
   }
 
-  /* ── #345: '여기까지 온 길' 계산 한 벌 ─────────────────────────────────────
+  /* ── #345: '이어진 순간'(이슈 584에서 개명) 계산 한 벌 ───────────────────
      타임라인 항목·단계·일수·감정 색은 화면이 아니라 여기서 정한다. 화면(book-extra.js)은 그리기만 한다. */
 
   // 감정 색: 기존 --lt-group-1..6 토큰 번호. 아는 감정은 고정, 모르는 감정은 글자 해시로 안정적으로 고른다.

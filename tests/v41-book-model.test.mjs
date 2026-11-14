@@ -106,7 +106,7 @@ test('7. 화면은 같은 계산을 다시 구현하지 않고 한 벌을 부른
     assert.ok(BOOK.includes(call), call);
   }
   assert.ok(EXTRA.includes('LT59Model.nextMomentOf'));
-  assert.ok(EXTRA.includes('LT59Model.journeyTimeline'), '여기까지 온 길 계산도 한 벌을 부른다');
+  assert.ok(EXTRA.includes('LT59Model.journeyTimeline'), '이어진 순간 계산도 한 벌을 부른다');
 });
 
 test('8. 이미 한 벌인 규칙은 그대로 둔다(book-usability.mjs)', () => {
@@ -118,8 +118,8 @@ test('8. 이미 한 벌인 규칙은 그대로 둔다(book-usability.mjs)', () =
   assert.ok(EXTRA.includes('window.LTTapIntent=tapIntent'));
 });
 
-// ── #345 '여기까지 온 길' 계산 표 ─────────────────────────────────────────────
-test('9. 여기까지 온 길: 지금 보는 순간까지의 칸·단계·일수', () => {
+// ── #345 '이어진 순간'(이슈 584에서 개명) 계산 표 ────────────────────────────
+test('9. 이어진 순간: 지금 보는 순간까지의 칸·단계·일수', () => {
   const chain = [
     { id: 'a', title: '첫 무대', date: '2026.10.02', emotion: '설렘', next: 'b', whyNext: '이 무대 보고 직캠까지 찾아봄' },
     { id: 'b', title: '팬미팅 영상', date: '2026.10.21', emotion: '응원', next: 'c', whyNext: '이어서 본 직캠' },
@@ -139,7 +139,7 @@ test('9. 여기까지 온 길: 지금 보는 순간까지의 칸·단계·일수
   assert.deepEqual(M.journeyTimeline([], [], 'x'), { items: [], steps: 0, days: null });
 });
 
-test('10. 여기까지 온 길: 연결 이유는 실제 연결 우선, 없으면 생략', () => {
+test('10. 이어진 순간: 연결 이유는 실제 연결 우선, 없으면 생략', () => {
   const list = [
     { id: 'a', title: 'A', date: '2026-01-01', next: 'b', whyNext: '예시 이유' },
     { id: 'b', title: 'B', date: '2026-01-02', next: 'c' },
@@ -155,7 +155,7 @@ test('10. 여기까지 온 길: 연결 이유는 실제 연결 우선, 없으면
   assert.equal(mismatch.items[0].reason, '', 'whyNext가 다음 칸을 가리키지 않으면 쓰지 않는다');
 });
 
-test('11. 여기까지 온 길: 썸네일·감정 색·제목 대체', () => {
+test('11. 이어진 순간: 썸네일·감정 색·제목 대체', () => {
   const list = [
     { id: 'y', title: '영상', date: '2026-01-01', externalUrl: 'https://www.youtube.com/shorts/9NXOCr-T8LU', emotion: '설렘' },
     { id: 'p', title: '사진', date: '2026-01-02', image: 'data:image/png;base64,xx', emotion: '위로' },

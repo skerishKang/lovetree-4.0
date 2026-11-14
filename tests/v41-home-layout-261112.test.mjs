@@ -52,7 +52,7 @@ test('카드는 언제나 불투명하고, blur 대신 밝기로 깊이를 낸�
 test('가운데 안전 구역: 제목·버튼 묶음 사각형+여백을 재고, 창이 바뀌면 다시 잰다', () => {
   assert.match(orbit, /const measureSafeZone=\(\)=>\{const c=shadow\.querySelector\('\.center'\)/);
   assert.match(orbit, /,M=32;/, '안전 구역 여백 32px');
-  assert.match(orbit, /fitNotice=\(\)=>\{host\.style\.height=`calc\(100dvh - \$\{noticeOuter\(\)\}px\)`;safeZoneDirty=true;schedule\(\);/, '창 크기 변경(fitNotice)마다 다시 잰다');
+  assert.match(orbit, /fitNotice=\(\)=>\{host\.style\.height=`calc\(100dvh - \$\{noticeOuter\(\)\}px\)`;appBox=app\.getBoundingClientRect\(\);safeZoneDirty=true;schedule\(\);/, '창 크기 변경(fitNotice)마다 다시 잰다(#586: 패럴랙스 rect 캐시도 함께 재운다)');
   assert.match(orbit, /setTimeout\(\(\)=>\{safeZoneDirty=true;schedule\(\);\},1500\)/, '글꼴 도착 뒤에도 다시 잰다(fonts.ready 접근은 뼈대 완성을 늦추므로 타이머를 쓴다)');
   // 카드 사각형(회전 여유 18%)과 겹치면 가장 얇은 쪽으로 민다 — 겹침 0 보장.
   // #491: 좁은 화면에서는 그려지는 배율(cScale)로 투영한다(넓은 화면은 fit=1이라 cScale===sc).

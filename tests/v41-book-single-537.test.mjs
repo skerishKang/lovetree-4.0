@@ -68,7 +68,7 @@ test('#537 1·2: 넓은 화면 한 장은 두 장 책의 한 쪽 크기·같은 
   assert.match(BOOK, /function narrow\(\)\{return innerWidth<600\}/, '폰 폭 판정 한 곳');
   assert.match(BOOK, /dataset\.bookShape=narrow\(\)\?'phone':'wide'/, '화면 모양 속성');
   // 두 장과 같은 높이 식 + 두 장 책 폭의 절반 = 한 쪽 크기, 위아래 가운데는 .stage의 place-items가 맡는다.
-  assert.match(CSS, /html\[data-book-view=single\]\[data-book-shape=wide\] \.book-wrap\{width:calc\(min\(1160px,80vw\)\/2\);height:min\(650px,calc\(100vh - 250px\)\);min-height:380px\}/, '넓은 화면 한 장 크기');
+  assert.match(CSS, /html\[data-book-view=single\]\[data-book-shape=wide\] \.book-wrap\{width:calc\(min\(1160px,80vw\)\/2\);height:min\(920px,calc\(100vh - 215px\)\);min-height:380px\}/, '넓은 화면 한 장 크기(이슈 584: 두 장과 같은 식)');
   assert.match(CSS, /html\[data-book-view=single\]\[data-book-shape=wide\] \.book\{grid-template-columns:1fr\}/, '한 쪽만 놓는 격자');
   assert.match(CSS, /html\[data-book-view=single\]\[data-book-shape=wide\] \.page\.left,\nhtml\[data-book-view=single\]\[data-book-shape=wide\] \.mobile-page,\nhtml\[data-book-view=single\]\[data-book-shape=wide\] \.mobile-inspect,\nhtml\[data-book-view=single\]\[data-book-shape=wide\] \.eyebrow\{display:none\}/, '넓은 화면 한 장: 오른쪽 한 쪽만');
   // 휴대폰 모양(좁은 책·작은 머리줄)은 폰 폭에만 남는다.
@@ -107,10 +107,10 @@ test('#537 8: 한 장 아래 작은 줄(.mobile-support)은 그리지 않는다'
   assert.match(USE_CSS, /html\[data-v41-screen=book\] \.next-page\{position:absolute;inset:0 0 56px\}/, '두 장은 빈 오른쪽 페이지를 그대로 채운다');
 });
 
-test('#537 10: 목차·여기까지 온 길에서 들어와도 그 순간이 바로 크게 나온다', () => {
+test('#537 10: 목차·이어진 순간에서 들어와도 그 순간이 바로 크게 나온다', () => {
   assert.match(BOOK, /jumpToMoment:id=>renderSpread\(posOfMoment\(id\),id,false\)/, '순간 id로 바로 그 쪽');
   assert.match(BOOK, /data-jump="\$\{at\}" data-focus="\$\{m.id\}"/, '목차 항목은 위치(순간 순번/펼침면 번호)를 싣는다');
-  assert.match(EXTRA, /const target=posOfMoment\(focus\);/, "'여기까지 온 길'도 같은 위치 규칙");
+  assert.match(EXTRA, /const target=posOfMoment\(focus\);/, "'이어진 순간'도 같은 위치 규칙");
   assert.match(BOOK, /const focus=LTDEMO\.get\(\)\|\|'';viewChoice=v;try\{localStorage\.setItem\(VIEW_KEY,v\)\}catch\{\}applyViewAttr\(\);renderSpread\(posOfMoment\(focus\),focus\|\|null,false\)/, '보기 전환도 같은 위치 규칙');
 });
 
