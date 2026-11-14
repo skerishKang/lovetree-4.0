@@ -325,6 +325,7 @@ const shellMessages=createMessages({
   openLoginStart:intent=>openLoginStart(intent),
   openAccountMenu:()=>openAccountMenu(),
   openCleanup:options=>shellCleanup.open(options),
+  openMovePicker:options=>shellCleanup.openMove(options),
   sample:(selection,view)=>sample(selection,view),
   applyTheme:(theme)=>applyTheme(theme),
   paintThemeControls:()=>paintThemeControls(),

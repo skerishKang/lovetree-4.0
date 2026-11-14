@@ -64,12 +64,12 @@ export function cleanupState({ selectedIds = [], newTreeName = '', targetId = ''
   };
 }
 
-/** 옮긴 뒤 안내. 현재 화면에 머물고 '가 보기'로 대상 트리를 열 수 있다. */
-export function movedNotice({ targetLabel = '', isNew = false } = {}) {
+/** 옮긴 뒤 안내. action에 단추 이름을 넣어 그 행동(되돌리기 등)을 함께 내놓는다. */
+export function movedNotice({ targetLabel = '', isNew = false, action = '가 보기' } = {}) {
   const label = String(targetLabel ?? '').trim();
   return {
     text: isNew ? `${label}${josaRo(label)} 새 트리를 만들었어요.` : `${label}${josaRo(label)} 옮겼어요.`,
-    action: '가 보기'
+    action
   };
 }
 
