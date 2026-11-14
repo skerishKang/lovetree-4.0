@@ -3,7 +3,7 @@ import './admin.css';
 import {
   GITHUB_REPO, KIND_LABEL, STATUS_LABEL, STATUS_ORDER, PERSONA_FIELDS,
   escapeText, richParagraph, formatTime, parseHash, viewHash, viewToTab,
-  filterRows, statusTabs, kindTabs, linkedIssueNumbers, issueStateLabel, needsFixButton,
+  filterRows, statusTabs, kindTabs, linkedIssueNumbers, normalizeIssueNumber, issueStateLabel, needsFixButton,
   statusChangeMessage, buildIssueUrl, issueLink, journalsSummary, journalRowsByCustomer
 } from './admin-view.js';
 
@@ -301,7 +301,8 @@ async function renderIssues() {
   }
   const rows = numbers.map(number => {
     const issue = byNumber.get(number);
-    const linked = posts.filter(post => String(post.issueNumber ?? '').trim() === String(number));
+    // #636: 저장된 값에 앞의 '#'이 붙어 있을 수 있다 — 읽는 쪽은 숫자로 맞춰 비교한다.
+    const linked = posts.filter(post => normalizeIssueNumber(post.issueNumber) === String(number));
     const stateLabel = issue ? issueStateLabel(issue.state) : '';
     const postRows = linked.map(post => {
       // 이슈가 고침 완료인데 고객 글이 아직 '고침'이 아니면 바꾸는 단추를 내놓는다. 누르기 전까지는 자동으로 바꾸지 않는다(#570 4).
@@ -393,7 +394,8 @@ document.addEventListener('click', async (event) => {
   }
   if (event.target.closest('[data-save]')) {
     const memo = document.querySelector('[data-memo]')?.value || '';
-    const issue = document.querySelector('[data-issue]')?.value || '';
+    // #636: 저장은 숫자만 — 앞의 '#'은 화면 표시일 뿐이다.
+    const issue = normalizeIssueNumber(document.querySelector('[data-issue]')?.value || '');
     const res = await read('/api/admin/feedback/' + encodeURIComponent(route.id), {method: 'PATCH', body: JSON.stringify({memo, issueNumber: issue})});
     const el = document.querySelector('[data-save-status]');
     if (el) el.textContent = res.ok ? '저장했어요.' : (res.payload?.error?.message || '저장에 실패했어요.');

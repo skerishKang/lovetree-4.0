@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createTree,editTree} from '../src/domain.js';
+import {createTree,editTree,addMoment} from '../src/domain.js';
 import {createWorkspaceService} from '../server/workspace-service.js';
 import {createMemoryWorkspaceRepo} from '../server/testing/memory-workspace-repo.js';
 import {createMemoryShareRepo} from '../server/testing/memory-share-repo.js';
@@ -146,6 +146,60 @@ test('comment edit is own-only, sets edited flag, keeps existing comments, and b
  await call(handle,'POST',`/api/community/shares/${shareId}/block`,{account:'bob'});
  const blocked=await call(handle,'POST',path,{account:'bob',key:'edit-key-0002',body:{body:'차단 후'}});assert.equal(blocked.status,403);assert.equal(blocked.body.error.code,'comment_blocked');
  const blockedEdit=await call(handle,'PATCH',`/api/community/comments/${made.body.comment.id}`,{account:'bob',body:{body:'차단 후 수정'}});assert.equal(blockedEdit.status,403);
+});
+
+test('#627: 둘러보기 검색은 트리 순간의 제목(영상 제목 포함)도 본다',async()=>{
+ // 트리 이름은 자동 이름('모아둔 순간')이고, 그룹 이름은 순간의 영상 제목에만 있다.
+ const workspaceRepo=createMemoryWorkspaceRepo(),workspace=createWorkspaceService({repo:workspaceRepo,productId:PRODUCT});
+ const video='https://www.youtube.com/watch?v=rescene00001';
+ let tree=createTree({subject:'윤슬',title:'첫 무대',note:'다시 보고 싶은 빛',emotion:'설렘',date:'2026-11-01',url:PHOTO},CLOCK);
+ tree=editTree(tree,{title:'모아둔 순간',subject:tree.subject,coverMomentId:tree.moments[0].id});
+ tree=addMoment(tree,{url:video,mediaMetadata:{title:'RESCENE(리센느) 무대 직캠',channel:'기록 채널',source:'youtu.be'}},tree.moments[0].id,CLOCK);
+ await workspace.write(principal('alice'),{state:{version:1,trees:[tree]},expectedRevision:0,clientKey:'seed-rescene'});
+ const shareRepo=createMemoryShareRepo();
+ const share=await shareRepo.setDiscoverable({productId:PRODUCT,subjectId:'alice',shareId:'r'.repeat(24),discoverable:true,treeId:tree.id,entryMomentId:tree.moments[0].id,view:'book',momentCount:3}).catch(()=>null)
+  ||await shareRepo.create({productId:PRODUCT,shareId:'r'.repeat(24),subjectId:'alice',treeId:tree.id,entryMomentId:tree.moments[0].id,view:'book',momentCount:3});
+ const discoverable=share.discoverable===true?share:await shareRepo.setDiscoverable({productId:PRODUCT,subjectId:'alice',shareId:share.shareId,discoverable:true});
+ const communityRepo=createMemoryCommunityRepo();communityRepo.seedShares([discoverable]);
+ let id=0;
+ const service=createCommunityService({communityRepo,shareRepo,workspaceRepo,productId:PRODUCT,admin:{roleFor:async()=>null},makeId:()=>String(++id).padStart(24,'d'),now:()=>Date.UTC(2026,10,1)});
+ const authenticate=async request=>{const subjectId=request.headers?.account;if(!subjectId)throw new ApiError(401,'unauthenticated','login');return principal(subjectId);};
+ const handle=createCommunityHandler({authenticate,service,productId:PRODUCT});
+ for(const query of ['rescene','RESCENE','리센느']){
+  const list=await call(handle,'GET','/api/community/shares',{query:'q='+encodeURIComponent(query)});
+  assert.equal(list.status,200,query);
+  assert.equal(list.body.items.length,1,`'${query}' 검색으로 순간 제목의 그룹 이름을 찾는다`);
+  assert.equal(list.body.items[0].title,'모아둔 순간');
+  // 검색용으로 모은 순간 제목은 응답에 내보내지 않는다(공개 카드 모양 그대로 — 실제 응답은 JSON 직렬화를 거친다).
+  assert.equal(Object.prototype.propertyIsEnumerable.call(list.body.items[0],'searchText'),false);
+  assert.equal(JSON.stringify(list.body).includes('RESCENE'),false);
+  assert.equal(JSON.stringify(list.body).includes('searchText'),false);
+ }
+ // 뜻 없는 검색어는 그대로 걸러진다(검색이 무조건 통과로 바뀌지 않았다).
+ assert.deepEqual((await call(handle,'GET','/api/community/shares',{query:'q=없는검색'})).body.items,[]);
+ // 순간 제목을 더 보느라 조회 수가 늘지 않는다(요약 한 번).
+ communityRepo.queryCount=0;
+ await call(handle,'GET','/api/community/shares',{query:'q=rescene'});
+ assert.equal(communityRepo.queryCount,1);
+});
+
+test('#627: 비공개 트리는 순간 제목으로도 검색되지 않는다',async()=>{
+ const workspaceRepo=createMemoryWorkspaceRepo(),workspace=createWorkspaceService({repo:workspaceRepo,productId:PRODUCT});
+ let tree=createTree({subject:'윤슬',title:'첫 무대',note:'다시 보고 싶은 빛',emotion:'설렘',date:'2026-11-01',url:PHOTO},CLOCK);
+ tree=editTree(tree,{title:'모아둔 순간',subject:tree.subject,coverMomentId:tree.moments[0].id});
+ tree=addMoment(tree,{url:'https://www.youtube.com/watch?v=rescene00002',mediaMetadata:{title:'RESCENE(리센느) 연습실',channel:'기록 채널',source:'youtu.be'}},tree.moments[0].id,CLOCK);
+ await workspace.write(principal('alice'),{state:{version:1,trees:[tree]},expectedRevision:0,clientKey:'seed-private'});
+ const shareRepo=createMemoryShareRepo();
+ const share=await shareRepo.create({productId:PRODUCT,shareId:'p'.repeat(24),subjectId:'alice',treeId:tree.id,entryMomentId:tree.moments[0].id,view:'book',momentCount:3});
+ const discoverable=await shareRepo.setDiscoverable({productId:PRODUCT,subjectId:'alice',shareId:share.shareId,discoverable:true});
+ // 공개 판정: 비공개로 바꾼 트리는 둘러보기 후보에서 빠진다(공개 범위 규칙은 그대로 — 저장소가 트리 공개 상태를 본다).
+ const communityRepo=createMemoryCommunityRepo({isPrivateTree:async()=>true});communityRepo.seedShares([discoverable]);
+ const visibilityRepo={get:async()=>({visibility:'private'})};
+ const service=createCommunityService({communityRepo,shareRepo,workspaceRepo,visibilityRepo,productId:PRODUCT,admin:{roleFor:async()=>null},makeId:()=>'x'.repeat(24),now:()=>Date.UTC(2026,10,1)});
+ const authenticate=async request=>principal(request.headers?.account||'bob');
+ const handle=createCommunityHandler({authenticate,service,productId:PRODUCT});
+ const hidden=await call(handle,'GET','/api/community/shares',{query:'q=rescene'});
+ assert.deepEqual(hidden.body.items,[],'비공개 트리는 순간 제목 검색으로도 나오지 않는다');
 });
 
 test('discover uses batched summaries, excludes blocked/hidden/deleted, and leaks no private ids',async()=>{

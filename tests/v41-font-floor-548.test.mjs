@@ -94,6 +94,10 @@ test('#548 기준선: 여섯 화면(390·1440)에서 12px 미만 글자 0개, �
       await page.goto(`${base}/v41/#home`, { waitUntil: 'load' });
       await page.waitForTimeout(1800);
       for (const [name, id] of [['설정', 'account-settings'], ['순간 추가', 'write-panel']]) {
+        // #548: 창이 아직 만들어지기 전에 showModal 을 부르면 'null 을 읽을 수 없다'로 시험이 통째로 멈춘다 —
+        // 실제로 그렇게 실패했다(2026-11-14, 이 기계가 바쁠 때). 기다리는 시간을 늘리는 대신 창이 생길 때까지
+        // 기다린다(재는 위치·기준은 그대로 — 12px·13px 도, 화면도 바꾸지 않는다).
+        await page.waitForFunction((dialogId) => Boolean(document.getElementById(dialogId)), id, { timeout: 30000, polling: 100 });
         await page.evaluate((dialogId) => document.getElementById(dialogId).showModal(), id);
         await page.waitForTimeout(350);
         for (const row of await page.evaluate(COLLECT)) {
