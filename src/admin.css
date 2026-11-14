@@ -48,8 +48,6 @@ body {
 .app-header nav a:hover,
 .app-header nav button:hover { background: #ffffff09; color: var(--lt-pearl); }
 .app-header nav button.is-active { color: var(--lt-pearl); background: rgba(255,230,166,.07); box-shadow: inset 0 0 0 1px var(--lt-gold-line); }
-.app-header nav a.back-app { color: var(--lt-pearl); border-color: rgba(255,255,255,.22); background: rgba(9,8,14,.62); font-size: 14px; letter-spacing: .06em; }
-.app-header nav a.back-app:hover { border-color: rgba(255,255,255,.44); background: rgba(255,255,255,.09); }
 
 .admin-shell { width: min(860px, calc(100% - 32px)); margin: 28px auto 64px; display: grid; gap: 16px; }
 
@@ -67,8 +65,13 @@ body {
 .lt-h1 { font-size: 22px; font-weight: 600; letter-spacing: -.02em; margin: 0; }
 .lt-h2 { font-size: 15px; font-weight: 600; margin: 0 0 10px; }
 .lt-sub { color: var(--lt-muted); font-size: 12px; margin: 0; }
-.lt-filters { display: flex; gap: 8px; flex-wrap: wrap; }
-.lt-filters select { min-height: 40px; border-radius: 10px; border: 1px solid var(--lt-line); background: rgba(255,255,255,.04); color: var(--lt-pearl); padding: 6px 10px; font: inherit; font-size: 13px; }
+/* #570 2: 거르기 드롭다운 대신 숫자 붙은 탭 줄. 옵션 글자가 안 보이던 문제는 탭이라 없어진다. */
+.lt-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.lt-tab { display: inline-flex; align-items: center; gap: 7px; min-height: 40px; padding: 0 14px; border-radius: var(--lt-r-pill); border: 1px solid var(--lt-line); background: rgba(255,255,255,.03); color: var(--lt-muted); font: inherit; font-size: 13px; cursor: pointer; }
+.lt-tab:hover { color: var(--lt-pearl); border-color: var(--lt-gold-line); }
+.lt-tab.is-active { border-color: var(--lt-gold); color: var(--lt-gold); background: rgba(255,230,166,.07); }
+.lt-tab-count { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; padding: 1px 6px; border-radius: var(--lt-r-pill); background: rgba(255,255,255,.06); font-size: 11px; color: var(--lt-muted); }
+.lt-tab.is-active .lt-tab-count { color: var(--lt-gold); background: rgba(255,230,166,.12); }
 
 .lt-post-list { display: grid; gap: 10px; }
 .lt-post { display: grid; gap: 6px; text-align: left; width: 100%; border: 1px solid var(--lt-line); border-radius: var(--lt-r-card); background: var(--lt-glass); padding: 14px 16px; color: inherit; cursor: pointer; }
@@ -116,6 +119,13 @@ body {
 .lt-status-row button.is-on { border-color: var(--lt-gold); color: var(--lt-gold); }
 .lt-issue-link { color: var(--lt-gold); text-decoration: underline; text-underline-offset: 3px; }
 .lt-issue-link:hover { color: var(--lt-pearl); }
+/* #570 4: '고치는 일' — 이슈 한 줄 + 연결된 고객 글 */
+.lt-issue-row { display: grid; gap: 10px; }
+.lt-issue-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.lt-issue-title { font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+.lt-badge[data-issue-state="open"] { color: var(--lt-gold); border-color: var(--lt-gold-line); }
+.lt-badge[data-issue-state="closed"] { color: #8fd0a0; border-color: #3f6b4c; }
+.lt-fix-btn { min-height: 36px; padding: 0 12px; font-size: 12px; }
 .lt-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
 .lt-btn { min-height: 44px; padding: 0 16px; border-radius: var(--lt-r-pill); border: 1px solid var(--lt-line); background: rgba(255,255,255,.04); color: var(--lt-pearl); font: inherit; font-size: 13px; cursor: pointer; }
 .lt-btn.primary { background: var(--lt-primary); color: var(--lt-primary-ink); border-color: transparent; font-weight: 600; }

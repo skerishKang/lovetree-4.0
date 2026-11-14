@@ -1,24 +1,25 @@
 import './styles.css';
 import './admin.css';
 import {
-  KIND_LABEL, STATUS_LABEL, STATUS_ORDER, PERSONA_FIELDS,
+  GITHUB_REPO, KIND_LABEL, STATUS_LABEL, STATUS_ORDER, PERSONA_FIELDS,
   escapeText, richParagraph, formatTime, parseHash, viewHash, viewToTab,
-  visibleRows, statusChangeMessage, buildIssueUrl, issueLink
+  filterRows, statusTabs, kindTabs, linkedIssueNumbers, issueStateLabel, needsFixButton,
+  statusChangeMessage, buildIssueUrl, issueLink
 } from './admin-view.js';
 
 /**
- * 러브트리 관리자 — 고객 의견·사용 일지 게시판 (#540 2차, #564 해시 라우팅).
+ * 러브트리 관리자 — 고객 의견·사용 일지 게시판 (#540 2차, #564 해시 라우팅, #570 탭).
  *
- * - 주소가 곧 화면: #board · #feedback/<id> · #persona/<id> · #reports · #issues.
- *   뒤로 가기·새로 고침·링크 공유가 화면 상태를 그대로 따른다(#564 2).
- * - 게시판: 목록(제목·글쓴이·날짜·종류·상태·답글 수) → 상세(본문 + 답글 스레드).
- * - 답글: 고객에게 보이는 답변 / 내부 메모. '닫음' 상태는 목록 기본에서 숨긴다(#564 10).
+ * - 주소가 곧 화면: #board · #board?status=..&kind=.. · #feedback/<id> · #persona/<id> · #reports · #issues.
+ *   뒤로 가기·새로 고침·링크 공유가 화면 상태를 그대로 따른다(#564 2). 탭 거르기도 주소에 남긴다(#570 2).
+ * - 고객 글: 목록(제목·글쓴이·날짜·종류·상태·답글 수) → 상세(본문 + 답글 스레드).
+ * - 탭: 상태(새 글·확인 중·고침·다음에·닫음)와 종류(전체·의견·일지)에 숫자를 붙인다(#570 2).
+ *   기본은 '닫음 뺀 전체' — 어느 상태 탭도 안 고른 상태다(#564 10).
+ * - 답글: 고객에게 보이는 답변 / 내부 메모.
  * - 글쓴이(AI 고객)를 누르면 페르소나 소개 + 그 고객 글 목록.
- * - 이슈 탭: GitHub 이슈 목록·상태만(공개 저장소, 토큰 없이).
+ * - '고치는 일' 탭: 고객 글의 '연결 이슈 번호'에 있는 GitHub 이슈만(#570 4). 공개 저장소 읽기만(토큰 없이).
  */
 
-// 화면이 직접 가지는 상태는 거르기와 답글 종류뿐이다. 나머지는 주소(해시)에서 온다.
-const state = {kind: '', status: ''};
 let route = parseHash(globalThis.location?.hash);
 let replyKind = 'internal'; // 상세 화면에서만 쓰는 답글 종류(#564 8). 기본은 내부 메모.
 
@@ -37,18 +38,18 @@ const sessionRes = await read('/api/admin/session');
 const session = sessionRes.payload ?? (sessionRes.status === 401 ? {} : null);
 
 /** 화면을 주소로 바꾸고 그린다. 주소가 이미 같으면 hashchange가 오지 않으므로 직접 그린다. */
-function navigate(view, id = null) {
-  const hash = viewHash(view, id);
+function navigate(view, id = null, filters = null) {
+  const hash = viewHash(view, id, filters ?? {});
   if (location.hash === hash) { route = parseHash(hash); render(); }
   else location.hash = hash;
 }
 
 function head() {
-  // #540 마무리: 머리줄을 러브트리 앱(public/v41/shell.css의 .app-header·.brand)과 같은 모양으로.
-  // 'app으로'는 '러브트리로 돌아가기'이고, 제목 옆 점(brand-dot)은 앱 머리줄에 없어 뺐다.
+  // #570 1: 머리줄의 '러브트리로 돌아가기'는 로고와 같은 일을 두 번 하는 셈이라 없앤다. 로고만 남기고 안내를 붙인다.
+  // #570 3: 탭 이름 — 게시판→고객 글, 이슈→고치는 일. 신고는 그대로.
   const tab = viewToTab(route.view);
   const tabBtn = (name, label) => `<button type="button" data-tab="${name}" class="${tab === name ? 'is-active' : ''}">${label}</button>`;
-  return `<header class="app-header"><a class="brand" href="/v41/"><span>LoveTree</span><small>4.1</small></a><nav aria-label="관리자 메뉴"><a class="back-app" href="/v41/">러브트리로 돌아가기</a>${tabBtn('board', '게시판')}${tabBtn('reports', '신고')}${tabBtn('issues', '이슈')}</nav></header>`;
+  return `<header class="app-header"><a class="brand" href="/v41/" title="러브트리로" aria-label="러브트리로"><span>LoveTree</span><small>4.1</small></a><nav aria-label="관리자 메뉴">${tabBtn('board', '고객 글')}${tabBtn('reports', '신고')}${tabBtn('issues', '고치는 일')}</nav></header>`;
 }
 
 function renderLogin() {
@@ -79,25 +80,26 @@ async function render() {
 }
 
 async function renderList() {
-  const params = new URLSearchParams();
-  if (state.kind) params.set('kind', state.kind);
-  if (state.status) params.set('status', state.status);
-  const res = await read('/api/admin/feedback?' + params.toString());
-  const rows = visibleRows(res.ok ? res.payload?.feedback : [], state.status);
-  const filters = `<div class="lt-filters">
-    <select data-filter="kind" aria-label="종류 거르기"><option value="">종류 전체</option><option value="opinion"${state.kind === 'opinion' ? ' selected' : ''}>의견</option><option value="journal"${state.kind === 'journal' ? ' selected' : ''}>일지</option></select>
-    <select data-filter="status" aria-label="상태 거르기"><option value="">상태 전체</option>${STATUS_ORDER.map(s => `<option value="${s}"${state.status === s ? ' selected' : ''}>${STATUS_LABEL[s]}</option>`).join('')}</select>
-  </div>`;
-  const list = rows.length
-    ? rows.map(row => `<article class="lt-post" data-open="${escapeText(row.id)}" tabindex="0" role="button">
+  // 탭 숫자를 함께 보여 주려고 목록을 거르지 않고 한 번에 읽어 화면에서 거른다(#570 2). 목록은 작다.
+  const res = await read('/api/admin/feedback');
+  const rows = res.ok && Array.isArray(res.payload?.feedback) ? res.payload.feedback : [];
+  const filters = {kind: route.kind, status: route.status};
+  const visible = filterRows(rows, filters);
+  const tabBtn = (data, value, label, count, active) =>
+    `<button type="button" ${data}="${escapeText(value)}" class="lt-tab${active ? ' is-active' : ''}"${count == null ? '' : ` aria-label="${escapeText(label)} ${count}건"`}>${escapeText(label)}${count == null ? '' : ` <span class="lt-tab-count">${count}</span>`}</button>`;
+  const statusRow = statusTabs(rows, route.kind).map(t => tabBtn('data-status-tab', t.status, t.label, t.count, route.status === t.status)).join('');
+  const kindRow = kindTabs(rows, route.status).map(t => tabBtn('data-kind-tab', t.kind, t.label, t.count, route.kind === t.kind)).join('');
+  const tabRows = `<div class="lt-tabs" role="group" aria-label="상태 탭">${statusRow}</div><div class="lt-tabs" role="group" aria-label="종류 탭">${kindRow}</div>`;
+  const list = visible.length
+    ? visible.map(row => `<article class="lt-post" data-open="${escapeText(row.id)}" tabindex="0" role="button">
         <div class="lt-post-top">${kindBadge(row.kind)}${statusBadge(row.status)}<span class="lt-post-date">${escapeText(formatTime(row.createdAt))}</span></div>
         <h3 class="lt-post-title">${escapeText(row.displayTitle || '(제목 없음)')}</h3>
         <div class="lt-post-meta"><span class="lt-post-author" data-author="${escapeText(row.subjectId || '')}">${escapeText(authorLabel(row))}</span>${issueLink(row.issueNumber) ? `<span class="lt-post-issue">이슈 ${issueLink(row.issueNumber)}</span>` : ''}<span>답글 ${row.replyCount || 0}</span></div>
       </article>`).join('')
     : '<p class="lt-empty">접수된 글이 없습니다.</p>';
   host.innerHTML = `${head()}<div class="admin-shell lt-board">
-    <div class="lt-board-head"><h1 class="lt-h1">고객 의견</h1><p class="lt-sub">${rows.length}건 · 최신 순</p></div>
-    ${filters}
+    <div class="lt-board-head"><h1 class="lt-h1">고객 글</h1><p class="lt-sub">${visible.length}건 · 최신 순</p></div>
+    ${tabRows}
     <div class="lt-post-list">${list}</div>
   </div>`;
 }
@@ -157,7 +159,7 @@ async function renderPersona(subjectId) {
   const res = await read('/api/admin/persona/' + encodeURIComponent(subjectId));
   const persona = res.ok ? res.payload?.persona : {name: '', intro: {}};
   const postsRes = await read('/api/admin/feedback');
-  const posts = visibleRows(postsRes.ok ? postsRes.payload?.feedback : [], 'all').filter(p => p.subjectId === subjectId);
+  const posts = postsRes.ok && Array.isArray(postsRes.payload?.feedback) ? postsRes.payload.feedback.filter(p => p.subjectId === subjectId) : [];
   const intro = persona.intro || {};
   // #564 13: 소개는 길어 잘리지 않게 여러 줄 칸으로. 내용 줄 수에 따라 높이를 정한다.
   const rowsFor = value => {
@@ -170,7 +172,7 @@ async function renderPersona(subjectId) {
     ? posts.map(p => `<button type="button" class="lt-post lt-post-row" data-open="${escapeText(p.id)}"><span>${kindBadge(p.kind)}</span><span class="lt-post-title">${escapeText(p.displayTitle || '')}</span><span class="lt-post-date">${escapeText(formatTime(p.createdAt))}</span></button>`).join('')
     : '<p class="lt-empty">쓴 글이 없습니다.</p>';
   host.innerHTML = `${head()}<div class="admin-shell lt-board">
-    <button type="button" class="lt-back" data-back-list>← 게시판</button>
+    <button type="button" class="lt-back" data-back-list>← 고객 글</button>
     <section class="lt-card">
       <h1 class="lt-h1">페르소나 · ${escapeText(persona.name || '이름 없음')}</h1>
       <label class="lt-field">이름<input data-persona-name value="${escapeText(persona.name || '')}" maxlength="120"></label>
@@ -209,18 +211,44 @@ async function renderReports() {
 }
 
 async function renderIssues() {
-  let issues = [], error = '';
-  try {
-    const r = await fetch('https://api.github.com/repos/skerishKang/lovetree-4.0/issues?state=all&per_page=50&sort=updated', {headers: {accept: 'application/vnd.github+json'}});
-    if (r.ok) issues = (await r.json()).filter(i => !i.pull_request);
-    else error = '이슈를 불러오지 못했어요(' + r.status + ').';
-  } catch { error = '이슈를 불러오지 못했어요(네트워크).'; }
-  const rows = issues.length
-    ? issues.map(i => `<a class="lt-post lt-post-row" href="${escapeText(i.html_url)}" target="_blank" rel="noopener"><span class="lt-badge" data-status="${i.state === 'open' ? 'received' : 'fixed'}">${i.state === 'open' ? '열림' : '닫힘'}</span><span class="lt-post-title">#${i.number} ${escapeText(i.title)}</span><span class="lt-post-date">댓글 ${i.comments}</span></a>`).join('')
-    : `<p class="lt-empty">${escapeText(error || '이슈가 없습니다.')}</p>`;
+  // #570 4: GitHub 이슈 전체 목록은 없애고, 고객 글의 '연결 이슈 번호'에 있는 이슈만 보여 준다.
+  const res = await read('/api/admin/feedback');
+  const posts = res.ok && Array.isArray(res.payload?.feedback) ? res.payload.feedback : [];
+  const numbers = linkedIssueNumbers(posts);
+  let error = '';
+  const byNumber = new Map();
+  if (numbers.length) {
+    // 공개 저장소 읽기만(토큰 없이). 하나가 실패해도 나머지는 그린다.
+    const results = await Promise.allSettled(numbers.map(async number => {
+      const r = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/issues/${number}`, {headers: {accept: 'application/vnd.github+json'}});
+      if (!r.ok) throw new Error(String(r.status));
+      const issue = await r.json();
+      return issue.pull_request ? null : issue; // 번호가 PR을 가리키면 건너뛴다
+    }));
+    results.forEach((result, index) => {
+      if (result.status === 'fulfilled' && result.value) byNumber.set(numbers[index], result.value);
+      else if (result.status === 'rejected') error = '이슈 상태를 불러오지 못했어요';
+    });
+  }
+  const rows = numbers.map(number => {
+    const issue = byNumber.get(number);
+    const linked = posts.filter(post => String(post.issueNumber ?? '').trim() === String(number));
+    const stateLabel = issue ? issueStateLabel(issue.state) : '';
+    const postRows = linked.map(post => {
+      // 이슈가 고침 완료인데 고객 글이 아직 '고침'이 아니면 바꾸는 단추를 내놓는다. 누르기 전까지는 자동으로 바꾸지 않는다(#570 4).
+      const fixBtn = needsFixButton(post, issue?.state)
+        ? `<button type="button" class="lt-btn lt-fix-btn" data-fix-status="${escapeText(post.id)}">고침으로 바꾸기</button>` : '';
+      return `<article class="lt-post lt-post-row" data-open="${escapeText(post.id)}" tabindex="0" role="button"><span class="lt-post-title">${escapeText(post.displayTitle || '(제목 없음)')}</span>${statusBadge(post.status)}${fixBtn}</article>`;
+    }).join('');
+    return `<section class="lt-card lt-issue-row" data-issue-row="${number}">
+      <div class="lt-issue-head"><a class="lt-issue-link" href="https://github.com/${GITHUB_REPO}/issues/${number}" target="_blank" rel="noopener">#${number}</a><span class="lt-issue-title">${issue ? escapeText(issue.title) : '(이슈를 불러오지 못했어요)'}</span>${stateLabel ? `<span class="lt-badge" data-issue-state="${escapeText(issue.state)}">${stateLabel}</span>` : ''}</div>
+      <div class="lt-post-list">${postRows}</div>
+    </section>`;
+  }).join('');
   host.innerHTML = `${head()}<div class="admin-shell lt-board">
-    <div class="lt-board-head"><h1 class="lt-h1">GitHub 이슈</h1><p class="lt-sub">목록·상태만 · 공개 저장소</p></div>
-    <div class="lt-post-list">${rows}</div>
+    <div class="lt-board-head"><h1 class="lt-h1">고치는 일</h1><p class="lt-sub">고객 글과 연결된 이슈만 · 공개 저장소 읽기만</p></div>
+    ${error ? `<p class="lt-empty" data-issue-error>${escapeText(error)}</p>` : ''}
+    ${rows || '<p class="lt-empty">고객 글에 연결된 이슈가 없습니다.</p>'}
   </div>`;
 }
 
@@ -235,8 +263,25 @@ document.addEventListener('click', async (event) => {
   }
   const tab = event.target.closest('[data-tab]');
   if (tab) { navigate(tab.dataset.tab); return; }
-  const filter = event.target.closest('[data-filter]');
-  if (filter) return; // handled by change
+  // 탭 거르기(#570 2): 다시 누르면 해제한다. 상태는 주소(#board?status=..&kind=..)에 남는다.
+  const statusTab = event.target.closest('[data-status-tab]');
+  if (statusTab) {
+    const next = route.status === statusTab.dataset.statusTab ? '' : statusTab.dataset.statusTab;
+    navigate('board', null, {status: next, kind: route.kind});
+    return;
+  }
+  const kindTab = event.target.closest('[data-kind-tab]');
+  if (kindTab) {
+    const next = route.kind === kindTab.dataset.kindTab ? '' : kindTab.dataset.kindTab;
+    navigate('board', null, {status: route.status, kind: next});
+    return;
+  }
+  const fixBtn = event.target.closest('[data-fix-status]');
+  if (fixBtn) {
+    const res = await read('/api/admin/feedback/' + encodeURIComponent(fixBtn.dataset.fixStatus), {method: 'PATCH', body: JSON.stringify({status: 'fixed'})});
+    if (res.ok) await renderIssues();
+    return;
+  }
   const open = event.target.closest('[data-open]');
   if (open && !event.target.closest('[data-persona]')) { navigate('feedback', open.dataset.open); return; }
   const persona = event.target.closest('[data-persona]');
@@ -293,11 +338,6 @@ document.addEventListener('click', async (event) => {
     if (el) el.textContent = res.ok ? '소개를 저장했어요.' : (res.payload?.error?.message || '저장에 실패했어요.');
     return;
   }
-});
-
-document.addEventListener('change', async (event) => {
-  const filter = event.target.closest('[data-filter]');
-  if (filter) { state[filter.dataset.filter] = filter.value; await renderList(); }
 });
 
 document.addEventListener('submit', async (event) => {
