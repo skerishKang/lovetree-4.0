@@ -187,12 +187,17 @@ function growBoard(){let s=LT58Model.boardSize(moments.map(m=>({x:m.x,y:m.y,h:re
 const BOARD_VIEW_KEY='lt41.boardView';
 function boardCards(){return moments.map(m=>{let el=cardLayer.querySelector(`[data-id="${m.id}"]`);return{id:m.id,x:m.x,y:m.y,w:el?.offsetWidth||242,h:el?.offsetHeight||260}})}
 // 보이는 칸: 왼쪽 도구 창·오른쪽 상세 창(열려 있거나 곧 열릴 때)을 뺀 자리. 좁은 화면(760 미만)은 두 창이 아래에서 올라오므로 빼지 않는다.
-function boardSafeArea(expectDetail=false){let vw=viewport.clientWidth,vh=viewport.clientHeight,left=16,right=16;
+function boardSafeArea(expectDetail=false){let vw=viewport.clientWidth,vh=viewport.clientHeight,left=16,right=16,top=12,bottom=12;
 if(innerWidth>=760){let lp=$('#leftPanel'),dt=$('#detail'),vr=viewport.getBoundingClientRect();
 if(lp){let r=lp.getBoundingClientRect();if(r.width&&r.right-vr.left<vw/2)left=Math.max(16,r.right-vr.left+12)}
 if(dt&&(expectDetail||dt.classList.contains('open')))right=dt.offsetWidth+32}
+else{/* #267: 좁은 판에서는 위에 순간 탐색 판(선택·책 열기)이, 오른쪽 아래에 시네마 단추가 카드 위에 뜬다 —
+  처음 맞춤이 카드를 그 밑에 두도록 위·아래 자리를 비켜 둔다(판이 없으면 지금처럼 12px만 남긴다). */
+const vr=viewport.getBoundingClientRect();
+const pk=$('.lt-moment-picker');if(pk){const r=pk.getBoundingClientRect();if(r.width)top=Math.max(top,r.bottom-vr.top+12)}
+const cb=$('.cinemaBtn');if(cb){const r=cb.getBoundingClientRect();if(r.width)bottom=Math.max(bottom,vr.bottom-r.top+12)}}
 let w=vw-left-right;if(w<260){left=16;w=vw-32}
-return{x:left,y:12,w:Math.max(1,w),h:Math.max(1,vh-24)}}
+return{x:left,y:top,w:Math.max(1,w),h:Math.max(1,vh-top-bottom)}}
 function boardTreeId(){try{return String(window.parent.LT41?.tree?.id||'')}catch{return ''}}
 function readBoardView(){let id=boardTreeId();if(!id)return null;try{return LT58Model.savedView(JSON.parse(localStorage.getItem(BOARD_VIEW_KEY)||'{}')[id])}catch{return null}}
 function writeBoardView(v){let id=boardTreeId();if(!id)return;try{let all=JSON.parse(localStorage.getItem(BOARD_VIEW_KEY)||'{}');if(v)all=LT58Model.rememberView(all,id,v,Date.now());else delete all[id];localStorage.setItem(BOARD_VIEW_KEY,JSON.stringify(all))}catch{/* 저장소를 못 쓰면 이번 화면에서만 기억 */}}

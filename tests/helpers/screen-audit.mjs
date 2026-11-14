@@ -2,7 +2,7 @@
 // 네 가지를 한 번에 잰다(기준은 각 이슈에서 정한 값을 그대로 쓴다 — 여기서 기준을 바꾸지 않는다):
 //   ① 보이는 글자·단추끼리 겹침 0 + 다른 요소에 가려진 글자 0(#635 PR B의 scanOverlap 규칙 —
 //      렌즈 복제본(#lens·#mobileLensStage)·opacity 0·닫힌 패널은 제외, 부모-자식은 겹침이 아니다)
-//   ② 가로 넘침 0px·잘린 글자 0(overflow가 있는 요소에서 scrollWidth > clientWidth)
+//   ② 가로 넘침 0px·잘린 글자 0(overflow가 있는 요소에서 scrollWidth > clientWidth — 의도한 한 줄 말줄임은 제외, #662)
 //   ③ 화면 글자에 undefined·null·NaN·[object Object] 없음(#635의 scanPage와 같은 값 넷)
 //   ④ 12px 미만 글자 0·단추 13px 미만 0(#548의 COLLECT 규칙 — 그림자 DOM까지, 보이지 않는 글자 제외)
 // 검사는 좌표·DOM으로 한다(눈 확인에 기대지 않는다). 실패 한 건을 한 줄로 만드는 lineOf도 여기 둔다.
@@ -58,14 +58,28 @@ export const AUDIT_FN = function audit() {
     }
     return s;
   };
+  // 조상이 overflow로 잘라내는 영역을 반영한 사각형 — 잘린 부분은 눈에도 보이지 않는다(#662:
+  // 스크롤 경계에 잘린 글자·굴리는 칸 밖으로 밀린 글자를 보이는 것으로 세지 않는다).
+  const clipRect = (el) => {
+    const own = el.getBoundingClientRect();
+    let box = { left: own.left, top: own.top, right: own.right, bottom: own.bottom };
+    for (let n = el.parentElement; n; n = n.parentElement || (n.getRootNode ? n.getRootNode().host : null)) {
+      const cs = getComputedStyle(n);
+      if ((cs.overflowX && cs.overflowX !== 'visible') || (cs.overflowY && cs.overflowY !== 'visible')) {
+        const nb = n.getBoundingClientRect();
+        box = { left: Math.max(box.left, nb.left), top: Math.max(box.top, nb.top), right: Math.min(box.right, nb.right), bottom: Math.min(box.bottom, nb.bottom) };
+      }
+    }
+    return box;
+  };
   const visible = (el) => {
     for (const n of chain(el)) {
       if (LENS.has(n.id)) return false;
       const cs = getComputedStyle(n);
       if (cs.display === 'none' || cs.visibility === 'hidden' || Number(cs.opacity) < 0.05) return false;
     }
-    const r = el.getBoundingClientRect();
-    if (!(r.width > 2 && r.height > 2)) return false;
+    const r = clipRect(el);
+    if (!(r.right - r.left > 2 && r.bottom - r.top > 2)) return false;
     // 화면 밖(닫힌 패널이 transform으로 치워진 것 등)은 판정에서 뺀다(#635).
     return r.right > 0 && r.bottom > 0 && r.left < innerWidth && r.top < innerHeight;
   };
@@ -104,7 +118,7 @@ export const AUDIT_FN = function audit() {
   // 토스트는 위에 잠깐 뜨는 것이 정상인 오버레이라 겹침·가려짐 판정에서 뺀다(타이밍에 따라 결과가 달라지는 소음을 줄인다).
   const isToast = (el) => chain(el).some((n) => n.id === 'toast' || /\btoast\b/.test(String(n.className || '')));
   const pairable = vis.filter((el) => !isToast(el));
-  const rects = pairable.map((el) => ({ el, r: el.getBoundingClientRect() }));
+  const rects = pairable.map((el) => ({ el, r: clipRect(el) }));
 
   // ① 겹침 — 쌍끼리 4px 초과로 포개지면 실패(부모-자식은 겹침이 아니다).
   const issues = [];
@@ -119,20 +133,23 @@ export const AUDIT_FN = function audit() {
   const covered = [];
   for (const { el, r } of rects) {
     if (isToast(el)) continue;
-    const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    const cx = (r.left + r.right) / 2, cy = (r.top + r.bottom) / 2;
+    const top = document.elementFromPoint(cx, cy);
     if (!top) continue;
     if (isToast(top)) continue;
     if (top === el || chain(top).includes(el) || chain(el).includes(top)) continue;
     if (chain(top).some((n) => LENS.has(n.id))) continue;
-    covered.push({ el: sel(el), by: sel(top), x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) });
+    covered.push({ el: sel(el), by: sel(top), x: Math.round(cx), y: Math.round(cy) });
   }
 
   // ② 가로 넘침(문서 기준)·잘린 글자(넘침을 자르는 요소에서 scrollWidth > clientWidth).
+  // 한 줄 말줄임(text-overflow:ellipsis + nowrap)은 의도한 잘라 보이기다 — 실패가 아니라 제목·연결 이유의 원래 모양(#662).
   const overflow = document.documentElement.scrollWidth - document.documentElement.clientWidth;
   const clipped = [];
   for (const el of vis) {
     const cs = getComputedStyle(el);
     if (!cs.overflowX || cs.overflowX === 'visible') continue;
+    if (cs.textOverflow === 'ellipsis' && cs.whiteSpace === 'nowrap') continue;
     if (el.scrollWidth > el.clientWidth + 1) clipped.push({ el: sel(el), text: el.textContent.trim().replace(/\s+/g, ' ').slice(0, 30), sw: el.scrollWidth, cw: el.clientWidth });
   }
 
