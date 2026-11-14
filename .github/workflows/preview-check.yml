@@ -141,6 +141,15 @@ jobs:
           npx vite build > /dev/null
           node --test tests/v41-orbit-535-float-overlap.test.mjs
           echo "첫 화면 떠 있음·겹침 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+      # #586: 첫 화면 끌기 성능 — 매 프레임 z-index 쓰기를 밴드로 줄이고, 끄는 동안 hover 모양 고정,
+      # 패럴랙스 rect 캐시, 첫 화면 문서의 스타일시트 수 축소를 실제 화면에서 잠근다. 건너뜀=실패.
+      - name: 첫 화면 끌기 성능 계약 시험(#586, 건너뜀=실패)
+        env:
+          LT_ORBIT586_REQUIRE: '1'
+        run: |
+          start=$(date +%s)
+          node --test tests/v41-orbit-586-perf.test.mjs
+          echo "첫 화면 끌기 성능 계약 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
       # #537: 책의 한 장 보기가 순간 하나씩 넘어가는지, 넓은 화면에서 두 장 책의 한 쪽 크기·같은 높이로
       # 나오는지, 390 휴대폰 모양이 그대로인지를 실제 화면에서 잰다. 건너뜀=실패(크롬이 준비된 이 잡에서 돈다).
       - name: 책 한 장 보기 시험(1440·390 순간 하나씩, 건너뜀=실패 — #537)
