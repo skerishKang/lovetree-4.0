@@ -29,7 +29,8 @@
     "version": "4.1.4",
     "date": "2026.11.15",
     "items": [
-      {"kind": "new", "text": "보드가 칸마다 차곡차곡 쌓여요. 긴 카드 아래가 비지 않아요", "source": "team", "issue": "#619"}
+      {"kind": "new", "text": "보드가 칸마다 차곡차곡 쌓여요. 긴 카드 아래가 비지 않아요", "source": "team", "issue": "#619"},
+      {"kind": "new", "text": "보드에 카드를 다른 카드 사이에 끼워 넣어 순서를 바꿀 수 있어요", "source": "team", "issue": "#619"}
     ]
   }
 ]
