@@ -337,7 +337,8 @@ test('편집기 저장은 같은 member.apply 경로로 나간다', () => {
     assert.equal(prevented, true);
     assert.deepEqual(h.calls.apply.map((a) => a.mode), ['add']);
     assert.equal(h.calls.apply[0].payload.note, '저장할 글');
-    assert.deepEqual(h.calls.apply[0].sel, { treeId: 'tree-1', momentId: 'm1' });
+    // #601 '가' 결정: 추가 모드에서 부모를 고르지 않으면 가장 최근 순간(m2)에 이어진다.
+    assert.deepEqual(h.calls.apply[0].sel, { treeId: 'tree-1', momentId: 'm2' });
     assert.match(h.calls.notify.at(-1), /서버에 저장하고 있어요/);
 
     // 수정 모드에서는 같은 폼이 'edit'으로 나가야 한다(모드가 add로 굳으면 여기서 잡힌다).
