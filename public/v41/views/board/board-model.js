@@ -21,6 +21,20 @@ window.LT58Model = (() => {
       return (Number(b?.createdOrder) || 0) - (Number(a?.createdOrder) || 0);
     }).map((m) => m.id);
   }
+  // 각 열의 다음 카드가 놓일 y. 열마다 따로 쌓으므로 짧은 카드만 있는 열은
+  // 긴 카드가 다른 열에 있어도 그 높이까지 아래 카드가 내려가지 않는다(줄 맞춤이 아니다).
+  function stackLayout(ids, { cols = 4, reservedOf = null } = {}) {
+    const n = Math.max(1, Math.floor(Number(cols)) || 1);
+    const tops = new Array(n).fill(GRID_MARGIN);
+    const out = new Map();
+    for (const id of ids) {
+      let col = 0;
+      for (let c = 1; c < n; c++) if (tops[c] < tops[col]) col = c;
+      out.set(id, { col, y: tops[col] });
+      tops[col] += (Number(reservedOf?.(id)) || BASE_CARD_H) + ROW_GAP;
+    }
+    return out;
+  }
   // 저장한 자리(사람이 꽂은 칸)는 비켜 놓고, 나머지를 줄어든 순서대로 빈 칸에 채운다(왼쪽→오른쪽, 위→아래).
   // saved: Map(id → {col,row}) — 화면이 저장된 x·y에서 되새겨 넘긴다. 저장 자리는 원친대로 남는다(#395 계약).
   function pinboardSpread(ids, { cols = 4, saved = null } = {}) {
@@ -337,5 +351,5 @@ window.LT58Model = (() => {
   }
 
   // 지우기 허용 판단: 실제 기록(읽기 전용)이면 안내 문구를 함께 준다. (#582: 보드에서 줄을 만들거나 지우지 않으므로 연결 지우기는 지도가 맡는다)
-  return { escapeHTML, gridColumns, dateDescOrder, pinboardSpread, gridRowTops, gridPosition, slotOf, isPinboardSlot, settleColumnGaps, fitZoom, boardSize, contentBox, fitBox, clampView, startView, visibleCards, rememberView, savedView, editGuard, collectPath, nextConnections, detailButtonState, cinemaBeats, filterVisible, maxCreatedOrder, decorationMotion };
+  return { escapeHTML, gridColumns, dateDescOrder, stackLayout, pinboardSpread, gridRowTops, gridPosition, slotOf, isPinboardSlot, settleColumnGaps, fitZoom, boardSize, contentBox, fitBox, clampView, startView, visibleCards, rememberView, savedView, editGuard, collectPath, nextConnections, detailButtonState, cinemaBeats, filterVisible, maxCreatedOrder, decorationMotion };
 })();
