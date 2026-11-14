@@ -601,6 +601,21 @@ test('#635 PR C 화면: 메뉴 시작 입구·첫날 표기·크게 보기 대�
           assert.ok(gapHome >= 16, `${width}·${theme}: 첫 화면 안내와 링크 줄 사이가 ${gapHome}px다(16px 이상)`);
           const hintPos = await frame.evaluate(() => { const root = document.getElementById('orbit'); const el = root && root.shadowRoot ? root.shadowRoot.querySelector('.center-hint') : document.querySelector('.center-hint'); return el ? getComputedStyle(el).position : '없음'; });
           assert.equal(hintPos, 'static', `${width}·${theme}: 안내가 여전히 화면 아래 고정 자리다(${hintPos})`);
+          // #book-dup. 새 소식 카드: 390에서 머리줄 바로 아래 자리는 '순간 목록'·테마 단추를 가렸다(실측 겹침 133×66px).
+          // 이제 화면 아래, 링크 줄 위에 놓인다 — 어떤 단추와도 겹침 0. 1440 자리(오른쪽 아래)는 그대로다.
+          {
+            const card = page.locator('.updates-card');
+            await card.waitFor({ state: 'visible', timeout: 8000 }).catch(() => {});
+            const cardBox = await card.boundingBox();
+            assert.ok(cardBox, `${width}·${theme}: 첫 화면에 새 소식 카드가 보이지 않는다`);
+            const menuBtn = await frame.locator('.menuBtn').first().boundingBox();
+            const themeBtn = await frame.locator('.theme-quick').first().boundingBox();
+            const overlapWith = (b) => cardBox && b ? Math.max(0, Math.min(cardBox.x + cardBox.width, b.x + b.width) - Math.max(cardBox.x, b.x)) * Math.max(0, Math.min(cardBox.y + cardBox.height, b.y + b.height) - Math.max(cardBox.y, b.y)) : 0;
+            assert.equal(overlapWith(menuBtn), 0, `${width}·${theme}: 새 소식 카드가 '순간 목록' 단추와 겹친다`);
+            assert.equal(overlapWith(themeBtn), 0, `${width}·${theme}: 새 소식 카드가 테마 단추와 겹친다`);
+            assert.equal(overlapWith(linksBox), 0, `${width}·${theme}: 새 소식 카드가 링크 줄과 겹친다`);
+            if (width === 390) assert.ok(cardBox.y + cardBox.height <= linksBox.y, `${width}·${theme}: 새 소식 카드가 링크 줄 위에 있지 않다(카드 아래 ${Math.round(linksBox.y - cardBox.y - cardBox.height)}px)`);
+          }
           await shot(page, `home-after-${width}-${theme}`);
           await context.close();
         }
