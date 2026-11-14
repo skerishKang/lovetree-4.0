@@ -1781,3 +1781,14 @@ COM2에는 merge `6900df8aa446dfe0201d01997457fae04c4abe16`의 변경 서버 파
 - `shell.mjs`는 진입점으로 남기고, 옮긴 이름(`themedView`·`applyTheme`·`toggleTheme`·`screens` 등)은 얇은 래퍼·재수출로 유지한다.
 - 기준 스크린샷(`/mnt/e/lt-refactor-shots/before-*.png` 24장) 대비: 헤더 상단 80px 차이 0(18장), 완전 동일 6장. 나머지 차이는 iframe 안쪽 카드 회전·관계 지도 배치의 촬영 시점 차이.
 - **겉모습 비교(2026-11-08)**: `미리보기 검사`가 `tools/visual-baseline`로 **운영(before) vs PR 미리보기(after)** 24장을 비교해 PR 체크 요약에 장별 차이 %를 표로 남긴다. **알림만** 하고 실패로 만들지 않는다(기준 초과는 "확인 필요"). diff 이미지는 artifact.
+
+## 2026-11-15 — 새 소식·AI 테스터 표시·내 의견 손질 (#611, 컴1 레인, ai/com1-lt611-updates-261115 + ai/com1-lt611-b-261115, main 9bbb193 기준, PR #621 → main 9bbb193, PR #622 → main 4b7fd36)
+
+- **새 소식 원본**: `public/v41/updates.json` + 화면 `public/v41/updates.mjs` + `AGENTS.md` 한 줄 규칙 "새 소식 원본은 public/v41/updates.json … 다음 버전 항목 한 줄". 알림은 "접속 때 한 번" — 첫 화면에서만 띄우고 닫으면 그 버전은 다시 안 뜸(브라우저 저장, 서버 없음). 로그아웃에도 뜸. 연결용 `issue` 필드는 화면 문구에 나오지 않음.
+- **첫 버전 4.1.3(2026.11.14)**: 핀보드·책·지도·첫 화면·공개·공유 미리보기 카드 + 새벽 날짜·'오늘-어제'·작은 글씨. 고친 것(3건) 전부 AI 테스터 윤제 출처. 화면 문구에 이슈번호·개발용어·"여러분이 알려 주신" 없음(시험으로 금지어 검사).
+- **AI 테스터 표시**: ai_customer 역할 기록이 남에게 보이는 곳(둘러보기 카드·감상 허브 미리보기·공유 /t/<id> 화면·미리보기 카드(og) 설명 '· AI 테스터')에만 `aiTester: true` 비트. 서버 공개 응답(community discover·public share)에 계정 정보 0(시험으로 확인). 본인 화면엔 표시 없음. 운영센터는 이름 앞 'AI'(목록·상세·일지 탭).
+- **내 의견**: 새 답글 알림은 계정 단추 점 + '내 의견' 옆 숫자(안 본 답글만, 열어 보면 사라짐 — 브라우저 `lt41.replySeen` 저장). 고객 덧붙이기: 본인 의견 아래 '덧붙일 말' 칸 — 저장 모양은 기존 답글(authorType=customer)이라 운영센터에 '고객 덧붙임'으로 보임, 고침·닫음이면 '다시 열림'(reviewing). 남의 글·일지는 404. '새 소식에도 올렸어요 — 4.1.3 보기' 링크는 의견의 연결 이슈와 updates.json의 issue 매칭(고침·닫음 상태일 때만).
+- **ops-reply --status-only**: 답변 파일 없이 상태·연결 이슈만 — 답글이 이미 있어도 처리. 컴2 고정 위치(/opt/padiem/lovetree-api/tools/ops-reply.mjs)사본은 머지 뒤 수동으로 최신으로 교체함(autodeploy 설치 대상 아님).
+- **트러블슈팅**: (1) 서버 index.js에서 shareService가 admin보다 먼저 생성돼 Deploy Bundle Boot에서 `Cannot access 'admin' before initialization` — CI가 잡아 admin 선언을 위로 이동(c270d90). (2) 헤더 토큰 시험이 CSS 끝부분(#0008·주석 #611 hex 오인)에서 실패 — 알림 카드 배경을 토큰으로, 주석 '이슈 611'로 고침. (3) 지도 판 흐름 시험에서 알림 카드가 '#overviewBtn'을 가려 막힘 — 알림은 첫 화면에서만.
+- **배포**: Pages 자동 배포. 서버는 A·B 두 번 autodeploy — 최종 installed_sha 4b7fd36 확인(2026-11-14 14:05). content-reports 자동메시지 머지는 일정 때문에 생김(별도 이슈).
+- **실측**: 계정 02 배포본 로그인 — 390·1440 첫 화면 알림 카드+새 소식 창 확인, 둘러보기 카드 2건 중 1건 aiTester 실측, 공개 공유 읽기 aiTester:true 실측. 스크린샷 `E:\lovetree-qa\611\`(home·updates-panel·signed-in·community·share-ai). postdeploy 로그인: fail=0 warn=4(390·360 겹침 5쌍 — 4 쌍은 커뮤니티 패널 기존 것, 1 쌍은 알림 닫기×둘러보기 닫기가 모달 가림상자 겹침).
