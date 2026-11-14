@@ -214,10 +214,14 @@ jobs:
           # 대비 시험 워커 2개 + 이 시험 브라우저 1개가 함께 도는다. 잡이 2분 안에 들도록 순서로 쌓지 않는다.
           node --test --test-concurrency=1 tests/v41-map-contrast.test.mjs > /tmp/map-contrast.log 2>&1 & p1=$!
           LT_MAP_FAN_REQUIRE=1 node --test --test-concurrency=1 tests/v41-map-fan-open.test.mjs > /tmp/map-fan.log 2>&1 & p2=$!
-          wait $p1; r1=$?; wait $p2; r2=$?
-          # 실패하면 원인을 그대로 보인다(#529 흔들림 진단 출력 유지).
-          if [ $r1 -ne 0 ]; then echo '— 지도 대비 시험 출력 —'; tail -60 /tmp/map-contrast.log; fi
-          if [ $r2 -ne 0 ]; then echo '— 지도 부채꼴·열기 시험 출력 —'; cat /tmp/map-fan.log; fi
+          # 종료 코드는 wait 자리에서 받아 둔다 — bash -e 에서 `wait $p1; r1=$?`는 wait가 0이 아니면
+          # 셸이 그 자리에서 죽어 뒤의 로그 tail·why 진단이 아예 안 나왔다(#591 지도 잡 두 번 빨강에 진단 0).
+          wait $p1 || r1=$?
+          wait $p2 || r2=$?
+          r1=${r1:-0}; r2=${r2:-0}
+          # 성공·실패와 관계없이 두 시험의 로그 끝(대비 실패행의 why 진단 포함)을 항상 남긴다.
+          echo '— 지도 대비 시험 출력(끝 60줄) —'; tail -60 /tmp/map-contrast.log
+          echo '— 지도 부채꼴·열기 시험 출력 —'; cat /tmp/map-fan.log
           [ $r1 -eq 0 ] && [ $r2 -eq 0 ] || exit 1
           echo "지도 실제 대비·부채꼴 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
 

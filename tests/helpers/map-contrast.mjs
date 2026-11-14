@@ -38,9 +38,12 @@ export function installMapPaintProbe() {
   });
 }
 
-// Called in the map frame with an actual Playwright screenshot PNG. The same
+// Called in the map frame with the actual Playwright screenshot PNG and the overlay
+// rectangles that were read immediately before the capture (see measureMap). The same
 // pixel sampler is used by the executable test and the evidence report.
-export async function measureMapPixelsInPage(png) {
+export async function measureMapPixelsInPage(arg) {
+  const png = typeof arg === 'string' ? arg : arg.png;
+  const overlays = typeof arg === 'string' ? [] : (arg.overlays || []);
   const img = new Image(); img.src = png; await img.decode();
   const scratch = document.createElement('canvas'); scratch.width = img.width; scratch.height = img.height;
   const sc = scratch.getContext('2d', { willReadFrequently: true }); sc.drawImage(img, 0, 0);
@@ -51,10 +54,10 @@ export async function measureMapPixelsInPage(png) {
   const ratio = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + .05) / (Math.min(x, y) + .05); };
   const hex = (c) => '#' + c.map(v => Math.round(v).toString(16).padStart(2, '0')).join('');
   const quantile = (values, q) => values.slice().sort((a, b) => a.ratio - b.ratio)[Math.min(values.length - 1, Math.floor(values.length * q))];
-  const overlays = [...document.querySelectorAll('.topbar button,.mode-pill,.hero,.legend,.controls,.detail.open,.route-status.show,.toast.show,.edge-tip.show,.mobile-ribbon,.lt-moment-picker')].filter(el => {
-    const r = el.getBoundingClientRect(), s = getComputedStyle(el);
-    return r.width > 0 && r.height > 0 && s.visibility === 'visible' && Number(s.opacity) > .01;
-  }).map(el => el.getBoundingClientRect());
+  // #594: 겉요소 사각형은 스크린샷 직전에 읽어 넘겨 받는다(freshScreenshot이 모은다). 예전에는 여기서
+  // 스크린샷을 찍은 뒤 따로 읽었는데, 토스트가 2.3초에 숨는 타이밍이 그 사이에 끼면 스크린샷에는 토스트가
+  // 있고(그 아래 지도는 backdrop-filter로 뿌옇다) 좌표에는 토스트가 없어 뿌연 픽셀을 가리개 없이 재었다
+  // (#591 지도 잡 간헐 실패 — line(43) 1.08:1 < 3). 좌표와 픽셀의 시점을 맞춘다.
   const visible = (x, y) => {
     if (x < 3 || y < 3 || x >= stage.clientWidth - 3 || y >= stage.clientHeight - 3) return false;
     if (overlays.some(r => x >= r.left - 1 && x <= r.right + 1 && y >= r.top - 1 && y <= r.bottom + 1)) return false;
@@ -223,11 +226,55 @@ export async function measureMap(frame) {
   // 어긋나면 화면이 멈출 때까지 기다렸다 다시 잰다(최대 3번). 멈춰 있으면 검사가 추가로 걸리지 않는다.
   for (let attempt = 0; ; attempt += 1) {
     const before = await frame.evaluate(() => JSON.stringify(window.__mapPaint));
-    const screenshot = await frame.locator('#stage').screenshot({ animations: 'disabled' });
-    const canvas = await frame.evaluate(measureMapPixelsInPage, `data:image/png;base64,${screenshot.toString('base64')}`);
+    const { screenshot, overlays } = await freshScreenshot(frame);
+    const canvas = await frame.evaluate(measureMapPixelsInPage, { png: `data:image/png;base64,${screenshot.toString('base64')}`, overlays });
     const dom = await frame.evaluate(measureMapDOMInPage);
     const after = await frame.evaluate(() => JSON.stringify(window.__mapPaint));
     if (before === after || attempt >= 2) return { canvas, dom, screenshot };
+    await settleMap(frame);
+  }
+}
+
+// #594: 헤드리스 크로미움은 캔버스를 그린 뒤 곧바로 화면(present)에 올리지 않을 때가 있다(실측 0.6~2.4초+, 실행기가
+// 바쁠수록 길다). 올라가지 않은 옛날 프레임을 재면 그리기 기록(지금 상태)과 픽셀이 어긋나 이행 전 색을 잰다 — #591
+// 지도 잡 간헐 실패의 원인(동심원 보기 focus에서 클릭 전 프레임의 흐린 선 alpha .16이 잠깼다: line(43) 1.08:1).
+// 기존의 앞·뒤 기록 비교는 기하만 보므로 알파만 달라진 재그리기와 스틸 프레임을 가리지 못한다.
+// 그래서 두 가지를 한다. ① #stage에 번역 없는 transform(translateZ(0))을 걸었다가 캡처 뒤 되돌려 합성을 다시
+// 하게 한다(부하 아래 실측 — 이것만이 확실히 새 프레임을 올렸다: 스틸 8회 연속 → 토글 뒤 즉시 신선).
+// ② 모서리 한 픽셀(CSS 0.5,0.5 — 측정은 가장자리 3px 안을 표본에서 제외하므로 값에 영향이 없다)에 심은
+// 신호 색(#010203)이 스크린샷에 찍혔는지 확인한다. 신호가 없으면 여전히 옛날 프레임이라는 뜻이므로
+// 화면이 멈춘 뒤 다시 시도(최대 10번)하고, 끝내 안 찍히면 잘못된 재보다 실패가 낫다 — 이유를 남긴다.
+async function freshScreenshot(frame) {
+  for (let i = 0; ; i += 1) {
+    // 겉요소(토스트 포함) 사각형을 캡처 직전 같은 시점에 읽는다 — 스크린샷과 좌표의 시점을 맞추기 위해서다(#594).
+    const overlays = await frame.evaluate(() => {
+      const rects = [...document.querySelectorAll('.topbar button,.mode-pill,.hero,.legend,.controls,.detail.open,.route-status.show,.toast.show,.edge-tip.show,.mobile-ribbon,.lt-moment-picker')].filter(el => {
+        const r = el.getBoundingClientRect(), s = getComputedStyle(el);
+        return r.width > 0 && r.height > 0 && s.visibility === 'visible' && Number(s.opacity) > .01;
+      }).map(el => { const r = el.getBoundingClientRect(); return { left: r.left, top: r.top, right: r.right, bottom: r.bottom }; });
+      const s = document.getElementById('stage');
+      const c = s.getContext('2d');
+      c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.fillStyle = '#010203'; c.fillRect(0, 0, 1, 1); c.restore();
+      s.dataset.ltPrevTransform = s.style.transform || '';
+      s.style.transform = 'translateZ(0)';
+      return rects;
+    });
+    let screenshot;
+    try {
+      screenshot = await frame.locator('#stage').screenshot({ animations: 'disabled' });
+    } finally {
+      await frame.evaluate(() => { const s = document.getElementById('stage'); s.style.transform = s.dataset.ltPrevTransform || ''; delete s.dataset.ltPrevTransform; });
+    }
+    const fresh = await frame.evaluate(async png => {
+      const img = new Image(); img.src = png; await img.decode();
+      const scratch = document.createElement('canvas'); scratch.width = 1; scratch.height = 1;
+      const sc = scratch.getContext('2d', { willReadFrequently: true });
+      sc.drawImage(img, 0, 0, 1, 1, 0, 0, 1, 1);
+      const [r, g, b] = sc.getImageData(0, 0, 1, 1).data;
+      return r <= 5 && g <= 6 && b <= 7; // 신호가 찍힌 값(실측 0,0,0). 스틸 프레임의 모서리는 주변과 섞여 밝다(실측 10,8,7).
+    }, `data:image/png;base64,${screenshot.toString('base64')}`);
+    if (fresh) return { screenshot, overlays };
+    if (i >= 9) throw new Error('스크린샷이 최신 그리기를 보여 주지 않는다(모서리 신호 픽셀 10번 재시도에도 없음) — 표시 지연이 길다. 이 재면 이행 전 색을 잊므로 실패로 멈춘다');
     await settleMap(frame);
   }
 }
