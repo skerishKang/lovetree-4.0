@@ -164,7 +164,6 @@ test('계정 가입일 채우기: 기존 행은 가장 이른 흔적으로, 근�
       if (file !== pending) await pool.query(await readFile(file, 'utf8'));
     }
     await pool.query('ALTER TABLE lovetree_account_emails DROP COLUMN IF EXISTS created_at');
-    await pool.query('ALTER TABLE lovetree_shares DROP CONSTRAINT IF EXISTS lovetree_shares_product_id_share_id_key');
 
     const tag = Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
     const productId = ('lt-' + tag).slice(0, 32);
@@ -182,7 +181,7 @@ test('계정 가입일 채우기: 기존 행은 가장 이른 흔적으로, 근�
     await pool.query(
       `INSERT INTO lovetree_shares(product_id,share_id,subject_id,tree_id,entry_moment_id,initial_view,created_at)
        VALUES($1,$2,$3,'t2','t2-m0','book','2026-06-01T00:00:00.000Z')`,
-      [productId, ('s' + tag).padEnd(24, 'x').slice(0, 24), shareSubject]
+      [productId, ('s' + tag + 'x'.repeat(24)).slice(0, 24), shareSubject]
     );
     await pool.query(
       `INSERT INTO lovetree_feedback(product_id,subject_id,kind,category,body,created_at)
