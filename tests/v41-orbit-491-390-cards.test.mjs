@@ -26,6 +26,7 @@ test('#491: 띠에 못 들어가는 카드는 배율을 줄여 보여 준다(숨
 });
 
 test('#491: 줄임 배율은 transform scale에 곱해진다', () => {
-  assert.match(orbit, /scale\(\$\{sc\*Math\.max\(\.58,fit\)\*drawShrink\}\)/, 'transform scale에 drawShrink가 곱해진다');
+  // #593: 그리는 배율은 배치 함수가 돌려주고(at.scale) 애니메이션·끌기 쓰기가 그 값을 쓴다.
+  assert.match(orbit, /scale:sc\*\(!demo&&cards\.length<=8\?1:Math\.max\(\.58,fit\)\)\*drawShrink/, 'transform scale에 drawShrink가 곱해진다');
   assert.match(orbit, /let drawShrink=1;/, '기본값 1(줄임 없음)');
 });
