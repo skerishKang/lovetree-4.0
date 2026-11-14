@@ -73,6 +73,16 @@ jobs:
           start=$(date +%s)
           node --test tests/v41-board-wide-view-536.test.mjs
           echo "보드 넓은 화면·머리줄 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+      # #553: 썸네일이 실린 긴 YouTube 카드가 줄 간격(420px)을 넘어 위아래 카드와 겹치던 것 —
+      # 줄 간격을 카드 종류별 최대 높이에 맞추고, 그린 뒤 실제 높이로 열 안 겹침을 벌린다.
+      # 건너뜀=실패(크롬이 준비된 이 잡에서 돈다).
+      - name: 보드 YouTube 카드 겹침 시험(건너뜀=실패 — #553)
+        env:
+          LT_BOARD_YT_REQUIRE: '1'
+        run: |
+          start=$(date +%s)
+          node --test tests/v41-board-yt-overlap-553.test.mjs
+          echo "보드 YouTube 겹침 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
       # #514: 남은 접근성 항목(moderate 이하)을 실제 화면에서 잰다 — 확대 막기·랜드마크·제목 단계·
       # 모바일 선택 줄 top. axe-core·Chromium이 필요한 실행형 시험이라 크롬이 준비된 이 잡에서 돈다.
       - name: 남은 접근성 항목 시험(#514, 건너뜀=실패)

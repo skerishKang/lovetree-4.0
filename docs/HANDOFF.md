@@ -68,6 +68,14 @@
 - **선례 확인(AGENTS 규칙)**: LoveBud(b80647f)·lovetree-limone(aae492e)에서 og 메타·공유 미리보기·sitemap 구현을 찾지 못했다(_headers·CSP는 있으나 og 카드·sitemap 없음) → 신규 작성. thumb-fallback.mjs youtubeIdFrom 과 같은 규칙의 youtubeVideoId 를 함수 묶음용으로 뒀고 두 벌 판정 일치를 시험으로 견준다(클라 모듈 통째 import 회피).
 - **주의/남긴 것**: ① `/v41/` (끝 슬래시) 요청이 functions/v41/index.js 로 걸리는지는 배포 뒤 curl 로 확인 필요 — 걸리지 않으면 robots.txt 차단만 남는다(기능 영향 없음). ② 실제 공유 1개로 카드 curl 검증은 미완료 — 시험 계정 03이 2026-11-09 대표 결정으로 삭제돼 있고(.secrets 에 01·02·04 키만 있음), 다른 레인 몫 계정은 쓰지 않는 규칙이라 여기서 멈춤. ③ sitemap 은 discoverable 공유가 지금 0개라 빈 urlset 이 나온다. ④ 카카오·페이스북 공유 디버거 화면 확인은 로그인이 필요해 대표 확인 항목으로 남긴다. ⑤ `npm test` 1,483건 1,444 pass/0 fail/39 skip, build·modulepreload --check 통과. 기존 `domain-routing.test.mjs` 는 pages.dev 루트가 next() 로 가던 옛 기대를 새 noindex 동작에 맞게 갱신.
 
+## 2026-11-14 — #553 보드: 썸네일이 실린 긴 YouTube 카드가 줄 간격(420px)을 넘어 위아래 카드와 겹침 (로컬2, ai/com1-lt553-board-yt-overlap-20261114-075350-876bda, main d6c0f69 기준)
+
+- **원인**: treeSpread의 줄 간격이 고정 420px인데 썸네일이 실린 YouTube 카드는 실세로 465px(세로 Shorts 648px)라 같은 열 위아래 카드와 28px씩 겹쳤다(모아둔 순간 26 구조에서 인접 겹침 22쌍, 390 면적 153,337px²·1440 98,136px²). #536 전 배치에도 있던 특성.
+- **고침(두 층)**: ① `treeSpread(ids, edges, heights)` — 화면이 카드 종류별 예약 높이(board.js: YouTube 가로 480·세로 680, 기본 260 — CSS가 정한 최대 높이+여유)를 넘기면 밴드의 최대 높이+여백 160px가 줄 간격이 된다. 기본 카드뿐인 트리는 420px로 같아 예시 40순간 배치가 그대로다(시험이 좌표까지 고정). ② `settleColumnGaps`(모델)+`settlePlacedCards`(화면) — 카드를 그린 뒤 offsetHeight를 재어 같은 열 안 남은 겹침(긴 메모 등)을 top만 고쳐 벌린다. innerHTML 다시 쓰기 없음·깜빡임 없음, 저장 자리 카드는 그대로(#395), 썸네일이 실린 뒤 한 번만 다시 잰다.
+- **실측(시험 데이터 재현, 계정 사용 없음 — 셸과 같은 LT41 문맥을 호스트로 흉내)**: 모아둔 26(자식 전부 YouTube) 겹침 22쌍 → 0쌍(390·1440 × 종이·밤 4조합 전부), 390 줌 100%·1440 0.8배 유지. 예시 40순간 처음 보기: 줌 80%·카드 줄 y [150,570,990,1410]·무대 2200px 그대로. 혼합 종류(가로·세로 유튜브+긴 메모 733px+저장 자리 카드)에서도 겹침 0·저장 자리 유지. 확대 중 fps 1440: 전/후 같음(43fps, 헤드리스 소프트웨어 렌더링 기준 — 전후 동일이 본 뜻). 스크린샷·수치 E:\lovetree-qa\553\.
+- **시험**: 신규 `tests/v41-board-yt-overlap-553.test.mjs` 5건(모델 3+실행형 2, 미리보기 검사 '화면 시험 — 보드·접근성·날짜' 잡에 단계 추가, `LT_BOARD_YT_REQUIRE=1`). 옛 코드로 되돌리면 3건 빨강. `v41-board-model` export 목록에 settleColumnGaps 추가. `npm test` 1,535건 0 fail(지도 대비 300초 타임아웃은 이 환경의 알려진 문제 — HANDOFF 2026-11-13 참고, 지도 파일은 이번 변경 밖), build·modulepreload --check 통과.
+- **남긴 것**: 저장 자리가 이미 저장된 트리(보드 동기화로 x·y가 저장된 경우)는 저장값을 그대로 쓰는 #395 계약대로라 이번 규칙이 다시 놓지 않는다 — 저장 자리 카드와 배치 카드가 섞인 열은 settleColumnGaps가 저장 카드를 피해 벌린다. 실제 계정 로그인 화면 확인은 이번엔 불필요(호스트 흉내가 셸과 같은 문맥) — 필요하면 컴2 tabbit로.
+
 ## 2026-11-14 — 고객 의견 2차: 관리자 게시판 + AI 고객 사용 일지 (이슈 #540, 로컬3 레인)
 
 - **DB**: `server/db/migrations/board-261114.sql` + `schema.sql`. `lovetree_product_roles` CHECK 에 `ai_customer` 추가. `lovetree_feedback` 에 `kind`(opinion/journal)·`title`·`score`(1~5)·`journal_date` 추가. 신규 `lovetree_feedback_replies`(customer/internal)·`lovetree_ai_personas`(이름+intro jsonb). 계정 탈퇴 경로에 replies·personas 포함.
