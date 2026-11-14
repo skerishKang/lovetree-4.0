@@ -42,7 +42,8 @@ try {
   # 1) 컴2 판독기 — JSON 을 base64 한 줄로 받는다(한글·줄바꿈 깨짐 없이). 이유는 stderr 한 줄뿐.
   $sshErrFile = [System.IO.Path]::GetTempFileName()
   try {
-    $remote = "wsl bash -c '/usr/local/bin/node $ReaderOnComp2 | base64 -w 0'"
+    # cmd 가 | 를 파이프로 해석하지 않도록 겹따옴표+wsl -e 로 — 2026-11-14 실측(작은따옴표는 cmd 가 무시해 빈 출력).
+  $remote = 'wsl -e bash -c "/usr/local/bin/node ' + $ReaderOnComp2 + ' | base64 -w 0"'
     $b64 = (& $ssh -o BatchMode=yes -o ConnectTimeout=15 comp2 $remote 2>$sshErrFile) -join ''
     $sshExit = $LASTEXITCODE
     $sshErr = [string](Get-Content $sshErrFile -Raw -ErrorAction SilentlyContinue)

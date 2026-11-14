@@ -12,7 +12,7 @@
 - **컴1 실행 스크립트** `tools/run-ai-customer-export.ps1`(신규): Git 번들 ssh(Windows 내장 ssh.exe 가 깨져 있음 — `ssh -V` 도 255·무출력, 2026-11-14 실측) → comp2 → `wsl bash -c 'node 판독기 | base64 -w 0'` → 디코드해 임시 JSON → md 작성 → 임시 삭제. 로그 `E:\lovetree-qa\export-log\ai-customer-YYMMDD.log` 맨 윗줄이 이유 한 줄(성공 요약/실패 이유), 실패 시 종료 코드 1.
 - **설치 목록**: `install.sh` 가 판독기를 `/opt/padiem/lovetree-api/tools/` 에 넣고, `autodeploy.sh` 의 API 변경 판정에 `tools/export-ai-customer-db.mjs` 를 추가(이 파일만 바뀌어도 설치). migration 변경 없음 — 자동 설치 대상.
 - **시험** `tests/export-ai-customer.test.mjs` 12건(문장 READ ONLY·쓰기 키워드 없음, subject·이메일 없음, 가림, JSON→md, 이름 중복 폴더). `npm test` 전체는 PR당 1회 실행(결과는 PR 본문).
-- **주의**: 컴2 ssh 는 Windows 셸(cmd)이라 WSL 명령은 `wsl ...` 로 우회(WSL 기본 사용자 root — .env 읽기 가능). JSON 은 base64 한 줄로만 전달(한글·줄바꿈 안전). 판독기 오류 이유는 값 없이 한 줄만 stderr 로.
+- **주의**: 컴2 ssh 는 Windows 셸(cmd)이라 WSL 명령은 `wsl -e bash -c "..."` 로 우회(WSL 기본 사용자 root — .env 읽기 가능; 작은따옴표로는 cmd 가 `|` 를 파이프로 삼켜 빈 출력 — 겹따옴표+`-e` 로 실측 해결). JSON 은 base64 한 줄로만 전달(한글·줄바꿈 안전). 판독기 오류 이유는 값 없이 한 줄만 stderr 로.
 
 ## 2026-11-14 — 운영센터 2차 다듬기: 탭 거르기·고치는 일 (#570, 로컬3 레인, ai/local3-admin-570-261115, main f605e81 기준)
 
