@@ -13,6 +13,10 @@
 - **일부러 되돌려 확인**: `#feedback-context-fields label{display:grid}` 를 다시 넣으면 `상자와 글자 세로 차이 11.5px` 로 실패합니다(수치 판정이 실제 고장을 잡음).
 - **시험 결과**: `npm test` 1569 pass / 0 fail / 124 skipped(화면 시험은 #646 규칙대로 `npm test` 에서 빠짐), `LT_FEEDBACK_631_REQUIRE=1 node --test tests/v41-shell-dialogs.test.mjs` 24 pass, `npm run build`·`v41-modulepreload --check` 통과.
 
+## 2026-11-15 — 의견 보내기 창 다듬기: 함께 보낼 정보 한 줄·보낸 뒤 화면 (#631, 로컬5 레인, PR #648 → main 524bc23)
+
+- #540 의견 창의 보내기 단계를 다듬었습니다 — 보내기 전에 함께 보낼 자동 정보를 한 줄로 보여 주고, 보낸 뒤에는 '받았어요. 살펴보고 고칠게요.' 확인 화면으로 끝냅니다. 이 창의 미리보기 postdeploy 화면 시험 연결은 CTO가 PR #651로 따로 올렸습니다(2026-11-15 기준 OPEN).
+
 ## 2026-11-15 — 운영센터 '고치는 일' 연결 복구 · 둘러보기 검색에 순간 제목 · 글자 기준선 시험의 대기 (#636·#627·#548, 로컬4 레인, main 2444078 기준)
 
 - **#636 운영센터 '고치는 일' 탭이 비어 보임**: 운영 도구(`tools/ops-reply.mjs`)가 이슈 번호를 `#584` 처럼 저장했는데 읽는 쪽(`src/admin-view.js` 의 `linkedIssueNumbers`·`issueLink`)이 숫자만 받아(`/^\d+$/`) 전부 버렸습니다. 고객 글의 '이슈 #' 표시도 함께 사라졌습니다. 고침: ① 읽는 쪽에 `normalizeIssueNumber()` 를 두고 앞의 `#`을 떼고 숫자로 맞춘 뒤 비교한다(`linkedIssueNumbers`·`issueLink`·`src/admin.js` 이슈별 연결 판정·저장 시 정규화 모두 같은 함수) ② 쓰는 쪽(`tools/ops-reply.mjs`)은 숫자만 저장한다. 이미 `#`이 붙어 저장된 값은 읽는 쪽 수정만으로 보이므로 DB 는 고치지 않았습니다. 시험: `tests/admin-view.test.mjs`('#584'/'584'/빈 값/잘못된 값이 섞인 목록·`issueLink('#541')`)·`tests/ops-reply.test.mjs`('#' 입력이 숫자로 저장됨).
