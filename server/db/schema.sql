@@ -276,7 +276,7 @@ CREATE TABLE IF NOT EXISTS lovetree_feedback (
   kind text NOT NULL DEFAULT 'opinion' CHECK (kind IN ('opinion','journal')),
   category text NOT NULL CHECK (category IN ('bug','inconvenient','feature','other')),
   title text,
-  body text NOT NULL CHECK (char_length(body) BETWEEN 1 AND 2000),
+  body text NOT NULL CHECK ((kind = 'journal' AND char_length(body) BETWEEN 1 AND 8000) OR (kind <> 'journal' AND char_length(body) BETWEEN 1 AND 2000)),
   score smallint CHECK (score IS NULL OR (score BETWEEN 1 AND 5)),
   journal_date date,
   context jsonb NOT NULL DEFAULT '{}'::jsonb,

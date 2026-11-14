@@ -127,3 +127,34 @@ test('페르소나 소개는 관리자가 쓰고 고친다', async () => {
   const denied = await call('PUT', `/api/admin/persona/${AI}`, {account: USER, body: {name: 'x', intro: {}}});
   assert.equal(denied.status, 403);
 });
+
+test('일지 본문 한도 8000(#596) — 초과분은 한도까지 저장, 의견은 2000 유지', async () => {
+  const {call, feedbackRepo} = setup();
+  const ok = await call('POST', '/api/board', {account: AI, body: {title: '8000자', body: '가'.repeat(8000), score: 3}});
+  assert.equal(ok.status, 201);
+  const over = await call('POST', '/api/board', {account: AI, body: {title: '8001자', body: '가'.repeat(8001), score: 3}});
+  assert.equal(over.status, 201);
+  const mine = await call('GET', '/api/board/mine', {account: AI});
+  assert.equal(mine.body.posts[0].body.length, 8000);
+  const opinionOver = await call('POST', '/api/feedback', {account: AI, body: {category: 'other', body: '가'.repeat(2001)}});
+  assert.equal(opinionOver.status, 201);
+  const opinion = feedbackRepo.rows.find(row => row.kind === 'opinion');
+  assert.equal(opinion.body.length, 2000);
+});
+
+test('관리자 일지 탭 읽기 API(#596): 일지만 날짜 내림차순, 관리자만', async () => {
+  const {call} = setup();
+  await call('PUT', `/api/admin/persona/${AI}`, {account: ADMIN, body: {name: '윤제', intro: {}}});
+  await call('POST', '/api/board', {account: AI, body: {title: '오늘 일지', body: '내용', score: 3}});
+  await call('POST', '/api/feedback', {account: USER, body: {category: 'bug', body: '의견입니다'}});
+  const denied = await call('GET', '/api/admin/journals', {account: USER});
+  assert.equal(denied.status, 403);
+  const anon = await call('GET', '/api/admin/journals');
+  assert.equal(anon.status, 401);
+  const got = await call('GET', '/api/admin/journals', {account: ADMIN});
+  assert.equal(got.status, 200);
+  assert.equal(got.body.journals.length, 1);
+  assert.equal(got.body.journals[0].kind, 'journal');
+  assert.equal(got.body.journals[0].authorName, '윤제');
+  assert.equal(got.body.journals[0].displayTitle, '오늘 일지');
+});

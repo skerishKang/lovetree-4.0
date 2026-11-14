@@ -70,6 +70,21 @@ export function createFeedbackRepo(pool) {
       return rows.map(feedbackRow);
     },
 
+    async listJournals({ productId, limit = 300 }) {
+      const size = Math.max(1, Math.min(500, Number(limit) || 300));
+      const { rows } = await pool.query(
+        `SELECT f.*,
+          (SELECT count(*)::int FROM lovetree_feedback_replies r WHERE r.product_id = f.product_id AND r.post_id = f.id) AS reply_count,
+          (SELECT p.name FROM lovetree_ai_personas p WHERE p.product_id = f.product_id AND p.subject_id = f.subject_id) AS author_name
+         FROM lovetree_feedback f
+         WHERE f.product_id = $1 AND f.kind = 'journal'
+         ORDER BY f.journal_date DESC, f.created_at DESC, f.id DESC
+         LIMIT $2`,
+        [productId, size]
+      );
+      return rows.map(feedbackRow);
+    },
+
     async get({ productId, id }) {
       const numeric = Number(id);
       if (!Number.isSafeInteger(numeric) || numeric <= 0) return null;
