@@ -220,6 +220,8 @@ function markup(url,title='',mediaMetadata=null,momentId='',context=null,momentM
  const m=describe(url);
  if(m.kind==='none')return '';
  if(m.kind==='invalid')return '<p class="lt-media-error">링크를 열 수 없어요. 원본 주소를 확인해 주세요.</p>';
+ // #632: 내 기록(auto) YouTube 카드만 사라짐 감지를 청한다. 표시는 data-lt-auto 로만 남기고
+ // 실제 요청은 화면에 보일 때(IntersectionObserver) 한다 — 공유·예시는 #327 '누르기 전 외부 요청 0'을 그대로 유지.
  // #601: 보드 카드의 큰 썸네일 한 장 — 크게 보기·안내 글·원본 링크·두 번째 제목은 상세가 맡는다.
  const compact=!!opts?.compact;
  const canLoad=!!m.loadUrl&&(new URL(m.loadUrl).protocol==='https:'||m.privateFile);
@@ -249,7 +251,7 @@ function markup(url,title='',mediaMetadata=null,momentId='',context=null,momentM
  const status=compact?'':(auto?'재생을 누르면 여기서 바로 재생해요.':(canLoad?'불러오기를 누르면 원본 사이트에 연결됩니다.':'원본 사이트에서 확인할 수 있어요.'));
  // #393 2: 크게 보기 — 영상을 어두운 깔개 위 화면 가운데 크게 연다(바깥 클릭·Esc로 복귀).
  const expand=canLoad&&!compact&&(m.kind==='youtube'||m.kind==='video')?'<div class="lt-media-toolbar"><button type="button" data-lt-expand>크게 보기</button></div>':'';
- let html = '<div class="lt-media" data-lt-url="'+esc(url)+'" data-lt-title="'+esc(title)+'"'+(momentId?' data-lt-moment-id="'+esc(momentId)+'"':'')+(m.kind==='youtube'?' data-lt-youtube="1"':'')+(vertical?' data-lt-vertical="1"':'')+'>'+expand+'<div class="lt-media-body">'+body+'</div>'+(compact?'':'<p class="lt-media-status" role="status">'+status+'</p><a href="'+esc(m.openUrl)+'" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">'+esc(m.kind==='youtube'?m.actionLabel+(m.startSeconds?' · 시작 '+formatStart(m.startSeconds):''):'원본 링크 열기')+' ↗</a>')+'</div>';
+ let html = '<div class="lt-media" data-lt-url="'+esc(url)+'" data-lt-title="'+esc(title)+'"'+(momentId?' data-lt-moment-id="'+esc(momentId)+'"':'')+(m.kind==='youtube'?' data-lt-youtube="1"':'')+(auto?' data-lt-auto="1"':'')+(vertical?' data-lt-vertical="1"':'')+'>'+expand+'<div class="lt-media-body">'+body+'</div>'+(compact?'':'<p class="lt-media-status" role="status">'+status+'</p><a href="'+esc(m.openUrl)+'" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">'+esc(m.kind==='youtube'?m.actionLabel+(m.startSeconds?' · 시작 '+formatStart(m.startSeconds):''):'원본 링크 열기')+' ↗</a>')+'</div>';
  if(m.privateFile)html=html.replace('불러오기를 누르면 원본 사이트에 연결됩니다.','내 계정에 보관한 파일입니다. 불러오기를 눌러 확인하세요.').replace(/<a href=[\s\S]*?<\/a>/,'');
  return html;
 }
@@ -257,7 +259,7 @@ function markup(url,title='',mediaMetadata=null,momentId='',context=null,momentM
 // 주소를 못 만들면(모듈 실패·모양이 다름) 원본 링크 안내로 물러난다.
 async function playInPlace(root){
  const m=describe(root.dataset.ltUrl);
- if(m.kind!=='youtube'||root.dataset.ltPlaying)return;
+ if(m.kind!=='youtube'||root.dataset.ltPlaying||root.dataset.ltVanished==='1')return;
  root.dataset.ltPlaying='1';
  const body=root.querySelector('.lt-media-body'),status=root.querySelector('.lt-media-status');
  let embed=null;
@@ -373,11 +375,109 @@ async function openLightbox(url,title='',verticalHint=null){
   video.src=src;stage.replaceChildren(video);
  }
 }
-window.LTMedia={describe,markup,privateAssetName,autoLoadMedia,currentContext:mediaContext,youtubeThumbUrl,youtubeCandidates,verticalVideo,probeVertical,upgradeVerticals,openLightbox,closeLightbox};
+// #632: 사라진 영상 감지·표시 — 내 기록(auto) YouTube 카드만, 보이는 카드만 검사하고 결과는 하루 기억한다.
+// 신호 두 개를 짝으로 쓴다: ① 썸네일 내려가기 카드(삭제·비공개는 i.ytimg.com 그림도 함께 사라진다 — 실측 404)
+// ② oEmbed 프록시(#344) — 404는 삭제 확정, 200은 영상이 있음, 502는 비공개·임베드 금지·일시 오류가 섞인 보류.
+// 썸네일이 살아 있는 카드는 영상이 있는 것이므로 묻지 않는다(임베드 금지를 사라진 영상으로 세지 않게,
+// 정상 카드마다 요청을 보내지 않게). 썸네일이 실패한 카드만 프록시에 물어 보고, 404(하루 기억)와
+// 502(기억하지 않음 — 다음 화면에 다시 판정)일 때 '사라진 영상'으로 정한다. 200이면 썸네일만
+// 잠깐 실패한 것이므로 기존 안내('영상을 볼 수 없어요')를 그대로 둔다.
+const VANISHED_TEXT='영상이 삭제되었거나 비공개예요';
+const VANISHED_BADGE='사라진 영상';
+const VANISHED_CONCURRENCY=3;
+const vanishedQueue=new Set();
+let vanishedInFlight=0,vanishedIo=null,vanishedWatchTimer=0;
+let videoStatusLoader=null; // 시험이 끼워 넣는 판정 모듈 — 평소에는 video-status.mjs를 동적으로 불러 온다.
+function loadVideoStatusModule(){
+ if(videoStatusLoader)return Promise.resolve(videoStatusLoader()).catch(()=>null);
+ return import('/v41/video-status.mjs').catch(()=>null);
+}
+function localStore(){try{return globalThis.localStorage||null}catch{return null}}
+// 썸네일 내려가기가 실패로 끝난 카드 — 썸네일이 살아 있으면 영상이 있는 것이므로 묻지 않는다.
+function thumbFailed(root){
+ return !!(root.querySelector && root.querySelector('[data-lt-fallback],.lt-fallback-notice'));
+}
+function applyVanished(root, doc = (typeof document !== 'undefined' ? document : null)){
+ if(!root||!root.querySelectorAll||!doc||root.dataset.ltVanished==='1')return;
+ root.dataset.ltVanished='1';
+ root.classList.add('lt-media-vanished');
+ // 재생·크게 보기·기존 안내는 치우고, 보관된 제목·채널(그림·글 카드)은 그대로 둔다.
+ for(const el of root.querySelectorAll('.lt-media-toolbar,[data-lt-play],.lt-media-status,.lt-fallback-notice'))el.remove();
+ const note=doc.createElement('p');
+ note.className='lt-media-vanished-note';
+ note.setAttribute('role','status');
+ const badge=doc.createElement('strong');
+ badge.className='lt-media-vanished-badge';
+ badge.textContent=VANISHED_BADGE;
+ note.append(badge,doc.createTextNode(' '+VANISHED_TEXT));
+ const host=root.querySelector('.lt-media-body')||root;
+ host.after(note);
+}
+function scheduleVanishedCheck(root){
+ if(!root||root.dataset?.ltAuto!=='1'||root.dataset.ltVanishedChecked==='1')return;
+ root.dataset.ltVanishedChecked='1';
+ vanishedQueue.add(root);
+ void runVanishedQueue();
+}
+function runVanishedQueue(){
+ while(vanishedInFlight<VANISHED_CONCURRENCY&&vanishedQueue.size){
+  const root=vanishedQueue.values().next().value;
+  vanishedQueue.delete(root);
+  if(!root.isConnected)continue;
+  vanishedInFlight+=1;
+  checkVanished(root).catch(()=>{}).finally(()=>{vanishedInFlight=Math.max(0,vanishedInFlight-1);void runVanishedQueue();});
+ }
+}
+async function checkVanished(root, hooks = null){
+ // hooks는 시험이 끼우는 자리(doc·store)다 — 평소에는 이 문서의 document·localStorage를 쓴다.
+ const m=describe(root?.dataset?.ltUrl||'');
+ if(m.kind!=='youtube'||!m.videoId||!root.isConnected)return;
+ if(!thumbFailed(root))return;
+ const mod=await loadVideoStatusModule();
+ if(!mod||!root.isConnected)return;
+ const store=(hooks&&hooks.store)||localStore();
+ let status=mod.readVideoStatusCache?mod.readVideoStatusCache(store,m.videoId):null;
+ if(!status){
+  status=await mod.fetchVideoStatus(m.videoId);
+  if(status!=='unknown'&&root.isConnected)mod.writeVideoStatusCache?.(store,m.videoId,status);
+ }
+ // 404(삭제 확정)와 502(비공개·일시 오류 — 썸네일 실패가 짝 신호)는 표시하고, 200은 그대로 둔다.
+ if(status!=='ok'&&root.isConnected)applyVanished(root,hooks&&hooks.doc);
+}
+function watchVanished(){
+ // 이미 '사라진 영상'으로 정해진 칸에 썸네일 내려가기가 나중에 글 카드를 놓으면 기존 안내가 따로 붙는다 — 겹침을 치운다.
+ for(const el of document.querySelectorAll('.lt-media-vanished .lt-fallback-notice'))el.remove();
+ // 검사 상대는 썸네일이 실패한 카드뿐이다 — 정상 카드는 요청도 관찰도 하지 않는다.
+ const pending=[];
+ for(const el of document.querySelectorAll('.lt-media[data-lt-auto="1"]:not([data-lt-vanished-checked])')){
+  if(thumbFailed(el))pending.push(el);
+ }
+ if(!pending.length)return;
+ if(typeof IntersectionObserver!=='function'){ // 보이는 판정을 못 하면(오래된 브라우저) 문서의 카드를 한 번 검사한다.
+  for(const el of pending)scheduleVanishedCheck(el);
+  return;
+ }
+ if(!vanishedIo){
+  vanishedIo=new IntersectionObserver(entries=>{
+   for(const entry of entries){
+    if(!entry.isIntersecting)continue;
+    vanishedIo.unobserve(entry.target);
+    scheduleVanishedCheck(entry.target);
+   }
+  },{rootMargin:'160px 0px 160px 0px'});
+ }
+ for(const el of pending)vanishedIo.observe(el);
+}
+function queueWatchVanished(){ // 끌기·넘기기 동안 몰리는 바뀜마다 일을 하지 않게 조금 뒤에 한 번만 본다.
+ if(vanishedWatchTimer)return;
+ vanishedWatchTimer=setTimeout(()=>{vanishedWatchTimer=0;watchVanished();},300);
+}
+window.LTMedia={describe,markup,privateAssetName,autoLoadMedia,currentContext:mediaContext,youtubeThumbUrl,youtubeCandidates,verticalVideo,probeVertical,upgradeVerticals,openLightbox,closeLightbox,applyVanished,scheduleVanishedCheck,checkVanished,watchVanished,setVideoStatusLoader(fn){videoStatusLoader=typeof fn==='function'?fn:null;}};
 if(typeof document!=='undefined'){
  const cleanup=()=>{for(const [node,url] of ownedUrls)if(!node.isConnected){URL.revokeObjectURL(url);ownedUrls.delete(node);}};
- new MutationObserver(cleanup).observe(document.documentElement,{childList:true,subtree:true});
+ new MutationObserver(()=>{cleanup();queueWatchVanished();}).observe(document.documentElement,{childList:true,subtree:true});
  addEventListener('pagehide',()=>{for(const url of ownedUrls.values())URL.revokeObjectURL(url);ownedUrls.clear();});
+ watchVanished();
  // #601: 보드 카드의 그림은 카드를 끄는 자리다 — 카드 안에서는 이 막음을 풀어 준다(다른 화면은 그대로).
  document.addEventListener('pointerdown',e=>{if(e.target.closest?.('.lt-media')&&!e.target.closest?.('.card'))e.stopPropagation();},true);
  document.addEventListener('click',e=>{if(e.target.closest?.('[data-lt-title-edit]'))return;const root=e.target.closest?.('.lt-media');if(!root)return;e.stopImmediatePropagation();if(e.target.closest('[data-lt-expand]')){e.preventDefault();void openLightbox(root.dataset.ltUrl,root.dataset.ltTitle,root.hasAttribute('data-lt-vertical')?true:null);return;}if(e.target.closest('[data-lt-play]')){e.preventDefault();void playInPlace(root);return;}if(e.target.closest('[data-lt-load]')){e.preventDefault();load(root);}},true);
