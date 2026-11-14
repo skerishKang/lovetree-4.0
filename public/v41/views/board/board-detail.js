@@ -53,14 +53,14 @@
   const v11CardHTML=cardHTML;
   cardHTML=function(m){
     let media='';
-    if(m.url)media=LTMedia.markup(m.url,m.title,m.mediaMetadata,m.id,null,{emotion:m.emotion,date:m.date,note:m.memo});
+    if(m.url)media=LTMedia.markup(m.url,m.title,m.mediaMetadata,m.id,null,{emotion:m.emotion,date:m.date,note:m.memo},{compact:true});
     else if(m.type==='note') media=`<div class="noteText">“${esc(m.memo)}”</div>`;
     else if(isYtMoment(m)) media=`<div class="media linkMedia">${ytMediaHTML(originalUrl(m),'<span class="playBadge">▶</span>')}</div>`;
     else if(m.type==='video') media=`<div class="media"><video muted playsinline loop poster="${m.asset}" src="${m.video||''}"></video><span class="playBadge">▶</span><span class="duration">${m.duration||'00:03'}</span></div>`;
     else media=`<div class="media ${m.type==='link'?'linkMedia':''}"><img src="${m.asset}" data-fallback="${ASSET.link}" onerror="this.onerror=null;this.src=this.dataset.fallback" alt=""></div>`;
-    let kws=(m.keywords||[]).slice(0,4).map(k=>`<span>${esc(k)}</span>`).join('');
+    // #601: 카드는 훑기용 — 큰 썸네일 + 제목 2줄 + 감정·날짜 한 줄만. 마음·출처·키워드·크게 보기는 상세가 맡는다.
     let heading=titleMain(m);
-    return `<article class="card ${m.first?'first':''} ${m.type==='note'?'noteCard':''} ${pinClass(m)} ${cardClass(m)}" data-id="${m.id}" style="left:${m.x}px;top:${m.y}px;--rot:${m.rot}deg;--pin:${colors[m.color]};--halo:${colors[m.color]}55">${m.first?'<div class="firstTag">첫 순간</div>':''}<button class="pin" data-pin="${m.id}" aria-hidden="true" tabindex="-1"></button>${media}<div class="cardBody"><div class="eyebrow"><span class="emotionDot"></span>${LTLabels.type(m.originalType||m.type)} 순간 · ${esc(m.emotion)}</div>${heading?`<h3>${esc(heading)}</h3>`:''}${titleSubMarkup(m)}<div class="meta"><span>${esc(dateText(m.date))}</span><span>${m.type==='link'||isYtMoment(m)?'↗':''}</span></div>${m.type!=='note'?`<div class="memo">${esc(m.memo)}</div>`:''}<div class="keywordOnCard">${kws}</div>${(m.url||m.sourceUrl)?`<div class="domain">${esc(m.source)}</div>`:''}</div></article>`;
+    return `<article class="card ${m.first?'first':''} ${m.type==='note'?'noteCard':''} ${pinClass(m)} ${cardClass(m)}" data-id="${m.id}" style="left:${m.x}px;top:${m.y}px;--rot:${m.rot}deg;--pin:${colors[m.color]};--halo:${colors[m.color]}55">${m.first?'<div class="firstTag">첫 순간</div>':''}<button class="pin" data-pin="${m.id}" aria-hidden="true" tabindex="-1"></button>${media}<div class="cardBody"><h3 class="cardTitle">${esc(heading)}</h3><div class="cardMeta"><span class="emotionDot"></span>${esc(m.emotion)} · ${esc(dateText(m.date))}</div></div></article>`;
   };
 
   /* Composer: VIDEO supports local or YouTube source; VIDEO LINK remains a direct YouTube 순간. */
