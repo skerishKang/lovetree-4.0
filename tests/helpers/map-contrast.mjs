@@ -158,7 +158,9 @@ export async function measureMapPixelsInPage([png, overlaysArg]) {
       if (ring.length) add(offset === 5 ? 'first-inner-ring' : 'first-ring', d.id, ring, .5);
     }
   }
-  const clearPoint = (p) => visible(p.x, p.y) && ![...dots, ...hubs].some(d => Math.hypot(p.x - d.x, p.y - d.y) < d.r + (d.first ? 12 : 3)) && !textBounds.some(t => p.x > t.left - 2 && p.x < t.right + 2 && p.y > t.top - 2 && p.y < t.bottom + 2);
+  // #601: 점 썸네일(이름표 앞 16px 사진)도 점과 같은 불투명 요소다 — 사진 뒤를 지나는 선은 가린 것으로 본다.
+  const thumbRects = (typeof window !== 'undefined' && window.__lt?.thumbRects?.()) || [];
+  const clearPoint = (p) => visible(p.x, p.y) && ![...dots, ...hubs].some(d => Math.hypot(p.x - d.x, p.y - d.y) < d.r + (d.first ? 12 : 3)) && !textBounds.some(t => p.x > t.left - 2 && p.x < t.right + 2 && p.y > t.top - 2 && p.y < t.bottom + 2) && !thumbRects.some(r => p.x > r.x - 2 && p.x < r.x + r.w + 2 && p.y > r.y - 2 && p.y < r.y + r.h + 2);
   for (const [i, p] of window.__mapPaint.paths.entries()) {
     const samples = [];
     const points = p.closed ? [{ x: p.points.reduce((n, q) => n + q.x, 0) / p.points.length, y: p.points.reduce((n, q) => n + q.y, 0) / p.points.length }] : p.points.slice(1).map((q, j) => ({ x: (q.x + p.points[j].x) / 2, y: (q.y + p.points[j].y) / 2 }));

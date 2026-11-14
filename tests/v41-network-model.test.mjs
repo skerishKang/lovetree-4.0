@@ -10,7 +10,7 @@ const SCREEN = fs.readFileSync(new URL('../public/v41/views/network/network.js',
 const HTML = fs.readFileSync(new URL('../public/v41/views/track56-network.html', import.meta.url), 'utf8');
 
 test('0. 계산 한 벌은 화면이 실제로 부르는 함수만 노출하고, 모델을 먼저 부른다', () => {
-  assert.deepEqual(Object.keys(M).sort(), ['bezierGeometry', 'bezierPoint', 'branchPoint', 'clusterSpan', 'concentricLayout', 'fitBox', 'gridFor', 'groupSizeFor', 'networkLayout', 'originPath', 'pathEmphasis', 'placeLabels', 'relationText', 'routeEdges', 'shortTitle', 'treeLevels']);
+  assert.deepEqual(Object.keys(M).sort(), ['bezierGeometry', 'bezierPoint', 'branchPoint', 'clusterSpan', 'concentricLayout', 'emotionGroups', 'fitBox', 'gridFor', 'groupSizeFor', 'labelTitle', 'monthGroups', 'networkLayout', 'originPath', 'pathEmphasis', 'pickGroups', 'placeLabels', 'relationText', 'routeEdges', 'shortTitle', 'treeLevels']);
   assert.ok(HTML.indexOf('network-model.js') < HTML.indexOf('network.js'), '모델을 화면보다 먼저 부른다');
 });
 
@@ -108,9 +108,12 @@ test('8. 화면은 같은 계산을 다시 구현하지 않고 한 벌을 부른
   assert.doesNotMatch(SCREEN, /clamp\(Math\.min\(\(vw-26\)/);
   assert.doesNotMatch(SCREEN, /for\(let i=0;i<p\.nodes\.length-1;i\+\+\)/);
   assert.doesNotMatch(SCREEN, /a=-2\.8\+j\*\.78,dist=100\+j\*38/, '#366 나선 배치 공식은 LT56Model.networkLayout 한 벌로 옮겨졌다');
-  for (const call of ['LT56Model.branchPoint', 'LT56Model.groupSizeFor', 'LT56Model.clusterSpan', 'LT56Model.fitBox', 'LT56Model.bezierGeometry', 'LT56Model.placeLabels', 'LT56Model.shortTitle', 'LT56Model.routeEdges', 'LT56Model.networkLayout', 'LT56Model.concentricLayout', 'LT56Model.originPath', 'LT56Model.pathEmphasis', 'LT56Model.bezierPoint', 'LT56Model.relationText']) {
+  for (const call of ['LT56Model.branchPoint', 'LT56Model.pickGroups', 'LT56Model.labelTitle', 'LT56Model.fitBox', 'LT56Model.bezierGeometry', 'LT56Model.placeLabels', 'LT56Model.shortTitle', 'LT56Model.routeEdges', 'LT56Model.networkLayout', 'LT56Model.concentricLayout', 'LT56Model.originPath', 'LT56Model.pathEmphasis', 'LT56Model.bezierPoint', 'LT56Model.relationText']) {
     assert.ok(SCREEN.includes(call), call);
   }
+  // #601: 묶음은 감정별 — 화면이 7개씩 자르거나 묶음 이름을 다시 만들지 않는다(모델 한 벌).
+  assert.doesNotMatch(SCREEN, /LT56Model\.groupSizeFor/);
+  assert.doesNotMatch(SCREEN, /LT56Model\.clusterSpan/);
   // 예시 판본 판단(canPlay)은 그대로 한 곳에 있다.
   assert.match(SCREEN, /const canPlay=LTDEMO\.example;/);
   // #366 성능 원칙(#346): 상시 rAF 루프는 없다 — 상태가 바뀔 때 scheduleDraw 한 번.

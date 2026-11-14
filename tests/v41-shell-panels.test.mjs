@@ -117,7 +117,8 @@ test('setEditorMode(add)는 추가 모드 기본값과 폼 기준값을 세운�
     assert.equal(h.els['moment-management'].hidden, true);
     assert.equal(h.els['moment-form'].elements.emotion.value, '설렘', '기본 감정');
     assert.match(h.els['moment-form'].elements.date.value, /^\d{4}-\d{2}-\d{2}$/, '오늘 날짜');
-    assert.equal(h.els['editor-context'].textContent, '새 순간 추가 · 첫 순간에서 이어집니다.');
+    // #601 '가' 결정: 고르지 않은 추가는 가장 최근 순간(둘째 순간)에서 이어짐을 보여 준다.
+    assert.equal(h.els['editor-context'].textContent, '새 순간 추가 · 둘째 순간에서 이어집니다.');
     assert.equal(h.counts().tabsVisible, 'detailed', '더하기는 자세한 추가 구역을 보여 준다');
     assert.equal(h.uploads.resets, 1, '모드를 바꾸면 업로드 상태를 비운다');
     h.els['write-panel'].open = true;
@@ -154,6 +155,7 @@ test('setEditorMode(add, parentId)는 그 순간을 부모로 삼는다', () => 
   try {
     window.LT41.momentId = 'm2';
     h.panels.setEditorMode('add', 'm1');
+    // 부모를 정확히 고른 추가는 그 순간(m1)에서 이어짐을 보여 준다.
     assert.equal(h.els['editor-context'].textContent, '새 순간 추가 · 첫 순간에서 이어집니다.');
     assert.equal(h.els['parent-management'].hidden, true);
   } finally { h.restore(); }
