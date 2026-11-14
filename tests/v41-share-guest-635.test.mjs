@@ -78,7 +78,7 @@ const homeHostHTML = `<!doctype html><html lang="ko"><head><meta charset="utf-8"
 <script>window.LT41={source:'file',member:'out',treeCount:0,trees:[],prefs:{}};window.LT41_MESSAGES=[];addEventListener('message',(e)=>{if(e.data&&String(e.data.type||'').startsWith('lt41-'))window.LT41_MESSAGES.push(e.data.type)});</script>
 <iframe src="/v41/home.html" style="position:fixed;inset:0;width:100vw;height:100vh;border:0"></iframe></body></html>`;
 
-const CAPTURE_DIR = 'E:\\lovetree-qa\\lane\\local1-635b';
+const CAPTURE_DIR = 'E:\\lovetree-qa\\lane\\local1-635c';
 const shot = (page, name) => { mkdirSync(CAPTURE_DIR, { recursive: true }); return page.screenshot({ path: path.join(CAPTURE_DIR, name + '.png'), fullPage: false }); };
 
 async function openBook(browser, url, { width = 1440, height = 900, theme = 'night', route = null } = {}) {
@@ -455,6 +455,166 @@ test('#635 PR B 화면: 영상 칸 — 보관 썸네일을 먼저 보이고, 없
       if (expect === '썸네일') assert.equal(cell.imgOk, true, `${route}: 썸네일이 실제로 그려지지 않았다`);
       if (expect === '글카드') assert.equal(cell.title, true, `${route}: 글 카드에 제목이 없다`);
       assert.ok(cell.w > 100 && cell.h > 60, `${route}: 영상 칸이 너무 작다 ${JSON.stringify(cell)}`);
+      await context.close();
+    }
+  } finally {
+    if (browser) await browser.close().catch(() => {});
+    server.close();
+  }
+});
+
+// ===================== #635 PR C (2026-11-15): 남은 4가지 + 마무리 =====================
+// 8. 로그아웃 메뉴(≡) 맨 위 '내 러브트리 시작하기' — 첫 화면의 '첫 순간 추가'와 같은 시작 흐름(openLoginStart('first')).
+// 9. '1단계 · 0일' → 같은 날이면 '첫날', 그 뒤는 'N일째'(#549의 '0일 전 → 오늘' 원칙과 맞춤). 화면에 '0일' 글자가 없다.
+// 10. 책 영상 칸 '크게 보기' — '재생' 단추와 같은 정도로 읽힌다(대비 4.5:1 이상, 실측).
+// 11. 390 아래쪽 간격 — 책과 '새 소식 · 의견 보내기' 링크 줄 사이 16px 이상·겹침 0,
+//     첫 화면에서는 '드래그 · 금테 카드를 눌러 감상' 안내를 단추 묶음 바로 아래(안내 줄 옆)로 올리고 링크 줄과 16px 이상 띄운다.
+
+test('#635 PR C 규칙(정적): 시작 입구·첫날 표기·크게 보기 대비·아래쪽 간격·안내 자리', () => {
+  const shell = read('public/v41/shell.mjs');
+  // 8. 로그아웃 메뉴 맨 위 시작 입구 — 로그인 상태에서는 붙지 않는다(조건이 add('첫 화면'…) 앞에 있다).
+  const foldAt = shell.indexOf('function buildFoldMenu()');
+  const startEntry = shell.indexOf("if(!member?.snapshot().owned)add('내 러브트리 시작하기',()=>openLoginStart('first'));");
+  assert.ok(startEntry > foldAt, '접기 메뉴(≡)에 시작 입구를 넣는다');
+  assert.ok(shell.indexOf("add('첫 화면'", startEntry) > startEntry, '시작 입구는 메뉴 맨 위다');
+  // 9. '0일' 표기 — '이어진 순간' 요약이 첫날·N일째로 읽힌다.
+  const extra = read('public/v41/views/book/book-extra.js');
+  assert.match(extra, /journey\.days===0\?'첫날':journey\.days\+'일째'/, "'이어진 순간' 요약: 같은 날은 '첫날', 그 뒤는 'N일째'");
+  assert.ok(!extra.includes("journey.days+'일'"), "예전 'N일' 표기가 남지 않는다");
+  // 10. '크게 보기' 대비 — 밤은 '재생' 단추와 같은 바탕·글자, 정원은 종이 바탕·잉크 글자.
+  const useCss = read('public/v41/views/book/book-usability.css');
+  assert.match(useCss, /\.media-links button\{[^}]*background:rgba\(7,7,12,\.72\);color:var\(--lt-pearl\)/, "밤 '크게 보기'는 '재생'과 같은 바탕·글자다");
+  assert.match(useCss, /html\[data-lt-theme=garden\] \.media-links button\{background:var\(--lt-paper\);color:var\(--lt-gold-ink\)\}/, "정원 '크게 보기'는 종이 바탕·잉크 글자다");
+  // 11. 간격·안내 자리.
+  const layout = read('public/v41/reader-layout.css');
+  assert.match(layout, /padding:24px 14px 60px/, '390 책 화면: 아래 고정 링크 줄과 16px 이상 띄울 여백을 둔다');
+  const orbit = read('src/views/orbit.js');
+  assert.match(orbit, /<span class="center-hint">드래그 · 금테 카드를 눌러 감상<\/span>/, '첫 화면 안내는 안내 줄 옆에 함께 그린다');
+  assert.ok(!orbit.includes('<div class="hint">드래그'), '첫 화면 오른쪽 아래 고정 안내(링크 줄과 겹치던)는 치웠다');
+  assert.match(orbit, /\.center-note\{display:flex;flex-wrap:wrap/, '안내 줄은 단추 묶음 바로 아래에서 두 문장을 나란히 쓴다');
+});
+
+// 실제 셸(/v41/)을 여는 도우미 — 로그아웃 상태 그대로(예시 기록).
+async function openShell(browser, base, hash, { width = 1440, height = 900, theme = 'night' } = {}) {
+  const context = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
+  await context.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); } catch {} }, theme);
+  const page = await context.newPage();
+  const problems = [];
+  page.on('pageerror', (e) => problems.push(String(e.message || e)));
+  await page.goto(`${base}/v41/${hash}`, { waitUntil: 'load' });
+  let frame = null;
+  for (let i = 0; i < 80 && !frame; i++) {
+    frame = page.frames().find((f) => /track59-sketchbook|src064-orbit|home/.test(f.url()));
+    if (!frame) await page.waitForTimeout(250);
+  }
+  await page.waitForTimeout(1200);
+  return { context, page, frame, problems };
+}
+
+// 대비 실측: 글자색(+opacity)과 그 자리에 실제 칠해진 바탕(스크린샷 최다 색)으로 4.5:1을 낸다(#515·#516과 같은 방법).
+const parseColor = (s) => { const m = s.match(/rgba?\(([^)]+)\)/); if (!m) return null; const p = m[1].split(/[\s,/]+/).filter(Boolean).map(Number); return { r: p[0], g: p[1], b: p[2], a: p.length > 3 ? p[3] : 1 }; };
+const lumOf = (c) => { const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(c.r) + 0.7152 * f(c.g) + 0.0722 * f(c.b); };
+const ratioOf = (a, b) => { const x = lumOf(a), y = lumOf(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+const blend = (t, u) => ({ r: t.r * t.a + u.r * (1 - t.a), g: t.g * t.a + u.g * (1 - t.a), b: t.b * t.a + u.b * (1 - t.a), a: 1 });
+
+async function measureContrast(page, frame, selector) {
+  const loc = frame.locator(selector).first();
+  if (!(await loc.count()) || !(await loc.isVisible())) return null;
+  const box = await loc.boundingBox();
+  if (!box || box.width < 1 || box.height < 1) return null;
+  const style = await loc.evaluate((el) => { const cs = getComputedStyle(el); return { color: cs.color, opacity: cs.opacity, text: el.textContent.trim() }; });
+  const b64 = (await page.screenshot({ clip: { x: Math.floor(box.x), y: Math.floor(box.y), width: Math.max(1, Math.ceil(box.width)), height: Math.max(1, Math.ceil(box.height)) } })).toString('base64');
+  const dominant = await page.evaluate(async (data) => {
+    const img = new Image(); img.src = 'data:image/png;base64,' + data; await img.decode();
+    const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
+    const g = c.getContext('2d'); g.drawImage(img, 0, 0);
+    const d = g.getImageData(0, 0, c.width, c.height).data; const counts = new Map();
+    for (let i = 0; i < d.length; i += 4) { const k = `${d[i]},${d[i + 1]},${d[i + 2]}`; counts.set(k, (counts.get(k) || 0) + 1); }
+    return [...counts].sort((a, b) => b[1] - a[1])[0][0];
+  }, b64);
+  const [r, g, b] = dominant.split(',').map(Number);
+  const color = parseColor(style.color);
+  const fg = blend({ ...color, a: color.a * Number(style.opacity) }, { r, g, b, a: 1 });
+  return { text: style.text.slice(0, 20), color: style.color, bg: `rgb(${r},${g},${b})`, ratio: Math.round(ratioOf(fg, { r, g, b, a: 1 }) * 100) / 100 };
+}
+
+test('#635 PR C 화면: 메뉴 시작 입구·첫날 표기·크게 보기 대비·아래쪽 간격(390·1440 × 밤·정원)', { skip: REQUIRE ? false : skip, timeout: 360000 }, async () => {
+  if (skip) assert.fail(`미리보기 검사에서는 화면 시험 건너뜀이 실패다 — ${skip}`);
+  const server = await serve();
+  const base = `http://127.0.0.1:${server.address().port}`;
+  let browser;
+  try {
+    browser = await chromium.launch({ headless: true });
+
+    // 8. 로그아웃 메뉴(≡): 첫 항목이 '내 러브트리 시작하기'이고, 누르면 첫 화면의 시작 흐름(로그인 화면 이동)으로 간다.
+    {
+      const { context, page, problems } = await openShell(browser, base, '#book', { width: 390, height: 844, theme: 'night' });
+      assert.equal(problems.length, 0, `메뉴 화면 오류 ${problems.join(' | ')}`);
+      await page.click('#mobile-more');
+      const items = page.locator('#header-overflow button');
+      const first = await items.first().textContent();
+      assert.equal((first || '').trim(), '내 러브트리 시작하기', `메뉴 첫 항목이 시작 입구가 아니다(${first})`);
+      await shot(page, 'menu-open-390-night');
+      await items.first().click();
+      // location.assign 이동은 waitForURL가 가로채지 못하는 경우가 있어 주소를 직접 확인한다.
+      let target = null;
+      for (let i = 0; i < 20 && !target; i++) { if (/auth\/login/.test(page.url())) target = page.url(); else await page.waitForTimeout(200); }
+      assert.ok(target, '시작 입구를 눌렀는데 시작 흐름(로그인 화면)으로 가지 않는다 — ' + page.url());
+      await context.close();
+    }
+
+    for (const width of [390, 1440]) {
+      for (const theme of ['night', 'garden']) {
+        const height = width === 390 ? 844 : 900;
+
+        // 11-책. 책 아래쪽: 책 테두리와 고정 링크 줄 사이가 16px 이상·겹침 0. 9·10. 첫날 표기와 '크게 보기' 대비.
+        {
+          const { context, page, frame, problems } = await openShell(browser, base, '#book', { width, height, theme });
+          assert.equal(problems.length, 0, `책 ${width}·${theme}: 화면 오류 ${problems.join(' | ')}`);
+          const linksTop = await page.evaluate(() => { const l = document.querySelector('.home-links')?.getBoundingClientRect(); return l ? Math.round(l.top) : null; });
+          const bookBox = await frame.locator(width === 390 ? '.mobile-page' : '.book-wrap').first().boundingBox();
+          assert.ok(bookBox && linksTop !== null, `${width}·${theme}: 책·링크 줄 자리를 못 읽었다`);
+          const spacing = Math.round(linksTop - (bookBox.y + bookBox.height));
+          assert.ok(spacing >= 16, `${width}·${theme}: 책과 링크 줄 사이가 ${spacing}px다(16px 이상)`);
+          await shot(page, `book-after-${width}-${theme}`);
+          await frame.click('#overviewBtn');
+          await frame.waitForFunction(() => (document.querySelector('#journeySummary')?.textContent || '').length > 0, null, { timeout: 8000 });
+          const summary = await frame.evaluate(() => document.querySelector('#journeySummary').textContent.trim());
+          assert.match(summary, /^\d+단계 · (첫날|\d+일째)$/, `${width}·${theme}: '이어진 순간' 요약이 첫날·N일째 모양이 아니다(${summary})`);
+          assert.ok(!/(^|[^\d])0일/.test(summary), `${width}·${theme}: 요약에 '0일'이 남아 있다(${summary})`);
+          await frame.click('#overviewClose');
+          await page.waitForTimeout(300);
+          await shot(page, `book-after-${width}-${theme}`);
+          await context.close();
+        }
+
+        // 11-첫 화면. 안내(단추 묶음 바로 아래)와 고정 링크 줄이 겹치지 않고 16px 이상 떨어져 있다.
+        {
+          const { context, page, frame, problems } = await openShell(browser, base, '', { width, height, theme });
+          assert.equal(problems.length, 0, `첫 화면 ${width}·${theme}: 화면 오류 ${problems.join(' | ')}`);
+          const noteBox = await frame.locator('.center-note').first().boundingBox();
+          const linksBox = await page.locator('.home-links').boundingBox();
+          assert.ok(noteBox && linksBox, `${width}·${theme}: 안내 줄·링크 줄 자리를 못 읽었다`);
+          const gapHome = Math.round(linksBox.y - (noteBox.y + noteBox.height));
+          const overlapHome = Math.max(0, Math.min(noteBox.y + noteBox.height, linksBox.y + linksBox.height) - Math.max(noteBox.y, linksBox.y));
+          assert.equal(overlapHome, 0, `${width}·${theme}: 첫 화면 안내와 링크 줄이 ${overlapHome}px 겹친다`);
+          assert.ok(gapHome >= 16, `${width}·${theme}: 첫 화면 안내와 링크 줄 사이가 ${gapHome}px다(16px 이상)`);
+          const hintPos = await frame.evaluate(() => { const root = document.getElementById('orbit'); const el = root && root.shadowRoot ? root.shadowRoot.querySelector('.center-hint') : document.querySelector('.center-hint'); return el ? getComputedStyle(el).position : '없음'; });
+          assert.equal(hintPos, 'static', `${width}·${theme}: 안내가 여전히 화면 아래 고정 자리다(${hintPos})`);
+          await shot(page, `home-after-${width}-${theme}`);
+          await context.close();
+        }
+      }
+    }
+
+    // 10. '크게 보기' 대비 실측 — 유튜브 순간이 있는 책(share-host)에서 밤·정원 각각 잰다.
+    //    (예시 기록의 '영상'은 보관 그림이라 '크게 보기'가 없다 — 대비는 유튜브 칸에서만 의미가 있다.)
+    for (const theme of ['night', 'garden']) {
+      const { context, page, frame, problems } = await openBook(browser, `${base}/share-host.html`, { width: 390, height: 844, theme, route: (r) => r.abort() });
+      assert.equal(problems.length, 0, `대비 ${theme}: 화면 오류 ${problems.join(' | ')}`);
+      const expand = await measureContrast(page, frame, '.media-links button');
+      assert.ok(expand, `${theme}: '크게 보기' 단추를 찾지 못함`);
+      assert.ok(expand.ratio >= 4.5, `${theme}: '크게 보기' 대비 ${expand.ratio}:1(${expand.color} on ${expand.bg})`);
       await context.close();
     }
   } finally {

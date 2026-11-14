@@ -102,7 +102,10 @@ html[data-v41-screen=book] .yt-frame.is-vertical{width:auto;height:clamp(240px,5
    왼쪽 YouTube ↗(원본 링크), 오른쪽 크게 보기 — 영상 위에는 단추가 겹치지 않는다. */
 html[data-v41-screen=book] .media-links{display:flex;align-items:center;gap:8px;margin:6px 0 2px;min-width:0}
 html[data-v41-screen=book] .media-links .media-source-link{font-size:13px}
-html[data-v41-screen=book] .media-links button{margin-left:auto;flex:0 0 auto;min-height:44px;padding:8px 14px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-pill);background:rgba(255,230,166,.1);color:var(--lt-gold-ink);font-size:13px;cursor:pointer}
+html[data-v41-screen=book] .media-links button{margin-left:auto;flex:0 0 auto;min-height:44px;padding:8px 14px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-pill);background:rgba(7,7,12,.72);color:var(--lt-pearl);font-size:13px;cursor:pointer}
+/* #635 PR C: '크게 보기' 글자가 밤 배경 위 금색 잉크(#8a6420)라 희미했다 — '재생' 단추와 같은 바탕·글자로 올린다.
+   정원(밝은 종이)에서는 종이 바탕에 잉크 글자가 4.5:1 이상이라 그 값을 유지한다. */
+html[data-lt-theme=garden] .media-links button{background:var(--lt-paper);color:var(--lt-gold-ink)}
 html[data-v41-screen=book] .media-links button:hover{background:rgba(255,230,166,.22)}
 html[data-book-shape=phone][data-v41-screen=book] .yt-play.is-vertical,
 html[data-book-shape=phone][data-v41-screen=book] .yt-frame.is-vertical{height:clamp(220px,44vh,360px)}

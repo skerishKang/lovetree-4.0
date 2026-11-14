@@ -376,7 +376,7 @@ function openJourney(){
  journeyOpener=document.activeElement;
  const journey=LT59Model.journeyTimeline(LTDEMO.moments,LTDEMO.edges,LTDEMO.get(),titleMainFor);
  $b('#overviewFlow').innerHTML=journeyMarkup(journey);
- $b('#journeySummary').textContent=journey.days===null?journey.steps+'단계':journey.steps+'단계 · '+journey.days+'일';
+ $b('#journeySummary').textContent=journey.days===null?journey.steps+'단계':journey.steps+'단계 · '+(journey.days===0?'첫날':journey.days+'일째');
  const overlay=$b('#overview');overlay.inert=false;overlay.classList.add('open');
  setTimeout(()=>$b('#overviewClose').focus(),40);
 }

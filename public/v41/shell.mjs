@@ -72,6 +72,9 @@ function closeMore(){moreMenu.classList.remove('is-open');moreMenu.hidden=true;m
 function buildFoldMenu(){
  moreMenu.replaceChildren();
  const add=(label,click,mark)=>{const b=document.createElement('button');b.type='button';b.setAttribute('role','menuitem');b.textContent=label;if(mark)b.setAttribute('aria-current','true');b.onclick=()=>{closeMore();click()};moreMenu.append(b)};
+ // #635 PR C: 로그아웃 상태 메뉴(≡) 맨 위에 시작 입구 — 첫 화면의 '첫 순간 추가'와 같은 시작 흐름(openLoginStart('first'))으로 간다.
+ // 로그인 상태 메뉴는 바꾸지 않는다.
+ if(!member?.snapshot().owned)add('내 러브트리 시작하기',()=>openLoginStart('first'));
  // #380 2번: 접기 메뉴도 맨 위 메뉴와 같은 구조 — 첫 화면(로고)·둘러보기 · 책·보드·지도 · 내 트리 전체 보기 · 순간 추가.
  // #458: 지금 보고 있는 화면 항목에 aria-current를 남긴다(메뉴를 열 때마다 다시 만들어 지금 상태를 반영한다).
  add('첫 화면',()=>document.querySelector('.brand').click(),current==='src064-orbit.html');
