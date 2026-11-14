@@ -266,7 +266,9 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
    const base=cardSizes[i];const size={w:base.w+24,h:base.h+40};
    const AX=(c.tiltX+Math.sin(th)*9)*Math.PI/180,AY=(c.tiltY+Math.cos(th)*18)*Math.PI/180,AZ=(c.tiltZ+Math.sin(th*.6)*7)*Math.PI/180;
    const rX=Math.cos(AX),uX=Math.sin(AX),rY=Math.cos(AY),uY=Math.sin(AY),rZ=Math.cos(AZ),uZ=Math.sin(AZ);
-   const Cx0=w/2+px+size.w/2,Cy0=h/2+py+size.h/2;
+   // 판정 사각형은 '실제 카드 중심' 둘레로만 부풀린다 — 부푼 크기로 중심까지 옮기면 모델이 실제보다
+   // 12·20px 어긋나, 아래로 민 카드가 실제로는 20px 더 위(=가운데 구역 안)에 서게 된다(실측 4px 침범).
+   const Cx0=w/2+px+base.w/2,Cy0=h/2+py+base.h/2;
    const cScale=narrow?sc*Math.max(.58,fit):sc;
    let minX=1e9,maxX=-1e9,minY=1e9,maxY=-1e9;
    for(const corner of [[-1,-1],[1,-1],[-1,1],[1,1]]){
@@ -318,7 +320,9 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
  function layout(){
   const w=app.clientWidth,h=app.clientHeight;
   if(safeZoneDirty){measureSafeZone();safeZoneDirty=false;}
-  if(!cardSizes)cardSizes=elements.map(el=>({w:el.offsetWidth||180,h:el.offsetHeight||232}));
+  // #593: 카드 크기는 배치할 때마다 다시 잰다 — 첫 배치 때 크기 클래스(.lg/.sm)·글꼴이 아직 안 붙어
+  // 작게 재면, 안전 구역 밀어내기가 실제보다 작은 사각형으로 계산해 카드가 가운데를 침범한다(실측 52px).
+  cardSizes=elements.map(el=>({w:el.offsetWidth||180,h:el.offsetHeight||232}));
   layoutBox={w,h};
   if(warmups<1)warmups=1;
   const cap=cardCapFor(w);

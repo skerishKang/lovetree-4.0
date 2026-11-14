@@ -43,7 +43,7 @@ export function countFrameLoadsInPage() {
 }
 
 // 첫 화면(궤도)의 카드 상태. 카드는 그림자 DOM 안의 button.card다(src/views/orbit.js).
-// - 배치 안 된 카드: 폭별 상한으로 숨긴 카드(display:none)는 빼고, transform이 비었거나 크기가 0인 카드를 센다
+// - 배치 안 된 카드: 폭별 상한으로 숨긴 카드(display:none)는 빼고, transform이 비었거나(인라인·계산값 모두) 크기가 0인 카드를 센다
 //   (궤도가 자리를 잡지 못한 모양 — 사고 직후 카드가 겹쳐 서거나 첫 화면이 비는 현상).
 //   화면 밖으로 나간 카드는 세지 않는다: 궤도는 화면 밖 카드를 일부러 둔다(원래부터 그렇다).
 // - 가운데 안전 구역 침범: .center 글상자(제목·문구·단추) 사각형 + 여백 32px(src/views/orbit.js measureSafeZone)와
@@ -65,7 +65,11 @@ export function readHomeCardState() {
   for (const card of root.querySelectorAll('button.card')) {
     if (card.style.display === 'none') continue; // 폭별 상한으로 숨긴 카드(#429)
     cards += 1;
-    const transform = (card.style.transform || '').trim();
+    // #593: 카드 자리는 이제 궤도 애니메이션(WAAPI)이 들고 있다 — 인라인 transform 이 비어 있어도
+    //   실제로 자리를 잡았는지는 계산된 transform 으로 본다(유휴 스타일 쓰기를 없앤 변경).
+    const inline = (card.style.transform || '').trim();
+    const animated = inline ? '' : String(getComputedStyle(card).transform || '').trim();
+    const transform = inline || (animated && animated !== 'none' ? animated : '');
     const rect = card.getBoundingClientRect();
     if (!transform || !(rect.width > 2 && rect.height > 2)) {
       unplaced += 1;
