@@ -203,18 +203,40 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
  const orbitKF=[];
  const orbitKeyframes=(i,w,h,warm)=>{if(orbitKF[i])return orbitKF[i];
   const c=cards[i],narrow=w<=650,cfg=(narrow?ringsNarrow:rings)[c.ring],fit=Math.min(1,w/780,h/850)*(narrow?.5:1),out=[];
-  // #593: 판정 사각형을 떠 있음 폭만큼 부풀렸으므로(placeCard) 여백은 부풀린 만큼 돌려준다 — 실제 여유는 전과 같은 12px.
-  const zs=safeZone?{l:safeZone.l,t:safeZone.t,r:safeZone.r,b:safeZone.b}:null;
+  // #593: 판정 사각형을 떠 있음 폭만큼(+24·+40) 부풀려 잡으므로, 목표 구역도 그만큼 넓혀 잡는다 —
+  // 부푼 만큼만 밀면 실제 카드가 그 차이만큼 안쪽(가운데 구역)에 서서 미리보기 검사에 걸린다(실측 20px).
+  const padX=narrow?6:16,padY=narrow?0:20;
+  const zs=safeZone?{l:safeZone.l-padX,t:safeZone.t-padY,r:safeZone.r+padX,b:safeZone.b+padY}:null;
   // 키프레임을 구울 때 placeCard 는 '지금 위상'의 판정 결과를 카드에 직접 쓴다(밝기·숨김). 굽는 동안의
   // 숨김은 화면 상태가 아니므로 되돌리고, 판정이 극단값으로 숨긴 표본은 직전 표본 자리를 그대로 쓴다.
   let last=null;
-  for(let k=0;k<ORBIT_STEPS;k++){
-   const th=c.baseAngle+k/ORBIT_STEPS*TWO_PI+c.phaseOffset;let x=Math.cos(th)*cfg.rx,y=Math.sin(th)*cfg.ry+cfg.band+Math.sin(th*1.7+c.phaseOffset*3)*45,z=Math.sin(th+1.1+c.phaseOffset*4)*cfg.zAmp+cfg.zBase+c.zOffset;
+  // #593: 표본 하나를 굽는다. 굽는 동안 placeCard 는 '지금 위상'의 판정 결과를 카드에 직접 쓰므로(밝기·숨김)
+  // 숨김은 되돌리고, 판정이 극단값으로 숨긴 표본은 직전 표본 자리를 그대로 쓴다.
+  const bake=(k)=>{const th=c.baseAngle+k/ORBIT_STEPS*TWO_PI+c.phaseOffset;let x=Math.cos(th)*cfg.rx,y=Math.sin(th)*cfg.ry+cfg.band+Math.sin(th*1.7+c.phaseOffset*3)*45,z=Math.sin(th+1.1+c.phaseOffset*4)*cfg.zAmp+cfg.zBase+c.zOffset;
    if(!demo&&cards.length<=8){const angle=i*TWO_PI/cards.length+k/ORBIT_STEPS*TWO_PI;x=Math.cos(angle)*Math.min(w*.34,420);y=Math.sin(angle)*Math.min(h*.3,250)+(i%2===0?80:-80);z=0;}
    const sc=Math.max(.18,Math.min(narrow?1.1:1.82,1050/(1050-z)));
-   // 떠 있음은 .lt-lift 가 따로 맡는다 — 여기서는 궤도 자리만 굽는다.
    const at=placeCard(elements[i],c,i,th,x,y,z,sc,w,h,fit,narrow,zs,warm,last?.side)||last;
-   if(!at)continue;last=at;
+   if(!at)return null;last=at;at.k=k;at.th=th;return at;};
+  const samples=[];
+  for(let k=0;k<ORBIT_STEPS;k++){const at=bake(k);if(at)samples.push(at);}
+  // #593: 표본 사이는 브라우저가 직선으로 잇는다. 이웃 두 표본은 각각 구역 밖이어도 그 사이 직선이 가운데
+  // 구역을 스칠 수 있다(미리보기 검사에서 1장 침범으로 잡혔다). 판정 사각형을 선형 보간해 보고 걸리는
+  // 구간은 가운데를 다시 굽는다 — 두 번 접으면 최대 1/4 표본 간격까지 촘촘해진다.
+  const lerpBox=(a,b,t)=>({l:a.judge.l+(b.judge.l-a.judge.l)*t,t:a.judge.t+(b.judge.t-a.judge.t)*t,r:a.judge.r+(b.judge.r-a.judge.r)*t,b:a.judge.b+(b.judge.b-a.judge.b)*t});
+  const hits=(a,b)=>{if(!a.judge||!b.judge||b.k-a.k<.2)return false;
+   for(const t of [.25,.5,.75]){const x=lerpBox(a,b,t);if(x.l<zs.r&&x.r>zs.l&&x.t<zs.b&&x.b>zs.t)return true;}return false;};
+  for(let pass=0;pass<2;pass++){
+   const next=[];let added=0;
+   for(let n=0;n<samples.length;n++){next.push(samples[n]);
+    const a=samples[n],b=samples[n+1];if(!b||!hits(a,b))continue;
+    const at=bake((a.k+b.k)/2);if(at&&at.judge){at.side=a.side;next.push(at);added++;}
+   }
+   samples.length=0;for(const at of next)samples.push(at);
+   if(!added)break;
+  }
+  for(const at of samples){
+   const k=at.k,th=at.th;
+   // 떠 있음은 .lt-lift 가 따로 맡는다 — 여기서는 궤도 자리만 굽는다.
    // #593: transform 만 굽는다. filter·z-index 를 키프레임에 넣으면 브라우저가 애니메이션을 컴포지터에 넘기지 못하고
    // 매 프레임 스타일 재계산을 다시 한다(실측 120→418ms/s). 깊이 밝기와 순서는 배치(layout) 때 한 번만 쓴다.
    out.push({offset:k/ORBIT_STEPS,transform:`translate3d(${at.px.toFixed(2)}px,${at.py.toFixed(2)}px,0) scale(${at.scale.toFixed(4)}) rotateX(${(c.tiltX+Math.sin(th)*9).toFixed(2)}deg) rotateY(${(c.tiltY+Math.cos(th)*18).toFixed(2)}deg) rotateZ(${(c.tiltZ+Math.sin(th*.6)*7).toFixed(2)}deg)`});
@@ -259,7 +281,7 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
   if(el.style.display==='none')el.style.display='';
   // 카드는 left/top:50% 에 놓이므로 카드 중심을 궤도 자리에 맞추는 -90·-116(카드 기본 폭·높이의 절반)을 늘 더한다.
   let px=x*sc*(!demo&&cards.length<=8?1:fit)-90,py=y*sc*(!demo&&cards.length<=8?1:fit)-116;
-  let drawShrink=1;
+  let drawShrink=1,judge=null;
   if(zs&&warm&&cardSizes&&cardSizes[i]){
    // #593: 떠 있음(±11·18px)은 .lt-lift 층이 따로 들고 있어 판정 시점의 사각형에 들어 있지 않다.
    // 흔들려도 안전 구역을 넘지 않도록 판정 사각형을 그만큼(가로 24·세로 40) 부풀려 잡는다.
@@ -306,6 +328,9 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
     if(prefer&&side===prefer){if(prefer==='l')px-=pushL;else if(prefer==='r')px+=pushR;else if(prefer==='t')py-=pushT;else py+=pushB;outSide=prefer;}
     else{if(m===pushL)px-=pushL;else if(m===pushR)px+=pushR;else if(m===pushT)py-=pushT;else py+=pushB;outSide=m===pushL?'l':m===pushR?'r':m===pushT?'t':'b';}
    }
+   // #593: 모델을 계산한 표본은 밀어내지 않았어도 판정 사각형을 남긴다 — 굽는 쪽이 '표본 사이 직선'이
+   // 가운데 구역을 지나는지 검사할 때 쓴다(비어 있으면 그 구간을 건너뛰어 침범이 남았다).
+   judge={l:minX,t:minY,r:maxX,b:maxY};
   }
   // #429 2/2: 깊이는 크기와 밝기로만 — 카드는 언제나 불투명(opacity 1, 비침 없음), blur는 쓰지 않는다.
   // #593: 밝기·순서는 궤도 키프레임이 아니라 배치 때 한 번만 쓴다(키프레임에 넣으면 컴포지터로 못 넘어간다).
@@ -314,7 +339,7 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
   if(el.__b!==fv){el.__b=fv;el.style.filter=`brightness(${fv})`;}
   // #586: z-index는 64 단계 밴드로만 쓴다 — 밴드 안의 순서 오차는 깊이 차가 작아 눈에 띄지 않는다.
   const zv=Math.round((1000+z)/64)*64;if(el.__z!==zv){el.__z=zv;el.style.zIndex=zv;}
-  return {px,py,scale:sc*(!demo&&cards.length<=8?1:Math.max(.58,fit))*drawShrink,side:outSide};
+  return {px,py,scale:sc*(!demo&&cards.length<=8?1:Math.max(.58,fit))*drawShrink,side:outSide,judge};
  }
  // 배치(layout): 창 크기·안전 구역·좁은 화면 대역·예시 장수가 바뀔 때만 카드 자리를 다시 쓴다.
  function layout(){
