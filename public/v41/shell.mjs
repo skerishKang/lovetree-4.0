@@ -39,8 +39,18 @@ import {normalizeTitleDisplay, normalizeAccentColor, normalizeDateStyle, normali
 import {backfillVideoTitles} from './title-backfill.mjs';
 import {thumbnailCandidates, coverFallbackAttrs, fallbackCardData, emotionToneOf, mountThumbFallback, ADD_TITLE_LABEL, VIDEO_UNAVAILABLE_TEXT} from './thumb-fallback.mjs';
 const $=id=>document.getElementById(id);
+// #666: 알림 줄(토스트)은 화면 아래에 늘 붙어 있는 것들 — '새 소식·의견 보내기' 링크 줄, ＋ 단추, 새 소식 카드 —
+// 을 덮지 않는다. 붙어 있는 것들의 가장 높은 윗변을 좌표로 재서 그 위로 올린다(글자 크기·화면 폭이 달라도 겹침 0).
+// 390 실측: 링크 줄 아래 10~37px·＋ 단추 12~68px·카드 86~152px → 알림 줄 아래 134px.
+function placeToast(){let above=0;for(const el of document.querySelectorAll('.home-links,#mobile-add,.updates-card')){if(el.hidden)continue;const cs=getComputedStyle(el);if(cs.display==='none'||cs.visibility==='hidden'||Number(cs.opacity)===0)continue;const r=el.getBoundingClientRect();if(r.width<1||r.height<1)continue;above=Math.max(above,document.documentElement.clientHeight-r.top+10)}const style=document.documentElement.style;if(above>0)style.setProperty('--lt-toast-bottom',Math.round(above)+'px');else style.removeProperty('--lt-toast-bottom')}
+addEventListener('resize',placeToast);
+addEventListener('orientationchange',()=>setTimeout(placeToast,0));
+// ＋ 단추(body.lt-fab-ok)·새 소식 카드가 늦게 뜨거나 닫힐 때도 다시 잰다.
+for(const el of [$('updates-card')].filter(Boolean))new MutationObserver(placeToast).observe(el,{attributes:true,attributeFilter:['hidden']});
+new MutationObserver(placeToast).observe(document.body,{attributes:true,attributeFilter:['class']});
+placeToast();
 // 안내 한 벌(#353 후속): 담기·중복·로그인 필요 안내(hold)가 상태 안내보다 먼저 일정 시간 보인다.
-const shellNotice=createNotifier({$});
+const shellNotice=createNotifier({$,beforeShow:placeToast});
 function notify(text,options){return shellNotice.notify(text,options);}
 // #347 후속: 계정 제목 보기 설정. 계정 상태(state.prefs.titleDisplay)에 저장하고 화면에 알린다.
 function currentPrefs(){try{return member?.state?.().prefs||{titleDisplay:'both'}}catch{return {titleDisplay:'both'}}}

@@ -84,6 +84,9 @@ html[data-v41-screen] .lt-moment-picker label>span{font-size:12px}
 .lt-media .lt-media-vanished-note{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:8px 0 0;font:13px/1.5 var(--lt-ui)!important;color:inherit!important}
 .lt-media .lt-media-vanished-badge{display:inline-flex;align-items:center;min-height:24px;padding:2px 10px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-pill);background:rgba(255,230,166,.14);font:12px/1.4 var(--lt-ui)!important;letter-spacing:.02em}
 .lt-media-vanished .lt-yt-preview img{filter:saturate(.6) brightness(.92)}
+/* 이슈 666: 임베드 금지(401) — 영상은 있는데 다른 곳에서 보여 줄 수 없는 경우. '사라진 영상'으로 표시하지 않고
+   '유튜브에서 보기' 길만 안내한다(링크 누름 자리는 아래 .lt-media a의 44px 그대로). */
+.lt-media .lt-media-noembed-note{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:8px 0 0;font:13px/1.5 var(--lt-ui)!important;color:inherit!important}
 .lt-media a{display:inline-flex;align-items:center;min-height:44px;color:inherit;text-decoration:underline;text-underline-offset:3px}
 html[data-v41-screen=board] .lt-media{color:#57425e;background:#fff7fc}
 html[data-v41-screen=network] .lt-media{color:#49344f}

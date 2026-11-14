@@ -17,6 +17,14 @@ const OEMBED_ENDPOINT = 'https://www.youtube.com/oembed';
 const THUMBNAIL_HOST = /(?:^|\.)ytimg\.com$/;
 export const DEFAULT_TIMEOUT_MS = 3000;
 export const DEFAULT_TTL_MS = 24 * 60 * 60 * 1000;
+// #666: 유튜브 oEmbed가 알려 주는 '이 영상은 못 보여 준다'의 네 가지. 응답 코드를 바꾸지 않고 그대로 넘긴다.
+// 5xx·응답 없음은 여기에 없다 — 그건 '모른다'(unknown)로 두고 502로 돌려준다.
+const UPSTREAM_ERRORS = {
+  400: { code: 'youtube_missing', message: '이 영상은 없어졌어요.' },
+  401: { code: 'youtube_embed_forbidden', message: '이 영상은 다른 곳에서 보여 줄 수 없어요.' },
+  403: { code: 'youtube_private', message: '이 영상은 비공개예요.' },
+  404: { code: 'youtube_not_found', message: '이 영상을 찾을 수 없어요.' }
+};
 const MAX_CACHE_ENTRIES = 500;
 const MAX_TITLE = 200;
 const MAX_AUTHOR = 120;
@@ -67,8 +75,7 @@ export function exposedMetadata(videoId, data) {
   };
 }
 
-export function createYoutubeOembedClient({ fetchImpl = (...args) => fetch(...args), timeoutMs = DEFAULT_TIMEOUT_MS, ttlMs = DEFAULT_TTL_MS, now = () => Date.now() } = {}) {
-  const cache = new Map();
+export function createYoutubeOembedClient({ fetchImpl = (...args) => fetch(...args), timeoutMs = DEFAULT_TIMEOUT_MS, ttlMs = DEFAULT_TTL_MS, now = () => Date.now() } = {}) {  const cache = new Map();
 
   function read(videoId) {
     const hit = cache.get(videoId);
@@ -102,7 +109,10 @@ export function createYoutubeOembedClient({ fetchImpl = (...args) => fetch(...ar
         clearTimeout(timer);
       }
       if (!response.ok) {
-        if (response.status === 404) throw new ApiError(404, 'youtube_not_found', '이 영상을 찾을 수 없어요.');
+        // #666: 유튜브가 준 응답 코드를 그대로 돌려준다(예전에는 403·401·400을 모두 502로 물감았다).
+        // 그래야 화면이 비공개(403)·임베드 금지(401)·없는 영상(400)·없어진 영상(404)을 갈라 보여 줄 수 있다.
+        const upstream = UPSTREAM_ERRORS[response.status];
+        if (upstream) throw new ApiError(response.status, upstream.code, upstream.message);
         throw new ApiError(502, 'youtube_metadata', '영상 정보를 불러오지 못했어요.');
       }
       let data;
@@ -120,6 +130,9 @@ export function createYoutubeOembedHandler({ authenticate, productId, client, fe
   const resolved = client ?? createYoutubeOembedClient({ fetchImpl, timeoutMs, ttlMs, now });
   const effectiveTtl = Number.isFinite(ttlMs) && ttlMs > 0 ? ttlMs : DEFAULT_TTL_MS;
   const headers = { 'cache-control': `private, max-age=${Math.floor(effectiveTtl / 1000)}`, 'x-content-type-options': 'nosniff' };
+  // #666: 실패 응답은 기억하지 않는다. 특히 비공개(403)는 나중에 공개로 바뀔 수 있어서
+  // 하루 동안 브라우저·중간 캐시에 남으면 안 된다(같은 이유로 화면도 403을 기억하지 않는다).
+  const errorHeaders = { 'cache-control': 'private, no-store', 'x-content-type-options': 'nosniff' };
 
   return async function request(request) {
     try {
@@ -132,9 +145,9 @@ export function createYoutubeOembedHandler({ authenticate, productId, client, fe
 
       return { status: 200, body: await resolved.metadata(videoId), headers };
     } catch (error) {
-      if (error instanceof ApiError) return { status: error.status, body: { error: { code: error.code, message: error.message } }, headers };
+      if (error instanceof ApiError) return { status: error.status, body: { error: { code: error.code, message: error.message } }, headers: errorHeaders };
       console.error('[lovetree-youtube] oEmbed 요청 실패', { path: request?.path, method: request?.method });
-      return { status: 502, body: { error: { code: 'youtube_unreachable', message: '영상 정보를 불러오지 못했어요.' } }, headers };
+      return { status: 502, body: { error: { code: 'youtube_unreachable', message: '영상 정보를 불러오지 못했어요.' } }, headers: errorHeaders };
     }
   };
 }

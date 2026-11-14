@@ -396,15 +396,20 @@ async function openLightbox(url,title='',verticalHint=null){
 }
 // #632: 사라진 영상 감지·표시 — 내 기록(auto) YouTube 카드만, 보이는 카드만 검사하고 결과는 하루 기억한다.
 // 신호 두 개를 짝으로 쓴다: ① 썸네일 내려가기 카드(삭제·비공개는 i.ytimg.com 그림도 함께 사라진다 — 실측 404)
-// ② oEmbed 프록시(#344) — 404는 삭제 확정('gone'), 200은 영상이 있음('ok'), 502는 비공개·임베드 금지·일시 오류가
-// 섞인 보류('held'). 응답 자체가 없으면(끊김·시간 초과·오프라인) 'unknown' — 사라졌다고 말하지 않는다.
+// ② oEmbed 프록시(#344) — #666부터 유튜브 응답 코드가 그대로 온다.
+//   200 ok(영상 있음) · 404·400 gone(없는 영상 — 삭제와 같이 표시) · 403 private(비공개 — 사라진 영상으로 표시)
+//   401 noembed(임베드 금지 — 사라진 영상으로 표시하지 않고 '유튜브에서 보기' 안내)
+//   5xx·응답 없음 unknown(사라졌다고 말하지 않는다) · 그 밖 held(보류)
 // 썸네일이 살아 있는 카드는 영상이 있는 것이므로 묻지 않는다(임베드 금지를 사라진 영상으로 세지 않게,
-// 정상 카드마다 요청을 보내지 않게). 썸네일이 실패한 카드만 프록시에 물어 보고, gone(하루 기억)과
-// held(기억하지 않음 — 다음 화면에 다시 판정)일 때 '사라진 영상'으로 정한다. ok면 썸네일만
-// 잠깐 실패한 것이므로 기존 안내('영상을 볼 수 없어요')를 그대로 두고, unknown이면 검사 표시를 지워
-// 연결이 돌아오면(online) 다시 묻는다.
+// 정상 카드마다 요청을 보내지 않게). 썸네일이 실패한 카드만 프록시에 물어 보고, gone·private(하루 기억)과
+// held(기억하지 않음 — 다음 화면에 다시 판정)일 때 '사라진 영상'으로 정한다. 401은 사라진 영상이 아니라
+// '유튜브에서 보기' 안내만 붙이고 기억하지 않는다(나중에 임베드가 풀릴 수 있다). 403도 기억하지 않는다 —
+// 비공개는 나중에 공개로 바뀔 수 있다. ok면 썸네일만 잠깐 실패한 것이므로 기존 안내('영상을 볼 수 없어요')를
+// 그대로 두고, unknown이면 검사 표시를 지워 연결이 돌아오면(online) 다시 묻는다.
 const VANISHED_TEXT='영상이 삭제되었거나 비공개예요';
 const VANISHED_BADGE='사라진 영상';
+const NOEMBED_TEXT='이 영상은 여기서 볼 수 없어요. 유튜브에서 볼 수 있어요.';
+const NOEMBED_LABEL='유튜브에서 보기';
 const VANISHED_CONCURRENCY=3;
 const vanishedQueue=new Set();
 let vanishedInFlight=0,vanishedIo=null,vanishedWatchTimer=0;
@@ -423,7 +428,7 @@ function applyVanished(root, doc = (typeof document !== 'undefined' ? document :
  root.dataset.ltVanished='1';
  root.classList.add('lt-media-vanished');
  // 재생·크게 보기·기존 안내는 치우고, 보관된 제목·채널(그림·글 카드)은 그대로 둔다.
- for(const el of root.querySelectorAll('.lt-media-toolbar,[data-lt-play],.lt-media-status,.lt-fallback-notice'))el.remove();
+ for(const el of root.querySelectorAll('.lt-media-toolbar,[data-lt-play],.lt-media-status,.lt-fallback-notice,.lt-media-noembed-note'))el.remove();
  const note=doc.createElement('p');
  note.className='lt-media-vanished-note';
  note.setAttribute('role','status');
@@ -431,6 +436,28 @@ function applyVanished(root, doc = (typeof document !== 'undefined' ? document :
  badge.className='lt-media-vanished-badge';
  badge.textContent=VANISHED_BADGE;
  note.append(badge,doc.createTextNode(' '+VANISHED_TEXT));
+ const host=root.querySelector('.lt-media-body')||root;
+ host.after(note);
+}
+// 401(임베드 금지): 영상은 멀짓하므로 '사라진 영상'으로 표시하지 않는다 — 대신 '유튜브에서 보기' 안내를 붙인다.
+// 제목·그림·도구줄은 그대로 두고 기존 안내만 치운다(재생 창은 유튜브가 거절한다).
+function applyNoEmbed(root, doc = (typeof document !== 'undefined' ? document : null)){
+ if(!root||!root.querySelectorAll||!doc||root.dataset.ltNoembed==='1')return;
+ const m=describe(root.dataset.ltUrl||'');
+ if(m.kind!=='youtube'||!m.videoId)return;
+ root.dataset.ltNoembed='1';
+ root.classList.add('lt-media-noembed');
+ for(const el of root.querySelectorAll('.lt-media-status,.lt-media-vanished-note'))el.remove();
+ const note=doc.createElement('p');
+ note.className='lt-media-noembed-note';
+ note.setAttribute('role','status');
+ const link=doc.createElement('a');
+ link.className='lt-media-noembed-link';
+ link.href='https://www.youtube.com/watch?v='+encodeURIComponent(m.videoId);
+ link.target='_blank';
+ link.rel='noopener noreferrer';
+ link.textContent=NOEMBED_LABEL;
+ note.append(doc.createTextNode(NOEMBED_TEXT+' '),link);
  const host=root.querySelector('.lt-media-body')||root;
  host.after(note);
 }
@@ -465,12 +492,15 @@ async function checkVanished(root, hooks = null){
   // 확정 판정(ok·gone)만 기억한다 — held·unknown은 다음에 다시 묻는다.
   if((status==='ok'||status==='gone')&&root.isConnected)mod.writeVideoStatusCache?.(store,m.videoId,status);
  }
- // gone(삭제 확정)과 held(보류 — 썸네일 실패가 짝 신호)는 표시하고, ok는 그대로 둔다.
- // unknown(응답 없음 — 지하철·기내 모드 같은 끊김)은 표시하지 않고 검사 표시를 지워
+ // gone(삭제·없는 영상)·private(비공개)·held(보류 — 썸네일 실패가 짝 신호)는 '사라진 영상'으로 표시하고,
+ // noembed(임베드 금지)는 '유튜브에서 보기' 안내만, ok는 그대로 둔다.
+ // unknown(응답 없음 — 지하철·기내 모드 같은 끊김이나 유튜브 5xx)은 표시하지 않고 검사 표시를 지워
  // 다음에 화면에 보일 때(online 포함) 다시 묻는다.
  // hooks.doc는 undefined를 지나야 기본 문서(document)에 닿는다 — null을 넘기지 않게 한다.
- if(status==='gone'||status==='held'){
+ if(status==='gone'||status==='private'||status==='held'){
   if(root.isConnected)applyVanished(root,hooks?hooks.doc:undefined);
+ }else if(status==='noembed'){
+  if(root.isConnected)applyNoEmbed(root,hooks?hooks.doc:undefined);
  }else if(status==='unknown'&&root.isConnected){
   delete root.dataset.ltVanishedChecked;
  }
@@ -503,7 +533,7 @@ function queueWatchVanished(){ // 끌기·넘기기 동안 몰리는 바뀜마�
  if(vanishedWatchTimer)return;
  vanishedWatchTimer=setTimeout(()=>{vanishedWatchTimer=0;watchVanished();},300);
 }
-window.LTMedia={describe,markup,privateAssetName,autoLoadMedia,currentContext:mediaContext,youtubeThumbUrl,youtubeCandidates,verticalVideo,probeVertical,upgradeVerticals,openLightbox,closeLightbox,applyVanished,scheduleVanishedCheck,checkVanished,watchVanished,setVideoStatusLoader(fn){videoStatusLoader=typeof fn==='function'?fn:null;}};
+window.LTMedia={describe,markup,privateAssetName,autoLoadMedia,currentContext:mediaContext,youtubeThumbUrl,youtubeCandidates,verticalVideo,probeVertical,upgradeVerticals,openLightbox,closeLightbox,applyVanished,applyNoEmbed,scheduleVanishedCheck,checkVanished,watchVanished,setVideoStatusLoader(fn){videoStatusLoader=typeof fn==='function'?fn:null;}};
 if(typeof document!=='undefined'){
  const cleanup=()=>{for(const [node,url] of ownedUrls)if(!node.isConnected){URL.revokeObjectURL(url);ownedUrls.delete(node);}};
  new MutationObserver(()=>{cleanup();queueWatchVanished();}).observe(document.documentElement,{childList:true,subtree:true});
