@@ -8,16 +8,19 @@ window.LT58Model = (() => {
 
   // 카드 자리: 8장씩 줄을 바꾸고, 세로는 400px 간격, 회전은 -2·0·2도.
   function cardPosition(i) {
-    return { x: 150 + (i % 8) * 280, y: 150 + Math.floor(i / 8) * 400, rot: (i % 3 - 1) * 2 };
+    // #548: 카드 글자를 기준선(부수 12px·본문 13px)으로 올리면서 카드가 최대 424px까지 자랐다 —
+    // 세로 간격도 400px에서 440px로 벌려 카드끼리 겹치지 않게 한다.
+    return { x: 150 + (i % 8) * 280, y: 150 + Math.floor(i / 8) * 440, rot: (i % 3 - 1) * 2 };
   }
 
   // 처음 배치(#395): 자리를 정한 적 없는 순간을 이야기 순서대로 펼친다.
   // 첫 순간은 왼쪽, 이어진 순간은 오른쪽으로 가지 치듯(가로 300px 간격).
-  // 세로 간격(#553): 기본 카드(260px)+여백 160px = 420px. 화면이 heights(id→예약 높이)를 넘기면
-  // 그 밴드의 최대 카드 높이에 여백을 더한 값이 줄 간격이 된다 — 썸네일이 실린 YouTube 카드(465px)
-  // 같은 큰 카드가 같은 열 위아래 카드와 겹치지 않게 한다. 기본 카드뿐인 트리(예시 40순간)는
-  // 간격이 420px로 같으므로 배치가 그대로다. 자리를 저장한 순간(x·y)은 board.js가 저장값을 그대로 쓴다.
-  const BASE_CARD_H = 260, ROW_GAP = 160;
+  // 세로 간격(#553): 밴드별로 '그 밴드 카드의 최대 예약 높이 + 여백'이 줄 간격이 된다 — 썸네일이
+  // 실린 YouTube 카드처럼 큰 카드가 같은 열 위아래 카드와 겹치지 않게 한다. 기본 카드는 #548이
+  // 글자 기준선을 올려 최대 424px까지 자랐고 간격도 420→460으로 벌렸으므로, 기본 예약 높이
+  // 424px + 여백 36px = 460px로 #548과 같다. 기본 카드뿐인 트리(예시 40순간)는 간격이 460px로
+  // #548과 같으므로 배치가 그대로다. 자리를 저장한 순간(x·y)은 board.js가 저장값을 그대로 쓴다.
+  const BASE_CARD_H = 424, ROW_GAP = 36;
   function treeSpread(ids, edges, heights) {
     const known = new Set(ids);
     const kids = new Map(ids.map((id) => [id, []]));
@@ -103,6 +106,8 @@ window.LT58Model = (() => {
       const slot = wrapped.get(wrap)?.get(id);
       const col = slot ? slot.col : (depth % cols);
       const rel = slot ? slot.row : row - (bandRows.get(wrap) || [0])[0];
+      // #553: 밴드마다 줄 간격이 다르므로 위 밴드까지의 세로 픽셀(bandTopPx)에서 시작한다.
+      // 기본 카드뿐인 밴드는 간격이 460px(#548)이라 main의 (rel+top)*460과 같은 자리가 나온다.
       result.set(id, { x: 150 + col * 300, y: 150 + (bandTopPx.get(wrap) || 0) + rel * (bandPitch.get(wrap) || BASE_CARD_H + ROW_GAP), rot: (i++ % 3 - 1) * 2 });
     }
     return result;

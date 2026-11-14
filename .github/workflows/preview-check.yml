@@ -152,7 +152,7 @@ jobs:
           echo "책 한 장 보기 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
 
   screen-map-a:
-    name: 화면 시험 — 지도 대비·판 전환
+    name: 화면 시험 — 지도 대비
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -179,7 +179,7 @@ jobs:
             npx playwright install --with-deps chromium
           fi
           node -e "import('playwright-core').then(()=>console.log('playwright-core 확인')).catch(e=>{console.error(e.message);process.exit(1)})"
-      - name: 지도 실제 대비·판 전환 시험(건너뜀=실패)
+      - name: 지도 실제 대비 시험(건너뜀=실패)
         env:
           LT_MAP_CONTRAST_REQUIRE: '1'
         run: |
@@ -191,12 +191,13 @@ jobs:
           fi
           fc-cache -f >/dev/null 2>&1 || true
           echo "한글 글꼴 $(fc-list :lang=ko | wc -l)개 · 대표 $(fc-match 'sans-serif:lang=ko' | head -1)"
-          # 두 시험은 차례로 돌린다(브라우저 둘이 동시에 뜨면 느린 실행기에서 서로의 시간을 흔든다).
-          node --test --test-concurrency=1 tests/v41-map-contrast.test.mjs tests/v41-map-theme-flow.test.mjs
-          echo "지도 실제 대비·판 전환 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+          # 시험 안에서 조합(크기×테마×판 8개)을 둘씩 동시에 돌린다(지도 잡 시간 단축 — 픽셀 해석이
+          # 렌더러 프로세스별로 나뉜다). 판 흐름 시험은 지도 도구 줄 잡으로 옮겼다(지도 잡이 3분 안에 들도록).
+          node --test --test-concurrency=1 tests/v41-map-contrast.test.mjs
+          echo "지도 실제 대비 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
 
   screen-map-b:
-    name: 화면 시험 — 지도 도구 줄·책 이동
+    name: 화면 시험 — 지도 도구 줄·판 흐름·책 이동
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -238,6 +239,26 @@ jobs:
           # #517·#518: 390·360 지도 도구 줄 넘침·겹침과 상세 '기억책에서 보기'의 책 이동을 실제 화면에서 잰다.
           node --test --test-concurrency=1 tests/v41-network-toolbar-517.test.mjs tests/v41-map-open-book-518.test.mjs
           echo "지도 도구 줄·책 이동 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+      # 지도 판 흐름(설정·저장 복원·두 보기·누르기·유휴 0)은 지도 대비 잡에서 여기로 옮겼다(지도 잡 시간 단축).
+      # 브라우저 준비·한글 글꼴은 같은 잡의 앞 단계에서 이미 끝난 것을 쓴다.
+      - name: 지도 판 흐름 시험(건너뜀=실패)
+        env:
+          LT_MAP_CONTRAST_REQUIRE: '1'
+        run: |
+          start=$(date +%s)
+          node --test --test-concurrency=1 tests/v41-map-theme-flow.test.mjs
+          echo "지도 판 흐름 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+      # 이슈 548: 화면마다 기준선(부수 글자 12px·본문·안내·단추 13px)에 못 미치는 글자가 0개인지 실제 크롬으로 잰다.
+      # 가장 짧은 화면 시험 잡에 단계로 붙인다(각 잡 소요는 요약에 적힌다). 첫 화면이 vite 번들이라 먼저 build 한다.
+      # 지도 판 흐름(약 75초)과 함께 이 잡은 약 3분 — 여전히 가장 짧은 화면 시험 잡이다.
+      - name: 화면 글자 기준선 시험(이슈 548, 건너뜀=실패)
+        env:
+          LT_FONT_FLOOR_REQUIRE: '1'
+        run: |
+          start=$(date +%s)
+          npx vite build > /dev/null
+          node --test tests/v41-font-floor-548.test.mjs
+          echo "화면 글자 기준선 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
 
   deploy:
     name: 미리보기 배포 검사(postdeploy·겉모습 비교)

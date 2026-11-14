@@ -15,5 +15,22 @@
     return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
   }
 
-  root.LTLocalDate = {localDateOnly};
+  // #549: 지난 날 안내('마지막 순간 · N일 전')의 일수를 기기 지역 날짜(#547) 기준으로 세는 한 벌.
+  // 예전에는 (Date.now()-raw)/86400000의 floor라 UTC 기준이었고, 새벽을 넘은 순간 '0일 전'·'1일 전'이
+  // 하루 밀려 보였다. from(기준 시각, 기본값 지금)과 to(순간 시각)의 지역 날짜가 며칠 차이인지 돌려준다.
+  // 잘못된 시각은 localDateOnly와 같은 규칙으로 지금으로 본다.
+  function localDaysBetween(fromClock, toClock) {
+    const day = (clock) => Date.parse(`${localDateOnly(clock)}T00:00:00`);
+    return Math.round((day(fromClock === undefined ? new Date() : fromClock) - day(toClock)) / 86400000);
+  }
+
+  // #549: 일수를 사람 말로. 0일은 '오늘', 1일은 '어제', 그 뒤는 'N일 전'. 미래 시각(시계 차이)도 '오늘'.
+  function relativeDayLabel(days) {
+    const count = Number(days);
+    if (!Number.isFinite(count) || count <= 0) return '오늘';
+    if (count === 1) return '어제';
+    return `${count}일 전`;
+  }
+
+  root.LTLocalDate = {localDateOnly, localDaysBetween, relativeDayLabel};
 })(typeof window !== 'undefined' ? window : globalThis);

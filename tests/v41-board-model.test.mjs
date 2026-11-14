@@ -15,10 +15,10 @@ test('0. 보드 한 벌: 화면이 부르는 함수가 전부 있다', () => {
   for (const fn of Object.keys(M)) assert.equal(typeof M[fn], 'function', fn);
 });
 
-test('1. 카드 자리: 8장씩 줄바꿈, 세로 400px 간격, 회전 -2·0·2도', () => {
+test('1. 카드 자리: 8장씩 줄바꿈, 세로 440px 간격(#548: 카드 글자 기준선 올림에 따른 여유), 회전 -2·0·2도', () => {
   assert.deepEqual(M.cardPosition(0), { x: 150, y: 150, rot: -2 });
   assert.deepEqual(M.cardPosition(1), { x: 430, y: 150, rot: 0 });
-  assert.deepEqual(M.cardPosition(8), { x: 150, y: 550, rot: 2 });
+  assert.deepEqual(M.cardPosition(8), { x: 150, y: 590, rot: 2 });
   assert.deepEqual(Array.from({ length: 8 }, (_, i) => M.cardPosition(i).x), [150, 430, 710, 990, 1270, 1550, 1830, 2110]);
 });
 

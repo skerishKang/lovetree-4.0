@@ -117,7 +117,7 @@ test('#547 보드도 같은 한 벌을 쓴다 — 클래식 스크립트는 loca
 test('#547 규칙은 한 벌이다 — 클래식(local-date.js)과 모듈(local-date.mjs)이 같은 답', () => {
   const classic = read('public/v41/local-date.js');
   assert.doesNotMatch(classic, /^\s*(import|export)\s/m, '클래식 스크립트로도 읽히는 문법이어야 한다');
-  assert.match(classic, /root\.LTLocalDate = \{localDateOnly\};/);
+  assert.match(classic, /root\.LTLocalDate = \{localDateOnly, localDaysBetween, relativeDayLabel\};/, '#549에서 지난 날 규칙도 이 한 벌에 둔다');
   assert.match(read('public/v41/local-date.mjs'), /import '\.\/local-date\.js';/, '모듈은 클래식 한 벌을 그대로 쓴다');
   // 실제로 두 경로가 같은 답을 내는지 이 프로세스에서 확인한다(모듈이 클래식 파일을 먼저 읽는다).
   for (const at of [new Date(2026, 10, 14, 0, 30), new Date(2026, 10, 14, 23, 59)]) {

@@ -267,7 +267,7 @@ CREATE INDEX IF NOT EXISTS lovetree_account_delete_rpc_requests_expiry_idx
 
 -- 2026-11-14 고객 의견 창구 (#540). 로그인·로그아웃 모두 보낼 수 있고, 로그아웃이면 subject_id를 비운다.
 -- 개인 정보(이메일·전화번호 꼴)는 저장 전에 가린다. 화면 그림 첨부는 2차로 미룬다.
--- 상태: 받음(received) / 확인 중(reviewing) / 고침(fixed) / 다음에(later).
+-- 상태: 받음(received) / 확인 중(reviewing) / 고침(fixed) / 다음에(later) / 닫음(closed — 목록 기본에서 숨긴다, #564).
 -- 종류: 이상해요(bug) / 불편해요(inconvenient) / 기능 제안(feature) / 그 밖에(other).
 CREATE TABLE IF NOT EXISTS lovetree_feedback (
   id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -280,7 +280,7 @@ CREATE TABLE IF NOT EXISTS lovetree_feedback (
   score smallint CHECK (score IS NULL OR (score BETWEEN 1 AND 5)),
   journal_date date,
   context jsonb NOT NULL DEFAULT '{}'::jsonb,
-  status text NOT NULL DEFAULT 'received' CHECK (status IN ('received','reviewing','fixed','later')),
+  status text NOT NULL DEFAULT 'received' CHECK (status IN ('received','reviewing','fixed','later','closed')),
   memo text,
   issue_number text,
   created_at timestamptz NOT NULL DEFAULT now(),

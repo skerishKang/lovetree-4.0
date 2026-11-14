@@ -79,7 +79,7 @@ export function createWritePanel(deps) {
 
   function open(tab) {
     const dialog = $('write-panel');
-    if (!dialog.open) dialog.showModal();
+    if (!dialog.open) { dialog.showModal(); deps.onModalShown?.(); }
     show(tab ?? readWriteTab(storage));
   }
 
