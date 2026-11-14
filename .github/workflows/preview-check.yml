@@ -102,6 +102,15 @@ jobs:
           start=$(date +%s)
           node --test --test-concurrency=1 tests/v41-local-date-547.test.mjs
           echo "지역 날짜 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+      # 11-14 점검: 핀보드(#582)·상세 다음/이전 단추(#583) 화면 시험이 CI 어디에도 연결되지 않아 조용히 건너뛰어졌다.
+      - name: 핀보드·상세 단추 시험(건너뜀=실패 — #582·#583)
+        env:
+          LT_BOARD_582_REQUIRE: '1'
+          LT_BOARD_583_REQUIRE: '1'
+        run: |
+          start=$(date +%s)
+          node --test --test-concurrency=1 tests/v41-board-pinboard-582.test.mjs tests/v41-board-cursor-detail.test.mjs
+          echo "핀보드·상세 단추 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
 
   screen-home-book:
     name: 화면 시험 — 첫 화면·책
@@ -340,6 +349,15 @@ jobs:
           start=$(date +%s)
           node --test tests/v41-view-a11y-panel.test.mjs
           echo "겹 초점 계약 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+      # 11-14 점검: 첫 트리 안내 '알겠어요'(#549)·'이름 바꾸기'(#571) 화면 시험도 연결되지 않아 건너뛰어졌다.
+      - name: 첫 트리 안내 시험(건너뜀=실패 — #549·#571)
+        env:
+          LT_TREE_TIPS_549_REQUIRE: '1'
+          LT_TREE_RENAME_571_REQUIRE: '1'
+        run: |
+          start=$(date +%s)
+          node --test --test-concurrency=1 tests/v41-tree-tips-549.test.mjs tests/v41-tree-rename-tips-571.test.mjs
+          echo "첫 트리 안내 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
 
   deploy:
     name: 미리보기 배포 검사(postdeploy·겉모습 비교)

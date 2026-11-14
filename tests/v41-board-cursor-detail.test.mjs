@@ -18,6 +18,8 @@ const PUB = path.join(ROOT, 'public');
 const read = (rel) => readFileSync(path.join(ROOT, rel), 'utf8');
 
 let chromium, skip = false;
+// CI(미리보기 검사)에서는 LT_BOARD_583_REQUIRE=1 — 크롬이 준비된 잡에서 건너뜀을 실패로 본다.
+const REQUIRE = process.env.LT_BOARD_583_REQUIRE === '1';
 try {
   ({ chromium } = await import('playwright'));
   const { existsSync } = await import('node:fs');
@@ -136,7 +138,7 @@ test('2. 상세의 다음·이전 순간은 단추다 — board.js의 열기와 
   assert.match(extras, /b\.dataset\.dir==='next'\)moveViaConnection\(c\);else pulseConnection\(c,\(\)=>focusBoardMoment\(c\.a\)\)/);
 });
 
-test('3. 화면: 다음 순간 단추를 누르면 판이 이동하고 카드가 선택되며 상세가 바뀐다', { skip }, async (t) => {
+test('3. 화면: 다음 순간 단추를 누르면 판이 이동하고 카드가 선택되며 상세가 바뀐다', { skip: REQUIRE ? false : skip }, async (t) => {
   const tree = chainTree(6);
   const browser = await chromium.launch();
   const server = await serve({ '/host.html': hostHTML(tree) });
@@ -171,7 +173,7 @@ test('3. 화면: 다음 순간 단추를 누르면 판이 이동하고 카드가
   await frame.waitForFunction(() => document.querySelector('#dTitle')?.textContent.includes('순간 4'), null, { timeout: 5000 });
 });
 
-test('4. 화면: 이전 순간 단추도 있다 — 사슬 끝에서 누르면 거꾸로 돌아간다', { skip }, async (t) => {
+test('4. 화면: 이전 순간 단추도 있다 — 사슬 끝에서 누르면 거꾸로 돌아간다', { skip: REQUIRE ? false : skip }, async (t) => {
   const tree = chainTree(6);
   const browser = await chromium.launch();
   const server = await serve({ '/host.html': hostHTML(tree) });
