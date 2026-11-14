@@ -1879,3 +1879,17 @@ COM2에는 merge `6900df8aa446dfe0201d01997457fae04c4abe16`의 변경 서버 파
 - 배포: Pages 자동 배포. 서버 변경 없음이라 autodeploy 이슈 없음.
 - 시험: 로컬 전체 npm test 1662건 중 1618 통과/2 실패 — 두 실패(v41-view-a11y-panel, pinboard2 1980 재현)는 단독 실행 시 둘 다 통과하는 동시 실행 플레이크(직렬로 60건 통과). CI 필수검사·보드·첫화면 잡 전부 초록.
 - 스크린샷: E:/lovetree-qa/619/ (before-mine·after-mine 각 1440·390, 합성 26순간 트리, PR A·B 같은 도구).
+
+
+## 2026-11-15 — 두 탭 충돌 쉬운 안내·백업 뒤 불러오기 + 새 소식 점·정원 대비 (#644 2·3번, 컴2 로컬 레인, ai/local2-644b-261115, main bda9d9c 기준, PR #663 → main fac2883)
+
+- **충돌 안내 한 벌**: sync-controller에 `editCount`(성공 저장·불러오기·로그아웃·시작 때 0, 로컬 저장 때 증가)와 `conflictDetail()` — "다른 곳에서 기록이 바뀌었어요. 이 화면에서 고친 N개는 따로 보관해 둘게요."(0개면 개수 생략). 409 충돌·확인 중 재충돌·복원 충돌 세 곳이 같은 문구를 쓴다. 저장 규칙(pull/force 액션·개정 번호 판정)은 그대로.
+- **충돌 띠 재배치**: 주 단추는 '최신 기록 불러오기' 하나(누르면 자동으로 이 화면 기록을 lovetree-draft.json으로 백업 → 최신 불러오기 — 손실 0). '덮어쓰기'는 '자세히' 안으로(확인 창 "…다른 곳에서 바뀐 기록은 지워질 수 있어요. 계속할까요?") + '현재 기록 백업'. '저장 안 됨' 표시(구 '미저장 기록')를 누르면 순간 추가 대신 같은 설명 연다(`explainSaveState`).
+- **조용한 최신 확인**: sync-controller `check()` — owned·저장 번호 확인·고친 것 없음·진행 중 없음·충돌 아님일 때만 GET 한 번, 번호가 다르면 조용히 교체(띠·소리 없음). member-session이 visibilitychange(보임)·focus에서 4초 간격 제한으로 부른다. headless 시험은 탭 전환 이벤트가 나지 않아 같은 이벤트를 직접 보내 검사.
+- **새 소식 점**: 계정 동그라미 점 + 마우스 설명('새 소식이 있어요' 등, header.mjs는 `getAccountTip`으로 유지), 계정 메뉴 '새 소식' 항목 점+'새 소식 1' 개수, '내 의견' 점.
+- **정원 대비**: 토스트 글자 --lt-pearl→--lt-paper(17.91:1, 이전 1.54:1), 보드 트리 이름·메뉴 잉크색(10.60:1, 이전 1.17:1), 밤 토스트 17.84:1. 옮기기 창 첫 포커스를 X가 아닌 제목으로(index.html autofocus). 충돌 띠에 position:relative;z-index:31 — 떠 있는 새 소식 카드가 안내를 가리지 않게.
+- **시험**: 전체 npm test 1602 pass/0 fail(화면 제외). 화면 시험(Chromium+가짜 /api/workspace 서버, tests/v41-header-ia.test.mjs에 추가, LT_HEADER_IA_REQUIRE=1일 때 CI 필수): 두 탭 같은 계정 — 한쪽만 고침→띠 없이 조용히 최신(예상 번호 그대로 저장), 양쪽 다 고침→쉬운 띠+주 단추 하나+백업 파일에 고친 순간 보존+불러온 뒤 다른 탭 순간 보임, 고친 게 있으면 확인 이벤트가 와도 띠 유지, 390에서 넘침 0·주 단추 44px·가림 없음(elementFromPoint), 정원·밤 색 실측, 옮기기 첫 포커스. 기존 소스 고정 시험 2건(#453·#425)은 write-menu 연결에 dirty 분기가 들어간 대로 패턴 갱신.
+- **트러블슈팅**: (1) 새 worktree에 node_modules 없어 playwright 미탐 — lovetree-4.0-b의 node_modules를 junction으로 연결해 화면 시험 실행. (2) 가짜 서버가 디렉터리 경로의 Content-Type을 URL에서가 아니라 파일 확장자로 정해야 했음(아니면 Chromium이 다운로드로 처리). (3) 보드 iframe은 src가 아니라 contentWindow.location.replace로 열리므로 시험이 프레임 URL로 검사. (4) updates.json 충돌(#642 줄과 #644 3줄) — 둘 다 남기고 해소.
+- **배포**: Pages 자동 배포. 서버·DB 변경 없음.
+- **캡처**: E:/lovetree-qa/lane/local2-644b/ (충돌 띠 1440·390, 계정 메뉴 점, 정원·밤 보드, 옮기기 포커스, 저장 중 설명 — 8장).
+- **계정**: 시험 계정 03·05 신규 가입 완료(컴2 tabbit, 메일 인증·캡차 없음 확인). .env PADIEM_TUTORIAL03/05_* 4줄, 거버넌스 계정비밀_대장.md 표 1에 행 추가.
