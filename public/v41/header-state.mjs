@@ -90,7 +90,7 @@ export function headerPartsFor(input = {}) {
 // 닫으면 저장소에 남겨 다시 보여 주지 않는다. 저장소가 막히면 그냥 다시 보여 준다.
 // #619-5: '알겠어요'를 누르지 않은 상태라면 트리 26개짜리 계정에서도 보드를 열 때마다 안내가
 // 다시 뜬다. 조건을 '계정 트리가 정확히 1개고 그 트리의 순간이 1개 이하'로 좁혀, 그밖의
-// 계정은 띄우지 않는다. '봤음'은 localStorage 외에 서버 계정 설정 경로에도 남긴다.
+// 계정은 띄우지 않는다. '봤음'은 localStorage 에 남긴다(서버 저장 경로는 없다).
 export const TIPS_KEY = 'lt41.tips.firstTree';
 // #571(#549-2 대표 결정 '나'): 첫 항목을 '트리 이름은 지금 바꿀 수 있어요'로 바꾸고 안내에
 // [이름 바꾸기] 단추를 둔다 — 자동 이름('모아둔 순간')이 마음에 안 들면 만든 직후 바로 바꾸게.
@@ -108,14 +108,9 @@ export function readTipsSeen(storage) {
   }
 }
 
-export function writeTipsSeen(storage, server) {
+export function writeTipsSeen(storage) {
   try {
     storage?.setItem(TIPS_KEY, '1');
-    if (server) {
-      try {
-        server.setItem('lt41.user.firstTreeSeen', '1');
-      } catch {}
-    }
     return true;
   } catch {
     return false;
@@ -127,7 +122,7 @@ export function writeTipsSeen(storage, server) {
 // 예시 트리로 바뀌어도 "내 첫 트리"로 잘못 보지 않게 source로 한 번 더 막는다.
 // #619-5: 계정의 트리가 1개 이상이고 그 트리의 순간이 2개 이상이면 "첫 트리를 만들었어요"가 아님 —
 // 트리 26개짜리 계정에서도 보드 전환 시마다 안 뜨도록, 트리 1개 & 그 트리의 순간 1개 이하일 때만
-// 띄운다. 서버에 계정별 설정 저장 경로가 있으면 함께 저장하되, 없으면 만들지 않는다.
+// 띄운다.
 export function tipsWanted({ owned = false, treeCount = 0, seen = false, source = 'server', momentCount = 0 } = {}) {
   return source === 'server' && !!owned && Number(treeCount) === 1 && Number(momentCount) <= 1 && !seen;
 }

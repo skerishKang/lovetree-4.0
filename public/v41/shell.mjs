@@ -539,7 +539,7 @@ function placeTreeTips(){
 function closeTreeTips(remember=true){
   const box=$('tree-tips');if(!box||box.hidden)return;
   tipsRestore();
-  box.hidden=true;if(remember)writeTipsSeen(localStorage, window.LT41?.writable);
+  box.hidden=true;if(remember)writeTipsSeen(localStorage);
   const back=tipsReturnFocus||$('tree-views')?.querySelector('button')||$('mobile-more');tipsReturnFocus=null;
   if(back&&document.contains(back)&&!back.hidden)back.focus();
 }

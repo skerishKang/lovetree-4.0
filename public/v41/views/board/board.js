@@ -33,7 +33,8 @@ document.addEventListener('click',e=>{
 // 기억 보드는 예시 판본과, 서버 기록을 쓰기 가능한 계정으로 연 경우에 편집할 수 있다.
 // 공유 감상(share)은 읽기 전용이다. 서버 쓰기 가능 여부는 셸이 LT41.writable로 넘긴다.
 function boardSaveEnabled(){try{return window.parent!==window&&window.parent.LT41?.source==='server'&&window.parent.LT41?.writable===true&&!LTDEMO.readOnly}catch{return false}}
-const canEditBoard=LTDEMO.example||boardSaveEnabled();
+const exampleBoard=LTDEMO.example;
+const canEditBoard=exampleBoard||boardSaveEnabled();
 // #553: 카드 종류별 예약 높이 — CSS가 정한 최대 높이에 여유를 더한 값(실측: 썸네일이 실린 YouTube 카드
 // 465px·세로 Shorts 648px, 기본 카드는 #548 글자 기준선 올림으로 최대 424px). 줄 간격은 이 예약 높이에서
 // 나오므로 링크 없는 트리(예시 40순간)는 기본 간격 460px(#548과 같다), YouTube 밴드는 그보다 크게 벌어진다.
@@ -58,7 +59,9 @@ let boardMode=readBoardMode();
 function setBoardMode(mode,{save=true,replace=true}={}){if(mode!=='date'&&mode!=='mine')return;boardMode=mode;if(save)writeBoardMode(mode);
 for(const b of document.querySelectorAll('[data-board-mode]'))b.setAttribute('aria-pressed',b.dataset.boardMode===mode?'true':'false');
 if(mode==='mine')for(const m of moments){if(m.savedPos&&m.savedXY){m.x=m.savedXY.x;m.y=m.savedXY.y;m.rot=m.savedXY.rot}}
-if(replace){placeAll();settlePlacedCards()}applyView(false)}
+if(replace){placeAll();settlePlacedCards()}applyView(false);
+// #619-4: 배치를 바꾼 뒤 화면에 카드가 하나도 없으면 자동으로 전체 맞춤한다(전환 직후 빈 화면 방지).
+if(replace&&!visibleCardCount())fitAll(false)}
 // 전체 판 계획: '내 배치'에서는 저장 자리를 그대로 두고(#395 계약) 나머지를 날짜 최신순으로 빈 칸에 채운 뒤,
 // 줄의 y는 그 줄의 최대 예약 높이로 정한다(#553 규칙 — 큰 카드가 있는 줄은 그만큼 벌어진다).
 // '날짜순'에서는 저장 자리도 날짜순 바둑판으로 다시 꽂는다(보여 주기만 — 저장 값을 지우지 않는다).
@@ -222,6 +225,8 @@ toast('이전 상태로 돌아왔어요.')}
 
 // #601: 판 자리 바꾸기(끌어 꽂기)는 '정렬 되돌리기'가 쓰던 같은 가드를 쓴다 — 읽기 전용에서는 옮기지 않는다.
 function dragGuard(){const guard=LT58Model.editGuard(canEditBoard);if(guard.blocked){toast(guard.message);return false}return true}
+// #619-4: 지금 화면(보이는 칸)에 걸친 카드 수. 배치 모드를 바꾼 뒤 0이면 전체 맞춤으로 되돌린다.
+function visibleCardCount(){const vr=viewport.getBoundingClientRect();let n=0;for(const el of cardLayer.querySelectorAll('.card')){const r=el.getBoundingClientRect();if(r.right>vr.left+4&&r.left<vr.right-4&&r.bottom>vr.top+4&&r.top<vr.bottom-4)n++}return n}
 
 function bindCard(el){let id=el.dataset.id;
 el.addEventListener('pointerdown',e=>{if(e.target.classList.contains('pin'))return;if(cinema)return;if(!dragGuard())return;e.stopPropagation();snapshot();let m=moments.find(x=>x.id===id),p=screenToWorld(e.clientX,e.clientY);drag={id,dx:p.x-m.x,dy:p.y-m.y};el.setPointerCapture?.(e.pointerId);selectMoment(id,true)});

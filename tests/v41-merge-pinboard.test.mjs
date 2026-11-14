@@ -30,7 +30,9 @@ test('예시 판본 판단은 한 곳에만 둔다(연결 색이 같은 값을 �
   // #582: 보드에서 줄을 만들거나 지우지 않으므로 지우기 동작·말풍선 단추는 함께 거뒀다.
   const branches = SERVER.match(/LTDEMO\.example/g) || [];
   assert.equal(branches.length, 1);
-  assert.match(SERVER, /const canEditBoard=LTDEMO\.example\|\|boardSaveEnabled\(\);/);
+  // #619-6: 판단은 exampleBoard 한 곳에 두고, 연결 색과 꾸밈 카드 스타일이 같은 값을 본다.
+  assert.match(SERVER, /const exampleBoard=LTDEMO\.example;/);
+  assert.match(SERVER, /const canEditBoard=exampleBoard\|\|boardSaveEnabled\(\);/);
   assert.match(SERVER, /'cyan':\(canEditBoard\?\['rose','violet','cyan','amber'\]\[Math\.max\(0,moments\.findIndex/);
   assert.doesNotMatch(SERVER, /source===['"]example['"]/);
   assert.ok(!SERVER.includes('deleteConnBubble'), '연결 말풍선 단추는 없다');

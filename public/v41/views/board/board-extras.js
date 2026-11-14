@@ -34,7 +34,9 @@ const LT_CARD_STYLES=['photo','postit','memo','rounded','film','ticket'];
 
 let defaultPinStyle='pearl',defaultCardStyle='photo',lastAddedId=null,lastParentId=null,pathOnly=false,activePathIds=new Set(),activePathConns=new Set();
 
-moments.forEach((m,i)=>{m.keywords=m.keywords||[];m.pinStyle=m.pinStyle||LT_PIN_STYLES[i%LT_PIN_STYLES.length];m.cardStyle=m.cardStyle||LT_CARD_STYLES[i%LT_CARD_STYLES.length];m.privacy=m.privacy||'PRIVATE';if(m.type==='youtube')m.thumbnailUrl=youtubeThumbUrl(m.url||'');m.createdOrder=m.createdOrder||i+1});
+// #619-6: 꾸밈 카드 스타일(필름의 검은 테두리 등)은 예시 보드에서만 돌아가며 붙인다.
+// 서버 기록은 사람이 고른 스타일이 없으면 기본(photo)으로 둔다 — 마지막 열에 검은 테두리 카드가 섞이던 원인.
+moments.forEach((m,i)=>{m.keywords=m.keywords||[];m.pinStyle=m.pinStyle||LT_PIN_STYLES[i%LT_PIN_STYLES.length];m.cardStyle=m.cardStyle||(exampleBoard?LT_CARD_STYLES[i%LT_CARD_STYLES.length]:'photo');m.privacy=m.privacy||'PRIVATE';if(m.type==='youtube')m.thumbnailUrl=youtubeThumbUrl(m.url||'');m.createdOrder=m.createdOrder||i+1});
 
 function youtubeId(url=''){try{let u=new URL(url);
 if(!['http:','https:'].includes(u.protocol))return '';
@@ -107,7 +109,18 @@ function detailPlayerHTML(m){
 }
 // 이어진 순간 작은 카드: 썸네일 + 제목. 누르면 판이 그 순간으로 부드럽게 이동한다(#583 규칙 그대로).
 // 썸네일이 없으면 '…'를 보인다.
-function connThumb(t){if(!t)return '';if(t.url&&typeof youtubeId==='function'&&youtubeId(t.url))return `<span class="connThumb"><img src="${youtubeThumb(t.url)}" alt="" loading="lazy"></span>`;if(t.asset)return `<span class="connThumb"><img src="${t.asset}" alt="" loading="lazy"></span>`;return `<span class="connThumb connThumbText">…</span>`}
+function connThumb(t){
+  if(!t)return '';
+  const api=thumbApi();
+  const moment={url:String(t.url||''),externalUrl:String(t.url||''),mediaMetadata:t.mediaMetadata||null,image:t.asset||''};
+  const list=api?api.thumbnailCandidates(moment,{autoLoad:true}):[];
+  if(list.length)return `<span class="connThumb"><img src="${esc(list[0])}" ${api.coverFallbackAttrs(list)} alt="" loading="lazy"></span>`;
+  if(t.asset)return `<span class="connThumb"><img src="${esc(t.asset)}" alt="" loading="lazy"></span>`;
+  return `<span class="connThumb connThumbText">…</span>`;
+}
+// #619-6: 위 내려가기 단계(회색 120×90 판정 포함)가 보드에서도 돌게 공용 감시를 한 번 건다.
+// board-thumb.mjs(모듈)가 LTThumbFallback을 내놓은 뒤이므로 DOMContentLoaded에서 건다.
+addEventListener('DOMContentLoaded',()=>{try{thumbApi()?.mountThumbFallback?.(document)}catch{}});
 selectMoment=function(id,open=true){if(open)LTDEMO.select(id);selected=id;mobilePicker?.select(id);document.querySelectorAll('.card').forEach(c=>c.classList.toggle('selected',c.dataset.id===id));if(open){let m=moments.find(x=>x.id===id);if(!m)return;const _ti=titleInfo(m);$('#dTitle').textContent=_ti.main;const _ds=$('#detailSub');if(_ds){_ds.textContent=_ti.sub?'▶ '+_ti.sub:'';_ds.hidden=!_ti.sub}
 // #601: 플레이어가 맨 위, 내 마음은 크게(비어 있으면 입력칸), 감정·날짜·트리 한 줄.
 $('#detailPlayer').innerHTML=detailPlayerHTML(m);
