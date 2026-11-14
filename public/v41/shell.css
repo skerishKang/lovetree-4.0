@@ -521,13 +521,38 @@ html[data-lt-theme="garden"] #account-advanced[aria-checked="true"]:after{backgr
 .updates-kind ul{margin:0;padding-left:18px;display:grid;gap:8px}
 .updates-kind li{font-size:14px;line-height:1.75;color:var(--lt-pearl)}
 .updates-source{display:block;font-size:11px;color:var(--lt-muted)}
-#feedback-context-fields{display:grid;gap:6px;margin-top:8px;border:1px solid var(--line);border-radius:12px;padding:12px 14px}
-#feedback-context-fields legend{font-size:12px;color:var(--muted);padding:0 4px}
-#feedback-context-fields label{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--lt-pearl);min-height:32px}
-#feedback-context-fields input{width:16px;height:16px;accent-color:var(--lt-rose)}
-#feedback-form label{display:grid;gap:6px;margin-top:14px;font-size:13px;color:var(--lt-pearl)}
+/* 이슈 631 의견 창 — 넓은 화면에서 조금 넓게, 함께 보낼 정보는 상자와 글자를 한 줄에 2~3열로. */
+#feedback-panel{width:min(560px,calc(100vw - 32px))}
+#feedback-panel{word-break:keep-all}
+#feedback-panel .panel-note,#feedback-panel p,#feedback-panel textarea,#feedback-panel textarea::placeholder{word-break:keep-all}
+#feedback-form>label{display:grid;gap:6px;margin-top:14px;font-size:13px;color:var(--lt-pearl)}
 #feedback-form textarea,#feedback-form select{width:100%;border-radius:12px;border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.04);color:inherit;padding:10px 12px;font:inherit}
-#feedback-form textarea{min-height:120px;resize:vertical}
+#feedback-form textarea{min-height:104px;resize:vertical}
+#feedback-form .feedback-count-row{margin:4px 0 0;text-align:right}
+#feedback-context-fields{display:grid;gap:6px 14px;margin-top:8px;border:1px solid var(--line);border-radius:12px;padding:12px 14px;grid-template-columns:minmax(0,1fr)}
+#feedback-context-fields legend{font-size:12px;color:var(--muted);padding:0 4px}
+#feedback-context-fields label{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--lt-pearl);min-height:32px;margin:0}
+#feedback-context-fields label[hidden]{display:none}
+#feedback-context-fields input{flex:0 0 auto;width:16px;height:16px;margin:0;accent-color:var(--lt-rose)}
+@media(min-width:480px){#feedback-context-fields{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(min-width:900px){#feedback-context-fields{grid-template-columns:repeat(3,minmax(0,1fr))}}
+/* 보내기·취소는 창 오른쪽 아래, 보내기가 맨 오른쪽. */
+#feedback-panel .button-row{justify-content:flex-end;align-items:center}
+#feedback-panel .button-row .primary{background:var(--lt-primary);color:var(--lt-primary-ink);border-color:transparent}
+#feedback-panel .button-row .primary:focus-visible{outline:2px solid var(--lt-gold);outline-offset:3px;border-radius:var(--lt-r-pill)}
+/* 보낸 뒤: 체크 표시와 함께 분명하게, 닫기는 보내기와 같은 주 단추. */
+#feedback-done{display:grid;gap:8px}
+#feedback-done[hidden]{display:none}
+#feedback-done .feedback-done-line{display:flex;align-items:center;gap:10px;margin:6px 0 2px;font-size:16px;color:var(--lt-pearl)}
+#feedback-done .feedback-check{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;flex:0 0 auto;border-radius:50%;background:var(--lt-primary);color:var(--lt-primary-ink);font-size:15px;font-weight:800}
+#feedback-done .panel-note{margin:0}
+#feedback-done .button-row .primary{background:var(--lt-primary);color:var(--lt-primary-ink);border-color:transparent;border-radius:var(--lt-r-pill)}
+#feedback-done .button-row .primary:focus-visible{outline:2px solid var(--lt-gold);outline-offset:3px;border-radius:var(--lt-r-pill)}
+#feedback-done .button-row button{background:var(--lt-primary);color:var(--lt-primary-ink);border-color:transparent}
+#feedback-done .button-row button:hover{filter:brightness(1.06)}
+.feedback-myposts{min-height:32px;padding:4px 12px;border-radius:var(--lt-r-pill);border:1px solid var(--lt-gold-line);background:rgba(255,230,166,.08);color:var(--lt-gold);font-size:13px}
+.feedback-myposts:hover{background:rgba(255,230,166,.16)}
+.feedback-myposts:focus-visible{outline:2px solid var(--lt-gold);outline-offset:2px;border-radius:var(--lt-r-pill)}
 
 /* 이슈 538 공개가 기본: 공유 창의 공개 상태 표시와 Plus 잠금, 설정의 현재값 표시 */
 .share-visibility{margin:12px 0;padding:12px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-card)}

@@ -740,7 +740,7 @@ $('settings-assets-open').onclick=()=>openAssets($('settings-assets-open'));
   const treeId=owned&&source==='server'&&window.LT41?.tree?.id?String(window.LT41.tree.id):'';
   return {screen,viewport:window.innerWidth+'x'+window.innerHeight,theme:readTheme(localStorage),version:'4.1',loggedIn:owned,treeId};
  }
- const feedbackDialog=createFeedbackDialog({$,notify,getContext:feedbackContext,show:()=>panel('feedback-panel')});
+ const feedbackDialog=createFeedbackDialog({$,notify,getContext:feedbackContext,show:()=>panel('feedback-panel'),openMyPosts:()=>{shellDialogs.requestClose('feedback-panel');panel('myposts-panel');}});
  $('account-feedback').onclick=()=>{closeAccountMenu();feedbackDialog.open();};
  $('feedback-link').onclick=()=>feedbackDialog.open();
  // 2차: AI 고객 '오늘 사용 일지'·모든 로그인 사용자 '내 의견'.
