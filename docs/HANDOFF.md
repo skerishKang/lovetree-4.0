@@ -19,6 +19,13 @@
 - **시험**: 신규 `tests/v41-board-cursor-detail.test.mjs` 4건 — (1) 커서 흔적 없음(5개 파일·public/v41 전체 `cursor:none` 걷기) + 상태 커서 규칙, (2) 단추 규칙, (3) 실제 브라우저 다음 단추 클릭 → 판 이동(transform 변화)·선택·상세 전환 + Enter, (4) 이전 단추. board-model 시험의 커서 시험 5건(19~24)은 함수 소멸로 함께 거둠. 관련 시험 49건 통과(board-model·신규·#553 겹침·#536 넓게·터치 영역), build·modulepreload 유지 확인.
 - **fps(1440, 사슬 40순간, 헤드리스 playwright)**: 판 끌기 40→43~44, 확대 56→58 — 같거나 소폭 빠름(동그라미 그리기·기억을 덜어서). 스크린샷·수치: `E:\lovetree-qaoard-cursor\`(detail-next-button.png, fps 기록).
 - **머지**: PR #583 → main. 보드 배치(treeSpread·cardPosition)는 건드리지 않았다.
+## 2026-11-14 — AI 고객 페르소나 '자주 쓰는 곳·익숙한 디자인' + 일지 디자인 느낌 틀 (#590, 로컬5 레인)
+
+- **운영센터**: `PERSONA_FIELDS`(src/admin-view.js)에 `habits`('자주 쓰는 곳·익숙한 디자인', 여러 줄 칸)를 '쓰는 모습' 뒤에 추가 — admin.js 폼은 PERSONA_FIELDS 공용(row 높이 자동 계산)이라 코드 무변경. 운영센터·내보내기 md 가 같은 순서 7항목.
+- **서버 무변경 확인**: intro 는 jsonb 통과 — `savePersona`가 키를 거르지 않아(DB 변경 없음). `board-service` 시험에 habits 저장→불러오기 왕복 단언 추가.
+- **일지 쓰기 창**: `public/v41/index.html` journal-panel 내용 칸 뒤에 '(선택) 디자인 느낌 — 내가 자주 쓰는 ○○와 비교해서: 익숙했던 점 / 어색했던 점' 안내 한 줄(본문 틀 예시). 시험 `v41-journal-design-hint-590`(마크업 글자).
+- **내보내기**: `renderIntroMarkdown` 같은 항목 — 시험 갱신(7개 항목·여러 줄 값·빈 값 '—'). 머지 뒤 `E:\lovetree-qa\export-tool\` 사본 재복사 + `schtasks /run` 0 확인. 윤제 소개의 habits 내용은 페르소나 레인 몫(여기서 채우지 않음).
+
 ## 2026-11-14 — AI 고객 내보내기: 쿠키 없이 컴2 DB에서 (로컬5 레인, ai/local5-lt-ai-export-db-261114, main b79752d 기준)
 
 - **무엇**: 매일 07:00 AI 고객 내보내기의 원본을 컴2 운영 DB(읽기만)로 바꿨다. 관리자 세션 쿠키 방식은 폐지(쿠키 만료로 조용히 멈추는 문제·쿠키 파일 보관 문제).

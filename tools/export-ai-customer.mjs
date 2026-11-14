@@ -36,7 +36,7 @@ const clean = value => String(value ?? '').replace(/\r\n/g, '\n').trim();
 
 export function renderIntroMarkdown(persona) {
   const intro = persona?.intro || {};
-  const fields = [['who', '누구'], ['why', '왜 쓰나'], ['how', '쓰는 모습'], ['satisfied', '만족한 점'], ['disappointed', '실망한 점'], ['now', '지금 상태']];
+  const fields = [['who', '누구'], ['why', '왜 쓰나'], ['how', '쓰는 모습'], ['habits', '자주 쓰는 곳·익숙한 디자인'], ['satisfied', '만족한 점'], ['disappointed', '실망한 점'], ['now', '지금 상태']];
   const body = fields.map(([key, label]) => `- **${label}**: ${clean(intro[key]) || '—'}`).join('\n');
   return `# ${clean(persona?.name) || 'AI 고객'} 소개\n\n${body}\n`;
 }

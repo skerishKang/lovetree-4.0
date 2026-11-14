@@ -119,7 +119,9 @@ test('종류 탭 줄은 전체·의견·일지 숫자를 센다(#570 2)', () => 
 test("'받음'은 운영센터에서 '새 글'로 부른다(서버 값은 received 그대로, #570 2)", () => {
   assert.equal(STATUS_LABEL.received, '새 글');
   assert.ok(STATUS_ORDER.includes('closed'));
-  assert.equal(PERSONA_FIELDS.length, 6);
+  assert.equal(PERSONA_FIELDS.length, 7);
+  // #590: '자주 쓰는 곳·익숙한 디자인' 칸 — '쓰는 모습' 뒤 순서 고정(내보내기 md 와 같은 순서).
+  assert.deepEqual(PERSONA_FIELDS[3], ['habits', '자주 쓰는 곳·익숙한 디자인']);
 });
 
 test("상태 알림 문구는 받침에 따라 '으로/로'를 고른다(#564 6)", () => {

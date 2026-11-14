@@ -14,7 +14,7 @@ export const KIND_LABEL = {opinion: '의견', journal: '일지'};
 export const STATUS_LABEL = {received: '새 글', reviewing: '확인 중', fixed: '고침', later: '다음에', closed: '닫음'};
 export const STATUS_ORDER = ['received', 'reviewing', 'fixed', 'later', 'closed'];
 export const PERSONA_FIELDS = [
-  ['who', '누구'], ['why', '왜 쓰나'], ['how', '쓰는 모습'], ['satisfied', '만족한 점'], ['disappointed', '실망한 점'], ['now', '지금 상태']
+  ['who', '누구'], ['why', '왜 쓰나'], ['how', '쓰는 모습'], ['habits', '자주 쓰는 곳·익숙한 디자인'], ['satisfied', '만족한 점'], ['disappointed', '실망한 점'], ['now', '지금 상태']
 ];
 export const GITHUB_REPO = 'skerishKang/lovetree-4.0';
 
