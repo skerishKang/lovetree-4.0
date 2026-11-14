@@ -161,11 +161,9 @@ test('배선: 빠른 추가·자세한 추가가 미리보기 제목을 저장�
   const panels = readFileSync(new URL('../public/v41/shell/panels.mjs', import.meta.url), 'utf8');
   const quickPure = readFileSync(new URL('../public/v41/quick-add.mjs', import.meta.url), 'utf8');
   const videoTitle = readFileSync(new URL('../public/v41/video-title.mjs', import.meta.url), 'utf8');
-  // 빠른 추가: titleCache의 제목을 quickAdd 입력에 붙인다. 못 받으면 붙이지 않고(기존 규칙),
-  // 제목이 도착하면 방금 담은 순간에 backfillTitles로 채운다(이슈 638 — 저장은 treeId를 함께 넘긴다).
+  // 빠른 추가: titleCache의 제목을 quickAdd 입력에 붙인다. 못 받으면 붙이지 않고, 제목이 늦으면
+  // backfillTitles로 방금 담은 순간에만 채운다(동작은 tests/v41-quick-add.test.mjs의 하네스 시험으로 본다).
   assert.match(quickDom, /apply\('quickAdd', input\)/);
-  assert.match(quickDom, /const input = \{ url, \.\.\.\(quickTreeId \? \{ treeId: quickTreeId \} : \{\}\), \.\.\.quickMediaTitle\(url\) \}/);
-  assert.match(quickDom, /apply\('backfillTitles', \{ items: \[\{ treeId: pending\.treeId, momentId: pending\.momentId, url: pending\.url, mediaMetadata: \{ title \} \}\] \}\)/);
   assert.match(quickDom, /const title = titleCache\.get\(parsed\.videoId\) \|\| '';/);
   assert.match(quickDom, /return title \? \{ mediaMetadata: \{ title \} \} : \{\};/);
   assert.match(quickDom, /import \{fetchVideoTitle\} from '\.\.\/video-title\.mjs';/);
