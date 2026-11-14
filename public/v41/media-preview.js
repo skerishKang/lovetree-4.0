@@ -378,7 +378,8 @@ if(typeof document!=='undefined'){
  const cleanup=()=>{for(const [node,url] of ownedUrls)if(!node.isConnected){URL.revokeObjectURL(url);ownedUrls.delete(node);}};
  new MutationObserver(cleanup).observe(document.documentElement,{childList:true,subtree:true});
  addEventListener('pagehide',()=>{for(const url of ownedUrls.values())URL.revokeObjectURL(url);ownedUrls.clear();});
- document.addEventListener('pointerdown',e=>{if(e.target.closest?.('.lt-media'))e.stopPropagation();},true);
+ // #601: 보드 카드의 그림은 카드를 끄는 자리다 — 카드 안에서는 이 막음을 풀어 준다(다른 화면은 그대로).
+ document.addEventListener('pointerdown',e=>{if(e.target.closest?.('.lt-media')&&!e.target.closest?.('.card'))e.stopPropagation();},true);
  document.addEventListener('click',e=>{if(e.target.closest?.('[data-lt-title-edit]'))return;const root=e.target.closest?.('.lt-media');if(!root)return;e.stopImmediatePropagation();if(e.target.closest('[data-lt-expand]')){e.preventDefault();void openLightbox(root.dataset.ltUrl,root.dataset.ltTitle,root.hasAttribute('data-lt-vertical')?true:null);return;}if(e.target.closest('[data-lt-play]')){e.preventDefault();void playInPlace(root);return;}if(e.target.closest('[data-lt-load]')){e.preventDefault();load(root);}},true);
 }
 })();
