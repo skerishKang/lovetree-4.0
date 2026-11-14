@@ -88,13 +88,17 @@ test.after(() => lib?.server?.close());
 
 if (REQUIRE && skip) throw new Error(`#535 실행 시험이 필요한데 건너뜀: ${skip}`);
 
-// 소스 계약: 얼어 있던 위상을 벽시계(elapsed)로 돌리고, 동작 줄이기면 그대로 멈춘다.
+// 소스 계약: 부유는 궤도 위상과 분리된 벽시계 시간으로 돌고, 동작 줄이기면 그대로 멈춘다.
+// #593: 벽시계 시간은 이제 JS 프레임 루프가 아니라 카드 층의 애니메이션(.lt-lift)이 들고 있다
+// (유휴에 카드 style 을 다시 쓰지 않으려고 옮겼다 — 시간 기준은 그대로).
 s('#535 부유는 궤도 위상과 분리한 벽시계 시간으로 돌린다(소스 계약)', () => {
   const src = readFileSync(path.join(REPO, 'src', 'views', 'orbit.js'), 'utf8');
-  assert.match(src, /elapsed\+=Math\.min\(40,dt\)\/1000/, '프레임마다 초를 쌓는다');
-  assert.match(src, /x\+=Math\.sin\(elapsed\*/, '가로 부유를 elapsed 로 돌린다');
-  assert.match(src, /y\+=Math\.cos\(elapsed\*/, '세로 부유를 elapsed 로 돌린다');
-  assert.match(src, /phase\+=\.000018\*dt/, '궤도 회전도 눈에 보이게 올렸다(전 .000006)');
+  assert.match(src, /const floatKeyframes=/, '부유 키프레임을 따로 둔다');
+  assert.match(src, /translate:`\$\{\(Math\.sin\(ph\)\*ax\)/, '가로 부유');
+  assert.match(src, /px \$\{\(Math\.cos\(ph\)\*ay\)/, '세로 부유');
+  assert.match(src, /const ax=11,ay=18/, '폭 11·18px(#535 값 그대로)');
+  assert.match(src, /id:'lt-float'/, '부유는 .lt-lift 층의 애니메이션이 맡는다(궤도와 분리)');
+  assert.match(src, /PHASE_STEP=\.000018;/, '궤도 회전 속도는 그대로(전 .000006)');
   assert.match(src, /const reduced=matchMedia\('\(prefers-reduced-motion: reduce\)'\)\.matches;let paused=reduced/, '동작 줄이기면 처음부터 멈춤');
   assert.match(src, /ringsNarrow/, '좁은 화면은 원래 반지름을 그대로 쓴다');
 });
@@ -168,10 +172,14 @@ s('#535 가만히 있을 때 그리기 횟수는 크게 늘지 않는다', async
 // 겹침: 움직이므로 여러 번 재서 최댓값을 쓴다. 가운데 안전 구역 침범은 언제나 0.
 // 측정은 움직임을 멈춘 상태(동작 줄이기)로 한다 — 움직이는 화면을 몇 번 재는 방식은
 // 회차마다 값이 달라져 CI에서 흔들린다. 떠 있는 폭은 위 시험이 따로 잰다.
+// #593: 떠 있음이 .lt-lift 층으로 옮겨 가면서, 떠 있는 동안에도 가운데 안전 구역을 넘지 않도록 판정 사각형에
+// 그 폭(±11·18px)을 더해 잡는다. 카드가 그만큼 바깥에 서므로 겹친 면적이 조금 늘었다
+// (실측: 1440 로그아웃 244k·로그인 273k / 1920 258k·292k / 390 43k·32k, 침범 0).
+// #535 이전 값(1440 269k·292k / 1920 277k·301k / 390 44k·36k)과 같은 수준이다.
 const LIMITS = {
-  '1440x900': { pairs: 26, area: 265000 },
-  '1920x1080': { pairs: 29, area: 280000 },
-  '390x844': { pairs: 12, area: 46000 }
+  '1440x900': { pairs: 24, area: 282000 },
+  '1920x1080': { pairs: 26, area: 301000 },
+  '390x844': { pairs: 11, area: 44500 }
 };
 
 s('#535 카드끼리 겹친 면적을 줄였다(1440·1920·390, 안전 구역 침범 0)', async () => {

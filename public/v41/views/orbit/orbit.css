@@ -16,10 +16,15 @@ button{color:inherit}
 
 .world{position:absolute;inset:0;z-index:3;perspective:1200px;transform-style:preserve-3d;will-change:transform}
 
-.card{position:absolute;left:50%;top:50%;width:180px;height:232px;border-radius:14px;overflow:hidden;transform-origin:center;will-change:transform,opacity,filter;cursor:pointer;border:1px solid rgba(255,255,255,.12);background:#111;box-shadow:0 24px 60px rgba(0,0,0,.38);transition:border-color .18s,filter .25s,box-shadow .25s}
+.card{position:absolute;left:50%;top:50%;width:180px;height:232px;border-radius:14px;overflow:hidden;transform-origin:center;will-change:transform;cursor:pointer;border:1px solid rgba(255,255,255,.12);background:#111;box-shadow:0 24px 60px rgba(0,0,0,.38);transition:border-color .18s,filter .25s,box-shadow .25s}
 
 .card.sm{width:128px;height:166px;border-radius:11px}
 .card.lg{width:226px;height:292px;border-radius:16px}
+
+/* #593: 카드 위에 두 겹을 더 둔다 — 자리·패럴랙스(.lt-move)와 떠 있음(.lt-lift).
+   궤도·떠 있음은 각 층의 애니메이션이 들고, JS 는 배치가 바뀔 때만 쓴다(유휴 스타일 쓰기 0). */
+.lt-move{position:absolute;inset:0;will-change:transform}
+.lt-lift{position:absolute;inset:0;will-change:transform}
 
 .card .surface{position:absolute;inset:0;overflow:hidden;background:#111}
 

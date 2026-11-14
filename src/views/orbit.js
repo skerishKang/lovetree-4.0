@@ -80,7 +80,7 @@ export function mountOrbit(host,{trees,storage,context,actions,authHtml='',onSel
  };
  performance.mark('m1');shadow.innerHTML=`<style>${originalCSS}${extraCSS}.auth-entry{white-space:nowrap}</style><section class="app" aria-label="${SERVICE} 첫 화면"><div class="topbar"><span class="brand">${SERVICE} · MEMORY ORBIT</span><div class="top-actions"><button class="menuBtn" data-do="index">순간 목록</button>${authHtml}</div></div><div class="world"></div><div class="center-scrim" aria-hidden="true"></div><div class="center"><div class="eyebrow">${demo?'나의 첫 순간':'WELCOME BACK'}</div><h1>${demo?'좋아하는 순간부터.':'다시, 그 순간으로.'}</h1><p>${demo?'간직하고 싶은 장면에 마음을 남겨 보세요.<br>지금 떠오르는 순간 하나면 충분해요.':'기억은 아직 여기에서 이어지고 있어요.'}</p>${recentMoment?recentMarkup(recentMoment):''}<div class="actions"><button class="subtleBtn primary-cta" data-do="${demo?'new':'continue'}">${demo?NEW_TREE:'이어 보던 순간'}</button><button class="subtleBtn" data-do="${demo?'continue':'new'}">${demo?'예시 순간 감상':NEW_TREE}</button><button class="subtleBtn" data-do="trees">${GO_TREES}</button></div><p class="center-note">${demo?'감상 예시 · 내 기록에는 저장되지 않아요':esc(recordNote??`${all.length}개의 순간 · 서버에 보관`)}</p></div><div class="hint">드래그 · 금테 카드를 눌러 감상</div></section><dialog class="orbit-dialog" aria-label="순간 감상"></dialog>`;
  const app=shadow.querySelector('.app'),world=shadow.querySelector('.world'),dialog=shadow.querySelector('dialog');
- const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;let paused=reduced,phase=0,elapsed=0,raf=0,previous=0,drag=null,moved=0,opener=null,hoveredCard=null,spin=0,glide=0;
+ const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;let paused=reduced,phase=0,raf=0,previous=0,drag=null,moved=0,opener=null,spin=0,glide=0;
  // #41 마우스 패럴랙스: 중심 기준 제한된 변위를 보간한다(phase를 누적하지 않음). 멈춤·reduced·팝업·백그라운드에서 정지, 터치에는 걸지 않는다.
  // 깊이별 차등은 SRC064 원본의 카메라를 그대로 쓴다(reference/originals/src064-orbit.html):
  //   목표 = (포인터 - 화면 중심) × 배율, 카드 이동량 = 카메라 × (0.45 + sc × 0.3) — 가까운 카드가 더 크게 움직인다.
@@ -150,7 +150,7 @@ const toggleRecentPlay=btn=>{if(!recentMoment)return;const card=shadow.querySele
  if(!embed)return;
  const frame=document.createElement('iframe');frame.className='recent-frame';frame.src=embed;frame.title=mainOf(recentMoment)||'YouTube 영상';frame.allow='accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';frame.allowFullscreen=true;frame.setAttribute('referrerpolicy','no-referrer');media.querySelector('img')?.setAttribute('hidden','');media.append(frame);recentFrame=frame;btn.setAttribute('aria-label','정지');const glyph=btn.querySelector('span');if(glyph)glyph.textContent='■';};
 shadow.addEventListener('click',e=>{const play=e.target.closest('[data-recent-play]');if(play){e.stopPropagation();toggleRecentPlay(play);return;}const b=e.target.closest('button');if(!b){if(!e.target.closest?.('[data-lt-title-edit]')&&e.target.closest?.('[data-do=recent]'))openRecent();return;}if(b.dataset.next){focus(findMoment(b.dataset.next));return;}switch(b.dataset.do){case'close':dialog.close();break;case'new':actions.requestMoment('new');break;case'trees':actions.navigate('trees');break;case'continue':focus(lastCard);break;case'index':index();break;case'recent':if(!e.target.closest?.('[data-lt-title-edit]'))openRecent();break;}},{signal});
- dialog.addEventListener('close',()=>{opener?.focus();schedule()},{signal});
+ dialog.addEventListener('close',()=>{opener?.focus();syncMotion();schedule()},{signal});
  // #394 1번: 상세 창에서 화살표 키와(모바일) 옆으로 밀기로도 앞·뒤 순간으로 옮겨 간다.
  dialog.addEventListener('keydown',e=>{if(!detailMoment)return;if(e.key==='ArrowLeft'){e.preventDefault();stepDetail(-1);}else if(e.key==='ArrowRight'){e.preventDefault();stepDetail(1);}},{signal});
  let detailSwipe=null;
@@ -166,100 +166,249 @@ shadow.addEventListener('click',e=>{const play=e.target.closest('[data-recent-pl
   }
  });
  track(disposeThumb);
-performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElement('button');b.className=`card ${c.type} ${c.sizeClass}${c.example?' example':''}${c.source==='mine'?' mine':''}`;b.dataset.example=c.example?'1':'';b.innerHTML=`<div class="surface" data-lt-thumb-host>${c.image?`<img src="${esc(c.image)}" alt="" draggable="false" style="object-fit:${c.fitMode==='contain'?'contain':'cover'}"${thumbFallbackAttrs(c,{candidates:c.thumbCandidates||[c.image],writable:!demo&&!c.example,variant:'orbit'})}${c.youtubeThumb?' referrerpolicy="no-referrer" loading="lazy" decoding="async"':''}>`:(!demo&&!c.example&&needsFallbackCard(c,{autoLoad:false})?fallbackCardMarkup(c,{writable:!demo&&!c.example,variant:'orbit',dateStyle}):`<div class="memoKicker">${esc(dateOf(c))}</div><div class="memoText">${esc(mainOf(c))}</div><div class="memoFoot">${esc(c.emotion)}</div>`)}</div>${c.youtubeThumb&&c.image?'<span class="playGlyph" aria-hidden="true">▶</span>':''}${c.first?'<div class="firstMark">FIRST</div>':''}<div class="caption"><span>${esc(mainOf(c))}${subMarkup(c)}</span></div>`;b.addEventListener('pointerenter',e=>{if(e.pointerType==='mouse'&&!drag)hoveredCard=b;},{signal});b.addEventListener('pointerleave',()=>{if(hoveredCard===b)hoveredCard=null;},{signal});b.onclick=e=>{if(e.target?.closest?.('[data-lt-title-edit]'))return;if(e.detail===0||moved<9){if(onOpen&&!c.example){onOpen(c);return;}focus(c)}};world.append(b);return b;});performance.mark('m3');
- // #429 2/2: 카드 기본 폭·높이와 안전 구역은 둘째 프레임에서 한 번만 잰다. 첫 프레임에서 강제 레이아웃을
- // 하면 뼈대 완성(DOMContentLoaded)이 그 만큼 늦어진다(#400 뼈대 완성 보호 — 첫 프레임은 밀어내기 없이 그린다).
- let cardSizes=null,warmups=0;
- function frame(now){performance.mark('f'+warmups);raf=0;const dt=Math.min(40,now-previous||16);previous=now;elapsed+=Math.min(40,dt)/1000;// #535-3: 손을 뗀 뒤 관성(초당 6%씩 줄어 0.7초쯤 미끄러짐)으로 돌다가 멈춘다. 동작 줄이기면 관성 없음.
- if(glide){phase+=glide*dt/16.7;glide*=Math.pow(.94,dt/16.7);if(Math.abs(glide)<.0004)glide=0;}
- if(!paused&&!dialog.open&&!drag&&!hoveredCard)phase+=.000018*dt;
- // 움직임이 끝나면 끄는 동안 켰던 레이어 승격을 풀어 유휴 비용·메모리를 원래대로 돌린다.
- if(!drag&&!glide&&!hoveredCard&&!dialog.open&&host.getAttribute('data-lt-busy'))setBusy(false);const w=app.clientWidth,h=app.clientHeight;
-  if(warmups>=1){if(safeZoneDirty){measureSafeZone();safeZoneDirty=false;}if(!cardSizes)cardSizes=elements.map(el=>({w:el.offsetWidth||180,h:el.offsetHeight||232}));}
-  warmups+=1;
-  // 밀어낼 때는 프레임 사이 각도·위상 변화를 덮는 12px 여유를 더 붙인다(실측 침범 0 유지).
-  const zs=safeZone?{l:safeZone.l-12,t:safeZone.t-12,r:safeZone.r+12,b:safeZone.b+12}:null;
-  cards.forEach((c,i)=>{const cfg=(w<=650?ringsNarrow:rings)[c.ring],th=c.baseAngle+phase*cfg.speed+c.phaseOffset;let x=Math.cos(th)*cfg.rx,y=Math.sin(th)*cfg.ry+cfg.band+Math.sin(th*1.7+c.phaseOffset*3)*45,z=Math.sin(th+1.1+c.phaseOffset*4)*cfg.zAmp+cfg.zBase+c.zOffset;if(!demo&&cards.length<=8){const angle=i*Math.PI*2/cards.length+phase;x=Math.cos(angle)*Math.min(w*.34,420);y=Math.sin(angle)*Math.min(h*.3,250)+(i%2===0?80:-80);z=0;}// #535: 떠 있는 느낌이 바로 오도록, 궤도 위상(th)·각도에 묶여 얼어 있던 흔들림을 벽시계 시간(elapsed)으로 돌린다.
-   // 폭 11px·18px, 주기 8.5~14초로 카드마다 다르게 두어 한 덩어리로 흔들리지 않게 하고 멀미를 피한다.
-   x+=Math.sin(elapsed*(Math.PI*2/(11+(i%4)*1.7))+i*1.9)*11;y+=Math.cos(elapsed*(Math.PI*2/(8.5+(i%5)*1.2))+i*2.3)*18;
-   const narrow=w<=650;
-   // #457: 좁은 화면은 깊이 상한을 낮추고(가까운 카드가 너무 커지지 않게) 궤도 반지름도 더 좁혀,
-   // 안전 구역을 피해 밀어내기 전부터 카드가 화면에 가깝게 놓이게 한다(민 뒤 화면 밖으로 밀리는 양을 줄인다).
-   const sc=Math.max(.18,Math.min(narrow?1.1:1.82,1050/(1050-z))),fit=Math.min(1,w/780,h/850)*(narrow?.5:1);const placementFit=!demo&&cards.length<=8?1:fit;const el=elements[i];let drawShrink=1;
-   // #429 2/2: 폭별 상한을 넘는 카드는 숨긴다(가로 넘침·과밀 방지). 창이 넓어지면 다시 보인다.
-   if(i>=cardCapFor(w)){el.style.display='none';return;}
-   if(el.style.display==='none')el.style.display='';
-   // #429 2/2: 가운데 안전 구역(제목·문구·버튼 묶음+여백)과 카드 사각형이 겹치면 겹침이 0이 되도록 가장 얇은 쪽으로 민다.
-   // 카드는 소각 회전을 하므로 폭·높이에 18% 여유를 두고 사각형으로 판정한다.
-   let px=(x+camera.x*(.45+sc*.3))*sc*placementFit-90,py=(y+camera.y*(.38+sc*.24))*sc*placementFit-116;
-   if(safeZone){const size=cardSizes[i];
-    // 카드 사각형을 정확히: rotateX·Y·Z 합성 회전 → scale → 원근(1200px) 투영까지 네 귀퉁이로 계산한다.
-    // 원근은 월드 중심 원점 기준이므로 카드 중심 위치(Cx0·Cy0)도 함께 투영된다.
-    const AX=(c.tiltX+Math.sin(th)*9)*Math.PI/180,AY=(c.tiltY+Math.cos(th)*18)*Math.PI/180,AZ=(c.tiltZ+Math.sin(th*.6)*7)*Math.PI/180;
-    const rX=Math.cos(AX),uX=Math.sin(AX),rY=Math.cos(AY),uY=Math.sin(AY),rZ=Math.cos(AZ),uZ=Math.sin(AZ);
-    const Cx0=w/2+px+size.w/2,Cy0=h/2+py+size.h/2;
-    // #491: 좁은 화면에서는 실제로 그려지는 배율(sc×max(.58,fit))로 판정한다. sc만 쓰면 실제보다 최대 1.7배 큰
-    // 사각형으로 판정해, 띠에 들어갈 카드까지 "못 들어간다"고 숨겼다(390에서 카드 0~2장). 넓은 화면은 fit이 1이라 같은 값이다.
-    const cScale=narrow?sc*Math.max(.58,fit):sc;
-    let minX=1e9,maxX=-1e9,minY=1e9,maxY=-1e9;
-    for(const corner of [[-1,-1],[1,-1],[-1,1],[1,1]]){
-     const X=size.w/2*corner[0],Y=size.h/2*corner[1];
-     const x1=X*rZ-Y*uZ,y1=X*uZ+Y*rZ;              // rotateZ
-     const x2=x1*rY,y2=y1,z2=-x1*uY;               // rotateY
-     const y3=y2*rX-z2*uX,z3=y2*uX+z2*rX;          // rotateX
-     const k=1200/(1200-z3);
-     const sxp=w/2+(Cx0-w/2+x2*cScale)*k,syp=h/2+(Cy0-h/2+y3*cScale)*k;    // 원근 원점(화면 중심) 기준으로 투영
-     if(sxp<minX)minX=sxp;if(sxp>maxX)maxX=sxp;if(syp<minY)minY=syp;if(syp>maxY)maxY=syp;
-    }
-    if(narrow){
-     // #457: 좁은 화면은 안전 구역이 폭 대부분을 차지해 옆으로는 못 피한다. 가로는 먼저 화면 안(0..w)으로
-     // 당기고(옆으로 못 미니 화면 밖 자체를 막는다), 그 가로 위치로 안전 구역과 겹치는지 다시 본 뒤
-     // 겹치면 위·아래 띠로만 민다 — 가로를 당기고 나서 봐야 겹침을 제대로 판정한다(당기기 전 기준으로 겹침이 없다고
-     // 넘겼다가 당긴 뒤에 겹치는 경우를 막는다).
-     /* 이슈 458: 셸이 data-lt-fab을 표시하면 오른쪽 아래 56px 단추+여백 20px 자리를 비낀다(가로 당김 bound를 줄인다).
-      화면 위쪽 카드는 이 bound와 무관하게 안전 구역 밀어내기를 그대로 따른다. */
-     const fabPad=document.documentElement.hasAttribute('data-lt-fab')?76:0;
-     if(minX<0){px-=minX;maxX-=minX;minX=0;}else if(maxX>w-fabPad){const over=maxX-(w-fabPad);px-=over;maxX-=over;minX-=over;}
-     if(maxX>zs.l&&minX<zs.r&&maxY>zs.t&&minY<zs.b){
-      const pushT=maxY-zs.t,pushB=zs.b-minY,upFits=minY-pushT>=0,downFits=maxY+pushB<=h;
-      // #491: 띠 둘 다에 안 들어가는 카드는 숨기는 대신, 더 큰 쪽 띠에 맞춰 그림 배율을 줄인다(390에서 카드 0장은 안 된다).
-      // 줄인 뒤에는 줄어든 사각형으로 다시 밀어 넣는다. 바닥값 .5로 카드가 지나치게 작아지지 않게 둔다.
-      if(!upFits&&!downFits){
-       const band=Math.max(zs.t,h-zs.b),rectH=maxY-minY,rectW=maxX-minX,shrink=Math.max(.5,Math.min(1,band/rectH));
-       drawShrink*=shrink;
-       const cx=(minX+maxX)/2,cy=(minY+maxY)/2,nw=rectW*shrink,nh=rectH*shrink;
-       minX=cx-nw/2;maxX=cx+nw/2;minY=cy-nh/2;maxY=cy+nh/2;
-       const pushT2=maxY-zs.t,pushB2=zs.b-minY;
-       if(pushT2<=pushB2){py-=pushT2;minY-=pushT2;maxY-=pushT2;}else{py+=pushB2;minY+=pushB2;maxY+=pushB2;}
-      }
-      else if(upFits&&downFits?pushT<=pushB:upFits){py-=pushT;minY-=pushT;maxY-=pushT;}else{py+=pushB;minY+=pushB;maxY+=pushB;}
-     }
-     if(minY<0){py-=minY;maxY-=minY;minY=0;}else if(maxY>h){const over=maxY-h;py-=over;maxY-=over;minY-=over;}
-     // 마지막 안전망: 그래도 안전 구역과 겹치면(위 보정이 다 못 막은 극단 경우) 보여 주는 대신 숨긴다.
-     if(maxX>zs.l&&minX<zs.r&&maxY>zs.t&&minY<zs.b){el.style.display='none';return;}
-    } else if(maxX>zs.l&&minX<zs.r&&maxY>zs.t&&minY<zs.b){
-     // #429 2/2: 가운데 안전 구역과 카드 사각형이 겹치면 겹침이 0이 되도록 네 쪽 중 가장 얇은 쪽으로 민다(그대로).
-     const pushL=maxX-zs.l,pushR=zs.r-minX,pushT=maxY-zs.t,pushB=zs.b-minY,m=Math.min(pushL,pushR,pushT,pushB);
-     if(m===pushL)px-=pushL;else if(m===pushR)px+=pushR;else if(m===pushT)py-=pushT;else py+=pushB;
-    }
+performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElement('button');b.className=`card ${c.type} ${c.sizeClass}${c.example?' example':''}${c.source==='mine'?' mine':''}`;b.dataset.example=c.example?'1':'';b.setAttribute('tabindex','-1');b.setAttribute('aria-hidden','true');b.innerHTML=`<span class="lt-move"><span class="lt-lift"><span class="surface" data-lt-thumb-host>${c.image?`<img src="${esc(c.image)}" alt="" draggable="false" style="object-fit:${c.fitMode==='contain'?'contain':'cover'}"${thumbFallbackAttrs(c,{candidates:c.thumbCandidates||[c.image],writable:!demo&&!c.example,variant:'orbit'})}${c.youtubeThumb?' referrerpolicy="no-referrer" loading="lazy" decoding="async"':''}>`:(!demo&&!c.example&&needsFallbackCard(c,{autoLoad:false})?fallbackCardMarkup(c,{writable:!demo&&!c.example,variant:'orbit',dateStyle}):`<div class="memoKicker">${esc(dateOf(c))}</div><div class="memoText">${esc(mainOf(c))}</div><div class="memoFoot">${esc(c.emotion)}</div>`)}</span></span></span>${c.youtubeThumb&&c.image?'<span class="playGlyph" aria-hidden="true">▶</span>':''}${c.first?'<div class="firstMark">FIRST</div>':''}<div class="caption"><span>${esc(mainOf(c))}${subMarkup(c)}</span></div>`;
+ // #593: 바깥 .card 는 자리(궤도 애니메이션)만 맡는다 — 실제로 눌리고 초점을 받는 것은 안쪽 .surface 다(중첩 단추 방지).
+ const surface=b.querySelector('.surface'),surfaceLabel=b.querySelector('.caption span')?.textContent||mainOf(c)||'순간';
+ surface.setAttribute('role','button');surface.setAttribute('tabindex','0');surface.setAttribute('aria-label',surfaceLabel);
+ surface.addEventListener('pointerenter',e=>{if(e.pointerType==='mouse'&&!drag)hoveredCard=surface;},{signal});
+ surface.addEventListener('pointerleave',()=>{if(hoveredCard===surface)hoveredCard=null;},{signal});
+ surface.addEventListener('click',e=>{if(e.target?.closest?.('[data-lt-title-edit]'))return;if(e.detail===0||moved<9){if(onOpen&&!c.example){onOpen(c);return;}focus(c)}},{signal});
+ world.append(b);return b;});performance.mark('m3');
+ // #429 2/2: 카드 기본 폭·높이와 안전 구역은 둘째 번에 한 번만 잰다. 첫 그리기에서 강제 레이아웃을 하면
+ // 뼈대 완성(DOMContentLoaded)이 그 만큼 늦어진다(#400 뼈대 완성 보호 — 첫 그리기는 밀어내기 없이 그린다).
+ let layoutBox=null,cardSizes=null,warmups=0;
+ // ── #593 애니메이션 엔진 ─────────────────────────────────────────────────────────────
+ // 전에는 카드 28장의 transform·filter·z-index 를 매 프레임 JS 로 다시 썼다(실측 #586: 스타일 재계산 ~1000ms/s).
+ // 이제 유휴에는 카드마다 걸어 둔 애니메이션(WAAPI)만 돈다. JS 는 배치가 바뀌는 사건(창 크기·좁은 화면 대역·
+ // 안전 구역·예시 장수·끌기)에만 카드 자리를 쓴다.
+ //  · .card      — 궤도(타원 위 자리·깊이 배율·기울기·밝기·z-index). 카드마다 표본 48개.
+ //  · .lt-lift   — 떠 있음(#535: 11·18px, 주기 11~16.1초). .card 와 다른 층이라 궤도와 겹치지 않는다.
+ //  · .lt-move   — 패럴랙스(카메라)와 끄는 동안의 자리. 이 층이 있어야 애니메이션 transform 을 덮지 않는다.
+ // 끄는 동안·관성 동안에는 .card 에 !important 로 transform 을 직접 써서 잡은 손을 그대로 따라가게 한다
+ // (애니메이션보다 인라인 !important 가 이기므로 애니메이션을 껐다 켤 필요가 없다 — 끌 때 다시 트는 비용 0).
+ let hoveredCard=null;
+ const TWO_PI=Math.PI*2, ORBIT_MS=349000, ORBIT_STEPS=48, PHASE_STEP=.000018;
+ const orbitAnims=cards.map(()=>null), floatAnims=cards.map(()=>null);
+ const animRunning=()=>!paused&&!dialog.open&&!document.hidden;
+ const floatDelay=cards.map((c,i)=>i*370);
+ // 멈춤(동작 줄이기·보기 메뉴)·팝업·숨은 탭이면 애니메이션만 세운다. 멈출 때는 떠 있음 위상을 첫 자리(0·18px)로
+ // 되돌려, 예전에 elapsed 가 0 에 얼어 있던 화면과 같은 자리를 보여 준다.
+ const syncMotion=()=>{const rate=animRunning()?1:0;
+  for(const a of orbitAnims)if(a)a.playbackRate=rate;
+  floatAnims.forEach((a,i)=>{if(!a)return;a.playbackRate=rate;if(!rate){const d=a.effect.getTiming().duration;a.currentTime=floatDelay[i]%d;}});};
+ // 떠 있음: 사인 한 주기를 네 점으로 나눈 표본. 카드마다 위상을 어긋내 한 덩어리로 흔들리지 않게 한다(#535).
+ const floatKeyframes=()=>{const ax=11,ay=18,out=[];for(let k=0;k<=4;k++){const ph=k/4*TWO_PI;out.push({offset:k/4,translate:`${(Math.sin(ph)*ax).toFixed(2)}px ${(Math.cos(ph)*ay).toFixed(2)}px`,easing:'cubic-bezier(.37,0,.63,1)'});}return out;};
+ // 궤도 키프레임: 아래 drawOnly 에서 카드 한 장에 하던 계산을 그대로 표본마다 되풀이해 굽는다.
+ // 밀어내기(#429/#457/#491)도 표본마다 계산하므로, 애니메이션만 돌아도 가운데 안전 구역을 침범하지 않는다.
+ const orbitKF=[];
+ const orbitKeyframes=(i,w,h,warm)=>{if(orbitKF[i])return orbitKF[i];
+  const c=cards[i],narrow=w<=650,cfg=(narrow?ringsNarrow:rings)[c.ring],fit=Math.min(1,w/780,h/850)*(narrow?.5:1),out=[];
+  // #593: 판정 사각형을 떠 있음 폭만큼(+24·+40) 부풀려 잡으므로, 목표 구역도 그만큼 넓혀 잡는다 —
+  // 부푼 만큼만 밀면 실제 카드가 그 차이만큼 안쪽(가운데 구역)에 서서 미리보기 검사에 걸린다(실측 20px).
+  const padX=narrow?6:16,padY=narrow?0:20;
+  const zs=safeZone?{l:safeZone.l-padX,t:safeZone.t-padY,r:safeZone.r+padX,b:safeZone.b+padY}:null;
+  // 키프레임을 구울 때 placeCard 는 '지금 위상'의 판정 결과를 카드에 직접 쓴다(밝기·숨김). 굽는 동안의
+  // 숨김은 화면 상태가 아니므로 되돌리고, 판정이 극단값으로 숨긴 표본은 직전 표본 자리를 그대로 쓴다.
+  let last=null;
+  // #593: 표본 하나를 굽는다. 굽는 동안 placeCard 는 '지금 위상'의 판정 결과를 카드에 직접 쓰므로(밝기·숨김)
+  // 숨김은 되돌리고, 판정이 극단값으로 숨긴 표본은 직전 표본 자리를 그대로 쓴다.
+  const bake=(k)=>{const th=c.baseAngle+k/ORBIT_STEPS*TWO_PI+c.phaseOffset;let x=Math.cos(th)*cfg.rx,y=Math.sin(th)*cfg.ry+cfg.band+Math.sin(th*1.7+c.phaseOffset*3)*45,z=Math.sin(th+1.1+c.phaseOffset*4)*cfg.zAmp+cfg.zBase+c.zOffset;
+   if(!demo&&cards.length<=8){const angle=i*TWO_PI/cards.length+k/ORBIT_STEPS*TWO_PI;x=Math.cos(angle)*Math.min(w*.34,420);y=Math.sin(angle)*Math.min(h*.3,250)+(i%2===0?80:-80);z=0;}
+   const sc=Math.max(.18,Math.min(narrow?1.1:1.82,1050/(1050-z)));
+   const at=placeCard(elements[i],c,i,th,x,y,z,sc,w,h,fit,narrow,zs,warm,last?.side)||last;
+   if(!at)return null;last=at;at.k=k;at.th=th;return at;};
+  const samples=[];
+  for(let k=0;k<ORBIT_STEPS;k++){const at=bake(k);if(at)samples.push(at);}
+  // #593: 표본 사이는 브라우저가 직선으로 잇는다. 이웃 두 표본은 각각 구역 밖이어도 그 사이 직선이 가운데
+  // 구역을 스칠 수 있다(미리보기 검사에서 1장 침범으로 잡혔다). 판정 사각형을 선형 보간해 보고 걸리는
+  // 구간은 가운데를 다시 굽는다 — 두 번 접으면 최대 1/4 표본 간격까지 촘촘해진다.
+  const lerpBox=(a,b,t)=>({l:a.judge.l+(b.judge.l-a.judge.l)*t,t:a.judge.t+(b.judge.t-a.judge.t)*t,r:a.judge.r+(b.judge.r-a.judge.r)*t,b:a.judge.b+(b.judge.b-a.judge.b)*t});
+  const hits=(a,b)=>{if(!a.judge||!b.judge||b.k-a.k<.2)return false;
+   for(const t of [.25,.5,.75]){const x=lerpBox(a,b,t);if(x.l<zs.r&&x.r>zs.l&&x.t<zs.b&&x.b>zs.t)return true;}return false;};
+  for(let pass=0;pass<2;pass++){
+   const next=[];let added=0;
+   for(let n=0;n<samples.length;n++){next.push(samples[n]);
+    const a=samples[n],b=samples[n+1];if(!b||!hits(a,b))continue;
+    const at=bake((a.k+b.k)/2);if(at&&at.judge){at.side=a.side;next.push(at);added++;}
    }
-   el.style.transform=`translate3d(${px}px,${py}px,0) scale(${sc*Math.max(.58,fit)*drawShrink}) rotateX(${c.tiltX+Math.sin(th)*9}deg) rotateY(${c.tiltY+Math.cos(th)*18}deg) rotateZ(${c.tiltZ+Math.sin(th*.6)*7}deg)`;
-   // #429 2/2: 깊이는 크기와 밝기로만 — 카드는 언제나 불투명(opacity 1, 비침 없음), blur는 쓰지 않는다.
-   // 대표: "흐리게 처리한 카드는 별로, 선명한 게 좋다"(2026-11-08). 뒤쪽 카드는 밝기 0.78까지 조금 어둡게.
-   const depth=(!demo&&cards.length<=8)?1:Math.max(0,Math.min(1,(z+520)/1040));
-   // #535-3: 밝기(filter)는 8단계가 바뀔 때만 다시 쓴다 — filter 다시 칠하기가 가장 비싸고 단계 차이는 눈에 띄지 않는다.
-   // 끄는 동안에는 쓰지 않고(가장 비싼 구간), 손을 떼면 다음 프레임에 정확한 값으로 돌아온다.
-   const fv=(0.78+0.22*depth).toFixed(3),band=Math.round(depth*8);
-   if(!drag&&el.__b!==band){el.__b=band;el.style.filter=`brightness(${fv})`;}
-   // #586: z-index를 매 프레임 다시 쓰지 않고 64 단계 밴드로만 쓴다 — z-index 쓰기가 이어지면 스타일
-   // 재계산이 몇 배로 무거워진 상태가 계속된다(실측 E:\lovetree-qa\orbit-fps, 유휴 재계산 ~900ms/s).
-   // 밴드 안의 순서 오차는 깊이 차가 작아(크기 차 몇 %) 겹침에서 눈에 띄지 않는다.
-   const zv=Math.round((1000+z)/64)*64;if(el.__z!==zv){el.__z=zv;el.style.zIndex=zv;}});
-  if(motionOn()){camera={x:camera.x+(cameraTarget.x-camera.x)*CAMERA_LERP,y:camera.y+(cameraTarget.y-camera.y)*CAMERA_LERP};}
-  if(!paused&&!document.hidden&&!dialog.open)raf=requestAnimationFrame(frame);
+   samples.length=0;for(const at of next)samples.push(at);
+   if(!added)break;
+  }
+  for(const at of samples){
+   const k=at.k,th=at.th;
+   // 떠 있음은 .lt-lift 가 따로 맡는다 — 여기서는 궤도 자리만 굽는다.
+   // #593: transform 만 굽는다. filter·z-index 를 키프레임에 넣으면 브라우저가 애니메이션을 컴포지터에 넘기지 못하고
+   // 매 프레임 스타일 재계산을 다시 한다(실측 120→418ms/s). 깊이 밝기와 순서는 배치(layout) 때 한 번만 쓴다.
+   out.push({offset:k/ORBIT_STEPS,transform:`translate3d(${at.px.toFixed(2)}px,${at.py.toFixed(2)}px,0) scale(${at.scale.toFixed(4)}) rotateX(${(c.tiltX+Math.sin(th)*9).toFixed(2)}deg) rotateY(${(c.tiltY+Math.cos(th)*18).toFixed(2)}deg) rotateZ(${(c.tiltZ+Math.sin(th*.6)*7).toFixed(2)}deg)`});
+  }
+  // #593: 48 표본이 모두 판정에서 숨겨졌다면(좁은 화면에서 띠에 못 들어가는 큰 카드) 그 카드는 이 폭에서
+  // 보여 줄 자리가 없다. 예전 코드는 그런 위상마다 숨겼으므로, 여기서도 숨긴 채로 둔다(가운데 제목을 가로지르지 않게).
+  noFit[i]=!out.length;
+  // 첫·마지막 표본이 빠졌으면 0·1 로 늘여 붙인다 — 0 이 없으면 애니메이션 시작 구간에서 변형이 적용되지 않아
+  // 카드가 제자리(화면 가운데)에 남는다.
+  if(out.length){out[0].offset=0;out[out.length-1].offset=1;}
+  orbitKF[i]=out;
+  const el0=elements[i];if(el0&&el0.style.display==='none'&&i<cardCapFor(w))el0.style.display='';
+  return out;};
+ // 좁은 화면 반지름 표가 다르므로 폭 대역이 바뀔 때만 궤도 애니메이션을 다시 건다(창 크기가 바뀔 때 몇 번).
+ let orbitBand=null,orbitBox=null;
+ // 이 폭에서 보여 줄 자리가 없는 카드(모든 표본이 안전 구역 판정에서 숨겨짐) — 배치 때 숨긴다.
+ const noFit=[];
+ const startOrbit=(i,w,h,warm)=>{const el=elements[i];if(!el)return;const at=orbitAnims[i]?.currentTime;orbitAnims[i]?.cancel();
+  const cfg=(w<=650?ringsNarrow:rings)[cards[i].ring];
+  orbitAnims[i]=el.animate(orbitKeyframes(i,w,h,warm),{duration:Math.round(ORBIT_MS/cfg.speed),iterations:Infinity,id:'lt-orbit'});
+  if(at!=null)orbitAnims[i].currentTime=at;
+  orbitAnims[i].playbackRate=animRunning()?1:0;};
+ const startFloat=(i)=>{const lift=elements[i]?.querySelector('.lt-lift');if(!lift)return;
+  floatAnims[i]=lift.animate(floatKeyframes(),{duration:Math.round(1000*(11+(i%4)*1.7)),iterations:Infinity,id:'lt-float',delay:-floatDelay[i]});
+  floatAnims[i].playbackRate=animRunning()?1:0;};
+ // 애니메이션의 현재 시각을 phase 에 맞춘다(끌고 난 뒤 이어지는 자리가 튀지 않게).
+ const syncOrbitTime=()=>{elements.forEach((el,i)=>{const a=orbitAnims[i],cfg=(layoutBox&&layoutBox.w<=650?ringsNarrow:rings)[cards[i].ring];if(!a)return;
+  const d=a.effect.getTiming().duration;const t=(phase*cfg.speed/(TWO_PI))%1;a.currentTime=((t+1)%1)*d;});};
+ // 카메라(패럴랙스): 가까운 카드가 더 크게 움직인다. 층마다 값을 넘겨 애니메이션 사이에 끼어든다.
+ // 깊이별 계수에 쓰는 sc 는 카드가 궤도 한 바퀴에서 갖는 배율의 평균(카드마다 고정) — 흔들림 폭 차이는 눈에 띄지 않는다.
+ let avgScales=cards.map(()=>1);
+ const camWrite=()=>{elements.forEach((el,i)=>{const move=el.querySelector('.lt-move');if(!move)return;const sc=avgScales[i];
+  const mx=(camera.x*(.45+sc*.3)).toFixed(2),my=(camera.y*(.38+sc*.24)).toFixed(2);
+  if(move.__mx===mx&&move.__my===my)return;move.__mx=mx;move.__my=my;move.style.transform=`translate3d(${mx}px,${my}px,0)`;});};
+// 카드 한 장의 자리 계산 — 궤도 키프레임을 구울 때와 끄는 동안(JS 쓰기) 모두 이 함수를 쓴다.
+ // 안전 구역 밀어내기(#429/#457/#491)는 카드 사각형을 회전·원근까지 투영해 가장 얇은 쪽으로 민다.
+ // warm(2번째 배치부터) 전에는 재지 않은 값(카드 크기)이 없으므로 밀어내기를 하지 않는다 — 첫 그리기 보호(#400).
+ function placeCard(el,c,i,th,x,y,z,sc,w,h,fit,narrow,zs,warm,prefer){
+  let outSide=null;
+  // #429 2/2: 폭별 상한을 넘는 카드는 숨긴다(가로 넘침·과밀 방지). 창이 넓어지면 다시 보인다.
+  if(i>=cardCapFor(w)){el.style.display='none';return;}
+  if(el.style.display==='none')el.style.display='';
+  // 카드는 left/top:50% 에 놓이므로 카드 중심을 궤도 자리에 맞추는 -90·-116(카드 기본 폭·높이의 절반)을 늘 더한다.
+  let px=x*sc*(!demo&&cards.length<=8?1:fit)-90,py=y*sc*(!demo&&cards.length<=8?1:fit)-116;
+  let drawShrink=1,judge=null;
+  if(zs&&warm&&cardSizes&&cardSizes[i]){
+   // #593: 떠 있음(±11·18px)은 .lt-lift 층이 따로 들고 있어 판정 시점의 사각형에 들어 있지 않다.
+   // 흔들려도 안전 구역을 넘지 않도록 판정 사각형을 그만큼(가로 24·세로 40) 부풀려 잡는다.
+   const base=cardSizes[i];const size={w:base.w+24,h:base.h+40};
+   const AX=(c.tiltX+Math.sin(th)*9)*Math.PI/180,AY=(c.tiltY+Math.cos(th)*18)*Math.PI/180,AZ=(c.tiltZ+Math.sin(th*.6)*7)*Math.PI/180;
+   const rX=Math.cos(AX),uX=Math.sin(AX),rY=Math.cos(AY),uY=Math.sin(AY),rZ=Math.cos(AZ),uZ=Math.sin(AZ);
+   // 판정 사각형은 '실제 카드 중심' 둘레로만 부풀린다 — 부푼 크기로 중심까지 옮기면 모델이 실제보다
+   // 12·20px 어긋나, 아래로 민 카드가 실제로는 20px 더 위(=가운데 구역 안)에 서게 된다(실측 4px 침범).
+   const Cx0=w/2+px+base.w/2,Cy0=h/2+py+base.h/2;
+   const cScale=narrow?sc*Math.max(.58,fit):sc;
+   let minX=1e9,maxX=-1e9,minY=1e9,maxY=-1e9;
+   for(const corner of [[-1,-1],[1,-1],[-1,1],[1,1]]){
+    const X=size.w/2*corner[0],Y=size.h/2*corner[1];
+    const x1=X*rZ-Y*uZ,y1=X*uZ+Y*rZ;
+    const x2=x1*rY,y2=y1,z2=-x1*uY;
+    const y3=y2*rX-z2*uX,z3=y2*uX+z2*rX;
+    const k=1200/(1200-z3);
+    const sxp=w/2+(Cx0-w/2+x2*cScale)*k,syp=h/2+(Cy0-h/2+y3*cScale)*k;
+    if(sxp<minX)minX=sxp;if(sxp>maxX)maxX=sxp;if(syp<minY)minY=syp;if(syp>maxY)maxY=syp;
+   }
+   if(narrow){
+    const fabPad=document.documentElement.hasAttribute('data-lt-fab')?76:0;
+    if(minX<0){px-=minX;maxX-=minX;minX=0;}else if(maxX>w-fabPad){const over=maxX-(w-fabPad);px-=over;maxX-=over;minX-=over;}
+    if(maxX>zs.l&&minX<zs.r&&maxY>zs.t&&minY<zs.b){
+     const pushT=maxY-zs.t,pushB=zs.b-minY,upFits=minY-pushT>=0,downFits=maxY+pushB<=h;
+     if(!upFits&&!downFits){
+      const band=Math.max(zs.t,h-zs.b),rectH=maxY-minY,rectW=maxX-minX,shrink=Math.max(.5,Math.min(1,band/rectH));
+      drawShrink*=shrink;
+      const cx=(minX+maxX)/2,cy=(minY+maxY)/2,nw=rectW*shrink,nh=rectH*shrink;
+      minX=cx-nw/2;maxX=cx+nw/2;minY=cy-nh/2;maxY=cy+nh/2;
+      const pushT2=maxY-zs.t,pushB2=zs.b-minY;
+      if(pushT2<=pushB2){py-=pushT2;minY-=pushT2;maxY-=pushT2;}else{py+=pushB2;minY+=pushB2;maxY+=pushB2;}
+     }
+     else if(upFits&&downFits?(prefer==='b'?false:prefer==='t'?true:pushT<=pushB):upFits){py-=pushT;minY-=pushT;maxY-=pushT;outSide='t';}else{py+=pushB;minY+=pushB;maxY+=pushB;outSide='b';}
+    }
+    if(minY<0){py-=minY;maxY-=minY;minY=0;}else if(maxY>h){const over=maxY-h;py-=over;maxY-=over;minY-=over;}
+    // 마지막 안전망: 그래도 겹치는 극단 경우는 숨긴다(침범 0 보장).
+    if(maxX>zs.l&&minX<zs.r&&maxY>zs.t&&minY<zs.b){el.style.display='none';return;}
+   } else if(maxX>zs.l&&minX<zs.r&&maxY>zs.t&&minY<zs.b){
+    const pushL=maxX-zs.l,pushR=zs.r-minX,pushT=maxY-zs.t,pushB=zs.b-minY,m=Math.min(pushL,pushR,pushT,pushB);
+    // #593: 키프레임을 구울 때는 앞 표본과 같은 쪽으로 민다 — 표본 사이는 직선으로 이어지므로, 쪽이 바뀌면
+    // 그 사이에서 카드가 가운데 구역을 가로지른다(실측 390에서 1장 침범). 크게 밀려야 하면(1.4배 초과) 그때만 가장 얇은 쪽.
+    const side=pushL<=m*1.4?'l':pushR<=m*1.4?'r':pushT<=m*1.4?'t':pushB<=m*1.4?'b':null;
+    if(prefer&&side===prefer){if(prefer==='l')px-=pushL;else if(prefer==='r')px+=pushR;else if(prefer==='t')py-=pushT;else py+=pushB;outSide=prefer;}
+    else{if(m===pushL)px-=pushL;else if(m===pushR)px+=pushR;else if(m===pushT)py-=pushT;else py+=pushB;outSide=m===pushL?'l':m===pushR?'r':m===pushT?'t':'b';}
+   }
+   // #593: 모델을 계산한 표본은 밀어내지 않았어도 판정 사각형을 남긴다 — 굽는 쪽이 '표본 사이 직선'이
+   // 가운데 구역을 지나는지 검사할 때 쓴다(비어 있으면 그 구간을 건너뛰어 침범이 남았다).
+   judge={l:minX,t:minY,r:maxX,b:maxY};
+  }
+  // #429 2/2: 깊이는 크기와 밝기로만 — 카드는 언제나 불투명(opacity 1, 비침 없음), blur는 쓰지 않는다.
+  // #593: 밝기·순서는 궤도 키프레임이 아니라 배치 때 한 번만 쓴다(키프레임에 넣으면 컴포지터로 못 넘어간다).
+  const depth=(!demo&&cards.length<=8)?1:Math.max(0,Math.min(1,(z+520)/1040));
+  const fv=(0.78+0.22*depth).toFixed(3);
+  if(el.__b!==fv){el.__b=fv;el.style.filter=`brightness(${fv})`;}
+  // #586: z-index는 64 단계 밴드로만 쓴다 — 밴드 안의 순서 오차는 깊이 차가 작아 눈에 띄지 않는다.
+  const zv=Math.round((1000+z)/64)*64;if(el.__z!==zv){el.__z=zv;el.style.zIndex=zv;}
+  return {px,py,scale:sc*(!demo&&cards.length<=8?1:Math.max(.58,fit))*drawShrink,side:outSide,judge};
+ }
+ // 배치(layout): 창 크기·안전 구역·좁은 화면 대역·예시 장수가 바뀔 때만 카드 자리를 다시 쓴다.
+ function layout(){
+  const w=app.clientWidth,h=app.clientHeight;
+  if(safeZoneDirty){measureSafeZone();safeZoneDirty=false;}
+  // #593: 카드 크기는 배치할 때마다 다시 잰다 — 첫 배치 때 크기 클래스(.lg/.sm)·글꼴이 아직 안 붙어
+  // 작게 재면, 안전 구역 밀어내기가 실제보다 작은 사각형으로 계산해 카드가 가운데를 침범한다(실측 52px).
+  cardSizes=elements.map(el=>({w:el.offsetWidth||180,h:el.offsetHeight||232}));
+  layoutBox={w,h};
+  if(warmups<1)warmups=1;
+  const cap=cardCapFor(w);
+  // 궤도 애니메이션 — 폭 대역(좁은 화면 반지름 표)이나 안전 구역이 바뀌면 다시 굽고, 아니면 시각만 맞춘다.
+  const band=w<=650?'narrow':'wide',boxKey=`${band}|${Math.round(w)}x${Math.round(h)}|${safeZone?`${Math.round(safeZone.l)},${Math.round(safeZone.t)},${Math.round(safeZone.r)},${Math.round(safeZone.b)}`:'-'}|${warmups}`;
+  const needBake=orbitBox!==boxKey;
+  // #593: 지금 위상의 자리로 한 번 배치해 밝기·z-index(placeCard)를 쓰고, 떠 있음 애니메이션을 건다.
+  // 유휴에는 이 배치를 다시 부르지 않는다 — 프레임마다 쓰던 style 쓰기가 사라진 자리다.
+  const zs=safeZone?{l:safeZone.l-12,t:safeZone.t-12,r:safeZone.r+12,b:safeZone.b+12}:null,fit=Math.min(1,w/780,h/850)*(w<=650?.5:1),narrow=w<=650;
+  // 상한을 넘는 카드도 placeCard 를 거쳐야 숨김(display:none)이 유지된다 — 건너뛰면 화면 가운데에 남는다.
+  cards.forEach((c,i)=>{
+   avgScales[i]=avgScaleOf(c,w,h);
+   const cfg=(narrow?ringsNarrow:rings)[c.ring],th=c.baseAngle+phase*cfg.speed+c.phaseOffset;
+   let x=Math.cos(th)*cfg.rx,y=Math.sin(th)*cfg.ry+cfg.band+Math.sin(th*1.7+c.phaseOffset*3)*45,z=Math.sin(th+1.1+c.phaseOffset*4)*cfg.zAmp+cfg.zBase+c.zOffset;
+   if(!demo&&cards.length<=8){const angle=i*Math.PI*2/cards.length+phase;x=Math.cos(angle)*Math.min(w*.34,420);y=Math.sin(angle)*Math.min(h*.3,250)+(i%2===0?80:-80);z=0;}
+   const sc=Math.max(.18,Math.min(narrow?1.1:1.82,1050/(1050-z)));
+   placeCard(elements[i],c,i,th,x,y,z,sc,w,h,fit,narrow,zs,warmups);
+   if(noFit[i])elements[i].style.display='none';else if(i<cap&&!floatAnims[i])startFloat(i);});
+  if(needBake){elements.forEach((el,i)=>{orbitKF[i]=null;});elements.forEach((el,i)=>{if(i<cap)startOrbit(i,w,h,warmups);});orbitBox=boxKey;}
+  orbitBand=band;
+  camWrite();
+  dragDraw();
+ }
+ // 카드가 궤도 한 바퀴에서 갖는 배율의 평균 — 패럴랙스 깊이 계수에만 쓴다.
+ function avgScaleOf(c,w,h){
+  const narrow=w<=650,cfg=(narrow?ringsNarrow:rings)[c.ring],narrowMax=narrow?1.1:1.82;let sum=0,N=16;
+  for(let k=0;k<N;k++){const th=c.baseAngle+k/N*TWO_PI;const z=Math.sin(th+1.1+c.phaseOffset*4)*cfg.zAmp+cfg.zBase+c.zOffset;sum+=Math.max(.18,Math.min(narrowMax,1050/(1050-z)));}
+  return sum/N;
+ }
+ // 끄는 동안·관성 동안의 자리 쓰기. 유휴에는 부르지 않는다 — 그때는 애니메이션만 돈다.
+ let jsMode=false;
+ function dragDraw(){
+  if(!drag&&!glide)return;
+  const w=layoutBox?.w||app.clientWidth,h=layoutBox?.h||app.clientHeight;
+  const zs=safeZone?{l:safeZone.l-12,t:safeZone.t-12,r:safeZone.r+12,b:safeZone.b+12}:null,fit=Math.min(1,w/780,h/850)*(w<=650?.5:1),narrow=w<=650;
+  cards.forEach((c,i)=>{const el=elements[i],cfg=(narrow?ringsNarrow:rings)[c.ring];const th=c.baseAngle+phase*cfg.speed+c.phaseOffset;
+   let x=Math.cos(th)*cfg.rx,y=Math.sin(th)*cfg.ry+cfg.band+Math.sin(th*1.7+c.phaseOffset*3)*45,z=Math.sin(th+1.1+c.phaseOffset*4)*cfg.zAmp+cfg.zBase+c.zOffset;
+   if(!demo&&cards.length<=8){const angle=i*Math.PI*2/cards.length+phase;x=Math.cos(angle)*Math.min(w*.34,420);y=Math.sin(angle)*Math.min(h*.3,250)+(i%2===0?80:-80);z=0;}
+   const sc=Math.max(.18,Math.min(narrow?1.1:1.82,1050/(1050-z)));
+   const at=placeCard(el,c,i,th,x,y,z,sc,w,h,fit,narrow,zs,warmups);
+   if(!at)return;
+   // 애니메이션 transform 을 이기려면 !important — 유휴 때 굽은 키프레임과 같은 자리 식을 쓴다.
+   el.style.setProperty('transform',`translate3d(${at.px.toFixed(2)}px,${at.py.toFixed(2)}px,0) scale(${at.scale.toFixed(4)}) rotateX(${(c.tiltX+Math.sin(th)*9).toFixed(2)}deg) rotateY(${(c.tiltY+Math.cos(th)*18).toFixed(2)}deg) rotateZ(${(c.tiltZ+Math.sin(th*.6)*7).toFixed(2)}deg)`,'important');});
+ }
+ const dropJsWrite=()=>{elements.forEach(el=>{el.style.removeProperty('transform');});};
+ // 움직임이 멈춘 뒤: 손으로 쓴 자리를 걷고 애니메이션 시각을 phase 에 맞춘다(자리가 튀지 않게).
+ const endJsMode=()=>{if(!jsMode)return;jsMode=false;dropJsWrite();syncOrbitTime();if(host.getAttribute('data-lt-busy'))setBusy(false);};
+ const cameraSettling=()=>Math.abs(camera.x-cameraTarget.x)>.05||Math.abs(camera.y-cameraTarget.y)>.05;
+ let layoutPending=true;
+ function frame(now){performance.mark('f'+warmups);raf=0;
+  if(layoutPending||safeZoneDirty){layoutPending=false;layout();}
+  const dt=Math.min(40,now-previous||16);previous=now;
+  // #535-3: 손을 뗀 뒤 관성(초당 6%씩 줄어 0.7초쯤 미끄러짐)으로 돌다가 멈춘다. 동작 줄이기면 관성 없음.
+  if(glide){phase+=glide*dt/16.7;glide*=Math.pow(.94,dt/16.7);if(Math.abs(glide)<.0004)glide=0;}
+  dragDraw();
+  if(cameraSettling()&&motionOn()){camera={x:camera.x+(cameraTarget.x-camera.x)*CAMERA_LERP,y:camera.y+(cameraTarget.y-camera.y)*CAMERA_LERP};camWrite();}
+  if(!drag&&!glide){endJsMode();if(!cameraSettling())return;}
+  schedule();
  }
  function schedule(){if(!raf&&!document.hidden)raf=requestAnimationFrame(frame);}
- app.addEventListener('pointerdown',e=>{if(e.target.closest('.center,.topbar'))return;drag={x:e.clientX,id:e.pointerId,at:performance.now()};moved=0;spin=0;glide=0;setBusy(true);},{signal});
+ app.addEventListener('pointerdown',e=>{if(e.target.closest('.center,.topbar'))return;drag={x:e.clientX,id:e.pointerId,at:performance.now()};moved=0;spin=0;glide=0;jsMode=true;setBusy(true);schedule();},{signal});
  app.addEventListener('pointermove',e=>{if(!drag||e.pointerId!==drag.id)return;const dx=e.clientX-drag.x;moved+=Math.abs(dx);
   // #535-3: 손 움직임 대비 회전량을 화면 폭에 맞춘다. 전에는 화면 폭과 무관한 dx*.0038 이라
   // 1440에서 한 화면 폭을 끌면 313°, 390에서는 85°로 크게 달랐다. 화면 폭만큼 끌면 어디서나 172°가 되게 한다.
@@ -271,7 +420,7 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
  window.addEventListener('pointerup',()=>{
   // #535-3: 관성 — 손을 뗀 뒤에도 남은 속도로 살짝 미끄러지다 천천히 멈춘다(동작 줄이기면 곧바로 멈춤).
   if(drag&&!reduced&&performance.now()-drag.at<120)glide=Math.max(-.05,Math.min(.05,spin));else glide=0;
-  drag=null;schedule();},{signal});window.addEventListener('pointercancel',()=>{drag=null;moved=20},{signal});window.addEventListener('resize',schedule,{signal});document.addEventListener('visibilitychange',()=>{if(document.hidden){cancelAnimationFrame(raf);raf=0;}else schedule()},{signal});
+  drag=null;schedule();},{signal});window.addEventListener('pointercancel',()=>{drag=null;moved=20},{signal});window.addEventListener('resize',()=>fitNotice(),{signal});document.addEventListener('visibilitychange',()=>{if(document.hidden){cancelAnimationFrame(raf);raf=0;}else{syncMotion();fitNotice();}},{signal});
  // #81 뷰포트 높이 계약은 첫 화면만 갖는다. 동기화 안내가 흐름에 얹히는 만큼만 빼고,
  // 나머지 화면(책장·기억책·작업공간)은 본문 자연 높이 뒤에 안내가 오도록 건드리지 않는다.
  // 가리는 방식(overflow)은 쓰지 않고, 안내가 자라면 첫 화면이 그 만큼 줄어든다.
@@ -286,7 +435,6 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
  if(noticeResize&&barNow)noticeResize.observe(barNow);
  const barWatch=typeof MutationObserver==="function"?new MutationObserver(()=>{if(noticeResize){noticeResize.disconnect();const bar=document.getElementById("sync-bar");if(bar)noticeResize.observe(bar);}fitNotice();}):null;
  if(barWatch)barWatch.observe(document.body,{childList:true});
- window.addEventListener("resize",fitNotice,{signal});
  // 글꼴이 늦게 도착해 제목 묶음 크기가 바뀌면 안전 구역을 다시 잰다.
  // (document.fonts.ready에 접근하면 뼈대 완성이 늦어지는 것을 확인 — 타이머로 대체한다. #400)
  const fontTimer=setTimeout(()=>{safeZoneDirty=true;schedule();},1500);
@@ -298,7 +446,12 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
  // #394: 트리 드롭다운의 "내 순간 전체 보기"로 열렸으면 순간 목록을 처음부터 연다(트리 골라진 상태).
  if(momentList?.initialOpen)index();
  fitNotice();
- schedule();track(()=>cancelAnimationFrame(raf));track(()=>dialog.close());
+ // #593: 첫 배치를 한 번 하고 나면 유휴에는 프레임을 예약하지 않는다. 화면이 살아 있음을 확인하는
+ // 낮은 주기 박동(초당 4회)만 남긴다 — 카드 style 은 쓰지 않으므로 스타일 재계산이 들지 않는다.
+ layoutPending=true;schedule();
+ const beat=setInterval(()=>{if(!document.hidden&&!raf&&!drag&&!glide)schedule();},250);
+ track(()=>clearInterval(beat));
+ track(()=>cancelAnimationFrame(raf));track(()=>orbitAnims.forEach(a=>a?.cancel()));track(()=>floatAnims.forEach(a=>a?.cancel()));track(()=>dialog.close());
  // #213 2번: 첫 화면 도구 줄의 "보기" 메뉴가 움직임을 읽고 바꾼다. dispose는 함수 그대로 둔다.
  dispose.motion={get paused(){return paused;},set(value){setMotionPaused(value);},toggle(){setMotionPaused(!paused);return paused;}};
  return dispose;
