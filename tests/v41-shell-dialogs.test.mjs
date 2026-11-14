@@ -419,3 +419,232 @@ test('보이는 연 버튼(data-lt-return)이 있으면 더보기 버튼으로 �
   assert.equal(fallback.focusCount, 1, '보이는 연 버튼으로 돌아온다');
   assert.equal(elements['mobile-more'].focusCount, 0, '더보기로 보내지 않는다');
 });
+
+// ---- #631: 의견 보내기 창 다듬기 -------------------------------------------------
+// 보내기 전 검사와 보낸 뒤 화면(제목·안내·주 단추)을 실제 값으로 고정한다.
+import { createFeedbackDialog } from '../public/v41/feedback.mjs';
+
+function feedbackHarness({loggedIn = false} = {}) {
+  const make = (props = {}) => ({
+    value: '', textContent: '', hidden: false, disabled: false, open: false,
+    dataset: {}, listeners: {}, focusCount: 0,
+    focus() { this.focusCount += 1; },
+    addEventListener(type, fn) { this.listeners[type] = fn; },
+    querySelector() { return null; },
+    querySelectorAll() { return []; },
+    reset() {},
+    ...props
+  });
+  const closeButton = make();
+  const boxes = [
+    {dataset: {ctx: 'screen'}, checked: true},
+    {dataset: {ctx: 'viewport'}, checked: true},
+    {dataset: {ctx: 'version'}, checked: false}
+  ];
+  const els = {
+    'feedback-panel': make({querySelectorAll: () => boxes}),
+    'feedback-form': make(),
+    'feedback-done': make({querySelector: (sel) => (sel === '.button-row .primary' ? closeButton : null)}),
+    'feedback-error': make(),
+    'feedback-body': make(),
+    'feedback-count': make(),
+    'feedback-send': make(),
+    'feedback-tree-field': make({hidden: true}),
+    'feedback-category': make(),
+    'feedback-title': make(),
+    'feedback-note': make(),
+    'feedback-done-logged-in': make({hidden: true}),
+    'feedback-done-logged-out': make({hidden: false}),
+    'feedback-open-myposts': make()
+  };
+  const sent = [];
+  let myPostsOpened = 0;
+  const dialog = createFeedbackDialog({
+    $: id => els[id] || null,
+    notify: () => {},
+    getContext: () => ({screen: '첫 화면', viewport: '1440x900', theme: 'night', version: '4.1', loggedIn, treeId: ''}),
+    show: () => { els['feedback-panel'].open = true; },
+    openMyPosts: () => { myPostsOpened += 1; },
+    api: {send: async (payload) => { sent.push(payload); return {ok: true, status: 201}; }}
+  });
+  return {dialog, els, sent, closeButton, myPostsOpenCount: () => myPostsOpened};
+}
+
+test('의견 창: 종류를 고르지 않으면 보내지 않고 무엇을 고를지 알려 준다', async () => {
+  const h = feedbackHarness();
+  h.dialog.open();
+  h.els['feedback-body'].value = '설명이 단어 중간에서 끊겨요';
+  await h.els['feedback-form'].listeners.submit({preventDefault() {}});
+  assert.equal(h.els['feedback-error'].textContent, '어떤 의견인지 골라 주세요.');
+  assert.equal(h.els['feedback-category'].focusCount, 1, '고를 칸으로 초점이 간다');
+  assert.equal(h.sent.length, 0, '고르지 않았으면 보내지 않는다');
+  assert.equal(h.els['feedback-done'].hidden, true);
+});
+
+test('의견 창: 보낸 뒤 제목을 바꾸고 보내기 전 안내를 감추고 주 단추로 초점을 옮긴다', async () => {
+  const h = feedbackHarness({loggedIn: false});
+  h.dialog.open();
+  assert.equal(h.els['feedback-title'].textContent, '의견 보내기');
+  h.els['feedback-category'].value = 'bug';
+  h.els['feedback-body'].value = '설명이 단어 중간에서 끊겨요';
+  await h.els['feedback-form'].listeners.submit({preventDefault() {}});
+  assert.equal(h.sent.length, 1);
+  assert.equal(h.sent[0].category, 'bug');
+  assert.deepEqual(h.sent[0].context, {screen: '첫 화면', viewport: '1440x900'}, '끈 정보는 보내지 않는다');
+  assert.equal(h.els['feedback-title'].textContent, '의견을 보냈어요');
+  assert.equal(h.els['feedback-note'].hidden, true, '보내기 전 안내는 보낸 뒤 감춘다');
+  assert.equal(h.els['feedback-form'].hidden, true);
+  assert.equal(h.els['feedback-done'].hidden, false);
+  assert.equal(h.els['feedback-done-logged-out'].hidden, false, '로그아웃이면 로그인 안내');
+  assert.equal(h.els['feedback-done-logged-in'].hidden, true);
+  assert.equal(h.closeButton.focusCount, 1, '닫기 주 단추로 초점이 간다');
+});
+
+test('의견 창: 로그인 상태면 내 의견 바로가기를 보여 주고 누르면 연다', () => {
+  const h = feedbackHarness({loggedIn: true});
+  h.dialog.open();
+  assert.equal(h.els['feedback-done-logged-in'].hidden, false);
+  assert.equal(h.els['feedback-done-logged-out'].hidden, true);
+  h.els['feedback-open-myposts'].listeners.click();
+  assert.equal(h.myPostsOpenCount(), 1);
+});
+
+test('의견 창: 다시 열면 제목·안내·단추가 보내기 전 모양으로 돌아온다', async () => {
+  const h = feedbackHarness();
+  h.dialog.open();
+  h.els['feedback-category'].value = 'other';
+  h.els['feedback-body'].value = '고맙습니다';
+  await h.els['feedback-form'].listeners.submit({preventDefault() {}});
+  h.dialog.open();
+  assert.equal(h.els['feedback-title'].textContent, '의견 보내기');
+  assert.equal(h.els['feedback-note'].hidden, false);
+  assert.equal(h.els['feedback-done'].hidden, true);
+  assert.equal(h.els['feedback-send'].disabled, false);
+});
+
+// #631 화면 수치 시험: 크롬이 있어야 도는 실행형 시험이라 LT_FEEDBACK_631_REQUIRE=1 에서만 돈다.
+// 판정은 눈이 아니라 숫자로 한다 — 창 높이·체크 상자와 글자 높이 차이·단추 오른쪽 정렬·기본값 없음.
+const FEEDBACK631_REQUIRE = process.env.LT_FEEDBACK_631_REQUIRE === '1';
+let chromium631 = null;
+let skip631 = false;
+try {
+  ({ chromium: chromium631 } = await import('playwright'));
+  const { existsSync } = await import('node:fs');
+  if (!existsSync(chromium631.executablePath())) skip631 = 'chromium 미설치';
+} catch {
+  skip631 = 'playwright 없음';
+}
+if (FEEDBACK631_REQUIRE && skip631) throw new Error(`LT_FEEDBACK_631_REQUIRE=1 인데 실행 시험을 건너뛴다: ${skip631}`);
+
+test('의견 창 수치: 1440·390 밤·정원에서 창이 화면 안에 들어오고 상자·글자가 한 줄, 단추는 오른쪽', {skip: skip631}, async () => {
+  const { createServer } = await import('node:http');
+  const { createReadStream, statSync } = await import('node:fs');
+  const path = await import('node:path');
+  const { fileURLToPath } = await import('node:url');
+  const ROOT = path.resolve(fileURLToPath(new URL('../public', import.meta.url)));
+  const TYPES = {'.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json'};
+  const server = createServer((req, res) => {
+    let file = path.join(ROOT, decodeURIComponent(new URL(req.url, 'http://x').pathname));
+    if (file.endsWith(path.sep)) file += 'index.html';
+    let ok = false;
+    try { ok = statSync(file).isFile(); } catch { ok = false; }
+    if (!ok) { res.writeHead(404).end(''); return; }
+    res.writeHead(200, {'content-type': TYPES[path.extname(file)] || 'application/octet-stream'});
+    createReadStream(file).pipe(res);
+  });
+  await new Promise(resolve => server.listen(0, resolve));
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium631.launch();
+  const seen = [];
+  try {
+    for (const theme of ['night', 'garden']) {
+      for (const viewport of [{width: 1440, height: 900}, {width: 390, height: 844}]) {
+        const context = await browser.newContext({viewport, deviceScaleFactor: 1});
+        const page = await context.newPage();
+        await page.addInitScript(value => { try { localStorage.setItem('lt41.theme', value); } catch {} }, theme);
+        await page.route('**/api/**', route => route.fulfill({status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}'}));
+        await page.goto(`${base}/v41/index.html`, {waitUntil: 'load'});
+        await page.evaluate(() => document.getElementById('feedback-panel').showModal());
+        await page.waitForTimeout(150);
+        const before = await page.evaluate(() => {
+          const dialog = document.getElementById('feedback-panel');
+          const rect = dialog.getBoundingClientRect();
+          const rows = [...document.querySelectorAll('#feedback-context-fields label:not([hidden])')].map(label => {
+            const box = label.querySelector('input').getBoundingClientRect();
+            const text = label.getBoundingClientRect();
+            return {dy: Math.round(((text.top + text.height / 2) - (box.top + box.height / 2)) * 10) / 10, height: Math.round(text.height)};
+          });
+          const send = document.getElementById('feedback-send').getBoundingClientRect();
+          const cancel = document.querySelector('#feedback-actions button[data-close]').getBoundingClientRect();
+          return {
+            height: Math.round(rect.height), width: Math.round(rect.width),
+            viewportHeight: innerHeight, overflow: dialog.scrollHeight - dialog.clientHeight,
+            rows, gapToRight: Math.round(rect.right - send.right),
+            sendAfterCancel: send.left > cancel.left,
+            category: document.getElementById('feedback-category').value,
+            eyebrow: document.querySelectorAll('#feedback-panel .eyebrow').length,
+            text: dialog.innerText
+          };
+        });
+        assert.ok(before.height <= before.viewportHeight, `${theme} ${viewport.width}: 창 높이 ${before.height} ≤ 화면 ${before.viewportHeight}`);
+        assert.ok(before.overflow <= 1, `${theme} ${viewport.width}: 창 안 스크롤 없음(${before.overflow})`);
+        for (const row of before.rows) assert.ok(Math.abs(row.dy) <= 4, `${theme} ${viewport.width}: 상자와 글자 세로 차이 ${row.dy}px`);
+        assert.ok(before.rows.every(row => row.height <= 40), '상자와 글자가 한 줄에 놓인다');
+        assert.equal(before.category, '', '처음에는 아무것도 골라져 있지 않다');
+        assert.equal(before.eyebrow, 0, '작은 꼬리표를 뺐다');
+        assert.ok(before.gapToRight < 40 && before.gapToRight >= 0, `보내기 단추가 오른쪽(${before.gapToRight}px)`);
+        assert.ok(before.sendAfterCancel, '보내기가 맨 오른쪽');
+        assert.ok(!/undefined|null|NaN/.test(before.text), '창 글자에 undefined·null·NaN 없음');
+        // 종류를 고르지 않으면 무엇을 고를지 알려 주고, 종류를 고른 뒤 내용이 비면 그것도 알려 준다(창은 그대로).
+        await page.click('#feedback-send');
+        await page.waitForTimeout(120);
+        assert.match(await page.textContent('#feedback-error'), /골라 주세요/, '고르지 않으면 알려 준다');
+        await page.selectOption('#feedback-category', 'bug');
+        await page.click('#feedback-send');
+        await page.waitForTimeout(120);
+        const warned = await page.evaluate(() => ({
+          error: document.getElementById('feedback-error').textContent,
+          formHidden: document.getElementById('feedback-form').hidden
+        }));
+        assert.match(warned.error, /내용을 입력해 주세요/, '빈 내용도 알려 준다');
+        assert.equal(warned.formHidden, false);
+        // 내용을 채워 보내면 보낸 뒤 화면.
+        await page.fill('#feedback-body', '설명이 단어 중간에서 끊겨요');
+        await page.click('#feedback-send');
+        await page.waitForFunction(() => !document.getElementById('feedback-done').hidden, null, {timeout: 5000});
+        const after = await page.evaluate(() => {
+          const dialog = document.getElementById('feedback-panel');
+          const rect = dialog.getBoundingClientRect();
+          const close = document.getElementById('feedback-done-close');
+          const closeRect = close.getBoundingClientRect();
+          const root = getComputedStyle(document.documentElement);
+          const style = getComputedStyle(close);
+          return {
+            title: document.getElementById('feedback-title').textContent,
+            noteHidden: document.getElementById('feedback-note').hidden,
+            closeGap: Math.round(rect.right - closeRect.right),
+            closeBg: style.backgroundColor,
+            closeRadius: style.borderRadius,
+            primary: root.getPropertyValue('--lt-primary').trim(),
+            loggedOutShown: !document.getElementById('feedback-done-logged-out').hidden,
+            checkBox: (() => { const box = document.querySelector('#feedback-done .feedback-check').getBoundingClientRect(); return [Math.round(box.width), Math.round(box.height)]; })(),
+            text: dialog.innerText
+          };
+        });
+        assert.equal(after.title, '의견을 보냈어요');
+        assert.equal(after.noteHidden, true, '보내기 전 안내를 감춘다');
+        assert.ok(after.closeGap < 40, `닫기 단추가 오른쪽(${after.closeGap}px)`);
+        assert.ok(after.closeRadius.startsWith('9'), `닫기 단추가 둥글다(${after.closeRadius})`);
+        assert.ok(after.loggedOutShown, '로그아웃이면 로그인 안내');
+        assert.ok(after.checkBox[0] >= 24, `완료 표시가 작지 않다(${after.checkBox.join('x')})`);
+        assert.ok(!/undefined|null|NaN/.test(after.text), '보낸 뒤 글자에도 undefined·null·NaN 없음');
+        seen.push({theme, viewport: `${viewport.width}x${viewport.height}`, height: before.height, rows: before.rows.length, gap: before.gapToRight});
+        await context.close();
+      }
+    }
+  } finally {
+    await browser.close();
+    server.close();
+  }
+  assert.equal(seen.length, 4);
+});
