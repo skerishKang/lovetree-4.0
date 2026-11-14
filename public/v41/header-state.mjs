@@ -89,8 +89,11 @@ export function headerPartsFor(input = {}) {
 // 첫 트리를 만든 직후 한 번만 보여 주는 말풍선(#213 3번).
 // 닫으면 저장소에 남겨 다시 보여 주지 않는다. 저장소가 막히면 그냥 다시 보여 준다.
 export const TIPS_KEY = 'lt41.tips.firstTree';
+// #571(#549-2 대표 결정 '나'): 첫 항목을 '트리 이름은 지금 바꿀 수 있어요'로 바꾸고 안내에
+// [이름 바꾸기] 단추를 둔다 — 자동 이름('모아둔 순간')이 마음에 안 들면 만든 직후 바로 바꾸게.
+// '여기서 순간을 더 남겨요' 항목은 그림(549-mock-na-390.png)에서 뺐다 — ＋ 순간 추가는 머리에 늘 보인다.
 export const FIRST_TREE_TIPS = Object.freeze([
-  { id: 'write', anchor: 'write-menu', title: '여기서 순간을 더 남겨요', body: '오른쪽 위 "＋ 순간 추가"를 누르면 오늘의 순간이 이 트리에 쌓입니다.' },
+  { id: 'rename', anchor: 'tree-manager', title: '트리 이름은 지금 바꿀 수 있어요', body: "'모아둔 순간'으로 자동 지었어요. 마음에 드는 이름으로 바꿔 보세요." },
   { id: 'views', anchor: 'tree-views', title: '책·보드·지도로 다르게 봐요', body: '같은 기록을 책처럼, 카드처럼, 이어진 선처럼 볼 수 있어요.' }
 ]);
 

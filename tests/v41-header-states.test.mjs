@@ -57,13 +57,13 @@ test('5. 모르는 상태는 로그아웃으로 떨어진다(빈 화면을 만�
 // 6번(셸이 숨김/표시로 정리하는지 소스 글자로 보던 시험)은 2026-11-09에
 // tests/v41-header-flow.test.mjs의 상태 4 × 화면 5 표(함수 직접 호출)로 옮겼다.
 
-test('7. 첫 트리 말풍선: 2~3개, 순간 남기기·보기 전환을 알려 준다', () => {
+test('7. 첫 트리 말풍선: 이름 바꾸기·보기 전환을 알려 준다(#571 — 첫 항목을 이름 바꾸기 안내로)', () => {
   assert.ok(FIRST_TREE_TIPS.length >= 2 && FIRST_TREE_TIPS.length <= 3, `말풍선 ${FIRST_TREE_TIPS.length}개`);
   const titles = FIRST_TREE_TIPS.map((tip) => tip.title).join(' ');
-  assert.match(titles, /순간/);
+  assert.match(titles, /트리 이름은 지금 바꿀 수 있어요/);
   assert.match(titles, /책·보드·지도/);
   for (const tip of FIRST_TREE_TIPS) {
-    assert.ok(tip.anchor === 'write-menu' || tip.anchor === 'tree-views', tip.anchor);
+    assert.ok(tip.anchor === 'tree-manager' || tip.anchor === 'tree-views', tip.anchor);
     assert.ok(tip.body.length > 10 && tip.body.length < 120, `${tip.id} 설명 길이`);
   }
 });
@@ -94,10 +94,11 @@ test('8. 말풍선은 한 번만 — 닫으면 저장하고, 저장소가 막히
   assert.match(shell, /tipsWanted\(\{owned:!!member\?\.snapshot\(\)\.owned,treeCount:model\?\.trees\?\.length\|\|0,seen:readTipsSeen\(localStorage\),source\}\)/);
 });
 
-test('이슈 457 2번: 안내 문구는 지금 버튼 이름("＋ 순간 추가")을 쓴다', () => {
-  const body = FIRST_TREE_TIPS.find((tip) => tip.anchor === 'write-menu').body;
-  assert.match(body, /＋ 순간 추가/);
-  assert.doesNotMatch(body, /순간 남기기/, '지금 이름이 아닌 옛 문구가 남지 않는다');
+test('이슈 571: 첫 항목은 자동 이름("모아둔 순간")을 말해 주고 이름 바꾸기로 안내한다', () => {
+  const body = FIRST_TREE_TIPS.find((tip) => tip.anchor === 'tree-manager').body;
+  assert.match(body, /모아둔 순간/);
+  assert.match(body, /바꿔 보세요/);
+  assert.doesNotMatch(FIRST_TREE_TIPS.map((tip) => tip.title).join(' '), /＋ 순간 추가/, '＋ 순간 추가는 머리에 늘 보이므로 안내 항목에서 뺐다');
 });
 
 test('9. 말풍선 마크업·스타일: Esc·포커스 되돌림, 밤·정원 공통 토큰, 390·360 넘침 없음', () => {

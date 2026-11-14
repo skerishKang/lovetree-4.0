@@ -550,6 +550,10 @@ function syncTreeTips(){
 // 모달 창이 열리거나 닫힐 때 안내의 자리를 다시 맞춘다(창이 열려 있으면 창 안, 없으면 제자리).
 document.addEventListener('close',()=>placeTreeTips(),true);
 $('tree-tips-close')?.addEventListener('click',()=>closeTreeTips());
+// #571: 안내의 [이름 바꾸기]는 트리 관리 창을 바로 열고 이름 칸에 초점을 둔다(openTreeManager가 초점을 옮긴다).
+// 안내는 닫지 않고 그대로 둔다 — 이름 창을 닫고 돌아오면 두 번째 안내와 알겠어요가 그대로 있다.
+// 순간 추가 창이 열려 있는 동안에도 눌린다: 안내는 #566 placeTreeTips로 창 안으로 옮겨 뜬다.
+$('tree-tips-rename')?.addEventListener('click',()=>shellPanels.openTreeManager());
 // 2026-11-07: 390·360에서 탭 7개가 폭을 넘는다. 탭 줄은 가로 스크롤이고, 화면을 바꿀 때 현재 탭을 가운데로 당겨 보이게 한다.
 // 넘치는 쪽 끝에만 페이드를 켜서 잘린 것이 아니라 더 있다는 신호를 준다. 데스크톱(넓은 폭)은 스크롤이 없어 아무 일도 하지 않는다.
 const navBar=document.querySelector('.app-header nav');
