@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {
   headerState, headerParts, headerPartsFor,
-  FIRST_TREE_TIPS, TIPS_KEY, readTipsSeen, writeTipsSeen, tipsWanted
+  FIRST_TREE_TIPS, TIPS_KEY, readTipsSeen, writeTipsSeen, tipsWanted,
+  unsavedNoticeText, writeMenuLabel
 } from '../public/v41/header-state.mjs';
 
 const header = readFileSync(new URL('../public/v41/shell/header.mjs', import.meta.url), 'utf8');
@@ -115,4 +116,13 @@ test('9. 말풍선 마크업·스타일: Esc·포커스 되돌림, 밤·정원 �
   assert.match(block, /background:var\(--lt-glass-strong\)/, '유리 배경');
   assert.match(block, /@media\(max-width:780px\)\{\.tree-tips\{top:88px;left:12px;right:12px;width:auto/);
   assert.doesNotMatch(block, /#(?!000)[0-9a-fA-F]{3,6}\b/, '색은 --lt-* 토큰만 쓴다');
+});
+
+// 이슈 644 3번: 머리줄 '저장 안 됨' 표시 — 누르면 같은 설명을 연다. 띠가 숨어 있는 동안(저장 중)에는
+// 저장 중 설명을, 실패 띠가 이미 있을 때는 그 띠를 그대로 쓴다(셸 explainSaveState).
+test('이슈 644: 저장 안 됨 표시의 설명 문구는 저장 중·실패를 가른다', () => {
+  assert.equal(writeMenuLabel({owned: true, hasTree: true, dirty: true}), '저장 안 됨');
+  assert.equal(unsavedNoticeText('syncing'), '바뀐 내용을 서버에 저장하고 있어요. 잠시 뒤 저절로 저장돼요.');
+  assert.equal(unsavedNoticeText('offline'), '서버에 저장하지 못했어요. 저장 안내를 확인해 주세요.');
+  assert.equal(unsavedNoticeText(), '서버에 저장하지 못했어요. 저장 안내를 확인해 주세요.');
 });

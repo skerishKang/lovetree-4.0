@@ -200,6 +200,8 @@ html[data-lt-theme=garden] .account-popover{background:var(--lt-glass-strong);bo
 html[data-lt-theme=garden] .account-popover button{color:var(--lt-ink)}
 html[data-lt-theme=garden] .account-popover button:hover{background:rgba(152,80,94,.08)}
 html[data-lt-theme=garden] .account-email{color:var(--lt-muted);border-bottom-color:var(--lt-line)}
+/* 이슈 644: 토스트는 밤·정원 모두 어두운 판 위에 뜬다. 정원에서는 --lt-pearl이 어두운 잉크가 되어 읽히지 않으므로 밝은 종이 토큰을 쓴다. */
+html[data-lt-theme=garden] #toast{color:var(--lt-paper)}
 /* 2026-11-12 #414 한 틀(트리 ▾│책│보드│지도)이 밝은 테마에서 어두운 회색으로 보이던 것: 밝은 바탕·진한 글자로 */
 html[data-lt-theme=garden] .tree-frame{background:rgba(255,253,248,.9);border-color:rgba(119,91,82,.3)}
 html[data-lt-theme=garden] .tree-frame .tree-views>button{border-left-color:rgba(119,91,82,.22)}

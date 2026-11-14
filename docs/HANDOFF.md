@@ -17,6 +17,13 @@
 - **캡처**: `E:\lovetree-qa\lane\local4-known1\` board(-detail)-before/after-{1440,390}-{night,garden}.png — 390 이전에는 실제 클릭이 셸 바닥 내비·다른 카드의 핀에 막혀 상세가 열리지 않았고 이후에는 열린다.
 - **updates.json**: '다음 버전'에 한 줄 넣었다(source: team, #662).
 
+## 2026-11-15 — 이슈 #638 마무리(로컬3 레인): 1·2·3 머지(#647) + 4·5·6 수정(PR #660)
+
+- **1·2·3(쉬운 추가 고른 트리 담기·휴대폰 유튜브 제목·지도 NaN월)**: PR #647 머지 완료(main ae44a20). 운영 개발 주소 https://lovetree-4-0.pages.dev/v41/ 에서 04 계정으로 '후' 실사 확인 — 1440 밤 12/12, 390 밤 11/11 통과(캡처 `E:\lovetree-qa\lane\local3-638a\` after-*). 시험 파일은 이슈 이름 새 파일 2개를 `tests/v41-quick-add.test.mjs`·`tests/v41-network-model.test.mjs`에 합치고 지웠다(main '시험 점검 뒤 규칙').
+- **4·5·6(PR #660, ai/local3-638b-261115, head 18dd376, 자동 머지 SQUASH 걸림)**: ① 덧붙일 말 입력칸 짜부라짐+한글 거꾸로 저장 — 원인은 `shell.css` `.myposts-followup`이 flex-wrap 없는 flex에서 오류 줄 `flex-basis:100%`가 폭을 독점한 것(390에서 입력칸 26px 실측). 좁은 입력칸에서는 조합 입력 중 캐럿이 앞으로 점프해 값이 뒤섞인다(Chromium 재현: 26px 칸 `오늘`+` 다시 해 보니.`→` 다시 해 보니.오늘`, 넓은 칸 정상). 고침: `flex-wrap:wrap`+라벨 `flex:1 1 12em` → 입력칸 237px 실측, 조합 값 그대로. ② 책 '✎ 고치기' 터치 안 열림 — `book.js` 쪽 면 pointerdown의 `setPointerCapture`가 탭 뒤 click을 쪽 면으로 보낸 것(터치 에뮬레이션 재현: 창 열림 false, 마우스는 정상). 고침: 손끝이 `[data-title-edit],[data-note-edit]` 위면 가두기 생략. ③ 내 의견 카드 제목이 본문 첫 줄 반복 — `server/feedback-service.js:66`이 제목 없으면 `displayTitle`=본문 첫 줄이라 `feedback-board.mjs`가 그대로 그렸다. 고침: 제목 없으면 본문만, 있으면 두 줄 line-clamp.
+- **시험**: 기존 파일에만 더했고 새 시험 파일 없음. `npm test` 1,725건 중 1,596 pass / 0 fail / 129 skip, build 통과. 화면 실사는 미리보기 Functions 503(환경)으로 미루고 머지 뒤 운영 개발 주소에서 04로 한다.
+- **계정**: 01에 남았던 시드 트리 2개(lt638tree1·2) 삭제 완료(GET 확인 0개). 04는 '후' 실사에 사용.
+- **다음에 이어갈 것**: PR #633(무대 날짜 안내)은 main 합침+자동 머지 걸어 뒀는데 '지도 대비' 캔버스 화살 대비(1440 night 1.07:1) 실패로 BLOCKED — #633 변경(moment-form 한 줄)과 무관해 보이니 1회 재실행 결과를 보고, 또 빨강이면 main 대조 필요. #638 4번의 '이미 거꾸로 저장된 덧붙임 자동 고침'은 미처리(사용자가 직접 고치는 쪽으로 두었다 — 지시가 잘렸던 항목).
 ## 2026-11-15 — 화면 공통 검사기: 겹침·잘림·흔적 값·작은 글자를 한 번에 (#657, 로컬4 레인, ai/local4-screen-audit-261115, main 8ee872a 기준)
 
 - **검사기**: `tests/helpers/screen-audit.mjs`(검사 함수) + `tests/v41-screen-audit.test.mjs`(화면 목록 — 이 묶음에서 새로 생긴 시험 파일은 이것 하나). 주요 화면 10 상태(첫 화면 예시 · 책 공유 첫 장→매 장→마지막 장 · 보드 · 지도 · 둘러보기 · 의견 창 전·후 · 어떻게 쓰나요) × 390·1440 × 밤·정원 = 40조합을 한 번에 재고, ①겹침·가려짐(#635 규칙 — 렌즈 복제본·opacity 0·닫힌 판 제외, 창이 열려 있으면 창 안만) ②가로 넘침·잘림 ③흔적 값 넷(undefined·null·NaN·[object Object]) ④12px/13px 기준선(#548 규칙)을 본다. 실패는 화면·크기·테마·선택자·좌표를 한 줄씩 출력한다. 프레임 검사가 예외로 죽으면 조용히 건너뛰지 않고 '검사오류'로 기록한다(이 작업 중 프레임 검사가 통째로 생략될 수 있는 결함을 발견해 막았다).
@@ -1885,3 +1892,17 @@ COM2에는 merge `6900df8aa446dfe0201d01997457fae04c4abe16`의 변경 서버 파
 - 배포: Pages 자동 배포. 서버 변경 없음이라 autodeploy 이슈 없음.
 - 시험: 로컬 전체 npm test 1662건 중 1618 통과/2 실패 — 두 실패(v41-view-a11y-panel, pinboard2 1980 재현)는 단독 실행 시 둘 다 통과하는 동시 실행 플레이크(직렬로 60건 통과). CI 필수검사·보드·첫화면 잡 전부 초록.
 - 스크린샷: E:/lovetree-qa/619/ (before-mine·after-mine 각 1440·390, 합성 26순간 트리, PR A·B 같은 도구).
+
+
+## 2026-11-15 — 두 탭 충돌 쉬운 안내·백업 뒤 불러오기 + 새 소식 점·정원 대비 (#644 2·3번, 컴2 로컬 레인, ai/local2-644b-261115, main bda9d9c 기준, PR #663 → main fac2883)
+
+- **충돌 안내 한 벌**: sync-controller에 `editCount`(성공 저장·불러오기·로그아웃·시작 때 0, 로컬 저장 때 증가)와 `conflictDetail()` — "다른 곳에서 기록이 바뀌었어요. 이 화면에서 고친 N개는 따로 보관해 둘게요."(0개면 개수 생략). 409 충돌·확인 중 재충돌·복원 충돌 세 곳이 같은 문구를 쓴다. 저장 규칙(pull/force 액션·개정 번호 판정)은 그대로.
+- **충돌 띠 재배치**: 주 단추는 '최신 기록 불러오기' 하나(누르면 자동으로 이 화면 기록을 lovetree-draft.json으로 백업 → 최신 불러오기 — 손실 0). '덮어쓰기'는 '자세히' 안으로(확인 창 "…다른 곳에서 바뀐 기록은 지워질 수 있어요. 계속할까요?") + '현재 기록 백업'. '저장 안 됨' 표시(구 '미저장 기록')를 누르면 순간 추가 대신 같은 설명 연다(`explainSaveState`).
+- **조용한 최신 확인**: sync-controller `check()` — owned·저장 번호 확인·고친 것 없음·진행 중 없음·충돌 아님일 때만 GET 한 번, 번호가 다르면 조용히 교체(띠·소리 없음). member-session이 visibilitychange(보임)·focus에서 4초 간격 제한으로 부른다. headless 시험은 탭 전환 이벤트가 나지 않아 같은 이벤트를 직접 보내 검사.
+- **새 소식 점**: 계정 동그라미 점 + 마우스 설명('새 소식이 있어요' 등, header.mjs는 `getAccountTip`으로 유지), 계정 메뉴 '새 소식' 항목 점+'새 소식 1' 개수, '내 의견' 점.
+- **정원 대비**: 토스트 글자 --lt-pearl→--lt-paper(17.91:1, 이전 1.54:1), 보드 트리 이름·메뉴 잉크색(10.60:1, 이전 1.17:1), 밤 토스트 17.84:1. 옮기기 창 첫 포커스를 X가 아닌 제목으로(index.html autofocus). 충돌 띠에 position:relative;z-index:31 — 떠 있는 새 소식 카드가 안내를 가리지 않게.
+- **시험**: 전체 npm test 1602 pass/0 fail(화면 제외). 화면 시험(Chromium+가짜 /api/workspace 서버, tests/v41-header-ia.test.mjs에 추가, LT_HEADER_IA_REQUIRE=1일 때 CI 필수): 두 탭 같은 계정 — 한쪽만 고침→띠 없이 조용히 최신(예상 번호 그대로 저장), 양쪽 다 고침→쉬운 띠+주 단추 하나+백업 파일에 고친 순간 보존+불러온 뒤 다른 탭 순간 보임, 고친 게 있으면 확인 이벤트가 와도 띠 유지, 390에서 넘침 0·주 단추 44px·가림 없음(elementFromPoint), 정원·밤 색 실측, 옮기기 첫 포커스. 기존 소스 고정 시험 2건(#453·#425)은 write-menu 연결에 dirty 분기가 들어간 대로 패턴 갱신.
+- **트러블슈팅**: (1) 새 worktree에 node_modules 없어 playwright 미탐 — lovetree-4.0-b의 node_modules를 junction으로 연결해 화면 시험 실행. (2) 가짜 서버가 디렉터리 경로의 Content-Type을 URL에서가 아니라 파일 확장자로 정해야 했음(아니면 Chromium이 다운로드로 처리). (3) 보드 iframe은 src가 아니라 contentWindow.location.replace로 열리므로 시험이 프레임 URL로 검사. (4) updates.json 충돌(#642 줄과 #644 3줄) — 둘 다 남기고 해소.
+- **배포**: Pages 자동 배포. 서버·DB 변경 없음.
+- **캡처**: E:/lovetree-qa/lane/local2-644b/ (충돌 띠 1440·390, 계정 메뉴 점, 정원·밤 보드, 옮기기 포커스, 저장 중 설명 — 8장).
+- **계정**: 시험 계정 03·05 신규 가입 완료(컴2 tabbit, 메일 인증·캡차 없음 확인). .env PADIEM_TUTORIAL03/05_* 4줄, 거버넌스 계정비밀_대장.md 표 1에 행 추가.

@@ -9,6 +9,18 @@ export function createMemberSession({api,onState=()=>{},onStatus=()=>{},navigate
    if(result.ok){if(subject&&subject!==result.subject){mismatch=true;bound=false;return {ok:false,status:401,code:'account_changed'};}subject=result.subject;bound=result.writeSubjectBound===true&&typeof subject==='string'&&!!subject;}return result;},
  put:body=>{if(!active||!bound||mismatch||!subject)return Promise.resolve({ok:false,status:401});return api.put({...body,expectedSubject:subject});},logout:()=>api.logout()};
  const sync=createSyncController({getState:()=>document,replaceState:s=>{if(!active)return;document=validateState(s);onState(structuredClone(document));},api:wrapped,draftStorage,cacheStorage,delay,makeClientKey,navigate:url=>navigate(url.startsWith('/auth/login')?'/auth/login?next=/v41/':url),onChange:s=>{if(active)onStatus({...s,writable:sync.snapshot().owned&&bound&&!mismatch,dirty:sync.snapshot().dirty});}});
+ // 이슈 644 3번: 탭을 다시 보거나 창으로 돌아오면 최신 기록을 확인한다. 이 화면에서 고친 게 없을 때만
+ // 조용히 최신 기록을 불러온다(띠 없음) — 확인 자체는 sync 컨트롤러의 check()가 판정한다. 4초에 한 번 넘지 않게 쉰다.
+ let lastQuietCheck = 0;
+ const quietCheck = () => {
+   const at = Date.now();
+   if (at - lastQuietCheck < 4000) return;
+   lastQuietCheck = at;
+   void sync.check();
+ };
+ const onVisible = () => { if (globalThis.document?.visibilityState === 'visible') quietCheck(); };
+ globalThis.document?.addEventListener?.('visibilitychange', onVisible);
+ globalThis.addEventListener?.('focus', quietCheck);
  function apply(action,input={},selection={}){
    const snap=sync.snapshot();if(!active||!snap.owned||!bound||mismatch||['checking','login','conflict'].includes(sync.status().phase))throw Error('먼저 내 기록을 불러오고 저장 연결을 확인해 주세요.');
    // 계정 표시 설정(#347 후속): 나무 없이도 저장한다. 서버에는 상태 전체가 PUT된다.
@@ -73,5 +85,5 @@ export function createMemberSession({api,onState=()=>{},onStatus=()=>{},navigate
    }
    document=validateState({version:1,trees,prefs:document.prefs});onState(structuredClone(document),{treeId,momentId});sync.markLocalSave();return {treeId,momentId};
  }
- return {start:()=>sync.start(),apply,act:name=>sync.act(name),snapshot:()=>({...sync.snapshot(),subject,writable:sync.snapshot().owned&&bound&&!mismatch,phase:sync.status().phase}),state:()=>structuredClone(document),dispose:()=>{active=false;bound=false;},status:()=>sync.status()};
+ return {start:()=>sync.start(),apply,act:name=>sync.act(name),snapshot:()=>({...sync.snapshot(),subject,writable:sync.snapshot().owned&&bound&&!mismatch,phase:sync.status().phase}),state:()=>structuredClone(document),dispose:()=>{active=false;bound=false;globalThis.document?.removeEventListener?.('visibilitychange',onVisible);globalThis.removeEventListener?.('focus',quietCheck);},status:()=>sync.status()};
 }
