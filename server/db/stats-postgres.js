@@ -7,11 +7,11 @@
  * 세는 것과 근거:
  *   · 계정 = `lovetree_workspaces` 행이 있는 계정(러브트리 데이터가 있는 계정). 읽기만 한 계정은
  *     행이 없으므로 세지 않는다.
- *   · 새 계정 = 그 계정의 **가장 오래된 흔적**이 창(window) 안인 계정. 흔적으로 쓰는 것은 공유 행
- *     생성 시각과 고객 글 작성 시각이다(개인정보가 없는 시각 열). 요청 클레임 표는 90일 보관 뒤
- *     지워지므로 근거로 쓰지 않는다 — 오래 쉬다 돌아온 계정이 '새 계정'으로 보이는 것을 막는다.
- *     다만 자동 공개 행이 생기기 시작한 2026-11-14 이전 계정은 그 전 시각이 남아 있지 않아,
- *     그 주에 한해 새 계정 수가 실제보다 클 수 있다(그 뒤로는 정확하다).
+ *   · 새 계정 = **문서 안 첫 기록 시각** 기준. 문서(workspace doc)의 트리·순간 `createdAt` 중
+ *     가장 이른 값이 창(window) 안인 계정을 센다. 저장 표에는 계정 생성 시각 칸이 없으므로
+ *     (schema.sql 의 lovetree_workspaces 는 revision·saved_at 만 둔다) 문서에 남은 기록 시각을 쓴다.
+ *     공유 행·고객 글 시각이 아니라 문서 안 시각이라, 아직 공유도 글도 없는 새 사용자도 세어진다.
+ *     생성 시각이 하나도 없는 문서는 세지 않는다(근거가 없으므로 '새 계정'이라 말하지 않는다).
  *   · 트리·순간 = `lovetree_workspaces.doc` 의 trees/moments 배열 길이 합(문서당 한 번).
  *   · 새 순간 = 순간의 `createdAt`(ISO 글자)이 창 안인 것. ISO-8601 UTC 글자라 글자 비교로 충분하다.
  *   · 공개 트리 = 활성 공유 행이 있고 비공개 표시가 없는 트리(중복 제거).
@@ -47,7 +47,8 @@ per_doc AS (
   SELECT d.subject_id, d.ai_tester,
          COALESCE(jsonb_array_length(d.doc->'trees'), 0) AS trees,
          COALESCE(m.moments, 0) AS moments,
-         COALESCE(m.moments_since, 0) AS moments_since
+         COALESCE(m.moments_since, 0) AS moments_since,
+         f.first_record AS first_record
   FROM docs d
   LEFT JOIN LATERAL (
     SELECT (count(*))::int AS moments,
@@ -55,6 +56,18 @@ per_doc AS (
     FROM jsonb_array_elements(COALESCE(d.doc->'trees', '[]'::jsonb)) AS tree
     CROSS JOIN LATERAL jsonb_array_elements(COALESCE(tree->'moments', '[]'::jsonb)) AS moment
   ) m ON true
+  -- 문서 안 첫 기록 시각 = 트리·순간 createdAt 의 최솟값(ISO-8601 UTC 글자라 글자 비교로 충분하다).
+  LEFT JOIN LATERAL (
+    SELECT min(stamp) AS first_record FROM (
+      SELECT tree->>'createdAt' AS stamp
+      FROM jsonb_array_elements(COALESCE(d.doc->'trees', '[]'::jsonb)) AS tree
+      UNION ALL
+      SELECT moment->>'createdAt'
+      FROM jsonb_array_elements(COALESCE(d.doc->'trees', '[]'::jsonb)) AS tree
+      CROSS JOIN LATERAL jsonb_array_elements(COALESCE(tree->'moments', '[]'::jsonb)) AS moment
+    ) stamps
+    WHERE stamp IS NOT NULL
+  ) f ON true
 ),
 active_share AS (
   SELECT s.subject_id, s.share_id, s.tree_id, s.moment_count, s.origin, s.discoverable,
@@ -81,20 +94,12 @@ featured_tree AS (
       WHERE h.product_id = $1 AND s2.subject_id = s.subject_id AND s2.tree_id = s.tree_id
     )
 ),
-first_seen AS (
-  SELECT subject_id, min(at) AS at FROM (
-    SELECT subject_id, created_at AS at FROM lovetree_shares WHERE product_id = $1
-    UNION ALL
-    SELECT subject_id, created_at FROM lovetree_feedback WHERE product_id = $1 AND subject_id IS NOT NULL
-  ) evidence
-  GROUP BY subject_id
-),
 account_row AS (
-  SELECT (count(*))::int AS "accountsReal",
-         (count(*) FILTER (WHERE d.ai_tester))::int AS "accountsAi",
-         (count(*) FILTER (WHERE NOT d.ai_tester AND f.at >= $2::timestamptz))::int AS "accountsNewReal",
-         (count(*) FILTER (WHERE d.ai_tester AND f.at >= $2::timestamptz))::int AS "accountsNewAi"
-  FROM per_doc d LEFT JOIN first_seen f ON f.subject_id = d.subject_id
+  SELECT (count(*) FILTER (WHERE NOT ai_tester))::int AS "accountsReal",
+         (count(*) FILTER (WHERE ai_tester))::int AS "accountsAi",
+         (count(*) FILTER (WHERE NOT ai_tester AND first_record >= $2))::int AS "accountsNewReal",
+         (count(*) FILTER (WHERE ai_tester AND first_record >= $2))::int AS "accountsNewAi"
+  FROM per_doc
 ),
 tree_row AS (
   SELECT (COALESCE(sum(trees) FILTER (WHERE NOT ai_tester), 0))::int AS "treesReal",

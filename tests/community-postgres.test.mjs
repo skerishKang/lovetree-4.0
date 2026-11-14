@@ -6,7 +6,6 @@ import {createStatsRepo} from '../server/db/stats-postgres.js';
 import {createMemoryStatsRepo} from '../server/testing/memory-stats-repo.js';
 import {createMemoryWorkspaceRepo} from '../server/testing/memory-workspace-repo.js';
 import {createMemoryShareRepo} from '../server/testing/memory-share-repo.js';
-import {createMemoryFeedbackRepo} from '../server/testing/memory-feedback-repo.js';
 import {createMemoryTreeVisibilityRepo} from '../server/testing/memory-tree-visibility-repo.js';
 import {createModelAdminRoleStore} from '../server/testing/model-admin-role-store.js';
 import {assertIsolatedTestDatabase} from '../server/testing/isolated-test-database.js';
@@ -99,15 +98,15 @@ test('운영센터 전체 숫자 집계: 계정·트리·순간·공개·둘러�
   await applySchema(pool);const tag=suffix(),productId='lt-'+tag;
   const REAL_ONE='sub_a'+tag,REAL_TWO='sub_b'+tag,AI_ONE='sub_c'+tag;
   const recent=new Date(Date.now()-3600e3).toISOString(),old='2026-05-01T00:00:00.000Z';
-  const tree=(id,subject,moments)=>({id,subject,title:'나무 '+id,coverMomentId:'',coverDesign:'',inbox:false,createdAt:old,updatedAt:old,
+  const tree=(id,subject,moments,createdAt=old)=>({id,subject,title:'나무 '+id,coverMomentId:'',coverDesign:'',inbox:false,createdAt,updatedAt:createdAt,
     moments:moments.map((createdAt,index)=>({id:`${id}-m${index}`,parentId:null,links:[],title:'순간',note:'',emotion:'설렘',date:'2026-05-01',url:'',createdAt}))});
   const docs=new Map([
     [REAL_ONE,{version:1,trees:[tree('t1','윤슬',[recent,old]),tree('t2','윤슬',[old])]}],
-    [REAL_TWO,{version:1,trees:[tree('t3','윤슬',[old])]}],
+    [REAL_TWO,{version:1,trees:[tree('t3','윤슬',[recent],recent)]}],
     [AI_ONE,{version:1,trees:[tree('t4','윤슬',[old,old,old])]}]
   ]);
   for(const [subjectId,doc] of docs)await pool.query('INSERT INTO lovetree_workspaces(product_id,subject_id,doc) VALUES($1,$2,$3::jsonb)',[productId,subjectId,JSON.stringify(doc)]);
-  // AI 테스터 역할과 공유 행(30일 전에 만든 것으로 두어 '새 계정' 판정을 가른다)
+  // AI 테스터 역할과 공유 행. '새 계정'은 문서 안 첫 기록 시각으로 가른다(공유 시각이 아니다).
   await pool.query("INSERT INTO lovetree_product_roles(product_id,subject_id,role) VALUES($1,$2,'ai_customer')",[productId,AI_ONE]);
   const share=(shareId,subjectId,treeId,momentCount,createdDaysAgo)=>pool.query(
     `INSERT INTO lovetree_shares(product_id,share_id,subject_id,tree_id,entry_moment_id,initial_view,origin,moment_count,created_at)
@@ -118,13 +117,12 @@ test('운영센터 전체 숫자 집계: 계정·트리·순간·공개·둘러�
   await share(('s4'+tag).padEnd(24,'x').slice(0,24),REAL_TWO,'t3',3,0);
   // 비공개 트리는 공유 행이 있어도 공개·둘러보기에서 빠진다.
   await pool.query("INSERT INTO lovetree_tree_visibility(product_id,subject_id,tree_id,visibility) VALUES($1,$2,'t3','private')",[productId,REAL_TWO]);
-  await pool.query("INSERT INTO lovetree_feedback(product_id,subject_id,kind,category,body) VALUES($1,$2,'opinion','other','새로 왔어요')",[productId,REAL_TWO]);
 
   const stats=await createStatsRepo(pool).aggregate({productId,since:new Date(Date.now()-7*86400e3).toISOString()});
   assert.deepEqual(stats,{
     accountsReal:2,accountsAi:1,accountsNewReal:1,accountsNewAi:0,
     treesReal:3,treesAi:1,
-    momentsReal:4,momentsAi:3,momentsNewReal:1,momentsNewAi:0,
+    momentsReal:4,momentsAi:3,momentsNewReal:2,momentsNewAi:0,
     publicReal:2,publicAi:1,
     featuredReal:1,featuredAi:1
   });
@@ -141,9 +139,7 @@ test('운영센터 전체 숫자 집계: 계정·트리·순간·공개·둘러�
   await roleStore.assign({productId,subjectId:AI_ONE,role:'ai_customer'});
   const visibilityRepo=createMemoryTreeVisibilityRepo();
   await visibilityRepo.set({productId,subjectId:REAL_TWO,treeId:'t3',visibility:'private'});
-  const feedbackRepo=createMemoryFeedbackRepo({now:Date.now()});
-  await feedbackRepo.create({productId,subjectId:REAL_TWO,category:'other',body:'새로 왔어요'});
-  const memory=await createMemoryStatsRepo({workspaceRepo,shareRepo,feedbackRepo,roleStore,visibilityRepo}).aggregate({productId,since:new Date(Date.now()-7*86400e3).toISOString()});
+  const memory=await createMemoryStatsRepo({workspaceRepo,shareRepo,roleStore,visibilityRepo}).aggregate({productId,since:new Date(Date.now()-7*86400e3).toISOString()});
   assert.deepEqual(memory,stats);
  }finally{await pool.end();}
 });

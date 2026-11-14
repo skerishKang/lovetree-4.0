@@ -3,6 +3,9 @@
  *
  * PostgreSQL 판(`server/db/stats-postgres.js`)과 **같은 뜻**으로 세도록 맞춰 두었다 —
  * 계정·트리·순간·공개 트리·둘러보기 소개·AI 테스터 가르기·최근 창(window) 판정이 모두 같은 규칙이다.
+ * '새 계정'은 **문서 안 첫 기록 시각** 기준이다 — 문서의 트리·순간 createdAt 중 가장 이른 값이 창 안인
+ * 계정을 센다(공유 행·고객 글 시각이 아니라 문서 안 시각이라, 공유·글이 없는 새 사용자도 세어진다).
+ * 생성 시각이 하나도 없는 문서는 세지 않는다.
  * 여기 통과가 PostgreSQL 검증은 아니다(실제 SQL 은 필수 검사 'PostgreSQL 저장·로그인 상태 검증'이 본다).
  *
  * 세는 근거는 이미 시험들이 쓰는 메모리 저장소 그대로다 — 저장 경로로 실제로 쌓은 문서·공유 행·
@@ -18,7 +21,7 @@ const atOf = (value) => {
 };
 
 export function createMemoryStatsRepo({
-  workspaceRepo, shareRepo, feedbackRepo = null, roleStore = null, visibilityRepo = null, communityRepo = null
+  workspaceRepo, shareRepo, roleStore = null, visibilityRepo = null, communityRepo = null
 } = {}) {
   if (!workspaceRepo || typeof workspaceRepo.documents !== 'function') throw new Error('workspaceRepo.documents 가 필요합니다.');
   if (!shareRepo || typeof shareRepo.allForProduct !== 'function') throw new Error('shareRepo.allForProduct 가 필요합니다.');
@@ -29,7 +32,6 @@ export function createMemoryStatsRepo({
       const documents = await workspaceRepo.documents({ productId });
       const allShares = await shareRepo.allForProduct({ productId });
       const shares = allShares.filter((row) => row?.status === 'active');
-      const posts = feedbackRepo?.list ? await feedbackRepo.list({ productId, limit: 100000 }) : [];
       const roles = roleStore?.list ? await roleStore.list({ productId }) : [];
       const privateTrees = visibilityRepo?.privateTrees ? await visibilityRepo.privateTrees({ productId }) : [];
       const hiddenShares = communityRepo?.inspect ? new Set(communityRepo.inspect().hiddenShares ?? []) : new Set();
@@ -43,38 +45,28 @@ export function createMemoryStatsRepo({
         const trees = Array.isArray(document?.doc?.trees) ? document.doc.trees : [];
         let moments = 0;
         let momentsSince = 0;
+        let firstRecord = null;
+        const rememberFirst = (value) => {
+          const created = atOf(value);
+          if (created === null) return;
+          if (firstRecord === null || created < firstRecord) firstRecord = created;
+        };
         for (const tree of trees) {
           const list = Array.isArray(tree?.moments) ? tree.moments : [];
+          rememberFirst(tree?.createdAt);
           moments += list.length;
           for (const moment of list) {
+            rememberFirst(moment?.createdAt);
             const created = atOf(moment?.createdAt);
             if (created !== null && sinceMs !== null && created >= sinceMs) momentsSince += 1;
           }
         }
         totals[ai ? 'accountsAi' : 'accountsReal'] += 1;
+        // 새 계정 = 문서 안 첫 기록 시각이 창 안. 생성 시각이 하나도 없는 문서는 세지 않는다.
+        if (firstRecord !== null && sinceMs !== null && firstRecord >= sinceMs) totals[ai ? 'accountsNewAi' : 'accountsNewReal'] += 1;
         totals[ai ? 'treesAi' : 'treesReal'] += trees.length;
         totals[ai ? 'momentsAi' : 'momentsReal'] += moments;
         totals[ai ? 'momentsNewAi' : 'momentsNewReal'] += momentsSince;
-      }
-
-      // '새 계정' = 그 계정의 가장 오래된 흔적(공유 행 생성·고객 글 작성 시각)이 창 안.
-      const firstSeen = new Map();
-      const remember = (subjectId, value) => {
-        const at = atOf(value);
-        if (!subjectId || at === null) return;
-        const current = firstSeen.get(subjectId);
-        if (current === undefined || at < current) firstSeen.set(subjectId, at);
-      };
-      // 근거는 취소된 공유 행도 포함한다 — 오래전에 만들었다가 내린 행도 '이 계정이 언제 처음 보였는지'를 말해 준다(SQL 과 같은 규칙).
-      for (const share of allShares) remember(subjectOf(share), share.createdAt);
-      for (const post of posts) remember(subjectOf(post), post.createdAt);
-      if (sinceMs !== null) {
-        for (const document of documents) {
-          const subjectId = subjectOf(document);
-          const at = firstSeen.get(subjectId);
-          if (at === undefined || at < sinceMs) continue;
-          totals[aiSubjects.has(subjectId) ? 'accountsNewAi' : 'accountsNewReal'] += 1;
-        }
       }
 
       // 공개 트리 = 활성 공유 행이 있고 비공개가 아닌 트리(중복 제거). 둘러보기 소개는 같은 조건에

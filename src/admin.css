@@ -180,6 +180,11 @@ body {
 /* 390에서 카드 두 줄 셀의 긴 이름이 잘리지 않게 — 라벨은 두 줄까지 늘어난다. */
 .lt-ov-cards .lt-ov-label { min-height: 2.6em; }
 
+/* '한눈에' 두 묶음 제목(#655 2차) — '전체 숫자' / '처리할 일'. 묶음 사이만 벌리고 카드 사이 간격은 그대로. */
+.lt-ov-section { display: grid; gap: 8px; }
+.lt-ov-section + .lt-ov-section { margin-top: 4px; }
+.lt-ov-heading { margin: 0; font-size: 13px; font-weight: 700; letter-spacing: .02em; color: var(--lt-muted); }
+
 /* '한눈에' 맨 위 전체 숫자 줄(#655 2차) — 실제 사용자를 크게, AI 테스터를 작게 나란히. */
 .lt-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
 .lt-stat { display: grid; gap: 3px; justify-items: start; align-content: start; padding: 14px 16px; border: 1px solid var(--lt-line); border-radius: var(--lt-r-panel); background: var(--lt-glass); }

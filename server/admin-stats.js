@@ -10,6 +10,11 @@ import { ApiError } from './errors.js';
  *
  * 개인정보는 다루지 않는다: 저장소에서 돌아오는 것은 숫자뿐이고, 응답에도 숫자만 실린다
  * (이메일·이름·아이디·subject 를 담을 자리를 만들지 않는다).
+ *
+ * accounts.new 는 **문서 안 첫 기록 시각 기준**이다 — 문서(workspace doc)의 트리·순간 createdAt 중
+ * 가장 이른 값이 창(window) 안인 계정을 센다. 저장 표에 계정 생성 시각 칸이 없어서
+ * (server/db/schema.sql 의 lovetree_workspaces 는 revision·saved_at 만 둔다) 문서에 남은 시각을 쓴다.
+ * 생성 시각이 하나도 없는 문서는 세지 않는다.
  */
 
 export const STATS_WINDOW_DAYS = 7;
@@ -53,6 +58,7 @@ export function createAdminStatsService({ repo, productId, now = () => new Date(
       return {
         checkedAt: at.toISOString(),
         window: { days, since },
+        // new = 문서 안 첫 기록 시각(트리·순간 createdAt 의 최솟값)이 창 안인 계정.
         accounts: {
           ...split(row.accountsReal, row.accountsAi),
           new: split(row.accountsNewReal, row.accountsNewAi)
