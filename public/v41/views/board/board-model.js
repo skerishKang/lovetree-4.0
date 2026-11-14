@@ -6,11 +6,14 @@ window.LT58Model = (() => {
     return String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   }
 
-  // 카드 자리: 8장씩 줄을 바꾸고, 세로는 400px 간격, 회전은 -2·0·2도.
-  function cardPosition(i) {
-    // #548: 카드 글자를 기준선(부수 12px·본문 13px)으로 올리면서 카드가 최대 424px까지 자랐다 —
-    // 세로 간격도 400px에서 440px로 벌려 카드끼리 겹치지 않게 한다.
-    return { x: 150 + (i % 8) * 280, y: 150 + Math.floor(i / 8) * 440, rot: (i % 3 - 1) * 2 };
+  // 카드 자리: 8장씩 줄을 바꾸고, 회전은 -2·0·2도.
+  // 세로 간격(#553 — #548의 고정 440px를 대신한다): 카드 종류별 예약 높이에 여백(ROW_GAP)을 더한 값.
+  // 예약 높이를 넘기지 않으면 기본 카드(최대 424px) 기준 460px — treeSpread의 기본 간격과 같다.
+  // 화면(board.js)은 순간의 예약 높이를 넘겨 큰 카드(YouTube 등)가 있는 줄은 더 벌린다.
+  const BASE_CARD_H = 424, ROW_GAP = 36;
+  function cardPosition(i, reserveH) {
+    const pitch = (Number.isFinite(reserveH) && reserveH > 0 ? reserveH : BASE_CARD_H) + ROW_GAP;
+    return { x: 150 + (i % 8) * 280, y: 150 + Math.floor(i / 8) * pitch, rot: (i % 3 - 1) * 2 };
   }
 
   // 처음 배치(#395): 자리를 정한 적 없는 순간을 이야기 순서대로 펼친다.
@@ -20,7 +23,6 @@ window.LT58Model = (() => {
   // 글자 기준선을 올려 최대 424px까지 자랐고 간격도 420→460으로 벌렸으므로, 기본 예약 높이
   // 424px + 여백 36px = 460px로 #548과 같다. 기본 카드뿐인 트리(예시 40순간)는 간격이 460px로
   // #548과 같으므로 배치가 그대로다. 자리를 저장한 순간(x·y)은 board.js가 저장값을 그대로 쓴다.
-  const BASE_CARD_H = 424, ROW_GAP = 36;
   function treeSpread(ids, edges, heights) {
     const known = new Set(ids);
     const kids = new Map(ids.map((id) => [id, []]));

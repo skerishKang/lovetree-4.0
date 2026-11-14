@@ -35,12 +35,12 @@ document.addEventListener('click',e=>{
 function boardSaveEnabled(){try{return window.parent!==window&&window.parent.LT41?.source==='server'&&window.parent.LT41?.writable===true&&!LTDEMO.readOnly}catch{return false}}
 const canEditBoard=LTDEMO.example||boardSaveEnabled();
 // #553: 카드 종류별 예약 높이 — CSS가 정한 최대 높이에 여유를 더한 값(실측: 썸네일이 실린 YouTube 카드
-// 465px·세로 Shorts 648px, 기본 카드 210~260px). 링크가 실린 순간만 크므로 링크 없는 트리(예시 40순간)
-// 은 예약 높이가 기본이라 줄 간격 420px이 그대로다.
+// 465px·세로 Shorts 648px, 기본 카드는 #548 글자 기준선 올림으로 최대 424px). 줄 간격은 이 예약 높이에서
+// 나오므로 링크 없는 트리(예시 40순간)는 기본 간격 460px(#548과 같다), YouTube 밴드는 그보다 크게 벌어진다.
 const YT_RESERVED_H=480,YT_VERTICAL_RESERVED_H=680,BASE_RESERVED_H=424;
 const reservedHeights=new Map(LTDEMO.moments.map(m=>[m.id,m.externalUrl?(LTMedia.verticalVideo(m.externalUrl,m.mediaMetadata)?YT_VERTICAL_RESERVED_H:YT_RESERVED_H):BASE_RESERVED_H]));
 const spread=LT58Model.treeSpread(LTDEMO.moments.map(m=>m.id),LTDEMO.edges,reservedHeights);
-let moments=LTDEMO.moments.map((m,i)=>{const pos=spread.get(m.id)||LT58Model.cardPosition(i);return{id:m.id,type:m.type==='memo'?'note':'photo',originalType:m.type==='memo'?'note':m.type,createdOrder:i+1,title:m.title,emotion:m.emotion,date:m.date,source:m.source||'예시 기록',mediaMetadata:m.mediaMetadata||null,memo:m.memo||m.whyNext||'',x:Number.isFinite(m.x)?m.x:pos.x,y:Number.isFinite(m.y)?m.y:pos.y,rot:Number.isFinite(m.rot)?m.rot:pos.rot,savedPos:Number.isFinite(m.x)&&Number.isFinite(m.y),pinStyle:m.pinStyle,cardStyle:m.cardStyle,keywords:Array.isArray(m.keywords)?m.keywords:[],color:m.color||['rose','violet','cyan','amber'][i%4],asset:m.image,url:m.externalUrl||'',first:!!m.first}});
+let moments=LTDEMO.moments.map((m,i)=>{const pos=spread.get(m.id)||LT58Model.cardPosition(i,reservedHeights.get(m.id));return{id:m.id,type:m.type==='memo'?'note':'photo',originalType:m.type==='memo'?'note':m.type,createdOrder:i+1,title:m.title,emotion:m.emotion,date:m.date,source:m.source||'예시 기록',mediaMetadata:m.mediaMetadata||null,memo:m.memo||m.whyNext||'',x:Number.isFinite(m.x)?m.x:pos.x,y:Number.isFinite(m.y)?m.y:pos.y,rot:Number.isFinite(m.rot)?m.rot:pos.rot,savedPos:Number.isFinite(m.x)&&Number.isFinite(m.y),pinStyle:m.pinStyle,cardStyle:m.cardStyle,keywords:Array.isArray(m.keywords)?m.keywords:[],color:m.color||['rose','violet','cyan','amber'][i%4],asset:m.image,url:m.externalUrl||'',first:!!m.first}});
 
 let connections=LTDEMO.edges.map((e,i)=>({id:'c'+i,kind:e.kind,a:e.from,b:e.to,why:e.kind==='related'?'관련 순간':e.reason||'',color:e.kind==='related'?'cyan':(canEditBoard?['rose','violet','cyan','amber'][Math.max(0,moments.findIndex(m=>m.id===e.from))%4]:'rose')}));
 
