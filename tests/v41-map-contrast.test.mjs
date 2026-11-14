@@ -49,7 +49,8 @@ test('지도 실제 대비: 앱 2 × 판 2 × 1440·390, 두 보기·선택 상�
         const page = await ctx.newPage(), errors = [];
         page.on('pageerror', e => errors.push(String(e.message || e)));
         await page.goto(`${base}/v41/#network`, { waitUntil: 'load' });
-        await page.waitForFunction(() => [...document.querySelectorAll('iframe')].some(f => f.contentWindow?.__lt?.dots?.().length > 0), null, { timeout: 15000 });
+        // #583: 전체 자리(npm test)에서는 여러 브라우저 시험이 함께 도는 — 첫 그리기 대기만 넉넉히(단언·측정은 그대로).
+        await page.waitForFunction(() => [...document.querySelectorAll('iframe')].some(f => f.contentWindow?.__lt?.dots?.().length > 0), null, { timeout: 30000 });
         const frame = page.frames().find(f => /track56-network/.test(f.url()));
         assert.ok(frame, '지도 프레임을 찾지 못함');
         await frame.evaluate(() => document.fonts.ready);

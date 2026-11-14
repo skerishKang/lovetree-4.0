@@ -163,6 +163,13 @@ document.addEventListener('keydown',event=>{
 });
 const initialRoute=parseSelectionRoute(location.hash);
 let model=null,current=screenForView(initialRoute.view)[1],source='example',loadGeneration=0,previousDirty=false,member=null,handledHash=null,activeShareId=null,resumeAfterStart=null;
+// #583 '이 순간 열기': 주소(#my/network?tree=…&moment=…)로 지도를 특정 순간을 가운데 두고 열 요청이 오면
+// 여기에 한 번 적어 두고, 지도 프레임을 띄울 때(show) 소비해 프레임 주소에 ?open=<순간>을 붙인다.
+// 지도(network.js)는 이 표시가 있을 때만 그 순간을 고른 상태로 가운데에 둔다 — 그냥 지도를 열 때는
+// 예전대로 전체 보기(화면 맞춤)로 뜬다.
+let networkOpenMoment=null;
+const requestNetworkOpen=id=>{networkOpenMoment=id||null};
+const takeNetworkOpen=()=>{const v=networkOpenMoment;networkOpenMoment=null;return v};
 setMemberRefreshStarted(false);
 const shareApi=createShareApi();
 const accountApi=createWorkspaceApi();
@@ -351,6 +358,7 @@ const shellLocation=createLocation({
   notify:text=>notify(text),
   startMember:()=>startMember(),
   showPublicRoute:route=>showPublicRoute(route),
+  requestNetworkOpen,
   journey:shellJourney,
   gotoJourneyStep:step=>gotoJourneyStep(step),
   openFirstJourney:options=>openFirstJourney(options),
@@ -421,6 +429,7 @@ const shellScreens=createScreens({
   setCurrent:file=>{current=file;},
   getSource:()=>source,
   hasTree:()=>!!window.LT41,
+  takeNetworkOpen,
   flowNavigation,
   applyTheme,
   writeLocation,
@@ -651,6 +660,9 @@ async function startMember(){setMemberRefreshStarted(true);if(!leaveMember())ret
   // 4.1 기억 보드 저장: 화면이 이미 자기 상태를 들고 있으므로 셸은 모델만 갱신하고 iframe을 다시 그리지 않는다.
   if(meta?.board){const projected=workspaceModel({revision:0,state});model=projected;if(window.LT41){const tree=projected.trees.find(t=>t.id===window.LT41.tree.id);if(tree){window.LT41.tree=tree;window.LT41.trees=projected.trees;window.LT41.writable=true}}return;}const snapshot=session.snapshot(),saved=accountPosition(localStorage,snapshot.subject)||{},active=parseSelectionRoute(location.hash),pending=!initialized&&active.scope!=='owner'?pendingOwnerRoute(sessionStorage):null,route=active.scope==='owner'?active:pending;let requested=selection||stateSelection();
    if(!initialized){if(route)requested=route;else if(!selection)requested=saved;
+    // #583 '이 순간 열기': 맨 처음 주소(#my/network?tree=…&moment=…)로 열 때도 지도가 그 순간을 가운데 두게 한다 —
+    // 뒤의 주소 이동(applyBrowserLocation)과 같은 규칙. 이후 동기화 때는 다시 정하지 않는다(initialized 뒤).
+    if(!initialized&&route?.scope==='owner'&&route.view==='network'&&route.momentId)requestNetworkOpen(route.momentId);
     // #368 3차: 로그인 후 처음 보여 줄 곳(첫 화면/내 트리 전체 보기/이어 읽기). resume이 지금 동작이라 기본값이고,
     // 주소(#my/…·#share/…·#home 등)가 있으면 그 주소가 이긴다(기존 규칙 그대로).
     const startPlace=(()=>{try{return normalizeStartPlace(state.prefs?.startPlace)}catch{return 'resume'}})();
