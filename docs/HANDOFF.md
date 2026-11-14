@@ -12,6 +12,17 @@
 - **시험**: tests/v41-orbit-586-perf.test.mjs(신규, 소스 계약 4 + 실행 계약 3 — 유휴 4초 z-index 쓰기 수, pointermove 40번에 rect 재기 0회, 글꼴 토큰 유지). preview-check screen-home-book 잡에 LT_ORBIT586_REQUIRE=1 단계 추가. #535 시험 6/6, 전체 npm test 초록(한 개 소스 계약을 #586 변경에 맞게 갱신).
 - **남은 것**: 대표 실기기 확인(끄는 흐름·hover 사라짐이 눈에 띄지 않는지), 근본 해법 이슈 작성.
 
+## 2026-11-14 — 책 YouTube 개선 4+2(이슈 #584, 로컬1 레인, ai/local1-lt-584-book-play-261115, main 8092d28 기준)
+
+- **▶ 재생(1)**: 재생 단추 이름 '여기서 재생'→'▶ 재생'(시작 시점 있으면 '▶ 재생 · 1:23'), 안내 문구 '바로 재생할 수 없어요…'로 맞춤. `media-preview.js`(공용)·`src/views/orbit.js`.
+- **링크 한 줄(2)**: YouTube ↗(왼쪽)·크게 보기(오른쪽)를 카드 아래 `.media-links` 한 줄로 — 영상 위 '크게 보기'(`yt-expand`) 겹침 제거. `book-extra.js`·`book-usability.css`.
+- **오류 153 수정(3)**: iframe `referrerpolicy` `no-referrer`→`strict-origin-when-cross-origin`(`media-preview.js` 그 자리 재생·크게 보기 두 자리). 실측: 같은 영상이 no-referrer에서 '플레이어 구성 오류(153)', 바꾸면 그 자리·크게 보기 모두 재생됨. **공용 파일이라 보드 YouTube 카드에도 같이 적용됨(#582와 공유).**
+- **넓은 화면 두 장 모드(4)**: 책 높이 한도 650→920px(`calc(100vh - 215px)`), 넘치면 영상 틀을 220px(세로)/180px(가로) 아래로 줄여 스크롤 없이 맞춤 — 글자는 줄이지 않음(#548 기준선). 세로 판정 보강: **oEmbed는 가로세로 정보가 없다(항상 200×113, 2026-11-14 실측)** → oardefault 썸네일 실측(`probeVertical`·`upgradeVerticals`, 세로 영상에만 존재·CORS 없이 naturalWidth/Height 읽기 가능)으로 세로 칸을 9:16 틀로 올려 고침. 내 기록일 때만(공유·예시 화면 '누르기 전 외부 요청 0' #327 유지). 390 한 장 모드(#537)는 그대로.
+- **1장|2장 묶음(5)·돋보기 아이콘·이어진 순간(6)**: 보기 단추를 한 테두리 안 두 칸으로(고른 칸만 금색 — #464의 '눌리지 않은 쪽 배경' 규칙을 '묶음 바탕 + 투명 칸'으로 갱신), 돋보기는 SVG 아이콘(켜지면 금색), '여기까지 온 길'→'이어진 순간'. 단추 설명은 브라우저 title 대신 작은 말풍선(`mountTips` — 올림·초점·휴대폰 0.5초 길게 누름, aria-label과 같은 말).
+- **시험**: 신규 `tests/v41-book-play-584.test.mjs`(정적 8 + 실행 6, 세로 픽스처 `tests/fixtures/vertical-1x2.png`) — preview-check.yml '첫 화면·책' 잡에 연결. 기존 시험 9개 갱신. `npm test` 1,577건 1,535 pass / 1 fail(`v41-map-contrast` 알려진 간헐 — 재실행 통과). 머지 뒤 main f0fb5c4에서 build·modulepreload --check·관련 시험 32건 통과.
+- **머지·배포**: PR #588 머지 → main `f0fb5c4`, 필수 검사 전부 초록. 스크린샷 전/후 1440·1920·2560 × 밤·정원 + 세로 사례 + 실제 재생 2장 → `E:\lovetree-qa84\`. 이슈 #584 보고 댓글 후 닫음.
+- **남긴 것**: 실기기(컴2 tabbit) 재생 확인은 이쪽에서 못 했다 — 로컬 Chromium(headed playwright) 실측으로 대체했고 같은 엔진이라 같은 결과를 기대하지만, 배포 뒤 컴2에서 한 번 열어 보는 것을 권한다.
+
 ## 2026-11-15 — 보드 마감: 금색 커서 동그라미 제거 + 상세 다음·이전 순간 단추화 (로컬2 레인, ai/com2-lt-cursor-detail-20261115-0830-3a7c, main 8092d28 기준)
 
 - **커서 동그라미 완전 제거**: 따라오는 금색 동그라미(`cursorRing`·`cursorInner`·`cursorFX`·`cursor-burst/ripple/drop`)를 HTML 요소·board.css 스타일·board-extras.js 배선·board-model.js 판정 함수(`cursorMode`·`cursorHover`·`cursorScale`·`cursorEffectAllowed`·`cursorPresence`)까지 치웠다. 원래 마우스 커서를 쓰고, 상태는 CSS cursor로 알린다 — 판 `grab`(끌 때 `grabbing`, `#viewport.panning`), 카드 `grab`(끌 때 `grabbing`, `.card.dragLift`), 핀 연결 중 `crosshair`(`#cardLayer.linking`), 핀·단추 `pointer`. `public/v41` 전체에 `cursor:none` 없음(시험이 검사).
