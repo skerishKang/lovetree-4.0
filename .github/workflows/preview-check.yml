@@ -250,6 +250,48 @@ jobs:
           node --test tests/v41-font-floor-548.test.mjs
           echo "화면 글자 기준선 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
 
+  screen-book-screen:
+    name: 화면 시험 — 책 대비·초점
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ms-playwright-${{ runner.os }}-1.49.1
+      - name: 브라우저 준비(Playwright Chromium, 캐시)
+        id: browser
+        run: |
+          # 모듈은 항상 설치한다(캐시는 브라우저 바이너리에만 걸린다). 캐시가 있어도 모듈이 없으면 실행이 안 된다.
+          npm i --no-save --no-package-lock playwright@1.49.1
+          if ls "$HOME/.cache/ms-playwright" 2>/dev/null | grep -q chromium; then
+            echo "캐시된 Chromium 사용"
+          else
+            npx playwright install --with-deps chromium
+          fi
+          node -e "import('playwright-core').then(()=>console.log('playwright-core 확인')).catch(e=>{console.error(e.message);process.exit(1)})"
+      # 책 화면 시험들은 지금까지 크롬이 없는 check 잡에서 조용히 건너뛰어졌다(보드·지도와 같은 빈틈).
+      # #515·#516 정원 책 이유 줄·보기 알약·페이지 수 대비, #522 좌우 페이지 번호 대비,
+      # #519 닫힌 창 초점(inert)을 실제 화면에서 잰다. 세 시험 모두 글자색은 getComputedStyle로 읽고
+      # 바탕은 스크린샷 픽셀로 재므로 한글 글꼴 설치가 필요 없다(2026-11-15 로컬 REQUIRE=1 통과).
+      - name: 책 대비·초점 시험(#515·#516·#522·#519, 건너뜀=실패)
+        env:
+          LT_BOOK_CONTRAST_REQUIRE: '1'
+          LT_BOOK_FOLIO_REQUIRE: '1'
+          LT_BOOK_FOCUS_REQUIRE: '1'
+        run: |
+          start=$(date +%s)
+          node --test --test-concurrency=1 tests/v41-book-contrast-515-516.test.mjs tests/v41-book-folio-contrast-522.test.mjs tests/v41-book-closed-focus-519.test.mjs
+          echo "책 대비·초점 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+
   deploy:
     name: 미리보기 배포 검사(postdeploy·겉모습 비교)
     runs-on: ubuntu-latest
@@ -431,7 +473,7 @@ jobs:
     name: 미리보기 postdeploy(로그아웃)
     runs-on: ubuntu-latest
     if: always()
-    needs: [screen-board, screen-home-book, screen-map-a, screen-map-b, deploy]
+    needs: [screen-board, screen-home-book, screen-map-a, screen-map-b, screen-book-screen, deploy]
     steps:
       - name: 모든 화면 시험·배포 검사 결과 모으기
         env:
