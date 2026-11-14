@@ -68,8 +68,16 @@ if(replace&&!visibleCardCount())fitAll(false)}
 function gridPlan(vw){const slots=LT58Model.pinboardSpread(LT58Model.dateDescOrder(moments),{cols:LT58Model.gridColumns(vw),saved:boardMode==='mine'?savedSlotsOf(moments):null});
 const tops=LT58Model.gridRowTops(slots,(id)=>reservedHeights.get(id)||BASE_RESERVED_H);return{slots,tops}}
 let moments=LTDEMO.moments.map((m,i)=>{const saved=Number.isFinite(m.x)&&Number.isFinite(m.y)&&LT58Model.isPinboardSlot(m.x);return{id:m.id,type:m.type==='memo'?'note':'photo',originalType:m.type==='memo'?'note':m.type,createdOrder:i+1,title:m.title,emotion:m.emotion,date:m.date,source:m.source||'예시 기록',mediaMetadata:m.mediaMetadata||null,memo:m.memo||m.whyNext||'',x:saved?m.x:0,y:saved?m.y:0,rot:saved?(Number.isFinite(m.rot)?m.rot:0):0,savedPos:saved,savedXY:saved?{x:m.x,y:m.y,rot:Number.isFinite(m.rot)?m.rot:0}:null,pinStyle:m.pinStyle,cardStyle:m.cardStyle,keywords:Array.isArray(m.keywords)?m.keywords:[],color:m.color||['rose','violet','cyan','amber'][i%4],asset:m.image,url:m.externalUrl||'',first:!!m.first}});
+// #619-5: 쌓기 배치(핀터레스트식) — 열마다 위에서부터 차곡차곡 쌓는다. 줄을 맞추지 않으므로
+// 세로(쇼츠) 카드가 섞인 열 아래가 비지 않는다. 순서는 날짜 최신순 그대로.
+function placeStacked(){const layout=LT58Model.stackLayout(LT58Model.dateDescOrder(moments),{cols:LT58Model.gridColumns(innerWidth),reservedOf:(id)=>reservedHeights.get(id)||BASE_RESERVED_H});let i=0;
+for(const m of moments){const s=layout.get(m.id);if(!s)continue;
+const pos=LT58Model.gridPosition(s.col,s.y,i++);
+m.x=pos.x;m.y=pos.y;m.rot=pos.rot;
+const el=cardLayer.querySelector(`[data-id="${m.id}"]`);
+if(el){el.style.left=pos.x+'px';el.style.top=pos.y+'px';el.style.setProperty('--rot',pos.rot+'deg')}}}
 // '날짜순'에서는 전체를, '내 배치'에서는 저장 자리가 없는 카드만 바둑판에 꽂는다(처음 열기·창 크기 변경·모드 전환이 함께 쓴다).
-function placeAll(){const{slots,tops}=gridPlan(innerWidth);let i=0;
+function placeAll(){if(boardMode==='date'){placeStacked();return}const{slots,tops}=gridPlan(innerWidth);let i=0;
 for(const m of moments){if(boardMode==='mine'&&m.savedPos)continue;const s=slots.get(m.id);if(!s)continue;
 const pos=LT58Model.gridPosition(s.col,tops[s.row]??GRID_MARGIN,i++);
 m.x=pos.x;m.y=pos.y;m.rot=pos.rot;
