@@ -4,7 +4,7 @@ import {
   STATUS_ORDER, PERSONA_FIELDS,
   richParagraph, formatTime, parseHash, viewHash, viewToTab,
   filterRows, statusTabs, kindTabs, STATUS_LABEL,
-  linkedIssueNumbers, issueStateLabel, needsFixButton,
+  linkedIssueNumbers, normalizeIssueNumber, issueStateLabel, needsFixButton,
   statusChangeMessage, buildIssueUrl, issueLink, escapeText,
   journalsSummary, journalRowsByCustomer, journalStage
 } from '../src/admin-view.js';
@@ -173,6 +173,19 @@ test('고객 글의 연결 이슈 번호만 추려 번호 내림차순으로 나
   assert.deepEqual(linkedIssueNumbers(rows), [549, 548]);
   assert.deepEqual(linkedIssueNumbers([]), []);
   assert.deepEqual(linkedIssueNumbers(undefined), []);
+  // #636: 앞의 '#'이 붙어 저장된 값도 같은 번호로 읽는다(운영 도구가 그렇게 저장해 왔다). 빈 값·잘못된 값은 버린다.
+  assert.deepEqual(linkedIssueNumbers([{issueNumber: '#584'}, {issueNumber: ' 584 '}, {issueNumber: '584'}]), [584]);
+  assert.deepEqual(linkedIssueNumbers([{issueNumber: '#584'}, {issueNumber: '611'}, {issueNumber: ''}, {issueNumber: null}, {issueNumber: 'abc'}, {issueNumber: '#'}, {issueNumber: '#12a'}]), [611, 584]);
+  assert.deepEqual(linkedIssueNumbers([{issueNumber: ''}, {issueNumber: '   '}, {issueNumber: null}, {issueNumber: undefined}, {}, {issueNumber: '#'}, {issueNumber: '!42'}, {issueNumber: '4 2'}, {issueNumber: '0x10'}]), []);
+  assert.deepEqual(linkedIssueNumbers([{issueNumber: '#000'}]), [0]);
+  assert.equal(normalizeIssueNumber('#584'), '584');
+  assert.equal(normalizeIssueNumber(' 584 '), '584');
+  assert.equal(normalizeIssueNumber('# 584'), '584');
+  assert.equal(normalizeIssueNumber('584'), '584');
+  assert.equal(normalizeIssueNumber(''), '');
+  assert.equal(normalizeIssueNumber('#'), '');
+  assert.equal(normalizeIssueNumber('abc'), '');
+  assert.equal(normalizeIssueNumber(null), '');
 });
 
 test("GitHub open/closed를 '고치는 중/고침 완료'로 바꿔 쓴다(#570 4)", () => {
@@ -206,6 +219,9 @@ test('GitHub 이슈 새 글 주소는 제목·본문만 넣는다(#564 4)', () =
 test('연결 이슈 번호가 숫자일 때만 링크를 만든다(#564 14)', () => {
   assert.ok(issueLink('541').includes('href="https://github.com/skerishKang/lovetree-4.0/issues/541"'));
   assert.ok(issueLink('541').includes('#541'));
+  // #636: '#'이 붙어 저장된 값도 이슈 링크가 되어야 한다(운영센터 '고치는 일' 탭이 비어 보이던 원인).
+  assert.equal(issueLink('#541'), issueLink('541'));
+  assert.equal(issueLink(' #541 '), issueLink('541'));
   assert.equal(issueLink(' 541 '), issueLink('541'));
   assert.equal(issueLink(''), '');
   assert.equal(issueLink('abc'), '');

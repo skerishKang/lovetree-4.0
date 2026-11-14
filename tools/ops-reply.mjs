@@ -34,7 +34,8 @@ export function parseOpsArgs(argv) {
   if (!args.statusOnly && !args.replyFile) throw new Error('답변 파일(--reply)이 필요합니다. --status-only면 생략할 수 있어요.');
   if (!STATUSES.includes(args.status)) throw new Error(`상태(--status)는 ${STATUSES.join('|')} 중 하나여야 합니다.`);
   if (!/^#?[0-9A-Za-z._-]{1,20}$/.test(String(args.issue ?? ''))) throw new Error('연결 이슈 번호(--issue)가 필요합니다.');
-  if (!args.issue.startsWith('#')) args.issue = '#' + args.issue;
+  // #636: 저장은 숫자만 한다. '#'은 화면 표시일 뿐인데 그대로 넣어 두어 운영센터가 그 글을 '연결 이슈'로 읽지 못했다.
+  args.issue = args.issue.replace(/^#/, '');
   if (!args.envPath) throw new Error('환경 파일 경로(--env)가 비어 있습니다.');
   return args;
 }
