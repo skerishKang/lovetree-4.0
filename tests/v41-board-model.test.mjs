@@ -11,7 +11,7 @@ const BOARD = fs.readFileSync(new URL('../public/v41/views/board/board.js', impo
 const EXTRAS = fs.readFileSync(new URL('../public/v41/views/board/board-extras.js', import.meta.url), 'utf8');
 
 test('0. 보드 한 벌: 화면이 부르는 함수가 전부 있다', () => {
-  assert.deepEqual(Object.keys(M).sort(), ['boardSize', 'cardPosition', 'cinemaBeats', 'clampView', 'collectPath', 'contentBox', 'cursorEffectAllowed', 'cursorHover', 'cursorMode', 'cursorPresence', 'cursorScale', 'decorationMotion', 'detailButtonState', 'editGuard', 'escapeHTML', 'filterVisible', 'fitBox', 'fitZoom', 'maxCreatedOrder', 'nextConnections', 'rememberView', 'removeConnection', 'savedView', 'settleColumnGaps', 'startView', 'threadPath', 'threadRedrawStep', 'treeSpread', 'visibleCards']);
+  assert.deepEqual(Object.keys(M).sort(), ['boardSize', 'cardPosition', 'cinemaBeats', 'clampView', 'collectPath', 'contentBox', 'decorationMotion', 'detailButtonState', 'editGuard', 'escapeHTML', 'filterVisible', 'fitBox', 'fitZoom', 'maxCreatedOrder', 'nextConnections', 'rememberView', 'removeConnection', 'savedView', 'settleColumnGaps', 'startView', 'threadPath', 'threadRedrawStep', 'treeSpread', 'visibleCards']);
   for (const fn of Object.keys(M)) assert.equal(typeof M[fn], 'function', fn);
 });
 
@@ -227,95 +227,6 @@ test('14. board-extras.js는 필터 판정을 다시 구현하지 않고 한 벌
   assert.ok(EXTRAS.includes('LT58Model.maxCreatedOrder(moments)'));
   // DOM 반영(클래스 토글)은 화면에 그대로 남는다.
   assert.ok(EXTRAS.includes("el.classList.toggle('filteredOut',!ok)"));
-});
-
-test('19. 커서 동작: 끔 조건·움직임 줄임·반응 대상·크기 배율', () => {
-  // 끔 조건
-  assert.equal(M.cursorMode({ pointerType: 'touch' }), 'off');
-  assert.equal(M.cursorMode({ coarse: true }), 'off');
-  assert.equal(M.cursorMode({ cinema: true }), 'off');
-  assert.equal(M.cursorMode({ reducedMotion: true }), 'position');
-  assert.equal(M.cursorMode({}), 'full');
-  // 반응 대상: 입력 위 숨김, 카드·핀·실·버튼 위 반응
-  assert.equal(M.cursorHover({ text: true }), 'hidden');
-  assert.equal(M.cursorHover({ text: true, card: true }), 'hidden');
-  assert.equal(M.cursorHover({ card: true }), 'interactive');
-  assert.equal(M.cursorHover({ pin: true }), 'interactive');
-  assert.equal(M.cursorHover({ thread: true }), 'interactive');
-  assert.equal(M.cursorHover({ button: true }), 'interactive');
-  assert.equal(M.cursorHover({}), 'default');
-  // 크기 배율: 끔 0, 드래그 작은 점, 누름 0.8, 반응 1.6, 기본 1
-  assert.equal(M.cursorScale({ mode: 'off' }), 0);
-  assert.equal(M.cursorScale({ dragging: true }), 0.3);
-  assert.equal(M.cursorScale({ down: true }), 0.8);
-  assert.equal(M.cursorScale({ hover: 'interactive' }), 1.6);
-  assert.equal(M.cursorScale({}), 1);
-  assert.equal(M.cursorScale({ hover: 'interactive', down: true }), 0.8, '누름이 반응 확대보다 우선');
-});
-
-test('20. 커서 동작 세기 증명: 끔·숨김·축소를 풀어 버리면 답이 달라진다', () => {
-  const mode = (o) => M.cursorMode(o);
-  const hover = (o) => M.cursorHover(o);
-  const scale = (o) => M.cursorScale(o);
-  assert.notEqual(mode({ pointerType: 'touch' }), mode({ pointerType: 'mouse' }));
-  assert.notEqual(mode({ cinema: true }), mode({ cinema: false }));
-  assert.notEqual(mode({ reducedMotion: true }), mode({ reducedMotion: false }));
-  assert.notEqual(hover({ text: true }), hover({ text: false }));
-  assert.notEqual(hover({ button: true }), hover({ button: false }));
-  assert.notEqual(scale({ down: true }), scale({ down: false }));
-  assert.notEqual(scale({ dragging: true }), scale({ dragging: false }));
-  assert.notEqual(scale({ hover: 'interactive' }), scale({ hover: 'default' }));
-  assert.notEqual(scale({ mode: 'off' }), scale({ mode: 'full' }));
-});
-
-test('21. 클릭 효과 한도: 동시에 켜진 묶음이 넘으면 새 묶음을 막는다', () => {
-  assert.equal(M.cursorEffectAllowed(0, 3), true);
-  assert.equal(M.cursorEffectAllowed(2, 3), true);
-  assert.equal(M.cursorEffectAllowed(3, 3), false);
-  assert.equal(M.cursorEffectAllowed(4, 3), false);
-  assert.equal(M.cursorEffectAllowed(0, 1), true);
-  assert.equal(M.cursorEffectAllowed(1, 1), false);
-});
-
-test('22. 클릭 효과 한도 세기 증명: 한도를 풀면 넘치는 묶음도 허용해 버린다', () => {
-  assert.notEqual(M.cursorEffectAllowed(3, 3), M.cursorEffectAllowed(3, 4));
-  assert.equal(M.cursorEffectAllowed(3, 4), true);
-  assert.equal(M.cursorEffectAllowed(3, 3), false);
-});
-
-test('23. 커서 화면 배선: 위치는 translate3d·프레임당 1회, 크기는 transform으로만, 끌기는 작은 점', () => {
-  const CSS = fs.readFileSync(new URL('../public/v41/views/board/board.css', import.meta.url), 'utf8');
-  const ring = CSS.match(/\.cursorRing\{([^}]*)\}/)?.[1] || '';
-  assert.ok(ring, '.cursorRing 규칙이 있어야 한다');
-  assert.match(ring, /translate3d\(-100px,-100px,0\)/, '위치는 transform으로만 옮긴다(레이아웃 값 left/top 없음)');
-  assert.match(ring, /scale\(var\(--cursor-scale/, '크기는 transform 배율로만 바꾼다');
-  assert.doesNotMatch(ring, /transition:[^;}]*width/, 'width/height 전환을 두지 않는다');
-  assert.match(CSS, /\.cursorRing\.drag-dot\{width:44px;height:44px;/, '끌기 점 크기는 transform 배율과 함께 44px 기준');
-  assert.match(CSS, /@media \(pointer:coarse\)\{\.cursorRing,\.cursorFX\{display:none!important\}\}/, '거친 포인터에서는 숨긴다');
-  assert.match(CSS, /@keyframes cursorRipple[\s\S]*?@keyframes cursorDrop/, '물결·물방울 효과가 있다');
-  assert.match(EXTRAS, /translate3d\(\$\{cursorState\.x\}px,\$\{cursorState\.y\}px,0\)/, '화면이 translate3d로 위치를 쓴다');
-  assert.match(EXTRAS, /if\(!cursorState\.raf\)cursorState\.raf=requestAnimationFrame\(cursorApply\)/, '프레임당 1회만 예약한다');
-  assert.match(EXTRAS, /document\.elementFromPoint\(cursorState\.x,cursorState\.y\)/, 'elementFromPoint는 프레임당 1회');
-  assert.doesNotMatch(EXTRAS, /ring\.style\.left=/, 'left로 위치를 쓰지 않는다');
-  assert.match(EXTRAS, /LT58Model\.cursorMode\(/, '끔 조건은 계산 한 벌을 쓴다');
-  assert.match(EXTRAS, /LT58Model\.cursorHover\(/, '반응 대상은 계산 한 벌을 쓴다');
-  assert.match(EXTRAS, /LT58Model\.cursorScale\(/, '배율은 계산 한 벌을 쓴다');
-  assert.match(EXTRAS, /LT58Model\.cursorEffectAllowed\(/, '효과 한도는 계산 한 벌을 쓴다');
-});
-
-test('24. 커서 표시 판정(#361 후속): 보드 밖·탭 숨김·포커스 아웃이면 숨김, 다시 들어오면 보임', () => {
-  assert.equal(M.cursorPresence({}), 'shown');
-  assert.equal(M.cursorPresence({ seen: true }), 'shown');
-  assert.equal(M.cursorPresence({ seen: false }), 'hidden');
-  assert.equal(M.cursorPresence({ outside: true }), 'hidden');
-  assert.equal(M.cursorPresence({ blurred: true }), 'hidden');
-  assert.equal(M.cursorPresence({ hidden: true }), 'hidden');
-  assert.equal(M.cursorPresence({ outside: true, seen: false }), 'hidden');
-  // 세기 증명: 밖/숨김 판정을 풀면 답이 달라진다.
-  assert.notEqual(M.cursorPresence({ outside: true }), M.cursorPresence({ outside: false }));
-  assert.notEqual(M.cursorPresence({ blurred: true }), M.cursorPresence({ blurred: false }));
-  assert.notEqual(M.cursorPresence({ hidden: true }), M.cursorPresence({ hidden: false }));
-  assert.notEqual(M.cursorPresence({ seen: false }), M.cursorPresence({ seen: true }));
 });
 
 test('처음 배치(#395): 첫 순간은 왼쪽, 이어진 순간은 오른쪽으로 펼치고 카드끼리 겹치지 않는다', () => {
