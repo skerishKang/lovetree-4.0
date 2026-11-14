@@ -168,7 +168,7 @@ has_api=0
 for file in "${changed[@]}"; do
   case "$file" in
     server/*|src/domain.js|package.json|package-lock.json|\
-    tools/export-ai-customer-db.mjs|\
+    tools/export-ai-customer-db.mjs|tools/ops-reply.mjs|\
     deploy/host-com2/lovetree-api/install.sh|\
     deploy/host-com2/lovetree-api/check_config.mjs|\
     deploy/host-com2/lovetree-api/preflight_imports.mjs) has_api=1 ;;
