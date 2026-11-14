@@ -15,6 +15,7 @@ export function createScreens(deps) {
     applyTheme,
     writeLocation,
     links,
+    takeNetworkOpen,
     onFrameReady
   } = deps;
 
@@ -168,7 +169,11 @@ export function createScreens(deps) {
     document.body.classList.toggle('home-screen', file === 'src064-orbit.html');
     document.querySelectorAll('[data-view]').forEach(b => b.setAttribute('aria-current', String(b.dataset.view === file)));
     $('empty').hidden = true;
-    showInFrame(screenUrl(file, getSource(), location.origin), '러브트리 · ' + screenTitle(file));
+    // #583 '이 순간 열기': 지도를 특정 순간을 가운데 두고 열 요청이 있으면 프레임 주소에 ?open=<순간>을 붙인다.
+    // 요청은 한 번 쓰면 지운다(다른 화면을 먼저 보여 줬으면 끝난 요청이다).
+    const openMoment = takeNetworkOpen?.() ?? null;
+    const openQuery = file === 'track56-network.html' && openMoment ? `?open=${encodeURIComponent(openMoment)}` : '';
+    showInFrame(screenUrl(file, getSource(), location.origin) + openQuery, '러브트리 · ' + screenTitle(file));
     if (write) writeLocation();
     links();
   }

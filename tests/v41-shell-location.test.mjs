@@ -5,7 +5,7 @@ import {ownerSelectionRoute} from '../public/v41/selection-location.mjs';
 
 // #231 1-B 후속: shell/location.mjs를 직접 호출해 주소 읽기·쓰기를 고정한다(가짜 history·location).
 
-function setup({hash = '#home', handled = '', source = 'example', owned = false, shareId = null, current = 'src064-orbit.html', journey = {}} = {}) {
+function setup({hash = '#home', handled = '', source = 'example', owned = false, shareId = null, current = 'src064-orbit.html', journey = {}, trees = [], networkOpen = null} = {}) {
   const calls = [];
   const historyCalls = [];
   const storage = {data: {}, getItem(k) { return this.data[k] ?? null; }, setItem(k, v) { this.data[k] = String(v); }};
@@ -25,7 +25,7 @@ function setup({hash = '#home', handled = '', source = 'example', owned = false,
     setCurrent: file => { state.current = file; calls.push(['current', file]); },
     getMember: () => state.member,
     getSource: () => source,
-    getModel: () => ({trees: []}),
+    getModel: () => ({trees}),
     getActiveShareId: () => shareId,
     getHandled: () => state.handled,
     setHandled: h => { state.handled = h; },
@@ -34,6 +34,7 @@ function setup({hash = '#home', handled = '', source = 'example', owned = false,
     notify: text => calls.push(['notify', text]),
     startMember: () => calls.push(['startMember']),
     showPublicRoute: route => calls.push(['public', route.shareId]),
+    requestNetworkOpen: id => { (networkOpen || calls).push(['networkOpen', id]); },
     journey: {saved: () => !!journey.saved},
     gotoJourneyStep: step => calls.push(['goto', step]),
     openFirstJourney: options => calls.push(['openJourney', options.step]),
@@ -116,4 +117,24 @@ test('보통 화면 주소는 화면만 바꿔 보여 준다', () => {
   const {api, calls} = setup({hash: '#network'});
   api.applyBrowserLocation();
   assert.deepEqual(calls.filter(c => c[0] !== 'listen'), [['current', 'track56-network.html'], ['show', 'track56-network.html', false]]);
+});
+
+// #583 '이 순간 열기': 주소가 지도의 특정 순간을 가리키면(로그인 상태) 지도가 그 순간을 가운데 두고
+// 열리게 요청을 남긴다. 순간을 찾지 못했거나 지도가 아닌 보기면 요청을 남기지 않는다.
+test('#my/network?moment=…는 지도 열기 요청을 남기고, 못 찾은 순간·다른 보기는 남기지 않는다', () => {
+  const trees = [{id: 't1', moments: [{id: 'm9', parentId: null}, {id: 'm1', parentId: null}]}];
+  const open = setup({hash: '#my/network?tree=t1&moment=m9', source: 'server', owned: true, trees});
+  open.api.applyBrowserLocation();
+  assert.deepEqual(open.calls.filter(c => c[0] === 'networkOpen'), [['networkOpen', 'm9']]);
+
+  // 주소의 순간이 이 계정에 없으면: 시작 순간 안내만 하고 가운데 열기 요청은 없다.
+  const missing = setup({hash: '#my/network?tree=t1&moment=zz', source: 'server', owned: true, trees});
+  missing.api.applyBrowserLocation();
+  assert.deepEqual(missing.calls.filter(c => c[0] === 'networkOpen'), []);
+  assert.ok(missing.calls.some(c => c[0] === 'notify'), '못 찾은 순간 안내는 그대로다');
+
+  // 지도가 아닌 보기(책)의 주소는 요청을 남기지 않는다.
+  const book = setup({hash: '#my/book?tree=t1&moment=m9', source: 'server', owned: true, trees});
+  book.api.applyBrowserLocation();
+  assert.deepEqual(book.calls.filter(c => c[0] === 'networkOpen'), []);
 });

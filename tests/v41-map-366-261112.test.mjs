@@ -15,9 +15,11 @@ const model=src('public/v41/views/network/network-model.js');
 test('#366 ① 맨 위 한 줄 안내가 있고, 첫 로드에 흐려지지 않는다',()=>{
   assert.match(html,/첫 순간에서 어떻게 이어졌는지 보는 지도예요/);
   // 첫 로드에서 선택 자동 맞춤(centerOn)을 하면 .hero가 .07까지 흐려져 안내가 사라진다 — 더 이상 부르지 않는다.
-  const boot=js.split("const n=nodes.find(n=>n.id===LTDEMO.get());")[1]?.split('\n')[0]||'';
-  assert.match(boot,/state\.selected=n/,'첫 순간 선택은 남긴다');
-  assert.doesNotMatch(boot,/centerOn\(/,'첫 로드에 안내를 덮는 자동 맞춤 없음');
+  // #583 '이 순간 열기'(?open= 주소 약속)는 예외로, 주소로 열린 순간만 selectMoment로 가운데에 둔다.
+  const boot=js.slice(js.indexOf("(()=>{if(state.view==='concentric')computeConcentric(true)"));
+  assert.match(boot,/else state\.selected=n/,'첫 순간 선택은 남긴다(자동 맞춤 없음)');
+  assert.match(boot,/openId&&n\.id===openId\)selectMoment\(n,true\)/,'가운데 자동 맞춤은 주소로 열린 순간(?open=)뿐이다');
+  assert.doesNotMatch(boot,/centerOn\(/,'첫 로드에 안내를 덮는 자동 맞춤 없음(주소 열기는 selectMoment 경로다)');
 });
 
 test('#366 ③ 연결 이유: 저장된 relation이 화면 그래프(reason)까지 온다',()=>{
