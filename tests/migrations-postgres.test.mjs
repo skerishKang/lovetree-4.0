@@ -4,6 +4,7 @@ import { readFile, readdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { createPool } from '../server/db/postgres.js';
 import { assertIsolatedTestDatabase } from '../server/testing/isolated-test-database.js';
+import { createAccountRepo } from '../server/db/account-postgres.js';
 
 /**
  * 실제 PostgreSQL에서만 도는 migration 실행 시험.
@@ -104,7 +105,9 @@ test('migrations apply cleanly to empty DB and are re-runnable', { skip }, async
         { column: 'product_id', nullable: 'NO', type: 'text' },
         { column: 'subject_id', nullable: 'NO', type: 'text' },
         { column: 'email', nullable: 'NO', type: 'text' },
-        { column: 'updated_at', nullable: 'NO', type: 'timestamp with time zone' }
+        { column: 'updated_at', nullable: 'NO', type: 'timestamp with time zone' },
+        // 2026-11-15 (#655 2차): created_at = 러브트리 첫 로그인 시각(가입일)
+        { column: 'created_at', nullable: 'NO', type: 'timestamp with time zone' }
       ],
       'lovetree_account_emails 컬럼이 스키마대로다'
     );
@@ -123,6 +126,88 @@ test('migrations apply cleanly to empty DB and are re-runnable', { skip }, async
       [productId, 'sub_owner']
     );
     assert.equal(emailRow.rows[0].email, 'second@example.test');
+
+    // ⑤ 첫 로그인 시각은 한 번만 찍힌다 (#655 2차). 두 번째 로그인은 updated_at 만 바꾼다.
+    const accountRepo = createAccountRepo(pool);
+    const loginSubject = 'sub_login';
+    await accountRepo.upsertEmail({ productId, subjectId: loginSubject, email: 'first@example.test' });
+    const first = (await pool.query(
+      'SELECT email, created_at, updated_at FROM lovetree_account_emails WHERE product_id = $1 AND subject_id = $2',
+      [productId, loginSubject]
+    )).rows[0];
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    await accountRepo.upsertEmail({ productId, subjectId: loginSubject, email: 'second@example.test' });
+    const second = (await pool.query(
+      'SELECT email, created_at, updated_at FROM lovetree_account_emails WHERE product_id = $1 AND subject_id = $2',
+      [productId, loginSubject]
+    )).rows[0];
+    assert.equal(second.email, 'second@example.test');
+    assert.equal(second.created_at.getTime(), first.created_at.getTime(), 'created_at(가입일)은 그대로여야 한다');
+    assert.ok(second.updated_at.getTime() > first.updated_at.getTime(), 'updated_at 은 두 번째 로그인 시각으로 바뀐다');
+  } finally {
+    await pool.end();
+  }
+});
+
+// 기존 행 채우기: created_at 칸이 생기기 전에 있던 계정은 그 계정의 가장 이른 흔적으로 한 번 채운다.
+// 흔적(문서 안 트리·순간 createdAt, 공유 행 시각, 고객 글 시각)이 하나도 없으면 updated_at 을 쓴다.
+const CREATED_AT_MIGRATION = 'account-emails-created-at-261115.sql';
+
+test('계정 가입일 채우기: 기존 행은 가장 이른 흔적으로, 근거가 없으면 updated_at 으로 채운다', { skip }, async () => {
+  assertIsolatedTestDatabase(DATABASE_URL);
+  const pool = await createPool(DATABASE_URL, { max: 1 });
+  try {
+    await pool.query(await readFile(SCHEMA_PATH, 'utf8'));
+    // 이 migration 만 빼고 적용한 뒤, 칸이 생기기 전 상태를 만든다.
+    const pending = fileURLToPath(new URL(`../server/db/migrations/${CREATED_AT_MIGRATION}`, import.meta.url));
+    for (const file of await listMigrationFiles()) {
+      if (file !== pending) await pool.query(await readFile(file, 'utf8'));
+    }
+    await pool.query('ALTER TABLE lovetree_account_emails DROP COLUMN IF EXISTS created_at');
+    await pool.query('ALTER TABLE lovetree_shares DROP CONSTRAINT IF EXISTS lovetree_shares_product_id_share_id_key');
+
+    const tag = Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
+    const productId = ('lt-' + tag).slice(0, 32);
+    const docSubject = 'sub_doc', shareSubject = 'sub_share', feedbackSubject = 'sub_feedback', emptySubject = 'sub_empty';
+    const doc = {
+      version: 1,
+      trees: [{
+        id: 't1', createdAt: '2026-03-02T00:00:00.000Z', title: '나무', moments: [
+          { id: 't1-m0', createdAt: '2026-03-09T00:00:00.000Z' },
+          { id: 't1-m1', createdAt: '2026-03-05T00:00:00.000Z' }
+        ]
+      }]
+    };
+    await pool.query('INSERT INTO lovetree_workspaces(product_id,subject_id,doc) VALUES($1,$2,$3::jsonb)', [productId, docSubject, JSON.stringify(doc)]);
+    await pool.query(
+      `INSERT INTO lovetree_shares(product_id,share_id,subject_id,tree_id,entry_moment_id,initial_view,created_at)
+       VALUES($1,$2,$3,'t2','t2-m0','book','2026-06-01T00:00:00.000Z')`,
+      [productId, ('s' + tag).padEnd(24, 'x').slice(0, 24), shareSubject]
+    );
+    await pool.query(
+      `INSERT INTO lovetree_feedback(product_id,subject_id,kind,category,body,created_at)
+       VALUES($1,$2,'opinion','bug','글','2026-04-04T00:00:00.000Z')`,
+      [productId, feedbackSubject]
+    );
+    for (const [subjectId, updatedAt] of [[docSubject, '2026-09-09T00:00:00.000Z'], [shareSubject, '2026-09-09T00:00:00.000Z'], [feedbackSubject, '2026-09-09T00:00:00.000Z'], [emptySubject, '2026-07-07T00:00:00.000Z']]) {
+      await pool.query(
+        `INSERT INTO lovetree_account_emails(product_id,subject_id,email,updated_at) VALUES($1,$2,$3,$4)`,
+        [productId, subjectId, subjectId + '@example.test', updatedAt]
+      );
+    }
+
+    await pool.query(await readFile(pending, 'utf8'));
+    const rows = new Map((await pool.query(
+      'SELECT subject_id, created_at, updated_at FROM lovetree_account_emails WHERE product_id = $1',
+      [productId]
+    )).rows.map((row) => [row.subject_id, row]));
+    // 문서 안 트리(03-02)·순간(03-05) 중 가장 이른 03-02 이 updated_at(09-09)보다 이르다.
+    assert.equal(rows.get(docSubject).created_at.toISOString(), '2026-03-02T00:00:00.000Z');
+    assert.equal(rows.get(shareSubject).created_at.toISOString(), '2026-06-01T00:00:00.000Z');
+    assert.equal(rows.get(feedbackSubject).created_at.toISOString(), '2026-04-04T00:00:00.000Z');
+    // 흔적이 하나도 없으면 지금 updated_at 을 쓴다(근거 없이 더 이른 시각을 지어내지 않는다).
+    assert.equal(rows.get(emptySubject).created_at.toISOString(), '2026-07-07T00:00:00.000Z');
+    assert.equal(rows.get(emptySubject).updated_at.toISOString(), '2026-07-07T00:00:00.000Z');
   } finally {
     await pool.end();
   }

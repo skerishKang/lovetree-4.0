@@ -42,12 +42,14 @@ export function createAccountRepo(pool) {
     return result.rowCount > 0 ? result.rows[0].email : null;
   }
 
+  // created_at 은 첫 로그인 시각(가입일, #655 2차)이다. INSERT 때만 찍히고 ON CONFLICT DO UPDATE 에서
+  // 일부러 빠져 있다 — 로그인할 때마다 가입일이 밀리면 '새 계정'을 셀 수 없다.
   async function upsertEmail({ productId, subjectId, email }) {
     if (typeof productId !== 'string' || !productId || typeof subjectId !== 'string' || !subjectId
         || typeof email !== 'string' || !email.trim() || email.trim().length > 320) return;
     await pool.query(
-      `INSERT INTO lovetree_account_emails (product_id, subject_id, email, updated_at)
-       VALUES ($1, $2, $3, now())
+      `INSERT INTO lovetree_account_emails (product_id, subject_id, email, updated_at, created_at)
+       VALUES ($1, $2, $3, now(), now())
        ON CONFLICT (product_id, subject_id) DO UPDATE SET email = EXCLUDED.email, updated_at = now()`,
       [productId, subjectId, email.trim()]
     );

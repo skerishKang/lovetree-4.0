@@ -7,6 +7,7 @@ import { createModelAdminRoleStore } from '../server/testing/model-admin-role-st
 import { createAdminRoleService, ROLE_ADMIN, ROLE_AI_CUSTOMER } from '../server/admin-roles.js';
 import { createAdminStatsService } from '../server/admin-stats.js';
 import { createMemoryStatsRepo } from '../server/testing/memory-stats-repo.js';
+import { createMemoryAccountRepo } from '../server/testing/memory-account-repo.js';
 import { createMemoryShareRepo } from '../server/testing/memory-share-repo.js';
 import { createMemoryTreeVisibilityRepo } from '../server/testing/memory-tree-visibility-repo.js';
 import { createPadiemAuthorityAuth } from '../server/padiem-authority-auth.js';
@@ -43,10 +44,11 @@ function build({
   const admin = withAdmin ? createAdminRoleService({ store: roleStore, productId: PRODUCT }) : null;
   const repo = createMemoryWorkspaceRepo();
   // #655 2차: 숫자 세기는 실제 저장 경로로 쌓은 메모리 저장소를 그대로 읽는다(숫자를 손으로 넣지 않는다).
-  // '새 계정'은 문서 안 첫 기록 시각 기준이라 고객 글 저장소는 쓰지 않는다.
+  // 계정·새 계정은 로그인 표(memory-account-repo = lovetree_account_emails)의 createdAt(첫 로그인 시각)으로 센다.
+  const accountRepo = createMemoryAccountRepo();
   const adminStats = shareRepo
     ? createAdminStatsService({
-        repo: createMemoryStatsRepo({ workspaceRepo: repo, shareRepo, roleStore, visibilityRepo }),
+        repo: createMemoryStatsRepo({ workspaceRepo: repo, shareRepo, accountRepo, roleStore, visibilityRepo }),
         productId: PRODUCT,
         ...(statsNow ? { now: statsNow } : {})
       })
@@ -58,7 +60,7 @@ function build({
   // 숫자 시험용: 저장 경로(문서 쓰기)와 다른 집계 서비스를 끼운 핸들러.
   let writes = 0;
   const writeDoc = (subjectId, doc) => repo.commit({ productId: PRODUCT, subjectId, doc, expectedRevision: 0, clientKey: `stats-${subjectId}-${++writes}`, requestHash: 'a'.repeat(64) });
-  return { handle, admin, roleStore, as, writeDoc, handleWithStats: handleFor };
+  return { handle, admin, roleStore, accountRepo, as, writeDoc, handleWithStats: handleFor };
 }
 
 const ok = (response) => ({ status: response.status, body: response.body });
@@ -201,13 +203,24 @@ test('운영센터 전체 숫자(#655 2차): 계정·트리·순간·공개·둘
   });
   const write = (subjectId, trees) => repos.writeDoc(subjectId, { version: 1, trees });
 
+  // 로그인한 적 있는 계정 = 가입일(첫 로그인 시각)이 lovetree_account_emails.created_at 에 남는다.
+  // 순간을 하나도 안 담은 NEW_EMPTY 도 로그인했으면 계정이고, 가입일이 창 안이라 '새 계정'이다.
+  const NEW_EMPTY = `sub_${'5'.repeat(32)}`;
+  const login = (subjectId, createdAt) => repos.accountRepo.upsertEmail({ productId: PRODUCT, subjectId, email: `${subjectId}@example.test`, at: createdAt });
+  await login(ADMIN2, '2026-10-01T00:00:00.000Z');
+  await login(REAL_ONE, '2026-10-01T00:00:00.000Z');
+  await login(AI_ONE, '2026-10-04T00:00:00.000Z');
+  await login(NEW_EMPTY, '2026-11-19T00:00:00.000Z');
+  await login(`sub_${'4'.repeat(32)}`, '2026-10-05T00:00:00.000Z');
+
   // 실제 사용자 1: 트리 2(순간 3, 그중 1개가 창 안) + 자동 공개(순간 3) → 공개·둘러보기 1
   await write(REAL_ONE, [
     tree('ta', ['2026-11-18T10:00:00.000Z', '2026-10-01T00:00:00.000Z']),
     tree('tb', ['2026-10-02T00:00:00.000Z'])
   ]);
   await shareRepo.upsertAutoShare({ productId: PRODUCT, subjectId: REAL_ONE, shareId: 'auto-' + 'a'.repeat(20), treeId: 'ta', entryMomentId: 'ta-m0', momentCount: 3 });
-  // 실제 사용자 2: 트리 1(순간 1), 공유 없음. 문서 안 첫 기록이 창 안 → '새 계정'
+  // 실제 사용자 2: 트리 1(순간 1), 공유 없음. 가입일이 창 안 → '새 계정'
+  await login(REAL_TWO, '2026-11-18T00:00:00.000Z');
   await write(REAL_TWO, [tree('tc', ['2026-11-18T09:00:00.000Z'], '2026-11-18T09:00:00.000Z')]);
   // AI 테스터: 트리 1(순간 3) + 자동 공개 → 공개·둘러보기 1(AI 쪽 숫자도 따로 센다)
   await write(AI_ONE, [tree('td', ['2026-10-04T00:00:00.000Z', '2026-10-05T00:00:00.000Z', '2026-10-06T00:00:00.000Z'])]);
@@ -221,8 +234,9 @@ test('운영센터 전체 숫자(#655 2차): 계정·트리·순간·공개·둘
   assert.equal(response.status, 200);
   assert.equal(response.body.ok, true);
   const stats = response.body.stats;
-  // 계정 4(실제 3 · AI 1). 새 계정은 문서 안 첫 기록 시각이 창 안인 실제 사용자 2 한 명(공유·글이 없어도 센다).
-  assert.deepEqual(stats.accounts, { total: 4, real: 3, aiTester: 1, new: { total: 1, real: 1, aiTester: 0 } });
+  // 계정 6(실제 5 · AI 1) — 로그인한 적 있는 계정을 센다(문서를 하나도 안 쓴 NEW_EMPTY 포함).
+  // 새 계정은 가입일(첫 로그인 시각)이 창(11-13 이후) 안인 실제 사용자 2(REAL_TWO·NEW_EMPTY).
+  assert.deepEqual(stats.accounts, { total: 6, real: 5, aiTester: 1, new: { total: 2, real: 2, aiTester: 0 } });
   // 트리 5(실제 4 · AI 1). 공개 2(실제 1 · AI 1) — 비공개 트리는 빠진다.
   assert.deepEqual(stats.trees, {
     total: 5, real: 4, aiTester: 1,

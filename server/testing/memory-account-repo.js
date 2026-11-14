@@ -5,7 +5,10 @@ export function createMemoryAccountRepo({ rows = null, failOn = null } = {}) {
   const tables = rows ?? new Map();
   const deletions = new Set();
   // 이메일은 계정 하나당 한 값. 중복 없이 마지막 로그인 값이 남는다.
+  // 2026-11-15 (#655 2차): createdAt = 첫 로그인 시각(가입일). 두 번째 로그인부터는 updatedAt 만 바뀐다.
   const emails = new Map();
+  let tick = 0;
+  const stamp = () => new Date(Date.UTC(2026, 10, 15) + (tick += 1) * 1000).toISOString();
   let fail = failOn;
   const clone = () => new Map([...tables].map(([name, list]) => [name, list.map((row) => ({ ...row, subjects: [...row.subjects] }))]));
 
@@ -24,13 +27,29 @@ export function createMemoryAccountRepo({ rows = null, failOn = null } = {}) {
     },
     async emailFor({ productId, subjectId }) {
       if (typeof productId !== 'string' || !productId || typeof subjectId !== 'string' || !subjectId) return null;
-      return emails.has(productId + '\u0000' + subjectId) ? emails.get(productId + '\u0000' + subjectId) : null;
+      const row = emails.get(productId + '\u0000' + subjectId);
+      return row ? row.email : null;
     },
-    async upsertEmail({ productId, subjectId, email }) {
+    async upsertEmail({ productId, subjectId, email, at = null }) {
       if (typeof productId !== 'string' || !productId || typeof subjectId !== 'string' || !subjectId
         || typeof email !== 'string' || !email.trim() || email.trim().length > 320) return null;
-      emails.set(productId + '\u0000' + subjectId, email.trim());
+      const key = productId + '\u0000' + subjectId;
+      const now = at ? String(at) : stamp();
+      const previous = emails.get(key);
+      // 첫 로그인에서만 createdAt 이 찍힌다(PG 의 ON CONFLICT DO UPDATE 에서 created_at 이 빠진 것과 같다).
+      emails.set(key, { email: email.trim(), createdAt: previous ? previous.createdAt : now, updatedAt: now });
       return email.trim();
+    },
+    /** 가입일 확인·집계용(#655 2차). 로그인한 적 있는 계정만 들어 있다. */
+    async accounts({ productId }) {
+      return [...emails.entries()]
+        .filter(([key]) => key.startsWith(productId + '\u0000'))
+        .map(([key, row]) => ({ subjectId: key.slice(productId.length + 1), createdAt: row.createdAt, updatedAt: row.updatedAt }))
+        .sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)));
+    },
+    async accountCreatedAt({ productId, subjectId }) {
+      const row = emails.get(productId + '\u0000' + subjectId);
+      return row ? row.createdAt : null;
     },
     async deleteAll({ productId, subjectId, subjectHash, at }) {
       const before = clone();

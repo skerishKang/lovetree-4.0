@@ -5,13 +5,12 @@
  * 로 먼저 좁히고(모든 대상 표가 product_id 로 시작하는 인덱스를 쓴다), 남은 계산은 SQL 안에서 한다.
  *
  * 세는 것과 근거:
- *   · 계정 = `lovetree_workspaces` 행이 있는 계정(러브트리 데이터가 있는 계정). 읽기만 한 계정은
- *     행이 없으므로 세지 않는다.
- *   · 새 계정 = **문서 안 첫 기록 시각** 기준. 문서(workspace doc)의 트리·순간 `createdAt` 중
- *     가장 이른 값이 창(window) 안인 계정을 센다. 저장 표에는 계정 생성 시각 칸이 없으므로
- *     (schema.sql 의 lovetree_workspaces 는 revision·saved_at 만 둔다) 문서에 남은 기록 시각을 쓴다.
- *     공유 행·고객 글 시각이 아니라 문서 안 시각이라, 아직 공유도 글도 없는 새 사용자도 세어진다.
- *     생성 시각이 하나도 없는 문서는 세지 않는다(근거가 없으므로 '새 계정'이라 말하지 않는다).
+ *   · 계정 = `lovetree_account_emails` 행이 있는 계정 — 러브트리에 **로그인한 적 있는** 계정이다.
+ *     순간을 하나도 담지 않은 계정도 로그인했으면 센다. (workspace 행이 있는 계정만 세면 로그인만 한
+ *     계정이 빠진다.)
+ *   · 새 계정 = 그 표의 `created_at`(러브트리 **첫 로그인 시각 = 가입일**)이 창(window) 안인 계정.
+ *     created_at 은 upsert 에서 갱신하지 않으므로(migration account-emails-created-at-261115) 로그인을
+ *     반복해도 가입일이 밀리지 않는다. 기존 행은 그 migration 이 가장 이른 흔적으로 한 번 채웠다.
  *   · 트리·순간 = `lovetree_workspaces.doc` 의 trees/moments 배열 길이 합(문서당 한 번).
  *   · 새 순간 = 순간의 `createdAt`(ISO 글자)이 창 안인 것. ISO-8601 UTC 글자라 글자 비교로 충분하다.
  *   · 공개 트리 = 활성 공유 행이 있고 비공개 표시가 없는 트리(중복 제거).
@@ -43,12 +42,17 @@ docs AS (
   FROM lovetree_workspaces w
   WHERE w.product_id = $1
 ),
+accounts AS (
+  SELECT e.subject_id, e.created_at,
+         EXISTS (SELECT 1 FROM ai a WHERE a.subject_id = e.subject_id) AS ai_tester
+  FROM lovetree_account_emails e
+  WHERE e.product_id = $1
+),
 per_doc AS (
   SELECT d.subject_id, d.ai_tester,
          COALESCE(jsonb_array_length(d.doc->'trees'), 0) AS trees,
          COALESCE(m.moments, 0) AS moments,
-         COALESCE(m.moments_since, 0) AS moments_since,
-         f.first_record AS first_record
+         COALESCE(m.moments_since, 0) AS moments_since
   FROM docs d
   LEFT JOIN LATERAL (
     SELECT (count(*))::int AS moments,
@@ -56,18 +60,6 @@ per_doc AS (
     FROM jsonb_array_elements(COALESCE(d.doc->'trees', '[]'::jsonb)) AS tree
     CROSS JOIN LATERAL jsonb_array_elements(COALESCE(tree->'moments', '[]'::jsonb)) AS moment
   ) m ON true
-  -- 문서 안 첫 기록 시각 = 트리·순간 createdAt 의 최솟값(ISO-8601 UTC 글자라 글자 비교로 충분하다).
-  LEFT JOIN LATERAL (
-    SELECT min(stamp) AS first_record FROM (
-      SELECT tree->>'createdAt' AS stamp
-      FROM jsonb_array_elements(COALESCE(d.doc->'trees', '[]'::jsonb)) AS tree
-      UNION ALL
-      SELECT moment->>'createdAt'
-      FROM jsonb_array_elements(COALESCE(d.doc->'trees', '[]'::jsonb)) AS tree
-      CROSS JOIN LATERAL jsonb_array_elements(COALESCE(tree->'moments', '[]'::jsonb)) AS moment
-    ) stamps
-    WHERE stamp IS NOT NULL
-  ) f ON true
 ),
 active_share AS (
   SELECT s.subject_id, s.share_id, s.tree_id, s.moment_count, s.origin, s.discoverable,
@@ -97,9 +89,9 @@ featured_tree AS (
 account_row AS (
   SELECT (count(*) FILTER (WHERE NOT ai_tester))::int AS "accountsReal",
          (count(*) FILTER (WHERE ai_tester))::int AS "accountsAi",
-         (count(*) FILTER (WHERE NOT ai_tester AND first_record >= $2))::int AS "accountsNewReal",
-         (count(*) FILTER (WHERE ai_tester AND first_record >= $2))::int AS "accountsNewAi"
-  FROM per_doc
+         (count(*) FILTER (WHERE NOT ai_tester AND created_at >= $2::timestamptz))::int AS "accountsNewReal",
+         (count(*) FILTER (WHERE ai_tester AND created_at >= $2::timestamptz))::int AS "accountsNewAi"
+  FROM accounts
 ),
 tree_row AS (
   SELECT (COALESCE(sum(trees) FILTER (WHERE NOT ai_tester), 0))::int AS "treesReal",

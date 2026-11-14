@@ -3,9 +3,9 @@
  *
  * PostgreSQL 판(`server/db/stats-postgres.js`)과 **같은 뜻**으로 세도록 맞춰 두었다 —
  * 계정·트리·순간·공개 트리·둘러보기 소개·AI 테스터 가르기·최근 창(window) 판정이 모두 같은 규칙이다.
- * '새 계정'은 **문서 안 첫 기록 시각** 기준이다 — 문서의 트리·순간 createdAt 중 가장 이른 값이 창 안인
- * 계정을 센다(공유 행·고객 글 시각이 아니라 문서 안 시각이라, 공유·글이 없는 새 사용자도 세어진다).
- * 생성 시각이 하나도 없는 문서는 세지 않는다.
+ * 계정은 **로그인한 적 있는 계정**(accountRepo 의 이메일 표 = lovetree_account_emails)을 센다 —
+ * 순간을 하나도 담지 않은 계정도 들어간다. '새 계정'은 그 표의 createdAt(첫 로그인 시각 = 가입일)이
+ * 창 안인 계정이다(PG 판과 같은 규칙).
  * 여기 통과가 PostgreSQL 검증은 아니다(실제 SQL 은 필수 검사 'PostgreSQL 저장·로그인 상태 검증'이 본다).
  *
  * 세는 근거는 이미 시험들이 쓰는 메모리 저장소 그대로다 — 저장 경로로 실제로 쌓은 문서·공유 행·
@@ -21,7 +21,7 @@ const atOf = (value) => {
 };
 
 export function createMemoryStatsRepo({
-  workspaceRepo, shareRepo, roleStore = null, visibilityRepo = null, communityRepo = null
+  workspaceRepo, shareRepo, accountRepo = null, roleStore = null, visibilityRepo = null, communityRepo = null
 } = {}) {
   if (!workspaceRepo || typeof workspaceRepo.documents !== 'function') throw new Error('workspaceRepo.documents 가 필요합니다.');
   if (!shareRepo || typeof shareRepo.allForProduct !== 'function') throw new Error('shareRepo.allForProduct 가 필요합니다.');
@@ -45,28 +45,26 @@ export function createMemoryStatsRepo({
         const trees = Array.isArray(document?.doc?.trees) ? document.doc.trees : [];
         let moments = 0;
         let momentsSince = 0;
-        let firstRecord = null;
-        const rememberFirst = (value) => {
-          const created = atOf(value);
-          if (created === null) return;
-          if (firstRecord === null || created < firstRecord) firstRecord = created;
-        };
         for (const tree of trees) {
           const list = Array.isArray(tree?.moments) ? tree.moments : [];
-          rememberFirst(tree?.createdAt);
           moments += list.length;
           for (const moment of list) {
-            rememberFirst(moment?.createdAt);
             const created = atOf(moment?.createdAt);
             if (created !== null && sinceMs !== null && created >= sinceMs) momentsSince += 1;
           }
         }
-        totals[ai ? 'accountsAi' : 'accountsReal'] += 1;
-        // 새 계정 = 문서 안 첫 기록 시각이 창 안. 생성 시각이 하나도 없는 문서는 세지 않는다.
-        if (firstRecord !== null && sinceMs !== null && firstRecord >= sinceMs) totals[ai ? 'accountsNewAi' : 'accountsNewReal'] += 1;
         totals[ai ? 'treesAi' : 'treesReal'] += trees.length;
         totals[ai ? 'momentsAi' : 'momentsReal'] += moments;
         totals[ai ? 'momentsNewAi' : 'momentsNewReal'] += momentsSince;
+      }
+
+      // 계정 = 로그인한 적 있는 계정(이메일 표). 새 계정 = 그 표의 첫 로그인 시각이 창 안.
+      const accounts = accountRepo?.accounts ? await accountRepo.accounts({ productId }) : [];
+      for (const row of accounts) {
+        const ai = aiSubjects.has(subjectOf(row));
+        const created = atOf(row?.createdAt);
+        totals[ai ? 'accountsAi' : 'accountsReal'] += 1;
+        if (created !== null && sinceMs !== null && created >= sinceMs) totals[ai ? 'accountsNewAi' : 'accountsNewReal'] += 1;
       }
 
       // 공개 트리 = 활성 공유 행이 있고 비공개가 아닌 트리(중복 제거). 둘러보기 소개는 같은 조건에

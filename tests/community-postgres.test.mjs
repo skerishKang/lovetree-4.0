@@ -4,6 +4,7 @@ import {createCommunityRepo} from '../server/db/community-postgres.js';
 import {createTreeVisibilityRepo} from '../server/db/tree-visibility-postgres.js';
 import {createStatsRepo} from '../server/db/stats-postgres.js';
 import {createMemoryStatsRepo} from '../server/testing/memory-stats-repo.js';
+import {createMemoryAccountRepo} from '../server/testing/memory-account-repo.js';
 import {createMemoryWorkspaceRepo} from '../server/testing/memory-workspace-repo.js';
 import {createMemoryShareRepo} from '../server/testing/memory-share-repo.js';
 import {createMemoryTreeVisibilityRepo} from '../server/testing/memory-tree-visibility-repo.js';
@@ -106,8 +107,15 @@ test('운영센터 전체 숫자 집계: 계정·트리·순간·공개·둘러�
     [AI_ONE,{version:1,trees:[tree('t4','윤슬',[old,old,old])]}]
   ]);
   for(const [subjectId,doc] of docs)await pool.query('INSERT INTO lovetree_workspaces(product_id,subject_id,doc) VALUES($1,$2,$3::jsonb)',[productId,subjectId,JSON.stringify(doc)]);
-  // AI 테스터 역할과 공유 행. '새 계정'은 문서 안 첫 기록 시각으로 가른다(공유 시각이 아니다).
+  // AI 테스터 역할과 공유 행. '계정'과 '새 계정'은 로그인 표(lovetree_account_emails)의
+  // created_at(첫 로그인 시각 = 가입일)으로 가른다 — 문서를 하나도 안 쓴 로그인만 계정도 센다.
   await pool.query("INSERT INTO lovetree_product_roles(product_id,subject_id,role) VALUES($1,$2,'ai_customer')",[productId,AI_ONE]);
+  const LOGIN_ONLY='sub_d'+tag;
+  const login=(subjectId,createdAt)=>pool.query('INSERT INTO lovetree_account_emails(product_id,subject_id,email,created_at) VALUES($1,$2,$3,$4)',[productId,subjectId,subjectId+'@example.test',createdAt]);
+  await login(REAL_ONE,old);
+  await login(REAL_TWO,old);
+  await login(AI_ONE,old);
+  await login(LOGIN_ONLY,recent);
   const share=(shareId,subjectId,treeId,momentCount,createdDaysAgo)=>pool.query(
     `INSERT INTO lovetree_shares(product_id,share_id,subject_id,tree_id,entry_moment_id,initial_view,origin,moment_count,created_at)
      VALUES($1,$2,$3,$4,$5,'book','auto',$6,now()-($7||' days')::interval)`,[productId,shareId,subjectId,treeId,treeId+'-m0',momentCount,String(createdDaysAgo)]);
@@ -120,7 +128,7 @@ test('운영센터 전체 숫자 집계: 계정·트리·순간·공개·둘러�
 
   const stats=await createStatsRepo(pool).aggregate({productId,since:new Date(Date.now()-7*86400e3).toISOString()});
   assert.deepEqual(stats,{
-    accountsReal:2,accountsAi:1,accountsNewReal:1,accountsNewAi:0,
+    accountsReal:3,accountsAi:1,accountsNewReal:1,accountsNewAi:0,
     treesReal:3,treesAi:1,
     momentsReal:4,momentsAi:3,momentsNewReal:2,momentsNewAi:0,
     publicReal:2,publicAi:1,
@@ -131,6 +139,10 @@ test('운영센터 전체 숫자 집계: 계정·트리·순간·공개·둘러�
   const workspaceRepo=createMemoryWorkspaceRepo();
   let writes=0;
   for(const [subjectId,doc] of docs)await workspaceRepo.commit({productId,subjectId,doc,expectedRevision:0,clientKey:'k'+(++writes),requestHash:'a'.repeat(64)});
+  const accountRepo=createMemoryAccountRepo();
+  for(const [subjectId,createdAt] of [[REAL_ONE,old],[REAL_TWO,old],[AI_ONE,old],[LOGIN_ONLY,recent]]){
+    await accountRepo.upsertEmail({productId,subjectId,email:subjectId+'@example.test',at:createdAt});
+  }
   const shareRepo=createMemoryShareRepo({now:Date.now()-30*86400e3});
   for(const [subjectId,treeId,momentCount,daysAgo] of [[REAL_ONE,'t1',3,30],[REAL_ONE,'t2',1,30],[AI_ONE,'t4',3,30],[REAL_TWO,'t3',3,0]]){
     await shareRepo.upsertAutoShare({productId,subjectId,shareId:'m'+subjectId+treeId,treeId,entryMomentId:treeId+'-m0',momentCount});
@@ -139,7 +151,7 @@ test('운영센터 전체 숫자 집계: 계정·트리·순간·공개·둘러�
   await roleStore.assign({productId,subjectId:AI_ONE,role:'ai_customer'});
   const visibilityRepo=createMemoryTreeVisibilityRepo();
   await visibilityRepo.set({productId,subjectId:REAL_TWO,treeId:'t3',visibility:'private'});
-  const memory=await createMemoryStatsRepo({workspaceRepo,shareRepo,roleStore,visibilityRepo}).aggregate({productId,since:new Date(Date.now()-7*86400e3).toISOString()});
+  const memory=await createMemoryStatsRepo({workspaceRepo,shareRepo,accountRepo,roleStore,visibilityRepo}).aggregate({productId,since:new Date(Date.now()-7*86400e3).toISOString()});
   assert.deepEqual(memory,stats);
  }finally{await pool.end();}
 });

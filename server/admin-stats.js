@@ -11,10 +11,12 @@ import { ApiError } from './errors.js';
  * 개인정보는 다루지 않는다: 저장소에서 돌아오는 것은 숫자뿐이고, 응답에도 숫자만 실린다
  * (이메일·이름·아이디·subject 를 담을 자리를 만들지 않는다).
  *
- * accounts.new 는 **문서 안 첫 기록 시각 기준**이다 — 문서(workspace doc)의 트리·순간 createdAt 중
- * 가장 이른 값이 창(window) 안인 계정을 센다. 저장 표에 계정 생성 시각 칸이 없어서
- * (server/db/schema.sql 의 lovetree_workspaces 는 revision·saved_at 만 둔다) 문서에 남은 시각을 쓴다.
- * 생성 시각이 하나도 없는 문서는 세지 않는다.
+ * accounts 는 **로그인한 적 있는 계정**(lovetree_account_emails — 로그인 콜백이 쓰는 표)이다. 순간을
+ * 하나도 담지 않은 계정도 로그인했으면 센다. accounts.new 는 그 표의 created_at(러브트리 **첫 로그인
+ * 시각 = 가입일**)이 창(window) 안인 계정이다. created_at 은 upsert 에서 갱신하지 않으므로
+ * (server/db/migrations/account-emails-created-at-261115.sql) 로그인을 반복해도 가입일이 밀리지 않는다.
+ * 기존 행은 그 migration 이 가장 이른 흔적(문서 안 트리·순간 createdAt, 공유 행 시각, 고객 글 시각,
+ * updated_at)으로 한 번 채웠다.
  */
 
 export const STATS_WINDOW_DAYS = 7;
