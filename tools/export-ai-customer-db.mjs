@@ -34,7 +34,7 @@ export const QUERIES = {
       ON r.product_id = p.product_id AND r.subject_id = p.subject_id AND r.role = 'ai_customer'
     WHERE p.product_id = $1
     ORDER BY p.name, p.subject_id`,
-  posts: `SELECT f.id, f.kind, f.category, f.title, f.body, f.score, f.journal_date, f.context,
+  posts: `SELECT f.id, f.subject_id, f.kind, f.category, f.title, f.body, f.score, f.journal_date, f.context,
          f.status, f.memo, f.issue_number, f.created_at, f.updated_at
     FROM lovetree_feedback f
     WHERE f.product_id = $1 AND f.subject_id = ANY($2)
