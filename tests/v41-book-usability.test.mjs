@@ -284,7 +284,7 @@ test('좁은 화면 탭 판정: 돋보기가 켜져도 같은 자리에서 떼�
   }
 });
 
-// ── #345 순간 면·여기까지 온 길 표시 규칙 ───────────────────────────────────────
+// ── #345 순간 면·이어진 순간(이슈 584에서 개명) 표시 규칙 ───────────────────────
 test('14. 출처 줄·편집 손잡이: 표시 규칙은 함수가 정한다(#345)', () => {
   assert.equal(mediaSourceText({title: '영상 제목', channel: '채널'}), '영상 제목 · 채널');
   assert.equal(mediaSourceText({title: '영상 제목'}), '영상 제목');
@@ -300,12 +300,12 @@ test('14. 출처 줄·편집 손잡이: 표시 규칙은 함수가 정한다(#34
   assert.deepEqual(editAffordances({hasTitle: false, hasNote: false}), {title: false, hint: false, guide: true});
 });
 
-test('15. #345 마크업: 여기까지 온 길·세로 타임라인·출처 줄·감정 점·마음 안내', () => {
+test('15. #345 마크업: 이어진 순간·세로 타임라인·출처 줄·감정 점·마음 안내', () => {
   const src = html[VIEWS[0]];
   assert.ok(!src.includes('경로 한눈에'), '옛 이름은 남기지 않는다');
-  assert.ok(src.includes('>여기까지 온 길</button>'), '도구 줄 버튼 이름');
-  assert.ok(src.includes('<h2 id="overviewTitle">여기까지 온 길</h2>'), '창 제목');
-  assert.ok(src.includes('처음 좋아하게 된 순간부터 지금 보는 순간까지예요. 누르면 그 장으로 넘어가요.'), '설명 문구');
+  assert.ok(src.includes('>이어진 순간</button>'), '도구 줄 버튼 이름(이슈 584: 이어진 순간)');
+  assert.ok(src.includes('<h2 id="overviewTitle">이어진 순간</h2>'), '창 제목(이슈 584: 이어진 순간)');
+  assert.ok(src.includes('처음 순간부터 지금까지 이어진 순간을 한눈에 보여 줘요. 누르면 그 장으로 넘어가요.'), '설명 문구(이슈 584)');
   assert.ok(src.includes('id="journeySummary"'), 'N단계 · N일 자리');
   assert.ok(src.includes('class="overview" id="overview" inert'), '닫힌 창은 포커스 대상이 아니다');
   assert.ok(src.includes('class="journey-item'), '세로 타임라인 칸');

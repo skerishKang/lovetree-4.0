@@ -23,7 +23,33 @@ const t=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt
 /* 5. 돋보기: 기본 꺼짐. 선택값은 localStorage(실패하면 꺼짐). */
 let lensPref=readLens(window.localStorage);
 try{lensOn=lensPref}catch{}
-function paintLensButton(){const b=$b('#lensBtn');if(!b)return;b.classList.toggle('active',lensPref);b.textContent=lensPref?'돋보기 켜짐':'돋보기';b.setAttribute('aria-pressed',String(lensPref))}
+/* 이슈 584: 돋보기는 아이콘 단추 — 글자 대신 SVG를 쓰고, 상태는 aria-pressed·말풍선으로 알린다. */
+function paintLensButton(){const b=$b('#lensBtn');if(!b)return;b.classList.toggle('active',lensPref);b.setAttribute('aria-pressed',String(lensPref));const tip='돋보기 — 마우스 근처를 크게 보기 · '+(lensPref?'켜짐':'꺼짐');b.setAttribute('data-lt-tip',tip);b.setAttribute('aria-label',tip)}
+/* 이슈 584: 머리줄 단추 설명 — 브라우저 기본 title 대신 러브트리 모양 작은 말풍선.
+   마우스를 올리거나 키보드 초점에 뜨고, 휴대폰(마우스 없는 기기)은 0.5초 길게 누르면 뜬다.
+   설명 문구는 단추의 aria-label 과 같아서 낭독기와 눈이 같은 말을 듣는다. */
+let tipTimer=0,tipTarget=null;
+function showTip(el){
+ const text=el?.getAttribute?.('data-lt-tip');if(!text)return;
+ let bubble=$b('#lt-tip-bubble');
+ if(!bubble){bubble=document.createElement('div');bubble.id='lt-tip-bubble';bubble.className='lt-tip-bubble';bubble.setAttribute('role','tooltip');document.body.appendChild(bubble)}
+ tipTarget=el;bubble.textContent=text;bubble.hidden=false;
+ const r=el.getBoundingClientRect(),b=bubble.getBoundingClientRect();
+ const left=Math.max(8,Math.min(r.left+r.width/2-b.width/2,innerWidth-b.width-8));
+ let top=r.top-b.height-8;if(top<8)top=r.bottom+8;
+ bubble.style.left=left+'px';bubble.style.top=top+'px';
+}
+function hideTip(){tipTarget=null;clearTimeout(tipTimer);const bubble=$b('#lt-tip-bubble');if(bubble)bubble.hidden=true}
+function mountTips(){
+ document.addEventListener('mouseover',e=>{const el=e.target.closest?.('[data-lt-tip]');if(el)showTip(el)});
+ document.addEventListener('mouseout',e=>{if(tipTarget&&(!e.relatedTarget||!tipTarget.contains(e.relatedTarget)))hideTip()});
+ document.addEventListener('focusin',e=>{const el=e.target.closest?.('[data-lt-tip]');if(el)showTip(el)});
+ document.addEventListener('focusout',()=>hideTip());
+ addEventListener('scroll',hideTip,true);
+ document.addEventListener('keydown',e=>{if(e.key==='Escape')hideTip()});
+ document.addEventListener('pointerdown',e=>{const el=e.target.closest?.('[data-lt-tip]');if(!el||matchMedia('(hover:hover)').matches)return;tipTimer=setTimeout(()=>showTip(el),500)},{passive:true});
+ for(const kind of ['pointerup','pointercancel','pointermove'])document.addEventListener(kind,e=>{if(matchMedia('(hover:hover)').matches)return;clearTimeout(tipTimer);if(kind!=='pointermove'||!tipTarget?.contains(e.target))hideTip()},{passive:true});
+}
 /* 4. '다음 순간 추가': 이 순간을 부모로 기존 순간 추가 편집기를 연다. */
 function requestNextMoment(parentId){
  if(!parentId)return;
@@ -193,20 +219,22 @@ momentContent=function(m,compact=false){
    const candidates=auto?thumbnailCandidates(m,{vertical,autoLoad:true}):[];
    const remoteThumb=candidates[0]||defaultThumb;
    const thumbFallback=auto?thumbFallbackAttrs(m,{candidates:candidates.length?candidates:[remoteThumb],writable:writableBook,videoUnavailable:true,variant:'book',momentId:safe.id}):'';
-   const label=media.startSeconds?('여기서 재생 · '+media.label.replace('YouTube 링크 · ','')):'여기서 재생';
+   // #584: 단추 이름을 '▶ 재생'으로 줄인다. 시작 시점이 있으면 '▶ 재생 · 1:23'.
+   const label=media.startSeconds?('▶ 재생 · '+media.label.replace('YouTube 링크 · ','')):'▶ 재생';
    const face=thumb?'<img src="'+t(thumb)+'" alt="">'
     :auto?'<img src="'+t(remoteThumb)+'" alt="'+t(safe.title||'YouTube 영상 썸네일')+'"'+thumbFallback+' referrerpolicy="no-referrer" loading="lazy" decoding="async">'
     :'<span class="yt-placeholder"></span>';
-   // #345: 영상 바로 아래 한 줄 — ▶ 영상 제목 · 채널 … YouTube ↗. 제목이 없으면 원본 링크만 남긴다.
+   /* #345: 영상 바로 아래 한 줄 — ▶ 채널. 이슈 584에서 YouTube ↗·크게 보기는 그 아래 .media-links 한 줄로 옮겼다. */
     const source=String(safe.mediaMetadata?.channel||'').trim();
+   // #584: 채널 줄은 정보만 남기고, YouTube ↗(왼쪽)·크게 보기(오른쪽)를 카드 아래 한 줄(.media-links)에 둔다.
+   //   크게 보기가 영상 위(yt-expand)에서 카드 아래로 내려와 영상 위에 단추가 겹치지 않는다.
    const piece='<div class="clipping moment" data-moment="'+t(safe.id)+'">'+
-    '<div class="yt-expand"><button type="button" data-yt-expand="'+t(safe.id)+'">크게 보기</button></div>'+
     '<button type="button" class="yt-play'+(vertical?' is-vertical':'')+'" data-lt-thumb-host data-yt-play="'+t(media.videoId)+'" data-yt-start="'+t(media.startSeconds||0)+'"'+(vertical?' data-yt-vertical="1"':'')+'>'+
     face+
     '<span class="yt-play-label">'+t(label)+'</span></button>'+
-    '<div class="media-source">'+
-    (source?'<span class="media-source-mark" aria-hidden="true">▶</span><span class="media-source-text">'+t(source)+'</span><span class="media-source-sep" aria-hidden="true"></span>':'')+
-    '<a class="media-source-link" href="'+t(media.openUrl)+'" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">YouTube ↗</a></div></div>';
+    (source?'<div class="media-source"><span class="media-source-mark" aria-hidden="true">▶</span><span class="media-source-text">'+t(source)+'</span></div>':'')+
+    '<div class="media-links"><a class="media-source-link" href="'+t(media.openUrl)+'" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">YouTube ↗</a>'+
+    '<button type="button" data-yt-expand="'+t(safe.id)+'">크게 보기</button></div></div>';
    return piece+paintTitle(safe);
   }
   if(media.kind==='link'&&!localThumb(safe)&&LTMedia.autoLoadMedia(ctx.source,ctx.owned)){
@@ -222,6 +250,9 @@ momentContent=function(m,compact=false){
 const originalRenderSpread=renderSpread;
 renderSpread=function(idx,focusId=null,land=true){
  originalRenderSpread(idx,focusId,land);
+ // #584: 주소·정보만으로 세로를 못 정한 YouTube 칸을 썸네일 실측으로 올려 고친다.
+ //   공유·예시 화면은 누르기 전 외부 요청 0 규칙(#327)을 유지하기 위해 내 기록일 때만 본다.
+ if(window.LTMedia?.upgradeVerticals){const ctx=(typeof LTMedia.currentContext==='function')?LTMedia.currentContext():{source:'',owned:false};if(LTMedia.autoLoadMedia(ctx.source,ctx.owned))LTMedia.upgradeVerticals(document);}
  // #537: 한 장은 순간 하나가 한 쪽 전체다 — 그 순간의 제목 한 벌만 다시 그리고, 두 장은 지금처럼 양쪽 페이지를 고친다.
  const one=single()?momentAtPos(current):null;
  if(one){
@@ -307,7 +338,7 @@ if(treeTrigger&&treeMenu){
  });
 }
 /* #393 5: 마지막 장의 다른 트리 표지도 같은 이동 규칙(openBook)으로 간다. */
-/* #345: '여기까지 온 길' — 처음 순간부터 지금 보는 순간까지의 세로 타임라인.
+/* #345: '이어진 순간'(이슈 584에서 '여기까지 온 길'에서 이름을 바꿈) — 처음 순간부터 지금 보는 순간까지의 세로 타임라인.
    칸·단계·일수·감정 색 계산은 LT59Model.journeyTimeline(book-model.js)이 맡고 여기는 그리기만 한다. */
 let journeyOpener=null;
 function journeyMarkup(journey){
@@ -374,6 +405,7 @@ function paintTreeTitles(){
  if(document.body.dataset.treeName!==name)document.body.dataset.treeName=name;
 }
 paintTreeTitles();
+mountTips();
 /* 원본 화면은 이 모듈보다 먼저 한 번 그린다. 새 규칙으로 다시 그린다(저장·선택은 그대로). */
 /* #295 보완: 넘침 판정을 렌더 때만 하면 이미지가 늦게 로드되어 페이지가 나중에 넘칠 때 다시 잘린다.
    book.js(클래식)는 createOverflowRejudge를 못 불러 오므로 여기서 연결하고, 이미지 load·창 크기 변경·

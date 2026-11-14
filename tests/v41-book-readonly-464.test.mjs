@@ -89,7 +89,10 @@ test('#464 보기 단추는 aria-pressed로 상태를 알리고, 눌린 쪽과 �
   assert.match(book, /two\.setAttribute\('aria-pressed',String\(!s\)\)/, '두 장: aria-pressed로 알린다');
   // 두 쪽의 배경 규칙이 서로 다른 값을 낸다(같은 값이면 #464가 다시 생긴다).
   const goldRule = /view-toggle \.ui-btn\[aria-pressed=true\][^{]*\{[^}]*background:var\(--lt-gold\)/;
-  const mutedRule = /view-toggle \.ui-btn\[aria-pressed=false\][^{]*\{[^}]*background:rgba\(9,8,14,\.35\)/;
-  assert.match(identity, goldRule, '눌린 쪽 배경은 금빛');
-  assert.match(identity, mutedRule, '안 눌린 쪽 배경은 눌러 둔 색 — 같지 않다');
+  // 이슈 584: 두 칸이 한 묶음(테두리 안)이라 눌리지 않은 칸은 묶음 바탕을 그대로 쓴다 — 눌린 칸 금색과 같지 않다.
+  const mutedRule = /view-toggle\{[^}]*background:rgba\(9,8,14,\.35\)/;
+  const cellRule = /view-toggle \.ui-btn\[aria-pressed=false\]\{[^}]*background:transparent/;
+  assert.match(identity, goldRule, '눌린 칸 배경은 금빛');
+  assert.match(identity, mutedRule, '묶음 바탕은 눌러 둔 색');
+  assert.match(identity, cellRule, '안 눌린 칸은 묶음 바탕을 그대로 — 눌린 칸과 같지 않다');
 });

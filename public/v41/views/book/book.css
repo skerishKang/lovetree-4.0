@@ -40,7 +40,9 @@ body:before{content:"MEMORY\A SKETCHBOOK";white-space:pre;position:fixed;left:3.
 html[data-lt-theme=garden] .shelf-back{background:var(--lt-paper);border-color:var(--lt-line-paper);color:var(--lt-ink)}
 html[data-lt-theme=garden] .shelf-back:hover{background:var(--lt-glass-strong);border-color:var(--lt-gold-line);color:var(--lt-ink)}
 .stage{position:absolute;inset:70px 0 0;display:grid;place-items:center;padding:25px 32px 112px;overflow:hidden}
-.book-wrap{position:relative;width:min(1160px,80vw);height:min(650px,calc(100vh - 250px));min-height:380px;perspective:2100px;filter:drop-shadow(0 37px 45px rgba(0,0,0,.35));user-select:none;touch-action:none}
+/* 이슈 584: 넓은 화면 두 장 모드에서 책을 화면 높이에 맞게 키운다(650px 한도 → 920px).
+   390 한 장 모드(#537)와 넓은 화면 한 장 모드는 그대로 둔다. */
+.book-wrap{position:relative;width:min(1160px,80vw);height:min(920px,calc(100vh - 215px));min-height:380px;perspective:2100px;filter:drop-shadow(0 37px 45px rgba(0,0,0,.35));user-select:none;touch-action:none}
 .book-cover{position:absolute;inset:-17px -20px -22px;border-radius:18px 25px 25px 18px;background:linear-gradient(100deg,#4d303c,#6b4855 47%,#4a303d 53%,#39242f);box-shadow:0 16px 42px rgba(0,0,0,.5),inset 0 0 0 1px rgba(255,255,255,.055);transform:rotateX(2.2deg)}
 .book{position:absolute;inset:0;display:grid;grid-template-columns:1fr 1fr;transform-style:preserve-3d;transform:rotateX(1.6deg);overflow:visible}
 .book:before{content:"";position:absolute;z-index:30;left:50%;top:-5px;bottom:-7px;width:48px;transform:translateX(-50%);background:radial-gradient(ellipse at center,rgba(59,41,36,.42),rgba(102,79,67,.17) 28%,rgba(255,255,255,.16) 47%,transparent 69%);mix-blend-mode:multiply;pointer-events:none}
@@ -335,7 +337,7 @@ html[data-book-shape=phone] .archive-item b{font-size:12px}
 html[data-book-shape=phone] .archive-item small{font-size:10px;line-height:1.4}
 /* #537: 넓은 화면의 한 장 — 휴대폰 모양이 아니라 두 장 책의 한 쪽을 그대로 크게 보여 준다.
    높이는 두 장과 같고(같은 식), 위아래 가운데. 글씨·사진 크기도 두 장의 한 쪽과 같다(오른쪽 페이지에 그린다). */
-html[data-book-view=single][data-book-shape=wide] .book-wrap{width:calc(min(1160px,80vw)/2);height:min(650px,calc(100vh - 250px));min-height:380px}
+html[data-book-view=single][data-book-shape=wide] .book-wrap{width:calc(min(1160px,80vw)/2);height:min(920px,calc(100vh - 215px));min-height:380px}
 html[data-book-view=single][data-book-shape=wide] .book{grid-template-columns:1fr}
 html[data-book-view=single][data-book-shape=wide] .page.left,
 html[data-book-view=single][data-book-shape=wide] .mobile-page,

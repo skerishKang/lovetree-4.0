@@ -17,8 +17,9 @@ assert.match(BOOK,/function single\(\)\{return narrow\(\)\|\|\(viewChoice\?\?def
 
 test('#393 4: 책 위쪽 버튼 줄에 [한 장|두 장] 단추가 있고 aria-pressed로 눌린 쪽을 알린다',()=>{
  assert.match(HTML,/class="view-toggle" role="group" aria-label="책 보기 방식"/,'단추 한 벌은 role=group으로 묶인다');
- assert.match(HTML,/id="singleViewBtn" aria-pressed="false">한 장</,'한 장 단추');
- assert.match(HTML,/id="doubleViewBtn" aria-pressed="false">두 장</,'두 장 단추');
+ // 이슈 584: 두 칸을 한 묶음(테두리)으로 보여 주고, 칸마다 말풍선 설명(data-lt-tip)과 같은 aria-label을 둔다.
+ assert.match(HTML,/id="singleViewBtn" aria-pressed="false" data-lt-tip="한 쪽씩 크게 보기" aria-label="1장 — 한 쪽씩 크게 보기">1장</,'1장 단추(설명 포함)');
+ assert.match(HTML,/id="doubleViewBtn" aria-pressed="false" data-lt-tip="펼친 책처럼 두 쪽 보기" aria-label="2장 — 펼친 책처럼 두 쪽 보기">2장</,'2장 단추(설명 포함)');
  assert.match(BOOK,/applyViewAttr\(\);\n\$\('#singleViewBtn'\)\.onclick/,'단추는 book.js에서 연결된다');
  assert.match(BOOK,/one\.setAttribute\('aria-pressed',String\(s\)\)/,'한 장 aria-pressed 갱신');
  assert.match(BOOK,/two\.setAttribute\('aria-pressed',String\(!s\)\)/,'두 장 aria-pressed 갱신');
@@ -33,7 +34,7 @@ test('#393 4: 보기 모드는 data-book-view 속성으로 정해진다 — 폭 
  assert.match(BOOK,/dataset\.bookShape=narrow\(\)\?'phone':'wide'/,'화면 모양은 휴대폰/넓은 화면으로 따로 매긴다');
 assert.match(CSS,/html\[data-book-shape=phone\] \.page\.left,\nhtml\[data-book-shape=phone\] \.page\.right,\nhtml\[data-book-shape=phone\] \.eyebrow\{display:none\}/,'휴대폰 한 장: 두 페이지 접기');
 assert.match(CSS,/html\[data-book-view=single\]\[data-book-shape=wide\] \.page\.left,\nhtml\[data-book-view=single\]\[data-book-shape=wide\] \.mobile-page,\nhtml\[data-book-view=single\]\[data-book-shape=wide\] \.mobile-inspect,\nhtml\[data-book-view=single\]\[data-book-shape=wide\] \.eyebrow\{display:none\}/,'넓은 화면 한 장: 오른쪽 한 쪽만 남긴다');
-assert.match(CSS,/html\[data-book-view=single\]\[data-book-shape=wide\] \.book-wrap\{width:calc\(min\(1160px,80vw\)\/2\);height:min\(650px,calc\(100vh - 250px\)\);min-height:380px\}/,'넓은 화면 한 장: 두 장 책 한 쪽 크기·같은 높이');
+assert.match(CSS,/html\[data-book-view=single\]\[data-book-shape=wide\] \.book-wrap\{width:calc\(min\(1160px,80vw\)\/2\);height:min\(920px,calc\(100vh - 215px\)\);min-height:380px\}/,'넓은 화면 한 장: 두 장 책 한 쪽 크기·같은 높이(이슈 584와 같은 식)');
  assert.match(CSS,/html\[data-book-shape=phone\] \.mobile-page\{display:block/,'휴대폰 한 장: 한 장 페이지 펼치기');
  assert.match(LAYOUT,/html\[data-book-shape=phone\]\[data-v41-screen=book\] \.book\{position:relative;inset:auto;transform:none;display:block\}/,'휴대폰 한 장: 책 종이도 세로 흐름으로');
  assert.match(CSS,/html\[data-book-shape=phone\] \.desktop-only\{display:none!important\}/,'휴대폰 한 장에서만 돋보기(데스크톱 전용)를 숨긴다 — 넓은 화면 한 장은 쓸 수 있다(#537 3)');

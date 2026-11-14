@@ -69,7 +69,7 @@ test('M5: 로그인 기기 미러(ltDateStyle)는 문서 속성을 localStorage�
   }
 });
 
-test('M3: 기억책 "여기까지 온 길" 날짜도 상세 kicker와 같은 styledDate(dateStyle 적용)를 쓴다', () => {
+test('M3: 기억책 "이어진 순간" 날짜도 상세 kicker와 같은 styledDate(dateStyle 적용)를 쓴다', () => {
   // book-extra.js는 LTDEMO 전역에 의존하는 classic script라 직접 실행하지 않고(이 파일의 다른 시험과
   // 같은 이유), 소스가 journey 항목에서도 화면 안 다른 날짜와 같은 한 벌을 쓰는지 확인한다.
   const bookExtra = read('public/v41/views/book/book-extra.js');
