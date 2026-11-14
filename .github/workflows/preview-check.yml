@@ -224,6 +224,18 @@ jobs:
           node --test --test-concurrency=1 tests/updates-card-611-followup.test.mjs
           echo "새 소식 카드 겹침 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
 
+      # #635: 감상 화면(공유 링크·예시)의 책에서 undefined·null·NaN 흔적이 없는지 첫 장~마지막 장 전부 넘기며 검사하고,
+      # 첫 화면 '어떻게 쓰나요'가 안내 패널을 여는지(둘러보기가 같이 열리지 않는지) 실제 화면에서 본다.
+      # 첫 화면은 vite 번들이라 먼저 build 한다. 건너뜀=실패(크롬이 준비된 이 잡에서 돈다).
+      - name: 감상 화면 흔적 값·어떻게 쓰나요 안내 시험(건너뜀=실패 — #635)
+        env:
+          LT_635A_REQUIRE: '1'
+        run: |
+          start=$(date +%s)
+          npx vite build > /dev/null
+          node --test --test-concurrency=1 tests/v41-share-guest-635.test.mjs
+          echo "감상 화면 흔적 값·어떻게 쓰나요 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+
   screen-map-a:
     name: 화면 시험 — 지도 대비
     runs-on: ubuntu-latest
