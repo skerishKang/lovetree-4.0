@@ -4,6 +4,7 @@
 //   화면 어디에도 cursor:none이 남으면 안 된다.
 // - 순간 상세의 '다음 순간'('이전 순간'도)을 누르는 단추로 내놓는다: 누르면 판이 그 카드로
 //   부드럽게 이동하고 카드가 선택되며 상세가 그 순간으로 바뀐다. 실제 <button>이므로 Tab·Enter도 된다.
+//   (#601: 단추는 작은 썸네일 카드(connCard)로 진화 — 클릭·키보드 규칙은 그대로.)
 //   이유(why) 글은 단추 아래 작은 글씨로 그대로, 3개 넘으면 '나머지 N개 보기'도 그대로.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -122,9 +123,9 @@ test('1. 커서 동그라미의 흔적이 남지 않는다(요소·스타일·�
 test('2. 상세의 다음·이전 순간은 단추다 — board.js의 열기와 extras의 다시 그리기가 같은 규칙', () => {
   const board = read('public/v41/views/board/board.js');
   const extras = read('public/v41/views/board/board-extras.js');
-  // 실제 <button>이고 방향을 data-dir로 알린다(키보드 Tab·Enter 접근 보장).
+  // 실제 <button>이고 방향을 data-dir로 알린다(키보드 Tab·Enter 접근 보장). #601: 작은 썸네일 카드(connCard).
   for (const s of [board, extras]) {
-    assert.match(s, /<button type="button" class="connLink" data-cid=/);
+    assert.match(s, /<button type="button" class="connCard" data-cid=/);
     assert.match(s, /data-dir=/);
     // 이유(why) 글은 단추 아래 작은 글씨로 그대로.
     assert.match(s, /connWhy/);
@@ -150,22 +151,22 @@ test('3. 화면: 다음 순간 단추를 누르면 판이 이동하고 카드가
   // 카드를 눌러 상세를 연다 — 다음 순간 단추가 보인다.
   await frame.click('.card[data-id="m2"]');
   await frame.waitForFunction(() => document.querySelector('.card.selected')?.dataset.id === 'm2', null, { timeout: 5000 });
-  await frame.waitForSelector('#dConn .connLink[data-dir="next"]', { timeout: 5000 });
-  const btnText = await frame.$eval('#dConn .connLink[data-dir="next"]', (b) => b.textContent.trim());
+  await frame.waitForSelector('#dConn .connCard[data-dir="next"]', { timeout: 5000 });
+  const btnText = await frame.$eval('#dConn .connCard[data-dir="next"]', (b) => b.textContent.trim());
   assert.match(btnText, /순간 3/, '단추는 다음 순간의 제목을 보여준다: ' + btnText);
   assert.equal(await frame.$eval('#dConn .connWhy', (el) => el.textContent.trim()), '이어서', '이유 글은 단추 아래 작은 글씨로 그대로');
 
   // 누른다 — 판이 그 카드로 이동하고, 카드가 선택되고, 상세가 그 순간으로 바뀐다.
   const t1 = await worldTransform(frame);
-  await frame.click('#dConn .connLink[data-dir="next"]');
+  await frame.click('#dConn .connCard[data-dir="next"]');
   await frame.waitForFunction(() => document.querySelector('.card.selected')?.dataset.id === 'm3', null, { timeout: 8000 });
   await frame.waitForFunction(() => document.querySelector('#dTitle')?.textContent.includes('순간 3'), null, { timeout: 5000 });
   const t2 = await worldTransform(frame);
   assert.notEqual(t1, t2, '판이 해당 카드로 부드럽게 이동한다(변환 변화)');
 
   // 키보드: 실제 <button>이므로 Tab으로 닿고 Enter로 누른다.
-  assert.equal(await frame.$eval('#dConn .connLink', (b) => b.tagName), 'BUTTON');
-  await frame.focus('#dConn .connLink[data-dir="next"]');
+  assert.equal(await frame.$eval('#dConn .connCard', (b) => b.tagName), 'BUTTON');
+  await frame.focus('#dConn .connCard[data-dir="next"]');
   await page.keyboard.press('Enter');
   await frame.waitForFunction(() => document.querySelector('.card.selected')?.dataset.id === 'm4', null, { timeout: 8000 });
   await frame.waitForFunction(() => document.querySelector('#dTitle')?.textContent.includes('순간 4'), null, { timeout: 5000 });
@@ -180,10 +181,10 @@ test('4. 화면: 이전 순간 단추도 있다 — 사슬 끝에서 누르면 �
   assert.deepEqual(problems, [], '화면 오류 없음: ' + problems.join(' | '));
   await frame.click('.card[data-id="m6"]');
   await frame.waitForFunction(() => document.querySelector('.card.selected')?.dataset.id === 'm6', null, { timeout: 5000 });
-  await frame.waitForSelector('#dConn .connLink[data-dir="prev"]', { timeout: 5000 });
-  const btnText = await frame.$eval('#dConn .connLink[data-dir="prev"]', (b) => b.textContent.trim());
+  await frame.waitForSelector('#dConn .connCard[data-dir="prev"]', { timeout: 5000 });
+  const btnText = await frame.$eval('#dConn .connCard[data-dir="prev"]', (b) => b.textContent.trim());
   assert.match(btnText, /순간 5/, '이전 순간 단추: ' + btnText);
-  await frame.click('#dConn .connLink[data-dir="prev"]');
+  await frame.click('#dConn .connCard[data-dir="prev"]');
   await frame.waitForFunction(() => document.querySelector('.card.selected')?.dataset.id === 'm5', null, { timeout: 8000 });
   await frame.waitForFunction(() => document.querySelector('#dTitle')?.textContent.includes('순간 5'), null, { timeout: 5000 });
 });

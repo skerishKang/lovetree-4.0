@@ -11,7 +11,7 @@ const BOARD = fs.readFileSync(new URL('../public/v41/views/board/board.js', impo
 const EXTRAS = fs.readFileSync(new URL('../public/v41/views/board/board-extras.js', import.meta.url), 'utf8');
 
 test('0. 보드 한 벌: 화면이 부르는 함수가 전부 있다', () => {
-  assert.deepEqual(Object.keys(M).sort(), ['boardSize', 'cinemaBeats', 'clampView', 'collectPath', 'contentBox', 'dateDescOrder', 'decorationMotion', 'detailButtonState', 'editGuard', 'escapeHTML', 'filterVisible', 'fitBox', 'fitZoom', 'gridColumns', 'gridPosition', 'gridRowTops', 'maxCreatedOrder', 'nextConnections', 'pinboardSpread', 'rememberView', 'savedView', 'settleColumnGaps', 'slotOf', 'startView', 'visibleCards']);
+  assert.deepEqual(Object.keys(M).sort(), ['boardSize', 'cinemaBeats', 'clampView', 'collectPath', 'contentBox', 'dateDescOrder', 'decorationMotion', 'detailButtonState', 'editGuard', 'escapeHTML', 'filterVisible', 'fitBox', 'fitZoom', 'gridColumns', 'gridPosition', 'gridRowTops', 'isPinboardSlot', 'maxCreatedOrder', 'nextConnections', 'pinboardSpread', 'rememberView', 'savedView', 'settleColumnGaps', 'slotOf', 'startView', 'visibleCards']);
   for (const fn of Object.keys(M)) assert.equal(typeof M[fn], 'function', fn);
 });
 

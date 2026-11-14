@@ -37,7 +37,7 @@ const canEditBoard=LTDEMO.example||boardSaveEnabled();
 // #553: 카드 종류별 예약 높이 — CSS가 정한 최대 높이에 여유를 더한 값(실측: 썸네일이 실린 YouTube 카드
 // 465px·세로 Shorts 648px, 기본 카드는 #548 글자 기준선 올림으로 최대 424px). 줄 간격은 이 예약 높이에서
 // 나오므로 링크 없는 트리(예시 40순간)는 기본 간격 460px(#548과 같다), YouTube 밴드는 그보다 크게 벌어진다.
-const YT_RESERVED_H=480,YT_VERTICAL_RESERVED_H=680,BASE_RESERVED_H=424;
+const YT_RESERVED_H=330,YT_VERTICAL_RESERVED_H=440,BASE_RESERVED_H=330;
 const reservedHeights=new Map(LTDEMO.moments.map(m=>[m.id,m.externalUrl?(LTMedia.verticalVideo(m.externalUrl,m.mediaMetadata)?YT_VERTICAL_RESERVED_H:YT_RESERVED_H):BASE_RESERVED_H]));
 // #582: 보드는 핀보드 — 날짜 최신순 바둑판에 꽂는다. 사람이 옮긴 자리(x·y가 저장된 순간)는 그 칸을
 // 그대로 쓰고(#395 계약), 나머지를 빈 칸에 채운다. 칸 수는 화면 폭이 정한다(1440 4칸, 390 1칸).
@@ -46,15 +46,28 @@ const GRID_COL_PITCH=300,GRID_MARGIN=150;
 function rowTopsNow(exceptId=null){return[...new Set(moments.filter(o=>o.id!==exceptId&&Number.isFinite(o.y)).map(o=>o.y))].sort((a,b)=>a-b)}
 function rowIndexOf(y,ys=rowTopsNow()){if(!ys.length)return 0;let best=0;for(let i=1;i<ys.length;i++)if(Math.abs(ys[i]-y)<Math.abs(ys[best]-y))best=i;return best}
 function colOf(x){return Math.max(0,Math.round(((Number(x)||0)-GRID_MARGIN)/GRID_COL_PITCH))}
-function savedSlotsOf(list){const ys=rowTopsNow();const out=new Map();for(const m of list)if(m.savedPos&&Number.isFinite(m.x)&&Number.isFinite(m.y))out.set(m.id,{col:colOf(m.x),row:rowIndexOf(m.y,ys)});return out}
-// 전체 판 계획: 저장 자리는 그대로 두고(#395 계약) 나머지를 날짜 최신순으로 빈 칸에 채운 뒤,
+function savedSlotsOf(list){const ys=rowTopsNow();const out=new Map();for(const m of list)if(m.savedPos&&Number.isFinite(m.x)&&Number.isFinite(m.y)&&LT58Model.isPinboardSlot(m.x))out.set(m.id,{col:colOf(m.x),row:rowIndexOf(m.y,ys)});return out}
+// #601: 배치 모드 — '날짜순'(기본)은 저장 자리를 무시한 날짜 최신순 바둑판, '내 배치'는 사람이 꽂은 자리를
+// 그대로 쓴다(#395 계약). 전환은 저장 자리를 지우지 않는다('정렬 되돌리기'를 대체한다).
+// 트리별로 기억한다(같은 기기에서 다시 열면 마지막 모드).
+const BOARD_MODE_KEY='lt41.boardMode';
+function boardModeKey(){const id=boardTreeId();return id?BOARD_MODE_KEY+':'+id:BOARD_MODE_KEY}
+function readBoardMode(){try{return localStorage.getItem(boardModeKey())==='mine'?'mine':'date'}catch{return 'date'}}
+function writeBoardMode(mode){try{localStorage.setItem(boardModeKey(),mode)}catch{/* 저장소를 못 쓰면 이번 화면에서만 기억 */}}
+let boardMode=readBoardMode();
+function setBoardMode(mode,{save=true,replace=true}={}){if(mode!=='date'&&mode!=='mine')return;boardMode=mode;if(save)writeBoardMode(mode);
+for(const b of document.querySelectorAll('[data-board-mode]'))b.setAttribute('aria-pressed',b.dataset.boardMode===mode?'true':'false');
+if(mode==='mine')for(const m of moments){if(m.savedPos&&m.savedXY){m.x=m.savedXY.x;m.y=m.savedXY.y;m.rot=m.savedXY.rot}}
+if(replace){placeAll();settlePlacedCards()}applyView(false)}
+// 전체 판 계획: '내 배치'에서는 저장 자리를 그대로 두고(#395 계약) 나머지를 날짜 최신순으로 빈 칸에 채운 뒤,
 // 줄의 y는 그 줄의 최대 예약 높이로 정한다(#553 규칙 — 큰 카드가 있는 줄은 그만큼 벌어진다).
-function gridPlan(vw){const slots=LT58Model.pinboardSpread(LT58Model.dateDescOrder(moments),{cols:LT58Model.gridColumns(vw),saved:savedSlotsOf(moments)});
+// '날짜순'에서는 저장 자리도 날짜순 바둑판으로 다시 꽂는다(보여 주기만 — 저장 값을 지우지 않는다).
+function gridPlan(vw){const slots=LT58Model.pinboardSpread(LT58Model.dateDescOrder(moments),{cols:LT58Model.gridColumns(vw),saved:boardMode==='mine'?savedSlotsOf(moments):null});
 const tops=LT58Model.gridRowTops(slots,(id)=>reservedHeights.get(id)||BASE_RESERVED_H);return{slots,tops}}
-let moments=LTDEMO.moments.map((m,i)=>{const saved=Number.isFinite(m.x)&&Number.isFinite(m.y);return{id:m.id,type:m.type==='memo'?'note':'photo',originalType:m.type==='memo'?'note':m.type,createdOrder:i+1,title:m.title,emotion:m.emotion,date:m.date,source:m.source||'예시 기록',mediaMetadata:m.mediaMetadata||null,memo:m.memo||m.whyNext||'',x:saved?m.x:0,y:saved?m.y:0,rot:saved?(Number.isFinite(m.rot)?m.rot:0):0,savedPos:saved,pinStyle:m.pinStyle,cardStyle:m.cardStyle,keywords:Array.isArray(m.keywords)?m.keywords:[],color:m.color||['rose','violet','cyan','amber'][i%4],asset:m.image,url:m.externalUrl||'',first:!!m.first}});
-// 저장 자리가 없는 카드를 바둑판에 꽂는다(처음 열기·창 크기 변경·정렬 되돌리기가 함께 쓴다).
+let moments=LTDEMO.moments.map((m,i)=>{const saved=Number.isFinite(m.x)&&Number.isFinite(m.y)&&LT58Model.isPinboardSlot(m.x);return{id:m.id,type:m.type==='memo'?'note':'photo',originalType:m.type==='memo'?'note':m.type,createdOrder:i+1,title:m.title,emotion:m.emotion,date:m.date,source:m.source||'예시 기록',mediaMetadata:m.mediaMetadata||null,memo:m.memo||m.whyNext||'',x:saved?m.x:0,y:saved?m.y:0,rot:saved?(Number.isFinite(m.rot)?m.rot:0):0,savedPos:saved,savedXY:saved?{x:m.x,y:m.y,rot:Number.isFinite(m.rot)?m.rot:0}:null,pinStyle:m.pinStyle,cardStyle:m.cardStyle,keywords:Array.isArray(m.keywords)?m.keywords:[],color:m.color||['rose','violet','cyan','amber'][i%4],asset:m.image,url:m.externalUrl||'',first:!!m.first}});
+// '날짜순'에서는 전체를, '내 배치'에서는 저장 자리가 없는 카드만 바둑판에 꽂는다(처음 열기·창 크기 변경·모드 전환이 함께 쓴다).
 function placeAll(){const{slots,tops}=gridPlan(innerWidth);let i=0;
-for(const m of moments){if(m.savedPos)continue;const s=slots.get(m.id);if(!s)continue;
+for(const m of moments){if(boardMode==='mine'&&m.savedPos)continue;const s=slots.get(m.id);if(!s)continue;
 const pos=LT58Model.gridPosition(s.col,tops[s.row]??GRID_MARGIN,i++);
 m.x=pos.x;m.y=pos.y;m.rot=pos.rot;
 const el=cardLayer.querySelector(`[data-id="${m.id}"]`);
@@ -82,7 +95,7 @@ let connections=LTDEMO.edges.map((e,i)=>({id:'c'+i,kind:e.kind,a:e.from,b:e.to,w
 function domainDateText(v){const s=String(v||'');if(/^\d{4}-\d{2}-\d{2}$/.test(s))return s;const m=s.match(/(\d{4})\.(\d{2})\.(\d{2})/);if(m)return `${m[1]}-${m[2]}-${m[3]}`;const d=new Date(s);return Number.isNaN(d.getTime())?LTLocalDate.localDateOnly():LTLocalDate.localDateOnly(d)}
 function boardPayload(){const parentOf=id=>{const c=connections.find(c=>c.kind==='parent'&&c.b===id);return c?c.a:null};
 const relatedOf=id=>[...new Set(connections.filter(c=>c.kind==='related'&&(c.a===id||c.b===id)).map(c=>c.a===id?c.b:c.a))];
-return moments.map(m=>{const pc=connections.find(c=>c.kind==='parent'&&c.b===m.id);return{id:m.id,parentId:parentOf(m.id),relation:pc?(pc.why||''):'',links:relatedOf(m.id),title:m.title,note:m.memo||'',emotion:m.emotion||'설렘',date:domainDateText(m.date),url:m.url||'',...(m.mediaMetadata?{mediaMetadata:m.mediaMetadata}:{}),createdAt:m.createdAt||new Date().toISOString(),x:m.x,y:m.y,rot:m.rot,pinStyle:m.pinStyle,cardStyle:m.cardStyle,keywords:m.keywords||[],color:m.color}})}
+return moments.map(m=>{const pc=connections.find(c=>c.kind==='parent'&&c.b===m.id);return{id:m.id,parentId:parentOf(m.id),relation:pc?(pc.why||''):'',links:relatedOf(m.id),title:m.title,note:m.memo||'',emotion:m.emotion||'설렘',date:domainDateText(m.date),url:m.url||'',...(m.mediaMetadata?{mediaMetadata:m.mediaMetadata}:{}),createdAt:m.createdAt||new Date().toISOString(),...(m.savedPos&&m.savedXY&&boardMode==='date'?{x:m.savedXY.x,y:m.savedXY.y,rot:m.savedXY.rot}:{x:m.x,y:m.y,rot:m.rot}),pinStyle:m.pinStyle,cardStyle:m.cardStyle,keywords:m.keywords||[],color:m.color}})}
 function newBoardId(){let id;do{id='m'+Math.random().toString(36).slice(2,10)}while(moments.some(m=>m.id===id));return id}
 function persistBoard(){if(!boardSaveEnabled())return;try{const treeId=window.parent.LT41.tree.id;window.parent.postMessage({type:'lt41-board-sync',treeId,moments:boardPayload()},location.origin)}catch{/* 셸이 없으면 저장하지 않는다 */}}
 window.addEventListener('message',e=>{if(e.origin!==location.origin)return;if(e.data?.type!=='lt41-board-saved')return;if(e.data.ok===false)toast(e.data.error||'서버에 저장하지 못했어요. 잠시 뒤 다시 시도해 주세요.')});
@@ -109,11 +122,12 @@ function titleSubMarkup(m){const sub=titleSub(m);return sub?'<div class="videoTi
 function dateText(v){return window.LTTitle?.formatDisplayDate?.(v)||v||''}
 
 function cardHTML(m){let media='';
-if(m.url)media=LTMedia.markup(m.url,m.title,m.mediaMetadata,m.id);
+if(m.url)media=LTMedia.markup(m.url,m.title,m.mediaMetadata,m.id,null,null,{compact:true});
 else if(m.type==='note') media=`<div class="noteText">“${esc(m.memo)}”</div>`;
 else if(m.type==='video') media=`<div class="media"><video muted playsinline loop poster="${m.asset}" src="${m.video}"></video><span class="playBadge">▶</span><span class="duration">${m.duration||'00:03'}</span></div>`;
 else media=`<div class="media ${m.type==='link'||m.type==='youtube'?'linkMedia':''}"><img src="${m.asset}" alt=""><span class="${m.type==='youtube'?'playBadge':''}">${m.type==='youtube'?'▶':''}</span></div>`;
-return `<article class="card ${m.first?'first':''} ${m.type==='note'?'noteCard':''}" data-id="${m.id}" title="끌어서 자리 옮기기" style="left:${m.x}px;top:${m.y}px;--rot:${m.rot}deg;--pin:${colors[m.color]};--halo:${colors[m.color]}55">${m.first?'<div class="firstTag">첫 순간</div>':''}<button class="pin" data-pin="${m.id}" aria-hidden="true" tabindex="-1"></button>${media}<div class="cardBody"><div class="eyebrow"><span class="emotionDot"></span>${LTLabels.type(m.originalType||m.type)} 순간 · ${esc(m.emotion)}</div><h3>${esc(titleMain(m))}</h3>${titleSubMarkup(m)}<div class="meta"><span>${esc(dateText(m.date))}</span><span>${m.type==='link'||m.type==='youtube'?'↗':''}</span></div>${m.type!=='note'?`<div class="memo">${esc(m.memo)}</div>`:''}${m.url?`<div class="domain">${esc(m.source)}</div>`:''}</div></article>`}
+// #601: 카드는 훑기용 — 큰 썸네일 + 제목 2줄 + 감정·날짜 한 줄만. 나머지(마음·출처·키워드·크게 보기)는 상세가 맡는다.
+return `<article class="card ${m.first?'first':''} ${m.type==='note'?'noteCard':''}" data-id="${m.id}" title="끌어서 자리 옮기기" style="left:${m.x}px;top:${m.y}px;--rot:${m.rot}deg;--pin:${colors[m.color]};--halo:${colors[m.color]}55">${m.first?'<div class="firstTag">첫 순간</div>':''}<button class="pin" data-pin="${m.id}" aria-hidden="true" tabindex="-1"></button>${media}<div class="cardBody"><h3 class="cardTitle">${esc(titleMain(m))}</h3><div class="cardMeta"><span class="emotionDot"></span>${esc(m.emotion)} · ${esc(dateText(m.date))}</div></div></article>`}
 
 function renderCards(){cardLayer.innerHTML=moments.map(cardHTML).join('');
 cardLayer.querySelectorAll('.card').forEach(el=>bindCard(el));
@@ -152,7 +166,9 @@ $('#zoomLabel').textContent=Math.round(view.z*100)+'%'}
    사용자가 옮기거나 확대한 자리는 트리별로 기억해 같은 트리로 돌아오면 그대로 연다(컴퓨터만, 휴대폰은 지금처럼 고른 순간). */
 let viewMode='start',userView=null,viewSaveTimer=0,worldSize={w:2400,h:2200};
 // 순간이 기본 무대 밖(아래 줄)까지 놓이면 판을 늘린다. DOM을 읽지 않는 가벼운 계산이라 화면을 옮길 때마다 불러도 된다.
-function growBoard(){let s=LT58Model.boardSize(moments);if(s.w===worldSize.w&&s.h===worldSize.h)return;worldSize=s;world.style.width=s.w+'px';world.style.height=s.h+'px'}
+// #601: 카드마다 예약 높이를 넘겨 판이 실제 카드 높이만큼 자라게 한다 — 전에는 기본 260px로 계산해
+// 마지막 줄 카드(썸네일이 실린 긴 카드)가 흰 판 밖으로 삐져나왔다.
+function growBoard(){let s=LT58Model.boardSize(moments.map(m=>({x:m.x,y:m.y,h:reservedHeights.get(m.id)||BASE_RESERVED_H})));if(s.w===worldSize.w&&s.h===worldSize.h)return;worldSize=s;world.style.width=s.w+'px';world.style.height=s.h+'px'}
 const BOARD_VIEW_KEY='lt41.boardView';
 function boardCards(){return moments.map(m=>{let el=cardLayer.querySelector(`[data-id="${m.id}"]`);return{id:m.id,x:m.x,y:m.y,w:el?.offsetWidth||242,h:el?.offsetHeight||260}})}
 // 보이는 칸: 왼쪽 도구 창·오른쪽 상세 창(열려 있거나 곧 열릴 때)을 뺀 자리. 좁은 화면(760 미만)은 두 창이 아래에서 올라오므로 빼지 않는다.
@@ -204,8 +220,11 @@ renderThreads();
 persistBoard();
 toast('이전 상태로 돌아왔어요.')}
 
+// #601: 판 자리 바꾸기(끌어 꽂기)는 '정렬 되돌리기'가 쓰던 같은 가드를 쓴다 — 읽기 전용에서는 옮기지 않는다.
+function dragGuard(){const guard=LT58Model.editGuard(canEditBoard);if(guard.blocked){toast(guard.message);return false}return true}
+
 function bindCard(el){let id=el.dataset.id;
-el.addEventListener('pointerdown',e=>{if(e.target.classList.contains('pin'))return;if(cinema)return;e.stopPropagation();snapshot();let m=moments.find(x=>x.id===id),p=screenToWorld(e.clientX,e.clientY);drag={id,dx:p.x-m.x,dy:p.y-m.y};el.setPointerCapture?.(e.pointerId);selectMoment(id,true)});
+el.addEventListener('pointerdown',e=>{if(e.target.classList.contains('pin'))return;if(cinema)return;if(!dragGuard())return;e.stopPropagation();snapshot();let m=moments.find(x=>x.id===id),p=screenToWorld(e.clientX,e.clientY);drag={id,dx:p.x-m.x,dy:p.y-m.y};el.setPointerCapture?.(e.pointerId);selectMoment(id,true)});
 el.addEventListener('pointermove',e=>{if(!drag||drag.id!==id)return;let p=screenToWorld(e.clientX,e.clientY),m=moments.find(x=>x.id===id);m.x=Math.max(70,Math.min(1320,p.x-drag.dx));m.y=Math.max(120,Math.min(760,p.y-drag.dy));el.style.left=m.x+'px';el.style.top=m.y+'px';rerenderThreads()});
 el.addEventListener('pointerup',e=>{if(drag?.id===id){let m=moments.find(x=>x.id===id);for(const o of moments){if(o.id===id)continue;if(Math.abs(o.x-m.x)<165&&Math.abs(o.y-m.y)<165){m.x+=34;m.y+=28;el.style.left=m.x+'px';el.style.top=m.y+'px';rerenderThreads();break}}drag=null;el.releasePointerCapture?.(e.pointerId)}});
 el.addEventListener('mouseenter',()=>{let v=el.querySelector('video:not(.lt-user-video)');if(v&&!cinema)v.play().catch(()=>{})});
@@ -222,7 +241,7 @@ let outs=connections.filter(c=>c.kind==='parent'&&c.a===id),ins=connections.filt
 // #553 뒤: '다음 순간'·'이전 순간'을 목차 글씨가 아니라 누르는 단추로 내놓는다(키보드 Tab·Enter도).
 // 누르면 판이 그 카드로 부드럽게 이동하고 카드가 선택되며 상세가 그 순간으로 바뀐다(focusBoardMoment).
 // 이유(why) 글은 단추 아래 작은 글씨로 그대로. 3개 넘으면 '나머지 N개 보기'를 유지한다.
-const _row=(c,dir)=>`<button type="button" class="connLink" data-cid="${c.id}" data-dir="${dir}">${dir==='next'?'→':'←'} ${esc(titleMain(moments.find(x=>x.id===(dir==='next'?c.b:c.a))))}</button>${(c.why&&c.why!=='관련 순간')?`<span class="connWhy">${esc(c.why)}</span>`:''}`;
+const _row=(c,dir)=>`<button type="button" class="connCard" data-cid="${c.id}" data-dir="${dir}"><span class="connName">${esc(titleMain(moments.find(x=>x.id===(dir==='next'?c.b:c.a))))}</span>${(c.why&&c.why!=='관련 순간')?`<span class="connWhy">${esc(c.why)}</span>`:''}</button>`;
 const _rows=outs.map(c=>_row(c,'next'));
 $('#dConn').innerHTML=_rows.length?_rows.slice(0,3).join('<br><br>')+(_rows.length>3?`<details><summary>나머지 ${_rows.length-3}개 보기</summary>${_rows.slice(3).join('<br><br>')}</details>`:''):(ins.length?ins.map(c=>_row(c,'prev')).join('<br><br>'):'아직 다음 순간이 없어요');
 $('#detail').classList.add('open')}}
@@ -358,17 +377,18 @@ $('#closeViewer').onclick=()=>{let v=$('#viewerMedia video');
 if(v)v.pause();
 $('#viewerModal').classList.remove('open')}
 ;
-$('#nextMoment').onclick=()=>{let c=connections.find(c=>c.a===selected);
-if(c)selectMoment(c.b,true)}
-;
+// #601: '다음 순간 보기'·'이전 순간 보기' 단추는 상세의 이어진 순간 카드로 대체됐다.
 // 전체 보기는 '처음으로' 돌아가는 단추이기도 하다: 기억한 자리를 지운다(다음에 열면 읽을 수 있는 처음 자리).
 function fitAllByUser(){userView=null;clearTimeout(viewSaveTimer);writeBoardView(null);fitAll(true)}
 $('#fitBtn').onclick=fitAllByUser;
 $('#resetBtn').onclick=fitAllByUser;
-// #582: '정렬 되돌리기' — 사람이 옮긴 자리를 지우고 날짜 최신순 바둑판으로 돌아간다. 자리 저장 방식은 그대로(x·y 저장).
-function sortReset(){const guard=LT58Model.editGuard(canEditBoard);if(guard.blocked){toast(guard.message);return}
-snapshot();for(const m of moments)m.savedPos=false;placeAll();settlePlacedCards();persistBoard();fitAllByUser();toast('날짜 최신순 바둑판으로 돌아왔어요.')}
-$('#sortResetBtn').onclick=sortReset;
+// #601: '날짜순 | 내 배치' 전환 — '정렬 되돌리기'를 대체한다. 전환은 저장 자리를 지우지 않는다.
+// 읽기 전용에서는 끌어 꽂기가 없어 '내 배치'가 '날짜순'과 같아진다 — 전환 자체는 막지 않는다(보기 모드).
+for(const b of document.querySelectorAll('[data-board-mode]')){
+ b.setAttribute('aria-pressed',b.dataset.boardMode===boardMode?'true':'false');
+ b.onclick=()=>{if(b.dataset.boardMode===boardMode)return;setBoardMode(b.dataset.boardMode);noteUserView();
+  toast(b.dataset.boardMode==='mine'?'내가 꽂은 자리를 그대로 보여요.':'날짜 최신순 바둑판으로 보여요. 꽂은 자리는 지우지 않아요.')};
+}
 $('#undoBtn').onclick=undo;
 $('#minusBtn').onclick=()=>zoomAtCenter(Math.max(.38,view.z-.1));
 $('#plusBtn').onclick=()=>zoomAtCenter(Math.min(1.45,view.z+.1));
