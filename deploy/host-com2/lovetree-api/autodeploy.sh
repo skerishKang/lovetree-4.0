@@ -168,6 +168,7 @@ has_api=0
 for file in "${changed[@]}"; do
   case "$file" in
     server/*|src/domain.js|package.json|package-lock.json|\
+    tools/export-ai-customer-db.mjs|\
     deploy/host-com2/lovetree-api/install.sh|\
     deploy/host-com2/lovetree-api/check_config.mjs|\
     deploy/host-com2/lovetree-api/preflight_imports.mjs) has_api=1 ;;
@@ -217,7 +218,7 @@ fi
 # clone을 umask 077로 만들거나 npm ci가 0700으로 만들면 Node가 모듈을 못 찾는다.
 fix_permissions() {
   chmod 0755 "$app"
-  chmod -R a+rX "$app/server" "$app/src" "$app/node_modules" 2>/dev/null || true
+  chmod -R a+rX "$app/server" "$app/src" "$app/tools" "$app/node_modules" 2>/dev/null || true
   chmod a+r "$app/check_config.mjs" "$app/preflight_imports.mjs" "$app/package.json" "$app/package-lock.json" 2>/dev/null || true
 }
 

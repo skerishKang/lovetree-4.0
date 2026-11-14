@@ -4,6 +4,16 @@
 
 > **빨간 필수 검사 규칭(2026-11-12 사고 뒤)**: 필수 검사가 빨강이면 **재실행은 1회까지**. 같은 항목이 또 빨강이면 멈추고 원인을 찾는다 — 재실행·빈 커밋으로 초록을 만들지 않는다. "간헐적·환경 탓"이라고 적으려면 **같은 시각 이 변경이 없는 브랜치(main 또는 다른 PR)** 에서도 같은 실패가 나는지 대조한 결과를 함께 적는다. 메시지를 받아 화면을 다시 띄우는 코드는 '뜰 때마다 보내는 쪽'과 짝으로 흐름 시험을 하고, 머지 전 미리보기 첫 화면을 5초 이상 직접 본다.
 
+## 2026-11-14 — AI 고객 내보내기: 쿠키 없이 컴2 DB에서 (로컬5 레인, ai/local5-lt-ai-export-db-261114, main b79752d 기준)
+
+- **무엇**: 매일 07:00 AI 고객 내보내기의 원본을 컴2 운영 DB(읽기만)로 바꿨다. 관리자 세션 쿠키 방식은 폐지(쿠키 만료로 조용히 멈추는 문제·쿠키 파일 보관 문제).
+- **컴2 판독기** `tools/export-ai-customer-db.mjs`(신규): API 서비스와 같은 .env(LOVETREE_DATABASE_URL·LOVETREE_PRODUCT_ID, 값 출력 금지)를 읽고 `BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY` 로 SELECT 만 — `lovetree_ai_personas` ⋈ `lovetree_product_roles(role='ai_customer')` 고객 + `lovetree_feedback`(답글 포함)을 관리자 API 응답 모양(camelCase) JSON 으로 stdout 으로. subject·이메일·전화번호 계열 필드는 아예 넣지 않고(maskPersonal 규칙 재적용), 고객 구분은 페르소나 이름+내부 번호(no)만.
+- **컴1 md 작성** `tools/export-ai-customer.mjs`: 입력을 `--from-json <파일|->` 로 바꾸고 쿠키·fetch 방식 코드는 지움(옛 방식 잔재 없음). 일지·소개 렌더 함수·KST 날짜 판정은 그대로. 같은 이름 페르소나 둘이면 폴더 `이름_no` 로 겹치지 않게.
+- **컴1 실행 스크립트** `tools/run-ai-customer-export.ps1`(신규): Git 번들 ssh(Windows 내장 ssh.exe 가 깨져 있음 — `ssh -V` 도 255·무출력, 2026-11-14 실측) → comp2 → `wsl -e /usr/local/bin/node 판독기 --b64`(인용·파이프 없는 명령 — powershell.exe 5.1 예약 작업이 겹따옴표·| 를 깨뜨려 판독기에 --b64 모드를 넣음, 실측) → 디코드해 임시 JSON → md 작성 → 임시 삭제. 로그 `E:\lovetree-qa\export-log\ai-customer-YYMMDD.log` 맨 윗줄이 이유 한 줄(성공 요약/실패 이유), 실패 시 종료 코드 1.
+- **설치 목록**: `install.sh` 가 판독기를 `/opt/padiem/lovetree-api/tools/` 에 넣고, `autodeploy.sh` 의 API 변경 판정에 `tools/export-ai-customer-db.mjs` 를 추가(이 파일만 바뀌어도 설치). migration 변경 없음 — 자동 설치 대상.
+- **시험** `tests/export-ai-customer.test.mjs` 12건(문장 READ ONLY·쓰기 키워드 없음, subject·이메일 없음, 가림, JSON→md, 이름 중복 폴더). `npm test` 전체는 PR당 1회 실행(결과는 PR 본문).
+- **주의**: 컴2 ssh 는 Windows 셸(cmd)이고 예약 작업은 powershell.exe 5.1 — 겹따옴표·`|`·작은따옴표가 원격 전달에서 깨진다(2026-11-14 실측) → 원격 명령은 인용·파이프 없이 `wsl -e node 판독기 --b64` 한 줄(base64 는 판독기가 출력). WSL 기본 사용자 root — .env 읽기 가능. JSON 은 base64 한 줄로만 전달(한글·줄바꿈 안전). 판독기 오류 이유는 값 없이 한 줄만 stderr 로.
+
 ## 2026-11-14 — 운영센터 2차 다듬기: 탭 거르기·고치는 일 (#570, 로컬3 레인, ai/local3-admin-570-261115, main f605e81 기준)
 
 - **머리줄**: '러브트리로 돌아가기' 단추는 로고와 같은 일을 두 번 하는 셈이라 없애고 로고(LoveTree 4.1)만 남겼다. 로고에 `title`·`aria-label` '러브트리로'. 탭 이름은 게시판→'고객 글', 이슈→'고치는 일'(신고 그대로) — 상세의 '← 게시판'도 '← 고객 글'로 맞춤.
