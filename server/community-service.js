@@ -2,6 +2,7 @@ import {randomUUID} from 'node:crypto';
 import {ApiError} from './errors.js';
 import {parsePrincipal} from './principal.js';
 import {projectSharedTree} from './share-service.js';
+import {ROLE_AI_CUSTOMER} from './admin-roles.js';
 import {coverModeOf} from '../src/domain.js';
 
 export const REACTION_KINDS=Object.freeze(['heart','like','love','laugh','wow','sad','angry']);
@@ -35,7 +36,7 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
   if(visibilityRepo){const visibility=(await visibilityRepo.get({productId,subjectId:share.subjectId,treeId:share.treeId})).visibility;if(visibility==='private')throw new ApiError(404,'share_not_found','공개 트리를 찾을 수 없어요.');}
   return share;
  }
- async function card(share,viewerSubjectId,statsOverride=null,lastActivityAt=null){
+ async function card(share,viewerSubjectId,statsOverride=null,lastActivityAt=null,aiTesterLookup=null){
   const stored=await workspaceRepo.load({productId,subjectId:share.subjectId});
   if(!stored)return null;
   let projected;try{projected=projectSharedTree(stored.doc,share.treeId);}catch{return null;}
@@ -46,21 +47,33 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
   const coverUrl=coverModeOf(tree)==='moment'?(cover?.url||''):'';
   const emotions=[...new Set(tree.moments.map(moment=>moment.emotion).filter(Boolean))];
   const stats=statsOverride||await communityRepo.stats({productId,shareId:share.shareId,viewerSubjectId});
-  return {shareId:share.shareId,title:tree.title,subject:tree.subject,summary:clean(cover?.note,160),emotions,momentCount:tree.moments.length,entryMomentId:share.entryMomentId,view:share.view,cover:{title:cover?.title||tree.title,url:coverUrl,emotion:cover?.emotion||''},createdAt:share.createdAt,lastActivityAt:lastActivityAt||share.createdAt,stats};
+  const card={shareId:share.shareId,title:tree.title,subject:tree.subject,summary:clean(cover?.note,160),emotions,momentCount:tree.moments.length,entryMomentId:share.entryMomentId,view:share.view,cover:{title:cover?.title||tree.title,url:coverUrl,emotion:cover?.emotion||''},createdAt:share.createdAt,lastActivityAt:lastActivityAt||share.createdAt,stats};
+  // #611 3번: AI 테스터 기록은 남에게 보이는 카드에 'AI 테스터' 배지 한 비트만 내린다
+  // (계정·이메일·subject는 공개 응답에 넣지 않는다).
+  if(aiTesterLookup&&await aiTesterLookup(share.subjectId))card.aiTester=true;
+  return card;
  }
  return {
   async discover({query='',emotion='',cursor='',limit=12,viewerSubjectId=null}={}){
    const q=clean(query,80).toLocaleLowerCase('ko-KR'),tag=clean(emotion,12),size=Math.max(1,Math.min(24,Number(limit)||12));
+   // #611 3번: AI 테스터 배지 비트 — 이번 한 번의 둘러보기 조회에서는 같은 주인이면 한 번만 묻는다.
+   const roleCache=new Map();
+   const aiTesterLookup=admin?async subjectId=>{
+    if(roleCache.has(subjectId))return roleCache.get(subjectId);
+    const flag=await admin.roleFor({productId,subjectId})===ROLE_AI_CUSTOMER;
+    roleCache.set(subjectId,flag);
+    return flag;
+   }:null;
    let entries;
    if(typeof communityRepo.listDiscoverableSummaries==='function'){
     const summaries=await communityRepo.listDiscoverableSummaries({productId,viewerSubjectId,limit:240});
     entries=await Promise.all(summaries.map(async summary=>{
-     const item=await card(summary.share,viewerSubjectId,summary.stats,summary.lastActivityAt);
+     const item=await card(summary.share,viewerSubjectId,summary.stats,summary.lastActivityAt,aiTesterLookup);
      return item;
     }));
    }else{
     const shares=await communityRepo.listDiscoverable({productId,viewerSubjectId,limit:240});
-    entries=await Promise.all(shares.map(share=>card(share,viewerSubjectId)));
+    entries=await Promise.all(shares.map(share=>card(share,viewerSubjectId,null,null,aiTesterLookup)));
    }
    const cards=[];
    for(const item of entries){if(!item)continue;const haystack=(item.title+' '+item.subject+' '+item.summary).toLocaleLowerCase('ko-KR');if(q&&!haystack.includes(q))continue;if(tag&&!item.emotions.includes(tag))continue;cards.push(item);}

@@ -12,11 +12,11 @@ const first=createTree({subject:'윤슬',title:'첫 장면',note:'비밀 마음'
 const second=createTree({subject:'다른 대상',title:'다른 트리',note:'절대 공개하지 않음',emotion:'위로',date:'2026-11-01',url:'https://example.com/public'},CLOCK);
 const state={version:1,trees:[first,second]};
 
-async function setup(documentState=state){
+async function setup(documentState=state,admin=null){
  const workspaceRepo=createMemoryWorkspaceRepo(),workspace=createWorkspaceService({repo:workspaceRepo,productId:PRODUCT});
  await workspace.write(principal('alice'),{state:documentState,expectedRevision:0,clientKey:'seed',});
  const shareRepo=createMemoryShareRepo();let n=0;
- const service=createShareService({shareRepo,workspaceRepo,productId:PRODUCT,makeId:()=>String(++n).padStart(24,'s')});
+ const service=createShareService({shareRepo,workspaceRepo,productId:PRODUCT,admin,makeId:()=>String(++n).padStart(24,'s')});
  const authenticate=async request=>principal(request.headers?.account||'alice');
  return {workspace,workspaceRepo,handle:createShareHandler({authenticate,service,productId:PRODUCT})};
 }
@@ -46,6 +46,27 @@ test('preview is non-mutating and explicit create exposes one projected tree onl
  assert.equal(publicRead.body.tree.id,first.id);assert.equal(publicRead.body.tree.moments[0].url,'');
  assert.equal(JSON.stringify(publicRead.body).includes('/api/media/'),false,'공유 응답에 올린 사진 주소가 없다');
  assert.equal(JSON.stringify(publicRead.body).includes(second.title),false);assert.equal('state' in publicRead.body,false);assert.equal(JSON.stringify(publicRead.body).includes('alice'),false);
+});
+
+test('#611 3번: 공개 공유 읽기에는 aiTester 한 비트만 내린다(계정·이메일·subject는 넣지 않는다)',async()=>{
+ const input={treeId:first.id,entryMomentId:first.moments[0].id,view:'board'};
+ // 보통 기록: 표지가 없다.
+ const plain=await setup();
+ const pPrev=await request(plain.handle,'POST','/api/shares/preview',input,'alice');
+ const pMade=await request(plain.handle,'POST','/api/shares',{...input,previewToken:pPrev.body.preview.previewToken},'alice');
+ const pRead=await request(plain.handle,'GET','/api/public/shares/'+pMade.body.share.id);
+ assert.equal(pRead.status,200);assert.equal(pRead.body.aiTester,undefined,'일반 기록에는 표시하지 않는다');
+ assert.equal(JSON.stringify(pRead.body).includes('alice'),false);
+ assert.equal(JSON.stringify(pRead.body).match(/@/),null,'이메일이 없다');
+ // ai_customer 역할: aiTester:true만 있다.
+ const ai=await setup(state,{roleFor:async value=>value.subjectId==='alice'?'ai_customer':null});
+ const aPrev=await request(ai.handle,'POST','/api/shares/preview',input,'alice');
+ const aMade=await request(ai.handle,'POST','/api/shares',{...input,previewToken:aPrev.body.preview.previewToken},'alice');
+ const aRead=await request(ai.handle,'GET','/api/public/shares/'+aMade.body.share.id);
+ assert.equal(aRead.body.aiTester,true,'AI 테스터 비트');
+ assert.equal(JSON.stringify(aRead.body).includes('alice'),false);
+ assert.equal(JSON.stringify(aRead.body).match(/@/),null,'이메일이 없다');
+ assert.equal(JSON.stringify(aRead.body).includes('subjectId'),false,'subject 식별자 필드를 내리지 않는다');
 });
 
 test('photo cover is projected to design or basic in the public tree while the stored tree keeps photo mode',async()=>{

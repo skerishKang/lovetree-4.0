@@ -155,7 +155,8 @@ const shareService = createShareService({
   workspaceRepo: repo,
   visibilityRepo,
   productId: LOVETREE_PRODUCT_ID,
-  plusEntitled: () => false
+  plusEntitled: () => false,
+  admin
 });
 const service = createWorkspaceService({
   repo,
