@@ -48,6 +48,15 @@
 - **서버 무변경 확인**: intro 는 jsonb 통과 — `savePersona`가 키를 거르지 않아(DB 변경 없음). `board-service` 시험에 habits 저장→불러오기 왕복 단언 추가.
 - **일지 쓰기 창**: `public/v41/index.html` journal-panel 내용 칸 뒤에 '(선택) 디자인 느낌 — 내가 자주 쓰는 ○○와 비교해서: 익숙했던 점 / 어색했던 점' 안내 한 줄(본문 틀 예시). 시험 `v41-journal-design-hint-590`(마크업 글자).
 - **내보내기**: `renderIntroMarkdown` 같은 항목 — 시험 갱신(7개 항목·여러 줄 값·빈 값 '—'). 머지 뒤 `E:\lovetree-qa\export-tool\` 사본 재복사 + `schtasks /run` 0 확인. 윤제 소개의 habits 내용은 페르소나 레인 몫(여기서 채우지 않음).
+## 2026-11-14 — 운영센터 '사용 일지' 탭 + 일지 본문 8000자 (#596, 로컬5 레인)
+
+- **머리줄 탭**: 고객 글 · **사용 일지** · 신고 · 고치는 일. 탭 상태는 주소 `#journals` 로 남겨 새로고침·뒤로가기 유지(#564·#570 방식 — parseHash·viewHash·viewToTab 에 journals 추가). 고객 글 탭의 '일지' 거르기는 그대로(중복 허용).
+- **사용 일지 탭**: 위에 오늘 요약(활동 고객 수·오늘 일지 수·평균 다시 올 점수·떠남 위험 수 — 떠남 규칙은 최근 두 기록일 점수가 연속 2 이하, 운영 기준 6.4 지표), 아래 고객별 줄(이름·단계·최근 점수·날짜별 점수 흐름 점·마지막 기록일 — 단계는 일지 기록일 수 기준 시작 1일/꾸준 2~4일/정착 5일 이상, 마지막 접속 기록이 따로 없어 기록일로 대표). 줄을 누르면 그 고객 일지를 날짜 내림차순으로 펼쳐 읽기 — 본문 줄바꿈 유지(richParagraph), 같은 날 그 고객이 보낸 의견 링크(#feedback/<id>).
+- **읽기 API 하나 추가(관리자만)**: `GET /api/admin/journals` — kind='journal' 만 journal_date 내림차순(feedback-postgres listJournals + memory 저장소 동형 구현 + service.adminJournals + proxy 허용 목록). 기존 /api/admin/feedback·persona 는 그대로.
+- **일지 본문 한도 2000→8000**: 서버 createJournal 만 MAX_JOURNAL_BODY 8000(의견은 MAX_BODY 2000 유지) + DB CHECK 를 kind 로 나눠 일지만 8000(schema.sql + `migrations/feedback-body-8000-261114.sql` — 재실행 안전 DROP IF EXISTS→ADD). **migration 은 자동 설치 금지 대상 — 컴2 수동 적용 후 --accept-migrations 1회**(AUTODEPLOY.md 절차).
+- **시험**: admin-view(요약 계산·고객별 정렬·떠남 규칙·단계·주소 왕복)·board-service(한도 8000 저장·의견 2000 유지·읽기 API 401/403/200)·feedback-postgres(DB CHECK — journal 8000 허용·8001/opinion 2001 거절·listJournals). 전체 npm test 1,605건 1,563 pass/0 fail/42 skip, build 통과.
+- **화면 확인**: 모의 관리자 API + 헤드리스 1440·390 — 탭 4개·요약 값·고객 줄 3·펼치기·날짜 정렬·줄바꿈·의견 링크(#feedback/55)·가로 넘침 0·새로고침 주소 유지(스크린샷 .tmp-596/). 윤제 소개의 habits 내용은 페르소나 레인 몫(#590).
+
 ## 2026-11-14 — 지도 대비 시험 간헐 실패 수리: 말풍선 시차 + CI 진단 출력 (#591, 로컬5 레인)
 
 - **원인(로컬 재현·dbg 실측)**: 점을 누르면 '연결 이유' 말풍선(#366)이 3.2초 고정되고 토스트는 2.3초 — 스크린샷(표시 중)과 겹침 계산(사라진 뒤) 사이가 워커 병렬 부하로 벌어지면 말풍선 밑 선을 패널색(#211b2b, 1.08~1.16:1)으로 재서 실패. 어느 조합·선이 떨어지는지는 타이밍마다 달랐다(02:38 CI 실패·로컬 2회 — 02:38 실패는 wait 가 bash -e 로 죽어 진단이 안 남았다).
