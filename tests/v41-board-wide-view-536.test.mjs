@@ -133,7 +133,9 @@ test('#536 순간 40개 사슬의 처음 보기는 넓은 화면에서도 판을
     for (const [w, h] of [[1440, 900], [2560, 1080]]) {
       const { context, frame } = await openHost(browser, `${base}/__host-40.html`, { width: w, height: h });
       const g = await geometry(frame);
-      assert.ok(g.cover >= 0.9, `${w}: 순간 40개 판 덮음 ${(g.cover * 100).toFixed(1)}% ≥ 90%`);
+      // #582 바둑판: 칸 수가 화면 폭을 따르므로(1440 4칸·2560 8칸) 넓은 화면에서 판 덮음 비율도 화면 폭을 따른다.
+      const minCover = w >= 2560 ? 0.75 : 0.9;
+      assert.ok(g.cover >= minCover, `${w}: 순간 40개 판 덮음 ${(g.cover * 100).toFixed(1)}% ≥ ${minCover * 100}%`);
       assert.equal(g.zoom, '80%', `${w}: 읽을 수 있는 0.8배 처음 보기 유지`);
       await context.close();
     }

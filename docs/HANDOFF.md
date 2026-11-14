@@ -14,6 +14,14 @@
 - **시험**: `tests/v41-orbit-535-float-overlap.test.mjs`(부유 소스 계약을 새 구조로), `tests/v41-orbit-491-390-cards.test.mjs`(배율 계약 문구) 갱신. 전체 `npm test` 1,594건 중 1,551 pass / 1 fail 은 다른 레인 파일(`v41-map-contrast` — 재실행 통과, 이 변경과 무관).
 - **도구·기록**: `E:\lovetree-qa\orbit-593`(measure593·dragbreak·area3·intr 등), 스크린샷 1440·1920·390.
 
+## 2026-11-14 — 저장소 점검: CI 에서 돌지 않던 화면 시험 4개 연결, 운영센터 배경 (CTO)
+
+- **점검 결과**: main 필수 검사 초록, 로컬 전체 npm test 1,595건 fail 0. workflow 가 부르는 시험 파일은 모두 존재. 그런데 **크롬이 필요한 화면 시험 4개가 미리보기 검사에 연결되지 않아 CI 에서 조용히 건너뛰어졌다**: v41-board-pinboard-582(#582), v41-board-cursor-detail(#583), v41-tree-tips-549(#549), v41-tree-rename-tips-571(#571).
+- **고침**: 앞의 둘은 '보드·접근성·날짜' 잡, 뒤의 둘은 '책 대비·초점' 잡에 '건너뜀=실패' 단계로 연결. #583·#549 시험에 REQUIRE 플래그(LT_BOARD_583_REQUIRE·LT_TREE_TIPS_549_REQUIRE)를 붙였다.
+- **새 화면 시험을 만드는 레인 규칙**: 크롬이 필요한 시험은 반드시 `LT_…_REQUIRE` 플래그를 두고 같은 PR 에서 preview-check.yml 에 단계로 연결한다. 연결 여부는 `grep -l "REQUIRE" tests/*.mjs` 와 workflow 대조로 확인.
+- **운영센터 배경(#595)**: 빌드 뒤 admin.css 가 styles.css 보다 먼저 실려 :root 크림이 이겼다 → `html:root` 로 명시도를 올림.
+
+
 ## 2026-11-15 — 첫 화면 끌기 성능: 원인 규명과 저위험 완화 (#586, 로컬3 레인, ai/local3-orbit-fps-261115, main cf5ad94 기준)
 
 - **측정으로 밝힌 정확한 원인(Performance.getMetrics·CDP 트레이스, 도구·기록 E:\lovetree-qa\orbit-fps)**: 첫 화면은 가만히 있어도 렌더러 메인 스레드가 코어 하나의 80~100%를 씁니다(RecalcStyleDuration ~850–1000ms/s). 프레임마다 카드 28장의 transform·z-index·filter 를 다시 쓰기 때문이고, 이때 스타일 재계산이 카드 하나당 ~1.2ms(28장 한 배치 ~16–37ms) 걸립니다 — 같은 쓰기를 그림자 스타일시트를 떼면 ~0.03ms 로 떨어져, 규칙 일치·재계산 자체가 병목입니다. 유휴와 끄기의 CPU 가 같아 "끄는 동안만 무거운 것"이 아니라 "항상 이만큼 쓰는 것"이 끌기 44fps 의 한계였습니다.
@@ -33,6 +41,18 @@
 - **머지·배포**: PR #588 머지 → main `f0fb5c4`, 필수 검사 전부 초록. 스크린샷 전/후 1440·1920·2560 × 밤·정원 + 세로 사례 + 실제 재생 2장 → `E:\lovetree-qa84\`. 이슈 #584 보고 댓글 후 닫음.
 - **남긴 것**: 실기기(컴2 tabbit) 재생 확인은 이쪽에서 못 했다 — 로컬 Chromium(headed playwright) 실측으로 대체했고 같은 엔진이라 같은 결과를 기대하지만, 배포 뒤 컴2에서 한 번 열어 보는 것을 권한다.
 
+## 2026-11-15 — 보드를 핀보드로: 바둑판 배치·끌어 꽂기·줄은 지도에 (#582, 로컬2 레인, ai/com2-lt582-pinboard-grid-20261115, main ee8172a 기준)
+
+- **배치**: treeSpread(관계 기준 펼치기)를 버리고 날짜 최신순 바둑판. 칸 수는 화면 폭이 정한다(1440 4칸·390 1칸·1920 6칸 상한), 카드 크기는 #548 기준선 그대로. 저장 자리(#395 계약)는 그대로 남고 나머지를 빈 칸에 채운다.
+- **끌어 꽂기**: 카드를 끌면 가장 가까운 빈 칸에 스냅되고 x·y를 기존 저장 방식(lt41-board-sync) 그대로 저장. '정렬 되돌리기' 단추로 날짜순 바둑판 복귀. 판 끌기 중 카드 pointer-events 를 꺼 성능 확보.
+- **줄 없음**: 보드에서 실·핀 연결·'이어진 이유' 창·연결 배너 제거 — 관계도는 지도가 맡는다. 이어 주기는 순간 추가의 '이전 순간 고르기'와 지도에서.
+- **상세**: 이전·다음 순간 링크 유지(#583), '지도에서 관계 보기' 단추 신설 — 셸 메시지 lt41-open-network 로 `#my/network?tree=…&moment=…` 약속대로 열기(messages.mjs 한 조각, 지도 파일 미수정). extras selectMoment 의 다음 순간 목록을 board.js 와 같은 3개 규칙으로 통일.
+- **용어**(이슈 댓글 반영): '＋ 순간 꽂기'→'＋ 순간 추가', '기억판에 꽂기'→'보드에 추가', 토스트·기본값·이어진 이유 기본 문자열도 '추가'로. 카드 끌기 설명은 '끌어서 자리 옮기기'(title). 숨김 고급 도구(DEFAULT PIN·CARD)는 화면에 안 남아 유지.
+- **시험**: 신규 `tests/v41-board-pinboard-582.test.mjs` 7건. 관계 배치에 묶였던 기존 시험을 바둑판 기준으로 갱신(spread-469·board-model·553·536·cursor-detail·merge-pinboard·touch-targets — board-model 의 실 3건·연결 지우기는 기능 소멸로 삭제). 서버·DB 변경 없음.
+- **fps(1440, 26순간, 헤드리스)**: 판 끌기 17.9~36.3 → 45.1~49.5, 확대 25.5~58.6 → 58.7~60.5. 스크린샷(1440·390 × 종이·밤 전/후 + 상대): `E:\lovetree-qa\582\`
+- **트러블슈팅 기록**: (1) 이전 세션 전체 npm test 의 2건 실패는 환경 탓 — #548 글자 기준선은 worktree 의 `dist/` 가 지워진 상태(빈 페이지 → dialog null), 지도 대비는 오래된 dist 기준. 재빌드 후 둘 다 통과. (2) 첫 CI 실패 3건은 브랜치가 main 뒤쳐져 새 시험 파일(v41-orbit-586-perf·v41-map-fan-open)이 없었던 것 — 워크플로우는 PR head 를 체크아웃하므로 main 병합으로 해소. (3) 미리보기 postdeploy 의 503(youtube-oembed·콘솔)은 미리보기 Functions 미준비 — 운영은 401/200 정상 대조로 #582 무관 확인.
+- **머지**: PR #594 → main `ab21965`, 필수 검사 전부 초록. 이슈 #582 보고 댓글 후 닫음.
+
 ## 2026-11-15 — 보드 마감: 금색 커서 동그라미 제거 + 상세 다음·이전 순간 단추화 (로컬2 레인, ai/com2-lt-cursor-detail-20261115-0830-3a7c, main 8092d28 기준)
 
 - **커서 동그라미 완전 제거**: 따라오는 금색 동그라미(`cursorRing`·`cursorInner`·`cursorFX`·`cursor-burst/ripple/drop`)를 HTML 요소·board.css 스타일·board-extras.js 배선·board-model.js 판정 함수(`cursorMode`·`cursorHover`·`cursorScale`·`cursorEffectAllowed`·`cursorPresence`)까지 치웠다. 원래 마우스 커서를 쓰고, 상태는 CSS cursor로 알린다 — 판 `grab`(끌 때 `grabbing`, `#viewport.panning`), 카드 `grab`(끌 때 `grabbing`, `.card.dragLift`), 핀 연결 중 `crosshair`(`#cardLayer.linking`), 핀·단추 `pointer`. `public/v41` 전체에 `cursor:none` 없음(시험이 검사).
@@ -40,6 +60,35 @@
 - **시험**: 신규 `tests/v41-board-cursor-detail.test.mjs` 4건 — (1) 커서 흔적 없음(5개 파일·public/v41 전체 `cursor:none` 걷기) + 상태 커서 규칙, (2) 단추 규칙, (3) 실제 브라우저 다음 단추 클릭 → 판 이동(transform 변화)·선택·상세 전환 + Enter, (4) 이전 단추. board-model 시험의 커서 시험 5건(19~24)은 함수 소멸로 함께 거둠. 관련 시험 49건 통과(board-model·신규·#553 겹침·#536 넓게·터치 영역), build·modulepreload 유지 확인.
 - **fps(1440, 사슬 40순간, 헤드리스 playwright)**: 판 끌기 40→43~44, 확대 56→58 — 같거나 소폭 빠름(동그라미 그리기·기억을 덜어서). 스크린샷·수치: `E:\lovetree-qaoard-cursor\`(detail-next-button.png, fps 기록).
 - **머지**: PR #583 → main. 보드 배치(treeSpread·cardPosition)는 건드리지 않았다.
+## 2026-11-14 — AI 고객 페르소나 '자주 쓰는 곳·익숙한 디자인' + 일지 디자인 느낌 틀 (#590, 로컬5 레인)
+
+- **운영센터**: `PERSONA_FIELDS`(src/admin-view.js)에 `habits`('자주 쓰는 곳·익숙한 디자인', 여러 줄 칸)를 '쓰는 모습' 뒤에 추가 — admin.js 폼은 PERSONA_FIELDS 공용(row 높이 자동 계산)이라 코드 무변경. 운영센터·내보내기 md 가 같은 순서 7항목.
+- **서버 무변경 확인**: intro 는 jsonb 통과 — `savePersona`가 키를 거르지 않아(DB 변경 없음). `board-service` 시험에 habits 저장→불러오기 왕복 단언 추가.
+- **일지 쓰기 창**: `public/v41/index.html` journal-panel 내용 칸 뒤에 '(선택) 디자인 느낌 — 내가 자주 쓰는 ○○와 비교해서: 익숙했던 점 / 어색했던 점' 안내 한 줄(본문 틀 예시). 시험 `v41-journal-design-hint-590`(마크업 글자).
+- **내보내기**: `renderIntroMarkdown` 같은 항목 — 시험 갱신(7개 항목·여러 줄 값·빈 값 '—'). 머지 뒤 `E:\lovetree-qa\export-tool\` 사본 재복사 + `schtasks /run` 0 확인. 윤제 소개의 habits 내용은 페르소나 레인 몫(여기서 채우지 않음).
+## 2026-11-14 — 운영센터 '사용 일지' 탭 + 일지 본문 8000자 (#596, 로컬5 레인)
+
+- **머리줄 탭**: 고객 글 · **사용 일지** · 신고 · 고치는 일. 탭 상태는 주소 `#journals` 로 남겨 새로고침·뒤로가기 유지(#564·#570 방식 — parseHash·viewHash·viewToTab 에 journals 추가). 고객 글 탭의 '일지' 거르기는 그대로(중복 허용).
+- **사용 일지 탭**: 위에 오늘 요약(활동 고객 수·오늘 일지 수·평균 다시 올 점수·떠남 위험 수 — 떠남 규칙은 최근 두 기록일 점수가 연속 2 이하, 운영 기준 6.4 지표), 아래 고객별 줄(이름·단계·최근 점수·날짜별 점수 흐름 점·마지막 기록일 — 단계는 일지 기록일 수 기준 시작 1일/꾸준 2~4일/정착 5일 이상, 마지막 접속 기록이 따로 없어 기록일로 대표). 줄을 누르면 그 고객 일지를 날짜 내림차순으로 펼쳐 읽기 — 본문 줄바꿈 유지(richParagraph), 같은 날 그 고객이 보낸 의견 링크(#feedback/<id>).
+- **읽기 API 하나 추가(관리자만)**: `GET /api/admin/journals` — kind='journal' 만 journal_date 내림차순(feedback-postgres listJournals + memory 저장소 동형 구현 + service.adminJournals + proxy 허용 목록). 기존 /api/admin/feedback·persona 는 그대로.
+- **일지 본문 한도 2000→8000**: 서버 createJournal 만 MAX_JOURNAL_BODY 8000(의견은 MAX_BODY 2000 유지) + DB CHECK 를 kind 로 나눠 일지만 8000(schema.sql + `migrations/feedback-body-8000-261114.sql` — 재실행 안전 DROP IF EXISTS→ADD). **migration 은 자동 설치 금지 대상 — 컴2 수동 적용 후 --accept-migrations 1회**(AUTODEPLOY.md 절차).
+- **시험**: admin-view(요약 계산·고객별 정렬·떠남 규칙·단계·주소 왕복)·board-service(한도 8000 저장·의견 2000 유지·읽기 API 401/403/200)·feedback-postgres(DB CHECK — journal 8000 허용·8001/opinion 2001 거절·listJournals). 전체 npm test 1,605건 1,563 pass/0 fail/42 skip, build 통과.
+- **화면 확인**: 모의 관리자 API + 헤드리스 1440·390 — 탭 4개·요약 값·고객 줄 3·펼치기·날짜 정렬·줄바꿈·의견 링크(#feedback/55)·가로 넘침 0·새로고침 주소 유지(스크린샷 .tmp-596/). 윤제 소개의 habits 내용은 페르소나 레인 몫(#590).
+
+- **운영 답변 보조**(컴2 root, #596 후속): `wsl -e node /opt/padiem/lovetree-api/tools/ops-reply.mjs --id <의견 번호> --reply <답변 파일> --status <fixed|closed|...> --issue <번호>` — 운영센터 API 와 같은 서버 함수(feedback-service.reply·update)로 고객 답변·상태·연결 이슈를 처리하고, 이미 답글이 있으면 건너뜀(종료 3). 설치 목록·CI 진단 같은 모양 유지.
+
+## 2026-11-14 — 지도 대비 시험 간헐 실패 수리: 말풍선 시차 + CI 진단 출력 (#591, 로컬5 레인)
+
+- **원인(로컬 재현·dbg 실측)**: 점을 누르면 '연결 이유' 말풍선(#366)이 3.2초 고정되고 토스트는 2.3초 — 스크린샷(표시 중)과 겹침 계산(사라진 뒤) 사이가 워커 병렬 부하로 벌어지면 말풍선 밑 선을 패널색(#211b2b, 1.08~1.16:1)으로 재서 실패. 어느 조합·선이 떨어지는지는 타이밍마다 달랐다(02:38 CI 실패·로컬 2회 — 02:38 실패는 wait 가 bash -e 로 죽어 진단이 안 남았다).
+- **수리**: `tests/helpers/map-contrast.mjs` — 겹침 사각형을 스크린샷 직전에 재서(overlayRectsInPage → measureMapPixelsInPage 전달) 스크린샷 시점과 같은 겹침으로 거른다. 제품(말풍선·토스트) 변경 없음 — 측정 조건 수리.
+- **CI**: `preview-check.yml` 지도 대비 잡의 `wait $p1; r1=$?` 가 bash -e 에서 즉시 사망해 진단이 안 남던 것 — 종료 코드를 받아 두고 두 로그를 항상 출력한 뒤 마지막에 판정. 같은 모양 다른 잡 없음(전수 확인).
+
+## 2026-11-14 — 지도 대비 시험: 같은 원인 독립 도달 + 스크린샷 신선함 검증 얹기 (#591, 로컬1 레인, ai/local1-preview-diag-261115, main 5f87fe6 기준, PR #599 → aca4408)
+
+- **중복 발견**: 이 레인도 같은 원인(스크린샷 뒤에 겹침 계산이 도는 시차)에 독립적으로 도달했고, 진단 중 로컬5 레인의 #598 이 먼저 머지됐다 — 규칙대로 main 을 합쳐 그쪽 workflow 단계를 살리고, 헬퍼는 두 판을 합쳤다(좌표 수집은 캡처 직전 유지).
+- **얹은 것(신선함 검증)**: 헤드리스 크로미움은 캔버스를 그린 뒤 화면에 올리기를 미룬다(부하 아래 실측 8회 연속 스틸, 2.4초+) — 스틸 프레임을 재면 좌표와 픽셀이 어긋난다. `#stage` 에 번역 없는 transform(`translateZ(0)`)을 캡처 직후에 잠깐 걸어 합성을 강제하고, 모서리 한 픽셀(CSS 0.5,0.5 — 측정 표본 제외 자리)에 심은 신호 색(#010203)이 스크린샷에 찍혔는지로 최신 프레임임을 확인한다(안 찍히면 화면이 멈출 때까지 기다렸다 최대 10번 재시도, 고정 대기 없음).
+- **검증**: 로컬 같은 커밋 — 대비 시험 동시 3회 + 차례 3회 모두 통과(88~105초; 수정 전 같은 비교는 동시 1/3·차례 0/3 통과로 경합 재현). CI 지도 대비 잡 **3회 연속 초록**(같은 커밋 c243f0f 재실행 attempt 1·2·3, 잡 1분51초 — 2분 안).
+
 ## 2026-11-14 — AI 고객 내보내기: 쿠키 없이 컴2 DB에서 (로컬5 레인, ai/local5-lt-ai-export-db-261114, main b79752d 기준)
 
 - **무엇**: 매일 07:00 AI 고객 내보내기의 원본을 컴2 운영 DB(읽기만)로 바꿨다. 관리자 세션 쿠키 방식은 폐지(쿠키 만료로 조용히 멈추는 문제·쿠키 파일 보관 문제).

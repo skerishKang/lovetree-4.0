@@ -216,17 +216,19 @@ function verticalVideo(url, mediaMetadata = null) {
   if (verticalProbed.get(m.videoId) === true) return true;
   return !!(m.vertical || metaVertical);
 }
-function markup(url,title='',mediaMetadata=null,momentId='',context=null,momentMeta=null){
+function markup(url,title='',mediaMetadata=null,momentId='',context=null,momentMeta=null,opts=null){
  const m=describe(url);
  if(m.kind==='none')return '';
  if(m.kind==='invalid')return '<p class="lt-media-error">링크를 열 수 없어요. 원본 주소를 확인해 주세요.</p>';
+ // #601: 보드 카드의 큰 썸네일 한 장 — 크게 보기·안내 글·원본 링크·두 번째 제목은 상세가 맡는다.
+ const compact=!!opts?.compact;
  const canLoad=!!m.loadUrl&&(new URL(m.loadUrl).protocol==='https:'||m.privateFile);
  const ctx=context||mediaContext();
  const ownedServer=autoLoadMedia(ctx.source,ctx.owned);
  const auto=canLoad&&m.kind==='youtube'&&ownedServer;
  const vertical=verticalVideo(url,mediaMetadata);
  const caption=[mediaMetadata?.title,mediaMetadata?.channel,mediaMetadata?.source].filter(value=>typeof value==='string'&&value.trim()).join(' · ');
- const cached=caption?'<p class="lt-media-title">'+esc(caption)+'</p>':'';
+ const cached=(caption&&!compact)?'<p class="lt-media-title">'+esc(caption)+'</p>':'';
  const fb=globalThis.LTThumbFallback||null;
  const momentRecord={id:momentId,title,url,mediaMetadata,...(momentMeta||{})};
  const candidates=auto?youtubeCandidates(m.videoId,vertical,mediaMetadata):[];
@@ -244,10 +246,10 @@ function markup(url,title='',mediaMetadata=null,momentId='',context=null,momentM
   // 썸네일 아무 곳이나 눌러도 그 자리에서 재생한다. autoplay 는 누른 뒤 만들어지는 embed 주소에만 있다.
   ?'<figure class="lt-yt-preview" data-lt-thumb-host><img src="'+esc(previewSrc)+'" alt="'+esc(title||'YouTube 영상 썸네일')+'"'+previewFallback+' referrerpolicy="no-referrer" loading="lazy" decoding="async"><button type="button" class="lt-yt-play" data-lt-play aria-label="바로 재생"><span aria-hidden="true">▶</span></button></figure>'+cached
   :(linkCard?linkCard:(canLoad?'<button type="button" data-lt-load>'+esc(m.loadLabel)+'</button>':'<span>'+esc(m.label)+'</span>')+cached);
- const status=auto?'재생을 누르면 여기서 바로 재생해요.':(canLoad?'불러오기를 누르면 원본 사이트에 연결됩니다.':'원본 사이트에서 확인할 수 있어요.');
+ const status=compact?'':(auto?'재생을 누르면 여기서 바로 재생해요.':(canLoad?'불러오기를 누르면 원본 사이트에 연결됩니다.':'원본 사이트에서 확인할 수 있어요.'));
  // #393 2: 크게 보기 — 영상을 어두운 깔개 위 화면 가운데 크게 연다(바깥 클릭·Esc로 복귀).
- const expand=canLoad&&(m.kind==='youtube'||m.kind==='video')?'<div class="lt-media-toolbar"><button type="button" data-lt-expand>크게 보기</button></div>':'';
- let html = '<div class="lt-media" data-lt-url="'+esc(url)+'" data-lt-title="'+esc(title)+'"'+(momentId?' data-lt-moment-id="'+esc(momentId)+'"':'')+(m.kind==='youtube'?' data-lt-youtube="1"':'')+(vertical?' data-lt-vertical="1"':'')+'>'+expand+'<div class="lt-media-body">'+body+'</div><p class="lt-media-status" role="status">'+status+'</p><a href="'+esc(m.openUrl)+'" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">'+esc(m.kind==='youtube'?m.actionLabel+(m.startSeconds?' · 시작 '+formatStart(m.startSeconds):''):'원본 링크 열기')+' ↗</a></div>';
+ const expand=canLoad&&!compact&&(m.kind==='youtube'||m.kind==='video')?'<div class="lt-media-toolbar"><button type="button" data-lt-expand>크게 보기</button></div>':'';
+ let html = '<div class="lt-media" data-lt-url="'+esc(url)+'" data-lt-title="'+esc(title)+'"'+(momentId?' data-lt-moment-id="'+esc(momentId)+'"':'')+(m.kind==='youtube'?' data-lt-youtube="1"':'')+(vertical?' data-lt-vertical="1"':'')+'>'+expand+'<div class="lt-media-body">'+body+'</div>'+(compact?'':'<p class="lt-media-status" role="status">'+status+'</p><a href="'+esc(m.openUrl)+'" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">'+esc(m.kind==='youtube'?m.actionLabel+(m.startSeconds?' · 시작 '+formatStart(m.startSeconds):''):'원본 링크 열기')+' ↗</a>')+'</div>';
  if(m.privateFile)html=html.replace('불러오기를 누르면 원본 사이트에 연결됩니다.','내 계정에 보관한 파일입니다. 불러오기를 눌러 확인하세요.').replace(/<a href=[\s\S]*?<\/a>/,'');
  return html;
 }

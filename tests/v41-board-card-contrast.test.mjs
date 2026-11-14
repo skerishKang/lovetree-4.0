@@ -81,7 +81,8 @@ test('보드 카드: 종이·밤 판 × 밤·정원 테마, 카드 종류마다 
         for (const s of ['photo', 'postit', 'memo', 'rounded', 'film', 'ticket']) {
           for (const v of [`cardStyle-${s}`, `first cardStyle-${s}`, `noteCard cardStyle-${s}`]) assert.ok(variants.has(v), `${appTheme}×${plate}: ${v} 카드를 재지 못함`);
         }
-        for (const role of ['title', 'memo', 'date', 'mark']) assert.ok(rows.some((r) => r.role === role), `${appTheme}×${plate}: ${role} 글자를 재지 못함`);
+        // #601: 카드에서 메모(.memo)는 상세로 옮겨졌다 — 제목·감정·날짜·표식을 잰다.
+        for (const role of ['title', 'date', 'mark']) assert.ok(rows.some((r) => r.role === role), `${appTheme}×${plate}: ${role} 글자를 재지 못함`);
         for (const r of rows) if (r.ratio < 4.5) failures.push(`${appTheme}×${plate} ${r.variant} ${r.role}(${r.sel}) ${r.fg}/${r.bg} = ${r.ratio}:1`);
       }
     }

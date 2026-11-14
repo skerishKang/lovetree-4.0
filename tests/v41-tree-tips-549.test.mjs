@@ -17,6 +17,8 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.resolve(fileURLToPath(new URL('../public', import.meta.url)));
 let chromium = null;
 let skip = false;
+// CI(미리보기 검사)에서는 LT_TREE_TIPS_549_REQUIRE=1 — 크롬이 준비된 잡에서 건너뜀을 실패로 본다.
+const REQUIRE = process.env.LT_TREE_TIPS_549_REQUIRE === '1';
 try {
   ({ chromium } = await import('playwright'));
   if (!existsSync(chromium.executablePath())) skip = 'Playwright chromium이 설치되어 있지 않아 건너뜀(npx playwright install chromium 뒤 실행)';
@@ -71,7 +73,7 @@ let server, base;
 test.before(async () => { server = await serve(ROOT); base = `http://127.0.0.1:${server.address().port}`; });
 test.after(() => new Promise((ok) => server.close(ok)));
 
-test('#549 순간 추가 창이 열려 있어도 첫 트리 안내의 알겠어요가 눌린다', { skip }, async () => {
+test('#549 순간 추가 창이 열려 있어도 첫 트리 안내의 알겠어요가 눌린다', { skip: REQUIRE ? false : skip }, async () => {
   const browser = await chromium.launch();
   try {
     const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
@@ -101,7 +103,7 @@ test('#549 순간 추가 창이 열려 있어도 첫 트리 안내의 알겠어�
   } finally { await browser.close(); }
 });
 
-test('#549 알겠어요를 누르면 다시 보여 주지 않는다(기억)', { skip }, async () => {
+test('#549 알겠어요를 누르면 다시 보여 주지 않는다(기억)', { skip: REQUIRE ? false : skip }, async () => {
   const browser = await chromium.launch();
   try {
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });

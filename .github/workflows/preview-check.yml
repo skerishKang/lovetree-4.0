@@ -83,6 +83,15 @@ jobs:
           start=$(date +%s)
           node --test tests/v41-board-yt-overlap-553.test.mjs
           echo "보드 YouTube 겹침 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+      # #601: 핀보드 2차 — 옛 자리 무시·배치 모드 전환·카드 간소화·상세 재구성·줌 단추·말풍선을
+      # 실제 화면에서 잰다. 건너뜀=실패(크롬이 준비된 이 잡에서 돈다).
+      - name: 보드 핀보드 2차 시험(건너뜀=실패 — #601)
+        env:
+          LT_BOARD_601_REQUIRE: '1'
+        run: |
+          start=$(date +%s)
+          node --test --test-concurrency=1 tests/v41-board-pinboard2-601.test.mjs
+          echo "보드 핀보드 2차 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
       # #514: 남은 접근성 항목(moderate 이하)을 실제 화면에서 잰다 — 확대 막기·랜드마크·제목 단계·
       # 모바일 선택 줄 top. axe-core·Chromium이 필요한 실행형 시험이라 크롬이 준비된 이 잡에서 돈다.
       - name: 남은 접근성 항목 시험(#514, 건너뜀=실패)
@@ -102,6 +111,15 @@ jobs:
           start=$(date +%s)
           node --test --test-concurrency=1 tests/v41-local-date-547.test.mjs
           echo "지역 날짜 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+      # 11-14 점검: 핀보드(#582)·상세 다음/이전 단추(#583) 화면 시험이 CI 어디에도 연결되지 않아 조용히 건너뛰어졌다.
+      - name: 핀보드·상세 단추 시험(건너뜀=실패 — #582·#583)
+        env:
+          LT_BOARD_582_REQUIRE: '1'
+          LT_BOARD_583_REQUIRE: '1'
+        run: |
+          start=$(date +%s)
+          node --test --test-concurrency=1 tests/v41-board-pinboard-582.test.mjs tests/v41-board-cursor-detail.test.mjs
+          echo "핀보드·상세 단추 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
 
   screen-home-book:
     name: 화면 시험 — 첫 화면·책
@@ -214,10 +232,15 @@ jobs:
           # 대비 시험 워커 2개 + 이 시험 브라우저 1개가 함께 도는다. 잡이 2분 안에 들도록 순서로 쌓지 않는다.
           node --test --test-concurrency=1 tests/v41-map-contrast.test.mjs > /tmp/map-contrast.log 2>&1 & p1=$!
           LT_MAP_FAN_REQUIRE=1 node --test --test-concurrency=1 tests/v41-map-fan-open.test.mjs > /tmp/map-fan.log 2>&1 & p2=$!
-          wait $p1; r1=$?; wait $p2; r2=$?
-          # 실패하면 원인을 그대로 보인다(#529 흔들림 진단 출력 유지).
-          if [ $r1 -ne 0 ]; then echo '— 지도 대비 시험 출력 —'; tail -60 /tmp/map-contrast.log; fi
-          if [ $r2 -ne 0 ]; then echo '— 지도 부채꼴·열기 시험 출력 —'; cat /tmp/map-fan.log; fi
+          # bash -e 에서 wait 가 실패하면 셸이 즉시 끝나 진단이 안 남는다(2026-11-14 실측 — #591).
+          # 종료 코드를 받아 두고 두 로그를 항상 출력한 뒤 마지막에 판정한다.
+          r1=0; wait $p1 || r1=$?
+          r2=0; wait $p2 || r2=$?
+          echo "map-contrast exit=$r1 · map-fan exit=$r2"
+          echo '— 지도 대비 시험 출력(마지막 60줄) —'
+          tail -60 /tmp/map-contrast.log || true
+          echo '— 지도 부채꼴·열기 시험 출력 —'
+          cat /tmp/map-fan.log || true
           [ $r1 -eq 0 ] && [ $r2 -eq 0 ] || exit 1
           echo "지도 실제 대비·부채꼴 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
 
@@ -335,6 +358,15 @@ jobs:
           start=$(date +%s)
           node --test tests/v41-view-a11y-panel.test.mjs
           echo "겹 초점 계약 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+      # 11-14 점검: 첫 트리 안내 '알겠어요'(#549)·'이름 바꾸기'(#571) 화면 시험도 연결되지 않아 건너뛰어졌다.
+      - name: 첫 트리 안내 시험(건너뜀=실패 — #549·#571)
+        env:
+          LT_TREE_TIPS_549_REQUIRE: '1'
+          LT_TREE_RENAME_571_REQUIRE: '1'
+        run: |
+          start=$(date +%s)
+          node --test --test-concurrency=1 tests/v41-tree-tips-549.test.mjs tests/v41-tree-rename-tips-571.test.mjs
+          echo "첫 트리 안내 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
 
   deploy:
     name: 미리보기 배포 검사(postdeploy·겉모습 비교)

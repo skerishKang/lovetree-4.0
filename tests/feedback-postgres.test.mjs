@@ -39,6 +39,21 @@ test('feedback rows save, mask-friendly body, filter, and update by status/memo/
   await assert.rejects(repo.create({productId,category:'nope',body:'x'}),/check|violates|invalid input/i);
   }finally{await pool.end();}
 });
+test('일지 본문 DB 한도: journal 8000까지(#596), opinion 2001은 CHECK로 거른다',{skip},async()=>{
+ assertIsolatedTestDatabase(DATABASE_URL);const pool=await createPool(DATABASE_URL,{max:2});
+ try{
+  await applySchema(pool);const repo=createFeedbackRepo(pool),tag=suffix(),productId='lt-'+tag;
+  const journal=await repo.create({productId,subjectId:'sub_'+tag,kind:'journal',category:'other',title:'긴 일지',body:'가'.repeat(8000),score:4,journalDate:'2026-11-14'});
+  assert.equal(journal.body.length,8000);
+  await assert.rejects(()=>repo.create({productId,subjectId:'sub_'+tag,kind:'journal',category:'other',body:'가'.repeat(8001),journalDate:'2026-11-14'}),/check|violates/i);
+  await assert.rejects(()=>repo.create({productId,subjectId:'sub_'+tag,kind:'opinion',category:'bug',body:'가'.repeat(2001)}),/check|violates/i);
+  // 관리자 일지 탭 읽기 경로와 같은 질의 — 일지만 날짜 내림차순
+  const journals=await repo.listJournals({productId});
+  assert.equal(journals.length,1);
+  assert.equal(journals[0].journalDate,'2026-11-14');
+  assert.equal(journals[0].body.length,8000);
+ }finally{await pool.end();}
+});
 test('board: opinion/journal, reply counts, replies, persona, today journal',{skip},async()=>{
  assertIsolatedTestDatabase(DATABASE_URL);const pool=await createPool(DATABASE_URL,{max:3});
  try{

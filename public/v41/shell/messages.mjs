@@ -90,6 +90,14 @@ export function createMessages(deps) {
     if (data?.type === 'lt41-open-book' && getModel()?.trees.some(t => t.id === data.treeId && t.moments.some(m => m.id === data.id))) {
       setCurrent('track59-sketchbook.html'); choose(data.treeId, data.id); writeLocation();
     }
+    // #582: 보드 상세의 '지도에서 관계 보기' — 지도→책 이동과 같은 셸 방식(LT41.momentId로 그 순간을 연다).
+    // 지도 파일은 건드리지 않는다. 지도는 뜰 때 LTDEMO.get()(=LT41.momentId)의 순간을 선택한다.
+    if (data?.type === 'lt41-open-network') {
+      const treeId = data.treeId || window.LT41?.tree?.id;
+      if (getModel()?.trees.some(t => t.id === treeId && t.moments.some(m => m.id === data.momentId))) {
+        setCurrent('track56-network.html'); choose(treeId, data.momentId); writeLocation();
+      }
+    }
     // #417: 보드·지도 화면의 트리 ▾ — 다른 트리를 같은 보기로 열 때 쓴다. 책(lt41-open-book)과 같은 규칙이고,
     // 보기는 board·network만 허용하며(그 밖은 무시), 없는 트리도 무시한다.
     if (data?.type === 'lt41-open-view' && ['board', 'network'].includes(data.view) && getModel()?.trees.some(t => t.id === data.treeId)) {
