@@ -170,8 +170,10 @@ test('붙여넣기·미리보기 문구는 계약 그대로다', () => {
 // 마크업·CSS 값 검사(값 자체가 요구사항이라 글자로 고정한다): #343 시안의 두 줄 설명·버튼 하나·안내 줄·높이 고정.
 test('#343 마크업: 두 줄 설명·크림 버튼 하나·고정 안내 줄(#462: 맨 아래 보관 안내는 뺐다)', () => {
   const html = readFileSync(new URL('../public/v41/index.html', import.meta.url), 'utf8');
-  assert.match(html, /<p class="quick-lede"><span>주소만 붙여 넣으면 모아둔 순간에 담겨요\.<\/span><span>제목과 감상은 나중에 다듬어도 돼요\.<\/span><\/p>/, '설명 두 줄 고정');
-  assert.match(html, /id="quick-submit" type="submit" disabled>모아둔 순간에 담기</, '아래 큰 버튼 하나');
+  // #638: 담기는 곳은 트리 한 줄(고른 트리 우선)이 정한다 — 설명은 '지금 고른 트리'로 고쳤다.
+  assert.match(html, /<p class="quick-lede"><span>주소만 붙여 넣으면 지금 고른 트리에 담겨요\.<\/span><span>제목과 감상은 나중에 다듬어도 돼요\.<\/span><\/p>/, '설명 두 줄 고정');
+  assert.match(html, /id="quick-tree-line" class="quick-tree-line">모아둔 순간 트리에 담겨요<\/p><label class="quick-sr" for="quick-tree-select">담을 트리<\/label><select id="quick-tree-select"/, '담을 트리 한 줄(이름+고르기)');
+  assert.match(html, /id="quick-submit" type="submit" disabled>모아둔 순간에 담기</, '아래 큰 버튼 하나(처음 이름은 기본 트리)');
   // #462: 링크 추가와 무관한 보관 용량 글씨는 쉬운 추가에 두지 않는다.
   assert.doesNotMatch(html, /quick-storage-note|105MB·200개까지/, '쉬운 추가에는 보관 용량 글씨가 없다');
   assert.doesNotMatch(html, /data-close="quick-add">닫기</, '아래 닫기 버튼은 두지 않는다(오른쪽 위 ✕만)');
