@@ -274,3 +274,95 @@ test('#537 실제 화면: 1440·390에서 한 장으로 끝까지 넘기면 모�
     server.close();
   }
 });
+
+/* ── #book-dup(2026-11-15): 메모 장 제목·본문 중복과 390 긴 트리 이름 머리줄 겹침 ── */
+
+// 메모 장(.note-piece)이 보일 때까지 넘긴다. 390(한 장)은 .mobile-content, 1440(두 장)은 .page.
+const walkToNote = async (frame) => {
+  for (let guard = 0; guard < 60; guard++) {
+    const has = await frame.evaluate(() => !!document.querySelector('.mobile-content .note-piece, .page .note-piece'));
+    if (has) return true;
+    const done = await frame.evaluate(() => document.getElementById('nextBtn').disabled);
+    if (done) return false;
+    const label = await frame.evaluate(() => document.getElementById('pageLabel').textContent);
+    await frame.evaluate(() => document.getElementById('nextBtn').click());
+    await frame.waitForFunction((prev) => document.getElementById('pageLabel').textContent !== prev, label, { timeout: 5000 });
+    await frame.waitForTimeout(60);
+  }
+  return false;
+};
+
+// 한 장(또는 두 장의 각 쪽)에서: 본문 조각이 그린 제목·본문이 아래 제목 줄에 다시 쓰이지 않는지 잰다.
+const memoDup = (frame, pageSelector) => frame.evaluate((sel) => {
+  const host = document.querySelector(sel);
+  const piece = host && host.querySelector('.note-piece');
+  if (!piece || !host) return null;
+  const h2 = (piece.querySelector('h2')?.textContent || '').trim();
+  const note = (piece.querySelector('p')?.textContent || '').trim();
+  const title = host.querySelector('.moment-title');
+  const tText = (title?.textContent || '').trim();
+  return {
+    h2, note,
+    momentTitles: host.querySelectorAll('.moment-title').length,
+    dupTitle: !!h2 && tText.includes(h2),
+    dupNote: note.length > 12 && tText.includes(note.slice(0, 20)),
+    keepsDate: /\d{4}\. \d{2}\. \d{2}/.test(tText),
+    keepsEmotion: !!title?.querySelector('.moment-emotion'),
+  };
+}, pageSelector);
+
+test('#book-dup 실제 화면: 메모 장에서 제목·본문을 두 번 쓰지 않고, 390 긴 트리 이름은 목차 단추와 겹치지 않는다', { skip: REQUIRE ? false : skip, timeout: 180000 }, async () => {
+  if (skip) assert.fail(`미리보기 검사에서는 이 시험의 건너뜀이 실패다 — ${skip}`);
+  const server = await serve(ROOT);
+  const base = `http://127.0.0.1:${server.address().port}`;
+  let browser;
+  try {
+    browser = await chromium.launch({ headless: true });
+
+    // 390(휴대폰 한 장): 메모 장에서 조각(h2·p)과 .moment-title이 같은 글자를 두 번 쓰지 않는다.
+    const phone = await openBook(browser, base, 390, 844, 'single');
+    assert.ok(await walkToNote(phone.frame), '390에서 메모 장을 찾지 못했다');
+    const phoneMemo = await memoDup(phone.frame, '.mobile-content');
+    assert.ok(phoneMemo, '390 메모 장 값을 읽지 못했다');
+    assert.equal(phoneMemo.momentTitles, 1, '메모 장에 제목 줄이 여러 개다');
+    assert.equal(phoneMemo.dupTitle, false, `메모 장 제목 '${phoneMemo.h2}'가 두 번 그려진다`);
+    assert.equal(phoneMemo.dupNote, false, '메모 장 본문이 두 번 그려진다');
+    assert.equal(phoneMemo.keepsDate, true, '아래 제목 줄에 날짜가 남아 있어야 한다');
+    assert.equal(phoneMemo.keepsEmotion, true, '아래 제목 줄에 감정이 남아 있어야 한다');
+
+    // 390 머리줄: 20자가 넘는 트리 이름도 '목차' 단추와 겹치지 않고 말줄임(…)으로 끊긴다.
+    const head = await phone.frame.evaluate(() => {
+      const el = document.getElementById('bookTitleText');
+      el.textContent = '좋아하는 순간들이 이어지는 우리의 오래된 기록 저장소';
+      const box = (q) => { const b = document.querySelector(q)?.getBoundingClientRect(); return b ? { l: b.left, r: b.right } : null; };
+      const title = box('.book-title-btn'), index = box('#archiveBtn');
+      const span = document.getElementById('bookTitleText');
+      return {
+        overlap: title && index ? Math.max(0, Math.min(title.r, index.r) - Math.max(title.l, index.l)) : null,
+        ellipsized: span.scrollWidth > span.clientWidth,
+        oneLine: getComputedStyle(span).whiteSpace,
+      };
+    });
+    assert.equal(head.overlap, 0, `긴 트리 이름이 '목차' 단추와 ${head.overlap}px 겹친다`);
+    assert.equal(head.ellipsized, true, '긴 트리 이름이 말줄임으로 끊기지 않는다');
+    assert.equal(head.oneLine, 'nowrap', '트리 이름이 한 줄로 남지 않았다');
+    await phone.ctx.close();
+
+    // 1440(두 장): 왼쪽·오른쪽 쪽에서 같은 규칙을 지킨다.
+    const wide = await openBook(browser, base, 1440, 900, 'double');
+    assert.ok(await walkToNote(wide.frame), '1440에서 메모 장을 찾지 못했다');
+    for (const sel of ['.page.left', '.page.right']) {
+      const row = await memoDup(wide.frame, sel);
+      if (!row) continue;
+      assert.equal(row.dupTitle, false, `1440 ${sel}: 메모 장 제목 '${row.h2}'가 두 번 그려진다`);
+      assert.equal(row.dupNote, false, `1440 ${sel}: 메모 장 본문이 두 번 그려진다`);
+      if (row.momentTitles) {
+        assert.equal(row.keepsDate, true, `1440 ${sel}: 아래 제목 줄에 날짜가 남아 있어야 한다`);
+      }
+    }
+    await wide.ctx.close();
+  } finally {
+    if (browser) await browser.close().catch(() => {});
+    server.close();
+  }
+});

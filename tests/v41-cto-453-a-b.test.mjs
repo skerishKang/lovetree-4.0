@@ -43,7 +43,8 @@ test('B: 자세한 추가를 처음 보일 때 기본값과 기준값을 한 번
   assert.match(writePanelLF, /paint\(\);\n    onTab\(current\);/, '탭 전환마다 알린다');
   assert.match(panelsLF, /function onWriteTab\(tab\) \{\n    if \(tab !== 'detailed' \|\| formBaseline\) return;/, '기준값이 없을 때만 잡는다(쓴 뒤 탭을 오가도 기준값을 덮지 않는다)');
   // #547: '오늘'은 기기의 지역 날짜로 채운다(예전에는 UTC 날짜라 새벽에 하루 전이 찍혔다).
-  assert.match(panelsLF, /if \(!form\.elements\.date\.value\) form\.elements\.date\.value = localDateOnly\(\);/, '기본 날짜를 채운다(기기의 오늘)');
+  // #627: 자동으로 채운 무대 날짜에는 안내를 붙인다(같은 한 줄에서 기준값을 잡는 동작은 그대로다).
+  assert.match(panelsLF, /if \(!form\.elements\.date\.value\) \{ form\.elements\.date\.value = localDateOnly\(\); \$\('stage-date-hint'\)\.hidden = false; \}/, '기본 날짜를 채운다(기기의 오늘)');
   assert.match(panelsLF, /if \(!form\.elements\.emotion\.value\) form\.elements\.emotion\.value = '설렘';/, '기본 감정을 채운다');
   assert.match(panelsLF, /function startQuickSession\(\) \{[^}]*\n    formBaseline = '';/, '＋ 순간 추가로 열 때 기준값을 비운다(#462: 남은 수정 상태도 먼저 비운다)');
   assert.match(quickAddLF, /deps\.resetEditorBaseline\?\.\(\);\n    deps\.writePanel\.open\(\);/, '빠른 추가도 기준값을 비운 뒤 연다');

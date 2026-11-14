@@ -39,7 +39,10 @@ test('입력 순서는 링크·사진 → 마음 한마디 → 더 적기(제목
   assert.ok(more > note, '더 적기는 마음 한마디 뒤에 접혀 있다');
   assert.ok(title > more && emotion > title && date > emotion, '제목·감정·날짜는 더 적기 안에 있다');
   assert.ok(relation > date, '연결 이유는 더 적기 뒤에 남는다');
-  assert.match(form, /<details class="more-fields" id="more-fields"><summary>더 적기 · 제목·감정·날짜<\/summary>/);
+  assert.match(form, /<details class="more-fields" id="more-fields"><summary>더 적기 · 제목·감정·무대 날짜<\/summary>/);
+  // #627: 날짜 칸의 이름은 '무대 날짜'로 통일하고, 자동으로 채운 날짜에는 안내가 붙는다.
+  assert.match(form, /<label>무대 날짜<input name="date" type="date" required aria-describedby="stage-date-hint"><\/label>/);
+  assert.match(form, /<p id="stage-date-hint" class="panel-note stage-date-hint" role="status" hidden>지금은 순간을 넣은 날이 들어 있어요\. 무대 날짜가 다르면 고쳐 주세요\.<\/p>/);
   assert.equal(/id="subject-label"/.test(html), false, '새 트리 전용 대상 칸은 패널에서 빠진다');
 });
 

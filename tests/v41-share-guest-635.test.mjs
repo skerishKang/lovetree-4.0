@@ -266,13 +266,10 @@ test('#635 화면: 공유 링크 책(로그아웃) 전 장에서 undefined·null
     for (const [width, height] of [[1440, 900], [390, 844]]) {
       for (const theme of ['night', 'garden']) {
         const { context, page, frame, problems } = await openBook(browser, `${base}/share-host.html?w=${width}&t=${theme}`, { width, height, theme, route: (r) => r.abort() });
-        const found = await sweepPages(frame);
-        assert.deepEqual(found, [], `${width}·${theme}: 화면 흔적 값 ${JSON.stringify(found)}`);
+        // 책장을 끝까지 넘기기만 한다 — 매 장의 흔적 값·겹침·가려짐은 화면 공통 검사기(#657)가 같은 규칙으로 잡는다.
+        await sweepPages(frame);
         assert.equal(problems.length, 0, `${width}·${theme}: 화면 오류 ${problems.join(' | ')}`);
-        // #635 PR B: 매 장에서 글자 겹침·가려짐이 없고, 책장 넘기기 힌트 상자가 보이지 않는다.
-        const overlap = await scanOverlap(frame);
-        assert.deepEqual(overlap.issues, [], `${width}·${theme}: 글자 겹침 ${JSON.stringify(overlap.issues)}`);
-        assert.deepEqual(overlap.covered, [], `${width}·${theme}: 가려진 글자 ${JSON.stringify(overlap.covered)}`);
+        // #635 PR B: 책장 넘기기 힌트 상자가 보이지 않는다(겹침·가려짐 판정은 #657 검사기가 잡는다).
         const layout = await scanBookLayout(frame);
         assert.equal(layout.turnWhyShown, false, `${width}·${theme}: 감상 화면에 책장 넘기기 힌트 상자가 보인다`);
         assert.equal(layout.turnWhyOpacity, 0, `${width}·${theme}: 힌트 상자가 반투명으로 남는다`);
@@ -601,6 +598,21 @@ test('#635 PR C 화면: 메뉴 시작 입구·첫날 표기·크게 보기 대�
           assert.ok(gapHome >= 16, `${width}·${theme}: 첫 화면 안내와 링크 줄 사이가 ${gapHome}px다(16px 이상)`);
           const hintPos = await frame.evaluate(() => { const root = document.getElementById('orbit'); const el = root && root.shadowRoot ? root.shadowRoot.querySelector('.center-hint') : document.querySelector('.center-hint'); return el ? getComputedStyle(el).position : '없음'; });
           assert.equal(hintPos, 'static', `${width}·${theme}: 안내가 여전히 화면 아래 고정 자리다(${hintPos})`);
+          // #book-dup. 새 소식 카드: 390에서 머리줄 바로 아래 자리는 '순간 목록'·테마 단추를 가렸다(실측 겹침 133×66px).
+          // 이제 화면 아래, 링크 줄 위에 놓인다 — 어떤 단추와도 겹침 0. 1440 자리(오른쪽 아래)는 그대로다.
+          {
+            const card = page.locator('.updates-card');
+            await card.waitFor({ state: 'visible', timeout: 8000 }).catch(() => {});
+            const cardBox = await card.boundingBox();
+            assert.ok(cardBox, `${width}·${theme}: 첫 화면에 새 소식 카드가 보이지 않는다`);
+            const menuBtn = await frame.locator('.menuBtn').first().boundingBox();
+            const themeBtn = await frame.locator('.theme-quick').first().boundingBox();
+            const overlapWith = (b) => cardBox && b ? Math.max(0, Math.min(cardBox.x + cardBox.width, b.x + b.width) - Math.max(cardBox.x, b.x)) * Math.max(0, Math.min(cardBox.y + cardBox.height, b.y + b.height) - Math.max(cardBox.y, b.y)) : 0;
+            assert.equal(overlapWith(menuBtn), 0, `${width}·${theme}: 새 소식 카드가 '순간 목록' 단추와 겹친다`);
+            assert.equal(overlapWith(themeBtn), 0, `${width}·${theme}: 새 소식 카드가 테마 단추와 겹친다`);
+            assert.equal(overlapWith(linksBox), 0, `${width}·${theme}: 새 소식 카드가 링크 줄과 겹친다`);
+            if (width === 390) assert.ok(cardBox.y + cardBox.height <= linksBox.y, `${width}·${theme}: 새 소식 카드가 링크 줄 위에 있지 않다(카드 아래 ${Math.round(linksBox.y - cardBox.y - cardBox.height)}px)`);
+          }
           await shot(page, `home-after-${width}-${theme}`);
           await context.close();
         }

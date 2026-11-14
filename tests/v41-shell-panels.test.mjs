@@ -117,6 +117,10 @@ test('setEditorMode(add)는 추가 모드 기본값과 폼 기준값을 세운�
     assert.equal(h.els['moment-management'].hidden, true);
     assert.equal(h.els['moment-form'].elements.emotion.value, '설렘', '기본 감정');
     assert.match(h.els['moment-form'].elements.date.value, /^\d{4}-\d{2}-\d{2}$/, '오늘 날짜');
+    // #627: 자동으로 채운 무대 날짜에는 안내가 보이고, 직접 고치면 감춰진다.
+    assert.equal(h.els['stage-date-hint'].hidden, false, '추가 모드에서 무대 날짜 안내가 보인다');
+    h.els['moment-form'].elements.date.listeners['input']();
+    assert.equal(h.els['stage-date-hint'].hidden, true, '날짜를 직접 고치면 안내가 감춰진다');
     // #601 '가' 결정: 고르지 않은 추가는 가장 최근 순간(둘째 순간)에서 이어짐을 보여 준다.
     assert.equal(h.els['editor-context'].textContent, '새 순간 추가 · 둘째 순간에서 이어집니다.');
     assert.equal(h.counts().tabsVisible, 'detailed', '더하기는 자세한 추가 구역을 보여 준다');
@@ -144,6 +148,8 @@ test('setEditorMode(edit)는 기존 값을 채우고 이전 순간 관리와 더
     assert.equal(h.els['parent-current'].textContent, '현재 이전 순간 · 첫 순간');
     assert.equal(h.els['parent-target'].value, 'm1');
     assert.equal(h.els['relation-label'].hidden, true);
+    // #627: 수정 모드의 무대 날짜는 이미 정해진 값이라 안내를 보이지 않는다.
+    assert.equal(h.els['stage-date-hint'].hidden, true, '수정 모드에서는 무대 날짜 안내가 없다');
     assert.equal(h.els['editor-context'].textContent, '수정할 순간 · 둘째 순간 · 현재 이전 순간: 첫 순간');
     assert.equal(h.counts().tabsVisible, 'none', '수정에는 탭 줄이 없다');
     assert.deepEqual(h.calls, [], '모드 전환은 저장하지 않는다');

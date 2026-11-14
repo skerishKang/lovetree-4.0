@@ -1,5 +1,6 @@
 // #548 — 화면마다 기준선(부수 글자 12px, 본문·안내·단추 13px)에 못 미치는 글자가 0개인지
-// 실제 크롬으로 잰다. 대상: 홈·책·보드·지도·설정·순간 추가 × 390·1440.
+// 실제 크롬으로 잰다. 홈·책·보드·지도는 화면 공통 검사기(#657, tests/v41-screen-audit.test.mjs)가
+// 같은 규칙으로 밤·정원까지 함께 재므로, 여기서는 설정 창·순간 추가 창만 잰다.
 // 잰다의 뜻: 화면에 실제로 그려진 글자의 computed font-size(그림자 DOM·안쪽 프레임 포함,
 // display:none·visibility:hidden·opacity 0인 글자는 읽을 수 없으므로 제외).
 // 크롬(Playwright chromium)이 없는 곳에서는 건너뛴다 — CI(LT_FONT_FLOOR_REQUIRE=1)에서는 건너뜀을 실패로 본다.
@@ -67,7 +68,7 @@ const COLLECT = () => {
   return [...seen.values()];
 };
 
-test('#548 기준선: 여섯 화면(390·1440)에서 12px 미만 글자 0개, 단추 13px 미만 0개', { skip: REQUIRE ? false : skip, timeout: 420000 }, async () => {
+test('#548 기준선: 설정·순간 추가 창(390·1440)에서 12px 미만 글자 0개, 단추 13px 미만 0개 — 나머지 화면은 #657 검사기가 잰다', { skip: REQUIRE ? false : skip, timeout: 420000 }, async () => {
   if (skip) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip}`);
   const server = await serve();
   const base = `http://127.0.0.1:${server.address().port}`;
@@ -78,18 +79,6 @@ test('#548 기준선: 여섯 화면(390·1440)에서 12px 미만 글자 0개, �
       const context = await browser.newContext({ viewport: { width, height: width === 390 ? 852 : 900 }, reducedMotion: 'reduce' });
       await context.addInitScript(() => { try { localStorage.setItem('lt41.theme', 'night'); } catch {} });
       const page = await context.newPage();
-      for (const [name, url] of [
-        ['홈', `${base}/v41/#home`],
-        ['책', `${base}/v41/#book`],
-        ['보드', `${base}/v41/#board`],
-        ['지도', `${base}/v41/#network`],
-      ]) {
-        await page.goto(url, { waitUntil: 'load' });
-        await page.waitForTimeout(2200);
-        for (const row of await page.evaluate(COLLECT)) {
-          if (row.px < 12 || (row.interactive && row.px < 13)) offenders.push({ 화면: `${width}-${name}`, ...row });
-        }
-      }
       // 설정 창(셸 모달)과 순간 추가 창도 같은 기준선을 적용한다.
       await page.goto(`${base}/v41/#home`, { waitUntil: 'load' });
       await page.waitForTimeout(1800);
