@@ -56,9 +56,12 @@ const ALLOWED = new Map([
   ['/api/board/journal/today', new Set(['GET'])],
   ['/api/admin/feedback', new Set(['GET'])],
   ['/api/admin/journals', new Set(['GET'])],
+  ['/api/admin/stats', new Set(['GET'])],
   ['/api/youtube/oembed', new Set(['GET'])],
   ['/api/admin/session', new Set(['GET'])],
   ['/api/admin/roles', new Set(['GET'])],
+  // 운영센터 '한눈에' 숫자(#671 후속) — 서버 경로는 있었지만 프록시 허용 목록에 없어 404였다. GET만 넘긴다.
+  ['/api/admin/stats', new Set(['GET'])],
   ['/auth/login', new Set(['GET'])],
   ['/auth/callback', new Set(['GET', 'POST'])],
   ['/auth/logout', new Set(['POST'])]
