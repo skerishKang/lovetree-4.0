@@ -1,3 +1,5 @@
+import { ACCOUNT_DELETION_RETENTION_DAYS } from './access-log-retention-postgres.js';
+
 export function createAccountDeleteRpcRepo(pool) {
   if (!pool || typeof pool.query !== 'function') throw new Error('PostgreSQL pool이 필요합니다.');
 
@@ -26,9 +28,13 @@ export function createAccountDeleteRpcRepo(pool) {
     },
 
     async pruneExpiredAccountDeletionAudits() {
+      // 2026-11-16 대표 결정: 탈퇴 처리 기록은 90일 보관(기존 365일에서 단축 — GDPR 보관 최소화).
+      // 기간은 access-log-retention-postgres.js의 ACCOUNT_DELETION_RETENTION_DAYS 한 벌을 쓰고,
+      // 운영 purge 작업(purge-operational-logs.js)과 이 매일 타이머가 같은 기간으로 둘 다 돈다.
       const result = await pool.query(
         `DELETE FROM lovetree_account_deletions
-         WHERE deleted_at <= now() - interval '365 days'`
+         WHERE deleted_at <= now() - ($1 * interval '1 day')`,
+        [ACCOUNT_DELETION_RETENTION_DAYS]
       );
       return result.rowCount;
     }
