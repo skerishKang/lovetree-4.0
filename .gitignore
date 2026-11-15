@@ -1,35 +1,33 @@
-node_modules/
-dist/
-.wrangler/
+
+!.env.example
+# PR 작성 보조 파일(저장소에 두지 않는다)
+# lovetree-postdeploy local state and output (never commit)
+# 레인 임시 작업 폴더(커밋 금지 — 번호가 바뀌어도 전부)
+# 캡처 결과(out/)는 커밋하지 않는다
+*.log
+*.pyc
+.DS_Store
+.dev.vars
 .env
 .env.*
-!.env.example
-.dev.vars
-*.log
-test-results/
-playwright-report/
-.DS_Store
-Thumbs.db
 .local/
-__pycache__/
-*.pyc
-
-# lovetree-postdeploy local state and output (never commit)
-tools/postdeploy/.profile*/
-tools/postdeploy/out/
-tools/postdeploy/package-lock.json
-
-# PR 작성 보조 파일(저장소에 두지 않는다)
-pr-body.md
-pr-payload.json
-pr-comment.md
-pr-comment.json
-
-# 캡처 결과(out/)는 커밋하지 않는다
-out/
-
-# 레인 임시 작업 폴더(커밋 금지 — 번호가 바뀌어도 전부)
 .tmp-*/
 .tmp49/
 .tmp553/
 .tmpcur/
+.wrangler/
+Thumbs.db
+__pycache__/
+dist/
+node_modules/
+out/
+playwright-report/
+pr-body.md
+pr-comment.json
+pr-comment.md
+pr-payload.json
+test-results/
+tmp-probe/
+tools/postdeploy/.profile*/
+tools/postdeploy/out/
+tools/postdeploy/package-lock.json

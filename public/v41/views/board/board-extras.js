@@ -4,7 +4,8 @@ renderCards();
 renderThreads();
 formFor(addType);
 setTimeout(boardStartView,40);
-setTimeout(()=>toast('순간을 선택해 연결된 기록을 살펴보세요.'),900);
+// #662 후속(CTO 지시): 안내는 상세 판이 닫혀 있을 때만 뜬다 — 이미 순간을 선택해 판이 열렸으면 '선택하라'는 안내는 필요 없다.
+setTimeout(()=>{if(!document.getElementById('detail').classList.contains('open'))toast('순간을 선택해 연결된 기록을 살펴보세요.')},900);
 
 window.__LT58={moments,connections,get state(){return{moments:moments.length,connections:connections.length,view:{...view},selected,cinema}},fitAll,startCinema,selectMoment,addDemo:(type='photo')=>{addType=type;
 formFor(type);
@@ -136,7 +137,7 @@ $('#dBasic').innerHTML=`<b>${esc(m.emotion)}</b> · ${esc(dateText(m.date))}${m.
 let outs=connections.filter(c=>c.kind==='parent'&&c.a===id),ins=connections.filter(c=>c.kind==='parent'&&c.b===id);
 // #583 규칙 한 벌: 다음 3개 + '나머지 N개 보기', 다음이 없으면 이전. board.js open()과 같은 규칙이다.
 const _rowsHTML=(rows)=>rows.length>3?rows.slice(0,3).join('')+`<details><summary>나머지 ${rows.length-3}개 보기</summary>${rows.slice(3).join('')}</details>`:rows.join('');
-$('#dConn').innerHTML=outs.length?_rowsHTML(outs.map(c=>connRow(c,'next'))):(ins.length?_rowsHTML(ins.map(c=>connRow(c,'prev'))):'아직 이어진 순간이 없어요');$('#detail').classList.add('open');
+$('#dConn').innerHTML=outs.length?_rowsHTML(outs.map(c=>connRow(c,'next'))):(ins.length?_rowsHTML(ins.map(c=>connRow(c,'prev'))):'아직 이어진 순간이 없어요');hideToast();$('#detail').classList.add('open');
 const _st=LT58Model.detailButtonState(ins,outs);const _cin=$('#cinemaFromMoment');if(_cin){_cin.disabled=_st.nextDisabled;_cin.title=_st.nextDisabled?'이 순간에서 이어진 길이 없어요':''}
 // 'YouTube에서 열기' — 원본 주소가 있을 때만 보인다.
 const _ytBtn=$('#detailYtBtn');if(_ytBtn){const _u=(window.__LT58YT?.originalUrl?.(m))||m.url||'';_ytBtn.hidden=!_u;_ytBtn.onclick=()=>{if(_u)window.open(_u,'_blank','noopener,noreferrer')}}

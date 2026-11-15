@@ -3,6 +3,7 @@
     "version": "4.1.4",
     "date": "2026.11.15",
     "items": [
+      {"kind": "fix", "text": "보드 안내 말풍선이 정원에서 흰 글자가 흰 바탕에 묻히지 않게 읽히게 했고, 상세 판이 열려 있으면 안내를 띄우지 않게 했어요", "source": "team", "issue": "#662"},
       {"kind": "new", "text": "핀보드에서 카드를 열에 차곡차곡 쌓아 담아요", "source": "team"},
       {"kind": "new", "text": "핀보드에서 카드를 원하는 자리에 끼워 넣고 순서를 저장해요", "source": "team"},
       {"kind": "fix", "text": "공유한 책의 마지막 장에 낯설게 떠 있던 안내 상자를 치웠어요", "source": "ai_tester", "tester": "테스터", "issue": "#635"},

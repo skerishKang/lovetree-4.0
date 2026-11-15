@@ -86,7 +86,7 @@ const frameOf = async (page, test_) => {
   return null;
 };
 
-test('#657 화면 공통 검사기: 주요 화면 12 상태 × 390·1440 × 밤·정원에서 겹침·잘림·흔적 값·작은 글자가 0이다', { skip: REQUIRE ? false : skip, timeout: 900000 }, async () => {
+test('#657 화면 공통 검사기: 주요 화면 13 상태 × 390·1440 × 밤·정원에서 겹침·잘림·흔적 값·작은 글자가 0이다', { skip: REQUIRE ? false : skip, timeout: 900000 }, async () => {
   if (skip) assert.fail(`미리보기 검사에서는 건너뜀이 실패다 — ${skip}`);
   const server = await serve({ '/share-host.html': shareHost, '/home-host.html': homeHost });
   const base = `http://127.0.0.1:${server.address().port}`;
@@ -152,6 +152,24 @@ test('#657 화면 공통 검사기: 주요 화면 12 상태 × 390·1440 × 밤�
     await frameOf(page3, /views\/track/); // 안쪽 화면 프레임이 뜰 때까지(검사 누락 방지)
     await page3.waitForTimeout(1200);
     await take(page3, '보드');
+    // #662 후속(CTO 지시): 안내 풍선은 상세 판이 닫혀 있을 때만 뜬다 — 판은 로드 때 선택 복원으로 열려 있으므로 먼저 닫는다.
+    // 닫힘 상태에서는 풍선이 캔버스 위에 뜬 상태로 겹침·대비를 풍선까지 잰다(풍선은 '도구×캔버스' 제외 대상이 아니다).
+    const boardFrame = await frameOf(page3, /views\/track/);
+    await boardFrame.evaluate(() => document.getElementById('detailClose').click());
+    await boardFrame.waitForFunction(() => { const d = document.getElementById('detail'); if (!d || d.classList.contains('open')) return false; const r = d.getBoundingClientRect(); return r.left >= innerWidth || r.top >= innerHeight; }, null, { timeout: 5000 }).catch(() => {});
+    await page3.waitForTimeout(300);
+    await boardFrame.evaluate(() => toast('순간을 선택해 연결된 기록을 살펴보세요.'));
+    await page3.waitForTimeout(400);
+    await take(page3, '보드·안내·판 닫힘');
+    // 판을 열면 안내는 치워진다(이미 순간을 선택했으므로) — 열림 상태에서도 겹침 0을 잰다.
+    await boardFrame.evaluate(() => selectMoment(LTDEMO.get()));
+    await page3.waitForTimeout(500);
+    assert.equal(await boardFrame.evaluate(() => document.querySelector('.toast').classList.contains('show')), false, '상세 판이 열렸으면 보드 안내 풍선은 사라진다');
+    await take(page3, '보드·안내·판 열림');
+    await boardFrame.evaluate(() => document.getElementById('detailClose').click());
+    // 판 닫힘 넘어가는 동안(0.35s transform)을 기다린다 — 중간에 검사하면 판 끝에 걸친 단추가 '가려짐'으로 잡힌다.
+    await boardFrame.waitForFunction(() => { const d = document.getElementById('detail'); if (!d || d.classList.contains('open')) return false; const r = d.getBoundingClientRect(); return r.left >= innerWidth || r.top >= innerHeight; }, null, { timeout: 5000 }).catch(() => {});
+    await page3.waitForTimeout(300);
     // #666: ＋ 단추(body.lt-fab-ok — 로그인해 내 기록을 쓰는 자리에서만 뜬다)를 함께 띄우고 알림 줄을 올린다.
     await page3.evaluate(() => document.body.classList.add('lt-fab-ok'));
     await raiseToast(page3);
