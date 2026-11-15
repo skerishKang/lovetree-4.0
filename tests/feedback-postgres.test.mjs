@@ -138,7 +138,8 @@ test('#671 후속: DATE 칸은 DB의 YYYY-MM-DD를 그대로 내린다 — 현�
   assert.equal(gf.deletedReplies,1,'그 의견의 답글 1건만 지운다');
   assert.equal(ad.deleted,1,'90일 넘은 탈퇴 기록 1건만 지운다');
   const left=await pool.query('SELECT id,subject_id FROM lovetree_feedback WHERE product_id=$1 ORDER BY id',[productId]);
-  assert.deepEqual(left.rows.map(r=>r.id),[guestRecent.id,mine.id],'6개월 안 된 비로그인 의견과 로그인 의견은 남는다');
+  // node-postgres는 bigint(id)를 문자열로 돌려준다 — repo가 만든 숫자 id와 비교하려면 숫자로 맞춘다(CI 1차 실패 원인).
+  assert.deepEqual(left.rows.map(r=>Number(r.id)),[guestRecent.id,mine.id],'6개월 안 된 비로그인 의견과 로그인 의견은 남는다');
   const replies=await pool.query('SELECT body FROM lovetree_feedback_replies WHERE product_id=$1',[productId]);
   assert.deepEqual(replies.rows.map(r=>r.body),['로그인 의견의 답글'],'남는 의견의 답글도 남는다');
   const del=await pool.query('SELECT subject_hash FROM lovetree_account_deletions WHERE product_id=$1',[productId]);
