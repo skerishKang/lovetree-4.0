@@ -45,6 +45,7 @@ export function createFeedbackDialog({$, notify, getContext, show, openMyPosts, 
   const note = $('feedback-note');
   const doneLoggedIn = $('feedback-done-logged-in');
   const doneLoggedOut = $('feedback-done-logged-out');
+  const doneNo = $('feedback-done-no');
   const myPosts = $('feedback-open-myposts');
   const TITLE_FORM = '의견 보내기';
   const TITLE_DONE = '의견을 보냈어요';
@@ -70,6 +71,7 @@ export function createFeedbackDialog({$, notify, getContext, show, openMyPosts, 
     if (count) count.textContent = '0';
     done.hidden = true;
     form.hidden = false;
+    if (doneNo) { doneNo.hidden = true; doneNo.textContent = ''; }
     if (send) send.disabled = false;
     // #631: 보낸 뒤 화면이 남지 않게 제목·안내·단추 글자를 보내기 전 모양으로 되돌린다.
     if (title) title.textContent = TITLE_FORM;
@@ -112,6 +114,13 @@ export function createFeedbackDialog({$, notify, getContext, show, openMyPosts, 
     // #631: 보낸 뒤에는 제목을 바꾸고 보내기 전 안내('함께 보낼 정보를 고를 수 있어요')를 감춘다.
     if (title) title.textContent = TITLE_DONE;
     if (note) note.hidden = true;
+    // #678 후속(윤제 4회차): 운영센터와 같은 의견 번호를 보낸 직후에도 작게 알린다 — 고객이
+    // '제가 보낸 #18번'처럼 말할 수 있게. 번호가 없는 응답(오래된 화면)이면 줄을 감춘다.
+    if (doneNo) {
+      const feedbackId = Number(result.id);
+      doneNo.hidden = !Number.isSafeInteger(feedbackId) || feedbackId <= 0;
+      doneNo.textContent = doneNo.hidden ? '' : `의견 #${feedbackId}로 받았어요`;
+    }
     const signed = loggedIn();
     if (doneLoggedIn) doneLoggedIn.hidden = !signed;
     if (doneLoggedOut) doneLoggedOut.hidden = signed;
