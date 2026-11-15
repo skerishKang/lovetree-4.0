@@ -16,7 +16,7 @@ test('611: updates.json 은 버전·날짜·항목(kind·text·source·tester?) 
     assert.match(entry.date, /^\d{4}\.\d{2}\.\d{2}$/, '날짜 모양');
     assert.ok(Array.isArray(entry.items) && entry.items.length >= 1, '항목이 하나 이상 있다');
     for (const item of entry.items) {
-      assert.ok(['new', 'fix'].includes(item.kind), `kind는 new|fix (받음: ${JSON.stringify(item)})`);
+      assert.ok(['new', 'fix', 'soon'].includes(item.kind), `kind는 new|fix|soon (받음: ${JSON.stringify(item)})`);
       assert.equal(typeof item.text, 'string', '한 줄 문구');
       assert.ok(item.text.trim(), '문구가 비지 않는다');
       assert.ok(!item.text.includes('\n'), '한 줄로 적는다');
@@ -87,6 +87,21 @@ test('611: 렌더는 버전별·새로워진 것·고친 것 순서로 쉬운 �
   assert.doesNotMatch(html, /이슈 #/, '이슈 번호를 보여 주지 않는다');
   const empty = renderUpdates([], '');
   assert.match(empty, /아직 새 소식이 없어요/, '빈 목록 안내');
+});
+
+test('616: 아직 준비 중(soon)은 고친 것 뒤에 한 버전에 한 번만 보인다', () => {
+  const html = renderUpdates(UPDATES, '4.1.6');
+  const start = html.indexOf('data-updates-version="4\.1\.6"');
+  assert.ok(start > -1, '4.1.6 버전 자리가 있다');
+  const end = html.indexOf('data-updates-version="4\.1\.5"', start);
+  const section = html.slice(start, end > -1 ? end : undefined);
+  assert.match(section, /새로워진 것/, '4.1.6에 새로워진 것 있다');
+  assert.match(section, /고친 것/, '4.1.6에 고친 것 있다');
+  assert.match(section, /아직 준비 중/, '4.1.6에 아직 준비 중 있다');
+  assert.ok(section.indexOf('고친 것') < section.indexOf('아직 준비 중'), '아직 준비 중은 고친 것 뒤에 온다');
+  assert.equal((html.match(/아직 준비 중/g) || []).length, 1, '아직 준비 중 제목은 전체 화면에서 한 번만 보인다');
+  // soon 항목에는 출처 줄을 붙이지 않는다(team 출처 — 문구 자체가 없지만 묶음 규칙과 함께 다시 확인한다).
+  assert.doesNotMatch(section, /아직 준비 중[\s\S]*?updates-source/, '아직 준비 중 묶음에는 출처 줄이 없다');
 });
 
 test('611: 닫으면 그 버전은 다시 안 띄운다(브라우저 저장, try/catch)', async () => {
