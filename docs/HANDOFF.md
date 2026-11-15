@@ -12,6 +12,12 @@
 - **강도 증명**: 새 동작 시험 2종을 검증 — screens.mjs aria-current 줄을 `'false'` 고정으로 깜 → 신규 시험 fail, header.mjs rememberLetter를 빈 함수로 깜 → shell-header fail. 둘 다 되돌려 복원 확인.
 - **시험 결과**: 편집 7파일 개별 `node --test` 67/67 pass, 전체 `npm test` 1769검 중 1630 pass·0 fail·139 skip(기존 건너뜀), `npm run build` 통과.
 - **2차 후보(다음 레인)**: `v41-shell-tree-title`의 messages·panels·community 호출점 검사(createMessages·createPanels·mountCommunity가 내보내기는 있으나 하네스가 무거움), `v41-cto-453-cde` 전체(셸 배선 글자 검사), `v41-shell-notice` 배선. 기준은 docs/TESTING.md '소스 글자 검사 줄이기 1차' 항목에 남겼다.
+## 2026-11-15 — 꼬리표 2차(가수 종류·제목 해석·보드 판 폭)와 결함 ③ 수리 (#627, 로컬2 레인, ai/local2-627c-tags2 → #684, ai/local2-627d-tags-sync → #686, main 40123dd 기준)
+
+- **2차(#684, 스쿼시 머지됨)**: `tags.mjs` TAG_KINDS에 가수(`가수:` 3자 — 값 예산 21자, 활동기만 4자→20자)를 더했다. 제목 해석은 영문(한글) 꼬꼬에서 영문 하나로만 가수를 제안(한글 표기 버림), 무대 꼬리표는 방송 이름만 남기고 날짜를 뗀다, 직캠·화질·날짜가 섞인 붙임표 덩어리는 노래로 제안하지 않는다. 보드의 오른쪽 검은 빈 자리는 `.spaceGlow{inset:-20%}`가 만든 숨은 가로 스크롤 때문이었고 `.app`을 `overflow:clip`(board.css:2)으로 스크롤 컨테이너가 아니게 했다. 보드 상세 '꼬리표' 두 번 표시는 줄 안 하나로 정리(tag-line.mjs). 제목 해석 시험 27개 + 실제 제목 3개 = 30개.
+- **결함 ③(tags-sync, #686)**: 꼬리표 정리 창(이름 바꾸기·합치기·제안 확인)과 담은 직후 안내처럼 셸이 tag-save.mjs를 곧장 부르는 길은 `lt41-tags-saved` 답이 어느 화면에도 없었다 — boardSync는 iframe을 다시 그리지 않으므로 열린 보드·책 화면의 꼬리표 줄·카드 칩이 옛 값에 머문다. 수리: tag-save가 저장이 실제로 바뀌었을 때 열린 프레임(view·view-next)마다 답 모양을 알리고, saveMoments는 바뀐 순간만 알린다. messages.mjs는 성공 저장 뒤 같은 답을 두 번 보내지 않게 실패·변화 없음일 때만 돌려준다. 시험 +3건(v41-tags-627.test.mjs), npm test 1771검 0 fail.
+- **주의**: #684는 자동 머지가 기다리던 사이 머지돼 브랜치가 지워졌고, 그 사이에 밀어 넣은 결함 ③ 커밋은 고아 가지가 됐다 — main 최신에서 새 가지(ai/local2-627d-tags-sync)로 옮겨 #686으로 냈다. 작업 가지는 머지 직후 짧다는 것을 다시 확인.
+- **시험 계정 원상 복구**: 2차 시험에서 꼬리표를 저장해 둔 순간 b863047b(공개 공유 '리센느' 트리 — 소유는 AI 고객 윤제 계정, 계정비밀_대장 표 1)의 `무대:쇼챔피언 261111`을 화면(보드 상세 꼬리표 줄 칩 해제)으로 지워 keywords 없음으로 되돌렸다(리비전 19→20, 공개 공유 응답에서도 확인). 캡처 `E:\lovetree-qa\lane\local2-627c\`.
 
 ## 2026-11-15 — 꼬리표를 화면에 붙이기: 상세·담은 직후 안내·카드·꼬리표 정리 (#627 1단계 PR B, 로컬2 레인, ai/local2-627b-tags, main 1c2935d 기준, PR #680)
 

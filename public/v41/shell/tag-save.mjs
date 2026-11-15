@@ -9,6 +9,16 @@ export function createTagSave(deps) {
   const getMember = deps.getMember;
   const getModel = deps.getModel;
   const notify = deps.notify;
+  // #627 결함 ③(tags-sync): 정리 창처럼 셸이 직접 저장하는 길은 열린 화면(iframe)에 답이 없었다 —
+  // boardSync는 iframe을 다시 그리지 않으므로 꼬리표 줄·카드 칩이 옛 값을 계속 보인다. 저장이 끝나면
+  // 열린 프레임 모두에 lt41-tags-saved(화면이 이미 알아듣는 답 모양)를 알린다(tag-line.mjs가 받아 다시 그린다).
+  const frames = deps.frames || (() => []);
+  function announce(momentId, keywords) {
+    const origin = globalThis.location?.origin;
+    for (const win of frames()) {
+      try { win.postMessage({ type: 'lt41-tags-saved', ok: true, momentId, keywords }, origin); } catch { /* 닫힌 프레임은 건너뛴다 */ }
+    }
+  }
 
   // {treeId, momentId, keywords} → 바뀐 부분만 저장. 바뀐 것이 없으면 저장하지 않는다(조용히 같은 값).
   // 돌려주는 값: {ok, keywords, changed, error?} — 화면은 keywords로 칩을 다시 맞춘다.
@@ -28,6 +38,7 @@ export function createTagSave(deps) {
       return { ok: false, error: error?.message || '저장하지 못했어요.' };
     }
     if (!quiet && notice) notify(notice);
+    announce(momentId, tags);
     return { ok: true, keywords: tags, changed: true };
   }
 
@@ -38,12 +49,18 @@ export function createTagSave(deps) {
     const tree = (getModel()?.trees || []).find((t) => t.id === treeId);
     if (!tree) return { ok: false, error: 'notfound' };
     if (!Array.isArray(moments) || !moments.length) return { ok: false, error: 'empty' };
+    // 바뀐 순간만 알린다(이름 바꾸기·합치기는 순간 전체를 넘겨도 꼬리표가 바뀐 것만 화면에 도달한다).
+    const before = new Map(tree.moments.map((m) => [m.id, Array.isArray(m.keywords) ? m.keywords.join('\u0000') : '']));
     try {
       member.apply('boardSync', { moments }, { treeId });
     } catch (error) {
       return { ok: false, error: error?.message || '저장하지 못했어요.' };
     }
     if (notice) notify(notice);
+    for (const m of moments) {
+      const fresh = Array.isArray(m?.keywords) ? m.keywords : [];
+      if (before.get(m.id) !== fresh.join('\u0000')) announce(m.id, fresh);
+    }
     return { ok: true, changed: true };
   }
 
