@@ -34,7 +34,7 @@ test('#611 4번: 내 의견 덧붙이기 경로는 서버로 넘기고, 딴 글 
 });
 
 test('허용한 경로만 업스트림으로 넘기고 나머지는 404 JSON 이다', async () => {
-  const allowed = [['/api/account', 'GET'], ['/api/account/delete', 'POST'], ['/api/workspace', 'GET'], ['/api/admin/session', 'GET'], ['/api/admin/roles', 'GET'], ['/api/admin/stats', 'GET'], ['/api/youtube/oembed', 'GET'], ['/auth/login', 'GET'], ['/auth/callback', 'GET'], ['/auth/logout', 'POST']];
+  const allowed = [['/api/account', 'GET'], ['/api/account/delete', 'POST'], ['/api/workspace', 'GET'], ['/api/admin/session', 'GET'], ['/api/admin/roles', 'GET'], ['/api/admin/feedback', 'GET'], ['/api/admin/journals', 'GET'], ['/api/admin/stats', 'GET'], ['/api/youtube/oembed', 'GET'], ['/auth/login', 'GET'], ['/auth/callback', 'GET'], ['/auth/logout', 'POST']];
   for (const [path, method] of allowed) {
     const fetcher = recorder(new Response('{}', { headers: { 'content-type': 'application/json' } }));
     const response = await onRequest(createProxy({ fetcher }), `https://lovetree.example${path}`, { method });

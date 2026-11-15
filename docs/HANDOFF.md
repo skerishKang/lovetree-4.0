@@ -6,17 +6,15 @@
 
 > **시험 멈춤 규칙(2026-11-15)**: 브라우저 코드에 setInterval 반복을 넣으면 unref하거나 정리한다 — 안 그러면 npm test가 끝나지 않고 CI가 멈춘다.
 
-## 2026-11-15 — 운영센터 고치기 4가지: /api/admin/stats 프록시 허용·일지 날짜 하루 밀림·탭 전환 좌우 흔들림·답글 카드 빈 여백 (#671 후속, 컴1로컬5 레인, ai/local5-admin-fix-261115)
+## 2026-11-15 — 운영센터 고치기 마무리: 일지 날짜 읽기(서버 DB DATE를 문자열로 내린다) — #699가 머지한 4가지 뒤수습 (#671 후속, 컴1로컬5 레인, ai/local5-admin-fix-261115, #701)
 
-- **프록시 허용 목록(`functions/_lib/proxy.js`)**: 서버에는 `GET /api/admin/stats`(#655 2차)가 있었는데 프록시 허용 목록에 없어 pages.dev 운영센터 '한눈에'가 404 JSON을 받았다. GET만 허용 목록에 더했다. 시험은 tests/pages-proxy 기존 허용·405 두 목록에 `/api/admin/stats` 한 경로씩(새 파일 없음).
-- **일지 날짜 하루 밀림(읽기 `server/db/feedback-postgres.js`)**: node-postgres가 DATE(journal_date)를 '현지 시각 자정' Date로 파싱하는데 feedbackRow가 toISOString()으로 바꿔 한국 시각(+09:00)에서 하루가 밀렸다 — DB 2026-11-14가 화면에서 11-13. 이제 DATE 칸은 DB의 'YYYY-MM-DD'를 그대로 내린다(dateText: Date는 현지 날짜로 읽고 문자열은 그대로).
-- **일지 날짜 저장(쓰기 `server/feedback-service.js` createJournal)**: journalDate를 UTC toISOString로 잘랐다 — 한국 새벽 04:28에 쓴 일지가 하루 전 날짜로 저장돼, 다음 날 todayJournal(DB는 한국 오늘 비교)이 그날 일지를 못 찾아 같은 날 두 건이 생길 수 있었다. 이제 한국 오늘(now+9h, 서머타임 없음)로 저장한다.
-- **탭 전환 좌우 흔들림(`src/admin.css`)**: 클래식 스크롤바 환경에서 탭을 바꾸면 세로 스크롤바가 나타났다 사라지며 가운데 정렬된 .admin-shell(max-width 860px)이 스크롤바 폭의 절반 ≈8px씩 좌우로 흔들렸다. `html { scrollbar-gutter: stable }`로 자리를 늘 남긴다. 실측: 고친 뒤 스크롤바가 있어도 없어도 셸 왼쪽이 282.5px로 일정(고치기 전 290 — 자리 예약 없음). 헤드리스 Chrome은 오버레이 스크롤바라 흔들림 자체는 클래식 스크롤바 환경(대표가 본 환경)에서 생긴다.
-- **답글 카드 빈 여백(`src/admin.css`)**: '답글 남기기' 단추 아래 빈 상태 줄(`<p class="lt-status" role="status">`)이 min-height 18px + 아래 여백 12px = 30px를 차지했다. `.lt-status:empty { display: none }` — 말이 생기면 그때 보인다(role=status 그대로). 실측: 단추→카드 안 빈 공간 31px→1px, 단추→다음 카드('처리') 67px→37px.
-- **시험**: 기존 파일에만 더함 — pages-proxy(stats 허용·405)·board-service(새벽 04:28 일지가 한국 날짜로 저장 1건)·feedback-postgres(DATE 문자열·현지 자정 Date도 그날 날짜 1건). 관련 40검 36 pass·4 skip(PG 필요분), 전체 npm test 1822검 1683 pass·0 fail·139 skip(31.5초에 끝까지), build·modulepreload --check 통과.
-- **화면 실측·캡처**: dist 서빙 + 모의 관리자 API(시험 계정만, 컴2 9223 미사용) + 헤드리스 Chrome 1440·390 — 캡처·measure.json `E:\lovetree-qa\lane\local5-admin\{before,after}\`. before=main 0179c52, after=이 가지.
+- **나뉜 이유**: 앞 세션(로컬5, 크레딧 부족으로 멈춤)이 찾은 같은 고장 4가지를 로컬3 레인이 #699(6fd4b25)로 먼저 머지했다 — 프록시 허용(/api/admin/stats GET)·일지 날짜 쓰기(UTC 자름→Intl seoulDate)·탭 밀림(html:root scrollbar-gutter: stable)·답글 카드 빈 안내 줄(.lt-status:empty). 이 가지(#701)는 #699가 고치지 않은 **읽기 쪽**을 마무리한다.
+
+- **일지 날짜 읽기 하루 밀림(`server/db/feedback-postgres.js`)**: node-postgres가 DATE(journal_date)를 '현지 시각 자정' Date로 파싱하는데 feedbackRow가 toISOString()으로 바꿔 한국 시각(+09:00) 서버에서 하루가 밀린다 — #699 뒤에도 한국 시각으로 저장된 2026-11-15가 화면에서 11-14로 보인다. 이제 DATE 칸은 DB의 'YYYY-MM-DD'를 그대로 내린다(dateText: Date는 현지 날짜로 읽고, 문자열은 그대로). #699의 화면 폴백(빈 journal_date → 만든 시각 서울 날짜, src/admin-view.js)과 겹치지 않는다.
+- **시험**: tests/feedback-postgres.test.mjs에 1건 — 현지 자정 Date·'YYYY-MM-DD' 문자열 모두 그날 날짜(stub pool, PG 없는 환경에서도 도는 동작 시험). pages-proxy 405 목록에 `/api/admin/stats` POST 거절 한 경로를 더했다(#699는 허용 목록만). 쓰기 시험은 #699가 feedback-service 시험에 넣은 2건이 있어 이 가지가 만든 board-service 시험은 중복이라 뺐다. 관련 시험(pages-proxy·feedback-service·feedback-postgres·admin-view·updates) 통과, build·modulepreload --check 통과.
+- **화면 실측·캡처**: dist 서빙 + 모의 관리자 API(시험 계정만, 컴2 9223 미사용) + 헤드리스 Chrome 1440·390 — 캡처·measure.json `E:\lovetree-qa\lane\local5-admin\{before,after}\`. before=main 0179c52, after=이 가지. #699의 local3 캡처(`E:\lovetree-qa\lane\local3-admin\`)와 같은 결론 — 빈 안내 줄 30px(min-height 18+여백 12, 단추→카드 안 31px→1px)·셸 자리 예약 15px(스크롤바 유무 무관 셸 왼쪽 282.5px, 예약 전 290) 확인.
 - **updates.json**: 4.1.4에 일지 날짜 고침 한 줄(고객 '내 의견'의 일지 날짜가 하루 밀려 보이던 것 — source ai_tester). 운영센터만의 수리(프록시·여백·흔들림)는 고객 화면과 무관해 적지 않았다(#671·#655 판단과 같음).
-- **머지 뒤**: 서버 파일(feedback-service·feedback-postgres)이 바뀌므로 컴2 autodeploy 설치·sha 확인이 필요하다.
+- **머지 뒤**: 서버 파일(#699의 feedback-service·이 가지의 feedback-postgres)이 바뀌므로 컴2 autodeploy 설치·sha 확인이 필요하다.
 
 ## 2026-11-15 — 그래프 재료 잇기: buildGraph stacks + 꼬리표 한꺼번에 제안 (#627 후속, 컴1로컬2 레인, ai/local2-627-graph-material-261115, main 7420245 기준)
 
