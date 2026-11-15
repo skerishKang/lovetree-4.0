@@ -178,6 +178,19 @@ const graphHost = `<!doctype html><html lang="ko"><head><meta charset="utf-8"><m
 <body data-member="in" data-record-source="file"><script>window.LT41={source:'file',writable:false,owned:true,momentId:'m01',prefs:{},tree:${JSON.stringify(graphTree)},trees:[${JSON.stringify(graphTree)}]};</script>
 <iframe src="/v41/views/graph/track60-graph.html" style="position:fixed;inset:0;width:100vw;height:100vh;border:0"></iframe></body></html>`;
 
+// 2026-11-16 CTO 지적: 묶음 0개 그래프 — 꼬리표 값이 하나뿐인 순간 둘(허브 규칙은 같은 꼬리표 2개 이상)이라
+// 판 가운데가 비어 보인다. 빈 판 안내(같은 꼬리표 2개 이상이면 묶임 + 제안받기 단추)를 단정하는 상태의 호스트.
+const graphEmptyTree = (() => {
+  const t = createTree({ subject: '시험', title: '시험 트리', note: '기록', emotion: '설렘', date: '2026-11-16', url: 'https://www.youtube.com/watch?v=aaa11111111' }, '2026-11-16T00:00:00.000Z');
+  t.moments[0].keywords = ['노래:Super Shy'];
+  const second = addMoment(t, { subject: '시험', title: '다른 노래 무대', note: '기록', emotion: '즐거움', date: '2026-11-16', url: 'https://www.youtube.com/watch?v=bbb22222222' }, t.moments[0].id, '2026-11-16T00:01:00.000Z');
+  second.moments.at(-1).keywords = ['무대:쇼챔피언'];
+  return second;
+})();
+const graphEmptyHost = `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>그래프 빈 묶음 호스트</title></head>
+<body data-member="in" data-record-source="file"><script>window.LT41={source:'file',writable:false,owned:true,momentId:'m01',prefs:{},tree:${JSON.stringify(graphEmptyTree)},trees:[${JSON.stringify(graphEmptyTree)}]};</script>
+<iframe src="/v41/views/graph/track60-graph.html" style="position:fixed;inset:0;width:100vw;height:100vh;border:0"></iframe></body></html>`;
+
 const frameOf = async (page, test_) => {
   for (let i = 0; i < 80; i++) {
     const f = page.frames().find((f) => f !== page.mainFrame() && test_.test(f.url()));
@@ -189,7 +202,7 @@ const frameOf = async (page, test_) => {
 
 test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤·정원에서 겹침·잘림·흔적 값·작은 글자가 0이다', { skip: REQUIRE ? false : skip, timeout: 900000 }, async () => {
   if (skip) assert.fail(`미리보기 검사에서는 건너뜀이 실패다 — ${skip}`);
-  const server = await serve({ '/share-host.html': shareHost, '/home-host.html': homeHost, '/graph-host.html': graphHost });
+  const server = await serve({ '/share-host.html': shareHost, '/home-host.html': homeHost, '/graph-host.html': graphHost, '/graph-empty-host.html': graphEmptyHost });
   const base = `http://127.0.0.1:${server.address().port}`;
   const browser = await chromium.launch({ headless: true });
   const known = [], fresh = [];
@@ -986,6 +999,10 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     assert.deepEqual(graphSwitch.labels, ['그물형', '동심원형', '그래프'], `보기 고르기 세 단추(실제 ${JSON.stringify(graphSwitch.labels)})`);
     assert.deepEqual(graphSwitch.pressed, ['false', 'false', 'true'], '현재 보기(그래프)만 aria-pressed=true');
     assert.equal(graphSwitch.overflow, 0, `그래프 머리줄에서 가로 넘침 0(실제 ${graphSwitch.overflow})`);
+    // 2026-11-16 CTO 지적: 묶음이 있는 그래프에서는 빈 판 안내가 보이지 않는다(있으면 안내는 사라진다).
+    const hubGuideHubful = await graphFrame.evaluate(() => { const e = document.getElementById('gEmpty'); return { shown: !e.hidden, text: e.textContent || '' }; });
+    assert.equal(hubGuideHubful.shown, false, '묶음이 있는 그래프에서는 빈 판 안내가 보이지 않는다');
+    assert.ok(!hubGuideHubful.text.includes('묶여요'), '묶음이 있는 그래프에 안내 문구가 없다');
     await take(page7, '그래프 보기');
     const graphCheck = await page7.evaluate(() => {
       const f = [...document.querySelectorAll('iframe')].at(-1);
@@ -1152,6 +1169,38 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     assert.equal(emptyCheck.head, '같은 노래를 담은 다른 팬', '노래 허브의 칸 제목(소스 상수)');
     assert.equal(emptyCheck.empty, '아직 같은 노래를 담은 다른 팬이 없어요', `빈 상태 문구(실제 "${emptyCheck.empty}")`);
     assert.equal(emptyCheck.overflow, 0, `다른 팬 칸이 있어도 가로 넘침 0(실제 ${emptyCheck.overflow})`);
+    // 2026-11-16 CTO 지적: 묶음 0개 그래프 — 빈 무대를 고장으로 본다. 짧은 안내 + 바로 할 수 있는
+    // 단추(꼬리표 한 번에 제안받기)가 보이고, 누른 목록 제목도 실제 뜻('아직 묶음에 안 든 순간')이다.
+    const ctx7b = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
+    await ctx7b.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); } catch {} }, theme);
+    await ctx7b.route('**://i.ytimg.com/**', THUMB);
+    await ctx7b.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
+    const page7b = await ctx7b.newPage();
+    await page7b.goto(`${base}/graph-empty-host.html`, { waitUntil: 'domcontentloaded' });
+    const emptyGraphFrame = await frameOf(page7b, /track60-graph/);
+    assert.ok(emptyGraphFrame, '묶음 0개 그래프가 열린다');
+    await page7b.waitForTimeout(700);
+    const hubGuide = await emptyGraphFrame.evaluate(() => {
+      const e = document.getElementById('gEmpty');
+      const b = e.querySelector('.g-empty-cta');
+      return { shown: !e.hidden, text: e.textContent || '', cta: b?.textContent || '', badge: (document.getElementById('gBadge') || {}).textContent || '' };
+    });
+    assert.equal(hubGuide.shown, true, '묶음 0개 그래프에서는 빈 판 안내가 보인다');
+    assert.ok(hubGuide.text.includes('2개 이상이면 여기에 묶여요'), `안내가 묶음 규칙을 알려준다(실제 ${hubGuide.text})`);
+    assert.equal(hubGuide.cta, '꼬리표 한 번에 제안받기', '안내에는 바로 할 수 있는 단추가 있다');
+    assert.ok(hubGuide.badge.includes('묶음 0'), `묶음 0이 표시에도 보인다(실제 ${hubGuide.badge})`);
+    // 2026-11-16 CTO 지적: 안내의 단추와 선반의 단추가 두 번 연달아 보이지 않게 — 빈 판 안내가 떠 있는
+    // 동안에는 제안 단추가 한 개만 보인다(선반은 '아직 묶음에 안 든 순간 N' 글자만 남긴다).
+    const ctaCount = await emptyGraphFrame.evaluate(() => [...document.querySelectorAll('.g-empty-cta, .g-shelf-hint')].filter((b) => { const r = b.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(b).visibility !== 'hidden'; }).length);
+    assert.equal(ctaCount, 1, `제안 단추는 한 개만 보인다(실제 ${ctaCount})`);
+    await emptyGraphFrame.evaluate(() => document.querySelector('.g-empty-cta').click());
+    await page7b.waitForTimeout(400);
+    const suggestHead = await emptyGraphFrame.evaluate(() => (document.querySelector('#detailCard .d-kicker') || {}).textContent || '');
+    assert.match(suggestHead, /^아직 묶음에 안 든 순간 2/, `제안 목록 제목도 실제 뜻으로(실제 ${suggestHead})`);
+    const shelfLabel = await emptyGraphFrame.evaluate(() => (document.getElementById('shelfLabel') || {}).textContent || '');
+    assert.match(shelfLabel, /^아직 묶음에 안 든 순간 /, `선반 이름도 실제 뜻으로(실제 ${shelfLabel})`);
+    await take(page7b, '그래프·묶음 0개 안내');
+    await ctx7b.close();
     await ctx7.close();
 
     // 주소로 열리는지(#my/graph) — 셸이 그래프 보기를 화면 파일로 띄우는지 단정한다(메뉴 단추는 없다).
