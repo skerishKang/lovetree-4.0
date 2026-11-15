@@ -97,7 +97,7 @@ test('611 실행: 새 소식은 로그아웃 상태에서도 보이고, 알림 �
     assert.match(text, /러브트리 4\.1\.4/, '버전 제목');
     assert.match(text, /새로워진 것/, '새로워진 것');
     assert.match(text, /고친 것/, '고친 것');
-    assert.match(text, /AI 테스터가 찾아 준 것 · 윤제/, '출처 표시');
+    assert.match(text, /AI 명예회원 윤제 님이 알려 준 것/, '출처 표시');
     assert.match(text, /핀보드/, '첫 노트 항목');
     assert.match(text, /칸마다 차곡차곡/i, '다음 버전(4.1.4) 항목이 함께 보인다');
     assert.doesNotMatch(text, /여러분이/, '금지 문국이 없다');

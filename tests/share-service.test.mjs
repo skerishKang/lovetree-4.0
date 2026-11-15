@@ -63,7 +63,7 @@ test('#611 3번: 공개 공유 읽기에는 aiTester 한 비트만 내린다(계
  const aPrev=await request(ai.handle,'POST','/api/shares/preview',input,'alice');
  const aMade=await request(ai.handle,'POST','/api/shares',{...input,previewToken:aPrev.body.preview.previewToken},'alice');
  const aRead=await request(ai.handle,'GET','/api/public/shares/'+aMade.body.share.id);
- assert.equal(aRead.body.aiTester,true,'AI 테스터 비트');
+ assert.equal(aRead.body.aiTester,true,'AI 명예회원 비트(aiTester)');
  assert.equal(JSON.stringify(aRead.body).includes('alice'),false);
  assert.equal(JSON.stringify(aRead.body).match(/@/),null,'이메일이 없다');
  assert.equal(JSON.stringify(aRead.body).includes('subjectId'),false,'subject 식별자 필드를 내리지 않는다');

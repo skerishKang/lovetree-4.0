@@ -72,7 +72,7 @@ html[data-lt-theme=garden] #context-kind{color:var(--lt-rose-ink)}
 .community-cover{position:relative;min-height:220px;background:radial-gradient(circle at 50% 24%,#6b4b66,#19151d 68%);background-position:center;background-size:cover}
 .community-cover:after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 45%,#17131ce6)}
 .community-tag{position:absolute;z-index:1;left:10px;bottom:10px;padding:5px 8px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-pill);background:rgba(9,7,10,.8);color:var(--lt-gold);font-size:10px}
-/* 이슈 611 3번: AI 테스터 배지 — 남에게 보이는 곳(둘러보기 카드·미리보기)에만 단다. */
+/* 이슈 611 3번: AI 명예회원 배지 — 남에게 보이는 곳(둘러보기 카드·미리보기)에만 단다. */
 .community-ai{display:inline-flex;align-items:center;min-height:26px;padding:0 10px;border:1px solid var(--lt-rose);border-radius:var(--lt-r-pill);color:var(--lt-rose);font-size:11px;font-weight:700;letter-spacing:.04em}
 .community-cover .community-ai{position:absolute;z-index:1;top:10px;left:10px;background:rgba(9,7,10,.8)}
 .community-preview-paper .community-ai{margin-bottom:8px}

@@ -7,7 +7,7 @@
  * - '닫음'(closed) 상태: 목록 기본에서는 제외
  * - 탭 거르기(#570): 상태·종류 탭 숫자 계산과 주소(#board?status=..&kind=..) 왕복
  * - '고치는 일' 탭(#570): 고객 글에 연결된 이슈만, open/closed를 '고치는 중/고침 완료'로
- * - '한눈에' 전체 숫자 카드(#655 2차): 서버 집계 응답을 '실제 사용자 / AI 테스터'로 나눠 보여 준다
+ * - '한눈에' 전체 숫자 카드(#655 2차): 서버 집계 응답을 '실제 사용자 / AI 명예회원'으로 나눠 보여 준다
  */
 
 export const KIND_LABEL = {opinion: '의견', journal: '일지'};
@@ -193,7 +193,7 @@ export function journalRowsByCustomer(journals) {
   const map = new Map();
   for (const row of Array.isArray(journals) ? journals : []) {
     const key = row?.subjectId || `anon:${row?.id}`;
-    if (!map.has(key)) map.set(key, {subjectId: row?.subjectId || '', name: (row?.authorRole === 'ai_customer' ? 'AI ' : '') + (row?.authorName || '고객'), journals: []});
+    if (!map.has(key)) map.set(key, {subjectId: row?.subjectId || '', name: (row?.authorRole === 'ai_customer' ? 'AI 명예회원 ' : '') + (row?.authorName || '고객'), journals: []});
     map.get(key).journals.push(row);
   }
   const rows = [...map.values()].map(entry => {
@@ -237,7 +237,7 @@ export function journalsSummary(journals, day) {
 /**
  * '한눈에' 맨 위 전체 숫자 카드(#655 2차). 서버 `/api/admin/stats` 응답({ok, payload:{ok, stats}})만 받는다.
  * 값이 하나라도 이상하면 그 카드만 '불러오지 못했어요'로 두고 나머지는 그린다(숫자를 지어내지 않는다).
- * '실제 사용자'(real)·'AI 테스터'(aiTester)·'시험 계정'(tester)을 카드마다 나눠 보여 준다.
+ * '실제 사용자'(real)·'AI 명예회원'(aiTester)·'시험 계정'(tester)을 카드마다 나눠 보여 준다.
  * 셋은 겹치지 않고 전체 = 셋의 합이다(#671). 시험 계정은 이 화면(운영센터)에서만 보이고 남에게 보이는
  * 공개 화면에는 표시하지 않는다.
  */

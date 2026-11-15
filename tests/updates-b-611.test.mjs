@@ -80,11 +80,11 @@ test('611 4번: 반영 안 된 의견에는 새 소식 링크를 단지 않는�
   } finally { restore(); }
 });
 
-test('611 3번: 운영센터 일지 줄의 AI 고객 이름 앞에 AI를 단다', () => {
+test('611 3번·호칭 결정: 운영센터 일지 줄의 AI 고객 이름을 AI 명예회원으로 알린다', () => {
   const rows = journalRowsByCustomer([
     {id: 1, subjectId: 'ai', authorName: '윤제', authorRole: 'ai_customer', journalDate: '2026-11-14', score: 4},
     {id: 2, subjectId: 'me', authorName: null, authorRole: null, journalDate: '2026-11-14', score: 3}
   ]);
-  assert.equal(rows.find(r => r.subjectId === 'ai').name, 'AI 윤제');
+  assert.equal(rows.find(r => r.subjectId === 'ai').name, 'AI 명예회원 윤제');
   assert.equal(rows.find(r => r.subjectId === 'me').name, '고객');
 });
