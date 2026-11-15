@@ -20,6 +20,10 @@ const MAX_MEMO = 2000;
 const MAX_ISSUE = 40;
 const MAX_REPLY = 4000;
 const NO_STORE = {'cache-control':'no-store, max-age=0',pragma:'no-cache','x-content-type-options':'nosniff'};
+// 일지 날짜는 한국(Asia/Seoul) 오늘로 저장한다(#671 후속). UTC로 잘랐을 때는 새벽에 쓴 일지가
+// 하루 전 날짜로 저장돼, 다음 날 todayJournal이 그날 일지를 못 찾아 같은 날 두 건이 생겼다.
+const KST_DATE_OFFSET_MS = 9 * 60 * 60 * 1000; // 한국은 서머타임이 없어 고정 +09:00.
+const journalDay = ms => new Date(ms + KST_DATE_OFFSET_MS).toISOString().slice(0, 10);
 
 const isCategory = value => typeof value === 'string' && FEEDBACK_CATEGORIES.includes(value);
 const isStatus = value => typeof value === 'string' && FEEDBACK_STATUSES.includes(value);
@@ -123,7 +127,7 @@ export function createFeedbackService({feedbackRepo,productId,admin=null,now=()=
      const row=await feedbackRepo.update({productId,id:today.id,title:text,body:masked,score:value});
      return {id:row.id,status:row.status,updated:true,createdAt:row.createdAt};
     }
-    const row=await feedbackRepo.create({productId,subjectId:principal.subjectId,kind:'journal',category:'other',title:text,body:masked,score:value,journalDate:(new Date(now())).toISOString().slice(0,10)});
+    const row=await feedbackRepo.create({productId,subjectId:principal.subjectId,kind:'journal',category:'other',title:text,body:masked,score:value,journalDate:journalDay(now())});
     return {id:row.id,status:row.status,updated:false,createdAt:row.createdAt};
    },
 

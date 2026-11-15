@@ -6,6 +6,18 @@
 
 > **시험 멈춤 규칙(2026-11-15)**: 브라우저 코드에 setInterval 반복을 넣으면 unref하거나 정리한다 — 안 그러면 npm test가 끝나지 않고 CI가 멈춘다.
 
+## 2026-11-15 — 운영센터 고치기 4가지: /api/admin/stats 프록시 허용·일지 날짜 하루 밀림·탭 전환 좌우 흔들림·답글 카드 빈 여백 (#671 후속, 컴1로컬5 레인, ai/local5-admin-fix-261115)
+
+- **프록시 허용 목록(`functions/_lib/proxy.js`)**: 서버에는 `GET /api/admin/stats`(#655 2차)가 있었는데 프록시 허용 목록에 없어 pages.dev 운영센터 '한눈에'가 404 JSON을 받았다. GET만 허용 목록에 더했다. 시험은 tests/pages-proxy 기존 허용·405 두 목록에 `/api/admin/stats` 한 경로씩(새 파일 없음).
+- **일지 날짜 하루 밀림(읽기 `server/db/feedback-postgres.js`)**: node-postgres가 DATE(journal_date)를 '현지 시각 자정' Date로 파싱하는데 feedbackRow가 toISOString()으로 바꿔 한국 시각(+09:00)에서 하루가 밀렸다 — DB 2026-11-14가 화면에서 11-13. 이제 DATE 칸은 DB의 'YYYY-MM-DD'를 그대로 내린다(dateText: Date는 현지 날짜로 읽고 문자열은 그대로).
+- **일지 날짜 저장(쓰기 `server/feedback-service.js` createJournal)**: journalDate를 UTC toISOString로 잘랐다 — 한국 새벽 04:28에 쓴 일지가 하루 전 날짜로 저장돼, 다음 날 todayJournal(DB는 한국 오늘 비교)이 그날 일지를 못 찾아 같은 날 두 건이 생길 수 있었다. 이제 한국 오늘(now+9h, 서머타임 없음)로 저장한다.
+- **탭 전환 좌우 흔들림(`src/admin.css`)**: 클래식 스크롤바 환경에서 탭을 바꾸면 세로 스크롤바가 나타났다 사라지며 가운데 정렬된 .admin-shell(max-width 860px)이 스크롤바 폭의 절반 ≈8px씩 좌우로 흔들렸다. `html { scrollbar-gutter: stable }`로 자리를 늘 남긴다. 실측: 고친 뒤 스크롤바가 있어도 없어도 셸 왼쪽이 282.5px로 일정(고치기 전 290 — 자리 예약 없음). 헤드리스 Chrome은 오버레이 스크롤바라 흔들림 자체는 클래식 스크롤바 환경(대표가 본 환경)에서 생긴다.
+- **답글 카드 빈 여백(`src/admin.css`)**: '답글 남기기' 단추 아래 빈 상태 줄(`<p class="lt-status" role="status">`)이 min-height 18px + 아래 여백 12px = 30px를 차지했다. `.lt-status:empty { display: none }` — 말이 생기면 그때 보인다(role=status 그대로). 실측: 단추→카드 안 빈 공간 31px→1px, 단추→다음 카드('처리') 67px→37px.
+- **시험**: 기존 파일에만 더함 — pages-proxy(stats 허용·405)·board-service(새벽 04:28 일지가 한국 날짜로 저장 1건)·feedback-postgres(DATE 문자열·현지 자정 Date도 그날 날짜 1건). 관련 40검 36 pass·4 skip(PG 필요분), 전체 npm test 1822검 1683 pass·0 fail·139 skip(31.5초에 끝까지), build·modulepreload --check 통과.
+- **화면 실측·캡처**: dist 서빙 + 모의 관리자 API(시험 계정만, 컴2 9223 미사용) + 헤드리스 Chrome 1440·390 — 캡처·measure.json `E:\lovetree-qa\lane\local5-admin\{before,after}\`. before=main 0179c52, after=이 가지.
+- **updates.json**: 4.1.4에 일지 날짜 고침 한 줄(고객 '내 의견'의 일지 날짜가 하루 밀려 보이던 것 — source ai_tester). 운영센터만의 수리(프록시·여백·흔들림)는 고객 화면과 무관해 적지 않았다(#671·#655 판단과 같음).
+- **머지 뒤**: 서버 파일(feedback-service·feedback-postgres)이 바뀌므로 컴2 autodeploy 설치·sha 확인이 필요하다.
+
 ## 2026-11-15 — 그래프 재료 잇기: buildGraph stacks + 꼬리표 한꺼번에 제안 (#627 후속, 컴1로컬2 레인, ai/local2-627-graph-material-261115, main 7420245 기준)
 
 - **buildGraph stacks(`public/v41/graph-model.mjs`)**: 결과에 `stacks: [{key, kind:'same-video'|'same-stage', momentIds, leadId}]`를 더하고 각 순간 entries에 `stackId`(없으면 null)를 붙였다. 묶음 판정은 same-stage.mjs 한 벌(findDuplicates·findSameStage)을 그대로 쓰고, leadId는 발자취 순서의 가장 앞선 순간, 두 종류 묶음에 모두 걸린 순간의 stackId는 같은 영상 묶음 열쇠를 권한다(영상 중복이 더 강한 신호 — 두 묶음은 stacks에 둘 다 남는다). 허브·1차 소속·발자취 규칙 불변.

@@ -5,6 +5,9 @@
    html:root 로 명시도를 올려 순서와 상관없이 무대색이 이기게 한다. */
 html:root { min-height: 100%; background-color: var(--lt-stage); }
 body { min-height: 100vh; background-color: var(--lt-stage); }
+/* #671 후속: 탭을 바꾸면 세로 스크롤바가 나타났다 사라지며 화면이 좌우로 8px쯤 흔들렸다 —
+   오른쪽 자리를 늘 남겨 두어 좌우 이동을 없앤다. */
+html { scrollbar-gutter: stable; }
 
 body {
   margin: 0;
@@ -136,6 +139,9 @@ body {
 .lt-btn { min-height: 44px; padding: 0 16px; border-radius: var(--lt-r-pill); border: 1px solid var(--lt-line); background: rgba(255,255,255,.04); color: var(--lt-pearl); font: inherit; font-size: 13px; cursor: pointer; }
 .lt-btn.primary { background: var(--lt-primary); color: var(--lt-primary-ink); border-color: transparent; font-weight: 600; }
 .lt-status { color: var(--lt-muted); font-size: 12px; min-height: 18px; }
+/* #671 후속: 아직 말이 없는 상태 줄은 자리를 차지하지 않는다 — '답글 남기기' 단추 아래 빈 안내 줄이
+   (min-height 18px + 문단 기본 여백) 카드 안 빈 공간을 만들었다. 말이 생기면 그때 보인다(role=status 그대로). */
+.lt-status:empty { display: none; }
 
 @media (max-width: 480px) {
   .app-header { min-height: 0; padding: 12px 14px; gap: 10px; flex-wrap: wrap; }

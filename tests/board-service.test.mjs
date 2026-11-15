@@ -209,3 +209,12 @@ test('관리자 일지 탭 읽기 API(#596): 일지만 날짜 내림차순, 관�
   assert.equal(got.body.journals[0].authorName, '윤제');
   assert.equal(got.body.journals[0].displayTitle, '오늘 일지');
 });
+
+test('#671 후속: 일지 날짜는 한국 오늘로 저장한다 — 새벽에 써도 하루 전으로 밀리지 않는다', async () => {
+  const feedbackRepo = createMemoryFeedbackRepo();
+  const admin = {roleFor: async value => value?.subjectId === AI ? 'ai_customer' : null};
+  // 2026-11-14 19:28 UTC = 한국 11-15 04:28. UTC로 잘랐을 때는 11-14로 저장됐다.
+  const service = createFeedbackService({feedbackRepo, productId: PRODUCT, admin, now: () => Date.UTC(2026, 10, 14, 19, 28, 0)});
+  await service.createJournal({principal: principal(AI), title: '새벽 일지', body: '내용', score: 3});
+  assert.equal(feedbackRepo.rows.find(r => r.kind === 'journal').journalDate, '2026-11-15');
+});
