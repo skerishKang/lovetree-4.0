@@ -215,7 +215,7 @@ html[data-v41-screen=book] .tools .ui-btn::after,html[data-v41-screen=board] hea
 /* 2026-11-08 #213 3번: 첫 트리를 만든 직후 한 번만 보여 주는 말풍선. 밤·정원 모두 --lt-* 토큰만 쓴다. */
 .tree-tips{position:fixed;top:104px;right:20px;z-index:25;width:min(360px,calc(100% - 24px));display:grid;gap:10px;padding:18px 18px 14px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-card);background:var(--lt-glass-strong);backdrop-filter:blur(20px);box-shadow:0 18px 48px #0008;color:var(--lt-pearl)}
 .tree-tips[hidden]{display:none!important}
-.tree-tips .tree-tips-step{margin:0;font-size:11px;font-weight:700;letter-spacing:var(--lt-track);color:var(--lt-gold)}
+.tree-tips .tree-tips-step{margin:0;font-size:12px;font-weight:700;letter-spacing:var(--lt-track);color:var(--lt-gold)}
 .tree-tips h2{margin:0;font-size:18px;line-height:1.5}
 .tree-tips ul{list-style:none;margin:0;padding:0;display:grid;gap:12px}
 .tree-tips li{display:grid;gap:4px;padding-left:12px;border-left:2px solid var(--lt-gold-line)}
@@ -594,7 +594,7 @@ html[data-lt-theme="garden"] #account-advanced[aria-checked="true"]:after{backgr
 .myposts-reply span{font-size:11px;color:var(--lt-gold)}
 .myposts-reply p{margin:4px 0 0;font-size:13px;line-height:1.7;overflow-wrap:anywhere}
 /* 이슈 611 4번: 내 의견 — 새 답글 숫자·덧붙이기·새 소식 링크. */
-.account-menu-count{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;margin-left:8px;padding:0 6px;border-radius:var(--lt-r-pill);background:var(--lt-rose);color:var(--lt-stage);font-size:11px;font-weight:700;vertical-align:2px}
+.account-menu-count{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;margin-left:8px;padding:0 6px;border-radius:var(--lt-r-pill);background:var(--lt-rose);color:var(--lt-stage);font-size:12px;font-weight:700;vertical-align:2px}
 .account-menu-count[hidden]{display:none}
 /* 이슈 644 2번: 계정 메뉴 항목의 새 소식 점 — 아바타 점(.account-avatar.has-dot)과 같은 색·비슷한 크기 */
 .account-popover button.has-dot::before{content:'';display:inline-block;width:7px;height:7px;margin-right:7px;border-radius:50%;background:var(--lt-rose);vertical-align:1px}
