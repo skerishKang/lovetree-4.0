@@ -4,6 +4,15 @@
 
 > **빨간 필수 검사 규칭(2026-11-12 사고 뒤)**: 필수 검사가 빨강이면 **재실행은 1회까지**. 같은 항목이 또 빨강이면 멈추고 원인을 찾는다 — 재실행·빈 커밋으로 초록을 만들지 않는다. "간헐적·환경 탓"이라고 적으려면 **같은 시각 이 변경이 없는 브랜치(main 또는 다른 PR)** 에서도 같은 실패가 나는지 대조한 결과를 함께 적는다. 메시지를 받아 화면을 다시 띄우는 코드는 '뜰 때마다 보내는 쪽'과 짝으로 흐름 시험을 하고, 머지 전 미리보기 첫 화면을 5초 이상 직접 본다.
 
+## 2026-11-15 — 새 소식 제목 되풀이·지도 390 조작 줄 잘림 수리 (#638 뒤정리, 컴1로컬3 레인, ai/local3-small-261115, #679의 ai/local4-638rest-261115 d76d6e8 위에 쌓음)
+
+- **새 소식 제목 되풀이(#679가 만든 묶음의 사이드 이펙트)**: #679가 출처 줄을 '이웃 항목 묶음'으로 치면서 묶음마다 `<h3>`를 다시 써 한 버전에 '새로워진 것' 3번·'고친 것' 4번(실측, 4.1.4)이 됐다. 고침: `updates.mjs` `renderUpdates()` — 한 출처 묶음을 하나의 `<section class="updates-kind">`에 넣고 제목은 한 번만, 출처 줄(`.updates-source`, 12px 유지)은 묶음 끝 항목 안(`<li>` 마지막에 `<small>`, display:block이라 항목 아래 한 줄)에 붙인다. 실측: 각 버전 '새로워진 것'·'고친 것' 각 1회, 출처 12px.
+- **지도 390 조작 줄 잘림**: 390에서 `.mobile-ribbon`이 scrollWidth 949px vs clientWidth 370px — '02 이하 묶음 단추'가 화면 오른쪽 밖으로 잘렸다(overflow-x:auto라 굴리면 보이지만 눈에 잘려 보인다). 고침: ①묶음 단추 이름을 줄여 쓴다(`network.js` `setupMobileRibbon()` — 묶음끼리 연도가 같으면 연도를 덜고 개수를 뺀다: '01 2026년 1–2월 · 10개' → '01 1–2월'. 전체 이름은 aria-label·title에 남긴다) ②`network.css` 390 미디어 쿼리에 `flex-wrap:wrap`을 더해 두 줄로 쌓는다(높이 58→108px). 상태 판(`.route-status`)·묶음 고르기(`.branch-chooser`) bottom을 96/100→152px로 올려 조작 줄 위를 지킨다. 실측(390 밤): 잘림 0, 두 줄(첫 줄 첫 순간 보기·−·＋·01·02 / 둘째 줄 03·04·전체 보기), 링크 줄과 겹침 0.
+- **검사기 보강(`tests/v41-screen-audit.test.mjs` — 상태는 새 파일 없이 기존 '지도 390'·'새 소식 펼침'에 더함)**: ①'지도 390' 상태의 프레임 찾기가 DOM iframe에 없는 `f.url()`을 써 늘 빈손이었다(검사가 아예 안 돌았음) — `contentWindow.location.href`로 고치고(셸이 src 속성 없이 `location.replace`로 화면을 바꾼다) `.mobile-ribbon`의 잘림(scrollWidth−clientWidth) 측정을 더했다. 숨은 왼쪽 판 단추(#viewNet·#viewConc)는 대비를 재지 않게 건너뀀다 ②'새 소식 펼침' 상태에 제목 되풀이 검사(한 버전에 같은 제목 2번 이상이면 실패)를 더했다.
+- **시험**: 바꾼 파일 관련 `updates-format`·`v41-panels-flow`·`v41-map-theme-flow`·`v41-board-map-tree-title` 통과, `v41-screen-audit`(15 상태 × 390·1440 × 밤·정원) 통과 — 알려진 문제 20건은 KNOWN 그대로, 새 실패 0. `npx vite build`·`modulepreload --check` 통과. **로컬 전체 `npm test`는 미완료** — 같은 PC에서 다른 레인의 `npm test`가 어제부터 밀린 채 돌고 있어(프로세스 11108, 11-14 06:53 시작) 30분째 진행이 멈춰 내 실행만 지웠다. 전체는 CI 필수 검사에 맡긴다.
+- **캡처**: `E:\lovetree-qa\lane\local3-small\` — map-{1440,390}-{night,garden}.png(조작 줄 두 줄)·updates-{1440,390}-{night,garden}.png(제목 1회).
+- **updates.json**: '다음 버전'(둘째 4.1.4)에 한 줄 넣었다(source: team, #638).
+
 ## 2026-11-15 — 캡처에 찍힌 'none'의 정체 · 계정 메뉴와 첫 트리 안내는 한 번에 하나 (#666 2차, 로컬2 레인, ai/local2-none-666d-261115, main 3143f33 기준)
 
 - **'none'은 제품 글자가 아니었다**: 캡처(x≈8, y≈82)에 찍힌 `none`은 **시험 하네스가 만든 글자**였다. `tests/v41-header-ia.test.mjs`의 가짜 서버 `serve644()`가 `public/`만 서빙하는데, 셸이 화면 프레임을 `/v41/home.html`로 열기 때문이다 — 이 파일은 **빌드 진입점**(`vite.config.js`의 `v41home`)이라 `public/`에 없고, 서버의 마지막 `res.writeHead(404); res.end('none')` 본문이 `#view` iframe 안에 날글자로 그려졌다(캡처마다 'none'). 실사이트(빌드된 `dist`)에서는 `home.html`이 있어 나오지 않는다 — `npx vite build` 뒤 같은 자리를 재면 `#view` 안이 비어 있고 'none'이 사라진다(실측). 고친 곳: `serve644()`의 루트를 공통 검사기와 같은 판정(`dist/v41/home.html`이 있으면 `dist`, 없으면 `public`)으로 바꿨다. 그래서 앞으로 캡처에 404 본문이 섞이지 않는다.
