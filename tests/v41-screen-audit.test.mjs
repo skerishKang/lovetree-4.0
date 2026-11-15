@@ -32,6 +32,11 @@ const KNOWN = [
   // (레거시 첫 화면 모양. 트리가 있어야 뜨므로 지금까지 잰 적이 없었다). 이 이슈에서는 손대지 않는다.
   { 화면: '계정 메뉴·첫 트리 안내', 항목: '작은글자', 찾을: 'small "(마지막 순간|시험 · 이어 보기)', 이슈: '#548(12px 기준)·레거시 첫 화면' },
   { 화면: '계정 메뉴 닫힘·첫 트리 안내', 항목: '작은글자', 찾을: 'small "(마지막 순간|시험 · 이어 보기)', 이슈: '#548(12px 기준)·레거시 첫 화면' },
+  // '첫 화면 글자 카드' 상태(261116, #728 후속)가 처음 잰 자리 — 레거시 첫 화면·SRC064 원본의 기존 모양.
+  { 화면: '첫 화면 글자 카드', 항목: '작은글자', 찾을: 'small "(마지막 순간|시험 · 이어 보기)', 이슈: '#548·레거시 첫 화면(계정 메뉴 상태와 같은 줄)' },
+  { 화면: '첫 화면 글자 카드', 항목: '작은글자', 찾을: 'div.memo(Kicker|Foot)', 이슈: 'SRC064 궤도 메모 카드 원본 9px(#728 후속 — 이 이슈에서 손대지 않는다)' },
+  { 화면: '첫 화면 글자 카드', 항목: '겹침', 찾을: 'span.lt-fallback-date × strong.lt-fallback-title', 이슈: '#728 후속 — legacy box의 rect 보고(그림은 3줄 말줄임 — 2070·1440 줌 실측)' },
+  { 화면: '첫 화면 글자 카드', 항목: '겹침', 찾을: '(span.lt-fallback-emotion × (strong|small)|strong.lt-fallback-title × button.subtleBtn|small.lt-fallback-notice × button.subtleBtn|div.firstMark × small)', 이슈: '궤도 카드가 가운데 UI 뒤를 지나가는 3D 원본 배치(#728 후속 — 궤도 배치 불변)' },
   // 지도 — Track56 원본 모양: 안내 문구가 캔버스 뒤에 깔려 있다(원본 보존 커밋 b2567fe — 원본 구조는 바꾸지 않는다).
   { 화면: '지도', 항목: '가려짐', 찾을: 'p ← canvas#stage', 이슈: 'Track56 원본(b2567fe)' },
 ];
@@ -147,6 +152,23 @@ const graphTree = (() => {
     t = addMoment(t, { subject: '시험', title: defs[i].title, note: '기록', emotion: '설렘', date: defs[i].date, url: defs[i].url }, t.moments[0].id, '2026-11-15T00:0' + Math.min(i, 9) + ':00.000Z');
     t.moments.at(-1).keywords = defs[i].keywords;
   }
+  return t;
+})();
+// 첫 화면 글자 카드(261116): 내려간 영상(없는 id → 회색 120×90)의 '영상을 볼 수 없어요' 카드를
+// 궤도에서 그리기 위한 시험 트리 — 긴 사용자 제목 1건(3줄 말줄임 대상)·영상 제목+채널 1건(보조 줄)·사진 1건.
+const thumbTree = (() => {
+  const V = 'https://www.youtube.com/watch?v=';
+  let t = createTree({ subject: '시험', title: '글자 카드 시험 트리', note: '기록', emotion: '설렘', date: '2026-11-11', url: V + 'zz404zz404a' }, '2026-11-16T00:00:00.000Z');
+  t.moments[0].title = 'CHAERYEONG Moonlit Club 퍼포먼스를 보고 그 밤의 무대 조명이 꽃처럼 피어 올랐던 기억을 길고 담백하게 적어 본다';
+  t.moments[0].url = V + 'zz404zz404a';
+  t.moments[0].mediaMetadata = { thumbnail: '', width: 1920, height: 1080 };
+  t.moments[0].createdAt = '2026-11-13T09:00:00.000Z'; t.moments[0].updatedAt = t.moments[0].createdAt;
+  t = addMoment(t, { subject: '시험', title: '내려간 직캠 영상', note: '기록', emotion: '그리움', date: '2026-11-12', url: V + 'zz404zz404b' }, t.moments[0].id, '2026-11-16T00:01:00.000Z');
+  t.moments[1].mediaMetadata = { title: '유튜브에서 내려간 무대 직캠 영상', channel: 'KBS Kpop', thumbnail: '', width: 1920, height: 1080 };
+  t.moments[1].createdAt = '2026-11-12T09:00:00.000Z'; t.moments[1].updatedAt = t.moments[1].createdAt;
+  t = addMoment(t, { subject: '시험', title: '사진 순간(정상)', note: '기록', emotion: '즐거움', date: '2026-11-10', url: '' }, t.moments[0].id, '2026-11-16T00:02:00.000Z');
+  t.moments[2].mediaMetadata = { thumbnail: 'data:image/svg+xml;base64,' + Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><rect width="640" height="360" fill="#8a5a6e"/></svg>').toString('base64') };
+  t.moments[2].createdAt = '2026-11-10T09:00:00.000Z'; t.moments[2].updatedAt = t.moments[2].createdAt;
   return t;
 })();
 // 그래프 보기는 지금 주소(#my/graph)로만 열리는 화면이라 셸 상태 대신 호스트가 LT41을 직접 넘긴다(share-host와 같은 틀).
@@ -820,6 +842,74 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     const graphByHash = await frameOf(page8, /track60-graph/);
     assert.ok(graphByHash, '#my/graph 주소로 그래프 보기가 열린다(메뉴 연결 없이 주소로만)');
     await ctx8.close();
+
+    // 첫 화면 글자 카드(261116): 내려간 영상(회색 120×90)의 '영상을 볼 수 없어요' 카드가 #orbit
+    // shadowRoot 안에서 줄(감정·날짜·제목·알림)을 지키는지 — 제목 3줄 말줄임·카드 안 배치·
+    // '첫 순간' 배지와 감정 칩 겹침 0을 수치로 단정한다. 카드는 그림자 안에 있으므로 shadowRoot로
+    // 스코핑한다(#730과 같은 판정). 셸이 lt41-date-style 동기화로 프레임을 다시 띄우므로 매번 전 프레임 검사.
+    const ctx9 = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
+    await ctx9.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); localStorage.setItem('lt41.homeCards', 'mine'); } catch {} }, theme);
+    await ctx9.route('**://i.ytimg.com/**', (r) => r.fulfill({ status: 200, contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="90"><rect width="120" height="90" fill="#282828"/><text x="60" y="52" font-size="18" fill="#777" text-anchor="middle">...</text></svg>' }));
+    await ctx9.route('**/api/**', (r) => {
+      if (/api\/workspace/.test(r.request().url())) {
+        return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ revision: 1, state: { version: 1, trees: [thumbTree], prefs: {} }, subject: '시험계정', writeSubjectBound: true, savedAt: '2026-11-16T00:00:00.000Z' }) });
+      }
+      return r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' });
+    });
+    const page9 = await ctx9.newPage();
+    await page9.goto(`${base}/v41/?account=1`, { waitUntil: 'load' });
+    let homeFrame = null;
+    for (let i = 0; i < 80 && !homeFrame; i++) {
+      for (const fr of page9.frames()) {
+        if (fr === page9.mainFrame()) continue;
+        try { if (await fr.evaluate(() => !!document.getElementById('orbit')?.shadowRoot?.querySelector('.card .lt-fallback-title'))) { homeFrame = fr; break; } } catch {}
+      }
+      if (!homeFrame) await page9.waitForTimeout(300);
+    }
+    assert.ok(homeFrame, '첫 화면 글자 카드가 그려진다(내려간 영상 → 글 카드)');
+    const cardCheck = await homeFrame.evaluate(() => {
+      const sh = document.getElementById('orbit').shadowRoot;
+      const cards = [...sh.querySelectorAll('.card .lt-fallback-card, .recent-media .lt-fallback-card')];
+      const bad = [];
+      for (const card of cards) {
+        const cr = card.getBoundingClientRect();
+        const title = card.querySelector('.lt-fallback-title');
+        if (!title) { bad.push('제목 칸이 없다'); continue; }
+        const tcs = getComputedStyle(title);
+        const limit = parseFloat(tcs.fontSize) * parseFloat(tcs.lineHeight) * 3 + 2;
+        if (title.clientHeight > limit) bad.push(`제목이 3줄을 넘는다(${title.clientHeight}px > ${Math.round(limit)}px)`);
+        const inside = (el) => { const r = el.getBoundingClientRect(); return r.top >= cr.top - 1 && r.bottom <= cr.bottom + 1 && r.left >= cr.left - 1 && r.right <= cr.right + 1; };
+        for (const sel of ['.lt-fallback-head', '.lt-fallback-title', '.lt-fallback-notice']) {
+          const el = card.querySelector(sel);
+          if (el && !inside(el)) bad.push(sel + '이(가) 카드 밖으로 나온다');
+        }
+        const emo = card.querySelector('.lt-fallback-emotion');
+        const date = card.querySelector('.lt-fallback-date');
+        if (emo && date) {
+          const er = emo.getBoundingClientRect(), dr = date.getBoundingClientRect();
+          /* 감정 칩 박스는 패딩을 포함해 날짜 칸과 최대 4px 맞닿을 수 있다(글자 충돌 아님 — 2070 줌 실측).
+             판정은 '날짜가 감정보다 한 줄 아래에서 시작하는가'(각자 다른 줄)로 한다. */
+          if (!(dr.top >= er.top + parseFloat(getComputedStyle(emo).fontSize) - 1)) bad.push('감정과 날짜가 같은 줄에 붙어 있다(감정 ' + Math.round(er.top) + ' / 날짜 ' + Math.round(dr.top) + ')');
+        }
+        /* 4px 이하는 절대 위치 알림(하단 고정)·반올림 한계 — 시각 결함이 아니다(2070·1440 실측). */
+        if (card.scrollHeight > card.clientHeight + 4) bad.push(`카드 내용이 카드 밖으로 넘친다(${card.scrollHeight - card.clientHeight}px)`);
+      }
+      for (const fm of [...sh.querySelectorAll('.card .firstMark')]) {
+        const fb = fm.parentElement?.querySelector('.surface .lt-fallback-card');
+        const emo = fb?.querySelector('.lt-fallback-emotion');
+        if (!fb || !emo) continue;
+        const a = fm.getBoundingClientRect(), b = emo.getBoundingClientRect();
+        const ox = Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left));
+        const oy = Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
+        if (ox * oy > 0) bad.push(`'첫 순간' 배지와 감정 칩이 겹친다(${Math.round(ox * oy)}px²)`);
+      }
+      return { cards: cards.length, bad, overflow: Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth) };
+    });
+    assert.ok(cardCheck.cards >= 1, `첫 화면 글자 카드 수(실제 ${cardCheck.cards})`);
+    assert.deepEqual(cardCheck.bad, [], `첫 화면 글자 카드 줄·말줄임·배치: ${JSON.stringify(cardCheck.bad)}`);
+    assert.equal(cardCheck.overflow, 0, `첫 화면 가로 넘침 0(실제 ${cardCheck.overflow})`);
+    await take(page9, '첫 화면 글자 카드');
+    await ctx9.close();
 
     await context.close();
     return rows;

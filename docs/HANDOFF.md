@@ -2152,3 +2152,14 @@ COM2에는 merge `6900df8aa446dfe0201d01997457fae04c4abe16`의 변경 서버 파
 - 검사기('그래프 보기' 상태, 새 시험 파일 없음): tag-moments 가짜 응답 주입(무대 꼬리표=5건·AI 1건, 그 외=빈 응답) — 3개 미리보기·AI 표 위치(aiTester 줄만)·/t/ 링크·'더 보기'→5·빈 상태 문구·줄 겹침 0·판 안 배치·가로 넘침 0을 390·1440 × 밤·정원에서 단정.
 - 검사기 대조 메모: 이 워크트리는 dist를 빌드하기 전엔 검사기 첫 화면 상태가 20초 초과로 빨강이었다(순수 main도 같음 — public 직접 서빙일 때 첫 화면 모듈 로딩이 늦음). dist 빌드 후 초록. 워크트리에서 검사기를 돌릴 때는 npm run build 먼저.
 - npm test 1697 pass·0 fail, build·modulepreload --check 통과. 캡처 E:/lovetree-qa/lane/local3-graph/fans3901440/ 12장(390·1440 × 밤 rgb(4,4,7)·정원 rgb(247,240,232), 허브 고른 상태 -hub). 메뉴 연결은 여전히 없음. updates.json 안 고침.
+
+## 2026-11-16 — 4.1 첫 화면(궤도) 글자 카드 모양 — '영상을 볼 수 없어요' 줄 정리 (컴1로컬3 레인, ai/local3-thumbcard-261116, main 8685a1f(#727) 기준)
+
+- **대표 화면(2070 밤)의 원인**: 궤도 카드의 썸네일이 내려가면(없는 영상 id·회색 120×90) thumb-fallback.mjs가 카드를 innerHTML로 갈아끼우는데, 이때 제목의 -webkit-line-clamp(3줄 말줄임) 레이아웃이 **오래된 채로 남는다**(Chrome 158 실측 — 카드 노드 재부착·크기 읽기로는 풀리지 않고 스타일시트 변화가 흔들어야 풀린다). 그 결과 제목이 3줄을 넘어 카드 밖으로 넘치고(clip 20px) '첫 순간' 배지와 감정 칩이 겹쳤다(413~414px²).
+- **고친 것 3파일**:
+  1. `public/v41/thumb-fallback.mjs` mountThumbFallback — 그림자 문서(root.host 있음)에서만, 글자 카드가 그려진 동안 250ms 간격(24회=6초 자동 종료·unref)으로 **스타일시트 킥**: `display:-webkit-box`를 <style> 근원에서 다시 선언하고 크기를 읽는다. 사용자 속성 킥·노드 재부착·강제 읽기만으로는 재계산이 일어나지 않는다(실측). 빛 DOM 문서(보드·책·감상)는 재계산이 정상이라 킥 없음. sweep 로직은 건드리지 않았다(#727 유지).
+  2. `public/v41/identity.css` — **궤도 변형(orbit)에만** 카드를 block 레이아웃으로: 감정·날짜(머리 칸 세로 2줄)·제목·'영상을 볼 수 없어요'가 각자 다른 줄(고정 간격 9px), 알림은 카드 하단 고정(absolute bottom 14px), 제목 3줄 한계(max-height 3×1.35em + 기존 clamp), '첫 순간' 배지가 있는 카드는 머리 칸을 배지 아래로(44px), 궤도 카드 작은 글자 11→12px(감정·날짜·알림 — #548 12px 기준). **보드(board)·책(book)·감상(media) 변형은 한 줄도 안 바꿨다** — sandbox rect 전·후 동일로 확인.
+  3. `tests/v41-screen-audit.test.mjs` — '첫 화면 글자 카드' 상태 추가: 가짜 /api/workspace(404 영상 시험 트리) + 회색 120×90 라우트, 카드는 #orbit shadowRoot 안이므로 shadowRoot로 스코핑(#730 판정). 단정: 제목 clientHeight ≤ 3줄(폭×줄높이×3+2)·머리/제목/알림이 카드 안·감정과 날짜가 각자 줄(날짜 top ≥ 감정 top + 감정 fs−1)·카드 내용 넘침 ≤ 4px(절대 알림·반올림 한계)·배지×감정 겹침 0·가로 넘침 0 — 390·1440 × 밤·정원. KNOWN 4건 추가(레거시 첫 화면 11px recent-meta·SRC064 궤도 메모 카드 9px·legacy box rect 보고·궤도 카드가 가운데 UI 뒤를 지나가는 3D 원본 배치 — 모두 이 이슈 이전 모양).
+- **실측(2070 밤, 시험 트리)**: '첫 순간' 배지×감정 겹침 414→**0**, 제목 3줄 말줄임 복원(clientHeight 61px 고정 — 안정성 관찰 6×500ms 동일), 줄 간격 9px 고정, 감정·날짜 각자 줄. **보드·책 불변**: sandbox(240×316) title 61px·top 86·notice 286 — 전·후 바이트 동일. 궤도 3D 배치(자리·기울기·크기) 불변.
+- **캡처**: `E:/lovetree-qa/lane/local3-graph/` — tcard-before-home-night-{2070,zoom,390}.png(전)·tcard-after-home-{night,garden}-{2070,1440,390}{,-zoom}.png(후)·tcard-{before,after}-{book,board}-night-2070.png(불변 확인)·tcard-final-2070.json(수치). 한 장씩 직접 읽어 대조 완료(2070 밤·정원 줌, 390 밤, 1440 밤).
+- **메모**: 이 작업은 한 번 중지됐다가 정정으로 다시 시작(대표가 본 깨진 카드가 4.0 첫 화면(#728)이라 했다가 4.1 첫 화면에서도 생기는 것으로 정정). 재현·측정은 가짜 기록(/api/workspace 가로챔)으로만 하고 시험 계정·대표·AI 고객 세션(9223)에는 붙지 않았다. updates.json 안 고침. npm test 1704검 0 fail(30초), build·modulepreload --check 통과.
