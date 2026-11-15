@@ -555,6 +555,19 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     await ctx7.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); } catch {} }, theme);
     await ctx7.route('**://i.ytimg.com/**', THUMB);
     await ctx7.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
+    // #627 3단계 '다른 팬 보기' 가짜 응답: 무대 허브 꼬리표는 5건(AI 명예회원 1건), 그 외 꼬리표는 빈 응답 —
+    // 3개 미리보기·'더 보기'·빈 상태 문구를 한 상태에서 단정한다. (playwright는 나중에 등장한 경로가 먼저 맞는다.)
+    const fansFixture = [
+      { shareId: 'fan1', link: '/t/fan1', treeTitle: '윤제의 기억 나무', title: '데뷔쇼 직관 기록', url: 'https://www.youtube.com/watch?v=aaa11111111', thumbnail: 'https://i.ytimg.com/vi/aaa11111111/hqdefault.jpg', date: '2026-01-10', aiTester: false },
+      { shareId: 'fan2', link: '/t/fan2', treeTitle: 'AI 명예회원 윤제 나무', title: '데뷔쇼 다시 보기', url: '', thumbnail: '', date: '2026-01-20', aiTester: true },
+      { shareId: 'fan3', link: '/t/fan3', treeTitle: '은지의 앨범', title: '데뷔쇼 엔딩 멘트', url: 'https://www.youtube.com/watch?v=bbb22222222', thumbnail: 'https://i.ytimg.com/vi/bbb22222222/hqdefault.jpg', date: '2026-01-12', aiTester: false },
+      { shareId: 'fan4', link: '/t/fan4', treeTitle: '민의 사담', title: '데뷔쇼 리허설 후기', url: '', thumbnail: '', date: '2026-01-11', aiTester: false },
+      { shareId: 'fan5', link: '/t/fan5', treeTitle: '서현의 순간', title: '데뷔쇼 첫 소환', url: '', thumbnail: '', date: '2026-01-09', aiTester: false }
+    ];
+    await ctx7.route('**/api/public/tag-moments**', (r) => {
+      const tag = new URL(r.request().url()).searchParams.get('tag') || '';
+      r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ tag, items: tag.startsWith('무대:') ? fansFixture : [] }) });
+    });
     const page7 = await ctx7.newPage();
     await page7.goto(`${base}/graph-host.html`, { waitUntil: 'domcontentloaded' });
     const graphFrame = await frameOf(page7, /track60-graph/);
@@ -664,6 +677,68 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     assert.deepEqual(graphTouch.nameOnMark, [], `허브 이름이 '처음/지금' 표시와 겹친다: ${JSON.stringify(graphTouch.nameOnMark)}`);
     assert.deepEqual(graphTouch.countOnDot, [], `무더기 개수(×N)가 점 위에 겹친다: ${JSON.stringify(graphTouch.countOnDot)}`);
     assert.match(graphCheck.badge, /순간 17/, '표시에 순간 수가 있다');
+    // #627 3단계: 허브 상세의 '같은 노래를 담은 다른 팬' 칸 — 가짜 응답(무대=5건·AI 1건, 그 외=빈 응답)으로
+    // 3개 미리보기·AI 명예회원 표시·'더 보기'·빈 상태 문구·판 안 배치(겹침·넘침 0)를 단정한다.
+    const fansCheck = await page7.evaluate(async () => {
+      const f = [...document.querySelectorAll('iframe')].at(-1);
+      const doc = f.contentDocument;
+      const hub = [...doc.querySelectorAll('#gsvg g[role="button"]')].find((g) => (g.getAttribute('aria-label') || '').startsWith('무대'));
+      hub?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await new Promise((res) => setTimeout(res, 700));
+      const box = doc.querySelector('.d-fans');
+      const cardR = doc.getElementById('detailCard').getBoundingClientRect();
+      const rows = box ? [...box.children].filter((x) => x.querySelector?.('.d-fans-row')) : [];
+      const rowRects = rows.map((x) => x.getBoundingClientRect());
+      let rowPairs = 0;
+      for (let i = 0; i < rowRects.length; i++) for (let j = i + 1; j < rowRects.length; j++) {
+        const a = rowRects[i], b = rowRects[j];
+        if (a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom) rowPairs++;
+      }
+      const outside = rows.filter((x) => { const r = x.getBoundingClientRect(); return r.width === 0 || r.left < cardR.left - 1 || r.right > cardR.right + 1; }).length;
+      return {
+        head: doc.querySelector('.d-fanshead')?.textContent || '',
+        rows: rows.length,
+        rowPairs,
+        outside,
+        aiBadge: doc.querySelector('.d-fans-ai')?.textContent || '',
+        aiOnRow: rows[1]?.querySelector('.d-fans-ai')?.textContent || '',
+        links: rows.map((x) => x.querySelector('a')?.getAttribute('href') || ''),
+        more: doc.querySelector('.d-fans-more')?.textContent || '',
+        thumbs: rows.filter((x) => x.querySelector('.d-fans-thumb')).length
+      };
+    });
+    assert.match(fansCheck.head, /같은 무대를 본 다른 팬/, `칸 제목은 소스 상수(실제 "${fansCheck.head}")`);
+    assert.equal(fansCheck.rows, 3, `처음엔 3개만 보인다(실제 ${fansCheck.rows})`);
+    assert.equal(fansCheck.rowPairs, 0, `다른 팬 줄끼리 겹침 0(실제 ${fansCheck.rowPairs})`);
+    assert.equal(fansCheck.outside, 0, `다른 팬 줄이 상세 판 안에 있다(벗어난 줄 ${fansCheck.outside})`);
+    assert.equal(fansCheck.aiBadge, 'AI 명예회원', 'AI 명예회원 표시가 있다');
+    assert.equal(fansCheck.aiOnRow, 'AI 명예회원', 'AI 표시는 aiTester 줄(fixture 2번째)에 붙는다');
+    assert.ok(fansCheck.links.every((l) => l.startsWith('/t/')), `줄이 공개 트리 링크(/t/…)다: ${JSON.stringify(fansCheck.links)}`);
+    assert.ok(fansCheck.thumbs >= 1, '썸네일 줄이 있다(썸네일 없는 줄은 자리를 비우지 않는다)');
+    assert.match(fansCheck.more, /더 보기/, "나머지는 '더 보기'로");
+    const afterMore = await page7.evaluate(async () => {
+      const f = [...document.querySelectorAll('iframe')].at(-1);
+      const doc = f.contentDocument;
+      doc.querySelector('.d-fans-more')?.click();
+      await new Promise((res) => setTimeout(res, 250));
+      return [...doc.querySelectorAll('.d-fans > li')].filter((x) => x.querySelector('.d-fans-row')).length;
+    });
+    assert.equal(afterMore, 5, `'더 보기'로 나머지가 보인다(실제 ${afterMore})`);
+    const emptyCheck = await page7.evaluate(async () => {
+      const f = [...document.querySelectorAll('iframe')].at(-1);
+      const doc = f.contentDocument;
+      const hub = [...doc.querySelectorAll('#gsvg g[role="button"]')].find((g) => (g.getAttribute('aria-label') || '').startsWith('노래'));
+      hub?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await new Promise((res) => setTimeout(res, 700));
+      return {
+        empty: doc.querySelector('.d-fans-empty')?.textContent || '',
+        head: doc.querySelector('.d-fanshead')?.textContent || '',
+        overflow: Math.max(0, doc.documentElement.scrollWidth - doc.documentElement.clientWidth)
+      };
+    });
+    assert.equal(emptyCheck.head, '같은 노래를 담은 다른 팬', '노래 허브의 칸 제목(소스 상수)');
+    assert.equal(emptyCheck.empty, '아직 같은 노래를 담은 다른 팬이 없어요', `빈 상태 문구(실제 "${emptyCheck.empty}")`);
+    assert.equal(emptyCheck.overflow, 0, `다른 팬 칸이 있어도 가로 넘침 0(실제 ${emptyCheck.overflow})`);
     await ctx7.close();
 
     // 주소로 열리는지(#my/graph) — 셸이 그래프 보기를 화면 파일로 띄우는지 단정한다(메뉴 단추는 없다).

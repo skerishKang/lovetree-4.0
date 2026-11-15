@@ -106,3 +106,19 @@ html[data-lt-theme="garden"] .d-list button:hover{background:rgba(64,53,54,.07)}
   .g-frame { flex: 0 0 auto; }
   .g-stagewrap { flex: none; } /* 인라인 높이(격자+이름 두 줄)를 그대로 쓰게 — flex-basis 0%가 높이를 무너뜨린다 */
 }
+
+/* '같은 노래를 담은 다른 팬'(#627 3단계) — 허브 상세 판 안의 공개 순간 줄. 색은 --lt-* 토큰만. */
+.d-fans{margin:0 0 12px;padding:0;list-style:none;display:grid;gap:4px}
+.d-fans-row{display:flex;align-items:center;gap:8px;padding:4px 8px;border-radius:8px;color:var(--lt-pearl);font-size:13px;text-decoration:none}
+.d-fans-row:hover{background:rgba(255,255,255,.05)}
+html[data-lt-theme="garden"] .d-fans-row:hover{background:rgba(64,53,54,.07)}
+.d-fans-thumb{width:34px;height:34px;border-radius:7px;object-fit:cover;flex:none;border:1px solid var(--lt-line);background:rgba(255,255,255,.05)}
+html[data-lt-theme="garden"] .d-fans-thumb{background:rgba(64,53,54,.08)}
+.d-fans-meta{display:flex;flex-direction:column;min-width:0;flex:1;text-align:left}
+.d-fans-meta b{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.d-fans-meta small{color:var(--lt-muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.d-fans-ai{font-style:normal;font-size:11px;color:var(--lt-gold);border:1px solid var(--lt-gold);border-radius:var(--lt-r-pill);padding:1px 7px;flex:none}
+.d-fans-empty{color:var(--lt-muted);font-size:13px;padding:4px 8px}
+.d-fans-more{width:100%;min-height:32px;padding:3px 8px;text-align:center;font-size:12.5px;color:var(--lt-gold);border-radius:8px}
+.d-fans-more:hover{background:rgba(255,255,255,.05)}
+html[data-lt-theme="garden"] .d-fans-more:hover{background:rgba(64,53,54,.07)}
