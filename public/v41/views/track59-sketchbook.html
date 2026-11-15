@@ -7,14 +7,14 @@ SCOPE: existing LoveTree character photo/video-thumbnail assets
 STATUS: candidate
 DATE: 2026-08-11
 -->
-<html data-v41-screen="book" lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>러브트리 4.1 · 책</title><!-- modulepreload:start (tools/v41-modulepreload.mjs가 만든다) --><link rel="modulepreload" href="/v41/book-usability.mjs"><link rel="modulepreload" href="/v41/domain.mjs"><link rel="modulepreload" href="/v41/local-date.js"><link rel="modulepreload" href="/v41/local-date.mjs"><link rel="modulepreload" href="/v41/thumb-fallback.mjs"><link rel="modulepreload" href="/v41/tree-name.mjs"><link rel="modulepreload" href="/v41/views/book/book-extra.js"><link rel="modulepreload" href="/v41/views/shelf/shelf-model.mjs"><!-- modulepreload:end -->
+<html data-v41-screen="book" lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>러브트리 4.1 · 책</title><!-- modulepreload:start (tools/v41-modulepreload.mjs가 만든다) --><link rel="modulepreload" href="/v41/book-usability.mjs"><link rel="modulepreload" href="/v41/domain.mjs"><link rel="modulepreload" href="/v41/local-date.js"><link rel="modulepreload" href="/v41/local-date.mjs"><link rel="modulepreload" href="/v41/tag-line.mjs"><link rel="modulepreload" href="/v41/tag-model.mjs"><link rel="modulepreload" href="/v41/tags.mjs"><link rel="modulepreload" href="/v41/thumb-fallback.mjs"><link rel="modulepreload" href="/v41/tree-name.mjs"><link rel="modulepreload" href="/v41/views/book/book-extra.js"><link rel="modulepreload" href="/v41/views/shelf/shelf-model.mjs"><!-- modulepreload:end -->
 <link rel="stylesheet" href="/v41/views/book/book.css"><style>#addLinkBtn{display:none!important}</style><style id="member-reading-scroll">
 /* Canonical notes can reach 500 characters; keep every line inside the paper. */
 .page-content{overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y}
 .page-content .note-piece,.page-content .clipping{flex:0 0 auto}
 .book-wrap{touch-action:pan-y}
 @media(max-width:820px){.mobile-content{overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y}.mobile-support{position:static;margin-top:22px}.mobile-page .note-piece{min-height:260px}.mobile-page .note-piece p{font-size:15px;line-height:1.8}}
-</style><link rel="stylesheet" href="/v41/reader-layout.css"><link rel="stylesheet" href="/v41/identity.css"><link rel="stylesheet" href="/v41/views/book/book-usability.css"><style id="lt-touch-targets">/* 2026-11-08 터치 타깃: 보이는 모양은 그대로 두고 ::after로 누르는 영역만 44px 이상으로 넓힌다. */
+</style><link rel="stylesheet" href="/v41/reader-layout.css"><link rel="stylesheet" href="/v41/tag-line.css"><link rel="stylesheet" href="/v41/identity.css"><link rel="stylesheet" href="/v41/views/book/book-usability.css"><style id="lt-touch-targets">/* 2026-11-08 터치 타깃: 보이는 모양은 그대로 두고 ::after로 누르는 영역만 44px 이상으로 넓힌다. */
 #prevBtn,#nextBtn,#detailClose,#viewerClose,#openViewerBtn,#detailIndexBtn,#linkCancel,#linkSave,#branchClose{position:relative}
 #prevBtn::after,#nextBtn::after{content:"";position:absolute;inset:-7px}
 #detailClose::after,#viewerClose::after{content:"";position:absolute;inset:-5px}
@@ -31,5 +31,5 @@ DATE: 2026-08-11
 <div class="branch-modal" id="branchModal" inert><div class="branch-card"><h2>여기서 다른 경로도 열렸어요</h2><p>연결 이유를 보고 다음 기억 경로를 선택하세요.</p><div class="branch-choice" id="branchChoices"></div><div style="margin-top:13px;text-align:right"><button class="ui-btn" id="branchClose">닫기</button></div></div></div>
 <div class="overview" id="overview" inert><div class="overview-card" role="dialog" aria-modal="true" aria-labelledby="overviewTitle"><h2 id="overviewTitle">이어진 순간</h2><p>처음 순간부터 지금까지 이어진 순간을 한눈에 보여 줘요. 누르면 그 장으로 넘어가요.</p><div class="overview-flow journey" id="overviewFlow"></div><div class="overview-foot"><span class="journey-summary" id="journeySummary"></span><button class="ui-btn" id="overviewClose">책으로 돌아가기</button></div></div></div><div class="toast" id="toast"></div>
 <script src="/v41/labels.js"></script><script src="/v41/media-preview.js"></script><script src="/v41/runtime.js"></script><script src="/v41/view-navigation.js"></script>
-<script src="/v41/views/book/book-model.js"></script><script src="/v41/views/book/book.js"></script><script type="module" src="/v41/views/book/book-extra.js"></script>
+<script src="/v41/views/book/book-model.js"></script><script src="/v41/views/book/book.js"></script><script type="module" src="/v41/tag-line.mjs"></script><script type="module" src="/v41/views/book/book-extra.js"></script>
 </body></html>

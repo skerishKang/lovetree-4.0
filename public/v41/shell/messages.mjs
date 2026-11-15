@@ -30,6 +30,8 @@ export function createMessages(deps) {
   const openLoginStart = deps.openLoginStart;
   const openAccountMenu = deps.openAccountMenu;
   const openCleanup = deps.openCleanup;
+  // #627 PR B: 꼬리표 저장 한 곳(셸 tag-save.mjs) — 화면의 lt41-tags가 부른다.
+  const saveTags = deps.saveTags || (() => ({ ok: false, error: 'notfound' }));
   // #644 1: 상세의 옮기기는 트리 목록(셸 cleanup 모듈의 openMove)으로 바로 연다 — 트리가 하나뿐이면
   // 그 모듈이 기존 정리 창('새 트리 만들어 옮기기')을 연다. 셸이 넘겨 주지 않으면 예전 동작(정리 창)으로라도 연다.
   const openMovePicker = deps.openMovePicker || openCleanup;
@@ -57,6 +59,15 @@ export function createMessages(deps) {
       if (getSource() !== 'server' || !getMember()?.snapshot().writable) { reply(false, '서버 편집 연결이 없어 저장하지 않았어요.'); return; }
       try { getMember().apply('boardSync', {moments: data.moments}, {treeId: data.treeId}); reply(true); }
       catch (error) { reply(false, error?.message || '저장하지 못했어요.'); }
+      return;
+    }
+    // #627 PR B: 화면의 꼬리표 줄이 확인한 것 — keywords만 기존 저장 경로(shellTags → boardSync)로 바꾼다.
+    // 답(lt41-tags-saved)을 보낸 화면에만 돌려 화면 사본이 칩을 다시 맞추게 한다. iframe을 다시 그리지 않는다.
+    if (data?.type === 'lt41-tags') {
+      const reply = (ok, keywords, error) => { try { event.source?.postMessage({type:'lt41-tags-saved', ok, momentId: data.momentId, keywords, error}, location.origin); } catch {} };
+      if (getSource() !== 'server' || !getMember()?.snapshot().writable) { reply(false, null, '읽어 보는 화면에서는 꼬리표를 바꿀 수 없어요.'); return; }
+      const saved = saveTags({ treeId: data.treeId, momentId: data.momentId, keywords: data.keywords, quiet: true });
+      reply(saved.ok, saved.ok ? saved.keywords : null, saved.error);
       return;
     }
     if (data?.type === 'lt41-theme') { applyTheme(); paintThemeControls(); }

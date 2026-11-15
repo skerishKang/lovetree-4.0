@@ -6,6 +6,9 @@ import {fetchVideoTitle} from '../video-title.mjs';
 import {suggestMomentTitle} from '../domain.mjs';
 import {displayTreeTitle} from '../tree-name.mjs';
 import {extractDropUrl, hasDropPayload, firstImageFile, parseQuickUrl, dropRoute, previewState, previewTag, savedNoticeText, quickTreeLineText, quickTreeAfterText, quickSubmitText, quickSavedTreeText, QUICK_INBOX_LABEL, QUICK_EMPTY_ERROR, QUICK_INVALID_ERROR, DROP_LOGIN_NOTICE, DROP_READONLY_NOTICE, QUICK_PASTE_LABEL, QUICK_CLEAR_LABEL, QUICK_EMPTY_PREVIEW, QUICK_INVALID_PREVIEW, QUICK_PASTE_EMPTY, QUICK_PASTE_ERROR} from '../quick-add.mjs';
+// #627 PR B: 담은 직후 안내에 붙는 꼬리표 줄 — 그리기·누르기는 tag-line.mjs 한 벌, 규칙은 tag-model.mjs 한 벌.
+// 저장은 deps.saveTags(셸 tag-save.mjs)가 기존 경로로 keywords만 바꾼다. 쓰기 창 자체 흐름은 바꾸지 않는다.
+import {renderTagLine} from '../tag-line.mjs';
 
 export function createQuickAdd(deps) {
   const $ = deps.$;
@@ -88,6 +91,29 @@ export function createQuickAdd(deps) {
     refineButton.hidden = true;
     refineButton.dataset.treeId = '';
     refineButton.dataset.momentId = '';
+    // #627: 지난 안내의 꼬리표 줄도 함께 치운다.
+    $('quick-tagline')?.replaceChildren();
+  }
+
+  // #627: 담은 직후 안내에 꼬리표 줄을 붙인다(창 안 #quick-tagline·떠 있는 안내 #quick-saved-tags 두 모양 같은 한 벌).
+  // 방금 담은 순간은 꼬리표가 아직 없으므로 제목 해석 제안(재사용 먼저)이 흐린 칩으로 보인다. 눌러 확인한 것만 저장된다.
+  function renderQuickTagline(host, result, savedTitle) {
+    if (!host) return;
+    if (!deps.saveTags || !result?.treeId || !result?.momentId) { host.replaceChildren(); return; }
+    const knownTags = [];
+    for (const m of deps.listTrees?.().find(t => t.id === result.treeId)?.moments || []) {
+      for (const k of Array.isArray(m.keywords) ? m.keywords : []) if (!knownTags.includes(k)) knownTags.push(k);
+    }
+    renderTagLine({
+      host,
+      moment: { id: result.momentId, title: savedTitle || '', keywords: [] },
+      knownTags,
+      writable: true,
+      onCommit: keywords => {
+        const saved = deps.saveTags({ treeId: result.treeId, momentId: result.momentId, keywords });
+        if (saved?.ok === false) deps.notify(saved.error === 'readonly' ? '지금은 꼬리표를 바꿀 수 없어요.' : (saved.error || '저장하지 못했어요.'));
+      }
+    });
   }
 
   function fallbackTitle(url) {
@@ -332,6 +358,7 @@ export function createQuickAdd(deps) {
       $('quick-notice').textContent = savedNoticeText(savedTitle);
       $('quick-notice').hidden = false;
       setRefineTarget($('quick-refine'), result);
+      renderQuickTagline($('quick-tagline'), result, savedTitle);
       return;
     }
     const image = $('quick-saved-thumb');
@@ -341,6 +368,7 @@ export function createQuickAdd(deps) {
     $('quick-saved-text').textContent = quickSavedTreeText(selectedTreeName());
     $('quick-saved').hidden = false;
     setRefineTarget($('quick-saved-refine'), result);
+    renderQuickTagline($('quick-saved-tags'), result, savedTitle);
     clearTimeout(savedTimerBox.timer);
     savedTimerBox.timer = setTimeout(() => { $('quick-saved').hidden = true; }, 20000);
   }

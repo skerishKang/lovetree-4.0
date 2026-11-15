@@ -26,6 +26,9 @@ import {createQuickIntake} from './shell/quick-intake.mjs';
 import {createJourney} from './shell/journey.mjs';
 import {createMessages} from './shell/messages.mjs';
 import {createCleanup} from './shell/cleanup.mjs';
+// #627 PR B: 꼬리표 저장 한 곳(shell/tag-save.mjs — 기존 boardSync 경로로 keywords만)과 꼬리표 정리 창(shell/tag-manager.mjs).
+import {createTagSave} from './shell/tag-save.mjs';
+import {createTagManager} from './shell/tag-manager.mjs';
 import {headerBadge, cleanupAvailable} from './inbox-model.mjs';
 import {createDialogs} from './shell/dialogs.mjs';
 import {createFeedbackDialog} from './feedback.mjs';
@@ -128,17 +131,22 @@ function renderTreeMenu(){
  const currentTree=window.LT41?.tree||null;
  const cleanupRow=cleanupAvailable({source,owned:!!member?.snapshot().owned,tree:currentTree})&&member?.snapshot().writable
   ? `<button type="button" role="menuitem" class="tree-item tree-cleanup" data-tree-action="cleanup"><span class="tree-name">정리 전 ${currentTree?.moments?.length||0}개 정리하기</span></button>` : '';
+ // #627 PR B: 기존 '정리' 옆에 두는 꼬리표 정리 입구(내 기록·쓸 수 있을 때만).
+ const tagsRow=source==='server'&&member?.snapshot().owned&&member.snapshot().writable
+  ? '<button type="button" role="menuitem" class="tree-item tree-tags" data-tree-action="tags"><span class="tree-name">꼬리표 정리</span></button>' : '';
  const manage=source==='server'&&window.LT41&&member?.snapshot().owned&&member.snapshot().writable;
  // #394: 트리 드롭다운 맨 아래 "내 순간 전체 보기"(#380의 "내 트리 전체 보기" 자리 옆). 내 기록(서버)에서만 보인다.
  const momentsEntry=source==='server'&&window.LT41?'<button type="button" role="menuitem" data-tree-action="moments">내 순간 전체 보기</button>':'';
  // #380 2번: 맨 아래 "내 트리 전체 보기" — 지금의 책장 화면(모든 트리의 책장)을 연다. 로그인 상태에서만 보인다.
  const shelfEntry=member?.snapshot().owned?'<button type="button" role="menuitem" data-tree-action="shelf">내 트리 전체 보기</button>':'';
- treePopover.innerHTML=rows+`<div class="tree-foot" role="none">${cleanupRow}<button type="button" role="menuitem" data-tree-action="new">＋ 새 트리</button>${manage?'<button type="button" role="menuitem" data-tree-action="manage">이 트리 관리 (이름·표지)</button><button type="button" role="menuitem" data-tree-action="share">이 트리 공유</button>':''}${shelfEntry}${momentsEntry}</div>`;
+ treePopover.innerHTML=rows+`<div class="tree-foot" role="none">${cleanupRow}${tagsRow}<button type="button" role="menuitem" data-tree-action="new">＋ 새 트리</button>${manage?'<button type="button" role="menuitem" data-tree-action="manage">이 트리 관리 (이름·표지)</button><button type="button" role="menuitem" data-tree-action="share">이 트리 공유</button>':''}${shelfEntry}${momentsEntry}</div>`;
   // 트리를 누르면 그 트리로 이동한다: 책·보드·지도를 보던 중이면 같은 보기로, 그 외(첫 화면·내 트리·둘러보기)에는 그 트리의 책으로. 주소도 따라오게 남긴다.
   const TREE_VIEWS=new Set(['track59-sketchbook.html','track58-pinboard.html','track56-network.html']);
   treePopover.querySelectorAll('[data-tree-id]').forEach(b=>b.onclick=()=>{const id=b.dataset.treeId;closeTreeMenu();if(!id)return;const wasTreeView=TREE_VIEWS.has(current);choose(id);if(!wasTreeView)show('track59-sketchbook.html',false);flowNavigation();writeLocation();});
  treePopover.querySelector('[data-tree-action="new"]')?.addEventListener('click',()=>{closeTreeMenu();if(member?.snapshot().writable)openEditor('new');else openLoginStart('new-tree');});
  treePopover.querySelector('[data-tree-action="cleanup"]')?.addEventListener('click',()=>{closeTreeMenu();shellCleanup.open({});});
+ // #627 PR B: 기존 '정리' 옆의 두 번째 입구 — 꼬리표 정리(이름 바꾸기·합치기·제안).
+ treePopover.querySelector('[data-tree-action="tags"]')?.addEventListener('click',()=>{closeTreeMenu();shellTagManager.open();});
  treePopover.querySelector('[data-tree-action="manage"]')?.addEventListener('click',()=>{shellPanels.openTreeManager();closeTreeMenu();});
  treePopover.querySelector('[data-tree-action="share"]')?.addEventListener('click',()=>{closeTreeMenu();$('share-menu').click();});
  // #394: 첫 화면 순간 목록을 지금 트리가 골라진 상태로 연다. 화면을 다시 불러오므로 요청을 전역 플래그로 남긴다.
@@ -231,6 +239,21 @@ function openEditor(mode,parentId=''){return shellPanels.openEditor(mode,parentI
 shellWrite.setTabHook(tab=>shellPanels.onWriteTab(tab));
 // 쉬운 추가(#빠른 추가 ②): 창 열기·끌어다 놓기는 shell/quick-add.mjs가 맡는다.
 // #425부터 입구는 하나다 — 같은 창을 열고 먼저 보일 탭만 설정값(lt41.writeTab)이 정한다.
+// #627 PR B: 꼬리표 저장 한 곳 — 기존 워크스페이스 저장 경로(boardSync)로 keywords만 바꾼다(새 저장 경로·서버 변경 없음).
+// 꼬리표 정리 창은 같은 저장 길을 쓰고, 화면(iframe)의 lt41-tags도 이 한 곳을 부른다(shell/messages.mjs).
+const shellTags=createTagSave({
+  getMember:()=>member,
+  getModel:()=>model,
+  notify:text=>notify(text)
+});
+const shellTagManager=createTagManager({
+  $,
+  getMember:()=>member,
+  getSource:()=>source,
+  notify:text=>notify(text),
+  panel:id=>panel(id),
+  saveMoments:shellTags.saveMoments
+});
 const shellQuick=createQuickAdd({
   $,
   getMember:()=>member,
@@ -252,7 +275,9 @@ const shellQuick=createQuickAdd({
   // 사진 올리기는 기존 업로더(#310 onUploaded·imagesOnly)를 그대로 쓴다.
   mountUpload:mountPrivateUpload,
   // 이슈 671: '그 순간 다음에 담기' 한 줄에 쓸 순간 제목 — 책·보드와 같은 제목 규칙(자동 제목 빼기)을 쓴다.
-  momentTitle:moment=>{const main=titleView(moment,titleDisplayValue()).main;return main||withoutAutoTitle(moment).title;}
+  momentTitle:moment=>{const main=titleView(moment,titleDisplayValue()).main;return main||withoutAutoTitle(moment).title;},
+  // #627 PR B: 담은 직후 안내의 꼬리표 줄이 눌렸을 때 — keywords만 기존 경로로 저장한다.
+  saveTags:payload=>shellTags.save(payload)
 });
 $('write-menu').onclick=()=>{if(source!=='server'&&member?.snapshot().owned){void resumeMember('write');return;}if(member?.snapshot().dirty){explainSaveState();return;}shellQuick.openWrite();};
 // #458: 모바일 떠 있는 ＋ 단추 — 헤더의 ＋ 순간 추가와 같은 길(같은 창)을 연다. 단추는 body.lt-fab-ok일 때만 보인다.
@@ -345,6 +370,8 @@ const shellMessages=createMessages({
   openLoginStart:intent=>openLoginStart(intent),
   openAccountMenu:()=>openAccountMenu(),
   openCleanup:options=>shellCleanup.open(options),
+  // #627 PR B: 화면(책·보드·지도)의 꼬리표 줄이 확인한 것을 저장하는 한 길.
+  saveTags:payload=>shellTags.save(payload),
   openMovePicker:options=>shellCleanup.openMove(options),
   sample:(selection,view)=>sample(selection,view),
   applyTheme:(theme)=>applyTheme(theme),
