@@ -6,6 +6,12 @@
 
 > **시험 멈춤 규칙(2026-11-15)**: 브라우저 코드에 setInterval 반복을 넣으면 unref하거나 정리한다 — 안 그러면 npm test가 끝나지 않고 CI가 멈춘다.
 
+## 2026-11-16 — 둘러보기 카드 작은 글자 12px 이상·검사기 KNOWN 4→3건 (#705 후속, 컴1로컬4 레인, ai/local4-community-261116, main 18f0ce1 기준)
+
+- **고친 글자(shell.css 커뮤니티 블록)**: 감정 칩 .community-tag 10→12px · AI 명예회원 배지 .community-ai 11→12px · 대상 줄 .community-subject 11→13px · 요약 .community-summary 12→13px(본문급) · 메타 줄 .community-muted 11→12px · '댓글·신고·차단' 펼침 11→12px · 반응 칩 단추 .community-reaction 12→13px(단추 13px 규칙). 즐겨찾기·반응 단추 누름 영역 44px(#705) 유지 — 실측 h44.
+- **KNOWN**: tests/v41-screen-audit.test.mjs에서 둘러보기 작은글자 1줄(span.community-tag|p.community-subject|p.community-muted|summary '댓글') 삭제 — **4→3건**. 빨강 근거: before 캡처 감사 줄(390 2건·1440 6건 — 10·11px), after 0건(#657은 CI가 다시 지킨다).
+- **빈 검색 결과(보람 'RIIZE')**: .community-empty 안내 13px·'첫 트리 만들기' 단추 16px·h44 — 이미 기준 통과(확인만, 수정 없음).
+- **시험·측정**: build·modulepreload --check·전체 npm test 1842검 1702 pass·0 fail·140 skip(30.8초, 끝까지 도는 것 확인). 카드 높이 390 372→379px·1440 278→285px(+7px), 가로 넘침 0. 캡처 `E:\lovetree-qa\lane\local4-community\{before,after}\`(community-{390,1440}-{night,garden}(-empty).png + summary.json).
 ## 2026-11-15 — 보드 첫 진입 두 안내 겹침: 셸 알림이 떠 있는 동안 보드 안내 말풍선은 기다렸다 띄운다 (컴1로컬5 레인, ai/local5-board-notice-overlap-261115, main ecca7fb 기준, CTO가 after-390-night 캡처에서 지적)
 
 - **원인**: 보드 안내 말풍선('순간을 선택해 연결된 기록을 살펴보세요.', board-extras 진입 900ms 뒤 2.2초)은 ≤700px에서 화면 아래 중앙(bottom 95px)이고, 셸 알림('내 기록을 불러왔어요.', 약 3초)도 #666 규칙으로 아래 중앙(--lt-toast-bottom, ＋ 단추·링크 줄 위)에 뜬다 — 첫 진입에서 두 상자가 겹친다(390 실측 최대 5,328px², 동시 노출 약 2.2초). 1440은 말풍선이 오른쪽 아래(right 24px·bottom 160px)라 기하학적으로 겹치지 않고, 선택 복원으로 상세 판이 먼저 열려 안내가 뜨지도 않는다.
