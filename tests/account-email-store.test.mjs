@@ -89,3 +89,22 @@ test('a repository failure is 503', async () => {
   assert.equal(res.status, 503);
   assert.equal(res.body.error.code, 'account_email_unavailable');
 });
+
+test('memory account repo keeps the first sign-in time as created_at and only moves updated_at afterwards', async () => {
+  const repo = createMemoryAccountRepo();
+  assert.deepEqual(await repo.accounts({ productId: PRODUCT }), []);
+  await repo.upsertEmail({ productId: PRODUCT, subjectId: 'sub_a', email: 'First@Example.test' });
+  const [first] = await repo.accounts({ productId: PRODUCT });
+  assert.equal(first.subjectId, 'sub_a');
+  assert.ok(first.createdAt && first.updatedAt, '첫 로그인에서 createdAt·updatedAt 이 찍힌다');
+
+  await repo.upsertEmail({ productId: PRODUCT, subjectId: 'sub_a', email: 'second@example.test' });
+  const [second] = await repo.accounts({ productId: PRODUCT });
+  assert.equal(await repo.emailFor({ productId: PRODUCT, subjectId: 'sub_a' }), 'second@example.test');
+  assert.equal(second.createdAt, first.createdAt, 'createdAt(가입일)은 두 번째 로그인에서도 그대로다');
+  assert.ok(second.updatedAt > first.updatedAt, 'updatedAt 은 두 번째 로그인 시각으로 바뀐다');
+  assert.equal(await repo.accountCreatedAt({ productId: PRODUCT, subjectId: 'sub_a' }), first.createdAt);
+  // 다른 제품의 계정은 섞이지 않는다.
+  await repo.upsertEmail({ productId: 'other-product', subjectId: 'sub_b', email: 'b@example.test' });
+  assert.deepEqual((await repo.accounts({ productId: PRODUCT })).map((row) => row.subjectId), ['sub_a']);
+});
