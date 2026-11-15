@@ -256,7 +256,12 @@ try {
 } catch { skip644 = 'playwright 패키지가 없어 이슈 644 화면 시험을 건너뜀'; }
 
 const MIME644 = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.webp': 'image/webp', '.woff2': 'font/woff2' };
-const ROOT644 = new URL('../public', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
+// 이슈 666: 빌드 결과(dist)가 있으면 그것을 먼저 쓴다. public 에는 빌드 진입점인 v41/home.html 이
+// 없어서, public 만 서빙하면 화면 안 프레임이 404 본문('not found')을 그대로 그린다 — 캡처에
+// 제품에 없는 글자가 찍히고 겹침 좌표도 404 본문을 재게 된다(공통 검사기와 같은 판정).
+const ROOT644 = existsSync644(new URL('../dist/v41/home.html', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'))
+  ? new URL('../dist', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')
+  : new URL('../public', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
 const PREFS644 = { titleDisplay: 'both', displayName: '', accentColor: '', dateStyle: 'dot', startPlace: 'resume', shareView: 'book', shareDiscover: false };
 const doc644 = (trees) => ({ version: 1, trees, prefs: PREFS644 });
 const tree644 = (subject, title) => createTree({ subject, title, note: '기록', emotion: '설렘', date: '2026-11-15', url: '' }, '2026-11-15T00:00:00.000Z');
