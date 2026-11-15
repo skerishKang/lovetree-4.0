@@ -577,8 +577,24 @@ function closeTreeTips(remember=true){
   const back=tipsReturnFocus||$('tree-views')?.querySelector('button')||$('mobile-more');tipsReturnFocus=null;
   if(back&&document.contains(back)&&!back.hidden)back.focus();
 }
+// 이슈 666: 계정 메뉴와 첫 트리 안내는 한 번에 하나만 보인다. 안내(z-index 25)는 머리줄 상자
+// (z-index 5) 안에 있는 메뉴 위로 떠 메뉴 항목을 가렸다. 메뉴가 열려 있으면 안내는 미뤄 두고,
+// 메뉴가 닫히면 그때 띄운다. 미뤘다고 '봤음'으로 적지 않는다 — 닫은 뒤에도 다시 보여 준다.
+function accountMenuOpen(){const pop=$('account-popover');return !!pop&&!pop.hidden;}
+let tipsHeld=false;
+function tipsFollowAccountMenu(){
+  const box=$('tree-tips');
+  if(accountMenuOpen()){
+    if(box&&!box.hidden){tipsHeld=true;closeTreeTips(false);}
+    return;
+  }
+  if(!tipsHeld)return;
+  tipsHeld=false;
+  syncTreeTips();
+}
 function showTreeTips(){
   const box=$('tree-tips');if(!box||!box.hidden)return;
+  if(accountMenuOpen()){tipsHeld=true;return;}
   const list=$('tree-tips-list');
   if(list&&!list.children.length)for(const tip of FIRST_TREE_TIPS){const li=document.createElement('li');const strong=document.createElement('strong');const span=document.createElement('span');strong.textContent=tip.title;span.textContent=tip.body;li.append(strong,span);list.append(li);}
   if(!tipsReturnFocus)tipsReturnFocus=document.activeElement;
@@ -593,6 +609,9 @@ function syncTreeTips(){
 }
 // 모달 창이 열리거나 닫힐 때 안내의 자리를 다시 맞춘다(창이 열려 있으면 창 안, 없으면 제자리).
 document.addEventListener('close',()=>placeTreeTips(),true);
+// 계정 메뉴가 열리고 닫힐 때마다 안내와의 순서를 다시 맞춘다(메뉴를 여는 길이 여럿이라 상태 변화를 본다).
+const accountPopoverBox=$('account-popover');
+if(accountPopoverBox)new MutationObserver(()=>tipsFollowAccountMenu()).observe(accountPopoverBox,{attributes:true,attributeFilter:['hidden']});
 $('tree-tips-close')?.addEventListener('click',()=>closeTreeTips());
 // #571: 안내의 [이름 바꾸기]는 트리 관리 창을 바로 열고 이름 칸에 초점을 둔다(openTreeManager가 초점을 옮긴다).
 // 안내는 닫지 않고 그대로 둔다 — 이름 창을 닫고 돌아오면 두 번째 안내와 알겠어요가 그대로 있다.

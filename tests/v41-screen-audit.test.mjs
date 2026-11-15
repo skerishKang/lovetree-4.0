@@ -2,6 +2,7 @@
 // 검사 함수는 tests/helpers/screen-audit.mjs에 있다(①겹침·가려짐 #635 규칙 ②가로 넘침·잘림 ③흔적 값 넷 #635 ④글자 기준선 #548 ⑤알림 줄이 아래 링크 줄·＋ 단추·새 소식 카드를 덮지 않음 #666).
 // 화면 목록: 첫 화면(예시)·책(공유 링크, 마지막 장 포함)·보드·지도·둘러보기·의견 보내기 창(보내기 전·후)·어떻게 쓰나요 안내.
 // #666이 더한 상태: 알림 줄(토스트)이 떠 있는 셸 첫 화면·보드 — ＋ 단추(body.lt-fab-ok)와 새 소식 카드가 함께 뜬 자리에서 잰다.
+// #666 2번이 더한 상태: 계정 메뉴가 열린 자리·닫힌 자리의 첫 트리 안내 — 메뉴가 열려 있는 동안 안내는 접혀 있고 겹침 0.
 // 크기·테마: 390·1440 × 밤·정원. 앞으로 화면 수리는 아래 SCREENS에 화면이나 상태를 한 줄 더하는 것으로 끝낸다.
 //
 // 알려진 문제(기준을 낮추지 않는다): main에서 이미 나는 실패는 KNOWN에 화면·항목·이슈 번호와 함께 적고,
@@ -11,6 +12,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
 import { serve, auditPage, failuresOf } from './helpers/screen-audit.mjs';
+import { createTree } from '../public/v41/domain.mjs';
 
 const REQUIRE = process.env.LT_SCREEN_AUDIT_REQUIRE === '1';
 let chromium, skip = false;
@@ -36,6 +38,10 @@ const KNOWN = [
   { 화면: '보드', 항목: '겹침', 찾을: 'button#detailClose × div\\.label', 이슈: '#601' },
   { 화면: '보드', 항목: '가려짐', 찾을: '(button#openMoment|button#cinemaFromMoment|button#detailMapBtn) ← div\\.surface', 이슈: '#601' },
   { 화면: '보드', 항목: '가려짐', 찾을: 'div#themeBadge ← aside#detail', 이슈: '#601' },
+  // #666 2번의 새 상태가 처음 그린 자리 — 첫 화면 '최근 순간' 카드(src/views/orbit.js:80)의 아래 두 줄이 11px다
+  // (레거시 첫 화면 모양. 트리가 있어야 뜨므로 지금까지 잰 적이 없었다). 이 이슈에서는 손대지 않는다.
+  { 화면: '계정 메뉴·첫 트리 안내', 항목: '작은글자', 찾을: 'small "(마지막 순간|시험 · 이어 보기)', 이슈: '#548(12px 기준)·레거시 첫 화면' },
+  { 화면: '계정 메뉴 닫힘·첫 트리 안내', 항목: '작은글자', 찾을: 'small "(마지막 순간|시험 · 이어 보기)', 이슈: '#548(12px 기준)·레거시 첫 화면' },
   // 지도 — Track56 원본 모양: 안내 문구가 캔버스 뒤에 깔려 있다(원본 보존 커밋 b2567fe — 원본 구조는 바꾸지 않는다).
   { 화면: '지도', 항목: '가려짐', 찾을: 'p ← canvas#stage', 이슈: 'Track56 원본(b2567fe)' },
 ];
@@ -89,6 +95,11 @@ const raiseToast = async (page) => {
 };
 const lowerToast = async (page) => { await page.evaluate(() => { const t = document.getElementById('toast'); if (t) t.hidden = true; }); };
 
+// #666 2번: 첫 트리 안내와 계정 메뉴는 한 번에 하나만. 안내는 서버 기록·로그인 소유자가 첫 트리를
+// 만든 자리에서만 뜨므로(tipsWanted), 가짜 /api/workspace로 그 자리를 만든다. 트리 하나·순간 하나.
+// 기록 문서는 도메인 규칙을 통과해야 셸이 '내 기록'으로 받아 준다(손으로 만든 트리는 거절된다) — createTree로 만든다.
+const firstTree = createTree({ subject: '시험', title: '시험 트리', note: '기록', emotion: '설렘', date: '2026-11-15', url: '' }, '2026-11-15T00:00:00.000Z');
+
 const frameOf = async (page, test_) => {
   for (let i = 0; i < 80; i++) {
     const f = page.frames().find((f) => f !== page.mainFrame() && test_.test(f.url()));
@@ -98,7 +109,7 @@ const frameOf = async (page, test_) => {
   return null;
 };
 
-test('#657 화면 공통 검사기: 주요 화면 12 상태 × 390·1440 × 밤·정원에서 겹침·잘림·흔적 값·작은 글자가 0이다', { skip: REQUIRE ? false : skip, timeout: 900000 }, async () => {
+test('#657 화면 공통 검사기: 주요 화면 14 상태 × 390·1440 × 밤·정원에서 겹침·잘림·흔적 값·작은 글자가 0이다', { skip: REQUIRE ? false : skip, timeout: 900000 }, async () => {
   if (skip) assert.fail(`미리보기 검사에서는 건너뜀이 실패다 — ${skip}`);
   const server = await serve({ '/share-host.html': shareHost, '/home-host.html': homeHost });
   const base = `http://127.0.0.1:${server.address().port}`;
@@ -201,6 +212,37 @@ test('#657 화면 공통 검사기: 주요 화면 12 상태 × 390·1440 × 밤�
     await page4.waitForTimeout(300);
     await take(page4, '의견 창·보낸 뒤');
     await ctx4.close();
+
+    // #666 2번: 계정 메뉴가 열린 자리에서 첫 트리 안내가 메뉴를 덮지 않는다(한 번에 하나만).
+    // 안내가 뜨고 메뉴가 열리면 안내를 잠시 접고, 메뉴를 닫으면 다시 뜨는 것까지 확인한다.
+    const ctx5 = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
+    await ctx5.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); } catch {} }, theme);
+    await ctx5.route('**://i.ytimg.com/**', THUMB);
+    await ctx5.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
+    await ctx5.route('**/api/workspace**', (r) => r.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify({ revision: 1, state: { version: 1, trees: [firstTree], prefs: {} }, subject: '시험계정', writeSubjectBound: true, savedAt: '2026-11-15T09:00:00.000Z' })
+    }));
+    const page5 = await ctx5.newPage();
+    // ?account=1 은 '내 기록을 불러오는 자리'라는 표시다(shouldLoadMemberRecords) — 로그인 화면으로 가지 않고 기록을 읽는다.
+    await page5.goto(`${base}/v41/?account=1`, { waitUntil: 'load' });
+    await page5.waitForFunction(() => { const a = document.getElementById('account-avatar'); return a && !a.hidden; }, null, { timeout: 20000 });
+    await page5.waitForFunction(() => !document.getElementById('tree-tips')?.hidden, null, { timeout: 8000 });
+    await page5.click('#account-avatar');
+    await page5.waitForFunction(() => !document.getElementById('account-popover')?.hidden, null, { timeout: 8000 });
+    await page5.waitForTimeout(300);
+    const both = await page5.evaluate(() => ({ tips: !document.getElementById('tree-tips').hidden, pop: !document.getElementById('account-popover').hidden }));
+    assert.equal(both.pop, true, '계정 메뉴가 열렸다');
+    assert.equal(both.tips, false, '메뉴가 열려 있는 동안 첫 트리 안내는 접혀 있다(한 번에 하나만 보인다)');
+    await take(page5, '계정 메뉴·첫 트리 안내');
+    // 접었다고 '봤음'으로 적지 않는다 — 메뉴를 닫으면 안내가 그대로 돌아온다.
+    await page5.click('#account-avatar');
+    await page5.waitForTimeout(400);
+    const after = await page5.evaluate(() => ({ tips: !document.getElementById('tree-tips').hidden, pop: !document.getElementById('account-popover').hidden, seen: localStorage.getItem('lt41.tips.firstTree') || '' }));
+    assert.deepEqual({ tips: after.tips, pop: after.pop }, { tips: true, pop: false }, '메뉴를 닫으면 안내가 다시 뜬다(봤음 처리하지 않음)');
+    assert.notEqual(after.seen, '1', '접었다고 봤음으로 적지 않는다');
+    await take(page5, '계정 메뉴 닫힘·첫 트리 안내');
+    await ctx5.close();
 
     await context.close();
     return rows;
