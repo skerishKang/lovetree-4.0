@@ -1,33 +1,16 @@
 import { fetchVideoTitle } from './video-title.mjs';
 import { isUserTitle } from './book-usability.mjs';
+import { youtubeIdFrom } from './youtube-id.mjs';
 
 // #347 후속 B: 예전 YouTube 순간의 영상 제목 채우기.
 // 제목이 자동 제목이고 mediaMetadata.title이 비어 있을 때만, 본인 기록(server)에서만,
 // 한 번에 limit개까지 시도한다. 같은 순간은 한 세션에서 한 번만 시도하고 실패는 건너뛴다.
 // 사용자가 쓴 제목(title)은 절대 바꾸지 않고 mediaMetadata만 채운다.
 
-const YOUTUBE_HOSTS = new Set(['youtube.com', 'www.youtube.com', 'm.youtube.com', 'music.youtube.com', 'youtu.be']);
-const VIDEO_ID = /^[A-Za-z0-9_-]{11}$/;
-
-export function youtubeVideoId(value) {
-  const raw = String(value ?? '').trim();
-  if (!raw) return '';
-  let url;
-  try { url = new URL(raw); } catch { return ''; }
-  if (!['http:', 'https:'].includes(url.protocol)) return '';
-  const host = url.hostname.toLowerCase();
-  if (!YOUTUBE_HOSTS.has(host)) return '';
-  if (host === 'youtu.be') {
-    const id = url.pathname.split('/').filter(Boolean)[0] || '';
-    return VIDEO_ID.test(id) ? id : '';
-  }
-  if (url.pathname === '/watch') {
-    const id = url.searchParams.get('v') || '';
-    return VIDEO_ID.test(id) ? id : '';
-  }
-  const matched = url.pathname.match(/^\/(shorts|live|embed)\/([^/?#]+)/);
-  return matched && VIDEO_ID.test(matched[2]) ? matched[2] : '';
-}
+// 유튜브 주소 판정은 한 벤(public/v41/youtube-id.mjs)을 쓴다 — 예전 복사본은 지웠다.
+// youtubeIdFrom 이 예전 복사본보다 ytimg 썸네일 주소·userinfo·2048자 초과까지 걸러 내지만,
+// 채울 대상(YouTube 시청·쇼츠·라이브·임베드 주소) 판정은 그대로다.
+export const youtubeVideoId = youtubeIdFrom;
 
 const keyOf = (treeId, momentId) => `${treeId}/${momentId}`;
 

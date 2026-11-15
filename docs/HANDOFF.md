@@ -6,6 +6,13 @@
 
 > **시험 멈춤 규칙(2026-11-15)**: 브라우저 코드에 setInterval 반복을 넣으면 unref하거나 정리한다 — 안 그러면 npm test가 끝나지 않고 CI가 멈춘다.
 
+## 2026-11-15 — 유튜브 id 판정 한 벤 + 같은 영상·같은 무대 찾기 규칙(순수 함수) (#627 후속, 컴1로컬2 레인, ai/local2-627-same-stage-261115, main 0527a21 기준)
+
+- **유튜브 id 한 벤(`public/v41/youtube-id.mjs` 새)**: 세 벌의 복사본(thumb-fallback.mjs youtubeIdFrom·title-backfill.mjs youtubeVideoId·functions/_lib/tree-preview.mjs youtubeVideoId)을 한 곳으로 모었다. thumb-fallback은 같은 이름을 다시 내보내 쓰던 주소를 유지하고, title-backfill·tree-preview는 한 벤을 불러 쓴다(tree-preview는 tests가 부르는 `youtubeVideoId` 별명으로 재수출). 동작은 thumb-fallback youtubeIdFrom 기준 그대로(ytimg 썸네일 주소·userinfo·2048자 검사 포함) — 같은 판정은 pages-search-preview corpus 시험이 확인한다. 기존 시험 무수정 통과, 지운 시험 없음.
+- **같은 영상·같은 무대 규칙(`public/v41/same-stage.mjs` 새, DOM 없는 순수 함수)**: videoKey(url)(위 한 벤 사용)·findDuplicates(moments)(유튜브 id 같은 순간 묶음)·findSameStage(moments)(꼬리표 무대·노래 값과 무대 날짜=순간 date 칸이 모두 같을 때만, 하나라도 비면 안 묶음). 꼬리표 읽기는 tags.mjs tagValues·tagKey 재사용, 2개 이상만 묶음·처음 본 순서 유지(graph-model.mjs와 같은 자리잡기). **아직 화면에 연결하지 않았다** — views·shell 금지 범위라 다음 단계에서 쓰는 규칙 한 벤이다.
+- **시험**: `tests/v41-same-stage.test.mjs` 동작 시험 8개(주소 모양 18가지, 같은 영상 2번, 같은 무대 직캠 3, 날짜 다른 같은 노래 안 묶음, 꼬리표 빈 순간·종류 없는 옛 꼬리표 안 묶음, 표기 차이 tagKey 묶음, 300개 50ms 이하 — 첫 계산에 JIT 준비가 섞이므로 준비 1회 후 함수별 측정). 관련 시험 80/80 통과, 전체 npm test 1804검 1665 pass·0 fail·139 skip(기존 건너뜀) 3분 안에 끝까지, build·modulepreload --check 통과.
+- **modulepreload**: thumb-fallback이 youtube-id.mjs를 정적으로 부르게 되어 도구가 shell(index.html)·book·board·network·shelf HTML 목록을 갱신(도구 기계 갱신 — views/** 코드는 안 건드렸다).
+
 ## 2026-11-15 — 새 소식 제목 되풀이·지도 390 조작 줄 잘림 수리 (#638 뒤정리, 컴1로컬3 레인, ai/local3-small-261115, #679의 ai/local4-638rest-261115 d76d6e8 위에 쌓음)
 
 - **새 소식 제목 되풀이(#679가 만든 묶음의 사이드 이펙트)**: #679가 출처 줄을 '이웃 항목 묶음'으로 치면서 묶음마다 `<h3>`를 다시 써 한 버전에 '새로워진 것' 3번·'고친 것' 4번(실측, 4.1.4)이 됐다. 고침: `updates.mjs` `renderUpdates()` — 한 출처 묶음을 하나의 `<section class="updates-kind">`에 넣고 제목은 한 번만, 출처 줄(`.updates-source`, 12px 유지)은 묶음 끝 항목 안(`<li>` 마지막에 `<small>`, display:block이라 항목 아래 한 줄)에 붙인다. 실측: 각 버전 '새로워진 것'·'고친 것' 각 1회, 출처 12px.
