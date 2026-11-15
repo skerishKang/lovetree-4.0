@@ -23,8 +23,8 @@ const VIEWS = new Set(['book', 'board', 'network']);
 const CANCELED_TITLE = '공유가 취소되었어요';
 const CANCELED_DESCRIPTION = '이 공유 주소는 더 이상 열리지 않아요. 러브트리에서 좋아하는 순간을 모아 새 공유 주소를 만들 수 있어요.';
 
-// 유튜브 영상 id 판정은 한 벤(public/v41/youtube-id.mjs)을 쓴다 — 예전엔 thumb-fallback.mjs 의
-// youtubeIdFrom 과 같은 규칙의 복사본을 함수 묶음을 작게 유지하려고 여기 뒀는데, 작은 한 벤 모듈을
+// 유튜브 영상 id 판정은 한 벌(public/v41/youtube-id.mjs)을 쓴다 — 예전엔 thumb-fallback.mjs 의
+// youtubeIdFrom 과 같은 규칙의 복사본을 함수 묶음을 작게 유지하려고 여기 뒀는데, 작은 한 벌 모듈을
 // 가져오는 쪽이 묶음도 작게 유지한다. 같은 판정은 tests/pages-search-preview.test.mjs 가 확인한다.
 const youtubeVideoId = youtubeIdFrom;
 export { youtubeVideoId };

@@ -7,7 +7,7 @@ import { youtubeIdFrom } from './youtube-id.mjs';
 // 한 번에 limit개까지 시도한다. 같은 순간은 한 세션에서 한 번만 시도하고 실패는 건너뛴다.
 // 사용자가 쓴 제목(title)은 절대 바꾸지 않고 mediaMetadata만 채운다.
 
-// 유튜브 주소 판정은 한 벤(public/v41/youtube-id.mjs)을 쓴다 — 예전 복사본은 지웠다.
+// 유튜브 주소 판정은 한 벌(public/v41/youtube-id.mjs)을 쓴다 — 예전 복사본은 지웠다.
 // youtubeIdFrom 이 예전 복사본보다 ytimg 썸네일 주소·userinfo·2048자 초과까지 걸러 내지만,
 // 채울 대상(YouTube 시청·쇼츠·라이브·임베드 주소) 판정은 그대로다.
 export const youtubeVideoId = youtubeIdFrom;

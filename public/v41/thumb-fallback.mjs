@@ -5,7 +5,7 @@
 import { userTitleText, formatDisplayDate } from './book-usability.mjs';
 import { YOUTUBE_HOSTS, YTIMG_HOST, VIDEO_ID_RE, youtubeIdFrom } from './youtube-id.mjs';
 
-// 유튜브 영상 id 판정은 한 벤(public/v41/youtube-id.mjs)을 쓴다 — 예전 복사본은 지웠다.
+// 유튜브 영상 id 판정은 한 벌(public/v41/youtube-id.mjs)을 쓴다 — 예전 복사본은 지웠다.
 // 예전에 여기 있던 이름 그대로 다시 내보낸다(쓰던 곳의 주소가 바뀌지 않게).
 export { youtubeIdFrom };
 
