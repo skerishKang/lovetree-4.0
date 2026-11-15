@@ -1,0 +1,26 @@
+import { chromium } from 'playwright';
+import { serve, AUDIT_FN } from '../tests/helpers/screen-audit.mjs';
+const server = await serve({});
+const browser = await chromium.launch();
+const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+const page = await ctx.newPage();
+await page.goto(`http://127.0.0.1:${server.address().port}/v41/#board`, { waitUntil: 'load' });
+await page.waitForTimeout(1200);
+const view = page.frames().find((f) => /track58/.test(f.url()));
+const r = await view.evaluate(async () => {
+  selectMoment(LTDEMO.get());
+  await new Promise((res) => setTimeout(res, 500));
+  toast('순간을 선택해 연결된 기록을 살펴보세요.');
+  await new Promise((res) => setTimeout(res, 400));
+  const t = document.querySelector('.toast');
+  const tr = t.getBoundingClientRect();
+  const cs = getComputedStyle(t);
+  const sec = document.querySelector('#detail .section');
+  const sr = sec.getBoundingClientRect();
+  const ox = Math.min(tr.right, sr.right) - Math.max(tr.left, sr.left), oy = Math.min(tr.bottom, sr.bottom) - Math.max(tr.top, sr.top);
+  return { toast: [Math.round(tr.left), Math.round(tr.top), Math.round(tr.right), Math.round(tr.bottom)], show: t.classList.contains('show'), op: cs.opacity, section: [Math.round(sr.left), Math.round(sr.top), Math.round(sr.right), Math.round(sr.bottom)], ox: Math.round(ox), oy: Math.round(oy) };
+});
+console.log(JSON.stringify(r));
+const audit = await view.evaluate(AUDIT_FN, { checkToast: true });
+console.log('토스트 겹침:', JSON.stringify(audit.issues.filter((i) => /toast/.test(i.a + i.b))));
+await browser.close(); server.close();

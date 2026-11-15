@@ -117,13 +117,21 @@ export const AUDIT_FN = function audit(opts) {
   for (const el of all) text += ' ' + el.textContent;
   const bad = ['undefined', 'null', 'NaN', '[object Object]'].filter((b) => text.includes(b));
 
-  // 보이는 글자만 좌표 검사 대상. 635가 뺀 것(책장 판·hidden 속성)도 같이 뺀다.
-  const vis = all.filter((el) => inTop(el) && visible(el) && !el.closest('.flip-sheet') && !el.closest('[hidden]'));
   // 토스트는 위에 잠깐 뜨는 것이 정상인 오버레이라 겹침·가려짐 판정에서 뺀다(타이밍에 따라 결과가 달라지는 소음을 줄인다).
+  // ('보드·안내' 상태에서는 CHECK_TOAST로 풍선까지 검사 대상에 넣는다 — 아래 pairable에서)
   const isToast = (el) => chain(el).some((n) => n.id === 'toast' || /\btoast\b/.test(String(n.className || '')));
-  /* #662(CTO 지시): 기억 보드는 판nable 캔버스 위에 고정 도구(머리글·탐색 판·도구줄·시네마 단추·테마 표시)가 뜨는 모양이다 —
-     캔버스 내용(#world)이 도구 밑으로 슬라이드되는 것은 설계대로다(첫 화면은 초점 카드를 도구 밖에 세워 검사기의 '작은카드' 기준이 지킨다).
-     도구끼리·캔버스 내용끼리의 겹침은 그대로 잡는다. */
+  // 보이는 글자만 좌표 검사 대상. 635가 뺀 것(책장 판·hidden 속성)도 같이 뺀다.
+  // 상세 판이 열려 있으면 판은 창과 같은 것 — 판에 가려지는 본문(카드·도구줄)은 '정상 가려짐'이라 좌표 검사에서 뺀다(#662 후속).
+  // 판 안의 글자와 판에 닿지 않는 요소(책 이면 글·머리글·탐색 판 등), 판 위에 뜨는 풍선은 그대로 검사 대상.
+  const openPanel = document.querySelector('.detail.open');
+  const panelRect = openPanel ? openPanel.getBoundingClientRect() : null;
+  const underPanel = (el) => {
+    if (!panelRect || openPanel.contains(el) || isToast(el)) return false;
+    const r = clipRect(el);
+    return Math.min(r.right, panelRect.right) - Math.max(r.left, panelRect.left) > 4 && Math.min(r.bottom, panelRect.bottom) - Math.max(r.top, panelRect.top) > 4;
+  };
+  const vis = all.filter((el) => inTop(el) && visible(el) && !underPanel(el) && !el.closest('.flip-sheet') && !el.closest('[hidden]'));
+  // 토스트는 위에 잠깐 뜨는 것이 정상인 오버레이라 겹침·가려짐 판정에서 뺀다(타이밍에 따라 결과가 달라지는 소음을 줄인다).
   const CHROME_SEL = 'header,.lt-moment-picker,.toolbar,.cinemaBtn,#themeBadge';
   const inChrome = (el) => chain(el).some((n) => n.matches && n.matches(CHROME_SEL));
   const inWorld = (el) => chain(el).some((n) => n.id === 'world');
@@ -237,7 +245,7 @@ export async function auditPage(page, screen) {
   const out = EMPTY();
   for (const frame of page.frames()) {
     let res;
-    try { res = await frame.evaluate(AUDIT_FN, { checkToast: screen === '보드·안내' }); } catch (e) {
+    try { res = await frame.evaluate(AUDIT_FN, { checkToast: screen.startsWith('보드·안내') }); } catch (e) {
       // 검사 함수가 잘못되면 조용히 건너뛰지 않는다 — 기록해 두고 시험이 실패하게 한다(about:blank 등은 애초에 evaluate가 오류를 내지 않는다).
       out.errors.push({ 화면: screen, 프레임: frame.url(), 오류: String(e).slice(0, 200) });
       continue;

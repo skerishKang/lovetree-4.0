@@ -1,0 +1,24 @@
+import { chromium } from 'playwright';
+import { serve } from '../tests/helpers/screen-audit.mjs';
+const server = await serve({});
+const browser = await chromium.launch();
+const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+const page = await ctx.newPage();
+await page.goto(`http://127.0.0.1:${server.address().port}/v41/#board`, { waitUntil: 'load' });
+await page.waitForTimeout(1200);
+const view = page.frames().find((f) => /track58/.test(f.url()));
+console.log(JSON.stringify(await view.evaluate(() => {
+  const out = {};
+  const d = document.getElementById('detail');
+  const r0 = d.getBoundingClientRect();
+  out.closedDetail = [Math.round(r0.left), Math.round(r0.top), Math.round(r0.right), Math.round(r0.bottom)];
+  const b = document.getElementById('openMoment');
+  const rb = b.getBoundingClientRect();
+  out.btn = [Math.round(rb.left), Math.round(rb.top), Math.round(rb.right), Math.round(rb.bottom)];
+  out.btnStyle = getComputedStyle(b).visibility + '/' + getComputedStyle(b).opacity;
+  const cx = (Math.max(rb.left, 0) + Math.min(rb.right, innerWidth)) / 2, cy = (rb.top + rb.bottom) / 2;
+  out.hitAt = [Math.round(cx), Math.round(cy)];
+  out.hit = document.elementsFromPoint(cx, cy).slice(0, 4).map((e) => e.tagName + '#' + (e.id || String(e.className).split(' ')[0]));
+  return out;
+})));
+await browser.close(); server.close();
