@@ -87,7 +87,7 @@ test('도메인이 꼬리표 형식을 그대로 받아 저장한다(기존 keyw
 const TITLES = [
   ['뉴진스 (NewJeans) ‘Super Shy’ Official MV', ['artist:NewJeans', 'song:Super Shy']],
   ['TWICE "CHEER UP" M/V', ['artist:TWICE', 'song:CHEER UP']],
-  ['STRAY KIDS "특(S-Class)" M/V', ['song:특(S-Class)'], '여러 단어인 대문자 이름은 사전 없이는 끝을 알 수 없어 가수로 제안하지 않는다'],
+  ['STRAY KIDS "특(S-Class)" M/V', ['artist:STRAY KIDS', 'song:특(S-Class)'], '여러 단어 대문자 그룹명은 바로 뒤에 따옴표 노래 제목이 붙는 모양일 때만 이음 전체를 가수로 제안한다'],
   ['(여자)아이들 \'퀸카 (Queencard)\' Official MV', ['song:퀸카 (Queencard)']],
   ['아이브 (IVE) \'아이엠 I AM\' Official MV', ['artist:IVE', 'song:아이엠 I AM']],
   ['BTS (방탄소년단) \'Dynamite\' Official MV', ['artist:BTS', 'song:Dynamite']],
@@ -115,11 +115,11 @@ const TITLES = [
   ['세븐틴 호시 직캠 \'아낄없이\' 991299', ['song:아낄없이'], '달·날이 실제 범위가 아닌 6자리는 날짜로 읽지 않는다'],
   // 오늘 캡처(E:\lovetree-qa\lane\local2-627c)에서 온 실제 제목 3개:
   ['[쇼챔 MIX직캠] RESCENE(리센느) - With | Show Champion | EP.618', ['artist:RESCENE', 'stage:쇼챔피언'], '영문(한글) 꼬꼬에서 가수를 영문으로 하나만, 파이프 섞인 덩어리는 노래로 제안하지 않는다'],
-  ['[쇼챔 원픽캠 4K] RESCENE ZENA (리센느 제나) - With | Show Champion | EP.618 | 261111', ['artist:ZENA', 'artist:RESCENE', 'stage:쇼챔피언'], '무대 값에서 날짜(261111)를 뗀다'],
+  ['[쇼챔 원픽캠 4K] RESCENE ZENA (리센느 제나) - With | Show Champion | EP.618 | 261111', ['artist:RESCENE', 'member:ZENA', 'stage:쇼챔피언'], '꼬꼬 짝의 낱말 수가 같으면 첫 낱말은 가수, 다음 낱말은 멤버다(2단계 그래프 보기 구분). 무대 값에서 날짜(261111)를 뗀다'],
   ['261114 하츠투하츠 지우 15-LOVE 직캠 4K60p MMA Hearts2Hearts fancam', ['artist:Hearts2Hearts', 'stage:멜론뮤직어워드'], '직캠·화질·무대가 섞인 덩어리에서는 노래를 제안하지 않는다(2차 규칙)'],
 ];
 
-test('제목 해석: 실제 제목 형태 30개에서 가수·노래·무대를 제안한다(제안일 뿐, 저장은 없다)', () => {
+test('제목 해석: 실제 제목 형태 31개에서 가수·멤버·노래·무대를 제안한다(제안일 뿐, 저장은 없다)', () => {
   assert.ok(TITLES.length >= 20, '실제 형태 20개 이상');
   for (const [title, expected, why] of TITLES) {
     const got = brief(suggestTagsFromTitle(title));
@@ -137,7 +137,7 @@ test('제목 해석: 실제 제목 형태 30개에서 가수·노래·무대를 
 });
 
 test('재사용 제안: 내가 쓴 꼬리표가 먼저고, 제목 규칙이 그 뒤를 잇는다', () => {
-  // 멤버는 사전 없이는 가수 이름과 구별할 수 없어 이미 쓴 꼬리표에서만 찾는다.
+  // 멤버는 재사용(이미 쓴 꼬리표)과 확실한 모양(꼬꼬 짝·직캠 문맥의 가수 확정)에서만 찾는다.
   const fancam = '[직캠] 뉴진스 혜인 \'Super Shy\' (NewJeans Hyein Fancam) @인기가요 23716';
   const withMember = suggestTagsFromTitle(fancam, { knownTags: ['멤버:혜인', '감정:설렘'] });
   assert.deepEqual(brief(withMember), ['member:혜인', 'song:Super Shy', 'stage:인기가요'], '재사용이 먼저, 제목 규칙이 뒤');
@@ -152,6 +152,43 @@ test('재사용 제안: 내가 쓴 꼬리표가 먼저고, 제목 규칙이 그 
   // 제목에 없는 꼬리표는 제안하지 않는다.
   const none = suggestTagsFromTitle('뉴진스 \'ETA\' @인기가요', { knownTags: ['멤버:카리나', '노래:Drama'] });
   assert.ok(!brief(none).some((s) => s.includes('카리나') || s.includes('Drama')), '제목과 맞지 않는 꼬리표는 건너뛴다');
+});
+
+// ── 2단계(#627): 가수·멤버 구분 — 그래프 보기에서 가수와 멤버는 다른 큰 점이다 ─────────────────
+
+test('꼬꼬 짝: 바로 앞 대문자 낱말 수와 괄호 안 한글 낱말 수가 같으면 첫 낱말은 가수, 다음은 멤버다', () => {
+  // 두 낱말 짝 — 원픽캠 제목(TITLES 30번째 줄과 같은 규칙).
+  const pair = suggestTagsFromTitle('[원픽캠 4K] RESCENE ZENA (리센느 제나) - Focus');
+  assert.deepEqual(brief(pair), ['artist:RESCENE', 'member:ZENA', 'song:Focus']);
+  // 한 낱말 + '그룹 멤버' 한글 괄호 — 그 낱말은 멤버다.
+  assert.deepEqual(brief(suggestTagsFromTitle('ZENA (리센느 제나) - Focus')), ['member:ZENA', 'song:Focus']);
+  // 한 낱말 + 그룹 한글 괄호(한 낱말) — 가수다(기존 꼬꼬 규칙).
+  assert.deepEqual(brief(suggestTagsFromTitle('ZENA (리센느) - Focus')), ['artist:ZENA', 'song:Focus']);
+  // 낱말 수가 다르면('RESCENE ZENA (리센느)') 멤버를 추측하지 않는다 — 가수(그룹)만 남긴다.
+  const mismatch = suggestTagsFromTitle('RESCENE ZENA (리센느) - Focus');
+  assert.deepEqual(brief(mismatch), ['artist:RESCENE', 'song:Focus']);
+});
+
+test('직캠 문맥의 두 낱말 이음: 가수가 확실할 때만 다음 낱말을 멤버로 제안한다', () => {
+  // 가수가 재사용으로 확실하면('[직캠] RESCENE ZENA') ZENA는 멤버다.
+  const known = suggestTagsFromTitle('[직캠] RESCENE ZENA - Focus', { knownTags: ['가수:RESCENE'] });
+  assert.deepEqual(brief(known), ['artist:RESCENE', 'member:ZENA', 'song:Focus'], '재사용이 가수를 확정하고, 이어지는 이름은 멤버다');
+  // 가수가 확실하지 않으면(재사용 없음·꼬꼬 짝 없음) 제안하지 않는다 — 그룹 이름이 두 낱말일 수도 있어(STRAY KIDS).
+  const unknown = suggestTagsFromTitle('[직캠] RESCENE ZENA - Focus');
+  assert.deepEqual(brief(unknown), ['song:Focus'], '확신이 없으면 제안하지 않는다(틀린 제안보다 안 하는 게 낫다)');
+  // 세 낱말 이음(STRAY KIDS FELIX)은 가수가 확실해도 어디까지가 그룹 이름인지 알 수 없다.
+  const three = suggestTagsFromTitle('STRAY KIDS FELIX 직캠 - Focus', { knownTags: ['가수:STRAY KIDS'] });
+  assert.ok(!brief(three).some((s) => s.startsWith('member:')), '세 낱말 이음은 멤버로 추측하지 않는다');
+});
+
+test('재사용 종류가 이긴다: 멤버:ZENA를 쓴 적 있으면 같은 값을 가수로 다시 제안하지 않는다', () => {
+  const reused = suggestTagsFromTitle('[쇼챔 원픽캠 4K] RESCENE ZENA (리센느 제나) - With | Show Champion | EP.618 | 261111', { knownTags: ['멤버:ZENA'] });
+  assert.deepEqual(brief(reused), ['member:ZENA', 'artist:RESCENE', 'stage:쇼챔피언'], '재사용 멤버가 제목 규칙의 가수 제안보다 앞선다');
+});
+
+test('여러 단어 대문자 그룹명: 따옴표 노래 제목이 없는 모양은 여전히 제안하지 않는다', () => {
+  assert.deepEqual(brief(suggestTagsFromTitle('STRAY KIDS 직캠 - Focus')), ['song:Focus'], '따옴표 노래 제목 없이는 가수도 제안하지 않는다(지금처럼)');
+  assert.deepEqual(brief(suggestTagsFromTitle('STRAY KIDS - Focus')), ['song:Focus']);
 });
 
 test('제목 해석의 한계(문서화한 대로) — 멤버 사전이 없으면 멤버를 추측하지 않는다', () => {
