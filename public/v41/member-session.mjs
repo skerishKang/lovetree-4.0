@@ -30,7 +30,7 @@ export function createMemberSession({api,onState=()=>{},onStatus=()=>{},navigate
      sync.markLocalSave();
      return {prefs:document.prefs};
    }
-   // #347 후속 B: 예전 YouTube 순간의 영상 제목을 한 번에 채운다. title은 건드리지 않는다.
+   // #347 후속 B(#678 후속 갱신): 예전 YouTube 순간의 영상 제목을 한 번에 채운다 — 자동 제목('<도메인>에서 간직한 순간')은 영상 제목으로 바로잡리고, 고객이 직접 적은 제목은 그대로 둔다(domain cacheMomentMediaMetadata).
    if(action==='backfillTitles'){
      let next=document,changed=false;
      for(const item of (Array.isArray(input?.items)?input.items:[])){

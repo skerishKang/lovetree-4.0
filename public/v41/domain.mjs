@@ -252,12 +252,21 @@ export function editMoment(tree, id, input, clock = new Date().toISOString()) {
     return edited;
   }) };
 }
+const AUTO_TITLE_RE = /^(?:[a-z0-9-]+.)+[a-z]{2,}(?::d{1,5})?에서 간직한 순간$/i;
+
 export function cacheMomentMediaMetadata(tree, id, url, metadata, clock = new Date().toISOString()) {
   const current = tree.moments.find(m => m.id === id);
   if (!current || !url || current.url !== safeUrl(url)) return tree;
   const mediaMetadata = normalizeMediaMetadata(metadata, current.url);
-  if (!mediaMetadata || JSON.stringify(current.mediaMetadata || null) === JSON.stringify(mediaMetadata)) return tree;
-  return {...tree, updatedAt:clock, moments:tree.moments.map(m => m.id === id ? {...m, mediaMetadata} : m)};
+  const metadataChanged = !!mediaMetadata && JSON.stringify(current.mediaMetadata || null) !== JSON.stringify(mediaMetadata);
+  // #678 후속(보람 트리 재발, 2026-11-15): 늦게 도착한 영상 제목은 mediaMetadata뿐 아니라 자동 제목
+  // ('<도메인>에서 간직한 순간' — suggestMomentTitle의 기본 문구)까지 바로잡는다. 고객이 직접 적은
+  // 제목은 절대 건드리지 않는다(자동 제목 판정은 book-usability.mjs isUserTitle과 같은 규칙 —
+  // 순환 import을 피하기 위해 같은 정규식을 여기 둔다).
+  const videoTitle = typeof mediaMetadata?.title === 'string' ? mediaMetadata.title.trim() : '';
+  const titleFix = videoTitle && AUTO_TITLE_RE.test(String(current.title || '').trim()) ? shortened(videoTitle, 80) : null;
+  if (!metadataChanged && !titleFix) return tree;
+  return {...tree, updatedAt:clock, moments:tree.moments.map(m => m.id === id ? {...m, mediaMetadata: metadataChanged ? mediaMetadata : m.mediaMetadata, ...(titleFix ? {title: titleFix} : {})} : m)};
 }
 export function parentCandidates(tree, id) {
   if (!tree.moments.some(m => m.id === id)) return [];
