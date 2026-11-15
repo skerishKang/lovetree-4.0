@@ -18,6 +18,7 @@ import {
   thumbFallbackAttrs,
   coverFallbackAttrs,
   applyThumbOutcome,
+  sweepPendingThumbs,
   mountThumbFallback,
   needsFallbackCard,
 } from '../public/v41/thumb-fallback.mjs';
@@ -243,6 +244,83 @@ test('#429 DOM 내려가기 실행: 회색(120×90) 연속 발생 시 카드·�
   };
   applyThumbOutcome(coverImg, { naturalWidth: 120, naturalHeight: 90 });
   assert.equal(coverRemoved, true);
+});
+
+test('#679 sweep: lazy로 아직 시작하지 않은 그림은 8초가 지나도 글 카드가 되지 않고, 시작한 뒤 매달린 그림만 다음 후보로 넘어간다', () => {
+  const CANDS = [
+    'https://i.ytimg.com/vi/abc123DEF45/hqdefault.jpg',
+    'https://i.ytimg.com/vi/abc123DEF45/mqdefault.jpg',
+  ];
+  const fakeImg = ({ loading = 'lazy', complete = false, naturalWidth = 0, naturalHeight = 0, offscreen = false } = {}) => {
+    const attrs = {
+      'data-lt-candidates': JSON.stringify(CANDS),
+      'data-lt-cand-index': '0',
+      'data-lt-fallback-mode': 'card',
+      'data-lt-fallback-html': '<div class="lt-fallback-card">글 카드</div>',
+    };
+    const img = {
+      loading, complete, naturalWidth, naturalHeight,
+      src: CANDS[0],
+      dataset: {},
+      getAttribute: (k) => attrs[k] ?? null,
+      setAttribute: (k, v) => { attrs[k] = String(v); },
+      // 화면 안/밤 판정에 쓰는 사각형 — offscreen이면 화면 밖에 있다.
+      getBoundingClientRect: () => (offscreen ? { top: 900, bottom: 1000, left: 0, right: 100 } : { top: 10, bottom: 100, left: 10, right: 100 }),
+      ownerDocument: { defaultView: { innerWidth: 1000, innerHeight: 800 } },
+    };
+    img.parentElement = { innerHTML: '' };
+    return img;
+  };
+  const rootOf = (imgs) => ({ querySelectorAll: (sel) => (sel === 'img[data-lt-candidates]' ? imgs : []) });
+  const t0 = 1_000_000;
+
+  // ① lazy이고 아직 화면 밖(불러오기 시작 전)인 그림 — 8초가 지나도 글 카드가 되지 않는다.
+  const lazyOff = fakeImg({ offscreen: true });
+  sweepPendingThumbs(rootOf([lazyOff]), t0);
+  assert.equal(lazyOff.dataset.ltThumbStarted, undefined, '시작 전 그림은 시계를 시작하지 않는다');
+  sweepPendingThumbs(rootOf([lazyOff]), t0 + 9000);
+  assert.equal(lazyOff.parentElement.innerHTML, '', '시작 전 그림은 글 카드로 바뀌지 않는다');
+  assert.equal(lazyOff.src, CANDS[0], '후보를 바꾸지 않는다');
+  assert.equal(lazyOff.dataset.ltThumbSettled, undefined, '실패로 확정하지 않는다');
+
+  // ② 시작한 뒤(화면 안) 응답이 없는 그림 — 8초 뒤 다음 후보로 넘어간다. 뒤늦게 화면을 벗어나도 계속 판정한다.
+  const hung = fakeImg({});
+  sweepPendingThumbs(rootOf([hung]), t0);
+  assert.equal(hung.dataset.ltThumbStarted, String(t0), '시작된 그림은 시계를 시작한다');
+  hung.getBoundingClientRect = () => ({ top: 900, bottom: 1000, left: 0, right: 100 }); // 뒤늦게 화면 밖으로
+  sweepPendingThumbs(rootOf([hung]), t0 + 9000);
+  assert.equal(hung.src, CANDS[1], '8초 뒤 다음 후보로 넘어간다');
+  assert.equal(hung.getAttribute('data-lt-cand-index'), '1');
+  assert.equal(hung.dataset.ltThumbStarted, undefined, '다음 후보는 새 시계로 산다');
+  // 둘째 후보도 매달리면 글 카드로 내려앉는다(#638 원래 목적) — 다시 화면 안에 들어와 시작된 뒤부터 시계.
+  hung.getBoundingClientRect = () => ({ top: 10, bottom: 100, left: 10, right: 100 });
+  sweepPendingThumbs(rootOf([hung]), t0 + 9001);
+  assert.equal(hung.dataset.ltThumbStarted, String(t0 + 9001));
+  sweepPendingThumbs(rootOf([hung]), t0 + 18001);
+  assert.equal(hung.dataset.ltThumbSettled, '1');
+  assert.match(hung.parentElement.innerHTML, /lt-fallback-card/);
+
+  // ②b eager 그림은 화면 자리와 무관하게 예전 규칙(#638) 그대로 — 8초 뒤 다음 후보.
+  const eagerOff = fakeImg({ loading: 'eager', offscreen: true });
+  sweepPendingThumbs(rootOf([eagerOff]), t0);
+  assert.equal(eagerOff.dataset.ltThumbStarted, String(t0), 'eager는 화면 밖어도 시계를 시작한다');
+  sweepPendingThumbs(rootOf([eagerOff]), t0 + 9000);
+  assert.equal(eagerOff.src, CANDS[1], 'eager 매달림은 여전히 다음 후보로 넘어간다');
+
+  // ③ 진짜 회색(120×90)·404는 여전히 글 카드다 — 완료된 그림은 sweep이 건드리지 않고(load·error 경로),
+  // 회색·실패 판정이 내려가면 마지막 후보에서 글 카드로 내려앉는다.
+  const gray = fakeImg({ loading: 'eager', complete: true, naturalWidth: 120, naturalHeight: 90 });
+  sweepPendingThumbs(rootOf([gray]), t0 + 9000);
+  assert.equal(gray.parentElement.innerHTML, '', '완료된 그림은 sweep 대상이 아니다');
+  assert.equal(applyThumbOutcome(gray, { error: false, naturalWidth: 120, naturalHeight: 90 })?.status, 'retry', '120×90은 다음 후보로');
+  assert.equal(applyThumbOutcome(gray, { error: false, naturalWidth: 120, naturalHeight: 90 })?.status, 'fallback', '마지막 후보까지 120×90이면 글 카드');
+  assert.equal(gray.dataset.ltThumbSettled, '1');
+  const dead = fakeImg({ loading: 'eager' });
+  const baseGet = dead.getAttribute;
+  dead.getAttribute = (k) => (k === 'data-lt-cand-index' ? '1' : baseGet(k));
+  applyThumbOutcome(dead, { error: true }); // 404
+  assert.equal(dead.dataset.ltThumbSettled, '1', '404는 글 카드로 확정한다');
+  assert.match(dead.parentElement.innerHTML, /lt-fallback-card/);
 });
 
 test('#429 "제목 달기" 클릭·키보드는 지정 순간 편집을 열고 읽기 전용에서는 막는다', () => {

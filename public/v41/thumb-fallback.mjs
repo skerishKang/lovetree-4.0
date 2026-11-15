@@ -321,6 +321,8 @@ export function applyThumbOutcome(img, outcome = {}) {
   if (step.status === 'retry') {
     if (img.setAttribute) img.setAttribute('data-lt-cand-index', String(step.index));
     if (img.dataset) img.dataset.ltCandIndex = String(step.index);
+    // 다음 후보는 새 시계로 산다 — 시작한 뒤부터 8초(#679 수리).
+    if (img.dataset) delete img.dataset.ltThumbStarted;
     img.src = step.src;
     return step;
   }
@@ -359,6 +361,45 @@ export function applyThumbOutcome(img, outcome = {}) {
     img.remove?.();
   }
   return step;
+}
+
+// #638: 책이 무거웠던 가장 큰 원인 — 외부 썸네일 요청이 응답 없이 매달리면 error 이벤트가 오지 않아
+// 내려가기 사슬이 멈추고 장이 그려지지 않은 채로 남는다. 매달린 후보는 8초 뒤 실패로 간주해 다음 후보로 진행한다.
+// #679 수리(2026-11-16): loading="lazy" 그림은 화면 밖이면 불러오기를 시작하지 않은 채 complete=false로 남는다.
+// '아직 시작하지 않은 그림'을 매달린 요청으로 잘못 세면 살아 있는 영상의 첫 화면 카드까지
+// '영상을 볼 수 없어요' 글 카드로 바뀌었다. 그래서 lazy 그림은 화면 안에 들어온 뒤부터만 시계를 시작하고,
+// 시계가 시작된 그림은 뒤늦게 화면을 벗어나도 매달림 판정을 계속한다(책의 원래 문제는 그대로 막는다).
+// eager 그림은 화면 자리와 무관하게 불러오기를 시작하므로 예전 규칙(#638) 그대로 둔다.
+const THUMB_PENDING_TIMEOUT_MS = 8000;
+
+/**
+ * 매달린 썸네일 요청을 훑는다(#638). mountThumbFallback이 2초마다 부르고, 시험은 직접 불러 시각을 넣는다.
+ */
+export function sweepPendingThumbs(root, now = Date.now()) {
+  if (!root?.querySelectorAll) return;
+  const imgs = root.querySelectorAll('img[data-lt-candidates]');
+  for (const img of imgs) {
+    if (img.complete || img.dataset?.ltThumbSettled === '1') continue;
+    const started = Number(img.dataset?.ltThumbStarted || 0);
+    if (!started) {
+      const lazy = String(img.loading || img.getAttribute?.('loading') || '') === 'lazy';
+      if (lazy && !inViewport(img)) continue; // 아직 불러오기를 시작하지 않은 lazy 그림 — 매달린 요청이 아니다.
+      if (img.dataset) img.dataset.ltThumbStarted = String(now);
+      continue;
+    }
+    if (now - started >= THUMB_PENDING_TIMEOUT_MS) applyThumbOutcome(img, { error: true });
+  }
+}
+
+// 화면 안 판정. 크기를 알 수 없는 환경(오래된 환경·가짜 그림)은 원래 동작(#638)을 유지하기 위해 안에 있다고 본다.
+function inViewport(img) {
+  const rect = img.getBoundingClientRect?.();
+  if (!rect) return true;
+  const view = img.ownerDocument?.defaultView || globalThis.window;
+  const w = Number(view?.innerWidth) || 0;
+  const h = Number(view?.innerHeight) || 0;
+  if (!w || !h) return true;
+  return rect.bottom > 0 && rect.top < h && rect.right > 0 && rect.left < w;
 }
 
 const mountedRoots = new WeakSet();
@@ -444,22 +485,11 @@ export function mountThumbFallback(root = globalThis.document, { onEditTitle = n
   }
   // #638: 책이 무거웠던 가장 큰 원인 — 외부 썸네일 요청이 응답 없이 매달리면 error 이벤트가 오지 않아
   // 내려가기 사슬이 멈추고 장이 그려지지 않은 채로 남는다. 매달린 후보는 8초 뒤 실패로 간주해 다음 후보로 진행한다.
-  const THUMB_PENDING_TIMEOUT_MS = 8000;
-  const sweepPending = () => {
-    if (!root.querySelectorAll) return;
-    const imgs = root.querySelectorAll('img[data-lt-candidates]');
-    const now = Date.now();
-    for (const img of imgs) {
-      if (img.complete || img.dataset?.ltThumbSettled === '1') continue;
-      const started = Number(img.dataset?.ltThumbStarted || 0);
-      if (!started) { img.dataset.ltThumbStarted = String(now); continue; }
-      if (now - started >= THUMB_PENDING_TIMEOUT_MS) applyThumbOutcome(img, { error: true });
-    }
-  };
-  const sweepTimer = typeof setInterval === 'function' ? setInterval(sweepPending, 2000) : null;
+  // #679 수리: sweep 대상과 시계 시작은 sweepPendingThumbs(위)가 정한다 — lazy 미시작 그림은 제외.
+  const sweepTimer = typeof setInterval === 'function' ? setInterval(() => sweepPendingThumbs(root), 2000) : null;
   // 시험(Node)에서 이 타이머가 프로세스를 붙잡아 npm test가 끝나지 않았다 — 붙잡지 않게 한다.
   sweepTimer?.unref?.();
-  if (sweepTimer && typeof sweepPending === 'function') { try { sweepPending(); } catch { /* ignore */ } }
+  if (sweepTimer) { try { sweepPendingThumbs(root); } catch { /* ignore */ } }
   inspectComplete(root);
 
   return () => {
@@ -495,6 +525,7 @@ const api = {
   thumbFallbackAttrs,
   coverFallbackAttrs,
   applyThumbOutcome,
+  sweepPendingThumbs,
   mountThumbFallback,
 };
 
