@@ -28,7 +28,7 @@ export function cardTags(keywords, max = 3) {
 // 상세의 꼬리표 줄 한 벌: 확정(진한 칩)·제안(흐린 칩)을 한 번에 정한다.
 // 제안은 재사용이 먼저다(tags.mjs suggestTagsFromTitle의 순서를 그대로 따른다). 이미 확정한 값은
 // 다시 제안하지 않고(같은 값을 두 번 권하지 않는다). 24자를 넘어 붙일 수 없는 후보는 제안에
-// 보이지 않는다(윤제 4회차 — 회색 '24자를 넘어요' 칩은 누를 수 없는 소음이었다). tags.mjs가
+// 보이지 않는다(#678 회차 지적 — 회색 '24자를 넘어요' 칩은 누를 수 없는 소음이었다). tags.mjs가
 // 돌려주는 tooLong 표시는 계약으로 남는다(너무 길다는 사실을 조용히 버리지 않는다).
 export function tagLineChips({ keywords, title, knownTags } = {}) {
   const confirmed = listOf(keywords).map((t) => ({ state: 'confirmed', kindId: t.kindId, label: t.label, value: t.value, raw: t.raw }));

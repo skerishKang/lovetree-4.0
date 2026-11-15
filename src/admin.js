@@ -72,7 +72,7 @@ function renderLogin() {
 
 function statusBadge(status) { return `<span class="lt-badge" data-status="${escapeText(status)}">${escapeText(STATUS_LABEL[status] || status)}</span>`; }
 function kindBadge(kind) { return `<span class="lt-badge" data-kind="${escapeText(kind)}">${escapeText(KIND_LABEL[kind] || kind)}</span>`; }
-// #611 3번: 운영센터에서는 AI 고객 이름을 'AI 명예회원 윤제'처럼 알린다(2026-11-15 호칭 결정).
+// #611 3번: 운영센터에서는 AI 고객 이름을 'AI 명예회원' 호칭으로 알린다(2026-11-15 호칭 결정).
 function authorLabel(row) { const name = row.authorName || (row.subjectId ? '고객' : '익명'); return row.authorRole === 'ai_customer' ? `AI 명예회원 ${name}` : name; }
 
 async function render() {

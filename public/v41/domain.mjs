@@ -258,7 +258,7 @@ export function cacheMomentMediaMetadata(tree, id, url, metadata, clock = new Da
   if (!current || !url || current.url !== safeUrl(url)) return tree;
   const mediaMetadata = normalizeMediaMetadata(metadata, current.url);
   const metadataChanged = !!mediaMetadata && JSON.stringify(current.mediaMetadata || null) !== JSON.stringify(mediaMetadata);
-  // #678 후속(보람 트리 재발, 2026-11-15): 늦게 도착한 영상 제목은 mediaMetadata뿐 아니라 자동 제목
+  // #678 후속(둘러보기 트리 재발, 2026-11-15): 늦게 도착한 영상 제목은 mediaMetadata뿐 아니라 자동 제목
   // ('<도메인>에서 간직한 순간' — suggestMomentTitle의 기본 문구)까지 바로잡는다. 고객이 직접 적은
   // 제목은 절대 건드리지 않는다(자동 제목 판정은 auto-title.mjs의 isAutoTitle — 규칙 한 벌).
   const videoTitle = typeof mediaMetadata?.title === 'string' ? mediaMetadata.title.trim() : '';

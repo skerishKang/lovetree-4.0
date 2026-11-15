@@ -25,7 +25,7 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
   const host=el('span','community-reaction-group');host.setAttribute('role','group');host.setAttribute('aria-label',label||'반응');
   const counts=item.stats.reactions||{heart:item.stats.hearts||0};const mine=new Set(item.stats.mine||[]);
   const active=kind=>mine.has(kind)||(kind==='heart'&&item.stats.hearted&&!item.stats.mine);
-  // #678 후속(윤제 4회차): 0짜리 반응 칩 7개가 늘어서 시끄럽다 — 반응이 하나도 없으면 '반응 남기기'
+  // #678 후속(회차 지적): 0짜리 반응 칩 7개가 늘어서 시끄럽다 — 반응이 하나도 없으면 '반응 남기기'
   // 한 개만 보이고(누르면 7가지가 그 자리에서 펼쳐진다), 반응이 있으면 개수가 있는 것과 내가 누른 것만 보인다.
   const chips=()=>{
    const out=[];

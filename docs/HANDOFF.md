@@ -14,7 +14,7 @@
 - **숫자(390, 가짜 기록)**: 전 — 최대 겹침 밤 5,328px²·정원 4,884px²(동시 노출 7회). 후 — 0(동시 노출 0회, 셸 알림·말풍선 각각은 여전히 뜬다). 1440: 전·후 0. 캡처 전·후 390·1440 × 밤·정원(1.3s·2.6s·6.5s): E:\lovetree-qa\lane\local5-board\.
 - **시험**: `v41-screen-audit` 초록, board-extras 관련 10 파일(v41-board-cursor-detail·date-edit-608·model·pinboard-582·pinboard2-601·revival·theme-flow·inbox-display·readonly-520-521·wide-view-536) 96건 통과, 전체 npm test 1,836건 0 fail(31초), build·modulepreload --check 통과.
 
-## 2026-11-15 — 보드 390 두 줄 도구 줄: 카드 비침 수리·'진주빛 보드' 온전히 보이게·[종이|밤]에 '판' 이름표 (컴1로컬5 레인, ai/local5-board-toolbar-390-261115, main 909ef40 기준, 보람 2회차 지적)
+## 2026-11-15 — 보드 390 두 줄 도구 줄: 카드 비침 수리·'진주빛 보드' 온전히 보이게·[종이|밤]에 '판' 이름표 (컴1로컬5 레인, ai/local5-board-toolbar-390-261115, main 909ef40 기준, AI 명예회원 2회차 지적)
 
 - **원인(실측)**: ≤580px 머리줄은 두 줄로 감기는데(flex-wrap, #601) `.boardFrame` 시작을 고정 100px로 두었다. ＋ 순간 추가가 둘째 줄까지 내려오는 로그인 화면에서 머리줄 아래끝은 107px — 카드가 7px 도구 줄 밑으로 들어가고, 머리줄 바탕이 알파 0.9→0.38 그라데이션(밤)이라 카드 꼬리표·제목이 비쳤다. '진주빛 보드' 표시는 둘째 줄 맨 오른쪽(오른쪽 끝 8px 남음)에 비침과 겹쳐 잘려 보였다.
 - **수리(보드 3개 파일)**: ① `board-extra.css` ≤580 블록 — `.boardFrame{inset:var(--lt-board-frame-top,100px) 0 0}`(board-extras syncMomentPickerTop 이 같은 재기로 머리줄 아래끝을 내려 보낸다 — 1440은 66px 그대로), 도구 줄 바탕 불투명(밤 `linear-gradient(var(--lt-stage),var(--lt-stage-2))`·정원 `var(--lt-paper)`), `.boardThemeSwitch .switchLead`(≤580에서만 보이는 '판' 이름표 — [종이|밤]이 판 테마 단추라는 뜻). ② `track58-pinboard.html` — 스위치 안 `<span class="switchLead" aria-hidden="true">판</span>`. ③ `board-extras.js` — syncMomentPickerTop 이 `--lt-board-frame-top` 도 설정(기존 ResizeObserver 그대로).
@@ -27,11 +27,11 @@
 
 - **4.1.4 두 판 → 하나**: updates.json에 4.1.4가 두 개였다(위 판 — f19c414(#649)가 새로 만든 것, 아래 판 — 029fbc5(#619-5)의 원래 것. 화면에는 '러브트리 4.1.4' 제목이 두 번 떴다). 한 판으로 합치고 뜻이 같은 줄은 한 줄만 남겼다 — '핀보드에서 카드를 열에 쌓아 담아요'·'원하는 자리에 끼워 넣고 순서를 저장해요'(team, 이슈 없음)는 아래 판의 #619 줄(이슈·더 쉬운 말)로 흡수. 40줄.
 - **4.1.5(2026.11.15, 5줄)**: 4.1.4 이후 머지됐는데 어디에도 못 들은 고객 화면 것만 — 내 의견 덧붙임 고치기·지우기(#678), 순간 담기 '무대 날짜' 이름·자동 채움 확인(#627), 책 카드 꼬리표·겹친 꼬리표 표시(#627), 책 제목 고치기 손잡이 복원(#676), 연습용 트리 둘러보기 제외(#678). 서버·운영센터·시험 정비(#686·#689·#690·#694·#697·#699·#702·#703)와 화면 호칭 정리(#698)는 고객 기능 변화가 없어 뺐다.
-- **AI 명예회원 이름 칸**: tester '테스터'는 역할 글자라 이름 칸에서 뺐다 — #635 회차 6줄은 실명 '보람'으로(앞 세션 확인), #638 6줄·#671 1줄은 이름을 모르는 항목이라 tester 칸을 빼고 `sourceLabel`의 이름 없음 표시('AI 명예회원이 알려 준 것')로 보인다. 윤제 줄은 실명이라 그대로.
+- **AI 명예회원 이름 칸**: tester '테스터'는 역할 글자라 이름 칸에서 뺐다 — #635 회차 6줄은 실명으로(앞 세션 확인), #638 6줄·#671 1줄은 이름을 모르는 항목이라 tester 칸을 빼고 `sourceLabel`의 이름 없음 표시('AI 명예회원이 알려 준 것')로 보인다. 이미 실명으로 든 줄은 그대로.
 - **4.1.0(2026.11.14) 맨 아래 3줄**: '러브트리 4.1 첫 공개' 요약(검은 무대 금테 카드·책·보드·지도·둘러보기 자동 소개). 날짜는 운영 배포·실화면 확인이 기록된 2026-11-14(HANDOFF #565·#557).
 - **시험**: updates-format에 동작 시험 2건(버전 번호 겹침 금지·위에서부터 큰 번호 순서 / AI 명예회원 이름 칸에 '테스터'·'AI 테스터' 역할 글자 금지) — 고치기 전 red 2건 확인, 고친 뒤 green. 이름 없는 출처 계약으로 형식 시험을 다듬었다(tester는 선택 — `sourceLabel({source:'ai_tester'})`='AI 명예회원이 알려 준 것' 단정 추가).
 - **AGENTS.md**: 규칙 한 줄 추가 — '레인은 updates.json을 직접 고치지 않는다 — 새 소식은 하루 한 번 CTO가 정한 레인이 그날 머지된 PR을 모아 한 판으로 만든다.'
-- **updates-screen-611도 함께 고침(CI 빨강 원인)**: 화면 시험이 알림 카드·패널 제목을 '4.1.4'로 고정 단정해 4.1.5가 최신이 되자 깨졌다(screen-home-book·postdeploy 빨강). 최신 버전을 updates.json에서 읽어 대조하는 동작 단정으로 바꿔 다음 버전에서도 깨지지 않는다. '칸마다 차곡차곡'·'AI 명예회원 윤제'·'핀보드' 단정은 통합 판에서 그대로 만족한다.
+- **updates-screen-611도 함께 고침(CI 빨강 원인)**: 화면 시험이 알림 카드·패널 제목을 '4.1.4'로 고정 단정해 4.1.5가 최신이 되자 깨졌다(screen-home-book·postdeploy 빨강). 최신 버전을 updates.json에서 읽어 대조하는 동작 단정으로 바꿔 다음 버전에서도 깨지지 않는다. '칸마다 차곡차곡'·'AI 명예회원' 출처·'핀보드' 단정은 통합 판에서 그대로 만족한다.
 
 ## 2026-11-15 — 책 갈림길 탭 13px·책 밖 잘림 0 + 지도 ? 단추 캡처 다시 (컴1로컬4 레인, ai/local4-branchtab-261115, main 3e7574a 기준)
 
@@ -50,14 +50,14 @@
 - **updates.json**: 4.1.4에 일지 날짜 고침 한 줄(고객 '내 의견'의 일지 날짜가 하루 밀려 보이던 것 — source ai_tester). 운영센터만의 수리(프록시·여백·흔들림)는 고객 화면과 무관해 적지 않았다(#671·#655 판단과 같음).
 - **머지 뒤**: 서버 파일(#699의 feedback-service·이 가지의 feedback-postgres)이 바뀌므로 컴2 autodeploy 설치·sha 확인이 필요하다.
 
-## 2026-11-15 — 윤제 4회차 화면 지적: 24자 넘는 꼬리표 제안 숨김·390 종류 라벨 위 얹음·지도 사용법 ? 단추·책 갈림길 문구 교정 (컴1로컬4 레인, ai/local4-yunje4-261115, main 0179c52 기준)
+## 2026-11-15 — #678 회차 지적: 24자 넘는 꼬리표 제안 숨김·390 종류 라벨 위 얹음·지도 사용법 ? 단추·책 갈림길 문구 교정 (컴1로컬4 레인, ai/local4-yunje4-261115, main 0179c52 기준)
 
 - **① 꼬리표 24자 넘는 제안은 보이지 않게**: `tag-model.mjs` tagLineChips·suggestForTree가 tooLong 후보를 제안 목록에서 뺀다(tags.mjs의 tooLong 표시는 계약으로 유지 — 데이터를 조용히 버리지 않는다). `tag-line.mjs`·`shell/tag-manager.mjs`의 회색 '24자를 넘어요' 칩 렌더는 지웠다. #697 suggestForMoments('한꺼번에 제안')와 같은 규칙이다. 시험은 기존 tooLong 시험을 '보이지 않음' 규칙으로 갱신(v41-tags-627).
 - **② 지도 보기 칩에서 '사용법'을 뗀다**: `track56-network.html`의 #helpBtn을 둥근 '?' 단추(aria-label='사용법', title 포함)로 바꾸고 `network.css`에 36px(640px 이하 44px, 원형) 크기를 더했다. 보기 방식(전체 보기·그물형·동심원형)과 한 줄에 섞이지 않는다. 누르면 나오는 안내 말풍선 문구는 그대로다.
-- **③ 책 하단 갈림길 탭 문구 교정**: '○○에서 갈라지는 길' → '○○에서 갈라진 길'(`views/book/book-model.js`). 윤제가 '갈리지는 길'로 읽던 지적 — '갈리지는'은 저장소·이력 어디에도 없고 실제 문구는 '갈라지는 길'이었다(4a9aced 때부터). 작은 글자에 틀리게 읽힌 것으로 보아 표준형으로 바로잡았다. **참고(다음 회차 후보)**: 넓은 화면 책의 갈림길 탭 글자는 9px(12px 기준 미달 — book.css; 전화 390은 reader-layout.css가 12px로 올려 준다). 이번 범위 밖.
+- **③ 책 하단 갈림길 탭 문구 교정**: '○○에서 갈라지는 길' → '○○에서 갈라진 길'(`views/book/book-model.js`). #678 회차에서 '갈리지는 길'로 읽던 지적 — '갈리지는'은 저장소·이력 어디에도 없고 실제 문구는 '갈라지는 길'이었다(4a9aced 때부터). 작은 글자에 틀리게 읽힌 것으로 보아 표준형으로 바로잡았다. **참고(다음 회차 후보)**: 넓은 화면 책의 갈림길 탭 글자는 9px(12px 기준 미달 — book.css; 전화 390은 reader-layout.css가 12px로 올려 준다). 이번 범위 밖.
 - **390 '종류' 라벨 두 줄 꺾임**: `tag-line.css` 직접 입력 줄을 '라벨 위 얹음'(칸 위 12px 라벨, 칸 높이 30px)으로 — 390에서 '종/류' 꺾임·드롭다운·값 칸 눌림이 없어지고 넓은 화면에서도 같은 모양이다.
 - **시험**: v41-tags-627 31/31, updates-format·v41-book-model 포함 53/53, 전체 npm test 1820검 1681 pass·0 fail·139 skip(29.2초), build·modulepreload --check 통과. 화면 캡처 전·후(390·1440, 밤, 검사기와 같은 LT41 주입 하네스 — 컴2 접속 없음): `E:\lovetree-qa\lane\local4-yunje4\{before,after}\` 태그 상세·태그 정리·지도 칩·책 하단 4상태 × 8장 + summary.json(실측 텍스트 포함 — 전: 회색 '… · 24자를 넘어요' 칩·'사용법' pill·'갈라지는 길' → 후: 모두 사라지거나 바로잡힘).
-- **updates.json**: 4.1.4에 '고친 것' 4건(ai_tester·윤제)을 더했다.
+- **updates.json**: 4.1.4에 '고친 것' 4건(ai_tester·#678 회차)을 더했다.
 - **머지 직전 수리(CI 빨강 → 판 구조)**: CI에서만 나던 공용 검사기 빨강 4건('꼬리표 줄이 열린 상세'·'꼬리표 정리' × 1440·밤·정원, `button#detailClose × div#dBasic @(1380,99)`) — 로컬 재현(1440×768)으로 밝힌 원인: 보드 상세 판의 닫기 단추가 `.detail .close{position:absolute;top:14px;right:14px;background:none}`로 굴리는 영역(.detailScroll) 위에 떠 있어, 내용이 길어 스크롤이 깊어지면 글자가 단추 밑으로 지나갔다(이번에 태그 줄이 높아져 스크롤이 더 깊어져 드러남 — main도 여유 5px이던 잠재 결함). 시험 계약(렴침 0)이 정당하므로 화면을 맞춤: 닫기 단추를 판의 첫 머리 행(`flex:0 0 auto;align-self:flex-end`, position:relative로 터치 확장 ::after 유지)으로 냈다 — 내용을 굴려도 단추와 글자가 만나지 않는다. 로컬 실측 900·768 겹침 0, 공용 검사기 16 상태 통과, 보드 판 실측 클릭 14/14. 지도 도구 줄 시험(#517·#518)은 애초 통과였다(빨강 원인 아님). 참고: 지도 상세판(track56)도 같은 떠 있는 닫기 모양이라 다음 회차 후보.
 
 ## 2026-11-15 — 그래프 재료 잇기: buildGraph stacks + 꼬리표 한꺼번에 제안 (#627 후속, 컴1로컬2 레인, ai/local2-627-graph-material-261115, main 7420245 기준)
@@ -327,7 +327,7 @@
 - **운영센터**: `PERSONA_FIELDS`(src/admin-view.js)에 `habits`('자주 쓰는 곳·익숙한 디자인', 여러 줄 칸)를 '쓰는 모습' 뒤에 추가 — admin.js 폼은 PERSONA_FIELDS 공용(row 높이 자동 계산)이라 코드 무변경. 운영센터·내보내기 md 가 같은 순서 7항목.
 - **서버 무변경 확인**: intro 는 jsonb 통과 — `savePersona`가 키를 거르지 않아(DB 변경 없음). `board-service` 시험에 habits 저장→불러오기 왕복 단언 추가.
 - **일지 쓰기 창**: `public/v41/index.html` journal-panel 내용 칸 뒤에 '(선택) 디자인 느낌 — 내가 자주 쓰는 ○○와 비교해서: 익숙했던 점 / 어색했던 점' 안내 한 줄(본문 틀 예시). 시험 `v41-journal-design-hint-590`(마크업 글자).
-- **내보내기**: `renderIntroMarkdown` 같은 항목 — 시험 갱신(7개 항목·여러 줄 값·빈 값 '—'). 머지 뒤 `E:\lovetree-qa\export-tool\` 사본 재복사 + `schtasks /run` 0 확인. 윤제 소개의 habits 내용은 페르소나 레인 몫(여기서 채우지 않음).
+- **내보내기**: `renderIntroMarkdown` 같은 항목 — 시험 갱신(7개 항목·여러 줄 값·빈 값 '—'). 머지 뒤 `E:\lovetree-qa\export-tool\` 사본 재복사 + `schtasks /run` 0 확인. AI 고객 소개의 habits 내용은 페르소나 레인 몫(여기서 채우지 않음).
 ## 2026-11-14 — 운영센터 '사용 일지' 탭 + 일지 본문 8000자 (#596, 로컬5 레인)
 
 - **머리줄 탭**: 고객 글 · **사용 일지** · 신고 · 고치는 일. 탭 상태는 주소 `#journals` 로 남겨 새로고침·뒤로가기 유지(#564·#570 방식 — parseHash·viewHash·viewToTab 에 journals 추가). 고객 글 탭의 '일지' 거르기는 그대로(중복 허용).
@@ -335,7 +335,7 @@
 - **읽기 API 하나 추가(관리자만)**: `GET /api/admin/journals` — kind='journal' 만 journal_date 내림차순(feedback-postgres listJournals + memory 저장소 동형 구현 + service.adminJournals + proxy 허용 목록). 기존 /api/admin/feedback·persona 는 그대로.
 - **일지 본문 한도 2000→8000**: 서버 createJournal 만 MAX_JOURNAL_BODY 8000(의견은 MAX_BODY 2000 유지) + DB CHECK 를 kind 로 나눠 일지만 8000(schema.sql + `migrations/feedback-body-8000-261114.sql` — 재실행 안전 DROP IF EXISTS→ADD). **migration 은 자동 설치 금지 대상 — 컴2 수동 적용 후 --accept-migrations 1회**(AUTODEPLOY.md 절차).
 - **시험**: admin-view(요약 계산·고객별 정렬·떠남 규칙·단계·주소 왕복)·board-service(한도 8000 저장·의견 2000 유지·읽기 API 401/403/200)·feedback-postgres(DB CHECK — journal 8000 허용·8001/opinion 2001 거절·listJournals). 전체 npm test 1,605건 1,563 pass/0 fail/42 skip, build 통과.
-- **화면 확인**: 모의 관리자 API + 헤드리스 1440·390 — 탭 4개·요약 값·고객 줄 3·펼치기·날짜 정렬·줄바꿈·의견 링크(#feedback/55)·가로 넘침 0·새로고침 주소 유지(스크린샷 .tmp-596/). 윤제 소개의 habits 내용은 페르소나 레인 몫(#590).
+- **화면 확인**: 모의 관리자 API + 헤드리스 1440·390 — 탭 4개·요약 값·고객 줄 3·펼치기·날짜 정렬·줄바꿈·의견 링크(#feedback/55)·가로 넘침 0·새로고침 주소 유지(스크린샷 .tmp-596/). AI 고객 소개의 habits 내용은 페르소나 레인 몫(#590).
 
 - **운영 답변 보조**(컴2 root, #596 후속): `wsl -e node /opt/padiem/lovetree-api/tools/ops-reply.mjs --id <의견 번호> --reply <답변 파일> --status <fixed|closed|...> --issue <번호>` — 운영센터 API 와 같은 서버 함수(feedback-service.reply·update)로 고객 답변·상태·연결 이슈를 처리하고, 이미 답글이 있으면 건너뜀(종료 3). 설치 목록·CI 진단 같은 모양 유지.
 
@@ -391,11 +391,11 @@
 
 ## 2026-11-14 — 운영 시작 준비: 관리자 권한·운영센터 입구·디자인 통일·AI 고객 등록·매일 내보내기 (이슈 #540 마무리, 로컬3 레인, ai/local3-lt-540c-ops-261114, main 69cb042 기준)
 
-- **관리자·AI 고객 역할 부여(컴2 운영 작업)**: 대표 계정 1개에 `admin`, AI 고객(윤제) 계정 1개에 `ai_customer` 역할을 부여했다. 둘 다 `createAdminRoleRepo(pool).assign(...)` 저장소 호출로만 — `lovetree_product_roles` 2행 + `lovetree_product_role_audit` 2행(이메일·subject 값은 어디에도 기록하지 않았다). 대표가 관리자 화면을 열면 게시판이 보이는지는 대표 로그인 확인 몫이다.
+- **관리자·AI 고객 역할 부여(컴2 운영 작업)**: 대표 계정 1개에 `admin`, AI 고객 계정 1개에 `ai_customer` 역할을 부여했다. 둘 다 `createAdminRoleRepo(pool).assign(...)` 저장소 호출로만 — `lovetree_product_roles` 2행 + `lovetree_product_role_audit` 2행(이메일·subject 값은 어디에도 기록하지 않았다). 대표가 관리자 화면을 열면 게시판이 보이는지는 대표 로그인 확인 몫이다.
 - **운영센터 입구(앱 안)**: `server/account-service.describe` 가 `admin` 플래그를 더 돌려주고(`public/v41/api.mjs` 파싱), 오른쪽 위 계정 메뉴와 설정 화면에 '운영' 항목이 생겼다 — 계정 메뉴 '운영센터'(관리자에게만 보임, `/admin.html` 새 탭), 설정 '운영' 묶음 '운영센터 열기'(같은 판정, 열림 때마다 서버 응답으로 다시 판정). 관리자가 아니면 둘 다 보이지 않는다.
 - **관리자 화면 디자인 통일**: 머리줄을 앱(shell.css의 `.app-header`·`.brand`)과 같은 모양으로 — 'app으로'는 '러브트리로 돌아가기', 제목 옆 점(brand-dot) 제거. 권한 없음·로그인 필요 화면의 4.0 연베이지 상자·초록 글씨(`storage-notice`·`notice`)를 금테 카드 + `--lt-*` 안내 모양으로 바꾸고, 권한 없음 문구는 '운영센터는 관리자 계정만 볼 수 있어요' + '러브트리로 돌아가기' 단추. 전·후 스크린샷(390·1440 × 목록·상세·답글·페르소나·이슈 탭·권한 없음)은 `E:\lovetree-qa\admin-ui-261114\{before,after}\`(저장소 밖) — '전'은 pages.dev 라이브 화면에서 대표가 지적한 4가지(연베이지 상자·초록 글씨·제목 옆 점·'app으로')가 모두 보임을 확인.
-- **AI 고객 윤제 등록(컴2, 저장소 호출)**: `lovetree_ai_personas`에 윤제 페르소나(소개.md 내용을 who/why/how/satisfied/disappointed/now 키로). `lovetree_feedback`에 일지 1건(kind=journal, journal_date 2026-11-14, 다시 올 점수 4, 제목 '첫날 — 가입하고 리센느·하츠투하츠 트리 만들기')과 의견 4건(새벽 날짜→#547·고침, 작은 글씨→#548·확인 중, '감상 없이' 문구→#548·확인 중, '0일 전'→#549·확인 중). 일지 아래 '운영센터 답글'은 '감상 없이' 문구 의견의 고객에게 보이는 답변(customer reply)으로. 원본 일지·소개는 거버넌스 `_원본보관\\`에 보관.
-- **내보내기·예약**: 거버넌스 윤제 폴더 원본을 `_원본보관\\`로 복사한 뒤 `tools/export-ai-customer.mjs` 실데이터 1회 실행 — `일지_261114.md`·`소개.md`가 사이트 내용으로 다시 써짐을 확인. 컴1 작업 스케줄러에 매일 07:00 등록, 로그 `E:\lovetree-qa\\export-log\\`. 관리자 세션 쿠키는 계정비밀_대장 규칙대로 파일로만 보관(출력·커밋 금지).
+- **AI 고객 등록(컴2, 저장소 호출)**: `lovetree_ai_personas`에 AI 고객 페르소나(소개.md 내용을 who/why/how/satisfied/disappointed/now 키로). `lovetree_feedback`에 일지 1건(kind=journal, journal_date 2026-11-14, 다시 올 점수 4, 제목 '첫날 — 가입하고 리센느·하츠투하츠 트리 만들기')과 의견 4건(새벽 날짜→#547·고침, 작은 글씨→#548·확인 중, '감상 없이' 문구→#548·확인 중, '0일 전'→#549·확인 중). 일지 아래 '운영센터 답글'은 '감상 없이' 문구 의견의 고객에게 보이는 답변(customer reply)으로. 원본 일지·소개는 거버넌스 `_원본보관\\`에 보관.
+- **내보내기·예약**: 거버넌스 AI 고객 폴더 원본을 `_원본보관\\`로 복사한 뒤 `tools/export-ai-customer.mjs` 실데이터 1회 실행 — `일지_261114.md`·`소개.md`가 사이트 내용으로 다시 써짐을 확인. 컴1 작업 스케줄러에 매일 07:00 등록, 로그 `E:\lovetree-qa\\export-log\\`. 관리자 세션 쿠키는 계정비밀_대장 규칙대로 파일로만 보관(출력·커밋 금지).
 - **시험**: `npm test` 전부 통과(브라우저 지도 대비 제외 환경), `npm run build`·`node tools/v41-modulepreload.mjs --check` 통과. 설정 '운영' 묶음·계정 메뉴 항목은 서버 응답 기반 표시라 모의 `/api/account`로 DOM 확인.
 - **남긴 것**: 대표의 실제 관리자 화면 확인(게시판 보임)·`skerish@naver.com` 계정 관리자 권한은 대표 지시 대기. 내보내기 예약의 쿠키 만료(세션 최대 나이) 시 갱신 절차 필요.
 
@@ -2038,7 +2038,7 @@ COM2에는 merge `6900df8aa446dfe0201d01997457fae04c4abe16`의 변경 서버 파
 ## 2026-11-15 — 새 소식·AI 테스터 표시·내 의견 손질 (#611, 컴1 레인, ai/com1-lt611-updates-261115 + ai/com1-lt611-b-261115, main 9bbb193 기준, PR #621 → main 9bbb193, PR #622 → main 4b7fd36)
 
 - **새 소식 원본**: `public/v41/updates.json` + 화면 `public/v41/updates.mjs` + `AGENTS.md` 한 줄 규칙 "새 소식 원본은 public/v41/updates.json … 다음 버전 항목 한 줄". 알림은 "접속 때 한 번" — 첫 화면에서만 띄우고 닫으면 그 버전은 다시 안 뜸(브라우저 저장, 서버 없음). 로그아웃에도 뜸. 연결용 `issue` 필드는 화면 문구에 나오지 않음.
-- **첫 버전 4.1.3(2026.11.14)**: 핀보드·책·지도·첫 화면·공개·공유 미리보기 카드 + 새벽 날짜·'오늘-어제'·작은 글씨. 고친 것(3건) 전부 AI 테스터 윤제 출처. 화면 문구에 이슈번호·개발용어·"여러분이 알려 주신" 없음(시험으로 금지어 검사).
+- **첫 버전 4.1.3(2026.11.14)**: 핀보드·책·지도·첫 화면·공개·공유 미리보기 카드 + 새벽 날짜·'오늘-어제'·작은 글씨. 고친 것(3건) 전부 AI 테스터 출처(#547·#548·#549 회차 지적). 화면 문구에 이슈번호·개발용어·"여러분이 알려 주신" 없음(시험으로 금지어 검사).
 - **AI 테스터 표시**: ai_customer 역할 기록이 남에게 보이는 곳(둘러보기 카드·감상 허브 미리보기·공유 /t/<id> 화면·미리보기 카드(og) 설명 '· AI 테스터')에만 `aiTester: true` 비트. 서버 공개 응답(community discover·public share)에 계정 정보 0(시험으로 확인). 본인 화면엔 표시 없음. 운영센터는 이름 앞 'AI'(목록·상세·일지 탭).
 - **내 의견**: 새 답글 알림은 계정 단추 점 + '내 의견' 옆 숫자(안 본 답글만, 열어 보면 사라짐 — 브라우저 `lt41.replySeen` 저장). 고객 덧붙이기: 본인 의견 아래 '덧붙일 말' 칸 — 저장 모양은 기존 답글(authorType=customer)이라 운영센터에 '고객 덧붙임'으로 보임, 고침·닫음이면 '다시 열림'(reviewing). 남의 글·일지는 404. '새 소식에도 올렸어요 — 4.1.3 보기' 링크는 의견의 연결 이슈와 updates.json의 issue 매칭(고침·닫음 상태일 때만).
 - **ops-reply --status-only**: 답변 파일 없이 상태·연결 이슈만 — 답글이 이미 있어도 처리. 컴2 고정 위치(/opt/padiem/lovetree-api/tools/ops-reply.mjs)사본은 머지 뒤 수동으로 최신으로 교체함(autodeploy 설치 대상 아님).
@@ -2106,10 +2106,10 @@ COM2에는 merge `6900df8aa446dfe0201d01997457fae04c4abe16`의 변경 서버 파
 ## 2026-11-15 — 'AI 테스터' → 'AI 명예회원' 호칭 바꾸기 (컴1로컬5 레인, ai/local5-ai-honorific-261115, main 96f462e 기준)
 
 - **대표 결정(2026-11-15)**: AI 고객(페르소나)을 화면·고객 대상 글에서 'AI 명예회원'으로 부른다('AI'는 남긴다 — 사람이 아님을 알림). 역할 값(ai_customer·tester)·필드 이름(aiTester 등)·DB 열·API 경로는 그대로고 보이는 글자만 바꿨다.
-- **바꾼 곳(보이는 글자 9곳 + 관련 주석)**: 둘러보기 카드·감상 허브 미리보기 배지(community-panel.mjs 2곳), 공유 화면 안내(shell.mjs), /t/ og 카드 설명 ' · AI 명예회원'(tree-preview.mjs), 새 소식 출처 줄 'AI 명예회원 윤제 님이 알려 준 것'(updates.mjs sourceLabel — #679 묶음 규칙 그대로, 글자만), 운영센터 이름표 'AI 명예회원 윤제'(admin.js authorLabel·admin-view.js 일지 줄), 운영센터 전체 숫자 카드 'AI 명예회원 N'·aria-label(admin.js).
+- **바꾼 곳(보이는 글자 9곳 + 관련 주석)**: 둘러보기 카드·감상 허브 미리보기 배지(community-panel.mjs 2곳), 공유 화면 안내(shell.mjs), /t/ og 카드 설명 ' · AI 명예회원'(tree-preview.mjs), 새 소식 출처 줄 'AI 명예회원 ○○ 님이 알려 준 것'(updates.mjs sourceLabel — #679 묶음 규칙 그대로, 글자만), 운영센터 'AI 명예회원' 이름표(admin.js authorLabel·admin-view.js 일지 줄), 운영센터 전체 숫자 카드 'AI 명예회원 N'·aria-label(admin.js).
 - **안 바꾼 것**: 역할 값·필드 이름·DB 열·API 경로. updates.json은 항목에 'AI 테스터' 글자가 없어 손댈 곳이 없다(출처는 source·tester 필드). HANDOFF 과거 기록·마이그레이션 주석·시험 내부 명칭(fixture 트리 제목·시험 이름)은 과거 기록으로 남긴다.
 - **시험 계정(tester 역할) 걸러 내기**: 없다 — 둘러보기 discover(/api/community/shares)는 역할과 무관하게 공유 행을 나열하고 aiTester 비트만 본다(지금은 시험 계정이 공유가 없어 안 보일 뿐). 방법(별도 서버 PR): discover 목록과 자동 공유 생성에서 주체 역할을 roleFor로 확인해 role='tester'면 목록에서 제외하고 새 공유를 막는다(공개 읽기 /api/public/shares/:id도 같은 판정).
-- **시험**: 기존 시험 기대 글자 8곳 갱신(updates-format·updates-screen-611·updates-b-611 'AI 윤제'→'AI 명예회원 윤제'·pages-search-preview·share-service·admin-view 'AI 고객1'→'AI 명예회원 고객1'). 새 시험·소스 글자 검사 없음. 전체 npm test 1820검 1681 pass·0 fail·139 skip, build·modulepreload --check 통과.
+- **시험**: 기존 시험 기대 글자 8곳 갱신(updates-format·updates-screen-611·updates-b-611·pages-search-preview·share-service는 'AI 명예회원' 호칭으로·admin-view 'AI 고객1'→'AI 명예회원 고객1'). 새 시험·소스 글자 검사 없음. 전체 npm test 1820검 1681 pass·0 fail·139 skip, build·modulepreload --check 통과.
 - **머지 뒤 할 일**: 서버 파일이 바뀌었으므로(주석만) 컴2 autodeploy 설치 sha 확인. 화면 캡처(둘러보기 카드·새 소식·운영센터 1440·390, 시험 계정·관리자 계정)는 배포 뒤 컴2에서.
 
 ## 2026-11-16 — 그래프 390 배치: 2열 격자·이름 고정(숨김 없음) (컴1로컬3 레인, ai/local3-graph-view-261115, PR #716 — #714 후속)

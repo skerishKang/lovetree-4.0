@@ -25,7 +25,7 @@ const feedbackRow = value => value && ({
   memo: value.memo || null,
   issueNumber: value.issue_number || null,
   authorName: value.author_name || null,
-  // #611 3번: 운영센터에서는 AI 고객 이름을 'AI 윤제'처럼 알린다. 역할 한 칸만 읽는다.
+  // #611 3번: 운영센터에서는 AI 고객임을 이름 앞에 알린다. 역할 한 칸만 읽는다.
   authorRole: value.author_role || null,
   replyCount: value.reply_count === undefined ? undefined : Number(value.reply_count || 0),
   createdAt: iso(value.created_at),

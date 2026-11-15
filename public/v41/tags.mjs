@@ -149,7 +149,7 @@ const ARTIST_NOISE = new Set([
   'EP', 'MV', 'OFFICIAL', 'VIDEO', 'PERFORMANCE', 'DANCE', 'PRACTICE', 'SPECIAL', 'CLIP', 'STAGE',
   'SHORTS', 'AWARD', 'AWARDS', 'KBS', 'MBC', 'SBS', 'MNET', 'JTBC', 'THE', 'AND', 'OF',
   'COUNTDOWN', 'CHAMPION', 'BANK', 'CORE', 'FANCAM', 'CAM', 'VER', 'CHAN', 'M', 'V',
-  'CHOREOGRAPHY', 'CHOREO', // 무용·연습 영상 채널 이름 — 가수가 아니다(보람 알림)
+  'CHOREOGRAPHY', 'CHOREO', // 무용·연습 영상 채널 이름 — 가수가 아니다(AI 고객 회차 지적)
 ]);
 
 // 낱말이 온전히 대문자 영문(가운데 숫자·& 허용)인지 — 적어도 글자 2개. 한 낱말짜리 대문자(M 같은)도
