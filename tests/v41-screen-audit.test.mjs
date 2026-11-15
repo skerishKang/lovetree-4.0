@@ -22,20 +22,8 @@ if (REQUIRE && !existsSync(new URL('../dist/v41/home.html', import.meta.url))) s
 
 // — 알려진 문제 목록 — main에서 이미 나는 것(기준을 낮추지 않고 따로 기록한다. 목록 밖의 새 실패만 빨강이 된다) —
 // 형식: { 화면(줄 맨 앞), 항목, 찾을: 줄에서 찾을 정규식, 이슈 }
+// #662에서 보드·안내·책의 항목을 모두 고쳐 KNOWN에서 뺐다 — 이제 검사기가 지켜서 새로 생기면 빨강이 된다.
 const KNOWN = [
-  // #635 PR B의 안내 패널 — 390에서 닫기 단추 상자(72×44)가 제목 줄 상자와 약 12px 포개진다(글자끼리는 부딪히지 않는다).
-  { 화면: '어떻게 쓰나요 안내', 항목: '겹침', 찾을: 'button\\.close × h2', 이슈: '#635' },
-  // 책·공유 — 영상 칸의 출처 표(▶)가 #357에서 의도한 10px다(#548 기준 12px와 어긋난다. #548은 공유 책을 재지 않았다).
-  { 화면: '책·공유', 항목: '작은글자', 찾을: 'span\\.media-source-mark', 이슈: '#357' },
-  // 보드 390 — 좁은 판에서 머리글·도구줄·카드 글자 상자가 포개지고 잘린다(track58은 #267에서 갈라졌고, 머리글은 #417 모양이다).
-  { 화면: '보드', 항목: '겹침', 찾을: '(noteText|treeTitleText|cardTitle)', 이슈: '#267·#417' },
-  { 화면: '보드', 항목: '가려짐', 찾을: '(div\\.noteText ← button\\.tool|h3\\.cardTitle ← select|div\\.firstTag ← img)', 이슈: '#267' },
-  { 화면: '보드', 항목: '잘림', 찾을: '(span\\.connWhy|span#treeTitleText)', 이슈: '#267' },
-  // 보드 상세 판(#601 상세 재구성) — 열린 판이 테마 꼬리표를 덮고, ×단추 상자가 '순간 상세' 줄과 포개지고,
-  // 판에서 내민 단추의 실제 마우스 Hit가 핀판 표면에 가로막긴다(기존 시험은 evaluate 클릭이라 못 봤다).
-  { 화면: '보드', 항목: '겹침', 찾을: 'button#detailClose × div\\.label', 이슈: '#601' },
-  { 화면: '보드', 항목: '가려짐', 찾을: '(button#openMoment|button#cinemaFromMoment|button#detailMapBtn) ← div\\.surface', 이슈: '#601' },
-  { 화면: '보드', 항목: '가려짐', 찾을: 'div#themeBadge ← aside#detail', 이슈: '#601' },
   // 지도 — Track56 원본 모양: 안내 문구가 캔버스 뒤에 깔려 있다(원본 보존 커밋 b2567fe — 원본 구조는 바꾸지 않는다).
   { 화면: '지도', 항목: '가려짐', 찾을: 'p ← canvas#stage', 이슈: 'Track56 원본(b2567fe)' },
 ];
@@ -139,12 +127,16 @@ test('#657 화면 공통 검사기: 주요 화면 12 상태 × 390·1440 × 밤�
     const book = await frameOf(page2, /track59-sketchbook/);
     assert.ok(book, '책 프레임이 열린다');
     await book.waitForFunction(() => !!document.querySelector('.moment'), null, { timeout: 20000 });
+    // 장 넘김 애니메이션이 끝나기를 기다린다(#662 CI: 450ms 고정 대기는 넘김 중간에 검사해 img·clipping이 글자를 덮은 것으로 나왔다).
+    const bookIdle = () => book.waitForFunction(() => { try { return machineState === 'IDLE'; } catch { return false; } }, null, { timeout: 5000 }).catch(() => {});
+    await bookIdle();
     await page2.waitForTimeout(700);
     for (let i = 0; i < 12; i++) {
       await take(page2, i === 0 ? '책·공유 첫 장' : `책·공유 ${i + 1}장`);
       const next = book.locator('#nextBtn');
       if (await next.isDisabled()) break;
       await next.click();
+      await bookIdle();
       await page2.waitForTimeout(450);
     }
     await take(page2, '책·공유 마지막 장');

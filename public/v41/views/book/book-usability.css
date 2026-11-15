@@ -189,7 +189,7 @@ html[data-book-view=single][data-book-shape=wide][data-v41-screen=book] .moment-
 html[data-book-view=single][data-book-shape=wide][data-v41-screen=book] .moment-heading:focus-within .title-edit-hint,
 html[data-book-view=single][data-book-shape=wide][data-v41-screen=book] .title-edit-hint:focus-visible{opacity:.72;pointer-events:auto}
 html[data-v41-screen=book] .media-source{display:flex;align-items:center;gap:8px;margin:10px 0 2px;min-width:0;font-size:12px;line-height:1.5;color:var(--lt-ink)}
-html[data-v41-screen=book] .media-source-mark{flex:0 0 auto;font-size:10px;color:var(--lt-ink)}
+html[data-v41-screen=book] .media-source-mark{flex:0 0 auto;font-size:12px;color:var(--lt-ink)}/* #662: 10px는 #548 기준(12px)에 못 미쳐 검사기에 걸렸다 — 12px로. */
 html[data-v41-screen=book] .media-source-text{flex:0 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 html[data-v41-screen=book] .media-source-link{flex:0 0 auto;color:var(--lt-ink);font-weight:700;text-decoration:underline;text-decoration-color:var(--lt-gold-line);text-underline-offset:3px}
 html[data-v41-screen=book] .media-source-link:hover{text-decoration-color:var(--lt-ink)}

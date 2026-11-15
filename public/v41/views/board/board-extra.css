@@ -231,11 +231,13 @@ html[data-lt-theme=garden] .boardModeSwitch .modeSwitchBtn[aria-pressed="true"]{
   .boardModeSwitch{order:9;margin-left:auto}
   .boardModeSwitch .modeSwitchBtn{height:44px}
   .boardFrame{inset:100px 0 0}
+  /* #662: 테마 표시를 머리줄 둘째 줄로 옮겼다(board-extras fitThemeBadge) — 흐름 안에 놓인다. */
+  .themeBadge{position:static;order:10;align-self:center;margin-left:6px}
 }
 
 /* 2. 카드: 큰 썸네일 + 제목 2줄 + 감정·날짜 한 줄. 높이 상한(썸네일 200px·세로 영상 9:16 300px). */
 .card .cardTitle{margin:5px 0 4px;font-size:16px;line-height:1.35;font-weight:700;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;min-height:2.7em}
-.card .cardMeta{font-size:12px;color:#61526a;display:flex;align-items:center;white-space:nowrap;overflow:hidden}
+.card .cardMeta{font-size:12px;color:#61526a;display:flex;align-items:center;white-space:nowrap;overflow:hidden;margin-top:6px}/* #662: 제목 상자(-webkit-line-clamp)가 아래로 8px 더 늘어나 감정·날짜 줄과 포개진다 — 사이를 벌린다. */
 .card .cardMeta .emotionDot{flex:0 0 auto}
 .card .cardMeta{gap:0}
 /* #601: 카드 한가운데 재생 단추가 끌기를 가로막지 않게 — 보드 카드에서는 모서리 작은 표로 줄인다(상세·책은 그대로). */
