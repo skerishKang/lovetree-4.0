@@ -572,9 +572,7 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     assert.deepEqual(graphTouch.nameOnDot, [], `허브 이름이 자기 점 위에 겹친다: ${JSON.stringify(graphTouch.nameOnDot)}`);
     assert.deepEqual(graphTouch.nameOnMark, [], `허브 이름이 '처음/지금' 표시와 겹친다: ${JSON.stringify(graphTouch.nameOnMark)}`);
     assert.deepEqual(graphTouch.countOnDot, [], `무더기 개수(×N)가 점 위에 겹친다: ${JSON.stringify(graphTouch.countOnDot)}`);
-=======
     assert.match(graphCheck.badge, /순간 17/, '표시에 순간 수가 있다');
->>>>>>> origin/main
     await ctx7.close();
 
     // 주소로 열리는지(#my/graph) — 셸이 그래프 보기를 화면 파일로 띄우는지 단정한다(메뉴 단추는 없다).
