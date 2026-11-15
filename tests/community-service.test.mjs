@@ -6,6 +6,7 @@ import {createMemoryWorkspaceRepo} from '../server/testing/memory-workspace-repo
 import {createMemoryShareRepo} from '../server/testing/memory-share-repo.js';
 import {createMemoryCommunityRepo} from '../server/testing/memory-community-repo.js';
 import {createCommunityHandler,createCommunityService} from '../server/community-service.js';
+import {createShareService} from '../server/share-service.js';
 import {ApiError} from '../server/errors.js';
 
 const PRODUCT='lovetree-test',principal=subjectId=>({productId:PRODUCT,subjectId});
@@ -227,7 +228,7 @@ test('discover uses batched summaries, excludes blocked/hidden/deleted, and leak
 
 // ── #627 3단계 '다른 팬 보기': GET /api/public/tag-moments (화면 없음 — 서버 규칙만) ──────────
 const TAG_URL='https://example.com/video/zena.mp4';
-async function tagSetup({accounts,aiSubjects=[],privateTreeId=null,hiddenShareIds=[],blocks=[]}={}){
+async function tagSetup({accounts,aiSubjects=[],testerSubjects=[],privateTreeId=null,hiddenShareIds=[],blocks=[]}={}){
  // accounts: [{subject, trees:[{title, moments:[{title, date, url, keywords, mediaMetadata?}]}]}]
  const workspaceRepo=createMemoryWorkspaceRepo(),workspace=createWorkspaceService({repo:workspaceRepo,productId:PRODUCT});
  const shareRepo=createMemoryShareRepo();
@@ -250,7 +251,7 @@ async function tagSetup({accounts,aiSubjects=[],privateTreeId=null,hiddenShareId
   await workspace.write(principal(account.subject),{state:{version:1,trees},expectedRevision:0,clientKey:'seed'});
   for(const tree of trees){
    const shareId='share'+String(++n).padStart(20,'0');
-   rows.push(await shareRepo.create({productId:PRODUCT,shareId,subjectId:account.subject,treeId:tree.id,entryMomentId:tree.moments[0].id,view:'book',momentCount:tree.moments.length}));
+   rows.push(await shareRepo.create({productId:PRODUCT,shareId,subjectId:account.subject,treeId:tree.id,entryMomentId:tree.moments[0].id,view:'book',momentCount:tree.moments.length,origin:'auto'}));
   }
  }
  const communityRepo=createMemoryCommunityRepo({isPrivateTree:privateTreeId?(p,s,t)=>t===privateTreeId:null});
@@ -261,10 +262,10 @@ async function tagSetup({accounts,aiSubjects=[],privateTreeId=null,hiddenShareId
   await communityRepo.moderateReport({productId:PRODUCT,reportId:'report-'+String(r).padStart(20,'0'),status:'resolved',visibility:'hidden',actorSubjectId:'admin'});
  }
  for(const [a,b] of blocks)await communityRepo.blockOwner({productId:PRODUCT,blockerSubjectId:a,blockedSubjectId:b});
- const admin={roleFor:async value=>aiSubjects.includes(value.subjectId)?'ai_customer':null};
+ const admin={roleFor:async value=>aiSubjects.includes(value.subjectId)?'ai_customer':(testerSubjects.includes(value.subjectId)?'tester':null)};
  const service=createCommunityService({communityRepo,shareRepo,workspaceRepo,productId:PRODUCT,admin,makeId:()=>String(++n).padStart(24,'c')});
  const authenticate=async request=>{const subjectId=request.headers?.account;if(!subjectId)throw new ApiError(401,'unauthenticated','login');return principal(subjectId);};
- return {communityRepo,workspaceRepo,handle:createCommunityHandler({authenticate,service,productId:PRODUCT})};
+ return {communityRepo,shareRepo,workspaceRepo,handle:createCommunityHandler({authenticate,service,productId:PRODUCT}),shareRows:rows.map(r=>({subjectId:r.subjectId,treeId:r.treeId,shareId:r.shareId}))};
 }
 const tagCall=(handle,tag,account)=>call(handle,'GET','/api/public/tag-moments',{query:'tag='+encodeURIComponent(tag),account});
 
@@ -368,4 +369,35 @@ test('tag-moments: 종류 없는 꼬리표·빈 값은 400',async()=>{
  assert.equal((await tagCall(data.handle,'무대')).status,400,'종류 표시가 없는 옛 꼬리표는 이 경로에서 받지 않는다');
  assert.equal((await tagCall(data.handle,'')).status,400);
  assert.equal((await tagCall(data.handle,'노래:')).status,400);
+});
+
+test('#678 후속: tester 계정 트리는 둘러보기·다른 팬 보기에 나오지 않고, 공유 링크 직접 열기는 그대로 된다',async()=>{
+ const data=await tagSetup({
+  accounts:[
+   {subject:'t1',trees:[{title:'시험 계정 트리',moments:[{title:'시험 계정 트리 순간',date:'2026-11-06',url:TAG_URL,keywords:['가수:RESCENE']},{title:'시험 계정 트리 둘째 순간',date:'2026-11-06',url:TAG_URL,keywords:['가수:RESCENE']},{title:'시험 계정 트리 셋째 순간',date:'2026-11-06',url:TAG_URL,keywords:['가수:RESCENE']}]}]},
+   {subject:'a1',trees:[{title:'AI 명예회원 트리',moments:[{title:'AI 명예회원 트리 순간',date:'2026-11-05',url:TAG_URL,keywords:['가수:RESCENE']},{title:'AI 명예회원 트리 둘째 순간',date:'2026-11-05',url:TAG_URL,keywords:['가수:RESCENE']},{title:'AI 명예회원 트리 셋째 순간',date:'2026-11-05',url:TAG_URL,keywords:['가수:RESCENE']}]}]},
+   {subject:'h1',trees:[{title:'일반 트리',moments:[{title:'일반 트리 순간',date:'2026-11-04',url:TAG_URL,keywords:['가수:RESCENE']},{title:'일반 트리 둘째 순간',date:'2026-11-04',url:TAG_URL,keywords:['가수:RESCENE']},{title:'일반 트리 셋째 순간',date:'2026-11-04',url:TAG_URL,keywords:['가수:RESCENE']}]}]},
+  ],
+  aiSubjects:['a1'],
+  testerSubjects:['t1'],
+ });
+ // 둘러보기: 시험 계정 트리는 빠지고 AI 명예회원·일반 트리는 그대로(배지 비트도 유지).
+ const list=await call(data.handle,'GET','/api/community/shares');
+ assert.equal(list.status,200);
+ const titles=list.body.items.map(item=>item.title);
+ assert.equal(titles.includes('시험 계정 트리'),false,'시험 계정 트리는 둘러보기에 없다');
+ assert.deepEqual(titles,['AI 명예회원 트리','일반 트리']);
+ assert.equal(list.body.items.find(item=>item.title==='AI 명예회원 트리').aiTester,true,'AI 명예회원 배지는 유지');
+ // 다른 팬 보기: 시험 계정 순간이 빠지고 나머지는 꼬리표 판정대로.
+ const res=await tagCall(data.handle,'가수:RESCENE');
+ const treeTitles=res.body.items.map(item=>item.treeTitle);
+ assert.equal(treeTitles.includes('시험 계정 트리'),false,'시험 계정 순간은 다른 팬 보기에 없다');
+ assert.deepEqual([...new Set(treeTitles)],['AI 명예회원 트리','일반 트리']);
+ assert.equal(res.body.items.find(item=>item.treeTitle==='AI 명예회원 트리').aiTester,true);
+ // 공유 링크 직접 열기(/t/<id>가 읽는 공개 읽기 경로 — share-service.read)는 시험 계정 트리도 그대로 된다(레인 시험용).
+ const testerShare=data.shareRows.find(r=>r.subjectId==='t1');
+ const shareService=createShareService({shareRepo:data.shareRepo,workspaceRepo:data.workspaceRepo,productId:PRODUCT});
+ const direct=await shareService.read(testerShare.shareId);
+ assert.ok(direct.tree,'공유 링크 직접 열기는 막히지 않는다');
+ assert.equal(direct.tree.title,'시험 계정 트리');
 });
