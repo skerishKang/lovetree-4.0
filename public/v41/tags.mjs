@@ -7,14 +7,16 @@
 //   예) '노래:Super Shy' · '멤버:카리나' · '활동기:2024 여름' · '무대:인기가요 240524' · '감정:설렘'
 // 종류 표시가 없는 기존 keywords('무대', '여행' 같은 평범한 낱말)는 그대로 읽힌다(뒤로 호환) —
 // 종류 없는 꼬리표로 취급하며 데이터를 잃지 않는다.
-// 종류 목록은 이 파일 한 곳에서 정의한다. 노래·멤버·활동기·무대(방송·공연)·감정이 1차 목록이고,
+// 종류 목록은 이 파일 한 곳에서 정의한다. 가수(그룹·솔로 가수)·노래·멤버·활동기·무대(방송·공연)·감정이 목록이고,
 // 강의·요리 같은 다른 대상으로 넓힐 때는 TAG_KINDS에 한 줄만 더한다.
+// '가수:' 표시도 3자라 값이 21자 남는다(노래·멤버·감정과 같고, 활동기 4자만 20자).
 
 // 도메인·서버의 keywords 규칙과 같은 수(한 벌) — 이 두 값을 바꾸면 안 된다.
 export const TAG_MAX_LENGTH = 24;
 export const TAG_MAX_COUNT = 20;
 
 export const TAG_KINDS = [
+  { id: 'artist', label: '가수', prefix: '가수:' },
   { id: 'song', label: '노래', prefix: '노래:' },
   { id: 'member', label: '멤버', prefix: '멤버:' },
   { id: 'era', label: '활동기', prefix: '활동기:' },
@@ -92,7 +94,7 @@ const STAGE_LABELS = [
   { label: '뮤직뱅크', alias: ['뮤직뱅크', 'music bank'] },
   { label: '음악중심', alias: ['음악중심', 'music core'] },
   { label: '엠카운트다운', alias: ['엠카운트다운', 'm countdown', 'mcountdown'] },
-  { label: '쇼챔피언', alias: ['쇼챔피언', 'show champion'] },
+  { label: '쇼챔피언', alias: ['쇼챔피언', '쇼챔', 'show champion'] },
   { label: '더쇼', alias: ['더쇼', 'the show'] },
   { label: '팩트스타', alias: ['팩트스타', 'fact in star'] },
   { label: '가요대축제', alias: ['가요대축제'] },
@@ -109,22 +111,19 @@ const STAGE_LABELS = [
 ];
 
 // 제목에서 흔히 잡동사니로 섞이는 표시 — 꼬리표 값에서 벗긴다.
-const NOISE = /#shorts|쇼츠|\b4k\b|\b60fps\b|\b2160p\b|\b1080p\b/gi;
+const NOISE = /#shorts|쇼츠|\b4k\b|\b60fps\b|\b2160p\b|\b1080p\b|\b60p\b/gi;
 const TAIL_MARKS = /\s*(M\/V|MV|Official (Music )?Video|Official MV|Performance Video|Dance Practice|Special Clip|Practice Video)\s*$/i;
 // 직캠 표시는 노래 제목 뒤에 붙는 대상이 아니라 찍은 대상의 표시라 값에서 벗긴다.
 const CAM_MARKS = /\s*(세로직캠|가로직캠|직캠|팬캠|fancam|fan cam)\s*$/gi;
 
-// 따옴표 묶음(노래 제목이 가장 흔히 쓰는 모양).
+// 따옴표 묶음(노래 제목이 가장 흔히 쓰는 모양) — 전부 찾는 판도 함께 쓴다.
 const QUOTED = /['‘“"]([^'’“”"]{1,60})['’”"]/;
+const QUOTED_ALL = /['‘“"]([^'’“”"]{1,60})['’”"]/g;
 
-// 6자리(YYMMDD)·8자리(YYYYMMDD) 날짜 — 달·날이 실제 범위일 때만 무대 날짜로 본다.
+// 6자리(YYMMDD)·8자리(YYYYMMDD) 날짜 — 노래 덩어리에 섞인 날짜를 걸러 낼 때 쓴다(무대 꼬리표 값에는
+// 날짜를 붙이지 않는다 — 2차 규칙: 무대는 방송 이름만 남긴다).
 const DATE6 = /(?<!\d)(\d{6})(?!\d)/;
 const DATE8 = /(?<!\d)(\d{8})(?!\d)/;
-
-const validYMD = (s) => { // s는 MMDD(앞의 연도 두 자리는 이미 뗐다)
-  const mm = Number(s.slice(0, 2)), dd = Number(s.slice(2, 4));
-  return mm >= 1 && mm <= 12 && dd >= 1 && dd <= 31;
-};
 
 // 단어 경계가 있는 부분 일치 — 'MAMA'가 'MAMAMOO' 안에서 잘못 걸리지 않게 한다.
 const containsWord = (hay, needle) => {
@@ -140,6 +139,110 @@ const containsWord = (hay, needle) => {
 
 const foldTitle = (t) => ' ' + tagKey(t) + ' ';
 
+// ── 가수 후보(#627 2차) ─────────────────────────────────────────────────────────────
+// 가수는 영문 표기로 통일한다(영문+한글이 같이 나오면 영문만 남기고 한글은 버린다 — 같은 그룹에
+// 꼬리표 두 개가 생기지 않게). 두 모양만 본다: '영문(한글)' 괄호 꼬꼬와, 홀로 선 대문자 영문 이름.
+// 멤버 이름·방송국·무대 이름까지 가수로 잘못 부르지 않게 걸러 낸다. 불확실하면 제안하지 않는다.
+
+// 가수 후보에서 걸러 낸 낱말(대문자로 비교한다): 방송국·무대·잡동사니 표시.
+const ARTIST_NOISE = new Set([
+  'EP', 'MV', 'OFFICIAL', 'VIDEO', 'PERFORMANCE', 'DANCE', 'PRACTICE', 'SPECIAL', 'CLIP', 'STAGE',
+  'SHORTS', 'AWARD', 'AWARDS', 'KBS', 'MBC', 'SBS', 'MNET', 'JTBC', 'THE', 'AND', 'OF',
+  'COUNTDOWN', 'CHAMPION', 'BANK', 'CORE', 'FANCAM', 'CAM', 'VER', 'CHAN', 'M', 'V',
+]);
+
+// 낱말이 온전히 대문자 영문(가운데 숫자·& 허용)인지 — 적어도 글자 2개. 한 낱말짜리 대문자(M 같은)도
+// 잡동사니 걸름에서 같이 본다.
+const isCapsName = (w) => /^[A-Z][A-Z0-9&'’-]*$/.test(w) && (w.replace(/[^A-Z]/g, '').length >= 2);
+const isCapsish = (w) => /^[A-Z]$/.test(w) || isCapsName(w);
+
+// 글자로 시작해 가운데에 숫자가 박힌 영문 이름(Hearts2Hearts 같은 모양) — 짧은 표기(RUN2U)는 제외.
+const isDigitName = (w) => w.length >= 6 && /^[A-Za-z][A-Za-z0-9]*\d[A-Za-z0-9]*$/.test(w) && w.replace(/[^A-Za-z]/g, '').length >= 4;
+
+// 괄호 안팎이 영문·한글로 갈라진 꼬꼬에서 가수 이름을 찾는다. 영문이 괄호 밖이든 안이든 영문 쪽을 쓴다.
+//   'RESCENE(리센느)' → RESCENE · '뉴진스 (NewJeans)' → NewJeans · '르세라핌(LE SSERAFIM)' → LE SSERAFIM
+function artistFromParens(t) {
+  const out = [];
+  for (const m of t.matchAll(/\(([^()]*)\)/g)) {
+    const inner = m[1].trim();
+    if (!inner) continue;
+    const before = (t.slice(0, m.index).match(/([A-Za-z][A-Za-z0-9&'’-]*)\s*$/) || [,''])[1].trim(); // 바로 앞의 한 단어만 — 'RESCENE ZENA (…)'에서 ZENA만 이 괄호의 짝이다
+    const latinOf = (s) => (/^[A-Za-z][A-Za-z0-9 .&+'’-]*$/.test(s) ? s.trim() : '');
+    let name = '';
+    if (/[가-힣]/.test(inner) && before) name = latinOf(before); // '영문(한글)' — 영문은 괄호 밖
+    else if (!/[가-힣]/.test(inner) && /(?:^|[^A-Za-z0-9])[가-힣]\s*$/.test(t.slice(0, m.index))) name = latinOf(inner); // '한글(영문)'
+    if (!name || looksLikeCamCredit(name)) continue;
+    out.push(name);
+  }
+  return out;
+}
+
+// 이름 후보에 직캠 크레딧·잡동사니가 섞였으면 가수 이름이 아니다.
+function looksLikeCamCredit(name) {
+  const words = name.split(/\s+/);
+  if (words.length > 4) return true;
+  return words.some((w) => ARTIST_NOISE.has(w.toUpperCase()) || /직캠|팬캠|fancam/i.test(w));
+}
+
+// 괄호를 덜어 낸 제목에서 홀로 선 가수 이름(모두 대문자, 또는 Hearts2Hearts 모양)을 찾는다.
+// parens: 괄호 구간의 [시작, 끝] 목록 — 괄호 안의 낱말(직캠 크레딧 등)은 이름 후보에서 뺀다.
+// 대문자 낱말이 연달아 오면(STRAY KIDS·RESCENE ZENA) 어디까지가 이름인지 사전 없이는 알 수 없어
+// 제안하지 않는다. 다만 구간 바로 뒤에 한글 괄호 표기가 붙으면('RESCENE ZENA (리센느 제나)')
+// 구간의 첫 낱말은 그룹 이름이다 — 첫 낱말만 제안한다.
+function artistFromWords(t, parens = []) {
+  const inParens = (tok) => parens.some(([a, b]) => tok.i >= a && tok.end <= b);
+  const out = [];
+  const tokens = [...t.matchAll(/[A-Za-z0-9&'’-]+/g)].map((m) => ({ w: m[0], i: m.index, end: m.index + m[0].length }));
+  const gapIsSpace = (a, b) => /^\s*$/.test(t.slice(a.end, b.i));
+  const capsish = (tok) => tok && isCapsish(tok.w.toUpperCase()) && !ARTIST_NOISE.has(tok.w.toUpperCase());
+  for (let k = 0; k < tokens.length; k++) {
+    const tok = tokens[k];
+    if (inParens(tok)) continue;
+    const w = tok.w;
+    const before = t.charAt(tok.i - 1);
+    const after = t.charAt(tok.end);
+    // '15-LOVE'처럼 붙임표·숫자에 붙어 있거나 한글에 붙어 있는 조각(MIX직캠의 MIX)은 이름이 아니다.
+    if (before === '-' || /\d/.test(before) || /[가-힣]/.test(before)) continue;
+    if (after === '-' || /\d/.test(after) || /[가-힣]/.test(after)) continue;
+    const up = w.toUpperCase();
+    if (ARTIST_NOISE.has(up)) continue;
+    if (STAGE_ALIASES.has(up)) continue; // MAMA·MMA 같은 무대 이름은 가수가 아니다
+    if (isDigitName(w)) { out.push(w); continue; } // Hearts2Hearts 모양은 홀로 이름이다
+    if (!isCapsName(w)) continue;
+    const prev = tokens[k - 1], next = tokens[k + 1];
+    const runPrev = prev && !inParens(prev) && gapIsSpace(prev, tok) && capsish(prev);
+    const runNext = next && !inParens(next) && gapIsSpace(tok, next) && capsish(next);
+    if (runPrev || runNext) {
+      if (runPrev) continue; // 구간의 첫 낱말만 검사한다
+      let e = k;
+      while (e + 1 < tokens.length && !inParens(tokens[e + 1]) && gapIsSpace(tokens[e], tokens[e + 1]) && capsish(tokens[e + 1])) e++;
+      const paren = t.slice(tokens[e].end).match(/^\s*\(([^()]*)\)/);
+      if (paren && /[가-힣]/.test(paren[1])) out.push(w);
+      continue;
+    }
+    out.push(w);
+  }
+  return out;
+}
+
+// 무대 이름의 모든 별칭(대문자) — 가수 후보에서 무대 이름을 걸러 낼 때 쓴다.
+const STAGE_ALIASES = new Set(STAGE_LABELS.flatMap((s) => s.alias.map((a) => tagKey(a).toUpperCase().replace(/[^A-Z0-9 ]/g, ''))));
+
+// 제목에서 가수 후보를 모은다. 따옴표 묶음(노래 제목)과 붙임표 노래 덩어리는 먼저 덜어 낸다
+// (괄호 안 노래 제목·노래 이름을 가수로 읽지 않게).
+function findArtists(t) {
+  let rest = t.replace(QUOTED_ALL, ' '); // 따옴표 안은 노래 제목이다
+  const songChunk = findSong(t);
+  if (songChunk && !QUOTED.test(t)) rest = rest.split(songChunk).join(' '); // 붙임표 덩어리가 노래였으면 그것도 뺀다
+  const out = [];
+  const seen = new Set();
+  const add = (name) => { const k = tagKey(name); if (k && !seen.has(k)) { seen.add(k); out.push(name); } };
+  for (const name of artistFromParens(rest)) add(name);
+  const parens = [...rest.matchAll(/\([^()]*\)/g)].map((m) => [m.index, m.index + m[0].length]);
+  for (const name of artistFromWords(rest, parens)) add(name);
+  return out;
+}
+
 function findStage(t) {
   const hay = foldTitle(t);
   for (const stage of STAGE_LABELS) {
@@ -150,23 +253,22 @@ function findStage(t) {
   return null;
 }
 
-function findDate(t) {
-  const m8 = t.match(DATE8);
-  if (m8 && /^(19|20)/.test(m8[1]) && validYMD(m8[1].slice(4))) return m8[1].slice(2); // YYYYMMDD → YYMMDD
-  const m6 = t.match(DATE6);
-  if (m6 && validYMD(m6[1].slice(2))) return m6[1]; // YYMMDD의 뒤 네 자리가 MMDD
-  return null;
-}
-
 function findSong(t) {
-  // 1) 따옴표 묶음이 노래 제목이다(공식 뮤직비디오·직캠 모두 이 모양을 쓴다).
+  // 1) 따옴표 묶음이 노래 제목이다(공식 뮤직비디오·직캠 모두 이 모양을 쓴다) — 따옴표는 믿는다.
   const q = t.match(QUOTED);
   if (q) return cleanText(q[1]).replace(NOISE, '').replace(CAM_MARKS, '').trim();
-  // 2) '가수 - 노래 @무대' 모양(방송·공연 클립이 이 모양을 쓴다).
+  // 2) '가수 - 노래 @무대' 모양(방송·공연 클립이 이 모양을 쓴다) — 붙임표 덩어리는 의심한다:
+  //    직캠·화질·날짜·무대 이름·구분선이 섞인 덩어리는 노래라고 단정할 수 없어 제안하지 않는다.
   const dash = t.match(/-\s*([^@|#]+?)(?=\s*@|\s*$)/);
   if (dash) {
     const v = cleanText(dash[1]).replace(NOISE, '').replace(CAM_MARKS, '').replace(TAIL_MARKS, '').trim();
-    if (v) return v;
+    if (!v) return null;
+    if (/[|@]/.test(v)) return null;
+    if (/직캠|팬캠|fancam/i.test(v)) return null;
+    if (/#shorts|쇼츠|\b4k\b|\b60fps\b|\b2160p\b|\b1080p\b|\b60p\b/i.test(v)) return null;
+    if (DATE6.test(v) || DATE8.test(v)) return null;
+    if (findStage(v)) return null;
+    return v;
   }
   return null;
 }
@@ -193,14 +295,12 @@ export function suggestTagsFromTitle(title, options = {}) {
     if (needle.length >= 2 && hay.includes(needle)) push(p.kindId, p.value, 'reuse');
   }
 
-  // 2) 제목 규칙: 노래 → 무대(방송·시상식·공연 이름 + 날짜).
+  // 2) 제목 규칙: 가수 → 노래 → 무대(방송·시상식·공연 이름 — 날짜 숫자는 값에 섞지 않는다).
+  for (const name of findArtists(t)) push('artist', name, 'title');
   const song = findSong(t);
   if (song) push('song', song, 'title');
   const stage = findStage(t);
-  const date = findDate(t);
-  if (stage && date) push('stage', `${stage} ${date}`, 'title');
-  else if (stage) push('stage', stage, 'title');
-  else if (date) push('stage', date, 'title');
+  if (stage) push('stage', stage, 'title'); // 261111·240524 같은 날짜는 무대 꼬리표에 붙이지 않는다
 
   // 같은 값(표기 차이 포함)은 하나만 — 앞에 온 것(재사용)이 이긴다. 종류 없는 꼬리표로 이미 제안한 값은
   // 제목 규칙이 종류를 붙여 다시 제안하지 않는다(같은 값을 두 번 권하지 않는다).

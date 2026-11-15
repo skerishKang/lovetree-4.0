@@ -107,7 +107,7 @@ const SCREENS = {
     buildHost: (doc) => {
       const section = doc.createElement('div');
       section.className = 'section lt-tagline-section';
-      section.append(Object.assign(doc.createElement('div'), { className: 'label', textContent: '꼬리표' }));
+      // '꼬리표' 표시는 줄 안에 하나만 있다(#627 2차 — 예전에는 여기에도 붙여 두 번 보였다).
       const host = doc.createElement('div');
       host.id = 'dTags';
       section.append(host);

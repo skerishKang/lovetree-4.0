@@ -14,8 +14,8 @@ const stateOf = (tree) => ({ version: 1, trees: [tree] });
 const brief = (result) => result.proposals.map((p) => (p.kindId || 'plain') + ':' + p.value + (p.tooLong ? '(너무 길다)' : ''));
 
 test('종류 목록은 한 곳(TAG_KINDS)에 있고, 접두어를 붙여 만들고 그대로 읽힌다', () => {
-  assert.deepEqual(TAG_KINDS.map((k) => k.label), ['노래', '멤버', '활동기', '무대', '감정']);
-  assert.deepEqual(TAG_KINDS.map((k) => k.id), ['song', 'member', 'era', 'stage', 'emotion']);
+  assert.deepEqual(TAG_KINDS.map((k) => k.label), ['가수', '노래', '멤버', '활동기', '무대', '감정']);
+  assert.deepEqual(TAG_KINDS.map((k) => k.id), ['artist', 'song', 'member', 'era', 'stage', 'emotion']);
   // 만들기·읽기가 서로를 왕복한다.
   for (const k of TAG_KINDS) {
     const raw = makeTag(k.id, '값');
@@ -30,6 +30,7 @@ test('종류 목록은 한 곳(TAG_KINDS)에 있고, 접두어를 붙여 만들�
   assert.equal(makeTag('song', '   '), null);
   assert.equal(makeTag('song', 'x'.repeat(22)), null, '접두어 3자 + 22자 = 25자');
   assert.equal(makeTag('song', 'x'.repeat(21)), '노래:' + 'x'.repeat(21), '접두어 3자 + 21자 = 24자까지 된다');
+  assert.equal(makeTag('artist', 'x'.repeat(21)), '가수:' + 'x'.repeat(21), '가수 표시도 3자라 값이 21자까지 — 24자 예산은 그대로다');
   assert.equal(makeTag('era', 'x'.repeat(20)), '활동기:' + 'x'.repeat(20), '활동기 표시는 4자라 값이 20자까지');
 });
 
@@ -80,43 +81,55 @@ test('도메인이 꼬리표 형식을 그대로 받아 저장한다(기존 keyw
   assert.deepEqual(strict, ['노래:Super Shy']);
 });
 
-// 실제 제목 형태 21개 — 공식 뮤직비디오·직캠·음악방송·시상식·쇼츠·연습·팬 찍은 영상이 섞여 있다.
+// 실제 제목 형태 27개 + 오늘 캡처에서 온 실제 제목 3개 — 공식 뮤직비디오·직캠·음악방송·시상식·쇼츠·연습·팬 찍은 영상이 섞여 있다.
+// 2차 규칙(#627): 무대는 방송 이름만(날짜 숫자는 뗀다), 가수는 영문 표기 하나로, 노래는 직캠·화질·무대가
+// 섞인 덩어리에서는 제안하지 않는다.
 const TITLES = [
-  ['뉴진스 (NewJeans) ‘Super Shy’ Official MV', ['song:Super Shy']],
-  ['TWICE "CHEER UP" M/V', ['song:CHEER UP']],
-  ['STRAY KIDS "특(S-Class)" M/V', ['song:특(S-Class)']],
+  ['뉴진스 (NewJeans) ‘Super Shy’ Official MV', ['artist:NewJeans', 'song:Super Shy']],
+  ['TWICE "CHEER UP" M/V', ['artist:TWICE', 'song:CHEER UP']],
+  ['STRAY KIDS "특(S-Class)" M/V', ['song:특(S-Class)'], '여러 단어인 대문자 이름은 사전 없이는 끝을 알 수 없어 가수로 제안하지 않는다'],
   ['(여자)아이들 \'퀸카 (Queencard)\' Official MV', ['song:퀸카 (Queencard)']],
-  ['아이브 (IVE) \'아이엠 I AM\' Official MV', ['song:아이엠 I AM']],
-  ['BTS (방탄소년단) \'Dynamite\' Official MV', ['song:Dynamite']],
-  ['BLACKPINK - ‘Pink Venom’ M/V', ['song:Pink Venom']],
-  ['르세라핌(LE SSERAFIM) \'UNFORGIVEN (feat. Nile Rodgers)\' Official MV', ['song:UNFORGIVEN (feat. Nile Rodgers)(너무 길다)'], '24자를 넘는 노래 제목은 너무 길다는 표시로 남긴다(조용히 버리지 않는다)'],
+  ['아이브 (IVE) \'아이엠 I AM\' Official MV', ['artist:IVE', 'song:아이엠 I AM']],
+  ['BTS (방탄소년단) \'Dynamite\' Official MV', ['artist:BTS', 'song:Dynamite']],
+  ['BLACKPINK - ‘Pink Venom’ M/V', ['artist:BLACKPINK', 'song:Pink Venom']],
+  ['르세라핌(LE SSERAFIM) \'UNFORGIVEN (feat. Nile Rodgers)\' Official MV', ['artist:LE SSERAFIM', 'song:UNFORGIVEN (feat. Nile Rodgers)(너무 길다)'], '24자를 넘는 노래 제목은 너무 길다는 표시로 남긴다(조용히 버리지 않는다)'],
   ['[직캠] 뉴진스 혜인 \'Super Shy\' (NewJeans Hyein Fancam) @인기가요 23716', ['song:Super Shy', 'stage:인기가요']],
-  ['에스파 카리나 직캠 \'Supernova\' (aespa Karina Fancam) @뮤직뱅크 240524', ['song:Supernova', 'stage:뮤직뱅크 240524']],
-  ['[안방1열 직캠4K] 소녀시대 태연 \'우주별\' (TAEYEON Fancam) @뮤직뱅크 240517', ['song:우주별', 'stage:뮤직뱅크 240517']],
-  ['세븐틴 - 손오공 @엠카운트다운 240502', ['song:손오공', 'stage:엠카운트다운 240502']],
+  ['에스파 카리나 직캠 \'Supernova\' (aespa Karina Fancam) @뮤직뱅크 240524', ['song:Supernova', 'stage:뮤직뱅크']],
+  ['[안방1열 직캠4K] 소녀시대 태연 \'우주별\' (TAEYEON Fancam) @뮤직뱅크 240517', ['song:우주별', 'stage:뮤직뱅크']],
+  ['세븐틴 - 손오공 @엠카운트다운 240502', ['song:손오공', 'stage:엠카운트다운']],
   ['뉴진스 - ETA @SBS 인기가요 23716', ['song:ETA', 'stage:인기가요'], '인기가요 회차 번호(5자리)는 날짜로 읽지 않는다'],
-  ['쇼! 음악중심 240525 아이브 - 해야(HEYA)', ['song:해야(HEYA)', 'stage:음악중심 240525']],
-  ['KBS 가요대축제 231215 에스파 - Drama', ['song:Drama', 'stage:가요대축제 231215']],
-  ['MBC 가요대제전 231231 뉴진스 - ETA', ['song:ETA', 'stage:가요대제전 231231']],
+  ['쇼! 음악중심 240525 아이브 - 해야(HEYA)', ['song:해야(HEYA)', 'stage:음악중심']],
+  ['KBS 가요대축제 231215 에스파 - Drama', ['song:Drama', 'stage:가요대축제']],
+  ['MBC 가요대제전 231231 뉴진스 - ETA', ['song:ETA', 'stage:가요대제전']],
   ['2024 MAMA AWARDS 스트레이키즈 - 청(LALALALA)', ['song:청(LALALALA)', 'stage:MAMA']],
-  ['M COUNTDOWN 240411 아이들 - 클락션', ['song:클락션', 'stage:엠카운트다운 240411'], '영문 별칭도 같은 무대 이름으로'],
-  ['골든디스크 어워즈 240106 르세라핌 - Smart', ['song:Smart', 'stage:골든디스크 240106']],
-  ['더쇼 240521 스테이씨 - RUN2U', ['song:RUN2U', 'stage:더쇼 240521']],
+  ['M COUNTDOWN 240411 아이들 - 클락션', ['song:클락션', 'stage:엠카운트다운'], '영문 별칭도 같은 무대 이름으로'],
+  ['골든디스크 어워즈 240106 르세라핌 - Smart', ['song:Smart', 'stage:골든디스크']],
+  ['더쇼 240521 스테이씨 - RUN2U', ['song:RUN2U', 'stage:더쇼']],
   ['마마무 - 데칼코마니 직캠 4K', ['song:데칼코마니'], '직캠 표시가 노래 값에 섞이지 않고, 마마무가 MAMA 시상식으로 오탐되지 않는다'],
   ['지민 \'Closer Than This\' #Shorts', ['song:Closer Than This']],
   ['쇼츠) 뉴진스 \'ETA\' #Shorts', ['song:ETA']],
   ['투바투 \'가면무도회\' Dance Practice', ['song:가면무도회']],
   ['뉴진스 \'How Sweet\' Performance Video', ['song:How Sweet']],
   ['잇지 \'마.피.아. In the morning\' 직캠 4K', ['song:마.피.아. In the morning']],
-  ['콘서트 20241115 세븐틴 - 아낄없이', ['song:아낄없이', 'stage:콘서트 241115'], '8자리 날짜는 6자리로 통일한다'],
+  ['콘서트 20241115 세븐틴 - 아낄없이', ['song:아낄없이', 'stage:콘서트'], '무대 꼬리표에는 날짜를 붙이지 않는다(2차 규칙)'],
   ['세븐틴 호시 직캠 \'아낄없이\' 991299', ['song:아낄없이'], '달·날이 실제 범위가 아닌 6자리는 날짜로 읽지 않는다'],
+  // 오늘 캡처(E:\lovetree-qa\lane\local2-627c)에서 온 실제 제목 3개:
+  ['[쇼챔 MIX직캠] RESCENE(리센느) - With | Show Champion | EP.618', ['artist:RESCENE', 'stage:쇼챔피언'], '영문(한글) 꼬꼬에서 가수를 영문으로 하나만, 파이프 섞인 덩어리는 노래로 제안하지 않는다'],
+  ['[쇼챔 원픽캠 4K] RESCENE ZENA (리센느 제나) - With | Show Champion | EP.618 | 261111', ['artist:ZENA', 'artist:RESCENE', 'stage:쇼챔피언'], '무대 값에서 날짜(261111)를 뗀다'],
+  ['261114 하츠투하츠 지우 15-LOVE 직캠 4K60p MMA Hearts2Hearts fancam', ['artist:Hearts2Hearts', 'stage:멜론뮤직어워드'], '직캠·화질·무대가 섞인 덩어리에서는 노래를 제안하지 않는다(2차 규칙)'],
 ];
 
-test('제목 해석: 실제 제목 형태 27개에서 노래·무대를 제안한다(제안일 뿐, 저장은 없다)', () => {
+test('제목 해석: 실제 제목 형태 30개에서 가수·노래·무대를 제안한다(제안일 뿐, 저장은 없다)', () => {
   assert.ok(TITLES.length >= 20, '실제 형태 20개 이상');
   for (const [title, expected, why] of TITLES) {
     const got = brief(suggestTagsFromTitle(title));
     assert.deepEqual(got, expected, why ? `${title} — ${why}` : title);
+  }
+  // 무대 꼬리표에는 날짜 숫자가 섞이지 않는다(2차 규칙 — 방송 이름만 남긴다).
+  for (const [title] of TITLES) {
+    for (const p of suggestTagsFromTitle(title).proposals) {
+      if (p.kindId === 'stage') assert.ok(!/\d/.test(p.value), `무대 값에 날짜가 섞였다: ${p.value} (${title})`);
+    }
   }
   // 제안은 저장하지 않는다 — 이 모듈에는 저장·보내기 코드가 없다(파일에 persist·fetch·apply가 없다).
   const src = readFileSync(new URL('../public/v41/tags.mjs', import.meta.url), 'utf8');
@@ -131,10 +144,10 @@ test('재사용 제안: 내가 쓴 꼬리표가 먼저고, 제목 규칙이 그 
   assert.equal(withMember.proposals[0].how, 'reuse');
   // 대소문자·띄어쓰기 차이를 맞춘다.
   const reuse = suggestTagsFromTitle('뉴진스 (NewJeans) ‘SUPER  SHY’ Official MV', { knownTags: ['노래:Super Shy'] });
-  assert.deepEqual(brief(reuse), ['song:Super Shy'], '표기 차이(대소문자·공백)를 맞춰 재사용하고, 제목 규칙이 같은 값을 다시 제안하지 않는다');
+  assert.deepEqual(brief(reuse), ['song:Super Shy', 'artist:NewJeans'], '표기 차이(대소문자·공백)를 맞춰 재사용하고, 제목 규칙이 같은 값을 다시 제안하지 않는다');
   // 종류 없는 기존 꼬리표도 재사용한다(제목 규칙이 같은 값을 제안하면 재사용이 이긴다).
   const plain = suggestTagsFromTitle('소녀시대 태연 \'우주별\' @뮤직뱅크 240517', { knownTags: ['우주별'] });
-  assert.deepEqual(brief(plain), ['plain:우주별', 'stage:뮤직뱅크 240517']);
+  assert.deepEqual(brief(plain), ['plain:우주별', 'stage:뮤직뱅크'], '무대 값에서 날짜를 뗀다(2차 규칙)');
   assert.equal(plain.proposals[0].how, 'reuse');
   // 제목에 없는 꼬리표는 제안하지 않는다.
   const none = suggestTagsFromTitle('뉴진스 \'ETA\' @인기가요', { knownTags: ['멤버:카리나', '노래:Drama'] });
@@ -149,6 +162,49 @@ test('제목 해석의 한계(문서화한 대로) — 멤버 사전이 없으�
   // 활동기·감정은 제목만으로 정할 수 없다 — 제안하지 않는다(재사용 경로로만 들어온다).
   const noEra = suggestTagsFromTitle('뉴진스 \'Super Shy\' Official MV');
   assert.ok(!noEra.proposals.some((p) => p.kindId === 'era' || p.kindId === 'emotion'));
+});
+
+// ── #627 2차: 가수 종류와 제목 해석 다듬기 ─────────────────────────────────────────
+test('가수 종류: 접두어는 3자라 값 예산이 21자로 노래·멤버와 같다(24자 한도는 그대로)', () => {
+  assert.equal(makeTag('artist', 'Hearts2Hearts'), '가수:Hearts2Hearts');
+  assert.equal(parseTag('가수:RESCENE').kindId, 'artist');
+  assert.equal(parseTag('가수:RESCENE').label, '가수');
+  assert.equal(makeTag('artist', 'x'.repeat(22)), null, '3자 + 22자 = 25자는 만들지 않는다');
+});
+
+test('가수 제안: 영문+한글이 같이 나오면 영문 하나로 통일하고 한글은 버린다', () => {
+  // '영문(한글)' 꼬꼬 — 영문 하나만 제안한다(같은 그룹에 꼬리표 두 개가 생기지 않게).
+  const one = suggestTagsFromTitle('[쇼챔 MIX직캠] RESCENE(리센느) - With | Show Champion | EP.618');
+  const artists = one.proposals.filter((p) => p.kindId === 'artist');
+  assert.equal(artists.length, 1, '가수 제안은 하나다');
+  assert.equal(artists[0].value, 'RESCENE');
+  assert.ok(!one.proposals.some((p) => p.value.includes('리센느')), '한글 표기는 버린다');
+  // '한글(영문)' 꼬꼬도 영문 쪽으로 통일한다.
+  const flip = suggestTagsFromTitle('하츠투하츠(HEARTS2HEARTS) \'Dance Practice\'');
+  assert.deepEqual(flip.proposals.filter((p) => p.kindId === 'artist').map((p) => p.value), ['HEARTS2HEARTS']);
+  // 이미 쓴 가수 꼬리표는 재사용이 먼저다.
+  const known = suggestTagsFromTitle('RESCENE(리센느) 직캠', { knownTags: ['가수:rescene'] });
+  assert.equal(known.proposals[0].how, 'reuse');
+  assert.equal(known.proposals[0].kindId, 'artist');
+  // 방송국·무대 이름·회차 표시는 가수로 제안하지 않는다.
+  const noise = suggestTagsFromTitle('KBS 가요대축제 231215 에스파 - Drama');
+  assert.ok(!noise.proposals.some((p) => p.kindId === 'artist'), 'KBS는 가수가 아니다');
+  const mama = suggestTagsFromTitle('2024 MAMA AWARDS 스트레이키즈 - 청(LALALALA)');
+  assert.ok(!mama.proposals.some((p) => p.kindId === 'artist'), 'MAMA는 무대 이름이다');
+});
+
+test('노래 제안: 직캠·화질·무대가 섞인 덩어리에서는 제안하지 않는다(불확실하면 낫지 않게)', () => {
+  // 붙임표 덩어리에 직캠·화질·날짜·무대 이름이 남아 있으면 노래라고 단정할 수 없다.
+  const mixed = suggestTagsFromTitle('261114 하츠투하츠 지우 15-LOVE 직캠 4K60p MMA Hearts2Hearts fancam');
+  assert.ok(!mixed.proposals.some((p) => p.kindId === 'song'), '15-LOVE 조각을 노래로 제안하지 않는다');
+  const pipe = suggestTagsFromTitle('[쇼챔 MIX직캠] RESCENE(리센느) - With | Show Champion | EP.618');
+  assert.ok(!pipe.proposals.some((p) => p.kindId === 'song'), '파이프·무대 이름이 섞인 덩어리를 노래로 제안하지 않는다');
+  // 반면 따옴표 묶음은 노래 제목이라 믿는다.
+  const quoted = suggestTagsFromTitle('잇지 \'마.피.아. In the morning\' 직캠 4K');
+  assert.deepEqual(quoted.proposals.map((p) => p.value), ['마.피.아. In the morning']);
+  // 깨끗한 붙임표 덩어리는 여전히 노래다.
+  const clean = suggestTagsFromTitle('세븐틴 - 손오공 @엠카운트다운 240502');
+  assert.ok(clean.proposals.some((p) => p.kindId === 'song' && p.value === '손오공'));
 });
 
 
@@ -166,12 +222,12 @@ const realTreeOf = (keywordsList = []) => {
   return made;
 };
 
-test('카드 칩: 확정 꼬리표를 노래 → 멤버 → 무대 순서로 1~3개만 보인다', () => {
-  const all = ['감정:설렘', '무대:인기가요 240524', '멤버:카리나', '노래:Supernova', '활동기:2024 여름', '여행'];
+test('카드 칩: 확정 꼬리표를 가수 → 노래 → 멤버 → 무대 순서로 1~3개만 보인다', () => {
+  const all = ['감정:설렘', '무대:인기가요', '멤버:카리나', '노래:Supernova', '가수:aespa', '활동기:2024 여름', '여행'];
   const got = cardTags(all);
-  assert.deepEqual(got.map((t) => t.value), ['Supernova', '카리나', '인기가요 240524'], '노래 → 멤버 → 무대가 먼저다');
+  assert.deepEqual(got.map((t) => t.value), ['aespa', 'Supernova', '카리나'], '가수 → 노래 → 멤버가 먼저다(무대는 4번째 자리라 3개에 못 들어간다)');
   assert.equal(got.length, 3, '카드에는 3개까지만');
-  assert.deepEqual(cardTags(all, 2).map((t) => t.value), ['Supernova', '카리나'], '자리가 좁으면 더 줄인다');
+  assert.deepEqual(cardTags(all, 2).map((t) => t.value), ['aespa', 'Supernova'], '자리가 좁으면 더 줄인다');
   // 종류 없는 옛 keywords도 확정된 꼬리표다(데이터를 잃지 않는다).
   assert.deepEqual(cardTags(['무대', '여행']).map((t) => t.value), ['무대', '여행']);
   assert.equal(cardTags([]).length, 0);
