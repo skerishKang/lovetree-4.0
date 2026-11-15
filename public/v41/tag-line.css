@@ -1,0 +1,53 @@
+/* #627 PR B: 꼬리표 줄·꼬리표 칩의 한 벌 모양. 색은 identity.css의 --lt-* 토큰만 쓴다(시각 통일 기준).
+   쓰이는 자리: 책·보드·지도의 순간 상세, 셸의 쉬운 추가 직후 안내(#quick-saved·#quick-notice 아래),
+   꼬리표 정리 창, 보드·책 카드. 밤·정원 테마 모두 토큰이 바꿔 주므로 색을 여기서 따로 두지 않는다. */
+
+.lt-tagline{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:8px}
+.lt-tagline-name{font-size:12px;color:var(--lt-muted);flex:0 0 auto}
+.lt-tagline-chips{display:flex;flex-wrap:wrap;gap:5px;align-items:center;min-width:0}
+.lt-tagline-empty{font-size:12px;color:var(--lt-muted)}
+.lt-tagline-error{width:100%;margin:2px 0 0;font-size:12px;color:var(--lt-rose)}
+
+/* 칩: 확정은 진한 칩, 제안은 흐린 칩, 24자를 넘는 후보는 회색으로 알려 준다(#627). 글자는 12px 이상(#548). */
+.lt-tag-chip{display:inline-flex;align-items:center;max-width:100%;padding:3px 9px;border-radius:var(--lt-r-pill);
+  font-size:12px;line-height:1.4;font-family:inherit;text-align:left;overflow-wrap:anywhere}
+button.lt-tag-chip{cursor:pointer;border:1px solid var(--lt-gold-line);background:transparent;color:var(--lt-gold);min-height:24px;font-size:13px}
+button.lt-tag-chip:hover{border-color:var(--lt-gold-deep)}
+.lt-tag-chip.is-confirmed{background:var(--lt-gold);border:1px solid var(--lt-gold);color:var(--lt-stage)}
+.lt-tag-chip.is-toolong{border:1px dashed var(--lt-line);background:transparent;color:var(--lt-muted);cursor:default}
+
+/* 카드 위 칩(보드·책) — 종이 위 올려 쓴다. 확정된 꼬리표만 1~3개, 12px 이상(#627). */
+.lt-tag-chip.is-card{padding:1px 7px;border:1px solid var(--lt-line-paper);background:transparent;color:var(--lt-ink)}
+.book-page .chip.lt-tag-chip,.moment-title .lt-tag-chip{font-size:12px;padding:1px 7px}
+
+/* 직접 입력: 종류 고르기 + 값 + 붙이기. 상세 판 안의 좁은 자리에서도 한 줄에 눌린다. */
+.lt-tagline-input{display:flex;flex-wrap:wrap;gap:4px;align-items:center;width:100%;margin-top:2px}
+.lt-tagline-input .lt-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.lt-tagline-kind,.lt-tagline-value{min-height:26px;padding:2px 7px;border-radius:9px;border:1px solid var(--lt-line);
+  background:var(--lt-glass);color:var(--lt-pearl);font-size:13px;font-family:inherit}
+.lt-tagline-kind{flex:0 0 auto;max-width:9em}
+.lt-tagline-value{flex:1 1 90px;min-width:90px;max-width:100%}
+.lt-tagline-add{min-height:26px;padding:2px 10px;border-radius:9px;border:1px solid var(--lt-gold-line);
+  background:transparent;color:var(--lt-gold);font-size:13px;font-family:inherit;cursor:pointer}
+.lt-tagline-add:hover{border-color:var(--lt-gold-deep)}
+
+/* 셸의 쉬운 추가 직후 안내(#quick-saved) 안에서는 한 줄로 조용히 붙는다. */
+#quick-saved .lt-tagline{margin:6px 0 0;width:100%}
+#quick-saved-tags{flex:1 1 100%}
+.quick-tagline .lt-tagline{margin-top:6px}
+
+/* 꼬리표 정리 창(#627): 이 트리에서 쓴 꼬리표 목록과 개수, 이름 바꾸기·합치기. */
+.tag-manage-list{display:flex;flex-direction:column;gap:8px;margin:10px 0}
+.tag-manage-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:9px 12px;border:1px solid var(--lt-line);border-radius:var(--lt-r-card);background:var(--lt-glass)}
+.tag-manage-chip{display:inline-flex;align-items:center;padding:3px 10px;border-radius:var(--lt-r-pill);background:var(--lt-gold);color:var(--lt-stage);font-size:12px;max-width:100%;overflow-wrap:anywhere}
+.tag-manage-count{font-size:12px;color:var(--lt-muted)}
+.tag-manage-actions{display:flex;gap:6px;margin-left:auto;flex-wrap:wrap}
+.tag-manage-actions button{min-height:28px;padding:3px 10px;border-radius:9px;border:1px solid var(--lt-line);background:transparent;color:var(--lt-pearl);font-size:13px;font-family:inherit;cursor:pointer}
+.tag-manage-actions button:hover{border-color:var(--lt-gold-deep);color:var(--lt-gold)}
+.tag-manage-edit{display:flex;flex-wrap:wrap;gap:6px;align-items:center;width:100%}
+.tag-manage-edit input,.tag-manage-edit select{min-height:28px;padding:3px 8px;border-radius:9px;border:1px solid var(--lt-line);background:var(--lt-glass-strong);color:var(--lt-pearl);font-size:13px;font-family:inherit}
+.tag-manage-edit input{flex:1 1 140px;min-width:120px}
+.tag-suggest-moment{padding:9px 12px;border:1px solid var(--lt-line);border-radius:var(--lt-r-card);background:var(--lt-glass)}
+.tag-suggest-moment b{display:block;font-size:13px;margin-bottom:5px;overflow-wrap:anywhere}
+.tag-suggest-moment label{display:inline-flex;align-items:center;gap:5px;margin:2px 8px 2px 0;font-size:12px;color:var(--lt-pearl)}
+.tag-suggest-empty{font-size:12px;color:var(--lt-muted)}

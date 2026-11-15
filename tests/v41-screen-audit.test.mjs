@@ -12,7 +12,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
 import { serve, auditPage, failuresOf } from './helpers/screen-audit.mjs';
-import { createTree } from '../public/v41/domain.mjs';
+import { createTree, addMoment } from '../public/v41/domain.mjs';
 
 const REQUIRE = process.env.LT_SCREEN_AUDIT_REQUIRE === '1';
 let chromium, skip = false;
@@ -86,7 +86,12 @@ const lowerToast = async (page) => { await page.evaluate(() => { const t = docum
 // #666 2번: 첫 트리 안내와 계정 메뉴는 한 번에 하나만. 안내는 서버 기록·로그인 소유자가 첫 트리를
 // 만든 자리에서만 뜨므로(tipsWanted), 가짜 /api/workspace로 그 자리를 만든다. 트리 하나·순간 하나.
 // 기록 문서는 도메인 규칙을 통과해야 셸이 '내 기록'으로 받아 준다(손으로 만든 트리는 거절된다) — createTree로 만든다.
-const firstTree = createTree({ subject: '시험', title: '시험 트리', note: '기록', emotion: '설렘', date: '2026-11-15', url: '' }, '2026-11-15T00:00:00.000Z');
+const firstTree = createTree({ subject: '시험', title: '시험 트리', note: '기록', emotion: '설렘', date: '2026-11-15', url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' }, '2026-11-15T00:00:00.000Z');
+// #627 PR B: '꼬리표 줄이 열린 상세'·'꼬리표 정리 화면' 상태에 쓰는 모양 — 첫 순간에는 꼬리표가 있고(종류 표시와 옛 낱말 섞음),
+// 둘째 순간에는 없어 '제목에서 꼬리표 한 번에 제안받기'의 대상이 된다. 도메인 규칙을 통과하는 값만 쓴다.
+firstTree.moments[0].keywords = ['노래:Super Shy', '무대'];
+const tagSecond = addMoment(firstTree, { subject: '시험', title: '뉴진스 Super Shy 직캠 @인기가요 23716', note: '기록', emotion: '설렘', date: '2026-11-15', url: '' }, firstTree.moments[0].id, '2026-11-15T00:01:00.000Z');
+if (!tagSecond?.moments?.length && !tagSecond?.tree?.moments?.length) throw new Error('시험 트리의 둘째 순간을 만들지 못했다');
 
 const frameOf = async (page, test_) => {
   for (let i = 0; i < 80; i++) {
@@ -252,6 +257,27 @@ test('#657 화면 공통 검사기: 주요 화면 15 상태 × 390·1440 × 밤�
     assert.deepEqual({ tips: after.tips, pop: after.pop }, { tips: true, pop: false }, '메뉴를 닫으면 안내가 다시 뜬다(봤음 처리하지 않음)');
     assert.notEqual(after.seen, '1', '접었다고 봤음으로 적지 않는다');
     await take(page5, '계정 메뉴 닫힘·첫 트리 안내');
+    // #627 PR B: 꼬리표 줄이 열린 상세(보드) — 확정 칩·직접 입력이 보이는 자리에서 겹침·잘림·작은 글자를 잰다.
+    // 같은 문맥에서 보드를 새로 연다(주소에 보기까지 넣는다 — 셸은 불러올 때의 주소로 보기를 정한다).
+    const page6 = await ctx5.newPage();
+    await page6.goto(`${base}/v41/?account=1#board`, { waitUntil: 'load' });
+    await frameOf(page6, /views\/track/);
+    await page6.waitForTimeout(1500);
+    const tagBoard = await frameOf(page6, /track58-pinboard/);
+    assert.ok(tagBoard, '보드 프레임이 열린다(꼬리표 줄 상태)');
+    await tagBoard.waitForFunction(() => !!document.getElementById('dTags') && document.getElementById('dTags').childNodes.length > 0, null, { timeout: 10000 }).catch(() => {});
+    await tagBoard.evaluate(() => selectMoment(LTDEMO.moments[0].id));
+    await page6.waitForTimeout(600);
+    await take(page6, '꼬리표 줄이 열린 상세');
+    // #627 PR B: 꼬리표 정리 화면 — 목록·개수와 '제목에서 꼬리표 한 번에 제안받기'가 그려진 자리를 잰다.
+    await page6.evaluate(() => document.getElementById('record-menu')?.click());
+    await page6.waitForTimeout(400);
+    await page6.evaluate(() => document.querySelector('[data-tree-action="tags"]')?.click());
+    await page6.waitForFunction(() => !!document.getElementById('tag-panel')?.open, null, { timeout: 8000 });
+    await page6.waitForTimeout(300);
+    await page6.evaluate(() => document.getElementById('tag-suggest-open')?.click());
+    await page6.waitForTimeout(400);
+    await take(page6, '꼬리표 정리 화면');
     await ctx5.close();
 
     await context.close();

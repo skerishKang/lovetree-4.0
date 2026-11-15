@@ -4,6 +4,19 @@
 
 > **빨간 필수 검사 규칭(2026-11-12 사고 뒤)**: 필수 검사가 빨강이면 **재실행은 1회까지**. 같은 항목이 또 빨강이면 멈추고 원인을 찾는다 — 재실행·빈 커밋으로 초록을 만들지 않는다. "간헐적·환경 탓"이라고 적으려면 **같은 시각 이 변경이 없는 브랜치(main 또는 다른 PR)** 에서도 같은 실패가 나는지 대조한 결과를 함께 적는다. 메시지를 받아 화면을 다시 띄우는 코드는 '뜰 때마다 보내는 쪽'과 짝으로 흐름 시험을 하고, 머지 전 미리보기 첫 화면을 5초 이상 직접 본다.
 
+## 2026-11-15 — 꼬리표를 화면에 붙이기: 상세·담은 직후 안내·카드·꼬리표 정리 (#627 1단계 PR B, 로컬2 레인, ai/local2-627b-tags, main 1c2935d 기준, PR #680)
+
+- **규칙 한 벌이 둘로 갈라졌다**: 계산만 하는 `public/v41/tag-model.mjs`(카드 칩 순서·꼬리표 줄 칩 구성·누르기·직접 입력·목록·이름 바꾸기·합치기·제안)와 그리기만 하는 `public/v41/tag-line.mjs`(상세 세 곳은 화면 파일을 건드리지 않고 상세 제목 MutationObserver로 붙는다). 저장은 `shell/tag-save.mjs` 한 곳이 **기존 boardSync 경로로 keywords만** 바꾼다(새 저장 경로·서버 변경 없음). tags.mjs 저장 형식은 건드리지 않았다.
+- **화면→셸 저장 길**: 화면(iframe)이 `lt41-tags` 메시지(shell/messages.mjs)로 확인한 keywords 전체를 보내면 셸이 tag-save로 저장하고 `lt41-tags-saved` 답을 보낸 화면에만 돌려준다. boardSync는 iframe을 다시 그리지 않는 길이라 상세를 연 채로 칩이 바뀌고, 보드 카드 사본은 `lt41-tags-changed` 이벤트로만 keywords를 맞춘다.
+- **읽어 보는 화면(공유·예시)에는 확정 꼬리표만** 보인다(제안·직접 입력은 소유자만). 예시 트리는 keywords가 아예 없어 '아직 꼬리표가 없어요' 흐린 글자만 보인다(원본 모양 보존).
+- **카드 칩**: 보드 카드는 board-detail.js의 cardHTML, 책 페이지는 book.js momentContent — 둘 다 `window.LTTagLine.cardTags`(모듈이 늦게 도착하므로 `lt41-tagline-ready` 이벤트로 한 번 다시 그린다). 노래 → 멤버 → 무대 순서 1~3개, 12px 이상.
+- **꼬리표 정리 창**: `shell/tag-manager.mjs` + index.html `#tag-panel`(cleanup-panel 옆). 입구는 트리 ▾ 메뉴의 기존 '정리' 옆 한 곳. 표기 차이(대소문자·따옴표·마침표)는 tagKey로 묶어 하나로 세고, 이름 바꾸기·합치기는 묶음의 모든 표기를 함께 바꾼다. '제목에서 꼬리표 한 번에 제안받기'는 체크로 확인한 것만 저장한다.
+- **시험(기존 파일에만 더함)**: `tests/v41-tags-627.test.mjs`에 함수 시험 10건(제안→확정해야 저장·해제·직접 입력·tooLong 거절·이름 바꾸기·합치기·옛 keywords 보존·서버 규칙 통과) — 소스 글자 시험은 만들지 않았다. `tests/v41-screen-audit.test.mjs`에 '꼬리표 줄이 열린 상세'·'꼬리표 정리 화면' 상태 2개(가짜 /api/workspace 트리에 keywords를 넣고 둘째 순간은 비워 제안받기까지 잰다) — 16 상태 × 390·1440 × 밤·정원 통과, 새 실패 0. 단추 글자는 검사기 규칙(단추 13px 이상)을 따라 칩·입력 칸 단추를 13px로, 카드 칩(span)은 12px로 두었다.
+- **시험 결과**: `npm test` 1766검 pass 0 fail(건너뜀 139), `node --test tests/v41-screen-audit.test.mjs`(Chromium 실측) 통과, `npx vite build`·modulepreload 목록 갱신 통과.
+- **주의**: 셸 문서에서 `tag-manager.mjs` 안에 함수 `tree()`와 같은 이름 지역 변수를 함께 쓰면 TDZ 오류('Cannot access tree before initialization')가 난다 — 지역 변수는 `current`로 썼다. tag-line.mjs는 Node 시험에서도 불리므로 `window` 노출·자동 붙이기는 `typeof window !== 'undefined'`로 감쌌다.
+- **updates.json**: '다음 버전'(4.1.4)에 쉬운 말 한 줄 넣었다(source: team, #627).
+- **건드리지 않은 것**: tags.mjs 저장 형식, 책 '✎ 고치기' 경로(#676), 새 소식·지도 조작 줄, 서버·DB, 다른 레인 파일.
+
 ## 2026-11-15 — 운영 숫자에서 레인 시험 계정을 갈라 센다 (#671, 로컬1 레인, ai/lt-tester-stats-261115, PR #673 → main 25aa365)
 
 - **왜**: 운영센터 '한눈에'의 '실제 사용자 7'에 레인 시험 계정(01~05)이 섞여 있었다. 이제 숫자를 **실제 사용자 / AI 테스터 / 시험 계정** 세 갈래로 센다. 셋은 겹치지 않고 **전체 = 셋의 합**이다.

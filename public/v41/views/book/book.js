@@ -48,7 +48,12 @@ function momentContent(m,compact=false){const mark=m.first?'<span class="first-m
  else if(m.kind==='text')v=`<div class="letter moment" data-moment="${m.id}"><h2>${esc(titleMainOf(m))}</h2><p>${esc(m.note)}<br><br>한 페이지를 넘길 때마다 이유가 하나씩 선명해졌다.</p><div class="sign">— 그날의 나</div></div>`;
  else v=`<div class="archive-piece moment" data-moment="${m.id}"><h2>${esc(titleMainOf(m))}</h2><p>${esc(m.note)}</p><div class="archive-stat"><div><b>07</b><span>순간</span></div><div><b>06</b><span>CONNECTIONS</span></div><div><b>03</b><span>EMOTIONS</span></div><div><b>01</b><span>갈림길</span></div></div></div>`;
  if(m.synthetic)return v;
- const info=`<div class="moment-title">${!m.url&&["photo","video","collage"].includes(m.kind)?`<h3>${esc(titleMainOf(m))}</h3>`:""}<p>${esc(dateOf(m.date))} · ${esc(m.emotion)} · ${esc(m.source)}</p><div class="chips">${m.keywords.map(k=>`<span class="chip">#${esc(k)}</span>`).join('')}</div></div>`;return v+info}
+ // #627: 카드(책 페이지)에 확정된 꼬리표를 1~3개만 작게 보인다(노래 → 멤버 → 무대 순서, LTTagLine 한 벌).
+ // 꼬리표가 없으면 원본 모양(감정 칩)을 그대로 둔다. 모듈이 늦으면 lt41-tagline-ready에서 한 번 다시 그린다.
+ const _ltSrc=window.LTDEMO?window.LTDEMO.moments.find(x=>x.id===m.id):null;
+ const _ltTags=(window.LTTagLine&&_ltSrc)?window.LTTagLine.cardTags(_ltSrc.keywords):null;
+ const _chips=_ltTags&&_ltTags.length?_ltTags.map(k=>`<span class="chip lt-tag-chip">${esc(k.value)}</span>`).join(''):m.keywords.map(k=>`<span class="chip">#${esc(k)}</span>`).join('');
+ const info=`<div class="moment-title">${!m.url&&["photo","video","collage"].includes(m.kind)?`<h3>${esc(titleMainOf(m))}</h3>`:""}<p>${esc(dateOf(m.date))} · ${esc(m.emotion)} · ${esc(m.source)}</p><div class="chips">${_chips}</div></div>`;return v+info}
 function pageFace(m,side){return `<div class="page-content">${momentContent(m)}</div><div class="folio" style="${side==='left'?'left:23px':'right:23px'}">${LT59Model.folioLabel(m.spread,side)}</div>`}
 // #295: 순간 내용이 페이지보다 길면 그 페이지만 안에서 스크롤해 끝까지 읽게 한다(여유 4px = book-usability.mjs pageOverflows).
 // 짧은 순간은 넘침이 없어 클래스가 붙지 않고 화면이 그대로다. 모바일은 현재 쪽이 넘칠 때만 book-wrap이 세로 터치 스크롤을 허용해
@@ -196,4 +201,6 @@ applyViewAttr();
 $('#singleViewBtn').onclick=()=>setViewChoice('single');
 $('#doubleViewBtn').onclick=()=>setViewChoice('double');
 renderSpread(posOfMoment(LTDEMO.get()),LTDEMO.get(),true);setTimeout(syncLensClone,120);
+// #627: 꼬리표 칩 규칙(tag-line.mjs)이 클래식 스크립트 뒤에 도착한다 — 페이지를 한 번 다시 그려 칩을 붙인다.
+addEventListener('lt41-tagline-ready',()=>{if(machineState==='IDLE'&&!document.fullscreenElement)renderSpread(current,null,false)});
 window.__TRACK59__={getState:()=>({current,machineState,lensOn,recent:[...recent],detail:$('#detail').classList.contains('open'),viewer:$('#viewer').classList.contains('open'),archive:$('#archivePanel').classList.contains('open'),branch:$('#branchModal').classList.contains('open'),page:current,total:pageCount(),pageIds:pageSteps().map(x=>x.id),shape:narrow()?'phone':'wide',mobile:single(),view:single()?'single':'double'}),turnNext:()=>autoTurn('next'),turnPrev:()=>autoTurn('prev'),jump:(i,id)=>renderSpread(i,id,false),jumpToMoment:id=>renderSpread(posOfMoment(id),id,false),pageSteps,pageCount,posOfMoment,momentAtPos,currentSpread,spreadOfPos,setView:setViewChoice,showDetail,openArchive,openBranch,meta:metadataFor,openAddLink:openLinkModal,normalizeHttpUrl,youtubeId,customConnections:()=>[...customConnections],rejudgeOverflow:()=>markOverflowPages()};
