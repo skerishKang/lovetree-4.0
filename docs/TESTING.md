@@ -65,6 +65,14 @@
 - 현재 `npm test` 합계: **874건 / 837 pass / 0 fail / 37 skip**(자동 제목·영상 제목 시험 6건(#344) 추가, 2026-11-10). 글자 검사 분류 수치는 위 1~3절(2026-11-09 7차 기준)에서 그대로 유지된다(책등 목차 7건은 함수 호출 5건 + 연결·규격 글자 검사 2건).
 - **빠른 추가(#327 ②, 2026-11-09)**: 판정·추출·분기·문구는 `tests/v41-quick-add.test.mjs` 8건(함수 직접 호출 + 정원 대비 CSS 값 1건), 연결은 `tests/v41-quick-add-flow.test.mjs` 12건(`createQuickAdd`를 가짜 DOM으로 직접 호출). '순간 남기기' 연결이 panels.mjs → shell.mjs(shell/quick-add.mjs)로 옮겨진 것도 두 기존 시험을 새 계약으로 갱신해 고정했다(#245 전례 — 연결 누락 방지).
 
+## 소스 글자 검사 줄이기 1차 — 셸 메뉴·운영센터·서버 범위 (2026-11-15)
+
+범위(운영센터 admin* · 서버 server/** · 셸 메뉴 header-ia 등)의 소스 글자 검사 단정을 세 갈래로 나눠 정리했다. **소스 글자 검사 단정 120 → 97건(-23)**:
+- **지움 12** — 같은 내용을 이미 동작 시험이 지킨다: hashchange 배선(`v41-shell-location`의 createLocation 표), `openLoginStart` 배선(`v41-shell-auth`의 직접 호출). 중복 제거 10: 접기 메뉴 항목·순서는 `v41-topmenu` 순서 검사 한 벌로, 트리 클릭 배선 조각도 같은 줄 검사 한 벌로.
+- **바꿈 11** — 화면 목록·말풍선 제목은 `navigation.mjs` screens·`header-state.mjs` FIRST_TREE_TIPS **데이터 직접 확인**; aria-current 표시·빈 화면 해제(`v41-shell-screens`), 직전 동그라미 글자 저장소 계약(`v41-shell-header` store)은 **함수 직접 호출 시험**. 강도 증명: screens.mjs aria-current 줄과 header.mjs rememberLetter 저장을 일부러 깨서 실패 확인하고 되돌림.
+- **남김 97** — 마크업·CSS 값·문구·schema 계약과 **페이지 스크립트(shell.mjs·src/admin.js) 배선**: 내보내기가 없어 함수 시험으로 바꾸려면 제품 코드 변경이 필요하다(docs/TESTING.md 기준 §6).
+- **2차 후보**: `v41-shell-tree-title`의 messages·panels·community 호출점 검사(createMessages·createPanels·mountCommunity가 내보내기는 있으나 하네스가 무거움), `v41-cto-453-cde` 전체(셸 배선 글자 검사), `v41-shell-notice` 배선.
+
 ## 새 시험을 쓸 때
 
 1. 확인하려는 것이 **동작**(분기·호출·응답·포커스 이동)이면 → 그 함수를 `import`해 직접 부르고 인자·반환·부수효과를 본다.

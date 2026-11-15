@@ -8,7 +8,6 @@ const read = (p) => readFileSync(new URL('../' + p, import.meta.url), 'utf8');
 const shell = read('public/v41/shell.mjs');
 const html = read('public/v41/index.html');
 const css = read('public/v41/shell.css');
-const screens = read('public/v41/shell/screens.mjs');
 const community = read('public/v41/community-panel.mjs');
 const notice = read('public/v41/shell/notice.mjs');
 const upload = read('public/v41/private-upload.mjs');
@@ -44,7 +43,8 @@ test('B-2: 사진·영상은 디자인 단추 + 고른 파일 이름으로 고�
 });
 
 test('D1: 빈 화면에서는 어느 탭도 "지금 보는 곳"이 아니다', () => {
-  assert.match(screens, /document\.querySelectorAll\('\[data-view\]'\)\.forEach\(b => b\.setAttribute\('aria-current', 'false'\)\);/);
+  // screens.mjs가 빈 화면에서 aria-current를 전부 지우는 동작은 tests/v41-shell-screens.test.mjs가
+  // createScreens로 직접 부러 본다. 여기서는 되살리지 않는 문구(community 배선)만 고정한다.
   assert.match(community, /const emptyShown=!document\.getElementById\('empty'\)\?\.hidden;/, '빈 화면이면 닫을 때 되살리지 않는다');
   assert.match(community, /if\(!emptyShown\)t\.setAttribute\('aria-current','true'\)/);
 });
