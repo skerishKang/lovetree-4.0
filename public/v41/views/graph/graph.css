@@ -100,3 +100,9 @@ html[data-lt-theme="garden"] .d-list button:hover{background:rgba(64,53,54,.07)}
   .g-brand b{font-size:17px}
   .g-badge{display:none}
 }
+
+/* 좁은 무대(#714 후속): 스테이지가 세로로 길어지면(2열 격자 + 이름 두 줄) 프레임이 내용을 담고 페이지가 스크롤된다. */
+@media (max-width: 599px) {
+  .g-frame { flex: 0 0 auto; }
+  .g-stagewrap { flex: none; } /* 인라인 높이(격자+이름 두 줄)를 그대로 쓰게 — flex-basis 0%가 높이를 무너뜨린다 */
+}
