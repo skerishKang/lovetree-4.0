@@ -244,7 +244,8 @@ test('둘러보기 소개 백필: 나오던 트리만 켜짐으로 채우고 재
        VALUES($1,$2,$3,$4,$5,'book',$6,$7)`,
       [productId, sid(p), subjectId, treeId, treeId + '-m0', origin, momentCount]
     );
-    // 나오던 트리: auto 3개 / 옛 스위치 행 3개 / 2개 / 켜지 않은 3개 / 비공개 3개.
+    // 옛 규칙에서 나오던 트리: auto 3개 / 옛 스위치 행 3개 / auto 3개(공개) — 셋 다 켜짐으로 채운다.
+    // 나오지 않던 트리: 2개(tree-c)·비공개(tree-e) — 채우지 않는다. (옛 규칙에는 트리별 '꺼짐'이 없었다.)
     await share('sa', 'own-a', 'tree-a', 3);
     await share('sb', 'own-b', 'tree-b', 3, 'owner');
     await pool.query(`UPDATE lovetree_shares SET discoverable=true WHERE product_id=$1 AND share_id=$2`, [productId, sid('sb')]);
@@ -258,11 +259,11 @@ test('둘러보기 소개 백필: 나오던 트리만 켜짐으로 채우고 재
 
     await pool.query(await readFile(pending, 'utf8'));
     let filled = await discoverRows();
-    assert.deepEqual([...filled.keys()].sort(), ['own-a/tree-a', 'own-b/tree-b'], '나오던 트리만 켜짐으로 채운다(2개·꺼짐·비공개는 그대로)');
+    assert.deepEqual([...filled.keys()].sort(), ['own-a/tree-a', 'own-b/tree-b', 'own-d/tree-d'], '나오던 트리만 켜짐으로 채운다(2개·비공개는 그대로)');
     // 재실행 안전: 다시 돌려도 같은 상태(중복 행 없음).
     await pool.query(await readFile(pending, 'utf8'));
     filled = await discoverRows();
-    assert.deepEqual([...filled.keys()].sort(), ['own-a/tree-a', 'own-b/tree-b'], '재실행해도 같은 상태다');
+    assert.deepEqual([...filled.keys()].sort(), ['own-a/tree-a', 'own-b/tree-b', 'own-d/tree-d'], '재실행해도 같은 상태다');
   } finally {
     await pool.end();
   }
