@@ -117,9 +117,9 @@ test('상태를 고침으로 바꾸면 연결 이슈 번호가 내 글에 보인
 
 test('페르소나 소개는 관리자가 쓰고 고친다', async () => {
   const {call} = setup();
-  const saved = await call('PUT', `/api/admin/persona/${AI}`, {account: ADMIN, body: {name: '윤제', intro: {who: '팬', why: '기록', how: '매일', habits: '매일 쓰는 곳: 유튜브·네이버 카페', satisfied: '좋음', disappointed: '없음', now: '쓰는 중'}}});
+  const saved = await call('PUT', `/api/admin/persona/${AI}`, {account: ADMIN, body: {name: '시험 사용자', intro: {who: '팬', why: '기록', how: '매일', habits: '매일 쓰는 곳: 유튜브·네이버 카페', satisfied: '좋음', disappointed: '없음', now: '쓰는 중'}}});
   assert.equal(saved.status, 200);
-  assert.equal(saved.body.persona.name, '윤제');
+  assert.equal(saved.body.persona.name, '시험 사용자');
   const got = await call('GET', `/api/admin/persona/${AI}`, {account: ADMIN});
   assert.equal(got.body.persona.intro.who, '팬');
   // #590: intro 는 jsonb 통과 — 서버가 키를 거르지 않아 새 칸(habits)도 저장·불러오기 된다.
@@ -185,17 +185,17 @@ test('#611 4번: 남의 글·일지에는 덧붙일 수 없고, 빈 말은 400',
 
 test('#611 3번: 운영센터 글쓴이 이름 앞에 AI를 단다', async () => {
   const {call} = setup();
-  await call('PUT', `/api/admin/persona/${AI}`, {account: ADMIN, body: {name: '윤제', intro: {}}});
+  await call('PUT', `/api/admin/persona/${AI}`, {account: ADMIN, body: {name: '시험 사용자', intro: {}}});
   await call('POST', '/api/feedback', {account: AI, body: {category: 'bug', body: 'AI 의견'}});
   await call('POST', '/api/feedback', {account: USER, body: {category: 'bug', body: '사용자 의견'}});
   const list = await call('GET', '/api/admin/feedback', {account: ADMIN});
-  assert.equal(list.body.feedback.find(r => r.authorName === '윤제')?.authorRole, 'ai_customer');
-  assert.equal(list.body.feedback.find(r => r.authorName !== '윤제')?.authorRole, null);
+  assert.equal(list.body.feedback.find(r => r.authorName === '시험 사용자')?.authorRole, 'ai_customer');
+  assert.equal(list.body.feedback.find(r => r.authorName !== '시험 사용자')?.authorRole, null);
 });
 
 test('관리자 일지 탭 읽기 API(#596): 일지만 날짜 내림차순, 관리자만', async () => {
   const {call} = setup();
-  await call('PUT', `/api/admin/persona/${AI}`, {account: ADMIN, body: {name: '윤제', intro: {}}});
+  await call('PUT', `/api/admin/persona/${AI}`, {account: ADMIN, body: {name: '시험 사용자', intro: {}}});
   await call('POST', '/api/board', {account: AI, body: {title: '오늘 일지', body: '내용', score: 3}});
   await call('POST', '/api/feedback', {account: USER, body: {category: 'bug', body: '의견입니다'}});
   const denied = await call('GET', '/api/admin/journals', {account: USER});
@@ -206,6 +206,6 @@ test('관리자 일지 탭 읽기 API(#596): 일지만 날짜 내림차순, 관�
   assert.equal(got.status, 200);
   assert.equal(got.body.journals.length, 1);
   assert.equal(got.body.journals[0].kind, 'journal');
-  assert.equal(got.body.journals[0].authorName, '윤제');
+  assert.equal(got.body.journals[0].authorName, '시험 사용자');
   assert.equal(got.body.journals[0].displayTitle, '오늘 일지');
 });

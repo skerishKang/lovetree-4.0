@@ -48,7 +48,7 @@ const WORKSPACE = {
     version: 1,
     prefs: {},
     trees: [{
-      id: 'tree1', subject: '윤제', title: '모아둔 순간', coverMomentId: '', inbox: false,
+      id: 'tree1', subject: '시험 사용자', title: '모아둔 순간', coverMomentId: '', inbox: false,
       createdAt: '2026-11-15T00:00:00.000Z', updatedAt: '2026-11-15T00:00:00.000Z',
       moments: [{
         id: 'm1', parentId: null, links: [], createdAt: '2026-11-15T00:00:00.000Z',
@@ -68,7 +68,7 @@ const WORKSPACE_TWO_TREES_26_MOMENTS = {
     prefs: {},
     trees: [
       {
-        id: 'tree1', subject: '윤제', title: '모아둔 순간', coverMomentId: '', inbox: false,
+        id: 'tree1', subject: '시험 사용자', title: '모아둔 순간', coverMomentId: '', inbox: false,
         createdAt: '2026-11-01T00:00:00.000Z', updatedAt: '2026-11-15T00:00:00.000Z',
         moments: Array.from({ length: 13 }, (_, i) => ({
           id: `m${i + 1}`, parentId: null, links: [], createdAt: `2026-11-${(i % 28) + 1 < 10 ? '0' + (i % 28) + 1 : i % 28 + 1}T00:00:00.000Z`,
@@ -76,7 +76,7 @@ const WORKSPACE_TWO_TREES_26_MOMENTS = {
         })),
       },
       {
-        id: 'tree2', subject: '윤제', title: '리센느', coverMomentId: '', inbox: false,
+        id: 'tree2', subject: '시험 사용자', title: '리센느', coverMomentId: '', inbox: false,
         createdAt: '2026-11-01T00:00:00.000Z', updatedAt: '2026-11-15T00:00:00.000Z',
         moments: Array.from({ length: 13 }, (_, i) => ({
           id: `m${i + 14}`, parentId: null, links: [], createdAt: `2026-11-${(i % 28) + 1 < 10 ? '0' + (i % 28) + 1 : i % 28 + 1}T00:00:00.000Z`,

@@ -114,7 +114,7 @@ export function createFeedbackDialog({$, notify, getContext, show, openMyPosts, 
     // #631: 보낸 뒤에는 제목을 바꾸고 보내기 전 안내('함께 보낼 정보를 고를 수 있어요')를 감춘다.
     if (title) title.textContent = TITLE_DONE;
     if (note) note.hidden = true;
-    // #678 후속(윤제 4회차): 운영센터와 같은 의견 번호를 보낸 직후에도 작게 알린다 — 고객이
+    // #678 후속(회차 지적): 운영센터와 같은 의견 번호를 보낸 직후에도 작게 알린다 — 고객이
     // '제가 보낸 #18번'처럼 말할 수 있게. 번호가 없는 응답(오래된 화면)이면 줄을 감춘다.
     if (doneNo) {
       const feedbackId = Number(result.id);

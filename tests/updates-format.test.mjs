@@ -35,7 +35,7 @@ test('611: 첫 버전(4.1.3)은 새로워진 것·고친 것을 쉬운 말 한 �
   const fixed = entry.items.filter(i => i.kind === 'fix');
   assert.ok(fresh.length >= 8, `새로워진 것 줄이 넉넉히 있다(${fresh.length})`);
   assert.ok(fixed.length >= 8, `고친 것 줄이 넉넉히 있다(${fixed.length})`);
-  // #625: 390 카드 위치 수정 한 줄은 팀 출처(source: team)다 — 나머지 고친 것은 AI 명예회원 윤제.
+  // #625: 390 카드 위치 수정 한 줄은 팀 출처(source: team)다 — 나머지 고친 것은 AI 명예회원 출처(#678 회차 지적).
   assert.ok(fixed.every(i => (i.source === 'ai_tester' && i.tester === '윤제') || i.source === 'team'), '고친 것은 AI 명예회원 윤제 또는 팀 출처다');
   const joined = entry.items.map(i => i.text).join(' ');
   assert.match(joined, /핀보드/, '핀보드');
