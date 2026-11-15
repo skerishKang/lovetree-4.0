@@ -2,7 +2,7 @@
 // 셸이 iframe을 불러온 뒤 이름·키보드·포커스만 보완한다.
 export const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]):not([type="hidden"]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
 export const DIALOGS = Object.freeze([
-  ['#archivePanel', 'open'], ['#detail', 'open'], ['#viewer', 'open'], ['#linkModal', 'open'],
+  ['#archivePanel', 'open'], ['#detail', 'open'], ['#viewer', 'open'],
   ['#branchModal', 'open'], ['#overview', 'open'], ['#newBookModal', 'hidden'],
   ['#viewerModal', 'open'], ['#addModal', 'open'], ['#editModal', 'open'], ['#whyModal', 'open'],
   ['#nextChooser', 'open'], ['#postAdd', 'show'], ['#branchChooser', 'open']

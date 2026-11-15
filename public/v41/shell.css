@@ -488,7 +488,7 @@ html[data-lt-theme="garden"] #account-advanced[aria-checked="true"]:after{backgr
  body.lt-fab-ok #mobile-add{display:flex}
  body.lt-fab-ok:has(dialog[open]) #mobile-add{display:none}
  body.lt-fab-ok.lt-kbd #mobile-add{display:none}
- /* 화면 안의 큰 창(지도 상세 #detail·책 링크 창 #linkModal)이 열려 있으면 화면 아래를 통째로 덮으므로 단추도 숨긴다. */
+ /* 화면 안의 큰 창(지도 상세 #detail·책 순간 자세 #detail)이 열려 있으면 화면 아래를 통째로 덮으므로 단추도 숨긴다. */
  body.lt-fab-ok.lt-sheet-open #mobile-add{display:none}
  /* 화면마다 아래쪽에 이미 있는 단추·탭 위로 올린다(390·360 실측값 — 겹침 0 근거는 이슈 458 보고).
     책: 갈라치기 탭(아래 99px) 위, 보드: 시네마 보기(아래 68px) 위, 지도: 이동 리본(이슈 638로 올라감, 아래 160px) 위, 책장: 넘김 화살표(아래 28px) 위. */
