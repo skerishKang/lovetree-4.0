@@ -38,8 +38,8 @@ export function renderTagLine({ host, doc = document, moment, knownTags = [], wr
       + (chips.length ? `<span class="lt-tagline-chips">${chips.map(chipHTML).join('')}</span>`
         : `<span class="lt-tagline-empty">${esc(emptyText)}</span>`)
       + (writable ? `<div class="lt-tagline-input" role="group" aria-label="꼬리표 직접 입력">`
-          + `<label class="lt-sr">종류<select class="lt-tagline-kind" aria-label="꼬리표 종류">${kinds}</select></label>`
-          + `<label class="lt-sr">값<input class="lt-tagline-value" maxlength="24" autocomplete="off" placeholder="꼬리표 값" aria-label="꼬리표 값"></label>`
+          + `<label class="lt-tagline-label">종류<select class="lt-tagline-kind" aria-label="꼬리표 종류">${kinds}</select></label>`
+          + `<label class="lt-tagline-label">값<input class="lt-tagline-value" maxlength="24" autocomplete="off" placeholder="꼬리표 값" aria-label="꼬리표 값"></label>`
           + `<button type="button" class="lt-tagline-add">붙이기</button></div>`
         : '')
       + `<p class="lt-tagline-error" role="alert" hidden></p>`

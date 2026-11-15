@@ -22,7 +22,7 @@ button.lt-tag-chip:hover{border-color:var(--lt-gold-deep)}
 
 /* 직접 입력: 종류 고르기 + 값 + 붙이기. 상세 판 안의 좁은 자리에서도 한 줄에 눌린다. */
 .lt-tagline-input{display:flex;flex-wrap:wrap;gap:4px;align-items:center;width:100%;margin-top:2px}
-.lt-tagline-input .lt-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.lt-tagline-label{display:inline-flex;align-items:center;gap:3px;font-size:13px;color:var(--lt-muted)}
 .lt-tagline-kind,.lt-tagline-value{min-height:26px;padding:2px 7px;border-radius:9px;border:1px solid var(--lt-line);
   background:var(--lt-glass);color:var(--lt-pearl);font-size:13px;font-family:inherit}
 .lt-tagline-kind{flex:0 0 auto;max-width:9em}
