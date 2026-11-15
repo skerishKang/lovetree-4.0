@@ -137,7 +137,7 @@ test('제목 해석: 실제 제목 형태 31개에서 가수·멤버·노래·�
   assert.doesNotMatch(src, /apply\(|persist|postMessage|fetch\(|localStorage|sessionStorage/, '제안 모듈은 저장을 부르지 않는다');
 });
 
-test('직캠 문맥의 괄호 크레딧(채널 이름)은 가수로 제안하지 않는다(보람 알림)', () => {
+test('직캠 문맥의 괄호 크레딧(채널 이름)은 가수로 제안하지 않는다(AI 명예회원 알림)', () => {
   // 실제 사례: 괄호는 찍은 곳(채널) 크레딧이다 — 바로 앞 한국어가 '직캠'으로 끝나면 괄호 안 영문을 가수로 읽지 않는다.
   const { proposals } = suggestTagsFromTitle("[K-Choreo 8K] 라이즈 직캠 'Bag Bad Back' (RIIZE Choreography) @250523");
   assert.ok(!proposals.some((p) => p.kindId === 'artist'), '채널 이름을 가수로 권하지 않는다: ' + brief({ proposals }));
@@ -344,7 +344,7 @@ test('직접 입력: 종류를 고르고 값을 적어 붙인다 — 24자를 �
   assert.deepEqual(toggledKeywords(kws, inputTag('song', 'x'.repeat(22)).raw ?? ''), kws);
 });
 
-test('24자를 넘어 붙일 수 없는 후보는 제안에 보이지 않는다(윤제 4회차)', () => {
+test('24자를 넘어 붙일 수 없는 후보는 제안에 보이지 않는다(#678 회차 지적)', () => {
   // 전: 너무 긴 후보도 회색 칩('24자를 넘어요')으로 보였다 → 후: 제안 목록에서 아예 보이지 않는다.
   // tags.mjs suggestTagsFromTitle의 tooLong 표시는 그대로다(데이터를 조용히 버리지 않는 계약).
   const line = tagLineChips({
