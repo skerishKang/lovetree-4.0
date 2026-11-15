@@ -6,6 +6,13 @@
 
 > **시험 멈춤 규칙(2026-11-15)**: 브라우저 코드에 setInterval 반복을 넣으면 unref하거나 정리한다 — 안 그러면 npm test가 끝나지 않고 CI가 멈춘다.
 
+## 2026-11-16 — 둘러보기 카드 작은 글자 12px 이상·검사기 KNOWN 4→3건 (#705 후속, 컴1로컬4 레인, ai/local4-community-261116, main 18f0ce1 기준)
+
+- **고친 글자(shell.css 커뮤니티 블록)**: 감정 칩 .community-tag 10→12px · AI 명예회원 배지 .community-ai 11→12px · 대상 줄 .community-subject 11→13px · 요약 .community-summary 12→13px(본문급) · 메타 줄 .community-muted 11→12px · '댓글·신고·차단' 펼침 11→12px · 반응 칩 단추 .community-reaction 12→13px(단추 13px 규칙). 즐겨찾기·반응 단추 누름 영역 44px(#705) 유지 — 실측 h44.
+- **KNOWN**: tests/v41-screen-audit.test.mjs에서 둘러보기 작은글자 1줄(span.community-tag|p.community-subject|p.community-muted|summary '댓글') 삭제 — **4→3건**. 빨강 근거: before 캡처 감사 줄(390 2건·1440 6건 — 10·11px), after 0건(#657은 CI가 다시 지킨다).
+- **빈 검색 결과(보람 'RIIZE')**: .community-empty 안내 13px·'첫 트리 만들기' 단추 16px·h44 — 이미 기준 통과(확인만, 수정 없음).
+- **시험·측정**: build·modulepreload --check·전체 npm test 1842검 1702 pass·0 fail·140 skip(30.8초, 끝까지 도는 것 확인). 카드 높이 390 372→379px·1440 278→285px(+7px), 가로 넘침 0. 캡처 `E:\lovetree-qa\lane\local4-community\{before,after}\`(community-{390,1440}-{night,garden}(-empty).png + summary.json).
+
 ## 2026-11-15 — 보드 390 두 줄 도구 줄: 카드 비침 수리·'진주빛 보드' 온전히 보이게·[종이|밤]에 '판' 이름표 (컴1로컬5 레인, ai/local5-board-toolbar-390-261115, main 909ef40 기준, 보람 2회차 지적)
 
 - **원인(실측)**: ≤580px 머리줄은 두 줄로 감기는데(flex-wrap, #601) `.boardFrame` 시작을 고정 100px로 두었다. ＋ 순간 추가가 둘째 줄까지 내려오는 로그인 화면에서 머리줄 아래끝은 107px — 카드가 7px 도구 줄 밑으로 들어가고, 머리줄 바탕이 알파 0.9→0.38 그라데이션(밤)이라 카드 꼬리표·제목이 비쳤다. '진주빛 보드' 표시는 둘째 줄 맨 오른쪽(오른쪽 끝 8px 남음)에 비침과 겹쳐 잘려 보였다.
