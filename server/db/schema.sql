@@ -299,6 +299,8 @@ CREATE INDEX IF NOT EXISTS lovetree_feedback_journal_idx
   ON lovetree_feedback (product_id, subject_id, journal_date);
 
 -- 게시판 답글. 고객에게 보이는 답변(customer)과 내부 메모(internal).
+-- status·edited_at: 고객이 자기 덧붙임을 고치거나 지울 때 쓴다(커뮤니티 댓글과 같은 방식 —
+-- 지우기는 실제 삭제가 아니라 status='deleted'. 기존 행은 기본 'visible').
 CREATE TABLE IF NOT EXISTS lovetree_feedback_replies (
   id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   product_id text NOT NULL,
@@ -306,7 +308,9 @@ CREATE TABLE IF NOT EXISTS lovetree_feedback_replies (
   author_type text NOT NULL CHECK (author_type IN ('customer','internal')),
   author_subject_id text,
   body text NOT NULL CHECK (char_length(body) BETWEEN 1 AND 4000),
-  created_at timestamptz NOT NULL DEFAULT now()
+  status text NOT NULL DEFAULT 'visible' CHECK (status IN ('visible','deleted')),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  edited_at timestamptz
 );
 CREATE INDEX IF NOT EXISTS lovetree_feedback_replies_post_idx
   ON lovetree_feedback_replies (product_id, post_id, created_at);

@@ -170,3 +170,107 @@ test("'닫음' 상태를 관리자가 저장하고 계약 목록에도 있다(#5
   const byClosed = await call('GET', '/api/admin/feedback', {account: 'admin', query: 'status=closed'});
   assert.equal(byClosed.body.feedback.length, 1);
 });
+test('#678 후속: 고객이 자기 덧붙임을 고친다 — 본인 것만, 빈 글 거절, 가림은 붙이기와 같다', async () => {
+  const {call, feedbackRepo} = setup();
+  const created = await call('POST', '/api/feedback', {account: 'alice', ip: '203.0.113.1', body: {category: 'bug', body: '고장', context: {}}});
+  const postId = created.body.id;
+  const appended = await call('POST', `/api/board/mine/${postId}/followup`, {account: 'alice', body: {body: '처음 덧붙임'}});
+  assert.equal(appended.status, 201);
+  const replyId = appended.body.followup.id;
+  await call('PATCH', `/api/admin/feedback/${postId}`, {account: 'admin', body: {status: 'closed'}});
+
+  const edited = await call('PATCH', `/api/board/mine/${postId}/followup/${replyId}`, {account: 'alice', body: {body: '고친 덧붙임 me@example.com'}});
+  assert.equal(edited.status, 200);
+  assert.equal(edited.body.followup.body, '고친 덧붙임 [이메일]', '붙이기와 같은 가림');
+  assert.equal(edited.body.followup.edited, true);
+  assert.equal(edited.body.followup.mine, true);
+  assert.equal(edited.body.followup.canEdit, true);
+  assert.equal(edited.body.followup.canDelete, true);
+  assert.equal(edited.body.followup.status, 'reviewing', '붙이기와 같이 다시 열림');
+  const row = feedbackRepo.replies.find(r => r.id === replyId);
+  assert.equal(row.status, 'visible');
+  assert.ok(row.editedAt, '고친 시각을 남긴다');
+
+  const empty = await call('PATCH', `/api/board/mine/${postId}/followup/${replyId}`, {account: 'alice', body: {body: '   '}});
+  assert.equal(empty.status, 400);
+  assert.equal(empty.body.error.code, 'body_required');
+
+  const missing = await call('PATCH', `/api/board/mine/${postId}/followup/999999`, {account: 'alice', body: {body: 'x'}});
+  assert.equal(missing.status, 404);
+  assert.equal(missing.body.error.code, 'followup_not_found');
+});
+
+test('#678 후속: 고객이 자기 덧붙임을 지운다 — 목록에서 빠지고, 운영 상세에는 지운 표시가 남는다', async () => {
+  const {call} = setup();
+  const created = await call('POST', '/api/feedback', {account: 'alice', body: {category: 'bug', body: '고장', context: {}}});
+  const postId = created.body.id;
+  const first = await call('POST', `/api/board/mine/${postId}/followup`, {account: 'alice', body: {body: '첫 덧붙임'}});
+  const second = await call('POST', `/api/board/mine/${postId}/followup`, {account: 'alice', body: {body: '둘째 덧붙임'}});
+  const f1 = first.body.followup.id, f2 = second.body.followup.id;
+  const adminReply = await call('POST', `/api/admin/feedback/${postId}/reply`, {account: 'admin', body: {authorType: 'customer', body: '고객에게 보이는 답변'}});
+  const opsReplyId = adminReply.body.reply.id;
+
+  const deleted = await call('DELETE', `/api/board/mine/${postId}/followup/${f1}`, {account: 'alice'});
+  assert.equal(deleted.status, 200);
+  assert.equal(deleted.body.deleted, true);
+
+  // 내 의견 목록: 지운 덧붙임은 빠지고 남은 덧붙임·운영 답변은 그대로다.
+  const mine = await call('GET', '/api/board/mine', {account: 'alice'});
+  const post = mine.body.posts.find(p => p.id === postId);
+  const ids = post.replies.map(r => r.id);
+  assert.ok(!ids.includes(f1), '지운 덧붙임은 목록에서 빠진다');
+  assert.ok(ids.includes(f2));
+  assert.ok(ids.includes(opsReplyId));
+
+  // 운영센터 상세에는 지운 표시가 그대로 보인다(화면은 이 값을 '고객이 지움'으로 그린다).
+  const detail = await call('GET', `/api/admin/feedback/${postId}`, {account: 'admin'});
+  const deletedReply = detail.body.feedback.replies.find(r => r.id === f1);
+  assert.equal(deletedReply.status, 'deleted');
+  assert.ok(deletedReply.editedAt);
+
+  // 지운 덧붙임은 다시 고치거나 지울 수 없다.
+  const editDeleted = await call('PATCH', `/api/board/mine/${postId}/followup/${f1}`, {account: 'alice', body: {body: '다시 고침'}});
+  assert.equal(editDeleted.status, 404);
+  const deleteAgain = await call('DELETE', `/api/board/mine/${postId}/followup/${f1}`, {account: 'alice'});
+  assert.equal(deleteAgain.status, 404);
+});
+
+test('#678 후속: 남의 덧붙임·운영센터 답변·로그아웃은 고치기·지우기가 모두 거절된다', async () => {
+  const {call} = setup();
+  const created = await call('POST', '/api/feedback', {account: 'alice', body: {category: 'bug', body: '고장', context: {}}});
+  const postId = created.body.id;
+  const appended = await call('POST', `/api/board/mine/${postId}/followup`, {account: 'alice', body: {body: 'alice의 덧붙임'}});
+  const f1 = appended.body.followup.id;
+  // 운영센터가 고객에게 보이는 답변(authorType=customer, 작성자는 관리자 계정)을 단다.
+  const adminReply = await call('POST', `/api/admin/feedback/${postId}/reply`, {account: 'admin', body: {authorType: 'customer', body: '고객에게 보이는 답변'}});
+  const opsReplyId = adminReply.body.reply.id;
+
+  // author_type 'customer'는 '고객에게 보이는 답'이라는 뜻이라 운영센터 답변도 customer다 —
+  // 그래서 덧붙임 작성 계정 = 요청 계정 = 글 작성 계정일 때만 허용한다.
+  const editOpsReply = await call('PATCH', `/api/board/mine/${postId}/followup/${opsReplyId}`, {account: 'alice', body: {body: '운영 답변을 바꿔 본다'}});
+  assert.equal(editOpsReply.status, 403);
+  assert.equal(editOpsReply.body.error.code, 'followup_forbidden');
+  const deleteOpsReply = await call('DELETE', `/api/board/mine/${postId}/followup/${opsReplyId}`, {account: 'alice'});
+  assert.equal(deleteOpsReply.status, 403);
+  assert.equal(deleteOpsReply.body.error.code, 'followup_forbidden');
+
+  // 남의 글의 덧붙임은 없는 것과 같이 404(append와 같은 원칙).
+  const editForeign = await call('PATCH', `/api/board/mine/${postId}/followup/${f1}`, {account: 'bob', body: {body: '남의 글'}});
+  assert.equal(editForeign.status, 404);
+  const deleteForeign = await call('DELETE', `/api/board/mine/${postId}/followup/${f1}`, {account: 'bob'});
+  assert.equal(deleteForeign.status, 404);
+
+  // 로그아웃은 401.
+  const editLoggedOut = await call('PATCH', `/api/board/mine/${postId}/followup/${f1}`, {body: {body: 'x'}});
+  assert.equal(editLoggedOut.status, 401);
+  const deleteLoggedOut = await call('DELETE', `/api/board/mine/${postId}/followup/${f1}`);
+  assert.equal(deleteLoggedOut.status, 401);
+
+  // 내 의견 목록에서 운영 답변은 mine·canEdit·canDelete가 모두 아니다.
+  const mine = await call('GET', '/api/board/mine', {account: 'alice'});
+  const post = mine.body.posts.find(p => p.id === postId);
+  assert.equal(post.replies.find(r => r.id === opsReplyId).canEdit, false);
+  assert.equal(post.replies.find(r => r.id === opsReplyId).canDelete, false);
+  assert.equal(post.replies.find(r => r.id === opsReplyId).mine, false);
+  assert.equal(post.replies.find(r => r.id === f1).canEdit, true);
+});
