@@ -155,7 +155,7 @@ const graphTree = (() => {
   return t;
 })();
 // 첫 화면 글자 카드(261116): 내려간 영상(없는 id → 회색 120×90)의 '영상을 볼 수 없어요' 카드를
-// 궤도에서 그리기 위한 시험 트리 — 긴 사용자 제목 1건(3줄 말줄임 대상)·영상 제목+채널 1건(보조 줄)·사진 1건.
+// 궤도에서 그리기 위한 시험 트리 — 긴 사용자 제목 1건(3줄 높이 절단 대상)·영상 제목+채널 1건(보조 줄)·사진 1건.
 const thumbTree = (() => {
   const V = 'https://www.youtube.com/watch?v=';
   let t = createTree({ subject: '시험', title: '글자 카드 시험 트리', note: '기록', emotion: '설렘', date: '2026-11-11', url: V + 'zz404zz404a' }, '2026-11-16T00:00:00.000Z');
@@ -844,7 +844,7 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     await ctx8.close();
 
     // 첫 화면 글자 카드(261116): 내려간 영상(회색 120×90)의 '영상을 볼 수 없어요' 카드가 #orbit
-    // shadowRoot 안에서 줄(감정·날짜·제목·알림)을 지키는지 — 제목 3줄 말줄임·카드 안 배치·
+    // shadowRoot 안에서 줄(감정·날짜·제목·알림)을 지키는지 — 제목이 3줄 높이 안(max-height 절단)·카드 안 배치·
     // '첫 순간' 배지와 감정 칩 겹침 0을 수치로 단정한다. 카드는 그림자 안에 있으므로 shadowRoot로
     // 스코핑한다(#730과 같은 판정). 셸이 lt41-date-style 동기화로 프레임을 다시 띄우므로 매번 전 프레임 검사.
     const ctx9 = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
@@ -877,7 +877,7 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
         if (!title) { bad.push('제목 칸이 없다'); continue; }
         const tcs = getComputedStyle(title);
         const limit = parseFloat(tcs.fontSize) * parseFloat(tcs.lineHeight) * 3 + 2;
-        if (title.clientHeight > limit) bad.push(`제목이 3줄을 넘는다(${title.clientHeight}px > ${Math.round(limit)}px)`);
+        if (title.clientHeight > limit) bad.push(`제목이 3줄 높이를 넘는다(${title.clientHeight}px > ${Math.round(limit)}px — max-height 3줄 절단)`);
         const inside = (el) => { const r = el.getBoundingClientRect(); return r.top >= cr.top - 1 && r.bottom <= cr.bottom + 1 && r.left >= cr.left - 1 && r.right <= cr.right + 1; };
         for (const sel of ['.lt-fallback-head', '.lt-fallback-title', '.lt-fallback-notice']) {
           const el = card.querySelector(sel);

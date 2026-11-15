@@ -464,7 +464,7 @@ html[data-v41-screen=book] .tools .lens-icon{display:block}
    있어, thumb-fallback.mjs mountThumbFallback이 스타일시트 킥으로 재계산을 확정한다. */
 .lt-fallback-card[data-lt-variant="orbit"]{display:block;position:relative}
 .lt-fallback-card[data-lt-variant="orbit"] .lt-fallback-head{flex-direction:column;align-items:flex-start;gap:5px;margin-bottom:9px}
-.lt-fallback-card[data-lt-variant="orbit"] .lt-fallback-title{margin-bottom:9px;max-height:calc(3 * 1.35em)}
+.lt-fallback-card[data-lt-variant="orbit"] .lt-fallback-title{display:block;margin-bottom:9px;max-height:calc(3 * 1.35em);overflow:hidden}
 .lt-fallback-card[data-lt-variant="orbit"] .lt-fallback-sub{margin-bottom:9px}
 .lt-fallback-card[data-lt-variant="orbit"] .lt-fallback-notice{position:absolute;left:15px;right:15px;bottom:14px;margin:0;font-size:12px}
 .lt-fallback-card[data-lt-variant="orbit"] .lt-fallback-emotion,.lt-fallback-card[data-lt-variant="orbit"] .lt-fallback-date{font-size:12px}

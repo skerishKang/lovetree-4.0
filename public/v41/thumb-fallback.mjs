@@ -491,33 +491,10 @@ export function mountThumbFallback(root = globalThis.document, { onEditTitle = n
   sweepTimer?.unref?.();
   if (sweepTimer) { try { sweepPendingThumbs(root); } catch { /* ignore */ } }
   inspectComplete(root);
-  // 그림자 문서(첫 화면 궤도)에서 innerHTML로 글자 카드를 갈아끼우면 제목의 -webkit-line-clamp(3줄
-  // 말줄임) 레이아웃이 오래된 채로 남는다(Chrome 158 실측 — 카드 노드 재부착·크기 읽기로는 풀리지
-  // 않고 스타일시트 변화가 흔들어야 풀린다. 대표 화면: 감정·날짜·제목이 겹치고 큰 글자가 카드 밖으로
-  // 넘쳐 잘렸다). 스타일시트를 잠깐 흔드는 킥을 짧은 간격으로 돌려 재계산을 확정한다 — 그림자 문서만,
-  // 글자 카드가 있을 때만, 24회(6초) 뒤 자동 종료. 빛 DOM 문서(보드·책·감상)에서는 재계산이 정상이라
-  // 킥이 없다. 킥 규칙 자체는 무해한 사용자 속성 하나다.
-  let kickCount = 0;
-  const kickStyle = root.ownerDocument?.createElement?.('style');
-  const kickTimer = (typeof setInterval === 'function' && root.host && kickStyle)
-    ? setInterval(() => {
-      kickCount += 1;
-      if (kickCount > 24) { clearInterval(kickTimer); return; }
-      const card = root.querySelector?.('.lt-fallback-card');
-      if (!card) return;
-      if (!kickStyle.isConnected) (root.append ? root : card.getRootNode()).append(kickStyle);
-      /* display:-webkit-box를 <style> 근원에서 다시 선언해야 재계산된다(사용자 속성만 흔들면 무효 — 실측). */
-      kickStyle.textContent = '.lt-fallback-card .lt-fallback-title,.lt-fallback-card .lt-fallback-sub{display:-webkit-box}';
-      void card.offsetWidth;
-    }, 250)
-    : null;
-  kickTimer?.unref?.();
 
   return () => {
     mountedRoots.delete(root);
     if (sweepTimer) clearInterval(sweepTimer);
-    if (kickTimer) clearInterval(kickTimer);
-    kickStyle?.remove?.();
     root.removeEventListener?.('load', onLoad, true);
     root.removeEventListener?.('error', onError, true);
     root.removeEventListener?.('click', onClick, true);
