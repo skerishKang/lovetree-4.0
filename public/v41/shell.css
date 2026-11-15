@@ -533,7 +533,7 @@ html[data-lt-theme="garden"] #account-advanced[aria-checked="true"]:after{backgr
 .updates-kind h3{color:var(--lt-gold);margin:0 0 8px}
 .updates-kind ul{margin:0;padding-left:18px;display:grid;gap:8px}
 .updates-kind li{font-size:14px;line-height:1.75;color:var(--lt-pearl)}
-.updates-source{display:block;font-size:11px;color:var(--lt-muted)}
+.updates-source{display:block;font-size:12px;color:var(--lt-muted)}
 /* 이슈 631 의견 창 — 넓은 화면에서 조금 넓게, 함께 보낼 정보는 상자와 글자를 한 줄에 2~3열로. */
 #feedback-panel{width:min(560px,calc(100vw - 32px))}
 #feedback-panel{word-break:keep-all}
