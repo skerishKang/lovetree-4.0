@@ -33,7 +33,7 @@ function harness({
   source = 'server', owned = true, writable = true, current = 'track32-bookshelf.html',
   busy = false, confirmAnswer = true, lt41 = { tree: TREE, momentId: 'm1' }
 } = {}) {
-  const calls = { login: [], notify: [], panel: [], firstJourney: 0, reset: 0, apply: [], writeOpen: [], writeShow: [] };
+  const calls = { login: [], notify: [], panel: [], firstJourney: 0, reset: 0, apply: [], writeOpen: [], writeShow: [], confirmMessages: [] };
   const elements = {};
   const ids = [
     'change-parent', 'delete-moment', 'editor-cancel', 'link-moment', 'manage-tree',
@@ -96,7 +96,8 @@ function harness({
     isMediaUrl: () => false
   };
   globalThis.FormData = FakeFormData;
-  globalThis.confirm = () => confirmAnswer;
+  // 시험 정비 2차: 확인 창에 어떤 문구가 갔는지 기록한다(트리 삭제 확인 문구 계약).
+  globalThis.confirm = (message) => { calls.confirmMessages.push(message); return confirmAnswer; };
   globalThis.queueMicrotask = (fn) => fn();
   globalThis.document = {
     querySelectorAll: () => [],
@@ -432,5 +433,24 @@ test('#314 회귀: 사진으로 표지를 만든 뒤 책 정보 저장을 다시
     assert.equal(last.payload.coverDesign, '', '다른 책(A)의 격자가 사진 표지 저장에 섞이지 않는다');
     assert.equal(last.payload.coverMomentId, 'b-photo', '표지는 사진 순간으로 저장된다');
     assert.equal(last.payload.title, '겨울 정원', '저장 제목은 B 그대로다');
+  } finally { h.restore(); }
+});
+
+// 시험 정비 2차(2026-11-15): 트리 이름 호출점을 소스 글자 대신 동작으로 본다(v41-shell-tree-title에서 옮김).
+test('트리 삭제 확인 문구는 줄인 이름을 쓰고, 확인하면 deleteTree를 적용한다', () => {
+  const h = harness({ lt41: { tree: { ...TREE_A, title: '리센느, 나의 순간들' }, momentId: 'a1' } });
+  try {
+    h.elements['tree-delete'].onclick();
+    assert.match(h.calls.confirmMessages[0], /“리센느”과 2개 순간을 모두 삭제할까요\?/, '삭제 확인은 줄인 이름으로 묻는다');
+    assert.ok(!h.calls.confirmMessages[0].includes('나의 순간들'), '자동 꼬리말이 확인 문구에 남지 않는다');
+    assert.equal(h.calls.apply.at(-1).mode, 'deleteTree', '확인하면 삭제를 적용한다');
+  } finally { h.restore(); }
+});
+
+test('책 정보 편집 입력은 저장값(원본 이름)을 그대로 보여 준다', () => {
+  const h = harness({ lt41: { tree: { ...TREE_A, title: '리센느, 나의 순간들' }, momentId: 'a1' } });
+  try {
+    h.panels.openTreeManager();
+    assert.equal(h.elements['tree-form'].elements.title.value, '리센느, 나의 순간들', '편집 입력은 displayTreeTitle을 거치지 않는다');
   } finally { h.restore(); }
 });

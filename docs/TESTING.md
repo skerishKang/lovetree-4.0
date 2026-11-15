@@ -73,6 +73,14 @@
 - **남김 97** — 마크업·CSS 값·문구·schema 계약과 **페이지 스크립트(shell.mjs·src/admin.js) 배선**: 내보내기가 없어 함수 시험으로 바꾸려면 제품 코드 변경이 필요하다(docs/TESTING.md 기준 §6).
 - **2차 후보**: `v41-shell-tree-title`의 messages·panels·community 호출점 검사(createMessages·createPanels·mountCommunity가 내보내기는 있으나 하네스가 무거움), `v41-cto-453-cde` 전체(셸 배선 글자 검사), `v41-shell-notice` 배선.
 
+## 소스 글자 검사 줄이기 2차 — 트리 이름 호출점 (2026-11-15)
+
+1차가 적어 둔 2차 후보 중 `v41-shell-tree-title`(11건)과 `v41-cto-453-cde`의 community 검사(D1·D3)를 정리했다. **소스 글자 검사 단정 42 → 32건(-10)**(집계 스크립트 전체 기준 1367 → 1357):
+- **바꿈 9** — 호출점을 직접 띄워 본다. 공유 미리보기 요약은 `createMessages` 하네스(`v41-date-style-one-piece`와 같은 모양), 둘러보기 카드·미리보기 제목은 `mountCommunity` + 가짜 fetch, 트리 삭제 확인 문구·책 정보 편집 입력 원본 보존은 `v41-panels-flow` 하네스에 confirm 기록을 얹어, 둘러보기 닫을 때 탭 표시 복구(빈 화면 여부 2행)·빈 결과 미리보기 칸 숨김(빈 결과·결과 있음·불러오는 중 3행)은 `v41-cto-453-cde`의 community 하네스로.
+- **지움 1** — community-panel.mjs의 `displayTreeTitle` import 검사: 동작 시험이 모듈을 실제로 import해 띄우므로 같은 내용을 지킨다.
+- **남김 32** — `v41-shell-tree-title`의 shell.mjs 드롭다운 2건(페이지 스크립트 배선, 내보내기 없음 — 규칙 6)과 CSS 값 3건, `v41-cto-453-cde`의 shell 배선·CSS. topmenu·header-states·shell-notice는 이번에 손대지 않았다(1차와 같은 남김 사유).
+- **강도 증명**: messages.mjs 미리보기 요약·panels.mjs 삭제 확인 문구·편집 입력·community-panel.mjs 카드 제목·닫기 복구·미리보기 숨김 6곳을 한 줄씩 깨서 새 시험이 모두 빨강이 되는지 확인하고 되돌렸다.
+
 ## 새 시험을 쓸 때
 
 1. 확인하려는 것이 **동작**(분기·호출·응답·포커스 이동)이면 → 그 함수를 `import`해 직접 부르고 인자·반환·부수효과를 본다.
