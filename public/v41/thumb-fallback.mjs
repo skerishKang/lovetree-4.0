@@ -467,10 +467,29 @@ export function mountThumbFallback(root = globalThis.document, { onEditTitle = n
     observer = new MutationObserver(() => inspectComplete(root));
     try { observer.observe(observeTarget, { childList: true, subtree: true }); } catch { observer = null; }
   }
+  // #638: 책이 무거웠던 가장 큰 원인 — 외부 썸네일 요청이 응답 없이 매달리면 error 이벤트가 오지 않아
+  // 내려가기 사슬이 멈추고 장이 그려지지 않은 채로 남는다. 매달린 후보는 8초 뒤 실패로 간주해 다음 후보로 진행한다.
+  const THUMB_PENDING_TIMEOUT_MS = 8000;
+  const sweepPending = () => {
+    if (!root.querySelectorAll) return;
+    const imgs = root.querySelectorAll('img[data-lt-candidates]');
+    const now = Date.now();
+    for (const img of imgs) {
+      if (img.complete || img.dataset?.ltThumbSettled === '1') continue;
+      const started = Number(img.dataset?.ltThumbStarted || 0);
+      if (!started) { img.dataset.ltThumbStarted = String(now); continue; }
+      if (now - started >= THUMB_PENDING_TIMEOUT_MS) applyThumbOutcome(img, { error: true });
+    }
+  };
+  const sweepTimer = typeof setInterval === 'function' ? setInterval(sweepPending, 2000) : null;
+  // 시험(Node)에서 이 타이머가 프로세스를 붙잡아 npm test가 끝나지 않았다 — 붙잡지 않게 한다.
+  sweepTimer?.unref?.();
+  if (sweepTimer && typeof sweepPending === 'function') { try { sweepPending(); } catch { /* ignore */ } }
   inspectComplete(root);
 
   return () => {
     mountedRoots.delete(root);
+    if (sweepTimer) clearInterval(sweepTimer);
     root.removeEventListener?.('load', onLoad, true);
     root.removeEventListener?.('error', onError, true);
     root.removeEventListener?.('click', onClick, true);

@@ -376,3 +376,67 @@ test('제목에서 꼬리표 한 번에 제안받기: 꼬리표 없는 순간만
   assert.deepEqual(out[1], tree.moments[1], '고르지 않은 순간은 그대로');
   assert.deepEqual(validateState(stateOf({ ...tree, moments: out })).trees[0].moments[0].keywords, ['노래:Supernova', '무대:뮤직뱅크 240524']);
 });
+
+// ── #627 결함 ③(tags-sync): 셸이 직접 저장하는 길(정리 창·담은 직후 안내)도 열린 화면에 알린다 ──
+// 화면(iframe)의 lt41-tags 길은 messages.mjs가 답하지만, 정리 창의 이름 바꾸기·합치기·제안 확인은
+// tag-save.mjs를 곧장 부른다 — boardSync는 iframe을 다시 그리지 않으므로 알림이 없으면
+// 열린 보드·책 화면의 꼬리표 줄과 카드 칩이 옛 값에 머문다.
+import { createTagSave } from '../public/v41/shell/tag-save.mjs';
+
+function tagSaveOf(keywordsList, { frameCount = 2, owned = true } = {}) {
+  const applied = [];
+  const posted = [];
+  const tree = realTreeOf(keywordsList);
+  const made = createTagSave({
+    getMember: () => ({ snapshot: () => ({ owned, writable: owned }), apply: (action, input, opts) => applied.push({ action, input, opts }) }),
+    getModel: () => ({ trees: [tree] }),
+    notify: () => {},
+    frames: () => Array.from({ length: frameCount }, (_, i) => ({ postMessage: (msg, origin) => posted.push({ i, msg, origin }) }))
+  });
+  return { save: made.save, saveMoments: made.saveMoments, tree, applied, posted };
+}
+
+test('결함 ③: 셸이 직접 저장해도 열린 화면마다 lt41-tags-saved(답 모양)를 알린다', () => {
+  const { save, tree, applied, posted } = tagSaveOf([['노래:Supernova'], []]);
+  const out = save({ treeId: tree.id, momentId: tree.moments[1].id, keywords: ['무대:뮤직뱅크'], quiet: true });
+  assert.equal(out.ok, true);
+  assert.equal(applied.length, 1, '저장은 기존 boardSync 경로 한 번이다');
+  assert.equal(applied[0].action, 'boardSync');
+  assert.equal(posted.length, 2, '열린 프레임마다 한 번');
+  for (const { msg } of posted) {
+    assert.equal(msg.type, 'lt41-tags-saved');
+    assert.equal(msg.ok, true);
+    assert.equal(msg.momentId, tree.moments[1].id);
+    assert.deepEqual(msg.keywords, ['무대:뮤직뱅크']);
+  }
+});
+
+test('결함 ③: 같은 값 저장·읽기 전용·못 찾은 순간은 아무것도 알리지 않는다', () => {
+  const same = tagSaveOf([['노래:Supernova'], []]);
+  assert.deepEqual(same.save({ treeId: same.tree.id, momentId: same.tree.moments[0].id, keywords: ['노래:Supernova'], quiet: true }), { ok: true, keywords: ['노래:Supernova'], changed: false });
+  assert.equal(same.posted.length, 0, '바뀐 것이 없으면 알리지 않는다');
+  const ro = tagSaveOf([['노래:Supernova'], []], { owned: false });
+  assert.equal(ro.save({ treeId: ro.tree.id, momentId: ro.tree.moments[0].id, keywords: [] }).ok, false);
+  assert.equal(ro.posted.length, 0);
+  const nf = tagSaveOf([['노래:Supernova'], []]);
+  assert.equal(nf.save({ treeId: '없는 트리', momentId: nf.tree.moments[0].id, keywords: [] }).ok, false);
+  assert.equal(nf.posted.length, 0);
+});
+
+test('결함 ③: 이름 바꾸기·합치기는 꼬리표가 실제로 바뀐 순간만 알린다', () => {
+  // 묶음(대소문자 차이)이 두 순간에 걸쳐 있고 셋째 순간은 그 꼬리표가 없다.
+  const { saveMoments, tree, posted } = tagSaveOf([['무대', '노래:Super Shy'], ['노래:super shy', '노래:ETA'], ['노래:ETA']]);
+  const group = tagInventory(tree).find((g) => g.value === 'Super Shy');
+  const out = saveMoments({ treeId: tree.id, moments: renamedMoments(tree, group, 'Super Shy!').moments, notice: '' });
+  assert.equal(out.ok, true);
+  assert.deepEqual([...new Set(posted.map((p) => p.msg.momentId))], [tree.moments[0].id, tree.moments[1].id], '그 꼬리표가 없던 셋째 순간은 알리지 않는다(프레임마다 한 번씩이라 겹친다)');
+  assert.ok(posted.every((p) => p.msg.type === 'lt41-tags-saved' && p.msg.ok === true));
+  assert.deepEqual(posted[0].msg.keywords, ['무대', '노래:Super Shy!']);
+  // 합치기도 같다 — 합쳐진 순간만.
+  const merge = tagSaveOf([['노래:Super Shy', '무대'], ['노래:super shy', '노래:ETA']]);
+  const shy = tagInventory(merge.tree).find((g) => g.value === 'Super Shy');
+  const eta = tagInventory(merge.tree).find((g) => g.value === 'ETA');
+  merge.saveMoments({ treeId: merge.tree.id, moments: mergedMoments(merge.tree, shy, eta).moments, notice: '' });
+  assert.deepEqual([...new Set(merge.posted.map((p) => p.msg.momentId))], merge.tree.moments.map((m) => m.id), '두 순간 모두 바뀐다');
+  assert.deepEqual(merge.posted.find((p) => p.msg.momentId === merge.tree.moments[1].id).msg.keywords, ['노래:ETA']);
+});

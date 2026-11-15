@@ -1,8 +1,12 @@
 // 새 소식(버전 업데이트 노트) — #611.
 // 원본은 public/v41/updates.json 하나. 화면·알림 모두 이 파일을 읽는다.
 // 마지막으로 본 버전은 서버 저장 없이 브라우저(localStorage, try/catch)에 둔다.
+import { localDateOnly } from './local-date.mjs';
 
 export const SEEN_KEY = 'lt41.updatesSeen';
+// #638: '새로워졌어요' 카드는 하루에 한 번만 뜬다 — 같은 날 버전이 여러 번 올라가도(4.1.3→4.1.4)
+// 두 번째부터는 카드 대신 점·새 소식 입구로만 알린다. 날짜는 기기의 지역 날짜(#547와 같은 규칙).
+export const CARD_DAY_KEY = 'lt41.updatesCardDay';
 const VERSION_RE = /^\d+\.\d+\.\d+$/;
 
 export function validVersion(value) {
@@ -54,7 +58,8 @@ export function markSeen(storage, version) {
 
 const esc = value => String(value ?? '').replace(/[&<>"]/g, ch => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[ch]));
 
-/** 노트 목록을 쉬운 말 한 줄씩으로 그리는 조각. 버전·날짜·새로워진 것·고친 것 그대로만 쓴다. */
+/** 노트 목록을 쉬운 말 한 줄씩으로 그리는 조각. 버전·날짜·새로워진 것·고친 것 그대로만 쓴다.
+ *  #638: 출처 줄('AI 테스터가 찾아 준 것 · 이름')은 같은 출처의 이웃 항목을 한 묶음으로 쳐서 한 번만 보인다. */
 export function renderUpdates(updates, activeVersion = '') {
   const entries = (Array.isArray(updates) ? updates : [])
     .filter(entry => validVersion(entry?.version))
@@ -66,11 +71,14 @@ export function renderUpdates(updates, activeVersion = '') {
       .map(([kind, title]) => {
         const rows = (Array.isArray(entry.items) ? entry.items : []).filter(item => item?.kind === kind);
         if (!rows.length) return '';
-        const lines = rows.map(item => {
+        const bundles = [];
+        for (const item of rows) {
           const label = sourceLabel(item);
-          return `<li>${esc(item.text)}${label ? `<small class="updates-source">${esc(label)}</small>` : ''}</li>`;
-        }).join('');
-        return `<section class="updates-kind"><h3>${esc(title)}</h3><ul>${lines}</ul></section>`;
+          const last = bundles[bundles.length - 1];
+          if (last && last.label === label) last.texts.push(item.text);
+          else bundles.push({label, texts: [item.text]});
+        }
+        return bundles.map(bundle => `<section class="updates-kind"><h3>${esc(title)}</h3><ul>${bundle.texts.map(text => `<li>${esc(text)}</li>`).join('')}</ul>${bundle.label ? `<small class="updates-source">${esc(bundle.label)}</small>` : ''}</section>`).join('');
       }).join('');
     return `<section class="updates-version" data-updates-version="${esc(entry.version)}"${activeVersion === entry.version ? ' data-active="true"' : ''}>
       <h2 class="updates-version-title">러브트리 ${esc(entry.version)} <span>${esc(entry.date || '')}</span></h2>${groups}</section>`;
@@ -104,7 +112,14 @@ export function mountUpdates({ $, showPanel, fetchJson, storage, onDot }) {
   function showCard(entry) {
     const card = $('updates-card');
     if (!card || cardShown) return;
+    // #638: 하루에 한 번 — 같은 날 이미 카드를 본 접속이면 다시 띄우지 않는다(점은 그대로).
+    const day = localDateOnly();
+    if (!day) return; // 날짜를 알 수 없으면 기존 규칙(접속 때 한 번)만 쓴다
+    let seenDay = '';
+    try { seenDay = store?.getItem?.(CARD_DAY_KEY) || ''; } catch { seenDay = ''; }
+    if (seenDay === day) return;
     cardShown = true;
+    try { store?.setItem?.(CARD_DAY_KEY, day); } catch { /* 저장소가 없으면 이번 접속만 */ }
     const text = $('updates-card-text');
     if (text) text.textContent = `러브트리가 새로워졌어요 — ${entry.version}`;
     card.hidden = false;

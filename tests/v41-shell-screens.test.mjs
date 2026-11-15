@@ -105,6 +105,61 @@ test('실제 기록(source=server)이면 views/ 판본, 트리가 없으면 빈 
   }
 });
 
+// #453 D1 + 맨 위 메뉴 눌린 표시: show()가 [data-view] 단추에 aria-current를 넣는다 —
+// 지금 보는 화면만 'true', 나머지는 'false'이고, 빈 화면(트리 없음)에서는 전부 'false'다.
+test("show()는 [data-view] 단추에 지금 보는 화면만 aria-current=true로 남긴다", () => {
+  const replaced = [];
+  const fakeEl = extra => ({
+    hidden: false, title: '', dataset: {}, style: {}, attrs: {},
+    classList: { add() {}, remove() {}, toggle() {}, contains: () => false },
+    contentWindow: { location: { href: 'about:blank', replace: url => replaced.push(url) } },
+    addEventListener() {}, inert: false,
+    setAttribute(name, value) { this.attrs[name] = String(value); },
+    removeAttribute(name) { delete this.attrs[name]; },
+    getAttribute(name) { return this.attrs[name] ?? null; },
+    ...extra
+  });
+  const tabs = ['track59-sketchbook.html', 'track58-pinboard.html', 'track56-network.html']
+    .map(view => fakeEl({ dataset: { view } }));
+  const elements = { view: fakeEl(), 'view-next': fakeEl(), empty: fakeEl(), 'community-panel': { open: false, close() {} } };
+  const saved = { document: globalThis.document, location: globalThis.location };
+  globalThis.location = { origin: 'https://lovetree-4-0.pages.dev' };
+  globalThis.document = {
+    body: { classList: { add() {}, remove() {}, toggle() {}, contains: () => false } },
+    querySelectorAll: sel => (sel === '[data-view]' ? tabs : [])
+  };
+  try {
+    let hasTree = true;
+    const screens = createScreens({
+      $: id => elements[id] ?? null,
+      screens: [['book', 'track59-sketchbook.html', '책'], ['board', 'track58-pinboard.html', '보드'], ['network', 'track56-network.html', '지도']],
+      getCurrent: () => 'src064-orbit.html',
+      setCurrent() {},
+      getSource: () => 'example',
+      hasTree: () => hasTree,
+      flowNavigation() {},
+      applyTheme() {},
+      writeLocation() {},
+      links() {},
+      onFrameReady() {}
+    });
+    screens.show('track59-sketchbook.html');
+    assert.deepEqual(tabs.map(b => b.attrs['aria-current']), ['true', 'false', 'false'], '지금 보는 화면만 눌린 상태다');
+
+    screens.show('track58-pinboard.html');
+    assert.deepEqual(tabs.map(b => b.attrs['aria-current']), ['false', 'true', 'false'], '화면을 옮기면 눌린 표시도 옮겨간다');
+
+    // #453 D1: 빈 화면(트리 없음)에서는 어느 탭도 "지금 보는 곳"이 아니다 — 전부 false로 지운다.
+    hasTree = false;
+    screens.show('track56-network.html');
+    assert.deepEqual(tabs.map(b => b.attrs['aria-current']), ['false', 'false', 'false'], '빈 화면에서는 눌린 표시가 없다');
+  } finally {
+    globalThis.document = saved.document;
+    if (saved.location === undefined) delete globalThis.location;
+    else globalThis.location = saved.location;
+  }
+});
+
 // #583 '이 순간 열기': 지도를 특정 순간을 가운데 두고 열 요청이 있으면 show()가 프레임 주소에
 // ?open=<순간>을 붙이고, 요청은 한 번 쓰면 지운다. 다른 화면에는 붙이지 않는다.
 test("show()는 '이 순간 열기' 요청을 지도 프레임 주소 ?open=으로 옮기고 한 번만 쓴다", () => {
