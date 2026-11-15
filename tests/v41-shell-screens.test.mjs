@@ -206,3 +206,45 @@ test("show()는 '이 순간 열기' 요청을 지도 프레임 주소 ?open=으�
     else globalThis.location = saved.location;
   }
 });
+
+// #713 후속(2026-11-16 보고): 그래프 화면만 views/graph/ 아래에 있다 — screenUrl이 하위 폴더를 빠뜨려
+// #my/graph가 4.0 첫 화면으로 열렸다. show()가 만드는 iframe 주소와 화면 파일 실재를 고정한다.
+test('show()는 그래프 화면 주소에 views/graph/ 하위 폴더를 붙인다', () => {
+  const replaced = [];
+  const fakeEl = () => ({
+    hidden: false, title: '', dataset: {}, style: {},
+    classList: { add() {}, remove() {}, toggle() {}, contains: () => false },
+    contentWindow: { location: { href: 'about:blank', replace: url => replaced.push(url) } },
+    addEventListener() {}, setAttribute() {}, removeAttribute() {}, inert: false
+  });
+  const elements = { view: fakeEl(), 'view-next': fakeEl(), empty: fakeEl(), 'community-panel': { open: false, close() {} } };
+  const saved = { document: globalThis.document, location: globalThis.location };
+  globalThis.location = { origin: 'https://lovetree-4-0.pages.dev' };
+  globalThis.document = {
+    body: { classList: { add() {}, remove() {}, toggle() {}, contains: () => false } },
+    querySelectorAll: () => []
+  };
+  try {
+    const screens = createScreens({
+      $: id => elements[id] ?? null,
+      screens: [['graph', 'track60-graph.html', '그래프 보기'], ['network', 'track56-network.html', '지도']],
+      getCurrent: () => 'src064-orbit.html',
+      setCurrent() {},
+      getSource: () => 'server',
+      hasTree: () => true,
+      flowNavigation() {},
+      applyTheme() {},
+      writeLocation() {},
+      links() {},
+      onFrameReady() {}
+    });
+    screens.show('track60-graph.html');
+    assert.equal(replaced.at(-1), 'https://lovetree-4-0.pages.dev/v41/views/graph/track60-graph.html', '그래프 프레임 주소에 하위 폴더가 있다');
+    screens.show('track56-network.html');
+    assert.equal(replaced.at(-1), 'https://lovetree-4-0.pages.dev/v41/views/track56-network.html', '다른 화면 주소는 그대로다');
+  } finally {
+    globalThis.document = saved.document;
+    if (saved.location === undefined) delete globalThis.location;
+    else globalThis.location = saved.location;
+  }
+});
