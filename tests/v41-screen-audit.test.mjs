@@ -152,6 +152,11 @@ test('#657 화면 공통 검사기: 주요 화면 12 상태 × 390·1440 × 밤�
     await frameOf(page3, /views\/track/); // 안쪽 화면 프레임이 뜰 때까지(검사 누락 방지)
     await page3.waitForTimeout(1200);
     await take(page3, '보드');
+    // #662 후속: 보드 안내 풍선이 떠 있는 상태 — 풍선은 '도구×캔버스' 제외 대상이 아니므로 겹침·가려짐·대비를 풍선까지 잰다.
+    const boardFrame = await frameOf(page3, /views\/track/);
+    await boardFrame.evaluate(() => toast('순간을 선택해 연결된 기록을 살펴보세요.'));
+    await page3.waitForTimeout(400);
+    await take(page3, '보드·안내');
     // #666: ＋ 단추(body.lt-fab-ok — 로그인해 내 기록을 쓰는 자리에서만 뜬다)를 함께 띄우고 알림 줄을 올린다.
     await page3.evaluate(() => document.body.classList.add('lt-fab-ok'));
     await raiseToast(page3);
