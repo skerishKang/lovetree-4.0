@@ -590,9 +590,30 @@ html[data-lt-theme="garden"] #account-advanced[aria-checked="true"]:after{backgr
 .myposts-body{font-size:13px;line-height:1.8;color:var(--lt-pearl);overflow-wrap:anywhere;white-space:pre-wrap}
 .myposts-issue{display:inline-block;margin-top:6px;font-size:12px;color:var(--lt-rose)}
 .myposts-replies{margin-top:10px;display:grid;gap:8px}
-.myposts-reply{border-left:3px solid var(--lt-gold);padding:6px 10px;background:rgba(255,230,166,.06);border-radius:8px}
+.myposts-reply{border-left:3px solid var(--lt-gold);padding:6px 10px;background:rgba(255,230,166,.06);border-radius:8px;display:grid;gap:6px}
 .myposts-reply span{font-size:12px;color:var(--lt-gold)}
-.myposts-reply p{margin:4px 0 0;font-size:13px;line-height:1.7;overflow-wrap:anywhere}
+.myposts-reply p{margin:0;font-size:13px;line-height:1.7;overflow-wrap:anywhere}
+/* 이슈 678 후속 B: 내 덧붙임 고치기·지우기 — 가끔 쓰는 기능이라 머리 줄 오른쪽 끝의 작은 글자 단추
+   두 개('고치기 · 지우기', 13px·테두리 없음)로 둔다. 누름 영역은 44px을 유지한다(단추가 머리 줄 안에서
+   그 높이를 채운다 — 겉모양만 작게). (고침) 표시·라벨은 12px 기준선(이슈 548)을 따른다. */
+.myposts-reply-head{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:44px}
+.myposts-reply-tools{display:flex;align-items:center;flex:0 0 auto}
+.myposts-reply .myposts-reply-sep{font-size:13px;color:var(--lt-muted)}
+.myposts-reply-btn{border:0;padding:0 6px;min-height:44px;min-width:44px;background:none;color:var(--lt-muted);font-size:13px;cursor:pointer}
+.myposts-reply-btn:hover{color:var(--lt-pearl)}
+.myposts-reply-btn:focus-visible{outline:2px solid var(--lt-gold);outline-offset:2px}
+.myposts-reply .myposts-reply-edited{margin-left:6px;font-size:12px;color:var(--lt-muted)}
+.myposts-reply[hidden]{display:none}
+.myposts-reply-edit{display:grid;gap:8px}
+.myposts-reply .myposts-reply-edit-label{font-size:12px;color:var(--lt-muted)}
+.myposts-reply-edit input{width:100%;min-height:44px;border-radius:12px;border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.04);color:inherit;padding:10px 12px;font:inherit}
+.myposts-reply-edit input:focus-visible{outline:2px solid var(--lt-gold);outline-offset:2px}
+.myposts-reply-edit-row{display:flex;gap:8px;justify-content:flex-end}
+.myposts-reply-save,.myposts-reply-cancel{min-height:44px;padding:0 14px;border-radius:var(--lt-r-pill);font-size:13px;cursor:pointer}
+.myposts-reply-save{border:0;background:var(--lt-primary);color:var(--lt-primary-ink)}
+.myposts-reply-cancel{border:1px solid var(--lt-line);background:rgba(255,255,255,.04);color:var(--lt-pearl)}
+.myposts-reply-save:focus-visible,.myposts-reply-cancel:focus-visible{outline:2px solid var(--lt-gold);outline-offset:2px}
+.myposts-reply .myposts-reply-edit-error{margin:0;font-size:12px;color:var(--lt-rose)}
 /* 이슈 611 4번: 내 의견 — 새 답글 숫자·덧붙이기·새 소식 링크. */
 .account-menu-count{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;margin-left:8px;padding:0 6px;border-radius:var(--lt-r-pill);background:var(--lt-rose);color:var(--lt-stage);font-size:12px;font-weight:700;vertical-align:2px}
 .account-menu-count[hidden]{display:none}

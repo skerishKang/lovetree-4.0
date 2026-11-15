@@ -180,8 +180,15 @@ async function renderDetail(id) {
   replyKind = 'internal'; // 글을 다시 열면 내부 메모부터(#564 8).
   const replies = Array.isArray(post.replies) ? post.replies : [];
   const persona = post.persona && post.persona.name ? post.persona : null;
+  // #678 후속 B: 고객이 지우거나 고친 덧붙임은 status('deleted')·edited_at(PR A)으로 알린다.
+  // 지운 것은 흐리게 '고객이 지움 · 시각', 고친 것은 '고객이 고침 · 시각'을 머리 줄에 붙인다.
   const replyRows = replies.length
-    ? replies.map(r => `<div class="lt-reply" data-type="${r.authorType}"><div class="lt-reply-head"><span>${r.fromCustomer ? '고객 덧붙임' : (r.authorType === 'customer' ? '고객 답변' : '내부 메모')}</span><span>${escapeText(formatTime(r.createdAt))}</span></div><p>${richParagraph(r.body)}</p></div>`).join('')
+    ? replies.map(r => {
+        const removed = r.status === 'deleted';
+        const stateMark = removed ? ' · 고객이 지움' : (r.editedAt ? ' · 고객이 고침' : '');
+        const stateTime = stateMark ? formatTime(r.editedAt || r.createdAt) : formatTime(r.createdAt);
+        return `<div class="lt-reply${removed ? ' is-deleted' : ''}" data-type="${r.authorType}"><div class="lt-reply-head"><span>${r.fromCustomer ? '고객 덧붙임' : (r.authorType === 'customer' ? '고객 답변' : '내부 메모')}${stateMark}</span><span>${escapeText(stateTime)}</span></div><p>${richParagraph(r.body)}</p></div>`;
+      }).join('')
     : '<p class="lt-empty">아직 답글이 없습니다.</p>';
   const author = post.subjectId
     ? `<button type="button" class="lt-author-link" data-persona="${escapeText(post.subjectId)}">${escapeText(authorLabel(post))}${persona ? ' · 페르소나' : ''}</button>`
