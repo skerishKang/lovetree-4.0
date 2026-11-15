@@ -100,7 +100,9 @@ test('4. 오른쪽 빈 페이지는 다음 순간 안내 + 현재 순간을 부�
   const shell = read('public/v41/shell.mjs') + read('public/v41/shell/panels.mjs') + read('public/v41/shell/messages.mjs');
   assert.ok(/function openEditor\(requestedMode, *parentId = ''\)/.test(shell), '셸: 편집기가 부모를 받는다');
   assert.ok(/setEditorMode\(mode, *parentId\)/.test(shell), '셸: 부모를 그대로 넘긴다');
-  assert.ok(/type === 'lt41-write'\) openEditor\(data\.mode, data\.parentId\)/.test(shell), '셸: 메시지의 부모를 쓴다');
+  // 이슈 671: 고치기(edit)는 편집기가 부모를 쓰고, 새로 추가(new·add)는 목적지를 쓰기 창에 넘긴다.
+  assert.ok(/mode === 'edit'\) openEditor\(data\.mode, data\.parentId\)/.test(shell), '셸: 고치기 메시지의 부모를 쓴다');
+  assert.ok(/parentId: data\.parentId \|\| ''/.test(shell), '셸: 새로 추가는 목적지를 쓰기 창에 넘긴다');
 });
 
 test('5. 돋보기는 기본 꺼짐, 카드는 누를 수 있는 모양, 선택은 저장(실패해도 계속 동작)', () => {
