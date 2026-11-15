@@ -236,11 +236,29 @@ export const AUDIT_FN = function audit(opts) {
     }
   }
 
-  return { issues, covered, bad, overflow, clipped, small, cards, toastHits, contrast };
+  // 책 상태 단정(261116 책 글자 다듬기): 날짜·'이어진 순간' 칩 글자는 12px 이상(#548 기준선)이고, 접힌 제목
+  // 단추는 두 줄(펼침 전)이다. 펼친 제목(.title-open)과 단추가 아예 없는 감상 화면(제목이 h3)은 대상이 아니다.
+  const bookState = [];
+  if (document.documentElement.getAttribute('data-v41-screen') === 'book') {
+    for (const s of ['.moment-date', '#overviewBtn']) {
+      const el = document.querySelector(s);
+      if (!el) continue;
+      const px = parseFloat(getComputedStyle(el).fontSize);
+      if (px < 12) bookState.push({ el: s, 실측: px + 'px', 검사: '12px 이상' });
+    }
+    for (const t of document.querySelectorAll('.moment-title-button')) {
+      if (t.classList.contains('title-open')) continue;
+      const cs = getComputedStyle(t);
+      const lines = Math.round(t.getBoundingClientRect().height / parseFloat(cs.lineHeight));
+      if (parseInt(cs.webkitLineClamp, 10) !== 2 || lines > 2) bookState.push({ el: '.moment-title-button', 실측: 'clamp ' + cs.webkitLineClamp + ' · ' + lines + '줄', 검사: '제목 두 줄(펼침 전)' });
+    }
+  }
+
+  return { issues, covered, bad, overflow, clipped, small, cards, toastHits, contrast, bookState };
 };
 
 // 페이지와 그 안의 모든 프레임(같은 출처)에 검사를 돌려 한 묶음으로 모은다.
-const EMPTY = () => ({ issues: [], covered: [], bad: [], clipped: [], small: [], overflowList: [], toastHits: [], errors: [], cardsList: [], contrast: [] });
+const EMPTY = () => ({ issues: [], covered: [], bad: [], clipped: [], small: [], overflowList: [], toastHits: [], errors: [], cardsList: [], contrast: [], bookState: [] });
 export async function auditPage(page, screen) {
   const out = EMPTY();
   for (const frame of page.frames()) {
@@ -251,7 +269,7 @@ export async function auditPage(page, screen) {
       continue;
     }
     const url = frame.url().replace(/^https?:\/\/[^/]+/, '');
-    for (const key of ['issues', 'covered', 'clipped', 'small', 'toastHits', 'contrast']) for (const item of res[key] || []) out[key].push({ 화면: screen, 프레임: url, ...item });
+    for (const key of ['issues', 'covered', 'clipped', 'small', 'toastHits', 'contrast', 'bookState']) for (const item of res[key] || []) out[key].push({ 화면: screen, 프레임: url, ...item });
     for (const b of res.bad || []) out.bad.push({ 화면: screen, 프레임: url, 값: b });
     if (res.cards) out.cardsList.push({ 화면: screen, 프레임: url, ...res.cards });
     if ((res.overflow || 0) > 0) out.overflowList.push({ 화면: screen, 프레임: url, overflow: res.overflow });
@@ -269,6 +287,7 @@ export function lineOf(res) {
   if (res.항목 === '작은글자') return `${res.화면} 작은글자 ${res.px}px${res.단추 ? '(단추)' : ''} ${res.el} "${res.text}"`;
   if (res.항목 === '알림줄겹침') return `${res.화면} 알림줄겹침 ${res.el} × ${res.by} @(${res.x},${res.y})`;
   if (res.항목 === '대비') return `${res.화면} 대비 ${res.el} ${res.ratio}:1 < 4.5:1 "${res.text}"`;
+  if (res.항목 === '책글자') return `${res.화면} 책글자 ${res.el} — ${res.검사}(${res.실측})`;
   return JSON.stringify(res);
 }
 
@@ -282,6 +301,7 @@ export function failuresOf(res, 크기, 테마) {
   for (const c of res.covered) rows.push(['가려짐', lineOf({ 항목: '가려짐', ...c })]);
   for (const c of res.clipped) rows.push(['잘림', lineOf({ 항목: '잘림', ...c })]);
   for (const s of res.small) rows.push(['작은글자', lineOf({ 항목: '작은글자', ...s })]);
+  for (const b of res.bookState || []) rows.push(['책글자', lineOf({ 항목: '책글자', ...b })]);
   for (const c of res.cardsList || []) {
     const 기준 = 크기 < 700 ? 200 : 180;
     if (String(c.화면).startsWith('보드') && c.maxW < 기준) rows.push(['작은카드', `${c.화면} 작은카드 보이는 카드 ${c.n}장 중 가장 넓은 폭 ${c.maxW}px < ${기준}px`]);

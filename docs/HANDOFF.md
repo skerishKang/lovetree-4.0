@@ -12,6 +12,21 @@
 - **수리**: 화면 파일 이름('track60-graph.html' — 시험·postdeploy 판정 키)은 그대로 두고 `screenUrl`이 주소를 만들 때만 `VIEW_SUBDIRS`로 `views/graph/`를 붙인다. 메뉴 단추는 붙이지 않았다(대표 결정 전).
 - **시험**: screen-audit에 세 경우(로그인 진입·로그인 왕복·hash 이동) iframe 파일 이름·`data-v41-screen`·주소 단정 추가, 기존 #my/graph 단정도 프레임 주소·문서 표시까지 강화(폴백 프레임도 이름이 걸리던 허점 메움), shell-screens에 주소 매핑 단정, topmenu에 screens 화면 파일 실재 검사. 전체 npm test 1705 pass 0 fail(43초)·build·modulepreload --check 통과.
 
+## 2026-11-16 — 첫 화면 카드가 '영상을 볼 수 없어요'로 바뀌는 판정 오류: sweep이 lazy 미시작 그림을 실패로 셈 (컴1로컬2 레인, ai/local2-thumb-sweep-261116, main f64745c 기준)
+
+- **원인**: #679의 sweep 타이머(public/v41/thumb-fallback.mjs)가 complete=false인 그림을 모두 '매달린 요청'으로 보고 8초 뒤 실패 처리했다. 첫 화면 궤도의 YouTube 카드는 `loading="lazy"`(src/views/orbit.js)라 화면 밖(3D 투영상 벗어난 자리) 그림은 불러오기를 시작하지 않은 채 complete=false로 남고, 이것까지 실패로 넘어가 후보를 다 소진해 살아 있는 영상도 글 카드가 됐다.
+- **수리**: sweep을 `sweepPendingThumbs(root, now)`로 한 벌로 빼고(시험은 시각을 넣어 직접 호출) — lazy 그림은 화면 안에 들어온 뒤(getBoundingClientRect가 화면과 겹칠 때)부터만 시계를 시작하고, 시계가 시작된 그림은 뒤늦게 화면을 벗어나도 계속 판정한다. eager 그림은 #638 규칙 그대로(화면 자리 무관 8초). 재시도로 다음 후보를 붙일 때는 시계를 새로 산다.
+- **측정(가짜 기록 — YouTube 순간 40개 트리·로그인 소유자·2070×1000, ytimg 응답 고정, 마지막 3개는 404)**: 수리 전 카드 39 · 썸네일 28 · 글자 카드 11(이유: sweep이 잘라 낸 살아 있는 영상 8~9·진짜 404 2~3) → 수리 후 카드 39 · 썸네일 28 · 글자 카드 2(전부 진짜 404) · 미시작 대기 9(화면에 들어오면 그때 판정). 6초 시점의 미완료 그림 9장이 모두 화면 밖이었다는 점이 원인 확인 근거.
+- **시험**: tests/v41-thumb-fallback.test.mjs에 sweep 시험 1건(① lazy 미시작은 8초가 지나도 글 카드 아님 ② 시작 뒤 매달림은 8초 뒤 다음 후보·eager도 규칙 유지 ③ 120×90·404는 글 카드). 전체 npm test 1844검 1704 pass·0 fail·140 skip(33초), build·modulepreload --check 통과. updates.json은 손대지 않았다(고객 화면 변화 없음 — 잘못된 글자 카드가 원래 모양으로 돌아가는 것).
+## 2026-11-16 — 책 글자 다듬기: 칩 '이어진 순간' 전체 15px·날짜 본문 크기·잘린 제목 누르면 펼침 (컴1로컬4 레인, ai/local4-booktext-261115, main 18f0ce1 기준)
+
+- **칩(#overviewBtn)**: ≤600px 축약 '이어진 길'(view-navigation.js) 폐지 — 읽는 사람이 다른 단추로 읽은 문자열이었다(#584의 '이어진 순간'과 섞임). 전체 이름을 15px로 쓰고(book-usability.css 600px 블록), 이름 아래 '누르면 한눈에' 12px 보조 줄을 붙인다(폰은 올림·초점·길게 누름 팁이 안 보인다). 390 실측: 도구 줄 188px ≤ 60vw 234px·단추 오른쪽 376 ≤ 화면-8 — #book-dup2 기준(잘림 0) 유지. 600px를 넘나들면 matchMedia change로 따라 바꾼다.
+- **날짜(.moment-date)**: 13px → 본문과 같은 15px(폰, reader-layout.css)·17px(넓은 화면, book-usability.css).
+- **잘린 제목**: 누르면 펼침·다시 누르면 접힘(✎ 고치기는 그대로). 펼침은 openTitles(순간 id Set)로 기억해 다시 그리기(꼬리표 준비·설정 메시지)에 유지 — 재그림이 클래스를 지워 첫 누름이 무시된 것처럼 보였다(390 실측: 누름 70ms 뒤 노드 교체 확인). 접힘·펼침·짧은 제목에 맞춰 낭독 이름(제목 펼치기/접기/고치기)·aria-expanded를 실측 동기화(book-extra.js titleAriaSync + MutationObserver).
+- **공용 검사기(tests/helpers/screen-audit.mjs)**: 책 상태 단정 추가 — 날짜·칩 12px 이상, 접힌 제목 두 줄. '책글자' 줄로 KNOWN 대조에 흐른다. 위반 주입(날짜 11px·clamp 3)으로 red 2건 확인 → 원복 green.
+- **시험·측정**: node --test(584 브라우저 포함 17/17·share-readonly·book-usability·merge-sketchbook·screen-defaults·book-model·book-single-537·date-style 76 pass·0 fail), build·modulepreload --check·npm test 1836검 1697 pass·0 fail·139 skip(39초). 캡처·before/after 수치 `E:\lovetree-qa\lane\local4-booktext\{before,after}\`(390 칩 13→15px·날짜 13→15px, 1440 날짜 13→17px, 제목 누름 2줄→4줄·다시 2줄, 겹침·가려짐 0 — 전에는 누름이 고치기 창을 열어 겹침 3건이 보였음).
+- **CI 빨강 수리(261116, 로컬3 이어받기)**: '화면 시험 — 첫 화면·책'(#book-dup2, tests/v41-book-single-537.test.mjs:391)이 'night: 도구 줄이 10px 잘린다(scrollWidth 188 > clientWidth 178)'로 빨강 — 위 실측 줄은 60vw 상한(234px)을 재었지만 #book-dup2 계약은 **도구 줄 요소 폭**(390에서 177~178px)과 비교한다. 칩이 전체 이름+보조 줄(88px)이 되며 도구 줄 내용은 188px가 필요해 10~11px가 잘렸다. 계약(잘림 0)이 정당하므로 화면을 맞춤: ≤600px 블록에 `.book-title{max-width:84px}`(#book-dup 말줄임 그 자리에서 끊김)·`.tools{gap:4px}` — 도구 줄 186px ≤ 남은 자리 190px(로컬)·192px(CI 390). 칩 15px 전체 이름·보조 줄은 그대로. 재검증: book-single-537 13/13(밤·정원), 실측 tools scrollW 186 = clientW 186·book-title 97→84px. 펼침 재확인(내 기록 책, source:'file'): 누름→펼침(aria-expanded true·'제목 접기' 라벨)→다시 누름→접힘, 사이 쪽 번호 변화 0, 접은 뒤 150·400·800ms에 next 첫 클릭 모두 넘김 됨(02→03), lt41-select(고치기 창) 메시지 0건.
+
 ## 2026-11-16 — 둘러보기 카드 작은 글자 12px 이상·검사기 KNOWN 4→3건 (#705 후속, 컴1로컬4 레인, ai/local4-community-261116, main 18f0ce1 기준)
 
 - **고친 글자(shell.css 커뮤니티 블록)**: 감정 칩 .community-tag 10→12px · AI 명예회원 배지 .community-ai 11→12px · 대상 줄 .community-subject 11→13px · 요약 .community-summary 12→13px(본문급) · 메타 줄 .community-muted 11→12px · '댓글·신고·차단' 펼침 11→12px · 반응 칩 단추 .community-reaction 12→13px(단추 13px 규칙). 즐겨찾기·반응 단추 누름 영역 44px(#705) 유지 — 실측 h44.
@@ -40,6 +55,7 @@
 - **4.1.4 두 판 → 하나**: updates.json에 4.1.4가 두 개였다(위 판 — f19c414(#649)가 새로 만든 것, 아래 판 — 029fbc5(#619-5)의 원래 것. 화면에는 '러브트리 4.1.4' 제목이 두 번 떴다). 한 판으로 합치고 뜻이 같은 줄은 한 줄만 남겼다 — '핀보드에서 카드를 열에 쌓아 담아요'·'원하는 자리에 끼워 넣고 순서를 저장해요'(team, 이슈 없음)는 아래 판의 #619 줄(이슈·더 쉬운 말)로 흡수. 40줄.
 - **4.1.5(2026.11.15, 5줄)**: 4.1.4 이후 머지됐는데 어디에도 못 들은 고객 화면 것만 — 내 의견 덧붙임 고치기·지우기(#678), 순간 담기 '무대 날짜' 이름·자동 채움 확인(#627), 책 카드 꼬리표·겹친 꼬리표 표시(#627), 책 제목 고치기 손잡이 복원(#676), 연습용 트리 둘러보기 제외(#678). 서버·운영센터·시험 정비(#686·#689·#690·#694·#697·#699·#702·#703)와 화면 호칭 정리(#698)는 고객 기능 변화가 없어 뺐다.
 - **AI 명예회원 이름 칸**: tester '테스터'는 역할 글자라 이름 칸에서 뺐다 — #635 회차 6줄은 실명으로(앞 세션 확인), #638 6줄·#671 1줄은 이름을 모르는 항목이라 tester 칸을 빼고 `sourceLabel`의 이름 없음 표시('AI 명예회원이 알려 준 것')로 보인다. 이미 실명으로 든 줄은 그대로.
+- **#726(#725 옆 한 줄)**: 시험 파일 8곳(admin-view·board-service·export-ai-customer·feedback-postgres·v41-book-play-584·v41-screen-audit·v41-tags-627·v41-title-backfill)에 남아 있던 AI 고객 이름을 이슈 번호·중립 이름으로 바꿨다 — #725의 이름 표기 규칙을 시험까지 맞춘 것(기대값만, 검사 구조는 그대로).
 - **4.1.0(2026.11.14) 맨 아래 3줄**: '러브트리 4.1 첫 공개' 요약(검은 무대 금테 카드·책·보드·지도·둘러보기 자동 소개). 날짜는 운영 배포·실화면 확인이 기록된 2026-11-14(HANDOFF #565·#557).
 - **시험**: updates-format에 동작 시험 2건(버전 번호 겹침 금지·위에서부터 큰 번호 순서 / AI 명예회원 이름 칸에 '테스터'·'AI 테스터' 역할 글자 금지) — 고치기 전 red 2건 확인, 고친 뒤 green. 이름 없는 출처 계약으로 형식 시험을 다듬었다(tester는 선택 — `sourceLabel({source:'ai_tester'})`='AI 명예회원이 알려 준 것' 단정 추가).
 - **AGENTS.md**: 규칙 한 줄 추가 — '레인은 updates.json을 직접 고치지 않는다 — 새 소식은 하루 한 번 CTO가 정한 레인이 그날 머지된 PR을 모아 한 판으로 만든다.'
