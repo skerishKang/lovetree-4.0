@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { youtubeVideoId, titleBackfillTargets, backfillVideoTitles } from '../public/v41/title-backfill.mjs';
+import { isAutoTitle, autoTitleFor } from '../public/v41/auto-title.mjs';
 import { validateState } from '../public/v41/domain.mjs';
 import { createMemberSession } from '../public/v41/member-session.mjs';
 
@@ -138,4 +139,47 @@ test('6. #678 후속(보람 트리 재발): 늦게 도착한 제목이 자동 �
   assert.equal(fixed.title, '【2026 MMA】RIIZE (라이즈) Insomnia + Overdrive + Do your dance 4K Fancam', '자동 제목은 영상 제목으로 바로잡린다');
   assert.equal(user.title, '내가 쓴 제목', '사용자가 직접 적은 제목은 그대로');
   session.dispose();
+});
+
+test('7. #707: 포트 붙은 도메인 자동 제목도 바로잡는다(자동 제목 규칙 한 벌 — 도메인 복사본 유실 확인)', async () => {
+  // 'example.com:8080에서 간직한 순간'은 자동 제목이다 — 복사본 규칙(역슬래시 빠진 정규식)으로는
+  // ':8080'을 못 읽어 이 시험이 빨강이 된다(한 벌로 합친 뒤에는 통과해야 한다).
+  const portState = () => ({
+    version: 1,
+    trees: [{
+      id: 't1', subject: '나', title: '나의 순간들', coverMomentId: '', coverDesign: '', inbox: false,
+      createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+      moments: [{ id: 'm1', title: 'example.com:8080에서 간직한 순간', note: '', emotion: '설렘', date: '2026-01-01', url: 'https://example.com:8080/watch?v=abc123DEF45', parentId: null, links: [], createdAt: '2026-01-01T00:00:00.000Z' }]
+    }]
+  });
+  // 포트 붙은 도메인은 YouTube 대상 판정(videoId)이 아니라 적용 경로(세션 apply → cacheMomentMediaMetadata)의
+  // 자동 제목 판정으로 바로잡린다 — 아래 세션 적용이 이 시험의 본제다(대상 판정은 YouTube 주소만 통과).
+  let saved = validateState(portState()), revision = 0;
+  const api = {
+    get: async () => ({ ok: true, state: saved, revision, subject: 'qa', writeSubjectBound: true }),
+    put: async (body) => { saved = validateState(body.state); return { ok: true, revision: ++revision }; },
+    logout: async () => ({ ok: true })
+  };
+  const session = createMemberSession({ api, delay: () => new Promise(() => {}) });
+  await session.start();
+  session.apply('backfillTitles', { items: [{ treeId: 't1', momentId: 'm1', url: 'https://example.com:8080/watch?v=abc123DEF45', mediaMetadata: { title: '실제 영상 제목' } }] });
+  await session.act('retry');
+  const moment = saved.trees[0].moments.find((m) => m.id === 'm1');
+  assert.equal(moment.title, '실제 영상 제목', '자동 제목은 영상 제목으로 바로잡린다');
+  session.dispose();
+});
+
+test('8. #707: 자동 제목 규칙 한 벌 — 포트·점·한글 판정과 문구 만들기', () => {
+  // 자동 제목: 도메인(점 있음) + 선택 포트.
+  assert.equal(isAutoTitle('example.com:8080에서 간직한 순간'), true, '포트 붙은 도메인은 자동');
+  assert.equal(isAutoTitle('youtu.be에서 간직한 순간'), true, '짧은 도메인은 자동');
+  assert.equal(isAutoTitle('m.youtube.com에서 간직한 순간'), true, '서브도메인은 자동');
+  // 점이 없거나 사람이 쓴 한글 제목은 자동이 아니다.
+  assert.equal(isAutoTitle('abcxcom에서 간직한 순간'), false, '점이 없으면 자동이 아니다');
+  assert.equal(isAutoTitle('내가 쓴 한글 제목'), false, '사람이 쓴 제목은 자동이 아니다');
+  assert.equal(isAutoTitle(''), false, '빈 값은 자동이 아니다');
+  // 문구 만들기: 주소 모양(m.youtube.com·youtu.be·si= 꼬리)에서 같은 규칙으로 만든다.
+  assert.equal(autoTitleFor('https://m.youtube.com/watch?v=GONa9BsP9_c'), 'm.youtube.com에서 간직한 순간');
+  assert.equal(autoTitleFor('https://youtu.be/abc123DEF45?si=xyz'), 'youtu.be에서 간직한 순간');
+  assert.equal(autoTitleFor('https://www.youtube.com/watch?v=abc123DEF45'), 'youtube.com에서 간직한 순간');
 });
