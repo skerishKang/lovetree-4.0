@@ -112,7 +112,7 @@ html[data-lt-theme=garden][data-v41-screen=network] .lt-moment-picker button{bor
 html[data-lt-theme=garden][data-v41-screen=network] .lt-moment-picker button:hover{background:#fff;border-color:var(--lt-line-paper)}
 
 /* === #366 관계 지도 다듬기(2026-11-10): 보기 방식 고르기·연결 이유 툴팁·동심원 보기. 밤·정원 --lt-* 토큰만 쓴다. === */
-/* 윤제 4회차: 사용법은 보기 종류(전체 보기·그물형·동심원형)와 섞이지 않게 줄 끝의 작은 ? 단추로 뗀다. */
+/* #678 회차 지적: 사용법은 보기 종류(전체 보기·그물형·동심원형)와 섞이지 않게 줄 끝의 작은 ? 단추로 뗀다. */
 #helpBtn{flex:0 0 auto;width:36px;height:36px;min-height:36px;min-width:36px;padding:0;border-radius:50%;text-align:center;font-size:15px;line-height:1;letter-spacing:0}
 @media(max-width:640px){#helpBtn{width:44px;height:44px;min-height:44px;min-width:44px;font-size:17px}}
 .view-switch{display:inline-flex;gap:6px;pointer-events:auto}

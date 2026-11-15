@@ -8,7 +8,7 @@
 .lt-tagline-empty{font-size:12px;color:var(--lt-muted)}
 .lt-tagline-error{width:100%;margin:2px 0 0;font-size:12px;color:var(--lt-rose)}
 
-/* 칩: 확정은 진한 칩, 제안은 흐린 칩이다. 24자를 넘어 붙일 수 없는 후보는 애초에 제안에 보이지 않는다(윤제 4회차). 글자는 12px 이상(#548). */
+/* 칩: 확정은 진한 칩, 제안은 흐린 칩이다. 24자를 넘어 붙일 수 없는 후보는 애초에 제안에 보이지 않는다(#678 회차 지적). 글자는 12px 이상(#548). */
 .lt-tag-chip{display:inline-flex;align-items:center;max-width:100%;padding:3px 9px;border-radius:var(--lt-r-pill);
   font-size:12px;line-height:1.4;font-family:inherit;text-align:left;overflow-wrap:anywhere}
 button.lt-tag-chip{cursor:pointer;border:1px solid var(--lt-gold-line);background:transparent;color:var(--lt-gold);min-height:24px;font-size:13px}
@@ -19,7 +19,7 @@ button.lt-tag-chip:hover{border-color:var(--lt-gold-deep)}
 .lt-tag-chip.is-card{padding:1px 7px;border:1px solid var(--lt-line-paper);background:transparent;color:var(--lt-ink)}
 .book-page .chip.lt-tag-chip,.moment-title .lt-tag-chip{font-size:12px;padding:1px 7px}
 
-/* 직접 입력: 종류 고르기 + 값 + 붙이기. 라벨은 칸 위에 얹는다(윤제 4회차 — 390에서 '종/류'로 두 줄로 꺾이고
+/* 직접 입력: 종류 고르기 + 값 + 붙이기. 라벨은 칸 위에 얹는다(#678 회차 지적 — 390에서 '종/류'로 두 줄로 꺾이고
    드롭다운·값 칸이 좁아졌다). 위 얹음은 넓은 화면에서도 같은 모양이라 한 벌이다. */
 .lt-tagline-input{display:flex;flex-wrap:wrap;gap:6px;align-items:flex-end;width:100%;margin-top:2px}
 .lt-tagline-label{display:inline-flex;flex-direction:column;align-items:flex-start;gap:3px;font-size:12px;color:var(--lt-muted);min-width:0}
