@@ -14,6 +14,13 @@
 - **migration**: `server/db/migrations/tree-discover-optin-261116.sql` — 표 생성 + '지금 둘러보기에 나오는 트리'(active + 3개 이상 + auto/discoverable + 비공개 아님 + 숨김 없음)를 켜짐으로 백필(ON CONFLICT DO NOTHING — 재실행 안전). schema.sql에도 같은 표 추가. 탈퇴 경로(account-postgres.js)에도 표 추가.
 - **시험**: public-default-538(메모리)에 기본 꺼짐→켬→끔·남의 트리 404·tester 켜도 안 나옴·백필(켬) 트리 유지 + 공유/공개 상태 응답 discover 칸. community-service(메모리) tag-moments에 소개 꺼짐 제외·켬 추가. community-postgres(PG, CI) 둘러보기 SQL을 소개 표 기준으로 재작성(켬/끔/2개/비공개/숨김/재켜기) + stats 집계 백필 반영. migrations-postgres(PG, CI)에 백필 migration 재실행 안전 시험. 전체 npm test 1712 pass 0 fail(31초)·build·modulepreload --check 통과.
 - **운영 반영(머지 뒤, 대표 승인 — 백업 먼저)**: 컴2 autodeploy가 needs_manual_migration에서 멈추면 → 대상 표 백업(dump+sql, chmod 600) → migration 1회 → 둘러보기 목록 수가 migration 전과 같은지 확인 → `AUTODEPLOY_ACCEPT_MIGRATIONS=1` 설치. 백업 경로·전후 목록 수를 운영일지 '운영센터 처리'에 한 줄 기록.
+## 2026-11-16 — 보드에서 붙인 꼬리표가 트리 첫 순간에 저장되는 결함 수리 (컴1로컬4 레인, ai/local4-lt-tagline-first-moment-261116, main a5fc571 기준, PR #738)
+
+- **원인(확정)**: public/v41/tag-line.mjs mountViewTagLine이 onCommit을 '줄을 처음 만든 순간'의 moment 객체 클로저로 만들었다 — 카드를 바꿔 line.update()로 화면은 새 순간을 보여 줘도 저장은 처음 만든 순간(첫 순간) id로 갔다. 화면 선택 자체는 보드·책·지도 모두 LTDEMO.select로 셸 LT41.momentId를 이미 맞춘다(runtime.js) — '보드만 lt41-select를 보내지 않는다'는 후보는 원인이 아니었다. 보드는 같은 제목의 다른 카드로 바꾸면 제목 관찰만으론 다시 그리지 않아 옛 keywords를 들고 저장할 수도 있었다(함께 막음).
+- **수리(한 벌 — 보드·책·지도 동시, 그래프는 꼬리표 줄 미사용)**: renderTagLine의 commit이 onCommit에 (keywords, 지금 보고 있는 순간 id)를 넘기고 mountViewTagLine은 그 id로만 저장한다. 상세 전체(#detail)를 관찰해 선택 바뀜을 잡되, 꼬리표 줄이 스스로 그린 바뀜(wrap 안)은 무시한다. 고치기 창 코드는 건드리지 않았다(로컬2의 커스텀 꼬리표 결함 작업과 파일 겹침 없음).
+- **시험**: tests/v41-tags-627.test.mjs에 renderTagLine 계약 1건 + 보드(A→B·같은 제목 A→B)·책·지도 흐름 3건(가짜 문서 하네스, 셸은 부모 창 흉내). 고치기 전 코드로는 새 시험 4건 실패, 고친 코드로 40/40. 전체 npm test 1851검 fail 0(32초)·build·modulepreload --check 통과.
+- **영향 조사(컴2 READ ONLY, 읽기만)**: 윤제·보람 트리 3개의 첫 순간 꼬리표 모두 0개 — 이 결함으로 남은 오기록 없음(11-15 운영 정리 뒤). 윤제 '쇼챔피언 261111' 꼬리표는 이미 11-15 20:36 제거됐고, 남은 데이터(revision 이력 없음)로는 이 결함 경로와 #679 실사 직접 쓰기를 구별할 수 없다 — 운영 기록상 실사 오염 설이 유력. 자세한 근거는 PR #738 댓글.
+- **별도 진행**: 새 소식 4.1.6 + '아직 준비 중' 갈래는 같은 레인의 PR #734(updates.json·updates.mjs·updates 시험 — 이 결함과 파일 겹침 없음, 대표 결정 2026-11-16 문구 그대로).
 
 ## 2026-11-16 — #my/graph가 그래프가 아니라 첫 화면으로 열리는 문제 수리 (컴1로컬4 레인, ai/local4-graph-route-261116, main f64745c 기준, PR #728)
 
