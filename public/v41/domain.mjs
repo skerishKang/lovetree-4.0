@@ -1,5 +1,6 @@
 // #547: '오늘' 날짜는 기기의 지역 날짜로 만든다(UTC 날짜였을 때 새벽 순간이 하루 전으로 찍혔다).
 import { localDateOnly } from './local-date.mjs';
+import { isAutoTitle, autoTitleFor } from './auto-title.mjs';
 export const EMOTIONS = ['설렘', '위로', '벅참', '그리움', '고마움', '즐거움'];
 // #256-3: 책(트리)마다 고르는 디자인 표지. 테마 표지 색(--lt-cover-N) 위의 질감 변형 6종.
 // 값은 이 목록뿐이다. 모르는 값·타입은 저장 거부가 아니라 ''(기본 표지)로 되돌린다.
@@ -171,7 +172,7 @@ export function suggestMomentTitle({ title = '', note = '', url = '', mediaMetad
   const parsed = new URL(normalized);
   if (/\.(?:png|jpe?g|gif|webp)$/.test(parsed.pathname.toLowerCase())) return '사진으로 남긴 순간';
   if (/\.(?:mp4|webm)$/.test(parsed.pathname.toLowerCase())) return '영상으로 남긴 순간';
-  return `${parsed.hostname.replace(/^www\./, '') || '링크'}에서 간직한 순간`;
+  return autoTitleFor(normalized);
 }
 export function normalizeEmotion(value) {
   if (EMOTIONS.includes(value)) return value;
@@ -256,8 +257,14 @@ export function cacheMomentMediaMetadata(tree, id, url, metadata, clock = new Da
   const current = tree.moments.find(m => m.id === id);
   if (!current || !url || current.url !== safeUrl(url)) return tree;
   const mediaMetadata = normalizeMediaMetadata(metadata, current.url);
-  if (!mediaMetadata || JSON.stringify(current.mediaMetadata || null) === JSON.stringify(mediaMetadata)) return tree;
-  return {...tree, updatedAt:clock, moments:tree.moments.map(m => m.id === id ? {...m, mediaMetadata} : m)};
+  const metadataChanged = !!mediaMetadata && JSON.stringify(current.mediaMetadata || null) !== JSON.stringify(mediaMetadata);
+  // #678 후속(보람 트리 재발, 2026-11-15): 늦게 도착한 영상 제목은 mediaMetadata뿐 아니라 자동 제목
+  // ('<도메인>에서 간직한 순간' — suggestMomentTitle의 기본 문구)까지 바로잡는다. 고객이 직접 적은
+  // 제목은 절대 건드리지 않는다(자동 제목 판정은 auto-title.mjs의 isAutoTitle — 규칙 한 벌).
+  const videoTitle = typeof mediaMetadata?.title === 'string' ? mediaMetadata.title.trim() : '';
+  const titleFix = videoTitle && isAutoTitle(String(current.title || '').trim()) ? shortened(videoTitle, 80) : null;
+  if (!metadataChanged && !titleFix) return tree;
+  return {...tree, updatedAt:clock, moments:tree.moments.map(m => m.id === id ? {...m, mediaMetadata: metadataChanged ? mediaMetadata : m.mediaMetadata, ...(titleFix ? {title: titleFix} : {})} : m)};
 }
 export function parentCandidates(tree, id) {
   if (!tree.moments.some(m => m.id === id)) return [];

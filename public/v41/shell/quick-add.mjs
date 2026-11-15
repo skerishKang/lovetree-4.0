@@ -250,9 +250,10 @@ export function createQuickAdd(deps) {
   }
 
   // #638 제목 경합: 제목이 도착하기 전에 담았으면 저장한 순간을 기록해 두었다가, 제목이 도착하면
-  // 그 순간의 영상 제목(mediaMetadata)을 채운다. backfillTitles(#347 후속 B)는 mediaMetadata만 채우고
-  // title은 건드리지 않으므로 사용자가 직접 쓴 제목은 덮이지 않고, 이 화면에서 방금 담은 순간만 채운다
-  // (이미 저장된 다른 순간은 자동으로 고치지 않는다 — 그 길은 기존 title-backfill이 맡는다).
+  // 그 순간의 영상 제목을 채운다. backfillTitles(#347 후속 B)의 적용은 자동 제목('<도메인>에서
+  // 간직한 순간' — 담기 때 기본 문구로 저장된 것)까지 영상 제목으로 바로잡고(#678 후속), 사용자가
+  // 직접 쓴 제목은 덮이지 않는다. 이 화면에서 방금 담은 순간만 채운다(이미 저장된 다른 순간은
+  // 자동으로 고치지 않는다 — 그 길은 기존 title-backfill이 맡는다).
   function fillPendingTitle(videoId, title) {
     const pending = pendingTitleFill;
     if (!pending || pending.videoId !== videoId || !title) return;
