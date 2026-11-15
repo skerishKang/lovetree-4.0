@@ -70,7 +70,7 @@ function renderLogin() {
   return true;
 }
 
-function statusBadge(status) { return `<span class="lt-badge" data-status="${escapeText(status)}">${escapeText(STATUS_LABEL[status] || status)}</span>`; }
+function statusBadge(status, prefix = '') { return `<span class="lt-badge" data-status="${escapeText(status)}">${escapeText(prefix + (STATUS_LABEL[status] || status))}</span>`; }
 function kindBadge(kind) { return `<span class="lt-badge" data-kind="${escapeText(kind)}">${escapeText(KIND_LABEL[kind] || kind)}</span>`; }
 // #611 3번: 운영센터에서는 AI 고객 이름을 'AI 명예회원' 호칭으로 알린다(2026-11-15 호칭 결정).
 function authorLabel(row) { const name = row.authorName || (row.subjectId ? '고객' : '익명'); return row.authorRole === 'ai_customer' ? `AI 명예회원 ${name}` : name; }
@@ -385,11 +385,12 @@ async function renderIssues() {
   const byNumber = new Map();
   if (numbers.length) {
     // 공개 저장소 읽기만(토큰 없이). 하나가 실패해도 나머지는 그린다.
+    // 번호가 PR을 가리켜도 그대로 돌려준다 — 줄에서 'PR #번호 · 제목'으로 보여 준다(대표 요청 2026-11-16,
+    // '#637 (이슈를 불러오지 못했어요)'처럼 PR을 못 부른 것처럼 보이지 않게).
     const results = await Promise.allSettled(numbers.map(async number => {
       const r = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/issues/${number}`, {headers: {accept: 'application/vnd.github+json'}});
       if (!r.ok) throw new Error(String(r.status));
-      const issue = await r.json();
-      return issue.pull_request ? null : issue; // 번호가 PR을 가리키면 건너뛴다
+      return await r.json();
     }));
     results.forEach((result, index) => {
       if (result.status === 'fulfilled' && result.value) byNumber.set(numbers[index], result.value);
@@ -397,20 +398,25 @@ async function renderIssues() {
     });
   }
   // #743: '한눈에'의 열린/닫힌 이슈 카드가 #issues?status=open|closed 로 열면 그 상태만 보여 준다.
-  const shown = route.status ? numbers.filter(number => byNumber.get(number)?.state === route.status) : numbers;
+  // PR은 이슈 상태 거름이 아니므로 거름에 넣지 않는다(둘 다 열리지 않은 것처럼 숨기지 않고 그대로 보인다).
+  const shown = route.status ? numbers.filter(number => { const row = byNumber.get(number); return row && !row.pull_request && row.state === route.status; }) : numbers;
   const rows = shown.map(number => {
     const issue = byNumber.get(number);
     // #636: 저장된 값에 앞의 '#'이 붙어 있을 수 있다 — 읽는 쪽은 숫자로 맞춰 비교한다.
     const linked = posts.filter(post => normalizeIssueNumber(post.issueNumber) === String(number));
-    const stateLabel = issue ? issueStateLabel(issue.state) : '';
+    const isPr = Boolean(issue?.pull_request);
+    const stateLabel = issue && !isPr ? issueStateLabel(issue.state) : '';
+    const issueTitle = issue ? (isPr ? `PR #${number} · ${issue.title}` : issue.title) : '(이슈를 불러오지 못했어요)';
     const postRows = linked.map(post => {
-      // 이슈가 고침 완료인데 고객 글이 아직 '고침'이 아니면 바꾸는 단추를 내놓는다. 누르기 전까지는 자동으로 바꾸지 않는다(#570 4).
+      // 이슈가 닫혔는데 고객 글이 아직 '고침'이 아니면 바꾸는 단추를 내놓는다. 누르기 전까지는 자동으로 바꾸지 않는다(#570 4).
       const fixBtn = needsFixButton(post, issue?.state)
         ? `<button type="button" class="lt-btn lt-fix-btn" data-fix-status="${escapeText(post.id)}">고침으로 바꾸기</button>` : '';
-      return `<article class="lt-post lt-post-row" data-open="${escapeText(post.id)}" tabindex="0" role="button"><span class="lt-post-title">${escapeText(post.displayTitle || '(제목 없음)')}</span>${statusBadge(post.status)}${fixBtn}</article>`;
+      // 고객 글 상태 칩에는 '고객에게:' 머리를 붙인다(대표 요청 2026-11-16) — 이슈 상태 칩('이슈 열림/이슈 닫힘')과
+      // 같은 말이 반복되어 보이지 않게. 다른 탭의 상태 이름(새 글·확인 중·고침…)은 그대로 쓴다.
+      return `<article class="lt-post lt-post-row lt-issue-post" data-open="${escapeText(post.id)}" tabindex="0" role="button"><span class="lt-post-title">${escapeText(post.displayTitle || '(제목 없음)')}</span>${statusBadge(post.status, '고객에게: ')}${fixBtn}</article>`;
     }).join('');
     return `<section class="lt-card lt-issue-row" data-issue-row="${number}">
-      <div class="lt-issue-head"><a class="lt-issue-link" href="https://github.com/${GITHUB_REPO}/issues/${number}" target="_blank" rel="noopener">#${number}</a><span class="lt-issue-title">${issue ? escapeText(issue.title) : '(이슈를 불러오지 못했어요)'}</span>${stateLabel ? `<span class="lt-badge" data-issue-state="${escapeText(issue.state)}">${stateLabel}</span>` : ''}</div>
+      <div class="lt-issue-head"><a class="lt-issue-link" href="https://github.com/${GITHUB_REPO}/${isPr ? 'pull' : 'issues'}/${number}" target="_blank" rel="noopener">#${number}</a><span class="lt-issue-title">${escapeText(issueTitle)}</span>${stateLabel ? `<span class="lt-badge" data-issue-state="${escapeText(issue.state)}">${stateLabel}</span>` : ''}</div>
       <div class="lt-post-list">${postRows}</div>
     </section>`;
   }).join('');

@@ -400,6 +400,17 @@ jobs:
           node --test tests/v41-screen-audit.test.mjs
           echo "화면 공통 검사기 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
 
+      # 대표 요청 2026-11-16: 운영센터 상태 칩 한 모양(높이·한 줄·글자 폭)·이름('이슈 닫힘'/'고객에게: 고침')·
+      # PR 번호('PR #637 · 제목')를 1440·390에서 숫자로 잰다(tests/admin-view.test.mjs — 관리자 세션·GitHub 읽기는 가짜).
+      - name: 운영센터 상태 칩 시험(건너뜀=실패)
+        env:
+          LT_ADMIN_REQUIRE: '1'
+        run: |
+          start=$(date +%s)
+          npx vite build > /dev/null
+          node --test tests/admin-view.test.mjs
+          echo "운영센터 상태 칩 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+
   screen-book-screen:
     name: 화면 시험 — 책 대비·초점
     runs-on: ubuntu-latest
