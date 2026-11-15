@@ -2094,3 +2094,12 @@ COM2에는 merge `6900df8aa446dfe0201d01997457fae04c4abe16`의 변경 서버 파
 - **시험 계정(tester 역할) 걸러 내기**: 없다 — 둘러보기 discover(/api/community/shares)는 역할과 무관하게 공유 행을 나열하고 aiTester 비트만 본다(지금은 시험 계정이 공유가 없어 안 보일 뿐). 방법(별도 서버 PR): discover 목록과 자동 공유 생성에서 주체 역할을 roleFor로 확인해 role='tester'면 목록에서 제외하고 새 공유를 막는다(공개 읽기 /api/public/shares/:id도 같은 판정).
 - **시험**: 기존 시험 기대 글자 8곳 갱신(updates-format·updates-screen-611·updates-b-611 'AI 윤제'→'AI 명예회원 윤제'·pages-search-preview·share-service·admin-view 'AI 고객1'→'AI 명예회원 고객1'). 새 시험·소스 글자 검사 없음. 전체 npm test 1820검 1681 pass·0 fail·139 skip, build·modulepreload --check 통과.
 - **머지 뒤 할 일**: 서버 파일이 바뀌었으므로(주석만) 컴2 autodeploy 설치 sha 확인. 화면 캡처(둘러보기 카드·새 소식·운영센터 1440·390, 시험 계정·관리자 계정)는 배포 뒤 컴2에서.
+
+## 2026-11-16 — 그래프 390 배치: 2열 격자·이름 고정(숨김 없음) (컴1로컬3 레인, ai/local3-graph-view-261115, PR #716 — #714 후속)
+
+- CTO가 final-night-390.png 판정 — 1440은 좋고 390은 못 씀: 이름이 자기 고리에서 떨어져 다른 고리 사이에 놓임·이름 없는 묶음 3개·3열 격자. #714(8f78350, 시안 v2 이식 분)는 좁은 무대 3열 격자 + 이름 4방향 시도(못 찾으면 group.remove로 통째로 숨김)였다.
+- **바꾼 것**(public/v41/views/graph/graph.js·graph.css): 좁은 무대(≤699px)를 **2열 격자**로 — 칸 = 묶음 고리 + 바로 아래 가운데 이름 두 줄(이름/종류 개수). 필요 높이만큼 스테이지 세로 성장(스테이지 inline height + ≤599px .g-frame flex:0 0 auto로 높이 보존), 이름 숨김 없음(길면 …). 1440 넓은 무대는 그대로(CTO 승인). ×N 개수 표시는 점 중심 8방향 후보 중 다른 점(원 거리)·허브 점·이름 상자를 모두 피하는 첫 자리.
+- **검사기**(tests/v41-screen-audit.test.mjs, '그래프 보기' 상태): ①좁은 화면 이름 중심↔자기 고리 중심 ≤ 고리 r+이름 h+12 ②고리끼리 겹침 쌍 0 ③좁은 화면 숨김 이름 0 ④×N↔순간 점 원 거리(dotR+h/2+1). 판정용 .g-ring/.g-hubdot/data-key/data-cr 표식.
+- **실측(시험 트리 17순간·묶음 8, iframe 실측)**: 390 숨긴 이름 3→**0**, 이름 5/8→**8/8**, 이름↔자기 고리 최대 73→**56px**(한계 70px 안, 8개 모두 통과), 고리 겹침 0·0. 1440은 이름 최대 99px로 전·후 같음(배치 불변), ×N↔점은 검사기 ④로 잠금. 캡처 E:/lovetree-qa/lane/local3-graph/final2/ 12장(밤 rgb(4,4,7)·정원 rgb(247,240,232)).
+- **교훈(커밋 습관)**: 이 수리가 한동안 워크트리에 커밋 없이 남아 있었다(직전 PR #714는 표식 제거만으로 자동 머지됨). 작업 중간에도 강도 증명 전 커밋 먼저.
+- npm test 1697 pass·0 fail, build·modulepreload --check 통과. 메뉴 연결은 여전히 없음(#my/graph 주소로만).
