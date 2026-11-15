@@ -118,6 +118,43 @@ firstTree.moments[0].keywords = ['노래:Super Shy', '무대'];
 const tagSecond = addMoment(firstTree, { subject: '시험', title: '뉴진스 Super Shy 직캠 @인기가요 23716', note: '기록', emotion: '설렘', date: '2026-11-15', url: '' }, firstTree.moments[0].id, '2026-11-15T00:01:00.000Z');
 if (!tagSecond?.moments?.length && !tagSecond?.tree?.moments?.length) throw new Error('시험 트리의 둘째 순간을 만들지 못했다');
 
+// #627 PR3: '그래프 보기' 상태의 시험 트리 — 꼬리표 허브 8종(무대·노래·멤버·가수)·같은 영상 묶음(stacks)·
+// 꼬리표 없는 순간 3개(선반·제안받기 대상). 도메인 규칙(createTree·addMoment)으로 만들어 셸이 그대로 받게 한다 —
+// 호스트(LT41 직접 주입)와 셸 주소(#my/graph) 양쪽에서 같은 트리를 쓴다.
+const graphTree = (() => {
+  const V = 'https://www.youtube.com/watch?v=';
+  const defs = [
+    { title: '데뷔쇼 첫 무대', date: '2026-01-10', url: V + 'aaa11111111', keywords: ['가수:하츠투하츠', '무대:데뷔쇼'] },
+    { title: '데뷔쇼 다시 보기', date: '2026-01-20', url: V + 'aaa11111111', keywords: ['가수:하츠투하츠', '무대:데뷔쇼'] },
+    { title: '쇼챔 1주차', date: '2026-02-05', url: V + 'bbb22222222', keywords: ['가수:하츠투하츠', '무대:쇼챔피언', '노래:With'] },
+    { title: '쇼챔 2주차', date: '2026-02-12', url: V + 'bbb22222222', keywords: ['가수:하츠투하츠', '무대:쇼챔피언', '노래:With', '멤버:제나'] },
+    { title: '쇼챔 3주차', date: '2026-02-19', url: V + 'ccc33333333', keywords: ['가수:하츠투하츠', '무대:쇼챔피언', '노래:15-LOVE'] },
+    { title: '제나 직캠', date: '2026-03-01', url: V + 'ddd44444444', keywords: ['가수:하츠투하츠', '멤버:제나'] },
+    { title: '제나 직캠 세로', date: '2026-03-02', url: V + 'ddd44444444', keywords: ['가수:하츠투하츠', '멤버:제나'] },
+    { title: '팬콘 하이투치', date: '2026-04-10', url: V + 'eee55555555', keywords: ['가수:하츠투하츠', '무대:팬콘'] },
+    { title: '팬콘 앙코르', date: '2026-04-11', url: V + 'eee55555555', keywords: ['가수:하츠투하츠', '무대:팬콘'] },
+    { title: '멜론 어워즈 무대', date: '2026-05-20', url: V + 'fff66666666', keywords: ['가수:하츠투하츠', '무대:멜론뮤직어워즈'] },
+    { title: 'RESCENE 단체 컨셉', date: '2026-06-01', url: V + 'ggg77777777', keywords: ['가수:RESCENE'] },
+    { title: 'RESCENE 비하인드', date: '2026-06-02', url: V + 'hhh88888888', keywords: ['가수:RESCENE'] },
+    { title: 'With 연습실', date: '2026-02-22', url: '', keywords: ['노래:With'] },
+    { title: '15-LOVE 무대 영상', date: '2026-03-15', url: V + 'iii99999999', keywords: ['노래:15-LOVE'] },
+    { title: '벤치의 기억', date: '2026-02-01', url: '', keywords: [] },
+    { title: '산책한 날', date: '2026-04-03', url: '', keywords: [] },
+    { title: '창밖의 비', date: '2026-05-05', url: '', keywords: [] }
+  ];
+  let t = createTree({ subject: '시험', title: '시험 트리(꼬리표)', note: '기록', emotion: '설렘', date: defs[0].date, url: defs[0].url }, '2026-11-15T00:00:00.000Z');
+  t.moments[0].keywords = defs[0].keywords;
+  for (let i = 1; i < defs.length; i++) {
+    t = addMoment(t, { subject: '시험', title: defs[i].title, note: '기록', emotion: '설렘', date: defs[i].date, url: defs[i].url }, t.moments[0].id, '2026-11-15T00:0' + Math.min(i, 9) + ':00.000Z');
+    t.moments.at(-1).keywords = defs[i].keywords;
+  }
+  return t;
+})();
+// 그래프 보기는 지금 주소(#my/graph)로만 열리는 화면이라 셸 상태 대신 호스트가 LT41을 직접 넘긴다(share-host와 같은 틀).
+const graphHost = `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>그래프 호스트</title></head>
+<body data-member="in" data-record-source="file"><script>window.LT41={source:'file',writable:false,owned:true,momentId:'m01',prefs:{},tree:${JSON.stringify(graphTree)},trees:[${JSON.stringify(graphTree)}]};</script>
+<iframe src="/v41/views/graph/track60-graph.html" style="position:fixed;inset:0;width:100vw;height:100vh;border:0"></iframe></body></html>`;
+
 const frameOf = async (page, test_) => {
   for (let i = 0; i < 80; i++) {
     const f = page.frames().find((f) => f !== page.mainFrame() && test_.test(f.url()));
@@ -127,9 +164,9 @@ const frameOf = async (page, test_) => {
   return null;
 };
 
-test('#657 화면 공통 검사기: 주요 화면 16 상태 × 390·1440 × 밤·정원에서 겹침·잘림·흔적 값·작은 글자가 0이다', { skip: REQUIRE ? false : skip, timeout: 900000 }, async () => {
+test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤·정원에서 겹침·잘림·흔적 값·작은 글자가 0이다', { skip: REQUIRE ? false : skip, timeout: 900000 }, async () => {
   if (skip) assert.fail(`미리보기 검사에서는 건너뜀이 실패다 — ${skip}`);
-  const server = await serve({ '/share-host.html': shareHost, '/home-host.html': homeHost });
+  const server = await serve({ '/share-host.html': shareHost, '/home-host.html': homeHost, '/graph-host.html': graphHost });
   const base = `http://127.0.0.1:${server.address().port}`;
   const browser = await chromium.launch({ headless: true });
   const known = [], fresh = [];
@@ -465,6 +502,66 @@ test('#657 화면 공통 검사기: 주요 화면 16 상태 × 390·1440 × 밤�
       [...document.querySelectorAll('.moment-title .lt-tag-chip')].map((n) => n.textContent.trim()));
     assert.ok(bookChips.includes('Super Shy') && bookChips.includes('무대'), `책 쪽에 확정 꾀리표 칩이 그려져야 한다(실제: ${JSON.stringify(bookChips)})`);
     await ctx5.close();
+
+    // #627 PR3: 그래프 보기 — 지금은 주소(#my/graph)로만 열리는 화면이라 호스트가 LT41을 직접 넘긴다
+    // (share-host와 같은 틀, 실제 트리 = 셸이 넘기는 순간들과 같은 모양). 허브 이름 상자 겹침 0·
+    // 가로 넘침 0·고리 썸네일 동그라미 보임을 수치로 단정한다.
+    const ctx7 = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
+    await ctx7.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); } catch {} }, theme);
+    await ctx7.route('**://i.ytimg.com/**', THUMB);
+    await ctx7.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
+    const page7 = await ctx7.newPage();
+    await page7.goto(`${base}/graph-host.html`, { waitUntil: 'domcontentloaded' });
+    const graphFrame = await frameOf(page7, /track60-graph/);
+    assert.ok(graphFrame, '그래프 프레임이 열린다');
+    await page7.waitForTimeout(700);
+    await take(page7, '그래프 보기');
+    const graphCheck = await page7.evaluate(() => {
+      const f = [...document.querySelectorAll('iframe')].at(-1);
+      const doc = f.contentDocument;
+      const names = [...doc.querySelectorAll('.g-hubname')];
+      const boxes = names.map((x) => x.getBoundingClientRect());
+      let hubPairs = 0;
+      const pairTexts = [];
+      for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
+        const a = boxes[i], b = boxes[j];
+        if (a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom) {
+          hubPairs++;
+          pairTexts.push(names[i].textContent + '×' + names[j].textContent + ' @' + Math.round(a.left) + ',' + Math.round(a.top));
+        }
+      }
+      return {
+        hubPairs,
+        pairTexts,
+        hubs: names.length,
+        thumbs: doc.querySelectorAll('#gsvg image').length,
+        stacks: [...doc.querySelectorAll('.g-stackcount')].map((x) => x.textContent),
+        overflow: Math.max(0, doc.documentElement.scrollWidth - doc.documentElement.clientWidth),
+        badge: doc.getElementById('gBadge')?.textContent || ''
+      };
+    });
+    assert.equal(graphCheck.hubPairs, 0, `허브 이름 상자 겹침 0(실제 ${graphCheck.hubPairs}: ${JSON.stringify(graphCheck.pairTexts)})`);
+    assert.equal(graphCheck.overflow, 0, `그래프 보기 가로 넘침 0(실제 ${graphCheck.overflow})`);
+    assert.ok(graphCheck.hubs >= 4, `허브가 그려진다(실제 ${graphCheck.hubs})`);
+    assert.ok(graphCheck.thumbs >= 3, `고리 썸네일 동그라미가 보인다(실제 ${graphCheck.thumbs})`);
+    assert.ok(graphCheck.stacks.length >= 1, `같은 영상·같은 무대 무더기 개수가 표시된다(실제 ${JSON.stringify(graphCheck.stacks)})`);
+    assert.match(graphCheck.badge, /순간 17/, '표시에 순간 수가 있다');
+    await ctx7.close();
+
+    // 주소로 열리는지(#my/graph) — 셸이 그래프 보기를 화면 파일로 띄우는지 단정한다(메뉴 단추는 없다).
+    const ctx8 = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
+    await ctx8.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); } catch {} }, theme);
+    await ctx8.route('**://i.ytimg.com/**', THUMB);
+    await ctx8.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
+    await ctx8.route('**/api/workspace**', (r) => r.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify({ revision: 1, state: { version: 1, trees: [graphTree], prefs: {} }, subject: '시험계정', writeSubjectBound: true, savedAt: '2026-11-15T09:00:00.000Z' })
+    }));
+    const page8 = await ctx8.newPage();
+    await page8.goto(`${base}/v41/?account=1#my/graph`, { waitUntil: 'load' });
+    const graphByHash = await frameOf(page8, /track60-graph/);
+    assert.ok(graphByHash, '#my/graph 주소로 그래프 보기가 열린다(메뉴 연결 없이 주소로만)');
+    await ctx8.close();
 
     await context.close();
     return rows;

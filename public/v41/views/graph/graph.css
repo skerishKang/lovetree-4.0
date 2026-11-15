@@ -1,0 +1,102 @@
+/* 그래프 보기(#627 2단계 PR3) — 검은 무대 위 금테 카드, 색·모서리는 identity.css의 --lt-* 토큰만.
+   배치는 docs/GRAPH_VIEW_20261115.md 안2 '묶음 원형(결정론)' — 시안 v2를 실제 데이터로 옮긴 것. */
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{
+  display:flex;flex-direction:column;padding:12px 14px;gap:0;overflow-x:clip;
+  background:var(--lt-stage);color:var(--lt-pearl);
+  font-family:var(--lt-ui);font-size:14px;line-height:1.6;
+}
+button{font:inherit;color:inherit;cursor:pointer;background:none;border:0}
+button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--lt-gold);outline-offset:3px;border-radius:8px}
+
+.g-frame{
+  flex:1;min-height:0;display:flex;flex-direction:column;gap:10px;padding:14px 16px 12px;
+  border-radius:16px;border:1px solid var(--lt-gold-line);
+  box-shadow:0 0 0 1px rgba(255,230,166,.1),0 0 32px rgba(238,190,104,.16),0 24px 60px rgba(0,0,0,.5);
+  background:radial-gradient(120% 90% at 50% 0%,var(--lt-stage-2),var(--lt-stage) 70%);
+}
+html[data-lt-theme="garden"] .g-frame{box-shadow:0 0 0 1px var(--lt-garden-edge),0 18px 46px var(--lt-garden-shadow)}
+
+/* 머리: 브랜드 · 표시(발자취 지도 / 그래프 보기 전환은 지도 입구의 다음 단계 — 자리만 남긴다) */
+.g-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.g-brand{display:flex;align-items:baseline;gap:9px;min-width:0}
+.g-brand b{font-family:var(--lt-font-display);font-size:19px;font-weight:600;letter-spacing:-.02em;color:var(--lt-pearl);white-space:nowrap}
+.g-brand small{font-size:12px;letter-spacing:.14em;color:var(--lt-gold);white-space:nowrap}
+.g-head-spacer{flex:1}
+.g-badge{font-size:12px;color:var(--lt-muted);border:1px solid var(--lt-line);border-radius:var(--lt-r-pill);padding:5px 11px;white-space:nowrap}
+.g-head-note{flex-basis:100%;font-size:12.5px;color:var(--lt-muted);margin:0}
+.g-head-note[hidden]{display:none}
+
+/* 몸: 무대 + 레일 */
+.g-body{flex:1;min-height:0;display:flex;gap:14px}
+.g-stagewrap{flex:1;min-width:0;position:relative}
+#gsvg{position:absolute;inset:0;width:100%;height:100%;display:block}
+#gsvg text{font-family:var(--lt-ui)}
+.g-hubname{font-size:13.5px;font-weight:600;fill:var(--lt-pearl);paint-order:stroke;stroke:var(--lt-stage);stroke-width:4px}
+.g-hubsub{fill:var(--lt-muted)}
+.g-mark{font-size:12.5px;font-weight:600;fill:var(--lt-gold);paint-order:stroke;stroke:var(--lt-stage);stroke-width:4px}
+.g-stackcount{font-size:12px;font-weight:700;fill:var(--lt-stage);paint-order:stroke;stroke:var(--lt-pearl);stroke-width:3px}
+.g-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;color:var(--lt-muted);font-size:15px}
+/* hidden 속성이 author display:flex에 눌리지 않게 — 이 오버레이가 남아 있으면 무대 전체를 덮어 클릭도 막는다(검사기가 잡았다). */
+.g-empty[hidden]{display:none!important}
+
+/* 꼬리표 없는 순간 선반(아래) — 시간 순서로 흐리게, '꼬리표 한 번에 제안받기' 자리 */
+.g-shelf{position:absolute;left:18px;right:18px;bottom:2px;display:flex;align-items:center;gap:10px;pointer-events:none}
+.g-shelf-label{font-size:12.5px;color:var(--lt-muted);white-space:nowrap;pointer-events:auto}
+.g-shelf-hint{pointer-events:auto;font-size:13px;color:var(--lt-gold);border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-pill);padding:4px 10px;background:rgba(255,230,166,.05);white-space:nowrap}
+.g-shelf-hint:hover{background:rgba(255,230,166,.12)}
+
+/* 오른쪽 레일(1440)·아래 시트(390) */
+.g-rail{flex:0 0 336px;display:flex;flex-direction:column;gap:12px;min-height:0;overflow:auto}
+.g-card{border:1px solid var(--lt-line);border-radius:var(--lt-r-card);background:var(--lt-glass);padding:13px 14px}
+.g-card h3{margin:0 0 8px;font-size:12px;font-weight:700;letter-spacing:var(--lt-track);color:var(--lt-muted)}
+.g-legend-row{display:flex;gap:6px 16px;flex-wrap:wrap}
+.g-legend-group{display:grid;gap:3px;min-width:86px}
+.g-legend-title{font-size:12px;color:var(--lt-muted)}
+.g-legend-item{display:flex;align-items:center;gap:7px;min-height:30px;padding:2px 8px;border-radius:9px;font-size:13px;color:var(--lt-pearl);text-align:left}
+.g-legend-item:hover{background:rgba(255,255,255,.05)}
+html[data-lt-theme="garden"] .g-legend-item:hover{background:rgba(64,53,54,.07)}
+.g-legend-item i{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.g-legend-item small{margin-left:auto;color:var(--lt-muted);font-size:12px}
+
+.g-detail .d-kicker{font-size:12px;letter-spacing:.12em;color:var(--lt-gold);margin-bottom:4px}
+.g-detail h2{margin:0 0 8px;font-family:var(--lt-font-display);font-size:20px;font-weight:600;letter-spacing:-.02em;line-height:1.3;color:var(--lt-pearl)}
+.g-detail .d-date{font-size:13px;color:var(--lt-muted);margin-bottom:9px}
+.d-chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.d-chip{font-size:12.5px;padding:4px 10px;border-radius:var(--lt-r-pill);border:1px solid var(--lt-line);color:var(--lt-pearl);background:rgba(255,255,255,.04)}
+html[data-lt-theme="garden"] .d-chip{background:rgba(255,253,248,.7)}
+.d-chip.emo{border-color:var(--lt-rose);color:var(--lt-rose)}
+.d-chip .chip-kind{color:var(--lt-muted);margin-right:4px}
+.d-memo{margin:0 0 12px;font-size:13.5px;line-height:1.75;color:var(--lt-muted);font-family:var(--lt-reading)}
+.d-listhead{font-size:12.5px;color:var(--lt-muted);margin:0 0 6px}
+.d-list{margin:0;padding:0;list-style:none;display:grid;gap:4px;max-height:180px;overflow:auto}
+.d-list button{width:100%;min-height:34px;padding:3px 8px;text-align:left;font-size:13px;color:var(--lt-pearl);border-radius:8px}
+.d-list button:hover{background:rgba(255,255,255,.05)}
+html[data-lt-theme="garden"] .d-list button:hover{background:rgba(64,53,54,.07)}
+.d-list small{color:var(--lt-muted);margin-right:7px;font-size:12px}
+.d-nav{display:flex;gap:8px}
+.d-nav button{flex:1;min-height:40px;padding:4px 8px;border:1px solid var(--lt-line);border-radius:10px;font-size:13px;color:var(--lt-muted);text-align:left;overflow:hidden}
+.d-nav button:hover{border-color:var(--lt-gold-line);color:var(--lt-pearl)}
+.d-nav button small{display:block;font-size:12px;color:var(--lt-gold)}
+.d-suggest{margin:10px 0 0;padding:10px 12px;border:1px dashed var(--lt-gold-line);border-radius:10px;font-size:12.5px;color:var(--lt-muted)}
+.d-suggest b{color:var(--lt-gold);font-weight:600}
+.d-suggest .d-chips{margin:8px 0 0}
+
+/* 발자취 걷기(레일 맨 아래) */
+.g-walk{min-height:44px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-pill);font-size:13.5px;color:var(--lt-gold);background:rgba(255,230,166,.06)}
+.g-walk:hover{background:rgba(255,230,166,.14)}
+.g-walk[data-on="true"]{color:var(--lt-stage);background:var(--lt-gold);border-color:var(--lt-gold)}
+
+/* 390: 무대가 화면 폭을 다 쓰고, 레일은 아래 시트로 내려온다(지도 390 조작 줄 잘림 패턴 반복 없음). */
+@media (max-width: 859px) {
+  body{padding:8px 10px}
+  .g-body{flex-direction:column}
+  .g-rail{flex:none;max-height:42vh}
+  .g-walk{flex-shrink:0}
+}
+@media (max-width: 480px) {
+  .g-frame{padding:10px 10px 8px}
+  .g-brand b{font-size:17px}
+  .g-badge{display:none}
+}
