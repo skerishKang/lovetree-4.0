@@ -545,8 +545,7 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     assert.ok(graphCheck.hubs >= 4, `허브가 그려진다(실제 ${graphCheck.hubs})`);
     assert.ok(graphCheck.thumbs >= 3, `고리 썸네일 동그라미가 보인다(실제 ${graphCheck.thumbs})`);
     assert.ok(graphCheck.stacks.length >= 1, `같은 영상·같은 무대 무더기 개수가 표시된다(실제 ${JSON.stringify(graphCheck.stacks)})`);
-<<<<<<< HEAD
-        assert.match(graphCheck.badge, /순간 17/, '표시에 순간 수가 있다(실제 배지: ' + JSON.stringify(graphCheck.badge) + ')');
+    assert.match(graphCheck.badge, /순간 17/, '표시에 순간 수가 있다');
     // CTO 지적(#713 후속): 검사기가 이름 상자끼리만 재었다 — 이름↔허브 점·이름↔'처음/지금'·'×N'↔점도 0이어야 한다.
     const graphTouch = await page7.evaluate(() => {
       const f = [...document.querySelectorAll('iframe')].at(-1);
