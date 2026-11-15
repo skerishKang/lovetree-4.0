@@ -14,6 +14,7 @@
 - **390 '종류' 라벨 두 줄 꺾임**: `tag-line.css` 직접 입력 줄을 '라벨 위 얹음'(칸 위 12px 라벨, 칸 높이 30px)으로 — 390에서 '종/류' 꺾임·드롭다운·값 칸 눌림이 없어지고 넓은 화면에서도 같은 모양이다.
 - **시험**: v41-tags-627 31/31, updates-format·v41-book-model 포함 53/53, 전체 npm test 1820검 1681 pass·0 fail·139 skip(29.2초), build·modulepreload --check 통과. 화면 캡처 전·후(390·1440, 밤, 검사기와 같은 LT41 주입 하네스 — 컴2 접속 없음): `E:\lovetree-qa\lane\local4-yunje4\{before,after}\` 태그 상세·태그 정리·지도 칩·책 하단 4상태 × 8장 + summary.json(실측 텍스트 포함 — 전: 회색 '… · 24자를 넘어요' 칩·'사용법' pill·'갈라지는 길' → 후: 모두 사라지거나 바로잡힘).
 - **updates.json**: 4.1.4에 '고친 것' 4건(ai_tester·윤제)을 더했다.
+- **머지 직전 수리(CI 빨강 → 판 구조)**: CI에서만 나던 공용 검사기 빨강 4건('꼬리표 줄이 열린 상세'·'꼬리표 정리' × 1440·밤·정원, `button#detailClose × div#dBasic @(1380,99)`) — 로컬 재현(1440×768)으로 밝힌 원인: 보드 상세 판의 닫기 단추가 `.detail .close{position:absolute;top:14px;right:14px;background:none}`로 굴리는 영역(.detailScroll) 위에 떠 있어, 내용이 길어 스크롤이 깊어지면 글자가 단추 밑으로 지나갔다(이번에 태그 줄이 높아져 스크롤이 더 깊어져 드러남 — main도 여유 5px이던 잠재 결함). 시험 계약(렴침 0)이 정당하므로 화면을 맞춤: 닫기 단추를 판의 첫 머리 행(`flex:0 0 auto;align-self:flex-end`, position:relative로 터치 확장 ::after 유지)으로 냈다 — 내용을 굴려도 단추와 글자가 만나지 않는다. 로컬 실측 900·768 겹침 0, 공용 검사기 16 상태 통과, 보드 판 실측 클릭 14/14. 지도 도구 줄 시험(#517·#518)은 애초 통과였다(빨강 원인 아님). 참고: 지도 상세판(track56)도 같은 떠 있는 닫기 모양이라 다음 회차 후보.
 
 ## 2026-11-15 — 그래프 재료 잇기: buildGraph stacks + 꼬리표 한꺼번에 제안 (#627 후속, 컴1로컬2 레인, ai/local2-627-graph-material-261115, main 7420245 기준)
 
