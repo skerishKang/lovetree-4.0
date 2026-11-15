@@ -6,6 +6,13 @@
 
 > **시험 멈춤 규칙(2026-11-15)**: 브라우저 코드에 setInterval 반복을 넣으면 unref하거나 정리한다 — 안 그러면 npm test가 끝나지 않고 CI가 멈춘다.
 
+## 2026-11-16 — 순간 고치기 창이 고정 목록 밖 꼬리표를 지우는 결함 수리 (#736, 컴1로컬2 레인, ai/local2-edit-tag-loss-20261116-050103-644db7, main a5fc5719 기준)
+
+- **원인**: 보드 순간 고치기 창의 키워드 고르기(`board-extras.js` `keywordPickerHTML`)가 고정 목록 17개(LT_KEYWORDS) 단추만 그렸다. 저장은 `selectedKeywords('edit')`가 켜진 단추의 data-key만 모으므로, 목록 밖 꼬리표('가수:PSY' 같은 종류:값·옛 커스텀 낱말)는 창에 없는 것으로 저장됐다 — 편집 한 번에 꼬리표가 조용히 사라졌다(데이터 손실). 살아 있는 정의는 board-detail.js 오버레이지만(#608) 두 정의가 같은 한 벌 함수를 쓰므로 한 곳 고침이 두 경로(책·보드의 add/edit)에 다 통한다.
+- **고침**: `keywordPickerHTML`이 이미 붙은 꼬리표 중 고정 목록에 없는 것을 칩으로 그린다(켜진 칩은 저장 순서 그대로 앞에, 고정 목록 나머지는 그 뒤 — 저장 때 순서도 보존). 표기는 꼬리표 칩과 같은 모양(`tag-line.mjs`의 parseTag·chipText 한 벌 — `window.LTTagLine`에 parseTag 노출 추가, 모듈이 늦으면 '#값'으로 표시), data-key는 저장값 그대로. 커스텀 추가는 같은 값 단추가 있으면 새로 붙이지 않고 켠다(중복 칩·중복 저장 방지). 고정 목록 17개 고르기는 그대로.
+- **시험**: `tests/v41-board-date-edit-608.test.mjs`에 크롬 화면 시험 1건(3 시나리오) — 고치기 창에서 ① 아무것도 안 바꾸고 저장 → 꼬리표 그대로 ② 다른 꼬리표 더해 저장 → 원래 것 + 새 것 ③ 하나 지우고 저장 → 그것만 빠짐. 로컬 608 파일 4/4·인접 보드·꼬리표 8파일 109/109·build·modulepreload --check 통과, 전체 npm test 1회(1848건 fail 0, 화면 시험 142건 건너뜀).
+- **영향 조사(읽기 전용, 컴2 READ ONLY 트랜잭션)**: AI 명예회원 윤제·보람 — 보람 순간 3개(꼬리표 없음 1·종류:값 꼬리표 남음 2), 윤제 순간 8개(꼬리표 없음 7·종류:값 꼬리표 남음 1). 편집 이력이 DB에 남지 않아(lovetree_workspaces는 revision만) 잃은 순간 수는 확정 불가 — 꼬리표가 없거나 고정 목록 낱말뿐인 순간이 잃었을 수 있는 상한이다.
+
 ## 2026-11-16 — #my/graph가 그래프가 아니라 첫 화면으로 열리는 문제 수리 (컴1로컬4 레인, ai/local4-graph-route-261116, main f64745c 기준, PR #728)
 
 - **원인**: #713(8db6946)에서 그래프 화면이 `public/v41/views/graph/track60-graph.html` 하위 폴더로 들어갔는데 `shell/navigation.mjs`의 `screenUrl`은 `views/ + 파일이름`만 만든다 → `/v41/views/track60-graph.html`은 배포에 없는 주소라 Cloudflare Pages가 4.0 SPA index로 200 폴백(라이브 확인: 실제 그래프는 `/v41/views/graph/track60-graph`, 308 경유). iframe이 4.0 앱을 불러와 첫 화면('다시, 그 순간으로.')이 보였다(대표 제보).

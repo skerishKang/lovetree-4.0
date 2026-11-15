@@ -2,7 +2,7 @@
 // 규칙·계산은 tag-model.mjs·tags.mjs 한 벌을 쓰고, 이 파일은 그리기·누르기만 한다.
 // 제안은 흐린 칩, 확정은 진한 칩이다. 누르면 확정·해제된다. 사용자가 확인하기 전에는 저장하지 않는다 —
 // 저장 호출은 onCommit(바뀐 keywords 전체)으로 바깥에 맡기고, 이 파일은 저장 경로를 모른다.
-import { TAG_KINDS } from './tags.mjs';
+import { TAG_KINDS, parseTag } from './tags.mjs';
 import { cardTags, chipText, tagLineChips, toggledKeywords, inputTag } from './tag-model.mjs';
 
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -226,7 +226,7 @@ export function mountViewTagLine({ screen }) {
 // 클래식 스크립트(보드 카드·책 페이지)가 쓰는 한 벌 노출 — 카드 칩 순서·개수 규칙은 tag-model.mjs 하나다.
 // (시험은 Node에서 이 모듈을 부르기도 한다 — 브라우저 전역이 없는 자리에서는 노출·붙이기를 건너뛴다.)
 if (typeof window !== 'undefined') {
-  window.LTTagLine = { cardTags, chipText };
+  window.LTTagLine = { cardTags, chipText, parseTag };
 
   // 책·보드·지도 화면은 스스로 붙는다(tree-title.mjs와 같은 화면 판정).
   const screen = document.documentElement.dataset.v41Screen;
