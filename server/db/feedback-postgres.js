@@ -1,4 +1,16 @@
 const iso = value => (value instanceof Date ? value.toISOString() : value ? String(value) : null);
+// DATE 칸(journal_date)은 DB의 'YYYY-MM-DD'를 그대로 내린다(#671 후속). node-postgres는 DATE를
+// "현지 시각 자정" Date로 파싱하고, 여기서 toISOString()으로 바꾸면 한국 시각(+09:00)에서 하루가
+// 밀렸다 — DB journal_date 2026-11-14가 화면에서 11-13으로 보였다. 현지 날짜를 읽어 되돌린다.
+const dateText = value => {
+  if (!value) return null;
+  if (value instanceof Date) {
+    const month = String(value.getMonth() + 1).padStart(2, '0');
+    const day = String(value.getDate()).padStart(2, '0');
+    return `${value.getFullYear()}-${month}-${day}`;
+  }
+  return String(value).slice(0, 10);
+};
 const feedbackRow = value => value && ({
   id: Number(value.id),
   subjectId: value.subject_id || null,
@@ -7,7 +19,7 @@ const feedbackRow = value => value && ({
   title: value.title || null,
   body: value.body,
   score: value.score === null || value.score === undefined ? null : Number(value.score),
-  journalDate: value.journal_date ? iso(value.journal_date).slice(0, 10) : null,
+  journalDate: dateText(value.journal_date),
   context: value.context && typeof value.context === 'object' ? value.context : {},
   status: value.status,
   memo: value.memo || null,

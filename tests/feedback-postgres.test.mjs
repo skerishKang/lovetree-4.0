@@ -104,3 +104,13 @@ test('feedback table exists after schema and accepts an empty context object',{s
   assert.deepEqual(row.context,{});
  }finally{await pool.end();}
 });
+test('#671 후속: DATE 칸은 DB의 YYYY-MM-DD를 그대로 내린다 — 현지 자정 Date도 하루 밀리지 않는다',async()=>{
+ // node-postgres는 DATE를 현지 시각 자정 Date로 파싱한다. toISOString()으로 바꾸면 KST(+09:00)에서 하루가 밀렸다.
+ const rows=[
+  {id:1,subject_id:'sub_a',kind:'journal',category:'other',title:'일지',body:'내용',score:3,journal_date:new Date(2026,10,14),context:{},status:'received',memo:null,issue_number:null,author_name:'윤제',author_role:'ai_customer',reply_count:1,created_at:'2026-11-14T01:00:00.000Z',updated_at:'2026-11-14T01:00:00.000Z'},
+  {id:2,subject_id:null,kind:'opinion',category:'bug',title:null,body:'의견',score:null,journal_date:'2026-11-14',context:{},status:'received',memo:null,issue_number:null,author_name:null,author_role:null,reply_count:0,created_at:'2026-11-14T01:00:00.000Z',updated_at:null}];
+ const repo=createFeedbackRepo({query:async()=>({rows})});
+ const list=await repo.list({productId:'lt-date'});
+ assert.equal(list[0].journalDate,'2026-11-14','Date(현지 자정)도 그날 날짜로');
+ assert.equal(list[1].journalDate,'2026-11-14','문자열은 그대로');
+});
