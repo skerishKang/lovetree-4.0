@@ -1970,3 +1970,14 @@ COM2에는 merge `6900df8aa446dfe0201d01997457fae04c4abe16`의 변경 서버 파
 - **배포**: Pages 자동 배포. 서버·DB 변경 없음.
 - **캡처**: E:/lovetree-qa/lane/local2-644b/ (충돌 띠 1440·390, 계정 메뉴 점, 정원·밤 보드, 옮기기 포커스, 저장 중 설명 — 8장).
 - **계정**: 시험 계정 03·05 신규 가입 완료(컴2 tabbit, 메일 인증·캡차 없음 확인). .env PADIEM_TUTORIAL03/05_* 4줄, 거버넌스 계정비밀_대장.md 표 1에 행 추가.
+
+
+## 2026-11-15 — 보여주기 2단계 '그래프 보기' 설계 + 독립 시안 (#627, 컴1 로컬 레인, ai/local4-graph-261115, main 40123dd 기준)
+
+- **이번 PR 범위**: `docs/GRAPH_VIEW_20261115.md`(설계) + `public/v41/prototypes/graph-view.html`(독립 시안, 메뉴 연결 없음). 실제 화면·메뉴·views/network·서버·DB 변경 없음. updates.json 없음.
+- **설계 요약**: 허브(큰 점)=확정 꼬리표 값 중 가수·노래·무대, 같은 값 2개 이상일 때만. 1차 소속 규칙 무대>노래>가수. 발자취 줄=전체 순간을 무대 날짜 시간 순서로 잇는 금실(지도 발자취 수리를 2단계에 합친 대표 결정의 실체 — 그래프 보기가 시간 순서 재생을 실제 기록까지로 넓힘). 꼬리표 없는 순간은 '꼬리표 없는' 선반(시간순·흐리게) + '꼬리표 한 번에 제안받기'(#680 기능 연결). 추천 배치안=안2 '묶음 원형(결정론)' — 겹침 0을 시험으로 단정 가능·limone L53·현재 network-model과 같은 결정론 계열·1→300순간 같은 규칙. 지금 지도와는 '대체가 아니라 보기 방식 하나로 추가'(같은 지도 입구에 전환 알약).
+- **시안 데이터**: 첫 화면 예시 40순간(example.mjs designData 그대로) + 가짜 꼬리표('종류:값' 저장 규칙 모양): 가수 2·노래 3·무대 4종, 꼬리표 없는 4개(m10·m23·m34·m40). 시안 안의 색은 identity.css --lt-* 토큰만.
+- **확인한 기존 구현**(재사용 판단은 문서 §1): limone Lineage53VerticalNetworkOverview(SVG 결정론 클러스터·범례 필터·경로 내비 — 구조 재사용), limone V4GraphExperiences(자유 배치 — '저절로 정리'와 안 맞아 배제), 현재 views/network-model.js(canvas 결정론 — 방식 계승), tags.mjs(저장 형식 그대로). 참고 문서 '러브트리_보여주기_방향_20261115'는 저장소·로컬에서 못 찾아 #627 본문·댓글 기준으로 씀 — 미확인 사실.
+- **검증**: build ✓, modulepreload --check ✓(시안은 검사기 진입점 목록 밖), 걸린 시험 없음(src 변경 없음). headless chromium 실측: 1440·390 × 밤·정원 4장에서 콘솔 오류 0, 순간 점 40·허브 9(무대4·노래3·가수2) 생성, 화면 글자 undefined/null/NaN 0.
+- **캡처**: E:/lovetree-qa/lane/local4-graph/ (graph-view-{1440,390}-{night,garden}.png 4장 + dom 검사 파일). 캡처 도구: ms-playwright chrome.exe --headless --screenshot(스크립트 capture.sh 같이 두움 — 저장소 아님).
+- **다음 단계**(문서 §7): PR2 graph-model.mjs 순수 규칙+함수 시험 → PR3 views/graph 화면+지도 입구 전환 알약+화면 검사기 상태 → PR4(선택) 재생·직접 이은 줄 토글·멤버·감정 걸러 보기.

@@ -1,0 +1,577 @@
+<!doctype html>
+<!-- 시안 — #627 2단계 '그래프 보기'(2026-11-15). 실제 메뉴·데이터와 연결하지 않는 독립 페이지다.
+     데이터: 첫 화면 예시 40순간(example.mjs designData) + 가짜 꼬리표('종류:값', tags.mjs 저장 규칙과 같은 모양).
+     배치: docs/GRAPH_VIEW_20261115.md 안2 '묶음 원형(허브-클러스터, 결정론)'. 색·모서리는 identity.css의 --lt-* 토큰만 쓴다. -->
+<html lang="ko" data-lt-theme="night">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>그래프 보기 시안 — 러브트리</title>
+<link rel="stylesheet" href="../identity.css">
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    display:flex;flex-direction:column;padding:14px;gap:0;
+    background:var(--lt-stage);color:var(--lt-pearl);
+    font-family:var(--lt-ui);font-size:14px;line-height:1.6;
+  }
+  button{font:inherit;color:inherit;cursor:pointer;background:none;border:0}
+  button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--lt-gold);outline-offset:3px;border-radius:8px}
+
+  .g-frame{
+    flex:1;min-height:0;display:flex;flex-direction:column;gap:10px;padding:14px 16px 12px;
+    border-radius:16px;border:1px solid var(--lt-gold-line);
+    box-shadow:0 0 0 1px rgba(255,230,166,.1),0 0 32px rgba(238,190,104,.16),0 24px 60px rgba(0,0,0,.5);
+    background:radial-gradient(120% 90% at 50% 0%,var(--lt-stage-2),var(--lt-stage) 70%);
+  }
+  html[data-lt-theme="garden"] .g-frame{
+    box-shadow:0 0 0 1px var(--lt-garden-edge),0 18px 46px var(--lt-garden-shadow);
+  }
+
+  /* 머리: 브랜드 · 보기 전환 · 표시 */
+  .g-head{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  .g-brand{display:flex;align-items:baseline;gap:9px;min-width:0}
+  .g-brand b{font-family:var(--lt-font-display);font-size:19px;font-weight:600;letter-spacing:-.02em;color:var(--lt-pearl)}
+  .g-brand small{font-size:12px;letter-spacing:.14em;color:var(--lt-gold)}
+  .g-switch{display:flex;gap:4px;padding:3px;border:1px solid var(--lt-line);border-radius:var(--lt-r-pill)}
+  .g-switch button{min-height:34px;padding:0 14px;border-radius:var(--lt-r-pill);font-size:13px;color:var(--lt-muted)}
+  .g-switch button[aria-selected="true"]{color:var(--lt-pearl);background:rgba(255,230,166,.08);box-shadow:inset 0 0 0 1px var(--lt-gold-line)}
+  html[data-lt-theme="garden"] .g-switch button[aria-selected="true"]{color:var(--lt-primary-ink);background:var(--lt-gold);box-shadow:none}
+  .g-head-spacer{flex:1}
+  .g-badge{font-size:12px;color:var(--lt-muted);border:1px solid var(--lt-line);border-radius:var(--lt-r-pill);padding:5px 11px;white-space:nowrap}
+  .g-theme{min-height:34px;padding:0 13px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-pill);font-size:13px;color:var(--lt-gold)}
+  .g-switch-note{flex-basis:100%;font-size:12.5px;color:var(--lt-muted);margin:0}
+  .g-switch-note[hidden]{display:none}
+
+  /* 몸: 무대 + 레일 */
+  .g-body{flex:1;min-height:0;display:flex;gap:14px}
+  .g-stagewrap{flex:1;min-width:0;position:relative}
+  #gsvg{position:absolute;inset:0;width:100%;height:100%;display:block}
+  #gsvg text{font-family:var(--lt-ui)}
+  .g-hubname{font-size:13px;font-weight:600;fill:var(--lt-pearl);paint-order:stroke;stroke:var(--lt-stage);stroke-width:3px}
+  .g-hubsub{font-size:12px;fill:var(--lt-muted);paint-order:stroke;stroke:var(--lt-stage);stroke-width:3px}
+  .g-mark{font-size:12px;fill:var(--lt-gold);paint-order:stroke;stroke:var(--lt-stage);stroke-width:3px}
+  .g-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;color:var(--lt-muted);font-size:15px}
+
+  /* 꼬리표 없는 순간 선반 */
+  .g-shelf{
+    position:absolute;left:18px;right:18px;bottom:6px;display:flex;align-items:center;gap:10px;
+    pointer-events:none;
+  }
+  .g-shelf-label{font-size:12.5px;color:var(--lt-muted);white-space:nowrap}
+  .g-shelf-hint{pointer-events:auto;font-size:12.5px;color:var(--lt-gold);border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-pill);padding:4px 10px;background:rgba(255,230,166,.05)}
+
+  /* 오른쪽 레일 */
+  .g-rail{flex:0 0 336px;display:flex;flex-direction:column;gap:12px;min-height:0}
+  .g-card{border:1px solid var(--lt-line);border-radius:var(--lt-r-card);background:var(--lt-glass);padding:13px 14px}
+  .g-card h3{margin:0 0 8px;font-size:12px;font-weight:700;letter-spacing:var(--lt-track);color:var(--lt-muted)}
+  .g-legend-row{display:flex;gap:14px;flex-wrap:wrap}
+  .g-legend-group{display:grid;gap:4px;min-width:90px}
+  .g-legend-title{font-size:12px;color:var(--lt-muted)}
+  .g-legend-item{display:flex;align-items:center;gap:7px;min-height:30px;padding:2px 8px;border-radius:9px;font-size:13px;color:var(--lt-pearl)}
+  .g-legend-item:hover{background:rgba(255,255,255,.05)}
+  html[data-lt-theme="garden"] .g-legend-item:hover{background:rgba(64,53,54,.07)}
+  .g-legend-item i{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+  .g-legend-item small{margin-left:auto;color:var(--lt-muted);font-size:12px}
+  .g-legend-all{min-height:30px;padding:2px 10px;border-radius:9px;font-size:13px;color:var(--lt-muted);border:1px dashed var(--lt-line)}
+  .g-legend-all:hover{color:var(--lt-pearl)}
+
+  .g-detail .d-kicker{font-size:12px;letter-spacing:.12em;color:var(--lt-gold);margin-bottom:4px}
+  .g-detail h2{margin:0 0 8px;font-family:var(--lt-font-display);font-size:20px;font-weight:600;letter-spacing:-.02em;line-height:1.3;color:var(--lt-pearl)}
+  .g-detail .d-date{font-size:13px;color:var(--lt-muted);margin-bottom:9px}
+  .d-chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+  .d-chip{font-size:12.5px;padding:4px 10px;border-radius:var(--lt-r-pill);border:1px solid var(--lt-line);color:var(--lt-pearl);background:rgba(255,255,255,.04)}
+  html[data-lt-theme="garden"] .d-chip{background:rgba(255,253,248,.7)}
+  .d-chip.emo{border-color:var(--lt-rose);color:var(--lt-rose)}
+  .d-chip b{font-weight:600}
+  .d-chip .chip-kind{color:var(--lt-muted);margin-right:4px}
+  .d-memo{margin:0 0 12px;font-size:13.5px;line-height:1.75;color:var(--lt-muted);font-family:var(--lt-reading)}
+  .d-nav{display:flex;gap:8px}
+  .d-nav button{flex:1;min-height:40px;padding:4px 8px;border:1px solid var(--lt-line);border-radius:10px;font-size:12.5px;color:var(--lt-muted);text-align:left;overflow:hidden}
+  .d-nav button:hover{border-color:var(--lt-gold-line);color:var(--lt-pearl)}
+  .d-nav button small{display:block;font-size:12px;color:var(--lt-gold)}
+  .d-nav button span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .d-list{margin:0;padding:0;list-style:none;display:grid;gap:4px;max-height:150px;overflow:auto}
+  .d-list button{width:100%;min-height:34px;padding:3px 8px;text-align:left;font-size:13px;color:var(--lt-pearl);border-radius:8px}
+  .d-list button:hover{background:rgba(255,255,255,.05)}
+  .d-list small{color:var(--lt-muted);margin-right:7px;font-size:12px}
+  .g-play{min-height:44px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-pill);font-size:13.5px;color:var(--lt-gold);background:rgba(255,230,166,.06);flex-shrink:0}
+  .g-play:hover{background:rgba(255,230,166,.12)}
+  .g-play[data-on="true"]{background:var(--lt-gold);color:var(--lt-primary-ink)}
+  html[data-lt-theme="garden"] .g-play{color:var(--lt-primary);background:rgba(152,80,94,.08)}
+  html[data-lt-theme="garden"] .g-play[data-on="true"]{background:var(--lt-primary);color:var(--lt-primary-ink)}
+
+  /* 390 등 좁은 폭: 무대 위, 상세는 아래 시트 */
+  @media (max-width:860px){
+    body{padding:8px;font-size:13px}
+    .g-frame{padding:10px 10px 8px;gap:8px}
+    .g-brand b{font-size:16px}
+    .g-switch button{padding:0 10px;font-size:12.5px;min-height:32px}
+    .g-badge{display:none}
+    .g-body{flex-direction:column;gap:10px}
+    .g-stagewrap{flex:1 1 auto;min-height:0}
+    .g-rail{flex:0 0 auto;flex-direction:row;flex-wrap:wrap;gap:8px;max-height:42%;overflow:auto}
+    .g-card{flex:1 1 100%;padding:9px 11px}
+    .g-legend-row{gap:4px 10px}
+    .g-legend-group{grid-auto-flow:column;gap:1px;min-width:0}
+    .g-legend-title{margin-bottom:1px}
+    .g-legend-item{min-height:26px;padding:1px 6px;font-size:12.5px;gap:5px}
+    .g-detail{flex:1 1 100%}
+    .g-play{flex:1 1 auto}
+    .g-detail h2{font-size:18px}
+    .g-detail .d-memo{margin-bottom:8px}
+  }
+</style>
+</head>
+<body>
+<div class="g-frame">
+  <header class="g-head">
+    <div class="g-brand"><b>러브트리</b><small>GRAPH VIEW · 시안</small></div>
+    <div class="g-switch" role="tablist" aria-label="보기 방식">
+      <button type="button" id="mapTab" aria-selected="false">발자취 지도</button>
+      <button type="button" aria-selected="true">그래프 보기</button>
+    </div>
+    <div class="g-head-spacer"></div>
+    <span class="g-badge">시안 · 예시 40순간 + 가짜 꼬리표</span>
+    <button type="button" class="g-theme" id="themeBtn">정원 보기</button>
+    <p class="g-switch-note" id="switchNote" hidden>시안에는 그래프 보기만 그렸어요. 설계는 지금 지도와 같은 입구에서 '발자취 지도 / 그래프 보기'를 고르는 방식입니다(docs/GRAPH_VIEW_20261115.md §5).</p>
+  </header>
+
+  <div class="g-body">
+    <div class="g-stagewrap">
+      <svg id="gsvg" aria-label="꼬리표로 묶은 순간 그래프"></svg>
+      <div class="g-empty" id="gEmpty" hidden></div>
+      <div class="g-shelf" id="gShelf">
+        <span class="g-shelf-label" id="shelfLabel"></span>
+        <button type="button" class="g-shelf-hint">꼬리표 한 번에 제안받기</button>
+      </div>
+    </div>
+
+    <aside class="g-rail" aria-label="범례와 상세">
+      <div class="g-card" id="legendCard">
+        <h3>묶음 (꼬리표 허브)</h3>
+        <div class="g-legend-row" id="legendRow"></div>
+      </div>
+      <div class="g-card g-detail" id="detailCard"></div>
+      <button type="button" class="g-play" id="playBtn">▶ 발자취 걷기 (시간 순서)</button>
+    </aside>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* ---------- 예시 데이터: 첫 화면 예시 40순간(public/v41/example.mjs designData) + 가짜 꼬리표 ---------- */
+const MOMENTS = [
+{id:'m01',t:'첫인상',d:'2026.01.01',e:'끌림',f:1,imp:1,why:'이 표정이 계속 생각나서 다음 라이브까지 찾아봤다.',next:'m02',b:null,tags:['가수:하츠투하츠']},
+{id:'m02',t:'푸른 시간',d:'2026.02.04',e:'설렘',f:0,imp:0,why:'짧은 장면이 끝난 뒤에도 소리가 남아 다음 영상을 눌렀다.',next:'m03',b:null,tags:['가수:하츠투하츠','노래:The Chase']},
+{id:'m03',t:'무대 뒤의 빛',d:'2026.03.07',e:'호기심',f:0,imp:0,why:'아직 이유는 몰랐지만 한 번 더 보고 싶었다.',next:'m04',b:null,tags:['가수:하츠투하츠','무대:데뷔쇼']},
+{id:'m04',t:'비가 그친 뒤',d:'2026.04.10',e:'잔상',f:0,imp:0,why:'무대보다 사람이 궁금해지기 시작했다.',next:'m05',b:null,tags:['가수:하츠투하츠','무대:데뷔쇼','노래:The Chase']},
+{id:'m05',t:'고요한 초상',d:'2026.05.13',e:'몰입',f:0,imp:0,why:'지나쳤는데 다시 보고 싶어져 같은 날의 기록을 찾았다.',next:'m06',b:null,tags:['가수:하츠투하츠']},
+{id:'m06',t:'도시의 창',d:'2026.06.16',e:'따뜻함',f:0,imp:1,why:'이 순간을 저장한 뒤 비슷한 감정의 다음 순간으로 이어졌다.',next:'m07',b:'m21',tags:['가수:하츠투하츠','노래:The Chase']},
+{id:'m07',t:'무대 끝에서',d:'2026.07.19',e:'끌림',f:0,imp:0,why:'이 표정이 계속 생각나서 다음 라이브까지 찾아봤다.',next:'m08',b:null,tags:['가수:하츠투하츠','무대:데뷔쇼','멤버:지우']},
+{id:'m08',t:'진주빛 밤',d:'2026.08.22',e:'설렘',f:0,imp:0,why:'짧은 장면이 끝난 뒤에도 소리가 남아 다음 영상을 눌렀다.',next:'m19',b:null,tags:['가수:하츠투하츠','무대:데뷔쇼','노래:The Chase','멤버:제나']},
+{id:'m09',t:'은빛 방',d:'2026.01.25',e:'호기심',f:0,imp:0,why:'아직 이유는 몰랐지만 한 번 더 보고 싶었다.',next:'m10',b:null,tags:['가수:하츠투하츠']},
+{id:'m10',t:'벤치의 기억',d:'2026.02.01',e:'잔상',f:0,imp:0,why:'무대보다 사람이 궁금해지기 시작했다.',next:'m11',b:null,tags:[]},
+{id:'m11',t:'의자에 앉은 모습',d:'2026.03.04',e:'몰입',f:0,imp:0,why:'지나쳤는데 다시 보고 싶어져 같은 날의 기록을 찾았다.',next:'m12',b:null,tags:['가수:하츠투하츠','멤버:지우']},
+{id:'m12',t:'돌아보다',d:'2026.04.07',e:'따뜻함',f:0,imp:0,why:'이 순간을 저장한 뒤 비슷한 감정의 다음 순간으로 이어졌다.',next:'m13',b:null,tags:['가수:하츠투하츠','노래:With']},
+{id:'m13',t:'장면 사이',d:'2026.05.10',e:'끌림',f:0,imp:1,why:'이 표정이 계속 생각나서 다음 라이브까지 찾아봤다.',next:'m14',b:null,tags:['가수:하츠투하츠','무대:쇼챔피언','노래:15-LOVE','멤버:지우']},
+{id:'m14',t:'목소리를 듣다',d:'2026.06.13',e:'설렘',f:0,imp:0,why:'짧은 장면이 끝난 뒤에도 소리가 남아 다음 영상을 눌렀다.',next:'m15',b:null,tags:['가수:하츠투하츠','노래:15-LOVE']},
+{id:'m15',t:'트리의 빛',d:'2026.07.16',e:'호기심',f:0,imp:0,why:'아직 이유는 몰랐지만 한 번 더 보고 싶었다.',next:'m16',b:null,tags:['가수:하츠투하츠','무대:팬콘']},
+{id:'m16',t:'마지막 열차',d:'2026.08.19',e:'잔상',f:0,imp:0,why:'무대보다 사람이 궁금해지기 시작했다.',next:'m17',b:null,tags:['가수:하츠투하츠']},
+{id:'m17',t:'부드러운 초점',d:'2026.01.22',e:'몰입',f:0,imp:0,why:'지나쳤는데 다시 보고 싶어져 같은 날의 기록을 찾았다.',next:'m18',b:null,tags:['가수:하츠투하츠','무대:쇼챔피언','노래:15-LOVE']},
+{id:'m18',t:'아침의 기록',d:'2026.02.25',e:'따뜻함',f:0,imp:0,why:'이 순간을 저장한 뒤 비슷한 감정의 다음 순간으로 이어졌다.',next:'m19',b:null,tags:['가수:하츠투하츠','멤버:제나']},
+{id:'m19',t:'첫 라이브',d:'2026.03.01',e:'끌림',f:0,imp:0,why:'이 표정이 계속 생각나서 다음 라이브까지 찾아봤다.',next:'m36',b:null,tags:['가수:하츠투하츠','무대:팬콘','노래:15-LOVE']},
+{id:'m20',t:'춤추는 순간',d:'2026.04.04',e:'설렘',f:0,imp:0,why:'짧은 장면이 끝난 뒤에도 소리가 남아 다음 영상을 눌렀다.',next:'m21',b:null,tags:['가수:하츠투하츠','무대:쇼챔피언','노래:With']},
+{id:'m21',t:'라이브 방송',d:'2026.05.07',e:'호기심',f:0,imp:0,why:'아직 이유는 몰랐지만 한 번 더 보고 싶었다.',next:'m22',b:null,tags:['가수:하츠투하츠','무대:팬콘']},
+{id:'m22',t:'인터뷰 장면',d:'2026.06.10',e:'잔상',f:0,imp:0,why:'무대보다 사람이 궁금해지기 시작했다.',next:'m23',b:null,tags:['가수:하츠투하츠','멤버:지우']},
+{id:'m23',t:'사진 속 이야기',d:'2026.07.13',e:'몰입',f:0,imp:0,why:'지나쳤는데 다시 보고 싶어져 같은 날의 기록을 찾았다.',next:'m24',b:null,tags:[]},
+{id:'m24',t:'연습 영상',d:'2026.08.16',e:'따뜻함',f:0,imp:1,why:'이 순간을 저장한 뒤 비슷한 감정의 다음 순간으로 이어졌다.',next:'m25',b:null,tags:['가수:하츠투하츠','노래:With','멤버:제나']},
+{id:'m25',t:'밤의 무대',d:'2026.01.19',e:'끌림',f:0,imp:0,why:'이 표정이 계속 생각나서 다음 라이브까지 찾아봤다.',next:'m26',b:null,tags:['가수:하츠투하츠','무대:멜론뮤직어워드','노래:15-LOVE']},
+{id:'m26',t:'목소리 한 조각',d:'2026.02.22',e:'설렘',f:0,imp:0,why:'짧은 장면이 끝난 뒤에도 소리가 남아 다음 영상을 눌렀다.',next:'m27',b:null,tags:['가수:하츠투하츠','멤버:제나']},
+{id:'m27',t:'무대 뒤의 순간',d:'2026.03.25',e:'호기심',f:0,imp:0,why:'아직 이유는 몰랐지만 한 번 더 보고 싶었다.',next:'m28',b:null,tags:['가수:하츠투하츠','무대:멜론뮤직어워드']},
+{id:'m28',t:'팬 촬영 영상',d:'2026.04.01',e:'잔상',f:0,imp:0,why:'무대보다 사람이 궁금해지기 시작했다.',next:null,b:null,tags:['가수:RESCENE','무대:쇼챔피언']},
+{id:'m29',t:'기억해 둔 표정',d:'2026.05.04',e:'몰입',f:0,imp:0,why:'지나쳤는데 다시 보고 싶어져 같은 날의 기록을 찾았다.',next:'m20',b:'m37',tags:['가수:하츠투하츠','무대:멜론뮤직어워드','노래:15-LOVE']},
+{id:'m30',t:'한 번 더 보고 싶었다',d:'2026.06.07',e:'따뜻함',f:0,imp:0,why:'이 순간을 저장한 뒤 비슷한 감정의 다음 순간으로 이어졌다.',next:'m31',b:null,tags:['가수:하츠투하츠','노래:15-LOVE']},
+{id:'m31',t:'소리가 남았다',d:'2026.07.10',e:'끌림',f:0,imp:0,why:'이 표정이 계속 생각나서 다음 라이브까지 찾아봤다.',next:'m32',b:null,tags:['가수:RESCENE','노래:With']},
+{id:'m32',t:'그날의 공기',d:'2026.08.13',e:'설렘',f:0,imp:1,why:'짧은 장면이 끝난 뒤에도 소리가 남아 다음 영상을 눌렀다.',next:'m33',b:null,tags:['가수:하츠투하츠','무대:멜론뮤직어워드','노래:15-LOVE','멤버:지우']},
+{id:'m33',t:'다음 영상을 찾은 이유',d:'2026.01.16',e:'호기심',f:0,imp:0,why:'아직 이유는 몰랐지만 한 번 더 보고 싶었다.',next:'m34',b:null,tags:['가수:하츠투하츠','무대:쇼챔피언']},
+{id:'m34',t:'멈춘 시간',d:'2026.02.19',e:'잔상',f:0,imp:0,why:'무대보다 사람이 궁금해지기 시작했다.',next:'m35',b:null,tags:[]},
+{id:'m35',t:'아직 이어지는 문장',d:'2026.03.22',e:'몰입',f:0,imp:0,why:'지나쳤는데 다시 보고 싶어져 같은 날의 기록을 찾았다.',next:'m36',b:null,tags:['가수:하츠투하츠','무대:쇼챔피언','노래:15-LOVE']},
+{id:'m36',t:'공식 무대 원본',d:'2026.04.25',e:'따뜻함',f:0,imp:0,why:'이 순간을 저장한 뒤 비슷한 감정의 다음 순간으로 이어졌다.',next:'m29',b:null,tags:['가수:하츠투하츠','무대:쇼챔피언','노래:With']},
+{id:'m37',t:'인터뷰 아카이브',d:'2026.05.01',e:'끌림',f:0,imp:0,why:'이 표정이 계속 생각나서 다음 라이브까지 찾아봤다.',next:'m38',b:null,tags:['가수:하츠투하츠','멤버:지우']},
+{id:'m38',t:'라이브 클립',d:'2026.06.04',e:'설렘',f:0,imp:0,why:'짧은 장면이 끝난 뒤에도 소리가 남아 다음 영상을 눌렀다.',next:'m39',b:null,tags:['가수:하츠투하츠','무대:팬콘','노래:With']},
+{id:'m39',t:'포토 에디토리얼',d:'2026.07.07',e:'호기심',f:0,imp:0,why:'아직 이유는 몰랐지만 한 번 더 보고 싶었다.',next:'m40',b:null,tags:['가수:하츠투하츠']},
+{id:'m40',t:'팬 기록 링크',d:'2026.08.10',e:'잔상',f:0,imp:0,why:'무대보다 사람이 궁금해지기 시작했다.',next:null,b:null,tags:[]}
+];
+
+/* ---------- 규칙 (docs/GRAPH_VIEW_20261115.md §2) ---------- */
+const KIND_LABEL = {artist:'가수', song:'노래', stage:'무대', member:'멤버', era:'활동기', emotion:'감정'};
+const KIND_COLOR = {stage:'var(--lt-gold-deep)', song:'var(--lt-rose)', artist:'var(--lt-blue)', member:'var(--lt-violet)', era:'var(--lt-violet)', emotion:'var(--lt-rose-ink)'};
+const PRIORITY = ['stage','song','artist']; /* 1차 소속: 무대 > 노래 > 가수 */
+
+function parseTag(raw){
+  const i = raw.indexOf(':');
+  if(i < 0) return null;
+  const label = raw.slice(0, i);
+  const kind = Object.keys(KIND_LABEL).find(k => KIND_LABEL[k] === label);
+  if(!kind) return null;
+  return {kind, value: raw.slice(i+1), raw};
+}
+function parseDate(s){
+  const m = /^(\d{4})[.\-\/](\d{2})[.\-\/](\d{2})$/.exec(String(s||''));
+  if(!m) return null;
+  return Date.UTC(+m[1], +m[2]-1, +m[3]);
+}
+function hash01(str){
+  let h = 2166136261;
+  for(let i=0;i<str.length;i++){ h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return ((h >>> 0) % 1000) / 1000;
+}
+const GOLDEN = 137.508 * Math.PI / 180;
+
+/* 묶음 모델: 꼬리표 → 허브·1차 소속·발자취 */
+function buildModel(){
+  const moments = MOMENTS.map(m => {
+    const tags = (m.tags||[]).map(parseTag).filter(Boolean);
+    let primary = null;
+    for(const k of PRIORITY){ const hit = tags.find(t => t.kind === k); if(hit){ primary = hit; break; } }
+    return {...m, tags, primary, time: parseDate(m.d)};
+  });
+  const hubMap = new Map();
+  for(const m of moments){
+    for(const t of m.tags){
+      if(!PRIORITY.includes(t.kind)) continue; /* 멤버·활동기·감정은 허브가 아니라 상세 칩과 걸러 보기로 */
+      const key = t.kind + ':' + t.value;
+      if(!hubMap.has(key)) hubMap.set(key, {key, kind:t.kind, value:t.value, primaryIds:[], allIds:[]});
+      hubMap.get(key).allIds.push(m.id);
+    }
+    if(m.primary){
+      const key = m.primary.kind + ':' + m.primary.value;
+      hubMap.get(key).primaryIds.push(m.id);
+    }
+  }
+  const hubs = [...hubMap.values()].filter(h => h.allIds.length >= 2); /* 1개뿐인 꼬리표는 허브로 만들지 않는다 */
+  hubs.sort((a,b) => b.primaryIds.length - a.primaryIds.length || PRIORITY.indexOf(a.kind) - PRIORITY.indexOf(b.kind) || a.value.localeCompare(b.value));
+  return {moments, hubs};
+}
+
+/* ---------- 배치 (안2 묶음 원형, 결정론) ---------- */
+const svg = document.getElementById('gsvg');
+let MODEL = buildModel();
+let selected = {type:'moment', id:'m01'};
+let filterHub = null;
+let trailOrder = [];
+let playTimer = null;
+
+function layoutModel(W, H){
+  const {moments, hubs} = MODEL;
+  const narrow = W < 860;
+  const s = Math.max(0.58, Math.min(1, W / 1040));          /* 좁은 무대에서 반지름·글자 간격만 줄인다 */
+  const shelfH = narrow ? 44 : 50;
+  const labelPad = narrow ? 34 : 30;
+  const clusterR = h => (14 + 8.5 * Math.sqrt(h.primaryIds.length)) * s;
+  const hubR = h => Math.min(26 * s, Math.max((8 + 1.9 * h.primaryIds.length) * s, 9 * s));
+  const maxC = Math.max(...hubs.map(clusterR), 0);
+  const maxR = Math.max(...hubs.map(hubR), 0);
+  const top = 26, usableBottom = H - shelfH - 6;
+  const cx = W / 2, cy = (top + usableBottom) / 2;
+  const rx = Math.max(70, W / 2 - 26 - maxC - maxR - labelPad);
+  const ry = Math.max(60, (usableBottom - top) / 2 - maxC - maxR - labelPad);
+
+  hubs.forEach((h, i) => {
+    const a = i * GOLDEN + 0.55;
+    h.x = cx + Math.cos(a) * rx;
+    h.y = cy + Math.sin(a) * ry * 0.86;
+    h.color = KIND_COLOR[h.kind];
+    h.cr = clusterR(h); h.hr = hubR(h);
+    const members = h.primaryIds.map(id => moments.find(m => m.id === id));
+    members.forEach((m, j) => {
+      const rr = h.cr * Math.sqrt((j + 0.8) / Math.max(members.length, 1));
+      const aa = j * GOLDEN + hash01(m.id) * 40 * Math.PI / 180;
+      m.x = h.x + Math.cos(aa) * rr;
+      m.y = h.y + Math.sin(aa) * rr;
+    });
+  });
+  /* 꼬리표 없는 순간 선반: 시간 순서로 왼쪽부터. 점은 아래 안내 글줄 밴드 위에 놓는다 */
+  const shelf = moments.filter(m => !m.primary).sort(byTime);
+  const gap = narrow ? 40 : 52, x0 = narrow ? 26 : 120;
+  shelf.forEach((m, i) => { m.x = x0 + i * gap; m.y = H - shelfH + 4; });
+  /* 발자취: 전체 순간을 시간 순서로 */
+  trailOrder = [...moments].sort(byTime);
+  trailOrder.forEach((m, i) => { m.trailPrev = i > 0 ? trailOrder[i-1] : null; m.trailNext = i < trailOrder.length-1 ? trailOrder[i+1] : null; });
+  MODEL.narrow = narrow; MODEL.W = W; MODEL.H = H; MODEL.s = s; MODEL.cx = cx; MODEL.cy = cy;
+}
+function byTime(a, b){
+  const ta = a.time == null ? Infinity : a.time, tb = b.time == null ? Infinity : b.time;
+  return ta - tb || a.id.localeCompare(b.id);
+}
+function trailPath(pts){
+  if(pts.length < 2) return '';
+  let d = 'M' + pts[0].x.toFixed(1) + ' ' + pts[0].y.toFixed(1);
+  for(let i = 0; i < pts.length - 1; i++){
+    const p0 = pts[Math.max(i-1, 0)], p1 = pts[i], p2 = pts[i+1], p3 = pts[Math.min(i+2, pts.length-1)];
+    const c1x = p1.x + (p2.x - p0.x) / 6, c1y = p1.y + (p2.y - p0.y) / 6;
+    const c2x = p2.x - (p3.x - p1.x) / 6, c2y = p2.y - (p3.y - p1.y) / 6;
+    d += 'C' + c1x.toFixed(1) + ' ' + c1y.toFixed(1) + ' ' + c2x.toFixed(1) + ' ' + c2y.toFixed(1) + ' ' + p2.x.toFixed(1) + ' ' + p2.y.toFixed(1);
+  }
+  return d;
+}
+
+/* ---------- 그리기 ---------- */
+const SVGNS = 'http://www.w3.org/2000/svg';
+function el(name, attrs, parent){
+  const n = document.createElementNS(SVGNS, name);
+  for(const k in attrs) n.setAttribute(k, attrs[k]);
+  if(parent) parent.appendChild(n);
+  return n;
+}
+function dimmed(hubKey){
+  return filterHub !== null && filterHub !== hubKey;
+}
+function render(){
+  const box = svg.parentElement.getBoundingClientRect();
+  const W = Math.max(300, Math.round(box.width)), H = Math.max(360, Math.round(box.height));
+  svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+  svg.replaceChildren();
+  layoutModel(W, H);
+  const {moments, hubs, narrow} = MODEL;
+
+  /* 소속 선: 1차 허브 반사선 + 묶음 밖 허브(1차 멤버 0) 점선 */
+  const spokeG = el('g', {}, svg);
+  for(const h of hubs){
+    for(const id of h.primaryIds){
+      const m = moments.find(x => x.id === id);
+      el('line', {x1:h.x, y1:h.y, x2:m.x, y2:m.y, stroke:h.color, 'stroke-width':1, opacity:.32}, spokeG);
+    }
+    if(h.primaryIds.length === 0){ /* RESCENE 같은 '관련만 있는 허브' — 고아로 두지 않는다 */
+      for(const id of h.allIds){
+        const m = moments.find(x => x.id === id);
+        el('line', {x1:h.x, y1:h.y, x2:m.x, y2:m.y, stroke:h.color, 'stroke-width':1, opacity:.4, 'stroke-dasharray':'3 4'}, spokeG);
+      }
+    }
+  }
+
+  /* 발자취 줄: 시간 순서 한 줄 */
+  const trailD = trailPath(trailOrder.filter(m => m.x != null));
+  el('path', {d:trailD, fill:'none', stroke:'var(--lt-gold-line)', 'stroke-width':1.4, opacity:.62, 'stroke-linecap':'round'}, svg);
+  const first = trailOrder[0], last = trailOrder[trailOrder.length-1];
+  if(first && first.x != null){
+    const ax = first.x > MODEL.W - 64 ? first.x - 12 : first.x + 12;
+    el('text', {x:ax, y:first.y - 10, class:'g-mark', 'text-anchor': first.x > MODEL.W - 64 ? 'end' : 'start'}, svg).textContent = '처음';
+  }
+  if(last && last.x != null){
+    const ax = last.x > MODEL.W - 64 ? last.x - 12 : last.x + 12;
+    el('text', {x:ax, y:last.y - 10, class:'g-mark', 'text-anchor': last.x > MODEL.W - 64 ? 'end' : 'start'}, svg).textContent = '지금';
+  }
+
+  /* 묶음 허브: 점 + 바깥쪽 이름 */
+  for(const h of hubs){
+    const dim = dimmed(h.key);
+    const g = el('g', {tabindex:'0', role:'button', 'aria-label':KIND_LABEL[h.kind] + ' ' + h.value + ' · 순간 ' + h.primaryIds.length + '개', opacity: dim ? .14 : 1}, svg);
+    g.dataset.hub = h.key;
+    if(h.primaryIds.length > 0){
+      el('circle', {cx:h.x, cy:h.y, r:h.cr, fill:'none', stroke:h.color, 'stroke-width':1, opacity:.35, 'stroke-dasharray':'2 5'}, g);
+    }
+    el('circle', {cx:h.x, cy:h.y, r:h.hr, fill:h.color, opacity:.92}, g);
+    const ux = (h.x - MODEL.cx) / Math.max(Math.hypot(h.x - MODEL.cx, h.y - MODEL.cy), 1);
+    const uy = (h.y - MODEL.cy) / Math.max(Math.hypot(h.x - MODEL.cx, h.y - MODEL.cy), 1);
+    let lx, ly, anchor;
+    if(narrow){ /* 좁은 무대에서는 이름을 점 아래 가운데 — 바깥쪽 이름이 화면 끝에서 잘리지 않게 */
+      lx = h.x; ly = h.y + h.hr + 17; anchor = 'middle';
+    } else {
+      lx = h.x + ux * (h.hr + 10); ly = h.y + uy * (h.hr + 18);
+      anchor = ux > .45 ? 'start' : ux < -.45 ? 'end' : 'middle';
+    }
+    const name = el('text', {x:lx, y:ly, class:'g-hubname', 'text-anchor':anchor, style:'font-size:' + (narrow ? 12.5 : 13.5) + 'px'}, g);
+    name.textContent = h.value;
+    const sub = el('text', {x:lx, y:ly + (narrow ? 13 : 15), class:'g-hubsub', 'text-anchor':anchor}, g);
+    sub.textContent = KIND_LABEL[h.kind] + ' · ' + (h.primaryIds.length > 0 ? '순간 ' + h.primaryIds.length : '관련 ' + h.allIds.length);
+    g.addEventListener('click', () => { filterHub = null; selected = {type:'hub', key:h.key}; render(); drawLegend(); drawDetail(); });
+  }
+  /* 허브 이름 겹침 한 번 정리(결정론) */
+  const labels = [...svg.querySelectorAll('.g-hubname')].map(t => ({t, r:t.getBoundingClientRect(), dy:0, dx:0}));
+  for(let i = 0; i < labels.length; i++){
+    for(let j = i + 1; j < labels.length; j++){
+      const a = labels[i], b = labels[j];
+      if(a.r.left < b.r.right && b.r.left < a.r.right && a.r.top < b.r.bottom && b.r.top < a.r.bottom){
+        if(b.r.top >= a.r.top){ b.dy = a.dy + 17; } else { a.dy = b.dy + 17; }
+      }
+    }
+  }
+  labels.forEach(({t, dy}) => {
+    if(!dy) return;
+    const sub = t.nextElementSibling;
+    const base = parseFloat(t.getAttribute('y'));
+    t.setAttribute('y', (base + dy).toFixed(1));
+    if(sub && sub.classList.contains('g-hubsub')) sub.setAttribute('y', (base + dy + (narrow ? 13 : 15)).toFixed(1));
+  });
+
+  /* 순간 점 */
+  const dotG = el('g', {}, svg);
+  for(const m of moments){
+    const hub = m.primary ? hubs.find(h => h.kind + ':' + h.value === m.primary.kind + ':' + m.primary.value) : null;
+    const color = hub ? hub.color : 'var(--lt-muted)';
+    const dim = m.primary ? dimmed(m.primary.kind + ':' + m.primary.value) : filterHub !== null;
+    const r = (m.imp ? 7.5 : 5.5) * MODEL.s + (selected.type === 'moment' && selected.id === m.id ? 2.5 : 0);
+    const g = el('g', {tabindex:'0', role:'button', 'aria-label':'순간 ' + m.t + ' · ' + m.d, opacity: dim ? .14 : 1}, dotG);
+    g.dataset.moment = m.id;
+    el('circle', {cx:m.x, cy:m.y, r:r, fill:color, stroke: m.imp ? 'var(--lt-gold)' : 'none', 'stroke-width': m.imp ? 1.6 : 0}, g);
+    if(!m.primary){
+      el('circle', {cx:m.x, cy:m.y, r:r + 4.5, fill:'none', stroke:'var(--lt-muted)', 'stroke-width':1, opacity:.7}, g);
+    }
+    g.addEventListener('click', () => { selected = {type:'moment', id:m.id}; render(); drawLegend(); drawDetail(); });
+  }
+}
+
+/* ---------- 범례 ---------- */
+function drawLegend(){
+  const row = document.getElementById('legendRow');
+  row.replaceChildren();
+  const groups = new Map();
+  for(const h of MODEL.hubs){
+    if(!groups.has(h.kind)) groups.set(h.kind, []);
+    groups.get(h.kind).push(h);
+  }
+  const kinds = [...groups.keys()].sort((a,b) => PRIORITY.indexOf(a) - PRIORITY.indexOf(b) || a.localeCompare(b));
+  for(const kind of kinds){
+    const wrap = document.createElement('div'); wrap.className = 'g-legend-group';
+    const title = document.createElement('div'); title.className = 'g-legend-title';
+    title.textContent = KIND_LABEL[kind] + ' ' + groups.get(kind).length;
+    wrap.appendChild(title);
+    for(const h of groups.get(kind)){
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'g-legend-item';
+      const dot = document.createElement('i'); dot.style.background = KIND_COLOR[h.kind];
+      const label = document.createElement('span'); label.textContent = h.value;
+      const n = document.createElement('small'); n.textContent = String(h.primaryIds.length > 0 ? h.primaryIds.length : h.allIds.length);
+      b.append(dot, label, n);
+      b.addEventListener('click', () => { filterHub = filterHub === h.key ? null : h.key; render(); });
+      wrap.appendChild(b);
+    }
+    row.appendChild(wrap);
+  }
+  if(filterHub !== null){
+    const all = document.createElement('button'); all.type = 'button'; all.className = 'g-legend-all'; all.textContent = '전체 보기';
+    all.addEventListener('click', () => { filterHub = null; render(); });
+    row.appendChild(all);
+  }
+}
+
+/* ---------- 상세 판 ---------- */
+function chipEl(kindLabel, value, color){
+  const c = document.createElement('span'); c.className = 'd-chip';
+  const k = document.createElement('span'); k.className = 'chip-kind'; k.textContent = kindLabel;
+  const v = document.createElement('b'); v.textContent = value;
+  if(color) c.style.borderColor = color;
+  c.append(k, v);
+  return c;
+}
+function drawDetail(){
+  const card = document.getElementById('detailCard');
+  card.replaceChildren();
+  if(selected.type === 'hub'){
+    const h = MODEL.hubs.find(x => x.key === selected.key);
+    if(!h) return;
+    const kick = document.createElement('div'); kick.className = 'd-kicker'; kick.textContent = KIND_LABEL[h.kind] + ' 묶음';
+    const h2 = document.createElement('h2'); h2.textContent = h.value;
+    const date = document.createElement('div'); date.className = 'd-date';
+    date.textContent = h.primaryIds.length > 0 ? '1차 소속 순간 ' + h.primaryIds.length + '개 · 관련 꼬리표 순간 ' + h.allIds.length + '개' : '묶음 없이 관련된 순간 ' + h.allIds.length + '개';
+    const list = document.createElement('ul'); list.className = 'd-list';
+    const ids = h.primaryIds.length > 0 ? h.primaryIds : h.allIds;
+    for(const id of ids){
+      const m = MODEL.moments.find(x => x.id === id);
+      const li = document.createElement('li');
+      const b = document.createElement('button'); b.type = 'button';
+      const d = document.createElement('small'); d.textContent = m.d;
+      const t = document.createElement('span'); t.textContent = m.t;
+      b.append(d, t);
+      b.addEventListener('click', () => { selected = {type:'moment', id:m.id}; render(); drawLegend(); drawDetail(); });
+      li.appendChild(b); list.appendChild(li);
+    }
+    card.append(kick, h2, date, list);
+    return;
+  }
+  const m = MODEL.moments.find(x => x.id === selected.id);
+  if(!m) return;
+  const kick = document.createElement('div'); kick.className = 'd-kicker'; kick.textContent = '순간 · 무대 날짜';
+  const h2 = document.createElement('h2'); h2.textContent = m.t;
+  const date = document.createElement('div'); date.className = 'd-date'; date.textContent = m.d;
+  const chips = document.createElement('div'); chips.className = 'd-chips';
+  const emo = document.createElement('span'); emo.className = 'd-chip emo'; emo.textContent = '감정 ' + m.e;
+  chips.appendChild(emo);
+  for(const t of m.tags) chips.appendChild(chipEl(KIND_LABEL[t.kind], t.value, KIND_COLOR[t.kind]));
+  if(m.tags.length === 0){
+    chips.appendChild(chipEl('꼬리표', '아직 없음', 'var(--lt-line)'));
+  }
+  const memo = document.createElement('p'); memo.className = 'd-memo';
+  memo.textContent = m.why || '메모 없음';
+  const nav = document.createElement('div'); nav.className = 'd-nav';
+  for(const [label, mm] of [['발자취 이전', m.trailPrev], ['발자취 다음', m.trailNext]]){
+    const b = document.createElement('button'); b.type = 'button';
+    const small = document.createElement('small'); small.textContent = mm ? label : label + ' · 없음';
+    const span = document.createElement('span'); span.textContent = mm ? mm.t : '—';
+    b.append(small, span);
+    if(mm) b.addEventListener('click', () => { selected = {type:'moment', id:mm.id}; render(); drawLegend(); drawDetail(); });
+    nav.appendChild(b);
+  }
+  card.append(kick, h2, date, chips, memo, nav);
+}
+
+/* ---------- 상단·테마·재생 ---------- */
+document.getElementById('mapTab').addEventListener('click', () => {
+  document.getElementById('switchNote').hidden = false;
+});
+const themeBtn = document.getElementById('themeBtn');
+function applyTheme(theme){
+  document.documentElement.dataset.ltTheme = theme;
+  themeBtn.textContent = theme === 'garden' ? '밤 보기' : '정원 보기';
+  render();
+}
+themeBtn.addEventListener('click', () => {
+  applyTheme(document.documentElement.dataset.ltTheme === 'garden' ? 'night' : 'garden');
+});
+const urlTheme = new URLSearchParams(location.search).get('theme');
+if(urlTheme === 'garden' || urlTheme === 'night') applyTheme(urlTheme);
+
+document.getElementById('playBtn').addEventListener('click', () => {
+  const btn = document.getElementById('playBtn');
+  if(playTimer){ clearInterval(playTimer); playTimer = null; btn.dataset.on = 'false'; btn.textContent = '▶ 발자취 걷기 (시간 순서)'; return; }
+  let i = 0;
+  btn.dataset.on = 'true'; btn.textContent = '■ 걷기 멈추기';
+  playTimer = setInterval(() => {
+    if(i >= trailOrder.length){ clearInterval(playTimer); playTimer = null; btn.dataset.on = 'false'; btn.textContent = '▶ 발자취 걷기 (시간 순서)'; return; }
+    selected = {type:'moment', id:trailOrder[i].id};
+    i += 1;
+    render(); drawLegend(); drawDetail();
+  }, 550);
+});
+
+/* 꼬리표 없는 순간 선반 안내 */
+function drawShelf(){
+  const untagged = MODEL.moments.filter(m => !m.primary);
+  document.getElementById('shelfLabel').textContent = untagged.length > 0 ? '꼬리표 없는 순간 ' + untagged.length : '';
+  document.getElementById('gShelf').style.display = untagged.length > 0 ? 'flex' : 'none';
+}
+
+/* 빈 트리(순간 1개일 때 안내 문구 규칙 확인용 — 이 시안은 항상 40순간이다) */
+function drawEmptyNote(){
+  const n = MODEL.moments.length;
+  const empty = document.getElementById('gEmpty');
+  if(n === 1){ empty.hidden = false; empty.textContent = '순간이 하나예요. 다음 순간을 남기면 흐름이 보여요.'; }
+  else { empty.hidden = true; }
+}
+
+let lastW = 0;
+function onResize(){
+  const w = Math.round(svg.parentElement.getBoundingClientRect().width);
+  if(Math.abs(w - lastW) < 8) return;
+  lastW = w;
+  render(); drawLegend(); drawDetail(); drawShelf();
+}
+window.addEventListener('resize', onResize);
+
+render(); drawLegend(); drawDetail(); drawShelf(); drawEmptyNote();
+lastW = Math.round(svg.parentElement.getBoundingClientRect().width);
+</script>
+</body>
+</html>
