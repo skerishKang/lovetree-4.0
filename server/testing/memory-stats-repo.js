@@ -78,31 +78,49 @@ export function createMemoryStatsRepo({
 
       // 공개 트리 = 활성 공유 행이 있고 비공개가 아닌 트리(중복 제거). 둘러보기 소개는 같은 조건에
       // 순간 3개 이상 + 소개 켬(2026-11-16 대표 결정 — 기본 꺼짐) + 숨김 없음 — discovery SQL 과 같은 뜻.
+      // #743: 펼침 내역의 제목 목록(최대 20)이 같은 근거를 쓰게 — 지도 값에 갈래 이름과 트리 제목을 함께 둔다.
       const publicTrees = new Map();
       const featuredTrees = new Map();
+      const treeTitleOf = (subjectId, treeId) => {
+        const document = documents.find((entry) => subjectOf(entry) === subjectId);
+        const tree = document && (Array.isArray(document?.doc?.trees) ? document.doc.trees : []).find((t) => String(t?.id ?? '') === String(treeId));
+        return String(tree?.title || tree?.subject || '').trim();
+      };
       for (const share of shares) {
         const key = `${subjectOf(share)}\u0000${share.treeId}`;
         if (privateKeys.has(key)) continue;
-        publicTrees.set(key, where(share));
+        publicTrees.set(key, { group: where(share), title: treeTitleOf(subjectOf(share), share.treeId) });
         const discoverOn = discoverRepo ? await discoverRepo.isOn(productId, subjectOf(share), share.treeId) : true;
         // 숨김은 공유 행 하나가 아니라 트리 전체에 걸린다 — 같은 트리의 다른 행이 숨겨졌으면 그 트리도 빠진다(SQL 과 같은 규칙).
         const hidden = allShares.some((other) => other.treeId === share.treeId && subjectOf(other) === subjectOf(share) && hiddenShares.has(`${productId}\u0000${other.shareId}`));
         if (Number(share.momentCount ?? 0) >= 3 && discoverOn && !hidden) {
-          featuredTrees.set(key, where(share));
+          featuredTrees.set(key, { group: where(share), title: treeTitleOf(subjectOf(share), share.treeId) });
         }
       }
       const countTrees = (map) => {
         const out = { Real: 0, Ai: 0, Tester: 0 };
-        for (const value of map.values()) out[value] += 1;
+        for (const value of map.values()) out[value.group] += 1;
         return out;
       };
+      // 제목 목록은 제목·id 순으로 정해 둬어 PostgreSQL 판과 같은 답을 돌려준다(각 최대 20).
+      const titlesOf = (pairs) => pairs
+        .map(([treeId, title]) => ({ treeId: String(treeId), title: String(title ?? '').trim() }))
+        .filter((entry) => entry.title)
+        .sort((a, b) => a.title.localeCompare(b.title) || a.treeId.localeCompare(b.treeId))
+        .slice(0, 20)
+        .map((entry) => entry.title);
+      const allTreeTitles = titlesOf(documents.flatMap((document) =>
+        (Array.isArray(document?.doc?.trees) ? document.doc.trees : []).map((t) => [String(t?.id ?? ''), String(t?.title || t?.subject || '')])));
       const publicCount = countTrees(publicTrees);
       const featuredCount = countTrees(featuredTrees);
 
       return {
         ...totals,
         publicReal: publicCount.Real, publicAi: publicCount.Ai, publicTester: publicCount.Tester,
-        featuredReal: featuredCount.Real, featuredAi: featuredCount.Ai, featuredTester: featuredCount.Tester
+        featuredReal: featuredCount.Real, featuredAi: featuredCount.Ai, featuredTester: featuredCount.Tester,
+        treesTitles: allTreeTitles,
+        publicTitles: titlesOf([...publicTrees.entries()].map(([key, value]) => [key.split('\u0000')[1], value.title])),
+        featuredTitles: titlesOf([...featuredTrees.entries()].map(([key, value]) => [key.split('\u0000')[1], value.title]))
       };
     }
   };

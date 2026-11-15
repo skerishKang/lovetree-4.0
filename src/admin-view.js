@@ -45,15 +45,20 @@ export function parseHash(hash) {
   // #655: 'pending'은 받음·확인 중을 한 번에 보는 보조 조건이다('한눈에' 카드에서 쓴다).
   const status = [...STATUS_ORDER, PENDING_STATUS].includes(params.get('status')) ? params.get('status') : '';
   const kind = params.get('kind') in KIND_LABEL ? params.get('kind') : '';
+  // #743: '한눈에' 카드가 각 탭의 조건을 주소로 남긴다 — 답글 0(#board?unanswered=1),
+  // 신고 검토 대기(#reports?status=open), 열린·닫힌 이슈(#issues?status=open|closed).
+  const unanswered = params.get('unanswered') === '1';
+  const reportStatus = ['open', 'resolved', 'dismissed'].includes(params.get('status')) ? params.get('status') : '';
+  const issueState = ['open', 'closed'].includes(params.get('status')) ? params.get('status') : '';
   if (name === 'overview') return {view: 'overview', id: null, status: '', kind: ''};
   if (name === 'feedback' && id) return {view: 'feedback', id, status: '', kind: ''};
   if (name === 'persona' && id) return {view: 'persona', id, status: '', kind: ''};
   if (name === 'journals') return {view: 'journals', id: null, status: '', kind: ''};
-  if (name === 'reports') return {view: 'reports', id: null, status: '', kind: ''};
-  if (name === 'issues') return {view: 'issues', id: null, status: '', kind: ''};
+  if (name === 'reports') return {view: 'reports', id: null, status: reportStatus, kind: ''};
+  if (name === 'issues') return {view: 'issues', id: null, status: issueState, kind: ''};
   // #655: 운영센터를 열면(주소 없이) '한눈에'가 기본이다. 기존 주소(#board 등)는 그대로다.
   if (!name) return {view: 'overview', id: null, status: '', kind: ''};
-  return {view: 'board', id: null, status, kind};
+  return unanswered ? {view: 'board', id: null, status, kind, unanswered: true} : {view: 'board', id: null, status, kind};
 }
 
 /** 화면 상태를 주소 해시로. 탭 거르기는 #board 물음표 뒤에 남긴다(#570 2). */
@@ -62,14 +67,21 @@ export function viewHash(view, id = null, filters = {}) {
     const params = new URLSearchParams();
     if (filters.status) params.set('status', String(filters.status));
     if (filters.kind) params.set('kind', String(filters.kind));
+    if (filters.unanswered === true || filters.unanswered === '1') params.set('unanswered', '1');
     const query = params.toString();
     return query ? `#board?${query}` : '#board';
   }
   if (view === 'feedback' && id != null) return '#feedback/' + encodeURIComponent(id);
   if (view === 'persona' && id != null) return '#persona/' + encodeURIComponent(id);
   if (view === 'journals') return '#journals';
-  if (view === 'reports') return '#reports';
-  if (view === 'issues') return '#issues';
+  if (view === 'reports') {
+    // #743: '한눈에'의 신고 대기 카드가 검토 대기만 보는 주소를 쓴다.
+    return filters.status ? `#reports?status=${encodeURIComponent(filters.status)}` : '#reports';
+  }
+  if (view === 'issues') {
+    // #743: 열린·닫힌 이슈 카드가 각각의 상태만 보는 주소를 쓴다.
+    return filters.status ? `#issues?status=${encodeURIComponent(filters.status)}` : '#issues';
+  }
   if (view === 'overview') return '#overview';
   return '#board';
 }
@@ -86,12 +98,14 @@ export const PENDING_STATUS = 'pending';
 export function isPendingStatus(status) {
   return status === 'received' || status === 'reviewing';
 }
-export function filterRows(rows, {kind = '', status = ''} = {}) {
+export function filterRows(rows, {kind = '', status = '', unanswered = false} = {}) {
   let list = Array.isArray(rows) ? rows : [];
   if (kind) list = list.filter(row => row?.kind === kind);
   if (status === PENDING_STATUS) list = list.filter(row => isPendingStatus(row?.status));
   else if (status) list = list.filter(row => row?.status === status);
   else list = list.filter(row => row?.status !== 'closed');
+  // #743: '답을 아직 안 단 글' 카드의 조건 — 답글 0이고 닫힌 글은 아니다.
+  if (unanswered === true || unanswered === '1') list = list.filter(row => (row?.replyCount || 0) === 0);
   return list;
 }
 
@@ -260,13 +274,16 @@ export function statsCards(response) {
     ['featured-trees', '둘러보기 소개', stats.trees?.featured]
   ];
   const num = (value) => (Number.isSafeInteger(value) && value >= 0 ? value : null);
+  // #743: 트리 계열 카드는 펼침 내역에 제목 목록(최대 20)을 받는다. 없으면 내역은 갈래 수만 — 지어내지 않는다.
+  const TREE_KEYS = new Set(['trees', 'public-trees', 'featured-trees']);
+  const titleList = (value) => Array.isArray(value) ? value.map((item) => String(item ?? '').trim()).filter(Boolean).slice(0, 20) : null;
   const cards = cells.map(([key, label, value]) => {
     const real = num(value?.real);
     const aiTester = num(value?.aiTester);
     const tester = num(value?.tester);
     return real === null || aiTester === null || tester === null
       ? {key, label, error: true}
-      : {key, label, real, aiTester, tester};
+      : {key, label, total: real + aiTester + tester, real, aiTester, tester, ...(TREE_KEYS.has(key) ? {titles: titleList(value?.titles)} : {})};
   });
   return {error: cards.every(card => card.error), cards};
 }
