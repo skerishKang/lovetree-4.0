@@ -247,6 +247,10 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     // #662 후속(CTO 지시): 안내 풍선은 상세 판이 닫혀 있을 때만 뜬다 — 판은 로드 때 선택 복원으로 열려 있으므로 먼저 닫는다.
     // 닫힘 상태에서는 풍선이 캔버스 위에 뜬 상태로 겹침·대비를 풍선까지 잰다(풍선은 '도구×캔버스' 제외 대상이 아니다).
     const boardFrame = await frameOf(page3, /views\/track/);
+    // 2026-11-16 대표 결정: 읽기 전용(예시) 보드에서는 '진주빛 보드 · 읽기 전용' 표시가 그대로 보인다.
+    const readOnlyBadge = await boardFrame.evaluate(() => { const el = document.getElementById('themeBadge'); return { hidden: el.hidden, text: el.textContent }; });
+    assert.equal(readOnlyBadge.hidden, false, '읽기 전용 보드에서는 테마 표시를 그대로 둔다');
+    assert.ok(readOnlyBadge.text.includes('진주빛 보드 · 읽기 전용'), '읽기 전용 표시가 그대로다 — 실측=' + readOnlyBadge.text);
     await boardFrame.evaluate(() => document.getElementById('detailClose').click());
     await boardFrame.waitForFunction(() => { const d = document.getElementById('detail'); if (!d || d.classList.contains('open')) return false; const r = d.getBoundingClientRect(); return r.left >= innerWidth || r.top >= innerHeight; }, null, { timeout: 5000 }).catch(() => {});
     await page3.waitForTimeout(300);
@@ -545,6 +549,16 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     await page6.waitForTimeout(1500);
     const tagBoard = await frameOf(page6, /track58-pinboard/);
     assert.ok(tagBoard, '보드 프레임이 열린다(꼬리표 줄 상태)');
+    // 2026-11-16 대표 결정: 쓰기 가능한 내 보드에서는 고급 기능의 원본 테마 이름('진주빛 보드') 글자를 숨긴다.
+    // 고급 기능을 켠 상태·끈 상태 모두(배지는 고급 표시와 무관하므로 두 상태를 모두 단정한다).
+    const pearlHidden = await tagBoard.evaluate(() => { const el = document.getElementById('themeBadge'); return { hidden: el.hidden, text: el.textContent }; });
+    assert.equal(pearlHidden.hidden, true, '쓰기 가능한 보드에서 테마 표시를 숨긴다');
+    assert.ok(!pearlHidden.text.includes('진주빛'), '쓰기 가능한 보드에 진주빛 글자가 없다');
+    await tagBoard.evaluate(() => document.body.classList.add('lt-advanced'));
+    const pearlAdvanced = await tagBoard.evaluate(() => { const el = document.getElementById('themeBadge'); return { hidden: el.hidden, text: el.textContent }; });
+    assert.equal(pearlAdvanced.hidden, true, '고급 기능을 켠 보드에서도 테마 표시를 숨긴다');
+    assert.ok(!pearlAdvanced.text.includes('진주빛'), '고급 기능을 켠 보드에도 진주빛 글자가 없다');
+    await tagBoard.evaluate(() => document.body.classList.remove('lt-advanced'));
     await tagBoard.waitForFunction(() => !!document.getElementById('dTags') && document.getElementById('dTags').childNodes.length > 0, null, { timeout: 10000 }).catch(() => {});
     await tagBoard.evaluate(() => selectMoment(LTDEMO.moments[0].id));
     await page6.waitForTimeout(600);
