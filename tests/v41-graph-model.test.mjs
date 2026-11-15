@@ -64,14 +64,17 @@ test('순간 10개: 꼬리표로 허브·1차 소속·함께 속함·선반이 �
   assert.deepEqual(graph.hubs.map((h) => [h.kindId, h.value, h.count]), [
     ['stage', '쇼챔피언', 3], ['song', '15-LOVE', 4], ['artist', 'RESCENE', 3], ['member', '지우', 3],
   ]);
-  // 1차 소속은 무대 > 노래 > 가수 순서 — s1은 무대 묶음에 살고 나머지는 함께 속함(키워드 순서).
+  // 1차 소속은 무대 > 노래 > 멤버 > 가수 순서 — s1은 무대 묶음에 살고 나머지는 함께 속함(키워드 순서).
   const s1 = graph.moments.find((m) => m.id === 's1');
   assert.equal(s1.hubId, 'stage:쇼챔피언');
   assert.deepEqual(s1.alsoHubIds, ['song:15-love', 'artist:rescene', 'member:지우']);
-  // 멤버 허브는 1차 소속 후보가 아니다 — 멤버 꼬리표만 달린 순간은 1차 없이 함께 속함만.
+  // 멤버도 1차 소속 후보(문서 v2) — 멤버 꼬리표만 달린 순간은 멤버 묶음에 산다.
   const c1 = graph.moments.find((m) => m.id === 'c1');
-  assert.equal(c1.hubId, null, '1차 소속 순서(무대>노래>가수)에는 멤버가 없다');
-  assert.deepEqual(c1.alsoHubIds, ['member:지우']);
+  assert.equal(c1.hubId, 'member:지우');
+  assert.deepEqual(c1.alsoHubIds, []);
+  const memberHub = graph.hubs.find((h) => h.kindId === 'member');
+  assert.deepEqual(memberHub.momentIds, ['c1', 'c2'], '멤버 묶음은 멤버 꼬리표만 달린 c1·c2');
+  assert.deepEqual(memberHub.linkedIds, ['s1', 'c1', 'c2'], 's1은 무대 묶음에 살지만 이 값은 함께 가진다');
   // 꼬리표 없는 순간은 선반 목록으로.
   assert.deepEqual(graph.shelf, ['t1']);
   // 묶음(1차 소속)은 무대 허브에 세 순간 — 선반 순간은 어느 허브에도 없다.
@@ -81,6 +84,24 @@ test('순간 10개: 꼬리표로 허브·1차 소속·함께 속함·선반이 �
   const songHub = graph.hubs.find((h) => h.kindId === 'song');
   assert.deepEqual(songHub.momentIds, ['a1', 'a2']);
   assert.deepEqual(songHub.linkedIds, ['s1', 's2', 'a1', 'a2']);
+});
+
+test('1차 소속 우선순위: 멤버는 가수보다 앞서고, 무대·노래가 있으면 물러난다', () => {
+  const moments = [
+    M('c1', '2026-11-01', [member('지우')]),
+    M('c2', '2026-11-02', [member('지우')]),
+    M('sc', '2026-11-03', [stage('쇼챔피언'), member('지우')]),
+    M('s2', '2026-11-04', [stage('쇼챔피언')]),
+  ];
+  const graph = buildGraph(moments);
+  // 멤버 꼬리표만 있으면 멤버 허브의 1차 소속이 된다(문서 v2 순서: 무대 > 노래 > 멤버 > 가수).
+  assert.deepEqual(graph.moments.find((m) => m.id === 'c1'), { id: 'c1', hubId: 'member:지우', alsoHubIds: [] });
+  const memberHub = graph.hubs.find((h) => h.kindId === 'member');
+  assert.deepEqual(memberHub.momentIds, ['c1', 'c2']);
+  // 무대가 함께 있으면 멤버는 물러난다 — 그 순간은 무대 묶음에 살고 멤버와는 함께 속함.
+  assert.equal(graph.moments.find((m) => m.id === 'sc').hubId, 'stage:쇼챔피언');
+  assert.deepEqual(graph.moments.find((m) => m.id === 'sc').alsoHubIds, ['member:지우']);
+  assert.deepEqual(memberHub.momentIds, ['c1', 'c2'], 'sc는 멤버 묶음의 1차 소속이 아니다');
 });
 
 test('1차 소속 우선순위: 노래가 가수보다, 무대가 노래보다 먼저다', () => {
@@ -188,7 +209,7 @@ test('pathFor(허브): 그 허브에 연결된 순간(1차+함께 속함)이 지
   const memberHub = graph.hubs.find((h) => h.kindId === 'member');
   // 무대 허브 묶음(p2·p3·p4)을 지나는 구간만 밝힌다.
   assert.deepEqual(pathFor(graph, { hubId: stageHub.id }), { segments: [['p1', 'p2'], ['p2', 'p3'], ['p3', 'p4'], ['p4', 'p5']] });
-  // 멤버 허브는 1차 소속이 없어도 함께 속함(p2·p6)으로 발자취 구간이 나온다(고아 허브).
+  // 멤버 허브는 1차 소속(p6)과 함께 속함(p2)을 한 벌로 지나는 구간이 나온다.
   assert.deepEqual(pathFor(graph, { hubId: memberHub.id }), { segments: [['p1', 'p2'], ['p2', 'p3'], ['p5', 'p6']] });
 });
 
