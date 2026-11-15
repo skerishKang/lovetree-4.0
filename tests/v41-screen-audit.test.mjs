@@ -819,6 +819,9 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     await page8.goto(`${base}/v41/?account=1#my/graph`, { waitUntil: 'load' });
     const graphByHash = await frameOf(page8, /track60-graph/);
     assert.ok(graphByHash, '#my/graph 주소로 그래프 보기가 열린다(메뉴 연결 없이 주소로만)');
+    // 프레임이 열렸어도 주소가 틀리면 배포가 4.0 첫 화면으로 되돌려 준다(2026-11-16 보고) — 문서 표시까지 본다.
+    assert.match(graphByHash.url(), /views\/graph\/track60-graph\.html$/, '#my/graph 프레임 주소에 그래프 하위 폴더가 있다');
+    assert.equal(await graphByHash.evaluate(() => document.documentElement.getAttribute('data-v41-screen')), 'graph', '#my/graph 프레임 문서가 그래프 화면이다');
     await ctx8.close();
 
     await context.close();
@@ -837,4 +840,85 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
   }
   if (known.length) console.log(`#657 알려진 문제(${known.length}건 — KNOWN 목록에 있다, 기준 그대로):\n` + known.map((r) => '  ' + r.줄).join('\n'));
   assert.deepEqual(fresh, [], `알려진 문제 밖의 새 화면 실패 ${fresh.length}건:\n` + fresh.map((r) => '  ' + r.줄).join('\n'));
+});
+
+// #713 후속(2026-11-16 보고): #my/graph가 그래프가 아니라 첫 화면으로 열렸다 — screenUrl이 그래프의
+// 하위 폴더(views/graph/)를 빠뜨려 없는 주소를 배포가 4.0 첫 화면(SPA 폴백)으로 되돌려 줬다.
+// 세 경우 모두 iframe 파일 이름·프레임 문서 표시(data-v41-screen)·주소를 문자로 기록해 단정한다(눈 판단 없음).
+test('#my/graph는 로그인 진입·로그인 왕복·hash 이동 세 경우 모두 그래프 화면을 연다', { skip: REQUIRE ? false : skip, timeout: 180000 }, async () => {
+  if (skip) assert.fail(`미리보기 검사에서는 건너뜀이 실패다 — ${skip}`);
+  const server = await serve();
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch({ headless: true });
+  const GRAPH_FRAME = /views\/graph\/track60-graph\.html/;
+  const workspace = (r, owned) => r.fulfill({
+    status: owned ? 200 : 401, contentType: 'application/json',
+    body: owned
+      ? JSON.stringify({ revision: 1, state: { version: 1, trees: [graphTree], prefs: {} }, subject: '시험계정', writeSubjectBound: true, savedAt: '2026-11-16T09:00:00.000Z' })
+      : '{"error":"auth"}'
+  });
+  const frameShown = (file) => () => {
+    const f = document.getElementById('view');
+    return !!f && !f.hidden && new RegExp(file).test(f.contentWindow?.location?.href || '');
+  };
+  const graphState = async (page) => {
+    const f = await frameOf(page, GRAPH_FRAME);
+    const screen = f ? await f.evaluate(() => document.documentElement.getAttribute('data-v41-screen') || '') : '';
+    return { frame: f ? f.url() : '(프레임 없음)', screen, hash: await page.evaluate(() => location.hash) };
+  };
+  try {
+    // ① 로그인된 상태에서 주소창에 #my/graph 입력(새 페이지 로드).
+    const ctx1 = await browser.newContext({ viewport: { width: 1280, height: 900 }, reducedMotion: 'reduce' });
+    await ctx1.route('**://i.ytimg.com/**', THUMB);
+    await ctx1.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
+    await ctx1.route('**/api/workspace**', (r) => workspace(r, true));
+    const page1 = await ctx1.newPage();
+    await page1.goto(`${base}/v41/#my/graph`, { waitUntil: 'load' });
+    await page1.waitForFunction(frameShown('track60-graph'), null, { timeout: 20000 });
+    const got1 = await graphState(page1);
+    assert.match(got1.frame, GRAPH_FRAME, '① 로그인 상태 #my/graph: iframe 파일이 views/graph/track60-graph.html이다');
+    assert.equal(got1.screen, 'graph', '① 프레임 문서가 그래프 화면이다(data-v41-screen)');
+    assert.match(got1.hash, /^#my\/graph/, '① 주소가 #my/graph로 남는다');
+    await ctx1.close();
+
+    // ② 로그아웃 상태에서 #my/graph로 들어와 로그인을 거쳐 돌아온 경우 — 같은 탭이 hash 없이 돌아오고
+    // 보관 경로(pending-owner-route)로 그래프를 되살린다. 로그인 왕복은 ?account=1 돌아옴 + 회원 응답으로 흉내 낸다.
+    const ctx2 = await browser.newContext({ viewport: { width: 1280, height: 900 }, reducedMotion: 'reduce' });
+    let owned = false;
+    await ctx2.route('**://i.ytimg.com/**', THUMB);
+    await ctx2.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
+    await ctx2.route('**/api/workspace**', (r) => workspace(r, owned));
+    const page2 = await ctx2.newPage();
+    await page2.goto(`${base}/v41/#my/graph`, { waitUntil: 'load' });
+    await page2.waitForTimeout(1200);
+    const stash = await page2.evaluate(() => sessionStorage.getItem('lovetree.v41.pending-owner-route.v1') || '');
+    assert.equal(stash, '#my/graph', '② 로그인 전 보관 경로가 남는다');
+    owned = true;
+    await page2.goto(`${base}/v41/?account=1`, { waitUntil: 'load' });
+    await page2.waitForFunction(frameShown('track60-graph'), null, { timeout: 20000 });
+    const got2 = await graphState(page2);
+    assert.match(got2.frame, GRAPH_FRAME, '② 로그인 왕복 뒤에도 그래프 화면을 연다');
+    assert.equal(got2.screen, 'graph', '② 프레임 문서가 그래프 화면이다');
+    assert.match(got2.hash, /^#my\/graph/, '② 돌아온 뒤 주소가 #my/graph로 쓰인다');
+    await ctx2.close();
+
+    // ③ 다른 화면(책)에 있다가 hash만 #my/graph로 바꾼 경우.
+    const ctx3 = await browser.newContext({ viewport: { width: 1280, height: 900 }, reducedMotion: 'reduce' });
+    await ctx3.route('**://i.ytimg.com/**', THUMB);
+    await ctx3.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
+    await ctx3.route('**/api/workspace**', (r) => workspace(r, true));
+    const page3 = await ctx3.newPage();
+    await page3.goto(`${base}/v41/#my/book`, { waitUntil: 'load' });
+    await page3.waitForFunction(frameShown('track59-sketchbook'), null, { timeout: 20000 });
+    await page3.evaluate(() => { location.hash = '#my/graph'; });
+    await page3.waitForFunction(frameShown('track60-graph'), null, { timeout: 20000 });
+    const got3 = await graphState(page3);
+    assert.match(got3.frame, GRAPH_FRAME, '③ hash만 바꿔도 그래프 화면을 연다');
+    assert.equal(got3.screen, 'graph', '③ 프레임 문서가 그래프 화면이다');
+    assert.match(got3.hash, /^#my\/graph/, '③ 주소가 #my/graph다');
+    await ctx3.close();
+  } finally {
+    await browser.close();
+    server.close();
+  }
 });

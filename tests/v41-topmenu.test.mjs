@@ -4,7 +4,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {screens} from '../public/v41/shell/navigation.mjs';
+import {screens, screenUrl} from '../public/v41/shell/navigation.mjs';
 import {FIRST_TREE_TIPS} from '../public/v41/header-state.mjs';
 
 const read = file => fs.readFileSync(new URL(`../${file}`, import.meta.url), 'utf8');
@@ -106,4 +106,15 @@ test('postdeploy 기대값도 새 메뉴 구조를 센다', () => {
   // 없어진 내 책장 탭을 클릭하는 검사는 남아 있으면 안 된다.
   assert.doesNotMatch(postdeploy, /nav button\[data-view="track32-bookshelf\.html"\]/);
   assert.match(postdeploy, /내 트리 전체 보기/);
+});
+
+// #713 후속(2026-11-16 보고): 그래프 화면 파일이 views/graph/ 아래로 옮겨졌는데 셸 주소는 그대로
+// views/track60-graph.html을 써 배포가 4.0 첫 화면으로 되돌려 주었다. screens의 안쪽 화면 파일이
+// 실제로 존재하는지 검사해 주소·파일 위치 어긋남을 미리 잡는다.
+test('screens의 안쪽 화면 파일은 주소가 가리키는 자리에 실제로 있다', () => {
+  for (const [view, file] of screens) {
+    if (file === 'src064-orbit.html') continue; // 첫 화면은 vite 빌드 진입점(v41/home.html)이 만든다
+    const rel = decodeURIComponent(new URL(screenUrl(file, 'server', 'https://lovetree-4-0.pages.dev')).pathname).replace(/^\/v41\//, '');
+    assert.ok(fs.existsSync(new URL('../public/v41/' + rel, import.meta.url)), `${view} 화면 파일이 없다: ${rel}`);
+  }
 });
