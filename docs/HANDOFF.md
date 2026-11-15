@@ -4,6 +4,14 @@
 
 > **빨간 필수 검사 규칭(2026-11-12 사고 뒤)**: 필수 검사가 빨강이면 **재실행은 1회까지**. 같은 항목이 또 빨강이면 멈추고 원인을 찾는다 — 재실행·빈 커밋으로 초록을 만들지 않는다. "간헐적·환경 탓"이라고 적으려면 **같은 시각 이 변경이 없는 브랜치(main 또는 다른 PR)** 에서도 같은 실패가 나는지 대조한 결과를 함께 적는다. 메시지를 받아 화면을 다시 띄우는 코드는 '뜰 때마다 보내는 쪽'과 짝으로 흐름 시험을 하고, 머지 전 미리보기 첫 화면을 5초 이상 직접 본다.
 
+## 2026-11-15 — 소스 글자 검사 줄이기 1차: 셸 메뉴·운영센터·서버 범위 120→97건 (로컬3 레인, ai/local3-test-strings-261115, main 40123dd 기준)
+
+- **왜**: 시험 232개 파일 중 약 96개가 동작이 아니라 소스 글자(`src.includes('…')`·`assert.match(소스)`)를 검사해, 제품을 수리할 때마다 '기존 계약 갱신'이 필요했다. 이번 1차는 **운영센터(admin*)·서버(server/**)·셸 메뉴(header-ia 등)** 범위만. 열린 PR(#679·#681)이 만지는 `tests/domain.test.mjs`·`v41-panels-flow.test.mjs`·`v41-screen-audit.test.mjs`는 만지지 않았다. **제품 코드 변경 0** — `git diff`가 tests/ 7개 파일 + docs 2개뿐이다.
+- **처리(단정 기준, 기계 계수와 일치)**: **지움 12**(hashchange 배선·openLoginStart 배선은 각각 `v41-shell-location`·`v41-shell-auth`의 기존 동작 시험이 이미 지키고, 접기 메뉴 항목 7·트리 클릭 배선 조각 3은 `v41-topmenu`의 순서·한 줄 검사와 겹치는 중복) / **바꿈 11**(topmenu 화면 목록·말풍선 제목 7건 → `navigation.mjs` screens·`header-state.mjs` FIRST_TREE_TIPS 데이터 직접 확인; shell-header 직전 동그라미 글자 3건 → createHeader + 가짜 localStorage로 저장·'나' 미저장·로그아웃 삭제를 동작으로; aria-current 표시·빈 화면 해제 2건(topmenu·cto-453) → `v41-shell-screens`에 createScreens 직접 호출 신규 1시험) / **남김 97**(마크업·CSS·문구·schema 계약 + shell.mjs·src/admin.js 페이지 스크립트 배선 — 내보내기가 없어 전환하려면 제품 코드 변경 필요).
+- **파일**: `v41-topmenu`(38→30)·`v41-header-tabs-mobile`(26→19)·`v41-cto-453-cde`(31→30)·`v41-header-ia`(9→8)·`v41-shell-header`(3→0)·`v41-tree-menu-cleanup`(13→10)·`v41-shell-screens`(신규 동작 시험 +1). 줄 수는 순 +56(글자 검사 제거 41줄, 동작 시험·주석 추가) — 부담 감소는 단정 수 기준.
+- **강도 증명**: 새 동작 시험 2종을 검증 — screens.mjs aria-current 줄을 `'false'` 고정으로 깜 → 신규 시험 fail, header.mjs rememberLetter를 빈 함수로 깜 → shell-header fail. 둘 다 되돌려 복원 확인.
+- **시험 결과**: 편집 7파일 개별 `node --test` 67/67 pass, 전체 `npm test` 1769검 중 1630 pass·0 fail·139 skip(기존 건너뜀), `npm run build` 통과.
+- **2차 후보(다음 레인)**: `v41-shell-tree-title`의 messages·panels·community 호출점 검사(createMessages·createPanels·mountCommunity가 내보내기는 있으나 하네스가 무거움), `v41-cto-453-cde` 전체(셸 배선 글자 검사), `v41-shell-notice` 배선. 기준은 docs/TESTING.md '소스 글자 검사 줄이기 1차' 항목에 남겼다.
 ## 2026-11-15 — 꼬리표 2차(가수 종류·제목 해석·보드 판 폭)와 결함 ③ 수리 (#627, 로컬2 레인, ai/local2-627c-tags2 → #684, ai/local2-627d-tags-sync → #686, main 40123dd 기준)
 
 - **2차(#684, 스쿼시 머지됨)**: `tags.mjs` TAG_KINDS에 가수(`가수:` 3자 — 값 예산 21자, 활동기만 4자→20자)를 더했다. 제목 해석은 영문(한글) 꼬꼬에서 영문 하나로만 가수를 제안(한글 표기 버림), 무대 꼬리표는 방송 이름만 남기고 날짜를 뗀다, 직캠·화질·날짜가 섞인 붙임표 덩어리는 노래로 제안하지 않는다. 보드의 오른쪽 검은 빈 자리는 `.spaceGlow{inset:-20%}`가 만든 숨은 가로 스크롤 때문이었고 `.app`을 `overflow:clip`(board.css:2)으로 스크롤 컨테이너가 아니게 했다. 보드 상세 '꼬리표' 두 번 표시는 줄 안 하나로 정리(tag-line.mjs). 제목 해석 시험 27개 + 실제 제목 3개 = 30개.
