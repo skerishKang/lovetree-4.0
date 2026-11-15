@@ -16,6 +16,16 @@
 - **updates.json**: 4.1.4에 일지 날짜 고침 한 줄(고객 '내 의견'의 일지 날짜가 하루 밀려 보이던 것 — source ai_tester). 운영센터만의 수리(프록시·여백·흔들림)는 고객 화면과 무관해 적지 않았다(#671·#655 판단과 같음).
 - **머지 뒤**: 서버 파일(#699의 feedback-service·이 가지의 feedback-postgres)이 바뀌므로 컴2 autodeploy 설치·sha 확인이 필요하다.
 
+## 2026-11-15 — 윤제 4회차 화면 지적: 24자 넘는 꼬리표 제안 숨김·390 종류 라벨 위 얹음·지도 사용법 ? 단추·책 갈림길 문구 교정 (컴1로컬4 레인, ai/local4-yunje4-261115, main 0179c52 기준)
+
+- **① 꼬리표 24자 넘는 제안은 보이지 않게**: `tag-model.mjs` tagLineChips·suggestForTree가 tooLong 후보를 제안 목록에서 뺀다(tags.mjs의 tooLong 표시는 계약으로 유지 — 데이터를 조용히 버리지 않는다). `tag-line.mjs`·`shell/tag-manager.mjs`의 회색 '24자를 넘어요' 칩 렌더는 지웠다. #697 suggestForMoments('한꺼번에 제안')와 같은 규칙이다. 시험은 기존 tooLong 시험을 '보이지 않음' 규칙으로 갱신(v41-tags-627).
+- **② 지도 보기 칩에서 '사용법'을 뗀다**: `track56-network.html`의 #helpBtn을 둥근 '?' 단추(aria-label='사용법', title 포함)로 바꾸고 `network.css`에 36px(640px 이하 44px, 원형) 크기를 더했다. 보기 방식(전체 보기·그물형·동심원형)과 한 줄에 섞이지 않는다. 누르면 나오는 안내 말풍선 문구는 그대로다.
+- **③ 책 하단 갈림길 탭 문구 교정**: '○○에서 갈라지는 길' → '○○에서 갈라진 길'(`views/book/book-model.js`). 윤제가 '갈리지는 길'로 읽던 지적 — '갈리지는'은 저장소·이력 어디에도 없고 실제 문구는 '갈라지는 길'이었다(4a9aced 때부터). 작은 글자에 틀리게 읽힌 것으로 보아 표준형으로 바로잡았다. **참고(다음 회차 후보)**: 넓은 화면 책의 갈림길 탭 글자는 9px(12px 기준 미달 — book.css; 전화 390은 reader-layout.css가 12px로 올려 준다). 이번 범위 밖.
+- **390 '종류' 라벨 두 줄 꺾임**: `tag-line.css` 직접 입력 줄을 '라벨 위 얹음'(칸 위 12px 라벨, 칸 높이 30px)으로 — 390에서 '종/류' 꺾임·드롭다운·값 칸 눌림이 없어지고 넓은 화면에서도 같은 모양이다.
+- **시험**: v41-tags-627 31/31, updates-format·v41-book-model 포함 53/53, 전체 npm test 1820검 1681 pass·0 fail·139 skip(29.2초), build·modulepreload --check 통과. 화면 캡처 전·후(390·1440, 밤, 검사기와 같은 LT41 주입 하네스 — 컴2 접속 없음): `E:\lovetree-qa\lane\local4-yunje4\{before,after}\` 태그 상세·태그 정리·지도 칩·책 하단 4상태 × 8장 + summary.json(실측 텍스트 포함 — 전: 회색 '… · 24자를 넘어요' 칩·'사용법' pill·'갈라지는 길' → 후: 모두 사라지거나 바로잡힘).
+- **updates.json**: 4.1.4에 '고친 것' 4건(ai_tester·윤제)을 더했다.
+- **머지 직전 수리(CI 빨강 → 판 구조)**: CI에서만 나던 공용 검사기 빨강 4건('꼬리표 줄이 열린 상세'·'꼬리표 정리' × 1440·밤·정원, `button#detailClose × div#dBasic @(1380,99)`) — 로컬 재현(1440×768)으로 밝힌 원인: 보드 상세 판의 닫기 단추가 `.detail .close{position:absolute;top:14px;right:14px;background:none}`로 굴리는 영역(.detailScroll) 위에 떠 있어, 내용이 길어 스크롤이 깊어지면 글자가 단추 밑으로 지나갔다(이번에 태그 줄이 높아져 스크롤이 더 깊어져 드러남 — main도 여유 5px이던 잠재 결함). 시험 계약(렴침 0)이 정당하므로 화면을 맞춤: 닫기 단추를 판의 첫 머리 행(`flex:0 0 auto;align-self:flex-end`, position:relative로 터치 확장 ::after 유지)으로 냈다 — 내용을 굴려도 단추와 글자가 만나지 않는다. 로컬 실측 900·768 겹침 0, 공용 검사기 16 상태 통과, 보드 판 실측 클릭 14/14. 지도 도구 줄 시험(#517·#518)은 애초 통과였다(빨강 원인 아님). 참고: 지도 상세판(track56)도 같은 떠 있는 닫기 모양이라 다음 회차 후보.
+
 ## 2026-11-15 — 그래프 재료 잇기: buildGraph stacks + 꼬리표 한꺼번에 제안 (#627 후속, 컴1로컬2 레인, ai/local2-627-graph-material-261115, main 7420245 기준)
 
 - **buildGraph stacks(`public/v41/graph-model.mjs`)**: 결과에 `stacks: [{key, kind:'same-video'|'same-stage', momentIds, leadId}]`를 더하고 각 순간 entries에 `stackId`(없으면 null)를 붙였다. 묶음 판정은 same-stage.mjs 한 벌(findDuplicates·findSameStage)을 그대로 쓰고, leadId는 발자취 순서의 가장 앞선 순간, 두 종류 묶음에 모두 걸린 순간의 stackId는 같은 영상 묶음 열쇠를 권한다(영상 중복이 더 강한 신호 — 두 묶음은 stacks에 둘 다 남는다). 허브·1차 소속·발자취 규칙 불변.

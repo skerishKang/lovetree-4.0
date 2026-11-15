@@ -323,17 +323,26 @@ test('직접 입력: 종류를 고르고 값을 적어 붙인다 — 24자를 �
   assert.deepEqual(toggledKeywords(kws, inputTag('song', 'x'.repeat(22)).raw ?? ''), kws);
 });
 
-test('tooLong 후보는 회색으로 알려 줄 뿐이고, 눌러도 저장되지 않는다', () => {
+test('24자를 넘어 붙일 수 없는 후보는 제안에 보이지 않는다(윤제 4회차)', () => {
+  // 전: 너무 긴 후보도 회색 칩('24자를 넘어요')으로 보였다 → 후: 제안 목록에서 아예 보이지 않는다.
+  // tags.mjs suggestTagsFromTitle의 tooLong 표시는 그대로다(데이터를 조용히 버리지 않는 계약).
   const line = tagLineChips({
     keywords: [],
-    title: '르세라핌(LE SSERAFIM) \'UNFORGIVEN (feat. Nile Rodgers)\' Official MV',
+    title: '르세라핌(LE SSERAFIM) \'UNFORGIVEN (feat. Nile Rodgers)\' @뮤직뱅크 240502',
     knownTags: []
   });
-  const long = line.proposals.find((p) => p.state === 'tooLong');
-  assert.ok(long, '24자를 넘는 후보도 버리지 않고 표시한다');
-  assert.equal(long.raw, '', '너무 긴 후보는 저장값이 없다(눌러도 붙지 않는다)');
-  // raw가 빈 제안을 눌러도 keywords는 그대로다.
-  assert.deepEqual(toggledKeywords([], long.raw || ''), []);
+  assert.ok(line.proposals.some((p) => p.kindId === 'stage'), '짧은 후보(무대)는 그대로 제안한다');
+  assert.ok(line.proposals.every((p) => p.state === 'proposal'), '제안은 모두 누를 수 있는 모양이다');
+  assert.ok(line.proposals.every((p) => p.raw !== ''), '저장값이 없는(너무 긴) 후보는 제안에 없다');
+  // 정리 창의 '한 번에 제안받기'도 같은 규칙이다 — 후보가 전부 너무 길면 그 순간은 줄 자체가 없다.
+  const tree = realTreeOf([[], []]);
+  tree.moments[0].title = '르세라핌 \'UNFORGIVEN (feat. Nile Rodgers)\' Official MV';
+  tree.moments[1].title = '세븐틴 - 손오공 @엠카운트다운 240502';
+  const rows = suggestForTree(tree);
+  assert.deepEqual(rows.map((r) => r.momentId), [tree.moments[1].id], '후보가 전부 너무 긴 순간은 제안 줄에서 뺀다');
+  assert.ok(rows.flatMap((r) => r.proposals).every((p) => !p.tooLong));
+  // raw가 빈 제안을 눌러도 keywords는 그대로다(모델 방어는 그대로 둔다).
+  assert.deepEqual(toggledKeywords([], ''), []);
 });
 
 test('꼬리표 정리: 목록과 개수는 표기 차이를 하나로 묶어 센다', () => {

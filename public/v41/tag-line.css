@@ -8,26 +8,26 @@
 .lt-tagline-empty{font-size:12px;color:var(--lt-muted)}
 .lt-tagline-error{width:100%;margin:2px 0 0;font-size:12px;color:var(--lt-rose)}
 
-/* 칩: 확정은 진한 칩, 제안은 흐린 칩, 24자를 넘는 후보는 회색으로 알려 준다(#627). 글자는 12px 이상(#548). */
+/* 칩: 확정은 진한 칩, 제안은 흐린 칩이다. 24자를 넘어 붙일 수 없는 후보는 애초에 제안에 보이지 않는다(윤제 4회차). 글자는 12px 이상(#548). */
 .lt-tag-chip{display:inline-flex;align-items:center;max-width:100%;padding:3px 9px;border-radius:var(--lt-r-pill);
   font-size:12px;line-height:1.4;font-family:inherit;text-align:left;overflow-wrap:anywhere}
 button.lt-tag-chip{cursor:pointer;border:1px solid var(--lt-gold-line);background:transparent;color:var(--lt-gold);min-height:24px;font-size:13px}
 button.lt-tag-chip:hover{border-color:var(--lt-gold-deep)}
 .lt-tag-chip.is-confirmed{background:var(--lt-gold);border:1px solid var(--lt-gold);color:var(--lt-stage)}
-.lt-tag-chip.is-toolong{border:1px dashed var(--lt-line);background:transparent;color:var(--lt-muted);cursor:default}
 
 /* 카드 위 칩(보드·책) — 종이 위 올려 쓴다. 확정된 꼬리표만 1~3개, 12px 이상(#627). */
 .lt-tag-chip.is-card{padding:1px 7px;border:1px solid var(--lt-line-paper);background:transparent;color:var(--lt-ink)}
 .book-page .chip.lt-tag-chip,.moment-title .lt-tag-chip{font-size:12px;padding:1px 7px}
 
-/* 직접 입력: 종류 고르기 + 값 + 붙이기. 상세 판 안의 좁은 자리에서도 한 줄에 눌린다. */
-.lt-tagline-input{display:flex;flex-wrap:wrap;gap:4px;align-items:center;width:100%;margin-top:2px}
-.lt-tagline-label{display:inline-flex;align-items:center;gap:3px;font-size:13px;color:var(--lt-muted)}
-.lt-tagline-kind,.lt-tagline-value{min-height:26px;padding:2px 7px;border-radius:9px;border:1px solid var(--lt-line);
+/* 직접 입력: 종류 고르기 + 값 + 붙이기. 라벨은 칸 위에 얹는다(윤제 4회차 — 390에서 '종/류'로 두 줄로 꺾이고
+   드롭다운·값 칸이 좁아졌다). 위 얹음은 넓은 화면에서도 같은 모양이라 한 벌이다. */
+.lt-tagline-input{display:flex;flex-wrap:wrap;gap:6px;align-items:flex-end;width:100%;margin-top:2px}
+.lt-tagline-label{display:inline-flex;flex-direction:column;align-items:flex-start;gap:3px;font-size:12px;color:var(--lt-muted);min-width:0}
+.lt-tagline-kind,.lt-tagline-value{min-height:30px;padding:3px 9px;border-radius:9px;border:1px solid var(--lt-line);
   background:var(--lt-glass);color:var(--lt-pearl);font-size:13px;font-family:inherit}
-.lt-tagline-kind{flex:0 0 auto;max-width:9em}
-.lt-tagline-value{flex:1 1 90px;min-width:90px;max-width:100%}
-.lt-tagline-add{min-height:26px;padding:2px 10px;border-radius:9px;border:1px solid var(--lt-gold-line);
+.lt-tagline-kind{flex:1 1 120px;max-width:100%}
+.lt-tagline-value{flex:2 1 150px;min-width:120px;max-width:100%}
+.lt-tagline-add{min-height:30px;padding:2px 10px;border-radius:9px;border:1px solid var(--lt-gold-line);
   background:transparent;color:var(--lt-gold);font-size:13px;font-family:inherit;cursor:pointer}
 .lt-tagline-add:hover{border-color:var(--lt-gold-deep)}
 

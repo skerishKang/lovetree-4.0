@@ -171,21 +171,16 @@ export function createTagManager(deps) {
       title.textContent = row.title || '제목 없는 순간';
       box.append(title);
       for (const p of row.proposals) {
+        // 24자를 넘어 붙일 수 없는 후보는 모델(suggestForTree)이 이미 걸러 보낸다 — 여기에 오는 제안은 모두 누를 수 있다.
         const label = document.createElement('label');
-        if (p.tooLong) {
-          // 너무 긴 후보는 고를 수 없다 — 회색으로 이유를 알려 준다.
-          label.classList.add('is-toolong');
-          label.append(document.createTextNode(`${chipText(p)} · ${TOO_LONG_TEXT}`));
-        } else {
-          const box2 = document.createElement('input');
-          box2.type = 'checkbox';
-          const key = `${row.momentId}\u0000${p.raw || p.value}`;
-          box2.addEventListener('change', () => {
-            if (box2.checked) picked.add(key); else picked.delete(key);
-            $('tag-suggest-save').hidden = !picked.size;
-          });
-          label.append(box2, document.createTextNode(chipText(p)));
-        }
+        const box2 = document.createElement('input');
+        box2.type = 'checkbox';
+        const key = `${row.momentId}\u0000${p.raw || p.value}`;
+        box2.addEventListener('change', () => {
+          if (box2.checked) picked.add(key); else picked.delete(key);
+          $('tag-suggest-save').hidden = !picked.size;
+        });
+        label.append(box2, document.createTextNode(chipText(p)));
         box.append(label);
       }
       host.append(box);
