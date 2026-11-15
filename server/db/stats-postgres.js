@@ -17,39 +17,42 @@
  *   · 둘러보기 소개 = 공개 트리 중 둘러보기 조건과 같은 것 — 활성 공유 행의 moment_count>=3 이고
  *     (자동 공개 행이거나 주인이 소개를 켠 행), 숨김 처리된 공유 행이 없는 트리(community-postgres 의
  *     `listDiscoverable` 과 같은 조건).
- *   · AI 테스터 = `lovetree_product_roles.role='ai_customer'` 인 subject. 전체 숫자에 포함되며
- *     실제 사용자 = 전체 − AI 테스터로 응답에서 나뉜다.
+ *   · AI 테스터 = `lovetree_product_roles.role='ai_customer'` 인 subject. 시험 계정 =
+ *     `role='tester'` 인 subject(레인 시험 계정 01~05, #671). 둘 다 전체 숫자에 포함되며
+ *     응답에서 실제 사용자 / AI 테스터 / 시험 계정 세 갈래로 나뉜다(실제 = 전체 − AI − 시험).
  *
  * 응답에는 숫자만 담는다 — subject·이메일·이름은 돌려주지 않는다.
  */
 
 const NUMERIC_FIELDS = [
-  'accountsReal', 'accountsAi', 'accountsNewReal', 'accountsNewAi',
-  'treesReal', 'treesAi',
-  'momentsReal', 'momentsAi', 'momentsNewReal', 'momentsNewAi',
-  'publicReal', 'publicAi',
-  'featuredReal', 'featuredAi'
+  'accountsReal', 'accountsAi', 'accountsTester', 'accountsNewReal', 'accountsNewAi', 'accountsNewTester',
+  'treesReal', 'treesAi', 'treesTester',
+  'momentsReal', 'momentsAi', 'momentsTester', 'momentsNewReal', 'momentsNewAi', 'momentsNewTester',
+  'publicReal', 'publicAi', 'publicTester',
+  'featuredReal', 'featuredAi', 'featuredTester'
 ];
 
 const SQL = `
-WITH ai AS (
-  SELECT subject_id FROM lovetree_product_roles
-  WHERE product_id = $1 AND role = 'ai_customer'
+WITH roles AS (
+  SELECT subject_id, role FROM lovetree_product_roles
+  WHERE product_id = $1 AND role IN ('ai_customer','tester')
 ),
 docs AS (
   SELECT w.subject_id, w.doc,
-         EXISTS (SELECT 1 FROM ai a WHERE a.subject_id = w.subject_id) AS ai_tester
+         EXISTS (SELECT 1 FROM roles r WHERE r.subject_id = w.subject_id AND r.role = 'ai_customer') AS ai_tester,
+         EXISTS (SELECT 1 FROM roles r WHERE r.subject_id = w.subject_id AND r.role = 'tester') AS tester
   FROM lovetree_workspaces w
   WHERE w.product_id = $1
 ),
 accounts AS (
   SELECT e.subject_id, e.created_at,
-         EXISTS (SELECT 1 FROM ai a WHERE a.subject_id = e.subject_id) AS ai_tester
+         EXISTS (SELECT 1 FROM roles r WHERE r.subject_id = e.subject_id AND r.role = 'ai_customer') AS ai_tester,
+         EXISTS (SELECT 1 FROM roles r WHERE r.subject_id = e.subject_id AND r.role = 'tester') AS tester
   FROM lovetree_account_emails e
   WHERE e.product_id = $1
 ),
 per_doc AS (
-  SELECT d.subject_id, d.ai_tester,
+  SELECT d.subject_id, d.ai_tester, d.tester,
          COALESCE(jsonb_array_length(d.doc->'trees'), 0) AS trees,
          COALESCE(m.moments, 0) AS moments,
          COALESCE(m.moments_since, 0) AS moments_since
@@ -63,7 +66,8 @@ per_doc AS (
 ),
 active_share AS (
   SELECT s.subject_id, s.share_id, s.tree_id, s.moment_count, s.origin, s.discoverable,
-         EXISTS (SELECT 1 FROM ai a WHERE a.subject_id = s.subject_id) AS ai_tester
+         EXISTS (SELECT 1 FROM roles r WHERE r.subject_id = s.subject_id AND r.role = 'ai_customer') AS ai_tester,
+         EXISTS (SELECT 1 FROM roles r WHERE r.subject_id = s.subject_id AND r.role = 'tester') AS tester
   FROM lovetree_shares s
   WHERE s.product_id = $1 AND s.status = 'active'
     AND NOT EXISTS (
@@ -73,10 +77,10 @@ active_share AS (
     )
 ),
 public_tree AS (
-  SELECT DISTINCT subject_id, tree_id, ai_tester FROM active_share
+  SELECT DISTINCT subject_id, tree_id, ai_tester, tester FROM active_share
 ),
 featured_tree AS (
-  SELECT DISTINCT s.subject_id, s.tree_id, s.ai_tester
+  SELECT DISTINCT s.subject_id, s.tree_id, s.ai_tester, s.tester
   FROM active_share s
   WHERE s.moment_count >= 3
     AND (s.origin = 'auto' OR s.discoverable = true)
@@ -87,29 +91,36 @@ featured_tree AS (
     )
 ),
 account_row AS (
-  SELECT (count(*) FILTER (WHERE NOT ai_tester))::int AS "accountsReal",
+  SELECT (count(*) FILTER (WHERE NOT ai_tester AND NOT tester))::int AS "accountsReal",
          (count(*) FILTER (WHERE ai_tester))::int AS "accountsAi",
-         (count(*) FILTER (WHERE NOT ai_tester AND created_at >= $2::timestamptz))::int AS "accountsNewReal",
-         (count(*) FILTER (WHERE ai_tester AND created_at >= $2::timestamptz))::int AS "accountsNewAi"
+         (count(*) FILTER (WHERE tester))::int AS "accountsTester",
+         (count(*) FILTER (WHERE NOT ai_tester AND NOT tester AND created_at >= $2::timestamptz))::int AS "accountsNewReal",
+         (count(*) FILTER (WHERE ai_tester AND created_at >= $2::timestamptz))::int AS "accountsNewAi",
+         (count(*) FILTER (WHERE tester AND created_at >= $2::timestamptz))::int AS "accountsNewTester"
   FROM accounts
 ),
 tree_row AS (
-  SELECT (COALESCE(sum(trees) FILTER (WHERE NOT ai_tester), 0))::int AS "treesReal",
+  SELECT (COALESCE(sum(trees) FILTER (WHERE NOT ai_tester AND NOT tester), 0))::int AS "treesReal",
          (COALESCE(sum(trees) FILTER (WHERE ai_tester), 0))::int AS "treesAi",
-         (COALESCE(sum(moments) FILTER (WHERE NOT ai_tester), 0))::int AS "momentsReal",
+         (COALESCE(sum(trees) FILTER (WHERE tester), 0))::int AS "treesTester",
+         (COALESCE(sum(moments) FILTER (WHERE NOT ai_tester AND NOT tester), 0))::int AS "momentsReal",
          (COALESCE(sum(moments) FILTER (WHERE ai_tester), 0))::int AS "momentsAi",
-         (COALESCE(sum(moments_since) FILTER (WHERE NOT ai_tester), 0))::int AS "momentsNewReal",
-         (COALESCE(sum(moments_since) FILTER (WHERE ai_tester), 0))::int AS "momentsNewAi"
+         (COALESCE(sum(moments) FILTER (WHERE tester), 0))::int AS "momentsTester",
+         (COALESCE(sum(moments_since) FILTER (WHERE NOT ai_tester AND NOT tester), 0))::int AS "momentsNewReal",
+         (COALESCE(sum(moments_since) FILTER (WHERE ai_tester), 0))::int AS "momentsNewAi",
+         (COALESCE(sum(moments_since) FILTER (WHERE tester), 0))::int AS "momentsNewTester"
   FROM per_doc
 ),
 public_row AS (
-  SELECT (count(*) FILTER (WHERE NOT ai_tester))::int AS "publicReal",
-         (count(*) FILTER (WHERE ai_tester))::int AS "publicAi"
+  SELECT (count(*) FILTER (WHERE NOT ai_tester AND NOT tester))::int AS "publicReal",
+         (count(*) FILTER (WHERE ai_tester))::int AS "publicAi",
+         (count(*) FILTER (WHERE tester))::int AS "publicTester"
   FROM public_tree
 ),
 featured_row AS (
-  SELECT (count(*) FILTER (WHERE NOT ai_tester))::int AS "featuredReal",
-         (count(*) FILTER (WHERE ai_tester))::int AS "featuredAi"
+  SELECT (count(*) FILTER (WHERE NOT ai_tester AND NOT tester))::int AS "featuredReal",
+         (count(*) FILTER (WHERE ai_tester))::int AS "featuredAi",
+         (count(*) FILTER (WHERE tester))::int AS "featuredTester"
   FROM featured_tree
 )
 SELECT * FROM account_row, tree_row, public_row, featured_row

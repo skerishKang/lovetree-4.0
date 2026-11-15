@@ -278,6 +278,9 @@ el.textContent=t;
 el.classList.add('show');
 clearTimeout(toast.t);
 toast.t=setTimeout(()=>el.classList.remove('show'),2200)}
+// #662 후속(CTO 지시): 상세 판이 열리면 안내 풍선은 즉시 치운다 — 안내는 '순간을 선택하라'는 뜻이라 이미 선택해
+// 판이 열렸으면 필요 없고, 넓은 판에서는 풍선 자리가 판 안쪽('이어진 순간' 줄)과 포개진다. 다른 풍선(마음 저장 등)은 그대로 뜬다.
+function hideToast(){const el=$('#toast');clearTimeout(toast.t);el.classList.remove('show')}
 
 function addMoment(m,connectFrom=null){snapshot();
 moments.push(m);

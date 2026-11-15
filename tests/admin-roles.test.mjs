@@ -4,7 +4,8 @@ import { createApiHandler } from '../server/http.js';
 import { createWorkspaceService } from '../server/workspace-service.js';
 import { createMemoryWorkspaceRepo } from '../server/testing/memory-workspace-repo.js';
 import { createModelAdminRoleStore } from '../server/testing/model-admin-role-store.js';
-import { createAdminRoleService, ROLE_ADMIN, ROLE_AI_CUSTOMER } from '../server/admin-roles.js';
+import { createAdminRoleService, ROLE_ADMIN, ROLE_AI_CUSTOMER, ROLE_TESTER } from '../server/admin-roles.js';
+import { parseRoleArgs, emailList, mask } from '../tools/admin-role.mjs';
 import { createAdminStatsService } from '../server/admin-stats.js';
 import { createMemoryStatsRepo } from '../server/testing/memory-stats-repo.js';
 import { createMemoryAccountRepo } from '../server/testing/memory-account-repo.js';
@@ -155,10 +156,19 @@ test('부여·회수는 이력으로 남고, 행이 고쳐지거나 저장이 �
   assert.equal(assigned.assignment.previousRole, null);
   assert.equal(await admin.roleFor(target), ROLE_ADMIN);
 
+  // #671: 시험 계정 표식 'tester' 도 같은 부여·회수 경로를 쓴다(이력 포함).
+  const asTester = await admin.assign({ actorPrincipal: actor, targetSubjectId: MEMBER_SUBJECT, role: ROLE_TESTER, reason: '레인 시험 계정' });
+  assert.equal(asTester.assignment.role, ROLE_TESTER);
+  assert.equal(asTester.assignment.previousRole, ROLE_ADMIN);
+  assert.equal(await admin.roleFor(target), ROLE_TESTER);
+  assert.deepEqual((await admin.list()).filter((row) => row.subjectId === MEMBER_SUBJECT).map((row) => row.role), [ROLE_TESTER]);
+  await admin.assign({ actorPrincipal: actor, targetSubjectId: MEMBER_SUBJECT, role: ROLE_ADMIN });
+
   const revoked = await admin.revoke({ actorPrincipal: actor, targetSubjectId: MEMBER_SUBJECT });
   assert.equal(revoked.revocation.previousRole, ROLE_ADMIN);
   assert.equal(await admin.roleFor(target), null);
-  assert.deepEqual((await admin.history({ limit: 5 })).map((row) => row.action), ['revoke', 'assign', 'assign']);
+  // #671 tester 왕복(부여·되돌림)이 더해져 이력은 5줄이다.
+  assert.deepEqual((await admin.history({ limit: 5 })).map((row) => row.action), ['revoke', 'assign', 'assign', 'assign', 'assign']);
 
   await store.assign({ productId: PRODUCT, subjectId: MEMBER_SUBJECT, role: ROLE_ADMIN });
   store.rows.set(`${PRODUCT}\u0000${MEMBER_SUBJECT}`, { productId: PRODUCT, subjectId: ADMIN_SUBJECT, role: ROLE_ADMIN });
@@ -179,6 +189,8 @@ test('운영센터 전체 숫자(#655 2차): 계정·트리·순간·공개·둘
   const REAL_ONE = `sub_${'1'.repeat(32)}`;
   const REAL_TWO = `sub_${'2'.repeat(32)}`;
   const AI_ONE = `sub_${'3'.repeat(32)}`;
+  // #671: 레인 시험 계정 표식 tester — '실제 사용자' 숫자에서 갈라 센다.
+  const TESTER_ONE = `sub_${'6'.repeat(32)}`;
   const sessions = new Map([
     ['sess_admin', { productId: PRODUCT, subjectId: ADMIN2, state: 'active', expiresAt: FUTURE }],
     ['sess_member', { productId: PRODUCT, subjectId: REAL_ONE, state: 'active', expiresAt: FUTURE }]
@@ -186,6 +198,7 @@ test('운영센터 전체 숫자(#655 2차): 계정·트리·순간·공개·둘
   const roleStore = createModelAdminRoleStore();
   await roleStore.assign({ productId: PRODUCT, subjectId: ADMIN2, role: ROLE_ADMIN, grantedBy: null });
   await roleStore.assign({ productId: PRODUCT, subjectId: AI_ONE, role: ROLE_AI_CUSTOMER, grantedBy: null });
+  await roleStore.assign({ productId: PRODUCT, subjectId: TESTER_ONE, role: ROLE_TESTER, grantedBy: null });
   // 공유 행은 창(7일) 밖인 10-01 에, 고객 글은 창 안인 11-18 에 쌓인다 — '새 계정' 판정을 가른다.
   const shareRepo = createMemoryShareRepo({ now: Date.UTC(2026, 9, 1) });
   const visibilityRepo = createMemoryTreeVisibilityRepo();
@@ -225,6 +238,9 @@ test('운영센터 전체 숫자(#655 2차): 계정·트리·순간·공개·둘
   // AI 테스터: 트리 1(순간 3) + 자동 공개 → 공개·둘러보기 1(AI 쪽 숫자도 따로 센다)
   await write(AI_ONE, [tree('td', ['2026-10-04T00:00:00.000Z', '2026-10-05T00:00:00.000Z', '2026-10-06T00:00:00.000Z'])]);
   await shareRepo.upsertAutoShare({ productId: PRODUCT, subjectId: AI_ONE, shareId: 'auto-' + 'b'.repeat(20), treeId: 'td', entryMomentId: 'td-m0', momentCount: 3 });
+  // 시험 계정: 로그인(가입일 창 밖) + 트리 1(순간 2) → 계정·트리·순간에서 '시험 계정'으로 간다.
+  await login(TESTER_ONE, '2026-10-03T00:00:00.000Z');
+  await write(TESTER_ONE, [tree('tf', ['2026-10-09T00:00:00.000Z', '2026-10-10T00:00:00.000Z'])]);
   // 비공개 트리는 공개·둘러보기에서 빠진다(활성 공유 행이 있어도).
   await write(`sub_${'4'.repeat(32)}`, [tree('te', ['2026-10-06T00:00:00.000Z', '2026-10-07T00:00:00.000Z', '2026-10-08T00:00:00.000Z'])]);
   await shareRepo.upsertAutoShare({ productId: PRODUCT, subjectId: `sub_${'4'.repeat(32)}`, shareId: 'auto-' + 'c'.repeat(20), treeId: 'te', entryMomentId: 'te-m0', momentCount: 3 });
@@ -234,24 +250,25 @@ test('운영센터 전체 숫자(#655 2차): 계정·트리·순간·공개·둘
   assert.equal(response.status, 200);
   assert.equal(response.body.ok, true);
   const stats = response.body.stats;
-  // 계정 6(실제 5 · AI 1) — 로그인한 적 있는 계정을 센다(문서를 하나도 안 쓴 NEW_EMPTY 포함).
+  // 계정 7(실제 5 · AI 1 · 시험 1) — 로그인한 적 있는 계정을 센다(문서를 하나도 안 쓴 NEW_EMPTY 포함).
   // 새 계정은 가입일(첫 로그인 시각)이 창(11-13 이후) 안인 실제 사용자 2(REAL_TWO·NEW_EMPTY).
-  assert.deepEqual(stats.accounts, { total: 6, real: 5, aiTester: 1, new: { total: 2, real: 2, aiTester: 0 } });
-  // 트리 5(실제 4 · AI 1). 공개 2(실제 1 · AI 1) — 비공개 트리는 빠진다.
+  assert.deepEqual(stats.accounts, { total: 7, real: 5, aiTester: 1, tester: 1, new: { total: 2, real: 2, aiTester: 0, tester: 0 } });
+  // 트리 6(실제 4 · AI 1 · 시험 1). 공개 2(실제 1 · AI 1) — 비공개 트리는 빠진다.
   assert.deepEqual(stats.trees, {
-    total: 5, real: 4, aiTester: 1,
-    public: { total: 2, real: 1, aiTester: 1 },
-    featured: { total: 2, real: 1, aiTester: 1 }
+    total: 6, real: 4, aiTester: 1, tester: 1,
+    public: { total: 2, real: 1, aiTester: 1, tester: 0 },
+    featured: { total: 2, real: 1, aiTester: 1, tester: 0 }
   });
-  // 순간 10(실제 7 · AI 3), 그중 창 안은 실제 2개(사용자 1의 새 순간 + 사용자 2의 첫 순간).
-  assert.deepEqual(stats.moments, { total: 10, real: 7, aiTester: 3, new: { total: 2, real: 2, aiTester: 0 } });
+  // 순간 12(실제 7 · AI 3 · 시험 2), 그중 창 안은 실제 2개(사용자 1의 새 순간 + 사용자 2의 첫 순간).
+  assert.deepEqual(stats.moments, { total: 12, real: 7, aiTester: 3, tester: 2, new: { total: 2, real: 2, aiTester: 0, tester: 0 } });
   assert.equal(stats.window.days, 7);
   assert.equal(stats.window.since, '2026-11-13T00:00:00.000Z');
   assert.equal(response.headers['cache-control'], 'private, no-store');
 
   // 개인정보는 싣지 않는다 — 개인정보 칸도, subject·이메일 글자도 응답에 없다.
   const text = JSON.stringify(response.body);
-  for (const word of ['sub_', '@', 'email', 'name', 'subject', 'subjectId']) assert.ok(!text.includes(word), `응답에 ${word} 가 실렸다`);
+  for (const word of ['sub_', '@', 'email', 'name', 'subject', 'subjectId', 'tester_sub', 'role']) assert.ok(!text.includes(word), `응답에 ${word} 가 실렸다`);
+  assert.ok(text.includes('"tester":1'), '시험 계정 숫자는 응답에 있다(운영센터 전용)');
   const keys = new Set(Object.keys(stats));
   assert.deepEqual([...keys].sort(), ['accounts', 'checkedAt', 'moments', 'trees', 'window']);
 
@@ -278,4 +295,22 @@ test('운영센터 전체 숫자: 집계 저장소가 망가지면 503으로 닫
   const response = await handle({ method: 'GET', path: '/api/admin/stats', ...made.as('sess_admin') });
   assert.equal(response.status, 503);
   assert.equal(response.body.error.code, 'admin_stats_unavailable');
+});
+
+test('시험 계정 부여 도구(#671): 이메일 목록을 다듬고, tester 만 받고, 이메일·subject 를 출력하지 않는다', () => {
+  // 목록: 주석·빈 줄·중복(대소문자 무시)을 걷어낸다.
+  assert.deepEqual(emailList(['# 레인 시험 계정', '', 'A@Example.test', 'a@example.test', '  b@example.test  '].join(String.fromCharCode(10))), ['A@Example.test', 'b@example.test']);
+  // 기본 역할은 tester, --revoke 로 해제, 모르는 역할·인자·빈 목록은 거부.
+  assert.equal(parseRoleArgs(['--emails', '/tmp/l.txt']).role, ROLE_TESTER);
+  assert.equal(parseRoleArgs(['--email', 'a@b.test', '--revoke']).revoke, true);
+  assert.equal(parseRoleArgs(['--email', 'a@b.test', '--role', ROLE_AI_CUSTOMER]).role, ROLE_AI_CUSTOMER);
+  assert.throws(() => parseRoleArgs(['--email', 'a@b.test', '--role', 'OWNER']), /역할/);
+  assert.throws(() => parseRoleArgs(['--emails']), /모르는 인자|이메일/);
+  assert.throws(() => parseRoleArgs([]), /이메일/);
+  assert.throws(() => parseRoleArgs(['--email', 'a@b.test', '--surprise']), /모르는 인자/);
+  // 출력은 마스크뿐 — 이메일도 subject 도 그대로 나가지 않는다.
+  const masked = mask('charlie@example.test');
+  assert.match(masked, /^[0-9a-f]{8}$/);
+  assert.ok(!masked.includes('charlie'));
+  assert.notEqual(mask('a@b.test'), mask('b@b.test'));
 });

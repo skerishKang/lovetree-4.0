@@ -127,6 +127,17 @@ test('migrations apply cleanly to empty DB and are re-runnable', { skip }, async
     );
     assert.equal(emailRow.rows[0].email, 'second@example.test');
 
+    // ⑤-1 역할 CHECK 가 시험 계정 표식 'tester' 를 받는다(#671). 그 밖의 값은 거부한다.
+    await pool.query(
+      `INSERT INTO lovetree_product_roles(product_id, subject_id, role) VALUES ($1, 'sub_tester', 'tester')`,
+      [productId]
+    );
+    await assert.rejects(
+      pool.query(`INSERT INTO lovetree_product_roles(product_id, subject_id, role) VALUES ($1, 'sub_bad', 'tester_x')`, [productId]),
+      /check|violates/i
+    );
+    await pool.query('DELETE FROM lovetree_product_roles WHERE product_id = $1', [productId]);
+
     // ⑤ 첫 로그인 시각은 한 번만 찍힌다 (#655 2차). 두 번째 로그인은 updated_at 만 바꾼다.
     const accountRepo = createAccountRepo(pool);
     const loginSubject = 'sub_login';
