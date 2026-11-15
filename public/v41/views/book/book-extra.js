@@ -201,9 +201,14 @@ function paintTitle(m,pieceHasStory=false){
  let lead='';
  if(parts.main)lead=heading+sub;
  else if(parts.note)lead='<p class="moment-note moment-note-lead">'+t(parts.note)+'</p>';
- if(pieceHasStory)return '<div class="moment-title">'+date+lead+emotionMarkup(m.emotion)+'</div>';
+ /* #627: 책 쪽(카드)에도 확정된 꾀리표를 1~3개 작게 보인다(노래 → 멤버 → 무대 순서). 유튜브·링크 쪽은
+    book-extra의 momentContent가 paintTitle로 제목 줄을 다시 그리므로 여기에 함께 그린다. 꾀리표가 없으면
+    아무것도 더하지 않는다(원본 모양 보존). LTTagLine이 늦게 도착하면 빈 채로 지나가고 다음 그리기에서 붙는다. */
+ const tagChips=(window.LTTagLine&&source)?(window.LTTagLine.cardTags(source.keywords||[])||[]):[];
+ const tagRow=tagChips.length?'<div class="chips">'+tagChips.map(k=>'<span class="chip lt-tag-chip">'+t(k.value)+'</span>').join('')+'</div>':'';
+ if(pieceHasStory)return '<div class="moment-title">'+date+lead+emotionMarkup(m.emotion)+tagRow+'</div>';
  const tail=parts.main&&parts.note?'<p class="moment-note">'+t(parts.note)+'</p>':'';
- return '<div class="moment-title">'+date+lead+emotionMarkup(m.emotion)+tail+'</div>';
+ return '<div class="moment-title">'+date+lead+emotionMarkup(m.emotion)+tagRow+tail+'</div>';
 }
 /* 3. 한 페이지에 다 들어오게 + 1. YouTube는 그 자리에서 재생(누르기 전 외부 요청 0). */
 function localThumb(m){const src=String(m.image||'');if(src.startsWith('data:image/'))return src;if(src.startsWith('/api/media/'))return src;return ''}

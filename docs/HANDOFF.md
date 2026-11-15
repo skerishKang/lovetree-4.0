@@ -4,6 +4,39 @@
 
 > **빨간 필수 검사 규칭(2026-11-12 사고 뒤)**: 필수 검사가 빨강이면 **재실행은 1회까지**. 같은 항목이 또 빨강이면 멈추고 원인을 찾는다 — 재실행·빈 커밋으로 초록을 만들지 않는다. "간헐적·환경 탓"이라고 적으려면 **같은 시각 이 변경이 없는 브랜치(main 또는 다른 PR)** 에서도 같은 실패가 나는지 대조한 결과를 함께 적는다. 메시지를 받아 화면을 다시 띄우는 코드는 '뜰 때마다 보내는 쪽'과 짝으로 흐름 시험을 하고, 머지 전 미리보기 첫 화면을 5초 이상 직접 본다.
 
+## 2026-11-15 — 꼬리표를 화면에 붙이기: 상세·담은 직후 안내·카드·꼬리표 정리 (#627 1단계 PR B, 로컬2 레인, ai/local2-627b-tags, main 1c2935d 기준, PR #680)
+
+- **규칙 한 벌이 둘로 갈라졌다**: 계산만 하는 `public/v41/tag-model.mjs`(카드 칩 순서·꼬리표 줄 칩 구성·누르기·직접 입력·목록·이름 바꾸기·합치기·제안)와 그리기만 하는 `public/v41/tag-line.mjs`(상세 세 곳은 화면 파일을 건드리지 않고 상세 제목 MutationObserver로 붙는다). 저장은 `shell/tag-save.mjs` 한 곳이 **기존 boardSync 경로로 keywords만** 바꾼다(새 저장 경로·서버 변경 없음). tags.mjs 저장 형식은 건드리지 않았다.
+- **화면→셸 저장 길**: 화면(iframe)이 `lt41-tags` 메시지(shell/messages.mjs)로 확인한 keywords 전체를 보내면 셸이 tag-save로 저장하고 `lt41-tags-saved` 답을 보낸 화면에만 돌려준다. boardSync는 iframe을 다시 그리지 않는 길이라 상세를 연 채로 칩이 바뀌고, 보드 카드 사본은 `lt41-tags-changed` 이벤트로만 keywords를 맞춘다.
+- **읽어 보는 화면(공유·예시)에는 확정 꼬리표만** 보인다(제안·직접 입력은 소유자만). 예시 트리는 keywords가 아예 없어 '아직 꼬리표가 없어요' 흐린 글자만 보인다(원본 모양 보존).
+- **카드 칩**: 보드 카드는 board-detail.js의 cardHTML, 책 페이지는 book.js momentContent — 둘 다 `window.LTTagLine.cardTags`(모듈이 늦게 도착하므로 `lt41-tagline-ready` 이벤트로 한 번 다시 그린다). 노래 → 멤버 → 무대 순서 1~3개, 12px 이상.
+- **꼬리표 정리 창**: `shell/tag-manager.mjs` + index.html `#tag-panel`(cleanup-panel 옆). 입구는 트리 ▾ 메뉴의 기존 '정리' 옆 한 곳. 표기 차이(대소문자·따옴표·마침표)는 tagKey로 묶어 하나로 세고, 이름 바꾸기·합치기는 묶음의 모든 표기를 함께 바꾼다. '제목에서 꼬리표 한 번에 제안받기'는 체크로 확인한 것만 저장한다.
+- **시험(기존 파일에만 더함)**: `tests/v41-tags-627.test.mjs`에 함수 시험 10건(제안→확정해야 저장·해제·직접 입력·tooLong 거절·이름 바꾸기·합치기·옛 keywords 보존·서버 규칙 통과) — 소스 글자 시험은 만들지 않았다. `tests/v41-screen-audit.test.mjs`에 '꼬리표 줄이 열린 상세'·'꼬리표 정리 화면' 상태 2개(가짜 /api/workspace 트리에 keywords를 넣고 둘째 순간은 비워 제안받기까지 잰다) — 16 상태 × 390·1440 × 밤·정원 통과, 새 실패 0. 단추 글자는 검사기 규칙(단추 13px 이상)을 따라 칩·입력 칸 단추를 13px로, 카드 칩(span)은 12px로 두었다.
+- **시험 결과**: `npm test` 1766검 pass 0 fail(건너뜀 139), `node --test tests/v41-screen-audit.test.mjs`(Chromium 실측) 통과, `npx vite build`·modulepreload 목록 갱신 통과.
+- **주의**: 셸 문서에서 `tag-manager.mjs` 안에 함수 `tree()`와 같은 이름 지역 변수를 함께 쓰면 TDZ 오류('Cannot access tree before initialization')가 난다 — 지역 변수는 `current`로 썼다. tag-line.mjs는 Node 시험에서도 불리므로 `window` 노출·자동 붙이기는 `typeof window !== 'undefined'`로 감쌌다.
+- **updates.json**: '다음 버전'(4.1.4)에 쉬운 말 한 줄 넣었다(source: team, #627).
+- **건드리지 않은 것**: tags.mjs 저장 형식, 책 '✎ 고치기' 경로(#676), 새 소식·지도 조작 줄, 서버·DB, 다른 레인 파일.
+- **머지 뒤 tabbit 실측에서 잡힌 결함 둘(PR #682·#683)**: ① 꼬리표 줄의 '종류 고르기·값 입력'을 숨김 라벨(`.lt-sr`)로 감쌌더라 실제 화면에서 붙이기 단추만 보였다 — 보이는 라벨(`.lt-tagline-label`, 13px)로 바꾸고 검사기에 '종류·값·붙이기가 실제로 보인다' 단정을 더했다(#682). ② 책 카드 칩을 book.js momentContent에만 넣었더라 책 화면은 book-extra.js가 momentContent를 덮어 쓰고 renderSpread도 `.moment-title`을 paintTitle로 갈아 끼워 칩이 끝내 보이지 않았다 — paintTitle이 확정 칩을 함께 그리고, 검사기가 책 쪽 칩('Super Shy'·'무대')을 세게 했다(#683). 교훈: 화면 파일을 덮어 쓰는 확장(book-extra)이 있는 화면은 원본만 고쳐서는 안 보인다 — 실제 그려지는 길을 tabbit으로 먼저 본다.
+
+## 2026-11-15 — 운영 숫자에서 레인 시험 계정을 갈라 센다 (#671, 로컬1 레인, ai/lt-tester-stats-261115, PR #673 → main 25aa365)
+
+- **왜**: 운영센터 '한눈에'의 '실제 사용자 7'에 레인 시험 계정(01~05)이 섞여 있었다. 이제 숫자를 **실제 사용자 / AI 테스터 / 시험 계정** 세 갈래로 센다. 셋은 겹치지 않고 **전체 = 셋의 합**이다.
+- **역할 추가 방식(마이그레이션)**: `lovetree_product_roles.role` 의 CHECK 에 `tester` 를 더했다 — `server/db/migrations/tester-role-261115.sql`(DROP CONSTRAINT IF EXISTS → 같은 이름으로 재생성, 재실행 안전). `server/db/schema.sql` 도 세 값으로 맞췄고 `server/admin-roles.js` 에 `ROLE_TESTER='tester'`, `ROLES=[admin, ai_customer, tester]`.
+- **부여 도구**: `tools/admin-role.mjs` — 컴2 WSL root 에서 1회. 운영센터와 **같은 서버 함수 경로**(`createAdminRoleRepo(pool).assign/revoke`)를 써서 역할 행 + 감사 행(`lovetree_product_role_audit`, `actor_subject_id='operator:ops-admin-role'`, 사유 '레인 시험 계정 표식 (#671)')이 한 호출로 남는다. 계정은 이메일로 지정하고 subject 는 운영 DB 로그인 표(`lovetree_account_emails`)에서 찾는다. 이메일·subject 는 출력·저장하지 않고 sha256 앞 8자 마스크만 쓴다. `--emails <파일>` `--email` `--role` `--revoke` `--reason` `--env`, 종료 코드 0/2/3.
+  - **주의**: 이 파일은 자동 배포 설치 목록(`/usr/local/sbin/lovetree-api-autodeploy` 171행 근처의 allowlist)에 없어 `/opt/padiem/lovetree-api/tools` 로 복사되지 않는다. 이번에는 배포 저장소의 `tools/admin-role.mjs` 를 그 자리에 복사해 실행했다(md5 로 같은 파일임을 확인). 다음에 쓰려면 allowlist 에 `tools/admin-role.mjs` 를 더하는 편이 좋다.
+- **집계**(`server/db/stats-postgres.js`): `roles` CTE 하나로 `ai_customer`·`tester` 를 같은 질의에서 나눠 세고(`FILTER (WHERE ai_tester)` / `FILTER (WHERE tester)` / 나머지가 real), 계정·트리·순간·공개·둘러보기 모두 세 갈래 + 새 계정·새 순간도 세 갈래. `server/testing/memory-stats-repo.js` 가 같은 규칙을 미러링하고 `tests/community-postgres.test.mjs` 가 PG·메모리 결과를 deepEqual 로 대조한다.
+- **응답·화면**: `server/admin-stats.js` 의 각 묶음이 `{total, real, aiTester, tester}`. `src/admin-view.js`·`src/admin.js`·`src/admin.css` 카드에 큰 숫자(실제 사용자) 아래 `AI 테스터 N` 옆 `시험 계정 M` 한 줄. **옛 응답(칸 없음)이면 그 카드는 '불러오지 못했어요'** 로 두고 0을 지어내지 않는다.
+- **공개 화면은 그대로**: 'AI 테스터' 표시는 지금처럼 `ai_customer` 만. `tester` 는 운영센터 숫자에만 나오고 공개 API·공개 화면에 표시도, 칸도 없다(운영 `/api/community/shares` 응답에서 `"tester"`·`role` 0건 확인).
+- **시험(기존 파일에만 더함, 새 파일 없음)**: `tests/admin-roles.test.mjs`(tester 부여·회수·이력·목록, 통계 세 갈래 계정 7=5+1+1·트리 6=4+1+1·순간 12=7+3+2, 응답에 `sub_`·`@`·`email`·`role` 없음, 도구 인자·목록·마스크) 9/9 · `tests/admin-view.test.mjs`(카드 세 갈래, 시험 계정 칸 없으면 실패) 24/24 · `tests/migrations-postgres.test.mjs`(CHECK 가 `tester` 를 받고 `tester_x` 를 거부) · `tests/community-postgres.test.mjs`(PG↔메모리 21개 값 대조). 로컬 `npm test` 1748 중 1610 통과·실패 0·건너뜀 137, `vite build` 통과, modulepreload `--check` 0.
+- **화면 실측**: 운영센터 '한눈에' 390·1440 을 dist 서빙으로 재어 카드 7개·`시험 계정 N`/`AI 테스터 N` 두 줄 보임·카드 안 넘침 0·겹침 0·가로 스크롤 없음(캡처 `E:\lovetree-qa\lane\local1-tester\`).
+- **CI 빨강 1건(원인 수리 아님, 남겨 둠)**: 첫 실행에서 `화면 시험 — 지도 도구 줄·판 흐름·책 이동` 이 '책·공유 2장 가려짐' 4건으로 빨강(390·night), 재실행에서 같은 4건(390·garden). 같은 시각 다른 두 PR(#672·#674)의 같은 잡은 초록이었고 로컬(내 브랜치·main 3143f33 양쪽)은 통과 — 넘김 애니메이션 도중에 재는 흔들림으로 보였다. main 이 같은 자리를 `bookIdle()`(machineState==='IDLE' 대기, #662)로 이미 고쳐 두어서, 내가 올린 같은 취지의 커밋은 **충돌로 버리고** main 판을 그대로 썼다(중복 방지). 즉 이 빨강은 내 변경과 무관하며 main 최신에서 다시 확인해야 한다.
+- **운영 적용(컴2)**: 사전 상태 `result=needs_manual_migration`(installed c00e0b8 → target 25aa365). 백업 `/opt/padiem/lovetree-api/backups/roles-20261115T011030Z.{dump,sql}`(역할 표 + 감사 표, chmod 600). 마이그레이션 파일 md5 `b2a3d7c0…` 대조 후 `SET ROLE lovetree_owner; BEGIN; \i …; COMMIT;` 1회 → CHECK 세 값, 역할 행 **2행→2행**(admin 1·ai_customer 1), 소유자 유지. 이어 `AUTODEPLOY_ACCEPT_MIGRATIONS=1 … run` 1회 → `INSTALLED sha=598b853f23ebffcf39020edfbf876d8162be798c`(그 사이 main 이 한 칸 더 나가 #674 포함), `result=installed`, `failed_stage=null`, 유닛 active, 배포 후 오류 로그 0.
+- **부여 실행**: `.secrets` 의 `PADIEM_TUTORIAL01~05_EMAIL` 을 임시 파일로 만들어(값 미출력) `node tools/admin-role.mjs --emails …` 1회 → **5건 부여·못 찾음 0**. 이후 역할 분포 **admin 1 · ai_customer 1 · tester 5**, 감사 행 5개(사유·실행자 남음), 시험 계정 5명 모두 로그인 표와 이어짐.
+- **운영 숫자(읽기 전용 집계, 2026-11-08 기준 7일 창)**: 계정 **실제 2 · AI 1 · 시험 5**(전체 8), 새 계정 실제 1 · AI 1 · 시험 3(전체 5), 트리 실제 6 · AI 2 · 시험 2(전체 10), 순간 실제 41 · AI 6 · 시험 10(전체 57), 새 순간 40·6·6, 공개 트리 4·2·2, 둘러보기 1·1·1. 적용 전 '실제 사용자 7' 이던 값이 시험 계정 5를 빼고 **2** 로 내려왔다.
+- **updates.json 은 넣지 않았다**: 운영센터(관리자) 화면 숫자만 바뀌고 고객 화면은 그대로다(#655 2차와 같은 판단).
+- **건드리지 않은 것**: 고객 화면·책·보드·지도, 공개 API 응답 모양, DB 구조(역할 CHECK 외), oEmbed 프록시.
+- **다음에 이어갈 것**: (1) 관리자 계정을 하나 두고 `/api/admin/stats` 를 브라우저에서 200 으로 확인하는 절차 — 지금은 관리자 세션이 없어 401 이라 화면 숫자는 dist 모형으로만 재었다. (2) 자동 배포 allowlist 에 `tools/admin-role.mjs` 추가.
+
 ## 2026-11-15 — 캡처에 찍힌 'none'의 정체 · 계정 메뉴와 첫 트리 안내는 한 번에 하나 (#666 2차, 로컬2 레인, ai/local2-none-666d-261115, main 3143f33 기준)
 
 - **'none'은 제품 글자가 아니었다**: 캡처(x≈8, y≈82)에 찍힌 `none`은 **시험 하네스가 만든 글자**였다. `tests/v41-header-ia.test.mjs`의 가짜 서버 `serve644()`가 `public/`만 서빙하는데, 셸이 화면 프레임을 `/v41/home.html`로 열기 때문이다 — 이 파일은 **빌드 진입점**(`vite.config.js`의 `v41home`)이라 `public/`에 없고, 서버의 마지막 `res.writeHead(404); res.end('none')` 본문이 `#view` iframe 안에 날글자로 그려졌다(캡처마다 'none'). 실사이트(빌드된 `dist`)에서는 `home.html`이 있어 나오지 않는다 — `npx vite build` 뒤 같은 자리를 재면 `#view` 안이 비어 있고 'none'이 사라진다(실측). 고친 곳: `serve644()`의 루트를 공통 검사기와 같은 판정(`dist/v41/home.html`이 있으면 `dist`, 없으면 `public`)으로 바꿨다. 그래서 앞으로 캡처에 404 본문이 섞이지 않는다.
