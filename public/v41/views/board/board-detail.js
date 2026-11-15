@@ -58,9 +58,12 @@
     else if(isYtMoment(m)) media=`<div class="media linkMedia">${ytMediaHTML(originalUrl(m),'<span class="playBadge">▶</span>')}</div>`;
     else if(m.type==='video') media=`<div class="media"><video muted playsinline loop poster="${m.asset}" src="${m.video||''}"></video><span class="playBadge">▶</span><span class="duration">${m.duration||'00:03'}</span></div>`;
     else media=`<div class="media ${m.type==='link'?'linkMedia':''}"><img src="${m.asset}" data-fallback="${ASSET.link}" onerror="this.onerror=null;this.src=this.dataset.fallback" alt=""></div>`;
-    // #601: 카드는 훑기용 — 큰 썸네일 + 제목 2줄 + 감정·날짜 한 줄만. 마음·출처·키워드·크게 보기는 상세가 맡는다.
+    // #601: 카드는 훑기용 — 큰 썸네일 + 제목 2줄 + 감정·날짜 한 줄만. 마음·출처·크게 보기는 상세가 맡는다.
+    // #627: 확정된 꼬리표는 노래 → 멤버 → 무대 순서로 1~3개만 작게(LTTagLine.cardTags 한 벌). 모듈이 늦으면 다음 그리기 때 붙는다.
+    const _tags=(window.LTTagLine?window.LTTagLine.cardTags(m.keywords):[])||[];
+    const _tagRow=_tags.length?`<div class="cardTags">${_tags.map(_t=>`<span class="lt-tag-chip is-card">${esc(_t.value)}</span>`).join('')}</div>`:'';
     let heading=titleMain(m);
-    return `<article class="card ${m.first?'first':''} ${m.type==='note'?'noteCard':''} ${pinClass(m)} ${cardClass(m)}" data-id="${m.id}" style="left:${m.x}px;top:${m.y}px;--rot:${m.rot}deg;--pin:${colors[m.color]};--halo:${colors[m.color]}55">${m.first?'<div class="firstTag">첫 순간</div>':''}<button class="pin" data-pin="${m.id}" aria-hidden="true" tabindex="-1"></button>${media}<div class="cardBody"><h3 class="cardTitle">${esc(heading)}</h3><div class="cardMeta"><span class="emotionDot"></span>${esc(m.emotion)} · ${esc(dateText(m.date))}</div></div></article>`;
+    return `<article class="card ${m.first?'first':''} ${m.type==='note'?'noteCard':''} ${pinClass(m)} ${cardClass(m)}" data-id="${m.id}" style="left:${m.x}px;top:${m.y}px;--rot:${m.rot}deg;--pin:${colors[m.color]};--halo:${colors[m.color]}55">${m.first?'<div class="firstTag">첫 순간</div>':''}<button class="pin" data-pin="${m.id}" aria-hidden="true" tabindex="-1"></button>${media}<div class="cardBody"><h3 class="cardTitle">${esc(heading)}</h3><div class="cardMeta"><span class="emotionDot"></span>${esc(m.emotion)} · ${esc(dateText(m.date))}</div>${_tagRow}</div></article>`;
   };
 
   /* Composer: VIDEO supports local or YouTube source; VIDEO LINK remains a direct YouTube 순간. */
@@ -158,5 +161,9 @@
   /* Wire overwritten handlers and render actual YouTube source. */
   $('#editMomentBtn').onclick=openEdit;$('#editSave').onclick=saveEdit;$('#confirmAdd').onclick=()=>confirmAdd();
   renderCards();renderThreads();updateKeywordFilter();formFor(addType);boardStartView();applyPathHighlight();setTimeout(()=>{if(innerWidth<700){/* #267: board-extras와 같은 원칙 — 처음에는 전체 맞춤을 지키고 선택 표시만 한다. */selectMoment(LTDEMO.get(),false);$('#detail').classList.remove('open');}else selectMoment(LTDEMO.get(),true)},100);
+  // #627: 꼬리표 줄 모듈(tag-line.mjs)이 늦게 붙는다 — 카드 칩은 규칙이 도착하면 한 번 다시 그린다.
+  addEventListener('lt41-tagline-ready',()=>{if(moments.some(m=>(m.keywords||[]).length))renderCards()});
+  // #627: 꼬리표 저장은 iframe을 다시 그리지 않는 길(boardSync)이라 답으로 카드 사본의 keywords만 바꾼다.
+  addEventListener('lt41-tags-changed',e=>{const d=e.detail||{};const m=moments.find(x=>x.id===d.momentId);if(m&&Array.isArray(d.keywords)&&m.keywords.join('\u0000')!==d.keywords.join('\u0000')){m.keywords=[...d.keywords];renderCards()}});
   window.__LT58V12={...window.__LT58V11,ytId,ytMax,ytHQ,ytEmbed,isYtMoment,openViewer,openEdit,saveEdit,get cinema(){return typeof cinemaV11!=='undefined'?{...cinemaV11}:null},get state(){return{moments:moments.length,connections:connections.length,selected,theme:document.body.dataset.theme,ytMoments:moments.filter(isYtMoment).map(m=>({id:m.id,url:originalUrl(m),videoId:ytId(originalUrl(m)),thumb:ytMax(originalUrl(m)),source:m.videoSource||m.type}))}}};
 })();
