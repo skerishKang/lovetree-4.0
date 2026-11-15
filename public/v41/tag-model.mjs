@@ -25,19 +25,22 @@ export function cardTags(keywords, max = 3) {
     .map(({ t }) => ({ kindId: t.kindId, label: t.label, value: t.value, raw: t.raw }));
 }
 
-// 상세의 꼬리표 줄 한 벌: 확정(진한 칩)·제안(흐린 칩)·너무 긴 후보(회색)를 한 번에 정한다.
+// 상세의 꼬리표 줄 한 벌: 확정(진한 칩)·제안(흐린 칩)을 한 번에 정한다.
 // 제안은 재사용이 먼저다(tags.mjs suggestTagsFromTitle의 순서를 그대로 따른다). 이미 확정한 값은
-// 다시 제안하지 않고(같은 값을 두 번 권하지 않는다), 24자를 넘는 후보는 tooLong 표시로 남긴다.
+// 다시 제안하지 않고(같은 값을 두 번 권하지 않는다). 24자를 넘어 붙일 수 없는 후보는 제안에
+// 보이지 않는다(윤제 4회차 — 회색 '24자를 넘어요' 칩은 누를 수 없는 소음이었다). tags.mjs가
+// 돌려주는 tooLong 표시는 계약으로 남는다(너무 길다는 사실을 조용히 버리지 않는다).
 export function tagLineChips({ keywords, title, knownTags } = {}) {
   const confirmed = listOf(keywords).map((t) => ({ state: 'confirmed', kindId: t.kindId, label: t.label, value: t.value, raw: t.raw }));
   const seen = new Set(confirmed.map((c) => tagKey(c.value)));
   const { proposals } = suggestTagsFromTitle(title ?? '', { knownTags: Array.isArray(knownTags) ? knownTags : [] });
   const suggested = [];
   for (const p of proposals) {
+    if (p.tooLong) continue;
     const key = tagKey(p.value);
-    if (!p.tooLong && seen.has(key)) continue;
+    if (seen.has(key)) continue;
     seen.add(key);
-    suggested.push({ state: p.tooLong ? 'tooLong' : 'proposal', kindId: p.kindId, label: p.label, value: p.value, raw: p.raw || '' });
+    suggested.push({ state: 'proposal', kindId: p.kindId, label: p.label, value: p.value, raw: p.raw || '' });
   }
   return { confirmed, proposals: suggested };
 }
@@ -136,7 +139,9 @@ export function suggestForTree(tree) {
   for (const moment of tree?.moments || []) {
     if ((Array.isArray(moment.keywords) ? moment.keywords : []).length) continue;
     const { proposals } = suggestTagsFromTitle(moment.title || '', { knownTags: known });
-    if (proposals.length) out.push({ momentId: moment.id, title: moment.title || '', proposals });
+    // 붙일 수 없는(24자를 넘는) 후보는 제안 줄에도 보이지 않는다 — 전부 너무 길면 그 순간은 줄 자체가 없다.
+    const usable = proposals.filter((p) => !p.tooLong);
+    if (usable.length) out.push({ momentId: moment.id, title: moment.title || '', proposals: usable });
   }
   return out;
 }

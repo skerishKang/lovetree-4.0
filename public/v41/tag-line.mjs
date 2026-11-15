@@ -9,9 +9,6 @@ const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
 const TOO_LONG_TEXT = '24자를 넘어요';
 
 function chipHTML(tag) {
-  if (tag.state === 'tooLong') {
-    return `<span class="lt-tag-chip is-toolong" data-toolong="1">${esc(chipText(tag))} · ${TOO_LONG_TEXT}</span>`;
-  }
   const cls = tag.state === 'confirmed' ? 'is-confirmed' : 'is-proposal';
   const title = tag.state === 'confirmed' ? '누르면 꼬리표를 뗀다' : '누르면 꼬리표를 붙인다';
   return `<button type="button" class="lt-tag-chip ${cls}" data-tag-raw="${esc(tag.raw || tag.value)}" title="${title}">${esc(chipText(tag))}</button>`;
