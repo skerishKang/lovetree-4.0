@@ -67,7 +67,9 @@ export function createMessages(deps) {
       const reply = (ok, keywords, error) => { try { event.source?.postMessage({type:'lt41-tags-saved', ok, momentId: data.momentId, keywords, error}, location.origin); } catch {} };
       if (getSource() !== 'server' || !getMember()?.snapshot().writable) { reply(false, null, '읽어 보는 화면에서는 꼬리표를 바꿀 수 없어요.'); return; }
       const saved = saveTags({ treeId: data.treeId, momentId: data.momentId, keywords: data.keywords, quiet: true });
-      reply(saved.ok, saved.ok ? saved.keywords : null, saved.error);
+      // 결함 ③(tags-sync): 저장이 실제로 바뀌었으면 tag-save가 열린 프레임 모두(부낸 화면 포함)에 알렸다 —
+      // 같은 답을 두 번 보내지 않게 여기서는 실패·변화 없음일 때만 돌려준다.
+      if (!saved.ok || !saved.changed) reply(saved.ok, saved.ok ? saved.keywords : null, saved.error);
       return;
     }
     if (data?.type === 'lt41-theme') { applyTheme(); paintThemeControls(); }
