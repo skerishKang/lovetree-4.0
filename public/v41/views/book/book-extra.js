@@ -162,6 +162,15 @@ document.addEventListener('click',e=>{
  const yt=e.target.closest('[data-yt-play]');
  if(yt){if(yt.querySelector('.lt-fallback-card'))return;e.preventDefault();e.stopPropagation();if(!yt.parentElement||yt.parentElement.querySelector('iframe.yt-frame'))return;
   playInline(yt,{openUrl:'https://www.youtube.com/watch?v='+yt.dataset.ytPlay});return}
+ /* 책 글자 다듬기(261116) ③: 잘린 제목은 누르면 펼침·다시 누르면 접힌다(✎ 고치기는 그대로). 폰의 길게 누름(0.42초)은
+    돋보기에 배정돼 있으므로 누름(탭)에 배정해 충돌이 없다. 펼침은 읽는 동작 — 단추가 있는 책(내 기록)에서만 온다. */
+ const titleBtn=e.target.closest&&e.target.closest('.moment-title-button');
+ if(titleBtn&&(titleBtn.classList.contains('title-open')||titleBtn.scrollHeight>titleBtn.clientHeight+1)){e.preventDefault();e.stopPropagation();
+  const titleOpen=!titleBtn.classList.contains('title-open');
+  if(titleOpen)openTitles.add(titleBtn.dataset.titleEdit||'');else openTitles.delete(titleBtn.dataset.titleEdit||'');
+  titleBtn.classList.toggle('title-open',titleOpen);
+  titleBtn.setAttribute('aria-expanded',String(titleOpen));
+  titleBtn.setAttribute('aria-label',(titleOpen?'제목 접기: ':'제목 펼치기: ')+titleBtn.textContent);return}
  const edit=e.target.closest('[data-title-edit],[data-note-edit]');
  if(edit){if(LTDEMO.readOnly)return;e.preventDefault();e.stopPropagation();const id=edit.dataset.titleEdit||edit.dataset.noteEdit||'';if(window.parent===window){toast('이 순간 고치기는 러브트리 화면에서 열 수 있어요');return}
   window.parent.postMessage({type:'lt41-select',id},location.origin);
@@ -183,6 +192,9 @@ function emotionMarkup(emotion){
 /* #635 이후 발견(#book-dup): 메모(.note-piece)·링크 장은 본문 조각이 이미 제목(h2)과 본문을 그린다.
    pieceHasStory가 참이면 아래 .moment-title은 날짜·감정만 남긴다 — 제목·본문을 두 번 쓰지 않게.
    paintTitle(m) 하나만 쓰는 곳(유튜브·링크 카드 조각)은 조각에 제목이 없어 그대로 제목·본문을 그린다. */
+/* 책 글자 다듬기(261116) ③: 펼쳐 둔 제목은 다시 그리기(꼬리표 준비·설정 메시지·보기 바꾸기)에 유지한다 —
+   버튼을 다시 그리면 클래스가 지워져 첫 누름이 무시된 것처럼 보였다(390 실측: 누름 70ms 뒤 노드 교체 확인). */
+const openTitles=new Set();
 function paintTitle(m,pieceHasStory=false){
  const source=LTDEMO.moments.find(x=>x.id===m.id);
  const view=titleViewFor(source||m);
@@ -194,7 +206,7 @@ function paintTitle(m,pieceHasStory=false){
  /* #635: 유튜브 제목이 사용자 제목과 같으면(앞뒤 공백·대소문자 무시) '▶ 제목' 줄은 두 번 보이지 않게 감춘다. */
  const sub=parts.media&&parts.media.trim().toLowerCase()!==String(parts.main||'').trim().toLowerCase()?'<p class="video-title">▶ '+t(parts.media)+'</p>':'';
  const heading=parts.main?(hands.title
-  ?'<div class="moment-heading"><button type="button" class="moment-title-button" data-title-edit="'+t(m.id)+'" aria-label="제목 고치기: '+t(parts.main)+'">'+t(parts.main)+'</button>'+(hands.hint?'<button type="button" class="title-edit-hint" data-title-edit="'+t(m.id)+'" aria-label="제목 고치기"><span aria-hidden="true">✎</span> 고치기</button>':'')+'</div>'
+  ?'<div class="moment-heading"><button type="button" class="moment-title-button'+(openTitles.has(m.id)?' title-open':'')+'" data-title-edit="'+t(m.id)+'" aria-label="'+(openTitles.has(m.id)?'제목 접기: ':'제목 고치기: ')+t(parts.main)+'"'+(openTitles.has(m.id)?' aria-expanded="true"':'')+'>'+t(parts.main)+'</button>'+(hands.hint?'<button type="button" class="title-edit-hint" data-title-edit="'+t(m.id)+'" aria-label="제목 고치기"><span aria-hidden="true">✎</span> 고치기</button>':'')+'</div>'
   :'<h3>'+t(parts.main)+'</h3>'):'';
  /* #537: 마음 한마디가 비었을 때 '이 순간에 남기고 싶은 마음을 적어 보세요…' 안내를 내용처럼 그리지 않는다.
     (감상 화면에서 안내 글과 실제 마음이 같은 모양이라 내용으로 읽혔다 — 비면 아무것도 그리지 않는다.) */
@@ -451,3 +463,16 @@ addEventListener('message',e=>{if(e.data?.type!=='lt41-date-style')return;try{do
 // #379 후속: 재그림은 현재 선택 순간(LTDEMO.get())을 유지해, 펼침면 오른쪽 페이지의 순간을 열면
 // 왼쪽 페이지 순간으로 선택이 돌아가는 문제를 막는다(renderSpread의 land가 기본 true여 focusId 없으면 left.id로 재선택).
 try{renderSpread(current,LTDEMO.get(),false)}catch{}
+/* 책 글자 다듬기(261116) ③: 잘림은 폭·글꼴이 정하므로 그려진 뒤 실제 측정으로 단추의 낭독 이름·펼침 상태를 맞춘다 —
+   접힌 제목이 '고치기'로 읽히면 누른 결과(펼침)와 낭독 이름이 어긋난다. 다 그린 뒤와 다시 그릴 때마다 맞춘다. */
+function titleAriaSync(){
+ for(const btn of document.querySelectorAll('.moment-title-button')){
+  const open=btn.classList.contains('title-open');
+  if(open){btn.setAttribute('aria-expanded','true');btn.setAttribute('aria-label','제목 접기: '+btn.textContent);}
+  else if(btn.scrollHeight>btn.clientHeight+1){btn.setAttribute('aria-expanded','false');btn.setAttribute('aria-label','제목 펼치기: '+btn.textContent);}
+  else{btn.removeAttribute('aria-expanded');btn.setAttribute('aria-label','제목 고치기: '+btn.textContent);}
+ }
+}
+const titleAriaObserver=new MutationObserver(()=>requestAnimationFrame(titleAriaSync));
+titleAriaObserver.observe(document.getElementById('book')||document.body,{childList:true,subtree:true});
+titleAriaSync();
