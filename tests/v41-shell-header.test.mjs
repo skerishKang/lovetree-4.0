@@ -1,7 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 // #231 1-B②-2: 옮긴 헤더 함수를 직접 불러 결과를 본다(소스 글자 시험이 아니라 최소 가짜 DOM).
-import fs from 'node:fs';
 import { createHeader } from '../public/v41/shell/header.mjs';
 
 function fakeEl(extra = {}) {
@@ -36,8 +35,15 @@ function harness({ owned = false, trees = 0, tree = null, source = 'example', cu
     'server': fakeEl(),
     'logout': fakeEl()
   };
-  const saved = { document: globalThis.document, sessionStorage: globalThis.sessionStorage };
+  const saved = { document: globalThis.document, sessionStorage: globalThis.sessionStorage, localStorage: globalThis.localStorage };
+  const store = new Map();
   globalThis.sessionStorage = { getItem: () => null, setItem() {}, removeItem() {} };
+  // 직전 동그라미 글자(lt41.avatarLetter)는 localStorage에 한 글자로 남는다(#465 4) — 가짜 저장소를 직접 본다.
+  globalThis.localStorage = {
+    getItem: key => (store.has(key) ? store.get(key) : null),
+    setItem: (key, value) => store.set(key, String(value)),
+    removeItem: key => store.delete(key)
+  };
   globalThis.document = { querySelectorAll: () => [] , body: { classList: { add() {}, remove() {}, toggle() {}, contains: () => false }, dataset: {} } };
   globalThis.window = globalThis;
   globalThis.LT41 = tree ? { tree } : null;
@@ -60,9 +66,11 @@ function harness({ owned = false, trees = 0, tree = null, source = 'example', cu
     globalThis.document = saved.document;
     globalThis.sessionStorage = saved.sessionStorage;
     if (saved.sessionStorage === undefined) delete globalThis.sessionStorage;
+    globalThis.localStorage = saved.localStorage;
+    if (saved.localStorage === undefined) delete globalThis.localStorage;
     delete globalThis.LT41;
   };
-  return { header, els, tips: () => tips, setOwned: (value) => { ownedState = value; }, restore };
+  return { header, els, store, tips: () => tips, setOwned: (value) => { ownedState = value; }, restore };
 }
 
 test('flowNavigation: 로그아웃이면 트리 탭을 숨기고 "트리 고르기"를 보여 준다', () => {
@@ -270,12 +278,15 @@ test('#465 4: 저장본·직전 글자가 없으면 지금처럼 나였다가 �
   const h = harness({ owned: true, accountApi: { account: async () => ({ ok: true, confirmKind: 'email', email }) } });
   h.header.renderAccount();
   assert.equal(h.els['account-avatar'].textContent, '나', '다른 근거가 없으면 나로 시작(기존 동작)');
+  assert.equal(h.store.has('lt41.avatarLetter'), false, "'나'는 직전 글자로 저장하지 않는다");
   await h.header.loadAccountEmail();
   assert.equal(h.els['account-avatar'].textContent, 'F', '이메일이 오면 첫 글자로 갱신');
-  // 직전 글자는 한 글자만 저장하며(전체 이메일 저장 금지), 로그인 알약으로 돌아가면 지운다.
-  assert.match(HEADER_SRC(), /lt41\.avatarLetter/);
-  assert.match(HEADER_SRC(), /rememberLetter\(shown\)/);
-  assert.match(HEADER_SRC(), /removeItem\('lt41\.avatarLetter'\)/);
+  // 직전 글자는 한 글자만 저장하며(전체 이메일 저장 금지), 로그인 알약으로 돌아가면 지운다 — 저장소를 직접 본다.
+  assert.equal(h.store.get('lt41.avatarLetter'), 'F', '저장된 것은 한 글자(전체 이메일 저장 금지)');
+  h.setOwned(false);
+  h.header.renderAccount();
+  assert.equal(h.els['account-entry'].textContent, '로그인', '로그인 알약으로 돌아온다');
+  assert.equal(h.store.has('lt41.avatarLetter'), false, '로그인 알약으로 돌아가면 직전 글자를 지운다');
 });
 
 test('#465 4: 저장본 표시 이름이 있으면 이메일과 무관하게 표시 이름 첫 글자를 유지한다', async () => {
@@ -283,6 +294,3 @@ test('#465 4: 저장본 표시 이름이 있으면 이메일과 무관하게 표
   await h.header.loadAccountEmail();
   assert.equal(h.els['account-avatar'].textContent, '윤', '표시 이름 첫 글자가 이메일 글자보다 우선(#368 규칙)');
 });
-
-
-function HEADER_SRC() { return fs.readFileSync(new URL('../public/v41/shell/header.mjs', import.meta.url), 'utf8'); }

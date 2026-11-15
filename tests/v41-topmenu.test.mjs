@@ -1,15 +1,16 @@
 // #380 2번: 맨 위 메뉴 개편 — 로고→첫 화면, 첫 화면·내 책장 탭 삭제, [트리 ▾ │ 책│보드│지도] 한 틀.
-// 셸 헤더는 그림자 DOM이라 소스 계약으로 고정하고, 계산 규칙(header-state)은 함수 직접 호출로 본다.
+// 셸 헤더는 그림자 DOM이라 소스 계약으로 고정하고, 화면 목록(screens)·말풍선 제목(FIRST_TREE_TIPS)은
+// 데이터를 직접 확인하고, 배선은 함수 시험(v41-shell-location·v41-shell-screens)에 맡긴다.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import {screens} from '../public/v41/shell/navigation.mjs';
+import {FIRST_TREE_TIPS} from '../public/v41/header-state.mjs';
 
 const read = file => fs.readFileSync(new URL(`../${file}`, import.meta.url), 'utf8');
 const html = read('public/v41/index.html');
 const css = read('public/v41/shell.css');
 const shell = read('public/v41/shell.mjs');
-const navigation = read('public/v41/shell/navigation.mjs');
-const headerState = read('public/v41/header-state.mjs');
 const postdeploy = read('tools/postdeploy/postdeploy.mjs');
 
 const nav = html.slice(html.indexOf('<nav class="main-nav"'), html.indexOf('</nav>'));
@@ -23,10 +24,9 @@ test('첫 화면·내 책장 탭은 맨 위 메뉴에서 없어진다', () => {
 
 test('로고가 첫 화면으로 간다 — 링크·키보드(#home 해시)', () => {
   assert.match(html, /<a class="brand" href="#home" aria-label="[^"]*첫 화면/);
-  // 주소 처리는 #home을 첫 화면으로 읽는다(location.mjs의 parseSelectionRoute + show).
-  const location = read('public/v41/shell/location.mjs');
-  assert.match(location, /addEventListener\('hashchange', applyBrowserLocation\)/);
-  assert.match(navigation, /\['home', 'src064-orbit\.html', '첫 화면'\]/);
+  // 해시 감시 배선(popstate·hashchange)은 tests/v41-shell-location.test.mjs가 createLocation으로 지키고,
+  // 화면 목록·제목은 navigation.mjs의 screens 한 벌로 본다.
+  assert.deepEqual(screens[0], ['home', 'src064-orbit.html', '첫 화면']);
 });
 
 test('트리 선택과 보기 방식이 한 틀(.tree-frame)에 붙고 이름은 책·보드·지도다', () => {
@@ -44,9 +44,8 @@ test('트리 선택과 보기 방식이 한 틀(.tree-frame)에 붙고 이름은
 });
 
 test('지금 보는 보기는 눌린 상태(aria-current)로 표시된다', () => {
-  // screens.mjs show()가 data-view 버튼에 aria-current를 넣고, CSS가 금테로 칠한다.
-  const screens = read('public/v41/shell/screens.mjs');
-  assert.match(screens, /querySelectorAll\('\[data-view\]'\)\.forEach\(b => b\.setAttribute\('aria-current', String\(b\.dataset\.view === file\)\)\)/);
+  // show()가 data-view 버튼에 aria-current를 넣는 동작은 tests/v41-shell-screens.test.mjs가
+  // createScreens로 직접 부러 본다. 여기서는 그 표시를 칠하는 CSS(금테)만 고정한다.
   assert.match(css, /nav button\[aria-current=true\]\{[^}]*box-shadow:inset 0 0 0 1px var\(--lt-gold-line\)/);
 });
 
@@ -92,11 +91,12 @@ test('둘러보기 패널 닫기 버튼은 맨 위 메뉴의 계정 버튼과 �
 });
 
 test('화면 제목과 안내 글도 줄인 이름을 쓴다', () => {
-  assert.match(navigation, /\['book', 'track59-sketchbook\.html', '책'\]/);
-  assert.match(navigation, /\['board', 'track58-pinboard\.html', '보드'\]/);
-  assert.match(navigation, /\['network', 'track56-network\.html', '지도'\]/);
-  assert.match(navigation, /\['shelf', 'track32-bookshelf\.html', '내 트리'\]/);
-  assert.match(headerState, /title: '책·보드·지도로 다르게 봐요'/);
+  // navigation.mjs의 screens 한 벌과 header-state.mjs의 FIRST_TREE_TIPS를 직접 확인한다(글자 검사 대신).
+  assert.deepEqual(screens.find(s => s[0] === 'book'), ['book', 'track59-sketchbook.html', '책']);
+  assert.deepEqual(screens.find(s => s[0] === 'board'), ['board', 'track58-pinboard.html', '보드']);
+  assert.deepEqual(screens.find(s => s[0] === 'network'), ['network', 'track56-network.html', '지도']);
+  assert.deepEqual(screens.find(s => s[0] === 'shelf'), ['shelf', 'track32-bookshelf.html', '내 트리']);
+  assert.ok(FIRST_TREE_TIPS.some(tip => tip.title === '책·보드·지도로 다르게 봐요'), '보기 전환 말풍선 제목');
 });
 
 test('postdeploy 기대값도 새 메뉴 구조를 센다', () => {

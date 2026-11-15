@@ -244,7 +244,9 @@ shellWrite.setTabHook(tab=>shellPanels.onWriteTab(tab));
 const shellTags=createTagSave({
   getMember:()=>member,
   getModel:()=>model,
-  notify:text=>notify(text)
+  notify:text=>notify(text),
+  // 결함 ③(tags-sync): 저장 뒤 열린 화면(iframe) 두 개에 답 모양(lt41-tags-saved)을 알린다.
+  frames:()=>[$('view')?.contentWindow,$('view-next')?.contentWindow].filter(Boolean)
 });
 const shellTagManager=createTagManager({
   $,
