@@ -6,6 +6,14 @@
 
 > **시험 멈춤 규칙(2026-11-15)**: 브라우저 코드에 setInterval 반복을 넣으면 unref하거나 정리한다 — 안 그러면 npm test가 끝나지 않고 CI가 멈춘다.
 
+## 2026-11-16 — 책 글자 다듬기: 칩 '이어진 순간' 전체 15px·날짜 본문 크기·잘린 제목 누르면 펼침 (컴1로컬4 레인, ai/local4-booktext-261115, main 18f0ce1 기준)
+
+- **칩(#overviewBtn)**: ≤600px 축약 '이어진 길'(view-navigation.js) 폐지 — 읽는 사람이 다른 단추로 읽은 문자열이었다(#584의 '이어진 순간'과 섞임). 전체 이름을 15px로 쓰고(book-usability.css 600px 블록), 이름 아래 '누르면 한눈에' 12px 보조 줄을 붙인다(폰은 올림·초점·길게 누름 팁이 안 보인다). 390 실측: 도구 줄 188px ≤ 60vw 234px·단추 오른쪽 376 ≤ 화면-8 — #book-dup2 기준(잘림 0) 유지. 600px를 넘나들면 matchMedia change로 따라 바꾼다.
+- **날짜(.moment-date)**: 13px → 본문과 같은 15px(폰, reader-layout.css)·17px(넓은 화면, book-usability.css).
+- **잘린 제목**: 누르면 펼침·다시 누르면 접힘(✎ 고치기는 그대로). 펼침은 openTitles(순간 id Set)로 기억해 다시 그리기(꼬리표 준비·설정 메시지)에 유지 — 재그림이 클래스를 지워 첫 누름이 무시된 것처럼 보였다(390 실측: 누름 70ms 뒤 노드 교체 확인). 접힘·펼침·짧은 제목에 맞춰 낭독 이름(제목 펼치기/접기/고치기)·aria-expanded를 실측 동기화(book-extra.js titleAriaSync + MutationObserver).
+- **공용 검사기(tests/helpers/screen-audit.mjs)**: 책 상태 단정 추가 — 날짜·칩 12px 이상, 접힌 제목 두 줄. '책글자' 줄로 KNOWN 대조에 흐른다. 위반 주입(날짜 11px·clamp 3)으로 red 2건 확인 → 원복 green.
+- **시험·측정**: node --test(584 브라우저 포함 17/17·share-readonly·book-usability·merge-sketchbook·screen-defaults·book-model·book-single-537·date-style 76 pass·0 fail), build·modulepreload --check·npm test 1836검 1697 pass·0 fail·139 skip(39초). 캡처·before/after 수치 `E:\lovetree-qa\lane\local4-booktext\{before,after}\`(390 칩 13→15px·날짜 13→15px, 1440 날짜 13→17px, 제목 누름 2줄→4줄·다시 2줄, 겹침·가려짐 0 — 전에는 누름이 고치기 창을 열어 겹침 3건이 보였음).
+
 ## 2026-11-15 — 보드 390 두 줄 도구 줄: 카드 비침 수리·'진주빛 보드' 온전히 보이게·[종이|밤]에 '판' 이름표 (컴1로컬5 레인, ai/local5-board-toolbar-390-261115, main 909ef40 기준, 보람 2회차 지적)
 
 - **원인(실측)**: ≤580px 머리줄은 두 줄로 감기는데(flex-wrap, #601) `.boardFrame` 시작을 고정 100px로 두었다. ＋ 순간 추가가 둘째 줄까지 내려오는 로그인 화면에서 머리줄 아래끝은 107px — 카드가 7px 도구 줄 밑으로 들어가고, 머리줄 바탕이 알파 0.9→0.38 그라데이션(밤)이라 카드 꼬리표·제목이 비쳤다. '진주빛 보드' 표시는 둘째 줄 맨 오른쪽(오른쪽 끝 8px 남음)에 비침과 겹쳐 잘려 보였다.
