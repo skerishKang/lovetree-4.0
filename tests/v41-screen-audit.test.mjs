@@ -211,7 +211,25 @@ test('#657 화면 공통 검사기: 주요 화면 16 상태 × 390·1440 × 밤�
     const boardFrame = await frameOf(page3, /views\/track/);
     await boardFrame.evaluate(() => document.getElementById('detailClose').click());
     await boardFrame.waitForFunction(() => { const d = document.getElementById('detail'); if (!d || d.classList.contains('open')) return false; const r = d.getBoundingClientRect(); return r.left >= innerWidth || r.top >= innerHeight; }, null, { timeout: 5000 }).catch(() => {});
-    await page3.waitForTimeout(300);
+    // 390px 툴바 가로 넘침·겹침 검사(판 닫힘 상태에서 툴바와 시네마 단추가 닿지 않고 툴바가 화면을 벗어나지 않음)
+    if (width === 390) {
+      await page3.waitForTimeout(300);
+      const toolbarCheck = await boardFrame.evaluate(() => {
+        const toolbar = document.querySelector('.toolbar');
+        const cinemaBtn = document.querySelector('.cinemaBtn');
+        if (!toolbar || !cinemaBtn) return null;
+        const tr = toolbar.getBoundingClientRect();
+        const cr = cinemaBtn.getBoundingClientRect();
+        const ox = Math.min(tr.right, cr.right) - Math.max(tr.left, cr.left);
+        const oy = Math.min(tr.bottom, cr.bottom) - Math.max(tr.top, cr.top);
+        return { overflow: Math.max(0, toolbar.scrollWidth - toolbar.clientWidth), overlap: ox > 0 && oy > 0 ? ox * oy : 0 };
+      });
+      if (toolbarCheck) {
+        const tail = ` · ${width}·${theme}`;
+        if (toolbarCheck.overflow > 0) rows.push({ 항목: '가로 넘침', 줄: `보드 390 툴바 가로 넘침 ${Math.round(toolbarCheck.overflow)}px${tail}` });
+        if (toolbarCheck.overlap > 0) rows.push({ 항목: '겹침', 줄: `보드 390 툴바 겹침 툴바×시네마 ${Math.round(toolbarCheck.overlap)}px²${tail}` });
+      }
+    }
     await boardFrame.evaluate(() => toast('순간을 선택해 연결된 기록을 살펴보세요.'));
     await page3.waitForTimeout(400);
     await take(page3, '보드·안내·판 닫힘');
