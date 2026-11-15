@@ -2203,3 +2203,11 @@ COM2에는 merge `6900df8aa446dfe0201d01997457fae04c4abe16`의 변경 서버 파
 - **끌기 무게(글자 카드 5장, 2070)**: 궤도 2초 끌기 — 킥 버전 longtask(>50ms) 0·rAF 간격 >50ms 0·최대 33ms, 새 버전 **같은 수치**(두 버전 모두 버벅임 관측 0).
 - **캡처**: `E:/lovetree-qa/lane/local3-graph/` — tcard-before-home-night-{2070,zoom,390}.png(전)·tcard-after-home-{night,garden}-{2070,1440,390}{,-zoom}.png(후·킥 제거 최종판)·tcard-{before,after}-{book,board}-night-2070.png(불변 확인)·tcard-final-2070.json(수치)·tcard-drag-night-2070.png(끌기). 한 장씩 직접 읽어 대조 완료(2070 밤·정원 줌, 390 밤, 1440 밤).
 - **메모**: 이 작업은 한 번 중지됐다가 정정으로 다시 시작(대표가 본 깨진 카드가 4.0 첫 화면(#728)이라 했다가 4.1 첫 화면에서도 생기는 것으로 정정). 재현·측정은 가짜 기록(/api/workspace 가로챔)으로만 하고 시험 계정·대표·AI 고객 세션(9223)에는 붙지 않았다. updates.json 안 고침. npm test 1704검 0 fail(31초), build·modulepreload --check 통과.
+
+## 2026-11-16 — 둘러보기 카드 날짜 하루 전 문제(하은 1회차 관찰) + 여정 기본 날짜 같은 근거 (컴1로컬3 레인, ai/local3-commdate-261116, main 7ce13c3(#742) 기준)
+
+- **원인**: community-panel.mjs의 `when`이 서버 시각(UTC 타임스탬프 createdAt)을 `String(value).slice(0,10)`으로 잘라 **UTC 날짜**를 만들었다 — 하은 1회차(KST 11-16 새벽 0~5시)에 담은 순간의 둘러보기 카드가 '2026. 11. 15'로 나옴(#547과 같은 계열). 댓글 머리 줄도 같은 `when`을 썼다.
+- **수리**: `when`을 `formatDisplayDate(localDateOnly(value), dateStyle())`로 — local-date.mjs의 #547 한 벌을 그대로 쓴다(새 날짜 함수 없음). 같은 확인 순회에서 발견한 같은 근거 한 곳도 함께: **first-journey.mjs의 `isoDay`**(첫 여정 기본 날짜 — 새벽에 여정을 쓰면 어제 날짜가 기본값)도 localDateOnly로 교체. 나머지 확인 결과: 공유 감상 화면·다른 팬 보기는 순간 DATE 문자열(#547 규칙 준수), /t/ 미리보기는 시각 칸 없음, 운영센터 journalDayOf는 seoulDayOf(#701)로 이미 지역 날짜 — 수리 불필요.
+- **시험**: ①감사 '둘러보기' 상태에 Asia/Seoul timezoneId 문맥 + UTC 교차 fixture(2026-11-15T20:00Z = KST 11-16 05:00) — 카드 날짜가 '2026. 11. 16'이고 UTC 절단('2026. 11. 15')이 아닌지 단정(CI UTC에서도 timezoneId로 결정적). ②first-journey 단위 시험 1건(같은 교차 시각, localDateOnly 계약). ③v41-date-style-one-piece 계약 갱신(슬라이스 → localDateOnly 경유).
+- **캡처**: E:/lovetree-qa/lane/local3-graph/audit-community-date-{390,1440}.png(교차 fixture, 한국 날짜 확인 — 두 장 직접 읽음).
+- npm test 1719검 0 fail(33초), build·modulepreload --check 통과. updates.json 안 고침.
