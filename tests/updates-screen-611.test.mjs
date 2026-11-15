@@ -2,12 +2,15 @@
 // 크롬이 필요한 실행형 시험이라 LT_UPDATES_611_REQUIRE=1 에서만 돈다(미리보기 검사 잡에 연결).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { latestEntry } from '../public/v41/updates.mjs';
+
+const UPDATES_JSON = JSON.parse(readFileSync(new URL('../public/v41/updates.json', import.meta.url), 'utf8'));
 
 const ROOT = path.resolve(fileURLToPath(new URL('../public', import.meta.url)));
 const REQUIRE = process.env.LT_UPDATES_611_REQUIRE === '1';
@@ -80,10 +83,12 @@ test('611 실행: 새 소식은 로그아웃 상태에서도 보이고, 알림 �
     const link = page.locator('#updates-link');
     await link.waitFor({ state: 'visible', timeout: 8000 });
     assert.equal(await link.textContent(), '새 소식');
-    // 첫 접속: 작은 카드 "러브트리가 새로워졌어요 — 4.1.4"가 한 번 뜬다.
+    // 첫 접속: 작은 카드 "러브트리가 새로워졌어요 — <최신 버전>"가 한 번 뜬다. 버전이 지나가도 깨지지 않게
+    // updates.json의 최신 버전을 읽어 대조한다(4.1.4 고정 단정은 4.1.5가 나오자 깨졌다 — #706).
     const card = page.locator('#updates-card');
     await card.waitFor({ state: 'visible', timeout: 8000 });
-    assert.match(await page.locator('#updates-card-text').textContent(), /4\.1\.4/);
+    const latestVersion = latestEntry(UPDATES_JSON).version;
+    assert.match(await page.locator('#updates-card-text').textContent(), new RegExp(latestVersion.replaceAll('.', '\\.')), `카드는 최신 버전(${latestVersion})을 말한다`);
     assert.equal(await page.evaluate(() => document.getElementById('account-avatar').classList.contains('has-dot')), true, '계정 단추에 작은 점이 뜬다');
     // 닫으면 그 버전은 다시 안 뜬다.
     await page.click('#updates-dismiss');
@@ -94,12 +99,12 @@ test('611 실행: 새 소식은 로그아웃 상태에서도 보이고, 알림 �
     await panel.waitFor({ state: 'attached' });
     await page.waitForFunction(() => document.getElementById('updates-panel').open, null, { timeout: 5000 });
     const text = await page.locator('#updates-list').textContent();
-    assert.match(text, /러브트리 4\.1\.4/, '버전 제목');
+    assert.match(text, new RegExp('러브트리 ' + latestVersion.replaceAll('.', '\\.')), '맨 위 버전 제목');
     assert.match(text, /새로워진 것/, '새로워진 것');
     assert.match(text, /고친 것/, '고친 것');
     assert.match(text, /AI 명예회원 윤제 님이 알려 준 것/, '출처 표시');
     assert.match(text, /핀보드/, '첫 노트 항목');
-    assert.match(text, /칸마다 차곡차곡/i, '다음 버전(4.1.4) 항목이 함께 보인다');
+    assert.match(text, /칸마다 차곡차곡/i, '다음 버전 항목이 함께 보인다');
     assert.doesNotMatch(text, /여러분이/, '금지 문국이 없다');
     assert.doesNotMatch(text, /이슈 #|#[0-9]{2,}/, '이슈 번호를 보여 주지 않는다');
     assert.equal(await page.evaluate(() => document.getElementById('account-avatar').classList.contains('has-dot')), false, '새 소식을 보면 점이 사라진다');
