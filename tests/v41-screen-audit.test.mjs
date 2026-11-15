@@ -477,6 +477,8 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     await ctx7.route('**://i.ytimg.com/**', THUMB);
     await ctx7.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
     const page7 = await ctx7.newPage();
+    
+    
     await page7.goto(`${base}/graph-host.html`, { waitUntil: 'domcontentloaded' });
     const graphFrame = await frameOf(page7, /track60-graph/);
     assert.ok(graphFrame, '그래프 프레임이 열린다');
@@ -503,7 +505,9 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
         thumbs: doc.querySelectorAll('#gsvg image').length,
         stacks: [...doc.querySelectorAll('.g-stackcount')].map((x) => x.textContent),
         overflow: Math.max(0, doc.documentElement.scrollWidth - doc.documentElement.clientWidth),
-        badge: doc.getElementById('gBadge')?.textContent || ''
+        badge: doc.getElementById('gBadge')?.textContent || '',
+        svgKids: doc.getElementById('gsvg')?.children.length ?? -1,
+        pageErrors: []
       };
     });
     assert.equal(graphCheck.hubPairs, 0, `허브 이름 상자 겹침 0(실제 ${graphCheck.hubPairs}: ${JSON.stringify(graphCheck.pairTexts)})`);
@@ -511,7 +515,33 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     assert.ok(graphCheck.hubs >= 4, `허브가 그려진다(실제 ${graphCheck.hubs})`);
     assert.ok(graphCheck.thumbs >= 3, `고리 썸네일 동그라미가 보인다(실제 ${graphCheck.thumbs})`);
     assert.ok(graphCheck.stacks.length >= 1, `같은 영상·같은 무대 무더기 개수가 표시된다(실제 ${JSON.stringify(graphCheck.stacks)})`);
-    assert.match(graphCheck.badge, /순간 17/, '표시에 순간 수가 있다');
+        assert.match(graphCheck.badge, /순간 17/, '표시에 순간 수가 있다(실제 배지: ' + JSON.stringify(graphCheck.badge) + ')');
+    // CTO 지적(#713 후속): 검사기가 이름 상자끼리만 재었다 — 이름↔허브 점·이름↔'처음/지금'·'×N'↔점도 0이어야 한다.
+    const graphTouch = await page7.evaluate(() => {
+      const f = [...document.querySelectorAll('iframe')].at(-1);
+      const doc = f.contentDocument;
+      const rect = (x) => x.getBoundingClientRect().toJSON();
+      const hit = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+      const out = { nameOnDot: [], nameOnMark: [], countOnDot: [] };
+      const dots = [...doc.querySelectorAll('.g-hubdot')].map((c) => ({ key: c.parentElement.getAttribute('data-hub-key'), r: rect(c) }));
+      const marks = [...doc.querySelectorAll('.g-mark')].map((x) => ({ r: rect(x) }));
+      for (const name of [...doc.querySelectorAll('.g-hubname')]) {
+        const nr = rect(name);
+        const key = name.parentElement?.getAttribute('data-hub-key');
+        const own = dots.find((d) => d.key === key);
+        if (own && hit(nr, own.r)) out.nameOnDot.push(name.textContent + ' ← 자기 점 @' + Math.round(nr.left) + ',' + Math.round(nr.top) + ' w' + Math.round(nr.width) + ' | dot @' + Math.round(own.r.left) + ',' + Math.round(own.r.top) + ' w' + Math.round(own.r.width) + ' h' + Math.round(own.r.height));
+        for (const mk of marks) if (hit(nr, mk.r)) out.nameOnMark.push(name.textContent + ' ← 처음/지금');
+      }
+      for (const count of [...doc.querySelectorAll('.g-stackcount')]) {
+        const cr = rect(count);
+        const dot = count.parentElement?.querySelector('circle');
+        if (dot && hit(cr, rect(dot))) out.countOnDot.push(count.textContent + ' ← 점');
+      }
+      return out;
+    });
+    assert.deepEqual(graphTouch.nameOnDot, [], `허브 이름이 자기 점 위에 겹친다: ${JSON.stringify(graphTouch.nameOnDot)}`);
+    assert.deepEqual(graphTouch.nameOnMark, [], `허브 이름이 '처음/지금' 표시와 겹친다: ${JSON.stringify(graphTouch.nameOnMark)}`);
+    assert.deepEqual(graphTouch.countOnDot, [], `무더기 개수(×N)가 점 위에 겹친다: ${JSON.stringify(graphTouch.countOnDot)}`);
     await ctx7.close();
 
     // 주소로 열리는지(#my/graph) — 셸이 그래프 보기를 화면 파일로 띄우는지 단정한다(메뉴 단추는 없다).

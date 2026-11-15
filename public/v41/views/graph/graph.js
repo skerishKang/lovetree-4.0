@@ -8,13 +8,16 @@
 import { buildGraph, pathFor } from '../../graph-model.mjs';
 import { suggestForMoments } from '../../tags.mjs';
 import { videoKey } from '../../same-stage.mjs';
+import { applyThemeAttribute, readTheme } from '../../header-state.mjs';
 
 const KIND_LABEL = { stage: '무대', song: '노래', member: '멤버', artist: '가수' };
 const KIND_OWN = { stage: '이 무대의 내 순간들', song: '이 노래의 내 순간들', member: '이 멤버의 내 순간들', artist: '이 가수의 내 순간들' };
 const KIND_COLOR = { stage: 'var(--lt-gold-deep)', song: 'var(--lt-rose)', member: 'var(--lt-violet, #8b69e8)', artist: 'var(--lt-blue, #547cd0)' };
-const GOLDEN = 137.508 * Math.PI / 180;
 const SVGNS = 'http://www.w3.org/2000/svg';
 const svg = document.getElementById('gsvg');
+
+// 테마도 본 사이트와 같은 한 벌(저장 키 lt41.theme) — 셸이 속성을 넘겨 주기 전에 스스로 적용한다(호스트로 열 때도).
+applyThemeAttribute(document.documentElement, readTheme(localStorage));
 
 const ctx = parent.LT41 || {};
 const tree = ctx.tree || {};
@@ -45,102 +48,78 @@ const emotionOf = (m) => String(MOMENT_OF.get(m?.id)?.emotion || '');
 const hash01 = (str) => { let h = 2166136261; for (const c of String(str)) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return ((h >>> 0) % 1000) / 1000; };
 const textWidth = (text, fs) => String(text ?? '').length * fs * 0.62;
 
-/* ── 배치(결정론) — 넓은 무대: 황금각 타원(시안 v2). 좁은 무대: 묶음 격자(390이 화면 폭을 다 쓰고,
-   이름은 점 바깥 고정 자리 — 겹치면 줄을 옮기고 그래도 겹치면 작은 묶음 이름을 숨긴다). ── */
+/* ── 배치(결정론) — 시안 v2(d6a490f)의 묶음 원형을 그대로 옮긴 것: 허브는 큰 원 위(넓게) 또는 3열 격자(좁게),
+   순간은 허브 주위 고리(orbitR)에 시간 순서로, 무더기(stacks)는 고리 위 한 칸 + 개수. ── */
 function layoutModel(W, H) {
   const { hubs, moments, stacks } = model.graph;
-  const narrow = W < 860;
-  const s = narrow ? Math.max(0.72, Math.min(1, W / 760)) : Math.max(0.9, Math.min(1, W / 1240));
-  const shelfH = narrow ? 46 : 52;
-  const dotR = (m) => 11 * s;
-  /* 고리 반지름은 보이는 점 수(무더기로 접힌 것은 대표 하나) 기준 — 접힌 뒤에도 고리가 점에 맞는다. */
+  const narrow = W < 600;
+  const s = narrow ? 1 : Math.max(.94, Math.min(1, W / 1040));
+  const shelfH = narrow ? 54 : 62;
+  const top = 22;
+  const usableBottom = H - shelfH - (narrow ? 16 : 8);
+  const dotR = (narrow ? 7 : 8.5) * s;
+  /* 고리 위에 보이는 칸 수 — 무더기(stacks)는 대표 하나로 접힌다. */
   const leadCount = (h) => {
     const leads = new Set();
     for (const id of h.momentIds) {
       const m = momentById(id);
-      const stack = m?.stackId ? model.graph.stacks.find((s2) => s2.key === m.stackId) : null;
+      const stack = m?.stackId ? stacks.find((s2) => s2.key === m.stackId) : null;
       leads.add(stack ? stack.leadId : id);
     }
     return leads.size;
   };
-  const hubR = (h) => {
-    const base = Math.min(30 * s, Math.max((10 + 2 * leadCount(h)) * s, 12 * s));
-    return h.kindId === 'artist' ? base * 0.85 : base;
-  };
-  const ringR = (h) => {
-    const n = Math.max(leadCount(h), 1);
-    const mr = 11 * s, gap = 6 * s;
-    return Math.max(hubR(h) + mr + 5 * s, (n * (2 * mr + gap)) / (2 * Math.PI) + 3 * s);
-  };
-  model.narrow = narrow; model.W = W; model.H = H; model.s = s; model.dotR = dotR;
-  if (!hubs.length) {
-    for (const m of moments) { m.x = W / 2; m.y = (H - shelfH) / 2; }
-    return;
-  }
-
-  if (!narrow) {
-    /* 넓은 무대: 황금각 타원 + 고리 */
-    const maxC = Math.max(...hubs.map(ringR), 0);
-    const maxR = Math.max(...hubs.map(hubR), 0);
-    const top = 20, usableBottom = H - shelfH - 4;
-    const cx = W / 2, cy = (top + usableBottom) / 2;
-    const horizPad = maxC + maxR + 58, vertPad = maxC + maxR + 30;
-    const rx = Math.max(60, W / 2 - horizPad);
-    const ry = Math.max(54, (usableBottom - top) / 2 - vertPad);
-    hubs.forEach((h, i) => {
-      const a = i * GOLDEN + 0.55;
-      h.x = cx + Math.cos(a) * rx;
-      h.y = cy + Math.sin(a) * ry * 0.84;
-      h.color = KIND_COLOR[h.kindId]; h.cr = ringR(h); h.hr = hubR(h);
-      placeRing(h);
-    });
-  } else {
-    /* 좁은 무대: 묶음 격자(행·열 고정) — 이름은 묶음 아래 고정 자리. 전체가 남는 높이에 맞게 축소한다. */
-    const cols = W >= 700 ? 3 : 2;
-    const sorted = [...hubs].sort((a, b) => b.momentIds.length - a.momentIds.length || a.id.localeCompare(b.id));
-    let scale = 1;
-    for (let pass = 0; pass < 6; pass++) {
-      const cellW = W / cols;
-      const rows = Math.ceil(sorted.length / cols);
-      const cellH = (H - shelfH - 4) / Math.max(rows, 1);
-      const need = Math.max(...sorted.map((h) => ringR(h) * scale * 2 + 30), 40);
-      if (need <= cellH * 0.9 || scale <= 0.5) {
-        sorted.forEach((h, i) => {
-          const col = i % cols, row = Math.floor(i / cols);
-          const cx = cellW * col + cellW / 2;
-          const cy = cellH * row + cellH / 2 + 4;
-          h.x = cx; h.y = cy; h.color = KIND_COLOR[h.kindId]; h.cr = ringR(h) * scale; h.hr = hubR(h) * scale;
-          placeRing(h);
-        });
-        break;
-      }
-      scale *= 0.9;
-    }
-  }
-  /* 발자초 위치: 모든 순간(무더기에 접힌 것은 대표 점과 같은 자리). 선반은 시간 순서(왼쪽부터). */
-  const at = new Map();
-  for (const h of hubs) for (const id of h.momentIds) at.set(id, { x: h.x, y: h.y });
-  const orderAt = new Map(model.graph.footprint.order.map((id, i) => [id, i]));
-  const shelfMoments = moments.filter((m) => m.hubId === null).sort((a, b) => (orderAt.get(a.id) ?? 0) - (orderAt.get(b.id) ?? 0));
-  const gap = narrow ? 40 : 56, x0 = narrow ? 20 : 96;
-  shelfMoments.forEach((m, i) => at.set(m.id, { x: x0 + i * gap, y: H - shelfH }));
-  for (const m of moments) {
-    const stack = m.stackId ? stacks.find((s2) => s2.key === m.stackId) : null;
-    const anchorId = stack ? stack.leadId : m.id;
-    const p = at.get(anchorId) || at.get(m.id) || { x: W / 2, y: (H - shelfH) / 2 };
-    m.x = p.x; m.y = p.y;
-  }
-}
-function placeRing(h) {
-  const members = h.momentIds.map((id) => momentById(id)).filter(Boolean).sort(byTime);
-  const base = hash01(h.id) * 2 * Math.PI;
-  const isLead = (m) => !m.stackId || model.graph.stacks.find((s2) => s2.key === m.stackId)?.leadId === m.id;
-  const visible = members.filter(isLead);
-  visible.forEach((m, j) => {
-    const aa = base + (j / Math.max(visible.length, 1)) * 2 * Math.PI;
-    m.x = h.x + Math.cos(aa) * h.cr;
-    m.y = h.y + Math.sin(aa) * h.cr;
+  hubs.forEach((h) => {
+    const n = leadCount(h);
+    const strength = Math.max(1, n);
+    h.hr = (narrow ? 9 : 12) + Math.sqrt(strength) * (narrow ? 1.8 : 2);
+    const orbitR = n > 0 ? Math.max(h.hr + dotR + (narrow ? 13 : 17), n * (dotR * 2 + 4) / (Math.PI * 2)) : 0;
+    h.orbitR = orbitR;
+    h.cr = n > 0 ? orbitR + dotR + 5 : h.hr + 8; /* 묶음 테두리는 고리 바깥 */
+    h.color = KIND_COLOR[h.kindId];
   });
+  const maxC = Math.max(...hubs.map((h) => h.cr), 0);
+  const cx = W / 2, cy = (top + usableBottom) / 2 - (narrow ? 0 : 7);
+  const rx = Math.max(0, Math.min(W * .36, W / 2 - maxC - 96));
+  const ry = Math.max(0, Math.min((usableBottom - top) / 2 - maxC - 48, H * .32));
+  const cols = 3, rows = Math.ceil(hubs.length / cols);
+  const rowH = (usableBottom - top) / rows;
+  const orderAt = new Map(model.graph.footprint.order.map((id, i) => [id, i]));
+  hubs.forEach((h, i) => {
+    if (narrow) {
+      const col = i % cols, row = Math.floor(i / cols);
+      const labelH = 35;
+      h.x = (col + .5) * W / cols;
+      h.y = top + row * rowH + Math.max(0, (rowH - (h.cr * 2 + labelH)) / 2) + h.cr;
+    } else {
+      const a = -Math.PI / 2 + i * Math.PI * 2 / hubs.length;
+      h.x = cx + Math.cos(a) * rx;
+      h.y = cy + Math.sin(a) * ry;
+    }
+    /* 고리 위의 점 순서 = 그 묶음 안의 시간 순서(시계 방향, id 기반 결정론 흔들림) */
+    const members = h.momentIds.map((id) => momentById(id)).filter(Boolean).sort(byTime);
+    const isLead = (m) => !m.stackId || stacks.find((s2) => s2.key === m.stackId)?.leadId === m.id;
+    const visible = members.filter(isLead);
+    visible.forEach((m, j) => {
+      const a = -Math.PI / 2 + j * Math.PI * 2 / visible.length + hash01(m.id) * .12;
+      m.x = h.x + Math.cos(a) * h.orbitR;
+      m.y = h.y + Math.sin(a) * h.orbitR;
+    });
+  });
+  /* 무더기에 접힌 순간은 대표 점과 같은 자리(걷기 길이 그 점을 지난다). */
+  const leadPos = new Map();
+  for (const m of moments) if (m.x != null) leadPos.set(m.id, { x: m.x, y: m.y });
+  for (const m of moments) {
+    if (m.x != null) continue;
+    const stack = m.stackId ? stacks.find((s2) => s2.key === m.stackId) : null;
+    const p = stack ? leadPos.get(stack.leadId) : null;
+    m.x = p ? p.x : W / 2; m.y = p ? p.y : (H - shelfH) / 2;
+  }
+  /* 꼬리표 없는 순간 선반: 시간 순서대로 가운데에서 양쪽으로(시안 v2 방식). */
+  const shelf = moments.filter((m) => m.hubId === null).sort((a, b) => (orderAt.get(a.id) ?? 0) - (orderAt.get(b.id) ?? 0));
+  const gap = narrow ? (W - 76) / Math.max(1, shelf.length - 1) : 54;
+  const x0 = (W - gap * Math.max(0, shelf.length - 1)) / 2;
+  shelf.forEach((m, i) => { m.x = x0 + i * gap; m.y = H - shelfH; });
+  model.narrow = narrow; model.W = W; model.H = H; model.s = s; model.dotR = dotR; model.shelfH = shelfH; model.cx = cx; model.cy = cy;
 }
 
 /* ── 그리기(SVG — 색은 --lt-* 토큰이라 밤·정원 전환이 CSS만으로 처리된다) ── */
@@ -198,7 +177,11 @@ function render() {
     if (pts.length >= 2) el('path', { d: trailD(pts), fill: 'none', stroke: color, 'stroke-width': width, opacity: .92, 'stroke-linecap': 'round' }, trailG);
   };
   if (selM) drawSeg(pathFor(model.graph, { momentId: selM.id }).segments.flat(), 'var(--lt-gold)', 2.6);
-  if (selH) drawSeg(pathFor(model.graph, { hubId: selH.id }).segments.flat(), selH.color, 2.3);
+  if (selH) { // 고른 허브의 순간들끼리 시간 순서로만 — 선반(꼬리표 없는) 점과는 잇지 않는다(대표 지적).
+    const shelfIds = new Set(model.graph.shelf);
+    const segs = pathFor(model.graph, { hubId: selH.id }).segments.filter(([a, b]) => !shelfIds.has(a) && !shelfIds.has(b));
+    for (const seg of segs) drawSeg(seg, selH.color, 2.3);
+  }
   /* 처음·지금 표시는 허브 이름 상자를 피해 자리를 잡는다(이름 배치가 끝난 뒤 그린다 — 아래에서 호출). */
   const markDot = (m, text, avoid) => {
     if (!m || m.x == null) return;
@@ -227,73 +210,76 @@ function render() {
     marks.push([firstM, '처음'], [lastM, '지금']);
   }
 
-  /* 허브 점 + 고리 바깥 고정 자리의 이름(이름·종류·개수 한 줄) — 겹치면 줄 이동, 그래도 겹치면 숨김 */
+  /* 허브 이름 자리(시안 v2 d6a490f 방식): 4방향 시도 → clearLabel — 무대 안 + 이미 놓인 이름 없음 +
+     순간 점·허브 점과 닿지 않음(접촉 반경 dotR+3) — 어느 방향도 안 되면 그 묶음 이름을 숨긴다(범례에 남는다). */
   const labelEls = [];
+  const placed = [];
+  const hit = (a, b) => a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
+  const labelRect = (name, sub) => {
+    const a = name.getBBox(), b = sub.getBBox();
+    return { x: Math.min(a.x, b.x) - 2, y: Math.min(a.y, b.y) - 2, width: Math.max(a.x + a.width, b.x + b.width) - Math.min(a.x, b.x) + 4, height: Math.max(a.y + a.height, b.y + b.height) - Math.min(a.y, b.y) + 4 };
+  };
+  const textOnPoint = (r, point, radius) => {
+    const x = Math.max(r.x, Math.min(point.x, r.x + r.width));
+    const y = Math.max(r.y, Math.min(point.y, r.y + r.height));
+    return Math.hypot(point.x - x, point.y - y) < radius + 3;
+  };
+  const clearLabel = (r, placedHere) => {
+    const shelfH = model.shelfH;
+    if (r.x < 6 || r.y < 6 || r.x + r.width > model.W - 6 || r.y + r.height > model.H - shelfH - 6) return false;
+    if (placedHere.some((other) => hit(other, r))) return false;
+    if (model.graph.moments.some((m) => m.x != null && textOnPoint(r, m, model.dotR + (m.stackId ? 15 : 0)))) return false;
+    return !model.graph.hubs.some((h) => textOnPoint(r, h, h.hr));
+  };
+  const placeHubLabel = (h, name, sub, group, placedHere) => {
+    const { W, narrow } = model;
+    const maxWidth = narrow ? Math.min(112, W / 3 - 10) : 148;
+    while (name.getComputedTextLength() > maxWidth && name.textContent.length > 2) {
+      name.textContent = name.textContent.replace(/…?$/, '') + '…';
+    }
+    const sides = narrow ? ['bottom', 'top', 'right', 'left'] : (Math.abs(h.x - model.cx) > Math.abs(h.y - model.cy)
+      ? [h.x < model.cx ? 'left' : 'right', h.y < model.cy ? 'top' : 'bottom', 'bottom', 'top']
+      : [h.y < model.cy ? 'top' : 'bottom', h.x < model.cx ? 'left' : 'right', 'right', 'left']);
+    for (const side of sides) {
+      let x = h.x, y = h.y, anchor = 'middle';
+      if (side === 'bottom') y = h.y + h.cr + 16;
+      if (side === 'top') y = h.y - h.cr - 34;
+      if (side === 'left' || side === 'right') {
+        x = h.x + (side === 'left' ? -1 : 1) * (h.cr + 13);
+        y = h.y - 7;
+        anchor = side === 'left' ? 'end' : 'start';
+      }
+      if (anchor === 'middle') {
+        const width = Math.max(name.getComputedTextLength(), sub.getComputedTextLength());
+        x = Math.max(width / 2 + 8, Math.min(x, W - width / 2 - 8));
+      }
+      name.setAttribute('x', x);
+      name.setAttribute('y', y);
+      name.setAttribute('text-anchor', anchor);
+      sub.setAttribute('x', x);
+      sub.setAttribute('y', y + 21);
+      sub.setAttribute('text-anchor', anchor);
+      const r = labelRect(name, sub);
+      if (clearLabel(r, placedHere)) { placedHere.push(r); return r; }
+    }
+    group.remove();
+    return null;
+  };
   for (const h of hubs) {
     const dim = dimmed(h.id);
-    const g = el('g', { tabindex: '0', role: 'button', 'aria-label': KIND_LABEL[h.kindId] + ' ' + h.value + ' · 순간 ' + (h.momentIds.length || '관련 ' + h.linkedIds.length) + '개', opacity: dim ? .14 : 1 }, svg);
-    el('circle', { cx: h.x, cy: h.y, r: h.hr, fill: h.color, opacity: .95 }, g);
-    const ux = (h.x - W / 2) / Math.max(Math.hypot(h.x - W / 2, h.y - H / 2), 1);
-    let lx, ly, anchor;
-    const fs = model.narrow ? 12.5 : 13.5;
+    const g = el('g', { tabindex: '0', role: 'button', 'data-hub-key': h.id, 'aria-label': KIND_LABEL[h.kindId] + ' ' + h.value + ' · 순간 ' + (h.momentIds.length || '관련 ' + h.linkedIds.length) + '개', opacity: dim ? .14 : 1 }, svg);
+    el('circle', { cx: h.x, cy: h.y, r: h.hr, class: 'g-hubdot', fill: h.color, opacity: .95 }, g);
+    const fs2 = model.narrow ? 12.5 : 14.5;
     const subText = KIND_LABEL[h.kindId] + ' ' + (h.momentIds.length > 0 ? h.momentIds.length : '관련 ' + h.linkedIds.length);
-    const tw = textWidth(h.value, fs) + 6 + textWidth(subText, Math.max(12, fs - 1.5));
-    if (model.narrow) { lx = h.x; ly = h.y + h.cr + 15; anchor = 'middle'; }
-    else {
-      lx = h.x + ux * (h.cr + 22); ly = h.y + ux * 0 + (h.y - H / 2) / Math.max(Math.hypot(h.x - W / 2, h.y - H / 2), 1) * (h.cr + 24);
-      anchor = ux > .45 ? 'start' : ux < -.45 ? 'end' : 'middle';
-    }
-    if (anchor === 'start' && lx + tw > W - 6) anchor = 'end';
-    else if (anchor === 'end' && lx - tw < 6) anchor = 'start';
-    else if (anchor === 'middle') { if (lx + tw / 2 > W - 6) anchor = 'end'; else if (lx - tw / 2 < 6) anchor = 'start'; }
-    if (anchor === 'start') lx = Math.min(lx, W - tw - 6);
-    if (anchor === 'end') lx = Math.max(lx, tw + 6);
-    if (anchor === 'middle') lx = Math.min(Math.max(lx, tw / 2 + 4), W - tw / 2 - 4);
-    ly = Math.min(Math.max(ly, 16), H - 10);
-    const yName = ly;
-    /* 폭은 그려진 뒤 실측(getBBox)으로 — 근사 폭은 한글에서 어긋나 이름·보조가 겹친다(검사기가 잡았다).
-       자리: start = 이름 lx·보조 오른쪽 / end = 보조 lx(끝)·이름 왼쪽 / middle = 합쳐 중앙. */
-    const name = el('text', { x: lx, y: yName, class: 'g-hubname', 'text-anchor': anchor, style: 'font-size:' + fs + 'px' }, g);
+    const name = el('text', { class: 'g-hubname', style: 'font-size:' + fs2 + 'px' }, g);
     name.textContent = h.value;
-    const sub = el('text', { x: lx, y: yName, class: 'g-hubname g-hubsub', 'text-anchor': anchor, style: 'font-size:' + Math.max(12, fs - 1.5) + 'px' }, g);
+    const sub = el('text', { class: 'g-hubname g-hubsub', style: 'font-size:' + Math.max(12, fs2 - 1.5) + 'px' }, g);
     sub.textContent = subText;
-    const wValue = name.getBBox().width, wSub = sub.getBBox().width;
-    if (anchor === 'start') { sub.setAttribute('x', lx + wValue + 6); }
-    else if (anchor === 'end') { sub.setAttribute('x', lx); sub.setAttribute('text-anchor', 'end'); name.setAttribute('x', lx - wSub - 6); }
-    else { name.setAttribute('text-anchor', 'start'); sub.setAttribute('text-anchor', 'start'); name.setAttribute('x', lx - (wValue + 6 + wSub) / 2); sub.setAttribute('x', lx - (wValue + 6 + wSub) / 2 + wValue + 6); }
-    labelEls.push({ g, name, sub, count: h.momentIds.length });
+    const r = placeHubLabel(h, name, sub, g, placed);
+    if (r) labelEls.push({ g, name, sub, count: h.momentIds.length, rect: r });
     g.addEventListener('click', () => { filterHub = null; stopWalk(); selected = { type: 'hub', key: h.id }; refresh(); });
   }
-  const boxes = labelEls.map((x) => ({ x, r: x.name.getBoundingClientRect(), r2: x.sub.getBoundingClientRect(), dy: 0 }));
-  for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
-    const a = boxes[i], b = boxes[j];
-    for (const [ra, rb] of [[a.r, b.r], [a.r, b.r2], [a.r2, b.r], [a.r2, b.r2]]) {
-      if (ra.left < rb.right && rb.left < ra.right && ra.top < rb.bottom && rb.top < ra.bottom) {
-        if (b.r.top >= a.r.top) b.dy = Math.max(b.dy, a.dy + 17); else a.dy = Math.max(a.dy, b.dy + 17);
-      }
-    }
-  }
-  for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
-    const a = boxes[i], b = boxes[j];
-    if (a.r.left < b.r.right && b.r.left < a.r.right && a.r.top < b.r.bottom && b.r.top < a.r.bottom) {
-      if (b.r.top >= a.r.top) b.dy = a.dy + 17; else a.dy = b.dy + 17;
-    }
-  }
-  for (const b of boxes.filter((x) => x.dy)) {
-    b.x.name.setAttribute('y', (parseFloat(b.x.name.getAttribute('y')) + b.dy).toFixed(1));
-    b.x.sub.setAttribute('y', (parseFloat(b.x.sub.getAttribute('y')) + b.dy).toFixed(1));
-  }
-  for (let i = 0; i < labelEls.length; i++) for (let j = i + 1; j < labelEls.length; j++) {
-    const rA = labelEls[i].name.getBoundingClientRect(), rA2 = labelEls[i].sub.getBoundingClientRect();
-    const rB = labelEls[j].name.getBoundingClientRect(), rB2 = labelEls[j].sub.getBoundingClientRect();
-    const hit = (r1, r2) => r1.width && r2.width && r1.left < r2.right && r2.left < r1.right && r1.top < r2.bottom && r2.top < r1.bottom;
-    if (hit(rA, rB) || hit(rA, rB2) || hit(rA2, rB) || hit(rA2, rB2)) {
-      const small = labelEls[i].count <= labelEls[j].count ? labelEls[i] : labelEls[j];
-      small.name.style.display = 'none'; small.sub.style.display = 'none'; /* 범례에 이름이 남는다 */
-    }
-  }
-
-  /* 순간 점: 고리 위 썸네일 동그라미. 무더기(stacks)는 대표 점 + 개수. */
+  /* 순간 점: 고리 위 썸네일 동그라미(없으면 묶음 색 점). 무더기(stacks)는 대표 점 + 개수. */
   const dotG = el('g', {}, svg);
   let cid = 0;
   const stackCount = new Map();
@@ -308,9 +294,8 @@ function render() {
     const dim = m.hubId ? dimmed(m.hubId) : filterHub !== null;
     const isSel = selM === m;
     const stackN = m.stackId ? (stackCount.get(m.stackId) || 1) : 1;
-    const r = model.dotR(m) + (isSel ? 2.5 : 0);
-    const g = el('g', { tabindex: '0', role: 'button', 'aria-label': '순간 ' + titleOf(m) + ' · ' + dayOf(m) + (stackN > 1 ? ' · 같은 기록 ' + stackN + '개' : ''), opacity: dim ? .14 : 1 }, dotG);
-    g.dataset.moment = m.id;
+    const r = model.dotR + (isSel ? 2.5 : 0);
+    const g = el('g', { tabindex: '0', role: 'button', 'data-moment': m.id, 'aria-label': '순간 ' + titleOf(m) + ' · ' + dayOf(m) + (stackN > 1 ? ' · 같은 기록 ' + stackN + '개' : ''), opacity: dim ? .14 : 1 }, dotG);
     const thumb = thumbOf(MOMENT_OF.get(m.id));
     if (thumb) {
       cid += 1;
@@ -324,21 +309,19 @@ function render() {
     if (stackN > 1) el('text', { x: m.x, y: m.y + r + 12, class: 'g-stackcount', 'text-anchor': 'middle' }, g).textContent = '×' + stackN;
     g.addEventListener('click', () => { stopWalk(); selected = { type: 'moment', id: m.id }; try { parent.postMessage({ type: 'lt-selection', id: m.id }, location.origin); } catch {} refresh(); });
   }
-
-  /* 처음·지금 표시는 마지막에 그린다 — 허브 이름·무더기 개수 상자를 피해 자리를 잡는다. */
-  // 회피 상자를 SVG 사용자 단위로 바꾼다 — markDot의 ax·ay는 viewBox 단위고, getBoundingClientRect는
-  // 화면 단위라 좌표계가 다르면 회피가 헛돈다(검사기가 잡은 '지금'×'가수 2' 겹침).
+  /* 처음·지금 표시는 허브 이름 상자를 피해 자리를 잡는다(좌표계: viewBox 사용자 단위로 통일). */
   const wrapBox = svg.parentElement.getBoundingClientRect();
   const avoidBoxes = [];
-  const toUser = (r) => ({ left: r.left - wrapBox.left, top: r.top - wrapBox.top, right: r.right - wrapBox.left, bottom: r.bottom - wrapBox.top });
   for (const l of labelEls) {
-    avoidBoxes.push(toUser(l.name.getBoundingClientRect()), toUser(l.sub.getBoundingClientRect()));
+    for (const t of [l.name, l.sub]) {
+      const r = t.getBoundingClientRect();
+      avoidBoxes.push({ left: r.left - wrapBox.left, top: r.top - wrapBox.top, right: r.right - wrapBox.left, bottom: r.bottom - wrapBox.top });
+    }
   }
-  for (const t of svg.querySelectorAll('.g-stackcount')) avoidBoxes.push(toUser(t.getBoundingClientRect()));
   for (const [m, text] of marks) markDot(m, text, avoidBoxes);
 }
 
-/* ── 범례(품을 꼬리표 뷰) ── */
+/* ── 범례(묶음 (꼬리표 허브)) ── */
 function drawLegend() {
   const row = document.getElementById('legendRow');
   row.replaceChildren();
