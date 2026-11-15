@@ -34,8 +34,8 @@ html[data-book-shape=phone][data-v41-screen=book] .mobile-page .clipping p{font-
 /* #635 PR B: 공책 줄 간격(31px)과 글 줄 높이를 맞춘다 — 모바일에서도 같은 격자를 쓴다. */
 html[data-book-shape=phone][data-v41-screen=book] .mobile-page .note-piece p{line-height:31px}
 html[data-book-shape=phone][data-v41-screen=book] .mobile-page .moment-title p{font-size:12px;line-height:1.6}
-/* #638: 책 안 날짜도 13px 이상 — 위의 12px 규칙보다 구체적으로 덮는다. */
-html[data-book-shape=phone][data-v41-screen=book] .mobile-page .moment-title .moment-date{font-size:13px}
+/* #638: 책 안 날짜도 위의 12px 규칙보다 구체적으로 덮는다 — 책 글자 다듬기(261116) ②: 폰에서 본문과 같은 15px. */
+html[data-book-shape=phone][data-v41-screen=book] .mobile-page .moment-title .moment-date{font-size:15px}
 html[data-book-shape=phone][data-v41-screen=book] .nav-pill{position:sticky;left:auto;bottom:12px;transform:none;width:max-content;margin:22px auto 0;z-index:48}
 html[data-book-shape=phone][data-v41-screen=book] .nav-pill button{width:44px;height:44px}
 html[data-book-shape=phone][data-v41-screen=book] .why-margin{position:static;transform:none;width:auto;margin:16px 10px 0;line-height:1.7}

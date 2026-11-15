@@ -6,6 +6,15 @@
 
 > **시험 멈춤 규칙(2026-11-15)**: 브라우저 코드에 setInterval 반복을 넣으면 unref하거나 정리한다 — 안 그러면 npm test가 끝나지 않고 CI가 멈춘다.
 
+## 2026-11-16 — 책 글자 다듬기: 칩 '이어진 순간' 전체 15px·날짜 본문 크기·잘린 제목 누르면 펼침 (컴1로컬4 레인, ai/local4-booktext-261115, main 18f0ce1 기준)
+
+- **칩(#overviewBtn)**: ≤600px 축약 '이어진 길'(view-navigation.js) 폐지 — 읽는 사람이 다른 단추로 읽은 문자열이었다(#584의 '이어진 순간'과 섞임). 전체 이름을 15px로 쓰고(book-usability.css 600px 블록), 이름 아래 '누르면 한눈에' 12px 보조 줄을 붙인다(폰은 올림·초점·길게 누름 팁이 안 보인다). 390 실측: 도구 줄 188px ≤ 60vw 234px·단추 오른쪽 376 ≤ 화면-8 — #book-dup2 기준(잘림 0) 유지. 600px를 넘나들면 matchMedia change로 따라 바꾼다.
+- **날짜(.moment-date)**: 13px → 본문과 같은 15px(폰, reader-layout.css)·17px(넓은 화면, book-usability.css).
+- **잘린 제목**: 누르면 펼침·다시 누르면 접힘(✎ 고치기는 그대로). 펼침은 openTitles(순간 id Set)로 기억해 다시 그리기(꼬리표 준비·설정 메시지)에 유지 — 재그림이 클래스를 지워 첫 누름이 무시된 것처럼 보였다(390 실측: 누름 70ms 뒤 노드 교체 확인). 접힘·펼침·짧은 제목에 맞춰 낭독 이름(제목 펼치기/접기/고치기)·aria-expanded를 실측 동기화(book-extra.js titleAriaSync + MutationObserver).
+- **공용 검사기(tests/helpers/screen-audit.mjs)**: 책 상태 단정 추가 — 날짜·칩 12px 이상, 접힌 제목 두 줄. '책글자' 줄로 KNOWN 대조에 흐른다. 위반 주입(날짜 11px·clamp 3)으로 red 2건 확인 → 원복 green.
+- **시험·측정**: node --test(584 브라우저 포함 17/17·share-readonly·book-usability·merge-sketchbook·screen-defaults·book-model·book-single-537·date-style 76 pass·0 fail), build·modulepreload --check·npm test 1836검 1697 pass·0 fail·139 skip(39초). 캡처·before/after 수치 `E:\lovetree-qa\lane\local4-booktext\{before,after}\`(390 칩 13→15px·날짜 13→15px, 1440 날짜 13→17px, 제목 누름 2줄→4줄·다시 2줄, 겹침·가려짐 0 — 전에는 누름이 고치기 창을 열어 겹침 3건이 보였음).
+- **CI 빨강 수리(261116, 로컬3 이어받기)**: '화면 시험 — 첫 화면·책'(#book-dup2, tests/v41-book-single-537.test.mjs:391)이 'night: 도구 줄이 10px 잘린다(scrollWidth 188 > clientWidth 178)'로 빨강 — 위 실측 줄은 60vw 상한(234px)을 재었지만 #book-dup2 계약은 **도구 줄 요소 폭**(390에서 177~178px)과 비교한다. 칩이 전체 이름+보조 줄(88px)이 되며 도구 줄 내용은 188px가 필요해 10~11px가 잘렸다. 계약(잘림 0)이 정당하므로 화면을 맞춤: ≤600px 블록에 `.book-title{max-width:84px}`(#book-dup 말줄임 그 자리에서 끊김)·`.tools{gap:4px}` — 도구 줄 186px ≤ 남은 자리 190px(로컬)·192px(CI 390). 칩 15px 전체 이름·보조 줄은 그대로. 재검증: book-single-537 13/13(밤·정원), 실측 tools scrollW 186 = clientW 186·book-title 97→84px. 펼침 재확인(내 기록 책, source:'file'): 누름→펼침(aria-expanded true·'제목 접기' 라벨)→다시 누름→접힘, 사이 쪽 번호 변화 0, 접은 뒤 150·400·800ms에 next 첫 클릭 모두 넘김 됨(02→03), lt41-select(고치기 창) 메시지 0건.
+
 ## 2026-11-16 — 둘러보기 카드 작은 글자 12px 이상·검사기 KNOWN 4→3건 (#705 후속, 컴1로컬4 레인, ai/local4-community-261116, main 18f0ce1 기준)
 
 - **고친 글자(shell.css 커뮤니티 블록)**: 감정 칩 .community-tag 10→12px · AI 명예회원 배지 .community-ai 11→12px · 대상 줄 .community-subject 11→13px · 요약 .community-summary 12→13px(본문급) · 메타 줄 .community-muted 11→12px · '댓글·신고·차단' 펼침 11→12px · 반응 칩 단추 .community-reaction 12→13px(단추 13px 규칙). 즐겨찾기·반응 단추 누름 영역 44px(#705) 유지 — 실측 h44.
