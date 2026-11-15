@@ -482,6 +482,51 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     await tagBoard.evaluate(() => document.getElementById('dTags').scrollIntoView({ block: 'center' }));
     await page6.waitForTimeout(200);
     assert.equal(await tagBoard.evaluate(() => document.getElementById('app').scrollLeft), 0, '꼬리표 줄로 스크롤해도 보드 판이 가로로 밀리지 않는다');
+    // #716: 390 두 줄 도구 줄 — 카드가 도구 줄 밑으로 들어가 꼬리표·제목이 비치지 않는다(교차 면적 0·바탕 알파 1),
+    // 도구 줄이 옆으로 넘치거나 단추가 잘리지 않고, '선택한 순간' 고르기 칸도 도구 줄과 겹치지 않는다.
+    if (width === 390) {
+      const bar = await tagBoard.evaluate(() => {
+        const box = (el) => { const r = el.getBoundingClientRect(); return { t: r.top, b: r.bottom, l: r.left, rt: r.right }; };
+        const header = document.querySelector('header');
+        const hb = box(header);
+        const cs = getComputedStyle(header);
+        const stops = cs.backgroundImage.match(/rgba?\([^)]*\)/g) || [];
+        const alphas = stops.map((s) => { const m = /rgba?\(([^)]+)\)/.exec(s); if (!m) return 1; const p = m[1].split(',').map((v) => parseFloat(v)); return p.length > 3 ? p[3] : 1; });
+        if (cs.backgroundColor && cs.backgroundColor !== 'rgba(0, 0, 0, 0)') alphas.push(1);
+        const items = [...header.querySelectorAll('button, .boardThemeSwitch, .boardModeSwitch, .tree-title')].filter((el) => {
+          const r = el.getBoundingClientRect(); const s = getComputedStyle(el);
+          return s.display !== 'none' && s.visibility !== 'hidden' && r.width > 0;
+        }).map((el) => ({ text: (el.textContent || '').trim().slice(0, 12), ...box(el) }));
+        const vw = innerWidth;
+        const texts = [...document.querySelectorAll('#cardLayer .card h3, #cardLayer .card .cardMeta, #cardLayer .card .keywordOnCard, #cardLayer .card .videoTitle, #cardLayer .card .domain, #cardLayer .card small, #cardLayer .card .firstTag')].filter((el) => { const s = getComputedStyle(el); const r = el.getBoundingClientRect(); return s.display !== 'none' && s.visibility !== 'hidden' && r.width > 0 && r.height > 0; });
+        const frame = box(document.getElementById('viewport'));
+        let area = 0;
+        for (const el of texts) {
+          const r = box(el);
+          // 판(.boardFrame)은 overflow:hidden 이라 위로 삐져나온 카드는 잘려 보이지 않는다 —
+          // 도구 줄 뒤로 '보이는' 겹침만 잡는다(텍스트 ∩ 도구 줄 ∩ 판 보이는 영역).
+          const w = Math.min(hb.rt, r.rt, frame.rt) - Math.max(hb.l, r.l, frame.l);
+          const h = Math.min(hb.b, r.b, frame.b) - Math.max(hb.t, r.t, frame.t);
+          if (w > 0 && h > 0) area += w * h;
+        }
+        const frameTop = Math.round(frame.t);
+        const picker = document.querySelector('.lt-moment-picker');
+        const pb = picker ? box(picker) : null;
+        const pickerOverlap = pb ? Math.max(0, Math.min(hb.b, pb.b) - Math.max(hb.t, pb.t)) : 0;
+        return {
+          alphas, overlapArea: Math.round(area),
+          overflowRight: Math.round(Math.max(0, ...items.map((i) => i.rt - vw))),
+          cut: items.filter((i) => i.rt > vw + 0.5 || i.l < -0.5).map((i) => i.text).join(','),
+          frameTop, headerBottom: Math.round(hb.b), pickerOverlap: Math.round(pickerOverlap)
+        };
+      });
+      assert.equal(bar.alphas.some((a) => a < 1), false, `390 도구 줄 바탕은 불투명하다(정지 색 알파 ${JSON.stringify(bar.alphas)})`);
+      assert.equal(bar.overlapArea, 0, `390 도구 줄 뒤로 카드 글자가 들어가지 않는다(교차 면적 ${bar.overlapArea}px²)`);
+      assert.equal(bar.overflowRight, 0, `390 도구 줄이 가로로 넘치지 않는다(넘침 ${bar.overflowRight}px)`);
+      assert.equal(bar.cut, '', `390 잘린 단추가 없다(잘림: ${bar.cut || '없음'})`);
+      assert.ok(bar.frameTop >= bar.headerBottom, `390 판이 도구 줄 아래끝(${bar.headerBottom}px)부터 시작한다(실제 ${bar.frameTop}px)`);
+      assert.equal(bar.pickerOverlap, 0, `390 '선택한 순간' 고르기 칸이 도구 줄과 겹치지 않는다(겹침 ${bar.pickerOverlap}px)`);
+    }
     await take(page6, '꼬리표 줄이 열린 상세');
     // #627 PR B: 꼬리표 정리 화면 — 목록·개수와 '제목에서 꼬리표 한 번에 제안받기'가 그려진 자리를 잰다.
     await page6.evaluate(() => document.getElementById('record-menu')?.click());
