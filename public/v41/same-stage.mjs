@@ -1,8 +1,8 @@
 // #627 후속: 같은 영상·같은 무대 찾기 한 벌 — DOM도 그리기도 없는 순수 규칙(graph-model.mjs와 같은 자리).
-// '같은 영상'은 유튜브 영상 id가 같은 순간들(youtube-id.mjs 한 벤을 쓴다).
+// '같은 영상'은 유튜브 영상 id가 같은 순간들(youtube-id.mjs 한 벌을 쓴다).
 // '같은 무대'는 꼬리표 무대·노래 값과 무대 날짜(순간의 date 칸 — 순간 폼 라벨과 같은 이름)가
 // 모두 같은 순간들이다. 하나라도 비면 묶지 않는다 — 틀린 묶음보다 안 묶는 게 낫다(#627 꼬리표 제안과 같은 원칙).
-// 꼬리표 읽기·표기 차이 묶기는 tags.mjs 한 벤(tagValues·tagKey)을 그대로 쓴다(새 규칙을 만들지 않는다).
+// 꼬리표 읽기·표기 차이 묶기는 tags.mjs 한 벌(tagValues·tagKey)을 그대로 쓴다(새 규칙을 만들지 않는다).
 import { youtubeIdFrom } from './youtube-id.mjs';
 import { tagKey, tagValues } from './tags.mjs';
 
@@ -47,6 +47,8 @@ export function findSameStage(moments) {
     const date = String(m?.date || '').trim();
     if (!stage || !song || !date) return null; // 하나라도 비면 묶지 않는다
     // 표기 차이('Super Shy'와 'super shy.')는 tags.mjs tagKey로 하나로 센다(#684 꼬리표 정리와 같은 판정).
-    return { key: `${tagKey(stage)}|${tagKey(song)}|${date}`, stage, song, date };
+    // 열쇠는 값 규칙이 금지한 제어문자로 잇는다 — '|'로 잇으면 '노래:B|C'와 '무대:A|B' 같은 값이
+    // 서로 다른 묶음을 같은 열쇠로 뭉갠다(A|B|C|D). 그래프의 stackId가 이 열쇠를 그대로 쓴다.
+    return { key: `${tagKey(stage)}\u001f${tagKey(song)}\u001f${date}`, stage, song, date };
   });
 }

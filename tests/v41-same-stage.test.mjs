@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-// #627 후속: 같은 영상·같은 무대 찾기 한 벤(same-stage.mjs) — 동작 시험만 한다(소스 글자 검사 없다).
+// #627 후속: 같은 영상·같은 무대 찾기 한 벌(same-stage.mjs) — 동작 시험만 한다(소스 글자 검사 없다).
 import { videoKey, findDuplicates, findSameStage } from '../public/v41/same-stage.mjs';
 
 test('videoKey — 주소 모양 열여덟 가지(watch·youtu.be·shorts·m.youtube·embed·t=·ytimg)', () => {
@@ -119,4 +119,17 @@ test('300개 순간 계산은 50ms 안에서 끝난다', () => {
   assert.equal(sameStage.length, 4, '같은 무대 묶음 4개(무대 2 × 날짜 2)');
   assert.ok(duplicatesMs <= 50, `findDuplicates 300개 ${duplicatesMs.toFixed(1)}ms ≤ 50ms`);
   assert.ok(sameMs <= 50, `findSameStage 300개 ${sameMs.toFixed(1)}ms ≤ 50ms`);
+});
+
+test('findSameStage — 묶음 열쇠는 값에 나올 수 없는 구분자로 잡는다(| 값이어도 안 뭉개진다)', () => {
+  const moments = [
+    fancam('m1', { stage: 'A', song: 'B|C', date: '2024-05-01' }, 'https://youtu.be/aaa111bbb01'),
+    fancam('m2', { stage: 'A|B', song: 'C', date: '2024-05-01' }, 'https://youtu.be/bbb222ccc02'),
+    fancam('m3', { stage: 'A', song: 'B|C', date: '2024-05-01' }, 'https://youtu.be/ccc333ddd03'),
+  ];
+  const groups = findSameStage(moments);
+  assert.equal(groups.length, 1, '무대:A·노래:B|C 와 무대:A|B·노래:C 는 다른 묶음이다');
+  assert.deepEqual(groups[0].momentIds, ['m1', 'm3'], '같은 무대·노래·날짜인 m1·m3만 한 무더기');
+  assert.equal(groups[0].stage, 'A');
+  assert.equal(groups[0].song, 'B|C');
 });
