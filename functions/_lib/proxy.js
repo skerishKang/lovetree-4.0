@@ -48,6 +48,8 @@ const ALLOWED = new Map([
   ['/api/community/shares', new Set(['GET'])],
   ['/api/community/me/favorites', new Set(['GET'])],
   ['/api/community/admin/reports', new Set(['GET'])],
+  // #627 3단계 '다른 팬 보기' — 같은 꼬리표의 공개 순간(GET만).
+  ['/api/public/tag-moments', new Set(['GET'])],
   ['/api/feedback', new Set(['POST'])],
   ['/api/board', new Set(['POST'])],
   ['/api/board/mine', new Set(['GET'])],

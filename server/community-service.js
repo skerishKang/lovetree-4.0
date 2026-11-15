@@ -4,6 +4,8 @@ import {parsePrincipal} from './principal.js';
 import {projectSharedTree} from './share-service.js';
 import {ROLE_AI_CUSTOMER} from './admin-roles.js';
 import {coverModeOf} from '../src/domain.js';
+// 꼬리표 판정은 화면과 같은 한 벌 — 서버에 규칙을 복사하지 않는다(#627 3단계 '다른 팬 보기').
+import {parseTag, tagKey} from '../public/v41/tags.mjs';
 
 export const REACTION_KINDS=Object.freeze(['heart','like','love','laugh','wow','sad','angry']);
 const isReactionKind=value=>typeof value==='string'&&REACTION_KINDS.includes(value);
@@ -12,6 +14,8 @@ const SHARE_ID=/^[A-Za-z0-9_-]{20,64}$/;
 const ITEM_ID=/^[A-Za-z0-9_-]{1,80}$/;
 const IDEMPOTENCY=/^[A-Za-z0-9._:-]{8,128}$/;
 const NO_STORE={'cache-control':'no-store, max-age=0',pragma:'no-cache','x-content-type-options':'nosniff'};
+// '다른 팬 보기' 응답의 개수 제한(#627 3단계) — 요청 파라미터로 늘리지 않는다.
+const TAG_MOMENT_LIMIT=30;
 const clean=(value,max)=>typeof value==='string'?value.trim().slice(0,max):'';
 function jsonBody(request){
  if(!String(request?.headers?.['content-type']||'').toLowerCase().startsWith('application/json'))throw new ApiError(415,'unsupported_media_type','JSON 요청만 사용할 수 있어요.');
@@ -85,6 +89,45 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
    const start=cursor?Math.max(0,cards.findIndex(item=>item.shareId===cursor)+1):0,items=cards.slice(start,start+size),next=start+size<cards.length?items.at(-1)?.shareId||null:null;
    return {items,nextCursor:next,totalVisible:cards.length};
   },
+  // #627 3단계 '다른 팬 보기': 같은 꼬리표('종류:값')를 담은 공개 순간(공유 상태 active·비공개 아님)을 찾는다.
+  // 화면은 아직 만들지 않는다(회차 진행 중 — 서버 규칙만). 판정은 화면과 같은 한 벌(public/v41/tags.mjs의
+  // parseTag·tagKey)로 표기 차이('Super Shy'와 'super shy.')를 하나로 묶는다. 개수 제한·순서(무대 날짜 최신 먼저)는
+  // 여기서 정하고, 비공개 미디어 주소 거름은 공개 읽기 경로(projectSharedTree)를 그대로 쓴다.
+  async tagMoments({tag='',viewerSubjectId=null}={}){
+   const parsed=parseTag(clean(tag,28));
+   if(!parsed||parsed.kindId===null||!parsed.value)throw new ApiError(400,'tag_invalid','꼬리표 형식을 확인해 주세요(종류:값).');
+   const valueKey=tagKey(parsed.value);
+   const matches=(raw)=>{const p=parseTag(raw);return !!p&&p.kindId===parsed.kindId&&tagKey(p.value)===valueKey;};
+   // 공개 공유 행을 스캔한 뒤(최근 것부터 상한 400행) 문서에서 순간을 걸러 낸다 — 지금 규모(수십~수백 트리)에서
+   // 충분하다. 공개 트리가 수천 개가 되면 파생 꼬리표 표(moments_tags)+색인으로 SQL에서 바로 걸러 내야 한다.
+   const shares=await communityRepo.listPublicTagShares({productId,viewerSubjectId,limit:400});
+   const docs=new Map(),roles=new Map(),items=[];
+   for(const share of shares){
+    let stored=docs.get(share.subjectId);
+    if(stored===undefined){stored=await workspaceRepo.load({productId,subjectId:share.subjectId});docs.set(share.subjectId,stored);}
+    if(!stored)continue;
+    let tree;
+    try{tree=projectSharedTree(stored.doc,share.treeId).tree;}catch{continue;} // 문서에서 사라진 트리는 건너뛴다
+    if(!tree.moments.length)continue;
+    let aiTester=roles.get(share.subjectId);
+    if(aiTester===undefined){aiTester=!!admin&&await admin.roleFor({productId,subjectId:share.subjectId})===ROLE_AI_CUSTOMER;roles.set(share.subjectId,aiTester);}
+    for(const moment of tree.moments){
+     if(!Array.isArray(moment.keywords)||!moment.keywords.some(matches))continue;
+     items.push({
+      shareId:share.shareId,
+      link:'/t/'+share.shareId,
+      treeTitle:tree.title,
+      title:moment.title,
+      url:moment.url||'',
+      thumbnail:moment.mediaMetadata?.thumbnail||moment.thumbnailUrl||'',
+      date:moment.date||'',
+      aiTester
+     });
+    }
+   }
+   items.sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))||String(a.shareId).localeCompare(String(b.shareId)));
+   return {tag:parsed.raw,items:items.slice(0,TAG_MOMENT_LIMIT)};
+  },
   async favorite(subjectId,shareId,enabled){await activeShare(shareId);rate(subjectId,'favorite',40);await communityRepo.setFavorite({productId,shareId,subjectId,enabled});return communityRepo.stats({productId,shareId,viewerSubjectId:subjectId});},
   async favorites(subjectId){return communityRepo.listFavorites({productId,subjectId});},
   async react(subjectId,shareId,enabled,kind='heart'){
@@ -113,6 +156,8 @@ export function createCommunityHandler({authenticate,service,productId}){
  }
  async function handle(request){
   const path=String(request?.path||''),method=request?.method||'GET',query=request?.query||new URLSearchParams();
+  // #627 3단계 '다른 팬 보기' — 공개 경로라 로그인 없이도 부른다. 로그인했으면 자기 트리·차단 관계를 뺀다.
+  if(path==='/api/public/tag-moments'&&method==='GET'){const who=await principal(request,false);return {status:200,body:await service.tagMoments({tag:String(query.get('tag')||''),viewerSubjectId:who?.subjectId||null}),headers:NO_STORE};}
   if(path==='/api/community/shares'&&method==='GET'){const who=await principal(request,false);return {status:200,body:await service.discover({query:query.get('q')||'',emotion:query.get('emotion')||'',cursor:query.get('cursor')||'',limit:query.get('limit')||12,viewerSubjectId:who?.subjectId||null}),headers:NO_STORE};}
   if(path==='/api/community/me/favorites'&&method==='GET'){const who=await principal(request);return {status:200,body:{shareIds:await service.favorites(who.subjectId)},headers:NO_STORE};}
   if(path==='/api/community/admin/reports'&&method==='GET'){const who=await principal(request);return {status:200,body:{reports:await service.reports(who)},headers:NO_STORE};}
