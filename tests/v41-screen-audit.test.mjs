@@ -322,9 +322,26 @@ test('#657 화면 공통 검사기: 주요 화면 16 상태 × 390·1440 × 밤�
     const editButtons = await page4.locator('.myposts-reply-btn[data-reply-edit]').count();
     assert.equal(editButtons, 2, '내 덧붙임 둘에만 고치기 단추가 있다(운영센터 답변에는 없다)');
     assert.equal(await page4.locator('.myposts-reply-edited').count(), 1, '고친 덧붙임에 (고침) 표시가 하나 있다');
+    // 단추는 덧붙임 머리 줄 안에 있고, 겉모양은 작아도 누름 영역은 44px 이상이다(수치로 판정).
+    const buttons = await page4.evaluate(() => {
+      const list = [...document.querySelectorAll('.myposts-reply-head .myposts-reply-btn')];
+      const rects = list.map(b => b.getBoundingClientRect());
+      return { count: list.length, inHead: list.every(b => b.closest('.myposts-reply-head')), minH: Math.round(Math.min(...rects.map(r => r.height))), minW: Math.round(Math.min(...rects.map(r => r.width))) };
+    });
+    assert.equal(buttons.count, 4, '고치기·지우기 단추 네 개(내 덧붙임 둘)가 모두 머리 줄 안에 있다');
+    assert.equal(buttons.inHead, true, '단추의 부모는 덧붙임 머리 줄이다');
+    assert.ok(buttons.minH >= 44 && buttons.minW >= 44, `누름 영역 44px 이상(최소 ${buttons.minW}×${buttons.minH}px)`);
     await page4.locator('.myposts-reply-btn[data-reply-edit]').first().click();
+    // 고치기 중에는 원래 덧붙임 카드가 숨는다(같은 글이 두 번 보이지 않게).
     await page4.waitForFunction(() => !!document.querySelector('.myposts-reply-edit input'), null, { timeout: 8000 });
     await page4.waitForTimeout(400);
+    const editState = await page4.evaluate(() => {
+      const editInput = document.querySelector('.myposts-reply-edit input');
+      const hiddenBoxes = [...document.querySelectorAll('.myposts-reply')].filter(b => b.hidden);
+      return { open: Boolean(editInput), hiddenCount: hiddenBoxes.length };
+    });
+    assert.equal(editState.open, true, '고치기 입력칸이 열려 있다');
+    assert.equal(editState.hiddenCount, 1, '고치는 덧붙임 카드 하나가 숨는다');
     await take(page4, '내 의견 덧붙임 고치기 열림');
     await ctx4.close();
 

@@ -125,15 +125,16 @@ export function createFeedbackBoard({$, notify, show, showFull, onReplyCount, on
     const updates = await updatesByIssue();
     plist.innerHTML = posts.map(post => {
       const replies = Array.isArray(post.replies) ? post.replies : [];
-      // #678 후속 B: 내 덧붙임(canEdit·canDelete가 true)에만 고치기·지우기 단추가 보이고,
+      // #678 후속 B: 내 덧붙임(canEdit·canDelete가 true)에만 고치기·지우기가 붙는다 — 가끔 쓰는 기능이라
+      // 큰 단추 대신 머리 줄('내 덧붙임 (고침)') 오른쪽 끝의 작은 글자 단추 두 개로 둔다(누름 영역은 44px, CSS 몫).
       // 고친 덧붙임에는 (고침) 표시가 붙는다. 운영센터 답변(mine=false)에는 단추가 없다.
       const replyHtml = replies.length
         ? `<div class="myposts-replies">${replies.map(r => {
             const tools = r.canDelete === true
-              ? `<span class="myposts-reply-tools"><button type="button" class="myposts-reply-btn" data-reply-edit="${esc(r.id)}">고치기</button><button type="button" class="myposts-reply-btn" data-reply-delete="${esc(r.id)}">지우기</button></span>`
+              ? `<span class="myposts-reply-tools"><button type="button" class="myposts-reply-btn" data-reply-edit="${esc(r.id)}">고치기</button><span class="myposts-reply-sep" aria-hidden="true">·</span><button type="button" class="myposts-reply-btn" data-reply-delete="${esc(r.id)}">지우기</button></span>`
               : '';
             const editedMark = r.edited === true ? '<span class="myposts-reply-edited">(고침)</span>' : '';
-            return `<div class="myposts-reply" data-reply-id="${esc(r.id)}"><span>${r.mine ? '내 덧붙임' : '답변'}${editedMark}</span><p>${esc(r.body)}</p>${tools}</div>`;
+            return `<div class="myposts-reply" data-reply-id="${esc(r.id)}"><div class="myposts-reply-head"><span>${r.mine ? '내 덧붙임' : '답변'}${editedMark}</span>${tools}</div><p>${esc(r.body)}</p></div>`;
           }).join('')}</div>`
         : '';
       const issue = (post.status === 'fixed' || post.status === 'closed') && post.issueNumber ? `<span class="myposts-issue">이슈 ${esc(post.issueNumber)}</span>` : '';
@@ -176,17 +177,21 @@ export function createFeedbackBoard({$, notify, show, showFull, onReplyCount, on
     for (const link of plist.querySelectorAll('.myposts-updates-link')) {
       link.addEventListener('click', () => { if (typeof onOpenUpdates === 'function') onOpenUpdates(link.dataset.updatesVersion); });
     }
-    // #678 후속 B: 내 덧붙임 고치기·지우기. 고치기는 그 자리에서 입력칸으로 바뀌고 저장·취소가 있고,
-    // 지우기는 한 번 확인한 뒤 지운다(서버는 status='deleted'로 남긴다). 저장·지운 뒤에는 목록을 다시 부른다.
+    // #678 후속 B: 내 덧붙임 고치기·지우기. 고치기를 누르면 원래 덧붙임 카드를 숨기고 그 자리에
+    // 입력칸(저장·취소)을 놓는다(같은 글이 두 번 보이지 않게). 지우기는 한 번 확인한 뒤 지운다
+    // (서버는 status='deleted'로 남긴다). 저장·지운 뒤에는 목록을 다시 부른다.
     for (const button of plist.querySelectorAll('[data-reply-edit]')) {
       button.addEventListener('click', () => {
         const box = button.closest('.myposts-reply');
-        if (!box || box.querySelector('.myposts-reply-edit')) return;
+        if (!box || box.hidden || box.parentElement?.querySelector('.myposts-reply-edit')) return;
         const replyId = box.dataset.replyId || '';
         const postId = button.closest('.myposts-item')?.querySelector('[data-followup]')?.dataset.followup || '';
         const current = box.querySelector('p')?.textContent || '';
-        box.innerHTML = `<form class="myposts-reply-edit"><span class="myposts-reply-edit-label">내 덧붙임 고치기</span><input name="reply" maxlength="2000" autocomplete="off" value="${esc(current)}"><div class="myposts-reply-edit-row"><button type="submit" class="myposts-reply-save">저장</button><button type="button" class="myposts-reply-cancel">취소</button></div><p class="myposts-reply-edit-error" role="alert"></p></form>`;
-        const form = box.querySelector('.myposts-reply-edit');
+        box.hidden = true;
+        const form = document.createElement('form');
+        form.className = 'myposts-reply-edit';
+        form.innerHTML = `<span class="myposts-reply-edit-label">내 덧붙임 고치기</span><input name="reply" maxlength="2000" autocomplete="off" value="${esc(current)}"><div class="myposts-reply-edit-row"><button type="submit" class="myposts-reply-save">저장</button><button type="button" class="myposts-reply-cancel">취소</button></div><p class="myposts-reply-edit-error" role="alert"></p>`;
+        box.after(form);
         const input = form.querySelector('input');
         input.focus();
         input.setSelectionRange(input.value.length, input.value.length);
