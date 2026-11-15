@@ -274,3 +274,16 @@ test('#678 후속: 남의 덧붙임·운영센터 답변·로그아웃은 고치
   assert.equal(post.replies.find(r => r.id === opsReplyId).mine, false);
   assert.equal(post.replies.find(r => r.id === f1).canEdit, true);
 });
+
+test('사용 일지의 journal_date는 한국 시각(Asia/Seoul) 기준 — 한국 새벽 기록이 하루 전으로 저장되지 않는다', async () => {
+  const feedbackRepo = createMemoryFeedbackRepo();
+  const created = [];
+  const original = feedbackRepo.create.bind(feedbackRepo);
+  feedbackRepo.create = async (input) => { created.push(input); return original(input); };
+  const admin = {roleFor: async value => (value?.subjectId === 'tester' ? 'ai_customer' : null)};
+  // 2026-11-14T19:28:00Z = 한국 시각 2026-11-15 04:28 — 서울 날짜(11-15)로 저장돼야 한다(UTC로 쓰면 11-14가 된다).
+  const service = createFeedbackService({feedbackRepo, productId: PRODUCT, admin, now: () => Date.UTC(2026, 10, 14, 19, 28, 0)});
+  await service.createJournal({principal: principal('tester'), title: '오늘 사용 일지', body: '내용', score: 4});
+  assert.equal(created.length, 1);
+  assert.equal(created[0].journalDate, '2026-11-15');
+});
