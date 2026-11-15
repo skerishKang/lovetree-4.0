@@ -224,3 +224,148 @@ test('discover uses batched summaries, excludes blocked/hidden/deleted, and leak
  const hidden=await call(handle,'GET','/api/community/shares',{account:'eve'});
  assert.deepEqual(hidden.body.items,[]);
 });
+
+// ── #627 3단계 '다른 팬 보기': GET /api/public/tag-moments (화면 없음 — 서버 규칙만) ──────────
+const TAG_URL='https://example.com/video/zena.mp4';
+async function tagSetup({accounts,aiSubjects=[],privateTreeId=null,hiddenShareIds=[],blocks=[]}={}){
+ // accounts: [{subject, trees:[{title, moments:[{title, date, url, keywords, mediaMetadata?}]}]}]
+ const workspaceRepo=createMemoryWorkspaceRepo(),workspace=createWorkspaceService({repo:workspaceRepo,productId:PRODUCT});
+ const shareRepo=createMemoryShareRepo();
+ const rows=[];let n=0;
+ for(const account of accounts){
+  const trees=[];
+  for(const t of account.trees){
+   let tree=createTree({subject:'좋아하는 대상',title:t.moments[0].title,note:'기록',emotion:'설렘',date:t.moments[0].date,url:t.moments[0].url},CLOCK);
+   tree=editTree(tree,{title:t.title,subject:tree.subject,coverMomentId:''});
+   tree.moments[0].keywords=t.moments[0].keywords||[];
+   if(t.moments[0].mediaMetadata)tree.moments[0].mediaMetadata=t.moments[0].mediaMetadata;
+   for(const m of t.moments.slice(1)){
+    tree=addMoment(tree,{title:m.title,note:'기록',emotion:'설렘',date:m.date,url:m.url},tree.moments[0].id,CLOCK);
+    const moment=tree.moments.at(-1);
+    moment.keywords=m.keywords||[];
+    if(m.mediaMetadata)moment.mediaMetadata=m.mediaMetadata;
+   }
+   trees.push(tree);
+  }
+  await workspace.write(principal(account.subject),{state:{version:1,trees},expectedRevision:0,clientKey:'seed'});
+  for(const tree of trees){
+   const shareId='share'+String(++n).padStart(20,'0');
+   rows.push(await shareRepo.create({productId:PRODUCT,shareId,subjectId:account.subject,treeId:tree.id,entryMomentId:tree.moments[0].id,view:'book',momentCount:tree.moments.length}));
+  }
+ }
+ const communityRepo=createMemoryCommunityRepo({isPrivateTree:privateTreeId?(p,s,t)=>t===privateTreeId:null});
+ communityRepo.seedShares(rows);
+ let r=0;
+ for(const shareId of hiddenShareIds){
+  await communityRepo.createReport({productId:PRODUCT,reportId:'report-'+String(++r).padStart(20,'0'),shareId,subjectId:'moderator',reason:'시험',clientKey:'key-'+r});
+  await communityRepo.moderateReport({productId:PRODUCT,reportId:'report-'+String(r).padStart(20,'0'),status:'resolved',visibility:'hidden',actorSubjectId:'admin'});
+ }
+ for(const [a,b] of blocks)await communityRepo.blockOwner({productId:PRODUCT,blockerSubjectId:a,blockedSubjectId:b});
+ const admin={roleFor:async value=>aiSubjects.includes(value.subjectId)?'ai_customer':null};
+ const service=createCommunityService({communityRepo,shareRepo,workspaceRepo,productId:PRODUCT,admin,makeId:()=>String(++n).padStart(24,'c')});
+ const authenticate=async request=>{const subjectId=request.headers?.account;if(!subjectId)throw new ApiError(401,'unauthenticated','login');return principal(subjectId);};
+ return {communityRepo,workspaceRepo,handle:createCommunityHandler({authenticate,service,productId:PRODUCT})};
+}
+const tagCall=(handle,tag,account)=>call(handle,'GET','/api/public/tag-moments',{query:'tag='+encodeURIComponent(tag),account});
+
+test('tag-moments: 같은 꼬리표의 공개 순간만 나오고 내 것·비공개·숨김·차단·표기 차이를 한 벌로 판정한다',async()=>{
+ const song=v=>'노래:'+v;
+ const data=await tagSetup({
+  accounts:[
+   {subject:'s1',trees:[{title:'첫 트리',moments:[
+    {title:'최신 무대',date:'2026-11-05',url:TAG_URL,keywords:[song('Super Shy')]},
+    {title:'예전 무대',date:'2026-11-01',url:TAG_URL,keywords:[song('Super Shy')]},
+   ]}]},
+   {subject:'s2',trees:[{title:'다른 팬 트리',moments:[{title:'표기 다른 순간',date:'2026-10-20',url:TAG_URL,keywords:[song('super shy.')]}]}]},
+   {subject:'s3',trees:[{title:'비공개 트리',moments:[{title:'숨은 기록',date:'2026-11-03',url:TAG_URL,keywords:[song('Super Shy')]}]}]},
+   {subject:'s4',trees:[{title:'숨김 트리',moments:[{title:'신고 처리된 순간',date:'2026-11-02',url:TAG_URL,keywords:[song('Super Shy')]}]}]},
+   {subject:'s5',trees:[{title:'내가 차단한 트리',moments:[{title:'차단된 순간',date:'2026-11-04',url:TAG_URL,keywords:[song('Super Shy')]}]}]},
+   {subject:'s6',trees:[{title:'나를 차단한 트리',moments:[{title:'역차단된 순간',date:'2026-11-04',url:TAG_URL,keywords:[song('Super Shy')]}]}]},
+   {subject:'s7',trees:[{title:'다른 꼬리표 트리',moments:[{title:'다른 노래',date:'2026-11-06',url:TAG_URL,keywords:[song('Drama')]}]}]},
+   {subject:'viewer',trees:[{title:'내 트리',moments:[{title:'내 순간',date:'2026-11-07',url:TAG_URL,keywords:[song('Super Shy')]}]}]},
+  ],
+  privateTreeId:'tree-private-1',
+  blocks:[['viewer','s5'],['s6','viewer']],
+ });
+ // 비공개 트리의 공유 행을 비공개 트리 id로 바꿔 두고(isPrivateTree가 걸러 봄), 숨김 트리의 행을 신고 처리로 숨긴다.
+ data.communityRepo.seedShares(data.communityRepo.shares.map(row=>row.subjectId==='s3'?{...row,treeId:'tree-private-1'}:row));
+ const hiddenRow=data.communityRepo.shares.find(row=>row.subjectId==='s4');
+ await data.communityRepo.createReport({productId:PRODUCT,reportId:'report-hidden-1',shareId:hiddenRow.shareId,subjectId:'moderator',reason:'시험',clientKey:'key-hidden-1'});
+ await data.communityRepo.moderateReport({productId:PRODUCT,reportId:'report-hidden-1',status:'resolved',visibility:'hidden',actorSubjectId:'admin'});
+
+ const mine=await tagCall(data.handle,'노래:Super Shy','viewer');
+ assert.equal(mine.status,200);
+ const titles=mine.body.items.map(item=>item.title);
+ assert.deepEqual(titles,['최신 무대','예전 무대','표기 다른 순간'],'무대 날짜 최신 먼저, 표기 차이(super shy.)도 같은 꼬리표다');
+ assert.equal(JSON.stringify(mine.body).includes('내 순간'),false,'요청한 사람 자신의 순간은 뺀다');
+ assert.equal(JSON.stringify(mine.body).includes('숨은 기록'),false,'비공개 트리는 뺀다');
+ assert.equal(JSON.stringify(mine.body).includes('신고 처리된 순간'),false,'숨김(신고 처리) 트리는 뺀다');
+ assert.equal(JSON.stringify(mine.body).includes('차단된 순간'),false,'내가 차단한 트리는 뺀다');
+ assert.equal(JSON.stringify(mine.body).includes('역차단된 순간'),false,'나를 차단한 트리도 뺀다(양방향)');
+ assert.equal(JSON.stringify(mine.body).includes('다른 노래'),false,'다른 꼬리표 값은 뺀다');
+ // 로그아웃으로 부르면 내 것 제외·차단이 사라진다(공개 경로, 요청자가 없어 차단 관계도 없다).
+ const anonymous=await tagCall(data.handle,'노래:Super Shy');
+ assert.equal(anonymous.status,200);
+ assert.ok(anonymous.body.items.some(item=>item.title==='내 순간'),'로그아웃이면 내 트리 개념이 없다');
+ assert.ok(anonymous.body.items.some(item=>item.title==='차단된 순간'),'로그아웃에는 차단 관계가 없다 — 공개 판정만으로 걸러진다');
+ assert.equal(anonymous.body.items.some(item=>item.title==='숨은 기록'),false,'비공개·숨김은 요청자와 무관하게 뺀다');
+ assert.equal(anonymous.body.items.some(item=>item.title==='신고 처리된 순간'),false);
+});
+
+test('tag-moments: 응답은 제목·영상 주소·썸네일·무대 날짜·트리 이름·공유 링크·aiTester뿐 — 개인정보 필드가 없다',async()=>{
+ const data=await tagSetup({
+  accounts:[{subject:'kimbs5993+tutorial01@gmail.com',trees:[{title:'공개 트리',moments:[
+   {title:'비공개 미디어 순간',date:'2026-11-05',url:PHOTO,keywords:['무대:쇼챔피언']},
+   {title:'영상 순간',date:'2026-11-04',url:TAG_URL,keywords:['무대:쇼챔피언'],mediaMetadata:{thumbnail:'https://i.ytimg.com/vi/abcdefghijk/hqdefault.jpg'}},
+  ]}]}],
+ });
+ const res=await tagCall(data.handle,'무대:쇼챔피언');
+ assert.equal(res.status,200);
+ const [redacted,video]=res.body.items;
+ assert.equal(redacted.url,'','올린 사진(/api/media/) 주소는 공개 읽기와 같이 거른다');
+ assert.equal(video.url,TAG_URL);
+ assert.equal(video.thumbnail,'https://i.ytimg.com/vi/abcdefghijk/hqdefault.jpg');
+ assert.equal(video.link,'/t/'+video.shareId,'공유 링크는 /t/<공유 주소>');
+ assert.equal(video.treeTitle,'공개 트리');
+ assert.equal(video.date,'2026-11-04','무대 날짜');
+ const body=JSON.stringify(res.body);
+ assert.equal(body.includes('@'),false,'이메일은 내리지 않는다');
+ assert.equal(body.includes('kimbs5993'),false);
+ assert.equal(body.includes('subject'),false,'subject id는 내리지 않는다');
+ for(const item of res.body.items)assert.deepEqual(Object.keys(item).sort(),['aiTester','date','link','shareId','thumbnail','title','treeTitle','url'],'응답 필드는 약속한 것만');
+});
+
+test('tag-moments: AI 테스터 표시는 공개 읽기와 같은 판정(roleFor=ai_customer)으로 한 비트만 내린다',async()=>{
+ const data=await tagSetup({
+  accounts:[
+   {subject:'tester',trees:[{title:'AI 테스터 트리',moments:[{title:'테스터 순간',date:'2026-11-05',url:TAG_URL,keywords:['가수:RESCENE']}]}]},
+   {subject:'human',trees:[{title:'일반 트리',moments:[{title:'일반 순간',date:'2026-11-04',url:TAG_URL,keywords:['가수:RESCENE']}]}]},
+  ],
+  aiSubjects:['tester'],
+ });
+ const res=await tagCall(data.handle,'가수:RESCENE');
+ const byTree=Object.fromEntries(res.body.items.map(item=>[item.treeTitle,item.aiTester]));
+ assert.equal(byTree['AI 테스터 트리'],true,'AI 고객 계정 글에는 aiTester:true');
+ assert.equal(byTree['일반 트리'],false,'일반 계정은 false');
+ assert.equal(JSON.stringify(res.body).includes('tester'),false,'표시 외에 계정 흔적은 없다');
+});
+
+test('tag-moments: 개수 제한 30 — 그 이상 담아도 30개만 무대 날짜 최신 순으로',async()=>{
+ const moments=[];
+ for(let i=0;i<35;i+=1){
+  moments.push({title:'순간 '+i,date:`2026-${String(1+Math.floor(i/28)).padStart(2,'0')}-${String(1+(i%28)).padStart(2,'0')}`,url:TAG_URL,keywords:['노래:15-LOVE']});
+ }
+ const data=await tagSetup({accounts:[{subject:'s1',trees:[{title:'많은 트리',moments}]}]});
+ const res=await tagCall(data.handle,'노래:15-LOVE');
+ assert.equal(res.body.items.length,30);
+ const dates=res.body.items.map(item=>item.date);
+ assert.deepEqual([...dates].sort().reverse(),dates,'무대 날짜 최신 먼저');
+ assert.equal(JSON.stringify(res.body).includes('순간 34'),true,'가장 최신부터 채운다');
+});
+
+test('tag-moments: 종류 없는 꼬리표·빈 값은 400',async()=>{
+ const data=await tagSetup({accounts:[{subject:'s1',trees:[{title:'트리',moments:[{title:'순간',date:'2026-11-01',url:TAG_URL,keywords:['무대']}]}]}]});
+ assert.equal((await tagCall(data.handle,'무대')).status,400,'종류 표시가 없는 옛 꼬리표는 이 경로에서 받지 않는다');
+ assert.equal((await tagCall(data.handle,'')).status,400);
+ assert.equal((await tagCall(data.handle,'노래:')).status,400);
+});

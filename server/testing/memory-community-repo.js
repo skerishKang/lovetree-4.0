@@ -44,6 +44,30 @@ export function createMemoryCommunityRepo({isPrivateTree=null}={}){
    });
   },
   seedShares(rows){this.shares=rows.map(copy);},
+  // #627 3단계: 태그 검색이 훑을 공개 공유 행 — active, 사람×트리당 한 행(auto 우선), 숨김·비공개·
+  // 차단(양방향)·요청자 본인을 뺀다. 둘러보기 후보와 달리 moment_count·discoverable 조건이 없다.
+  async listPublicTagShares({productId,viewerSubjectId,limit=400}){
+   const picked=new Map();
+   for(const row of (this.shares||[])){
+    if(row.productId!==productId||row.status!=='active')continue;
+    const pk=key(row.subjectId,row.treeId);
+    const prev=picked.get(pk);
+    if(!prev||(row.origin==='auto'&&prev.origin!=='auto'))picked.set(pk,row);
+   }
+   const owners=[...picked.values()].sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
+   const out=[];
+   for(const row of owners){
+    if(out.length>=limit)break;
+    let hiddenAny=false;
+    for(const other of (this.shares||[]))if(other.productId===productId&&other.treeId===row.treeId&&hiddenShares.has(key(productId,other.shareId))){hiddenAny=true;break;}
+    if(hiddenAny)continue;
+    if(isPrivateTree&&await isPrivateTree(productId,row.subjectId,row.treeId))continue;
+    if(viewerSubjectId&&row.subjectId===viewerSubjectId)continue;
+    if(viewerSubjectId&&(blocks.has(key(productId,viewerSubjectId,row.subjectId))||blocks.has(key(productId,row.subjectId,viewerSubjectId))))continue;
+    out.push(copy(row));
+   }
+   return out;
+  },
   async stats({productId,shareId,viewerSubjectId}){
    const prefix=key(productId,shareId)+'\0';
    const reqs=reactionKeys().filter(v=>v.startsWith(prefix));
