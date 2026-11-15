@@ -24,14 +24,31 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
   const labels={heart:'공감',like:'좋아요',love:'사랑',laugh:'웃음',wow:'놀람',sad:'슬픔',angry:'화남'};
   const host=el('span','community-reaction-group');host.setAttribute('role','group');host.setAttribute('aria-label',label||'반응');
   const counts=item.stats.reactions||{heart:item.stats.hearts||0};const mine=new Set(item.stats.mine||[]);
-  for(const reactionKind of kinds){
-   const active=mine.has(reactionKind)||(reactionKind==='heart'&&item.stats.hearted&&!item.stats.mine);
-   const count=counts[reactionKind]||0;
-   const b=el('button','community-mini community-reaction',`${active?'✓ ':''}${labels[reactionKind]||reactionKind} ${count}`);
-   b.type='button';b.dataset.reactionKind=reactionKind;b.setAttribute('aria-pressed',String(active));
-   b.onclick=async()=>{const answer=await api.react(item.shareId,!active,reactionKind);if(!answer.ok){message(loginMessage(answer));return;}item.stats=answer.stats;render();};
-   host.append(b);
+  const active=kind=>mine.has(kind)||(kind==='heart'&&item.stats.hearted&&!item.stats.mine);
+  // #678 후속(윤제 4회차): 0짜리 반응 칩 7개가 늘어서 시끄럽다 — 반응이 하나도 없으면 '반응 남기기'
+  // 한 개만 보이고(누르면 7가지가 그 자리에서 펼쳐진다), 반응이 있으면 개수가 있는 것과 내가 누른 것만 보인다.
+  const chips=()=>{
+   const out=[];
+   for(const reactionKind of kinds){
+    const count=counts[reactionKind]||0;
+    const isActive=active(reactionKind);
+    if(!count&&!isActive)continue;
+    const b=el('button','community-mini community-reaction',`${isActive?'✓ ':''}${labels[reactionKind]||reactionKind} ${count}`);
+    b.type='button';b.dataset.reactionKind=reactionKind;b.setAttribute('aria-pressed',String(isActive));
+    b.onclick=async()=>{const answer=await api.react(item.shareId,!isActive,reactionKind);if(!answer.ok){message(loginMessage(answer));return;}item.stats=answer.stats;render();};
+    out.push(b);
+   }
+   return out;
+  };
+  const anyVisible=kinds.some(kind=>(counts[kind]||0)>0||active(kind));
+  if(!anyVisible){
+   const open=el('button','community-mini community-reaction-open','반응 남기기');
+   open.type='button';
+   open.onclick=()=>host.replaceChildren(...chips());
+   host.append(open);
+   return host;
   }
+  host.append(...chips());
   return host;
  }
  async function comments(item,host){

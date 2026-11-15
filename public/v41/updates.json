@@ -1,17 +1,44 @@
 [
   {
+    "version": "4.1.5",
+    "date": "2026.11.15",
+    "items": [
+      {"kind": "new", "text": "내 의견에 남긴 덧붙임을 고치거나 지울 수 있어요", "source": "team", "issue": "#678"},
+      {"kind": "new", "text": "순간을 담을 때 날짜 칸 이름이 '무대 날짜'로 바뀌었어요. 저절로 채워진 날짜는 확인하고 넣어요", "source": "team", "issue": "#627"},
+      {"kind": "fix", "text": "책 카드에도 붙인 꼬리표가 보이고, 겹친 꼬리표도 함께 보여요", "source": "team", "issue": "#627"},
+      {"kind": "fix", "text": "책 제목 옆 '고치기' 손잡이가 다시 보여요", "source": "team", "issue": "#676"},
+      {"kind": "fix", "text": "연습용 트리가 둘러보기·다른 팬 보기 목록에 섞여 보이지 않아요", "source": "team", "issue": "#678"}
+    ]
+  },
+  {
     "version": "4.1.4",
     "date": "2026.11.15",
     "items": [
+      {"kind": "new", "text": "보드가 칸마다 차곡차곡 쌓여요. 긴 카드 아래가 비지 않아요", "source": "team", "issue": "#619"},
+      {"kind": "new", "text": "보드에 카드를 다른 카드 사이에 끼워 넣어 순서를 바꿀 수 있어요", "source": "team", "issue": "#619"},
+      {"kind": "new", "text": "순간 상세에서 다른 트리로 바로 옮길 수 있어요. 옮긴 뒤에는 되돌릴 수 있어요", "source": "team", "issue": "#644"},
+      {"kind": "fix", "text": "‘의견 보내기’ 창을 다듬었어요 — 함께 보낼 정보를 한 줄에 모으고, 보낸 뒤 안내를 분명하게 했어요", "source": "team", "issue": "#631"},
+      {"kind": "fix", "text": "쉬운 추가로 담으면 지금 보고 있는 트리에 담겨요. 담기 창에서 트리를 바로 바꿀 수도 있어요", "source": "ai_tester", "tester": "윤제", "issue": "#638"},
+      {"kind": "fix", "text": "휴대폰 유튜브 주소(m.youtube.com·youtu.be·쇼츠·음악)를 붙여 넣어도 영상 제목이 제대로 담겨요", "source": "ai_tester", "tester": "윤제", "issue": "#638"},
+      {"kind": "fix", "text": "지도에 잘못 보이던 날짜를 제대로 고쳤어요", "source": "ai_tester", "tester": "윤제", "issue": "#638"},
+      {"kind": "fix", "text": "책의 메모 장에 제목이 두 번 보이던 것을 고쳤어요. 작은 화면에서 글자나 알림 카드가 단추를 가리지 않아요", "source": "team", "issue": "#658"},
+      {"kind": "fix", "text": "보드를 휴대폰으로 열면 지금 순간이 읽히는 크기로 크게 보이고, 순간을 누르면 크게 보기·시네마 단추를 바로 누를 수 있어요", "source": "team", "issue": "#662"},
+      {"kind": "fix", "text": "휴대폰에서 지도 아래 조작 줄이 '새 소식 · 의견 보내기' 링크와 겹치지 않게 띄웠어요", "source": "ai_tester", "issue": "#638"},
+      {"kind": "fix", "text": "책의 날짜·'고치기' 글자를 키웠어요", "source": "ai_tester", "issue": "#638"},
+      {"kind": "fix", "text": "영상 그림을 인터넷에서 가져오지 못해도 책 장이 멈추지 않아요", "source": "ai_tester", "issue": "#638"},
+      {"kind": "fix", "text": "순간을 자세히 적을 때 적은 제목이 그대로 저장돼요", "source": "ai_tester", "issue": "#638"},
+      {"kind": "fix", "text": "새 소식에서 같은 출처 줄이 되풀이되지 않고, 알림 카드는 하루에 한 번만 떠요", "source": "ai_tester", "issue": "#638"},
+      {"kind": "fix", "text": "내 의견 상태를 '받았어요 · 살펴보는 중 · 고쳤어요 · 답했어요'처럼 쉬운 말로 보여 줘요", "source": "ai_tester", "issue": "#638"},
+      {"kind": "fix", "text": "새 소식의 '새로워진 것'·'고친 것' 제목이 한 버전에 한 번만 보이고, 휴대폰 지도 아래 조작 줄이 화면에서 잘리지 않아요", "source": "team", "issue": "#638"},
+      {"kind": "fix", "text": "책의 갈라짐 안내 띠가 아래 링크를 가리지 않게 띄웠어요. 작은 화면 책 머리글의 단추도 잘리지 않아요", "source": "team"},
+      {"kind": "fix", "text": "작은 화면 책에서 보라색 책 테두리가 아래 링크를 가리지 않게 띄웠어요. 갈라짐 안내 글자도 키웠어요", "source": "team"},
       {"kind": "fix", "text": "보드 안내 말풍선이 정원에서 흰 글자가 흰 바탕에 묻히지 않게 읽히게 했고, 상세 판이 열려 있으면 안내를 띄우지 않게 했어요", "source": "team", "issue": "#662"},
-      {"kind": "new", "text": "핀보드에서 카드를 열에 차곡차곡 쌓아 담아요", "source": "team"},
-      {"kind": "new", "text": "핀보드에서 카드를 원하는 자리에 끼워 넣고 순서를 저장해요", "source": "team"},
-      {"kind": "fix", "text": "공유한 책의 마지막 장에 낯설게 떠 있던 안내 상자를 치웠어요", "source": "ai_tester", "tester": "테스터", "issue": "#635"},
-      {"kind": "fix", "text": "'어떻게 쓰나요' 안내가 읽기 편해졌어요 — 여백·줄바꿈·단추 자리를 다듬었어요", "source": "ai_tester", "tester": "테스터", "issue": "#635"},
-      {"kind": "fix", "text": "영상 칸이 빈 상자로 남지 않아요 — 썸네일을 먼저 보이고, 없으면 제목 카드로 보여요", "source": "ai_tester", "tester": "테스터", "issue": "#635"},
-      {"kind": "new", "text": "로그아웃 화면의 ≡ 메뉴 맨 위에 '내 러브트리 시작하기'를 두었어요", "source": "ai_tester", "tester": "테스터", "issue": "#635"},
-      {"kind": "fix", "text": "이어진 순간의 '0일' 표기를 '첫날·N일째'로 바꾸었어요", "source": "ai_tester", "tester": "테스터", "issue": "#635"},
-      {"kind": "fix", "text": "작은 화면에서 책 아래 링크 줄과 첫 화면 안내가 겹치지 않게 띄웠어요", "source": "ai_tester", "tester": "테스터", "issue": "#635"},
+      {"kind": "fix", "text": "공유한 책의 마지막 장에 낯설게 떠 있던 안내 상자를 치웠어요", "source": "ai_tester", "tester": "보람", "issue": "#635"},
+      {"kind": "fix", "text": "'어떻게 쓰나요' 안내가 읽기 편해졌어요 — 여백·줄바꿈·단추 자리를 다듬었어요", "source": "ai_tester", "tester": "보람", "issue": "#635"},
+      {"kind": "fix", "text": "영상 칸이 빈 상자로 남지 않아요 — 썸네일을 먼저 보이고, 없으면 제목 카드로 보여요", "source": "ai_tester", "tester": "보람", "issue": "#635"},
+      {"kind": "new", "text": "로그아웃 화면의 ≡ 메뉴 맨 위에 '내 러브트리 시작하기'를 두었어요", "source": "ai_tester", "tester": "보람", "issue": "#635"},
+      {"kind": "fix", "text": "이어진 순간의 '0일' 표기를 '첫날·N일째'로 바꾸었어요", "source": "ai_tester", "tester": "보람", "issue": "#635"},
+      {"kind": "fix", "text": "작은 화면에서 책 아래 링크 줄과 첫 화면 안내가 겹치지 않게 띄웠어요", "source": "ai_tester", "tester": "보람", "issue": "#635"},
       {"kind": "fix", "text": "책에서 영상을 재생한 채 전체 화면으로 바꿔도 재생이 끊기지 않아요", "source": "user", "issue": "#642"},
       {"kind": "new", "text": "계정 동그라미·메뉴에 새 소식 점을 함께 보이고, 마우스를 올리면 무슨 소식인지 알려줘요", "source": "user", "issue": "#644"},
       {"kind": "new", "text": "다른 기기에서 기록이 바뀌었으면 쉬운 말로 알리고, 고친 것은 백업 뒤 최신 기록을 불러와요", "source": "user", "issue": "#644"},
@@ -26,7 +53,7 @@
       {"kind": "fix", "text": "작은 화면에서 꼬리표 '종류 고르기'가 두 줄로 꺾이지 않게 이름을 칸 위로 얹었어요", "source": "ai_tester", "tester": "윤제"},
       {"kind": "fix", "text": "관계 지도의 '사용법'을 보기 바꾸기와 섞이지 않게 둥근 ? 단추로 옆에 떼었어요", "source": "ai_tester", "tester": "윤제"},
       {"kind": "fix", "text": "책 아래 갈림길 안내 문구를 '…에서 갈라진 길'로 바로잡았어요", "source": "ai_tester", "tester": "윤제"},
-      {"kind": "fix", "text": "사용 일지 날짜가 하루 밀려 보이던 것을 고쳤어요 — 새벽에 쓴 일지도 그날 날짜로 저장돼요", "source": "ai_tester", "tester": "테스터", "issue": "#671"}
+      {"kind": "fix", "text": "사용 일지 날짜가 하루 밀려 보이던 것을 고쳤어요 — 새벽에 쓴 일지도 그날 날짜로 저장돼요", "source": "ai_tester", "issue": "#671"}
     ]
   },
   {
@@ -56,27 +83,12 @@
     ]
   },
   {
-    "version": "4.1.4",
-    "date": "2026.11.15",
+    "version": "4.1.0",
+    "date": "2026.11.14",
     "items": [
-      {"kind": "new", "text": "보드가 칸마다 차곡차곡 쌓여요. 긴 카드 아래가 비지 않아요", "source": "team", "issue": "#619"},
-      {"kind": "new", "text": "보드에 카드를 다른 카드 사이에 끼워 넣어 순서를 바꿀 수 있어요", "source": "team", "issue": "#619"},
-      {"kind": "new", "text": "순간 상세에서 다른 트리로 바로 옮길 수 있어요. 옮긴 뒤에는 되돌릴 수 있어요", "source": "team", "issue": "#644"},
-      {"kind": "fix", "text": "‘의견 보내기’ 창을 다듬었어요 — 함께 보낼 정보를 한 줄에 모으고, 보낸 뒤 안내를 분명하게 했어요", "source": "team", "issue": "#631"},
-      {"kind": "fix", "text": "쉬운 추가로 담으면 지금 보고 있는 트리에 담겨요. 담기 창에서 트리를 바로 바꿀 수도 있어요", "source": "ai_tester", "tester": "윤제", "issue": "#638"},
-      {"kind": "fix", "text": "휴대폰 유튜브 주소(m.youtube.com·youtu.be·쇼츠·음악)를 붙여 넣어도 영상 제목이 제대로 담겨요", "source": "ai_tester", "tester": "윤제", "issue": "#638"},
-      {"kind": "fix", "text": "지도에 잘못 보이던 날짜를 제대로 고쳤어요", "source": "ai_tester", "tester": "윤제", "issue": "#638"},
-      {"kind": "fix", "text": "책의 메모 장에 제목이 두 번 보이던 것을 고쳤어요. 작은 화면에서 글자나 알림 카드가 단추를 가리지 않아요", "source": "team", "issue": "#658"},
-      {"kind": "fix", "text": "보드를 휴대폰으로 열면 지금 순간이 읽히는 크기로 크게 보이고, 순간을 누르면 크게 보기·시네마 단추를 바로 누를 수 있어요", "source": "team", "issue": "#662"},
-      {"kind": "fix", "text": "휴대폰에서 지도 아래 조작 줄이 '새 소식 · 의견 보내기' 링크와 겹치지 않게 띄웠어요", "source": "ai_tester", "tester": "테스터", "issue": "#638"},
-      {"kind": "fix", "text": "책의 날짜·'고치기' 글자를 키웠어요", "source": "ai_tester", "tester": "테스터", "issue": "#638"},
-      {"kind": "fix", "text": "영상 그림을 인터넷에서 가져오지 못해도 책 장이 멈추지 않아요", "source": "ai_tester", "tester": "테스터", "issue": "#638"},
-      {"kind": "fix", "text": "순간을 자세히 적을 때 적은 제목이 그대로 저장돼요", "source": "ai_tester", "tester": "테스터", "issue": "#638"},
-      {"kind": "fix", "text": "새 소식에서 같은 출처 줄이 되풀이되지 않고, 알림 카드는 하루에 한 번만 떠요", "source": "ai_tester", "tester": "테스터", "issue": "#638"},
-      {"kind": "fix", "text": "내 의견 상태를 '받았어요 · 살펴보는 중 · 고쳤어요 · 답했어요'처럼 쉬운 말로 보여 줘요", "source": "ai_tester", "tester": "테스터", "issue": "#638"},
-      {"kind": "fix", "text": "새 소식의 '새로워진 것'·'고친 것' 제목이 한 버전에 한 번만 보이고, 휴대폰 지도 아래 조작 줄이 화면에서 잘리지 않아요", "source": "team", "issue": "#638"},
-            {"kind": "fix", "text": "책의 갈라짐 안내 띠가 아래 링크를 가리지 않게 띄웠어요. 작은 화면 책 머리글의 단추도 잘리지 않아요", "source": "team"},
-      {"kind": "fix", "text": "작은 화면 책에서 보라색 책 테두리가 아래 링크를 가리지 않게 띄웠어요. 갈라짐 안내 글자도 키웠어요", "source": "team"}
+      {"kind": "new", "text": "러브트리 4.1이 처음 공개됐어요 — 검은 무대 위 금테 카드에 순간을 모아요", "source": "team"},
+      {"kind": "new", "text": "모은 순간을 책·보드·지도로 다시 볼 수 있어요", "source": "team"},
+      {"kind": "new", "text": "순간 3개를 모은 트리는 둘러보기에 저절로 소개돼요 — 트리 이름은 보이지 않아요", "source": "team"}
     ]
   }
 ]

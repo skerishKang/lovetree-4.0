@@ -21,7 +21,7 @@ test('611: updates.json 은 버전·날짜·항목(kind·text·source·tester?) 
       assert.ok(item.text.trim(), '문구가 비지 않는다');
       assert.ok(!item.text.includes('\n'), '한 줄로 적는다');
       assert.ok(['ai_tester', 'user', 'team'].includes(item.source), `source는 ai_tester|user|team (받음: ${JSON.stringify(item)})`);
-      if (item.source === 'ai_tester') assert.equal(typeof item.tester, 'string', 'AI 명예회원 출처는 이름을 함께 적는다');
+      if (item.source === 'ai_tester' && item.tester !== undefined) assert.equal(typeof item.tester, 'string', 'AI 명예회원 출처에 이름이 있으면 문자열이다 (받음: ' + JSON.stringify(item) + ')');
       // 이달용 이슈 번호는 연결용으로만 두는 필드 — 화면 문구에는 넣지 않는다.
       if (item.issue !== undefined) assert.match(item.issue, /^#[\w.-]+$/, '이슈 연결 모양');
     }
@@ -69,6 +69,7 @@ test('611: 버전 비교·최신 버전 선택은 숫자 세 자리로만 한다
 
 test('611: 출처 한 줄은 AI 명예회원과 실제 사용자를 구분한다', () => {
   assert.equal(sourceLabel({source: 'ai_tester', tester: '윤제'}), 'AI 명예회원 윤제 님이 알려 준 것');
+  assert.equal(sourceLabel({source: 'ai_tester'}), 'AI 명예회원이 알려 준 것', '이름을 모르면 역할로만 보여 준다');
   assert.equal(sourceLabel({source: 'user'}), '사용자 의견으로 고친 것');
   assert.equal(sourceLabel({source: 'team'}), '');
   assert.equal(sourceLabel({}), '');
@@ -110,6 +111,24 @@ test('611: 닫으면 그 버전은 다시 안 띄운다(브라우저 저장, try
   assert.equal(r.newer, false, '다시 접속하면 안 보인다');
   await again.openUpdates();
   assert.equal(readSeen(storage), latest, '창을 열어도 같은 버전으로 유지된다');
+});
+
+test('611: 버전 번호는 겹치지 않고, 위에서부터 큰 번호 순서다', () => {
+  const versions = UPDATES.map(e => e.version);
+  assert.equal(new Set(versions).size, versions.length, `버전 번호가 겹친다: ${versions.join(', ')}`);
+  for (let i = 1; i < versions.length; i++) {
+    assert.equal(compareVersions(versions[i - 1], versions[i]), 1, `${versions[i - 1]} 항목이 ${versions[i]}보다 위에 있어야 한다`);
+  }
+});
+
+test('611: AI 명예회원 이름 칸에 역할 글자를 쓰지 않는다', () => {
+  for (const entry of UPDATES) {
+    for (const item of entry.items) {
+      if (item.source !== 'ai_tester' || item.tester === undefined) continue;
+      assert.ok(item.tester.trim(), `이름이 있으면 비지 않는다 (${JSON.stringify(item)})`);
+      assert.doesNotMatch(item.tester, /^(AI ?테스터|테스터)$/, `역할 글자를 이름으로 쓰지 않는다 (${JSON.stringify(item)})`);
+    }
+  }
 });
 
 test('611: 저장소가 막혀도 화면이 멈추지 않는다', async () => {

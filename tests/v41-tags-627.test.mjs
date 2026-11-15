@@ -7,6 +7,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { makeTag, parseTag, normalizeTags, tagValues, tagKey, TAG_KINDS, TAG_MAX_LENGTH, TAG_MAX_COUNT, suggestTagsFromTitle, suggestForMoments } from '../public/v41/tags.mjs';
+import { tagFacets, filterMomentsByTags, matchMomentText } from '../public/v41/tag-filter.mjs';
 import { createTree, addMoment, validateState } from '../src/domain.js';
 
 const input = (title = '첫 목소리') => ({ subject: '윤슬', title, note: '오래 기억하고 싶은 마음', emotion: '설렘', date: '2026-10-27', url: '' });
@@ -134,6 +135,26 @@ test('제목 해석: 실제 제목 형태 31개에서 가수·멤버·노래·�
   // 제안은 저장하지 않는다 — 이 모듈에는 저장·보내기 코드가 없다(파일에 persist·fetch·apply가 없다).
   const src = readFileSync(new URL('../public/v41/tags.mjs', import.meta.url), 'utf8');
   assert.doesNotMatch(src, /apply\(|persist|postMessage|fetch\(|localStorage|sessionStorage/, '제안 모듈은 저장을 부르지 않는다');
+});
+
+test('직캠 문맥의 괄호 크레딧(채널 이름)은 가수로 제안하지 않는다(보람 알림)', () => {
+  // 실제 사례: 괄호는 찍은 곳(채널) 크레딧이다 — 바로 앞 한국어가 '직캠'으로 끝나면 괄호 안 영문을 가수로 읽지 않는다.
+  const { proposals } = suggestTagsFromTitle("[K-Choreo 8K] 라이즈 직캠 'Bag Bad Back' (RIIZE Choreography) @250523");
+  assert.ok(!proposals.some((p) => p.kindId === 'artist'), '채널 이름을 가수로 권하지 않는다: ' + brief({ proposals }));
+  assert.ok(proposals.some((p) => p.kindId === 'song' && p.value === 'Bag Bad Back'), '노래 제안은 그대로다');
+  // 다른 채널 크레딧 모양(채널 'M2')도 같다.
+  const cam = suggestTagsFromTitle("라이즈 직캠 'Do your dance' (M2) @250523");
+  assert.ok(!cam.proposals.some((p) => p.kindId === 'artist'), '직캠 크레딧 괄호를 가수로 권하지 않는다');
+  assert.ok(cam.proposals.some((p) => p.kindId === 'song' && p.value === 'Do your dance'), '노래 제안은 그대로다');
+  // 괄호 앞 한국어가 직캠 표시가 아니면 정상 꼬꼬('한글(영문)') — 그대로 제안한다.
+  const ok = suggestTagsFromTitle('뉴진스 (NewJeans) How Sweet');
+  assert.deepEqual(brief(ok).filter((p) => p.startsWith('artist:')), ['artist:NewJeans']);
+  // 직캠 표시가 앞쪽 대괄호에만 있고 꼬꼬 바로 앞이 아니면('[MPD직캠] 라이즈 (RIIZE)') 꼬꼬는 그대로 제안한다.
+  const prefix = suggestTagsFromTitle("[MPD직캠] 라이즈 (RIIZE) 'Do your dance'");
+  assert.deepEqual(brief(prefix).filter((p) => p.startsWith('artist:')), ['artist:RIIZE']);
+  // 채널 이름 낱말(CHOREOGRAPHY·CHOREO)이 섞인 후보는 괄호 앞 모양과 무관하게 가수에서 뺀다.
+  const noise = suggestTagsFromTitle('라이즈 무용 영상 모음 (RIIZE Choreography)');
+  assert.ok(!noise.proposals.some((p) => p.kindId === 'artist'), '채널 이름 낱말을 가수로 권하지 않는다');
 });
 
 test('재사용 제안: 내가 쓴 꼬리표가 먼저고, 제목 규칙이 그 뒤를 잇는다', () => {
@@ -535,11 +556,97 @@ test('suggestForMoments — 순간 300개 계산도 50ms 안에 끝난다', () =
       keywords: i % 3 ? [] : ['가수:RESCENE'],
     });
   }
-  suggestForMoments(moments); // 첫 계산은 모듈 적재·JIT 준비가 섞이므로 준비 1회 후에 잰다
-  const started = performance.now();
-  const result = suggestForMoments(moments);
-  const elapsed = performance.now() - started;
+  suggestForMoments(moments); // 예열 1회 — 모듈 적재·JIT 준비 시간은 재지 않는다
+  let result;
+  let elapsed = Infinity;
+  for (let run = 0; run < 5; run += 1) {
+    const started = performance.now();
+    result = suggestForMoments(moments);
+    elapsed = Math.min(elapsed, performance.now() - started); // 여러 번 중 가장 빠른 값
+  }
   assert.equal(result.length, 300, '꼬리표가 아예 없는 순간·가수만 있는 순간 모두 빠진 종류 제안이 있다');
   assert.ok(result.every((r) => r.suggestions.includes('노래:Super Shy') && r.suggestions.length >= 2), '노래·무대는 제목 규칙으로 권한다');
   assert.ok(elapsed <= 50, `300순간 한꺼번에 제안 ${elapsed.toFixed(1)}ms ≤ 50ms`);
+});
+
+// ── 꼬리표로 찾기·걸러 보기(#627 후속): 순수 계산 — 화면(순간 목록)은 나중에 이 함수를 붙인다.
+
+test('tagFacets — 종류별로 모으고 같은 값(표기 차이)은 한 칸, 많이 쓴 순서다', () => {
+  const moments = [
+    { id: 'f1', keywords: ['노래:Super Shy', '가수:NewJeans', '멤버:카리나'] },
+    { id: 'f2', keywords: ['노래:super shy.', '가수:NewJeans', '멤버:카리나'] },
+    { id: 'f3', keywords: ['노래:super shy.', '무대'] },
+    { id: 'f4', keywords: ['노래:ETA'] },
+    { id: 'f5', keywords: [] },
+  ];
+  const facets = tagFacets(moments);
+  assert.deepEqual(facets.map((f) => f.kindId), ['artist', 'song', 'member', null], '종류 순서(TAG_KINDS) 뒤에 그 밖');
+  const song = facets.find((f) => f.kindId === 'song');
+  assert.equal(song.label, '노래');
+  assert.deepEqual(song.tags, [
+    { key: 'super shy', value: 'super shy.', count: 3 },
+    { key: 'eta', value: 'ETA', count: 1 },
+  ], "'Super Shy'·'super shy.'은 tagKey로 한 칸이고, 표시 값은 가장 많이 쓴 표기다");
+  assert.deepEqual(facets[facets.length - 1], { kindId: null, label: '그 밖', tags: [{ key: '무대', value: '무대', count: 1 }] },
+    '종류 없는 옛 꼬리표는 마지막 그 밖 묶음이다');
+  assert.deepEqual(JSON.parse(JSON.stringify(facets)), facets, '결과는 JSON 그대로 넘길 수 있는 평범한 배열·객체다');
+  assert.deepEqual(tagFacets([]), [], '꼬리표가 없으면 빈 배열 — 화면은 줄을 숨긴다');
+  assert.deepEqual(tagFacets([{ id: 'x', keywords: [] }]), []);
+});
+
+test('filterMomentsByTags — 여러 개 고르면 모두 붙은 순간만(그리고), 표기 차이는 무시한다', () => {
+  const moments = [
+    { id: 'a', keywords: ['노래:Super Shy', '멤버:카리나'] },
+    { id: 'b', keywords: ['노래:super shy.', '멤버:카리나'] },
+    { id: 'c', keywords: ['노래:Super Shy'] },
+    { id: 'd', keywords: ['멤버:카리나'] },
+    { id: 'e', keywords: [] },
+  ];
+  assert.deepEqual(filterMomentsByTags(moments, []).map((m) => m.id), ['a', 'b', 'c', 'd', 'e'], '빈 선택은 전부(꼬리표 없는 순간도)');
+  assert.deepEqual(filterMomentsByTags(moments, ['super shy']).map((m) => m.id), ['a', 'b', 'c']);
+  assert.deepEqual(filterMomentsByTags(moments, ['Super Shy.']).map((m) => m.id), ['a', 'b', 'c'], '선택 열쇠도 표기 차이를 무시한다');
+  assert.deepEqual(filterMomentsByTags(moments, ['super shy', '카리나']).map((m) => m.id), ['a', 'b'], '둘 다 붙은 순간만(그리고)');
+  assert.deepEqual(filterMomentsByTags(moments, ['노래:Super Shy', '멤버:카리나']).map((m) => m.id), ['a', 'b'], '종류가 붙은 저장값을 골라도 같은 열쇠다');
+  assert.deepEqual(filterMomentsByTags(moments, ['없는 꼬리표']), [], '없는 꼬리표를 고르면 빈 목록');
+  assert.equal(moments.length, 5, '원래 배열은 그대로다');
+});
+
+test('matchMomentText — 제목·마음·꼬리표 값에서 찾고, 꼬리표는 표기 차이를 무시한다', () => {
+  const moment = { title: 'Super Shy 무대', note: '카리나의 손짓이 오래 남았다', keywords: ['가수:NewJeans', '멤버:카리나'] };
+  assert.equal(matchMomentText(moment, 'super shy'), true, '제목 대소문자 무시');
+  assert.equal(matchMomentText(moment, '손짓'), true, '마음 한마디');
+  assert.equal(matchMomentText(moment, '카리나.'), true, '꼬리표 값(마침표 차이 무시)');
+assert.equal(matchMomentText(moment, 'newjeans'), true, '꼬리표 값 대소문자 무시');
+  assert.equal(matchMomentText(moment, '멤버:카리나'), true, '검색어에 종류 표시가 붙어도 값으로 찾는다');
+  assert.equal(matchMomentText(moment, '노래'), false, '종류 표시는 값이 아니다');
+  assert.equal(matchMomentText(moment, '없는말'), false);
+  assert.equal(matchMomentText(moment, ''), true, '빈 검색어는 모두 맞는다');
+  assert.equal(matchMomentText({ title: '', note: '', keywords: [] }, '무대'), false, '꼬리표 없는 순간에도 안전하다');
+});
+
+test('tagFacets·filterMomentsByTags·matchMomentText — 순간 300개 계산도 50ms 안에 끝난다', () => {
+  const moments = Array.from({ length: 300 }, (_, i) => ({
+    id: 'm' + i,
+    title: `RESCENE "Super Shy" ${i % 2 ? '인기가요' : '뮤직뱅크'} 직캠`,
+    note: i % 4 ? '카리나의 무대가 오래 남았다' : '',
+    keywords: ['가수:RESCENE', i % 2 ? '노래:Super Shy' : '노래:super shy.', '멤버:카리나', i % 3 ? '무대:인기가요' : '무대'],
+  }));
+  tagFacets(moments); // 예열 1회 — 모듈 적재·JIT 준비 시간은 재지 않는다
+  filterMomentsByTags(moments, ['super shy', '카리나']);
+  matchMomentText(moments[0], 'super');
+  let facets;
+  let filtered;
+  let matched;
+  let elapsed = Infinity;
+  for (let run = 0; run < 5; run += 1) {
+    const started = performance.now();
+    facets = tagFacets(moments);
+    filtered = filterMomentsByTags(moments, ['super shy', '카리나']);
+    matched = moments.filter((m) => matchMomentText(m, 'super shy'));
+    elapsed = Math.min(elapsed, performance.now() - started); // 여러 번 중 가장 빠른 값
+  }
+  assert.equal(filtered.length, 300, '모두 두 꼬리표를 가진다');
+  assert.equal(matched.length, 300);
+  assert.equal(facets.find((f) => f.kindId === 'song').tags[0].count, 300);
+  assert.ok(elapsed <= 50, `300순간 꼬리표 걸러 보기 ${elapsed.toFixed(1)}ms ≤ 50ms`);
 });

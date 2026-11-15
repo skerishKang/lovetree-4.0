@@ -154,7 +154,7 @@ export function createFeedbackBoard({$, notify, show, showFull, onReplyCount, on
       const bodyText = String(post.body || '').trim();
       const titleHtml = ownTitle && !bodyText.startsWith(ownTitle) ? `<h3 class="myposts-title">${esc(ownTitle)}</h3>` : '';
       return `<article class="myposts-item">
-        <div class="myposts-head"><span class="myposts-kind">${esc(KIND_LABEL[post.kind] || post.kind)}</span><span class="myposts-status">${esc(STATUS_LABEL[post.status] || post.status)}</span><span class="myposts-date">${esc(time(post.createdAt))}</span></div>
+        <div class="myposts-head"><span class="myposts-kind">${esc(KIND_LABEL[post.kind] || post.kind)}</span><span class="myposts-no">#${esc(post.id)}</span><span class="myposts-status">${esc(STATUS_LABEL[post.status] || post.status)}</span><span class="myposts-date">${esc(time(post.createdAt))}</span></div>
         ${titleHtml}
         <p class="myposts-body">${esc(post.body)}</p>
         ${issue}${updatesLink}${replyHtml}
