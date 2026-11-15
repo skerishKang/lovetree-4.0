@@ -143,12 +143,17 @@ test('운영센터 전체 숫자 집계: 계정·트리·순간·공개·둘러�
   await pool.query("INSERT INTO lovetree_tree_visibility(product_id,subject_id,tree_id,visibility) VALUES($1,$2,'t3','private')",[productId,REAL_TWO]);
 
   const stats=await createStatsRepo(pool).aggregate({productId,since:new Date(Date.now()-7*86400e3).toISOString()});
+  // #743: 트리 계열 카드의 펼침 내역에 쓰는 제목 목록(최대 20)도 같은 집계에서 온다 — 제목만 싣는다.
+  // t5는 제목이 없어 목록에서 빠진다(빈 이름을 지어내지 않는다). 순서는 제목·id 순(두 구현 같은 규칙).
   assert.deepEqual(stats,{
     accountsReal:3,accountsAi:1,accountsTester:1,accountsNewReal:1,accountsNewAi:0,accountsNewTester:1,
     treesReal:3,treesAi:1,treesTester:1,
     momentsReal:4,momentsAi:3,momentsTester:2,momentsNewReal:2,momentsNewAi:0,momentsNewTester:2,
     publicReal:2,publicAi:1,publicTester:0,
-    featuredReal:1,featuredAi:1,featuredTester:0
+    featuredReal:1,featuredAi:1,featuredTester:0,
+    treesTitles:['나무 t1','나무 t2','나무 t3','나무 t4'],
+    publicTitles:['나무 t1','나무 t2','나무 t4'],
+    featuredTitles:['나무 t1','나무 t4']
   });
 
   // 같은 자료를 메모리 저장소로도 쌓아 두 구현이 같은 숫자를 내는지 본다(계약이 갈라지면 여기서 걸린다).
