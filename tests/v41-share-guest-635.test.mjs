@@ -676,22 +676,25 @@ test('공유 책 마지막 장에서 → 를 눌러도 쓰기 창·쓰기 메시
       }
       const atLast = await frame.evaluate(() => {
         const st = window.__TRACK59__.getState();
-        return { last: st.page === st.total - 1, nextDisabled: document.querySelector('#nextBtn').disabled, addLinkHidden: document.querySelector('#addLinkBtn')?.hidden ?? null };
+        // #722: 책의 '링크 순간 추가' 창·단추는 지웠다 — 요소 자체가 없어야 한다(읽기 전용에서 없음이 더 강하게 성립).
+        return { last: st.page === st.total - 1, nextDisabled: document.querySelector('#nextBtn').disabled, addLinkGone: document.querySelector('#addLinkBtn') === null };
       });
       assert.equal(atLast.last, true, `${width}: 마지막 장까지 넘기지 못했다(${JSON.stringify(atLast)})`);
       assert.equal(atLast.nextDisabled, true, `${width}: 마지막 장에서 → 단추는 비활성이다`);
-      assert.equal(atLast.addLinkHidden, true, `${width}: 읽기 전용 책에는 '＋ 링크 순간' 단추가 없다`);
+      assert.equal(atLast.addLinkGone, true, `${width}: 책에는 '＋ 링크 순간' 단추가 없다(지운 뒤)`);
       // 실제 사용자 길: → 단추(disabled — 브라우저가 클릭 이벤트를 만들지 않는다)·키보드 →.
       await frame.click('#nextBtn', { force: true, timeout: 2000 }).catch(() => {});
       await page.waitForTimeout(300);
       await frame.evaluate(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })));
       await page.waitForTimeout(500);
       const after = await frame.evaluate(() => ({
-        linkModalOpen: document.querySelector('#linkModal')?.classList.contains('open') || false,
+        linkModalPresent: document.querySelector('#linkModal') !== null,
+        linkModalOpen: document.querySelector('#linkModal')?.classList.contains('open') === true,
         page: window.__TRACK59__.getState().page,
         total: window.__TRACK59__.getState().total,
         writeMessages: (parent.LT41_MESSAGES || []).filter((t) => t === 'lt41-write')
       }));
+      assert.equal(after.linkModalPresent, false, `${width}: 책에 링크(쓰기) 창 요소가 남아 있다`);
       assert.equal(after.linkModalOpen, false, `${width}: 마지막 장에서 → 로 링크(쓰기) 창이 열렸다`);
       assert.equal(after.page, after.total - 1, `${width}: 마지막 장에서 → 로 장이 바뀌었다`);
       assert.deepEqual(after.writeMessages, [], `${width}: 쓰기 메시지(lt41-write)가 셸에 남았다`);

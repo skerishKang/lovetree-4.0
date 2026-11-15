@@ -1,5 +1,15 @@
 # LoveTree 4.0 — 핸드오프
 
+## 2026-11-16 — 책의 죽은 '링크 순간 추가' 창·단추 지우기 (#722 정리, 컴1로컬2 레인, ai/local2-drop-link-modal-20261116-093000-7c3f1a, main 43633ac 기준)
+
+- **왜 지웠나**: #722 제보(게스트 책 마지막 장 → 로 '링크 순간 추가' 창이 열린다)를 실서비스에서 다시 쟀더니 #linkModal은 20개 상태 모두 `opacity:0·inert`로 닫혀 있었다(#722 댓글). 원인은 `#addLinkBtn`이 469c592(2026-10-31)부터 인라인 `display:none!important`로 숨겨져 **사람이 열 길이 없다**는 것 — 그래서 CTO 결정으로 죽은 코드를 지웠다. 순간 추가는 셸의 '＋ 순간 추가'(쉬운 추가·자세한 추가)가 맡는다.
+- **지운 것**: `views/track59-sketchbook.html` — `#linkModal` 마크업·`#addLinkBtn` 단추·인라인 숨김 스타일·`#linkCancel/#linkSave/#linkEmotion` 초점·누름 규칙(12줄). `views/book/book.js` — `openLinkModal·closeLinkModal·previewLink·linkSourceMoment·linkFallbackImage`, 링크 폼 submit(동반 순간 생성), `__TRACK59__`의 `openAddLink`·`customConnections` 노출, `dynamicLinkCounter`(10줄). `views/book/book.css` — 모달 전용 규칙 21줄(`.link-modal`·`.link-card`·`.link-form`·`.link-actions`·`.link-preview`·`.preview-thumb`·`.source-current`와 phone 변형). `book-usability.css` 죽은 선택자 3개.
+- **남긴 것**: `.link-thumb/.link-domain/.link-url`(링크 순간 카드 표시)·`normalizeHttpUrl`·`youtubeId`·`isYouTubeUrl`(원본 링크 열기·YouTube 판정이 계속 씀)·`customConnections`(빈 배열, 82행 연결 요약이 읽음). 게스트 쓰기 차단(#315 readOnly 가드)과 셸 lt41-write 차단(#635)은 다른 쓰기 경로가 함께 쓰므로 그대로.
+- **셸·접근성**: `shell.mjs`가 감시하는 아래쪽 창 목록에서 `linkModal`만 뺐다(지도·책 `#detail` 감시는 유지), `view-a11y.mjs` 초점 가둠 목록에서도 제거, `shell.css` 주석 정리.
+- **시험**: `v41-share-guest-635`의 '마지막 장 → 에서 쓰기 창·쓰기 메시지 없음'은 **창 요소 자체가 없음(`linkModalPresent:false`)** 단정으로 더 강하게 고정. `v41-book-closed-focus-519`는 닫힌 창 6→5개·링크 창 열기 단계 삭제, `v41-touch-targets`의 `#linkCancel/#linkSave`·`#linkEmotion` 항목 삭제, `v41-merge-sketchbook`의 `synthetic:true`(링크 폼이 만들던 동반 순간) 단정 삭제 — 리팩터링으로 깨진 소스 글자 단정은 고쳐 맞추지 않고 지웠다.
+- **검증**: 전체 npm test 1720 pass / 0 fail / 143 skipped, 화면 검사기(`LT_SCREEN_AUDIT_REQUIRE=1`) 2/2 pass(책 390·1440 × 밤·정원 포함), build ✓, modulepreload --check ✓. updates.json은 건드리지 않았다.
+- **남은 것**: #722는 닫지 않았다 — 보람 3회차 확인 뒤 닫는다.
+
 ## 2026-11-16 — 쉬운 추가 연속 담기: 옛 꼬리표 줄이 살아 남아 옛 순간에 저장·재클릭에 모두 해제 (#741, 컴1로컬2 레인, ai/local2-quickadd-tag-chip-20261116-070500-9f3c2a, main 76b2b8d 기준)
 
 - **재현(시험 계정 04, 390×844, 배포본 #738 반영)**: 같은 쉬운 추가 창에서 3회 연속 담기(순간 c54cc47c·54dc7b7f·89af3589) 뒤 세 번째 안내의 '가수:ILLIT' 칩 클릭 1회 → PUT·토스트 '서버에 저장됐어요.'(쌓인 귀가 옛 순간 2개에도 오염 저장), 같은 칩 재클릭 → **세 순간 모두 keywords []** — 하은 1회차 증상(칩을 눌렀는데 책·순간 목록·꼬리표로 찾기에 아무것도 없음)과 일치. 2회 연속 담기 재현에서도 두 번째 칩 클릭 1회에 첫 순간(6ddd1293)에 '가수:NewJeans' 오염 저장.

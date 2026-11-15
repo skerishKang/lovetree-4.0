@@ -507,19 +507,19 @@ const shellScreens=createScreens({
     d.addEventListener('click',e=>{const b=e.target.closest('button,a');if(!b)return;let file;if(b.matches('[data-action="tree"],[data-menu="tree"]'))file='track32-bookshelf.html';if(b.matches('#storyBook,[data-menu="book"]'))file='track59-sketchbook.html';if(current==='track56-network.html'&&b.id==='openMoment')file='track59-sketchbook.html';if(file){e.preventDefault();e.stopImmediatePropagation();show(file);}},true);
   }
 });
-// 이슈 458: 화면 안의 아래쪽 큰 창(지도 상세 #detail·책 링크 창 #linkModal)이 열림/닫힘을 셸이 알아채
+// 이슈 458: 화면 안의 아래쪽 큰 창(지도 상세 #detail·책 순간 자세 #detail)이 열림/닫힘을 셸이 알아채
 // body.lt-sheet-open에 옮긴다 — 떠 있는 ＋ 단추는 창이 열려 있는 동안 숨는다(shell.css).
 const sheetObservers=new Map();
 function watchFrameSheet(frame){
   const d=frame.contentDocument;if(!d)return;
   const old=sheetObservers.get(frame);if(old){old.disconnect();sheetObservers.delete(frame);}
-  // 지도 상세(#detail)·책 순간 자세(#detail)·책 링크 창(#linkModal) — 아래쪽을 덮는 창은 화면마다 이름이 같아도 다르다.
-  const els=['detail','linkModal'].map(id=>d.getElementById(id)).filter(Boolean);
+  // 지도 상세(#detail)·책 순간 자세(#detail) — 아래쪽을 덮는 창은 화면마다 이름이 같아도 다르다.
+  const els=['detail'].map(id=>d.getElementById(id)).filter(Boolean);
   if(!els.length)return;
   // 지금 보이는 장(#view)의 창 상태만을 반영한다 — 옛 장이 about:blank로 바뀌며 load가 걸려도 흔들리지 않는다.
   const sync=()=>{const cur=[...document.querySelectorAll('iframe')].find(f=>f.id==='view');
     const doc=cur&&cur.contentDocument;
-    const open=!!doc&&['detail','linkModal'].some(id=>{const el=doc.getElementById(id);return !!el&&el.classList.contains('open');});
+    const open=!!doc&&['detail'].some(id=>{const el=doc.getElementById(id);return !!el&&el.classList.contains('open');});
     document.body.classList.toggle('lt-sheet-open',open);};
   const observer=new MutationObserver(sync);
   for(const el of els)observer.observe(el,{attributes:true,attributeFilter:['class']});

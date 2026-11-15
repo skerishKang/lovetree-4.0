@@ -59,17 +59,15 @@ test('#464 예시 트리(demoData)는 source와 무관하게 읽기 전용이다
 });
 
 // ── 기억책(track59) 연결: 버튼을 렌더하지 않고, 남아도 메시지를 보내지 않는다 ──
-test('기억책: 공유에서 제목 고치기·다음 순간 남기기·링크 순간 버튼을 렌더하지 않는다', () => {
+test('기억책: 공유에서 제목 고치기·다음 순간 남기기 버튼을 렌더하지 않는다', () => {
   assert.match(bookExtra, /editAffordances\(\{readOnly:!!LTDEMO\.readOnly,synthetic:!!m\.synthetic/, '편집 손잡이는 공유·예시에서 렌더하지 않는다(editAffordances)');
   assert.equal((bookExtra.match(/LTDEMO\.readOnly\?''/g) || []).length, 2, '다음 순간 남기기 버튼(책 끝·모바일)도 공유에서 렌더하지 않는다');
-  assert.match(book, /if\(LTDEMO\.readOnly\)\{\$\('#addLinkBtn'\)\.hidden=true\}/, '+ 링크 순간 버튼은 공유에서 숨긴다');
 });
 
 test('기억책: 쓰기 클릭·요청은 공유에서 메시지를 보내지 않는다(이중)', () => {
   assert.match(bookExtra, /function requestNextMoment\(parentId\)\{[\s\S]*?if\(LTDEMO\.readOnly\)return;/, '순간 추가 요청은 공유에서 조용히 끝난다');
   assert.match(bookExtra, /if\(next\)\{if\(LTDEMO\.readOnly\)return;/, '다음 순간 남기기 클릭 가드');
   assert.match(bookExtra, /if\(edit\)\{if\(LTDEMO\.readOnly\)return;/, '제목 고치기 클릭 가드');
-  assert.match(book, /function openLinkModal\(\)\{if\(LTDEMO\.readOnly\)return;/, '링크 순간 창은 공유에서 열지 않는다');
 });
 
 // ── 기억판(track58) 연결: 순간 꽂기·되돌리기·편집 도구를 숨기고 동작도 막는다 ──

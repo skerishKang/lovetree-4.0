@@ -10,8 +10,7 @@ html[data-v41-screen=book] .letter h2,html[data-v41-screen=book] .archive-piece 
 html[data-v41-screen=book] .detail h2,html[data-v41-screen=book] .folio,html[data-v41-screen=book] .photo-caption{font-family:var(--lt-reading)!important}
 html[data-v41-screen=book] .note-piece p,html[data-v41-screen=book] .letter p,html[data-v41-screen=book] .clipping p,
 html[data-v41-screen=book] .detail-why,html[data-v41-screen=book] .turn-why span,html[data-v41-screen=book] .why-margin,
-html[data-v41-screen=book] .connection-note p,html[data-v41-screen=book] .link-preview p,html[data-v41-screen=book] .link-preview .preview-why,
-html[data-v41-screen=book] .link-preview h3,html[data-v41-screen=book] .archive-item b,html[data-v41-screen=book] .meta-why{font-family:var(--lt-ui)!important}
+html[data-v41-screen=book] .connection-note p,html[data-v41-screen=book] .archive-item b,html[data-v41-screen=book] .meta-why{font-family:var(--lt-ui)!important}
 /* 정원 테마의 한글 제목: Gowun Batang 라틴 서브셋에는 한글 글리프가 없어 다른 글꼴로 그려졌다.
    종이(책장)는 원본 종이를 그대로 두고, 어댑터가 새로 그리는 면(안내·상세·재생 단추)만 정원 토큰을 쓴다. */
 html[data-v41-screen=book][data-lt-theme=garden]{--lt-reading:MaruBuri,'Noto Serif CJK KR',Batang,serif}
