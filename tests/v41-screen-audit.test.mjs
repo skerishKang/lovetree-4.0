@@ -905,7 +905,10 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
           return null;
         };
         let sawShell = false, sawBoard = false, maxArea = 0, bothAt = -1;
-        for (let i = 0; i < 18; i++) {
+        // 보드 풍선은 셸 알림이 사라진 뒤에 뜬다(board-extras boardGuide — 최대 900ms+9×600ms 대기).
+        // CI 부하 아래에서는 그 최대 대기가 관측 창(구 7.2초)을 벗어나 '빈손'으로 실패한 적이 있다(#735 CI) —
+        // 보드 쪽 규정 대기 시간을 담을 수 있게 26×400ms로 넓힌다. 단정의 뜻(풍선이 결국 뜬다·겹침 0)은 그대로.
+        for (let i = 0; i < 26; i++) {
           const shell = document.getElementById('toast');
           const board = boardToast();
           const shellUp = !!shell && !shell.hidden;
@@ -937,7 +940,13 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     assert.ok(treeBeforeTrip.id, '지금 트리가 부른 상태에서 왕복을 본다');
     const mapFrameTrip = () => [...pageMap.frames()].find((f) => { try { return /track56-network/.test(f.url()); } catch { return false; } });
     const graphFrameTrip = () => [...pageMap.frames()].find((f) => { try { return /track60-graph/.test(f.url()); } catch { return false; } });
-    await mapFrameTrip().evaluate(() => document.getElementById('viewGraph').click());
+    let graphClicked = false;
+    for (let i = 0; i < 12 && !graphClicked; i++) {
+      const f = mapFrameTrip();
+      if (f) graphClicked = await f.evaluate(() => { const b = document.getElementById('viewGraph'); if (b) { b.click(); return true; } return false; }).catch(() => false);
+      if (!graphClicked) await pageMap.waitForTimeout(500);
+    }
+    assert.ok(graphClicked, '지도의 [그래프] 단추를 누른다');
     await pageMap.waitForFunction(() => [...document.querySelectorAll('iframe')].some((f) => { try { return /track60-graph/.test(f.contentWindow.location.href); } catch { return false; } }), null, { timeout: 10000 });
     // 그래프 모듈이 그려질 때까지(배지가 채워질 때까지) 기다린다 — 프레임 주소만으로는 그리기 전이다.
     await pageMap.waitForFunction(() => {
@@ -960,14 +969,28 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
       const f = [...document.querySelectorAll('iframe')].find((x) => { try { return /track56-network/.test(x.contentWindow.location.href); } catch { return false; } });
       return Boolean(f && f.contentDocument?.body && f.contentDocument.body.dataset.ltView === 'concentric');
     }, null, { timeout: 10000 });
-    const mapAfterConc = await mapFrameTrip().evaluate(() => ({ view: document.body.dataset.ltView, concPressed: document.getElementById('viewConc')?.getAttribute('aria-pressed'), stored: localStorage.getItem('lt41.network.view') }));
+    let mapAfterConc = null;
+    for (let i = 0; i < 12 && !mapAfterConc; i++) {
+      const f = mapFrameTrip();
+      if (f) mapAfterConc = await f.evaluate(() => ({ view: document.body.dataset.ltView, concPressed: document.getElementById('viewConc')?.getAttribute('aria-pressed'), stored: localStorage.getItem('lt41.network.view') })).catch(() => null);
+      if (!mapAfterConc) await pageMap.waitForTimeout(500);
+    }
     assert.equal(mapAfterConc.view, 'concentric', '그래프의 [동심원형]으로 지도가 동심원형 보기로 열린다');
     assert.equal(mapAfterConc.concPressed, 'true', '동심원형이 눌린 상태(aria-pressed=true)');
     assert.equal(mapAfterConc.stored, 'concentric', '지도 보기 저장 키(lt41.network.view)가 바뀐다');
     await mapFrameTrip().evaluate(() => document.getElementById('viewNet').click());
-    await pageMap.waitForTimeout(1200);
+    // 프레임 교체 순간에는 URL로 프레임이 잠깐 안 보일 수 있다(#735 CI 1회) — 그물 보기로 돌아올 때까지 기다린다.
+    await pageMap.waitForFunction(() => {
+      const f = [...document.querySelectorAll('iframe')].find((x) => { try { return /track56-network/.test(x.contentWindow.location.href); } catch { return false; } });
+      return Boolean(f && f.contentDocument?.body && f.contentDocument.body.dataset.ltView === 'network');
+    }, null, { timeout: 10000 });
     const treeAfterTrip = await pageMap.evaluate(() => ({ id: window.LT41?.tree?.id || '', moments: (window.LT41?.tree?.moments || []).length, momentId: window.LT41?.momentId || '' }));
-    const mapAfterNet = await mapFrameTrip().evaluate(() => ({ view: document.body.dataset.ltView, netPressed: document.getElementById('viewNet')?.getAttribute('aria-pressed') }));
+    let mapAfterNet = null;
+    for (let i = 0; i < 12 && !mapAfterNet; i++) {
+      const f = mapFrameTrip();
+      if (f) mapAfterNet = await f.evaluate(() => ({ view: document.body.dataset.ltView, netPressed: document.getElementById('viewNet')?.getAttribute('aria-pressed') })).catch(() => null);
+      if (!mapAfterNet) await pageMap.waitForTimeout(500);
+    }
     assert.equal(mapAfterNet.view, 'network', '지도의 [그물형]으로 그물 보기로 돌아온다');
     assert.equal(mapAfterNet.netPressed, 'true', '그물형이 눌린 상태(aria-pressed=true)');
     assert.deepEqual(treeAfterTrip, treeBeforeTrip, '왕복 뒤에도 지금 트리·순간이 유지된다');
