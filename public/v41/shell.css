@@ -631,3 +631,7 @@ html[data-lt-theme="garden"] #account-advanced[aria-checked="true"]:after{backgr
 /* 이슈 638: 오류 줄은 자기 줄을 통째로 쓰게 한다(감싸기). 감싸기가 없으면 빈 오류 줄의 flex-basis:100%가
    라벨·입력칸을 손가락 하나 폭까지 짜부라뜨리고, 좁은 입력칸에서는 조합 입력이 거꾸로 저장되기까지 했다. */
 .myposts-followup-error{flex-basis:100%;margin:0;font-size:12px;color:var(--lt-rose)}
+/* 2026-11-15 보고: 자동 공개 안내(문장 + [비공개로 바꾸기] 한 줄)의 토스트 단추. 글자는 토스트와 같은 13px(이슈 548 기준)이고,
+   색은 토스트 글자(정원 이슈 644 규칙 포함)를 따라 밤·정원에서 모두 읽힌다. 누르면 토스트 내용이 결과 안내로 바뀐다. */
+.toast-action{flex-shrink:0;margin-left:10px;padding:5px 12px;border:1px solid rgba(255,230,166,.45);border-radius:999px;background:rgba(255,230,166,.1);color:inherit;font-size:13px;letter-spacing:.02em}
+.toast-action:hover{background:rgba(255,230,166,.18)}

@@ -646,3 +646,59 @@ test('#635 PR C 화면: 메뉴 시작 입구·첫날 표기·크게 보기 대�
     server.close();
   }
 });
+
+// 2026-11-15 보고(게스트 책·자동 공개 안내) — 보람이 본 '게스트 책 마지막 장 → 순간 추가 창' 수사.
+// 남은 경로 세 가지를 확인한 결론: ① 둘러보기 패널 '미리보기'는 책 화면·iframe을 만들지 않는다(아래 정적 검사),
+// ② 넓은 화면 두 장 보기의 마지막 펼침면·③ 홀수 순간 마지막 장(시험 트리는 순간 3개)은 아래 동작 검사에서
+// 공유 링크 책과 같은 길로 잰다. 재현되지 않았으므로 '막혀 있다'는 동작을 시험으로 고정한다(코드 변경 없음).
+test('#635 규칙(정적): 둘러보기 미리보기는 책 화면·iframe을 만들지 않는다', () => {
+  const panel = read('public/v41/community-panel.mjs');
+  assert.doesNotMatch(panel, /track59-sketchbook/, '둘러보기 패널 안에 책 화면을 만들지 않는다 — 미리보기는 카드다');
+  assert.doesNotMatch(panel, /createElement\('iframe'\)|<iframe/, '둘러보기 패널은 iframe을 만들지 않는다 — 쓰기 창이 생길 곳이 없다');
+});
+
+test('공유 책 마지막 장에서 → 를 눌러도 쓰기 창·쓰기 메시지가 생기지 않는다(390 한 장·1440 두 장, 홀수 마지막)', { skip: REQUIRE ? false : skip, timeout: 240000 }, async () => {
+  if (skip) assert.fail(`미리보기 검사에서는 화면 시험 건너뜀이 실패다 — ${skip}`);
+  const server = await serve();
+  const base = `http://127.0.0.1:${server.address().port}`;
+  let browser;
+  try {
+    browser = await chromium.launch({ headless: true });
+    for (const [width, height] of [[1440, 900], [390, 844]]) {
+      const { context, page, frame, problems } = await openBook(browser, `${base}/share-host.html`, { width, height, theme: 'night', route: (r) => r.abort() });
+      assert.equal(problems.length, 0, `${width}: 화면 오류 ${problems.join(' | ')}`);
+      // 끝까지 넘긴다(단추가 비활성이 되면 마지막 장이다).
+      for (let i = 0; i < 40; i++) {
+        const next = frame.locator('#nextBtn');
+        if (await next.isDisabled()) break;
+        await next.click();
+        await frame.waitForTimeout(450);
+      }
+      const atLast = await frame.evaluate(() => {
+        const st = window.__TRACK59__.getState();
+        return { last: st.page === st.total - 1, nextDisabled: document.querySelector('#nextBtn').disabled, addLinkHidden: document.querySelector('#addLinkBtn')?.hidden ?? null };
+      });
+      assert.equal(atLast.last, true, `${width}: 마지막 장까지 넘기지 못했다(${JSON.stringify(atLast)})`);
+      assert.equal(atLast.nextDisabled, true, `${width}: 마지막 장에서 → 단추는 비활성이다`);
+      assert.equal(atLast.addLinkHidden, true, `${width}: 읽기 전용 책에는 '＋ 링크 순간' 단추가 없다`);
+      // 실제 사용자 길: → 단추(disabled — 브라우저가 클릭 이벤트를 만들지 않는다)·키보드 →.
+      await frame.click('#nextBtn', { force: true, timeout: 2000 }).catch(() => {});
+      await page.waitForTimeout(300);
+      await frame.evaluate(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })));
+      await page.waitForTimeout(500);
+      const after = await frame.evaluate(() => ({
+        linkModalOpen: document.querySelector('#linkModal')?.classList.contains('open') || false,
+        page: window.__TRACK59__.getState().page,
+        total: window.__TRACK59__.getState().total,
+        writeMessages: (parent.LT41_MESSAGES || []).filter((t) => t === 'lt41-write')
+      }));
+      assert.equal(after.linkModalOpen, false, `${width}: 마지막 장에서 → 로 링크(쓰기) 창이 열렸다`);
+      assert.equal(after.page, after.total - 1, `${width}: 마지막 장에서 → 로 장이 바뀌었다`);
+      assert.deepEqual(after.writeMessages, [], `${width}: 쓰기 메시지(lt41-write)가 셸에 남았다`);
+      await context.close();
+    }
+  } finally {
+    if (browser) await browser.close().catch(() => {});
+    server.close();
+  }
+});
