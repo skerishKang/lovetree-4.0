@@ -4,6 +4,8 @@ import {readTheme} from './header-state.mjs';
 import {displayTreeTitle} from './tree-name.mjs';
 // #480 L13: 둘러보기 카드·댓글의 날짜도 책·보드·지도와 같은 한 벌로 적는다.
 import {formatDisplayDate} from './book-usability.mjs';
+// #547·#701 규칙: 서버가 내려주는 시각(UTC 타임스탬프)은 기기 지역 날짜로 바꿔 보여 준다(#547 한 벌).
+import {localDateOnly} from './local-date.mjs';
 const el=(tag,className,text)=>{const node=document.createElement(tag);if(className)node.className=className;if(text!=null)node.textContent=text;return node;};
 export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareOwn,hasOwnTree,getDateStyle}){
  const api=createCommunityApi(),form=dialog.querySelector('#community-search-form'),query=dialog.querySelector('#community-query'),emotion=dialog.querySelector('#community-emotion'),list=dialog.querySelector('#community-list'),feedback=dialog.querySelector('#community-feedback'),more=dialog.querySelector('#community-more'),preview=dialog.querySelector('#community-preview');
@@ -11,8 +13,10 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
  const message=text=>{feedback.textContent=text;};
  // #480 L13: 계정 설정의 날짜 표기. 넘겨받지 않으면 기본(dot) — 새 규칙을 만들지 않는다.
  const dateStyle=()=>(typeof getDateStyle==='function'?getDateStyle():'dot');
- // 예전에는 String(createdAt).slice(0,10)이라 언제나 YYYY-MM-DD로 보였다(설정과 무관).
- const when=value=>formatDisplayDate(String(value||'').slice(0,10),dateStyle());
+ // 하은 1회차(261116,#728 후속): 새벽(KST 0~9시, UTC 전날)에 담은 순간의 둘러보기 카드가
+ // '2026. 11. 15'(UTC 날짜 절단)로 나왔다. 예전 String(createdAt).slice(0,10) 절단 대신
+ // localDateOnly(#547 한 벌)로 기기 지역 날짜를 만들어 formatDisplayDate에 넘긴다.
+ const when=value=>formatDisplayDate(localDateOnly(value),dateStyle());
  const loginMessage=answer=>answer.status===401?'로그인하면 이 기능을 사용할 수 있어요.':answer.message||'요청을 처리하지 못했어요.';
  function statButton(item,kind,label){
   if(kind==='reaction')return reactionButtons(item,label);

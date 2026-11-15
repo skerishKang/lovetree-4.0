@@ -416,6 +416,32 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     assert.ok(reactions.open >= 1, '반응이 없으면 반응 남기기 단추가 보인다');
     assert.equal(reactions.zeroChips, 0, '0짜리 반응 칩은 보이지 않는다');
     await take(page4, '둘러보기');
+    // 하은 1회차(261116,#728 후속): 새벽(KST 0~9시, UTC 전날)에 담은 순간의 둘러보기 카드 날짜가
+    // UTC 절단('2026. 11. 15')으로 나왔다 — Asia/Seoul 시간대 문맥에서 한국 날짜로 보이는지 수치로 단정한다.
+    const ctxDate = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce', timezoneId: 'Asia/Seoul' });
+    await ctxDate.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); } catch {} }, theme);
+    await ctxDate.route('**://i.ytimg.com/**', THUMB);
+    await ctxDate.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
+    const CROSSING = '2026-11-15T20:00:00.000Z'; // UTC로는 11-15, 한국 시간으로는 11-16 05:00(0~9시 구간)
+    await ctxDate.route('**/api/community/shares*', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, items: [Object.assign({}, COMMUNITY_CARDS[0], { createdAt: CROSSING, momentCount: 3 })], totalVisible: 1 }) }));
+    const pageDate = await ctxDate.newPage();
+    await pageDate.goto(`${base}/v41/`, { waitUntil: 'load' });
+    await pageDate.waitForTimeout(1200);
+    await pageDate.evaluate(() => document.getElementById('community-menu')?.click());
+    await pageDate.waitForFunction(() => !!document.getElementById('community-panel')?.open, null, { timeout: 8000 }).catch(() => {});
+    await pageDate.waitForFunction(() => !!document.querySelector('.community-card'), null, { timeout: 8000 }).catch(() => {});
+    await pageDate.waitForTimeout(400);
+    const cardDate = await pageDate.evaluate((crossing) => {
+      const meta = [...document.querySelectorAll('.community-muted')].map((p) => p.textContent).find((t) => /개 순간/.test(t)) || '';
+      const d = new Date(crossing);
+      const localToday = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+      return { meta, localToday };
+    }, CROSSING);
+    const utcCut = '2026. 11. 15';
+    assert.ok(cardDate.meta.includes(cardDate.localToday.replace(/-/g, '. ')), `새벽 순간의 카드 날짜는 지역(한국) 날짜다 — 실제 "${cardDate.meta}" / 기대 ${cardDate.localToday}`);
+    assert.ok(!cardDate.meta.includes(utcCut), `카드 날짜가 UTC 절단(어제)으로 나온다: "${cardDate.meta}"`);
+    await pageDate.screenshot({ path: 'E:/lovetree-qa/lane/local3-graph/audit-community-date-' + width + '.png', animations: 'disabled', timeout: 10000 }).catch(() => {});
+    await ctxDate.close();
     await page4.keyboard.press('Escape');
     await page4.waitForTimeout(300);
     await page4.evaluate(() => document.getElementById('feedback-panel').showModal());
