@@ -137,6 +137,26 @@ test('제목 해석: 실제 제목 형태 31개에서 가수·멤버·노래·�
   assert.doesNotMatch(src, /apply\(|persist|postMessage|fetch\(|localStorage|sessionStorage/, '제안 모듈은 저장을 부르지 않는다');
 });
 
+test('직캠 문맥의 괄호 크레딧(채널 이름)은 가수로 제안하지 않는다(보람 알림)', () => {
+  // 실제 사례: 괄호는 찍은 곳(채널) 크레딧이다 — 바로 앞 한국어가 '직캠'으로 끝나면 괄호 안 영문을 가수로 읽지 않는다.
+  const { proposals } = suggestTagsFromTitle("[K-Choreo 8K] 라이즈 직캠 'Bag Bad Back' (RIIZE Choreography) @250523");
+  assert.ok(!proposals.some((p) => p.kindId === 'artist'), '채널 이름을 가수로 권하지 않는다: ' + brief({ proposals }));
+  assert.ok(proposals.some((p) => p.kindId === 'song' && p.value === 'Bag Bad Back'), '노래 제안은 그대로다');
+  // 다른 채널 크레딧 모양(채널 'M2')도 같다.
+  const cam = suggestTagsFromTitle("라이즈 직캠 'Do your dance' (M2) @250523");
+  assert.ok(!cam.proposals.some((p) => p.kindId === 'artist'), '직캠 크레딧 괄호를 가수로 권하지 않는다');
+  assert.ok(cam.proposals.some((p) => p.kindId === 'song' && p.value === 'Do your dance'), '노래 제안은 그대로다');
+  // 괄호 앞 한국어가 직캠 표시가 아니면 정상 꼬꼬('한글(영문)') — 그대로 제안한다.
+  const ok = suggestTagsFromTitle('뉴진스 (NewJeans) How Sweet');
+  assert.deepEqual(brief(ok).filter((p) => p.startsWith('artist:')), ['artist:NewJeans']);
+  // 직캠 표시가 앞쪽 대괄호에만 있고 꼬꼬 바로 앞이 아니면('[MPD직캠] 라이즈 (RIIZE)') 꼬꼬는 그대로 제안한다.
+  const prefix = suggestTagsFromTitle("[MPD직캠] 라이즈 (RIIZE) 'Do your dance'");
+  assert.deepEqual(brief(prefix).filter((p) => p.startsWith('artist:')), ['artist:RIIZE']);
+  // 채널 이름 낱말(CHOREOGRAPHY·CHOREO)이 섞인 후보는 괄호 앞 모양과 무관하게 가수에서 뺀다.
+  const noise = suggestTagsFromTitle('라이즈 무용 영상 모음 (RIIZE Choreography)');
+  assert.ok(!noise.proposals.some((p) => p.kindId === 'artist'), '채널 이름 낱말을 가수로 권하지 않는다');
+});
+
 test('재사용 제안: 내가 쓴 꼬리표가 먼저고, 제목 규칙이 그 뒤를 잇는다', () => {
   // 멤버는 재사용(이미 쓴 꼬리표)과 확실한 모양(꼬꼬 짝·직캠 문맥의 가수 확정)에서만 찾는다.
   const fancam = '[직캠] 뉴진스 혜인 \'Super Shy\' (NewJeans Hyein Fancam) @인기가요 23716';

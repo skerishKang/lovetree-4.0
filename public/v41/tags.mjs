@@ -149,6 +149,7 @@ const ARTIST_NOISE = new Set([
   'EP', 'MV', 'OFFICIAL', 'VIDEO', 'PERFORMANCE', 'DANCE', 'PRACTICE', 'SPECIAL', 'CLIP', 'STAGE',
   'SHORTS', 'AWARD', 'AWARDS', 'KBS', 'MBC', 'SBS', 'MNET', 'JTBC', 'THE', 'AND', 'OF',
   'COUNTDOWN', 'CHAMPION', 'BANK', 'CORE', 'FANCAM', 'CAM', 'VER', 'CHAN', 'M', 'V',
+  'CHOREOGRAPHY', 'CHOREO', // 무용·연습 영상 채널 이름 — 가수가 아니다(보람 알림)
 ]);
 
 // 낱말이 온전히 대문자 영문(가운데 숫자·& 허용)인지 — 적어도 글자 2개. 한 낱말짜리 대문자(M 같은)도
@@ -192,7 +193,12 @@ function artistFromParens(t) {
       const koWords = inner.match(/[가-힣]+/g) || [];
       const run = capsRunBefore(t, m.index);
       if (run.length >= 1 && run.length === koWords.length && run.length <= 2) name = run[0];
-    } else if (!/[가-힣]/.test(inner) && /(?:^|[^A-Za-z0-9])[가-힣]\s*$/.test(t.slice(0, m.index))) name = latinOf(inner); // '한글(영문)'
+    } else if (!/[가-힣]/.test(inner) && /(?:^|[^A-Za-z0-9])[가-힣]\s*$/.test(t.slice(0, m.index))) {
+      // '한글(영문)'. 다만 괄호 바로 앞 한국어가 직캠 표시로 끝나면('라이즈 직캠 (RIIZE Choreography)')
+      // 괄호는 찍은 곳(채널) 크레딧이다 — 가수로 읽지 않는다(틀린 제안보다 안 하는 게 낫다).
+      const lastKo = (t.slice(0, m.index).match(/[가-힣]+/g) || []).slice(-1)[0] ?? '';
+      if (!/(?:직캠|팬캠)$/.test(lastKo)) name = latinOf(inner);
+    }
     if (!name || looksLikeCamCredit(name)) continue;
     out.push(name);
   }
