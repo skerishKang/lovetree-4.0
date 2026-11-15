@@ -44,7 +44,13 @@ html[data-lt-theme=garden] .g-view-switch button[aria-pressed=true]{color:var(--
 .g-hubsub{fill:var(--lt-muted)}
 .g-mark{font-size:12.5px;font-weight:600;fill:var(--lt-gold);paint-order:stroke;stroke:var(--lt-stage);stroke-width:4px}
 .g-stackcount{font-size:12px;font-weight:700;fill:var(--lt-stage);paint-order:stroke;stroke:var(--lt-pearl);stroke-width:3px}
-.g-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;color:var(--lt-muted);font-size:15px}
+.g-empty{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);max-width:min(520px,86%);display:flex;flex-direction:column;gap:14px;align-items:center;justify-content:center;text-align:center;color:var(--lt-muted);font-size:15px}
+/* 안내 상자는 내용 크기만 차지한다(판 전체를 덮지 않는다) — 아래 선반(아직 묶음에 안 든 순간)을 가리지 않는다(검사기 가려짐 0). */
+/* 묶음 0개 안내(2026-11-16 CTO 지적) — 빈 무대를 고장으로 보지 않게 짧은 안내 + 바로 할 수 있는 단추. */
+.g-empty .g-empty-text{margin:0;font-size:15px;line-height:1.7;color:var(--lt-muted)}
+.g-empty .g-empty-cta{min-height:44px;padding:0 16px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-pill);background:transparent;color:var(--lt-gold);font:inherit;font-size:14px;cursor:pointer}
+.g-empty .g-empty-cta:hover,.g-empty .g-empty-cta:focus-visible{background:var(--lt-glass-strong);color:var(--lt-pearl)}
+html[data-lt-theme=garden] .g-empty .g-empty-cta:hover,html[data-lt-theme=garden] .g-empty .g-empty-cta:focus-visible{color:var(--lt-ink)}
 /* hidden 속성이 author display:flex에 눌리지 않게 — 이 오버레이가 남아 있으면 무대 전체를 덮어 클릭도 막는다(검사기가 잡았다). */
 .g-empty[hidden]{display:none!important}
 
