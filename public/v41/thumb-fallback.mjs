@@ -482,6 +482,8 @@ export function mountThumbFallback(root = globalThis.document, { onEditTitle = n
     }
   };
   const sweepTimer = typeof setInterval === 'function' ? setInterval(sweepPending, 2000) : null;
+  // 시험(Node)에서 이 타이머가 프로세스를 붙잡아 npm test가 끝나지 않았다 — 붙잡지 않게 한다.
+  sweepTimer?.unref?.();
   if (sweepTimer && typeof sweepPending === 'function') { try { sweepPending(); } catch { /* ignore */ } }
   inspectComplete(root);
 

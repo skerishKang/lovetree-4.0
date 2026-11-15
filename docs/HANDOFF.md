@@ -4,14 +4,27 @@
 
 > **빨간 필수 검사 규칭(2026-11-12 사고 뒤)**: 필수 검사가 빨강이면 **재실행은 1회까지**. 같은 항목이 또 빨강이면 멈추고 원인을 찾는다 — 재실행·빈 커밋으로 초록을 만들지 않는다. "간헐적·환경 탓"이라고 적으려면 **같은 시각 이 변경이 없는 브랜치(main 또는 다른 PR)** 에서도 같은 실패가 나는지 대조한 결과를 함께 적는다. 메시지를 받아 화면을 다시 띄우는 코드는 '뜰 때마다 보내는 쪽'과 짝으로 흐름 시험을 하고, 머지 전 미리보기 첫 화면을 5초 이상 직접 본다.
 
+> **시험 멈춤 규칙(2026-11-15)**: 브라우저 코드에 setInterval 반복을 넣으면 unref하거나 정리한다 — 안 그러면 npm test가 끝나지 않고 CI가 멈춘다.
+
 ## 2026-11-15 — 새 소식 제목 되풀이·지도 390 조작 줄 잘림 수리 (#638 뒤정리, 컴1로컬3 레인, ai/local3-small-261115, #679의 ai/local4-638rest-261115 d76d6e8 위에 쌓음)
 
 - **새 소식 제목 되풀이(#679가 만든 묶음의 사이드 이펙트)**: #679가 출처 줄을 '이웃 항목 묶음'으로 치면서 묶음마다 `<h3>`를 다시 써 한 버전에 '새로워진 것' 3번·'고친 것' 4번(실측, 4.1.4)이 됐다. 고침: `updates.mjs` `renderUpdates()` — 한 출처 묶음을 하나의 `<section class="updates-kind">`에 넣고 제목은 한 번만, 출처 줄(`.updates-source`, 12px 유지)은 묶음 끝 항목 안(`<li>` 마지막에 `<small>`, display:block이라 항목 아래 한 줄)에 붙인다. 실측: 각 버전 '새로워진 것'·'고친 것' 각 1회, 출처 12px.
 - **지도 390 조작 줄 잘림**: 390에서 `.mobile-ribbon`이 scrollWidth 949px vs clientWidth 370px — '02 이하 묶음 단추'가 화면 오른쪽 밖으로 잘렸다(overflow-x:auto라 굴리면 보이지만 눈에 잘려 보인다). 고침: ①묶음 단추 이름을 줄여 쓴다(`network.js` `setupMobileRibbon()` — 묶음끼리 연도가 같으면 연도를 덜고 개수를 뺀다: '01 2026년 1–2월 · 10개' → '01 1–2월'. 전체 이름은 aria-label·title에 남긴다) ②`network.css` 390 미디어 쿼리에 `flex-wrap:wrap`을 더해 두 줄로 쌓는다(높이 58→108px). 상태 판(`.route-status`)·묶음 고르기(`.branch-chooser`) bottom을 96/100→152px로 올려 조작 줄 위를 지킨다. 실측(390 밤): 잘림 0, 두 줄(첫 줄 첫 순간 보기·−·＋·01·02 / 둘째 줄 03·04·전체 보기), 링크 줄과 겹침 0.
 - **검사기 보강(`tests/v41-screen-audit.test.mjs` — 상태는 새 파일 없이 기존 '지도 390'·'새 소식 펼침'에 더함)**: ①'지도 390' 상태의 프레임 찾기가 DOM iframe에 없는 `f.url()`을 써 늘 빈손이었다(검사가 아예 안 돌았음) — `contentWindow.location.href`로 고치고(셸이 src 속성 없이 `location.replace`로 화면을 바꾼다) `.mobile-ribbon`의 잘림(scrollWidth−clientWidth) 측정을 더했다. 숨은 왼쪽 판 단추(#viewNet·#viewConc)는 대비를 재지 않게 건너뀀다 ②'새 소식 펼침' 상태에 제목 되풀이 검사(한 버전에 같은 제목 2번 이상이면 실패)를 더했다.
-- **시험**: 바꾼 파일 관련 `updates-format`·`v41-panels-flow`·`v41-map-theme-flow`·`v41-board-map-tree-title` 통과, `v41-screen-audit`(15 상태 × 390·1440 × 밤·정원) 통과 — 알려진 문제 20건은 KNOWN 그대로, 새 실패 0. `npx vite build`·`modulepreload --check` 통과. **로컬 전체 `npm test`는 미완료** — 같은 PC에서 다른 레인의 `npm test`가 어제부터 밀린 채 돌고 있어(프로세스 11108, 11-14 06:53 시작) 30분째 진행이 멈춰 내 실행만 지웠다. 전체는 CI 필수 검사에 맡긴다.
+- **시험**: 바꾼 파일 관련 `updates-format`·`v41-panels-flow`·`v41-map-theme-flow`·`v41-board-map-tree-title` 통과, `v41-screen-audit`(15 상태 × 390·1440 × 밤·정원) 통과 — 알려진 문제 20건은 KNOWN 그대로, 새 실패 0. `npx vite build`·`modulepreload --check` 통과. **로컬 전체 `npm test`는 미완료** — 같은 PC에서 다른 레인의 `npm test`가 어제부터 밀린 채 돌고 있어(프로세스 11108, 11-14 06:53 시작) 30분째 진행이 멈춰 내 실행만 지웠다. 전체는 CI 필수 검사에 맡긴다. (2026-11-15 수리: 멈춤 원인은 thumb-fallback 스윕 타이머였다 — unref로 고쳐 전체 npm test가 29초에 끝까지 돌게 됐다.)
 - **캡처**: `E:\lovetree-qa\lane\local3-small\` — map-{1440,390}-{night,garden}.png(조작 줄 두 줄)·updates-{1440,390}-{night,garden}.png(제목 1회).
 - **updates.json**: '다음 버전'(둘째 4.1.4)에 한 줄 넣었다(source: team, #638).
+
+## 2026-11-15 — 소스 글자 검사 줄이기 1차: 셸 메뉴·운영센터·서버 범위 120→97건 (로컬3 레인, ai/local3-test-strings-261115, main 40123dd 기준)
+
+- **왜**: 시험 232개 파일 중 약 96개가 동작이 아니라 소스 글자(`src.includes('…')`·`assert.match(소스)`)를 검사해, 제품을 수리할 때마다 '기존 계약 갱신'이 필요했다. 이번 1차는 **운영센터(admin*)·서버(server/**)·셸 메뉴(header-ia 등)** 범위만. 열린 PR(#679·#681)이 만지는 `tests/domain.test.mjs`·`v41-panels-flow.test.mjs`·`v41-screen-audit.test.mjs`는 만지지 않았다. **제품 코드 변경 0** — `git diff`가 tests/ 7개 파일 + docs 2개뿐이다.
+- **처리(단정 기준, 기계 계수와 일치)**: **지움 12**(hashchange 배선·openLoginStart 배선은 각각 `v41-shell-location`·`v41-shell-auth`의 기존 동작 시험이 이미 지키고, 접기 메뉴 항목 7·트리 클릭 배선 조각 3은 `v41-topmenu`의 순서·한 줄 검사와 겹치는 중복) / **바꿈 11**(topmenu 화면 목록·말풍선 제목 7건 → `navigation.mjs` screens·`header-state.mjs` FIRST_TREE_TIPS 데이터 직접 확인; shell-header 직전 동그라미 글자 3건 → createHeader + 가짜 localStorage로 저장·'나' 미저장·로그아웃 삭제를 동작으로; aria-current 표시·빈 화면 해제 2건(topmenu·cto-453) → `v41-shell-screens`에 createScreens 직접 호출 신규 1시험) / **남김 97**(마크업·CSS·문구·schema 계약 + shell.mjs·src/admin.js 페이지 스크립트 배선 — 내보내기가 없어 전환하려면 제품 코드 변경 필요).
+- **파일**: `v41-topmenu`(38→30)·`v41-header-tabs-mobile`(26→19)·`v41-cto-453-cde`(31→30)·`v41-header-ia`(9→8)·`v41-shell-header`(3→0)·`v41-tree-menu-cleanup`(13→10)·`v41-shell-screens`(신규 동작 시험 +1). 줄 수는 순 +56(글자 검사 제거 41줄, 동작 시험·주석 추가) — 부담 감소는 단정 수 기준.
+- **강도 증명**: 새 동작 시험 2종을 검증 — screens.mjs aria-current 줄을 `'false'` 고정으로 깜 → 신규 시험 fail, header.mjs rememberLetter를 빈 함수로 깜 → shell-header fail. 둘 다 되돌려 복원 확인.
+- **시험 결과**: 편집 7파일 개별 `node --test` 67/67 pass, 전체 `npm test` 1769검 중 1630 pass·0 fail·139 skip(기존 건너뜀), `npm run build` 통과.
+- **2차 후보(다음 레인)**: `v41-shell-tree-title`의 messages·panels·community 호출점 검사(createMessages·createPanels·mountCommunity가 내보내기는 있으나 하네스가 무거움), `v41-cto-453-cde` 전체(셸 배선 글자 검사), `v41-shell-notice` 배선. 기준은 docs/TESTING.md '소스 글자 검사 줄이기 1차' 항목에 남겼다.
+
+## 2026-11-15 — 꼬리표 2차(가수 종류·제목 해석·보드 판 폭)와 결함 ③ 수리 (#627, 로컬2 레인, ai/local2-627c-tags2 → #684, ai/local2-627d-tags-sync → #686, main 40123dd 기준)
 
 ## 2026-11-15 — 꼬리표를 화면에 붙이기: 상세·담은 직후 안내·카드·꼬리표 정리 (#627 1단계 PR B, 로컬2 레인, ai/local2-627b-tags, main 1c2935d 기준, PR #680)
 

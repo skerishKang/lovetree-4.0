@@ -47,14 +47,9 @@ test('#457 3번: 계정·☰는 트리 틀 유무와 상관없이 오른쪽 끝�
 });
 
 test('접기 메뉴는 기존 화면 버튼을 복제해 같은 동작을 부른다', () => {
-  assert.match(shell, /function buildFoldMenu\(\)/);
-  // #380 2번: 접기 메뉴도 같은 구조 — 첫 화면(로고)·둘러보기 · 책·보드·지도 · 내 트리 전체 보기 · 순간 추가.
-  assert.match(shell, /add\('첫 화면',\(\)=>document\.querySelector\('\.brand'\)\.click\(\),current==='src064-orbit\.html'\)/);
-  assert.match(shell, /add\('둘러보기'/);
-  assert.match(shell, /add\('책'/);
-  assert.match(shell, /add\('보드'/);
-  assert.match(shell, /add\('지도'/);
-  assert.match(shell, /add\('내 트리 전체 보기'/);
+  // 접기 메뉴 항목·순서(첫 화면·둘러보기·책·보드·지도·내 트리 전체 보기)는
+  // tests/v41-topmenu.test.mjs의 순서 검사가 존재와 순서를 함께 지킨다 — 여기서는 되풀이하지 않는다.
+  // 남는 것은 닫기 배선 하나다.
   assert.match(shell, /event\.target\.closest\('button'\)\)closeMore\(\)/);
 });
 

@@ -3,7 +3,7 @@
 //    공유·예시 화면·로그아웃·읽기 전용·창(dialog) 열림·화상 키보드(lt-kbd)에서는 숨긴다. 781px 이상에는 영향이 없다.
 // 2) ☰ 접기 메뉴의 지금 화면 항목에 aria-current="true"를 남기고 금테(--lt-gold-deep 토큰)로 표시한다.
 // 3) 알림 줄(#toast)은 단추 왼쪽에 닿게 오른쪽 76px을 비워 둔다. 첫 화면 안내 줄(.hint)은 단추 자리만큼 왼쪽을 비운다.
-// 4) 화면마다 아래쪽에 이미 있는 단추·탭 위로 단추를 올린다(data-fab-lift: 책 104·보드 68·지도 76, 책장은 낮은 화면 24).
+// 4) 화면마다 아래쪽에 이미 있는 단추·탭 위로 단추를 올린다(data-fab-lift: 책 104·보드 68·지도 160, 책장은 낮은 화면 24).
 //    지도 상세(#detail)·책 링크 창(#linkModal)이 열려 있으면 화면 아래를 덮으므로 단추도 숨긴다(lt-sheet-open).
 //    첫 화면 궤도는 data-lt-fab 표시를 받아 오른쪽 아래 단추 자리를 비낀다(가로 당김 bound).
 import test from 'node:test';
@@ -41,7 +41,7 @@ test('#458: 화면별로 이미 있는 아래쪽 단추 위로 올린다', () =>
   assert.match(header, /document\.body\.dataset\.fabLift=\{'track59-sketchbook\.html':'book','track58-pinboard\.html':'board','track56-network\.html':'network','track32-bookshelf\.html':'shelf'\}\[getCurrent\(\)\]\|\|''/, 'flowNavigation이 지금 화면의 끌어올림 값을 정한다');
   assert.match(shellCSS, /body\.lt-fab-ok\[data-fab-lift="book"\] #mobile-add\{bottom:calc\(104px \+ env\(safe-area-inset-bottom\)\)\}/, '책: 갈라치기 탭(753~797) 위');
   assert.match(shellCSS, /body\.lt-fab-ok\[data-fab-lift="board"\] #mobile-add\{bottom:calc\(68px \+ env\(safe-area-inset-bottom\)\)\}/, '보드: 시네마 보기(784~828) 위');
-  assert.match(shellCSS, /body\.lt-fab-ok\[data-fab-lift="network"\] #mobile-add\{bottom:calc\(76px \+ env\(safe-area-inset-bottom\)\)\}/, '지도: 이동 리본(781~825) 위');
+  assert.match(shellCSS, /body\.lt-fab-ok\[data-fab-lift="network"\] #mobile-add\{bottom:calc\(160px \+ env\(safe-area-inset-bottom\)\)\}/, '지도: 올라간 이동 리본 위(이슈 638)');
   const shelf = shellCSS.slice(shellCSS.indexOf('책장의 넘김 화살표'));
   assert.match(shelf, /@media\(max-width:780px\) and \(max-height:749px\)\{\n  body\.lt-fab-ok\[data-fab-lift="shelf"\] #mobile-add\{bottom:calc\(24px \+ env\(safe-area-inset-bottom\)\)\}\n \}/, '책장은 화면이 낮을 때만 올린다(390×844는 그대로)');
 });

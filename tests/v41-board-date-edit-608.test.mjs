@@ -176,10 +176,14 @@ test('#608 화면: 날짜를 바꾸면 카드 글·날짜순 자리가 바뀌고
   assert.equal(sent.date, '2026-12-31', '보드가 보낸 날짜');
   assert.equal(sent.title, '순간 1', '순간 ID·제목은 그대로다');
   // '내 배치': 아래쪽 보이는 카드를 골라 옆 칸으로 끌면 내 배치로 전환되고, 그 카드의 자리는 날짜를 다시 바꿔도 그대로다(#395).
+  // .leftPanel(왼쪽 도구 판, z 56)이 판 위를 덮는다 — 판에 가려진 카드는 가운데를 눌러도 끌 수 없으니(누르면 판이 눌린다)
+  // 가운데가 판 오른쪽 밖인 카드만 고른다. 예전에는 .app 세로 스크롤 부작용으로 판이 걸러 올라가 우연히 통과했다(#627 2차 overflow:clip 정리).
   const dragId = await frame.evaluate(() => {
+    const sb = document.querySelector('.leftPanel');
+    const sr = sb && sb.getBoundingClientRect();
     for (const c of document.querySelectorAll('#cardLayer .card')) {
       const r = c.getBoundingClientRect();
-      if (r.top > 80 && r.bottom < 880 && r.left > 0 && r.right < 1430) return c.dataset.id;
+      if (r.top > 80 && r.bottom < 880 && r.right < 1430 && (!sr || (r.left + r.right) / 2 > sr.right)) return c.dataset.id;
     }
     return null;
   });

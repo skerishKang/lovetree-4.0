@@ -5,10 +5,11 @@
 // SQL 을 직접 쓰지 않고, 검사·개인정보 가림·감사 기록까지 운영센터와 동일하게 적용된다.
 // 접속 설정은 API 서비스와 같은 .env 에서만 읽고, 이메일·subject·접속 문자열은 출력하지 않는다.
 //
-// 입력: --id <의견 번호> [--reply <답변 파일>] --status <received|reviewing|fixed|later|closed> --issue <연결 이슈> [--status-only] [--env <경로>]
+// 입력: --id <의견 번호> [--reply <답변 파일>] --status <received|reviewing|fixed|later|closed> [--issue <연결 이슈>] [--status-only] [--issue-clear] [--env <경로>]
 // 규칙: 대상 의견에 이미 답글이 있으면 아무 것도 하지 않고 끝난다(종료 코드 3 — 건너뜀).
-//       --status-only(#611 5번)면 답변 파일 없이 상태·연결 이슈만 바꾼다(답글이 이미 있어도 처리).
-//       답변은 고객에게 보이는 답변(authorType=customer)으로 남고, 상태·연결 이슈 번호를 함께 바꾼다.
+//       --status-only(#611 5번)면 답변 파일 없이 상태만 바꾼다(답글이 이미 있어도 처리) — #678: --issue를 안 주면 이슈 값은 그대로 둔다.
+//       --issue는 숫자만 받고(#636), 이슈 값을 비우려면 --issue-clear를 쓴다(#678 — 'none' 같은 값은 받지 않는다).
+//       답변을 달 때(--reply)는 상태·연결 이슈 번호를 함께 바꾼다(답변은 고객에게 보이는 답변 authorType=customer).
 //
 // 실행: node /opt/padiem/lovetree-api/tools/ops-reply.mjs --id 7 --reply /tmp/reply.txt --status fixed --issue 584
 
@@ -19,10 +20,11 @@ const STATUSES = ['received', 'reviewing', 'fixed', 'later', 'closed'];
 
 /** 인자 검사(순수) — 잘못된 값은 한 줄 이유로 거부한다. */
 export function parseOpsArgs(argv) {
-  const args = {id: null, replyFile: null, status: null, issue: null, statusOnly: false, envPath: '/opt/padiem/lovetree-api/.env'};
+  const args = {id: null, replyFile: null, status: null, issue: null, issueClear: false, statusOnly: false, envPath: '/opt/padiem/lovetree-api/.env'};
   for (let i = 0; i < argv.length; i++) {
     const key = argv[i];
     if (key === '--status-only') args.statusOnly = true;
+    else if (key === '--issue-clear') args.issueClear = true;
     else if (key === '--id') args.id = argv[++i] ?? '';
     else if (key === '--reply') args.replyFile = argv[++i] ?? '';
     else if (key === '--status') args.status = argv[++i] ?? '';
@@ -33,9 +35,17 @@ export function parseOpsArgs(argv) {
   if (!/^\d{1,20}$/.test(String(args.id ?? ''))) throw new Error('의견 번호(--id)가 필요합니다.');
   if (!args.statusOnly && !args.replyFile) throw new Error('답변 파일(--reply)이 필요합니다. --status-only면 생략할 수 있어요.');
   if (!STATUSES.includes(args.status)) throw new Error(`상태(--status)는 ${STATUSES.join('|')} 중 하나여야 합니다.`);
-  if (!/^#?[0-9A-Za-z._-]{1,20}$/.test(String(args.issue ?? ''))) throw new Error('연결 이슈 번호(--issue)가 필요합니다.');
-  // #636: 저장은 숫자만 한다. '#'은 화면 표시일 뿐인데 그대로 넣어 두어 운영센터가 그 글을 '연결 이슈'로 읽지 못했다.
-  args.issue = args.issue.replace(/^#/, '');
+  if (args.issueClear && args.issue !== null) throw new Error('--issue-clear는 --issue와 함께 쓰지 않는다. 이슈 값을 비우는 것이 --issue-clear다.');
+  if (args.issue !== null) {
+    // #636: 저장은 숫자만 한다. '#'은 화면 표시일 뿐인데 그대로 넣어 두어 운영센터가 그 글을 '연결 이슈'로 읽지 못했다.
+    // #678: 'none' 같은 숫자가 아닌 값도 받지 않는다(운영센터 화면이 이슈 연결 없음으로 보이길 바라면 --issue-clear를 쓴다).
+    const digits = String(args.issue).replace(/^#/, '');
+    if (!/^\d{1,20}$/.test(digits)) throw new Error('연결 이슈 번호(--issue)는 숫자만 받습니다. 이슈 값을 비우려면 --issue-clear를 쓰세요.');
+    args.issue = digits;
+  } else if (!args.statusOnly) {
+    // #678: --status-only에서는 --issue를 생략할 수 있다 — 이슈 값은 그대로 둔다(덮어쓰지 않는다). 답변을 달 때는 연결 이슈를 받는다.
+    throw new Error('연결 이슈 번호(--issue)가 필요합니다. --status-only면 생략할 수 있고, 이슈 값을 비우려면 --issue-clear를 쓰세요.');
+  }
   if (!args.envPath) throw new Error('환경 파일 경로(--env)가 비어 있습니다.');
   return args;
 }
@@ -85,7 +95,12 @@ async function main() {
     const principal = { productId, subjectId: adminSubject };
 
     const reply = args.statusOnly ? null : await service.reply(principal, String(args.id), {authorType: 'customer', body: replyText});
-    const updated = await service.update(principal, String(args.id), {status: args.status, issueNumber: args.issue});
+    // #678: 이슈 값을 생략하면 patch에 아예 넣지 않아 운영센터와 같은 update가 기존 값을 그대로 둔다.
+    // --issue-clear는 운영센터가 이슈를 지울 때 보내는 빈 값('')을 그대로 서비스에 넘긴다(DB 직접 쓰기 없음).
+    const patch = {status: args.status};
+    if (args.issueClear) patch.issueNumber = '';
+    else if (args.issue !== null) patch.issueNumber = args.issue;
+    const updated = await service.update(principal, String(args.id), patch);
     if (args.statusOnly) console.log(`updated id=${updated.id} status=${updated.status} issue=${updated.issueNumber || ''} replies=${updated.replyCount}`);
     else console.log(`replied id=${updated.id} replyId=${reply.id} authorType=customer status=${updated.status} issue=${updated.issueNumber || ''} replies=${updated.replyCount}`);
   } finally {
