@@ -7,9 +7,11 @@
 //
 // 입력: --id <의견 번호> [--reply <답변 파일>] --status <received|reviewing|fixed|later|closed> [--issue <연결 이슈>] [--status-only] [--issue-clear] [--env <경로>]
 // 규칙: 대상 의견에 이미 답글이 있으면 아무 것도 하지 않고 끝난다(종료 코드 3 — 건너뜀).
-//       --status-only(#611 5번)면 답변 파일 없이 상태만 바꾼다(답글이 이미 있어도 처리) — #678: --issue를 안 주면 이슈 값은 그대로 둔다.
-//       --issue는 숫자만 받고(#636), 이슈 값을 비우려면 --issue-clear를 쓴다(#678 — 'none' 같은 값은 받지 않는다).
-//       답변을 달 때(--reply)는 상태·연결 이슈 번호를 함께 바꾼다(답변은 고객에게 보이는 답변 authorType=customer).
+//       --status-only(#611 5번)면 답변 파일 없이 상태만 바꾼다(답글이 이미 있어도 처리).
+//       --issue는 어느 모드에서든 생략할 수 있다(#689 후속 — 생략하면 이슈 값은 그대로 둔다. #678이 --status-only에서 먼저 연 규칙을 답변 모드까지 맞춘 것).
+//       --issue는 숫자만 받고(#636), 이슈 값을 비우려면 --issue-clear를 쓴다(#678 — 'none' 같은 값은 받지 않는다. 답변 모드에서도 같다).
+//       --issue와 --issue-clear를 함께 쓰면 거절한다.
+//       답변을 달 때(--reply)는 상태를 함께 바꾸고 연결 이슈는 --issue/--issue-clear를 준 만큼만 바꾼다(답변은 고객에게 보이는 답변 authorType=customer).
 //
 // 실행: node /opt/padiem/lovetree-api/tools/ops-reply.mjs --id 7 --reply /tmp/reply.txt --status fixed --issue 584
 
@@ -42,12 +44,19 @@ export function parseOpsArgs(argv) {
     const digits = String(args.issue).replace(/^#/, '');
     if (!/^\d{1,20}$/.test(digits)) throw new Error('연결 이슈 번호(--issue)는 숫자만 받습니다. 이슈 값을 비우려면 --issue-clear를 쓰세요.');
     args.issue = digits;
-  } else if (!args.statusOnly) {
-    // #678: --status-only에서는 --issue를 생략할 수 있다 — 이슈 값은 그대로 둔다(덮어쓰지 않는다). 답변을 달 때는 연결 이슈를 받는다.
-    throw new Error('연결 이슈 번호(--issue)가 필요합니다. --status-only면 생략할 수 있고, 이슈 값을 비우려면 --issue-clear를 쓰세요.');
   }
+  // #689 후속: --issue를 생략할 수 있다(#678이 --status-only에서 연 규칙을 답변 모드까지) — 이슈 값은 그대로 둔다.
   if (!args.envPath) throw new Error('환경 파일 경로(--env)가 비어 있습니다.');
   return args;
+}
+
+/** 상태·연결 이슈 patch(순수) — 이슈를 생략하면 patch에 넣지 않아(서비스 update가 기존 값을 유지)
+ *  --issue-clear는 운영센터가 이슈를 지울 때 보내는 빈 값('')을 그대로 넣는다. */
+export function buildPatch(args) {
+  const patch = {status: args.status};
+  if (args.issueClear) patch.issueNumber = '';
+  else if (args.issue !== null) patch.issueNumber = args.issue;
+  return patch;
 }
 
 /** 이미 답글이 있으면 건너뛴다(아무 것도 바꾸지 않는다). */
@@ -95,11 +104,9 @@ async function main() {
     const principal = { productId, subjectId: adminSubject };
 
     const reply = args.statusOnly ? null : await service.reply(principal, String(args.id), {authorType: 'customer', body: replyText});
-    // #678: 이슈 값을 생략하면 patch에 아예 넣지 않아 운영센터와 같은 update가 기존 값을 그대로 둔다.
+    // 이슈를 생략하면 patch에 넣지 않아 운영센터와 같은 update가 기존 값을 그대로 둔다(#678·#689 후속).
     // --issue-clear는 운영센터가 이슈를 지울 때 보내는 빈 값('')을 그대로 서비스에 넘긴다(DB 직접 쓰기 없음).
-    const patch = {status: args.status};
-    if (args.issueClear) patch.issueNumber = '';
-    else if (args.issue !== null) patch.issueNumber = args.issue;
+    const patch = buildPatch(args);
     const updated = await service.update(principal, String(args.id), patch);
     if (args.statusOnly) console.log(`updated id=${updated.id} status=${updated.status} issue=${updated.issueNumber || ''} replies=${updated.replyCount}`);
     else console.log(`replied id=${updated.id} replyId=${reply.id} authorType=customer status=${updated.status} issue=${updated.issueNumber || ''} replies=${updated.replyCount}`);

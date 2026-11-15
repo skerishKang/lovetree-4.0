@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseOpsArgs, shouldSkip } from '../tools/ops-reply.mjs';
+import { parseOpsArgs, shouldSkip, buildPatch } from '../tools/ops-reply.mjs';
 
 test('#596 후속: ops-reply 인자 검사', () => {
   const args = parseOpsArgs(['--id', '7', '--reply', '/tmp/r.txt', '--status', 'fixed', '--issue', '584']);
@@ -35,6 +35,23 @@ test('#678: --status-only는 --issue를 생략할 수 있고, 이슈 값은 숫�
   assert.equal(cleared.issueClear, true);
   assert.equal(cleared.issue, null);
   assert.throws(() => parseOpsArgs(['--id', '16', '--status', 'closed', '--issue', '1', '--issue-clear', '--status-only']), /--issue-clear/);
+});
+
+test('#689 후속: 답변 모드에서도 --issue를 생략할 수 있고 --issue-clear로 비운다(--status-only와 같은 규칙)', () => {
+  // 답변 모드 + --issue 생략 — parse가 받아들이고(issue null) patch에 이슈를 넣지 않아 기존 값이 그대로 남는다.
+  const noIssue = parseOpsArgs(['--id', '21', '--reply', '/tmp/r.txt', '--status', 'reviewing']);
+  assert.deepEqual(noIssue, {id: '21', replyFile: '/tmp/r.txt', status: 'reviewing', issue: null, issueClear: false, statusOnly: false, envPath: '/opt/padiem/lovetree-api/.env'});
+  assert.deepEqual(buildPatch(noIssue), {status: 'reviewing'});
+  // 답변 모드 + --issue-clear — patch에 빈 값('')을 넣어 이슈를 비운다(운영센터가 이슈를 지울 때와 같은 값).
+  const cleared = parseOpsArgs(['--id', '21', '--reply', '/tmp/r.txt', '--status', 'reviewing', '--issue-clear']);
+  assert.deepEqual(cleared, {id: '21', replyFile: '/tmp/r.txt', status: 'reviewing', issue: null, issueClear: true, statusOnly: false, envPath: '/opt/padiem/lovetree-api/.env'});
+  assert.deepEqual(buildPatch(cleared), {status: 'reviewing', issueNumber: ''});
+  // 둘을 함께 쓰면 거절한다.
+  assert.throws(() => parseOpsArgs(['--id', '21', '--reply', '/tmp/r.txt', '--status', 'reviewing', '--issue', '7', '--issue-clear']), /--issue-clear/);
+  // 숫자가 아닌 값도 거절한다.
+  assert.throws(() => parseOpsArgs(['--id', '21', '--reply', '/tmp/r.txt', '--status', 'reviewing', '--issue', 'none']), /연결 이슈/);
+  // 생략한 답변 모드에 --issue를 주면 이전과 같이 그 값으로 바꾼다.
+  assert.equal(parseOpsArgs(['--id', '21', '--reply', '/tmp/r.txt', '--status', 'fixed', '--issue', '#584']).issue, '584');
 });
 
 test('#596 후속: 이미 답글이 있으면 건너뛴다', () => {
