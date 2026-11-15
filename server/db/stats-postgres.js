@@ -139,12 +139,12 @@ title_row AS (
     (SELECT COALESCE(jsonb_agg(title), '[]'::jsonb) FROM (
       SELECT title FROM doc_tree WHERE title <> '' ORDER BY title, tree_id LIMIT 20
     ) names) AS "treesTitles",
-    (SELECT COALESCE(jsonb_agg(c.title), '[]'::jsonb) FROM (
+    (SELECT COALESCE(jsonb_agg(names.title), '[]'::jsonb) FROM (
       SELECT c.title FROM doc_tree c
       JOIN public_tree p ON p.subject_id = c.subject_id AND p.tree_id = c.tree_id
       WHERE c.title <> '' ORDER BY c.title, c.tree_id LIMIT 20
     ) names) AS "publicTitles",
-    (SELECT COALESCE(jsonb_agg(c.title), '[]'::jsonb) FROM (
+    (SELECT COALESCE(jsonb_agg(names.title), '[]'::jsonb) FROM (
       SELECT c.title FROM doc_tree c
       JOIN featured_tree f ON f.subject_id = c.subject_id AND f.tree_id = c.tree_id
       WHERE c.title <> '' ORDER BY c.title, c.tree_id LIMIT 20
