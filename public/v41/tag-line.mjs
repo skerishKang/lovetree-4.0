@@ -1,8 +1,8 @@
 // #627 PR B: 꼬리표 줄 — 순간 상세(책·보드·지도)와 쉬운 추가로 담은 직후 안내에 붙는 한 벌 화면 조각.
 // 규칙·계산은 tag-model.mjs·tags.mjs 한 벌을 쓰고, 이 파일은 그리기·누르기만 한다.
 // 제안은 흐린 칩, 확정은 진한 칩이다. 누르면 확정·해제된다. 사용자가 확인하기 전에는 저장하지 않는다 —
-// 저장 호출은 onCommit(바뀐 keywords 전체)으로 바깥에 맡기고, 이 파일은 저장 경로를 모른다.
-import { TAG_KINDS } from './tags.mjs';
+// 저장 호출은 onCommit(바뀐 keywords 전체, 지금 보고 있는 순간 id)으로 바깥에 맡기고, 이 파일은 저장 경로를 모른다.
+import { TAG_KINDS, parseTag } from './tags.mjs';
 import { cardTags, chipText, tagLineChips, toggledKeywords, inputTag } from './tag-model.mjs';
 
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -16,6 +16,9 @@ function chipHTML(tag) {
 
 // 꼬리표 줄 하나를 host에 그린다. update(moment)로 같은 자리에 다시 그리고, destroy로 지운다.
 export function renderTagLine({ host, doc = document, moment, knownTags = [], writable = false, onCommit, emptyText = '아직 꼬리표가 없어요' }) {
+  // #739: 눌러 듣는 귀는 이 줄 인스턴스에 묶는다 — destroy로 함께 거둔다. 안 그러면 같은 host에 줄을
+  // 다시 그릴 때(쉬운 추가 연속 담기) 옛 줄의 귀가 살아 남아 옛 순간에 저장하고, 같은 칩을 다시 누르면
+  // 옛 줄이 해제 저장해 어디에도 남지 않는다(하은 1회차 실측 — 세 순간 모두 keywords []).
   const state = {
     momentId: moment?.id || '',
     title: moment?.title || '',
@@ -54,15 +57,22 @@ export function renderTagLine({ host, doc = document, moment, knownTags = [], wr
   function commit(next) {
     state.keywords = Array.isArray(next) ? [...next] : [];
     draw();
-    try { onCommit?.([...state.keywords]); } catch (error) { fail(error?.message || '저장하지 못했어요.'); }
+    // #735: onCommit에 '지금 보고 있는 순간 id'를 함께 넘긴다 — 줄을 처음 만든 순간의 id를 클로저로
+    // 계속 보내 다른 카드의 꼬리표가 첫 순간에 저장되던 결함을 막는다(update()로 state.momentId가 바뀐다).
+    try { onCommit?.([...state.keywords], state.momentId); } catch (error) { fail(error?.message || '저장하지 못했어요.'); }
   }
 
+  const off = new AbortController();
+  const when = { signal: off.signal };
+  // #739: 거둔 줄의 귀는 두 번 막는다 — signal로 지우고(진짜 DOM), aborted면 무시한다(host가 귀를 안 지우는 흉내·옛 브라우저까지).
+  const alive = () => !off.signal.aborted;
   host.addEventListener('click', (event) => {
+    if (!alive()) return;
     const chip = event.target.closest('[data-tag-raw]');
     if (!chip) return;
     fail('');
     commit(toggledKeywords(state.keywords, chip.dataset.tagRaw));
-  });
+  }, when);
   // 직접 입력: 쓰기 창 안에도 붙으므로 form 대신 group으로 두고 Enter·단추로 붙인다(중첩 form 금지).
   function submitInput() {
     const kind = host.querySelector('.lt-tagline-kind')?.value || '';
@@ -74,10 +84,11 @@ export function renderTagLine({ host, doc = document, moment, knownTags = [], wr
     fail('');
     commit(toggledKeywords(state.keywords, made.raw));
   }
-  host.addEventListener('click', (event) => { if (event.target.closest('.lt-tagline-add')) submitInput(); });
+  host.addEventListener('click', (event) => { if (alive() && event.target.closest('.lt-tagline-add')) submitInput(); }, when);
   host.addEventListener('keydown', (event) => {
+    if (!alive()) return;
     if (event.key === 'Enter' && event.target.closest('.lt-tagline-value')) { event.preventDefault(); submitInput(); }
-  });
+  }, when);
 
   draw();
   return {
@@ -90,7 +101,7 @@ export function renderTagLine({ host, doc = document, moment, knownTags = [], wr
     },
     setKnownTags(tags) { state.knownTags = Array.isArray(tags) ? [...tags] : []; draw(); },
     get momentId() { return state.momentId; },
-    destroy() { host.replaceChildren(); host.classList.remove('lt-tagline-host'); host.hidden = true; }
+    destroy() { off.abort(); host.replaceChildren(); host.classList.remove('lt-tagline-host'); host.hidden = true; }
   };
 }
 
@@ -183,7 +194,9 @@ export function mountViewTagLine({ screen }) {
         moment: { id: moment.id, title: moment.title || '', keywords: moment.keywords },
         knownTags: knownTagsOf(c),
         writable: writable(),
-        onCommit: (keywords) => sendTags(c, moment.id, keywords)
+        // #735: 저장할 순간 id는 줄이 가진 현재 값(renderTagLine이 넘겨 주는 것)으로 정한다 —
+        // 처음 만든 순간의 객체를 클로저로 계속 보내지 않는다.
+        onCommit: (keywords, momentId) => { if (momentId) sendTags(c, momentId, keywords); }
       });
     } else {
       line.update({ id: moment.id, title: moment.title || '', keywords: moment.keywords });
@@ -193,11 +206,16 @@ export function mountViewTagLine({ screen }) {
   }
 
   // 상세 제목이 바뀌면(다른 순간을 열면) 다시 그린다. 같은 순간을 다시 열어도 다시 그린다(값이 바뀌었을 수 있다).
-  new MutationObserver(() => {
+  // #735: 제목만 관찰하면 보드에서 같은 제목의 다른 카드로 바꿀 때 다시 그리지 않아, 꼬리표 줄이 옛 순간의
+  // keywords를 그대로 들고 저장할 수 있다. 상세 전체를 관찰해 선택이 바뀐 것(제목이 같아도 보드는 dBasic·dConn을
+  // 다시 그린다)을 잡고, 꼬리표 줄이 스스로 그린 바뀜(wrap 안)은 무시한다.
+  const detailRoot = doc.getElementById('detail') || title;
+  new MutationObserver((records) => {
+    if (records.every((record) => wrap.contains(record.target))) return;
     const id = context()?.momentId || '';
     if (id && id !== shownId) render();
-    else if (id) render();
-  }).observe(title, { childList: true, characterData: true, subtree: true });
+    else if (id && records.some((record) => title.contains(record.target))) render();
+  }).observe(detailRoot, { childList: true, characterData: true, subtree: true });
 
   // 셸의 저장 답: 모델의 keywords를 다시 읽어 그리고, 화면이 들고 있는 자기 사본에게 알린다(보드 카드 등).
   addEventListener('message', (event) => {
@@ -226,7 +244,7 @@ export function mountViewTagLine({ screen }) {
 // 클래식 스크립트(보드 카드·책 페이지)가 쓰는 한 벌 노출 — 카드 칩 순서·개수 규칙은 tag-model.mjs 하나다.
 // (시험은 Node에서 이 모듈을 부르기도 한다 — 브라우저 전역이 없는 자리에서는 노출·붙이기를 건너뛴다.)
 if (typeof window !== 'undefined') {
-  window.LTTagLine = { cardTags, chipText };
+  window.LTTagLine = { cardTags, chipText, parseTag };
 
   // 책·보드·지도 화면은 스스로 붙는다(tree-title.mjs와 같은 화면 판정).
   const screen = document.documentElement.dataset.v41Screen;

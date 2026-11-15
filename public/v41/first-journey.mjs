@@ -12,13 +12,15 @@ export const JOURNEY_STEPS = Object.freeze([
   {index: '03', key: 'next', label: '다음 영상 잇기'},
   {index: '04', key: 'growth', label: '성장'},
 ]);
+import {localDateOnly} from './local-date.mjs';
 export const JOURNEY_LAST_STEP = JOURNEY_STEPS.length - 1;
 export const JOURNEY_EMOTIONS = EMOTIONS;
 
 const LIMIT = {subject: 60, note: 500, reason: 500, nextReason: 100, nextNote: 500};
 const text = (value, max) => (typeof value === 'string' ? value.slice(0, max) : '');
 const trimmed = value => (typeof value === 'string' ? value.trim() : '');
-const isoDay = clock => (clock instanceof Date ? clock : new Date(clock)).toISOString().slice(0, 10);
+// #547 한 벌(local-date.mjs): 새벽(KST 0~9시)에 여정을 쓰면 toISOString UTC 절단이 어제 날짜를 줬다.
+const isoDay = clock => localDateOnly(clock);
 
 function clampStep(value) {
   const step = Number.parseInt(value, 10);

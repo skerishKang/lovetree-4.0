@@ -219,3 +219,62 @@ test('#608 화면: 날짜를 바꾸면 카드 글·날짜순 자리가 바뀌고
   assert.equal(problems.length, 0, `화면 문제 없음 (${problems.join(' | ') || '없음'})`);
   await context.close();
 });
+
+test('#736 편집 창은 고정 목록에 없는 꼬리표를 지우지 않는다 — 열고·더하고·지우기', { skip: REQUIRE ? false : skip, timeout: 300000 }, async (t) => {
+  if (skip) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip}`);
+  const tree = chainTree(3);
+  tree.moments[0].keywords = ['가수:PSY', '첫만남', '노래:Gangnam Style'];
+  const server = await serve({ '/host.html': hostHTML(tree) });
+  const browser = await chromium.launch({ headless: true });
+  t.after(async () => { await browser.close(); server.close(); });
+  const { context, page, frame, problems } = await openHost(browser, 'http://127.0.0.1:' + server.address().port + '/host.html');
+
+  const syncCount = () => page.evaluate(() => window.LT41_MESSAGES.filter((m) => m.type === 'lt41-board-sync').length);
+  const lastKeywords = () => page.evaluate(() => {
+    const sync = window.LT41_MESSAGES.filter((m) => m.type === 'lt41-board-sync').at(-1);
+    return sync ? (sync.moments.find((x) => x.id === 'm1')?.keywords || []) : null;
+  });
+  const openEdit = async () => {
+    await frame.click('.card[data-id="m1"]');
+    await frame.waitForSelector('#editMomentBtn', { timeout: 5000 });
+    await frame.click('#editMomentBtn');
+    await frame.waitForSelector('#editModal.open', { timeout: 5000 });
+  };
+
+  await openEdit();
+  // 고정 목록에 없는 꼬리표도 칩으로 보인다 — 종류·값 표기는 꼬리표 칩과 같은 모양, 켜진 상태로.
+  const chips = await frame.evaluate(() => [...document.querySelectorAll('#editKeywordPicker .keywordBtn.is-custom-tag')].map((b) => ({ key: b.dataset.key, text: b.textContent, on: b.classList.contains('on') })));
+  assert.deepEqual(chips, [
+    { key: '가수:PSY', text: '가수 · PSY', on: true },
+    { key: '노래:Gangnam Style', text: '노래 · Gangnam Style', on: true }
+  ], '고정 목록에 없는 꼬리표도 칩으로 보인다(종류 · 값 표기)');
+
+  // ① 아무것도 안 바꾸고 저장 → 꼬리표 그대로
+  const before1 = await syncCount();
+  await frame.click('#editSave');
+  await frame.waitForFunction(() => !document.querySelector('#editModal').classList.contains('open'), null, { timeout: 5000 });
+  await page.waitForFunction((n) => window.LT41_MESSAGES.filter((m) => m.type === 'lt41-board-sync').length > n, before1, { timeout: 8000 });
+  assert.deepEqual(await lastKeywords(), ['가수:PSY', '첫만남', '노래:Gangnam Style'], '① 저장만 해도 꼬리표가 그대로다');
+
+  // ② 다른 꼬리표를 더해 저장 → 원래 것 + 새 것
+  await openEdit();
+  await frame.fill('#editCustomKeyword', '무대:인기가요 240524');
+  await frame.click('#editAddKeyword');
+  await frame.waitForSelector('#editKeywordPicker .keywordBtn.on[data-key="무대:인기가요 240524"]', { timeout: 5000 });
+  const before2 = await syncCount();
+  await frame.click('#editSave');
+  await frame.waitForFunction(() => !document.querySelector('#editModal').classList.contains('open'), null, { timeout: 5000 });
+  await page.waitForFunction((n) => window.LT41_MESSAGES.filter((m) => m.type === 'lt41-board-sync').length > n, before2, { timeout: 8000 });
+  assert.deepEqual(await lastKeywords(), ['가수:PSY', '첫만남', '노래:Gangnam Style', '무대:인기가요 240524'], '② 원래 것 + 새 것');
+
+  // ③ 하나를 지우고 저장 → 그것만 빠진다
+  await openEdit();
+  await frame.click('#editKeywordPicker .keywordBtn[data-key="가수:PSY"]');
+  const before3 = await syncCount();
+  await frame.click('#editSave');
+  await frame.waitForFunction(() => !document.querySelector('#editModal').classList.contains('open'), null, { timeout: 5000 });
+  await page.waitForFunction((n) => window.LT41_MESSAGES.filter((m) => m.type === 'lt41-board-sync').length > n, before3, { timeout: 8000 });
+  assert.deepEqual(await lastKeywords(), ['첫만남', '노래:Gangnam Style', '무대:인기가요 240524'], '③ 직접 지운 것만 빠진다');
+  assert.equal(problems.length, 0, `화면 문제 없음 (${problems.join(' | ') || '없음'})`);
+  await context.close();
+});

@@ -167,7 +167,10 @@ export function createScreens(deps) {
       return;
     }
     document.body.classList.toggle('home-screen', file === 'src064-orbit.html');
-    document.querySelectorAll('[data-view]').forEach(b => b.setAttribute('aria-current', String(b.dataset.view === file)));
+    // 2026-11-16 대표 결정: 그래프 보기(#627 3단계, track60-graph.html)는 지도 안의 보기 하나다 —
+    // 위쪽 메뉴(책·보드·지도)에서는 지도가 켜진 상태로 보인다. 메뉴 단추는 따로 만들지 않는다(navigation.mjs 그대로).
+    const viewFamily = (b) => b.dataset.view === file || (file === 'track60-graph.html' && b.dataset.view === 'track56-network.html');
+    document.querySelectorAll('[data-view]').forEach(b => b.setAttribute('aria-current', String(viewFamily(b))));
     $('empty').hidden = true;
     // #583 '이 순간 열기': 지도를 특정 순간을 가운데 두고 열 요청이 있으면 프레임 주소에 ?open=<순간>을 붙인다.
     // 요청은 한 번 쓰면 지운다(다른 화면을 먼저 보여 줬으면 끝난 요청이다).

@@ -320,11 +320,13 @@ test('#655 2차 전체 숫자 카드 — 실제 사용자·AI 테스터·시험 
   assert.deepEqual(model.cards.map(card => card.key), ['accounts', 'accounts-new', 'trees', 'moments', 'moments-new', 'public-trees', 'featured-trees']);
   const byKey = Object.fromEntries(model.cards.map(card => [card.key, card]));
   // 실제 사용자를 크게, AI 테스터를 함께 — AI 테스터는 전체에 포함된 수다.
-  assert.deepEqual(byKey.accounts, {key: 'accounts', label: '계정', real: 9, aiTester: 3, tester: 3});
-  assert.deepEqual(byKey['accounts-new'], {key: 'accounts-new', label: '새 계정 · 7일', real: 3, aiTester: 1, tester: 2});
-  assert.deepEqual(byKey.moments, {key: 'moments', label: '순간', real: 70, aiTester: 20, tester: 15});
-  assert.deepEqual(byKey['public-trees'], {key: 'public-trees', label: '공개 트리', real: 6, aiTester: 2, tester: 3});
-  assert.deepEqual(byKey['featured-trees'], {key: 'featured-trees', label: '둘러보기 소개', real: 4, aiTester: 1, tester: 3});
+  // #743: 카드마다 '전체 = 실제 + AI + 시험'을 함께 낸다(숫자가 서로 어긋나 보이지 않게).
+  assert.deepEqual(byKey.accounts, {key: 'accounts', label: '계정', total: 15, real: 9, aiTester: 3, tester: 3});
+  assert.deepEqual(byKey['accounts-new'], {key: 'accounts-new', label: '새 계정 · 7일', total: 6, real: 3, aiTester: 1, tester: 2});
+  assert.deepEqual(byKey.moments, {key: 'moments', label: '순간', total: 105, real: 70, aiTester: 20, tester: 15});
+  // 트리 계열 카드는 펼침 내역의 제목 목록(최대 20)을 함께 받는다 — 응답에 없으면 null(지어내지 않는다).
+  assert.deepEqual(byKey['public-trees'], {key: 'public-trees', label: '공개 트리', total: 11, real: 6, aiTester: 2, tester: 3, titles: null});
+  assert.deepEqual(byKey['featured-trees'], {key: 'featured-trees', label: '둘러보기 소개', total: 8, real: 4, aiTester: 1, tester: 3, titles: null});
 
   // 응답이 실패했거나 값이 이상하면 그 카드만 실패 — 숫자를 0으로 지어내지 않는다.
   assert.deepEqual(statsCards({ok: false, status: 503, payload: null}), {error: true, cards: []});
@@ -335,6 +337,19 @@ test('#655 2차 전체 숫자 카드 — 실제 사용자·AI 테스터·시험 
   const broken = statsCards({ok: true, payload: {ok: true, stats: {accounts: {total: 1, real: 1}, trees: {}, moments: {}}}});
   assert.equal(broken.error, true);
   assert.ok(broken.cards.every(card => card.error), '값이 없는 카드는 실패로 남는다');
+
+  // #743: 트리 계열 카드는 서버가 준 제목 목록(최대 20)을 펼침 내역에 쓴다. 제목만 싣는다(이메일·subject 없음).
+  const withTitles = statsCards({ok: true, payload: {ok: true, stats: {
+    accounts: {total: 2, real: 2, aiTester: 0, tester: 0, new: {total: 0, real: 0, aiTester: 0, tester: 0}},
+    trees: {total: 3, real: 3, aiTester: 0, tester: 0, titles: ['가을 노래', '겨울 산책'], public: {total: 1, real: 1, aiTester: 0, tester: 0, titles: ['가을 노래']}, featured: {total: 0, real: 0, aiTester: 0, tester: 0, titles: []}},
+    moments: {total: 4, real: 4, aiTester: 0, tester: 0, new: {total: 0, real: 0, aiTester: 0, tester: 0}}
+  }}});
+  const treeCards = Object.fromEntries(withTitles.cards.map(card => [card.key, card]));
+  assert.deepEqual(treeCards.trees.titles, ['가을 노래', '겨울 산책']);
+  assert.deepEqual(treeCards['public-trees'].titles, ['가을 노래']);
+  assert.deepEqual(treeCards['featured-trees'].titles, [], '제목이 없으면 빈 목록(숫자를 지어내지 않는다)');
+  assert.equal(treeCards.moments.titles, undefined, '트리 계열이 아닌 카드에는 제목 목록이 없다');
+
 });
 
 test('journal_date가 비어 있으면 만든 시각을 한국 시각 날짜로 읽는다(UTC 자름이 아니다)', () => {
@@ -345,4 +360,36 @@ test('journal_date가 비어 있으면 만든 시각을 한국 시각 날짜로 
   ]);
   assert.equal(rows[0].lastDay, '2026-11-15', '한국 시각 11-15 04:28 기록은 11-15로 보인다');
   assert.deepEqual(rows[0].flow, [{day: '2026-11-13', score: 2}, {day: '2026-11-15', score: 3}]);
+});
+
+test('#743 한눈에 카드: 갈 탭이 있는 카드가 자기 조건으로 그 탭을 여는 주소를 만든다', () => {
+  // 답글 0 카드 → 고객 글 탭에서 답글 0만 남긴다(주소 왕복).
+  assert.equal(viewHash('board', null, {unanswered: true}), '#board?unanswered=1');
+  assert.deepEqual(parseHash('#board?unanswered=1'), {view: 'board', id: null, status: '', kind: '', unanswered: true});
+  assert.equal(viewHash(parseHash('#board?unanswered=1').view, null, parseHash('#board?unanswered=1')), '#board?unanswered=1');
+  // 신고 대기 카드 → 신고 탭의 검토 대기만.
+  assert.equal(viewHash('reports', null, {status: 'open'}), '#reports?status=open');
+  assert.equal(parseHash('#reports?status=open').status, 'open');
+  assert.equal(viewHash(parseHash('#reports?status=open').view, null, parseHash('#reports?status=open')), '#reports?status=open');
+  // 열린·닫힌 이슈 카드 → 고치는 일 탭의 그 상태만.
+  assert.equal(viewHash('issues', null, {status: 'open'}), '#issues?status=open');
+  assert.equal(viewHash('issues', null, {status: 'closed'}), '#issues?status=closed');
+  assert.equal(parseHash('#issues?status=closed').status, 'closed');
+  // 모르는 값은 버린다(주소는 늘 해석된다).
+  assert.equal(parseHash('#reports?status=bogus').status, '');
+  assert.equal(parseHash('#issues?status=pending').status, '');
+  // 두 카드(전체·고침)는 지금처럼 상태 조건만 쓴다.
+  assert.equal(viewHash('board', null, {status: 'fixed', kind: '', unanswered: false}), '#board?status=fixed');
+  assert.equal(viewHash('board', null, {status: '', kind: '', unanswered: false}), '#board');
+
+  // 거르기도 같은 뜻이다 — 답글 0은 닫힌 글을 빼고 센다('한눈에' 카드 숫자와 같은 규칙).
+  const rows = [
+    {id: 'a', status: 'received', replyCount: 0},
+    {id: 'b', status: 'reviewing', replyCount: 2},
+    {id: 'c', status: 'fixed', replyCount: 0},
+    {id: 'd', status: 'closed', replyCount: 0}
+  ];
+  assert.deepEqual(filterRows(rows, {unanswered: true}).map(row => row.id), ['a', 'c']);
+  assert.deepEqual(filterRows(rows, {unanswered: true, status: 'fixed'}).map(row => row.id), ['c']);
+  assert.equal(filterRows(rows, {}).length, 3, '조건이 없으면 지금과 같다(닫음 제외)');
 });

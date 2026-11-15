@@ -32,6 +32,11 @@ const KNOWN = [
   // (레거시 첫 화면 모양. 트리가 있어야 뜨므로 지금까지 잰 적이 없었다). 이 이슈에서는 손대지 않는다.
   { 화면: '계정 메뉴·첫 트리 안내', 항목: '작은글자', 찾을: 'small "(마지막 순간|시험 · 이어 보기)', 이슈: '#548(12px 기준)·레거시 첫 화면' },
   { 화면: '계정 메뉴 닫힘·첫 트리 안내', 항목: '작은글자', 찾을: 'small "(마지막 순간|시험 · 이어 보기)', 이슈: '#548(12px 기준)·레거시 첫 화면' },
+  // '첫 화면 글자 카드' 상태(261116, #728 후속)가 처음 잰 자리 — 레거시 첫 화면·SRC064 원본의 기존 모양.
+  { 화면: '첫 화면 글자 카드', 항목: '작은글자', 찾을: 'small "(마지막 순간|시험 · 이어 보기)', 이슈: '#548·레거시 첫 화면(계정 메뉴 상태와 같은 줄)' },
+  { 화면: '첫 화면 글자 카드', 항목: '작은글자', 찾을: 'div.memo(Kicker|Foot)', 이슈: 'SRC064 궤도 메모 카드 원본 9px(#728 후속 — 이 이슈에서 손대지 않는다)' },
+  { 화면: '첫 화면 글자 카드', 항목: '겹침', 찾을: 'span.lt-fallback-date × strong.lt-fallback-title', 이슈: '#728 후속 — legacy box의 rect 보고(그림은 3줄 말줄임 — 2070·1440 줌 실측)' },
+  { 화면: '첫 화면 글자 카드', 항목: '겹침', 찾을: '(span.lt-fallback-emotion × (strong|small)|strong.lt-fallback-title × button.subtleBtn|small.lt-fallback-notice × button.subtleBtn|div.firstMark × small)', 이슈: '궤도 카드가 가운데 UI 뒤를 지나가는 3D 원본 배치(#728 후속 — 궤도 배치 불변)' },
   // 지도 — Track56 원본 모양: 안내 문구가 캔버스 뒤에 깔려 있다(원본 보존 커밋 b2567fe — 원본 구조는 바꾸지 않는다).
   { 화면: '지도', 항목: '가려짐', 찾을: 'p ← canvas#stage', 이슈: 'Track56 원본(b2567fe)' },
 ];
@@ -151,9 +156,39 @@ const graphTree = (() => {
   }
   return t;
 })();
+// 첫 화면 글자 카드(261116): 내려간 영상(없는 id → 회색 120×90)의 '영상을 볼 수 없어요' 카드를
+// 궤도에서 그리기 위한 시험 트리 — 긴 사용자 제목 1건(3줄 높이 절단 대상)·영상 제목+채널 1건(보조 줄)·사진 1건.
+const thumbTree = (() => {
+  const V = 'https://www.youtube.com/watch?v=';
+  let t = createTree({ subject: '시험', title: '글자 카드 시험 트리', note: '기록', emotion: '설렘', date: '2026-11-11', url: V + 'zz404zz404a' }, '2026-11-16T00:00:00.000Z');
+  t.moments[0].title = 'CHAERYEONG Moonlit Club 퍼포먼스를 보고 그 밤의 무대 조명이 꽃처럼 피어 올랐던 기억을 길고 담백하게 적어 본다';
+  t.moments[0].url = V + 'zz404zz404a';
+  t.moments[0].mediaMetadata = { thumbnail: '', width: 1920, height: 1080 };
+  t.moments[0].createdAt = '2026-11-13T09:00:00.000Z'; t.moments[0].updatedAt = t.moments[0].createdAt;
+  t = addMoment(t, { subject: '시험', title: '내려간 직캠 영상', note: '기록', emotion: '그리움', date: '2026-11-12', url: V + 'zz404zz404b' }, t.moments[0].id, '2026-11-16T00:01:00.000Z');
+  t.moments[1].mediaMetadata = { title: '유튜브에서 내려간 무대 직캠 영상', channel: 'KBS Kpop', thumbnail: '', width: 1920, height: 1080 };
+  t.moments[1].createdAt = '2026-11-12T09:00:00.000Z'; t.moments[1].updatedAt = t.moments[1].createdAt;
+  t = addMoment(t, { subject: '시험', title: '사진 순간(정상)', note: '기록', emotion: '즐거움', date: '2026-11-10', url: '' }, t.moments[0].id, '2026-11-16T00:02:00.000Z');
+  t.moments[2].mediaMetadata = { thumbnail: 'data:image/svg+xml;base64,' + Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><rect width="640" height="360" fill="#8a5a6e"/></svg>').toString('base64') };
+  t.moments[2].createdAt = '2026-11-10T09:00:00.000Z'; t.moments[2].updatedAt = t.moments[2].createdAt;
+  return t;
+})();
 // 그래프 보기는 지금 주소(#my/graph)로만 열리는 화면이라 셸 상태 대신 호스트가 LT41을 직접 넘긴다(share-host와 같은 틀).
 const graphHost = `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>그래프 호스트</title></head>
 <body data-member="in" data-record-source="file"><script>window.LT41={source:'file',writable:false,owned:true,momentId:'m01',prefs:{},tree:${JSON.stringify(graphTree)},trees:[${JSON.stringify(graphTree)}]};</script>
+<iframe src="/v41/views/graph/track60-graph.html" style="position:fixed;inset:0;width:100vw;height:100vh;border:0"></iframe></body></html>`;
+
+// 2026-11-16 CTO 지적: 묶음 0개 그래프 — 꼬리표 값이 하나뿐인 순간 둘(허브 규칙은 같은 꼬리표 2개 이상)이라
+// 판 가운데가 비어 보인다. 빈 판 안내(같은 꼬리표 2개 이상이면 묶임 + 제안받기 단추)를 단정하는 상태의 호스트.
+const graphEmptyTree = (() => {
+  const t = createTree({ subject: '시험', title: '시험 트리', note: '기록', emotion: '설렘', date: '2026-11-16', url: 'https://www.youtube.com/watch?v=aaa11111111' }, '2026-11-16T00:00:00.000Z');
+  t.moments[0].keywords = ['노래:Super Shy'];
+  const second = addMoment(t, { subject: '시험', title: '다른 노래 무대', note: '기록', emotion: '즐거움', date: '2026-11-16', url: 'https://www.youtube.com/watch?v=bbb22222222' }, t.moments[0].id, '2026-11-16T00:01:00.000Z');
+  second.moments.at(-1).keywords = ['무대:쇼챔피언'];
+  return second;
+})();
+const graphEmptyHost = `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>그래프 빈 묶음 호스트</title></head>
+<body data-member="in" data-record-source="file"><script>window.LT41={source:'file',writable:false,owned:true,momentId:'m01',prefs:{},tree:${JSON.stringify(graphEmptyTree)},trees:[${JSON.stringify(graphEmptyTree)}]};</script>
 <iframe src="/v41/views/graph/track60-graph.html" style="position:fixed;inset:0;width:100vw;height:100vh;border:0"></iframe></body></html>`;
 
 const frameOf = async (page, test_) => {
@@ -167,7 +202,7 @@ const frameOf = async (page, test_) => {
 
 test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤·정원에서 겹침·잘림·흔적 값·작은 글자가 0이다', { skip: REQUIRE ? false : skip, timeout: 900000 }, async () => {
   if (skip) assert.fail(`미리보기 검사에서는 건너뜀이 실패다 — ${skip}`);
-  const server = await serve({ '/share-host.html': shareHost, '/home-host.html': homeHost, '/graph-host.html': graphHost });
+  const server = await serve({ '/share-host.html': shareHost, '/home-host.html': homeHost, '/graph-host.html': graphHost, '/graph-empty-host.html': graphEmptyHost });
   const base = `http://127.0.0.1:${server.address().port}`;
   const browser = await chromium.launch({ headless: true });
   const known = [], fresh = [];
@@ -275,6 +310,37 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     await page3.evaluate(() => { location.hash = '#network'; });
     await page3.waitForTimeout(1800);
     await take(page3, '지도');
+    // 2026-11-16 대표 결정: 보기 고르기에 [그래프]가 셋째로 붙는다 — 390에서도 세 단추가 머리줄에 들어간다(넘침·겹침 0).
+    const mapHeader = await page3.evaluate(() => {
+      const frame = [...document.querySelectorAll('iframe')].find((f) => { try { return /track56-network/.test(f.contentWindow.location.href); } catch { return false; } });
+      if (!frame) return null;
+      const doc = frame.contentDocument;
+      const bar = doc.querySelector('.topbar');
+      const switchBtns = [...doc.querySelectorAll('.view-switch .pill')];
+      const btns = [...doc.querySelectorAll('.top-actions button')].filter((b) => b.getBoundingClientRect().width > 0);
+      const rects = btns.map((b) => b.getBoundingClientRect());
+      const pairTexts = [];
+      for (let i = 0; i < rects.length; i++) for (let j = i + 1; j < rects.length; j++) {
+        const a = rects[i], b = rects[j];
+        if (a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1) pairTexts.push(btns[i].textContent.trim() + '×' + btns[j].textContent.trim());
+      }
+      return {
+        switchCount: switchBtns.length,
+        labels: switchBtns.map((b) => b.textContent.trim()),
+        netPressed: doc.getElementById('viewNet')?.getAttribute('aria-pressed'),
+        graphPressed: doc.getElementById('viewGraph')?.getAttribute('aria-pressed'),
+        overflowX: Math.max(0, bar.scrollWidth - bar.clientWidth),
+        outOfFrame: btns.filter((b) => b.getBoundingClientRect().right > doc.documentElement.clientWidth + 1).map((b) => b.textContent.trim()),
+        pairTexts
+      };
+    }).catch(() => null);
+    assert.ok(mapHeader, '지도 머리줄을 잰다');
+    assert.deepEqual(mapHeader.labels, ['그물형', '동심원형', '그래프'], `보기 고르기 세 단추(실제 ${JSON.stringify(mapHeader.labels)})`);
+    assert.equal(mapHeader.netPressed, 'true', '현재 보기(그물형) aria-pressed=true');
+    assert.equal(mapHeader.graphPressed, 'false', '그래프 단추는 지도에서 눌리지 않은 상태');
+    assert.equal(mapHeader.overflowX, 0, `지도 머리줄 가로 넘침 0(실제 ${mapHeader.overflowX})`);
+    assert.deepEqual(mapHeader.outOfFrame, [], '머리줄 단추가 화면 밖으로 나가지 않는다');
+    assert.deepEqual(mapHeader.pairTexts, [], `머리줄 단추 겹침 0(실제 ${JSON.stringify(mapHeader.pairTexts)})`);
     // #638: 지도 390(조작 줄) — iframe 안 조작 줄이 셸의 링크 줄·＋ 단추와 겹치지 않고, 보기 전환 단추 대비 4.5:1.
     if (width === 390) {
       const ribbonCheck = await page3.evaluate(() => {
@@ -367,6 +433,32 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     assert.ok(reactions.open >= 1, '반응이 없으면 반응 남기기 단추가 보인다');
     assert.equal(reactions.zeroChips, 0, '0짜리 반응 칩은 보이지 않는다');
     await take(page4, '둘러보기');
+    // 하은 1회차(261116,#728 후속): 새벽(KST 0~9시, UTC 전날)에 담은 순간의 둘러보기 카드 날짜가
+    // UTC 절단('2026. 11. 15')으로 나왔다 — Asia/Seoul 시간대 문맥에서 한국 날짜로 보이는지 수치로 단정한다.
+    const ctxDate = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce', timezoneId: 'Asia/Seoul' });
+    await ctxDate.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); } catch {} }, theme);
+    await ctxDate.route('**://i.ytimg.com/**', THUMB);
+    await ctxDate.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
+    const CROSSING = '2026-11-15T20:00:00.000Z'; // UTC로는 11-15, 한국 시간으로는 11-16 05:00(0~9시 구간)
+    await ctxDate.route('**/api/community/shares*', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, items: [Object.assign({}, COMMUNITY_CARDS[0], { createdAt: CROSSING, momentCount: 3 })], totalVisible: 1 }) }));
+    const pageDate = await ctxDate.newPage();
+    await pageDate.goto(`${base}/v41/`, { waitUntil: 'load' });
+    await pageDate.waitForTimeout(1200);
+    await pageDate.evaluate(() => document.getElementById('community-menu')?.click());
+    await pageDate.waitForFunction(() => !!document.getElementById('community-panel')?.open, null, { timeout: 8000 }).catch(() => {});
+    await pageDate.waitForFunction(() => !!document.querySelector('.community-card'), null, { timeout: 8000 }).catch(() => {});
+    await pageDate.waitForTimeout(400);
+    const cardDate = await pageDate.evaluate((crossing) => {
+      const meta = [...document.querySelectorAll('.community-muted')].map((p) => p.textContent).find((t) => /개 순간/.test(t)) || '';
+      const d = new Date(crossing);
+      const localToday = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+      return { meta, localToday };
+    }, CROSSING);
+    const utcCut = '2026. 11. 15';
+    assert.ok(cardDate.meta.includes(cardDate.localToday.replace(/-/g, '. ')), `새벽 순간의 카드 날짜는 지역(한국) 날짜다 — 실제 "${cardDate.meta}" / 기대 ${cardDate.localToday}`);
+    assert.ok(!cardDate.meta.includes(utcCut), `카드 날짜가 UTC 절단(어제)으로 나온다: "${cardDate.meta}"`);
+    await pageDate.screenshot({ path: 'E:/lovetree-qa/lane/local3-graph/audit-community-date-' + width + '.png', animations: 'disabled', timeout: 10000 }).catch(() => {});
+    await ctxDate.close();
     await page4.keyboard.press('Escape');
     await page4.waitForTimeout(300);
     await page4.evaluate(() => document.getElementById('feedback-panel').showModal());
@@ -433,6 +525,135 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     assert.equal(editState.hiddenCount, 1, '고치는 덧붙임 카드 하나가 숨는다');
     await take(page4, '내 의견 덧붙임 고치기 열림');
     await ctx4.close();
+
+    // #743: 운영센터 '한눈에' — 카드 7+7이 1440·1920에서 각각 한 줄, 390은 지금처럼 줄바꿈(가로 넘침 0),
+    // 모든 카드가 같은 누름 모양(role·tabindex·44px 이상)이고, 탭이 있는 카드는 그 탭을 조건으로 열며
+    // 탭이 없는 카드는 내역을 펼친다(다시 누르면 접힘). 관리자 세션은 가짜 API(응답 모형)로 만든다.
+    const ctxAdm = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
+    await ctxAdm.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); } catch {} }, theme);
+    await ctxAdm.route('**://i.ytimg.com/**', THUMB);
+    await ctxAdm.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
+    await ctxAdm.route('**/api/admin/session', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, authenticated: true, admin: true, role: 'admin' }) }));
+    await ctxAdm.route('**/api/admin/feedback', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, feedback: [
+      { id: 'f1', kind: 'opinion', status: 'received', replyCount: 0, createdAt: '2026-11-14T09:00:00.000Z', displayTitle: '꼬리표가 안 붙어요', issueNumber: 741 },
+      { id: 'f2', kind: 'opinion', status: 'fixed', replyCount: 2, createdAt: '2026-11-13T09:00:00.000Z', displayTitle: '편집 창 꼬리표', issueNumber: 736 },
+      { id: 'f3', kind: 'journal', status: 'reviewing', replyCount: 0, createdAt: '2026-11-12T09:00:00.000Z', displayTitle: '오늘 사용 일지', issueNumber: null }
+    ] }) }));
+    await ctxAdm.route('**/api/admin/journals', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, journals: [] }) }));
+    await ctxAdm.route('**/api/community/admin/reports', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, reports: [
+      { id: 'r1', status: 'open', reason: '시험 신고', shareId: 'share-1', createdAt: '2026-11-14T10:00:00.000Z', hidden: false }
+    ] }) }));
+    await ctxAdm.route('**/api/admin/stats', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, stats: {
+      checkedAt: '2026-11-16T00:00:00.000Z', window: { days: 7, since: '2026-11-09T00:00:00.000Z' },
+      accounts: { total: 8, real: 2, aiTester: 4, tester: 2, new: { total: 3, real: 1, aiTester: 1, tester: 1 } },
+      trees: { total: 9, real: 4, aiTester: 3, tester: 2, titles: ['가을 노래', '겨울 산책', '봄의 기록'], public: { total: 3, real: 2, aiTester: 1, tester: 0, titles: ['가을 노래', '봄의 기록'] }, featured: { total: 1, real: 1, aiTester: 0, tester: 0, titles: ['가을 노래'] } },
+      moments: { total: 40, real: 21, aiTester: 12, tester: 7, new: { total: 6, real: 3, aiTester: 2, tester: 1 } }
+    } }) }));
+    await ctxAdm.route('**://api.github.com/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ number: 736, title: '시험 이슈', state: 'open' }) }));
+    const pageAdm = await ctxAdm.newPage();
+    await pageAdm.goto(`${base}/admin.html`, { waitUntil: 'load' });
+    await pageAdm.waitForFunction(() => document.querySelectorAll('.lt-stats .lt-stat').length === 7 && document.querySelectorAll('.lt-ov-cards .lt-ov-card').length === 7, null, { timeout: 20000 });
+    await pageAdm.waitForTimeout(400);
+    const adminCards = await pageAdm.evaluate(() => {
+      const stat = [...document.querySelectorAll('.lt-stats .lt-stat')];
+      const todo = [...document.querySelectorAll('.lt-ov-cards .lt-ov-card')];
+      const all = [...stat, ...todo];
+      const rects = all.map((el) => el.getBoundingClientRect());
+      const flat = (el) => el.textContent.replace(/\s+/g, ' ').trim();
+      return {
+        statCount: stat.length, todoCount: todo.length,
+        statTops: [...new Set(stat.map((el) => Math.round(el.getBoundingClientRect().top)))],
+        todoTops: [...new Set(todo.map((el) => Math.round(el.getBoundingClientRect().top)))],
+        minW: Math.round(Math.min(...rects.map((r) => r.width))), minH: Math.round(Math.min(...rects.map((r) => r.height))),
+        roles: all.map((el) => el.getAttribute('role')), tabs: all.map((el) => el.getAttribute('tabindex')),
+        cursors: [...new Set(all.map((el) => getComputedStyle(el).cursor))],
+        overflow: Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth),
+        firstStatText: flat(stat[0]),
+        treeCardText: flat(stat.find((el) => el.dataset.statToggle === 'featured-trees'))
+      };
+    });
+    assert.equal(adminCards.statCount, 7, '전체 숫자 카드 7개');
+    assert.equal(adminCards.todoCount, 7, '처리할 일 카드 7개');
+    if (width >= 1440) {
+      assert.equal(adminCards.statTops.length, 1, `전체 숫자 카드가 한 줄이다(카드 위 좌표 ${JSON.stringify(adminCards.statTops)})`);
+      assert.equal(adminCards.todoTops.length, 1, `처리할 일 카드가 한 줄이다(카드 위 좌표 ${JSON.stringify(adminCards.todoTops)})`);
+    }
+    assert.equal(adminCards.overflow, 0, `운영센터 가로 넘침 0(실제 ${adminCards.overflow}px)`);
+    assert.ok(adminCards.minH >= 44 && adminCards.minW >= 44, `카드 누름 영역 44px 이상(최소 ${adminCards.minW}×${adminCards.minH}px)`);
+    assert.deepEqual(adminCards.roles, Array(14).fill('button'), '모든 카드가 role=button이다');
+    assert.deepEqual(adminCards.tabs, Array(14).fill('0'), '모든 카드가 tabindex=0이다(키보드로 연다)');
+    assert.deepEqual(adminCards.cursors, ['pointer'], `모든 카드가 같은 누름 모양(커서 ${JSON.stringify(adminCards.cursors)})`);
+    // 숫자 뜻: 큰 숫자가 '실제 고객'이고, 전체 = 실제 + AI + 시험을 카드 안에 함께 적는다.
+    assert.ok(adminCards.firstStatText.includes('실제 고객'), `큰 숫자가 무엇을 세는지 카드 안에 적는다(실측: ${adminCards.firstStatText})`);
+    assert.ok(adminCards.firstStatText.includes('전체 8') && adminCards.firstStatText.includes('AI 4') && adminCards.firstStatText.includes('시험 2'), `전체 = 실제+AI+시험을 함께 적는다(실측: ${adminCards.firstStatText})`);
+    assert.ok(adminCards.treeCardText.includes('전체 1'), `둘러보기 소개 카드도 전체를 함께 적는다(실측: ${adminCards.treeCardText})`);
+    await take(pageAdm, '운영센터 한눈에');
+
+    // 1920에서도 두 묶음이 각각 한 줄이다(#743 대표 요청).
+    if (width >= 1440) {
+      await pageAdm.setViewportSize({ width: 1920, height: 1080 });
+      await pageAdm.waitForTimeout(400);
+      const wide = await pageAdm.evaluate(() => ({
+        statTops: [...new Set([...document.querySelectorAll('.lt-stats .lt-stat')].map((el) => Math.round(el.getBoundingClientRect().top)))],
+        todoTops: [...new Set([...document.querySelectorAll('.lt-ov-cards .lt-ov-card')].map((el) => Math.round(el.getBoundingClientRect().top)))],
+        overflow: Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth)
+      }));
+      assert.equal(wide.statTops.length, 1, `1920 전체 숫자 한 줄(실측 ${JSON.stringify(wide.statTops)})`);
+      assert.equal(wide.todoTops.length, 1, `1920 처리할 일 한 줄(실측 ${JSON.stringify(wide.todoTops)})`);
+      assert.equal(wide.overflow, 0, `1920 가로 넘침 0(실제 ${wide.overflow}px)`);
+      await pageAdm.setViewportSize({ width, height });
+      await pageAdm.waitForTimeout(300);
+    }
+
+    // 탭이 없는 카드(전체 숫자)는 내역이 펼쳐지고, 다시 누르면 접힌다. Enter로도 열린다.
+    const expand = await pageAdm.evaluate(() => {
+      const card = document.querySelector('[data-stat-toggle="trees"]');
+      card.click();
+      const detail = document.getElementById('stat-detail-trees');
+      const open = { hidden: detail.hidden, expanded: card.getAttribute('aria-expanded'), titles: detail.querySelectorAll('.lt-stat-titles li').length, split: detail.querySelectorAll('.lt-stat-split li').length, text: detail.textContent.replace(/\s+/g, ' ').trim() };
+      card.click();
+      const closed = { hidden: detail.hidden, expanded: card.getAttribute('aria-expanded') };
+      return { open, closed };
+    });
+    assert.deepEqual([expand.open.hidden, expand.open.expanded], [false, 'true'], '탭이 없는 카드를 누르면 내역이 펼쳐진다');
+    assert.equal(expand.open.titles, 3, `트리 카드 내역에 제목 목록(최대 20)이 보인다(실측 ${expand.open.titles}개)`);
+    assert.equal(expand.open.split, 3, '내역에 실제 고객·AI 명예회원·시험 계정 갈래 수가 있다');
+    assert.ok(expand.open.text.includes('AI 명예회원') && !/@/.test(expand.open.text), '내역에 이메일 같은 개인정보는 없다');
+    assert.deepEqual([expand.closed.hidden, expand.closed.expanded], [true, 'false'], '다시 누르면 내역이 접힌다');
+    await pageAdm.focus('[data-stat-toggle="accounts"]');
+    await pageAdm.keyboard.press('Enter');
+    await pageAdm.waitForTimeout(200);
+    const byEnter = await pageAdm.evaluate(() => ({ hidden: document.getElementById('stat-detail-accounts').hidden, expanded: document.querySelector('[data-stat-toggle="accounts"]').getAttribute('aria-expanded') }));
+    assert.deepEqual([byEnter.hidden, byEnter.expanded], [false, 'true'], 'Enter로도 내역이 펼쳐진다');
+    await pageAdm.keyboard.press('Enter');
+    await pageAdm.waitForTimeout(200);
+
+    // 탭이 있는 카드는 그 탭을 해당 조건으로 걸러 연다(주소에 조건이 남는다).
+    const jump = async (selector) => {
+      await pageAdm.evaluate(() => { location.hash = '#overview'; });
+      await pageAdm.waitForFunction(() => document.querySelectorAll('.lt-ov-cards .lt-ov-card').length === 7, null, { timeout: 8000 });
+      await pageAdm.click(selector);
+      await pageAdm.waitForFunction(() => location.hash !== '#overview', null, { timeout: 8000 });
+      await pageAdm.waitForTimeout(200);
+      return pageAdm.evaluate(() => ({ hash: location.hash, filterNote: !!document.querySelector('[data-clear-filter]') }));
+    };
+    const pending = await jump('[data-ov-view="board"][data-ov-status="pending"]');
+    assert.equal(pending.hash, '#board?status=pending', `처리 대기 카드 → 고객 글 탭의 처리 대기(실제 ${pending.hash})`);
+    const unanswered = await jump('[data-ov-unanswered="1"]');
+    assert.equal(unanswered.hash, '#board?unanswered=1', `답글 0 카드 → 답글 0만 거른 고객 글(실제 ${unanswered.hash})`);
+    assert.equal(unanswered.filterNote, true, '거른 조건을 지우는 단추가 함께 보인다');
+    const reports = await jump('[data-ov-view="reports"][data-ov-status="open"]');
+    assert.equal(reports.hash, '#reports?status=open', `신고 대기 카드 → 신고 탭의 검토 대기(실제 ${reports.hash})`);
+    const issues = await jump('[data-ov-view="issues"][data-ov-status="closed"]');
+    assert.equal(issues.hash, '#issues?status=closed', `닫힌 이슈 카드 → 고치는 일 탭의 닫힌 이슈(실제 ${issues.hash})`);
+    // 키보드(Space)로도 카드가 열린다.
+    await pageAdm.evaluate(() => { location.hash = '#overview'; });
+    await pageAdm.waitForFunction(() => document.querySelectorAll('.lt-ov-cards .lt-ov-card').length === 7, null, { timeout: 8000 });
+    await pageAdm.focus('[data-ov-view="issues"][data-ov-status="open"]');
+    await pageAdm.keyboard.press(' ');
+    await pageAdm.waitForFunction(() => location.hash.startsWith('#issues'), null, { timeout: 8000 });
+    assert.equal(await pageAdm.evaluate(() => location.hash), '#issues?status=open', 'Space로도 카드가 열린다');
+    await ctxAdm.close();
 
     // #666 2번: 계정 메뉴가 열린 자리에서 첫 트리 안내가 메뉴를 덮지 않는다(한 번에 하나만).
     // 안내가 뜨고 메뉴가 열리면 안내를 잠시 접고, 메뉴를 닫으면 다시 뜨는 것까지 확인한다.
@@ -705,6 +926,52 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
       await pageNotice.close();
       await ctxNotice.close();
     }
+    // 2026-11-16 대표 결정: 지도→그래프→동심원형→그물형 왕복 — 기존 화면 전환 메시지(lt41-navigate) 한 길로
+    // 오가고, 지금 트리·순간이 유지되는지(같은 트리·같은 순간·그래프 표시의 순간 수)까지 잰다.
+    // 쓰기 가능 문맥(ctx5 — 예시가 아니라 지금 트리를 부른 자리)에서만 의미가 있어 여기서 한다.
+    const pageMap = await ctx5.newPage();
+    await pageMap.goto(`${base}/v41/?account=1#network`, { waitUntil: 'load' });
+    await frameOf(pageMap, /track56-network/);
+    await pageMap.waitForTimeout(1500);
+    const treeBeforeTrip = await pageMap.evaluate(() => ({ id: window.LT41?.tree?.id || '', moments: (window.LT41?.tree?.moments || []).length, momentId: window.LT41?.momentId || '' }));
+    assert.ok(treeBeforeTrip.id, '지금 트리가 부른 상태에서 왕복을 본다');
+    const mapFrameTrip = () => [...pageMap.frames()].find((f) => { try { return /track56-network/.test(f.url()); } catch { return false; } });
+    const graphFrameTrip = () => [...pageMap.frames()].find((f) => { try { return /track60-graph/.test(f.url()); } catch { return false; } });
+    await mapFrameTrip().evaluate(() => document.getElementById('viewGraph').click());
+    await pageMap.waitForFunction(() => [...document.querySelectorAll('iframe')].some((f) => { try { return /track60-graph/.test(f.contentWindow.location.href); } catch { return false; } }), null, { timeout: 10000 });
+    // 그래프 모듈이 그려질 때까지(배지가 채워질 때까지) 기다린다 — 프레임 주소만으로는 그리기 전이다.
+    await pageMap.waitForFunction(() => {
+      const f = [...document.querySelectorAll('iframe')].find((x) => { try { return /track60-graph/.test(x.contentWindow.location.href); } catch { return false; } });
+      return Boolean(f && (f.contentDocument.getElementById('gBadge')?.textContent || '').length > 0);
+    }, null, { timeout: 10000 });
+    const gFrameTrip = graphFrameTrip();
+    assert.ok(gFrameTrip, '지도의 [그래프] 단추로 그래프 보기가 열린다(기존 lt41-navigate 한 길)');
+    const tripGraph = await gFrameTrip.evaluate(() => {
+      const b = [...document.querySelectorAll('.g-view-switch .pill')];
+      return { n: b.length, pressed: b.map((x) => x.getAttribute('aria-pressed')), badge: document.getElementById('gBadge')?.textContent || '' };
+    });
+    assert.equal(tripGraph.n, 3, '그래프 머리줄 보기 고르기 세 단추');
+    assert.deepEqual(tripGraph.pressed, ['false', 'false', 'true'], '현재 보기(그래프)만 aria-pressed=true');
+    assert.ok(tripGraph.badge.startsWith(`순간 ${treeBeforeTrip.moments}`), `그래프 표시의 순간 수가 지금 트리와 같다(실제 ${tripGraph.badge})`);
+    const navCurrent = await pageMap.evaluate(() => document.querySelector('.tree-views [data-view="track56-network.html"]')?.getAttribute('aria-current'));
+    assert.equal(navCurrent, 'true', '그래프 보기에서 위쪽 메뉴(책·보드·지도)의 지도가 켜진 상태다');
+    await gFrameTrip.evaluate(() => document.getElementById('gViewConc').click());
+    await pageMap.waitForFunction(() => {
+      const f = [...document.querySelectorAll('iframe')].find((x) => { try { return /track56-network/.test(x.contentWindow.location.href); } catch { return false; } });
+      return Boolean(f && f.contentDocument?.body && f.contentDocument.body.dataset.ltView === 'concentric');
+    }, null, { timeout: 10000 });
+    const mapAfterConc = await mapFrameTrip().evaluate(() => ({ view: document.body.dataset.ltView, concPressed: document.getElementById('viewConc')?.getAttribute('aria-pressed'), stored: localStorage.getItem('lt41.network.view') }));
+    assert.equal(mapAfterConc.view, 'concentric', '그래프의 [동심원형]으로 지도가 동심원형 보기로 열린다');
+    assert.equal(mapAfterConc.concPressed, 'true', '동심원형이 눌린 상태(aria-pressed=true)');
+    assert.equal(mapAfterConc.stored, 'concentric', '지도 보기 저장 키(lt41.network.view)가 바뀐다');
+    await mapFrameTrip().evaluate(() => document.getElementById('viewNet').click());
+    await pageMap.waitForTimeout(1200);
+    const treeAfterTrip = await pageMap.evaluate(() => ({ id: window.LT41?.tree?.id || '', moments: (window.LT41?.tree?.moments || []).length, momentId: window.LT41?.momentId || '' }));
+    const mapAfterNet = await mapFrameTrip().evaluate(() => ({ view: document.body.dataset.ltView, netPressed: document.getElementById('viewNet')?.getAttribute('aria-pressed') }));
+    assert.equal(mapAfterNet.view, 'network', '지도의 [그물형]으로 그물 보기로 돌아온다');
+    assert.equal(mapAfterNet.netPressed, 'true', '그물형이 눌린 상태(aria-pressed=true)');
+    assert.deepEqual(treeAfterTrip, treeBeforeTrip, '왕복 뒤에도 지금 트리·순간이 유지된다');
+    await pageMap.close();
     await ctx5.close();
 
     // #627 PR3: 그래프 보기 — 지금은 주소(#my/graph)로만 열리는 화면이라 호스트가 LT41을 직접 넘긴다
@@ -732,6 +999,24 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     const graphFrame = await frameOf(page7, /track60-graph/);
     assert.ok(graphFrame, '그래프 프레임이 열린다');
     await page7.waitForTimeout(700);
+    // 2026-11-16 대표 결정: 그래프 머리줄에도 지도와 같은 모양의 보기 고르기가 있고 그래프가 눌린 상태다.
+    const graphSwitch = await graphFrame.evaluate(() => {
+      const b = [...document.querySelectorAll('.g-view-switch .pill')];
+      return {
+        n: b.length,
+        labels: b.map((x) => x.textContent.trim()),
+        pressed: b.map((x) => x.getAttribute('aria-pressed')),
+        overflow: Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth)
+      };
+    }).catch(() => null);
+    assert.ok(graphSwitch, '그래프 머리줄 보기 고르기를 잰다');
+    assert.deepEqual(graphSwitch.labels, ['그물형', '동심원형', '그래프'], `보기 고르기 세 단추(실제 ${JSON.stringify(graphSwitch.labels)})`);
+    assert.deepEqual(graphSwitch.pressed, ['false', 'false', 'true'], '현재 보기(그래프)만 aria-pressed=true');
+    assert.equal(graphSwitch.overflow, 0, `그래프 머리줄에서 가로 넘침 0(실제 ${graphSwitch.overflow})`);
+    // 2026-11-16 CTO 지적: 묶음이 있는 그래프에서는 빈 판 안내가 보이지 않는다(있으면 안내는 사라진다).
+    const hubGuideHubful = await graphFrame.evaluate(() => { const e = document.getElementById('gEmpty'); return { shown: !e.hidden, text: e.textContent || '' }; });
+    assert.equal(hubGuideHubful.shown, false, '묶음이 있는 그래프에서는 빈 판 안내가 보이지 않는다');
+    assert.ok(!hubGuideHubful.text.includes('묶여요'), '묶음이 있는 그래프에 안내 문구가 없다');
     await take(page7, '그래프 보기');
     const graphCheck = await page7.evaluate(() => {
       const f = [...document.querySelectorAll('iframe')].at(-1);
@@ -898,6 +1183,38 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     assert.equal(emptyCheck.head, '같은 노래를 담은 다른 팬', '노래 허브의 칸 제목(소스 상수)');
     assert.equal(emptyCheck.empty, '아직 같은 노래를 담은 다른 팬이 없어요', `빈 상태 문구(실제 "${emptyCheck.empty}")`);
     assert.equal(emptyCheck.overflow, 0, `다른 팬 칸이 있어도 가로 넘침 0(실제 ${emptyCheck.overflow})`);
+    // 2026-11-16 CTO 지적: 묶음 0개 그래프 — 빈 무대를 고장으로 본다. 짧은 안내 + 바로 할 수 있는
+    // 단추(꼬리표 한 번에 제안받기)가 보이고, 누른 목록 제목도 실제 뜻('아직 묶음에 안 든 순간')이다.
+    const ctx7b = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
+    await ctx7b.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); } catch {} }, theme);
+    await ctx7b.route('**://i.ytimg.com/**', THUMB);
+    await ctx7b.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
+    const page7b = await ctx7b.newPage();
+    await page7b.goto(`${base}/graph-empty-host.html`, { waitUntil: 'domcontentloaded' });
+    const emptyGraphFrame = await frameOf(page7b, /track60-graph/);
+    assert.ok(emptyGraphFrame, '묶음 0개 그래프가 열린다');
+    await page7b.waitForTimeout(700);
+    const hubGuide = await emptyGraphFrame.evaluate(() => {
+      const e = document.getElementById('gEmpty');
+      const b = e.querySelector('.g-empty-cta');
+      return { shown: !e.hidden, text: e.textContent || '', cta: b?.textContent || '', badge: (document.getElementById('gBadge') || {}).textContent || '' };
+    });
+    assert.equal(hubGuide.shown, true, '묶음 0개 그래프에서는 빈 판 안내가 보인다');
+    assert.ok(hubGuide.text.includes('2개 이상이면 여기에 묶여요'), `안내가 묶음 규칙을 알려준다(실제 ${hubGuide.text})`);
+    assert.equal(hubGuide.cta, '꼬리표 한 번에 제안받기', '안내에는 바로 할 수 있는 단추가 있다');
+    assert.ok(hubGuide.badge.includes('묶음 0'), `묶음 0이 표시에도 보인다(실제 ${hubGuide.badge})`);
+    // 2026-11-16 CTO 지적: 안내의 단추와 선반의 단추가 두 번 연달아 보이지 않게 — 빈 판 안내가 떠 있는
+    // 동안에는 제안 단추가 한 개만 보인다(선반은 '아직 묶음에 안 든 순간 N' 글자만 남긴다).
+    const ctaCount = await emptyGraphFrame.evaluate(() => [...document.querySelectorAll('.g-empty-cta, .g-shelf-hint')].filter((b) => { const r = b.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(b).visibility !== 'hidden'; }).length);
+    assert.equal(ctaCount, 1, `제안 단추는 한 개만 보인다(실제 ${ctaCount})`);
+    await emptyGraphFrame.evaluate(() => document.querySelector('.g-empty-cta').click());
+    await page7b.waitForTimeout(400);
+    const suggestHead = await emptyGraphFrame.evaluate(() => (document.querySelector('#detailCard .d-kicker') || {}).textContent || '');
+    assert.match(suggestHead, /^아직 묶음에 안 든 순간 2/, `제안 목록 제목도 실제 뜻으로(실제 ${suggestHead})`);
+    const shelfLabel = await emptyGraphFrame.evaluate(() => (document.getElementById('shelfLabel') || {}).textContent || '');
+    assert.match(shelfLabel, /^아직 묶음에 안 든 순간 /, `선반 이름도 실제 뜻으로(실제 ${shelfLabel})`);
+    await take(page7b, '그래프·묶음 0개 안내');
+    await ctx7b.close();
     await ctx7.close();
 
     // 주소로 열리는지(#my/graph) — 셸이 그래프 보기를 화면 파일로 띄우는지 단정한다(메뉴 단추는 없다).
@@ -917,6 +1234,74 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     assert.match(graphByHash.url(), /views\/graph\/track60-graph\.html$/, '#my/graph 프레임 주소에 그래프 하위 폴더가 있다');
     assert.equal(await graphByHash.evaluate(() => document.documentElement.getAttribute('data-v41-screen')), 'graph', '#my/graph 프레임 문서가 그래프 화면이다');
     await ctx8.close();
+
+    // 첫 화면 글자 카드(261116): 내려간 영상(회색 120×90)의 '영상을 볼 수 없어요' 카드가 #orbit
+    // shadowRoot 안에서 줄(감정·날짜·제목·알림)을 지키는지 — 제목이 3줄 높이 안(max-height 절단)·카드 안 배치·
+    // '첫 순간' 배지와 감정 칩 겹침 0을 수치로 단정한다. 카드는 그림자 안에 있으므로 shadowRoot로
+    // 스코핑한다(#730과 같은 판정). 셸이 lt41-date-style 동기화로 프레임을 다시 띄우므로 매번 전 프레임 검사.
+    const ctx9 = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
+    await ctx9.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); localStorage.setItem('lt41.homeCards', 'mine'); } catch {} }, theme);
+    await ctx9.route('**://i.ytimg.com/**', (r) => r.fulfill({ status: 200, contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="90"><rect width="120" height="90" fill="#282828"/><text x="60" y="52" font-size="18" fill="#777" text-anchor="middle">...</text></svg>' }));
+    await ctx9.route('**/api/**', (r) => {
+      if (/api\/workspace/.test(r.request().url())) {
+        return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ revision: 1, state: { version: 1, trees: [thumbTree], prefs: {} }, subject: '시험계정', writeSubjectBound: true, savedAt: '2026-11-16T00:00:00.000Z' }) });
+      }
+      return r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' });
+    });
+    const page9 = await ctx9.newPage();
+    await page9.goto(`${base}/v41/?account=1`, { waitUntil: 'load' });
+    let homeFrame = null;
+    for (let i = 0; i < 80 && !homeFrame; i++) {
+      for (const fr of page9.frames()) {
+        if (fr === page9.mainFrame()) continue;
+        try { if (await fr.evaluate(() => !!document.getElementById('orbit')?.shadowRoot?.querySelector('.card .lt-fallback-title'))) { homeFrame = fr; break; } } catch {}
+      }
+      if (!homeFrame) await page9.waitForTimeout(300);
+    }
+    assert.ok(homeFrame, '첫 화면 글자 카드가 그려진다(내려간 영상 → 글 카드)');
+    const cardCheck = await homeFrame.evaluate(() => {
+      const sh = document.getElementById('orbit').shadowRoot;
+      const cards = [...sh.querySelectorAll('.card .lt-fallback-card, .recent-media .lt-fallback-card')];
+      const bad = [];
+      for (const card of cards) {
+        const cr = card.getBoundingClientRect();
+        const title = card.querySelector('.lt-fallback-title');
+        if (!title) { bad.push('제목 칸이 없다'); continue; }
+        const tcs = getComputedStyle(title);
+        const limit = parseFloat(tcs.fontSize) * parseFloat(tcs.lineHeight) * 3 + 2;
+        if (title.clientHeight > limit) bad.push(`제목이 3줄 높이를 넘는다(${title.clientHeight}px > ${Math.round(limit)}px — max-height 3줄 절단)`);
+        const inside = (el) => { const r = el.getBoundingClientRect(); return r.top >= cr.top - 1 && r.bottom <= cr.bottom + 1 && r.left >= cr.left - 1 && r.right <= cr.right + 1; };
+        for (const sel of ['.lt-fallback-head', '.lt-fallback-title', '.lt-fallback-notice']) {
+          const el = card.querySelector(sel);
+          if (el && !inside(el)) bad.push(sel + '이(가) 카드 밖으로 나온다');
+        }
+        const emo = card.querySelector('.lt-fallback-emotion');
+        const date = card.querySelector('.lt-fallback-date');
+        if (emo && date) {
+          const er = emo.getBoundingClientRect(), dr = date.getBoundingClientRect();
+          /* 감정 칩 박스는 패딩을 포함해 날짜 칸과 최대 4px 맞닿을 수 있다(글자 충돌 아님 — 2070 줌 실측).
+             판정은 '날짜가 감정보다 한 줄 아래에서 시작하는가'(각자 다른 줄)로 한다. */
+          if (!(dr.top >= er.top + parseFloat(getComputedStyle(emo).fontSize) - 1)) bad.push('감정과 날짜가 같은 줄에 붙어 있다(감정 ' + Math.round(er.top) + ' / 날짜 ' + Math.round(dr.top) + ')');
+        }
+        /* 4px 이하는 절대 위치 알림(하단 고정)·반올림 한계 — 시각 결함이 아니다(2070·1440 실측). */
+        if (card.scrollHeight > card.clientHeight + 4) bad.push(`카드 내용이 카드 밖으로 넘친다(${card.scrollHeight - card.clientHeight}px)`);
+      }
+      for (const fm of [...sh.querySelectorAll('.card .firstMark')]) {
+        const fb = fm.parentElement?.querySelector('.surface .lt-fallback-card');
+        const emo = fb?.querySelector('.lt-fallback-emotion');
+        if (!fb || !emo) continue;
+        const a = fm.getBoundingClientRect(), b = emo.getBoundingClientRect();
+        const ox = Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left));
+        const oy = Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
+        if (ox * oy > 0) bad.push(`'첫 순간' 배지와 감정 칩이 겹친다(${Math.round(ox * oy)}px²)`);
+      }
+      return { cards: cards.length, bad, overflow: Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth) };
+    });
+    assert.ok(cardCheck.cards >= 1, `첫 화면 글자 카드 수(실제 ${cardCheck.cards})`);
+    assert.deepEqual(cardCheck.bad, [], `첫 화면 글자 카드 줄·말줄임·배치: ${JSON.stringify(cardCheck.bad)}`);
+    assert.equal(cardCheck.overflow, 0, `첫 화면 가로 넘침 0(실제 ${cardCheck.overflow})`);
+    await take(page9, '첫 화면 글자 카드');
+    await ctx9.close();
 
     await context.close();
     return rows;

@@ -4,6 +4,7 @@ import { pathToFileURL } from 'node:url';
 import { createPool, createWorkspaceRepo } from './db/postgres.js';
 import { createShareRepo } from './db/shares-postgres.js';
 import { createTreeVisibilityRepo } from './db/tree-visibility-postgres.js';
+import { createTreeDiscoverRepo } from './db/tree-discover-postgres.js';
 import { createCommunityRepo } from './db/community-postgres.js';
 import { createAdminRoleRepo } from './db/admin-roles-postgres.js';
 import { createAdminRoleService } from './admin-roles.js';
@@ -152,6 +153,8 @@ const repo = createWorkspaceRepo(pool);
 // 결제는 아직 없으므로 Plus 자격은 항상 false — 비공개 지정은 서버가 403 으로 거절한다.
 const shareRepo = createShareRepo(pool);
 const visibilityRepo = createTreeVisibilityRepo(pool);
+// 둘러보기 소개 표시(2026-11-16 대표 결정 — 기본 꺼짐, 고객이 켠다. 무료). 켠 트리만 행이 쌓인다.
+const discoverRepo = createTreeDiscoverRepo(pool);
 // #67 제품 역할. 표가 아직 없거나 저장이 망가진 자리에서는 역할 없음으로 닫힌다(fail-closed).
 const admin = createAdminRoleService({ store: createAdminRoleRepo(pool), productId: LOVETREE_PRODUCT_ID });
 // #655 2차 운영센터 전체 숫자. 집계는 저장소 안에서 한 번에 끝내고(전체 행을 읽어 오지 않는다)
@@ -161,6 +164,7 @@ const shareService = createShareService({
   shareRepo,
   workspaceRepo: repo,
   visibilityRepo,
+  discoverRepo,
   productId: LOVETREE_PRODUCT_ID,
   plusEntitled: () => false,
   admin

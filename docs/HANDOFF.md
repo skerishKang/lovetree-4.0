@@ -1,10 +1,65 @@
 # LoveTree 4.0 — 핸드오프
 
+## 2026-11-16 — 쉬운 추가 연속 담기: 옛 꼬리표 줄이 살아 남아 옛 순간에 저장·재클릭에 모두 해제 (#741, 컴1로컬2 레인, ai/local2-quickadd-tag-chip-20261116-070500-9f3c2a, main 76b2b8d 기준)
+
+- **재현(시험 계정 04, 390×844, 배포본 #738 반영)**: 같은 쉬운 추가 창에서 3회 연속 담기(순간 c54cc47c·54dc7b7f·89af3589) 뒤 세 번째 안내의 '가수:ILLIT' 칩 클릭 1회 → PUT·토스트 '서버에 저장됐어요.'(쌓인 귀가 옛 순간 2개에도 오염 저장), 같은 칩 재클릭 → **세 순간 모두 keywords []** — 하은 1회차 증상(칩을 눌렀는데 책·순간 목록·꼬리표로 찾기에 아무것도 없음)과 일치. 2회 연속 담기 재현에서도 두 번째 칩 클릭 1회에 첫 순간(6ddd1293)에 '가수:NewJeans' 오염 저장.
+- **원인**: 담을 때마다 `renderQuickTagline`이 `#quick-tagline`에 줄을 새로 그리는데 옛 인스턴스를 거두지 않는다(clearSavedNotice는 replaceChildren만, `renderTagLine.destroy()`는 host의 클릭 귀를 못 지움) — 귀가 담기 횟수만큼 쌓여 각자 '자기 순간'에 저장/해제한다.
+- **고침**: `tag-line.mjs` renderTagLine — 귀 3개(click 2·keydown)를 AbortController에 묶고 destroy가 abort하며, aborted 귀는 즉시 무시(host가 귀를 안 지우는 환경까지 이중 안전). `shell/quick-add.mjs` — `quickTagLine` 한 개만 살려 두고 다시 그리기 전·안내 비울 때 destroy. renderTagLine에 doc을 명시해 전달(기본값 document 평가를 피함 — 가짜 DOM 시험 가능).
+- **시험**: `tests/v41-quick-add-flow.test.mjs` — harness fakeEl이 실제 DOM처럼 귀를 쌓게 고치고(덮어쓰면 결함을 못 잡음) saveTags deps 추가, 신규 1건: 연속 담기 뒤 칩 클릭 → 저장 호출 1회·방금 담은 순간 id·['가수:ILLIT'], 재클릭 → 해제([])도 같은 순간뿐. `tests/v41-tags-627.test.mjs` — destroy 계약 1건. 로컬: 627 41/41·quick-add-flow 16/16·전체 npm test 1713 pass fail 0(30초)·build·modulepreload --check 통과.
+- **제안 칩 '가수 · MMA2026'은 이번에 고치지 않음**: 세 번째 영상 제목 '#아일릿 #ILLIT #MMA2026 퍼포먼스 하이라이트…'의 해시태그 대문자 라틴 낱말 둘이 제목 규칙의 가수 후보로 둘 다 건진 것(로컬 확인 일치). 시상식 이름을 가수로 제안하지 않게 할지는 별도 판단.
+- **남은 검증**: 머지·배포 뒤 실주소에서 같은 재현(연속 담기 뒤 칩 1회 클릭 → 방금 담은 순간만 저장)을 다시 재어야 한다(.tmp553/gcheck/easytag3.mjs 재사용).
+## 2026-11-16 — 운영센터 '한눈에' 카드 7+7 한 줄·모두 누르기(#743, 컴1로컬2 레인, ai/local2-admin-overview-cards-20261116-081200-4b7e1d, main 557b95d 기준)
+
+- **한 줄**: '전체 숫자'·'처리할 일' 각 7장이 1440 이상에서 한 줄(카드가 들어가도록 '한눈에'만 판 폭을 min(1280px, 100%-64px)로 넓힘 — 다른 탭 폭은 그대로). 좁은 화면은 지금처럼 줄바꿈.
+- **누름 규칙 하나**: 갈 탭이 있는 카드는 그 탭을 조건으로 연다 — 처리 대기(#board?status=pending)·고침(fixed)·전체(board)·답글 0(#board?unanswered=1, 새 조건)·신고 대기(#reports?status=open)·열린/닫힌 이슈(#issues?status=open|closed). 갈 탭이 없는 카드(계정·트리·순간…)는 카드 아래 내역이 펼쳐지고 다시 누르면 접힌다 — 실제 고객/AI 명예회원/시험 계정 갈래 수 + 트리 계열은 제목 목록(최대 20). 제목만 싣고 이메일·subject는 싣지 않는다.
+- **숫자 뜻 맞춤**: 큰 숫자 옆에 '실제 고객'을 적고 '전체 = 실제 + AI + 시험'을 카드 안에 함께 적는다(전에는 '둘러보기 소개 1' 아래 'AI 명예회원 4·시험 계정 2'가 보여 전체보다 큰 것처럼 읽혔다).
+- **서버**: `/api/admin/stats`의 trees·public·featured에 titles(최대 20) 추가 — PostgreSQL 집계 SQL 한 번에 doc_tree/title_row CTE로 뽑고, 메모리 저장소(server/testing/memory-stats-repo.js)도 같은 계약. 응답 키는 accounts·checkedAt·moments·trees·window 그대로.
+- **접근성/모양**: 카드마다 role=button·tabindex=0·min-height 44px·같은 커서·hover·focus-visible 테두리. Enter·Space로 열린다(네이티브 button). audit 기준(12px 글자·13px 단추)에 맞춰 관리자 머리줄 브랜드 13px·4.1 12px·탭 단추 13px(390)·글 날짜 12px·이슈 링크 13px로 올렸다.
+- **검증**: 화면 검사기 admin 상태(390·1440 × 밤·정원) 추가 — 카드 7+7, 1440/1920 rect.top 동일, 390 넘침 0, role/tabindex/cursor, 펼침·접힘, 네 카드의 탭 전환(주소 조건), Enter·Space. `LT_SCREEN_AUDIT_REQUIRE=1 node --test tests/v41-screen-audit.test.mjs` 2/2 통과, admin-view 26/26·admin-roles 9/9, 전체 npm test 1717 pass fail 0(143 skipped), build ✓, modulepreload --check ✓. updates.json 미수정.
+
 > **main 보호 규칙(2026-11-09, 룰셋 "main 보호 (PR·필수 검사)")**: main은 PR로만 바꾼다(직접 푸시·force push·삭제 금지, 관리자도 예외 없음 — 비상시 대표가 룰셋 enforcement를 잠깐 끈다). 필수 검사: `check (ubuntu-latest)`·`check (windows-latest)`·`미리보기 postdeploy(로그아웃)` — 셋 다 paths 필터가 없어 문서만 바뀐 PR에서도 항상 돈다. 승인 수 0(레인이 스스로 머지). Deploy Bundle Boot Test는 paths 필터가 있어 필수에 넣지 않았다.
 
 > **빨간 필수 검사 규칭(2026-11-12 사고 뒤)**: 필수 검사가 빨강이면 **재실행은 1회까지**. 같은 항목이 또 빨강이면 멈추고 원인을 찾는다 — 재실행·빈 커밋으로 초록을 만들지 않는다. "간헐적·환경 탓"이라고 적으려면 **같은 시각 이 변경이 없는 브랜치(main 또는 다른 PR)** 에서도 같은 실패가 나는지 대조한 결과를 함께 적는다. 메시지를 받아 화면을 다시 띄우는 코드는 '뜰 때마다 보내는 쪽'과 짝으로 흐름 시험을 하고, 머지 전 미리보기 첫 화면을 5초 이상 직접 본다.
 
 > **시험 멈춤 규칙(2026-11-15)**: 브라우저 코드에 setInterval 반복을 넣으면 unref하거나 정리한다 — 안 그러면 npm test가 끝나지 않고 CI가 멈춘다.
+
+## 2026-11-16 — 꼬리표 제안: 시상식 이름+연도(MMA2026)를 가수로 잡던 문제 (컴1로컬4 레인, ai/local4-lt-stagename-year-261116, main ecf3309 기준)
+
+- **제보(하은 1회차)**: 제목 '#아일릿 #ILLIT #MMA2026 퍼포먼스 하이라이트 💚'의 제안이 `가수:ILLIT`·`가수:MMA2026`이었다 — MMA2026은 시상식(멜론뮤직어워드 2026).
+- **원인(코드 위치)**: `public/v41/tags.mjs` `artistFromWords` — 해시태그 전용 경로는 없다. '#'이 낱말 사이를 갈라 `gapIsSpace`가 거짓이 되어 '대문자 낱말 이음'으로 묶이지 않고, 낱말마다 따로 가수 후보가 된다. 걸러 내는 자리는 `STAGE_ALIASES`(무대 별칭 집합)인데 **낱말 전체가 별칭과 정확히 같을 때만** 걸렀다 — 'MMA2026'은 'MMA'가 아니어서 통과했다. `findStage`도 `containsWord`가 뒤 글자를 보고 'mma2026'을 'mma'로 읽지 못해 무대로도 잡히지 않았다.
+- **수리**: ① `stageOfToken(낱말)` — 낱말(대문자)이 별칭과 같거나, 끝의 4자리 연도를 뗀 값이 별칭이면 그 무대 이름(`STAGE_ALIAS_LABEL` 별칭→이름 표)을 돌려준다. `artistFromWords`·`artistFromParens`·`capsish`(낱말 이음 판정)가 모두 이 함수를 거쳐 무대 이름을 가수 후보에서 뺀다. ② `hasYearSuffix` — 영문+4자리 연도 꼴(MMA2026·MAMA2025)은 가수 이름이 아니다(무대 별칭이 아니어도). ③ `findStage`에 연도 허용 판정(`무대이름(?:19|20)\d{2}`)을 더해 '#MMA2026'도 `무대:멜론뮤직어워드`로 제안한다(날짜는 값에 붙이지 않는다 — 2차 규칙 그대로). 기존 목록(STAGE_LABELS — 방송·시상식 이름 한 벌)을 그대로 재사용했다.
+- **시험**(`tests/v41-tags-627.test.mjs` — 새 파일 없음): 제목 형태 표에 2건 추가('#아일릿 #ILLIT #MMA2026 …' → `artist:ILLIT`·`stage:멜론뮤직어워드`, '#ILLIT #MAMA2025 무대' → `artist:ILLIT`·`stage:MAMA`) + 새 시험 1건(연도 붙은 이름·시상식 이름은 가수 아님 / 무대는 방송 이름만 / ILLIT·RIIZE·NewJeans는 그대로 / 'MAMA2025'만 있는 제목은 가수 0). 수리 전 코드로 **fail 2**(`["ILLIT","MMA2026"]`) → 수리 후 42/42. 전체 npm test 1865검 1721 pass 0 fail(144 skip)·build·modulepreload --check 통과. updates.json은 건드리지 않았다.
+
+## 2026-11-16 — 운영센터 상태 칩 한 모양 + 이름 정리 + PR 번호 연결 (컴1로컬4 레인, ai/local4-lt-admin-chips-261116, main ecf3309 기준)
+
+- **문제(대표, 1440 정원 테마 '고치는 일' 탭)**: ① 상태 칩 모양이 자리마다 달랐다 — 긴 글 줄의 '고침' 칩은 눌려 '고/침' 두 줄(높이 40px), 짧은 줄 칩은 남은 폭을 다 채움(677px·593px·239px). 원인은 그리드 칸의 기본 stretch + `white-space` 없음. ② '고침 완료'(GitHub 이슈 닫힘)와 고객 글 칩 '고침'(고객에게 '고쳤어요' 답함)이 같은 말처럼 보임. ③ 연결 번호가 PR이면 `issues/637`을 읽어 실패해 '(이슈를 불러오지 못했어요)'로 보였다(실제 #637은 PR).
+- **수리**: `src/admin.css`의 `.lt-badge`에 `flex: none; justify-self: start; white-space: nowrap; line-height: 1.4` — flex·그리드 어느 줄에서도 글자 폭만·한 줄·세로 가운데. '고치는 일' 고객 글 줄은 `.lt-issue-post{grid-template-columns:minmax(0,1fr) auto auto}`로 제목 칸이 남은 폭을 가져가 줄바꿈하고 칩을 밀지 않는다. 이름: `issueStateLabel`을 '이슈 열림/이슈 닫힘'으로, 이 탭 고객 글 칩은 `statusBadge(status,'고객에게: ')`로 다른 탭 이름(새 글·확인 중·고침…)+머리. PR: GitHub 응답의 `pull_request`를 버리지 않고 'PR #번호 · 제목'(링크는 /pull/)으로 보인다. 상태 거름(#issues?status=open|closed)은 PR을 이슈 상태로 세지 않는다.
+- **숫자(1440·390, 가짜 API·가짜 GitHub)**: 전 — 칩 높이 24~40px(긴 줄 '고침' 40 = 두 줄), 폭 677/593/239px(글자 23/33/20px). 후 — 높이 모두 **23px**, 폭 90/64/87/100px(글자 70/44/67/80px + 여백·테두리 20 — 칩 폭이 글자+여백뿐), 390도 같은 값. PR 줄 'PR #637 · 검색 색인 고치기', 이슈 줄 제목 그대로.
+- **시험**: `tests/admin-view.test.mjs`(새 파일 없음)에 칩 시험 1건 — 1440·390에서 모든 칩 높이 오차 1px 이내·한 줄(높이 ≤ 한 줄 높이)·잘림 0·폭 ≤ 글자+21px, 긴 글 줄은 제목 높이 > 칩 높이(밀지 않음), 이름('이슈 닫힘'·'고객에게: 고침')·PR 제목 단정. 수리 전 코드로는 **fail 2**(24~40px) → 수리 후 27/27. CI 미리보기 검사에 `LT_ADMIN_REQUIRE=1` 단계 추가(지도 도구 줄 잡). 전체 npm test 1864검 1720 pass 0 fail(144 skip)·build·modulepreload --check 통과. updates.json은 건드리지 않았다(대표 지시).
+
+## 2026-11-16 — 둘러보기 소개 기본 꺼짐: 고객이 켜는 것으로 (컴1로컬4 레인, ai/local4-lt-discover-optin-261116, main b30034a 기준)
+
+- **결정(대표, 2026-11-16)**: 링크 공유는 무료·그대로. 둘러보기 소개는 **기본 꺼짐** — 고객이 켜야 둘러보기·다른 팬 보기(tag-moments)에 나오고(무료), 완전 비공개(링크 차단)만 Plus 전용 유지. 이미 나오던 트리는 켜진 상태로 둔다(고객 데이터 불변, 새 트리부터 기본 꺼짐). AI 명예회원 두 명이 공개를 무서워한 것이 계기.
+- **서버 경로**: '순간 3개 자동 소개' 규칙은 ① `server/db/community-postgres.js` 둘러보기 SQL(`moment_count>=3 AND (origin='auto' OR discoverable)`) ② 같은 파일 `listPublicTagShares`(조건 없음) ③ `server/db/stats-postgres.js` featured_tree ④ sitemap(functions/_lib/search-meta.mjs — 둘러보기 목록을 따라감)에 있었다. 넷 모두 `lovetree_tree_discover` 표(새 — 스파스, 켠 트리만 행)의 `EXISTS`로 바꾸고, tag-moments에도 `moment_count>=3`을 더했다. tester 거름은 서비스층 역할 판정(기존 #678 후속) 그대로.
+- **새 API(무료, 본인 트리만)**: `GET/PUT /api/trees/<treeId>/discover`(`{discover:true|false}`) — 응답에 지금 상태를 돌려준다. 공유 상태 응답(`GET /api/shares`)과 공개 상태 응답(visibility GET/PUT)에도 `discover` 칸을 넣었다(화면이 다음 PR에서 쓴다 — 이번 PR은 화면을 바꾸지 않는다).
+- **migration**: `server/db/migrations/tree-discover-optin-261116.sql` — 표 생성 + '지금 둘러보기에 나오는 트리'(active + 3개 이상 + auto/discoverable + 비공개 아님 + 숨김 없음)를 켜짐으로 백필(ON CONFLICT DO NOTHING — 재실행 안전). schema.sql에도 같은 표 추가. 탈퇴 경로(account-postgres.js)에도 표 추가.
+- **시험**: public-default-538(메모리)에 기본 꺼짐→켬→끔·남의 트리 404·tester 켜도 안 나옴·백필(켬) 트리 유지 + 공유/공개 상태 응답 discover 칸. community-service(메모리) tag-moments에 소개 꺼짐 제외·켬 추가. community-postgres(PG, CI) 둘러보기 SQL을 소개 표 기준으로 재작성(켬/끔/2개/비공개/숨김/재켜기) + stats 집계 백필 반영. migrations-postgres(PG, CI)에 백필 migration 재실행 안전 시험. 전체 npm test 1712 pass 0 fail(31초)·build·modulepreload --check 통과.
+- **운영 반영 완료(2026-11-16, 대표 승인)**: 컴2 autodeploy가 needs_manual_migration에서 멈춘 것을 확인 → 백업 `/opt/padiem/lovetree-api/backups/discover-optin-20261115T222914Z.{dump,sql}`(lovetree_shares·lovetree_tree_visibility 두 표, 600·9.5KB/17.1KB) → migration `tree-discover-optin-261116.sql` 1회(표 생성 + **백필 8행**, ON CONFLICT DO NOTHING) → 둘러보기 목록 수 **5장 → 5장 불변**(옛 서버·migration 직후·새 코드 설치 뒤 셋 다 같음 — 백필이 옛 규칙과 같은 트리를 채웠는지 대조; 서비스층 tester 거름 뒤 화면 5장) → `AUTODEPLOY_ACCEPT_MIGRATIONS=1`로 **INSTALLED sha=ecf33090**(d2130e6 → ecf33090), 서비스 active·목록 200·tag-moments 200. 운영일지 '운영센터 처리'에 기록.
+## 2026-11-16 — 보드에서 붙인 꼬리표가 트리 첫 순간에 저장되는 결함 수리 (컴1로컬4 레인, ai/local4-lt-tagline-first-moment-261116, main a5fc571 기준, PR #738)
+
+- **원인(확정)**: public/v41/tag-line.mjs mountViewTagLine이 onCommit을 '줄을 처음 만든 순간'의 moment 객체 클로저로 만들었다 — 카드를 바꿔 line.update()로 화면은 새 순간을 보여 줘도 저장은 처음 만든 순간(첫 순간) id로 갔다. 화면 선택 자체는 보드·책·지도 모두 LTDEMO.select로 셸 LT41.momentId를 이미 맞춘다(runtime.js) — '보드만 lt41-select를 보내지 않는다'는 후보는 원인이 아니었다. 보드는 같은 제목의 다른 카드로 바꾸면 제목 관찰만으론 다시 그리지 않아 옛 keywords를 들고 저장할 수도 있었다(함께 막음).
+- **수리(한 벌 — 보드·책·지도 동시, 그래프는 꼬리표 줄 미사용)**: renderTagLine의 commit이 onCommit에 (keywords, 지금 보고 있는 순간 id)를 넘기고 mountViewTagLine은 그 id로만 저장한다. 상세 전체(#detail)를 관찰해 선택 바뀜을 잡되, 꼬리표 줄이 스스로 그린 바뀜(wrap 안)은 무시한다. 고치기 창 코드는 건드리지 않았다(로컬2의 커스텀 꼬리표 결함 작업과 파일 겹침 없음).
+- **시험**: tests/v41-tags-627.test.mjs에 renderTagLine 계약 1건 + 보드(A→B·같은 제목 A→B)·책·지도 흐름 3건(가짜 문서 하네스, 셸은 부모 창 흉내). 고치기 전 코드로는 새 시험 4건 실패, 고친 코드로 40/40. 전체 npm test 1851검 fail 0(32초)·build·modulepreload --check 통과.
+- **영향 조사(컴2 READ ONLY, 읽기만)**: 윤제·보람 트리 3개의 첫 순간 꼬리표 모두 0개 — 이 결함으로 남은 오기록 없음(11-15 운영 정리 뒤). 윤제 '쇼챔피언 261111' 꼬리표는 이미 11-15 20:36 제거됐고, 남은 데이터(revision 이력 없음)로는 이 결함 경로와 #679 실사 직접 쓰기를 구별할 수 없다 — 운영 기록상 실사 오염 설이 유력. 자세한 근거는 PR #738 댓글.
+- **별도 진행**: 새 소식 4.1.6 + '아직 준비 중' 갈래는 같은 레인의 PR #734(updates.json·updates.mjs·updates 시험 — 이 결함과 파일 겹침 없음, 대표 결정 2026-11-16 문구 그대로).
+
+## 2026-11-16 — 순간 고치기 창이 고정 목록 밖 꼬리표를 지우는 결함 수리 (#736, 컴1로컬2 레인, ai/local2-edit-tag-loss-20261116-050103-644db7, main a5fc5719 기준, 이후 main d2130e6(#738) 병합 — tag-line.mjs는 parseTag 노출만 남기고 #738 수리 그대로, HANDOFF는 두 기록 모두 살림)
+
+- **원인**: 보드 순간 고치기 창의 키워드 고르기(`board-extras.js` `keywordPickerHTML`)가 고정 목록 17개(LT_KEYWORDS) 단추만 그렸다. 저장은 `selectedKeywords('edit')`가 켜진 단추의 data-key만 모으므로, 목록 밖 꼬리표('가수:PSY' 같은 종류:값·옛 커스텀 낱말)는 창에 없는 것으로 저장됐다 — 편집 한 번에 꼬리표가 조용히 사라졌다(데이터 손실). 살아 있는 정의는 board-detail.js 오버레이지만(#608) 두 정의가 같은 한 벌 함수를 쓰므로 한 곳 고침이 두 경로(책·보드의 add/edit)에 다 통한다.
+- **고침**: `keywordPickerHTML`이 이미 붙은 꼬리표 중 고정 목록에 없는 것을 칩으로 그린다(켜진 칩은 저장 순서 그대로 앞에, 고정 목록 나머지는 그 뒤 — 저장 때 순서도 보존). 표기는 꼬리표 칩과 같은 모양(`tag-line.mjs`의 parseTag·chipText 한 벌 — `window.LTTagLine`에 parseTag 노출 추가, 모듈이 늦으면 '#값'으로 표시), data-key는 저장값 그대로. 커스텀 추가는 같은 값 단추가 있으면 새로 붙이지 않고 켠다(중복 칩·중복 저장 방지). 고정 목록 17개 고르기는 그대로.
+- **시험**: `tests/v41-board-date-edit-608.test.mjs`에 크롬 화면 시험 1건(3 시나리오) — 고치기 창에서 ① 아무것도 안 바꾸고 저장 → 꼬리표 그대로 ② 다른 꼬리표 더해 저장 → 원래 것 + 새 것 ③ 하나 지우고 저장 → 그것만 빠짐. 로컬 608 파일 4/4·인접 보드·꼬리표 8파일 109/109·build·modulepreload --check 통과, 전체 npm test 1회(1848건 fail 0, 화면 시험 142건 건너뜀).
+- **영향 조사(읽기 전용, 컴2 READ ONLY 트랜잭션)**: AI 명예회원 윤제·보람 — 보람 순간 3개(꼬리표 없음 1·종류:값 꼬리표 남음 2), 윤제 순간 8개(꼬리표 없음 7·종류:값 꼬리표 남음 1). 편집 이력이 DB에 남지 않아(lovetree_workspaces는 revision만) 잃은 순간 수는 확정 불가 — 꼬리표가 없거나 고정 목록 낱말뿐인 순간이 잃었을 수 있는 상한이다.
+
 
 ## 2026-11-16 — #my/graph가 그래프가 아니라 첫 화면으로 열리는 문제 수리 (컴1로컬4 레인, ai/local4-graph-route-261116, main f64745c 기준, PR #728)
 
@@ -2158,3 +2213,23 @@ COM2에는 merge `6900df8aa446dfe0201d01997457fae04c4abe16`의 변경 서버 파
 - 검사기('그래프 보기' 상태, 새 시험 파일 없음): tag-moments 가짜 응답 주입(무대 꼬리표=5건·AI 1건, 그 외=빈 응답) — 3개 미리보기·AI 표 위치(aiTester 줄만)·/t/ 링크·'더 보기'→5·빈 상태 문구·줄 겹침 0·판 안 배치·가로 넘침 0을 390·1440 × 밤·정원에서 단정.
 - 검사기 대조 메모: 이 워크트리는 dist를 빌드하기 전엔 검사기 첫 화면 상태가 20초 초과로 빨강이었다(순수 main도 같음 — public 직접 서빙일 때 첫 화면 모듈 로딩이 늦음). dist 빌드 후 초록. 워크트리에서 검사기를 돌릴 때는 npm run build 먼저.
 - npm test 1697 pass·0 fail, build·modulepreload --check 통과. 캡처 E:/lovetree-qa/lane/local3-graph/fans3901440/ 12장(390·1440 × 밤 rgb(4,4,7)·정원 rgb(247,240,232), 허브 고른 상태 -hub). 메뉴 연결은 여전히 없음. updates.json 안 고침.
+
+## 2026-11-16 — 4.1 첫 화면(궤도) 글자 카드 모양 — '영상을 볼 수 없어요' 줄 정리 (컴1로컬3 레인, ai/local3-thumbcard-261116, main 8685a1f(#727) 기준 — CTO 수정 반영 2판)
+
+- **대표 화면(2070 밤)의 원인**: 궤도 카드의 썸네일이 내려가면(없는 영상 id·회색 120×90) thumb-fallback.mjs가 카드를 innerHTML로 갈아끼우는데, 제목의 -webkit-line-clamp(3줄 말줄임)가 그림자 안 <link> 규칙에서는 무효다(Chrome 158 실측). 그 결과 제목이 3줄을 넘어 카드 밖으로 넘치고(clip 20px) '첫 순간' 배지와 감정 칩이 겹쳤다(413~414px²).
+- **고친 것 2파일(CTO 수정 2판 — 첫판의 스타일시트 킥 타이머 제거)**:
+  1. `public/v41/thumb-fallback.mjs` — **#727 상태로 완전 복귀(킥 코드 0줄, sweep 불변)**. 첫판의 '250ms×24회 스타일시트 킥'은 첫 화면 그림자의 비싼 재계산(#586)을 6초간 반복 흔드는 방식이라 CTO가 빼 달라고 하셨다. 참고: 킥 버전에서도 궤도 끌기(2초, 글자 카드 5장)의 긴 프레임은 longtask 0·rAF 간격 >50ms 0·최대 33ms로 실측상 관측되지 않았고, 새 버전도 같은 수치다.
+  2. `public/v41/identity.css` — **궤도 변형(orbit)에만** 카드를 block 레이아웃으로: 감정·날짜(머리 칸 세로 2줄)·제목·'영상을 볼 수 없어요'가 각각 다른 줄(고정 간격 9px), 알림은 카드 하단 고정(absolute bottom 14px), 제목 3줄 한계는 **-webkit-line-clamp 대신 line-height×3 = max-height(3×1.35em)+overflow:hidden 절단**(말줄임표 없음 — 절단이 줄 경계에서 깨끗해 그라데이션은 넣지 않았다), '첫 순간' 배지가 있는 카드는 머리 칸을 배지 아래로(44px), 궤도 카드 작은 글자 11→12px(감정·날짜·알림 — #548 12px 기준). **보드(board)·책(book)·감상(media) 변형은 한 줄도 안 바꿨다** — sandbox rect 전·후 동일로 확인. 이 방식은 -webkit-box가 없어 오래 남는 레이아웃 문제가 생기지 않는다.
+  3. `tests/v41-screen-audit.test.mjs` — '첫 화면 글자 카드' 상태 추가: 가짜 /api/workspace(404 영상 시험 트리) + 회색 120×90 라우트, 카드는 #orbit shadowRoot 안이므로 shadowRoot로 스코핑(#730 판정). 단정: **제목이 3줄 높이 안**(clientHeight ≤ 폭×줄높이×3+2)·머리/제목/알림이 카드 안·감정과 날짜가 각자 줄(날짜 top ≥ 감정 top + 감정 fs−1)·카드 내용 넘침 ≤ 4px(절대 알림·반올림 한계)·배지×감정 겹침 0·가로 넘침 0 — 390·1440 × 밤·정원. KNOWN 4건 추가(레거시 첫 화면 11px recent-meta·SRC064 궤도 메모 카드 9px·legacy box rect 보고·궤도 카드가 가운데 UI 뒤를 지나가는 3D 원본 배치 — 모두 이 이슈 이전 모양).
+- **실측(2070 밤, 시험 트리)**: '첫 순간' 배지×감정 겹침 414→**0**, 제목 clientHeight **innerHTML 교체 직후 61px = 6초 뒤 61px(gap 6001ms) — 두 시점 동일**(addInitScript 관찰기 10ms 샘플링, 높이 종류 1종), 줄 간격 9px 고정, 감정·날짜 각자 줄. **보드·책 불변**: sandbox(240×316) title 61px·top 86·notice 286 — 전·후 바이트 동일. 궤도 3D 배치(자리·기울기·크기) 불변.
+- **끌기 무게(글자 카드 5장, 2070)**: 궤도 2초 끌기 — 킥 버전 longtask(>50ms) 0·rAF 간격 >50ms 0·최대 33ms, 새 버전 **같은 수치**(두 버전 모두 버벅임 관측 0).
+- **캡처**: `E:/lovetree-qa/lane/local3-graph/` — tcard-before-home-night-{2070,zoom,390}.png(전)·tcard-after-home-{night,garden}-{2070,1440,390}{,-zoom}.png(후·킥 제거 최종판)·tcard-{before,after}-{book,board}-night-2070.png(불변 확인)·tcard-final-2070.json(수치)·tcard-drag-night-2070.png(끌기). 한 장씩 직접 읽어 대조 완료(2070 밤·정원 줌, 390 밤, 1440 밤).
+- **메모**: 이 작업은 한 번 중지됐다가 정정으로 다시 시작(대표가 본 깨진 카드가 4.0 첫 화면(#728)이라 했다가 4.1 첫 화면에서도 생기는 것으로 정정). 재현·측정은 가짜 기록(/api/workspace 가로챔)으로만 하고 시험 계정·대표·AI 고객 세션(9223)에는 붙지 않았다. updates.json 안 고침. npm test 1704검 0 fail(31초), build·modulepreload --check 통과.
+
+## 2026-11-16 — 둘러보기 카드 날짜 하루 전 문제(하은 1회차 관찰) + 여정 기본 날짜 같은 근거 (컴1로컬3 레인, ai/local3-commdate-261116, main 7ce13c3(#742) 기준)
+
+- **원인**: community-panel.mjs의 `when`이 서버 시각(UTC 타임스탬프 createdAt)을 `String(value).slice(0,10)`으로 잘라 **UTC 날짜**를 만들었다 — 하은 1회차(KST 11-16 새벽 0~5시)에 담은 순간의 둘러보기 카드가 '2026. 11. 15'로 나옴(#547과 같은 계열). 댓글 머리 줄도 같은 `when`을 썼다.
+- **수리**: `when`을 `formatDisplayDate(localDateOnly(value), dateStyle())`로 — local-date.mjs의 #547 한 벌을 그대로 쓴다(새 날짜 함수 없음). 같은 확인 순회에서 발견한 같은 근거 한 곳도 함께: **first-journey.mjs의 `isoDay`**(첫 여정 기본 날짜 — 새벽에 여정을 쓰면 어제 날짜가 기본값)도 localDateOnly로 교체. 나머지 확인 결과: 공유 감상 화면·다른 팬 보기는 순간 DATE 문자열(#547 규칙 준수), /t/ 미리보기는 시각 칸 없음, 운영센터 journalDayOf는 seoulDayOf(#701)로 이미 지역 날짜 — 수리 불필요.
+- **시험**: ①감사 '둘러보기' 상태에 Asia/Seoul timezoneId 문맥 + UTC 교차 fixture(2026-11-15T20:00Z = KST 11-16 05:00) — 카드 날짜가 '2026. 11. 16'이고 UTC 절단('2026. 11. 15')이 아닌지 단정(CI UTC에서도 timezoneId로 결정적). ②first-journey 단위 시험 1건(같은 교차 시각, localDateOnly 계약). ③v41-date-style-one-piece 계약 갱신(슬라이스 → localDateOnly 경유).
+- **캡처**: E:/lovetree-qa/lane/local3-graph/audit-community-date-{390,1440}.png(교차 fixture, 한국 날짜 확인 — 두 장 직접 읽음).
+- npm test 1719검 0 fail(33초), build·modulepreload --check 통과. updates.json 안 고침.

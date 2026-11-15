@@ -19,6 +19,10 @@ export function createQuickAdd(deps) {
   const savedTimerBox = {timer: null};
   let titleCache = new Map();
   let previewToken = 0;
+  let quickTagLine = null;
+  // #739: 담은 직후 꼬리표 줄 인스턴스는 한 개만 살아 있는다 — 다시 그릴 때(연속 담기)·안내를 비울 때
+  // destroy로 거둔다. destroy는 이 줄의 눌러 듣는 귀까지 지우므로(tag-line.mjs #739) 옛 줄이 옛 순간에
+  // 저장하거나 해제하는 일이 없다(하은 1회차 실측: 연속 담기 뒤 칩 두 번 누름 → 세 순간 모두 keywords []).
   // #638: 담을 트리(고른 트리 우선)와, 저장 뒤에 도착한 영상 제목을 채울 대상 한 개.
   let quickTreeId = '';
   let pendingTitleFill = null;
@@ -91,7 +95,8 @@ export function createQuickAdd(deps) {
     refineButton.hidden = true;
     refineButton.dataset.treeId = '';
     refineButton.dataset.momentId = '';
-    // #627: 지난 안내의 꼬리표 줄도 함께 치운다.
+    // #627: 지난 안내의 꼬리표 줄도 함께 치운다. #739: 옛 줄 인스턴스도 거둔다(귀까지).
+    if (quickTagLine) { quickTagLine.destroy(); quickTagLine = null; }
     $('quick-tagline')?.replaceChildren();
   }
 
@@ -99,13 +104,16 @@ export function createQuickAdd(deps) {
   // 방금 담은 순간은 꼬리표가 아직 없으므로 제목 해석 제안(재사용 먼저)이 흐린 칩으로 보인다. 눌러 확인한 것만 저장된다.
   function renderQuickTagline(host, result, savedTitle) {
     if (!host) return;
+    // #739: 같은 host에 줄을 다시 그리기 전에 옛 줄을 거둔다 — 귀가 쌓이면 옛 순간에 저장된다.
+    if (quickTagLine) { quickTagLine.destroy(); quickTagLine = null; }
     if (!deps.saveTags || !result?.treeId || !result?.momentId) { host.replaceChildren(); return; }
     const knownTags = [];
     for (const m of deps.listTrees?.().find(t => t.id === result.treeId)?.moments || []) {
       for (const k of Array.isArray(m.keywords) ? m.keywords : []) if (!knownTags.includes(k)) knownTags.push(k);
     }
-    renderTagLine({
+    quickTagLine = renderTagLine({
       host,
+      doc,
       moment: { id: result.momentId, title: savedTitle || '', keywords: [] },
       knownTags,
       writable: true,

@@ -14,9 +14,12 @@ function fakeEl(extra = {}) {
   const node = {
     value: '', textContent: '', hidden: false, open: false, dataset: {}, src: '', alt: '', className: '',
     children: [], listeners,
-    addEventListener(type, fn) { listeners[type] = fn; },
-    dispatchEvent(event) { this.dispatched.push(event.type); return true; },
+    // #739: 실제 DOM처럼 같은 종류의 귀를 쌓아 두는다 — 덮어 쓰면 '옛 꼬리표 줄의 귀가 남는' 결함을 시험이 못 잡는다.
+    addEventListener(type, fn) { (listeners[type] ||= []).push(fn); },
+    dispatchEvent(event) { this.dispatched.push(event.type); for (const fn of listeners[event.type] || []) fn(event); return true; },
     dispatched: [],
+    querySelector: () => null,
+    classList: { list: new Set(), add(...names) { for (const n of names) this.list.add(n); }, remove(...names) { for (const n of names) this.list.delete(n); }, contains(name) { return this.list.has(name); } },
     replaceChildren() { this.children = []; },
     append(...kids) { this.children.push(...kids); },
     removeAttribute(name) { delete this.attrs?.[name]; },
@@ -29,7 +32,7 @@ function fakeEl(extra = {}) {
 }
 
 function harness({ source = 'server', owned = true, writable = true, current = 'track59-sketchbook.html', finePointer = true, applyImpl = null, attachFiles = null, clipboard = null } = {}) {
-  const calls = { apply: [], notify: [], panel: [], choose: [], openEditor: [], login: [], resume: [], attach: [], writeOpen: [], writeShow: [], requestClose: [], reset: 0 };
+  const calls = { apply: [], notify: [], panel: [], choose: [], openEditor: [], login: [], resume: [], attach: [], writeOpen: [], writeShow: [], requestClose: [], reset: 0, saveTags: [] };
   const els = {};
   // #425: 고르기 창·빠른 추가·편집기가 한 창(write-panel)으로 합쳐졌다.
   const need = ['write-panel', 'write-tabs', 'write-tab-easy', 'write-tab-detailed', 'write-easy', 'write-detailed', 'write-menu', 'quick-form', 'quick-url', 'quick-paste', 'quick-preview', 'quick-error', 'quick-submit', 'quick-notice', 'quick-refine', 'quick-saved', 'quick-saved-thumb', 'quick-saved-text', 'quick-saved-refine', 'drop-veil', 'drop-veil-text', 'moment-form'];
@@ -85,6 +88,8 @@ function harness({ source = 'server', owned = true, writable = true, current = '
     attachFiles: attachFiles || ((input, file) => { calls.attach.push([input === editorMedia ? 'editor' : 'quick', file]); return true; }),
     isFinePointer: () => finePointer,
     fetchImpl: async () => ({ ok: false }),
+    // #627 PR B: 담은 직후 꼬리표 줄의 저장 한 곳 — 기록만 두고 성공으로 돌려준다.
+    saveTags: payload => { calls.saveTags.push(payload); return { ok: true, keywords: payload.keywords, changed: true }; },
     ...(clipboard ? { readClipboard: clipboard } : {})
   });
   const restore = () => { globalThis.LTMedia = saved.LTMedia; globalThis.Event = saved.Event; };
@@ -146,7 +151,7 @@ test('쉬운 추가로 열면 한 창의 쉬운 추가 탭이고, 칸은 비어 
   const quick = harness();
   try {
     quick.els['quick-url'].value = '';
-    quick.els['quick-url'].listeners.input();
+    quick.els['quick-url'].listeners.input[0]();
     quick.api.openQuick();
     assert.deepEqual(quick.calls.writeOpen, ['easy'], '탭은 쉬운 추가로 열린다');
     assert.equal(quick.els['write-panel'].open, true, '한 창을 연다');
@@ -183,7 +188,7 @@ test('미리보기: YouTube·Shorts는 썸네일+금테 꼬리표+제목, 링크
   const h = harness();
   try {
     h.els['quick-url'].value = URL_OK;
-    h.els['quick-url'].listeners.input();
+    h.els['quick-url'].listeners.input[0]();
     let parts = previewParts(h.els);
     assert.equal(h.els['quick-preview'].dataset.state, 'youtube');
     assert.equal(parts.media.children[0].tagName, 'img');
@@ -195,12 +200,12 @@ test('미리보기: YouTube·Shorts는 썸네일+금테 꼬리표+제목, 링크
     assert.equal(h.els['quick-paste'].textContent, QUICK_CLEAR_LABEL, '값이 생기면 알약은 지우기');
 
     h.els['quick-url'].value = URL_SHORTS;
-    h.els['quick-url'].listeners.input();
+    h.els['quick-url'].listeners.input[0]();
     parts = previewParts(h.els);
     assert.equal(parts.tag.textContent, 'YOUTUBE · SHORTS', 'Shorts는 모양까지 보여 준다');
 
     h.els['quick-url'].value = 'https://example.com/a';
-    h.els['quick-url'].listeners.input();
+    h.els['quick-url'].listeners.input[0]();
     parts = previewParts(h.els);
     assert.equal(parts.media, null, '일반 링크에는 썸네일이 없다');
     assert.equal(parts.tag.textContent, 'example.com');
@@ -208,7 +213,7 @@ test('미리보기: YouTube·Shorts는 썸네일+금테 꼬리표+제목, 링크
     assert.equal(h.els['quick-submit'].disabled, false);
 
     h.els['quick-url'].value = 'notaurl';
-    h.els['quick-url'].listeners.input();
+    h.els['quick-url'].listeners.input[0]();
     assert.equal(h.els['quick-preview'].dataset.state, 'invalid');
     assert.equal(h.els['quick-preview'].children[0].className, 'quick-preview-invalid');
     assert.equal(h.els['quick-preview'].children[0].textContent, QUICK_INVALID_PREVIEW, '같은 틀에 안내');
@@ -216,7 +221,7 @@ test('미리보기: YouTube·Shorts는 썸네일+금테 꼬리표+제목, 링크
     assert.equal(h.els['quick-submit'].disabled, true, '지원하지 않는 주소는 담기 흐림');
 
     h.els['quick-url'].value = '';
-    h.els['quick-url'].listeners.input();
+    h.els['quick-url'].listeners.input[0]();
     assert.equal(h.els['quick-preview'].children[0].textContent, QUICK_EMPTY_PREVIEW, '빈 칸은 빗금 안내로 돌아간다');
     assert.equal(h.els['quick-error'].textContent, '', '빈 칸은 오류가 아니다');
   } finally { h.restore(); }
@@ -228,7 +233,7 @@ test('저장: apply("quickAdd",{url}) 한 번 → ✓ 안내·지금 다듬기·
     h.els['write-panel'].open = true;
     h.api.renderPreview();
     h.els['quick-url'].value = URL_OK;
-    h.els['quick-url'].listeners.input();
+    h.els['quick-url'].listeners.input[0]();
     h.els['quick-form'].onsubmit({ preventDefault() {} });
     assert.deepEqual(h.calls.apply, [['quickAdd', { url: URL_OK }]], '로컬1 계약 그대로 한 번');
     assert.equal(h.els['quick-notice'].textContent, savedNoticeText(FALLBACK_TITLE), '✓ 담았어요 · 제목 요약');
@@ -248,11 +253,11 @@ test('저장: 새 입력을 시작하면 지난 안내가 즉시 사라진다(#3
   try {
     h.els['write-panel'].open = true;
     h.els['quick-url'].value = URL_OK;
-    h.els['quick-url'].listeners.input();
+    h.els['quick-url'].listeners.input[0]();
     h.els['quick-form'].onsubmit({ preventDefault() {} });
     assert.equal(h.els['quick-notice'].hidden, false, '저장 직후에는 보인다');
     h.els['quick-url'].value = URL_SHORTS;
-    h.els['quick-url'].listeners.input();
+    h.els['quick-url'].listeners.input[0]();
     assert.equal(h.els['quick-notice'].textContent, '', '새 입력이 시작되면 지난 안내를 비운다');
     assert.equal(h.els['quick-notice'].hidden, true);
     assert.equal(h.els['quick-refine'].hidden, true, '지난 순간의 다듬기 링크도 함께 비운다');
@@ -264,7 +269,7 @@ test('붙여넣기 알약: 값이 있으면 지우기, 비었으면 클립보드
   const clear = harness();
   try {
     clear.els['quick-url'].value = URL_OK;
-    clear.els['quick-url'].listeners.input();
+    clear.els['quick-url'].listeners.input[0]();
     await clear.api.togglePaste();
     assert.equal(clear.els['quick-url'].value, '', '값이 있으면 지운다');
     assert.equal(clear.els['quick-paste'].textContent, QUICK_PASTE_LABEL);
@@ -432,4 +437,45 @@ test('연결 구조(#425 2번): 쉬운 추가는 업로더를 만들지 않고 w
   // #425: 순간 남기기는 한 창(write-panel)을 연다 — 고르기 창은 없다.
   assert.match(shell, /\$\('write-menu'\)\.onclick=\(\)=>\{if\(source!=='server'&&member\?\.snapshot\(\)\.owned\)\{void resumeMember\('write'\);return;\}if\(member\?\.snapshot\(\)\.dirty\)\{explainSaveState\(\);return;\}shellQuick\.openWrite\(\);\}/, '순간 남기기는 한 창을 연다(예시면 내 기록으로 돌아온 뒤, 저장 안 됨이면 그 설명을 연다)');
   assert.doesNotMatch(shell, /openWriteChooser/, '옛 고르기 창 진입이 남지 않는다');
+});
+
+test('#739 담은 직후 제안 칩을 누르면 방금 담은 순간에 저장된다 — 연속 담기에서 옛 줄은 저장하지 않는다', async () => {
+  // 하은 1회차(390, 실주소) 재현: 같은 쉬운 추가 창에서 연속으로 담으면 옛 꼬리표 줄의 귀가 host에 남아
+  // 다음 안내의 칩을 눌렀을 때 옛 순간에도 저장하고(오염), 같은 칩을 다시 누르면 옛 줄이 해제 저장해
+  // 어디에도 남지 않았다(세 순간 모두 keywords []). 고친 뒤에는 저장이 방금 담은 순간 하나로만 나간다.
+  const titles = ['ILLIT (아일릿) ‘Magnetic’ Official MV', 'NewJeans (뉴진스) ‘Supernatural’ Official MV'];
+  let nth = 0;
+  const h = harness({
+    applyImpl: (kind) => kind === 'quickAdd' ? { treeId: 'tree-inbox', momentId: 'm-new-' + (++nth) } : null,
+    fetchImpl: async (url) => ({ ok: true, json: async () => ({ title: url.includes('illit') ? titles[0] : titles[1], authorName: 'HYBE LABELS', thumbnailUrl: '' }) })
+  });
+  try {
+    h.els['write-panel'].open = true;
+    const chipClick = (raw) => { for (const fn of h.els['quick-tagline'].listeners.click || []) fn({ target: { closest: (sel) => sel === '[data-tag-raw]' ? { dataset: { tagRaw: raw } } : null } }); };
+    // 첫 담기: 제목이 캐시에 채워져 제안 칩이 보인다.
+    h.els['quick-url'].value = 'https://www.youtube.com/shorts/illitmv01';
+    h.els['quick-url'].listeners.input[0]();
+    await new Promise((ok) => setTimeout(ok, 0));
+    h.els['quick-form'].onsubmit({ preventDefault() {} });
+    const first = { treeId: h.els['quick-refine'].dataset.treeId, momentId: h.els['quick-refine'].dataset.momentId };
+    assert.ok(first.momentId, '첫 담기의 순간 id를 안다');
+    // 연속 담기: 같은 창에서 다른 영상을 한 번 더 담는다 — 안내와 꼬리표 줄이 새것으로 다시 그려진다.
+    h.els['quick-url'].value = 'https://www.youtube.com/shorts/newjeansmv1';
+    h.els['quick-url'].listeners.input[0]();
+    await new Promise((ok) => setTimeout(ok, 0));
+    h.els['quick-form'].onsubmit({ preventDefault() {} });
+    const second = { treeId: h.els['quick-refine'].dataset.treeId, momentId: h.els['quick-refine'].dataset.momentId };
+    assert.notEqual(first.momentId, second.momentId, '두 번 담은 순간은 다르다');
+    // 두 번째 안내의 제안 칩을 누른다 → 저장은 방금 담은 순간 하나로만 나간다.
+    chipClick('가수:ILLIT');
+    assert.equal(h.calls.saveTags.length, 1, '저장 호출은 한 번이다(옛 줄이 저장하지 않는다)');
+    assert.equal(h.calls.saveTags[0].treeId, first.treeId, '트리는 같은 곳이다');
+    assert.equal(h.calls.saveTags[0].momentId, second.momentId, '방금 담은 순간으로 저장한다');
+    assert.deepEqual(h.calls.saveTags[0].keywords, ['가수:ILLIT'], '누른 제안이 확정된다');
+    // 같은 칩을 다시 누르면(더블탭) 이 줄에서만 해제된다 — 옛 순간을 건드리지 않는다.
+    chipClick('가수:ILLIT');
+    assert.equal(h.calls.saveTags.length, 2, '다시 누름도 이 줄의 저장뿐이다');
+    assert.equal(h.calls.saveTags[1].momentId, second.momentId, '해제 저장도 방금 담은 순간이다');
+    assert.deepEqual(h.calls.saveTags[1].keywords, [], '다시 누르면 해제(빈 keywords)다');
+  } finally { h.restore(); }
 });

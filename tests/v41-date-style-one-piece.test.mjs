@@ -120,10 +120,13 @@ function communityHarness({ dateStyle = 'dot', items = [], comments = [] } = {})
 }
 
 // 카드 글자를 실제로 만드는 함수는 모듈 안쪽이라, 계약(공용 한 벌을 지난다)을 코드로 고정한다.
-test('둘러보기: 카드·댓글 날짜가 공용 한 벌을 지난다(전: ISO 앞 10글자 고정)', () => {
+test('둘러보기: 카드·댓글 날짜가 공용 한 벌을 지난다(전: ISO 앞 10글자 고정 → #547 지역 날짜 경유)', () => {
   const src = read('public/v41/community-panel.mjs');
   assert.match(src, /import \{formatDisplayDate\} from '\.\/book-usability\.mjs';/);
-  assert.match(src, /const when=value=>formatDisplayDate\(String\(value\|\|''\)\.slice\(0,10\),dateStyle\(\)\);/);
+  // 하은 1회차(261116): 새벽(KST 0~9시)에 담은 순간의 카드가 UTC 절단('2026. 11. 15')으로 나온 것을
+  // 고친다 — 서버 시각(UTC 타임스탬프)은 localDateOnly(#547 한 벌)로 지역 날짜를 만들어 넘긴다.
+  assert.match(src, /import \{localDateOnly\} from '\.\/local-date\.mjs';/);
+  assert.match(src, /const when=value=>formatDisplayDate\(localDateOnly\(value\),dateStyle\(\)\);/);
   assert.doesNotMatch(src, /String\(comment\.createdAt\|\|''\)\.slice\(0,10\)/, '댓글 날짜가 원본 앞 10글자로 남지 않는다');
   assert.doesNotMatch(src, /String\(item\.createdAt\|\|''\)\.slice\(0,10\)/, '카드 날짜가 원본 앞 10글자로 남지 않는다');
   assert.match(src, /const dateStyle=\(\)=>\(typeof getDateStyle==='function'\?getDateStyle\(\):'dot'\);/);

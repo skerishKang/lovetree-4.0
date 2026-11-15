@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
+import {localDateOnly} from '../public/v41/local-date.mjs';
 import {
   JOURNEY_STEPS, JOURNEY_LAST_STEP, JOURNEY_STORAGE_KEY,
   emptyJourneyDraft, normalizeJourneyDraft, journeyDraftHasContent,
@@ -22,6 +23,13 @@ const draft = extra => normalizeJourneyDraft({
   nextUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
   nextReason: '댓글을 따라 찾아봤어요',
   ...extra,
+});
+
+test('#547 한 벌: 새벽(KST 0~9시, UTC 전날) 여정의 기본 날짜는 지역 날짜다(하은 1회차 날짜 문제와 같은 근거)', () => {
+  const T = '2026-11-15T20:00:00.000Z'; // UTC로는 11-15, 한국 시간으로는 11-16 05:00
+  const d = emptyJourneyDraft({clock: T}).date;
+  assert.equal(d, localDateOnly(T), '여정 기본 날짜는 #547 한 벌(localDateOnly)을 따른다');
+  if (localDateOnly(T) !== T.slice(0, 10)) assert.notEqual(d, T.slice(0, 10), 'toISOString UTC 절단이면 어제가 된다(기기 시간대가 UTC보다 동쪽일 때)');
 });
 
 test('단계는 00~04 다섯 개이고 앞뒤 이동은 범위를 넘지 않는다', () => {

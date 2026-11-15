@@ -2,6 +2,7 @@ import test from 'node:test';import assert from 'node:assert/strict';
 import {applySchema,createPool} from '../server/db/postgres.js';
 import {createCommunityRepo} from '../server/db/community-postgres.js';
 import {createTreeVisibilityRepo} from '../server/db/tree-visibility-postgres.js';
+import {createTreeDiscoverRepo} from '../server/db/tree-discover-postgres.js';
 import {createStatsRepo} from '../server/db/stats-postgres.js';
 import {createMemoryStatsRepo} from '../server/testing/memory-stats-repo.js';
 import {createMemoryAccountRepo} from '../server/testing/memory-account-repo.js';
@@ -17,6 +18,8 @@ test('community rows are independent, idempotent and auditable',{skip},async()=>
  try{
   await applySchema(pool);const repo=createCommunityRepo(pool),tag=suffix(),productId='lt-'+tag,shareId=('s'+tag).padEnd(24,'x').slice(0,24);
   await pool.query(`INSERT INTO lovetree_shares(product_id,share_id,subject_id,tree_id,entry_moment_id,initial_view,discoverable,moment_count) VALUES($1,$2,$3,'tree','moment','book',true,3)`,[productId,shareId,'owner-'+tag]);
+  // 2026-11-16 대표 결정: 소개가 켜진 트리만 목록에 나온다(기본 꺼짐) — 시드 뒤 켠다.
+  await pool.query(`INSERT INTO lovetree_tree_discover(product_id,subject_id,tree_id,discover) VALUES($1,$2,'tree',true)`,[productId,'owner-'+tag]);
   assert.equal((await repo.listDiscoverable({productId})).length,1);
   await repo.setFavorite({productId,shareId,subjectId:'reader',enabled:true});await repo.setFavorite({productId,shareId,subjectId:'reader',enabled:true});
   await repo.setReaction({productId,shareId,subjectId:'reader',enabled:true});
@@ -39,6 +42,7 @@ test('browse reaction counts keep every kind and deletes remove only the request
  try{
   await applySchema(pool);const repo=createCommunityRepo(pool),tag=suffix(),productId='lt-'+tag,shareId=('r'+tag).padEnd(24,'x').slice(0,24);
   await pool.query(`INSERT INTO lovetree_shares(product_id,share_id,subject_id,tree_id,entry_moment_id,initial_view,discoverable,moment_count) VALUES($1,$2,$3,'tree','moment','book',true,3)`,[productId,shareId,'owner-'+tag]);
+  await pool.query(`INSERT INTO lovetree_tree_discover(product_id,subject_id,tree_id,discover) VALUES($1,$2,'tree',true)`,[productId,'owner-'+tag]);
   const card=async viewer=>{const rows=await repo.listDiscoverableSummaries({productId,viewerSubjectId:viewer});return rows.find(row=>row.share.shareId===shareId);};
   await repo.setReaction({productId,shareId,subjectId:'reader-a',kind:'like',enabled:true});
   const first=await card('reader-a');
@@ -65,30 +69,35 @@ test('browse reaction counts keep every kind and deletes remove only the request
   assert.equal(heartOff.stats.reactions.heart,1);
  }finally{await pool.end();}
 });
-test('#538 둘러보기 SQL: 순간 3개 이상·트리당 한 행·비공개 제외·숨김은 트리 단위',{skip},async()=>{
+test('#538 둘러보기 SQL: 소개 켬 + 순간 3개 이상·트리당 한 행·비공개 제외·숨김은 트리 단위(261116 대표 결정)',{skip},async()=>{
  assertIsolatedTestDatabase(DATABASE_URL);const pool=await createPool(DATABASE_URL,{max:3});
  try{
-  await applySchema(pool);const repo=createCommunityRepo(pool),visibility=createTreeVisibilityRepo(pool),tag=suffix(),productId='lt-'+tag;
+  await applySchema(pool);const repo=createCommunityRepo(pool),visibility=createTreeVisibilityRepo(pool),discover=createTreeDiscoverRepo(pool),tag=suffix(),productId='lt-'+tag;
   const insert=async(shareId,subjectId,treeId,{origin='auto',momentCount=3,discoverable=false})=>{
    await pool.query(`INSERT INTO lovetree_shares(product_id,share_id,subject_id,tree_id,entry_moment_id,initial_view,discoverable,origin,moment_count) VALUES($1,$2,$3,$4,'moment','book',$5,$6,$7)`,
     [productId,shareId,subjectId,treeId,discoverable,origin,momentCount]);
   };
   const sid=prefix=>(prefix+tag).padEnd(24,'x').slice(0,24);
-  await insert(sid('auto3'),'own-a','tree-a',{});                       // 자동 공개 3개 → 나온다
-  await insert(sid('own3'),'own-b','tree-b',{origin:'owner',discoverable:true}); // 옛 스위치 행 3개 → 나온다
-  await insert(sid('two'),'own-c','tree-c',{momentCount:2});            // 순간 2개 → 안 나온다
-  await insert(sid('priv'),'own-d','tree-d',{});                        // 비공개 지정 → 안 나온다
+  const listedTrees=async()=>(await repo.listDiscoverable({productId})).map(row=>row.treeId).sort();
+  await insert(sid('auto3'),'own-a','tree-a',{});await discover.set({productId,subjectId:'own-a',treeId:'tree-a',discover:true}); // 켬 → 나온다
+  await insert(sid('own3'),'own-b','tree-b',{origin:'owner',discoverable:true});await discover.set({productId,subjectId:'own-b',treeId:'tree-b',discover:true}); // 옛 스위치 행도 소개 표가 켜져야 나온다
+  await insert(sid('two'),'own-c','tree-c',{momentCount:2});await discover.set({productId,subjectId:'own-c',treeId:'tree-c',discover:true}); // 2개 → 안 나온다
+  await insert(sid('off'),'own-f','tree-f',{});                             // 기본 꺼짐 → 안 나온다
+  await insert(sid('priv'),'own-d','tree-d',{});await discover.set({productId,subjectId:'own-d',treeId:'tree-d',discover:true}); // 켜도 비공개는 안 나온다
   await visibility.set({productId,subjectId:'own-d',treeId:'tree-d',visibility:'private'});
-  await insert(sid('dupO'),'own-e','tree-e',{origin:'owner',discoverable:true}); // 같은 트리에
-  await insert(sid('dupA'),'own-e','tree-e',{});                        // 자동 행과 옛 행 → 한 행만
-  const listed=await repo.listDiscoverable({productId});
-  const trees=listed.map(row=>row.treeId).sort();
-  assert.deepEqual(trees,['tree-a','tree-b','tree-e'],'2개·비공개는 빠지고 트리당 한 행만');
-  const dup=listed.find(row=>row.treeId==='tree-e');
+  await insert(sid('dupO'),'own-e','tree-e',{origin:'owner',discoverable:true});await discover.set({productId,subjectId:'own-e',treeId:'tree-e',discover:true}); // 같은 트리에
+  await insert(sid('dupA'),'own-e','tree-e',{});                            // 자동 행과 옛 행 → 한 행만
+  assert.deepEqual(await listedTrees(),['tree-a','tree-b','tree-e'],'2개·비공개·소개 꺼짐은 빠지고 트리당 한 행만');
+  const dup=(await repo.listDiscoverable({productId})).find(row=>row.treeId==='tree-e');
   assert.equal(dup.shareId,sid('dupA'),'트리당 자동 공개 행을 우선한다');
   // 숨김은 트리 단위: 자동 행을 숨겨도 같은 트리의 옛 행으로 다시 나오지 않는다.
   await pool.query(`INSERT INTO lovetree_community_hidden_shares(product_id,share_id,hidden_by) VALUES($1,$2,'admin')`,[productId,sid('dupA')]);
-  assert.deepEqual((await repo.listDiscoverable({productId})).map(row=>row.treeId).sort(),['tree-a','tree-b']);
+  assert.deepEqual(await listedTrees(),['tree-a','tree-b']);
+  // 고객이 끄면 빠지고, 다시 켜면 돌아온다(무료 — 재실행 안전).
+  await discover.set({productId,subjectId:'own-a',treeId:'tree-a',discover:false});
+  assert.deepEqual(await listedTrees(),['tree-b'],'끄면 목록에서 빠진다');
+  await discover.set({productId,subjectId:'own-a',treeId:'tree-a',discover:true});
+  assert.deepEqual(await listedTrees(),['tree-a','tree-b'],'다시 켜면 목록에 돌아온다');
  }finally{await pool.end();}
 });
 
@@ -128,16 +137,23 @@ test('운영센터 전체 숫자 집계: 계정·트리·순간·공개·둘러�
   await share(('s2'+tag).padEnd(24,'x').slice(0,24),REAL_ONE,'t2',1,30);
   await share(('s3'+tag).padEnd(24,'x').slice(0,24),AI_ONE,'t4',3,30);
   await share(('s4'+tag).padEnd(24,'x').slice(0,24),REAL_TWO,'t3',3,0);
+  // 2026-11-16 대표 결정: 소개 켬 트리만 둘러보기 숫자에 센다 — t1·t4는 켜고, t2(1개)도 켜 보아 순간 수 조건을 함께 본다.
+  await pool.query(`INSERT INTO lovetree_tree_discover(product_id,subject_id,tree_id,discover) VALUES($1,$2,'t1',true),($1,$3,'t4',true),($1,$2,'t2',true)`,[productId,REAL_ONE,AI_ONE]);
   // 비공개 트리는 공유 행이 있어도 공개·둘러보기에서 빠진다.
   await pool.query("INSERT INTO lovetree_tree_visibility(product_id,subject_id,tree_id,visibility) VALUES($1,$2,'t3','private')",[productId,REAL_TWO]);
 
   const stats=await createStatsRepo(pool).aggregate({productId,since:new Date(Date.now()-7*86400e3).toISOString()});
+  // #743: 트리 계열 카드의 펼침 내역에 쓰는 제목 목록(최대 20)도 같은 집계에서 온다 — 제목만 싣는다.
+  // t5는 제목이 없어 목록에서 빠진다(빈 이름을 지어내지 않는다). 순서는 제목·id 순(두 구현 같은 규칙).
   assert.deepEqual(stats,{
     accountsReal:3,accountsAi:1,accountsTester:1,accountsNewReal:1,accountsNewAi:0,accountsNewTester:1,
     treesReal:3,treesAi:1,treesTester:1,
     momentsReal:4,momentsAi:3,momentsTester:2,momentsNewReal:2,momentsNewAi:0,momentsNewTester:2,
     publicReal:2,publicAi:1,publicTester:0,
-    featuredReal:1,featuredAi:1,featuredTester:0
+    featuredReal:1,featuredAi:1,featuredTester:0,
+    treesTitles:['나무 t1','나무 t2','나무 t3','나무 t4'],
+    publicTitles:['나무 t1','나무 t2','나무 t4'],
+    featuredTitles:['나무 t1','나무 t4']
   });
 
   // 같은 자료를 메모리 저장소로도 쌓아 두 구현이 같은 숫자를 내는지 본다(계약이 갈라지면 여기서 걸린다).

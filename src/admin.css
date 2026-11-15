@@ -31,8 +31,8 @@ body {
   flex-wrap: nowrap;
 }
 .app-header .brand { display: flex; align-items: center; gap: 9px; flex-shrink: 0; min-height: 40px; color: var(--lt-pearl); opacity: .92; text-decoration: none; }
-.app-header .brand > span { font-weight: 700; font-size: 11px; letter-spacing: .22em; white-space: nowrap; }
-.app-header .brand small { font-size: 10px; font-weight: 600; letter-spacing: .12em; color: var(--lt-gold); margin-left: 8px; }
+.app-header .brand > span { font-weight: 700; font-size: 13px; letter-spacing: .22em; white-space: nowrap; }
+.app-header .brand small { font-size: 12px; font-weight: 600; letter-spacing: .12em; color: var(--lt-gold); margin-left: 8px; }
 .app-header nav { display: flex; align-items: center; gap: 2px; flex: 1; min-width: 0; }
 .app-header nav a,
 .app-header nav button {
@@ -104,7 +104,7 @@ body {
 .lt-post-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .lt-post-title { font-size: 15px; font-weight: 600; margin: 2px 0; overflow-wrap: anywhere; }
 .lt-post-meta { display: flex; gap: 12px; color: var(--lt-muted); font-size: 12px; }
-.lt-post-date { color: var(--lt-muted); font-size: 11px; margin-left: auto; }
+.lt-post-date { color: var(--lt-muted); font-size: 12px; margin-left: auto; }
 .lt-post-row { grid-template-columns: auto 1fr auto; align-items: center; }
 .lt-empty { color: var(--lt-muted); font-size: 13px; padding: 12px 0; }
 
@@ -145,7 +145,7 @@ body {
 .lt-status-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
 .lt-status-row button { min-height: 40px; padding: 0 14px; border-radius: var(--lt-r-pill); border: 1px solid var(--lt-line); background: rgba(255,255,255,.03); color: var(--lt-pearl); font: inherit; font-size: 12px; cursor: pointer; }
 .lt-status-row button.is-on { border-color: var(--lt-gold); color: var(--lt-gold); }
-.lt-issue-link { color: var(--lt-gold); text-decoration: underline; text-underline-offset: 3px; }
+.lt-issue-link { color: var(--lt-gold); font-size: 13px; text-decoration: underline; text-underline-offset: 3px; }
 .lt-issue-link:hover { color: var(--lt-pearl); }
 /* #570 4: '고치는 일' — 이슈 한 줄 + 연결된 고객 글 */
 .lt-issue-row { display: grid; gap: 10px; }
@@ -174,7 +174,7 @@ body {
   .lt-theme-toggle { grid-column: 2; grid-row: 1; justify-self: end; font-size: 13px; padding: 0 10px; letter-spacing: .02em; min-height: 40px; }
   .app-header nav { grid-column: 1 / -1; grid-row: 2; overflow-x: auto; scrollbar-width: none; gap: 0; padding: 2px 0 7px; }
   .app-header nav::-webkit-scrollbar { display: none; }
-  .app-header nav button { flex: 1; min-height: 44px; padding: 0 12px; font-size: 12px; }
+  .app-header nav button { flex: 1; min-height: 44px; padding: 0 12px; font-size: 13px; }
   .admin-shell { width: calc(100% - 20px); margin: 18px auto 48px; }
   .lt-post-row { grid-template-columns: 1fr; }
 }
@@ -224,17 +224,40 @@ body {
 .lt-ov-heading { margin: 0; font-size: 13px; font-weight: 700; letter-spacing: .02em; color: var(--lt-muted); }
 
 /* '한눈에' 맨 위 전체 숫자 줄(#655 2차) — 실제 사용자를 크게, AI 명예회원·시험 계정(#671)을 작게 나란히. */
-.lt-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
-.lt-stat { display: grid; gap: 3px; justify-items: start; align-content: start; padding: 14px 16px; border: 1px solid var(--lt-line); border-radius: var(--lt-r-panel); background: var(--lt-glass); }
+.lt-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; align-items: start; }
+/* #743: 숫자 카드도 누를 수 있는 카드다 — 처리할 일 카드(.lt-ov-card)와 같은 누름 모양(커서·hover·초점). */
+.lt-stat-cell { display: grid; gap: 0; }
+.lt-stat { display: grid; gap: 3px; justify-items: start; align-content: start; width: 100%; min-height: 44px; text-align: left; padding: 14px 16px; border: 1px solid var(--lt-line); border-radius: var(--lt-r-panel); background: var(--lt-glass); color: inherit; font: inherit; cursor: pointer; }
+.lt-stat:hover, .lt-stat:focus-visible, .lt-ov-card:hover, .lt-ov-card:focus-visible { border-color: var(--lt-gold-line); outline: none; }
+.lt-stat:focus-visible, .lt-ov-card:focus-visible { outline: 3px solid var(--lt-gold-line); outline-offset: 2px; }
+.lt-stat.is-open { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+.lt-stat[disabled] { cursor: default; }
+.lt-stat[disabled]:hover { border-color: var(--lt-line); }
 .lt-stat-value { font-size: 24px; font-weight: 700; color: var(--lt-pearl); font-variant-numeric: tabular-nums; }
 .lt-stat-label { font-size: 12px; color: var(--lt-muted); overflow-wrap: anywhere; min-height: 2.6em; }
-.lt-stat-ai { font-size: 11px; color: var(--lt-gold); }
-.lt-stat-tester { font-size: 11px; color: var(--lt-muted); }
-.lt-stat-fail { font-size: 11px; color: var(--lt-rose-ink); }
+/* #743: 큰 숫자가 무엇을 세는지 카드 안에 적는다('실제 고객'). 전체 = 실제 + AI + 시험을 함께 적어 숫자가 어긋나지 않게. */
+.lt-stat-mean { font-size: 12px; font-weight: 600; color: var(--lt-gold); }
+.lt-stat-others { font-size: 12px; color: var(--lt-muted); font-variant-numeric: tabular-nums; }
+.lt-stat-fail { font-size: 12px; color: var(--lt-rose-ink); }
+/* #743: 카드 아래 펼치는 내역 — 갈래 수 + (트리 계열은) 제목 목록. 이메일·subject는 싣지 않는다. */
+.lt-stat-detail { display: grid; gap: 8px; padding: 12px 16px 14px; border: 1px solid var(--lt-gold-line); border-top: 0; border-radius: 0 0 var(--lt-r-panel) var(--lt-r-panel); background: var(--lt-glass); }
+.lt-stat-detail[hidden] { display: none; }
+.lt-stat-split { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0; padding: 0; list-style: none; font-size: 12px; color: var(--lt-muted); }
+.lt-stat-split b { color: var(--lt-pearl); font-variant-numeric: tabular-nums; }
+.lt-stat-note { margin: 0; font-size: 12px; color: var(--lt-muted); }
+.lt-stat-titles { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; font-size: 12px; color: var(--lt-pearl); }
+.lt-stat-titles li { overflow-wrap: anywhere; }
 @media (max-width: 480px) {
   .lt-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .lt-stat { padding: 12px 12px; }
   .lt-stat-value { font-size: 20px; }
+}
+
+/* #743: '한눈에'는 두 묶음 모두 1440 이상에서 한 줄(카드 7개씩). 좁은 화면은 지금처럼 줄바꿈한다.
+   카드가 한 줄에 들어가도록 '한눈에'만 판을 넓힌다(다른 탭 폭은 그대로). */
+.admin-shell.is-overview { width: min(1280px, calc(100% - 64px)); }
+@media (min-width: 1440px) {
+  .is-overview .lt-stats, .is-overview .lt-ov-cards { grid-template-columns: repeat(7, minmax(0, 1fr)); }
 }
 @media (max-width: 480px) {
   .lt-ov-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
