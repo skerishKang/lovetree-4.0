@@ -495,6 +495,51 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     await tagBoard.evaluate(() => document.getElementById('dTags').scrollIntoView({ block: 'center' }));
     await page6.waitForTimeout(200);
     assert.equal(await tagBoard.evaluate(() => document.getElementById('app').scrollLeft), 0, '꼬리표 줄로 스크롤해도 보드 판이 가로로 밀리지 않는다');
+    // #716: 390 두 줄 도구 줄 — 카드가 도구 줄 밑으로 들어가 꼬리표·제목이 비치지 않는다(교차 면적 0·바탕 알파 1),
+    // 도구 줄이 옆으로 넘치거나 단추가 잘리지 않고, '선택한 순간' 고르기 칸도 도구 줄과 겹치지 않는다.
+    if (width === 390) {
+      const bar = await tagBoard.evaluate(() => {
+        const box = (el) => { const r = el.getBoundingClientRect(); return { t: r.top, b: r.bottom, l: r.left, rt: r.right }; };
+        const header = document.querySelector('header');
+        const hb = box(header);
+        const cs = getComputedStyle(header);
+        const stops = cs.backgroundImage.match(/rgba?\([^)]*\)/g) || [];
+        const alphas = stops.map((s) => { const m = /rgba?\(([^)]+)\)/.exec(s); if (!m) return 1; const p = m[1].split(',').map((v) => parseFloat(v)); return p.length > 3 ? p[3] : 1; });
+        if (cs.backgroundColor && cs.backgroundColor !== 'rgba(0, 0, 0, 0)') alphas.push(1);
+        const items = [...header.querySelectorAll('button, .boardThemeSwitch, .boardModeSwitch, .tree-title')].filter((el) => {
+          const r = el.getBoundingClientRect(); const s = getComputedStyle(el);
+          return s.display !== 'none' && s.visibility !== 'hidden' && r.width > 0;
+        }).map((el) => ({ text: (el.textContent || '').trim().slice(0, 12), ...box(el) }));
+        const vw = innerWidth;
+        const texts = [...document.querySelectorAll('#cardLayer .card h3, #cardLayer .card .cardMeta, #cardLayer .card .keywordOnCard, #cardLayer .card .videoTitle, #cardLayer .card .domain, #cardLayer .card small, #cardLayer .card .firstTag')].filter((el) => { const s = getComputedStyle(el); const r = el.getBoundingClientRect(); return s.display !== 'none' && s.visibility !== 'hidden' && r.width > 0 && r.height > 0; });
+        const frame = box(document.getElementById('viewport'));
+        let area = 0;
+        for (const el of texts) {
+          const r = box(el);
+          // 판(.boardFrame)은 overflow:hidden 이라 위로 삐져나온 카드는 잘려 보이지 않는다 —
+          // 도구 줄 뒤로 '보이는' 겹침만 잡는다(텍스트 ∩ 도구 줄 ∩ 판 보이는 영역).
+          const w = Math.min(hb.rt, r.rt, frame.rt) - Math.max(hb.l, r.l, frame.l);
+          const h = Math.min(hb.b, r.b, frame.b) - Math.max(hb.t, r.t, frame.t);
+          if (w > 0 && h > 0) area += w * h;
+        }
+        const frameTop = Math.round(frame.t);
+        const picker = document.querySelector('.lt-moment-picker');
+        const pb = picker ? box(picker) : null;
+        const pickerOverlap = pb ? Math.max(0, Math.min(hb.b, pb.b) - Math.max(hb.t, pb.t)) : 0;
+        return {
+          alphas, overlapArea: Math.round(area),
+          overflowRight: Math.round(Math.max(0, ...items.map((i) => i.rt - vw))),
+          cut: items.filter((i) => i.rt > vw + 0.5 || i.l < -0.5).map((i) => i.text).join(','),
+          frameTop, headerBottom: Math.round(hb.b), pickerOverlap: Math.round(pickerOverlap)
+        };
+      });
+      assert.equal(bar.alphas.some((a) => a < 1), false, `390 도구 줄 바탕은 불투명하다(정지 색 알파 ${JSON.stringify(bar.alphas)})`);
+      assert.equal(bar.overlapArea, 0, `390 도구 줄 뒤로 카드 글자가 들어가지 않는다(교차 면적 ${bar.overlapArea}px²)`);
+      assert.equal(bar.overflowRight, 0, `390 도구 줄이 가로로 넘치지 않는다(넘침 ${bar.overflowRight}px)`);
+      assert.equal(bar.cut, '', `390 잘린 단추가 없다(잘림: ${bar.cut || '없음'})`);
+      assert.ok(bar.frameTop >= bar.headerBottom, `390 판이 도구 줄 아래끝(${bar.headerBottom}px)부터 시작한다(실제 ${bar.frameTop}px)`);
+      assert.equal(bar.pickerOverlap, 0, `390 '선택한 순간' 고르기 칸이 도구 줄과 겹치지 않는다(겹침 ${bar.pickerOverlap}px)`);
+    }
     await take(page6, '꼬리표 줄이 열린 상세');
     // #627 PR B: 꼬리표 정리 화면 — 목록·개수와 '제목에서 꼬리표 한 번에 제안받기'가 그려진 자리를 잰다.
     await page6.evaluate(() => document.getElementById('record-menu')?.click());
@@ -550,9 +595,55 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
         thumbs: doc.querySelectorAll('#gsvg image').length,
         stacks: [...doc.querySelectorAll('.g-stackcount')].map((x) => x.textContent),
         overflow: Math.max(0, doc.documentElement.scrollWidth - doc.documentElement.clientWidth),
-        badge: doc.getElementById('gBadge')?.textContent || ''
+        badge: doc.getElementById('gBadge')?.textContent || '',
+        // CTO 지적(#714 후속): 이름 상자가 빈 곳만 피하는지로는 부족하다 — 아래 세 가지를 잰다.
+        narrow: doc.documentElement.clientWidth < 700,
+        hubDots: [...doc.querySelectorAll('.g-hubdot')].map((c) => {
+          const r = c.getBoundingClientRect();
+          return { key: c.parentElement?.getAttribute('data-hub-key'), cr: Number(c.parentElement?.getAttribute('data-cr') || 0), x: r.left + r.width / 2, y: r.top + r.height / 2 };
+        }),
+        nameBoxes: [...doc.querySelectorAll('.g-hubname')].filter((x) => !x.classList.contains('g-hubsub') && x.getBoundingClientRect().width > 0).map((x) => {
+          const r = x.getBoundingClientRect();
+          return { key: x.parentElement?.getAttribute('data-hub-key'), cx: r.left + r.width / 2, cy: r.top + r.height / 2, h: r.height, t: x.textContent };
+        }),
+        rings: [...doc.querySelectorAll('.g-ring')].map((c) => { const r = c.getBoundingClientRect(); return { key: c.getAttribute('data-key'), x: r.left + r.width / 2, y: r.top + r.height / 2, r: r.width / 2 }; }),
+        counts: [...doc.querySelectorAll('.g-stackcount')].map((x) => {
+          const box = x.getBoundingClientRect();
+          const dot = x.parentElement?.querySelector('circle');
+          const dr = dot ? dot.getBoundingClientRect() : null;
+          return { t: x.textContent, x: box.left + box.width / 2, y: box.top + box.height / 2, h: box.height, dotX: dr ? dr.left + dr.width / 2 : null, dotY: dr ? dr.top + dr.height / 2 : null, dotR: dr ? dr.width / 2 : null };
+        })
       };
     });
+    // ① 각 허브 이름의 중심은 자기 고리 중심에서 (고리 반지름 + 이름 높이 + 여유) 안에 있다(좁은 화면).
+    if (graphCheck.narrow) {
+      const tooFar = graphCheck.nameBoxes.map((n) => {
+        const dot = graphCheck.hubDots.find((d) => d.key === n.key);
+        if (!dot) return n.t + ' ← 자기 고리를 못 찾음';
+        const dist = Math.hypot(n.cx - dot.x, n.cy - dot.y);
+        const limit = dot.cr + n.h + 12;
+        return dist <= limit ? null : `${n.t} 거리 ${Math.round(dist)} > ${Math.round(limit)}`;
+      }).filter(Boolean);
+      assert.deepEqual(tooFar, [], `390 허브 이름은 자기 고리 바로 아래에 있어야 한다: ${JSON.stringify(tooFar)}`);
+      // ③ 좁은 화면에서는 허브 이름을 숨기지 않는다.
+      const hidden = graphCheck.hubDots.length - graphCheck.nameBoxes.length;
+      assert.equal(hidden, 0, `390에서 숨겨진 허브 이름 0(실제 ${hidden}개 숨김)`);
+    }
+    // ② 고리끼리 겹침 0(원-원 거리, 2px 여유).
+    const ringPairs = [];
+    for (let i = 0; i < graphCheck.rings.length; i++) for (let j = i + 1; j < graphCheck.rings.length; j++) {
+      const a = graphCheck.rings[i], b = graphCheck.rings[j];
+      const dist = Math.hypot(a.x - b.x, a.y - b.y);
+      if (dist < a.r + b.r - 2) ringPairs.push(`${a.key}×${b.key} @거리${Math.round(dist)} < r${Math.round(a.r)}+${Math.round(b.r)}`);
+    }
+    assert.deepEqual(ringPairs, [], `고리끼리 겹침 0: ${JSON.stringify(ringPairs)}`);
+    // '×N' 개수 표시는 점과 원 거리로 판정한다(상자 겹침이 아니라) — 점 표면에서 떨어져 있어야 한다.
+    const countTouch = graphCheck.counts.map((c) => {
+      if (c.dotX == null) return null;
+      const dist = Math.hypot(c.x - c.dotX, c.y - c.dotY);
+      return dist >= c.dotR + c.h / 2 + 1 ? null : `${c.t} 점 표면에서 ${Math.round(dist - c.dotR)}px`;
+    }).filter(Boolean);
+    assert.deepEqual(countTouch, [], `무더기 개수(×N)가 점에 닿지 않게 떨어져 있다: ${JSON.stringify(countTouch)}`);
     assert.equal(graphCheck.hubPairs, 0, `허브 이름 상자 겹침 0(실제 ${graphCheck.hubPairs}: ${JSON.stringify(graphCheck.pairTexts)})`);
     assert.equal(graphCheck.overflow, 0, `그래프 보기 가로 넘침 0(실제 ${graphCheck.overflow})`);
     assert.ok(graphCheck.hubs >= 4, `허브가 그려진다(실제 ${graphCheck.hubs})`);

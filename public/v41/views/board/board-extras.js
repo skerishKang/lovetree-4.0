@@ -220,6 +220,8 @@ addEventListener('lt-date-style-changed',()=>{try{renderCards()}catch{}try{rende
 // #514 메모: 모바일 '선택한 순간' 줄의 top 을 머리줄 높이에서 계산한다.
 // 고정 96px 은 머리줄이 두 줄이 되면 '진주빛 보드 · 읽기 전용' 표시와 다시 겹친다.
 // 머리줄·테마 표시의 실제 아래끝을 재서 그보다 7px 아래에 둔다(390 한 줄일 때 96px 과 같은 값).
+// 같은 재기로 판(boardFrame)의 시작 위치도 내려 보낸다 — 두 줄 머리줄(＋ 순간 추가가 둘째 줄)에서는
+// 고정 100px보다 아래끝이 낮아(로그인 화면 107px 실측) 카드가 도구 줄 밑으로 들어가 비쳤다.
 function syncMomentPickerTop(){
   const head=document.querySelector('header');
   const badge=document.getElementById('themeBadge');
@@ -227,6 +229,9 @@ function syncMomentPickerTop(){
   const bottom=bottoms.length?Math.max(...bottoms):0;
   if(bottom>0) document.documentElement.style.setProperty('--lt-board-picker-top',Math.round(bottom+7)+'px');
   else document.documentElement.style.removeProperty('--lt-board-picker-top');
+  const headBottom=head?head.getBoundingClientRect().bottom:0;
+  if(headBottom>0) document.documentElement.style.setProperty('--lt-board-frame-top',Math.round(headBottom)+'px');
+  else document.documentElement.style.removeProperty('--lt-board-frame-top');
 }
 syncMomentPickerTop();
 addEventListener('resize',syncMomentPickerTop);
