@@ -3,7 +3,8 @@
 //            자기 의견 아래에 짧게 덧붙일 수 있고(운영센터 상세에 같은 줄로 보인다),
 //            반영된 의견의 답글에는 새 소식 버전 링크('새 소식에도 올렸어요 — 4.1.3 보기')를 단다.
 const KIND_LABEL = {opinion: '의견', journal: '일지'};
-const STATUS_LABEL = {received: '받음', reviewing: '확인 중', fixed: '고침', later: '다음에', closed: '처리 끝'};
+// #638: 고객에게 보이는 상태 말은 쉬운 말로 쓴다(운영센터의 말은 src/admin-view.js가 따로 쓴다).
+const STATUS_LABEL = {received: '받았어요', reviewing: '살펴보는 중', fixed: '고쳤어요', later: '다음에', closed: '답했어요'};
 const REPLY_SEEN_KEY = 'lt41.replySeen';
 const esc = value => String(value ?? '').replace(/[&<>"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
 const time = value => { const d = new Date(value); return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString('ko-KR', {hour12: false}); };

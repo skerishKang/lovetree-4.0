@@ -161,11 +161,11 @@ html[data-book-shape=phone][data-v41-screen=book] .detail-panel{left:8px;right:8
 /* ── #345 순간 면: 날짜 위·제목 주인공·감정 점+글자·영상 아래 출처 한 줄 ─────────────
    종이 위 글자는 --lt-ink(밤·정원 모두 어두운 잉크)만 쓰고, 보조 글자는 0.75 이상 불투명도로
    4.5:1을 넘긴다. 감정 점 색만 --lt-group-1..6 토큰을 쓴다(장식). */
-html[data-v41-screen=book] .moment-title .moment-date{margin:0 0 4px;font-size:12px;line-height:1.4;color:var(--lt-ink);opacity:.75;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+html[data-v41-screen=book] .moment-title .moment-date{margin:0 0 4px;font-size:13px;line-height:1.4;color:var(--lt-ink);opacity:.75;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 html[data-v41-screen=book] .moment-heading{pointer-events:auto;display:flex;align-items:baseline;gap:8px;min-width:0}
 html[data-v41-screen=book] .moment-title-button{pointer-events:auto;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin:0;padding:0;border:0;background:none;color:var(--lt-ink);font:500 20px/1.32 var(--lt-reading);text-align:left;word-break:keep-all;cursor:text}
 html[data-v41-screen=book] .moment-title-button:hover{text-decoration:underline;text-decoration-color:var(--lt-gold-line);text-underline-offset:4px}
-html[data-v41-screen=book] .title-edit-hint{pointer-events:auto;flex:0 0 auto;min-height:32px;padding:4px 6px;border:0;background:none;color:var(--lt-ink);opacity:.72;font-size:11px;white-space:nowrap;cursor:pointer}
+html[data-v41-screen=book] .title-edit-hint{pointer-events:auto;flex:0 0 auto;min-height:32px;padding:4px 6px;border:0;background:none;color:var(--lt-ink);opacity:.72;font-size:13px;white-space:nowrap;cursor:pointer}
 html[data-v41-screen=book] .title-edit-hint:hover{opacity:1;text-decoration:underline}
 html[data-v41-screen=book] .moment-emotion{display:flex;align-items:center;gap:6px;margin:6px 0 0;font-size:12px;line-height:1.4;color:var(--lt-ink);opacity:.78}
 html[data-v41-screen=book] .emotion-dot{flex:0 0 auto;width:8px;height:8px;border-radius:50%;background:var(--lt-rose)}

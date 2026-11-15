@@ -130,7 +130,9 @@ export function createPanels(deps) {
     // #627: 추가 모드는 날짜를 자동으로 채워 두므로 무대 날짜 안내를 보인다; 수정 모드의 날짜는 이미 정해진 값이다.
     $('stage-date-hint').hidden = mode !== 'add';
     // 2026-11-08 수정 모드에서 이미 적어 둔 제목·감정·날짜가 있으면 '더 적기'를 펼친 상태로 연다.
-    $('more-fields').open = mode === 'edit' && Boolean((m.title || '').trim() || (m.emotion || '').trim() || (m.date || '').trim());
+    // #638: 자세한 추가에서도 펼쳐 둔다 — 제목 칸이 접혀 숨으면 찾지 못해 마음 한마디에 다 적고,
+    // 저장된 제목이 마음 한마디 첫 줄(자동 제목)이 되어 '제목이 덮어써졌다'로 보였다.
+    $('more-fields').open = mode === 'edit' ? Boolean((m.title || '').trim() || (m.emotion || '').trim() || (m.date || '').trim()) : true;
     const parent = mode === 'edit' && m.parentId ? c.tree.moments.find(moment => moment.id === m.parentId) : null;
     $('editor-context').textContent = mode === 'add' ? `새 순간 추가 · ${m.title}에서 이어집니다.` : parent ? `수정할 순간 · ${m.title} · 현재 이전 순간: ${parent.title}` : `수정할 순간 · ${m.title} · 트리의 시작 순간`;
     $('form-error').textContent = ''; $('moment-management').hidden = mode !== 'edit';

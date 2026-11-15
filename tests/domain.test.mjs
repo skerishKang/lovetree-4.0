@@ -30,6 +30,20 @@ test('validated serialization preserves the emotional path', () => {
   assert.equal(reloaded.trees[0].moments[1].parentId, first.moments[0].id);
   assert.equal(reloaded.trees[0].moments[1].relation, '직접 만나고 싶어서');
 });
+test('#638: 자세한 추가에서 적은 제목은 마음 한마디가 있어도 그대로 저장된다', () => {
+  // 저장 경로 전체(입력 검사 → 순간 담기 → 상태 저장 검사)를 돌린다 — 클라이언트 apply('add')가 밟는 순서.
+  const tree = createTree({ subject: '윤슬', title: '첫 순간', note: '', emotion: '설렘', date: '2026-11-01', url: '' });
+  const grown = addMoment(tree, { title: '우리의 첫 콘서트', note: '설레는 마음 한마디', emotion: '설렘', date: '2026-11-15', url: '' }, tree.moments[0].id);
+  const saved = validateState(stateOf(grown)).trees[0].moments.at(-1);
+  assert.equal(saved.title, '우리의 첫 콘서트', '적은 제목이 저장값에 남는다');
+  assert.equal(saved.note, '설레는 마음 한마디');
+  // 다시 저장(수정·상태 전체 PUT)해도 제목은 마음 한마디로 바뀌지 않는다.
+  const again = validateState(stateOf(editMoment(grown, saved.id, { title: '다시 적은 제목', note: '설레는 마음 한마디', emotion: '설렘', date: '2026-11-15', url: '' })));
+  assert.equal(again.trees[0].moments.find(m => m.id === saved.id).title, '다시 적은 제목');
+  // 제목을 비우면(사용자가 제목 칸을 쓰지 않았을 때) 마음 한마디 첫 줄이 자동 제목이 된다(기존 규칙).
+  const auto = addMoment(tree, { title: '', note: '마음으로 남긴 순간', emotion: '설렘', date: '2026-11-15', url: '' }, tree.moments[0].id);
+  assert.equal(validateState(stateOf(auto)).trees[0].moments.at(-1).title, '마음으로 남긴 순간');
+});
 test('invalid parent and non-web URLs cannot be saved', () => {
   const tree = createTree(input());
   assert.throws(() => addMoment(tree, input(), 'missing'));
