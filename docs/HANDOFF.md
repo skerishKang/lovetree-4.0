@@ -18,6 +18,17 @@
 - **캡처(2차)**: `E:\lovetree-qa\lane\local4-known1b\` board(-detail)-after-{1440,390}-{night,garden}.png — 390 카드 폭 275px(2장 보임)·1440 220px(12장), 상세 판 열림·페이지오류 0.
 - **updates.json**: '다음 버전'에 한 줄 넣었다(source: team, #662).
 
+## 2026-11-15 — 알림 줄 자리 · 고급 기능 스위치 · 사라진 영상 2차 (#666, 로컬2 레인, ai/local2-toast-644c-261115, main e99376a 기준)
+
+- **① 알림 줄(토스트) 자리**: 예전에는 `#toast`가 아래 22px에 떠 390에서 '새 소식 · 의견 보내기' 링크 줄(아래 10~37px)을 그대로 덮었다. 이제 셸이 띄우기 직전에 화면 아래에 붙은 것들(`.home-links`·`#mobile-add`·`#updates-card`)의 가장 높은 윗변을 재서 그 위로 올린다(`shell.mjs` `placeToast()`, CSS `--lt-toast-bottom`). 실측(계정 로그인·390×844): 알림 줄 아래 162px, 링크 줄·＋ 단추·새 소식 카드와 겹침 0 / 1440×900: 아래 98px, 겹침 0. 예전 자리(`--lt-toast-bottom:0`)로 되돌리면 링크 줄과 65×15px 겹침이 나 검사가 실제로 잡는다. ＋ 단추를 피해 오른쪽 76px을 비켜 서던 규칙(`body.lt-fab-ok #toast`)은 필요 없어져 지웠다.
+- **② 고급 기능 스위치**: 28×16px 회색 막대 → 44×26px 트랙 + 손잡이(흰 동그라미). 켜짐·꺼짐이 색과 손잡이 자리 둘 다로 갈리고(`--lt-muted` ↔ `--lt-gold-deep`, `background-position:0 0` ↔ `18px 0`), 누를 자리(단추)는 64px. 대비 실측 — 밤 꺼짐 7.15:1·켜짐 10.34:1, 정원 꺼짐 5.90:1·켜짐 5.66:1(기준 3:1). 설명 글은 11px → 12px로 올리고 스위치와 나란히 서지 않고 아래 한 줄로 내렸다(`#account-advanced` 격자: text/switch 두 칸 + desc 한 줄).
+- **③ 사라진 영상 2차**: 서버 oEmbed 프록시가 유튜브의 403·401·400을 모두 502로 묶개 보내던 것을 원래 코드 그대로 전달하게 고쳤다(`server/youtube-oembed.js` `UPSTREAM_ERRORS` — 403 youtube_private·401 youtube_embed_forbidden·400 youtube_missing·404 youtube_not_found, 새 경로 없음·응답 형식 그대로). 실패 응답은 `cache-control: private, no-store`(성공만 `max-age=86400` 유지 — 포스트디플로이 검사 그대로). 화면 `video-status.mjs`는 200 ok · 404·400 gone · 403 private · 401 noembed · 5xx·응답 없음 unknown · 그 밖 held로 가른다. `media-preview.js`는 gone·private·held를 '사라진 영상'으로 표시하고, **noembed(401)는 사라진 영상으로 표시하지 않고** '유튜브에서 보기'(watch 주소, 44px 링크) 안내만 붙인다. 기기에 기억하는 것은 ok·gone뿐 — **비공개(403)는 기억하지 않는다**(나중에 공개로 바뀔 수 있음).
+- **시험(기존 파일에 더함, 새 파일 없음)**: 서버 `tests/youtube-oembed.test.mjs` 2건(403·401·400·404 코드 보존·캐시 안 함·5xx는 502 / 실패 응답 no-store) · 화면 `tests/v41-video-vanished-632.test.mjs` 1건 추가+분류·요청 시험 갱신(403·401·400·5xx 표, '유튜브에서 보기' 링크 주소·글자·긴급 표시 아님) · 공통 검사기에 ⑤알림 줄 겹침 검사 추가(`tests/helpers/screen-audit.mjs`) + 상태 2개('셸 첫 화면·알림 줄'·'보드·알림 줄', 실제 길인 기록 파일 열기로 띄움) → `tests/v41-screen-audit.test.mjs` 12 상태 × 390·1440 × 밤·정원 통과(알림 줄 겹침 0건, 알려진 문제 90건은 그대로) · 스위치 화면 시험 1건(`tests/v41-header-ia.test.mjs`, 실제 계정 메뉴를 열어 1440·390 × 밤·정원 실측·대비 계산). 기존 소스 글자 시험 6건은 동작이 의도라 패턴만 새 규칙에 맞췄다(`v41-465-small`·`v41-account-settings`·`v41-shell-notice`·`v41-mobile-fab-458`·`v41-header-states` — CSS 주석의 `#666`은 헥스 색 검사에 걸려 '이슈 666'으로 는다).
+- **시험 결과**: `npm test` 1605 pass / 0 fail / 135 skipped(화면 시험 제외 — #646 규칙). `LT_SCREEN_AUDIT_REQUIRE=1 node --test tests/v41-screen-audit.test.mjs`(vite build 뒤 dist로) 통과, `node --test tests/v41-header-ia.test.mjs` 22/22.
+- **트러블슈팅**: (1) 공통 검사기는 `dist`가 없으면 `public`을 쓰는데, 그 모드에서는 첫 화면 프레임이 안내 단추까지 가지 못해 20초 만에 멈춘다(main 워크트리에서도 같은 실패 — 이 변경과 무관). `npx vite build` 뒤 `LT_SCREEN_AUDIT_REQUIRE=1`로 돌리면 통과한다. (2) 알림 줄 검사가 '빈손 통과'하지 않게 띄운 뒤 `--lt-toast-bottom`이 0보다 큰지 먼저 단정한다.
+- **스크린샷**: `E:\lovetree-qa\lane\local2-toast\`.
+- **건드리지 않은 것**: DB 구조·저장 규칙·꼬리표 화면·보드 상세 판·보드 390·책 머리줄/테두리·책 고치기·의견 카드.
+
 ## 2026-11-15 — 이슈 #638 마무리(로컬3 레인): 1·2·3 머지(#647) + 4·5·6 수정(PR #660)
 
 - **1·2·3(쉬운 추가 고른 트리 담기·휴대폰 유튜브 제목·지도 NaN월)**: PR #647 머지 완료(main ae44a20). 운영 개발 주소 https://lovetree-4-0.pages.dev/v41/ 에서 04 계정으로 '후' 실사 확인 — 1440 밤 12/12, 390 밤 11/11 통과(캡처 `E:\lovetree-qa\lane\local3-638a\` after-*). 시험 파일은 이슈 이름 새 파일 2개를 `tests/v41-quick-add.test.mjs`·`tests/v41-network-model.test.mjs`에 합치고 지웠다(main '시험 점검 뒤 규칙').

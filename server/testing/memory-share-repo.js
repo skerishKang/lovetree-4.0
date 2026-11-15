@@ -3,6 +3,8 @@ export function createMemoryShareRepo({now=Date.UTC(2026,10,1)}={}) {
   return {
     async create(input){const k=key(input.productId,input.shareId);if(rows.has(k))return null;const value={...input,origin:input.origin||'owner',momentCount:Number(input.momentCount??0),status:'active',createdAt:stamp(),revokedAt:null,discoverable:false,discoverableAt:null};rows.set(k,value);return structuredClone(value);},
     async load({productId,shareId}){const value=rows.get(key(productId,shareId));return value?structuredClone(value):null;},
+    // 시험·집계용 읽기(#655 2차). 제품의 공유 행 전체.
+    async allForProduct({productId}){return [...rows.values()].filter(v=>v.productId===productId).map(value=>structuredClone(value));},
     async list({productId,subjectId}){return [...rows.values()].filter(v=>v.productId===productId&&v.subjectId===subjectId).sort((a,b)=>b.createdAt.localeCompare(a.createdAt)).map(value=>structuredClone(value));},
     async setDiscoverable({productId,subjectId,shareId,discoverable}){const value=rows.get(key(productId,shareId));if(!value||value.subjectId!==subjectId||value.status!=='active')return null;value.discoverable=discoverable;value.discoverableAt=discoverable?(value.discoverableAt||stamp()):null;return structuredClone(value);},
     async revoke({productId,subjectId,shareId}){const value=rows.get(key(productId,shareId));if(!value||value.subjectId!==subjectId)return null;if(value.status==='active'){value.status='revoked';value.revokedAt=stamp();}return structuredClone(value);},

@@ -71,6 +71,9 @@ test('#458: 지금 화면 항목은 금테(테마 토큰)로 표시된다', () =
 
 test('#458: 알림 줄과 첫 화면 안내 줄이 단추와 겹치지 않게 자리를 피한다', () => {
   const block = shellCSS.slice(shellCSS.indexOf('이슈 458: 모바일에서 늘 떠 있는'));
-  assert.match(block, /body\.lt-fab-ok #toast\{max-width:calc\(100% - 104px\);transform:translateX\(calc\(-50% - 38px\)\)\}/, '알림 줄은 오른쪽 76px을 비워 둔다');
+  // #666: 예전에는 알림 줄이 오른쪽 76px을 비켜 섰다. 이제는 아래에 붙은 것들(링크 줄·＋ 단추·새 소식 카드)
+  // 위로 통째로 올라가므로 비켜 설 필요가 없다 — 자리는 셸이 재서 --lt-toast-bottom에 넣는다.
+  assert.match(shellCSS, /#toast\{position:fixed;bottom:max\(22px,var\(--lt-toast-bottom,0px\),env\(safe-area-inset-bottom\)\)/, '알림 줄은 화면 아래에 붙은 것들 위로 올라간다');
+  assert.doesNotMatch(block, /body\.lt-fab-ok #toast\{max-width/, '알림 줄이 단추를 피해 옆으로 비켜 서지 않는다');
   assert.match(orbitJS, /.hint\{font-size:13px;bottom:18px;right:80px\}/, '첫 화면 안내 줄은 단추 자리(오른쪽 76px+여백)만큼 왼쪽을 비운다(#548: 안내 13px)');
 });

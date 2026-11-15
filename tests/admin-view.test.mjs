@@ -5,7 +5,7 @@ import {
   richParagraph, formatTime, parseHash, viewHash, viewToTab,
   filterRows, statusTabs, kindTabs, STATUS_LABEL,
   linkedIssueNumbers, normalizeIssueNumber, issueStateLabel, needsFixButton,
-  statusChangeMessage, buildIssueUrl, issueLink, escapeText,
+  statusChangeMessage, buildIssueUrl, issueLink, escapeText, statsCards,
   journalsSummary, journalRowsByCustomer, journalStage,
   isPendingStatus, overviewModel, overviewTodos
 } from '../src/admin-view.js';
@@ -304,4 +304,31 @@ test('#655 처리 대기(pending) 조건 — 받음·확인 중을 한 번에 �
   // 기존 조건은 그대로다.
   assert.deepEqual(filterRows(rows, {status: 'fixed'}), [{status: 'fixed'}]);
   assert.equal(filterRows(rows, {}).length, 3, '조건 없으면 닫음을 뺀 전체(#564 10)');
+});
+
+test('#655 2차 전체 숫자 카드 — 실제 사용자와 AI 테스터를 나눠 읽고, 못 불러오면 그 줄만 실패로 둔다', () => {
+  const payload = {ok: true, payload: {ok: true, stats: {
+    checkedAt: '2026-11-20T00:00:00.000Z',
+    window: {days: 7, since: '2026-11-13T00:00:00.000Z'},
+    accounts: {total: 12, real: 9, aiTester: 3, new: {total: 4, real: 3, aiTester: 1}},
+    trees: {total: 20, real: 15, aiTester: 5, public: {total: 8, real: 6, aiTester: 2}, featured: {total: 5, real: 4, aiTester: 1}},
+    moments: {total: 90, real: 70, aiTester: 20, new: {total: 11, real: 9, aiTester: 2}}
+  }}};
+  const model = statsCards(payload);
+  assert.equal(model.error, false);
+  assert.deepEqual(model.cards.map(card => card.key), ['accounts', 'accounts-new', 'trees', 'moments', 'moments-new', 'public-trees', 'featured-trees']);
+  const byKey = Object.fromEntries(model.cards.map(card => [card.key, card]));
+  // 실제 사용자를 크게, AI 테스터를 함께 — AI 테스터는 전체에 포함된 수다.
+  assert.deepEqual(byKey.accounts, {key: 'accounts', label: '계정', real: 9, aiTester: 3});
+  assert.deepEqual(byKey['accounts-new'], {key: 'accounts-new', label: '새 계정 · 7일', real: 3, aiTester: 1});
+  assert.deepEqual(byKey.moments, {key: 'moments', label: '순간', real: 70, aiTester: 20});
+  assert.deepEqual(byKey['public-trees'], {key: 'public-trees', label: '공개 트리', real: 6, aiTester: 2});
+  assert.deepEqual(byKey['featured-trees'], {key: 'featured-trees', label: '둘러보기 소개', real: 4, aiTester: 1});
+
+  // 응답이 실패했거나 값이 이상하면 그 카드만 실패 — 숫자를 0으로 지어내지 않는다.
+  assert.deepEqual(statsCards({ok: false, status: 503, payload: null}), {error: true, cards: []});
+  assert.equal(statsCards({ok: true, payload: {ok: false}}).error, true);
+  const broken = statsCards({ok: true, payload: {ok: true, stats: {accounts: {total: 1, real: 1}, trees: {}, moments: {}}}});
+  assert.equal(broken.error, true);
+  assert.ok(broken.cards.every(card => card.error), '값이 없는 카드는 실패로 남는다');
 });

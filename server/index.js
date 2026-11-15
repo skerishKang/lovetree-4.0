@@ -7,6 +7,8 @@ import { createTreeVisibilityRepo } from './db/tree-visibility-postgres.js';
 import { createCommunityRepo } from './db/community-postgres.js';
 import { createAdminRoleRepo } from './db/admin-roles-postgres.js';
 import { createAdminRoleService } from './admin-roles.js';
+import { createAdminStatsService } from './admin-stats.js';
+import { createStatsRepo } from './db/stats-postgres.js';
 import { resolveListen } from './listen-config.js';
 import { createApiHandler, createNodeHandler } from './http.js';
 import { createWorkspaceService } from './workspace-service.js';
@@ -152,6 +154,9 @@ const shareRepo = createShareRepo(pool);
 const visibilityRepo = createTreeVisibilityRepo(pool);
 // #67 제품 역할. 표가 아직 없거나 저장이 망가진 자리에서는 역할 없음으로 닫힌다(fail-closed).
 const admin = createAdminRoleService({ store: createAdminRoleRepo(pool), productId: LOVETREE_PRODUCT_ID });
+// #655 2차 운영센터 전체 숫자. 집계는 저장소 안에서 한 번에 끝내고(전체 행을 읽어 오지 않는다)
+// 서비스는 숫자만 다듬는다. 이 자리는 운영센터 화면만 부르며 권한은 storageHandler 가 판정한다.
+const adminStats = createAdminStatsService({ repo: createStatsRepo(pool), productId: LOVETREE_PRODUCT_ID });
 const shareService = createShareService({
   shareRepo,
   workspaceRepo: repo,
@@ -206,6 +211,7 @@ const storageHandler = createApiHandler({
   productId: LOVETREE_PRODUCT_ID,
   maxBodyBytes,
   admin,
+  adminStats,
   account: accountService,
   allowedOrigins: publicOrigins
 });

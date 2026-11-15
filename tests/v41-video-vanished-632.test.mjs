@@ -28,16 +28,18 @@ function fakeStorage(initial = {}) {
   };
 }
 
-test('#632 분류: 프록시 200=정상, 404=삭제 확정, 답은 왔지만 판정을 못 하는 나머지(403·401·400·502)는 보류(held) — 실측 응답 표', () => {
-  // 실측(2026-11-15): 정상 200 / 삭제 404 / 비공개 403·임베드 금지 401·없는 id 400 은 서버가 502로 뭉개 보낸다.
+test('#666 분류: 200=정상, 404·400=없는 영상, 403=비공개, 401=임베드 금지, 5xx·응답 없음=unknown — 실측 응답 표', () => {
+  // 실측(2026-11-15): 정상 200 / 삭제 404 / 비공개 403 / 임베드 금지 401 / 없는 id 400 — #666부터 서버가 유튜브 코드를 그대로 넘긴다.
   const rows = [
     [200, 'ok'],
     [404, 'gone'],
-    [403, 'held'], // 비공개 — 프록시가 502로 바꿔 보내므로 답은 왔지만 단정하지 않는다
-    [401, 'held'], // 임베드 금지 — 영상이 아직 있으므로 사라진 영상이 아니다
-    [400, 'held'],
-    [502, 'held'],
-    [500, 'held'],
+    [400, 'gone'], // 없는 영상 — 삭제와 같이 표시한다
+    [403, 'private'], // 비공개 — 사라진 영상으로 표시(하루 기억하지 않는다)
+    [401, 'noembed'], // 임베드 금지 — 사라진 영상으로 표시하지 않고 '유튜브에서 보기'로 안내
+    [405, 'held'], // 답은 왔지만 판정하지 못하는 나머지
+    [502, 'unknown'], // 5xx는 '사라졌다'고 말하지 않는다
+    [500, 'unknown'],
+    [503, 'unknown'],
     ['', 'unknown'], // 상태 코드가 없으면 답이 온 것이 아니다
     [undefined, 'unknown'],
     [0, 'unknown'],
@@ -90,7 +92,7 @@ test('#632 기억: 한도(500)를 넘치면 오래된 것부터 버리고, 깨�
   assert.equal(writeVideoStatusCache(null, 'abc123DEF45', 'gone'), false);
 });
 
-test('#632 요청: 프록시 주소는 한 벌(/api/youtube/oembed?v=), 답이 오면 ok·gone·held, 응답이 없으면 unknown', async () => {
+test('#632 요청: 프록시 주소는 한 벌(/api/youtube/oembed?v=), 답이 오면 코드별 판정, 응답이 없으면 unknown', async () => {
   const calls = [];
   const ok = await fetchVideoStatus('abc123DEF45', {
     fetchImpl: async (url, init) => {
@@ -102,8 +104,10 @@ test('#632 요청: 프록시 주소는 한 벌(/api/youtube/oembed?v=), 답이 �
   assert.deepEqual(calls, [{ url: '/api/youtube/oembed?v=abc123DEF45', accept: 'application/json' }]);
 
   assert.equal(await fetchVideoStatus('R5mpcDWpYSA', { fetchImpl: async () => ({ status: 404 }) }), 'gone', '삭제');
-  assert.equal(await fetchVideoStatus('yZIXLfi8CZQ', { fetchImpl: async () => ({ status: 502 }) }), 'held', '비공개는 프록시가 502로 뭉개 보낸다 — 답은 온 보류');
-  assert.equal(await fetchVideoStatus('3xlegeyULX8', { fetchImpl: async () => ({ status: 502 }) }), 'held', '임베드 금지도 보류');
+  assert.equal(await fetchVideoStatus('yZIXLfi8CZQ', { fetchImpl: async () => ({ status: 403 }) }), 'private', '비공개 — #666부터 프록시가 403을 그대로 넘긴다');
+  assert.equal(await fetchVideoStatus('aaaaaaaaaaa', { fetchImpl: async () => ({ status: 400 }) }), 'gone', '없는 영상은 삭제와 같이');
+  assert.equal(await fetchVideoStatus('3xlegeyULX8', { fetchImpl: async () => ({ status: 401 }) }), 'noembed', '임베드 금지는 사라진 영상이 아니다');
+  assert.equal(await fetchVideoStatus('abc123DEF45', { fetchImpl: async () => ({ status: 502 }) }), 'unknown', '5xx는 사라졌다고 말하지 않는다');
   assert.equal(await fetchVideoStatus('abc123DEF45', { fetchImpl: async () => { throw new Error('끊김'); } }), 'unknown', '응답이 없으면 사라졌다고 말하지 않는다');
   assert.equal(await fetchVideoStatus('', { fetchImpl: async () => ({ status: 200 }) }), 'unknown');
   // 시간 초과도 응답이 없는 것이다.
@@ -319,6 +323,60 @@ test('#632 표시: 썸네일이 실패한 카드만 묻고, gone·held는 표시
     await media.checkVanished(notYt, { doc: fakeDoc(), store });
     assert.deepEqual(fetches, []);
     assert.equal(notYt.dataset.ltVanished, undefined);
+  } finally {
+    media.setVideoStatusLoader(null);
+  }
+});
+
+test('#666 표시: 비공개(403)는 사라진 영상, 임베드 금지(401)는 유튜브에서 보기 안내, 없는 영상(400)은 삭제와 같이', async () => {
+  const store = fakeStorage();
+  const answers = { yZIXLfi8CZQ: 'private', '3xlegeyULX8': 'noembed', aaaaaaaaaaa: 'gone', dQw4w9WgXcQ: 'unknown' };
+  media.setVideoStatusLoader(() => ({
+    readVideoStatusCache: (s, id) => readVideoStatusCache(s, id),
+    writeVideoStatusCache: (s, id, status) => writeVideoStatusCache(s, id, status),
+    fetchVideoStatus: async (id) => answers[id] || 'unknown'
+  }));
+  try {
+    // 비공개(403) — 사라진 영상으로 표시하되, 나중에 공개로 바뀔 수 있으니 기억하지 않는다.
+    const priv = vanishedRoot();
+    priv.dataset.ltUrl = 'https://www.youtube.com/watch?v=yZIXLfi8CZQ';
+    await media.checkVanished(priv, { doc: fakeDoc(), store });
+    assert.equal(priv.dataset.ltVanished, '1');
+    assert.equal(readVideoStatusCache(store, 'yZIXLfi8CZQ'), null, '비공개는 하루 기억하지 않는다');
+
+    // 임베드 금지(401) — 사라진 영상으로 표시하지 않고 '유튜브에서 보기'로 보낸다.
+    const noembedDoc = fakeDoc();
+    const noembed = vanishedRoot();
+    noembed.dataset.ltUrl = 'https://www.youtube.com/watch?v=3xlegeyULX8';
+    await media.checkVanished(noembed, { doc: noembedDoc, store });
+    assert.equal(noembed.dataset.ltVanished, undefined, '임베드 금지는 사라진 영상이 아니다');
+    assert.equal(noembed.classList.list.has('lt-media-noembed'), true);
+    const note = noembedDoc.created.find((el) => el.className === 'lt-media-noembed-note');
+    assert.ok(note, '안내 한 줄');
+    assert.equal(note.attrs.role, 'status');
+    const link = note.children[1];
+    assert.equal(link.className, 'lt-media-noembed-link');
+    assert.equal(link.textContent, '유튜브에서 보기');
+    assert.equal(link.href, 'https://www.youtube.com/watch?v=3xlegeyULX8');
+    assert.equal(link.target, '_blank');
+    assert.match(note.children[0].text, /여기서 볼 수 없어요/);
+    assert.deepEqual(noembed.body.afterArgs, [note], '몸통 뒤에 놓인다');
+    assert.equal(readVideoStatusCache(store, '3xlegeyULX8'), null, '임베드 금지도 기억하지 않는다');
+
+    // 없는 영상(400) — 삭제와 같이 표시하고 기억한다.
+    const missing = vanishedRoot();
+    missing.dataset.ltUrl = 'https://www.youtube.com/watch?v=aaaaaaaaaaa';
+    await media.checkVanished(missing, { doc: fakeDoc(), store });
+    assert.equal(missing.dataset.ltVanished, '1');
+    assert.equal(readVideoStatusCache(store, 'aaaaaaaaaaa'), 'gone');
+
+    // 5xx·응답 없음(unknown) — 표시를 바꾸지 않고 다시 묻도록 검사 표시를 지운다.
+    const unknown = vanishedRoot();
+    unknown.dataset.ltUrl = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
+    await media.checkVanished(unknown, { doc: fakeDoc(), store });
+    assert.equal(unknown.dataset.ltVanished, undefined);
+    assert.equal(unknown.dataset.ltVanishedChecked, undefined);
+    assert.equal(unknown.dataset.ltNoembed, undefined);
   } finally {
     media.setVideoStatusLoader(null);
   }

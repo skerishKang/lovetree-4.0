@@ -7,6 +7,7 @@
  * - '닫음'(closed) 상태: 목록 기본에서는 제외
  * - 탭 거르기(#570): 상태·종류 탭 숫자 계산과 주소(#board?status=..&kind=..) 왕복
  * - '고치는 일' 탭(#570): 고객 글에 연결된 이슈만, open/closed를 '고치는 중/고침 완료'로
+ * - '한눈에' 전체 숫자 카드(#655 2차): 서버 집계 응답을 '실제 사용자 / AI 테스터'로 나눠 보여 준다
  */
 
 export const KIND_LABEL = {opinion: '의견', journal: '일지'};
@@ -231,7 +232,35 @@ export function journalsSummary(journals, day) {
   };
 }
 
-// ── '한눈에' 탭(#655) — 이미 있는 API의 응답만 모아 처리할 일을 숫자로 낸다. 서버를 바꾸지 않는다. ──
+// ── '한눈에' 탭(#655) — 이미 있는 API의 응답만 모아 처리할 일을 숫자로 낸다(1차). ──
+
+/**
+ * '한눈에' 맨 위 전체 숫자 카드(#655 2차). 서버 `/api/admin/stats` 응답({ok, payload:{ok, stats}})만 받는다.
+ * 값이 하나라도 이상하면 그 카드만 '불러오지 못했어요'로 두고 나머지는 그린다(숫자를 지어내지 않는다).
+ * '실제 사용자'(real)와 'AI 테스터'(aiTester)를 카드마다 나눠 보여 준다 — AI 테스터는 전체에 포함된다.
+ */
+export function statsCards(response) {
+  const stats = response?.ok && response.payload?.ok ? response.payload.stats : null;
+  if (!stats || typeof stats !== 'object') return {error: true, cards: []};
+  const cells = [
+    ['accounts', '계정', stats.accounts],
+    ['accounts-new', '새 계정 · 7일', stats.accounts?.new],
+    ['trees', '트리', stats.trees],
+    ['moments', '순간', stats.moments],
+    ['moments-new', '새 순간 · 7일', stats.moments?.new],
+    ['public-trees', '공개 트리', stats.trees?.public],
+    ['featured-trees', '둘러보기 소개', stats.trees?.featured]
+  ];
+  const num = (value) => (Number.isSafeInteger(value) && value >= 0 ? value : null);
+  const cards = cells.map(([key, label, value]) => {
+    const real = num(value?.real);
+    const aiTester = num(value?.aiTester);
+    return real === null || aiTester === null ? {key, label, error: true} : {key, label, real, aiTester};
+  });
+  return {error: cards.every(card => card.error), cards};
+}
+
+
 
 /** '오늘 할 일'(#655): 답이 없는 글(답글 0) 중 오래된 순 5개. 닫은 글은 처리가 끝난 것이므로 세지 않는다.
  *  연결 이슈 번호는 '#584' 같은 표시도 숫자로 맞춰 돌려준다(#636). */

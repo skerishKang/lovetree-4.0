@@ -1,6 +1,7 @@
 // #657 — 화면 공통 검사기. 이슈마다 따로 짜 온 '겹침 0·NaN 없음·글자 12px 이상' 검사를 하나로 모은다.
-// 검사 함수는 tests/helpers/screen-audit.mjs에 있다(①겹침·가려짐 #635 규칙 ②가로 넘침·잘림 ③흔적 값 넷 #635 ④글자 기준선 #548).
+// 검사 함수는 tests/helpers/screen-audit.mjs에 있다(①겹침·가려짐 #635 규칙 ②가로 넘침·잘림 ③흔적 값 넷 #635 ④글자 기준선 #548 ⑤알림 줄이 아래 링크 줄·＋ 단추·새 소식 카드를 덮지 않음 #666).
 // 화면 목록: 첫 화면(예시)·책(공유 링크, 마지막 장 포함)·보드·지도·둘러보기·의견 보내기 창(보내기 전·후)·어떻게 쓰나요 안내.
+// #666이 더한 상태: 알림 줄(토스트)이 떠 있는 셸 첫 화면·보드 — ＋ 단추(body.lt-fab-ok)와 새 소식 카드가 함께 뜬 자리에서 잰다.
 // 크기·테마: 390·1440 × 밤·정원. 앞으로 화면 수리는 아래 SCREENS에 화면이나 상태를 한 줄 더하는 것으로 끝낸다.
 //
 // 알려진 문제(기준을 낮추지 않는다): main에서 이미 나는 실패는 KNOWN에 화면·항목·이슈 번호와 함께 적고,
@@ -57,6 +58,25 @@ const homeHost = `<!doctype html><html lang="ko"><head><meta charset="utf-8"><me
 <script>window.LT41={source:'file',member:'out',treeCount:0,trees:[],prefs:{}};</script>
 <iframe src="/v41/home.html" style="position:fixed;inset:0;width:100vw;height:100vh;border:0"></iframe></body></html>`;
 
+// #666: 알림 줄을 실제 사용자 길로 띄운다 — 기록 파일을 열면 셸이 '파일을 열었어요…'(또는 '불러오기 실패…') 안내를 올린다.
+// 알림 줄은 셸(index.html)의 #toast이고, 아래 링크 줄·＋ 단추·새 소식 카드도 같은 문서에 있다.
+const raiseToast = async (page) => {
+  await page.setInputFiles('#file', { name: 'record.json', mimeType: 'application/json', buffer: Buffer.from('{"trees":"깨진 값"}') }).catch(() => {});
+  await page.waitForFunction(() => { const t = document.getElementById('toast'); return !!t && !t.hidden; }, null, { timeout: 8000 });
+  await page.waitForTimeout(200);
+  // 알림 줄이 실제로 떠 있고, 자리가 아래에 붙은 것들 위로 잡혔는지 먼저 확인한다(검사가 빈손으로 통과하지 않게).
+  const box = await page.evaluate(() => {
+    const t = document.getElementById('toast');
+    const r = t.getBoundingClientRect();
+    return { hidden: t.hidden, top: Math.round(r.top), bottom: Math.round(r.bottom), gap: getComputedStyle(document.documentElement).getPropertyValue('--lt-toast-bottom').trim(), text: t.textContent };
+  });
+  assert.equal(box.hidden, false, '알림 줄이 떠 있다');
+  assert.ok(box.text.trim().length > 0, '알림 줄에 글자가 있다');
+  assert.ok(Number.parseFloat(box.gap) > 0, `알림 줄 자리를 아래에 붙은 것들 위로 잡았다(--lt-toast-bottom: ${box.gap || '없음'})`);
+  return box;
+};
+const lowerToast = async (page) => { await page.evaluate(() => { const t = document.getElementById('toast'); if (t) t.hidden = true; }); };
+
 const frameOf = async (page, test_) => {
   for (let i = 0; i < 80; i++) {
     const f = page.frames().find((f) => f !== page.mainFrame() && test_.test(f.url()));
@@ -66,7 +86,7 @@ const frameOf = async (page, test_) => {
   return null;
 };
 
-test('#657 화면 공통 검사기: 주요 화면 10 상태 × 390·1440 × 밤·정원에서 겹침·잘림·흔적 값·작은 글자가 0이다', { skip: REQUIRE ? false : skip, timeout: 900000 }, async () => {
+test('#657 화면 공통 검사기: 주요 화면 12 상태 × 390·1440 × 밤·정원에서 겹침·잘림·흔적 값·작은 글자가 0이다', { skip: REQUIRE ? false : skip, timeout: 900000 }, async () => {
   if (skip) assert.fail(`미리보기 검사에서는 건너뜀이 실패다 — ${skip}`);
   const server = await serve({ '/share-host.html': shareHost, '/home-host.html': homeHost });
   const base = `http://127.0.0.1:${server.address().port}`;
@@ -132,6 +152,12 @@ test('#657 화면 공통 검사기: 주요 화면 10 상태 × 390·1440 × 밤�
     await frameOf(page3, /views\/track/); // 안쪽 화면 프레임이 뜰 때까지(검사 누락 방지)
     await page3.waitForTimeout(1200);
     await take(page3, '보드');
+    // #666: ＋ 단추(body.lt-fab-ok — 로그인해 내 기록을 쓰는 자리에서만 뜬다)를 함께 띄우고 알림 줄을 올린다.
+    await page3.evaluate(() => document.body.classList.add('lt-fab-ok'));
+    await raiseToast(page3);
+    await take(page3, '보드·알림 줄');
+    await lowerToast(page3);
+    await page3.evaluate(() => document.body.classList.remove('lt-fab-ok'));
     await page3.evaluate(() => { location.hash = '#network'; });
     await page3.waitForTimeout(1800);
     await take(page3, '지도');
@@ -145,6 +171,12 @@ test('#657 화면 공통 검사기: 주요 화면 10 상태 × 390·1440 × 밤�
     const page4 = await ctx4.newPage();
     await page4.goto(`${base}/v41/`, { waitUntil: 'load' });
     await page4.waitForTimeout(1200);
+    // #666: 셸 첫 화면(링크 줄 + 새 소식 카드 + ＋ 단추)에서 알림 줄이 이것들을 덮지 않는지 잰다.
+    await page4.evaluate(() => document.body.classList.add('lt-fab-ok'));
+    await raiseToast(page4);
+    await take(page4, '셸 첫 화면·알림 줄');
+    await lowerToast(page4);
+    await page4.evaluate(() => document.body.classList.remove('lt-fab-ok'));
     await page4.evaluate(() => document.getElementById('community-menu')?.click());
     await page4.waitForFunction(() => !!document.getElementById('community-panel')?.open, null, { timeout: 8000 }).catch(() => {});
     await page4.waitForTimeout(600);
