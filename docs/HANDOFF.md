@@ -22,6 +22,14 @@
 - **캡처**: `E:\lovetree-qa\lane\local3-small\` — map-{1440,390}-{night,garden}.png(조작 줄 두 줄)·updates-{1440,390}-{night,garden}.png(제목 1회).
 - **updates.json**: '다음 버전'(둘째 4.1.4)에 한 줄 넣었다(source: team, #638).
 
+## 2026-11-15 — 소스 글자 검사 줄이기 2차: 트리 이름 호출점 42→32건 (컴1로컬4 레인, ai/local4-test-trim2-261115, main 38e3f19 기준)
+
+- **범위**: 1차가 남긴 2차 후보 중 `v41-shell-tree-title`(11건)·`v41-cto-453-cde`의 community 검사(D1·D3). **제품 코드 변경 0**. topmenu·header-states·shell-notice는 남김(1차와 같은 사유).
+- **처리(단정 기준, 집계 스크립트 계수)**: **바꿈 9**(공유 미리보기 요약 → createMessages 하네스, 둘러보기 카드·미리보기 제목 → mountCommunity + 가짜 fetch, 트리 삭제 확인 문구·책 정보 편집 입력 원본 → `v41-panels-flow` 하네스에 confirm 기록, 닫기 탭 표시 복구 2행·빈 결과 미리보기 칸 숨김 3행 → cto-453-cde community 하네스) / **지움 1**(community-panel.mjs displayTreeTitle import 검사 — 동작 시험이 대신 지킴) / **남김 32**. 2차 범위 42→32, 전체 집계 1367→1357.
+- **강도 증명**: 6곳(messages 요약·panels 확인 문구·편집 입력·카드 제목·닫기 복구·미리보기 숨김)을 한 줄씩 깨서 전부 빨강 확인 후 복원.
+- **시험 결과**: 편집 3파일 `node --test` pass, 전체 `npm test` 1791검 30초에 끝까지 도는 것 확인 — 첫 실행 5건 빨강은 이 워크트리에 devDeps(vite·axe-core·playwright-core) 미설치 탓이었고 `npm install` 후 해당 2파일 21/21 pass 대조 확인. `npm run build`·`modulepreload --check` 통과. 기록은 docs/TESTING.md '소스 글자 검사 줄이기 2차' 항목.
+- **남김(다음 후보)**: `v41-cto-453-cde`의 셸 배선 검사, `v41-shell-notice` 배선, topmenu·header-states의 마크업·CSS.
+
 ## 2026-11-15 — 소스 글자 검사 줄이기 1차: 셸 메뉴·운영센터·서버 범위 120→97건 (로컬3 레인, ai/local3-test-strings-261115, main 40123dd 기준)
 
 - **왜**: 시험 232개 파일 중 약 96개가 동작이 아니라 소스 글자(`src.includes('…')`·`assert.match(소스)`)를 검사해, 제품을 수리할 때마다 '기존 계약 갱신'이 필요했다. 이번 1차는 **운영센터(admin*)·서버(server/**)·셸 메뉴(header-ia 등)** 범위만. 열린 PR(#679·#681)이 만지는 `tests/domain.test.mjs`·`v41-panels-flow.test.mjs`·`v41-screen-audit.test.mjs`는 만지지 않았다. **제품 코드 변경 0** — `git diff`가 tests/ 7개 파일 + docs 2개뿐이다.
