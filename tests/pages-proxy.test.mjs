@@ -275,3 +275,23 @@ test('명시적 공유 경로만 메서드별로 프록시하고 하위 확장�
  for(const [path,method] of cases){const fetcher=recorder(new Response('{}',{headers:{'content-type':'application/json'}}));const response=await onRequest(createProxy({fetcher}),`https://lovetree.example${path}`,{method});assert.equal(response.status,200,`${method} ${path}`);assert.equal(fetcher.calls[0].url,`${UPSTREAM}${path}`);}
  for(const path of ['/api/shares/token/extra','/api/public/shares/token/extra','/api/public/shares/token.json']){const fetcher=recorder(new Response('{}'));const response=await onRequest(createProxy({fetcher}),`https://lovetree.example${path}`);assert.equal(response.status,404,path);assert.equal(fetcher.calls.length,0);}
 });
+
+test('#678 후속: 덧붙임 고치기·지우기 경로는 PATCH·DELETE만 서버로 넘긴다', async () => {
+  // PATCH·DELETE 두 번을 모두 넘기므로 응답은 호출마다 새로 만든다(객체 하나를 두 번 소비하지 않게).
+  const fetcher = recorder(() => new Response('{"deleted":true}', { headers: { 'content-type': 'application/json' } }));
+  const proxy = createProxy({ fetcher });
+  const patched = await onRequest(proxy, 'https://lovetree.example/api/board/mine/42/followup/9', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: '{"body":"고친 덧붙임"}' });
+  assert.equal(patched.status, 200, '덧붙임 고치기 PATCH는 넘긴다');
+  assert.equal(fetcher.calls.at(-1).url, `${UPSTREAM}/api/board/mine/42/followup/9`);
+  assert.equal(fetcher.calls.at(-1).method, 'PATCH');
+  const deleted = await onRequest(proxy, 'https://lovetree.example/api/board/mine/42/followup/9', { method: 'DELETE' });
+  assert.equal(deleted.status, 200, '덧붙임 지우기 DELETE는 넘긴다');
+  // 허용 경로도 메서드가 밖이면 405, 번호 모양·경로 밖은 404다.
+  for (const [path, method, expected] of [['/api/board/mine/42/followup/9', 'POST', 405], ['/api/board/mine/42/followup/9', 'GET', 405], ['/api/board/mine/42/followup/abc', 'PATCH', 404], ['/api/board/mine/42/followup/9/x', 'DELETE', 404]]) {
+    const before = fetcher.calls.length;
+    const init = method === 'GET' || method === 'DELETE' ? {method} : {method, headers: {'content-type': 'application/json'}, body: '{}'};
+    const response = await onRequest(proxy, `https://lovetree.example${path}`, init);
+    assert.equal(response.status, expected, `${method} ${path}: ${expected}`);
+    assert.equal(fetcher.calls.length, before, '업스트림 호출 없음');
+  }
+});

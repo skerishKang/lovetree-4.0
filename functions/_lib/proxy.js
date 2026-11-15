@@ -26,6 +26,8 @@ const COMMUNITY_REPORT_ITEM = /^\/api\/community\/admin\/reports\/[A-Za-z0-9_-]{
 const ADMIN_FEEDBACK_ITEM = /^\/api\/admin\/feedback\/[0-9]{1,20}$/;
 const ADMIN_FEEDBACK_REPLY = /^\/api\/admin\/feedback\/[0-9]{1,20}\/reply$/;
 const MY_POST_FOLLOWUP = /^\/api\/board\/mine\/[0-9]{1,20}\/followup$/;
+// #678 후속: 고객이 자기 덧붙임을 고치거나 지우는 경로(커뮤니티 댓글 항목 경로와 같은 모양).
+const MY_POST_FOLLOWUP_ITEM = /^\/api\/board\/mine\/[0-9]{1,20}\/followup\/[0-9]{1,20}$/;
 const ADMIN_PERSONA_ITEM = /^\/api\/admin\/persona\/[A-Za-z0-9_-]{1,128}$/;
 function communityMethods(path) {
   const action=path.match(COMMUNITY_SHARE_ACTION)?.[1];
@@ -136,6 +138,7 @@ export function createProxy({ fetcher = (...args) => fetch(...args), timeoutMs =
       || (ADMIN_FEEDBACK_ITEM.test(incoming.pathname) ? new Set(['GET','PATCH']) : null)
       || (ADMIN_FEEDBACK_REPLY.test(incoming.pathname) ? new Set(['POST']) : null)
       || (MY_POST_FOLLOWUP.test(incoming.pathname) ? new Set(['POST']) : null)
+      || (MY_POST_FOLLOWUP_ITEM.test(incoming.pathname) ? new Set(['PATCH','DELETE']) : null)
       || (ADMIN_PERSONA_ITEM.test(incoming.pathname) ? new Set(['GET','PUT']) : null)
       || communityMethods(incoming.pathname);
     if (!methods) return jsonError(404, 'not_proxied', '이 경로는 서버로 넘기지 않아요.');

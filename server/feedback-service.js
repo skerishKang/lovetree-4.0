@@ -66,6 +66,14 @@ function boardRow(row) {
   return {...row, displayTitle: row.title || firstLine(row.body)};
 }
 
+// #678 후속: 덧붙임을 고객에게 내려 줄 때의 모양 — 커뮤니티 댓글의 publicComment와 같은 방식
+// (mine·edited·canEdit·canDelete). 답변자 신원(subject)과 고친 시각 값은 고객에게 내리지 않는다
+// (고쳤는지 여부만 알리고, 시각은 운영센터 상세의 응답이 그대로 가진다).
+function publicFollowup(row,viewer){
+  const mine=!!viewer&&row.authorSubjectId===viewer;
+  return {id:row.id,body:row.body,createdAt:row.createdAt,edited:!!row.editedAt,mine,canEdit:mine,canDelete:mine};
+}
+
 export function createFeedbackService({feedbackRepo,productId,admin=null,now=()=>Date.now()}={}){
   if(!feedbackRepo)throw new Error('feedbackRepo가 필요합니다.');
   const writes=new Map();
@@ -138,8 +146,10 @@ export function createFeedbackService({feedbackRepo,productId,admin=null,now=()=
       const replies=await feedbackRepo.listReplies({productId,postId:item.id});
       // #611 4번: 고객이 직접 덧붙인 줄과 운영센터 답글을 구분한다(mine).
       // 답변자 신원은 고객에게 내리지 않는다 — 본인 글인지 여부만 알린다.
-      item.replies=replies.filter(reply=>reply.authorType==='customer')
-        .map(reply=>({id:reply.id,authorType:reply.authorType,body:reply.body,createdAt:reply.createdAt,mine:reply.authorSubjectId===principal.subjectId}));
+      // #678 후속: 고객이 지운 덧붙임(status='deleted')은 목록에서 뺀다(커뮤니티 댓글과 같은 방식).
+      // 고칠 수 있는지(mine·canEdit·canDelete)와 고쳤는지(edited)는 댓글의 publicComment처럼 알린다.
+      item.replies=replies.filter(reply=>reply.authorType==='customer'&&reply.status!=='deleted')
+        .map(reply=>({...publicFollowup(reply,principal.subjectId),authorType:reply.authorType}));
      }else{
       item.replies=[];
      }
@@ -164,6 +174,44 @@ export function createFeedbackService({feedbackRepo,productId,admin=null,now=()=
      status=reopened?.status||'reviewing';
     }
     return {id:reply.id,postId:post.id,status,createdAt:reply.createdAt};
+   },
+
+   /** #678 후속: 고객이 자기 덧붙임을 고친다(커뮤니티 댓글 updateComment와 같은 방식).
+    *  본인 덧붙임만 — 덧붙임 작성 계정 = 요청 계정 = 글 작성 계정. 운영센터 답변도 authorType은
+    *  'customer'이지만 author_subject_id가 다르므로 여기서 걸린다. 글자 수 제한은 붙이기와 같다(2000).
+    *  내용이 바뀌었으므로 상태가 고침·닫음이면 붙이기와 같이 '다시 열림'으로 바뀐다. */
+   async updateFollowup({principal,id,replyId,body}={}){
+    requirePrincipal(principal);
+    const post=await feedbackRepo.get({productId,id});
+    // 본인 의견인지, 남의 글·일지인지는 밖으로 알리지 않는다(없는 것과 같이 404 — append와 같은 원칙).
+    if(!post||post.subjectId!==principal.subjectId||post.kind!=='opinion')throw new ApiError(404,'feedback_not_found','글을 찾을 수 없어요.');
+    const current=await feedbackRepo.getReply?.({productId,replyId});
+    if(!current||current.status!=='visible'||current.postId!==post.id)throw new ApiError(404,'followup_not_found','덧붙일 말을 찾을 수 없어요.');
+    if(current.authorSubjectId!==principal.subjectId)throw new ApiError(403,'followup_forbidden','이 덧붙일 말을 고칠 수 없어요.');
+    const text=clean(body,MAX_BODY);
+    if(!text)throw new ApiError(400,'body_required','덧붙일 말을 입력해 주세요.');
+    rate('followup:'+principal.subjectId,20,10*60_000,'잠시 뒤 다시 시도해 주세요.');
+    const row=await feedbackRepo.updateReply({productId,replyId:current.id,subjectId:principal.subjectId,body:maskPersonal(text)});
+    if(!row)throw new ApiError(403,'followup_forbidden','이 덧붙일 말을 고칠 수 없어요.');
+    if(post.status==='fixed'||post.status==='closed'){
+     const reopened=await feedbackRepo.update({productId,id:post.id,status:'reviewing',memo:null,issueNumber:null,title:null,body:null,score:null});
+     return {...publicFollowup(row,principal.subjectId),status:reopened?.status||'reviewing'};
+    }
+    return {...publicFollowup(row,principal.subjectId),status:post.status};
+   },
+
+   /** #678 후속: 고객이 자기 덧붙임을 지운다(커뮤니티 댓글 deleteComment와 같은 방식 —
+    *  실제 삭제가 아니라 status='deleted'로 남긴다. 운영센터 상세에는 '고객이 지움'으로 보인다). */
+   async deleteFollowup({principal,id,replyId}={}){
+    requirePrincipal(principal);
+    const post=await feedbackRepo.get({productId,id});
+    if(!post||post.subjectId!==principal.subjectId||post.kind!=='opinion')throw new ApiError(404,'feedback_not_found','글을 찾을 수 없어요.');
+    const current=await feedbackRepo.getReply?.({productId,replyId});
+    if(!current||current.status!=='visible'||current.postId!==post.id)throw new ApiError(404,'followup_not_found','덧붙일 말을 찾을 수 없어요.');
+    if(current.authorSubjectId!==principal.subjectId)throw new ApiError(403,'followup_forbidden','이 덧붙일 말을 지울 수 없어요.');
+    const row=await feedbackRepo.deleteReply({productId,replyId:current.id,subjectId:principal.subjectId});
+    if(!row)throw new ApiError(403,'followup_forbidden','이 덧붙일 말을 지울 수 없어요.');
+    return {deleted:true,id:row.id};
    },
 
    /** 관리자 목록(최신 순). 종류·상태·종류(의견/일지) 거르기. */
@@ -274,6 +322,17 @@ export function createFeedbackHandler({authenticate,service,productId}){
    const who=await requiredPrincipal(request);
    const body=jsonBody(request);
    return {status:201,body:{followup:await service.append({principal:who,id:decodeURIComponent(followup[1]),body:body?.body})},headers:NO_STORE};
+  }
+  // #678 후속: 고객이 자기 덧붙임을 고치거나 지운다(커뮤니티 댓글 경로와 같은 모양).
+  const followupItem=path.match(/^\/api\/board\/mine\/([^/]+)\/followup\/([^/]+)$/);
+  if(followupItem&&method==='PATCH'){
+   const who=await requiredPrincipal(request);
+   const body=jsonBody(request);
+   return {status:200,body:{followup:await service.updateFollowup({principal:who,id:decodeURIComponent(followupItem[1]),replyId:decodeURIComponent(followupItem[2]),body:body?.body})},headers:NO_STORE};
+  }
+  if(followupItem&&method==='DELETE'){
+   const who=await requiredPrincipal(request);
+   return {status:200,body:await service.deleteFollowup({principal:who,id:decodeURIComponent(followupItem[1]),replyId:decodeURIComponent(followupItem[2])}),headers:NO_STORE};
   }
   if(path==='/api/board/journal/today'&&method==='GET'){
    const who=await requiredPrincipal(request);

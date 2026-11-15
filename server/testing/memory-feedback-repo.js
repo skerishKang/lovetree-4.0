@@ -69,12 +69,32 @@ export function createMemoryFeedbackRepo() {
       return {...clone(row), replyCount: replyCount(row.id), authorName: authorName(row.subjectId), authorRole: row.subjectId && personas.has(row.subjectId) ? 'ai_customer' : null};
     },
     async addReply({productId, postId, authorType, authorSubjectId = null, body}) {
-      const reply = {id: nextReplyId++, productId, postId: Number(postId), authorType, authorSubjectId, body, createdAt: '2026-11-14T00:02:00.000Z'};
+      const reply = {id: nextReplyId++, productId, postId: Number(postId), authorType, authorSubjectId, body, status: 'visible', createdAt: '2026-11-14T00:02:00.000Z', editedAt: null};
       replies.push(reply);
       return {...reply};
     },
     async listReplies({productId, postId}) {
       return replies.filter(r => r.productId === productId && r.postId === Number(postId)).sort((a, b) => a.id - b.id).map(r => ({...r}));
+    },
+    async getReply({productId, replyId}) {
+      const row = replies.find(r => r.productId === productId && r.id === Number(replyId));
+      return row ? {...row} : null;
+    },
+    // 고객이 자기 덧붙임을 고친다(커뮤니티 댓글 updateComment와 같은 방식 — visible이고 본인 것만).
+    async updateReply({productId, replyId, subjectId, body}) {
+      const row = replies.find(r => r.productId === productId && r.id === Number(replyId));
+      if (!row || row.status !== 'visible' || row.authorSubjectId !== subjectId) return null;
+      row.body = body;
+      row.editedAt = '2026-11-14T00:04:00.000Z';
+      return {...row};
+    },
+    // 지운 표시를 남기는 지우기(댓글 deleteComment와 같은 방식 — status='deleted', 행은 남는다).
+    async deleteReply({productId, replyId, subjectId}) {
+      const row = replies.find(r => r.productId === productId && r.id === Number(replyId));
+      if (!row || row.status !== 'visible' || row.authorSubjectId !== subjectId) return null;
+      row.status = 'deleted';
+      row.editedAt = '2026-11-14T00:04:00.000Z';
+      return {...row};
     },
     async getPersona({productId, subjectId}) {
       const p = personas.get(subjectId);

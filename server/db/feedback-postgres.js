@@ -25,7 +25,11 @@ const replyRow = value => value && ({
   authorType: value.author_type,
   authorSubjectId: value.author_subject_id || null,
   body: value.body,
-  createdAt: iso(value.created_at)
+  // #678 후속: 고객 덧붙임 고치기·지우기(커뮤니티 댓글과 같은 방식). migration 전 기존 배포에서도
+  // 읽기가 깨지지 않게 칸이 없으면 기본값('visible'·null)으로 채운다.
+  status: value.status || 'visible',
+  createdAt: iso(value.created_at),
+  editedAt: iso(value.edited_at)
 });
 
 export function createFeedbackRepo(pool) {
@@ -148,6 +152,44 @@ export function createFeedbackRepo(pool) {
         [productId, Number(postId)]
       );
       return rows.map(replyRow);
+    },
+
+    async getReply({ productId, replyId }) {
+      const numeric = Number(replyId);
+      if (!Number.isSafeInteger(numeric) || numeric <= 0) return null;
+      const { rows } = await pool.query(
+        `SELECT * FROM lovetree_feedback_replies WHERE product_id = $1 AND id = $2`,
+        [productId, numeric]
+      );
+      return rows[0] ? replyRow(rows[0]) : null;
+    },
+
+    // 고객이 자기 덧붙임을 고친다(커뮤니티 댓글 updateComment와 같은 방식 — visible이고 본인 것만).
+    async updateReply({ productId, replyId, subjectId, body }) {
+      const numeric = Number(replyId);
+      if (!Number.isSafeInteger(numeric) || numeric <= 0) return null;
+      const { rows } = await pool.query(
+        `UPDATE lovetree_feedback_replies
+            SET body = $4, edited_at = now()
+          WHERE product_id = $1 AND id = $2 AND status = 'visible' AND author_subject_id = $3
+          RETURNING *`,
+        [productId, numeric, subjectId, body]
+      );
+      return rows[0] ? replyRow(rows[0]) : null;
+    },
+
+    // 고친 시각과 지운 표시를 남기는 지우기(댓글 deleteComment와 같은 방식 — status='deleted', 행은 남는다).
+    async deleteReply({ productId, replyId, subjectId }) {
+      const numeric = Number(replyId);
+      if (!Number.isSafeInteger(numeric) || numeric <= 0) return null;
+      const { rows } = await pool.query(
+        `UPDATE lovetree_feedback_replies
+            SET status = 'deleted', edited_at = now()
+          WHERE product_id = $1 AND id = $2 AND status = 'visible' AND author_subject_id = $3
+          RETURNING *`,
+        [productId, numeric, subjectId]
+      );
+      return rows[0] ? replyRow(rows[0]) : null;
     },
 
     async getPersona({ productId, subjectId }) {
