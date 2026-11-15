@@ -59,7 +59,8 @@ export function markSeen(storage, version) {
 const esc = value => String(value ?? '').replace(/[&<>"]/g, ch => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[ch]));
 
 /** 노트 목록을 쉬운 말 한 줄씩으로 그리는 조각. 버전·날짜·새로워진 것·고친 것 그대로만 쓴다.
- *  #638: 출처 줄('AI 테스터가 찾아 준 것 · 이름')은 같은 출처의 이웃 항목을 한 묶음으로 쳐서 한 번만 보인다. */
+ *  #638: '새로워진 것'·'고친 것' 제목은 한 버전에 한 번만 보인다. 출처 줄('AI 테스터가 찾아 준 것 · 이름')은
+ *  같은 출처의 이웃 항목을 한 묶음으로 쳐서 그 묶음 끝 항목 아래에 작게 단다(12px — shell.css). */
 export function renderUpdates(updates, activeVersion = '') {
   const entries = (Array.isArray(updates) ? updates : [])
     .filter(entry => validVersion(entry?.version))
@@ -75,10 +76,14 @@ export function renderUpdates(updates, activeVersion = '') {
         for (const item of rows) {
           const label = sourceLabel(item);
           const last = bundles[bundles.length - 1];
-          if (last && last.label === label) last.texts.push(item.text);
-          else bundles.push({label, texts: [item.text]});
+          if (last && last.label === label) last.items.push(item);
+          else bundles.push({label, items: [item]});
         }
-        return bundles.map(bundle => `<section class="updates-kind"><h3>${esc(title)}</h3><ul>${bundle.texts.map(text => `<li>${esc(text)}</li>`).join('')}</ul>${bundle.label ? `<small class="updates-source">${esc(bundle.label)}</small>` : ''}</section>`).join('');
+        // 묶음마다 제목을 다시 쓰지 않는다 — 한 칸(<section>)에 제목 하나·목록 하나, 출처는 묶음 끝 항목에 붙인다.
+        const lines = bundles.map(bundle => bundle.items
+          .map((item, i) => `<li>${esc(item.text)}${bundle.label && i === bundle.items.length - 1 ? `<small class="updates-source">${esc(bundle.label)}</small>` : ''}</li>`)
+          .join('')).join('');
+        return `<section class="updates-kind"><h3>${esc(title)}</h3><ul>${lines}</ul></section>`;
       }).join('');
     return `<section class="updates-version" data-updates-version="${esc(entry.version)}"${activeVersion === entry.version ? ' data-active="true"' : ''}>
       <h2 class="updates-version-title">러브트리 ${esc(entry.version)} <span>${esc(entry.date || '')}</span></h2>${groups}</section>`;

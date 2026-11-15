@@ -6,6 +6,15 @@
 
 > **시험 멈춤 규칙(2026-11-15)**: 브라우저 코드에 setInterval 반복을 넣으면 unref하거나 정리한다 — 안 그러면 npm test가 끝나지 않고 CI가 멈춘다.
 
+## 2026-11-15 — 새 소식 제목 되풀이·지도 390 조작 줄 잘림 수리 (#638 뒤정리, 컴1로컬3 레인, ai/local3-small-261115, #679의 ai/local4-638rest-261115 d76d6e8 위에 쌓음)
+
+- **새 소식 제목 되풀이(#679가 만든 묶음의 사이드 이펙트)**: #679가 출처 줄을 '이웃 항목 묶음'으로 치면서 묶음마다 `<h3>`를 다시 써 한 버전에 '새로워진 것' 3번·'고친 것' 4번(실측, 4.1.4)이 됐다. 고침: `updates.mjs` `renderUpdates()` — 한 출처 묶음을 하나의 `<section class="updates-kind">`에 넣고 제목은 한 번만, 출처 줄(`.updates-source`, 12px 유지)은 묶음 끝 항목 안(`<li>` 마지막에 `<small>`, display:block이라 항목 아래 한 줄)에 붙인다. 실측: 각 버전 '새로워진 것'·'고친 것' 각 1회, 출처 12px.
+- **지도 390 조작 줄 잘림**: 390에서 `.mobile-ribbon`이 scrollWidth 949px vs clientWidth 370px — '02 이하 묶음 단추'가 화면 오른쪽 밖으로 잘렸다(overflow-x:auto라 굴리면 보이지만 눈에 잘려 보인다). 고침: ①묶음 단추 이름을 줄여 쓴다(`network.js` `setupMobileRibbon()` — 묶음끼리 연도가 같으면 연도를 덜고 개수를 뺀다: '01 2026년 1–2월 · 10개' → '01 1–2월'. 전체 이름은 aria-label·title에 남긴다) ②`network.css` 390 미디어 쿼리에 `flex-wrap:wrap`을 더해 두 줄로 쌓는다(높이 58→108px). 상태 판(`.route-status`)·묶음 고르기(`.branch-chooser`) bottom을 96/100→152px로 올려 조작 줄 위를 지킨다. 실측(390 밤): 잘림 0, 두 줄(첫 줄 첫 순간 보기·−·＋·01·02 / 둘째 줄 03·04·전체 보기), 링크 줄과 겹침 0.
+- **검사기 보강(`tests/v41-screen-audit.test.mjs` — 상태는 새 파일 없이 기존 '지도 390'·'새 소식 펼침'에 더함)**: ①'지도 390' 상태의 프레임 찾기가 DOM iframe에 없는 `f.url()`을 써 늘 빈손이었다(검사가 아예 안 돌았음) — `contentWindow.location.href`로 고치고(셸이 src 속성 없이 `location.replace`로 화면을 바꾼다) `.mobile-ribbon`의 잘림(scrollWidth−clientWidth) 측정을 더했다. 숨은 왼쪽 판 단추(#viewNet·#viewConc)는 대비를 재지 않게 건너뀀다 ②'새 소식 펼침' 상태에 제목 되풀이 검사(한 버전에 같은 제목 2번 이상이면 실패)를 더했다.
+- **시험**: 바꾼 파일 관련 `updates-format`·`v41-panels-flow`·`v41-map-theme-flow`·`v41-board-map-tree-title` 통과, `v41-screen-audit`(15 상태 × 390·1440 × 밤·정원) 통과 — 알려진 문제 20건은 KNOWN 그대로, 새 실패 0. `npx vite build`·`modulepreload --check` 통과. **로컬 전체 `npm test`는 미완료** — 같은 PC에서 다른 레인의 `npm test`가 어제부터 밀린 채 돌고 있어(프로세스 11108, 11-14 06:53 시작) 30분째 진행이 멈춰 내 실행만 지웠다. 전체는 CI 필수 검사에 맡긴다. (2026-11-15 수리: 멈춤 원인은 thumb-fallback 스윕 타이머였다 — unref로 고쳐 전체 npm test가 29초에 끝까지 돌게 됐다.)
+- **캡처**: `E:\lovetree-qa\lane\local3-small\` — map-{1440,390}-{night,garden}.png(조작 줄 두 줄)·updates-{1440,390}-{night,garden}.png(제목 1회).
+- **updates.json**: '다음 버전'(둘째 4.1.4)에 한 줄 넣었다(source: team, #638).
+
 ## 2026-11-15 — 소스 글자 검사 줄이기 1차: 셸 메뉴·운영센터·서버 범위 120→97건 (로컬3 레인, ai/local3-test-strings-261115, main 40123dd 기준)
 
 - **왜**: 시험 232개 파일 중 약 96개가 동작이 아니라 소스 글자(`src.includes('…')`·`assert.match(소스)`)를 검사해, 제품을 수리할 때마다 '기존 계약 갱신'이 필요했다. 이번 1차는 **운영센터(admin*)·서버(server/**)·셸 메뉴(header-ia 등)** 범위만. 열린 PR(#679·#681)이 만지는 `tests/domain.test.mjs`·`v41-panels-flow.test.mjs`·`v41-screen-audit.test.mjs`는 만지지 않았다. **제품 코드 변경 0** — `git diff`가 tests/ 7개 파일 + docs 2개뿐이다.
@@ -14,12 +23,8 @@
 - **강도 증명**: 새 동작 시험 2종을 검증 — screens.mjs aria-current 줄을 `'false'` 고정으로 깜 → 신규 시험 fail, header.mjs rememberLetter를 빈 함수로 깜 → shell-header fail. 둘 다 되돌려 복원 확인.
 - **시험 결과**: 편집 7파일 개별 `node --test` 67/67 pass, 전체 `npm test` 1769검 중 1630 pass·0 fail·139 skip(기존 건너뜀), `npm run build` 통과.
 - **2차 후보(다음 레인)**: `v41-shell-tree-title`의 messages·panels·community 호출점 검사(createMessages·createPanels·mountCommunity가 내보내기는 있으나 하네스가 무거움), `v41-cto-453-cde` 전체(셸 배선 글자 검사), `v41-shell-notice` 배선. 기준은 docs/TESTING.md '소스 글자 검사 줄이기 1차' 항목에 남겼다.
-## 2026-11-15 — 꼬리표 2차(가수 종류·제목 해석·보드 판 폭)와 결함 ③ 수리 (#627, 로컬2 레인, ai/local2-627c-tags2 → #684, ai/local2-627d-tags-sync → #686, main 40123dd 기준)
 
-- **2차(#684, 스쿼시 머지됨)**: `tags.mjs` TAG_KINDS에 가수(`가수:` 3자 — 값 예산 21자, 활동기만 4자→20자)를 더했다. 제목 해석은 영문(한글) 꼬꼬에서 영문 하나로만 가수를 제안(한글 표기 버림), 무대 꼬리표는 방송 이름만 남기고 날짜를 뗀다, 직캠·화질·날짜가 섞인 붙임표 덩어리는 노래로 제안하지 않는다. 보드의 오른쪽 검은 빈 자리는 `.spaceGlow{inset:-20%}`가 만든 숨은 가로 스크롤 때문이었고 `.app`을 `overflow:clip`(board.css:2)으로 스크롤 컨테이너가 아니게 했다. 보드 상세 '꼬리표' 두 번 표시는 줄 안 하나로 정리(tag-line.mjs). 제목 해석 시험 27개 + 실제 제목 3개 = 30개.
-- **결함 ③(tags-sync, #686)**: 꼬리표 정리 창(이름 바꾸기·합치기·제안 확인)과 담은 직후 안내처럼 셸이 tag-save.mjs를 곧장 부르는 길은 `lt41-tags-saved` 답이 어느 화면에도 없었다 — boardSync는 iframe을 다시 그리지 않으므로 열린 보드·책 화면의 꼬리표 줄·카드 칩이 옛 값에 머문다. 수리: tag-save가 저장이 실제로 바뀌었을 때 열린 프레임(view·view-next)마다 답 모양을 알리고, saveMoments는 바뀐 순간만 알린다. messages.mjs는 성공 저장 뒤 같은 답을 두 번 보내지 않게 실패·변화 없음일 때만 돌려준다. 시험 +3건(v41-tags-627.test.mjs), npm test 1771검 0 fail.
-- **주의**: #684는 자동 머지가 기다리던 사이 머지돼 브랜치가 지워졌고, 그 사이에 밀어 넣은 결함 ③ 커밋은 고아 가지가 됐다 — main 최신에서 새 가지(ai/local2-627d-tags-sync)로 옮겨 #686으로 냈다. 작업 가지는 머지 직후 짧다는 것을 다시 확인.
-- **시험 계정 원상 복구**: 2차 시험에서 꼬리표를 저장해 둔 순간 b863047b(공개 공유 '리센느' 트리 — 소유는 AI 고객 윤제 계정, 계정비밀_대장 표 1)의 `무대:쇼챔피언 261111`을 화면(보드 상세 꼬리표 줄 칩 해제)으로 지워 keywords 없음으로 되돌렸다(리비전 19→20, 공개 공유 응답에서도 확인). 캡처 `E:\lovetree-qa\lane\local2-627c\`.
+## 2026-11-15 — 꼬리표 2차(가수 종류·제목 해석·보드 판 폭)와 결함 ③ 수리 (#627, 로컬2 레인, ai/local2-627c-tags2 → #684, ai/local2-627d-tags-sync → #686, main 40123dd 기준)
 
 ## 2026-11-15 — 꼬리표를 화면에 붙이기: 상세·담은 직후 안내·카드·꼬리표 정리 (#627 1단계 PR B, 로컬2 레인, ai/local2-627b-tags, main 1c2935d 기준, PR #680)
 

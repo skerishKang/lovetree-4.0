@@ -210,7 +210,9 @@ test('#657 화면 공통 검사기: 주요 화면 15 상태 × 390·1440 × 밤�
         const lum = (c) => { const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }; return 0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2]); };
         const mix = (t, b) => [t[0] * t[3] + b[0] * (1 - t[3]), t[1] * t[3] + b[1] * (1 - t[3]), t[2] * t[3] + b[2] * (1 - t[3]), 1];
         const box = (el) => { if (!el) return null; const r = el.getBoundingClientRect(); return { t: r.top, b: r.bottom, l: r.left, r: r.right }; };
-        const frame = [...document.querySelectorAll('iframe')].find((f) => /track56-network/.test(f.url()));
+        // iframe은 src 속성이 비어 있다(셸이 contentWindow.location.replace로 화면을 바꾼다) —
+        // f.url()은 DOM iframe에 없어서 이 검사가 늘 빈손이었다(#638: contentWindow 주소로 찾는다).
+        const frame = [...document.querySelectorAll('iframe')].find((f) => { try { return /track56-network/.test(f.contentWindow.location.href); } catch { return false; } });
         if (!frame) return null;
         const doc = frame.contentDocument;
         const ribbonEl = doc.getElementById('mobileRibbon');
@@ -223,7 +225,7 @@ test('#657 화면 공통 검사기: 주요 화면 15 상태 × 390·1440 × 밤�
         const ox = (a, b) => Math.min(a.r, b.r) - Math.max(a.l, b.l);
         const oy = (a, b) => Math.min(a.b, b.b) - Math.max(a.t, b.t);
         const contrast = (el) => {
-          if (!el) return 0;
+          if (!el || el.getBoundingClientRect().width < 2) return 0; // 좁은 화면에서 숨은 단추(왼쪽 판)는 대비를 재지 않는다
           const win = frame.contentWindow;
           const fg = rgb(win.getComputedStyle(el).color);
           const layers = [];
@@ -234,6 +236,7 @@ test('#657 화면 공통 검사기: 주요 화면 15 상태 × 390·1440 × 밤�
           return Math.round((Math.max(lum(fge), lum(bgc)) + 0.05) / (Math.min(lum(fge), lum(bgc)) + 0.05) * 100) / 100;
         };
         return {
+          cut: Math.max(0, ribbonEl.scrollWidth - ribbonEl.clientWidth),
           linksOverlap: links ? Math.max(0, ox(ribbon, links)) * Math.max(0, oy(ribbon, links)) : 0,
           fabOverlap: fab && fab.r > fab.l ? Math.max(0, ox(ribbon, fab)) * Math.max(0, oy(ribbon, fab)) : 0,
           contrastNet: contrast(doc.getElementById('viewNet')),
@@ -242,9 +245,10 @@ test('#657 화면 공통 검사기: 주요 화면 15 상태 × 390·1440 × 밤�
       }).catch(() => null);
       if (ribbonCheck) {
         const tail = ` · ${width}·${theme}`;
+        if (ribbonCheck.cut > 0) rows.push({ 항목: '잘림', 줄: `지도 390(조작 줄) 잘림 .mobile-ribbon ${Math.round(ribbonCheck.cut)}px 넘침${tail}` });
         if (ribbonCheck.linksOverlap > 0) rows.push({ 항목: '겹침', 줄: `지도 390(조작 줄) 겹침 .mobile-ribbon × .home-links ${Math.round(ribbonCheck.linksOverlap)}px²${tail}` });
         if (ribbonCheck.fabOverlap > 0) rows.push({ 항목: '겹침', 줄: `지도 390(조작 줄) 겹침 .mobile-ribbon × #mobile-add ${Math.round(ribbonCheck.fabOverlap)}px²${tail}` });
-        for (const [id, v] of [['viewNet', ribbonCheck.contrastNet], ['viewConc', ribbonCheck.contrastConc]]) if (v < 4.5) rows.push({ 항목: '대비', 줄: `지도 390(조작 줄) 대비 #${id} ${v}:1 < 4.5:1${tail}` });
+        for (const [id, v] of [['viewNet', ribbonCheck.contrastNet], ['viewConc', ribbonCheck.contrastConc]]) if (v > 0 && v < 4.5) rows.push({ 항목: '대비', 줄: `지도 390(조작 줄) 대비 #${id} ${v}:1 < 4.5:1${tail}` });
       }
     }
     await ctx3.close();
@@ -287,6 +291,17 @@ test('#657 화면 공통 검사기: 주요 화면 15 상태 × 390·1440 × 밤�
     await page4.waitForFunction(() => !!document.getElementById('updates-panel')?.open, null, { timeout: 8000 }).catch(() => {});
     await page4.waitForTimeout(500);
     await take(page4, '새 소식 펼침');
+    // #638: '새로워진 것'·'고친 것' 제목은 한 버전에 한 번 — 출처 묶음마다 되풀이되지 않는다(수치로 판정).
+    const repeats = await page4.evaluate(() => {
+      const out = [];
+      for (const v of document.querySelectorAll('.updates-version')) {
+        const counts = new Map();
+        for (const h of v.querySelectorAll('.updates-kind h3')) counts.set(h.textContent.trim(), (counts.get(h.textContent.trim()) || 0) + 1);
+        for (const [t, n] of counts) if (n > 1) out.push(`${v.getAttribute('data-updates-version')} 버전 "${t}" ${n}번`);
+      }
+      return out;
+    });
+    for (const r of repeats) rows.push({ 항목: '되풀이', 줄: `새 소식 펼침 제목 되풀이 ${r} · ${width}·${theme}` });
     await page4.keyboard.press('Escape');
     await page4.waitForTimeout(400);
     // #638: 내 의견 목록 — 가짜 게시물로 상태 말·출처 묶음이 그려진 목록을 검사한다.
