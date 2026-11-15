@@ -1,7 +1,7 @@
 // #627 PR B: 꼬리표 줄 — 순간 상세(책·보드·지도)와 쉬운 추가로 담은 직후 안내에 붙는 한 벌 화면 조각.
 // 규칙·계산은 tag-model.mjs·tags.mjs 한 벌을 쓰고, 이 파일은 그리기·누르기만 한다.
 // 제안은 흐린 칩, 확정은 진한 칩이다. 누르면 확정·해제된다. 사용자가 확인하기 전에는 저장하지 않는다 —
-// 저장 호출은 onCommit(바뀐 keywords 전체)으로 바깥에 맡기고, 이 파일은 저장 경로를 모른다.
+// 저장 호출은 onCommit(바뀐 keywords 전체, 지금 보고 있는 순간 id)으로 바깥에 맡기고, 이 파일은 저장 경로를 모른다.
 import { TAG_KINDS } from './tags.mjs';
 import { cardTags, chipText, tagLineChips, toggledKeywords, inputTag } from './tag-model.mjs';
 
@@ -54,7 +54,9 @@ export function renderTagLine({ host, doc = document, moment, knownTags = [], wr
   function commit(next) {
     state.keywords = Array.isArray(next) ? [...next] : [];
     draw();
-    try { onCommit?.([...state.keywords]); } catch (error) { fail(error?.message || '저장하지 못했어요.'); }
+    // #735: onCommit에 '지금 보고 있는 순간 id'를 함께 넘긴다 — 줄을 처음 만든 순간의 id를 클로저로
+    // 계속 보내 다른 카드의 꼬리표가 첫 순간에 저장되던 결함을 막는다(update()로 state.momentId가 바뀐다).
+    try { onCommit?.([...state.keywords], state.momentId); } catch (error) { fail(error?.message || '저장하지 못했어요.'); }
   }
 
   host.addEventListener('click', (event) => {
@@ -183,7 +185,9 @@ export function mountViewTagLine({ screen }) {
         moment: { id: moment.id, title: moment.title || '', keywords: moment.keywords },
         knownTags: knownTagsOf(c),
         writable: writable(),
-        onCommit: (keywords) => sendTags(c, moment.id, keywords)
+        // #735: 저장할 순간 id는 줄이 가진 현재 값(renderTagLine이 넘겨 주는 것)으로 정한다 —
+        // 처음 만든 순간의 객체를 클로저로 계속 보내지 않는다.
+        onCommit: (keywords, momentId) => { if (momentId) sendTags(c, momentId, keywords); }
       });
     } else {
       line.update({ id: moment.id, title: moment.title || '', keywords: moment.keywords });
@@ -193,11 +197,16 @@ export function mountViewTagLine({ screen }) {
   }
 
   // 상세 제목이 바뀌면(다른 순간을 열면) 다시 그린다. 같은 순간을 다시 열어도 다시 그린다(값이 바뀌었을 수 있다).
-  new MutationObserver(() => {
+  // #735: 제목만 관찰하면 보드에서 같은 제목의 다른 카드로 바꿀 때 다시 그리지 않아, 꼬리표 줄이 옛 순간의
+  // keywords를 그대로 들고 저장할 수 있다. 상세 전체를 관찰해 선택이 바뀐 것(제목이 같아도 보드는 dBasic·dConn을
+  // 다시 그린다)을 잡고, 꼬리표 줄이 스스로 그린 바뀜(wrap 안)은 무시한다.
+  const detailRoot = doc.getElementById('detail') || title;
+  new MutationObserver((records) => {
+    if (records.every((record) => wrap.contains(record.target))) return;
     const id = context()?.momentId || '';
     if (id && id !== shownId) render();
-    else if (id) render();
-  }).observe(title, { childList: true, characterData: true, subtree: true });
+    else if (id && records.some((record) => title.contains(record.target))) render();
+  }).observe(detailRoot, { childList: true, characterData: true, subtree: true });
 
   // 셸의 저장 답: 모델의 keywords를 다시 읽어 그리고, 화면이 들고 있는 자기 사본에게 알린다(보드 카드 등).
   addEventListener('message', (event) => {
