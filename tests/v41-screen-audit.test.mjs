@@ -546,6 +546,59 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     const bookChips = await (await frameOf(page6, /track59-sketchbook/)).evaluate(() =>
       [...document.querySelectorAll('.moment-title .lt-tag-chip')].map((n) => n.textContent.trim()));
     assert.ok(bookChips.includes('Super Shy') && bookChips.includes('무대'), `책 쪽에 확정 꾀리표 칩이 그려져야 한다(실제: ${JSON.stringify(bookChips)})`);
+    // 보드 첫 진입 두 안내(390) — 셸 알림('내 기록을 불러왔어요.')과 보드 안내 말풍선('순간을 선택해…')이
+    // 같은 자리에 포개지지 않는다. 보드는 ≤700px에서 말풍선을 화면 아래 중앙(bottom 95px)에 띄우고,
+    // 셸 알림도 #666 규칙으로 아래 중앙(--lt-toast-bottom)에 뜬다. 보드는 셸 알림이 떠 있는 동안
+    // 기다렸다 말풍선을 띄운다 — 두 상자가 동시에 보이는 동안에는 겹침 면적이 0이어야 한다.
+    // 1440은 말풍선(오른쪽 아래)·알림(아래 중앙)이 다른 모서리라 기하학적으로 겹치지 않고, 선택 복원으로
+    // 상세 판이 열려 안내가 뜨지 않는 폭이어서 390에서만 잰다.
+    // 새 문맥으로 띄운다(저장된 보기·선택이 없어야 첫 진입 흐름 — 900ms 뒤 말풍선, 셸 알림은 약 3초 — 이 재현된다).
+    if (width === 390) {
+      const ctxNotice = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
+      await ctxNotice.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); } catch {} }, theme);
+      await ctxNotice.route('**://i.ytimg.com/**', THUMB);
+      await ctxNotice.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
+      await ctxNotice.route('**/api/workspace**', (r) => r.fulfill({
+        status: 200, contentType: 'application/json',
+        body: JSON.stringify({ revision: 1, state: { version: 1, trees: [firstTree], prefs: {} }, subject: '시험계정', writeSubjectBound: true, savedAt: '2026-11-15T09:00:00.000Z' })
+      }));
+      const pageNotice = await ctxNotice.newPage();
+      await pageNotice.goto(`${base}/v41/?account=1#board`, { waitUntil: 'domcontentloaded' });
+      await frameOf(pageNotice, /track58-pinboard/);
+      const twoNotices = await pageNotice.evaluate(async () => {
+        const boxOf = (el) => { const r = el.getBoundingClientRect(); return { t: r.top, b: r.bottom, l: r.left, rt: r.right }; };
+        const overlapArea = (a, b) => Math.max(0, Math.min(a.rt, b.rt) - Math.max(a.l, b.l)) * Math.max(0, Math.min(a.b, b.b) - Math.max(a.t, b.t));
+        // 보드 문서는 #view·#view-next 가운데 지금 #cardLayer(보드)를 든 쪽이다(셸이 두 프레임을 갈아끼운다).
+        const boardToast = () => {
+          for (const id of ['view', 'view-next']) {
+            const doc = document.getElementById(id)?.contentDocument;
+            const toast = doc && doc.getElementById('toast');
+            if (toast && doc.getElementById('cardLayer')) return toast;
+          }
+          return null;
+        };
+        let sawShell = false, sawBoard = false, maxArea = 0, bothAt = -1;
+        for (let i = 0; i < 18; i++) {
+          const shell = document.getElementById('toast');
+          const board = boardToast();
+          const shellUp = !!shell && !shell.hidden;
+          const boardUp = !!board && board.classList.contains('show');
+          if (shellUp) sawShell = true;
+          if (boardUp) sawBoard = true;
+          if (shellUp && boardUp) {
+            bothAt = i;
+            maxArea = Math.max(maxArea, overlapArea(boxOf(shell), boxOf(board)));
+          }
+          await new Promise((r) => setTimeout(r, 400));
+        }
+        return { sawShell, sawBoard, maxArea: Math.round(maxArea), bothAt };
+      });
+      assert.ok(twoNotices.sawShell, '390 셸 알림(기록 불러오기 안내)이 떠 있는 자리를 본다(빈손 통과 금지)');
+      assert.ok(twoNotices.sawBoard, '390 보드 안내 말풍선이 뜨는 자리를 본다(빈손 통과 금지)');
+      assert.equal(twoNotices.maxArea, 0, `390 셸 알림과 보드 안내 말풍선이 같은 자리에 포개지지 않는다(겹침 ${twoNotices.maxArea}px², 동시 노출: ${twoNotices.bothAt < 0 ? '없음' : twoNotices.bothAt + '번째 관찰'})`);
+      await pageNotice.close();
+      await ctxNotice.close();
+    }
     await ctx5.close();
 
     // #627 PR3: 그래프 보기 — 지금은 주소(#my/graph)로만 열리는 화면이라 호스트가 LT41을 직접 넘긴다
