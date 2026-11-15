@@ -6,6 +6,12 @@
 
 > **시험 멈춤 규칙(2026-11-15)**: 브라우저 코드에 setInterval 반복을 넣으면 unref하거나 정리한다 — 안 그러면 npm test가 끝나지 않고 CI가 멈춘다.
 
+## 2026-11-16 — #my/graph가 그래프가 아니라 첫 화면으로 열리는 문제 수리 (컴1로컬4 레인, ai/local4-graph-route-261116, main f64745c 기준, PR #728)
+
+- **원인**: #713(8db6946)에서 그래프 화면이 `public/v41/views/graph/track60-graph.html` 하위 폴더로 들어갔는데 `shell/navigation.mjs`의 `screenUrl`은 `views/ + 파일이름`만 만든다 → `/v41/views/track60-graph.html`은 배포에 없는 주소라 Cloudflare Pages가 4.0 SPA index로 200 폴백(라이브 확인: 실제 그래프는 `/v41/views/graph/track60-graph`, 308 경유). iframe이 4.0 앱을 불러와 첫 화면('다시, 그 순간으로.')이 보였다(대표 제보).
+- **수리**: 화면 파일 이름('track60-graph.html' — 시험·postdeploy 판정 키)은 그대로 두고 `screenUrl`이 주소를 만들 때만 `VIEW_SUBDIRS`로 `views/graph/`를 붙인다. 메뉴 단추는 붙이지 않았다(대표 결정 전).
+- **시험**: screen-audit에 세 경우(로그인 진입·로그인 왕복·hash 이동) iframe 파일 이름·`data-v41-screen`·주소 단정 추가, 기존 #my/graph 단정도 프레임 주소·문서 표시까지 강화(폴백 프레임도 이름이 걸리던 허점 메움), shell-screens에 주소 매핑 단정, topmenu에 screens 화면 파일 실재 검사. 전체 npm test 1705 pass 0 fail(43초)·build·modulepreload --check 통과.
+
 ## 2026-11-16 — 둘러보기 카드 작은 글자 12px 이상·검사기 KNOWN 4→3건 (#705 후속, 컴1로컬4 레인, ai/local4-community-261116, main 18f0ce1 기준)
 
 - **고친 글자(shell.css 커뮤니티 블록)**: 감정 칩 .community-tag 10→12px · AI 명예회원 배지 .community-ai 11→12px · 대상 줄 .community-subject 11→13px · 요약 .community-summary 12→13px(본문급) · 메타 줄 .community-muted 11→12px · '댓글·신고·차단' 펼침 11→12px · 반응 칩 단추 .community-reaction 12→13px(단추 13px 규칙). 즐겨찾기·반응 단추 누름 영역 44px(#705) 유지 — 실측 h44.
