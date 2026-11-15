@@ -64,16 +64,17 @@ const knownHit = (항목, 줄) => KNOWN.some((k) => 줄.startsWith(k.화면) && 
 const THUMB = (route) => route.fulfill({ status: 200, contentType: 'image/png', body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64') });
 
 // 시험 트리(#635와 같은 모양 — 순간 3개 사슬, 첫 순간은 유튜브). 가짜 데이터다.
+// 첫 순간이 두 갈래(e2·e3)를 나가므로 첫 장에 갈림길 탭이 보인다 — #700 후속 탭 글자 크기·잘림 검사 대상.
 const VIDEO_TITLE = 'Super Shy — Official MV';
 const tree = (() => {
   const moments = [
     { id: 'm1', title: 'super shy — official mv', date: '2026-11-01', emotion: '설렘', note: '첫 날의 글', parentId: null, relation: '', url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', mediaMetadata: { title: VIDEO_TITLE, channel: '예시 채널' }, x: null, y: null, rot: 0, color: 'rose', keywords: [], privacy: 'public' },
     { id: 'm2', title: '둘째 순간', date: '2026-11-02', emotion: '행복', note: '이어지는 글', parentId: 'm1', relation: '같이 들어서', url: '', mediaMetadata: null, x: null, y: null, rot: 0, color: 'sky', keywords: ['무대'], privacy: 'public' },
-    { id: 'm3', title: '마지막 순간', date: '2026-11-03', emotion: '그리움', note: '끝의 글', parentId: 'm2', relation: '', url: '', mediaMetadata: null, x: null, y: null, rot: 0, color: 'gold', keywords: [], privacy: 'public' }
+    { id: 'm3', title: '마지막 순간', date: '2026-11-03', emotion: '그리움', note: '끝의 글', parentId: 'm1', relation: '', url: '', mediaMetadata: null, x: null, y: null, rot: 0, color: 'gold', keywords: [], privacy: 'public' }
   ];
   const edges = [
     { id: 'e2', kind: 'parent', from: 'm1', to: 'm2', reason: '같이 들어서' },
-    { id: 'e3', kind: 'parent', from: 'm2', to: 'm3', reason: '' }
+    { id: 'e3', kind: 'parent', from: 'm1', to: 'm3', reason: '다른 경로' }
   ];
   return { id: 't1', title: '시험 트리', moments, edges };
 })();
@@ -171,6 +172,19 @@ test('#657 화면 공통 검사기: 주요 화면 16 상태 × 390·1440 × 밤�
     const bookIdle = () => book.waitForFunction(() => { try { return machineState === 'IDLE'; } catch { return false; } }, null, { timeout: 5000 }).catch(() => {});
     await bookIdle();
     await page2.waitForTimeout(700);
+    // #700 후속(갈림길 탭): 첫 장의 탭이 보이는 자리에서 글자 크기와 잘림을 직접 단정한다 —
+    // 12px 기준(#548)에 단추 규칙(13px)을 적용하고, 무대(.stage) 밖으로 나가 잘리는 모양을 막는다.
+    const branchTab = await book.evaluate(() => {
+      const tab = document.getElementById('branchTab');
+      if (!tab || tab.hidden) return null;
+      const stage = document.querySelector('.stage');
+      const tr = tab.getBoundingClientRect(), sr = stage.getBoundingClientRect();
+      return { font: parseFloat(getComputedStyle(tab).fontSize), tabRight: tr.right, stageRight: sr.right, text: tab.textContent.trim() };
+    });
+    assert.ok(branchTab, '첫 장에 갈림길 탭이 보인다(시험 트리의 첫 순간이 두 갈래를 나간다)');
+    assert.ok(branchTab.font >= 13, `갈림길 탭 글자는 13px 이상이다(실측 ${branchTab.font}px)`);
+    assert.ok(branchTab.tabRight <= branchTab.stageRight, `갈림길 탭이 무대 안쪽에 있어야 한다 — 잘림 0(탭 오른쪽 ${Math.round(branchTab.tabRight)}px / 무대 오른쪽 ${Math.round(branchTab.stageRight)}px)`);
+    assert.ok(branchTab.text.includes('에서 갈라진 길'), `탭 문구는 그대로다(실측: ${branchTab.text})`);
     for (let i = 0; i < 12; i++) {
       await take(page2, i === 0 ? '책·공유 첫 장' : `책·공유 ${i + 1}장`);
       const next = book.locator('#nextBtn');
