@@ -81,15 +81,23 @@ function layoutModel(W, H) {
   const cx = W / 2, cy = (top + usableBottom) / 2 - (narrow ? 0 : 7);
   const rx = Math.max(0, Math.min(W * .36, W / 2 - maxC - 96));
   const ry = Math.max(0, Math.min((usableBottom - top) / 2 - maxC - 48, H * .32));
-  const cols = 3, rows = Math.ceil(hubs.length / cols);
-  const rowH = (usableBottom - top) / rows;
+  /* 좁은 무대: 2열 격자 — 각 칸 = 고리 + 바로 아래 가운데 이름 두 줄. 고리끼리·이름끼리 안 겹치게
+     칸 높이를 잡고, 필요하면 세로로 길어진다(세로 스크롤 허용 — 이름을 숨기지 않는 대신). */
+  const cols = narrow ? 2 : 3;
+  const rows = Math.ceil(hubs.length / cols);
+  const maxCr = Math.max(...hubs.map((h) => h.cr), 0);
+  const rowH = narrow ? maxCr * 2 + 46 + 12 : (usableBottom - top) / rows;
+  if (narrow) {
+    const neededH = top + rows * rowH + shelfH + 16;
+    if (neededH > H) H = neededH;
+    model.rowH = rowH; model.maxCr = maxCr;
+  }
   const orderAt = new Map(model.graph.footprint.order.map((id, i) => [id, i]));
   hubs.forEach((h, i) => {
     if (narrow) {
       const col = i % cols, row = Math.floor(i / cols);
-      const labelH = 35;
       h.x = (col + .5) * W / cols;
-      h.y = top + row * rowH + Math.max(0, (rowH - (h.cr * 2 + labelH)) / 2) + h.cr;
+      h.y = top + row * model.rowH + model.maxCr + 10;
     } else {
       const a = -Math.PI / 2 + i * Math.PI * 2 / hubs.length;
       h.x = cx + Math.cos(a) * rx;
@@ -146,10 +154,12 @@ const trailD = (pts) => {
 
 function render() {
   const box = svg.parentElement.getBoundingClientRect();
-  const W = Math.max(280, Math.round(box.width)), H = Math.max(300, Math.round(box.height));
-  svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+  const W = Math.max(280, Math.round(box.width)), availH = Math.max(300, Math.round(box.height));
+  layoutModel(W, availH); /* 좁은 무대에서는 model.H가 필요 높이로 늘어난다 */
+  const H = model.H;
+  svg.setAttribute('viewBox', '0 0 ' + model.W + ' ' + model.H);
+  svg.parentElement.style.height = model.narrow ? model.H + 'px' : '';
   svg.replaceChildren();
-  layoutModel(W, H);
   const { moments, hubs, footprint } = model.graph;
   const defs = el('defs', {}, svg);
   const selM = selectedMoment(), selH = selectedHub();
@@ -163,7 +173,7 @@ function render() {
   for (const h of hubs) {
     const dim = dimmed(h.id);
     if (h.momentIds.length > 0) {
-      el('circle', { cx: h.x, cy: h.y, r: h.cr, fill: 'none', stroke: h.color, 'stroke-width': selH === h ? 2.4 : 1.2, opacity: dim ? .08 : (selH === h ? .55 : .3) }, ringG);
+      el('circle', { cx: h.x, cy: h.y, r: h.cr, class: 'g-ring', 'data-key': h.id, fill: 'none', stroke: h.color, 'stroke-width': selH === h ? 2.4 : 1.2, opacity: dim ? .08 : (selH === h ? .55 : .3) }, ringG);
     } else {
       for (const id of h.linkedIds) { const m = momentById(id); if (m && m.x != null) el('line', { x1: h.x, y1: h.y, x2: m.x, y2: m.y, stroke: h.color, 'stroke-width': 1.2, opacity: dim ? .08 : .45, 'stroke-dasharray': '3 5' }, spokeG); }
     }
@@ -267,7 +277,7 @@ function render() {
   };
   for (const h of hubs) {
     const dim = dimmed(h.id);
-    const g = el('g', { tabindex: '0', role: 'button', 'data-hub-key': h.id, 'aria-label': KIND_LABEL[h.kindId] + ' ' + h.value + ' · 순간 ' + (h.momentIds.length || '관련 ' + h.linkedIds.length) + '개', opacity: dim ? .14 : 1 }, svg);
+    const g = el('g', { tabindex: '0', role: 'button', 'data-hub-key': h.id, 'data-cr': h.cr.toFixed(1), 'aria-label': KIND_LABEL[h.kindId] + ' ' + h.value + ' · 순간 ' + (h.momentIds.length || '관련 ' + h.linkedIds.length) + '개', opacity: dim ? .14 : 1 }, svg);
     el('circle', { cx: h.x, cy: h.y, r: h.hr, class: 'g-hubdot', fill: h.color, opacity: .95 }, g);
     const fs2 = model.narrow ? 12.5 : 14.5;
     const subText = KIND_LABEL[h.kindId] + ' ' + (h.momentIds.length > 0 ? h.momentIds.length : '관련 ' + h.linkedIds.length);
@@ -275,8 +285,21 @@ function render() {
     name.textContent = h.value;
     const sub = el('text', { class: 'g-hubname g-hubsub', style: 'font-size:' + Math.max(12, fs2 - 1.5) + 'px' }, g);
     sub.textContent = subText;
-    const r = placeHubLabel(h, name, sub, g, placed);
-    if (r) labelEls.push({ g, name, sub, count: h.momentIds.length, rect: r });
+    if (model.narrow) {
+      /* 좁은 무대(2열 격자): 이름은 자기 고리 바로 아래 가운데 두 줄(이름 / 종류 개수) — 숨기지 않는다.
+         길면 …로 줄여 칸 폭 안에 둔다. 칸이 고리+이름을 담도록 layoutModel이 칸 높이를 잡았다. */
+      const maxWidth = model.W / 2 - 16;
+      while (name.getComputedTextLength() > maxWidth && name.textContent.length > 2) {
+        name.textContent = name.textContent.replace(/…?$/, '') + '…';
+      }
+      name.setAttribute('x', h.x); name.setAttribute('y', h.y + h.cr + 17); name.setAttribute('text-anchor', 'middle');
+      sub.setAttribute('x', h.x); sub.setAttribute('y', h.y + h.cr + 37); sub.setAttribute('text-anchor', 'middle');
+      labelEls.push({ g, name, sub, count: h.momentIds.length });
+    } else {
+      const r = placeHubLabel(h, name, sub, g, placed);
+      if (r) labelEls.push({ g, name, sub, count: h.momentIds.length, rect: r });
+      else g.remove(); /* 넓은 무대에서 자리를 못 찾으면 숨긴다(범례에 이름이 남는다) */
+    }
     g.addEventListener('click', () => { filterHub = null; stopWalk(); selected = { type: 'hub', key: h.id }; refresh(); });
   }
   /* 순간 점: 고리 위 썸네일 동그라미(없으면 묶음 색 점). 무더기(stacks)는 대표 점 + 개수. */
@@ -306,7 +329,37 @@ function render() {
     } else {
       el('circle', { cx: m.x, cy: m.y, r: r, fill: color, stroke: isSel ? 'var(--lt-gold)' : 'var(--lt-stage)', 'stroke-width': isSel ? 3 : 1.4 }, g);
     }
-    if (stackN > 1) el('text', { x: m.x, y: m.y + r + 12, class: 'g-stackcount', 'text-anchor': 'middle' }, g).textContent = '×' + stackN;
+    if (stackN > 1) {
+      /* 개수 표시 자리: 점 중심에서 8방향 후보 — 다른 점(원 거리)·허브 점·이미 놓인 이름 상자를 모두 피하는
+         첫 후보를 고른다(검사기가 ×N↔점을 원 거리로, 이름 겹침을 상자로 잰다 — CTO 지적 #714 후속). */
+      const countEl = el('text', { class: 'g-stackcount', 'text-anchor': 'middle' }, g);
+      countEl.textContent = '×' + stackN;
+      const bb = countEl.getBBox();
+      const w2 = bb.width / 2 + 2, h2 = bb.height / 2 + 2;
+      const dotCX = m.x, dotCY = m.y;
+      const hubDot = hub ? { x: hub.x, y: hub.y, r: hub.hr } : null;
+      const otherDots = moments.filter((o) => o !== m && o.x != null).map((o) => ({ x: o.x, y: o.y, r: model.dotR }));
+      const labelBoxes = placed.map((r2) => r2);
+      const cand = [
+        [r + 10 + w2, -(r + h2 + 2)], [-(r + 10 + w2), -(r + h2 + 2)],
+        [r + 10 + w2, r + h2 + 2], [-(r + 10 + w2), r + h2 + 2],
+        [r + 10 + w2, 0], [-(r + 10 + w2), 0], [0, -(r + h2 + 12)], [0, r + h2 + 12]
+      ];
+      const clear2 = (cx2, cy2) => {
+        if (cx2 - w2 < 4 || cx2 + w2 > model.W - 4 || cy2 - h2 < 4 || cy2 + h2 > model.H - model.shelfH - 2) return false;
+        if (otherDots.some((d) => Math.hypot(cx2 - d.x, cy2 - d.y) < d.r + h2 + 1)) return false;
+        if (hubDot && Math.hypot(cx2 - hubDot.x, cy2 - hubDot.y) < hubDot.r + h2 + 1) return false;
+        return !labelBoxes.some((r2) => cx2 - w2 < r2.x + r2.width && r2.x < cx2 + w2 && cy2 - h2 < r2.y + r2.height && r2.y < cy2 + h2);
+      };
+      let chosen = null;
+      for (const [dx2, dy2] of cand) {
+        const cx2 = dotCX + dx2, cy2 = dotCY + dy2;
+        if (clear2(cx2, cy2)) { chosen = { cx: cx2, cy: cy2 }; break; }
+      }
+      if (!chosen) chosen = { cx: dotCX + r + 10 + w2, cy: dotCY - (r + h2 + 2) };
+      countEl.setAttribute('x', (chosen.cx - w2).toFixed(1));
+      countEl.setAttribute('y', (chosen.cy + h2).toFixed(1));
+    }
     g.addEventListener('click', () => { stopWalk(); selected = { type: 'moment', id: m.id }; try { parent.postMessage({ type: 'lt-selection', id: m.id }, location.origin); } catch {} refresh(); });
   }
   /* 처음·지금 표시는 허브 이름 상자를 피해 자리를 잡는다(좌표계: viewBox 사용자 단위로 통일). */
@@ -317,6 +370,10 @@ function render() {
       const r = t.getBoundingClientRect();
       avoidBoxes.push({ left: r.left - wrapBox.left, top: r.top - wrapBox.top, right: r.right - wrapBox.left, bottom: r.bottom - wrapBox.top });
     }
+  }
+  for (const t of svg.querySelectorAll('.g-stackcount')) {
+    const r = t.getBoundingClientRect();
+    avoidBoxes.push({ left: r.left - wrapBox.left, top: r.top - wrapBox.top, right: r.right - wrapBox.left, bottom: r.bottom - wrapBox.top });
   }
   for (const [m, text] of marks) markDot(m, text, avoidBoxes);
 }

@@ -537,9 +537,55 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
         thumbs: doc.querySelectorAll('#gsvg image').length,
         stacks: [...doc.querySelectorAll('.g-stackcount')].map((x) => x.textContent),
         overflow: Math.max(0, doc.documentElement.scrollWidth - doc.documentElement.clientWidth),
-        badge: doc.getElementById('gBadge')?.textContent || ''
+        badge: doc.getElementById('gBadge')?.textContent || '',
+        // CTO 지적(#714 후속): 이름 상자가 빈 곳만 피하는지로는 부족하다 — 아래 세 가지를 잰다.
+        narrow: doc.documentElement.clientWidth < 700,
+        hubDots: [...doc.querySelectorAll('.g-hubdot')].map((c) => {
+          const r = c.getBoundingClientRect();
+          return { key: c.parentElement?.getAttribute('data-hub-key'), cr: Number(c.parentElement?.getAttribute('data-cr') || 0), x: r.left + r.width / 2, y: r.top + r.height / 2 };
+        }),
+        nameBoxes: [...doc.querySelectorAll('.g-hubname')].filter((x) => !x.classList.contains('g-hubsub') && x.getBoundingClientRect().width > 0).map((x) => {
+          const r = x.getBoundingClientRect();
+          return { key: x.parentElement?.getAttribute('data-hub-key'), cx: r.left + r.width / 2, cy: r.top + r.height / 2, h: r.height, t: x.textContent };
+        }),
+        rings: [...doc.querySelectorAll('.g-ring')].map((c) => { const r = c.getBoundingClientRect(); return { key: c.getAttribute('data-key'), x: r.left + r.width / 2, y: r.top + r.height / 2, r: r.width / 2 }; }),
+        counts: [...doc.querySelectorAll('.g-stackcount')].map((x) => {
+          const box = x.getBoundingClientRect();
+          const dot = x.parentElement?.querySelector('circle');
+          const dr = dot ? dot.getBoundingClientRect() : null;
+          return { t: x.textContent, x: box.left + box.width / 2, y: box.top + box.height / 2, h: box.height, dotX: dr ? dr.left + dr.width / 2 : null, dotY: dr ? dr.top + dr.height / 2 : null, dotR: dr ? dr.width / 2 : null };
+        })
       };
     });
+    // ① 각 허브 이름의 중심은 자기 고리 중심에서 (고리 반지름 + 이름 높이 + 여유) 안에 있다(좁은 화면).
+    if (graphCheck.narrow) {
+      const tooFar = graphCheck.nameBoxes.map((n) => {
+        const dot = graphCheck.hubDots.find((d) => d.key === n.key);
+        if (!dot) return n.t + ' ← 자기 고리를 못 찾음';
+        const dist = Math.hypot(n.cx - dot.x, n.cy - dot.y);
+        const limit = dot.cr + n.h + 12;
+        return dist <= limit ? null : `${n.t} 거리 ${Math.round(dist)} > ${Math.round(limit)}`;
+      }).filter(Boolean);
+      assert.deepEqual(tooFar, [], `390 허브 이름은 자기 고리 바로 아래에 있어야 한다: ${JSON.stringify(tooFar)}`);
+      // ③ 좁은 화면에서는 허브 이름을 숨기지 않는다.
+      const hidden = graphCheck.hubDots.length - graphCheck.nameBoxes.length;
+      assert.equal(hidden, 0, `390에서 숨겨진 허브 이름 0(실제 ${hidden}개 숨김)`);
+    }
+    // ② 고리끼리 겹침 0(원-원 거리, 2px 여유).
+    const ringPairs = [];
+    for (let i = 0; i < graphCheck.rings.length; i++) for (let j = i + 1; j < graphCheck.rings.length; j++) {
+      const a = graphCheck.rings[i], b = graphCheck.rings[j];
+      const dist = Math.hypot(a.x - b.x, a.y - b.y);
+      if (dist < a.r + b.r - 2) ringPairs.push(`${a.key}×${b.key} @거리${Math.round(dist)} < r${Math.round(a.r)}+${Math.round(b.r)}`);
+    }
+    assert.deepEqual(ringPairs, [], `고리끼리 겹침 0: ${JSON.stringify(ringPairs)}`);
+    // '×N' 개수 표시는 점과 원 거리로 판정한다(상자 겹침이 아니라) — 점 표면에서 떨어져 있어야 한다.
+    const countTouch = graphCheck.counts.map((c) => {
+      if (c.dotX == null) return null;
+      const dist = Math.hypot(c.x - c.dotX, c.y - c.dotY);
+      return dist >= c.dotR + c.h / 2 + 1 ? null : `${c.t} 점 표면에서 ${Math.round(dist - c.dotR)}px`;
+    }).filter(Boolean);
+    assert.deepEqual(countTouch, [], `무더기 개수(×N)가 점에 닿지 않게 떨어져 있다: ${JSON.stringify(countTouch)}`);
     assert.equal(graphCheck.hubPairs, 0, `허브 이름 상자 겹침 0(실제 ${graphCheck.hubPairs}: ${JSON.stringify(graphCheck.pairTexts)})`);
     assert.equal(graphCheck.overflow, 0, `그래프 보기 가로 넘침 0(실제 ${graphCheck.overflow})`);
     assert.ok(graphCheck.hubs >= 4, `허브가 그려진다(실제 ${graphCheck.hubs})`);
