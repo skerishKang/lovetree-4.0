@@ -249,7 +249,8 @@ test('setEditorMode 표: 파일 전송 중·입력 있음이면 바꾸지 않고
     add.panels.setEditorMode('add');
     assert.equal(add.elements['write-panel-title'].textContent, '순간 추가');
     assert.equal(add.elements['relation-label'].hidden, false, '추가일 때만 연결 이유를 보여 준다');
-    assert.equal(add.elements['more-fields'].open, false);
+    // #638: 자세한 추가에서도 '더 적기'를 펼쳐 둔다 — 접힌 제목 칸 대신 마음 한마디에만 적어 제목이 덮어써지던 것을 막는다.
+    assert.equal(add.elements['more-fields'].open, true);
     assert.equal(add.elements['moment-management'].hidden, true);
     assert.equal(add.calls.reset, 1, '업로드 상태를 비운다');
     assert.match(add.elements['editor-context'].textContent, /^새 순간 추가 · /);

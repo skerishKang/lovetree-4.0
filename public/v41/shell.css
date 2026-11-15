@@ -493,7 +493,7 @@ html[data-lt-theme="garden"] #account-advanced[aria-checked="true"]:after{backgr
     책: 갈라치기 탭(아래 99px) 위, 보드: 시네마 보기(아래 68px) 위, 지도: 이동 리본(아래 76px) 위, 책장: 넘김 화살표(아래 28px) 위. */
  body.lt-fab-ok[data-fab-lift="book"] #mobile-add{bottom:calc(104px + env(safe-area-inset-bottom))}
  body.lt-fab-ok[data-fab-lift="board"] #mobile-add{bottom:calc(68px + env(safe-area-inset-bottom))}
- body.lt-fab-ok[data-fab-lift="network"] #mobile-add{bottom:calc(76px + env(safe-area-inset-bottom))}
+ body.lt-fab-ok[data-fab-lift="network"] #mobile-add{bottom:calc(160px + env(safe-area-inset-bottom))}
  /* 책장의 넘김 화살표(›)는 내용 높이를 따라 붙는다(390×844 실측 724~768). 화면이 낮으면(749px 이하)
     단추가 화살표에 닿으므로 그때만 올린다(360×740 실측 기준 24px). */
  @media(max-width:780px) and (max-height:749px){
@@ -583,15 +583,15 @@ html[data-lt-theme="garden"] #account-advanced[aria-checked="true"]:after{backgr
 #journal-form textarea{min-height:140px;resize:vertical}
 .myposts-list{display:grid;gap:12px;margin-top:12px}
 .myposts-item{border:1px solid var(--lt-line);border-radius:var(--lt-r-card);padding:14px 16px;background:var(--lt-glass)}
-.myposts-head{display:flex;gap:8px;align-items:center;font-size:11px;color:var(--lt-muted)}
+.myposts-head{display:flex;gap:8px;align-items:center;font-size:12px;color:var(--lt-muted)}
 .myposts-kind{color:var(--lt-gold)}
 .myposts-date{margin-left:auto}
 .myposts-title{font-size:15px;margin:6px 0;font-weight:600;overflow-wrap:anywhere;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
 .myposts-body{font-size:13px;line-height:1.8;color:var(--lt-pearl);overflow-wrap:anywhere;white-space:pre-wrap}
-.myposts-issue{display:inline-block;margin-top:6px;font-size:11px;color:var(--lt-rose)}
+.myposts-issue{display:inline-block;margin-top:6px;font-size:12px;color:var(--lt-rose)}
 .myposts-replies{margin-top:10px;display:grid;gap:8px}
 .myposts-reply{border-left:3px solid var(--lt-gold);padding:6px 10px;background:rgba(255,230,166,.06);border-radius:8px}
-.myposts-reply span{font-size:11px;color:var(--lt-gold)}
+.myposts-reply span{font-size:12px;color:var(--lt-gold)}
 .myposts-reply p{margin:4px 0 0;font-size:13px;line-height:1.7;overflow-wrap:anywhere}
 /* 이슈 611 4번: 내 의견 — 새 답글 숫자·덧붙이기·새 소식 링크. */
 .account-menu-count{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;margin-left:8px;padding:0 6px;border-radius:var(--lt-r-pill);background:var(--lt-rose);color:var(--lt-stage);font-size:12px;font-weight:700;vertical-align:2px}

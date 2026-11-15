@@ -1937,3 +1937,15 @@ COM2에는 merge `6900df8aa446dfe0201d01997457fae04c4abe16`의 변경 서버 파
 - **배포**: Pages 자동 배포. 서버·DB 변경 없음.
 - **캡처**: E:/lovetree-qa/lane/local2-644b/ (충돌 띠 1440·390, 계정 메뉴 점, 정원·밤 보드, 옮기기 포커스, 저장 중 설명 — 8장).
 - **계정**: 시험 계정 03·05 신규 가입 완료(컴2 tabbit, 메일 인증·캡차 없음 확인). .env PADIEM_TUTORIAL03/05_* 4줄, 거버넌스 계정비밀_대장.md 표 1에 행 추가.
+
+
+## 2026-11-15 — #638 남은 7~11 (컴1 로컬 레인, ai/local4-638rest-261115, main 27efb73 기준)
+
+- 7 지도 390: 아래 조작 줄(.mobile-ribbon)이 셸의 '새 소식 · 의견 보내기' 링크 줄과 144×25px 포개졌다(iframe 좌표→뷰포트 환산 실측). network.css ≤640px에서 리본 bottom 10px→38px+안전여백, route-status 64→96px·branch-chooser 70→100px, 셸 #mobile-add 지도 리프트 76→160px. 수리 뒤 겹침 −3px(0). '동심원형' 단추 대비는 4가지 조합(밤·정원 × 판 밤·종이, 안 눌림·눌림) 실측 5.67~16.42:1로 이미 기준을 넘었다 — 수리 없이 검사기로 잠근다.
+- 8 책: '✎ 고치기' 11→13px(book-usability.css), 날짜 12→13px + phone 모양 reader-layout.css의 12px 규칙을 .moment-date에 한해 13px로 덮음. 무거움: 같은 스크립트로 첫 장·한 장 넘기기 3회씩 실측 — 첫 장 173~221ms, 넘기기 178~236ms(밤·정원)로 로컬에서는 빠르다. 38s의 가장 큰 원인으로 외부 썸네일(i.ytimg.com)이 응답 없이 매달리면 error 이벤트가 없어 내려가기 사슬이 영원히 멈추는 것을 골라 thumb-fallback.mjs에 8초 pending 타임아웃 청소를 더했다(매달린 후보 → 다음 후보/글 카드). ytimg를 응답 없이 매달리게 한 실측: 수리 전 30초+미회수 → 수리 후 11.8~13.8초 안에 글 카드로 자리 잡음.
+- 9 자세한 추가: shell/panels.mjs setEditorMode — add 모드에서도 '더 적기'를 펼쳐 제목 칸을 보인다(접혀 숨어 마음 한마디에만 적어 자동 제목이 되던 것). domain.test.mjs에 저장 경로 전체 시험 추가.
+- 10 새 소식: updates.mjs — 같은 출처 줄을 이웃 항목과 묶어 한 번만 보이고, .updates-source 11→12px, '새로워졌어요' 카드는 CARD_DAY_KEY로 하루 한 번. 같은 날 재배포돼도 카드는 한 번.
+- 11 내 의견 상태 말: feedback-board.mjs STATUS_LABEL → 받았어요/살펴보는 중/고쳤어요/다음에/답했어요. 운영센터(src/admin-view.js) 말은 그대로. myposts 11px 세 곳 → 12px.
+- 공통 검사기(tests/v41-screen-audit.test.mjs)에 상태 3개 추가: '지도 390(조작 줄)'(iframe↔셸 교차 겹침 + 보기 전환 단추 대비 4.5:1), '새 소식 펼침', '내 의견 목록'(/api/board/mine 가짜 게시물). 390·1440 × 밤·정원 통과. KNOWN 20건은 기존 그대로. updates.json 'NaN월' 문구는 검사기 흔적값 오탈이어서 '잘못 보이던 날짜'로 다듬었다.
+- 시험: 관련 단위 시험 전부 통과(domain·updates 4종·thumb 2종·panels 3종 — v41-panels-flow의 add 모드 '더 적기' 단정은 #638 방향으로 갱신), npm run build + modulepreload --check 통과, 화면 공통 검사기 REQUIRE 통과(35s). 페이지 오류 0.
+- 캡처: E:/lovetree-qa/lane/local4-638rest/ (지도 390 전·후 밤/정원, 책 390 후, 새 소식·내 의견 1440).
