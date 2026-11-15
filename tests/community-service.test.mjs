@@ -5,6 +5,7 @@ import {createWorkspaceService} from '../server/workspace-service.js';
 import {createMemoryWorkspaceRepo} from '../server/testing/memory-workspace-repo.js';
 import {createMemoryShareRepo} from '../server/testing/memory-share-repo.js';
 import {createMemoryCommunityRepo} from '../server/testing/memory-community-repo.js';
+import { createMemoryTreeDiscoverRepo } from '../server/testing/memory-tree-discover-repo.js';
 import {createCommunityHandler,createCommunityService} from '../server/community-service.js';
 import {createShareService} from '../server/share-service.js';
 import {ApiError} from '../server/errors.js';
@@ -228,7 +229,7 @@ test('discover uses batched summaries, excludes blocked/hidden/deleted, and leak
 
 // ── #627 3단계 '다른 팬 보기': GET /api/public/tag-moments (화면 없음 — 서버 규칙만) ──────────
 const TAG_URL='https://example.com/video/zena.mp4';
-async function tagSetup({accounts,aiSubjects=[],testerSubjects=[],privateTreeId=null,hiddenShareIds=[],blocks=[]}={}){
+async function tagSetup({accounts,aiSubjects=[],testerSubjects=[],privateTreeId=null,hiddenShareIds=[],blocks=[],discoverOff=[]}={}){
  // accounts: [{subject, trees:[{title, moments:[{title, date, url, keywords, mediaMetadata?}]}]}]
  const workspaceRepo=createMemoryWorkspaceRepo(),workspace=createWorkspaceService({repo:workspaceRepo,productId:PRODUCT});
  const shareRepo=createMemoryShareRepo();
@@ -246,6 +247,11 @@ async function tagSetup({accounts,aiSubjects=[],testerSubjects=[],privateTreeId=
     moment.keywords=m.keywords||[];
     if(m.mediaMetadata)moment.mediaMetadata=m.mediaMetadata;
    }
+   // 2026-11-16 대표 결정: 다른 팬 보기도 '소개 켬 + 순간 3개 이상'만 훑는다 — 시험 트리를 3개 이상으로
+   // 맞춘다(껍질 순간은 꼬리표 없음 — 걸림 목록에 섞이지 않는다).
+   while(tree.moments.length<3){
+    tree=addMoment(tree,{title:'담은 순간',note:'기록',emotion:'설렘',date:'2026-11-01',url:''},tree.moments[0].id,CLOCK);
+   }
    trees.push(tree);
   }
   await workspace.write(principal(account.subject),{state:{version:1,trees},expectedRevision:0,clientKey:'seed'});
@@ -254,7 +260,13 @@ async function tagSetup({accounts,aiSubjects=[],testerSubjects=[],privateTreeId=
    rows.push(await shareRepo.create({productId:PRODUCT,shareId,subjectId:account.subject,treeId:tree.id,entryMomentId:tree.moments[0].id,view:'book',momentCount:tree.moments.length,origin:'auto'}));
   }
  }
- const communityRepo=createMemoryCommunityRepo({isPrivateTree:privateTreeId?(p,s,t)=>t===privateTreeId:null});
+ // 소개 표: 기본 켬(기존 시험 유지) — discoverOff 에 넣은 주인의 트리만 꺼 둔다(2026-11-16 대표 결정).
+ const discoverRepo=createMemoryTreeDiscoverRepo();
+ for(const row of rows)await discoverRepo.set({productId:PRODUCT,subjectId:row.subjectId,treeId:row.treeId,discover:!discoverOff.includes(row.subjectId)});
+ const communityRepo=createMemoryCommunityRepo({
+  isPrivateTree:privateTreeId?(p,s,t)=>t===privateTreeId:null,
+  isDiscoverOn:(p,s,t)=>discoverRepo.isOn(p,s,t)
+ });
  communityRepo.seedShares(rows);
  let r=0;
  for(const shareId of hiddenShareIds){
@@ -265,7 +277,7 @@ async function tagSetup({accounts,aiSubjects=[],testerSubjects=[],privateTreeId=
  const admin={roleFor:async value=>aiSubjects.includes(value.subjectId)?'ai_customer':(testerSubjects.includes(value.subjectId)?'tester':null)};
  const service=createCommunityService({communityRepo,shareRepo,workspaceRepo,productId:PRODUCT,admin,makeId:()=>String(++n).padStart(24,'c')});
  const authenticate=async request=>{const subjectId=request.headers?.account;if(!subjectId)throw new ApiError(401,'unauthenticated','login');return principal(subjectId);};
- return {communityRepo,shareRepo,workspaceRepo,handle:createCommunityHandler({authenticate,service,productId:PRODUCT}),shareRows:rows.map(r=>({subjectId:r.subjectId,treeId:r.treeId,shareId:r.shareId}))};
+ return {communityRepo,shareRepo,discoverRepo,workspaceRepo,handle:createCommunityHandler({authenticate,service,productId:PRODUCT}),shareRows:rows.map(r=>({subjectId:r.subjectId,treeId:r.treeId,shareId:r.shareId}))};
 }
 const tagCall=(handle,tag,account)=>call(handle,'GET','/api/public/tag-moments',{query:'tag='+encodeURIComponent(tag),account});
 
@@ -311,6 +323,24 @@ test('tag-moments: 같은 꼬리표의 공개 순간만 나오고 내 것·비�
  assert.ok(anonymous.body.items.some(item=>item.title==='차단된 순간'),'로그아웃에는 차단 관계가 없다 — 공개 판정만으로 걸러진다');
  assert.equal(anonymous.body.items.some(item=>item.title==='숨은 기록'),false,'비공개·숨김은 요청자와 무관하게 뺀다');
  assert.equal(anonymous.body.items.some(item=>item.title==='신고 처리된 순간'),false);
+});
+
+test('tag-moments: 소개가 꺼진 트리의 순간은 나오지 않는다(2026-11-16 대표 결정 — 기본 꺼짐)',async()=>{
+ const song=v=>'노래:'+v;
+ const data=await tagSetup({
+  accounts:[
+   {subject:'s1',trees:[{title:'켠 트리',moments:[{title:'켠 트리 순간',date:'2026-11-05',url:TAG_URL,keywords:[song('Super Shy')]}]}]},
+   {subject:'s2',trees:[{title:'끈 트리',moments:[{title:'끈 트리 순간',date:'2026-11-04',url:TAG_URL,keywords:[song('Super Shy')]}]}]},
+  ],
+  discoverOff:['s2']
+ });
+ const res=await tagCall(data.handle,'노래:Super Shy');
+ assert.equal(res.status,200);
+ assert.deepEqual(res.body.items.map(item=>item.title),['켠 트리 순간'],'소개가 켜진 트리의 순간만 나온다');
+ // 켜면 바로 나온다(무료 — 본인 트리).
+ await data.discoverRepo.set({productId:PRODUCT,subjectId:'s2',treeId:data.shareRows.find(r=>r.subjectId==='s2').treeId,discover:true});
+ const after=await tagCall(data.handle,'노래:Super Shy');
+ assert.deepEqual(after.body.items.map(item=>item.title),['켠 트리 순간','끈 트리 순간'],'켜면 다른 팬 보기에 나온다');
 });
 
 test('tag-moments: 응답은 제목·영상 주소·썸네일·무대 날짜·트리 이름·공유 링크·aiTester뿐 — 개인정보 필드가 없다',async()=>{

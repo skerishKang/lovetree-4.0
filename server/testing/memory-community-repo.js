@@ -1,16 +1,17 @@
-export function createMemoryCommunityRepo({isPrivateTree=null}={}){
+export function createMemoryCommunityRepo({isPrivateTree=null,isDiscoverOn=null}={}){
  const favorites=new Set(),reactionSet=new Set(),comments=new Map(),reports=new Map(),blocks=new Set(),hiddenShares=new Set(),audits=[];
  const key=(...parts)=>parts.join('\0'),copy=value=>structuredClone(value),now=()=>new Date().toISOString();
  const reactionKeys=()=>[...reactionSet];
  // #538: 둘러보기 후보는 활성 공유 행 가운데 moment_count>=3(직접 올린 사진만 있는 순간도 센다)이고,
- // 자동 공개 행이 있으면 그 행으로, 없으면 예전 스위치를 켠 행으로 트리당 하나만 뽑는다.
+ // 2026-11-16 대표 결정으로 '둘러보기 소개'가 켜진 트리만이다(기본 꺼짐 — 고객이 켠다). 켠 트리는
+ // 트리당 하나의 행(auto 우선)으로 뽑는다. isDiscoverOn 이 없으면(예전 모형) 켜짐으로 본다 — 기존 시험 호환.
  // 숨김은 행이 아니라 트리 단위로 판단한다(어느 행이 숨겨져도 그 트리는 둘러보기에서 내려간다).
  const candidates=async function*(productId,viewerSubjectId){
   const picked=new Map();
   for(const row of (this.shares||[])){
    if(row.productId!==productId||row.status!=='active')continue;
    if(Number(row.momentCount??0)<3)continue;
-   if(row.origin!=='auto'&&row.discoverable!==true)continue;
+   if(isDiscoverOn&&!await isDiscoverOn(productId,row.subjectId,row.treeId))continue;
    const prev=picked.get(row.treeId);
    if(!prev||(row.origin==='auto'&&prev.origin!=='auto'))picked.set(row.treeId,row);
   }
@@ -45,11 +46,14 @@ export function createMemoryCommunityRepo({isPrivateTree=null}={}){
   },
   seedShares(rows){this.shares=rows.map(copy);},
   // #627 3단계: 태그 검색이 훑을 공개 공유 행 — active, 사람×트리당 한 행(auto 우선), 숨김·비공개·
-  // 차단(양방향)·요청자 본인을 뺀다. 둘러보기 후보와 달리 moment_count·discoverable 조건이 없다.
+  // 차단(양방향)·요청자 본인을 뺀다. 2026-11-16 대표 결정: 소개 켜짐 + 순간 3개 이상만 훑는다
+  // (둘러보기 목록과 같은 조건). isDiscoverOn 이 없으면(예전 모형) 켜짐으로 본다.
   async listPublicTagShares({productId,viewerSubjectId,limit=400}){
    const picked=new Map();
    for(const row of (this.shares||[])){
     if(row.productId!==productId||row.status!=='active')continue;
+    if(Number(row.momentCount??0)<3)continue;
+    if(isDiscoverOn&&!await isDiscoverOn(productId,row.subjectId,row.treeId))continue;
     const pk=key(row.subjectId,row.treeId);
     const prev=picked.get(pk);
     if(!prev||(row.origin==='auto'&&prev.origin!=='auto'))picked.set(pk,row);

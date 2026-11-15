@@ -222,3 +222,49 @@ test('계정 가입일 채우기: 기존 행은 가장 이른 흔적으로, 근�
     await pool.end();
   }
 });
+
+// 2026-11-16 대표 결정: 둘러보기 소개 기본 꺼짐. 지금 둘러보기에 나오던 트리(active + moment_count>=3
+// + auto/discoverable + 비공개 아님 + 숨김 없음)만 켜짐으로 채운다 — 재실행 안전, 고객 데이터 불변.
+const DISCOVER_MIGRATION = 'tree-discover-optin-261116.sql';
+
+test('둘러보기 소개 백필: 나오던 트리만 켜짐으로 채우고 재실행에도 같다', { skip }, async () => {
+  assertIsolatedTestDatabase(DATABASE_URL);
+  const pool = await createPool(DATABASE_URL, { max: 1 });
+  try {
+    await pool.query(await readFile(SCHEMA_PATH, 'utf8'));
+    const pending = fileURLToPath(new URL(`../server/db/migrations/${DISCOVER_MIGRATION}`, import.meta.url));
+    for (const file of await listMigrationFiles()) {
+      if (file !== pending) await pool.query(await readFile(file, 'utf8'));
+    }
+    const tag = Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
+    const productId = ('lt-' + tag).slice(0, 32);
+    const sid = (p) => (p + tag).padEnd(24, 'x').slice(0, 24);
+    const share = (p, subjectId, treeId, momentCount, origin = 'auto') => pool.query(
+      `INSERT INTO lovetree_shares(product_id,share_id,subject_id,tree_id,entry_moment_id,initial_view,origin,moment_count)
+       VALUES($1,$2,$3,$4,$5,'book',$6,$7)`,
+      [productId, sid(p), subjectId, treeId, treeId + '-m0', origin, momentCount]
+    );
+    // 옛 규칙에서 나오던 트리: auto 3개 / 옛 스위치 행 3개 / auto 3개(공개) — 셋 다 켜짐으로 채운다.
+    // 나오지 않던 트리: 2개(tree-c)·비공개(tree-e) — 채우지 않는다. (옛 규칙에는 트리별 '꺼짐'이 없었다.)
+    await share('sa', 'own-a', 'tree-a', 3);
+    await share('sb', 'own-b', 'tree-b', 3, 'owner');
+    await pool.query(`UPDATE lovetree_shares SET discoverable=true WHERE product_id=$1 AND share_id=$2`, [productId, sid('sb')]);
+    await share('sc', 'own-c', 'tree-c', 2);
+    await share('sd', 'own-d', 'tree-d', 3);
+    await share('se', 'own-e', 'tree-e', 3);
+    await pool.query(`INSERT INTO lovetree_tree_visibility(product_id,subject_id,tree_id,visibility) VALUES($1,'own-e','tree-e','private')`, [productId]);
+    const discoverRows = async () => new Map((await pool.query(
+      'SELECT subject_id, tree_id FROM lovetree_tree_discover WHERE product_id=$1 AND discover=true', [productId]
+    )).rows.map((row) => [row.subject_id + '/' + row.tree_id, true]));
+
+    await pool.query(await readFile(pending, 'utf8'));
+    let filled = await discoverRows();
+    assert.deepEqual([...filled.keys()].sort(), ['own-a/tree-a', 'own-b/tree-b', 'own-d/tree-d'], '나오던 트리만 켜짐으로 채운다(2개·비공개는 그대로)');
+    // 재실행 안전: 다시 돌려도 같은 상태(중복 행 없음).
+    await pool.query(await readFile(pending, 'utf8'));
+    filled = await discoverRows();
+    assert.deepEqual([...filled.keys()].sort(), ['own-a/tree-a', 'own-b/tree-b', 'own-d/tree-d'], '재실행해도 같은 상태다');
+  } finally {
+    await pool.end();
+  }
+});

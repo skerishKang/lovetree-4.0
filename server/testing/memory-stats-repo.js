@@ -21,7 +21,7 @@ const atOf = (value) => {
 };
 
 export function createMemoryStatsRepo({
-  workspaceRepo, shareRepo, accountRepo = null, roleStore = null, visibilityRepo = null, communityRepo = null
+  workspaceRepo, shareRepo, accountRepo = null, roleStore = null, visibilityRepo = null, discoverRepo = null, communityRepo = null
 } = {}) {
   if (!workspaceRepo || typeof workspaceRepo.documents !== 'function') throw new Error('workspaceRepo.documents 가 필요합니다.');
   if (!shareRepo || typeof shareRepo.allForProduct !== 'function') throw new Error('shareRepo.allForProduct 가 필요합니다.');
@@ -77,17 +77,17 @@ export function createMemoryStatsRepo({
       }
 
       // 공개 트리 = 활성 공유 행이 있고 비공개가 아닌 트리(중복 제거). 둘러보기 소개는 같은 조건에
-      // 순간 3개 이상 + (자동 공개 또는 소개 켬) + 숨김 없음 — discovery SQL 과 같은 뜻.
+      // 순간 3개 이상 + 소개 켬(2026-11-16 대표 결정 — 기본 꺼짐) + 숨김 없음 — discovery SQL 과 같은 뜻.
       const publicTrees = new Map();
       const featuredTrees = new Map();
       for (const share of shares) {
         const key = `${subjectOf(share)}\u0000${share.treeId}`;
         if (privateKeys.has(key)) continue;
         publicTrees.set(key, where(share));
-        const discoverable = share.origin === 'auto' || share.discoverable === true;
+        const discoverOn = discoverRepo ? await discoverRepo.isOn(productId, subjectOf(share), share.treeId) : true;
         // 숨김은 공유 행 하나가 아니라 트리 전체에 걸린다 — 같은 트리의 다른 행이 숨겨졌으면 그 트리도 빠진다(SQL 과 같은 규칙).
         const hidden = allShares.some((other) => other.treeId === share.treeId && subjectOf(other) === subjectOf(share) && hiddenShares.has(`${productId}\u0000${other.shareId}`));
-        if (Number(share.momentCount ?? 0) >= 3 && discoverable && !hidden) {
+        if (Number(share.momentCount ?? 0) >= 3 && discoverOn && !hidden) {
           featuredTrees.set(key, where(share));
         }
       }

@@ -111,6 +111,18 @@ CREATE TABLE IF NOT EXISTS lovetree_tree_visibility (
   PRIMARY KEY (product_id, subject_id, tree_id)
 );
 
+-- 트리 둘러보기 소개 표시(2026-11-16 대표 결정 — 기본 꺼짐, 고객이 켠다. 무료).
+-- 행이 없으면 꺼짐이다(스파스 운용 — 켠 트리의 행만 쌓인다). 기존에 둘러보기에 나오던 트리는
+-- migrations/tree-discover-optin-261116.sql 이 켜짐으로 채운다(고객 데이터는 바꾸지 않는다).
+CREATE TABLE IF NOT EXISTS lovetree_tree_discover (
+  product_id text NOT NULL,
+  subject_id text NOT NULL,
+  tree_id text NOT NULL,
+  discover boolean NOT NULL DEFAULT true,
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (product_id, subject_id, tree_id)
+);
+
 -- 기존 공유 행의 순간 수를 저장 문서에서 채운다(둘러보기 조건 moment_count>=3).
 UPDATE lovetree_shares s
 SET moment_count = c.cnt, updated_at = now()
