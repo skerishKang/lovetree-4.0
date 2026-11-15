@@ -1,5 +1,14 @@
 # LoveTree 4.0 — 핸드오프
 
+## 2026-11-16 — 운영센터 '한눈에' 카드 7+7 한 줄·모두 누르기(#743, 컴1로컬2 레인, ai/local2-admin-overview-cards-20261116-081200-4b7e1d, main 557b95d 기준)
+
+- **한 줄**: '전체 숫자'·'처리할 일' 각 7장이 1440 이상에서 한 줄(카드가 들어가도록 '한눈에'만 판 폭을 min(1280px, 100%-64px)로 넓힘 — 다른 탭 폭은 그대로). 좁은 화면은 지금처럼 줄바꿈.
+- **누름 규칙 하나**: 갈 탭이 있는 카드는 그 탭을 조건으로 연다 — 처리 대기(#board?status=pending)·고침(fixed)·전체(board)·답글 0(#board?unanswered=1, 새 조건)·신고 대기(#reports?status=open)·열린/닫힌 이슈(#issues?status=open|closed). 갈 탭이 없는 카드(계정·트리·순간…)는 카드 아래 내역이 펼쳐지고 다시 누르면 접힌다 — 실제 고객/AI 명예회원/시험 계정 갈래 수 + 트리 계열은 제목 목록(최대 20). 제목만 싣고 이메일·subject는 싣지 않는다.
+- **숫자 뜻 맞춤**: 큰 숫자 옆에 '실제 고객'을 적고 '전체 = 실제 + AI + 시험'을 카드 안에 함께 적는다(전에는 '둘러보기 소개 1' 아래 'AI 명예회원 4·시험 계정 2'가 보여 전체보다 큰 것처럼 읽혔다).
+- **서버**: `/api/admin/stats`의 trees·public·featured에 titles(최대 20) 추가 — PostgreSQL 집계 SQL 한 번에 doc_tree/title_row CTE로 뽑고, 메모리 저장소(server/testing/memory-stats-repo.js)도 같은 계약. 응답 키는 accounts·checkedAt·moments·trees·window 그대로.
+- **접근성/모양**: 카드마다 role=button·tabindex=0·min-height 44px·같은 커서·hover·focus-visible 테두리. Enter·Space로 열린다(네이티브 button). audit 기준(12px 글자·13px 단추)에 맞춰 관리자 머리줄 브랜드 13px·4.1 12px·탭 단추 13px(390)·글 날짜 12px·이슈 링크 13px로 올렸다.
+- **검증**: 화면 검사기 admin 상태(390·1440 × 밤·정원) 추가 — 카드 7+7, 1440/1920 rect.top 동일, 390 넘침 0, role/tabindex/cursor, 펼침·접힘, 네 카드의 탭 전환(주소 조건), Enter·Space. `LT_SCREEN_AUDIT_REQUIRE=1 node --test tests/v41-screen-audit.test.mjs` 2/2 통과, admin-view 26/26·admin-roles 9/9, 전체 npm test 1717 pass fail 0(143 skipped), build ✓, modulepreload --check ✓. updates.json 미수정.
+
 > **main 보호 규칙(2026-11-09, 룰셋 "main 보호 (PR·필수 검사)")**: main은 PR로만 바꾼다(직접 푸시·force push·삭제 금지, 관리자도 예외 없음 — 비상시 대표가 룰셋 enforcement를 잠깐 끈다). 필수 검사: `check (ubuntu-latest)`·`check (windows-latest)`·`미리보기 postdeploy(로그아웃)` — 셋 다 paths 필터가 없어 문서만 바뀐 PR에서도 항상 돈다. 승인 수 0(레인이 스스로 머지). Deploy Bundle Boot Test는 paths 필터가 있어 필수에 넣지 않았다.
 
 > **빨간 필수 검사 규칭(2026-11-12 사고 뒤)**: 필수 검사가 빨강이면 **재실행은 1회까지**. 같은 항목이 또 빨강이면 멈추고 원인을 찾는다 — 재실행·빈 커밋으로 초록을 만들지 않는다. "간헐적·환경 탓"이라고 적으려면 **같은 시각 이 변경이 없는 브랜치(main 또는 다른 PR)** 에서도 같은 실패가 나는지 대조한 결과를 함께 적는다. 메시지를 받아 화면을 다시 띄우는 코드는 '뜰 때마다 보내는 쪽'과 짝으로 흐름 시험을 하고, 머지 전 미리보기 첫 화면을 5초 이상 직접 본다.

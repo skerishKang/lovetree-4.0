@@ -118,17 +118,17 @@ async function renderOverview() {
   }
   const model = overviewModel({feedback: feedbackRes, journals: journalsRes, reports: reportsRes, issues: {ok: issuesOk, states}});
   const fb = model.feedbackCard, rp = model.reportCard, is = model.issueCard, jr = model.journalCard;
-  const card = (value, label, view, status = '', failed = false) => failed
-    ? `<button type="button" class="lt-ov-card" disabled><span class="lt-ov-value">—</span><span class="lt-ov-label">${escapeText(label)}</span><span class="lt-ov-fail">불러오지 못했어요</span></button>`
-    : `<button type="button" class="lt-ov-card" data-ov-view="${escapeText(view)}"${status ? ` data-ov-status="${escapeText(status)}"` : ''}><span class="lt-ov-value">${escapeText(value)}</span><span class="lt-ov-label">${escapeText(label)}</span></button>`;
+  const card = (value, label, view, status = '', failed = false, unanswered = false) => failed
+    ? `<button type="button" class="lt-ov-card" role="button" tabindex="0" disabled><span class="lt-ov-value">—</span><span class="lt-ov-label">${escapeText(label)}</span><span class="lt-ov-fail">불러오지 못했어요</span></button>`
+    : `<button type="button" class="lt-ov-card" role="button" tabindex="0" data-ov-view="${escapeText(view)}"${status ? ` data-ov-status="${escapeText(status)}"` : ''}${unanswered ? ' data-ov-unanswered="1"' : ''}><span class="lt-ov-value">${escapeText(value)}</span><span class="lt-ov-label">${escapeText(label)}</span></button>`;
   const cards = [
     card(fb.pending, '고객 글 · 처리 대기(받음·확인 중)', 'board', PENDING_STATUS, Boolean(fb.error)),
     card(fb.fixed, '고객 글 · 고침', 'board', 'fixed', Boolean(fb.error)),
     card(fb.total, '고객 글 · 전체', 'board', '', Boolean(fb.error)),
-    card(fb.unanswered, '답을 아직 안 단 글(답글 0)', 'board', '', Boolean(fb.error)),
-    card(rp.pending, '신고 · 검토 대기', 'reports', '', Boolean(rp.error)),
-    card(is.open, '고치는 일 · 열린 이슈', 'issues', '', Boolean(is.error)),
-    card(is.closed, '고치는 일 · 닫힌 이슈', 'issues', '', Boolean(is.error))
+    card(fb.unanswered, '답을 아직 안 단 글(답글 0)', 'board', '', Boolean(fb.error), true),
+    card(rp.pending, '신고 · 검토 대기', 'reports', 'open', Boolean(rp.error)),
+    card(is.open, '고치는 일 · 열린 이슈', 'issues', 'open', Boolean(is.error)),
+    card(is.closed, '고치는 일 · 닫힌 이슈', 'issues', 'closed', Boolean(is.error))
   ].join('');
   const journalSection = jr.error
     ? `<section class="lt-card"><h2 class="lt-h2">사용 일지</h2><p class="lt-empty">불러오지 못했어요</p></section>`
@@ -138,18 +138,28 @@ async function renderOverview() {
     : (model.todos.length
         ? model.todos.map(row => `<article class="lt-post lt-post-row" data-open="${escapeText(row.id)}" tabindex="0" role="button"><span class="lt-post-title">${escapeText(row.title)}</span>${row.issueNumber ? `<span class="lt-post-issue">이슈 ${issueLink(row.issueNumber)}</span>` : '<span class="lt-post-issue"></span>'}<span class="lt-post-date">${escapeText(formatTime(row.createdAt))}</span></article>`).join('')
         : '<p class="lt-empty">답을 기다리는 글이 없습니다.</p>');
-  // 전체 숫자 줄(#655 2차). '실제 사용자'를 크게, 'AI 명예회원'·'시험 계정'을 작게 나란히 적는다(#671).
   const statModel = statsCards(statsRes);
+  // 전체 숫자 줄(#655 2차). '실제 사용자'를 크게, 'AI 명예회원'·'시험 계정'을 작게 나란히 적는다(#671).
+  // #743: 카드마다 큰 숫자가 무엇을 세는지 카드 안에 적고('실제 고객'), 전체 = 실제+AI+시험을 함께 적어
+  // 숫자가 서로 어긋나 보이지 않게 한다. 누르면 그 갈래 수(과 트리 계열은 제목 목록)를 카드 아래에 펼친다.
+  const statSplit = (item) => `<ul class="lt-stat-split"><li>실제 고객 <b>${escapeText(item.real)}</b></li><li>AI 명예회원 <b>${escapeText(item.aiTester)}</b></li><li>시험 계정 <b>${escapeText(item.tester)}</b></li></ul>`;
+  const statDetail = (item) => {
+    const hasTitles = Array.isArray(item.titles);
+    const titles = hasTitles && item.titles.length
+      ? `<p class="lt-stat-note">제목 (최대 20)</p><ul class="lt-stat-titles">${item.titles.map((title) => `<li>${escapeText(title)}</li>`).join('')}</ul>`
+      : (hasTitles ? '<p class="lt-stat-note">아직 없습니다.</p>' : '');
+    return `<div class="lt-stat-detail" id="stat-detail-${escapeText(item.key)}" hidden>${statSplit(item)}${titles}</div>`;
+  };
   const statCell = (item) => item.error
-    ? `<div class="lt-stat" data-stat="${escapeText(item.key)}"><span class="lt-stat-value">—</span><span class="lt-stat-label">${escapeText(item.label)}</span><span class="lt-stat-fail">불러오지 못했어요</span></div>`
-    : `<div class="lt-stat" data-stat="${escapeText(item.key)}"><span class="lt-stat-value">${escapeText(item.real)}</span><span class="lt-stat-label">${escapeText(item.label)}</span><span class="lt-stat-ai">AI 명예회원 ${escapeText(item.aiTester)}</span><span class="lt-stat-tester">시험 계정 ${escapeText(item.tester)}</span></div>`;
+    ? `<div class="lt-stat-cell"><button type="button" class="lt-stat" role="button" tabindex="0" disabled><span class="lt-stat-value">—</span><span class="lt-stat-label">${escapeText(item.label)}</span><span class="lt-stat-fail">불러오지 못했어요</span></button></div>`
+    : `<div class="lt-stat-cell"><button type="button" class="lt-stat" role="button" tabindex="0" data-stat-toggle="${escapeText(item.key)}" aria-expanded="false" aria-controls="stat-detail-${escapeText(item.key)}"><span class="lt-stat-value">${escapeText(item.real)}</span><span class="lt-stat-label">${escapeText(item.label)}</span><span class="lt-stat-mean">실제 고객</span><span class="lt-stat-others">전체 ${escapeText(item.total)} · AI ${escapeText(item.aiTester)} · 시험 ${escapeText(item.tester)}</span></button>${statDetail(item)}</div>`;
   // 두 묶음 사이에 작은 제목을 단다: '전체 숫자'(계정·트리·순간…) / '처리할 일'(고객 글·신고·이슈).
   const statsRow = statModel.error
     ? '<section class="lt-ov-section"><h2 class="lt-ov-heading">전체 숫자</h2><div class="lt-stats" aria-label="전체 숫자"><p class="lt-empty">불러오지 못했어요</p></div></section>'
-    : `<section class="lt-ov-section"><h2 class="lt-ov-heading">전체 숫자</h2><div class="lt-stats" aria-label="전체 숫자 · 실제 사용자 / AI 명예회원 / 시험 계정">${statModel.cards.map(statCell).join('')}</div></section>`;
+    : `<section class="lt-ov-section"><h2 class="lt-ov-heading">전체 숫자</h2><div class="lt-stats" role="group" aria-label="전체 숫자 · 실제 고객 / AI 명예회원 / 시험 계정">${statModel.cards.map(statCell).join('')}</div></section>`;
   const todoCards = `<section class="lt-ov-section"><h2 class="lt-ov-heading">처리할 일</h2><div class="lt-ov-cards" role="group" aria-label="처리할 일 숫자">${cards}</div></section>`;
-  host.innerHTML = `${head()}<div class="admin-shell lt-board">
-    <div class="lt-board-head"><h1 class="lt-h1">한눈에</h1><p class="lt-sub">지금 쌓인 처리할 일 · 숫자를 누르면 그 탭이 그 조건으로 열립니다</p></div>
+  host.innerHTML = `${head()}<div class="admin-shell lt-board is-overview">
+    <div class="lt-board-head"><h1 class="lt-h1">한눈에</h1><p class="lt-sub">지금 쌓인 처리할 일 · 숫자를 누르면 그 탭이 그 조건으로 열리고, 탭이 없는 숫자는 내역이 펼쳐집니다</p></div>
     ${statsRow}
     ${todoCards}
     ${journalSection}
@@ -161,7 +171,7 @@ async function renderList() {
   // 탭 숫자를 함께 보여 주려고 목록을 거르지 않고 한 번에 읽어 화면에서 거른다(#570 2). 목록은 작다.
   const res = await read('/api/admin/feedback');
   const rows = res.ok && Array.isArray(res.payload?.feedback) ? res.payload.feedback : [];
-  const filters = {kind: route.kind, status: route.status};
+  const filters = {kind: route.kind, status: route.status, unanswered: route.unanswered};
   const visible = filterRows(rows, filters);
   const tabBtn = (data, value, label, count, active) =>
     `<button type="button" ${data}="${escapeText(value)}" class="lt-tab${active ? ' is-active' : ''}"${count == null ? '' : ` aria-label="${escapeText(label)} ${count}건"`}>${escapeText(label)}${count == null ? '' : ` <span class="lt-tab-count">${count}</span>`}</button>`;
@@ -176,8 +186,9 @@ async function renderList() {
       </article>`).join('')
     : '<p class="lt-empty">접수된 글이 없습니다.</p>';
   host.innerHTML = `${head()}<div class="admin-shell lt-board">
-    <div class="lt-board-head"><h1 class="lt-h1">고객 글</h1><p class="lt-sub">${visible.length}건 · 최신 순</p></div>
+    <div class="lt-board-head"><h1 class="lt-h1">고객 글</h1><p class="lt-sub">${visible.length}건 · 최신 순${route.unanswered ? ' · 답을 아직 안 단 글만' : ''}</p></div>
     ${tabRows}
+    ${route.unanswered ? '<p class="lt-post-meta">답글 0인 글만 보는 중 · <button type="button" class="lt-btn" data-clear-filter="board">조건 지우기</button></p>' : ''}
     <div class="lt-post-list">${list}</div>
   </div>`;
 }
@@ -339,7 +350,9 @@ function journalDetailHtml(subjectId) {
 async function renderReports() {
   const res = await read('/api/community/admin/reports');
   const reports = res.ok && Array.isArray(res.payload?.reports) ? res.payload.reports : [];
-  const rows = reports.length
+  // #743: '한눈에'의 신고 대기 카드가 #reports?status=open 으로 열면 검토 대기만 보여 준다.
+  const shown = route.status ? reports.filter(report => report?.status === route.status) : reports;
+  const rows = shown.length
     ? reports.map(report => {
         const stateLabel = report.status === 'open' ? '검토 대기' : report.status === 'resolved' ? '처리 완료' : '기각';
         const visibility = report.hidden ? '발견 숨김' : '발견 노출';
@@ -357,7 +370,8 @@ async function renderReports() {
       }).join('')
     : '<p class="lt-empty">접수된 신고가 없습니다.</p>';
   host.innerHTML = `${head()}<div class="admin-shell lt-board">
-    <div class="lt-board-head"><h1 class="lt-h1">발견·커뮤니티 신고 검토</h1><p class="lt-sub">신고 ${reports.length}건 · 자동 숨김 없이 관리자가 명시적으로 처리합니다.</p></div>
+    <div class="lt-board-head"><h1 class="lt-h1">발견·커뮤니티 신고 검토</h1><p class="lt-sub">신고 ${shown.length}건 · 자동 숨김 없이 관리자가 명시적으로 처리합니다.</p></div>
+    ${route.status ? '<p class="lt-post-meta">검토 대기만 보는 중 · <button type="button" class="lt-btn" data-clear-filter="reports">조건 지우기</button></p>' : ''}
     <div class="lt-post-list">${rows}</div>
   </div>`;
 }
@@ -382,7 +396,9 @@ async function renderIssues() {
       else if (result.status === 'rejected') error = '이슈 상태를 불러오지 못했어요';
     });
   }
-  const rows = numbers.map(number => {
+  // #743: '한눈에'의 열린/닫힌 이슈 카드가 #issues?status=open|closed 로 열면 그 상태만 보여 준다.
+  const shown = route.status ? numbers.filter(number => byNumber.get(number)?.state === route.status) : numbers;
+  const rows = shown.map(number => {
     const issue = byNumber.get(number);
     // #636: 저장된 값에 앞의 '#'이 붙어 있을 수 있다 — 읽는 쪽은 숫자로 맞춰 비교한다.
     const linked = posts.filter(post => normalizeIssueNumber(post.issueNumber) === String(number));
@@ -400,6 +416,7 @@ async function renderIssues() {
   }).join('');
   host.innerHTML = `${head()}<div class="admin-shell lt-board">
     <div class="lt-board-head"><h1 class="lt-h1">고치는 일</h1><p class="lt-sub">고객 글과 연결된 이슈만 · 공개 저장소 읽기만</p></div>
+    ${route.status ? `<p class="lt-post-meta">${route.status === 'open' ? '열린' : '닫힌'} 이슈만 보는 중 · <button type="button" class="lt-btn" data-clear-filter="issues">조건 지우기</button></p>` : ''}
     ${error ? `<p class="lt-empty" data-issue-error>${escapeText(error)}</p>` : ''}
     ${rows || '<p class="lt-empty">고객 글에 연결된 이슈가 없습니다.</p>'}
   </div>`;
@@ -425,8 +442,29 @@ document.addEventListener('click', async (event) => {
   const tab = event.target.closest('[data-tab]');
   if (tab) { navigate(tab.dataset.tab); return; }
   // #655: '한눈에' 카드 — 그 조건이 열린 탭 주소로 이동한다(예: #board?status=pending).
+  // #743: 답글 0·신고 대기·열린/닫힌 이슈도 조건을 주소로 남겨 그 탭을 걸러 연다.
   const ovCard = event.target.closest('[data-ov-view]');
-  if (ovCard) { navigate(ovCard.dataset.ovView, null, {status: ovCard.dataset.ovStatus || '', kind: ''}); return; }
+  if (ovCard) {
+    const view = ovCard.dataset.ovView;
+    navigate(view, null, {status: ovCard.dataset.ovStatus || '', kind: '', unanswered: ovCard.dataset.ovUnanswered === '1'});
+    return;
+  }
+  // #743: 갈 탭이 없는 카드(계정·트리·순간…)는 카드 아래 내역을 펼친다(다시 누르면 접힘).
+  const statToggle = event.target.closest('[data-stat-toggle]');
+  if (statToggle) {
+    const key = statToggle.dataset.statToggle;
+    const detail = document.getElementById('stat-detail-' + key);
+    if (detail) {
+      const open = detail.hidden;
+      detail.hidden = !open;
+      statToggle.setAttribute('aria-expanded', String(open));
+      statToggle.classList.toggle('is-open', open);
+    }
+    return;
+  }
+  // #743: 걸러 본 탭에서 조건을 지운다(신고·고치는 일).
+  const clearFilter = event.target.closest('[data-clear-filter]');
+  if (clearFilter) { navigate(clearFilter.dataset.clearFilter, null, {}); return; }
   // 탭 거르기(#570 2): 다시 누르면 해제한다. 상태는 주소(#board?status=..&kind=..)에 남는다.
   const statusTab = event.target.closest('[data-status-tab]');
   if (statusTab) {

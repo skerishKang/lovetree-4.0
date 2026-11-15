@@ -10,7 +10,8 @@ import { ApiError } from './errors.js';
  * 시험 계정은 운영센터 숫자에서만 갈라 보이고, 남에게 보이는 공개 화면에는 표시하지 않는다.
  *
  * 개인정보는 다루지 않는다: 저장소에서 돌아오는 것은 숫자뿐이고, 응답에도 숫자만 실린다
- * (이메일·이름·아이디·subject 를 담을 자리를 만들지 않는다).
+ * (이메일·이름·아이디·subject 를 담을 자리를 만들지 않는다). #743에서 예외는 트리 계열 카드의
+ * '제목 목록' 하나다 — 트리 제목(최대 20)만 싣고, 이메일·subject·고객 이름은 여전히 싣지 않는다.
  *
  * accounts 는 **로그인한 적 있는 계정**(lovetree_account_emails — 로그인 콜백이 쓰는 표)이다. 순간을
  * 하나도 담지 않은 계정도 로그인했으면 센다. accounts.new 는 그 표의 created_at(러브트리 **첫 로그인
@@ -36,6 +37,13 @@ function split(rawReal, rawAi, rawTester) {
   const aiTester = count(rawAi);
   const tester = count(rawTester);
   return { total: real + aiTester + tester, real, aiTester, tester };
+}
+
+/** #743: 트리 계열 카드의 제목 목록. 글자만 남기고 최대 20개로 끊는다 — 숫자를 지어내지 않는다. */
+function titles(value) {
+  return Array.isArray(value)
+    ? value.map((item) => String(item ?? '').trim()).filter(Boolean).slice(0, 20)
+    : [];
 }
 
 export function createAdminStatsService({ repo, productId, now = () => new Date(), windowDays = STATS_WINDOW_DAYS } = {}) {
@@ -69,8 +77,9 @@ export function createAdminStatsService({ repo, productId, now = () => new Date(
         },
         trees: {
           ...split(row.treesReal, row.treesAi, row.treesTester),
-          public: split(row.publicReal, row.publicAi, row.publicTester),
-          featured: split(row.featuredReal, row.featuredAi, row.featuredTester)
+          titles: titles(row.treesTitles),
+          public: { ...split(row.publicReal, row.publicAi, row.publicTester), titles: titles(row.publicTitles) },
+          featured: { ...split(row.featuredReal, row.featuredAi, row.featuredTester), titles: titles(row.featuredTitles) }
         },
         moments: {
           ...split(row.momentsReal, row.momentsAi, row.momentsTester),

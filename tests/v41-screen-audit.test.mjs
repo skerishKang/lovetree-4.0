@@ -483,6 +483,135 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     await take(page4, '내 의견 덧붙임 고치기 열림');
     await ctx4.close();
 
+    // #743: 운영센터 '한눈에' — 카드 7+7이 1440·1920에서 각각 한 줄, 390은 지금처럼 줄바꿈(가로 넘침 0),
+    // 모든 카드가 같은 누름 모양(role·tabindex·44px 이상)이고, 탭이 있는 카드는 그 탭을 조건으로 열며
+    // 탭이 없는 카드는 내역을 펼친다(다시 누르면 접힘). 관리자 세션은 가짜 API(응답 모형)로 만든다.
+    const ctxAdm = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
+    await ctxAdm.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); } catch {} }, theme);
+    await ctxAdm.route('**://i.ytimg.com/**', THUMB);
+    await ctxAdm.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
+    await ctxAdm.route('**/api/admin/session', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, authenticated: true, admin: true, role: 'admin' }) }));
+    await ctxAdm.route('**/api/admin/feedback', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, feedback: [
+      { id: 'f1', kind: 'opinion', status: 'received', replyCount: 0, createdAt: '2026-11-14T09:00:00.000Z', displayTitle: '꼬리표가 안 붙어요', issueNumber: 741 },
+      { id: 'f2', kind: 'opinion', status: 'fixed', replyCount: 2, createdAt: '2026-11-13T09:00:00.000Z', displayTitle: '편집 창 꼬리표', issueNumber: 736 },
+      { id: 'f3', kind: 'journal', status: 'reviewing', replyCount: 0, createdAt: '2026-11-12T09:00:00.000Z', displayTitle: '오늘 사용 일지', issueNumber: null }
+    ] }) }));
+    await ctxAdm.route('**/api/admin/journals', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, journals: [] }) }));
+    await ctxAdm.route('**/api/community/admin/reports', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, reports: [
+      { id: 'r1', status: 'open', reason: '시험 신고', shareId: 'share-1', createdAt: '2026-11-14T10:00:00.000Z', hidden: false }
+    ] }) }));
+    await ctxAdm.route('**/api/admin/stats', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, stats: {
+      checkedAt: '2026-11-16T00:00:00.000Z', window: { days: 7, since: '2026-11-09T00:00:00.000Z' },
+      accounts: { total: 8, real: 2, aiTester: 4, tester: 2, new: { total: 3, real: 1, aiTester: 1, tester: 1 } },
+      trees: { total: 9, real: 4, aiTester: 3, tester: 2, titles: ['가을 노래', '겨울 산책', '봄의 기록'], public: { total: 3, real: 2, aiTester: 1, tester: 0, titles: ['가을 노래', '봄의 기록'] }, featured: { total: 1, real: 1, aiTester: 0, tester: 0, titles: ['가을 노래'] } },
+      moments: { total: 40, real: 21, aiTester: 12, tester: 7, new: { total: 6, real: 3, aiTester: 2, tester: 1 } }
+    } }) }));
+    await ctxAdm.route('**://api.github.com/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ number: 736, title: '시험 이슈', state: 'open' }) }));
+    const pageAdm = await ctxAdm.newPage();
+    await pageAdm.goto(`${base}/admin.html`, { waitUntil: 'load' });
+    await pageAdm.waitForFunction(() => document.querySelectorAll('.lt-stats .lt-stat').length === 7 && document.querySelectorAll('.lt-ov-cards .lt-ov-card').length === 7, null, { timeout: 20000 });
+    await pageAdm.waitForTimeout(400);
+    const adminCards = await pageAdm.evaluate(() => {
+      const stat = [...document.querySelectorAll('.lt-stats .lt-stat')];
+      const todo = [...document.querySelectorAll('.lt-ov-cards .lt-ov-card')];
+      const all = [...stat, ...todo];
+      const rects = all.map((el) => el.getBoundingClientRect());
+      const flat = (el) => el.textContent.replace(/\s+/g, ' ').trim();
+      return {
+        statCount: stat.length, todoCount: todo.length,
+        statTops: [...new Set(stat.map((el) => Math.round(el.getBoundingClientRect().top)))],
+        todoTops: [...new Set(todo.map((el) => Math.round(el.getBoundingClientRect().top)))],
+        minW: Math.round(Math.min(...rects.map((r) => r.width))), minH: Math.round(Math.min(...rects.map((r) => r.height))),
+        roles: all.map((el) => el.getAttribute('role')), tabs: all.map((el) => el.getAttribute('tabindex')),
+        cursors: [...new Set(all.map((el) => getComputedStyle(el).cursor))],
+        overflow: Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth),
+        firstStatText: flat(stat[0]),
+        treeCardText: flat(stat.find((el) => el.dataset.statToggle === 'featured-trees'))
+      };
+    });
+    assert.equal(adminCards.statCount, 7, '전체 숫자 카드 7개');
+    assert.equal(adminCards.todoCount, 7, '처리할 일 카드 7개');
+    if (width >= 1440) {
+      assert.equal(adminCards.statTops.length, 1, `전체 숫자 카드가 한 줄이다(카드 위 좌표 ${JSON.stringify(adminCards.statTops)})`);
+      assert.equal(adminCards.todoTops.length, 1, `처리할 일 카드가 한 줄이다(카드 위 좌표 ${JSON.stringify(adminCards.todoTops)})`);
+    }
+    assert.equal(adminCards.overflow, 0, `운영센터 가로 넘침 0(실제 ${adminCards.overflow}px)`);
+    assert.ok(adminCards.minH >= 44 && adminCards.minW >= 44, `카드 누름 영역 44px 이상(최소 ${adminCards.minW}×${adminCards.minH}px)`);
+    assert.deepEqual(adminCards.roles, Array(14).fill('button'), '모든 카드가 role=button이다');
+    assert.deepEqual(adminCards.tabs, Array(14).fill('0'), '모든 카드가 tabindex=0이다(키보드로 연다)');
+    assert.deepEqual(adminCards.cursors, ['pointer'], `모든 카드가 같은 누름 모양(커서 ${JSON.stringify(adminCards.cursors)})`);
+    // 숫자 뜻: 큰 숫자가 '실제 고객'이고, 전체 = 실제 + AI + 시험을 카드 안에 함께 적는다.
+    assert.ok(adminCards.firstStatText.includes('실제 고객'), `큰 숫자가 무엇을 세는지 카드 안에 적는다(실측: ${adminCards.firstStatText})`);
+    assert.ok(adminCards.firstStatText.includes('전체 8') && adminCards.firstStatText.includes('AI 4') && adminCards.firstStatText.includes('시험 2'), `전체 = 실제+AI+시험을 함께 적는다(실측: ${adminCards.firstStatText})`);
+    assert.ok(adminCards.treeCardText.includes('전체 1'), `둘러보기 소개 카드도 전체를 함께 적는다(실측: ${adminCards.treeCardText})`);
+    await take(pageAdm, '운영센터 한눈에');
+
+    // 1920에서도 두 묶음이 각각 한 줄이다(#743 대표 요청).
+    if (width >= 1440) {
+      await pageAdm.setViewportSize({ width: 1920, height: 1080 });
+      await pageAdm.waitForTimeout(400);
+      const wide = await pageAdm.evaluate(() => ({
+        statTops: [...new Set([...document.querySelectorAll('.lt-stats .lt-stat')].map((el) => Math.round(el.getBoundingClientRect().top)))],
+        todoTops: [...new Set([...document.querySelectorAll('.lt-ov-cards .lt-ov-card')].map((el) => Math.round(el.getBoundingClientRect().top)))],
+        overflow: Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth)
+      }));
+      assert.equal(wide.statTops.length, 1, `1920 전체 숫자 한 줄(실측 ${JSON.stringify(wide.statTops)})`);
+      assert.equal(wide.todoTops.length, 1, `1920 처리할 일 한 줄(실측 ${JSON.stringify(wide.todoTops)})`);
+      assert.equal(wide.overflow, 0, `1920 가로 넘침 0(실제 ${wide.overflow}px)`);
+      await pageAdm.setViewportSize({ width, height });
+      await pageAdm.waitForTimeout(300);
+    }
+
+    // 탭이 없는 카드(전체 숫자)는 내역이 펼쳐지고, 다시 누르면 접힌다. Enter로도 열린다.
+    const expand = await pageAdm.evaluate(() => {
+      const card = document.querySelector('[data-stat-toggle="trees"]');
+      card.click();
+      const detail = document.getElementById('stat-detail-trees');
+      const open = { hidden: detail.hidden, expanded: card.getAttribute('aria-expanded'), titles: detail.querySelectorAll('.lt-stat-titles li').length, split: detail.querySelectorAll('.lt-stat-split li').length, text: detail.textContent.replace(/\s+/g, ' ').trim() };
+      card.click();
+      const closed = { hidden: detail.hidden, expanded: card.getAttribute('aria-expanded') };
+      return { open, closed };
+    });
+    assert.deepEqual([expand.open.hidden, expand.open.expanded], [false, 'true'], '탭이 없는 카드를 누르면 내역이 펼쳐진다');
+    assert.equal(expand.open.titles, 3, `트리 카드 내역에 제목 목록(최대 20)이 보인다(실측 ${expand.open.titles}개)`);
+    assert.equal(expand.open.split, 3, '내역에 실제 고객·AI 명예회원·시험 계정 갈래 수가 있다');
+    assert.ok(expand.open.text.includes('AI 명예회원') && !/@/.test(expand.open.text), '내역에 이메일 같은 개인정보는 없다');
+    assert.deepEqual([expand.closed.hidden, expand.closed.expanded], [true, 'false'], '다시 누르면 내역이 접힌다');
+    await pageAdm.focus('[data-stat-toggle="accounts"]');
+    await pageAdm.keyboard.press('Enter');
+    await pageAdm.waitForTimeout(200);
+    const byEnter = await pageAdm.evaluate(() => ({ hidden: document.getElementById('stat-detail-accounts').hidden, expanded: document.querySelector('[data-stat-toggle="accounts"]').getAttribute('aria-expanded') }));
+    assert.deepEqual([byEnter.hidden, byEnter.expanded], [false, 'true'], 'Enter로도 내역이 펼쳐진다');
+    await pageAdm.keyboard.press('Enter');
+    await pageAdm.waitForTimeout(200);
+
+    // 탭이 있는 카드는 그 탭을 해당 조건으로 걸러 연다(주소에 조건이 남는다).
+    const jump = async (selector) => {
+      await pageAdm.evaluate(() => { location.hash = '#overview'; });
+      await pageAdm.waitForFunction(() => document.querySelectorAll('.lt-ov-cards .lt-ov-card').length === 7, null, { timeout: 8000 });
+      await pageAdm.click(selector);
+      await pageAdm.waitForFunction(() => location.hash !== '#overview', null, { timeout: 8000 });
+      await pageAdm.waitForTimeout(200);
+      return pageAdm.evaluate(() => ({ hash: location.hash, filterNote: !!document.querySelector('[data-clear-filter]') }));
+    };
+    const pending = await jump('[data-ov-view="board"][data-ov-status="pending"]');
+    assert.equal(pending.hash, '#board?status=pending', `처리 대기 카드 → 고객 글 탭의 처리 대기(실제 ${pending.hash})`);
+    const unanswered = await jump('[data-ov-unanswered="1"]');
+    assert.equal(unanswered.hash, '#board?unanswered=1', `답글 0 카드 → 답글 0만 거른 고객 글(실제 ${unanswered.hash})`);
+    assert.equal(unanswered.filterNote, true, '거른 조건을 지우는 단추가 함께 보인다');
+    const reports = await jump('[data-ov-view="reports"][data-ov-status="open"]');
+    assert.equal(reports.hash, '#reports?status=open', `신고 대기 카드 → 신고 탭의 검토 대기(실제 ${reports.hash})`);
+    const issues = await jump('[data-ov-view="issues"][data-ov-status="closed"]');
+    assert.equal(issues.hash, '#issues?status=closed', `닫힌 이슈 카드 → 고치는 일 탭의 닫힌 이슈(실제 ${issues.hash})`);
+    // 키보드(Space)로도 카드가 열린다.
+    await pageAdm.evaluate(() => { location.hash = '#overview'; });
+    await pageAdm.waitForFunction(() => document.querySelectorAll('.lt-ov-cards .lt-ov-card').length === 7, null, { timeout: 8000 });
+    await pageAdm.focus('[data-ov-view="issues"][data-ov-status="open"]');
+    await pageAdm.keyboard.press(' ');
+    await pageAdm.waitForFunction(() => location.hash.startsWith('#issues'), null, { timeout: 8000 });
+    assert.equal(await pageAdm.evaluate(() => location.hash), '#issues?status=open', 'Space로도 카드가 열린다');
+    await ctxAdm.close();
+
     // #666 2번: 계정 메뉴가 열린 자리에서 첫 트리 안내가 메뉴를 덮지 않는다(한 번에 하나만).
     // 안내가 뜨고 메뉴가 열리면 안내를 잠시 접고, 메뉴를 닫으면 다시 뜨는 것까지 확인한다.
     const ctx5 = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });

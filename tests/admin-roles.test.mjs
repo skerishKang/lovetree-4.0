@@ -254,10 +254,13 @@ test('운영센터 전체 숫자(#655 2차): 계정·트리·순간·공개·둘
   // 새 계정은 가입일(첫 로그인 시각)이 창(11-13 이후) 안인 실제 사용자 2(REAL_TWO·NEW_EMPTY).
   assert.deepEqual(stats.accounts, { total: 7, real: 5, aiTester: 1, tester: 1, new: { total: 2, real: 2, aiTester: 0, tester: 0 } });
   // 트리 6(실제 4 · AI 1 · 시험 1). 공개 2(실제 1 · AI 1) — 비공개 트리는 빠진다.
+  // #743: 트리 계열 카드에 펼침 내역용 제목 목록(카드마다 최대 20)이 함께 온다 — 제목만 싣는다.
+  const treeTitles = ['나무 ta', '나무 tb', '나무 tc', '나무 td', '나무 te', '나무 tf'];
+  const publicTitles = ['나무 ta', '나무 td'];
   assert.deepEqual(stats.trees, {
-    total: 6, real: 4, aiTester: 1, tester: 1,
-    public: { total: 2, real: 1, aiTester: 1, tester: 0 },
-    featured: { total: 2, real: 1, aiTester: 1, tester: 0 }
+    total: 6, real: 4, aiTester: 1, tester: 1, titles: treeTitles,
+    public: { total: 2, real: 1, aiTester: 1, tester: 0, titles: publicTitles },
+    featured: { total: 2, real: 1, aiTester: 1, tester: 0, titles: publicTitles }
   });
   // 순간 12(실제 7 · AI 3 · 시험 2), 그중 창 안은 실제 2개(사용자 1의 새 순간 + 사용자 2의 첫 순간).
   assert.deepEqual(stats.moments, { total: 12, real: 7, aiTester: 3, tester: 2, new: { total: 2, real: 2, aiTester: 0, tester: 0 } });
@@ -267,6 +270,8 @@ test('운영센터 전체 숫자(#655 2차): 계정·트리·순간·공개·둘
 
   // 개인정보는 싣지 않는다 — 개인정보 칸도, subject·이메일 글자도 응답에 없다.
   const text = JSON.stringify(response.body);
+  // #743: 트리 제목 목록은 실리지만(운영자가 내역을 펼쳐 보는 자리) subject·이메일은 여전히 실리지 않는다.
+  assert.ok(text.includes('나무 ta'), '트리 제목은 카드 펼침 내역에 쓰인다');
   for (const word of ['sub_', '@', 'email', 'name', 'subject', 'subjectId', 'tester_sub', 'role']) assert.ok(!text.includes(word), `응답에 ${word} 가 실렸다`);
   assert.ok(text.includes('"tester":1'), '시험 계정 숫자는 응답에 있다(운영센터 전용)');
   const keys = new Set(Object.keys(stats));

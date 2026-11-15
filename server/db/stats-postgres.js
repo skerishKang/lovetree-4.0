@@ -126,8 +126,31 @@ featured_row AS (
          (count(*) FILTER (WHERE ai_tester))::int AS "featuredAi",
          (count(*) FILTER (WHERE tester))::int AS "featuredTester"
   FROM featured_tree
+),
+-- #743: 트리 계열 카드('트리'·'공개 트리'·'둘러보기 소개')를 펼쳐 볼 제목 목록(카드마다 최대 20).
+-- 제목만 싣는다 — 이메일·subject·이름은 여기서도 돌려주지 않는다. 제목·id 순으로 정해 둬어 같은 답이 돌아온다.
+doc_tree AS (
+  SELECT d.subject_id, t->>'id' AS tree_id,
+         COALESCE(NULLIF(t->>'title', ''), t->>'subject', '') AS title
+  FROM docs d CROSS JOIN LATERAL jsonb_array_elements(COALESCE(d.doc->'trees', '[]'::jsonb)) AS t
+),
+title_row AS (
+  SELECT
+    (SELECT COALESCE(jsonb_agg(title), '[]'::jsonb) FROM (
+      SELECT title FROM doc_tree WHERE title <> '' ORDER BY title, tree_id LIMIT 20
+    ) names) AS "treesTitles",
+    (SELECT COALESCE(jsonb_agg(c.title), '[]'::jsonb) FROM (
+      SELECT c.title FROM doc_tree c
+      JOIN public_tree p ON p.subject_id = c.subject_id AND p.tree_id = c.tree_id
+      WHERE c.title <> '' ORDER BY c.title, c.tree_id LIMIT 20
+    ) names) AS "publicTitles",
+    (SELECT COALESCE(jsonb_agg(c.title), '[]'::jsonb) FROM (
+      SELECT c.title FROM doc_tree c
+      JOIN featured_tree f ON f.subject_id = c.subject_id AND f.tree_id = c.tree_id
+      WHERE c.title <> '' ORDER BY c.title, c.tree_id LIMIT 20
+    ) names) AS "featuredTitles"
 )
-SELECT * FROM account_row, tree_row, public_row, featured_row
+SELECT * FROM account_row, tree_row, public_row, featured_row, title_row
 `;
 
 export function createStatsRepo(pool) {
@@ -139,6 +162,11 @@ export function createStatsRepo(pool) {
       for (const field of NUMERIC_FIELDS) {
         const value = Number(row[field]);
         out[field] = Number.isSafeInteger(value) && value > 0 ? value : 0;
+      }
+      // #743: 트리 계열 카드의 제목 목록(각 최대 20). 글자만 깔끔히 — 숫자 계약은 그대로다.
+      for (const [field, key] of [['treesTitles', 'treesTitles'], ['publicTitles', 'publicTitles'], ['featuredTitles', 'featuredTitles']]) {
+        const value = row[field];
+        out[key] = Array.isArray(value) ? value.map((item) => String(item ?? '').trim()).filter(Boolean).slice(0, 20) : [];
       }
       return out;
     }
