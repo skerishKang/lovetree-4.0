@@ -192,7 +192,7 @@ function tree26() {
       title: `순간 ${i}`, note: `이 순간의 마음 ${i}`, emotion: '설렘', date: '2026.11.01', relation: '', url,
     });
   }
-  return { id: 'tree1', subject: '윤제', title: '시험 트리', coverMomentId: '', inbox: false, moments, edges: [] };
+  return { id: 'tree1', subject: '시험 사용자', title: '시험 트리', coverMomentId: '', inbox: false, moments, edges: [] };
 }
 
 let server, base;

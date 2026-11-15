@@ -80,14 +80,14 @@ test('board: opinion/journal, reply counts, replies, persona, today journal',{sk
   assert.equal(today.id,journal.id);
   // 페르소나
   assert.equal(await repo.getPersona({productId,subjectId:'sub_'+tag}),null);
-  const persona=await repo.upsertPersona({productId,subjectId:'sub_'+tag,name:'윤제',intro:{who:'팬'}});
-  assert.equal(persona.name,'윤제');
+  const persona=await repo.upsertPersona({productId,subjectId:'sub_'+tag,name:'시험 사용자',intro:{who:'팬'}});
+  assert.equal(persona.name,'시험 사용자');
   assert.equal(persona.intro.who,'팬');
-  const up=await repo.upsertPersona({productId,subjectId:'sub_'+tag,name:'윤제2',intro:{who:'팬2'}});
-  assert.equal(up.name,'윤제2');
+  const up=await repo.upsertPersona({productId,subjectId:'sub_'+tag,name:'시험 사용자2',intro:{who:'팬2'}});
+  assert.equal(up.name,'시험 사용자2');
   const listed=await repo.list({productId});
   const op=listed.find(r=>r.id===opinion.id);
-  assert.equal(op.authorName,'윤제2');
+  assert.equal(op.authorName,'시험 사용자2');
   // journal 은 고객 답변 불가(서비스 규칙) — 여기서는 CHECK(author_type)만 확인
   await assert.rejects(repo.addReply({productId,postId:journal.id,authorType:'nope',body:'x'}),/check|violates/i);
  }finally{await pool.end();}
@@ -107,7 +107,7 @@ test('feedback table exists after schema and accepts an empty context object',{s
 test('#671 후속: DATE 칸은 DB의 YYYY-MM-DD를 그대로 내린다 — 현지 자정 Date도 하루 밀리지 않는다',async()=>{
  // node-postgres는 DATE를 현지 시각 자정 Date로 파싱한다. toISOString()으로 바꾸면 KST(+09:00)에서 하루가 밀렸다.
  const rows=[
-  {id:1,subject_id:'sub_a',kind:'journal',category:'other',title:'일지',body:'내용',score:3,journal_date:new Date(2026,10,14),context:{},status:'received',memo:null,issue_number:null,author_name:'윤제',author_role:'ai_customer',reply_count:1,created_at:'2026-11-14T01:00:00.000Z',updated_at:'2026-11-14T01:00:00.000Z'},
+  {id:1,subject_id:'sub_a',kind:'journal',category:'other',title:'일지',body:'내용',score:3,journal_date:new Date(2026,10,14),context:{},status:'received',memo:null,issue_number:null,author_name:'시험 사용자',author_role:'ai_customer',reply_count:1,created_at:'2026-11-14T01:00:00.000Z',updated_at:'2026-11-14T01:00:00.000Z'},
   {id:2,subject_id:null,kind:'opinion',category:'bug',title:null,body:'의견',score:null,journal_date:'2026-11-14',context:{},status:'received',memo:null,issue_number:null,author_name:null,author_role:null,reply_count:0,created_at:'2026-11-14T01:00:00.000Z',updated_at:null}];
  const repo=createFeedbackRepo({query:async()=>({rows})});
  const list=await repo.list({productId:'lt-date'});

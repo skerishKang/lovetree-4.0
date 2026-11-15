@@ -101,7 +101,7 @@ test('5. 서버 저장: backfillTitles는 자동 제목을 영상 제목으로 �
   session.dispose();
 });
 
-test('6. #678 후속(보람 트리 재발): 늦게 도착한 제목이 자동 제목(m.youtube.com에서 간직한 순간)을 바로잡는다', async () => {
+test('6. #678 후속(둘러보기 트리 재발): 늦게 도착한 제목이 자동 제목(m.youtube.com에서 간직한 순간)을 바로잡는다', async () => {
   // 실제 사건(둘러보기 'RIIZE' 트리, 2026-11-15): 쉬운 추가로 담긴 순간에 mediaMetadata는 도착했지만
   // 순간 제목이 자동 문구('m.youtube.com에서 간직한 순간')로 남아 고착됐다 — titleBackfillTargets가
   // mediaMetadata가 있는 순간을 제외했기 때문. 자동 제목이면 대상에 들어가고, 세션 적용으로 제목까지 바로잡는다.

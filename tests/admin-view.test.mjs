@@ -136,14 +136,14 @@ test('#596 사용 일지 탭 주소: #journals 왕복', () => {
 
 test('#596 오늘 요약·고객별 줄·떠남 위험(이틀 연속 2 이하)', () => {
   const journals = [
-    {id: 1, subjectId: 'a', authorName: '윤제', kind: 'journal', journalDate: '2026-11-13', score: 2, createdAt: '2026-11-13T01:00:00Z', displayTitle: '13일'},
-    {id: 2, subjectId: 'a', authorName: '윤제', kind: 'journal', journalDate: '2026-11-14', score: 2, createdAt: '2026-11-14T01:00:00Z', displayTitle: '14일'},
+    {id: 1, subjectId: 'a', authorName: '시험 사용자', kind: 'journal', journalDate: '2026-11-13', score: 2, createdAt: '2026-11-13T01:00:00Z', displayTitle: '13일'},
+    {id: 2, subjectId: 'a', authorName: '시험 사용자', kind: 'journal', journalDate: '2026-11-14', score: 2, createdAt: '2026-11-14T01:00:00Z', displayTitle: '14일'},
     {id: 3, subjectId: 'b', authorName: '다른', kind: 'journal', journalDate: '2026-11-14', score: 1, createdAt: '2026-11-14T02:00:00Z', displayTitle: '14일 b'}
   ];
   const summary = journalsSummary(journals, '2026-11-14');
   assert.deepEqual(summary, {activeCustomers: 2, journalCount: 2, avgScore: 1.5, atRisk: 1});
   const rows = journalRowsByCustomer(journals);
-  assert.deepEqual(rows.map(row => row.name), ['윤제', '다른']); // 최근 기록일 내림차순(같으면 고정 순서)
+  assert.deepEqual(rows.map(row => row.name), ['시험 사용자', '다른']); // 최근 기록일 내림차순(같으면 고정 순서)
   assert.equal(rows[0].stage, '꾸준'); // 2일
   assert.equal(rows[1].stage, '시작'); // 1일
   assert.deepEqual(rows[0].flow, [{day: '2026-11-13', score: 2}, {day: '2026-11-14', score: 2}]);
@@ -340,8 +340,8 @@ test('#655 2차 전체 숫자 카드 — 실제 사용자·AI 테스터·시험 
 test('journal_date가 비어 있으면 만든 시각을 한국 시각 날짜로 읽는다(UTC 자름이 아니다)', () => {
   // 2026-11-14T19:28:00Z = 한국 시각 2026-11-15 04:28.
   const rows = journalRowsByCustomer([
-    {id: 1, subjectId: 'a', authorName: '윤제', kind: 'journal', journalDate: null, score: 3, createdAt: '2026-11-14T19:28:00Z'},
-    {id: 2, subjectId: 'a', authorName: '윤제', kind: 'journal', journalDate: '2026-11-13', score: 2, createdAt: '2026-11-13T01:00:00Z'}
+    {id: 1, subjectId: 'a', authorName: '시험 사용자', kind: 'journal', journalDate: null, score: 3, createdAt: '2026-11-14T19:28:00Z'},
+    {id: 2, subjectId: 'a', authorName: '시험 사용자', kind: 'journal', journalDate: '2026-11-13', score: 2, createdAt: '2026-11-13T01:00:00Z'}
   ]);
   assert.equal(rows[0].lastDay, '2026-11-15', '한국 시각 11-15 04:28 기록은 11-15로 보인다');
   assert.deepEqual(rows[0].flow, [{day: '2026-11-13', score: 2}, {day: '2026-11-15', score: 3}]);

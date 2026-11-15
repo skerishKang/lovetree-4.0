@@ -44,7 +44,7 @@ const WORKSPACE = () => ({
     version: 1,
     prefs: {},
     trees: [{
-      id: 'tree1', subject: '윤제', title: '모아둔 순간', coverMomentId: '', inbox: false,
+      id: 'tree1', subject: '시험 사용자', title: '모아둔 순간', coverMomentId: '', inbox: false,
       createdAt: '2026-11-15T00:00:00.000Z', updatedAt: '2026-11-15T00:00:00.000Z',
       moments: [{
         id: 'm1', parentId: null, links: [], createdAt: '2026-11-15T00:00:00.000Z',
