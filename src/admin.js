@@ -63,8 +63,8 @@ function renderLogin() {
 
 function statusBadge(status) { return `<span class="lt-badge" data-status="${escapeText(status)}">${escapeText(STATUS_LABEL[status] || status)}</span>`; }
 function kindBadge(kind) { return `<span class="lt-badge" data-kind="${escapeText(kind)}">${escapeText(KIND_LABEL[kind] || kind)}</span>`; }
-// #611 3번: 운영센터에서는 AI 고객 이름을 'AI 윤제'처럼 알린다(남에게 보이는 곳의 'AI 테스터' 표시와 같은 결정).
-function authorLabel(row) { const name = row.authorName || (row.subjectId ? '고객' : '익명'); return row.authorRole === 'ai_customer' ? `AI ${name}` : name; }
+// #611 3번: 운영센터에서는 AI 고객 이름을 'AI 명예회원 윤제'처럼 알린다(2026-11-15 호칭 결정).
+function authorLabel(row) { const name = row.authorName || (row.subjectId ? '고객' : '익명'); return row.authorRole === 'ai_customer' ? `AI 명예회원 ${name}` : name; }
 
 async function render() {
   if (renderLogin()) return;
@@ -87,7 +87,7 @@ async function render() {
 /** #655 '한눈에' 탭 — 이미 있는 탭이 부르는 API만 모아 처리할 일을 숫자로 보여 준다. 서버를 바꾸지 않는다.
  *  하나라도 못 불러오면 그 카드만 '불러오지 못했어요'로 두고 나머지는 그린다. */
 async function renderOverview() {
-  // #655 2차: 맨 위 전체 숫자는 서버가 집계한다(계정·트리·순간·공개·둘러보기·AI 테스터).
+  // #655 2차: 맨 위 전체 숫자는 서버가 집계한다(계정·트리·순간·공개·둘러보기·AI 명예회원).
   // 이 응답이 실패해도 나머지 카드는 그대로 그린다 — 그 줄만 '불러오지 못했어요'.
   const [feedbackRes, journalsRes, reportsRes, statsRes] = await Promise.all([read('/api/admin/feedback'), read('/api/admin/journals'), read('/api/community/admin/reports'), read('/api/admin/stats')]);
   const posts = feedbackRes.ok && Array.isArray(feedbackRes.payload?.feedback) ? feedbackRes.payload.feedback : [];
@@ -129,15 +129,15 @@ async function renderOverview() {
     : (model.todos.length
         ? model.todos.map(row => `<article class="lt-post lt-post-row" data-open="${escapeText(row.id)}" tabindex="0" role="button"><span class="lt-post-title">${escapeText(row.title)}</span>${row.issueNumber ? `<span class="lt-post-issue">이슈 ${issueLink(row.issueNumber)}</span>` : '<span class="lt-post-issue"></span>'}<span class="lt-post-date">${escapeText(formatTime(row.createdAt))}</span></article>`).join('')
         : '<p class="lt-empty">답을 기다리는 글이 없습니다.</p>');
-  // 전체 숫자 줄(#655 2차). '실제 사용자'를 크게, 'AI 테스터'·'시험 계정'을 작게 나란히 적는다(#671).
+  // 전체 숫자 줄(#655 2차). '실제 사용자'를 크게, 'AI 명예회원'·'시험 계정'을 작게 나란히 적는다(#671).
   const statModel = statsCards(statsRes);
   const statCell = (item) => item.error
     ? `<div class="lt-stat" data-stat="${escapeText(item.key)}"><span class="lt-stat-value">—</span><span class="lt-stat-label">${escapeText(item.label)}</span><span class="lt-stat-fail">불러오지 못했어요</span></div>`
-    : `<div class="lt-stat" data-stat="${escapeText(item.key)}"><span class="lt-stat-value">${escapeText(item.real)}</span><span class="lt-stat-label">${escapeText(item.label)}</span><span class="lt-stat-ai">AI 테스터 ${escapeText(item.aiTester)}</span><span class="lt-stat-tester">시험 계정 ${escapeText(item.tester)}</span></div>`;
+    : `<div class="lt-stat" data-stat="${escapeText(item.key)}"><span class="lt-stat-value">${escapeText(item.real)}</span><span class="lt-stat-label">${escapeText(item.label)}</span><span class="lt-stat-ai">AI 명예회원 ${escapeText(item.aiTester)}</span><span class="lt-stat-tester">시험 계정 ${escapeText(item.tester)}</span></div>`;
   // 두 묶음 사이에 작은 제목을 단다: '전체 숫자'(계정·트리·순간…) / '처리할 일'(고객 글·신고·이슈).
   const statsRow = statModel.error
     ? '<section class="lt-ov-section"><h2 class="lt-ov-heading">전체 숫자</h2><div class="lt-stats" aria-label="전체 숫자"><p class="lt-empty">불러오지 못했어요</p></div></section>'
-    : `<section class="lt-ov-section"><h2 class="lt-ov-heading">전체 숫자</h2><div class="lt-stats" aria-label="전체 숫자 · 실제 사용자 / AI 테스터 / 시험 계정">${statModel.cards.map(statCell).join('')}</div></section>`;
+    : `<section class="lt-ov-section"><h2 class="lt-ov-heading">전체 숫자</h2><div class="lt-stats" aria-label="전체 숫자 · 실제 사용자 / AI 명예회원 / 시험 계정">${statModel.cards.map(statCell).join('')}</div></section>`;
   const todoCards = `<section class="lt-ov-section"><h2 class="lt-ov-heading">처리할 일</h2><div class="lt-ov-cards" role="group" aria-label="처리할 일 숫자">${cards}</div></section>`;
   host.innerHTML = `${head()}<div class="admin-shell lt-board">
     <div class="lt-board-head"><h1 class="lt-h1">한눈에</h1><p class="lt-sub">지금 쌓인 처리할 일 · 숫자를 누르면 그 탭이 그 조건으로 열립니다</p></div>

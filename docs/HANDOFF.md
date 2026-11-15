@@ -2048,3 +2048,12 @@ COM2에는 merge `6900df8aa446dfe0201d01997457fae04c4abe16`의 변경 서버 파
 - 공통 검사기(tests/v41-screen-audit.test.mjs)에 상태 3개 추가: '지도 390(조작 줄)'(iframe↔셸 교차 겹침 + 보기 전환 단추 대비 4.5:1), '새 소식 펼침', '내 의견 목록'(/api/board/mine 가짜 게시물). 390·1440 × 밤·정원 통과. KNOWN 20건은 기존 그대로. updates.json 'NaN월' 문구는 검사기 흔적값 오탈이어서 '잘못 보이던 날짜'로 다듬었다.
 - 시험: 관련 단위 시험 전부 통과(domain·updates 4종·thumb 2종·panels 3종 — v41-panels-flow의 add 모드 '더 적기' 단정은 #638 방향으로 갱신), npm run build + modulepreload --check 통과, 화면 공통 검사기 REQUIRE 통과(35s). 페이지 오류 0.
 - 캡처: E:/lovetree-qa/lane/local4-638rest/ (지도 390 전·후 밤/정원, 책 390 후, 새 소식·내 의견 1440).
+
+## 2026-11-15 — 'AI 테스터' → 'AI 명예회원' 호칭 바꾸기 (컴1로컬5 레인, ai/local5-ai-honorific-261115, main 96f462e 기준)
+
+- **대표 결정(2026-11-15)**: AI 고객(페르소나)을 화면·고객 대상 글에서 'AI 명예회원'으로 부른다('AI'는 남긴다 — 사람이 아님을 알림). 역할 값(ai_customer·tester)·필드 이름(aiTester 등)·DB 열·API 경로는 그대로고 보이는 글자만 바꿨다.
+- **바꾼 곳(보이는 글자 9곳 + 관련 주석)**: 둘러보기 카드·감상 허브 미리보기 배지(community-panel.mjs 2곳), 공유 화면 안내(shell.mjs), /t/ og 카드 설명 ' · AI 명예회원'(tree-preview.mjs), 새 소식 출처 줄 'AI 명예회원 윤제 님이 알려 준 것'(updates.mjs sourceLabel — #679 묶음 규칙 그대로, 글자만), 운영센터 이름표 'AI 명예회원 윤제'(admin.js authorLabel·admin-view.js 일지 줄), 운영센터 전체 숫자 카드 'AI 명예회원 N'·aria-label(admin.js).
+- **안 바꾼 것**: 역할 값·필드 이름·DB 열·API 경로. updates.json은 항목에 'AI 테스터' 글자가 없어 손댈 곳이 없다(출처는 source·tester 필드). HANDOFF 과거 기록·마이그레이션 주석·시험 내부 명칭(fixture 트리 제목·시험 이름)은 과거 기록으로 남긴다.
+- **시험 계정(tester 역할) 걸러 내기**: 없다 — 둘러보기 discover(/api/community/shares)는 역할과 무관하게 공유 행을 나열하고 aiTester 비트만 본다(지금은 시험 계정이 공유가 없어 안 보일 뿐). 방법(별도 서버 PR): discover 목록과 자동 공유 생성에서 주체 역할을 roleFor로 확인해 role='tester'면 목록에서 제외하고 새 공유를 막는다(공개 읽기 /api/public/shares/:id도 같은 판정).
+- **시험**: 기존 시험 기대 글자 8곳 갱신(updates-format·updates-screen-611·updates-b-611 'AI 윤제'→'AI 명예회원 윤제'·pages-search-preview·share-service·admin-view 'AI 고객1'→'AI 명예회원 고객1'). 새 시험·소스 글자 검사 없음. 전체 npm test 1820검 1681 pass·0 fail·139 skip, build·modulepreload --check 통과.
+- **머지 뒤 할 일**: 서버 파일이 바뀌었으므로(주석만) 컴2 autodeploy 설치 sha 확인. 화면 캡처(둘러보기 카드·새 소식·운영센터 1440·390, 시험 계정·관리자 계정)는 배포 뒤 컴2에서.

@@ -52,7 +52,7 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
   const emotions=[...new Set(tree.moments.map(moment=>moment.emotion).filter(Boolean))];
   const stats=statsOverride||await communityRepo.stats({productId,shareId:share.shareId,viewerSubjectId});
   const card={shareId:share.shareId,title:tree.title,subject:tree.subject,summary:clean(cover?.note,160),emotions,momentCount:tree.moments.length,entryMomentId:share.entryMomentId,view:share.view,cover:{title:cover?.title||tree.title,url:coverUrl,emotion:cover?.emotion||''},createdAt:share.createdAt,lastActivityAt:lastActivityAt||share.createdAt,stats};
-  // #611 3번: AI 테스터 기록은 남에게 보이는 카드에 'AI 테스터' 배지 한 비트만 내린다
+  // #611 3번: AI 명예회원 기록은 남에게 보이는 카드에 'AI 명예회원' 배지 한 비트만 내린다
   // (계정·이메일·subject는 공개 응답에 넣지 않는다).
   if(aiTesterLookup&&await aiTesterLookup(share.subjectId))card.aiTester=true;
   // #627: 둘러보기 검색에 이 트리 순간들의 제목(사용자 제목 + 영상 제목)도 넣는다. 트리 이름이 자동 이름
@@ -65,7 +65,7 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
  return {
   async discover({query='',emotion='',cursor='',limit=12,viewerSubjectId=null}={}){
    const q=clean(query,80).toLocaleLowerCase('ko-KR'),tag=clean(emotion,12),size=Math.max(1,Math.min(24,Number(limit)||12));
-   // #611 3번: AI 테스터 배지 비트 — 이번 한 번의 둘러보기 조회에서는 같은 주인이면 한 번만 묻는다.
+   // #611 3번: AI 명예회원 배지 비트 — 이번 한 번의 둘러보기 조회에서는 같은 주인이면 한 번만 묻는다.
    const roleCache=new Map();
    const aiTesterLookup=admin?async subjectId=>{
     if(roleCache.has(subjectId))return roleCache.get(subjectId);

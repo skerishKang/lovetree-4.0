@@ -17,9 +17,9 @@
  *   · 둘러보기 소개 = 공개 트리 중 둘러보기 조건과 같은 것 — 활성 공유 행의 moment_count>=3 이고
  *     (자동 공개 행이거나 주인이 소개를 켠 행), 숨김 처리된 공유 행이 없는 트리(community-postgres 의
  *     `listDiscoverable` 과 같은 조건).
- *   · AI 테스터 = `lovetree_product_roles.role='ai_customer'` 인 subject. 시험 계정 =
+ *   · AI 명예회원 = `lovetree_product_roles.role='ai_customer'` 인 subject. 시험 계정 =
  *     `role='tester'` 인 subject(레인 시험 계정 01~05, #671). 둘 다 전체 숫자에 포함되며
- *     응답에서 실제 사용자 / AI 테스터 / 시험 계정 세 갈래로 나뉜다(실제 = 전체 − AI − 시험).
+ *     응답에서 실제 사용자 / AI 명예회원 / 시험 계정 세 갈래로 나뉜다(실제 = 전체 − AI − 시험).
  *
  * 응답에는 숫자만 담는다 — subject·이메일·이름은 돌려주지 않는다.
  */

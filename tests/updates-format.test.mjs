@@ -21,7 +21,7 @@ test('611: updates.json 은 버전·날짜·항목(kind·text·source·tester?) 
       assert.ok(item.text.trim(), '문구가 비지 않는다');
       assert.ok(!item.text.includes('\n'), '한 줄로 적는다');
       assert.ok(['ai_tester', 'user', 'team'].includes(item.source), `source는 ai_tester|user|team (받음: ${JSON.stringify(item)})`);
-      if (item.source === 'ai_tester') assert.equal(typeof item.tester, 'string', 'AI 테스터 출처는 테스터 이름을 함께 적는다');
+      if (item.source === 'ai_tester') assert.equal(typeof item.tester, 'string', 'AI 명예회원 출처는 이름을 함께 적는다');
       // 이달용 이슈 번호는 연결용으로만 두는 필드 — 화면 문구에는 넣지 않는다.
       if (item.issue !== undefined) assert.match(item.issue, /^#[\w.-]+$/, '이슈 연결 모양');
     }
@@ -35,8 +35,8 @@ test('611: 첫 버전(4.1.3)은 새로워진 것·고친 것을 쉬운 말 한 �
   const fixed = entry.items.filter(i => i.kind === 'fix');
   assert.ok(fresh.length >= 8, `새로워진 것 줄이 넉넉히 있다(${fresh.length})`);
   assert.ok(fixed.length >= 8, `고친 것 줄이 넉넉히 있다(${fixed.length})`);
-  // #625: 390 카드 위치 수정 한 줄은 팀 출처(source: team)다 — 나머지 고친 것은 AI 테스터 윤제.
-  assert.ok(fixed.every(i => (i.source === 'ai_tester' && i.tester === '윤제') || i.source === 'team'), '고친 것은 AI 테스터 윤제 또는 팀 출처다');
+  // #625: 390 카드 위치 수정 한 줄은 팀 출처(source: team)다 — 나머지 고친 것은 AI 명예회원 윤제.
+  assert.ok(fixed.every(i => (i.source === 'ai_tester' && i.tester === '윤제') || i.source === 'team'), '고친 것은 AI 명예회원 윤제 또는 팀 출처다');
   const joined = entry.items.map(i => i.text).join(' ');
   assert.match(joined, /핀보드/, '핀보드');
   assert.match(joined, /재생/, '재생');
@@ -67,8 +67,8 @@ test('611: 버전 비교·최신 버전 선택은 숫자 세 자리로만 한다
   assert.equal(latestEntry(null), null);
 });
 
-test('611: 출처 한 줄은 AI 테스터와 실제 사용자를 구분한다', () => {
-  assert.equal(sourceLabel({source: 'ai_tester', tester: '윤제'}), 'AI 테스터가 찾아 준 것 · 윤제');
+test('611: 출처 한 줄은 AI 명예회원과 실제 사용자를 구분한다', () => {
+  assert.equal(sourceLabel({source: 'ai_tester', tester: '윤제'}), 'AI 명예회원 윤제 님이 알려 준 것');
   assert.equal(sourceLabel({source: 'user'}), '사용자 의견으로 고친 것');
   assert.equal(sourceLabel({source: 'team'}), '');
   assert.equal(sourceLabel({}), '');
@@ -79,7 +79,7 @@ test('611: 렌더는 버전별·새로워진 것·고친 것 순서로 쉬운 �
   assert.match(html, /러브트리 4\.1\.3/, '버전 제목');
   assert.match(html, /새로워진 것/, '새로워진 것 묶음');
   assert.match(html, /고친 것/, '고친 것 묶음');
-  assert.match(html, /AI 테스터가 찾아 준 것 · 윤제/, '출처 표시');
+  assert.match(html, /AI 명예회원 윤제 님이 알려 준 것/, '출처 표시');
   assert.match(html, /data-updates-version="4\.1\.3"/, '버전 자리');
   assert.match(html, /data-active="true"/, '연 버전 자리 표시');
   assert.doesNotMatch(html, /여러분이/, '금지 문구가 없다');

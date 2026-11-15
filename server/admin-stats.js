@@ -6,7 +6,7 @@ import { ApiError } from './errors.js';
  * 1차는 이미 화면이 부르던 응답에서 숫자를 모았고, 2차는 서버 저장소가 직접 센다.
  * 세는 자리는 `repo.aggregate({ productId, since })` 하나다 — PostgreSQL 은 집계 SQL 한 번,
  * 시험용 메모리 저장소는 같은 계약을 자바스크립트로 흉내 낸다. 이 파일은 그 결과를
- * 화면이 읽기 좋은 모양으로 다듬고 '실제 사용자'·'AI 테스터'·'시험 계정'(#671)으로 나눈다.
+ * 화면이 읽기 좋은 모양으로 다듬고 '실제 사용자'·'AI 명예회원'·'시험 계정'(#671)으로 나눈다.
  * 시험 계정은 운영센터 숫자에서만 갈라 보이고, 남에게 보이는 공개 화면에는 표시하지 않는다.
  *
  * 개인정보는 다루지 않는다: 저장소에서 돌아오는 것은 숫자뿐이고, 응답에도 숫자만 실린다
@@ -30,7 +30,7 @@ function count(value) {
   return Number.isSafeInteger(number) && number > 0 ? number : 0;
 }
 
-/** 한 묶음(전체·실제 사용자·AI 테스터·시험 계정). 셋은 겹치지 않고 전체 = 셋의 합(#671). */
+/** 한 묶음(전체·실제 사용자·AI 명예회원·시험 계정). 셋은 겹치지 않고 전체 = 셋의 합(#671). */
 function split(rawReal, rawAi, rawTester) {
   const real = count(rawReal);
   const aiTester = count(rawAi);
