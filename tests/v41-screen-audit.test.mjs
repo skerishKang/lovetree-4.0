@@ -110,12 +110,14 @@ const lowerToast = async (page) => { await page.evaluate(() => { const t = docum
 // #666 2번: 첫 트리 안내와 계정 메뉴는 한 번에 하나만. 안내는 서버 기록·로그인 소유자가 첫 트리를
 // 만든 자리에서만 뜨므로(tipsWanted), 가짜 /api/workspace로 그 자리를 만든다. 트리 하나·순간 하나.
 // 기록 문서는 도메인 규칙을 통과해야 셸이 '내 기록'으로 받아 준다(손으로 만든 트리는 거절된다) — createTree로 만든다.
-const firstTree = createTree({ subject: '시험', title: '시험 트리', note: '기록', emotion: '설렘', date: '2026-11-15', url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' }, '2026-11-15T00:00:00.000Z');
+let firstTree = createTree({ subject: '시험', title: '시험 트리', note: '기록', emotion: '설렘', date: '2026-11-15', url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' }, '2026-11-15T00:00:00.000Z');
 // #627 PR B: '꼬리표 줄이 열린 상세'·'꼬리표 정리 화면' 상태에 쓰는 모양 — 첫 순간에는 꼬리표가 있고(종류 표시와 옛 낱말 섞음),
 // 둘째 순간에는 없어 '제목에서 꼬리표 한 번에 제안받기'의 대상이 된다. 도메인 규칙을 통과하는 값만 쓴다.
 firstTree.moments[0].keywords = ['노래:Super Shy', '무대'];
-const tagSecond = addMoment(firstTree, { subject: '시험', title: '뉴진스 Super Shy 직캠 @인기가요 23716', note: '기록', emotion: '설렘', date: '2026-11-15', url: '' }, firstTree.moments[0].id, '2026-11-15T00:01:00.000Z');
-if (!tagSecond?.moments?.length && !tagSecond?.tree?.moments?.length) throw new Error('시험 트리의 둘째 순간을 만들지 못했다');
+// #678 후속(꼬리표 걸러 보기): 걸러 보기 상태 전용 트리 — 둘째 순간(꼬리표 없음)이 있어야
+// 칩을 눌렀을 때 목록이 2건→1건으로 줄어드는 것을 검사할 수 있다. addMoment는 불변이므로 반환 트리를 쓴다.
+const twoMomentTree = addMoment(firstTree, { subject: '시험', title: '뉴진스 Super Shy 직캠 @인기가요 23716', note: '기록', emotion: '설렘', date: '2026-11-15', url: '' }, firstTree.moments[0].id, '2026-11-15T00:01:00.000Z');
+if (!twoMomentTree?.moments || twoMomentTree.moments.length !== 2) throw new Error('시험 트리의 둘째 순간을 만들지 못했다');
 
 // #627 PR3: '그래프 보기' 상태의 시험 트리 — 꼬리표 허브 8종(무대·노래·멤버·가수)·같은 영상 묶음(stacks)·
 // 꼬리표 없는 순간 3개(선반·제안받기 대상). 도메인 규칙(createTree·addMoment)으로 만들어 셸이 그대로 받게 한다 —
@@ -456,7 +458,85 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     const after = await page5.evaluate(() => ({ tips: !document.getElementById('tree-tips').hidden, pop: !document.getElementById('account-popover').hidden, seen: localStorage.getItem('lt41.tips.firstTree') || '' }));
     assert.deepEqual({ tips: after.tips, pop: after.pop }, { tips: true, pop: false }, '메뉴를 닫으면 안내가 다시 뜬다(봤음 처리하지 않음)');
     assert.notEqual(after.seen, '1', '접었다고 봤음으로 적지 않는다');
-    await take(page5, '계정 메뉴 닫힘·첫 트리 안내');
+    // #678 후속(꼬리표 걸러 보기): 트리 메뉴의 내 순간 전체 보기로 홈 보기를 열면 순간 목록이
+    // 처음부터 열린다(#394 경로). 꼬리표 칩으로 걸러 보는 것까지 수치로 본다(둘째 순간은 꼬리표가 없어
+    // 칩을 누르면 남는 순간이 줄어든다). 셸의 보기 프레임은 src가 빈 채 내용이 채워지므로
+    // 프레임을 URL이 아니라 내용(orbit 순간 목록 단추)으로 찾는다 — 매 단계 다시 찾는다.
+    // 이 상태에서만 둘째 순간(꼬리표 없음)이 있는 트리를 서브한다 — 걸러 보기로 목록이 줄어드는 것을 보려면.
+    // 앞 상태들(첫 트리 안내)은 '트리 하나·순간 하나'가 조건이라 원래 가짜를 그대로 쓰고, 끝나면 되돌린다.
+    const twoMomentRoute = (r) => r.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify({ revision: 1, state: { version: 1, trees: [twoMomentTree], prefs: {} }, subject: '시험계정', writeSubjectBound: true, savedAt: '2026-11-15T09:00:00.000Z' })
+    });
+    await ctx5.route('**/api/workspace**', twoMomentRoute);
+    const page5b = await ctx5.newPage();
+    await page5b.goto(`${base}/v41/?account=1`, { waitUntil: 'load' });
+    await page5b.waitForFunction(() => { const a = document.getElementById('account-avatar'); return a && !a.hidden; }, null, { timeout: 20000 });
+    await page5b.click('#record-menu');
+    await page5b.waitForFunction(() => !document.getElementById('tree-popover')?.hidden, null, { timeout: 8000 });
+    await page5b.click('#tree-popover [data-tree-action="moments"]');
+    const orbitFrameOf = async () => {
+      for (const f of page5b.frames()) {
+        if (f === page5b.mainFrame()) continue;
+        let ok = false;
+        try {
+          ok = await Promise.race([
+            f.evaluate(() => Boolean(document.getElementById('orbit')?.shadowRoot?.querySelector('[data-do=index]'))),
+            page5b.waitForTimeout(2000).then(() => false)
+          ]);
+        } catch { ok = false; }
+        if (ok) return f;
+      }
+      return null;
+    };
+    const frameEval = async (fn) => {
+      const f = await orbitFrameOf();
+      if (!f) return null;
+      try {
+        return await Promise.race([f.evaluate(fn), page5b.waitForTimeout(2000).then(() => null)]);
+      } catch { return null; }
+    };
+    let chips0 = null;
+    for (let i = 0; i < 24; i++) {
+      const list = await frameEval(() => Boolean(document.getElementById('orbit')?.shadowRoot?.querySelector('.index-list .indexTagChip')));
+      if (!list) {
+        const f = await orbitFrameOf();
+        if (f) await f.evaluate(() => document.getElementById('orbit').shadowRoot.querySelector('[data-do=index]').click()).catch(() => {});
+        await page5b.waitForTimeout(400);
+      }
+      chips0 = await frameEval(() => {
+        const sr = document.getElementById('orbit')?.shadowRoot;
+        return {
+          chips: sr ? [...sr.querySelectorAll('.index-list .indexTagChip')].map((b) => b.textContent.trim()) : [],
+          rows: sr ? sr.querySelectorAll('.index-list [data-lt-moment-row]').length : 0
+        };
+      });
+      if (chips0 && chips0.chips.some((t) => t.includes('노래 · Super Shy'))) break;
+      await page5b.waitForTimeout(400);
+    }
+    assert.ok(chips0 && chips0.chips.some((t) => t.includes('노래 · Super Shy')), '꼬리표 칩에 노래 · Super Shy가 있다 — 실측=' + JSON.stringify(chips0));
+    let picked = null;
+    for (let i = 0; i < 16; i++) {
+      picked = await frameEval(() => {
+        const sr = document.getElementById('orbit')?.shadowRoot;
+        if (!sr) return null;
+        return {
+          picked: sr.querySelectorAll('.index-list .indexTagPicked').length,
+          rows: sr.querySelectorAll('.index-list [data-lt-moment-row]').length,
+          minH: Math.min(...[...sr.querySelectorAll('.index-list .indexTagChip')].map((b) => Math.round(b.getBoundingClientRect().height)))
+        };
+      });
+      if (picked && picked.picked >= 1 && picked.rows >= 1 && picked.rows < chips0.rows) break;
+      const f = await orbitFrameOf();
+      if (f) await f.evaluate(() => { const sr = document.getElementById('orbit')?.shadowRoot; const b = sr && [...sr.querySelectorAll('.index-list .indexTagChip')].find((b) => b.textContent.includes('노래 · Super Shy')); if (b) b.click(); }).catch(() => {});
+      await page5b.waitForTimeout(400);
+    }
+    assert.ok(picked && picked.picked >= 1, '고른 꼬리표가 위에 모여 보인다 — 실측=' + JSON.stringify(picked));
+    assert.ok(picked.rows >= 1 && picked.rows < chips0.rows, '걸러 보기로 순간 수가 준다');
+    assert.ok(picked.minH >= 44, '칩 누름 영역 44px 이상');
+    await take(page5b, '순간 목록 꼬리표 걸러 보기');
+    await ctx5.unroute('**/api/workspace**', twoMomentRoute);
+    await page5b.close();
     // #627 PR B: 꼬리표 줄이 열린 상세(보드) — 확정 칩·직접 입력이 보이는 자리에서 겹침·잘림·작은 글자를 잰다.
     // 같은 문맥에서 보드를 새로 연다(주소에 보기까지 넣는다 — 셸은 불러올 때의 주소로 보기를 정한다).
     const page6 = await ctx5.newPage();
