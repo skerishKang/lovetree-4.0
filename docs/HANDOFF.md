@@ -1981,3 +1981,13 @@ COM2에는 merge `6900df8aa446dfe0201d01997457fae04c4abe16`의 변경 서버 파
 - **검증**: build ✓, modulepreload --check ✓(시안은 검사기 진입점 목록 밖), 걸린 시험 없음(src 변경 없음). headless chromium 실측: 1440·390 × 밤·정원 4장에서 콘솔 오류 0, 순간 점 40·허브 9(무대4·노래3·가수2) 생성, 화면 글자 undefined/null/NaN 0.
 - **캡처**: E:/lovetree-qa/lane/local4-graph/ (graph-view-{1440,390}-{night,garden}.png 4장 + dom 검사 파일). 캡처 도구: ms-playwright chrome.exe --headless --screenshot(스크립트 capture.sh 같이 두움 — 저장소 아님).
 - **다음 단계**(문서 §7): PR2 graph-model.mjs 순수 규칙+함수 시험 → PR3 views/graph 화면+지도 입구 전환 알약+화면 검사기 상태 → PR4(선택) 재생·직접 이은 줄 토글·멤버·감정 걸러 보기.
+
+## 2026-11-15 — 그래프 시안 v2 (#687, 키미 · numes/moonshotai/kimi-k3.1)
+
+- **기본 시간 선 없음**: 묶음 안의 짧은 이음만 두고, 순간·허브 선택이나 발자취 걷기에서만 길을 밝힌다. 걷기는 지나온 길을 순서대로 보여 주며 나머지 묶음은 옅게 한다. 결정을 docs/GRAPH_VIEW_20261115.md §0과 선 규칙에 반영했다.
+- **묶음과 이름**: 허브 안 나선 대신 바깥 고리에 36개 순간 점(선반 4개 포함 총 40개)을 크게 배치. 이름은 묶음 밖에서 점·다른 이름·화면 끝을 피해 결정론으로 놓고 필요하면 줄인다. 허브와 범례 선택은 해당 순간 목록을 열고, Enter/Space 선택도 연결했다. 클릭을 막던 숨은 빈 안내 박스도 제거했다.
+- **390**: 물대가 가용폭 352px 전체와 58dvh(약 490px)를 사용. 머리 버튼·범례 줄바꿈·아래 레일로 가로 넘침 0을 확인했다.
+- **시숫값(같은 실제 CSS 뷰포트 기준)**: 허브 이름 상자 겹침 0→0쌍(네 상태 모두 이름+부제 논리 상자). 이름–점 접촉 1440 7→0쌍, 390 8→0쌍. 가로 넘침 0→0px(모든 상태). v2 이름9·순간40·허브9, 브라우저 오류0. 너비360의 가로 넘침·버튼 잘림0, Enter로 순간 선택 확인.
+- **검증**: npm run build·node tools/v41-modulepreload.mjs --check 통과. PR 전체 npm test 1회 = 1,768건/1,629 pass/0 fail/139 skip(비화면). 실제 허브 목록·발자취·키보드는 저장소 밖 measure-v2.mjs로 확인.
+- **캡처**: E:/lovetree-qa/lane/local4-graph/graph-view-{1440,390}-{night,garden}-v2.png 네 장과 graph-view-1440-night-walk-v2.png. 같은 폴터의 원본 네 장과 직접 비교했다.
+- **범위 유지**: public/v41/prototypes/graph-view.html 독립 시안과 설명 문서만 보완. views/network/**·메뉴·graph-model.mjs·서버·DB·updates.json 변경 없음. 실제 데이터·메뉴 연결로 주장하지 않는다.

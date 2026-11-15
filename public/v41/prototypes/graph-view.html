@@ -6,6 +6,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
 <title>그래프 보기 시안 — 러브트리</title>
 <link rel="stylesheet" href="../identity.css">
 <style>
@@ -30,50 +31,52 @@
   }
 
   /* 머리: 브랜드 · 보기 전환 · 표시 */
-  .g-head{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
-  .g-brand{display:flex;align-items:baseline;gap:9px;min-width:0}
+  .g-head{display:flex;align-items:center;gap:14px;flex-wrap:wrap;min-width:0}
+  .g-brand{display:flex;align-items:baseline;gap:9px;min-width:0;white-space:nowrap}
   .g-brand b{font-family:var(--lt-font-display);font-size:19px;font-weight:600;letter-spacing:-.02em;color:var(--lt-pearl)}
   .g-brand small{font-size:12px;letter-spacing:.14em;color:var(--lt-gold)}
-  .g-switch{display:flex;gap:4px;padding:3px;border:1px solid var(--lt-line);border-radius:var(--lt-r-pill)}
-  .g-switch button{min-height:34px;padding:0 14px;border-radius:var(--lt-r-pill);font-size:13px;color:var(--lt-muted)}
+  .g-switch{display:flex;gap:4px;padding:3px;border:1px solid var(--lt-line);border-radius:var(--lt-r-pill);flex:0 0 auto}
+  .g-switch button{min-height:34px;padding:0 14px;border-radius:var(--lt-r-pill);font-size:13px;color:var(--lt-muted);white-space:nowrap}
   .g-switch button[aria-selected="true"]{color:var(--lt-pearl);background:rgba(255,230,166,.08);box-shadow:inset 0 0 0 1px var(--lt-gold-line)}
-  html[data-lt-theme="garden"] .g-switch button[aria-selected="true"]{color:var(--lt-primary-ink);background:var(--lt-gold);box-shadow:none}
+  html[data-lt-theme="garden"] .g-switch button[aria-selected="true"]{color:var(--lt-pearl);background:var(--lt-rose-ink);box-shadow:none}
   .g-head-spacer{flex:1}
   .g-badge{font-size:12px;color:var(--lt-muted);border:1px solid var(--lt-line);border-radius:var(--lt-r-pill);padding:5px 11px;white-space:nowrap}
-  .g-theme{min-height:34px;padding:0 13px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-pill);font-size:13px;color:var(--lt-gold)}
+  .g-theme{min-height:34px;padding:0 13px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-pill);font-size:13px;color:var(--lt-gold);flex:0 0 auto;white-space:nowrap}
   .g-switch-note{flex-basis:100%;font-size:12.5px;color:var(--lt-muted);margin:0}
   .g-switch-note[hidden]{display:none}
 
-  /* 몸: 무대 + 레일 */
-  .g-body{flex:1;min-height:0;display:flex;gap:14px}
-  .g-stagewrap{flex:1;min-width:0;position:relative}
+  /* 몸: 묶음이 하나씩 보이는 무대 + 레일 */
+  .g-body{flex:1;min-height:0;display:flex;gap:14px;min-width:0}
+  .g-stagewrap{flex:1;min-width:0;position:relative;overflow:hidden}
   #gsvg{position:absolute;inset:0;width:100%;height:100%;display:block}
   #gsvg text{font-family:var(--lt-ui)}
-  .g-hubname{font-size:13px;font-weight:600;fill:var(--lt-pearl);paint-order:stroke;stroke:var(--lt-stage);stroke-width:3px}
+  .g-hubname{font-size:14px;font-weight:600;fill:var(--lt-pearl);paint-order:stroke;stroke:var(--lt-stage);stroke-width:3px}
   .g-hubsub{font-size:12px;fill:var(--lt-muted);paint-order:stroke;stroke:var(--lt-stage);stroke-width:3px}
   .g-mark{font-size:12px;fill:var(--lt-gold);paint-order:stroke;stroke:var(--lt-stage);stroke-width:3px}
-  .g-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;color:var(--lt-muted);font-size:15px}
+  .g-hub-label{pointer-events:none}
+  [data-hub]:focus-visible,[data-moment]:focus-visible{outline:none}
+  [data-hub]:focus-visible .g-hub-focus,[data-moment]:focus-visible .g-dot-focus{stroke:var(--lt-pearl);stroke-width:2;opacity:1}
+  .g-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;color:var(--lt-muted);font-size:15px;pointer-events:none}
+  .g-empty[hidden]{display:none}
 
   /* 꼬리표 없는 순간 선반 */
-  .g-shelf{
-    position:absolute;left:18px;right:18px;bottom:6px;display:flex;align-items:center;gap:10px;
-    pointer-events:none;
-  }
+  .g-shelf{position:absolute;left:18px;right:18px;bottom:6px;display:flex;align-items:center;justify-content:center;gap:10px;pointer-events:none}
   .g-shelf-label{font-size:12.5px;color:var(--lt-muted);white-space:nowrap}
-  .g-shelf-hint{pointer-events:auto;font-size:12.5px;color:var(--lt-gold);border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-pill);padding:4px 10px;background:rgba(255,230,166,.05)}
+  .g-shelf-hint{pointer-events:auto;font-size:12.5px;color:var(--lt-gold);border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-pill);padding:4px 10px;background:rgba(255,230,166,.05);white-space:nowrap}
 
   /* 오른쪽 레일 */
-  .g-rail{flex:0 0 336px;display:flex;flex-direction:column;gap:12px;min-height:0}
-  .g-card{border:1px solid var(--lt-line);border-radius:var(--lt-r-card);background:var(--lt-glass);padding:13px 14px}
+  .g-rail{flex:0 0 336px;display:flex;flex-direction:column;gap:12px;min-height:0;min-width:0}
+  .g-card{border:1px solid var(--lt-line);border-radius:var(--lt-r-card);background:var(--lt-glass);padding:13px 14px;min-width:0}
   .g-card h3{margin:0 0 8px;font-size:12px;font-weight:700;letter-spacing:var(--lt-track);color:var(--lt-muted)}
   .g-legend-row{display:flex;gap:14px;flex-wrap:wrap}
   .g-legend-group{display:grid;gap:4px;min-width:90px}
   .g-legend-title{font-size:12px;color:var(--lt-muted)}
-  .g-legend-item{display:flex;align-items:center;gap:7px;min-height:30px;padding:2px 8px;border-radius:9px;font-size:13px;color:var(--lt-pearl)}
+  .g-legend-item{display:flex;align-items:center;gap:7px;min-width:0;min-height:30px;padding:2px 8px;border-radius:9px;font-size:13px;color:var(--lt-pearl)}
   .g-legend-item:hover{background:rgba(255,255,255,.05)}
   html[data-lt-theme="garden"] .g-legend-item:hover{background:rgba(64,53,54,.07)}
   .g-legend-item i{width:10px;height:10px;border-radius:50%;flex-shrink:0}
-  .g-legend-item small{margin-left:auto;color:var(--lt-muted);font-size:12px}
+  .g-legend-item span{min-width:0;overflow-wrap:anywhere}
+  .g-legend-item small{margin-left:auto;color:var(--lt-muted);font-size:12px;flex:0 0 auto}
   .g-legend-all{min-height:30px;padding:2px 10px;border-radius:9px;font-size:13px;color:var(--lt-muted);border:1px dashed var(--lt-line)}
   .g-legend-all:hover{color:var(--lt-pearl)}
 
@@ -88,39 +91,59 @@
   .d-chip .chip-kind{color:var(--lt-muted);margin-right:4px}
   .d-memo{margin:0 0 12px;font-size:13.5px;line-height:1.75;color:var(--lt-muted);font-family:var(--lt-reading)}
   .d-nav{display:flex;gap:8px}
-  .d-nav button{flex:1;min-height:40px;padding:4px 8px;border:1px solid var(--lt-line);border-radius:10px;font-size:12.5px;color:var(--lt-muted);text-align:left;overflow:hidden}
+  .d-nav button{flex:1;min-width:0;min-height:40px;padding:4px 8px;border:1px solid var(--lt-line);border-radius:10px;font-size:12.5px;color:var(--lt-muted);text-align:left;overflow:hidden}
   .d-nav button:hover{border-color:var(--lt-gold-line);color:var(--lt-pearl)}
   .d-nav button small{display:block;font-size:12px;color:var(--lt-gold)}
   .d-nav button span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .d-list{margin:0;padding:0;list-style:none;display:grid;gap:4px;max-height:150px;overflow:auto}
-  .d-list button{width:100%;min-height:34px;padding:3px 8px;text-align:left;font-size:13px;color:var(--lt-pearl);border-radius:8px}
+  .d-list button{width:100%;min-width:0;min-height:34px;padding:3px 8px;text-align:left;font-size:13px;color:var(--lt-pearl);border-radius:8px}
   .d-list button:hover{background:rgba(255,255,255,.05)}
   .d-list small{color:var(--lt-muted);margin-right:7px;font-size:12px}
   .g-play{min-height:44px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-pill);font-size:13.5px;color:var(--lt-gold);background:rgba(255,230,166,.06);flex-shrink:0}
   .g-play:hover{background:rgba(255,230,166,.12)}
   .g-play[data-on="true"]{background:var(--lt-gold);color:var(--lt-primary-ink)}
-  html[data-lt-theme="garden"] .g-play{color:var(--lt-primary);background:rgba(152,80,94,.08)}
+  html[data-lt-theme="garden"] .g-play{color:var(--lt-ink);background:rgba(152,80,94,.08)}
   html[data-lt-theme="garden"] .g-play[data-on="true"]{background:var(--lt-primary);color:var(--lt-primary-ink)}
 
-  /* 390 등 좁은 폭: 무대 위, 상세는 아래 시트 */
+  /* 390 등 좁은 폭: 머리·범례는 폭 안에서 줄바꿈하고 묶음 무대는 전폭·58dvh */
   @media (max-width:860px){
-    body{padding:8px;font-size:13px}
-    .g-frame{padding:10px 10px 8px;gap:8px}
-    .g-brand b{font-size:16px}
+    body{padding:8px;min-height:100dvh;height:auto;font-size:13px}
+    .g-frame{flex:none;min-height:calc(100dvh - 16px);padding:10px 10px 8px;gap:8px;min-width:0}
+    .g-head{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}
+    .g-brand{grid-column:1 / -1;gap:7px}
+    .g-brand b{font-size:17px}
+    .g-brand small{font-size:11.5px;letter-spacing:.1em}
+    .g-head-spacer{display:none}
+    .g-switch{grid-column:1;grid-row:2;justify-self:start}
     .g-switch button{padding:0 10px;font-size:12.5px;min-height:32px}
+    .g-theme{grid-column:2;grid-row:2;min-height:40px;padding:0 10px;font-size:12.5px}
     .g-badge{display:none}
-    .g-body{flex-direction:column;gap:10px}
-    .g-stagewrap{flex:1 1 auto;min-height:0}
-    .g-rail{flex:0 0 auto;flex-direction:row;flex-wrap:wrap;gap:8px;max-height:42%;overflow:auto}
-    .g-card{flex:1 1 100%;padding:9px 11px}
-    .g-legend-row{gap:4px 10px}
-    .g-legend-group{grid-auto-flow:column;gap:1px;min-width:0}
-    .g-legend-title{margin-bottom:1px}
-    .g-legend-item{min-height:26px;padding:1px 6px;font-size:12.5px;gap:5px}
+    .g-switch-note{grid-column:1 / -1}
+    .g-body{flex:none;flex-direction:column;gap:12px;min-height:0;width:100%}
+    .g-stagewrap{flex:0 0 clamp(450px,58dvh,560px);width:100%;min-height:0}
+    .g-rail{flex:0 0 auto;flex-direction:row;flex-wrap:wrap;gap:8px;max-height:none;overflow:visible;width:100%}
+    .g-card{flex:1 1 100%;padding:10px 11px;min-width:0}
+    .g-legend-row{gap:7px}
+    .g-legend-group{display:flex;align-items:center;flex-wrap:wrap;gap:3px;min-width:0;flex:1 1 100%}
+    .g-legend-title{margin:0 3px 0 0;font-size:11.5px;flex:0 0 auto}
+    .g-legend-item{display:inline-flex;flex:0 1 auto;min-height:28px;padding:2px 5px;font-size:12px;gap:4px;max-width:100%}
+    .g-legend-item span{line-height:1.35;white-space:normal}
+    .g-legend-item small{margin-left:2px}
+    .g-legend-item i{width:9px;height:9px}
     .g-detail{flex:1 1 100%}
     .g-play{flex:1 1 auto}
     .g-detail h2{font-size:18px}
     .g-detail .d-memo{margin-bottom:8px}
+    .g-shelf{left:6px;right:6px;bottom:7px;gap:7px}
+    .g-shelf-label{font-size:11.5px}
+    .g-shelf-hint{font-size:11.5px;padding:4px 8px;min-width:0}
+    .g-hubname{font-size:12.5px}
+    .g-hubsub{font-size:11.5px}
+  }
+  @media (max-width:360px){
+    .g-brand small{font-size:11px;letter-spacing:.07em}
+    .g-legend-title{flex:1 1 100%;margin-bottom:2px}
+    .g-hubsub{font-size:11px}
   }
 </style>
 </head>
@@ -228,8 +251,6 @@ function hash01(str){
   for(let i=0;i<str.length;i++){ h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
   return ((h >>> 0) % 1000) / 1000;
 }
-const GOLDEN = 137.508 * Math.PI / 180;
-
 /* 묶음 모델: 꼬리표 → 허브·1차 소속·발자취 */
 function buildModel(){
   const moments = MOMENTS.map(m => {
@@ -262,45 +283,65 @@ let MODEL = buildModel();
 let selected = {type:'moment', id:'m01'};
 let filterHub = null;
 let trailOrder = [];
+let visibleTrail = [];
+let selectionMade = false;
 let playTimer = null;
 
 function layoutModel(W, H){
   const {moments, hubs} = MODEL;
-  const narrow = W < 860;
-  const s = Math.max(0.58, Math.min(1, W / 1040));          /* 좁은 무대에서 반지름·글자 간격만 줄인다 */
-  const shelfH = narrow ? 44 : 50;
-  const labelPad = narrow ? 34 : 30;
-  const clusterR = h => (14 + 8.5 * Math.sqrt(h.primaryIds.length)) * s;
-  const hubR = h => Math.min(26 * s, Math.max((8 + 1.9 * h.primaryIds.length) * s, 9 * s));
-  const maxC = Math.max(...hubs.map(clusterR), 0);
-  const maxR = Math.max(...hubs.map(hubR), 0);
-  const top = 26, usableBottom = H - shelfH - 6;
-  const cx = W / 2, cy = (top + usableBottom) / 2;
-  const rx = Math.max(70, W / 2 - 26 - maxC - maxR - labelPad);
-  const ry = Math.max(60, (usableBottom - top) / 2 - maxC - maxR - labelPad);
-
-  hubs.forEach((h, i) => {
-    const a = i * GOLDEN + 0.55;
-    h.x = cx + Math.cos(a) * rx;
-    h.y = cy + Math.sin(a) * ry * 0.86;
+  const narrow = W < 600;
+  const s = narrow ? 1 : Math.max(.94, Math.min(1, W / 1040));
+  const shelfH = narrow ? 54 : 62;
+  const top = 22;
+  const usableBottom = H - shelfH - (narrow ? 16 : 8);
+  const dotR = (narrow ? 7 : 8.5) * s;
+  hubs.forEach(h => {
+    const n = h.primaryIds.length;
+    const strength = Math.max(1, n);
+    h.hr = (narrow ? 9 : 12) + Math.sqrt(strength) * (narrow ? 1.8 : 2);
+    const orbitR = n > 0 ? Math.max(h.hr + dotR + (narrow ? 13 : 17), n * (dotR * 2 + 4) / (Math.PI * 2)) : 0;
+    h.orbitR = orbitR;
+    h.cr = n > 0 ? orbitR + dotR + 5 : h.hr + 8;
     h.color = KIND_COLOR[h.kind];
-    h.cr = clusterR(h); h.hr = hubR(h);
+  });
+  const maxC = Math.max(...hubs.map(h => h.cr), 0);
+  const cx = W / 2, cy = (top + usableBottom) / 2 - (narrow ? 0 : 7);
+  const rx = Math.max(0, Math.min(W * .36, W / 2 - maxC - 96));
+  const ry = Math.max(0, Math.min((usableBottom - top) / 2 - maxC - 48, H * .32));
+  const cols = 3, rows = Math.ceil(hubs.length / cols);
+  const rowH = (usableBottom - top) / rows;
+  hubs.forEach((h, i) => {
+    if(narrow){
+      const col = i % cols, row = Math.floor(i / cols);
+      const labelH = 35;
+      h.x = (col + .5) * W / cols;
+      h.y = top + row * rowH + Math.max(0, (rowH - (h.cr * 2 + labelH)) / 2) + h.cr;
+    } else {
+      const a = -Math.PI / 2 + i * Math.PI * 2 / hubs.length;
+      h.x = cx + Math.cos(a) * rx;
+      h.y = cy + Math.sin(a) * ry;
+    }
     const members = h.primaryIds.map(id => moments.find(m => m.id === id));
     members.forEach((m, j) => {
-      const rr = h.cr * Math.sqrt((j + 0.8) / Math.max(members.length, 1));
-      const aa = j * GOLDEN + hash01(m.id) * 40 * Math.PI / 180;
-      m.x = h.x + Math.cos(aa) * rr;
-      m.y = h.y + Math.sin(aa) * rr;
+      const a = -Math.PI / 2 + j * Math.PI * 2 / members.length + hash01(m.id) * .12;
+      m.x = h.x + Math.cos(a) * h.orbitR;
+      m.y = h.y + Math.sin(a) * h.orbitR;
     });
   });
-  /* 꼬리표 없는 순간 선반: 시간 순서로 왼쪽부터. 점은 아래 안내 글줄 밴드 위에 놓는다 */
   const shelf = moments.filter(m => !m.primary).sort(byTime);
-  const gap = narrow ? 40 : 52, x0 = narrow ? 26 : 120;
-  shelf.forEach((m, i) => { m.x = x0 + i * gap; m.y = H - shelfH + 4; });
-  /* 발자취: 전체 순간을 시간 순서로 */
+  const gap = narrow ? (W - 76) / Math.max(1, shelf.length - 1) : 54;
+  const x0 = (W - gap * Math.max(0, shelf.length - 1)) / 2;
+  shelf.forEach((m, i) => { m.x = x0 + i * gap; m.y = H - shelfH; });
   trailOrder = [...moments].sort(byTime);
   trailOrder.forEach((m, i) => { m.trailPrev = i > 0 ? trailOrder[i-1] : null; m.trailNext = i < trailOrder.length-1 ? trailOrder[i+1] : null; });
-  MODEL.narrow = narrow; MODEL.W = W; MODEL.H = H; MODEL.s = s; MODEL.cx = cx; MODEL.cy = cy;
+  MODEL.narrow = narrow;
+  MODEL.W = W;
+  MODEL.H = H;
+  MODEL.s = s;
+  MODEL.dotR = dotR;
+  MODEL.shelfH = shelfH;
+  MODEL.cx = cx;
+  MODEL.cy = cy;
 }
 function byTime(a, b){
   const ta = a.time == null ? Infinity : a.time, tb = b.time == null ? Infinity : b.time;
@@ -329,6 +370,92 @@ function el(name, attrs, parent){
 function dimmed(hubKey){
   return filterHub !== null && filterHub !== hubKey;
 }
+function awake(g, action){
+  g.addEventListener('click', action);
+  g.addEventListener('keydown', event => {
+    if(event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    const type = g.dataset.hub != null ? 'hub' : 'moment';
+    const id = g.dataset[type];
+    action();
+    svg.querySelector('[data-' + type + '="' + CSS.escape(id) + '"]')?.focus({preventScroll:true});
+  });
+}
+function refresh(){
+  render();
+  drawLegend();
+  drawDetail();
+}
+function selectMoment(id){
+  selectionMade = true;
+  selected = {type:'moment', id};
+  visibleTrail = trailOrder;
+  filterHub = null;
+  refresh();
+}
+function selectHub(key){
+  const h = MODEL.hubs.find(item => item.key === key);
+  if(!h) return;
+  const ids = new Set(h.primaryIds.length > 0 ? h.primaryIds : h.allIds);
+  selectionMade = true;
+  selected = {type:'hub', key};
+  visibleTrail = trailOrder.filter(m => ids.has(m.id));
+  filterHub = key;
+  refresh();
+}
+function hit(a, b){
+  return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
+}
+function labelRect(name, sub){
+  const a = name.getBBox(), b = sub.getBBox();
+  return {x:Math.min(a.x, b.x) - 2, y:Math.min(a.y, b.y) - 2, width:Math.max(a.x + a.width, b.x + b.width) - Math.min(a.x, b.x) + 4, height:Math.max(a.y + a.height, b.y + b.height) - Math.min(a.y, b.y) + 4};
+}
+function textOnPoint(r, point, radius){
+  const x = Math.max(r.x, Math.min(point.x, r.x + r.width));
+  const y = Math.max(r.y, Math.min(point.y, r.y + r.height));
+  return Math.hypot(point.x - x, point.y - y) < radius + 3;
+}
+function clearLabel(r, placed){
+  const {moments, hubs, W, H, shelfH, dotR} = MODEL;
+  if(r.x < 6 || r.y < 6 || r.x + r.width > W - 6 || r.y + r.height > H - shelfH - 6) return false;
+  if(placed.some(other => hit(r, other))) return false;
+  if(moments.some(m => m.x != null && textOnPoint(r, m, dotR + (m.imp ? 1.5 : 0)))) return false;
+  return !hubs.some(h => textOnPoint(r, h, h.hr));
+}
+function placeHubLabel(h, name, sub, group, placed){
+  const {W, narrow} = MODEL;
+  const maxWidth = narrow ? Math.min(112, W / 3 - 10) : 148;
+  while(name.getComputedTextLength() > maxWidth && name.textContent.length > 2){
+    name.textContent = name.textContent.replace(/…?$/, '') + '…';
+  }
+  const sides = narrow ? ['bottom','top','right','left'] : (Math.abs(h.x - MODEL.cx) > Math.abs(h.y - MODEL.cy)
+    ? [h.x < MODEL.cx ? 'left' : 'right', h.y < MODEL.cy ? 'top' : 'bottom', 'bottom','top']
+    : [h.y < MODEL.cy ? 'top' : 'bottom', h.x < MODEL.cx ? 'left' : 'right', 'right','left']);
+  for(const side of sides){
+    let x = h.x, y = h.y, anchor = 'middle';
+    if(side === 'bottom') y = h.y + h.cr + 16;
+    if(side === 'top') y = h.y - h.cr - 34;
+    if(side === 'left' || side === 'right'){
+      x = h.x + (side === 'left' ? -1 : 1) * (h.cr + 13);
+      y = h.y - 7;
+      anchor = side === 'left' ? 'end' : 'start';
+    }
+    if(anchor === 'middle'){
+      const width = Math.max(name.getComputedTextLength(), sub.getComputedTextLength());
+      x = Math.max(width / 2 + 8, Math.min(x, W - width / 2 - 8));
+    }
+    name.setAttribute('x', x);
+    name.setAttribute('y', y);
+    name.setAttribute('text-anchor', anchor);
+    sub.setAttribute('x', x);
+    sub.setAttribute('y', y + 21);
+    sub.setAttribute('text-anchor', anchor);
+    const r = labelRect(name, sub);
+    if(clearLabel(r, placed)) return r;
+  }
+  group.remove();
+  return null;
+}
 function render(){
   const box = svg.parentElement.getBoundingClientRect();
   const W = Math.max(300, Math.round(box.width)), H = Math.max(360, Math.round(box.height));
@@ -337,90 +464,73 @@ function render(){
   layoutModel(W, H);
   const {moments, hubs, narrow} = MODEL;
 
-  /* 소속 선: 1차 허브 반사선 + 묶음 밖 허브(1차 멤버 0) 점선 */
-  const spokeG = el('g', {}, svg);
+  /* 기본에는 묶음 안의 설명선만. 전체 시간 선은 고르거나 걸을 때만 그린다. */
+  const spokeG = el('g', {class:'g-cluster-spokes'}, svg);
   for(const h of hubs){
-    for(const id of h.primaryIds){
+    const related = h.primaryIds.length === 0 && (filterHub === h.key || (selected.type === 'hub' && selected.key === h.key) || (selected.type === 'moment' && selectionMade && h.allIds.includes(selected.id)));
+    const ids = related ? h.allIds : h.primaryIds;
+    for(const id of ids){
       const m = moments.find(x => x.id === id);
-      el('line', {x1:h.x, y1:h.y, x2:m.x, y2:m.y, stroke:h.color, 'stroke-width':1, opacity:.32}, spokeG);
-    }
-    if(h.primaryIds.length === 0){ /* RESCENE 같은 '관련만 있는 허브' — 고아로 두지 않는다 */
-      for(const id of h.allIds){
-        const m = moments.find(x => x.id === id);
-        el('line', {x1:h.x, y1:h.y, x2:m.x, y2:m.y, stroke:h.color, 'stroke-width':1, opacity:.4, 'stroke-dasharray':'3 4'}, spokeG);
-      }
+      el('line', {x1:h.x, y1:h.y, x2:m.x, y2:m.y, stroke:h.color, 'stroke-width':1, opacity:related ? .55 : .16, 'stroke-dasharray':related ? '3 4' : 'none'}, spokeG);
     }
   }
 
-  /* 발자취 줄: 시간 순서 한 줄 */
-  const trailD = trailPath(trailOrder.filter(m => m.x != null));
-  el('path', {d:trailD, fill:'none', stroke:'var(--lt-gold-line)', 'stroke-width':1.4, opacity:.62, 'stroke-linecap':'round'}, svg);
-  const first = trailOrder[0], last = trailOrder[trailOrder.length-1];
-  if(first && first.x != null){
-    const ax = first.x > MODEL.W - 64 ? first.x - 12 : first.x + 12;
-    el('text', {x:ax, y:first.y - 10, class:'g-mark', 'text-anchor': first.x > MODEL.W - 64 ? 'end' : 'start'}, svg).textContent = '처음';
-  }
-  if(last && last.x != null){
-    const ax = last.x > MODEL.W - 64 ? last.x - 12 : last.x + 12;
-    el('text', {x:ax, y:last.y - 10, class:'g-mark', 'text-anchor': last.x > MODEL.W - 64 ? 'end' : 'start'}, svg).textContent = '지금';
+  const orderedTrail = visibleTrail.filter(m => m.x != null);
+  const activeTrail = orderedTrail.length > 1;
+  const selectedMoment = selectionMade && selected.type === 'moment' ? moments.find(m => m.id === selected.id) : null;
+  const selectedHubKey = selected.type === 'hub' ? selected.key : selectedMoment?.primary ? selectedMoment.primary.kind + ':' + selectedMoment.primary.value : null;
+  if(activeTrail){
+    el('path', {class:'g-trail-path g-time-trail', d:trailPath(orderedTrail), fill:'none', stroke:'var(--lt-gold)', 'stroke-width':1.4, opacity:.78, 'stroke-linecap':'round', 'stroke-linejoin':'round'}, svg);
   }
 
-  /* 묶음 허브: 점 + 바깥쪽 이름 */
+  const hubGroups = new Map();
   for(const h of hubs){
     const dim = dimmed(h.key);
-    const g = el('g', {tabindex:'0', role:'button', 'aria-label':KIND_LABEL[h.kind] + ' ' + h.value + ' · 순간 ' + h.primaryIds.length + '개', opacity: dim ? .14 : 1}, svg);
+    const chosen = selected.type === 'hub' && selected.key === h.key;
+    const g = el('g', {tabindex:'0', role:'button', 'aria-label':KIND_LABEL[h.kind] + ' ' + h.value + ' · 순간 ' + (h.primaryIds.length || h.allIds.length) + '개', 'aria-pressed':chosen ? 'true' : 'false', opacity:dim ? .18 : activeTrail && selectedHubKey !== h.key ? .35 : 1}, svg);
     g.dataset.hub = h.key;
+    hubGroups.set(h.key, g);
+    el('title', {}, g).textContent = h.value + ' · 이 노래/묶음의 내 순간들';
+    el('circle', {class:'g-hub-focus', cx:h.x, cy:h.y, r:h.cr, fill:'none', stroke:'none', opacity:0}, g);
     if(h.primaryIds.length > 0){
-      el('circle', {cx:h.x, cy:h.y, r:h.cr, fill:'none', stroke:h.color, 'stroke-width':1, opacity:.35, 'stroke-dasharray':'2 5'}, g);
+      el('circle', {cx:h.x, cy:h.y, r:h.cr, fill:'none', stroke:h.color, 'stroke-width':1, opacity:.26, 'stroke-dasharray':'2 5'}, g);
+      el('circle', {cx:h.x, cy:h.y, r:h.orbitR, fill:'none', stroke:h.color, 'stroke-width':1, opacity:.18}, g);
     }
-    el('circle', {cx:h.x, cy:h.y, r:h.hr, fill:h.color, opacity:.92}, g);
-    const ux = (h.x - MODEL.cx) / Math.max(Math.hypot(h.x - MODEL.cx, h.y - MODEL.cy), 1);
-    const uy = (h.y - MODEL.cy) / Math.max(Math.hypot(h.x - MODEL.cx, h.y - MODEL.cy), 1);
-    let lx, ly, anchor;
-    if(narrow){ /* 좁은 무대에서는 이름을 점 아래 가운데 — 바깥쪽 이름이 화면 끝에서 잘리지 않게 */
-      lx = h.x; ly = h.y + h.hr + 17; anchor = 'middle';
-    } else {
-      lx = h.x + ux * (h.hr + 10); ly = h.y + uy * (h.hr + 18);
-      anchor = ux > .45 ? 'start' : ux < -.45 ? 'end' : 'middle';
-    }
-    const name = el('text', {x:lx, y:ly, class:'g-hubname', 'text-anchor':anchor, style:'font-size:' + (narrow ? 12.5 : 13.5) + 'px'}, g);
+    el('circle', {cx:h.x, cy:h.y, r:h.hr, fill:h.color, opacity:.95, stroke:chosen ? 'var(--lt-pearl)' : 'none', 'stroke-width':chosen ? 2 : 0}, g);
+    const labelG = el('g', {class:'g-hub-label'}, g);
+    const name = el('text', {class:'g-hubname', style:'font-size:' + (narrow ? 12.5 : 14.5) + 'px'}, labelG);
     name.textContent = h.value;
-    const sub = el('text', {x:lx, y:ly + (narrow ? 13 : 15), class:'g-hubsub', 'text-anchor':anchor}, g);
+    const sub = el('text', {class:'g-hubsub', style:'font-size:' + (narrow ? 11.5 : 12) + 'px'}, labelG);
     sub.textContent = KIND_LABEL[h.kind] + ' · ' + (h.primaryIds.length > 0 ? '순간 ' + h.primaryIds.length : '관련 ' + h.allIds.length);
-    g.addEventListener('click', () => { filterHub = null; selected = {type:'hub', key:h.key}; render(); drawLegend(); drawDetail(); });
+    g.hubLabelParts = {name, sub, labelG};
+    awake(g, () => selectHub(h.key));
   }
-  /* 허브 이름 겹침 한 번 정리(결정론) */
-  const labels = [...svg.querySelectorAll('.g-hubname')].map(t => ({t, r:t.getBoundingClientRect(), dy:0, dx:0}));
-  for(let i = 0; i < labels.length; i++){
-    for(let j = i + 1; j < labels.length; j++){
-      const a = labels[i], b = labels[j];
-      if(a.r.left < b.r.right && b.r.left < a.r.right && a.r.top < b.r.bottom && b.r.top < a.r.bottom){
-        if(b.r.top >= a.r.top){ b.dy = a.dy + 17; } else { a.dy = b.dy + 17; }
-      }
-    }
-  }
-  labels.forEach(({t, dy}) => {
-    if(!dy) return;
-    const sub = t.nextElementSibling;
-    const base = parseFloat(t.getAttribute('y'));
-    t.setAttribute('y', (base + dy).toFixed(1));
-    if(sub && sub.classList.contains('g-hubsub')) sub.setAttribute('y', (base + dy + (narrow ? 13 : 15)).toFixed(1));
-  });
 
-  /* 순간 점 */
-  const dotG = el('g', {}, svg);
+  const dotG = el('g', {class:'g-moment-dots'}, svg);
   for(const m of moments){
     const hub = m.primary ? hubs.find(h => h.kind + ':' + h.value === m.primary.kind + ':' + m.primary.value) : null;
     const color = hub ? hub.color : 'var(--lt-muted)';
-    const dim = m.primary ? dimmed(m.primary.kind + ':' + m.primary.value) : filterHub !== null;
-    const r = (m.imp ? 7.5 : 5.5) * MODEL.s + (selected.type === 'moment' && selected.id === m.id ? 2.5 : 0);
-    const g = el('g', {tabindex:'0', role:'button', 'aria-label':'순간 ' + m.t + ' · ' + m.d, opacity: dim ? .14 : 1}, dotG);
+    const chosenCollection = selected.type === 'hub' && hub && selected.key === hub.key;
+    const dim = (filterHub !== null && !chosenCollection) || (activeTrail && selectedMoment && selected.id !== m.id);
+    const r = MODEL.dotR + (m.imp ? 1.5 : 0);
+    const chosen = selectionMade && selected.type === 'moment' && selected.id === m.id;
+    const g = el('g', {tabindex:'0', role:'button', 'aria-label':'순간 ' + m.t + ' · ' + m.d, opacity:dim ? .14 : 1}, dotG);
     g.dataset.moment = m.id;
-    el('circle', {cx:m.x, cy:m.y, r:r, fill:color, stroke: m.imp ? 'var(--lt-gold)' : 'none', 'stroke-width': m.imp ? 1.6 : 0}, g);
-    if(!m.primary){
-      el('circle', {cx:m.x, cy:m.y, r:r + 4.5, fill:'none', stroke:'var(--lt-muted)', 'stroke-width':1, opacity:.7}, g);
-    }
-    g.addEventListener('click', () => { selected = {type:'moment', id:m.id}; render(); drawLegend(); drawDetail(); });
+    if(chosen) g.setAttribute('aria-current', 'true');
+    el('title', {}, g).textContent = m.t + ' · ' + m.d;
+    el('circle', {class:'g-dot-focus', cx:m.x, cy:m.y, r:r + (chosen ? 5 : 3), fill:'none', stroke:'var(--lt-gold)', 'stroke-width':2, opacity:chosen ? 1 : 0}, g);
+    el('circle', {cx:m.x, cy:m.y, r, fill:color, stroke:m.imp ? 'var(--lt-gold)' : 'var(--lt-stage)', 'stroke-width':m.imp ? 1.6 : 1.2}, g);
+    if(!m.primary) el('circle', {cx:m.x, cy:m.y, r:r + 3, fill:'none', stroke:'var(--lt-muted)', 'stroke-width':1, opacity:.7}, g);
+    awake(g, () => selectMoment(m.id));
+  }
+
+  const placed = [];
+  for(const h of hubs){
+    const group = hubGroups.get(h.key);
+    if(!group || dimmed(h.key) && filterHub !== h.key) continue;
+    const {name, sub, labelG} = group.hubLabelParts;
+    const r = placeHubLabel(h, name, sub, labelG, placed);
+    if(r) placed.push(r);
   }
 }
 
@@ -445,7 +555,7 @@ function drawLegend(){
       const label = document.createElement('span'); label.textContent = h.value;
       const n = document.createElement('small'); n.textContent = String(h.primaryIds.length > 0 ? h.primaryIds.length : h.allIds.length);
       b.append(dot, label, n);
-      b.addEventListener('click', () => { filterHub = filterHub === h.key ? null : h.key; render(); });
+      b.addEventListener('click', () => { filterHub === h.key ? (filterHub = null, visibleTrail = [], refresh()) : selectHub(h.key); });
       wrap.appendChild(b);
     }
     row.appendChild(wrap);
@@ -485,7 +595,7 @@ function drawDetail(){
       const d = document.createElement('small'); d.textContent = m.d;
       const t = document.createElement('span'); t.textContent = m.t;
       b.append(d, t);
-      b.addEventListener('click', () => { selected = {type:'moment', id:m.id}; render(); drawLegend(); drawDetail(); });
+      b.addEventListener('click', () => selectMoment(m.id));
       li.appendChild(b); list.appendChild(li);
     }
     card.append(kick, h2, date, list);
@@ -511,7 +621,7 @@ function drawDetail(){
     const small = document.createElement('small'); small.textContent = mm ? label : label + ' · 없음';
     const span = document.createElement('span'); span.textContent = mm ? mm.t : '—';
     b.append(small, span);
-    if(mm) b.addEventListener('click', () => { selected = {type:'moment', id:mm.id}; render(); drawLegend(); drawDetail(); });
+    if(mm) b.addEventListener('click', () => selectMoment(mm.id));
     nav.appendChild(b);
   }
   card.append(kick, h2, date, chips, memo, nav);
@@ -533,17 +643,32 @@ themeBtn.addEventListener('click', () => {
 const urlTheme = new URLSearchParams(location.search).get('theme');
 if(urlTheme === 'garden' || urlTheme === 'night') applyTheme(urlTheme);
 
-document.getElementById('playBtn').addEventListener('click', () => {
-  const btn = document.getElementById('playBtn');
-  if(playTimer){ clearInterval(playTimer); playTimer = null; btn.dataset.on = 'false'; btn.textContent = '▶ 발자취 걷기 (시간 순서)'; return; }
+const playBtn = document.getElementById('playBtn');
+playBtn.setAttribute('aria-pressed', 'false');
+function stopWalk(){
+  if(playTimer){ clearInterval(playTimer); playTimer = null; }
+  playBtn.dataset.on = 'false';
+  playBtn.setAttribute('aria-pressed', 'false');
+  playBtn.textContent = '▶ 발자취 걷기 (시간 순서)';
+}
+playBtn.addEventListener('click', () => {
+  if(playTimer){ stopWalk(); return; }
   let i = 0;
-  btn.dataset.on = 'true'; btn.textContent = '■ 걷기 멈추기';
-  playTimer = setInterval(() => {
-    if(i >= trailOrder.length){ clearInterval(playTimer); playTimer = null; btn.dataset.on = 'false'; btn.textContent = '▶ 발자취 걷기 (시간 순서)'; return; }
+  filterHub = null;
+  visibleTrail = trailOrder;
+  selectionMade = true;
+  playBtn.dataset.on = 'true';
+  playBtn.setAttribute('aria-pressed', 'true');
+  playBtn.textContent = '■ 걷기 멈추기';
+  const step = () => {
+    if(i >= trailOrder.length){ stopWalk(); return; }
+    visibleTrail = trailOrder.slice(0, i + 1);
     selected = {type:'moment', id:trailOrder[i].id};
     i += 1;
-    render(); drawLegend(); drawDetail();
-  }, 550);
+    refresh();
+  };
+  step();
+  playTimer = setInterval(step, 550);
 });
 
 /* 꼬리표 없는 순간 선반 안내 */
@@ -561,17 +686,23 @@ function drawEmptyNote(){
   else { empty.hidden = true; }
 }
 
-let lastW = 0;
+let lastW = 0, lastH = 0;
 function onResize(){
-  const w = Math.round(svg.parentElement.getBoundingClientRect().width);
-  if(Math.abs(w - lastW) < 8) return;
+  const box = svg.parentElement.getBoundingClientRect();
+  const w = Math.round(box.width), h = Math.round(box.height);
+  if(Math.abs(w - lastW) < 2 && Math.abs(h - lastH) < 2) return;
   lastW = w;
-  render(); drawLegend(); drawDetail(); drawShelf();
+  lastH = h;
+  refresh();
+  drawShelf();
 }
 window.addEventListener('resize', onResize);
+new ResizeObserver(onResize).observe(svg.parentElement);
+document.fonts.ready.then(refresh);
 
 render(); drawLegend(); drawDetail(); drawShelf(); drawEmptyNote();
 lastW = Math.round(svg.parentElement.getBoundingClientRect().width);
+lastH = Math.round(svg.parentElement.getBoundingClientRect().height);
 </script>
 </body>
 </html>
