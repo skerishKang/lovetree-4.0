@@ -107,12 +107,16 @@ test('#657 화면 공통 검사기: 주요 화면 10 상태 × 390·1440 × 밤�
     const book = await frameOf(page2, /track59-sketchbook/);
     assert.ok(book, '책 프레임이 열린다');
     await book.waitForFunction(() => !!document.querySelector('.moment'), null, { timeout: 20000 });
+    // 장 넘김 애니메이션이 끝나기를 기다린다(#662 CI: 450ms 고정 대기는 넘김 중간에 검사해 img·clipping이 글자를 덮은 것으로 나왔다).
+    const bookIdle = () => book.waitForFunction(() => { try { return machineState === 'IDLE'; } catch { return false; } }, null, { timeout: 5000 }).catch(() => {});
+    await bookIdle();
     await page2.waitForTimeout(700);
     for (let i = 0; i < 12; i++) {
       await take(page2, i === 0 ? '책·공유 첫 장' : `책·공유 ${i + 1}장`);
       const next = book.locator('#nextBtn');
       if (await next.isDisabled()) break;
       await next.click();
+      await bookIdle();
       await page2.waitForTimeout(450);
     }
     await take(page2, '책·공유 마지막 장');
