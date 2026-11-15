@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 // #627 후속: 같은 영상·같은 무대 찾기 한 벌(same-stage.mjs) — 동작 시험만 한다(소스 글자 검사 없다).
 import { videoKey, findDuplicates, findSameStage } from '../public/v41/same-stage.mjs';
+import { timingRatio, TIMING_RATIO_LIMIT, TIMING_CEILING_MS } from './helpers/timing-ratio.mjs';
 
 test('videoKey — 주소 모양 열여덟 가지(watch·youtu.be·shorts·m.youtube·embed·t=·ytimg)', () => {
   const cases = [
@@ -97,7 +98,7 @@ test('findSameStage — 표기 차이는 tags.mjs tagKey로 하나로 센다', (
   assert.equal(groups[0].song, 'Super Shy', '표시 값은 처음 본 원본 값');
 });
 
-test('300개 순간 계산은 50ms 안에서 끝난다', () => {
+test('300개 순간 계산은 30개에 비해 제곱으로 느려지지 않는다', () => {
   const moments = [];
   for (let i = 0; i < 300; i += 1) {
     moments.push({
@@ -107,26 +108,17 @@ test('300개 순간 계산은 50ms 안에서 끝난다', () => {
       keywords: [`무대:${i % 2 ? '인기가요' : '뮤직뱅크'}`, '노래:Super Shy'],
     });
   }
-  findDuplicates(moments);
-  findSameStage(moments); // 예열 1회 — 모듈 적재·JIT 준비 시간은 재지 않는다
-  let duplicates;
-  let duplicatesMs = Infinity;
-  for (let run = 0; run < 5; run += 1) {
-    const started = performance.now();
-    duplicates = findDuplicates(moments);
-    duplicatesMs = Math.min(duplicatesMs, performance.now() - started); // 여러 번 중 가장 빠른 값
-  }
-  let sameStage;
-  let sameMs = Infinity;
-  for (let run = 0; run < 5; run += 1) {
-    const started = performance.now();
-    sameStage = findSameStage(moments);
-    sameMs = Math.min(sameMs, performance.now() - started); // 여러 번 중 가장 빠른 값
-  }
+  const dup = timingRatio({ small: () => findDuplicates(moments.slice(0, 30)), big: () => findDuplicates(moments) });
+  const stage = timingRatio({ small: () => findSameStage(moments.slice(0, 30)), big: () => findSameStage(moments) });
+  const duplicates = dup.last;
+  const sameStage = stage.last;
   assert.equal(duplicates.length, 150, '같은 영상 묶음 150개');
   assert.equal(sameStage.length, 4, '같은 무대 묶음 4개(무대 2 × 날짜 2)');
-  assert.ok(duplicatesMs <= 50, `findDuplicates 300개 ${duplicatesMs.toFixed(1)}ms ≤ 50ms`);
-  assert.ok(sameMs <= 50, `findSameStage 300개 ${sameMs.toFixed(1)}ms ≤ 50ms`);
+  // 절대 ms 대신 같은 실행의 30개와 비교한다(#728 CI windows 러너 흔들림, #731).
+  assert.ok(dup.ratio <= TIMING_RATIO_LIMIT, `findDuplicates 300개/30개 비율 ${dup.ratio.toFixed(1)}배 ≤ ${TIMING_RATIO_LIMIT}배 (30개 ${dup.smallMs.toFixed(2)}ms · 300개 ${dup.bigMs.toFixed(1)}ms)`);
+  assert.ok(dup.bigMs <= TIMING_CEILING_MS, `findDuplicates 300개 ${dup.bigMs.toFixed(1)}ms ≤ ${TIMING_CEILING_MS}ms`);
+  assert.ok(stage.ratio <= TIMING_RATIO_LIMIT, `findSameStage 300개/30개 비율 ${stage.ratio.toFixed(1)}배 ≤ ${TIMING_RATIO_LIMIT}배 (30개 ${stage.smallMs.toFixed(2)}ms · 300개 ${stage.bigMs.toFixed(1)}ms)`);
+  assert.ok(stage.bigMs <= TIMING_CEILING_MS, `findSameStage 300개 ${stage.bigMs.toFixed(1)}ms ≤ ${TIMING_CEILING_MS}ms`);
 });
 
 test('findSameStage — 묶음 열쇠는 값에 나올 수 없는 구분자로 잡는다(| 값이어도 안 뭉개진다)', () => {
