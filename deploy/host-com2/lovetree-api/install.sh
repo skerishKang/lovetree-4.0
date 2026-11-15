@@ -34,7 +34,7 @@ if [[ ${LOVETREE_DEPLOY_LOCK_HELD:-0} != 1 ]]; then
   flock -w 300 9 || fail DEPLOY_LOCKED
 fi
 [[ ${EUID} -eq 0 ]] || fail ROOT_REQUIRED
-[[ -f "$source_root/server/index.js" && -f "$source_root/src/domain.js" && -f "$source_root/package-lock.json" ]] || fail SOURCE_MISSING
+[[ -f "$source_root/server/index.js" && -f "$source_root/src/domain.js" && -f "$source_root/public/v41/tags.mjs" && -f "$source_root/package-lock.json" ]] || fail SOURCE_MISSING
 [[ -x "$node_bin" ]] || fail NODE_MISSING
 "$node_bin" -e 'const[m,i]=process.versions.node.split(".").map(Number);process.exit(m>22||(m===22&&i>=13)?0:1)' || fail NODE_TOO_OLD
 command -v npm >/dev/null || fail NPM_MISSING
@@ -49,6 +49,11 @@ cp -a "$source_root/server" "$app/server"
 # 이 한 파일이 없으면 서비스는 시작한 직후 ERR_MODULE_NOT_FOUND로 죽는다.
 install -d -m 0755 "$app/src"
 install -m 0644 "$source_root/src/domain.js" "$app/src/domain.js"
+# 꼬리표 규칙 한 벌(#695): server/community-service.js가 ../public/v41/tags.mjs를 함께 읽는다
+# (src/domain.js를 서버·화면이 함께 쓰는 것과 같은 방식). tags.mjs는 다른 파일을 import하지 않는다 —
+# 이 파일에 import가 늘면 이 설치 목록도 함께 늘려야 한다.
+install -d -m 0755 "$app/public/v41"
+install -m 0644 "$source_root/public/v41/tags.mjs" "$app/public/v41/tags.mjs"
 # 컴1 내보내기가 ssh 로 부르는 읽기 전용 DB 판독기(tools/export-ai-customer-db.mjs).
 # 접속 값은 실행 시점에 읽는다 — 설치 트리에는 비밀 값이 없다.
 # 옛 소스 트리(되돌림 설치)에는 파일이 없을 수 있으므로 있을 때만 넣는다.
@@ -69,7 +74,7 @@ install -m 0644 "$here/preflight_imports.mjs" "$app/preflight_imports.mjs"
 # 서비스 사용자(lovetree-api)가 읽고 디렉터리를 통과할 수 있게 설치 트리를 정규화한다.
 # .env·backups는 건드리지 않는다(.env는 아래에서 0600으로 닫힌다).
 chmod 0755 "$app"
-chmod -R a+rX "$app/server" "$app/src" "$app/node_modules"
+chmod -R a+rX "$app/server" "$app/src" "$app/public" "$app/node_modules"
 chmod a+r "$app/check_config.mjs" "$app/preflight_imports.mjs" "$app/package.json" "$app/package-lock.json"
 if [[ -f "$app/tools/export-ai-customer-db.mjs" ]]; then chmod a+r "$app/tools/export-ai-customer-db.mjs"; fi
 if [[ -f "$app/tools/ops-reply.mjs" ]]; then chmod a+r "$app/tools/ops-reply.mjs"; fi
