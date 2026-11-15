@@ -36,7 +36,7 @@ import {createFeedbackBoard} from './feedback-board.mjs';
 import {mountUpdates} from './updates.mjs';
 import {connectionSignature} from './shell/panel-dirty.mjs';
 import {createLocation} from './shell/location.mjs';
-import {createNotifier, syncedNoticeText} from './shell/notice.mjs';
+import {createNotifier, syncedNoticeText, newlyPublishedTrees, autoPublishNoticeText, AUTO_PUBLISH_ACTION_LABEL} from './shell/notice.mjs';
 import {paintLoginLinks,paintThemeControls,applyTheme as applyThemeFor,toggleTheme as toggleThemeFor} from './shell/theme.mjs';
 import {normalizeTitleDisplay, normalizeAccentColor, normalizeDateStyle, normalizeStartPlace, normalizeShareView, coverModeOf, normalizeCoverDesign} from './domain.mjs';
 import {backfillVideoTitles} from './title-backfill.mjs';
@@ -708,6 +708,32 @@ function resumeMember(intent){resumeAfterStart=intent||'write';return startMembe
   $('save-actions').replaceChildren();
   $('save-feedback').hidden=false;
  }
+// 자동 공개 안내(2026-11-15 보고): 저장이 성공해 둘러보기에 새로 소개된 트리에 한 번 알린다.
+// 트리당 1회 기억은 이 기기(localStorage 'lt41.autoPublishNoted')에 두고, 비공개 트리는 서버에서
+// 공개 상태를 확인해 띄우지 않는다. 판정·문구는 notice.mjs 한 벌(#549와 같은 원칙).
+const countTreeMoments=()=>{const out={};for(const tree of (model?.trees||[]))out[tree.id]=(tree.moments||[]).length;return out;};
+let treeCountsBefore=null;
+function autoPublishNotedList(){try{const raw=JSON.parse(localStorage.getItem('lt41.autoPublishNoted')||'[]');return Array.isArray(raw)?raw.filter(v=>typeof v==='string'):[]}catch{return[]}}
+function markAutoPublishNoted(treeId){try{const list=autoPublishNotedList();if(!list.includes(treeId))list.push(treeId);localStorage.setItem('lt41.autoPublishNoted',JSON.stringify(list));}catch{}}
+function markPublicNoticeShown(){try{localStorage.setItem('lt41.publicNoticeShown','1');}catch{}}
+// 안내의 [비공개로 바꾸기] — 공유 패널 #share-private과 같은 경로(shareApi.setTreeVisibility).
+function turnTreePrivate(treeId){
+ shareApi.setTreeVisibility(treeId,'private').then(answer=>{
+  if(answer.ok)notify('비공개로 바꿨어요.',{hold:true});
+  else if(answer.code==='plus_required_private')notify('비공개는 Plus 전용이에요. 지금은 모든 트리가 공개로 유지돼요.',{hold:true});
+  else notify(answer.message||'공개 상태를 바꾸지 못했어요.',{hold:true});
+ }).catch(()=>notify('공개 상태를 바꾸지 못했어요.',{hold:true}));
+}
+function notifyAutoPublish(treeId){
+ if(autoPublishNotedList().includes(treeId))return;
+ void shareApi.getTreeVisibility(treeId).then(answer=>{
+  if(!answer.ok)return; // 확인 실패·로그인 만료 — 마킹하지 않아 다음 저장 때 다시 본다
+  markAutoPublishNoted(treeId);
+  if(answer.visibility==='private')return; // 비공개 트리는 둘러보기에 소개되지 않는다 — 안내를 띄우지 않는다
+  markPublicNoticeShown(); // #538 1회 안내와 하나로 — 같은 사실을 두 번 띄우지 않는다
+  notify(autoPublishNoticeText(),{hold:true,action:{label:AUTO_PUBLISH_ACTION_LABEL,run:()=>turnTreePrivate(treeId)}});
+ }).catch(()=>{});
+}
 function memberStatus(status){
   shellIntake.flush();
   const failed=status.dirty&&['offline','rejected','conflict','login'].includes(status.phase);
@@ -775,15 +801,24 @@ function memberStatus(status){
   // #549: 기록(순간)이 0개인 새 계정의 첫 안내는 '불러왔어요' 대신 첫 순간 안내로(문구는 notice.mjs 한 벌).
   const momentCount=(model?.trees||[]).reduce((n,tree)=>n+((tree.moments||[]).length),0);
   notify(syncedNoticeText({writable:status.writable,previousDirty,momentCount}));
+  // 자동 공개 안내: 이 저장으로 순간 3개에 처음 도달한 트리가 있으면 한 번 알린다(기기 첫 관측 포함).
+  // 토스트는 한 안내만 띄우므로 새로 공개된 트리 중 하나를 고른다(나머지는 다음 저장 때 다시 본다).
+  const treeCounts=countTreeMoments();
+  const autoCandidates=((previousDirty||treeCountsBefore===null)&&status.writable)
+   ?newlyPublishedTrees(treeCountsBefore,treeCounts).filter(row=>!autoPublishNotedList().includes(row.treeId))
+   :[];
+  const autoTree=autoCandidates[0]||null;
+  if(autoTree)notifyAutoPublish(autoTree.treeId);
   // #538: 첫 순간을 담은 뒤 한 번, 공개 기본과 익명성을 알린다. 기기당 1회(localStorage).
-  if(previousDirty&&status.writable&&(model?.trees||[]).some(tree=>tree.moments.length>0)){
+  // 자동 공개 안내가 뜨는 저장에서는 같은 사실(공개 기본·익명성·3개 소개)이라 여기는 건너뛴다.
+  else if(previousDirty&&status.writable&&(model?.trees||[]).some(tree=>tree.moments.length>0)){
    let shown=false;try{shown=localStorage.getItem('lt41.publicNoticeShown')==='1';}catch{}
    if(!shown){notify('내 트리는 다른 사람도 볼 수 있어요(순간 3개부터 둘러보기에 소개). 내 이름·아이디는 보이지 않아요.');try{localStorage.setItem('lt41.publicNoticeShown','1');}catch{}}
   }
  }
  else if(status.phase==='login'&&!status.dirty)notify('로그인이 필요해요.');
  else if(!status.dirty&&status.phase==='offline')notify(status.detail||'내 기록을 불러오지 못했어요.');
- $('write-menu').textContent=status.dirty?'저장 안 됨' :'＋ 순간 추가';$('empty-records').textContent=status.writable?'＋ 첫 트리 만들기':'내 기록 불러오기';/* #463: 이름을 한 곳에서 정한다(paintEmptyCopy와 같은 글자) *//* #463: 주 버튼 표시도 같이 유지한다(쓸 상태가 바뀌도 강조가 엉키지 않게). */$('empty-records').classList.toggle('primary',!!status.writable);$('empty-sample').classList.toggle('primary',!status.writable);previousDirty=status.dirty;renderAccount();flowNavigation();document.body.dataset.member=member?.snapshot().owned?'in':'out';document.body.dataset.treeCount=String(model?.trees?.length||0);applyAdvanced();
+ $('write-menu').textContent=status.dirty?'저장 안 됨' :'＋ 순간 추가';$('empty-records').textContent=status.writable?'＋ 첫 트리 만들기':'내 기록 불러오기';/* #463: 이름을 한 곳에서 정한다(paintEmptyCopy와 같은 글자) *//* #463: 주 버튼 표시도 같이 유지한다(쓸 상태가 바뀌도 강조가 엉키지 않게). */$('empty-records').classList.toggle('primary',!!status.writable);$('empty-sample').classList.toggle('primary',!status.writable);previousDirty=status.dirty;treeCountsBefore=countTreeMoments();renderAccount();flowNavigation();document.body.dataset.member=member?.snapshot().owned?'in':'out';document.body.dataset.treeCount=String(model?.trees?.length||0);applyAdvanced();
 }
 async function startMember(){setMemberRefreshStarted(true);if(!leaveMember())return;backfillStarted=false;backfillAttempted.clear();const startup=parseSelectionRoute(location.hash);if(startup.scope==='owner')stashPendingOwnerRoute(sessionStorage,location.hash);++loadGeneration;const generation=loadGeneration;clear();
  const api=createWorkspaceApi({fetchImpl:(url,init)=>fetch(init?.method==='GET'&&url==='/api/workspace'?'/api/workspace?features=bound-writes':url,init)});

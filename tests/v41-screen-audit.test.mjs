@@ -337,6 +337,19 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     await take(page4, '셸 첫 화면·알림 줄');
     await lowerToast(page4);
     await page4.evaluate(() => document.body.classList.remove('lt-fab-ok'));
+    // 자동 공개 안내 상태(2026-11-15 보고) — notice.mjs 한 벌(셸 notify와 같은 모듈)로 토스트에
+    // 문장+[비공개로 바꾸기] 한 줄을 띄운 자리. 자리 잡기(beforeShow)는 셸 placeToast와 같은 길 —
+    // 셸 내부 함수가 모듈 밖으로 나오지 않아 시험 안에서 같은 길을 잠시 그린다(#666 raiseToast와 같은 원칙).
+    await page4.evaluate(async () => {
+      const notice = await import('/v41/shell/notice.mjs');
+      const place = () => { let above = 0; for (const el of document.querySelectorAll('.home-links,#mobile-add,.updates-card')) { if (el.hidden) continue; const cs = getComputedStyle(el); if (cs.display === 'none' || cs.visibility === 'hidden' || Number(cs.opacity) === 0) continue; const r = el.getBoundingClientRect(); if (r.width < 1 || r.height < 1) continue; above = Math.max(above, document.documentElement.clientHeight - r.top + 10); } const style = document.documentElement.style; if (above > 0) style.setProperty('--lt-toast-bottom', Math.round(above) + 'px'); else style.removeProperty('--lt-toast-bottom'); };
+      const notifier = notice.createNotifier({ $: (id) => document.getElementById(id), beforeShow: place });
+      notifier.notify(notice.autoPublishNoticeText(), { hold: true, action: { label: notice.AUTO_PUBLISH_ACTION_LABEL, run: () => {} } });
+    });
+    await page4.waitForFunction(() => { const t = document.getElementById('toast'); return !!t && !t.hidden && !!t.querySelector('.toast-action'); }, null, { timeout: 5000 });
+    await page4.waitForTimeout(300);
+    await take(page4, '셸·자동 공개 안내');
+    await lowerToast(page4);
     await page4.evaluate(() => document.getElementById('community-menu')?.click());
     await page4.waitForFunction(() => !!document.getElementById('community-panel')?.open, null, { timeout: 8000 }).catch(() => {});
     // #678 후속(윤제 4회차): 반응이 없는 카드는 0짜리 칩 대신 '반응 남기기' 한 개만 보인다(수치로 판정).
