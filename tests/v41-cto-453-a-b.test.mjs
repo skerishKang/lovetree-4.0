@@ -47,7 +47,8 @@ test('B: 자세한 추가를 처음 보일 때 기본값과 기준값을 한 번
   assert.match(panelsLF, /if \(!form\.elements\.date\.value\) \{ form\.elements\.date\.value = localDateOnly\(\); \$\('stage-date-hint'\)\.hidden = false; \}/, '기본 날짜를 채운다(기기의 오늘)');
   assert.match(panelsLF, /if \(!form\.elements\.emotion\.value\) form\.elements\.emotion\.value = '설렘';/, '기본 감정을 채운다');
   assert.match(panelsLF, /function startQuickSession\(\) \{[^}]*\n    formBaseline = '';/, '＋ 순간 추가로 열 때 기준값을 비운다(#462: 남은 수정 상태도 먼저 비운다)');
-  assert.match(quickAddLF, /deps\.resetEditorBaseline\?\.\(\);\n    deps\.writePanel\.open\(\);/, '빠른 추가도 기준값을 비운 뒤 연다');
-  assert.match(quickAddLF, /deps\.resetEditorBaseline\?\.\(\);\n    deps\.writePanel\.open\('easy'\);/, '빠른 추가(쉬운 탭)도 같다');
+  // 이슈 671: openWrite가 목적지(그 순간 다음) 준비를 사이에 두게 됐다 — 기준값을 비운 뒤 창을 여는 순서는 그대로다.
+  assert.match(quickAddLF, /function openWrite\(target = \{\}\) \{[\s\S]*?deps\.resetEditorBaseline\?\.\(\);[\s\S]*?deps\.writePanel\.open\(\);/, '빠른 추가도 기준값을 비운 뒤 연다');
+  assert.match(quickAddLF, /function openQuick\(\) \{[\s\S]*?deps\.resetEditorBaseline\?\.\(\);[\s\S]*?deps\.writePanel\.open\('easy'\);/, '빠른 추가(쉬운 탭)도 같다');
   assert.match(shell, /shellWrite\.setTabHook\(tab=>shellPanels\.onWriteTab\(tab\)\);/);
 });
