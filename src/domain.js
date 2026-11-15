@@ -346,7 +346,10 @@ export function quickAdd(state, input, clock = new Date().toISOString()) {
   // public/v41/domain.mjs와 같은 규칙을 유지한다(#327 두 벌 같게).
   const chosen = trees.find(tree => tree.id === input?.treeId);
   if (chosen) {
-    const grown = addMoment(chosen, { url: input?.url || '', mediaMetadata: input?.mediaMetadata }, latestMomentId(chosen) || chosen.moments.find(m => m.parentId === null).id, clock);
+    // 이슈 671: '그 순간 다음에 담기'(input.parentId)가 이 트리의 순간이면 그 순간 바로 다음에 잇는다.
+    // 목적지가 없거나 못 찾으면 기존 규칙대로 가장 최근 순간 다음에 담는다. public/v41/domain.mjs와 같은 규칙.
+    const after = chosen.moments.some(m => m.id === input?.parentId) ? input.parentId : (latestMomentId(chosen) || chosen.moments.find(m => m.parentId === null).id);
+    const grown = addMoment(chosen, { url: input?.url || '', mediaMetadata: input?.mediaMetadata }, after, clock);
     return { state: { version: 1, trees: trees.map(tree => tree.id === chosen.id ? grown : tree), prefs: normalizePrefs(state.prefs) }, treeId: chosen.id, momentId: grown.moments.at(-1).id };
   }
   const inbox = trees.find(tree => tree.inbox === true);

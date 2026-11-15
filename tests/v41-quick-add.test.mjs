@@ -15,7 +15,7 @@ import vm from 'node:vm';
 import { fakeEl } from './helpers/fake-dom.mjs';
 import { createQuickAdd } from '../public/v41/shell/quick-add.mjs';
 import { quickAdd, cacheMomentMediaMetadata, validateState } from '../public/v41/domain.mjs';
-import { quickTreeLineText, quickSubmitText, quickSavedTreeText } from '../public/v41/quick-add.mjs';
+import { quickTreeLineText, quickTreeAfterText, quickSubmitText, quickSavedTreeText } from '../public/v41/quick-add.mjs';
 
 // LTMedia.describe와 같은 모양의 최소 판정(화면이 실제로 쓰는 전역과 같은 계약).
 const describeLike = (url) => {
@@ -253,6 +253,22 @@ test('#638 quickAdd는 고른 트리(input.treeId)에 담고, 가장 최근 순�
   assert.deepEqual(validateState(result.state), result.state);
 });
 
+// ---- 이슈 671: '그 순간 다음에 담기' — 책의 '다음 순간 추가'가 넘긴 parentId로 저장한다 ----
+test('#671 quickAdd는 input.parentId의 순간 바로 다음에 잇고, 못 찾으면 최근 순간으로 물러난다', () => {
+  // 두 번째 트리의 '담는 순간'(s9)을 목적지로 보내면 그 순간 다음에 잇는다.
+  const after = quickAdd(stateWithTwoTrees, { url: 'https://youtu.be/abc123DEF45', treeId: 't-second', parentId: 's9' });
+  assert.equal(after.treeId, 't-second', '트리는 고른 트리 규칙(#647)을 그대로 쓴다');
+  const grownTree = after.state.trees.find(tree => tree.id === 't-second');
+  assert.equal(grownTree.moments.length, 2);
+  assert.equal(grownTree.moments[1].parentId, 's9', '목적지 순간 다음에 잇는다');
+  assert.deepEqual(validateState(after.state), after.state);
+  // 목적지가 고른 트리의 순간이 아니면(오래된 화면·지워진 순간·다른 트리의 순간) 최근 순간 다음으로 물러난다.
+  const fallback = quickAdd(stateWithTwoTrees, { url: 'https://youtu.be/abc123DEF45', treeId: 't-second', parentId: 'm-missing' });
+  assert.equal(fallback.state.trees.find(tree => tree.id === 't-second').moments[1].parentId, 's9');
+  const otherTree = quickAdd(stateWithTwoTrees, { url: 'https://youtu.be/abc123DEF45', treeId: 't-second', parentId: 's0' });
+  assert.equal(otherTree.state.trees.find(tree => tree.id === 't-second').moments[1].parentId, 's9', '다른 트리의 순간을 목적지로 쓰지 않는다');
+});
+
 test('#638 treeId가 없거나 찾지 못하면 기존 규칙(inbox)으로 물러난다', () => {
   const without = quickAdd(stateWithTwoTrees, { url: 'https://youtu.be/abc123DEF45' });
   assert.equal(without.treeId, 't-inbox');
@@ -282,8 +298,8 @@ test('#638 backfillTitles(cacheMomentMediaMetadata)는 title을 건드리지 않
 const URL_OK = 'https://m.youtube.com/watch?v=abc12345678&t=76&si=xyz';
 const VIDEO_TITLE = '테스트 영상 제목';
 
-function harness638({ trees = [inboxTree, secondTree], currentTreeId = 't-second', applyImpl = null, fetchImpl = null } = {}) {
-  const calls = { apply: [], notify: [] };
+function harness638({ trees = [inboxTree, secondTree], currentTreeId = 't-second', applyImpl = null, fetchImpl = null, writeTab = 'easy' } = {}) {
+  const calls = { apply: [], notify: [], editors: [] };
   const els = {};
   const $ = id => { if (!els[id]) els[id] = fakeEl({ value: '', children: [], replaceChildren(...kids) { this.children = kids; }, append(...kids) { this.children.push(...kids); } }); return els[id]; };
   els['write-panel'] = fakeEl({ value: '', children: [], open: false, replaceChildren(...kids) { this.children = kids; }, append(...kids) { this.children.push(...kids); } });
@@ -308,10 +324,12 @@ function harness638({ trees = [inboxTree, secondTree], currentTreeId = 't-second
     notify: text => calls.notify.push(text),
     panel: () => {},
     choose: () => {},
-    openEditor: () => {},
+    openEditor: (mode, parentId) => calls.editors.push([mode, parentId]),
     resetEditorBaseline: () => {},
     openLoginStart: () => {},
-    writePanel: { open: () => { els['write-panel'].open = true; } },
+    // 이슈 671: writePanel.open()은 '먼저 보일 탭'을 돌려준다(기본 쉬운 추가, writeTab으로 바꿔 본다).
+    writePanel: { open: () => { els['write-panel'].open = true; return writeTab; } },
+    momentTitle: moment => moment.title || '',
     requestClose: () => {},
     currentTreeId: () => currentTreeId,
     listTrees: () => trees,
@@ -367,6 +385,56 @@ test('#638 트리가 하나뿐이면 고르기를 숨기고 그 트리 이름을
   h.api.openQuick();
   assert.equal(h.els['quick-tree-select'].hidden, true);
   assert.equal(h.els['quick-tree-line'].textContent, quickTreeLineText(QUICK_INBOX_LABEL));
+});
+
+// ---- 이슈 671: 쓰기 창 열림이 목적지('그 순간 다음에 담기')를 받는다 ----
+test('#671 openWrite는 목적지 순간 다음에 담기 문구를 보이고 저장에 parentId를 넘긴다', () => {
+  const h = harness638();
+  h.api.openWrite({ parentId: 's9' });
+  assert.equal(h.els['write-panel'].open, true, '같은 쓰기 창을 연다');
+  assert.equal(h.els['quick-tree-line'].textContent, quickTreeAfterText('담는 순간', '두 번째 트리'));
+  h.els['quick-url'].value = URL_OK;
+  h.api.renderPreview();
+  h.api.submitQuick({ preventDefault() {} });
+  assert.deepEqual(h.calls.apply[0], ['quickAdd', { url: URL_OK, treeId: 't-second', parentId: 's9' }]);
+});
+
+test('#671 목적지 없이 열면 기존 한 줄로 열고 parentId를 보내지 않는다', () => {
+  const h = harness638();
+  h.api.openWrite({ parentId: 's9' });
+  h.api.openWrite({});
+  assert.equal(h.els['quick-tree-line'].textContent, quickTreeLineText('두 번째 트리'), '다시 열면 목적지를 지운다');
+  h.els['quick-url'].value = URL_OK;
+  h.api.renderPreview();
+  h.api.submitQuick({ preventDefault() {} });
+  assert.deepEqual(h.calls.apply[0], ['quickAdd', { url: URL_OK, treeId: 't-second' }]);
+});
+
+test('#671 목적지 순간을 못 찾으면 목적지 없이 열린다', () => {
+  const h = harness638();
+  h.api.openWrite({ parentId: 'm-missing' });
+  assert.equal(h.els['quick-tree-line'].textContent, quickTreeLineText('두 번째 트리'));
+  assert.deepEqual(h.calls.editors, []);
+});
+
+test('#671 먼저 보일 탭이 자세한 추가면 편집기의 이어 담기로 넘긴다', () => {
+  const h = harness638({ writeTab: 'detailed' });
+  h.api.openWrite({ parentId: 's9' });
+  assert.deepEqual(h.calls.editors, [['add', 's9']], '자세한 탭은 편집기 규칙(setEditorMode)을 그대로 쓴다');
+  assert.deepEqual(h.calls.apply, [], '쉬운 추가 저장을 부르지 않는다');
+});
+
+test('#671 트리 고르기를 바꾸면 목적지를 지운다', () => {
+  const h = harness638();
+  h.api.openWrite({ parentId: 's9' });
+  const select = h.els['quick-tree-select'];
+  select.value = 't-inbox';
+  select.dispatch('change', {});
+  assert.equal(h.els['quick-tree-line'].textContent, quickTreeLineText(QUICK_INBOX_LABEL), '다른 트리의 순간 다음이 아니게 된다');
+  h.els['quick-url'].value = URL_OK;
+  h.api.renderPreview();
+  h.api.submitQuick({ preventDefault() {} });
+  assert.equal(h.calls.apply[0][1].parentId, undefined, '바꾼 트리에는 목적지 없이 담는다');
 });
 
 test('#638 제목이 늦게 도착하면 방금 담은 순간의 영상 제목을 채운다(backfillTitles)', async () => {

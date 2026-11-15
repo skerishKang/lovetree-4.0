@@ -24,6 +24,8 @@ export function createMessages(deps) {
   const writeLocation = deps.writeLocation;
   const choose = deps.choose;
   const openEditor = deps.openEditor;
+  // 이슈 671: 새로 추가(new·add)는 입구와 상관없이 같은 쓰기 창(openWrite)으로 연다 — 대표 결정(2026-11-12).
+  const openWriteEntry = deps.openWriteEntry || (() => {});
   const focusTitleInput = deps.focusTitleInput;
   const openLoginStart = deps.openLoginStart;
   const openAccountMenu = deps.openAccountMenu;
@@ -86,7 +88,10 @@ export function createMessages(deps) {
         else { window.LT41.momentId = data.momentId; links(); writeLocation(); }
       }
     }
-    if (data?.type === 'lt41-write') openEditor(data.mode, data.parentId);
+    // 이슈 671: 고치기(edit)는 지금처럼 편집기로, 새로 추가(new·add)는 같은 쓰기 창으로 보낸다.
+    // 목적지(트리·이어질 순간)가 오면 쓰기 창에 넘겨 그 트리·그 순간 다음에 담는다(#647 고른 트리 우선 재사용).
+    if (data?.type === 'lt41-write' && data.mode === 'edit') openEditor(data.mode, data.parentId);
+    else if (data?.type === 'lt41-write') openWriteEntry({ treeId: data.treeId || '', parentId: data.parentId || '' });
     if (data?.type === 'lt41-write' && data.focusTitle) focusTitleInput?.();
     // #327 2부: 순간 상세의 '다른 트리로 옮기기'. 공유·예시 화면에서는 보내지 않고, 여기서도 한 번 더 막는다.
     if (data?.type === 'lt41-move' && getSource() === 'server') openMovePicker({ momentId: data.momentId });

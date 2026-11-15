@@ -250,7 +250,9 @@ const shellQuick=createQuickAdd({
   currentTreeId: () => window.LT41?.tree?.id || '',
   listTrees: () => (Array.isArray(window.LT41?.trees) ? window.LT41.trees : []),
   // 사진 올리기는 기존 업로더(#310 onUploaded·imagesOnly)를 그대로 쓴다.
-  mountUpload:mountPrivateUpload
+  mountUpload:mountPrivateUpload,
+  // 이슈 671: '그 순간 다음에 담기' 한 줄에 쓸 순간 제목 — 책·보드와 같은 제목 규칙(자동 제목 빼기)을 쓴다.
+  momentTitle:moment=>{const main=titleView(moment,titleDisplayValue()).main;return main||withoutAutoTitle(moment).title;}
 });
 $('write-menu').onclick=()=>{if(source!=='server'&&member?.snapshot().owned){void resumeMember('write');return;}if(member?.snapshot().dirty){explainSaveState();return;}shellQuick.openWrite();};
 // #458: 모바일 떠 있는 ＋ 단추 — 헤더의 ＋ 순간 추가와 같은 길(같은 창)을 연다. 단추는 body.lt-fab-ok일 때만 보인다.
@@ -337,6 +339,8 @@ const shellMessages=createMessages({
   writeLocation:(mode)=>writeLocation(mode),
   choose:(id,momentId)=>choose(id,momentId),
   openEditor:(mode,parentId)=>openEditor(mode,parentId),
+  // 이슈 671: lt41-write의 새로 추가(new·add)는 쓰기 창 한 길로 — 목적지(트리·이어질 순간)를 함께 넘긴다.
+  openWriteEntry:target=>shellQuick.openWrite(target),
   focusTitleInput:()=>shellPanels.focusTitleInput?.(),
   openLoginStart:intent=>openLoginStart(intent),
   openAccountMenu:()=>openAccountMenu(),
