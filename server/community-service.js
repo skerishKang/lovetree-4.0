@@ -2,7 +2,7 @@ import {randomUUID} from 'node:crypto';
 import {ApiError} from './errors.js';
 import {parsePrincipal} from './principal.js';
 import {projectSharedTree} from './share-service.js';
-import {ROLE_AI_CUSTOMER} from './admin-roles.js';
+import {ROLE_AI_CUSTOMER,ROLE_TESTER} from './admin-roles.js';
 import {coverModeOf} from '../src/domain.js';
 // 꼬리표 판정은 화면과 같은 한 벌 — 서버에 규칙을 복사하지 않는다(#627 3단계 '다른 팬 보기').
 import {parseTag, tagKey} from '../public/v41/tags.mjs';
@@ -66,23 +66,29 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
   async discover({query='',emotion='',cursor='',limit=12,viewerSubjectId=null}={}){
    const q=clean(query,80).toLocaleLowerCase('ko-KR'),tag=clean(emotion,12),size=Math.max(1,Math.min(24,Number(limit)||12));
    // #611 3번: AI 명예회원 배지 비트 — 이번 한 번의 둘러보기 조회에서는 같은 주인이면 한 번만 묻는다.
+   // #678 후속: 역할을 한 번만 물어 두고(주인당 한 번) 그 값으로 배지와 시험 계정 거름을 함께 판정한다.
    const roleCache=new Map();
-   const aiTesterLookup=admin?async subjectId=>{
-    if(roleCache.has(subjectId))return roleCache.get(subjectId);
-    const flag=await admin.roleFor({productId,subjectId})===ROLE_AI_CUSTOMER;
-    roleCache.set(subjectId,flag);
-    return flag;
+   const roleOf=admin?async subjectId=>{
+    if(!roleCache.has(subjectId))roleCache.set(subjectId,await admin.roleFor({productId,subjectId}));
+    return roleCache.get(subjectId);
    }:null;
+   const aiTesterLookup=roleOf?async subjectId=>await roleOf(subjectId)===ROLE_AI_CUSTOMER:null;
+   const isTesterLookup=roleOf?async subjectId=>await roleOf(subjectId)===ROLE_TESTER:null;
    let entries;
    if(typeof communityRepo.listDiscoverableSummaries==='function'){
     const summaries=await communityRepo.listDiscoverableSummaries({productId,viewerSubjectId,limit:240});
     entries=await Promise.all(summaries.map(async summary=>{
+     // 시험 계정(tester 역할) 트리는 둘러보기 목록·검색에서 뺀다(#678 후속 — 공유 링크 직접 열기는 그대로).
+     if(await isTesterLookup(summary.share.subjectId))return null;
      const item=await card(summary.share,viewerSubjectId,summary.stats,summary.lastActivityAt,aiTesterLookup);
      return item;
     }));
    }else{
     const shares=await communityRepo.listDiscoverable({productId,viewerSubjectId,limit:240});
-    entries=await Promise.all(shares.map(share=>card(share,viewerSubjectId,null,null,aiTesterLookup)));
+    entries=await Promise.all(shares.map(async share=>{
+     if(await isTesterLookup(share.subjectId))return null;
+     return card(share,viewerSubjectId,null,null,aiTesterLookup);
+    }));
    }
    const cards=[];
    for(const item of entries){if(!item)continue;const haystack=(item.title+' '+item.subject+' '+item.summary+' '+(item.searchText||'')).toLocaleLowerCase('ko-KR');if(q&&!haystack.includes(q))continue;if(tag&&!item.emotions.includes(tag))continue;cards.push(item);}
@@ -109,8 +115,12 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
     let tree;
     try{tree=projectSharedTree(stored.doc,share.treeId).tree;}catch{continue;} // 문서에서 사라진 트리는 건너뛴다
     if(!tree.moments.length)continue;
-    let aiTester=roles.get(share.subjectId);
-    if(aiTester===undefined){aiTester=!!admin&&await admin.roleFor({productId,subjectId:share.subjectId})===ROLE_AI_CUSTOMER;roles.set(share.subjectId,aiTester);}
+    // #678 후속: 역할을 주인당 한 번만 물어 두고, 시험 계정(tester 역할) 트리는 '다른 팬 보기' 목록에서
+    // 뺀다(공유 링크 직접 열기 /t/<id>는 그대로). AI 명예회원 배지는 같은 판정으로 한 비트만 내린다.
+    let role=roles.get(share.subjectId);
+    if(role===undefined){role=admin?await admin.roleFor({productId,subjectId:share.subjectId}):null;roles.set(share.subjectId,role);}
+    if(role===ROLE_TESTER)continue;
+    const aiTester=role===ROLE_AI_CUSTOMER;
     for(const moment of tree.moments){
      if(!Array.isArray(moment.keywords)||!moment.keywords.some(matches))continue;
      items.push({
