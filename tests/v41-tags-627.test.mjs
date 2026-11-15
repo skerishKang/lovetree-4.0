@@ -547,7 +547,7 @@ test('suggestForMoments — 한도: 24자 넘는 제안은 내지 않고, 20개 
   assert.deepEqual(c3, [], '자리가 없으면 제안하지 않는다');
 });
 
-test('suggestForMoments — 순간 300개 계산도 50ms 안에 끝난다', () => {
+test('suggestForMoments — 순간 300개 계산은 30개에 비해 제곱으로 느려지지 않는다', () => {
   const moments = [];
   for (let i = 0; i < 300; i += 1) {
     moments.push({
@@ -556,17 +556,29 @@ test('suggestForMoments — 순간 300개 계산도 50ms 안에 끝난다', () =
       keywords: i % 3 ? [] : ['가수:RESCENE'],
     });
   }
-  suggestForMoments(moments); // 예열 1회 — 모듈 적재·JIT 준비 시간은 재지 않는다
-  let result;
-  let elapsed = Infinity;
-  for (let run = 0; run < 5; run += 1) {
-    const started = performance.now();
-    result = suggestForMoments(moments);
-    elapsed = Math.min(elapsed, performance.now() - started); // 여러 번 중 가장 빠른 값
-  }
+  const small = moments.slice(0, 30);
+  suggestForMoments(small); // 예열 1회 — 모듈 적재·JIT 준비 시간은 재지 않는다
+  suggestForMoments(moments);
+  const bestOf = (list, runs) => {
+    let best = Infinity;
+    let last;
+    for (let run = 0; run < runs; run += 1) {
+      const started = performance.now();
+      last = list();
+      best = Math.min(best, performance.now() - started); // 여러 번 중 가장 빠른 값 — 기계가 느려도 흔들리지 않게
+    }
+    return { best, last };
+  };
+  const smallMs = bestOf(() => suggestForMoments(small), 15).best;
+  const { best: bigMs, last: result } = bestOf(() => suggestForMoments(moments), 7);
   assert.equal(result.length, 300, '꼬리표가 아예 없는 순간·가수만 있는 순간 모두 빠진 종류 제안이 있다');
   assert.ok(result.every((r) => r.suggestions.includes('노래:Super Shy') && r.suggestions.length >= 2), '노래·무대는 제목 규칙으로 권한다');
-  assert.ok(elapsed <= 50, `300순간 한꺼번에 제안 ${elapsed.toFixed(1)}ms ≤ 50ms`);
+  // 절대 ms 대신 같은 실행의 30개와 비교한다(#728 CI windows 러너에서 50ms 한도가 88.5ms로 흔들렸다).
+  // 선형이면 비율은 10배 안팎이고, 제곱으로 느려지면 100배를 넘는다 — 25배 한도가 그 실수를 잡는다.
+  // 250ms 절대 상한은 2차 방벽: 평소 20ms 안팎이라 10배 이상 느려진 큰 되돌림을 따로 잡는다.
+  const ratio = bigMs / smallMs;
+  assert.ok(ratio <= 25, `300개/30개 비율 ${ratio.toFixed(1)}배 ≤ 25배 (30개 ${smallMs.toFixed(2)}ms · 300개 ${bigMs.toFixed(1)}ms)`);
+  assert.ok(bigMs <= 250, `300순간 한꺼번에 제안 ${bigMs.toFixed(1)}ms ≤ 250ms`);
 });
 
 // ── 꼬리표로 찾기·걸러 보기(#627 후속): 순수 계산 — 화면(순간 목록)은 나중에 이 함수를 붙인다.
