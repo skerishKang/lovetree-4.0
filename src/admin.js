@@ -1,6 +1,9 @@
 import './styles.css';
 import './admin.css';
 import {
+  applyThemeAttribute, nextTheme, readTheme, themeButtonAriaLabel, themeButtonLabel, themePressed, writeTheme
+} from '../public/v41/header-state.mjs';
+import {
   GITHUB_REPO, KIND_LABEL, STATUS_LABEL, STATUS_ORDER, PERSONA_FIELDS, PENDING_STATUS,
   escapeText, richParagraph, formatTime, parseHash, viewHash, viewToTab,
   filterRows, statusTabs, kindTabs, linkedIssueNumbers, normalizeIssueNumber, issueStateLabel, needsFixButton,
@@ -35,6 +38,9 @@ async function read(path, init = {}) {
 }
 
 const host = document.getElementById('main');
+// 테마는 본 사이트와 같은 한 벌(저장 키 lt41.theme — header-state.mjs) — 본 사이트에서 고른 밤/정원이
+// 운영센터에도 그대로 적용된다. 첫 그림 전에 속성부터 붙여 밤→정원 깜빡임을 막는다.
+applyThemeAttribute(document.documentElement, readTheme(localStorage));
 const sessionRes = await read('/api/admin/session');
 const session = sessionRes.payload ?? (sessionRes.status === 401 ? {} : null);
 
@@ -50,8 +56,11 @@ function head() {
   // #570 3: 탭 이름 — 게시판→고객 글, 이슈→고치는 일. 신고는 그대로.
   const tab = viewToTab(route.view);
   const tabBtn = (name, label) => `<button type="button" data-tab="${name}" class="${tab === name ? 'is-active' : ''}">${label}</button>`;
+  // 밤/정원 전환(2026-11-15 2단계) — 본 사이트와 같은 저장 키·문구(header-state.mjs 한 벌).
+  const theme = readTheme(localStorage);
+  const themeBtn = `<button type="button" class="lt-theme-toggle" data-lt-theme-toggle aria-pressed="${themePressed(theme)}" aria-label="${themeButtonAriaLabel(theme)}" title="${themeButtonAriaLabel(theme)}">${themeButtonLabel(theme)}</button>`;
   // #655: '한눈에'가 맨 앞 탭이다(운영센터를 열면 기본). 기존 탭·주소는 그대로 둔다.
-  return `<header class="app-header"><a class="brand" href="/v41/" title="러브트리로" aria-label="러브트리로"><span>LoveTree</span><small>4.1</small></a><nav aria-label="관리자 메뉴">${tabBtn('overview', '한눈에')}${tabBtn('board', '고객 글')}${tabBtn('journals', '사용 일지')}${tabBtn('reports', '신고')}${tabBtn('issues', '고치는 일')}</nav></header>`;
+  return `<header class="app-header"><a class="brand" href="/v41/" title="러브트리로" aria-label="러브트리로"><span>LoveTree</span><small>4.1</small></a><nav aria-label="관리자 메뉴">${tabBtn('overview', '한눈에')}${tabBtn('board', '고객 글')}${tabBtn('journals', '사용 일지')}${tabBtn('reports', '신고')}${tabBtn('issues', '고치는 일')}</nav>${themeBtn}</header>`;
 }
 
 function renderLogin() {
@@ -398,6 +407,14 @@ async function renderIssues() {
 
 // ---- events (delegated) ----
 document.addEventListener('click', async (event) => {
+  const themeBtn = event.target.closest('[data-lt-theme-toggle]');
+  if (themeBtn) {
+    // 본 사이트와 같은 한 벌(저장 키 lt41.theme) — 누르면 밤↔정원을 저장하고 속성·단추 문구를 다시 칠한다.
+    const theme = writeTheme(localStorage, nextTheme(readTheme(localStorage)));
+    applyThemeAttribute(document.documentElement, theme);
+    render();
+    return;
+  }
   const reportAct = event.target.closest('[data-report-act]');
   if (reportAct) {
     const hide = reportAct.dataset.reportAct === 'hide';
