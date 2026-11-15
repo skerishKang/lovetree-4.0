@@ -13,6 +13,7 @@
  *   서버에 닿지 못했을 때는 중립 기본 카드(noindex)를 주고, 사람은 공유 주소로 보낸다(앱이 상태를 알려 준다).
  */
 import { jsonError, upstreamOrigin } from './proxy.js';
+import { YTIMG_HOST, youtubeIdFrom } from '../../public/v41/youtube-id.mjs';
 import {
   CARD_IMAGE_URL, PRODUCTION_HOST, SEARCH_OPEN, SHARE_ID, SITE_TAGLINE, SITE_TITLE,
   appHomeUrl, appShareUrl, escapeHtml, isBotUserAgent, isProductionHost, oneLine
@@ -22,37 +23,11 @@ const VIEWS = new Set(['book', 'board', 'network']);
 const CANCELED_TITLE = '공유가 취소되었어요';
 const CANCELED_DESCRIPTION = '이 공유 주소는 더 이상 열리지 않아요. 러브트리에서 좋아하는 순간을 모아 새 공유 주소를 만들 수 있어요.';
 
-// thumb-fallback.mjs(youtubeIdFrom)와 같은 규칙의 함수 한 벌 — 함수 묶음을 작게 유지하려고
-// 클라이언트 모듈을 통째로 가져오지 않고 여기 둔다. 두 벌의 일치는 tests/pages-search-preview.test.mjs 가 확인한다.
-const YOUTUBE_HOSTS = new Set(['youtube.com', 'www.youtube.com', 'm.youtube.com', 'music.youtube.com', 'youtu.be']);
-const YTIMG_HOST = /(?:^|\.)ytimg\.com$/i;
-const VIDEO_ID_RE = /^[A-Za-z0-9_-]{11}$/;
-
-export function youtubeVideoId(value) {
-  const raw = String(value ?? '').trim();
-  if (!raw || raw.length > 2048) return '';
-  let parsed;
-  try { parsed = new URL(raw); } catch { return ''; }
-  if (!['http:', 'https:'].includes(parsed.protocol) || parsed.username || parsed.password) return '';
-  const host = parsed.hostname.toLowerCase();
-  if (YOUTUBE_HOSTS.has(host)) {
-    if (host === 'youtu.be') {
-      const id = (parsed.pathname || '').split('/').filter(Boolean)[0] || '';
-      return VIDEO_ID_RE.test(id) ? id : '';
-    }
-    if (parsed.pathname === '/watch') {
-      const id = parsed.searchParams.get('v') || '';
-      return VIDEO_ID_RE.test(id) ? id : '';
-    }
-    const matched = (parsed.pathname || '').match(/^\/(?:shorts|live|embed)\/([^/?#]+)/);
-    return matched && VIDEO_ID_RE.test(matched[1]) ? matched[1] : '';
-  }
-  if (YTIMG_HOST.test(host)) {
-    const matched = (parsed.pathname || '').match(/^\/vi(?:_webp)?\/([^/?#]+)\//);
-    return matched && VIDEO_ID_RE.test(matched[1]) ? matched[1] : '';
-  }
-  return '';
-}
+// 유튜브 영상 id 판정은 한 벤(public/v41/youtube-id.mjs)을 쓴다 — 예전엔 thumb-fallback.mjs 의
+// youtubeIdFrom 과 같은 규칙의 복사본을 함수 묶음을 작게 유지하려고 여기 뒀는데, 작은 한 벤 모듈을
+// 가져오는 쪽이 묶음도 작게 유지한다. 같은 판정은 tests/pages-search-preview.test.mjs 가 확인한다.
+const youtubeVideoId = youtubeIdFrom;
+export { youtubeVideoId };
 
 // 저장해 둔 썸네일 주소는 https + ytimg.com 만 받는다(임의 외부 호스트·사내 주소 차단).
 function safeSavedThumb(value) {

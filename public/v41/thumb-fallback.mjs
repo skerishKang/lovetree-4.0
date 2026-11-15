@@ -3,15 +3,17 @@
 //      → hqdefault → mqdefault → 모두 회색(120×90)/실패면 글 카드 → 제목도 없으면 최소 카드.
 // 썸네일 그림은 우리 서버에 복사하지 않고 주소만 다룬다(저작권 원칙).
 import { userTitleText, formatDisplayDate } from './book-usability.mjs';
+import { YOUTUBE_HOSTS, YTIMG_HOST, VIDEO_ID_RE, youtubeIdFrom } from './youtube-id.mjs';
+
+// 유튜브 영상 id 판정은 한 벤(public/v41/youtube-id.mjs)을 쓴다 — 예전 복사본은 지웠다.
+// 예전에 여기 있던 이름 그대로 다시 내보낸다(쓰던 곳의 주소가 바뀌지 않게).
+export { youtubeIdFrom };
 
 export const GRAY_THUMB_WIDTH = 120;
 export const GRAY_THUMB_HEIGHT = 90;
 export const VIDEO_UNAVAILABLE_TEXT = '영상을 볼 수 없어요';
 export const ADD_TITLE_LABEL = '제목 달기';
 
-const YOUTUBE_HOSTS = new Set(['youtube.com', 'www.youtube.com', 'm.youtube.com', 'music.youtube.com', 'youtu.be']);
-const YTIMG_HOST = /(?:^|\.)ytimg\.com$/i;
-const VIDEO_ID_RE = /^[A-Za-z0-9_-]{11}$/;
 const PUBLIC_ORIGINS = new Set(['https://lovetree-4-0.pages.dev', 'https://lovetree.padiem.net']);
 const PRIVATE_PHOTO_PATH = /^\/api\/media\/[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}\.(?:png|jpg|gif|webp)$/i;
 const EMOTION_TONES = { 설렘: 1, 그리움: 2, 위로: 3, 벅참: 4, 고마움: 5, 즐거움: 6 };
@@ -29,33 +31,6 @@ export function safeYoutubeThumb(value) {
   try { parsed = new URL(raw); } catch { return ''; }
   if (parsed.protocol !== 'https:' || parsed.username || parsed.password) return '';
   return YTIMG_HOST.test(parsed.hostname) ? parsed.href : '';
-}
-
-/** YouTube 시청/쇼츠/라이브/임베드 주소 또는 ytimg 썸네일 주소에서 11자리 영상 ID를 뽑는다. */
-export function youtubeIdFrom(value) {
-  const raw = trimText(value);
-  if (!raw || raw.length > 2048) return '';
-  let parsed;
-  try { parsed = new URL(raw); } catch { return ''; }
-  if (!['http:', 'https:'].includes(parsed.protocol) || parsed.username || parsed.password) return '';
-  const host = parsed.hostname.toLowerCase();
-  if (YOUTUBE_HOSTS.has(host)) {
-    if (host === 'youtu.be') {
-      const id = (parsed.pathname || '').split('/').filter(Boolean)[0] || '';
-      return VIDEO_ID_RE.test(id) ? id : '';
-    }
-    if (parsed.pathname === '/watch') {
-      const id = parsed.searchParams.get('v') || '';
-      return VIDEO_ID_RE.test(id) ? id : '';
-    }
-    const matched = (parsed.pathname || '').match(/^\/(?:shorts|live|embed)\/([^/?#]+)/);
-    return matched && VIDEO_ID_RE.test(matched[1]) ? matched[1] : '';
-  }
-  if (YTIMG_HOST.test(host)) {
-    const matched = (parsed.pathname || '').match(/^\/vi(?:_webp)?\/([^/?#]+)\//);
-    return matched && VIDEO_ID_RE.test(matched[1]) ? matched[1] : '';
-  }
-  return '';
 }
 
 export function youtubeStageThumbUrl(videoId, stage = 'hqdefault') {
