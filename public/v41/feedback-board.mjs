@@ -125,8 +125,16 @@ export function createFeedbackBoard({$, notify, show, showFull, onReplyCount, on
     const updates = await updatesByIssue();
     plist.innerHTML = posts.map(post => {
       const replies = Array.isArray(post.replies) ? post.replies : [];
+      // #678 후속 B: 내 덧붙임(canEdit·canDelete가 true)에만 고치기·지우기 단추가 보이고,
+      // 고친 덧붙임에는 (고침) 표시가 붙는다. 운영센터 답변(mine=false)에는 단추가 없다.
       const replyHtml = replies.length
-        ? `<div class="myposts-replies">${replies.map(r => `<div class="myposts-reply"><span>${r.mine ? '내 덧붙임' : '답변'}</span><p>${esc(r.body)}</p></div>`).join('')}</div>`
+        ? `<div class="myposts-replies">${replies.map(r => {
+            const tools = r.canDelete === true
+              ? `<span class="myposts-reply-tools"><button type="button" class="myposts-reply-btn" data-reply-edit="${esc(r.id)}">고치기</button><button type="button" class="myposts-reply-btn" data-reply-delete="${esc(r.id)}">지우기</button></span>`
+              : '';
+            const editedMark = r.edited === true ? '<span class="myposts-reply-edited">(고침)</span>' : '';
+            return `<div class="myposts-reply" data-reply-id="${esc(r.id)}"><span>${r.mine ? '내 덧붙임' : '답변'}${editedMark}</span><p>${esc(r.body)}</p>${tools}</div>`;
+          }).join('')}</div>`
         : '';
       const issue = (post.status === 'fixed' || post.status === 'closed') && post.issueNumber ? `<span class="myposts-issue">이슈 ${esc(post.issueNumber)}</span>` : '';
       // #611 4번: 이 의견이 반영된 버전이 새 소식에 있으면 본인에게 보여 준다.
@@ -167,6 +175,44 @@ export function createFeedbackBoard({$, notify, show, showFull, onReplyCount, on
     }
     for (const link of plist.querySelectorAll('.myposts-updates-link')) {
       link.addEventListener('click', () => { if (typeof onOpenUpdates === 'function') onOpenUpdates(link.dataset.updatesVersion); });
+    }
+    // #678 후속 B: 내 덧붙임 고치기·지우기. 고치기는 그 자리에서 입력칸으로 바뀌고 저장·취소가 있고,
+    // 지우기는 한 번 확인한 뒤 지운다(서버는 status='deleted'로 남긴다). 저장·지운 뒤에는 목록을 다시 부른다.
+    for (const button of plist.querySelectorAll('[data-reply-edit]')) {
+      button.addEventListener('click', () => {
+        const box = button.closest('.myposts-reply');
+        if (!box || box.querySelector('.myposts-reply-edit')) return;
+        const replyId = box.dataset.replyId || '';
+        const postId = button.closest('.myposts-item')?.querySelector('[data-followup]')?.dataset.followup || '';
+        const current = box.querySelector('p')?.textContent || '';
+        box.innerHTML = `<form class="myposts-reply-edit"><span class="myposts-reply-edit-label">내 덧붙임 고치기</span><input name="reply" maxlength="2000" autocomplete="off" value="${esc(current)}"><div class="myposts-reply-edit-row"><button type="submit" class="myposts-reply-save">저장</button><button type="button" class="myposts-reply-cancel">취소</button></div><p class="myposts-reply-edit-error" role="alert"></p></form>`;
+        const form = box.querySelector('.myposts-reply-edit');
+        const input = form.querySelector('input');
+        input.focus();
+        input.setSelectionRange(input.value.length, input.value.length);
+        form.addEventListener('submit', async event => {
+          event.preventDefault();
+          const error = form.querySelector('.myposts-reply-edit-error');
+          const text = input.value.trim();
+          if (!text) { error.textContent = '덧붙일 말을 입력해 주세요.'; return; }
+          const res = await api.call(`/api/board/mine/${encodeURIComponent(postId)}/followup/${encodeURIComponent(replyId)}`, {method: 'PATCH', body: JSON.stringify({body: text})});
+          if (!res.ok) { error.textContent = res.message || '고치지 못했어요.'; return; }
+          if (typeof notify === 'function') notify(res.followup?.status === 'reviewing' ? '고쳤어요. 다시 살펴볼게요.' : '고쳤어요.');
+          await openMyPosts();
+        });
+        form.querySelector('.myposts-reply-cancel').addEventListener('click', () => { openMyPosts(); });
+      });
+    }
+    for (const button of plist.querySelectorAll('[data-reply-delete]')) {
+      button.addEventListener('click', async () => {
+        const replyId = button.closest('.myposts-reply')?.dataset.replyId || '';
+        const postId = button.closest('.myposts-item')?.querySelector('[data-followup]')?.dataset.followup || '';
+        if (!globalThis.confirm('이 덧붙임을 지울까요? 지우면 내 의견 목록에서 사라져요.')) return;
+        const res = await api.call(`/api/board/mine/${encodeURIComponent(postId)}/followup/${encodeURIComponent(replyId)}`, {method: 'DELETE'});
+        if (!res.ok) { if (typeof notify === 'function') notify(res.message || '지우지 못했어요.'); return; }
+        if (typeof notify === 'function') notify('지웠어요.');
+        await openMyPosts();
+      });
     }
   }
 
