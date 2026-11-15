@@ -83,7 +83,11 @@ featured_tree AS (
   SELECT DISTINCT s.subject_id, s.tree_id, s.ai_tester, s.tester
   FROM active_share s
   WHERE s.moment_count >= 3
-    AND (s.origin = 'auto' OR s.discoverable = true)
+    -- 2026-11-16 대표 결정: 둘러보기 소개가 켜진 트리만 목록·운영 숫자에 센다(기본 꺼짐).
+    AND EXISTS (
+      SELECT 1 FROM lovetree_tree_discover d
+      WHERE d.product_id = s.product_id AND d.subject_id = s.subject_id AND d.tree_id = s.tree_id AND d.discover = true
+    )
     AND NOT EXISTS (
       SELECT 1 FROM lovetree_community_hidden_shares h
       JOIN lovetree_shares s2 ON s2.product_id = h.product_id AND s2.share_id = h.share_id

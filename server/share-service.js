@@ -50,7 +50,7 @@ function shareSummary(row) {
   return { id: row.shareId, treeId: row.treeId, entryMomentId: row.entryMomentId, view: row.view, status: row.status, createdAt: row.createdAt, revokedAt: row.revokedAt || null, discoverable: row.discoverable === true, discoverableAt: row.discoverableAt || null, origin: row.origin || 'owner', momentCount: Number(row.momentCount ?? 0) };
 }
 
-export function createShareService({ shareRepo, workspaceRepo, visibilityRepo = null, admin = null, productId, plusEntitled = () => false, makeId = () => randomBytes(18).toString('base64url') }) {
+export function createShareService({ shareRepo, workspaceRepo, visibilityRepo = null, discoverRepo = null, admin = null, productId, plusEntitled = () => false, makeId = () => randomBytes(18).toString('base64url') }) {
   async function projection(subjectId, input) {
     if (!input || typeof input !== 'object' || !RECORD_ID.test(input.treeId || ''))
       throw new ApiError(400, 'invalid_share_request', '공유할 트리를 다시 선택해 주세요.');
@@ -66,6 +66,22 @@ export function createShareService({ shareRepo, workspaceRepo, visibilityRepo = 
     if (!visibilityRepo) return 'public';
     return (await visibilityRepo.get({ productId, subjectId, treeId })).visibility;
   }
+  // 둘러보기 소개 표시(2026-11-16 대표 결정 — 기본 꺼짐, 고객이 켠다. 무료).
+  // 저장소가 없는 예전 모형(기존 시험)은 켜짐으로 본다 — 운영 서버는 늘 저장소를 넣는다.
+  async function treeDiscover(subjectId, treeId) {
+    if (!discoverRepo) return { discover: true };
+    return discoverRepo.get({ productId, subjectId, treeId });
+  }
+  async function ownTree(subjectId, treeId) {
+    if (!TREE_ID.test(treeId || '')) throw new ApiError(404, 'tree_not_found', '트리를 찾을 수 없어요.');
+    const stored = await workspaceRepo.load({ productId, subjectId });
+    if (!stored) throw new ApiError(404, 'tree_not_found', '트리를 찾을 수 없어요.');
+    let doc;
+    try { doc = validateState(stored.doc); }
+    catch { throw new ApiError(500, 'stored_document_invalid', '보관된 기록을 읽을 수 없어요.'); }
+    if (!doc.trees.some(tree => tree.id === treeId)) throw new ApiError(404, 'tree_not_found', '트리를 찾을 수 없어요.');
+    return doc;
+  }
   return {
     projection,
     async create(subjectId, input) {
@@ -80,7 +96,9 @@ export function createShareService({ shareRepo, workspaceRepo, visibilityRepo = 
       return { share: shareSummary(row), preview };
     },
     async list(subjectId) {
-      return (await shareRepo.list({ productId, subjectId })).map(shareSummary);
+      const rows = await shareRepo.list({ productId, subjectId });
+      // 공유 상태 응답에 소개 여부(discover)를 넣는다 — 화면이 켜고 끄는 스위치의 현재 값을 여기서 본다.
+      return Promise.all(rows.map(async row => ({ ...shareSummary(row), discover: (await treeDiscover(subjectId, row.treeId)).discover })));
     },
     async setDiscoverable(subjectId, shareId, discoverable) {
       if (!SHARE_ID.test(shareId)) throw new ApiError(404, 'share_not_found', '공유 주소를 찾을 수 없어요.');
@@ -138,25 +156,32 @@ export function createShareService({ shareRepo, workspaceRepo, visibilityRepo = 
       await shareRepo.revokeAutoSharesNotIn({ productId, subjectId, treeIds: [...counts.keys()] });
     },
     // #538: 트리 공개 상태. 비공개는 Plus 전용 — 판단은 서버가 한다.
+    // 응답에 소개 여부(discover)를 함께 돌려준다 — 화면이 두 값을 한 번에 본다.
     async setTreeVisibility(subjectId, treeId, visibility) {
-      if (!TREE_ID.test(treeId || '')) throw new ApiError(404, 'tree_not_found', '트리를 찾을 수 없어요.');
       if (visibility !== 'public' && visibility !== 'private') throw new ApiError(400, 'visibility_invalid', '공개 상태 값을 확인해 주세요.');
-      const stored = await workspaceRepo.load({ productId, subjectId });
-      if (!stored) throw new ApiError(404, 'tree_not_found', '트리를 찾을 수 없어요.');
-      let doc;
-      try { doc = validateState(stored.doc); }
-      catch { throw new ApiError(500, 'stored_document_invalid', '보관된 기록을 읽을 수 없어요.'); }
-      if (!doc.trees.some(tree => tree.id === treeId)) throw new ApiError(404, 'tree_not_found', '트리를 찾을 수 없어요.');
+      await ownTree(subjectId, treeId);
       if (visibility === 'private' && !plusEntitled(subjectId))
         throw new ApiError(403, 'plus_required_private', '비공개는 Plus 전용이에요. 지금은 모든 트리가 공개로 유지돼요.');
       if (visibilityRepo) await visibilityRepo.set({ productId, subjectId, treeId, visibility });
-      return { treeId, visibility };
+      return { treeId, visibility, discover: (await treeDiscover(subjectId, treeId)).discover };
     },
     async getTreeVisibility(subjectId, treeId) {
       if (!TREE_ID.test(treeId || '')) throw new ApiError(404, 'tree_not_found', '트리를 찾을 수 없어요.');
       const stored = await workspaceRepo.load({ productId, subjectId });
       if (!stored) throw new ApiError(404, 'tree_not_found', '트리를 찾을 수 없어요.');
-      return { treeId, visibility: await treeVisibility(subjectId, treeId) };
+      return { treeId, visibility: await treeVisibility(subjectId, treeId), discover: (await treeDiscover(subjectId, treeId)).discover };
+    },
+    // 둘러보기 소개 켜기·끄기(2026-11-16 대표 결정). 본인 트리만, 무료다(비공개 전환만 Plus 전용).
+    // 응답에 지금 상태를 돌려준다 — 화면은 응답값으로 스위치를 세운다.
+    async getTreeDiscover(subjectId, treeId) {
+      await ownTree(subjectId, treeId);
+      return { treeId, discover: (await treeDiscover(subjectId, treeId)).discover };
+    },
+    async setTreeDiscover(subjectId, treeId, discover) {
+      if (typeof discover !== 'boolean') throw new ApiError(400, 'discover_invalid', '소개 설정 값을 확인해 주세요.');
+      await ownTree(subjectId, treeId);
+      if (discoverRepo) await discoverRepo.set({ productId, subjectId, treeId, discover });
+      return { treeId, discover };
     }
   };
 }
@@ -198,6 +223,16 @@ export function createShareHandler({ authenticate, service, productId }) {
         return { status: 200, body: await service.setTreeVisibility(subjectId, visibility[1], body?.visibility), headers: NO_STORE };
       }
       if (method === 'GET') return { status: 200, body: await service.getTreeVisibility(subjectId, visibility[1]), headers: NO_STORE };
+      throw new ApiError(405, 'method_not_allowed', '이 요청은 지원하지 않아요.');
+    }
+    // 둘러보기 소개 켜기·끄기(2026-11-16 대표 결정). 본인 트리만, 무료. 응답에 지금 상태를 돌려준다.
+    const treeDiscover = path.match(/^\/api\/trees\/([^/]+)\/discover$/);
+    if (treeDiscover) {
+      if (method === 'PUT') {
+        const body = jsonBody(request);
+        return { status: 200, body: await service.setTreeDiscover(subjectId, treeDiscover[1], body?.discover), headers: NO_STORE };
+      }
+      if (method === 'GET') return { status: 200, body: await service.getTreeDiscover(subjectId, treeDiscover[1]), headers: NO_STORE };
       throw new ApiError(405, 'method_not_allowed', '이 요청은 지원하지 않아요.');
     }
     const item = path.match(/^\/api\/shares\/([^/]+)$/);

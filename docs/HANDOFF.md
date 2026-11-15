@@ -6,6 +6,15 @@
 
 > **시험 멈춤 규칙(2026-11-15)**: 브라우저 코드에 setInterval 반복을 넣으면 unref하거나 정리한다 — 안 그러면 npm test가 끝나지 않고 CI가 멈춘다.
 
+## 2026-11-16 — 둘러보기 소개 기본 꺼짐: 고객이 켜는 것으로 (컴1로컬4 레인, ai/local4-lt-discover-optin-261116, main b30034a 기준)
+
+- **결정(대표, 2026-11-16)**: 링크 공유는 무료·그대로. 둘러보기 소개는 **기본 꺼짐** — 고객이 켜야 둘러보기·다른 팬 보기(tag-moments)에 나오고(무료), 완전 비공개(링크 차단)만 Plus 전용 유지. 이미 나오던 트리는 켜진 상태로 둔다(고객 데이터 불변, 새 트리부터 기본 꺼짐). AI 명예회원 두 명이 공개를 무서워한 것이 계기.
+- **서버 경로**: '순간 3개 자동 소개' 규칙은 ① `server/db/community-postgres.js` 둘러보기 SQL(`moment_count>=3 AND (origin='auto' OR discoverable)`) ② 같은 파일 `listPublicTagShares`(조건 없음) ③ `server/db/stats-postgres.js` featured_tree ④ sitemap(functions/_lib/search-meta.mjs — 둘러보기 목록을 따라감)에 있었다. 넷 모두 `lovetree_tree_discover` 표(새 — 스파스, 켠 트리만 행)의 `EXISTS`로 바꾸고, tag-moments에도 `moment_count>=3`을 더했다. tester 거름은 서비스층 역할 판정(기존 #678 후속) 그대로.
+- **새 API(무료, 본인 트리만)**: `GET/PUT /api/trees/<treeId>/discover`(`{discover:true|false}`) — 응답에 지금 상태를 돌려준다. 공유 상태 응답(`GET /api/shares`)과 공개 상태 응답(visibility GET/PUT)에도 `discover` 칸을 넣었다(화면이 다음 PR에서 쓴다 — 이번 PR은 화면을 바꾸지 않는다).
+- **migration**: `server/db/migrations/tree-discover-optin-261116.sql` — 표 생성 + '지금 둘러보기에 나오는 트리'(active + 3개 이상 + auto/discoverable + 비공개 아님 + 숨김 없음)를 켜짐으로 백필(ON CONFLICT DO NOTHING — 재실행 안전). schema.sql에도 같은 표 추가. 탈퇴 경로(account-postgres.js)에도 표 추가.
+- **시험**: public-default-538(메모리)에 기본 꺼짐→켬→끔·남의 트리 404·tester 켜도 안 나옴·백필(켬) 트리 유지 + 공유/공개 상태 응답 discover 칸. community-service(메모리) tag-moments에 소개 꺼짐 제외·켬 추가. community-postgres(PG, CI) 둘러보기 SQL을 소개 표 기준으로 재작성(켬/끔/2개/비공개/숨김/재켜기) + stats 집계 백필 반영. migrations-postgres(PG, CI)에 백필 migration 재실행 안전 시험. 전체 npm test 1712 pass 0 fail(31초)·build·modulepreload --check 통과.
+- **운영 반영(머지 뒤, 대표 승인 — 백업 먼저)**: 컴2 autodeploy가 needs_manual_migration에서 멈추면 → 대상 표 백업(dump+sql, chmod 600) → migration 1회 → 둘러보기 목록 수가 migration 전과 같은지 확인 → `AUTODEPLOY_ACCEPT_MIGRATIONS=1` 설치. 백업 경로·전후 목록 수를 운영일지 '운영센터 처리'에 한 줄 기록.
+
 ## 2026-11-16 — #my/graph가 그래프가 아니라 첫 화면으로 열리는 문제 수리 (컴1로컬4 레인, ai/local4-graph-route-261116, main f64745c 기준, PR #728)
 
 - **원인**: #713(8db6946)에서 그래프 화면이 `public/v41/views/graph/track60-graph.html` 하위 폴더로 들어갔는데 `shell/navigation.mjs`의 `screenUrl`은 `views/ + 파일이름`만 만든다 → `/v41/views/track60-graph.html`은 배포에 없는 주소라 Cloudflare Pages가 4.0 SPA index로 200 폴백(라이브 확인: 실제 그래프는 `/v41/views/graph/track60-graph`, 308 경유). iframe이 4.0 앱을 불러와 첫 화면('다시, 그 순간으로.')이 보였다(대표 제보).
