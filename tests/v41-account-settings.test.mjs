@@ -170,6 +170,7 @@ test('공지·로그인 만료 안내는 설정 상태 줄 한 벌을 쓴다', (
   const auth = read('public/v41/shell/auth.mjs');
   // #453 C2: 설정이 닫혀 있을 때 온 안내가 창 안에 쌓이지 않는다(열려 있을 때만 그 줄에 쓴다).
   assert.match(notice, /if \(\$\('settings-feedback'\) && \$\('account-settings'\)\?\.open\) \$\('settings-feedback'\)\.textContent = text;/);
-  assert.match(notice, /\$\('toast'\)\.hidden = !!\$\('account-settings'\)\?\.open;/);
+  // #666: 안내 줄을 띄우기 직전에 자리를 재는 길(beforeShow)이 붙어도 설정 창 안에 쓰는 규칙은 그대로다.
+  assert.match(notice, /if \(\$\('account-settings'\)\?\.open\) \$\('toast'\)\.hidden = true;/);
   assert.doesNotMatch(auth, /record-feedback/);
 });

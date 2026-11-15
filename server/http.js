@@ -12,7 +12,7 @@ function errorBody(error) {
 
 const ACCOUNT_NO_STORE = { 'cache-control': 'private, no-store', 'x-content-type-options': 'nosniff' };
 
-export function createApiHandler({ authenticate, service, productId, admin = null, account = null, accountDeleteAuthenticate = null, accountDeleteWorkflow = null, allowedOrigins = [], maxBodyBytes = DEFAULT_MAX_BODY_BYTES }) {
+export function createApiHandler({ authenticate, service, productId, admin = null, adminStats = null, account = null, accountDeleteAuthenticate = null, accountDeleteWorkflow = null, allowedOrigins = [], maxBodyBytes = DEFAULT_MAX_BODY_BYTES }) {
   async function handle(request) {
     const { method = 'GET', path = '', body = '' } = request ?? {};
     const text = typeof body === 'string' ? body : String(body);
@@ -78,6 +78,17 @@ export function createApiHandler({ authenticate, service, productId, admin = nul
         body: { ok: true, role, registry: await admin.list(), history: await admin.history({ limit: 20 }) },
         headers: { 'cache-control': 'private, no-store', 'x-content-type-options': 'nosniff' }
       };
+    }
+
+    // 운영센터 '한눈에' 전체 숫자 (#655 2차). 권한 판정은 위 관리자 경계와 같은 자리를 쓴다 —
+    // 서버가 확인한 신원에 역할을 다시 견주고, 관리자가 아니면 403으로 닫는다.
+    if (path === '/api/admin/stats') {
+      if (method !== 'GET') throw new ApiError(405, 'method_not_allowed', '이 요청은 지원하지 않아요.');
+      if (!admin) throw new ApiError(503, 'admin_roles_unavailable', '역할 확인을 아직 켜지 않았어요.');
+      const role = await admin.roleFor(principal);
+      if (role !== ROLE_ADMIN) throw new ApiError(403, 'admin_forbidden', '관리자만 볼 수 있어요.');
+      if (!adminStats) throw new ApiError(503, 'admin_stats_unavailable', '숫자를 아직 켜지 않았어요.');
+      return { status: 200, body: { ok: true, stats: await adminStats.stats() }, headers: ACCOUNT_NO_STORE };
     }
 
     const treeItem = path.match(/^\/api\/workspace\/trees\/([^/]+)$/);

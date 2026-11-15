@@ -187,12 +187,17 @@ function growBoard(){let s=LT58Model.boardSize(moments.map(m=>({x:m.x,y:m.y,h:re
 const BOARD_VIEW_KEY='lt41.boardView';
 function boardCards(){return moments.map(m=>{let el=cardLayer.querySelector(`[data-id="${m.id}"]`);return{id:m.id,x:m.x,y:m.y,w:el?.offsetWidth||242,h:el?.offsetHeight||260}})}
 // 보이는 칸: 왼쪽 도구 창·오른쪽 상세 창(열려 있거나 곧 열릴 때)을 뺀 자리. 좁은 화면(760 미만)은 두 창이 아래에서 올라오므로 빼지 않는다.
-function boardSafeArea(expectDetail=false){let vw=viewport.clientWidth,vh=viewport.clientHeight,left=16,right=16;
+function boardSafeArea(expectDetail=false){let vw=viewport.clientWidth,vh=viewport.clientHeight,left=16,right=16,top=12,bottom=12;
 if(innerWidth>=760){let lp=$('#leftPanel'),dt=$('#detail'),vr=viewport.getBoundingClientRect();
 if(lp){let r=lp.getBoundingClientRect();if(r.width&&r.right-vr.left<vw/2)left=Math.max(16,r.right-vr.left+12)}
 if(dt&&(expectDetail||dt.classList.contains('open')))right=dt.offsetWidth+32}
+else{/* #267: 좁은 판에서는 위에 순간 탐색 판(선택·책 열기)이, 오른쪽 아래에 시네마 단추가 카드 위에 뜬다 —
+  처음 맞춤이 카드를 그 밑에 두도록 위·아래 자리를 비켜 둔다(판이 없으면 지금처럼 12px만 남긴다). */
+const vr=viewport.getBoundingClientRect();
+const pk=$('.lt-moment-picker');if(pk){const r=pk.getBoundingClientRect();if(r.width)top=Math.max(top,r.bottom-vr.top+12)}
+const cb=$('.cinemaBtn');if(cb){const r=cb.getBoundingClientRect();if(r.width)bottom=Math.max(bottom,vr.bottom-r.top+12)}}
 let w=vw-left-right;if(w<260){left=16;w=vw-32}
-return{x:left,y:12,w:Math.max(1,w),h:Math.max(1,vh-24)}}
+return{x:left,y:top,w:Math.max(1,w),h:Math.max(1,vh-top-bottom)}}
 function boardTreeId(){try{return String(window.parent.LT41?.tree?.id||'')}catch{return ''}}
 function readBoardView(){let id=boardTreeId();if(!id)return null;try{return LT58Model.savedView(JSON.parse(localStorage.getItem(BOARD_VIEW_KEY)||'{}')[id])}catch{return null}}
 function writeBoardView(v){let id=boardTreeId();if(!id)return;try{let all=JSON.parse(localStorage.getItem(BOARD_VIEW_KEY)||'{}');if(v)all=LT58Model.rememberView(all,id,v,Date.now());else delete all[id];localStorage.setItem(BOARD_VIEW_KEY,JSON.stringify(all))}catch{/* 저장소를 못 쓰면 이번 화면에서만 기억 */}}
@@ -202,7 +207,11 @@ userView={cx:(vw/2-view.x)/view.z,cy:(vh/2-view.y)/view.z,z:view.z};viewMode='us
 clearTimeout(viewSaveTimer);viewSaveTimer=setTimeout(()=>writeBoardView(userView),400)}
 // #490: 화면 전환(두 장 앞뒤 바꿈)에서는 이 문서가 숨은 프레임(폭 0)에서 먼저 뜬다. 그때 한 맞춤을 '전체 보기'로
 // 기억하면 드러난 뒤 resize가 맞춤(55%)을 다시 적용해 처음 80%·기억한 자리가 무시됐다 → 처음 자리 대기로 둔다.
-function boardStartView(){if(innerWidth<700){fitAll(false);viewMode='start';return}
+// #662(CTO 지시): 좁은 판(<700)에서도 전체 맞춤은 순간이 많으면 카드를 손톱만 하게 몰아 넣는다 — 예전처럼 지금(또는 첫)
+// 순간 카드가 읽히는 배율(카드 폭 ≥ 화면의 6할)로 크게 보이게 초점을 맞춘다. 머리글·탐색 판 비켜 두기는
+// focusBoardMoment가 판 아래끝을 실측해 해준다(#662). 초점 보기는 캔버스 설계상 이웃 카드가 도구 밑으로 슬라이드된다 —
+// 검사기는 보드의 도구×캔버스 겹침을 설계대로 제외하고 대신 '작은카드' 기준으로 읽히는 배율을 지킨다.
+function boardStartView(){if(innerWidth<700){if(typeof focusBoardMoment==='function')focusBoardMoment(LTDEMO.get(),false);else fitAll(false);viewMode='start';return}
 let vw=viewport.clientWidth,vh=viewport.clientHeight,cards=boardCards(),saved=userView||readBoardView();
 // #536: 기억한 자리의 적용·버림 판정까지 모델(LT58Model.startView)이 맡는다 — 처음 자리와 같은
 // 판 규칙(덮거나 가운데)을 함께 거치게 해 넓은 화면에서 판이 한쪽으로 쏠리지 않게 한다.
@@ -269,6 +278,9 @@ el.textContent=t;
 el.classList.add('show');
 clearTimeout(toast.t);
 toast.t=setTimeout(()=>el.classList.remove('show'),2200)}
+// #662 후속(CTO 지시): 상세 판이 열리면 안내 풍선은 즉시 치운다 — 안내는 '순간을 선택하라'는 뜻이라 이미 선택해
+// 판이 열렸으면 필요 없고, 넓은 판에서는 풍선 자리가 판 안쪽('이어진 순간' 줄)과 포개진다. 다른 풍선(마음 저장 등)은 그대로 뜬다.
+function hideToast(){const el=$('#toast');clearTimeout(toast.t);el.classList.remove('show')}
 
 function addMoment(m,connectFrom=null){snapshot();
 moments.push(m);

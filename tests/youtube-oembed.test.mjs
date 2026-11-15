@@ -75,6 +75,40 @@ test('404는 youtube_not_found, 형식 오류는 youtube_metadata로 구분한�
   await assert.rejects(() => createYoutubeOembedClient({ fetchImpl: async () => ({ ok: true, status: 200, async json() { throw new Error('bad json'); } }) }).metadata(ID), (error) => error.status === 502 && error.code === 'youtube_metadata');
 });
 
+test('#666 유튜브가 준 403·401·400을 502로 묽개지 않고 그대로 넘기고, 실패는 기억하지 않는다', async () => {
+  const rows = [[403, 'youtube_private'], [401, 'youtube_embed_forbidden'], [400, 'youtube_missing'], [404, 'youtube_not_found']];
+  for (const [upstream, code] of rows) {
+    let calls = 0;
+    const client = createYoutubeOembedClient({ fetchImpl: async () => { calls += 1; return jsonResponse({}, upstream); } });
+    await assert.rejects(() => client.metadata(ID), (error) => error instanceof ApiError && error.status === upstream && error.code === code, String(upstream));
+    // 실패는 캐시하지 않는다 — 비공개(403)가 하루 동안 기기에 고정되면 안 된다.
+    assert.equal(client.size(), 0, `${upstream}은 캐시하지 않는다`);
+    await assert.rejects(() => client.metadata(ID), (error) => error.status === upstream);
+    assert.equal(calls, 2, `${upstream}은 다시 묻는다`);
+  }
+  // 5xx·모르는 코드는 예전과 같이 502로 남는다(사라졌다고 말하지 않게).
+  for (const upstream of [429, 500, 503]) {
+    await assert.rejects(() => createYoutubeOembedClient({ fetchImpl: async () => jsonResponse({}, upstream) }).metadata(ID), (error) => error.status === 502 && error.code === 'youtube_metadata', String(upstream));
+  }
+});
+
+test('#666 실패 응답은 cache-control: private, no-store로 나가고 성공만 24시간을 남긴다', async () => {
+  const failing = createYoutubeOembedHandler({
+    authenticate: async () => ({ productId: 'lovetree-test', subjectId: 'bob' }),
+    productId: 'lovetree-test',
+    client: { metadata: async () => { throw new ApiError(403, 'youtube_private', '이 영상은 비공개예요.'); } }
+  });
+  const answer = await failing({ method: 'GET', path: '/api/youtube/oembed', query: new URLSearchParams({ v: ID }), headers: {} });
+  assert.equal(answer.status, 403);
+  assert.equal(answer.body.error.code, 'youtube_private');
+  assert.equal(answer.headers['cache-control'], 'private, no-store');
+  assert.equal(answer.headers['x-content-type-options'], 'nosniff');
+  // 성공 응답의 기억 시간은 그대로다(포스트디플로이 검사가 max-age=86400을 본다).
+  const ok = await handler().call('GET', '/api/youtube/oembed', { account: 'bob', query: { v: ID } });
+  assert.equal(ok.status, 200);
+  assert.match(ok.headers['cache-control'], /private, max-age=\d+$/);
+});
+
 test('시간 초과나 연결 실패는 youtube_unreachable로 끝난다', async () => {
   const hanging = createYoutubeOembedClient({ timeoutMs: 5, fetchImpl: (url, init) => new Promise((resolve, reject) => {
     init.signal.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' })));

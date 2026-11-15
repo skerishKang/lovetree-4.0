@@ -535,3 +535,79 @@ test('#644 화면: 보드 상세의 다른 트리로 옮기기 — 단추가 보
     }
   } finally { await browser.close(); server.close(); }
 });
+
+test('#662 화면: 상세 판의 행동 단추를 실제 좌표 클릭으로 누른다 — 판 표면에 가로막히지 않는다(1440·390)', { skip: REQUIRE ? false : skip, timeout: 300000 }, async () => {
+  if (skip) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip}`);
+  const tree = starTree(6);
+  const server = await serve({ '/__host-662.html': hostHTML(tree) });
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch({ headless: true });
+  try {
+    for (const [width, height] of [[1440, 900], [390, 844]]) {
+      const { context, page, frame, problems } = await openHost(browser, `${base}/__host-662.html`, { width, height });
+      try {
+        // 화면 안에 온전히 보이는 카드를 골라 상세를 연다(실제 마우스 클릭).
+        const card = await frame.evaluate(() => {
+          for (const c of document.querySelectorAll('#cardLayer .card')) {
+            const r = c.getBoundingClientRect();
+            if (r.left >= 0 && r.right <= innerWidth && r.top >= 60 && r.bottom <= innerHeight - 60) {
+              return { id: c.dataset.id, x: (r.left + r.right) / 2, y: (r.top + r.bottom) / 2 };
+            }
+          }
+          return null;
+        });
+        assert.ok(card, `${width}px에서 누를 카드가 화면 안에 있다`);
+        await page.mouse.click(card.x, card.y);
+        await page.waitForTimeout(700);
+        // 각 행동 단추의 중심에서 elementFromPoint가 그 단추를 가리키는지 — 판 표면이 가로막으면 실패다(#601).
+        const hit = await frame.evaluate(() => {
+          return ['openMoment', 'cinemaFromMoment', 'detailMapBtn'].map((id) => {
+            const b = document.getElementById(id);
+            if (!b || b.hidden) return { id, skip: true };
+            const r = b.getBoundingClientRect();
+            const x = r.left + r.width / 2, y = r.top + r.height / 2;
+            const top = document.elementFromPoint(x, y);
+            return { id, x: Math.round(x), y: Math.round(y), onScreen: y > 0 && y < innerHeight, hit: top === b || b.contains(top) };
+          });
+        });
+        for (const h of hit) {
+          if (h.skip) continue;
+          assert.equal(h.onScreen, true, `${width}px: #${h.id} 단추가 화면 안에 있다(@${h.x},${h.y})`);
+          assert.equal(h.hit, true, `${width}px: #${h.id} 중심(@${h.x},${h.y})의 클릭이 단추에 온다 — 판 표면이 가로막지 않는다`);
+        }
+        // 실제 좌표 클릭으로 동작까지 확인한다.
+        const center = (id) => frame.evaluate((i) => { const b = document.getElementById(i); const r = b.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }, id);
+        // 크게 보기 → 감상 창이 열린다.
+        const om = await center('openMoment');
+        await page.mouse.click(om.x, om.y);
+        await page.waitForTimeout(500);
+        assert.equal(await frame.evaluate(() => document.getElementById('viewerModal').classList.contains('open')), true, `${width}px: '크게 보기'를 실제 클릭으로 누르면 감상 창이 열린다`);
+        await frame.evaluate(() => document.getElementById('viewerModal').classList.remove('open'));
+        await page.waitForTimeout(200);
+        // 지도에서 관계 보기 → 셸로 lt41-open-network이 간다.
+        const mb = await center('detailMapBtn');
+        await page.mouse.click(mb.x, mb.y);
+        await page.waitForTimeout(400);
+        assert.equal(await page.evaluate(() => window.LT41_MESSAGES.some((m) => m.type === 'lt41-open-network')), true, `${width}px: '지도에서 관계 보기'를 실제 클릭으로 누르면 셸에 요청이 간다`);
+        // 여기부터 시네마 → 시네마가 켜진다(상세가 닫히므로 마지막에 누른다).
+        const cm = await center('cinemaFromMoment');
+        await page.mouse.click(cm.x, cm.y);
+        await page.waitForTimeout(800);
+        assert.equal(await frame.evaluate(() => document.getElementById('cinemaOverlay').classList.contains('active')), true, `${width}px: '여기부터 시네마'를 실제 클릭으로 누르면 시네마가 켜진다`);
+        await frame.evaluate(() => document.getElementById('cinExit').click());
+        await page.waitForTimeout(500);
+        // 테마 꼬리표가 상세 판에 덮이지 않았는지.
+        const badge = await frame.evaluate(() => {
+          const b = document.getElementById('themeBadge');
+          if (!b) return { skip: true };
+          const r = b.getBoundingClientRect();
+          const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+          const tag = (n) => n ? (n.id ? n.tagName + '#' + n.id : n.tagName + '.' + String(n.className).split(' ')[0]) : 'null';
+          return { hit: top === b || b.contains(top), top: tag(top), x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) };
+        });
+        if (!badge.skip) assert.equal(badge.hit, true, `${width}px: 테마 꼬리표가 다른 요소에 덮이지 않는다 (@${badge.x},${badge.y} 위: ${badge.top})`);
+        assert.equal(problems.length, 0, `${width}px: 화면 문제 없음 (${problems.join(' | ') || '없음'})`);
+      } finally { await context.close(); }
+    }
+  } finally { await browser.close(); server.close(); }
+});

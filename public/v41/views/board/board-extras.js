@@ -4,7 +4,8 @@ renderCards();
 renderThreads();
 formFor(addType);
 setTimeout(boardStartView,40);
-setTimeout(()=>toast('순간을 선택해 연결된 기록을 살펴보세요.'),900);
+// #662 후속(CTO 지시): 안내는 상세 판이 닫혀 있을 때만 뜬다 — 이미 순간을 선택해 판이 열렸으면 '선택하라'는 안내는 필요 없다.
+setTimeout(()=>{if(!document.getElementById('detail').classList.contains('open'))toast('순간을 선택해 연결된 기록을 살펴보세요.')},900);
 
 window.__LT58={moments,connections,get state(){return{moments:moments.length,connections:connections.length,view:{...view},selected,cinema}},fitAll,startCinema,selectMoment,addDemo:(type='photo')=>{addType=type;
 formFor(type);
@@ -136,7 +137,7 @@ $('#dBasic').innerHTML=`<b>${esc(m.emotion)}</b> · ${esc(dateText(m.date))}${m.
 let outs=connections.filter(c=>c.kind==='parent'&&c.a===id),ins=connections.filter(c=>c.kind==='parent'&&c.b===id);
 // #583 규칙 한 벌: 다음 3개 + '나머지 N개 보기', 다음이 없으면 이전. board.js open()과 같은 규칙이다.
 const _rowsHTML=(rows)=>rows.length>3?rows.slice(0,3).join('')+`<details><summary>나머지 ${rows.length-3}개 보기</summary>${rows.slice(3).join('')}</details>`:rows.join('');
-$('#dConn').innerHTML=outs.length?_rowsHTML(outs.map(c=>connRow(c,'next'))):(ins.length?_rowsHTML(ins.map(c=>connRow(c,'prev'))):'아직 이어진 순간이 없어요');$('#detail').classList.add('open');
+$('#dConn').innerHTML=outs.length?_rowsHTML(outs.map(c=>connRow(c,'next'))):(ins.length?_rowsHTML(ins.map(c=>connRow(c,'prev'))):'아직 이어진 순간이 없어요');hideToast();$('#detail').classList.add('open');
 const _st=LT58Model.detailButtonState(ins,outs);const _cin=$('#cinemaFromMoment');if(_cin){_cin.disabled=_st.nextDisabled;_cin.title=_st.nextDisabled?'이 순간에서 이어진 길이 없어요':''}
 // 'YouTube에서 열기' — 원본 주소가 있을 때만 보인다.
 const _ytBtn=$('#detailYtBtn');if(_ytBtn){const _u=(window.__LT58YT?.originalUrl?.(m))||m.url||'';_ytBtn.hidden=!_u;_ytBtn.onclick=()=>{if(_u)window.open(_u,'_blank','noopener,noreferrer')}}
@@ -151,7 +152,10 @@ let editBtn=[...$('#detail').querySelectorAll('button')].find(b=>b.textContent.t
 if(LTDEMO.readOnly){if(editBtn)editBtn.hidden=true;for(const id of ['addBtn','undoBtn']){const b=document.getElementById(id);if(b)b.hidden=true;}}
 // #601: 내 마음 입력 — 기존 순간 저장 경로(boardPayload의 note)로 그대로 저장한다.
 $('#dHeartSave').onclick=()=>{let m=moments.find(x=>x.id===selected);if(!m)return;const v=$('#dHeartInput').value.trim();if(!v){toast('마음을 적어 주세요.');return}snapshot();m.memo=v;persistBoard();selectMoment(m.id,false);toast('마음을 남겼어요.')};
-function focusBoardMoment(id,open=true){let m=moments.find(x=>x.id===id),el=cardLayer.querySelector(`[data-id="${id}"]`);if(!m||!el)return;let cx=m.x+el.offsetWidth/2,cy=m.y+el.offsetHeight/2,vw=viewport.clientWidth,vh=viewport.clientHeight;view.z=Math.min(vw<700?1.0:1.06,1.15);view.x=vw/2-cx*view.z;view.y=vw<700?156-m.y*view.z:vh/2-cy*view.z;applyView(open);noteUserView();if(!open)LTDEMO.select(id);selectMoment(id,open)}
+function focusBoardMoment(id,open=true){let m=moments.find(x=>x.id===id),el=cardLayer.querySelector(`[data-id="${id}"]`);if(!m||!el)return;let cx=m.x+el.offsetWidth/2,cy=m.y+el.offsetHeight/2,vw=viewport.clientWidth,vh=viewport.clientHeight;
+/* #267: 좁은 판에서는 위의 탐색 판(선택·책 열기) 아래부터 카드가 보이게 한다 — 고정 156px는 판이 현재 위치(99~179)보다 위라 카드 머리가 판에 덮였다. */
+let topOffset=156;if(vw<700){const pk=document.querySelector('.lt-moment-picker');if(pk){const r=pk.getBoundingClientRect(),vr=viewport.getBoundingClientRect();if(r.width)topOffset=Math.round(r.bottom-vr.top+12)}}
+view.z=Math.min(vw<700?1.0:1.06,1.15);view.x=vw/2-cx*view.z;view.y=vw<700?topOffset-m.y*view.z:vh/2-cy*view.z;applyView(open);noteUserView();if(!open)LTDEMO.select(id);selectMoment(id,open)}
 function pulseConnection(c,after){let g=threadLayer.querySelector(`[data-cid="${c.id}"]`);if(!g){after?.();return}g.classList.add('selectedPath');let p=g.querySelector('.threadColor');animateHotTip(p,760).then(()=>{setTimeout(()=>g.classList.remove('selectedPath'),600);after?.()})}
 function moveViaConnection(c){$('#nextChooser').classList.remove('open');pulseConnection(c,()=>focusBoardMoment(c.b))}
 let chooserOrigin=null;function chooseNext(dir='next'){chooserOrigin=dir==='next'?$('#nextMoment'):$('#prevMoment');$('#nextChooserTitle').textContent=dir==='next'?'다음 경로 선택':'이전 경로 선택';let list=LT58Model.nextConnections(dir,selected,connections);if(!list.length)return toast(dir==='next'?'다음으로 연결된 순간이 없어요.':'이전으로 연결된 순간이 없어요.');if(list.length===1){let c=list[0];if(dir==='next')moveViaConnection(c);else{pulseConnection(c,()=>focusBoardMoment(c.a))}return}let box=$('#nextChoices');box.innerHTML=list.map(c=>{let target=dir==='next'?moments.find(m=>m.id===c.b):moments.find(m=>m.id===c.a);return `<button class="routeChoice" data-cid="${c.id}" data-dir="${dir}">${esc(titleMain(target))}<small>${esc(c.why)}</small></button>`}).join('');$('#nextChooser').classList.add('open')}
@@ -192,7 +196,7 @@ const cinemaV11={active:false,paused:false,beats:[],index:0,progress:0,last:0,fo
 function makeCinemaBeats(startId=null){let path=startId?collectPathFrom(startId).ids:replayPath.filter(id=>moments.some(m=>m.id===id));if(!path.length)path=collectPathFrom(moments.find(m=>m.first)?.id||moments[0].id).ids;let beats=LT58Model.cinemaBeats(path,moments,connections);
 // #582: 줄이 없으므로 연결·이유·갈림 비트는 건너뛴다 — 시네마는 순간을 차례로 걷는다.
 return beats.filter(b=>!['connection','why','branch'].includes(b.type))}
-function resetCinemaVisuals(){document.querySelectorAll('.card').forEach(c=>c.classList.remove('cinemaDim','cinemaFocus'));threadLayer.querySelectorAll('.threadGroup').forEach(g=>{g.classList.remove('selectedPath');g.querySelector('.threadGlow').style.opacity=''});$('#hotTip').setAttribute('opacity','0');$('#cinemaCaption').classList.remove('show');$('#finalCTA').classList.remove('show');document.body.classList.remove('boardBloom')}
+function resetCinemaVisuals(){document.querySelectorAll('.card').forEach(c=>c.classList.remove('cinemaDim','cinemaFocus'));threadLayer.querySelectorAll('.threadGroup').forEach(g=>{g.classList.remove('selectedPath');/* #662: hotTip 요소는 판 화면에서 빠져 있다 — 없으면 건너뛰고 종료 뒤 정리가 이어지게 한다(종료 단추를 누르면 항상 터졌다). */g.querySelector('.threadGlow')?.style.setProperty('opacity','')});const ht=$('#hotTip');ht&&ht.setAttribute('opacity','0');$('#cinemaCaption').classList.remove('show');$('#finalCTA').classList.remove('show');document.body.classList.remove('boardBloom')}
 function enterBeatVisual(beat){resetCinemaVisuals();$('#beatLabel').textContent=beat.label;if(beat.type==='moment'){cinemaV11.focused=beat.id;let m=moments.find(x=>x.id===beat.id);focusMoment(beat.id,`${m.emotion} · ${titleMain(m)}`)}else if(beat.type==='connection'||beat.type==='why'){let c=connections.find(x=>x.id===beat.cid);cinemaV11.focused=c?.a||beat.id;let g=threadLayer.querySelector(`[data-cid="${beat.cid}"]`);g?.classList.add('selectedPath');if(beat.type==='why'){let c=connections.find(x=>x.id===beat.cid);$('#cinemaCaption').textContent=c?.why||'연결 이유';$('#cinemaCaption').classList.add('show')}}else if(beat.type==='branch'){$('#cinemaCaption').textContent='여기서 다른 경로도 열렸어요.';$('#cinemaCaption').classList.add('show');cinemaV11.focused=beat.id}else if(beat.type==='bloom'){document.querySelectorAll('.card').forEach(c=>c.classList.remove('cinemaDim','cinemaFocus'));fitAll(true);document.body.classList.add('boardBloom');threadLayer.querySelectorAll('.threadGlow').forEach(p=>p.style.opacity='.82');cinemaV11.focused=beat.id}else if(beat.type==='final'){fitAll(true);document.body.classList.add('boardBloom');$('#finalCTA').classList.add('show');cinemaV11.focused=beat.id}}
 function renderBeatProgress(beat,p){if(beat.type==='connection'){let g=threadLayer.querySelector(`[data-cid="${beat.cid}"]`),path=g?.querySelector('.threadColor');if(path){let len=path.getTotalLength(),pt=path.getPointAtLength(len*Math.max(0,Math.min(1,p)));$('#hotTip').setAttribute('opacity','1');$('#hotTip').setAttribute('cx',pt.x);$('#hotTip').setAttribute('cy',pt.y);$('#hotTip').setAttribute('r',String(5+2*Math.sin(p*Math.PI)));g.querySelector('.threadGlow').style.opacity=String(.45+.45*Math.sin(p*Math.PI));let c=connections.find(x=>x.id===beat.cid);$('#cinemaCaption').textContent=c?.why||'';$('#cinemaCaption').classList.add('show')}}}
 function cinemaOverall(){let n=cinemaV11.beats.length;return n<=1?0:((cinemaV11.index+cinemaV11.progress)/(n-1))*100}
@@ -204,7 +208,7 @@ startCinema=function(fromIndex=0){startCinemaV11(fromIndex,null)};endCinema=func
 $('#cinemaBtn').onclick=()=>startCinemaV11(0);$('#toolCinema').onclick=()=>startCinemaV11(0);$('#cinemaFromMoment').onclick=()=>startCinemaV11(0,selected);$('#cinPlay').onclick=()=>{cinemaV11.paused=!cinemaV11.paused;$('#cinPlay').textContent=cinemaV11.paused?'계속 보기':'일시정지';cinemaV11.last=performance.now()};$('#cinPrev').onclick=()=>setCinemaPosition(cinemaV11.index-1,0);$('#cinNext').onclick=()=>setCinemaPosition(cinemaV11.index+1,0);$('#cinRestart').onclick=()=>setCinemaPosition(0,0);$('#cinExit').onclick=()=>endCinemaV11(true);$('#cinProgress').oninput=e=>{let pct=+e.target.value/100,n=cinemaV11.beats.length-1,pos=pct*n,idx=Math.floor(pos),p=pos-idx;cinemaV11.paused=true;$('#cinPlay').textContent='계속 보기';setCinemaPosition(idx,p)};$('#enterBeat').onclick=()=>{let id=cinemaV11.focused;endCinemaV11(false);if(id){focusBoardMoment(id);selectMoment(id,true);toast('Cinema의 이 장면에서 기억 보드로 들어왔어요.')}};$('#walkAgain').onclick=()=>startCinemaV11(0,cinemaV11.fromMoment);$('#backBoard').onclick=()=>endCinemaV11(true);$('#finalOpen').onclick=()=>{let id=cinemaV11.focused;endCinemaV11(false);if(id){focusBoardMoment(id);openViewer(id)}};
 /* Wire theme/style inspector quick controls */
 let styleSec=document.createElement('div');styleSec.className='section';styleSec.hidden=false;styleSec.id='styleSection';styleSec.innerHTML=`<div class="label">STYLE</div><div class="ctaRow" style="margin-top:8px"><button class="miniBtn" id="quickPin">핀 바꾸기</button><button class="miniBtn" id="quickCard">카드 바꾸기</button></div>`;$('#detail .section.ctaRow').before(styleSec);$('#quickPin').onclick=()=>{let m=moments.find(x=>x.id===selected);snapshot();m.pinStyle=LT_PIN_STYLES[(LT_PIN_STYLES.indexOf(m.pinStyle)+1)%LT_PIN_STYLES.length];renderCards();selectMoment(m.id,true);persistBoard()};$('#quickCard').onclick=()=>{let m=moments.find(x=>x.id===selected);snapshot();m.cardStyle=LT_CARD_STYLES[(LT_CARD_STYLES.indexOf(m.cardStyle)+1)%LT_CARD_STYLES.length];renderCards();selectMoment(m.id,true);persistBoard()};
-$('#addBtn').onclick=()=>{if(LTDEMO.readOnly)return;openAdd()};$('#confirmAdd').onclick=()=>{if(LTDEMO.readOnly)return;confirmAdd()};renderCards();renderThreads();updateKeywordFilter();formFor(addType);fitAll(false);applyPathHighlight();setTimeout(()=>{if(innerWidth<700){focusBoardMoment(LTDEMO.get(),false);$('#detail').classList.remove('open');}else selectMoment(LTDEMO.get(),true)},100);
+$('#addBtn').onclick=()=>{if(LTDEMO.readOnly)return;openAdd()};$('#confirmAdd').onclick=()=>{if(LTDEMO.readOnly)return;confirmAdd()};renderCards();renderThreads();updateKeywordFilter();formFor(addType);fitAll(false);applyPathHighlight();setTimeout(()=>{if(innerWidth<700){/* #267: 좁은 판에서는 카드로 죽져들어가면 위의 탐색 판·머리글에 카드가 덮인다 — 처음에는 전체 맞춤(탐색 판 아래)을 지키고 지금 순간만 선택 표시만 한다. */selectMoment(LTDEMO.get(),false);$('#detail').classList.remove('open');}else selectMoment(LTDEMO.get(),true)},100);
 window.__LT58V11={youtubeId,youtubeThumb,youtubeThumbUrl,openEdit,saveEdit,chooseNext,highlightPath,startCinema:startCinemaV11,endCinema:endCinemaV11,setCinemaPosition,theme:t=>{document.body.dataset.theme=t},setMomentStyle:(id,pin,card)=>{let m=moments.find(x=>x.id===id);m.pinStyle=pin;m.cardStyle=card;renderCards()},get cinema(){return{active:cinemaV11.active,paused:cinemaV11.paused,index:cinemaV11.index,beat:cinemaV11.beats[cinemaV11.index]?.label,focused:cinemaV11.focused}},get state(){return{moments:moments.length,connections:connections.length,theme:document.body.dataset.theme,selected,keywords:[...new Set(moments.flatMap(m=>m.keywords||[]))]}}};
 
 addEventListener('message',e=>{if(e.data?.type==='lt41-title-display'){if(typeof renderCards==='function')renderCards();if(typeof renderThreads==='function')renderThreads();if(selected)selectMoment(selected,$('#detail').classList.contains('open'));}});
@@ -230,6 +234,17 @@ if(typeof ResizeObserver==='function'){
   const pickerTopObserver=new ResizeObserver(syncMomentPickerTop);
   [document.querySelector('header'),document.getElementById('themeBadge')].filter(Boolean).forEach(el=>pickerTopObserver.observe(el));
 }
+/* #662: 좁은 폭(≤580)에서는 머리줄이 두 줄이 되는데 테마 표시가 top:66 고정이라 머리줄 둘째 줄(배치 전환) 밑에 깔린다 —
+   좁은 폭에서는 표시를 머리줄 안으로 옮겨 둘째 줄에서 함께 흐르게 하고, 넓어지면 제자리(main 안)로 되돌린다. */
+function fitThemeBadge(){
+  const el=document.getElementById('themeBadge'),head=document.querySelector('header');
+  if(!el||!head)return;
+  const narrow=matchMedia('(max-width:580px)').matches;
+  if(narrow&&el.parentElement!==head){head.appendChild(el);syncMomentPickerTop()}
+  else if(!narrow&&el.parentElement!==document.querySelector('main')){document.querySelector('main').appendChild(el);syncMomentPickerTop()}
+}
+fitThemeBadge();
+addEventListener('resize',fitThemeBadge);
 
 /* #601: 말풍선 설명(#584의 책 화면 mountTips와 같은 동작) — 마우스 올림·키보드 초점·휴대폰 길게 누름.
    문구는 단추의 aria-label과 같아서 낭독기와 눈이 같은 말을 듣는다. */

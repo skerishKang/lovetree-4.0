@@ -17,7 +17,10 @@ import { ApiError } from './errors.js';
 
 export const ROLE_ADMIN = 'admin';
 export const ROLE_AI_CUSTOMER = 'ai_customer';
-export const ROLES = Object.freeze([ROLE_ADMIN, ROLE_AI_CUSTOMER]);
+// 2026-11-15 (#671): 레인 시험 계정(01~05). 운영 숫자에서 '실제 사용자'와 갈라 세기 위해서만 쓰는 표식이고,
+// 남에게 보이는 화면에는 아무 표시도 하지 않는다(AI 테스터 표시는 ai_customer 만).
+export const ROLE_TESTER = 'tester';
+export const ROLES = Object.freeze([ROLE_ADMIN, ROLE_AI_CUSTOMER, ROLE_TESTER]);
 
 // 권위가 만드는 canonical subject 모양. 이 밖의 값은 역할 자리에 받지 않는다.
 const SUBJECT = /^sub_[0-9a-f]{16,80}$/;

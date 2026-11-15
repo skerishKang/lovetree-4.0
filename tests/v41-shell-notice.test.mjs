@@ -86,7 +86,8 @@ test('중복·로그인 필요 안내도 같은 규칙으로 지켜진다', () =
 
 test('배선: shell.mjs가 입구 안내를 hold로 보내고 안내 한 벌을 쓴다', () => {
   const shell = readFileSync(new URL('../public/v41/shell.mjs', import.meta.url), 'utf8');
-  assert.match(shell, /const shellNotice=createNotifier\(\{\$\}\);/, 'shell.mjs가 안내 한 벌을 만든다');
+  // #666: 알림 줄을 띄우기 직전에 자리를 재는 길(beforeShow)이 붙었다 — 안내 한 벌을 쓰는 사실은 그대로다.
+  assert.match(shell, /const shellNotice=createNotifier\(\{\$,beforeShow:placeToast\}\)/, 'shell.mjs가 안내 한 벌을 만든다');
   assert.match(shell, /function notify\(text,options\)\{return shellNotice\.notify\(text,options\);\}/, '기존 notify 이름은 그대로다');
   assert.match(shell, /createQuickIntake\(\{[\s\S]*?notify:text=>notify\(text,\{hold:true\}\)/, '입구(담기·중복·로그인 필요) 안내만 hold로 보낸다');
 });

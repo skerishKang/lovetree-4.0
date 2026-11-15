@@ -20,6 +20,8 @@ export const DROP_READONLY_NOTICE = '서버 편집 연결이 아직 준비되지
 // #638(고른 트리 우선): 담기 창의 트리 한 줄·단추·담은 안내는 고른 트리 이름을 따른다.
 // 트리가 0개일 때는 기본 트리('모아둔 순간')가 새로 만들어지므로 QUICK_INBOX_LABEL을 쓴다.
 export function quickTreeLineText(name) { return `${name} 트리에 담겨요`; }
+// 이슈 671: '그 순간 다음에 담기'로 열렸을 때의 트리 한 줄 — 어디에 담기는지 순간 제목까지 알려 준다.
+export function quickTreeAfterText(momentTitle, name) { return `${momentTitle} 다음에 ${name} 트리에 담겨요`; }
 export function quickSubmitText(name) { return `${name}에 담기`; }
 export function quickSavedTreeText(name) { return `${name}에 담았어요`; }
 

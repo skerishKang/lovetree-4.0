@@ -5,7 +5,7 @@ import {mountPrivateUpload} from '../private-upload.mjs';
 import {fetchVideoTitle} from '../video-title.mjs';
 import {suggestMomentTitle} from '../domain.mjs';
 import {displayTreeTitle} from '../tree-name.mjs';
-import {extractDropUrl, hasDropPayload, firstImageFile, parseQuickUrl, dropRoute, previewState, previewTag, savedNoticeText, quickTreeLineText, quickSubmitText, quickSavedTreeText, QUICK_INBOX_LABEL, QUICK_EMPTY_ERROR, QUICK_INVALID_ERROR, DROP_LOGIN_NOTICE, DROP_READONLY_NOTICE, QUICK_PASTE_LABEL, QUICK_CLEAR_LABEL, QUICK_EMPTY_PREVIEW, QUICK_INVALID_PREVIEW, QUICK_PASTE_EMPTY, QUICK_PASTE_ERROR} from '../quick-add.mjs';
+import {extractDropUrl, hasDropPayload, firstImageFile, parseQuickUrl, dropRoute, previewState, previewTag, savedNoticeText, quickTreeLineText, quickTreeAfterText, quickSubmitText, quickSavedTreeText, QUICK_INBOX_LABEL, QUICK_EMPTY_ERROR, QUICK_INVALID_ERROR, DROP_LOGIN_NOTICE, DROP_READONLY_NOTICE, QUICK_PASTE_LABEL, QUICK_CLEAR_LABEL, QUICK_EMPTY_PREVIEW, QUICK_INVALID_PREVIEW, QUICK_PASTE_EMPTY, QUICK_PASTE_ERROR} from '../quick-add.mjs';
 
 export function createQuickAdd(deps) {
   const $ = deps.$;
@@ -20,6 +20,9 @@ export function createQuickAdd(deps) {
   let quickTreeId = '';
   let pendingTitleFill = null;
   const inflightTitles = new Map();
+  // 이슈 671: '그 순간 다음에 담기' 목적지 — 책의 '다음 순간 추가'가 lt41-write로 넘긴 {treeId, parentId}.
+  // 창을 새로 열 때마다 다시 정하고(없으면 지운다), 저장 뒤에도 지운다.
+  let quickTarget = null;
 
   function snapshot() { return deps.getMember()?.snapshot() || {}; }
 
@@ -34,16 +37,41 @@ export function createQuickAdd(deps) {
   }
 
   // #425: 입구는 하나다 — 같은 창(write-panel)을 열고, 먼저 보일 탭은 설정값(없으면 쉬운 추가)이 정한다.
-  function openWrite() {
+  // 이슈 671: 목적지(treeId·parentId)가 오면 그 트리·그 순간 다음에 담기로 준비한다. 먼저 보일 탭이
+  // '자세한 추가'면 편집기의 이어 담기 규칙(setEditorMode('add', parentId))을 그대로 쓴다.
+  function openWrite(target = {}) {
     if (!ensureWritable()) return;
     deps.resetEditorBaseline?.();
-    deps.writePanel.open();
+    const parent = validTargetParent(target);
+    if (parent) {
+      // open()은 설정된 '먼저 보일 탭'으로 열고 그 탭을 돌려준다.
+      const opened = deps.writePanel.open();
+      if (opened === 'detailed') { quickTarget = null; deps.openEditor?.('add', parent.id); return; }
+      quickTarget = parent;
+      quickTreeId = parent.treeId;
+    } else {
+      quickTarget = null;
+      deps.writePanel.open();
+    }
     renderTreeLine();
+  }
+
+  // 이슈 671: 목적지 순간이 실제로 있는지 확인하고 {treeId, id, title}로 돌려준다(없으면 null — 오래된 화면·지워진 순간).
+  function validTargetParent(target) {
+    const parentId = String(target?.parentId || '');
+    if (!parentId) return null;
+    const trees = deps.listTrees?.() || [];
+    const tree = (target.treeId ? trees.find(t => t.id === target.treeId) : null)
+      || trees.find(t => (t.moments || []).some(m => m.id === parentId));
+    const moment = tree?.moments?.find(m => m.id === parentId);
+    if (!tree || !moment) return null;
+    return { treeId: tree.id, id: moment.id, title: deps.momentTitle?.(moment) || moment.title || '' };
   }
   // 쉬운 추가 탭으로 연다(끌어다 놓기·'지금 다듬기'처럼 쉬운 추가로 되돌아오는 길).
   function openQuick() {
     if (!ensureWritable()) return;
     deps.resetEditorBaseline?.();
+    quickTarget = null; // 끌어다 놓기·붙여넣기 입구에는 '그 순간 다음' 목적지가 없다(이슈 671).
     deps.writePanel.open('easy');
     renderTreeLine();
   }
@@ -90,7 +118,10 @@ export function createQuickAdd(deps) {
     if (!quickTreeId || !choices.some(tree => tree.id === quickTreeId)) quickTreeId = resolveQuickTreeId(choices);
     const name = selectedTreeName();
     const line = $('quick-tree-line');
-    if (line) line.textContent = quickTreeLineText(name);
+    // 이슈 671: '그 순간 다음에 담기' 목적지가 있으면 어디에 담기는지 함께 알려 준다.
+    // 목적지 순간이 지금 고른 트리에 없으면(고르기를 바꿈) 목적지를 지운다.
+    if (quickTarget && quickTarget.treeId !== quickTreeId) quickTarget = null;
+    if (line) line.textContent = quickTarget ? quickTreeAfterText(quickTarget.title, name) : quickTreeLineText(name);
     const submit = $('quick-submit');
     if (submit) submit.textContent = quickSubmitText(name);
     const select = $('quick-tree-select');
@@ -264,10 +295,14 @@ export function createQuickAdd(deps) {
     const parsed = parseQuickUrl(url, describe);
     // #638: 담을 트리는 저장 시점에 정한다 — 창을 열지 않고 끌어다 놓기로 바로 담는 길에서도 지금 고른 트리에 담긴다.
     if (!quickTreeId || !treeChoices().some(tree => tree.id === quickTreeId)) quickTreeId = resolveQuickTreeId(treeChoices());
-    const input = { url, ...(quickTreeId ? { treeId: quickTreeId } : {}), ...quickMediaTitle(url) };
+    // 이슈 671: '그 순간 다음에 담기' 목적지가 지금 고른 트리에 유효하면 저장에 함께 넘긴다.
+    if (quickTarget && quickTarget.treeId !== quickTreeId) quickTarget = null;
+    const targetParent = quickTarget?.treeId === quickTreeId ? quickTarget.id : '';
+    const input = { url, ...(quickTreeId ? { treeId: quickTreeId } : {}), ...(targetParent ? { parentId: targetParent } : {}), ...quickMediaTitle(url) };
     let result = null;
     try { result = deps.getMember().apply('quickAdd', input) || null; }
     catch (error) { $('quick-error').textContent = error.message; return false; }
+    quickTarget = null;
     // #638 제목 경합: 제목을 못 받은 채 담았으면(저장 제목이 기본 문구로 떨어짐) 저장한 순간을 기록해 두고,
     // 제목이 도착하면 그 순간의 영상 제목을 채운다. 미리보기 때 요청이 이미 달리고 있으면 그 응답이 채운다.
     if (parsed.status === 'ok' && parsed.kind === 'youtube' && parsed.videoId && !titleCache.has(parsed.videoId) && result?.treeId && result?.momentId) {
@@ -403,8 +438,10 @@ export function createQuickAdd(deps) {
   $('quick-url').addEventListener('input', renderPreview);
   $('quick-paste').onclick = () => { void togglePaste(); };
   // #638: 트리 고르기를 바꾸면 그 자리에서 담을 트리가 바뀐다(문구·단추도 같이).
+  // 이슈 671: 트리를 바꾸면 '그 순간 다음' 목적지는 더 이상 유효하지 않으므로 지운다.
   $('quick-tree-select')?.addEventListener('change', () => {
     quickTreeId = $('quick-tree-select').value || quickTreeId;
+    quickTarget = null;
     renderTreeLine();
   });
   $('quick-refine').onclick = () => refine($('quick-refine'));

@@ -137,9 +137,15 @@ export function createFeedbackBoard({$, notify, show, showFull, onReplyCount, on
       const appendForm = post.kind === 'opinion'
         ? `<form class="myposts-followup" data-followup="${esc(post.id)}"><label>덧붙일 말<input name="followup" maxlength="2000" autocomplete="off" placeholder="짧게 덧붙여 주세요"></label><button type="submit" class="myposts-followup-submit">덧붙이기</button><p class="myposts-followup-error" role="alert"></p></form>`
         : '';
+      // 이슈 638: 의견 만들 때 서버가 제목을 본문 첫 줄로 채운다(server/feedback-service.js) —
+      // 그래서 제목이 본문 앞부분을 그대로 반복한다. 본문이 제목으로 시작하면 굵은 제목을
+      // 그리지 않고(본문만), 제목이 따로 있을 때는 굵은 줄을 두 줄로 줄인다(CSS line-clamp).
+      const ownTitle = String(post.title || '').trim();
+      const bodyText = String(post.body || '').trim();
+      const titleHtml = ownTitle && !bodyText.startsWith(ownTitle) ? `<h3 class="myposts-title">${esc(ownTitle)}</h3>` : '';
       return `<article class="myposts-item">
         <div class="myposts-head"><span class="myposts-kind">${esc(KIND_LABEL[post.kind] || post.kind)}</span><span class="myposts-status">${esc(STATUS_LABEL[post.status] || post.status)}</span><span class="myposts-date">${esc(time(post.createdAt))}</span></div>
-        <h3 class="myposts-title">${esc(post.displayTitle || '(제목 없음)')}</h3>
+        ${titleHtml}
         <p class="myposts-body">${esc(post.body)}</p>
         ${issue}${updatesLink}${replyHtml}
         ${appendForm}

@@ -82,6 +82,17 @@ html[data-lt-theme=garden] .modalIntro{color:var(--lt-muted)!important}
 html[data-lt-theme=garden] .detail h3,html[data-lt-theme=garden] .detail b,html[data-lt-theme=garden] .leftPanel b{color:var(--lt-ink)}
 html[data-lt-theme=garden][data-v41-screen=board] header .headbtn{background:var(--lt-paper);border-color:var(--lt-line);color:var(--lt-ink);box-shadow:none}
 html[data-lt-theme=garden][data-v41-screen=board] header .headbtn.primary{background:var(--lt-primary);border-color:var(--lt-primary);color:var(--lt-primary-ink)}
+/* 이슈 644: 정원의 보드 머리줄은 밝은 판이므로 트리 이름·목록도 잉크색으로 — 밤의 연분홍(#e8deee)은 흰 바탕 위에서 읽히지 않는다. */
+html[data-lt-theme=garden][data-v41-screen=board] .tree-title-btn{color:var(--lt-ink)}
+html[data-lt-theme=garden][data-v41-screen=board] .tree-title-btn:hover,html[data-lt-theme=garden][data-v41-screen=board] .tree-title-btn:focus-visible{background:rgba(152,80,94,.08)}
+html[data-lt-theme=garden][data-v41-screen=board] .tree-title-caret{color:var(--lt-gold-ink)}
+html[data-lt-theme=garden][data-v41-screen=board] .tree-menu{border-color:var(--lt-line);background:var(--lt-glass-strong);box-shadow:var(--lt-garden-shadow)}
+html[data-lt-theme=garden][data-v41-screen=board] .tree-menu .tree-item{color:var(--lt-ink)}
+html[data-lt-theme=garden][data-v41-screen=board] .tree-menu .tree-item:hover,html[data-lt-theme=garden][data-v41-screen=board] .tree-menu .tree-item:focus-visible{background:rgba(152,80,94,.08)}
+html[data-lt-theme=garden][data-v41-screen=board] .tree-menu .tree-item[aria-checked=true]{background:rgba(200,110,121,.14);box-shadow:inset 0 0 0 1px var(--lt-gold-line)}
+html[data-lt-theme=garden][data-v41-screen=board] .tree-menu .tree-count{color:var(--lt-muted)}
+html[data-lt-theme=garden][data-v41-screen=board] .tree-menu .tree-check{color:var(--lt-gold-ink)}
+html[data-lt-theme=garden][data-v41-screen=board] .tree-menu .tree-cover{border-color:rgba(119,91,82,.3)}
 /* 정원 대비 보정 2 (2026-11-08 CTO 지적): 패널 버튼·보조 글자·비율 표시를 정원 토큰으로. */
 html[data-lt-theme=garden][data-v41-screen=board] .wideTool{background:var(--lt-paper);border-color:var(--lt-line);color:var(--lt-ink)}
 html[data-lt-theme=garden][data-v41-screen=board] .wideTool:hover{background:#fff;border-color:var(--lt-line-paper)}
@@ -106,7 +117,7 @@ html[data-lt-theme=garden][data-v41-screen=board] .postAdd div{color:var(--lt-mu
 html[data-lt-theme=garden][data-v41-screen=board] .lt-moment-picker{background:var(--lt-glass-strong);border-color:var(--lt-line);color:var(--lt-ink)}
 html[data-lt-theme=garden][data-v41-screen=board] .lt-moment-picker button{background:var(--lt-paper);border-color:var(--lt-line);color:var(--lt-ink)}
 html[data-lt-theme=garden][data-v41-screen=board] .lt-moment-picker button[aria-pressed=true]{background:var(--lt-primary);border-color:var(--lt-primary);color:var(--lt-primary-ink)}
-html[data-lt-theme=garden][data-v41-screen=board] .toast{background:var(--lt-glass-strong);border-color:var(--lt-line);color:var(--lt-ink)}
+html[data-lt-theme=garden][data-v41-screen=board] #toast{background:var(--lt-glass-strong);border-color:var(--lt-line);color:var(--lt-ink)}
 html[data-lt-theme=garden][data-v41-screen=board] .lt-moment-picker select{background:var(--lt-paper);border:1px solid var(--lt-line);color:var(--lt-ink)}
 html[data-lt-theme=garden][data-v41-screen=board] .lt-moment-picker button{border:1px solid var(--lt-line);background:var(--lt-paper);color:var(--lt-ink)}
 
@@ -220,11 +231,13 @@ html[data-lt-theme=garden] .boardModeSwitch .modeSwitchBtn[aria-pressed="true"]{
   .boardModeSwitch{order:9;margin-left:auto}
   .boardModeSwitch .modeSwitchBtn{height:44px}
   .boardFrame{inset:100px 0 0}
+  /* #662: 테마 표시를 머리줄 둘째 줄로 옮겼다(board-extras fitThemeBadge) — 흐름 안에 놓인다. */
+  .themeBadge{position:static;order:10;align-self:center;margin-left:6px}
 }
 
 /* 2. 카드: 큰 썸네일 + 제목 2줄 + 감정·날짜 한 줄. 높이 상한(썸네일 200px·세로 영상 9:16 300px). */
 .card .cardTitle{margin:5px 0 4px;font-size:16px;line-height:1.35;font-weight:700;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;min-height:2.7em}
-.card .cardMeta{font-size:12px;color:#61526a;display:flex;align-items:center;white-space:nowrap;overflow:hidden}
+.card .cardMeta{font-size:12px;color:#61526a;display:flex;align-items:center;white-space:nowrap;overflow:hidden;margin-top:6px}/* #662: 제목 상자(-webkit-line-clamp)가 아래로 8px 더 늘어나 감정·날짜 줄과 포개진다 — 사이를 벌린다. */
 .card .cardMeta .emotionDot{flex:0 0 auto}
 .card .cardMeta{gap:0}
 /* #601: 카드 한가운데 재생 단추가 끌기를 가로막지 않게 — 보드 카드에서는 모서리 작은 표로 줄인다(상세·책은 그대로). */

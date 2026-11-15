@@ -76,7 +76,7 @@ function messagesHarness({ owned = true, source = 'server', current = 'track59-s
   const saved = globals();
   const els = {};
   const events = {};
-  const calls = {notify: [], panels: [], shown: [], editors: [], logins: [], links: 0, writes: 0, chooses: [], samples: [], journeys: [], menus: [], moves: []};
+  const calls = {notify: [], panels: [], shown: [], editors: [], writeEntries: [], logins: [], links: 0, writes: 0, chooses: [], samples: [], journeys: [], menus: [], moves: []};
   const requests = [];
   globalThis.addEventListener = (type, fn) => { events[type] = fn; };
   globalThis.location = {origin: 'https://lovetree-4-0.pages.dev', hostname: 'lovetree-4-0.pages.dev', hash: ''};
@@ -120,6 +120,7 @@ function messagesHarness({ owned = true, source = 'server', current = 'track59-s
     writeLocation: () => { calls.writes += 1; },
     choose: (treeId, momentId) => calls.chooses.push([treeId, momentId]),
     openEditor: (mode, parentId) => calls.editors.push([mode, parentId]),
+    openWriteEntry: target => calls.writeEntries.push(target ?? null),
     openLoginStart: intent => calls.logins.push(intent),
     openAccountMenu: () => calls.menus.push('account'),
     openMovePicker: options => calls.moves.push(options),
@@ -178,8 +179,14 @@ test('다른 출처·다른 iframe이 보낸 메시지는 무시한다', () => {
 test('lt41-write·lt41-start·lt41-community·lt41-journey-save는 정해진 곳으로 넘긴다', () => {
   const h = messagesHarness();
   try {
+    // 이슈 671: 새로 추가(new·add)는 같은 쓰기 창(openWriteEntry)으로 — 목적지(parentId)를 그대로 넘긴다.
     h.receive({type: 'lt41-write', mode: 'add', parentId: 'm1'});
-    assert.deepEqual(h.calls.editors, [['add', 'm1']]);
+    assert.deepEqual(h.calls.writeEntries, [{treeId: '', parentId: 'm1'}]);
+    assert.deepEqual(h.calls.editors, [], '자세한 편집기를 바로 열지 않는다');
+    h.receive({type: 'lt41-write', mode: 'new'});
+    assert.deepEqual(h.calls.writeEntries[1], {treeId: '', parentId: ''});
+    h.receive({type: 'lt41-write', mode: 'new'});
+    assert.deepEqual(h.calls.writeEntries[1], {treeId: '', parentId: ''});
     h.receive({type: 'lt41-start'});
     assert.deepEqual(h.calls.logins, ['first']);
     h.receive({type: 'lt41-community'});
@@ -189,6 +196,9 @@ test('lt41-write·lt41-start·lt41-community·lt41-journey-save는 정해진 곳
     h.receive({type: 'lt41-open-book', treeId: 'tree1', id: 'm1'});
     assert.deepEqual(h.calls.chooses, [['tree1', 'm1']]);
     assert.equal(h.calls.writes, 1, '기억책으로 옮기며 주소를 쓴다');
+    // 고치기(edit)는 지금처럼 편집기로 — 이어 담기(new·add)와 갈린다(이슈 671).
+    h.receive({type: 'lt41-write', mode: 'edit', momentId: 'm1'});
+    assert.deepEqual(h.calls.editors, [['edit', undefined]]);
   } finally { h.restore(); }
 });
 

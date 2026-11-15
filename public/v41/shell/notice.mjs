@@ -13,7 +13,9 @@ export function syncedNoticeText({ writable = false, previousDirty = false, mome
   return momentCount > 0 ? '내 기록을 불러왔어요.' : '반가워요. 첫 순간을 남겨 보세요.';
 }
 
-export function createNotifier({ $, now = () => Date.now(), holdMs = NOTICE_HOLD_MS, hideMs = NOTICE_HIDE_MS, setTimer = setTimeout, clearTimer = clearTimeout } = {}) {
+// #666: beforeShow는 알림 줄을 실제로 띄우기 직전에 부른다 — 셸이 화면 아래에 붙은 것들(링크 줄·＋ 단추·
+// 새 소식 카드)을 재서 그 위로 자리를 옮긴다. 재는 일은 셸이 하고, 이 파일은 언제 부를지만 정한다.
+export function createNotifier({ $, now = () => Date.now(), holdMs = NOTICE_HOLD_MS, hideMs = NOTICE_HIDE_MS, setTimer = setTimeout, clearTimer = clearTimeout, beforeShow = () => {} } = {}) {
   let holdUntil = 0;
   let timer = null;
   // hold=true는 사용자의 방금 행동에 대한 결과 안내다. holdMs가 지나기 전에는 다른 안내로 덮지 않는다.
@@ -25,7 +27,8 @@ export function createNotifier({ $, now = () => Date.now(), holdMs = NOTICE_HOLD
     // #453 C2: 설정과 무관한 지난 안내가 창 안에 남지 않도록, 설정이 열려 있을 때만 그 줄에 쓴다.
     if ($('settings-feedback') && $('account-settings')?.open) $('settings-feedback').textContent = text;
     $('toast').textContent = text;
-    $('toast').hidden = !!$('account-settings')?.open;
+    if ($('account-settings')?.open) $('toast').hidden = true;
+    else { beforeShow(); $('toast').hidden = false; }
     clearTimer(timer);
     timer = setTimer(() => { $('toast').hidden = true; }, hideMs);
     return true;

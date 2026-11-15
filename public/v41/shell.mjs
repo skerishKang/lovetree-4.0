@@ -9,7 +9,7 @@ import {clearCachedWorkspace, readCachedWorkspace} from './workspace-cache.mjs';
 import {exampleTree} from './example.mjs';
 import {parseSelectionRoute,memberStartupView,ownerSelectionRoute,accountPosition,rememberAccountPosition,resolveAccountPosition,stashPendingOwnerRoute,pendingOwnerRoute,takePendingOwnerRoute} from './selection-location.mjs';
 import {applyViewAccessibility,connectionLabel} from './view-a11y.mjs';
-import {accountPresentation,treePickerLabel,treePickerText,treeViewsVisible,writeMenuLabel,headerState,headerPartsFor,readTipsSeen,writeTipsSeen,tipsWanted,FIRST_TREE_TIPS,homeCenterState,homeStartLoginUrl,readTheme,readLoginIntent,writeTheme,nextTheme,themeButtonLabel,themeButtonAriaLabel,themePressed,appliedTheme,applyThemeAttribute,LOGIN_INTENTS,readPageTurn,writePageTurn} from './header-state.mjs';
+import {accountPresentation,treePickerLabel,treePickerText,treeViewsVisible,writeMenuLabel,headerState,headerPartsFor,readTipsSeen,writeTipsSeen,tipsWanted,unsavedNoticeText,FIRST_TREE_TIPS,homeCenterState,homeStartLoginUrl,readTheme,readLoginIntent,writeTheme,nextTheme,themeButtonLabel,themeButtonAriaLabel,themePressed,appliedTheme,applyThemeAttribute,LOGIN_INTENTS,readPageTurn,writePageTurn} from './header-state.mjs';
 import {parseJourneyRoute,journeyRouteDecision} from './first-journey.mjs';
 import {displayTreeTitle} from './tree-name.mjs';
 import {titleView, withoutAutoTitle} from './book-usability.mjs';
@@ -39,8 +39,18 @@ import {normalizeTitleDisplay, normalizeAccentColor, normalizeDateStyle, normali
 import {backfillVideoTitles} from './title-backfill.mjs';
 import {thumbnailCandidates, coverFallbackAttrs, fallbackCardData, emotionToneOf, mountThumbFallback, ADD_TITLE_LABEL, VIDEO_UNAVAILABLE_TEXT} from './thumb-fallback.mjs';
 const $=id=>document.getElementById(id);
+// #666: 알림 줄(토스트)은 화면 아래에 늘 붙어 있는 것들 — '새 소식·의견 보내기' 링크 줄, ＋ 단추, 새 소식 카드 —
+// 을 덮지 않는다. 붙어 있는 것들의 가장 높은 윗변을 좌표로 재서 그 위로 올린다(글자 크기·화면 폭이 달라도 겹침 0).
+// 390 실측: 링크 줄 아래 10~37px·＋ 단추 12~68px·카드 86~152px → 알림 줄 아래 134px.
+function placeToast(){let above=0;for(const el of document.querySelectorAll('.home-links,#mobile-add,.updates-card')){if(el.hidden)continue;const cs=getComputedStyle(el);if(cs.display==='none'||cs.visibility==='hidden'||Number(cs.opacity)===0)continue;const r=el.getBoundingClientRect();if(r.width<1||r.height<1)continue;above=Math.max(above,document.documentElement.clientHeight-r.top+10)}const style=document.documentElement.style;if(above>0)style.setProperty('--lt-toast-bottom',Math.round(above)+'px');else style.removeProperty('--lt-toast-bottom')}
+addEventListener('resize',placeToast);
+addEventListener('orientationchange',()=>setTimeout(placeToast,0));
+// ＋ 단추(body.lt-fab-ok)·새 소식 카드가 늦게 뜨거나 닫힐 때도 다시 잰다.
+for(const el of [$('updates-card')].filter(Boolean))new MutationObserver(placeToast).observe(el,{attributes:true,attributeFilter:['hidden']});
+new MutationObserver(placeToast).observe(document.body,{attributes:true,attributeFilter:['class']});
+placeToast();
 // 안내 한 벌(#353 후속): 담기·중복·로그인 필요 안내(hold)가 상태 안내보다 먼저 일정 시간 보인다.
-const shellNotice=createNotifier({$});
+const shellNotice=createNotifier({$,beforeShow:placeToast});
 function notify(text,options){return shellNotice.notify(text,options);}
 // #347 후속: 계정 제목 보기 설정. 계정 상태(state.prefs.titleDisplay)에 저장하고 화면에 알린다.
 function currentPrefs(){try{return member?.state?.().prefs||{titleDisplay:'both'}}catch{return {titleDisplay:'both'}}}
@@ -240,9 +250,11 @@ const shellQuick=createQuickAdd({
   currentTreeId: () => window.LT41?.tree?.id || '',
   listTrees: () => (Array.isArray(window.LT41?.trees) ? window.LT41.trees : []),
   // 사진 올리기는 기존 업로더(#310 onUploaded·imagesOnly)를 그대로 쓴다.
-  mountUpload:mountPrivateUpload
+  mountUpload:mountPrivateUpload,
+  // 이슈 671: '그 순간 다음에 담기' 한 줄에 쓸 순간 제목 — 책·보드와 같은 제목 규칙(자동 제목 빼기)을 쓴다.
+  momentTitle:moment=>{const main=titleView(moment,titleDisplayValue()).main;return main||withoutAutoTitle(moment).title;}
 });
-$('write-menu').onclick=()=>{if(source!=='server'&&member?.snapshot().owned){void resumeMember('write');return;}shellQuick.openWrite();};
+$('write-menu').onclick=()=>{if(source!=='server'&&member?.snapshot().owned){void resumeMember('write');return;}if(member?.snapshot().dirty){explainSaveState();return;}shellQuick.openWrite();};
 // #458: 모바일 떠 있는 ＋ 단추 — 헤더의 ＋ 순간 추가와 같은 길(같은 창)을 연다. 단추는 body.lt-fab-ok일 때만 보인다.
 $('mobile-add').addEventListener('click',()=>$('write-menu').click());
 // 빠른 담기 입구: 붙여넣기 + 공유 시트 진입(판정·추적은 ../quick-intake.mjs 한 벌).
@@ -327,6 +339,8 @@ const shellMessages=createMessages({
   writeLocation:(mode)=>writeLocation(mode),
   choose:(id,momentId)=>choose(id,momentId),
   openEditor:(mode,parentId)=>openEditor(mode,parentId),
+  // 이슈 671: lt41-write의 새로 추가(new·add)는 쓰기 창 한 길로 — 목적지(트리·이어질 순간)를 함께 넘긴다.
+  openWriteEntry:target=>shellQuick.openWrite(target),
   focusTitleInput:()=>shellPanels.focusTitleInput?.(),
   openLoginStart:intent=>openLoginStart(intent),
   openAccountMenu:()=>openAccountMenu(),
@@ -419,6 +433,8 @@ const shellHeader=createHeader({
   onEmailChange:email=>paintSettingsProfile(email),
   // #465 4: 동그라미 깜빡임 — 계정 정보를 부르는 동안 저장본(#408)의 표시 이름으로 먼저 그린다.
   getCachedName:()=>{try{return readCachedWorkspace(localStorage)?.state?.prefs?.displayName||''}catch{return ''}},
+  // 이슈 644 2번: 아바타에 새 소식이 있으면 마우스 설명을 점 안내로 바꾼다.
+  getAccountTip:()=>accountTip,
   delegate:{syncTreeTips:()=>syncTreeTips()}
 });
 function flowNavigation(){return shellHeader.flowNavigation();}
@@ -565,8 +581,24 @@ function closeTreeTips(remember=true){
   const back=tipsReturnFocus||$('tree-views')?.querySelector('button')||$('mobile-more');tipsReturnFocus=null;
   if(back&&document.contains(back)&&!back.hidden)back.focus();
 }
+// 이슈 666: 계정 메뉴와 첫 트리 안내는 한 번에 하나만 보인다. 안내(z-index 25)는 머리줄 상자
+// (z-index 5) 안에 있는 메뉴 위로 떠 메뉴 항목을 가렸다. 메뉴가 열려 있으면 안내는 미뤄 두고,
+// 메뉴가 닫히면 그때 띄운다. 미뤘다고 '봤음'으로 적지 않는다 — 닫은 뒤에도 다시 보여 준다.
+function accountMenuOpen(){const pop=$('account-popover');return !!pop&&!pop.hidden;}
+let tipsHeld=false;
+function tipsFollowAccountMenu(){
+  const box=$('tree-tips');
+  if(accountMenuOpen()){
+    if(box&&!box.hidden){tipsHeld=true;closeTreeTips(false);}
+    return;
+  }
+  if(!tipsHeld)return;
+  tipsHeld=false;
+  syncTreeTips();
+}
 function showTreeTips(){
   const box=$('tree-tips');if(!box||!box.hidden)return;
+  if(accountMenuOpen()){tipsHeld=true;return;}
   const list=$('tree-tips-list');
   if(list&&!list.children.length)for(const tip of FIRST_TREE_TIPS){const li=document.createElement('li');const strong=document.createElement('strong');const span=document.createElement('span');strong.textContent=tip.title;span.textContent=tip.body;li.append(strong,span);list.append(li);}
   if(!tipsReturnFocus)tipsReturnFocus=document.activeElement;
@@ -581,6 +613,9 @@ function syncTreeTips(){
 }
 // 모달 창이 열리거나 닫힐 때 안내의 자리를 다시 맞춘다(창이 열려 있으면 창 안, 없으면 제자리).
 document.addEventListener('close',()=>placeTreeTips(),true);
+// 계정 메뉴가 열리고 닫힐 때마다 안내와의 순서를 다시 맞춘다(메뉴를 여는 길이 여럿이라 상태 변화를 본다).
+const accountPopoverBox=$('account-popover');
+if(accountPopoverBox)new MutationObserver(()=>tipsFollowAccountMenu()).observe(accountPopoverBox,{attributes:true,attributeFilter:['hidden']});
 $('tree-tips-close')?.addEventListener('click',()=>closeTreeTips());
 // #571: 안내의 [이름 바꾸기]는 트리 관리 창을 바로 열고 이름 칸에 초점을 둔다(openTreeManager가 초점을 옮긴다).
 // 안내는 닫지 않고 그대로 둔다 — 이름 창을 닫고 돌아오면 두 번째 안내와 알겠어요가 그대로 있다.
@@ -636,6 +671,14 @@ function leaveMember(){if(!canLeave())return false;member?.dispose();member=null
 function pauseMember(){if(!canLeave())return false;if(!member?.snapshot().owned){member?.dispose();member=null;return true;}member.dispose();return true;}
 // #453 A: 예시를 둘러보는 중에 순간 추가·새 트리를 누르면 내 기록으로 돌아와서 이어 간다(로그인 화면으로 보내지 않는다).
 function resumeMember(intent){resumeAfterStart=intent||'write';return startMember();}
+ // 이슈 644 3번: 저장 실패 떠가 이미 보이면 그 설명을 그대로 쓰고, 숨어 있는 동안(저장 중)에는 저장 중 설명을 연다.
+ function explainSaveState(){
+  if(!$('save-feedback').hidden)return; // 이미 떠 있다 — 그 떠가 같은 설명이다.
+  const s=member?.status?.();
+  $('save-message').textContent=unsavedNoticeText(s?.phase);
+  $('save-actions').replaceChildren();
+  $('save-feedback').hidden=false;
+ }
 function memberStatus(status){
   shellIntake.flush();
   const failed=status.dirty&&['offline','rejected','conflict','login'].includes(status.phase);
@@ -647,6 +690,42 @@ function memberStatus(status){
   :'';
  $('save-actions').replaceChildren();
  if(failed){
+  if(status.phase==='conflict'){
+   // 이슈 644 3번: 충돌 떠는 쉬운 말 + 주 단추 하나(최신 기록 불러오기). 불러오기 전에 이 화면 기록을
+   // 자동으로 백업해 기록 손실이 없게 한다. '덮어쓰기'는 '자세히' 안에 둔다 — 저장 규칙은 그대로다.
+   $('save-message').textContent=status.detail||'';
+   const pull=status.actions.find(a=>a.name==='pull');
+   if(pull){
+    const primary=document.createElement('button');
+    primary.className='primary';
+    primary.textContent=pull.label||'최신 기록 불러오기';
+    primary.onclick=async()=>{backup();await member?.act('pull');};
+    $('save-actions').append(primary);
+   }
+   const force=status.actions.find(a=>a.name==='force');
+   if(force){
+    const more=document.createElement('button');
+    more.textContent='자세히';
+    more.setAttribute('aria-expanded','false');
+    const extra=document.createElement('div');
+    extra.className='save-extra';
+    extra.hidden=true;
+    const overwrite=document.createElement('button');
+    overwrite.textContent=force.label||'이 화면 것으로 덮어쓰기';
+    overwrite.onclick=async()=>{
+     if(!confirm('이 화면의 기록을 서버에 저장하고, 다른 곳에서 바뀐 기록은 지워질 수 있어요. 계속할까요?'))return;
+     extra.hidden=true;
+     await member?.act('force');
+    };
+    const keep=document.createElement('button');
+    keep.textContent='현재 기록 백업';
+    keep.onclick=backup;
+    extra.append(overwrite,keep);
+    more.onclick=()=>{extra.hidden=!extra.hidden;more.setAttribute('aria-expanded',String(!extra.hidden));};
+    $('save-actions').append(more,extra);
+   }
+  }
+  else{
   for(const a of status.actions.filter(a=>['retry','pull','force','login'].includes(a.name))){
    const b=document.createElement('button');
    b.textContent=a.name==='login'?'새 창에서 로그인':a.label;
@@ -660,6 +739,7 @@ function memberStatus(status){
    $('save-actions').append(b);
   }
   const b=document.createElement('button');b.textContent='현재 기록 백업';b.onclick=backup;$('save-actions').append(b);
+  }
  }
  if(status.phase==='checking')notify('내 기록을 불러오고 있어요.');
  else if(status.phase==='synced'){
@@ -674,7 +754,7 @@ function memberStatus(status){
  }
  else if(status.phase==='login'&&!status.dirty)notify('로그인이 필요해요.');
  else if(!status.dirty&&status.phase==='offline')notify(status.detail||'내 기록을 불러오지 못했어요.');
- $('write-menu').textContent=status.dirty?'미저장 기록' :'＋ 순간 추가';$('empty-records').textContent=status.writable?'＋ 첫 트리 만들기':'내 기록 불러오기';/* #463: 이름을 한 곳에서 정한다(paintEmptyCopy와 같은 글자) *//* #463: 주 버튼 표시도 같이 유지한다(쓸 상태가 바뀌도 강조가 엉키지 않게). */$('empty-records').classList.toggle('primary',!!status.writable);$('empty-sample').classList.toggle('primary',!status.writable);previousDirty=status.dirty;renderAccount();flowNavigation();document.body.dataset.member=member?.snapshot().owned?'in':'out';document.body.dataset.treeCount=String(model?.trees?.length||0);applyAdvanced();
+ $('write-menu').textContent=status.dirty?'저장 안 됨' :'＋ 순간 추가';$('empty-records').textContent=status.writable?'＋ 첫 트리 만들기':'내 기록 불러오기';/* #463: 이름을 한 곳에서 정한다(paintEmptyCopy와 같은 글자) *//* #463: 주 버튼 표시도 같이 유지한다(쓸 상태가 바뀌도 강조가 엉키지 않게). */$('empty-records').classList.toggle('primary',!!status.writable);$('empty-sample').classList.toggle('primary',!status.writable);previousDirty=status.dirty;renderAccount();flowNavigation();document.body.dataset.member=member?.snapshot().owned?'in':'out';document.body.dataset.treeCount=String(model?.trees?.length||0);applyAdvanced();
 }
 async function startMember(){setMemberRefreshStarted(true);if(!leaveMember())return;backfillStarted=false;backfillAttempted.clear();const startup=parseSelectionRoute(location.hash);if(startup.scope==='owner')stashPendingOwnerRoute(sessionStorage,location.hash);++loadGeneration;const generation=loadGeneration;clear();
  const api=createWorkspaceApi({fetchImpl:(url,init)=>fetch(init?.method==='GET'&&url==='/api/workspace'?'/api/workspace?features=bound-writes':url,init)});
@@ -752,8 +832,23 @@ $('settings-assets-open').onclick=()=>openAssets($('settings-assets-open'));
  // 2차: AI 고객 '오늘 사용 일지'·모든 로그인 사용자 '내 의견'.
  // #611 4번: 새 답글 알림 — 단추 점과 '내 의견' 옆 숫자를 함께 갱신한다.
  const dotState={updates:false,replies:false};
- function paintAvatarDot(){const avatar=$('account-avatar');if(avatar)avatar.classList.toggle('has-dot',!!(dotState.updates||dotState.replies));}
- function onReplyCount(count){const badge=$('account-my-posts-count');if(badge){badge.hidden=!(count>0);if(count>0)badge.textContent=String(count);}dotState.replies=count>0;paintAvatarDot();}
+ let accountTip='';
+ // 이슈 644 2번: 아바타 점과 계정 메뉴 항목의 점·개수·설명을 함께 갱신한다.
+ function paintAccountDots(){
+  const avatar=$('account-avatar');
+  if(avatar){
+   avatar.classList.toggle('has-dot',!!(dotState.updates||dotState.replies));
+   const tip=dotState.updates&&dotState.replies?'새 소식과 새 답글이 있어요':dotState.updates?'새 소식이 있어요':dotState.replies?'새 답글이 있어요':'';
+   accountTip=tip;
+   avatar.title=tip||'내 계정';
+  }
+  const updatesItem=$('account-updates'),updatesCount=$('account-updates-count');
+  if(updatesItem)updatesItem.classList.toggle('has-dot',!!dotState.updates);
+  if(updatesCount){updatesCount.hidden=!dotState.updates;if(dotState.updates)updatesCount.textContent='1';}
+  const postsItem=$('account-my-posts');
+  if(postsItem)postsItem.classList.toggle('has-dot',dotState.replies);
+ }
+ function onReplyCount(count){const badge=$('account-my-posts-count');if(badge){badge.hidden=!(count>0);if(count>0)badge.textContent=String(count);}dotState.replies=count>0;paintAccountDots();}
  const feedbackBoard=createFeedbackBoard({$,notify,show:()=>panel('journal-panel'),showFull:()=>panel('myposts-panel'),onReplyCount,onOpenUpdates:version=>{void updatesMount.openUpdates(version);}});
  $('account-journal').onclick=()=>{closeAccountMenu();feedbackBoard.openJournal();};
  $('account-my-posts').onclick=()=>{closeAccountMenu();feedbackBoard.openMyPosts();};
@@ -763,7 +858,7 @@ $('settings-assets-open').onclick=()=>openAssets($('settings-assets-open'));
  $('account-ops').onclick=()=>{closeAccountMenu();openOpsCenter();};
  $('settings-ops-open').onclick=()=>openOpsCenter();
  // #611 새 소식: 계정 메뉴·설정 아래쪽·로그아웃 작은 링크 모두 같은 창을 쓴다.
- const updatesMount=mountUpdates({$,showPanel:id=>panel(id),onDot:unread=>{dotState.updates=!!unread;paintAvatarDot();}});
+ const updatesMount=mountUpdates({$,showPanel:id=>panel(id),onDot:unread=>{dotState.updates=!!unread;paintAccountDots();}});
  $('account-updates').onclick=()=>{closeAccountMenu();void updatesMount.openUpdates();};
  $('updates-link').onclick=()=>{void updatesMount.openUpdates();};
  $('settings-updates-open').onclick=()=>{$('account-settings').close();void updatesMount.openUpdates();};

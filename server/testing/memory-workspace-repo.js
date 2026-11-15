@@ -11,6 +11,13 @@ export function createMemoryWorkspaceRepo({ now = Date.UTC(2026, 9, 27) } = {}) 
   const docKey = (productId, subjectId) => `${productId}\u0000${subjectId}`;
 
   return {
+    // 시험·집계용 읽기(#655 2차). 저장 계약에는 없고, 숫자 세기가 같은 문서를 보게 한다.
+    async documents({ productId }) {
+      return [...docs.entries()]
+        .filter(([key]) => key.startsWith(`${productId}\u0000`))
+        .map(([key, row]) => ({ subjectId: key.slice(productId.length + 1), revision: row.revision, savedAt: row.savedAt, doc: structuredClone(row.doc) }));
+    },
+
     async load({ productId, subjectId }) {
       const row = docs.get(docKey(productId, subjectId));
       return row ? { revision: row.revision, savedAt: row.savedAt, doc: structuredClone(row.doc) } : null;

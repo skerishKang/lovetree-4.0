@@ -430,6 +430,6 @@ test('연결 구조(#425 2번): 쉬운 추가는 업로더를 만들지 않고 w
   const shell = fs.readFileSync(new URL('../public/v41/shell.mjs', import.meta.url), 'utf8');
   assert.match(shell, /mountUpload:mountPrivateUpload/, 'shell.mjs는 기존 업로더를 quick-add에 그대로 넘긴다(호출 시그니처 유지)');
   // #425: 순간 남기기는 한 창(write-panel)을 연다 — 고르기 창은 없다.
-  assert.match(shell, /\$\('write-menu'\)\.onclick=\(\)=>\{if\(source!=='server'&&member\?\.snapshot\(\)\.owned\)\{void resumeMember\('write'\);return;\}shellQuick\.openWrite\(\);\}/, '순간 남기기는 한 창을 연다(예시면 내 기록으로 돌아온 뒤)');
+  assert.match(shell, /\$\('write-menu'\)\.onclick=\(\)=>\{if\(source!=='server'&&member\?\.snapshot\(\)\.owned\)\{void resumeMember\('write'\);return;\}if\(member\?\.snapshot\(\)\.dirty\)\{explainSaveState\(\);return;\}shellQuick\.openWrite\(\);\}/, '순간 남기기는 한 창을 연다(예시면 내 기록으로 돌아온 뒤, 저장 안 됨이면 그 설명을 연다)');
   assert.doesNotMatch(shell, /openWriteChooser/, '옛 고르기 창 진입이 남지 않는다');
 });

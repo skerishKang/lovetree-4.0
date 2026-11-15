@@ -324,12 +324,14 @@ test('#460 보던 자리 기억: 트리별로 남기고, 최근 20개만, 이상
   assert.equal(M.visibleCards({ z: 1, x: 0, y: 0 }, { x: 0, y: 0, w: 500, h: 500 }, chain(5)), 2);
 });
 
-test('#460 화면은 처음 자리·전체 보기·기억을 이 계산으로 하고, 휴대폰(700 미만)은 그대로 둔다', () => {
+test('#460 화면은 처음 자리·전체 보기·기억을 이 계산으로 하고, 휴대폰(700 미만)은 지금 순간을 읽히는 배율로 둔다(#662)', () => {
   const DETAIL = fs.readFileSync(new URL('../public/v41/views/board/board-detail.js', import.meta.url), 'utf8');
   assert.match(BOARD, /LT58Model\.startView\(/);
   assert.match(BOARD, /LT58Model\.contentBox\(/);
   assert.match(BOARD, /LT58Model\.rememberView\(/);
-  assert.match(BOARD, /function boardStartView\(\)\{if\(innerWidth<700\)\{fitAll\(false\);viewMode='start';return\}/);
+  // #662(CTO 지시): 좁은 판 초기 화면은 전체 맞춤(40장을 손톱만 하게 몰아 넣음)이 아니라 지금 순간 카드를
+  // 읽히는 배율로 크게 보이는 초점 보기다. 판이 아직 없으면(모듈 로드 순서) 전체 맞춤으로 대체한다.
+  assert.match(BOARD, /function boardStartView\(\)\{if\(innerWidth<700\)\{if\(typeof focusBoardMoment==='function'\)focusBoardMoment\(LTDEMO\.get\(\),false\);else fitAll\(false\);viewMode='start';return\}/);
   // #490: 숨은 프레임(폭 0)에서 한 맞춤은 '전체 보기'가 아니다 — 드러난 뒤 resize가 처음 자리(또는 기억한 자리)를 다시 계산한다.
   assert.ok(BOARD.includes("function boardResize(){if(innerWidth<700||cinema)return;placeAll();if(viewMode==='fit')fitAll(false);else boardStartView()}"), "boardResize: 저장 자리 없는 카드 재꽂기 포함")
   assert.match(DETAIL, /boardStartView\(\);applyPathHighlight\(\)/);

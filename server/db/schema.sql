@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS lovetree_login_states (
 CREATE TABLE IF NOT EXISTS lovetree_product_roles (
   product_id text NOT NULL,
   subject_id text NOT NULL,
-  role text NOT NULL CHECK (role IN ('admin','ai_customer')),
+  role text NOT NULL CHECK (role IN ('admin','ai_customer','tester')),
   granted_by text,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
@@ -249,11 +249,14 @@ CREATE TABLE IF NOT EXISTS lovetree_account_deletions (
 -- 2026-11-11 계정 이메일. 공통 로그인 토큰 교환 응답의 사용자 정보(profile.email)를
 -- 로그인 콜백이 검증된 access 토큰의 account_id와 함께 이 표에 모아 둔다(서버끼리만 쓰는
 -- 내부 경로 /internal/account/email, 공개 프록시 목록 밖). 확인·복구에 쓰고, 삭제 시 함께 지운다.
+-- 2026-11-15 (#655 2차): created_at = 러브트리 첫 로그인 시각(가입일). upsert 는 이 칸을 갱신하지
+-- 않는다 — 두 번째 로그인부터는 updated_at 만 바뀐다. 기존 행 채우기는 migrations 쪽에서 했다.
 CREATE TABLE IF NOT EXISTS lovetree_account_emails (
   product_id text NOT NULL,
   subject_id text NOT NULL,
   email text NOT NULL,
   updated_at timestamptz NOT NULL DEFAULT now(),
+  created_at timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY (product_id, subject_id)
 );
 
