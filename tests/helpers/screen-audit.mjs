@@ -5,6 +5,7 @@
 //   ② 가로 넘침 0px·잘린 글자 0(overflow가 있는 요소에서 scrollWidth > clientWidth)
 //   ③ 화면 글자에 undefined·null·NaN·[object Object] 없음(#635의 scanPage와 같은 값 넷)
 //   ④ 12px 미만 글자 0·단추 13px 미만 0(#548의 COLLECT 규칙 — 그림자 DOM까지, 보이지 않는 글자 제외)
+//   ⑤ 알림 줄(토스트)이 떠 있을 때, 화면 아래에 붙은 것들(링크 줄·＋ 단추·새 소식 카드)을 덮지 않음(#666)
 // 검사는 좌표·DOM으로 한다(눈 확인에 기대지 않는다). 실패 한 건을 한 줄로 만드는 lineOf도 여기 둔다.
 import { createServer } from 'node:http';
 import { createReadStream, existsSync } from 'node:fs';
@@ -144,11 +145,28 @@ export const AUDIT_FN = function audit() {
     if (px < 12 || (interactive && px < 13)) small.push({ el: sel(el), px, 단추: interactive, text: el.textContent.trim().replace(/\s+/g, ' ').slice(0, 30) });
   }
 
-  return { issues, covered, bad, overflow, clipped, small };
+  // ⑤ 알림 줄(#toast)이 떠 있으면, 화면 아래에 붙은 것들(.home-links·#mobile-add·#updates-card)을 덮지 않아야 한다(#666).
+  //    토스트는 ①·①의 판정에서 빠져 있으므로(위 isToast) 자리 자체를 여기서 따로 잰다 — 1px도 겹치면 실패다.
+  const toastHits = [];
+  const toastEl = document.getElementById('toast');
+  if (toastEl && !toastEl.hidden && visible(toastEl)) {
+    const toastRect = toastEl.getBoundingClientRect();
+    for (const bottomSel of ['.home-links', '#mobile-add', '#updates-card']) {
+      for (const other of document.querySelectorAll(bottomSel)) {
+        if (other.hidden || !visible(other)) continue;
+        const r2 = other.getBoundingClientRect();
+        const ox = Math.min(toastRect.right, r2.right) - Math.max(toastRect.left, r2.left);
+        const oy = Math.min(toastRect.bottom, r2.bottom) - Math.max(toastRect.top, r2.top);
+        if (ox > 0 && oy > 0) toastHits.push({ el: sel(toastEl), by: sel(other), x: Math.round(Math.max(toastRect.left, r2.left)), y: Math.round(Math.max(toastRect.top, r2.top)) });
+      }
+    }
+  }
+
+  return { issues, covered, bad, overflow, clipped, small, toastHits };
 };
 
 // 페이지와 그 안의 모든 프레임(같은 출처)에 검사를 돌려 한 묶음으로 모은다.
-const EMPTY = () => ({ issues: [], covered: [], bad: [], clipped: [], small: [], overflowList: [], errors: [] });
+const EMPTY = () => ({ issues: [], covered: [], bad: [], clipped: [], small: [], overflowList: [], toastHits: [], errors: [] });
 export async function auditPage(page, screen) {
   const out = EMPTY();
   for (const frame of page.frames()) {
@@ -159,7 +177,7 @@ export async function auditPage(page, screen) {
       continue;
     }
     const url = frame.url().replace(/^https?:\/\/[^/]+/, '');
-    for (const key of ['issues', 'covered', 'clipped', 'small']) for (const item of res[key] || []) out[key].push({ 화면: screen, 프레임: url, ...item });
+    for (const key of ['issues', 'covered', 'clipped', 'small', 'toastHits']) for (const item of res[key] || []) out[key].push({ 화면: screen, 프레임: url, ...item });
     for (const b of res.bad || []) out.bad.push({ 화면: screen, 프레임: url, 값: b });
     if ((res.overflow || 0) > 0) out.overflowList.push({ 화면: screen, 프레임: url, overflow: res.overflow });
   }
@@ -174,6 +192,7 @@ export function lineOf(res) {
   if (res.항목 === '가려짐') return `${res.화면} 가려짐 ${res.el} ← ${res.by} @(${res.x},${res.y})`;
   if (res.항목 === '잘림') return `${res.화면} 잘림 ${res.el} "${res.text}" ${res.sw}>${res.cw}`;
   if (res.항목 === '작은글자') return `${res.화면} 작은글자 ${res.px}px${res.단추 ? '(단추)' : ''} ${res.el} "${res.text}"`;
+  if (res.항목 === '알림줄겹침') return `${res.화면} 알림줄겹침 ${res.el} × ${res.by} @(${res.x},${res.y})`;
   return JSON.stringify(res);
 }
 
@@ -187,5 +206,6 @@ export function failuresOf(res, 크기, 테마) {
   for (const c of res.covered) rows.push(['가려짐', lineOf({ 항목: '가려짐', ...c })]);
   for (const c of res.clipped) rows.push(['잘림', lineOf({ 항목: '잘림', ...c })]);
   for (const s of res.small) rows.push(['작은글자', lineOf({ 항목: '작은글자', ...s })]);
+  for (const t of res.toastHits) rows.push(['알림줄겹침', lineOf({ 항목: '알림줄겹침', ...t })]);
   return rows.map(([항목, 줄]) => ({ 항목, 줄: `${줄} · ${크기}·${테마}` }));
 }
