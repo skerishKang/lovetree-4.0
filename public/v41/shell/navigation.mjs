@@ -8,7 +8,9 @@ export const screens = [
   ['shelf', 'track32-bookshelf.html', '내 트리'],
   ['book', 'track59-sketchbook.html', '책'],
   ['board', 'track58-pinboard.html', '보드'],
-  ['network', 'track56-network.html', '지도']
+  ['network', 'track56-network.html', '지도'],
+  // #627 3단계: 그래프 보기 — 지금은 주소로만 연다(#my/graph). 메뉴 단추는 붙이지 않았다(회차 진행 중).
+  ['graph', 'track60-graph.html', '그래프 보기']
 ];
 
 export const screenForView = view => screens.find(screen => screen[0] === view) || screens[0];
@@ -24,6 +26,7 @@ export function themedViewFor(file) {
   if (file === 'track59-sketchbook.html') return 'book';
   if (file === 'track58-pinboard.html') return 'board';
   if (file === 'track56-network.html') return 'network';
+  if (file === 'track60-graph.html') return 'graph';
   return 'inner';
 }
 

@@ -19,6 +19,7 @@ export const SCREENS = [
   {name: 'book', html: 'public/v41/views/track59-sketchbook.html', href: f => '/v41/' + f},
   {name: 'board', html: 'public/v41/views/track58-pinboard.html', href: f => '/v41/' + f},
   {name: 'network', html: 'public/v41/views/track56-network.html', href: f => '/v41/' + f},
+  {name: 'graph', html: 'public/v41/views/graph/track60-graph.html', href: f => '/v41/' + f},
   {name: 'shelf', html: 'public/v41/views/track32-bookshelf.html', href: f => '/v41/' + f},
 ];
 

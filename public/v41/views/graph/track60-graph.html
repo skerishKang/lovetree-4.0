@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="ko" data-v41-screen="graph">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+<title>러브트리 4.1 · 그래프 보기</title><!-- modulepreload:start (tools/v41-modulepreload.mjs가 만든다) --><link rel="modulepreload" href="/v41/graph-model.mjs"><link rel="modulepreload" href="/v41/same-stage.mjs"><link rel="modulepreload" href="/v41/tags.mjs"><link rel="modulepreload" href="/v41/views/graph/graph.js"><link rel="modulepreload" href="/v41/youtube-id.mjs"><!-- modulepreload:end -->
+<link rel="stylesheet" href="/v41/views/graph/graph.css">
+<link rel="stylesheet" href="/v41/identity.css">
+</head>
+<body>
+<div class="g-frame">
+ <div class="g-head">
+  <div class="g-brand"><b>러브트리</b><small>GRAPH VIEW</small></div>
+  <span class="g-badge" id="gBadge"></span>
+  <span class="g-head-spacer"></span>
+  <p class="g-head-note" id="switchNote" hidden>지도의 '그물형·동심원형' 옆 보기로 붙을 자리다 — 지금은 주소로만 연다(#627 3단계 전).</p>
+ </div>
+ <div class="g-body">
+  <div class="g-stagewrap">
+   <svg id="gsvg" role="group" aria-label="꼬리표로 묶은 그래프 보기"></svg>
+   <div class="g-shelf" id="gShelf"><span class="g-shelf-label" id="shelfLabel"></span><button type="button" class="g-shelf-hint" id="shelfHint">꼬리표 한 번에 제안받기</button></div>
+   <div class="g-empty" id="gEmpty" hidden></div>
+  </div>
+  <aside class="g-rail">
+   <div class="g-card"><h3>품을 (꼬리표 뷰)</h3><div class="g-legend-row" id="legendRow"></div></div>
+   <div class="g-card g-detail" id="detailCard"></div>
+   <button type="button" class="g-walk" id="walkBtn">▶ 발자취 걷기 (시간 순서)</button>
+  </aside>
+ </div>
+</div>
+<script type="module" src="/v41/views/graph/graph.js"></script>
+</body>
+</html>

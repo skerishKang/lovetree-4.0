@@ -1,4 +1,4 @@
-const VIEWS = new Set(['home','shelf','book','board','network']);
+const VIEWS = new Set(['home','shelf','book','board','network','graph']); // graph: 그래프 보기(#627 3단계) — 지금은 주소(#my/graph)로만 연다
 const POSITION_KEY = 'lovetree.v41.account-positions.v1';
 const PENDING_KEY = 'lovetree.v41.pending-owner-route.v1';
 
