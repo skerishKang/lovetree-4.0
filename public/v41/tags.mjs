@@ -437,3 +437,51 @@ export function suggestTagsFromTitle(title, options = {}) {
   }
   return { proposals: out };
 }
+
+// ── 여러 순간 한꺼번에 제안(#627 후속 — 그래프·정리 화면용 재료. 저장은 하지 않는다) ──────────────
+// 각 순간 제목에 suggestTagsFromTitle 규칙을 그대로 쓴다. 재사용 재료는 트리 안에서 이미 쓰인 꼬리표
+// 전부(처음 본 순서) — 제목 규칙만으로 못 찾는 값(짧은 노래 제목 같은)도 제목과 맞으면 권한다.
+// 이미 이 순간이 가진 값은 다시 권하지 않고, 종류가 정해진 꼬리표가 없는 종류만 권한다 — 이미 확정된
+// 종류를 다른 값으로 다시 권하면 고민만 늘어난다('AI는 제안만' — 결과는 제안이고 사용자가 확인해야 저장된다).
+// 종류 없는 옛 꼬리표는 어떤 종류도 차지하지 않는다(뒤로 호환) — 그 순간의 빈 종류는 여전히 빈 칸이지만,
+// 새 제안은 '종류:값' 한 벌 형식으로만 낸다(종류 없는 옛 값은 읽을 때만 지원한다). 24자를 넘는 제안과
+// 20개 한도에 닿은 뒤의 제안은 내지 않는다. 종류별로는 첫 제안 하나만(1차 소속의 '첫 꼬리표'와 같은 셈).
+export function suggestForMoments(moments) {
+  const list = Array.isArray(moments) ? moments : [];
+  const used = [];
+  const seenUsed = new Set();
+  for (const m of list) {
+    for (const raw of Array.isArray(m?.keywords) ? m.keywords : []) {
+      const p = parseTag(raw);
+      if (!p) continue;
+      const key = (p.kindId || 'plain') + '|' + tagKey(p.value);
+      if (!seenUsed.has(key)) { seenUsed.add(key); used.push(p.raw); }
+    }
+  }
+  const out = [];
+  for (const m of list) {
+    if (!m || typeof m.id !== 'string' || !m.id) continue;
+    const owned = (Array.isArray(m.keywords) ? m.keywords : []).map(parseTag).filter(Boolean);
+    const ownedValues = new Set(owned.map((p) => tagKey(p.value)));
+    const ownedKinds = new Set(owned.map((p) => p.kindId).filter(Boolean));
+    const budget = TAG_MAX_COUNT - owned.length;
+    if (budget <= 0) continue;
+    const { proposals } = suggestTagsFromTitle(String(m?.title ?? ''), { knownTags: used });
+    const suggestions = [];
+    const suggestedValues = new Set();
+    const perKind = new Set();
+    for (const p of proposals) {
+      if (suggestions.length >= budget) break;
+      if (p.tooLong || !p.kindId) continue; // 24자 넘는 제안·종류 없는 제안은 내지 않는다
+      if (ownedKinds.has(p.kindId)) continue; // 이미 정해진 종류는 다시 권하지 않는다
+      const valueKey = tagKey(p.value);
+      if (ownedValues.has(valueKey) || suggestedValues.has(valueKey)) continue; // 이미 있는 값·이미 권한 값
+      if (perKind.has(p.kindId)) continue; // 종류별 하나
+      perKind.add(p.kindId);
+      suggestedValues.add(valueKey);
+      suggestions.push(p.raw);
+    }
+    if (suggestions.length) out.push({ momentId: m.id, suggestions });
+  }
+  return out;
+}

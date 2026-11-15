@@ -23,8 +23,8 @@ const VIEWS = new Set(['book', 'board', 'network']);
 const CANCELED_TITLE = '공유가 취소되었어요';
 const CANCELED_DESCRIPTION = '이 공유 주소는 더 이상 열리지 않아요. 러브트리에서 좋아하는 순간을 모아 새 공유 주소를 만들 수 있어요.';
 
-// 유튜브 영상 id 판정은 한 벤(public/v41/youtube-id.mjs)을 쓴다 — 예전엔 thumb-fallback.mjs 의
-// youtubeIdFrom 과 같은 규칙의 복사본을 함수 묶음을 작게 유지하려고 여기 뒀는데, 작은 한 벤 모듈을
+// 유튜브 영상 id 판정은 한 벌(public/v41/youtube-id.mjs)을 쓴다 — 예전엔 thumb-fallback.mjs 의
+// youtubeIdFrom 과 같은 규칙의 복사본을 함수 묶음을 작게 유지하려고 여기 뒀는데, 작은 한 벌 모듈을
 // 가져오는 쪽이 묶음도 작게 유지한다. 같은 판정은 tests/pages-search-preview.test.mjs 가 확인한다.
 const youtubeVideoId = youtubeIdFrom;
 export { youtubeVideoId };
@@ -63,8 +63,8 @@ export function shareCardFromRead(read) {
   const subject = oneLine(tree.subject, 40);
   const base = `순간 ${moments.length}개${subject ? ` · 좋아하는 대상 ${subject}` : ''}`;
   const firstTitle = entry ? oneLine(entry.title, 60) : '';
-  // #611 3번: AI 테스터 기록은 미리보기 카드 문구에도 'AI 테스터'로 알린다(계정 정보는 여전히 넣지 않는다).
-  const aiNote = read && typeof read === 'object' && read.aiTester === true ? ' · AI 테스터' : '';
+  // #611 3번: AI 명예회원 기록은 미리보기 카드 문구에도 'AI 명예회원'으로 알린다(계정 정보는 여전히 넣지 않는다).
+  const aiNote = read && typeof read === 'object' && read.aiTester === true ? ' · AI 명예회원' : '';
   const description = oneLine(firstTitle ? `${base} · “${firstTitle}”${aiNote}` : `${base}${aiNote}`, 160);
   const image = cardImageFor(entry) || CARD_IMAGE_URL;
   return { title, description, image, view: VIEWS.has(share.view) ? share.view : 'book' };

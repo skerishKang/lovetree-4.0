@@ -251,7 +251,7 @@ const requestHandler = async (request) => {
   if (path.startsWith('/auth/')) return loginRoute(login, request);
   if (path.startsWith('/api/media')) return mediaHandler(request);
   if (path.startsWith('/api/shares') || path.startsWith('/api/public/shares/') || path.startsWith('/api/trees/')) return shareHandler(request);
- if (path.startsWith('/api/community/')) return communityHandler(request);
+ if (path.startsWith('/api/community/') || path === '/api/public/tag-moments') return communityHandler(request);
  if (path === '/api/feedback' || path.startsWith('/api/admin/feedback') || path.startsWith('/api/admin/journals') || path === '/api/board' || path.startsWith('/api/board/') || path.startsWith('/api/admin/persona/')) return feedbackHandler(request);
  if (path === '/api/youtube/oembed') return youtubeOembedHandler(request);
   return storageHandler(request);

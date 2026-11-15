@@ -82,6 +82,38 @@ export function createCommunityRepo(pool){
    );
    return rows.map(shareRow);
   },
+  // #627 3단계 '다른 팬 보기': 태그 검색이 훑을 공개 공유 행(active·비공개 아님·숨김 없음·차단 없음·요청자 아님).
+  // 트리당 한 행(auto 우선)만 고른다. 둘러보기(listDiscoverable)와 달리 moment_count·discoverable 조건이 없다 —
+  // 공개 판정은 공유 읽기 경로(read())와 같게 active+비공개만 본다. 차단은 양방향(isBlocked과 같게)으로 뺀다.
+  async listPublicTagShares({productId,viewerSubjectId=null,limit=400}){
+   const {rows}=await pool.query(
+    `WITH picked AS (
+       SELECT DISTINCT ON (s.subject_id,s.tree_id) s.*
+       FROM lovetree_shares s
+       WHERE s.product_id=$1 AND s.status='active'
+       ORDER BY s.subject_id,s.tree_id,(s.origin='auto') DESC,s.created_at DESC,s.share_id DESC
+     )
+     SELECT s.* FROM picked s
+     WHERE ($2::text IS NULL OR s.subject_id<>$2)
+       AND NOT EXISTS (
+         SELECT 1 FROM lovetree_community_hidden_shares h
+         WHERE h.product_id=s.product_id AND h.share_id=s.share_id
+       )
+       AND NOT EXISTS (
+         SELECT 1 FROM lovetree_tree_visibility v
+         WHERE v.product_id=s.product_id AND v.subject_id=s.subject_id AND v.tree_id=s.tree_id AND v.visibility='private'
+       )
+       AND ($2::text IS NULL OR NOT EXISTS (
+         SELECT 1 FROM lovetree_community_blocks b
+         WHERE b.product_id=s.product_id
+           AND ((b.blocker_subject_id=$2 AND b.blocked_subject_id=s.subject_id)
+             OR (b.blocker_subject_id=s.subject_id AND b.blocked_subject_id=$2))
+       ))
+     ORDER BY s.created_at DESC,s.share_id DESC LIMIT $3`,
+    [productId,viewerSubjectId,limit]
+   );
+   return rows.map(shareRow);
+  },
   async stats({productId,shareId,viewerSubjectId=null}){
    const {rows}=await pool.query(
     `SELECT

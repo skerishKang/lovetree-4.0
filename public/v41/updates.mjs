@@ -34,10 +34,10 @@ export function latestEntry(updates) {
   return best;
 }
 
-/** 출처 한 줄. AI 테스터·실제 사용자 의견을 구분한다 — 출처 원칙(#611 댓글). */
+/** 출처 한 줄. AI 명예회원·실제 사용자 의견을 구분한다 — 출처 원칙(#611 댓글), 호칭은 2026-11-15 대표 결정. */
 export function sourceLabel(item) {
   if (!item || typeof item !== 'object') return '';
-  if (item.source === 'ai_tester') return `AI 테스터가 찾아 준 것${item.tester ? ` · ${String(item.tester)}` : ''}`;
+  if (item.source === 'ai_tester') return item.tester ? `AI 명예회원 ${String(item.tester)} 님이 알려 준 것` : 'AI 명예회원이 알려 준 것';
   if (item.source === 'user') return '사용자 의견으로 고친 것';
   return '';
 }
@@ -59,7 +59,7 @@ export function markSeen(storage, version) {
 const esc = value => String(value ?? '').replace(/[&<>"]/g, ch => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[ch]));
 
 /** 노트 목록을 쉬운 말 한 줄씩으로 그리는 조각. 버전·날짜·새로워진 것·고친 것 그대로만 쓴다.
- *  #638: '새로워진 것'·'고친 것' 제목은 한 버전에 한 번만 보인다. 출처 줄('AI 테스터가 찾아 준 것 · 이름')은
+ *  #638: '새로워진 것'·'고친 것' 제목은 한 버전에 한 번만 보인다. 출처 줄('AI 명예회원 ○○ 님이 알려 준 것')은
  *  같은 출처의 이웃 항목을 한 묶음으로 쳐서 그 묶음 끝 항목 아래에 작게 단다(12px — shell.css). */
 export function renderUpdates(updates, activeVersion = '') {
   const entries = (Array.isArray(updates) ? updates : [])

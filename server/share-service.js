@@ -113,7 +113,7 @@ export function createShareService({ shareRepo, workspaceRepo, visibilityRepo = 
       const { tree, omittedPrivateMedia } = projectSharedTree(stored.doc, row.treeId);
       if (!tree.moments.length) throw new ApiError(422, 'share_empty', '공유할 순간이 아직 없어요.');
       const shared = { share: shareSummary(row), tree, omittedPrivateMedia };
-      // #611 3번: AI 테스터 기록은 공개 읽기 결과에 'AI 테스터' 배지 한 비트만 내린다.
+      // #611 3번: AI 명예회원 기록은 공개 읽기 결과에 'AI 명예회원' 배지 한 비트만 내린다.
       // 사본 화면(내 트리)에서는 붙이지 않는다 — 여기 read()는 남에게 보이는 공개 응답뿐이다.
       if (admin && await admin.roleFor({ productId, subjectId: row.subjectId }) === ROLE_AI_CUSTOMER) shared.aiTester = true;
       return shared;

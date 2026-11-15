@@ -6,7 +6,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { makeTag, parseTag, normalizeTags, tagValues, tagKey, TAG_KINDS, TAG_MAX_LENGTH, TAG_MAX_COUNT, suggestTagsFromTitle } from '../public/v41/tags.mjs';
+import { makeTag, parseTag, normalizeTags, tagValues, tagKey, TAG_KINDS, TAG_MAX_LENGTH, TAG_MAX_COUNT, suggestTagsFromTitle, suggestForMoments } from '../public/v41/tags.mjs';
 import { createTree, addMoment, validateState } from '../src/domain.js';
 
 const input = (title = '첫 목소리') => ({ subject: '윤슬', title, note: '오래 기억하고 싶은 마음', emotion: '설렘', date: '2026-10-27', url: '' });
@@ -485,4 +485,61 @@ test('결함 ③: 이름 바꾸기·합치기는 꼬리표가 실제로 바뀐 �
   merge.saveMoments({ treeId: merge.tree.id, moments: mergedMoments(merge.tree, shy, eta).moments, notice: '' });
   assert.deepEqual([...new Set(merge.posted.map((p) => p.msg.momentId))], merge.tree.moments.map((m) => m.id), '두 순간 모두 바뀐다');
   assert.deepEqual(merge.posted.find((p) => p.msg.momentId === merge.tree.moments[1].id).msg.keywords, ['노래:ETA']);
+});
+
+// ── suggestForMoments(#627 후속): 여러 순간 한꺼번에 제안 — 재사용 우선·빠진 종류만·한도. 저장은 없다.
+
+test('suggestForMoments — 한꺼번에 제안: 트리에서 이미 쓴 꼬리표(재사용)를 먼저 권한다', () => {
+  const tree = [
+    { id: 'a0', title: '다른 순간', keywords: ['노래:With', '가수:RESCENE'] },
+    { id: 'a1', title: 'RESCENE 콘서트 With', keywords: [] },
+    { id: 'a2', title: 'RESCENE 콘서트 인기가요', keywords: [] },
+  ];
+  const result = suggestForMoments(tree);
+  const a1 = result.find((r) => r.momentId === 'a1');
+  assert.deepEqual(a1.suggestions, ['노래:With', '가수:RESCENE', '무대:콘서트'], '제목 규칙만으로 못 찾는 With는 재사용으로, 앞에 온다');
+  const a2 = result.find((r) => r.momentId === 'a2');
+  assert.deepEqual(a2.suggestions, ['가수:RESCENE', '무대:인기가요'], '재사용(가수)이 먼저, 제목 규칙(무대)이 뒤에 온다');
+});
+
+test('suggestForMoments — 이미 있는 값·종류는 다시 권하지 않는다(빠진 종류만, 제안은 종류:값 형식)', () => {
+  // 이미 무대가 있는 순간 — 빠진 노래만 권한다(제목에 같은 값이 있어도).
+  const b1 = suggestForMoments([{ id: 'b1', title: '"Super Shy" 인기가요', keywords: ['무대:인기가요'] }]);
+  assert.deepEqual(b1, [{ momentId: 'b1', suggestions: ['노래:Super Shy'] }]);
+  // 같은 값(표기 차이 포함)은 다시 권하지 않는다 — 'super shy'를 가진 순간에 'Super Shy'를 권하지 않는다.
+  const b2 = suggestForMoments([{ id: 'b2', title: '"Super Shy"', keywords: ['노래:super shy'] }]);
+  assert.deepEqual(b2, [], '제안이 없으면 항목 자체를 내지 않는다');
+  // 종류 없는 옛 꼬리표는 어떤 종류도 차지하지 않는다 — 무대·노래 모두 빈 칸이다(새 제안은 종류:값 형식).
+  const b3 = suggestForMoments([{ id: 'b3', title: '"Super Shy" 인기가요', keywords: ['무대'] }]);
+  assert.deepEqual(b3, [{ momentId: 'b3', suggestions: ['노래:Super Shy', '무대:인기가요'] }]);
+});
+
+test('suggestForMoments — 한도: 24자 넘는 제안은 내지 않고, 20개 한도에 닿으면 거기서 멈춘다', () => {
+  const long = 'x'.repeat(30);
+  const c1 = suggestForMoments([{ id: 'c1', title: `"${long}" 인기가요`, keywords: [] }]);
+  assert.deepEqual(c1, [{ momentId: 'c1', suggestions: ['무대:인기가요'] }], '24자를 넘는 노래 제안은 내지 않는다');
+  const nineteen = Array.from({ length: 19 }, (_, i) => `감정:마음${i}`);
+  const c2 = suggestForMoments([{ id: 'c2', title: '"Super Shy" 인기가요', keywords: nineteen }]);
+  assert.deepEqual(c2, [{ momentId: 'c2', suggestions: ['노래:Super Shy'] }], '20개 한도까지 한 개만');
+  const twenty = Array.from({ length: 20 }, (_, i) => `감정:마음${i}`);
+  const c3 = suggestForMoments([{ id: 'c3', title: '"Super Shy" 인기가요', keywords: twenty }]);
+  assert.deepEqual(c3, [], '자리가 없으면 제안하지 않는다');
+});
+
+test('suggestForMoments — 순간 300개 계산도 50ms 안에 끝난다', () => {
+  const moments = [];
+  for (let i = 0; i < 300; i += 1) {
+    moments.push({
+      id: 'm' + i,
+      title: `RESCENE(리센느) "Super Shy" ${i % 2 ? '인기가요' : '뮤직뱅크'} 직캠`,
+      keywords: i % 3 ? [] : ['가수:RESCENE'],
+    });
+  }
+  suggestForMoments(moments); // 첫 계산은 모듈 적재·JIT 준비가 섞이므로 준비 1회 후에 잰다
+  const started = performance.now();
+  const result = suggestForMoments(moments);
+  const elapsed = performance.now() - started;
+  assert.equal(result.length, 300, '꼬리표가 아예 없는 순간·가수만 있는 순간 모두 빠진 종류 제안이 있다');
+  assert.ok(result.every((r) => r.suggestions.includes('노래:Super Shy') && r.suggestions.length >= 2), '노래·무대는 제목 규칙으로 권한다');
+  assert.ok(elapsed <= 50, `300순간 한꺼번에 제안 ${elapsed.toFixed(1)}ms ≤ 50ms`);
 });

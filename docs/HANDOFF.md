@@ -6,10 +6,19 @@
 
 > **시험 멈춤 규칙(2026-11-15)**: 브라우저 코드에 setInterval 반복을 넣으면 unref하거나 정리한다 — 안 그러면 npm test가 끝나지 않고 CI가 멈춘다.
 
-## 2026-11-15 — 유튜브 id 판정 한 벤 + 같은 영상·같은 무대 찾기 규칙(순수 함수) (#627 후속, 컴1로컬2 레인, ai/local2-627-same-stage-261115, main 0527a21 기준)
+## 2026-11-15 — 그래프 재료 잇기: buildGraph stacks + 꼬리표 한꺼번에 제안 (#627 후속, 컴1로컬2 레인, ai/local2-627-graph-material-261115, main 7420245 기준)
 
-- **유튜브 id 한 벤(`public/v41/youtube-id.mjs` 새)**: 세 벌의 복사본(thumb-fallback.mjs youtubeIdFrom·title-backfill.mjs youtubeVideoId·functions/_lib/tree-preview.mjs youtubeVideoId)을 한 곳으로 모었다. thumb-fallback은 같은 이름을 다시 내보내 쓰던 주소를 유지하고, title-backfill·tree-preview는 한 벤을 불러 쓴다(tree-preview는 tests가 부르는 `youtubeVideoId` 별명으로 재수출). 동작은 thumb-fallback youtubeIdFrom 기준 그대로(ytimg 썸네일 주소·userinfo·2048자 검사 포함) — 같은 판정은 pages-search-preview corpus 시험이 확인한다. 기존 시험 무수정 통과, 지운 시험 없음.
-- **같은 영상·같은 무대 규칙(`public/v41/same-stage.mjs` 새, DOM 없는 순수 함수)**: videoKey(url)(위 한 벤 사용)·findDuplicates(moments)(유튜브 id 같은 순간 묶음)·findSameStage(moments)(꼬리표 무대·노래 값과 무대 날짜=순간 date 칸이 모두 같을 때만, 하나라도 비면 안 묶음). 꼬리표 읽기는 tags.mjs tagValues·tagKey 재사용, 2개 이상만 묶음·처음 본 순서 유지(graph-model.mjs와 같은 자리잡기). **아직 화면에 연결하지 않았다** — views·shell 금지 범위라 다음 단계에서 쓰는 규칙 한 벤이다.
+- **buildGraph stacks(`public/v41/graph-model.mjs`)**: 결과에 `stacks: [{key, kind:'same-video'|'same-stage', momentIds, leadId}]`를 더하고 각 순간 entries에 `stackId`(없으면 null)를 붙였다. 묶음 판정은 same-stage.mjs 한 벌(findDuplicates·findSameStage)을 그대로 쓰고, leadId는 발자취 순서의 가장 앞선 순간, 두 종류 묶음에 모두 걸린 순간의 stackId는 같은 영상 묶음 열쇠를 권한다(영상 중복이 더 강한 신호 — 두 묶음은 stacks에 둘 다 남는다). 허브·1차 소속·발자취 규칙 불변.
+- **같은 무대 묶음 열쇠 수리(`public/v41/same-stage.mjs`)**: 열쇠 이음을 '|'(값에 나올 수 있음)에서 제어문자 \u001f로 — '무대:A·노래:B|C'와 '무대:A|B·노래:C'가 한 열쇠로 뭉개지던 것을 막는다. graph stackId가 이 열쇠를 그대로 쓴다.
+- **꼬리표 한꺼번에 제안(`public/v41/tags.mjs` suggestForMoments)**: 각 순간 제목에 suggestTagsFromTitle 규칙을 그대로 쓰되, 재사용 재료는 트리 안에서 이미 쓴 꼬리표 전부. 이미 있는 값(표기 차이 포함)·이미 정해진 종류는 다시 권하지 않고(빠진 종류만), 종류 없는 옛 꼬리표는 종류를 차지하지 않되 새 제안은 '종류:값' 형식만. 24자 넘는 제안·20개 한도 초과는 내지 않고, 종류별 첫 제안 하나만. 저장 없음(제안만 — 'AI는 제안만' 원칙). 결과: [{momentId, suggestions:['종류:값'…]}], 제안이 비면 항목 자체를 뺀다.
+- **시험**: 기존 파일에 더한다(v41-graph-model 2개·v41-tags-627 4개·v41-same-stage 1개). 결과 모양을 deepEqual로 단정하던 기존 3곳(빈 그래프·순간 1개·멤버 우선순위)에 stacks:[]·stackId:null을 기대 모양에 더했다 — 허브·1차 소속·발자취 단정은 한 글자도 안 바꿨다. 관련 시험 119/119, 전체 npm test 1811검 1672 pass·0 fail·139 skip, build·modulepreload --check 통과. 실측: buildGraph 300개 5.1ms(stacks 152), suggestForMoments 300개 11.9ms.
+- **표기 바로잡기**: #694에서 내가 쓴 '한 벤'을 저장소 관례대로 '한 벌'로 고쳤다(주석 5파일·HANDOFF).
+- **미연결**: 화면은 건드리지 않았다(AI 고객 회차) — 그래프 보기 실제 화면(PR3)이 stacks·stackId·suggestForMoments를 쓰면 된다.
+
+## 2026-11-15 — 유튜브 id 판정 한 벌 + 같은 영상·같은 무대 찾기 규칙(순수 함수) (#627 후속, 컴1로컬2 레인, ai/local2-627-same-stage-261115, main 0527a21 기준)
+
+- **유튜브 id 한 벌(`public/v41/youtube-id.mjs` 새)**: 세 벌의 복사본(thumb-fallback.mjs youtubeIdFrom·title-backfill.mjs youtubeVideoId·functions/_lib/tree-preview.mjs youtubeVideoId)을 한 곳으로 모었다. thumb-fallback은 같은 이름을 다시 내보내 쓰던 주소를 유지하고, title-backfill·tree-preview는 한 벌을 불러 쓴다(tree-preview는 tests가 부르는 `youtubeVideoId` 별명으로 재수출). 동작은 thumb-fallback youtubeIdFrom 기준 그대로(ytimg 썸네일 주소·userinfo·2048자 검사 포함) — 같은 판정은 pages-search-preview corpus 시험이 확인한다. 기존 시험 무수정 통과, 지운 시험 없음.
+- **같은 영상·같은 무대 규칙(`public/v41/same-stage.mjs` 새, DOM 없는 순수 함수)**: videoKey(url)(위 한 벌 사용)·findDuplicates(moments)(유튜브 id 같은 순간 묶음)·findSameStage(moments)(꼬리표 무대·노래 값과 무대 날짜=순간 date 칸이 모두 같을 때만, 하나라도 비면 안 묶음). 꼬리표 읽기는 tags.mjs tagValues·tagKey 재사용, 2개 이상만 묶음·처음 본 순서 유지(graph-model.mjs와 같은 자리잡기). **아직 화면에 연결하지 않았다** — views·shell 금지 범위라 다음 단계에서 쓰는 규칙 한 벌이다.
 - **시험**: `tests/v41-same-stage.test.mjs` 동작 시험 8개(주소 모양 18가지, 같은 영상 2번, 같은 무대 직캠 3, 날짜 다른 같은 노래 안 묶음, 꼬리표 빈 순간·종류 없는 옛 꼬리표 안 묶음, 표기 차이 tagKey 묶음, 300개 50ms 이하 — 첫 계산에 JIT 준비가 섞이므로 준비 1회 후 함수별 측정). 관련 시험 80/80 통과, 전체 npm test 1804검 1665 pass·0 fail·139 skip(기존 건너뜀) 3분 안에 끝까지, build·modulepreload --check 통과.
 - **modulepreload**: thumb-fallback이 youtube-id.mjs를 정적으로 부르게 되어 도구가 shell(index.html)·book·board·network·shelf HTML 목록을 갱신(도구 기계 갱신 — views/** 코드는 안 건드렸다).
 
@@ -2039,3 +2048,12 @@ COM2에는 merge `6900df8aa446dfe0201d01997457fae04c4abe16`의 변경 서버 파
 - 공통 검사기(tests/v41-screen-audit.test.mjs)에 상태 3개 추가: '지도 390(조작 줄)'(iframe↔셸 교차 겹침 + 보기 전환 단추 대비 4.5:1), '새 소식 펼침', '내 의견 목록'(/api/board/mine 가짜 게시물). 390·1440 × 밤·정원 통과. KNOWN 20건은 기존 그대로. updates.json 'NaN월' 문구는 검사기 흔적값 오탈이어서 '잘못 보이던 날짜'로 다듬었다.
 - 시험: 관련 단위 시험 전부 통과(domain·updates 4종·thumb 2종·panels 3종 — v41-panels-flow의 add 모드 '더 적기' 단정은 #638 방향으로 갱신), npm run build + modulepreload --check 통과, 화면 공통 검사기 REQUIRE 통과(35s). 페이지 오류 0.
 - 캡처: E:/lovetree-qa/lane/local4-638rest/ (지도 390 전·후 밤/정원, 책 390 후, 새 소식·내 의견 1440).
+
+## 2026-11-15 — 'AI 테스터' → 'AI 명예회원' 호칭 바꾸기 (컴1로컬5 레인, ai/local5-ai-honorific-261115, main 96f462e 기준)
+
+- **대표 결정(2026-11-15)**: AI 고객(페르소나)을 화면·고객 대상 글에서 'AI 명예회원'으로 부른다('AI'는 남긴다 — 사람이 아님을 알림). 역할 값(ai_customer·tester)·필드 이름(aiTester 등)·DB 열·API 경로는 그대로고 보이는 글자만 바꿨다.
+- **바꾼 곳(보이는 글자 9곳 + 관련 주석)**: 둘러보기 카드·감상 허브 미리보기 배지(community-panel.mjs 2곳), 공유 화면 안내(shell.mjs), /t/ og 카드 설명 ' · AI 명예회원'(tree-preview.mjs), 새 소식 출처 줄 'AI 명예회원 윤제 님이 알려 준 것'(updates.mjs sourceLabel — #679 묶음 규칙 그대로, 글자만), 운영센터 이름표 'AI 명예회원 윤제'(admin.js authorLabel·admin-view.js 일지 줄), 운영센터 전체 숫자 카드 'AI 명예회원 N'·aria-label(admin.js).
+- **안 바꾼 것**: 역할 값·필드 이름·DB 열·API 경로. updates.json은 항목에 'AI 테스터' 글자가 없어 손댈 곳이 없다(출처는 source·tester 필드). HANDOFF 과거 기록·마이그레이션 주석·시험 내부 명칭(fixture 트리 제목·시험 이름)은 과거 기록으로 남긴다.
+- **시험 계정(tester 역할) 걸러 내기**: 없다 — 둘러보기 discover(/api/community/shares)는 역할과 무관하게 공유 행을 나열하고 aiTester 비트만 본다(지금은 시험 계정이 공유가 없어 안 보일 뿐). 방법(별도 서버 PR): discover 목록과 자동 공유 생성에서 주체 역할을 roleFor로 확인해 role='tester'면 목록에서 제외하고 새 공유를 막는다(공개 읽기 /api/public/shares/:id도 같은 판정).
+- **시험**: 기존 시험 기대 글자 8곳 갱신(updates-format·updates-screen-611·updates-b-611 'AI 윤제'→'AI 명예회원 윤제'·pages-search-preview·share-service·admin-view 'AI 고객1'→'AI 명예회원 고객1'). 새 시험·소스 글자 검사 없음. 전체 npm test 1820검 1681 pass·0 fail·139 skip, build·modulepreload --check 통과.
+- **머지 뒤 할 일**: 서버 파일이 바뀌었으므로(주석만) 컴2 autodeploy 설치 sha 확인. 화면 캡처(둘러보기 카드·새 소식·운영센터 1440·390, 시험 계정·관리자 계정)는 배포 뒤 컴2에서.

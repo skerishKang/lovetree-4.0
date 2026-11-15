@@ -1,7 +1,8 @@
 // #627 2단계 그래프 보기(설계 docs/GRAPH_VIEW_20261115.md §2)의 순수 규칙 한 벌 — DOM도 배치 좌표도 없다.
 // 꼬리표('종류:값')를 점·선 재료로 바꾸는 일만 한다: 허브(큰 점)·1차 소속(묶음)·함께 속함·꼬리표 없는
-// 선반·발자취(시간 순서)와 고른 곳에 걸린 구간. 그리기(views/graph/)는 이 결과를 받아 그릴 뿐이고,
-// 종류·저장 형식은 tags.mjs 한 벌을 그대로 쓴다(새 규칙을 만들지 않는다).
+// 선반·발자취(시간 순서)·고른 곳에 걸린 구간, 그리고 겹치는 순간의 묶음(stacks — same-stage.mjs 한 벌:
+// 같은 영상·같은 무대). 그리기(views/graph/)는 이 결과를 받아 그릴 뿐이고, 종류·저장 형식은 tags.mjs
+// 한 벌을 그대로 쓴다(새 규칙을 만들지 않는다).
 //
 // 용어(설계 문서 §2 그대로):
 //   허브(큰 점)   — 같은 꼬리표 값을 가진 순간이 2개 이상일 때만 만든다. 1개뿐이면 허브가 아니다.
@@ -11,6 +12,7 @@
 //   선반          — 꼬리표가 아예 없는 순간(종류 없는 옛 꼬리표가 하나라도 있으면 선반이 아니다).
 //   발자취        — 전체 순간을 시간 순서로 잇는 한 줄. 화면은 전체를 그리지 않고 pathFor로 고른 곳만 밝힌다.
 import { parseTag, tagKey } from './tags.mjs';
+import { findDuplicates, findSameStage } from './same-stage.mjs';
 
 // 허브가 될 수 있는 종류 — 방향 문서의 '노래·멤버·무대가 큰 점' + 가수(설계 문서 v2 §2: 가수-만 순간의
 // 묶음 장소로, 화면에서 한 단계 작은 점). 활동기·감정·종류 없는 옛 꼬리표는 허브가 아니라 상세 판
@@ -120,7 +122,26 @@ export function buildGraph(moments) {
     h.momentIds = entries.filter((e) => e.hubId === h.id).map((e) => e.id);
   }
 
-  return { hubs, moments: entries, shelf, footprint: footprint(list) };
+  // #627 후속: 같은 영상·같은 무대 묶음(stacks) — 그림 쪽이 겹치는 순간을 '한 무더기 + 개수'로 그릴 때의 재료.
+  // 묶음 판정은 same-stage.mjs 한 벌(findDuplicates·findSameStage)을 그대로 쓰고, 여기서는 발자취
+  // 순서의 leadId(묶음을 대표해 먼저 보여 줄 순간)와 순간별 stackId만 붙인다. 허브·1차 소속·발자취
+  // 규칙은 바뀌지 않는다. 한 순간이 두 종류 묶음에 모두 걸리면 같은 영상 묶음을 stackId로 권한다 —
+  // 영상이 같으면 더 강한 겹침이다(두 묶음은 stacks에 둘 다 남는다). stackId는 묶음 열쇠 그대로다:
+  // 같은 영상은 영상 id, 같은 무대는 '무대·노래·날짜' 열쇠라 종류 사이 겹침이 없다.
+  const fp = footprint(list);
+  const stacks = [
+    ...findDuplicates(list).map((g) => ({ key: g.key, kind: 'same-video', momentIds: g.momentIds })),
+    ...findSameStage(list).map((g) => ({ key: g.key, kind: 'same-stage', momentIds: g.momentIds })),
+  ];
+  const orderAt = new Map(fp.order.map((id, i) => [id, i]));
+  const stackIdOf = new Map();
+  for (const s of stacks) {
+    s.leadId = s.momentIds.reduce((lead, id) => (orderAt.get(id) < orderAt.get(lead) ? id : lead), s.momentIds[0]);
+    for (const id of s.momentIds) if (!stackIdOf.has(id)) stackIdOf.set(id, s.key);
+  }
+  for (const e of entries) e.stackId = stackIdOf.get(e.id) ?? null;
+
+  return { hubs, stacks, moments: entries, shelf, footprint: fp };
 }
 
 // 고른 곳(허브 또는 순간)에 걸린 발자취 구간만 — 화면이 전체 줄 대신 이것만 밝힌다(대표 결정:

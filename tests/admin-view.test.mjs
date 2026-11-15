@@ -261,7 +261,7 @@ test("#655 '한눈에' 카드 숫자 — 가짜 응답으로 각 카드 계산�
   // '#584'와 '584'는 같은 이슈다(#636 정규화) — 열린 1로 센다.
   assert.deepEqual(model.issueCard, {open: 1, closed: 0});
   assert.equal(model.journalCard.total, 2);
-  assert.equal(model.journalCard.rows[0].name, 'AI 고객1');
+  assert.equal(model.journalCard.rows[0].name, 'AI 명예회원 고객1');
   assert.equal(model.journalCard.rows[0].lastDay, '2026-11-15');
   assert.equal(model.journalCard.rows[0].latestScore, 2);
   // 오늘 할 일: 답 안 단 글 오래된 순, 닫은 글은 빠지고, 이슈 번호는 숫자로 돌아온다.

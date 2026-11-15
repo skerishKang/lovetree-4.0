@@ -18,7 +18,7 @@ test('순간 0개(또는 id 없는 엉뚱한 값): 빈 그래프와 빈 구간',
   for (const input of [null, undefined, [], [null, { date: '2026-11-01' }, {}]]) {
     const graph = buildGraph(input);
     assert.deepEqual(graph, {
-      hubs: [], moments: [], shelf: [],
+      hubs: [], stacks: [], moments: [], shelf: [],
       footprint: { order: [], neighbors: {}, segments: [] }
     });
     assert.deepEqual(pathFor(graph, { momentId: 'm1' }), { segments: [] });
@@ -28,7 +28,8 @@ test('순간 0개(또는 id 없는 엉뚱한 값): 빈 그래프와 빈 구간',
 test('순간 1개: 허브는 없고(2개 미만), 발자취는 점 하나(구간 없음)', () => {
   const graph = buildGraph([M('m1', '2026-11-01', [artist('RESCENE')])]);
   assert.deepEqual(graph.hubs, []);
-  assert.deepEqual(graph.moments, [{ id: 'm1', hubId: null, alsoHubIds: [] }]);
+  assert.deepEqual(graph.moments, [{ id: 'm1', hubId: null, alsoHubIds: [], stackId: null }]);
+  assert.deepEqual(graph.stacks, []);
   assert.deepEqual(graph.shelf, []);
   assert.deepEqual(graph.footprint.order, ['m1']);
   assert.deepEqual(graph.footprint.segments, []);
@@ -95,7 +96,7 @@ test('1차 소속 우선순위: 멤버는 가수보다 앞서고, 무대·노래
   ];
   const graph = buildGraph(moments);
   // 멤버 꼬리표만 있으면 멤버 허브의 1차 소속이 된다(문서 v2 순서: 무대 > 노래 > 멤버 > 가수).
-  assert.deepEqual(graph.moments.find((m) => m.id === 'c1'), { id: 'c1', hubId: 'member:지우', alsoHubIds: [] });
+  assert.deepEqual(graph.moments.find((m) => m.id === 'c1'), { id: 'c1', hubId: 'member:지우', alsoHubIds: [], stackId: null });
   const memberHub = graph.hubs.find((h) => h.kindId === 'member');
   assert.deepEqual(memberHub.momentIds, ['c1', 'c2']);
   // 무대가 함께 있으면 멤버는 물러난다 — 그 순간은 무대 묶음에 살고 멤버와는 함께 속함.
@@ -248,4 +249,63 @@ test('순간 300개: buildGraph가 50ms 안에 끝난다', () => {
   assert.equal(graph.footprint.neighbors.m0.prev, null);
   assert.equal(graph.footprint.order[299], 'm299');
   assert.equal(graph.footprint.neighbors.m299.next, null);
+});
+
+test('같은 영상·같은 무대는 stacks 한 무더기 — leadId는 발자쭈다 가장 앞선 순간, stackId는 묶음 열쇠', () => {
+  const moments = [
+    M('v1', '2026-11-01', [stage('인기가요'), song('Super Shy')], { url: 'https://www.youtube.com/watch?v=aaa111bbb01' }),
+    M('v2', '2026-11-02', [stage('인기가요'), song('Super Shy')], { url: 'https://youtu.be/aaa111bbb01?t=32' }),
+    M('s1', '2026-11-05', [stage('뮤직뱅크'), song('The Chase')], { url: 'https://youtu.be/bbb222ccc02' }),
+    M('s2', '2026-11-05', [stage('뮤직뱅크'), song('The Chase')], { url: 'https://youtu.be/ccc333ddd03' }),
+    M('s3', '2026-11-05', [stage('뮤직뱅크'), song('The Chase')], { url: 'https://www.youtube.com/shorts/ddd444eee04' }),
+    M('o1', '2026-11-08', [stage('쇼챔피언'), song('With')], { url: 'https://youtu.be/eee555fff05' }),
+    M('o2', '2026-11-08', [stage('쇼챔피언'), song('With')], { url: 'https://www.youtube.com/embed/eee555fff05' }),
+    M('u1', '2026-11-09', [], { url: 'https://youtu.be/fff666ggg06' }),
+  ];
+  const graph = buildGraph(moments);
+  const videoStacks = graph.stacks.filter((s) => s.kind === 'same-video');
+  assert.deepEqual(videoStacks.map((s) => [s.key, s.momentIds]), [
+    ['aaa111bbb01', ['v1', 'v2']],
+    ['eee555fff05', ['o1', 'o2']],
+  ], '같은 영상 2번 — 주소 모양이 달라도 id가 같으면 한 무더기다');
+  assert.equal(videoStacks[0].leadId, 'v1', 'leadId는 발자쭈다 가장 앞선 순간');
+  const stageStacks = graph.stacks.filter((s) => s.kind === 'same-stage');
+  const fancamStack = stageStacks.find((s) => s.momentIds.length === 3);
+  assert.deepEqual(fancamStack.momentIds, ['s1', 's2', 's3'], '같은 무대 직캠 3개(영상은 셋 다 다르다)');
+  assert.equal(fancamStack.leadId, 's1');
+  assert.deepEqual(stageStacks.find((s) => s.momentIds.length === 2).momentIds, ['o1', 'o2']);
+  assert.equal(graph.stacks.length, 4, '같은 영상 2 + 같은 무대 2');
+  assert.equal(graph.moments.find((m) => m.id === 'v1').stackId, 'aaa111bbb01', 'stackId는 묶음 열쇠다(같은 영상은 영상 id)');
+  assert.equal(graph.moments.find((m) => m.id === 's1').stackId, fancamStack.key);
+  assert.equal(graph.moments.find((m) => m.id === 'o1').stackId, 'eee555fff05', '두 종류에 모두 걸리면 같은 영상 묶음을 권한다');
+  assert.equal(graph.moments.find((m) => m.id === 'u1').stackId, null, '겹침이 없으면 null이다');
+  // 허브·1차 소속·발자취 규칙은 그대로다.
+  assert.deepEqual(graph.hubs.map((h) => [h.kindId, h.value, h.count]), [
+    ['stage', '뮤직뱅크', 3], ['stage', '쇼챔피언', 2], ['stage', '인기가요', 2],
+    ['song', 'Super Shy', 2], ['song', 'The Chase', 3], ['song', 'With', 2],
+  ]);
+  assert.equal(graph.moments.find((m) => m.id === 'v1').hubId, 'stage:인기가요');
+  assert.equal(graph.moments.find((m) => m.id === 's1').hubId, 'stage:뮤직뱅크');
+  assert.deepEqual(graph.shelf, ['u1']);
+  assert.deepEqual(graph.footprint.order, ['v1', 'v2', 's1', 's2', 's3', 'o1', 'o2', 'u1']);
+});
+
+test('순간 300개(겹치는 영상·같은 무대 섞임): stacks까지 50ms 안에 끝난다', () => {
+  const moments = [];
+  for (let i = 0; i < 300; i += 1) {
+    moments.push(M('m' + i, i % 2 ? '2026-11-05' : '2026-11-12', [stage(i % 2 ? '인기가요' : '뮤직뱅크'), song('Super Shy')], {
+      url: `https://youtu.be/v${String(i % 150).padStart(10, '0')}`, // 영상 150개 × 2번
+      createdOrder: i + 1,
+    }));
+  }
+  const started = performance.now();
+  const graph = buildGraph(moments);
+  const elapsed = performance.now() - started;
+  assert.equal(graph.stacks.filter((s) => s.kind === 'same-video').length, 150, '영상마다 2번씩 — 같은 영상 묶음 150');
+  assert.deepEqual(graph.stacks.filter((s) => s.kind === 'same-stage').map((s) => s.momentIds.length), [150, 150], '같은 날 같은 무대·노래 150씩');
+  assert.equal(graph.stacks[0].leadId, 'm0', '묶음의 얼굴은 발자쭈다 앞선 순간');
+  assert.equal(graph.moments.filter((m) => m.stackId != null).length, 300, '모든 순간이 묶음에 든다');
+  const videoKeys = new Set(graph.stacks.filter((s) => s.kind === 'same-video').map((s) => s.key));
+  assert.ok(graph.moments.every((m) => videoKeys.has(m.stackId)), '두 종류에 모두 걸려도 stackId는 같은 영상 묶음 열쇠다');
+  assert.ok(elapsed < 50, `300순간 stacks 계산 ${elapsed.toFixed(1)}ms — 50ms 이하`);
 });
