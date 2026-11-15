@@ -106,9 +106,16 @@ body {
 .lt-post-meta { display: flex; gap: 12px; color: var(--lt-muted); font-size: 12px; }
 .lt-post-date { color: var(--lt-muted); font-size: 12px; margin-left: auto; }
 .lt-post-row { grid-template-columns: auto 1fr auto; align-items: center; }
+/* '고치는 일' 탭 고객 글 줄(대표 요청 2026-11-16): 제목 칸이 남은 폭을 다 가져가고 줄바꿈하고,
+   상태 칩·단추는 글자 폭만 차지한다 — 긴 글 옆에서 칩이 눌려 세로로 쪼개지지 않게. */
+.lt-issue-post { grid-template-columns: minmax(0, 1fr) auto auto; }
+/* 칸 안에서도 늘어나지 않게(그리드 칸은 기본이 stretch다) — 칩·단추만 글자 폭. */
+.lt-issue-post > .lt-badge, .lt-issue-post > .lt-btn { justify-self: start; }
 .lt-empty { color: var(--lt-muted); font-size: 13px; padding: 12px 0; }
 
-.lt-badge { display: inline-flex; align-items: center; padding: 3px 9px; border-radius: var(--lt-r-pill); font-size: 11px; border: 1px solid var(--lt-line); color: var(--lt-muted); }
+/* 상태 칩 한 모양(대표 요청 2026-11-16): 같은 높이, 글자 폭만(늘어나거나 눌리지 않음), 한 줄, 줄 안에서 세로 가운데.
+   flex:none — flex 줄(.lt-post-top·.lt-issue-head)에서 남은 폭을 채우거나 눌려 줄바꿈('고/침')되지 않게. */
+.lt-badge { display: inline-flex; align-items: center; flex: none; justify-self: start; white-space: nowrap; padding: 3px 9px; border-radius: var(--lt-r-pill); font-size: 11px; line-height: 1.4; border: 1px solid var(--lt-line); color: var(--lt-muted); }
 .lt-badge[data-kind="journal"] { color: var(--lt-gold); border-color: var(--lt-gold-line); }
 .lt-badge[data-status="received"] { color: var(--lt-rose); border-color: var(--lt-rose-ink); }
 .lt-badge[data-status="fixed"] { color: #8fd0a0; border-color: #3f6b4c; }
