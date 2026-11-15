@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS lovetree_login_states (
 CREATE TABLE IF NOT EXISTS lovetree_product_roles (
   product_id text NOT NULL,
   subject_id text NOT NULL,
-  role text NOT NULL CHECK (role IN ('admin','ai_customer')),
+  role text NOT NULL CHECK (role IN ('admin','ai_customer','tester')),
   granted_by text,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),

@@ -237,7 +237,9 @@ export function journalsSummary(journals, day) {
 /**
  * '한눈에' 맨 위 전체 숫자 카드(#655 2차). 서버 `/api/admin/stats` 응답({ok, payload:{ok, stats}})만 받는다.
  * 값이 하나라도 이상하면 그 카드만 '불러오지 못했어요'로 두고 나머지는 그린다(숫자를 지어내지 않는다).
- * '실제 사용자'(real)와 'AI 테스터'(aiTester)를 카드마다 나눠 보여 준다 — AI 테스터는 전체에 포함된다.
+ * '실제 사용자'(real)·'AI 테스터'(aiTester)·'시험 계정'(tester)을 카드마다 나눠 보여 준다.
+ * 셋은 겹치지 않고 전체 = 셋의 합이다(#671). 시험 계정은 이 화면(운영센터)에서만 보이고 남에게 보이는
+ * 공개 화면에는 표시하지 않는다.
  */
 export function statsCards(response) {
   const stats = response?.ok && response.payload?.ok ? response.payload.stats : null;
@@ -255,7 +257,10 @@ export function statsCards(response) {
   const cards = cells.map(([key, label, value]) => {
     const real = num(value?.real);
     const aiTester = num(value?.aiTester);
-    return real === null || aiTester === null ? {key, label, error: true} : {key, label, real, aiTester};
+    const tester = num(value?.tester);
+    return real === null || aiTester === null || tester === null
+      ? {key, label, error: true}
+      : {key, label, real, aiTester, tester};
   });
   return {error: cards.every(card => card.error), cards};
 }
