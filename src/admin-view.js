@@ -180,8 +180,14 @@ export function needsFixButton(post, issueState) {
 
 // ── 사용 일지 탭(#596) — 날짜·고객 묶음·오늘 요약·떠남 위험. 순수 계산(node 시험에서 바로 쓴다). ──
 
-/** 일지의 날짜(운영 기준 journal_date, 비어 있으면 만든 날짜). */
-const journalDayOf = row => String(row?.journalDate || String(row?.createdAt || '').slice(0, 10));
+/** 만든 시각(UTC ISO)을 한국 시각 날짜로 — journal_date가 비어 있을 때의 보조 기준(#627 회차 운영 기준). */
+const seoulDayOf = (iso) => {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? '' : new Intl.DateTimeFormat('en-CA', {timeZone: 'Asia/Seoul'}).format(d);
+};
+
+/** 일지의 날짜(운영 기준 journal_date, 비어 있으면 만든 날짜 — 한국 시각으로 읽는다). */
+const journalDayOf = row => String(row?.journalDate || seoulDayOf(row?.createdAt) || String(row?.createdAt || '').slice(0, 10));
 
 /** 일지 날짜 수로 보는 단계: 1일 '시작', 2~4일 '꾸준', 5일 이상 '정착'. */
 export function journalStage(dayCount) {

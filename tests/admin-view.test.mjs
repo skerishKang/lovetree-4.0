@@ -336,3 +336,13 @@ test('#655 2차 전체 숫자 카드 — 실제 사용자·AI 테스터·시험 
   assert.equal(broken.error, true);
   assert.ok(broken.cards.every(card => card.error), '값이 없는 카드는 실패로 남는다');
 });
+
+test('journal_date가 비어 있으면 만든 시각을 한국 시각 날짜로 읽는다(UTC 자름이 아니다)', () => {
+  // 2026-11-14T19:28:00Z = 한국 시각 2026-11-15 04:28.
+  const rows = journalRowsByCustomer([
+    {id: 1, subjectId: 'a', authorName: '윤제', kind: 'journal', journalDate: null, score: 3, createdAt: '2026-11-14T19:28:00Z'},
+    {id: 2, subjectId: 'a', authorName: '윤제', kind: 'journal', journalDate: '2026-11-13', score: 2, createdAt: '2026-11-13T01:00:00Z'}
+  ]);
+  assert.equal(rows[0].lastDay, '2026-11-15', '한국 시각 11-15 04:28 기록은 11-15로 보인다');
+  assert.deepEqual(rows[0].flow, [{day: '2026-11-13', score: 2}, {day: '2026-11-15', score: 3}]);
+});
