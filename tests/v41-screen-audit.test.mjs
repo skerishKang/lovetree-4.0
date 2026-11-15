@@ -276,6 +276,24 @@ test('#657 화면 공통 검사기: 주요 화면 15 상태 × 390·1440 × 밤�
       return b.width > 0 && b.height > 0 && getComputedStyle(el).visibility === 'visible' && getComputedStyle(el).display !== 'none';
     }));
     assert.deepStrictEqual(tagInputSeen, [true, true, true], '꼬리표 직접 입력(종류·값·붙이기)이 상세 판에 보여야 한다');
+    // #627 2차: '보드 1440 판 폭' — 보드 iframe이 셸 내용 폭을 다 쓰는지, 보드 안 .app이 가로로 밀려
+    // (숨은 가로 스크롤) 오른쪽에 검은 빈 자리가 생기지 않는지 단정한다. 스크롤을 부르는 동작을 해도
+    // 판이 밀리지 않아야 한다(overflow:clip으로 스크롤 컨테이너가 아니게 만들었다).
+    const boardWidth = await page6.evaluate(() => ({
+      stageW: document.getElementById('stage').clientWidth,
+      frameW: Math.round(document.getElementById('view').getBoundingClientRect().width),
+    }));
+    assert.equal(boardWidth.frameW, boardWidth.stageW, `보드 iframe 폭 = 셸 내용 폭(실제: ${JSON.stringify(boardWidth)})`);
+    const appScroll = await tagBoard.evaluate(() => {
+      const app = document.getElementById('app');
+      return { sl: app.scrollLeft, sw: app.scrollWidth, cw: app.clientWidth };
+    });
+    assert.equal(appScroll.sl, 0, '보드 .app이 가로로 밀려 있지 않다(검은 빈 자리 없음)');
+    await tagBoard.evaluate(() => { document.getElementById('app').scrollLeft = 400; });
+    assert.equal(await tagBoard.evaluate(() => document.getElementById('app').scrollLeft), 0, '보드 .app은 가로 스크롤 컨테이너가 아니다(overflow:clip — 밀어도 안 밀린다)');
+    await tagBoard.evaluate(() => document.getElementById('dTags').scrollIntoView({ block: 'center' }));
+    await page6.waitForTimeout(200);
+    assert.equal(await tagBoard.evaluate(() => document.getElementById('app').scrollLeft), 0, '꼬리표 줄로 스크롤해도 보드 판이 가로로 밀리지 않는다');
     await take(page6, '꼬리표 줄이 열린 상세');
     // #627 PR B: 꼬리표 정리 화면 — 목록·개수와 '제목에서 꼬리표 한 번에 제안받기'가 그려진 자리를 잰다.
     await page6.evaluate(() => document.getElementById('record-menu')?.click());

@@ -4,9 +4,9 @@
 // 순수 계산으로만 답하고, 실제 저장 호출은 셸(shell/tag-save.mjs)이 한다.
 import { parseTag, makeTag, normalizeTags, tagKey, suggestTagsFromTitle, TAG_MAX_LENGTH } from './tags.mjs';
 
-// 카드에 보일 순서: 노래 → 멤버 → 무대가 먼저(#627 PR B 요구), 그 뒤는 활동기·감정·종류 없는 옛 꼬리표가
-// 저장된 순서대로 이어진다. 종류 없는 옛 keywords도 확정된 꼬리표다(데이터를 잃지 않는다).
-const KIND_ORDER = { song: 0, member: 1, stage: 2, era: 3, emotion: 4, plain: 5 };
+// 카드에 보일 순서: 가수 → 노래 → 멤버 → 무대가 먼저(#627 2차 요구), 그 뒤는 활동기·감정·종류 없는
+// 옛 꼬리표가 저장된 순서대로 이어진다. 종류 없는 옛 keywords도 확정된 꼬리표다(데이터를 잃지 않는다).
+const KIND_ORDER = { artist: 0, song: 1, member: 2, stage: 3, era: 4, emotion: 5, plain: 6 };
 const kindRank = (t) => KIND_ORDER[t.kindId ?? 'plain'] ?? KIND_ORDER.plain;
 
 const listOf = (keywords) => (Array.isArray(keywords) ? keywords : []).map(parseTag).filter(Boolean);
