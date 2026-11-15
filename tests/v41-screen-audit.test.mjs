@@ -293,6 +293,37 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     await page3.evaluate(() => { location.hash = '#network'; });
     await page3.waitForTimeout(1800);
     await take(page3, '지도');
+    // 2026-11-16 대표 결정: 보기 고르기에 [그래프]가 셋째로 붙는다 — 390에서도 세 단추가 머리줄에 들어간다(넘침·겹침 0).
+    const mapHeader = await page3.evaluate(() => {
+      const frame = [...document.querySelectorAll('iframe')].find((f) => { try { return /track56-network/.test(f.contentWindow.location.href); } catch { return false; } });
+      if (!frame) return null;
+      const doc = frame.contentDocument;
+      const bar = doc.querySelector('.topbar');
+      const switchBtns = [...doc.querySelectorAll('.view-switch .pill')];
+      const btns = [...doc.querySelectorAll('.top-actions button')].filter((b) => b.getBoundingClientRect().width > 0);
+      const rects = btns.map((b) => b.getBoundingClientRect());
+      const pairTexts = [];
+      for (let i = 0; i < rects.length; i++) for (let j = i + 1; j < rects.length; j++) {
+        const a = rects[i], b = rects[j];
+        if (a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1) pairTexts.push(btns[i].textContent.trim() + '×' + btns[j].textContent.trim());
+      }
+      return {
+        switchCount: switchBtns.length,
+        labels: switchBtns.map((b) => b.textContent.trim()),
+        netPressed: doc.getElementById('viewNet')?.getAttribute('aria-pressed'),
+        graphPressed: doc.getElementById('viewGraph')?.getAttribute('aria-pressed'),
+        overflowX: Math.max(0, bar.scrollWidth - bar.clientWidth),
+        outOfFrame: btns.filter((b) => b.getBoundingClientRect().right > doc.documentElement.clientWidth + 1).map((b) => b.textContent.trim()),
+        pairTexts
+      };
+    }).catch(() => null);
+    assert.ok(mapHeader, '지도 머리줄을 잰다');
+    assert.deepEqual(mapHeader.labels, ['그물형', '동심원형', '그래프'], `보기 고르기 세 단추(실제 ${JSON.stringify(mapHeader.labels)})`);
+    assert.equal(mapHeader.netPressed, 'true', '현재 보기(그물형) aria-pressed=true');
+    assert.equal(mapHeader.graphPressed, 'false', '그래프 단추는 지도에서 눌리지 않은 상태');
+    assert.equal(mapHeader.overflowX, 0, `지도 머리줄 가로 넘침 0(실제 ${mapHeader.overflowX})`);
+    assert.deepEqual(mapHeader.outOfFrame, [], '머리줄 단추가 화면 밖으로 나가지 않는다');
+    assert.deepEqual(mapHeader.pairTexts, [], `머리줄 단추 겹침 0(실제 ${JSON.stringify(mapHeader.pairTexts)})`);
     // #638: 지도 390(조작 줄) — iframe 안 조작 줄이 셸의 링크 줄·＋ 단추와 겹치지 않고, 보기 전환 단추 대비 4.5:1.
     if (width === 390) {
       const ribbonCheck = await page3.evaluate(() => {
@@ -713,6 +744,52 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
       await pageNotice.close();
       await ctxNotice.close();
     }
+    // 2026-11-16 대표 결정: 지도→그래프→동심원형→그물형 왕복 — 기존 화면 전환 메시지(lt41-navigate) 한 길로
+    // 오가고, 지금 트리·순간이 유지되는지(같은 트리·같은 순간·그래프 표시의 순간 수)까지 잰다.
+    // 쓰기 가능 문맥(ctx5 — 예시가 아니라 지금 트리를 부른 자리)에서만 의미가 있어 여기서 한다.
+    const pageMap = await ctx5.newPage();
+    await pageMap.goto(`${base}/v41/?account=1#network`, { waitUntil: 'load' });
+    await frameOf(pageMap, /track56-network/);
+    await pageMap.waitForTimeout(1500);
+    const treeBeforeTrip = await pageMap.evaluate(() => ({ id: window.LT41?.tree?.id || '', moments: (window.LT41?.tree?.moments || []).length, momentId: window.LT41?.momentId || '' }));
+    assert.ok(treeBeforeTrip.id, '지금 트리가 부른 상태에서 왕복을 본다');
+    const mapFrameTrip = () => [...pageMap.frames()].find((f) => { try { return /track56-network/.test(f.url()); } catch { return false; } });
+    const graphFrameTrip = () => [...pageMap.frames()].find((f) => { try { return /track60-graph/.test(f.url()); } catch { return false; } });
+    await mapFrameTrip().evaluate(() => document.getElementById('viewGraph').click());
+    await pageMap.waitForFunction(() => [...document.querySelectorAll('iframe')].some((f) => { try { return /track60-graph/.test(f.contentWindow.location.href); } catch { return false; } }), null, { timeout: 10000 });
+    // 그래프 모듈이 그려질 때까지(배지가 채워질 때까지) 기다린다 — 프레임 주소만으로는 그리기 전이다.
+    await pageMap.waitForFunction(() => {
+      const f = [...document.querySelectorAll('iframe')].find((x) => { try { return /track60-graph/.test(x.contentWindow.location.href); } catch { return false; } });
+      return Boolean(f && (f.contentDocument.getElementById('gBadge')?.textContent || '').length > 0);
+    }, null, { timeout: 10000 });
+    const gFrameTrip = graphFrameTrip();
+    assert.ok(gFrameTrip, '지도의 [그래프] 단추로 그래프 보기가 열린다(기존 lt41-navigate 한 길)');
+    const tripGraph = await gFrameTrip.evaluate(() => {
+      const b = [...document.querySelectorAll('.g-view-switch .pill')];
+      return { n: b.length, pressed: b.map((x) => x.getAttribute('aria-pressed')), badge: document.getElementById('gBadge')?.textContent || '' };
+    });
+    assert.equal(tripGraph.n, 3, '그래프 머리줄 보기 고르기 세 단추');
+    assert.deepEqual(tripGraph.pressed, ['false', 'false', 'true'], '현재 보기(그래프)만 aria-pressed=true');
+    assert.ok(tripGraph.badge.startsWith(`순간 ${treeBeforeTrip.moments}`), `그래프 표시의 순간 수가 지금 트리와 같다(실제 ${tripGraph.badge})`);
+    const navCurrent = await pageMap.evaluate(() => document.querySelector('.tree-views [data-view="track56-network.html"]')?.getAttribute('aria-current'));
+    assert.equal(navCurrent, 'true', '그래프 보기에서 위쪽 메뉴(책·보드·지도)의 지도가 켜진 상태다');
+    await gFrameTrip.evaluate(() => document.getElementById('gViewConc').click());
+    await pageMap.waitForFunction(() => {
+      const f = [...document.querySelectorAll('iframe')].find((x) => { try { return /track56-network/.test(x.contentWindow.location.href); } catch { return false; } });
+      return Boolean(f && f.contentDocument?.body && f.contentDocument.body.dataset.ltView === 'concentric');
+    }, null, { timeout: 10000 });
+    const mapAfterConc = await mapFrameTrip().evaluate(() => ({ view: document.body.dataset.ltView, concPressed: document.getElementById('viewConc')?.getAttribute('aria-pressed'), stored: localStorage.getItem('lt41.network.view') }));
+    assert.equal(mapAfterConc.view, 'concentric', '그래프의 [동심원형]으로 지도가 동심원형 보기로 열린다');
+    assert.equal(mapAfterConc.concPressed, 'true', '동심원형이 눌린 상태(aria-pressed=true)');
+    assert.equal(mapAfterConc.stored, 'concentric', '지도 보기 저장 키(lt41.network.view)가 바뀐다');
+    await mapFrameTrip().evaluate(() => document.getElementById('viewNet').click());
+    await pageMap.waitForTimeout(1200);
+    const treeAfterTrip = await pageMap.evaluate(() => ({ id: window.LT41?.tree?.id || '', moments: (window.LT41?.tree?.moments || []).length, momentId: window.LT41?.momentId || '' }));
+    const mapAfterNet = await mapFrameTrip().evaluate(() => ({ view: document.body.dataset.ltView, netPressed: document.getElementById('viewNet')?.getAttribute('aria-pressed') }));
+    assert.equal(mapAfterNet.view, 'network', '지도의 [그물형]으로 그물 보기로 돌아온다');
+    assert.equal(mapAfterNet.netPressed, 'true', '그물형이 눌린 상태(aria-pressed=true)');
+    assert.deepEqual(treeAfterTrip, treeBeforeTrip, '왕복 뒤에도 지금 트리·순간이 유지된다');
+    await pageMap.close();
     await ctx5.close();
 
     // #627 PR3: 그래프 보기 — 지금은 주소(#my/graph)로만 열리는 화면이라 호스트가 LT41을 직접 넘긴다
@@ -740,6 +817,20 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     const graphFrame = await frameOf(page7, /track60-graph/);
     assert.ok(graphFrame, '그래프 프레임이 열린다');
     await page7.waitForTimeout(700);
+    // 2026-11-16 대표 결정: 그래프 머리줄에도 지도와 같은 모양의 보기 고르기가 있고 그래프가 눌린 상태다.
+    const graphSwitch = await graphFrame.evaluate(() => {
+      const b = [...document.querySelectorAll('.g-view-switch .pill')];
+      return {
+        n: b.length,
+        labels: b.map((x) => x.textContent.trim()),
+        pressed: b.map((x) => x.getAttribute('aria-pressed')),
+        overflow: Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth)
+      };
+    }).catch(() => null);
+    assert.ok(graphSwitch, '그래프 머리줄 보기 고르기를 잰다');
+    assert.deepEqual(graphSwitch.labels, ['그물형', '동심원형', '그래프'], `보기 고르기 세 단추(실제 ${JSON.stringify(graphSwitch.labels)})`);
+    assert.deepEqual(graphSwitch.pressed, ['false', 'false', 'true'], '현재 보기(그래프)만 aria-pressed=true');
+    assert.equal(graphSwitch.overflow, 0, `그래프 머리줄에서 가로 넘침 0(실제 ${graphSwitch.overflow})`);
     await take(page7, '그래프 보기');
     const graphCheck = await page7.evaluate(() => {
       const f = [...document.querySelectorAll('iframe')].at(-1);

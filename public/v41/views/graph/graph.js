@@ -559,6 +559,15 @@ function drawShelf() {
   const n = model.graph.moments.length;
   badge.textContent = n > 0 ? '순간 ' + n + ' · 묶음 ' + model.graph.hubs.length : '';
 }
+/* 2026-11-16 대표 결정: 그래프 보기는 지도 안의 보기 하나 — 위 보기 고르기에서 그물형·동심원형을 고르면
+   지도 보기 저장 키(lt41.network.view — network.js의 VIEW_KEY 한 벌)에 넣고 기존 화면 전환 메시지
+   (lt41-navigate) 한 길로 지도로 돌아간다. 지금 트리·순간은 셸이 그대로 유지한다. */
+const goMapWithView = (v) => {
+  try { localStorage.setItem('lt41.network.view', v); } catch {}
+  try { parent.postMessage({ type: 'lt41-navigate', view: 'track56-network.html' }, location.origin); } catch {}
+};
+document.getElementById('gViewNet')?.addEventListener('click', () => goMapWithView('network'));
+document.getElementById('gViewConc')?.addEventListener('click', () => goMapWithView('concentric'));
 document.getElementById('shelfHint').addEventListener('click', () => {
   const untagged = model.graph.moments.filter((m) => m.hubId === null).map((m) => MOMENT_OF.get(m.id)).filter(Boolean);
   const suggestions = suggestForMoments(untagged);
