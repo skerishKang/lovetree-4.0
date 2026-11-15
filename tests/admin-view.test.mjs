@@ -425,8 +425,24 @@ test('운영센터 상태 칩: 1440·390에서 높이가 같고 한 줄이며 �
       {id: 'p2', kind: 'opinion', status: 'reviewing', replyCount: 0, issueNumber: '584', displayTitle: '짧은 제목', createdAt: '2026-11-15T10:00:00Z'},
       {id: 'p3', kind: 'bug', status: 'received', replyCount: 0, issueNumber: '#637', displayTitle: '검색이 안 돼요', createdAt: '2026-11-15T11:00:00Z'}
     ]}) }));
-    await context.route('**api.github.com/repos/**/issues/584', r => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({number: 584, title: '둘러보기 검색이 막혀 있다', state: 'closed'}) }));
-    await context.route('**api.github.com/repos/**/issues/637', r => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({number: 637, title: '검색 색인 고치기', state: 'open', pull_request: {number: 637}}) }));
+    // GitHub 읽기는 전부 가짜다. 주소별 glob 대신 정규식으로 받는다 — CI의 낡은 Playwright에서는
+    // '**api.github.com/...' 꼴 glob이 안 먹어 실제 GitHub를 불러 왔다(2026-11-16 CI 빨강: 584 이슈 제목이
+    // 저장소의 진짜 제목으로 나왔다). 아래 '그 밖의 GitHub 요청'을 먼저 걸어 두어 실수로 실제 API를 부르면
+    // 404로 끝나고, 받은 횟수(githubHits)를 시험이 직접 확인한다.
+    const githubFake = new Map([
+      [584, { number: 584, title: '둘러보기 검색이 막혀 있다', state: 'closed' }],
+      [637, { number: 637, title: '검색 색인 고치기', state: 'open', pull_request: { number: 637 } }]
+    ]);
+    let githubHits = 0;
+    await context.route(/^https:\/\/api\.github\.com\//, r => r.fulfill({ status: 404, contentType: 'application/json', body: '{"message":"not found"}' }));
+    await context.route(/^https:\/\/api\.github\.com\/repos\/[^/]+\/[^/]+\/issues\/(\d+)$/, r => {
+      const number = Number(r.request().url().match(/(\d+)$/)[1]);
+      const fake = githubFake.get(number);
+      githubHits += 1;
+      return fake
+        ? r.fulfill({ status: 200, contentType: 'application/json', headers: {'cache-control': 'no-store'}, body: JSON.stringify(fake) })
+        : r.fulfill({ status: 404, contentType: 'application/json', body: '{"message":"not found"}' });
+    });
     const page = await context.newPage();
     for (const [width, height] of [[1440, 900], [390, 844]]) {
       await page.setViewportSize({ width, height });
@@ -484,6 +500,9 @@ test('운영센터 상태 칩: 1440·390에서 높이가 같고 한 줄이며 �
       const issueTitle = await page.textContent('[data-issue-row="584"] .lt-issue-title');
       assert.equal(issueTitle, '둘러보기 검색이 막혀 있다', '이슈는 제목을 그대로 보인다');
     }
+    // 가짜 응답이 실제로 쓰였는지 확인한다(이슈 2개를 한 번씩은 반드시 받는다 — 브라우저 캐시로 두 번째
+    // 화면 크기에서는 다시 부르지 않을 수 있어 2회를 하한으로 둔다). 실제 GitHub를 부르면 위 404 규칙에 걸린다.
+    assert.ok(githubHits >= 2, `GitHub 읽기는 가짜 응답을 쓴다(받은 횟수 ${githubHits})`);
     await context.close();
   } finally {
     await browser.close();
