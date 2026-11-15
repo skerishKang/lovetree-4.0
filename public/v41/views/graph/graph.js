@@ -558,6 +558,11 @@ const fanRow = (item) => {
 function drawShelf() {
   const untagged = model.graph.moments.filter((m) => m.hubId === null);
   document.getElementById('shelfLabel').textContent = untagged.length > 0 ? '아직 묶음에 안 든 순간 ' + untagged.length : '';
+  /* 빈 판 안내가 떠 있을 때는 선반의 단추를 숨기고 글자만 남긴다 — 안내의 단추와 두 번 연달아
+     보이는 것을 막는다(2026-11-16 CTO 지적). 조건은 drawEmptyNote의 안내와 같다(순간 2개 이상·묶음 0).
+     묶음이 생겨 안내가 사라지면 단추는 지금처럼 보인다. */
+  const guideShown = model.graph.moments.length > 1 && model.graph.hubs.length === 0;
+  document.getElementById('shelfHint').hidden = guideShown;
   document.getElementById('gShelf').style.display = untagged.length > 0 ? 'flex' : 'none';
   const badge = document.getElementById('gBadge');
   const n = model.graph.moments.length;

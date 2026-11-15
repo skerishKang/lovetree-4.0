@@ -1034,6 +1034,10 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     assert.ok(hubGuide.text.includes('2개 이상이면 여기에 묶여요'), `안내가 묶음 규칙을 알려준다(실제 ${hubGuide.text})`);
     assert.equal(hubGuide.cta, '꼬리표 한 번에 제안받기', '안내에는 바로 할 수 있는 단추가 있다');
     assert.ok(hubGuide.badge.includes('묶음 0'), `묶음 0이 표시에도 보인다(실제 ${hubGuide.badge})`);
+    // 2026-11-16 CTO 지적: 안내의 단추와 선반의 단추가 두 번 연달아 보이지 않게 — 빈 판 안내가 떠 있는
+    // 동안에는 제안 단추가 한 개만 보인다(선반은 '아직 묶음에 안 든 순간 N' 글자만 남긴다).
+    const ctaCount = await emptyGraphFrame.evaluate(() => [...document.querySelectorAll('.g-empty-cta, .g-shelf-hint')].filter((b) => { const r = b.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(b).visibility !== 'hidden'; }).length);
+    assert.equal(ctaCount, 1, `제안 단추는 한 개만 보인다(실제 ${ctaCount})`);
     await emptyGraphFrame.evaluate(() => document.querySelector('.g-empty-cta').click());
     await page7b.waitForTimeout(400);
     const suggestHead = await emptyGraphFrame.evaluate(() => (document.querySelector('#detailCard .d-kicker') || {}).textContent || '');
