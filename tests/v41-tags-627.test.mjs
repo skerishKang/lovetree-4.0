@@ -789,3 +789,20 @@ test('#735: 책·지도 화면도 같은 모양이다 — 바꾼 순간에만 �
     } finally { h.restore(); }
   }
 });
+
+test('#739: 거둔 꼬리표 줄(destroy)은 눌러도 저장하지 않는다 — 쉬운 추가 연속 담기의 옛 줄이 하는 일이다', () => {
+  const host = fakeEl({ querySelector: () => null, replaceChildren() {}, hidden: false });
+  const commits = [];
+  const line = renderTagLine({
+    host,
+    doc: {},
+    moment: { id: 'm1', title: '첫 순간', keywords: [] },
+    knownTags: [],
+    writable: true,
+    onCommit: (keywords, momentId) => commits.push({ keywords, momentId })
+  });
+  // 같은 host에 새 줄을 그리기 전에 옛 줄을 거둔다(quick-add가 연속 담기 때 하는 일).
+  line.destroy();
+  host.dispatch('click', { target: { closest: (sel) => sel === '[data-tag-raw]' ? { dataset: { tagRaw: '가수:ILLIT' } } : null } });
+  assert.deepEqual(commits, [], '거둔 줄의 귀는 저장을 부르지 않는다');
+});

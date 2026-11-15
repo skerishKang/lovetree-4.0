@@ -1,5 +1,13 @@
 # LoveTree 4.0 — 핸드오프
 
+## 2026-11-16 — 쉬운 추가 연속 담기: 옛 꼬리표 줄이 살아 남아 옛 순간에 저장·재클릭에 모두 해제 (#741, 컴1로컬2 레인, ai/local2-quickadd-tag-chip-20261116-070500-9f3c2a, main 76b2b8d 기준)
+
+- **재현(시험 계정 04, 390×844, 배포본 #738 반영)**: 같은 쉬운 추가 창에서 3회 연속 담기(순간 c54cc47c·54dc7b7f·89af3589) 뒤 세 번째 안내의 '가수:ILLIT' 칩 클릭 1회 → PUT·토스트 '서버에 저장됐어요.'(쌓인 귀가 옛 순간 2개에도 오염 저장), 같은 칩 재클릭 → **세 순간 모두 keywords []** — 하은 1회차 증상(칩을 눌렀는데 책·순간 목록·꼬리표로 찾기에 아무것도 없음)과 일치. 2회 연속 담기 재현에서도 두 번째 칩 클릭 1회에 첫 순간(6ddd1293)에 '가수:NewJeans' 오염 저장.
+- **원인**: 담을 때마다 `renderQuickTagline`이 `#quick-tagline`에 줄을 새로 그리는데 옛 인스턴스를 거두지 않는다(clearSavedNotice는 replaceChildren만, `renderTagLine.destroy()`는 host의 클릭 귀를 못 지움) — 귀가 담기 횟수만큼 쌓여 각자 '자기 순간'에 저장/해제한다.
+- **고침**: `tag-line.mjs` renderTagLine — 귀 3개(click 2·keydown)를 AbortController에 묶고 destroy가 abort하며, aborted 귀는 즉시 무시(host가 귀를 안 지우는 환경까지 이중 안전). `shell/quick-add.mjs` — `quickTagLine` 한 개만 살려 두고 다시 그리기 전·안내 비울 때 destroy. renderTagLine에 doc을 명시해 전달(기본값 document 평가를 피함 — 가짜 DOM 시험 가능).
+- **시험**: `tests/v41-quick-add-flow.test.mjs` — harness fakeEl이 실제 DOM처럼 귀를 쌓게 고치고(덮어쓰면 결함을 못 잡음) saveTags deps 추가, 신규 1건: 연속 담기 뒤 칩 클릭 → 저장 호출 1회·방금 담은 순간 id·['가수:ILLIT'], 재클릭 → 해제([])도 같은 순간뿐. `tests/v41-tags-627.test.mjs` — destroy 계약 1건. 로컬: 627 41/41·quick-add-flow 16/16·전체 npm test 1713 pass fail 0(30초)·build·modulepreload --check 통과.
+- **제안 칩 '가수 · MMA2026'은 이번에 고치지 않음**: 세 번째 영상 제목 '#아일릿 #ILLIT #MMA2026 퍼포먼스 하이라이트…'의 해시태그 대문자 라틴 낱말 둘이 제목 규칙의 가수 후보로 둘 다 건진 것(로컬 확인 일치). 시상식 이름을 가수로 제안하지 않게 할지는 별도 판단.
+- **남은 검증**: 머지·배포 뒤 실주소에서 같은 재현(연속 담기 뒤 칩 1회 클릭 → 방금 담은 순간만 저장)을 다시 재어야 한다(.tmp553/gcheck/easytag3.mjs 재사용).
 ## 2026-11-16 — 운영센터 '한눈에' 카드 7+7 한 줄·모두 누르기(#743, 컴1로컬2 레인, ai/local2-admin-overview-cards-20261116-081200-4b7e1d, main 557b95d 기준)
 
 - **한 줄**: '전체 숫자'·'처리할 일' 각 7장이 1440 이상에서 한 줄(카드가 들어가도록 '한눈에'만 판 폭을 min(1280px, 100%-64px)로 넓힘 — 다른 탭 폭은 그대로). 좁은 화면은 지금처럼 줄바꿈.
