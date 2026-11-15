@@ -268,6 +268,14 @@ test('#657 화면 공통 검사기: 주요 화면 15 상태 × 390·1440 × 밤�
     await tagBoard.waitForFunction(() => !!document.getElementById('dTags') && document.getElementById('dTags').childNodes.length > 0, null, { timeout: 10000 }).catch(() => {});
     await tagBoard.evaluate(() => selectMoment(LTDEMO.moments[0].id));
     await page6.waitForTimeout(600);
+    // 직접 입력 줄이 실제로 보이는지 단정한다(숨김 클래스를 쓰면 검사기 겹침만으로는 못 잡는다 — 실측에서 잡았던 결함).
+    const tagInputSeen = await tagBoard.evaluate(() => ['.lt-tagline-kind', '.lt-tagline-value', '.lt-tagline-add'].map((s) => {
+      const el = document.querySelector(`#dTags ${s}`);
+      if (!el) return false;
+      const b = el.getBoundingClientRect();
+      return b.width > 0 && b.height > 0 && getComputedStyle(el).visibility === 'visible' && getComputedStyle(el).display !== 'none';
+    }));
+    assert.deepStrictEqual(tagInputSeen, [true, true, true], '꼬리표 직접 입력(종류·값·붙이기)이 상세 판에 보여야 한다');
     await take(page6, '꼬리표 줄이 열린 상세');
     // #627 PR B: 꼬리표 정리 화면 — 목록·개수와 '제목에서 꼬리표 한 번에 제안받기'가 그려진 자리를 잰다.
     await page6.evaluate(() => document.getElementById('record-menu')?.click());
