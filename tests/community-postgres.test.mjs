@@ -111,11 +111,16 @@ test('운영센터 전체 숫자 집계: 계정·트리·순간·공개·둘러�
   // created_at(첫 로그인 시각 = 가입일)으로 가른다 — 문서를 하나도 안 쓴 로그인만 계정도 센다.
   await pool.query("INSERT INTO lovetree_product_roles(product_id,subject_id,role) VALUES($1,$2,'ai_customer')",[productId,AI_ONE]);
   const LOGIN_ONLY='sub_d'+tag;
+  // #671: 레인 시험 계정 표식 tester — 실제 사용자와 갈라 센다.
+  const TESTER_ONE='sub_e'+tag;
+  await pool.query("INSERT INTO lovetree_product_roles(product_id,subject_id,role) VALUES($1,$2,'tester')",[productId,TESTER_ONE]);
   const login=(subjectId,createdAt)=>pool.query('INSERT INTO lovetree_account_emails(product_id,subject_id,email,created_at) VALUES($1,$2,$3,$4)',[productId,subjectId,subjectId+'@example.test',createdAt]);
   await login(REAL_ONE,old);
   await login(REAL_TWO,old);
   await login(AI_ONE,old);
   await login(LOGIN_ONLY,recent);
+  await login(TESTER_ONE,recent);
+  await pool.query('INSERT INTO lovetree_workspaces(product_id,subject_id,doc) VALUES($1,$2,$3::jsonb)',[productId,TESTER_ONE,JSON.stringify({version:1,trees:[{id:'t5',createdAt:recent,moments:[{id:'t5-m0',createdAt:recent},{id:'t5-m1',createdAt:recent}]}]})]);
   const share=(shareId,subjectId,treeId,momentCount,createdDaysAgo)=>pool.query(
     `INSERT INTO lovetree_shares(product_id,share_id,subject_id,tree_id,entry_moment_id,initial_view,origin,moment_count,created_at)
      VALUES($1,$2,$3,$4,$5,'book','auto',$6,now()-($7||' days')::interval)`,[productId,shareId,subjectId,treeId,treeId+'-m0',momentCount,String(createdDaysAgo)]);
@@ -128,11 +133,11 @@ test('운영센터 전체 숫자 집계: 계정·트리·순간·공개·둘러�
 
   const stats=await createStatsRepo(pool).aggregate({productId,since:new Date(Date.now()-7*86400e3).toISOString()});
   assert.deepEqual(stats,{
-    accountsReal:3,accountsAi:1,accountsNewReal:1,accountsNewAi:0,
-    treesReal:3,treesAi:1,
-    momentsReal:4,momentsAi:3,momentsNewReal:2,momentsNewAi:0,
-    publicReal:2,publicAi:1,
-    featuredReal:1,featuredAi:1
+    accountsReal:3,accountsAi:1,accountsTester:1,accountsNewReal:1,accountsNewAi:0,accountsNewTester:1,
+    treesReal:3,treesAi:1,treesTester:1,
+    momentsReal:4,momentsAi:3,momentsTester:2,momentsNewReal:2,momentsNewAi:0,momentsNewTester:2,
+    publicReal:2,publicAi:1,publicTester:0,
+    featuredReal:1,featuredAi:1,featuredTester:0
   });
 
   // 같은 자료를 메모리 저장소로도 쌓아 두 구현이 같은 숫자를 내는지 본다(계약이 갈라지면 여기서 걸린다).
@@ -140,7 +145,7 @@ test('운영센터 전체 숫자 집계: 계정·트리·순간·공개·둘러�
   let writes=0;
   for(const [subjectId,doc] of docs)await workspaceRepo.commit({productId,subjectId,doc,expectedRevision:0,clientKey:'k'+(++writes),requestHash:'a'.repeat(64)});
   const accountRepo=createMemoryAccountRepo();
-  for(const [subjectId,createdAt] of [[REAL_ONE,old],[REAL_TWO,old],[AI_ONE,old],[LOGIN_ONLY,recent]]){
+  for(const [subjectId,createdAt] of [[REAL_ONE,old],[REAL_TWO,old],[AI_ONE,old],[LOGIN_ONLY,recent],[TESTER_ONE,recent]]){
     await accountRepo.upsertEmail({productId,subjectId,email:subjectId+'@example.test',at:createdAt});
   }
   const shareRepo=createMemoryShareRepo({now:Date.now()-30*86400e3});
@@ -149,6 +154,8 @@ test('운영센터 전체 숫자 집계: 계정·트리·순간·공개·둘러�
   }
   const roleStore=createModelAdminRoleStore();
   await roleStore.assign({productId,subjectId:AI_ONE,role:'ai_customer'});
+  await roleStore.assign({productId,subjectId:TESTER_ONE,role:'tester'});
+  await workspaceRepo.commit({productId,subjectId:TESTER_ONE,doc:{version:1,trees:[{id:'t5',createdAt:recent,moments:[{id:'t5-m0',createdAt:recent},{id:'t5-m1',createdAt:recent}]}]},expectedRevision:0,clientKey:'k-tester',requestHash:'b'.repeat(64)});
   const visibilityRepo=createMemoryTreeVisibilityRepo();
   await visibilityRepo.set({productId,subjectId:REAL_TWO,treeId:'t3',visibility:'private'});
   const memory=await createMemoryStatsRepo({workspaceRepo,shareRepo,accountRepo,roleStore,visibilityRepo}).aggregate({productId,since:new Date(Date.now()-7*86400e3).toISOString()});

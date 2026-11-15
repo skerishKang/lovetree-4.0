@@ -185,12 +185,13 @@ body {
 .lt-ov-section + .lt-ov-section { margin-top: 4px; }
 .lt-ov-heading { margin: 0; font-size: 13px; font-weight: 700; letter-spacing: .02em; color: var(--lt-muted); }
 
-/* '한눈에' 맨 위 전체 숫자 줄(#655 2차) — 실제 사용자를 크게, AI 테스터를 작게 나란히. */
+/* '한눈에' 맨 위 전체 숫자 줄(#655 2차) — 실제 사용자를 크게, AI 테스터·시험 계정(#671)을 작게 나란히. */
 .lt-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
 .lt-stat { display: grid; gap: 3px; justify-items: start; align-content: start; padding: 14px 16px; border: 1px solid var(--lt-line); border-radius: var(--lt-r-panel); background: var(--lt-glass); }
 .lt-stat-value { font-size: 24px; font-weight: 700; color: var(--lt-pearl); font-variant-numeric: tabular-nums; }
 .lt-stat-label { font-size: 12px; color: var(--lt-muted); overflow-wrap: anywhere; min-height: 2.6em; }
 .lt-stat-ai { font-size: 11px; color: var(--lt-gold); }
+.lt-stat-tester { font-size: 11px; color: var(--lt-muted); }
 .lt-stat-fail { font-size: 11px; color: var(--lt-rose-ink); }
 @media (max-width: 480px) {
   .lt-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }

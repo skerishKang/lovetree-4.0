@@ -129,15 +129,15 @@ async function renderOverview() {
     : (model.todos.length
         ? model.todos.map(row => `<article class="lt-post lt-post-row" data-open="${escapeText(row.id)}" tabindex="0" role="button"><span class="lt-post-title">${escapeText(row.title)}</span>${row.issueNumber ? `<span class="lt-post-issue">이슈 ${issueLink(row.issueNumber)}</span>` : '<span class="lt-post-issue"></span>'}<span class="lt-post-date">${escapeText(formatTime(row.createdAt))}</span></article>`).join('')
         : '<p class="lt-empty">답을 기다리는 글이 없습니다.</p>');
-  // 전체 숫자 줄(#655 2차). '실제 사용자'를 크게, 'AI 테스터'를 작게 나란히 적는다.
+  // 전체 숫자 줄(#655 2차). '실제 사용자'를 크게, 'AI 테스터'·'시험 계정'을 작게 나란히 적는다(#671).
   const statModel = statsCards(statsRes);
   const statCell = (item) => item.error
     ? `<div class="lt-stat" data-stat="${escapeText(item.key)}"><span class="lt-stat-value">—</span><span class="lt-stat-label">${escapeText(item.label)}</span><span class="lt-stat-fail">불러오지 못했어요</span></div>`
-    : `<div class="lt-stat" data-stat="${escapeText(item.key)}"><span class="lt-stat-value">${escapeText(item.real)}</span><span class="lt-stat-label">${escapeText(item.label)}</span><span class="lt-stat-ai">AI 테스터 ${escapeText(item.aiTester)}</span></div>`;
+    : `<div class="lt-stat" data-stat="${escapeText(item.key)}"><span class="lt-stat-value">${escapeText(item.real)}</span><span class="lt-stat-label">${escapeText(item.label)}</span><span class="lt-stat-ai">AI 테스터 ${escapeText(item.aiTester)}</span><span class="lt-stat-tester">시험 계정 ${escapeText(item.tester)}</span></div>`;
   // 두 묶음 사이에 작은 제목을 단다: '전체 숫자'(계정·트리·순간…) / '처리할 일'(고객 글·신고·이슈).
   const statsRow = statModel.error
     ? '<section class="lt-ov-section"><h2 class="lt-ov-heading">전체 숫자</h2><div class="lt-stats" aria-label="전체 숫자"><p class="lt-empty">불러오지 못했어요</p></div></section>'
-    : `<section class="lt-ov-section"><h2 class="lt-ov-heading">전체 숫자</h2><div class="lt-stats" aria-label="전체 숫자 · 실제 사용자 / AI 테스터">${statModel.cards.map(statCell).join('')}</div></section>`;
+    : `<section class="lt-ov-section"><h2 class="lt-ov-heading">전체 숫자</h2><div class="lt-stats" aria-label="전체 숫자 · 실제 사용자 / AI 테스터 / 시험 계정">${statModel.cards.map(statCell).join('')}</div></section>`;
   const todoCards = `<section class="lt-ov-section"><h2 class="lt-ov-heading">처리할 일</h2><div class="lt-ov-cards" role="group" aria-label="처리할 일 숫자">${cards}</div></section>`;
   host.innerHTML = `${head()}<div class="admin-shell lt-board">
     <div class="lt-board-head"><h1 class="lt-h1">한눈에</h1><p class="lt-sub">지금 쌓인 처리할 일 · 숫자를 누르면 그 탭이 그 조건으로 열립니다</p></div>
