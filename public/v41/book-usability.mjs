@@ -1,10 +1,8 @@
 import {displayTreeTitle} from './tree-name.mjs';
 import {normalizeDateStyle} from './domain.mjs';
+import {AUTO_TITLE} from './auto-title.mjs';
 // 기억책 사용성 규칙(2026-11-08 대표 피드백 1~9). 화면(iframe)과 셸이 같은 규칙을 쓰고,
 // 시험은 이 파일을 직접 불러 확인한다. 데이터는 읽기만 하고 바꾸지 않는다(표시 단계에서만 거른다).
-
-/** 자동 생성 제목: "<도메인>에서 간직한 순간" (예: "youtu.be에서 간직한 순간"). 정확히 일치할 때만 자동으로 본다. */
-const AUTO_TITLE = /^(?:[a-z0-9-]+\.)+[a-z]{2,}(?::\d{1,5})?에서 간직한 순간$/i;
 
 /** 사용자가 직접 쓴 제목인지. 자동 제목·빈 값이면 false. */
 export function isUserTitle(title) {
