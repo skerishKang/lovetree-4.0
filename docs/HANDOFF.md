@@ -6,6 +6,14 @@
 
 > **시험 멈춤 규칙(2026-11-15)**: 브라우저 코드에 setInterval 반복을 넣으면 unref하거나 정리한다 — 안 그러면 npm test가 끝나지 않고 CI가 멈춘다.
 
+## 2026-11-16 — 보드에서 붙인 꼬리표가 트리 첫 순간에 저장되는 결함 수리 (컴1로컬4 레인, ai/local4-lt-tagline-first-moment-261116, main a5fc571 기준, PR #738)
+
+- **원인(확정)**: public/v41/tag-line.mjs mountViewTagLine이 onCommit을 '줄을 처음 만든 순간'의 moment 객체 클로저로 만들었다 — 카드를 바꿔 line.update()로 화면은 새 순간을 보여 줘도 저장은 처음 만든 순간(첫 순간) id로 갔다. 화면 선택 자체는 보드·책·지도 모두 LTDEMO.select로 셸 LT41.momentId를 이미 맞춘다(runtime.js) — '보드만 lt41-select를 보내지 않는다'는 후보는 원인이 아니었다. 보드는 같은 제목의 다른 카드로 바꾸면 제목 관찰만으론 다시 그리지 않아 옛 keywords를 들고 저장할 수도 있었다(함께 막음).
+- **수리(한 벌 — 보드·책·지도 동시, 그래프는 꼬리표 줄 미사용)**: renderTagLine의 commit이 onCommit에 (keywords, 지금 보고 있는 순간 id)를 넘기고 mountViewTagLine은 그 id로만 저장한다. 상세 전체(#detail)를 관찰해 선택 바뀜을 잡되, 꼬리표 줄이 스스로 그린 바뀜(wrap 안)은 무시한다. 고치기 창 코드는 건드리지 않았다(로컬2의 커스텀 꼬리표 결함 작업과 파일 겹침 없음).
+- **시험**: tests/v41-tags-627.test.mjs에 renderTagLine 계약 1건 + 보드(A→B·같은 제목 A→B)·책·지도 흐름 3건(가짜 문서 하네스, 셸은 부모 창 흉내). 고치기 전 코드로는 새 시험 4건 실패, 고친 코드로 40/40. 전체 npm test 1851검 fail 0(32초)·build·modulepreload --check 통과.
+- **영향 조사(컴2 READ ONLY, 읽기만)**: 윤제·보람 트리 3개의 첫 순간 꼬리표 모두 0개 — 이 결함으로 남은 오기록 없음(11-15 운영 정리 뒤). 윤제 '쇼챔피언 261111' 꼬리표는 이미 11-15 20:36 제거됐고, 남은 데이터(revision 이력 없음)로는 이 결함 경로와 #679 실사 직접 쓰기를 구별할 수 없다 — 운영 기록상 실사 오염 설이 유력. 자세한 근거는 PR #738 댓글.
+- **별도 진행**: 새 소식 4.1.6 + '아직 준비 중' 갈래는 같은 레인의 PR #734(updates.json·updates.mjs·updates 시험 — 이 결함과 파일 겹침 없음, 대표 결정 2026-11-16 문구 그대로).
+
 ## 2026-11-16 — #my/graph가 그래프가 아니라 첫 화면으로 열리는 문제 수리 (컴1로컬4 레인, ai/local4-graph-route-261116, main f64745c 기준, PR #728)
 
 - **원인**: #713(8db6946)에서 그래프 화면이 `public/v41/views/graph/track60-graph.html` 하위 폴더로 들어갔는데 `shell/navigation.mjs`의 `screenUrl`은 `views/ + 파일이름`만 만든다 → `/v41/views/track60-graph.html`은 배포에 없는 주소라 Cloudflare Pages가 4.0 SPA index로 200 폴백(라이브 확인: 실제 그래프는 `/v41/views/graph/track60-graph`, 308 경유). iframe이 4.0 앱을 불러와 첫 화면('다시, 그 순간으로.')이 보였다(대표 제보).
