@@ -103,6 +103,16 @@ test('611 실행: 새 소식은 로그아웃 상태에서도 보이고, 알림 �
     assert.match(text, /새로워진 것/, '새로워진 것');
     assert.match(text, /고친 것/, '고친 것');
     assert.match(text, /AI 명예회원 윤제 님이 알려 준 것/, '출처 표시');
+    assert.match(text, /AI 명예회원 보람 님이 알려 준 것/, '출처 표시 — 보람');
+    // 4.1.6(2026-11-16): 새로워진 것 → 고친 것 → 아직 준비 중 순서, '아직 준비 중'은 한 번만.
+    const fresh = text.indexOf('새로워진 것');
+    const fixed = text.indexOf('고친 것');
+    const soon = text.indexOf('아직 준비 중');
+    assert.ok(fresh > -1 && fixed > fresh && soon > fixed, '새로워진 것 → 고친 것 → 아직 준비 중 순서다');
+    assert.equal((text.match(/아직 준비 중/g) || []).length, 1, '아직 준비 중 제목은 한 번만 보인다');
+    assert.match(text, /검색 사이트/, '아직 준비 중 — 검색 등록');
+    assert.match(text, /비밀번호 찾기/, '아직 준비 중 — 비밀번호 찾기');
+    assert.doesNotMatch(text, /undefined|null|NaN/, '화면 글자에 undefined·null·NaN 없다');
     assert.match(text, /핀보드/, '첫 노트 항목');
     assert.match(text, /칸마다 차곡차곡/i, '다음 버전 항목이 함께 보인다');
     assert.doesNotMatch(text, /여러분이/, '금지 문국이 없다');

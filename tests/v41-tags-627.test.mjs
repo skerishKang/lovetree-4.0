@@ -10,6 +10,8 @@ import { makeTag, parseTag, normalizeTags, tagValues, tagKey, TAG_KINDS, TAG_MAX
 import { tagFacets, filterMomentsByTags, matchMomentText } from '../public/v41/tag-filter.mjs';
 import { createTree, addMoment, validateState } from '../src/domain.js';
 import { timingRatio, TIMING_RATIO_LIMIT, TIMING_CEILING_MS } from './helpers/timing-ratio.mjs';
+import { renderTagLine, mountViewTagLine } from '../public/v41/tag-line.mjs';
+import { fakeEl } from './helpers/fake-dom.mjs';
 
 const input = (title = '첫 목소리') => ({ subject: '윤슬', title, note: '오래 기억하고 싶은 마음', emotion: '설렘', date: '2026-10-27', url: '' });
 const stateOf = (tree) => ({ version: 1, trees: [tree] });
@@ -643,4 +645,147 @@ test('tagFacets·filterMomentsByTags·matchMomentText — 순간 300개 계산�
   // 절대 ms 대신 같은 실행의 30개와 비교한다(#728 CI windows 러너 흔들림, #731).
   assert.ok(ratio <= TIMING_RATIO_LIMIT, `300개/30개 비율 ${ratio.toFixed(1)}배 ≤ ${TIMING_RATIO_LIMIT}배 (30개 ${smallMs.toFixed(2)}ms · 300개 ${bigMs.toFixed(1)}ms)`);
   assert.ok(bigMs <= TIMING_CEILING_MS, `300순간 꼬리표 걸러 보기 ${bigMs.toFixed(1)}ms ≤ ${TIMING_CEILING_MS}ms`);
+});
+
+// ── #735: 보드에서 붙인 꼬리표가 트리 첫 순간에 저장되던 결함 ─────────────────────────────
+// 원인: mountViewTagLine이 onCommit에 '줄을 처음 만든 순간'의 id를 클로저로 계속 보냈다 —
+//       카드를 바꿔 다시 그려도 저장은 첫 순간(처음 만든 순간)으로 갔다.
+// 고침: renderTagLine의 commit은 onCommit에 (keywords, 지금 보고 있는 순간 id)를 함께 넘기고,
+//       상세 전체를 관찰해 같은 제목의 다른 카드로 바꿔도 다시 읽는다.
+
+test('#735: 꼬리표 줄은 onCommit에 지금 보고 있는 순간 id를 넘긴다(처음 만든 순간이 아니다)', () => {
+  const host = fakeEl({ querySelector: () => null });
+  const commits = [];
+  const line = renderTagLine({
+    host,
+    doc: {}, // Node에는 문서가 없다 — renderTagLine은 그리기에 host만 쓴다.
+    moment: { id: 'm1', title: '첫 순간', keywords: [] },
+    knownTags: [],
+    writable: true,
+    onCommit: (keywords, momentId) => commits.push({ keywords, momentId })
+  });
+  // 카드 4를 열면 줄은 그 순간으로 다시 그린다(update).
+  line.update({ id: 'm4', title: '카드 4', keywords: [] });
+  assert.equal(line.momentId, 'm4');
+  host.dispatch('click', { target: { closest: (sel) => sel === '[data-tag-raw]' ? { dataset: { tagRaw: '노래:Supernova' } } : null } });
+  assert.deepEqual(commits, [{ keywords: ['노래:Supernova'], momentId: 'm4' }], '저장은 지금 보고 있는 순간(m4)으로 간다');
+  assert.notEqual(commits[0].momentId, 'm1', '처음 만든 순간(m1)으로 저장하지 않는다');
+});
+
+// 보드·책·지도가 쓰는 한 벌(mountViewTagLine)을 가짜 문서로 열고, 카드를 바꾼 뒤 칩을 누른다.
+// 셸(LT41)은 부모 창 흉내로 두고, 저장 요청(postMessage lt41-tags)을 기록해 어느 순간에 저장을 부르는지 본다.
+function tagLineHarness({ screen, moments }) {
+  const saved = {
+    document: globalThis.document, window: globalThis.window, location: globalThis.location,
+    addEventListener: globalThis.addEventListener, dispatchEvent: globalThis.dispatchEvent,
+    MutationObserver: globalThis.MutationObserver
+  };
+  const sent = [];
+  const observers = [];
+  const created = [];
+  const listeners = {};
+  const LT41 = { source: 'server', writable: true, momentId: moments[0].id, tree: { id: 't1', moments } };
+  const parentWin = { LT41, postMessage: (msg, origin) => sent.push({ msg, origin }) };
+  const makeNode = (extra = {}) => {
+    const node = fakeEl({
+      contains: () => false,
+      closest: () => null,
+      replaceChildren() { this.children = []; },
+      append(...kids) { for (const kid of kids) (this.children ||= []).push(kid); },
+      after(el) { this.afterCalled = el; },
+      ...extra
+    });
+    created.push(node);
+    return node;
+  };
+  const detailRoot = makeNode({ id: 'detail' });
+  const titles = { dTitle: makeNode(), detailTitle: makeNode() };
+  const anchors = { dBasic: makeNode(), detailChips: makeNode(), '#detail .chips': makeNode() };
+  const dBasicSection = makeNode();
+  anchors.dBasic.closest = (sel) => (sel === '.section' ? dBasicSection : null);
+  globalThis.document = {
+    getElementById: (id) => ({ detail: detailRoot, ...titles, ...anchors }[id] || null),
+    createElement: () => makeNode(),
+    querySelector: (sel) => anchors[sel] || null,
+    documentElement: { dataset: {} }
+  };
+  globalThis.window = { parent: parentWin };
+  globalThis.location = { origin: 'https://lovetree.test' };
+  globalThis.addEventListener = (type, fn) => { (listeners[type] ||= []).push(fn); };
+  globalThis.dispatchEvent = () => {};
+  globalThis.MutationObserver = class { constructor(cb) { this.cb = cb; observers.push(this); } observe() {} };
+
+  const api = mountViewTagLine({ screen });
+  // 상세 안에 그린 꼬리표 줄(호스트) — 자기 그림은 관찰에서 무시하는지 보는 열쇠다.
+  const host = created.find((el) => el.classList.list.has('lt-tagline-host')) || null;
+  const wrap = titles.dTitle.afterCalled || anchors.detailChips.afterCalled || anchors['#detail .chips'].afterCalled || dBasicSection.afterCalled || null;
+  if (wrap) detailRoot.contains = (el) => el === wrap || (wrap.children || []).includes(el);
+  const clickChip = (raw) => host?.dispatch('click', {
+    target: { closest: (sel) => (sel === '[data-tag-raw]' ? { dataset: { tagRaw: raw } } : null) }
+  });
+  const openMoment = (id) => {
+    // 보드·책·지도가 카드를 여는 순서: 셸 LT41.momentId를 먼저 바꾸고(LTDEMO.select) 상세를 다시 그린다.
+    LT41.momentId = id;
+    observers.forEach((o) => o.cb([{ target: anchors.dBasic }]));
+  };
+  const restore = () => {
+    for (const [key, value] of Object.entries(saved)) {
+      if (value === undefined) delete globalThis[key]; else globalThis[key] = value;
+    }
+  };
+  return { api, LT41, sent, observers, clickChip, openMoment, restore, host };
+}
+
+test('#735: 보드에서 카드 A를 열고 카드 B로 바꾼 뒤 꼬리표를 붙이면 B에만 저장한다(A·첫 순간은 그대로)', () => {
+  const moments = [
+    { id: 'm1', title: '첫 순간', keywords: [] },
+    { id: 'mA', title: '카드 A', keywords: [] },
+    { id: 'mB', title: '카드 B', keywords: [] }
+  ];
+  const h = tagLineHarness({ screen: 'board', moments });
+  try {
+    assert.ok(h.host, '꼬리표 줄이 상세에 붙는다');
+    // 처음 열린 순간(m1)에서 줄이 만들어진다 — 옛 결함에서는 이 id가 저장 끝까지 갔다.
+    h.openMoment('mB');
+    h.clickChip('노래:Supernova');
+    assert.deepEqual(h.sent.map((s) => s.msg), [
+      { type: 'lt41-tags', treeId: 't1', momentId: 'mB', keywords: ['노래:Supernova'] }
+    ], '저장 요청은 카드 B(mB)로 한 번만 간다');
+    assert.deepEqual(h.LT41.tree.moments[0].keywords, [], '첫 순간(m1)의 꼬리표는 그대로다');
+    assert.deepEqual(h.LT41.tree.moments[1].keywords, [], '카드 A(mA)의 꼬리표는 그대로다');
+  } finally { h.restore(); }
+});
+
+test('#735: 같은 제목의 다른 카드로 바꿔도 저장은 보고 있는 카드에 한다(제목만 관찰하면 놓친다)', () => {
+  const moments = [
+    { id: 'm1', title: '같은 제목', keywords: [] },
+    { id: 'mA', title: '같은 제목', keywords: [] },
+    { id: 'mB', title: '같은 제목', keywords: [] }
+  ];
+  const h = tagLineHarness({ screen: 'board', moments });
+  try {
+    h.openMoment('mB');
+    h.clickChip('멤버:카리나');
+    assert.deepEqual(h.sent.map((s) => s.msg.momentId), ['mB'], '제목이 같아도 보고 있는 카드(mB)로 저장한다');
+    assert.deepEqual(h.LT41.tree.moments[0].keywords, [], '첫 순간은 그대로다');
+  } finally { h.restore(); }
+});
+
+test('#735: 책·지도 화면도 같은 모양이다 — 바꾼 순간에만 저장한다', () => {
+  for (const screen of ['book', 'network']) {
+    const moments = [
+      { id: 'm1', title: '첫 순간', keywords: [] },
+      { id: 'mA', title: '책장 넘긴 순간', keywords: [] }
+    ];
+    const h = tagLineHarness({ screen, moments });
+    try {
+      assert.ok(h.host, screen + ': 꼬리표 줄이 상세에 붙는다');
+      h.openMoment('mA');
+      h.clickChip('무대:뮤직뱅크');
+      assert.deepEqual(h.sent.map((s) => s.msg), [
+        { type: 'lt41-tags', treeId: 't1', momentId: 'mA', keywords: ['무대:뮤직뱅크'] }
+      ], screen + ': 저장 요청은 연 순간(mA)으로 간다');
+      assert.deepEqual(h.LT41.tree.moments[0].keywords, [], screen + ': 첫 순간은 그대로다');
+    } finally { h.restore(); }
+  }
 });

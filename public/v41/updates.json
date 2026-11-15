@@ -1,5 +1,24 @@
 [
   {
+    "version": "4.1.6",
+    "date": "2026.11.16",
+    "items": [
+      {"kind": "new", "text": "순간 목록에서 꼬리표를 눌러 그 꼬리표가 붙은 순간만 모아 볼 수 있어요", "source": "team", "issue": "#627"},
+      {"kind": "new", "text": "순간이 3개가 되어 트리가 둘러보기에 공개될 때 안내가 떠요. 바로 비공개로 바꿀 수도 있어요", "source": "ai_tester", "tester": "보람", "issue": "#718"},
+      {"kind": "new", "text": "보낸 의견에 번호가 보여요", "source": "ai_tester", "tester": "윤제", "issue": "#705"},
+      {"kind": "fix", "text": "책에서 잘린 제목을 누르면 전체 제목이 펼쳐져요. 날짜 글씨도 본문만큼 커졌어요", "source": "ai_tester", "tester": "보람", "issue": "#719"},
+      {"kind": "fix", "text": "책 위 칩 이름을 '이어진 순간'으로 알아보기 쉽게 바꿨어요", "source": "ai_tester", "tester": "윤제", "issue": "#719"},
+      {"kind": "fix", "text": "영상 제목이 늦게 도착해도 '…에서 간직한 순간' 대신 실제 제목으로 바뀌어요", "source": "ai_tester", "tester": "보람", "issue": "#707"},
+      {"kind": "fix", "text": "직캠 영상의 채널 이름을 가수 꼬리표로 제안하지 않아요. 너무 긴 꼬리표 제안도 보이지 않아요", "source": "ai_tester", "tester": "보람", "issue": "#711"},
+      {"kind": "fix", "text": "휴대폰에서 보드 도구 줄이 겹치지 않아요. 판 모양 단추에 '판' 이름표를 붙였어요", "source": "ai_tester", "tester": "보람", "issue": "#717"},
+      {"kind": "fix", "text": "반응이 없는 공개 카드는 '반응 남기기' 단추 하나만 보여요. 둘러보기 카드 글씨도 커졌어요", "source": "ai_tester", "tester": "윤제", "issue": "#705"},
+      {"kind": "fix", "text": "책 갈림길 안내 문구를 바로잡고 글씨를 키웠어요", "source": "ai_tester", "tester": "윤제", "issue": "#700"},
+      {"kind": "fix", "text": "첫 화면 카드가 멀쩡한 영상인데도 '영상을 볼 수 없어요'로 바뀌던 것을 고쳤어요", "source": "team", "issue": "#727"},
+      {"kind": "soon", "text": "검색 사이트(네이버·구글)에서 러브트리 찾기 — 서비스를 정식으로 열 때 등록해요", "source": "team", "issue": "#541"},
+      {"kind": "soon", "text": "비밀번호 찾기·가입 확인 메일 — 로그인 화면에서 준비하고 있어요", "source": "team"}
+    ]
+  },
+  {
     "version": "4.1.5",
     "date": "2026.11.15",
     "items": [
