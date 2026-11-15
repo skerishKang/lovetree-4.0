@@ -23,6 +23,20 @@
 
 > **시험 멈춤 규칙(2026-11-15)**: 브라우저 코드에 setInterval 반복을 넣으면 unref하거나 정리한다 — 안 그러면 npm test가 끝나지 않고 CI가 멈춘다.
 
+## 2026-11-16 — 꼬리표 제안: 시상식 이름+연도(MMA2026)를 가수로 잡던 문제 (컴1로컬4 레인, ai/local4-lt-stagename-year-261116, main ecf3309 기준)
+
+- **제보(하은 1회차)**: 제목 '#아일릿 #ILLIT #MMA2026 퍼포먼스 하이라이트 💚'의 제안이 `가수:ILLIT`·`가수:MMA2026`이었다 — MMA2026은 시상식(멜론뮤직어워드 2026).
+- **원인(코드 위치)**: `public/v41/tags.mjs` `artistFromWords` — 해시태그 전용 경로는 없다. '#'이 낱말 사이를 갈라 `gapIsSpace`가 거짓이 되어 '대문자 낱말 이음'으로 묶이지 않고, 낱말마다 따로 가수 후보가 된다. 걸러 내는 자리는 `STAGE_ALIASES`(무대 별칭 집합)인데 **낱말 전체가 별칭과 정확히 같을 때만** 걸렀다 — 'MMA2026'은 'MMA'가 아니어서 통과했다. `findStage`도 `containsWord`가 뒤 글자를 보고 'mma2026'을 'mma'로 읽지 못해 무대로도 잡히지 않았다.
+- **수리**: ① `stageOfToken(낱말)` — 낱말(대문자)이 별칭과 같거나, 끝의 4자리 연도를 뗀 값이 별칭이면 그 무대 이름(`STAGE_ALIAS_LABEL` 별칭→이름 표)을 돌려준다. `artistFromWords`·`artistFromParens`·`capsish`(낱말 이음 판정)가 모두 이 함수를 거쳐 무대 이름을 가수 후보에서 뺀다. ② `hasYearSuffix` — 영문+4자리 연도 꼴(MMA2026·MAMA2025)은 가수 이름이 아니다(무대 별칭이 아니어도). ③ `findStage`에 연도 허용 판정(`무대이름(?:19|20)\d{2}`)을 더해 '#MMA2026'도 `무대:멜론뮤직어워드`로 제안한다(날짜는 값에 붙이지 않는다 — 2차 규칙 그대로). 기존 목록(STAGE_LABELS — 방송·시상식 이름 한 벌)을 그대로 재사용했다.
+- **시험**(`tests/v41-tags-627.test.mjs` — 새 파일 없음): 제목 형태 표에 2건 추가('#아일릿 #ILLIT #MMA2026 …' → `artist:ILLIT`·`stage:멜론뮤직어워드`, '#ILLIT #MAMA2025 무대' → `artist:ILLIT`·`stage:MAMA`) + 새 시험 1건(연도 붙은 이름·시상식 이름은 가수 아님 / 무대는 방송 이름만 / ILLIT·RIIZE·NewJeans는 그대로 / 'MAMA2025'만 있는 제목은 가수 0). 수리 전 코드로 **fail 2**(`["ILLIT","MMA2026"]`) → 수리 후 42/42. 전체 npm test 1865검 1721 pass 0 fail(144 skip)·build·modulepreload --check 통과. updates.json은 건드리지 않았다.
+
+## 2026-11-16 — 운영센터 상태 칩 한 모양 + 이름 정리 + PR 번호 연결 (컴1로컬4 레인, ai/local4-lt-admin-chips-261116, main ecf3309 기준)
+
+- **문제(대표, 1440 정원 테마 '고치는 일' 탭)**: ① 상태 칩 모양이 자리마다 달랐다 — 긴 글 줄의 '고침' 칩은 눌려 '고/침' 두 줄(높이 40px), 짧은 줄 칩은 남은 폭을 다 채움(677px·593px·239px). 원인은 그리드 칸의 기본 stretch + `white-space` 없음. ② '고침 완료'(GitHub 이슈 닫힘)와 고객 글 칩 '고침'(고객에게 '고쳤어요' 답함)이 같은 말처럼 보임. ③ 연결 번호가 PR이면 `issues/637`을 읽어 실패해 '(이슈를 불러오지 못했어요)'로 보였다(실제 #637은 PR).
+- **수리**: `src/admin.css`의 `.lt-badge`에 `flex: none; justify-self: start; white-space: nowrap; line-height: 1.4` — flex·그리드 어느 줄에서도 글자 폭만·한 줄·세로 가운데. '고치는 일' 고객 글 줄은 `.lt-issue-post{grid-template-columns:minmax(0,1fr) auto auto}`로 제목 칸이 남은 폭을 가져가 줄바꿈하고 칩을 밀지 않는다. 이름: `issueStateLabel`을 '이슈 열림/이슈 닫힘'으로, 이 탭 고객 글 칩은 `statusBadge(status,'고객에게: ')`로 다른 탭 이름(새 글·확인 중·고침…)+머리. PR: GitHub 응답의 `pull_request`를 버리지 않고 'PR #번호 · 제목'(링크는 /pull/)으로 보인다. 상태 거름(#issues?status=open|closed)은 PR을 이슈 상태로 세지 않는다.
+- **숫자(1440·390, 가짜 API·가짜 GitHub)**: 전 — 칩 높이 24~40px(긴 줄 '고침' 40 = 두 줄), 폭 677/593/239px(글자 23/33/20px). 후 — 높이 모두 **23px**, 폭 90/64/87/100px(글자 70/44/67/80px + 여백·테두리 20 — 칩 폭이 글자+여백뿐), 390도 같은 값. PR 줄 'PR #637 · 검색 색인 고치기', 이슈 줄 제목 그대로.
+- **시험**: `tests/admin-view.test.mjs`(새 파일 없음)에 칩 시험 1건 — 1440·390에서 모든 칩 높이 오차 1px 이내·한 줄(높이 ≤ 한 줄 높이)·잘림 0·폭 ≤ 글자+21px, 긴 글 줄은 제목 높이 > 칩 높이(밀지 않음), 이름('이슈 닫힘'·'고객에게: 고침')·PR 제목 단정. 수리 전 코드로는 **fail 2**(24~40px) → 수리 후 27/27. CI 미리보기 검사에 `LT_ADMIN_REQUIRE=1` 단계 추가(지도 도구 줄 잡). 전체 npm test 1864검 1720 pass 0 fail(144 skip)·build·modulepreload --check 통과. updates.json은 건드리지 않았다(대표 지시).
+
 ## 2026-11-16 — 둘러보기 소개 기본 꺼짐: 고객이 켜는 것으로 (컴1로컬4 레인, ai/local4-lt-discover-optin-261116, main b30034a 기준)
 
 - **결정(대표, 2026-11-16)**: 링크 공유는 무료·그대로. 둘러보기 소개는 **기본 꺼짐** — 고객이 켜야 둘러보기·다른 팬 보기(tag-moments)에 나오고(무료), 완전 비공개(링크 차단)만 Plus 전용 유지. 이미 나오던 트리는 켜진 상태로 둔다(고객 데이터 불변, 새 트리부터 기본 꺼짐). AI 명예회원 두 명이 공개를 무서워한 것이 계기.

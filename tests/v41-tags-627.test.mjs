@@ -121,6 +121,10 @@ const TITLES = [
   ['[쇼챔 MIX직캠] RESCENE(리센느) - With | Show Champion | EP.618', ['artist:RESCENE', 'stage:쇼챔피언'], '영문(한글) 꼬꼬에서 가수를 영문으로 하나만, 파이프 섞인 덩어리는 노래로 제안하지 않는다'],
   ['[쇼챔 원픽캠 4K] RESCENE ZENA (리센느 제나) - With | Show Champion | EP.618 | 261111', ['artist:RESCENE', 'member:ZENA', 'stage:쇼챔피언'], '꼬꼬 짝의 낱말 수가 같으면 첫 낱말은 가수, 다음 낱말은 멤버다(2단계 그래프 보기 구분). 무대 값에서 날짜(261111)를 뗀다'],
   ['261114 하츠투하츠 지우 15-LOVE 직캠 4K60p MMA Hearts2Hearts fancam', ['artist:Hearts2Hearts', 'stage:멜론뮤직어워드'], '직캠·화질·무대가 섞인 덩어리에서는 노래를 제안하지 않는다(2차 규칙)'],
+  // 2026-11-16 하은 1회차 제보: 해시태그의 대문자 라틴 낱말 둘(#ILLIT #MMA2026)이 모두 가수 후보로 잡혔다.
+  // MMA2026은 시상식(멜론뮤직어워드 2026)이다 — 가수에서 빼고, 무대 이름 뒤에 붙은 연도는 '무대:'로 읽는다.
+  ['#아일릿 #ILLIT #MMA2026 퍼포먼스 하이라이트 💚', ['artist:ILLIT', 'stage:멜론뮤직어워드'], '시상식 이름+연도(MMA2026)는 가수가 아니다 — 무대는 방송 이름만(날짜 없이)'],
+  ['#ILLIT #MAMA2025 무대', ['artist:ILLIT', 'stage:MAMA'], 'MAMA2025도 가수가 아니라 무대 MAMA다'],
 ];
 
 test('제목 해석: 실제 제목 형태 31개에서 가수·멤버·노래·무대를 제안한다(제안일 뿐, 저장은 없다)', () => {
@@ -138,6 +142,29 @@ test('제목 해석: 실제 제목 형태 31개에서 가수·멤버·노래·�
   // 제안은 저장하지 않는다 — 이 모듈에는 저장·보내기 코드가 없다(파일에 persist·fetch·apply가 없다).
   const src = readFileSync(new URL('../public/v41/tags.mjs', import.meta.url), 'utf8');
   assert.doesNotMatch(src, /apply\(|persist|postMessage|fetch\(|localStorage|sessionStorage/, '제안 모듈은 저장을 부르지 않는다');
+});
+
+test('시상식·방송 이름에 붙은 연도는 가수로 제안하지 않는다(2026-11-16 하은 1회차 제보)', () => {
+  // 해시태그는 '#'이 낱말 사이를 갈라 놓아 대문자 낱말 이음으로 이어지지 않는다 — 낱말마다 따로 후보가 되었다.
+  // 그래서 '무대 이름+연도'를 낱말 단위에서 걸러야 한다.
+  for (const [title, stage] of [
+    ['#아일릿 #ILLIT #MMA2026 퍼포먼스 하이라이트 💚', '멜론뮤직어워드'],
+    ['에스파 MMA2026 컴백', '멜론뮤직어워드'],
+    ['#RIIZE #MAMA2025 무대', 'MAMA'],
+    ['뉴진스 MAMA2025', 'MAMA']
+  ]) {
+    const { proposals } = suggestTagsFromTitle(title);
+    const artists = proposals.filter((p) => p.kindId === 'artist').map((p) => p.value);
+    assert.ok(!artists.some((name) => /(?:19|20)\d{2}$/.test(name)), `연도가 붙은 이름을 가수로 권하지 않는다: ${JSON.stringify(artists)} (${title})`);
+    assert.ok(!artists.some((name) => /^(?:MMA|MAMA)/i.test(name)), `시상식 이름을 가수로 권하지 않는다: ${JSON.stringify(artists)} (${title})`);
+    assert.deepEqual(proposals.filter((p) => p.kindId === 'stage').map((p) => p.value), [stage], `무대는 방송 이름만(날짜 없이): ${title}`);
+  }
+  // 가수는 그대로 잡는다(고치면서 맞게 잡던 것을 잃지 않는다).
+  assert.deepEqual(brief(suggestTagsFromTitle('#아일릿 #ILLIT #MMA2026 퍼포먼스 하이라이트 💚')).filter((p) => p.startsWith('artist:')), ['artist:ILLIT']);
+  assert.deepEqual(brief(suggestTagsFromTitle('뉴진스 (NewJeans) How Sweet')).filter((p) => p.startsWith('artist:')), ['artist:NewJeans']);
+  assert.deepEqual(brief(suggestTagsFromTitle('RIIZE (라이즈) ‘Get A Guitar’')).filter((p) => p.startsWith('artist:')), ['artist:RIIZE']);
+  // 연도만 붙은 제목은 아무 가수도 만들지 않는다(가수 없는 시상식 클립).
+  assert.deepEqual(suggestTagsFromTitle('MAMA2025').proposals.filter((p) => p.kindId === 'artist'), []);
 });
 
 test('직캠 문맥의 괄호 크레딧(채널 이름)은 가수로 제안하지 않는다(AI 명예회원 알림)', () => {

@@ -166,7 +166,7 @@ function capsRunBefore(t, at) {
   const ranges = [...t.matchAll(/\([^()]*\)/g)].map((m) => [m.index, m.index + m[0].length]);
   const inParens = (i) => ranges.some(([a, b]) => i >= a && i < b);
   const tokens = [...t.matchAll(/[A-Za-z0-9&'’-]+/g)];
-  const capsish = (tk) => isCapsish(tk[0].toUpperCase()) && !ARTIST_NOISE.has(tk[0].toUpperCase()) && !STAGE_ALIASES.has(tk[0].toUpperCase());
+  const capsish = (tk) => isCapsish(tk[0].toUpperCase()) && !ARTIST_NOISE.has(tk[0].toUpperCase()) && !stageOfToken(tk[0]);
   let e = -1;
   for (let k = tokens.length - 1; k >= 0; k--) {
     if (tokens[k].index < at && /^\s*$/.test(t.slice(tokens[k].index + tokens[k][0].length, at))) { e = k; break; }
@@ -199,7 +199,7 @@ function artistFromParens(t) {
       const lastKo = (t.slice(0, m.index).match(/[가-힣]+/g) || []).slice(-1)[0] ?? '';
       if (!/(?:직캠|팬캠)$/.test(lastKo)) name = latinOf(inner);
     }
-    if (!name || looksLikeCamCredit(name)) continue;
+    if (!name || looksLikeCamCredit(name) || stageOfToken(name) || hasYearSuffix(name)) continue;
     out.push(name);
   }
   return out;
@@ -223,7 +223,7 @@ function artistFromWords(t, parens = []) {
   const out = [];
   const tokens = [...t.matchAll(/[A-Za-z0-9&'’-]+/g)].map((m) => ({ w: m[0], i: m.index, end: m.index + m[0].length }));
   const gapIsSpace = (a, b) => /^\s*$/.test(t.slice(a.end, b.i));
-  const capsish = (tok) => tok && isCapsish(tok.w.toUpperCase()) && !ARTIST_NOISE.has(tok.w.toUpperCase()) && !STAGE_ALIASES.has(tok.w.toUpperCase());
+  const capsish = (tok) => tok && isCapsish(tok.w.toUpperCase()) && !ARTIST_NOISE.has(tok.w.toUpperCase()) && !stageOfToken(tok.w);
   for (let k = 0; k < tokens.length; k++) {
     const tok = tokens[k];
     if (inParens(tok)) continue;
@@ -235,7 +235,8 @@ function artistFromWords(t, parens = []) {
     if (after === '-' || /\d/.test(after) || /[가-힣]/.test(after)) continue;
     const up = w.toUpperCase();
     if (ARTIST_NOISE.has(up)) continue;
-    if (STAGE_ALIASES.has(up)) continue; // MAMA·MMA 같은 무대 이름은 가수가 아니다
+    if (stageOfToken(w)) continue; // MAMA·MMA·MMA2026 같은 무대 이름(연도 붙은 꼴 포함)은 가수가 아니다
+    if (hasYearSuffix(w)) continue; // MAMA2025처럼 영문+4자리 연도 꼴은 가수 이름이 아니다
     if (isDigitName(w)) { out.push(w); continue; } // Hearts2Hearts 모양은 홀로 이름이다
     if (!isCapsName(w)) continue;
     const prev = tokens[k - 1], next = tokens[k + 1];
@@ -286,7 +287,7 @@ function membersFromCamRun(rest, parens, artistKeys) {
   const out = [];
   const tokens = [...rest.matchAll(/[A-Za-z0-9&'’-]+/g)].map((m) => ({ w: m[0], i: m.index, end: m.index + m[0].length }));
   const gapIsSpace = (a, b) => /^\s*$/.test(rest.slice(a.end, b.i));
-  const capsish = (tok) => tok && isCapsish(tok.w.toUpperCase()) && !ARTIST_NOISE.has(tok.w.toUpperCase()) && !STAGE_ALIASES.has(tok.w.toUpperCase());
+  const capsish = (tok) => tok && isCapsish(tok.w.toUpperCase()) && !ARTIST_NOISE.has(tok.w.toUpperCase()) && !stageOfToken(tok.w);
   for (let k = 1; k < tokens.length; k++) {
     const prev = tokens[k - 1], tok = tokens[k];
     if (inParens(prev) || inParens(tok)) continue;
@@ -308,7 +309,7 @@ function artistFromQuotedRun(t) {
   const ranges = [...t.matchAll(/\([^()]*\)/g)].map((m) => [m.index, m.index + m[0].length]);
   const inParens = (i) => ranges.some(([a, b]) => i >= a && i < b);
   const tokens = [...t.matchAll(/[A-Za-z0-9&'’-]+/g)];
-  const capsish = (tk) => isCapsish(tk[0].toUpperCase()) && !ARTIST_NOISE.has(tk[0].toUpperCase()) && !STAGE_ALIASES.has(tk[0].toUpperCase());
+  const capsish = (tk) => isCapsish(tk[0].toUpperCase()) && !ARTIST_NOISE.has(tk[0].toUpperCase()) && !stageOfToken(tk[0]);
   for (const q of t.matchAll(QUOTED_ALL)) {
     let e = -1;
     for (let k = tokens.length - 1; k >= 0; k--) {
@@ -324,7 +325,23 @@ function artistFromQuotedRun(t) {
 }
 
 // 무대 이름의 모든 별칭(대문자) — 가수 후보에서 무대 이름을 걸러 낼 때 쓴다.
-const STAGE_ALIASES = new Set(STAGE_LABELS.flatMap((s) => s.alias.map((a) => tagKey(a).toUpperCase().replace(/[^A-Z0-9 ]/g, ''))));
+const STAGE_ALIAS_LABEL = new Map(STAGE_LABELS.flatMap((s) => s.alias.map((a) => [tagKey(a).toUpperCase().replace(/[^A-Z0-9 ]/g, ''), s.label])));
+const STAGE_ALIASES = new Set(STAGE_ALIAS_LABEL.keys());
+
+// 영문+숫자 4자리 연도 꼴(MMA2026·MAMA2025) — 가수 이름이 아니라 시상식·방송 이름에 연도가 붙은 모양이다.
+// 해시태그로 흔히 붙는다('#아일릿 #ILLIT #MMA2026 퍼포먼스' — 2026-11-16 하은 1회차 제보).
+const YEAR_SUFFIX_NAME = /^[A-Z][A-Z0-9&'. ]*?(?:19|20)\d{2}$/;
+const hasYearSuffix = (word) => YEAR_SUFFIX_NAME.test(String(word ?? '').toUpperCase().trim());
+
+// 낱말이 무대 이름인가 — 연도가 붙은 꼴(MMA2026)이면 그 무대 이름(label)을 돌려준다. 아니면 null.
+const stageOfToken = (word) => {
+  const up = String(word ?? '').toUpperCase().replace(/[^A-Z0-9 ]/g, '').trim();
+  if (!up) return null;
+  if (STAGE_ALIAS_LABEL.has(up)) return STAGE_ALIAS_LABEL.get(up);
+  const base = up.replace(/(?:19|20)\d{2}$/, '').trim();
+  if (base !== up && STAGE_ALIAS_LABEL.has(base)) return STAGE_ALIAS_LABEL.get(base);
+  return null;
+};
 
 // 따옴표 묶음(노래 제목)과 붙임표 노래 덩어리를 덜어 낸 제목 — 이름 후보를 볼 때 쓴다
 // (괄호 안 노래 제목·노래 이름을 가수·멤버로 읽지 않게).
@@ -363,9 +380,16 @@ function findMembers(t, artistKeys) {
 
 function findStage(t) {
   const hay = foldTitle(t);
+  // 'MMA2026'·'MAMA2025'처럼 방송·시상식 이름 뒤에 연도가 붙은 꼴도 같은 무대로 읽는다(해시태그에서 흔하다).
+  const containsStage = (needle) => {
+    if (containsWord(hay, needle)) return true;
+    const base = needle.replace(/[^a-z0-9 \u3131-\uD7A3]/g, ' ').trim().split(' ').join('\\s+');
+    if (!base) return false;
+    return new RegExp('(?<![a-z0-9\u3131-\uD7A3])' + base + '(?:19|20)[0-9]{2}(?![0-9])').test(hay);
+  };
   for (const stage of STAGE_LABELS) {
     for (const alias of stage.alias) {
-      if (containsWord(hay, tagKey(alias))) return stage.label;
+      if (containsStage(tagKey(alias))) return stage.label;
     }
   }
   return null;
