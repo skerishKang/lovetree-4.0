@@ -16,6 +16,9 @@ function chipHTML(tag) {
 
 // 꼬리표 줄 하나를 host에 그린다. update(moment)로 같은 자리에 다시 그리고, destroy로 지운다.
 export function renderTagLine({ host, doc = document, moment, knownTags = [], writable = false, onCommit, emptyText = '아직 꼬리표가 없어요' }) {
+  // #739: 눌러 듣는 귀는 이 줄 인스턴스에 묶는다 — destroy로 함께 거둔다. 안 그러면 같은 host에 줄을
+  // 다시 그릴 때(쉬운 추가 연속 담기) 옛 줄의 귀가 살아 남아 옛 순간에 저장하고, 같은 칩을 다시 누르면
+  // 옛 줄이 해제 저장해 어디에도 남지 않는다(하은 1회차 실측 — 세 순간 모두 keywords []).
   const state = {
     momentId: moment?.id || '',
     title: moment?.title || '',
@@ -59,12 +62,17 @@ export function renderTagLine({ host, doc = document, moment, knownTags = [], wr
     try { onCommit?.([...state.keywords], state.momentId); } catch (error) { fail(error?.message || '저장하지 못했어요.'); }
   }
 
+  const off = new AbortController();
+  const when = { signal: off.signal };
+  // #739: 거둔 줄의 귀는 두 번 막는다 — signal로 지우고(진짜 DOM), aborted면 무시한다(host가 귀를 안 지우는 흉내·옛 브라우저까지).
+  const alive = () => !off.signal.aborted;
   host.addEventListener('click', (event) => {
+    if (!alive()) return;
     const chip = event.target.closest('[data-tag-raw]');
     if (!chip) return;
     fail('');
     commit(toggledKeywords(state.keywords, chip.dataset.tagRaw));
-  });
+  }, when);
   // 직접 입력: 쓰기 창 안에도 붙으므로 form 대신 group으로 두고 Enter·단추로 붙인다(중첩 form 금지).
   function submitInput() {
     const kind = host.querySelector('.lt-tagline-kind')?.value || '';
@@ -76,10 +84,11 @@ export function renderTagLine({ host, doc = document, moment, knownTags = [], wr
     fail('');
     commit(toggledKeywords(state.keywords, made.raw));
   }
-  host.addEventListener('click', (event) => { if (event.target.closest('.lt-tagline-add')) submitInput(); });
+  host.addEventListener('click', (event) => { if (alive() && event.target.closest('.lt-tagline-add')) submitInput(); }, when);
   host.addEventListener('keydown', (event) => {
+    if (!alive()) return;
     if (event.key === 'Enter' && event.target.closest('.lt-tagline-value')) { event.preventDefault(); submitInput(); }
-  });
+  }, when);
 
   draw();
   return {
@@ -92,7 +101,7 @@ export function renderTagLine({ host, doc = document, moment, knownTags = [], wr
     },
     setKnownTags(tags) { state.knownTags = Array.isArray(tags) ? [...tags] : []; draw(); },
     get momentId() { return state.momentId; },
-    destroy() { host.replaceChildren(); host.classList.remove('lt-tagline-host'); host.hidden = true; }
+    destroy() { off.abort(); host.replaceChildren(); host.classList.remove('lt-tagline-host'); host.hidden = true; }
   };
 }
 
