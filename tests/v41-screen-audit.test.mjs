@@ -286,6 +286,15 @@ test('#657 화면 공통 검사기: 주요 화면 15 상태 × 390·1440 × 밤�
     await page6.evaluate(() => document.getElementById('tag-suggest-open')?.click());
     await page6.waitForTimeout(400);
     await take(page6, '꼬리표 정리 화면');
+    // #627 후속: 책 쪽(카드)에도 확정 꾀리표가 그려지는지 단정한다 — 책 페이지는 book-extra.js가
+    // momentContent를 덮어 써 paintTitle로 제목 줄을 다시 그리므로, 거기에 꾀리표가 없으면 책 카드에는
+    // 끝내 보이지 않는다(실측에서 잡았던 결함). 첫 순간을 선택한 채 책으로 넘어가 칩을 센다.
+    await page6.evaluate(() => { location.hash = '#my/book?tree=' + LT41.tree.id; });
+    await frameOf(page6, /track59-sketchbook/);
+    await page6.waitForTimeout(1500);
+    const bookChips = await (await frameOf(page6, /track59-sketchbook/)).evaluate(() =>
+      [...document.querySelectorAll('.moment-title .lt-tag-chip')].map((n) => n.textContent.trim()));
+    assert.ok(bookChips.includes('Super Shy') && bookChips.includes('무대'), `책 쪽에 확정 꾀리표 칩이 그려져야 한다(실제: ${JSON.stringify(bookChips)})`);
     await ctx5.close();
 
     await context.close();

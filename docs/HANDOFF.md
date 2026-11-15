@@ -16,6 +16,7 @@
 - **주의**: 셸 문서에서 `tag-manager.mjs` 안에 함수 `tree()`와 같은 이름 지역 변수를 함께 쓰면 TDZ 오류('Cannot access tree before initialization')가 난다 — 지역 변수는 `current`로 썼다. tag-line.mjs는 Node 시험에서도 불리므로 `window` 노출·자동 붙이기는 `typeof window !== 'undefined'`로 감쌌다.
 - **updates.json**: '다음 버전'(4.1.4)에 쉬운 말 한 줄 넣었다(source: team, #627).
 - **건드리지 않은 것**: tags.mjs 저장 형식, 책 '✎ 고치기' 경로(#676), 새 소식·지도 조작 줄, 서버·DB, 다른 레인 파일.
+- **머지 뒤 tabbit 실측에서 잡힌 결함 둘(PR #682·#683)**: ① 꼬리표 줄의 '종류 고르기·값 입력'을 숨김 라벨(`.lt-sr`)로 감쌌더라 실제 화면에서 붙이기 단추만 보였다 — 보이는 라벨(`.lt-tagline-label`, 13px)로 바꾸고 검사기에 '종류·값·붙이기가 실제로 보인다' 단정을 더했다(#682). ② 책 카드 칩을 book.js momentContent에만 넣었더라 책 화면은 book-extra.js가 momentContent를 덮어 쓰고 renderSpread도 `.moment-title`을 paintTitle로 갈아 끼워 칩이 끝내 보이지 않았다 — paintTitle이 확정 칩을 함께 그리고, 검사기가 책 쪽 칩('Super Shy'·'무대')을 세게 했다(#683). 교훈: 화면 파일을 덮어 쓰는 확장(book-extra)이 있는 화면은 원본만 고쳐서는 안 보인다 — 실제 그려지는 길을 tabbit으로 먼저 본다.
 
 ## 2026-11-15 — 운영 숫자에서 레인 시험 계정을 갈라 센다 (#671, 로컬1 레인, ai/lt-tester-stats-261115, PR #673 → main 25aa365)
 
