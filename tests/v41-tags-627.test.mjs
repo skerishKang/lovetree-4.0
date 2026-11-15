@@ -9,6 +9,7 @@ import { readFileSync } from 'node:fs';
 import { makeTag, parseTag, normalizeTags, tagValues, tagKey, TAG_KINDS, TAG_MAX_LENGTH, TAG_MAX_COUNT, suggestTagsFromTitle, suggestForMoments } from '../public/v41/tags.mjs';
 import { tagFacets, filterMomentsByTags, matchMomentText } from '../public/v41/tag-filter.mjs';
 import { createTree, addMoment, validateState } from '../src/domain.js';
+import { timingRatio, TIMING_RATIO_LIMIT, TIMING_CEILING_MS } from './helpers/timing-ratio.mjs';
 
 const input = (title = '첫 목소리') => ({ subject: '윤슬', title, note: '오래 기억하고 싶은 마음', emotion: '설렘', date: '2026-10-27', url: '' });
 const stateOf = (tree) => ({ version: 1, trees: [tree] });
@@ -556,29 +557,15 @@ test('suggestForMoments — 순간 300개 계산은 30개에 비해 제곱으로
       keywords: i % 3 ? [] : ['가수:RESCENE'],
     });
   }
-  const small = moments.slice(0, 30);
-  suggestForMoments(small); // 예열 1회 — 모듈 적재·JIT 준비 시간은 재지 않는다
-  suggestForMoments(moments);
-  const bestOf = (list, runs) => {
-    let best = Infinity;
-    let last;
-    for (let run = 0; run < runs; run += 1) {
-      const started = performance.now();
-      last = list();
-      best = Math.min(best, performance.now() - started); // 여러 번 중 가장 빠른 값 — 기계가 느려도 흔들리지 않게
-    }
-    return { best, last };
-  };
-  const smallMs = bestOf(() => suggestForMoments(small), 15).best;
-  const { best: bigMs, last: result } = bestOf(() => suggestForMoments(moments), 7);
+  const { smallMs, bigMs, ratio, last: result } = timingRatio({
+    small: () => suggestForMoments(moments.slice(0, 30)),
+    big: () => suggestForMoments(moments),
+  });
   assert.equal(result.length, 300, '꼬리표가 아예 없는 순간·가수만 있는 순간 모두 빠진 종류 제안이 있다');
   assert.ok(result.every((r) => r.suggestions.includes('노래:Super Shy') && r.suggestions.length >= 2), '노래·무대는 제목 규칙으로 권한다');
   // 절대 ms 대신 같은 실행의 30개와 비교한다(#728 CI windows 러너에서 50ms 한도가 88.5ms로 흔들렸다).
-  // 선형이면 비율은 10배 안팎이고, 제곱으로 느려지면 100배를 넘는다 — 25배 한도가 그 실수를 잡는다.
-  // 250ms 절대 상한은 2차 방벽: 평소 20ms 안팎이라 10배 이상 느려진 큰 되돌림을 따로 잡는다.
-  const ratio = bigMs / smallMs;
-  assert.ok(ratio <= 25, `300개/30개 비율 ${ratio.toFixed(1)}배 ≤ 25배 (30개 ${smallMs.toFixed(2)}ms · 300개 ${bigMs.toFixed(1)}ms)`);
-  assert.ok(bigMs <= 250, `300순간 한꺼번에 제안 ${bigMs.toFixed(1)}ms ≤ 250ms`);
+  assert.ok(ratio <= TIMING_RATIO_LIMIT, `300개/30개 비율 ${ratio.toFixed(1)}배 ≤ ${TIMING_RATIO_LIMIT}배 (30개 ${smallMs.toFixed(2)}ms · 300개 ${bigMs.toFixed(1)}ms)`);
+  assert.ok(bigMs <= TIMING_CEILING_MS, `300순간 한꺼번에 제안 ${bigMs.toFixed(1)}ms ≤ ${TIMING_CEILING_MS}ms`);
 });
 
 // ── 꼬리표로 찾기·걸러 보기(#627 후속): 순수 계산 — 화면(순간 목록)은 나중에 이 함수를 붙인다.
@@ -636,29 +623,24 @@ assert.equal(matchMomentText(moment, 'newjeans'), true, '꼬리표 값 대소문
   assert.equal(matchMomentText({ title: '', note: '', keywords: [] }, '무대'), false, '꼬리표 없는 순간에도 안전하다');
 });
 
-test('tagFacets·filterMomentsByTags·matchMomentText — 순간 300개 계산도 50ms 안에 끝난다', () => {
+test('tagFacets·filterMomentsByTags·matchMomentText — 순간 300개 계산은 30개에 비해 제곱으로 느려지지 않는다', () => {
   const moments = Array.from({ length: 300 }, (_, i) => ({
     id: 'm' + i,
     title: `RESCENE "Super Shy" ${i % 2 ? '인기가요' : '뮤직뱅크'} 직캠`,
     note: i % 4 ? '카리나의 무대가 오래 남았다' : '',
     keywords: ['가수:RESCENE', i % 2 ? '노래:Super Shy' : '노래:super shy.', '멤버:카리나', i % 3 ? '무대:인기가요' : '무대'],
   }));
-  tagFacets(moments); // 예열 1회 — 모듈 적재·JIT 준비 시간은 재지 않는다
-  filterMomentsByTags(moments, ['super shy', '카리나']);
-  matchMomentText(moments[0], 'super');
-  let facets;
-  let filtered;
-  let matched;
-  let elapsed = Infinity;
-  for (let run = 0; run < 5; run += 1) {
-    const started = performance.now();
-    facets = tagFacets(moments);
-    filtered = filterMomentsByTags(moments, ['super shy', '카리나']);
-    matched = moments.filter((m) => matchMomentText(m, 'super shy'));
-    elapsed = Math.min(elapsed, performance.now() - started); // 여러 번 중 가장 빠른 값
-  }
+  const measure = (list) => ({
+    facets: tagFacets(list),
+    filtered: filterMomentsByTags(list, ['super shy', '카리나']),
+    matched: list.filter((m) => matchMomentText(m, 'super shy')),
+  });
+  const { smallMs, bigMs, ratio, last } = timingRatio({ small: () => measure(moments.slice(0, 30)), big: () => measure(moments) });
+  const { facets, filtered, matched } = last;
   assert.equal(filtered.length, 300, '모두 두 꼬리표를 가진다');
   assert.equal(matched.length, 300);
   assert.equal(facets.find((f) => f.kindId === 'song').tags[0].count, 300);
-  assert.ok(elapsed <= 50, `300순간 꼬리표 걸러 보기 ${elapsed.toFixed(1)}ms ≤ 50ms`);
+  // 절대 ms 대신 같은 실행의 30개와 비교한다(#728 CI windows 러너 흔들림, #731).
+  assert.ok(ratio <= TIMING_RATIO_LIMIT, `300개/30개 비율 ${ratio.toFixed(1)}배 ≤ ${TIMING_RATIO_LIMIT}배 (30개 ${smallMs.toFixed(2)}ms · 300개 ${bigMs.toFixed(1)}ms)`);
+  assert.ok(bigMs <= TIMING_CEILING_MS, `300순간 꼬리표 걸러 보기 ${bigMs.toFixed(1)}ms ≤ ${TIMING_CEILING_MS}ms`);
 });

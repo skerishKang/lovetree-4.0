@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import { buildGraph, footprint, pathFor, ORDER_Y_BASE, ORDER_Y_RANGE } from '../public/v41/graph-model.mjs';
 import { makeTag } from '../public/v41/tags.mjs';
+import { timingRatio, TIMING_RATIO_LIMIT, TIMING_CEILING_MS } from './helpers/timing-ratio.mjs';
 
 // #627 2단계 PR2: 그래프 보기의 순수 규칙(buildGraph·footprint·pathFor)을 입력→출력으로만 본다.
 // 설계 문서 docs/GRAPH_VIEW_20261115.md §2. 소스 글자 검사는 하지 않는다(동작 시험만).
@@ -229,7 +230,7 @@ test('pathFor: 모르는 id·빈 선택은 빈 구간, 둘 다 넘기면 순간�
   assert.deepEqual(both, { segments: [['p1', 'p2']] }, '순간이 허브보다 구체적이다');
 });
 
-test('순간 300개: buildGraph가 50ms 안에 끝난다', () => {
+test('순간 300개: buildGraph는 30개에 비해 제곱으로 느려지지 않는다', () => {
   const moments = [];
   for (let i = 0; i < 300; i += 1) {
     const tags = [stage('무대 ' + (i % 30)), song('노래 ' + (i % 12)), artist('가수 ' + (i % 5))];
@@ -237,17 +238,15 @@ test('순간 300개: buildGraph가 50ms 안에 끝난다', () => {
     const date = `2026-${String(1 + Math.floor(i / 28)).padStart(2, '0')}-${String(1 + (i % 28)).padStart(2, '0')}`;
     moments.push(M('m' + i, date, tags, { createdOrder: i + 1 }));
   }
-  buildGraph(moments); // 예열 1회 — 모듈 준비 시간은 재지 않는다
-  let graph;
-  let elapsed = Infinity;
-  for (let run = 0; run < 5; run += 1) {
-    const started = performance.now();
-    graph = buildGraph(moments);
-    elapsed = Math.min(elapsed, performance.now() - started); // 여러 번 중 가장 빠른 값(CI 기계가 느려도 흔들리지 않게)
-  }
+  const { smallMs, bigMs, ratio, last: graph } = timingRatio({
+    small: () => buildGraph(moments.slice(0, 30)),
+    big: () => buildGraph(moments),
+  });
   assert.equal(graph.hubs.length, 30 + 12 + 5, '무대 30·노래 12·가수 5 허브');
   assert.equal(graph.moments.length, 300);
-  assert.ok(elapsed < 50, `300순간 계산 ${elapsed.toFixed(1)}ms — 50ms 이하`);
+  // 절대 ms 대신 같은 실행의 30개와 비교한다(#728 CI windows 러너 흔들림, #731).
+  assert.ok(ratio <= TIMING_RATIO_LIMIT, `300개/30개 비율 ${ratio.toFixed(1)}배 ≤ ${TIMING_RATIO_LIMIT}배 (30개 ${smallMs.toFixed(2)}ms · 300개 ${bigMs.toFixed(1)}ms)`);
+  assert.ok(bigMs <= TIMING_CEILING_MS, `300순간 계산 ${bigMs.toFixed(1)}ms ≤ ${TIMING_CEILING_MS}ms`);
   // 300개에서도 발자취는 한 줄: 구간 299개, 앞뒤 이웃이 맞다.
   assert.equal(graph.footprint.segments.length, 299);
   assert.equal(graph.footprint.order[0], 'm0');
@@ -295,7 +294,7 @@ test('같은 영상·같은 무대는 stacks 한 무더기 — leadId는 발자�
   assert.deepEqual(graph.footprint.order, ['v1', 'v2', 's1', 's2', 's3', 'o1', 'o2', 'u1']);
 });
 
-test('순간 300개(겹치는 영상·같은 무대 섞임): stacks까지 50ms 안에 끝난다', () => {
+test('순간 300개(겹치는 영상·같은 무대 섞임): stacks는 30개에 비해 제곱으로 느려지지 않는다', () => {
   const moments = [];
   for (let i = 0; i < 300; i += 1) {
     moments.push(M('m' + i, i % 2 ? '2026-11-05' : '2026-11-12', [stage(i % 2 ? '인기가요' : '뮤직뱅크'), song('Super Shy')], {
@@ -303,19 +302,17 @@ test('순간 300개(겹치는 영상·같은 무대 섞임): stacks까지 50ms �
       createdOrder: i + 1,
     }));
   }
-  buildGraph(moments); // 예열 1회 — 모듈 준비 시간은 재지 않는다
-  let graph;
-  let elapsed = Infinity;
-  for (let run = 0; run < 5; run += 1) {
-    const started = performance.now();
-    graph = buildGraph(moments);
-    elapsed = Math.min(elapsed, performance.now() - started); // 여러 번 중 가장 빠른 값
-  }
+  const { smallMs, bigMs, ratio, last: graph } = timingRatio({
+    small: () => buildGraph(moments.slice(0, 30)),
+    big: () => buildGraph(moments),
+  });
   assert.equal(graph.stacks.filter((s) => s.kind === 'same-video').length, 150, '영상마다 2번씩 — 같은 영상 묶음 150');
   assert.deepEqual(graph.stacks.filter((s) => s.kind === 'same-stage').map((s) => s.momentIds.length), [150, 150], '같은 날 같은 무대·노래 150씩');
   assert.equal(graph.stacks[0].leadId, 'm0', '묶음의 얼굴은 발자쭈다 앞선 순간');
   assert.equal(graph.moments.filter((m) => m.stackId != null).length, 300, '모든 순간이 묶음에 든다');
   const videoKeys = new Set(graph.stacks.filter((s) => s.kind === 'same-video').map((s) => s.key));
   assert.ok(graph.moments.every((m) => videoKeys.has(m.stackId)), '두 종류에 모두 걸려도 stackId는 같은 영상 묶음 열쇠다');
-  assert.ok(elapsed < 50, `300순간 stacks 계산 ${elapsed.toFixed(1)}ms — 50ms 이하`);
+  // 절대 ms 대신 같은 실행의 30개와 비교한다(#728 CI windows 러너 흔들림, #731).
+  assert.ok(ratio <= TIMING_RATIO_LIMIT, `300개/30개 비율 ${ratio.toFixed(1)}배 ≤ ${TIMING_RATIO_LIMIT}배 (30개 ${smallMs.toFixed(2)}ms · 300개 ${bigMs.toFixed(1)}ms)`);
+  assert.ok(bigMs <= TIMING_CEILING_MS, `300순간 stacks 계산 ${bigMs.toFixed(1)}ms ≤ ${TIMING_CEILING_MS}ms`);
 });
