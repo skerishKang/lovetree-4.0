@@ -16,6 +16,13 @@
 - **AGENTS.md**: 규칙 한 줄 추가 — '레인은 updates.json을 직접 고치지 않는다 — 새 소식은 하루 한 번 CTO가 정한 레인이 그날 머지된 PR을 모아 한 판으로 만든다.'
 - **updates-screen-611도 함께 고침(CI 빨강 원인)**: 화면 시험이 알림 카드·패널 제목을 '4.1.4'로 고정 단정해 4.1.5가 최신이 되자 깨졌다(screen-home-book·postdeploy 빨강). 최신 버전을 updates.json에서 읽어 대조하는 동작 단정으로 바꿔 다음 버전에서도 깨지지 않는다. '칸마다 차곡차곡'·'AI 명예회원 윤제'·'핀보드' 단정은 통합 판에서 그대로 만족한다.
 
+## 2026-11-15 — 책 갈림길 탭 13px·책 밖 잘림 0 + 지도 ? 단추 캡처 다시 (컴1로컬4 레인, ai/local4-branchtab-261115, main 3e7574a 기준)
+
+- **탭(book.css .branch-tab, 넓은 화면)**: right:-119px→-60px·width 144→108px·글자 9→13px(검사기 단추 규칙 — 12px도 잡는다). 오므린 이유: 안쪽 48px는 쪽 오른쪽 여백(52~56px) 안에 살아 글자와 안 겹치고, 내미는 60px은 600px 두 장 보기의 무대 여백(60px)까지 들어가므로 모든 넓은 화면에서 무대 밖 잘림이 0이다(1440 실측: 탭 오른쪽 1356 / 무대 1440, 쪽 글자 끝과 8px 간격). 문구('○○에서 갈라진 길') 그대로. 390(reader-layout.css)·book.css 폰 재정의도 12·8→13px로 통일.
+- **공용 검사기(tests/v41-screen-audit.test.mjs)**: 시험 트리의 첫 순간이 두 갈래(e3 m2→m3 → m1→m3 — runtime.js는 parent 연결 둘째를 branch로 만든다)를 나가게 해 첫 장에 탭이 보이게 했고, 책 상태에 탭 단정 3건(글자 13px 이상 / 무대 안쪽·잘림 0 / 문구 보존)을 더했다. 고치기 전 red(390 12px·1440 9px 잡음) → 고친 뒤 green(54.9초). 참고: 검사기 serve는 dist 우선 — 워크트리에서 도릴 때는 `npm run build` 먼저(home.html은 빌드 산물).
+- **캡처**: `E:\lovetree-qa\lane\local4-branchtab-261115\after\` — {book-tab,map-chips}-{390,1440}.png + summary.json. #700 때 map-chips에 꼬리표 정리 창이 겹쳐 이름·내용이 뒤바뀌었던 것을, 지도 문맥에서 꼬리표 창을 아예 열지 않는 흐름으로 바꿔 재발을 막았고 네 장 모두 열어 이름·내용 대조를 확인했다('? 단추 aria '사용법'·원형 36/44px, 탭 13px·clipped false).
+- **시험**: 전체 npm test 1824검 1685 pass·0 fail·139 skip(28.8초), build·modulepreload --check 통과.
+
 ## 2026-11-15 — 운영센터 고치기 마무리: 일지 날짜 읽기(서버 DB DATE를 문자열로 내린다) — #699가 머지한 4가지 뒤수습 (#671 후속, 컴1로컬5 레인, ai/local5-admin-fix-261115, #701)
 
 - **나뉜 이유**: 앞 세션(로컬5, 크레딧 부족으로 멈춤)이 찾은 같은 고장 4가지를 로컬3 레인이 #699(6fd4b25)로 먼저 머지했다 — 프록시 허용(/api/admin/stats GET)·일지 날짜 쓰기(UTC 자름→Intl seoulDate)·탭 밀림(html:root scrollbar-gutter: stable)·답글 카드 빈 안내 줄(.lt-status:empty). 이 가지(#701)는 #699가 고치지 않은 **읽기 쪽**을 마무리한다.
