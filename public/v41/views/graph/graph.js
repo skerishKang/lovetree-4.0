@@ -12,6 +12,10 @@ import { applyThemeAttribute, readTheme } from '../../header-state.mjs';
 
 const KIND_LABEL = { stage: '무대', song: '노래', member: '멤버', artist: '가수' };
 const KIND_OWN = { stage: '이 무대의 내 순간들', song: '이 노래의 내 순간들', member: '이 멤버의 내 순간들', artist: '이 가수의 내 순간들' };
+/* 보여주기 3단계 '다른 팬 보기'(#627) — 허브 종류별 칸 제목(소스 상수 — 캡처에서 옮겨 적지 않는다).
+   빈 상태 문구는 '아직 ' + 이 문구 + '이 없어요'로 합성한다. */
+const OTHER_FANS = { stage: '같은 무대를 본 다른 팬', song: '같은 노래를 담은 다른 팬', member: '같은 멤버를 좋아하는 다른 팬', artist: '같은 가수를 좋아하는 다른 팬' };
+const FANS_PREVIEW = 3; /* 처음엔 3개만 — '더 보기'로 나머지(서버 상한 30) */
 const KIND_COLOR = { stage: 'var(--lt-gold-deep)', song: 'var(--lt-rose)', member: 'var(--lt-violet, #8b69e8)', artist: 'var(--lt-blue, #547cd0)' };
 const SVGNS = 'http://www.w3.org/2000/svg';
 const svg = document.getElementById('gsvg');
@@ -448,6 +452,7 @@ function drawDetail() {
       }
       card.append(listhead, list);
     }
+    drawOtherFans(card, h);
     return;
   }
   const m = selectedMoment();
@@ -479,6 +484,71 @@ function drawDetail() {
 }
 const prevOf = (m) => { const i = model.graph.footprint.order.indexOf(m.id); return i > 0 ? momentById(model.graph.footprint.order[i - 1]) : null; };
 const nextOf = (m) => { const i = model.graph.footprint.order.indexOf(m.id); return i >= 0 && i < model.graph.footprint.order.length - 1 ? momentById(model.graph.footprint.order[i + 1]) : null; };
+
+/* ── '같은 노래를 담은 다른 팬'(보여주기 3단계 #627) — 서버 GET /api/public/tag-moments(#695 한 벌).
+   공개 경로라 로그아웃 상태에서도 된다. 그 허브의 꼬리표('가수:값' — 서버 parseTag와 같은 표기)로 부른다.
+   없으면 한 줄 문구, 불러오기 실패면 이 칸만 조용히 숨긴다(그래프는 그대로). */
+const fansCache = new Map(); /* tag → 약속(성공만 — 걷기 매 칫발 다시 부르지 않게) */
+const fansShown = new Map(); /* 허브 id → 펼친 개수(상세 판이 다시 그려져도 '더 보기'를 기억) */
+function drawOtherFans(card, h) {
+  const title = OTHER_FANS[h.kindId] || '같은 꼬리표를 담은 다른 팬';
+  const head = document.createElement('div'); head.className = 'd-listhead d-fanshead'; head.textContent = title;
+  const box = document.createElement('ul'); box.className = 'd-fans'; box.setAttribute('aria-label', title);
+  card.append(head, box);
+  const tag = (KIND_LABEL[h.kindId] || '') + ':' + h.value;
+  const reqHub = h.id;
+  let waiting = fansCache.get(tag);
+  if (!waiting) {
+    waiting = fetch('/api/public/tag-moments?tag=' + encodeURIComponent(tag)).then((r) => {
+      if (!r.ok) throw new Error('fans ' + r.status);
+      return r.json();
+    });
+    waiting.catch(() => fansCache.delete(tag)); /* 실패는 기억하지 않는다 — 다음에 다시 시도 */
+    fansCache.set(tag, waiting);
+  }
+  waiting.then((data) => {
+    /* 부르는 동안 선택이 바뀌면 버린다 — 상세 판은 refresh마다 다시 그려진다. */
+    if (selected.type !== 'hub' || selectedHub()?.id !== reqHub) return;
+    const items = Array.isArray(data?.items) ? data.items : [];
+    if (!items.length) {
+      const li = document.createElement('li'); li.className = 'd-fans-empty';
+      li.textContent = '아직 ' + title + '이 없어요';
+      box.appendChild(li);
+      return;
+    }
+    const render = (n) => {
+      box.replaceChildren();
+      for (const item of items.slice(0, n)) box.appendChild(fanRow(item));
+      if (items.length > n) {
+        const li = document.createElement('li');
+        const more = document.createElement('button'); more.type = 'button'; more.className = 'd-fans-more';
+        more.textContent = '더 보기 (남은 ' + (items.length - n) + '개)';
+        more.addEventListener('click', () => { fansShown.set(reqHub, items.length); render(items.length); });
+        li.appendChild(more); box.appendChild(li);
+      }
+    };
+    render(fansShown.get(reqHub) || FANS_PREVIEW);
+  }).catch(() => {
+    if (selected.type === 'hub' && selectedHub()?.id === reqHub) { head.remove(); box.remove(); }
+  });
+}
+const fanRow = (item) => {
+  const li = document.createElement('li');
+  const a = document.createElement('a'); a.className = 'd-fans-row'; a.href = String(item.link || '/t/'); a.target = '_blank'; a.rel = 'noopener';
+  if (item.thumbnail) {
+    const img = document.createElement('img'); img.className = 'd-fans-thumb'; img.alt = ''; img.loading = 'lazy';
+    img.src = String(item.thumbnail);
+    a.appendChild(img);
+  }
+  const meta = document.createElement('span'); meta.className = 'd-fans-meta';
+  const t = document.createElement('b'); t.textContent = String(item.title || '제목 없는 순간');
+  const s = document.createElement('small'); s.textContent = [item.treeTitle, item.date].filter(Boolean).join(' · ');
+  meta.append(t, s);
+  a.append(meta);
+  if (item.aiTester) { const ai = document.createElement('i'); ai.className = 'd-fans-ai'; ai.textContent = 'AI 명예회원'; a.appendChild(ai); }
+  li.appendChild(a);
+  return li;
+};
 
 /* ── 꼬리표 없는 순간 선반 + 제안(제안만 — 확인해야 저장이다) ── */
 function drawShelf() {

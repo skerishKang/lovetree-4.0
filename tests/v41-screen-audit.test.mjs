@@ -558,6 +558,59 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     const bookChips = await (await frameOf(page6, /track59-sketchbook/)).evaluate(() =>
       [...document.querySelectorAll('.moment-title .lt-tag-chip')].map((n) => n.textContent.trim()));
     assert.ok(bookChips.includes('Super Shy') && bookChips.includes('무대'), `책 쪽에 확정 꾀리표 칩이 그려져야 한다(실제: ${JSON.stringify(bookChips)})`);
+    // 보드 첫 진입 두 안내(390) — 셸 알림('내 기록을 불러왔어요.')과 보드 안내 말풍선('순간을 선택해…')이
+    // 같은 자리에 포개지지 않는다. 보드는 ≤700px에서 말풍선을 화면 아래 중앙(bottom 95px)에 띄우고,
+    // 셸 알림도 #666 규칙으로 아래 중앙(--lt-toast-bottom)에 뜬다. 보드는 셸 알림이 떠 있는 동안
+    // 기다렸다 말풍선을 띄운다 — 두 상자가 동시에 보이는 동안에는 겹침 면적이 0이어야 한다.
+    // 1440은 말풍선(오른쪽 아래)·알림(아래 중앙)이 다른 모서리라 기하학적으로 겹치지 않고, 선택 복원으로
+    // 상세 판이 열려 안내가 뜨지 않는 폭이어서 390에서만 잰다.
+    // 새 문맥으로 띄운다(저장된 보기·선택이 없어야 첫 진입 흐름 — 900ms 뒤 말풍선, 셸 알림은 약 3초 — 이 재현된다).
+    if (width === 390) {
+      const ctxNotice = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
+      await ctxNotice.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); } catch {} }, theme);
+      await ctxNotice.route('**://i.ytimg.com/**', THUMB);
+      await ctxNotice.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
+      await ctxNotice.route('**/api/workspace**', (r) => r.fulfill({
+        status: 200, contentType: 'application/json',
+        body: JSON.stringify({ revision: 1, state: { version: 1, trees: [firstTree], prefs: {} }, subject: '시험계정', writeSubjectBound: true, savedAt: '2026-11-15T09:00:00.000Z' })
+      }));
+      const pageNotice = await ctxNotice.newPage();
+      await pageNotice.goto(`${base}/v41/?account=1#board`, { waitUntil: 'domcontentloaded' });
+      await frameOf(pageNotice, /track58-pinboard/);
+      const twoNotices = await pageNotice.evaluate(async () => {
+        const boxOf = (el) => { const r = el.getBoundingClientRect(); return { t: r.top, b: r.bottom, l: r.left, rt: r.right }; };
+        const overlapArea = (a, b) => Math.max(0, Math.min(a.rt, b.rt) - Math.max(a.l, b.l)) * Math.max(0, Math.min(a.b, b.b) - Math.max(a.t, b.t));
+        // 보드 문서는 #view·#view-next 가운데 지금 #cardLayer(보드)를 든 쪽이다(셸이 두 프레임을 갈아끼운다).
+        const boardToast = () => {
+          for (const id of ['view', 'view-next']) {
+            const doc = document.getElementById(id)?.contentDocument;
+            const toast = doc && doc.getElementById('toast');
+            if (toast && doc.getElementById('cardLayer')) return toast;
+          }
+          return null;
+        };
+        let sawShell = false, sawBoard = false, maxArea = 0, bothAt = -1;
+        for (let i = 0; i < 18; i++) {
+          const shell = document.getElementById('toast');
+          const board = boardToast();
+          const shellUp = !!shell && !shell.hidden;
+          const boardUp = !!board && board.classList.contains('show');
+          if (shellUp) sawShell = true;
+          if (boardUp) sawBoard = true;
+          if (shellUp && boardUp) {
+            bothAt = i;
+            maxArea = Math.max(maxArea, overlapArea(boxOf(shell), boxOf(board)));
+          }
+          await new Promise((r) => setTimeout(r, 400));
+        }
+        return { sawShell, sawBoard, maxArea: Math.round(maxArea), bothAt };
+      });
+      assert.ok(twoNotices.sawShell, '390 셸 알림(기록 불러오기 안내)이 떠 있는 자리를 본다(빈손 통과 금지)');
+      assert.ok(twoNotices.sawBoard, '390 보드 안내 말풍선이 뜨는 자리를 본다(빈손 통과 금지)');
+      assert.equal(twoNotices.maxArea, 0, `390 셸 알림과 보드 안내 말풍선이 같은 자리에 포개지지 않는다(겹침 ${twoNotices.maxArea}px², 동시 노출: ${twoNotices.bothAt < 0 ? '없음' : twoNotices.bothAt + '번째 관찰'})`);
+      await pageNotice.close();
+      await ctxNotice.close();
+    }
     await ctx5.close();
 
     // #627 PR3: 그래프 보기 — 지금은 주소(#my/graph)로만 열리는 화면이라 호스트가 LT41을 직접 넘긴다
@@ -567,6 +620,19 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     await ctx7.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); } catch {} }, theme);
     await ctx7.route('**://i.ytimg.com/**', THUMB);
     await ctx7.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
+    // #627 3단계 '다른 팬 보기' 가짜 응답: 무대 허브 꼬리표는 5건(AI 명예회원 1건), 그 외 꼬리표는 빈 응답 —
+    // 3개 미리보기·'더 보기'·빈 상태 문구를 한 상태에서 단정한다. (playwright는 나중에 등장한 경로가 먼저 맞는다.)
+    const fansFixture = [
+      { shareId: 'fan1', link: '/t/fan1', treeTitle: '윤제의 기억 나무', title: '데뷔쇼 직관 기록', url: 'https://www.youtube.com/watch?v=aaa11111111', thumbnail: 'https://i.ytimg.com/vi/aaa11111111/hqdefault.jpg', date: '2026-01-10', aiTester: false },
+      { shareId: 'fan2', link: '/t/fan2', treeTitle: 'AI 명예회원 윤제 나무', title: '데뷔쇼 다시 보기', url: '', thumbnail: '', date: '2026-01-20', aiTester: true },
+      { shareId: 'fan3', link: '/t/fan3', treeTitle: '은지의 앨범', title: '데뷔쇼 엔딩 멘트', url: 'https://www.youtube.com/watch?v=bbb22222222', thumbnail: 'https://i.ytimg.com/vi/bbb22222222/hqdefault.jpg', date: '2026-01-12', aiTester: false },
+      { shareId: 'fan4', link: '/t/fan4', treeTitle: '민의 사담', title: '데뷔쇼 리허설 후기', url: '', thumbnail: '', date: '2026-01-11', aiTester: false },
+      { shareId: 'fan5', link: '/t/fan5', treeTitle: '서현의 순간', title: '데뷔쇼 첫 소환', url: '', thumbnail: '', date: '2026-01-09', aiTester: false }
+    ];
+    await ctx7.route('**/api/public/tag-moments**', (r) => {
+      const tag = new URL(r.request().url()).searchParams.get('tag') || '';
+      r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ tag, items: tag.startsWith('무대:') ? fansFixture : [] }) });
+    });
     const page7 = await ctx7.newPage();
     await page7.goto(`${base}/graph-host.html`, { waitUntil: 'domcontentloaded' });
     const graphFrame = await frameOf(page7, /track60-graph/);
@@ -676,6 +742,68 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     assert.deepEqual(graphTouch.nameOnMark, [], `허브 이름이 '처음/지금' 표시와 겹친다: ${JSON.stringify(graphTouch.nameOnMark)}`);
     assert.deepEqual(graphTouch.countOnDot, [], `무더기 개수(×N)가 점 위에 겹친다: ${JSON.stringify(graphTouch.countOnDot)}`);
     assert.match(graphCheck.badge, /순간 17/, '표시에 순간 수가 있다');
+    // #627 3단계: 허브 상세의 '같은 노래를 담은 다른 팬' 칸 — 가짜 응답(무대=5건·AI 1건, 그 외=빈 응답)으로
+    // 3개 미리보기·AI 명예회원 표시·'더 보기'·빈 상태 문구·판 안 배치(겹침·넘침 0)를 단정한다.
+    const fansCheck = await page7.evaluate(async () => {
+      const f = [...document.querySelectorAll('iframe')].at(-1);
+      const doc = f.contentDocument;
+      const hub = [...doc.querySelectorAll('#gsvg g[role="button"]')].find((g) => (g.getAttribute('aria-label') || '').startsWith('무대'));
+      hub?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await new Promise((res) => setTimeout(res, 700));
+      const box = doc.querySelector('.d-fans');
+      const cardR = doc.getElementById('detailCard').getBoundingClientRect();
+      const rows = box ? [...box.children].filter((x) => x.querySelector?.('.d-fans-row')) : [];
+      const rowRects = rows.map((x) => x.getBoundingClientRect());
+      let rowPairs = 0;
+      for (let i = 0; i < rowRects.length; i++) for (let j = i + 1; j < rowRects.length; j++) {
+        const a = rowRects[i], b = rowRects[j];
+        if (a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom) rowPairs++;
+      }
+      const outside = rows.filter((x) => { const r = x.getBoundingClientRect(); return r.width === 0 || r.left < cardR.left - 1 || r.right > cardR.right + 1; }).length;
+      return {
+        head: doc.querySelector('.d-fanshead')?.textContent || '',
+        rows: rows.length,
+        rowPairs,
+        outside,
+        aiBadge: doc.querySelector('.d-fans-ai')?.textContent || '',
+        aiOnRow: rows[1]?.querySelector('.d-fans-ai')?.textContent || '',
+        links: rows.map((x) => x.querySelector('a')?.getAttribute('href') || ''),
+        more: doc.querySelector('.d-fans-more')?.textContent || '',
+        thumbs: rows.filter((x) => x.querySelector('.d-fans-thumb')).length
+      };
+    });
+    assert.match(fansCheck.head, /같은 무대를 본 다른 팬/, `칸 제목은 소스 상수(실제 "${fansCheck.head}")`);
+    assert.equal(fansCheck.rows, 3, `처음엔 3개만 보인다(실제 ${fansCheck.rows})`);
+    assert.equal(fansCheck.rowPairs, 0, `다른 팬 줄끼리 겹침 0(실제 ${fansCheck.rowPairs})`);
+    assert.equal(fansCheck.outside, 0, `다른 팬 줄이 상세 판 안에 있다(벗어난 줄 ${fansCheck.outside})`);
+    assert.equal(fansCheck.aiBadge, 'AI 명예회원', 'AI 명예회원 표시가 있다');
+    assert.equal(fansCheck.aiOnRow, 'AI 명예회원', 'AI 표시는 aiTester 줄(fixture 2번째)에 붙는다');
+    assert.ok(fansCheck.links.every((l) => l.startsWith('/t/')), `줄이 공개 트리 링크(/t/…)다: ${JSON.stringify(fansCheck.links)}`);
+    assert.ok(fansCheck.thumbs >= 1, '썸네일 줄이 있다(썸네일 없는 줄은 자리를 비우지 않는다)');
+    assert.match(fansCheck.more, /더 보기/, "나머지는 '더 보기'로");
+    const afterMore = await page7.evaluate(async () => {
+      const f = [...document.querySelectorAll('iframe')].at(-1);
+      const doc = f.contentDocument;
+      doc.querySelector('.d-fans-more')?.click();
+      await new Promise((res) => setTimeout(res, 250));
+      return [...doc.querySelectorAll('.d-fans > li')].filter((x) => x.querySelector('.d-fans-row')).length;
+    });
+    assert.equal(afterMore, 5, `'더 보기'로 나머지가 보인다(실제 ${afterMore})`);
+    const emptyCheck = await page7.evaluate(async () => {
+      const f = [...document.querySelectorAll('iframe')].at(-1);
+      const doc = f.contentDocument;
+      const hub = [...doc.querySelectorAll('#gsvg g[role="button"]')].find((g) => (g.getAttribute('aria-label') || '').startsWith('노래'));
+      hub?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await new Promise((res) => setTimeout(res, 700));
+      return {
+        empty: doc.querySelector('.d-fans-empty')?.textContent || '',
+        head: doc.querySelector('.d-fanshead')?.textContent || '',
+        overflow: Math.max(0, doc.documentElement.scrollWidth - doc.documentElement.clientWidth)
+      };
+    });
+    assert.equal(emptyCheck.head, '같은 노래를 담은 다른 팬', '노래 허브의 칸 제목(소스 상수)');
+    assert.equal(emptyCheck.empty, '아직 같은 노래를 담은 다른 팬이 없어요', `빈 상태 문구(실제 "${emptyCheck.empty}")`);
+    assert.equal(emptyCheck.overflow, 0, `다른 팬 칸이 있어도 가로 넘침 0(실제 ${emptyCheck.overflow})`);
     await ctx7.close();
 
     // 주소로 열리는지(#my/graph) — 셸이 그래프 보기를 화면 파일로 띄우는지 단정한다(메뉴 단추는 없다).
