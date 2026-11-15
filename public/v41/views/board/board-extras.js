@@ -5,7 +5,21 @@ renderThreads();
 formFor(addType);
 setTimeout(boardStartView,40);
 // #662 후속(CTO 지시): 안내는 상세 판이 닫혀 있을 때만 뜬다 — 이미 순간을 선택해 판이 열렸으면 '선택하라'는 안내는 필요 없다.
-setTimeout(()=>{if(!document.getElementById('detail').classList.contains('open'))toast('순간을 선택해 연결된 기록을 살펴보세요.')},900);
+// #718: 셸 알림('내 기록을 불러왔어요.')과 같은 자리에 포개지지 않게 — ≤700px 말풍선은 화면 아래 중앙(bottom 95px)인데
+// 셸 알림도 #666 규칙으로 아래 중앙(--lt-toast-bottom)에 뜬다. 첫 진입에서 두 안내가 겹친다(390 실측 최대 5,328px²).
+// 안내는 한 번만 뜨는 일회성 말풍선이라 위치 규칙을 따라가는 것보다 셸 알림(약 3초)이 사라진 뒤 띄우는 편이 단순하다 —
+// 같은 출처 iframe 이라 부모 문서의 알림 상태를 읽을 수 있다. 최대 6초 기다린 뒤에는 그래도 띄운다(안내를 잃지 않게).
+(function boardGuide(){
+  const GUIDE_TRIES=10, FIRST=900, RETRY=600;
+  const show=(tries)=>setTimeout(()=>{
+    if(document.getElementById('detail').classList.contains('open'))return;
+    const shellToast=(window.parent&&window.parent!==window)?window.parent.document.getElementById('toast'):null;
+    const shellShowing=!!shellToast&&!shellToast.hidden;
+    if(shellShowing&&tries>0)return show(tries-1);
+    toast('순간을 선택해 연결된 기록을 살펴보세요.');
+  },tries===GUIDE_TRIES?FIRST:RETRY);
+  show(GUIDE_TRIES);
+})();
 
 window.__LT58={moments,connections,get state(){return{moments:moments.length,connections:connections.length,view:{...view},selected,cinema}},fitAll,startCinema,selectMoment,addDemo:(type='photo')=>{addType=type;
 formFor(type);
