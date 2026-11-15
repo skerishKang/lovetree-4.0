@@ -26,7 +26,8 @@
       {"kind": "fix", "text": "작은 화면에서 꼬리표 '종류 고르기'가 두 줄로 꺾이지 않게 이름을 칸 위로 얹었어요", "source": "ai_tester", "tester": "윤제"},
       {"kind": "fix", "text": "관계 지도의 '사용법'을 보기 바꾸기와 섞이지 않게 둥근 ? 단추로 옆에 떼었어요", "source": "ai_tester", "tester": "윤제"},
       {"kind": "fix", "text": "책 아래 갈림길 안내 문구를 '…에서 갈라진 길'로 바로잡았어요", "source": "ai_tester", "tester": "윤제"},
-      {"kind": "fix", "text": "사용 일지 날짜가 하루 밀려 보이던 것을 고쳤어요 — 새벽에 쓴 일지도 그날 날짜로 저장돼요", "source": "ai_tester", "tester": "테스터", "issue": "#671"}
+      {"kind": "fix", "text": "사용 일지 날짜가 하루 밀려 보이던 것을 고쳤어요 — 새벽에 쓴 일지도 그날 날짜로 저장돼요", "source": "ai_tester", "tester": "테스터", "issue": "#671"},
+      {"kind": "fix", "text": "직캠 영상 꼬리표 제안이 채널 이름을 '가수'로 권하던 것을 고쳤어요 — 이제 권하지 않아요", "source": "ai_tester", "tester": "보람"}
     ]
   },
   {
