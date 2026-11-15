@@ -58,8 +58,8 @@ export function markSeen(storage, version) {
 
 const esc = value => String(value ?? '').replace(/[&<>"]/g, ch => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[ch]));
 
-/** 노트 목록을 쉬운 말 한 줄씩으로 그리는 조각. 버전·날짜·새로워진 것·고친 것 그대로만 쓴다.
- *  #638: '새로워진 것'·'고친 것' 제목은 한 버전에 한 번만 보인다. 출처 줄('AI 명예회원 ○○ 님이 알려 준 것')은
+/** 노트 목록을 쉬운 말 한 줄씩으로 그리는 조각. 버전·날짜·새로워진 것·고친 것·아직 준비 중 그대로만 쓴다.
+ *  #638: '새로워진 것'·'고친 것'·'아직 준비 중' 제목은 한 버전에 한 번만 보인다. 출처 줄('AI 명예회원 ○○ 님이 알려 준 것')은
  *  같은 출처의 이웃 항목을 한 묶음으로 쳐서 그 묶음 끝 항목 아래에 작게 단다(12px — shell.css). */
 export function renderUpdates(updates, activeVersion = '') {
   const entries = (Array.isArray(updates) ? updates : [])
@@ -68,7 +68,7 @@ export function renderUpdates(updates, activeVersion = '') {
     .sort((a, b) => compareVersions(b.version, a.version));
   if (!entries.length) return '<p class="panel-note">아직 새 소식이 없어요.</p>';
   return entries.map(entry => {
-    const groups = [['new', '새로워진 것'], ['fix', '고친 것']]
+    const groups = [['new', '새로워진 것'], ['fix', '고친 것'], ['soon', '아직 준비 중']]
       .map(([kind, title]) => {
         const rows = (Array.isArray(entry.items) ? entry.items : []).filter(item => item?.kind === kind);
         if (!rows.length) return '';
