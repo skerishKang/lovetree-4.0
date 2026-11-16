@@ -279,7 +279,7 @@ html[data-v41-screen=book] .tools .ui-btn::after,html[data-v41-screen=board] hea
 .settings-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px}
 .settings-actions button{min-height:44px;padding:10px 14px;border:1px solid rgba(255,255,255,.18);border-radius:var(--lt-r-pill);background:rgba(255,255,255,.04)}
 /* 설정 창 맨 아래 처리방침·약관 링크: 하단 작은 링크와 같은 글자·색, 누름 영역 44px. */
-.settings-policy .policy-link{min-height:44px;display:inline-flex;align-items:center}
+.settings-policy .policy-link{min-height:44px;display:inline-flex;align-items:center;font-size:14px}
 .settings-group details{margin-top:14px}
 .settings-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:6px 0;border-top:1px solid var(--lt-line)}
 .settings-row:first-of-type{border-top:0}
@@ -515,8 +515,11 @@ html[data-lt-theme="garden"] #account-advanced[aria-checked="true"]:after{backgr
 .home-links{position:fixed;left:14px;bottom:max(10px,env(safe-area-inset-bottom));z-index:24;display:flex;gap:2px;align-items:center}
 /* 개인정보 처리방침·이용약관 링크(2026-11-16): 같은 줄의 작은 링크와 같은 글자·색. 줄이 좁으면
    두 개로 나누어 넘치지 않게 한다(가로 넘침 0 — 390 실측). 누름 영역은 44px 이상. */
-.home-links a.feedback-link{display:inline-flex;align-items:center;min-height:44px}
-@media(max-width:520px){.home-links{flex-wrap:wrap;row-gap:0}}
+.home-links a.feedback-link{display:inline-flex;align-items:center;min-height:44px;font-size:14px}
+/* 390에서는 처리방침·약관을 아래 고정 줄에 두지 않는다(설정 창 맨 아래·안내 패널에만). */
+@media(max-width:520px){.home-links a.feedback-link{display:none}}
+/* 390 지도·책: 조작 줄·책 테두리와 겹치던 아래 링크 줄을 숨긴다(1440은 지금 자리). */
+@media(max-width:520px){body[data-fab-lift=book] .home-links,body[data-fab-lift=network] .home-links{display:none}}
 /* 이슈 611: 계정 단추 점 — 새 소식이나 새 답글이 있을 때. */
 .account-avatar{position:relative}
 .account-avatar.has-dot::after{content:'';position:absolute;top:2px;right:2px;width:9px;height:9px;border-radius:50%;background:var(--lt-rose);border:1px solid var(--lt-stage)}

@@ -401,10 +401,6 @@ test('#book-dup2 실제 화면: 390에서 책 테두리·갈라짐 띠가 링크
       // 측정 도우미: 책 안 좌표(띠·테두리·머리줄)와 셸 좌표(링크 줄)를 함께 읽는다.
       const iframeBox = await phone.page.locator('#view').boundingBox();
       assert.ok(iframeBox, `${theme}: 책 iframe 자리를 못 읽었다`);
-      const readShell = () => phone.page.evaluate(() => {
-        const b = document.querySelector('.home-links').getBoundingClientRect();
-        return { l: b.left, t: b.top, r: b.right, b: b.bottom };
-      });
       const readBook = () => phone.frame.evaluate(() => {
         const box = (el) => { const b = el.getBoundingClientRect(); return { l: b.left, t: b.top, r: b.right, b: b.bottom }; };
         const tab = document.querySelector('.branch-tab');
@@ -423,27 +419,27 @@ test('#book-dup2 실제 화면: 390에서 책 테두리·갈라짐 띠가 링크
         };
       });
       const toShell = (r) => ({ l: Math.round(r.l + iframeBox.x), t: Math.round(r.t + iframeBox.y), r: Math.round(r.r + iframeBox.x), b: Math.round(r.b + iframeBox.y) });
-      const overlapOf = (a, b) => Math.max(0, Math.min(a.b, b.b) - Math.max(a.t, b.t)) * Math.max(0, Math.min(a.r, b.r) - Math.max(a.l, b.l));
 
-      // 띠 없는 장(첫 장): 책 테두리(.book-cover)가 링크 줄을 덮지 않는다.
+      // 390 책 화면에서는 아래 링크 줄(.home-links) 자체를 숨긴다 — 책 테두리·갈라짐 띠와 겹치거나 2px로 붙을 자지가 없다.
+      const linksHidden = await phone.page.evaluate(() => {
+        const el = document.querySelector('.home-links');
+        if (!el) return true;
+        const cs = getComputedStyle(el);
+        return cs.display === 'none' || cs.visibility === 'hidden' || el.getBoundingClientRect().height === 0;
+      });
+      assert.ok(linksHidden, `${theme}: 390 책 화면에 아래 링크 줄이 보인다`);
+
+      // 띠 없는 장(첫 장): 책 테두리를 읽는다.
       await phone.page.waitForTimeout(300);
-      let links = await readShell();
       let bookRow = await readBook();
-      let coverShell = toShell(bookRow.cover);
-      assert.equal(Math.round(overlapOf(coverShell, links)), 0, `${theme}: 띠 없는 장에서 책 테두리가 링크 줄과 겹친다(${JSON.stringify(coverShell)} vs ${JSON.stringify(links)})`);
-      assert.ok(links.t - coverShell.b >= 8, `${theme}: 띠 없는 장에서 책 테두리와 링크 줄 사이가 ${Math.round(links.t - coverShell.b)}px다(8px 이상)`);
+      assert.ok(bookRow.cover.b > bookRow.cover.t, `${theme}: 띠 없는 장의 책 테두리를 못 읽었다`);
 
-      // 갈라짐 띠가 있는 장: 테두리·띠가 모두 링크 줄에서 8px 이상 떨어져 있고, 띠 글자는 12px 이상이다.
+      // 갈라짐 띠가 있는 장: 띠 글자는 12px 이상이고, 화면 밖으로 넘치지 않는다.
       assert.ok(await walkToBranch(phone.frame), `${theme}: 갈라짐 띠가 있는 장을 찾지 못했다`);
       await phone.page.waitForTimeout(300);
-      links = await readShell();
       bookRow = await readBook();
-      coverShell = toShell(bookRow.cover);
       const tabShell = toShell(bookRow.tab);
-      assert.equal(Math.round(overlapOf(coverShell, links)), 0, `${theme}: 띠 있는 장에서 책 테두리가 링크 줄과 겹친다(${JSON.stringify(coverShell)} vs ${JSON.stringify(links)})`);
-      assert.ok(links.t - coverShell.b >= 8, `${theme}: 띠 있는 장에서 책 테두리와 링크 줄 사이가 ${Math.round(links.t - coverShell.b)}px다(8px 이상)`);
-      assert.equal(Math.round(overlapOf(tabShell, links)), 0, `${theme}: 갈라짐 띠가 링크 줄과 겹친다(${JSON.stringify(tabShell)})`);
-      assert.ok(links.t - tabShell.b >= 8, `${theme}: 갈라짐 띠와 링크 줄 사이가 ${Math.round(links.t - tabShell.b)}px다(8px 이상)`);
+      assert.ok(tabShell.l >= 0 && tabShell.r <= 390, `${theme}: 갈라짐 띠가 화면 밖으로 넘친다(${JSON.stringify(tabShell)})`);
       assert.ok(bookRow.tabFont >= 12, `${theme}: 갈라짐 띠 글자가 ${bookRow.tabFont}px다(12px 이상)`);
 
       // 머리줄: 보이는 단추가 전부 화면 안(오른쪽 여백 8px 이상)이고 도구 줄이 잘리지 않는다.

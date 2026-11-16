@@ -371,7 +371,9 @@ test('#635 화면: 첫 화면 어떻게 쓰나요 → 안내 패널이 열리고
           const h2 = d.querySelector('h2').getBoundingClientRect();
           const list = d.querySelector('.guide-list').getBoundingClientRect();
           const btns = [...d.querySelectorAll('.detail-buttons button')];
-          const last = btns[btns.length - 1].getBoundingClientRect();
+          // 처리방침·약관 줄이 단추 아래에 추가됐다 — 아래 여백은 마지막 내용(그 줄)에서 잰다.
+          const policy = d.querySelector('.guide-policy');
+          const last = (policy && policy.getBoundingClientRect().height > 0 ? policy : btns[btns.length - 1]).getBoundingClientRect();
           const active = r.activeElement;
           return {
             top: Math.round(h2.top - db.top), left: Math.round(list.left - db.left), right: Math.round(db.right - list.right), bottom: Math.round(db.bottom - last.bottom),
@@ -566,15 +568,27 @@ test('#635 PR C 화면: 메뉴 시작 입구·첫날 표기·크게 보기 대�
       for (const theme of ['night', 'garden']) {
         const height = width === 390 ? 844 : 900;
 
-        // 11-책. 책 아래쪽: 책 테두리와 고정 링크 줄 사이가 16px 이상·겹침 0. 9·10. 첫날 표기와 '크게 보기' 대비.
+        // 11-책. 390에서는 아래 링크 줄을 숨겨 책과 겹치지 않게 하고, 1440에서는 책과 링크 줄 사이 16px 이상·겹침 0.
+        // 9·10. 첫날 표기와 '크게 보기' 대비.
         {
           const { context, page, frame, problems } = await openShell(browser, base, '#book', { width, height, theme });
           assert.equal(problems.length, 0, `책 ${width}·${theme}: 화면 오류 ${problems.join(' | ')}`);
-          const linksTop = await page.evaluate(() => { const l = document.querySelector('.home-links')?.getBoundingClientRect(); return l ? Math.round(l.top) : null; });
           const bookBox = await frame.locator(width === 390 ? '.mobile-page' : '.book-wrap').first().boundingBox();
-          assert.ok(bookBox && linksTop !== null, `${width}·${theme}: 책·링크 줄 자리를 못 읽었다`);
-          const spacing = Math.round(linksTop - (bookBox.y + bookBox.height));
-          assert.ok(spacing >= 16, `${width}·${theme}: 책과 링크 줄 사이가 ${spacing}px다(16px 이상)`);
+          assert.ok(bookBox, `${width}·${theme}: 책 자리를 못 읽었다`);
+          if (width === 390) {
+            const hidden = await page.evaluate(() => {
+              const el = document.querySelector('.home-links');
+              if (!el) return true;
+              const cs = getComputedStyle(el);
+              return cs.display === 'none' || cs.visibility === 'hidden' || el.getBoundingClientRect().height === 0;
+            });
+            assert.ok(hidden, `${width}·${theme}: 책 화면에 아래 링크 줄이 보인다`);
+          } else {
+            const linksTop = await page.evaluate(() => { const l = document.querySelector('.home-links')?.getBoundingClientRect(); return l ? Math.round(l.top) : null; });
+            assert.ok(linksTop !== null, `${width}·${theme}: 링크 줄 자리를 못 읽었다`);
+            const spacing = Math.round(linksTop - (bookBox.y + bookBox.height));
+            assert.ok(spacing >= 16, `${width}·${theme}: 책과 링크 줄 사이가 ${spacing}px다(16px 이상)`);
+          }
           await shot(page, `book-after-${width}-${theme}`);
           await frame.click('#overviewBtn');
           await frame.waitForFunction(() => (document.querySelector('#journeySummary')?.textContent || '').length > 0, null, { timeout: 8000 });
