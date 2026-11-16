@@ -174,3 +174,16 @@ test('공지·로그인 만료 안내는 설정 상태 줄 한 벌을 쓴다', (
   assert.match(notice, /if \(\$\('account-settings'\)\?\.open\) \$\('toast'\)\.hidden = true;/);
   assert.doesNotMatch(auth, /record-feedback/);
 });
+
+// 개인정보 처리방침·이용약관 링크(2026-11-16): 설정 창 맨 아래에 같은 두 링크가 있다.
+// 새 창(target=_blank, rel=noopener)으로 열고, 처리방침은 공용 로그인 처리방침의 러브트리 절(#lovetree)로 바로 간다.
+test('설정 창 맨 아래에 처리방침·약관 링크가 있다(새 창, 러브트리 절, 누름 영역 44px)', () => {
+  const policy = settings.slice(settings.indexOf('id="account-settings-policy"'));
+  assert.ok(policy.includes('id="account-settings-policy"'), '설정 창 안에 처리방침 묶음이 있다');
+  assert.match(policy, /<a class="feedback-link policy-link" href="https:\/\/auth\.padiem\.net\/privacy#lovetree" target="_blank" rel="noopener">개인정보 처리방침<\/a>/);
+  assert.match(policy, /<a class="feedback-link policy-link" href="https:\/\/auth\.padiem\.net\/terms" target="_blank" rel="noopener">이용약관<\/a>/);
+  // 처리방침 묶음은 설정 창(</dialog>) 안의 마지막 묶음이다.
+  assert.ok(settings.indexOf('account-settings-policy') > settings.indexOf('id="account-settings-updates"'), '새 소식 묶음 뒤(맨 아래)에 있다');
+  // 누름 영역 44px.
+  assert.match(css, /\.settings-policy \.policy-link\{min-height:44px/);
+});

@@ -125,3 +125,11 @@ test('첫 화면 가운데 버튼 폭(대표 2026-11-13): 두 개여도 늘어�
   // 보이는 버튼 수를 표시한다.
   assert.match(home, /setAttribute\('data-count',String\(centerButtons\.filter\(b=>!b\.hidden/);
 });
+
+// 처리방침·약관 링크(2026-11-16): 첫 화면 '어떻게 쓰나요' 안내 패널 아래에도 같은 두 링크가 있다.
+// 새 창(target=_blank, rel=noopener)으로 열고, 처리방침은 공용 로그인 처리방침의 러브트리 절(#lovetree)로 바로 간다.
+test('첫 화면 안내 패널에 처리방침·약관 링크가 있다(새 창, 러브트리 절)', () => {
+  assert.match(homeSrc, /<div class="guide-policy"><a href="https:\/\/auth\.padiem\.net\/privacy#lovetree" target="_blank" rel="noopener">개인정보 처리방침<\/a><a href="https:\/\/auth\.padiem\.net\/terms" target="_blank" rel="noopener">이용약관<\/a><\/div>/);
+  // 누름 영역 44px.
+  assert.match(homeSrc, /#guidePanel \.guide-policy a\{min-height:44px/);
+});
