@@ -552,8 +552,11 @@ html[data-lt-theme="garden"] #account-advanced[aria-checked="true"]:after{backgr
 .eras[hidden]{display:none!important}
 .eras-summary{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:44px;padding:0 2px;color:var(--lt-gold);font-size:14px;letter-spacing:.02em;cursor:pointer;list-style:none}
 .eras-summary::-webkit-details-marker{display:none}
-.eras-summary::after{content:'+';font-size:16px;line-height:1;color:var(--lt-gold)}
-.eras[open] .eras-summary::after{content:'2'}
+.eras-summary-label{flex:1 1 auto;min-width:0}
+.eras-summary-state{flex:0 0 auto;font-size:13px;line-height:1;color:var(--lt-gold)}
+.eras-caret-open{display:none}
+.eras[open] .eras-caret-open{display:inline}
+.eras[open] .eras-caret-closed{display:none}
 .eras-summary:focus-visible{outline:2px solid var(--lt-gold-line);outline-offset:2px;border-radius:6px}
 .eras-list{list-style:none;margin:12px 0 0;padding:0;display:grid;gap:10px}
 .eras-card{position:relative;margin:0;padding:12px 14px 12px 54px;border:1px solid var(--lt-line);border-radius:var(--lt-r-card);background:var(--lt-glass);overflow-wrap:anywhere}

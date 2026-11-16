@@ -170,11 +170,14 @@ test('261116: 4.1.2·4.1.1은 4.1.3 아래·4.1.0 위에 문구 그대로 들어
   assert.ok(at('4.1.3') < at('4.1.2'), '4.1.2는 4.1.3 아래');
   assert.ok(at('4.1.2') < at('4.1.1'), '4.1.1은 4.1.2 아래');
   assert.ok(at('4.1.1') < at('4.1.0'), '4.1.1은 4.1.0 위');
+  // 261116 대표 손질: 4.1.2의 '보드에서 순간 날짜' 줄은 4.1.3과 겹쳐 지웠다 — 새로워진 것 1줄 + 고친 것 1줄.
   assert.deepEqual(UPDATES.find(e => e.version === '4.1.2').items.map(i => i.text), [
     '지도에서 새 순간이 앞 순간과 저절로 이어지고, 점마다 이름이 보여요',
-    '보드에서 순간 날짜를 바로 바꿀 수 있어요',
     '핀보드에서 사진 위를 잡아도 카드가 끌려요. 좁은 화면에서 머리글이 겹치지 않아요'
   ]);
+  const dup = UPDATES.find(e => e.version === '4.1.3').items.map(i => i.text).filter(t => t.includes('순간 날짜'));
+  assert.ok(dup.length >= 1, '4.1.3에 순간 날짜 줄이 있다(4.1.2에서 지운 이유)');
+  assert.equal(UPDATES.find(e => e.version === '4.1.2').items.filter(i => i.text.includes('순간 날짜')).length, 0, '4.1.2에는 같은 줄이 남지 않는다');
   assert.deepEqual(UPDATES.find(e => e.version === '4.1.1').items.map(i => i.text), [
     '보드가 핀보드로 바뀌었어요. 카드를 끌어 원하는 자리에 꽂고, 날짜순과 내 배치를 오갈 수 있어요',
     '첫 트리를 만들면 바로 이름을 바꿀 수 있어요',

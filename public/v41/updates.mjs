@@ -238,6 +238,13 @@ export function mountUpdates({ $, showPanel, fetchJson, fetchEras, storage, onDo
     return target;
   }
 
+  // '걸어온 길' 제목 줄은 접기/펴기 단추다 — 화면 읽기 프로그램에도 열림 상태를 알린다(aria-expanded).
+  const erasBox = $('eras');
+  erasBox?.addEventListener?.('toggle', () => {
+    const summary = erasBox.querySelector?.('.eras-summary');
+    if (summary) summary.setAttribute('aria-expanded', erasBox.open ? 'true' : 'false');
+  });
+
   $('updates-view')?.addEventListener?.('click', () => { void openUpdates(); });
   $('updates-dismiss')?.addEventListener?.('click', async () => {
     const list = await ensure();

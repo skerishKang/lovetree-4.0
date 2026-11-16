@@ -34,7 +34,7 @@ function hostHtml() {
 <div class="home-links"><button type="button" id="updates-link" class="feedback-link">새 소식</button></div>
 <dialog id="updates-panel" data-lt-panel="full" aria-labelledby="updates-title"><div class="panel-heading"><div><span class="eyebrow">새 소식</span><h2 id="updates-title">새 소식</h2></div><button type="button" id="updates-close" class="close" aria-label="새 소식 닫기">×</button></div>
 <div id="updates-list" class="updates-list"></div>
-<details id="eras" class="eras" hidden><summary class="eras-summary"><span>러브트리가 걸어온 길</span></summary><ol id="eras-list" class="eras-list"></ol></details>
+<details id="eras" class="eras" hidden><summary class="eras-summary" aria-expanded="false"><span class="eras-summary-label">러브트리가 걸어온 길</span><span class="eras-summary-state" aria-hidden="true"><span class="eras-caret-closed">▾</span><span class="eras-caret-open">▴</span></span></summary><ol id="eras-list" class="eras-list"></ol></details>
 <div class="updates-foot"><button type="button" id="updates-foot-close">닫기</button></div></dialog>
 <script type="module">
 import { mountUpdates } from '/v41/updates.mjs';
@@ -233,7 +233,8 @@ test('261116 실행: 4.1.2·4.1.1이 4.1.3 아래에 보이고, 걸어온 길은
         assert.ok(at('4.1.3') >= 0 && at('4.1.0') >= 0, `${width}/${theme}: 옛 판이 함께 보인다`);
         assert.ok(at('4.1.3') < at('4.1.2') && at('4.1.2') < at('4.1.1') && at('4.1.1') < at('4.1.0'), `${width}/${theme}: 4.1.3 → 4.1.2 → 4.1.1 → 4.1.0 순서(${versions.join(',')})`);
         const restored = await page.evaluate(() => ['4.1.2', '4.1.1'].map(v => document.querySelector(`[data-updates-version="${v}"]`)?.innerText || ''));
-        assert.match(restored[0], /보드에서 순간 날짜를 바로 바꿀 수 있어요/, '4.1.2 문구');
+        assert.match(restored[0], /지도에서 새 순간이 앞 순간과 저절로 이어지고/, '4.1.2 문구');
+        assert.doesNotMatch(restored[0], /보드에서 순간 날짜를 바로 바꿀 수 있어요/, '4.1.2에서 겹치는 줄을 지웠다(4.1.3에 있다)');
         assert.match(restored[1], /보드가 핀보드로 바뀌었어요/, '4.1.1 문구');
 
         // ② 구획은 처음엔 접힘 — 카드는 아직 안 보이고 제목만 있다.
@@ -242,12 +243,14 @@ test('261116 실행: 4.1.2·4.1.1이 4.1.3 아래에 보이고, 걸어온 길은
           const cards = document.querySelectorAll('#eras-list .eras-card');
           const summary = box.querySelector('.eras-summary');
           const r = summary.getBoundingClientRect();
-          return { open: box.open, hidden: box.hidden, cards: cards.length, label: summary.textContent.trim(), height: Math.round(r.height) };
+          return { open: box.open, hidden: box.hidden, cards: cards.length, label: summary.textContent.replace(/\s+/g, ' ').trim(), height: Math.round(r.height), expanded: summary.getAttribute('aria-expanded'), labelWidth: Math.round(r.width), boxWidth: Math.round(box.getBoundingClientRect().width) };
         });
         assert.equal(collapsed.open, false, `${width}/${theme}: 처음엔 접힘`);
         assert.equal(collapsed.hidden, false, `${width}/${theme}: 자료를 읽었으면 구획이 보인다`);
         assert.equal(collapsed.cards, ERAS.length, `${width}/${theme}: 카드 ${ERAS.length}장`);
-        assert.equal(collapsed.label, '러브트리가 걸어온 길', '구획 이름');
+        assert.equal(collapsed.label.replace('▾', '').replace('▴', '').trim(), '러브트리가 걸어온 길', `구획 이름(${collapsed.label})`);
+        assert.doesNotMatch(collapsed.label, /[0-9]/, '제목 줄에 숫자가 남지 않는다(깨진 기호 제거)');
+        assert.equal(collapsed.expanded, 'false', '접힌 상태를 aria-expanded로 알린다');
         assert.ok(collapsed.height >= 40, `${width}/${theme}: 접힌 줄 누름 영역 ${collapsed.height}px`);
 
         // ③ 펼치면 세대 카드가 옛것 → 지금, 마지막 한 장만 금테.
@@ -268,6 +271,16 @@ test('261116 실행: 4.1.2·4.1.1이 4.1.3 아래에 보이고, 걸어온 길은
             text: document.getElementById('eras-list').innerText
           };
         });
+        await page.waitForFunction(() => document.querySelector('#eras .eras-summary')?.getAttribute('aria-expanded') === 'true', null, { timeout: 3000 });
+        const expandedState = await page.evaluate(() => {
+          const box = document.getElementById('eras');
+          const summary = box.querySelector('.eras-summary');
+          return { expanded: summary.getAttribute('aria-expanded'), summaryWidth: Math.round(summary.getBoundingClientRect().width), boxWidth: Math.round(box.getBoundingClientRect().width), caret: summary.querySelector('.eras-caret-open') ? getComputedStyle(summary.querySelector('.eras-caret-open')).display : null, caretClosed: summary.querySelector('.eras-caret-closed') ? getComputedStyle(summary.querySelector('.eras-caret-closed')).display : null };
+        });
+        assert.equal(expandedState.expanded, 'true', `${width}/${theme}: 펼치면 aria-expanded=true`);
+        assert.ok(expandedState.summaryWidth >= expandedState.boxWidth - 2, `${width}/${theme}: 제목 줄 전체가 누름 영역이다(${expandedState.summaryWidth}/${expandedState.boxWidth})`);
+        assert.notEqual(expandedState.caret, 'none', '펼치면 ▴가 보인다');
+        assert.equal(expandedState.caretClosed, 'none', '펼치면 ▾는 숨는다');
         assert.deepEqual(opened.marks, ERAS.map(e => e.mark), `${width}/${theme}: 번호 순서`);
         assert.deepEqual(opened.names, ERAS.map(e => e.name), `${width}/${theme}: 이름 순서(옛것 → 지금)`);
         assert.deepEqual(opened.current, ['러브트리 4.1'], `${width}/${theme}: 금테는 지금 카드 한 장`);
