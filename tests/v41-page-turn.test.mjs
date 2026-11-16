@@ -74,36 +74,20 @@ test('기억책: 넘김 판정은 움직임 줄이기가 우선이고, 고른 �
   assert.match(read('public/v41/views/book/book-extra.js'), /type!=='lt41-page-turn'/);
 });
 
-test('설정 항목마다 저장 위치 표시가 있다(계정에 저장 / 이 기기에만)', () => {
-  // 실제 저장 위치와 일치하는지 — 코드 기준: 테마·움직임·카드·탭·페이지 넘김은 기기, 제목 보기·프로필은 계정.
+test('설정 항목의 저장 위치: 코드는 그대로고, 줄 표시는 탭 맨 아래 한 줄로 모았다(2026-11-16)', () => {
+  // 실제 저장 위치와 일치하는지 — 코드 기준: 테마·움직임·카드·탭·페이지 넘김은 기기, 제목 보기·프로필은 계정. 저장 키·방식은 바뀌지 않았다.
   assert.match(shell, /writeTheme\(localStorage,b\.dataset\.setTheme\)/, '테마는 이 기기');
   assert.match(shell, /member\.apply\('setPrefs',\{titleDisplay:value\}\)/, '제목 보기는 계정');
   assert.match(shell, /localStorage\.setItem\('lt41\.homeCards'/, '첫 화면 카드는 이 기기');
   assert.match(shell, /writeWriteTab\(localStorage,b\.dataset\.writeTab\)/, '먼저 보일 탭은 이 기기');
   assert.match(shell, /writePageTurn\(localStorage/, '페이지 넘김은 이 기기');
   assert.match(shell, /member\.apply\('setPrefs',patch\)/, '프로필은 계정');
-  // 표시: 제목 보기·프로필 행은 "계정에 저장", 나머지 설정 행은 "이 기기에만". 여섯 행 모두 표시가 있다.
-  const rows = [...html.matchAll(/<div class="settings-row"[\s\S]*?class="settings-scope">([^<]+)<\/span>/g)]
-    .map(m => `${m[0]}|${m[1]}`);
-  // 계정에 저장: 제목 보기·날짜 표기·처음 보여 줄 곳·프로필(이름·색)·공유 처음 열 보기. 나머지는 이 기기에만.
-  const accountRows = rows.filter(r => r.endsWith('|계정에 저장'));
-  assert.equal(accountRows.length, 6, '계정에 저장 6행(제목·날짜·처음·이름·색·공유)');
-  for (const frag of ['data-title-display', 'data-date-style', 'data-start-place', 'id="profile-name"', 'id="profile-color"', 'data-share-view', 'data-share-private-lock']) {
-    assert.ok(rows.some(r => r.includes(frag)), `행이 있어야 한다: ${frag}`);
-  }
-  assert.ok(rows.some(r => r.includes('data-date-style') && r.endsWith('|계정에 저장')), '날짜 표기는 계정에 저장');
-  assert.ok(rows.some(r => r.includes('data-start-place') && r.endsWith('|계정에 저장')), '처음 보여 줄 곳은 계정에 저장');
-  assert.ok(rows.some(r => r.includes('data-network-view') && r.endsWith('|이 기기에만')), '관계 지도 기본 보기는 이 기기에만');
-  assert.ok(rows.some(r => r.includes('data-quick-target') && r.endsWith('|이 기기에만')), '쉬운 추가로 담을 곳은 이 기기에만');
-  assert.ok(rows.some(r => r.includes('data-board-theme') && r.endsWith('|이 기기에만')), '보드 판은 이 기기에만');
-  assert.ok(rows.some(r => r.includes('data-share-private-lock') && r.endsWith('|전 트리 공개')), '#538: 트리 공개 행은 전 트리 공개 표시');
-  // 프로필 2 + 화면 8(테마·보드 판·움직임·제목·페이지 넘김·날짜·처음·카드) + 보기 2(관계 지도·쉬운 추가로 담을 곳) + 공유 2 + 순간 추가 1 = 15행.
-  assert.equal(rows.length, 15, '열다섯 설정 행마다 표시가 있다');
-  for (const row of rows) {
-    const isAccount = /data-title-display=/.test(row) || /id="profile-name"/.test(row) || /id="profile-color"/.test(row)
-      || /data-date-style=/.test(row) || /data-start-place=/.test(row) || /data-share-view=/.test(row);
-    const want = isAccount ? '계정에 저장' : (/data-share-private-lock/.test(row) ? '전 트리 공개' : '이 기기에만');
-    assert.ok(row.endsWith('|' + want), `저장 위치 표시(${want}): ${row.slice(0, 70)}…`);
-  }
+  // 줄마다 붙던 '이 기기에만 / 계정에 저장' 표시는 없다 — '전 트리 공개'는 저장 위치가 아니라 상태 표시라 남는다.
+  const rows = [...html.matchAll(/class="settings-scope">([^<]+)<\/span>/g)].map(m => m[1]);
+  assert.deepEqual(rows, ['전 트리 공개'], '줄 표시는 전 트리 공개 하나만 남는다');
+  // 대신 탭마다 한 줄 설명에 모았다.
+  assert.match(html, /id="settings-screen-note" class="panel-note">테마·움직임·보드·지도 판·관계 지도 보기·페이지 넘김·첫 화면 카드·고급 기능 보기는 이 기기에만 저장되고, 제목 보기·날짜 표기·처음 보여 줄 곳은 계정에 저장됩니다/);
+  assert.match(html, /표시 이름·동그라미 색은 계정에 저장됩니다/);
+  assert.match(html, /쉬운 추가로 담을 곳·먼저 보일 탭은 이 기기에만 저장되고, 공유 창 처음 열 보기는 계정에 저장됩니다/);
   assert.match(css, /\.settings-scope\{margin-left:auto;flex:0 0 auto;font-size:12px;color:var\(--lt-muted\);white-space:nowrap\}/, '#548: 부수 글자 12px');
 });

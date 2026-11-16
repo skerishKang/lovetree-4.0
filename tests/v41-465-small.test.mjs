@@ -40,11 +40,13 @@ test('#465 2: 설정 "움직임"은 켬/끔 스위치(role=switch)와 설명 한
   assert.match(read('public/v41/shell.css'), /\.settings-choice button\[role=switch\]\{min-width:76px;justify-content:center\}/);
 });
 
-test('#465 3: 계정 메뉴 "고급 기능 보기"에 무엇이 달라지는지 한 줄 설명이 있다', () => {
+test('#465 3: "고급 기능 보기"에 무엇이 달라지는지 한 줄 설명이 있다(2026-11-16: 계정 메뉴 → 설정 화면 탭 더 보기(고급))', () => {
   const html = read('public/v41/index.html');
-  assert.match(html, /id="account-advanced" aria-checked="false"><span class="account-item-text">고급 기능 보기<\/span><span class="account-item-desc">보드에서 편집 도구·되돌리기·이어 그리기가 늘어나요<\/span>/);
-  // #666: 11px → 12px(작은 글자 0 기준선 #548에 맞춤). 스위치와 나란히 서지 않고 아래 한 줄로 내려간다.
-  assert.match(read('public/v41/shell.css'), /\.account-popover \.account-item-desc\{display:block;font-size:12px/);
+  // 스위치는 설정 '화면' 탭의 더 보기(고급) 안에 있고, 켬/끔 글자로 상태가 보인다(#465 2의 role=switch 규칙과 같다).
+  assert.match(html, /id="settings-advanced" aria-checked="false" aria-describedby="settings-advanced-desc">끔</);
+  assert.match(html, /id="settings-advanced-desc">보드에서 편집 도구·되돌리기·이어 그리기가 늘어나요/);
+  // 설명 글은 13px panel-note(#548 작은 글자 0 기준선)이고, 계정 메뉴에는 이제 스위치가 없다.
+  assert.doesNotMatch(html, /id="account-advanced"/);
   // 설명 내용은 실제 고급 모드가 여는 것과 일치한다(보드 편집 도구·이어 그리기).
   assert.match(read('public/v41/views/board/board-extra.css'), /lt-advanced/);
 });

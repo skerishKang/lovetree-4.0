@@ -556,9 +556,8 @@ test('이슈 644 화면(390·정원): 충돌 띠가 좁은 화면에서 넘치�
   } finally { await browser.close(); server.close(); }
 });
 
-// #666: '고급 기능 보기' 스위치 — 예전에는 28×16px 회색 막대라 누르기 어렵고 켜짐·꺼짐이 잘 안 보였다.
-// 지금은 누를 자리(단추) 44px 이상, 켜짐·꺼짐이 색과 손잡이 자리로 함께 갈리고, 대비가 3:1을 넘는다.
-// 설명 글은 스위치와 나란히 서지 않고 아래 한 줄로 내려가며 12px 이상이다.
+// #666 + 2026-11-16: '고급 기능 보기' 스위치는 계정 메뉴에서 설정 '화면' 탭의 더 보기(고급) 접힘 안으로 옮겨졌다.
+// 누르는 규칙은 설정 줄의 다른 스위치(움직임, #465 2)와 같다 — role=switch · 끔/켬 글자 · 켜짐 색으로 상태가 갈린다.
 const SWITCH_CONTRAST = `(() => {
   const parse = (c) => { const m = String(c).match(/rgba?\(([^)]+)\)/); if (!m) return null; const p = m[1].split(',').map(Number); return { r: p[0], g: p[1], b: p[2], a: p.length > 3 ? p[3] : 1 }; };
   const over = (fg, bg) => ({ r: fg.r * fg.a + bg.r * (1 - fg.a), g: fg.g * fg.a + bg.g * (1 - fg.a), b: fg.b * fg.a + bg.b * (1 - fg.a), a: 1 });
@@ -571,7 +570,7 @@ const SWITCH_CONTRAST = `(() => {
   };
 })()`;
 
-test('이슈 666 화면: 고급 기능 스위치 — 누를 자리 44px, 켜짐·꺼짐이 색·자리로 갈리고 대비 3:1 이상, 설명은 스위치 아래 한 줄 12px', { skip: REQUIRE_644 ? false : skip644, timeout: 300000 }, async () => {
+test('이슈 666 화면: 고급 기능 스위치 — 설정 화면 탭 더 보기(고급) 안에서 끔·켬 글자와 색으로 갈리고 대비 3:1 이상, 설명은 스위치 아래 한 줄 12px', { skip: REQUIRE_644 ? false : skip644, timeout: 300000 }, async () => {
   if (skip644) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip644}`);
   const { server } = await serve644();
   const base = `http://127.0.0.1:${server.address().port}`;
@@ -585,67 +584,69 @@ test('이슈 666 화면: 고급 기능 스위치 — 누를 자리 44px, 켜짐�
         const page = await context.newPage();
         await page.goto(`${base}/v41/?account=1`, { waitUntil: 'load' });
         await waitSynced644(page);
-        // 실제 길로 연다 — 계정 동그라미를 눌러 메뉴를 펼친다.
+        // 실제 길로 연다 — 계정 동그라미 → 메뉴 → 설정. 스위치는 화면 탭의 '더 보기(고급)' 접힘 안에 있다(2026-11-16 이동).
         await page.click('#account-avatar');
         await page.waitForFunction(() => !document.getElementById('account-popover')?.hidden, null, { timeout: 8000 });
-        await wait644(250);
+        await page.click('#account-open-settings');
+        await page.waitForFunction(() => document.getElementById('account-settings')?.open, null, { timeout: 8000 });
+        assert.equal(await page.evaluate(() => document.getElementById('settings-tab-screen')?.getAttribute('aria-selected')), 'true', `${width}·${theme} 설정은 화면 탭에서 열린다`);
+        await page.click('#account-settings-screen-more > summary');
+        await page.waitForFunction(() => document.getElementById('account-settings-screen-more')?.open, null, { timeout: 8000 });
 
         const read = () => page.evaluate(`${SWITCH_CONTRAST}`).then(() => page.evaluate(() => {
-          const btn = document.getElementById('account-advanced');
-          const track = getComputedStyle(btn, '::after');
-          const desc = btn.querySelector('.account-item-desc');
-          const label = btn.querySelector('.account-item-text');
+          const btn = document.getElementById('settings-advanced');
+          const desc = document.getElementById('settings-advanced-desc');
+          const row = btn.closest('.settings-row');
           const br = btn.getBoundingClientRect();
           const dr = desc.getBoundingClientRect();
-          const lr = label.getBoundingClientRect();
-          const pop = document.getElementById('account-popover');
-          const baseBg = getComputedStyle(document.body).backgroundColor;
+          const rr = row.getBoundingClientRect();
+          const dlg = document.getElementById('account-settings');
+          const st = getComputedStyle(btn);
           return {
             checked: btn.getAttribute('aria-checked'),
+            text: btn.textContent,
             advanced: document.body.classList.contains('lt-advanced'),
-            button: { w: Math.round(br.width), h: Math.round(br.height), left: Math.round(br.left), top: Math.round(br.top) },
-            track: { w: Number.parseFloat(track.width), h: Number.parseFloat(track.height), color: track.backgroundColor, position: track.backgroundPosition, knob: /radial-gradient/.test(track.backgroundImage) },
-            label: { bottom: Math.round(lr.bottom) },
-            desc: { px: Number.parseFloat(getComputedStyle(desc).fontSize), top: Math.round(dr.top), left: Math.round(dr.left), width: Math.round(dr.width), color: getComputedStyle(desc).color },
-            popBg: getComputedStyle(pop).backgroundColor,
-            baseBg
+            button: { w: Math.round(br.width), h: Math.round(br.height) },
+            color: st.color, bg: st.backgroundColor,
+            desc: { px: Number.parseFloat(getComputedStyle(desc).fontSize), top: Math.round(dr.top) },
+            rowBottom: Math.round(rr.bottom),
+            dlgBg: getComputedStyle(dlg).backgroundColor,
+            bodyBg: getComputedStyle(document.body).backgroundColor
           };
         }));
 
         const off = await read();
-        // 꺼짐: 단추(누를 자리) 44px 이상 · 스위치 44×26 · 손잡이 있음 · 설명은 아래 줄 12px
-        assert.ok(off.button.h >= 44, `${width}·${theme} 스위치 단추 높이 44px 이상(${off.button.h}px)`);
+        // 꺼짐: 설정 줄 스위치 규칙(#465 2 role=switch — 움직임 스위치와 같은 모양) · 끔 글자 · 몸통에 lt-advanced 없음.
+        assert.ok(off.button.h >= 34, `${width}·${theme} 스위치 단추 높이 34px 이상(${off.button.h}px)`);
         assert.equal(off.checked, 'false', `${width}·${theme} 처음은 꺼짐`);
+        assert.equal(off.text, '끔', `${width}·${theme} 꺼짐 글자는 끔`);
         assert.equal(off.advanced, false, '몸통에 lt-advanced가 없다');
-        assert.equal(off.track.w, 44, '스위치 폭 44px');
-        assert.equal(off.track.h, 26, '스위치 높이 26px');
-        assert.equal(off.track.knob, true, '손잡이(흰 동그라미)가 그려진다');
-        assert.equal(off.label.bottom < off.desc.top, true, '설명 글은 스위치 줄 아래에 놓인다');
+        assert.equal(off.desc.top >= off.rowBottom, true, '설명 글은 스위치 줄 아래에 놓인다');
         assert.ok(off.desc.px >= 12, `설명 글 12px 이상(${off.desc.px}px)`);
 
-        await page.click('#account-advanced');
+        await page.click('#settings-advanced');
         await wait644(250);
         const on = await read();
-        // 켜짐: 색과 손잡이 자리가 함께 바뀐다.
+        // 켜짐: 글자·색·몸통이 함께 바뀐다.
         assert.equal(on.checked, 'true', `${width}·${theme} 누르면 켜짐`);
+        assert.equal(on.text, '켬', `${width}·${theme} 켜짐 글자는 켬`);
         assert.equal(on.advanced, true, '몸통에 lt-advanced가 붙는다');
-        assert.notEqual(on.track.color, off.track.color, `켜짐·꺼짐 색이 다르다(${off.track.color} → ${on.track.color})`);
-        assert.notEqual(on.track.position, off.track.position, `손잡이 자리가 다르다(${off.track.position} → ${on.track.position})`);
+        assert.notEqual(on.bg, off.bg, `켜짐·꺼짐 색이 다르다(${off.bg} → ${on.bg})`);
         assert.equal(on.button.h, off.button.h, '켜져도 누를 자리 크기는 그대로다');
 
-        // 대비 3:1 — 스위치(트랙) 색 대 메뉴 판 바탕(반투명이면 몸통 바탕 위에 얹어 계산).
-        const ratios = await page.evaluate(({ colors, popBg, baseBg }) => {
+        // 대비 3:1 — 스위치 글자 대 스위치 바탕(반투명이면 설정 창 바탕 위에 얹어 계산).
+        const ratios = await page.evaluate(({ colors, dlgBg, bodyBg }) => {
           const f = (() => {
             const parse = (c) => { const m = String(c).match(/rgba?\(([^)]+)\)/); if (!m) return null; const p = m[1].split(',').map(Number); return { r: p[0], g: p[1], b: p[2], a: p.length > 3 ? p[3] : 1 }; };
             const over = (fg, bg) => ({ r: fg.r * fg.a + bg.r * (1 - fg.a), g: fg.g * fg.a + bg.g * (1 - fg.a), b: fg.b * fg.a + bg.b * (1 - fg.a), a: 1 });
             const lum = (c) => { const ch = (v) => { const x = v / 255; return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4; }; return 0.2126 * ch(c.r) + 0.7152 * ch(c.g) + 0.0722 * ch(c.b); };
             return (fg, bg, base2) => { const b = over(parse(bg), parse(base2) && parse(base2).a > 0 ? parse(base2) : { r: 0, g: 0, b: 0, a: 1 }); const fg2 = over(parse(fg), b); const [light, dark] = [lum(fg2), lum(b)].sort((x, y) => y - x); return (light + 0.05) / (dark + 0.05); };
           })();
-          return colors.map((c) => Number(f(c, popBg, baseBg).toFixed(2)));
-        }, { colors: [off.track.color, on.track.color], popBg: on.popBg, baseBg: on.baseBg });
-        assert.ok(ratios[0] >= 3, `${width}·${theme} 꺼짐 스위치 대비 3:1 이상(${ratios[0]}:1, ${off.track.color})`);
-        assert.ok(ratios[1] >= 3, `${width}·${theme} 켜짐 스위치 대비 3:1 이상(${ratios[1]}:1, ${on.track.color})`);
-        rows.push({ 크기: `${width}`, 테마: theme, 꺼짐: `${off.track.color} ${off.track.position} ${ratios[0]}:1`, 켜짐: `${on.track.color} ${on.track.position} ${ratios[1]}:1`, 단추높이: off.button.h });
+          return colors.map((c) => Number(f(c, dlgBg, bodyBg).toFixed(2)));
+        }, { colors: [off.color, on.color], dlgBg: on.dlgBg, bodyBg: on.bodyBg });
+        assert.ok(ratios[0] >= 3, `${width}·${theme} 꺼짐 스위치 대비 3:1 이상(${ratios[0]}:1, ${off.color})`);
+        assert.ok(ratios[1] >= 3, `${width}·${theme} 켜짐 스위치 대비 3:1 이상(${ratios[1]}:1, ${on.color})`);
+        rows.push({ 크기: `${width}`, 테마: theme, 꺼짐: `${off.text} ${off.color} ${ratios[0]}:1`, 켜짐: `${on.text} ${on.color} ${ratios[1]}:1`, 단추높이: off.button.h });
 
         if (width === 390 && theme === 'garden') await shot644(page, '666-advanced-switch-390-garden');
         if (width === 1440 && theme === 'night') await shot644(page, '666-advanced-switch-1440-night');

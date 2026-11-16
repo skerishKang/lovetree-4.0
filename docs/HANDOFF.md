@@ -1,5 +1,15 @@
 # LoveTree 4.0 — 핸드오프
 
+## 2026-11-16 — 계정 메뉴 정리 + 설정 탭 넷 (컴1로컬6 레인, ai/local6-account-menu-20261116-1 PR #772 · ai/local6-settings-tabs-20261116-2 PR #775, main d57616da 기준, 대표 지적 2026-11-16)
+
+- **계정 메뉴(#772)**: 고객 항목 순서 설정 · 새 소식 · 내 의견 · 어떻게 쓰나요 · 내 보관 파일(+고급 기능 보기 — #775에서 설정으로 옮김). 운영센터(관리자만)는 구분선 아래 '운영' 묶음(라벨 + 항목, #account-ops-group role=group)으로 로그아웃 바로 위에 내렸다. '어떻게 쓰나요'는 첫 화면 안내 패널(#635)을 프레임 메시지 `lt41-open-guide`로 연다(home.js 수신기, 이미 열려 있으면 무시) — 로그인 첫 화면에는 안내 단추 자리가 없어(2026-11-14 결정) 메뉴가 유일한 입구다. 셸은 첫 화면이 아니면 show('src064-orbit.html') 뒤 #guidePanel이 만들어질 때까지(최대 3초) 기다렸다 한 번 보낸다(openGuideFromMenu).
+- **id 중복 수리(대표 지적 원인)**: 탈퇴 상태 줄 `<p id="account-feedback">`가 메뉴 단추와 같은 id라 openAccountSettings의 `$('account-feedback').textContent=''`가 설정을 열 때마다 메뉴 단추 '의견 보내기' 글자를 지웠다(정원에서 '운영센터 아래 빈 칸'으로 보였던 것). 상태 줄 id → `account-delete-status`. '의견 보내기' 칸은 메뉴에서 빠지고 내 의견 창 안 #myposts-send로 갔다(같은 feedbackDialog 재사용 — 새 창 없음).
+- **정원 대비**: 알림 숫자 배지(.account-menu-count, --lt-rose × 흰 글자)가 정원에서 3.1:1 — garden 오버라이드(--lt-rose-ink × --lt-paper)로 5.7:1. 메뉴 항목은 밤·정원 모두 4.5:1 이상(수치 기록은 캡처 폴더 contrast-report.txt).
+- **설정 탭(#775)**: account-settings 안에 .settings-layout(좌측 세로 탭, ≤780px 가로 탭) + 탭 넷(화면·프로필·기록 보기·계정·개인정보). SETTINGS_TABS 한 벌(shell.mjs) — paintSettingsTab·좌우(위아래) 화살표·Home·End 이동. 기본/더 보기(고급) 접힘: 화면 더 보기 = 보드·지도 판·관계 지도 기본 보기·페이지 넘김·날짜 표기·제목·고급 기능 보기(메뉴에서 옮김 — #settings-advanced, 저장 키 lt41.advanced.<subject> 불변, applyAdvanced가 aria-checked와 켬/끔 글자를 같이 갱신); 기록 보기 더 보기 = 먼저 보일 탭·공유; 계정·개인정보 더 보기 = 내 데이터·새 소식·탈퇴. 운영 묶음은 접힘 밖 맨 아래(관리자만). focusSettingsSection 행선지(section:'data')는 해당 탭 활성화 + 접힘 펼침 + 제목 초점. 줄마다 '이 기기에만/계정에 저장' 표시는 지우고 탭 맨 아래 한 줄로 모았다('전 트리 공개'는 상태 표시라 유지). 옛 '보기 기본값' 묶음은 해체(관계 지도 보기 → 화면 더 보기, 쉬운 추가로 담을 곳 → 기록 보기 탭). settings-usage는 응답 값이 온전할 때만 채운다(반쪽 응답에 NaN·undefined 글자가 남던 빈틈).
+- **시험 갱신 위치(값·뜻 그대로, 줄 위치만)**: v41-account-settings(탭 구조·메뉴 순서·스위치 계약)·v41-shell-connections(account-advanced → settings-advanced 자리 교체, 40개 유지)·v41-465-small·v41-header-ia(브라우저 — 스위치를 설정 화면 탭에서 잰다)·v41-board-theme-flow·v41-cto-453-cde(C1)·v41-page-turn·v41-screen-defaults·v41-map-theme-flow(settingsPlate가 접힘을 펼치고 누른다 — CI 1차 빨강 원인, 재실행 수리 커밋 3808f5f).
+- **검증**: 전체 npm test 1894건 1747 pass·0 fail, build·modulepreload --check 통과, 화면 감사(dist 재빌드 후) 3/3 — KNOWN 추가 없음. 캡처: E:/lovetree-qa/local6/계정메뉴(11장·대비 기록)·E:/lovetree-qa/local6/설정탭(29장·check-report.txt) — 각각 열어 확인. updates.json 불변, 운영 DB·실계정 세션 사용 없음(가짜 API만).
+- **CI 흔들림 수리(261117 — 설정 탭과 무관한 검사기 흔들림)**: #775 CI의 '지도 도구 줄·판 흐름·책 이동' 잡이 #657 감사기 지도 왕복에서 `Cannot read properties of undefined (reading 'evaluate')`로 빨강 — 프레임 교체 창(보기 단추를 누른 직후)에 즉시 find()가 undefined를 돌려주는 검사기 타이밍 문제다. 같은 감사기가 homecard 레인 CI(run 43916454751)에서도 다른 자리(꼬리표 칩 실측 null)에서 튄 것이 실측돼 검사기 자체 흔들림으로 본다. 지도 왕복 프레임 찾기 4곳을 기다리는 frameOf(최대 20초·못 찾으면 단계 메시지)로 바꿨다. 로컬 감사는 컴1 부하(CPU 94~100%, 다른 레인 동시 작업)로 7회 중 3회 통과 — 4회 실패 자리가 매번 달랐고 전부 이 PR이 건드리지 않는 자리(칩 누름 영역·레거시 궤도 카드 겹침 둘·지도 프레임 20초 부재)라 시간 흔들림으로 판정, CI에 판정을 맡긴다.
+- **남은 것(261117 갱신)**: ㉠#772 병합됨(23b5229) — #775는 그 위로 rebase했고 index.html 메뉴 줄·shell.css·v41-account-settings 메뉴 시험 블록 충돌을 '고급 기능 보기'를 계정 메뉴에서 빼는 쪽(설정 화면 탭 스위치 settings-advanced만 남긴다)으로 풀었다. #775 병합도 대표가 직접 한다(자동 병합 없음). ㉑'첫 화면 카드' 줄은 화면 탭 기본에 그대로 — 첫 화면 단추로 옮기는 작업이 그 줄만 지우면 된다. '처음 보여 줄 곳'의 '내 트리 전체 보기' 글자는 이후 작업에서 '서재'로 바뀔 예정 — #775에서는 손대지 않았다.
 ## 2026-11-16 — 커밋·PR 문구 검사(도구 꼬리말·금지어 차단) 도입 (컴1로컬4 레인, PR #769, CTO 결정 2026-11-16)
 
 - **규칙**: PR 제목·본문·커밋 메시지에 어떤 도구로 만들었는지·누가 만들었는지를 남기지 않는다. 도구가 자동으로 붙이는 작성자 꼬리말 줄도 squash 병합 메시지에서 지운다. 이미 들어간 기록은 다시 쓰지 않는다(새 커밋·새 PR부터).
@@ -10,6 +20,7 @@
 - **이력**: 브랜치 앞 커밋에 목록이 들어 있어 브랜치 이력을 한 커밋으로 다시 썼다(force-with-lease, 내 브랜치만 — main 이력 무변경).
 - **비밀값 등록**: 2026-11-16 13:16Z `gh secret set`(값은 화면·로그에 남기지 않음), `gh secret list`로 이름·갱신 시각만 확인.
 - **남은 것**: 필수 검사 지정(branch protection)은 **하지 않았다** — 며칠 오탐을 보고 정한다.
+
 
 ## 2026-11-16 — 운영센터 고객 정보 전부 보기 (컴1로컬4 레인, ai/com1-admin-customer-info-20261116-2, main db6c66c, PR #762, 대표 결정 2026-11-16)
 

@@ -906,13 +906,14 @@ $('account-avatar').onclick=e=>{
 const $on=(id,fn)=>{const el=$(id);if(el)el.onclick=fn;};
 function advancedKey(){try{return 'lt41.advanced.'+(member?.snapshot().subject||'')}catch{return 'lt41.advanced.'}}
 function readAdvanced(){try{return localStorage.getItem(advancedKey())==='1'}catch{return false}}
-function applyAdvanced(){const on=readAdvanced();document.body.classList.toggle('lt-advanced',on);$('account-advanced')?.setAttribute('aria-checked',String(on));try{$('view').contentWindow.postMessage({type:'lt41-advanced',value:on},location.origin)}catch{}}
+function applyAdvanced(){const on=readAdvanced();document.body.classList.toggle('lt-advanced',on);const sw=$('settings-advanced');if(sw){sw.setAttribute('aria-checked',String(on));sw.textContent=on?'켬':'끔';}try{$('view').contentWindow.postMessage({type:'lt41-advanced',value:on},location.origin)}catch{}}
  $('account-assets-open').onclick=()=>{closeAccountMenu();openAssets($('account-avatar'));};
 // #368: 설정 "내 데이터"의 내 보관 파일 열기. 창 위에 보관 파일 창이 열리고 닫으면 이 버튼으로 초점이 돌아온다.
 $('settings-assets-open').onclick=()=>openAssets($('settings-assets-open'));
  $('editor-assets-open').onclick=()=>openAssets($('editor-assets-open'));
  for(const b of document.querySelectorAll('[data-set-theme]'))b.onclick=()=>{writeTheme(localStorage,b.dataset.setTheme);applyTheme();paintThemeControls();};
- $('account-advanced').onclick=()=>{const next=!readAdvanced();try{localStorage.setItem(advancedKey(),next?'1':'0')}catch{}applyAdvanced();};
+ // 고급 기능 보기 스위치는 설정 '화면' 탭의 '더 보기(고급)' 안에 있다(2026-11-16 계정 메뉴에서 옮김). 저장 키(lt41.advanced.<subject>)는 그대로다.
+ $('settings-advanced').onclick=()=>{const next=!readAdvanced();try{localStorage.setItem(advancedKey(),next?'1':'0')}catch{}applyAdvanced();};
  $('account-open-settings').onclick=()=>{closeAccountMenu();void openAccountSettings();};
  // 고객 의견 창구 (#540): 로그인=계정 메뉴, 로그아웃=첫 화면 아래 작은 링크·접기 메뉴. 모두 같은 창을 쓴다.
  const FEEDBACK_SCREEN={'src064-orbit.html':'첫 화면','track59-sketchbook.html':'책','track58-pinboard.html':'보드','track56-network.html':'지도','track32-bookshelf.html':'내 트리'};
@@ -1026,14 +1027,24 @@ function accountConfirmMatches(){
  if(!accountExpected||!typed)return false;
  return accountExpected.kind==='email'?typed.toLowerCase()===accountExpected.value:typed===accountExpected.value;
 }
-// #368: 설정 창 묶음 — 입구는 묶음 이름으로 열고 해당 묶음(제목)으로 초점과 스크롤을 옮긴다.
-const SETTINGS_SECTIONS={profile:'account-settings-profile',screen:'account-settings-screen',look:'account-settings-look',share:'account-settings-share',write:'account-settings-write',data:'account-settings-data',account:'account-settings-account'};
+// #368 + 2026-11-16 탭 정리: 설정은 탭 넷(화면·프로필·기록 보기·계정·개인정보)이다. 입구는 탭 이름으로 열고
+// 해당 탭으로 초점과 스크롤을 옮긴다. 접힘 안의 묶음(내 데이터·공유·순간 추가)은 행선지로 열 때 접힘도 펼친다.
+const SETTINGS_TABS=[['settings-tab-screen','account-settings-screen'],['settings-tab-profile','account-settings-profile'],['settings-tab-records','account-settings-records'],['settings-tab-account','account-settings-account']];
+function paintSettingsTab(tabId){for(const[t,p]of SETTINGS_TABS){const tab=$(t),panel=$(p);if(!tab||!panel)continue;const on=t===tabId;tab.setAttribute('aria-selected',String(on));tab.tabIndex=on?0:-1;panel.hidden=!on;}}
+for(const[t]of SETTINGS_TABS){const tab=$(t);if(tab)tab.onclick=()=>paintSettingsTab(t);}
+// 탭 목록에서 좌우(좁은 화면의 가로 탭은 위·아래) 화살표·Home·End로 탭을 옮긴다(tablist 관례).
+const settingsTabList=document.querySelector('.settings-tabs');
+if(settingsTabList)settingsTabList.addEventListener('keydown',event=>{const ids=SETTINGS_TABS.map(([t])=>t);const at=ids.indexOf(document.activeElement?.id);if(at<0)return;let next=-1;if(event.key==='ArrowRight'||event.key==='ArrowDown')next=(at+1)%ids.length;else if(event.key==='ArrowLeft'||event.key==='ArrowUp')next=(at-1+ids.length)%ids.length;else if(event.key==='Home')next=0;else if(event.key==='End')next=ids.length-1;if(next<0)return;event.preventDefault();paintSettingsTab(ids[next]);$(ids[next])?.focus();});
 function focusSettingsSection(section=''){
  const box=$('account-settings');if(!box?.open)return;
- // #453 C1: 기본은 맨 위에서 연다. 입구가 구역을 지정했을 때만 그 묶음으로 내려간다.
- if(!section)return;
- const target=$(SETTINGS_SECTIONS[section]||SETTINGS_SECTIONS.profile);if(!target)return;
- queueMicrotask(()=>{target.scrollIntoView({block:'start'});const heading=target.querySelector('h3');if(heading)heading.focus({preventScroll:true});});
+ // #453 C1: 기본은 첫 탭(화면)에서 연다. 입구가 구역을 지정했을 때만 그 탭으로 옮긴다.
+ if(!section){paintSettingsTab('settings-tab-screen');return;}
+ const tabFor={screen:'settings-tab-screen',profile:'settings-tab-profile',records:'settings-tab-records',data:'settings-tab-account',account:'settings-tab-account'};
+ const tabId=tabFor[section];if(!tabId)return;
+ paintSettingsTab(tabId);
+ const foldFor={data:'account-settings-more',records:'account-settings-records-more',write:'account-settings-records-more',share:'account-settings-records-more',look:'account-settings-screen-more'};
+ const fold=$(foldFor[section]||'');if(fold)fold.open=true;
+ queueMicrotask(()=>{const heading=$( {data:'settings-data-title',profile:'settings-profile-title',screen:'settings-screen-title',records:'settings-records-title',account:'settings-account-title'}[section]||'');if(heading){heading.scrollIntoView({block:'start'});heading.focus({preventScroll:true});}});
 }
 // #368: 프로필 묶음 표시. 동그라미 글자는 표시 이름 첫 글자 → 이메일 첫 글자 → 나(#368 2차, header-state 규칙),
 // 색은 고른 색이고 고르지 않으면 지금 기본색이다. 이메일은 가리지 않는다(자기 계정 화면).
@@ -1175,7 +1186,8 @@ async function paintSettingsUsage(){
  const answer=await accountApi.listMedia().catch(()=>null);
  if(!$('settings-usage'))return;
  const data=answer?.media;
- if(!answer?.ok||!data){el.hidden=true;el.textContent='';return;}
+ // 2026-11-16: 값이 온전할 때만 채운다(숫자·목록이 비면 NaN·undefined 글자가 화면에 남는다 — 흔적 값 넷 기준선).
+ if(!answer?.ok||!data||typeof data.usedBytes!=='number'||typeof data.quotaBytes!=='number'||!Array.isArray(data.items)||typeof data.maxItems!=='number'){el.hidden=true;el.textContent='';return;}
  el.textContent=Math.round(data.usedBytes/1000000)+' MB / '+Math.round(data.quotaBytes/1000000)+' MB 사용 · '+data.items.length+' / '+data.maxItems+'개';
 }
 for(const b of document.querySelectorAll('[data-page-turn]'))b.onclick=()=>{

@@ -79,7 +79,7 @@ function communityHarness({ items = [], defer = false, emptyHidden = true } = {}
 
 test('C1·C2: 설정 창은 맨 위에서 열리고, 지난 안내는 남지 않는다', () => {
   assert.match(shell, /openAccountSettings\(\{section=''[\s\S]{0,80}?\)\{/, '기본값은 맨 위(빈 구역)다');
-  assert.match(shell, /if\(!section\)return;/, '구역을 지정했을 때만 그 묶음으로 스크롤한다');
+  assert.match(shell, /if\(!section\)\{paintSettingsTab\('settings-tab-screen'\);return;\}/, '기본은 첫 탭(화면)에서 열고, 구역을 지정했을 때만 그 탭으로 옮긴다');
   assert.match(shell, /settings-feedback'\)\.textContent=''/, '열 때 지난 안내를 비운다');
   assert.match(notice, /if \(\$\('settings-feedback'\) && \$\('account-settings'\)\?\.open\)/, '설정이 열려 있을 때만 그 줄에 쓴다');
 });

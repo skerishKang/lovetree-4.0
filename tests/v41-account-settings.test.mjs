@@ -14,16 +14,26 @@ const settingsEnd = html.indexOf('</dialog>', settingsStart);
 const settings = html.slice(settingsStart, settingsEnd);
 const popover = html.slice(html.indexOf('id="account-popover"'), html.indexOf('</div></div><button id="mobile-more"'));
 
-test('설정 창은 묶음 다섯 개(프로필·화면·순간 추가·내 데이터·계정)를 이 순서로 가진다', () => {
-  const order = [...settings.matchAll(/id="account-settings-(profile|screen|write|data|account)"/g)].map(m => m[1]);
-  assert.deepEqual(order, ['profile', 'screen', 'write', 'data', 'account']);
-  // 각 묶음 제목은 초점을 받을 수 있어야 한다(입구가 묶음으로 초점을 옮긴다).
-  for (const id of order) assert.match(settings, new RegExp(`id="account-settings-${id}"[^>]*aria-labelledby="settings-${id === 'write' ? 'write' : id}-title"`), id);
-  assert.match(css, /\.settings-group\{padding:16px 0 0\}/);
+test('설정 창은 탭 넷(화면·프로필·기록 보기·계정·개인정보)을 이 순서로 가진다', () => {
+  const order = [...html.matchAll(/id="settings-tab-(screen|profile|records|account)"/g)].map(m => m[1]);
+  assert.deepEqual(order, ['screen', 'profile', 'records', 'account']);
+  // 탭은 tablist 안의 role=tab이고, 같은 이름의 패널과 aria-controls로 이어진다.
+  assert.match(html, /class="settings-tabs" role="tablist" aria-label="설정 묶음"/);
+  for (const id of order) {
+    assert.match(html, new RegExp(`id="settings-tab-${id}"[^>]*aria-controls="account-settings-${id}"`), id);
+    assert.match(html, new RegExp(`id="account-settings-${id}"[^>]*aria-labelledby="settings-${id}-title"`), id);
+  }
+  // 기본은 화면 탭이다(나머지 패널은 hidden).
+  assert.match(html, /id="settings-tab-screen"[^>]*aria-selected="true"/);
+  for (const id of ['profile', 'records', 'account']) assert.match(html, new RegExp(`id="settings-tab-${id}"[^>]*aria-selected="false"[^>]*tabindex="-1"`), id);
+  // 탭 배치·좁은 화면 가로 탭·정원 색은 CSS 계약으로 고정한다(--lt-* 토큰만).
+  assert.match(css, /\.settings-layout\{display:grid;grid-template-columns:auto minmax\(0,1fr\)/);
+  assert.match(css, /@media\(max-width:780px\)\{\.settings-layout\{grid-template-columns:minmax\(0,1fr\)\}\.settings-tabs\{flex-direction:row/);
+  assert.match(css, /html\[data-lt-theme=garden\] \.settings-tabs \[role=tab\]\[aria-selected=true\]\{color:var\(--lt-ink\)/);
 });
 
 test('프로필 묶음: 동그라미 + 이메일 전체(없으면 내 계정), 편집 입구는 아직 없다', () => {
-  const profile = settings.slice(settings.indexOf('account-settings-profile'), settings.indexOf('account-settings-screen'));
+  const profile = settings.slice(settings.indexOf('id="account-settings-profile"'), settings.indexOf('id="account-settings-records"'));
   assert.match(profile, /id="settings-profile-initial"/);
   assert.match(profile, /id="settings-profile-name"/);
   assert.match(profile, /id="settings-profile-email"/);
@@ -47,35 +57,56 @@ test('프로필 묶음: 동그라미 + 이메일 전체(없으면 내 계정), �
   assert.match(dialogs, /PANEL_DIRTY\['account-settings'\]\s*=\s*\(\)\s*=>\s*deps\.isSettingsDirty\?\.\(\)\s*===\s*true;/);
 });
 
-test('화면 묶음은 기존 항목(테마·움직임·제목·첫 화면 카드)을 유지하고, 먼저 보일 탭은 순간 추가 묶음으로 간다', () => {
-  const screen = settings.slice(settings.indexOf('account-settings-screen"'), settings.indexOf('account-settings-write"'));
-  assert.match(screen, /data-set-theme="night"/);
-  assert.match(screen, /id="settings-motion"/);
-  assert.match(screen, /data-title-display="both"/);
-  assert.match(screen, /data-home-cards="example"/);
-  // #368 2차(댓글 2): 페이지 넘김 — 종이처럼(기본) / 부드럽게.
-  assert.match(screen, /id="settings-page-turn-label">페이지 넘김</);
-  assert.match(screen, /data-page-turn="paper"[^>]*>종이처럼</);
-  assert.match(screen, /data-page-turn="smooth"[^>]*>부드럽게</);
-  assert.doesNotMatch(screen, /data-write-tab/, '먼저 보일 탭은 화면 묶음에 없다');
-  const write = settings.slice(settings.indexOf('account-settings-write"'), settings.indexOf('account-settings-data"'));
-  assert.match(write, /id="settings-write-tab-label">먼저 보일 탭</);
-  assert.match(write, /data-write-tab="easy"/);
-  assert.match(write, /data-write-tab="detailed"/);
+test('화면 탭: 기본은 테마·움직임·처음 보여 줄 곳·첫 화면 카드, 나머지는 더 보기(고급) 접힘 안에', () => {
+  const screen = settings.slice(settings.indexOf('id="account-settings-screen"'), settings.indexOf('id="account-settings-profile"'));
+  const basic = screen.slice(0, screen.indexOf('account-settings-screen-more'));
+  const more = screen.slice(screen.indexOf('account-settings-screen-more'));
+  // 기본: 테마·움직임·처음 보여 줄 곳. '첫 화면 카드' 줄은 이번 정리에서 손대지 않았다(첫 화면에서 바로 고르는 단추로 옮기는 작업이 따로 있다).
+  assert.match(basic, /data-set-theme="night"/);
+  assert.match(basic, /id="settings-motion"/);
+  assert.match(basic, /data-start-place="resume"/);
+  assert.match(basic, /data-home-cards="example"/);
+  // 더 보기: 보드·지도 판·관계 지도 기본 보기·페이지 넘김·날짜 표기·제목·고급 기능 보기.
+  assert.match(more, /data-board-theme="paper"/);
+  assert.match(more, /data-network-view="network"/);
+  assert.match(more, /data-page-turn="paper"[^>]*>종이처럼</);
+  assert.match(more, /data-page-turn="smooth"[^>]*>부드럽게</);
+  assert.match(more, /data-date-style="dot"/);
+  assert.match(more, /data-title-display="both"/);
+  assert.match(more, /id="settings-advanced"/);
+  assert.doesNotMatch(basic, /data-write-tab/, '먼저 보일 탭은 화면 탭에 없다');
+  // 줄마다 붙던 '이 기기에만 / 계정에 저장' 꼬리말은 없다 — 화면 탭 맨 아래 한 줄로 모았다.
+  assert.doesNotMatch(settings, /settings-scope">이 기기에만</);
+  assert.doesNotMatch(settings, /settings-scope">계정에 저장</);
+  assert.match(screen, /id="settings-screen-note" class="panel-note">테마·움직임·보드·지도 판·관계 지도 보기·페이지 넘김·첫 화면 카드·고급 기능 보기는 이 기기에만 저장되고/);
+  // 먼저 보일 탭은 기록 보기 탭의 더 보기(고급) 안으로 간다.
+  const records = settings.slice(settings.indexOf('id="account-settings-records"'), settings.indexOf('id="account-settings-account"'));
+  assert.match(records, /id="settings-write-tab-label">먼저 보일 탭</);
+  assert.match(records, /data-write-tab="easy"/);
+  assert.match(records, /data-write-tab="detailed"/);
 });
 
-test('내 데이터 묶음: 백업·계정 기록 불러오기·내 보관 파일은 바로, 가져오기·화면 비우기·예시는 고급 접힘 안에', () => {
-  const data = settings.slice(settings.indexOf('account-settings-data"'), settings.indexOf('account-settings-account"'));
-  assert.match(data, /id="advanced-backup"[^>]*>기록 백업 \(내보내기\)</);
-  assert.match(data, /id="server"[^>]*hidden>계정 기록 불러오기</);
-  assert.match(data, /id="settings-assets-open"[^>]*>내 보관 파일 열기</);
-  const advanced = data.slice(data.indexOf('account-settings-advanced'));
-  assert.match(advanced, /<summary>고급 · 가져오기·화면 비우기·예시<\/summary>/);
-  assert.match(advanced, /id="advanced-import"/);
-  assert.match(advanced, /id="clear"/);
-  assert.match(advanced, /id="sample"/);
+test('계정·개인정보 탭: 내 보관 파일·로그아웃·약관은 바로, 백업·새 소식·탈퇴는 더 보기(고급) 접힘 안에', () => {
+  const account = settings.slice(settings.indexOf('id="account-settings-account"'), settingsEnd);
+  const basic = account.slice(0, account.indexOf('id="account-settings-more"'));
+  const more = account.slice(account.indexOf('id="account-settings-more"'));
+  // 기본: 내 보관 파일 열기·로그아웃·처리방침·약관.
+  assert.match(basic, /id="settings-assets-open"[^>]*>내 보관 파일 열기</);
+  assert.match(basic, /id="logout" type="button" hidden>로그아웃</);
+  assert.match(basic, /id="account-settings-policy"/);
+  // 더 보기: 내 데이터(백업·불러오기·고급 접힘)·새 소식·계정 탈퇴.
+  assert.match(more, /id="advanced-backup"[^>]*>기록 백업 \(내보내기\)</);
+  assert.match(more, /id="server"[^>]*hidden>계정 기록 불러오기</);
+  assert.match(more, /<summary>고급 · 가져오기·화면 비우기·예시<\/summary>/);
+  assert.match(more, /id="advanced-import"/);
+  assert.match(more, /id="clear"/);
+  assert.match(more, /id="sample"/);
+  assert.match(more, /id="settings-updates-open"[^>]*>새 소식 보기</);
+  assert.match(more, /<summary>계정 탈퇴<\/summary>/);
+  // 운영 묶음은 접힘 밖 맨 아래에 남는다(관리자에게만 보임 — 평소에는 hidden).
+  assert.match(account, /id="account-settings-ops"[^>]*hidden/);
   // CTO 결정(2026-11-12): 설정의 "백업 파일 열기"는 기록 가져오기와 같은 JSON 선택 창이라 뺀다.
-  assert.doesNotMatch(advanced, /id="settings-open-file"/);
+  assert.doesNotMatch(more, /id="settings-open-file"/);
   assert.doesNotMatch(settings, /백업 파일 열기/);
   // JSON input은 창 밖에 숨겨 둔다 — 설정이 닫혀 있어도(빈 화면) 열 수 있어야 한다.
   assert.ok(html.indexOf('id="file" type="file"') > settingsEnd, 'file input은 account-settings 밖에 있다');
@@ -101,9 +132,9 @@ test('내 기록 창(#records)은 없어지고 중복 트리 고르기도 함께
   assert.doesNotMatch(shell, /\$\('trees'\)/);
 });
 
-test('계정 메뉴: 맨 위 이메일 → 설정 → 새 소식 → 내 의견 → 어떻게 쓰나요 → 내 보관 파일 → 고급 기능 보기 → (운영) 운영센터 → 로그아웃', () => {
+test('계정 메뉴: 맨 위 이메일 → 설정 → 새 소식 → 내 의견 → 어떻게 쓰나요 → 내 보관 파일 → (운영) 운영센터 → 로그아웃(고급 기능 보기는 설정 화면 탭으로 옮겼다)', () => {
   assert.match(popover, /<strong id="account-email"><\/strong>/);
-  const order = ['account-open-settings', 'account-updates', 'account-my-posts', 'account-guide', 'account-assets-open', 'account-advanced', 'account-ops-group', 'account-logout'];
+  const order = ['account-open-settings', 'account-updates', 'account-my-posts', 'account-guide', 'account-assets-open', 'account-ops-group', 'account-logout'];
   let at = popover.indexOf('account-head');
   for (const id of order) {
     const next = popover.indexOf(`id="${id}"`, at);
@@ -116,7 +147,7 @@ test('계정 메뉴: 맨 위 이메일 → 설정 → 새 소식 → 내 의견 
   assert.match(opsGroup, /role="group" aria-label="운영"/);
   assert.match(opsGroup, /account-menu-group"[^>]*aria-hidden="true">운영</);
   assert.match(opsGroup, /id="account-ops"[^>]*>운영센터</);
-  assert.ok(popover.indexOf('id="account-ops-group"') > popover.indexOf('id="account-advanced"'), '운영 묶음은 고객 항목 뒤다');
+  assert.ok(popover.indexOf('id="account-ops-group"') > popover.indexOf('id="account-assets-open"'), '운영 묶음은 고객 항목 뒤다');
   // 2026-11-16 수리: 메뉴의 '의견 보내기' 칸을 없애고 내 의견 창 안에서 바로 보낸다.
   // 탈퇴 상태 줄과 메뉴 단추가 같은 id(account-feedback)를 써서 설정을 열 때마다 메뉴 글자가 지워졌다 — 두 id는 같을 수 없다.
   assert.doesNotMatch(html, /id="account-feedback"/);
@@ -128,6 +159,8 @@ test('계정 메뉴: 맨 위 이메일 → 설정 → 새 소식 → 내 의견 
   assert.match(shell, /\$\('account-guide'\)\.onclick=openGuideFromMenu;/);
   assert.match(shell, /\{type:'lt41-open-guide'\}/);
   assert.match(homeJs, /else if\(type==='lt41-open-guide'\)\{if\(!guideDialog\.open\)openGuide\(\);\}/);
+  // 고급 기능 보기 스위치는 이제 설정 '화면' 탭에 있다(2026-11-16).
+  assert.doesNotMatch(popover, /id="account-advanced"/);
   // 헷갈리는 옛 항목(내 계정 · 백업·내 기록)은 없다.
   assert.doesNotMatch(popover, /id="account-records"/);
   assert.doesNotMatch(popover, /id="account-backup"/);
@@ -145,10 +178,26 @@ test('옮겨진 기능 연결: 보관 파일·백업 파일(빈 화면만)·예�
   assert.match(shell, /\$\('logout'\)\.onclick=/);
 });
 
+// 고급 기능 보기 스위치(2026-11-16): 계정 메뉴에서 설정 '화면' 탭의 더 보기(고급)로 옮겼다. 저장 키·효과는 그대로다.
+test('고급 기능 보기 스위치는 설정 화면 탭 더 보기(고급) 안에 있고, 저장 키(lt41.advanced.<subject>)는 그대로다', () => {
+  assert.doesNotMatch(html, /id="account-advanced"/);
+  const screenMore = settings.slice(settings.indexOf('id="account-settings-screen-more"'), settings.indexOf('id="settings-screen-note"'));
+  assert.match(screenMore, /id="settings-advanced" aria-checked="false" aria-describedby="settings-advanced-desc">끔</);
+  assert.match(screenMore, /id="settings-advanced-desc">보드에서 편집 도구·되돌리기·이어 그리기가 늘어나요/);
+  assert.match(shell, /const sw=\$\('settings-advanced'\);if\(sw\)\{sw\.setAttribute\('aria-checked',String\(on\)\);sw\.textContent=on\?'켬':'끔';\}/);
+  assert.match(shell, /\$\('settings-advanced'\)\.onclick=\(\)=>\{const next=!readAdvanced\(\);try\{localStorage\.setItem\(advancedKey\(\),next\?'1':'0'\)\}catch\{\}applyAdvanced\(\);\};/);
+  assert.match(shell, /function advancedKey\(\)\{try\{return 'lt41\.advanced\.'\+\(member\?\.snapshot\(\)\.subject\|\|''\)\}catch\{return 'lt41\.advanced\.'\}\}/);
+});
+
 test('설정 입구는 로그인 상태에서만 열리고, 묶음 이름으로 열면 해당 묶음으로 초점을 옮긴다', () => {
   assert.match(shell, /if\(!member\?\.snapshot\(\)\.owned\)\{notify\('로그인한 뒤 설정을 열 수 있어요\.'\);return;\}/);
   // #453 C1: 기본은 맨 위에서 열고, 구역을 지정했을 때만 그 묶음으로 내려간다.
-  assert.match(shell, /function focusSettingsSection\(section=''\)\{[\s\S]*?if\(!section\)return;[\s\S]*?scrollIntoView\(\{block:'start'\}\)[\s\S]*?heading\.focus\(\{preventScroll:true\}\)/);
+  assert.match(shell, /function focusSettingsSection\(section=''\)\{[\s\S]*?paintSettingsTab\('settings-tab-screen'\);return;[\s\S]*?scrollIntoView\(\{block:'start'\}\)[\s\S]*?heading\.focus\(\{preventScroll:true\}\)/);
+  // 탭 넷과 키보드 이동, 행선지로 열 때 더 보기 접힘을 펼치는 것도 한 벌로 고정한다.
+  assert.match(shell, /const SETTINGS_TABS=\[\['settings-tab-screen','account-settings-screen'\],\['settings-tab-profile','account-settings-profile'\],\['settings-tab-records','account-settings-records'\],\['settings-tab-account','account-settings-account'\]\]/);
+  assert.match(shell, /function paintSettingsTab\(tabId\)\{for\(const\[t,p\]of SETTINGS_TABS\)\{const tab=\$\(t\),panel=\$\(p\);if\(!tab\|\|!panel\)continue;const on=t===tabId;tab\.setAttribute\('aria-selected',String\(on\)\);tab\.tabIndex=on\?0:-1;panel\.hidden=!on;\}\}/);
+  assert.match(shell, /settingsTabList\.addEventListener\('keydown'/);
+  assert.match(shell, /const foldFor=\{data:'account-settings-more',records:'account-settings-records-more',write:'account-settings-records-more',share:'account-settings-records-more',look:'account-settings-screen-more'\};/);
   assert.match(shell, /void openAccountSettings\(\{section:'data'\}\);/);
   assert.match(shell, /paintSettingsProfile\(\);\s*fillProfileForm\(\);\s*paintDateStyleControls\(\);paintStartPlaceControls\(\);paintNetworkViewControls\(\);paintShareControls\(\);paintQuickTargetControls\(\);\s*void paintSettingsUsage\(\);\s*panel\('account-settings'\);\s*focusSettingsSection\(section\);/);
 });
@@ -195,13 +244,14 @@ test('공지·로그인 만료 안내는 설정 상태 줄 한 벌을 쓴다', (
 
 // 개인정보 처리방침·이용약관 링크(2026-11-16): 설정 창 맨 아래에 같은 두 링크가 있다.
 // 새 창(target=_blank, rel=noopener)으로 열고, 처리방침은 공용 로그인 처리방침의 러브트리 절(#lovetree)로 바로 간다.
-test('설정 창 맨 아래에 처리방침·약관 링크가 있다(새 창, 러브트리 절, 누름 영역 44px)', () => {
+test('계정·개인정보 탭에 처리방침·약관 링크가 있다(새 창, 러브트리 절, 누름 영역 44px — 기본 항목)', () => {
   const policy = settings.slice(settings.indexOf('id="account-settings-policy"'));
   assert.ok(policy.includes('id="account-settings-policy"'), '설정 창 안에 처리방침 묶음이 있다');
   assert.match(policy, /<a class="feedback-link policy-link" href="https:\/\/auth\.padiem\.net\/privacy#lovetree" target="_blank" rel="noopener">개인정보 처리방침<\/a>/);
   assert.match(policy, /<a class="feedback-link policy-link" href="https:\/\/auth\.padiem\.net\/terms" target="_blank" rel="noopener">이용약관<\/a>/);
-  // 처리방침 묶음은 설정 창(</dialog>) 안의 마지막 묶음이다.
-  assert.ok(settings.indexOf('account-settings-policy') > settings.indexOf('id="account-settings-updates"'), '새 소식 묶음 뒤(맨 아래)에 있다');
+  // 처리방침은 계정·개인정보 탭의 기본 항목이다 — 더 보기(고급) 접힘보다 앞에 있다.
+  const account = settings.slice(settings.indexOf('id="account-settings-account"'));
+  assert.ok(account.indexOf('id="account-settings-policy"') < account.indexOf('id="account-settings-more"'), '더 보기 접힘보다 앞(기본 항목)에 있다');
   // 누름 영역 44px.
   assert.match(css, /\.settings-policy \.policy-link\{min-height:44px/);
 });
