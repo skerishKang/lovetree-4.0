@@ -1,0 +1,24 @@
+name: 커밋·PR 문구 검사
+# 공개 저장소에 도구 꼬리말·금지어가 남지 않게 PR마다 본다(2026-11-16 CTO 결정).
+# 금지어 목록은 저장소 비밀값 LT_COMMIT_BANNED_WORDS(줄마다 하나)에서 온다 — 이 파일·AGENTS.md·시험에는 낱말을 적지 않는다.
+# 비밀값이 없는 곳(포크 PR)에서는 도구 꼬리말만 검사하고 경고 한 줄을 남긴다.
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+permissions:
+  contents: read
+jobs:
+  hygiene:
+    name: PR 제목·본문·커밋 메시지에 도구 이름·꼬리말이 없다
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: 커밋·PR 문구 검사
+        env:
+          LT_COMMIT_BANNED_WORDS: ${{ secrets.LT_COMMIT_BANNED_WORDS }}
+        run: node scripts/commit-hygiene.mjs --event "$GITHUB_EVENT_PATH" --base "${{ github.base_ref }}"
