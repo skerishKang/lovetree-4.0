@@ -53,7 +53,7 @@ export function formatStart(seconds) {
   return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`;
 }
 
-function startFrom(parsed) {
+export function startFrom(parsed) {
   const search = parsed.searchParams.get('t') || parsed.searchParams.get('start');
   const hash = new URLSearchParams((parsed.hash || '').replace(/^#/, ''));
   return parseTimeToSeconds(search || hash.get('t') || hash.get('start'));

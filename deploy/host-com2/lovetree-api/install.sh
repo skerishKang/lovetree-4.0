@@ -49,6 +49,11 @@ cp -a "$source_root/server" "$app/server"
 # 이 한 파일이 없으면 서비스는 시작한 직후 ERR_MODULE_NOT_FOUND로 죽는다.
 install -d -m 0755 "$app/src"
 install -m 0644 "$source_root/src/domain.js" "$app/src/domain.js"
+# #792: src/domain.js가 src/moment-range.js를 import한다 — 빠지면 서버가 시작 즉시 죽는다.
+# 되돌리기(이전 소스)에 없는 새 파일은 있을 때만 복사 (새 소스에서 빠지면 preflight_imports가 ERR_MODULE_NOT_FOUND로 잡는다).
+if [[ -f "$source_root/src/moment-range.js" ]]; then
+  install -m 0644 "$source_root/src/moment-range.js" "$app/src/moment-range.js"
+fi
 # 꼬리표 규칙 한 벌(#695): server/community-service.js가 ../public/v41/tags.mjs를 함께 읽는다
 # (src/domain.js를 서버·화면이 함께 쓰는 것과 같은 방식). tags.mjs는 다른 파일을 import하지 않는다 —
 # 이 파일에 import가 늘면 이 설치 목록도 함께 늘려야 한다.

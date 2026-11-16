@@ -1,6 +1,127 @@
 // #547: '오늘' 날짜는 기기의 지역 날짜로 만든다(UTC 날짜였을 때 새벽 순간이 하루 전으로 찍혔다).
 import { localDateOnly } from './local-date.mjs';
 import { isAutoTitle, autoTitleFor } from './auto-title.mjs';
+
+// #792: 순간 구간의 순수 계산(서버 사본 src/moment-range.js와 같은 규칙 — tests/moment-range-792.test.mjs가 대조).
+export const MAX_RANGE_SECONDS = 12 * 60 * 60;
+
+export function parseTimecode(value) {
+  const raw = String(value ?? '').trim();
+  if (!raw) return null;
+  let seconds;
+  if (/^\d+$/.test(raw)) {
+    seconds = Number(raw);
+  } else {
+    const parts = raw.split(':');
+    if (parts.length < 2 || parts.length > 3 || parts.some(part => !/^\d{1,2}$/.test(part))) return null;
+    const nums = parts.map(Number);
+    if (parts.length === 2) {
+      if (nums[1] >= 60) return null;
+      seconds = nums[0] * 60 + nums[1];
+    } else {
+      if (nums[1] >= 60 || nums[2] >= 60) return null;
+      seconds = nums[0] * 3600 + nums[1] * 60 + nums[2];
+    }
+  }
+  if (!Number.isSafeInteger(seconds) || seconds < 0 || seconds > MAX_RANGE_SECONDS) return null;
+  return seconds;
+}
+
+/** 주소의 t=·start=(물음표·해시)에서 시작 초를 읽는다. src/media.js의 startFrom과 같은 자리. */
+export function startFromUrl(url) {
+  const raw = String(url ?? '').trim();
+  if (!raw) return null;
+  let parsed;
+  try { parsed = new URL(raw); } catch { return null; }
+  const hash = new URLSearchParams((parsed.hash || '').replace(/^#/, ''));
+  for (const value of [parsed.searchParams.get('t'), parsed.searchParams.get('start'), hash.get('t'), hash.get('start')]) {
+    if (value === null || value === '') continue;
+    const seconds = parseTimecode(String(value).replace(/s$/, ''));
+    if (seconds !== null) return seconds;
+  }
+  return null;
+}
+
+const hasValue = (value) => value !== undefined && value !== null && value !== '';
+
+/** 불러오기용(관대): 틀린 값은 그 필드만 버린다. */
+export function rangeFields(input = {}, url = input?.url || '') {
+  const raw = input && typeof input === 'object' ? input : {};
+  const hasStart = hasValue(raw.startSeconds);
+  const hasEnd = hasValue(raw.endSeconds);
+  if (!hasStart && !hasEnd) {
+    const keyed = Object.prototype.hasOwnProperty.call(raw, 'startSeconds') || Object.prototype.hasOwnProperty.call(raw, 'endSeconds');
+    if (!keyed) return {};
+    const fromUrl = startFromUrl(url);
+    return fromUrl === null ? {} : { startSeconds: fromUrl };
+  }
+  let start = hasStart ? parseTimecode(raw.startSeconds) : startFromUrl(url);
+  const end = hasEnd ? parseTimecode(raw.endSeconds) : null;
+  if (end !== null && start === null) start = 0;
+  if (end !== null && start !== null && end <= start) return start === 0 ? {} : { startSeconds: start };
+  if (start === null && end === null) return {};
+  const out = {};
+  if (start !== null) out.startSeconds = start;
+  if (end !== null) out.endSeconds = end;
+  return out;
+}
+
+/** 입력용(엄격): 형식이 틀리면 사용자 문구로 거부한다. 둘 다 없으면 빈 객체. */
+export function validateRange(input = {}, url = input?.url || '') {
+  const raw = input && typeof input === 'object' ? input : {};
+  const hasStart = hasValue(raw.startSeconds);
+  const hasEnd = hasValue(raw.endSeconds);
+  if (!hasStart && !hasEnd) {
+    const keyed = Object.prototype.hasOwnProperty.call(raw, 'startSeconds') || Object.prototype.hasOwnProperty.call(raw, 'endSeconds');
+    if (!keyed) return {};
+    const fromUrl = startFromUrl(url);
+    if (fromUrl === null) return {};
+    return { startSeconds: fromUrl };
+  }
+  if (hasStart && parseTimecode(raw.startSeconds) === null) throw new Error('시작 시간은 01:30 또는 01:02:30 형식으로 적어 주세요.');
+  let start = hasStart ? parseTimecode(raw.startSeconds) : startFromUrl(url);
+  const end = hasEnd ? parseTimecode(raw.endSeconds) : null;
+  if (hasEnd) {
+    const lower = start === null ? 0 : start;
+    if (end === null || end <= lower) throw new Error('끝 시간은 시작 시간보다 뒤여야 해요.');
+    if (start === null) start = 0;
+  }
+  const out = {};
+  if (start !== null) out.startSeconds = start;
+  if (hasEnd) out.endSeconds = end;
+  return out;
+}
+
+function clock(seconds) {
+  if (seconds === null || seconds === undefined || seconds === '') return '';
+  const n = Number(seconds);
+  if (!Number.isSafeInteger(n) || n < 0) return '';
+  const h = Math.floor(n / 3600);
+  const m = Math.floor((n % 3600) / 60);
+  const s = n % 60;
+  const pad = (value) => String(value).padStart(2, '0');
+  return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`;
+}
+
+/** 시작·끝을 '0:42–1:08'로, 끝이 없으면 '0:42부터'로 적는다. */
+export function formatRange(start, end) {
+  const from = clock(start);
+  if (!from) return '';
+  const to = Number.isSafeInteger(end) && end > start ? clock(end) : '';
+  return to ? `${from}–${to}` : `${from}부터`;
+}
+
+/** 끝은 시작보다 클 때만 붙인다. */
+export function youtubeRangeEmbedUrl(videoId, start, end) {
+  const id = String(videoId ?? '').trim();
+  const s = Number(start);
+  if (!id || !Number.isSafeInteger(s) || s < 0) return '';
+  const params = [`start=${s}`];
+  if (Number.isSafeInteger(end) && end > s) params.push(`end=${end}`);
+  params.push('rel=0');
+  return `https://www.youtube.com/embed/${encodeURIComponent(id)}?${params.join('&')}`;
+}
+
 export const EMOTIONS = ['설렘', '위로', '벅참', '그리움', '고마움', '즐거움'];
 // #256-3: 책(트리)마다 고르는 디자인 표지. 테마 표지 색(--lt-cover-N) 위의 질감 변형 6종.
 // 값은 이 목록뿐이다. 모르는 값·타입은 저장 거부가 아니라 ''(기본 표지)로 되돌린다.
@@ -193,7 +314,9 @@ export function validateMomentInput(input) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(date)) || new Date(date).toISOString().slice(0, 10) !== date) throw new Error('날짜를 확인해 주세요.');
   const relation = typeof input.relation === 'string' ? input.relation.trim() : '';
   if (relation.length > 100) throw new Error('연결 이유는 100자까지 적을 수 있어요.');
-  const result = { title, note, emotion, date, relation, url };
+  // #792: 시작·끝 구간은 선택 값. 둘 다 없으면 키 자체를 넣지 않는다.
+  const range = validateRange(input, url);
+  const result = { title, note, emotion, date, relation, url, ...range };
   if (mediaMetadata) result.mediaMetadata = mediaMetadata;
   return result;
 }
@@ -481,7 +604,10 @@ export function validateState(value) {
       if (!Array.isArray(rawLinks) || rawLinks.length > MAX_LINKS) throw new Error('관련 순간 데이터가 올바르지 않아요.');
       for (const link of rawLinks) if (!idValid(link) || link === m.id) throw new Error('관련 순간 데이터가 올바르지 않아요.');
       ids.add(m.id);
-      return { ...validateMomentInput(m), id: m.id, parentId: m.parentId, links: [...new Set(rawLinks)], createdAt: m.createdAt, ...boardLayoutOf(m) };
+      // 틀린 구간 값은 그 필드만 버린다(순간 전체를 거부하지 않는다).
+      const clean = { ...m };
+      delete clean.startSeconds; delete clean.endSeconds;
+      return { ...validateMomentInput(clean), ...rangeFields(m, m.url), id: m.id, parentId: m.parentId, links: [...new Set(rawLinks)], createdAt: m.createdAt, ...boardLayoutOf(m) };
     });
     if (moments.filter(m => m.parentId === null).length !== 1) throw new Error('트리의 시작 순간은 하나여야 해요.');
     const byId = new Map(moments.map(m => [m.id, m]));
