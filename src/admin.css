@@ -85,7 +85,8 @@ body {
 .lt-overflow button { min-height: 44px; text-align: left; border: 0; border-radius: 10px; background: none; color: var(--lt-pearl); padding: 0 10px; font: inherit; font-size: 13px; cursor: pointer; }
 .lt-overflow button.is-active { color: var(--lt-pearl); background: rgba(255,230,166,.07); box-shadow: inset 0 0 0 1px var(--lt-gold-line); }
 
-.admin-shell { width: min(860px, calc(100% - 32px)); margin: 28px auto 64px; display: grid; gap: 16px; }
+/* 2026-11-17: 모든 탭의 본문 폭을 1180으로 통일(한눈에만 넓던 판을 없앴다). */
+.admin-shell { width: min(1180px, calc(100% - 32px)); margin: 28px auto 64px; display: grid; gap: 16px; }
 
 .admin-card { border: 1px solid var(--lt-gold-line); border-radius: var(--lt-r-panel); background: var(--lt-glass-strong); padding: 20px 22px; line-height: 1.8; box-shadow: 0 18px 50px #0007; }
 .admin-card-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; }
@@ -277,11 +278,10 @@ body {
   .lt-stat-value { font-size: 20px; }
 }
 
-/* #743: '한눈에'는 두 묶음 모두 1440 이상에서 한 줄(카드 7개씩). 좁은 화면은 지금처럼 줄바꿈한다.
-   카드가 한 줄에 들어가도록 '한눈에'만 판을 넓힌다(다른 탭 폭은 그대로). */
-.admin-shell.is-overview { width: min(1280px, calc(100% - 64px)); }
-@media (min-width: 1440px) {
-  .is-overview .lt-stats, .is-overview .lt-ov-cards { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+/* 2026-11-17: '한눈에' 숫자 4장·할 일 3장이 1440에서 각각 한 줄. 판 폭은 다른 탭과 같다(1180). */
+@media (min-width: 1100px) {
+  .is-overview .lt-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .is-overview .lt-ov-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 @media (max-width: 480px) {
   .lt-ov-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -298,7 +298,8 @@ body {
 .lt-cust-head { display: grid; grid-template-columns: minmax(90px, 1.1fr) minmax(160px, 2fr) 92px repeat(3, minmax(96px, 1fr)) minmax(96px, 1fr) 92px; gap: 8px; padding: 0 12px; font-size: 12px; color: var(--lt-muted); }
 .lt-cust-row { display: grid; grid-template-columns: minmax(90px, 1.1fr) minmax(160px, 2fr) 92px repeat(3, minmax(96px, 1fr)) minmax(96px, 1fr) 92px; gap: 8px; align-items: center; width: 100%; text-align: left; padding: 10px 12px; border: 1px solid var(--lt-line); border-radius: var(--lt-r-card); background: var(--lt-glass); color: var(--lt-pearl); font: inherit; cursor: pointer; }
 .lt-cust-row:hover, .lt-cust-row:focus-visible { border-color: var(--lt-gold-line); }
-.lt-cust-name { font-weight: 700; overflow-wrap: anywhere; }
+.lt-cust-name { font-weight: 400; overflow-wrap: anywhere; }
+.lt-cust-name.has-name { font-weight: 700; }
 .lt-cust-email { font-size: 12px; overflow-wrap: anywhere; }
 .lt-cust-time, .lt-cust-count { font-size: 12px; color: var(--lt-muted); }
 .lt-cust-id { font-size: 12px; color: var(--lt-muted); font-variant-numeric: tabular-nums; }

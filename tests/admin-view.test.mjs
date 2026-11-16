@@ -322,16 +322,17 @@ test('#655 2차 전체 숫자 카드 — 실제 사용자·AI 테스터·시험 
   }}};
   const model = statsCards(payload);
   assert.equal(model.error, false);
-  assert.deepEqual(model.cards.map(card => card.key), ['accounts', 'accounts-new', 'trees', 'moments', 'moments-new', 'public-trees', 'featured-trees']);
+  // 2026-11-17: 한눈에 숫자는 네 장만 — 계정·트리·순간·공개 트리.
+  assert.deepEqual(model.cards.map(card => card.key), ['accounts', 'trees', 'moments', 'public-trees']);
   const byKey = Object.fromEntries(model.cards.map(card => [card.key, card]));
   // 실제 사용자를 크게, AI 테스터를 함께 — AI 테스터는 전체에 포함된 수다.
   // #743: 카드마다 '전체 = 실제 + AI + 시험'을 함께 낸다(숫자가 서로 어긋나 보이지 않게).
   assert.deepEqual(byKey.accounts, {key: 'accounts', label: '계정', total: 15, real: 9, aiTester: 3, tester: 3});
-  assert.deepEqual(byKey['accounts-new'], {key: 'accounts-new', label: '새 계정 · 7일', total: 6, real: 3, aiTester: 1, tester: 2});
+
   assert.deepEqual(byKey.moments, {key: 'moments', label: '순간', total: 105, real: 70, aiTester: 20, tester: 15});
   // 트리 계열 카드는 펼침 내역의 제목 목록(최대 20)을 함께 받는다 — 응답에 없으면 null(지어내지 않는다).
   assert.deepEqual(byKey['public-trees'], {key: 'public-trees', label: '공개 트리', total: 11, real: 6, aiTester: 2, tester: 3, titles: null});
-  assert.deepEqual(byKey['featured-trees'], {key: 'featured-trees', label: '둘러보기 소개', total: 8, real: 4, aiTester: 1, tester: 3, titles: null});
+
 
   // 응답이 실패했거나 값이 이상하면 그 카드만 실패 — 숫자를 0으로 지어내지 않는다.
   assert.deepEqual(statsCards({ok: false, status: 503, payload: null}), {error: true, cards: []});
@@ -352,7 +353,6 @@ test('#655 2차 전체 숫자 카드 — 실제 사용자·AI 테스터·시험 
   const treeCards = Object.fromEntries(withTitles.cards.map(card => [card.key, card]));
   assert.deepEqual(treeCards.trees.titles, ['가을 노래', '겨울 산책']);
   assert.deepEqual(treeCards['public-trees'].titles, ['가을 노래']);
-  assert.deepEqual(treeCards['featured-trees'].titles, [], '제목이 없으면 빈 목록(숫자를 지어내지 않는다)');
   assert.equal(treeCards.moments.titles, undefined, '트리 계열이 아닌 카드에는 제목 목록이 없다');
 
 });
@@ -611,3 +611,91 @@ test('첫 열기는 할 일, 숫자 0인 칸은 화면에서 숨긴다', () => {
   assert.equal(filterBoardRows(rows, {status: 'all'}).length, 7, '전체 해제 = 모든 글');
   assert.deepEqual(boardStatusTabs(rows).map(t => t.key), ['pending', 'fixed', 'more'], 'all은 칸으로 보이지 않는다');
 });
+
+test('운영센터 폭 통일 + 한눈에 카드 4·3 + 고객 칸 이름(1440·390 × 밤·정원)', { skip: adminSkip || false, timeout: 180000 }, async () => {
+  if (adminSkip) assert.fail(`건너뜀=실패 — ${adminSkip}`);
+  const { mkdirSync } = await import('node:fs');
+  const shotDir = process.env.LT_OPS_SHOT_DIR || 'E:\\lovetree-qa\\local4\\운영센터';
+  mkdirSync(shotDir, { recursive: true });
+  const { serve } = await import('./helpers/screen-audit.mjs');
+  const server = await serve();
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const stats = {ok: true, stats: {
+    accounts: {total: 15, real: 9, aiTester: 3, tester: 3},
+    trees: {total: 25, real: 15, aiTester: 5, tester: 5, public: {total: 11, real: 6, aiTester: 2, tester: 3}},
+    moments: {total: 105, real: 70, aiTester: 20, tester: 15}
+  }};
+  const browser = await adminChromium.launch({ headless: true,
+    ...(process.env.LT_ADMIN_BROWSER_EXE ? { executablePath: process.env.LT_ADMIN_BROWSER_EXE } : {}) });
+  try {
+    const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
+    await context.route('**/api/admin/session', r => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ok: true, authenticated: true, admin: true}) }));
+    await context.route('**/api/admin/feedback', r => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ok: true, feedback: [
+      {id: 'p1', kind: 'opinion', status: 'received', replyCount: 0, displayTitle: '새 의견', createdAt: '2026-11-16T09:00:00Z'},
+      {id: 'p2', kind: 'opinion', status: 'reviewing', replyCount: 0, displayTitle: '확인 중', createdAt: '2026-11-16T10:00:00Z'},
+      {id: 'p3', kind: 'journal', status: 'received', replyCount: 0, score: 4, journalDate: '2026-11-16', displayTitle: '일지', createdAt: '2026-11-16T11:00:00Z'}
+    ]}) }));
+    await context.route('**/api/admin/journals', r => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ok: true, journals: []}) }));
+    await context.route('**/api/community/admin/reports', r => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ok: true, reports: [{id: 'r1', status: 'open', hidden: false, reason: '신고', shareId: 'sh_1', createdAt: '2026-11-16T12:00:00Z'}]}) }));
+    await context.route('**/api/admin/stats', r => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(stats) }));
+    await context.route('**/api/admin/customers/views*', r => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ok: true, views: []}) }));
+    await context.route('**/api/admin/customers', r => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ok: true, customers: [
+      {subjectId: 's1', subjectMasked: 'sub_…1111', email: 'fan@example.com', displayName: '', role: 'real', roleLabel: '실제 고객', joinedAt: '2026-11-01T00:00:00Z', lastLoginAt: '', lastActivityAt: '', treeCount: 1, momentCount: 3},
+      {subjectId: 's2', subjectMasked: 'sub_…2222', email: 'named@example.com', displayName: '이름있음', role: 'real', roleLabel: '실제 고객', joinedAt: '2026-11-01T00:00:00Z', lastLoginAt: '', lastActivityAt: '', treeCount: 1, momentCount: 3}
+    ]}) }));
+    await context.route(/^https:\/\/api\.github\.com\//, r => r.fulfill({ status: 404, contentType: 'application/json', body: '{"message":"not found"}' }));
+    const page = await context.newPage();
+    const measure = () => page.evaluate(() => {
+      const shell = document.querySelector('.admin-shell');
+      const tops = [...document.querySelectorAll('.is-overview .lt-stats .lt-stat-cell')].map(el => Math.round(el.getBoundingClientRect().top));
+      const todoTops = [...document.querySelectorAll('.is-overview .lt-ov-cards .lt-ov-card')].map(el => Math.round(el.getBoundingClientRect().top));
+      const names = [...document.querySelectorAll('.lt-cust-name')].map(el => ({text: el.textContent.trim(), hasName: el.classList.contains('has-name'), weight: getComputedStyle(el).fontWeight}));
+      return {
+        width: Math.round(shell?.getBoundingClientRect().width || 0),
+        statCount: document.querySelectorAll('.lt-stats .lt-stat-cell').length,
+        todoCount: document.querySelectorAll('.lt-ov-cards .lt-ov-card').length,
+        statRows: new Set(tops).size, todoRows: new Set(todoTops).size,
+        names,
+        sub: document.querySelector('.lt-board-head .lt-sub')?.textContent.trim() || ''
+      };
+    });
+    for (const [width, height] of [[1440, 900], [390, 844]]) {
+      await page.setViewportSize({ width, height });
+      const widths = {};
+      for (const theme of ['night', 'garden']) {
+        await page.evaluate(t => { if (t === 'garden') document.documentElement.setAttribute('data-lt-theme', 'garden'); else document.documentElement.removeAttribute('data-lt-theme'); }, theme);
+        for (const [name, hash] of [['overview', '#overview'], ['customers', '#customers'], ['board', '#board']]) {
+          await page.goto(`${base}/admin.html${hash}`, { waitUntil: 'domcontentloaded' });
+          await page.waitForSelector('.admin-shell', { timeout: 8000 });
+          await page.waitForTimeout(150);
+          const got = await measure();
+          widths[name] = got.width;
+          if (width === 1440) assert.equal(got.width, 1180, `${name}·${theme} 본문 폭 1180`);
+          else assert.ok(got.width >= 330 && got.width <= 390, `${name}·${theme} 390에서 꽉 참(실제 ${got.width})`);
+          if (name === 'overview') {
+            assert.equal(got.statCount, 4, '숫자 카드 4장');
+            assert.equal(got.todoCount, 3, '할 일 카드 3장');
+            if (width === 1440) {
+              assert.equal(got.statRows, 1, '1440에서 숫자 4장 한 줄');
+              assert.equal(got.todoRows, 1, '1440에서 할 일 3장 한 줄');
+            }
+          }
+          if (name === 'customers') {
+            assert.deepEqual(got.names, [
+              {text: 'fan', hasName: false, weight: '400'},
+              {text: '이름있음', hasName: true, weight: '700'}
+            ], '이메일 @ 앞부분은 보통 굵기, 표시 이름은 굵게');
+            assert.equal(got.sub, '열 때마다 열람 기록이 남아요');
+          }
+          await page.screenshot({ path: `${shotDir}/pr2-${name}-${width}-${theme}.png` });
+        }
+      }
+      assert.equal(new Set(Object.values(widths)).size, 1, width + '에서 세 탭 본문 폭이 같다');
+    }
+    await context.close();
+  } finally {
+    await browser.close();
+    server.close();
+  }
+});
+

@@ -136,14 +136,11 @@ async function renderOverview() {
   const card = (value, label, view, status = '', failed = false, unanswered = false) => failed
     ? `<button type="button" class="lt-ov-card" role="button" tabindex="0" disabled><span class="lt-ov-value">—</span><span class="lt-ov-label">${escapeText(label)}</span><span class="lt-ov-fail">불러오지 못했어요</span></button>`
     : `<button type="button" class="lt-ov-card" role="button" tabindex="0" data-ov-view="${escapeText(view)}"${status ? ` data-ov-status="${escapeText(status)}"` : ''}${unanswered ? ' data-ov-unanswered="1"' : ''}><span class="lt-ov-value">${escapeText(value)}</span><span class="lt-ov-label">${escapeText(label)}</span></button>`;
+  // 2026-11-17: 처리할 일 카드 세 장 — 할 일·답 안 단 글·신고 대기.
   const cards = [
-    card(fb.pending, '고객 글 · 처리 대기(받음·확인 중)', 'board', PENDING_STATUS, Boolean(fb.error)),
-    card(fb.fixed, '고객 글 · 고침', 'board', 'fixed', Boolean(fb.error)),
-    card(fb.total, '고객 글 · 전체', 'board', '', Boolean(fb.error)),
-    card(fb.unanswered, '답을 아직 안 단 글(답글 0)', 'board', '', Boolean(fb.error), true),
-    card(rp.pending, '신고 · 검토 대기', 'reports', PENDING_STATUS, Boolean(rp.error)),
-    card(is.open, '고치는 일 · 열린 이슈', 'issues', 'open', Boolean(is.error)),
-    card(is.closed, '고치는 일 · 닫힌 이슈', 'issues', 'closed', Boolean(is.error))
+    card(fb.pending, '할 일', 'board', PENDING_STATUS, Boolean(fb.error)),
+    card(fb.unanswered, '답 안 단 글', 'board', '', Boolean(fb.error), true),
+    card(rp.pending, '신고 대기', 'reports', PENDING_STATUS, Boolean(rp.error))
   ].join('');
   const journalSection = jr.error
     ? `<section class="lt-card"><h2 class="lt-h2">사용 일지</h2><p class="lt-empty">불러오지 못했어요</p></section>`
@@ -228,7 +225,7 @@ async function renderCustomers() {
     : (list.rows.length
       ? `<div class="lt-cust-head" role="row"><span>고객</span><span>이메일</span><span>구분</span><span>가입</span><span>마지막 로그인</span><span>마지막 활동</span><span>기록</span><span>고객 id</span></div>`
         + list.rows.map((row, index) => `<button type="button" class="lt-cust-row" role="row" tabindex="0" data-cust-index="${index}" data-cust-role="button" aria-label="${escapeText(row.displayName || row.email)} 자세히 보기">
-          <span class="lt-cust-name">${escapeText(row.displayName || '(이름 없음)')}</span>
+          <span class="lt-cust-name${row.displayName ? ' has-name' : ''}">${escapeText(row.displayName || String(row.email || '').split('@')[0] || '—')}</span>
           <span class="lt-cust-email" data-label="이메일">${escapeText(row.email)}</span>
           <span class="lt-badge" data-role="${escapeText(row.role || 'real')}">${escapeText(row.roleLabel)}</span>
           <span class="lt-cust-time" data-label="가입">${escapeText(formatTime(row.joinedAt))}</span>
@@ -244,7 +241,7 @@ async function renderCustomers() {
       ? views.rows.map(row => `<div class="lt-cust-view-row"><span>${escapeText(formatTime(row.viewedAt))}</span><span>관리자 ${escapeText(row.adminMasked || '—')}</span><span>${escapeText(row.customerName || row.customerEmail || '(삭제된 계정)')}</span></div>`).join('')
       : '<p class="lt-empty">아직 열람 기록이 없습니다.</p>');
   host.innerHTML = `${head()}<div class="admin-shell lt-board">
-    <div class="lt-board-head"><h1 class="lt-h1">고객</h1><p class="lt-sub">고객 정보를 전부 보여 준다(261116 대표 결정) · 줄을 누르면 트리·순간·사진·의견·일지를 읽는다 · 열 때마다 열람 기록이 남는다 · 여기서는 고객 기록을 고치거나 지우지 않는다</p></div>
+    <div class="lt-board-head"><h1 class="lt-h1">고객</h1><p class="lt-sub">열 때마다 열람 기록이 남아요</p></div>
     ${cards}
     <section class="lt-card"><h2 class="lt-h2">고객 목록</h2><div class="lt-cust-list">${rows}</div></section>
     <section class="lt-card"><h2 class="lt-h2">열람 기록 · 최근 20</h2><p class="lt-sub">누가(관리자)·언제·어느 고객을 열었는지 — 90일 뒤 자동으로 지워진다</p><div class="lt-cust-views">${viewRows}</div></section>
@@ -301,7 +298,7 @@ async function renderCustomerDetail(subjectId) {
     : '<p class="lt-empty">보낸 의견·일지가 없습니다.</p>';
   host.innerHTML = `${head()}<div class="admin-shell lt-board">
     <button type="button" class="lt-back" data-back-customers>← 고객 목록</button>
-    <div class="lt-board-head"><h1 class="lt-h1">${escapeText(c.displayName || c.email)}</h1><p class="lt-sub">고객 정보를 읽기만 합니다 — 여기서 고치거나 지우지 않습니다 · 이 판을 열 때마다 열람 기록이 남습니다</p></div>
+    <div class="lt-board-head"><h1 class="lt-h1">${escapeText(c.displayName || c.email)}</h1><p class="lt-sub">열 때마다 열람 기록이 남아요</p></div>
     ${account}
     <section class="lt-card"><h2 class="lt-h2">트리 · 순간(공개·비공개 모두)</h2>${trees}</section>
     <section class="lt-card"><h2 class="lt-h2">올린 사진 · 영상</h2><p class="lt-sub">관리자 인증으로만 내려받습니다</p><div class="lt-cust-media">${mediaItems}</div></section>
@@ -771,3 +768,5 @@ document.addEventListener('keydown', (event) => {
 window.addEventListener('hashchange', () => { route = parseHash(location.hash); render(); });
 
 await render();
+
+
