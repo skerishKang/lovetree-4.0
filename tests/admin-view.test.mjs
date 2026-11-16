@@ -456,7 +456,7 @@ test('운영센터 탭 셋 + 옛 주소 3개 거르기 + 종류×상태 숫자',
         assert.deepEqual(board.tabs, ['한눈에', '고객', '고객 글'], width + '·' + theme + ': 탭 셋');
         assert.equal(board.activeTab, '고객 글');
         assert.deepEqual(board.kinds.map(k => k.label), ['전체', '의견', '일지', '신고']);
-        assert.deepEqual(board.statuses.map(s => s.label), ['할 일', '고침', '전체', '더 보기 ▾']);
+        assert.deepEqual(board.statuses.map(s => s.label), ['할 일', '고침', '더 보기 ▾']);
         assert.equal(board.statuses.find(s => s.label === '할 일').active, true, '첫 열기는 할 일');
         assert.equal(board.cards, 4, width + '·' + theme + ': 할 일 4건(의견 2 + 일지 1 + 신고 1)');
         assert.match(board.h1, /고객 글 \d+건 · 최신 순/);
@@ -570,16 +570,23 @@ const boardFixture = () => [
   {id: 7, kind: 'opinion', status: 'closed', issueNumber: '', replyCount: 1}
 ];
 
-test('고객 글 상태 한 줄: 할 일·고침·전체·더 보기 숫자가 종류별 합과 맞는다', () => {
+test('고객 글 상태 한 줄: 할 일·고침·더 보기 숫자가 고른 종류 안에서 센다', () => {
   const rows = boardFixture();
   const tabs = boardStatusTabs(rows);
-  assert.deepEqual(tabs.map(t => t.key), ['pending', 'fixed', 'all', 'more']);
-  assert.deepEqual(tabs.map(t => t.count), [4, 1, 7, 4]); // 할 일 1·2·4·5, 고침 3, 전체 7, 더 보기 2·3·6·7(이슈 있는 2·3 포함)
-  // 종류를 골라도 같은 식으로 센다.
+  assert.deepEqual(tabs.map(t => t.key), ['pending', 'fixed', 'more']); // 종류 '전체'와 겹치던 상태 '전체' 칸 제거
+  assert.deepEqual(tabs.map(t => t.count), [4, 1, 4]); // 할 일 1·2·4·5, 고침 3, 더 보기 2·3·6·7(이슈 있는 2·3 포함)
+  // 종류를 골라도 같은 식으로 센다 — '의견'이면 의견 중 할 일 2·고침 1·더 보기 4.
   const opinion = boardStatusTabs(rows, 'opinion');
-  assert.deepEqual(opinion.map(t => t.count), [2, 1, 5, 4]);
+  assert.deepEqual(opinion.map(t => t.count), [2, 1, 4]);
   for (const t of tabs) {
     assert.equal(t.count, filterBoardRows(rows, {status: t.key}).length, t.label + ' 숫자 = 실제 줄 수');
+  }
+  // 칩 숫자 = 그 종류·상태로 실제 화면에 그리는 카드 수.
+  for (const kind of ['', 'opinion', 'journal', 'report']) {
+    for (const status of ['pending', 'fixed', 'more']) {
+      const expected = boardStatusTabs(rows, kind).find(t => t.key === status).count;
+      assert.equal(filterBoardRows(rows, {kind, status}).length, expected, `${kind || '전체'}×${status} 카드 수`);
+    }
   }
 });
 
@@ -595,9 +602,12 @@ test('고객 글 종류 묶음: 전체·의견·일지·신고 숫자가 현재 
 test('첫 열기는 할 일, 숫자 0인 칸은 화면에서 숨긴다', () => {
   const rows = boardFixture();
   assert.equal(filterBoardRows(rows).length, 4, '상태를 고르지 않으면 할 일');
-  assert.deepEqual(boardStatusTabs(rows).map(t => t.count > 0), [true, true, true, true]);
-  // 신고만 있으면 의견·일지 칸은 0 → 숨김 대상이다.
+  assert.deepEqual(boardStatusTabs(rows).map(t => t.count > 0), [true, true, true]);
+  // 신고만 있으면 상태 칸은 할 일 1개뿐 — 고침·더 보기는 0 → 숨김 대상이다.
   const reports = boardStatusTabs(rows, 'report');
-  assert.deepEqual(reports.map(t => t.count), [1, 0, 1, 0]);
-  assert.deepEqual(reports.filter(t => t.count > 0).map(t => t.label), ['할 일', '전체']);
+  assert.deepEqual(reports.map(t => t.count), [1, 0, 0]);
+  assert.deepEqual(reports.filter(t => t.count > 0).map(t => t.label), ['할 일']);
+  // 고른 칩을 다시 누르면 status=all — 칸은 없고 그 종류의 모든 글이 보인다.
+  assert.equal(filterBoardRows(rows, {status: 'all'}).length, 7, '전체 해제 = 모든 글');
+  assert.deepEqual(boardStatusTabs(rows).map(t => t.key), ['pending', 'fixed', 'more'], 'all은 칸으로 보이지 않는다');
 });

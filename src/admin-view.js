@@ -52,7 +52,7 @@ export function parseHash(hash) {
   const [name, ...rest] = path.split('/');
   const id = decodeURIComponent(rest.join('/') || '');
   // #655: 'pending'은 받음·확인 중을 한 번에 보는 보조 조건이다('한눈에' 카드에서 쓴다).
-  const status = [...STATUS_ORDER, PENDING_STATUS].includes(params.get('status')) ? params.get('status') : '';
+  const status = [...STATUS_ORDER, PENDING_STATUS, ALL_STATUS].includes(params.get('status')) ? params.get('status') : '';
   const kind = params.get('kind') in KIND_LABEL ? params.get('kind') : '';
   // #743: '한눈에' 카드가 각 탭의 조건을 주소로 남긴다 — 답글 0(#board?unanswered=1),
   // 신고 검토 대기(#reports?status=open), 열린·닫힌 이슈(#issues?status=open|closed).
@@ -154,10 +154,12 @@ export const BOARD_KIND_TABS = [
   {key: 'journal', label: '일지'},
   {key: 'report', label: '신고'}
 ];
+// 2026-11-17 대표 지적: 종류 '전체'와 상태 '전체'가 겹쳐 숫자가 다르게 보였다 — 상태 칸에서는 '전체'를 없앴다.
+// 고른 상태 칩을 다시 누르면 status=all(칸 없는 값)로 풀려 그 종류의 모든 글이 보인다.
+export const ALL_STATUS = 'all';
 export const BOARD_STATUS_TABS = [
   {key: PENDING_STATUS, label: '할 일'},
   {key: 'fixed', label: '고침'},
-  {key: 'all', label: '전체'},
   {key: 'more', label: '더 보기 ▾'}
 ];
 

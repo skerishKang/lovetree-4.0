@@ -6,7 +6,7 @@ import {
 import {
   GITHUB_REPO, KIND_LABEL, STATUS_LABEL, STATUS_ORDER, PERSONA_FIELDS, PENDING_STATUS,
   escapeText, richParagraph, formatTime, parseHash, viewHash, viewToTab,
-  filterRows, statusTabs, kindTabs, TABS, BOARD_KIND_TABS, boardKindTabs, boardStatusTabs, filterBoardRows,
+  filterRows, statusTabs, kindTabs, TABS, BOARD_KIND_TABS, boardKindTabs, boardStatusTabs, filterBoardRows, ALL_STATUS,
   linkedIssueNumbers, normalizeIssueNumber, issueStateLabel, needsFixButton,
   statusChangeMessage, buildIssueUrl, issueLink, journalsSummary, journalRowsByCustomer,
   isPendingStatus, overviewModel, statsCards,
@@ -651,7 +651,9 @@ document.addEventListener('click', async (event) => {
   // 탭 거르기(#570 2): 다시 누르면 해제한다. 상태는 주소(#board?status=..&kind=..)에 남는다.
   const statusTab = event.target.closest('[data-status-tab]');
   if (statusTab) {
-    const next = route.status === statusTab.dataset.statusTab ? '' : statusTab.dataset.statusTab;
+    // 고른 칩을 다시 누르면 조건을 푼다(status=all — 칸 없는 값이라 종류의 모든 글이 보인다).
+    const active = route.status || PENDING_STATUS;
+    const next = active === statusTab.dataset.statusTab ? ALL_STATUS : statusTab.dataset.statusTab;
     navigate('board', null, {status: next, kind: route.kind});
     return;
   }
