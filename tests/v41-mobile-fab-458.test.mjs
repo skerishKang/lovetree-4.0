@@ -57,7 +57,7 @@ test('#458: ☰ 메뉴 항목과 화면 파일이 짝을 이룬다', () => {
   assert.match(shell, /add\('첫 화면'[^;]*current==='src064-orbit\.html'\)/);
   assert.match(shell, /add\('보드'[^;]*current==='track58-pinboard\.html'\)/);
   assert.match(shell, /add\('지도'[^;]*current==='track56-network\.html'\)/);
-  assert.match(shell, /add\('내 트리 전체 보기'[^;]*current==='track32-bookshelf\.html'\)/);
+  assert.match(shell, /add\('서재'[^;]*current==='track32-bookshelf\.html'\)/);
 });
 
 test('#458: 지금 화면 항목은 금테(테마 토큰)로 표시된다', () => {

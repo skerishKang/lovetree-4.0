@@ -43,7 +43,7 @@ test('로그인 전: [＋ 첫 순간 남기기·둘러보기·어떻게 쓰나�
 test('로그인·트리 있음: [순간 목록·둘러보기·내 트리] 세 개, 세트는 테두리형',()=>{
   const btns=[makeButton(),makeButton(),makeButton()];
   applyHomeCenter(btns,{member:'in',treeCount:2});
-  assert.deepEqual(btns.map(b=>b.textContent),['순간 목록','둘러보기','내 트리']);
+  assert.deepEqual(btns.map(b=>b.textContent),['순간 목록','둘러보기','서재']);
   assert.deepEqual(btns.map(b=>b.dataset.do), ['moments','community','trees']);
   assert.deepEqual([...btns].map(b=>b.classList.contains('primary-cta')),[false,false,false],"밝은 채움은 위쪽 '+ 순간 추가' 하나");
   assert.deepEqual(btns.map(b=>b.hidden),[false,false,false]);
@@ -52,7 +52,7 @@ test('로그인·트리 있음: [순간 목록·둘러보기·내 트리] 세 �
 test('로그인·트리 0: 세 자리 모두 채운다, 비활성 표시 없음',()=>{
   const btns=[makeButton(),makeButton(),makeButton()];
   applyHomeCenter(btns,{member:'in',treeCount:0});
-  assert.deepEqual(btns.map(b=>b.textContent),['순간 목록','둘러보기','내 트리']);
+  assert.deepEqual(btns.map(b=>b.textContent),['순간 목록','둘러보기','서재']);
   assert.equal(btns.some(b=>b.disabled),false);
   assert.deepEqual(btns.map(b=>b.hidden),[false,false,false]);
 });

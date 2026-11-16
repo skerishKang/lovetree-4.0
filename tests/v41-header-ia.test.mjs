@@ -76,7 +76,7 @@ test('첫 화면 로그아웃: 첫 버튼만 흰색 강조이고 문구는 처�
   const plan = homeCenterState({member: 'out', treeCount: 0});
   assert.equal(plan.state, 'out');
   assert.equal(plan.buttons.length, 3, '버튼 개수는 그대로 3개');
-  assert.deepEqual(plan.buttons.map(b => b.label), ['처음 시작하기', '새 트리 만들기', '내 트리']);
+  assert.deepEqual(plan.buttons.map(b => b.label), ['처음 시작하기', '새 트리 만들기', '서재']);
   assert.deepEqual(plan.buttons.map(b => b.emphasis), [true, false, false]);
   assert.deepEqual(plan.buttons.map(b => b.disabled), [false, false, false]);
 });
@@ -84,7 +84,7 @@ test('첫 화면 로그아웃: 첫 버튼만 흰색 강조이고 문구는 처�
 test('첫 화면 로그인·트리 0: 세 자리 [순간 목록·둘러보기·내 트리] 테두리형(261116 PR 2)', () => {
   const plan = homeCenterState({member: 'in', treeCount: 0});
   assert.equal(plan.state, 'in-empty');
-  assert.deepEqual(plan.buttons.map(b => b.label), ['순간 목록', '둘러보기', '내 트리']);
+  assert.deepEqual(plan.buttons.map(b => b.label), ['순간 목록', '둘러보기', '서재']);
   assert.deepEqual(plan.buttons.map(b => b.key), ['moments', 'community', 'trees']);
   assert.deepEqual(plan.buttons.map(b => b.emphasis), [false, false, false], "'+ 순간 추가'는 위쪽 단추로 올라갔다 — 세트는 강조 없다");
   assert.deepEqual(plan.buttons.map(b => b.disabled), [false, false, false]);
@@ -93,7 +93,7 @@ test('첫 화면 로그인·트리 0: 세 자리 [순간 목록·둘러보기·�
 test('첫 화면 로그인·트리 있음: 같은 세 자리, 세트는 테두리형(261116 PR 2)', () => {
   const plan = homeCenterState({member: 'in', treeCount: 2});
   assert.equal(plan.state, 'in-trees');
-  assert.deepEqual(plan.buttons.map(b => b.label), ['순간 목록', '둘러보기', '내 트리']);
+  assert.deepEqual(plan.buttons.map(b => b.label), ['순간 목록', '둘러보기', '서재']);
   assert.deepEqual(plan.buttons.map(b => b.emphasis), [false, false, false]);
   assert.deepEqual(plan.buttons.map(b => b.disabled), [false, false, false]);
 });
@@ -138,7 +138,7 @@ test('applyHomeCenter는 실제 버튼의 문구·강조·비활성을 상태에
   const buttons = [make(), make(), make()];
   const plan = applyHomeCenter(buttons, {member: 'in', treeCount: 0});
   assert.equal(plan.state, 'in-empty');
-  assert.deepEqual(buttons.map(b => b.textContent), ['순간 목록', '둘러보기', '내 트리']);
+  assert.deepEqual(buttons.map(b => b.textContent), ['순간 목록', '둘러보기', '서재']);
   assert.equal(buttons[2].hidden, false, '로그인한 화면도 셋째 자리를 쓴다(2026-11-14 대표 결정)');
   assert.equal(buttons[2].dataset.do, 'trees', '셋째 자리는 내 트리 목록으로 간다');
   assert.equal(buttons.some(b => b.disabled), false, '이어 보기 버튼이 없어 비활성 표시도 없다');

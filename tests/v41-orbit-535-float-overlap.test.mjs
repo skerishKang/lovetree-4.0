@@ -262,7 +262,7 @@ s('#535 로그인·로그아웃 가운데 단추가 같은 세 자리·같은 �
       const out = shape[`${w}/out`], inSide = shape[`${w}/in`];
       assert.equal(out.count, 3, `${w}: 로그아웃 세 자리`);
       assert.equal(inSide.count, 3, `${w}: 로그인도 세 자리`);
-      assert.deepEqual(inSide.labels, ['순간 목록', '둘러보기', '내 트리'], `${w}: 로그인 세 자리 문구(261116 PR 2 — '+ 순간 추가'는 위쪽 단추로 올라갔다)`);
+      assert.deepEqual(inSide.labels, ['순간 목록', '둘러보기', '서재'], `${w}: 로그인 세 자리 문구(261116 PR 2 — '+ 순간 추가'는 위쪽 단추로 올라갔다)`);
       assert.equal(new Set(inSide.w).size, 1, `${w}: 로그인 단추 폭이 같다(${inSide.w.join('/')})`);
       assert.equal(new Set(out.w).size, 1, `${w}: 로그아웃 단추 폭이 같다(${out.w.join('/')})`);
       // 261116 PR 2: 좁은 폭에서 로그인 세트는 한 줄(data-inline — 위쪽 '+ 순간 추가'가 있어 세로 쌓기가 필요 없다),

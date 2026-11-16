@@ -94,16 +94,17 @@ function buildFoldMenu(){
  // #635 PR C: 로그아웃 상태 메뉴(≡) 맨 위에 시작 입구 — 첫 화면의 '첫 순간 추가'와 같은 시작 흐름(openLoginStart('first'))으로 간다.
  // 로그인 상태 메뉴는 바꾸지 않는다.
  if(!member?.snapshot().owned)add('내 러브트리 시작하기',()=>openLoginStart('first'));
- // #380 2번: 접기 메뉴도 맨 위 메뉴와 같은 구조 — 첫 화면(로고)·둘러보기 · 책·보드·지도 · 내 트리 전체 보기 · 순간 추가.
+ // #380 2번: 접기 메뉴도 맨 위 메뉴와 같은 구조 — 첫 화면(로고)·둘러보기 · 서재·책·보드·지도 · 순간 추가.
+ // 261117 대표 확정: 서재가 탭 줄 [서재][책][보드][지도]의 첫 자리 — 접기 메뉴도 같은 순서를 미러한다.
  // #458: 지금 보고 있는 화면 항목에 aria-current를 남긴다(메뉴를 열 때마다 다시 만들어 지금 상태를 반영한다).
  add('첫 화면',()=>document.querySelector('.brand').click(),current==='src064-orbit.html');
  add('둘러보기',()=>$('community-menu').click());
+ add('서재',()=>{member?.snapshot().owned?show('track32-bookshelf.html'):openLoginStart('shelf')},current==='track32-bookshelf.html');
  if(window.LT41){
   add('책',()=>document.querySelector('.tree-views [data-view="track59-sketchbook.html"]').click(),current==='track59-sketchbook.html');
   add('보드',()=>document.querySelector('.tree-views [data-view="track58-pinboard.html"]').click(),current==='track58-pinboard.html');
   add('지도',()=>document.querySelector('.tree-views [data-view="track56-network.html"]').click(),current==='track56-network.html');
  }
- add('내 트리 전체 보기',()=>{member?.snapshot().owned?show('track32-bookshelf.html'):openLoginStart('shelf')},current==='track32-bookshelf.html');
   if(!$('write-menu').hidden)add('＋ 순간 추가',()=>$('write-menu').click());
   add('의견 보내기',()=>feedbackDialog.open());
  }
@@ -144,7 +145,7 @@ function renderTreeMenu(){
  // #394: 트리 드롭다운 맨 아래 "내 순간 전체 보기"(#380의 "내 트리 전체 보기" 자리 옆). 내 기록(서버)에서만 보인다.
  const momentsEntry=source==='server'&&window.LT41?'<button type="button" role="menuitem" data-tree-action="moments">내 순간 전체 보기</button>':'';
  // #380 2번: 맨 아래 "내 트리 전체 보기" — 지금의 책장 화면(모든 트리의 책장)을 연다. 로그인 상태에서만 보인다.
- const shelfEntry=member?.snapshot().owned?'<button type="button" role="menuitem" data-tree-action="shelf">내 트리 전체 보기</button>':'';
+ const shelfEntry=member?.snapshot().owned?'<button type="button" role="menuitem" data-tree-action="shelf">서재 전체 보기</button>':'';
  treePopover.innerHTML=rows+`<div class="tree-foot" role="none">${cleanupRow}${tagsRow}<button type="button" role="menuitem" data-tree-action="new">＋ 새 트리</button>${manage?'<button type="button" role="menuitem" data-tree-action="manage">이 트리 관리 (이름·표지)</button><button type="button" role="menuitem" data-tree-action="share">이 트리 공유</button>':''}${shelfEntry}${momentsEntry}</div>`;
   // 트리를 누르면 그 트리로 이동한다: 책·보드·지도를 보던 중이면 같은 보기로, 그 외(첫 화면·내 트리·둘러보기)에는 그 트리의 책으로. 주소도 따라오게 남긴다.
   const TREE_VIEWS=new Set(['track59-sketchbook.html','track58-pinboard.html','track56-network.html']);
@@ -998,7 +999,7 @@ const themeToggleTop=$('theme-toggle');if(themeToggleTop)themeToggleTop.onclick=
  $('settings-advanced').onclick=()=>{const next=!readAdvanced();try{localStorage.setItem(advancedKey(),next?'1':'0')}catch{}applyAdvanced();};
  $('account-open-settings').onclick=()=>{closeAccountMenu();void openAccountSettings();};
  // 고객 의견 창구 (#540): 로그인=계정 메뉴, 로그아웃=첫 화면 아래 작은 링크·접기 메뉴. 모두 같은 창을 쓴다.
- const FEEDBACK_SCREEN={'src064-orbit.html':'첫 화면','track59-sketchbook.html':'책','track58-pinboard.html':'보드','track56-network.html':'지도','track32-bookshelf.html':'내 트리'};
+ const FEEDBACK_SCREEN={'src064-orbit.html':'첫 화면','track59-sketchbook.html':'책','track58-pinboard.html':'보드','track56-network.html':'지도','track32-bookshelf.html':'서재'};
  function feedbackContext(){
   const owned=!!member?.snapshot().owned;
   const screen=$('community-panel')?.open?'둘러보기':$('account-settings')?.open?'설정':(FEEDBACK_SCREEN[current]||'첫 화면');

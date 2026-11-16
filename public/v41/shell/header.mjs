@@ -31,7 +31,7 @@ function flowNavigation(){
   const parts=headerPartsFor({owned,treeCount:getModel()?.trees?.length||0,publicReading});
   const showTreeViews=parts.treeViews&&treeViewsVisible({owned,publicReading});
   $('tree-views').hidden=!showTreeViews;for(const b of $('tree-views').querySelectorAll('button')){b.disabled=false;b.title='';}
-  $('tree-views').setAttribute('aria-label',window.LT41?.tree.title?displayTreeTitle(window.LT41.tree.title)+' 보기':'이 트리 보기');
+  $('tree-views').setAttribute('aria-label',window.LT41?.tree.title?'서재 · '+displayTreeTitle(window.LT41.tree.title)+' 보기':'서재·이 트리 보기');
   for(const b of document.querySelectorAll('nav>button'))b.hidden=publicReading;
   // 트리 선택은 뒤쪽 탭 묶음 바로 앞에 있고, 로그인 상태에서만 "트리: <이름> ▾"로 보여 준다.
   // 로그아웃이면 "트리 고르기", 브라우저에만 남은 미저장 기록이 있으면 "저장 안 된 기록"이다.

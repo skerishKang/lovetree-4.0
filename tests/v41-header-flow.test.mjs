@@ -22,7 +22,7 @@ const STATES = [
     make: () => ({ owned: false, trees: 0, tree: null, source: 'example' }),
     expect: {
       treeViews: false, recordMenu: false, writeMenu: false, shareMenu: false,
-      picker: '트리 고르기', write: '＋ 순간 추가', aria: '이 트리 보기'
+      picker: '트리 고르기', write: '＋ 순간 추가', aria: '서재·이 트리 보기'
     }
   },
   {
@@ -31,7 +31,7 @@ const STATES = [
     expect: {
       // 로그인했어도 트리가 없으면 기억책·보드·관계 지도 탭은 숨긴다(1-B 이전 동작 그대로).
       treeViews: false, recordMenu: false, writeMenu: true, shareMenu: false,
-      picker: '트리 고르기', write: '＋ 순간 추가', aria: '이 트리 보기'
+      picker: '트리 고르기', write: '＋ 순간 추가', aria: '서재·이 트리 보기'
     }
   },
   {
@@ -39,7 +39,7 @@ const STATES = [
     make: () => ({ owned: true, trees: 2, tree: { title: '리센느, 나의 순간들' }, source: 'server' }),
     expect: {
       treeViews: true, recordMenu: true, writeMenu: true, shareMenu: true,
-      picker: '트리: 리센느', write: '＋ 순간 추가', aria: '리센느 보기'
+      picker: '트리: 리센느', write: '＋ 순간 추가', aria: '서재 · 리센느 보기'
     }
   },
   {
@@ -47,7 +47,7 @@ const STATES = [
     make: () => ({ owned: true, trees: 2, tree: { title: '리센느, 나의 순간들' }, source: 'share' }),
     expect: {
       treeViews: false, recordMenu: false, writeMenu: false, shareMenu: false,
-      picker: '트리: 리센느', write: '＋ 순간 추가', aria: '리센느 보기'
+      picker: '트리: 리센느', write: '＋ 순간 추가', aria: '서재 · 리센느 보기'
     }
   }
 ];

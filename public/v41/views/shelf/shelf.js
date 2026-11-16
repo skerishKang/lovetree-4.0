@@ -67,13 +67,15 @@ import { createReader } from './shelf-reader.js';
         if(hero)hero.classList.toggle('compact',!spineVisible(list.length));
         // #256-1: 목록이 바뀔 때마다 다시 그린다. 칸은 검색·필터와 무관하게 전체 책(allBooks) 기준이라 좁아져도 그대로다.
         renderResumeCard();
-        $('#shelfRail').innerHTML=list.length?list.map(function(book,index){
+        $('#shelfRail').innerHTML=(list.length?list.map(function(book,index){
           // #212: 표지에 이름 한 번만. 표지 아래는 "순간 N개 · 마지막 YYYY-MM-DD" 하나만. "책 · 02"·"기본 표지" 같은 내부 표시는 없다.
           // #256-3: 디자인 표지는 shelf-model coverChoice 판정(book.design)을 그대로 쓴다. 없으면 속성도 없다(기존 화면 변화 0).
           return '<article class="book-card" data-book-index="'+index+'"><button type="button" data-book-id="'+esc(book.id)+'" aria-label="'+esc(book.name)+' 책 열기">'+
             '<div class="book-cover"'+(book.design?' data-cover-design="'+esc(book.design)+'"':'')+' style="'+coverStyle(book)+'">'+(book.inbox?'<span class="inbox-chip">'+INBOX_LABEL+'</span>':'')+(book.coverMedia?'<img class="book-cover-media" src="'+esc(book.coverMedia)+'"'+coverFallbackAttrs(book.coverCandidates||[book.coverMedia])+' alt="" loading="lazy" referrerpolicy="no-referrer">':'')+'<span class="cover-symbol"><span>'+esc(book.symbol)+'</span></span><strong class="cover-title">'+esc(book.name)+'</strong></div>'+
             '<span class="book-card-meta"><span>'+esc(bookMeta(book))+'</span></span></button></article>';
-        }).join(''):'<div class="empty"><strong>찾는 책이 없어요.</strong><span>트리 이름·좋아하는 대상·순간 제목으로 검색해 보세요.</span></div>';
+        }).join(''):'<div class="empty"><strong>찾는 책이 없어요.</strong><span>트리 이름·좋아하는 대상·순간 제목으로 검색해 보세요.</span></div>')
+        // 261117 대표 확정: 책장 진열 끝에 '+ 새 트리' 빈 책 한 권 — 누르면 지금의 새 트리 만들기 흐름(lt41-write new).
+        +'<article class="book-card book-card--new"><button type="button" data-new-book aria-label="새 트리 만들기"><div class="book-cover"><span class="new-book-plus" aria-hidden="true">＋</span><strong class="cover-title">+ 새 트리</strong></div><span class="book-card-meta"><span>새 트리 만들기</span></span></button></article>';
         updateCarousel(false);
       }
       function renderSpines(list) {
@@ -82,9 +84,11 @@ import { createReader } from './shelf-reader.js';
         if(!nav||!row)return;
         var visible=spineVisible(list.length);
         nav.hidden=!visible;
-        row.innerHTML=visible?spineItems(list).map(function(item){
+        // 261117 대표 확정: 책등 줄(책 줄) 끝에도 같은 '+ 새 트리' 빈 책이 선다.
+        row.innerHTML=(visible?spineItems(list).map(function(item){
           return '<button type="button" class="shelf-spine" data-book-id="'+esc(item.id)+'" data-book-index="'+item.index+'" style="'+spineStyle(item)+'" aria-label="'+esc(item.name)+' 책으로 넘기기"><span class="shelf-spine-title">'+esc(item.name)+'</span></button>';
-        }).join(''):'';
+        }).join(''):'')
+        +'<button type="button" class="shelf-spine shelf-spine--new" data-new-book aria-label="새 트리 만들기"><span class="shelf-spine-title">+ 새 트리</span></button>';
         syncSpines(true);
       }
       var spineActiveId=null;
@@ -149,7 +153,7 @@ import { createReader } from './shelf-reader.js';
       }
       function updateCarousel() {
         var rail=$('#shelfRail');
-        if(!rail||!state.shelfList.length)return;
+        if(!rail)return;
         var center=state.shelfIndex;
         state.shelfList.forEach(function(book,index){
           var card=rail.querySelector('[data-book-index="'+index+'"]');
@@ -168,6 +172,20 @@ import { createReader } from './shelf-reader.js';
           card.style.pointerEvents=placed.pointerEvents;
           card.style.filter=placed.filter;
         });
+        // 261117 대표 확정: '+ 새 트리' 빈 책은 진열 끝(마지막 책 다음 자리)에 선다. 책이 없으면 가운데.
+        var newCard=rail.querySelector('.book-card--new');
+        if(newCard){
+          var placedNew=carouselTransform(state.shelfList.length-center);
+          newCard.style.setProperty('--x',placedNew.x+'px');
+          newCard.style.setProperty('--y',placedNew.y+'px');
+          newCard.style.setProperty('--z',placedNew.z+'px');
+          newCard.style.setProperty('--scale',placedNew.scale);
+          newCard.style.setProperty('--rot',placedNew.rotate+'deg');
+          newCard.style.setProperty('--alpha',placedNew.alpha);
+          newCard.style.zIndex=String(placedNew.zIndex);
+          newCard.style.pointerEvents=placedNew.pointerEvents;
+          newCard.style.filter=placedNew.filter;
+        }
         syncSpines();
         setShelfAtmosphere(state.shelfList[center]);
       }
@@ -216,7 +234,11 @@ import { createReader } from './shelf-reader.js';
         rail.addEventListener('pointercancel',function(){if(!shelfDrag.active)return;shelfDrag.active=false;rail.classList.remove('dragging');state.shelfIndex=Math.round(state.shelfIndex);updateCarousel();});
       }
       function bind() {
+        // 261117 대표 확정: '+ 새 트리' 빈 책(책등 줄·진열 끝)은 지금의 새 트리 만들기 흐름을 엔다 —
+        // 이어 읽기 칸의 'first' 경로와 같은 lt41-write new(셸 기록 판 · 새 트리의 첫 순간).
+        var openNewTree=function(){parent.postMessage({type:'lt41-write',mode:'new'},location.origin);};
         $('#shelfSpineRow').addEventListener('click',function(event){
+          if(event.target.closest('[data-new-book]')){openNewTree();return;}
           // #256 2번: 책등을 누르면 아래 넘기기가 그 책으로 이동한다(책을 바로 열지는 않는다).
           var spine=event.target.closest('[data-book-id]');
           if(!spine)return;
@@ -224,6 +246,7 @@ import { createReader } from './shelf-reader.js';
           if(index<0||index>=state.shelfList.length||index===state.shelfIndex)return;
           state.shelfIndex=index;save();updateCarousel();
         });
+        $('#shelfRail').addEventListener('click',function(event){if(event.target.closest('[data-new-book]'))openNewTree();});
         $('#shelfJump').addEventListener('click',function(){state.query='';state.filter='all';$('#searchInput').value='';$$('.filter').forEach(function(item){item.classList.toggle('active',item.dataset.filter==='all');});renderShelf();var book=getShelfCard(state.shelfIndex)?.querySelector('button[data-book-id]');if(book)openReader(book.dataset.bookId,book.closest('.book-card'));});
         $('#searchInput').addEventListener('input',function(event){state.query=event.target.value;renderShelf();});
         $$('.filter').forEach(function(button){button.addEventListener('click',function(){state.filter=button.dataset.filter;$$('.filter').forEach(function(item){item.classList.toggle('active',item===button);});renderShelf();});});
