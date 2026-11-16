@@ -827,8 +827,9 @@ function answerDiscover(discover){
   if(!answer.ok){$('discover-ask-feedback').textContent=answer.message||'소개 설정을 저장하지 못했어요.';return;}
   discoverState.set(treeId,discover);
   markDiscoverAsked(treeId);
+  // 261117 대표 검수: 답변 확인 알림은 띄우지 않는다 — 첫 화면 숫자 줄을 가리고, 질문 창 본문이
+  // 이미 같은 사실을 말한다. 소개 상태는 공유 판(언제든 켜고 끄는 곳)에서 확인한다.
   $('discover-ask').close();
-  notify(discover?'둘러보기에 소개했어요. 공유 판에서 언제든 끌 수 있어요.':'링크를 받은 사람만 볼 수 있어요. 공유 판에서 언제든 켤 수 있어요.',{hold:true});
  }).catch(()=>{$('discover-ask-feedback').textContent='소개 설정을 저장하지 못했어요.';});
 }
 $('discover-ask-yes').onclick = () => answerDiscover(true);
