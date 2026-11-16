@@ -84,18 +84,19 @@ test('처음 보여 줄 곳: 첫 화면·내 트리 전체 보기·이어 읽기
   assert.doesNotMatch(shell, /orbit\.js/, 'orbit.js는 건드리지 않는다');
 });
 
-test('보기 기본값 묶음: 관계 지도 기본 보기(이 기기)만 두고, 보드 기본 테마는 선택지가 없어 행이 없다', () => {
-  assert.match(html, /id="settings-look-title"[^>]*>보기 기본값</);
-  assert.match(html, /data-network-view="network"[^>]*>그물</);
-  assert.match(html, /data-network-view="concentric"[^>]*>동심원</);
+test('보기 기본값(2026-11-16 탭 정리): 관계 지도 기본 보기는 화면 탭 더 보기(고급) 안에 있고, 옛 보기 기본값 묶음은 없다', () => {
+  const screen = html.slice(html.indexOf('id="account-settings-screen"'), html.indexOf('id="account-settings-profile"'));
+  const more = screen.slice(screen.indexOf('account-settings-screen-more'));
+  assert.match(more, /data-network-view="network"[^>]*>그물</);
+  assert.match(more, /data-network-view="concentric"[^>]*>동심원</);
+  assert.match(more, /지도를 다시 열 때 처음 보이는 보기입니다/);
   // network.js가 쓰는 같은 키·같은 값이다.
   assert.match(network, /const VIEW_KEY='lt41\.network\.view';/);
   assert.match(shell, /const NETWORK_VIEW_KEY='lt41\.network\.view';/);
   assert.match(network, /if\(\(e\.data\.value==='network'\|\|e\.data\.value==='concentric'\)&&state\.view!==e\.data\.value\)setView\(e\.data\.value\);/);
-  // 보드 테마 행 없음을 마크업 주석으로 남긴다(보고 근거).
-  assert.match(html, /보드 기본 테마는 지금 고를 수 있는 값이 없어/);
-  const look = html.slice(html.indexOf('account-settings-look"'), html.indexOf('account-settings-share"'));
-  assert.equal(/data-board-theme/.test(look), false, '보드 기본 테마 행은 없다');
+  // 옛 '보기 기본값' 묶음은 탭 정리에서 해체됐다(관계 지도 보기 → 화면 탭 더 보기, 쉬운 추가로 담을 곳 → 기록 보기 탭).
+  assert.doesNotMatch(html, /id="account-settings-look"/);
+  assert.doesNotMatch(html, /id="settings-look-title"/);
 });
 
 test('공유 기본값: 공유 창이 처음 열 보기를 설정값으로 시작한다(#538: 둘러보기 올림 설정은 공개 기본으로 정리)', () => {

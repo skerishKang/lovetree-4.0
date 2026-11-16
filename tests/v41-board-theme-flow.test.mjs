@@ -27,13 +27,15 @@ test('보드·지도 판 테마 수신: 어떤 화면에서도 다시 띄우지 
   }
 });
 
-test('설정 창 화면 묶음: 보드·지도 판(종이/밤) 행이 있고 이 기기에만 저장된다', () => {
+test('설정 창 화면 탭: 보드·지도 판(종이/밤) 행이 있다(2026-11-16: 더 보기(고급) 접힘 안, 저장 위치는 탭 맨 아래 한 줄)', () => {
   const html = read('public/v41/index.html');
-  const screen = html.slice(html.indexOf('account-settings-screen"'), html.indexOf('account-settings-write"'));
+  const screen = html.slice(html.indexOf('id="account-settings-screen"'), html.indexOf('id="account-settings-profile"'));
   assert.match(screen, /id="settings-board-theme-label">보드·지도 판<\/span>/);
   assert.match(screen, /data-board-theme="paper"[^>]*>종이<\/button>/);
   assert.match(screen, /data-board-theme="night"[^>]*>밤<\/button>/);
-  assert.match(screen, /aria-labelledby="settings-board-theme-label"[\s\S]*?class="settings-scope">이 기기에만<\/span>/);
+  // 줄마다 붙던 '이 기기에만' 표시는 없다 — 화면 탭 맨 아래 한 줄 설명에 모았다.
+  assert.doesNotMatch(screen, /settings-scope">이 기기에만</);
+  assert.match(screen, /테마·움직임·보드·지도 판·관계 지도 보기·페이지 넘김·첫 화면 카드·고급 기능 보기는 이 기기에만 저장되고/);
 });
 
 test('보드 화면 마크업: 도구 줄 및 패널에 종이/밤 전환 단추가 있다', () => {
