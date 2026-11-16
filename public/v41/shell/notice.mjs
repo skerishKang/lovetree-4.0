@@ -33,7 +33,10 @@ export function newlyPublishedTrees(before, after, minCount = AUTO_PUBLISH_MIN_M
 
 // #666: beforeShow는 알림 줄을 실제로 띄우기 직전에 부른다 — 셸이 화면 아래에 붙은 것들(링크 줄·＋ 단추·
 // 새 소식 카드)을 재서 그 위로 자리를 옮긴다. 재는 일은 셸이 하고, 이 파일은 언제 부를지만 정한다.
-export function createNotifier({ $, now = () => Date.now(), holdMs = NOTICE_HOLD_MS, hideMs = NOTICE_HIDE_MS, setTimer = setTimeout, clearTimer = clearTimeout, beforeShow = () => {} } = {}) {
+// afterShow는 띄운 뒤에도 다시 잰다 — 화면이 늦게 편성되면(기록 불러오기·화면 교대 애니메이션·글꼴)
+// beforeShow 시점의 좌표가 낡아 알림이 화면 아래쪽 내용을 덮을 수 있다. 자리(--lt-toast-bottom)는
+// 살아 있는 값이라 다시 재면 떠 있는 알림이 그 자리로 옮겨 앉는다.
+export function createNotifier({ $, now = () => Date.now(), holdMs = NOTICE_HOLD_MS, hideMs = NOTICE_HIDE_MS, setTimer = setTimeout, clearTimer = clearTimeout, beforeShow = () => {}, afterShow = () => {} } = {}) {
   let holdUntil = 0;
   let timer = null;
   // hold=true는 사용자의 방금 행동에 대한 결과 안내다. holdMs가 지나기 전에는 다른 안내로 덮지 않는다.
@@ -46,7 +49,7 @@ export function createNotifier({ $, now = () => Date.now(), holdMs = NOTICE_HOLD
     if ($('settings-feedback') && $('account-settings')?.open) $('settings-feedback').textContent = text;
     paintToast($('toast'), text, action);
     if ($('account-settings')?.open) $('toast').hidden = true;
-    else { beforeShow(); $('toast').hidden = false; }
+    else { beforeShow(); $('toast').hidden = false; afterShow(); setTimer(afterShow, 600); setTimer(afterShow, 1400); }
     clearTimer(timer);
     timer = setTimer(() => { $('toast').hidden = true; }, hideMs);
     return true;

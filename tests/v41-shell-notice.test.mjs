@@ -27,15 +27,22 @@ test('상태 안내: 토스트·설정 상태 줄에 함께 뜨고 숨김 타이
   // #453 C2: 설정이 닫혀 있을 때 온 안내는 창 안 줄에 쌓이지 않는다.
   assert.equal(h.els['settings-feedback'].textContent, '', '닫힌 설정 창에는 쓰지 않는다');
   assert.equal(h.els['toast'].hidden, false);
-  assert.equal(h.timers.length, 1);
-  assert.equal(h.timers[0].ms, NOTICE_HIDE_MS);
+  // 안내 하나에 숨김 타이머 1과 자리 다시 재기 2(600·1400 — 화면이 늦게 편성돼도 알림이 아래 내용을 덮지 않게)가 걸린다.
+  assert.equal(h.timers.length, 3);
+  assert.equal(h.timers[0].ms, 600);
+  assert.equal(h.timers[1].ms, 1400);
+  assert.equal(h.timers[2].ms, NOTICE_HIDE_MS);
+  // 자리 다시 재기는 토스트를 숨기지 않는다.
+  h.timers[0].fn();
+  h.timers[1].fn();
+  assert.equal(h.els['toast'].hidden, false);
 
   h.els['account-settings'].open = true;
   assert.equal(h.notifier.notify('설정 창이 열려 있을 때의 안내'), true);
   assert.equal(h.els['settings-feedback'].textContent, '설정 창이 열려 있을 때의 안내');
   assert.equal(h.els['toast'].hidden, true, '설정이 열려 있으면 토스트는 숨는다');
-  assert.equal(h.timers[0].cleared, true, '이전 숨김 타이머를 지운다');
-  h.timers[1].fn();
+  assert.equal(h.timers[2].cleared, true, '이전 숨김 타이머를 지운다');
+  h.timers[3].fn();
   assert.equal(h.els['toast'].hidden, true);
 });
 
@@ -86,8 +93,9 @@ test('중복·로그인 필요 안내도 같은 규칙으로 지켜진다', () =
 
 test('배선: shell.mjs가 입구 안내를 hold로 보내고 안내 한 벌을 쓴다', () => {
   const shell = readFileSync(new URL('../public/v41/shell.mjs', import.meta.url), 'utf8');
-  // #666: 알림 줄을 띄우기 직전에 자리를 재는 길(beforeShow)이 붙었다 — 안내 한 벌을 쓰는 사실은 그대로다.
-  assert.match(shell, /const shellNotice=createNotifier\(\{\$,beforeShow:placeToast\}\)/, 'shell.mjs가 안내 한 벌을 만든다');
+  // #666: 알림 줄을 띄우기 직전에 자리를 재는 길(beforeShow)이 붙었고, 띄운 뒤에도 다시 재는 길(afterShow)이 함께 붙었다 —
+  // 화면이 늦게 편성되면 beforeShow 시점의 좌표가 낡는다. 안내 한 벌을 쓰는 사실은 그대로다.
+  assert.match(shell, /const shellNotice=createNotifier\(\{\$,beforeShow:placeToast,afterShow:\(\)=>\{placeToast\(\);setTimeout\(placeToast,600\);setTimeout\(placeToast,1400\);\}\}\)/, 'shell.mjs가 안내 한 벌을 만들고 자리를 다시 잰다');
   assert.match(shell, /function notify\(text,options\)\{return shellNotice\.notify\(text,options\);\}/, '기존 notify 이름은 그대로다');
   assert.match(shell, /createQuickIntake\(\{[\s\S]*?notify:text=>notify\(text,\{hold:true\}\)/, '입구(담기·중복·로그인 필요) 안내만 hold로 보낸다');
 });

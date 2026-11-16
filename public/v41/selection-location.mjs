@@ -1,4 +1,6 @@
 const VIEWS = new Set(['home','shelf','book','board','network','graph']); // graph: 그래프 보기(#627 3단계) — 지금은 주소(#my/graph)로만 연다
+// #map 도 지도다 — 'network' 의 별칭(#book·#board·#graph 처럼 주소로 지도를 열게)
+const VIEW_ALIASES = new Map([['map','network']]);
 const POSITION_KEY = 'lovetree.v41.account-positions.v1';
 const PENDING_KEY = 'lovetree.v41.pending-owner-route.v1';
 
@@ -6,7 +8,10 @@ const safe = value => {
   const text = typeof value === 'string' ? value.trim() : '';
   return text && text.length <= 256 && !/[\u0000-\u001f\u007f]/.test(text) ? text : null;
 };
-const viewName = value => VIEWS.has(value) ? value : 'home';
+const viewName = value => {
+  value = VIEW_ALIASES.get(value) || value;
+  return VIEWS.has(value) ? value : 'home';
+};
 const rootMoment = tree => tree?.moments.find(moment => moment.parentId === null) || tree?.moments[0] || null;
 
 export function parseSelectionRoute(hash = '') {
@@ -21,7 +26,7 @@ export function parseSelectionRoute(hash = '') {
     const parts = path.split('/');
     return {scope:'public', shareId:safe(parts[1]), view:viewName(parts[2] || 'book'), explicit:true};
   }
-  return {scope:'screen', view:viewName(path), treeId:null, momentId:null, explicit:VIEWS.has(path)};
+  return {scope:'screen', view:viewName(path), treeId:null, momentId:null, explicit:VIEWS.has(VIEW_ALIASES.get(path) || path)};
 }
 
 // A bare domain is an intentional visit to the landing page. A pending
