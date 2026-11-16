@@ -76,3 +76,19 @@ test('불투명·blur 없음·밝기 깊이는 그대로 유지한다(#440 계�
     assert.doesNotMatch(body, /blur/, '카드 본체 blur 없음: ' + start);
   }
 });
+
+test('카드 3D 사선 잘림 방지: .world는 flat, 카드 transform은 각자 perspective로 시작한다(PR0)', () => {
+  // 여러 카드가 한 3D 공간(.world preserve-3d+perspective)에서 translate3d+rotate로 겹치면 카드 평면끼리
+  // 서로 관통해 사선으로 잘렸다(재발). .world는 flat으로 돌리고, 카드 transform 맨 앞에 각자 perspective(1200px)를 붙인다.
+  assert.doesNotMatch(orbitCSS, /preserve-3d/, 'orbit-source.css에 preserve-3d가 없다');
+  const world = ruleOf(orbitCSS, '.world{');
+  assert.doesNotMatch(world, /perspective\s*:/, '.world 규칙에 공유 perspective 속성이 없다');
+  // 키프레임(궤도)과 끌기(setProperty) 두 곳 모두 카드 transform 맨 앞에 perspective(1200px)가 온다.
+  assert.doesNotMatch(orbit, /transform:`translate3d/, '키프레임 카드 transform이 translate3d로 시작하지 않는다');
+  assert.doesNotMatch(orbit, /setProperty\('transform',`translate3d/, '끌기 카드 transform이 translate3d로 시작하지 않는다');
+  assert.match(orbit, /transform:`perspective\(1200px\) translate3d/, '키프레임 카드 transform이 perspective(1200px)로 시작한다');
+  assert.match(orbit, /setProperty\('transform',`perspective\(1200px\) translate3d/, '끌기 카드 transform이 perspective(1200px)로 시작한다');
+  // 겹침 순서는 scale 큰(가까운) 카드가 위 — z-index를 깊이(z)가 아니라 화면 배율로 매긴다.
+  assert.doesNotMatch(orbit, /zv=Math\.round\(\(1000\+z\)/, 'z-index를 깊이 z로 매기는 옛 식이 남아 있지 않다');
+  assert.match(orbit, /zv=Math\.round\(drawScale\*1000\/64\)\*64/, 'z-index는 화면 배율(drawScale)의 64 단계 밴드로 매긴다');
+});
