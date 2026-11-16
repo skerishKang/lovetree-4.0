@@ -1,3 +1,4 @@
+import { validateRange, rangeFields } from './moment-range.js';
 export const EMOTIONS = ['설렘', '위로', '벅참', '그리움', '고마움', '즐거움'];
 // #256-3: 책(트리)마다 고르는 디자인 표지. 테마 표지 색(--lt-cover-N) 위의 질감 변형 6종.
 // 값은 이 목록뿐이다. 모르는 값·타입은 저장 거부가 아니라 ''(기본 표지)로 되돌린다.
@@ -194,7 +195,9 @@ export function validateMomentInput(input) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(date)) || new Date(date).toISOString().slice(0, 10) !== date) throw new Error('날짜를 확인해 주세요.');
   const relation = typeof input.relation === 'string' ? input.relation.trim() : '';
   if (relation.length > 100) throw new Error('연결 이유는 100자까지 적을 수 있어요.');
-  const result = { title, note, emotion, date, relation, url };
+  // #792: 시작·끝 구간은 선택 값. 둘 다 없으면 키 자체를 넣지 않는다.
+  const range = validateRange(input, url);
+  const result = { title, note, emotion, date, relation, url, ...range };
   if (mediaMetadata) result.mediaMetadata = mediaMetadata;
   return result;
 }
@@ -465,7 +468,10 @@ export function validateState(value) {
       if (!Array.isArray(rawLinks) || rawLinks.length > MAX_LINKS) throw new Error('관련 순간 데이터가 올바르지 않아요.');
       for (const link of rawLinks) if (!idValid(link) || link === m.id) throw new Error('관련 순간 데이터가 올바르지 않아요.');
       ids.add(m.id);
-      return { ...validateMomentInput(m), id: m.id, parentId: m.parentId, links: [...new Set(rawLinks)], createdAt: m.createdAt, ...boardLayoutOf(m) };
+      // 틀린 구간 값은 그 필드만 버린다(순간 전체를 거부하지 않는다).
+      const clean = { ...m };
+      delete clean.startSeconds; delete clean.endSeconds;
+      return { ...validateMomentInput(clean), ...rangeFields(m, m.url), id: m.id, parentId: m.parentId, links: [...new Set(rawLinks)], createdAt: m.createdAt, ...boardLayoutOf(m) };
     });
     if (moments.filter(m => m.parentId === null).length !== 1) throw new Error('트리의 시작 순간은 하나여야 해요.');
     const byId = new Map(moments.map(m => [m.id, m]));
