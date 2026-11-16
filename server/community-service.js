@@ -27,6 +27,7 @@ function publicComment(row,viewer,isAdmin=false){const mine=!!viewer&&row.subjec
 
 export function createCommunityService({communityRepo,shareRepo,workspaceRepo,visibilityRepo=null,productId,admin=null,now=()=>Date.now(),makeId=()=>randomUUID()}){
  const writes=new Map();
+ let totalsCache=null;
  function rate(subjectId,kind,limit=20){
   const key=subjectId+'\0'+kind,cut=now()-60_000,list=(writes.get(key)||[]).filter(at=>at>cut);
   if(list.length>=limit)throw new ApiError(429,'rate_limited','잠시 뒤 다시 시도해 주세요.');
@@ -63,6 +64,16 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
   return card;
  }
  return {
+  // 첫 화면 둘러보기 숫자(261116 PR 2) — 공개 집계(로그인 없이 읽는다). 서버에서 1분 메모리 캐시를 두고,
+  // 응답 헤더에도 cache-control: max-age=60을 실어 브라우저·중간 단계가 같은 한도로 재활용하게 한다.
+  async discoverTotals(){
+   const at=now();
+   if(totalsCache&&at-totalsCache.at<60_000)return totalsCache.value;
+   if(typeof communityRepo.discoverTotals!=='function')return {trees:0,moments:0};
+   const value=await communityRepo.discoverTotals({productId});
+   totalsCache={at,value};
+   return value;
+  },
   async discover({query='',emotion='',cursor='',limit=12,viewerSubjectId=null}={}){
    const q=clean(query,80).toLocaleLowerCase('ko-KR'),tag=clean(emotion,12),size=Math.max(1,Math.min(24,Number(limit)||12));
    // #611 3번: AI 명예회원 배지 비트 — 이번 한 번의 둘러보기 조회에서는 같은 주인이면 한 번만 묻는다.
@@ -168,6 +179,7 @@ export function createCommunityHandler({authenticate,service,productId}){
   const path=String(request?.path||''),method=request?.method||'GET',query=request?.query||new URLSearchParams();
   // #627 3단계 '다른 팬 보기' — 공개 경로라 로그인 없이도 부른다. 로그인했으면 자기 트리·차단 관계를 뺀다.
   if(path==='/api/public/tag-moments'&&method==='GET'){const who=await principal(request,false);return {status:200,body:await service.tagMoments({tag:String(query.get('tag')||''),viewerSubjectId:who?.subjectId||null}),headers:NO_STORE};}
+  if(path==='/api/community/stats'&&method==='GET'){return {status:200,body:await service.discoverTotals(),headers:{...NO_STORE,'cache-control':'public, max-age=60'}};}
   if(path==='/api/community/shares'&&method==='GET'){const who=await principal(request,false);return {status:200,body:await service.discover({query:query.get('q')||'',emotion:query.get('emotion')||'',cursor:query.get('cursor')||'',limit:query.get('limit')||12,viewerSubjectId:who?.subjectId||null}),headers:NO_STORE};}
   if(path==='/api/community/me/favorites'&&method==='GET'){const who=await principal(request);return {status:200,body:{shareIds:await service.favorites(who.subjectId)},headers:NO_STORE};}
   if(path==='/api/community/admin/reports'&&method==='GET'){const who=await principal(request);return {status:200,body:{reports:await service.reports(who)},headers:NO_STORE};}

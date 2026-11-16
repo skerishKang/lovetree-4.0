@@ -1,20 +1,20 @@
-// 첫 화면(SRC064) 가운데 버튼의 상태별 표시 (대표 지시 2026-11-07 · #380 2026-11-11 댓글 반영 · #426 2026-11-12).
-// 2026-11-14 대표 결정: 로그인한 첫 화면도 세 자리를 쓴다 — [＋ 순간 추가·둘러보기·내 트리].
-// 로그아웃의 세 자리[＋ 첫 순간 추가·둘러보기·어떻게 쓰나요]와 같은 폭·여백(#505 의 .center .actions data-count)을 쓴다.
-// 흰 강조(primary-cta)는 언제나 첫째 하나. 자리가 남으면 숨긴다.
+// 첫 화면(SRC064) 가운데 버튼의 상태별 표시 (대표 지시 2026-11-07 · #380 2026-11-11 댓글 반영 · #426 2026-11-12 · 261116 PR 2).
+// 261116 PR 2(대표 확정): 로그인 상태의 '+ 순간 추가'는 글귀 바로 아래 위쪽 단추(밝은 채움)로 올라가고,
+// 가운데 세트는 [순간 목록·둘러보기·내 트리] 테두리형(같은 무게·같은 폭) — primary-cta는 세트에 없다.
+// 로그아웃의 세 자리[＋ 첫 순간 추가·둘러보기·어떻게 쓰나요]는 지금처럼 첫 버튼만 흰 강조다.
 // 로그아웃 문구는 이 화면이 쓴다(4.0 첫 화면의 말투 그대로). 로그인 상태 문구는 header-state 의 homeCenterState 와 같게 둔다.
 
 import {homeCenterState, homeStartLoginUrl, readTheme} from '../public/v41/header-state.mjs';
 
 const LABELS={
   out:['＋ 첫 순간 추가','둘러보기','어떻게 쓰나요'],
-  'in-empty':['＋ 순간 추가','둘러보기','내 트리'],
-  'in-trees':['＋ 순간 추가','둘러보기','내 트리']
+  'in-empty':['순간 목록','둘러보기','내 트리'],
+  'in-trees':['순간 목록','둘러보기','내 트리']
 };
 const KEYS={
   out:['start','community','guide'],
-  'in-empty':['add','community','trees'],
-  'in-trees':['add','community','trees']
+  'in-empty':['moments','community','trees'],
+  'in-trees':['moments','community','trees']
 };
 
 // mountOrbit이 만든 버튼에 상태를 입힌다. buttons: 순서대로의 실제 DOM 버튼. 라벨 수가 적으면 남은 버튼은 숨긴다.
@@ -29,7 +29,8 @@ export function applyHomeCenter(buttons, state) {
     button.hidden = false;
     button.textContent = labels[index];
     button.dataset.do = keys[index];
-    button.classList.toggle('primary-cta', index === 0);
+    // 261116 PR 2: 세트 강조는 로그아웃 첫 버튼만 — 로그인 세트는 테두리형(위쪽 '+ 순간 추가'가 밝은 채움을 맡는다).
+    button.classList.toggle('primary-cta', index === 0 && s === 'out');
     button.removeAttribute('title');
   });
   return plan;

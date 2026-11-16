@@ -51,6 +51,8 @@ const ALLOWED = new Map([
   ['/api/shares', new Set(['GET', 'POST'])],
   ['/api/shares/preview', new Set(['POST'])],
   ['/api/community/shares', new Set(['GET'])],
+  // 첫 화면 둘러보기 숫자(261116 PR 2) — 로그인 없이 읽는 공개 집계. GET만 넘긴다.
+  ['/api/community/stats', new Set(['GET'])],
   ['/api/community/me/favorites', new Set(['GET'])],
   ['/api/community/admin/reports', new Set(['GET'])],
   // #627 3단계 '다른 팬 보기' — 같은 꼬리표의 공개 순간(GET만).

@@ -145,8 +145,10 @@ export function writeMenuLabel({ owned = false, dirty = false, reading = false, 
   return '순간 추가';
 }
 
-// 첫 화면 가운데 버튼 3개. 자리와 개수는 그대로 두고 강조와 첫 버튼 문구만 상태로 바꾼다.
-// 흰색 강조(primary-cta)는 언제나 정확히 하나다.
+// 첫 화면 가운데 버튼 3개. 자리와 개수는 그대로 두고 첫 버튼 문구만 상태로 바꾼다.
+// 261116 PR 2(대표 확정): 로그인 상태는 '+ 순간 추가'가 글귀 바로 아래 위쪽 단추(밝은 채움)로 올라가고,
+// 가운데 세트는 [순간 목록·둘러보기·내 트리] 테두리형 — 강조는 세트에 없다(위쪽 단추 하나뿐).
+// 로그아웃은 지금처럼 첫 버튼만 흰 강조다.
 export function homeCenterState({ member = 'out', treeCount = 0 } = {}) {
   const signedIn = member === 'in';
   const hasTree = signedIn && Number(treeCount) > 0;
@@ -160,13 +162,13 @@ export function homeCenterState({ member = 'out', treeCount = 0 } = {}) {
       ]
     };
   }
-  // 2026-11-14 대표 결정: 로그인한 첫 화면도 로그아웃과 같은 세 자리를 쓴다 — [＋ 순간 추가·둘러보기·내 트리].
+  // 2026-11-14 대표 결정: 로그인한 첫 화면도 로그아웃과 같은 세 자리를 쓴다(261116 PR 2에서 첫 자리는 '순간 목록').
   // 폭·여백은 #505 의 .center .actions 규칙이 그대로 맡으므로, 두 상태의 단추 크기·간격이 같아진다.
   if (!hasTree) {
     return {
       state: 'in-empty',
       buttons: [
-        { key: 'add', label: '＋ 순간 추가', emphasis: true, disabled: false, title: '새 순간을 남깁니다.' },
+        { key: 'moments', label: '순간 목록', emphasis: false, disabled: false, title: '모아 둔 순간을 한곳에서 봅니다.' },
         { key: 'community', label: '둘러보기', emphasis: false, disabled: false, title: '다른 사람의 순간을 둘러봅니다.' },
         { key: 'trees', label: '내 트리', emphasis: false, disabled: false, title: '내 트리 목록을 엽니다.' }
       ]
@@ -175,7 +177,7 @@ export function homeCenterState({ member = 'out', treeCount = 0 } = {}) {
   return {
     state: 'in-trees',
     buttons: [
-      { key: 'add', label: '＋ 순간 추가', emphasis: true, disabled: false, title: '새 순간을 남깁니다.' },
+      { key: 'moments', label: '순간 목록', emphasis: false, disabled: false, title: '모아 둔 순간을 한곳에서 봅니다.' },
       { key: 'community', label: '둘러보기', emphasis: false, disabled: false, title: '다른 사람의 순간을 둘러봅니다.' },
       { key: 'trees', label: '내 트리', emphasis: false, disabled: false, title: '내 트리 목록을 엽니다.' }
     ]

@@ -10,6 +10,8 @@ import {applyHomeCenter} from './home-center.js';
 import {readTheme,writeTheme,appliedTheme,applyThemeAttribute} from '../public/v41/header-state.mjs';
 import {readTitleDisplay, titleDisplayOf, shouldReloadForTitleDisplay} from '../public/v41/book-usability.mjs';
 import {momentListEntries, momentListTrees} from './moment-list.js';
+// 261116 PR 2: 카드 모드(마지막·고정·그날·무작위·트리)·숫자 줄이기 — 순수 계산 한 벌.
+import {HOME_MOMENT_KEY, readHomeMoment, normalizeHomeMoment, homeMomentPick, homeDayMoment, homeMomentMenu, formatCount} from './home-card-mode.js';
 const shellBody=parent.document.body;
 const context=parent.LT41||{source:shellBody.dataset.recordSource,member:shellBody.dataset.member,treeCount:Number(shellBody.dataset.treeCount||0)};
 const bridge=createHomeActions({getContext:()=>parent.LT41,send:message=>parent.postMessage(message,location.origin),gallery:true});
@@ -27,6 +29,9 @@ const cardTrees=cardsPlan.cards.length?[{id:'home-cards',title:'첫 화면 카�
 // #394: 순간 목록은 모든 트리의 순간을 최근 순으로 보는 곳. 트리 드롭다운의 "내 순간 전체 보기"로
 // 열릴 때는 셸이 남긴 요청(LT41_MOMENTS_OPEN)의 트리가 골라진 상태로 시작한다.
 const momentsRequest=parent.LT41_MOMENTS_OPEN??null;try{console.log('[home] momentsRequest',JSON.stringify(momentsRequest||null));}catch{}
+// 261116 PR 2: 카드 모드 값 — 계정 설정(LT41.prefs.homeMoment)을 먼저 보고 기기 미러, 없으면 기본(마지막).
+let homeMomentValue=readHomeMoment({prefs:parent.LT41,storage:localStorage});
+const homeMomentDay=loggedIn?homeDayMoment(context.trees):null;
 const momentList=loggedIn?{
  trees:momentListTrees(context.trees),
  entries:momentListEntries({trees:context.trees,youtube}),
@@ -35,6 +40,8 @@ const momentList=loggedIn?{
  initialPicking:momentsRequest?.picking===true,
  initialNotice:momentsRequest?.notice||null
 }:null;
+const homeMomentChoice=homeMomentPick(momentList?.entries,homeMomentValue,{day:homeMomentDay,trees:momentList?.trees||[]});
+if(momentList){momentList.recent=homeMomentChoice.moment;momentList.recentHeader=homeMomentChoice.header;}
 // 이 문서가 그려질 때 쓴 날짜 표기. 셸이 같은 값을 다시 보내면 새로고침하지 않는다(아래 메시지 처리).
 const renderedDateStyle=dateStyleOf(ltDateStyle());
 // #481: 이 문서가 그릴 때 쓴 제목 보기. 받은 값이 이것과 다를 때만 다시 띄운다.
@@ -47,6 +54,11 @@ const renderedTitleDisplay=titleDisplayOf(readTitleDisplay(parent.LT41));
  prefs:parent.LT41?.prefs||null,
  titleDisplay:readTitleDisplay(parent.LT41),
  dateStyle:renderedDateStyle,
+ // 261116 PR 2: 순간 창의 '첫 화면에 걸기' — 계정 설정에 고정하고 모드를 '고정한 순간'으로 바꾼다.
+ homePin:{
+  pinned:c=>homeMomentValue.mode==='pin'&&homeMomentValue.momentId===c.id&&homeMomentValue.treeId===c.treeId,
+  toggle:c=>{setHomeMoment(isPinnedMoment(c)?{mode:'last'}:{mode:'pin',momentId:c.id,treeId:c.treeId});return isPinnedMoment(c);}
+ },
  onOpen:card=>{if(card.source==='public'){parent.location.hash=`#share/${card.shareId}/${card.view||'book'}`;return;}bridge.actions.openMine(card.treeId,card.id);},
  storage:{getItem:()=>null,setItem:()=>{}},context:{...presentation.context,readOnly:cardsPlan.kind==='example'},
  authHtml:`<button class="menuBtn auth-entry" data-home-account>${presentation.accountLabel}</button>`,actions:bridge.actions
@@ -54,11 +66,13 @@ const renderedTitleDisplay=titleDisplayOf(readTitleDisplay(parent.LT41));
 // #394: 순간 목록 열기 요청을 받았다고 셸에 알린다 — 셸은 요청 플래그를 치워 다음 화면 이동에 되풀이하지 않게 한다.
 if(momentsRequest){try{parent.postMessage({type:'lt41-moments-opened'},location.origin)}catch{}}
 const shadow=document.getElementById('orbit').shadowRoot;
+// 261116 PR 2: 오른쪽 위 '순간 목록' 단추는 없앤다 — 목록 입구는 가운데 세트 첫 단추로 옮겼다.
+shadow.querySelector('.top-actions > .menuBtn[data-do="index"]')?.remove();
 // #380(2026-11-11): 가운데 세 버튼 — 자리·개수 그대로, 남은 폭을 똑같이 나눠 세 폭 동일(가장 긴 글자 기준 고정), 로그인 후 상태 한 줄.
 const centerStyle=document.createElement('style');
 // 버튼 폭(대표 2026-11-13): 세 개일 때의 폭(약 176px)을 넘지 않게 묶는다 — 두 개면 265px씩 늘어나 둔해 보였다.
 // 휴대폰: 줄을 꽉 채우지 않는다. 두 개는 나란히(사이 10px), 세 개는 세로로 쌓되 폭 240px까지만 — 양옆과 버튼 사이에 여백을 둔다.
-centerStyle.textContent='.center .actions{gap:10px}.center .actions .subtleBtn{flex:1 1 0%;max-width:176px;min-width:0;overflow-wrap:anywhere;text-align:center;line-height:1.15}.center > p:not(.center-note){min-height:2lh}@media (max-width:480px){.center .actions{gap:10px}.center .actions .subtleBtn{max-width:150px}.center .actions[data-count="3"]{flex-direction:column;align-items:center}.center .actions[data-count="3"] .subtleBtn{flex:0 0 auto;width:100%;max-width:240px}}';
+centerStyle.textContent='.center .actions{gap:10px}.center .actions .subtleBtn{flex:1 1 0%;max-width:176px;min-width:0;overflow-wrap:anywhere;text-align:center;line-height:1.15}@media (max-width:480px){.center .actions{gap:10px}.center .actions .subtleBtn{max-width:150px}.center .actions[data-count="3"]:not([data-inline]){flex-direction:column;align-items:center}.center .actions[data-count="3"]:not([data-inline]) .subtleBtn{flex:0 0 auto;width:100%;max-width:240px}}';
 shadow.append(centerStyle);
 // 2026-11-07 테마 A/B: 첫 화면 오른쪽 위 도구 줄의 버튼 하나로 밤/정원을 바꾼다. 저장 키는 셸과 같다(lt41.theme).
 // 정원 색은 public/v41/identity.css의 정원 블록에만 있고, 그 파일을 그림자 루트에도 넣어 :host 규칙을 쓴다.
@@ -82,11 +96,12 @@ shadow.append(cardUI);
 const centerButtons=[...shadow.querySelectorAll('.center .actions button')];
 const centerPlan=applyHomeCenter(centerButtons,presentation.centerState);
 const byDo=name=>centerButtons.find(b=>b.dataset.do===name);
-// 보이는 버튼 수를 표시한다(위 버튼 폭 규칙이 쓴다).
-shadow.querySelector('.center .actions')?.setAttribute('data-count',String(centerButtons.filter(b=>!b.hidden&&b.style.display!=='none').length));
-// '＋ 순간 추가' → 기존 add 흐름(requestMoment add), 둘러보기 → 기존 community. '어떻게 쓰나요'(#635)는
-// 같은 첫 화면의 안내 패널(orbit-dialog·showModal 틀)을 연다 — 별도 사용법 안내 화면·경로는 없다(#388 때부터 둘러보기와 같은 동작이었다).
-const addButton=byDo('add');if(addButton)addButton.onclick=()=>bridge.actions.requestMoment('add');
+// 보이는 버튼 수를 표시한다(위 버튼 폭 규칙이 쓴다). 로그인 세트는 390에서도 한 줄(data-inline — 옛 세로 쌓기는 로그아웃만).
+const actionsRow=shadow.querySelector('.center .actions');
+actionsRow?.setAttribute('data-count',String(centerButtons.filter(b=>!b.hidden&&b.style.display!=='none').length));
+if(loggedIn)actionsRow?.setAttribute('data-inline','');
+// '순간 목록' → 궤도의 목록 창(전체). 둘러보기 → 기존 community. '어떻게 쓰나요'(#635)는 같은 첫 화면의 안내 패널(orbit-dialog·showModal 틀)을 연다.
+const momentsButton=byDo('moments');if(momentsButton)momentsButton.onclick=()=>orbit?.index?.('all');
 const communityButton=byDo('community');if(communityButton)communityButton.onclick=()=>bridge.actions.community();
 const guideButton=byDo('guide');if(guideButton)guideButton.onclick=openGuide;
 // 2026-11-14 대표 결정: 로그인한 첫 화면 셋째 단추 '내 트리'는 내 트리 목록(책장)으로 간다.
@@ -135,31 +150,119 @@ if(cardsPlan.note!==null)shadow.querySelector('.center-note').textContent=cardsP
 // 2026-11-08 접근성: 카드 출처 안내가 바뀌면 화면 낭독기가 알린다.
 shadow.querySelector('.center-note')?.setAttribute('aria-live','polite');
 shadow.querySelector('.center-note')?.setAttribute('role','status');
-// #380(2026-11-11): 로그인 후 큰 제목 아래 설명 둘째 줄 = 상태(높이 두 줄 고정): 정리 알림 > 첫 순간 안내. 로그인 전 문구는 그대로 둔다.
-// #426(2026-11-12): 마지막 순간 안내는 최근 순간 카드가 대신 보여 준다(둘째 줄에서 뺐다).
+// 261116 PR 2(대표 확정): 큰 제목 아래 둘째 줄 안내(옛 정리 알림·첫 순간 안내)는 치웠다 —
+// 그 자리(글귀 바로 아래)에 '+ 순간 추가' 단추(밝은 채움)가 온다. 로그인 상태만 — 로그아웃은 지금처럼 둔다.
 if(loggedIn){
-  const target=shadow.querySelector('.center > p:not(.center-note)');
-  if(target){
-    let label=null;
-    if(context.tree?.inbox===true){
-      const n=(context.tree.moments||[]).length;
-      // #380 5번: 정리하기 입구는 트리 ▾ 드롭다운 한 곳만 — 첫 화면은 몇 개인지만 알린다.
-      if(n>0){label=`정리 안 된 순간 ${n}개`;}
-    }
-    if(label===null){
-      // #426(2026-11-12): 순간이 하나라도 있으면 최근 순간 카드가 이어 보기를 대신한다 — 둘째 줄은 안내 한 줄만.
-      const hasAnyMoment=(Array.isArray(context.trees)?context.trees:[]).some(t=>Array.isArray(t?.moments)&&t.moments.length>0);
-      if(!hasAnyMoment)label='첫 순간을 남기면 여기서 이어 볼 수 있어요';
-    }
-    target.textContent='';
-    target.append('기억은 아직 여기에서 이어지고 있어요.');
-    // #426: 순간이 있으면 둘째 줄은 안내 한 줄만(카드가 마지막 순간을 대신 보여 준다).
-    if(label){
-      target.append(document.createElement('br'));
-      target.append(label);
-    }
-  }
+ const quote=shadow.querySelector('.center > p:not(.center-note)');
+ const addTop=document.createElement('button');
+ addTop.type='button';addTop.className='subtleBtn primary-cta home-add-top';
+ addTop.textContent='＋ 순간 추가';
+ addTop.onclick=()=>bridge.actions.requestMoment('add');
+ quote?.after(addTop);
 }
+// ── 261116 PR 2: 카드 모드 저장·머리글 메뉴·가운데 카드 아래 정보 줄 ─────────────────────
+const isPinnedMoment=c=>!!c&&homeMomentValue.mode==='pin'&&homeMomentValue.momentId===c.id&&homeMomentValue.treeId===c.treeId;
+const setHomeMoment=next=>{
+ homeMomentValue=normalizeHomeMoment(next);
+ try{localStorage.setItem(HOME_MOMENT_KEY,JSON.stringify(homeMomentValue))}catch{}
+ // 계정 설정(이미 있는 저장 길)에 저장한다 — 셸이 setPrefs로 계정 기록에 반영한다.
+ try{parent.postMessage({type:'lt41-home-moment',value:homeMomentValue},location.origin)}catch{}
+ const picked=homeMomentPick(momentList?.entries,homeMomentValue,{day:homeMomentDay,trees:momentList?.trees||[]});
+ orbit?.recent?.set(picked.moment,picked.header);
+ closeRecentMenu();
+};
+let recentMenu=null,recentMenuOpener=null;
+function closeRecentMenu(){recentMenu?.remove();recentMenu=null;if(recentMenuOpener){recentMenuOpener.setAttribute('aria-expanded','false');recentMenuOpener=null;}}
+function openRecentMenu(button){
+ closeRecentMenu();
+ recentMenuOpener=button;button.setAttribute('aria-expanded','true');
+ recentMenu=document.createElement('div');recentMenu.className='recent-menu';recentMenu.setAttribute('role','menu');recentMenu.setAttribute('aria-label','첫 화면 카드 고르기');
+ for(const item of homeMomentMenu(homeMomentValue,{trees:momentList?.trees||[]})){
+  const head=document.createElement('button');head.type='button';head.setAttribute('role','menuitemradio');
+  head.setAttribute('aria-checked',String(homeMomentValue.mode===item.mode));head.textContent=item.label;
+  if(item.mode!=='tree')head.dataset.mode=item.mode;
+  if(item.disabled)head.disabled=true;
+  head.onclick=()=>{closeRecentMenu();if(item.disabled||item.mode==='tree')return;setHomeMoment({mode:item.mode,momentId:item.mode==='pin'?homeMomentValue.momentId:'',treeId:item.mode==='pin'?homeMomentValue.treeId:''});};
+  recentMenu.append(head);
+  if(item.mode==='tree'){for(const tree of item.trees){
+   const tb=document.createElement('button');tb.type='button';tb.className='recent-menu-sub';tb.setAttribute('role','menuitemradio');
+   tb.setAttribute('aria-checked',String(homeMomentValue.mode==='tree'&&homeMomentValue.treeId===tree.id));tb.textContent=tree.label;
+   tb.onclick=()=>{closeRecentMenu();setHomeMoment({mode:'tree',treeId:tree.id});};
+   recentMenu.append(tb);
+  }}
+ }
+ shadow.append(recentMenu);
+ // 카드 위 작은 목록 — 카드 위쪽 가운데로 두고 화면 밖으로 나가지 않게 잡는다.
+ const card=shadow.querySelector('.recent-card'),rect=card?.getBoundingClientRect(),menu=recentMenu.getBoundingClientRect();
+ if(rect&&menu){
+  const width=Math.ceil(menu.width),height=Math.ceil(menu.height);
+  let left=Math.round(rect.left+rect.width/2-width/2),top=Math.round(rect.top-height-10);
+  if(top<8)top=8;
+  left=Math.max(8,Math.min(left,document.documentElement.clientWidth-width-8));
+  recentMenu.style.left=`${left}px`;recentMenu.style.top=`${top}px`;
+ }
+ const first=recentMenu.querySelector('button:not([disabled])');first?.focus();
+}
+shadow.addEventListener('click',event=>{
+ const head=event.target.closest?.('[data-recent-head]');
+ if(head){if(recentMenu)closeRecentMenu();else openRecentMenu(head);return;}
+ if(recentMenu&&!event.target.closest?.('.recent-menu'))closeRecentMenu();
+});
+shadow.addEventListener('keydown',event=>{if(event.key==='Escape'&&recentMenu){event.stopPropagation();const opener=recentMenuOpener;closeRecentMenu();opener?.focus();}},true);
+// 가운데 카드 아래 정보 줄 — 줄마다 이름 왼쪽·값 오른쪽 끝. 모아둔·전체·둘러보기·내 트리의 숫자는 한 벌(formatCount).
+function infoLine({label,value,gold=false,dim=false,ellipsis=false}){
+ const node=document.createElement(dim?'span':'button');
+ if(node.tagName==='BUTTON')node.type='button';
+ node.className='home-info-line'+(gold?' gold':'')+(dim?' dim':'');
+ const k=document.createElement('span');k.className='home-info-k';k.textContent=label;
+ const v=document.createElement('span');v.className='home-info-v'+(ellipsis?' ellipsis':'');v.textContent=value;
+ node.append(k,v);
+ return node;
+}
+const infoRow=document.createElement('div');infoRow.className='home-info';
+// 순간 목록 칸 — '모아둔 37'(금빛, 누르면 모아둔 고른 목록) / '전체 42'(누르면 전체 목록). 모아둔 0이면 그 줄 흐리게.
+const inboxTree=(Array.isArray(context.trees)?context.trees:[]).find(t=>t?.inbox===true);
+const inboxCount=Array.isArray(inboxTree?.moments)?inboxTree.moments.length:0;
+const totalCount=Array.isArray(momentList?.entries)?momentList.entries.length:0;
+const cellMoments=document.createElement('div');cellMoments.className='home-info-cell';cellMoments.dataset.cell='moments';
+const inboxLine=infoLine({label:'모아둔',value:formatCount(inboxCount),gold:true,dim:inboxCount===0});
+if(inboxCount>0)inboxLine.onclick=()=>orbit?.index?.(inboxTree?.id||'');
+const allLine=infoLine({label:'전체',value:formatCount(totalCount),dim:totalCount===0});
+if(totalCount>0)allLine.onclick=()=>orbit?.index?.('all');
+cellMoments.append(inboxLine,allLine);
+// 둘러보기 칸 — 로그인 없이 보이는 공개 집계(1분 캐시). '순간 N' / '트리 N', 누르면 둘러보기.
+const cellCommunity=document.createElement('div');cellCommunity.className='home-info-cell';cellCommunity.dataset.cell='community';
+const communityLine=label=>{const line=infoLine({label,value:'…'});line.dataset.community=label;line.onclick=()=>bridge.actions.community();return line;};
+const communityLines={moments:communityLine('순간'),trees:communityLine('트리')};
+cellCommunity.append(communityLines.moments,communityLines.trees);
+(async()=>{try{
+ const answer=await fetch('/api/community/stats',{headers:{accept:'application/json'}});
+ if(!answer.ok)throw Error('stats unavailable');
+ const stats=await answer.json();
+ communityLines.moments.querySelector('.home-info-v').textContent=formatCount(stats?.moments);
+ communityLines.trees.querySelector('.home-info-v').textContent=formatCount(stats?.trees);
+}catch{ // 집계를 못 가져오면 빈 약속 대신 칸을 숨긴다(숫자 없이 틀만 남기지 않는다).
+ cellCommunity.hidden=true;
+}})();
+infoRow.append(cellMoments,cellCommunity);
+// 내 트리 칸(로그인) — '트리 N' / '최근 <트리 이름>'(마지막으로 순간을 넣은 트리, 누르면 그 트리로; 길면 칸 폭에서 '…').
+if(loggedIn){
+ const cellTrees=document.createElement('div');cellTrees.className='home-info-cell';cellTrees.dataset.cell='trees';
+ const myTreeCount=(Array.isArray(momentList?.trees)?momentList.trees:[]).length;
+ const treesLine=infoLine({label:'트리',value:formatCount(myTreeCount),dim:myTreeCount===0});
+ if(myTreeCount>0)treesLine.onclick=()=>bridge.actions.navigate('trees');
+ const recentTree=(Array.isArray(momentList?.entries)?momentList.entries:[])[0]||null;
+ const recentLine=recentTree?infoLine({label:'최근',value:recentTree.treeLabel||'내 트리',ellipsis:true}):infoLine({label:'최근',value:'—',dim:true});
+ if(recentTree)recentLine.onclick=()=>bridge.actions.openMine(recentTree.treeId,recentTree.id);
+ cellTrees.append(treesLine,recentLine);
+ infoRow.append(cellTrees);
+}
+if(!loggedIn)cellCommunity.style.gridColumn='2'; // 로그인 전: 단추는 지금처럼, 숫자는 둘러보기 것만(가운데 칸).
+actionsRow?.after(infoRow);
+// 261116 PR 2 모양: 정보 줄·머리글 메뉴. 색은 identity.css의 --lt-* 토큰만(정원은 종이 위 글자 — gold-ink·muted).
+const infoStyle=document.createElement('style');
+infoStyle.textContent=`.home-add-top{margin-top:12px}.center .actions[data-inline]{flex-direction:row;align-items:stretch}.center .actions[data-inline] .subtleBtn{flex:1 1 0%;width:auto;max-width:176px}.home-info{display:grid;grid-template-columns:repeat(3,minmax(0,176px));gap:10px;justify-content:center;margin:12px auto 0;width:100%;max-width:560px}.home-info-cell{display:grid;align-content:start;min-width:0}.home-info-line{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:44px;padding:0 12px;border:0;background:none;cursor:pointer;font:inherit;font-size:12px;line-height:1.4;color:#d4cee0;text-align:left;min-width:0;width:100%}span.home-info-line{cursor:default}.home-info-line.gold{color:var(--lt-gold,#ffe6a6)}.home-info-line.dim{color:var(--lt-muted,#9b98a6)}.home-info-k{flex:none}.home-info-v{font-variant-numeric:tabular-nums;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right}.home-info-line:focus-visible{outline:2px solid #e8b8c9;outline-offset:1px;border-radius:8px}:host([data-lt-theme=garden]) .home-info-line{color:var(--lt-muted)}:host([data-lt-theme=garden]) .home-info-line.gold{color:var(--lt-gold-ink)}:host([data-lt-theme=garden]) .home-info-line.dim{opacity:.72}.recent-menu{position:fixed;z-index:4000;min-width:220px;max-width:min(300px,86vw);max-height:min(60dvh,420px);overflow:auto;padding:6px;border:1px solid var(--lt-line,rgba(255,255,255,.14));border-radius:14px;background:rgba(7,7,12,.97);box-shadow:0 18px 44px rgba(0,0,0,.5)}.recent-menu button{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;min-height:44px;padding:0 12px;border:0;border-radius:8px;background:none;cursor:pointer;font:inherit;font-size:13px;color:#e6ddef;text-align:left}.recent-menu button[aria-checked="true"]{color:var(--lt-gold,#ffe6a6)}.recent-menu button[disabled]{color:var(--lt-muted,#9b98a6);cursor:default}.recent-menu button:focus-visible{outline:2px solid #e8b8c9;outline-offset:-2px}.recent-menu .recent-menu-sub{padding-left:22px;font-size:12px;color:#cfc6dd}:host([data-lt-theme=garden]) .recent-menu{background:var(--lt-paper,#f7f0e8);border-color:var(--lt-line-paper)}:host([data-lt-theme=garden]) .recent-menu button{color:var(--lt-ink)}:host([data-lt-theme=garden]) .recent-menu button[aria-checked="true"]{color:var(--lt-gold-ink)}:host([data-lt-theme=garden]) .recent-menu button[disabled],:host([data-lt-theme=garden]) .recent-menu .recent-menu-sub{color:var(--lt-muted)}@media(max-width:650px){.home-info{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;max-width:none;padding:0 6px}.home-info-line{padding:0 8px}}`;
+shadow.append(infoStyle);
 const mobileFit=document.createElement('style');mobileFit.textContent='@media(max-width:768px){.topbar{gap:12px;flex-wrap:wrap;align-items:center;padding:8px 12px}.top-actions{gap:6px;flex-shrink:0;flex-wrap:wrap;margin-left:auto}.topbar .menuBtn{white-space:nowrap;padding:10px 9px;font-size:14px}.actions .subtleBtn{font-size:14px}.center .center-note{font-size:14px}.hint{font-size:14px}}';shadow.append(mobileFit);
 // #380 5번: 첫 화면 오른쪽 위 "보기 ▾" 메뉴(테마·움직임·카드 출처)는 없앴다.
 // 로그인 상태의 같은 항목은 설정 창(셸)의 '화면' 묶음에 있고, 셸이 아래 두 메시지로 알려 준다.

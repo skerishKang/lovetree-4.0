@@ -38,7 +38,8 @@ function fakeBook() {
   const selected = [];
   const LTDEMO = {
     moments,
-    prefs: { titleDisplay: 'both', displayName: '', accentColor: '', dateStyle: 'dot', startPlace: 'resume', shareView: 'book', shareDiscover: false, treeChipOrder: [] },
+    prefs: { titleDisplay: 'both', displayName: '', accentColor: '', dateStyle: 'dot', startPlace: 'resume', shareView: 'book', shareDiscover: false, treeChipOrder: [] }, prefs: { titleDisplay: 'both', displayName: '', accentColor: '', dateStyle: 'dot', startPlace: 'resume', shareView: 'book', shareDiscover: false, homeMoment: { mode: 'last', treeId: '', momentId: '' } },
+
     get: () => state.momentId,
     select: id => { if (moments.some(m => m.id === id)) { state.momentId = id; selected.push(id); } }
   };

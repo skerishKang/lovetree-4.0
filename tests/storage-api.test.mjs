@@ -118,6 +118,8 @@ test('users cannot reach each other workspace', async () => {
   const read = await get(bob);
   assert.equal(read.status, 200);
   assert.deepEqual(read.body, { revision: 0, savedAt: null, state: { version: 1, trees: [], prefs: { titleDisplay: 'both', displayName: '', accentColor: '', dateStyle: 'dot', startPlace: 'resume', shareView: 'book', shareDiscover: false, treeChipOrder: [] } }, subject: 'usr_b' });
+  assert.deepEqual(read.body, { revision: 0, savedAt: null, state: { version: 1, trees: [], prefs: { titleDisplay: 'both', displayName: '', accentColor: '', dateStyle: 'dot', startPlace: 'resume', shareView: 'book', shareDiscover: false, homeMoment: { mode: 'last', treeId: '', momentId: '' } } }, subject: 'usr_b' });
+
 });
 
 test('productId and uid inside the body are never identity', async () => {

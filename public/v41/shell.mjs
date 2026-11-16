@@ -39,7 +39,7 @@ import {connectionSignature} from './shell/panel-dirty.mjs';
 import {createLocation} from './shell/location.mjs';
 import {createNotifier, syncedNoticeText, newlyPublishedTrees} from './shell/notice.mjs';
 import {paintLoginLinks,paintThemeControls,applyTheme as applyThemeFor,toggleTheme as toggleThemeFor} from './shell/theme.mjs';
-import {normalizeTitleDisplay, normalizeAccentColor, normalizeDateStyle, normalizeStartPlace, normalizeShareView, coverModeOf, normalizeCoverDesign} from './domain.mjs';
+import {normalizeTitleDisplay, normalizeAccentColor, normalizeDateStyle, normalizeStartPlace, normalizeShareView, normalizeHomeMoment, coverModeOf, normalizeCoverDesign} from './domain.mjs';
 import {backfillVideoTitles} from './title-backfill.mjs';
 import {thumbnailCandidates, coverFallbackAttrs, fallbackCardData, emotionToneOf, mountThumbFallback, ADD_TITLE_LABEL, VIDEO_UNAVAILABLE_TEXT} from './thumb-fallback.mjs';
 const $=id=>document.getElementById(id);
@@ -950,6 +950,8 @@ async function startMember(){setMemberRefreshStarted(true);if(!leaveMember())ret
    if(window.LT41)window.LT41.prefs=state.prefs;
    // #441 후속: 다른 기기의 첫 그림도 계정 날짜 표기를 따르도록, 로그인 때 기기 미러 캐시를 계정값으로 채운다.
    try{localStorage.setItem('lt41.dateStyle',normalizeDateStyle(state.prefs?.dateStyle));}catch{}
+   // 261116 PR 2: 첫 화면 카드 모드도 기기 미러를 계정값으로 채운다(첫 화면 문서는 계정 값을 늦게 알 수 있다).
+   try{localStorage.setItem('lt41.homeMoment',JSON.stringify(normalizeHomeMoment(state.prefs?.homeMoment)));}catch{}
    // #481: 제목 보기도 같은 이유로 기기 미러를 계정값으로 채운다.
    rememberTitleDisplay(state.prefs?.titleDisplay);
    paintTitleDisplayControls();
@@ -1296,6 +1298,14 @@ for(const b of document.querySelectorAll('button[data-board-theme]'))b.onclick=(
 paintBoardThemeControls();
 window.addEventListener('message',e=>{
  if(e.origin!==location.origin)return;
+ if(e.data?.type==='lt41-home-moment'){
+  // 261116 PR 2: 첫 화면 카드 모드 저장 — 기기 미러를 먼저 쓰고 계정 설정(이미 있는 setPrefs 길)에 반영한다.
+  const value=normalizeHomeMoment(e.data.value);
+  try{localStorage.setItem('lt41.homeMoment',JSON.stringify(value))}catch{}
+  if(member?.snapshot().owned){
+   try{member.apply('setPrefs',{homeMoment:value});if(window.LT41)window.LT41.prefs=member.state().prefs;}catch{}
+  }
+ }
  if(e.data?.type==='lt41-board-theme'){
   const next=e.data.value==='night'?'night':'paper';
   try{localStorage.setItem(BOARD_THEME_KEY,next)}catch{}

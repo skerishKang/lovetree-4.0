@@ -5,6 +5,37 @@ const reportRow=value=>value&&({id:value.report_id,shareId:value.share_id,report
 
 export function createCommunityRepo(pool){
  return {
+  // 첫 화면 둘러보기 숫자(261116 PR 2) — 둘러보기에 소개된 트리 수와 그 순간 수(공개 집계, 읽기만).
+  // 둘러보기 목록(listDiscoverableSummaries)과 같은 규칙(active·3개 이상·discover 켬·숨김·비공개 제외)을
+  // 그대로 쓰고, 카드를 만들지 않고 두 숫자만 센다. 시험 계정 거름은 서비스 계층 역할 판정(#678 후속)이 맡는다.
+  async discoverTotals({productId}){
+   const {rows}=await pool.query(
+    `WITH picked AS (
+       SELECT DISTINCT ON (s.tree_id) s.*
+       FROM lovetree_shares s
+       WHERE s.product_id=$1 AND s.status='active' AND s.moment_count>=3
+         AND EXISTS (
+           SELECT 1 FROM lovetree_tree_discover d
+           WHERE d.product_id=s.product_id AND d.subject_id=s.subject_id AND d.tree_id=s.tree_id AND d.discover=true
+         )
+       ORDER BY s.tree_id,(s.origin='auto') DESC,s.created_at DESC,s.share_id DESC
+     )
+     SELECT count(*)::int AS trees, COALESCE(sum(s.moment_count),0)::int AS moments
+     FROM picked s
+     WHERE NOT EXISTS (
+       SELECT 1 FROM lovetree_shares s2
+       WHERE s2.product_id=s.product_id AND s2.tree_id=s.tree_id
+         AND EXISTS (SELECT 1 FROM lovetree_community_hidden_shares h WHERE h.product_id=s2.product_id AND h.share_id=s2.share_id)
+     )
+       AND NOT EXISTS (
+         SELECT 1 FROM lovetree_tree_visibility v
+         WHERE v.product_id=s.product_id AND v.subject_id=s.subject_id AND v.tree_id=s.tree_id AND v.visibility='private'
+       )`,
+    [productId]
+   );
+   const row=rows[0]||{};
+   return {trees:Number(row.trees||0),moments:Number(row.moments||0)};
+  },
   async listDiscoverableSummaries({productId,viewerSubjectId=null,limit=240}){
    const {rows}=await pool.query(
     `WITH picked AS (
