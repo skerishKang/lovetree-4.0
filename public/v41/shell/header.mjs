@@ -43,7 +43,7 @@ function flowNavigation(){
   $('write-menu').hidden=!parts.write||publicReading;$('share-menu').hidden=!parts.share||getSource()!=='server'||!window.LT41;
   // 261117 대표 결정: 좁은 화면에서는 '+ 순간 추가'를 '+'로 줄여 위 메뉴(테마 단추 포함)가 넘치지 않게 한다 —
   // 이름은 aria-label이 지킨다. 저장 안 됨('저장 안 됨')은 짧아 그대로다.
-  const narrowHeader=window.matchMedia('(max-width:650px)').matches;
+  const narrowHeader=window.innerWidth<=650;
   if(!getMember()?.snapshot().dirty){
    $('write-menu').textContent=narrowHeader?'+':'＋ 순간 추가';
    if(narrowHeader)$('write-menu').setAttribute('aria-label','순간 추가');else $('write-menu').removeAttribute('aria-label');
