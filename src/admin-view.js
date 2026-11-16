@@ -328,14 +328,12 @@ export function journalsSummary(journals, day) {
 export function statsCards(response) {
   const stats = response?.ok && response.payload?.ok ? response.payload.stats : null;
   if (!stats || typeof stats !== 'object') return {error: true, cards: []};
+  // 2026-11-17: 한눈에 숫자는 계정·트리·순간·공개 트리 네 장만(새 계정·새 순간·둘러보기 소개는 접어 둔다).
   const cells = [
     ['accounts', '계정', stats.accounts],
-    ['accounts-new', '새 계정 · 7일', stats.accounts?.new],
     ['trees', '트리', stats.trees],
     ['moments', '순간', stats.moments],
-    ['moments-new', '새 순간 · 7일', stats.moments?.new],
-    ['public-trees', '공개 트리', stats.trees?.public],
-    ['featured-trees', '둘러보기 소개', stats.trees?.featured]
+    ['public-trees', '공개 트리', stats.trees?.public]
   ];
   const num = (value) => (Number.isSafeInteger(value) && value >= 0 ? value : null);
   // #743: 트리 계열 카드는 펼침 내역에 제목 목록(최대 20)을 받는다. 없으면 내역은 갈래 수만 — 지어내지 않는다.
