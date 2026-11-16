@@ -154,9 +154,10 @@ test('611 실행: 390에서도 작은 카드와 새 소식 창이 보인다', { 
   }
 });
 
-// 새 소식 창 닫기(261116): ✕·목록 끝 '닫기'·Esc 세 길로 닫리고, 목록을 끝까지 스크롤해도 ✕가 창 안에 보인다
-// (sticky 머리줄). 390 휴대폰 폭에서 재단다. 창이 모달이라 바깥 메뉴는 누를 수 없어 '같은 입구 다시 누르기'는 닫기 길이 아니다.
-test('611 실행: 새 소식 창은 세 길로 닫리고, 스크롤해도 ✕가 보인다(390)', { skip }, async () => {
+// 새 소식 창 닫기(261116): 창을 열면 맨 위에서 열려 ✕가 바로 보인다(입구에서 열 때는 굴리지 않는다 —
+// 예전에는 열자마자 최신 버전으로 굴러 ✕가 창 위로 밀려났다). 목록 끝 '닫기'·Esc·✕ 세 길로 닫힌다. 390 휴대폰 폭에서 재단다.
+// 창이 모달이라 바깥 메뉴는 누를 수 없어 '같은 입구 다시 누르기'는 닫기 길이 아니다.
+test('611 실행: 새 소식 창은 맨 위에서 열리고 세 길로 닫힌다(390)', { skip }, async () => {
   const browser = await chromium.launch();
   try {
     const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
@@ -169,19 +170,19 @@ test('611 실행: 새 소식 창은 세 길로 닫리고, 스크롤해도 ✕가
     const open = () => page.waitForFunction(() => document.getElementById('updates-panel').open, null, { timeout: 5000 });
     const closed = () => page.waitForFunction(() => !document.getElementById('updates-panel').open, null, { timeout: 5000 });
 
-    // 1) 목록을 끝까지 스크롤 — ✕가 창 안에 보여야 한다(머리줄 고정).
+    // 1) 입구에서 열면 맨 위에서 열린다 — ✕가 창 안에 그대로 보인다(굸러 들어가지 않는다).
     await page.click('#updates-link');
     await open();
-    const sticky = await page.evaluate(() => {
+    const top = await page.evaluate(() => {
       const panel = document.getElementById('updates-panel');
-      panel.scrollTop = panel.scrollHeight;
       const btn = panel.querySelector('.close');
       const r = btn.getBoundingClientRect();
       const pr = panel.getBoundingClientRect();
-      return { visible: r.height > 0 && r.top >= pr.top - 1 && r.bottom <= pr.bottom + 1, width: Math.round(r.width) };
+      return { scrollTop: panel.scrollTop, visible: r.height > 0 && r.top >= pr.top - 1 && r.bottom <= pr.bottom + 1, width: Math.round(r.width) };
     });
-    assert.ok(sticky.visible, `스크롤 끝에서 ✕가 창 안에 보인다(${JSON.stringify(sticky)})`);
-    assert.ok(sticky.width >= 40, `✕ 누름 영역이 44px 근처다(${sticky.width}px)`);
+    assert.ok(top.scrollTop < 4, `입구에서 열면 맨 위에서 열린다(scrollTop=${top.scrollTop})`);
+    assert.ok(top.visible, `열자마자 ✕가 창 안에 보인다(${JSON.stringify(top)})`);
+    assert.ok(top.width >= 40, `✕ 누름 영역이 44px 근처다(${top.width}px)`);
 
     // 2) 목록 끝 '닫기' 단추로 닫친다.
     await page.click('#updates-foot-close');

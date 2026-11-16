@@ -161,7 +161,8 @@ export function mountUpdates({ $, showPanel, fetchJson, storage, onDot }) {
   async function openUpdates(version) {
     const list = await ensure();
     const latest = latestEntry(list);
-    const target = validVersion(version) ? version.trim() : (latest?.version || '');
+    const explicit = validVersion(version);
+    const target = explicit ? version.trim() : (latest?.version || '');
     const host = $('updates-list');
     if (host) host.innerHTML = renderUpdates(list, target);
     if (typeof showPanel === 'function') showPanel('updates-panel');
@@ -172,8 +173,13 @@ export function mountUpdates({ $, showPanel, fetchJson, storage, onDot }) {
       const newer = !!latest && compareVersions(latest.version, seen || '') > 0;
       if (typeof onDot === 'function') onDot(newer);
       hideCard();
-      const section = globalThis.document?.querySelector?.(`[data-updates-version="${target}"]`);
-      if (section) section.scrollIntoView?.({ block: 'start' });
+      // 새 소식 창 닫기(261116): 입구에서 그냥 열었으면 맨 위에서 연다 — 최신 버전은 어차피 목록 맨 위라
+      // 여기로 굳이 굴리면 머리줄(✕)이 창 위로 밀려나 #764의 '닫기가 안 보인다'가 됐다. 굴리는 것은
+      // 답변 알림처럼 특정 버전을 골라 열 때만 한다.
+      if (explicit) {
+        const section = globalThis.document?.querySelector?.(`[data-updates-version="${target}"]`);
+        if (section) section.scrollIntoView?.({ block: 'start' });
+      }
     }
     return target;
   }

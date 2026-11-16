@@ -532,11 +532,8 @@ html[data-lt-theme="garden"] #account-advanced[aria-checked="true"]:after{backgr
 @media(max-width:780px){.updates-card{left:16px;right:16px;top:auto;bottom:calc(max(10px, env(safe-area-inset-bottom)) + 76px);max-width:none}}
 /* 이슈 611: 새 소식 화면. */
 .updates-list{display:grid;gap:18px;margin-top:14px}
-/* 새 소식 창 닫기(261116): 버전 목록이 길어 스크롤하면 ✕가 창 위로 나갔다 — 머리줄(✕)을 창 위에 고정해
-   어디서든 닫을 수 있게 한다. 창 안 여백(넓은 화면 28px·좁은 화면 22px)까지 덮도록 음수 top으로 붙인다. */
-#updates-panel .panel-heading{position:sticky;top:-28px;z-index:2;background:var(--lt-glass-strong);padding-bottom:12px;border-bottom:1px solid var(--lt-line)}
-@media(max-width:780px){#updates-panel .panel-heading{top:-22px}}
-/* 목록 맨 끝에도 같은 일을 하는 '닫기' 단추를 둔다 — 스크롤을 끝까지 읽은 손에서 ✕까지 다시 올라가지 않아도 된다. */
+/* 새 소식 창 닫기(261116): 창을 열면 맨 위에서 열려 ✕가 바로 보인다(updates.mjs — 버전을 골라 열 때만 굴린다).
+   목록 맨 끝에도 같은 일을 하는 '닫기' 단추를 둔다 — 스크롤을 끝까지 읽은 손에서 ✕까지 다시 올라가지 않아도 된다. */
 .updates-foot{display:flex;justify-content:center;margin-top:20px}
 .updates-foot button{min-height:44px;padding:0 24px;border-radius:var(--lt-r-pill);border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.04);color:var(--lt-pearl);font-size:14px}
 .updates-version{border:1px solid var(--lt-line);border-radius:var(--lt-r-card);padding:16px;background:var(--lt-glass)}
