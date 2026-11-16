@@ -50,9 +50,10 @@ export function renderTagLine({ host, doc = document, moment, knownTags = [], wr
           + `<select class="lt-tagline-kind" aria-label="붙일 꼬리표의 갈래">${kinds}</select>`
           + `<input class="lt-tagline-value" maxlength="24" autocomplete="off" placeholder="${esc(KIND_PLACEHOLDER[state.kind] || '')}" aria-label="붙일 꼬리표 내용">`
           + `<button type="button" class="lt-tagline-add">붙이기</button></div></div>`;
+    // '꼬리표' 낱말은 줄 안에 한 번만 보인다(#754 이후) — 빈 상태에서는 라벨을 숨기고
+    // '아직 꼬리표가 없어요' 빈 문구만 그린다. 칩이 보일 때만 라벨이 나란히 붙는다.
     host.innerHTML = `<div class="lt-tagline">`
-      + `<span class="lt-tagline-name">꼬리표</span>`
-      + (chips.length ? `<span class="lt-tagline-chips">${chips.map(chipHTML).join('')}</span>`
+      + (chips.length ? `<span class="lt-tagline-name">꼬리표</span><span class="lt-tagline-chips">${chips.map(chipHTML).join('')}</span>`
         : `<span class="lt-tagline-empty">${esc(emptyText)}</span>`)
       + (writable ? manual : '')
       + `<p class="lt-tagline-error" role="alert" hidden></p>`
@@ -168,7 +169,7 @@ const SCREENS = {
     buildHost: (doc) => {
       const block = doc.createElement('div');
       block.className = 'detail-block lt-tagline-section';
-      block.append(Object.assign(doc.createElement('span'), { textContent: '꼬리표' }));
+      // 라벨은 꼬리표 줄 안의 것 하나만 쓴다(#754 이후) — 블록에도 '꼬리표'를 붙이면 두 번 보였다.
       const host = doc.createElement('div');
       host.id = 'detailTags';
       block.append(host);
