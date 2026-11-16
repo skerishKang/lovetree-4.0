@@ -24,7 +24,7 @@ function makePool(seed = {}) {
       const table = sql.match(/SELECT [\s\S]+? FROM (lovetree_[a-z_]+)/)?.[1];
       assert.ok(table, 'cleanup SQL must name an allow-listed operational table');
       assert.ok(ACCESS_LOG_RETENTION_TARGETS.some((target) => target.table === table));
-      assert.match(sql, /WHERE (claimed_at|changed_at) <= \$1/);
+      assert.match(sql, /WHERE (claimed_at|changed_at|viewed_at) <= \$1/);
       assert.match(sql, /LIMIT \$2[\s\S]+FOR UPDATE SKIP LOCKED/);
       calls.push({ table, cutoff: params[0], limit: params[1] });
 
@@ -56,6 +56,9 @@ test('90-day cutoff deletes before and exactly at the boundary, retaining newer 
     lovetree_community_moderation_audit: [
       { id: '4', changed_at: before }, { id: '5', changed_at: at }, { id: '6', changed_at: after }
     ],
+    lovetree_admin_customer_views: [
+      { id: '7', viewed_at: before }, { id: '8', viewed_at: at }, { id: '9', viewed_at: after }
+    ],
     lovetree_workspaces: [{ id: 'content', saved_at: before }],
     lovetree_account_deletions: [{ id: 'deletion-evidence', deleted_at: before }],
     lovetree_payment_records: [{ id: 'payment', created_at: before }]
@@ -67,11 +70,13 @@ test('90-day cutoff deletes before and exactly at the boundary, retaining newer 
   assert.deepEqual(result.deleted, {
     lovetree_request_claims: 2,
     lovetree_product_role_audit: 2,
-    lovetree_community_moderation_audit: 2
+    lovetree_community_moderation_audit: 2,
+    lovetree_admin_customer_views: 2
   });
   assert.deepEqual(pool.tables.lovetree_request_claims.map((row) => row.client_key), ['after']);
   assert.deepEqual(pool.tables.lovetree_product_role_audit.map((row) => row.id), ['3']);
   assert.deepEqual(pool.tables.lovetree_community_moderation_audit.map((row) => row.id), ['6']);
+  assert.deepEqual(pool.tables.lovetree_admin_customer_views.map((row) => row.id), ['9']);
   assert.deepEqual(pool.tables.lovetree_workspaces, [{ id: 'content', saved_at: before }]);
   assert.deepEqual(pool.tables.lovetree_account_deletions, [{ id: 'deletion-evidence', deleted_at: before }]);
   assert.deepEqual(pool.tables.lovetree_payment_records, [{ id: 'payment', created_at: before }]);

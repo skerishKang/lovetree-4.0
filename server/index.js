@@ -16,6 +16,8 @@ import { createWorkspaceService } from './workspace-service.js';
 import { createShareService, createShareHandler } from './share-service.js';
 import { createCommunityService, createCommunityHandler } from './community-service.js';
 import { createFeedbackRepo } from './db/feedback-postgres.js';
+import { createAdminCustomersRepo } from './db/admin-customers-postgres.js';
+import { createAdminCustomersService, createAdminCustomersHandler } from './admin-customers.js';
 import { createFeedbackService, createFeedbackHandler } from './feedback-service.js';
 import { createYoutubeOembedHandler } from './youtube-oembed.js';
 import { createPadiemAuthorityAuth } from './padiem-authority-auth.js';
@@ -239,6 +241,19 @@ const feedbackHandler = createFeedbackHandler({
  service: createFeedbackService({ feedbackRepo: createFeedbackRepo(pool), productId: LOVETREE_PRODUCT_ID, admin }),
  productId: LOVETREE_PRODUCT_ID
 });
+// 운영센터 고객 정보(261116 대표 결정) — 읽기만 한다. 자세히 판을 열 때 열람 기록을 남기고,
+// 올린 사진은 관리자 인증으로만 내려받는다(mediaStore 를 같이 쓴다).
+const adminCustomersHandler = createAdminCustomersHandler({
+ authenticate: guardedAuthenticate,
+ service: createAdminCustomersService({
+  repo: createAdminCustomersRepo(pool),
+  feedbackRepo: createFeedbackRepo(pool),
+  productId: LOVETREE_PRODUCT_ID,
+  admin,
+  mediaStore
+ }),
+ productId: LOVETREE_PRODUCT_ID
+});
 const youtubeOembedHandler = createYoutubeOembedHandler({ authenticate: guardedAuthenticate, productId: LOVETREE_PRODUCT_ID });
 const login = await buildLogin(pool);
 const mediaHandler = createMediaHandler({
@@ -257,6 +272,7 @@ const requestHandler = async (request) => {
   if (path.startsWith('/api/shares') || path.startsWith('/api/public/shares/') || path.startsWith('/api/trees/')) return shareHandler(request);
  if (path.startsWith('/api/community/') || path === '/api/public/tag-moments') return communityHandler(request);
  if (path === '/api/feedback' || path.startsWith('/api/admin/feedback') || path.startsWith('/api/admin/journals') || path === '/api/board' || path.startsWith('/api/board/') || path.startsWith('/api/admin/persona/')) return feedbackHandler(request);
+ if (path.startsWith('/api/admin/customers')) return adminCustomersHandler(request);
  if (path === '/api/youtube/oembed') return youtubeOembedHandler(request);
   return storageHandler(request);
 };

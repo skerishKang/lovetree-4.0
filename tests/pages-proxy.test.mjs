@@ -34,7 +34,7 @@ test('#611 4번: 내 의견 덧붙이기 경로는 서버로 넘기고, 딴 글 
 });
 
 test('허용한 경로만 업스트림으로 넘기고 나머지는 404 JSON 이다', async () => {
-  const allowed = [['/api/account', 'GET'], ['/api/account/delete', 'POST'], ['/api/workspace', 'GET'], ['/api/admin/session', 'GET'], ['/api/admin/roles', 'GET'], ['/api/admin/feedback', 'GET'], ['/api/admin/journals', 'GET'], ['/api/admin/stats', 'GET'], ['/api/youtube/oembed', 'GET'], ['/auth/login', 'GET'], ['/auth/callback', 'GET'], ['/auth/logout', 'POST']];
+  const allowed = [['/api/account', 'GET'], ['/api/account/delete', 'POST'], ['/api/workspace', 'GET'], ['/api/admin/session', 'GET'], ['/api/admin/roles', 'GET'], ['/api/admin/feedback', 'GET'], ['/api/admin/journals', 'GET'], ['/api/admin/stats', 'GET'], ['/api/admin/customers', 'GET'], ['/api/admin/customers/views', 'GET'], ['/api/youtube/oembed', 'GET'], ['/auth/login', 'GET'], ['/auth/callback', 'GET'], ['/auth/logout', 'POST']];
   for (const [path, method] of allowed) {
     const fetcher = recorder(new Response('{}', { headers: { 'content-type': 'application/json' } }));
     const response = await onRequest(createProxy({ fetcher }), `https://lovetree.example${path}`, { method });
@@ -293,5 +293,34 @@ test('#678 후속: 덧붙임 고치기·지우기 경로는 PATCH·DELETE만 서
     const response = await onRequest(proxy, `https://lovetree.example${path}`, init);
     assert.equal(response.status, expected, `${method} ${path}: ${expected}`);
     assert.equal(fetcher.calls.length, before, '업스트림 호출 없음');
+  }
+});
+
+test('운영센터 고객 자세히 판·사진 경로는 읽기만 넘기고, 모양 밖 고객 경로는 404다', async () => {
+  const subject = 'sub_b200000000000000';
+  const file = '01234567-89ab-4cde-8f01-234567890abc.png';
+  const detailFetcher = recorder(new Response('{"ok":true}', { headers: { 'content-type': 'application/json' } }));
+  const detail = await onRequest(createProxy({ fetcher: detailFetcher }), `https://lovetree.example/api/admin/customers/${subject}`, { method: 'GET' });
+  assert.equal(detail.status, 200, '고객 자세히 판 GET은 넘긴다');
+  assert.equal(detailFetcher.calls.at(-1).url, `${UPSTREAM}/api/admin/customers/${subject}`);
+
+  // 사진은 이미지 응답이라 미디어 이진 통로로 넘어가야 한다(JSON만 통과시키면 502로 막힌다).
+  const mediaFetcher = recorder(() => new Response(new Uint8Array([137, 80, 78, 71]), { headers: { 'content-type': 'image/png' } }));
+  const media = await onRequest(createProxy({ fetcher: mediaFetcher }), `https://lovetree.example/api/admin/customers/${subject}/media/${file}`, { method: 'GET' });
+  assert.equal(media.status, 200, '고객 사진 GET은 넘긴다');
+  assert.equal(media.headers.get('content-type'), 'image/png');
+
+  for (const [path, method, expected] of [
+    [`/api/admin/customers/${subject}`, 'POST', 405],
+    [`/api/admin/customers/${subject}`, 'DELETE', 405],
+    [`/api/admin/customers/${subject}/media/${file}`, 'DELETE', 405],
+    ['/api/admin/customers/sub_abc/media/not-a-file.png', 'GET', 404],
+    ['/api/admin/customers/sub_abc/notes', 'GET', 404]
+  ]) {
+    const fetcher = recorder(new Response('{}', { headers: { 'content-type': 'application/json' } }));
+    const init = method === 'GET' || method === 'DELETE' ? { method } : { method, headers: { 'content-type': 'application/json' }, body: '{}' };
+    const response = await onRequest(createProxy({ fetcher }), `https://lovetree.example${path}`, init);
+    assert.equal(response.status, expected, `${method} ${path}: ${expected}`);
+    assert.equal(fetcher.calls.length, 0, `${method} ${path}: 업스트림 호출 없음`);
   }
 });
