@@ -736,3 +736,63 @@ test('계정 메뉴: 운영 라벨 없음·구분선 유지·기본 항목 배�
     server.close();
   }
 });
+
+test('계정 메뉴 테두리: 마우스로 열면 0/none, 키보드 Enter로 열면 2px 실선(garden·night 1440)', { skip: menuSkip || false, timeout: 180000 }, async () => {
+  if (menuSkip) assert.fail(`건너뜀=실패 — ${menuSkip}`);
+  const { mkdirSync } = await import('node:fs');
+  const shotDir = process.env.LT_MENU3_SHOT_DIR || 'E:\\lovetree-qa\\local4\\계정메뉴3';
+  mkdirSync(shotDir, { recursive: true });
+  const { serve } = await import('./helpers/screen-audit.mjs');
+  const server = await serve();
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await menuChromium.launch({ headless: true,
+    ...(process.env.LT_MENU_BROWSER_EXE ? { executablePath: process.env.LT_MENU_BROWSER_EXE } : {}) });
+  try {
+    for (const theme of ['garden', 'night']) {
+      for (const how of ['mouse', 'keyboard']) {
+        const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
+        await ctx.addInitScript(t => { try { localStorage.setItem('lt41.theme', t); } catch {} }, theme);
+        await ctx.route('**/api/**', r => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
+        await ctx.route('**/api/workspace**', r => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ revision: 1, state: { version: 1, trees: [], prefs: {} }, subject: '시험계정', writeSubjectBound: true, savedAt: '2026-11-15T09:00:00.000Z' }) }));
+        const page = await ctx.newPage();
+        await page.goto(`${base}/v41/?account=1`, { waitUntil: 'load' });
+        await page.waitForFunction(() => { const a = document.getElementById('account-avatar'); return a && !a.hidden; }, null, { timeout: 20000 });
+        // 스크립트 click()/focus()로 메뉴를 열지 않는다 — 실제 포인터 클릭과 실제 키보드 입력만 쓴다.
+        if (how === 'mouse') await page.locator('#account-avatar').click();
+        else { await page.locator('#account-avatar').focus(); await page.keyboard.press('Enter'); }
+        await page.waitForFunction(() => !document.getElementById('account-popover')?.hidden, null, { timeout: 8000 });
+        await page.waitForTimeout(150);
+        const got = await page.evaluate(() => {
+          const pop = document.querySelector('#account-popover');
+          const b = pop.querySelector('button:not([hidden])');
+          const cs = getComputedStyle(b);
+          return {
+            openedBy: pop.dataset.ltOpenedBy, focusVisible: b.matches(':focus-visible'),
+            outlineWidth: cs.outlineWidth, outlineStyle: cs.outlineStyle, outlineColor: cs.outlineColor,
+            boxShadow: cs.boxShadow, background: cs.backgroundColor
+          };
+        });
+        const label = `${theme}·${how}`;
+        if (how === 'mouse') {
+          assert.equal(got.openedBy, 'mouse', label + ': 마우스로 열림');
+          assert.equal(got.focusVisible, false, label + ': :focus-visible 아님');
+          assert.equal(got.outlineWidth, '0px', label + ': outline-width 0 (실제 ' + got.outlineWidth + ')');
+          assert.equal(got.outlineStyle, 'none', label + ': outline-style none');
+          assert.equal(got.boxShadow, 'none', label + ': box-shadow none');
+          assert.equal(got.background, 'rgba(0, 0, 0, 0)', label + ': 칠 없음');
+        } else {
+          assert.equal(got.openedBy, 'keyboard', label + ': 키보드로 열림');
+          assert.equal(got.focusVisible, true, label + ': :focus-visible');
+          assert.equal(got.outlineWidth, '2px', label + ': outline-width 2px (실제 ' + got.outlineWidth + ')');
+          assert.equal(got.outlineStyle, 'solid', label + ': outline-style solid');
+          assert.equal(got.outlineColor, theme === 'garden' ? 'rgb(152, 80, 94)' : 'rgb(255, 230, 166)', label + ': 테두리 색');
+        }
+        await page.screenshot({ path: `${shotDir}/${theme}-${how}-1440.png` });
+        await ctx.close();
+      }
+    }
+  } finally {
+    await browser.close();
+    server.close();
+  }
+});

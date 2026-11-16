@@ -158,7 +158,9 @@ nav #record-menu[hidden]{display:none!important}
 .account-popover button{justify-content:flex-start;width:100%;min-height:44px;padding:0 10px;border:0;border-radius:10px;background:transparent;font-size:13px;letter-spacing:.02em;color:var(--lt-pearl)}
 .account-popover button:hover,.account-popover button:focus-visible,.account-popover button:active{background:rgba(255,255,255,.08)}
 /* 마우스로 연 메뉴는 첫 항목에 초점을 두되 칠하지 않는다(:focus-visible은 키보드일 때만). */
-.account-popover[data-lt-opened-by=mouse] button:focus-visible:not(:hover){background:transparent}
+.account-popover[data-lt-opened-by=mouse] button:focus-visible:not(:hover){background:transparent;outline:0;box-shadow:none}
+/* 초점은 있지만 키보드에서 온 게 아니면 테두리를 아예 그리지 않는다(계산 outline-width 0). */
+.account-popover button:focus:not(:focus-visible){outline:0;box-shadow:none}
 /* 2026-11-16 계정 메뉴 정리: 관리자 항목(운영센터)은 구분선 아래에 둔다. 라벨 글자는 운영센터와 겹쳐 2026-11-17에 없앴고,
    구분선(border-top)만 남겼다 — 선 아래 바로 운영센터, 그다음 로그아웃. [hidden]은 display:grid보다 이긴다. */
 .account-ops-group{display:grid;gap:4px;margin-top:4px;padding-top:8px;border-top:1px solid var(--lt-line)}
