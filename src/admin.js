@@ -345,6 +345,7 @@ async function renderList() {
       <div class="lt-kind-bundle" role="group" aria-label="종류">${kindRow}</div>
     </div>
     <div class="lt-tabs lt-status-row" role="group" aria-label="상태">${statusRow}</div>
+    ${route.unanswered ? '<p class="lt-post-meta">답글 0인 글만 보는 중 · <button type="button" class="lt-btn" data-clear-filter="board">조건 지우기</button></p>' : ''}
     <div class="lt-post-list">${list}</div>
   </div>`;
 }
