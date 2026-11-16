@@ -909,7 +909,7 @@ $('account-entry').onclick=e=>{
 };
 $('account-avatar').onclick=e=>{
  e.stopPropagation();
- if($('account-popover').hidden){openAccountMenu();void feedbackBoard.refreshReplyDot();}else closeAccountMenu();
+ if($('account-popover').hidden){openAccountMenu(e.detail===0?'keyboard':'mouse');void feedbackBoard.refreshReplyDot();}else closeAccountMenu();
 };
 const $on=(id,fn)=>{const el=$(id);if(el)el.onclick=fn;};
 function advancedKey(){try{return 'lt41.advanced.'+(member?.snapshot().subject||'')}catch{return 'lt41.advanced.'}}

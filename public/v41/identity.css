@@ -203,8 +203,11 @@ html[data-lt-theme=garden] .account-popover{background:var(--lt-glass-strong);bo
 /* 2026-11-16 계정 메뉴 대비: 알림 숫자 배지(--lt-rose 배경 × 흰 글자)는 정원에서 3.1:1로 4.5:1에 못 미친다 —
    진한 장미(--lt-rose-ink) 배경에 종이색 글자로 5.7:1. 밤은 기존(--lt-rose × --lt-stage 약 8:1) 그대로다. */
 html[data-lt-theme=garden] .account-menu-count{background:var(--lt-rose-ink);color:var(--lt-paper)}
-html[data-lt-theme=garden] .account-popover button{color:var(--lt-ink)}
-html[data-lt-theme=garden] .account-popover button:hover{background:rgba(152,80,94,.08)}
+/* 계정 메뉴 항목은 판 배경을 그대로 비운다(.header-actions button의 옅은 칸은 여기서 덮는다).
+   옅은 칠은 올림·초점·눌림에서만 — 기본 상태의 항목 박스가 정원에서 особенно 도드라졌다(2026-11-17). */
+html[data-lt-theme=garden] .account-popover button{color:var(--lt-ink);background:transparent}
+html[data-lt-theme=garden] .account-popover button:hover,html[data-lt-theme=garden] .account-popover button:focus-visible,html[data-lt-theme=garden] .account-popover button:active{background:rgba(152,80,94,.08)}
+html[data-lt-theme=garden] .account-popover[data-lt-opened-by=mouse] button:focus-visible:not(:hover){background:transparent}
 html[data-lt-theme=garden] .account-email{color:var(--lt-muted);border-bottom-color:var(--lt-line)}
 /* 이슈 644: 토스트는 밤·정원 모두 어두운 판 위에 뜬다. 정원에서는 --lt-pearl이 어두운 잉크가 되어 읽히지 않으므로 밝은 종이 토큰을 쓴다. */
 html[data-lt-theme=garden] #toast{color:var(--lt-paper)}
