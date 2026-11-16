@@ -249,7 +249,7 @@ s('#535 로그인·로그아웃 가운데 단추가 같은 세 자리·같은 �
           const bs = [...wrap.querySelectorAll('button')].filter((b) => !b.hidden && b.style.display !== 'none');
           const boxes = bs.map((b) => { const r = b.getBoundingClientRect(); return { label: b.textContent, w: Math.round(r.width), h: Math.round(r.height), l: Math.round(r.left), t: Math.round(r.top) }; });
           const gaps = boxes.slice(1).map((b, i) => (b.t !== boxes[i].t ? Math.round(b.t - (boxes[i].t + boxes[i].h)) : Math.round(b.l - (boxes[i].l + boxes[i].w))));
-          return { count: Number(wrap.getAttribute('data-count')), labels: boxes.map((b) => b.label), w: boxes.map((b) => b.w), h: boxes.map((b) => b.h), gaps };
+          return { count: Number(wrap.getAttribute('data-count')), labels: boxes.map((b) => b.label), w: boxes.map((b) => b.w), h: boxes.map((b) => b.h), t: boxes.map((b) => b.t), gaps };
         });
         await context.close();
       }
@@ -258,12 +258,19 @@ s('#535 로그인·로그아웃 가운데 단추가 같은 세 자리·같은 �
       const out = shape[`${w}/out`], inSide = shape[`${w}/in`];
       assert.equal(out.count, 3, `${w}: 로그아웃 세 자리`);
       assert.equal(inSide.count, 3, `${w}: 로그인도 세 자리`);
-      assert.deepEqual(inSide.labels, ['＋ 순간 추가', '둘러보기', '내 트리'], `${w}: 로그인 세 자리 문구`);
+      assert.deepEqual(inSide.labels, ['순간 목록', '둘러보기', '내 트리'], `${w}: 로그인 세 자리 문구(261116 PR 2 — '+ 순간 추가'는 위쪽 단추로 올라갔다)`);
       assert.equal(new Set(inSide.w).size, 1, `${w}: 로그인 단추 폭이 같다(${inSide.w.join('/')})`);
       assert.equal(new Set(out.w).size, 1, `${w}: 로그아웃 단추 폭이 같다(${out.w.join('/')})`);
-      assert.deepEqual(inSide.w, out.w, `${w}: 로그인·로그아웃 폭이 같다`);
-      assert.deepEqual(inSide.h, out.h, `${w}: 로그인·로그아웃 높이가 같다`);
-      assert.deepEqual(inSide.gaps, out.gaps, `${w}: 로그인·로그아웃 간격이 같다(${out.gaps.join('/')} vs ${inSide.gaps.join('/')})`);
+      // 261116 PR 2: 좁은 폭에서 로그인 세트는 한 줄(data-inline — 위쪽 '+ 순간 추가'가 있어 세로 쌓기가 필요 없다),
+      // 로그아웃은 옛 세로 쌓기를 그대로 쓴다 — 폭·간격이 같아질 수 없으므로 1440에서만 같은 폭을 본다.
+      if (w === 1440) {
+        assert.deepEqual(inSide.w, out.w, `${w}: 로그인·로그아웃 폭이 같다`);
+        assert.deepEqual(inSide.h, out.h, `${w}: 로그인·로그아웃 높이가 같다`);
+        assert.deepEqual(inSide.gaps, out.gaps, `${w}: 로그인·로그아웃 간격이 같다(${out.gaps.join('/')} vs ${inSide.gaps.join('/')})`);
+      } else {
+        assert.equal(new Set(inSide.t).size, 1, `390: 로그인 세트는 한 줄(${JSON.stringify(inSide.t)})`);
+        assert.equal(new Set(out.t).size, 3, `390: 로그아웃은 세로 쌓기를 유지한다(${JSON.stringify(out.t)})`);
+      }
     }
   } finally { await browser.close(); }
 });
