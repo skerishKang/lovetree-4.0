@@ -19,6 +19,8 @@ const MEDIA_ITEM = /^\/api\/media\/[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a
 const SHARE_ITEM = /^\/api\/shares\/[A-Za-z0-9_-]{1,128}$/;
 const SHARE_DISCOVERY = /^\/api\/shares\/[A-Za-z0-9_-]{1,128}\/discovery$/;
 const TREE_VISIBILITY = /^\/api\/trees\/[A-Za-z0-9_-]{1,80}\/visibility$/;
+// #739 이후: 공유 판의 '둘러보기 소개' 스위치(GET·PUT) — 서버·사이트는 있었고 프록시만 막혀 404였다.
+const TREE_DISCOVER = /^\/api\/trees\/[A-Za-z0-9_-]{1,80}\/discover$/;
 const PUBLIC_SHARE_ITEM = /^\/api\/public\/shares\/[A-Za-z0-9_-]{1,128}$/;
 const COMMUNITY_SHARE_ACTION = /^\/api\/community\/shares\/[A-Za-z0-9_-]{1,128}\/(comments|favorite|reaction|report|block)$/;
 const COMMUNITY_COMMENT_ITEM = /^\/api\/community\/comments\/[A-Za-z0-9_-]{1,128}$/;
@@ -145,6 +147,7 @@ export function createProxy({ fetcher = (...args) => fetch(...args), timeoutMs =
       || (SHARE_ITEM.test(incoming.pathname) ? new Set(['DELETE']) : null)
       || (SHARE_DISCOVERY.test(incoming.pathname) ? new Set(['PUT','DELETE']) : null)
       || (TREE_VISIBILITY.test(incoming.pathname) ? new Set(['GET','PUT']) : null)
+      || (TREE_DISCOVER.test(incoming.pathname) ? new Set(['GET','PUT']) : null)
       || (PUBLIC_SHARE_ITEM.test(incoming.pathname) ? new Set(['GET']) : null)
       || (ADMIN_FEEDBACK_ITEM.test(incoming.pathname) ? new Set(['GET','PATCH']) : null)
       || (ADMIN_FEEDBACK_REPLY.test(incoming.pathname) ? new Set(['POST']) : null)
