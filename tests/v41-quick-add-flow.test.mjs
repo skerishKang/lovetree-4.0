@@ -31,7 +31,7 @@ function fakeEl(extra = {}) {
   return Object.assign(node, extra);
 }
 
-function harness({ source = 'server', owned = true, writable = true, current = 'track59-sketchbook.html', finePointer = true, applyImpl = null, attachFiles = null, clipboard = null } = {}) {
+function harness({ source = 'server', owned = true, writable = true, current = 'track59-sketchbook.html', finePointer = true, applyImpl = null, attachFiles = null, clipboard = null, listTrees = null, saveTagsImpl = null } = {}) {
   const calls = { apply: [], notify: [], panel: [], choose: [], openEditor: [], login: [], resume: [], attach: [], writeOpen: [], writeShow: [], requestClose: [], reset: 0, saveTags: [] };
   const els = {};
   // #425: 고르기 창·빠른 추가·편집기가 한 창(write-panel)으로 합쳐졌다.
@@ -89,7 +89,10 @@ function harness({ source = 'server', owned = true, writable = true, current = '
     isFinePointer: () => finePointer,
     fetchImpl: async () => ({ ok: false }),
     // #627 PR B: 담은 직후 꼬리표 줄의 저장 한 곳 — 기록만 두고 성공으로 돌려준다.
-    saveTags: payload => { calls.saveTags.push(payload); return { ok: true, keywords: payload.keywords, changed: true }; },
+    // 하은 2회차 ④ 재현: saveTagsImpl로 실패·기록을 바꿔 본다.
+    saveTags: payload => { calls.saveTags.push(payload); if (saveTagsImpl) return saveTagsImpl(payload); return { ok: true, keywords: payload.keywords, changed: true }; },
+    // 하은 2회차 ④ 재현: 안내판이 들고 있는 순간의 '지금 자리'를 찾을 때 쓴다(옮기기·지우기 흉내).
+    ...(listTrees ? { listTrees } : {}),
     ...(clipboard ? { readClipboard: clipboard } : {})
   });
   const restore = () => { globalThis.LTMedia = saved.LTMedia; globalThis.Event = saved.Event; };
@@ -477,5 +480,127 @@ test('#739 담은 직후 제안 칩을 누르면 방금 담은 순간에 저장�
     assert.equal(h.calls.saveTags.length, 2, '다시 누름도 이 줄의 저장뿐이다');
     assert.equal(h.calls.saveTags[1].momentId, second.momentId, '해제 저장도 방금 담은 순간이다');
     assert.deepEqual(h.calls.saveTags[1].keywords, [], '다시 누르면 해제(빈 keywords)다');
+  } finally { h.restore(); }
+});
+
+// ── 하은 2회차(261116) ④: 꼬리표 직접 붙이기 유실 + 거짓 성공 ─────────────────────────────
+// 재현(하은 캡처 2e_직접붙이기뒤·2e_꼬리표정리_모아둔순간, 시험 계정으로만 재현한다):
+//   쉬운 추가로 담기 → 그 순간을 다른 트리로 옮기거나 지우기 → 안내판의 꼬리표 줄에 직접 붙이기.
+//   예전에는 안내판이 담을 때의 (treeId, momentId)를 클로저로 계속 들고 가서
+//   옮겨진 순간에는 옛 트리로 저장(notfound — 칩만 붙고 꼬리표는 사라짐),
+//   지워진 순간에는 저장 자체가 어긋났고 칩은 성공한 모양으로 남았다(거짓 성공).
+test('하은2회차 ④: 안내판의 꼬리표는 지금 자리를 다시 찾아 저장한다 — 옮겨진 순간에도 잃지 않는다', async () => {
+  let trees = [
+    { id: 'tree-inbox', title: '모아둔 순간', inbox: true, moments: [] },
+    { id: 'tree-second', title: '두 번째 트리', moments: [] }
+  ];
+  const h = harness({
+    applyImpl: (kind) => kind === 'quickAdd' ? { treeId: 'tree-inbox', momentId: 'm-new-1' } : null,
+    fetchImpl: async () => ({ ok: true, json: async () => ({ title: '아일릿 직캠', authorName: '', thumbnailUrl: '' }) }),
+    listTrees: () => trees
+  });
+  try {
+    h.els['write-panel'].open = true;
+    const chipClick = (raw) => { for (const fn of h.els['quick-tagline'].listeners.click || []) fn({ target: { closest: (sel) => sel === '[data-tag-raw]' ? { dataset: { tagRaw: raw } } : null } }); };
+    h.els['quick-url'].value = 'https://www.youtube.com/shorts/illitmv01';
+    h.els['quick-url'].listeners.input[0]();
+    await new Promise((ok) => setTimeout(ok, 0));
+    h.els['quick-form'].onsubmit({ preventDefault() {} });
+    assert.deepEqual(h.calls.saveTags, [], '담기 직후에는 저장을 부르지 않는다(눌러야 확정)');
+    // 순간을 다른 트리로 옮긴다(정리 창의 moveMoment와 같은 결과 — id는 그대로, 자리만 바뀐다).
+    trees = [
+      { id: 'tree-inbox', title: '모아둔 순간', inbox: true, moments: [] },
+      { id: 'tree-second', title: '두 번째 트리', moments: [{ id: 'm-new-1', title: '아일릿 직캠', keywords: [] }] }
+    ];
+    chipClick('가수:ILLIT');
+    assert.equal(h.calls.saveTags.length, 1, '저장은 한 번이다');
+    assert.equal(h.calls.saveTags[0].treeId, 'tree-second', '지금 자리(옮겨진 트리)로 저장한다 — 옛 트리가 아니다');
+    assert.equal(h.calls.saveTags[0].momentId, 'm-new-1');
+    assert.deepEqual(h.calls.saveTags[0].keywords, ['가수:ILLIT']);
+  } finally { h.restore(); }
+});
+
+test('하은2회차 ④: 지워진 순간의 안내판에 붙이면 저장하지 않고 되돌리며 다시 시도 안내를 보인다', async () => {
+  let trees = [
+    { id: 'tree-inbox', title: '모아둔 순간', inbox: true, moments: [] },
+    { id: 'tree-second', title: '두 번째 트리', moments: [] }
+  ];
+  const h = harness({
+    applyImpl: (kind) => kind === 'quickAdd' ? { treeId: 'tree-inbox', momentId: 'm-new-1' } : null,
+    fetchImpl: async () => ({ ok: true, json: async () => ({ title: '아일릿 직캠', authorName: '', thumbnailUrl: '' }) }),
+    listTrees: () => trees
+  });
+  try {
+    h.els['write-panel'].open = true;
+    const err = fakeEl({ hidden: true });
+    h.els['quick-tagline'] = fakeEl({ hidden: true, querySelector: (sel) => sel === '.lt-tagline-error' ? err : null });
+    const chipClick = (raw) => { for (const fn of h.els['quick-tagline'].listeners.click || []) fn({ target: { closest: (sel) => sel === '[data-tag-raw]' ? { dataset: { tagRaw: raw } } : null } }); };
+    h.els['quick-url'].value = 'https://www.youtube.com/shorts/illitmv01';
+    h.els['quick-url'].listeners.input[0]();
+    await new Promise((ok) => setTimeout(ok, 0));
+    h.els['quick-form'].onsubmit({ preventDefault() {} });
+    // 순간을 지운다 — 안내판은 아직 그 순간 id를 들고 있다(낡은 상태).
+    trees = [
+      { id: 'tree-inbox', title: '모아둔 순간', inbox: true, moments: [] },
+      { id: 'tree-second', title: '두 번째 트리', moments: [] }
+    ];
+    chipClick('가수:ILLIT');
+    assert.equal(h.calls.saveTags.length, 0, '없는 순간에 저장을 부르지 않는다');
+    assert.equal(err.hidden, false, '다시 시도 안내가 보인다');
+    assert.match(err.textContent, /다시|찾을 수 없/, `안내는 사람이 읽는 문구다(${err.textContent})`);
+    // 되돌림: 같은 칩을 다시 누르면(빈 keywords에서 다시 토글) 같은 값이 다시 온다 — 확정으로 남지 않는다.
+    chipClick('가수:ILLIT');
+    assert.equal(h.calls.saveTags.length, 0, '여전히 저장하지 않는다');
+  } finally { h.restore(); }
+});
+
+// ── 하은 2회차 손질 ②: '✓ 담았어요' 줄도 실패를 말해야 한다 ────────────────────────────────
+// 꼬리표 저장이 실패했는데 위 안내는 '✓ 담았어요'로 남아 고객에게 성공으로 보였다.
+// 실패를 알게 되면 그 줄을 '꼬리표를 붙이지 못했어요'로 바꾼다(창 안 안내·떠 있는 안내 두 모양 다).
+test('하은2회차 손질 ②: 꼬리표 저장이 실패하면 창 안 안내도 성공이라 말하지 않는다', async () => {
+  let trees = [
+    { id: 'tree-inbox', title: '모아둔 순간', inbox: true, moments: [] },
+    { id: 'tree-second', title: '두 번째 트리', moments: [] }
+  ];
+  const h = harness({
+    applyImpl: (kind) => kind === 'quickAdd' ? { treeId: 'tree-inbox', momentId: 'm-new-1' } : null,
+    fetchImpl: async () => ({ ok: true, json: async () => ({ title: '아일릿 직캠', authorName: '', thumbnailUrl: '' }) }),
+    listTrees: () => trees
+  });
+  try {
+    h.els['write-panel'].open = true;
+    const chipClick = (raw) => { for (const fn of h.els['quick-tagline'].listeners.click || []) fn({ target: { closest: (sel) => sel === '[data-tag-raw]' ? { dataset: { tagRaw: raw } } : null } }); };
+    h.els['quick-url'].value = 'https://www.youtube.com/shorts/illitmv01';
+    h.els['quick-url'].listeners.input[0]();
+    await new Promise((ok) => setTimeout(ok, 0));
+    h.els['quick-form'].onsubmit({ preventDefault() {} });
+    assert.match(h.els['quick-notice'].textContent, /담았어요/, '담기 직후에는 성공 안내다');
+    trees = [{ id: 'tree-inbox', title: '모아둔 순간', inbox: true, moments: [] }, { id: 'tree-second', title: '두 번째 트리', moments: [] }];
+    chipClick('가수:ILLIT'); // 지워진 순간 → 실패
+    assert.equal(h.els['quick-notice'].textContent, '꼬리표를 붙이지 못했어요', '성공 안내는 실패를 덮지 않는다');
+  } finally { h.restore(); }
+});
+
+test('하은2회차 손질 ②: 떠 있는 안내에서도 꼬리표 실패는 성공 안내를 덮는다', async () => {
+  let trees = [
+    { id: 'tree-inbox', title: '모아둔 순간', inbox: true, moments: [] },
+    { id: 'tree-second', title: '두 번째 트리', moments: [] }
+  ];
+  const h = harness({
+    applyImpl: (kind) => kind === 'quickAdd' ? { treeId: 'tree-inbox', momentId: 'm-new-1' } : null,
+    fetchImpl: async () => ({ ok: true, json: async () => ({ title: '아일릿 직캠', authorName: '', thumbnailUrl: '' }) }),
+    listTrees: () => trees
+  });
+  try {
+    h.els['write-panel'].open = false; // 창이 닫힌 채 담기는 길(떠 있는 안내)
+    const chipClick = (raw) => { for (const fn of h.els['quick-saved-tags'].listeners.click || []) fn({ target: { closest: (sel) => sel === '[data-tag-raw]' ? { dataset: { tagRaw: raw } } : null } }); };
+    h.els['quick-url'].value = 'https://www.youtube.com/shorts/illitmv01';
+    h.els['quick-url'].listeners.input[0]();
+    await new Promise((ok) => setTimeout(ok, 0));
+    h.els['quick-form'].onsubmit({ preventDefault() {} });
+    assert.match(h.els['quick-saved-text'].textContent, /담았어요/, '담기 직후에는 어디에 담았는지 알려 준다');
+    trees = [{ id: 'tree-inbox', title: '모아둔 순간', inbox: true, moments: [] }, { id: 'tree-second', title: '두 번째 트리', moments: [] }];
+    chipClick('가수:ILLIT');
+    assert.equal(h.els['quick-saved-text'].textContent, '꼬리표를 붙이지 못했어요', '떠 있는 안내도 성공이라 말하지 않는다');
   } finally { h.restore(); }
 });

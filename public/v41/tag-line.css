@@ -6,7 +6,9 @@
 .lt-tagline-name{font-size:12px;color:var(--lt-muted);flex:0 0 auto}
 .lt-tagline-chips{display:flex;flex-wrap:wrap;gap:5px;align-items:center;min-width:0}
 .lt-tagline-empty{font-size:12px;color:var(--lt-muted)}
-.lt-tagline-error{width:100%;margin:2px 0 0;font-size:12px;color:var(--lt-rose)}
+/* 하은 2회차 손질 ①(261116): 실패 문구가 쉬운 추가의 고정 단추(sticky, 52px+여백)에 가려지지 않게 —
+   문구를 화면으로 데려올 때 단추 높이만큼 비켜 서게 둔다(상세 화면처럼 고정 단추가 없는 곳에는 영향 없다). */
+.lt-tagline-error{width:100%;margin:2px 0 0;font-size:12px;color:var(--lt-rose);scroll-margin-bottom:100px}
 
 /* 칩: 확정은 진한 칩, 제안은 흐린 칩이다. 24자를 넘어 붙일 수 없는 후보는 애초에 제안에 보이지 않는다(#678 회차 지적). 글자는 12px 이상(#548). */
 .lt-tag-chip{display:inline-flex;align-items:center;max-width:100%;padding:3px 9px;border-radius:var(--lt-r-pill);

@@ -88,3 +88,27 @@ test('611 3번·호칭 결정: 운영센터 일지 줄의 AI 고객 이름을 AI
   assert.equal(rows.find(r => r.subjectId === 'ai').name, 'AI 명예회원 윤제');
   assert.equal(rows.find(r => r.subjectId === 'me').name, '고객');
 });
+
+// ── 하은 2회차(261116) ⑥: '오래된 글(#20)이 빠진다' 확인 ─────────────────────────────────
+// 진단(운영 DB READ ONLY, SELECT만): #20은 하은 글이 아니다 — #N은 고객별 번호가 아니라
+// 전체 글 일련번호다(#18 윤제·#19 보람·#20 무편성 계정·#21~#24 하은). 하은 목록 4건은 온전하다.
+// 이 시험은 화면 계약을 고정한다: 서버가 돌려준 글을 하나도 빼지 않고, 서버 순서(최신 먼저)대로 그린다.
+// 개수 제한은 서버 몫(listBySubject LIMIT 200 — 넘으면 오래된 것부터 잘린다)이고 '더 보기'는 없는 UI다.
+test('하은2회차 ⑥: 내 의견 목록은 서버가 돌려준 글을 빠뜨리지 않고 최신 먼저 그린다', async () => {
+  const posts = [
+    { id: 24, kind: 'opinion', status: 'received', body: '네 번째', createdAt: '2026-11-16T11:27:08Z', replies: [] },
+    { id: 23, kind: 'opinion', status: 'received', body: '세 번째', createdAt: '2026-11-16T11:26:55Z', replies: [] },
+    { id: 22, kind: 'journal', status: 'received', body: '일지', createdAt: '2026-11-15T20:54:57Z', replies: [] },
+    { id: 21, kind: 'opinion', status: 'reviewing', body: '두 번째', createdAt: '2026-11-15T20:51:32Z', replies: [] },
+    { id: 12, kind: 'opinion', status: 'fixed', issueNumber: '#600', body: '가장 오래된 글', createdAt: '2026-11-14T09:00:00Z', replies: [] }
+  ];
+  const { board, els, restore } = mount(null, posts);
+  try {
+    await board.openMyPosts();
+    const html = els['myposts-list'].innerHTML;
+    for (const id of [24, 23, 22, 21, 12]) assert.match(html, new RegExp(`myposts-no">#${id}<\/span>`), `#${id}도 목록에 있다(빠지지 않는다)`);
+    // 서버 순서(최신 먼저)대로 그린다 — 화면이 임의로 다시 섞지 않는다.
+    const order = [...html.matchAll(/myposts-no">#(\d+)<\/span>/g)].map((m) => Number(m[1]));
+    assert.deepEqual(order, [24, 23, 22, 21, 12], '서버가 준 순서(최신 먼저) 그대로다');
+  } finally { restore(); }
+});
