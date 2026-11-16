@@ -834,18 +834,16 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     const unanswered = await jump('[data-ov-unanswered="1"]');
     assert.equal(unanswered.hash, '#board?unanswered=1', `답글 0 카드 → 답글 0만 거른 고객 글(실제 ${unanswered.hash})`);
     assert.equal(unanswered.filterNote, true, '거른 조건을 지우는 단추가 함께 보인다');
-    // 2026-11-17: 신고·고치는 일 탭이 없어져 고객 글의 종류·상태 거르기로 연다.
-    const reports = await jump('[data-ov-view="reports"][data-ov-status="pending"]');
-    assert.equal(reports.hash, '#board?kind=report&status=pending', `신고 대기 카드 → 고객 글의 종류 신고(실제 ${reports.hash})`);
-    const issues = await jump('[data-ov-view="issues"][data-ov-status="closed"]');
-    assert.equal(issues.hash, '#board?status=more', `닫힌 이슈 카드 → 고객 글의 더 보기(실제 ${issues.hash})`);
-    // 키보드(Space)로도 카드가 열린다.
+    // 2026-11-17: 할 일 카드만 남았고 신고·고치는 일 카드는 없다(고객 글 거르기로 옮김).
+    assert.equal(await pageAdm.locator('[data-ov-view="reports"]').count(), 0, '신고 카드 없음');
+    assert.equal(await pageAdm.locator('[data-ov-view="issues"]').count(), 0, '고치는 일 카드 없음');
+    // 키보드(Space)로도 남은 카드가 열린다.
     await pageAdm.evaluate(() => { location.hash = '#overview'; });
     await pageAdm.waitForFunction(() => document.querySelectorAll('.lt-ov-cards .lt-ov-card').length === 3, null, { timeout: 8000 });
-    await pageAdm.focus('[data-ov-view="issues"][data-ov-status="open"]');
+    await pageAdm.focus('[data-ov-view="board"][data-ov-status="pending"]');
     await pageAdm.keyboard.press(' ');
     await pageAdm.waitForFunction(() => location.hash.startsWith('#board?status='), null, { timeout: 8000 });
-    assert.equal(await pageAdm.evaluate(() => location.hash), '#board?status=fixed', 'Space로도 카드가 열린다');
+    assert.equal(await pageAdm.evaluate(() => location.hash), '#board?status=pending', 'Space로도 카드가 열린다');
     await ctxAdm.close();
 
     // #666 2번: 계정 메뉴가 열린 자리에서 첫 트리 안내가 메뉴를 덮지 않는다(한 번에 하나만).
