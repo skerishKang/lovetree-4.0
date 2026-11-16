@@ -110,6 +110,46 @@ export function createMessages(deps) {
     if (data?.type === 'lt41-write' && data.focusTitle) focusTitleInput?.();
     // #327 2부: 순간 상세의 '다른 트리로 옮기기'. 공유·예시 화면에서는 보내지 않고, 여기서도 한 번 더 막는다.
     if (data?.type === 'lt41-move' && getSource() === 'server') openMovePicker({ momentId: data.momentId });
+    // 순간 목록에서의 옮기기(2026-11-17, 대표 결정): 골라 온 순간들을 한 트리로 옮긴다 — 기존
+    // member.apply('moveMoment') 한 길(cleanup.mjs와 같다). 옮긴 뒤에는 지금 보기를 다시 그려 목록을
+    // 열어 둔다(LT41_MOMENTS_OPEN을 되살려 목록이 다시 뜰 때 같은 목록·되돌리기 안내를 받게 한다).
+    if (data?.type === 'lt41-move-moments' && getSource() === 'server') {
+      const wanted = Array.isArray(data.pairs) && data.pairs.length
+        ? data.pairs.map(p => ({ id: String(p?.id || ''), fromTreeId: String(p?.fromTreeId || ''), toTreeId: String(p?.toTreeId || data.toTreeId || '') })).filter(p => p.id && p.toTreeId)
+        : (Array.isArray(data.momentIds) ? data.momentIds.map(id => ({ id: String(id || ''), fromTreeId: String(data.fromTreeId || ''), toTreeId: String(data.toTreeId || '') })).filter(p => p.id && p.toTreeId) : []);
+      if (!wanted.length) return;
+      const movedPairs = [];
+      try {
+        for (const wantedItem of wanted) {
+          const toTree = getModel()?.trees.find(t => t.id === wantedItem.toTreeId);
+          if (!toTree) continue;
+          const from = wantedItem.fromTreeId && getModel()?.trees.find(t => t.id === wantedItem.fromTreeId && t.moments.some(m => m.id === wantedItem.id))
+            || getModel()?.trees.find(t => t.moments.some(m => m.id === wantedItem.id));
+          if (!from || from.id === toTree.id) continue;
+          try{getMember().apply('moveMoment', { toTreeId: toTree.id }, { treeId: from.id, momentId: wantedItem.id });}catch(err){throw err;}
+          movedPairs.push({ id: wantedItem.id, fromTreeId: from.id });
+        }
+      } catch (error) { notify(error?.message || '옮기지 못했어요. 다시 시도해 주세요.'); return; }
+      if (!movedPairs.length) return;
+      notify(data.noticeText || '옮겼어요.');
+      // 되돌리기는 출발 트리가 남아 있을 때만(정리 창의 canUndo 규칙과 같다) — 옮기고 비워진 트리는
+      // 삭제되므로 그 짝은 되돌릴 수 없다.
+      const undoPairs = movedPairs.filter(p => getModel()?.trees.some(t => t.id === p.fromTreeId))
+        .map(p => ({ id: p.id, fromTreeId: data.toTreeId || '', toTreeId: p.fromTreeId }));
+      // 목록 유지: 옮긴 뒤 지금 보기를 다시 그린다 — 되돌리기 짝을 함께 넘겨 목록 창의 되돌리기가 쓴다
+      // (undo의 fromTreeId는 옮겨진 지금 자리, toTreeId는 원래 자리다).
+      window.LT41_MOMENTS_OPEN = {
+        treeId: String(data.keepTreeId || 'all'),
+        notice: { text: String(data.noticeText || ''), undo: undoPairs.length ? { pairs: undoPairs, toTreeId: movedPairs[0].fromTreeId } : null }
+      };
+      show(getCurrent());
+      return;
+    }
+    // 트리 칩 순서(2026-11-17, 대표 결정): 계정 설정 칸(state.prefs.treeChipOrder)에 저장 — 기존 setPrefs 한 길.
+    if (data?.type === 'lt41-prefs' && data.patch?.treeChipOrder && getSource() === 'server') {
+      try { getMember().apply('setPrefs', { treeChipOrder: data.patch.treeChipOrder }); } catch (error) { notify(error?.message || '순서를 저장하지 못했어요.'); }
+      return;
+    }
     if (data?.type === 'lt41-open-book' && getModel()?.trees.some(t => t.id === data.treeId && t.moments.some(m => m.id === data.id))) {
       setCurrent('track59-sketchbook.html'); choose(data.treeId, data.id); writeLocation();
     }

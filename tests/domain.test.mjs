@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createTree, editTree, addMoment, editMoment, parentCandidates, reparentMoment, removeMoment, validateState, validateMomentInput, suggestMomentTitle, importTrees, treeLayout, pathTo, stemGroups, linkMoments, unlinkMoments, relatedMoments, MAX_LINKS, safeUrl, newId } from '../src/domain.js';
+import { createTree, editTree, addMoment, editMoment, parentCandidates, reparentMoment, removeMoment, validateState, validateMomentInput, suggestMomentTitle, importTrees, treeLayout, pathTo, stemGroups, linkMoments, unlinkMoments, relatedMoments, MAX_LINKS, safeUrl, newId, moveMoment } from '../src/domain.js';
 
 const input = (title = '첫 목소리') => ({ subject: '윤슬', title, note: '오래 기억하고 싶은 마음', emotion: '설렘', date: '2026-10-27', url: '' });
 const stateOf = tree => ({ version: 1, trees: [tree] });
@@ -292,4 +292,29 @@ test('reparent moves one branch without cycles, orphans, or lost related links',
   const afterDelete = removeMoment(moved, cId);
   assert.equal(afterDelete.moments.find(moment => moment.id === aId).parentId, rootId);
   validateState(stateOf(afterDelete));
+});
+
+// 순간 목록에서의 옮기기(2026-11-17, 대표 결정): moveMoment로 옮겨도 꼬리표(keywords)가 유지되고,
+// 이어진 순간(자식)은 원래 트리에 남아 위 순간의 위(할머니)에 다시 붙는다 — 지금 도메인 규칙을 고정한다.
+test('옮겨도 꼬리표는 유지되고 이어진 순간 연결은 원래 트리에 남는다', () => {
+  const first = createTree({ subject: '시험', title: '원래 트리', note: '기록', emotion: '설렘', date: '2026-11-15', url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' }, '2026-11-15T00:00:00.000Z');
+  const rootId = first.moments[0].id;
+  const tagged = addMoment(first, { subject: '시험', title: '꼬리표 붙은 순간', note: '기록', emotion: '설렘', date: '2026-11-16', url: '' }, rootId, '2026-11-16T00:00:00.000Z');
+  const taggedId = tagged.moments.find(m => m.id !== rootId).id;
+  const child = addMoment(tagged, { subject: '시험', title: '이어진 순간', note: '기록', emotion: '그리움', date: '2026-11-17', url: '' }, taggedId, '2026-11-17T00:00:00.000Z');
+  const childId = child.moments.find(m => m.id !== rootId && m.id !== taggedId).id;
+  // 꼬리표는 태그 흐름(tag-model)이 순간에 붙인다 — 시험에서도 만든 뒤 붙여 도메인 규칙만 단정한다.
+  const withKeywords = { ...child, moments: child.moments.map(m => m.id === taggedId ? { ...m, keywords: ['Super Shy'] } : m) };
+  const second = createTree({ subject: '시험', title: '옮길 트리', note: '기록', emotion: '즐거움', date: '2026-11-10', url: '' }, '2026-11-10T00:00:00.000Z');
+  const state = { version: 1, trees: [withKeywords, second], prefs: {} };
+  const result = moveMoment(state, tagged.id, taggedId, second.id, null, '2026-11-17T01:00:00.000Z');
+  const target = result.state.trees.find(t => t.id === second.id);
+  const source = result.state.trees.find(t => t.id === tagged.id);
+  const movedMoment = target.moments.find(m => m.id === taggedId);
+  assert.ok(movedMoment, '옮긴 순간이 대상 트리에 있다');
+  assert.deepEqual(movedMoment.keywords, ['Super Shy'], '꼬리표(keywords)가 그대로 유지된다');
+  const childInSource = source.moments.find(m => m.id === childId);
+  assert.ok(childInSource, '이어진 순간은 원래 트리에 남는다');
+  assert.equal(childInSource.parentId, rootId, '이어진 순간은 원래 트리의 위 순간에 다시 붙는다(연결이 끊기지 않는다)');
+  validateState(result.state);
 });

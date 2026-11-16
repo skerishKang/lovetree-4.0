@@ -26,12 +26,14 @@ const cardsPlan=homeCardsPlan({mode,loggedIn,context,popular,youtube});
 const cardTrees=cardsPlan.cards.length?[{id:'home-cards',title:'첫 화면 카드',moments:cardsPlan.cards}]:[];
 // #394: 순간 목록은 모든 트리의 순간을 최근 순으로 보는 곳. 트리 드롭다운의 "내 순간 전체 보기"로
 // 열릴 때는 셸이 남긴 요청(LT41_MOMENTS_OPEN)의 트리가 골라진 상태로 시작한다.
-const momentsRequest=parent.LT41_MOMENTS_OPEN??null;
+const momentsRequest=parent.LT41_MOMENTS_OPEN??null;try{console.log('[home] momentsRequest',JSON.stringify(momentsRequest||null));}catch{}
 const momentList=loggedIn?{
  trees:momentListTrees(context.trees),
  entries:momentListEntries({trees:context.trees,youtube}),
  initialTreeId:momentsRequest?.treeId||'all',
- initialOpen:!!momentsRequest
+ initialOpen:!!momentsRequest,
+ initialPicking:momentsRequest?.picking===true,
+ initialNotice:momentsRequest?.notice||null
 }:null;
 // 이 문서가 그려질 때 쓴 날짜 표기. 셸이 같은 값을 다시 보내면 새로고침하지 않는다(아래 메시지 처리).
 const renderedDateStyle=dateStyleOf(ltDateStyle());
@@ -42,6 +44,7 @@ const renderedTitleDisplay=titleDisplayOf(readTitleDisplay(parent.LT41));
  // 내 것만 0장은 예시로 대체하지 않고 빈 궤도와 첫 순간 안내를 남긴다.
  empty:cardsPlan.kind==='mine-empty',
  momentList,
+ prefs:parent.LT41?.prefs||null,
  titleDisplay:readTitleDisplay(parent.LT41),
  dateStyle:renderedDateStyle,
  onOpen:card=>{if(card.source==='public'){parent.location.hash=`#share/${card.shareId}/${card.view||'book'}`;return;}bridge.actions.openMine(card.treeId,card.id);},
