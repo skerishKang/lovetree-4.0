@@ -17,6 +17,7 @@ import {titleView, withoutAutoTitle} from './book-usability.mjs';
 import {frameMessage, frameReadyMessages, FRAME_MESSAGE_TYPES} from './frame-wiring.mjs';
 import {screens,screenForView,viewForFile,themedViewFor} from './shell/navigation.mjs';
 import {createScreens} from './shell/screens.mjs';
+import {createHomeLink} from './shell/home-link.mjs';
 import {createHeader} from './shell/header.mjs';
 import {createAuth} from './shell/auth.mjs';
 import {createPanels} from './shell/panels.mjs';
@@ -481,6 +482,33 @@ const shellDialogs=createDialogs({
   panelBlocked:id=>id==='write-panel'&&(uploads.busy||shellQuick.uploads?.busy)?'파일 전송을 마치거나 취소해 주세요.':'',
   notify:text=>notify(text)
 });
+
+// 로고 클릭은 해시 변경에만 의존하지 않는다(2026-11-17 실측). 주소가 남는 화면(서재 등)에서 눌러도 첫 화면으로 간다.
+function closePanelsForHome(){
+  closeTreeMenu();closeMore();closeAccountMenu();
+  let ok=true;
+  for(const d of document.querySelectorAll('dialog[data-lt-panel][open]')){if(!shellDialogs.requestClose(d.id))ok=false;}
+  return ok;
+}
+function scrollHomeToTop(){
+  try{window.scrollTo(0,0)}catch{}
+  const frame=$('view');
+  try{frame?.contentWindow?.scrollTo?.(0,0)}catch{}
+  try{const app=frame?.contentDocument?.querySelector?.('.app');if(app)app.scrollTop=0}catch{}
+}
+function setHomeHash(){
+  if(location.hash!=='#home')history.pushState(null,'','#home');
+  handledHash='#home';
+}
+const shellHomeLink=createHomeLink({
+  $,
+  getCurrent:()=>current,
+  show:(file,write)=>show(file,write),
+  closePanels:closePanelsForHome,
+  setHomeHash,
+  scrollToTop:scrollHomeToTop
+});
+shellHomeLink.mount();
 
 const shellHeader=createHeader({
   $,
