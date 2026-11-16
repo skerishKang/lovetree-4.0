@@ -132,7 +132,7 @@ test('내 기록 창(#records)은 없어지고 중복 트리 고르기도 함께
   assert.doesNotMatch(shell, /\$\('trees'\)/);
 });
 
-test('계정 메뉴: 맨 위 이메일 → 설정 → 새 소식 → 내 의견 → 어떻게 쓰나요 → 내 보관 파일 → (운영) 운영센터 → 로그아웃(고급 기능 보기는 설정 화면 탭으로 옮겼다)', () => {
+test('계정 메뉴: 맨 위 이메일 → 설정 → 새 소식 → 내 의견 → 어떻게 쓰나요 → 내 보관 파일 → 운영센터 → 로그아웃(고급 기능 보기는 설정 화면 탭으로 옮겼다)', () => {
   assert.match(popover, /<strong id="account-email"><\/strong>/);
   const order = ['account-open-settings', 'account-updates', 'account-my-posts', 'account-guide', 'account-assets-open', 'account-ops-group', 'account-logout'];
   let at = popover.indexOf('account-head');
@@ -141,11 +141,10 @@ test('계정 메뉴: 맨 위 이메일 → 설정 → 새 소식 → 내 의견 
     assert.ok(next > at, `${id} 순서`);
     at = next;
   }
-  // 2026-11-16 CTO 지적: 관리자 항목은 고객 메뉴와 섞지 않는다 — 구분선 아래 '운영' 묶음(라벨 + 운영센터)이
-  // 로그아웃 바로 위에 있고, 고객 항목 사이에 있지 않다.
+  // 2026-11-16 CTO 지적: 관리자 항목은 고객 메뉴와 섞지 않는다 — 구분선 아래 운영센터가
+  // 로그아웃 바로 위에 있고, 고객 항목 사이에 있지 않다. 2026-11-17에 겹치던 '운영' 라벨 글자는 없앴다.
   const opsGroup = popover.slice(popover.indexOf('id="account-ops-group"'), popover.indexOf('id="account-logout"'));
   assert.match(opsGroup, /role="group" aria-label="운영"/);
-  assert.match(opsGroup, /account-menu-group"[^>]*aria-hidden="true">운영</);
   assert.match(opsGroup, /id="account-ops"[^>]*>운영센터</);
   assert.ok(popover.indexOf('id="account-ops-group"') > popover.indexOf('id="account-assets-open"'), '운영 묶음은 고객 항목 뒤다');
   // 2026-11-16 수리: 메뉴의 '의견 보내기' 칸을 없애고 내 의견 창 안에서 바로 보낸다.
