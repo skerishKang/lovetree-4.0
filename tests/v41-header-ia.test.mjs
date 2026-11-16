@@ -656,3 +656,73 @@ test('이슈 666 화면: 고급 기능 스위치 — 설정 화면 탭 더 보�
   } finally { await browser.close(); server.close(); }
   console.log('#666 고급 기능 스위치 실측:\n' + rows.map((r) => `  ${r.크기}·${r.테마} 단추높이 ${r.단추높이}px · 꺼짐 ${r.꺼짐} · 켜짐 ${r.켜짐}`).join('\n'));
 });
+
+// 2026-11-17 계정 메뉴: '운영' 라벨 제거 + 항목 기본 배경(밤·정원) 수치 판정.
+let menuChromium, menuSkip = '';
+try {
+  ({ chromium: menuChromium } = await import('playwright'));
+  const candidates = [menuChromium.executablePath()];
+  if (process.env.LT_MENU_BROWSER_EXE) candidates.push(process.env.LT_MENU_BROWSER_EXE);
+  if (!candidates.some(p => p && existsSync644(p))) menuSkip = 'Playwright Chromium이 없어 계정 메뉴 시험을 건너뜀';
+} catch { menuSkip = 'playwright 패키지가 없어 계정 메뉴 시험을 건너뜀'; }
+
+test('계정 메뉴: 운영 라벨 없음·구분선 유지·기본 항목 배경은 투명, hover에서만 칠(밤·정원)', { skip: menuSkip || false, timeout: 120000 }, async () => {
+  const { serve } = await import('./helpers/screen-audit.mjs');
+  const server = await serve();
+  const port = server.address().port;
+  let browser = null;
+  try {
+    browser = await menuChromium.launch({ headless: true,
+      ...(process.env.LT_MENU_BROWSER_EXE ? { executablePath: process.env.LT_MENU_BROWSER_EXE } : {}) });
+    for (const theme of ['night', 'garden']) {
+      const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+      await page.goto(`http://127.0.0.1:${port}/v41/`, { waitUntil: 'load' });
+      await page.waitForTimeout(500);
+      await page.evaluate(t => {
+        if (t === 'garden') document.documentElement.setAttribute('data-lt-theme', 'garden');
+        else document.documentElement.removeAttribute('data-lt-theme');
+        const pop = document.querySelector('#account-popover');
+        pop.hidden = false;
+        document.getElementById('account-ops-group').hidden = false;
+      }, theme);
+      const got = await page.evaluate(() => {
+        const cs = el => getComputedStyle(el);
+        const pop = document.querySelector('#account-popover');
+        const group = document.getElementById('account-ops-group');
+        return {
+          labels: pop.querySelectorAll('.account-menu-group').length,
+          divider: cs(group).borderTopWidth + ' ' + cs(group).borderTopStyle,
+          order: !!group && !!(group.compareDocumentPosition(document.getElementById('account-logout')) & Node.DOCUMENT_POSITION_FOLLOWING),
+          bgs: [...pop.querySelectorAll('button')].filter(b => !b.hidden).map(b => cs(b).backgroundColor),
+          colors: [...pop.querySelectorAll('button')].filter(b => !b.hidden).map(b => cs(b).color),
+          panelBg: cs(pop).backgroundColor
+        };
+      });
+      assert.equal(got.labels, 0, theme + ': 운영 라벨 글자 없음');
+      assert.equal(got.divider, '1px solid', theme + ': 구분선 유지');
+      assert.equal(got.order, true, theme + ': 운영센터 → 로그아웃 순서');
+      assert.ok(got.bgs.length >= 6, theme + ': 항목 수');
+      assert.ok(got.bgs.every(bg => bg === 'rgba(0, 0, 0, 0)'), theme + ': 기본 항목 배경은 모두 투명(판 배경 그대로)');
+
+      const defaultBg = got.bgs[0];
+      await page.hover('#account-open-settings');
+      await page.waitForTimeout(120);
+      const hoverBg = await page.evaluate(() => getComputedStyle(document.getElementById('account-open-settings')).backgroundColor);
+      assert.notEqual(hoverBg, defaultBg, theme + ': hover에서만 옅은 칠');
+
+      // 대비: 항목 글자색 × 판 배경(불투명 합성) ≥ 4.5:1
+      const rgb = s => { const m = String(s).match(/rgba?\(([^)]+)\)/); const p = m[1].split(',').map(Number); return { r: p[0], g: p[1], b: p[2], a: p[3] === undefined ? 1 : p[3] }; };
+      const lum = c => { const f = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(c.r) + 0.7152 * f(c.g) + 0.0722 * f(c.b); };
+      const panel = rgb(got.panelBg), base = { r: 4, g: 4, b: 7, a: 1 };
+      const flat = { r: panel.r * panel.a + base.r * (1 - panel.a), g: panel.g * panel.a + base.g * (1 - panel.a), b: panel.b * panel.a + base.b * (1 - panel.a) };
+      for (const color of got.colors) {
+        const a = lum(rgb(color)), b = lum(flat);
+        assert.ok((Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05) >= 4.5, theme + ': 글자 대비 4.5:1 이상');
+      }
+      await page.close();
+    }
+  } finally {
+    if (browser) await browser.close();
+    server.close();
+  }
+});
