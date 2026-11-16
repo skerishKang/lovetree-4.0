@@ -34,6 +34,18 @@ test('owner routes keep view/tree/moment while public routes stay a separate sco
   assert.equal(parseSelectionRoute('#unknown').explicit,false);
 });
 
+test('#map은 지도 별칭이다 — #network와 같은 화면을 가리킨다',()=>{
+  assert.deepEqual(parseSelectionRoute('#map'),{
+    scope:'screen',view:'network',treeId:null,momentId:null,explicit:true
+  });
+  assert.deepEqual(parseSelectionRoute('#network'),{
+    scope:'screen',view:'network',treeId:null,momentId:null,explicit:true
+  });
+  const saved={view:'book',treeId:'tree-a',momentId:'m1'};
+  assert.equal(memberStartupView(parseSelectionRoute('#map'),null,saved),'network');
+  assert.equal(memberStartupView(parseSelectionRoute('#network'),null,saved),'network');
+});
+
 test('owner address loads account records but public address never opens private records',()=>{
   const cookie='__Host-lovetree-shared=1';
   assert.equal(shouldLoadMemberRecords('','','#my/book?tree=a&moment=b'),true);

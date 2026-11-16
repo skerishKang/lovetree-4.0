@@ -105,7 +105,10 @@ html[data-lt-theme="garden"] .d-list button:hover{background:rgba(64,53,54,.07)}
 @media (max-width: 859px) {
   body{padding:8px 10px}
   .g-body{flex-direction:column}
-  .g-rail{flex:none;max-height:42vh}
+  /* 아래 시트의 마지막 줄(꼬리표·범례)이 셸 ＋ 단추(390 실측: 아래 12px + 높이 56px)에 가리지 않게
+     단추 자리보다 넉넉한 아래 여백을 둔다(390 실측 76px로는 18px 남음 → 100px) —
+     시트를 끝까지 내리면 마지막 줄이 단추 위로 온다(3회차 보람 결함). */
+  .g-rail{flex:none;max-height:42vh;padding-bottom:100px}
   .g-walk{flex-shrink:0}
 }
 @media (max-width: 480px) {

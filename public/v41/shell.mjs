@@ -45,7 +45,12 @@ const $=id=>document.getElementById(id);
 // #666: 알림 줄(토스트)은 화면 아래에 늘 붙어 있는 것들 — '새 소식·의견 보내기' 링크 줄, ＋ 단추, 새 소식 카드 —
 // 을 덮지 않는다. 붙어 있는 것들의 가장 높은 윗변을 좌표로 재서 그 위로 올린다(글자 크기·화면 폭이 달라도 겹침 0).
 // 390 실측: 링크 줄 아래 10~37px·＋ 단추 12~68px·카드 86~152px → 알림 줄 아래 134px.
-function placeToast(){let above=0;for(const el of document.querySelectorAll('.home-links,#mobile-add,.updates-card')){if(el.hidden)continue;const cs=getComputedStyle(el);if(cs.display==='none'||cs.visibility==='hidden'||Number(cs.opacity)===0)continue;const r=el.getBoundingClientRect();if(r.width<1||r.height<1)continue;above=Math.max(above,document.documentElement.clientHeight-r.top+10)}const style=document.documentElement.style;if(above>0)style.setProperty('--lt-toast-bottom',Math.round(above)+'px');else style.removeProperty('--lt-toast-bottom')}
+function placeToast(){let above=0;for(const el of document.querySelectorAll('.home-links,#mobile-add,.updates-card')){if(el.hidden)continue;const cs=getComputedStyle(el);if(cs.display==='none'||cs.visibility==='hidden'||Number(cs.opacity)===0)continue;const r=el.getBoundingClientRect();if(r.width<1||r.height<1)continue;above=Math.max(above,document.documentElement.clientHeight-r.top+10)}
+ // 화면 안의 아래쪽 내용(data-lt-keep-clear 표식 — 책의 페이지 알약·이유 안내·갈림길 책갈피)도 알림이 덮지 않게 한다.
+ // 보이는 프레임 문서까지 같은 좌표로 잰다(3회차 보람 회차 — 알림이 책 아래 안내 줄에 포개졌다).
+ const keepFrame=[...document.querySelectorAll('#view,#view-next')].find(f=>!f.hidden&&f.contentDocument&&f.contentDocument.querySelector('[data-lt-keep-clear]'));
+ if(keepFrame){const fr=keepFrame.getBoundingClientRect();for(const el of keepFrame.contentDocument.querySelectorAll('[data-lt-keep-clear]')){const cs=keepFrame.contentDocument.defaultView.getComputedStyle(el);if(cs.display==='none'||cs.visibility==='hidden'||Number(cs.opacity)===0)continue;const r=el.getBoundingClientRect();if(r.width<1||r.height<1)continue;above=Math.max(above,document.documentElement.clientHeight-(fr.top+r.top)+10)}}
+ const style=document.documentElement.style;if(above>0)style.setProperty('--lt-toast-bottom',Math.round(above)+'px');else style.removeProperty('--lt-toast-bottom')}
 addEventListener('resize',placeToast);
 addEventListener('orientationchange',()=>setTimeout(placeToast,0));
 // ＋ 단추(body.lt-fab-ok)·새 소식 카드가 늦게 뜨거나 닫힐 때도 다시 잰다.
@@ -53,7 +58,7 @@ for(const el of [$('updates-card')].filter(Boolean))new MutationObserver(placeTo
 new MutationObserver(placeToast).observe(document.body,{attributes:true,attributeFilter:['class']});
 placeToast();
 // 안내 한 벌(#353 후속): 담기·중복·로그인 필요 안내(hold)가 상태 안내보다 먼저 일정 시간 보인다.
-const shellNotice=createNotifier({$,beforeShow:placeToast});
+const shellNotice=createNotifier({$,beforeShow:placeToast,afterShow:()=>{placeToast();setTimeout(placeToast,600);setTimeout(placeToast,1400);}});
 function notify(text,options){return shellNotice.notify(text,options);}
 // #347 후속: 계정 제목 보기 설정. 계정 상태(state.prefs.titleDisplay)에 저장하고 화면에 알린다.
 function currentPrefs(){try{return member?.state?.().prefs||{titleDisplay:'both'}}catch{return {titleDisplay:'both'}}}
@@ -503,6 +508,9 @@ const shellScreens=createScreens({
     /* 이슈 458: 모바일(781px 미만)에서는 셸의 ＋ 단추가 오른쪽 아래에 뜬다 — 첫 화면 궤도가 그 자리를 비끼게
        프레임 html에 표시를 남긴다(궤도 쪽 좁은 화면 배치가 이 표시를 읽는다). */
     if(matchMedia('(max-width:780px)').matches)d.documentElement.dataset.ltFab='1';else delete d.documentElement.dataset.ltFab;
+    // 화면이 자리 잡은 뒤 알림 자리를 다시 잰다 — 알림이 떠 있는 동안 화면이 늦게 편성되면(기록 불러오기·글꼴)
+    // 자리가 낡아 화면 아래쪽 내용(책의 페이지 알약·이유 안내)을 덮는다. 자리는 살아 있는 값이라 즉시 따라 옮겨 앉는다.
+    placeToast();setTimeout(placeToast,1600);
     // #368 2차·3차: 새로 열린 화면에 페이지 넘김·날짜 표기 값을 알린다(테마와 같은 시점).
     // #481 T6: 무엇을 뜰 때마다 보내는지는 frameReadyMessages가 정한다(보내는 시점을 실행 시험으로 고정한다).
     // 무엇을 뜰 때마다 보내는지는 frameReadyMessages가 정하고, 여기서는 그것을 순서대로 보낸다
