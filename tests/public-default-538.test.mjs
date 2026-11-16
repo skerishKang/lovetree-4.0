@@ -192,6 +192,44 @@ test('주인이 트리를 지우면 자동 공개도 즉시 내려간다', async
   assert.equal(read.status, 410, '공개 읽기도 즉시 막힌다');
 });
 
+test('주인이 지운 트리의 주인 만든 공유 행도 회수하고 소개 행도 지운다 — 유령 공유 행을 남기지 않는다', async () => {
+  const h = await setup();
+  const gone = treeWithMoments(3);
+  const kept = treeWithMoments(3);
+  await h.workspace.write(principal('alice'), { state: { version: 1, trees: [gone, kept] }, expectedRevision: 0, clientKey: 'seed-ghost' });
+  // 두 트리 모두 소개를 켜고, 각각 주인이 만든 공유 링크를 하나씩 만든다.
+  await h.discoverOn(gone);
+  await h.discoverOn(kept);
+  const ownerShare = async tree => {
+    const preview = await h.request(h.shareHandle, 'POST', '/api/shares/preview', { treeId: tree.id, entryMomentId: tree.moments[0].id, view: 'book' }, 'alice');
+    const made = await h.request(h.shareHandle, 'POST', '/api/shares', { treeId: tree.id, entryMomentId: tree.moments[0].id, view: 'book', previewToken: preview.body.preview.previewToken }, 'alice');
+    assert.equal(made.status, 201);
+    return made.body.share.id;
+  };
+  const goneShareId = await ownerShare(gone);
+  const keptShareId = await ownerShare(kept);
+  // 남은 트리의 자동 공개 행 id — 둘러보기는 트리당 한 행(auto 우선)을 뽑으므로 어느 쪽 행이 나와도
+  // 남은 트리의 것인지만 보면 된다.
+  const keptAutoId = (await h.shareRepo.list({ productId: PRODUCT, subjectId: 'alice' }))
+    .find(rowValue => rowValue.treeId === kept.id && rowValue.origin === 'auto').shareId;
+  assert.equal((await h.browse()).items.length, 2);
+  assert.equal((await h.shareRepo.load({ productId: PRODUCT, shareId: goneShareId })).status, 'active');
+
+  await h.workspace.deleteTree(principal('alice'), gone.id);
+
+  // 지워진 트리: 주인 만든 공유 행도 revoked, 소개 행도 없다(유령이 남지 않는다).
+  assert.equal((await h.shareRepo.load({ productId: PRODUCT, shareId: goneShareId })).status, 'revoked', '주인 만든 공유 행도 회수된다');
+  assert.equal((await h.discoverRepo.get({ productId: PRODUCT, subjectId: 'alice', treeId: gone.id })).discover, false, '소개 행도 지워진다');
+  // 남은 트리: 주인 만든 공유 행과 소개 행이 그대로 살아 있다.
+  assert.equal((await h.shareRepo.load({ productId: PRODUCT, shareId: keptShareId })).status, 'active', '남은 트리의 공유 행은 그대로다');
+  assert.equal((await h.discoverRepo.get({ productId: PRODUCT, subjectId: 'alice', treeId: kept.id })).discover, true, '남은 트리의 소개 행은 그대로다');
+  const browse = await h.browse();
+  assert.equal(browse.items.length, 1, '둘러보기에는 남은 트리만 나온다');
+  assert.ok([keptAutoId, keptShareId].includes(browse.items[0].shareId), '남은 트리의 공유 행으로 나온다(지워진 트리의 행은 아니다)');
+  const read = await h.request(h.shareHandle, 'GET', `/api/public/shares/${goneShareId}`);
+  assert.equal(read.status, 410, '지워진 트리의 공유는 공개 읽기에서도 막힌다');
+});
+
 test('moment_count는 저장 때마다 갱신된다 — 순간 추가·삭제·주인 만든 공유 행도 함께', async () => {
   const h = await setup();
   let tree = treeWithMoments(3);

@@ -37,6 +37,14 @@ export function createTreeDiscoverRepo(pool) {
         [productId, subjectId, treeId]
       );
       return result.rows.length > 0;
+    },
+    // 문서에서 사라진 트리의 소개 행은 남기지 않는다(스파스 운용 — 지워진 트리의 행은 쓰이지 않는다).
+    async deleteNotIn({ productId, subjectId, treeIds }) {
+      const result = await pool.query(
+        'DELETE FROM lovetree_tree_discover WHERE product_id=$1 AND subject_id=$2 AND NOT (tree_id = ANY($3))',
+        [productId, subjectId, treeIds]
+      );
+      return result.rowCount;
     }
   };
 }

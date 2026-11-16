@@ -17,6 +17,15 @@ export function createMemoryTreeDiscoverRepo() {
       return [...onKeys].map((k) => k.split('\0')).filter(([p]) => p === productId).map(([, subjectId, treeId]) => ({ subjectId, treeId }));
     },
     // 메모리 커뮤니티 저장소의 둘러보기 필터에 쓰는 동기 판정.
-    isOn(productId, subjectId, treeId) { return onKeys.has(key(productId, subjectId, treeId)); }
+    isOn(productId, subjectId, treeId) { return onKeys.has(key(productId, subjectId, treeId)); },
+    // 문서에서 사라진 트리의 소개 행은 남기지 않는다(스파스 운용 — 지워진 트리의 행은 쓰이지 않는다).
+    async deleteNotIn({ productId, subjectId, treeIds }) {
+      const keep = new Set(treeIds);
+      for (const k of [...onKeys]) {
+        const [p, s, t] = k.split('\0');
+        if (p === productId && s === subjectId && !keep.has(t)) onKeys.delete(k);
+      }
+      return true;
+    }
   };
 }

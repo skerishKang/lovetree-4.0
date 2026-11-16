@@ -62,11 +62,12 @@ export function createShareRepo(pool) {
       );
       return row(result.rows[0]);
     },
-    // #538: 문서에서 사라진 트리의 자동 공개 행은 즉시 내린다(주인이 지우면 바로 내려감).
-    async revokeAutoSharesNotIn({productId,subjectId,treeIds}) {
+    // #538: 문서에서 사라진 트리의 공유 행은 즉시 내린다(주인이 지우면 바로 내려감).
+    // 자동 공개 행만이 아니라 주인이 만든 행도 함께 내린다 — 트리가 없는 공유 행(유령)을 남기지 않는다.
+    async revokeSharesNotIn({productId,subjectId,treeIds}) {
       const result = await pool.query(
         `UPDATE lovetree_shares SET status='revoked', revoked_at=COALESCE(revoked_at,now()), updated_at=now()
-         WHERE product_id=$1 AND subject_id=$2 AND origin='auto' AND status='active' AND NOT (tree_id = ANY($3))`,
+         WHERE product_id=$1 AND subject_id=$2 AND status='active' AND NOT (tree_id = ANY($3))`,
         [productId,subjectId,treeIds]
       );
       return result.rowCount;

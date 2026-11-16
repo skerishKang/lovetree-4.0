@@ -17,7 +17,8 @@ export function createMemoryShareRepo({now=Date.UTC(2026,10,1)}={}) {
       const value={productId,shareId,subjectId,treeId,entryMomentId,view:'book',origin:'auto',momentCount,status:'active',createdAt:stamp(),revokedAt:null,discoverable:false,discoverableAt:null};
       rows.set(key(productId,shareId),value);return structuredClone(value);
     },
-    // #538: 문서에서 사라진 트리의 자동 공개 행은 즉시 내린다(주인이 지우면 바로 내려감).
-    async revokeAutoSharesNotIn({productId,subjectId,treeIds}){const keep=new Set(treeIds);for(const value of rows.values())if(value.productId===productId&&value.subjectId===subjectId&&value.origin==='auto'&&value.status==='active'&&!keep.has(value.treeId)){value.status='revoked';value.revokedAt=stamp();}}
+    // #538: 문서에서 사라진 트리의 공유 행은 즉시 내린다(주인이 지우면 바로 내려감).
+    // 자동 공개 행만이 아니라 주인이 만든 행도 함께 내린다 — 트리가 없는 공유 행(유령)을 남기지 않는다.
+    async revokeSharesNotIn({productId,subjectId,treeIds}){const keep=new Set(treeIds);for(const value of rows.values())if(value.productId===productId&&value.subjectId===subjectId&&value.status==='active'&&!keep.has(value.treeId)){value.status='revoked';value.revokedAt=stamp();}}
   };
 }
