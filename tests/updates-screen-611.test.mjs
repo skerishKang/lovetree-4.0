@@ -32,8 +32,9 @@ function hostHtml() {
 <button type="button" id="settings-updates-open">새 소식 보기</button>
 <div id="updates-card" class="updates-card" role="status" hidden><p class="updates-card-text" id="updates-card-text"></p><div class="updates-card-actions"><button type="button" id="updates-view">보기</button><button type="button" id="updates-dismiss" aria-label="새 소식 알림 닫기">×</button></div></div>
 <div class="home-links"><button type="button" id="updates-link" class="feedback-link">새 소식</button></div>
-<dialog id="updates-panel" data-lt-panel="full" aria-labelledby="updates-title"><div class="panel-heading"><div><span class="eyebrow">새 소식</span><h2 id="updates-title">새 소식</h2></div></div>
-<div id="updates-list" class="updates-list"></div></dialog>
+<dialog id="updates-panel" data-lt-panel="full" aria-labelledby="updates-title"><div class="panel-heading"><div><span class="eyebrow">새 소식</span><h2 id="updates-title">새 소식</h2></div><button type="button" id="updates-close" class="close" aria-label="새 소식 닫기">×</button></div>
+<div id="updates-list" class="updates-list"></div>
+<div class="updates-foot"><button type="button" id="updates-foot-close">닫기</button></div></dialog>
 <script type="module">
 import { mountUpdates } from '/v41/updates.mjs';
 const $ = id => document.getElementById(id);
@@ -41,6 +42,8 @@ const mount = mountUpdates({ $, showPanel: id => $(id).showModal(), onDot: unrea
 $('account-updates').onclick = () => mount.openUpdates();
 $('updates-link').onclick = () => mount.openUpdates();
 $('settings-updates-open').onclick = () => mount.openUpdates();
+$('updates-close').onclick = () => $('updates-panel').close();
+$('updates-foot-close').onclick = () => $('updates-panel').close();
 window.__updatesDot = null;
 const probe = setInterval(() => {
   const avatar = $('account-avatar');
@@ -145,6 +148,58 @@ test('611 실행: 390에서도 작은 카드와 새 소식 창이 보인다', { 
     await page.waitForFunction(() => document.getElementById('updates-panel').open, null, { timeout: 5000 });
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     assert.ok(overflow <= 0, '가로 넘침이 없다');
+    await ctx.close();
+  } finally {
+    await browser.close();
+  }
+});
+
+// 새 소식 창 닫기(261116): ✕·목록 끝 '닫기'·Esc 세 길로 닫리고, 목록을 끝까지 스크롤해도 ✕가 창 안에 보인다
+// (sticky 머리줄). 390 휴대폰 폭에서 재단다. 창이 모달이라 바깥 메뉴는 누를 수 없어 '같은 입구 다시 누르기'는 닫기 길이 아니다.
+test('611 실행: 새 소식 창은 세 길로 닫리고, 스크롤해도 ✕가 보인다(390)', { skip }, async () => {
+  const browser = await chromium.launch();
+  try {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    const page = await ctx.newPage();
+    const errors = [];
+    page.on('pageerror', (e) => errors.push(String(e.message || e)));
+    await page.goto(`${base}/host611`, { waitUntil: 'load' });
+    // 목록은 창을 열 때 채워지므로, 열기 전에는 카드(접속 때 한 번)가 뜨는지만 기다린다.
+    await page.waitForFunction(() => !document.getElementById('updates-card')?.hidden, null, { timeout: 8000 });
+    const open = () => page.waitForFunction(() => document.getElementById('updates-panel').open, null, { timeout: 5000 });
+    const closed = () => page.waitForFunction(() => !document.getElementById('updates-panel').open, null, { timeout: 5000 });
+
+    // 1) 목록을 끝까지 스크롤 — ✕가 창 안에 보여야 한다(머리줄 고정).
+    await page.click('#updates-link');
+    await open();
+    const sticky = await page.evaluate(() => {
+      const panel = document.getElementById('updates-panel');
+      panel.scrollTop = panel.scrollHeight;
+      const btn = panel.querySelector('.close');
+      const r = btn.getBoundingClientRect();
+      const pr = panel.getBoundingClientRect();
+      return { visible: r.height > 0 && r.top >= pr.top - 1 && r.bottom <= pr.bottom + 1, width: Math.round(r.width) };
+    });
+    assert.ok(sticky.visible, `스크롤 끝에서 ✕가 창 안에 보인다(${JSON.stringify(sticky)})`);
+    assert.ok(sticky.width >= 40, `✕ 누름 영역이 44px 근처다(${sticky.width}px)`);
+
+    // 2) 목록 끝 '닫기' 단추로 닫친다.
+    await page.click('#updates-foot-close');
+    await closed();
+
+    // 3) Esc로 닫친다.
+    await page.click('#updates-link');
+    await open();
+    await page.keyboard.press('Escape');
+    await closed();
+
+    // 4) ✕로 닫친다.
+    await page.click('#updates-link');
+    await open();
+    await page.click('#updates-close');
+    await closed();
+
+    assert.deepEqual(errors, [], '페이지 오류 없음');
     await ctx.close();
   } finally {
     await browser.close();
