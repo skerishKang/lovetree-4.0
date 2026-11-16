@@ -92,6 +92,9 @@ async function fingerprintMatching(frame, expected) {
 
 async function settingsPlate(page, frame, plate) {
   await page.evaluate(() => document.getElementById('account-settings').showModal());
+  // 2026-11-16 탭 정리: 보드·지도 판 행은 화면 탭의 '더 보기(고급)' 접힘 안에 있다 — 화면 탭을 확인하고 접힘을 펼친 뒤 누른다.
+  await page.locator('#settings-tab-screen').click();
+  await page.evaluate(() => { document.getElementById('account-settings-screen-more').open = true; });
   await page.locator(`#account-settings button[data-board-theme="${plate}"]`).scrollIntoViewIfNeeded();
   await page.waitForTimeout(120);
   await frame.evaluate(() => { window.__mapDrawCount = 0; });
