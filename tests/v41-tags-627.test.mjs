@@ -833,3 +833,26 @@ test('#739: 거둔 꼬리표 줄(destroy)은 눌러도 저장하지 않는다 �
   host.dispatch('click', { target: { closest: (sel) => sel === '[data-tag-raw]' ? { dataset: { tagRaw: '가수:ILLIT' } } : null } });
   assert.deepEqual(commits, [], '거둔 줄의 귀는 저장을 부르지 않는다');
 });
+
+// ── #754 이후: 꼬리표 줄의 '꼬리표' 낱말 겹침 — 빈 상태(쉬운 추가 직후)에서 라벨과 빈 문구가 겹쳤다.
+// 판정은 그려진 글자로 한다: 태그 안쪽 속성(aria-label 따로)을 덜어 낸 뒤 보이는 글자에 '꼬리표'가 한 번.
+const visibleTextOf = (html) => String(html).replace(/<[^>]*>/g, ' ');
+const wordCount = (html, word) => visibleTextOf(html).split(word).length - 1;
+
+test('꼬리표 줄: 빈 상태에서는 라벨을 숨기고 빈 문구만 — 꼬리표 낱말이 줄 안에 한 번', () => {
+  // 쉬운 추가 직후(칩이 아직 없는 빈 상태): 예전에는 '꼬리표  아직 꼬리표가 없어요'로 두 번 보였다.
+  const host = fakeEl();
+  renderTagLine({ host, doc: {}, moment: { id: 'm1', title: '', keywords: [] }, knownTags: [], writable: true });
+  assert.ok(host.innerHTML.includes('lt-tagline-empty'), '빈 문구가 보인다');
+  assert.ok(!host.innerHTML.includes('lt-tagline-name'), '빈 상태에서는 라벨을 숨긴다');
+  assert.equal(wordCount(host.innerHTML, '꼬리표'), 1, '보이는 글자에 꼬리표는 한 번');
+  assert.ok(host.innerHTML.includes('아직 꼬리표가 없어요'));
+});
+
+test('꼬리표 줄: 칩이 보일 때는 라벨이 한 번 있고 빈 문구는 없다', () => {
+  const host = fakeEl();
+  renderTagLine({ host, doc: {}, moment: { id: 'm2', title: '', keywords: ['여행'] }, knownTags: [], writable: true });
+  assert.ok(host.innerHTML.includes('lt-tagline-chips'), '확정 칩이 보인다');
+  assert.ok(!host.innerHTML.includes('lt-tagline-empty'), '칩이 있으면 빈 문구를 내지 않는다');
+  assert.equal(wordCount(host.innerHTML, '꼬리표'), 1, '보이는 글자에 꼬리표는 한 번');
+});
