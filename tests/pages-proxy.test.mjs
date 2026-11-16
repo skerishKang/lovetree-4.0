@@ -1,5 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync, readdirSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { createProxy, upstreamOrigin, DEFAULT_RESPONSE_LIMIT_BYTES } from '../functions/_lib/proxy.js';
 import { DEFAULT_MAX_BODY_BYTES } from '../server/http.js';
 
@@ -323,4 +326,76 @@ test('운영센터 고객 자세히 판·사진 경로는 읽기만 넘기고, �
     assert.equal(response.status, expected, `${method} ${path}: ${expected}`);
     assert.equal(fetcher.calls.length, 0, `${method} ${path}: 업스트림 호출 없음`);
   }
+});
+
+/* 사이트·관리자 화면이 실제로 부르는 /api 주소를 프록시가 모두 넘기는지 검사한다.
+   서버와 사이트에만 있고 프록시 허용 목록에 빠진 경로(#671, #739 이후)를 다시 잡기 위한 것이다.
+   소스의 문자열 조각('/api/trees/' + id + '/discover', `${...}` 등)을 모아 가짜 id로 경로를 맞춘다. */
+const REPO = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
+function sourceFiles(dir, out = []) {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    if (entry.name === 'node_modules' || entry.name === 'dist' || entry.name === '.git') continue;
+    const file = path.join(dir, entry.name);
+    if (entry.isDirectory()) sourceFiles(file, out);
+    else if (/\.(?:mjs|js)$/.test(entry.name)) out.push(file);
+  }
+  return out;
+}
+function apiPathsInLine(line) {
+  const literals = [...line.matchAll(/'([^']*)'|`([^`]*)`|"([^"]*)"/g)].map((m) => m[1] ?? m[2] ?? m[3]);
+  const starts = literals.filter((s) => s.startsWith('/api/'));
+  const suffixes = literals.filter((s) => /^\/[A-Za-z0-9_-]+$/.test(s));
+  return starts.map((raw) => {
+    let p = raw.replace(/\$\{[^}]*\}/g, 'fake');
+    if (p.endsWith('/')) {
+      // '/api/.../'만 있는 줄은 startsWith 같은 prefix 검사다 — 같은 줄에 '/suffix'가 없으면 호출이 아니다.
+      if (!suffixes.length) return null;
+      p = p.slice(0, -1) + '/fake' + suffixes[0];
+    }
+    return p.replace(/[?].*$/, '');
+  }).filter(Boolean);
+}
+function collectSiteApiPaths() {
+  const files = [...sourceFiles(path.join(REPO, 'public', 'v41')), ...sourceFiles(path.join(REPO, 'src'))];
+  const found = new Set();
+  for (const file of files) {
+    for (const line of readFileSync(file, 'utf8').split(/\r?\n/)) {
+      if (!line.includes('/api/')) continue;
+      for (const p of apiPathsInLine(line)) if (p.startsWith('/api/')) found.add(p);
+    }
+  }
+  // 문자열이 '/api/x/' + id 로만 끝나는 항목 경로는 위에서 걸러진다 — 가짜 id로 따로 넣는다.
+  for (const p of [
+    '/api/media/00000000-0000-4000-8000-000000000000.png',
+    '/api/shares/fake', '/api/public/shares/fake', '/api/community/comments/fake',
+    '/api/admin/feedback/42', '/api/admin/persona/fake', '/api/admin/customers/sub_fake',
+    '/api/community/admin/reports/fake', '/api/board/mine/42/followup'
+  ]) found.add(p);
+  return found;
+}
+// 일부러 프록시하지 않는 경로가 생기면 여기에 이유와 함께 적는다(지금은 해당 없음).
+const INTENTIONALLY_NOT_PROXIED = [];
+const FAKE_IDS = ['fake', '42', 'sub_fake', '00000000-0000-4000-8000-000000000000.png'];
+const METHODS = ['GET', 'PUT', 'POST', 'PATCH', 'DELETE'];
+
+test('사이트가 부르는 /api 경로는 프록시가 모두 넘긴다', async () => {
+  const paths = [...collectSiteApiPaths()].sort();
+  assert.ok(paths.length > 15, `사이트 API 경로를 충분히 모았는지 확인(${paths.length}건)`);
+  const missing = [];
+  for (const raw of paths) {
+    let forwarded = false;
+    for (const id of FAKE_IDS) {
+      const candidate = raw.replaceAll('fake', id);
+      if (INTENTIONALLY_NOT_PROXIED.some((x) => x.path === candidate)) { forwarded = true; break; }
+      for (const method of METHODS) {
+        const fetcher = recorder(new Response('{}', { headers: { 'content-type': 'application/json' } }));
+        const init = method === 'GET' || method === 'DELETE' ? { method } : { method, headers: { 'content-type': 'application/json' }, body: '{}' };
+        const response = await onRequest(createProxy({ fetcher }), `https://lovetree.example${candidate}`, init);
+        if (response.status === 200) { forwarded = true; break; }
+      }
+      if (forwarded) break;
+    }
+    if (!forwarded) missing.push(raw);
+  }
+  assert.deepEqual(missing, [], `프록시 허용 목록에 빠진 사이트 경로: ${missing.join(', ')}`);
 });
