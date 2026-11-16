@@ -38,6 +38,10 @@ async function read(path, init = {}) {
 }
 
 const host = document.getElementById('main');
+// 머리줄은 .wrap 밖 body의 곧은 자식(#admin-header)에 그린다 — 본 화면 셸처럼 화면 양 끝까지 퍼지고(261116 대표 지적),
+// 내용(.wrap)은 가운데 폭을 유지한다. head()는 머리줄을 그리고 빈 문자열을 돌려 기존 host.innerHTML = `${head()}…` 자리에 내용만 남긴다.
+const headerHost = document.getElementById('admin-header');
+let moreOpen = false; // ≤780의 '메뉴 더보기'(☰) 판이 열려 있는가 — 셸의 #mobile-more·#header-overflow와 같은 규칙.
 // 테마는 본 사이트와 같은 한 벌(저장 키 lt41.theme — header-state.mjs) — 본 사이트에서 고른 밤/정원이
 // 운영센터에도 그대로 적용된다. 첫 그림 전에 속성부터 붙여 밤→정원 깜빡임을 막는다.
 applyThemeAttribute(document.documentElement, readTheme(localStorage));
@@ -60,7 +64,13 @@ function head() {
   const theme = readTheme(localStorage);
   const themeBtn = `<button type="button" class="lt-theme-toggle" data-lt-theme-toggle aria-pressed="${themePressed(theme)}" aria-label="${themeButtonAriaLabel(theme)}" title="${themeButtonAriaLabel(theme)}">${themeButtonLabel(theme)}</button>`;
   // #655: '한눈에'가 맨 앞 탭이다(운영센터를 열면 기본). 기존 탭·주소는 그대로 둔다.
-  return `<header class="app-header"><a class="brand" href="/v41/" title="러브트리로" aria-label="러브트리로"><span>LoveTree</span><small>4.1</small></a><nav aria-label="관리자 메뉴">${tabBtn('overview', '한눈에')}${tabBtn('board', '고객 글')}${tabBtn('journals', '사용 일지')}${tabBtn('reports', '신고')}${tabBtn('issues', '고치는 일')}</nav>${themeBtn}</header>`;
+  // 오른쪽 끝은 셸과 같은 .header-actions 자리 — 테마 단추 + ≤780의 ☰ 더보기. 좁은 화면에서는 알약 탭 대신 이 판으로 고른다.
+  const tabs = `${tabBtn('overview', '한눈에')}${tabBtn('board', '고객 글')}${tabBtn('journals', '사용 일지')}${tabBtn('reports', '신고')}${tabBtn('issues', '고치는 일')}`;
+  headerHost.innerHTML = `<a class="brand" href="/v41/" title="러브트리로" aria-label="러브트리로"><span>LoveTree</span><small>4.1</small></a>`
+    + `<nav aria-label="관리자 메뉴">${tabs}</nav>`
+    + `<div class="header-actions">${themeBtn}<button type="button" class="lt-more" data-admin-more aria-expanded="${moreOpen}" aria-controls="admin-overflow" aria-label="메뉴 더보기">☰</button></div>`
+    + `<div id="admin-overflow" class="lt-overflow" role="menu" aria-label="관리자 메뉴"${moreOpen ? '' : ' hidden'}>${tabs}</div>`;
+  return '';
 }
 
 function renderLogin() {
@@ -430,6 +440,10 @@ async function renderIssues() {
 
 // ---- events (delegated) ----
 document.addEventListener('click', async (event) => {
+  // ☰ 더보기(≤780) — 셸의 #mobile-more와 같은 규칙. 판 밖을 누르면 닫는다.
+  const moreBtn = event.target.closest('[data-admin-more]');
+  if (moreBtn) { moreOpen = !moreOpen; head(); return; }
+  if (moreOpen && !event.target.closest('#admin-overflow')) { moreOpen = false; head(); }
   const themeBtn = event.target.closest('[data-lt-theme-toggle]');
   if (themeBtn) {
     // 본 사이트와 같은 한 벌(저장 키 lt41.theme) — 누르면 밤↔정원을 저장하고 속성·단추 문구를 다시 칠한다.
@@ -446,7 +460,7 @@ document.addEventListener('click', async (event) => {
     return;
   }
   const tab = event.target.closest('[data-tab]');
-  if (tab) { navigate(tab.dataset.tab); return; }
+  if (tab) { moreOpen = false; navigate(tab.dataset.tab); return; }
   // #655: '한눈에' 카드 — 그 조건이 열린 탭 주소로 이동한다(예: #board?status=pending).
   // #743: 답글 0·신고 대기·열린/닫힌 이슈도 조건을 주소로 남겨 그 탭을 걸러 연다.
   const ovCard = event.target.closest('[data-ov-view]');
@@ -572,6 +586,7 @@ document.addEventListener('submit', async (event) => {
 });
 
 document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && moreOpen) { moreOpen = false; head(); return; }
   if ((event.key === 'Enter' || event.key === ' ') && event.target.matches('[data-open][role="button"]')) {
     event.preventDefault();
     navigate('feedback', event.target.dataset.open);
