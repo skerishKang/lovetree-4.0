@@ -90,6 +90,29 @@ export function renderUpdates(updates, activeVersion = '') {
   }).join('');
 }
 
+// '러브트리가 걸어온 길'(261116 대표 확정): 새 소식 창 맨 아래 접이식 구획. 옛것 → 지금 순서로 세대 카드를 세운다.
+// 자료는 public/v41/eras.json 하나. 못 읽으면 구획을 조용히 숨긴다(빈 카드·오류 문구를 남기지 않는다).
+export const ERAS_PATH = '/v41/eras.json';
+
+/** 카드로 그릴 수 있는 세대만 남긴다(번호·이름이 없으면 버린다). */
+export function erasModel(list) {
+  return (Array.isArray(list) ? list : [])
+    .filter(era => era && typeof era.mark === 'string' && era.mark.trim() && typeof era.name === 'string' && era.name.trim())
+    .slice(0, 12);
+}
+
+/** 세대 카드 다섯 장을 위에서 아래로(옛것 → 지금). 마지막(지금) 카드만 금테다. */
+export function renderEras(list) {
+  const rows = erasModel(list);
+  if (!rows.length) return '';
+  return rows.map((era, i) => `<li class="eras-card"${i === rows.length - 1 ? ' data-current="true"' : ''}>
+      <span class="eras-mark" aria-hidden="true">${esc(era.mark)}</span>
+      <p class="eras-name">${esc(era.name)}</p>
+      <p class="eras-when">${esc(era.when || '')}</p>
+      <p class="eras-line">${esc(era.line || '')}</p>
+    </li>`).join('');
+}
+
 async function defaultFetchJson() {
   const response = await fetch('/v41/updates.json', { headers: { accept: 'application/json' } });
   if (!response.ok) return null;
@@ -101,8 +124,21 @@ async function defaultFetchJson() {
  * 셸 배선. $는 문서 조회, showPanel은 셸의 공통 창 여는 함수.
  * onDot(unread)는 계정 단추 점 상태 보고 — 새 소식 점(#611).
  */
-export function mountUpdates({ $, showPanel, fetchJson, storage, onDot }) {
+export function mountUpdates({ $, showPanel, fetchJson, fetchEras, storage, onDot }) {
   const load = typeof fetchJson === 'function' ? fetchJson : defaultFetchJson;
+  const loadEras = typeof fetchEras === 'function'
+    ? fetchEras
+    : async () => {
+      try {
+        const response = await fetch(ERAS_PATH, { headers: { accept: 'application/json' } });
+        if (!response?.ok) return null;
+        const body = await response.json().catch(() => null);
+        return Array.isArray(body) ? body : null;
+      } catch {
+        return null;
+      }
+    };
+  let erasPromise = null;
   const store = storage ?? (() => { try { return globalThis.localStorage; } catch { return null; } })();
   let cache = null;
   let cachePromise = null;
@@ -158,6 +194,23 @@ export function mountUpdates({ $, showPanel, fetchJson, storage, onDot }) {
     return { latest: latest?.version || null, newer };
   }
 
+  // 구획은 처음에 접힌 채로 두고, 자료를 못 읽으면 숨긴다(오류 문구·빈 카드 없음).
+  async function openEras() {
+    const box = $('eras');
+    const host = $('eras-list');
+    if (!box || !host) return;
+    if (!erasPromise) erasPromise = Promise.resolve().then(loadEras).catch(() => null);
+    const body = await erasPromise;
+    const html = renderEras(body);
+    if (!html) {
+      host.innerHTML = '';
+      box.hidden = true;
+      return;
+    }
+    host.innerHTML = html;
+    box.hidden = false;
+  }
+
   async function openUpdates(version) {
     const list = await ensure();
     const latest = latestEntry(list);
@@ -165,6 +218,7 @@ export function mountUpdates({ $, showPanel, fetchJson, storage, onDot }) {
     const target = explicit ? version.trim() : (latest?.version || '');
     const host = $('updates-list');
     if (host) host.innerHTML = renderUpdates(list, target);
+    void openEras();
     if (typeof showPanel === 'function') showPanel('updates-panel');
     else $('updates-panel')?.showModal?.();
     if (target) {

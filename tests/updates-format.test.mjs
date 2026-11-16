@@ -4,10 +4,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  compareVersions, latestEntry, sourceLabel, readSeen, markSeen, renderUpdates, mountUpdates
+  compareVersions, latestEntry, sourceLabel, readSeen, markSeen, renderUpdates, renderEras, erasModel, mountUpdates
 } from '../public/v41/updates.mjs';
 
 const UPDATES = JSON.parse(readFileSync(new URL('../public/v41/updates.json', import.meta.url), 'utf8'));
+const ERAS = JSON.parse(readFileSync(new URL('../public/v41/eras.json', import.meta.url), 'utf8'));
 
 test('611: updates.json 은 버전·날짜·항목(kind·text·source·tester?) 모양을 지킨다', () => {
   assert.ok(Array.isArray(UPDATES) && UPDATES.length >= 1, '버전이 하나 이상 있다');
@@ -159,4 +160,74 @@ test('611: 저장소가 막혀도 화면이 멈추지 않는다', async () => {
   assert.deepEqual(dot, [true]);
   await mount.openUpdates();
   assert.deepEqual(dot, [true, true], '저장소가 막히면 본 버전을 남기지 못해 점이 그대로다(에러는 만들지 않는다)');
+});
+
+// 261116(대표 확정): 4.1.1·4.1.2 복원 — 4.1.3 아래·4.1.0 위에 문구 그대로 끼워 넣는다.
+test('261116: 4.1.2·4.1.1은 4.1.3 아래·4.1.0 위에 문구 그대로 들어 있다', () => {
+  const order = UPDATES.map(e => e.version);
+  const at = v => order.indexOf(v);
+  assert.ok(at('4.1.3') >= 0 && at('4.1.0') >= 0, '4.1.3·4.1.0이 있다');
+  assert.ok(at('4.1.3') < at('4.1.2'), '4.1.2는 4.1.3 아래');
+  assert.ok(at('4.1.2') < at('4.1.1'), '4.1.1은 4.1.2 아래');
+  assert.ok(at('4.1.1') < at('4.1.0'), '4.1.1은 4.1.0 위');
+  assert.deepEqual(UPDATES.find(e => e.version === '4.1.2').items.map(i => i.text), [
+    '지도에서 새 순간이 앞 순간과 저절로 이어지고, 점마다 이름이 보여요',
+    '보드에서 순간 날짜를 바로 바꿀 수 있어요',
+    '핀보드에서 사진 위를 잡아도 카드가 끌려요. 좁은 화면에서 머리글이 겹치지 않아요'
+  ]);
+  assert.deepEqual(UPDATES.find(e => e.version === '4.1.1').items.map(i => i.text), [
+    '보드가 핀보드로 바뀌었어요. 카드를 끌어 원하는 자리에 꽂고, 날짜순과 내 배치를 오갈 수 있어요',
+    '첫 트리를 만들면 바로 이름을 바꿀 수 있어요',
+    '지도가 나무 부채꼴로 펼쳐지고, 점을 누르면 그 순간이 열려요',
+    '책에서 YouTube 영상이 더 잘 재생돼요. 첫 화면 카드를 끌 때 덜 버벅여요. 화면 글자 크기를 맞췄어요'
+  ]);
+  for (const v of ['4.1.2', '4.1.1']) {
+    const entry = UPDATES.find(e => e.version === v);
+    assert.equal(entry.date, '2026.11.14', `${v} 날짜`);
+    assert.ok(entry.items.every(i => i.source === 'team'), `${v}는 팀 출처`);
+  }
+});
+
+// 옛 판을 다시 끼워 넣어도 최신 판(4.1.8)이 그대로라 '새 소식' 점이 다시 뜨면 안 된다(#611 저장 규칙).
+test('261116: 옛 판 복원으로 새 소식 점이 다시 뜨지 않는다', () => {
+  assert.equal(latestEntry(UPDATES).version, '4.1.8', '최신 판은 4.1.8 그대로');
+  const map = new Map();
+  const storage = { getItem: k => (map.has(k) ? map.get(k) : null), setItem: (k, v) => map.set(k, v) };
+  markSeen(storage, '4.1.8');
+  const latest = latestEntry(UPDATES).version;
+  assert.equal(compareVersions(latest, readSeen(storage)), 0, '본 판과 최신 판이 같아 점이 뜨지 않는다');
+  // 4.1.1·4.1.2가 끼어도 그 사이 판을 본 사람에게만 새 소식이 뜬다.
+  markSeen(storage, '4.1.0');
+  assert.equal(compareVersions(latest, readSeen(storage)), 1, '4.1.0까지 본 사람에게는 여전히 새 소식이 있다');
+});
+
+// 261116(대표 확정): '러브트리가 걸어온 길' — 세대 카드 다섯 장, 옛것 → 지금 순서.
+test('261116: 걸어온 길 자료는 다섯 세대를 옛것 → 지금 순서로 담는다', () => {
+  assert.ok(Array.isArray(ERAS) && ERAS.length === 5, '세대 카드 다섯 장');
+  assert.deepEqual(ERAS.map(e => e.mark), ['1', '2', '3', '4.0', '4.1'], '번호 순서');
+  assert.deepEqual(ERAS.map(e => e.name), ['첫 씨앗', '러브버드', '리모네·3.0', '러브트리 4.0', '러브트리 4.1']);
+  for (const era of ERAS) {
+    assert.equal(typeof era.when, 'string', '때');
+    assert.ok(era.when.trim(), '때가 비지 않는다');
+    assert.equal(typeof era.line, 'string', '한 줄');
+    assert.ok(era.line.trim(), '한 줄이 비지 않는다');
+    // 화면 문구에 저장소 주소·추정·개발 용어를 넣지 않는다.
+    const joined = `${era.mark} ${era.name} ${era.when} ${era.line}`;
+    assert.doesNotMatch(joined, /https?:|github|저장소|추정/, `개발 용어 없음: ${joined}`);
+  }
+});
+
+test('261116: 걸어온 길 카드는 마지막(지금) 한 장만 금테이고, 못 읽으면 그리지 않는다', () => {
+  const html = renderEras(ERAS);
+  assert.equal((html.match(/class="eras-card"/g) || []).length, 5, '카드 다섯 장');
+  assert.equal((html.match(/data-current="true"/g) || []).length, 1, '금테는 한 장만');
+  assert.ok(html.indexOf('data-current') > html.indexOf('러브트리 4.0'), '마지막(4.1) 카드가 금테다');
+  assert.ok(html.indexOf('첫 씨앗') < html.indexOf('러브트리 4.1'), '옛것 → 지금 순서');
+  // 자료가 없거나 모양이 깨지면 빈 문자열 — 구획을 조용히 숨긴다.
+  assert.equal(renderEras([]), '');
+  assert.equal(renderEras(null), '');
+  assert.equal(renderEras([{ name: '이름만' }]), '', '번호가 없으면 버린다');
+  assert.deepEqual(erasModel([{ mark: ' ', name: 'x' }, { mark: '1', name: 'ok' }]).map(e => e.name), ['ok']);
+  // 화면 글자로 넣기 전에 그대로 escape한다.
+  assert.match(renderEras([{ mark: '1', name: '<b>가&나</b>', when: '', line: '' }]), /&lt;b&gt;가&amp;나&lt;\/b&gt;/);
 });
