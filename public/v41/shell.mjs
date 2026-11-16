@@ -486,7 +486,7 @@ function updateNavFade(){return shellHeader.updateNavFade();}
 function revealCurrentTab(){return shellHeader.revealCurrentTab();}
 function closeAccountMenu(){return shellHeader.closeAccountMenu();}
 function renderAccount(){return shellHeader.renderAccount();}
-function openAccountMenu(){return shellHeader.openAccountMenu();}
+function openAccountMenu(via){return shellHeader.openAccountMenu(via);}
 function loadAccountEmail(){return shellHeader.loadAccountEmail();}
 function updateAccountControls(){return shellHeader.updateAccountControls();}
 // 화면 전환·iframe 두 장 교대는 shell/screens.mjs가 맡는다(#231 1-B). 셸은 지금 화면과 나머지 일을 넘긴다.
@@ -1336,3 +1336,5 @@ addEventListener('beforeunload',e=>{
  if(member?.snapshot().dirty||formDirty()||treeDirty()){e.preventDefault();e.returnValue='';}
 });
 if(shouldLoadMemberRecords(location.search,document.cookie,location.hash)||shellIntake.pending())startMember();
+
+
