@@ -856,3 +856,90 @@ test('꼬리표 줄: 칩이 보일 때는 라벨이 한 번 있고 빈 문구는
   assert.ok(!host.innerHTML.includes('lt-tagline-empty'), '칩이 있으면 빈 문구를 내지 않는다');
   assert.equal(wordCount(host.innerHTML, '꼬리표'), 1, '보이는 글자에 꼬리표는 한 번');
 });
+
+// ── 하은 2회차(261116) ④: 꼬리표 줄의 거짓 성공을 없앤다 ─────────────────────────────────
+// renderTagLine의 commit은 누르자마자 칩을 확정 모양으로 그렸고, onCommit이 {ok:false}를 돌려줘도
+// 무시했다 — 저장이 실패해도 칩이 붙은 모양으로 남았다(책·꼬리표 정리에는 '아직 꼬리표가 없어요').
+// 고친 계약: onCommit이 {ok:false, error}를 돌려주면(또는 던지면) 칩을 누르기 전으로 되돌리고
+// 실패 문구를 보인다. 성공({ok:true})·저장을 바깥에 맡기기만 하는 옛 부름(undefined)은 그대로다.
+function tagHostWithErrors() {
+  const err = fakeEl({ hidden: true });
+  const host = fakeEl({ querySelector: (sel) => sel === '.lt-tagline-error' ? err : null });
+  return { host, err };
+}
+
+test('하은2회차 ④: 저장이 실패하면({ok:false}) 칩을 되돌리고 실패 문구를 보인다 — 거짓 성공이 없다', () => {
+  const { host, err } = tagHostWithErrors();
+  const commits = [];
+  const line = renderTagLine({
+    host,
+    doc: {},
+    moment: { id: 'm1', title: '', keywords: [] },
+    knownTags: [],
+    writable: true,
+    onCommit: (keywords, momentId) => { commits.push({ keywords, momentId }); return { ok: false, error: '이 순간을 찾을 수 없어요. 순간을 다시 열어 붙여 주세요.' }; }
+  });
+  const click = () => host.dispatch('click', { target: { closest: (sel) => sel === '[data-tag-raw]' ? { dataset: { tagRaw: '가수:ILLIT' } } : null } });
+  click();
+  assert.equal(commits.length, 1, '저장은 한 번 부른다');
+  assert.equal(err.hidden, false, '실패 문구가 보인다');
+  assert.match(err.textContent, /찾을 수 없|다시/, `문구는 사람이 읽는다(${err.textContent})`);
+  click();
+  assert.deepEqual(commits[1].keywords, ['가수:ILLIT'], '되돌아간 상태에서 다시 누르면 같은 값이 다시 온다 — 확정으로 남지 않는다');
+  assert.equal(line.momentId, 'm1');
+});
+
+test('하은2회차 ④: 저장이 성공하면({ok:true}) 칩이 확정으로 남고 되돌리지 않는다', () => {
+  const { host, err } = tagHostWithErrors();
+  const commits = [];
+  const line = renderTagLine({
+    host,
+    doc: {},
+    moment: { id: 'm1', title: '', keywords: [] },
+    knownTags: [],
+    writable: true,
+    onCommit: (keywords, momentId) => { commits.push([...keywords]); return { ok: true, keywords, changed: true }; }
+  });
+  const click = () => host.dispatch('click', { target: { closest: (sel) => sel === '[data-tag-raw]' ? { dataset: { tagRaw: '가수:ILLIT' } } : null } });
+  click();
+  assert.deepEqual(commits[0], ['가수:ILLIT']);
+  assert.equal(err.hidden, true, '성공에는 문구가 없다');
+  click();
+  assert.deepEqual(commits[1], [], '성공한 확정은 남아 다시 누르면 해제다(되돌림이 실패를 만들지 않는다)');
+});
+
+// ── 하은 2회차 손질 ②(261116 병합 보류 지적): 실패 뒤에도 성공으로 보이면 안 된다 ──────────
+// 예전 되돌림은 '누르기 전 모양'으로 돌렸다 — 하은의 실제 상황(칩이 켜진 채 순간·트리가 지워진 뒤
+// 다시 누름 = 끄기 시도가 실패)에서는 칩이 켜진 채로 남았다('✓ 담았어요'와 함께 성공으로 보였다).
+// 고친 계약: 실패하면 누른 칩만 꺼진 모양으로 끝낸다(다른 확정 칩은 그대로). 꺼진 모양에서 다시
+// 누르면 같은 값이 다시 온다.
+test('하은2회차 손질 ②: 저장이 실패하면 누른 칩만 꺼진다 — 다른 확정 칩은 그대로다', () => {
+  const { host, err } = tagHostWithErrors();
+  const commits = [];
+  const line = renderTagLine({
+    host,
+    doc: {},
+    // 칩이 켜진 채(실제로 저장됐었다) 순간이 지워진 상태 — 다시 누름은 끄기 시도다.
+    moment: { id: 'm1', title: '', keywords: ['노래:Supernova', '가수:ILLIT'] },
+    knownTags: [],
+    writable: true,
+    onCommit: (keywords, momentId) => { commits.push([...keywords]); return { ok: false, error: '이 순간을 찾을 수 없어요. 순간을 다시 열어 붙여 주세요.' }; }
+  });
+  const click = (raw) => host.dispatch('click', { target: { closest: (sel) => sel === '[data-tag-raw]' ? { dataset: { tagRaw: raw } } : null } });
+  click('가수:ILLIT'); // 끄기 시도 → 실패(지워진 순간)
+  click('가수:ILLIT'); // 꺼진 모양이라면 다시 누름은 붙이기 — 가수가 다시 온다
+  assert.deepEqual(commits[1], ['노래:Supernova', '가수:ILLIT'], '실패 뒤 칩은 꺼진 모양이다 — 켜진 채면(예전) 다시 누름이 또 끄기가 된다');
+  assert.equal(err.hidden, false, '실패 문구는 계속 보인다');
+  assert.equal(line.momentId, 'm1');
+});
+
+// 하은 2회차 손질 ①: 실패 문구가 고정 단추(쉬운 추가의 '담기')에 가리지 않게 — 문구를 눈앞으로 데려온다.
+test('하은2회차 손질 ①: 실패 문구를 보일 때 화면에 보이는 자리로 데려온다(scrollIntoView)', () => {
+  const err = fakeEl({ hidden: true, scrolledWith: null });
+  err.scrollIntoView = (opts) => { err.scrolledWith = opts; };
+  const host = fakeEl({ querySelector: (sel) => sel === '.lt-tagline-error' ? err : null });
+  const line = renderTagLine({ host, doc: {}, moment: { id: 'm1', title: '', keywords: [] }, knownTags: [], writable: true, onCommit: () => ({ ok: false, error: '실패' }) });
+  host.dispatch('click', { target: { closest: (sel) => sel === '[data-tag-raw]' ? { dataset: { tagRaw: '가수:ILLIT' } } : null } });
+  assert.equal(err.scrolledWith?.block, 'nearest', '문구가 있는 곳이 화면에 보이게 스크롤한다');
+  assert.equal(line.momentId, 'm1');
+});

@@ -178,7 +178,8 @@ test('#343 마크업: 두 줄 설명·크림 버튼 하나·고정 안내 줄(#4
   const html = readFileSync(new URL('../public/v41/index.html', import.meta.url), 'utf8');
   // #638: 담기는 곳은 트리 한 줄(고른 트리 우선)이 정한다 — 설명은 '지금 고른 트리'로 고쳤다.
   assert.match(html, /<p class="quick-lede"><span>주소만 붙여 넣으면 지금 고른 트리에 담겨요\.<\/span><span>제목과 감상은 나중에 다듬어도 돼요\.<\/span><\/p>/, '설명 두 줄 고정');
-  assert.match(html, /id="quick-tree-line" class="quick-tree-line">모아둔 순간 트리에 담겨요<\/p><label class="quick-sr" for="quick-tree-select">담을 트리<\/label><select id="quick-tree-select"/, '담을 트리 한 줄(이름+고르기)');
+  // '담을 트리 한 줄' 글자 검사는 지웠다(261116 손질 ③ — 문구가 '‹이름›에 담겨요'로 바뀜). 그려진 줄은
+  // 위의 동작 시험(quickTreeLineText)이 검사한다.
   assert.match(html, /id="quick-submit" type="submit" disabled>모아둔 순간에 담기</, '아래 큰 버튼 하나(처음 이름은 기본 트리)');
   // #462: 링크 추가와 무관한 보관 용량 글씨는 쉬운 추가에 두지 않는다.
   assert.doesNotMatch(html, /quick-storage-note|105MB·200개까지/, '쉬운 추가에는 보관 용량 글씨가 없다');
@@ -300,6 +301,8 @@ const URL_OK = 'https://m.youtube.com/watch?v=abc12345678&t=76&si=xyz';
 const VIDEO_TITLE = '테스트 영상 제목';
 
 function harness638({ trees = [inboxTree, secondTree], currentTreeId = 't-second', applyImpl = null, fetchImpl = null, writeTab = 'easy', quickTarget = null } = {}) {
+  // 하은 2회차 ③ 재현을 위해 문자열 대신 함수도 받는다 — 트리를 바꾸고 다시 여는 시험에서 쓴다.
+  const nowTreeId = () => (typeof currentTreeId === 'function' ? currentTreeId() : currentTreeId);
   const calls = { apply: [], notify: [], editors: [] };
   const els = {};
   const $ = id => { if (!els[id]) els[id] = fakeEl({ value: '', children: [], replaceChildren(...kids) { this.children = kids; }, append(...kids) { this.children.push(...kids); } }); return els[id]; };
@@ -308,7 +311,7 @@ function harness638({ trees = [inboxTree, secondTree], currentTreeId = 't-second
   els['moment-form'] = fakeEl({ elements: { url: fakeEl() } });
   const member = {
     snapshot: () => ({ owned: true, writable: true, subject: 'sub_test0003' }),
-    apply: (...args) => { calls.apply.push(args); if (applyImpl) return applyImpl(...args); return { treeId: currentTreeId || 't-inbox', momentId: 'm-new' }; },
+    apply: (...args) => { calls.apply.push(args); if (applyImpl) return applyImpl(...args); return { treeId: nowTreeId() || 't-inbox', momentId: 'm-new' }; },
     state: () => null
   };
   let resolveTitle = null;
@@ -332,7 +335,7 @@ function harness638({ trees = [inboxTree, secondTree], currentTreeId = 't-second
     writePanel: { open: () => { els['write-panel'].open = true; return writeTab; } },
     momentTitle: moment => moment.title || '',
     requestClose: () => {},
-    currentTreeId: () => currentTreeId,
+    currentTreeId: nowTreeId,
     listTrees: () => trees,
     // 2026-11-16 대표 요청: 쉬운 추가로 담을 곳 설정(늘 같은 트리) — 셸이 넘기는 한 벌을 흉내 낸다.
     quickTargetPreference: () => quickTarget,
@@ -519,4 +522,46 @@ test('설정 줄과 안내 문구가 셸 문서에 있다(이 기기에만 저�
   assert.match(html, /id="quick-target-tree"[^>]*aria-label="늘 담을 트리 고르기"/, '늘 담을 트리 고르기(펼침용)');
   assert.match(html, /쉬운 추가·자세한 추가가 처음 고르는 트리입니다/, '무엇을 정하는 설정인지 안내');
   assert.match(html, /고른 트리를 지우면 지금 보고 있는 트리로 돌아가요/, '지워졌을 때 규칙 안내');
+});
+
+// ── 하은 2회차(261116) ③: 쉬운 추가 '담을 트리' 설정이 다시 열 때는 안 먹는다 ───────────────
+// 재현(하은 캡처 2d_쉬운추가·운영일지 2회차): 설정이 기본값('지금 보고 있는 트리')인데
+//   트리를 바꾸고 쉬운 추가를 다시 열면 '모아둔 순간'으로 열린다 — 2·3번째가 옛 트리에 오담했다.
+//   원인: renderTreeLine은 quickTreeId가 빈 값·없는 트리일 때만 다시 정한다 — 첫 열 때 정한
+//   quickTreeId가 유효한 한 '지금 보고 있는 트리' 설정을 다시 읽지 않는다.
+test('설정 지금 보고 있는 트리: 트리를 바꾸고 다시 열면 방금 보는 트리로 다시 골라진다(하은 2회차 ③)', () => {
+  let now = 't-inbox';
+  const h = harness638({ currentTreeId: () => now, quickTarget: { mode: 'current', treeId: '' } });
+  h.api.openQuick();
+  assert.equal(h.els['quick-tree-select'].value, 't-inbox', '첫 열기: 지금 보는 트리(모아둔 순간)');
+  now = 't-second';
+  h.els['write-panel'].open = false; // 창을 닫고 다른 트리를 보다가 다시 연다(하은의 실제 흐름).
+  h.api.openQuick();
+  assert.equal(h.els['quick-tree-select'].value, 't-second', '다시 열면 지금 보는 트리를 다시 읽는다 — 모아둔 순간에 머물지 않는다');
+  assert.equal(h.els['quick-tree-line'].textContent, quickTreeLineText('두 번째 트리'));
+});
+
+test('설정 늘 같은 트리: 다시 열어도 지정한 트리가 유지되고, 손으로 고른 것은 그 세션 안에서만 유지된다', () => {
+  let now = 't-second';
+  const h = harness638({ currentTreeId: () => now, quickTarget: { mode: 'fixed', treeId: 't-inbox' } });
+  h.api.openQuick();
+  assert.equal(h.els['quick-tree-select'].value, 't-inbox', '지정한 트리가 기본');
+  // 같은 세션(창이 열린 채 연속 담기)에서 손으로 두 번째 트리를 고른다.
+  const select = h.els['quick-tree-select'];
+  select.value = 't-second';
+  select.dispatch('change', {});
+  assert.equal(select.value, 't-second', '그 자리에서 바꾸면 유지된다');
+  // 다시 열면(새 세션) 설정(늘 같은 트리)으로 돌아온다.
+  h.els['write-panel'].open = false;
+  h.api.openQuick();
+  assert.equal(h.els['quick-tree-select'].value, 't-inbox', '다시 열면 설정이 이긴다');
+});
+
+// ── 하은 2회차 손질 ③: 트리 이름이 '트리'로 끝나면 '트리'가 두 번 보였다 ───────────────────
+// '두 번째 트리 트리에 담겨요' → 이름을 그대로 쓰는 '‹이름›에 담겨요'로 통일한다(대표 결정).
+test('트리 한 줄 문구: 이름을 그대로 쓰고, 이름이 트리로 끝나도 겹치지 않는다(하은 2회차 손질 ③)', () => {
+  assert.equal(quickTreeLineText('모아둔 순간'), '모아둔 순간에 담겨요');
+  assert.equal(quickTreeLineText('두 번째 트리'), '두 번째 트리에 담겨요');
+  assert.equal(quickTreeAfterText('담는 순간', '두 번째 트리'), '담는 순간 다음에 두 번째 트리에 담겨요');
+  assert.equal(quickTreeAfterText('담는 순간', '모아둔 순간'), '담는 순간 다음에 모아둔 순간에 담겨요');
 });

@@ -374,6 +374,8 @@ html[data-lt-theme=garden] .quick-error-line{color:var(--lt-rose-ink)}
 .quick-refine{flex:0 0 auto;min-height:44px;padding:0;border:0;background:none;color:var(--lt-gold);font-size:13px;white-space:nowrap}
 .quick-refine:hover{text-decoration:underline}
 .quick-submit{width:100%;min-height:52px;margin-top:12px;border-radius:14px;font-size:15px;font-weight:600}
+/* 하은 2회차 손질 ①(261116): 실패 문구 아래에 숨을 벌린다 — 고정 단추의 그림자(10px)가 문구 아래를 덮지 않게. */
+.quick-tagline .lt-tagline-error{margin-bottom:16px}
 @media(max-width:780px){.quick-preview{height:220px}}
 #drop-veil{position:fixed;inset:0;z-index:28;display:grid;place-items:center;background:rgba(4,4,7,.62);backdrop-filter:blur(3px);pointer-events:none}
 #drop-veil[hidden]{display:none}

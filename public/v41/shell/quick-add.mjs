@@ -58,6 +58,11 @@ export function createQuickAdd(deps) {
       quickTreeId = parent.treeId;
     } else {
       quickTarget = null;
+      // 하은 2회차 ③(261116): 창을 새로 열 때마다 담을 트리를 설정에 맞춰 다시 읽는다 — '지금 보고 있는
+      // 트리'면 지금 보는 트리로. 예전에는 첫 열 때 정한 quickTreeId가 유효한 한 설정을 다시 읽지 않아
+      // 다른 트리를 보고 열어도 '모아둔 순간'에 머물렀다(2·3번째가 옛 트리에 오담). 이미 열린 창(연속 담기)
+      // 에서 손으로 고른 트리는 다시 열 때까지 유지한다.
+      if (!$('write-panel').open) quickTreeId = resolveQuickTreeId(treeChoices());
       deps.writePanel.open();
     }
     renderTreeLine();
@@ -77,9 +82,13 @@ export function createQuickAdd(deps) {
   // 쉬운 추가 탭으로 연다(끌어다 놓기·'지금 다듬기'처럼 쉬운 추가로 되돌아오는 길).
   function openQuick() {
     if (!ensureWritable()) return;
+    const fresh = !$('write-panel').open;
     deps.resetEditorBaseline?.();
     quickTarget = null; // 끌어다 놓기·붙여넣기 입구에는 '그 순간 다음' 목적지가 없다(이슈 671).
     deps.writePanel.open('easy');
+    // 하은 2회차 ③: 창을 새로 열 때만 설정('지금 보고 있는 트리'·'늘 같은 트리')을 다시 읽는다 —
+    // 이미 열린 창에 끌어다 놓을 때는 손으로 고른 트리를 유지한다.
+    if (fresh) quickTreeId = resolveQuickTreeId(treeChoices());
     renderTreeLine();
   }
   function resetQuick() {
@@ -117,11 +126,37 @@ export function createQuickAdd(deps) {
       moment: { id: result.momentId, title: savedTitle || '', keywords: [] },
       knownTags,
       writable: true,
-      onCommit: keywords => {
-        const saved = deps.saveTags({ treeId: result.treeId, momentId: result.momentId, keywords });
-        if (saved?.ok === false) deps.notify(saved.error === 'readonly' ? '지금은 꼬리표를 바꿀 수 없어요.' : (saved.error || '저장하지 못했어요.'));
+      errorReserve: 100, // 쉬운 추가 창의 고정 단추(sticky 52px+아래 여백=72px) 위로 문구를 데려오고, 단추 그림자(10px)와 숨을 18px 남긴다(하은 2회차 손질 ①)
+      onCommit: (keywords, momentId) => {
+        // 하은 2회차 ④(261116): 안내판이 기억한 treeId는 '담을 때의 자리'다 — 누르는 시점에 지금 자리를
+        // 다시 찾는다. 옮겨졌으면(옮기기는 순간 id를 지키는 길이다) 새 트리에 저장하고, 지워졌으면 저장을
+        // 부르지 않고 실패를 돌려준다(꼬리표 줄이 칩을 꺼진 모양으로 되돌리고 다시 시도 안내를 보인다).
+        const trees = deps.listTrees?.();
+        const tree = trees ? trees.find((t) => (t.moments || []).some((m) => m.id === momentId)) : null;
+        if (trees && !tree) return tagSaveFailure({ ok: false, error: '이 순간을 찾을 수 없어요. 순간을 다시 열어 붙여 주세요.' });
+        const saved = deps.saveTags({ treeId: (tree || trees?.find((t) => t.id === result.treeId))?.id || result.treeId, momentId, keywords });
+        if (saved?.ok === false) {
+          return tagSaveFailure({ ...saved, error: saved.error === 'readonly' ? '지금은 꼬리표를 바꿀 수 없어요.'
+            : saved.error === 'notfound' ? '이 순간을 찾을 수 없어요. 순간을 다시 열어 붙여 주세요.'
+            : '꼬리표를 저장하지 못했어요. 다시 시도해 주세요.' });
+        }
+        return saved;
       }
     });
+
+    // 하은 2회차 손질 ②(261116): 꼬리표 저장이 실패하면 '✓ 담았어요' 안내가 성공을 말하면 안 된다 —
+    // 창 안 안내·떠 있는 안내 두 모양 다 실패를 말한다.
+    function tagSaveFailure(saved) {
+      const text = '꼬리표를 붙이지 못했어요';
+      if ($('write-panel').open) {
+        const notice = $('quick-notice');
+        if (notice) { notice.textContent = text; notice.hidden = false; }
+      } else {
+        const savedText = $('quick-saved-text');
+        if (savedText) savedText.textContent = text;
+      }
+      return saved;
+    }
   }
 
   function fallbackTitle(url) {
@@ -387,8 +422,13 @@ export function createQuickAdd(deps) {
   }
 
   function refine(button) {
-    const treeId = button.dataset.treeId;
     const momentId = button.dataset.momentId;
+    // 하은 2회차 ④(261116): '지금 다듬기'도 낡은 자리로 보내지 않게 — 지금 자리를 다시 찾는다.
+    // 옮겨졌으면 새 트리로 열고, 지워졌으면(자리가 없으면) 기존 안내로 돌린다. 트리 목록을 못 받는
+    // 옛 부름(시험 하네스 등)은 예전처럼 안내판에 적힌 트리를 쓴다.
+    const trees = deps.listTrees?.();
+    const tree = trees ? trees.find((t) => (t.moments || []).some((m) => m.id === momentId)) : null;
+    const treeId = tree ? tree.id : (trees ? '' : button.dataset.treeId);
     if ($('write-panel').open) deps.requestClose?.('write-panel');
     $('quick-saved').hidden = true;
     if (!treeId || !momentId) { deps.notify('모아둔 순간에서 그 순간을 직접 열어 주세요.'); return; }

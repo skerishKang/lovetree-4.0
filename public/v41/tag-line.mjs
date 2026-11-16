@@ -20,7 +20,7 @@ function chipHTML(tag) {
 }
 
 // 꼬리표 줄 하나를 host에 그린다. update(moment)로 같은 자리에 다시 그리고, destroy로 지운다.
-export function renderTagLine({ host, doc = document, moment, knownTags = [], writable = false, onCommit, emptyText = '아직 꼬리표가 없어요' }) {
+export function renderTagLine({ host, doc = document, moment, knownTags = [], writable = false, onCommit, emptyText = '아직 꼬리표가 없어요', errorReserve = 0 }) {
   // #739: 눌러 듣는 귀는 이 줄 인스턴스에 묶는다 — destroy로 함께 거둔다. 안 그러면 같은 host에 줄을
   // 다시 그릴 때(쉬운 추가 연속 담기) 옛 줄의 귀가 살아 남아 옛 순간에 저장하고, 같은 칩을 다시 누르면
   // 옛 줄이 해제 저장해 어디에도 남지 않는다(하은 1회차 실측 — 세 순간 모두 keywords []).
@@ -30,7 +30,8 @@ export function renderTagLine({ host, doc = document, moment, knownTags = [], wr
     keywords: Array.isArray(moment?.keywords) ? [...moment.keywords] : [],
     knownTags: Array.isArray(knownTags) ? [...knownTags] : [],
     manualOpen: false, // 직접 붙이기 칸은 접힘이 기본이다(261116 대표 지적 — 다음 영상을 바로 담는 사람을 막지 않게)
-    kind: 'artist'
+    kind: 'artist',
+    errorReserve: Number(errorReserve) || 0 // 실패 문구를 데려올 때 비켜 앉힐 높이(고정 단추가 있는 곳만 넘긴다)
   };
   if (!host) return null;
   host.classList.add('lt-tagline-host');
@@ -66,14 +67,50 @@ export function renderTagLine({ host, doc = document, moment, knownTags = [], wr
     if (!line) return;
     line.textContent = message;
     line.hidden = !message;
+    // 하은 2회차 손질 ①(261116): 실패 문구가 고정 단추(쉬운 추가의 '담기') 뒤에 가려지지 않게 —
+    // 문구를 눈앞으로 데려온다. scrollIntoView는 sticky 단추에 가려진 것을 '보이는 것'으로 치므로,
+    // 스크롤 통에서 단추 높이만큼(state.errorReserve) 비켜 앉힌다(tag-line.css의 scroll-margin도 함께 둔다).
+    if (message) revealError(line);
+  }
+
+  function revealError(line) {
+    let scroller = null;
+    for (let n = line.parentElement; n; n = n.parentElement) {
+      if (n.scrollHeight > n.clientHeight + 1) { scroller = n; break; }
+    }
+    if (!scroller) { line.scrollIntoView?.({ block: 'nearest' }); return; }
+    const port = scroller.getBoundingClientRect();
+    const r = line.getBoundingClientRect();
+    const reserve = state.errorReserve || 0;
+    const hidden = r.bottom - (port.bottom - reserve);
+    if (hidden > 0) scroller.scrollTop += hidden;
+    else if (r.top < port.top) scroller.scrollTop -= (port.top - r.top);
   }
 
   function commit(next) {
+    const prev = [...state.keywords];
     state.keywords = Array.isArray(next) ? [...next] : [];
     draw();
     // #735: onCommit에 '지금 보고 있는 순간 id'를 함께 넘긴다 — 줄을 처음 만든 순간의 id를 클로저로
     // 계속 보내 다른 카드의 꼬리표가 첫 순간에 저장되던 결함을 막는다(update()로 state.momentId가 바뀐다).
-    try { onCommit?.([...state.keywords], state.momentId); } catch (error) { fail(error?.message || '저장하지 못했어요.'); }
+    // 누른 값: 누르기 전·후 가운데 달라진 하나(붙이기든 끄기든).
+    const before = new Set(prev);
+    const after = new Set(state.keywords);
+    const clicked = [...after].find((v) => !before.has(v)) ?? [...before].find((v) => !after.has(v)) ?? '';
+    const revert = (message) => {
+      // 하은 2회차 손질 ②(261116): 실패하면 누른 칩만 꺼진 모양으로 끝낸다 — '누르기 전 모양'으로
+      // 되돌리면(예전) 끄기 시도가 실패한 뒤에도 칩이 켜져 성공으로 보였다. 다른 확정 칩은 그대로 둔다.
+      state.keywords = clicked ? prev.filter((v) => v !== clicked) : [...prev];
+      draw();
+      fail(message);
+    };
+    try {
+      const saved = onCommit?.([...state.keywords], state.momentId);
+      // 하은 2회차 ④(261116): 저장이 실패했다고 바깥이 알려주면({ok:false}) 눌렀던 칩을 꺼진 모양으로
+      // 되돌리고 실패 문구를 보인다 — 칩만 붙고 저장은 안 된 거짓 성공을 막는다.
+      // 성공({ok:true})과 결과를 돌려주지 않는 옛 부름(화면 저장 요청 postMessage)은 그대로다.
+      if (saved && saved.ok === false) revert(saved.error || '저장하지 못했어요. 다시 시도해 주세요.');
+    } catch (error) { revert(error?.message || '저장하지 못했어요. 다시 시도해 주세요.'); }
   }
 
   const off = new AbortController();
