@@ -6,7 +6,7 @@ button,a{font:inherit}button{color:inherit}.app{position:relative;width:100%;hei
 .app:before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 50% 50%,transparent 0 18%,rgba(0,0,0,.18) 30%,rgba(0,0,0,.44) 74%,rgba(0,0,0,.78) 100%);pointer-events:none;z-index:4}
 .topbar{position:absolute;z-index:60;top:0;left:0;right:0;padding:24px 28px;display:flex;align-items:center;justify-content:space-between;pointer-events:none}
 .brand{font-size:11px;letter-spacing:.22em;font-weight:700;opacity:.9}.menuBtn{pointer-events:auto;border:0;background:none;padding:10px 0;letter-spacing:.18em;font-size:11px;cursor:pointer}
-.world{position:absolute;inset:0;z-index:3;perspective:1200px;transform-style:preserve-3d;will-change:transform}
+.world{position:absolute;inset:0;z-index:3;transform-style:flat;will-change:transform}
 .card{position:absolute;left:50%;top:50%;width:180px;height:232px;border-radius:14px;overflow:hidden;transform-origin:center;will-change:transform;cursor:pointer;border:1px solid rgba(255,255,255,.12);background:#111;box-shadow:0 24px 60px rgba(0,0,0,.38);transition:border-color .18s,filter .25s,box-shadow .25s}
 .card.sm{width:128px;height:166px;border-radius:11px}.card.lg{width:226px;height:292px;border-radius:16px}
 /* #593: 카드 위에 겹을 둘 더 얹는다 — 자리·패럴랙스(.lt-move)와 떠 있음(.lt-lift).

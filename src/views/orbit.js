@@ -272,7 +272,8 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
    // 떠 있음은 .lt-lift 가 따로 맡는다 — 여기서는 궤도 자리만 굽는다.
    // #593: transform 만 굽는다. filter·z-index 를 키프레임에 넣으면 브라우저가 애니메이션을 컴포지터에 넘기지 못하고
    // 매 프레임 스타일 재계산을 다시 한다(실측 120→418ms/s). 깊이 밝기와 순서는 배치(layout) 때 한 번만 쓴다.
-   out.push({offset:k/ORBIT_STEPS,transform:`translate3d(${at.px.toFixed(2)}px,${at.py.toFixed(2)}px,0) scale(${at.scale.toFixed(4)}) rotateX(${(c.tiltX+Math.sin(th)*9).toFixed(2)}deg) rotateY(${(c.tiltY+Math.cos(th)*18).toFixed(2)}deg) rotateZ(${(c.tiltZ+Math.sin(th*.6)*7).toFixed(2)}deg)`});
+   // 사선 잘림 방지: .world가 flat이라 카드가 각자 perspective를 직접 쓴다(공유 3D 공간에서 카드 평면끼리 관통하지 않게).
+   out.push({offset:k/ORBIT_STEPS,transform:`perspective(1200px) translate3d(${at.px.toFixed(2)}px,${at.py.toFixed(2)}px,0) scale(${at.scale.toFixed(4)}) rotateX(${(c.tiltX+Math.sin(th)*9).toFixed(2)}deg) rotateY(${(c.tiltY+Math.cos(th)*18).toFixed(2)}deg) rotateZ(${(c.tiltZ+Math.sin(th*.6)*7).toFixed(2)}deg)`});
   }
   // #593: 48 표본이 모두 판정에서 숨겨졌다면(좁은 화면에서 띠에 못 들어가는 큰 카드) 그 카드는 이 폭에서
   // 보여 줄 자리가 없다. 예전 코드는 그런 위상마다 숨겼으므로, 여기서도 숨긴 채로 둔다(가운데 제목을 가로지르지 않게).
@@ -370,9 +371,11 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
   const depth=(!demo&&cards.length<=8)?1:Math.max(0,Math.min(1,(z+520)/1040));
   const fv=(0.78+0.22*depth).toFixed(3);
   if(el.__b!==fv){el.__b=fv;el.style.filter=`brightness(${fv})`;}
-  // #586: z-index는 64 단계 밴드로만 쓴다 — 밴드 안의 순서 오차는 깊이 차가 작아 눈에 띄지 않는다.
-  const zv=Math.round((1000+z)/64)*64;if(el.__z!==zv){el.__z=zv;el.style.zIndex=zv;}
-  return {px,py,scale:sc*(!demo&&cards.length<=8?1:Math.max(.58,fit))*drawShrink,side:outSide,judge};
+  // 사선 잘림 방지: .world를 flat으로 바꾸고 카드가 각자 perspective를 쓰므로, 겹침 순서도 깊이(z)가 아니라
+  // 화면 배율로 매긴다 — scale 큰(가까운) 카드가 위. 궤도 굽기·끌기 자리 쓰기 때만 다시 매긴다(매 프레임이 아니다).
+  const drawScale=sc*(!demo&&cards.length<=8?1:Math.max(.58,fit))*drawShrink;
+  const zv=Math.round(drawScale*2000);if(el.__z!==zv){el.__z=zv;el.style.zIndex=zv;}
+  return {px,py,scale:drawScale,side:outSide,judge};
  }
  // 배치(layout): 창 크기·안전 구역·좁은 화면 대역·예시 장수가 바뀔 때만 카드 자리를 다시 쓴다.
  function layout(){
@@ -422,8 +425,8 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
    const sc=Math.max(.18,Math.min(narrow?1.1:1.82,1050/(1050-z)));
    const at=placeCard(el,c,i,th,x,y,z,sc,w,h,fit,narrow,zs,warmups);
    if(!at)return;
-   // 애니메이션 transform 을 이기려면 !important — 유휴 때 굽은 키프레임과 같은 자리 식을 쓴다.
-   el.style.setProperty('transform',`translate3d(${at.px.toFixed(2)}px,${at.py.toFixed(2)}px,0) scale(${at.scale.toFixed(4)}) rotateX(${(c.tiltX+Math.sin(th)*9).toFixed(2)}deg) rotateY(${(c.tiltY+Math.cos(th)*18).toFixed(2)}deg) rotateZ(${(c.tiltZ+Math.sin(th*.6)*7).toFixed(2)}deg)`,'important');});
+   // 애니메이션 transform 을 이기려면 !important — 유휴 때 굽은 키프레임과 같은 자리 식을 쓴다(카드가 각자 perspective를 쓴다).
+   el.style.setProperty('transform',`perspective(1200px) translate3d(${at.px.toFixed(2)}px,${at.py.toFixed(2)}px,0) scale(${at.scale.toFixed(4)}) rotateX(${(c.tiltX+Math.sin(th)*9).toFixed(2)}deg) rotateY(${(c.tiltY+Math.cos(th)*18).toFixed(2)}deg) rotateZ(${(c.tiltZ+Math.sin(th*.6)*7).toFixed(2)}deg)`,'important');});
  }
  const dropJsWrite=()=>{elements.forEach(el=>{el.style.removeProperty('transform');});};
  // 움직임이 멈춘 뒤: 손으로 쓴 자리를 걷고 애니메이션 시각을 phase 에 맞춘다(자리가 튀지 않게).
