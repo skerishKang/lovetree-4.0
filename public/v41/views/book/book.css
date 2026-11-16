@@ -233,8 +233,11 @@ html[data-lt-theme=garden] .shelf-back:hover{background:var(--lt-glass-strong);b
 .branch-info b{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font:15px/1.4 var(--book-serif);margin:0 0 5px;word-break:keep-all}
 .branch-meta{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:11px;color:#bca8a8}
 .branch-meta .emotion-dot{width:8px;height:8px;border-radius:50%;background:var(--lt-rose);display:inline-block}
-.branch-count{display:block;margin-top:4px;font-size:11px;color:#a4919a}
-.branch-more{position:sticky;bottom:0;z-index:1;grid-column:1/-1;min-height:44px;border:1px solid rgba(255,255,255,.18);border-radius:999px;background:#33242b;color:#efe2dc;cursor:pointer;box-shadow:0 -8px 16px rgba(38,27,33,.9)}
+.branch-count{display:block;margin-top:7px;font-size:11px;color:#a4919a}
+/* '더 보기'는 목록 밖 발에 둔다 — 390에서 스크롤되는 카드 위에 얹혀 마지막 카드를 덮지 않게. */
+.branch-foot{flex:0 0 auto;padding:0 20px 18px;background:#261b21}
+.branch-more{display:block;width:100%;min-height:44px;border:1px solid rgba(255,255,255,.18);border-radius:999px;background:rgba(255,255,255,.05);color:#efe2dc;cursor:pointer}
+.branch-more[hidden]{display:none}
 .branch-empty{grid-column:1/-1;padding:18px;text-align:center;color:#bca8a8;font-size:13px}
 .branch-tab{position:absolute;z-index:50;right:-60px;top:44%;width:108px;padding:11px 12px;border:1px solid rgba(199,155,168,.32);border-left:0;border-radius:0 10px 10px 0;background:linear-gradient(90deg,#694657,#3e2a36);color:#f8eae7;font-size:13px;line-height:1.35;cursor:pointer;box-shadow:0 10px 20px rgba(0,0,0,.2)}
 /* #700 후속: 탭은 책 오른쪽에 60px만 내밈고(모든 넓은 화면에서 무대 밖 잘림 0), 안쪽 48px는 쪽 여백 안 —
