@@ -35,8 +35,11 @@ document.body.dataset.theme='pearl';
 
 /* #536: '진주빛 보드 · 읽기 전용' 표시는 예시·공유(읽기 전용)에서만 '읽기 전용'을 붙인다.
    전에는 자기 기록(쓰기 가능)인데도 HTML에 박힌 '읽기 전용'이 그대로 보였다. */
+/* 2026-11-16 대표 결정: 쓰기 가능한 내 보드에서는 고급 기능의 원본 테마 이름('진주빛 보드') 글자가
+   고객에게 뜻이 없으니 표시 자체를 숨기고 글자도 비워 둔다(테마 고르기·lt41.boardTheme·[종이|밤] 스위치·
+   '판' 이름표는 그대로). 읽기 전용(예시·남의 공개 보드·공유 감상)에서는 '진주빛 보드 · 읽기 전용'로 그대로 둔다. */
 function boardThemeNameOf(){const b=document.querySelector('.themeBtn.active');return (b?.textContent||'진주빛').trim()}
-function paintThemeBadge(){const el=document.getElementById('themeBadge');if(!el)return;el.textContent=boardThemeNameOf()+' 보드'+(LTDEMO.readOnly?' · 읽기 전용':'')}
+function paintThemeBadge(){const el=document.getElementById('themeBadge');if(!el)return;if(!LTDEMO.readOnly){el.hidden=true;el.textContent='';return}el.hidden=false;el.textContent=boardThemeNameOf()+' 보드 · 읽기 전용'}
 paintThemeBadge();
 
 const LT_KEYWORDS=['첫만남','무대','표정','목소리','계절','밤','이동','저장','다시보기','추천','우연','위로','벚꽃','드라이브','편지','여행','팬심'];

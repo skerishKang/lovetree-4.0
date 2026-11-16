@@ -13,6 +13,24 @@
 - **2차 손보기(CTO 캡처 지적, 같은 PR)**: ①상자 안 두 문장(순간 수 힌트·상태 줄)이 서버 응답 하나에서 같이 그려지게 — paintShareDiscover가 GET 뒤 rememberDiscover→힌트 재그리기까지 맡고 스위치 onclick은 paintShareDiscover 한 길(힌트 화가는 globalThis.window 경유로 비동기 꼬리에서도 안전), 상단 배너는 refreshTreeDiscover(GET)로 같은 값을 따른다 ②공유 판 문장 word-break:keep-all ③스위치 모양: 상태 문장은 위 한 줄·스위치는 그 아래 44px 누름(켜짐=--lt-primary 강조색, 꺼짐=테두리), 글자는 행동('소개 켜기'/'소개 끄기')+모양은 data-state(on/off).
 - **검증**: 감사 pass 2·fail 0(390·1440×밤·정원, 캡처 E:/lovetree-qa/lane/local3-graph/audit-discover-ask-{390,1440}-{night,garden}.png·audit-discover-panel-{off,on}-{390,1440}-{night,garden}.png — 켜짐/꺼짐 8장 각각 열어 확인), 전체 npm test 1719 pass·fail 0, build·modulepreload --check 통과, updates.json 불변. 시험 계정 세션 사용 없음(가짜 API만 — AGENTS #748 준수).
 
+## 2026-11-16 — 쉬운 추가 직후 '직접 꼬리표 붙이기' 칸: 접힘 기본·한 줄 펼침·개발 용어 제거 (컴1로컬3 레인, ai/local3-tagline-manual-261116, main 6189b20 기준, 대표 지적 2026-11-16)
+
+- **대표 관찰**: 밤·넓은 화면에서 제안이 없는 영상('헤어지자고? #shorts')을 담은 직후 '종류 [가수▾]·값 [꼬리표 값]·[붙이기]'가 세로로 길게(선택 120px·입력 150px) 늘어나고 '꼬리표 값을 적어 주세요.' 오류가 보이며 늘 펼쳐져 다음 영상 담기를 막았다.
+- **원인**: 옛 라벨(.lt-tagline-label)의 column flex 안에서 .lt-tagline-kind{flex:1 1 120px}·.lt-tagline-value{flex:2 1 150px}의 flex-basis가 **높이**로 작동(재현: 선택 120px·입력 150px·줄 167px — probe-tagline-before). 말은 '종류·값' 개발 용어였고, 오류는 빈 값 제출 때만이 아니라 칸을 만지다 Enter/붙이기로도 드러나는 구조였다.
+- **고침(tag-line.mjs 한 벌 — #742 단일 인스턴스 규칙 그대로)**: ①접힘 기본 — 제안 없음: '가수·노래를 붙여 두면 나중에 저절로 묶여요' 한 줄+[직접 붙이기](44px), 제안 있음: 칩 아래 작은 [직접 붙이기] 링크 ②[직접 붙이기]→한 줄 펼침 [가수 ▾][예: ILLIT][붙이기], 라벨 제거·갈래별 placeholder(가수 ILLIT·노래 Magnetic·멤버 원희·활동기 4세대·무대 인기가요·감정 설렘·그냥 단어로 데뷔 100일), 세 요소 44px 같은 높이, 390에서만 두 줄 ③오류는 빈 값 [붙이기]/Enter 때만 칸 바로 아래 한 줄 — 문구 '붙일 내용을 적어 주세요.'('값' 제거) ④'종류 없이' 옵션→'그냥 단어로', 화면 글자에서 '종류·값' 제거.
+- **시험**: 감사기에 '꼬리표 직접 붙이기' 상태(390·1440×밤·정원) — 접힘(오류 0·입력 줄 없음·안내+[직접 붙이기]) → 펼침(높이 같음·placeholder 예시·개발 용어 0) → 빈 값 오류 → 'ILLIT' 붙이면 두 번째 담기에서 새로 생긴 순간 id에 '가수:ILLIT' 저장(#742와 같은 순간 id) + 겹침·잘림 0. 보드 상세 감사는 '접힘 확인→[직접 붙이기]로 펼친 뒤 입력 줄 가시' 단정으로 갱신. KNOWN 2건(회원 궤도 레거시 작은 글자 — #548과 같은 원본).
+- **검증**: 전체 npm test 1723 pass·fail 0, build·modulepreload 통과, updates.json 불변, 시험 계정 세션 사용 없음(가짜 API만 — AGENTS #748). 캡처 전: E:/lovetree-qa/lane/local3-graph/tagline-before-{1440,390}-night.png, 후: tagline-after-{folded,open,error}-{390,1440}-{night,garden}.png 12장(각각 열어 확인).
+
+## 2026-11-16 — 책의 죽은 '링크 순간 추가' 창·단추 지우기 (#722 정리, 컴1로컬2 레인, ai/local2-drop-link-modal-20261116-093000-7c3f1a, main 43633ac 기준)
+
+- **왜 지웠나**: #722 제보(게스트 책 마지막 장 → 로 '링크 순간 추가' 창이 열린다)를 실서비스에서 다시 쟀더니 #linkModal은 20개 상태 모두 `opacity:0·inert`로 닫혀 있었다(#722 댓글). 원인은 `#addLinkBtn`이 469c592(2026-10-31)부터 인라인 `display:none!important`로 숨겨져 **사람이 열 길이 없다**는 것 — 그래서 CTO 결정으로 죽은 코드를 지웠다. 순간 추가는 셸의 '＋ 순간 추가'(쉬운 추가·자세한 추가)가 맡는다.
+- **지운 것**: `views/track59-sketchbook.html` — `#linkModal` 마크업·`#addLinkBtn` 단추·인라인 숨김 스타일·`#linkCancel/#linkSave/#linkEmotion` 초점·누름 규칙(12줄). `views/book/book.js` — `openLinkModal·closeLinkModal·previewLink·linkSourceMoment·linkFallbackImage`, 링크 폼 submit(동반 순간 생성), `__TRACK59__`의 `openAddLink`·`customConnections` 노출, `dynamicLinkCounter`(10줄). `views/book/book.css` — 모달 전용 규칙 21줄(`.link-modal`·`.link-card`·`.link-form`·`.link-actions`·`.link-preview`·`.preview-thumb`·`.source-current`와 phone 변형). `book-usability.css` 죽은 선택자 3개.
+- **남긴 것**: `.link-thumb/.link-domain/.link-url`(링크 순간 카드 표시)·`normalizeHttpUrl`·`youtubeId`·`isYouTubeUrl`(원본 링크 열기·YouTube 판정이 계속 씀)·`customConnections`(빈 배열, 82행 연결 요약이 읽음). 게스트 쓰기 차단(#315 readOnly 가드)과 셸 lt41-write 차단(#635)은 다른 쓰기 경로가 함께 쓰므로 그대로.
+- **셸·접근성**: `shell.mjs`가 감시하는 아래쪽 창 목록에서 `linkModal`만 뺐다(지도·책 `#detail` 감시는 유지), `view-a11y.mjs` 초점 가둠 목록에서도 제거, `shell.css` 주석 정리.
+- **시험**: `v41-share-guest-635`의 '마지막 장 → 에서 쓰기 창·쓰기 메시지 없음'은 **창 요소 자체가 없음(`linkModalPresent:false`)** 단정으로 더 강하게 고정. `v41-book-closed-focus-519`는 닫힌 창 6→5개·링크 창 열기 단계 삭제, `v41-touch-targets`의 `#linkCancel/#linkSave`·`#linkEmotion` 항목 삭제, `v41-merge-sketchbook`의 `synthetic:true`(링크 폼이 만들던 동반 순간) 단정 삭제 — 리팩터링으로 깨진 소스 글자 단정은 고쳐 맞추지 않고 지웠다.
+- **검증**: 전체 npm test 1720 pass / 0 fail / 143 skipped, 화면 검사기(`LT_SCREEN_AUDIT_REQUIRE=1`) 2/2 pass(책 390·1440 × 밤·정원 포함), build ✓, modulepreload --check ✓. updates.json은 건드리지 않았다.
+- **남은 것**: #722는 닫지 않았다 — 보람 3회차 확인 뒤 닫는다.
+
 ## 2026-11-16 — 쉬운 추가 연속 담기: 옛 꼬리표 줄이 살아 남아 옛 순간에 저장·재클릭에 모두 해제 (#741, 컴1로컬2 레인, ai/local2-quickadd-tag-chip-20261116-070500-9f3c2a, main 76b2b8d 기준)
 
 - **재현(시험 계정 04, 390×844, 배포본 #738 반영)**: 같은 쉬운 추가 창에서 3회 연속 담기(순간 c54cc47c·54dc7b7f·89af3589) 뒤 세 번째 안내의 '가수:ILLIT' 칩 클릭 1회 → PUT·토스트 '서버에 저장됐어요.'(쌓인 귀가 옛 순간 2개에도 오염 저장), 같은 칩 재클릭 → **세 순간 모두 keywords []** — 하은 1회차 증상(칩을 눌렀는데 책·순간 목록·꼬리표로 찾기에 아무것도 없음)과 일치. 2회 연속 담기 재현에서도 두 번째 칩 클릭 1회에 첫 순간(6ddd1293)에 '가수:NewJeans' 오염 저장.
@@ -36,6 +54,20 @@
 
 > **시험 멈춤 규칙(2026-11-15)**: 브라우저 코드에 setInterval 반복을 넣으면 unref하거나 정리한다 — 안 그러면 npm test가 끝나지 않고 CI가 멈춘다.
 
+## 2026-11-16 — 꼬리표 제안: 시상식 이름+연도(MMA2026)를 가수로 잡던 문제 (컴1로컬4 레인, ai/local4-lt-stagename-year-261116, main ecf3309 기준)
+
+- **제보(하은 1회차)**: 제목 '#아일릿 #ILLIT #MMA2026 퍼포먼스 하이라이트 💚'의 제안이 `가수:ILLIT`·`가수:MMA2026`이었다 — MMA2026은 시상식(멜론뮤직어워드 2026).
+- **원인(코드 위치)**: `public/v41/tags.mjs` `artistFromWords` — 해시태그 전용 경로는 없다. '#'이 낱말 사이를 갈라 `gapIsSpace`가 거짓이 되어 '대문자 낱말 이음'으로 묶이지 않고, 낱말마다 따로 가수 후보가 된다. 걸러 내는 자리는 `STAGE_ALIASES`(무대 별칭 집합)인데 **낱말 전체가 별칭과 정확히 같을 때만** 걸렀다 — 'MMA2026'은 'MMA'가 아니어서 통과했다. `findStage`도 `containsWord`가 뒤 글자를 보고 'mma2026'을 'mma'로 읽지 못해 무대로도 잡히지 않았다.
+- **수리**: ① `stageOfToken(낱말)` — 낱말(대문자)이 별칭과 같거나, 끝의 4자리 연도를 뗀 값이 별칭이면 그 무대 이름(`STAGE_ALIAS_LABEL` 별칭→이름 표)을 돌려준다. `artistFromWords`·`artistFromParens`·`capsish`(낱말 이음 판정)가 모두 이 함수를 거쳐 무대 이름을 가수 후보에서 뺀다. ② `hasYearSuffix` — 영문+4자리 연도 꼴(MMA2026·MAMA2025)은 가수 이름이 아니다(무대 별칭이 아니어도). ③ `findStage`에 연도 허용 판정(`무대이름(?:19|20)\d{2}`)을 더해 '#MMA2026'도 `무대:멜론뮤직어워드`로 제안한다(날짜는 값에 붙이지 않는다 — 2차 규칙 그대로). 기존 목록(STAGE_LABELS — 방송·시상식 이름 한 벌)을 그대로 재사용했다.
+- **시험**(`tests/v41-tags-627.test.mjs` — 새 파일 없음): 제목 형태 표에 2건 추가('#아일릿 #ILLIT #MMA2026 …' → `artist:ILLIT`·`stage:멜론뮤직어워드`, '#ILLIT #MAMA2025 무대' → `artist:ILLIT`·`stage:MAMA`) + 새 시험 1건(연도 붙은 이름·시상식 이름은 가수 아님 / 무대는 방송 이름만 / ILLIT·RIIZE·NewJeans는 그대로 / 'MAMA2025'만 있는 제목은 가수 0). 수리 전 코드로 **fail 2**(`["ILLIT","MMA2026"]`) → 수리 후 42/42. 전체 npm test 1865검 1721 pass 0 fail(144 skip)·build·modulepreload --check 통과. updates.json은 건드리지 않았다.
+
+## 2026-11-16 — 운영센터 상태 칩 한 모양 + 이름 정리 + PR 번호 연결 (컴1로컬4 레인, ai/local4-lt-admin-chips-261116, main ecf3309 기준)
+
+- **문제(대표, 1440 정원 테마 '고치는 일' 탭)**: ① 상태 칩 모양이 자리마다 달랐다 — 긴 글 줄의 '고침' 칩은 눌려 '고/침' 두 줄(높이 40px), 짧은 줄 칩은 남은 폭을 다 채움(677px·593px·239px). 원인은 그리드 칸의 기본 stretch + `white-space` 없음. ② '고침 완료'(GitHub 이슈 닫힘)와 고객 글 칩 '고침'(고객에게 '고쳤어요' 답함)이 같은 말처럼 보임. ③ 연결 번호가 PR이면 `issues/637`을 읽어 실패해 '(이슈를 불러오지 못했어요)'로 보였다(실제 #637은 PR).
+- **수리**: `src/admin.css`의 `.lt-badge`에 `flex: none; justify-self: start; white-space: nowrap; line-height: 1.4` — flex·그리드 어느 줄에서도 글자 폭만·한 줄·세로 가운데. '고치는 일' 고객 글 줄은 `.lt-issue-post{grid-template-columns:minmax(0,1fr) auto auto}`로 제목 칸이 남은 폭을 가져가 줄바꿈하고 칩을 밀지 않는다. 이름: `issueStateLabel`을 '이슈 열림/이슈 닫힘'으로, 이 탭 고객 글 칩은 `statusBadge(status,'고객에게: ')`로 다른 탭 이름(새 글·확인 중·고침…)+머리. PR: GitHub 응답의 `pull_request`를 버리지 않고 'PR #번호 · 제목'(링크는 /pull/)으로 보인다. 상태 거름(#issues?status=open|closed)은 PR을 이슈 상태로 세지 않는다.
+- **숫자(1440·390, 가짜 API·가짜 GitHub)**: 전 — 칩 높이 24~40px(긴 줄 '고침' 40 = 두 줄), 폭 677/593/239px(글자 23/33/20px). 후 — 높이 모두 **23px**, 폭 90/64/87/100px(글자 70/44/67/80px + 여백·테두리 20 — 칩 폭이 글자+여백뿐), 390도 같은 값. PR 줄 'PR #637 · 검색 색인 고치기', 이슈 줄 제목 그대로.
+- **시험**: `tests/admin-view.test.mjs`(새 파일 없음)에 칩 시험 1건 — 1440·390에서 모든 칩 높이 오차 1px 이내·한 줄(높이 ≤ 한 줄 높이)·잘림 0·폭 ≤ 글자+21px, 긴 글 줄은 제목 높이 > 칩 높이(밀지 않음), 이름('이슈 닫힘'·'고객에게: 고침')·PR 제목 단정. 수리 전 코드로는 **fail 2**(24~40px) → 수리 후 27/27. CI 미리보기 검사에 `LT_ADMIN_REQUIRE=1` 단계 추가(지도 도구 줄 잡). 전체 npm test 1864검 1720 pass 0 fail(144 skip)·build·modulepreload --check 통과. updates.json은 건드리지 않았다(대표 지시).
+
 ## 2026-11-16 — 둘러보기 소개 기본 꺼짐: 고객이 켜는 것으로 (컴1로컬4 레인, ai/local4-lt-discover-optin-261116, main b30034a 기준)
 
 - **결정(대표, 2026-11-16)**: 링크 공유는 무료·그대로. 둘러보기 소개는 **기본 꺼짐** — 고객이 켜야 둘러보기·다른 팬 보기(tag-moments)에 나오고(무료), 완전 비공개(링크 차단)만 Plus 전용 유지. 이미 나오던 트리는 켜진 상태로 둔다(고객 데이터 불변, 새 트리부터 기본 꺼짐). AI 명예회원 두 명이 공개를 무서워한 것이 계기.
@@ -43,7 +75,7 @@
 - **새 API(무료, 본인 트리만)**: `GET/PUT /api/trees/<treeId>/discover`(`{discover:true|false}`) — 응답에 지금 상태를 돌려준다. 공유 상태 응답(`GET /api/shares`)과 공개 상태 응답(visibility GET/PUT)에도 `discover` 칸을 넣었다(화면이 다음 PR에서 쓴다 — 이번 PR은 화면을 바꾸지 않는다).
 - **migration**: `server/db/migrations/tree-discover-optin-261116.sql` — 표 생성 + '지금 둘러보기에 나오는 트리'(active + 3개 이상 + auto/discoverable + 비공개 아님 + 숨김 없음)를 켜짐으로 백필(ON CONFLICT DO NOTHING — 재실행 안전). schema.sql에도 같은 표 추가. 탈퇴 경로(account-postgres.js)에도 표 추가.
 - **시험**: public-default-538(메모리)에 기본 꺼짐→켬→끔·남의 트리 404·tester 켜도 안 나옴·백필(켬) 트리 유지 + 공유/공개 상태 응답 discover 칸. community-service(메모리) tag-moments에 소개 꺼짐 제외·켬 추가. community-postgres(PG, CI) 둘러보기 SQL을 소개 표 기준으로 재작성(켬/끔/2개/비공개/숨김/재켜기) + stats 집계 백필 반영. migrations-postgres(PG, CI)에 백필 migration 재실행 안전 시험. 전체 npm test 1712 pass 0 fail(31초)·build·modulepreload --check 통과.
-- **운영 반영(머지 뒤, 대표 승인 — 백업 먼저)**: 컴2 autodeploy가 needs_manual_migration에서 멈추면 → 대상 표 백업(dump+sql, chmod 600) → migration 1회 → 둘러보기 목록 수가 migration 전과 같은지 확인 → `AUTODEPLOY_ACCEPT_MIGRATIONS=1` 설치. 백업 경로·전후 목록 수를 운영일지 '운영센터 처리'에 한 줄 기록.
+- **운영 반영 완료(2026-11-16, 대표 승인)**: 컴2 autodeploy가 needs_manual_migration에서 멈춘 것을 확인 → 백업 `/opt/padiem/lovetree-api/backups/discover-optin-20261115T222914Z.{dump,sql}`(lovetree_shares·lovetree_tree_visibility 두 표, 600·9.5KB/17.1KB) → migration `tree-discover-optin-261116.sql` 1회(표 생성 + **백필 8행**, ON CONFLICT DO NOTHING) → 둘러보기 목록 수 **5장 → 5장 불변**(옛 서버·migration 직후·새 코드 설치 뒤 셋 다 같음 — 백필이 옛 규칙과 같은 트리를 채웠는지 대조; 서비스층 tester 거름 뒤 화면 5장) → `AUTODEPLOY_ACCEPT_MIGRATIONS=1`로 **INSTALLED sha=ecf33090**(d2130e6 → ecf33090), 서비스 active·목록 200·tag-moments 200. 운영일지 '운영센터 처리'에 기록.
 ## 2026-11-16 — 보드에서 붙인 꼬리표가 트리 첫 순간에 저장되는 결함 수리 (컴1로컬4 레인, ai/local4-lt-tagline-first-moment-261116, main a5fc571 기준, PR #738)
 
 - **원인(확정)**: public/v41/tag-line.mjs mountViewTagLine이 onCommit을 '줄을 처음 만든 순간'의 moment 객체 클로저로 만들었다 — 카드를 바꿔 line.update()로 화면은 새 순간을 보여 줘도 저장은 처음 만든 순간(첫 순간) id로 갔다. 화면 선택 자체는 보드·책·지도 모두 LTDEMO.select로 셸 LT41.momentId를 이미 맞춘다(runtime.js) — '보드만 lt41-select를 보내지 않는다'는 후보는 원인이 아니었다. 보드는 같은 제목의 다른 카드로 바꾸면 제목 관찰만으론 다시 그리지 않아 옛 keywords를 들고 저장할 수도 있었다(함께 막음).

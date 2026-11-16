@@ -33,7 +33,6 @@ test('#458: 단추는 쓰기 가능한 내 기록에서만 뜬다', () => {
   assert.match(shellCSS, /body\.lt-fab-ok\.lt-kbd #mobile-add\{display:none\}/, '화상 키보드가 올라오면 숨긴다');
   assert.match(shellCSS, /body\.lt-fab-ok\.lt-sheet-open #mobile-add\{display:none\}/, '화면 안의 큰 창(지도 상세·책 링크 창)이 열리면 숨긴다');
   assert.match(shell, /watchFrameSheet\(frame\)/, '셸은 프레임의 창 열림/닫힘을 알아챈다');
-  assert.match(shell, /\['detail','linkModal'\]\.map\(id=>d\.getElementById\(id\)\)/, '감시 대상은 지도·책의 상세 창(#detail)과 책 링크 창(#linkModal)이다');
   assert.match(shell, /visualViewport\.height<window\.innerHeight-120/, '키보드 판정은 시각 창이 120px 이상 눌릴 때다');
 });
 

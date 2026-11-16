@@ -32,7 +32,7 @@ test('실제 기록 동작은 그대로 남는다(제자리 재생·읽기 스�
   assert.match(SERVER, /member-reading-scroll/);
   assert.match(SERVER, /\.lt-media/, '미디어 위 돋보기 예외');
   assert.match(SERVER, /LTDEMO\.edges\.filter\(e=>e\.kind==='parent'/);
-  assert.match(SERVER, /synthetic:true/);
+  // #722: '링크 순간 추가' 창을 지우면서 그 폼이 만들던 synthetic 동반 순간도 함께 사라졌다(단정 삭제).
   // 정원 명조 제목(#228): 주입 블록이 정원 테마의 읽기 글꼴을 따로 정의한다(값은 book-usability.mjs가 만든다).
   assert.match(SERVER, /\[data-lt-theme=garden\]\{--lt-reading:/);
   assert.match(SERVER, /yt-frame/, '제자리 재생');

@@ -8,8 +8,7 @@ const read = path => readFileSync(new URL('../' + path, import.meta.url), 'utf8'
 const TARGETS = {
   'public/v41/views/track59-sketchbook.html': {
     '#prevBtn': [34, 30], '#nextBtn': [34, 30], '#detailClose': [34, 34], '#viewerClose': [34, 34],
-    '#openViewerBtn': [85, 37], '#detailIndexBtn': [113, 37], '#linkCancel': [47, 32],
-    '#linkSave': [123, 32], '#branchClose': [54, 37],
+    '#openViewerBtn': [85, 37], '#detailIndexBtn': [113, 37], '#branchClose': [54, 37],
   },
   'public/v41/views/track58-pinboard.html': {
     '#minusBtn': [35, 38], '#plusBtn': [41, 38], '#resetBtn': [99, 38], '#openMoment': [63, 34],
@@ -50,12 +49,6 @@ for (const [file, targets] of Object.entries(TARGETS)) {
     }
   });
 }
-
-test('기억책 감정 선택은 최소 높이 44px를 직접 보장한다', () => {
-  const css = styleBlock(read('public/v41/views/track59-sketchbook.html'));
-  const rule = rules(css).find(item => item.sel.includes('#linkEmotion'));
-  assert.ok(rule && /min-height:44px/.test(rule.body), '#linkEmotion은 min-height:44px');
-});
 
 test('첫 화면 건너뛰기는 44px 이상이다', () => {
   const css = read('public/v41/shell.css');

@@ -132,7 +132,7 @@ test('설정 입구는 로그인 상태에서만 열리고, 묶음 이름으로 
   // #453 C1: 기본은 맨 위에서 열고, 구역을 지정했을 때만 그 묶음으로 내려간다.
   assert.match(shell, /function focusSettingsSection\(section=''\)\{[\s\S]*?if\(!section\)return;[\s\S]*?scrollIntoView\(\{block:'start'\}\)[\s\S]*?heading\.focus\(\{preventScroll:true\}\)/);
   assert.match(shell, /void openAccountSettings\(\{section:'data'\}\);/);
-  assert.match(shell, /paintSettingsProfile\(\);\s*fillProfileForm\(\);\s*paintDateStyleControls\(\);paintStartPlaceControls\(\);paintNetworkViewControls\(\);paintShareControls\(\);\s*void paintSettingsUsage\(\);\s*panel\('account-settings'\);\s*focusSettingsSection\(section\);/);
+  assert.match(shell, /paintSettingsProfile\(\);\s*fillProfileForm\(\);\s*paintDateStyleControls\(\);paintStartPlaceControls\(\);paintNetworkViewControls\(\);paintShareControls\(\);paintQuickTargetControls\(\);\s*void paintSettingsUsage\(\);\s*panel\('account-settings'\);\s*focusSettingsSection\(section\);/);
 });
 
 test('옛 내 기록 입구는 설정 "내 데이터"(로그아웃이면 로그인)로 열린다', () => {

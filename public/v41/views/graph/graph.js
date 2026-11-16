@@ -345,9 +345,9 @@ function render() {
       const otherDots = moments.filter((o) => o !== m && o.x != null).map((o) => ({ x: o.x, y: o.y, r: model.dotR }));
       const labelBoxes = placed.map((r2) => r2);
       const cand = [
-        [r + 10 + w2, -(r + h2 + 2)], [-(r + 10 + w2), -(r + h2 + 2)],
-        [r + 10 + w2, r + h2 + 2], [-(r + 10 + w2), r + h2 + 2],
-        [r + 10 + w2, 0], [-(r + 10 + w2), 0], [0, -(r + h2 + 12)], [0, r + h2 + 12]
+        [r + 12 + w2, -(r + h2 + 6)], [-(r + 12 + w2), -(r + h2 + 6)],
+        [r + 12 + w2, r + h2 + 6], [-(r + 12 + w2), r + h2 + 6],
+        [r + 12 + w2, 0], [-(r + 12 + w2), 0], [0, -(r + h2 + 16)], [0, r + h2 + 16]
       ];
       const clear2 = (cx2, cy2) => {
         if (cx2 - w2 < 4 || cx2 + w2 > model.W - 4 || cy2 - h2 < 4 || cy2 + h2 > model.H - model.shelfH - 2) return false;
@@ -360,7 +360,9 @@ function render() {
         const cx2 = dotCX + dx2, cy2 = dotCY + dy2;
         if (clear2(cx2, cy2)) { chosen = { cx: cx2, cy: cy2 }; break; }
       }
-      if (!chosen) chosen = { cx: dotCX + r + 10 + w2, cy: dotCY - (r + h2 + 2) };
+      /* 어느 후보도 안 되면: 점 테두리에서 최소 6px 떨어진 오른쪽 위로 물러난다(텍스트 하단이 점 상자에
+         닿아 '×N이 점에 겹친다'로 보였다 — 2026-11-16 CTO 지적 #740 캡처). */
+      if (!chosen) chosen = { cx: dotCX + r + 12 + w2, cy: dotCY - (r + h2 + 6) };
       countEl.setAttribute('x', (chosen.cx - w2).toFixed(1));
       countEl.setAttribute('y', (chosen.cy + h2).toFixed(1));
     }
@@ -550,10 +552,17 @@ const fanRow = (item) => {
   return li;
 };
 
-/* ── 꼬리표 없는 순간 선반 + 제안(제안만 — 확인해야 저장이다) ── */
+/* ── 아직 묶음에 안 든 순간 선반 + 제안(제안만 — 확인해야 저장이다) ──
+   2026-11-16 CTO 지적: '꼬리표 없는 순간'은 실제 뜻이 아니다 — 꼬리표가 있어도 값이 1개뿐이면
+   묶음(허브)에 안 든다. 실제 뜻에 맞게 부른다. */
 function drawShelf() {
   const untagged = model.graph.moments.filter((m) => m.hubId === null);
-  document.getElementById('shelfLabel').textContent = untagged.length > 0 ? '꼬리표 없는 순간 ' + untagged.length : '';
+  document.getElementById('shelfLabel').textContent = untagged.length > 0 ? '아직 묶음에 안 든 순간 ' + untagged.length : '';
+  /* 빈 판 안내가 떠 있을 때는 선반의 단추를 숨기고 글자만 남긴다 — 안내의 단추와 두 번 연달아
+     보이는 것을 막는다(2026-11-16 CTO 지적). 조건은 drawEmptyNote의 안내와 같다(순간 2개 이상·묶음 0).
+     묶음이 생겨 안내가 사라지면 단추는 지금처럼 보인다. */
+  const guideShown = model.graph.moments.length > 1 && model.graph.hubs.length === 0;
+  document.getElementById('shelfHint').hidden = guideShown;
   document.getElementById('gShelf').style.display = untagged.length > 0 ? 'flex' : 'none';
   const badge = document.getElementById('gBadge');
   const n = model.graph.moments.length;
@@ -568,12 +577,14 @@ const goMapWithView = (v) => {
 };
 document.getElementById('gViewNet')?.addEventListener('click', () => goMapWithView('network'));
 document.getElementById('gViewConc')?.addEventListener('click', () => goMapWithView('concentric'));
-document.getElementById('shelfHint').addEventListener('click', () => {
+/* 제안 목록 — 선반 단추와 빈 판 안내 단추가 같은 한 길로 쓴다. 목록 제목도 실제 뜻으로 부른다
+   (2026-11-16 CTO 지적: '꼬리표 없는'이 아니라 '아직 묶음에 안 든'이다). */
+function showSuggestions() {
   const untagged = model.graph.moments.filter((m) => m.hubId === null).map((m) => MOMENT_OF.get(m.id)).filter(Boolean);
   const suggestions = suggestForMoments(untagged);
   const card = document.getElementById('detailCard');
   card.replaceChildren();
-  const head = document.createElement('div'); head.className = 'd-kicker'; head.textContent = '꼬리표 한 번에 제안받기';
+  const head = document.createElement('div'); head.className = 'd-kicker'; head.textContent = '아직 묶음에 안 든 순간 ' + untagged.length + ' — 꼬리표 한 번에 제안받기';
   const note = document.createElement('p'); note.className = 'd-memo';
   note.innerHTML = '<b>제안일 뿐</b> — 확인한 것만 저장된다. 꼬리표 정리 화면에서 확인해 저장하세요(지금 화면은 저장하지 않는다).';
   const list = document.createElement('ul'); list.className = 'd-list';
@@ -591,7 +602,8 @@ document.getElementById('shelfHint').addEventListener('click', () => {
   }
   if (!shown) { const li = document.createElement('li'); const b = document.createElement('button'); b.type = 'button'; b.textContent = '지금 제안할 꼬리표가 없어요'; li.appendChild(b); list.appendChild(li); }
   card.append(head, note, list);
-});
+}
+document.getElementById('shelfHint').addEventListener('click', () => showSuggestions());
 
 /* ── 발자초 걷기(시간 순서 전체를 한 점씩 밝히며 걷는다) ── */
 const walkBtn = document.getElementById('walkBtn');
@@ -613,7 +625,7 @@ walkBtn.addEventListener('click', () => {
 });
 
 /* ── 그리기 갱신 ── */
-function refresh() { render(); drawLegend(); drawDetail(); drawShelf(); }
+function refresh() { render(); drawLegend(); drawDetail(); drawShelf(); drawEmptyNote(); }
 let lastW = 0, lastH = 0;
 const onResize = () => {
   const box = svg.parentElement.getBoundingClientRect();
@@ -630,12 +642,28 @@ window.addEventListener('resize', onResize);
 document.fonts?.ready?.then(() => refresh()).catch(() => {});
 
 /* ── 빈 트리 안내(순간 1개 규칙 — 설계 §2) ── */
+/* ── 빈 판 안내: 순간 1개 규칙(설계 §2) + 묶음 0개 안내(2026-11-16 CTO 지적 — 처음 쓰는 고객은
+   빈 무대를 고장으로 본다). 안내의 단추는 선반의 '꼬리표 한 번에 제안받기'와 같은 한 길(showSuggestions).
+   묶음이 생기면(허브 1개 이상) 안내는 사라진다. ── */
 function drawEmptyNote() {
   const n = model.graph.moments.length;
+  const hubs = model.graph.hubs.length;
   const empty = document.getElementById('gEmpty');
-  if (n === 1) { empty.hidden = false; empty.textContent = '순간이 하나예요. 다음 순간을 남기면 흐름이 보여요.'; }
-  else if (n === 0) { empty.hidden = false; empty.textContent = '아직 남긴 순간이 없어요. 순간을 남기면 흐름이 보여요.'; }
-  else empty.hidden = true;
+  if (n === 0) { empty.replaceChildren(); empty.hidden = false; empty.textContent = '아직 남긴 순간이 없어요. 순간을 남기면 흐름이 보여요.'; }
+  else if (n === 1) { empty.replaceChildren(); empty.hidden = false; empty.textContent = '순간이 하나예요. 다음 순간을 남기면 흐름이 보여요.'; }
+  else if (hubs === 0) {
+    const p = document.createElement('p');
+    p.className = 'g-empty-text';
+    p.textContent = '같은 가수·노래·무대 꼬리표가 붙은 순간이 2개 이상이면 여기에 묶여요.';
+    const cta = document.createElement('button');
+    cta.type = 'button';
+    cta.className = 'g-empty-cta';
+    cta.textContent = '꼬리표 한 번에 제안받기';
+    cta.addEventListener('click', () => showSuggestions());
+    empty.replaceChildren(p, cta);
+    empty.hidden = false;
+  }
+  else { empty.replaceChildren(); empty.hidden = true; }
 }
 
 refresh();

@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { existsSync } from 'node:fs';
 import {
   STATUS_ORDER, PERSONA_FIELDS,
   richParagraph, formatTime, parseHash, viewHash, viewToTab,
@@ -191,9 +192,9 @@ test('고객 글의 연결 이슈 번호만 추려 번호 내림차순으로 나
   assert.equal(normalizeIssueNumber(null), '');
 });
 
-test("GitHub open/closed를 '고치는 중/고침 완료'로 바꿔 쓴다(#570 4)", () => {
-  assert.equal(issueStateLabel('open'), '고치는 중');
-  assert.equal(issueStateLabel('closed'), '고침 완료');
+test("GitHub open/closed를 '이슈 열림/이슈 닫힘'으로 바꿔 쓴다(대표 요청 2026-11-16 — '고침 완료'는 이슈 닫힘, 고객 글 '고침'과 다른 것)", () => {
+  assert.equal(issueStateLabel('open'), '이슈 열림');
+  assert.equal(issueStateLabel('closed'), '이슈 닫힘');
   assert.equal(issueStateLabel(''), '');
   assert.equal(issueStateLabel(undefined), '');
 });
@@ -392,4 +393,119 @@ test('#743 한눈에 카드: 갈 탭이 있는 카드가 자기 조건으로 그
   assert.deepEqual(filterRows(rows, {unanswered: true}).map(row => row.id), ['a', 'c']);
   assert.deepEqual(filterRows(rows, {unanswered: true, status: 'fixed'}).map(row => row.id), ['c']);
   assert.equal(filterRows(rows, {}).length, 3, '조건이 없으면 지금과 같다(닫음 제외)');
+});
+
+/* ── 대표 요청 2026-11-16: 운영센터 상태 칩 한 모양 + 이름 + PR 번호 — 숫자로 판정한다 ──
+   크롬(Playwright chromium)이 있는 곳에서만 돈다. CI '미리보기 검사'는 LT_ADMIN_REQUIRE=1 로 직접 돌려
+   건너뜀을 실패로 본다. 관리자 세션·고객 글·GitHub 읽기는 모두 가짜 응답(서버·네트워크 쓰기 없음). */
+
+const ADMIN_REQUIRE = process.env.LT_ADMIN_REQUIRE === '1';
+let adminChromium, adminSkip = false;
+try {
+  const pw = await import('playwright');
+  adminChromium = pw.chromium;
+  if (!adminChromium?.executablePath?.() && !adminChromium?.executablePath) adminSkip = 'playwright 대역이어서 칩 검사를 건너뜀';
+  else if (!existsSync(adminChromium.executablePath())) adminSkip = 'Playwright Chromium이 없어 칩 검사를 건너뜀';
+} catch { adminSkip = 'playwright 패키지가 없어 칩 검사를 건너뜀'; }
+if (ADMIN_REQUIRE && !existsSync(new URL('../dist/admin.html', import.meta.url))) adminSkip = '빌드 결과가 없어 칩 검사를 건너뜀(npx vite build 필요)';
+
+const LONG_TITLE = '순간이 3개가 되는 순간에 트리가 둘러보기에 공개된다는 안내를 들었는데 저장할 때는 계속 서버에 저장됐어요만 떴고 공유 판에서 비공개로 바꾸려니 Plus 전용이라고 나왔어요. 저는 아직 열여덟 살이 안 됐는데 가입할 때 나이를 묻는 칸이 없었던 것도 신기했어요.';
+
+test('운영센터 상태 칩: 1440·390에서 높이가 같고 한 줄이며 폭이 글자+여백뿐이다(대표 요청 2026-11-16)', { skip: ADMIN_REQUIRE ? false : adminSkip, timeout: 120000 }, async () => {
+  if (adminSkip) assert.fail(`건너뜀=실패 — ${adminSkip}`);
+  const { serve } = await import('./helpers/screen-audit.mjs');
+  const server = await serve();
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await adminChromium.launch({ headless: true });
+  try {
+    const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
+    await context.route('**/api/admin/session', r => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ok: true, authenticated: true, admin: true}) }));
+    await context.route('**/api/admin/feedback', r => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ok: true, feedback: [
+      {id: 'p1', kind: 'opinion', status: 'fixed', replyCount: 1, issueNumber: '#584', displayTitle: LONG_TITLE, createdAt: '2026-11-15T09:00:00Z'},
+      {id: 'p2', kind: 'opinion', status: 'reviewing', replyCount: 0, issueNumber: '584', displayTitle: '짧은 제목', createdAt: '2026-11-15T10:00:00Z'},
+      {id: 'p3', kind: 'bug', status: 'received', replyCount: 0, issueNumber: '#637', displayTitle: '검색이 안 돼요', createdAt: '2026-11-15T11:00:00Z'}
+    ]}) }));
+    // GitHub 읽기는 전부 가짜다. 주소별 glob 대신 정규식으로 받는다 — CI의 낡은 Playwright에서는
+    // '**api.github.com/...' 꼴 glob이 안 먹어 실제 GitHub를 불러 왔다(2026-11-16 CI 빨강: 584 이슈 제목이
+    // 저장소의 진짜 제목으로 나왔다). 아래 '그 밖의 GitHub 요청'을 먼저 걸어 두어 실수로 실제 API를 부르면
+    // 404로 끝나고, 받은 횟수(githubHits)를 시험이 직접 확인한다.
+    const githubFake = new Map([
+      [584, { number: 584, title: '둘러보기 검색이 막혀 있다', state: 'closed' }],
+      [637, { number: 637, title: '검색 색인 고치기', state: 'open', pull_request: { number: 637 } }]
+    ]);
+    let githubHits = 0;
+    await context.route(/^https:\/\/api\.github\.com\//, r => r.fulfill({ status: 404, contentType: 'application/json', body: '{"message":"not found"}' }));
+    await context.route(/^https:\/\/api\.github\.com\/repos\/[^/]+\/[^/]+\/issues\/(\d+)$/, r => {
+      const number = Number(r.request().url().match(/(\d+)$/)[1]);
+      const fake = githubFake.get(number);
+      githubHits += 1;
+      return fake
+        ? r.fulfill({ status: 200, contentType: 'application/json', headers: {'cache-control': 'no-store'}, body: JSON.stringify(fake) })
+        : r.fulfill({ status: 404, contentType: 'application/json', body: '{"message":"not found"}' });
+    });
+    const page = await context.newPage();
+    for (const [width, height] of [[1440, 900], [390, 844]]) {
+      await page.setViewportSize({ width, height });
+      await page.goto(`${base}/admin.html#issues`, { waitUntil: 'domcontentloaded' });
+      await page.waitForSelector('[data-issue-row="637"]', { timeout: 8000 });
+      await page.waitForTimeout(200);
+      const chips = await page.evaluate(() => {
+        const oneLineHeight = (el) => {
+          const cs = getComputedStyle(el);
+          return parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom)
+            + parseFloat(cs.borderTopWidth) + parseFloat(cs.borderBottomWidth)
+            + Math.ceil(parseFloat(cs.fontSize) * parseFloat(cs.lineHeight));
+        };
+        return [...document.querySelectorAll('.lt-badge')].map(el => {
+          const rect = el.getBoundingClientRect();
+          const range = document.createRange();
+          range.selectNodeContents(el);
+          return {
+            text: el.textContent.trim(),
+            h: Math.round(rect.height * 10) / 10,
+            w: Math.round(rect.width * 10) / 10,
+            textW: Math.round(range.getBoundingClientRect().width * 10) / 10,
+            overflow: el.scrollWidth - el.clientWidth,
+            lineH: Math.round(oneLineHeight(el) * 10) / 10
+          };
+        });
+      });
+      assert.ok(chips.length >= 4, `고치는 일 탭에 칩이 그려진다(실제 ${chips.length}개)`);
+      const heights = chips.map(chip => chip.h);
+      assert.ok(Math.max(...heights) - Math.min(...heights) <= 1,
+        `모든 칩의 높이가 같다(오차 1px — 실제 ${Math.min(...heights)}~${Math.max(...heights)}px)`);
+      for (const chip of chips) {
+        assert.ok(chip.h <= chip.lineH + 1, `칩 안 글자가 한 줄이다(${chip.text} — 높이 ${chip.h}px ≤ 한 줄 ${chip.lineH}px)`);
+        assert.ok(chip.overflow <= 0, `칩 안 글자가 잘리지 않는다(${chip.text} — 넘침 ${chip.overflow}px)`);
+        // 칩 폭 = 글자 폭 + 좌우 여백(9px×2) + 테두리(1px×2) — 남은 폭을 채우거나 눌리지 않았다.
+        assert.ok(chip.w <= chip.textW + 21, `칩 폭이 글자 폭+여백뿐이다(${chip.text} — ${chip.w}px ≤ 글자 ${chip.textW}px+21px)`);
+        assert.ok(chip.w >= chip.textW, `칩이 글자를 담는다(${chip.text} — ${chip.w}px ≥ ${chip.textW}px)`);
+      }
+      // 긴 글 줄: 제목이 줄바꿈을 하고(칩을 밀지 않음), 그 줄의 칩도 한 줄 높이를 유지한다.
+      const longRow = await page.evaluate(() => {
+        const row = [...document.querySelectorAll('.lt-issue-post')].find(el => el.querySelector('.lt-post-title')?.textContent.length > 40);
+        if (!row) return null;
+        const title = row.querySelector('.lt-post-title');
+        const badge = row.querySelector('.lt-badge');
+        return { titleH: Math.round(title.getBoundingClientRect().height), badgeH: Math.round(badge.getBoundingClientRect().height) };
+      });
+      assert.ok(longRow, '긴 제목 고객 글 줄이 그려진다');
+      assert.ok(longRow.titleH > longRow.badgeH, `긴 글은 줄바꿈하고 칩을 밀지 않는다(제목 ${longRow.titleH}px > 칩 ${longRow.badgeH}px)`);
+      // 이름: 이슈 칩은 '이슈 닫힘/이슈 열림', 고객 글 칩은 '고객에게: ' 머리, PR 번호는 'PR #637 · 제목'.
+      const texts = chips.map(chip => chip.text);
+      assert.ok(texts.includes('이슈 닫힘'), `이슈 칩 이름이 '이슈 닫힘'이다(실제: ${JSON.stringify(texts)})`);
+      assert.ok(texts.some(text => text === '고객에게: 고침'), `고객 글 칩에 '고객에게:' 머리를 붙인다(실제: ${JSON.stringify(texts)})`);
+      const prTitle = await page.textContent('[data-issue-row="637"] .lt-issue-title');
+      assert.match(prTitle, /^PR #637 · /, `PR 번호는 'PR #번호 · 제목'으로 보인다(실제: ${prTitle})`);
+      const issueTitle = await page.textContent('[data-issue-row="584"] .lt-issue-title');
+      assert.equal(issueTitle, '둘러보기 검색이 막혀 있다', '이슈는 제목을 그대로 보인다');
+    }
+    // 가짜 응답이 실제로 쓰였는지 확인한다(이슈 2개를 한 번씩은 반드시 받는다 — 브라우저 캐시로 두 번째
+    // 화면 크기에서는 다시 부르지 않을 수 있어 2회를 하한으로 둔다). 실제 GitHub를 부르면 위 404 규칙에 걸린다.
+    assert.ok(githubHits >= 2, `GitHub 읽기는 가짜 응답을 쓴다(받은 횟수 ${githubHits})`);
+    await context.close();
+  } finally {
+    await browser.close();
+    server.close();
+  }
 });

@@ -34,7 +34,8 @@ function serve(root) {
   return new Promise((ok) => server.listen(0, '127.0.0.1', () => ok(server)));
 }
 
-const CLOSED = '.archive-panel,.detail,.viewer,.link-modal,.branch-modal,.overview';
+// #722: 책의 '링크 순간 추가' 창(#linkModal)은 지웠다 — 닫힌 채 시작하는 창은 다섯이다.
+const CLOSED = '.archive-panel,.detail,.viewer,.branch-modal,.overview';
 
 test('#519 책의 닫힌 창은 초점을 받지 않고, 열면 받고 닫으면 다시 빠진다', { skip: REQUIRE ? false : skip, timeout: 120000 }, async () => {
   if (skip) assert.fail(`미리보기 검사에서는 초점 시험 건너뜀이 실패다 — ${skip}`);
@@ -59,7 +60,7 @@ test('#519 책의 닫힌 창은 초점을 받지 않고, 열면 받고 닫으면
       await page.waitForTimeout(1500);
 
       const closed = await frame.evaluate((sel) => [...document.querySelectorAll(sel)].map((el) => ({ id: el.id, inert: el.inert, open: el.classList.contains('open') })), CLOSED);
-      assert.equal(closed.length, 6, `${theme}: 닫힌 창 6개를 찾지 못함`);
+      assert.equal(closed.length, 5, `${theme}: 닫힌 창 5개를 찾지 못함`);
       for (const item of closed) {
         assert.equal(item.open, false, `${theme}: ${item.id}가 열린 채로 시작함`);
         assert.equal(item.inert, true, `${theme}: 닫힌 ${item.id}에 inert가 없음`);
@@ -70,28 +71,11 @@ test('#519 책의 닫힌 창은 초점을 받지 않고, 열면 받고 닫으면
         await page.keyboard.press('Tab');
         seen.push(await frame.evaluate(() => {
           const a = document.activeElement;
-          return a ? { tag: a.tagName, id: a.id, hiddenWindow: !!a.closest('.link-modal[inert],.viewer[inert],.branch-modal[inert],.overview[inert],.detail[inert],.archive-panel[inert]') } : null;
+          return a ? { tag: a.tagName, id: a.id, hiddenWindow: !!a.closest('.viewer[inert],.branch-modal[inert],.overview[inert],.detail[inert],.archive-panel[inert]') } : null;
         }));
       }
       assert.deepEqual(seen.filter((x) => x?.hiddenWindow), [], `${theme}: 닫힌 창 안으로 Tab 초점이 들어감`);
 
-      // 링크 창을 실제 열기 경로로 연다(예시는 읽기 전용이라 이 시험에서만 쓰기 상태로 바꾼다).
-      const opened = await frame.evaluate(() => {
-        try { LTDEMO.readOnly = false; } catch { return { error: 'LTDEMO 없음' }; }
-        window.__TRACK59__.openAddLink();
-        const m = document.querySelector('#linkModal');
-        return { open: m.classList.contains('open'), inert: m.inert };
-      });
-      assert.deepEqual(opened, { open: true, inert: false }, `${theme}: 링크 창을 열지 못함`);
-      await page.waitForTimeout(250);
-      const active = await frame.evaluate(() => ({ id: document.activeElement?.id, inside: !!document.activeElement?.closest('#linkModal') }));
-      assert.deepEqual(active, { id: 'linkUrl', inside: true }, `${theme}: 연 창의 입력칸으로 초점이 가지 않음`);
-      const closedAgain = await frame.evaluate(() => {
-        document.querySelector('#linkCancel').click();
-        const m = document.querySelector('#linkModal');
-        return { open: m.classList.contains('open'), inert: m.inert };
-      });
-      assert.deepEqual(closedAgain, { open: false, inert: true }, `${theme}: 닫은 뒤 inert로 돌아오지 않음`);
       assert.equal(errors.length, 0, `${theme}: 페이지 오류 ${errors.join(' | ')}`);
       await ctx.close();
     }

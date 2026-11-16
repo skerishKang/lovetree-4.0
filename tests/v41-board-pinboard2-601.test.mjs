@@ -599,7 +599,9 @@ test('#662 화면: 상세 판의 행동 단추를 실제 좌표 클릭으로 누
         // 테마 꼬리표가 상세 판에 덮이지 않았는지.
         const badge = await frame.evaluate(() => {
           const b = document.getElementById('themeBadge');
-          if (!b) return { skip: true };
+          // 2026-11-16 대표 결정: 쓰기 가능한 내 보드에서는 배지를 숨긴다(hidden) — 숨겨져 있으면
+          // 덮임 검사 대상이 아니고, 표시가 보이는(읽기 전용) 보드에서만 검사한다.
+          if (!b || b.hidden) return { skip: true };
           const r = b.getBoundingClientRect();
           const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
           const tag = (n) => n ? (n.id ? n.tagName + '#' + n.id : n.tagName + '.' + String(n.className).split(' ')[0]) : 'null';

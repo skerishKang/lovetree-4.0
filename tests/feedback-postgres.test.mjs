@@ -113,4 +113,36 @@ test('#671 후속: DATE 칸은 DB의 YYYY-MM-DD를 그대로 내린다 — 현�
  const list=await repo.list({productId:'lt-date'});
  assert.equal(list[0].journalDate,'2026-11-14','Date(현지 자정)도 그날 날짜로');
  assert.equal(list[1].journalDate,'2026-11-14','문자열은 그대로');
+});test('보관 최소화(2026-11-16): 6개월 넘은 비로그인 의견+답글과 90일 넘은 탈퇴 기록을 지운다',{skip},async()=>{
+ assertIsolatedTestDatabase(DATABASE_URL);const pool=await createPool(DATABASE_URL,{max:3});
+ try{
+  await applySchema(pool);const repo=createFeedbackRepo(pool),tag=suffix(),productId='lt-'+tag;
+  const old=new Date(Date.now()-(183+10)*24*60*60*1000).toISOString();
+  const recent=new Date(Date.now()-60*24*60*60*1000).toISOString();
+  // 비로그인 의견(오래됨) + 답글, 비로그인 의견(최근), 로그인 의견(오래됨)
+  const guestOld=await repo.create({productId,subjectId:null,category:'other',body:'6개월 넘은 비로그인 의견'});
+  const guestRecent=await repo.create({productId,subjectId:null,category:'other',body:'6개월 안 된 비로그인 의견',context:{}});
+  const mine=await repo.create({productId,subjectId:'sub_keep_'+tag,category:'bug',body:'로그인 의견은 건드리지 않는다'});
+  await pool.query('UPDATE lovetree_feedback SET created_at=$1, updated_at=$1 WHERE id=ANY($2)',[old,[guestOld.id,mine.id]]);
+  await pool.query('UPDATE lovetree_feedback SET created_at=$1, updated_at=$1 WHERE id=$2',[recent,guestRecent.id]);
+  await repo.addReply({productId,postId:guestOld.id,authorType:'customer',authorSubjectId:null,body:'그 의견에 달린 답글'});
+  await repo.addReply({productId,postId:mine.id,authorType:'internal',authorSubjectId:null,body:'로그인 의견의 답글'});
+  // 탈퇴 기록: 90일 넘은 것 1건, 90일 안 된 것 1건
+  const hashOld='a'.repeat(64),hashKeep='b'.repeat(64);
+  const oldDeletedAt=new Date(Date.now()-(90+5)*24*60*60*1000).toISOString();
+  await pool.query('INSERT INTO lovetree_account_deletions (product_id,subject_hash,deleted_at) VALUES ($1,$2,$3),($1,$4,now())',[productId,hashOld,oldDeletedAt,hashKeep]);
+  const purge=await import('../server/db/access-log-retention-postgres.js');
+  const gf=await purge.deleteExpiredGuestFeedback(pool);
+  const ad=await purge.deleteExpiredAccountDeletionRecords(pool);
+  assert.equal(gf.deletedPosts,1,'6개월 넘은 비로그인 의견 1건만 지운다');
+  assert.equal(gf.deletedReplies,1,'그 의견의 답글 1건만 지운다');
+  assert.equal(ad.deleted,1,'90일 넘은 탈퇴 기록 1건만 지운다');
+  const left=await pool.query('SELECT id,subject_id FROM lovetree_feedback WHERE product_id=$1 ORDER BY id',[productId]);
+  // node-postgres는 bigint(id)를 문자열로 돌려준다 — repo가 만든 숫자 id와 비교하려면 숫자로 맞춘다(CI 1차 실패 원인).
+  assert.deepEqual(left.rows.map(r=>Number(r.id)),[guestRecent.id,mine.id],'6개월 안 된 비로그인 의견과 로그인 의견은 남는다');
+  const replies=await pool.query('SELECT body FROM lovetree_feedback_replies WHERE product_id=$1',[productId]);
+  assert.deepEqual(replies.rows.map(r=>r.body),['로그인 의견의 답글'],'남는 의견의 답글도 남는다');
+  const del=await pool.query('SELECT subject_hash FROM lovetree_account_deletions WHERE product_id=$1',[productId]);
+  assert.deepEqual(del.rows.map(r=>r.subject_hash),[hashKeep],'90일 안 된 탈퇴 기록은 남는다');
+ }finally{await pool.end();}
 });

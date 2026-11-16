@@ -47,6 +47,8 @@ const KNOWN = [
   { 화면: '공유 판·소개 꺼짐', 항목: '작은글자', 찾을: 'small "(마지막 순간|모아둔 순간)', 이슈: '#548(12px 기준)·레거시 궤도 카드' },
   { 화면: '공유 판·소개 켜짐', 항목: '작은글자', 찾을: 'span.lt-fallback-action "제목 달기"', 이슈: '#548(12px 기준)·레거시 궤도 카드' },
   { 화면: '공유 판·소개 켜짐', 항목: '작은글자', 찾을: 'small "(마지막 순간|모아둔 순간)', 이슈: '#548(12px 기준)·레거시 궤도 카드' },
+  { 화면: '꼬리표 직접 붙이기', 항목: '작은글자', 찾을: 'span.lt-fallback-action "제목 달기"', 이슈: '#548(12px 기준)·레거시 궤도 카드' },
+  { 화면: '꼬리표 직접 붙이기', 항목: '작은글자', 찾을: 'small "(마지막 순간|모아둔 순간)', 이슈: '#548(12px 기준)·레거시 궤도 카드' },
 ];
 
 // #638: '내 의견 목록' 상태 — 상태 말 네 가지·답변·새 소식 링크가 한 화면에 보이게 하는 가짜 게시물.
@@ -558,7 +560,97 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
       assert.equal(await pageBack.evaluate(() => !!document.getElementById('discover-ask')?.open), false, '백필(이미 소개 켜진) 계정은 질문 없이 건너뛴다');
       await ctxBack.close();
     }
-    await page4.keyboard.press('Escape');
+    await ctxDate.close();
+    // 꼬리표 직접 붙이기(261116 대표 지적) — 제안이 없는 영상을 담은 직후의 꼬리표 줄.
+    // 접힘·오류 0이 기본, [직접 붙이기]로 한 줄 펼침(44px 같은 높이·예시 placeholder·개발 용어 없음),
+    // 빈 값으로 붙이면 오류 한 줄, 'ILLIT'을 붙이면 방금 담은 순간에 '가수:ILLIT' 저장(#742와 같은 순간 id).
+    {
+      const ctxTag = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
+      await ctxTag.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); } catch {} }, theme);
+      await ctxTag.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
+      await ctxTag.route('**://i.ytimg.com/**', THUMB);
+      const tagSaves = []; // keywords가 담긴 순간 기록({ momentId, keywords })
+      const putMoments = []; // 회차별 그림 기록 — 회차 1의 순간과 회차 2의 순간 id를 가른다
+      await ctxTag.route('**/api/workspace*', (r) => {
+        if (r.request().method() === 'PUT') {
+          const body = r.request().postDataJSON() || {};
+          const moments = [];
+          for (const tree of body.state?.trees || []) for (const m of tree.moments || []) moments.push(m.id);
+          putMoments.push(moments);
+          for (const tree of body.state?.trees || []) for (const m of tree.moments || []) {
+            if (Array.isArray(m.keywords) && m.keywords.length) tagSaves.push({ momentId: m.id, keywords: [...m.keywords] });
+          }
+          return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, revision: Number(body.expectedRevision || 0) + 1, subject: '검사기계정' }) });
+        }
+        return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ revision: 1, state: { version: 1, trees: [] }, subject: '검사기계정', writeSubjectBound: true, savedAt: '2026-11-16T09:00:00.000Z' }) });
+      });
+      await ctxTag.route('**/api/youtube/oembed*', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ title: '헤어지자고? #shorts', author_name: '시험 채널' }) }));
+      await ctxTag.route('**/api/trees/*/discover', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, treeId: 'tagTree', discover: false }) }));
+      const pageTag = await ctxTag.newPage();
+      await pageTag.goto(base + '/v41/?account=1', { waitUntil: 'load' });
+      await pageTag.waitForTimeout(1200);
+      const quickSaveOnce = async (n) => {
+        await pageTag.evaluate(() => document.getElementById('write-menu')?.click());
+        await pageTag.waitForFunction(() => !!document.getElementById('quick-url'), null, { timeout: 8000 });
+        await pageTag.fill('#quick-url', 'https://www.youtube.com/watch?v=qaTag00' + n);
+        await pageTag.click('#quick-submit');
+        await pageTag.waitForTimeout(900);
+      };
+      await quickSaveOnce(1);
+      await quickSaveOnce(2); // 같은 창에서 연속 담기 — 꼬리표 줄은 방금 담은(두 번째) 순간을 가리킨다
+      await pageTag.waitForFunction(() => !!document.querySelector('#quick-tagline .lt-tagline'), null, { timeout: 10000 });
+      // 접힘 기본: 오류 0·입력 줄 없음·안내+[직접 붙이기]. 개발 용어('종류'·'값')는 처음부터 없다.
+      const folded = await pageTag.evaluate(() => {
+        const err = document.querySelector('#quick-tagline .lt-tagline-error');
+        return {
+          errorHidden: !err || err.hidden,
+          row: !!document.querySelector('#quick-tagline .lt-tagline-kind'),
+          toggle: !!document.querySelector('#quick-tagline .lt-tagline-toggle'),
+          text: (document.querySelector('#quick-tagline')?.textContent || '').replace(/\\s+/g, ' ').trim()
+        };
+      });
+      assert.equal(folded.errorHidden, true, '처음 상태에 오류가 없다');
+      assert.equal(folded.row, false, '직접 입력 칸은 접혀 있다');
+      assert.equal(folded.toggle, true, '[직접 붙이기]만 보인다');
+      assert.ok(folded.text.includes('가수·노래를 붙여 두면 나중에 저절로 묶여요'), '제안이 없을 때는 안내 한 줄이 보인다 — 실제 "' + folded.text + '"');
+      assert.ok(!/종류|꼬리표 값/.test(folded.text), '접힌 말에 개발 용어가 없다 — 실제 "' + folded.text + '"');
+      await take(pageTag, '꼬리표 직접 붙이기');
+      await pageTag.screenshot({ path: 'E:/lovetree-qa/lane/local3-graph/tagline-after-folded-' + width + '-' + theme + '.png', animations: 'disabled', timeout: 10000 }).catch(() => {});
+      await pageTag.evaluate(() => document.querySelector('#quick-tagline .lt-tagline-toggle')?.click());
+      await pageTag.waitForFunction(() => !!document.querySelector('#quick-tagline .lt-tagline-kind'), null, { timeout: 8000 });
+      await pageTag.waitForTimeout(300);
+      // 펼침: 세 요소 높이 같음(44px)·placeholder 예시·개발 용어 0.
+      const open = await pageTag.evaluate(() => {
+        const els = ['.lt-tagline-kind', '.lt-tagline-value', '.lt-tagline-add'].map((sel) => document.querySelector('#quick-tagline ' + sel));
+        const hs = els.map((el) => Math.round(el.getBoundingClientRect().height));
+        const value = document.querySelector('#quick-tagline .lt-tagline-value');
+        return { hs, placeholder: value?.placeholder || '', text: (document.querySelector('#quick-tagline')?.textContent || '').replace(/\\s+/g, ' ').trim() };
+      });
+      assert.ok(open.hs.every((h) => h >= 44) && (Math.max(...open.hs) - Math.min(...open.hs)) <= 1, '펼친 세 요소의 높이가 같다(44px) — 실제 ' + JSON.stringify(open.hs));
+      assert.equal(open.placeholder, '예: ILLIT', '갈래(가수)의 예시가 placeholder로 보인다');
+      assert.ok(!/종류|꼬리표 값/.test(open.text), '펼친 말에도 개발 용어가 없다 — 실제 "' + open.text + '"');
+      await pageTag.screenshot({ path: 'E:/lovetree-qa/lane/local3-graph/tagline-after-open-' + width + '-' + theme + '.png', animations: 'disabled', timeout: 10000 }).catch(() => {});
+      // 빈 값으로 [붙이기] → 오류 한 줄(칸 바로 아래).
+      await pageTag.evaluate(() => document.querySelector('#quick-tagline .lt-tagline-add')?.click());
+      await pageTag.waitForFunction(() => { const e = document.querySelector('#quick-tagline .lt-tagline-error'); return !!e && !e.hidden; }, null, { timeout: 8000 });
+      const errText = await pageTag.evaluate(() => document.querySelector('#quick-tagline .lt-tagline-error')?.textContent || '');
+      assert.equal(errText, '붙일 내용을 적어 주세요.', '빈 값 오류는 눌렀을 때만 한 줄로 보인다');
+      await take(pageTag, '꼬리표 직접 붙이기');
+      await pageTag.screenshot({ path: 'E:/lovetree-qa/lane/local3-graph/tagline-after-error-' + width + '-' + theme + '.png', animations: 'disabled', timeout: 10000 }).catch(() => {});
+      // 'ILLIT' 붙이기 → 방금 담은 순간에 '가수:ILLIT' 저장(첫 순간이 아니다 — #742와 같은 순간 id).
+      await pageTag.fill('#quick-tagline .lt-tagline-value', 'ILLIT');
+      await pageTag.evaluate(() => document.querySelector('#quick-tagline .lt-tagline-add')?.click());
+      await pageTag.waitForFunction(() => { const c = [...document.querySelectorAll('#quick-tagline .lt-tag-chip.is-confirmed')]; return c.some((x) => x.textContent.includes('ILLIT')); }, null, { timeout: 10000 });
+      await pageTag.waitForTimeout(1200); // 저장 PUT까지
+      const firstRound = putMoments[0] || [], secondRound = putMoments[putMoments.length - 1] || [];
+      const addedNow = secondRound.find((id) => !firstRound.includes(id));
+      assert.ok(addedNow, '두 번째 담기에서 새 순간 id를 가린다 — ' + JSON.stringify({ firstRound, secondRound }));
+      const save = tagSaves[tagSaves.length - 1];
+      assert.ok(save && save.momentId === addedNow, '꼬리표는 방금 담은 순간에 저장된다(#742와 같은 순간 id) — 실제 ' + JSON.stringify(save));
+      assert.deepEqual(save.keywords, ['가수:ILLIT'], '갈래와 값을 붙여 저장한다');
+      await ctxTag.close();
+    }
+    await page4.keyboard.press('Escape');    await page4.keyboard.press('Escape');
     await page4.waitForTimeout(300);
     await page4.evaluate(() => document.getElementById('feedback-panel').showModal());
     await page4.waitForTimeout(400);
@@ -872,14 +964,22 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     await tagBoard.waitForFunction(() => !!document.getElementById('dTags') && document.getElementById('dTags').childNodes.length > 0, null, { timeout: 10000 }).catch(() => {});
     await tagBoard.evaluate(() => selectMoment(LTDEMO.moments[0].id));
     await page6.waitForTimeout(600);
-    // 직접 입력 줄이 실제로 보이는지 단정한다(숨김 클래스를 쓰면 검사기 겹침만으로는 못 잡는다 — 실측에서 잡았던 결함).
+    // 직접 붙이기는 접힘이 기본이다(261116 대표 지적) — [직접 붙이기]가 보이고 입력 줄은 아직 없다.
+    const tagFolded = await tagBoard.evaluate(() => ({
+      toggle: !!document.querySelector('#dTags .lt-tagline-toggle'),
+      row: !!document.querySelector('#dTags .lt-tagline-kind')
+    }));
+    assert.deepStrictEqual(tagFolded, { toggle: true, row: false }, '꼬리표 직접 붙이기는 접힘이 기본이다 — [직접 붙이기]만 보인다');
+    await tagBoard.evaluate(() => document.querySelector('#dTags .lt-tagline-toggle')?.click());
+    await tagBoard.waitForFunction(() => !!document.querySelector('#dTags .lt-tagline-kind'), null, { timeout: 8000 });
+    // 펼친 입력 줄이 실제로 보이는지 단정한다(숨김 클래스를 쓰면 검사기 겹침만으로는 못 잡는다 — 실측에서 잡았던 결함).
     const tagInputSeen = await tagBoard.evaluate(() => ['.lt-tagline-kind', '.lt-tagline-value', '.lt-tagline-add'].map((s) => {
       const el = document.querySelector(`#dTags ${s}`);
       if (!el) return false;
       const b = el.getBoundingClientRect();
       return b.width > 0 && b.height > 0 && getComputedStyle(el).visibility === 'visible' && getComputedStyle(el).display !== 'none';
     }));
-    assert.deepStrictEqual(tagInputSeen, [true, true, true], '꼬리표 직접 입력(종류·값·붙이기)이 상세 판에 보여야 한다');
+    assert.deepStrictEqual(tagInputSeen, [true, true, true], '펼친 꼬리표 입력 줄(갈래·내용·붙이기)이 상세 판에 보여야 한다');
     // #627 2차: '보드 1440 판 폭' — 보드 iframe이 셸 내용 폭을 다 쓰는지, 보드 안 .app이 가로로 밀려
     // (숨은 가로 스크롤) 오른쪽에 검은 빈 자리가 생기지 않는지 단정한다. 스크롤을 부르는 동작을 해도
     // 판이 밀리지 않아야 한다(overflow:clip으로 스크롤 컨테이너가 아니게 만들었다).
