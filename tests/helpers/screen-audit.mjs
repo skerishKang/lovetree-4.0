@@ -145,6 +145,10 @@ export const AUDIT_FN = function audit(opts) {
     const a = rects[i], b = rects[j];
     if (a.el === b.el || a.el.contains(b.el) || b.el.contains(a.el)) continue;
     if (chromeVsWorld(a.el, b.el)) continue;
+    // 서로 다른 열린 창끼리는 모달이 겹치는 정상 모양이다 — 나중에 띄운 창(질문 창 등)이 앞선 창을 덮는 것을 실패로 세지 않는다.
+    const dlgA = openDialogs.find((d) => d === a.el || d.contains(a.el));
+    const dlgB = openDialogs.find((d) => d === b.el || d.contains(b.el));
+    if (dlgA && dlgB && dlgA !== dlgB) continue;
     const ox = Math.min(a.r.right, b.r.right) - Math.max(a.r.left, b.r.left);
     const oy = Math.min(a.r.bottom, b.r.bottom) - Math.max(a.r.top, b.r.top);
     if (ox > 4 && oy > 4) issues.push({ a: sel(a.el), b: sel(b.el), x: Math.round(Math.max(a.r.left, b.r.left)), y: Math.round(Math.max(a.r.top, b.r.top)) });
@@ -161,6 +165,9 @@ export const AUDIT_FN = function audit(opts) {
     if (isToast(top)) continue;
     if (top === el || chain(top).includes(el) || chain(el).includes(top)) continue;
     if (chain(top).some((n) => LENS.has(n.id))) continue;
+    // 가리는 쪽이 열린 창이고 자기 창과 다르면(또는 창 밖이면) 모달의 정상 가림 — 뒤 본문은 이미 검사 대상에서 뺐다.
+    const topDlg = chain(top).find((n) => n.tagName === 'DIALOG' && n.open);
+    if (topDlg && topDlg !== openDialogs.find((d) => d === el || d.contains(el))) continue;
     if ((inChrome(el) && inWorld(top)) || (inWorld(el) && inChrome(top))) continue;
     covered.push({ el: sel(el), by: sel(top), x: Math.round(cx), y: Math.round(cy) });
   }

@@ -58,7 +58,8 @@ function messagesHarness({ dateStyle = 'dot' } = {}) {
       list: async () => ({ ok: true, shares: [{ id: 's1', view: 'book', treeId: 'tree1', status: 'active', createdAt: ISO }] }),
       preview: async () => ({ ok: true, preview: { previewToken: 'tok', tree: { title: '윤슬', moments: [{ id: 'm1', title: '첫 순간', emotion: '설렘', date: ISO }] } } }),
       create: async () => ({ ok: true, share: { id: 's2' } }),
-      setDiscoverable: async () => ({ ok: true }), revoke: async () => ({ ok: true })
+      setDiscoverable: async () => ({ ok: true }), revoke: async () => ({ ok: true }),
+      getTreeDiscover: async () => ({ ok: true, discover: false }), setTreeDiscover: async () => ({ ok: true }) // 261116 결정 — 질문 창·공유 판 스위치가 쓰는 discover 한 벌
     },
     notify: () => {}, panel: () => {}, show: () => {}, links: () => {}, writeLocation: () => {}, choose: () => {},
     openEditor: () => {}, openLoginStart: () => {}, openAccountMenu: () => {}, sample: () => {},

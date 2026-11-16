@@ -16,13 +16,9 @@ export function syncedNoticeText({ writable = false, previousDirty = false, mome
 // 2026-11-15 보고(게스트 책·자동 공개 안내): 자동 공개 안내 한 벌.
 // 서버(#538 저장 훅)가 저장 뒤 자동 공유 행(origin='auto')을 만들고, 둘러보기 목록 SQL은
 // moment_count>=3(순간 3개)부터 소개한다. 그래서 '자동 공개가 새로 일어난 저장'은
-// 트리 순간 수가 3개에 처음 도달한 저장이다. 안내는 문장+단추 한 줄이고, 단추
-// ([비공개로 바꾸기])는 공유 패널 #share-private과 같은 경로(shareApi.setTreeVisibility)를 쓴다.
+// 둘러보기 소개 기준(순간 3개, #538 SQL moment_count>=3과 같다). 2026-11-16 결정으로
+// '공개됐어요' 토스트(#718)는 남기지 않는다 — 3개에 도달한 저장은 셸의 질문 창(discover-ask)이 대신 묻는다.
 export const AUTO_PUBLISH_MIN_MOMENTS = 3;
-export const AUTO_PUBLISH_ACTION_LABEL = '비공개로 바꾸기';
-export function autoPublishNoticeText() {
-  return '이 트리가 둘러보기에 공개됐어요 · 이름·아이디는 보이지 않아요.';
-}
 // 직전 기기 스냅샷(before: {트리 아이디: 순간 수})과 저장 뒤(after)를 비교해
 // 순간 3개에 처음 도달한 트리만 돌려준다. before에 없던 트리는 이 기기에서 처음
 // 관측한 것이므로 prev=0으로 본다(기기 첫 관측이 3개 이상이면 대상).

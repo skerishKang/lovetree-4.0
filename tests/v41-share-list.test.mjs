@@ -49,7 +49,9 @@ function listHarness({ shares = [], confirmAnswer = true, clipboard = null } = {
     create: async payload => { requests.push(['create', payload]); return {ok: true, share: {id: 'share-new', view: 'book'}}; },
     list: async () => { requests.push(['list']); return {ok: true, shares}; },
     setDiscoverable: async (id, next) => { requests.push(['discoverable', id, next]); return {ok: true}; },
-    revoke: async id => { requests.push(['revoke', id]); return {ok: true}; }
+    revoke: async id => { requests.push(['revoke', id]); return {ok: true}; },
+    getTreeDiscover: async () => ({ok: true, discover: false}),
+    setTreeDiscover: async (treeId, next) => { requests.push(['discover', treeId, next]); return {ok: true}; } // 261116 결정 — 스위치가 쓰는 discover 한 벌
   };
   const messages = createMessages({
     $: id => (els[id] ||= fakeElement()),

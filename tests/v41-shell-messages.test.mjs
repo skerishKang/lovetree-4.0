@@ -96,7 +96,9 @@ function messagesHarness({ owned = true, source = 'server', current = 'track59-s
     create: async payload => { requests.push(['create', payload]); return {ok: true, share: {id: 'share-1', view: 'book'}}; },
     list: async () => ({ok: true, shares: []}),
     setDiscoverable: async (id, next) => { requests.push(['discoverable', id, next]); return {ok: true}; },
-    revoke: async id => { requests.push(['revoke', id]); return {ok: true}; }
+    revoke: async id => { requests.push(['revoke', id]); return {ok: true}; },
+    getTreeDiscover: async () => ({ok: true, discover: false}),
+    setTreeDiscover: async (treeId, next) => { requests.push(['discover', treeId, next]); return {ok: true}; } // 261116 결정 — 스위치가 쓰는 discover 한 벌
   };
   const journey = {
     openFirstJourney: options => calls.journeys.push(['open', options]),

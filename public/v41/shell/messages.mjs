@@ -15,6 +15,8 @@ export function createMessages(deps) {
   // #480 L13: 계정 설정의 날짜 표기. 셸이 넘겨 주지 않으면 기본(dot)으로 적는다 — 새로 만드는 규칙 아님.
   const getDateStyle = deps.getDateStyle || (() => 'dot');
   const shareApi = deps.shareApi;
+  // 둘러보기 소개 상태(261116 결정) — 셸이 관찰한 마지막 값을 넘겨 준다(공유 판·힌트가 같은 값을 본다).
+  const discoverOf = deps.discoverOf || (() => null);
   const notify = deps.notify;
   const panel = deps.panel;
   // #368: 읽기 전용·로그아웃 안내의 행선지 — 설정 "내 데이터" 묶음(로그아웃이면 로그인).
@@ -279,7 +281,7 @@ export function createMessages(deps) {
     $('share-feedback').textContent = '';
     $('share-copy-note').textContent = '';
     paintShareMomentHint();
-    paintShareVisibility();
+    paintShareDiscover();
     paintShareSteps('choose');
     panel('share-panel');
     void loadShareList();
@@ -341,27 +343,42 @@ export function createMessages(deps) {
       $('share-feedback').textContent = '주소를 선택했어요. 복사해 주세요.';
     }
   };
-  // #538: 순간 수 안내 — 3개 미만이면 '순간 3개를 모으면 둘러보기에 소개돼요'.
+  // #538: 순간 수 안내 — 소개 상태(261116 결정: 기본 꺼짐·고객이 고름)에 맞게 적는다.
   function paintShareMomentHint() {
     const hint = $('share-moment-hint');
     if (!hint) return;
     const count = window.LT41?.tree?.moments?.length || 0;
+    const discover = discoverOf(window.LT41?.tree?.id);
     hint.textContent = count >= 3
-      ? `이 트리의 순간 ${count}개 · 둘러보기에 소개되고 있어요.`
-      : `이 트리의 순간 ${count}개 · 순간 3개를 모으면 둘러보기에 소개돼요.`;
+      ? (discover
+        ? `이 트리의 순간 ${count}개 · 둘러보기에 소개 중이에요.`
+        : `이 트리의 순간 ${count}개 · 둘러보기에 소개하지 않아요. 공유 판에서 켤 수 있어요.`)
+      : `이 트리의 순간 ${count}개 · 순간 3개를 담으면 소개할지 묻는 질문이 나와요.`;
   }
-  // #538: 공개 상태 표시. 비공개 전환은 Plus 전용 — 판단은 서버가 한다(403 plus_required_private).
-  function paintShareVisibility() {
-    const state = $('share-visibility-state');
-    if (state) state.textContent = '공개 상태 · 공개(기본)';
+  // 둘러보기 소개 스위치(261116 대표 결정 — 기본 꺼짐·무료로 켜고 끈다). 링크 공유는 지금처럼,
+  // 링크까지 막는 완전 비공개는 Plus(#739의 discover GET/PUT 같은 경로).
+  async function paintShareDiscover() {
+    const treeId = window.LT41?.tree?.id;
+    const state = $('share-discover-state'), toggle = $('share-discover-toggle');
+    if (!state || !toggle) return;
+    if (!treeId) { state.textContent = ''; toggle.hidden = true; return; }
+    toggle.hidden = false;
+    const discover = await shareApi.getTreeDiscover(treeId).then(a => a.ok ? a.discover === true : null).catch(() => null);
+    if (discover === null) { state.textContent = '소개 상태를 확인하지 못했어요.'; toggle.textContent = '다시 확인'; return; }
+    state.textContent = discover ? '둘러보기에 소개 중 · 무료' : '둘러보기에 소개하지 않음 · 무료';
+    toggle.textContent = discover ? '끄기' : '켜기';
+    toggle.dataset.next = discover ? 'false' : 'true';
   }
-  $('share-private').onclick = async () => {
+  $('share-discover-toggle').onclick = async () => {
     const treeId = window.LT41?.tree?.id;
     if (!treeId) { $('share-feedback').textContent = '공개 상태를 바꿀 트리를 먼저 열어 주세요.'; return; }
-    const answer = await shareApi.setTreeVisibility(treeId, 'private');
+    const next = $('share-discover-toggle').dataset.next === 'true';
+    const answer = await shareApi.setTreeDiscover(treeId, next);
     $('share-feedback').textContent = answer.ok
-      ? '비공개로 바꿨어요.'
-      : (answer.code === 'plus_required_private' ? '비공개는 Plus 전용이에요. 지금은 모든 트리가 공개로 유지돼요.' : (answer.message || '공개 상태를 바꾸지 못했어요.'));
+      ? (next ? '둘러보기에 소개했어요.' : '둘러보기 소개를 껐어요. 링크를 받은 사람만 볼 수 있어요.')
+      : (answer.message || '소개 설정을 바꾸지 못했어요.');
+    if (answer.ok) { deps.rememberDiscover?.(treeId, next); paintShareMomentHint(); } // 힌트 줄도 고른 값을 따르게(스위치만 다시 그리면 옛 말이 남는다)
+    paintShareDiscover();
   };
 
   // 둘러보기(공개 목록) 연결. 항목을 열면 공유 주소로, 내 기록 새로 시작은 첫 여정으로 간다.

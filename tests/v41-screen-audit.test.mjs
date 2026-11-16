@@ -39,6 +39,12 @@ const KNOWN = [
   { 화면: '첫 화면 글자 카드', 항목: '겹침', 찾을: '(span.lt-fallback-emotion × (strong|small)|strong.lt-fallback-title × button.subtleBtn|small.lt-fallback-notice × button.subtleBtn|div.firstMark × small)', 이슈: '궤도 카드가 가운데 UI 뒤를 지나가는 3D 원본 배치(#728 후속 — 궤도 배치 불변)' },
   // 지도 — Track56 원본 모양: 안내 문구가 캔버스 뒤에 깔려 있다(원본 보존 커밋 b2567fe — 원본 구조는 바꾸지 않는다).
   { 화면: '지도', 항목: '가려짐', 찾을: 'p ← canvas#stage', 이슈: 'Track56 원본(b2567fe)' },
+  // (261116, '둘러보기 소개 질문'·'공유 판·소개 스위치' 상태가 처음 잰 자리) 회원 계정의 궤도 첫 화면 —
+  // 실제 기록이 있어야 그리는 레거시 카드라 지금까지 안 잰 곳. #548·#728과 같은 원본 모양이라 이 이슈에서 손대지 않는다.
+  { 화면: '둘러보기 소개 질문', 항목: '작은글자', 찾을: 'span.lt-fallback-action "제목 달기"', 이슈: '#548(12px 기준)·레거시 궤도 카드' },
+  { 화면: '둘러보기 소개 질문', 항목: '작은글자', 찾을: 'small "(마지막 순간|모아둔 순간)', 이슈: '#548(12px 기준)·레거시 궤도 카드' },
+  { 화면: '공유 판·소개 스위치', 항목: '작은글자', 찾을: 'span.lt-fallback-action "제목 달기"', 이슈: '#548(12px 기준)·레거시 궤도 카드' },
+  { 화면: '공유 판·소개 스위치', 항목: '작은글자', 찾을: 'small "(마지막 순간|모아둔 순간)', 이슈: '#548(12px 기준)·레거시 궤도 카드' },
 ];
 
 // #638: '내 의견 목록' 상태 — 상태 말 네 가지·답변·새 소식 링크가 한 화면에 보이게 하는 가짜 게시물.
@@ -391,19 +397,7 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     await take(page4, '셸 첫 화면·알림 줄');
     await lowerToast(page4);
     await page4.evaluate(() => document.body.classList.remove('lt-fab-ok'));
-    // 자동 공개 안내 상태(2026-11-15 보고) — notice.mjs 한 벌(셸 notify와 같은 모듈)로 토스트에
-    // 문장+[비공개로 바꾸기] 한 줄을 띄운 자리. 자리 잡기(beforeShow)는 셸 placeToast와 같은 길 —
-    // 셸 내부 함수가 모듈 밖으로 나오지 않아 시험 안에서 같은 길을 잠시 그린다(#666 raiseToast와 같은 원칙).
-    await page4.evaluate(async () => {
-      const notice = await import('/v41/shell/notice.mjs');
-      const place = () => { let above = 0; for (const el of document.querySelectorAll('.home-links,#mobile-add,.updates-card')) { if (el.hidden) continue; const cs = getComputedStyle(el); if (cs.display === 'none' || cs.visibility === 'hidden' || Number(cs.opacity) === 0) continue; const r = el.getBoundingClientRect(); if (r.width < 1 || r.height < 1) continue; above = Math.max(above, document.documentElement.clientHeight - r.top + 10); } const style = document.documentElement.style; if (above > 0) style.setProperty('--lt-toast-bottom', Math.round(above) + 'px'); else style.removeProperty('--lt-toast-bottom'); };
-      const notifier = notice.createNotifier({ $: (id) => document.getElementById(id), beforeShow: place });
-      notifier.notify(notice.autoPublishNoticeText(), { hold: true, action: { label: notice.AUTO_PUBLISH_ACTION_LABEL, run: () => {} } });
-    });
-    await page4.waitForFunction(() => { const t = document.getElementById('toast'); return !!t && !t.hidden && !!t.querySelector('.toast-action'); }, null, { timeout: 5000 });
-    await page4.waitForTimeout(300);
-    await take(page4, '셸·자동 공개 안내');
-    await lowerToast(page4);
+    // (2026-11-16) '자동 공개 안내' 토스트는 질문 창(아래 '둘러보기 소개 질문' 상태)으로 대신해 남기지 않는다.
     await page4.evaluate(() => document.getElementById('community-menu')?.click());
     await page4.waitForFunction(() => !!document.getElementById('community-panel')?.open, null, { timeout: 8000 }).catch(() => {});
     // #678 후속(회차 지적): 반응이 없는 카드는 0짜리 칩 대신 '반응 남기기' 한 개만 보인다(수치로 판정).
@@ -442,6 +436,111 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     assert.ok(!cardDate.meta.includes(utcCut), `카드 날짜가 UTC 절단(어제)으로 나온다: "${cardDate.meta}"`);
     await pageDate.screenshot({ path: 'E:/lovetree-qa/lane/local3-graph/audit-community-date-' + width + '.png', animations: 'disabled', timeout: 10000 }).catch(() => {});
     await ctxDate.close();
+    // 둘러보기 소개 질문(2026-11-16 대표 결정) — 새 계정의 쉬운 추가 3번째 저장에서 한 번 묻는다.
+    // [지금은 안 할래요] → discover false·다시 안 물음, [소개하기] → discover true, 공유 판 스위치가 같은 값,
+    // 백필(이미 3개·소개 켜짐) 계정은 묻지 않는다. 창 모양(겹침·잘림 0)은 take가 함께 잰다.
+    const oembed = (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ title: '검사기 시험 영상', author_name: '시험 채널', thumbnail_url: 'https://i.ytimg.com/vi/qaAsk001/hqdefault.jpg' }) });
+    const openQuick = async (pageAsk) => {
+      if (await pageAsk.evaluate(() => !!document.getElementById('write-panel')?.open)) return;
+      // 저장이 끝난 뒤(메뉴 이름이 '＋ 순간 추가'로 돌아온 뒤) 연다 — dirty 가드(explainSaveState)를 피하려는 대기다.
+      await pageAsk.waitForFunction(() => document.getElementById('write-menu')?.textContent === '＋ 순간 추가', null, { timeout: 10000 }).catch(() => {});
+      await pageAsk.evaluate(() => document.getElementById('write-menu')?.click());
+      await pageAsk.waitForFunction(() => !!document.getElementById('quick-url'), null, { timeout: 8000 });
+    };
+    const quickSave = async (pageAsk, url) => {
+      await openQuick(pageAsk);
+      await pageAsk.fill('#quick-url', url);
+      await pageAsk.click('#quick-submit');
+      await pageAsk.waitForTimeout(800);
+    };
+    const askFlow = async (answer) => {
+      const ctxAsk = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
+      await ctxAsk.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); } catch {} }, theme);
+      await ctxAsk.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
+      await ctxAsk.route('**://i.ytimg.com/**', THUMB);
+      const discoverPuts = [];
+      await ctxAsk.route('**/api/workspace*', (r) => {
+        if (r.request().method() === 'PUT') {
+          const body = r.request().postDataJSON() || {};
+          return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, revision: Number(body.expectedRevision || 0) + 1, subject: '검사기계정' }) });
+        }
+        return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ revision: 1, state: { version: 1, trees: [] }, subject: '검사기계정', writeSubjectBound: true, savedAt: '2026-11-16T09:00:00.000Z' }) });
+      });
+      await ctxAsk.route('**/api/youtube/oembed*', oembed);
+      await ctxAsk.route('**/api/trees/*/discover', (r) => {
+        if (r.request().method() === 'PUT') { const body = r.request().postDataJSON() || {}; discoverPuts.push(body.discover === true); return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, treeId: 'askTree', discover: body.discover === true }) }); }
+        return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, treeId: 'askTree', discover: discoverPuts[discoverPuts.length - 1] === true }) });
+      });
+      const pageAsk = await ctxAsk.newPage();
+      await pageAsk.goto(base + '/v41/?account=1', { waitUntil: 'load' });
+      await pageAsk.waitForTimeout(1200);
+      await quickSave(pageAsk, 'https://www.youtube.com/watch?v=qaAsk01');
+      await quickSave(pageAsk, 'https://www.youtube.com/watch?v=qaAsk02');
+      await quickSave(pageAsk, 'https://www.youtube.com/watch?v=qaAsk03');
+      // 3번째 저장의 동기화 뒤 질문 창이 한 번 뜬다(2→3).
+      await pageAsk.waitForFunction(() => !!document.getElementById('discover-ask')?.open, null, { timeout: 15000 });
+      await pageAsk.waitForTimeout(400);
+      const buttons = await pageAsk.evaluate(() => [document.getElementById('discover-ask-yes')?.textContent, document.getElementById('discover-ask-no')?.textContent]);
+      assert.deepEqual(buttons, ['소개하기', '지금은 안 할래요'], '질문 창 단추는 소개하기·지금은 안 할래요다');
+      await take(pageAsk, '둘러보기 소개 질문'); // 겹침·잘림 0 검사에 창이 함께 든다(390·1440 × 밤·정원)
+      await pageAsk.screenshot({ path: 'E:/lovetree-qa/lane/local3-graph/audit-discover-ask-' + width + '-' + theme + '.png', animations: 'disabled', timeout: 10000 }).catch(() => {});
+      await pageAsk.evaluate((a) => document.getElementById(a === 'yes' ? 'discover-ask-yes' : 'discover-ask-no')?.click(), answer);
+      await pageAsk.waitForFunction(() => !document.getElementById('discover-ask')?.open, null, { timeout: 8000 });
+      assert.deepEqual(discoverPuts, [answer === 'yes'], '[소개하기]는 true, [지금은 안 할래요]는 false로 저장된다');
+      const asked = await pageAsk.evaluate(() => { try { return JSON.parse(localStorage.getItem('lt41.discoverAsked') || '[]'); } catch { return []; } });
+      assert.ok(asked.length >= 1, '고른 트리는 discoverAsked에 기억된다');
+      return { ctxAsk, pageAsk, discoverPuts };
+    };
+    const addFourth = async (pageAsk) => {
+      await quickSave(pageAsk, 'https://www.youtube.com/watch?v=qaAsk09');
+      await pageAsk.waitForTimeout(1500);
+      assert.equal(await pageAsk.evaluate(() => !!document.getElementById('discover-ask')?.open), false, '고른 뒤 같은 트리에서 다시 묻지 않는다');
+    };
+    const noAsk = await askFlow('no');
+    await addFourth(noAsk.pageAsk);
+    // 공유 판 스위치: 꺼진 트리 문장·단추 → 켜기 → discover PUT true·스위치가 값과 같아진다.
+    {
+      const { ctxAsk, pageAsk, discoverPuts } = noAsk;
+      await pageAsk.evaluate(() => document.getElementById('share-menu')?.click());
+      await pageAsk.waitForFunction(() => !!document.getElementById('share-panel')?.open, null, { timeout: 8000 }).catch(() => {});
+      await pageAsk.waitForFunction(() => (document.getElementById('share-discover-state')?.textContent || '').length > 0, null, { timeout: 8000 });
+      const before = await pageAsk.evaluate(() => ({ state: document.getElementById('share-discover-state').textContent, toggle: document.getElementById('share-discover-toggle').textContent }));
+      assert.ok(before.state.includes('소개하지 않음'), '안 할래요를 고른 트리는 공유 판에서도 꺼져 있다 — 실제 "' + before.state + '"');
+      assert.equal(before.toggle, '켜기', '꺼진 트리의 스위치 단추는 켜기다');
+      await pageAsk.evaluate(() => document.getElementById('share-discover-toggle')?.click());
+      await pageAsk.waitForFunction(() => (document.getElementById('share-discover-state')?.textContent || '').includes('소개 중'), null, { timeout: 8000 });
+      assert.deepEqual(discoverPuts, [false, true], '공유 판 스위치(켜기)도 discover PUT으로 저장한다');
+      const after = await pageAsk.evaluate(() => document.getElementById('share-discover-toggle').textContent);
+      assert.equal(after, '끄기', '켜진 트리의 스위치 단추는 끄기다 — 값과 같다');
+      await take(pageAsk, '공유 판·소개 스위치');
+      await pageAsk.screenshot({ path: 'E:/lovetree-qa/lane/local3-graph/audit-discover-panel-' + width + '-' + theme + '.png', animations: 'disabled', timeout: 10000 }).catch(() => {});
+      await ctxAsk.close();
+    }
+    const yesAsk = await askFlow('yes');
+    await addFourth(yesAsk.pageAsk);
+    await yesAsk.ctxAsk.close();
+    // 백필 계정(이미 3개·소개 켜짐) — 질문 없이 건너뛴다.
+    {
+      const ctxBack = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
+      await ctxBack.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); } catch {} }, theme);
+      await ctxBack.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
+      await ctxBack.route('**://i.ytimg.com/**', THUMB);
+      const now = '2026-11-16T09:00:00.000Z';
+      const moments = [1, 2, 3].map((i) => ({ id: 'bm' + i, parentId: i === 1 ? null : 'bm' + (i - 1), links: [], createdAt: now, updatedAt: now, url: 'https://www.youtube.com/watch?v=qaBack00' + i, title: '백필 순간 ' + i, note: '', emotion: '', date: '2026-11-1' + (2 + i) }));
+      await ctxBack.route('**/api/workspace*', (r) => {
+        if (r.request().method() === 'PUT') { const body = r.request().postDataJSON() || {}; return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, revision: Number(body.expectedRevision || 0) + 1, subject: '검사기계정' }) }); }
+        return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ revision: 2, state: { version: 1, trees: [{ id: 'askBackTree', subject: '검사기 트리', title: '검사기 트리 제목', createdAt: now, updatedAt: now, coverMomentId: '', moments }] }, subject: '검사기계정', writeSubjectBound: true, savedAt: now }) });
+      });
+      await ctxBack.route('**/api/youtube/oembed*', oembed);
+      await ctxBack.route('**/api/trees/*/discover', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, treeId: 'askBackTree', discover: true }) }));
+      const pageBack = await ctxBack.newPage();
+      await pageBack.goto(base + '/v41/?account=1', { waitUntil: 'load' });
+      await pageBack.waitForTimeout(1200);
+      await quickSave(pageBack, 'https://www.youtube.com/watch?v=qaBack09');
+      await pageBack.waitForTimeout(1500);
+      assert.equal(await pageBack.evaluate(() => !!document.getElementById('discover-ask')?.open), false, '백필(이미 소개 켜진) 계정은 질문 없이 건너뛴다');
+      await ctxBack.close();
+    }
     await page4.keyboard.press('Escape');
     await page4.waitForTimeout(300);
     await page4.evaluate(() => document.getElementById('feedback-panel').showModal());

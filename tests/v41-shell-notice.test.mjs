@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 // #353 후속: 담기·중복·로그인 필요 안내가 상태 안내보다 먼저 일정 시간 보이는지 가짜 DOM·가짜 시계로 직접 부른다.
 // shell.mjs 배선(입구 안내를 hold로 보내는 한 줄)은 글자로 고정한다(#245 전례와 같은 이유).
-import { createNotifier, NOTICE_HOLD_MS, NOTICE_HIDE_MS, syncedNoticeText, newlyPublishedTrees, autoPublishNoticeText, AUTO_PUBLISH_ACTION_LABEL, AUTO_PUBLISH_MIN_MOMENTS } from '../public/v41/shell/notice.mjs';
+import { createNotifier, NOTICE_HOLD_MS, NOTICE_HIDE_MS, syncedNoticeText, newlyPublishedTrees, AUTO_PUBLISH_MIN_MOMENTS } from '../public/v41/shell/notice.mjs';
 
 function harness() {
   const els = {};
@@ -64,7 +64,7 @@ test('synced 안내 문구(#549): 기록 0개 새 계정은 첫 순간 안내로
 // 셸 배선을 글자로 고정한다(#245 전례) — 문구 한 벌을 지나가지 않는 회귀를 막는다.
 test('셸은 synced 안내를 notice.mjs의 한 벌에서 가져온다(#549)', () => {
   const shell = readFileSync(new URL('../public/v41/shell.mjs', import.meta.url), 'utf8');
-  assert.match(shell, /import \{createNotifier, syncedNoticeText, newlyPublishedTrees, autoPublishNoticeText, AUTO_PUBLISH_ACTION_LABEL\} from '\.\/shell\/notice\.mjs';/, 'synced 안내는 notice.mjs 한 벌에서 온다(자동 공개 안내도 같은 한 벌)');
+  assert.match(shell, /import \{createNotifier, syncedNoticeText, newlyPublishedTrees\} from '\.\/shell\/notice\.mjs';/, 'synced 안내는 notice.mjs 한 벌에서 온다(자동 공개 안내는 질문 창이 대신한다)');
   assert.match(shell, /syncedNoticeText\(\{writable:status\.writable,previousDirty,momentCount\}\)/);
   assert.doesNotMatch(shell, /notify\([^\n]*'내 기록을 불러왔어요\.'/, '안내 문구는 notice.mjs 한 벌에서만 온다');
 });
@@ -102,15 +102,12 @@ test('자동 공개 판정: 순간 3개에 처음 도달한 트리만 새로 공
   assert.equal(AUTO_PUBLISH_MIN_MOMENTS, 3, '둘러보기 소개 기준(#538 SQL moment_count>=3)과 같다');
 });
 
-test('자동 공개 안내 문구·단추 라벨 한 벌', () => {
-  assert.equal(autoPublishNoticeText(), '이 트리가 둘러보기에 공개됐어요 · 이름·아이디는 보이지 않아요.');
-  assert.equal(AUTO_PUBLISH_ACTION_LABEL, '비공개로 바꾸기');
-});
 
-test('자동 공개 안내(hold+단추): hold 동안 상태 안내가 덮지 않고, 단추 없는 안내는 기존 길을 탄다', () => {
+test('hold+단추 안내: hold 동안 상태 안내가 덮지 않고, 단추 없는 안내는 기존 길을 탄다', () => {
   const h = harness();
-  assert.equal(h.notifier.notify(autoPublishNoticeText(), { hold: true, action: { label: AUTO_PUBLISH_ACTION_LABEL, run: () => {} } }), true);
-  assert.equal(h.els['toast'].textContent, autoPublishNoticeText(), '가짜 DOM(replaceChildren 없음)에서는 문장만 — 진짜 단추 모양은 화면 검사(셸·자동 공개 안내)가 잡는다');
+  const holdText = '둘러보기에 소개했어요. 공유 판에서 언제든 끌 수 있어요.';
+  assert.equal(h.notifier.notify(holdText, { hold: true, action: { label: '끄기', run: () => {} } }), true);
+  assert.equal(h.els['toast'].textContent, holdText, '가짜 DOM(replaceChildren 없음)에서는 문장만 — 진짜 단추 모양은 화면 검사가 잡는다');
   h.advance(1000);
   assert.equal(h.notifier.notify('서버에 저장됐어요.'), false, 'hold 동안 상태 안내가 덮지 않는다');
   h.advance(NOTICE_HOLD_MS + 1);
@@ -121,14 +118,15 @@ test('자동 공개 안내(hold+단추): hold 동안 상태 안내가 덮지 않
   assert.equal(h2.els['toast'].textContent, '서버에 저장됐어요.');
 });
 
-test('셸 배선: 자동 공개 안내 한 벌·판정·기억·#538 1회 안내와의 합침', () => {
+test('셸 배선: 질문 창 트리거·discoverAsked 기억·배너가 한 벌을 쓴다', () => {
   const shell = readFileSync(new URL('../public/v41/shell.mjs', import.meta.url), 'utf8');
-  assert.match(shell, /import \{createNotifier, syncedNoticeText, newlyPublishedTrees, autoPublishNoticeText, AUTO_PUBLISH_ACTION_LABEL\} from '\.\/shell\/notice\.mjs';/, '문구·판정은 notice.mjs 한 벌에서 온다');
-  assert.match(shell, /newlyPublishedTrees\(treeCountsBefore,treeCounts\)/, '직전 스냅샷 대비 전이 판정');
-  assert.match(shell, /lt41\.autoPublishNoted/, '트리당 1회 기억 키');
-  assert.match(shell, /if\(autoTree\)notifyAutoPublish\(autoTree\.treeId\);/, '토스트는 한 안내 — 새로 공개된 트리 하나를 고른다');
-  assert.match(shell, /else if\(previousDirty&&status\.writable&&\(model\?\.trees\|\|\[\]\)\.some\(tree=>tree\.moments\.length>0\)\)/, '#538 1회 안내는 else if — 자동 공개 안내가 뜨는 저장에서 두 번 뜨지 않는다');
-  assert.match(shell, /treeCountsBefore=countTreeMoments\(\);/, '매 상태에서 스냅샷 갱신');
-  assert.match(shell, /getTreeVisibility/, '비공개 트리는 서버 확인 뒤 안내를 띄우지 않는다');
-  assert.match(shell, /setTreeVisibility\(treeId,'private'\)/, '[비공개로 바꾸기]는 #share-private과 같은 경로');
+  assert.match(shell, /import \{createNotifier, syncedNoticeText, newlyPublishedTrees\} from '\.\/shell\/notice\.mjs';/, '판정 한 벌은 notice.mjs에서 온다');
+  assert.match(shell, /newlyPublishedTrees\(null,treeCounts\)/, '직전 스냅샷 재촬영 없이(3개 이상·안 물은 트리) 전이 판정');
+  assert.doesNotMatch(shell, /treeCountsBefore/, '상태마다 treeCountsBefore 재촬영(#718 원인)을 남기지 않는다');
+  assert.match(shell, /lt41\.discoverAsked/, '트리당 1회 질문 기억 키');
+  assert.match(shell, /if\(askTree\)askDiscover\(askTree\.treeId\);/, '2→3 전이 트리 하나에 질문 창을 띄운다');
+  assert.match(shell, /discoverAskedList\(\)\.includes\(treeId\)|markDiscoverAsked/, '고른 뒤 다시 묻지 않는다');
+  assert.match(shell, /shareApi\.getTreeDiscover\(treeId\)/, '이미 켜진 트리(#739 백필)는 묻지 않는다');
+  assert.match(shell, /shareApi\.setTreeDiscover\(treeId,discover\)/, '고른 값은 discover PUT으로 저장한다');
+  assert.doesNotMatch(shell, /autoPublishNoticeText|AUTO_PUBLISH_ACTION_LABEL|notifyAutoPublish|turnTreePrivate/, '#718 안내는 질문 창으로 대신해 남지 않는다');
 });
