@@ -90,5 +90,5 @@ test('카드 3D 사선 잘림 방지: .world는 flat, 카드 transform은 각자
   assert.match(orbit, /setProperty\('transform',`perspective\(1200px\) translate3d/, '끌기 카드 transform이 perspective(1200px)로 시작한다');
   // 겹침 순서는 scale 큰(가까운) 카드가 위 — z-index를 깊이(z)가 아니라 화면 배율로 매긴다.
   assert.doesNotMatch(orbit, /zv=Math\.round\(\(1000\+z\)/, 'z-index를 깊이 z로 매기는 옛 식이 남아 있지 않다');
-  assert.match(orbit, /zv=Math\.round\(drawScale\*2000\)/, 'z-index는 화면 배율(drawScale)로 매긴다');
+  assert.match(orbit, /zv=Math\.round\(drawScale\*1000\/64\)\*64/, 'z-index는 화면 배율(drawScale)의 64 단계 밴드로 매긴다');
 });

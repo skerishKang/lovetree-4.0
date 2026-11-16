@@ -58,9 +58,9 @@ test.after(() => lib?.server?.close());
 if (REQUIRE && skip) throw new Error(`#586 실행 시험이 필요한데 건너뜀: ${skip}`);
 
 // 소스 계약
-s('#586 z-index는 64 단계 밴드로만 다시 쓴다(소스 계약)', () => {
+s('#586 z-index는 64 단계 밴드로만 다시 쓴다(소스 계약 — PR0에서 밴드 기준을 깊이 z에서 화면 배율로)', () => {
   const src = readFileSync(path.join(REPO, 'src', 'views', 'orbit.js'), 'utf8');
-  assert.match(src, /Math\.round\(\(1000\+z\)\/64\)\*64/, 'z 값을 64 단계 밴드로 묶는다');
+  assert.match(src, /Math\.round\(drawScale\*1000\/64\)\*64/, '화면 배율(drawScale)을 64 단계 밴드로 묶는다');
   assert.doesNotMatch(src, /const zv=Math\.round\(1000\+z\);/, '매 프레임 정밀 z-index 쓰기를 남겨 두지 않는다');
 });
 s('#586 끄는 동안에는 hover 모양을 바꾸지 않는다(소스 계약)', () => {

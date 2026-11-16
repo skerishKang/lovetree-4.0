@@ -372,9 +372,10 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
   const fv=(0.78+0.22*depth).toFixed(3);
   if(el.__b!==fv){el.__b=fv;el.style.filter=`brightness(${fv})`;}
   // 사선 잘림 방지: .world를 flat으로 바꾸고 카드가 각자 perspective를 쓰므로, 겹침 순서도 깊이(z)가 아니라
-  // 화면 배율로 매긴다 — scale 큰(가까운) 카드가 위. 궤도 굽기·끌기 자리 쓰기 때만 다시 매긴다(매 프레임이 아니다).
+  // 화면 배율로 매긴다 — scale 큰(가까운) 카드가 위. #586 계약은 그대로: z-index는 64 단계 밴드로 묶어
+  // 궤도 굽기·끌기 자리 쓰기 때만 다시 쓴다(매 프레임이 아니다) — 밴드 안의 순서 오차는 배율(깊이) 차가 작아 눈에 띄지 않는다.
   const drawScale=sc*(!demo&&cards.length<=8?1:Math.max(.58,fit))*drawShrink;
-  const zv=Math.round(drawScale*2000);if(el.__z!==zv){el.__z=zv;el.style.zIndex=zv;}
+  const zv=Math.round(drawScale*1000/64)*64;if(el.__z!==zv){el.__z=zv;el.style.zIndex=zv;}
   return {px,py,scale:drawScale,side:outSide,judge};
  }
  // 배치(layout): 창 크기·안전 구역·좁은 화면 대역·예시 장수가 바뀔 때만 카드 자리를 다시 쓴다.
