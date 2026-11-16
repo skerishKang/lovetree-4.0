@@ -1125,9 +1125,15 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     await pageMap.waitForTimeout(1500);
     const treeBeforeTrip = await pageMap.evaluate(() => ({ id: window.LT41?.tree?.id || '', moments: (window.LT41?.tree?.moments || []).length, momentId: window.LT41?.momentId || '' }));
     assert.ok(treeBeforeTrip.id, '지금 트리가 부른 상태에서 왕복을 본다');
-    const mapFrameTrip = () => [...pageMap.frames()].find((f) => { try { return /track56-network/.test(f.url()); } catch { return false; } });
     const graphFrameTrip = () => [...pageMap.frames()].find((f) => { try { return /track60-graph/.test(f.url()); } catch { return false; } });
-    await mapFrameTrip().evaluate(() => document.getElementById('viewGraph').click());
+    // 프레임 교체·재적재 창(보기 단추를 누른 직후 주소가 잠깐 다른 문서로 보이는 때)에는 find()가 undefined를 돌려
+    // undefined.evaluate로 검사기가 죽는다(#657 CI 2차 실측 — runCombo 1160행) — 기다리는 frameOf 길로 찾는다.
+    const tripMapFrame = async (why) => {
+      const f = await frameOf(pageMap, /track56-network/);
+      assert.ok(f, why);
+      return f;
+    };
+    await (await tripMapFrame('지도→그래프: 지도 프레임')).evaluate(() => document.getElementById('viewGraph').click());
     await pageMap.waitForFunction(() => [...document.querySelectorAll('iframe')].some((f) => { try { return /track60-graph/.test(f.contentWindow.location.href); } catch { return false; } }), null, { timeout: 10000 });
     // 그래프 모듈이 그려질 때까지(배지가 채워질 때까지) 기다린다 — 프레임 주소만으로는 그리기 전이다.
     await pageMap.waitForFunction(() => {
@@ -1150,14 +1156,14 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
       const f = [...document.querySelectorAll('iframe')].find((x) => { try { return /track56-network/.test(x.contentWindow.location.href); } catch { return false; } });
       return Boolean(f && f.contentDocument?.body && f.contentDocument.body.dataset.ltView === 'concentric');
     }, null, { timeout: 10000 });
-    const mapAfterConc = await mapFrameTrip().evaluate(() => ({ view: document.body.dataset.ltView, concPressed: document.getElementById('viewConc')?.getAttribute('aria-pressed'), stored: localStorage.getItem('lt41.network.view') }));
+    const mapAfterConc = await (await tripMapFrame('동심원 복귀: 지도 프레임')).evaluate(() => ({ view: document.body.dataset.ltView, concPressed: document.getElementById('viewConc')?.getAttribute('aria-pressed'), stored: localStorage.getItem('lt41.network.view') }));
     assert.equal(mapAfterConc.view, 'concentric', '그래프의 [동심원형]으로 지도가 동심원형 보기로 열린다');
     assert.equal(mapAfterConc.concPressed, 'true', '동심원형이 눌린 상태(aria-pressed=true)');
     assert.equal(mapAfterConc.stored, 'concentric', '지도 보기 저장 키(lt41.network.view)가 바뀐다');
-    await mapFrameTrip().evaluate(() => document.getElementById('viewNet').click());
+    await (await tripMapFrame('그물 복귀 누르기: 지도 프레임')).evaluate(() => document.getElementById('viewNet').click());
     await pageMap.waitForTimeout(1200);
     const treeAfterTrip = await pageMap.evaluate(() => ({ id: window.LT41?.tree?.id || '', moments: (window.LT41?.tree?.moments || []).length, momentId: window.LT41?.momentId || '' }));
-    const mapAfterNet = await mapFrameTrip().evaluate(() => ({ view: document.body.dataset.ltView, netPressed: document.getElementById('viewNet')?.getAttribute('aria-pressed') }));
+    const mapAfterNet = await (await tripMapFrame('그물 복귀 확인: 지도 프레임')).evaluate(() => ({ view: document.body.dataset.ltView, netPressed: document.getElementById('viewNet')?.getAttribute('aria-pressed') }));
     assert.equal(mapAfterNet.view, 'network', '지도의 [그물형]으로 그물 보기로 돌아온다');
     assert.equal(mapAfterNet.netPressed, 'true', '그물형이 눌린 상태(aria-pressed=true)');
     assert.deepEqual(treeAfterTrip, treeBeforeTrip, '왕복 뒤에도 지금 트리·순간이 유지된다');
