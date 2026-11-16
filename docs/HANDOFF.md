@@ -1,5 +1,15 @@
 # LoveTree 4.0 — 핸드오프
 
+## 2026-11-16 — 운영센터 고객 정보 전부 보기 (컴1로컬4 레인, ai/com1-admin-customer-info-20261116-2, main db6c66c, PR #762, 대표 결정 2026-11-16)
+
+- **결정**: 운영진은 고객 정보를 다 본다(대표, 2026-11-16). 운영센터(/admin.html) '고객' 탭 = 이메일 전문·표시 이름·구분·가입일·마지막 로그인·마지막 활동·트리/순간 수·가린 id(`sub_…abcd`). 자세히 판 = 트리별 순간 **전체**(공개·비공개, 제목·날짜·감정·꼬리표·영상 주소·메모) + 트리 공개 상표(나만/링크 공유/둘러보기 소개) + 올린 사진(관리자 인증으로만 내려받기) + 의견·일지 본문. 만 14세 확인 시각은 **자리만**(`ageVerifiedAt: null` → 화면 '—') — 공용 로그인이 아직 안 준다.
+- **읽기만**: 고치기·지우기 경로 없음, PUT/PATCH/DELETE 405. 자세히 판을 열 때마다 열람 기록 한 줄(누가·언제·어느 고객) — `lovetree_admin_customer_views`(migration `admin-customer-views-261116.sql`), 90일 자동 삭제 대상(ACCESS_LOG_RETENTION_TARGETS + `docs/ACCESS_LOG_RETENTION_20261103.md`). 프록시 허용: `/api/admin/customers`, `/views`, `/customers/<subject>`, `/customers/<subject>/media/<uuid.ext>` — 모두 GET.
+- **subject 원문**: 화면 글자 0건(가린 id만). 주소 해시·응답 JSON에는 자세히 판을 여는 내부 식별자로 남는다.
+- **formatTime 수리**: `formatTime(null)`이 1970년('01.01 09:00')을 찍던 자리를 '—'로 — 없는 시각은 전부 '—'.
+- **시험**: feedback-service +12(목록·가린 id·자세히 판·공개 상표·열람 기록·405·사진 인증·403/401), admin-view +2(화면 모델·없는 시각), pages-proxy +1(자세히 판·사진만 GET, 모양 밖 404/405), log-retention 보강(새 표 90일 경계). `npm test` 1회 실패 0, build·modulepreload 통과. 화면 공통 검사기는 이 PC에서 빨강이지만 변경 stash 기준에서도 빨강(거짓 실패) — CI가 판정. CI 6개 화면 잡 첫 실행에서 390 보드 말풍선 단정 1건 빨강 → 재실행 초록(같은 기준 커밋 main 실행은 초록이었다).
+- **운영 반영 완료(2026-11-16, 대표 승인·캡처 검수 뒤 머지)**: 컴2 백업 `backups/admin-customer-views-20261116T110355Z.{dump,sql}`(전체, 600·156K/376K) → migration 1회(md5 `f4210204…` 일치, `SET ROLE lovetree_owner`·ON_ERROR_STOP, 표 1 + 인덱스 2, 행 0) → `AUTODEPLOY_ACCEPT_MIGRATIONS=1 run` → **INSTALLED sha=76dc5de**(#763 포함, #762는 조상), result=installed, 서비스 active → 관리자 역할 계정으로 자세히 판 1회(운영센터와 같은 서비스 함수): 트리 2·순간 8·의견 2, 열람 기록 0→1줄(11:06Z), 표 행 1 → 보관 드라이런(now=2000, 무삭제) 대상 4개 표에 새 표 포함·삭제 0, 타이머 ExecStart는 설치된 `server/purge-operational-logs.js` → 프록시: `lovetree.padiem.net`·`pages.dev`의 `/api/admin/customers`·`/views` 모두 401(경로 열림, 비로그인). 임시 스크립트·접속 env 삭제.
+- **남은 것**: ㉠대표가 컴2 브라우저에서 실제 관리자 세션으로 '고객' 탭을 한 번 열어 눈으로 확인(서비스 경로로는 확인됨 — 브라우저 세션 확인은 대표 몫). ㉡공용 로그인이 나이 확인 시각을 주면 `ageVerifiedAt` 자리만 채우면 된다. ㉢`updates.json`은 넣지 않았다(운영진 화면 — 고객 새 소식 아님).
+
 ## 2026-11-16 — 둘러보기 소개를 '고객이 고르는 것'으로: 질문 창·공유 판 스위치·상단 배너 (컴1로컬3 레인, ai/local3-discover-ask-261116, main ecf3309 기준, 대표 결정 2026-11-16)
 
 - **결정**: 링크 공유는 지금처럼 무료, 둘러보기 소개는 기본 꺼짐 — 고객이 고른다(서버 #739 discover GET/PUT·lovetree_tree_discover 표 배포됨). 링크까지 막는 완전 비공개는 Plus. 공유 판의 #share-private 단추·잠금 표시·'비공개는 Plus 전용이에요' note는 정리됐다.
