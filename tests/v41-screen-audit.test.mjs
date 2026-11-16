@@ -1554,3 +1554,57 @@ test('#my/graph는 로그인 진입·로그인 왕복·hash 이동 세 경우 �
     server.close();
   }
 });
+
+// 261116 대표 지적 — 운영센터 머리줄이 본 화면 셸 머리줄과 같은 규칙인지 숫자로 판정한다.
+// 390·1440·2560에서 셸(/v41/)과 운영센터(admin.html)의 로고 left·오른쪽 끝 단추 right·머리줄 높이가
+// 오차 2px 안에서 같아야 한다. 관리자 세션은 가짜 API(세션 관리자·빈 목록)로 만들고, 새 시험 파일 없이
+// 이 검사기 파일에 둔다. 셸과 운영센터는 같은 문맥의 다른 탭으로 열어 같은 뷰포트에서 잰다.
+const headerEdges = () => {
+  const header = document.querySelector('.app-header');
+  const brand = header.querySelector('.brand');
+  const rightBtn = [...header.querySelectorAll('button, a')]
+    .filter((el) => { const s = getComputedStyle(el); return s.display !== 'none' && s.visibility !== 'hidden' && el.getBoundingClientRect().width > 0; })
+    .sort((a, b) => b.getBoundingClientRect().right - a.getBoundingClientRect().right)[0];
+  const box = header.getBoundingClientRect();
+  return {
+    logoLeft: Math.round(brand.getBoundingClientRect().left),
+    rightBtnRight: rightBtn ? Math.round(rightBtn.getBoundingClientRect().right) : 0,
+    rightBtnName: rightBtn ? `${rightBtn.tagName.toLowerCase()}.${[...rightBtn.classList].join('.')}` : '(없음)',
+    height: Math.round(box.height)
+  };
+};
+test('운영센터 머리줄이 본 화면 셸 머리줄과 같은 폭·위치다(390·1440·2560 — 로고 left·오른쪽 끝 단추 right·높이, 오차 2px)', { skip: REQUIRE ? false : skip, timeout: 300000 }, async () => {
+  if (skip) assert.fail(`미리보기 검사에서는 건너뜀이 실패다 — ${skip}`);
+  const server = await serve();
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch({ headless: true });
+  try {
+    for (const width of [390, 1440, 2560]) {
+      const context = await browser.newContext({ viewport: { width, height: width === 390 ? 844 : 900 }, reducedMotion: 'reduce' });
+      await context.route('**://i.ytimg.com/**', THUMB);
+      // 뒤에 등록한 것이 이긴다 — 공통 응답을 먼저, 관리자 응답을 나중에.
+      await context.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{}' }));
+      await context.route('**/api/admin/session', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, authenticated: true, admin: true }) }));
+      await context.route('**/api/admin/feedback', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"feedback":[]}' }));
+      await context.route('**/api/admin/journals', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"journals":[]}' }));
+      await context.route('**/api/community/admin/reports', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"reports":[]}' }));
+      const shell = await context.newPage();
+      await shell.goto(`${base}/v41/`, { waitUntil: 'load' });
+      await shell.waitForSelector('.app-header', { timeout: 10000 });
+      await shell.waitForTimeout(400);
+      const admin = await context.newPage();
+      await admin.goto(`${base}/admin.html`, { waitUntil: 'load' });
+      await admin.waitForSelector('.app-header .brand', { timeout: 10000 });
+      await admin.waitForTimeout(400);
+      const s = await shell.evaluate(headerEdges);
+      const a = await admin.evaluate(headerEdges);
+      assert.ok(Math.abs(a.logoLeft - s.logoLeft) <= 2, `${width}: 로고 left가 셸과 같다(셸 ${s.logoLeft} / 운영센터 ${a.logoLeft})`);
+      assert.ok(Math.abs(a.rightBtnRight - s.rightBtnRight) <= 2, `${width}: 오른쪽 끝 단추 right가 셸과 같다(셸 ${s.rightBtn}=${s.rightBtnRight} / 운영센터 ${a.rightBtn}=${a.rightBtnRight})`);
+      assert.ok(Math.abs(a.height - s.height) <= 2, `${width}: 머리줄 높이가 셸과 같다(셸 ${s.height} / 운영센터 ${a.height})`);
+      await context.close();
+    }
+  } finally {
+    await browser.close();
+    server.close();
+  }
+});
