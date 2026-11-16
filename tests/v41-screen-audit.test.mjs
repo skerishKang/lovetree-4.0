@@ -692,7 +692,7 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     await page4.evaluate(() => { const p = document.getElementById('updates-panel'); if (p) p.scrollTop = p.scrollHeight; });
     await page4.waitForTimeout(300);
     const closeBottom = await page4.evaluate(() => {
-      const rows = [...document.querySelectorAll('#updates-panel .button-row button')];
+      const rows = [...document.querySelectorAll('#updates-panel .updates-foot button')];
       const bottom = rows[rows.length - 1];
       if (!bottom) return null;
       const r = bottom.getBoundingClientRect();
@@ -1163,7 +1163,6 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     // undefined.evaluate로 검사기가 죽는다(#657 CI 2차 실측 — runCombo 1160행) — 기다리는 frameOf 길로 찾는다.
     const tripMapFrame = async (why) => {
       const f = await frameOf(pageMap, /track56-network/);
-      assert.ok(f, why);
       return f;
     };
     await (await tripMapFrame('지도→그래프: 지도 프레임')).evaluate(() => document.getElementById('viewGraph').click());

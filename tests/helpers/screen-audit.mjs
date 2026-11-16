@@ -81,6 +81,8 @@ export const AUDIT_FN = function audit(opts) {
       if (LENS.has(n.id)) return false;
       const cs = getComputedStyle(n);
       if (cs.display === 'none' || cs.visibility === 'hidden' || Number(cs.opacity) < 0.05) return false;
+      // 닫힌 <details> 안의 글자는 그려지지 않는다(요약 줄만 보인다) — 그려지지 않을 좌표로 겹침을 세지 않는다(261117, 걸어온 길 접힘).
+      if (n.tagName === 'DETAILS' && !n.open && !el.closest('summary')) return false;
     }
     const r = clipRect(el);
     if (!(r.right - r.left > 2 && r.bottom - r.top > 2)) return false;
@@ -138,7 +140,6 @@ export const AUDIT_FN = function audit(opts) {
   const chromeVsWorld = (a, b) => (inChrome(a) && inWorld(b)) || (inWorld(a) && inChrome(b));
   // 머리 고정(sticky) 요소는 스크롤 본문 위에 불투명하게 뜨는 정상 모양이다(창 머리의 닫기 × 등) —
   // 겹침·가려짐 판정에서 크롬처럼 뺀다(2026-11-16 새 소식 창 머리 고정).
-  const isSticky = (el) => chain(el).some((n) => { try { return getComputedStyle(n).position === 'sticky'; } catch { return false; } }); // 머리 고정 컨테이너 안의 글자까지 크롬으로 본다 
   const pairable = vis.filter((el) => CHECK_TOAST || !isToast(el));
   const rects = pairable.map((el) => ({ el, r: clipRect(el) }));
 
@@ -148,7 +149,6 @@ export const AUDIT_FN = function audit(opts) {
     const a = rects[i], b = rects[j];
     if (a.el === b.el || a.el.contains(b.el) || b.el.contains(a.el)) continue;
     if (chromeVsWorld(a.el, b.el)) continue;
-    if (isSticky(a.el) || isSticky(b.el)) continue;
     // 서로 다른 열린 창끼리는 모달이 겹치는 정상 모양이다 — 나중에 띄운 창(질문 창 등)이 앞선 창을 덮는 것을 실패로 세지 않는다.
     const dlgA = openDialogs.find((d) => d === a.el || d.contains(a.el));
     const dlgB = openDialogs.find((d) => d === b.el || d.contains(b.el));
@@ -169,7 +169,6 @@ export const AUDIT_FN = function audit(opts) {
     if (isToast(top)) continue;
     if (top === el || chain(top).includes(el) || chain(el).includes(top)) continue;
     if (chain(top).some((n) => LENS.has(n.id))) continue;
-    if (isSticky(top)) continue; // 머리 고정 요소가 본문을 가리는 것은 정상(불투명 배경)
     // 가리는 쪽이 열린 창이고 자기 창과 다르면(또는 창 밖이면) 모달의 정상 가림 — 뒤 본문은 이미 검사 대상에서 뺐다.
     const topDlg = chain(top).find((n) => n.tagName === 'DIALOG' && n.open);
     if (topDlg && topDlg !== openDialogs.find((d) => d === el || d.contains(el))) continue;
