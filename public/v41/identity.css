@@ -470,3 +470,12 @@ html[data-v41-screen=book] .tools .lens-icon{display:block}
 .lt-fallback-card[data-lt-variant="orbit"] .lt-fallback-emotion,.lt-fallback-card[data-lt-variant="orbit"] .lt-fallback-date{font-size:12px}
 .card:has(> .firstMark) .lt-fallback-card[data-lt-variant="orbit"]{padding-top:44px}
 
+
+/* 2026-11-16 대표 요청: 펼친 select 목록도 테마와 같은 바탕·글자로 — 쉬운 추가 '담을 트리' 드롭다운에서
+   밤 테마의 옅은 글자가 브라우저 기본 흰 목록 위에 남아 못 읽었다(실측 대비 1.13). option 바탕·글자를
+   테마 토큰으로 맞춘다(셸·공유 판·설정·순간 고치기·화면 안의 고르기까지 이 파일을 쓰는 문서 전부 — 한 곳).
+   select에도 테마별 color-scheme을 명시해 목록 기본 바탕을 같은 쪽으로 둔다. */
+option{background:var(--lt-glass-strong);color:var(--lt-pearl)}
+html[data-lt-theme=garden] option{background:var(--lt-paper);color:var(--lt-ink)}
+select{color-scheme:dark}
+html[data-lt-theme=garden] select{color-scheme:light}

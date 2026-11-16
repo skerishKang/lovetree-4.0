@@ -94,10 +94,11 @@ test('설정 항목마다 저장 위치 표시가 있다(계정에 저장 / 이 
   assert.ok(rows.some(r => r.includes('data-date-style') && r.endsWith('|계정에 저장')), '날짜 표기는 계정에 저장');
   assert.ok(rows.some(r => r.includes('data-start-place') && r.endsWith('|계정에 저장')), '처음 보여 줄 곳은 계정에 저장');
   assert.ok(rows.some(r => r.includes('data-network-view') && r.endsWith('|이 기기에만')), '관계 지도 기본 보기는 이 기기에만');
+  assert.ok(rows.some(r => r.includes('data-quick-target') && r.endsWith('|이 기기에만')), '쉬운 추가로 담을 곳은 이 기기에만');
   assert.ok(rows.some(r => r.includes('data-board-theme') && r.endsWith('|이 기기에만')), '보드 판은 이 기기에만');
   assert.ok(rows.some(r => r.includes('data-share-private-lock') && r.endsWith('|전 트리 공개')), '#538: 트리 공개 행은 전 트리 공개 표시');
-  // 프로필 2 + 화면 8(테마·보드 판·움직임·제목·페이지 넘김·날짜·처음·카드) + 보기 1 + 공유 2 + 순간 추가 1 = 14행.
-  assert.equal(rows.length, 14, '열네 설정 행마다 표시가 있다');
+  // 프로필 2 + 화면 8(테마·보드 판·움직임·제목·페이지 넘김·날짜·처음·카드) + 보기 2(관계 지도·쉬운 추가로 담을 곳) + 공유 2 + 순간 추가 1 = 15행.
+  assert.equal(rows.length, 15, '열다섯 설정 행마다 표시가 있다');
   for (const row of rows) {
     const isAccount = /data-title-display=/.test(row) || /id="profile-name"/.test(row) || /id="profile-color"/.test(row)
       || /data-date-style=/.test(row) || /data-start-place=/.test(row) || /data-share-view=/.test(row);
