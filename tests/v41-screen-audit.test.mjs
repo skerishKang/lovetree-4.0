@@ -249,12 +249,13 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
       if (!tab || tab.hidden) return null;
       const stage = document.querySelector('.stage');
       const tr = tab.getBoundingClientRect(), sr = stage.getBoundingClientRect();
-      return { font: parseFloat(getComputedStyle(tab).fontSize), tabRight: tr.right, stageRight: sr.right, text: tab.textContent.trim() };
+      return { font: parseFloat(getComputedStyle(tab).fontSize), tabRight: tr.right, stageRight: sr.right, text: tab.textContent.trim(), title: tab.title || '' };
     });
     assert.ok(branchTab, '첫 장에 갈림길 탭이 보인다(시험 트리의 첫 순간이 두 갈래를 나간다)');
     assert.ok(branchTab.font >= 13, `갈림길 탭 글자는 13px 이상이다(실측 ${branchTab.font}px)`);
     assert.ok(branchTab.tabRight <= branchTab.stageRight, `갈림길 탭이 무대 안쪽에 있어야 한다 — 잘림 0(탭 오른쪽 ${Math.round(branchTab.tabRight)}px / 무대 오른쪽 ${Math.round(branchTab.stageRight)}px)`);
-    assert.ok(branchTab.text.includes('에서 갈라진 길'), `탭 문구는 그대로다(실측: ${branchTab.text})`);
+    assert.match(branchTab.text, /갈림길\s*\d+/, `탭은 짧은 '갈림길 N'이다(실측: ${branchTab.text})`);
+    assert.ok(branchTab.title.includes('에서 갈라진 길'), `긴 제목은 툴팁에만 있다(실측: ${branchTab.title})`);
     for (let i = 0; i < 12; i++) {
       await take(page2, i === 0 ? '책·공유 첫 장' : `책·공유 ${i + 1}장`);
       const next = book.locator('#nextBtn');
