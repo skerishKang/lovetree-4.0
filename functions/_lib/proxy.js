@@ -29,6 +29,9 @@ const MY_POST_FOLLOWUP = /^\/api\/board\/mine\/[0-9]{1,20}\/followup$/;
 // #678 후속: 고객이 자기 덧붙임을 고치거나 지우는 경로(커뮤니티 댓글 항목 경로와 같은 모양).
 const MY_POST_FOLLOWUP_ITEM = /^\/api\/board\/mine\/[0-9]{1,20}\/followup\/[0-9]{1,20}$/;
 const ADMIN_PERSONA_ITEM = /^\/api\/admin\/persona\/[A-Za-z0-9_-]{1,128}$/;
+// 운영센터 고객 정보(261116 대표 결정) — 고객 계정 하나의 자세히 판과 그 고객이 올린 사진(읽기만).
+const ADMIN_CUSTOMER_ITEM = /^\/api\/admin\/customers\/sub_[A-Za-z0-9_-]{1,128}$/;
+const ADMIN_CUSTOMER_MEDIA = /^\/api\/admin\/customers\/sub_[A-Za-z0-9_-]{1,128}\/media\/[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}\.(?:png|jpg|gif|webp|mp4|webm)$/;
 function communityMethods(path) {
   const action=path.match(COMMUNITY_SHARE_ACTION)?.[1];
   if(action==='comments')return new Set(['GET','POST']);
@@ -62,6 +65,9 @@ const ALLOWED = new Map([
   ['/api/admin/roles', new Set(['GET'])],
   // 운영센터 '한눈에' 숫자(#671 후속) — 서버 경로는 있었지만 프록시 허용 목록에 없어 404였다. GET만 넘긴다.
   ['/api/admin/stats', new Set(['GET'])],
+  // 운영센터 고객 정보(261116 대표 결정) — 목록·자세히 판·열람 기록·사진 내려받기(읽기만).
+  ['/api/admin/customers', new Set(['GET'])],
+  ['/api/admin/customers/views', new Set(['GET'])],
   ['/auth/login', new Set(['GET'])],
   ['/auth/callback', new Set(['GET', 'POST'])],
   ['/auth/logout', new Set(['POST'])]
@@ -133,7 +139,7 @@ async function readWithDeadline(upstream, { limit, timedOut, cancel }) {
 export function createProxy({ fetcher = (...args) => fetch(...args), timeoutMs = 15_000, maxResponseBytes = DEFAULT_RESPONSE_LIMIT_BYTES } = {}) {
   return async function onRequest({ request, env }) {
     const incoming = new URL(request.url);
-    const media = incoming.pathname === '/api/media' || MEDIA_ITEM.test(incoming.pathname);
+    const media = incoming.pathname === '/api/media' || MEDIA_ITEM.test(incoming.pathname) || ADMIN_CUSTOMER_MEDIA.test(incoming.pathname);
     const methods = ALLOWED.get(incoming.pathname)
       || (MEDIA_ITEM.test(incoming.pathname) ? new Set(['GET','DELETE']) : null)
       || (SHARE_ITEM.test(incoming.pathname) ? new Set(['DELETE']) : null)
@@ -145,6 +151,8 @@ export function createProxy({ fetcher = (...args) => fetch(...args), timeoutMs =
       || (MY_POST_FOLLOWUP.test(incoming.pathname) ? new Set(['POST']) : null)
       || (MY_POST_FOLLOWUP_ITEM.test(incoming.pathname) ? new Set(['PATCH','DELETE']) : null)
       || (ADMIN_PERSONA_ITEM.test(incoming.pathname) ? new Set(['GET','PUT']) : null)
+      || (ADMIN_CUSTOMER_ITEM.test(incoming.pathname) ? new Set(['GET']) : null)
+      || (ADMIN_CUSTOMER_MEDIA.test(incoming.pathname) ? new Set(['GET']) : null)
       || communityMethods(incoming.pathname);
     if (!methods) return jsonError(404, 'not_proxied', '이 경로는 서버로 넘기지 않아요.');
     if (!methods.has(request.method)) return jsonError(405, 'method_not_allowed', '이 요청은 지원하지 않아요.');
@@ -186,7 +194,7 @@ export function createProxy({ fetcher = (...args) => fetch(...args), timeoutMs =
 
       // 정적 호스트 폴백(HTML)이나 계약 밖 형식은 성공이 아니다.
       const type = String(upstream.headers.get('content-type') || '').toLowerCase();
-      const mediaBinary = MEDIA_ITEM.test(incoming.pathname) && request.method === 'GET' && upstream.ok && /^(?:image\/(?:png|jpeg|gif|webp)|video\/(?:mp4|webm))(?:;|$)/.test(type);
+      const mediaBinary = (MEDIA_ITEM.test(incoming.pathname) || ADMIN_CUSTOMER_MEDIA.test(incoming.pathname)) && request.method === 'GET' && upstream.ok && /^(?:image\/(?:png|jpeg|gif|webp)|video\/(?:mp4|webm))(?:;|$)/.test(type);
       const invalid = type.includes('text/html')
         || (incoming.pathname.startsWith('/api/') && !(type.includes('application/json') || (media && mediaBinary)));
       if (invalid) {

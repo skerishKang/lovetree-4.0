@@ -31,6 +31,8 @@ const pad2 = (n) => String(n).padStart(2, '0');
 
 /** '11.14 06:31' — 지역 시간, 초는 보이지 않는다(#564 5). */
 export function formatTime(value) {
+  // 없는 시각(null·'')은 '—'다. new Date(null)이 1970년으로 읽혀 '01.01 09:00'이 찍히던 자리를 막는다(261116).
+  if (value == null || value === '') return '—';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '—';
   return `${pad2(date.getMonth() + 1)}.${pad2(date.getDate())} ${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
@@ -52,6 +54,9 @@ export function parseHash(hash) {
   const reportStatus = ['open', 'resolved', 'dismissed'].includes(params.get('status')) ? params.get('status') : '';
   const issueState = ['open', 'closed'].includes(params.get('status')) ? params.get('status') : '';
   if (name === 'overview') return {view: 'overview', id: null, status: '', kind: ''};
+  if (name === 'customers') return {view: 'customers', id: null, status: '', kind: ''};
+  // 운영센터 고객 정보(261116): #customer/<subject> — 주소에는 내부 식별자가 남지만 화면 글자는 가린 id만 본다.
+  if (name === 'customer' && id) return {view: 'customer', id, status: '', kind: ''};
   if (name === 'feedback' && id) return {view: 'feedback', id, status: '', kind: ''};
   if (name === 'persona' && id) return {view: 'persona', id, status: '', kind: ''};
   if (name === 'journals') return {view: 'journals', id: null, status: '', kind: ''};
@@ -73,6 +78,8 @@ export function viewHash(view, id = null, filters = {}) {
     return query ? `#board?${query}` : '#board';
   }
   if (view === 'feedback' && id != null) return '#feedback/' + encodeURIComponent(id);
+  if (view === 'customers') return '#customers';
+  if (view === 'customer' && id != null) return '#customer/' + encodeURIComponent(id);
   if (view === 'persona' && id != null) return '#persona/' + encodeURIComponent(id);
   if (view === 'journals') return '#journals';
   if (view === 'reports') {
@@ -88,8 +95,9 @@ export function viewHash(view, id = null, filters = {}) {
 }
 
 /** 머리줄 탭 표시용: 글·페르소나 화면은 게시판 탭이 눌려 있다. */
-/** 탭: 한눈에(#655) · 고객 글 · 사용 일지(#596) · 신고 · 고치는 일. 나머지 화면(상세·페르소나)은 고객 글 탭 소속으로 본다. */
+/** 탭: 한눈에(#655) · 고객(261116) · 고객 글 · 사용 일지(#596) · 신고 · 고치는 일. 나머지 화면(상세·페르소나)은 고객 글 탭 소속으로 본다. */
 export function viewToTab(view) {
+  if (view === 'customers' || view === 'customer') return 'customers';
   return view === 'overview' || view === 'reports' || view === 'issues' || view === 'journals' ? view : 'board';
 }
 
@@ -338,4 +346,112 @@ export function overviewModel({feedback, journals, reports, issues} = {}) {
       }
     : {error: true};
   return {feedbackCard, reportCard, issueCard, journalCard, todos: overviewTodos(posts)};
+}
+
+// ---- 운영센터 고객 정보(261116 대표 결정: 운영진은 고객 정보를 다 본다) ----
+// 이메일·표시 이름은 전문으로 보여 주고, subject 원문은 화면 글자에 내지 않는다(서버가 가린 id만 내려 준다).
+// 고객 기록은 읽기만 한다 — 고치거나 지우는 동작은 이 화면에 두지 않는다.
+
+/** 고객 탭 요약 카드 4장 — 이미 있는 /api/admin/stats 응답의 계정 숫자를 나눠 보여 준다(새로 세지 않는다). */
+export function customerSummaryCards(statsResponse) {
+  const stats = statsResponse?.ok && statsResponse.payload?.ok ? statsResponse.payload.stats : null;
+  const accounts = stats && typeof stats.accounts === 'object' ? stats.accounts : null;
+  if (!accounts) return {error: true, cards: []};
+  const num = (value) => (Number.isSafeInteger(value) && value >= 0 ? value : null);
+  const newTotal = (accounts.new && ['real', 'aiTester', 'tester'].every(key => num(accounts.new[key]) !== null))
+    ? num(accounts.new.real) + num(accounts.new.aiTester) + num(accounts.new.tester)
+    : null;
+  const cards = [
+    {key: 'total', label: '전체 고객', value: num(accounts.total), detail: newTotal === null ? '' : `7일 새 ${newTotal}`},
+    {key: 'real', label: '실제 고객', value: num(accounts.real), detail: accounts.new && num(accounts.new.real) !== null ? `7일 새 ${num(accounts.new.real)}` : ''},
+    {key: 'ai', label: 'AI 명예회원', value: num(accounts.aiTester), detail: ''},
+    {key: 'tester', label: '시험 계정', value: num(accounts.tester), detail: ''}
+  ];
+  return {error: cards.some(card => card.value === null), cards};
+}
+
+/** 고객 목록 줄 — 서버가 이미 가린 id만 실어 준다. 여기서는 모양만 정리한다. */
+export function customerRows(response) {
+  if (!response?.ok || !Array.isArray(response.payload?.customers)) return {error: true, rows: []};
+  return {
+    error: false,
+    rows: response.payload.customers.map(row => ({
+      subjectId: String(row?.subjectId ?? ''), // 줄 → 자세히 판 이동용 내부 식별자(화면 글자에는 안 쓴다)
+      subjectMasked: String(row?.subjectMasked ?? ''),
+      email: String(row?.email ?? ''),
+      displayName: String(row?.displayName ?? ''),
+      role: String(row?.role ?? ''),
+      roleLabel: String(row?.roleLabel ?? '실제 고객'),
+      joinedAt: row?.joinedAt ?? null,
+      lastLoginAt: row?.lastLoginAt ?? null,
+      lastActivityAt: row?.lastActivityAt ?? null,
+      treeCount: Number(row?.treeCount) || 0,
+      momentCount: Number(row?.momentCount) || 0
+    }))
+  };
+}
+
+/** 고객 자세히 판 모델. 트리별 순간 목록(공개·비공개 모두)·올린 사진·의견·일지 본문을 전부 담는다. */
+export function customerDetailModel(response) {
+  const raw = response?.ok && response.payload?.ok ? response.payload.customer : null;
+  if (!raw) return {error: true};
+  return {
+    error: false,
+    subjectMasked: String(raw.subjectMasked ?? ''),
+    email: String(raw.email ?? ''),
+    displayName: String(raw.displayName ?? ''),
+    roleLabel: String(raw.roleLabel ?? '실제 고객'),
+    joinedAt: raw.joinedAt ?? null,
+    lastLoginAt: raw.lastLoginAt ?? null,
+    lastActivityAt: raw.lastActivityAt ?? null,
+    ageVerifiedAt: raw.ageVerifiedAt ?? null,
+    trees: (Array.isArray(raw.trees) ? raw.trees : []).map(tree => ({
+      id: String(tree?.id ?? ''),
+      title: String(tree?.title ?? ''),
+      visibility: ['나만', '링크 공유', '둘러보기 소개'].includes(tree?.visibility) ? tree.visibility : '나만',
+      moments: (Array.isArray(tree?.moments) ? tree.moments : []).map(moment => ({
+        id: String(moment?.id ?? ''),
+        title: String(moment?.title ?? ''),
+        date: String(moment?.date ?? ''),
+        emotion: String(moment?.emotion ?? ''),
+        keywords: Array.isArray(moment?.keywords) ? moment.keywords.map(k => String(k)) : [],
+        url: String(moment?.url ?? ''),
+        note: String(moment?.note ?? ''),
+        uploaded: moment?.uploaded === true
+      }))
+    })),
+    media: (Array.isArray(raw.media) ? raw.media : []).map(item => ({
+      name: String(item?.name ?? ''),
+      mime: String(item?.mime ?? ''),
+      size: Number(item?.size) || 0,
+      createdAt: item?.createdAt ?? null,
+      path: String(item?.path ?? '')
+    })),
+    feedback: (Array.isArray(raw.feedback) ? raw.feedback : []).map(row => ({
+      id: row?.id,
+      kind: row?.kind === 'journal' ? 'journal' : 'opinion',
+      displayTitle: String(row?.displayTitle ?? ''),
+      body: String(row?.body ?? ''),
+      status: String(row?.status ?? ''),
+      score: row?.score ?? null,
+      journalDate: row?.journalDate ?? null,
+      createdAt: row?.createdAt ?? null,
+      replyCount: Number(row?.replyCount) || 0
+    }))
+  };
+}
+
+/** 열람 기록 줄 — 누가(관리자, 가린 id)·언제·어느 고객(이메일·이름). */
+export function customerViewRows(response) {
+  if (!response?.ok || !Array.isArray(response.payload?.views)) return {error: true, rows: []};
+  return {
+    error: false,
+    rows: response.payload.views.map(row => ({
+      id: String(row?.id ?? ''),
+      adminMasked: String(row?.adminMasked ?? ''),
+      customerEmail: String(row?.customerEmail ?? ''),
+      customerName: String(row?.customerName ?? ''),
+      viewedAt: row?.viewedAt ?? null
+    }))
+  };
 }

@@ -35,6 +35,14 @@ export const ACCESS_LOG_RETENTION_TARGETS = Object.freeze([
     timestamp: 'changed_at',
     key: Object.freeze(['id']),
     order: 'changed_at, id'
+  }),
+  // 운영센터 고객 열람 기록(261116 대표 결정) — 누가·언제·어느 고객을 열었는지의 감사 줄.
+  // 내용(순간·의견 본문)은 여기에 두지 않고 각자의 원래 표에 있다.
+  Object.freeze({
+    table: 'lovetree_admin_customer_views',
+    timestamp: 'viewed_at',
+    key: Object.freeze(['id']),
+    order: 'viewed_at, id'
   })
 ]);
 

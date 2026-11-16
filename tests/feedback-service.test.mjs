@@ -287,3 +287,150 @@ test('사용 일지의 journal_date는 한국 시각(Asia/Seoul) 기준 — 한�
   assert.equal(created.length, 1);
   assert.equal(created[0].journalDate, '2026-11-15');
 });
+
+// ---- 운영센터 고객 정보(261116 대표 결정: 운영진은 고객 정보를 다 본다) ----
+// 읽기만 한다(고치기·지우기 경로 없음), 이메일·이름은 전문, subject는 가린 id만,
+// 자세히 판을 열 때마다 열람 기록 한 줄, 사진은 관리자 인증으로만 내려받는다.
+
+import { createAdminCustomersHandler, createAdminCustomersService, maskSubjectId, treeVisibility, momentRow } from '../server/admin-customers.js';
+import { createMemoryAdminCustomersRepo } from '../server/testing/memory-admin-customers-repo.js';
+
+const SUB = (hex) => `sub_${hex.padEnd(16, '0')}`;
+
+function customersSetup() {
+  const customers = [
+    { productId: PRODUCT, subjectId: SUB('a1'), email: 'yoonje@example.com', displayName: '윤제', role: null, joinedAt: '2026-11-01T09:00:00.000Z', lastLoginAt: '2026-11-15T09:00:00.000Z', lastActivityAt: '2026-11-15T10:00:00.000Z', treeCount: 2, momentCount: 12,
+      doc: { version: 1, prefs: { displayName: '윤제' }, trees: [
+        { id: 't1', title: '윤제, 나의 순간들', moments: [
+          { id: 'm1', title: '첫 콘서트', date: '2026-11-02', createdAt: '2026-11-02T09:00:00.000Z', emotion: '설렘', keywords: ['콘서트', 'MMA2026'], url: 'https://youtu.be/abc', note: '혼자 다녀왔어요' },
+          { id: 'm2', title: '응원 사진', date: '2026-11-03', createdAt: '2026-11-03T09:00:00.000Z', emotion: '기쁨', keywords: [], url: '/api/media/01234567-89ab-4cde-8f01-234567890abc.png', note: '' }
+        ] },
+        { id: 't2', title: '비공개 트리', moments: [ { id: 'm3', title: '혼자 본 영상', date: '2026-11-04', createdAt: '2026-11-04T09:00:00.000Z', emotion: '그리움', keywords: [], url: '', note: '비공개 메모' } ] }
+      ] },
+      markers: [
+        { treeId: 't1', kind: 'share', value: 'active' },
+        { treeId: 't2', kind: 'private', value: 'private' }
+      ] },
+    { productId: PRODUCT, subjectId: SUB('b2'), email: 'boram@example.com', displayName: '보람', role: 'ai_customer', joinedAt: '2026-11-02T09:00:00.000Z', lastLoginAt: '2026-11-16T08:00:00.000Z', lastActivityAt: '2026-11-16T08:30:00.000Z', treeCount: 1, momentCount: 3,
+      doc: { version: 1, prefs: { displayName: '보람' }, trees: [ { id: 't3', title: '보람의 기록', moments: [ { id: 'm4', title: '안녕', date: '2026-11-05', createdAt: '2026-11-05T09:00:00.000Z', emotion: '평온', keywords: [], url: '', note: '' } ] } ] },
+      markers: [ { treeId: 't3', kind: 'share', value: 'active' }, { treeId: 't3', kind: 'discover', value: 'true' } ] }
+  ];
+  const repo = createMemoryAdminCustomersRepo({ accounts: customers });
+  const feedbackRepo = createMemoryFeedbackRepo();
+  const admin = { roleFor: async value => (value?.subjectId === 'admin' ? 'admin' : null) };
+  const mediaStore = {
+    list: async () => ({ items: [{ id: '01234567-89ab-4cde-8f01-234567890abc', name: '01234567-89ab-4cde-8f01-234567890abc.png', mime: 'image/png', size: 1234, createdAt: '2026-11-03T09:00:00.000Z' }] }),
+    get: async () => ({ mime: 'image/png', bytes: new Uint8Array([137, 80, 78, 71]) })
+  };
+  const service = createAdminCustomersService({ repo, feedbackRepo, productId: PRODUCT, admin, mediaStore });
+  const authenticate = async request => {
+    const subjectId = request.headers?.account;
+    if (!subjectId) throw new ApiError(401, 'unauthenticated', 'login');
+    return principal(subjectId);
+  };
+  const handle = createAdminCustomersHandler({ authenticate, service, productId: PRODUCT });
+  const call = (method, path, { account } = {}) => handle({
+    method, path, query: new URLSearchParams(),
+    headers: account ? { account } : {},
+    body: ''
+  });
+  return { repo, feedbackRepo, service, call, customers };
+}
+
+test('고객 목록은 이메일·이름을 전문으로 주고 subject는 가린 id만 준다', async () => {
+  const { call } = customersSetup();
+  const res = await call('GET', '/api/admin/customers', { account: 'admin' });
+  assert.equal(res.status, 200);
+  const rows = res.body.customers;
+  assert.equal(rows.length, 2);
+  assert.equal(rows[0].email, 'boram@example.com'); // 마지막 활동 최신 순
+  assert.equal(rows[0].displayName, '보람');
+  assert.equal(rows[0].roleLabel, 'AI 명예회원');
+  assert.ok(rows[0].subjectMasked.startsWith('sub_…'));
+  assert.ok(!rows[0].subjectMasked.includes('b2'), '가린 id에 원문 조각을 남기지 않는다');
+  // 줄 → 자세히 판 이동에 쓰는 내부 식별자(subjectId)는 응답에 있다. 화면 글자에는 가린 id만 그린다(admin.js의 목록·자세히 판).
+  assert.equal(rows[0].subjectId, SUB('b2'));
+  assert.equal(rows[1].subjectId, SUB('a1'));
+});
+
+test('고객 목록·자세히 판은 관리자가 아니면 403이다', async () => {
+  const { call } = customersSetup();
+  assert.equal((await call('GET', '/api/admin/customers', { account: SUB('a1') })).status, 403);
+  assert.equal((await call('GET', '/api/admin/customers', { account: 'admin' })).status, 200);
+  assert.equal((await call('GET', `/api/admin/customers/${SUB('a1')}`, { account: SUB('a1') })).status, 403);
+  assert.equal((await call('GET', '/api/admin/customers')).status, 401);
+});
+
+test('자세히 판은 트리별 순간 전체(공개·비공개 모두)와 트리 공개 상표를 준다', async () => {
+  const { call } = customersSetup();
+  const res = await call('GET', `/api/admin/customers/${SUB('a1')}`, { account: 'admin' });
+  assert.equal(res.status, 200);
+  const c = res.body.customer;
+  assert.equal(c.email, 'yoonje@example.com');
+  assert.equal(c.displayName, '윤제');
+  assert.equal(c.trees.length, 2);
+  assert.equal(c.trees[0].visibility, '링크 공유');
+  assert.equal(c.trees[1].visibility, '나만');
+  assert.equal(c.trees[0].moments.length, 2);
+  const photo = c.trees[0].moments.find(m => m.id === 'm2');
+  assert.equal(photo.uploaded, true, '올린 파일 순간은 uploaded로 표시한다');
+  assert.equal(c.trees[0].moments[0].keywords.join(','), '콘서트,MMA2026', '꼬리표를 함께 준다');
+  assert.equal(c.trees[0].moments[0].note, '혼자 다녀왔어요', '메모 전문');
+  assert.equal(c.ageVerifiedAt, null, '공용 로그인이 아직 나이 확인 시각을 주지 않는다');
+});
+
+test('둘러보기 소개가 켜진 공유 트리는 둘러보기 소개로 표시한다', async () => {
+  const { call } = customersSetup();
+  const c = (await call('GET', `/api/admin/customers/${SUB('b2')}`, { account: 'admin' })).body.customer;
+  assert.equal(c.trees[0].visibility, '둘러보기 소개');
+});
+
+test('자세히 판을 열 때마다 열람 기록이 한 줄씩 쌓이고 목록은 최근 순이다', async () => {
+  const { call, repo } = customersSetup();
+  await call('GET', `/api/admin/customers/${SUB('a1')}`, { account: 'admin' });
+  await call('GET', `/api/admin/customers/${SUB('b2')}`, { account: 'admin' });
+  await call('GET', `/api/admin/customers/${SUB('a1')}`, { account: 'admin' });
+  assert.equal(repo.views.length, 3);
+  const res = await call('GET', '/api/admin/customers/views', { account: 'admin' });
+  const views = res.body.views;
+  assert.equal(views.length, 3);
+  assert.equal(views[0].customerMasked, maskSubjectId(SUB('a1')));
+  assert.equal(views[0].adminMasked, '', 'subject 모양 밖의 시험 관리자는 빈 값(운영 관리자는 sub_ 꼴이라 가린 id가 된다)');
+  assert.equal(views[0].customerEmail, 'yoonje@example.com');
+});
+
+test('고객 순간을 고치거나 지우는 경로는 없다(읽기만)', async () => {
+  const { call } = customersSetup();
+  assert.equal((await call('PUT', `/api/admin/customers/${SUB('a1')}`, { account: 'admin' })).status, 405);
+  assert.equal((await call('DELETE', `/api/admin/customers/${SUB('a1')}`, { account: 'admin' })).status, 405);
+  assert.equal((await call('PATCH', `/api/admin/customers/${SUB('a1')}`, { account: 'admin' })).status, 405);
+});
+
+test('올린 사진은 관리자 인증으로만 내려받는다', async () => {
+  const { call } = customersSetup();
+  const res = await call('GET', `/api/admin/customers/${SUB('a1')}/media/01234567-89ab-4cde-8f01-234567890abc.png`, { account: 'admin' });
+  assert.equal(res.status, 200);
+  assert.equal(res.headers['content-type'], 'image/png');
+  const denied = await call('GET', `/api/admin/customers/${SUB('a1')}/media/01234567-89ab-4cde-8f01-234567890abc.png`, { account: SUB('b2') });
+  assert.equal(denied.status, 403);
+});
+
+test('가린 id는 앞의 sub_와 마지막 넉 자만 남긴다', () => {
+  assert.equal(maskSubjectId(SUB('1234567890abcdef')), 'sub_…cdef');
+  assert.equal(maskSubjectId('not-a-subject'), '');
+  assert.equal(maskSubjectId(null), '');
+});
+
+test('트리 공개 상표: 나만·링크 공유·둘러보기 소개', () => {
+  assert.equal(treeVisibility([{ treeId: 't', kind: 'private', value: 'private' }], 't'), '나만');
+  assert.equal(treeVisibility([{ treeId: 't', kind: 'share', value: 'active' }], 't'), '링크 공유');
+  assert.equal(treeVisibility([{ treeId: 't', kind: 'share', value: 'active' }, { treeId: 't', kind: 'discover', value: 'true' }], 't'), '둘러보기 소개');
+  assert.equal(treeVisibility([], 't'), '나만', '상표가 없으면 기본인 나만이다');
+});
+
+test('순간 줄은 제목·날짜·감정·꼬리표·주소·메모를 전부 담고 올린 파일을 표시한다', () => {
+  const row = momentRow({ id: 'm1', title: '제목', date: '2026-11-02', createdAt: '2026-11-02T09:00:00.000Z', emotion: '설렘', keywords: ['a'], url: '/api/media/01234567-89ab-4cde-8f01-234567890abc.png', note: '메모' });
+  assert.equal(row.uploaded, true);
+  assert.equal(row.keywords.join(','), 'a');
+  assert.equal(momentRow(null), null);
+});

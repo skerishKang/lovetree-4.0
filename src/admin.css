@@ -282,6 +282,60 @@ body {
   .lt-ov-value { font-size: 20px; }
 }
 
+/* ---- 운영센터 고객 정보(261116 대표 결정) — --lt-* 토큰만 쓴다. ---- */
+.lt-cust-cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
+.lt-cust-card { display: grid; gap: 2px; padding: 12px 14px; border: 1px solid var(--lt-line); border-radius: var(--lt-r-panel); background: var(--lt-glass); }
+.lt-cust-value { font-size: 22px; font-weight: 700; color: var(--lt-gold); }
+.lt-cust-label { font-size: 12px; color: var(--lt-muted); }
+.lt-cust-detail { font-size: 12px; color: var(--lt-pearl); }
+.lt-cust-list { display: grid; gap: 6px; }
+.lt-cust-head { display: grid; grid-template-columns: minmax(90px, 1.1fr) minmax(160px, 2fr) 92px repeat(3, minmax(96px, 1fr)) minmax(96px, 1fr) 92px; gap: 8px; padding: 0 12px; font-size: 12px; color: var(--lt-muted); }
+.lt-cust-row { display: grid; grid-template-columns: minmax(90px, 1.1fr) minmax(160px, 2fr) 92px repeat(3, minmax(96px, 1fr)) minmax(96px, 1fr) 92px; gap: 8px; align-items: center; width: 100%; text-align: left; padding: 10px 12px; border: 1px solid var(--lt-line); border-radius: var(--lt-r-card); background: var(--lt-glass); color: var(--lt-pearl); font: inherit; cursor: pointer; }
+.lt-cust-row:hover, .lt-cust-row:focus-visible { border-color: var(--lt-gold-line); }
+.lt-cust-name { font-weight: 700; overflow-wrap: anywhere; }
+.lt-cust-email { font-size: 12px; overflow-wrap: anywhere; }
+.lt-cust-time, .lt-cust-count { font-size: 12px; color: var(--lt-muted); }
+.lt-cust-id { font-size: 12px; color: var(--lt-muted); font-variant-numeric: tabular-nums; }
+.lt-cust-views { display: grid; gap: 4px; }
+.lt-cust-view-row { display: grid; grid-template-columns: 130px minmax(110px, 1fr) 1fr; gap: 10px; padding: 6px 10px; font-size: 12px; color: var(--lt-muted); border-bottom: 1px solid var(--lt-line); }
+.lt-cust-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 18px; margin: 0; }
+.lt-cust-field { display: grid; gap: 2px; }
+.lt-cust-field dt { font-size: 12px; color: var(--lt-muted); }
+.lt-cust-field dd { margin: 0; font-size: 14px; color: var(--lt-pearl); overflow-wrap: anywhere; }
+.lt-cust-tree { border: 1px solid var(--lt-line); border-radius: var(--lt-r-card); background: var(--lt-glass); padding: 10px 14px; margin-bottom: 10px; }
+.lt-cust-tree-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+.lt-cust-tree-head h3 { margin: 0; font-size: 15px; color: var(--lt-pearl); }
+.lt-cust-moments { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.lt-cust-moment { border-top: 1px solid var(--lt-line); padding-top: 8px; }
+.lt-cust-moment:first-child { border-top: 0; padding-top: 0; }
+.lt-cust-moment-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.lt-cust-moment-top time { font-size: 12px; color: var(--lt-muted); }
+.lt-cust-tags { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px; }
+.lt-cust-tag { font-size: 12px; color: var(--lt-gold); border: 1px solid var(--lt-gold-line); border-radius: var(--lt-r-pill); padding: 0 8px; }
+.lt-cust-url { display: inline-block; margin-top: 4px; font-size: 12px; color: var(--lt-muted); overflow-wrap: anywhere; }
+a.lt-cust-url { color: var(--lt-gold); }
+.lt-cust-note { margin: 6px 0 0; font-size: 13px; color: var(--lt-pearl); overflow-wrap: anywhere; }
+.lt-cust-media { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+.lt-cust-media-item { margin: 0; display: grid; gap: 4px; }
+.lt-cust-media-item img { width: 100%; height: 110px; object-fit: cover; border-radius: var(--lt-r-card); border: 1px solid var(--lt-line); background: rgba(255,255,255,.04); }
+.lt-cust-media-item figcaption, .lt-cust-media-name, .lt-cust-media-meta { font-size: 12px; color: var(--lt-muted); overflow-wrap: anywhere; }
+.lt-cust-media-item.is-failed img, .lt-cust-media-item.is-video { min-height: 60px; border: 1px dashed var(--lt-line); border-radius: var(--lt-r-card); padding: 8px; }
+.lt-cust-media-item.is-failed img { display: none; }
+
+/* 좁은 화면 — 목록은 칸 이름 줄을 숨기고 두 단으로 접는다. 칸 이름은 값 앞에 붙인다.
+   (이 규칙은 위 기본 규칙 뒤에 와야 이긴다 — 순서를 바꾸지 않는다.) */
+@media (max-width: 1020px) {
+  .lt-cust-head { display: none; }
+  .lt-cust-row { grid-template-columns: 1fr 1fr; gap: 6px 12px; }
+  .lt-cust-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .lt-cust-fields { grid-template-columns: 1fr; }
+  .lt-cust-email::before, .lt-cust-time::before, .lt-cust-count::before, .lt-cust-id::before { content: attr(data-label) " "; color: var(--lt-muted); }
+}
+@media (max-width: 780px) {
+  .lt-cust-row { grid-template-columns: 1fr; }
+  .lt-cust-row .lt-badge { justify-self: start; }
+}
+
 /* 정원 테마(2026-11-15 2단계): 색 토큰은 identity.css의 html[data-lt-theme=garden]이 갈아 끼우고,
    관리자 고유 면(흰 유리 대신 쓴 rgba 흰색·그림자)만 정원 모양으로 덮는다. 토큰만 쓴 나머지는 그대로다. */
 html[data-lt-theme=garden] .app-header nav button:hover { background: rgba(152,80,94,.08); color: var(--lt-ink); }

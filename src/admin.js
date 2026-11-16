@@ -8,7 +8,8 @@ import {
   escapeText, richParagraph, formatTime, parseHash, viewHash, viewToTab,
   filterRows, statusTabs, kindTabs, linkedIssueNumbers, normalizeIssueNumber, issueStateLabel, needsFixButton,
   statusChangeMessage, buildIssueUrl, issueLink, journalsSummary, journalRowsByCustomer,
-  isPendingStatus, overviewModel, statsCards
+  isPendingStatus, overviewModel, statsCards,
+  customerSummaryCards, customerRows, customerDetailModel, customerViewRows
 } from './admin-view.js';
 
 /**
@@ -65,7 +66,7 @@ function head() {
   const themeBtn = `<button type="button" class="lt-theme-toggle" data-lt-theme-toggle aria-pressed="${themePressed(theme)}" aria-label="${themeButtonAriaLabel(theme)}" title="${themeButtonAriaLabel(theme)}">${themeButtonLabel(theme)}</button>`;
   // #655: '한눈에'가 맨 앞 탭이다(운영센터를 열면 기본). 기존 탭·주소는 그대로 둔다.
   // 오른쪽 끝은 셸과 같은 .header-actions 자리 — 테마 단추 + ≤780의 ☰ 더보기. 좁은 화면에서는 알약 탭 대신 이 판으로 고른다.
-  const tabs = `${tabBtn('overview', '한눈에')}${tabBtn('board', '고객 글')}${tabBtn('journals', '사용 일지')}${tabBtn('reports', '신고')}${tabBtn('issues', '고치는 일')}`;
+  const tabs = `${tabBtn('overview', '한눈에')}${tabBtn('customers', '고객')}${tabBtn('board', '고객 글')}${tabBtn('journals', '사용 일지')}${tabBtn('reports', '신고')}${tabBtn('issues', '고치는 일')}`;
   headerHost.innerHTML = `<a class="brand" href="/v41/" title="러브트리로" aria-label="러브트리로"><span>LoveTree</span><small>4.1</small></a>`
     + `<nav aria-label="관리자 메뉴">${tabs}</nav>`
     + `<div class="header-actions">${themeBtn}<button type="button" class="lt-more" data-admin-more aria-expanded="${moreOpen}" aria-controls="admin-overflow" aria-label="메뉴 더보기">☰</button></div>`
@@ -86,6 +87,7 @@ function kindBadge(kind) { return `<span class="lt-badge" data-kind="${escapeTex
 function authorLabel(row) { const name = row.authorName || (row.subjectId ? '고객' : '익명'); return row.authorRole === 'ai_customer' ? `AI 명예회원 ${name}` : name; }
 
 async function render() {
+  releaseMediaObjectUrls(); // 지난 자세히 판의 사진 미리보기 주소를 거둔다.
   if (renderLogin()) return;
   const authenticated = session?.ok && session.authenticated;
   const admin = authenticated && session.admin;
@@ -95,6 +97,8 @@ async function render() {
     return;
   }
   if (route.view === 'overview') { await renderOverview(); return; }
+  if (route.view === 'customers') { await renderCustomers(); return; }
+  if (route.view === 'customer' && route.id) { await renderCustomerDetail(route.id); return; }
   if (route.view === 'issues') { await renderIssues(); return; }
   if (route.view === 'reports') { await renderReports(); return; }
   if (route.view === 'journals') { await renderJournals(); return; }
@@ -175,6 +179,134 @@ async function renderOverview() {
     ${journalSection}
     <section class="lt-card"><h2 class="lt-h2">오늘 할 일 · 답 안 단 글 오래된 순</h2><div class="lt-post-list">${todosBlock}</div></section>
   </div>`;
+}
+
+// ---- 운영센터 고객 정보(261116 대표 결정: 운영진은 고객 정보를 다 본다) ----
+// 읽기만 한다 — 고치거나 지우는 단추는 두지 않는다. subject 원문은 화면 글자에 내지 않고
+// 가린 id만 보인다(서버가 가린 id만 내려 준다). 목록 줄에는 줄 번호만 달아 자세히 판으로 이동한다.
+let customerCache = [];   // 목록 응답 원본(자세히 판 이동에 쓴다) — 줄 번호 → subject.
+let mediaObjectUrls = []; // 자세히 판에서 만든 사진 미리보기 주소 — 다시 그릴 때 거둔다.
+
+function releaseMediaObjectUrls() {
+  while (mediaObjectUrls.length) URL.revokeObjectURL(mediaObjectUrls.pop());
+}
+
+/** 자세히 판의 사진 미리보기 — 관리자 인증으로만 내려받는 경로를 fetch로 받아 임시 주소로 보인다.
+ *  <img src>에 서버 경로를 직접 쓰지 않는다(주소 칸에 subject 원문이 노출되는 일을 줄인다). */
+async function loadCustomerMedia(root) {
+  for (const img of root.querySelectorAll('img[data-media-path]')) {
+    try {
+      const res = await fetch(img.dataset.mediaPath, {credentials: 'same-origin', headers: {accept: 'image/*,video/*'}});
+      const type = String(res.headers.get('content-type') || '');
+      // 서버가 사진·영상이 아닌 것을 주면(로그인 풀림·오류 JSON 등) 그림 칸을 깨뜨리지 않고 '못 불러옴'으로 둔다.
+      if (!res.ok || !/^(?:image|video)\//.test(type)) { img.closest('.lt-cust-media-item')?.classList.add('is-failed'); continue; }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      mediaObjectUrls.push(url);
+      img.src = url;
+      img.removeAttribute('data-media-path');
+    } catch { img.closest('.lt-cust-media-item')?.classList.add('is-failed'); }
+  }
+}
+
+async function renderCustomers() {
+  const [statsRes, listRes, viewsRes] = await Promise.all([
+    read('/api/admin/stats'),
+    read('/api/admin/customers'),
+    read('/api/admin/customers/views?limit=20')
+  ]);
+  const summary = customerSummaryCards(statsRes);
+  const list = customerRows(listRes);
+  const views = customerViewRows(viewsRes);
+  customerCache = list.rows;
+  const cards = summary.error
+    ? '<p class="lt-empty">불러오지 못했어요</p>'
+    : `<div class="lt-cust-cards" role="group" aria-label="고객 숫자">${summary.cards.map(c => `<div class="lt-cust-card"><span class="lt-cust-value">${escapeText(c.value)}</span><span class="lt-cust-label">${escapeText(c.label)}</span>${c.detail ? `<span class="lt-cust-detail">${escapeText(c.detail)}</span>` : ''}</div>`).join('')}</div>`;
+  const rows = list.error
+    ? '<p class="lt-empty">불러오지 못했어요</p>'
+    : (list.rows.length
+      ? `<div class="lt-cust-head" role="row"><span>고객</span><span>이메일</span><span>구분</span><span>가입</span><span>마지막 로그인</span><span>마지막 활동</span><span>기록</span><span>고객 id</span></div>`
+        + list.rows.map((row, index) => `<button type="button" class="lt-cust-row" role="row" tabindex="0" data-cust-index="${index}" data-cust-role="button" aria-label="${escapeText(row.displayName || row.email)} 자세히 보기">
+          <span class="lt-cust-name">${escapeText(row.displayName || '(이름 없음)')}</span>
+          <span class="lt-cust-email" data-label="이메일">${escapeText(row.email)}</span>
+          <span class="lt-badge" data-role="${escapeText(row.role || 'real')}">${escapeText(row.roleLabel)}</span>
+          <span class="lt-cust-time" data-label="가입">${escapeText(formatTime(row.joinedAt))}</span>
+          <span class="lt-cust-time" data-label="마지막 로그인">${escapeText(formatTime(row.lastLoginAt))}</span>
+          <span class="lt-cust-time" data-label="마지막 활동">${escapeText(formatTime(row.lastActivityAt))}</span>
+          <span class="lt-cust-count" data-label="기록">트리 ${escapeText(row.treeCount)} · 순간 ${escapeText(row.momentCount)}</span>
+          <span class="lt-cust-id" data-label="고객 id">${escapeText(row.subjectMasked || '—')}</span>
+        </button>`).join('')
+      : '<p class="lt-empty">아직 로그인한 고객이 없습니다.</p>');
+  const viewRows = views.error
+    ? '<p class="lt-empty">불러오지 못했어요</p>'
+    : (views.rows.length
+      ? views.rows.map(row => `<div class="lt-cust-view-row"><span>${escapeText(formatTime(row.viewedAt))}</span><span>관리자 ${escapeText(row.adminMasked || '—')}</span><span>${escapeText(row.customerName || row.customerEmail || '(삭제된 계정)')}</span></div>`).join('')
+      : '<p class="lt-empty">아직 열람 기록이 없습니다.</p>');
+  host.innerHTML = `${head()}<div class="admin-shell lt-board">
+    <div class="lt-board-head"><h1 class="lt-h1">고객</h1><p class="lt-sub">고객 정보를 전부 보여 준다(261116 대표 결정) · 줄을 누르면 트리·순간·사진·의견·일지를 읽는다 · 열 때마다 열람 기록이 남는다 · 여기서는 고객 기록을 고치거나 지우지 않는다</p></div>
+    ${cards}
+    <section class="lt-card"><h2 class="lt-h2">고객 목록</h2><div class="lt-cust-list">${rows}</div></section>
+    <section class="lt-card"><h2 class="lt-h2">열람 기록 · 최근 20</h2><p class="lt-sub">누가(관리자)·언제·어느 고객을 열었는지 — 90일 뒤 자동으로 지워진다</p><div class="lt-cust-views">${viewRows}</div></section>
+  </div>`;
+}
+
+function customerField(label, value) {
+  return `<div class="lt-cust-field"><dt>${escapeText(label)}</dt><dd>${value}</dd></div>`;
+}
+
+async function renderCustomerDetail(subjectId) {
+  const res = await read('/api/admin/customers/' + encodeURIComponent(subjectId));
+  if (!res.ok || !res.payload?.ok) {
+    const message = res.status === 404 ? '그 고객 계정을 찾을 수 없어요.' : (res.payload?.error?.message || '고객 정보를 불러오지 못했어요.');
+    host.innerHTML = `${head()}<div class="admin-shell lt-board"><button type="button" class="lt-back" data-back-customers>← 고객 목록</button><section class="admin-card"><div class="admin-card-head"><strong>${escapeText(message)}</strong></div></section></div>`;
+    return;
+  }
+  const c = customerDetailModel(res);
+  if (c.error) { host.innerHTML = `${head()}<div class="admin-shell lt-board"><p class="lt-empty">불러오지 못했어요</p></div>`; return; }
+  const field = (label, value) => customerField(label, value);
+  const account = `<section class="lt-card"><h2 class="lt-h2">계정 정보</h2><dl class="lt-cust-fields">`
+    + field('표시 이름', escapeText(c.displayName || '(없음)'))
+    + field('이메일', escapeText(c.email))
+    + field('구분', `<span class="lt-badge">${escapeText(c.roleLabel)}</span>`)
+    + field('가입일', escapeText(formatTime(c.joinedAt)))
+    + field('마지막 로그인', escapeText(formatTime(c.lastLoginAt)))
+    + field('마지막 활동', escapeText(formatTime(c.lastActivityAt)))
+    + field('만 14세 확인', escapeText(formatTime(c.ageVerifiedAt)))
+    + field('고객 id', escapeText(c.subjectMasked || '—'))
+    + `</dl></section>`;
+  const momentRowHtml = (m) => `<li class="lt-cust-moment">
+    <div class="lt-cust-moment-top"><strong>${escapeText(m.title || '(제목 없음)')}</strong><time>${escapeText(m.date || '—')}</time>${m.emotion ? `<span class="lt-badge" data-emotion="${escapeText(m.emotion)}">${escapeText(m.emotion)}</span>` : ''}</div>
+    ${m.keywords.length ? `<div class="lt-cust-tags">${m.keywords.map(k => `<span class="lt-cust-tag">${escapeText(k)}</span>`).join('')}</div>` : ''}
+    ${m.url ? (m.uploaded
+      ? '<span class="lt-cust-url">올린 파일 — 아래 사진·영상 목록에 있습니다</span>'
+      : `<a class="lt-cust-url" href="${escapeText(m.url)}" target="_blank" rel="noopener noreferrer no-referrer">영상 주소</a>`) : ''}
+    ${m.note ? `<p class="lt-cust-note">${richParagraph(m.note)}</p>` : ''}
+  </li>`;
+  const trees = c.trees.length
+    ? c.trees.map(tree => `<section class="lt-cust-tree"><div class="lt-cust-tree-head"><h3>${escapeText(tree.title || '(제목 없음)')}</h3><span class="lt-badge" data-visibility="${escapeText(tree.visibility)}">${escapeText(tree.visibility)}</span><span class="lt-cust-count">순간 ${escapeText(tree.moments.length)}</span></div>${tree.moments.length ? `<ul class="lt-cust-moments">${tree.moments.map(momentRowHtml).join('')}</ul>` : '<p class="lt-empty">빈 트리입니다.</p>'}</section>`).join('')
+    : '<p class="lt-empty">아직 트리가 없습니다.</p>';
+  const mediaItems = c.media.length
+    ? c.media.map(item => item.mime.startsWith('video/')
+      ? `<div class="lt-cust-media-item is-video"><span class="lt-cust-media-name">${escapeText(item.name)}</span><span class="lt-cust-media-meta">영상 · ${escapeText(formatTime(item.createdAt))}</span></div>`
+      : `<figure class="lt-cust-media-item"><img data-media-path="${escapeText(item.path)}" alt="${escapeText(item.name)} 올린 사진" loading="lazy"><figcaption>${escapeText(formatTime(item.createdAt))}</figcaption></figure>`).join('')
+    : '<p class="lt-empty">올린 사진·영상이 없습니다.</p>';
+  const feedbackRows = c.feedback.length
+    ? c.feedback.map(row => `<article class="lt-post">
+        <div class="lt-post-top">${kindBadge(row.kind)}${statusBadge(row.status)}${row.score ? `<span class="lt-badge">점수 ${escapeText(row.score)}</span>` : ''}${row.journalDate ? `<span class="lt-badge">${escapeText(row.journalDate)}</span>` : ''}<span class="lt-post-date">${escapeText(formatTime(row.createdAt))}</span></div>
+        <h3 class="lt-post-title">${escapeText(row.displayTitle || '(제목 없음)')}</h3>
+        <div class="lt-body">${richParagraph(row.body)}</div>
+        <div class="lt-post-meta"><a href="#feedback/${encodeURIComponent(String(row.id))}">전체 글·답글 보기</a><span>답글 ${escapeText(row.replyCount)}</span></div>
+      </article>`).join('')
+    : '<p class="lt-empty">보낸 의견·일지가 없습니다.</p>';
+  host.innerHTML = `${head()}<div class="admin-shell lt-board">
+    <button type="button" class="lt-back" data-back-customers>← 고객 목록</button>
+    <div class="lt-board-head"><h1 class="lt-h1">${escapeText(c.displayName || c.email)}</h1><p class="lt-sub">고객 정보를 읽기만 합니다 — 여기서 고치거나 지우지 않습니다 · 이 판을 열 때마다 열람 기록이 남습니다</p></div>
+    ${account}
+    <section class="lt-card"><h2 class="lt-h2">트리 · 순간(공개·비공개 모두)</h2>${trees}</section>
+    <section class="lt-card"><h2 class="lt-h2">올린 사진 · 영상</h2><p class="lt-sub">관리자 인증으로만 내려받습니다</p><div class="lt-cust-media">${mediaItems}</div></section>
+    <section class="lt-card"><h2 class="lt-h2">의견 · 일지 본문</h2><div class="lt-post-list">${feedbackRows}</div></section>
+  </div>`;
+  await loadCustomerMedia(host);
 }
 
 async function renderList() {
@@ -507,6 +639,14 @@ document.addEventListener('click', async (event) => {
   const open = event.target.closest('[data-open]');
   if (open && !event.target.closest('[data-persona]')) { navigate('feedback', open.dataset.open); return; }
   // #596: 고객 줄을 누르면 그 고객 일지를 날짜 내림차순으로 펼쳐 읽는다. 본문 줄바꿈 유지, 그날 의견 링크.
+  // 운영센터 고객 정보(261116): 목록 줄 → 자세히 판. 줄에 subject 원문을 달지 않고 목록 순서로 찾는다.
+  const custRow = event.target.closest('[data-cust-index]');
+  if (custRow) {
+    const entry = customerCache[Number(custRow.dataset.custIndex)];
+    if (entry?.subjectId) navigate('customer', entry.subjectId);
+    return;
+  }
+  if (event.target.closest('[data-back-customers]')) { navigate('customers'); return; }
   const jrow = event.target.closest('[data-customer]');
   if (jrow && !event.target.closest('a')) {
     const body = document.querySelector(`[data-customer-body="${CSS.escape(jrow.dataset.customer)}"]`);

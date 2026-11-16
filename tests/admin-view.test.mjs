@@ -8,7 +8,8 @@ import {
   linkedIssueNumbers, normalizeIssueNumber, issueStateLabel, needsFixButton,
   statusChangeMessage, buildIssueUrl, issueLink, escapeText, statsCards,
   journalsSummary, journalRowsByCustomer, journalStage,
-  isPendingStatus, overviewModel, overviewTodos
+  isPendingStatus, overviewModel, overviewTodos,
+  customerSummaryCards, customerRows, customerDetailModel, customerViewRows
 } from '../src/admin-view.js';
 
 test('주소 해시를 화면 상태로 바꾼다(#564 2)', () => {
@@ -508,4 +509,59 @@ test('운영센터 상태 칩: 1440·390에서 높이가 같고 한 줄이며 �
     await browser.close();
     server.close();
   }
+});
+
+// ---- 운영센터 고객 정보(261116 대표 결정) 화면 모델 ----
+test('고객 화면 모델은 이메일 전문·가린 id·트리 공개 상표·열람 기록을 그대로 전한다', () => {
+  const cards = customerSummaryCards({ok: true, payload: {ok: true, stats: {accounts: {total: 10, real: 6, aiTester: 3, tester: 1, new: {total: 2, real: 1, aiTester: 1, tester: 0}}}}});
+  assert.equal(cards.error, false);
+  assert.deepEqual(cards.cards.map(c => c.value), [10, 6, 3, 1]);
+  assert.equal(cards.cards[0].detail, '7일 새 2');
+  // 숫자가 빠진 응답은 0으로 지어내지 않고 '불러오지 못했어요'로 간다.
+  assert.equal(customerSummaryCards({ok: false}).error, true);
+  assert.equal(customerSummaryCards({ok: true, payload: {ok: true, stats: {accounts: {total: 10}}}}).error, true);
+
+  const rows = customerRows({ok: true, payload: {ok: true, customers: [{
+    subjectId: 'sub_b200000000000000', subjectMasked: 'sub_…0000', email: 'boram@example.com', displayName: '보람',
+    role: 'ai_customer', roleLabel: 'AI 명예회원', joinedAt: '2026-11-02T09:00:00.000Z', lastLoginAt: '2026-11-16T08:00:00.000Z',
+    lastActivityAt: '2026-11-16T08:30:00.000Z', treeCount: 1, momentCount: 3
+  }]}});
+  assert.equal(rows.error, false);
+  assert.equal(rows.rows[0].email, 'boram@example.com', '이메일은 가리지 않는다');
+  assert.equal(rows.rows[0].role, 'ai_customer', '구분 배지를 그리려면 role이 남아야 한다');
+  assert.equal(rows.rows[0].subjectId, 'sub_b200000000000000', '줄 → 자세히 판 이동용 내부 식별자');
+  assert.equal(rows.rows[0].subjectMasked, 'sub_…0000');
+
+  const detail = customerDetailModel({ok: true, payload: {ok: true, customer: {
+    subjectMasked: 'sub_…0000', email: 'boram@example.com', displayName: '보람', ageVerifiedAt: null,
+    trees: [{id: 't3', title: '보람의 기록', visibility: '둘러보기 소개', moments: [
+      {id: 'm4', title: '안녕', date: '2026-11-05', emotion: '평온', keywords: ['인사'], url: '/api/media/x.png', note: '메모', uploaded: true},
+      {id: 'm5', title: '모르는 공개값', visibility: 'x'}
+    ]}, {id: 't9', title: '깨진 트리', visibility: '이상한 값', moments: []}],
+    media: [{name: 'a.png', mime: 'image/png', size: 10, path: '/api/admin/customers/sub_b200000000000000/media/a.png'}],
+    feedback: [{id: 7, kind: 'journal', body: '일지', status: 'received', score: 4, journalDate: '2026-11-05', replyCount: 1}]
+  }}});
+  assert.equal(detail.error, false);
+  assert.equal(detail.trees[0].visibility, '둘러보기 소개');
+  assert.equal(detail.trees[1].visibility, '나만', '모르는 공개값은 지어내지 않고 나만으로 본다');
+  assert.equal(detail.trees[0].moments[0].uploaded, true);
+  assert.equal(detail.trees[0].moments[0].note, '메모');
+  assert.equal(detail.trees[0].moments[0].keywords.join(','), '인사');
+  assert.equal(detail.feedback[0].kind, 'journal');
+  assert.equal(detail.ageVerifiedAt, null, '만 14세 확인 시각은 자리만 둔다(화면은 —)');
+  assert.equal(customerDetailModel({ok: false}).error, true);
+
+  const views = customerViewRows({ok: true, payload: {ok: true, views: [
+    {id: '3', adminMasked: 'sub_…aa11', customerEmail: 'boram@example.com', customerName: '보람', viewedAt: '2026-11-16T09:00:00.000Z'}
+  ]}});
+  assert.equal(views.error, false);
+  assert.equal(views.rows[0].customerEmail, 'boram@example.com');
+  assert.equal(views.rows[0].adminMasked, 'sub_…aa11');
+});
+
+test('없는 시각(null·빈 값)은 —로 보이고 1970년으로 찍히지 않는다(261116)', () => {
+  assert.equal(formatTime(null), '—');
+  assert.equal(formatTime(undefined), '—');
+  assert.equal(formatTime(''), '—');
+  assert.equal(formatTime('2026-11-16T09:00:00.000Z').includes('—'), false);
 });
