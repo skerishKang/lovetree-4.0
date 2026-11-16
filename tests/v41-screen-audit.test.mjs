@@ -1015,7 +1015,7 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
         let ok = false;
         try {
           ok = await Promise.race([
-            f.evaluate(() => Boolean(document.getElementById('orbit')?.shadowRoot?.querySelector('[data-do=index]'))),
+            f.evaluate(() => Boolean(document.getElementById('orbit')?.shadowRoot?.querySelector('[data-do=moments],[data-do=index]'))),
             page5b.waitForTimeout(2000).then(() => false)
           ]);
         } catch { ok = false; }
@@ -1035,7 +1035,7 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
       const list = await frameEval(() => Boolean(document.getElementById('orbit')?.shadowRoot?.querySelector('.index-list .indexTagChip')));
       if (!list) {
         const f = await orbitFrameOf();
-        if (f) await f.evaluate(() => document.getElementById('orbit').shadowRoot.querySelector('[data-do=index]').click()).catch(() => {});
+        if (f) await f.evaluate(() => document.getElementById('orbit').shadowRoot.querySelector('[data-do=moments],[data-do=index]').click()).catch(() => {});
         await page5b.waitForTimeout(400);
       }
       chips0 = await frameEval(() => {
