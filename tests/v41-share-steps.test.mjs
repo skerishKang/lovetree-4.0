@@ -48,7 +48,7 @@ function shareHarness({ confirmAnswer = true, clipboard = null, visibilityAnswer
   els['share-steps'] = fakeElement({children: shareSteps});
   els['share-create-reason'] = fakeElement({textContent: '먼저 미리보기를 확인해 주세요.'});
   const member = {snapshot: () => ({owned: true, writable: true, dirty: false})};
-  const discoverNow = {discover: discoverAnswer};
+  const discoverNow = {discover: discoverAnswer, has: false}; // has=false = 아직 서버 값을 못 본 상태(null)
   const shareApi = {
     preview: async payload => { requests.push(['preview', payload]); return {ok: true, preview: {previewToken: 'tok-1', tree: {title: '윤슬', moments: [{title: '첫 순간', emotion: '설렘', date: '2026-11-01'}]}}}; },
     create: async payload => { requests.push(['create', payload]); return {ok: true, share: {id: 'share-1', view: 'book'}}; },
@@ -67,6 +67,8 @@ function shareHarness({ confirmAnswer = true, clipboard = null, visibilityAnswer
     getSource: () => 'server',
     getMember: () => member,
     shareApi,
+    discoverOf: treeId => discoverNow.has ? discoverNow.discover : null,
+    rememberDiscover: (treeId, value) => { discoverNow.has = true; discoverNow.discover = value === true; },
     notify: text => calls.notify.push(text),
     panel: id => calls.panels.push(id),
     show: () => {},
@@ -161,12 +163,17 @@ test('둘러보기 소개 스위치: 고른 값은 discover PUT으로 저장되�
     await h.messages.openSharePanel();
     await new Promise(r => setImmediate(r)); // paintShareDiscover의 가짜 GET 응답 한 바퀴
     assert.match(h.els['share-discover-state'].textContent, /소개하지 않음/, '기본 꺼짐(#739)을 먼저 확인해 보여 준다');
-    assert.equal(h.els['share-discover-toggle'].textContent, '켜기');
+    assert.equal(h.els['share-discover-toggle'].textContent, '소개 켜기', '글자는 행동을 말한다');
+    assert.equal(h.els['share-discover-toggle'].dataset.state, 'off', '꺼짐은 테두리 모양(CSS가 data-state로 고른다)');
+    assert.match(h.els['share-moment-hint'].textContent, /소개하지 않아요/, '꺼짐 상태에서 힌트 줄도 같은 상태를 말한다');
     await h.els['share-discover-toggle'].onclick();
     await new Promise(r => setImmediate(r)); // 다시 그리기(paintShareDiscover)의 가짜 GET 한 바퀴
     assert.deepEqual(h.requests.filter(r => r[0] === 'discover'), [['discover', 'tree1', true]], '판단은 서버에 맡긴다');
+    // 스위치 뒤 상자 안 문장들(순간 수 힌트·상태 줄)이 같은 상태를 말한다(261116 2차 지적).
     assert.match(h.els['share-discover-state'].textContent, /소개 중/);
-    assert.equal(h.els['share-discover-toggle'].textContent, '끄기', '스위치가 값과 같아진다');
+    assert.match(h.els['share-moment-hint'].textContent, /소개 중이에요/, '힌트 줄이 옛 값에 머물지 않는다');
+    assert.equal(h.els['share-discover-toggle'].textContent, '소개 끄기', '글자는 행동을 말한다');
+    assert.equal(h.els['share-discover-toggle'].dataset.state, 'on', '켜짐은 강조색 모양');
     assert.match(h.els['share-feedback'].textContent, /둘러보기에 소개했어요/);
   } finally { h.restore(); }
 });
@@ -184,7 +191,7 @@ test('공유 창 화면에는 발견이라는 말이 없고, 단계·이유·공
   assert.match(shareHtml, /<p id="share-copy-note" role="status"><\/p>/);
   assert.match(shareHtml, /<p id="share-moment-hint" class="panel-note" role="status"><\/p>/, '순간 수 안내 자리');
   assert.match(shareHtml, /<span id="share-discover-state" role="status">/);
-  assert.match(shareHtml, /<button id="share-discover-toggle" type="button">켜기<\/button>/, '둘러보기 소개 스위치(261116 결정 — 기본 꺼짐·무료로 켜고 끈다)');
+  assert.match(shareHtml, /<button id="share-discover-toggle" type="button" data-state="off">소개 켜기<\/button>/, '둘러보기 소개 스위치(261116 결정 — 기본 꺼짐·무료, 글자는 행동)');
   assert.match(shareHtml, /둘러보기 소개는 기본 꺼짐/);
   assert.match(shareHtml, /링크까지 막는 완전 비공개는 Plus/);
   assert.equal(shareHtml.includes('둘러보기에도 올리기'), false, '스위치 문구는 정리됐다');

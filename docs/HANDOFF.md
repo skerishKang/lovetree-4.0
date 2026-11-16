@@ -10,7 +10,8 @@
 - **상단 배너(#538) 문구**: discover 상태별 두 문장(소개 중 → '공유 판에서 끌 수 있어요', 꺼짐 → '공유 판에서 켤 수 있어요'), '이름·아이디는 보이지 않아요' 유지.
 - **검사기 보완(tests/helpers/screen-audit.mjs)**: 서로 다른 열린 창끼리는 겹침·가려짐을 판정하지 않는다(질문 창이 write-panel 위에 뜨는 모달 정상 모양). '둘러보기 소개 질문'·'공유 판·소개 스위치' 상태와 흐름 단정(질문 1회·PUT false/true·재질문 없음·스위치 일치·백필 스킵)을 감사기에 추가, KNOWN 4건(회원 궤도 첫 화면의 레거시 11·12px — #548과 같은 원본 모양, 이번 이슈에서 손대지 않음).
 - **기존 시험 갱신**: v41-share-api(배선 단정 setTreeVisibility→setTreeDiscover·Plus 문구), v41-share-steps(#538 비공개 전환 시험 → 스위치 discover PUT 시험, 마크업 단정), share-list·shell-messages·date-style-one-piece harness에 discover 가짜 추가, harness-id-roster(제거된 share-private id).
-- **검증**: 감사 pass 2·fail 0(390·1440×밤·정원, 캡처 E:/lovetree-qa/lane/local3-graph/audit-discover-{ask,panel}-{390,1440}-{night,garden}.png), 전체 npm test 1719 pass·fail 0, build·modulepreload --check 통과, updates.json 불변. 시험 계정 세션 사용 없음(가짜 API만 — AGENTS #748 준수).
+- **2차 손보기(CTO 캡처 지적, 같은 PR)**: ①상자 안 두 문장(순간 수 힌트·상태 줄)이 서버 응답 하나에서 같이 그려지게 — paintShareDiscover가 GET 뒤 rememberDiscover→힌트 재그리기까지 맡고 스위치 onclick은 paintShareDiscover 한 길(힌트 화가는 globalThis.window 경유로 비동기 꼬리에서도 안전), 상단 배너는 refreshTreeDiscover(GET)로 같은 값을 따른다 ②공유 판 문장 word-break:keep-all ③스위치 모양: 상태 문장은 위 한 줄·스위치는 그 아래 44px 누름(켜짐=--lt-primary 강조색, 꺼짐=테두리), 글자는 행동('소개 켜기'/'소개 끄기')+모양은 data-state(on/off).
+- **검증**: 감사 pass 2·fail 0(390·1440×밤·정원, 캡처 E:/lovetree-qa/lane/local3-graph/audit-discover-ask-{390,1440}-{night,garden}.png·audit-discover-panel-{off,on}-{390,1440}-{night,garden}.png — 켜짐/꺼짐 8장 각각 열어 확인), 전체 npm test 1719 pass·fail 0, build·modulepreload --check 통과, updates.json 불변. 시험 계정 세션 사용 없음(가짜 API만 — AGENTS #748 준수).
 
 ## 2026-11-16 — 쉬운 추가 연속 담기: 옛 꼬리표 줄이 살아 남아 옛 순간에 저장·재클릭에 모두 해제 (#741, 컴1로컬2 레인, ai/local2-quickadd-tag-chip-20261116-070500-9f3c2a, main 76b2b8d 기준)
 

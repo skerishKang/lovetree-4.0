@@ -43,8 +43,10 @@ const KNOWN = [
   // 실제 기록이 있어야 그리는 레거시 카드라 지금까지 안 잰 곳. #548·#728과 같은 원본 모양이라 이 이슈에서 손대지 않는다.
   { 화면: '둘러보기 소개 질문', 항목: '작은글자', 찾을: 'span.lt-fallback-action "제목 달기"', 이슈: '#548(12px 기준)·레거시 궤도 카드' },
   { 화면: '둘러보기 소개 질문', 항목: '작은글자', 찾을: 'small "(마지막 순간|모아둔 순간)', 이슈: '#548(12px 기준)·레거시 궤도 카드' },
-  { 화면: '공유 판·소개 스위치', 항목: '작은글자', 찾을: 'span.lt-fallback-action "제목 달기"', 이슈: '#548(12px 기준)·레거시 궤도 카드' },
-  { 화면: '공유 판·소개 스위치', 항목: '작은글자', 찾을: 'small "(마지막 순간|모아둔 순간)', 이슈: '#548(12px 기준)·레거시 궤도 카드' },
+  { 화면: '공유 판·소개 꺼짐', 항목: '작은글자', 찾을: 'span.lt-fallback-action "제목 달기"', 이슈: '#548(12px 기준)·레거시 궤도 카드' },
+  { 화면: '공유 판·소개 꺼짐', 항목: '작은글자', 찾을: 'small "(마지막 순간|모아둔 순간)', 이슈: '#548(12px 기준)·레거시 궤도 카드' },
+  { 화면: '공유 판·소개 켜짐', 항목: '작은글자', 찾을: 'span.lt-fallback-action "제목 달기"', 이슈: '#548(12px 기준)·레거시 궤도 카드' },
+  { 화면: '공유 판·소개 켜짐', 항목: '작은글자', 찾을: 'small "(마지막 순간|모아둔 순간)', 이슈: '#548(12px 기준)·레거시 궤도 카드' },
 ];
 
 // #638: '내 의견 목록' 상태 — 상태 말 네 가지·답변·새 소식 링크가 한 화면에 보이게 하는 가짜 게시물.
@@ -498,22 +500,37 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     };
     const noAsk = await askFlow('no');
     await addFourth(noAsk.pageAsk);
-    // 공유 판 스위치: 꺼진 트리 문장·단추 → 켜기 → discover PUT true·스위치가 값과 같아진다.
+    // 공유 판 스위치: 꺼짐 상태 문장·단추를 잰 뒤 켜기 → 켜짐 — 스위치 뒤 상자 안 두 문장(순간 수 힌트·상태)이 같은 상태를 말한다.
     {
       const { ctxAsk, pageAsk, discoverPuts } = noAsk;
       await pageAsk.evaluate(() => document.getElementById('share-menu')?.click());
       await pageAsk.waitForFunction(() => !!document.getElementById('share-panel')?.open, null, { timeout: 8000 }).catch(() => {});
       await pageAsk.waitForFunction(() => (document.getElementById('share-discover-state')?.textContent || '').length > 0, null, { timeout: 8000 });
-      const before = await pageAsk.evaluate(() => ({ state: document.getElementById('share-discover-state').textContent, toggle: document.getElementById('share-discover-toggle').textContent }));
+      await pageAsk.waitForTimeout(400);
+      const box = () => pageAsk.evaluate(() => ({
+        hint: document.getElementById('share-moment-hint')?.textContent || '',
+        state: document.getElementById('share-discover-state')?.textContent || '',
+        toggle: document.getElementById('share-discover-toggle')?.textContent || '',
+        toggleState: document.getElementById('share-discover-toggle')?.dataset.state || ''
+      }));
+      const before = await box();
       assert.ok(before.state.includes('소개하지 않음'), '안 할래요를 고른 트리는 공유 판에서도 꺼져 있다 — 실제 "' + before.state + '"');
-      assert.equal(before.toggle, '켜기', '꺼진 트리의 스위치 단추는 켜기다');
+      assert.ok(before.hint.includes('소개하지 않아요'), '꺼짐 상태에서 상자 첫 줄(힌트)도 같은 상태를 말한다 — 실제 "' + before.hint + '"');
+      assert.equal(before.toggle, '소개 켜기', '꺼진 트리의 스위치 글자는 행동(소개 켜기)다');
+      assert.equal(before.toggleState, 'off', '꺼짐은 테두리 모양(CSS가 data-state로 고른다)');
+      await take(pageAsk, '공유 판·소개 꺼짐');
+      await pageAsk.screenshot({ path: 'E:/lovetree-qa/lane/local3-graph/audit-discover-panel-off-' + width + '-' + theme + '.png', animations: 'disabled', timeout: 10000 }).catch(() => {});
       await pageAsk.evaluate(() => document.getElementById('share-discover-toggle')?.click());
       await pageAsk.waitForFunction(() => (document.getElementById('share-discover-state')?.textContent || '').includes('소개 중'), null, { timeout: 8000 });
-      assert.deepEqual(discoverPuts, [false, true], '공유 판 스위치(켜기)도 discover PUT으로 저장한다');
-      const after = await pageAsk.evaluate(() => document.getElementById('share-discover-toggle').textContent);
-      assert.equal(after, '끄기', '켜진 트리의 스위치 단추는 끄기다 — 값과 같다');
-      await take(pageAsk, '공유 판·소개 스위치');
-      await pageAsk.screenshot({ path: 'E:/lovetree-qa/lane/local3-graph/audit-discover-panel-' + width + '-' + theme + '.png', animations: 'disabled', timeout: 10000 }).catch(() => {});
+      assert.deepEqual(discoverPuts, [false, true], '공유 판 스위치(소개 켜기)도 discover PUT으로 저장한다');
+      await pageAsk.waitForTimeout(400);
+      const after = await box();
+      // 스위치 뒤 상자 안 문장들이 같은 상태를 말한다(261116 2차 지적 — 첫 줄이 옛 값에 머물던 것).
+      assert.ok(after.hint.includes('소개 중이에요'), '켜짐 뒤 힌트 줄이 옛 값에 머물지 않는다 — 실제 "' + after.hint + '"');
+      assert.equal(after.toggle, '소개 끄기', '켜진 트리의 스위치 글자는 행동(소개 끄기)다 — 값과 같다');
+      assert.equal(after.toggleState, 'on', '켜짐은 강조색 모양');
+      await take(pageAsk, '공유 판·소개 켜짐');
+      await pageAsk.screenshot({ path: 'E:/lovetree-qa/lane/local3-graph/audit-discover-panel-on-' + width + '-' + theme + '.png', animations: 'disabled', timeout: 10000 }).catch(() => {});
       await ctxAsk.close();
     }
     const yesAsk = await askFlow('yes');

@@ -344,16 +344,20 @@ export function createMessages(deps) {
     }
   };
   // #538: 순간 수 안내 — 소개 상태(261116 결정: 기본 꺼짐·고객이 고름)에 맞게 적는다.
+  // 상태를 아직 못 확인했으면(null) 상태 말을 두지 않는다 — 상태 줄과 어긋나는 두 줄을 만들지 않으려는 규칙(#753 후속).
   function paintShareMomentHint() {
     const hint = $('share-moment-hint');
     if (!hint) return;
-    const count = window.LT41?.tree?.moments?.length || 0;
-    const discover = discoverOf(window.LT41?.tree?.id);
-    hint.textContent = count >= 3
-      ? (discover
-        ? `이 트리의 순간 ${count}개 · 둘러보기에 소개 중이에요.`
-        : `이 트리의 순간 ${count}개 · 둘러보기에 소개하지 않아요. 공유 판에서 켤 수 있어요.`)
-      : `이 트리의 순간 ${count}개 · 순간 3개를 담으면 소개할지 묻는 질문이 나와요.`;
+    // globalThis 경유 — 비동기 꼬리(서버 응답 뒤 다시 그리기)는 가짜 DOM 시험이 전역을 이미 거둔 뒤에도 돈다.
+    const count = globalThis.window?.LT41?.tree?.moments?.length || 0;
+    const discover = discoverOf(globalThis.window?.LT41?.tree?.id);
+    hint.textContent = discover === true
+      ? `이 트리의 순간 ${count}개 · 둘러보기에 소개 중이에요.`
+      : discover === false
+        ? `이 트리의 순간 ${count}개 · 둘러보기에 소개하지 않아요. 공유 판에서 켤 수 있어요.`
+        : (count >= 3
+          ? `이 트리의 순간 ${count}개 · 둘러보기에 소개할지 공유 판에서 고를 수 있어요.`
+          : `이 트리의 순간 ${count}개 · 순간 3개를 담으면 소개할지 묻는 질문이 나와요.`);
   }
   // 둘러보기 소개 스위치(261116 대표 결정 — 기본 꺼짐·무료로 켜고 끈다). 링크 공유는 지금처럼,
   // 링크까지 막는 완전 비공개는 Plus(#739의 discover GET/PUT 같은 경로).
@@ -366,8 +370,11 @@ export function createMessages(deps) {
     const discover = await shareApi.getTreeDiscover(treeId).then(a => a.ok ? a.discover === true : null).catch(() => null);
     if (discover === null) { state.textContent = '소개 상태를 확인하지 못했어요.'; toggle.textContent = '다시 확인'; return; }
     state.textContent = discover ? '둘러보기에 소개 중 · 무료' : '둘러보기에 소개하지 않음 · 무료';
-    toggle.textContent = discover ? '끄기' : '켜기';
+    toggle.textContent = discover ? '소개 끄기' : '소개 켜기'; // 글자는 상태가 아니라 행동을 말한다(261116 2차 지적)
     toggle.dataset.next = discover ? 'false' : 'true';
+    toggle.dataset.state = discover ? 'on' : 'off'; // 켜짐 강조색·꺼짐 테두리는 CSS가 이 값으로 고른다
+    deps.rememberDiscover?.(treeId, discover); // 상자 안 두 줄(순간 수 힌트·상태)이 서버 응답 하나에서 같이 그려진다
+    paintShareMomentHint();
   }
   $('share-discover-toggle').onclick = async () => {
     const treeId = window.LT41?.tree?.id;
@@ -377,8 +384,7 @@ export function createMessages(deps) {
     $('share-feedback').textContent = answer.ok
       ? (next ? '둘러보기에 소개했어요.' : '둘러보기 소개를 껐어요. 링크를 받은 사람만 볼 수 있어요.')
       : (answer.message || '소개 설정을 바꾸지 못했어요.');
-    if (answer.ok) { deps.rememberDiscover?.(treeId, next); paintShareMomentHint(); } // 힌트 줄도 고른 값을 따르게(스위치만 다시 그리면 옛 말이 남는다)
-    paintShareDiscover();
+    void paintShareDiscover(); // 서버 응답 뒤 상자 안 두 줄이 같은 값에서 다시 그려진다(261116 2차 지적)
   };
 
   // 둘러보기(공개 목록) 연결. 항목을 열면 공유 주소로, 내 기록 새로 시작은 첫 여정으로 간다.
