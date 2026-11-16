@@ -41,7 +41,13 @@ function flowNavigation(){
   // #601: 칸 폭이 고정되어 있으므로(11em) 긴 이름은 말줄임 — 마우스 올림·초점에 전체 이름을 보여 준다.
   $('record-menu').title=owned?(window.LT41?`트리: ${displayTreeTitle(window.LT41?.tree.title||'')} — 다른 트리를 고릅니다.`:'열어볼 트리를 고릅니다.'):(pendingDraft?'로그인하면 저장하지 못한 기록을 복원합니다.':'로그인하면 내 트리를 고를 수 있습니다.');
   $('write-menu').hidden=!parts.write||publicReading;$('share-menu').hidden=!parts.share||getSource()!=='server'||!window.LT41;
-  if(!getMember()?.snapshot().dirty)$('write-menu').textContent='＋ 순간 추가';
+  // 261117 대표 결정: 좁은 화면에서는 '+ 순간 추가'를 '+'로 줄여 위 메뉴(테마 단추 포함)가 넘치지 않게 한다 —
+  // 이름은 aria-label이 지킨다. 저장 안 됨('저장 안 됨')은 짧아 그대로다.
+  const narrowHeader=window.matchMedia('(max-width:650px)').matches;
+  if(!getMember()?.snapshot().dirty){
+   $('write-menu').textContent=narrowHeader?'+':'＋ 순간 추가';
+   if(narrowHeader)$('write-menu').setAttribute('aria-label','순간 추가');else $('write-menu').removeAttribute('aria-label');
+  }
   $('write-menu').title=getSource()==='server'?(reading?'선택한 순간에서 이어지는 새 순간을 기록합니다.':'새 트리의 첫 순간을 기록합니다.'):'로그인한 계정에 내 트리를 만듭니다. 예시에는 저장하지 않아요.';
   // #458: 모바일 떠 있는 ＋ 단추는 로그인한 내 기록(서버·쓰기 가능)에서만 뜬다. 공유·예시 화면·로그아웃·읽기 전용에서는 숨긴다.
   document.body.classList.toggle('lt-fab-ok',!$('write-menu').hidden&&getSource()==='server'&&owned);

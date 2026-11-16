@@ -417,6 +417,7 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
   // #593: 표본 하나를 굽는다. 굽는 동안 placeCard 는 '지금 위상'의 판정 결과를 카드에 직접 쓰므로(밝기·숨김)
   // 숨김은 되돌리고, 판정이 극단값으로 숨긴 표본은 직전 표본 자리를 그대로 쓴다.
   const bake=(k)=>{const th=c.baseAngle+k/ORBIT_STEPS*TWO_PI+c.phaseOffset;let x=Math.cos(th)*cfg.rx,y=Math.sin(th)*cfg.ry+cfg.band+Math.sin(th*1.7+c.phaseOffset*3)*45,z=Math.sin(th+1.1+c.phaseOffset*4)*cfg.zAmp+cfg.zBase+c.zOffset;
+   if(!demo&&cards.length<=8&&w<=650)return null; // 261117 대표 결정: 좁은 화면 소수 카드(≤8)는 궤도 카드를 숨긴다 — 표본 없음=noFit
    if(!demo&&cards.length<=8){const angle=i*TWO_PI/cards.length+k/ORBIT_STEPS*TWO_PI;x=Math.cos(angle)*Math.min(w*.34,420);y=Math.sin(angle)*Math.min(h*.3,250)+(i%2===0?80:-80);z=0;}
    const sc=Math.max(.18,Math.min(narrow?1.1:1.82,1050/(1050-z)));
    const at=placeCard(elements[i],c,i,th,x,y,z,sc,w,h,fit,narrow,zs,warm,last?.side)||last;
@@ -453,7 +454,8 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
   // 카드가 제자리(화면 가운데)에 남는다.
   if(out.length){out[0].offset=0;out[out.length-1].offset=1;}
   orbitKF[i]=out;
-  const el0=elements[i];if(el0&&el0.style.display==='none'&&i<cardCapFor(w))el0.style.display='';
+  // 261117 대표 결정: 표본이 하나도 없으면(noFit — 좁은 화면 소수 카드 궤도 숨김 포함) 굽는 동안의 숨김을 되돌리지 않는다.
+  const el0=elements[i];if(el0&&el0.style.display==='none'&&i<cardCapFor(w)&&!noFit[i])el0.style.display='';
   return out;};
  // 좁은 화면 반지름 표가 다르므로 폭 대역이 바뀔 때만 궤도 애니메이션을 다시 건다(창 크기가 바뀔 때 몇 번).
  let orbitBand=null,orbitBox=null;
@@ -570,10 +572,12 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
    avgScales[i]=avgScaleOf(c,w,h);
    const cfg=(narrow?ringsNarrow:rings)[c.ring],th=c.baseAngle+phase*cfg.speed+c.phaseOffset;
    let x=Math.cos(th)*cfg.rx,y=Math.sin(th)*cfg.ry+cfg.band+Math.sin(th*1.7+c.phaseOffset*3)*45,z=Math.sin(th+1.1+c.phaseOffset*4)*cfg.zAmp+cfg.zBase+c.zOffset;
-   if(!demo&&cards.length<=8){const angle=i*Math.PI*2/cards.length+phase;x=Math.cos(angle)*Math.min(w*.34,420);y=Math.sin(angle)*Math.min(h*.3,250)+(i%2===0?80:-80);z=0;}
+   const fewHide=!demo&&cards.length<=8&&w<=650; // 261117 대표 결정: 좁은 화면 소수 카드(≤8)는 궤도 카드를 숨긴다 — 가운데 카드·단추·숫자에 집중(9장 이상은 기존 좁은 화면 궤도)
+   if(!fewHide&&!demo&&cards.length<=8){const angle=i*Math.PI*2/cards.length+phase;x=Math.cos(angle)*Math.min(w*.34,420);y=Math.sin(angle)*Math.min(h*.3,250)+(i%2===0?80:-80);z=0;}
    const sc=Math.max(.18,Math.min(narrow?1.1:1.82,1050/(1050-z)));
-   placeCard(elements[i],c,i,th,x,y,z,sc,w,h,fit,narrow,zs,warmups);
-   if(noFit[i])elements[i].style.display='none';else if(i<cap&&!floatAnims[i])startFloat(i);});
+   if(fewHide){elements[i].style.display='none';noFit[i]=true;console.log('[few] hide',i,'of',cards.length);}
+   else{placeCard(elements[i],c,i,th,x,y,z,sc,w,h,fit,narrow,zs,warmups);
+   if(noFit[i])elements[i].style.display='none';else if(i<cap&&!floatAnims[i])startFloat(i);}});
   if(needBake){elements.forEach((el,i)=>{orbitKF[i]=null;});elements.forEach((el,i)=>{if(i<cap)startOrbit(i,w,h,warmups);});orbitBox=boxKey;}
   orbitBand=band;
   camWrite();
@@ -593,6 +597,7 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
   const zs=safeZone?{l:safeZone.l-12,t:safeZone.t-12,r:safeZone.r+12,b:safeZone.b+12}:null,fit=Math.min(1,w/780,h/850)*(w<=650?.5:1),narrow=w<=650;
   cards.forEach((c,i)=>{const el=elements[i],cfg=(narrow?ringsNarrow:rings)[c.ring];const th=c.baseAngle+phase*cfg.speed+c.phaseOffset;
    let x=Math.cos(th)*cfg.rx,y=Math.sin(th)*cfg.ry+cfg.band+Math.sin(th*1.7+c.phaseOffset*3)*45,z=Math.sin(th+1.1+c.phaseOffset*4)*cfg.zAmp+cfg.zBase+c.zOffset;
+   if(!demo&&cards.length<=8&&w<=650){el.style.display='none';return;} // 261117: 좁은 화면 소수 카드 숨김 유지
    if(!demo&&cards.length<=8){const angle=i*Math.PI*2/cards.length+phase;x=Math.cos(angle)*Math.min(w*.34,420);y=Math.sin(angle)*Math.min(h*.3,250)+(i%2===0?80:-80);z=0;}
    const sc=Math.max(.18,Math.min(narrow?1.1:1.82,1050/(1050-z)));
    const at=placeCard(el,c,i,th,x,y,z,sc,w,h,fit,narrow,zs,warmups);
