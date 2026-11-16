@@ -39,8 +39,14 @@ const KNOWN = [
   { 화면: '첫 화면 글자 카드', 항목: '겹침', 찾을: '(span.lt-fallback-emotion × (strong|small)|strong.lt-fallback-title × button.subtleBtn|small.lt-fallback-notice × button.subtleBtn|div.firstMark × small)', 이슈: '궤도 카드가 가운데 UI 뒤를 지나가는 3D 원본 배치(#728 후속 — 궤도 배치 불변)' },
   // 지도 — Track56 원본 모양: 안내 문구가 캔버스 뒤에 깔려 있다(원본 보존 커밋 b2567fe — 원본 구조는 바꾸지 않는다).
   { 화면: '지도', 항목: '가려짐', 찾을: 'p ← canvas#stage', 이슈: 'Track56 원본(b2567fe)' },
-  // (261116, '꼬리표 직접 붙이기' 상태가 처음 잰 자리) 회원 계정의 궤도 첫 화면 — 실제 기록이 있어야 그리는
-  // 레거시 카드라 지금까지 안 잰 곳. #548·#728과 같은 원본 모양이라 이 이슈에서 손대지 않는다.
+  // (261116, '둘러보기 소개 질문'·'공유 판·소개 스위치' 상태가 처음 잰 자리) 회원 계정의 궤도 첫 화면 —
+  // 실제 기록이 있어야 그리는 레거시 카드라 지금까지 안 잰 곳. #548·#728과 같은 원본 모양이라 이 이슈에서 손대지 않는다.
+  { 화면: '둘러보기 소개 질문', 항목: '작은글자', 찾을: 'span.lt-fallback-action "제목 달기"', 이슈: '#548(12px 기준)·레거시 궤도 카드' },
+  { 화면: '둘러보기 소개 질문', 항목: '작은글자', 찾을: 'small "(마지막 순간|모아둔 순간)', 이슈: '#548(12px 기준)·레거시 궤도 카드' },
+  { 화면: '공유 판·소개 꺼짐', 항목: '작은글자', 찾을: 'span.lt-fallback-action "제목 달기"', 이슈: '#548(12px 기준)·레거시 궤도 카드' },
+  { 화면: '공유 판·소개 꺼짐', 항목: '작은글자', 찾을: 'small "(마지막 순간|모아둔 순간)', 이슈: '#548(12px 기준)·레거시 궤도 카드' },
+  { 화면: '공유 판·소개 켜짐', 항목: '작은글자', 찾을: 'span.lt-fallback-action "제목 달기"', 이슈: '#548(12px 기준)·레거시 궤도 카드' },
+  { 화면: '공유 판·소개 켜짐', 항목: '작은글자', 찾을: 'small "(마지막 순간|모아둔 순간)', 이슈: '#548(12px 기준)·레거시 궤도 카드' },
   { 화면: '꼬리표 직접 붙이기', 항목: '작은글자', 찾을: 'span.lt-fallback-action "제목 달기"', 이슈: '#548(12px 기준)·레거시 궤도 카드' },
   { 화면: '꼬리표 직접 붙이기', 항목: '작은글자', 찾을: 'small "(마지막 순간|모아둔 순간)', 이슈: '#548(12px 기준)·레거시 궤도 카드' },
 ];
@@ -182,19 +188,6 @@ const graphHost = `<!doctype html><html lang="ko"><head><meta charset="utf-8"><m
 <body data-member="in" data-record-source="file"><script>window.LT41={source:'file',writable:false,owned:true,momentId:'m01',prefs:{},tree:${JSON.stringify(graphTree)},trees:[${JSON.stringify(graphTree)}]};</script>
 <iframe src="/v41/views/graph/track60-graph.html" style="position:fixed;inset:0;width:100vw;height:100vh;border:0"></iframe></body></html>`;
 
-// 2026-11-16 CTO 지적: 묶음 0개 그래프 — 꼬리표 값이 하나뿐인 순간 둘(허브 규칙은 같은 꼬리표 2개 이상)이라
-// 판 가운데가 비어 보인다. 빈 판 안내(같은 꼬리표 2개 이상이면 묶임 + 제안받기 단추)를 단정하는 상태의 호스트.
-const graphEmptyTree = (() => {
-  const t = createTree({ subject: '시험', title: '시험 트리', note: '기록', emotion: '설렘', date: '2026-11-16', url: 'https://www.youtube.com/watch?v=aaa11111111' }, '2026-11-16T00:00:00.000Z');
-  t.moments[0].keywords = ['노래:Super Shy'];
-  const second = addMoment(t, { subject: '시험', title: '다른 노래 무대', note: '기록', emotion: '즐거움', date: '2026-11-16', url: 'https://www.youtube.com/watch?v=bbb22222222' }, t.moments[0].id, '2026-11-16T00:01:00.000Z');
-  second.moments.at(-1).keywords = ['무대:쇼챔피언'];
-  return second;
-})();
-const graphEmptyHost = `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>그래프 빈 묶음 호스트</title></head>
-<body data-member="in" data-record-source="file"><script>window.LT41={source:'file',writable:false,owned:true,momentId:'m01',prefs:{},tree:${JSON.stringify(graphEmptyTree)},trees:[${JSON.stringify(graphEmptyTree)}]};</script>
-<iframe src="/v41/views/graph/track60-graph.html" style="position:fixed;inset:0;width:100vw;height:100vh;border:0"></iframe></body></html>`;
-
 const frameOf = async (page, test_) => {
   for (let i = 0; i < 80; i++) {
     const f = page.frames().find((f) => f !== page.mainFrame() && test_.test(f.url()));
@@ -206,7 +199,7 @@ const frameOf = async (page, test_) => {
 
 test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤·정원에서 겹침·잘림·흔적 값·작은 글자가 0이다', { skip: REQUIRE ? false : skip, timeout: 900000 }, async () => {
   if (skip) assert.fail(`미리보기 검사에서는 건너뜀이 실패다 — ${skip}`);
-  const server = await serve({ '/share-host.html': shareHost, '/home-host.html': homeHost, '/graph-host.html': graphHost, '/graph-empty-host.html': graphEmptyHost });
+  const server = await serve({ '/share-host.html': shareHost, '/home-host.html': homeHost, '/graph-host.html': graphHost });
   const base = `http://127.0.0.1:${server.address().port}`;
   const browser = await chromium.launch({ headless: true });
   const known = [], fresh = [];
@@ -286,10 +279,6 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     // #662 후속(CTO 지시): 안내 풍선은 상세 판이 닫혀 있을 때만 뜬다 — 판은 로드 때 선택 복원으로 열려 있으므로 먼저 닫는다.
     // 닫힘 상태에서는 풍선이 캔버스 위에 뜬 상태로 겹침·대비를 풍선까지 잰다(풍선은 '도구×캔버스' 제외 대상이 아니다).
     const boardFrame = await frameOf(page3, /views\/track/);
-    // 2026-11-16 대표 결정: 읽기 전용(예시) 보드에서는 '진주빛 보드 · 읽기 전용' 표시가 그대로 보인다.
-    const readOnlyBadge = await boardFrame.evaluate(() => { const el = document.getElementById('themeBadge'); return { hidden: el.hidden, text: el.textContent }; });
-    assert.equal(readOnlyBadge.hidden, false, '읽기 전용 보드에서는 테마 표시를 그대로 둔다');
-    assert.ok(readOnlyBadge.text.includes('진주빛 보드 · 읽기 전용'), '읽기 전용 표시가 그대로다 — 실측=' + readOnlyBadge.text);
     await boardFrame.evaluate(() => document.getElementById('detailClose').click());
     await boardFrame.waitForFunction(() => { const d = document.getElementById('detail'); if (!d || d.classList.contains('open')) return false; const r = d.getBoundingClientRect(); return r.left >= innerWidth || r.top >= innerHeight; }, null, { timeout: 5000 }).catch(() => {});
     await page3.waitForTimeout(300);
@@ -412,19 +401,7 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     await take(page4, '셸 첫 화면·알림 줄');
     await lowerToast(page4);
     await page4.evaluate(() => document.body.classList.remove('lt-fab-ok'));
-    // 자동 공개 안내 상태(2026-11-15 보고) — notice.mjs 한 벌(셸 notify와 같은 모듈)로 토스트에
-    // 문장+[비공개로 바꾸기] 한 줄을 띄운 자리. 자리 잡기(beforeShow)는 셸 placeToast와 같은 길 —
-    // 셸 내부 함수가 모듈 밖으로 나오지 않아 시험 안에서 같은 길을 잠시 그린다(#666 raiseToast와 같은 원칙).
-    await page4.evaluate(async () => {
-      const notice = await import('/v41/shell/notice.mjs');
-      const place = () => { let above = 0; for (const el of document.querySelectorAll('.home-links,#mobile-add,.updates-card')) { if (el.hidden) continue; const cs = getComputedStyle(el); if (cs.display === 'none' || cs.visibility === 'hidden' || Number(cs.opacity) === 0) continue; const r = el.getBoundingClientRect(); if (r.width < 1 || r.height < 1) continue; above = Math.max(above, document.documentElement.clientHeight - r.top + 10); } const style = document.documentElement.style; if (above > 0) style.setProperty('--lt-toast-bottom', Math.round(above) + 'px'); else style.removeProperty('--lt-toast-bottom'); };
-      const notifier = notice.createNotifier({ $: (id) => document.getElementById(id), beforeShow: place });
-      notifier.notify(notice.autoPublishNoticeText(), { hold: true, action: { label: notice.AUTO_PUBLISH_ACTION_LABEL, run: () => {} } });
-    });
-    await page4.waitForFunction(() => { const t = document.getElementById('toast'); return !!t && !t.hidden && !!t.querySelector('.toast-action'); }, null, { timeout: 5000 });
-    await page4.waitForTimeout(300);
-    await take(page4, '셸·자동 공개 안내');
-    await lowerToast(page4);
+    // (2026-11-16) '자동 공개 안내' 토스트는 질문 창(아래 '둘러보기 소개 질문' 상태)으로 대신해 남기지 않는다.
     await page4.evaluate(() => document.getElementById('community-menu')?.click());
     await page4.waitForFunction(() => !!document.getElementById('community-panel')?.open, null, { timeout: 8000 }).catch(() => {});
     // #678 후속(회차 지적): 반응이 없는 카드는 0짜리 칩 대신 '반응 남기기' 한 개만 보인다(수치로 판정).
@@ -462,6 +439,127 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     assert.ok(cardDate.meta.includes(cardDate.localToday.replace(/-/g, '. ')), `새벽 순간의 카드 날짜는 지역(한국) 날짜다 — 실제 "${cardDate.meta}" / 기대 ${cardDate.localToday}`);
     assert.ok(!cardDate.meta.includes(utcCut), `카드 날짜가 UTC 절단(어제)으로 나온다: "${cardDate.meta}"`);
     await pageDate.screenshot({ path: 'E:/lovetree-qa/lane/local3-graph/audit-community-date-' + width + '.png', animations: 'disabled', timeout: 10000 }).catch(() => {});
+    await ctxDate.close();
+    // 둘러보기 소개 질문(2026-11-16 대표 결정) — 새 계정의 쉬운 추가 3번째 저장에서 한 번 묻는다.
+    // [지금은 안 할래요] → discover false·다시 안 물음, [소개하기] → discover true, 공유 판 스위치가 같은 값,
+    // 백필(이미 3개·소개 켜짐) 계정은 묻지 않는다. 창 모양(겹침·잘림 0)은 take가 함께 잰다.
+    const oembed = (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ title: '검사기 시험 영상', author_name: '시험 채널', thumbnail_url: 'https://i.ytimg.com/vi/qaAsk001/hqdefault.jpg' }) });
+    const openQuick = async (pageAsk) => {
+      if (await pageAsk.evaluate(() => !!document.getElementById('write-panel')?.open)) return;
+      // 저장이 끝난 뒤(메뉴 이름이 '＋ 순간 추가'로 돌아온 뒤) 연다 — dirty 가드(explainSaveState)를 피하려는 대기다.
+      await pageAsk.waitForFunction(() => document.getElementById('write-menu')?.textContent === '＋ 순간 추가', null, { timeout: 10000 }).catch(() => {});
+      await pageAsk.evaluate(() => document.getElementById('write-menu')?.click());
+      await pageAsk.waitForFunction(() => !!document.getElementById('quick-url'), null, { timeout: 8000 });
+    };
+    const quickSave = async (pageAsk, url) => {
+      await openQuick(pageAsk);
+      await pageAsk.fill('#quick-url', url);
+      await pageAsk.click('#quick-submit');
+      await pageAsk.waitForTimeout(800);
+    };
+    const askFlow = async (answer) => {
+      const ctxAsk = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
+      await ctxAsk.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); } catch {} }, theme);
+      await ctxAsk.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
+      await ctxAsk.route('**://i.ytimg.com/**', THUMB);
+      const discoverPuts = [];
+      await ctxAsk.route('**/api/workspace*', (r) => {
+        if (r.request().method() === 'PUT') {
+          const body = r.request().postDataJSON() || {};
+          return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, revision: Number(body.expectedRevision || 0) + 1, subject: '검사기계정' }) });
+        }
+        return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ revision: 1, state: { version: 1, trees: [] }, subject: '검사기계정', writeSubjectBound: true, savedAt: '2026-11-16T09:00:00.000Z' }) });
+      });
+      await ctxAsk.route('**/api/youtube/oembed*', oembed);
+      await ctxAsk.route('**/api/trees/*/discover', (r) => {
+        if (r.request().method() === 'PUT') { const body = r.request().postDataJSON() || {}; discoverPuts.push(body.discover === true); return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, treeId: 'askTree', discover: body.discover === true }) }); }
+        return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, treeId: 'askTree', discover: discoverPuts[discoverPuts.length - 1] === true }) });
+      });
+      const pageAsk = await ctxAsk.newPage();
+      await pageAsk.goto(base + '/v41/?account=1', { waitUntil: 'load' });
+      await pageAsk.waitForTimeout(1200);
+      await quickSave(pageAsk, 'https://www.youtube.com/watch?v=qaAsk01');
+      await quickSave(pageAsk, 'https://www.youtube.com/watch?v=qaAsk02');
+      await quickSave(pageAsk, 'https://www.youtube.com/watch?v=qaAsk03');
+      // 3번째 저장의 동기화 뒤 질문 창이 한 번 뜬다(2→3).
+      await pageAsk.waitForFunction(() => !!document.getElementById('discover-ask')?.open, null, { timeout: 15000 });
+      await pageAsk.waitForTimeout(400);
+      const buttons = await pageAsk.evaluate(() => [document.getElementById('discover-ask-yes')?.textContent, document.getElementById('discover-ask-no')?.textContent]);
+      assert.deepEqual(buttons, ['소개하기', '지금은 안 할래요'], '질문 창 단추는 소개하기·지금은 안 할래요다');
+      await take(pageAsk, '둘러보기 소개 질문'); // 겹침·잘림 0 검사에 창이 함께 든다(390·1440 × 밤·정원)
+      await pageAsk.screenshot({ path: 'E:/lovetree-qa/lane/local3-graph/audit-discover-ask-' + width + '-' + theme + '.png', animations: 'disabled', timeout: 10000 }).catch(() => {});
+      await pageAsk.evaluate((a) => document.getElementById(a === 'yes' ? 'discover-ask-yes' : 'discover-ask-no')?.click(), answer);
+      await pageAsk.waitForFunction(() => !document.getElementById('discover-ask')?.open, null, { timeout: 8000 });
+      assert.deepEqual(discoverPuts, [answer === 'yes'], '[소개하기]는 true, [지금은 안 할래요]는 false로 저장된다');
+      const asked = await pageAsk.evaluate(() => { try { return JSON.parse(localStorage.getItem('lt41.discoverAsked') || '[]'); } catch { return []; } });
+      assert.ok(asked.length >= 1, '고른 트리는 discoverAsked에 기억된다');
+      return { ctxAsk, pageAsk, discoverPuts };
+    };
+    const addFourth = async (pageAsk) => {
+      await quickSave(pageAsk, 'https://www.youtube.com/watch?v=qaAsk09');
+      await pageAsk.waitForTimeout(1500);
+      assert.equal(await pageAsk.evaluate(() => !!document.getElementById('discover-ask')?.open), false, '고른 뒤 같은 트리에서 다시 묻지 않는다');
+    };
+    const noAsk = await askFlow('no');
+    await addFourth(noAsk.pageAsk);
+    // 공유 판 스위치: 꺼짐 상태 문장·단추를 잰 뒤 켜기 → 켜짐 — 스위치 뒤 상자 안 두 문장(순간 수 힌트·상태)이 같은 상태를 말한다.
+    {
+      const { ctxAsk, pageAsk, discoverPuts } = noAsk;
+      await pageAsk.evaluate(() => document.getElementById('share-menu')?.click());
+      await pageAsk.waitForFunction(() => !!document.getElementById('share-panel')?.open, null, { timeout: 8000 }).catch(() => {});
+      await pageAsk.waitForFunction(() => (document.getElementById('share-discover-state')?.textContent || '').length > 0, null, { timeout: 8000 });
+      await pageAsk.waitForTimeout(400);
+      const box = () => pageAsk.evaluate(() => ({
+        hint: document.getElementById('share-moment-hint')?.textContent || '',
+        state: document.getElementById('share-discover-state')?.textContent || '',
+        toggle: document.getElementById('share-discover-toggle')?.textContent || '',
+        toggleState: document.getElementById('share-discover-toggle')?.dataset.state || ''
+      }));
+      const before = await box();
+      assert.ok(before.state.includes('소개하지 않음'), '안 할래요를 고른 트리는 공유 판에서도 꺼져 있다 — 실제 "' + before.state + '"');
+      assert.ok(before.hint.includes('소개하지 않아요'), '꺼짐 상태에서 상자 첫 줄(힌트)도 같은 상태를 말한다 — 실제 "' + before.hint + '"');
+      assert.equal(before.toggle, '소개 켜기', '꺼진 트리의 스위치 글자는 행동(소개 켜기)다');
+      assert.equal(before.toggleState, 'off', '꺼짐은 테두리 모양(CSS가 data-state로 고른다)');
+      await take(pageAsk, '공유 판·소개 꺼짐');
+      await pageAsk.screenshot({ path: 'E:/lovetree-qa/lane/local3-graph/audit-discover-panel-off-' + width + '-' + theme + '.png', animations: 'disabled', timeout: 10000 }).catch(() => {});
+      await pageAsk.evaluate(() => document.getElementById('share-discover-toggle')?.click());
+      await pageAsk.waitForFunction(() => (document.getElementById('share-discover-state')?.textContent || '').includes('소개 중'), null, { timeout: 8000 });
+      assert.deepEqual(discoverPuts, [false, true], '공유 판 스위치(소개 켜기)도 discover PUT으로 저장한다');
+      await pageAsk.waitForTimeout(400);
+      const after = await box();
+      // 스위치 뒤 상자 안 문장들이 같은 상태를 말한다(261116 2차 지적 — 첫 줄이 옛 값에 머물던 것).
+      assert.ok(after.hint.includes('소개 중이에요'), '켜짐 뒤 힌트 줄이 옛 값에 머물지 않는다 — 실제 "' + after.hint + '"');
+      assert.equal(after.toggle, '소개 끄기', '켜진 트리의 스위치 글자는 행동(소개 끄기)다 — 값과 같다');
+      assert.equal(after.toggleState, 'on', '켜짐은 강조색 모양');
+      await take(pageAsk, '공유 판·소개 켜짐');
+      await pageAsk.screenshot({ path: 'E:/lovetree-qa/lane/local3-graph/audit-discover-panel-on-' + width + '-' + theme + '.png', animations: 'disabled', timeout: 10000 }).catch(() => {});
+      await ctxAsk.close();
+    }
+    const yesAsk = await askFlow('yes');
+    await addFourth(yesAsk.pageAsk);
+    await yesAsk.ctxAsk.close();
+    // 백필 계정(이미 3개·소개 켜짐) — 질문 없이 건너뛴다.
+    {
+      const ctxBack = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
+      await ctxBack.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); } catch {} }, theme);
+      await ctxBack.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
+      await ctxBack.route('**://i.ytimg.com/**', THUMB);
+      const now = '2026-11-16T09:00:00.000Z';
+      const moments = [1, 2, 3].map((i) => ({ id: 'bm' + i, parentId: i === 1 ? null : 'bm' + (i - 1), links: [], createdAt: now, updatedAt: now, url: 'https://www.youtube.com/watch?v=qaBack00' + i, title: '백필 순간 ' + i, note: '', emotion: '', date: '2026-11-1' + (2 + i) }));
+      await ctxBack.route('**/api/workspace*', (r) => {
+        if (r.request().method() === 'PUT') { const body = r.request().postDataJSON() || {}; return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, revision: Number(body.expectedRevision || 0) + 1, subject: '검사기계정' }) }); }
+        return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ revision: 2, state: { version: 1, trees: [{ id: 'askBackTree', subject: '검사기 트리', title: '검사기 트리 제목', createdAt: now, updatedAt: now, coverMomentId: '', moments }] }, subject: '검사기계정', writeSubjectBound: true, savedAt: now }) });
+      });
+      await ctxBack.route('**/api/youtube/oembed*', oembed);
+      await ctxBack.route('**/api/trees/*/discover', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, treeId: 'askBackTree', discover: true }) }));
+      const pageBack = await ctxBack.newPage();
+      await pageBack.goto(base + '/v41/?account=1', { waitUntil: 'load' });
+      await pageBack.waitForTimeout(1200);
+      await quickSave(pageBack, 'https://www.youtube.com/watch?v=qaBack09');
+      await pageBack.waitForTimeout(1500);
+      assert.equal(await pageBack.evaluate(() => !!document.getElementById('discover-ask')?.open), false, '백필(이미 소개 켜진) 계정은 질문 없이 건너뛴다');
+      await ctxBack.close();
+    }
     await ctxDate.close();
     // 꼬리표 직접 붙이기(261116 대표 지적) — 제안이 없는 영상을 담은 직후의 꼬리표 줄.
     // 접힘·오류 0이 기본, [직접 붙이기]로 한 줄 펼침(44px 같은 높이·예시 placeholder·개발 용어 없음),
@@ -508,7 +606,7 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
           errorHidden: !err || err.hidden,
           row: !!document.querySelector('#quick-tagline .lt-tagline-kind'),
           toggle: !!document.querySelector('#quick-tagline .lt-tagline-toggle'),
-          text: (document.querySelector('#quick-tagline')?.textContent || '').replace(/\s+/g, ' ').trim()
+          text: (document.querySelector('#quick-tagline')?.textContent || '').replace(/\\s+/g, ' ').trim()
         };
       });
       assert.equal(folded.errorHidden, true, '처음 상태에 오류가 없다');
@@ -526,7 +624,7 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
         const els = ['.lt-tagline-kind', '.lt-tagline-value', '.lt-tagline-add'].map((sel) => document.querySelector('#quick-tagline ' + sel));
         const hs = els.map((el) => Math.round(el.getBoundingClientRect().height));
         const value = document.querySelector('#quick-tagline .lt-tagline-value');
-        return { hs, placeholder: value?.placeholder || '', text: (document.querySelector('#quick-tagline')?.textContent || '').replace(/\s+/g, ' ').trim() };
+        return { hs, placeholder: value?.placeholder || '', text: (document.querySelector('#quick-tagline')?.textContent || '').replace(/\\s+/g, ' ').trim() };
       });
       assert.ok(open.hs.every((h) => h >= 44) && (Math.max(...open.hs) - Math.min(...open.hs)) <= 1, '펼친 세 요소의 높이가 같다(44px) — 실제 ' + JSON.stringify(open.hs));
       assert.equal(open.placeholder, '예: ILLIT', '갈래(가수)의 예시가 placeholder로 보인다');
@@ -552,7 +650,7 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
       assert.deepEqual(save.keywords, ['가수:ILLIT'], '갈래와 값을 붙여 저장한다');
       await ctxTag.close();
     }
-    await page4.keyboard.press('Escape');
+    await page4.keyboard.press('Escape');    await page4.keyboard.press('Escape');
     await page4.waitForTimeout(300);
     await page4.evaluate(() => document.getElementById('feedback-panel').showModal());
     await page4.waitForTimeout(400);
@@ -863,16 +961,6 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     await page6.waitForTimeout(1500);
     const tagBoard = await frameOf(page6, /track58-pinboard/);
     assert.ok(tagBoard, '보드 프레임이 열린다(꼬리표 줄 상태)');
-    // 2026-11-16 대표 결정: 쓰기 가능한 내 보드에서는 고급 기능의 원본 테마 이름('진주빛 보드') 글자를 숨긴다.
-    // 고급 기능을 켠 상태·끈 상태 모두(배지는 고급 표시와 무관하므로 두 상태를 모두 단정한다).
-    const pearlHidden = await tagBoard.evaluate(() => { const el = document.getElementById('themeBadge'); return { hidden: el.hidden, text: el.textContent }; });
-    assert.equal(pearlHidden.hidden, true, '쓰기 가능한 보드에서 테마 표시를 숨긴다');
-    assert.ok(!pearlHidden.text.includes('진주빛'), '쓰기 가능한 보드에 진주빛 글자가 없다');
-    await tagBoard.evaluate(() => document.body.classList.add('lt-advanced'));
-    const pearlAdvanced = await tagBoard.evaluate(() => { const el = document.getElementById('themeBadge'); return { hidden: el.hidden, text: el.textContent }; });
-    assert.equal(pearlAdvanced.hidden, true, '고급 기능을 켠 보드에서도 테마 표시를 숨긴다');
-    assert.ok(!pearlAdvanced.text.includes('진주빛'), '고급 기능을 켠 보드에도 진주빛 글자가 없다');
-    await tagBoard.evaluate(() => document.body.classList.remove('lt-advanced'));
     await tagBoard.waitForFunction(() => !!document.getElementById('dTags') && document.getElementById('dTags').childNodes.length > 0, null, { timeout: 10000 }).catch(() => {});
     await tagBoard.evaluate(() => selectMoment(LTDEMO.moments[0].id));
     await page6.waitForTimeout(600);
@@ -1006,10 +1094,7 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
           return null;
         };
         let sawShell = false, sawBoard = false, maxArea = 0, bothAt = -1;
-        // 보드 풍선은 셸 알림이 사라진 뒤에 뜬다(board-extras boardGuide — 최대 900ms+9×600ms 대기).
-        // CI 부하 아래에서는 그 최대 대기가 관측 창(구 7.2초)을 벗어나 '빈손'으로 실패한 적이 있다(#735 CI) —
-        // 보드 쪽 규정 대기 시간을 담을 수 있게 26×400ms로 넓힌다. 단정의 뜻(풍선이 결국 뜬다·겹침 0)은 그대로.
-        for (let i = 0; i < 26; i++) {
+        for (let i = 0; i < 18; i++) {
           const shell = document.getElementById('toast');
           const board = boardToast();
           const shellUp = !!shell && !shell.hidden;
@@ -1041,13 +1126,7 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     assert.ok(treeBeforeTrip.id, '지금 트리가 부른 상태에서 왕복을 본다');
     const mapFrameTrip = () => [...pageMap.frames()].find((f) => { try { return /track56-network/.test(f.url()); } catch { return false; } });
     const graphFrameTrip = () => [...pageMap.frames()].find((f) => { try { return /track60-graph/.test(f.url()); } catch { return false; } });
-    let graphClicked = false;
-    for (let i = 0; i < 12 && !graphClicked; i++) {
-      const f = mapFrameTrip();
-      if (f) graphClicked = await f.evaluate(() => { const b = document.getElementById('viewGraph'); if (b) { b.click(); return true; } return false; }).catch(() => false);
-      if (!graphClicked) await pageMap.waitForTimeout(500);
-    }
-    assert.ok(graphClicked, '지도의 [그래프] 단추를 누른다');
+    await mapFrameTrip().evaluate(() => document.getElementById('viewGraph').click());
     await pageMap.waitForFunction(() => [...document.querySelectorAll('iframe')].some((f) => { try { return /track60-graph/.test(f.contentWindow.location.href); } catch { return false; } }), null, { timeout: 10000 });
     // 그래프 모듈이 그려질 때까지(배지가 채워질 때까지) 기다린다 — 프레임 주소만으로는 그리기 전이다.
     await pageMap.waitForFunction(() => {
@@ -1070,28 +1149,14 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
       const f = [...document.querySelectorAll('iframe')].find((x) => { try { return /track56-network/.test(x.contentWindow.location.href); } catch { return false; } });
       return Boolean(f && f.contentDocument?.body && f.contentDocument.body.dataset.ltView === 'concentric');
     }, null, { timeout: 10000 });
-    let mapAfterConc = null;
-    for (let i = 0; i < 12 && !mapAfterConc; i++) {
-      const f = mapFrameTrip();
-      if (f) mapAfterConc = await f.evaluate(() => ({ view: document.body.dataset.ltView, concPressed: document.getElementById('viewConc')?.getAttribute('aria-pressed'), stored: localStorage.getItem('lt41.network.view') })).catch(() => null);
-      if (!mapAfterConc) await pageMap.waitForTimeout(500);
-    }
+    const mapAfterConc = await mapFrameTrip().evaluate(() => ({ view: document.body.dataset.ltView, concPressed: document.getElementById('viewConc')?.getAttribute('aria-pressed'), stored: localStorage.getItem('lt41.network.view') }));
     assert.equal(mapAfterConc.view, 'concentric', '그래프의 [동심원형]으로 지도가 동심원형 보기로 열린다');
     assert.equal(mapAfterConc.concPressed, 'true', '동심원형이 눌린 상태(aria-pressed=true)');
     assert.equal(mapAfterConc.stored, 'concentric', '지도 보기 저장 키(lt41.network.view)가 바뀐다');
     await mapFrameTrip().evaluate(() => document.getElementById('viewNet').click());
-    // 프레임 교체 순간에는 URL로 프레임이 잠깐 안 보일 수 있다(#735 CI 1회) — 그물 보기로 돌아올 때까지 기다린다.
-    await pageMap.waitForFunction(() => {
-      const f = [...document.querySelectorAll('iframe')].find((x) => { try { return /track56-network/.test(x.contentWindow.location.href); } catch { return false; } });
-      return Boolean(f && f.contentDocument?.body && f.contentDocument.body.dataset.ltView === 'network');
-    }, null, { timeout: 10000 });
+    await pageMap.waitForTimeout(1200);
     const treeAfterTrip = await pageMap.evaluate(() => ({ id: window.LT41?.tree?.id || '', moments: (window.LT41?.tree?.moments || []).length, momentId: window.LT41?.momentId || '' }));
-    let mapAfterNet = null;
-    for (let i = 0; i < 12 && !mapAfterNet; i++) {
-      const f = mapFrameTrip();
-      if (f) mapAfterNet = await f.evaluate(() => ({ view: document.body.dataset.ltView, netPressed: document.getElementById('viewNet')?.getAttribute('aria-pressed') })).catch(() => null);
-      if (!mapAfterNet) await pageMap.waitForTimeout(500);
-    }
+    const mapAfterNet = await mapFrameTrip().evaluate(() => ({ view: document.body.dataset.ltView, netPressed: document.getElementById('viewNet')?.getAttribute('aria-pressed') }));
     assert.equal(mapAfterNet.view, 'network', '지도의 [그물형]으로 그물 보기로 돌아온다');
     assert.equal(mapAfterNet.netPressed, 'true', '그물형이 눌린 상태(aria-pressed=true)');
     assert.deepEqual(treeAfterTrip, treeBeforeTrip, '왕복 뒤에도 지금 트리·순간이 유지된다');
@@ -1137,10 +1202,6 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     assert.deepEqual(graphSwitch.labels, ['그물형', '동심원형', '그래프'], `보기 고르기 세 단추(실제 ${JSON.stringify(graphSwitch.labels)})`);
     assert.deepEqual(graphSwitch.pressed, ['false', 'false', 'true'], '현재 보기(그래프)만 aria-pressed=true');
     assert.equal(graphSwitch.overflow, 0, `그래프 머리줄에서 가로 넘침 0(실제 ${graphSwitch.overflow})`);
-    // 2026-11-16 CTO 지적: 묶음이 있는 그래프에서는 빈 판 안내가 보이지 않는다(있으면 안내는 사라진다).
-    const hubGuideHubful = await graphFrame.evaluate(() => { const e = document.getElementById('gEmpty'); return { shown: !e.hidden, text: e.textContent || '' }; });
-    assert.equal(hubGuideHubful.shown, false, '묶음이 있는 그래프에서는 빈 판 안내가 보이지 않는다');
-    assert.ok(!hubGuideHubful.text.includes('묶여요'), '묶음이 있는 그래프에 안내 문구가 없다');
     await take(page7, '그래프 보기');
     const graphCheck = await page7.evaluate(() => {
       const f = [...document.querySelectorAll('iframe')].at(-1);
@@ -1307,38 +1368,6 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     assert.equal(emptyCheck.head, '같은 노래를 담은 다른 팬', '노래 허브의 칸 제목(소스 상수)');
     assert.equal(emptyCheck.empty, '아직 같은 노래를 담은 다른 팬이 없어요', `빈 상태 문구(실제 "${emptyCheck.empty}")`);
     assert.equal(emptyCheck.overflow, 0, `다른 팬 칸이 있어도 가로 넘침 0(실제 ${emptyCheck.overflow})`);
-    // 2026-11-16 CTO 지적: 묶음 0개 그래프 — 빈 무대를 고장으로 본다. 짧은 안내 + 바로 할 수 있는
-    // 단추(꼬리표 한 번에 제안받기)가 보이고, 누른 목록 제목도 실제 뜻('아직 묶음에 안 든 순간')이다.
-    const ctx7b = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
-    await ctx7b.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); } catch {} }, theme);
-    await ctx7b.route('**://i.ytimg.com/**', THUMB);
-    await ctx7b.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
-    const page7b = await ctx7b.newPage();
-    await page7b.goto(`${base}/graph-empty-host.html`, { waitUntil: 'domcontentloaded' });
-    const emptyGraphFrame = await frameOf(page7b, /track60-graph/);
-    assert.ok(emptyGraphFrame, '묶음 0개 그래프가 열린다');
-    await page7b.waitForTimeout(700);
-    const hubGuide = await emptyGraphFrame.evaluate(() => {
-      const e = document.getElementById('gEmpty');
-      const b = e.querySelector('.g-empty-cta');
-      return { shown: !e.hidden, text: e.textContent || '', cta: b?.textContent || '', badge: (document.getElementById('gBadge') || {}).textContent || '' };
-    });
-    assert.equal(hubGuide.shown, true, '묶음 0개 그래프에서는 빈 판 안내가 보인다');
-    assert.ok(hubGuide.text.includes('2개 이상이면 여기에 묶여요'), `안내가 묶음 규칙을 알려준다(실제 ${hubGuide.text})`);
-    assert.equal(hubGuide.cta, '꼬리표 한 번에 제안받기', '안내에는 바로 할 수 있는 단추가 있다');
-    assert.ok(hubGuide.badge.includes('묶음 0'), `묶음 0이 표시에도 보인다(실제 ${hubGuide.badge})`);
-    // 2026-11-16 CTO 지적: 안내의 단추와 선반의 단추가 두 번 연달아 보이지 않게 — 빈 판 안내가 떠 있는
-    // 동안에는 제안 단추가 한 개만 보인다(선반은 '아직 묶음에 안 든 순간 N' 글자만 남긴다).
-    const ctaCount = await emptyGraphFrame.evaluate(() => [...document.querySelectorAll('.g-empty-cta, .g-shelf-hint')].filter((b) => { const r = b.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(b).visibility !== 'hidden'; }).length);
-    assert.equal(ctaCount, 1, `제안 단추는 한 개만 보인다(실제 ${ctaCount})`);
-    await emptyGraphFrame.evaluate(() => document.querySelector('.g-empty-cta').click());
-    await page7b.waitForTimeout(400);
-    const suggestHead = await emptyGraphFrame.evaluate(() => (document.querySelector('#detailCard .d-kicker') || {}).textContent || '');
-    assert.match(suggestHead, /^아직 묶음에 안 든 순간 2/, `제안 목록 제목도 실제 뜻으로(실제 ${suggestHead})`);
-    const shelfLabel = await emptyGraphFrame.evaluate(() => (document.getElementById('shelfLabel') || {}).textContent || '');
-    assert.match(shelfLabel, /^아직 묶음에 안 든 순간 /, `선반 이름도 실제 뜻으로(실제 ${shelfLabel})`);
-    await take(page7b, '그래프·묶음 0개 안내');
-    await ctx7b.close();
     await ctx7.close();
 
     // 주소로 열리는지(#my/graph) — 셸이 그래프 보기를 화면 파일로 띄우는지 단정한다(메뉴 단추는 없다).

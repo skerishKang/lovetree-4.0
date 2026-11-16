@@ -36,7 +36,7 @@ import {createFeedbackBoard} from './feedback-board.mjs';
 import {mountUpdates} from './updates.mjs';
 import {connectionSignature} from './shell/panel-dirty.mjs';
 import {createLocation} from './shell/location.mjs';
-import {createNotifier, syncedNoticeText, newlyPublishedTrees, autoPublishNoticeText, AUTO_PUBLISH_ACTION_LABEL} from './shell/notice.mjs';
+import {createNotifier, syncedNoticeText, newlyPublishedTrees} from './shell/notice.mjs';
 import {paintLoginLinks,paintThemeControls,applyTheme as applyThemeFor,toggleTheme as toggleThemeFor} from './shell/theme.mjs';
 import {normalizeTitleDisplay, normalizeAccentColor, normalizeDateStyle, normalizeStartPlace, normalizeShareView, coverModeOf, normalizeCoverDesign} from './domain.mjs';
 import {backfillVideoTitles} from './title-backfill.mjs';
@@ -366,6 +366,8 @@ const shellMessages=createMessages({
   // #480 L13: 공유 목록·공유 미리보기의 날짜도 계정 설정 한 벌을 따른다(책·보드·지도·첫 화면과 같음).
   getDateStyle:()=>currentDateStyle(),
   shareApi,
+  discoverOf:treeId=>discoverState.has(treeId)?discoverState.get(treeId):null,
+  rememberDiscover:(treeId,discover)=>discoverState.set(treeId,discover===true),
   notify:text=>notify(text),
   panel:id=>panel(id),
   openSettingsData:intent=>openAccountData(intent),
@@ -716,31 +718,52 @@ function resumeMember(intent){resumeAfterStart=intent||'write';return startMembe
   $('save-actions').replaceChildren();
   $('save-feedback').hidden=false;
  }
-// 자동 공개 안내(2026-11-15 보고): 저장이 성공해 둘러보기에 새로 소개된 트리에 한 번 알린다.
-// 트리당 1회 기억은 이 기기(localStorage 'lt41.autoPublishNoted')에 두고, 비공개 트리는 서버에서
-// 공개 상태를 확인해 띄우지 않는다. 판정·문구는 notice.mjs 한 벌(#549와 같은 원칙).
+// 둘러보기 소개 질문(261116 대표 결정 — 기본 꺼짐·고객이 고름, 무료): 순간이 2개→3개가 되는 저장
+// 직후 한 번 묻는다(쉬운 추가·자세한 추가·책 추가 모두 — 저장 동기화 지점이 한 곳). 고른 값은
+// PUT /api/trees/<id>/discover(#739)로 저장하고, 한 트리에 한 번만 묻는다(고른 뒤 다시 묻지 않음).
+// 이미 소개가 켜진 트리(#739 백필)는 묻지 않는다. #718의 '공개됐어요' 안내는 이 질문 창으로 대신한다.
 const countTreeMoments=()=>{const out={};for(const tree of (model?.trees||[]))out[tree.id]=(tree.moments||[]).length;return out;};
-let treeCountsBefore=null;
-function autoPublishNotedList(){try{const raw=JSON.parse(localStorage.getItem('lt41.autoPublishNoted')||'[]');return Array.isArray(raw)?raw.filter(v=>typeof v==='string'):[]}catch{return[]}}
-function markAutoPublishNoted(treeId){try{const list=autoPublishNotedList();if(!list.includes(treeId))list.push(treeId);localStorage.setItem('lt41.autoPublishNoted',JSON.stringify(list));}catch{}}
-function markPublicNoticeShown(){try{localStorage.setItem('lt41.publicNoticeShown','1');}catch{}}
-// 안내의 [비공개로 바꾸기] — 공유 패널 #share-private과 같은 경로(shareApi.setTreeVisibility).
-function turnTreePrivate(treeId){
- shareApi.setTreeVisibility(treeId,'private').then(answer=>{
-  if(answer.ok)notify('비공개로 바꿨어요.',{hold:true});
-  else if(answer.code==='plus_required_private')notify('비공개는 Plus 전용이에요. 지금은 모든 트리가 공개로 유지돼요.',{hold:true});
-  else notify(answer.message||'공개 상태를 바꾸지 못했어요.',{hold:true});
- }).catch(()=>notify('공개 상태를 바꾸지 못했어요.',{hold:true}));
+function discoverAskedList(){try{const raw=JSON.parse(localStorage.getItem('lt41.discoverAsked')||'[]');return Array.isArray(raw)?raw.filter(v=>typeof v==='string'):[]}catch{return[]}}
+function markDiscoverAsked(treeId){try{const list=discoverAskedList();if(!list.includes(treeId))list.push(treeId);localStorage.setItem('lt41.discoverAsked',JSON.stringify(list));}catch{}}
+const discoverState=new Map(); // 트리 id → 마지막으로 확인한 소개 값(배너·공유 판이 같은 값을 본다)
+async function refreshTreeDiscover(treeId){
+ try{const answer=await shareApi.getTreeDiscover(treeId);if(!answer.ok)return null;
+  discoverState.set(treeId,answer.discover===true);return answer.discover===true;}catch{return null}
 }
-function notifyAutoPublish(treeId){
- if(autoPublishNotedList().includes(treeId))return;
- void shareApi.getTreeVisibility(treeId).then(answer=>{
-  if(!answer.ok)return; // 확인 실패·로그인 만료 — 마킹하지 않아 다음 저장 때 다시 본다
-  markAutoPublishNoted(treeId);
-  if(answer.visibility==='private')return; // 비공개 트리는 둘러보기에 소개되지 않는다 — 안내를 띄우지 않는다
-  markPublicNoticeShown(); // #538 1회 안내와 하나로 — 같은 사실을 두 번 띄우지 않는다
-  notify(autoPublishNoticeText(),{hold:true,action:{label:AUTO_PUBLISH_ACTION_LABEL,run:()=>turnTreePrivate(treeId)}});
- }).catch(()=>{});
+async function askDiscover(treeId){
+ try{
+  const discover=await refreshTreeDiscover(treeId);
+  if(discover===null)return; // 확인 실패 — 마킹하지 않아 다음 저장 때 다시 본다
+  markDiscoverAsked(treeId);
+  if(discover===true)return; // 이미 소개 켜진 트리(#739 백필)는 묻지 않는다
+  $('discover-ask-feedback').textContent='';
+  $('discover-ask').dataset.treeId=treeId;
+  $('discover-ask').showModal();
+  try{localStorage.setItem('lt41.publicNoticeShown','1');}catch{} // 질문 창이 #538 첫 공개 안내와 같은 사실을 대신한다 — 답한 뒤 배너가 또 뜨지 않게
+ }catch{/* 이미 다른 창이 열려 있으면 다음 저장 때 다시 본다 */}
+}
+function answerDiscover(discover){
+ const treeId=$('discover-ask').dataset.treeId;
+ if(!treeId)return;
+ shareApi.setTreeDiscover(treeId,discover).then(answer=>{
+  if(!answer.ok){$('discover-ask-feedback').textContent=answer.message||'소개 설정을 저장하지 못했어요.';return;}
+  discoverState.set(treeId,discover);
+  markDiscoverAsked(treeId);
+  $('discover-ask').close();
+  notify(discover?'둘러보기에 소개했어요. 공유 판에서 언제든 끌 수 있어요.':'링크를 받은 사람만 볼 수 있어요. 공유 판에서 언제든 켤 수 있어요.',{hold:true});
+ }).catch(()=>{$('discover-ask-feedback').textContent='소개 설정을 저장하지 못했어요.';});
+}
+$('discover-ask-yes').onclick = () => answerDiscover(true);
+$('discover-ask-no').onclick = () => answerDiscover(false);
+// 상단 배너(첫 저장 안내): 소개 상태에 맞는 문장 — 이름·아이디는 안 보인다는 말은 유지한다.
+async function notifyPublicBanner(treeId){
+ let discover=false;
+ if(treeId){const got=await refreshTreeDiscover(treeId);if(got!==null)discover=got;}
+  const text=discover
+   ?'이 트리는 둘러보기에 소개 중이에요. 공유 판에서 끌 수 있어요. 이름·아이디는 보이지 않아요.'
+   :'내 트리는 링크를 받은 사람만 볼 수 있어요. 둘러보기 소개는 공유 판에서 켤 수 있어요. 이름·아이디는 보이지 않아요.';
+  try{localStorage.setItem('lt41.publicNoticeShown','1');}catch{} // #538 기기당 1회 — 질문 창과 같은 사실을 알리는 안내다
+  notify(text);
 }
 function memberStatus(status){
   shellIntake.flush();
@@ -809,24 +832,25 @@ function memberStatus(status){
   // #549: 기록(순간)이 0개인 새 계정의 첫 안내는 '불러왔어요' 대신 첫 순간 안내로(문구는 notice.mjs 한 벌).
   const momentCount=(model?.trees||[]).reduce((n,tree)=>n+((tree.moments||[]).length),0);
   notify(syncedNoticeText({writable:status.writable,previousDirty,momentCount}));
-  // 자동 공개 안내: 이 저장으로 순간 3개에 처음 도달한 트리가 있으면 한 번 알린다(기기 첫 관측 포함).
-  // 토스트는 한 안내만 띄우므로 새로 공개된 트리 중 하나를 고른다(나머지는 다음 저장 때 다시 본다).
+  // 소개 질문(2026-11-16 대표 결정): 아직 안 물은 트리 중 순간 3개 이상인 것이 있으면 묻는다 —
+  // 2→3 저장 직후가 대표 경로다. 직전 관측 스냅샷(상태마다 재촬영)은 두지 않는다(#718 원인): 재촬영하면
+  // syncing에서 before==after가 되어 전이를 놓친다. 질문은 트리당 1회(discoverAsked), 백필(이미 켜진)은 건너뛴다.
   const treeCounts=countTreeMoments();
-  const autoCandidates=((previousDirty||treeCountsBefore===null)&&status.writable)
-   ?newlyPublishedTrees(treeCountsBefore,treeCounts).filter(row=>!autoPublishNotedList().includes(row.treeId))
+  const askCandidates=status.writable
+   ?newlyPublishedTrees(null,treeCounts).filter(row=>!discoverAskedList().includes(row.treeId))
    :[];
-  const autoTree=autoCandidates[0]||null;
-  if(autoTree)notifyAutoPublish(autoTree.treeId);
-  // #538: 첫 순간을 담은 뒤 한 번, 공개 기본과 익명성을 알린다. 기기당 1회(localStorage).
-  // 자동 공개 안내가 뜨는 저장에서는 같은 사실(공개 기본·익명성·3개 소개)이라 여기는 건너뛴다.
+  const askTree=askCandidates[0]||null;
+  if(askTree)askDiscover(askTree.treeId);
+  // #538: 첫 순간을 담은 뒤 한 번, 공개 방식(링크 공유·둘러보기 소개 기본 꺼짐)과 익명성을 알린다. 기기당 1회.
+  // 질문 창이 뜨는 저장에서는 같은 사실(공개 방식·익명성)이라 여기는 건너뛴다.
   else if(previousDirty&&status.writable&&(model?.trees||[]).some(tree=>tree.moments.length>0)){
    let shown=false;try{shown=localStorage.getItem('lt41.publicNoticeShown')==='1';}catch{}
-   if(!shown){notify('내 트리는 다른 사람도 볼 수 있어요(순간 3개부터 둘러보기에 소개). 내 이름·아이디는 보이지 않아요.');try{localStorage.setItem('lt41.publicNoticeShown','1');}catch{}}
+   if(!shown)notifyPublicBanner((model?.trees||[])[0]?.id);
   }
  }
  else if(status.phase==='login'&&!status.dirty)notify('로그인이 필요해요.');
  else if(!status.dirty&&status.phase==='offline')notify(status.detail||'내 기록을 불러오지 못했어요.');
- $('write-menu').textContent=status.dirty?'저장 안 됨' :'＋ 순간 추가';$('empty-records').textContent=status.writable?'＋ 첫 트리 만들기':'내 기록 불러오기';/* #463: 이름을 한 곳에서 정한다(paintEmptyCopy와 같은 글자) *//* #463: 주 버튼 표시도 같이 유지한다(쓸 상태가 바뀌도 강조가 엉키지 않게). */$('empty-records').classList.toggle('primary',!!status.writable);$('empty-sample').classList.toggle('primary',!status.writable);previousDirty=status.dirty;treeCountsBefore=countTreeMoments();renderAccount();flowNavigation();document.body.dataset.member=member?.snapshot().owned?'in':'out';document.body.dataset.treeCount=String(model?.trees?.length||0);applyAdvanced();
+ $('write-menu').textContent=status.dirty?'저장 안 됨' :'＋ 순간 추가';$('empty-records').textContent=status.writable?'＋ 첫 트리 만들기':'내 기록 불러오기';/* #463: 이름을 한 곳에서 정한다(paintEmptyCopy와 같은 글자) *//* #463: 주 버튼 표시도 같이 유지한다(쓸 상태가 바뀌도 강조가 엉키지 않게). */$('empty-records').classList.toggle('primary',!!status.writable);$('empty-sample').classList.toggle('primary',!status.writable);previousDirty=status.dirty;renderAccount();flowNavigation();document.body.dataset.member=member?.snapshot().owned?'in':'out';document.body.dataset.treeCount=String(model?.trees?.length||0);applyAdvanced();
 }
 async function startMember(){setMemberRefreshStarted(true);if(!leaveMember())return;backfillStarted=false;backfillAttempted.clear();const startup=parseSelectionRoute(location.hash);if(startup.scope==='owner')stashPendingOwnerRoute(sessionStorage,location.hash);++loadGeneration;const generation=loadGeneration;clear();
  const api=createWorkspaceApi({fetchImpl:(url,init)=>fetch(init?.method==='GET'&&url==='/api/workspace'?'/api/workspace?features=bound-writes':url,init)});

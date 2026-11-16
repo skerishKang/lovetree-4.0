@@ -1,5 +1,18 @@
 # LoveTree 4.0 — 핸드오프
 
+## 2026-11-16 — 둘러보기 소개를 '고객이 고르는 것'으로: 질문 창·공유 판 스위치·상단 배너 (컴1로컬3 레인, ai/local3-discover-ask-261116, main ecf3309 기준, 대표 결정 2026-11-16)
+
+- **결정**: 링크 공유는 지금처럼 무료, 둘러보기 소개는 기본 꺼짐 — 고객이 고른다(서버 #739 discover GET/PUT·lovetree_tree_discover 표 배포됨). 링크까지 막는 완전 비공개는 Plus. 공유 판의 #share-private 단추·잠금 표시·'비공개는 Plus 전용이에요' note는 정리됐다.
+- **질문 창(#discover-ask)**: 아직 안 물은 트리가 순간 3개 이상이면 synced에서 1회 띄운다 — 2→3 저장 직후가 대표 경로(쉬운 추가·일반 작성·북마크 담기 모두). [소개하기]→discover true·[지금은 안 할래요]→false, localStorage lt41.discoverAsked에 트리당 1회 기억. 백필(GET discover true)은 묻지 않고 같은 기억을 남긴다. 확인 실패는 마킹하지 않아 다음 저장 때 다시 본다. 질문 창이 뜨면 #538 기기 1회 깃발(lt41.publicNoticeShown)도 세팅 — 답변 뒤 배너가 또 뜨지 않게.
+- **3개 도달 판정 원인과 고친 것(#718 재발의 뿌리, 로컬4 발견)**: shell.mjs memberStatus 꼬리가 모든 상태에서 treeCountsBefore를 다시 찍어 syncing에서 before==after가 되고 2→3 전이를 놓쳤다. 스냅샷을 없애고 '아직 안 물은 트리 중 3개 이상'을 매 synced에서 골라 재촬영이 원리상 불가능하게 했다. tests/v41-shell-notice.test.mjs가 doesNotMatch /treeCountsBefore/로 고정.
+- **#718 '공개됐어요' 토스트 제거**: notice.mjs autoPublishNoticeText·AUTO_PUBLISH_ACTION_LABEL 삭제, 안내는 질문 창이 대신한다(배너·판 힌트는 남는다).
+- **공유 판 3줄(261116)**: 머리 note '링크 공유는 무료…소개는 기본 꺼짐 — 아래에서 켜고 끌 수 있어요.', 상태 줄 #share-discover-state('소개 중·무료'/'소개하지 않음·무료')+스위치 #share-discover-toggle(켜기/끄기, 44px), 꼬리 '링크까지 막는 완전 비공개는 Plus예요.' — 스위치가 고른 값은 discoverState에도 기억해 순간 수 힌트 줄이 같은 값을 따르게(#share-moment-hint).
+- **상단 배너(#538) 문구**: discover 상태별 두 문장(소개 중 → '공유 판에서 끌 수 있어요', 꺼짐 → '공유 판에서 켤 수 있어요'), '이름·아이디는 보이지 않아요' 유지.
+- **검사기 보완(tests/helpers/screen-audit.mjs)**: 서로 다른 열린 창끼리는 겹침·가려짐을 판정하지 않는다(질문 창이 write-panel 위에 뜨는 모달 정상 모양). '둘러보기 소개 질문'·'공유 판·소개 스위치' 상태와 흐름 단정(질문 1회·PUT false/true·재질문 없음·스위치 일치·백필 스킵)을 감사기에 추가, KNOWN 4건(회원 궤도 첫 화면의 레거시 11·12px — #548과 같은 원본 모양, 이번 이슈에서 손대지 않음).
+- **기존 시험 갱신**: v41-share-api(배선 단정 setTreeVisibility→setTreeDiscover·Plus 문구), v41-share-steps(#538 비공개 전환 시험 → 스위치 discover PUT 시험, 마크업 단정), share-list·shell-messages·date-style-one-piece harness에 discover 가짜 추가, harness-id-roster(제거된 share-private id).
+- **2차 손보기(CTO 캡처 지적, 같은 PR)**: ①상자 안 두 문장(순간 수 힌트·상태 줄)이 서버 응답 하나에서 같이 그려지게 — paintShareDiscover가 GET 뒤 rememberDiscover→힌트 재그리기까지 맡고 스위치 onclick은 paintShareDiscover 한 길(힌트 화가는 globalThis.window 경유로 비동기 꼬리에서도 안전), 상단 배너는 refreshTreeDiscover(GET)로 같은 값을 따른다 ②공유 판 문장 word-break:keep-all ③스위치 모양: 상태 문장은 위 한 줄·스위치는 그 아래 44px 누름(켜짐=--lt-primary 강조색, 꺼짐=테두리), 글자는 행동('소개 켜기'/'소개 끄기')+모양은 data-state(on/off).
+- **검증**: 감사 pass 2·fail 0(390·1440×밤·정원, 캡처 E:/lovetree-qa/lane/local3-graph/audit-discover-ask-{390,1440}-{night,garden}.png·audit-discover-panel-{off,on}-{390,1440}-{night,garden}.png — 켜짐/꺼짐 8장 각각 열어 확인), 전체 npm test 1719 pass·fail 0, build·modulepreload --check 통과, updates.json 불변. 시험 계정 세션 사용 없음(가짜 API만 — AGENTS #748 준수).
+
 ## 2026-11-16 — 쉬운 추가 직후 '직접 꼬리표 붙이기' 칸: 접힘 기본·한 줄 펼침·개발 용어 제거 (컴1로컬3 레인, ai/local3-tagline-manual-261116, main 6189b20 기준, 대표 지적 2026-11-16)
 
 - **대표 관찰**: 밤·넓은 화면에서 제안이 없는 영상('헤어지자고? #shorts')을 담은 직후 '종류 [가수▾]·값 [꼬리표 값]·[붙이기]'가 세로로 길게(선택 120px·입력 150px) 늘어나고 '꼬리표 값을 적어 주세요.' 오류가 보이며 늘 펼쳐져 다음 영상 담기를 막았다.
