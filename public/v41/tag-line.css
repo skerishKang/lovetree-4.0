@@ -19,16 +19,24 @@ button.lt-tag-chip:hover{border-color:var(--lt-gold-deep)}
 .lt-tag-chip.is-card{padding:1px 7px;border:1px solid var(--lt-line-paper);background:transparent;color:var(--lt-ink)}
 .book-page .chip.lt-tag-chip,.moment-title .lt-tag-chip{font-size:12px;padding:1px 7px}
 
-/* 직접 입력: 종류 고르기 + 값 + 붙이기. 라벨은 칸 위에 얹는다(#678 회차 지적 — 390에서 '종/류'로 두 줄로 꺾이고
-   드롭다운·값 칸이 좁아졌다). 위 얹음은 넓은 화면에서도 같은 모양이라 한 벌이다. */
-.lt-tagline-input{display:flex;flex-wrap:wrap;gap:6px;align-items:flex-end;width:100%;margin-top:2px}
-.lt-tagline-label{display:inline-flex;flex-direction:column;align-items:flex-start;gap:3px;font-size:12px;color:var(--lt-muted);min-width:0}
-.lt-tagline-kind,.lt-tagline-value{min-height:30px;padding:3px 9px;border-radius:9px;border:1px solid var(--lt-line);
-  background:var(--lt-glass);color:var(--lt-pearl);font-size:13px;font-family:inherit}
-.lt-tagline-kind{flex:1 1 120px;max-width:100%}
-.lt-tagline-value{flex:2 1 150px;min-width:120px;max-width:100%}
-.lt-tagline-add{min-height:30px;padding:2px 10px;border-radius:9px;border:1px solid var(--lt-gold-line);
-  background:transparent;color:var(--lt-gold);font-size:13px;font-family:inherit;cursor:pointer}
+/* 직접 붙이기(261116 대표 지적): 접힘이 기본 — 안내 한 줄+[직접 붙이기](칩이 있으면 칩 아래 작은 링크만).
+   누르면 한 줄로 펼친다: [가수 ▾][예: ILLIT][붙이기] — 라벨 없이 select의 갈래 이름·placeholder 예시로 뜻을 알리고,
+   세 요소 높이를 44px로 같게 한다. 옛 라벨(column flex) 안에서 flex-basis가 높이로 작동해 칸이 120~150px로
+   늘어나던 것을 함께 거둔다. 줄이 넘치면(390) 두 줄로 접힌다. */
+.lt-tagline-manual{display:flex;flex-wrap:wrap;align-items:center;gap:8px;width:100%;margin-top:6px}
+.lt-tagline-guide{font-size:12px;color:var(--lt-muted);min-width:0}
+.lt-tagline-toggle{min-height:44px;padding:10px 14px;border-radius:var(--lt-r-pill);border:1px solid var(--lt-gold-line);
+  background:transparent;color:var(--lt-gold);font-size:13px;font-family:inherit;cursor:pointer;flex:0 0 auto}
+.lt-tagline-toggle:hover{border-color:var(--lt-gold-deep)}
+.lt-tagline-toggle.is-link{min-height:32px;padding:2px 6px;border:0;color:var(--lt-muted);font-size:12px;
+  text-decoration:underline;text-underline-offset:3px}
+.lt-tagline-input{display:flex;flex-wrap:wrap;gap:8px;align-items:center;width:100%;margin-top:2px}
+.lt-tagline-kind,.lt-tagline-value{height:44px;padding:0 12px;border-radius:12px;border:1px solid var(--lt-line);
+  background:var(--lt-glass);color:var(--lt-pearl);font-size:14px;font-family:inherit;min-width:0}
+.lt-tagline-kind{flex:0 0 118px}
+.lt-tagline-value{flex:1 1 140px}
+.lt-tagline-add{height:44px;padding:0 14px;border-radius:12px;border:1px solid var(--lt-gold-line);
+  background:transparent;color:var(--lt-gold);font-size:14px;font-family:inherit;cursor:pointer;flex:0 0 auto}
 .lt-tagline-add:hover{border-color:var(--lt-gold-deep)}
 
 /* 셸의 쉬운 추가 직후 안내(#quick-saved) 안에서는 한 줄로 조용히 붙는다. */

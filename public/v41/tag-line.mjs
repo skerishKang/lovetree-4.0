@@ -7,6 +7,11 @@ import { cardTags, chipText, tagLineChips, toggledKeywords, inputTag } from './t
 
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const TOO_LONG_TEXT = '24자를 넘어요';
+// 직접 붙이기 칸의 갈래별 예시(261116 대표 지적 — '종류'·'값' 같은 낱말 대신 예시로 뜻을 알린다).
+// 순서는 tags.mjs의 TAG_KINDS를 따르고, 갈래 없이는 문장 꼬리표의 예다.
+const KIND_PLACEHOLDER = { artist: '예: ILLIT', song: '예: Magnetic', member: '예: 원희', era: '예: 4세대', stage: '예: 인기가요', emotion: '예: 설렘', '': '예: 데뷔 100일' };
+const MANUAL_GUIDE = '가수·노래를 붙여 두면 나중에 저절로 묶여요';
+const MANUAL_TOGGLE = '직접 붙이기';
 
 function chipHTML(tag) {
   const cls = tag.state === 'confirmed' ? 'is-confirmed' : 'is-proposal';
@@ -23,7 +28,9 @@ export function renderTagLine({ host, doc = document, moment, knownTags = [], wr
     momentId: moment?.id || '',
     title: moment?.title || '',
     keywords: Array.isArray(moment?.keywords) ? [...moment.keywords] : [],
-    knownTags: Array.isArray(knownTags) ? [...knownTags] : []
+    knownTags: Array.isArray(knownTags) ? [...knownTags] : [],
+    manualOpen: false, // 직접 붙이기 칸은 접힘이 기본이다(261116 대표 지적 — 다음 영상을 바로 담는 사람을 막지 않게)
+    kind: 'artist'
   };
   if (!host) return null;
   host.classList.add('lt-tagline-host');
@@ -32,16 +39,22 @@ export function renderTagLine({ host, doc = document, moment, knownTags = [], wr
     const { confirmed, proposals } = tagLineChips({ keywords: state.keywords, title: state.title, knownTags: state.knownTags });
     // 제안은 쓸 수 있는 자리(소유자)에서만 보인다 — 읽어 보는 화면(공유·예시)에는 확정된 꼬리표만 보인다.
     const chips = [...confirmed, ...(writable ? proposals : [])];
-    const kinds = [...TAG_KINDS.map((k) => `<option value="${k.id}">${k.label}</option>`), '<option value="">종류 없이</option>'].join('');
+    const kinds = [...TAG_KINDS.map((k) => `<option value="${k.id}">${k.label}</option>`), '<option value="">그냥 단어로</option>'].join('');
+    // 직접 붙이기(261116 대표 지적): 접힘이 기본 — 제안이 없으면 안내 한 줄+[직접 붙이기], 있으면 칩 아래 작은 링크만.
+    // 누르면 한 줄로 펼친다: [가수 ▾][예: ILLIT][붙이기] — 라벨 대신 select의 갈래 이름과 placeholder 예시로 뜻을 알린다.
+    const guide = chips.length ? '' : `<span class="lt-tagline-guide">${esc(MANUAL_GUIDE)}</span>`;
+    const manual = !state.manualOpen
+      ? `<div class="lt-tagline-manual">${guide}<button type="button" class="lt-tagline-toggle${chips.length ? ' is-link' : ''}">${MANUAL_TOGGLE}</button></div>`
+      : `<div class="lt-tagline-manual">${guide}`
+          + `<div class="lt-tagline-input" role="group" aria-label="꼬리표 직접 붙이기">`
+          + `<select class="lt-tagline-kind" aria-label="붙일 꼬리표의 갈래">${kinds}</select>`
+          + `<input class="lt-tagline-value" maxlength="24" autocomplete="off" placeholder="${esc(KIND_PLACEHOLDER[state.kind] || '')}" aria-label="붙일 꼬리표 내용">`
+          + `<button type="button" class="lt-tagline-add">붙이기</button></div></div>`;
     host.innerHTML = `<div class="lt-tagline">`
       + `<span class="lt-tagline-name">꼬리표</span>`
       + (chips.length ? `<span class="lt-tagline-chips">${chips.map(chipHTML).join('')}</span>`
         : `<span class="lt-tagline-empty">${esc(emptyText)}</span>`)
-      + (writable ? `<div class="lt-tagline-input" role="group" aria-label="꼬리표 직접 입력">`
-          + `<label class="lt-tagline-label">종류<select class="lt-tagline-kind" aria-label="꼬리표 종류">${kinds}</select></label>`
-          + `<label class="lt-tagline-label">값<input class="lt-tagline-value" maxlength="24" autocomplete="off" placeholder="꼬리표 값" aria-label="꼬리표 값"></label>`
-          + `<button type="button" class="lt-tagline-add">붙이기</button></div>`
-        : '')
+      + (writable ? manual : '')
       + `<p class="lt-tagline-error" role="alert" hidden></p>`
       + `</div>`;
     host.hidden = !(chips.length || writable);
@@ -78,13 +91,30 @@ export function renderTagLine({ host, doc = document, moment, knownTags = [], wr
     const kind = host.querySelector('.lt-tagline-kind')?.value || '';
     const value = host.querySelector('.lt-tagline-value')?.value || '';
     const made = inputTag(kind, value);
-    if (!made.ok) { fail(made.reason === 'long' ? TOO_LONG_TEXT : '꼬리표 값을 적어 주세요.'); return; }
+    if (!made.ok) { fail(made.reason === 'long' ? TOO_LONG_TEXT : '붙일 내용을 적어 주세요.'); return; }
     const valueInput = host.querySelector('.lt-tagline-value');
     if (valueInput) valueInput.value = '';
     fail('');
     commit(toggledKeywords(state.keywords, made.raw));
   }
-  host.addEventListener('click', (event) => { if (alive() && event.target.closest('.lt-tagline-add')) submitInput(); }, when);
+  host.addEventListener('click', (event) => {
+    if (!alive()) return;
+    if (event.target.closest('.lt-tagline-add')) { submitInput(); return; }
+    if (event.target.closest('.lt-tagline-toggle')) {
+      state.manualOpen = true;
+      draw();
+      host.querySelector('.lt-tagline-value')?.focus();
+    }
+  }, when);
+  // 갈래를 바꾸면 예시도 함께 바꾼다(가수 ILLIT / 노래 Magnetic / 무대 인기가요 …).
+  host.addEventListener('change', (event) => {
+    if (!alive()) return;
+    const select = event.target.closest('.lt-tagline-kind');
+    if (!select) return;
+    state.kind = select.value;
+    const input = host.querySelector('.lt-tagline-value');
+    if (input) input.placeholder = KIND_PLACEHOLDER[state.kind] || '';
+  }, when);
   host.addEventListener('keydown', (event) => {
     if (!alive()) return;
     if (event.key === 'Enter' && event.target.closest('.lt-tagline-value')) { event.preventDefault(); submitInput(); }
