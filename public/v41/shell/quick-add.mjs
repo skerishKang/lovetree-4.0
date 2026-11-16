@@ -136,6 +136,10 @@ export function createQuickAdd(deps) {
     return trees.map(tree => ({ id: String(tree?.id || ''), name: displayTreeTitle(String(tree?.title || tree?.subject || '') || '트리'), inbox: tree?.inbox === true })).filter(tree => tree.id);
   }
   function resolveQuickTreeId(choices) {
+    // 2026-11-16 대표 요청: 설정 '쉬운 추가로 담을 곳' — '늘 같은 트리'를 골랐으면 그 트리가 처음 고른 트리다.
+    // 고른 트리가 지워졌으면(목록에 없으면) 아래 기존 규칙('지금 보고 있는 트리')으로 돌아간다.
+    const pref = deps.quickTargetPreference?.() || null;
+    if (pref?.mode === 'fixed' && pref.treeId && choices.some(tree => tree.id === pref.treeId)) return pref.treeId;
     const current = String(deps.currentTreeId?.() || '');
     if (current && choices.some(tree => tree.id === current)) return current;
     return (choices.find(tree => tree.inbox) || choices[0])?.id || '';

@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { readFile } from 'node:fs/promises';
 import assert from 'node:assert/strict';
 // #327 ② 빠른 추가: 판정·추출·문구·분기는 함수 직접 호출로 본다(docs/TESTING.md).
 // DOM 연결은 tests/v41-quick-add-flow.test.mjs가 fake DOM으로 확인한다.
@@ -298,7 +299,7 @@ test('#638 backfillTitles(cacheMomentMediaMetadata)는 title을 건드리지 않
 const URL_OK = 'https://m.youtube.com/watch?v=abc12345678&t=76&si=xyz';
 const VIDEO_TITLE = '테스트 영상 제목';
 
-function harness638({ trees = [inboxTree, secondTree], currentTreeId = 't-second', applyImpl = null, fetchImpl = null, writeTab = 'easy' } = {}) {
+function harness638({ trees = [inboxTree, secondTree], currentTreeId = 't-second', applyImpl = null, fetchImpl = null, writeTab = 'easy', quickTarget = null } = {}) {
   const calls = { apply: [], notify: [], editors: [] };
   const els = {};
   const $ = id => { if (!els[id]) els[id] = fakeEl({ value: '', children: [], replaceChildren(...kids) { this.children = kids; }, append(...kids) { this.children.push(...kids); } }); return els[id]; };
@@ -333,6 +334,8 @@ function harness638({ trees = [inboxTree, secondTree], currentTreeId = 't-second
     requestClose: () => {},
     currentTreeId: () => currentTreeId,
     listTrees: () => trees,
+    // 2026-11-16 대표 요청: 쉬운 추가로 담을 곳 설정(늘 같은 트리) — 셸이 넘기는 한 벌을 흉내 낸다.
+    quickTargetPreference: () => quickTarget,
     isFinePointer: () => false,
     fetchImpl: titleFetch
   });
@@ -479,4 +482,41 @@ test('#638 담은 안내(떠 있는 알림)도 담긴 트리 이름을 따른다
   h.api.renderPreview();
   h.api.submitQuick({ preventDefault() {} });
   assert.equal(h.els['quick-saved-text'].textContent, quickSavedTreeText('두 번째 트리'));
+});
+
+// ---- 2026-11-16 대표 요청: 설정 '쉬운 추가로 담을 곳' — 늘 같은 트리 / 지금 보고 있는 트리 ----
+test('설정 늘 같은 트리(모아둔 순간): 다른 트리를 보다가 쉬운 추가를 열어도 그 트리가 골라져 있다', () => {
+  const h = harness638({ currentTreeId: 't-second', quickTarget: { mode: 'fixed', treeId: 't-inbox' } });
+  h.api.openQuick();
+  assert.equal(h.els['quick-tree-line'].textContent, quickTreeLineText(QUICK_INBOX_LABEL), '줄은 지정한 트리 이름을 보인다');
+  assert.equal(h.els['quick-tree-select'].value, 't-inbox', '지금 보는 트리(t-second)가 아니라 지정한 트리가 기본');
+  assert.equal(h.els['quick-submit'].textContent, quickSubmitText(QUICK_INBOX_LABEL));
+  // 창 안 드롭다운은 그대로 두어 그때그때 바꿀 수 있다.
+  assert.equal(h.els['quick-tree-select'].hidden, false, '트리가 둘이면 그 자리에서 바꾸는 고르기가 보인다');
+  const select = h.els['quick-tree-select'];
+  select.value = 't-second';
+  select.dispatch('change', {});
+  assert.equal(h.els['quick-tree-line'].textContent, quickTreeLineText('두 번째 트리'), '그 자리에서 바꾸면 저장 대상도 바뀐다');
+});
+
+test('설정 기본값(지금 보고 있는 트리)이면 보던 트리가 골라져 있다', () => {
+  const h = harness638({ currentTreeId: 't-second', quickTarget: { mode: 'current', treeId: '' } });
+  h.api.openQuick();
+  assert.equal(h.els['quick-tree-select'].value, 't-second', '기본값은 지금 보는 트리');
+});
+
+test('설정에 고른 트리가 지워졌으면 지금 보고 있는 트리로 돌아간다', () => {
+  const h = harness638({ currentTreeId: 't-second', quickTarget: { mode: 'fixed', treeId: 't-gone' } });
+  h.api.openQuick();
+  assert.equal(h.els['quick-tree-select'].value, 't-second', '지워진 트리 대신 지금 보는 트리로 돌아간다');
+  assert.equal(h.els['quick-tree-line'].textContent, quickTreeLineText('두 번째 트리'));
+});
+
+test('설정 줄과 안내 문구가 셸 문서에 있다(이 기기에만 저장·창 안에서 바꿀 수 있음 안내)', async () => {
+  const html = await readFile(new URL('../public/v41/index.html', import.meta.url), 'utf8');
+  assert.match(html, /data-quick-target="current"[^>]*>지금 보고 있는 트리</, '기본값 단추');
+  assert.match(html, /data-quick-target="fixed"[^>]*>늘 같은 트리</, '늘 같은 트리 단추');
+  assert.match(html, /id="quick-target-tree"[^>]*aria-label="늘 담을 트리 고르기"/, '늘 담을 트리 고르기(펼침용)');
+  assert.match(html, /쉬운 추가·자세한 추가가 처음 고르는 트리입니다/, '무엇을 정하는 설정인지 안내');
+  assert.match(html, /고른 트리를 지우면 지금 보고 있는 트리로 돌아가요/, '지워졌을 때 규칙 안내');
 });

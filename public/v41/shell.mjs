@@ -160,7 +160,7 @@ $('record-menu').addEventListener('click',event=>{event.stopPropagation();if(tre
 if(treePopover)treePopover.addEventListener('keydown',event=>{const items=[...treePopover.querySelectorAll('button')];const at=items.indexOf(document.activeElement);if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();const next=event.key==='ArrowDown'?(at+1)%items.length:(at-1+items.length)%items.length;items[next]?.focus();}else if(event.key==='Home'){event.preventDefault();items[0]?.focus();}else if(event.key==='End'){event.preventDefault();items.at(-1)?.focus();}});
 document.addEventListener('click',event=>{if(treePopover&&!treePopover.hidden&&!event.target.closest('.tree-slot'))closeTreeMenu();});
 document.addEventListener('keydown',event=>{if(event.key==='Escape'&&treePopover&&!treePopover.hidden){closeTreeMenu();treeTrigger.focus();}});
-addEventListener('lt41-trees-changed',()=>{if(treePopover&&!treePopover.hidden)renderTreeMenu();});
+addEventListener('lt41-trees-changed',()=>{if(treePopover&&!treePopover.hidden)renderTreeMenu();paintQuickTargetControls();});
 $('mobile-more').addEventListener('click',event=>{
  event.stopPropagation();
  if(moreMenu.hidden){buildFoldMenu();moreMenu.hidden=false;moreMenu.classList.add('is-open');moreButton.setAttribute('aria-expanded','true');}
@@ -234,7 +234,13 @@ const shellPanels=createPanels({
   // #380 4 2차: 편집기의 취소 버튼도 공통 닫기 규칙(×·바깥·Esc와 같은 확인·업로드 중 막기)을 쓴다.
   requestClose:id=>shellDialogs.requestClose(id)
 });
-function openEditor(mode,parentId=''){return shellPanels.openEditor(mode,parentId);}
+function openEditor(mode,parentId=''){
+  // 2026-11-16 대표 요청: 자세한 추가도 쉬운 추가와 같은 기본 트리를 쓴다 — 늘 같은 트리를 골랐고
+  // 지금 트리와 다르면 그 트리를 고른 뒤 연다(에디터 안내 줄이 그 트리를 가리킨다). 목적지 순간이
+  // 함께 오면(그 순간 다음에 담기) 사용자가 고른 목적지가 우선이라 그대로 둔다.
+  if(mode==='add'&&!parentId){const pref=quickTargetPreference();if(pref.mode==='fixed'&&pref.treeId&&window.LT41?.tree?.id!==pref.treeId&&model?.trees?.some(t=>t.id===pref.treeId))choose(pref.treeId);}
+  return shellPanels.openEditor(mode,parentId);
+}
 // #453 B: 탭을 보일 때(그리고 창을 여는 두 길 모두에서) 편집기 기준값을 다시 잡는다.
 shellWrite.setTabHook(tab=>shellPanels.onWriteTab(tab));
 // 쉬운 추가(#빠른 추가 ②): 창 열기·끌어다 놓기는 shell/quick-add.mjs가 맡는다.
@@ -279,7 +285,9 @@ const shellQuick=createQuickAdd({
   // 이슈 671: '그 순간 다음에 담기' 한 줄에 쓸 순간 제목 — 책·보드와 같은 제목 규칙(자동 제목 빼기)을 쓴다.
   momentTitle:moment=>{const main=titleView(moment,titleDisplayValue()).main;return main||withoutAutoTitle(moment).title;},
   // #627 PR B: 담은 직후 안내의 꼬리표 줄이 눌렸을 때 — keywords만 기존 경로로 저장한다.
-  saveTags:payload=>shellTags.save(payload)
+  saveTags:payload=>shellTags.save(payload),
+  // 2026-11-16 대표 요청: 처음 고르는 트리 설정(지금 보고 있는 트리/늘 같은 트리) — 바로 아래 한 벌.
+  quickTargetPreference:()=>quickTargetPreference()
 });
 $('write-menu').onclick=()=>{if(source!=='server'&&member?.snapshot().owned){void resumeMember('write');return;}if(member?.snapshot().dirty){explainSaveState();return;}shellQuick.openWrite();};
 // #458: 모바일 떠 있는 ＋ 단추 — 헤더의 ＋ 순간 추가와 같은 길(같은 창)을 연다. 단추는 body.lt-fab-ok일 때만 보인다.
@@ -1079,6 +1087,32 @@ for(const b of document.querySelectorAll('[data-network-view]'))b.onclick=()=>{
  notify(b.dataset.networkView==='concentric'?'지도를 동심원 보기로 열어요.':'지도를 그물 보기로 열어요.');
 };
 paintNetworkViewControls();
+// 2026-11-16 대표 요청: 쉬운 추가가 처음 고르는 트리 — 지금 보고 있는 트리(기본) 또는 늘 같은 트리.
+// 이 기기 설정(localStorage lt41.* 규칙)이고, 고른 트리를 지우면 지금 보고 있는 트리로 돌아간다
+// (쉬운 추가·자세한 추가가 이 한 벌(quickTargetPreference)을 따른다).
+const QUICK_TARGET_KEY='lt41.quickAddTarget';
+const QUICK_TARGET_TREE_KEY='lt41.quickAddTreeId';
+function quickAddTargetMode(){try{return localStorage.getItem(QUICK_TARGET_KEY)==="fixed"?"fixed":"current"}catch{return "current"}}
+function quickAddFixedTreeId(){try{return localStorage.getItem(QUICK_TARGET_TREE_KEY)||""}catch{return ""}}
+function quickTargetPreference(){return {mode:quickAddTargetMode(),treeId:quickAddFixedTreeId()}}
+function paintQuickTargetControls(){
+  const mode=quickAddTargetMode();
+  for(const b of document.querySelectorAll("[data-quick-target]"))b.setAttribute("aria-checked",String(b.dataset.quickTarget===mode));
+  const sel=$("quick-target-tree");
+  if(!sel)return;
+  const trees=model?.trees||[];
+  sel.replaceChildren(...trees.map(t=>{const o=document.createElement("option");o.value=t.id;o.textContent=displayTreeTitle(t.title||t.subject||"트리");return o}));
+  sel.hidden=mode!=="fixed"||!trees.length;
+  const wanted=quickAddFixedTreeId();
+  sel.value=trees.some(t=>t.id===wanted)?wanted:(trees[0]?.id||"");
+}
+for(const b of document.querySelectorAll("[data-quick-target]"))b.onclick=()=>{
+  try{localStorage.setItem(QUICK_TARGET_KEY,b.dataset.quickTarget)}catch{}
+  if(b.dataset.quickTarget==="fixed"){const wanted=quickAddFixedTreeId();const trees=model?.trees||[];const keep=trees.some(t=>t.id===wanted)?wanted:(trees[0]?.id||"");if(keep)try{localStorage.setItem(QUICK_TARGET_TREE_KEY,keep)}catch{}}
+  paintQuickTargetControls();notify(b.dataset.quickTarget==="fixed"?"쉬운 추가는 고른 트리에 담아요.":"쉬운 추가는 지금 보고 있는 트리에 담아요.");
+};
+$("quick-target-tree")?.addEventListener("change",()=>{try{localStorage.setItem(QUICK_TARGET_TREE_KEY,$("quick-target-tree").value)}catch{};paintQuickTargetControls();notify("쉬운 추가는 이 트리에 담아요.")});
+paintQuickTargetControls();
 function currentShareView(){try{return normalizeShareView(member?.state?.().prefs?.shareView)}catch{return 'book'}}
 function paintShareControls(){
  const view=currentShareView();
@@ -1152,7 +1186,7 @@ async function openAccountSettings({section=''}={}){
  if(!member?.snapshot().owned){notify('로그인한 뒤 설정을 열 수 있어요.');return;}
  paintSettingsProfile();
  fillProfileForm();
- paintDateStyleControls();paintStartPlaceControls();paintNetworkViewControls();paintShareControls();
+ paintDateStyleControls();paintStartPlaceControls();paintNetworkViewControls();paintShareControls();paintQuickTargetControls();
  void paintSettingsUsage();
  panel('account-settings');
  focusSettingsSection(section);
