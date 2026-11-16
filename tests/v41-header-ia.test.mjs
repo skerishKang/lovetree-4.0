@@ -704,6 +704,16 @@ test('계정 메뉴: 운영 라벨 없음·구분선 유지·기본 항목 배�
       assert.ok(got.bgs.length >= 6, theme + ': 항목 수');
       assert.ok(got.bgs.every(bg => bg === 'rgba(0, 0, 0, 0)'), theme + ': 기본 항목 배경은 모두 투명(판 배경 그대로)');
 
+      // 마우스로 열면 첫 항목에 초점이 있어도 칠이 0개여야 한다(키보드 :focus-visible만 칠한다).
+      const mouseOpen = await page.evaluate(() => {
+        const pop = document.querySelector('#account-popover');
+        pop.dataset.ltOpenedBy = 'mouse';
+        const first = pop.querySelector('button:not([hidden])');
+        first.focus();
+        return [...pop.querySelectorAll('button:not([hidden])')].map(b => getComputedStyle(b).backgroundColor);
+      });
+      assert.ok(mouseOpen.every(bg => bg === 'rgba(0, 0, 0, 0)'), theme + ': 마우스로 연 메뉴는 칠 0개(실제 ' + JSON.stringify(mouseOpen) + ')');
+
       const defaultBg = got.bgs[0];
       await page.hover('#account-open-settings');
       await page.waitForTimeout(120);
