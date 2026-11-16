@@ -11,6 +11,7 @@ export function createDialogs(deps) {
   // 보관 파일 다이얼로그를 연 버튼(없으면 계정 동그라미)으로 초점을 돌려준다.
   let assetsOpener = null;
 
+
   // 2026-11-08 #202 후속: 셸 대화상자(순간 편집기·보관 파일) Tab을 내부에서 순환시킨다.
   // 보관 파일이 편집기 위에 열려 있으면 보관 파일 안에서만 순환한다.
   const SHELL_FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]):not([type=hidden]),select:not([disabled]),textarea:not([disabled]),summary,[tabindex]:not([tabindex="-1"])';
@@ -143,6 +144,8 @@ export function createDialogs(deps) {
         target?.focus?.();
       }, 0);
     });
+    // Esc(cancel)·바깥 클릭의 '맨 위 창 하나'는 브라우저가 보장한다 — cancel은 top layer의 맨 위 모달에만,
+    // backdrop 클릭도 맨 위 창만 받는다(2026-11-16 확인). 그래서 여기서는 추가 판정 없이 그대로 닫는다.
     d.addEventListener('cancel', event => { if (!panelConfirmClose(d)) event.preventDefault(); else d.close(); });
     d.addEventListener('click', event => {
       if (event.target !== d) return;

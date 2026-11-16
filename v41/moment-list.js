@@ -8,8 +8,10 @@ const text = value => (typeof value === 'string' ? value.trim() : '');
 
 /** 순간 목록 위 트리 고르기 칸 목록. [전체]는 화면이 붙이고, 여기서는 모아둔 순간 먼저·나머지 기존 순서다. */
 export function momentListTrees(trees) {
+  // 트리마다 고정 색(2026-11-16 대표 지적) — 모아둔 순간 먼저·기존 순서(shelfOrder)의 자리가 고정이다.
+  // 색은 identity.css의 --lt-tree-1..6 토큰(낮은 채도 — 이름 글자는 기본색 그대로 두고 점으로만 구분한다).
   return shelfOrder(Array.isArray(trees) ? trees : [])
-    .map(tree => ({ id: text(tree?.id), label: pickerLabel(tree), inbox: isInboxTree(tree) }))
+    .map((tree, index) => ({ id: text(tree?.id), label: pickerLabel(tree), inbox: isInboxTree(tree), color: 'var(--lt-tree-' + (index % 6 + 1) + ')' }))
     .filter(tree => tree.id);
 }
 

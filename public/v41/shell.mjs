@@ -431,11 +431,28 @@ const shellLocation=createLocation({
   finishJourney:()=>finishJourney(),
   leaveJourney:()=>leaveJourney()
 });
+// 새 소식 창(비모달)의 Esc — 다른 창이 하나라도 열려 있으면 그 창이 Esc를 맡는다(맨 위 창 하나 규칙).
+// capture로 등록해 다른 Esc 처리보다 먼저 본다 — 아래 창(공유 목록)이 먼저 닫힌 뒤 '열린 창 없음'으로 오판하지 않게.
+document.addEventListener('keydown', event => {
+  if (event.key !== 'Escape') return;
+  const updates = $('updates-panel');
+  if (!updates?.open || updates.matches(':modal')) return;
+  if ([...document.querySelectorAll('dialog[open]')].some(d => d !== updates)) return; // 다른 창이 남아 있으면(맨 위 모달 포함) 그 창이 맡는다
+  event.preventDefault(); shellDialogs.requestClose('updates-panel');
+}, true);
+// 새 소식 창이 열린 채 위 메뉴(머리글)를 누르면 창을 닫고 그 메뉴로 이동한다(캡처 — 이동 처리는 그대로).
+document.querySelector('.app-header')?.addEventListener('click', () => {
+  const updates = $('updates-panel');
+  if (updates?.open && !updates.matches(':modal')) shellDialogs.requestClose('updates-panel');
+}, true);
 function writeLocation(mode){return shellLocation.writeLocation(mode);}
 function applyBrowserLocation(){return shellLocation.applyBrowserLocation();}
 const PENDING_NEW='lovetree.v41.pending-new';
 // 2026-11-07 계정 표시: 로그인 상태는 첫 글자 동그라미 + 작은 메뉴, 로그아웃 상태는 기존 로그인 알약.
-function panel(id){const target=$(id);if(!target.open){if(target.dataset.ltPanel){shellDialogs.noteOpener(id);if(target.dataset.ltPanel==='full')shellDialogs.syncPanelTop();}target.showModal();}
+function panel(id){const target=$(id);if(!target.open){if(target.dataset.ltPanel){shellDialogs.noteOpener(id);if(target.dataset.ltPanel==='full')shellDialogs.syncPanelTop();}
+ // 새 소식 창은 비모달로 연다(2026-11-16 대표 지적) — 위 메뉴가 눌리고 메뉴가 흐리게 덮이지 않는다.
+ // 나머지 창은 그대로 showModal(맨 위 창 하나 규칙은 dialogs.mjs의 topDialog가 맡는다).
+ if(id==='updates-panel')target.show();else target.showModal();}
  // #549: 창을 새로 띄울 때 첫 트리 안내가 이미 떠 있으면 창 안 맨 위로 옮긴다 —
  // 모달 창이 열려 있는 동안에는 창 밖 안내가 눌리지 않기 때문이다.
  placeTreeTips();}
