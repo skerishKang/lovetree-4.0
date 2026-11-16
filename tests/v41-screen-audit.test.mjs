@@ -718,7 +718,7 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     await take(page4, '내 의견 덧붙임 고치기 열림');
     await ctx4.close();
 
-    // #743: 운영센터 '한눈에' — 카드 7+7이 1440·1920에서 각각 한 줄, 390은 지금처럼 줄바꿈(가로 넘침 0),
+    // 2026-11-17: 운영센터 '한눈에' — 숫자 4장·할 일 3장이 1440·1920에서 각각 한 줄, 390은 줄바꿈(가로 넘침 0),
     // 모든 카드가 같은 누름 모양(role·tabindex·44px 이상)이고, 탭이 있는 카드는 그 탭을 조건으로 열며
     // 탭이 없는 카드는 내역을 펼친다(다시 누르면 접힘). 관리자 세션은 가짜 API(응답 모형)로 만든다.
     const ctxAdm = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
@@ -744,7 +744,7 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     await ctxAdm.route('**://api.github.com/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ number: 736, title: '시험 이슈', state: 'open' }) }));
     const pageAdm = await ctxAdm.newPage();
     await pageAdm.goto(`${base}/admin.html`, { waitUntil: 'load' });
-    await pageAdm.waitForFunction(() => document.querySelectorAll('.lt-stats .lt-stat').length === 7 && document.querySelectorAll('.lt-ov-cards .lt-ov-card').length === 7, null, { timeout: 20000 });
+    await pageAdm.waitForFunction(() => document.querySelectorAll('.lt-stats .lt-stat').length === 4 && document.querySelectorAll('.lt-ov-cards .lt-ov-card').length === 3, null, { timeout: 20000 });
     await pageAdm.waitForTimeout(400);
     const adminCards = await pageAdm.evaluate(() => {
       const stat = [...document.querySelectorAll('.lt-stats .lt-stat')];
@@ -761,24 +761,24 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
         cursors: [...new Set(all.map((el) => getComputedStyle(el).cursor))],
         overflow: Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth),
         firstStatText: flat(stat[0]),
-        treeCardText: flat(stat.find((el) => el.dataset.statToggle === 'featured-trees'))
+        treeCardText: flat(stat.find((el) => el.dataset.statToggle === 'public-trees'))
       };
     });
-    assert.equal(adminCards.statCount, 7, '전체 숫자 카드 7개');
-    assert.equal(adminCards.todoCount, 7, '처리할 일 카드 7개');
+    assert.equal(adminCards.statCount, 4, '전체 숫자 카드 4개');
+    assert.equal(adminCards.todoCount, 3, '처리할 일 카드 3개');
     if (width >= 1440) {
       assert.equal(adminCards.statTops.length, 1, `전체 숫자 카드가 한 줄이다(카드 위 좌표 ${JSON.stringify(adminCards.statTops)})`);
       assert.equal(adminCards.todoTops.length, 1, `처리할 일 카드가 한 줄이다(카드 위 좌표 ${JSON.stringify(adminCards.todoTops)})`);
     }
     assert.equal(adminCards.overflow, 0, `운영센터 가로 넘침 0(실제 ${adminCards.overflow}px)`);
     assert.ok(adminCards.minH >= 44 && adminCards.minW >= 44, `카드 누름 영역 44px 이상(최소 ${adminCards.minW}×${adminCards.minH}px)`);
-    assert.deepEqual(adminCards.roles, Array(14).fill('button'), '모든 카드가 role=button이다');
-    assert.deepEqual(adminCards.tabs, Array(14).fill('0'), '모든 카드가 tabindex=0이다(키보드로 연다)');
+    assert.deepEqual(adminCards.roles, Array(7).fill('button'), '모든 카드가 role=button이다');
+    assert.deepEqual(adminCards.tabs, Array(7).fill('0'), '모든 카드가 tabindex=0이다(키보드로 연다)');
     assert.deepEqual(adminCards.cursors, ['pointer'], `모든 카드가 같은 누름 모양(커서 ${JSON.stringify(adminCards.cursors)})`);
     // 숫자 뜻: 큰 숫자가 '실제 고객'이고, 전체 = 실제 + AI + 시험을 카드 안에 함께 적는다.
     assert.ok(adminCards.firstStatText.includes('실제 고객'), `큰 숫자가 무엇을 세는지 카드 안에 적는다(실측: ${adminCards.firstStatText})`);
     assert.ok(adminCards.firstStatText.includes('전체 8') && adminCards.firstStatText.includes('AI 4') && adminCards.firstStatText.includes('시험 2'), `전체 = 실제+AI+시험을 함께 적는다(실측: ${adminCards.firstStatText})`);
-    assert.ok(adminCards.treeCardText.includes('전체 1'), `둘러보기 소개 카드도 전체를 함께 적는다(실측: ${adminCards.treeCardText})`);
+    assert.ok(adminCards.treeCardText.includes('전체 3'), `공개 트리 카드도 전체를 함께 적는다(실측: ${adminCards.treeCardText})`);
     await take(pageAdm, '운영센터 한눈에');
 
     // 1920에서도 두 묶음이 각각 한 줄이다(#743 대표 요청).
@@ -823,7 +823,7 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     // 탭이 있는 카드는 그 탭을 해당 조건으로 걸러 연다(주소에 조건이 남는다).
     const jump = async (selector) => {
       await pageAdm.evaluate(() => { location.hash = '#overview'; });
-      await pageAdm.waitForFunction(() => document.querySelectorAll('.lt-ov-cards .lt-ov-card').length === 7, null, { timeout: 8000 });
+      await pageAdm.waitForFunction(() => document.querySelectorAll('.lt-ov-cards .lt-ov-card').length === 3, null, { timeout: 8000 });
       await pageAdm.click(selector);
       await pageAdm.waitForFunction(() => location.hash !== '#overview', null, { timeout: 8000 });
       await pageAdm.waitForTimeout(200);
@@ -841,7 +841,7 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     assert.equal(issues.hash, '#board?status=more', `닫힌 이슈 카드 → 고객 글의 더 보기(실제 ${issues.hash})`);
     // 키보드(Space)로도 카드가 열린다.
     await pageAdm.evaluate(() => { location.hash = '#overview'; });
-    await pageAdm.waitForFunction(() => document.querySelectorAll('.lt-ov-cards .lt-ov-card').length === 7, null, { timeout: 8000 });
+    await pageAdm.waitForFunction(() => document.querySelectorAll('.lt-ov-cards .lt-ov-card').length === 3, null, { timeout: 8000 });
     await pageAdm.focus('[data-ov-view="issues"][data-ov-status="open"]');
     await pageAdm.keyboard.press(' ');
     await pageAdm.waitForFunction(() => location.hash.startsWith('#board?status='), null, { timeout: 8000 });
@@ -1616,3 +1616,4 @@ test('운영센터 머리줄이 본 화면 셸 머리줄과 같은 폭·위치�
     server.close();
   }
 });
+
