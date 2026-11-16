@@ -554,7 +554,13 @@ nav #record-menu{min-height:40px;font-size:13px;letter-spacing:0}
 .updates-kind h3{color:var(--lt-gold);margin:0 0 8px}
 .updates-kind ul{margin:0;padding-left:18px;display:grid;gap:8px}
 .updates-kind li{font-size:14px;line-height:1.75;color:var(--lt-pearl)}
-.updates-source{display:block;font-size:12px;color:var(--lt-muted)}
+/* 2026-11-17 대표 결정: AI 명예회원 출처를 항목마다 긴 줄로 쓰지 않고 항목 끝 이름표로 붙인다.
+   하트는 장식(aria-hidden), 이름은 굵게 — 밤·정원 모두 --lt-gold 토큰으로 4.5:1 이상을 지킨다. */
+.updates-source{display:inline-flex;align-items:center;gap:4px;margin-left:8px;font-size:13px;line-height:1.4;color:var(--lt-gold);white-space:nowrap}
+.updates-source strong{font-weight:700}
+.updates-heart{font-size:12px;line-height:1}
+.updates-source-user{margin-left:8px;font-size:13px;color:var(--lt-gold)}
+.updates-source-summary{margin:18px 0 0;padding-top:12px;border-top:1px solid var(--lt-line);font-size:13px;line-height:1.7;color:var(--lt-gold)}
 
 /* '러브트리가 걸어온 길'(261116 대표 확정) — 새 소식 창 맨 아래 접이식 구획. 처음엔 접힘.
    토큰만 쓴다(밤·정원 모두 --lt-pearl/--lt-muted/--lt-gold가 테마에서 갈린다). 자료를 못 읽으면 hidden. */

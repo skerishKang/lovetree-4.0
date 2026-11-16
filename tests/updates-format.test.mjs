@@ -4,7 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  compareVersions, latestEntry, sourceLabel, readSeen, markSeen, renderUpdates, renderEras, erasModel, mountUpdates
+  compareVersions, latestEntry, sourceLabel, sourceSummary, readSeen, markSeen, renderUpdates, renderEras, erasModel, mountUpdates
 } from '../public/v41/updates.mjs';
 
 const UPDATES = JSON.parse(readFileSync(new URL('../public/v41/updates.json', import.meta.url), 'utf8'));
@@ -68,12 +68,23 @@ test('611: 버전 비교·최신 버전 선택은 숫자 세 자리로만 한다
   assert.equal(latestEntry(null), null);
 });
 
-test('611: 출처 한 줄은 AI 명예회원과 실제 사용자를 구분한다', () => {
-  assert.equal(sourceLabel({source: 'ai_tester', tester: '윤제'}), 'AI 명예회원 윤제 님이 알려 준 것');
-  assert.equal(sourceLabel({source: 'ai_tester'}), 'AI 명예회원이 알려 준 것', '이름을 모르면 역할로만 보여 준다');
-  assert.equal(sourceLabel({source: 'user'}), '사용자 의견으로 고친 것');
+test('611: 출처 이름표는 짧은 이름으로 AI 명예회원과 실제 사용자를 구분한다', () => {
+  assert.equal(sourceLabel({source: 'ai_tester', tester: '윤제'}), '윤제 님');
+  assert.equal(sourceLabel({source: 'ai_tester'}), 'AI 명예회원', '이름을 모르면 역할로만 보여 준다');
+  assert.equal(sourceLabel({source: 'user'}), '사용자 의견');
   assert.equal(sourceLabel({source: 'team'}), '');
   assert.equal(sourceLabel({}), '');
+});
+
+test('261117: 창 맨 아래 출처 줄은 이름별 개수를 한 번만 모은다', () => {
+  const items = [
+    {source: 'ai_tester', tester: '윤제'}, {source: 'ai_tester', tester: '윤제'},
+    {source: 'ai_tester', tester: '보람'}, {source: 'team'}, {source: 'user'}
+  ];
+  assert.equal(sourceSummary(items), 'AI 명예회원 윤제 님 2 · 보람 님 1');
+  assert.equal(sourceSummary([{source: 'ai_tester', tester: '하은'}, {source: 'ai_tester', tester: '하은'}]), 'AI 명예회원 하은 님이 알려 준 것 2가지');
+  assert.equal(sourceSummary([]), '');
+  assert.equal(sourceSummary([{source: 'team'}]), '');
 });
 
 test('611: 렌더는 버전별·새로워진 것·고친 것 순서로 쉬운 말만 쓴다', () => {
@@ -81,7 +92,9 @@ test('611: 렌더는 버전별·새로워진 것·고친 것 순서로 쉬운 �
   assert.match(html, /러브트리 4\.1\.3/, '버전 제목');
   assert.match(html, /새로워진 것/, '새로워진 것 묶음');
   assert.match(html, /고친 것/, '고친 것 묶음');
-  assert.match(html, /AI 명예회원 윤제 님이 알려 준 것/, '출처 표시');
+  assert.match(html, /<span class="updates-source" aria-label="윤제 님이 알려 준 것"><span class="updates-heart" aria-hidden="true">♥<\/span><strong>윤제 님<\/strong><\/span>/, '항목 끝 이름표');
+  assert.match(html, /<p class="updates-source-summary">AI 명예회원 /, '창 맨 아래 출처 집계 줄');
+  assert.ok((html.match(/AI 명예회원 [^\n]*님이 알려 준 것/g) || []).length <= 1, '긴 출처 문장은 집계 줄에만 한 번');
   assert.match(html, /data-updates-version="4\.1\.3"/, '버전 자리');
   assert.match(html, /data-active="true"/, '연 버전 자리 표시');
   assert.doesNotMatch(html, /여러분이/, '금지 문구가 없다');

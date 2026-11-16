@@ -34,12 +34,30 @@ export function latestEntry(updates) {
   return best;
 }
 
-/** 출처 한 줄. AI 명예회원·실제 사용자 의견을 구분한다 — 출처 원칙(#611 댓글), 호칭은 2026-11-15 대표 결정. */
+/** 항목 끝에 붙는 짧은 이름표. AI 명예회원은 '○○ 님', 사용자 의견은 짧은 출처 문구.
+ *  호칭은 2026-11-15 대표 결정, 이름표 모양은 2026-11-17 대표 결정. */
 export function sourceLabel(item) {
   if (!item || typeof item !== 'object') return '';
-  if (item.source === 'ai_tester') return item.tester ? `AI 명예회원 ${String(item.tester)} 님이 알려 준 것` : 'AI 명예회원이 알려 준 것';
-  if (item.source === 'user') return '사용자 의견으로 고친 것';
+  if (item.source === 'ai_tester') {
+    const name = String(item.tester ?? '').trim();
+    return name ? `${name} 님` : 'AI 명예회원';
+  }
+  if (item.source === 'user') return '사용자 의견';
   return '';
+}
+
+/** 창 맨 아래에 한 번만 쓰는 출처 집계 줄. 이름이 여러 개면 '○○ 님 5 · △△ 님 3'. */
+export function sourceSummary(items) {
+  const counts = new Map();
+  for (const item of Array.isArray(items) ? items : []) {
+    if (item?.source !== 'ai_tester') continue;
+    const name = sourceLabel(item);
+    counts.set(name, (counts.get(name) || 0) + 1);
+  }
+  if (!counts.size) return '';
+  const rows = [...counts.entries()];
+  if (rows.length === 1) return `AI 명예회원 ${rows[0][0]}이 알려 준 것 ${rows[0][1]}가지`;
+  return `AI 명예회원 ${rows.map(([name, n]) => `${name} ${n}`).join(' · ')}`;
 }
 
 export function readSeen(storage) {
@@ -59,35 +77,35 @@ export function markSeen(storage, version) {
 const esc = value => String(value ?? '').replace(/[&<>"]/g, ch => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[ch]));
 
 /** 노트 목록을 쉬운 말 한 줄씩으로 그리는 조각. 버전·날짜·새로워진 것·고친 것·아직 준비 중 그대로만 쓴다.
- *  #638: '새로워진 것'·'고친 것'·'아직 준비 중' 제목은 한 버전에 한 번만 보인다. 출처 줄('AI 명예회원 ○○ 님이 알려 준 것')은
- *  같은 출처의 이웃 항목을 한 묶음으로 쳐서 그 묶음 끝 항목 아래에 작게 단다(12px — shell.css). */
+ *  2026-11-17 대표 결정: AI 명예회원 출처는 항목 끝 이름표(하트 + '○○ 님', 13px)로만 붙이고,
+ *  같은 긴 문장을 항목마다 되풀이하지 않는다. 창 맨 아래에는 출처별 개수를 한 줄로 모은다. */
 export function renderUpdates(updates, activeVersion = '') {
   const entries = (Array.isArray(updates) ? updates : [])
     .filter(entry => validVersion(entry?.version))
     .slice()
     .sort((a, b) => compareVersions(b.version, a.version));
   if (!entries.length) return '<p class="panel-note">아직 새 소식이 없어요.</p>';
-  return entries.map(entry => {
+  const tag = item => {
+    const label = sourceLabel(item);
+    if (!label) return '';
+    if (item.source !== 'ai_tester') return `<small class="updates-source-user">${esc(label)}</small>`;
+    const who = String(item.tester ?? '').trim();
+    const aria = who ? `${who} 님이 알려 준 것` : 'AI 명예회원이 알려 준 것';
+    return `<span class="updates-source" aria-label="${esc(aria)}"><span class="updates-heart" aria-hidden="true">♥</span><strong>${esc(label)}</strong></span>`;
+  };
+  const sections = entries.map(entry => {
     const groups = [['new', '새로워진 것'], ['fix', '고친 것'], ['soon', '아직 준비 중']]
       .map(([kind, title]) => {
         const rows = (Array.isArray(entry.items) ? entry.items : []).filter(item => item?.kind === kind);
         if (!rows.length) return '';
-        const bundles = [];
-        for (const item of rows) {
-          const label = sourceLabel(item);
-          const last = bundles[bundles.length - 1];
-          if (last && last.label === label) last.items.push(item);
-          else bundles.push({label, items: [item]});
-        }
-        // 묶음마다 제목을 다시 쓰지 않는다 — 한 칸(<section>)에 제목 하나·목록 하나, 출처는 묶음 끝 항목에 붙인다.
-        const lines = bundles.map(bundle => bundle.items
-          .map((item, i) => `<li>${esc(item.text)}${bundle.label && i === bundle.items.length - 1 ? `<small class="updates-source">${esc(bundle.label)}</small>` : ''}</li>`)
-          .join('')).join('');
+        const lines = rows.map(item => `<li>${esc(item.text)}${tag(item)}</li>`).join('');
         return `<section class="updates-kind"><h3>${esc(title)}</h3><ul>${lines}</ul></section>`;
       }).join('');
     return `<section class="updates-version" data-updates-version="${esc(entry.version)}"${activeVersion === entry.version ? ' data-active="true"' : ''}>
       <h2 class="updates-version-title">러브트리 ${esc(entry.version)} <span>${esc(entry.date || '')}</span></h2>${groups}</section>`;
   }).join('');
+  const summary = sourceSummary(entries.flatMap(entry => Array.isArray(entry.items) ? entry.items : []));
+  return sections + (summary ? `<p class="updates-source-summary">${esc(summary)}</p>` : '');
 }
 
 // '러브트리가 걸어온 길'(261116 대표 확정): 새 소식 창 맨 아래 접이식 구획. 옛것 → 지금 순서로 세대 카드를 세운다.

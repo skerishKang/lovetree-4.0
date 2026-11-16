@@ -71,6 +71,38 @@ function serve() {
   return new Promise((ok) => server.listen(0, '127.0.0.1', () => ok(server)));
 }
 
+/** 실제 그려진 색을 겹쳐 대비를 잰다(밤·정원 모두 같은 규칙). */
+async function measureRatios(page, selectors) {
+  return page.evaluate((sels) => {
+    const parse = (text) => {
+      const m = /rgba?\(([^)]+)\)/.exec(text || '');
+      if (!m) return null;
+      const p = m[1].split(/[\s,/]+/).filter(Boolean).map(Number);
+      if (p.length < 3 || p.some(n => Number.isNaN(n))) return null;
+      return { r: p[0], g: p[1], b: p[2], a: p.length > 3 ? p[3] : 1 };
+    };
+    const over = (top, under) => ({ r: top.r * top.a + under.r * (1 - top.a), g: top.g * top.a + under.g * (1 - top.a), b: top.b * top.a + under.b * (1 - top.a), a: 1 });
+    const lum = (c) => { const f = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(c.r) + 0.7152 * f(c.g) + 0.0722 * f(c.b); };
+    const ratio = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+    const stack = (el) => {
+      const layers = [];
+      for (let node = el; node; node = node.parentElement) {
+        const bg = parse(getComputedStyle(node).backgroundColor);
+        if (bg && bg.a > 0) layers.push(bg);
+        if (bg && bg.a === 1) break;
+      }
+      const base = parse(getComputedStyle(document.body).backgroundColor) || { r: 4, g: 4, b: 7, a: 1 };
+      return layers.reduceRight((under, top) => over(top, under), base.a === 1 ? base : { r: 4, g: 4, b: 7, a: 1 });
+    };
+    return sels.map((sel) => {
+      const el = document.querySelector(sel);
+      if (!el) return { sel, ratio: null };
+      const fg = parse(getComputedStyle(el).color);
+      return { sel, ratio: Math.round(ratio(fg, stack(el)) * 100) / 100 };
+    });
+  }, selectors);
+}
+
 let server, base;
 test.before(async () => { server = await serve(); base = `http://127.0.0.1:${server.address().port}`; });
 test.after(() => new Promise((ok) => server.close(ok)));
@@ -106,13 +138,20 @@ test('611 실행: 새 소식은 로그아웃 상태에서도 보이고, 알림 �
     assert.match(text, new RegExp('러브트리 ' + latestVersion.replaceAll('.', '\\.')), '맨 위 버전 제목');
     assert.match(text, /새로워진 것/, '새로워진 것');
     assert.match(text, /고친 것/, '고친 것');
-    assert.match(text, /AI 명예회원 윤제 님이 알려 준 것/, '출처 표시');
-    assert.match(text, /AI 명예회원 보람 님이 알려 준 것/, '출처 표시 — 보람');
+    assert.match(text, /♥\s*윤제 님/, '항목 끝 이름표 — 윤제');
+    assert.match(text, /♥\s*보람 님/, '항목 끝 이름표 — 보람');
+    assert.match(text, /AI 명예회원\s+[^\n]*님\s+\d+/, '창 맨 아래 출처 집계 줄');
+    assert.ok((text.match(/님이 알려 준 것/g) || []).length <= 1, '긴 출처 문장은 집계 줄에만');
+    // 4.1.8에서 출처 항목을 지워 첫 '새로워진 것'은 4.1.7 — 판 안에서 순서를 잰다.
     // 4.1.6(2026-11-16): 새로워진 것 → 고친 것 → 아직 준비 중 순서, '아직 준비 중'은 한 번만.
-    const fresh = text.indexOf('새로워진 것');
-    const fixed = text.indexOf('고친 것');
-    const soon = text.indexOf('아직 준비 중');
-    assert.ok(fresh > -1 && fixed > fresh && soon > fixed, '새로워진 것 → 고친 것 → 아직 준비 중 순서다');
+    const at417 = text.indexOf('러브트리 4.1.7');
+    const at416 = text.indexOf('러브트리 4.1.6');
+    assert.ok(at417 > -1 && at416 > at417, '4.1.7·4.1.6 판이 있다');
+    const block417 = text.slice(at417, at416);
+    const fresh = block417.indexOf('새로워진 것');
+    const fixed = block417.indexOf('고친 것');
+    const soon = text.indexOf('아직 준비 중', at416);
+    assert.ok(fresh > -1 && fixed > fresh && soon > at416, '새로워진 것 → 고친 것 → 아직 준비 중 순서다');
     assert.equal((text.match(/아직 준비 중/g) || []).length, 1, '아직 준비 중 제목은 한 번만 보인다');
     assert.match(text, /검색 사이트/, '아직 준비 중 — 검색 등록');
     assert.match(text, /비밀번호 찾기/, '아직 준비 중 — 비밀번호 찾기');
@@ -292,35 +331,63 @@ test('261116 실행: 4.1.2·4.1.1이 4.1.3 아래에 보이고, 걸어온 길은
         assert.doesNotMatch(opened.text, /https?:|github|저장소/, '저장소 주소·개발 용어 없음');
 
         // ④ 밤·정원 모두 카드 글자 대비 4.5:1 이상(실제 그려진 색을 겹쳐서 잰다).
-        const ratios = await page.evaluate(() => {
-          const parse = (text) => {
-            const m = /rgba?\(([^)]+)\)/.exec(text || '');
-            if (!m) return null;
-            const p = m[1].split(/[\s,/]+/).filter(Boolean).map(Number);
-            if (p.length < 3 || p.some(n => Number.isNaN(n))) return null;
-            return { r: p[0], g: p[1], b: p[2], a: p.length > 3 ? p[3] : 1 };
-          };
-          const over = (top, under) => ({ r: top.r * top.a + under.r * (1 - top.a), g: top.g * top.a + under.g * (1 - top.a), b: top.b * top.a + under.b * (1 - top.a), a: 1 });
-          const lum = (c) => { const f = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(c.r) + 0.7152 * f(c.g) + 0.0722 * f(c.b); };
-          const ratio = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
-          const stack = (el) => {
-            const layers = [];
-            for (let node = el; node; node = node.parentElement) {
-              const bg = parse(getComputedStyle(node).backgroundColor);
-              if (bg && bg.a > 0) layers.push(bg);
-              if (bg && bg.a === 1) break;
-            }
-            const base = parse(getComputedStyle(document.body).backgroundColor) || { r: 4, g: 4, b: 7, a: 1 };
-            return layers.reduceRight((under, top) => over(top, under), base.a === 1 ? base : { r: 4, g: 4, b: 7, a: 1 });
-          };
-          return ['.eras-name', '.eras-line', '.eras-when', '.eras-mark', '.eras-summary'].map((sel) => {
-            const el = document.querySelector(sel);
-            const fg = parse(getComputedStyle(el).color);
-            const bg = stack(el);
-            return { sel, ratio: Math.round(ratio(fg, bg) * 100) / 100 };
-          });
-        });
+        const ratios = await measureRatios(page, ['.eras-name', '.eras-line', '.eras-when', '.eras-mark', '.eras-summary']);
         for (const row of ratios) assert.ok(row.ratio >= 4.5, `${width}/${theme}: ${row.sel} 대비 ${row.ratio}:1 (4.5:1 이상)`);
+        assert.deepEqual(errors, [], `${width}/${theme}: 페이지 오류 없음`);
+        await ctx.close();
+      }
+    }
+  } finally {
+    await browser.close();
+  }
+});
+
+// 2026-11-17 대표 결정: AI 명예회원 출처는 항목 끝 이름표(하트 + 굵은 이름, 13px)와 창 맨 아래 집계 한 줄.
+// 눈이 아니라 수치로 판정한다 — 이름표 개수·글자 크기·굵기·대비 4.5:1·가로 넘침 0(1440·390 × 밤·정원).
+test('261117 실행: 이름표와 출처 집계 줄이 1440·390 × 밤·정원에서 4.5:1로 읽힌다', { skip }, async () => {
+  const browser = await chromium.launch();
+  try {
+    for (const theme of ['night', 'garden']) {
+      for (const width of [1440, 390]) {
+        const ctx = await browser.newContext({ viewport: { width, height: width === 390 ? 844 : 900 } });
+        const page = await ctx.newPage();
+        const errors = [];
+        page.on('pageerror', (e) => errors.push(String(e.message || e)));
+        await page.goto(`${base}/host611`, { waitUntil: 'load' });
+        await page.evaluate((t) => document.documentElement.setAttribute('data-lt-theme', t), theme);
+        await page.waitForFunction(() => !document.getElementById('updates-card')?.hidden, null, { timeout: 8000 });
+        await page.click('#updates-link');
+        await page.waitForFunction(() => document.getElementById('updates-panel').open, null, { timeout: 5000 });
+        const info = await page.evaluate(() => {
+          const tags = [...document.querySelectorAll('#updates-list .updates-source')];
+          const first = tags[0];
+          const strong = first?.querySelector('strong');
+          const heart = first?.querySelector('.updates-heart');
+          return {
+            tags: tags.length,
+            font: first ? getComputedStyle(first).fontSize : null,
+            strongWeight: strong ? getComputedStyle(strong).fontWeight : null,
+            heart: heart?.textContent?.trim(),
+            heartHidden: heart?.getAttribute('aria-hidden'),
+            label: first?.getAttribute('aria-label'),
+            summary: document.querySelector('#updates-list .updates-source-summary')?.textContent?.trim() || '',
+            summaryLast: document.querySelector('#updates-list')?.lastElementChild?.classList.contains('updates-source-summary'),
+            repeats: (document.getElementById('updates-list').innerText.match(/님이 알려 준 것/g) || []).length,
+            overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth
+          };
+        });
+        assert.ok(info.tags >= 10, `${width}/${theme}: 이름표 ${info.tags}개`);
+        assert.equal(info.font, '13px', `${width}/${theme}: 이름표 글자 13px`);
+        assert.ok(Number(info.strongWeight) >= 700, `${width}/${theme}: 이름 굵게(${info.strongWeight})`);
+        assert.equal(info.heart, '♥', `${width}/${theme}: 하트 아이콘`);
+        assert.equal(info.heartHidden, 'true', `${width}/${theme}: 하트는 장식`);
+        assert.match(info.label || '', /님이 알려 준 것/, `${width}/${theme}: 이름표 읽기 문구`);
+        assert.match(info.summary, /^AI 명예회원 /, `${width}/${theme}: 창 맨 아래 집계 줄(${info.summary})`);
+        assert.equal(info.summaryLast, true, `${width}/${theme}: 집계 줄이 맨 아래`);
+        assert.ok(info.repeats <= 1, `${width}/${theme}: 긴 출처 문장 되풀이 ${info.repeats}회`);
+        assert.ok(info.overflow <= 0, `${width}/${theme}: 가로 넘침 ${info.overflow}px`);
+        const ratios = await measureRatios(page, ['.updates-source', '.updates-source strong', '.updates-source-summary']);
+        for (const row of ratios) assert.ok(row.ratio !== null && row.ratio >= 4.5, `${width}/${theme}: ${row.sel} 대비 ${row.ratio}:1 (4.5:1 이상)`);
         assert.deepEqual(errors, [], `${width}/${theme}: 페이지 오류 없음`);
         await ctx.close();
       }
