@@ -108,6 +108,12 @@ body {
 .lt-tab.is-active { border-color: var(--lt-gold); color: var(--lt-gold); background: rgba(255,230,166,.07); }
 .lt-tab-count { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; padding: 1px 6px; border-radius: var(--lt-r-pill); background: rgba(255,255,255,.06); font-size: 11px; color: var(--lt-muted); }
 .lt-tab.is-active .lt-tab-count { color: var(--lt-gold); background: rgba(255,230,166,.12); }
+/* 2026-11-17: 종류 묶음은 머리 오른쪽, 상태 한 줄은 그 아래. */
+.lt-board-head--filters { align-items: center; justify-content: space-between; }
+.lt-board-head--filters .lt-h1 small { font-size: 13px; font-weight: 400; color: var(--lt-muted); letter-spacing: 0; margin-left: 6px; }
+.lt-kind-bundle { display: flex; gap: 6px; flex-wrap: wrap; }
+.lt-status-row { margin-bottom: 4px; }
+.lt-report-card .lt-actions { margin-top: 4px; }
 
 .lt-post-list { display: grid; gap: 10px; }
 .lt-post { display: grid; gap: 6px; text-align: left; width: 100%; border: 1px solid var(--lt-line); border-radius: var(--lt-r-card); background: var(--lt-glass); padding: 14px 16px; color: inherit; cursor: pointer; }

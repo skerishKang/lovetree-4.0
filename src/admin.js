@@ -6,7 +6,8 @@ import {
 import {
   GITHUB_REPO, KIND_LABEL, STATUS_LABEL, STATUS_ORDER, PERSONA_FIELDS, PENDING_STATUS,
   escapeText, richParagraph, formatTime, parseHash, viewHash, viewToTab,
-  filterRows, statusTabs, kindTabs, linkedIssueNumbers, normalizeIssueNumber, issueStateLabel, needsFixButton,
+  filterRows, statusTabs, kindTabs, TABS, BOARD_KIND_TABS, boardKindTabs, boardStatusTabs, filterBoardRows,
+  linkedIssueNumbers, normalizeIssueNumber, issueStateLabel, needsFixButton,
   statusChangeMessage, buildIssueUrl, issueLink, journalsSummary, journalRowsByCustomer,
   isPendingStatus, overviewModel, statsCards,
   customerSummaryCards, customerRows, customerDetailModel, customerViewRows
@@ -66,7 +67,7 @@ function head() {
   const themeBtn = `<button type="button" class="lt-theme-toggle" data-lt-theme-toggle aria-pressed="${themePressed(theme)}" aria-label="${themeButtonAriaLabel(theme)}" title="${themeButtonAriaLabel(theme)}">${themeButtonLabel(theme)}</button>`;
   // #655: '한눈에'가 맨 앞 탭이다(운영센터를 열면 기본). 기존 탭·주소는 그대로 둔다.
   // 오른쪽 끝은 셸과 같은 .header-actions 자리 — 테마 단추 + ≤780의 ☰ 더보기. 좁은 화면에서는 알약 탭 대신 이 판으로 고른다.
-  const tabs = `${tabBtn('overview', '한눈에')}${tabBtn('customers', '고객')}${tabBtn('board', '고객 글')}${tabBtn('journals', '사용 일지')}${tabBtn('reports', '신고')}${tabBtn('issues', '고치는 일')}`;
+  const tabs = TABS.map(t => tabBtn(t.view, t.label)).join('');
   headerHost.innerHTML = `<a class="brand" href="/v41/" title="러브트리로" aria-label="러브트리로"><span>LoveTree</span><small>4.1</small></a>`
     + `<nav aria-label="관리자 메뉴">${tabs}</nav>`
     + `<div class="header-actions">${themeBtn}<button type="button" class="lt-more" data-admin-more aria-expanded="${moreOpen}" aria-controls="admin-overflow" aria-label="메뉴 더보기">☰</button></div>`
@@ -140,7 +141,7 @@ async function renderOverview() {
     card(fb.fixed, '고객 글 · 고침', 'board', 'fixed', Boolean(fb.error)),
     card(fb.total, '고객 글 · 전체', 'board', '', Boolean(fb.error)),
     card(fb.unanswered, '답을 아직 안 단 글(답글 0)', 'board', '', Boolean(fb.error), true),
-    card(rp.pending, '신고 · 검토 대기', 'reports', 'open', Boolean(rp.error)),
+    card(rp.pending, '신고 · 검토 대기', 'reports', PENDING_STATUS, Boolean(rp.error)),
     card(is.open, '고치는 일 · 열린 이슈', 'issues', 'open', Boolean(is.error)),
     card(is.closed, '고치는 일 · 닫힌 이슈', 'issues', 'closed', Boolean(is.error))
   ].join('');
@@ -311,28 +312,58 @@ async function renderCustomerDetail(subjectId) {
 
 async function renderList() {
   // 탭 숫자를 함께 보여 주려고 목록을 거르지 않고 한 번에 읽어 화면에서 거른다(#570 2). 목록은 작다.
-  const res = await read('/api/admin/feedback');
-  const rows = res.ok && Array.isArray(res.payload?.feedback) ? res.payload.feedback : [];
-  const filters = {kind: route.kind, status: route.status, unanswered: route.unanswered};
-  const visible = filterRows(rows, filters);
+  // 2026-11-17: 둘러보기 신고도 같은 카드 모양으로 섞어 보여 준다(처리 단추는 신고 탭의 것 그대로).
+  const [res, reportsRes] = await Promise.all([read('/api/admin/feedback'), read('/api/community/admin/reports')]);
+  const posts = res.ok && Array.isArray(res.payload?.feedback) ? res.payload.feedback : [];
+  const reports = reportsRes.ok && Array.isArray(reportsRes.payload?.reports) ? reportsRes.payload.reports : [];
+  const reportRows = reports.map(report => ({
+    id: `report:${report.id}`, reportId: report.id, kind: 'report', report,
+    status: report.status === 'open' ? 'reviewing' : report.status === 'resolved' ? 'fixed' : 'closed',
+    displayTitle: String(report.reason || '').slice(0, 90) || '신고', createdAt: report.createdAt, replyCount: 0
+  }));
+  const rows = [...posts, ...reportRows];
+  const activeStatus = route.status || PENDING_STATUS;
+  const visible = filterBoardRows(rows, {kind: route.kind, status: activeStatus});
   const tabBtn = (data, value, label, count, active) =>
-    `<button type="button" ${data}="${escapeText(value)}" class="lt-tab${active ? ' is-active' : ''}"${count == null ? '' : ` aria-label="${escapeText(label)} ${count}건"`}>${escapeText(label)}${count == null ? '' : ` <span class="lt-tab-count">${count}</span>`}</button>`;
-  const statusRow = statusTabs(rows, route.kind).map(t => tabBtn('data-status-tab', t.status, t.label, t.count, route.status === t.status)).join('');
-  const kindRow = kindTabs(rows, route.status).map(t => tabBtn('data-kind-tab', t.kind, t.label, t.count, route.kind === t.kind)).join('');
-  const tabRows = `<div class="lt-tabs" role="group" aria-label="상태 탭">${statusRow}</div><div class="lt-tabs" role="group" aria-label="종류 탭">${kindRow}</div>`;
+    `<button type="button" ${data}="${escapeText(value)}" class="lt-tab${active ? ' is-active' : ''}" aria-label="${escapeText(label)} ${count}건">${escapeText(label)} <span class="lt-tab-count">${count}</span></button>`;
+  const kindRow = boardKindTabs(rows, activeStatus)
+    .map(t => tabBtn('data-kind-tab', t.key, t.label, t.count, route.kind === t.key)).join('');
+  // 숫자 0인 상태 칸은 숨긴다.
+  const statusRow = boardStatusTabs(rows, route.kind)
+    .filter(t => t.count > 0)
+    .map(t => tabBtn('data-status-tab', t.key, t.label, t.count, activeStatus === t.key)).join('');
   const list = visible.length
-    ? visible.map(row => `<article class="lt-post" data-open="${escapeText(row.id)}" tabindex="0" role="button">
-        <div class="lt-post-top">${kindBadge(row.kind)}${statusBadge(row.status)}<span class="lt-post-date">${escapeText(formatTime(row.createdAt))}</span></div>
+    ? visible.map(row => row.kind === 'report' ? reportCard(row.report) : `<article class="lt-post" data-open="${escapeText(row.id)}" tabindex="0" role="button">
+        <div class="lt-post-top">${kindBadge(row.kind)}${statusBadge(row.status)}${row.kind === 'journal' && row.score ? `<span class="lt-badge">점수 ${escapeText(row.score)}</span>` : ''}${row.kind === 'journal' && row.journalDate ? `<span class="lt-badge">${escapeText(row.journalDate)}</span>` : ''}<span class="lt-post-date">${escapeText(formatTime(row.createdAt))}</span></div>
         <h3 class="lt-post-title">${escapeText(row.displayTitle || '(제목 없음)')}</h3>
         <div class="lt-post-meta"><span class="lt-post-author" data-author="${escapeText(row.subjectId || '')}">${escapeText(authorLabel(row))}</span>${issueLink(row.issueNumber) ? `<span class="lt-post-issue">이슈 ${issueLink(row.issueNumber)}</span>` : ''}<span>답글 ${row.replyCount || 0}</span></div>
       </article>`).join('')
-    : '<p class="lt-empty">접수된 글이 없습니다.</p>';
+    : '<p class="lt-empty">지금 조건에 맞는 글이 없습니다.</p>';
   host.innerHTML = `${head()}<div class="admin-shell lt-board">
-    <div class="lt-board-head"><h1 class="lt-h1">고객 글</h1><p class="lt-sub">${visible.length}건 · 최신 순${route.unanswered ? ' · 답을 아직 안 단 글만' : ''}</p></div>
-    ${tabRows}
-    ${route.unanswered ? '<p class="lt-post-meta">답글 0인 글만 보는 중 · <button type="button" class="lt-btn" data-clear-filter="board">조건 지우기</button></p>' : ''}
+    <div class="lt-board-head lt-board-head--filters">
+      <h1 class="lt-h1">고객 글 <small>${visible.length}건 · 최신 순</small></h1>
+      <div class="lt-kind-bundle" role="group" aria-label="종류">${kindRow}</div>
+    </div>
+    <div class="lt-tabs lt-status-row" role="group" aria-label="상태">${statusRow}</div>
     <div class="lt-post-list">${list}</div>
   </div>`;
+}
+
+/** 신고 카드 — 고객 글과 같은 .lt-post 모양에 신고 탭의 처리 단추를 그대로 둔다. */
+function reportCard(report) {
+  const stateLabel = report.status === 'open' ? '검토 대기' : report.status === 'resolved' ? '처리 완료' : '기각';
+  const visibility = report.hidden ? '발견 숨김' : '발견 노출';
+  const hide = report.hidden ? 'disabled' : '';
+  const restore = !report.hidden && report.status === 'dismissed' ? 'disabled' : '';
+  return `<article class="lt-post lt-report-card" data-report="${escapeText(report.id)}">
+    <div class="lt-post-top">${kindBadge('report')}<span class="lt-badge">${escapeText(stateLabel)}</span><span class="lt-badge">${escapeText(visibility)}</span><span class="lt-post-date">${escapeText(formatTime(report.createdAt))}</span></div>
+    <h3 class="lt-post-title">${escapeText(String(report.reason || '').slice(0, 90) || '신고')}</h3>
+    <div class="lt-post-meta">공유 ${escapeText(report.shareId)}</div>
+    <div class="lt-actions">
+      <button type="button" class="lt-btn" data-report-act="hide" data-id="${escapeText(report.id)}" ${hide}>검토 완료·발견 숨김</button>
+      <button type="button" class="lt-btn" data-report-act="restore" data-id="${escapeText(report.id)}" ${restore}>신고 기각·발견 복구</button>
+    </div>
+  </article>`;
 }
 
 async function renderDetail(id) {
@@ -588,7 +619,7 @@ document.addEventListener('click', async (event) => {
   if (reportAct) {
     const hide = reportAct.dataset.reportAct === 'hide';
     const res = await read('/api/community/admin/reports/' + encodeURIComponent(reportAct.dataset.id), {method: 'PATCH', body: JSON.stringify({status: hide ? 'resolved' : 'dismissed', visibility: hide ? 'hidden' : 'visible'})});
-    if (res.ok) await renderReports();
+    if (res.ok) await render(); // 신고 카드는 고객 글 목록에 있으므로 목록을 다시 그린다.
     return;
   }
   const tab = event.target.closest('[data-tab]');
@@ -633,7 +664,7 @@ document.addEventListener('click', async (event) => {
   const fixBtn = event.target.closest('[data-fix-status]');
   if (fixBtn) {
     const res = await read('/api/admin/feedback/' + encodeURIComponent(fixBtn.dataset.fixStatus), {method: 'PATCH', body: JSON.stringify({status: 'fixed'})});
-    if (res.ok) await renderIssues();
+    if (res.ok) await render();
     return;
   }
   const open = event.target.closest('[data-open]');

@@ -5,6 +5,7 @@ import {
   STATUS_ORDER, PERSONA_FIELDS,
   richParagraph, formatTime, parseHash, viewHash, viewToTab,
   filterRows, statusTabs, kindTabs, STATUS_LABEL,
+  TABS, BOARD_KIND_TABS, BOARD_STATUS_TABS, boardKindTabs, boardStatusTabs, filterBoardRows,
   linkedIssueNumbers, normalizeIssueNumber, issueStateLabel, needsFixButton,
   statusChangeMessage, buildIssueUrl, issueLink, escapeText, statsCards,
   journalsSummary, journalRowsByCustomer, journalStage,
@@ -17,8 +18,9 @@ test('주소 해시를 화면 상태로 바꾼다(#564 2)', () => {
   assert.deepEqual(parseHash(''), {view: 'overview', id: null, status: '', kind: ''});
   assert.deepEqual(parseHash('#overview'), {view: 'overview', id: null, status: '', kind: ''});
   assert.deepEqual(parseHash('#board'), {view: 'board', id: null, status: '', kind: ''});
-  assert.deepEqual(parseHash('#reports'), {view: 'reports', id: null, status: '', kind: ''});
-  assert.deepEqual(parseHash('#issues'), {view: 'issues', id: null, status: '', kind: ''});
+  // 2026-11-17: 없어진 탭의 옛 주소는 고객 글 거르기로 연다.
+  assert.deepEqual(parseHash('#reports'), {view: 'board', id: null, status: 'pending', kind: 'report'});
+  assert.deepEqual(parseHash('#issues'), {view: 'board', id: null, status: 'fixed', kind: ''});
   assert.deepEqual(parseHash('#feedback/abc'), {view: 'feedback', id: 'abc', status: '', kind: ''});
   assert.deepEqual(parseHash('#persona/고객-01'), {view: 'persona', id: '고객-01', status: '', kind: ''});
   // 모르는 모양은 목록으로 돌린다.
@@ -41,15 +43,15 @@ test('탭 거르기를 주소에 남기고 되돌린다(#570 2)', () => {
   assert.equal(viewHash('board', null, {status: 'closed'}), '#board?status=closed');
   assert.equal(viewHash('board', null, {}), '#board');
   // 왕복: 해시 → 상태 → 해시가 같다.
-  for (const hash of ['#overview', '#board', '#board?status=reviewing', '#board?status=pending', '#board?kind=journal', '#board?status=closed&kind=opinion', '#reports', '#issues', '#feedback/p1', '#persona/x']) {
+  for (const hash of ['#overview', '#board', '#board?status=reviewing', '#board?status=pending', '#board?kind=journal', '#board?status=closed&kind=opinion', '#board?kind=report', '#board?status=fixed', '#feedback/p1', '#persona/x']) {
     const view = parseHash(hash);
     assert.equal(viewHash(view.view, view.id, view), hash);
   }
 });
 
 test('화면 상태를 주소 해시로 되돌린다', () => {
-  assert.equal(viewHash('reports'), '#reports');
-  assert.equal(viewHash('issues'), '#issues');
+  assert.equal(viewHash('reports'), '#board?kind=report');
+  assert.equal(viewHash('issues'), '#board?status=fixed');
   assert.equal(viewHash('feedback', 'p1'), '#feedback/p1');
   assert.equal(viewHash('persona', '고 객'), '#persona/' + encodeURIComponent('고 객'));
 });
@@ -58,8 +60,8 @@ test('글·페르소나 화면은 고객 글 탭이 눌려 있다', () => {
   assert.equal(viewToTab('board'), 'board');
   assert.equal(viewToTab('feedback'), 'board');
   assert.equal(viewToTab('persona'), 'board');
-  assert.equal(viewToTab('reports'), 'reports');
-  assert.equal(viewToTab('issues'), 'issues');
+  assert.equal(viewToTab('reports'), 'board');
+  assert.equal(viewToTab('issues'), 'board');
 });
 
 test("날짜를 '11.14 06:31' 모양으로 쓴다(지역 시간, 초 없음)", () => {
@@ -116,10 +118,11 @@ test('종류 탭 줄은 전체·의견·일지 숫자를 센다(#570 2)', () => 
     {id: '3', status: 'fixed', kind: 'journal'}
   ];
   // 상태 탭을 고르지 않으면 기본 화면(닫음 뺀 전체)의 숫자다.
-  assert.deepEqual(kindTabs(rows).map(t => t.count), [2, 1, 1]);
-  assert.deepEqual(kindTabs(rows).map(t => t.label), ['전체', '의견', '일지']);
+  // 2026-11-17: 신고가 종류에 추가됐다(이 목록에는 신고가 0건).
+  assert.deepEqual(kindTabs(rows).map(t => t.count), [2, 1, 1, 0]);
+  assert.deepEqual(kindTabs(rows).map(t => t.label), ['전체', '의견', '일지', '신고']);
   // 상태 탭을 고르면 그 상태 안의 숫자다.
-  assert.deepEqual(kindTabs(rows, 'closed').map(t => t.count), [1, 1, 0]);
+  assert.deepEqual(kindTabs(rows, 'closed').map(t => t.count), [1, 1, 0, 0]);
 });
 
 test("'받음'은 운영센터에서 '새 글'로 부른다(서버 값은 received 그대로, #570 2)", () => {
@@ -130,10 +133,10 @@ test("'받음'은 운영센터에서 '새 글'로 부른다(서버 값은 receiv
   assert.deepEqual(PERSONA_FIELDS[3], ['habits', '자주 쓰는 곳·익숙한 디자인']);
 });
 
-test('#596 사용 일지 탭 주소: #journals 왕복', () => {
-  assert.deepEqual(parseHash('#journals'), {view: 'journals', id: null, status: '', kind: ''});
-  assert.equal(viewHash('journals'), '#journals');
-  assert.equal(viewToTab('journals'), 'journals');
+test('옛 #journals 주소는 고객 글의 종류 일지 거르기로 열린다', () => {
+  assert.deepEqual(parseHash('#journals'), {view: 'board', id: null, status: '', kind: 'journal'});
+  assert.equal(viewHash('journals'), '#board?kind=journal');
+  assert.equal(viewToTab('journals'), 'board');
 });
 
 test('#596 오늘 요약·고객별 줄·떠남 위험(이틀 연속 2 이하)', () => {
@@ -369,17 +372,17 @@ test('#743 한눈에 카드: 갈 탭이 있는 카드가 자기 조건으로 그
   assert.equal(viewHash('board', null, {unanswered: true}), '#board?unanswered=1');
   assert.deepEqual(parseHash('#board?unanswered=1'), {view: 'board', id: null, status: '', kind: '', unanswered: true});
   assert.equal(viewHash(parseHash('#board?unanswered=1').view, null, parseHash('#board?unanswered=1')), '#board?unanswered=1');
-  // 신고 대기 카드 → 신고 탭의 검토 대기만.
-  assert.equal(viewHash('reports', null, {status: 'open'}), '#reports?status=open');
-  assert.equal(parseHash('#reports?status=open').status, 'open');
-  assert.equal(viewHash(parseHash('#reports?status=open').view, null, parseHash('#reports?status=open')), '#reports?status=open');
-  // 열린·닫힌 이슈 카드 → 고치는 일 탭의 그 상태만.
-  assert.equal(viewHash('issues', null, {status: 'open'}), '#issues?status=open');
-  assert.equal(viewHash('issues', null, {status: 'closed'}), '#issues?status=closed');
-  assert.equal(parseHash('#issues?status=closed').status, 'closed');
+  // 신고 대기 카드 → 고객 글의 종류 신고 + 할 일.
+  assert.equal(viewHash('reports', null, {status: 'open'}), '#board?kind=report&status=pending');
+  const reportRoute = parseHash('#reports?status=open');
+  assert.deepEqual(reportRoute, {view: 'board', id: null, status: 'pending', kind: 'report'});
+  // 열린·닫힌 이슈 카드 → 고객 글의 상태 고침 / 더 보기.
+  assert.equal(viewHash('issues', null, {status: 'open'}), '#board?status=fixed');
+  assert.equal(viewHash('issues', null, {status: 'closed'}), '#board?status=more');
+  assert.deepEqual(parseHash('#issues?status=closed'), {view: 'board', id: null, status: 'more', kind: ''});
   // 모르는 값은 버린다(주소는 늘 해석된다).
-  assert.equal(parseHash('#reports?status=bogus').status, '');
-  assert.equal(parseHash('#issues?status=pending').status, '');
+  assert.equal(parseHash('#reports?status=bogus').status, 'pending');
+  assert.equal(parseHash('#issues?status=pending').status, 'fixed');
   // 두 카드(전체·고침)는 지금처럼 상태 조건만 쓴다.
   assert.equal(viewHash('board', null, {status: 'fixed', kind: '', unanswered: false}), '#board?status=fixed');
   assert.equal(viewHash('board', null, {status: '', kind: '', unanswered: false}), '#board');
@@ -396,114 +399,89 @@ test('#743 한눈에 카드: 갈 탭이 있는 카드가 자기 조건으로 그
   assert.equal(filterRows(rows, {}).length, 3, '조건이 없으면 지금과 같다(닫음 제외)');
 });
 
-/* ── 대표 요청 2026-11-16: 운영센터 상태 칩 한 모양 + 이름 + PR 번호 — 숫자로 판정한다 ──
-   크롬(Playwright chromium)이 있는 곳에서만 돈다. CI '미리보기 검사'는 LT_ADMIN_REQUIRE=1 로 직접 돌려
-   건너뜀을 실패로 본다. 관리자 세션·고객 글·GitHub 읽기는 모두 가짜 응답(서버·네트워크 쓰기 없음). */
-
+/* ── 2026-11-17 운영센터 탭 셋 + 고객 글 한 줄 거르기 — 화면 이름·숫자로 판정한다 ──
+   크롬이 있는 곳에서만 돈다. CI는 LT_ADMIN_REQUIRE=1로 건너뜀을 실패로 본다.
+   관리자 세션·고객 글·신고 읽기는 모두 가짜 응답(서버·네트워크 쓰기 없음). */
 const ADMIN_REQUIRE = process.env.LT_ADMIN_REQUIRE === '1';
 let adminChromium, adminSkip = false;
 try {
-  const pw = await import('playwright');
-  adminChromium = pw.chromium;
-  if (!adminChromium?.executablePath?.() && !adminChromium?.executablePath) adminSkip = 'playwright 대역이어서 칩 검사를 건너뜀';
-  else if (!existsSync(adminChromium.executablePath())) adminSkip = 'Playwright Chromium이 없어 칩 검사를 건너뜀';
-} catch { adminSkip = 'playwright 패키지가 없어 칩 검사를 건너뜀'; }
-if (ADMIN_REQUIRE && !existsSync(new URL('../dist/admin.html', import.meta.url))) adminSkip = '빌드 결과가 없어 칩 검사를 건너뜀(npx vite build 필요)';
+  ({ chromium: adminChromium } = await import('playwright'));
+  const candidates = [adminChromium.executablePath()];
+  if (process.env.LT_ADMIN_BROWSER_EXE) candidates.push(process.env.LT_ADMIN_BROWSER_EXE);
+  if (!candidates.some(p => p && existsSync(p))) adminSkip = 'Playwright Chromium이 없어 운영센터 화면 시험을 건너뜀';
+} catch { adminSkip = 'playwright 패키지가 없어 운영센터 화면 시험을 건너뜀'; }
 
-const LONG_TITLE = '순간이 3개가 되는 순간에 트리가 둘러보기에 공개된다는 안내를 들었는데 저장할 때는 계속 서버에 저장됐어요만 떴고 공유 판에서 비공개로 바꾸려니 Plus 전용이라고 나왔어요. 저는 아직 열여덟 살이 안 됐는데 가입할 때 나이를 묻는 칸이 없었던 것도 신기했어요.';
-
-test('운영센터 상태 칩: 1440·390에서 높이가 같고 한 줄이며 폭이 글자+여백뿐이다(대표 요청 2026-11-16)', { skip: ADMIN_REQUIRE ? false : adminSkip, timeout: 120000 }, async () => {
+test('운영센터 탭 셋 + 옛 주소 3개 거르기 + 종류×상태 숫자', { skip: adminSkip || false, timeout: 180000 }, async () => {
   if (adminSkip) assert.fail(`건너뜀=실패 — ${adminSkip}`);
+  const { mkdirSync } = await import('node:fs');
+  const shotDir = process.env.LT_OPS_SHOT_DIR || 'E:\\lovetree-qa\\local4\\운영센터';
+  mkdirSync(shotDir, { recursive: true });
   const { serve } = await import('./helpers/screen-audit.mjs');
   const server = await serve();
   const base = `http://127.0.0.1:${server.address().port}`;
-  const browser = await adminChromium.launch({ headless: true });
+  const browser = await adminChromium.launch({ headless: true,
+    ...(process.env.LT_ADMIN_BROWSER_EXE ? { executablePath: process.env.LT_ADMIN_BROWSER_EXE } : {}) });
   try {
     const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
     await context.route('**/api/admin/session', r => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ok: true, authenticated: true, admin: true}) }));
     await context.route('**/api/admin/feedback', r => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ok: true, feedback: [
-      {id: 'p1', kind: 'opinion', status: 'fixed', replyCount: 1, issueNumber: '#584', displayTitle: LONG_TITLE, createdAt: '2026-11-15T09:00:00Z'},
-      {id: 'p2', kind: 'opinion', status: 'reviewing', replyCount: 0, issueNumber: '584', displayTitle: '짧은 제목', createdAt: '2026-11-15T10:00:00Z'},
-      {id: 'p3', kind: 'bug', status: 'received', replyCount: 0, issueNumber: '#637', displayTitle: '검색이 안 돼요', createdAt: '2026-11-15T11:00:00Z'}
+      {id: 'p1', kind: 'opinion', status: 'received', replyCount: 0, issueNumber: '', displayTitle: '새 의견', createdAt: '2026-11-16T09:00:00Z'},
+      {id: 'p2', kind: 'opinion', status: 'reviewing', replyCount: 0, issueNumber: '584', displayTitle: '확인 중 의견', createdAt: '2026-11-16T10:00:00Z'},
+      {id: 'p3', kind: 'opinion', status: 'fixed', replyCount: 1, issueNumber: 584, displayTitle: '고침 의견', createdAt: '2026-11-16T11:00:00Z'},
+      {id: 'p4', kind: 'journal', status: 'received', replyCount: 0, issueNumber: '', score: 4, journalDate: '2026-11-16', displayTitle: '사용 일지', createdAt: '2026-11-16T12:00:00Z'},
+      {id: 'p5', kind: 'opinion', status: 'later', replyCount: 1, issueNumber: '', displayTitle: '다음에', createdAt: '2026-11-15T12:00:00Z'}
     ]}) }));
-    // GitHub 읽기는 전부 가짜다. 주소별 glob 대신 정규식으로 받는다 — CI의 낡은 Playwright에서는
-    // '**api.github.com/...' 꼴 glob이 안 먹어 실제 GitHub를 불러 왔다(2026-11-16 CI 빨강: 584 이슈 제목이
-    // 저장소의 진짜 제목으로 나왔다). 아래 '그 밖의 GitHub 요청'을 먼저 걸어 두어 실수로 실제 API를 부르면
-    // 404로 끝나고, 받은 횟수(githubHits)를 시험이 직접 확인한다.
-    const githubFake = new Map([
-      [584, { number: 584, title: '둘러보기 검색이 막혀 있다', state: 'closed' }],
-      [637, { number: 637, title: '검색 색인 고치기', state: 'open', pull_request: { number: 637 } }]
-    ]);
-    let githubHits = 0;
-    await context.route(/^https:\/\/api\.github\.com\//, r => r.fulfill({ status: 404, contentType: 'application/json', body: '{"message":"not found"}' }));
-    await context.route(/^https:\/\/api\.github\.com\/repos\/[^/]+\/[^/]+\/issues\/(\d+)$/, r => {
-      const number = Number(r.request().url().match(/(\d+)$/)[1]);
-      const fake = githubFake.get(number);
-      githubHits += 1;
-      return fake
-        ? r.fulfill({ status: 200, contentType: 'application/json', headers: {'cache-control': 'no-store'}, body: JSON.stringify(fake) })
-        : r.fulfill({ status: 404, contentType: 'application/json', body: '{"message":"not found"}' });
-    });
+    await context.route('**/api/community/admin/reports', r => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ok: true, reports: [
+      {id: 'r1', status: 'open', hidden: false, reason: '둘러보기 신고 내용', shareId: 'sh_1', createdAt: '2026-11-16T13:00:00Z'}
+    ]}) }));
     const page = await context.newPage();
+    const read = () => page.evaluate(() => ({
+      tabs: [...document.querySelectorAll('header nav [data-tab]')].map(b => b.textContent.trim()),
+      activeTab: document.querySelector('header nav [data-tab].is-active')?.textContent.trim(),
+      kinds: [...document.querySelectorAll('[data-kind-tab]')].map(b => ({label: b.textContent.trim().replace(/\s*\d+$/, ''), active: b.classList.contains('is-active')})),
+      statuses: [...document.querySelectorAll('[data-status-tab]')].map(b => ({label: b.textContent.trim().replace(/\s*\d+$/, ''), active: b.classList.contains('is-active')})),
+      cards: document.querySelectorAll('.lt-post').length,
+      reportCards: document.querySelectorAll('[data-report-act]').length,
+      scoreBadges: [...document.querySelectorAll('.lt-post .lt-badge')].filter(b => b.textContent.includes('점수')).length,
+      h1: document.querySelector('.lt-h1')?.textContent.trim()
+    }));
+
     for (const [width, height] of [[1440, 900], [390, 844]]) {
       await page.setViewportSize({ width, height });
-      await page.goto(`${base}/admin.html#issues`, { waitUntil: 'domcontentloaded' });
-      await page.waitForSelector('[data-issue-row="637"]', { timeout: 8000 });
-      await page.waitForTimeout(200);
-      const chips = await page.evaluate(() => {
-        const oneLineHeight = (el) => {
-          const cs = getComputedStyle(el);
-          return parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom)
-            + parseFloat(cs.borderTopWidth) + parseFloat(cs.borderBottomWidth)
-            + Math.ceil(parseFloat(cs.fontSize) * parseFloat(cs.lineHeight));
-        };
-        return [...document.querySelectorAll('.lt-badge')].map(el => {
-          const rect = el.getBoundingClientRect();
-          const range = document.createRange();
-          range.selectNodeContents(el);
-          return {
-            text: el.textContent.trim(),
-            h: Math.round(rect.height * 10) / 10,
-            w: Math.round(rect.width * 10) / 10,
-            textW: Math.round(range.getBoundingClientRect().width * 10) / 10,
-            overflow: el.scrollWidth - el.clientWidth,
-            lineH: Math.round(oneLineHeight(el) * 10) / 10
-          };
-        });
-      });
-      assert.ok(chips.length >= 4, `고치는 일 탭에 칩이 그려진다(실제 ${chips.length}개)`);
-      const heights = chips.map(chip => chip.h);
-      assert.ok(Math.max(...heights) - Math.min(...heights) <= 1,
-        `모든 칩의 높이가 같다(오차 1px — 실제 ${Math.min(...heights)}~${Math.max(...heights)}px)`);
-      for (const chip of chips) {
-        assert.ok(chip.h <= chip.lineH + 1, `칩 안 글자가 한 줄이다(${chip.text} — 높이 ${chip.h}px ≤ 한 줄 ${chip.lineH}px)`);
-        assert.ok(chip.overflow <= 0, `칩 안 글자가 잘리지 않는다(${chip.text} — 넘침 ${chip.overflow}px)`);
-        // 칩 폭 = 글자 폭 + 좌우 여백(9px×2) + 테두리(1px×2) — 남은 폭을 채우거나 눌리지 않았다.
-        assert.ok(chip.w <= chip.textW + 21, `칩 폭이 글자 폭+여백뿐이다(${chip.text} — ${chip.w}px ≤ 글자 ${chip.textW}px+21px)`);
-        assert.ok(chip.w >= chip.textW, `칩이 글자를 담는다(${chip.text} — ${chip.w}px ≥ ${chip.textW}px)`);
+      for (const theme of ['night', 'garden']) {
+        await page.evaluate(t => { if (t === 'garden') document.documentElement.setAttribute('data-lt-theme', 'garden'); else document.documentElement.removeAttribute('data-lt-theme'); }, theme);
+        await page.goto(`${base}/admin.html#board`, { waitUntil: 'domcontentloaded' });
+        await page.waitForSelector('[data-kind-tab]', { timeout: 8000 });
+        const board = await read();
+        assert.deepEqual(board.tabs, ['한눈에', '고객', '고객 글'], width + '·' + theme + ': 탭 셋');
+        assert.equal(board.activeTab, '고객 글');
+        assert.deepEqual(board.kinds.map(k => k.label), ['전체', '의견', '일지', '신고']);
+        assert.deepEqual(board.statuses.map(s => s.label), ['할 일', '고침', '전체', '더 보기 ▾']);
+        assert.equal(board.statuses.find(s => s.label === '할 일').active, true, '첫 열기는 할 일');
+        assert.equal(board.cards, 4, width + '·' + theme + ': 할 일 4건(의견 2 + 일지 1 + 신고 1)');
+        assert.match(board.h1, /고객 글 \d+건 · 최신 순/);
+        await page.screenshot({ path: `${shotDir}/pr1-board-${width}-${theme}.png` });
       }
-      // 긴 글 줄: 제목이 줄바꿈을 하고(칩을 밀지 않음), 그 줄의 칩도 한 줄 높이를 유지한다.
-      const longRow = await page.evaluate(() => {
-        const row = [...document.querySelectorAll('.lt-issue-post')].find(el => el.querySelector('.lt-post-title')?.textContent.length > 40);
-        if (!row) return null;
-        const title = row.querySelector('.lt-post-title');
-        const badge = row.querySelector('.lt-badge');
-        return { titleH: Math.round(title.getBoundingClientRect().height), badgeH: Math.round(badge.getBoundingClientRect().height) };
-      });
-      assert.ok(longRow, '긴 제목 고객 글 줄이 그려진다');
-      assert.ok(longRow.titleH > longRow.badgeH, `긴 글은 줄바꿈하고 칩을 밀지 않는다(제목 ${longRow.titleH}px > 칩 ${longRow.badgeH}px)`);
-      // 이름: 이슈 칩은 '이슈 닫힘/이슈 열림', 고객 글 칩은 '고객에게: ' 머리, PR 번호는 'PR #637 · 제목'.
-      const texts = chips.map(chip => chip.text);
-      assert.ok(texts.includes('이슈 닫힘'), `이슈 칩 이름이 '이슈 닫힘'이다(실제: ${JSON.stringify(texts)})`);
-      assert.ok(texts.some(text => text === '고객에게: 고침'), `고객 글 칩에 '고객에게:' 머리를 붙인다(실제: ${JSON.stringify(texts)})`);
-      const prTitle = await page.textContent('[data-issue-row="637"] .lt-issue-title');
-      assert.match(prTitle, /^PR #637 · /, `PR 번호는 'PR #번호 · 제목'으로 보인다(실제: ${prTitle})`);
-      const issueTitle = await page.textContent('[data-issue-row="584"] .lt-issue-title');
-      assert.equal(issueTitle, '둘러보기 검색이 막혀 있다', '이슈는 제목을 그대로 보인다');
     }
-    // 가짜 응답이 실제로 쓰였는지 확인한다(이슈 2개를 한 번씩은 반드시 받는다 — 브라우저 캐시로 두 번째
-    // 화면 크기에서는 다시 부르지 않을 수 있어 2회를 하한으로 둔다). 실제 GitHub를 부르면 위 404 규칙에 걸린다.
-    assert.ok(githubHits >= 2, `GitHub 읽기는 가짜 응답을 쓴다(받은 횟수 ${githubHits})`);
+
+    await page.setViewportSize({ width: 1440, height: 900 });
+    const cases = [
+      ['#journals', 'journal'],
+      ['#reports', 'report'],
+      ['#fixes', '']
+    ];
+    for (const [hash, tabLabel, kind] of cases) {
+      await page.goto(`${base}/admin.html${hash}`, { waitUntil: 'domcontentloaded' });
+      await page.waitForSelector('[data-kind-tab]', { timeout: 8000 });
+      const got = await read();
+      assert.equal(got.activeTab, '고객 글', hash + ' → 고객 글 탭');
+      if (kind) assert.equal(got.kinds.find(k => k.label === kind).active, true, hash + ' → 종류 ' + kind);
+      if (hash === '#reports') {
+        assert.equal(got.reportCards, 2, '신고 카드에 처리 단추 2개');
+        await page.screenshot({ path: `${shotDir}/pr1-reports.png` });
+      }
+      if (hash === '#journals') assert.ok(got.scoreBadges >= 1, '일지 카드에 다시 올 점수 배지');
+    }
     await context.close();
   } finally {
     await browser.close();
@@ -564,4 +542,62 @@ test('없는 시각(null·빈 값)은 —로 보이고 1970년으로 찍히지 �
   assert.equal(formatTime(undefined), '—');
   assert.equal(formatTime(''), '—');
   assert.equal(formatTime('2026-11-16T09:00:00.000Z').includes('—'), false);
+});
+
+// 2026-11-17 운영센터 탭 셋 + 고객 글 한 줄 거르기.
+test('머리줄 탭은 한눈에·고객·고객 글 셋뿐이다', () => {
+  assert.deepEqual(TABS.map(t => t.label), ['한눈에', '고객', '고객 글']);
+  assert.deepEqual(TABS.map(t => t.view), ['overview', 'customers', 'board']);
+  for (const view of ['board', 'feedback', 'persona', 'journals', 'reports', 'issues', 'fixes']) {
+    assert.equal(viewToTab(view), 'board', view + '는 고객 글 탭 소속');
+  }
+});
+
+test('없어진 탭의 옛 주소 셋이 각각 올바른 거르기로 열린다', () => {
+  assert.deepEqual(parseHash('#journals'), {view: 'board', id: null, status: '', kind: 'journal'});
+  assert.deepEqual(parseHash('#reports'), {view: 'board', id: null, status: 'pending', kind: 'report'});
+  assert.deepEqual(parseHash('#fixes'), {view: 'board', id: null, status: 'fixed', kind: ''});
+  assert.deepEqual(parseHash('#issues'), {view: 'board', id: null, status: 'fixed', kind: ''});
+});
+
+const boardFixture = () => [
+  {id: 1, kind: 'opinion', status: 'received', issueNumber: '', replyCount: 0},
+  {id: 2, kind: 'opinion', status: 'reviewing', issueNumber: 584, replyCount: 1},
+  {id: 3, kind: 'opinion', status: 'fixed', issueNumber: 584, replyCount: 1},
+  {id: 4, kind: 'journal', status: 'received', issueNumber: '', replyCount: 0},
+  {id: 5, kind: 'report', status: 'reviewing', issueNumber: '', replyCount: 0},
+  {id: 6, kind: 'opinion', status: 'later', issueNumber: '', replyCount: 1},
+  {id: 7, kind: 'opinion', status: 'closed', issueNumber: '', replyCount: 1}
+];
+
+test('고객 글 상태 한 줄: 할 일·고침·전체·더 보기 숫자가 종류별 합과 맞는다', () => {
+  const rows = boardFixture();
+  const tabs = boardStatusTabs(rows);
+  assert.deepEqual(tabs.map(t => t.key), ['pending', 'fixed', 'all', 'more']);
+  assert.deepEqual(tabs.map(t => t.count), [4, 1, 7, 4]); // 할 일 1·2·4·5, 고침 3, 전체 7, 더 보기 2·3·6·7(이슈 있는 2·3 포함)
+  // 종류를 골라도 같은 식으로 센다.
+  const opinion = boardStatusTabs(rows, 'opinion');
+  assert.deepEqual(opinion.map(t => t.count), [2, 1, 5, 4]);
+  for (const t of tabs) {
+    assert.equal(t.count, filterBoardRows(rows, {status: t.key}).length, t.label + ' 숫자 = 실제 줄 수');
+  }
+});
+
+test('고객 글 종류 묶음: 전체·의견·일지·신고 숫자가 현재 상태의 합과 맞는다', () => {
+  const rows = boardFixture();
+  const tabs = boardKindTabs(rows, 'pending');
+  assert.deepEqual(tabs.map(t => t.label), ['전체', '의견', '일지', '신고']);
+  assert.deepEqual(tabs.map(t => t.count), [4, 2, 1, 1]);
+  assert.equal(tabs[0].count, tabs.slice(1).reduce((sum, t) => sum + t.count, 0), '전체 = 의견+일지+신고');
+  assert.deepEqual(boardKindTabs(rows, 'all').map(t => t.count), [7, 5, 1, 1]);
+});
+
+test('첫 열기는 할 일, 숫자 0인 칸은 화면에서 숨긴다', () => {
+  const rows = boardFixture();
+  assert.equal(filterBoardRows(rows).length, 4, '상태를 고르지 않으면 할 일');
+  assert.deepEqual(boardStatusTabs(rows).map(t => t.count > 0), [true, true, true, true]);
+  // 신고만 있으면 의견·일지 칸은 0 → 숨김 대상이다.
+  const reports = boardStatusTabs(rows, 'report');
+  assert.deepEqual(reports.map(t => t.count), [1, 0, 1, 0]);
+  assert.deepEqual(reports.filter(t => t.count > 0).map(t => t.label), ['할 일', '전체']);
 });
