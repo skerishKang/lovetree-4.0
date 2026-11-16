@@ -139,7 +139,7 @@ export function createShareService({ shareRepo, workspaceRepo, visibilityRepo = 
     // #538: /api/workspace 저장 성공 뒤 같은 훅에서 부른다.
     // ① 살아 있는 공유 행(주인 만든 행 포함)의 moment_count 를 갱신하고,
     // ② 공유 행이 없는 트리(순간 1개 이상)에 자동 공개 행(origin='auto')을 만들며,
-    // ③ 문서에서 사라진 트리의 자동 공개 행은 즉시 내린다.
+    // ③ 문서에서 사라진 트리의 공유 행(자동·주인 모두)은 즉시 내리고, 그 트리의 소개 행도 지운다.
     async syncSharesAfterSave(subjectId, doc) {
       const counts = new Map();
       for (const tree of (doc?.trees || [])) counts.set(tree.id, Array.isArray(tree.moments) ? tree.moments.length : 0);
@@ -153,7 +153,8 @@ export function createShareService({ shareRepo, workspaceRepo, visibilityRepo = 
         const entry = tree.moments.find(moment => moment.parentId === null) || tree.moments[0];
         await shareRepo.upsertAutoShare({ productId, subjectId, shareId: makeId(), treeId, entryMomentId: entry.id, momentCount });
       }
-      await shareRepo.revokeAutoSharesNotIn({ productId, subjectId, treeIds: [...counts.keys()] });
+      await shareRepo.revokeSharesNotIn({ productId, subjectId, treeIds: [...counts.keys()] });
+      if (discoverRepo) await discoverRepo.deleteNotIn({ productId, subjectId, treeIds: [...counts.keys()] });
     },
     // #538: 트리 공개 상태. 비공개는 Plus 전용 — 판단은 서버가 한다.
     // 응답에 소개 여부(discover)를 함께 돌려준다 — 화면이 두 값을 한 번에 본다.
