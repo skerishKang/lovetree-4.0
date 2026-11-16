@@ -178,6 +178,9 @@ addEventListener('message',event=>{
   let mirror=null;try{mirror=localStorage.getItem('lt41.dateStyle');}catch{}
   if(shouldReloadForDateStyle({value:event.data.value,rendered:renderedDateStyle,mirror}))location.reload();
  }
+ // 2026-11-16 계정 메뉴 정리: 셸 계정 메뉴의 '어떻게 쓰나요'가 이 메시지로 같은 안내 패널을 연다.
+ // 이미 열려 있을 때 showModal을 다시 부르면 InvalidStateError가 나므로 열려 있으면 무시한다.
+ else if(type==='lt41-open-guide'){if(!guideDialog.open)openGuide();}
 });
 if(!loggedIn){
  const topActions=shadow.querySelector('.top-actions');

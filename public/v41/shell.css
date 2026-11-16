@@ -161,6 +161,11 @@ nav #record-menu[hidden]{display:none!important}
    이슈 666: 11px → 12px. 스위치와 나란히 서지 않고 스위치 아래 한 줄로 내려간다(#account-advanced 격자). */
 .account-popover .account-item-text{display:block}
 .account-popover .account-item-desc{display:block;font-size:12px;color:var(--lt-muted);margin-top:2px;line-height:1.5;white-space:normal}
+/* 2026-11-16 계정 메뉴 정리: 관리자 항목(운영센터)은 고객 항목과 섞지 않게 구분선 아래 '운영' 묶음으로 내렸다.
+   묶음 라벨은 항목 설명과 같은 12px(--lt-muted) — 밤·정원 모두 4.5:1 이상. [hidden]은 display:grid보다 이긴다. */
+.account-ops-group{display:grid;gap:4px;margin-top:4px;padding-top:8px;border-top:1px solid var(--lt-line)}
+.account-ops-group[hidden]{display:none!important}
+.account-menu-group{padding:0 10px;font-size:12px;letter-spacing:.06em;color:var(--lt-muted)}
 /* 2026-11-08 순간 추가·수정 패널: 링크·사진을 한 묶음으로, 나머지는 '더 적기' 접힘. 색은 --lt-* 토큰만 쓴다. */
 .link-photo-field{margin:18px 0;padding:16px;border:1px solid var(--lt-line);border-radius:var(--lt-r-card);background:var(--lt-stage-2)}
 .link-photo-field>label{margin:0}

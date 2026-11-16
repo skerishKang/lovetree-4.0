@@ -101,15 +101,33 @@ test('내 기록 창(#records)은 없어지고 중복 트리 고르기도 함께
   assert.doesNotMatch(shell, /\$\('trees'\)/);
 });
 
-test('계정 메뉴: 맨 위 이메일 전체 → 설정 → 내 보관 파일 → 고급 기능 보기 → 로그아웃', () => {
+test('계정 메뉴: 맨 위 이메일 → 설정 → 새 소식 → 내 의견 → 어떻게 쓰나요 → 내 보관 파일 → 고급 기능 보기 → (운영) 운영센터 → 로그아웃', () => {
   assert.match(popover, /<strong id="account-email"><\/strong>/);
-  const order = ['account-open-settings', 'account-assets-open', 'account-advanced', 'account-logout'];
+  const order = ['account-open-settings', 'account-updates', 'account-my-posts', 'account-guide', 'account-assets-open', 'account-advanced', 'account-ops-group', 'account-logout'];
   let at = popover.indexOf('account-head');
   for (const id of order) {
     const next = popover.indexOf(`id="${id}"`, at);
     assert.ok(next > at, `${id} 순서`);
     at = next;
   }
+  // 2026-11-16 CTO 지적: 관리자 항목은 고객 메뉴와 섞지 않는다 — 구분선 아래 '운영' 묶음(라벨 + 운영센터)이
+  // 로그아웃 바로 위에 있고, 고객 항목 사이에 있지 않다.
+  const opsGroup = popover.slice(popover.indexOf('id="account-ops-group"'), popover.indexOf('id="account-logout"'));
+  assert.match(opsGroup, /role="group" aria-label="운영"/);
+  assert.match(opsGroup, /account-menu-group"[^>]*aria-hidden="true">운영</);
+  assert.match(opsGroup, /id="account-ops"[^>]*>운영센터</);
+  assert.ok(popover.indexOf('id="account-ops-group"') > popover.indexOf('id="account-advanced"'), '운영 묶음은 고객 항목 뒤다');
+  // 2026-11-16 수리: 메뉴의 '의견 보내기' 칸을 없애고 내 의견 창 안에서 바로 보낸다.
+  // 탈퇴 상태 줄과 메뉴 단추가 같은 id(account-feedback)를 써서 설정을 열 때마다 메뉴 글자가 지워졌다 — 두 id는 같을 수 없다.
+  assert.doesNotMatch(html, /id="account-feedback"/);
+  assert.match(html, /id="myposts-send"[^>]*>의견 보내기</);
+  assert.match(shell, /\$\('myposts-send'\)\.onclick=\(\)=>\{shellDialogs\.requestClose\('myposts-panel'\);feedbackDialog\.open\(\);\};/);
+  assert.match(shell, /\$\('account-delete-status'\)\.textContent='';/);
+  // '어떻게 쓰나요'는 첫 화면의 안내 패널(#635)을 연다 — 셸 계정 메뉴에서 프레임 메시지로, home.js에서 같은 패널을 연다.
+  const homeJs = read('v41/home.js');
+  assert.match(shell, /\$\('account-guide'\)\.onclick=openGuideFromMenu;/);
+  assert.match(shell, /\{type:'lt41-open-guide'\}/);
+  assert.match(homeJs, /else if\(type==='lt41-open-guide'\)\{if\(!guideDialog\.open\)openGuide\(\);\}/);
   // 헷갈리는 옛 항목(내 계정 · 백업·내 기록)은 없다.
   assert.doesNotMatch(popover, /id="account-records"/);
   assert.doesNotMatch(popover, /id="account-backup"/);

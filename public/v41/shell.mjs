@@ -923,7 +923,22 @@ $('settings-assets-open').onclick=()=>openAssets($('settings-assets-open'));
   return {screen,viewport:window.innerWidth+'x'+window.innerHeight,theme:readTheme(localStorage),version:'4.1',loggedIn:owned,treeId};
  }
  const feedbackDialog=createFeedbackDialog({$,notify,getContext:feedbackContext,show:()=>panel('feedback-panel'),openMyPosts:()=>{shellDialogs.requestClose('feedback-panel');panel('myposts-panel');}});
- $('account-feedback').onclick=()=>{closeAccountMenu();feedbackDialog.open();};
+ // 2026-11-16 계정 메뉴 정리: 메뉴의 '의견 보내기' 칸을 없애고 내 의견 창 안에서 바로 보내게 했다.
+ // 보내기 창은 로그아웃 첫 화면 작은 링크($('feedback-link'))와 같은 창을 쓴다(feedbackDialog).
+ $('myposts-send').onclick=()=>{shellDialogs.requestClose('myposts-panel');feedbackDialog.open();};
+ // '어떻게 쓰나요': 첫 화면의 안내 패널(#635)을 연다 — 별도 안내 화면은 없다(#388).
+ // 첫 화면이 아니면 먼저 첫 화면으로 옮긴 뒤, 프레임이 안내 패널을 만들었을 때(초기화 끝) 여는 메시지를 한 번 보낸다(최대 3초).
+ function openGuideFromMenu(){
+  closeAccountMenu();
+  const send=()=>{try{$('view').contentWindow.postMessage({type:'lt41-open-guide'},location.origin)}catch{}};
+  if(current==='src064-orbit.html'){send();return;}
+  show('src064-orbit.html');
+  let tries=0;
+  const tick=()=>{let ready=false;try{ready=!!$('view').contentDocument?.getElementById('orbit')?.shadowRoot?.querySelector('#guidePanel')}catch{}
+   if(ready||tries>=30){send();return;}tries+=1;setTimeout(tick,100);};
+  setTimeout(tick,100);
+ }
+ $('account-guide').onclick=openGuideFromMenu;
  $('feedback-link').onclick=()=>feedbackDialog.open();
  // 2차: AI 고객 '오늘 사용 일지'·모든 로그인 사용자 '내 의견'.
  // #611 4번: 새 답글 알림 — 단추 점과 '내 의견' 옆 숫자를 함께 갱신한다.
@@ -1203,7 +1218,7 @@ function openAccountData(intent='first'){
  void openAccountSettings({section:'data'});
 }
 async function openAccountSettings({section=''}={}){
- accountExpected=null;$('account-feedback').textContent='';
+ accountExpected=null;$('account-delete-status').textContent='';
  // #453 C2: 지난번에 뜬 '내 기록을 불러왔어요.' 같은 안내가 창 안에 남지 않는다.
  if($('settings-feedback'))$('settings-feedback').textContent='';$('account-confirm').value='';$('account-delete').disabled=true;$('account-confirm-hint').textContent='';
  // 로그아웃·공유·예시 상태에서는 설정 입구가 없다(기존 규칙). 여기서도 열지 않는다.
@@ -1233,10 +1248,10 @@ $('account-form').onsubmit=async event=>{
  if(!confirm('계정을 탈퇴하면 되돌릴 수 없습니다. 계속할까요?'))return;
  const button=$('account-delete');
  button.disabled=true;
- $('account-feedback').textContent='탈퇴를 처리하고 있어요.';
+ $('account-delete-status').textContent='탈퇴를 처리하고 있어요.';
  const answer=await accountApi.deleteAccount(value);
  if(!answer.ok){
-  $('account-feedback').textContent=answer.message||'탈퇴하지 못했어요. 다시 시도해 주세요.';
+  $('account-delete-status').textContent=answer.message||'탈퇴하지 못했어요. 다시 시도해 주세요.';
   button.disabled=false;
   return;
  }

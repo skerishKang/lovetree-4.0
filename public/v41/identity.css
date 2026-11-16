@@ -200,6 +200,9 @@ html[data-lt-theme=garden] .header-actions button:hover,html[data-lt-theme=garde
 html[data-lt-theme=garden] .header-actions #write-menu.primary-action{background:rgba(200,110,121,.14);border-color:var(--lt-gold-line);color:var(--lt-gold-ink);box-shadow:inset 0 0 0 1px rgba(152,80,94,.18)}
 html[data-lt-theme=garden] .account-avatar{background:rgba(200,110,121,.16);border-color:var(--lt-gold-line);color:var(--lt-gold-ink)}
 html[data-lt-theme=garden] .account-popover{background:var(--lt-glass-strong);border-color:var(--lt-line);box-shadow:0 12px 30px rgba(75,51,42,.16)}
+/* 2026-11-16 계정 메뉴 대비: 알림 숫자 배지(--lt-rose 배경 × 흰 글자)는 정원에서 3.1:1로 4.5:1에 못 미친다 —
+   진한 장미(--lt-rose-ink) 배경에 종이색 글자로 5.7:1. 밤은 기존(--lt-rose × --lt-stage 약 8:1) 그대로다. */
+html[data-lt-theme=garden] .account-menu-count{background:var(--lt-rose-ink);color:var(--lt-paper)}
 html[data-lt-theme=garden] .account-popover button{color:var(--lt-ink)}
 html[data-lt-theme=garden] .account-popover button:hover{background:rgba(152,80,94,.08)}
 html[data-lt-theme=garden] .account-email{color:var(--lt-muted);border-bottom-color:var(--lt-line)}
