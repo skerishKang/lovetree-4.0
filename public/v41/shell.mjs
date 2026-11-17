@@ -100,11 +100,10 @@ function buildFoldMenu(){
  add('첫 화면',()=>document.querySelector('.brand').click(),current==='src064-orbit.html');
  add('둘러보기',()=>$('community-menu').click());
  add('서재',()=>{member?.snapshot().owned?show('track32-bookshelf.html'):openLoginStart('shelf')},current==='track32-bookshelf.html');
- if(window.LT41){
-  add('책',()=>document.querySelector('.tree-views [data-view="track59-sketchbook.html"]').click(),current==='track59-sketchbook.html');
-  add('보드',()=>document.querySelector('.tree-views [data-view="track58-pinboard.html"]').click(),current==='track58-pinboard.html');
-  add('지도',()=>document.querySelector('.tree-views [data-view="track56-network.html"]').click(),current==='track56-network.html');
- }
+ // 2026-11-17 대표 결정: 트리 0개여도 네 화면이 모두 열리므로 접기 메뉴에서도 책·보드·지도를 늘 둔다.
+ add('책',()=>show('track59-sketchbook.html'),current==='track59-sketchbook.html');
+ add('보드',()=>show('track58-pinboard.html'),current==='track58-pinboard.html');
+ add('지도',()=>show('track56-network.html'),current==='track56-network.html');
   if(!$('write-menu').hidden)add('＋ 순간 추가',()=>$('write-menu').click());
   add('의견 보내기',()=>feedbackDialog.open());
  }
@@ -752,6 +751,7 @@ function choose(id,momentId){const tree=model.trees.find(t=>t.id===id);window.LT
 // 2026-11-17 대표 결정: 트리 0개 계정이 서재·책·보드·지도탭을 열면 그 화면의 빈 상태를 보여 준다.
 function paintEmptyForScreen(file){
   const shelf=file==='track32-bookshelf.html';
+  if(shelf)$('empty').dataset.emptyView='shelf';else delete $('empty').dataset.emptyView;
   $('empty').querySelector('h1').textContent=shelf?'아직 책장이 비어 있어요.':'아직 트리가 없어요.';
   $('empty').querySelector('p').textContent=shelf?'첫 순간을 담으면 책장에 책이 꽂혀요.':'좋아하는 영상 주소 하나면 시작돼요.';
   $('empty-records').textContent=shelf?'＋ 새 트리':'＋ 첫 순간 추가';
@@ -760,7 +760,8 @@ function paintEmptyForScreen(file){
 }
 function paintEmptyCopy(){
   const owned=!!member?.snapshot().owned;
- $('empty').querySelector('h1').textContent=owned?'아직 트리가 없어요.':'다시 펼칠 순간을 기다리고 있어요.';
+  delete $('empty').dataset.emptyView;
+  $('empty').querySelector('h1').textContent=owned?'아직 트리가 없어요.':'다시 펼칠 순간을 기다리고 있어요.';
  // #463(2026-11-13): 트리 0개(로그인)는 처음 온 사람용 한 줄로. 예전 문구는 다시 온 사람용이었고
  // ("예시를 둘러보거나..."), 떠 있는 카드가 예시라는 것도 모호했다.
  $('empty').querySelector('p').textContent=owned

@@ -2009,33 +2009,50 @@ test('#657 후속 261117: 트리 0개 계정의 탭 4개와 화면별 빈 상태
         await ctx.route('**/api/workspace**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ revision: 1, state: { version: 1, trees: [], prefs: {} }, subject: '시험계정', writeSubjectBound: true, savedAt: '2026-11-17T00:00:00.000Z' }) }));
         const page = await ctx.newPage();
         await page.goto(`${base}/v41/?account=1`, { waitUntil: 'load', timeout: 30000 });
-        await page.waitForFunction(() => !document.getElementById('tree-views')?.hidden, null, { timeout: 10000 });
-        const tabs = await page.evaluate(() => {
-          const buttons = [...document.querySelectorAll('#tree-views button[data-view]')].map((b) => {
+        const labels = { 'track32-bookshelf.html': '서재', 'track59-sketchbook.html': '책', 'track58-pinboard.html': '보드', 'track56-network.html': '지도' };
+        const openMore = async () => {
+          if (width !== 390) return;
+          const open = await page.locator('#header-overflow').evaluate((el) => el.classList.contains('is-open') && !el.hidden);
+          if (!open) await page.locator('#mobile-more').click();
+          await page.waitForTimeout(200);
+        };
+        await openMore();
+        const tabs = await page.evaluate((labelList) => {
+          const folded = innerWidth <= 780;
+          const nodes = folded
+            ? [...document.querySelectorAll('#header-overflow button')].filter((b) => labelList.includes(b.textContent.trim()))
+            : [...document.querySelectorAll('#tree-views button[data-view]')];
+          const buttons = nodes.map((b) => {
             const r = b.getBoundingClientRect();
-            return { view: b.dataset.view, text: b.textContent.trim(), w: Math.round(r.width), h: Math.round(r.height) };
+            return { text: b.textContent.trim(), w: Math.round(r.width), h: Math.round(r.height), current: b.getAttribute('aria-current') === 'true' };
           });
-          return { buttons, overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth };
-        });
-        assert.equal(tabs.buttons.length, 4, `${width}/${theme}: 탭 4개`);
+          return { buttons, folded, overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth, themeButtons: document.querySelectorAll('#theme-toggle').length };
+        }, Object.values(labels));
+        assert.equal(tabs.buttons.length, 4, `${width}/${theme}: 탭 4개 — ${JSON.stringify(tabs.buttons)}`);
         assert.ok(tabs.buttons.every((b) => b.w > 0 && b.h > 0), `${width}/${theme}: 탭 rect>0 — ${JSON.stringify(tabs.buttons)}`);
         assert.ok(tabs.overflow <= 0, `${width}/${theme}: 가로 넘침 ${tabs.overflow}px`);
+        assert.equal(tabs.themeButtons, 1, `${width}/${theme}: 머리줄 테마 단추 1개`);
         for (const [view, heading, action] of [
           ['track32-bookshelf.html', '아직 책장이 비어 있어요.', '＋ 새 트리'],
           ['track59-sketchbook.html', '아직 트리가 없어요.', '＋ 첫 순간 추가'],
           ['track58-pinboard.html', '아직 트리가 없어요.', '＋ 첫 순간 추가'],
           ['track56-network.html', '아직 트리가 없어요.', '＋ 첫 순간 추가']
         ]) {
-          await page.locator(`#tree-views button[data-view="${view}"]`).click();
+          await openMore();
+          if (tabs.folded) await page.locator('#header-overflow button').filter({ hasText: new RegExp('^' + labels[view] + '$') }).click();
+          else await page.locator(`#tree-views button[data-view="${view}"]`).click();
           await page.waitForTimeout(350);
-          const state = await page.evaluate(() => ({
+          await openMore();
+          const state = await page.evaluate((folded) => ({
             hash: location.hash,
             home: document.body.classList.contains('home-screen'),
             emptyShown: !document.getElementById('empty')?.hidden,
             heading: document.querySelector('#empty h1')?.textContent?.trim(),
             action: document.getElementById('empty-records')?.textContent?.trim(),
-            current: document.querySelector('#tree-views button[aria-current="true"]')?.dataset.view || ''
-          }));
+            current: folded
+              ? Object.keys({ 'track32-bookshelf.html': '서재', 'track59-sketchbook.html': '책', 'track58-pinboard.html': '보드', 'track56-network.html': '지도' }).find((v) => { const b = [...document.querySelectorAll('#header-overflow button')].find((x) => x.getAttribute('aria-current') === 'true'); return b && b.textContent.trim() === { 'track32-bookshelf.html': '서재', 'track59-sketchbook.html': '책', 'track58-pinboard.html': '보드', 'track56-network.html': '지도' }[v]; }) || ''
+              : document.querySelector('#tree-views button[aria-current="true"]')?.dataset.view || ''
+          }), tabs.folded);
           assert.equal(state.hash, '#' + { 'track32-bookshelf.html': 'shelf', 'track59-sketchbook.html': 'book', 'track58-pinboard.html': 'board', 'track56-network.html': 'network' }[view], `${width}/${theme}/${view}: 주소가 탭에 남는다`);
           assert.equal(state.home, false, `${width}/${theme}/${view}: 첫 화면으로 튕기지 않는다`);
           assert.ok(state.emptyShown, `${width}/${theme}/${view}: 빈 상태가 보인다`);

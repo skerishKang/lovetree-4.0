@@ -110,7 +110,7 @@ test('실제 기록(source=server)이면 views/ 판본, 트리가 없으면 빈 
 });
 
 // #453 D1 + 맨 위 메뉴 눌린 표시: show()가 [data-view] 단추에 aria-current를 넣는다 —
-// 지금 보는 화면만 'true', 나머지는 'false'이고, 빈 화면(트리 없음)에서는 전부 'false'다.
+// 지금 보는 화면만 'true', 나머지는 'false'다. 2026-11-17 결정으로 트리 0개여도 눌린 탭은 그대로 표시한다.
 test("show()는 [data-view] 단추에 지금 보는 화면만 aria-current=true로 남긴다", () => {
   const replaced = [];
   const fakeEl = extra => ({
@@ -153,10 +153,10 @@ test("show()는 [data-view] 단추에 지금 보는 화면만 aria-current=true�
     screens.show('track58-pinboard.html');
     assert.deepEqual(tabs.map(b => b.attrs['aria-current']), ['false', 'true', 'false'], '화면을 옮기면 눌린 표시도 옮겨간다');
 
-    // #453 D1: 빈 화면(트리 없음)에서는 어느 탭도 "지금 보는 곳"이 아니다 — 전부 false로 지운다.
+    // 2026-11-17 대표 결정: 트리 0개 계정도 탭이 보이고, 눌린 탭은 "지금 보는 곳"으로 남는다.
     hasTree = false;
     screens.show('track56-network.html');
-    assert.deepEqual(tabs.map(b => b.attrs['aria-current']), ['false', 'false', 'false'], '빈 화면에서는 눌린 표시가 없다');
+    assert.deepEqual(tabs.map(b => b.attrs['aria-current']), ['false', 'false', 'true'], '빈 화면에서도 눌린 탭 표시가 남는다');
   } finally {
     globalThis.document = saved.document;
     if (saved.location === undefined) delete globalThis.location;
