@@ -71,8 +71,9 @@ function closeDetail(){
 }
 function detailMarkup(m){
  const nextInfo=nextMomentOf(m.id);
- /* #635: 감상 화면에서는 이유가 비었을 때의 안내를 감춘다 — 내 트리는 예전 그대로 둔다. */
- const line=connectionLine(nextInfo?.title,nextInfo?.reason,{hideEmptyWhy:!!LTDEMO.readOnly});
+ /* #815: 연결 이유는 적었을 때만 보인다(비면 아무것도 그리지 않는다). */
+ const line=connectionLine(nextInfo?.title,nextInfo?.reason,{hideEmptyWhy:true});
+ const rangeLine=formatRange(m.startSeconds,m.endSeconds);
  const open=m.url&&isYouTubeUrl(m.url)?'YouTube에서 열기 ↗':'원본 링크 열기 ↗';
  // #327 2부: 내 기록(서버)의 순간 상세에서 다른 트리로 옮길 수 있다. 공유·예시는 숨긴다.
  const canMove=(window.parent&&window.parent.LT41)?window.parent.LT41.source==='server':false;
@@ -80,8 +81,9 @@ function detailMarkup(m){
  return '<div class="detail-kicker">'+t(LTLabels.type(m.kind))+' · '+t(formatDisplayDate(m.date,ltDateStyle()))+' · '+t(m.emotion)+'</div>'+
   (view.main?'<h2>'+t(view.main)+'</h2>'+(view.sub&&view.sub.toLowerCase()!==view.main.trim().toLowerCase()?'<p class="video-title">▶ '+t(view.sub)+'</p>':''):'')+
   '<p>'+t(m.note)+' · 출처: '+t(m.source)+'</p>'+
+  (rangeLine?'<p class="detail-range">기억할 구간 '+t(rangeLine)+'</p>':'')+
   '<div class="chips">'+m.keywords.map(k=>'<span class="chip">#'+t(k)+'</span>').join('')+'</div>'+
-  (line?'<div class="detail-why">'+t(line)+'</div>':(LTDEMO.readOnly?'':'<div class="detail-why">연결 이유는 아직 적지 않았어요</div>'))+
+  (line?'<div class="detail-why">'+t(line)+'</div>':'')+
   '<div class="detail-actions"><button type="button" data-detail-viewer>순간 열기</button>'+
   (m.url?'<a href="'+t(m.url)+'" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">'+open+'</a>':'')+
   '<button type="button" data-detail-index>목차에서 보기</button>'+

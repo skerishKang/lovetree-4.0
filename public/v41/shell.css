@@ -389,6 +389,8 @@ html[data-lt-theme=garden] .settings-more-fold>summary:hover{color:var(--lt-ink)
 /* 오류 줄도 높이 고정 — 오류 문구가 버튼 자리를 밀지 않는다. 정원 글자는 진한 장미(기존 선례). */
 .quick-error-line{margin:8px 0 0!important;min-height:18px;max-height:18px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:12px;line-height:1.5;color:var(--lt-rose)}
 html[data-lt-theme=garden] .quick-error-line{color:var(--lt-rose-ink)}
+/* 815: 정원(밝은 바탕)에서는 순간 추가 폼의 입력칸이 흰 테두리라 안 보였다 — 정원 종이·선 토큰으로 같은 칸 모양을 쓴다. 밤은 기본값 그대로다. */
+html[data-lt-theme=garden] #moment-form input,html[data-lt-theme=garden] #moment-form textarea{background:var(--lt-paper);border-color:var(--lt-line-paper)}
 /* 안내 줄: 높이 고정. 담은 뒤에만 채우고, 새 입력이 시작되면 renderPreview가 비운다(이슈 343). */
 /* 이슈 638: 담을 트리 한 줄 — 고른 트리 이름을 보이고 그 자리에서 바꾼다. 색은 --lt-* 토큰만 쓴다. */
 .quick-tree-row{display:flex;align-items:center;gap:10px;min-height:44px;margin-top:8px}
