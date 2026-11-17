@@ -12,13 +12,17 @@ const homePresentation=src('v41/home-presentation.js');
 
 test('#426 최근 순간 카드는 내 기록 최신 순간 한 장(로그아웃에는 없다)',()=>{
   // 카드는 순간 목록 한 벌(momentList.entries)에서 읽는다 — 예시 모드(사진 3장 미만 등)에서도 순간이 있으면 카드가 나오고, 로그아웃은 momentList가 없어 없다.
-  assert.match(orbit,/const recentMoment=\(Array\.isArray\(momentList\?\.entries\)&&momentList\.entries\.length\)\?momentList\.entries\[0\]:null;/);
+  // 261116 PR 2: 홈이 모드별로 고른 카드(momentList.recent)를 먼저 쓰고, 없으면 최근 순간 한 장(기존 동작).
+  assert.match(orbit,/let recentMoment=\(Array\.isArray\(momentList\?\.entries\)&&momentList\.entries\.length\)\?\(momentList\.recent\|\|momentList\.entries\[0\]\):null;/);
+  assert.match(orbit,/momentList\.recentHeader/,'머리글 문구도 홈이 넘긴다');
   // 예시(데모)·빈 궤도(로그아웃)에서는 카드 마크업 자체가 없다 — 로그아웃은 momentList가 없다.
   assert.match(orbit,/\$\{recentMoment\?recentMarkup\(recentMoment\):''\}/);
 });
 
 test('#426 카드 모양: 썸네일 크게 + 마지막 순간·지난 날 + 한 줄 제목 + 트리 이름·이어 보기',()=>{
-  assert.match(orbit,/마지막 순간\$\{days===null\?'':` · \$\{relativeDayLabel\(days\)\}`\}/,'첫 줄 안내(#549: 오늘·어제·N일 전)');
+  // 261116 PR 2: 머리글은 눌러 카드 모드를 고르는 단추다 — 기본 문구('마지막 순간 · N일 전')는 그 안에 그대로 살아 있다.
+  assert.match(orbit,/class="recent-head" data-recent-head/);
+  assert.match(orbit,/마지막 순간\$\{days===null\?'':` · \$\{relativeDayLabel\(days\)\}`\}/,'기본 머리글 문구(#549: 오늘·어제·N일 전)');
   assert.match(orbit,/localDaysBetween\(undefined,raw\)/,'일수는 기기 지역 날짜(#547) 기준');
   assert.match(orbit,/<strong>\$\{esc\(head\)\}<\/strong>/,'한 줄 제목');
   assert.match(orbit,/· 이어 보기 →<\/small>/,'트리 이름·이어 보기');
@@ -67,16 +71,18 @@ test('#426 ▶ 재생은 누른 뒤에만 — 첫 화면이 열릴 때는 플레
   assert.match(orbit,/if\(play\)\{e\.stopPropagation\(\);toggleRecentPlay\(play\);return;\}/);
 });
 
-test('#426 이어 보던 순간 버튼은 없다 — 로그인 후 버튼은 추가·둘러보기·내 트리',()=>{
+test('#426 이어 보던 순간 버튼은 없다 — 로그인 후 세트는 [순간 목록·둘러보기·내 트리](261116 PR 2)',()=>{
   assert.doesNotMatch(homeCenter,/resume/);
   // 2026-11-14 대표 결정: 셋째 자리에 '내 트리'(trees)를 둔다. 순서·문구는 header-state 한 곳에서 온다.
   assert.match(homeCenter,/button\.hidden = true/,'자리가 모자라면 숨긴다');
-  assert.match(homeCenter,/'in-trees':\['add','community','trees'\]/);
-  assert.match(homeCenter,/'in-empty':\['add','community','trees'\]/);
+  // 261116 PR 2: 첫 자리는 '순간 목록'(moments) — 오른쪽 위 단추는 없앴다.
+  assert.match(homeCenter,/'in-trees':\['moments','community','trees'\]/);
+  assert.match(homeCenter,/'in-empty':\['moments','community','trees'\]/);
+  assert.doesNotMatch(home,/top-actions > \.menuBtn\[data-do="index"\]\?\.append/);
+  assert.match(home,/menuBtn\[data-do="index"\]'\)\?\.remove\(\)/,'오른쪽 위 순간 목록 단추는 없앤다(261116 PR 2)');
   // 둘째 줄에서도 마지막 순간 문구를 뺀다(카드가 대신) — 안내 문구에는 마지막 순간 표기가 남지 않는다.
   assert.doesNotMatch(homePresentation,/마지막 순간 「/);
   assert.doesNotMatch(homePresentation,/`마지막 순간 ·/);
-  assert.match(home,/최근 순간 카드가 이어 보기를 대신/);
 });
 
 test('#426 390: 카드 폭=화면-32px, 세로 썸네일 높이 제한',()=>{

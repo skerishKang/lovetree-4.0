@@ -61,7 +61,7 @@ test('섞어서: 사진 5 + 글 3이면 사진 5 + 글 2, 남는 33자리는 예
   assert.equal(plan.cards.filter(c => c.type === 'memo').length, HOME_TEXT_LIMIT);
   assert.equal(plan.cards.length, 7);
   assert.equal(plan.examples, 33);
-  assert.equal(plan.note, '금빛 카드는 내가 남긴 순간이에요');
+  assert.equal(plan.note, '테두리가 있는 카드는 내가 남긴 순간이에요');
   assert.ok(plan.cards.every(c => c.source === 'mine'));
 });
 
@@ -130,7 +130,7 @@ test('업로드 사진 3개는 섞어서와 내 것만에서 사진 카드가 �
   const mix = homeCardsPlan({mode: 'mix', loggedIn: true, context: member(uploads), origin: PRIVATE_ORIGIN});
   assert.equal(mix.kind, 'mix');
   assert.equal(mix.cards.filter(c => c.type === 'photo').length, 3);
-  assert.ok(mix.note.includes('금빛'));
+  assert.ok(mix.note.includes('테두리가 있는'));
   const mine = homeCardsPlan({mode: 'mine', loggedIn: true, context: member(uploads), origin: PRIVATE_ORIGIN});
   assert.equal(mine.kind, 'mine');
   assert.equal(mine.cards.length, 3);
@@ -146,7 +146,7 @@ test('업로드 사진은 YouTube mediaMetadata 순간과 섞여도 각자 카�
   assert.ok(cards.photos.filter(c => c.id.startsWith('u')).every(c => c.type === 'photo'));
   const mix = homeCardsPlan({mode: 'mix', loggedIn: true, context: member([...uploads, youtube]), origin: PRIVATE_ORIGIN});
   assert.equal(mix.cards.filter(c => c.type === 'photo').length, 4);
-  assert.equal(mix.note.includes('금빛'), true);
+  assert.equal(mix.note.includes('테두리가 있는'), true);
 });
 
 test('다른 출처의 /api/media 모양과 업로드 영상은 사진 카드가 아니다', () => {

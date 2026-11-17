@@ -77,7 +77,7 @@ export function homeCardsPlan({mode, loggedIn = false, context = null, popular =
     kind: 'mix',
     cards,
     examples: Math.max(0, limit - cards.length),
-    note: '금빛 카드는 내가 남긴 순간이에요',
+    note: '테두리가 있는 카드는 내가 남긴 순간이에요', // 261117 대표 검수: 밤 금빛·정원 분홍 — 테마마다 다르게 말하지 않고 테두리로 말한다
   };
 }
 

@@ -193,6 +193,15 @@ export function normalizeShareView(value) {
 export function normalizeShareDiscover(value) {
   return value === true;
 }
+// 첫 화면 카드 모드(261116 PR 2): 마지막·고정·그날·무작위·트리. 모르는 값은 기본 '마지막'.
+// 고정·트리가 걸 때 쓰는 id는 지우고 남은 순간이어도 화면이 마지막으로 돌아오므로(home-card-mode homeMomentPick)
+// 여기서는 형식(문자열 80자)만 맞춘다. 서버(src/domain.js)와 같은 한 벌을 유지한다.
+export const HOME_MOMENT_MODES = ['last', 'pin', 'day', 'random', 'tree'];
+export function normalizeHomeMoment(value) {
+  const mode = HOME_MOMENT_MODES.includes(value?.mode) ? value.mode : 'last';
+  const id = text => (typeof text === 'string' ? text.trim().slice(0, 80) : '');
+  return {mode, treeId: id(value?.treeId), momentId: id(value?.momentId)};
+}
 // 제목 보기 설정(#347 후속): 모르는 값은 기본 '둘 다'. 상태(state.prefs)에 저장한다.
 export function normalizeTitleDisplay(value) {
   return TITLE_DISPLAYS.includes(value) ? value : DEFAULT_TITLE_DISPLAY;
@@ -219,7 +228,8 @@ export function normalizePrefs(value) {
     startPlace: normalizeStartPlace(value?.startPlace),
     shareView: normalizeShareView(value?.shareView),
     shareDiscover: normalizeShareDiscover(value?.shareDiscover),
-    treeChipOrder: normalizeTreeChipOrder(value?.treeChipOrder)
+    treeChipOrder: normalizeTreeChipOrder(value?.treeChipOrder), homeMoment: normalizeHomeMoment(value?.homeMoment)
+
   };
 }
 export function updatePrefs(state, patch = {}) {

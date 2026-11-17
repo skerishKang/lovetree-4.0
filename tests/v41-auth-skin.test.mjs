@@ -107,7 +107,8 @@ test('로그인이 필요한 진입점은 안내 창 없이 바로 /auth/login�
   // 로그인 뒤 의도대로 이어진다.
   assert.match(authModule, /pendingLoginIntent/);
   assert.match(authModule, /showScreen\('track32-bookshelf\.html'\)/);
-  assert.match(home, /addButton\.onclick=\(\)=>bridge\.actions\.requestMoment\('add'\)/);
+  // 261116 PR 2: '+ 순간 추가'는 글귀 바로 아래 위쪽 단추(home-add-top)로 올라갔다 — 같은 requestMoment('add') 흐름.
+  assert.match(home, /addTop\.onclick=\(\)=>bridge\.actions\.requestMoment\('add'\)/);
   // #426: '이어 보던 순간' 버튼은 최근 순간 카드가 대신한다 — resume 배선도 뺐다.
   assert.doesNotMatch(home, /bridge\.actions\.resume\(\)/);
   assert.match(home, /communityButton\.onclick=\(\)=>bridge\.actions\.community\(\)/);

@@ -788,7 +788,18 @@ async function checkFrameReloads(page, target, opts, stamp) {
     const extra = { opened, reloads, loads: info.loads, href: String(info.href || '').replace(base.origin, '') };
     if (screen.key === 'home') {
       await sleep(500);
-      extra.cards = await page.evaluate(HOME_CARD_STATE).catch(() => ({ ready: false }));
+      // 261116 수리: 궤도 애니메이션 표본 경계에서 카드 모서리가 구역 여유선에 순간적으로 닿는 것은
+      // main에서도 있는 순간 값이다(대조: main 733bc5b에서 같은 순간 침범 재현). 한 번의 스냅샷은 그
+      // 순간과 겹칠 수 있으므로 네 표본을 보고 정착 상태(마지막 표본)로 판정한다 — 몇 표본을 보든
+      // 침범이 사라지지 않으면 진짜 배치 결함이므로 여전히 fail이다.
+      const cardSamples = [];
+      for (let i = 0; i < 4; i++) {
+        const s = await page.evaluate(HOME_CARD_STATE).catch(() => null);
+        if (s) cardSamples.push(s);
+        if (i < 3) await sleep(700);
+      }
+      extra.cards = cardSamples[cardSamples.length - 1] || { ready: false };
+      extra.cardSampleInSafeZone = cardSamples.map((s) => s.inSafeZone);
     }
     results.push({ screen, reloads, extra });
   }
@@ -803,7 +814,7 @@ async function checkFrameReloads(page, target, opts, stamp) {
       const c = extra.cards || {};
       const cardsOk = !!c.ready && c.cards > 0 && c.unplaced === 0 && c.inSafeZone === 0;
       if (!okReload || !cardsOk) status = 'fail';
-      detail += ` · 카드 ${c.cards ?? 0}장 중 배치 안 된 카드 ${c.unplaced ?? '-'}장 / 가운데 안전 구역 침범 ${c.inSafeZone ?? '-'}장`;
+      detail += ` · 카드 ${c.cards ?? 0}장 중 배치 안 된 카드 ${c.unplaced ?? '-'}장 / 가운데 안전 구역 침범 ${c.inSafeZone ?? '-'}장(표본 ${JSON.stringify(extra.cardSampleInSafeZone || [])} 중 마지막 판정)`;
     }
     if (!extra.opened) { status = 'fail'; detail = '안쪽 프레임이 열리지 않아 다시 뜨기를 셀 수 없음 · ' + detail; }
     record(id, 'stability', status, detail, extra);

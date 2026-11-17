@@ -194,6 +194,13 @@ const thumbTree = (() => {
   t.moments[1].createdAt = '2026-11-12T09:00:00.000Z'; t.moments[1].updatedAt = t.moments[1].createdAt;
   t = addMoment(t, { subject: '시험', title: '사진 순간(정상)', note: '기록', emotion: '즐거움', date: '2026-11-10', url: '' }, t.moments[0].id, '2026-11-16T00:02:00.000Z');
   t.moments[2].mediaMetadata = { thumbnail: 'data:image/svg+xml;base64,' + Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><rect width="640" height="360" fill="#8a5a6e"/></svg>').toString('base64') };
+  // 261117 대표 결정: 이 상태는 390의 궤도 겹침 검사가 목적 — 9장 이상(표준 좁은 화면 궤도)이어야 한다.
+  // 8장 이하 390은 궤도 카드를 숨기는 계약(소수 카드는 가운데에 집중)이라 별도 단언(#657 후속 261117)이 본다.
+  for (let fi = 0; fi < 6; fi++) {
+    t = addMoment(t, { subject: '시험', title: '사진 순간 채우기 ' + (fi + 1), note: '기록', emotion: '즐거움', date: '2026-11-0' + (fi % 9 + 1), url: '' }, t.moments.at(-1).id, '2026-11-16T00:03:0' + fi + '.000Z');
+    t.moments.at(-1).mediaMetadata = { thumbnail: 'data:image/svg+xml;base64,' + Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><rect width="640" height="360" fill="' + ['#5a6e8a', '#6e8a5a', '#8a7a5a', '#8a5a6e'][fi % 4] + '"/></svg>').toString('base64') };
+    t.moments.at(-1).createdAt = '2026-11-09T0' + fi + ':00:00.000Z'; t.moments.at(-1).updatedAt = t.moments.at(-1).createdAt;
+  }
   t.moments[2].createdAt = '2026-11-10T09:00:00.000Z'; t.moments[2].updatedAt = t.moments[2].createdAt;
   return t;
 })();
@@ -210,10 +217,7 @@ const frameOf = async (page, test_) => {
   }
   return null;
 };
-// 프레임 교체·재적재 창에서 주소만 잡으면 '아직 그리지 않은 문서'를 물린다(#657 CI page null).
-// frame 객체는 같은 iframe에서 재사용되므로 객체 동일성 대신 readyState complete + 루트 요소 + (지정 시)
-// 보기 상태가 지금 보기로 바뀔 때까지 기다린다. 못 찾으면 현재 프레임 URL 목록을 담은 메시지로 실패한다 —
-// null.evaluate TypeError가 나지 않게.
+
 const frameUrls = (page) => page.frames().map((f) => { try { return f.url(); } catch { return '<url 조회 실패>'; } });
 const readyFrame = async (page, test_, { root = null, view = null, timeout = 45000, why = '프레임 준비' } = {}) => {
   const deadline = Date.now() + timeout;
@@ -1015,7 +1019,7 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
         let ok = false;
         try {
           ok = await Promise.race([
-            f.evaluate(() => Boolean(document.getElementById('orbit')?.shadowRoot?.querySelector('[data-do=index]'))),
+            f.evaluate(() => Boolean(document.getElementById('orbit')?.shadowRoot?.querySelector('[data-do=moments],[data-do=index]'))),
             page5b.waitForTimeout(2000).then(() => false)
           ]);
         } catch { ok = false; }
@@ -1035,7 +1039,7 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
       const list = await frameEval(() => Boolean(document.getElementById('orbit')?.shadowRoot?.querySelector('.index-list .indexTagChip')));
       if (!list) {
         const f = await orbitFrameOf();
-        if (f) await f.evaluate(() => document.getElementById('orbit').shadowRoot.querySelector('[data-do=index]').click()).catch(() => {});
+        if (f) await f.evaluate(() => document.getElementById('orbit').shadowRoot.querySelector('[data-do=moments],[data-do=index]').click()).catch(() => {});
         await page5b.waitForTimeout(400);
       }
       chips0 = await frameEval(() => {
@@ -1587,7 +1591,10 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     assert.equal(await graphByHash.evaluate(() => document.documentElement.getAttribute('data-v41-screen')), 'graph', '#my/graph 프레임 문서가 그래프 화면이다');
     await ctx8.close();
 
-    // 첫 화면 글자 카드(261116): 내려간 영상(회색 120×90)의 '영상을 볼 수 없어요' 카드가 #orbit
+    // 261117 대표 결정: 글자 카드 세부 검사(존재·줄·말줄임·배치)는 1440에서 한다 — 390은 가운데가 커져
+    // 위·아래 띠가 카드를 못 담아 안전망이 궤도 카드를 숨길 수 있다(소수 카드 숨김 계약은
+    // '#657 후속 261117' 단언이 본다). 390에서 이 상태의 겹침 검사는 보이는 카드가 없어 자동 만족이다.
+    if (width === 1440) {
     // shadowRoot 안에서 줄(감정·날짜·제목·알림)을 지키는지 — 제목이 3줄 높이 안(max-height 절단)·카드 안 배치·
     // '첫 순간' 배지와 감정 칩 겹침 0을 수치로 단정한다. 카드는 그림자 안에 있으므로 shadowRoot로
     // 스코핑한다(#730과 같은 판정). 셸이 lt41-date-style 동기화로 프레임을 다시 띄우므로 매번 전 프레임 검사.
@@ -1654,6 +1661,7 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     assert.equal(cardCheck.overflow, 0, `첫 화면 가로 넘침 0(실제 ${cardCheck.overflow})`);
     await take(page9, '첫 화면 글자 카드');
     await ctx9.close();
+    } // width 1440 — 390은 위 단언(궤도 카드 0장)이 대신한다
 
     await context.close();
     return rows;
@@ -1808,3 +1816,102 @@ test('운영센터 머리줄이 본 화면 셸 머리줄과 같은 폭·위치�
   }
 });
 
+// 261117 대표 결정: 좁은 화면(390)에서 궤도 카드가 8장 이하인 계정은 궤도 카드를 숨긴다 —
+// 커진 가운데(위쪽 '+ 순간 추가'·정보 줄)가 소수 카드의 원을 덮어 밀어낸 카드가 한자리에 쌓였다
+// (실측 3장 동일 좌표). 9장 이상은 기존 좁은 화면 궤도를 그대로 쓴다(글자 카드 상태가 390 겹침을 잰다).
+test('#657 후속 261117: 좁은 화면 소수 카드(≤8) 계정은 궤도 카드 0장 — 가운데에 집중한다', { skip: REQUIRE ? false : skip, timeout: 120000 }, async () => {
+  const { createTree, addMoment } = await import('../public/v41/domain.mjs');
+  let t = createTree({ subject: '시험', title: '카드 적은 트리', note: '기록', emotion: '설렘', date: '2026-11-11', url: '' }, '2026-11-16T00:00:00.000Z');
+  t = addMoment(t, { subject: '시험', title: '사진 순간', note: '기록', emotion: '즐거움', date: '2026-11-11', url: '' }, t.moments[0].id, '2026-11-16T00:01:00.000Z');
+  t.moments[1].mediaMetadata = { thumbnail: 'data:image/svg+xml;base64,' + Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><rect width="640" height="360" fill="#8a5a6e"/></svg>').toString('base64') };
+  t = addMoment(t, { subject: '시험', title: '메모 순간', note: '기록', emotion: '그리움', date: '2026-11-12', url: '' }, t.moments[1].id, '2026-11-16T00:02:00.000Z');
+  const fewTrees = [t];
+  const server = await serve();
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch();
+  try {
+    const context = await browser.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' });
+    await context.addInitScript((theme) => {
+      try {
+        localStorage.setItem('lt41.theme', theme);
+        localStorage.setItem('lt41.dateStyle', 'dot');
+        localStorage.setItem('lt41.titleDisplay', 'both');
+        localStorage.setItem('lt41.homeCards', 'mine');
+      } catch {}
+    }, 'night');
+    await context.route('**://i.ytimg.com/**', THUMB);
+    await context.route('**/api/**', (r) => {
+      if (/api\/workspace/.test(r.request().url())) return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ revision: 1, state: { version: 1, trees: fewTrees, prefs: {} }, subject: '시험계정', writeSubjectBound: true, savedAt: '2026-11-16T00:00:00.000Z' }) });
+      return r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' });
+    });
+    const page = await context.newPage();
+    await page.goto(`${base}/v41/?account=1`, { waitUntil: 'load', timeout: 30000 });
+    await page.waitForTimeout(6000);
+    const visible = await page.evaluate(() => {
+      // 셸이 프레임을 갈아끼운다(#view·#view-next) — 지금 보이는 쪽의 궤도를 본다(예전 프레임의 예시 궤도와 섞이지 않게).
+      const els = [...document.querySelectorAll('#view,#view-next')].filter((e) => e.getClientRects().length > 0 && !e.hidden);
+      const sh = (els[0] || document.getElementById('view'))?.contentDocument?.getElementById('orbit')?.shadowRoot;
+      if (!sh) return null;
+      return [...sh.querySelectorAll('button.card')].filter((c) => c.style.display !== 'none').length;
+    });
+    assert.equal(visible, 0, `390 소수 카드 계정: 궤도 카드 0장(실제 ${visible}장)`);
+    await context.close();
+  } finally {
+    await browser.close();
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+// 2026-11-17 CTO 캡처 후속: 390에서 궤도 카드가 0장이어도 다른 층 카드가 바닥 링크 줄에 겹치지 않는다.
+// 눈이 아니라 수치로 판정한다 — 보이는 카드 수, 카드↔링크 겹침 쌍 0, 카드 아래끝 ≤ 링크 줄 top−8(1440도 겹침 0).
+test('#657 후속 261117: 카드 층은 바닥 링크 줄 위에서 자른다(390 few·many, 1440)', { skip: REQUIRE ? false : skip, timeout: 180000 }, async () => {
+  const { createTree, addMoment } = await import('../public/v41/domain.mjs');
+  const treeWith = (n) => {
+    let t = createTree({ subject: '시험', title: '카드 계정', note: '기록', emotion: '설렘', date: '2026-11-11', url: '' }, '2026-11-16T00:00:00.000Z');
+    for (let i = 1; i < n; i++) {
+      t = addMoment(t, { subject: '시험', title: `순간 ${i}`, note: '기록', emotion: '설렘', date: '2026-11-11', url: '' }, t.moments[i - 1].id, `2026-11-16T00:0${i % 10}:00.000Z`);
+      t.moments[i].mediaMetadata = { thumbnail: 'data:image/svg+xml;base64,' + Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><rect width="640" height="360" fill="#8a5a6e"/></svg>').toString('base64') };
+    }
+    return t;
+  };
+  const server = await serve();
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch();
+  try {
+    for (const [label, width, count] of [['few-390', 390, 3], ['many-390', 390, 12], ['many-1440', 1440, 12]]) {
+      const ctx = await browser.newContext({ viewport: { width, height: width === 390 ? 844 : 900 }, reducedMotion: 'reduce' });
+      await ctx.addInitScript(() => { try { localStorage.setItem('lt41.theme', 'night'); localStorage.setItem('lt41.homeCards', 'mine'); } catch {} });
+      await ctx.route('**://i.ytimg.com/**', THUMB);
+      await ctx.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
+      await ctx.route('**/api/workspace**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ revision: 1, state: { version: 1, trees: [treeWith(count)], prefs: {} }, subject: '시험계정', writeSubjectBound: true, savedAt: '2026-11-16T00:00:00.000Z' }) }));
+      const page = await ctx.newPage();
+      await page.goto(`${base}/v41/?account=1`, { waitUntil: 'load', timeout: 30000 });
+      await page.waitForTimeout(6000);
+      const measured = await page.evaluate(() => {
+        const frames = [...document.querySelectorAll('#view,#view-next')].filter((f) => f.getClientRects().length > 0 && !f.hidden);
+        const sh = (frames[0] || document.getElementById('view'))?.contentDocument?.getElementById('orbit')?.shadowRoot;
+        const cards = sh ? [...sh.querySelectorAll('button.card')].filter((c) => c.style.display !== 'none' && getComputedStyle(c).display !== 'none') : [];
+        const rects = cards.map((c) => {
+          const a = c.getBoundingClientRect(), s = c.querySelector('.surface')?.getBoundingClientRect() || a;
+          return { l: Math.min(a.left, s.left), r: Math.max(a.right, s.right), t: Math.min(a.top, s.top), b: Math.max(a.bottom, s.bottom) };
+        });
+        const allLinks = [...document.querySelectorAll('.home-links a,.home-links button')].map((e) => { const r = e.getBoundingClientRect(); return { text: e.textContent.trim().slice(0, 8), l: r.left, r: r.right, t: r.top, b: r.bottom, shown: r.r > r.l && r.b > r.t }; });
+        const links = allLinks.filter((l) => l.shown);
+        const overlaps = rects.reduce((n, c) => n + links.filter((l) => Math.min(c.r, l.r) - Math.max(c.l, l.l) > 0 && Math.min(c.b, l.b) - Math.max(c.t, l.t) > 0).length, 0);
+        const lr = document.querySelector('.home-links')?.getBoundingClientRect();
+        window.scrollTo(0, document.documentElement.scrollHeight);
+        const scroll = { scrollHeight: document.documentElement.scrollHeight, clientHeight: document.documentElement.clientHeight, links: allLinks.map((l) => ({ text: l.text, shown: l.shown, top: Math.round(l.t), bottom: Math.round(l.b), inView: !l.shown || (l.t >= -1 && l.b <= globalThis.innerHeight + 1) })) };
+        return { count: cards.length, overlaps, ceiling: lr ? Math.round(lr.top) - 8 : null, lowest: rects.length ? Math.round(Math.max(...rects.map((c) => c.b))) : null, scroll };
+      });
+      assert.equal(measured.overlaps, 0, `${label}: 카드↔바닥 링크 겹침 ${measured.overlaps}쌍`);
+      if (label === 'few-390') assert.equal(measured.count, 0, `390 소수 카드 계정: 보이는 카드 ${measured.count}장(기존 궤도 숨김 유지)`);
+      if (measured.ceiling > 0 && measured.lowest !== null) assert.ok(measured.lowest <= measured.ceiling, `${label}: 카드 아래끝 ${measured.lowest} > 링크 줄 위 ${measured.ceiling}`);
+      assert.equal(measured.scroll.links.length, 4, `${label}: 바닥 링크 4개를 잰다`);
+      assert.ok(measured.scroll.links.every((l) => l.inView), `${label}: 맨 아래 스크롤 뒤 링크가 화면 밖 — ${JSON.stringify(measured.scroll.links)}`);
+      await ctx.close();
+    }
+  } finally {
+    await browser.close();
+    await new Promise((resolve) => server.close(resolve));
+  }
+});

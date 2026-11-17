@@ -62,7 +62,7 @@ test('섞어서: YouTube 3장이면 내 썸네일 카드 3장(예시로 물러�
   assert.ok(plan.cards.every(c => c.type === 'video' && c.youtubeThumb === true));
   assert.ok(plan.cards.every(c => c.image.startsWith('https://i.ytimg.com/vi/')));
   assert.equal(plan.examples, 37);
-  assert.equal(plan.note, '금빛 카드는 내가 남긴 순간이에요');
+  assert.equal(plan.note, '테두리가 있는 카드는 내가 남긴 순간이에요');
 });
 
 test('섞어서: YouTube 2장이면 지금처럼 예시(mix-empty 기준은 #297 보류로 그대로)', () => {

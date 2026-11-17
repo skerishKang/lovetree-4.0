@@ -57,11 +57,12 @@ test('#463 빈 화면 단추 두 개가 실제 동작(첫 트리 만들기·예�
   assert.match(wiring.slice(0, 300), /createTree|openTree|newTree|quickAdd|openEditor|startTree/i, '첫 트리 만들기 → 트리 생성 흐름');
 });
 
-// ── ① 첫 화면 문구: 트리 0개(순간 없음)면 처음 온 사람용 ──
-test('#463 첫 화면 문구는 순간이 하나도 없을 때 처음 온 사람용 한 줄을 준다', () => {
-  assert.match(home, /if\(!hasAnyMoment\)label='첫 순간을 남기면 여기서 이어 볼 수 있어요'/, '순간 0개 문구');
-  // 다시 온 사람용 문장은 유지하되, 순간 0개에는 위 한 줄이 함께 붙는다.
-  assert.match(home, /target\.append\('기억은 아직 여기에서 이어지고 있어요\.'\)/, '한 줄은 그대로');
+// ── ① 첫 화면 문구: 261116 PR 2로 둘째 줄은 치워졌다 — 그 자리에 '+ 순간 추가' 단추가 온다 ──
+test('#463 첫 화면 문구는 261116 PR 2 배치로 바뀌었다 — 안내 줄 대신 추가 단추', () => {
+  // 옛 둘째 줄(순간 0개 문구·한 줄 안내)은 같이 거뒀다 — 리팩터링으로 깨진 문구 단정은 고쳐 맞추지 않고 지운다.
+  assert.doesNotMatch(home, /첫 순간을 남기면 여기서 이어 볼 수 있어요/);
+  assert.match(home, /home-add-top/, "글귀 바로 아래 '+ 순간 추가' 단추");
+  assert.match(home, /quote\?\.after\(addTop\)/);
 });
 
 test('#463 예시 카드 안내는 "예시"임을 밝힌다(모호한 옛 문구 제거)', () => {
