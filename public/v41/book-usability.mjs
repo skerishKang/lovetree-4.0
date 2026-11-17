@@ -197,16 +197,9 @@ export function detailPlacement(rightEmpty) {
   return rightEmpty ? 'right-page' : 'card-side';
 }
 
-/**
- * 좁은 화면에서 손을 뗀 순간 무엇을 할지 정한다(#296).
- * 420ms 넘게 누르면 돋보기(inspect)가 켜지는데, 그대로 두면 상세가 영영 열리지 않는다.
- * 430px 이하에서는 같은 자리에서 손을 떼면 돋보기를 닫고 상세를 연다(넘김·스와이프는 그대로).
- */
-export function tapIntent({mode, longPressed, dx = 0, dy = 0, hasMoment = false, width = 1440, cancel = false} = {}) {
-  const still = Math.hypot(dx, dy) < 10;
-  if (mode === 'inspect') return width <= 430 && !cancel && hasMoment && still ? 'detail' : 'close-lens';
-  if (mode === 'pending' && !longPressed && still && hasMoment) return 'detail';
-  return 'none';
+/** Moment-card taps only read the page; a long-press inspection closes without opening a detail panel. */
+export function tapIntent({mode} = {}) {
+  return mode === 'inspect' ? 'close-lens' : 'none';
 }
 
 /** 오른쪽 페이지의 '다음 순간 추가'는 이 순간을 부모로 편집기를 연다. */

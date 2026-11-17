@@ -74,6 +74,29 @@ export function createMessages(deps) {
       if (!saved.ok || !saved.changed) reply(saved.ok, saved.ok ? saved.keywords : null, saved.error);
       return;
     }
+    if (data?.type === 'lt41-story-save') {
+      const treeId = typeof data.treeId === 'string' ? data.treeId : '';
+      const fromMomentId = typeof data.fromMomentId === 'string' ? data.fromMomentId : '';
+      const momentId = typeof data.momentId === 'string' ? data.momentId : '';
+      const relation = typeof data.relation === 'string' ? data.relation.trim() : null;
+      const reply = (ok, error) => { try { event.source?.postMessage({type:'lt41-story-saved', ok, treeId, fromMomentId, momentId, relation: relation ?? '', error}, location.origin); } catch {} };
+      const member = getMember();
+      const tree = getModel()?.trees?.find(item => item.id === treeId);
+      const parent = tree?.moments?.find(item => item.id === fromMomentId);
+      const child = tree?.moments?.find(item => item.id === momentId);
+      if (getSource() !== 'server' || !member?.snapshot().writable) { reply(false, '읽기 전용 화면에서는 한마디를 저장할 수 없어요.'); return; }
+      if (!tree || !parent || !child || child.parentId !== fromMomentId) { reply(false, '이어진 순간을 찾지 못했어요.'); return; }
+      if (relation === null || relation.length > 100) { reply(false, '한마디는 100자까지 적을 수 있어요.'); return; }
+      try {
+        member.apply('edit', {
+          ...child,
+          note: child.note ?? '',
+          relation
+        }, {treeId, momentId});
+        reply(true, '');
+      } catch (error) { reply(false, error?.message || '저장하지 못했어요.'); }
+      return;
+    }
     if (data?.type === 'lt41-theme') { applyTheme(); paintThemeControls(); }
     if (data?.type === 'lt41-journey-step') { journey.noteJourneyStep(data.step); return; }
     if (data?.type === 'lt41-journey-save') { if (getSource() === 'share') return; journey.saveFirstJourney(data.draft); return; }

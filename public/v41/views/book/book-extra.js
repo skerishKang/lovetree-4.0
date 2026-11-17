@@ -1,5 +1,6 @@
 // 2026-11-08 책 사용성 1~9 화면 보조. 데이터·저장 계약은 그대로 두고 표시만 바꾼다.
-import {displayTitle,withoutAutoTitle,titleParts,mediaSourceText,editAffordances,embedUrl,connectionLine,readLens,writeLens,detailPlacement,nextMomentMessage,NEXT_PAGE_COPY,NEXT_PAGE_ACTION,treeTitleText,isPrimaryButton,tapIntent,createOverflowRejudge,titleView,formatDisplayDate} from '/v41/book-usability.mjs';
+import {displayTitle,withoutAutoTitle,titleParts,mediaSourceText,editAffordances,embedUrl,connectionLine,readLens,writeLens,detailPlacement,nextMomentMessage,NEXT_PAGE_COPY,NEXT_PAGE_ACTION,treeTitleText,isPrimaryButton,createOverflowRejudge,titleView,formatDisplayDate} from '/v41/book-usability.mjs';
+import {formatRange} from '/v41/domain.mjs';
 import {coverChoice,COVER_PALETTE} from '/v41/views/shelf/shelf-model.mjs';
 import {coverMomentFor} from '/v41/views/shelf/shelf-model.mjs';
 import {thumbnailCandidates,thumbFallbackAttrs,coverFallbackAttrs,fallbackCardMarkup,mountThumbFallback,VIDEO_UNAVAILABLE_TEXT} from '/v41/thumb-fallback.mjs';
@@ -17,8 +18,6 @@ const ltDateStyle=()=>{
  return 'dot';};
 const styledDate=v=>formatDisplayDate(v,ltDateStyle());
 try{window.LTBookTitle={view:titleViewFor,date:styledDate}}catch{}
-// #296: 손을 뗀 순간의 판단은 book-usability.mjs의 tapIntent가 맡는다(book.js는 클래식 스크립트라 여기서 넘겨 준다).
-window.LTTapIntent=tapIntent;
 const t=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 /* 5. 돋보기: 기본 꺼짐. 선택값은 localStorage(실패하면 꺼짐). */
 let lensPref=readLens(window.localStorage);
@@ -148,6 +147,8 @@ document.addEventListener('pointerdown',e=>{
 },true);
 document.addEventListener('click',e=>{
  if(!isPrimaryButton(e))return;
+ const noteMore=e.target.closest&&e.target.closest('[data-note-more]');
+ if(noteMore){e.preventDefault();e.stopPropagation();const wrap=noteMore.closest('.moment-note-wrap');if(wrap){const open=wrap.classList.toggle('is-open');noteMore.textContent=open?'접기':'더 보기';noteMore.setAttribute('aria-expanded',String(open));}return}
  if(e.target.closest&&e.target.closest('[data-lt-title-edit]'))return;
  // #393 2: 크게 보기 — 어두운 깔개 위 화면 가운데 크게(세로 높이 가득·가로 폭 가득). 바깥 클릭·Esc로 책 복귀.
  const expand=e.target.closest('[data-yt-expand]');
@@ -182,52 +183,43 @@ document.addEventListener('click',e=>{
  if(e.target.closest('[data-detail-index]')){e.preventDefault();closeDetail();openArchive();return}
  if(e.target.closest('[data-detail-close]')){e.preventDefault();closeDetail();return}
 },true);
-/* 2. 자동 제목은 표시 단계에서만 거른다(데이터 그대로). 제목·마음 한마디·감정을 나눠 그린다(#345).
-   날짜는 제목 위에 작게, 제목이 주인공, 감정은 색 점+글자, 마음 한마디가 비면 흐린 안내(누르면 바로 쓰기). */
-function emotionMarkup(emotion){
- const value=String(emotion||'').trim();
- if(!value)return '';
- return '<span class="moment-emotion"><span class="emotion-dot" data-tone="'+window.LT59Model.emotionTone(value)+'" aria-hidden="true"></span>'+t(value)+'</span>';
-}
-/* #635 이후 발견(#book-dup): 메모(.note-piece)·링크 장은 본문 조각이 이미 제목(h2)과 본문을 그린다.
-   pieceHasStory가 참이면 아래 .moment-title은 날짜·감정만 남긴다 — 제목·본문을 두 번 쓰지 않게.
-   paintTitle(m) 하나만 쓰는 곳(유튜브·링크 카드 조각)은 조각에 제목이 없어 그대로 제목·본문을 그린다. */
+/* #800: 모든 순간 카드는 정보 줄 → 제목 → 메모 순서로 한 번만 그린다. */
 /* 책 글자 다듬기(261116) ③: 펼쳐 둔 제목은 다시 그리기(꼬리표 준비·설정 메시지·보기 바꾸기)에 유지한다 —
    버튼을 다시 그리면 클래스가 지워져 첫 누름이 무시된 것처럼 보였다(390 실측: 누름 70ms 뒤 노드 교체 확인). */
 const openTitles=new Set();
-function paintTitle(m,pieceHasStory=false){
+function paintTitle(m){
  const source=LTDEMO.moments.find(x=>x.id===m.id);
  const view=titleViewFor(source||m);
  const parts={main:view.main,note:view.note,media:view.sub};
  const noteText=source?String(source.memo??'').trim():parts.note;
  parts.note=noteText;
- const hands=editAffordances({readOnly:!!LTDEMO.readOnly,synthetic:!!m.synthetic,hasTitle:!!parts.main,hasNote:!!parts.note});
- const date=m.date?'<p class="moment-date">'+t(formatDisplayDate(m.date,ltDateStyle()))+'</p>':'';
+ const hands=editAffordances({readOnly:!LTDEMO.writable,synthetic:!!m.synthetic,hasTitle:!!parts.main,hasNote:!!parts.note});
+ const date=m.date?formatDisplayDate(m.date,ltDateStyle()):'';
+ const range=formatRange(m.startSeconds,m.endSeconds);
+ const metaText=[date,range,m.emotion].filter(value=>String(value||'').trim()).map(t).join(' · ');
+ const edit=LTDEMO.writable&&!m.synthetic?'<button type="button" class="moment-edit" data-title-edit="'+t(m.id)+'"><span aria-hidden="true">✎</span> 고치기</button>':'';
+ const meta='<div class="moment-meta"><span class="moment-meta-copy">'+metaText+'</span>'+edit+'</div>';
  /* #635: 유튜브 제목이 사용자 제목과 같으면(앞뒤 공백·대소문자 무시) '▶ 제목' 줄은 두 번 보이지 않게 감춘다. */
  const sub=parts.media&&parts.media.trim().toLowerCase()!==String(parts.main||'').trim().toLowerCase()?'<p class="video-title">▶ '+t(parts.media)+'</p>':'';
  const heading=parts.main?(hands.title
-  ?'<div class="moment-heading"><button type="button" class="moment-title-button'+(openTitles.has(m.id)?' title-open':'')+'" data-title-edit="'+t(m.id)+'" aria-label="'+(openTitles.has(m.id)?'제목 접기: ':'제목 고치기: ')+t(parts.main)+'"'+(openTitles.has(m.id)?' aria-expanded="true"':'')+'>'+t(parts.main)+'</button>'+(hands.hint?'<button type="button" class="title-edit-hint" data-title-edit="'+t(m.id)+'" aria-label="제목 고치기"><span aria-hidden="true">✎</span> 고치기</button>':'')+'</div>'
+  ?'<div class="moment-heading"><button type="button" class="moment-title-button'+(openTitles.has(m.id)?' title-open':'')+'" data-title-edit="'+t(m.id)+'" aria-label="'+(openTitles.has(m.id)?'제목 접기: ':'제목 고치기: ')+t(parts.main)+'"'+(openTitles.has(m.id)?' aria-expanded="true"':'')+'>'+t(parts.main)+'</button></div>'
   :'<h3>'+t(parts.main)+'</h3>'):'';
  /* #537: 마음 한마디가 비었을 때 '이 순간에 남기고 싶은 마음을 적어 보세요…' 안내를 내용처럼 그리지 않는다.
     (감상 화면에서 안내 글과 실제 마음이 같은 모양이라 내용으로 읽혔다 — 비면 아무것도 그리지 않는다.) */
- let lead='';
- if(parts.main)lead=heading+sub;
- else if(parts.note)lead='<p class="moment-note moment-note-lead">'+t(parts.note)+'</p>';
+ const note=noteText?'<div class="moment-note-wrap"><p class="moment-note">'+t(noteText)+'</p>'+(noteText.length>96?'<button type="button" class="moment-note-more" data-note-more aria-expanded="false">더 보기</button>':'')+'</div>':'';
  /* #627: 책 쪽(카드)에도 확정된 꾀리표를 1~3개 작게 보인다(노래 → 멤버 → 무대 순서). 유튜브·링크 쪽은
     book-extra의 momentContent가 paintTitle로 제목 줄을 다시 그리므로 여기에 함께 그린다. 꾀리표가 없으면
     아무것도 더하지 않는다(원본 모양 보존). LTTagLine이 늦게 도착하면 빈 채로 지나가고 다음 그리기에서 붙는다. */
  const tagChips=(window.LTTagLine&&source)?(window.LTTagLine.cardTags(source.keywords||[])||[]):[];
  const tagRow=tagChips.length?'<div class="chips">'+tagChips.map(k=>'<span class="chip lt-tag-chip">'+t(k.value)+'</span>').join('')+'</div>':'';
- if(pieceHasStory)return '<div class="moment-title">'+date+lead+emotionMarkup(m.emotion)+tagRow+'</div>';
- const tail=parts.main&&parts.note?'<p class="moment-note">'+t(parts.note)+'</p>':'';
- return '<div class="moment-title">'+date+lead+emotionMarkup(m.emotion)+tagRow+tail+'</div>';
+ return '<div class="moment-title">'+meta+heading+sub+note+tagRow+'</div>';
 }
 /* 3. 한 페이지에 다 들어오게 + 1. YouTube는 그 자리에서 재생(누르기 전 외부 요청 0). */
 function localThumb(m){const src=String(m.image||'');if(src.startsWith('data:image/'))return src;if(src.startsWith('/api/media/'))return src;return ''}
 const originalMomentContent=momentContent;
 momentContent=function(m,compact=false){
  const safe=withoutAutoTitle(m);
- const writableBook=!LTDEMO.readOnly;
+ const writableBook=!!LTDEMO.writable;
  if(safe.url&&window.LTMedia&&LTMedia.describe){
   const media=LTMedia.describe(safe.url);
   const ctx=(typeof LTMedia.currentContext==='function')?LTMedia.currentContext():{source:'',owned:false};
@@ -250,15 +242,11 @@ momentContent=function(m,compact=false){
       빈 상자는 이제 어디에도 나오지 않는다. */
    const face=thumb?'<img src="'+t(thumb)+'" alt=""'+(thumb.startsWith('/api/media/')?thumbFallbackAttrs(safe,{candidates:[thumb],writable:writableBook,videoUnavailable:false,variant:'book',momentId:safe.id}):'')+'>'
     :'<img src="'+t(remoteThumb)+'" alt="'+t(safe.title||'YouTube 영상 썸네일')+'"'+thumbFallback+' referrerpolicy="no-referrer" loading="lazy" decoding="async">';
-   /* #345: 영상 바로 아래 한 줄 — ▶ 채널. 이슈 584에서 YouTube ↗·크게 보기는 그 아래 .media-links 한 줄로 옮겼다. */
-    const source=String(safe.mediaMetadata?.channel||'').trim();
-   // #584: 채널 줄은 정보만 남기고, YouTube ↗(왼쪽)·크게 보기(오른쪽)를 카드 아래 한 줄(.media-links)에 둔다.
-   //   크게 보기가 영상 위(yt-expand)에서 카드 아래로 내려와 영상 위에 단추가 겹치지 않는다.
+   // YouTube 출처는 링크 한 곳에만 남긴다.
    const piece='<div class="clipping moment" data-moment="'+t(safe.id)+'">'+
     '<button type="button" class="yt-play'+(vertical?' is-vertical':'')+'" data-lt-thumb-host data-yt-play="'+t(media.videoId)+'" data-yt-start="'+t(media.startSeconds||0)+'"'+(vertical?' data-yt-vertical="1"':'')+'>'+
     face+
     '<span class="yt-play-label">'+t(label)+'</span></button>'+
-    (source?'<div class="media-source"><span class="media-source-mark" aria-hidden="true">▶</span><span class="media-source-text">'+t(source)+'</span></div>':'')+
     '<div class="media-links"><a class="media-source-link" href="'+t(media.openUrl)+'" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">YouTube ↗</a>'+
     '<button type="button" data-yt-expand="'+t(safe.id)+'">크게 보기</button></div></div>';
    return piece+paintTitle(safe);
@@ -270,7 +258,19 @@ momentContent=function(m,compact=false){
    return piece+paintTitle(safe);
   }
  }
- return originalMomentContent(safe,compact);
+ if(safe.synthetic)return originalMomentContent(safe,compact);
+ if(!safe.url&&!safe.image&&['memo','note','text','letter','archive'].includes(String(safe.kind||''))){
+  return '<div class="book-card-moment moment" data-moment="'+t(safe.id)+'">'+paintTitle(safe)+'</div>';
+ }
+ const template=document.createElement('template');
+ template.innerHTML=originalMomentContent(safe,compact);
+ template.content.querySelector('.moment-title')?.remove();
+ const piece=template.content.querySelector('.moment[data-moment]');
+ if(!piece)return template.innerHTML+paintTitle(safe);
+ const hasVisual=!!piece.querySelector('img,video,iframe,.lt-media,.lt-fallback-card,.collage,.ticket');
+ piece.querySelectorAll(':scope > h2,:scope > p,:scope > .photo-caption').forEach(node=>node.remove());
+ if(!hasVisual)return '<div class="book-card-moment moment" data-moment="'+t(safe.id)+'">'+paintTitle(safe)+'</div>';
+ return template.innerHTML+paintTitle(safe);
 };
 /* 8. 가운데 머리 표시는 CSS로 지우고, 4. 오른쪽 빈 페이지 문구·버튼을 여기서 만든다. */
 const originalRenderSpread=renderSpread;
@@ -283,11 +283,7 @@ renderSpread=function(idx,focusId=null,land=true){
  const one=single()?momentAtPos(current):null;
  if(one){
   const host=narrow()?mobileContent:rightPage;
-  /* 이슈 671 실사에서 발견한 #659의 해프닝: 본문 조각이 h2로 제목을 그리는 쪽(메모·사진·영상)에서는
-     편집 손잡이(제목 단추·✎ 고치기)까지 함께 사라졌다. 조각의 h2는 겹치는 제목이므로 지우고,
-     paintTitle에는 조각이 본문을 이미 그렸다는 뜻(pieceHasStory)을 그대로 넘겨 마음 한마디 겹침은 막는다 —
-     제목 표시는 한 번, 고치기 손잡이는 남는다. */
-  const old=host.querySelector('.moment-title');if(old&&!one.synthetic){const hadStory=!!host.querySelector('.moment h2');const pieceTitle=[...host.querySelectorAll('.moment h2')].find(h=>h.textContent.trim());if(pieceTitle)pieceTitle.remove();old.outerHTML=paintTitle(one,hadStory);}
+  const old=host.querySelector('.moment-title');if(old&&!one.synthetic)old.outerHTML=paintTitle(one);
   /* 마지막 순간 뒤의 '다음 순간' 안내는 그 순간 글 아래에 이어 붙인다(쪽을 덮지 않는다).
      안내를 쪽 위에 겹쳐 놓으면 그 순간의 카드·단추를 가린다 — 순간 내용 상자 안 끝에 놓는다. */
   const spread=currentSpread();
@@ -303,7 +299,7 @@ renderSpread=function(idx,focusId=null,land=true){
  }else{
   for(const [host,side] of [[leftPage,'left'],[rightPage,'right']]){
    const m=SPREADS[current][side];if(!m||m.synthetic)continue;
-   const old=host.querySelector('.moment-title');if(old){const hadStory=!!host.querySelector('.moment h2');const pieceTitle=[...host.querySelectorAll('.moment h2')].find(h=>h.textContent.trim());if(pieceTitle)pieceTitle.remove();old.outerHTML=paintTitle(m,hadStory);}
+   const old=host.querySelector('.moment-title');if(old)old.outerHTML=paintTitle(m)
   }
   const right=SPREADS[current].right;
   if(right&&right.synthetic){
@@ -314,17 +310,66 @@ renderSpread=function(idx,focusId=null,land=true){
  }
  paintLensButton();
 };
-/* 9. 연결 안내는 한 줄, 다음 순간이 없으면 숨긴다. 시스템 용어를 쓰지 않는다. */
-const originalUpdateConnectionSummary=updateConnectionSummary;
+/* 연결 한마디는 두 페이지의 가운데에 둔다. 빈 관계는 입력 버튼으로, 저장된 관계는 다시 편집할 수 있는 문장으로 보인다. */
+const STORY_TIP_KEY='lt41.tips.bookStory';
+let storyTipOpen=false,storyRequest=null;
+try{storyTipOpen=LTDEMO.moments.length>=2&&localStorage.getItem(STORY_TIP_KEY)!=='1';if(storyTipOpen)localStorage.setItem(STORY_TIP_KEY,'1')}catch{storyTipOpen=LTDEMO.moments.length>=2}
+function storyTipMarkup(){return storyTipOpen?'<div class="story-tip" role="note"><span>두 순간 사이에 한마디를 남기면, 책이 이야기처럼 이어져요. 안 적어도 괜찮아요.</span><button type="button" data-story-tip-dismiss>알겠어요</button></div>':''}
 updateConnectionSummary=function(id){
- const next=nextMomentOf(id),host=$b('#whyMargin');
- /* #635: 감상 화면에서는 이유가 비었을 때의 안내를 감춘다 — 남의 트리를 보는 사람에게 필요 없는 말이다.
-    이유가 있으면 감상 화면에서도 그대로 보여 준다(내 트리는 예전 그대로). */
- const line=connectionLine(next&&next.title,next&&next.reason,{hideEmptyWhy:!!LTDEMO.readOnly});
- if(!line){host.hidden=true;host.replaceChildren();return}
+ const next=nextMomentOf(id),host=$b('#whyMargin'),momentId=String(id||'');
+ if(!host)return;
+ const tip=storyTipMarkup();
+ let action='';
+ if(next){
+  const reason=String(next.reason||'').trim();
+  if(LTDEMO.writable){
+   const label=reason?'→ '+reason:'＋ 두 순간을 잇는 한마디';
+   action='<button type="button" class="story-action" data-story-open data-from-moment="'+t(momentId)+'" data-to-moment="'+t(next.id)+'">'+t(label)+'</button>';
+  }else if(reason){action='<span class="story-action story-readonly">→ '+t(reason)+'</span>'}
+ }
+ if(!tip&&!action){host.hidden=true;host.replaceChildren();return}
  host.hidden=false;
- host.innerHTML='<span></span>'+t(line);
+ host.innerHTML=tip+(action?'<div class="story-action-wrap">'+action+'</div>':'');
 };
+function openStoryEditor(fromMomentId,toMomentId,initial=''){
+ const host=$b('#whyMargin');if(!host)return;
+ host.innerHTML=storyTipMarkup()+'<form class="story-editor" data-story-form data-from-moment="'+t(fromMomentId)+'" data-to-moment="'+t(toMomentId)+'"><input name="relation" maxlength="100" aria-label="두 순간을 잇는 한마디" placeholder="두 순간을 잇는 한마디" value="'+t(initial)+'"><button type="submit">저장</button><button type="button" data-story-cancel>취소</button></form>';
+ host.hidden=false;
+ const input=host.querySelector('input[name="relation"]');input?.focus();
+}
+document.addEventListener('click',e=>{
+ const dismiss=e.target.closest?.('[data-story-tip-dismiss]');
+ if(dismiss){e.preventDefault();storyTipOpen=false;try{localStorage.setItem(STORY_TIP_KEY,'1')}catch{}updateConnectionSummary(LTDEMO.get());return}
+ const open=e.target.closest?.('[data-story-open]');
+ if(open){e.preventDefault();e.stopPropagation();const child=LTDEMO.moments.find(item=>item.id===open.dataset.toMoment);openStoryEditor(open.dataset.fromMoment||'',open.dataset.toMoment||'',child?.relation||'');return}
+ const cancel=e.target.closest?.('[data-story-cancel]');
+ if(cancel){e.preventDefault();updateConnectionSummary(cancel.closest('[data-story-form]')?.dataset.fromMoment||LTDEMO.get());return}
+},true);
+document.addEventListener('submit',e=>{
+ const form=e.target.closest?.('[data-story-form]');if(!form)return;
+ e.preventDefault();
+ if(!LTDEMO.writable||window.parent===window){toast('저장할 수 없는 화면이에요.');return}
+ const input=form.querySelector('input[name="relation"]'),relation=String(input?.value||'').trim();
+ if(relation.length>100){toast('한마디는 100자까지 적을 수 있어요.');return}
+ const fromMomentId=form.dataset.fromMoment||'',momentId=form.dataset.toMoment||'',child=LTDEMO.moments.find(item=>item.id===momentId);
+ if(!child||child.parentId!==fromMomentId){toast('이어진 순간을 찾지 못했어요.');return}
+ storyRequest={treeId:LTDEMO.treeId,fromMomentId,momentId};
+ const save=form.querySelector('button[type="submit"]');if(save)save.disabled=true;
+ window.parent.postMessage({type:'lt41-story-save',treeId:LTDEMO.treeId,fromMomentId,momentId,relation},location.origin);
+},true);
+addEventListener('message',event=>{
+ const data=event.data;
+ if(event.origin!==location.origin||event.source!==window.parent||data?.type!=='lt41-story-saved'||!storyRequest)return;
+ if(data.treeId!==storyRequest.treeId||data.fromMomentId!==storyRequest.fromMomentId||data.momentId!==storyRequest.momentId)return;
+ const request=storyRequest;storyRequest=null;
+ if(!data.ok){toast(data.error||'저장하지 못했어요.');const save=$b('[data-story-form] button[type="submit"]');if(save)save.disabled=false;return}
+ const child=LTDEMO.moments.find(item=>item.id===request.momentId);
+ if(child)child.relation=String(data.relation||'');
+ const edge=LTDEMO.edges.find(item=>item.kind==='parent'&&item.from===request.fromMomentId&&item.to===request.momentId);
+ if(edge)edge.reason=String(data.relation||'');
+ updateConnectionSummary(request.fromMomentId);
+ toast('한마디를 저장했어요.');
+});
 /* #537: 한 장의 작은 '탭하여 보기' 줄은 없앴다(순간마다 한 쪽 전체). 마지막 순간 뒤의 다음 순간 안내는
    renderSpread가 두 장의 빈 오른쪽 페이지와 같은 자리에 붙인다. */
 /* #393 5: 다른 트리로 가는 길. 목록 내용·이동 규칙은 셸의 트리 드롭다운을 따른다.
@@ -463,6 +508,7 @@ addEventListener('message',e=>{if(e.data?.type!=='lt41-date-style')return;try{do
 // #379 후속: 재그림은 현재 선택 순간(LTDEMO.get())을 유지해, 펼침면 오른쪽 페이지의 순간을 열면
 // 왼쪽 페이지 순간으로 선택이 돌아가는 문제를 막는다(renderSpread의 land가 기본 true여 focusId 없으면 left.id로 재선택).
 try{renderSpread(current,LTDEMO.get(),false)}catch{}
+updateConnectionSummary(LTDEMO.get());
 /* 책 글자 다듬기(261116) ③: 잘림은 폭·글꼴이 정하므로 그려진 뒤 실제 측정으로 단추의 낭독 이름·펼침 상태를 맞춘다 —
    접힌 제목이 '고치기'로 읽히면 누른 결과(펼침)와 낭독 이름이 어긋난다. 다 그린 뒤와 다시 그릴 때마다 맞춘다. */
 function titleAriaSync(){

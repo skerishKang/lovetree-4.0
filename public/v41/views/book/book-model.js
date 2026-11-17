@@ -5,7 +5,7 @@ window.LT59Model = (() => {
   // 펼침면 만들기: 순간을 두 장씩 묶고, 갈래가 있는 면에 갈래 정보를 붙인다.
   // 오른쪽 장이 없으면 "다음 순간을 기다리며" 동반 페이지(합성)를 만든다.
   function buildSpreads(moments) {
-const spreads =Array.from({length:Math.ceil(moments.length/2)},(_,i)=>{const toPage=m=>({kind:m.type==='memo'?'note':m.type==='link'?'link':m.type==='video'?'video':'photo',id:m.id,title:m.title,date:m.date,emotion:m.emotion,keywords:[m.emotion||'기록'],source:m.source||'예시 기록',mediaMetadata:m.mediaMetadata||null,first:!!m.first,note:m.memo||m.whyNext||'기억해 두고 싶은 순간',image:m.image,url:m.externalUrl||'',domain:m.source||''});const a=moments[i*2],b=moments[i*2+1];const branchSource=[a,b].find(m=>m?.branch&&m.next&&moments.some(x=>x.id===m.branch)&&moments.some(x=>x.id===m.next));return {eyebrow:`${String(i+1).padStart(2,'0')} · ${a.date}`,why:a.whyNext||'다음 순간으로 이어집니다.',left:toPage(a),right:b?toPage(b):{kind:'companion',synthetic:true,id:a.id+'-end',title:'다음 순간을 기다리며',note:'상단에서 이 순간을 이어 쓸 수 있어요.',date:'',emotion:'',keywords:[],source:''},branch:branchSource?{label:branchSource.title+'에서 갈라진 길',source:branchSource.id,main:branchSource.next,moment:branchSource.branch,to:Math.floor(moments.findIndex(m=>m.id===branchSource.branch)/2)}:null}});
+const spreads =Array.from({length:Math.ceil(moments.length/2)},(_,i)=>{const toPage=m=>({kind:m.kind|| (m.type==='memo'?'note':m.type==='link'?'link':m.type==='video'?'video':'photo'),id:m.id,title:m.title,date:m.date,emotion:m.emotion,keywords:m.keywords||[m.emotion||'기록'],source:m.source||'예시 기록',mediaMetadata:m.mediaMetadata||null,first:!!m.first,parentId:m.parentId,relation:m.relation||'',startSeconds:m.startSeconds,endSeconds:m.endSeconds,next:m.next,note:m.memo||'',image:m.image,url:m.externalUrl||'',domain:m.source||''});const a=moments[i*2],b=moments[i*2+1];const branchSource=[a,b].find(m=>m?.branch&&m.next&&moments.some(x=>x.id===m.branch)&&moments.some(x=>x.id===m.next));return {eyebrow:`${String(i+1).padStart(2,'0')} · ${a.date}`,why:a.whyNext||'다음 순간으로 이어집니다.',left:toPage(a),right:b?toPage(b):{kind:'companion',synthetic:true,id:a.id+'-end',title:'다음 순간을 기다리며',note:'상단에서 이 순간을 이어 쓸 수 있어요.',date:'',emotion:'',keywords:[],source:''},branch:branchSource?{label:branchSource.title+'에서 갈라진 길',source:branchSource.id,main:branchSource.next,moment:branchSource.branch,to:Math.floor(moments.findIndex(m=>m.id===branchSource.branch)/2)}:null}});
     return spreads;
   }
 
@@ -66,7 +66,7 @@ const spreads =Array.from({length:Math.ceil(moments.length/2)},(_,i)=>{const toP
     if (!next) return null;
     const edge = edges.find((e) => e.kind === 'parent' && e.from === id && e.to === next.id);
     const title = displayTitle ? displayTitle(next.title, next) : next.title;
-    return { id: next.id, title: title || String(next.memo || '').trim(), reason: edge?.reason || '' };
+    return { id: next.id, title: title || String(next.memo || '').trim(), reason: edge?.reason || next.relation || '' };
   }
 
   /* ── #345: '이어진 순간'(이슈 584에서 개명) 계산 한 벌 ───────────────────

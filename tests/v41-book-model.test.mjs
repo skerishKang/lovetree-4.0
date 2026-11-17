@@ -13,7 +13,7 @@ const BOOK_CSS = fs.readFileSync(new URL('../public/v41/views/book/book.css', im
 
 const moments = [
   { id: 'm1', type: 'photo', title: 'A', date: '2026.01.01', emotion: '끌림', next: 'm2', branch: 'm3', whyNext: 'w', first: true },
-  { id: 'm2', type: 'memo', title: 'B', date: 'd2', emotion: 'e' },
+  { id: 'm2', type: 'memo', title: 'B', date: 'd2', emotion: 'e', relation: '두 순간 사이의 한마디' },
   { id: 'm3', type: 'link', title: 'C', date: 'd3', emotion: 'e3' },
   { id: 'm4', type: 'photo', title: 'D', date: 'd4', emotion: 'e4' }
 ];
@@ -36,6 +36,18 @@ test('1. 펼침면: 순간 둘씩 묶고, 모자라면 동반 페이지(합성)�
   assert.equal(odd[1].right.synthetic, true);
   assert.equal(odd[1].right.id, 'm3-end');
   assert.equal(odd[1].right.title, '다음 순간을 기다리며');
+});
+
+test('#800: 책 쪽 데이터는 연결 이유·영상 구간을 보존하고 빈 메모를 만들지 않는다', () => {
+  const spread = M.buildSpreads([
+    {id: 'a', type: 'memo', title: '첫 순간', date: '2026.11.17', startSeconds: 42, endSeconds: 68, next: 'b'},
+    {id: 'b', type: 'memo', title: '둘째 순간', parentId: 'a', relation: '무대 뒤에서 다시 떠올랐어요.'}
+  ])[0];
+  assert.equal(spread.left.startSeconds, 42);
+  assert.equal(spread.left.endSeconds, 68);
+  assert.equal(spread.left.note, '');
+  assert.equal(spread.right.parentId, 'a');
+  assert.equal(spread.right.relation, '무대 뒤에서 다시 떠올랐어요.');
 });
 
 test('2. 펼침면 갈래: 갈래·다음이 모두 실제 순간일 때만 붙는다', () => {
@@ -87,6 +99,7 @@ test('6. 다음 순간: 부모 연결로 이어진 다음 순간과 이유, 없�
   assert.deepEqual(M.nextMomentOf('m1', moments, edges, (t) => t), { id: 'm2', title: 'B', reason: 'r1' });
   assert.equal(M.nextMomentOf('m2', moments, edges, (t) => t), null);
   assert.equal(M.nextMomentOf('zzz', moments, edges, (t) => t), null);
+  assert.equal(M.nextMomentOf('m1', moments, [], (t) => t).reason, '두 순간 사이의 한마디', '관계 이유는 순간 데이터에서도 복원한다');
   // 표시 이름 함수를 넘기면 그 결과를 쓴다(사용자 제목 규칙은 book-usability.mjs 그대로).
   assert.equal(M.nextMomentOf('m1', moments, edges, () => '표시 제목').title, '표시 제목');
   // 표시 이름이 비면 메모로 대체한다.
@@ -115,7 +128,6 @@ test('8. 이미 한 벌인 규칙은 그대로 둔다(book-usability.mjs)', () =
     assert.ok(USABILITY.includes(name), name);
   }
   // 화면은 그 규칙을 다시 만들지 않고 넘겨받아 쓴다.
-  assert.ok(EXTRA.includes('window.LTTapIntent=tapIntent'));
 });
 
 // ── #345 '이어진 순간'(이슈 584에서 개명) 계산 표 ────────────────────────────

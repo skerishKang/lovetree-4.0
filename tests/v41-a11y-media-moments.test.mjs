@@ -29,6 +29,7 @@ function fakePiece({id, hasFocusable}) {
       if (selector === '.lt-a11y-open') return this.prepended || null;
       return null;
     },
+    querySelectorAll(selector) { return selector === '.lt-a11y-open' && this.prepended ? [this.prepended] : []; },
     click() { this.clicks = (this.clicks || 0) + 1; }
   };
 }
@@ -83,32 +84,22 @@ function harness() {
   return {mediaPiece, plainPiece, lens, mobileLens, opened, style: created};
 }
 
-test('사진·미디어 순간 카드는 role=button이 아니고, 키보드로 열 실제 버튼을 안에 둔다 (#325)', () => {
+test('사진·미디어 순간 카드는 읽기 면으로 남고 카드 자체에 열기 동작을 붙이지 않는다 (#800)', () => {
   const {mediaPiece, opened} = harness();
   assert.equal(mediaPiece.getAttribute('role'), null, '중첩 상호작용이 되지 않게 래퍼는 버튼이 아니다');
   assert.equal(mediaPiece.tabIndex, undefined, '래퍼에 탭 정지를 만들지 않는다');
   assert.equal(mediaPiece.classes.has('lt-a11y-focusable'), false);
-  assert.ok(mediaPiece.prepended, '카드 맨 앞에 열기 버튼이 있어야 한다');
-  assert.equal(mediaPiece.prepended.className, 'lt-a11y-open');
-  assert.equal(mediaPiece.prepended.textContent, '순간 열기');
-  const click = mediaPiece.prepended.listeners.click?.[0];
-  assert.equal(typeof click, 'function');
-  click();
-  assert.deepEqual(opened, ['photo-moment'], '열기 버튼은 상세를 연다(#202 의도 유지)');
+  assert.equal(mediaPiece.prepended, undefined, '카드 맨 앞에 상세 열기 단추를 만들지 않는다');
+  assert.deepEqual(opened, [], '카드에는 상세를 여는 키보드 동작도 없다');
 });
 
-test('일반 순간 카드는 지금처럼 role=button·탭 정지·Enter/Space 열기를 유지한다', () => {
+test('일반 순간 카드도 포커스 정지·Enter/Space 상세 열기를 만들지 않는다 (#800)', () => {
   const {plainPiece, opened} = harness();
-  assert.equal(plainPiece.getAttribute('role'), 'button');
-  assert.equal(plainPiece.tabIndex, 0);
-  assert.equal(plainPiece.classes.has('lt-a11y-focusable'), true);
-  const keydown = plainPiece.listeners.keydown?.[0];
-  assert.equal(typeof keydown, 'function');
-  keydown({key: 'a', preventDefault() {}});
+  assert.equal(plainPiece.getAttribute('role'), null);
+  assert.equal(plainPiece.tabIndex, undefined);
+  assert.equal(plainPiece.classes.has('lt-a11y-focusable'), false);
+  assert.equal(plainPiece.listeners.keydown, undefined);
   assert.deepEqual(opened, []);
-  keydown({key: 'Enter', preventDefault() {}});
-  keydown({key: ' ', preventDefault() {}});
-  assert.deepEqual(opened, ['note-moment', 'note-moment']);
 });
 
 test('돋보기 복제본은 포커스·낭독 대상에서 빠진다(inert)', () => {

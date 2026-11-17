@@ -170,7 +170,9 @@ function serve(root) {
 function hostHtml() {
   return `<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;height:100%}iframe{position:fixed;inset:0;width:100%;height:100%;border:0}</style></head>` +
     `<body data-record-source="server" data-member="in"><script>` +
+    `const saved=JSON.parse(localStorage.getItem('qa-book-story')||'{}');for(const m of window.__TREE__.moments){if(saved[m.id]!==undefined)m.relation=saved[m.id]}for(const e of window.__TREE__.edges){const child=window.__TREE__.moments.find(m=>m.id===e.to);if(child)e.reason=child.relation||''}` +
     `window.LT41={tree:window.__TREE__,trees:[window.__TREE__],source:'server',momentId:'m01',prefs:{},writable:true};` +
+    `addEventListener('message',event=>{const d=event.data,frame=document.querySelector('iframe');if(event.origin!==location.origin||event.source!==frame?.contentWindow||d?.type!=='lt41-story-save')return;const t=window.__TREE__,child=t.moments.find(m=>m.id===d.momentId),parent=t.moments.find(m=>m.id===d.fromMomentId);if(!child||!parent||child.parentId!==parent.id||typeof d.relation!=='string'||d.relation.length>100){event.source.postMessage({type:'lt41-story-saved',ok:false,treeId:d.treeId,fromMomentId:d.fromMomentId,momentId:d.momentId,relation:'',error:'저장하지 못했어요.'},location.origin);return}child.relation=d.relation;localStorage.setItem('qa-book-story',JSON.stringify(Object.fromEntries(t.moments.filter(m=>m.relation).map(m=>[m.id,m.relation]))));for(const e of t.edges){if(e.from===parent.id&&e.to===child.id)e.reason=child.relation}event.source.postMessage({type:'lt41-story-saved',ok:true,treeId:d.treeId,fromMomentId:d.fromMomentId,momentId:d.momentId,relation:child.relation,error:''},location.origin)});` +
     `</script><iframe src="/v41/views/track59-sketchbook.html" title="책"></iframe></body></html>`;
 }
 
@@ -197,9 +199,9 @@ let server, base;
 test.before(async () => { server = await serve(ROOT); base = `http://127.0.0.1:${server.address().port}`; });
 test.after(() => new Promise((ok) => server.close(ok)));
 
-async function openBook(browser, width, height, extraRoutes = []) {
+async function openBook(browser, width, height, extraRoutes = [], tree = tree26()) {
   const ctx = await browser.newContext({ viewport: { width, height } });
-  await ctx.addInitScript((tree) => { window.__TREE__ = tree; }, tree26());
+  await ctx.addInitScript((tree) => { window.__TREE__ = tree; }, tree);
   const page = await ctx.newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push(String(e.message || e)));
@@ -249,6 +251,84 @@ test('584 실행: 두 장 모드에서 두 쪽 모두 스크롤 없이 한 순�
         assert.deepEqual(errors, [], `${width}px에서 페이지 오류 없음`);
       } finally { await ctx.close(); }
     }
+  } finally { await browser.close(); }
+});
+
+test('#800 실행: 빈 카드 탭은 창을 열지 않고, 한마디 저장·다시 열기와 모바일 한 줄 정보를 확인한다', { skip, timeout: 60000 }, async () => {
+  const browser = await chromium.launch();
+  const tree = tree26();
+  tree.moments = tree.moments.slice(0, 3);
+  tree.moments[0].url = 'https://www.youtube.com/shorts/s0000000001';
+  tree.moments[0].mediaMetadata = {title: '세로 쇼츠', channel: '가짜 채널'};
+  tree.moments[0].note = '가짜 기록의 긴 메모입니다. 두 순간 사이의 맥락을 충분히 적으면 처음에는 접어서 보여 주고, 더 보기를 눌러 끝까지 읽을 수 있어야 합니다. '.repeat(2);
+  tree.moments[0].startSeconds = 42;
+  tree.moments[0].endSeconds = 68;
+  tree.moments[1].parentId = 'm01';
+  tree.moments[1].relation = '';
+  tree.moments[2].parentId = 'm02';
+  tree.edges = [
+    {id: 'e1', kind: 'parent', from: 'm01', to: 'm02', reason: ''},
+    {id: 'e2', kind: 'parent', from: 'm02', to: 'm03', reason: ''}
+  ];
+  try {
+    const {ctx, page, frame, errors} = await openBook(browser, 390, 844, [], tree);
+    try {
+      const tipText = '두 순간 사이에 한마디를 남기면, 책이 이야기처럼 이어져요. 안 적어도 괜찮아요.';
+      await frame.waitForSelector('.story-tip');
+      assert.equal((await frame.locator('.story-tip span').innerText()).trim(), tipText);
+      assert.equal(await frame.locator('.story-tip').count(), 1, '첫 진입 팁은 한 번만 보인다');
+
+      await frame.locator('#mobileContent .clipping[data-moment="m01"]').click({position: {x: 3, y: 3}});
+      assert.equal(await frame.locator('#detailSide').evaluate(el => el.hidden), true, '빈 카드 영역을 눌러도 옆 상세 창이 없다');
+      assert.equal(await frame.locator('#detail').evaluate(el => el.classList.contains('open')), false, '빈 카드 영역을 눌러도 아래 상세 창이 없다');
+
+      const meta = frame.locator('.moment-title .moment-meta').first();
+      const metaState = await meta.evaluate(el => {
+        const copy = el.querySelector('.moment-meta-copy'), edit = el.querySelector('.moment-edit');
+        const a = copy.getBoundingClientRect(), b = edit.getBoundingClientRect();
+        return {text: copy.innerText, copyHeight: copy.clientHeight, copyScroll: copy.scrollHeight, editWidth: b.width, editHeight: b.height, centerDelta: Math.abs((a.top + a.height / 2) - (b.top + b.height / 2))};
+      });
+      assert.match(metaState.text, /0:42–1:08/, '구간은 정보 줄에 보인다');
+      assert.ok(metaState.copyHeight > 0 && metaState.copyScroll <= metaState.copyHeight + 1, '날짜·구간·감정은 한 줄');
+      assert.ok(metaState.editWidth > 0 && metaState.editHeight >= 44, '고치기 손잡이는 보이고 44px 이상');
+      assert.ok(metaState.centerDelta <= 2, '정보와 고치기 중심선이 맞는다');
+      assert.deepEqual(await frame.locator('#mobileContent .moment-title').evaluate(el => [...el.children].map(child => child.className)), ['moment-meta', 'moment-heading', 'video-title', 'moment-note-wrap'], '정보 줄·제목·메모 순서');
+      const more = frame.locator('#mobileContent [data-note-more]');
+      assert.equal(await more.count(), 1, '긴 메모에 더 보기가 있다');
+      await more.click();
+      assert.equal(await frame.locator('#mobileContent .moment-note-wrap').evaluate(el => el.classList.contains('is-open')), true, '더 보기로 메모가 펼쳐진다');
+
+      await frame.locator('[data-story-tip-dismiss]').click();
+      await frame.locator('[data-story-open]').click();
+      const input = frame.locator('[data-story-form] input[name="relation"]');
+      await input.fill('밤 무대가 다시 떠올랐어요.');
+      await frame.locator('[data-story-form] button[type="submit"]').click();
+      await frame.waitForFunction(() => document.querySelector('[data-story-open]')?.textContent.includes('밤 무대가 다시 떠올랐어요.'));
+      await frame.locator('[data-story-open]').click();
+      assert.equal(await frame.locator('[data-story-form] input[name="relation"]').inputValue(), '밤 무대가 다시 떠올랐어요.', '저장한 문장을 다시 편집할 때 복원한다');
+      await frame.locator('[data-story-cancel]').click();
+
+      const storyBox = await frame.locator('[data-story-open]').evaluate(el => {
+        const r = el.getBoundingClientRect(), nav = document.querySelector('.nav-pill').getBoundingClientRect();
+        const range = document.createRange(); range.selectNodeContents(el);
+        const intersections = range.getClientRects().length;
+        const overlap = Math.max(0, Math.min(r.right, nav.right) - Math.max(r.left, nav.left)) * Math.max(0, Math.min(r.bottom, nav.bottom) - Math.max(r.top, nav.top));
+        return {width: r.width, height: r.height, lines: intersections, overlap, navBottom: nav.bottom, viewportHeight: innerHeight};
+      });
+      assert.ok(storyBox.width > 0 && storyBox.height > 0, '저장된 문장은 실제로 보인다');
+      assert.ok(storyBox.lines <= 2, '390에서 한마디가 두 줄 이내');
+      assert.equal(storyBox.overlap, 0, '한마디와 페이지 이동 줄 겹침 0');
+      assert.ok(storyBox.navBottom <= storyBox.viewportHeight, '390에서 페이지 이동 단추도 화면 안에 있다');
+      assert.ok(await frame.evaluate(() => document.documentElement.scrollWidth <= innerWidth), '390 가로 넘침 0');
+
+      await page.reload({waitUntil: 'load'});
+      const reopened = page.frames().find(f => /track59-sketchbook/.test(f.url()));
+      assert.ok(reopened, '책이 다시 열린다');
+      await reopened.waitForSelector('[data-story-open]');
+      assert.match(await reopened.locator('[data-story-open]').innerText(), /밤 무대가 다시 떠올랐어요\./, '다시 열어도 한마디가 남아 있다');
+      assert.equal(await reopened.locator('.story-tip').count(), 0, '확인한 첫 진입 팁은 다시 보이지 않는다');
+      assert.deepEqual(errors, [], '브라우저 오류 없음');
+    } finally { await ctx.close(); }
   } finally { await browser.close(); }
 });
 
