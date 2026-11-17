@@ -233,7 +233,6 @@ test('#601 상세: 플레이어가 맨 위, 내 마음은 크게, 이어진 순�
 test('#601 확대 단추: [－][＋][전체 보기]와 말풍선 설명', () => {
   const html = read('views/track58-pinboard.html');
   const extras = read('views/board/board-extras.js');
-  const css = read('views/board/board-extra.css');
   assert.match(html, /id="minusBtn"[^>]*data-lt-tip="작게 보기[^"]*"/);
   assert.match(html, /id="plusBtn"[^>]*data-lt-tip="크게 보기[^"]*"/);
   assert.match(html, /id="resetBtn"[^>]*>전체 보기</, "'보기 초기화'는 지도처럼 '전체 보기'로 부른다");
@@ -241,7 +240,6 @@ test('#601 확대 단추: [－][＋][전체 보기]와 말풍선 설명', () => 
   // 말풍선: 마우스 올림·초점·길게 누름(#584와 같은 동작).
   assert.match(extras, /function showBoardTip\(el\)/);
   assert.match(extras, /id='lt-tip-bubble'|id="lt-tip-bubble"/);
-  assert.match(css, /\.lt-tip-bubble\{position:fixed/);
 });
 
 test('#601 셸: 트리 칸은 고정 폭(11em) — 탭이 흔들리지 않는다', () => {
@@ -483,8 +481,10 @@ test('#601 화면: 카드 높이 상한·마지막 줄이 판 안, 상세는 플
     assert.notEqual(z1, z2, '＋ 단추가 배율을 바꾼다');
     await frame.evaluate(() => document.getElementById('resetBtn').dispatchEvent(new MouseEvent('mouseover', { bubbles: true })));
     await page.waitForTimeout(300);
-    const tip = await frame.evaluate(() => { const b = document.getElementById('lt-tip-bubble'); return b && !b.hidden ? b.textContent : ''; });
-    assert.match(tip, /전체 보기/, '말풍선 설명이 뜬다');
+    const tip = await frame.evaluate(() => { const b = document.getElementById('lt-tip-bubble'); const style = b && getComputedStyle(b); return b && !b.hidden ? { text: b.textContent, position: style.position, fontSize: style.fontSize } : null; });
+    assert.match(tip?.text || '', /전체 보기/, '말풍선 설명이 뜬다');
+    assert.equal(tip?.position, 'fixed', '보드 공통 말풍선은 화면 기준으로 뜬다');
+    assert.equal(tip?.fontSize, '13px', '보드 말풍선 글자는 13px 이상이다');
     assert.equal(problems.length, 0, `화면 문제 없음 (${problems.join(' | ') || '없음'})`);
     await context.close();
   } finally { await browser.close(); server.close(); }

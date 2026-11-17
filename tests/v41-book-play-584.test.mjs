@@ -117,8 +117,6 @@ test('584-6: 돋보기는 SVG 아이콘(켜지면 금색), 설명은 말풍선�
   assert.match(EXTRA, /function mountTips\(\)/, '말풍선 배선');
   assert.match(EXTRA, /focusin/, '키보드 초점에도 뜬다');
   assert.match(EXTRA, /setTimeout\(\(\)=>showTip\(el\),500\)/, '휴대폰은 길게 누르면 뜬다');
-  assert.match(USE_CSS, /\.lt-tip-bubble\{position:fixed/, '말풍선 모양 규칙');
-  assert.match(USE_CSS, /\.lt-tip-bubble\{[^}]*font-size:13px/, '말풍선 글자도 #548 기준선(13px) 이상');
   assert.match(EXTRA, /role","tooltip"|setAttribute\('role','tooltip'\)|bubble\.setAttribute\('role','tooltip'\)/, '낭독기에는 tooltip으로 읽힌다');
 });
 
@@ -377,9 +375,11 @@ test('584 실행: 머리줄 — 1장|2장 한 묶음, 돋보기 아이콘, 말�
       // 말풍선: 키보드 초점에 뜬다(브라우저 title이 아니다).
       await frame.focus('#lensBtn');
       await frame.waitForSelector('#lt-tip-bubble:not([hidden])', { timeout: 5000 });
-      const tip = await frame.evaluate(() => ({ text: document.getElementById('lt-tip-bubble').textContent, title: document.getElementById('lensBtn').getAttribute('title') }));
+      const tip = await frame.evaluate(() => { const bubble = document.getElementById('lt-tip-bubble'); const style = getComputedStyle(bubble); return { text: bubble.textContent, title: document.getElementById('lensBtn').getAttribute('title'), position: style.position, fontSize: style.fontSize }; });
       assert.match(tip.text, /돋보기 — 마우스 근처를 크게 보기 · 꺼짐/, '초점에 말풍선이 뜬다');
       assert.equal(tip.title, null, '브라우저 기본 title은 쓰지 않는다');
+      assert.equal(tip.position, 'fixed', '공통 말풍선은 화면 기준으로 뜬다');
+      assert.equal(tip.fontSize, '13px', '말풍선 글자는 13px 이상이다');
       // 돋보기를 켜면 금색 + 말풍선 상태가 바뀐다.
       await frame.click('#lensBtn');
       await frame.waitForTimeout(100);

@@ -28,13 +28,10 @@
    const title=document.querySelector('#archivePanel h2');if(title)title.textContent='순간 목차';
    // 책 글자 다듬기(261116): 좁은 폭 축약 '이어진 길'은 없앤다 — 이름이 가려져 읽는 사람이 다른 단추로 읽었다(#584 문자열과 섞임).
    // 전체 이름 '이어진 순간'을 그대로 쓰고 390에서 15px로 본문과 같은 결(실측: 도구 줄 193px ≤ 60vw 234px, 단추 오른쪽 376 ≤ 화면-8 — 잘림 0).
-   // 폰에서는 올림·초점·길게 누름 팁이 안 보이므로 누르면 무엇이 나오는지 짧은 보조 줄을 이름 아래 붙인다. 600px를 넘나들면 따라 바꾼다.
+   // 폰에서도 버튼 이름은 한 줄로 유지하고, 자세한 설명은 data-lt-tip에 남긴다.
    const overview=document.getElementById('overviewBtn');
    if(overview){
-    const chipMq=matchMedia('(max-width:600px)');
-    const chipApply=()=>{if(chipMq.matches)overview.innerHTML='<span class="overview-name">이어진 순간</span><span class="overview-hint" aria-hidden="true">누르면 한눈에</span>';else overview.textContent='이어진 순간';};
-    chipApply();
-    if(chipMq.addEventListener)chipMq.addEventListener('change',chipApply);
+    overview.textContent='이어진 순간';
    }
   }
  };

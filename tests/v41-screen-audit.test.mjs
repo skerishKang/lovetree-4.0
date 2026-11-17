@@ -467,7 +467,7 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
       assert.equal(cardPair.gap, 8, `390 카드 아래와 ＋ 위 간격이 8px이다: ${JSON.stringify(cardPair)}`);
       assert.equal(cardPair.textLines, 1, `390 새 소식 카드 문구가 한 줄이다: ${JSON.stringify(cardPair)}`);
       assert.equal(cardPair.viewLines, 1, `390 보기 단추 문구가 한 줄이다: ${JSON.stringify(cardPair)}`);
-      assert.match(cardPair.text, /4\.1\.8/, `390 카드에 버전 글자가 보인다: ${JSON.stringify(cardPair)}`);
+      assert.match(cardPair.text, /\d+\.\d+\.\d+/, `390 카드에 최신 버전 글자가 보인다: ${JSON.stringify(cardPair)}`);
     }
     await raiseToast(page4);
     await take(page4, '셸 첫 화면·알림 줄');

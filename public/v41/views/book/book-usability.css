@@ -90,7 +90,7 @@ html[data-v41-screen=book] .yt-play{position:relative;display:block;width:100%;a
 html[data-v41-screen=book] .yt-play img{display:block;width:100%;height:100%;object-fit:cover}
 html[data-v41-screen=book] .yt-play.is-vertical{width:auto;height:clamp(240px,52vh,400px);max-width:100%;aspect-ratio:9/16;margin:0 auto}
 html[data-v41-screen=book] .yt-play.is-vertical img{object-fit:contain}
-html[data-v41-screen=book] .yt-play .yt-play-label{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);white-space:nowrap;padding:7px 14px;border-radius:var(--lt-r-pill);border:1px solid var(--lt-gold-line);background:rgba(7,7,12,.7);color:var(--lt-pearl);font-size:13px}
+html[data-v41-screen=book] .yt-play .yt-play-label{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);white-space:nowrap;padding:7px 14px;border-radius:var(--lt-r-pill);border:2px solid var(--lt-paper);background:var(--lt-ink);color:var(--lt-paper);box-shadow:0 2px 10px rgba(0,0,0,.42);font-size:13px}
 html[data-v41-screen=book] .yt-placeholder{display:grid;place-items:center;width:100%;height:100%;background:var(--lt-paper);color:var(--lt-ink)}
 /* #635 PR B: 썸네일이 없거나 깨진 영상 칸은 제목 글 카드로 대신한다(회색·빈 상자 금지). 재생 단추 안에서 카드가 칸을 채운다. */
 html[data-v41-screen=book] .yt-play .lt-fallback-card{width:100%;height:100%;display:flex;flex-direction:column;justify-content:center}
@@ -198,7 +198,6 @@ html[data-v41-screen=book] .media-source-link:hover{text-decoration-color:var(--
 
 /* 이슈 584(6번): 머리줄 단추 설명 말풍선 — 브라우저 기본 title 대신 러브트리 모양 작은 알약.
    마우스 올림·키보드 초점·휴대폰 길게 누름에 뜬다(뜨는 동작은 book-extra.js mountTips). */
-.lt-tip-bubble{position:fixed;z-index:80;max-width:min(320px,80vw);padding:6px 10px;border-radius:10px;border:1px solid var(--lt-gold);background:rgba(20,16,10,.94);color:var(--lt-pearl,#f5ece6);font-size:13px;line-height:1.45;pointer-events:none;box-shadow:0 6px 18px rgba(0,0,0,.35)}
 
 /* ── #345 '이어진 순간'(이슈 584에서 개명) — 세로 타임라인. 카드·글자는 토큰만 쓴다. ── */
 html[data-v41-screen=book] .overview-card{width:min(560px,92vw);max-height:min(86vh,760px);display:flex;flex-direction:column;overflow:hidden;padding:24px 24px 16px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-panel);background:var(--lt-glass-strong);color:var(--lt-pearl);box-shadow:0 24px 55px rgba(0,0,0,.4)}
@@ -240,11 +239,9 @@ html[data-book-shape=phone][data-v41-screen=book] .journey-reason{margin-left:88
 @media(max-width:600px){
  html[data-v41-screen=book] .topbar .tools{max-width:60vw;width:auto;overflow-x:auto;justify-content:flex-start;gap:5px;scrollbar-width:none}
  html[data-v41-screen=book] .topbar .tools .ui-btn{white-space:nowrap;flex:0 0 auto;font-size:13px;padding:7px 6px}
- /* 책 글자 다듬기(261116) ①: 칩은 축약 없이 '이어진 순간' 전체 15px(view-navigation.js가 이름 아래 보조 줄을 붙인다).
-    390 실측: 도구 줄 193px ≤ 60vw 234px, 단추 오른쪽 376 ≤ 화면-8 382 — #book-dup2 기준(잘림 0)을 그대로 넘긴다. */
+ /* 책 글자 다듬기(261116) ①: 칩은 축약 없이 '이어진 순간' 한 줄 이름을 쓴다.
+    뜻 설명은 data-lt-tip·aria-label에 남기고, 화면 글자는 머리줄 높이를 늘리지 않는다. */
  html[data-v41-screen=book] .topbar .tools #overviewBtn{font-size:15px;line-height:1.2}
- html[data-v41-screen=book] .topbar .tools #overviewBtn .overview-name{display:block}
- html[data-v41-screen=book] .topbar .tools #overviewBtn .overview-hint{display:block;font-size:12px;letter-spacing:0;color:var(--lt-muted)}
  /* #book-dup2: 390에서 '이어진 순간' 단추가 도구 줄 스크롤에 9px 잘렸다(실측: 단추 오른쪽 385 > 도구 줄 오른쪽 376).
     단추 속 간격 8→6px·단추 사이 6→5px로 줄여 3개 단추(목차·1장·이어진 순간)가 모두 화면 안에 든다. */
  html[data-v41-screen=book] .shelf-back{font-size:13px;padding:0 8px}
@@ -255,13 +252,20 @@ html[data-book-shape=phone][data-v41-screen=book] .journey-reason{margin-left:88
  html[data-v41-screen=book] .book-title{flex:0 1 auto;min-width:0;max-width:100%}
  html[data-v41-screen=book] .book-title-btn{max-width:100%;min-width:0}
  html[data-v41-screen=book] .topbar .tools::-webkit-scrollbar{display:none}
- /* 수리(261116, 로컬3 이어받기): 칩이 전체 이름+보조 줄(88px)이 되며 도구 줄 내용은 188px — 390에서
+ /* 수리(261116, 로컬3 이어받기): 칩은 전체 이름 한 줄(약 88px)이며 도구 줄 내용은 188px — 390에서
     제목 묶음이 177px를 쓰면 11px가 잘린다(#book-dup2 계약: 도구 줄 잘림 0). 제목 최대 폭을 84px로 두고
     (#book-dup의 말줄임 그 자리에서 끊긴다) 단추 사이 5→4px — 도구 줄 186px ≤ 남은 자리 190px(CI 390 기준 192px).
-    칩은 15px 전체 이름·보조 줄을 그대로 지킨다. */
+    칩 이름은 15px 전체 문구 한 줄로 지킨다. */
  html[data-v41-screen=book] .book-title{max-width:84px}
  html[data-v41-screen=book] .topbar .tools{gap:4px}
 }
+/* 책 머리줄은 왼쪽·오른쪽 묶음 모두 44px 높이와 같은 세로 중심선을 쓴다. */
+html[data-v41-screen=book] .topbar>.topbar-left>.shelf-back,
+html[data-v41-screen=book] .topbar>.topbar-left>.book-title>.book-title-btn,
+html[data-v41-screen=book] .topbar>.tools button{box-sizing:border-box;height:44px;min-height:44px;display:inline-flex;align-items:center;justify-content:center}
+html[data-v41-screen=book] .topbar>.tools{position:relative;top:1px}
+html[data-v41-screen=book] .topbar>.tools button:hover,html[data-v41-screen=book] .topbar>.tools button.active{transform:none}
+html[data-v41-screen=book] .topbar>.tools #singleViewBtn,html[data-v41-screen=book] .topbar>.tools #doubleViewBtn{position:relative;top:-1px}
 /* #537: 마지막 순간 뒤의 '다음 순간' 안내 — 한 장(휴대폰·넓은 화면)에서는 그 순간 글 아래 흐름에 놓는다.
    쪽 위에 겹쳐 놓으면 그 순간의 카드·단추를 가린다. 두 장은 지금처럼 빈 오른쪽 페이지를 채운다(위 규칙). */
 html[data-book-view=single][data-v41-screen=book] .next-page{position:static;inset:auto;height:auto;min-height:120px;margin-top:18px;padding:16px 12px}
