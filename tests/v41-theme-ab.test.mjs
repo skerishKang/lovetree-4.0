@@ -124,10 +124,11 @@ test('화면 테마는 설정 창의 "화면" 묶음에 있고 밤/정원 두 �
   assert.match(html, /data-title-display="both"/, '제목 보기도 설정 화면 묶음에 있다');
   assert.match(html, /data-home-cards="mix"/, '첫 화면 카드도 설정 화면 묶음에 있다');
   assert.match(themeModule, /data-set-theme/);
-  // 로그아웃에는 설정 입구가 없으므로 첫 화면 오른쪽 위 작은 ◐ 단추만 남는다(테마 저장 키 그대로).
-  assert.match(homeJS, /data-theme-quick/);
-  assert.match(homeJS, /writeTheme\(localStorage,readTheme\(localStorage\)==='garden'\?'night':'garden'\)/, '◐ 단추는 밤↔정원 전환·저장');
-  assert.match(homeJS, /parent\.postMessage\(\{type:'lt41-theme',theme:next\}/, '첫 화면이 lt41-theme를 그대로 보낸다');
+  // #776 규칙을 로그아웃에도: 테마는 머리줄 #theme-toggle 하나, 첫 화면 ◐와 '순간 목록'은 없다.
+  assert.doesNotMatch(homeJS, /data-theme-quick/, '첫 화면 ◐ 빠른 단추를 두지 않는다');
+  assert.match(homeJS, /if\(!loggedIn\)shadow\.querySelector\('\[data-do="index"\]'\)\?\.remove\(\)/, '로그아웃이면 순간 목록 입구를 지운다');
+  assert.match(html, /id="theme-toggle"[^>]*data-lt-theme-icon/, '머리줄에 테마 단추가 있다');
+  assert.match(read('public/v41/shell.css'), /#theme-toggle\{[^}]*min-width:44px/, '머리줄 테마 단추 누름 영역 44px');
   assert.doesNotMatch(homeJS, /createViewMenu/, '첫 화면에 보기 메뉴 배선이 없다');
   // #231 1-B: 테마 버튼 반영은 shell/theme.mjs로 옮겼다(같은 선택자·같은 문구).
   assert.match(themeModule, /document\.querySelectorAll\('\[data-lt-theme-toggle\]'\)/);

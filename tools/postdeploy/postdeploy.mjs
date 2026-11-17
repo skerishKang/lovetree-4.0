@@ -965,9 +965,9 @@ async function checkVisualTokens(page, target, opts, stamp) {
 }
 
 async function checkScreenSettings(page, target, opts, stamp) {
-  // #380 5번: 첫 화면 오른쪽 위 "보기 ▾" 메뉴(테마·움직임·카드 출처)를 없앴다.
-  //  - 로그아웃: 오른쪽 위 작은 ◐ 하나만 남고, 누르면 밤↔정원이 바뀐다(설정 입구가 없기 때문).
-  //  - 로그인: 같은 항목이 설정 창의 "화면" 묶음에 있다(테마 2 · 움직임 1 · 제목 3 · 첫 화면 카드 4).
+  // #380 5번·#776: 첫 화면 오른쪽 위 "보기 ▾" 메뉴와 ◐ 빠른 단추를 없앴다.
+  //  - 테마는 로그인·로그아웃 모두 머리줄 #theme-toggle 하나(같은 저장값·같은 aria-label)로 바꾼다.
+  //  - 로그인: 같은 항목이 설정 창의 "화면" 묶음에도 있다(테마 2 · 움직임 1 · 제목 3 · 첫 화면 카드 4).
   // #366 뒤로 "화면" 묶음은 테마·움직임·제목·페이지 넘김·날짜 표기·처음 보여 줄 곳·첫 화면 카드 7행이다.
   // 예전에는 보기 메뉴 항목 수로 기대값을 만들었는데, 설정 묶음이 늘 때마다 어긋났다 — 화면에 있는 행 이름을 그대로 센다.
   const SCREEN_SETTINGS_ROWS = ['테마', '보드·지도 판', '움직임', '제목', '페이지 넘김', '날짜 표기', '처음 보여 줄 곳', '첫 화면 카드'];
@@ -978,12 +978,16 @@ async function checkScreenSettings(page, target, opts, stamp) {
     const doc = frame?.contentDocument;
     const sh = doc?.getElementById('orbit')?.shadowRoot;
     const quick = sh?.querySelector('[data-theme-quick]');
+    const headerToggles = [...document.querySelectorAll('#theme-toggle')].filter((b) => b.getClientRects().length > 0);
+    const headerToggle = headerToggles[0];
     const avatar = document.getElementById('account-avatar');
     const box = document.getElementById('account-settings');
     const labels = (sel) => box ? [...box.querySelectorAll(sel)].map((b) => b.textContent.trim()) : [];
     return {
       theme: document.documentElement.dataset.ltTheme || '',
       quick: quick ? { text: quick.textContent.trim(), label: quick.getAttribute('aria-label') || '' } : null,
+      headerThemeCount: headerToggles.length,
+      headerTheme: headerToggle ? { text: headerToggle.textContent.trim(), label: headerToggle.getAttribute('aria-label') || '' } : null,
       viewMenu: !!sh?.querySelector('#home-view-menu') || !!sh?.querySelector('[data-lt-view-menu]'),
       toolButtons: sh ? [...sh.querySelectorAll('.top-actions > button')].filter((b) => b.getClientRects().length > 0).map((b) => b.textContent.trim()) : [],
       settingsOpen: !!box?.open,
@@ -999,7 +1003,7 @@ async function checkScreenSettings(page, target, opts, stamp) {
   }).catch(() => null);
   const read = async () => {
     let last = await readOnce();
-    for (let attempt = 0; attempt < 6 && (!last || !last.toolButtons.length); attempt += 1) {
+    for (let attempt = 0; attempt < 6 && (!last || (!last.toolButtons.length && !last.headerThemeCount)); attempt += 1) {
       await sleep(500);
       last = await readOnce();
     }
@@ -1023,9 +1027,10 @@ async function checkScreenSettings(page, target, opts, stamp) {
     if (!seen) { problems.push(`${width}: 화면 상태를 읽지 못함`); continue; }
     if (seen.oldCleanupButton) problems.push(`${width}: 헤더에 옛 '정리하기' 단추가 남아 있음`);
     if (seen.viewMenu) problems.push(`${width}: 첫 화면에 옛 "보기" 메뉴가 남아 있음`);
+    if (seen.quick) problems.push(`${width}: 첫 화면에 ◐ 단추가 보임`);
+    if (seen.headerThemeCount !== 1) problems.push(`${width}: 머리줄 테마 단추 ${seen.headerThemeCount}개 (기대 1)`);
     if (seen.loggedIn) {
-      // 로그인: 첫 화면에는 ◐도 보기 메뉴도 없다 — 설정 창의 "화면" 묶음 한 곳만 쓴다.
-      if (seen.quick) problems.push(`${width}: 로그인인데 첫 화면에 ◐ 단추가 보임`);
+      // 로그인: 테마는 머리줄 단추와 설정 창 "화면" 묶음 두 곳에서 바꿀 수 있다.
       await page.click('#account-avatar', { timeout: opts.timeout }).catch((error) => problems.push(`${width}: 계정 메뉴 열기 실패 ${error.message}`));
       await sleep(200);
       await page.click('#account-open-settings', { timeout: opts.timeout }).catch((error) => problems.push(`${width}: 설정 열기 실패 ${error.message}`));
@@ -1047,22 +1052,15 @@ async function checkScreenSettings(page, target, opts, stamp) {
       await page.keyboard.press('Escape').catch(() => {});
       await sleep(200);
     } else {
-      // 로그아웃: ◐ 단추 하나만 남고, 누르면 저장된 테마가 밤↔정원으로 바뀐다.
-      if (!seen.quick) problems.push(`${width}: 로그아웃인데 ◐ 단추가 없음 ${JSON.stringify(seen.toolButtons)}`);
-      else {
+      // 로그아웃: 설정 입구가 없으므로 머리줄 #theme-toggle 하나가 테마를 맡는다(로그인과 같은 단추).
+      if (seen.headerThemeCount === 1) {
+        if (!seen.headerTheme?.label) problems.push(`${width}: 머리줄 테마 단추에 이름이 없음`);
         const before = seen.theme;
-        await page.evaluate(() => {
-          const frame = ([document.getElementById('view'), document.getElementById('view-next')].find((el) => el && !el.hidden && el.getClientRects().length > 0) || document.getElementById('view'));
-          frame?.contentDocument?.getElementById('orbit')?.shadowRoot?.querySelector('[data-theme-quick]')?.click();
-        }).catch((error) => problems.push(`${width}: ◐ 클릭 실패 ${error.message}`));
+        await page.click('#theme-toggle', { timeout: opts.timeout }).catch((error) => problems.push(`${width}: 머리줄 테마 단추 클릭 실패 ${error.message}`));
         await sleep(500);
         const after = await read();
-        if (after?.theme === before) problems.push(`${width}: ◐를 눌렀는데 테마가 그대로 ${before}`);
-        if (!after?.quick?.label) problems.push(`${width}: ◐ 단추에 이름이 없음`);
-        await page.evaluate(() => {
-          const frame = ([document.getElementById('view'), document.getElementById('view-next')].find((el) => el && !el.hidden && el.getClientRects().length > 0) || document.getElementById('view'));
-          frame?.contentDocument?.getElementById('orbit')?.shadowRoot?.querySelector('[data-theme-quick]')?.click();
-        }).catch(() => {});
+        if (after?.theme === before) problems.push(`${width}: 머리줄 테마 단추를 눌렀는데 테마가 그대로 ${before}`);
+        await page.click('#theme-toggle', { timeout: opts.timeout }).catch(() => {});
         await sleep(300);
       }
     }
@@ -1071,7 +1069,7 @@ async function checkScreenSettings(page, target, opts, stamp) {
   await page.setViewportSize({ width: 1440, height: 900 }).catch(() => {});
   const frames = problems.length ? await viewFrameInfo(page) : null;
   record('screen-settings', 'visual', problems.length ? 'fail' : 'pass',
-    problems.length ? `${problems.join('; ')} [프레임 ${JSON.stringify(frames)}]` : '화면 설정: 첫 화면 보기 메뉴 없음·로그아웃 ◐ 테마 전환·로그인 설정 "화면" 묶음(테마·움직임·제목·카드) (1440/390)', { problems, frames });
+    problems.length ? `${problems.join('; ')} [프레임 ${JSON.stringify(frames)}]` : '화면 설정: 첫 화면 보기 메뉴·◐ 없음·머리줄 테마 단추 1개 전환(로그인·로그아웃 공통)·로그인 설정 "화면" 묶음(테마·움직임·제목·카드) (1440/390)', { problems, frames });
 }
 
 // 로그인 상태에서만 보이는 헤더 버튼 검사(2026-11-08).
@@ -1892,7 +1890,7 @@ async function checkThemeRoundTrip(page, base, opts, stamp) {
     stored: (() => { try { return localStorage.getItem('lt41.theme') || ''; } catch { return 'n/a'; } })(),
     headerBg: getComputedStyle(document.querySelector('.app-header')).backgroundColor
   })).catch(() => ({ theme: '?', stored: '?', headerBg: '?' }));
-  // #380 5번: 첫 화면 "보기 ▾" 메뉴를 없앴다 — 로그아웃은 오른쪽 위 ◐ 단추, 로그인은 설정 창의 "화면" 묶음이 테마를 맡는다.
+  // #380 5번·#776: 첫 화면 "보기 ▾" 메뉴와 ◐ 단추를 없앴다 — 테마는 로그인·로그아웃 모두 머리줄 #theme-toggle가 맡는다.
   const loggedIn = () => page.evaluate(() => {
     const avatar = document.getElementById('account-avatar');
     return !!avatar && !avatar.hidden && getComputedStyle(avatar).display !== 'none';
@@ -1902,9 +1900,8 @@ async function checkThemeRoundTrip(page, base, opts, stamp) {
     const sh = frame?.contentDocument?.getElementById('orbit')?.shadowRoot;
     return !!(sh?.querySelector('#home-view-menu') || sh?.querySelector('[data-lt-view-menu]'));
   }).catch(() => true);
-  const quickTheme = () => page.evaluate(() => {
-    const frame = ([document.getElementById('view'), document.getElementById('view-next')].find((el) => el && !el.hidden && el.getClientRects().length > 0) || document.getElementById('view'));
-    const btn = frame?.contentDocument?.getElementById('orbit')?.shadowRoot?.querySelector('[data-theme-quick]');
+  const headerThemeToggle = () => page.evaluate(() => {
+    const btn = document.getElementById('theme-toggle');
     if (!btn) return false;
     btn.click();
     return true;
@@ -1919,13 +1916,13 @@ async function checkThemeRoundTrip(page, base, opts, stamp) {
     await page.keyboard.press('Escape').catch(() => {});
     await sleep(200);
   };
-  // 원하는 테마가 될 때까지 두 길 중 하나로 바꾼다(로그인=설정 창, 로그아웃=◐ 단추).
+  // 원하는 테마가 될 때까지 로그인=설정 창, 로그아웃=머리줄 테마 단추로 바꾼다(두 상태 모두 머리줄 단추는 공통).
   const pickTheme = async (value) => {
     const want = value === 'night' ? '' : 'garden';
     for (let attempt = 0; attempt < 3; attempt += 1) {
       if ((await state()).theme === want) return true;
       if (await loggedIn()) await settingsTheme(value);
-      else if (!(await quickTheme())) return false;
+      else if (!(await headerThemeToggle())) return false;
       await sleep(900);
     }
     return (await state()).theme === want;

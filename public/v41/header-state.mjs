@@ -255,6 +255,11 @@ export function themeButtonAriaLabel(theme) {
   return normalizeTheme(theme) === THEME_GARDEN ? '밤 테마로 바꾸기' : '정원 테마로 바꾸기';
 }
 
+// 머리줄 원형 단추는 '누르면 갈 곳'을 그림으로 보여 준다(밤이면 ☀, 정원이면 ☾).
+export function themeIconGlyph(theme) {
+  return normalizeTheme(theme) === THEME_GARDEN ? '☾' : '☀';
+}
+
 export function themePressed(theme) {
   return normalizeTheme(theme) === THEME_GARDEN;
 }

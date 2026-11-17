@@ -990,6 +990,7 @@ function applyAdvanced(){const on=readAdvanced();document.body.classList.toggle(
 $('settings-assets-open').onclick=()=>openAssets($('settings-assets-open'));
  $('editor-assets-open').onclick=()=>openAssets($('editor-assets-open'));
  for(const b of document.querySelectorAll('[data-set-theme]'))b.onclick=()=>{writeTheme(localStorage,b.dataset.setTheme);applyTheme();paintThemeControls();};
+const themeToggleTop=$('theme-toggle');if(themeToggleTop)themeToggleTop.onclick=()=>{toggleTheme();};
  // 고급 기능 보기 스위치는 설정 '화면' 탭의 '더 보기(고급)' 안에 있다(2026-11-16 계정 메뉴에서 옮김). 저장 키(lt41.advanced.<subject>)는 그대로다.
  $('settings-advanced').onclick=()=>{const next=!readAdvanced();try{localStorage.setItem(advancedKey(),next?'1':'0')}catch{}applyAdvanced();};
  $('account-open-settings').onclick=()=>{closeAccountMenu();void openAccountSettings();};
