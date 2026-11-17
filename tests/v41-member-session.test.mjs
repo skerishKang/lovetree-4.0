@@ -10,6 +10,28 @@ test('response loss keeps draft and retries exactly the same request key',async(
 test('conflict never silently overwrites and account change closes write ownership',async()=>{const {session,writes,api}=setup({put:()=>({ok:false,status:409,code:'revision_conflict',currentRevision:4})});await session.start();session.apply('new',fields);await session.act('retry');assert.equal(session.snapshot().phase,'conflict');assert.throws(()=>session.apply('new',fields));await session.act('retry');assert.equal(writes.length,1);await session.act('pull');assert.equal(session.state().trees.length,0);api.put=async()=>({ok:false,status:401,code:'account_changed'});session.apply('new',fields);await session.act('retry');assert.equal(session.snapshot().owned,false);assert.equal(session.snapshot().writable,false);assert.equal(session.state().trees.length,1);assert.throws(()=>session.apply('new',fields));});
 test('disposed session cannot restore late account read',async()=>{let resolve;const {session,api,events}=setup();api.get=()=>new Promise(r=>resolve=r);const reading=session.start();session.dispose();resolve({ok:true,revision:0,state:{version:1,trees:[]},subject:'member-A',writeSubjectBound:true});await reading;assert.equal(events.length,0);assert.throws(()=>session.apply('new',fields));});
 
+// 로그아웃은 서버 요청 뒤 화면 상태를 다시 알려야 한다 — 알림이 빠지면 셸이 로그인 상태로 남아
+// 계정 동그라미가 그대로 보인다(sync-controller act('logout') 누락 재발 방지).
+test('로그아웃 성공 뒤 로그인 상태 알림이 와서 계정 동그라미가 사라진다',async()=>{
+  const statuses=[];const server={version:1,trees:[]};let revision=0;
+  const api={get:async()=>({ok:true,revision,state:server,subject:'member-A',writeSubjectBound:true}),put:async()=>({ok:true,revision:++revision}),logout:async()=>({ok:true})};
+  const session=createMemberSession({api,delay:()=>new Promise(()=>{}),onStatus:s=>statuses.push(s),navigate:()=>{}});
+  await session.start();
+  assert.equal(session.snapshot().owned,true);
+  assert.equal(statuses.at(-1).phase,'synced');
+  const before=statuses.length;
+  const out=await session.act('logout');
+  assert.equal(out.phase,'login','act 반환값도 로그인 상태다');
+  assert.ok(statuses.length>before,'로그아웃 뒤 상태 알림이 온다');
+  const last=statuses.at(-1);
+  assert.equal(last.phase,'login');
+  assert.equal(last.writable,false,'쓰기 연결도 끊긴 것으로 알린다');
+  assert.ok(last.actions.some(a=>a.name==='login'),'로그인 다시 안내가 붙는다');
+  assert.equal(session.snapshot().owned,false,'셸이 계정 동그라미 대신 로그인 알약을 고른다');
+  assert.equal(session.state().trees.length,0);
+  session.dispose();
+});
+
 // 이슈 644 3번: 다른 탭이 기록을 바뀌었을 때 이 화면의 대응 — 고친 게 없으면 조용히 최신 기록을 불러오고(띠 없음),
 // 고친 게 있으면 아무것도 하지 않는다(충돌 판정은 저장 때 그대로). check는 확인할 뿐 덮어쓰지 않는다.
 test('check: 고친 게 없으면 조용히 최신 기록을 불러온다(띠 없음)',async()=>{const {session,changeServer,gets}=setup();await session.start();
