@@ -103,6 +103,17 @@ function clock(seconds) {
   return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`;
 }
 
+/** 초를 입력 칸용 시간 표기(1:30·1:02:30)로 되돌린다. 없으면 빈 값. */
+export function formatTimecode(seconds) {
+  return clock(seconds);
+}
+
+/** 추가·고치기 창의 시작 칸 자동 채움: 이미 적은 값은 건드리지 않고, 주소의 t=만 읽어 채운다. */
+export function fillStartFromUrl(url, currentValue) {
+  if (String(currentValue ?? '').trim() !== '') return null;
+  return startFromUrl(url);
+}
+
 /** 시작·끝을 '0:42–1:08'로, 끝이 없으면 '0:42부터'로 적는다. */
 export function formatRange(start, end) {
   const from = clock(start);

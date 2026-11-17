@@ -44,6 +44,22 @@ function formatStart(seconds) {
   const pad = (value) => String(value).padStart(2, '0');
   return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`;
 }
+/* #792: 기억할 구간의 표·재생 주소. 규칙은 src/moment-range.js·public/v41/domain.mjs의 한 벌과 같다(여기는 그 자리 재생용 사본). */
+function formatRange(start, end) {
+  const from = formatStart(start);
+  if (!from) return '';
+  const to = (Number.isFinite(Number(end)) && Number(end) > Number(start)) ? formatStart(end) : '';
+  return to ? `${from}–${to}` : `${from}부터`;
+}
+function rangeEmbedUrl(videoId, start, end) {
+  const id = String(videoId ?? '').trim();
+  const s = Number(start);
+  if (!id || !Number.isSafeInteger(s) || s < 0) return '';
+  const params = [`start=${s}`];
+  if (Number.isSafeInteger(end) && end > s) params.push(`end=${end}`);
+  params.push('autoplay=1', 'rel=0');
+  return `https://www.youtube.com/embed/${encodeURIComponent(id)}?${params.join('&')}`;
+}
 
 function startFrom(parsed) {
   const search = parsed.searchParams.get('t') || parsed.searchParams.get('start');
@@ -270,7 +286,10 @@ function markup(url,title='',mediaMetadata=null,momentId='',context=null,momentM
  const status=compact?'':(auto?'재생을 누르면 여기서 바로 재생해요.':(canLoad?'불러오기를 누르면 원본 사이트에 연결됩니다.':'원본 사이트에서 확인할 수 있어요.'));
  // #393 2: 크게 보기 — 영상을 어두운 깔개 위 화면 가운데 크게 연다(바깥 클릭·Esc로 복귀).
  const expand=canLoad&&!compact&&(m.kind==='youtube'||m.kind==='video')?'<div class="lt-media-toolbar"><button type="button" data-lt-expand>크게 보기</button></div>':'';
- let html = '<div class="lt-media" data-lt-url="'+esc(url)+'" data-lt-title="'+esc(title)+'"'+(momentId?' data-lt-moment-id="'+esc(momentId)+'"':'')+(m.kind==='youtube'?' data-lt-youtube="1"':'')+(auto?' data-lt-auto="1"':'')+(vertical?' data-lt-vertical="1"':'')+'>'+expand+'<div class="lt-media-body">'+body+'</div>'+(compact?'':'<p class="lt-media-status" role="status">'+status+'</p><a href="'+esc(m.openUrl)+'" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">'+esc(m.kind==='youtube'?m.actionLabel+(m.startSeconds?' · 시작 '+formatStart(m.startSeconds):''):'원본 링크 열기')+' ↗</a>')+'</div>';
+ // #792: 기억할 구간 표 — 순간의 시작·끝(저장 값)이 있을 때만 작은 한 줄을 보인다. 재생은 그 구간만(data-lt-end).
+ const rangeText=(m.kind==='youtube'&&momentMeta)?formatRange(momentMeta.startSeconds,momentMeta.endSeconds):'';
+ const rangeLine=rangeText?'<div class="lt-media-range"><span class="lt-media-range-mark" aria-hidden="true">기억할 구간</span><strong>'+esc(rangeText)+'</strong></div>':'';
+ let html = '<div class="lt-media" data-lt-url="'+esc(url)+'" data-lt-title="'+esc(title)+'"'+(momentId?' data-lt-moment-id="'+esc(momentId)+'"':'')+(m.kind==='youtube'?' data-lt-youtube="1"':'')+(auto?' data-lt-auto="1"':'')+(vertical?' data-lt-vertical="1"':'')+(momentMeta&&Number(momentMeta.endSeconds)>0?' data-lt-end="'+Number(momentMeta.endSeconds)+'"':'')+(momentMeta&&Number(momentMeta.startSeconds)>0?' data-lt-start="'+Number(momentMeta.startSeconds)+'"':'')+'>'+expand+'<div class="lt-media-body">'+body+'</div>'+rangeLine+(compact?'':'<p class="lt-media-status" role="status">'+status+'</p><a href="'+esc(m.openUrl)+'" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">'+esc(m.kind==='youtube'?m.actionLabel+(m.startSeconds?' · 시작 '+formatStart(m.startSeconds):''):'원본 링크 열기')+' ↗</a>')+'</div>';
  if(m.privateFile)html=html.replace('불러오기를 누르면 원본 사이트에 연결됩니다.','내 계정에 보관한 파일입니다. 불러오기를 눌러 확인하세요.').replace(/<a href=[\s\S]*?<\/a>/,'');
  return html;
 }
@@ -281,8 +300,14 @@ async function playInPlace(root){
  if(m.kind!=='youtube'||root.dataset.ltPlaying||root.dataset.ltVanished==='1')return;
  root.dataset.ltPlaying='1';
  const body=root.querySelector('.lt-media-body'),status=root.querySelector('.lt-media-status');
+ // #792: 기억할 구간 — 순간의 시작·끝(카드가 들고 있는 저장 값)이 있으면 그 구간만 재생한다.
+ // '처음부터 보기'를 누른 뒤엔 시작 시점도 없이 처음부터. 끝이 없으면 시작 시점부터.
+ const fromStart=root.dataset.ltFromStart==='1';
+ const end=Number(root.dataset.ltEnd||0);
+ const start=Number(root.dataset.ltStart||m.startSeconds||0);
+ const rangeUsed=!fromStart&&end>start;
  let embed=null;
- try{const usability=await import('/v41/book-usability.mjs');embed=usability.embedUrl(m.videoId,m.startSeconds);}catch{}
+ try{const usability=await import('/v41/book-usability.mjs');embed=fromStart?usability.embedUrl(m.videoId,0):(rangeUsed?rangeEmbedUrl(m.videoId,start,end):usability.embedUrl(m.videoId,start));}catch{}
  if(!embed){delete root.dataset.ltPlaying;if(status)status.textContent='바로 재생할 수 없어요. 아래 원본 링크에서 열어 주세요.';return;}
  if(!root.isConnected){delete root.dataset.ltPlaying;return;}
  const frame=document.createElement('iframe');
@@ -292,7 +317,9 @@ async function playInPlace(root){
  // strict-origin-when-cross-origin 으로 같은 영상이 그 자리에서 재생된다.
  frame.setAttribute('referrerpolicy','strict-origin-when-cross-origin');
  body.replaceChildren(frame);
+ if(rangeUsed&&!fromStart){const again=document.createElement('button');again.type='button';again.className='lt-from-start';again.dataset.ltFromStart='';again.textContent='처음부터 보기';body.append(again);}
  delete root.dataset.ltPlaying;
+ delete root.dataset.ltFromStart;
  if(status)status.textContent='재생 중이에요. 아래 원본 링크로도 열 수 있어요.';
 }
 async function youtubeMeta(root,m,onUnavailable){
@@ -543,6 +570,6 @@ if(typeof document!=='undefined'){
  watchVanished();
  // #601: 보드 카드의 그림은 카드를 끄는 자리다 — 카드 안에서는 이 막음을 풀어 준다(다른 화면은 그대로).
  document.addEventListener('pointerdown',e=>{if(e.target.closest?.('.lt-media')&&!e.target.closest?.('.card'))e.stopPropagation();},true);
- document.addEventListener('click',e=>{if(e.target.closest?.('[data-lt-title-edit]'))return;const root=e.target.closest?.('.lt-media');if(!root)return;e.stopImmediatePropagation();if(e.target.closest('[data-lt-expand]')){e.preventDefault();void openLightbox(root.dataset.ltUrl,root.dataset.ltTitle,root.hasAttribute('data-lt-vertical')?true:null);return;}if(e.target.closest('[data-lt-play]')){e.preventDefault();void playInPlace(root);return;}if(e.target.closest('[data-lt-load]')){e.preventDefault();load(root);}},true);
+ document.addEventListener('click',e=>{if(e.target.closest?.('[data-lt-title-edit]'))return;const root=e.target.closest?.('.lt-media');if(!root)return;e.stopImmediatePropagation();if(e.target.closest('[data-lt-expand]')){e.preventDefault();void openLightbox(root.dataset.ltUrl,root.dataset.ltTitle,root.hasAttribute('data-lt-vertical')?true:null);return;}if(e.target.closest('[data-lt-from-start]')){e.preventDefault();delete root.dataset.ltEnd;root.dataset.ltFromStart='1';void playInPlace(root);return;}if(e.target.closest('[data-lt-play]')){e.preventDefault();void playInPlace(root);return;}if(e.target.closest('[data-lt-load]')){e.preventDefault();load(root);}},true);
 }
 })();

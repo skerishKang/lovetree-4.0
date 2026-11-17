@@ -318,3 +318,5 @@ html[data-book-shape=phone][data-v41-screen=book] .nav-pill{order:2;position:sta
 html[data-book-shape=phone][data-v41-screen=book] .branch-tab{order:3}
 html[data-book-shape=phone][data-v41-screen=book] .yt-play.is-vertical,
 html[data-book-shape=phone][data-v41-screen=book] .yt-frame.is-vertical{height:clamp(190px,26vh,230px)}
+/* #792: 구간 재생 뒤 '처음부터 보기' — 터치 영역 44px. */
+html[data-v41-screen=book] .yt-from-start{align-self:flex-start;margin:8px 0 2px;min-height:44px;padding:8px 12px;border:1px solid var(--lt-line,#c9b8a8);border-radius:999px;background:none;color:var(--lt-ink);font:inherit;font-size:12px;cursor:pointer}
