@@ -9,7 +9,8 @@ const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
 const TOO_LONG_TEXT = '24자를 넘어요';
 // 직접 붙이기 칸의 갈래별 예시(261116 대표 지적 — '종류'·'값' 같은 낱말 대신 예시로 뜻을 알린다).
 // 순서는 tags.mjs의 TAG_KINDS를 따르고, 갈래 없이는 문장 꼬리표의 예다.
-const KIND_PLACEHOLDER = { artist: '예: ILLIT', song: '예: Magnetic', member: '예: 원희', era: '예: 4세대', stage: '예: 인기가요', emotion: '예: 설렘', '': '예: 데뷔 100일' };
+// 261117 고객 의견: '예: ILLIT'는 특정 가수 이름이라, 가수 갈래는 실명을 들지 않는 예시로 바꾼다.
+const KIND_PLACEHOLDER = { artist: '예: 좋아하는 가수', song: '예: Magnetic', member: '예: 원희', era: '예: 4세대', stage: '예: 인기가요', emotion: '예: 설렘', '': '예: 입덕 순간, 무대, 직캠' };
 const MANUAL_GUIDE = '가수·노래를 붙여 두면 나중에 저절로 묶여요';
 const MANUAL_TOGGLE = '직접 붙이기';
 
@@ -42,7 +43,7 @@ export function renderTagLine({ host, doc = document, moment, knownTags = [], wr
     const chips = [...confirmed, ...(writable ? proposals : [])];
     const kinds = [...TAG_KINDS.map((k) => `<option value="${k.id}">${k.label}</option>`), '<option value="">그냥 단어로</option>'].join('');
     // 직접 붙이기(261116 대표 지적): 접힘이 기본 — 제안이 없으면 안내 한 줄+[직접 붙이기], 있으면 칩 아래 작은 링크만.
-    // 누르면 한 줄로 펼친다: [가수 ▾][예: ILLIT][붙이기] — 라벨 대신 select의 갈래 이름과 placeholder 예시로 뜻을 알린다.
+    // 누르면 한 줄로 펼친다: [가수 ▾][예: 좋아하는 가수][붙이기] — 라벨 대신 select의 갈래 이름과 placeholder 예시로 뜻을 알린다.
     const guide = chips.length ? '' : `<span class="lt-tagline-guide">${esc(MANUAL_GUIDE)}</span>`;
     const manual = !state.manualOpen
       ? `<div class="lt-tagline-manual">${guide}<button type="button" class="lt-tagline-toggle${chips.length ? ' is-link' : ''}">${MANUAL_TOGGLE}</button></div>`
@@ -144,7 +145,7 @@ export function renderTagLine({ host, doc = document, moment, knownTags = [], wr
       host.querySelector('.lt-tagline-value')?.focus();
     }
   }, when);
-  // 갈래를 바꾸면 예시도 함께 바꾼다(가수 ILLIT / 노래 Magnetic / 무대 인기가요 …).
+  // 갈래를 바꾸면 예시도 함께 바꾼다(가수·노래·무대 … 갈래마다 다른 예시).
   host.addEventListener('change', (event) => {
     if (!alive()) return;
     const select = event.target.closest('.lt-tagline-kind');

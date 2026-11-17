@@ -196,5 +196,9 @@ test('공유 창 화면에는 발견이라는 말이 없고, 단계·이유·공
   assert.match(shareHtml, /링크까지 막는 완전 비공개는 Plus/);
   assert.equal(shareHtml.includes('둘러보기에도 올리기'), false, '스위치 문구는 정리됐다');
   assert.match(shareHtml, /<details class="share-scope-more"><summary>자세히<\/summary>/);
-  assert.match(shareHtml, /올린 사진은 나만 볼 수 있어요/);
+  // 공개되는 범위(261117 고객 의견): 공개 응답(서버 projectSharedTree)에 트리 제목·순간(메모·날짜·감정·링크)이
+  // 그대로 담기고 /api/media/ 업로드 파일의 url은 빈 값으로 빠진다 — 그 사실대로 적었는지 글자로 고정한다.
+  assert.match(shareHtml, /지금 트리 하나의 제목과 순간\(메모·날짜·감정·링크\)이 그대로 보여요/);
+  assert.match(shareHtml, /사진·영상 파일과 다른 트리는 공개되지 않아요/);
+  assert.equal(shareHtml.includes('올린 사진은 나만 볼 수 있어요'), false, '사진을 올린 적 없는 사람도 이해하게 짧게 고쳤다');
 });
