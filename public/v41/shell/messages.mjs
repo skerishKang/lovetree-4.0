@@ -65,6 +65,11 @@ export function createMessages(deps) {
       catch (error) { reply(false, error?.message || '저장하지 못했어요.'); }
       return;
     }
+    if (data?.type === 'lt41-open-tags') {
+      const ok = deps.openTagManager?.({ suggest: data.suggest === true }) === true;
+      try { event.source?.postMessage({ type: 'lt41-tags-opened', ok }, location.origin); } catch {}
+      return;
+    }
     // #627 PR B: 화면의 꼬리표 줄이 확인한 것 — keywords만 기존 저장 경로(shellTags → boardSync)로 바꾼다.
     // 답(lt41-tags-saved)을 보낸 화면에만 돌려 화면 사본이 칩을 다시 맞추게 한다. iframe을 다시 그리지 않는다.
     if (data?.type === 'lt41-tags') {
