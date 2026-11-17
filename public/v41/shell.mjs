@@ -683,7 +683,6 @@ function links(){viewContext();const c=window.LT41;$('connections').replaceChild
 // 안내 판을 숨긴다. 창이 모두 닫히면 다시 띄우고, 이때 '봤음'으로 적지 않는다(#666의 계정 메뉴 미루기와
 // 같은 규칙 — 미뤘다고 본 것으로 치지 않는다).
 let tipsReturnFocus=null;
-const tipsBox=$('tree-tips');
 function anyDialogOpen(){return !!document.querySelector('dialog[open]');}
 function tipsFollowDialogs(){
   const box=$('tree-tips');if(!box)return;
