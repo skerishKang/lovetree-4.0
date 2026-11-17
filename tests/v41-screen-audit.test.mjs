@@ -1101,20 +1101,26 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
       picked = await frameEval(() => {
         const sr = document.getElementById('orbit')?.shadowRoot;
         if (!sr) return null;
+        const chips = [...sr.querySelectorAll('.index-list .indexTagChip')];
         return {
+          open: !!sr.querySelector('dialog[open]'),
           picked: sr.querySelectorAll('.index-list .indexTagPicked').length,
           rows: sr.querySelectorAll('.index-list [data-lt-moment-row]').length,
-          minH: Math.min(...[...sr.querySelectorAll('.index-list .indexTagChip')].map((b) => Math.round(b.getBoundingClientRect().height)))
+          minH: chips.length ? Math.min(...chips.map((b) => Math.round(b.getBoundingClientRect().height))) : null
         };
       });
-      if (picked && picked.picked >= 1 && picked.rows >= 1 && picked.rows < chips0.rows) break;
+      // 닫힌 dialog 안의 요소는 getBoundingClientRect가 0이다(실측: 닫힘 0 / 열림 44).
+      // 창이 열려 있고 칩이 실제로 보일 때까지 기다린 뒤에만 높이를 단정한다.
+      if (picked && picked.open && picked.picked >= 1 && picked.rows >= 1 && picked.rows < chips0.rows && picked.minH >= 44) break;
       const f = await orbitFrameOf();
       if (f) await f.evaluate(() => { const sr = document.getElementById('orbit')?.shadowRoot; const b = sr && [...sr.querySelectorAll('.index-list .indexTagChip')].find((b) => b.textContent.includes('노래 · Super Shy')); if (b) b.click(); }).catch(() => {});
       await page5b.waitForTimeout(400);
     }
-    assert.ok(picked && picked.picked >= 1, '고른 꼬리표가 위에 모여 보인다 — 실측=' + JSON.stringify(picked));
-    assert.ok(picked.rows >= 1 && picked.rows < chips0.rows, '걸러 보기로 순간 수가 준다');
-    assert.ok(picked.minH >= 44, '칩 누름 영역 44px 이상');
+    const pickDetail = `실측=${JSON.stringify(picked)}, 기다린 것: 열린 목록 창 + 고른 꼬리표 1개 이상 + 줄 수 감소 + 칩 높이 44px 이상`;
+    assert.ok(picked && picked.picked >= 1, '고른 꼬리표가 위에 모여 보인다 — ' + pickDetail);
+    assert.ok(picked.rows >= 1 && picked.rows < chips0.rows, '걸러 보기로 순간 수가 준다 — ' + pickDetail);
+    assert.ok(picked.open, '칩을 잴 때 목록 창이 열려 있다 — ' + pickDetail);
+    assert.ok(picked.minH >= 44, '칩 누름 영역 44px 이상 — ' + pickDetail);
     await take(page5b, '순간 목록 꼬리표 걸러 보기');
     await ctx5.unroute('**/api/workspace**', fiveMomentRoute);
     await page5b.close();
