@@ -25,7 +25,7 @@ import {createQuickAdd} from './shell/quick-add.mjs';
 import {createWritePanel, readWriteTab, writeWriteTab} from './shell/write-panel.mjs';
 import {createQuickIntake} from './shell/quick-intake.mjs';
 import {createJourney} from './shell/journey.mjs';
-import {createMessages} from './shell/messages.mjs';
+import {createMessages, lastShelfTreeId} from './shell/messages.mjs';
 import {createCleanup} from './shell/cleanup.mjs';
 // #627 PR B: 꼬리표 저장 한 곳(shell/tag-save.mjs — 기존 boardSync 경로로 keywords만)과 꼬리표 정리 창(shell/tag-manager.mjs).
 import {createTagSave} from './shell/tag-save.mjs';
@@ -748,7 +748,11 @@ $('tree-tips-rename')?.addEventListener('click',()=>shellPanels.openTreeManager(
 const navBar=document.querySelector('.app-header nav');
 const narrowNav=()=>matchMedia('(max-width:780px)').matches;
 function choose(id,momentId){const tree=model.trees.find(t=>t.id===id);window.LT41=tree?{tree,trees:model.trees,source,momentId:tree.moments.find(m=>m.id===momentId)?.id||tree.moments.find(m=>m.parentId===null)?.id||tree.moments[0]?.id,prefs:currentPrefs(),writable:source==='server'&&!!member?.snapshot().writable,}:null;
- if(tree||current==='src064-orbit.html')show(current,false,id||'');else{flowNavigation();document.body.classList.remove('home-screen');hideFrames();$('empty').hidden=false;links();}}
+ if(tree||current==='src064-orbit.html')show(current,false,id||'');
+ else{flowNavigation();document.body.classList.remove('home-screen');hideFrames();
+  // 261118 대표 결정: 트리 0개 계정이 주소(#my/shelf 등)로 바로 들어와도 그 화면의 빈 상태(#817)를 보여 준다 —
+  // 탭을 눌러 열 때와 같은 문구('아직 책장이 비어 있어요.' 등)로 시작한다.
+  paintEmptyForScreen(current);$('empty').hidden=false;links();}}
 // #453 D2: 빈 화면 문구·단추는 계정 상태에 맞춘다. 로그인한 사람에게 '로그인한 계정의 기록을 불러오세요'는 어색하고,
 // 백업 파일 열기는 계정 없이 쓰는 입구라 로그인 상태에서는 숨긴다(로그아웃은 지금 그대로 둔다).
 // 2026-11-17 대표 결정: 트리 0개 계정이 서재·책·보드·지도탭을 열면 그 화면의 빈 상태를 보여 준다.
@@ -1415,7 +1419,11 @@ async function showPublicRoute(route){
  const answer=await shareApi.read(route.shareId||'');if(generation!==loadGeneration)return;if(!answer.ok){publicProblem(answer);return;}
  activeShareId=answer.share.id;const view=['book','board','network'].includes(route.view)?route.view:answer.share.view;current=screenForView(view)[1];load({revision:0,state:{version:1,trees:[answer.tree]}},'share',{treeId:answer.tree.id,momentId:answer.share.entryMomentId});activeShareId=answer.share.id;show(current,false);writeLocation('replace');notify('공개된 트리를 감상하는 화면이에요. 감상만 할 수 있어요.'+(answer.aiTester?' AI 명예회원이 만든 트리예요.':'')+(answer.omittedPrivateMedia?' 올린 사진 '+answer.omittedPrivateMedia+'장은 나만 볼 수 있어요.':''));
 }
-document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{if(b.dataset.view==='track32-bookshelf.html'&&!member?.snapshot().owned){openLoginStart('shelf');return;}show(b.dataset.view);});
+document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{if(b.dataset.view==='track32-bookshelf.html'&&!member?.snapshot().owned){openLoginStart('shelf');return;}
+ // 261118 대표 지적 2차 5: 서재 화면에서 콕·보드·지도는 마지막에 본 트리(서재 가운데 책의 트리)로 연다.
+ if(current==='track32-bookshelf.html'&&b.dataset.view!=='track32-bookshelf.html'){const treeId=lastShelfTreeId();
+  if(treeId&&model?.trees?.some(t=>t.id===treeId)&&window.LT41?.tree?.id!==treeId){current=b.dataset.view;choose(treeId);writeLocation();return;}}
+ show(b.dataset.view);});
 for(const f of frames())f.addEventListener('load',()=>frameLoaded(f));
 paintThemeControls();applyTheme();paintTitleDisplayControls();applyAdvanced();
 if(initialRoute.scope==='public')showPublicRoute(initialRoute);else load(null,'example');
