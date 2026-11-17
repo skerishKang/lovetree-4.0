@@ -119,8 +119,9 @@ test('#537 6: 제목 고치기는 두 장·한 장이 같은 규칙(제목 위�
 });
 
 test('#537 함께: 마음 한마디가 비었을 때 안내 글을 내용처럼 그리지 않는다', () => {
+  // 지키려던 것: 마음이 비었을 때 '적어 보세요' 안내를 실제 내용처럼 그리지 않는다.
   assert.doesNotMatch(EXTRA, /class="moment-note is-empty/, '빈 안내 글 단추를 그리지 않는다');
-  assert.match(EXTRA, /const tail=parts\.main&&parts\.note\?'<p class="moment-note">'/, '마음이 있을 때만 그 줄을 그린다');
+  assert.match(EXTRA, /const note=noteText\?'<div class="moment-note-wrap"><p class="moment-note">/, '마음이 있을 때만 그 줄을 그린다');
 });
 
 /* ── 실제 화면(크롬) ───────────────────────────────────────────────────── */
