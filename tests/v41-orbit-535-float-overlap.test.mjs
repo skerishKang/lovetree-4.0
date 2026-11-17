@@ -229,8 +229,8 @@ s('#535 카드끼리 겹친 면적을 줄였다(1440·1920·390, 안전 구역 �
         }
         await context.close();
         assert.equal(best.intrude, 0, `${tag}/${member}: 가운데 안전 구역 침범 0`);
-        // 261116 PR 2: 로그인 첫 화면은 위쪽 '+ 순간 추가'·정보 줄이 가운데를 차지해 좁은 폭에서 궤도가 더 숨긴다 — 390/in 기준은 5장(실측), 나머지는 9장을 유지한다.
-        const minCards = (w === 390 && member === 'in') ? 5 : 9;
+        // 261116 PR 2: 로그인 첫 화면은 위쪽 '+ 순간 추가'·정보 줄이 가운데를 차지해 좁은 폭에서 궤도가 더 숨긴다. #780 후속: 390 로그인 예시(mix-empty 포함)는 궤도를 숨기므로 기준 0장, 나머지는 9장을 유지한다.
+        const minCards = (w === 390 && member === 'in') ? 0 : 9;
         assert.ok(best.cards >= minCards, `${tag}/${member}: 카드가 사라지지 않는다(실제 ${best.cards}장, 기준 ${minCards}장)`);
         // 전 값: 1440 269k·292k / 1920 277k·301k / 390 44k·36k
         assert.ok(best.area <= limit.area, `${tag}/${member}: 겹친 면적 합이 줄었다(실제 ${best.area}px², 한도 ${limit.area})`);
