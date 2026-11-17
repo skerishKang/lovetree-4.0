@@ -43,8 +43,8 @@ test('트리 선택과 보기 방식이 한 틀(.tree-frame)에 붙고 이름은
   assert.doesNotMatch(frame, /기억책|기억 보드|관계 지도/);
   // 한 틀 모양: 알약 테두리 한 줄, 보기 버튼 사이는 안쪽 구분선.
   assert.match(css, /\.tree-frame\{display:flex;align-items:center;flex:0 0 auto;margin-left:6px;padding:1px;border:1px solid rgba\(255,255,255,\.16\);border-radius:999px/);
-  assert.match(css, /\.tree-frame \.tree-views\{margin-left:0;padding-left:0;border-left:0;gap:0\}/);
-  assert.match(css, /\.tree-frame \.tree-views>button\{min-height:40px;border-left:1px solid var\(--line\);border-radius:0\}/);
+  assert.match(css, /\.tree-frame \.tree-views\{margin-left:0;padding-left:0;border-left:0;gap:0;align-self:stretch;align-items:stretch\}/);
+  assert.match(css, /\.tree-frame \.tree-views>button\{min-height:0;align-self:stretch;border-left:1px solid var\(--line\);border-radius:0/);
 });
 
 test('지금 보는 보기는 눌린 상태(aria-current)로 표시된다', () => {
@@ -83,7 +83,7 @@ test('간단·고급 모드와 상관없이 맨 위 메뉴 높이 규칙은 유�
   // 2026-11-10 메뉴 정리의 높이 규칙(최소 64px + 아래 경계선)을 그대로 둔다.
   assert.match(css, /\.app-header\{min-height:64px;padding:10px 20px/);
   // 한 틀 안의 버튼도 40px 높이 규칙을 쓴다 — 틀이 메뉴 높이를 키우지 않는다(변경 전 65px 유지).
-  assert.match(css, /\.tree-frame \.tree-views>button\{min-height:40px;/);
+  assert.match(css, /\.tree-frame \.tree-views>button\{min-height:0;align-self:stretch;/);
   // 고급 기능 보기(lt-advanced)는 계정 메뉴 안의 일이라 맨 위 메뉴 구조를 바꾸지 않는다.
   assert.match(shell, /document\.body\.classList\.toggle\('lt-advanced',on\)/);
   assert.doesNotMatch(css, /\.lt-advanced [^{]*\.tree-frame/);
