@@ -217,6 +217,28 @@ const frameOf = async (page, test_) => {
   }
   return null;
 };
+
+const frameUrls = (page) => page.frames().map((f) => { try { return f.url(); } catch { return '<url 조회 실패>'; } });
+const readyFrame = async (page, test_, { root = null, view = null, timeout = 45000, why = '프레임 준비' } = {}) => {
+  const deadline = Date.now() + timeout;
+  let detail = '대기 시작';
+  while (Date.now() < deadline) {
+    const f = page.frames().find((x) => x !== page.mainFrame() && test_.test(x.url()));
+    if (f) {
+      try {
+        const ok = await f.evaluate(({ sel, wantView }) =>
+          document.readyState === 'complete' &&
+          (!sel || Boolean(document.querySelector(sel))) &&
+          (!wantView || document.body?.dataset?.ltView === wantView), { sel: root, wantView: view });
+        if (ok) return f;
+        detail = '프레임은 있으나 문서 준비 전(readyState·루트 요소·보기 상태)';
+      } catch (e) { detail = '프레임 평가 실패: ' + String(e?.message || e); }
+    } else {
+      detail = '대상 프레임을 아직 찾지 못함';
+    }
+    await page.waitForTimeout(250);
+  }
+  assert.fail(`${why} 실패 — ${detail} (최대 ${timeout / 1000}초). 현재 프레임 URL: [${frameUrls(page).join(' | ')}]`);
 };
 
 test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤·정원에서 겹침·잘림·흔적 값·작은 글자가 0이다', { skip: REQUIRE ? false : skip, timeout: 900000 }, async () => {
@@ -1334,6 +1356,9 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     assert.equal(mapAfterConc.view, 'concentric', '그래프의 [동심원형]으로 지도가 동심원형 보기로 열린다');
     assert.equal(mapAfterConc.concPressed, 'true', '동심원형이 눌린 상태(aria-pressed=true)');
     assert.equal(mapAfterConc.stored, 'concentric', '지도 보기 저장 키(lt41.network.view)가 바뀐다');
+    await (await tripMapFrame('그물 복귀 누르기: 지도 프레임')).evaluate(() => document.getElementById('viewNet').click());
+    const treeAfterTrip = await pageMap.evaluate(() => ({ id: window.LT41?.tree?.id || '', moments: (window.LT41?.tree?.moments || []).length, momentId: window.LT41?.momentId || '' }));
+    const mapAfterNet = await (await readyFrame(pageMap, /track56-network/, { root: '#mapMain', view: 'network', timeout: 45000, why: '그물 복귀 확인: 지도 프레임이 다시 붙고 준비될 때까지' })).evaluate(() => ({ view: document.body.dataset.ltView, netPressed: document.getElementById('viewNet')?.getAttribute('aria-pressed') }));
     assert.equal(mapAfterNet.view, 'network', '지도의 [그물형]으로 그물 보기로 돌아온다');
     assert.equal(mapAfterNet.netPressed, 'true', '그물형이 눌린 상태(aria-pressed=true)');
     assert.deepEqual(treeAfterTrip, treeBeforeTrip, '왕복 뒤에도 지금 트리·순간이 유지된다');
