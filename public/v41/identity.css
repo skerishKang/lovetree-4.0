@@ -492,3 +492,8 @@ option{background:var(--lt-glass-strong);color:var(--lt-pearl)}
 html[data-lt-theme=garden] option{background:var(--lt-paper);color:var(--lt-ink)}
 select{color-scheme:dark}
 html[data-lt-theme=garden] select{color-scheme:light}
+/* #792: 기억할 구간 — 미디어 카드(판·보드)의 작은 표와 '처음부터 보기' 링크. #548 기준(12px 이상). */
+.lt-media .lt-media-range{display:flex;align-items:baseline;gap:8px;margin:8px 0 0;min-width:0;font-size:12px;line-height:1.5;color:var(--lt-ink)}
+.lt-media .lt-media-range-mark{flex:0 0 auto;color:var(--lt-muted,#b9a4be)}
+.lt-media .lt-media-range strong{font-weight:600;color:var(--lt-ink);overflow-wrap:anywhere}
+.lt-media .lt-from-start{min-height:44px;padding:8px 14px;border:1px solid #e8b8c9;border-radius:999px;background:#3a2c40;color:#fff;font:inherit;font-size:13px;cursor:pointer}

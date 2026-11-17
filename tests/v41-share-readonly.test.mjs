@@ -63,7 +63,8 @@ test('기억책: 공유에서 제목 고치기·다음 순간 남기기 버튼�
   // 지키려던 것: 공유·예시(읽기 전용) 책에 제목 고치기·다음 순간 남기기 버튼이 보이지 않는다.
   assert.match(bookExtra, /editAffordances\(\{readOnly:!LTDEMO\.writable,synthetic:!!m\.synthetic/, '편집 손잡이는 공유·예시에서 렌더하지 않는다(editAffordances)');
   assert.match(bookExtra, /const edit=LTDEMO\.writable&&!m\.synthetic\?'<button type="button" class="moment-edit"/, '"✎ 고치기"도 공유·예시에서 렌더하지 않는다');
-  assert.equal((bookExtra.match(/LTDEMO\.readOnly\?''/g) || []).length, 2, '다음 순간 남기기 버튼(책 끝·모바일)도 공유에서 렌더하지 않는다');
+  // 상세 판의 빈 이유 안내는 #815에서 제거돼(LTDEMO.readOnly?'':'...') 꼴이 남는 곳은 책 끝 한 곳이다.
+  assert.equal((bookExtra.match(/LTDEMO\.readOnly\?''/g) || []).length, 1, '다음 순간 남기기 버튼(책 끝)도 공유에서 렌더하지 않는다(상세 판 빈 이유 안내는 #815에서 제거)');
 });
 
 test('기억책: 쓰기 클릭·요청은 공유에서 메시지를 보내지 않는다(이중)', () => {

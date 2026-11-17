@@ -1,6 +1,6 @@
 // 2026-11-08 책 사용성 1~9 화면 보조. 데이터·저장 계약은 그대로 두고 표시만 바꾼다.
 import {displayTitle,withoutAutoTitle,titleParts,mediaSourceText,editAffordances,embedUrl,connectionLine,readLens,writeLens,detailPlacement,nextMomentMessage,NEXT_PAGE_COPY,NEXT_PAGE_ACTION,treeTitleText,isPrimaryButton,createOverflowRejudge,titleView,formatDisplayDate} from '/v41/book-usability.mjs';
-import {formatRange} from '/v41/domain.mjs';
+import {formatRange,youtubeRangeEmbedUrl} from '/v41/domain.mjs';
 import {coverChoice,COVER_PALETTE} from '/v41/views/shelf/shelf-model.mjs';
 import {coverMomentFor} from '/v41/views/shelf/shelf-model.mjs';
 import {thumbnailCandidates,thumbFallbackAttrs,coverFallbackAttrs,fallbackCardMarkup,mountThumbFallback,VIDEO_UNAVAILABLE_TEXT} from '/v41/thumb-fallback.mjs';
@@ -71,8 +71,9 @@ function closeDetail(){
 }
 function detailMarkup(m){
  const nextInfo=nextMomentOf(m.id);
- /* #635: 감상 화면에서는 이유가 비었을 때의 안내를 감춘다 — 내 트리는 예전 그대로 둔다. */
- const line=connectionLine(nextInfo?.title,nextInfo?.reason,{hideEmptyWhy:!!LTDEMO.readOnly});
+ /* #815: 연결 이유는 적었을 때만 보인다(비면 아무것도 그리지 않는다). */
+ const line=connectionLine(nextInfo?.title,nextInfo?.reason,{hideEmptyWhy:true});
+ const rangeLine=formatRange(m.startSeconds,m.endSeconds);
  const open=m.url&&isYouTubeUrl(m.url)?'YouTube에서 열기 ↗':'원본 링크 열기 ↗';
  // #327 2부: 내 기록(서버)의 순간 상세에서 다른 트리로 옮길 수 있다. 공유·예시는 숨긴다.
  const canMove=(window.parent&&window.parent.LT41)?window.parent.LT41.source==='server':false;
@@ -80,8 +81,9 @@ function detailMarkup(m){
  return '<div class="detail-kicker">'+t(LTLabels.type(m.kind))+' · '+t(formatDisplayDate(m.date,ltDateStyle()))+' · '+t(m.emotion)+'</div>'+
   (view.main?'<h2>'+t(view.main)+'</h2>'+(view.sub&&view.sub.toLowerCase()!==view.main.trim().toLowerCase()?'<p class="video-title">▶ '+t(view.sub)+'</p>':''):'')+
   '<p>'+t(m.note)+' · 출처: '+t(m.source)+'</p>'+
+  (rangeLine?'<p class="detail-range">기억할 구간 '+t(rangeLine)+'</p>':'')+
   '<div class="chips">'+m.keywords.map(k=>'<span class="chip">#'+t(k)+'</span>').join('')+'</div>'+
-  (line?'<div class="detail-why">'+t(line)+'</div>':(LTDEMO.readOnly?'':'<div class="detail-why">연결 이유는 아직 적지 않았어요</div>'))+
+  (line?'<div class="detail-why">'+t(line)+'</div>':'')+
   '<div class="detail-actions"><button type="button" data-detail-viewer>순간 열기</button>'+
   (m.url?'<a href="'+t(m.url)+'" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">'+open+'</a>':'')+
   '<button type="button" data-detail-index>목차에서 보기</button>'+
@@ -129,16 +131,23 @@ document.addEventListener('keydown',e=>{if(e.key!=='Escape')return;if(document.q
 /* 1. 실제 기록에서 재생 단추가 눌리지 않던 문제(2026-11-08): 카드 위 겹침·다른 리스너의 전파 차단에
    영향받지 않도록 pointerdown에서 먼저 잡고, 재생 주소를 못 만들면 원본 링크를 새 창으로 연다. */
 function playInline(yt,media){
- const url=embedUrl(yt.dataset.ytPlay,Number(yt.dataset.ytStart||0));
+ const start=Number(yt.dataset.ytStart||0),end=Number(yt.dataset.ytEnd||0);
+ const url=(end>start)?(youtubeRangeEmbedUrl(yt.dataset.ytPlay,start,end)+'&autoplay=1'):embedUrl(yt.dataset.ytPlay,start);
  if(!url){if(media&&media.openUrl)window.open(media.openUrl,'_blank','noopener');return}
  const frame=document.createElement('iframe');frame.className='yt-frame'+(yt.dataset.ytVertical==='1'?' is-vertical':'');frame.src=url;frame.title='YouTube 영상 재생';
  frame.allow='accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';frame.allowFullscreen=true;
  frame.setAttribute('referrerpolicy','strict-origin-when-cross-origin');
  const host=yt.parentElement;if(!host)return;host.replaceChildren(frame);
+ if(end>start)host.insertAdjacentHTML('beforeend','<button type="button" class="yt-from-start" data-yt-from-start="'+t(yt.dataset.ytPlay)+'">처음부터 보기</button>');
 }
 document.addEventListener('pointerdown',e=>{
  if(!isPrimaryButton(e))return;
  if(e.target.closest&&e.target.closest('[data-lt-title-edit]'))return;
+ const fromStart=e.target.closest&&e.target.closest('[data-yt-from-start]');
+ if(fromStart){e.preventDefault();e.stopPropagation();const host=fromStart.parentElement;if(!host||host.querySelector('iframe.yt-frame'))return;
+  const frame=document.createElement('iframe');frame.className='yt-frame';frame.src=embedUrl(fromStart.dataset.ytFromStart,0);frame.title='YouTube 영상 재생';
+  frame.allow='accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';frame.allowFullscreen=true;
+  frame.setAttribute('referrerpolicy','strict-origin-when-cross-origin');host.replaceChildren(frame);return}
  const yt=e.target.closest&&e.target.closest('[data-yt-play]');
  if(!yt||yt.querySelector('.lt-fallback-card'))return;
  e.preventDefault();e.stopPropagation();
@@ -244,7 +253,7 @@ momentContent=function(m,compact=false){
     :'<img src="'+t(remoteThumb)+'" alt="'+t(safe.title||'YouTube 영상 썸네일')+'"'+thumbFallback+' referrerpolicy="no-referrer" loading="lazy" decoding="async">';
    // YouTube 출처는 링크 한 곳에만 남긴다.
    const piece='<div class="clipping moment" data-moment="'+t(safe.id)+'">'+
-    '<button type="button" class="yt-play'+(vertical?' is-vertical':'')+'" data-lt-thumb-host data-yt-play="'+t(media.videoId)+'" data-yt-start="'+t(media.startSeconds||0)+'"'+(vertical?' data-yt-vertical="1"':'')+'>'+
+    '<button type="button" class="yt-play'+(vertical?' is-vertical':'')+'" data-lt-thumb-host data-yt-play="'+t(media.videoId)+'" data-yt-start="'+t(media.startSeconds||0)+'" data-yt-end="'+t(m.endSeconds||'')+'"'+(vertical?' data-yt-vertical="1"':'')+'>'+
     face+
     '<span class="yt-play-label">'+t(label)+'</span></button>'+
     '<div class="media-links"><a class="media-source-link" href="'+t(media.openUrl)+'" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">YouTube ↗</a>'+
