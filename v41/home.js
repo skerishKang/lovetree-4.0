@@ -246,9 +246,9 @@ cellCommunity.append(communityLines.moments,communityLines.trees);
  const stats=await answer.json();
  communityLines.moments.querySelector('.home-info-v').textContent=formatCount(stats?.moments);
  communityLines.trees.querySelector('.home-info-v').textContent=formatCount(stats?.trees);
-}catch{ // 집계를 못 가져오거나 8초를 넘기면 빈 약속 대신 칸을 숨긴다(숫자 없이 틀만 남기지 않는다).
- // 셀은 display:grid라 [hidden] 하나로는 안 가려져서 인라인까지 닫는다 — 안 그러면 '…'가 남는다(#780 후속).
- cellCommunity.hidden=true;cellCommunity.style.display='none';
+}catch{ // 집계를 못 가져오거나 8초를 넘기면 칸은 그대로 두고 값만 '–'로 바꾼다(세 칸×두 줄 배치가 틀어지지 않게).
+ // '…'가 계속 남지 않게 하고, 화면 낭독기에는 '불러오지 못했어요'로 읽힌다(#780 후속).
+ for(const line of [communityLines.moments,communityLines.trees]){const v=line.querySelector('.home-info-v');if(v){v.textContent='–';v.setAttribute('aria-label','불러오지 못했어요');}}
 }finally{clearTimeout(timer);}})();
 infoRow.append(cellMoments,cellCommunity);
 // 내 트리 칸(로그인) — '트리 N' / '최근 <트리 이름>'(마지막으로 순간을 넣은 트리, 누르면 그 트리로; 길면 칸 폭에서 '…').
