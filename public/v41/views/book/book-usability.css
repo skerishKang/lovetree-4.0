@@ -298,7 +298,7 @@ html[data-v41-screen=book] .story-editor{display:flex;align-items:center;gap:4px
 html[data-v41-screen=book] .story-editor input{box-sizing:border-box;flex:1 1 auto;min-width:0;min-height:44px;padding:8px 11px;border:1px solid var(--lt-line-paper);border-radius:12px;background:var(--lt-paper);color:var(--lt-ink);font:400 14px var(--lt-ui)}
 html[data-v41-screen=book] .story-editor button{flex:0 0 auto;padding:0 11px}
 html[data-v41-screen=book] .story-editor button[type=submit]{background:var(--lt-primary);border-color:var(--lt-primary);color:var(--lt-primary-ink)}
-html[data-book-shape=phone][data-v41-screen=book] .mobile-page .moment-title .moment-meta-copy{font-size:11px}
+html[data-book-shape=phone][data-v41-screen=book] .mobile-page .moment-title .moment-meta-copy{font-size:12px}
 html[data-book-shape=phone][data-v41-screen=book] .mobile-page .moment-title .moment-note{-webkit-line-clamp:2;font-size:14px}
 html[data-book-shape=phone][data-v41-screen=book] .why-margin{position:static;left:auto;top:auto;bottom:auto;transform:none;width:auto;margin:12px 10px 0;line-height:1.45}
 html[data-book-shape=phone][data-v41-screen=book] .story-tip{width:100%;box-sizing:border-box;font-size:12px}
@@ -309,6 +309,8 @@ html[data-book-shape=phone][data-v41-screen=book] .story-editor{width:100%}
 html[data-v41-screen=book] .why-margin{left:calc(50% + 150px);top:auto;bottom:24px;transform:translateX(-50%);width:min(320px,30vw)}
 html[data-v41-screen=book] .why-margin>.story-tip,html[data-v41-screen=book] .why-margin>.story-action-wrap{width:100%;max-width:100%;box-sizing:border-box}
 html[data-v41-screen=book] .story-tip span{color:var(--lt-ink);opacity:1}
+/* #800 새 연결 글자는 옛 .why-margin span의 11px를 이어받지 않도록 최소 12px를 지킨다(다른 크기·색·배치는 그대로). */
+html[data-v41-screen=book] .why-margin .moment-meta-copy,html[data-v41-screen=book] .why-margin .story-action,html[data-v41-screen=book] .why-margin .story-tip span{font-size:12px}
 html[data-v41-screen=book][data-lt-theme=garden] .why-margin{padding:0;border:0;border-radius:0;background:transparent;box-shadow:none}
 /* On one-page mobile, reserve the space before navigation so the tip and relation remain in the viewport. */
 html[data-book-shape=phone][data-v41-screen=book] .why-margin{order:1;top:auto;bottom:auto;margin:0 10px;position:static;left:auto;transform:none;width:auto}
