@@ -596,6 +596,9 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
       assert.ok(before.hint.includes('소개하지 않아요'), '꺼짐 상태에서 상자 첫 줄(힌트)도 같은 상태를 말한다 — 실제 "' + before.hint + '"');
       assert.equal(before.toggle, '소개 켜기', '꺼진 트리의 스위치 글자는 행동(소개 켜기)다');
       assert.equal(before.toggleState, 'off', '꺼짐은 테두리 모양(CSS가 data-state로 고른다)');
+      // 261117 고객 의견: '공개되는 범위' 문구가 줄바꿈돼도 겹침 0 — 문구 자리로 스크롤한 뒤에도 잰다.
+      await pageAsk.evaluate(() => document.querySelector('.share-warning')?.scrollIntoView({ block: 'center' }));
+      await pageAsk.waitForTimeout(300);
       await take(pageAsk, '공유 판·소개 꺼짐');
       await pageAsk.screenshot({ path: 'E:/lovetree-qa/lane/local3-graph/audit-discover-panel-off-' + width + '-' + theme + '.png', animations: 'disabled', timeout: 10000 }).catch(() => {});
       await pageAsk.evaluate(() => document.getElementById('share-discover-toggle')?.click());
@@ -607,6 +610,8 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
       assert.ok(after.hint.includes('소개 중이에요'), '켜짐 뒤 힌트 줄이 옛 값에 머물지 않는다 — 실제 "' + after.hint + '"');
       assert.equal(after.toggle, '소개 끄기', '켜진 트리의 스위치 글자는 행동(소개 끄기)다 — 값과 같다');
       assert.equal(after.toggleState, 'on', '켜짐은 강조색 모양');
+      await pageAsk.evaluate(() => document.querySelector('.share-warning')?.scrollIntoView({ block: 'center' }));
+      await pageAsk.waitForTimeout(300);
       await take(pageAsk, '공유 판·소개 켜짐');
       await pageAsk.screenshot({ path: 'E:/lovetree-qa/lane/local3-graph/audit-discover-panel-on-' + width + '-' + theme + '.png', animations: 'disabled', timeout: 10000 }).catch(() => {});
       await ctxAsk.close();
@@ -703,7 +708,19 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
         return { hs, placeholder: value?.placeholder || '', text: (document.querySelector('#quick-tagline')?.textContent || '').replace(/\\s+/g, ' ').trim() };
       });
       assert.ok(open.hs.every((h) => h >= 44) && (Math.max(...open.hs) - Math.min(...open.hs)) <= 1, '펼친 세 요소의 높이가 같다(44px) — 실제 ' + JSON.stringify(open.hs));
-      assert.equal(open.placeholder, '예: ILLIT', '갈래(가수)의 예시가 placeholder로 보인다');
+      assert.equal(open.placeholder, '예: 좋아하는 가수', '가수 갈래의 예시는 특정 실명 없이 뜻만 알린다(261117 고객 의견)');
+      // 갈래 없음('그냥 단어로')은 문장 꼬리표의 예시로 — 실명이 아닌 흔한 말로. 본 뒤 갈래는 가수로 되돌린다(뒤 저장 시험이 '가수:값'을 본다).
+      const wordPlaceholder = await pageTag.evaluate(() => {
+        const sel = document.querySelector('#quick-tagline .lt-tagline-kind');
+        if (!sel) return null;
+        sel.value = '';
+        sel.dispatchEvent(new Event('change', { bubbles: true }));
+        const placeholder = document.querySelector('#quick-tagline .lt-tagline-value')?.placeholder || '';
+        sel.value = 'artist';
+        sel.dispatchEvent(new Event('change', { bubbles: true }));
+        return placeholder;
+      });
+      assert.equal(wordPlaceholder, '예: 입덕 순간, 무대, 직캠', '갈래 없음의 예시는 문장 꼬리표 예시로 보인다');
       assert.ok(!/종류|꼬리표 값/.test(open.text), '펼친 말에도 개발 용어가 없다 — 실제 "' + open.text + '"');
       await pageTag.screenshot({ path: 'E:/lovetree-qa/lane/local3-graph/tagline-after-open-' + width + '-' + theme + '.png', animations: 'disabled', timeout: 10000 }).catch(() => {});
       // 빈 값으로 [붙이기] → 오류 한 줄(칸 바로 아래).

@@ -84,6 +84,10 @@ export const AUDIT_FN = function audit(opts) {
       // 닫힌 <details> 안의 글자는 그려지지 않는다(요약 줄만 보인다) — 그려지지 않을 좌표로 겹침을 세지 않는다(261117, 걸어온 길 접힘).
       if (n.tagName === 'DETAILS' && !n.open && !el.closest('summary')) return false;
     }
+    // 닫힌 <details>의 본문은 칠해지지 않는다(요약 줄만 보인다) — 사각형은 남아 있지만 화면에는 없다.
+    // 스크롤 위치에 따라 단추와 포개진 것처럼 보여 261117 캡처에서 가짜 겹침이 났다(요약 줄은 그대로 본다).
+    const closed = chain(el).find((n) => n.tagName === 'DETAILS' && !n.open);
+    if (closed && !closed.querySelector(':scope > summary')?.contains(el)) return false;
     const r = clipRect(el);
     if (!(r.right - r.left > 2 && r.bottom - r.top > 2)) return false;
     // 화면 밖(닫힌 패널이 transform으로 치워진 것 등)은 판정에서 뺀다(#635).
