@@ -196,6 +196,32 @@ const frameOf = async (page, test_) => {
   }
   return null;
 };
+// 프레임 교체·재적재 창에서 주소만 잡으면 '아직 그리지 않은 문서'를 물린다(#657 CI page null).
+// frame 객체는 같은 iframe에서 재사용되므로 객체 동일성 대신 readyState complete + 루트 요소 + (지정 시)
+// 보기 상태가 지금 보기로 바뀔 때까지 기다린다. 못 찾으면 현재 프레임 URL 목록을 담은 메시지로 실패한다 —
+// null.evaluate TypeError가 나지 않게.
+const frameUrls = (page) => page.frames().map((f) => { try { return f.url(); } catch { return '<url 조회 실패>'; } });
+const readyFrame = async (page, test_, { root = null, view = null, timeout = 45000, why = '프레임 준비' } = {}) => {
+  const deadline = Date.now() + timeout;
+  let detail = '대기 시작';
+  while (Date.now() < deadline) {
+    const f = page.frames().find((x) => x !== page.mainFrame() && test_.test(x.url()));
+    if (f) {
+      try {
+        const ok = await f.evaluate(({ sel, wantView }) =>
+          document.readyState === 'complete' &&
+          (!sel || Boolean(document.querySelector(sel))) &&
+          (!wantView || document.body?.dataset?.ltView === wantView), { sel: root, wantView: view });
+        if (ok) return f;
+        detail = '프레임은 있으나 문서 준비 전(readyState·루트 요소·보기 상태)';
+      } catch (e) { detail = '프레임 평가 실패: ' + String(e?.message || e); }
+    } else {
+      detail = '대상 프레임을 아직 찾지 못함';
+    }
+    await page.waitForTimeout(250);
+  }
+  assert.fail(`${why} 실패 — ${detail} (최대 ${timeout / 1000}초). 현재 프레임 URL: [${frameUrls(page).join(' | ')}]`);
+};
 
 test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤·정원에서 겹침·잘림·흔적 값·작은 글자가 0이다', { skip: REQUIRE ? false : skip, timeout: 900000 }, async () => {
   if (skip) assert.fail(`미리보기 검사에서는 건너뜀이 실패다 — ${skip}`);
@@ -1093,7 +1119,7 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     await page6.evaluate(() => { location.hash = '#my/book?tree=' + LT41.tree.id; });
     await frameOf(page6, /track59-sketchbook/);
     await page6.waitForTimeout(1500);
-    const bookChips = await (await frameOf(page6, /track59-sketchbook/)).evaluate(() =>
+    const bookChips = await (await readyFrame(page6, /track59-sketchbook/, { why: '책 쪽 확정 꾀리표를 읽을 책 프레임' })).evaluate(() =>
       [...document.querySelectorAll('.moment-title .lt-tag-chip')].map((n) => n.textContent.trim()));
     assert.ok(bookChips.includes('Super Shy') && bookChips.includes('무대'), `책 쪽에 확정 꾀리표 칩이 그려져야 한다(실제: ${JSON.stringify(bookChips)})`);
     // 보드 첫 진입 두 안내(390) — 셸 알림('내 기록을 불러왔어요.')과 보드 안내 말풍선('순간을 선택해…')이
@@ -1154,17 +1180,14 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     // 쓰기 가능 문맥(ctx5 — 예시가 아니라 지금 트리를 부른 자리)에서만 의미가 있어 여기서 한다.
     const pageMap = await ctx5.newPage();
     await pageMap.goto(`${base}/v41/?account=1#network`, { waitUntil: 'load' });
-    await frameOf(pageMap, /track56-network/);
+    await readyFrame(pageMap, /track56-network/, { root: '#mapMain', why: '지도 첫 열기' });
     await pageMap.waitForTimeout(1500);
     const treeBeforeTrip = await pageMap.evaluate(() => ({ id: window.LT41?.tree?.id || '', moments: (window.LT41?.tree?.moments || []).length, momentId: window.LT41?.momentId || '' }));
     assert.ok(treeBeforeTrip.id, '지금 트리가 부른 상태에서 왕복을 본다');
-    const graphFrameTrip = () => [...pageMap.frames()].find((f) => { try { return /track60-graph/.test(f.url()); } catch { return false; } });
-    // 프레임 교체·재적재 창(보기 단추를 누른 직후 주소가 잠깐 다른 문서로 보이는 때)에는 find()가 undefined를 돌려
-    // undefined.evaluate로 검사기가 죽는다(#657 CI 2차 실측 — runCombo 1160행) — 기다리는 frameOf 길로 찾는다.
-    const tripMapFrame = async (why) => {
-      const f = await frameOf(pageMap, /track56-network/);
-      return f;
-    };
+    // 프레임 교체·재적재 창(보기 단추를 누른 직후 주소가 잠깐 다른 문서로 보이는 때)에 find()가 undefined를
+    // 돌려 undefined.evaluate로 죽던 자리(#657 CI 2차 실측) — 준비된 frame을 기다리고, 없으면 URL 목록을
+    // 담은 메시지로 실패한다(null.evaluate TypeError가 나지 않게).
+    const tripMapFrame = (why) => readyFrame(pageMap, /track56-network/, { root: '#mapMain', why });
     await (await tripMapFrame('지도→그래프: 지도 프레임')).evaluate(() => document.getElementById('viewGraph').click());
     await pageMap.waitForFunction(() => [...document.querySelectorAll('iframe')].some((f) => { try { return /track60-graph/.test(f.contentWindow.location.href); } catch { return false; } }), null, { timeout: 10000 });
     // 그래프 모듈이 그려질 때까지(배지가 채워질 때까지) 기다린다 — 프레임 주소만으로는 그리기 전이다.
@@ -1172,8 +1195,7 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
       const f = [...document.querySelectorAll('iframe')].find((x) => { try { return /track60-graph/.test(x.contentWindow.location.href); } catch { return false; } });
       return Boolean(f && (f.contentDocument.getElementById('gBadge')?.textContent || '').length > 0);
     }, null, { timeout: 10000 });
-    const gFrameTrip = graphFrameTrip();
-    assert.ok(gFrameTrip, '지도의 [그래프] 단추로 그래프 보기가 열린다(기존 lt41-navigate 한 길)');
+    const gFrameTrip = await readyFrame(pageMap, /track60-graph/, { root: '#gBadge', why: '지도의 [그래프] 단추로 그래프 보기가 열린다(기존 lt41-navigate 한 길)' });
     const tripGraph = await gFrameTrip.evaluate(() => {
       const b = [...document.querySelectorAll('.g-view-switch .pill')];
       return { n: b.length, pressed: b.map((x) => x.getAttribute('aria-pressed')), badge: document.getElementById('gBadge')?.textContent || '' };
@@ -1193,9 +1215,8 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     assert.equal(mapAfterConc.concPressed, 'true', '동심원형이 눌린 상태(aria-pressed=true)');
     assert.equal(mapAfterConc.stored, 'concentric', '지도 보기 저장 키(lt41.network.view)가 바뀐다');
     await (await tripMapFrame('그물 복귀 누르기: 지도 프레임')).evaluate(() => document.getElementById('viewNet').click());
-    await pageMap.waitForTimeout(1200);
     const treeAfterTrip = await pageMap.evaluate(() => ({ id: window.LT41?.tree?.id || '', moments: (window.LT41?.tree?.moments || []).length, momentId: window.LT41?.momentId || '' }));
-    const mapAfterNet = await (await tripMapFrame('그물 복귀 확인: 지도 프레임')).evaluate(() => ({ view: document.body.dataset.ltView, netPressed: document.getElementById('viewNet')?.getAttribute('aria-pressed') }));
+    const mapAfterNet = await (await readyFrame(pageMap, /track56-network/, { root: '#mapMain', view: 'network', timeout: 45000, why: '그물 복귀 확인: 지도 프레임이 다시 붙고 준비될 때까지' })).evaluate(() => ({ view: document.body.dataset.ltView, netPressed: document.getElementById('viewNet')?.getAttribute('aria-pressed') }));
     assert.equal(mapAfterNet.view, 'network', '지도의 [그물형]으로 그물 보기로 돌아온다');
     assert.equal(mapAfterNet.netPressed, 'true', '그물형이 눌린 상태(aria-pressed=true)');
     assert.deepEqual(treeAfterTrip, treeBeforeTrip, '왕복 뒤에도 지금 트리·순간이 유지된다');
