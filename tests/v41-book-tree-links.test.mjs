@@ -6,9 +6,9 @@ const USE_CSS=readFileSync(new URL('../public/v41/views/book/book-usability.css'
 const HTML=readFileSync(new URL('../public/v41/views/track59-sketchbook.html',import.meta.url),'utf8');
 const NAV=readFileSync(new URL('../public/v41/view-navigation.js',import.meta.url),'utf8');
 
-test('#393 5: "← 내 책장"이 "← 내 트리"가 되고, 그 옆에 지금 책 제목 + ▾가 붙는다',()=>{
- assert.match(HTML,/id="shelfBackBtn" type="button">← 내 트리</,'왼쪽 위 단추 이름');
- assert.match(HTML,/class="topbar-left".*id="shelfBackBtn"/s,'← 내 트리와 제목은 한 묶음(왼쪽)');
+test('#393 5: "← 내 책장"이 "← 서재"가 되고, 그 옆에 지금 책 제목 + ▾가 붙는다',()=>{
+ assert.match(HTML,/id="shelfBackBtn" type="button">← 서재</,'왼쪽 위 단추 이름');
+ assert.match(HTML,/class="topbar-left".*id="shelfBackBtn"/s,'← 서재와 제목은 한 묶음(왼쪽)');
  assert.match(HTML,/id="bookTitleBtn" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="treeMenuPanel"/,'제목 단추는 팝업 단추로 자신을 알린다');
  assert.match(HTML,/id="bookTitleText">책</,'제목 글자 자리');
  assert.match(HTML,/class="book-title-caret" aria-hidden="true">▾</,'▾ 표시');

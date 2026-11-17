@@ -57,14 +57,14 @@ test('#459 낱말 표(docs/WORDS.md)가 있고 금지 낱말·예외를 적는�
 
 test('#459 새 말이 실제로 쓰이는 곳: 메뉴·단추·화면 제목', () => {
   const html = read('public/v41/index.html');
-  // 맨 위 메뉴: 책·보드·지도, 책장 진입은 트리 ▾의 '내 트리 전체 보기'
+  // 맨 위 메뉴: 책·보드·지도, 책장 진입은 트리 ▾의 '서재 전체 보기'·탭 줄 첫 자리 '서재'
   assert.match(html, /data-view="track59-sketchbook\.html">책<\/button>/);
   assert.match(html, /data-view="track58-pinboard\.html">보드<\/button>/);
   assert.match(html, /data-view="track56-network\.html">지도<\/button>/);
   // 순간 추가 창 제목과 서버 읽기 전용 단추
   assert.match(html, /id="write-panel-title">순간 추가<\/h2>/);
   const nav = read('public/v41/shell/navigation.mjs');
-  assert.match(nav, /\['shelf', 'track32-bookshelf\.html', '내 트리'\]/);
+  assert.match(nav, /\['shelf', 'track32-bookshelf\.html', '서재'\]/);
   assert.match(nav, /\['book', 'track59-sketchbook\.html', '책'\]/);
 });
 

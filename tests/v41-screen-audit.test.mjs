@@ -1932,3 +1932,66 @@ test('#657 후속 261117: 카드 층은 바닥 링크 줄 위에서 자른다(39
     await new Promise((resolve) => server.close(resolve));
   }
 });
+
+// 2026-11-17 11:28 대표 지적: 같은 탭 줄이니 글자 크기·굵기를 맞추고, 고른 칸은 묶음 안쪽을 꽉 채운다.
+test('#657 후속 261117: 상단 탭 글자 통일과 고른 탭 칸 높이(390·1440 × 정원·밤)', { skip: REQUIRE ? false : skip, timeout: 240000 }, async () => {
+  const { createTree } = await import('../public/v41/domain.mjs');
+  const oneTree = [createTree({ subject: '시험', title: '모아둔 순간', note: '기억', emotion: '설렘', date: '2026-11-17', url: '' }, '2026-11-17T00:00:00.000Z')];
+  const server = await serve();
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch();
+  try {
+    for (const theme of ['night', 'garden']) {
+      for (const width of [1440, 390]) {
+        const ctx = await browser.newContext({ viewport: { width, height: width === 390 ? 844 : 900 }, reducedMotion: 'reduce' });
+        await ctx.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); } catch {} }, theme);
+        await ctx.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
+        await ctx.route('**/api/workspace**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ revision: 1, state: { version: 1, trees: oneTree, prefs: {} }, subject: '시험계정', writeSubjectBound: true, savedAt: '2026-11-17T00:00:00.000Z' }) }));
+        const page = await ctx.newPage();
+        await page.goto(`${base}/v41/?account=1`, { waitUntil: 'load', timeout: 30000 });
+        await page.waitForFunction(() => !document.getElementById('tree-views')?.hidden, null, { timeout: 10000 });
+        const fonts = await page.evaluate(() => {
+          const style = (sel) => { const s = getComputedStyle(document.querySelector(sel)); return { size: s.fontSize, weight: s.fontWeight, color: s.color }; };
+          const topViews = ['track32-bookshelf.html', 'track59-sketchbook.html', 'track58-pinboard.html', 'track56-network.html'];
+          return { browse: style('#community-menu'), picker: style('#record-menu'), tabs: [...document.querySelectorAll('#tree-views button[data-view]')].filter((b) => topViews.includes(b.dataset.view)).map((b) => ({ view: b.dataset.view, size: getComputedStyle(b).fontSize, weight: getComputedStyle(b).fontWeight, color: getComputedStyle(b).color, current: b.getAttribute('aria-current') === 'true' })) };
+        });
+        assert.equal(fonts.tabs.length, 4, `${width}/${theme}: 탭 4개`);
+        for (const tab of fonts.tabs) {
+          assert.equal(tab.size, fonts.browse.size, `${width}/${theme}/${tab.view}: 둘러보기와 같은 글자 크기`);
+          assert.equal(tab.weight, fonts.browse.weight, `${width}/${theme}/${tab.view}: 둘러보기와 같은 굵기`);
+          assert.equal(tab.size, fonts.picker.size, `${width}/${theme}/${tab.view}: 트리 고르기와 같은 글자 크기`);
+          assert.equal(tab.weight, fonts.picker.weight, `${width}/${theme}/${tab.view}: 트리 고르기와 같은 굵기`);
+        }
+        const unselected = fonts.tabs.filter((t) => !t.current);
+        assert.ok(unselected.length >= 3, `${width}/${theme}: 고르지 않은 탭 3개 이상`);
+        for (const tab of unselected) assert.equal(tab.color, unselected[0].color, `${width}/${theme}/${tab.view}: 탭 글자색 RGB ${tab.color} = ${unselected[0].color}`);
+        const labels = { 'track32-bookshelf.html': '서재', 'track59-sketchbook.html': '책', 'track58-pinboard.html': '보드', 'track56-network.html': '지도' };
+        for (const view of ['track32-bookshelf.html', 'track59-sketchbook.html', 'track58-pinboard.html', 'track56-network.html']) {
+          if (width === 390) {
+            await page.locator('#mobile-more').click();
+            await page.locator('#header-overflow button').filter({ hasText: new RegExp('^' + labels[view] + '$') }).evaluate((el) => el.click());
+          } else {
+            await page.locator(`#tree-views button[data-view="${view}"]`).click();
+          }
+          await page.waitForTimeout(250);
+          if (width === 1440) {
+            const box = await page.evaluate(() => {
+              const frame = document.querySelector('.tree-frame').getBoundingClientRect();
+              const btn = document.querySelector('#tree-views button[aria-current="true"]');
+              const r = btn.getBoundingClientRect();
+              return { innerTop: Math.round(frame.top + 2), innerBottom: Math.round(frame.bottom - 2), innerHeight: Math.round(frame.height - 4), top: Math.round(r.top), bottom: Math.round(r.bottom), height: Math.round(r.height), radius: getComputedStyle(btn).borderTopRightRadius, last: btn === document.querySelector('#tree-views button:last-child') };
+            });
+            assert.ok(Math.abs(box.height - box.innerHeight) <= 2, `${width}/${theme}/${view}: 칠한 높이 ${box.height} = 묶음 안쪽 ${box.innerHeight}`);
+            assert.ok(Math.abs(box.top - box.innerTop) <= 2, `${width}/${theme}/${view}: 위 여백 ${box.top - box.innerTop}px`);
+            assert.ok(Math.abs(box.bottom - box.innerBottom) <= 2, `${width}/${theme}/${view}: 아래 여백 ${box.innerBottom - box.bottom}px`);
+            if (box.last) assert.ok(parseFloat(box.radius) >= 900, `${width}/${theme}/${view}: 마지막 탭 오른쪽 둥글기 ${box.radius}`);
+          }
+        }
+        await ctx.close();
+      }
+    }
+  } finally {
+    await browser.close();
+    await new Promise((resolve) => server.close(resolve));
+  }
+});

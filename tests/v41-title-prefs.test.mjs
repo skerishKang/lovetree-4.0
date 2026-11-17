@@ -25,6 +25,7 @@ test('0. 설정 값·기본값·정규화가 두 벌에서 같다', () => {
     titleDisplay: 'mine', displayName: '', accentColor: '', dateStyle: 'dash', startPlace: 'shelf', shareView: 'network', shareDiscover: true, treeChipOrder: [], homeMoment: { mode: 'last', treeId: '', momentId: '' },
   });
   assert.deepEqual(src.EMPTY_STATE().prefs, { titleDisplay: 'both', displayName: '', accentColor: '', dateStyle: 'dot', startPlace: 'resume', shareView: 'book', shareDiscover: false, treeChipOrder: [], homeMoment: { mode: 'last', treeId: '', momentId: '' } });
+  assert.deepEqual(pub.EMPTY_STATE().prefs, { titleDisplay: 'both', displayName: '', accentColor: '', dateStyle: 'dot', startPlace: 'resume', shareView: 'book', shareDiscover: false, treeChipOrder: [], homeMoment: { mode: 'last', treeId: '', momentId: '' } });
   // 261116 PR 2: 첫 화면 카드 모드(normalizeHomeMoment)도 두 벌이 같다. 모르는 값은 '마지막', id는 80자로 정리한다.
   assert.deepEqual(src.HOME_MOMENT_MODES, pub.HOME_MOMENT_MODES);
   assert.deepEqual(src.HOME_MOMENT_MODES, ['last', 'pin', 'day', 'random', 'tree']);
@@ -34,6 +35,7 @@ test('0. 설정 값·기본값·정규화가 두 벌에서 같다', () => {
   assert.deepEqual(src.normalizeHomeMoment({ mode: 'pin', momentId: ' m1 ', treeId: ' t1 ' }), { mode: 'pin', treeId: 't1', momentId: 'm1' });
   assert.deepEqual(src.normalizeHomeMoment({ mode: 'evil' }), { mode: 'last', treeId: '', momentId: '' });
   assert.deepEqual(src.EMPTY_STATE().prefs, { titleDisplay: 'both', displayName: '', accentColor: '', dateStyle: 'dot', startPlace: 'resume', shareView: 'book', shareDiscover: false, treeChipOrder: [], homeMoment: { mode: 'last', treeId: '', momentId: '' } });
+  assert.deepEqual(pub.EMPTY_STATE().prefs, { titleDisplay: 'both', displayName: '', accentColor: '', dateStyle: 'dot', startPlace: 'resume', shareView: 'book', shareDiscover: false, treeChipOrder: [], homeMoment: { mode: 'last', treeId: '', momentId: '' } });
 
 });
 

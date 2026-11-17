@@ -147,7 +147,7 @@ export function writeMenuLabel({ owned = false, dirty = false, reading = false, 
 
 // 첫 화면 가운데 버튼 3개. 자리와 개수는 그대로 두고 첫 버튼 문구만 상태로 바꾼다.
 // 261116 PR 2(대표 확정): 로그인 상태는 '+ 순간 추가'가 글귀 바로 아래 위쪽 단추(밝은 채움)로 올라가고,
-// 가운데 세트는 [순간 목록·둘러보기·내 트리] 테두리형 — 강조는 세트에 없다(위쪽 단추 하나뿐).
+// 가운데 세트는 [순간 목록·둘러보기·서재] 테두리형 — 강조는 세트에 없다(위쪽 단추 하나뿐). 261117 대표 확정: '내 트리' → '서재'.
 // 로그아웃은 지금처럼 첫 버튼만 흰 강조다.
 export function homeCenterState({ member = 'out', treeCount = 0 } = {}) {
   const signedIn = member === 'in';
@@ -158,7 +158,7 @@ export function homeCenterState({ member = 'out', treeCount = 0 } = {}) {
       buttons: [
         { key: 'start', label: '처음 시작하기', emphasis: true, disabled: false, title: '로그인하거나 가입하고 첫 순간을 남겨 보세요.' },
         { key: 'new', label: '새 트리 만들기', emphasis: false, disabled: false, title: '로그인한 뒤 새 트리를 만들 수 있어요.' },
-        { key: 'trees', label: '내 트리', emphasis: false, disabled: false, title: '내 트리를 엽니다.' }
+        { key: 'trees', label: '서재', emphasis: false, disabled: false, title: '서재를 엽니다.' }
       ]
     };
   }
@@ -170,7 +170,7 @@ export function homeCenterState({ member = 'out', treeCount = 0 } = {}) {
       buttons: [
         { key: 'moments', label: '순간 목록', emphasis: false, disabled: false, title: '모아 둔 순간을 한곳에서 봅니다.' },
         { key: 'community', label: '둘러보기', emphasis: false, disabled: false, title: '다른 사람의 순간을 둘러봅니다.' },
-        { key: 'trees', label: '내 트리', emphasis: false, disabled: false, title: '내 트리 목록을 엽니다.' }
+        { key: 'trees', label: '서재', emphasis: false, disabled: false, title: '서재를 엽니다.' }
       ]
     };
   }
@@ -179,7 +179,7 @@ export function homeCenterState({ member = 'out', treeCount = 0 } = {}) {
     buttons: [
       { key: 'moments', label: '순간 목록', emphasis: false, disabled: false, title: '모아 둔 순간을 한곳에서 봅니다.' },
       { key: 'community', label: '둘러보기', emphasis: false, disabled: false, title: '다른 사람의 순간을 둘러봅니다.' },
-      { key: 'trees', label: '내 트리', emphasis: false, disabled: false, title: '내 트리 목록을 엽니다.' }
+      { key: 'trees', label: '서재', emphasis: false, disabled: false, title: '서재를 엽니다.' }
     ]
   };
 }

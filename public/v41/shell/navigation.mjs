@@ -5,7 +5,7 @@
 
 export const screens = [
   ['home', 'src064-orbit.html', '첫 화면'],
-  ['shelf', 'track32-bookshelf.html', '내 트리'],
+  ['shelf', 'track32-bookshelf.html', '서재'],
   ['book', 'track59-sketchbook.html', '책'],
   ['board', 'track58-pinboard.html', '보드'],
   ['network', 'track56-network.html', '지도'],

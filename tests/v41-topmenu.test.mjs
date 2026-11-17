@@ -15,9 +15,8 @@ const postdeploy = read('tools/postdeploy/postdeploy.mjs');
 
 const nav = html.slice(html.indexOf('<nav class="main-nav"'), html.indexOf('</nav>'));
 
-test('첫 화면·내 책장 탭은 맨 위 메뉴에서 없어진다', () => {
+test('첫 화면 탭은 맨 위 메뉴에 없다 — data-view 탭은 서재·책·보드·지도뿐이다(261117 서재 첫 자리)', () => {
   assert.doesNotMatch(nav, /data-view="src064-orbit\.html"/);
-  assert.doesNotMatch(nav, /data-view="track32-bookshelf\.html"/);
   assert.doesNotMatch(nav, />첫 화면</);
   assert.doesNotMatch(nav, />내 책장</);
 });
@@ -29,18 +28,23 @@ test('로고가 첫 화면으로 간다 — 링크·키보드(#home 해시)', ()
   assert.deepEqual(screens[0], ['home', 'src064-orbit.html', '첫 화면']);
 });
 
-test('트리 선택과 보기 방식이 한 틀(.tree-frame)에 붙고 이름은 책·보드·지도다', () => {
+test('트리 선택과 보기 방식이 한 틀(.tree-frame)에 붙고 이름은 서재·책·보드·지도다', () => {
   const frame = nav.slice(nav.indexOf('class="tree-frame"'), nav.indexOf('</nav>'));
   assert.ok(frame.includes('id="record-menu"') && frame.includes('id="tree-views"'), '트리 ▾와 보기 묶음이 같은 틀 안에 있다');
-  assert.match(frame, /role="group" aria-label="이 트리 보기"/);
+  // 261117 대표 확정: 탭 줄은 [서재][책][보드][지도] — 서재가 첫 자리(나중에 '트리' 보기 탭이 서재 다음에 온다).
+  assert.match(frame, /role="group" aria-label="서재·이 트리 보기"/);
+  const tabIndex = frame.indexOf('>서재</button>');
+  assert.ok(tabIndex > -1, '서재 탭이 있다');
+  assert.ok(tabIndex < frame.indexOf('>책</button>'), '서재는 책보다 앞자리다');
+  assert.match(frame, /data-view="track32-bookshelf\.html">서재<\/button>/);
   assert.match(frame, />책<\/button>/);
   assert.match(frame, />보드<\/button>/);
   assert.match(frame, />지도<\/button>/);
   assert.doesNotMatch(frame, /기억책|기억 보드|관계 지도/);
   // 한 틀 모양: 알약 테두리 한 줄, 보기 버튼 사이는 안쪽 구분선.
   assert.match(css, /\.tree-frame\{display:flex;align-items:center;flex:0 0 auto;margin-left:6px;padding:1px;border:1px solid rgba\(255,255,255,\.16\);border-radius:999px/);
-  assert.match(css, /\.tree-frame \.tree-views\{margin-left:0;padding-left:0;border-left:0;gap:0\}/);
-  assert.match(css, /\.tree-frame \.tree-views>button\{min-height:40px;border-left:1px solid var\(--line\);border-radius:0\}/);
+  assert.match(css, /\.tree-frame \.tree-views\{margin-left:0;padding-left:0;border-left:0;gap:0;align-self:stretch;align-items:stretch\}/);
+  assert.match(css, /\.tree-frame \.tree-views>button\{min-height:0;align-self:stretch;border-left:1px solid var\(--line\);border-radius:0/);
 });
 
 test('지금 보는 보기는 눌린 상태(aria-current)로 표시된다', () => {
@@ -54,8 +58,8 @@ test('트리 ▾를 누르면 그 트리로 이동하는 동작이 그대로다'
   assert.match(shell, /const wasTreeView=TREE_VIEWS\.has\(current\);choose\(id\);if\(!wasTreeView\)show\('track59-sketchbook\.html',false\);flowNavigation\(\);writeLocation\(\);/);
 });
 
-test('트리 드롭다운 맨 아래 "내 트리 전체 보기"가 책장 화면을 연다', () => {
-  assert.match(shell, /data-tree-action="shelf">내 트리 전체 보기<\/button>/);
+test('트리 드롭다운 맨 아래 "서재 전체 보기"가 책장 화면을 연다', () => {
+  assert.match(shell, /data-tree-action="shelf">서재 전체 보기<\/button>/);
   assert.match(shell, /querySelector\('\[data-tree-action="shelf"\]'\)\?\.addEventListener\('click',\(\)=>\{closeTreeMenu\(\);show\('track32-bookshelf\.html'\);\}\)/);
   // 로그인 상태에서만 그려진다(로그아웃 드롭다운은 아예 열리지 않지만 이중으로 걸러 둔다).
   assert.match(shell, /const shelfEntry=member\?\.snapshot\(\)\.owned\?/);
@@ -63,7 +67,7 @@ test('트리 드롭다운 맨 아래 "내 트리 전체 보기"가 책장 화면
 
 test('모바일 접기 메뉴(메뉴 더보기)도 같은 구조다', () => {
   const fold = shell.slice(shell.indexOf('function buildFoldMenu'), shell.indexOf('const escHTML'));
-  const order = ["add('첫 화면'", "add('둘러보기'", "add('책'", "add('보드'", "add('지도'", "add('내 트리 전체 보기'"];
+  const order = ["add('첫 화면'", "add('둘러보기'", "add('서재'", "add('책'", "add('보드'", "add('지도'"];
   let at = -1;
   for (const token of order) {
     const next = fold.indexOf(token, at + 1);
@@ -79,7 +83,7 @@ test('간단·고급 모드와 상관없이 맨 위 메뉴 높이 규칙은 유�
   // 2026-11-10 메뉴 정리의 높이 규칙(최소 64px + 아래 경계선)을 그대로 둔다.
   assert.match(css, /\.app-header\{min-height:64px;padding:10px 20px/);
   // 한 틀 안의 버튼도 40px 높이 규칙을 쓴다 — 틀이 메뉴 높이를 키우지 않는다(변경 전 65px 유지).
-  assert.match(css, /\.tree-frame \.tree-views>button\{min-height:40px;/);
+  assert.match(css, /\.tree-frame \.tree-views>button\{min-height:0;align-self:stretch;/);
   // 고급 기능 보기(lt-advanced)는 계정 메뉴 안의 일이라 맨 위 메뉴 구조를 바꾸지 않는다.
   assert.match(shell, /document\.body\.classList\.toggle\('lt-advanced',on\)/);
   assert.doesNotMatch(css, /\.lt-advanced [^{]*\.tree-frame/);
@@ -95,7 +99,7 @@ test('화면 제목과 안내 글도 줄인 이름을 쓴다', () => {
   assert.deepEqual(screens.find(s => s[0] === 'book'), ['book', 'track59-sketchbook.html', '책']);
   assert.deepEqual(screens.find(s => s[0] === 'board'), ['board', 'track58-pinboard.html', '보드']);
   assert.deepEqual(screens.find(s => s[0] === 'network'), ['network', 'track56-network.html', '지도']);
-  assert.deepEqual(screens.find(s => s[0] === 'shelf'), ['shelf', 'track32-bookshelf.html', '내 트리']);
+  assert.deepEqual(screens.find(s => s[0] === 'shelf'), ['shelf', 'track32-bookshelf.html', '서재']);
   assert.ok(FIRST_TREE_TIPS.some(tip => tip.title === '책·보드·지도로 다르게 봐요'), '보기 전환 말풍선 제목');
 });
 

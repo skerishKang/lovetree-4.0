@@ -165,7 +165,7 @@ export function createReader(deps) {
         animateSharedBook(sourceRect,targetRect,function(){
           $('#readerScreen').classList.remove('active','is-preparing');
           state.selectedId=null;save();
-          $('#crumbLabel').textContent='내 트리';
+          $('#crumbLabel').textContent='서재';
           window.scrollTo({top:0,behavior:'smooth'});
         });
       }

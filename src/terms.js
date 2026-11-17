@@ -1,7 +1,7 @@
-// #39 — 네 화면(처음·내 트리·기억책·트리)이 같은 서비스로 읽히도록 공통 용어를 한 곳에 둔다.
+// #39 — 네 화면(처음·서재·기억책·트리)이 같은 서비스로 읽히도록 공통 용어를 한 곳에 둔다(261117 대표 확정: 내 트리 화면 이름 '서재').
 export const SERVICE = '러브트리';
 export const GO_HOME = '처음으로';
-export const GO_TREES = '내 트리';
+export const GO_TREES = '서재';
 export const GO_EXAMPLES = '예시 둘러보기';
 export const READ_BOOK = '기억책으로 읽기';
 export const VIEW_TREE = '트리 연결 보기';

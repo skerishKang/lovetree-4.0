@@ -72,10 +72,10 @@ test('날짜 표기 배선: 책·보드·지도·첫 화면 목록이 같은 한
   assert.match(shell, /try\{localStorage\.setItem\('lt41\.dateStyle',normalizeDateStyle\(state\.prefs\?\.dateStyle\)\);\}catch\{\}/);
 });
 
-test('처음 보여 줄 곳: 첫 화면·내 트리 전체 보기·이어 읽기(기본), 주소가 이기면 그 주소다', () => {
+test('처음 보여 줄 곳: 첫 화면·서재 전체 보기·이어 읽기(기본), 주소가 이기면 그 주소다', () => {
   assert.match(html, /data-start-place="resume"[^>]*>이어 읽기</);
   assert.match(html, /data-start-place="home"[^>]*>첫 화면</);
-  assert.match(html, /data-start-place="shelf"[^>]*>내 트리 전체 보기</);
+  assert.match(html, /data-start-place="shelf"[^>]*>서재 전체 보기</);
   assert.equal(normalizeStartPlace(undefined), 'resume', '옛 저장본은 지금 동작(이어 읽기)이다');
   // 셸 진입 경로에서만 처리하고, 주소(해시·owner 경로)가 있으면 설정보다 이긴다.
   assert.match(shell, /const startPlace=\(\(\)=>\{try\{return normalizeStartPlace\(state\.prefs\?\.startPlace\)\}catch\{return 'resume'\}\}\)\(\);/);
