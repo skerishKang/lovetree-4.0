@@ -55,6 +55,7 @@ function shareHarness({ confirmAnswer = true, clipboard = null, visibilityAnswer
     list: async () => ({ok: true, shares: requests.filter(r => r[0] === 'list').length ? {id: 'share-1', treeId: 'tree1', status: 'active', view: 'book', createdAt: '2026-11-12T09:00:00Z', discoverable: false} : []}),
     setDiscoverable: async (id, next) => { requests.push(['discoverable', id, next]); return {ok: true}; },
     setTreeVisibility: async (treeId, visibility) => { requests.push(['visibility', treeId, visibility]); return visibilityAnswer; },
+    getTreeVisibility: async () => ({ok: true, visibility: 'public'}), // #830: 비공개는 누구나 무료 — 조회는 공개로 본다
     getTreeDiscover: async () => ({ok: true, discover: discoverNow.discover}),
     setTreeDiscover: async (treeId, next) => { requests.push(['discover', treeId, next]); discoverNow.discover = next === true; return {ok: true}; }, // 261116 결정 — 스위치가 쓰는 discover 한 벌
     revoke: async id => { requests.push(['revoke', id]); return {ok: true}; }

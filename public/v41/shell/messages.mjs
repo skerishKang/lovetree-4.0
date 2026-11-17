@@ -350,6 +350,7 @@ export function createMessages(deps) {
     $('share-copy-note').textContent = '';
     paintShareMomentHint();
     paintShareDiscover();
+    paintShareVisibility();
     paintShareSteps('choose');
     panel('share-panel');
     void loadShareList();
@@ -452,6 +453,29 @@ export function createMessages(deps) {
       ? (next ? '둘러보기에 소개했어요.' : '둘러보기 소개를 껐어요. 링크를 받은 사람만 볼 수 있어요.')
       : (answer.message || '소개 설정을 바꾸지 못했어요.');
     void paintShareDiscover(); // 서버 응답 뒤 상자 안 두 줄이 같은 값에서 다시 그려진다(261116 2차 지적)
+  };
+  // 트리 공개/비공개(#830: 누구나 무료). 소개와 같은 줄로 현재 상태를 보이고, 단추 글자는 행동을 말한다.
+  async function paintShareVisibility() {
+    const treeId = window.LT41?.tree?.id;
+    const state = $('share-visibility-state'), toggle = $('share-visibility-toggle');
+    if (!state || !toggle) return;
+    if (!treeId) { state.textContent = ''; toggle.hidden = true; return; }
+    toggle.hidden = false;
+    const answer = await Promise.resolve().then(() => shareApi.getTreeVisibility(treeId)).then(a => (a.ok ? a.visibility : null)).catch(() => null);
+    if (answer === null) { state.textContent = '공개 상태를 확인하지 못했어요.'; toggle.textContent = '다시 확인'; return; }
+    state.textContent = answer === 'private' ? '비공개 · 무료' : '공개 · 무료';
+    toggle.textContent = answer === 'private' ? '공개로 바꾸기' : '비공개로 바꾸기';
+    toggle.dataset.state = answer === 'private' ? 'private' : 'public';
+  }
+  $('share-visibility-toggle').onclick = async () => {
+    const treeId = window.LT41?.tree?.id;
+    if (!treeId) { $('share-feedback').textContent = '공개 상태를 바꿀 트리를 먼저 열어 주세요.'; return; }
+    const next = $('share-visibility-toggle').dataset.state === 'private' ? 'public' : 'private';
+    const answer = await shareApi.setTreeVisibility(treeId, next);
+    $('share-feedback').textContent = answer.ok
+      ? (next === 'private' ? '이 트리를 비공개로 바꿨어요.' : '이 트리를 공개로 바꿨어요.')
+      : (answer.message || '공개 상태를 바꾸지 못했어요.');
+    void paintShareVisibility();
   };
 
   // 둘러보기(공개 목록) 연결. 항목을 열면 공유 주소로, 내 기록 새로 시작은 첫 여정으로 간다.
