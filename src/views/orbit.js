@@ -43,8 +43,8 @@ let extraCSS=`:host{display:block;height:100dvh;min-height:540px;font-family:var
 
 extraCSS += '@media(min-width:651px){.detail-grid{padding-left:64px;padding-right:64px}}@media(max-width:650px){.detail-grid{padding-top:60px}.detail-nav{top:6px;transform:none}.detail-nav--prev{left:12px}.detail-nav--next{left:64px;right:auto}.detail-nav-note{top:20px}}';
 // #426: 최근 순간 카드 — 궤도의 금빛 내 카드(.card.mine)와 같은 결(테두리·이중선·금빛 번짐). 390에서는 폭=화면-32px, 세로 썸네일 높이 제한.
-// 2026-11-17: 카드 층의 아래 경계를 바닥 링크 줄 위에서 자른다. 링크 줄 자체는 옮기지 않는다.
-extraCSS+=`.app{overflow:hidden}`;
+// 2026-11-17: 카드 층(.world)에만 아래 경계를 둔다. 링크 줄과 .app·body의 넘침은 건드리지 않는다.
+extraCSS+=`.world{bottom:56px;overflow:hidden}`;
 extraCSS+=`.center-note{display:flex;flex-wrap:wrap;justify-content:center;align-items:baseline;gap:2px 10px}.center-hint{color:var(--lt-muted,#9b98a6)}@media(max-width:650px){.center p.note-with-hint{font-size:12px;line-height:1.5;margin-top:8px}}/* #635 PR C: '드래그 · 금테 카드를 눌러 감상' 안내를 단추 묶음 바로 아래(안내 줄 옆)로 올린다 — 화면 아래 고정 링크 줄과 겹치지 않게. */`;
 /* 261117 대표 검수: 마우스로 열었으면 닫기 단추의 초점 테두리를 그리지 않는다(#795 계정 메뉴와 같은 방식) — 키보드로 열었으면 보인다. */
 extraCSS+=`dialog[data-lt-opened-by=mouse] .close:focus-visible,dialog[data-lt-opened-by=mouse] .close:focus{outline:0;box-shadow:none}`;

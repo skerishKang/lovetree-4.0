@@ -1898,14 +1898,19 @@ test('#657 후속 261117: 카드 층은 바닥 링크 줄 위에서 자른다(39
           const a = c.getBoundingClientRect(), s = c.querySelector('.surface')?.getBoundingClientRect() || a;
           return { l: Math.min(a.left, s.left), r: Math.max(a.right, s.right), t: Math.min(a.top, s.top), b: Math.max(a.bottom, s.bottom) };
         });
-        const links = [...document.querySelectorAll('.home-links a,.home-links button')].map((e) => { const r = e.getBoundingClientRect(); return { l: r.left, r: r.right, t: r.top, b: r.bottom }; }).filter((r) => r.r > r.l && r.b > r.t);
+        const allLinks = [...document.querySelectorAll('.home-links a,.home-links button')].map((e) => { const r = e.getBoundingClientRect(); return { text: e.textContent.trim().slice(0, 8), l: r.left, r: r.right, t: r.top, b: r.bottom, shown: r.r > r.l && r.b > r.t }; });
+        const links = allLinks.filter((l) => l.shown);
         const overlaps = rects.reduce((n, c) => n + links.filter((l) => Math.min(c.r, l.r) - Math.max(c.l, l.l) > 0 && Math.min(c.b, l.b) - Math.max(c.t, l.t) > 0).length, 0);
         const lr = document.querySelector('.home-links')?.getBoundingClientRect();
-        return { count: cards.length, overlaps, ceiling: lr ? Math.round(lr.top) - 8 : null, lowest: rects.length ? Math.round(Math.max(...rects.map((c) => c.b))) : null };
+        window.scrollTo(0, document.documentElement.scrollHeight);
+        const scroll = { scrollHeight: document.documentElement.scrollHeight, clientHeight: document.documentElement.clientHeight, links: allLinks.map((l) => ({ text: l.text, shown: l.shown, top: Math.round(l.t), bottom: Math.round(l.b), inView: !l.shown || (l.t >= -1 && l.b <= globalThis.innerHeight + 1) })) };
+        return { count: cards.length, overlaps, ceiling: lr ? Math.round(lr.top) - 8 : null, lowest: rects.length ? Math.round(Math.max(...rects.map((c) => c.b))) : null, scroll };
       });
       assert.equal(measured.overlaps, 0, `${label}: 카드↔바닥 링크 겹침 ${measured.overlaps}쌍`);
       if (label === 'few-390') assert.equal(measured.count, 0, `390 소수 카드 계정: 보이는 카드 ${measured.count}장(기존 궤도 숨김 유지)`);
       if (measured.ceiling !== null && measured.lowest !== null) assert.ok(measured.lowest <= measured.ceiling, `${label}: 카드 아래끝 ${measured.lowest} > 링크 줄 위 ${measured.ceiling}`);
+      assert.equal(measured.scroll.links.length, 4, `${label}: 바닥 링크 4개를 잰다`);
+      assert.ok(measured.scroll.links.every((l) => l.inView), `${label}: 맨 아래 스크롤 뒤 링크가 화면 밖 — ${JSON.stringify(measured.scroll.links)}`);
       await ctx.close();
     }
   } finally {
