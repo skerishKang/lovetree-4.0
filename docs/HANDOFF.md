@@ -1,5 +1,12 @@
 # LoveTree 4.0 — 핸드오프
 
+## 2026-11-18 — '내 의견 빈 화면' 수리와 일지 처리(#846, 컴1로컬4, PR #851·#854)
+
+- **고침(PR #851, main fcabc5f)**: 완료 창의 '내 의견 열기'가 창만 열고 목록을 다시 불러오지 않았다(shell.mjs가 `panel('myposts-panel')`만 호출) — 보낸 직후 `/api/board/mine` 요청 0번·빈 목록. `feedbackBoard.openMyPosts()`로 바꿈. 불러오는 중 문구 '불러오는 중이에요.', `#myposts-panel` 내용 최대 960px 가운데 정렬(2560 실측: 목록 960·항목 960·덧붙임 입력칸 843·가운데 true). 실측: 의견 2건 보낸 뒤 열기 → 항목 2개(#2·#1), 요청 GET /api/board/mine 1회씩. 캡처 `E:\lovetree-qa\local4\my-opinions\`.
+- **도구(PR #854, main 3b56d9f)**: ops-reply가 일지를 아예 거부하던 것을 고침 — 일지는 내부 메모(authorType=internal)·상태·연결 이슈 갱신만, 의견은 종전대로 고객 답변. replyMode 순수 함수 + tests/ops-reply.test.mjs 6건.
+- **실데이터 적용(판독기로 번호 확인)**: 증상을 적은 건은 일지 id=36 하나(같은 계정 의견 #20·#21·#23·#24에는 증상 없음). ops-reply로 id=36에 내부 메모 '보낸 직후에도 내 의견 목록이 바로 보이게 고쳤어요.'(reply id=37, internal) + 상태 fixed + 연결 이슈 846 — 판독기 재실행으로 DB 실값 확인.
+- **남긴 것**: ① comp2에 설치된 `/usr/local/sbin/lovetree-api-autodeploy`가 옛판이라 감시 목록에 tools/ops-reply.mjs가 없어 자동 설치가 걸리지 않았다 — 이번엔 수동 반영했고, 설치본 갱신이 필요하다. ② ops-reply 출력 문구의 authorType 고정값은 별도 PR로 바로잡는다. ③ #851은 사용자 보이는 고침이라 새 소식(updates.json) 한 줄은 소식 모아 만드는 레인 몫이다.
+
 ## 2026-11-18 — 서재 탭 구조 되돌림(감사기 3건 수리) (컴1로컬3, PR #847, d1e3e06)
 
 - CI 빨강 3개의 원인: 서재 탭을 #tree-views 밖 따로 단추(.shelf-tab)로 꺼낸 구조. main에는 원래 서재 탭이 묶음 첫 버튼이었다. 390에서는 묶음 접기 규칙(.main-nav .tree-views 숨김)이 서재 탭에 먹지 않아 테마 단추와 6px 겹침 + 단추 글자 12px(감사기 화면 실패 16건), '탭 글자 통일'·'트리 0개 탭 4개' 시험의 #tree-views 4버튼 기대와 어긋남.
