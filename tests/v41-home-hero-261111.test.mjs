@@ -164,15 +164,21 @@ test('홈 배선: 추가/둘러보기/로그아웃 시작이 기존 액션으로
   assert.equal(/새 트리 만들기/.test(centerCode),false,'"새 트리 만들기"는 가운데 줄에서 뺀다');
 });
 
-test('큰 제목 아래 둘째 줄: 치웠다(261116 PR 2) — 정리 입구는 첫 화면에 없다',()=>{
+test('큰 제목 아래 둘째 줄: 치웠다(261116 PR 2) — 모아둔 숫자를 누르면 정리 창',()=>{
   // 261116 PR 2: 둘째 줄 안내 자리에 '+ 순간 추가' 단추가 온다(밝은 채움).
   assert.match(homeSrc,/home-add-top/);
   assert.match(homeSrc,/primary-cta home-add-top/);
   assert.match(homeSrc,/quote\?\.after\(addTop\)/);
   assert.doesNotMatch(homeSrc,/정리 안 된 순간/,'둘째 줄 안내 문구는 첫 화면에서 뺐다');
-  // #380 5번: 첫 화면의 정리 링크(center-status)를 없앴다 — 입구는 트리 ▾ 드롭다운 하나뿐이다.
+  assert.doesNotMatch(homeSrc,/homeSecondLine/,'옛 둘째 줄 글자 단추는 없다');
+  // #380 5번: 첫 화면의 정리 링크(center-status)는 없다.
   assert.equal(homeSrc.includes('center-status'),false,'첫 화면 정리 링크 없음');
-  assert.equal(homeSrc.includes('actions.cleanup('),false,'첫 화면에서 정리 창을 열지 않는다');
+  // 261117 고객 의견: 숫자 줄 '모아둔 N' 칸을 누르면 정리 창(lt41-cleanup)을 연다.
+  assert.match(homeSrc,/inboxLine\.onclick=\(\)=>bridge\.actions\.cleanup\(\)/,'모아둔 칸 클릭은 정리 창 액션');
+  assert.match(homeSrc,/setAttribute\('aria-label',`모아둔 순간 \$\{inboxCount\}개 정리하기`\)/,'모아둔 칸 이름');
+  assert.match(homeSrc,/setAttribute\('aria-disabled','true'\)/,'모아둔 0은 비활성 표기');
+  assert.match(homeSrc,/\.home-info-line\{pointer-events:auto/,'모아둔 칸은 눌을 수 있게 화면 위로 올린다');
+  assert.match(homeSrc,/\.home-info-line\{pointer-events:auto;display:flex/,'모아둔 칸 최소 높이 44px');
 });
 
 test('가운데 위 모아둔 순간 알약은 첫 화면에서 제거됐다',()=>{
@@ -190,10 +196,10 @@ test('정리 화면 빈 제목 대체: 영상/비영상 구분, 흐린 글자, �
   assert.match(shellCss,/\.cleanup-moment \.is-blank/);
 });
 
-test('정리 화면 열기 메시지가 홈 액션에 준비됐다',()=>{
+test('정리 화면 열기 메시지가 홈 액션에 준비됐다(261117 고객 의견 — 모아둔 순간 정리 창)',()=>{
   const sent=[];
   createHomeActions({getContext:()=>null,send:m=>sent.push(m)}).actions.cleanup();
-  assert.deepEqual(sent,[{type:'lt41-move'}]);
+  assert.deepEqual(sent,[{type:'lt41-cleanup'}]);
 });
 
 test('첫 화면 가운데 버튼 폭(대표 2026-11-13): 두 개여도 늘어나지 않고, 휴대폰에서는 줄을 꽉 채우지 않는다', () => {

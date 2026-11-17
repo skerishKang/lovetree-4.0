@@ -8,8 +8,8 @@ export function createHomeActions({getContext,send,gallery=false}) {
   start:()=>send({type:'lt41-start'}),
    account:()=>send({type:'lt41-account'}),
    community:()=>send({type:'lt41-community'}),
-   // #380: 정리 화면 열기(홈 둘째 줄 '정리하기').
-   cleanup:()=>send({type:'lt41-move'}),
+   // 261117 고객 의견: 첫 화면 둘째 줄 '모아둔 순간 N개 정리하기' — 모아둔 순간 정리 창을 연다(순간 옮기기 picker와 별개).
+   cleanup:()=>send({type:'lt41-cleanup'}),
   navigate:where=>send({type:'lt41-navigate',view:where==='trees'?SHELF:'src064-orbit.html'}),
   openMine:(treeId,id)=>{const tree=ownTree(treeId,id);if(!tree)return;send({type:'lt41-open-book',treeId:tree.id,id});},
   openBook:(treeId,id)=>{const tree=ownTree(treeId,id);if(gallery&&tree){send({type:'lt41-open-book',treeId:tree.id,id});return;}if(gallery&&getContext()?.source!=='example'){send({type:'lt41-example',view:BOOK,momentId:id});return;}if(select(id))send({type:'lt41-navigate',view:BOOK});},

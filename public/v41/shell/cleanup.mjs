@@ -82,12 +82,8 @@ export function createCleanup(deps) {
           thumbNode.setAttribute('data-lt-fallback-mode', 'thumb-slot');
           thumbNode.setAttribute('data-lt-fallback-html', `<span class="lt-thumb-tone" data-tone="${tone}" aria-hidden="true"></span>`);
         }
-      } else if (fallbackCardOf) {
-        thumbNode = document.createElement('span');
-        thumbNode.className = 'lt-thumb-tone';
-        thumbNode.setAttribute('data-tone', String(emotionToneOf(moment.emotion)));
-        thumbNode.setAttribute('aria-hidden', 'true');
       }
+      // 썸네일이 없으면 그 자리를 비운다(#798 목록 규칙 — 빈 네모를 따로 두지 않는다).
       label.setAttribute('data-lt-moment-row', '');
       const text = document.createElement('span');
       const title = momentTitle(moment);
