@@ -41,12 +41,12 @@ test('상세 창 제목은 자동 기본 문구를 표시하지 않는다(정리
   // 마음 한마디가 큰 글씨가 되면 아래 메모 단락과 같은 글자를 두 번 보여 주지 않는다.
   assert.match(ORBIT, /\$\{head\.memoAsMain\?'':`<p>\$\{esc\(c\.note\)\}<\/p>`\}/);
   // 상세 창 안에서는 자동 문구 대체가 없어야 한다(head가 빈 제목이면 비워 둔다).
-  const detail = ORBIT.slice(ORBIT.indexOf('function renderDetail'), ORBIT.indexOf('function index()'));
+  const detail = ORBIT.slice(ORBIT.indexOf('function renderDetail'), ORBIT.indexOf('function index('));
   assert.doesNotMatch(detail, /<h2>\$\{esc\(mainOf/);
 });
 
 test('상세 창의 작은 영상 제목 줄도 한 벌(head.sub)에서 온다', () => {
-  const detail = ORBIT.slice(ORBIT.indexOf('function renderDetail'), ORBIT.indexOf('function index()'));
+  const detail = ORBIT.slice(ORBIT.indexOf('function renderDetail'), ORBIT.indexOf('function index('));
   assert.match(detail, /head\.sub\?`<span class="videoTitle">/);
   assert.doesNotMatch(detail, /\$\{subMarkup\(c\)\}/);
 });
