@@ -448,6 +448,9 @@ html[data-lt-theme=garden] #cleanup-panel input:not([type=checkbox]),html[data-l
 .app-header .brand{min-height:40px}
 .main-nav{display:flex;align-items:center;gap:2px;flex:1;min-width:0}
 .main-nav>button{min-height:40px;padding:0 10px;font-size:13px}
+/* 261118 대표 지적: 서재 탭은 상단 메뉴 맨 앞자리다. 지금 서재를 보고 있으면 채움 표시(1차 단추 알약)를 둔다. */
+.main-nav>button.shelf-tab{margin-right:8px}
+.main-nav>button.shelf-tab[aria-current=true]{background:var(--lt-primary);color:var(--lt-primary-ink);box-shadow:none;font-weight:600}
 /* 2026-11-11 맨 위 메뉴 개편(이슈 380) 2번: 트리 선택과 보기 방식을 한 틀로 붙인다 — [ a ▾ │ 책 │ 보드 │ 지도 ] */
 .tree-frame{display:flex;align-items:center;flex:0 0 auto;margin-left:6px;padding:1px;border:1px solid rgba(255,255,255,.16);border-radius:999px;background:rgba(9,8,14,.45)}
 /* 이슈 421 2회차: 트리 선택·보기 탭이 모두 숨겨진 상태(로그아웃·트리 없음·공유)에서는 빈 틀이 점으로 남지 않게 틀 자체를 숨긴다. */

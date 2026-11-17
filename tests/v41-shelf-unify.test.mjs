@@ -77,11 +77,13 @@ test('#212 "한 권의 책" 강조는 장미색이 아니라 흐린 진주색이
 });
 
 // 2. 책 카드 정보 줄.
-test('#212 카드 표지에는 이름이 한 번만 나오고 아래는 "순간 N개 · 마지막 YYYY-MM-DD"다', () => {
+test('#212 카드 표지에는 이름이 한 번만 나오고 아래는 "순간 N개 · 언제 담았는지"다(261118 대표 지적 5)', () => {
   assert.match(shelf, /<strong class="cover-title">'\+esc\(book\.name\)\+'<\/strong><\/div>/);
   assert.ok(!/book-card-meta"><strong>/.test(shelf), '표지 아래 중복 제목을 두지 않는다');
-  // 2026-11-09: 정보 줄·마지막 날짜 계산은 shelf-model.mjs로 옮겼다.
-  assert.match(shelf, /export const bookMeta = \(book\) => book\.chapters\.length \+ '개 순간 · 마지막 ' \+ \(book\.lastDate \|\| '-'\)/);
+  // 2026-11-09: 정보 줄 계산은 shelf-model.mjs로 옮겼다. 261118: '마지막 YYYY-MM-DD' 대신 쉰 말('어제 추가'·'3일 전 추가', 7일 넘으면 날짜).
+  assert.match(shelf, /export function addedLabel\(lastDate, now = new Date\(\)\)/);
+  assert.match(shelf, /if \(days <= 7\) return days \+ '일 전 추가'/, '7일 안은 상대 표기');
+  assert.ok(!/'마지막 '/.test(shelf), "'마지막 2026-11-13' 기계 표기를 쓰지 않는다");
   assert.match(shelf, /export function lastMomentDate\(tree\)/, '마지막 날짜를 순간에서 계산한다');
 });
 
@@ -129,13 +131,16 @@ test('#212 책장은 공용 표시 함수를 싣고 카드 이름에 적용한�
   assert.match(shelf, /LTTreeName\.displayTreeTitle/);
 });
 
-// 4. 예시 그림 자리 → 이어 읽기 칸(#256-1, 2026-11-09). #212의 "실제 내 책 4권" 작은 책장은
-//    역할이 아래 책장과 겹쳐 이어 읽기 칸으로 바뀌었다(이슈 #256 1번).
-test('#256-1 오른쪽 위 칸은 이어 읽기이고 문구·이동은 shelf-model 한 벌에서 온다', () => {
+// 4. 예시 그림 자리 → 이어 보기 띠(261118 대표 지적 4). 트리가 있으면 소개 문 대신 띠 한 줄.
+test('#서재 이어 보기 띠는 문구·이동·썸네일을 shelf-model 한 벌에서 온다', () => {
   const markup = shelf.slice(0, shelf.indexOf('<script'));
   assert.ok(!/<span>순간 0[1-4]<\/span>/.test(shelf), '가짜 예시 4권을 두지 않는다');
   assert.equal((markup.match(/class="hero-book"/g) || []).length, 0, '작은 책장 그림은 남기지 않는다');
-  assert.ok(markup.includes('id="resumeCard"'), '이어 읽기 칸을 둔다');
+  assert.ok(markup.includes('id="resumeStrip"'), '이어 보기 띠를 둔다');
+  assert.ok(markup.includes('id="resumeThumb"'), '가로 썸네일 칸을 둔다');
+  assert.ok(markup.includes('id="resumeTree"') && markup.includes('id="resumeMoment"'), '트리 이름·순간 제목 칸을 둔다');
+  assert.ok(markup.includes('이어 보기 ▶'), "단추 말은 '이어 보기'로 통일한다");
+  assert.ok(!/youtube\.com에서/.test(shelf), '주소 문구를 띠에 넣지 않는다');
   assert.match(shelf, /function renderResumeCard\(\)/);
   assert.match(shelf, /resumeCard\(\{/, '문구·칸 판정은 shelf-model의 resumeCard를 쓴다');
   assert.match(shelf, /renderShelf\(\);renderResumeCard\(\);bind\(\);/, '화면 진입 때 한 번 그린다');
@@ -160,11 +165,13 @@ test('#212 클래식 판본(tree-name.js)이 모듈과 같은 결과를 낸다',
   assert.match(shelf, /<script src="\/v41\/tree-name\.js"><\/script>/);
 });
 
-// #256-1: 책장 어댑터(view-navigation.js)가 이어 읽기 칸을 장식 취급하지 않는다.
-test('#256-1 view-navigation 어댑터가 이어 읽기 칸의 문구·접근성을 덮어 쓰지 않는다', () => {
+// 261118 대표 지적 4: 책장 어댑터(view-navigation.js)는 트리 0개 소개 문의 보조 문·단추 말만 덮는다 —
+// 이어 보기 띠 문구는 shelf.js·shelf-model이 정한다.
+test('#서재 view-navigation 어댑터는 트리 0개 소개 문만 덮고 이어 보기 띠를 만지지 않는다', () => {
   const nav = read('public/v41/view-navigation.js');
-  assert.match(nav, /stage\.closest\('#resumeCard'\)/, 'stage-label 덮어쓰기는 이어 읽기 칸을 제외한다');
-  assert.match(nav, /hero-stage:not\(#resumeCard\)/, 'aria-hidden은 이어 읽기 칸에 다시 붙이지 않는다');
+  assert.match(nav, /'책을 누르면 읽던 순간부터 책이 열려요\.'/, '소개 문 보조 문');
+  assert.match(nav, /jump\.textContent='책 열기'/, "트리 0개 단추 말은 '책 열기'");
+  assert.ok(!/resumeStrip|resumeCard|stage-label/.test(nav), '띠·이전 칸 요소를 어댑터가 만지지 않는다');
 });
 
 // #256-1: 칸을 바꾸면서 닫는 태그를 하나 남기면 아래 책장이 밀린다(실제로 그랬었다). 균형을 검사한다.
@@ -186,43 +193,34 @@ test('#서재 서재 화면의 머리말·고리칸·접근성 이름이 서재�
   assert.match(html, /id="shelfViewport" aria-label="서재"/, '책장 진열 접근성 이름');
   const reader = read('public/v41/views/shelf/shelf-reader.js');
   assert.match(reader, /crumbLabel'\)\.textContent='서재'/, '책에서 돌아올 때도 서재');
-  const nav = read('public/v41/view-navigation.js');
-  assert.match(nav, /stage\.textContent='서재'/, '장식 단계 이름도 서재');
 });
 
-// 261117 대표 확정: 서재 책 줄(책등 목차) 끝·책장 진열 끝에 '+ 새 트리' 빈 책 한 권 —
-// 누르면 지금의 새 트리 만들기 흐름(이어 읽기 칸 first 경로와 같은 lt41-write new).
-test('#서재 "+ 새 트리" 빈 책이 책등 줄 끝·진열 끝에 서고 누르면 새 트리 만들기 흐름을 연다', () => {
+// 261118 대표 지적 2·3: 세로 책등 줄은 지우고, '+ 새 트리' 입구는 오른쪽 단추 하나로 모은다.
+test('#서재 책등 줄은 없고 "+ 새 트리" 입구는 오른쪽 단추 하나다', () => {
   const js = read('public/v41/views/shelf/shelf.js');
-  assert.match(js, /book-card--new"><button type="button" data-new-book aria-label="새 트리 만들기"/, '진열 끝 빈 책');
-  assert.match(js, /shelf-spine--new" data-new-book aria-label="새 트리 만들기"/, '책등 줄 끝 빈 책');
-  assert.match(js, /<strong class="cover-title">\+ 새 트리<\/strong>/, '빈 책 이름');
-  // 배선은 한 벌: data-new-book 클릭 → lt41-write new(#256-1 first 경로와 같은 메시지).
-  assert.match(js, /closest\('\[data-new-book\]'\)\)\{openNewTree\(\);return;\}/, '책등 줄 배선');
-  assert.match(js, /closest\('\[data-new-book\]'\)\)openNewTree\(\);/, '진열 배선');
-  // lt41-write new는 두 곳에서 쓴다 — 이어 읽기 칸의 'first' 경로와 빈 책의 openNewTree(같은 흐름).
-  assert.equal((js.match(/lt41-write',mode:'new'/g) || []).length, 2, '이어 읽기 first 경로 + 빈 책');
-  assert.match(js, /var openNewTree=function\(\)\{parent\.postMessage\(\{type:'lt41-write',mode:'new'\},location\.origin\);\};/, '빈 책 배선은 openNewTree 한 벌');
-  // 진열 3D 배치: 빈 책도 마지막 책 다음 자리에 선다(책이 없으면 가운데).
-  assert.match(js, /carouselTransform\(state\.shelfList\.length-center\)/, '빈 책 자리는 진열 끝');
-  assert.match(js, /newCard=rail\.querySelector\('\.book-card--new'\)/, '빈 책을 배치 대상으로 본다');
-  // 모양 — 점선 테두리·가운데 ＋, 색은 --lt-* 토큰만. 책등 규칙은 shelf.css(덧칠 파일에 섞지 않는다).
+  const html = read('public/v41/views/track32-bookshelf.html');
+  const model = read('public/v41/views/shelf/shelf-model.mjs');
+  const css = read('public/v41/views/shelf/shelf.css');
   const extra = read('public/v41/views/shelf/shelf-extra.css');
-  const spineCss = read('public/v41/views/shelf/shelf.css');
-  assert.match(extra, /book-card--new \.book-cover \{[^}]*border: 2px dashed/, '진열 빈 책 점선 테두리');
-  assert.match(spineCss, /shelf-spine--new \{[^}]*border: 2px dashed/, '책등 빈 책 점선 테두리');
-  assert.match(extra, /new-book-plus \{[^}]*color: var\(--lt-gold,#ffe6a6\)/, '밤: ＋는 금빛');
-  assert.match(extra, /\[data-lt-theme=garden\] \.book-card--new \.new-book-plus \{ color: var\(--lt-gold-ink,#8a6420\)/, '정원: ＋는 종이 위 금빛');
+  // 책등 줄 흔적이 남지 않는다.
+  assert.ok(!/shelfSpine|shelf-spine/.test(html), '책장 문서에 책등 줄이 없다');
+  assert.ok(!/spine/i.test(js), 'shelf.js에 책등 코드가 없다');
+  assert.ok(!/spine/i.test(model), 'shelf-model에 책등 계산이 없다');
+  assert.ok(!/spine/i.test(css) && !/spine/i.test(extra), '책등 규칙이 남지 않는다');
+  assert.ok(!read('public/v41/identity.css').includes('shelf-spine'), 'identity.css에도 책등 규칙이 없다');
+  // '+ 새 트리' 입구는 단추 하나. 점선 빈 책·빈 칸은 없다.
+  assert.ok(html.includes('id="shelfNewTree"'), "오른쪽 '+ 새 트리' 단추를 둔다");
+  assert.ok(!/book-card--new|data-new-book|new-book-plus/.test(js + html), '점선 빈 책을 두지 않는다');
+  assert.match(js, /\$\('#shelfNewTree'\)\.addEventListener\('click',openNewTree\)/, '단추는 새 트리 만들기 흐름을 연다');
+  assert.equal((js.match(/lt41-write',mode:'new'/g) || []).length, 2, '이어 보기 띠 first 경로 + 새 트리 단추');
 });
 
-// 261117 대표 확정: 이어 읽기 칸이 테마를 따른다 — 정원에서도 검은 밤 카드로 남지 않는다.
-test('#서재 이어 읽기 칸은 정원에서 밝은 종이 카드(--lt-paper 위 --lt-ink)다', () => {
+// 261118 대표 지적 4: 이어 보기 띠가 테마를 따른다 — 정원에서도 검은 밤 카드로 남지 않는다.
+test('#서재 이어 보기 띠는 정원에서 밝은 종이 카드(--lt-paper 위 --lt-ink)다', () => {
   const extra = read('public/v41/views/shelf/shelf-extra.css');
-  assert.match(extra, /\[data-lt-theme=garden\] \.hero-stage \{[^}]*background: var\(--lt-paper,#f5efe2\)/, '정원: 카드 면은 종이');
-  assert.match(extra, /\[data-lt-theme=garden\] \.hero-stage \{[^}]*color: var\(--lt-ink,#433a34\)/, '정원: 글자는 종이 위 잉크');
-  assert.match(extra, /\[data-lt-theme=garden\] \.resume-copy strong \{ color: var\(--lt-ink,#433a34\)/, '정원: 이어 읽기 문구');
-  assert.match(extra, /\[data-lt-theme=garden\] \.resume-copy em \{ color: var\(--lt-gold-ink,#8a6420\)/, '정원: 행동 글자는 종이 위 금빛');
-  // 밤 규칙은 그대로다(정원에서만 고쳤다) — 밤 카드 면은 shelf.css의 원본 블록.
-  const base = read('public/v41/views/shelf/shelf.css');
-  assert.match(base, /\.hero-stage \{[^}]*linear-gradient\(135deg,#29272a,#161517 82%\)/, '밤 카드는 지금 그대로');
+  assert.match(extra, /\[data-lt-theme=garden\] \.resume-strip \{[^}]*background: var\(--lt-paper,#f5efe2\)/, '정원: 띠 면은 종이');
+  assert.match(extra, /\[data-lt-theme=garden\] \.resume-line strong \{ color: var\(--lt-ink,#433a34\)/, '정원: 트리 이름은 종이 위 잉크');
+  assert.match(extra, /\[data-lt-theme=garden\] \.resume-go \{ color: var\(--lt-gold-ink,#8a6420\)/, '정원: 행동 글자는 종이 위 금빛');
+  // 밤 규칙은 그대로다(정원에서만 고쳤다) — 밤 띠 면은 --lt-glass-strong.
+  assert.match(extra, /\.resume-strip \{[^}]*background: var\(--lt-glass-strong\)/, '밤 띠는 무대 위 유리 카드');
 });

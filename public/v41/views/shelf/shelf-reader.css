@@ -163,7 +163,6 @@
       .ghost { min-height: 34px; padding: 0 10px; font-size: 10px; }
       .hero { padding: 21px 17px; border-radius: 22px; }
       .hero h1 { font-size: 36px; }
-      .hero-stage { min-height: 235px; }
       .hero-books { gap: 8px; }
       .shelf-controls { align-items: stretch; flex-direction: column; }
       .search { max-width: none; }

@@ -175,7 +175,7 @@ test('3-1. 헤더가 실제로 줄인 이름을 보여 준다(함수 직접 호�
   try {
     assert.match(els['source-label'].textContent, /리센느/);
     assert.doesNotMatch(els['source-label'].textContent, /나의 순간들/, '자동 꼬리말은 헤더에 보이지 않는다');
-    assert.equal(els['tree-views'].getAttribute('aria-label'), '서재 · 리센느 보기');
+    assert.equal(els['tree-views'].getAttribute('aria-label'), '이 트리 보기');
   } finally { restore(); }
 });
 
@@ -183,7 +183,7 @@ test('3-2. 직접 쓴 이름은 헤더에서도 그대로다', () => {
   const {els, restore} = headerHarness({title: '리센느의 기록'});
   try {
     assert.equal(els['source-label'].textContent.includes('리센느의 기록'), true);
-    assert.equal(els['tree-views'].getAttribute('aria-label'), '서재 · 리센느의 기록 보기');
+    assert.equal(els['tree-views'].getAttribute('aria-label'), '이 트리 보기');
   } finally { restore(); }
 });
 

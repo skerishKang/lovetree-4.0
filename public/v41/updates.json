@@ -5,7 +5,8 @@
     "items": [
       {"kind": "new", "text": "서재에서 바로 새 트리를 만들고 고칠 수 있어요", "source": "user", "issue": "#810"},
       {"kind": "new", "text": "영상을 보다가 바로 그 순간을 담을 수 있어요", "source": "team", "issue": "#792"},
-      {"kind": "fix", "text": "첫 화면의 모아둔 순간 숫자를 누르면 바로 정리할 수 있어요", "source": "ai_tester"}
+      {"kind": "fix", "text": "첫 화면의 모아둔 순간 숫자를 누르면 바로 정리할 수 있어요", "source": "ai_tester"},
+      {"kind": "new", "text": "서재 화면이 정리됐어요: 맨 앞에 '서재' 탭이 생기고, 책등 줄이 없어지고, 책 아래에 '어제 추가'처럼 언제 담았는지 보여요", "source": "ai_tester", "tester": "레인", "issue": "#839"}
     ]
   },
   {

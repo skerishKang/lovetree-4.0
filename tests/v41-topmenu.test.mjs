@@ -31,13 +31,12 @@ test('로고가 첫 화면으로 간다 — 링크·키보드(#home 해시)', ()
 test('트리 선택과 보기 방식이 한 틀(.tree-frame)에 붙고 이름은 서재·책·보드·지도다', () => {
   const frame = nav.slice(nav.indexOf('class="tree-frame"'), nav.indexOf('</nav>'));
   assert.ok(frame.includes('id="record-menu"') && frame.includes('id="tree-views"'), '트리 ▾와 보기 묶음이 같은 틀 안에 있다');
-  // 261117 대표 확정: 탭 줄은 [서재][책][보드][지도] — 서재가 첫 자리(나중에 '트리' 보기 탭이 서재 다음에 온다).
-  assert.match(frame, /role="group" aria-label="서재·이 트리 보기"/);
-  const tabIndex = frame.indexOf('>서재</button>');
-  assert.ok(tabIndex > -1, '서재 탭이 있다');
-  assert.ok(tabIndex < frame.indexOf('>책</button>'), '서재는 책보다 앞자리다');
-  assert.match(frame, /data-view="track32-bookshelf\.html">서재<\/button>/);
-  assert.match(frame, />책<\/button>/);
+  // 261118 대표 지적 1: 서재 탭은 트리 틀 밖 맨 앞자리로 나왔다. 트리 틀 안은 책·보드·지도만 남는다.
+  const navStart = nav.slice(0, nav.indexOf('class="tree-frame"'));
+  assert.match(navStart, /<button data-view="track32-bookshelf\.html" class="shelf-tab">서재<\/button>/, '서재 탭은 맨 앞자리다');
+  assert.ok(!frame.includes('>서재</button>'), '트리 틀 안에 서재 탭이 남지 않는다');
+  assert.match(frame, /role="group" aria-label="이 트리 보기"/);
+  assert.match(frame, /data-view="track59-sketchbook\.html">책<\/button>/);
   assert.match(frame, />보드<\/button>/);
   assert.match(frame, />지도<\/button>/);
   assert.doesNotMatch(frame, /기억책|기억 보드|관계 지도/);
