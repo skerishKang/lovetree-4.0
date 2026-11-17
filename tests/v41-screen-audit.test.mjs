@@ -2024,7 +2024,7 @@ test('#657 후속 261117: 트리 0개 계정의 탭 4개와 화면별 빈 상태
             : [...document.querySelectorAll('#tree-views button[data-view]')];
           const buttons = nodes.map((b) => {
             const r = b.getBoundingClientRect();
-            return { text: b.textContent.trim(), w: Math.round(r.width), h: Math.round(r.height), current: b.getAttribute('aria-current') === 'true' };
+            return { text: b.textContent.trim(), w: Math.round(r.width), h: Math.round(r.height), color: getComputedStyle(b).color, current: b.getAttribute('aria-current') === 'true' };
           });
           return { buttons, folded, overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth, themeButtons: document.querySelectorAll('#theme-toggle').length };
         }, Object.values(labels));
@@ -2032,6 +2032,8 @@ test('#657 후속 261117: 트리 0개 계정의 탭 4개와 화면별 빈 상태
         assert.ok(tabs.buttons.every((b) => b.w > 0 && b.h > 0), `${width}/${theme}: 탭 rect>0 — ${JSON.stringify(tabs.buttons)}`);
         assert.ok(tabs.overflow <= 0, `${width}/${theme}: 가로 넘침 ${tabs.overflow}px`);
         assert.equal(tabs.themeButtons, 1, `${width}/${theme}: 머리줄 테마 단추 1개`);
+        const unselectedColors = [...new Set(tabs.buttons.filter((b) => !b.current).map((b) => b.color))];
+        assert.equal(unselectedColors.length, 1, `${width}/${theme}: 고르지 않은 탭 글자색 RGB 같음 — ${JSON.stringify(tabs.buttons)}`);
         for (const [view, heading, action] of [
           ['track32-bookshelf.html', '아직 책장이 비어 있어요.', '＋ 새 트리'],
           ['track59-sketchbook.html', '아직 트리가 없어요.', '＋ 첫 순간 추가'],
@@ -2043,25 +2045,74 @@ test('#657 후속 261117: 트리 0개 계정의 탭 4개와 화면별 빈 상태
           else await page.locator(`#tree-views button[data-view="${view}"]`).click();
           await page.waitForTimeout(350);
           await openMore();
-          const state = await page.evaluate((folded) => ({
-            hash: location.hash,
-            home: document.body.classList.contains('home-screen'),
-            emptyShown: !document.getElementById('empty')?.hidden,
-            heading: document.querySelector('#empty h1')?.textContent?.trim(),
-            action: document.getElementById('empty-records')?.textContent?.trim(),
-            current: folded
+          const state = await page.evaluate((folded) => {
+            const rect = (sel) => {
+              const el = document.querySelector(sel);
+              if (!el || el.hidden) return null;
+              const r = el.getBoundingClientRect();
+              return { l: r.left, r: r.right, t: r.top, b: r.bottom, w: Math.round(r.width), h: Math.round(r.height) };
+            };
+            const overlap = (a, b) => !a || !b ? 0 : Math.max(0, Math.min(a.r, b.r) - Math.max(a.l, b.l)) * Math.max(0, Math.min(a.b, b.b) - Math.max(a.t, b.t));
+            const targets = [['h1', rect('#empty h1')], ['p', rect('#empty p')], ['button', rect('#empty-records')]];
+            const blockers = [['updates', rect('.updates-card')], ['toast', rect('#toast')], ['plus', rect('#mobile-add')]];
+            return {
+              hash: location.hash,
+              home: document.body.classList.contains('home-screen'),
+              emptyShown: !document.getElementById('empty')?.hidden,
+              heading: document.querySelector('#empty h1')?.textContent?.trim(),
+              action: document.getElementById('empty-records')?.textContent?.trim(),
+              rectsOk: targets.every(([, t]) => t && t.w > 0 && t.h > 0),
+              overlaps: targets.flatMap(([tn, t]) => blockers.map(([bn, b]) => [tn + '/' + bn, overlap(t, b)])),
+              current: folded
               ? Object.keys({ 'track32-bookshelf.html': '서재', 'track59-sketchbook.html': '책', 'track58-pinboard.html': '보드', 'track56-network.html': '지도' }).find((v) => { const b = [...document.querySelectorAll('#header-overflow button')].find((x) => x.getAttribute('aria-current') === 'true'); return b && b.textContent.trim() === { 'track32-bookshelf.html': '서재', 'track59-sketchbook.html': '책', 'track58-pinboard.html': '보드', 'track56-network.html': '지도' }[v]; }) || ''
               : document.querySelector('#tree-views button[aria-current="true"]')?.dataset.view || ''
-          }), tabs.folded);
+            };
+          }, tabs.folded);
           assert.equal(state.hash, '#' + { 'track32-bookshelf.html': 'shelf', 'track59-sketchbook.html': 'book', 'track58-pinboard.html': 'board', 'track56-network.html': 'network' }[view], `${width}/${theme}/${view}: 주소가 탭에 남는다`);
           assert.equal(state.home, false, `${width}/${theme}/${view}: 첫 화면으로 튕기지 않는다`);
           assert.ok(state.emptyShown, `${width}/${theme}/${view}: 빈 상태가 보인다`);
           assert.equal(state.heading, heading, `${width}/${theme}/${view}: 빈 상태 문구`);
           assert.equal(state.action, action, `${width}/${theme}/${view}: 빈 상태 단추`);
           assert.equal(state.current, view, `${width}/${theme}/${view}: 탭 표시 유지`);
+          assert.ok(state.rectsOk, `${width}/${theme}/${view}: 안내 문장·단추 rect>0`);
+          const worst = state.overlaps.reduce((a, b) => (b[1] > a[1] ? b : a), ['none', 0]);
+          assert.equal(worst[1], 0, `${width}/${theme}/${view}: 안내·단추와 새 소식·알림·＋ 단추 겹침 ${worst[0]} ${worst[1]}px²`);
         }
         await ctx.close();
       }
+    }
+  } finally {
+    await browser.close();
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+// 2026-11-17 대표 지적: 트리가 있는 계정에서도 고르지 않은 탭 글자색이 밤·정원 모두 같아야 한다(빈 상태와 같은 규칙).
+test('#657 후속 261117: 트리 있는 계정의 탭 글자색도 같다(정원·밤)', { skip: REQUIRE ? false : skip, timeout: 180000 }, async () => {
+  const { createTree } = await import('../public/v41/domain.mjs');
+  const tree = createTree({ subject: '시험', title: '색 확인 트리', note: '기록', emotion: '설렘', date: '2026-11-17', url: '' }, '2026-11-17T00:00:00.000Z');
+  const server = await serve();
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch();
+  try {
+    for (const theme of ['night', 'garden']) for (const width of [1440, 390]) {
+      const ctx = await browser.newContext({ viewport: { width, height: width === 390 ? 844 : 900 }, reducedMotion: 'reduce' });
+      await ctx.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); } catch {} }, theme);
+      await ctx.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
+      await ctx.route('**/api/workspace**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ revision: 1, state: { version: 1, trees: [tree], prefs: {} }, subject: '시험계정', writeSubjectBound: true, savedAt: '2026-11-17T00:00:00.000Z' }) }));
+      const page = await ctx.newPage();
+      await page.goto(`${base}/v41/?account=1`, { waitUntil: 'load', timeout: 30000 });
+      await page.waitForFunction(() => !document.getElementById('tree-views')?.hidden, null, { timeout: 10000 });
+      if (width === 390) await page.locator('#mobile-more').click();
+      await page.waitForTimeout(200);
+      const colors = await page.evaluate(() => {
+        const nodes = innerWidth <= 780
+          ? [...document.querySelectorAll('#header-overflow button')].filter((b) => ['서재', '책', '보드', '지도'].includes(b.textContent.trim()))
+          : [...document.querySelectorAll('#tree-views button[data-view]')];
+        return nodes.filter((b) => b.getAttribute('aria-current') !== 'true').map((b) => getComputedStyle(b).color);
+      });
+      assert.equal(new Set(colors).size, 1, `${width}/${theme}: 고르지 않은 탭 글자색 RGB 같음 — ${JSON.stringify(colors)}`);
+      await ctx.close();
     }
   } finally {
     await browser.close();

@@ -733,3 +733,12 @@ body.lt-frame-dialog-open #toast{top:calc(72px + env(safe-area-inset-top));botto
 #empty[data-empty-view=shelf] .empty-tree-art{display:none}
 #empty[data-empty-view=shelf] #empty-records{display:flex;align-items:center;justify-content:center;width:180px;height:250px;margin:12px auto 0;border:2px dashed var(--lt-line,rgba(255,255,255,.3));border-radius:12px;background:rgba(255,255,255,.05);color:var(--lt-pearl);font-size:16px}
 html[data-lt-theme=garden] #empty[data-empty-view=shelf] #empty-records{background:rgba(73,61,58,.05);border-color:var(--lt-line-paper);color:var(--lt-ink)}
+/* 2026-11-17 대표 지적: 390 빈 상태의 세로 카드 그림이 새 소식 카드·알림에 닿는다 — 그림을 줄이고 위로 올려 단추까지 안전 구역에 둔다. */
+@media(max-width:600px){
+  #empty{align-content:start;padding-top:56px}
+  #empty:not([data-empty-view=shelf]) .empty-tree-art{width:min(140px,100%);margin:0 auto 2px}
+  #empty:not([data-empty-view=shelf]) .empty-tree-art svg{width:auto;height:150px;max-width:100%}
+  #empty:not([data-empty-view=shelf]) .empty-tree-art::before{inset:-10% -8% -6%}
+}
+/* 고르지 않은 탭은 밤·정원 모두 같은 토큰 색을 쓴다(빈 상태에서 색이 어긋나지 않게). */
+.tree-frame .tree-views>button:not([aria-current=true]),.tree-frame .tree-views>button:not([aria-current=true]):hover{color:var(--lt-muted)}
