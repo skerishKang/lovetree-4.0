@@ -419,14 +419,17 @@ html[data-lt-theme=garden] #moment-form input,html[data-lt-theme=garden] #moment
 /* 이슈 327 2부: 모아둔 순간 표시·정리 창. 계산은 inbox-model.mjs, 여기는 자리만 잡는다. */
 #cleanup-panel fieldset{border:0;border-top:1px solid var(--line);margin:22px 0 0;padding:18px 0 0}
 #cleanup-panel legend{font-size:13px;font-weight:600;padding:0}
-#cleanup-panel label{display:block;font-size:13px;color:var(--lt-muted);margin:12px 0}
-#cleanup-panel input,#cleanup-panel select{display:block;width:100%;margin-top:8px;padding:11px 12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.22);border-radius:12px;color:var(--lt-pearl);min-height:44px;line-height:1.6}
+/* 순간 후보 줄(label.cleanup-moment, 체크 칸)을 이 칸 규칙에서 빼서 줄이 깨지지 않게 한다. */
+#cleanup-panel label:not(.cleanup-moment){display:block;font-size:13px;color:var(--lt-muted);margin:12px 0}
+#cleanup-panel input:not([type=checkbox]),#cleanup-panel select{display:block;width:100%;margin-top:8px;padding:11px 12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.22);border-radius:12px;color:var(--lt-pearl);min-height:44px;line-height:1.6}
 .cleanup-moments{display:grid;gap:8px;max-height:min(46vh,420px);overflow:auto;padding-right:4px}
 .cleanup-moment{display:flex;align-items:center;gap:12px;min-height:48px;margin:0!important;padding:8px 12px;background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:var(--lt-r-card);color:var(--lt-pearl);font-size:14px}
 .cleanup-moment input{width:22px;height:22px;margin:0;accent-color:var(--lt-primary);flex:0 0 auto}
 .cleanup-moment span{min-width:0;overflow-wrap:anywhere}
 .cleanup-moment .is-blank{color:var(--lt-muted)}
-.cleanup-moment-thumb{display:block;flex:0 0 auto;width:34px;height:34px;margin:0;border-radius:6px;object-fit:cover;background:rgba(255,255,255,.06);border:1px solid var(--line)}
+.cleanup-moment-thumb{display:block;flex:0 0 auto;width:56px;height:56px;margin:0;border-radius:6px;object-fit:cover;background:rgba(255,255,255,.06);border:1px solid var(--line)}
+/* 순간 추가 폼 입력칸과 같은 규칙: 정원(밝은 바탕)에서는 정리 창의 입력칸도 정원 종이·선 토큰으로 흰 칸과 견준다. 밤은 기본값 그대로다. */
+html[data-lt-theme=garden] #cleanup-panel input:not([type=checkbox]),html[data-lt-theme=garden] #cleanup-panel select{background:var(--lt-paper);border-color:var(--lt-line-paper)}
 #cleanup-count{margin:10px 0 0}
 #cleanup-error{color:var(--lt-rose);font-weight:600}
 #move-feedback{flex:0 0 auto;position:relative;z-index:26;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;padding:10px 22px;background:rgba(238,190,104,.08);border-bottom:1px solid rgba(255,230,166,.35);font-size:13px;line-height:1.7}
