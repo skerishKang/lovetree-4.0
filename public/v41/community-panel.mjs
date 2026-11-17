@@ -105,12 +105,12 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
   return `${item.aiTester===true?'AI 명예회원 ':''}${publicName}님`;
  }
  function renderCover(item,{loading='lazy'}={}){
-  const cover=el('div','community-cover'),video=['video','youtube'].includes(item.cover?.type),vertical=video&&item.cover?.vertical===true;
-  cover.dataset.mediaKind=vertical?'video-vertical':video?'video':'photo';
+  const cover=el('div','community-cover'),youtube=item.cover?.type==='youtube',video=['video','youtube'].includes(item.cover?.type),vertical=video&&item.cover?.vertical===true;
+  cover.dataset.mediaKind=vertical?'video-vertical':youtube?'video-youtube':video?'video':'photo';
   const url=item.cover?.thumbnailUrl||item.cover?.url||'';
   if(url){
    const art=el('span','community-cover-art');
-   if(vertical){const backdrop=el('img','community-cover-backdrop');backdrop.src=url;backdrop.alt='';backdrop.setAttribute('aria-hidden','true');backdrop.loading=loading;art.append(backdrop);}
+   if(vertical||youtube){const backdrop=el('img','community-cover-backdrop');backdrop.src=url;backdrop.alt='';backdrop.setAttribute('aria-hidden','true');backdrop.loading=loading;art.append(backdrop);}
    const image=el('img','community-cover-image');image.src=url;image.alt='';image.loading=loading;image.decoding='async';image.referrerPolicy='no-referrer';
    image.onerror=()=>{if(image.isConnected)image.replaceWith(el('span','community-cover-fallback',item.cover?.title||'순간 사진을 불러오지 못했어요.'));};
    art.append(image);cover.append(art);

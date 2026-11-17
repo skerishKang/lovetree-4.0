@@ -54,10 +54,11 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
   // 디자인/기본으로 바뀌고(projectSharedTree), 디자인·기본 표지에는 주소가 없다.
   const coverUrl=coverModeOf(tree)==='moment'?(cover?.url||''):'';
   const vertical=['video','youtube'].includes(coverType)&&isVerticalMoment(cover);
+  const safeCoverThumbnail=safeYoutubeThumb(cover?.mediaMetadata?.thumbnail||cover?.mediaMetadata?.thumbnailUrl||cover?.thumbnailUrl);
+  const thumbnailId=youtubeId||youtubeIdFrom(safeCoverThumbnail);
+  const youtubeThumbnail=youtubeStageThumbUrl(thumbnailId,'mqdefault')||safeCoverThumbnail;
   const thumbnailUrl=coverModeOf(tree)==='moment'
-   ? coverType==='youtube'
-    ? safeYoutubeThumb(cover?.mediaMetadata?.thumbnail||cover?.mediaMetadata?.thumbnailUrl||cover?.thumbnailUrl)||youtubeStageThumbUrl(youtubeId)
-    : coverUrl
+   ? coverType==='youtube'?youtubeThumbnail:coverUrl
    : '';
   const emotions=[...new Set(tree.moments.map(moment=>moment.emotion).filter(Boolean))];
   const stats=statsOverride||await communityRepo.stats({productId,shareId:share.shareId,viewerSubjectId});

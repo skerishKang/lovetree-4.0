@@ -235,6 +235,21 @@ test('4-1. 같은 이름과 순간은 공개 표시명만 쓰고 순번을 붙�
   } finally { h.restore(); }
 });
 
+test('4-2. 가로 YouTube 표지는 넓게 그리고 세로 표지는 흐린 배경을 유지한다', async () => {
+  const horizontal = { ...COMMUNITY_ITEM, shareId: 'wide', cover: { ...COMMUNITY_ITEM.cover, type: 'youtube', url: 'https://www.youtube.com/watch?v=M7lc1UVf-VE', thumbnailUrl: 'https://img.youtube.com/vi/M7lc1UVf-VE/hqdefault.jpg', vertical: false } };
+  const vertical = { ...COMMUNITY_ITEM, shareId: 'tall', cover: { ...COMMUNITY_ITEM.cover, type: 'youtube', url: 'https://www.youtube.com/shorts/aqz-KE-bpKQ', thumbnailUrl: 'https://img.youtube.com/vi/aqz-KE-bpKQ/hqdefault.jpg', vertical: true } };
+  const h = communityHarness({ items: [horizontal, vertical] });
+  try {
+    await h.search();
+    const [wideCard, tallCard] = h.get('community-list').children;
+    const wideCover = wideCard.children[0], tallCover = tallCard.children[0];
+    assert.equal(wideCover.dataset.mediaKind, 'video-youtube');
+    assert.equal(tallCover.dataset.mediaKind, 'video-vertical');
+    assert.equal(wideCover.children[0].children.some(node => node.className === 'community-cover-backdrop'), true);
+    assert.equal(tallCover.children[0].children.some(node => node.className === 'community-cover-backdrop'), true);
+  } finally { h.restore(); }
+});
+
 test('5. 긴 이름은 말줄임 — 헤더 트리 이름과 문맥 줄이 폭을 넘지 않는다', () => {
   // #601: 트리를 바꿔도 탭이 흔들리지 않게 칸 폭을 고정한다(11em) — 넘치면 말줄임. (CSS 값은 글자로 유지)
   assert.match(css, /nav #record-menu{flex:0 0 auto;width:11em;/, '헤더 트리 선택 고정 폭');

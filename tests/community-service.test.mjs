@@ -153,10 +153,10 @@ test('comment edit is own-only, sets edited flag, keeps existing comments, and b
 test('#627: 둘러보기 검색은 트리 순간의 제목(영상 제목 포함)도 본다',async()=>{
  // 트리 이름은 자동 이름('모아둔 순간')이고, 그룹 이름은 순간의 영상 제목에만 있다.
  const workspaceRepo=createMemoryWorkspaceRepo(),workspace=createWorkspaceService({repo:workspaceRepo,productId:PRODUCT});
- const video='https://www.youtube.com/shorts/Rescene0001',thumbnail='https://i.ytimg.com/vi/Rescene0001/hqdefault.jpg';
+ const video='https://www.youtube.com/shorts/Rescene0001',savedThumbnail='https://img.youtube.com/vi/Rescene0001/hqdefault.jpg',thumbnail='https://i.ytimg.com/vi/Rescene0001/mqdefault.jpg';
  let tree=createTree({subject:'윤슬',title:'첫 무대',note:'다시 보고 싶은 빛',emotion:'설렘',date:'2026-11-01',url:PHOTO},CLOCK);
  tree=editTree(tree,{title:'모아둔 순간',subject:tree.subject,coverMomentId:tree.moments[0].id});
- tree=addMoment(tree,{type:'video',url:video,mediaMetadata:{title:'RESCENE(리센느) 무대 직캠',channel:'기록 채널',source:'youtube.com'}},tree.moments[0].id,CLOCK);
+ tree=addMoment(tree,{type:'video',url:video,mediaMetadata:{title:'RESCENE(리센느) 무대 직캠',channel:'기록 채널',source:'youtube.com',thumbnail:savedThumbnail}},tree.moments[0].id,CLOCK);
  const videoMoment=tree.moments.find(moment=>moment.url===video);
  tree=editTree(tree,{title:tree.title,subject:tree.subject,coverMomentId:videoMoment.id});
  tree={...tree,moments:tree.moments.map((moment,index)=>index===0?{...moment,keywords:[...(moment.keywords||[]),'가수:IVE','노래:Love Attack','무대:인기가요']}:moment)};
