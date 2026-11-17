@@ -123,9 +123,12 @@ if(hit&&typeof commitInsert==='function')commitInsert(id,hit.index);else if(type
 function detailKeywords(m){return `<div class="keywordRow">${(m.keywords||[]).map(k=>`<span class="chip on">#${esc(k)}</span>`).join('')}</div>`}
 // #601: 상세 플레이어 — 맨 위에서 바로 재생한다. YouTube는 썸네일을 그린 뒤 재생 단추를 눌러 임베드로,
 // 로컬 영상은 controls·autoplay, 사진은 크게, 기록은 큰 글씨로 보여 준다.
+// #840(도현 의견 34): 영상 칸 안의 '크게 보기'·'YouTube에서 열기'는 아래 단추 줄(#detailActions)과
+// 두 번씩 보였다. 칸 안에서는 도구를 빼고 미리보기·바로 재생만 남긴다(compact 한 벌 — 카드와 같은 판정) —
+// 크게 보기·원본 열기는 아래 단추 줄의 한 벌만 쓴다.
 function detailPlayerHTML(m){
-  const _yt=window.__LT58YT;if(_yt?.isYtMoment?.(m)){const u=_yt.originalUrl(m)||m.url;if(u)return LTMedia.markup(u,m.title,m.mediaMetadata,m.id,null,null)}
-  if(m.url)return LTMedia.markup(m.url,m.title,m.mediaMetadata,m.id,null,null);
+  const _yt=window.__LT58YT;if(_yt?.isYtMoment?.(m)){const u=_yt.originalUrl(m)||m.url;if(u)return LTMedia.markup(u,m.title,m.mediaMetadata,m.id,null,null,{compact:true})}
+  if(m.url)return LTMedia.markup(m.url,m.title,m.mediaMetadata,m.id,null,null,{compact:true});
   if(m.type==='note')return `<div class="detailNoteMedia">"${esc(m.memo)}"</div>`;
   if(m.type==='video')return `<video class="detailVideo" src="${m.video||''}" poster="${m.asset||''}" controls muted playsinline></video>`;
   return `<img class="detailPhoto" src="${m.asset||''}" data-fallback="${ASSET.link}" onerror="this.onerror=null;this.src=this.dataset.fallback" alt="">`;
