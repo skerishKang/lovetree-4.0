@@ -13,10 +13,15 @@
 
 export const KIND_LABEL = {opinion: '의견', journal: '일지', report: '신고'};
 // 운영센터 탭 셋(2026-11-17) — 사용 일지·신고·고치는 일 탭은 없애고 고객 글의 거르기로 옮겼다.
-export const TABS = [
+// 상단 메뉴(대표 요청 2026-11-17) — 고객 글 탭을 고장·불편·요청으로 나누고 일지·신고를 탭으로 돌린다.
+export const MENU_TABS = [
   {view: 'overview', label: '한눈에'},
   {view: 'customers', label: '고객'},
-  {view: 'board', label: '고객 글'}
+  {view: 'board', label: '고장·불편', cat: 'issue', countKey: 'issue'},
+  {view: 'board', label: '요청', cat: 'request', countKey: 'request'},
+  {view: 'board', label: '사용 일지', kind: 'journal'},
+  {view: 'board', label: '신고', kind: 'report'},
+  {view: 'issues', label: '고치는 일'}
 ];
 // '받음'은 운영센터에서 '새 글'로 부른다(#570 2). 서버 값 received 는 그대로고, 고객 쪽 표시는 따로 있다.
 export const STATUS_LABEL = {received: '새 글', reviewing: '확인 중', fixed: '고침', later: '다음에', closed: '닫음'};
@@ -69,10 +74,12 @@ export function parseHash(hash) {
   if (name === 'journals') return {view: 'board', id: null, status: '', kind: 'journal'};
   if (name === 'reports') return {view: 'board', id: null, kind: 'report',
     status: reportStatus === 'resolved' ? 'fixed' : reportStatus === 'dismissed' ? 'more' : PENDING_STATUS};
-  if (name === 'issues' || name === 'fixes') return {view: 'board', id: null, status: issueState === 'closed' ? 'more' : 'fixed', kind: ''};
-  // #655: 운영센터를 열면(주소 없이) '한눈에'가 기본이다. 기존 주소(#board 등)는 그대로다.
+  // 고치는 일 탭은 그대로 남긴다(상단 메뉴 7탭 중 하나) — #issues·#fixes 옛 주소 모두 이 화면으로.
+  if (name === 'issues' || name === 'fixes') return {view: 'issues', id: null, status: issueState, kind: ''};
+  // #655: 운영센터를 열면(주소 없이) '한눈에'가 기본이다. 기존 주소(#board 등)는 고장·불편으로 연다(대표 요청 2026-11-17).
   if (!name) return {view: 'overview', id: null, status: '', kind: ''};
-  return unanswered ? {view: 'board', id: null, status, kind, unanswered: true} : {view: 'board', id: null, status, kind};
+  const cat = params.get('cat') === 'request' ? 'request' : 'issue';
+  return unanswered ? {view: 'board', id: null, status, kind, cat, unanswered: true} : {view: 'board', id: null, status, kind, cat};
 }
 
 /** 화면 상태를 주소 해시로. 탭 거르기는 #board 물음표 뒤에 남긴다(#570 2). */
@@ -82,6 +89,7 @@ export function viewHash(view, id = null, filters = {}) {
     if (filters.status) params.set('status', String(filters.status));
     if (filters.kind) params.set('kind', String(filters.kind));
     if (filters.unanswered === true || filters.unanswered === '1') params.set('unanswered', '1');
+    if (filters.cat === 'request') params.set('cat', 'request');
     const query = params.toString();
     return query ? `#board?${query}` : '#board';
   }
@@ -95,7 +103,7 @@ export function viewHash(view, id = null, filters = {}) {
     const status = filters.status === 'open' ? PENDING_STATUS : filters.status || '';
     return status ? `#board?kind=report&status=${encodeURIComponent(status)}` : '#board?kind=report';
   }
-  if (view === 'issues') return filters.status === 'closed' ? '#board?status=more' : '#board?status=fixed';
+  if (view === 'issues') return filters.status ? `#issues?status=${encodeURIComponent(filters.status)}` : '#issues';
   if (view === 'overview') return '#overview';
   return '#board';
 }
@@ -147,6 +155,14 @@ export function kindTabs(rows, status = '') {
 }
 
 // ── 고객 글 머리 거르기(2026-11-17) ──
+// 고장·불편 탭은 의견 중 bug·inconvenient·other, 요청 탭은 feature만(일지·신고는 어느 쪽에도 들지 않는다).
+export const ISSUE_CATEGORIES = ['bug', 'inconvenient', 'other'];
+export function inBoardCat(row, cat) {
+  if (row?.kind !== 'opinion') return false;
+  if (cat === 'request') return row?.category === 'feature';
+  // 종류 없이 옛 시절에 남긴 의견(category 비어 있음)도 고장·불편에 둔다 — 어느 탭에서도 사라지지 않게.
+  return !row?.category || ISSUE_CATEGORIES.includes(row?.category);
+}
 // 종류는 오른쪽 위 묶음, 상태는 아래 한 줄. 처음 열 때 상태는 '할 일'(새 글+확인 중)이다.
 export const BOARD_KIND_TABS = [
   {key: '', label: '전체'},
@@ -174,9 +190,10 @@ export function inBoardStatus(row, key) {
 }
 
 /** 고객 글 목록 거르기 — 종류는 그대로, 상태의 기본은 '할 일'. */
-export function filterBoardRows(rows, {kind = '', status = PENDING_STATUS} = {}) {
+export function filterBoardRows(rows, {kind = '', cat = '', status = PENDING_STATUS} = {}) {
   const list = Array.isArray(rows) ? rows : [];
-  const scoped = kind ? list.filter(row => row?.kind === kind) : list;
+  const scoped = kind ? list.filter(row => row?.kind === kind)
+    : cat ? list.filter(row => inBoardCat(row, cat)) : list;
   return scoped.filter(row => inBoardStatus(row, status || PENDING_STATUS));
 }
 
@@ -187,10 +204,20 @@ export function boardKindTabs(rows, status = PENDING_STATUS) {
 }
 
 /** 상태 한 줄 숫자 — 지금 종류 안에서 센다. 숫자 0인 칸은 화면에서 숨긴다. */
-export function boardStatusTabs(rows, kind = '') {
+export function boardStatusTabs(rows, kind = '', cat = '') {
   const list = Array.isArray(rows) ? rows : [];
-  const scoped = kind ? list.filter(row => row?.kind === kind) : list;
+  const scoped = kind ? list.filter(row => row?.kind === kind)
+    : cat ? list.filter(row => inBoardCat(row, cat)) : list;
   return BOARD_STATUS_TABS.map(tab => ({...tab, count: scoped.filter(row => inBoardStatus(row, tab.key)).length}));
+}
+
+/** 상단 메뉴의 새 글(received) 수(대표 요청 2026-11-17) — 고장·불편·요청 탭 각각의 받은 의견 수다. */
+export function menuReceivedCounts(rows) {
+  const base = Array.isArray(rows) ? rows : [];
+  return {
+    issue: base.filter(row => inBoardCat(row, 'issue') && row?.status === 'received').length,
+    request: base.filter(row => inBoardCat(row, 'request') && row?.status === 'received').length
+  };
 }
 
 /** 받침이 있으면 '으로', 없으면 '로'(ㄹ 받침은 '로'). 상태 알림 문구에 쓴다. */

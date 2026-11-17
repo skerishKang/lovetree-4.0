@@ -6,9 +6,9 @@ import {
 import {
   GITHUB_REPO, KIND_LABEL, STATUS_LABEL, STATUS_ORDER, PERSONA_FIELDS, PENDING_STATUS,
   escapeText, richParagraph, formatTime, parseHash, viewHash, viewToTab,
-  filterRows, statusTabs, kindTabs, TABS, BOARD_KIND_TABS, boardKindTabs, boardStatusTabs, filterBoardRows, ALL_STATUS,
+  filterRows, boardKindTabs, boardStatusTabs, filterBoardRows, ALL_STATUS, MENU_TABS,
   linkedIssueNumbers, normalizeIssueNumber, issueStateLabel, needsFixButton,
-  statusChangeMessage, buildIssueUrl, issueLink, journalsSummary, journalRowsByCustomer,
+  statusChangeMessage, buildIssueUrl, issueLink, journalsSummary, journalRowsByCustomer, menuReceivedCounts,
   isPendingStatus, overviewModel, statsCards,
   customerSummaryCards, customerRows, customerDetailModel, customerViewRows
 } from './admin-view.js';
@@ -27,6 +27,11 @@ import {
  */
 
 let route = parseHash(globalThis.location?.hash);
+
+// 상단 메뉴(대표 요청 2026-11-17): 고객 글 탭을 고장·불편(cat=issue)·요청(cat=request)으로 나누고
+// 사용 일지(kind=journal)·신고(kind=report)를 탭으로 돌린다. 상세·페르소나는 원래 글의 탭이 눌린다.
+let feedbackCache = [];
+let detailCat = 'issue';
 let replyKind = 'internal'; // 상세 화면에서만 쓰는 답글 종류(#564 8). 기본은 내부 메모.
 
 async function read(path, init = {}) {
@@ -37,6 +42,16 @@ async function read(path, init = {}) {
   } catch {
     return {ok: false, status: 0, payload: null};
   }
+}
+
+// 고객 글 읽기 한 길 — 읽을 때마다 상단 메뉴의 새 글 수를 갱신한다.
+async function loadFeedback() {
+  const res = await read('/api/admin/feedback');
+  if (res.ok && Array.isArray(res.payload?.feedback)) {
+    feedbackCache = res.payload.feedback;
+    head();
+  }
+  return res;
 }
 
 const host = document.getElementById('main');
@@ -59,19 +74,25 @@ function navigate(view, id = null, filters = null) {
 
 function head() {
   // #570 1: 머리줄의 '러브트리로 돌아가기'는 로고와 같은 일을 두 번 하는 셈이라 없앤다. 로고만 남기고 안내를 붙인다.
-  // #570 3: 탭 이름 — 게시판→고객 글, 이슈→고치는 일. 신고는 그대로.
-  const tab = viewToTab(route.view);
-  const tabBtn = (name, label) => `<button type="button" data-tab="${name}" class="${tab === name ? 'is-active' : ''}">${label}</button>`;
+  // 고객 글 탭을 고장·불편·요청으로 나누고 사용 일지·신고를 탭으로 돌린다(대표 요청 2026-11-17).
+  // 새 글(received) 수는 고장·불편·요청 탭 옆에 작게 — 0이면 숨긴다. 숫자는 마지막으로 읽은 고객 글에서 센다.
+  const counts = menuReceivedCounts(feedbackCache);
+  const activeCat = route.view === 'feedback' ? (detailCat === 'request' ? 'request' : detailCat === 'journal' ? '' : 'issue') : (route.cat || '');
+  const activeKind = route.view === 'feedback' && detailCat === 'journal' ? 'journal' : (route.kind || '');
+  const isActive = t => (t.view === 'board'
+    ? route.view === 'board' && (t.kind ? activeKind === t.kind : !activeKind && activeCat === t.cat)
+    : route.view === t.view) || (route.view === 'feedback' && t.view === 'board' && (detailCat === 'journal' ? t.kind === 'journal' : (detailCat === 'request' ? t.cat === 'request' : t.cat === 'issue')));
+  const tabBtn = (t) => `<button type="button" data-tab="${t.view}"${t.cat ? ` data-cat="${t.cat}"` : ''}${t.kind ? ` data-kind="${t.kind}"` : ''} class="${isActive(t) ? 'is-active' : ''}">${t.label}${t.countKey && counts[t.countKey] ? ` <span class="lt-menu-count">${counts[t.countKey]}</span>` : ''}</button>`
   // 밤/정원 전환(2026-11-15 2단계) — 본 사이트와 같은 저장 키·문구(header-state.mjs 한 벌).
   const theme = readTheme(localStorage);
   const themeBtn = `<button type="button" class="lt-theme-toggle" data-lt-theme-toggle aria-pressed="${themePressed(theme)}" aria-label="${themeButtonAriaLabel(theme)}" title="${themeButtonAriaLabel(theme)}">${themeButtonLabel(theme)}</button>`;
   // #655: '한눈에'가 맨 앞 탭이다(운영센터를 열면 기본). 기존 탭·주소는 그대로 둔다.
   // 오른쪽 끝은 셸과 같은 .header-actions 자리 — 테마 단추 + ≤780의 ☰ 더보기. 좁은 화면에서는 알약 탭 대신 이 판으로 고른다.
-  const tabs = TABS.map(t => tabBtn(t.view, t.label)).join('');
+  const tabs = MENU_TABS.map(t => tabBtn(t)).join('');
   headerHost.innerHTML = `<a class="brand" href="/v41/" title="러브트리로" aria-label="러브트리로"><span>LoveTree</span><small>4.1</small></a>`
     + `<nav aria-label="관리자 메뉴">${tabs}</nav>`
     + `<div class="header-actions">${themeBtn}<button type="button" class="lt-more" data-admin-more aria-expanded="${moreOpen}" aria-controls="admin-overflow" aria-label="메뉴 더보기">☰</button></div>`
-    + `<div id="admin-overflow" class="lt-overflow" role="menu" aria-label="관리자 메뉴"${moreOpen ? '' : ' hidden'}>${tabs}</div>`;
+    + `<div id="admin-overflow" class="lt-overflow${moreOpen ? ' is-open' : ''}" role="menu" aria-label="관리자 메뉴"${moreOpen ? '' : ' hidden'}>${tabs}</div>`;
   return '';
 }
 
@@ -113,7 +134,7 @@ async function render() {
 async function renderOverview() {
   // #655 2차: 맨 위 전체 숫자는 서버가 집계한다(계정·트리·순간·공개·둘러보기·AI 명예회원).
   // 이 응답이 실패해도 나머지 카드는 그대로 그린다 — 그 줄만 '불러오지 못했어요'.
-  const [feedbackRes, journalsRes, reportsRes, statsRes] = await Promise.all([read('/api/admin/feedback'), read('/api/admin/journals'), read('/api/community/admin/reports'), read('/api/admin/stats')]);
+  const [feedbackRes, journalsRes, reportsRes, statsRes] = await Promise.all([loadFeedback(), read('/api/admin/journals'), read('/api/community/admin/reports'), read('/api/admin/stats')]);
   const posts = feedbackRes.ok && Array.isArray(feedbackRes.payload?.feedback) ? feedbackRes.payload.feedback : [];
   // 고치는 일: 고객 글의 연결 이슈 상태만('고치는 일' 탭과 같은 공개 읽기 경로). 하나가 실패해도 나머지 카드는 그린다.
   const numbers = linkedIssueNumbers(posts);
@@ -310,7 +331,7 @@ async function renderCustomerDetail(subjectId) {
 async function renderList() {
   // 탭 숫자를 함께 보여 주려고 목록을 거르지 않고 한 번에 읽어 화면에서 거른다(#570 2). 목록은 작다.
   // 2026-11-17: 둘러보기 신고도 같은 카드 모양으로 섞어 보여 준다(처리 단추는 신고 탭의 것 그대로).
-  const [res, reportsRes] = await Promise.all([read('/api/admin/feedback'), read('/api/community/admin/reports')]);
+  const [res, reportsRes] = await Promise.all([loadFeedback(), read('/api/community/admin/reports')]);
   const posts = res.ok && Array.isArray(res.payload?.feedback) ? res.payload.feedback : [];
   const reports = reportsRes.ok && Array.isArray(reportsRes.payload?.reports) ? reportsRes.payload.reports : [];
   const reportRows = reports.map(report => ({
@@ -320,26 +341,25 @@ async function renderList() {
   }));
   const rows = [...posts, ...reportRows];
   const activeStatus = route.status || PENDING_STATUS;
-  const visible = filterBoardRows(rows, {kind: route.kind, status: activeStatus});
+  const visible = filterBoardRows(rows, {kind: route.kind, cat: route.cat, status: activeStatus});
   const tabBtn = (data, value, label, count, active) =>
     `<button type="button" ${data}="${escapeText(value)}" class="lt-tab${active ? ' is-active' : ''}" aria-label="${escapeText(label)} ${count}건">${escapeText(label)} <span class="lt-tab-count">${count}</span></button>`;
-  const kindRow = boardKindTabs(rows, activeStatus)
-    .map(t => tabBtn('data-kind-tab', t.key, t.label, t.count, route.kind === t.key)).join('');
-  // 숫자 0인 상태 칸은 숨긴다.
-  const statusRow = boardStatusTabs(rows, route.kind)
+  // 종류 묶음(전체·의견·일지·신고)은 상단 탭으로 갈라졌다 — 없앤다(대표 요청 2026-11-17).
+  // 상태 줄('할 일·고침·더 보기')은 그대로 — 탭 범위(고장·불편/요청/일지/신고) 안에서 센다. 0인 칸은 숨긴다.
+  const statusRow = boardStatusTabs(rows, route.kind, route.cat)
     .filter(t => t.count > 0)
     .map(t => tabBtn('data-status-tab', t.key, t.label, t.count, activeStatus === t.key)).join('');
+  const listTitle = route.kind === 'journal' ? '사용 일지' : route.kind === 'report' ? '신고' : route.cat === 'request' ? '요청' : '고장·불편';
   const list = visible.length
     ? visible.map(row => row.kind === 'report' ? reportCard(row.report) : `<article class="lt-post" data-open="${escapeText(row.id)}" tabindex="0" role="button">
-        <div class="lt-post-top">${kindBadge(row.kind)}${statusBadge(row.status)}${row.kind === 'journal' && row.score ? `<span class="lt-badge">점수 ${escapeText(row.score)}</span>` : ''}${row.kind === 'journal' && row.journalDate ? `<span class="lt-badge">${escapeText(row.journalDate)}</span>` : ''}<span class="lt-post-date">${escapeText(formatTime(row.createdAt))}</span></div>
+        <div class="lt-post-top">${statusBadge(row.status)}${row.kind === 'journal' && row.score ? `<span class="lt-badge">점수 ${escapeText(row.score)}</span>` : ''}${row.kind === 'journal' && row.journalDate ? `<span class="lt-badge">${escapeText(row.journalDate)}</span>` : ''}<span class="lt-post-date">${escapeText(formatTime(row.createdAt))}</span></div>
         <h3 class="lt-post-title">${escapeText(row.displayTitle || '(제목 없음)')}</h3>
         <div class="lt-post-meta"><span class="lt-post-author" data-author="${escapeText(row.subjectId || '')}">${escapeText(authorLabel(row))}</span>${issueLink(row.issueNumber) ? `<span class="lt-post-issue">이슈 ${issueLink(row.issueNumber)}</span>` : ''}<span>답글 ${row.replyCount || 0}</span></div>
       </article>`).join('')
     : '<p class="lt-empty">지금 조건에 맞는 글이 없습니다.</p>';
   host.innerHTML = `${head()}<div class="admin-shell lt-board">
-    <div class="lt-board-head lt-board-head--filters">
-      <h1 class="lt-h1">고객 글 <small>${visible.length}건 · 최신 순</small></h1>
-      <div class="lt-kind-bundle" role="group" aria-label="종류">${kindRow}</div>
+    <div class="lt-board-head">
+      <h1 class="lt-h1">${listTitle} <small>${visible.length}건 · 최신 순</small></h1>
     </div>
     <div class="lt-tabs lt-status-row" role="group" aria-label="상태">${statusRow}</div>
     ${route.unanswered ? '<p class="lt-post-meta">답글 0인 글만 보는 중 · <button type="button" class="lt-btn" data-clear-filter="board">조건 지우기</button></p>' : ''}
@@ -354,7 +374,7 @@ function reportCard(report) {
   const hide = report.hidden ? 'disabled' : '';
   const restore = !report.hidden && report.status === 'dismissed' ? 'disabled' : '';
   return `<article class="lt-post lt-report-card" data-report="${escapeText(report.id)}">
-    <div class="lt-post-top">${kindBadge('report')}<span class="lt-badge">${escapeText(stateLabel)}</span><span class="lt-badge">${escapeText(visibility)}</span><span class="lt-post-date">${escapeText(formatTime(report.createdAt))}</span></div>
+    <div class="lt-post-top"><span class="lt-badge">${escapeText(stateLabel)}</span><span class="lt-badge">${escapeText(visibility)}</span><span class="lt-post-date">${escapeText(formatTime(report.createdAt))}</span></div>
     <h3 class="lt-post-title">${escapeText(String(report.reason || '').slice(0, 90) || '신고')}</h3>
     <div class="lt-post-meta">공유 ${escapeText(report.shareId)}</div>
     <div class="lt-actions">
@@ -423,9 +443,10 @@ async function renderDetail(id) {
 }
 
 async function renderPersona(subjectId) {
+  detailCat = 'issue';
   const res = await read('/api/admin/persona/' + encodeURIComponent(subjectId));
   const persona = res.ok ? res.payload?.persona : {name: '', intro: {}};
-  const postsRes = await read('/api/admin/feedback');
+  const postsRes = await loadFeedback();
   const posts = postsRes.ok && Array.isArray(postsRes.payload?.feedback) ? postsRes.payload.feedback.filter(p => p.subjectId === subjectId) : [];
   const intro = persona.intro || {};
   // #564 13: 소개는 길어 잘리지 않게 여러 줄 칸으로. 내용 줄 수에 따라 높이를 정한다.
@@ -453,7 +474,7 @@ async function renderPersona(subjectId) {
 
 /** #596 사용 일지 탭 — 오늘 요약 + 고객별 줄(누르면 그 고객 일지를 날짜 내림차순으로 펼쳐 읽는다). */
 async function renderJournals() {
-  const [journalsRes, feedbackRes] = await Promise.all([read('/api/admin/journals'), read('/api/admin/feedback')]);
+  const [journalsRes, feedbackRes] = await Promise.all([read('/api/admin/journals'), loadFeedback()]);
   const journals = journalsRes.ok && Array.isArray(journalsRes.payload?.journals) ? journalsRes.payload.journals : [];
   const feedback = feedbackRes.ok && Array.isArray(feedbackRes.payload?.feedback) ? feedbackRes.payload.feedback : [];
   // 오늘(운영 기준 KST 날짜) 요약. 일지 날짜는 journal_date(운영 기준 날짜), 의견 날짜는 만든 시각의 KST 날짜로 잡는다.
