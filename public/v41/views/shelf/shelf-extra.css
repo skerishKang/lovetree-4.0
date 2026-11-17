@@ -145,10 +145,20 @@ html[data-v41-screen=shelf][data-lt-theme=garden] .shelf-new-tree {
   color: #704b55;
 }
 html[data-v41-screen=shelf][data-lt-theme=garden] .shelf-new-tree:focus-visible { outline-color: var(--lt-gold-ink); }
+/* #819: 390에서 검색 아래 '트리 N개'와 [+ 새 트리]를 한 줄에 둔다(왼쪽 숫자·오른쪽 단추).
+   두 줄로 흩어지면 그 사이 빈칸이 커져 책등 줄이 화면 아래 고정 요소(＋ 단추·바닥 링크·알림 줄)까지 밀린다.
+   검색은 첫 줄 전체, 다음 줄은 숫자(왼쪽)·단추(오른쪽) 두 칸으로 못 박고 여백을 줄인다. */
 @media(max-width:780px){
-  html[data-v41-screen=shelf] .shelf-controls { flex-wrap: wrap; }
-  html[data-v41-screen=shelf] .shelf-controls .search { flex: 1 1 160px; max-width: none; }
-  html[data-v41-screen=shelf] .shelf-new-tree { margin-left: auto; }
+  html[data-v41-screen=shelf] .shelf-controls {
+    display: grid;
+    grid-template-columns: minmax(0,1fr) auto;
+    align-items: center;
+    gap: 8px 10px;
+    margin: 12px 0 8px;
+  }
+  html[data-v41-screen=shelf] .shelf-controls .search { grid-column: 1 / -1; flex: 1 1 160px; max-width: none; min-width: 0; }
+  html[data-v41-screen=shelf] .shelf-controls .count { grid-column: 1; margin-left: 0; min-height: 44px; display: flex; align-items: center; }
+  html[data-v41-screen=shelf] .shelf-new-tree { grid-column: 2; margin-left: 0; justify-self: end; }
 }
 
 /* #810: 책등·표지 ⋯ — 표지에 마우스를 올리면(1440) / 길게 누르면(390, show-manage) 보인다. 누르면 기존 트리 관리 창을 그 트리로 연다. */
