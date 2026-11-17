@@ -29,7 +29,7 @@ function run493Report({ consoleErrors }) {
     VISUAL('network', '안쪽 화면에 --lt-stage 토큰 없음 (빈 값)'),
     VISUAL('shelf', '안쪽 화면 표시  (기대 shelf)'),
     VISUAL('theme', '정원으로 바꾸지 못함; 정원 전환 {"theme":""}'),
-    { id: 'screen-settings', area: 'visual', status: 'fail', detail: '1440: 로그아웃인데 ◐ 단추가 없음 []', data: null },
+    { id: 'screen-settings', area: 'visual', status: 'fail', detail: '1440: 첫 화면에 ◐ 단추가 보임 []; 머리줄 테마 단추 0개 (기대 1)', data: null },
     // 나머지 fail 들도 같은 이유(화면이 안 떠서 확인 불가).
     ...['share-panel-open-close', 'write-menu-open', 'account-menu-open', 'journey-open'].map((id) => ({
       id, area: 'screen', status: 'fail', detail: '화면이 그려지지 않아 확인하지 못함', data: null
