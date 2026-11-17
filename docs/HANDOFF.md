@@ -6,7 +6,7 @@
 - **동기화/커밋**: 최신 main `878005822b9303a280733eaa8bb9098a459cfbf1`을 병합했다. 초기 구현 `a6c9845`, v2 구현 `d35ba2e`, main 동기화 `e665bc8`. PR #826은 열어 두며 병합하지 않는다.
 - **v2 수리**: YouTube URL에서 YouTube ID로 안전 썸네일을 만들고, 서버 의존성을 import 없는 `public/v41/youtube-id.mjs`에 모았다. install/autodeploy 복사·감지 목록과 preflight 시험을 고쳤다. 동일 제목·대표 순간은 순번 대신 선택적인 공개 표시명만 표시하며 계정 표시명은 API에 추가하지 않았다.
 - **캡처**: 최종 캡처와 실패 분석은 `E:\lovetree-qa\luna\784\v2\REPORT.md`·PNG·`capture-metrics.json`. 1440·390 정원에서 `img.youtube.com` 썸네일 2장이 HTTP 200/image/jpeg로 표시되고 세로 영상 흐림 배경을 눈으로 확인했다. 비교용 초기 화면은 `E:\lovetree-qa\luna\784\REPORT.md`를 본다.
-- **확인**: 카드 액션 0, 검색 입력 1개, 그룹 칩 한 줄, 가로 넘침 0, `.firstMark` 겹침 0, 대상 rect 0인 항목 0. 관련 시험 124/124, `npm run build`, modulepreload 검사 통과.
+- **확인**: 카드 액션 0(렌더 시험도 카드 안에 단추가 없음을 확인), 검색 입력 1개, 그룹 칩 한 줄, 가로 넘침 0, `.firstMark` 겹침 0, 대상 rect 0인 항목 0. 관련 시험 124/124, `npm run build`, modulepreload 검사 통과.
 - **전체 시험**: 기존 `npm test` 한 번의 1,812 통과·8 실패·158 건너뜀을 v2 보고서에서 테스트별 원인과 이번 변경 관련 여부로 기록했다. PR당 전체 시험 한 번 제한에 따라 재실행하지 않았다.
 - 캡처용 브라우저 세션과 로컬 Vite 서버는 종료했다.
 

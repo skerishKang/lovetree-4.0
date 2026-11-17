@@ -150,6 +150,7 @@ test('D3: 결과가 있어도 미리보기는 닫혀 있고, 카드를 누를 �
     assert.equal(some.get('community-preview').open, false, '목록을 불러와도 미리보기는 열리지 않는다');
     const card=some.get('community-list').children.find(node=>node.dataset.shareId==='s1');
     assert.equal(card.tagName,'BUTTON','카드 전체가 키보드로도 열리는 단추다');
+    assert.equal(card.children.some(node=>node.tagName==='BUTTON'),false,'카드 안에는 별도 액션 단추가 없다');
     card.onclick();
     assert.equal(some.get('community-preview').open,true,'카드를 누르면 미리보기가 열린다');
     const close=some.get('community-preview').children[0].children.find(node=>node.className==='community-preview-close');
