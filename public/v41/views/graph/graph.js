@@ -581,7 +581,9 @@ document.getElementById('gViewConc')?.addEventListener('click', () => goMapWithV
    (2026-11-16 CTO 지적: '꼬리표 없는'이 아니라 '아직 묶음에 안 든'이다). */
 function showSuggestions() {
   const untagged = model.graph.moments.filter((m) => m.hubId === null).map((m) => MOMENT_OF.get(m.id)).filter(Boolean);
-  const suggestions = suggestForMoments(untagged);
+  try { parent.postMessage({ type: 'lt-suggest-request', momentIds: untagged.map((m) => m.id) }, location.origin); } catch {}
+  const requestSuggestions = ctx.suggestForMoments || suggestForMoments;
+  const suggestions = requestSuggestions(untagged);
   const card = document.getElementById('detailCard');
   card.replaceChildren();
   const head = document.createElement('div'); head.className = 'd-kicker'; head.textContent = '아직 묶음에 안 든 순간 ' + untagged.length + ' — 꼬리표 한 번에 제안받기';
@@ -594,9 +596,14 @@ function showSuggestions() {
     shown += 1;
     const li = document.createElement('li');
     const b = document.createElement('button'); b.type = 'button';
-    const d = document.createElement('small'); d.textContent = dayOf(model.graph.moments.find((m) => m.id === s.momentId) || {});
-    const t = document.createElement('span'); t.textContent = s.title + ' — ' + s.suggestions.map((p) => p.raw).join(', ');
-    b.append(d, t);
+    const moment = MOMENT_OF.get(s.momentId) || {};
+    const title = String(moment.title || moment.subject || '').trim() || '제목 없음';
+    const date = String(moment.date || '').trim();
+    const d = document.createElement('small'); d.textContent = [date, title].filter(Boolean).join(' · ');
+    const tags = (Array.isArray(s.suggestions) ? s.suggestions : [])
+      .map((p) => (typeof p === 'string' ? p : p?.raw)).map((x) => String(x ?? '').trim()).filter(Boolean);
+    b.append(d);
+    if (tags.length) { const t = document.createElement('span'); t.textContent = ' — ' + tags.join(', '); b.append(t); }
     b.addEventListener('click', () => { stopWalk(); selected = { type: 'moment', id: s.momentId }; refresh(); });
     li.appendChild(b); list.appendChild(li);
   }
