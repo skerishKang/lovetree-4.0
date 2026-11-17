@@ -174,6 +174,8 @@ export function createMessages(deps) {
       try { getMember().apply('setPrefs', { treeChipOrder: data.patch.treeChipOrder }); } catch (error) { notify(error?.message || '순서를 저장하지 못했어요.'); }
       return;
     }
+    // 261117 고객 의견: 첫 화면 둘째 줄 '모아둔 순간 N개 정리하기' — 모아둔 순간 정리 창을 연다(옮기기와 별개).
+    if (data?.type === 'lt41-cleanup' && getSource() === 'server') { openCleanup({}); return; }
     if (data?.type === 'lt41-open-book' && getModel()?.trees.some(t => t.id === data.treeId && t.moments.some(m => m.id === data.id))) {
       setCurrent('track59-sketchbook.html'); choose(data.treeId, data.id); writeLocation();
     }
