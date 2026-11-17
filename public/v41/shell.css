@@ -744,3 +744,30 @@ html[data-lt-theme=garden] #empty[data-empty-view=shelf] #empty-records{backgrou
 }
 /* 고르지 않은 탭은 밤·정원 모두 같은 토큰 색을 쓴다(빈 상태에서 색이 어긋나지 않게). */
 .tree-frame .tree-views>button:not([aria-current=true]),.tree-frame .tree-views>button:not([aria-current=true]):hover{color:var(--lt-muted)}
+
+/* 이슈 792 2단계: 영상을 보다가 '이 순간 저장하기'로 지금 재생 위치를 시작 칸에 담는다.
+   길이 단추는 5·10·15초와 '끝 없이'(책갈피), 구간 반복은 기본 꺼짐. 누름 영역은 44px 이상. */
+.segment-capture{display:grid;gap:8px;margin-top:12px;padding:12px;border:1px solid var(--lt-line);border-radius:var(--lt-r-card);background:rgba(255,255,255,.04)}
+.segment-capture[hidden]{display:none!important}
+.segment-capture-head{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+#moment-form .segment-capture-start{min-height:44px;padding:0 16px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-pill);background:var(--lt-primary);color:var(--lt-primary-ink);font-size:14px;font-weight:600;white-space:nowrap}
+#moment-form .segment-capture-start:hover{filter:brightness(1.06)}
+#moment-form .segment-capture-start:focus-visible,#moment-form .segment-durations button:focus-visible,#moment-form .segment-loop input:focus-visible{outline:3px solid var(--lt-gold);outline-offset:2px}
+.segment-durations{display:flex;flex-wrap:wrap;gap:6px;min-width:0}
+#moment-form .segment-durations button{min-height:44px;min-width:44px;padding:0 12px;border:1px solid var(--lt-line);border-radius:var(--lt-r-pill);background:rgba(255,255,255,.04);color:var(--lt-pearl);font-size:13px;white-space:nowrap}
+#moment-form .segment-durations button[aria-pressed=true]{border-color:var(--lt-gold-line);background:rgba(255,230,166,.14);color:var(--lt-gold)}
+#moment-form .segment-loop{display:inline-flex;align-items:center;gap:8px;min-height:44px;margin:0;font-size:13px;color:var(--lt-muted);white-space:nowrap}
+#moment-form .segment-loop input{display:inline-block;width:20px;height:20px;min-height:20px;margin:0;padding:0;accent-color:var(--lt-gold-deep);flex:0 0 auto}
+#moment-form .segment-status{margin:0;font-size:13px;line-height:1.6;color:var(--lt-muted)}
+#moment-form .segment-status[hidden]{display:none!important}
+html[data-lt-theme=garden] .segment-capture{border-color:var(--lt-line-paper);background:rgba(255,253,248,.72)}
+html[data-lt-theme=garden] #moment-form .segment-durations button{background:rgba(255,253,248,.9);color:var(--lt-ink)}
+html[data-lt-theme=garden] #moment-form .segment-durations button[aria-pressed=true]{background:rgba(200,110,121,.14);color:var(--lt-gold-ink)}
+html[data-lt-theme=garden] #moment-form .segment-loop,html[data-lt-theme=garden] #moment-form .segment-status{color:var(--lt-muted)}
+@media(max-width:520px){
+  .segment-capture{padding:10px}
+  .segment-capture-head{display:grid;grid-template-columns:1fr;gap:8px}
+  #moment-form .segment-capture-start{width:100%}
+  .segment-durations{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));width:100%}
+  #moment-form .segment-durations button{min-width:0;padding:0 6px}
+}
