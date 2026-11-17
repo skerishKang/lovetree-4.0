@@ -44,7 +44,7 @@ test('트리 선택과 보기 방식이 한 틀(.tree-frame)에 붙고 이름은
   assert.doesNotMatch(frame, /기억책|기억 보드|관계 지도/);
   // 한 틀 모양: 알약 테두리 한 줄, 보기 버튼 사이는 안쪽 구분선, 묶음 글자는 14px로 통일.
   assert.match(css, /\.tree-frame\{display:flex;align-items:center;flex:0 0 auto;margin-left:6px;padding:1px;border:1px solid rgba\(255,255,255,\.16\);border-radius:999px/);
-  assert.match(css, /\.tree-frame \.tree-views\{margin-left:0;padding-left:0;border-left:0;gap:0;align-self:stretch;align-items:stretch\}/);
+  assert.match(css, /\.tree-frame \.tree-views\{margin-left:0;padding-left:0;border-left:0;gap:0;align-self:stretch;align-items:stretch;min-height:40px\}/);
   assert.match(css, /\.tree-frame \.tree-views>button\{min-height:0;align-self:stretch;border-left:1px solid var\(--line\);border-radius:0;font-size:14px/);
   // 고른 탭은 묶음 안을 꽉 채운다(서재 탭과 같은 채움). 마지막 탭은 오른쪽 둥근 모서리를 따라 칠한다.
   assert.match(css, /\.tree-frame \.tree-views>button\[aria-current=true\]\{background:var\(--lt-primary\)/);
