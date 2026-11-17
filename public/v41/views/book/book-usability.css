@@ -269,3 +269,52 @@ html[data-v41-screen=book] .topbar>.tools #singleViewBtn,html[data-v41-screen=bo
 /* #537: 마지막 순간 뒤의 '다음 순간' 안내 — 한 장(휴대폰·넓은 화면)에서는 그 순간 글 아래 흐름에 놓는다.
    쪽 위에 겹쳐 놓으면 그 순간의 카드·단추를 가린다. 두 장은 지금처럼 빈 오른쪽 페이지를 채운다(위 규칙). */
 html[data-book-view=single][data-v41-screen=book] .next-page{position:static;inset:auto;height:auto;min-height:120px;margin-top:18px;padding:16px 12px}
+
+/* #800: moment cards are reading surfaces; explicit links, edit buttons, and playback controls stay interactive. */
+html[data-v41-screen=book] .moment{cursor:default}
+html[data-v41-screen=book] .moment:hover{filter:none}
+html[data-v41-screen=book] .moment-meta{pointer-events:auto;display:flex;align-items:center;gap:5px;min-width:0;min-height:44px;white-space:nowrap;overflow:hidden;color:var(--lt-ink)}
+html[data-v41-screen=book] .moment-meta-copy{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;font:500 12px/1.3 var(--lt-ui);color:var(--lt-ink);opacity:.78;white-space:nowrap}
+html[data-v41-screen=book] .moment-edit{pointer-events:auto;position:relative;flex:0 0 auto;min-width:44px;min-height:44px;padding:0 4px;border:0;background:transparent;color:var(--lt-ink);font:600 12px/1.2 var(--lt-ui);white-space:nowrap;cursor:pointer}
+html[data-v41-screen=book] .moment-edit:hover{text-decoration:underline;text-underline-offset:3px}
+html[data-v41-screen=book] .moment-title .moment-heading{display:block;margin:0;min-width:0}
+html[data-v41-screen=book] .moment-title .moment-title-button{max-width:100%}
+html[data-v41-screen=book] .moment-title .moment-note-wrap{margin:4px 0 0;min-width:0}
+html[data-v41-screen=book] .moment-title .moment-note{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden;margin:0;color:var(--lt-ink);font:400 15px/1.5 var(--lt-reading);white-space:normal;overflow-wrap:anywhere}
+html[data-v41-screen=book] .moment-title .moment-note-more{pointer-events:auto;display:block;min-height:44px;margin:2px 0 0;padding:0 4px;border:0;background:transparent;color:var(--lt-gold-ink);font:600 12px var(--lt-ui);text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+html[data-v41-screen=book] .moment-title .moment-note-wrap.is-open .moment-note{-webkit-line-clamp:unset;overflow:visible}
+html[data-v41-screen=book] .book-card-moment{margin:8px;padding:18px 16px;border:1px solid var(--lt-line-paper);border-radius:12px;background:var(--lt-paper);color:var(--lt-ink);box-shadow:0 10px 20px rgba(55,38,31,.12)}
+html[data-v41-screen=book] .book-card-moment .moment-title{margin:0}
+html[data-v41-screen=book] .why-margin{display:flex;flex-direction:column;align-items:center;gap:6px;padding:0;border:0;border-radius:0;background:transparent;box-shadow:none;opacity:1}
+html[data-v41-screen=book] #whyMargin[hidden]{display:none!important}
+html[data-v41-screen=book] .story-tip{display:flex;align-items:center;justify-content:center;gap:8px;max-width:min(640px,90vw);padding:8px 12px;border:1px solid var(--lt-line-paper);border-radius:14px;background:var(--lt-paper);color:var(--lt-ink);box-shadow:0 3px 10px rgba(55,38,31,.12);font:400 13px/1.5 var(--lt-ui);text-align:left}
+html[data-v41-screen=book] .story-tip button,html[data-v41-screen=book] .story-action,html[data-v41-screen=book] .story-editor button{position:relative;min-height:44px;border:1px solid var(--lt-line-paper);border-radius:var(--lt-r-pill);background:var(--lt-paper);color:var(--lt-ink);font:600 13px/1.35 var(--lt-ui);cursor:pointer}
+html[data-v41-screen=book] .story-tip button{flex:0 0 auto;padding:0 12px}
+html[data-v41-screen=book] .story-action-wrap{display:flex;justify-content:center;max-width:min(640px,90vw)}
+html[data-v41-screen=book] .story-action{display:block;max-width:100%;padding:8px 16px;white-space:normal;overflow-wrap:anywhere;text-align:center}
+html[data-v41-screen=book] .story-action:hover,html[data-v41-screen=book] .story-tip button:hover,html[data-v41-screen=book] .story-editor button:hover{border-color:var(--lt-gold-ink);background:var(--lt-paper)}
+html[data-v41-screen=book] .story-readonly{cursor:default}
+html[data-v41-screen=book] .story-editor{display:flex;align-items:center;gap:4px;width:min(640px,90vw)}
+html[data-v41-screen=book] .story-editor input{box-sizing:border-box;flex:1 1 auto;min-width:0;min-height:44px;padding:8px 11px;border:1px solid var(--lt-line-paper);border-radius:12px;background:var(--lt-paper);color:var(--lt-ink);font:400 14px var(--lt-ui)}
+html[data-v41-screen=book] .story-editor button{flex:0 0 auto;padding:0 11px}
+html[data-v41-screen=book] .story-editor button[type=submit]{background:var(--lt-primary);border-color:var(--lt-primary);color:var(--lt-primary-ink)}
+html[data-book-shape=phone][data-v41-screen=book] .mobile-page .moment-title .moment-meta-copy{font-size:12px}
+html[data-book-shape=phone][data-v41-screen=book] .mobile-page .moment-title .moment-note{-webkit-line-clamp:2;font-size:14px}
+html[data-book-shape=phone][data-v41-screen=book] .why-margin{position:static;left:auto;top:auto;bottom:auto;transform:none;width:auto;margin:12px 10px 0;line-height:1.45}
+html[data-book-shape=phone][data-v41-screen=book] .story-tip{width:100%;box-sizing:border-box;font-size:12px}
+html[data-book-shape=phone][data-v41-screen=book] .story-action-wrap{width:100%;max-width:none}
+html[data-book-shape=phone][data-v41-screen=book] .story-action{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;width:100%;max-height:64px}
+html[data-book-shape=phone][data-v41-screen=book] .story-editor{width:100%}
+/* #800: desktop places the relationship at the bottom center of the open pages, above page controls. */
+html[data-v41-screen=book] .why-margin{left:calc(50% + 150px);top:auto;bottom:24px;transform:translateX(-50%);width:min(320px,30vw)}
+html[data-v41-screen=book] .why-margin>.story-tip,html[data-v41-screen=book] .why-margin>.story-action-wrap{width:100%;max-width:100%;box-sizing:border-box}
+html[data-v41-screen=book] .story-tip span{color:var(--lt-ink);opacity:1}
+/* #800 새 연결 글자는 옛 .why-margin span의 11px를 이어받지 않도록 최소 12px를 지킨다(다른 크기·색·배치는 그대로). */
+html[data-v41-screen=book] .why-margin .moment-meta-copy,html[data-v41-screen=book] .why-margin .story-action,html[data-v41-screen=book] .why-margin .story-tip span{font-size:12px}
+html[data-v41-screen=book][data-lt-theme=garden] .why-margin{padding:0;border:0;border-radius:0;background:transparent;box-shadow:none}
+/* On one-page mobile, reserve the space before navigation so the tip and relation remain in the viewport. */
+html[data-book-shape=phone][data-v41-screen=book] .why-margin{order:1;top:auto;bottom:auto;margin:0 10px;position:static;left:auto;transform:none;width:auto}
+html[data-book-shape=phone][data-v41-screen=book] .nav-pill{order:2;position:static;bottom:auto;margin:2px auto 0}
+html[data-book-shape=phone][data-v41-screen=book] .branch-tab{order:3}
+html[data-book-shape=phone][data-v41-screen=book] .yt-play.is-vertical,
+html[data-book-shape=phone][data-v41-screen=book] .yt-frame.is-vertical{height:clamp(190px,26vh,230px)}

@@ -74,35 +74,12 @@ export function applyViewAccessibility(doc, win = doc?.defaultView) {
   });
 
   const decorateBookMoments = () => all('#book [data-moment],#mobilePage [data-moment]').forEach(piece => {
-    if (piece.dataset.ltA11yMoment === '1') return;
+    // A moment card is a reading surface. Keep only its explicit edit/media controls interactive.
+    piece.removeAttribute('role');
+    if (piece.dataset.ltA11yMoment === '1' || piece.classList.contains('lt-a11y-focusable')) piece.removeAttribute('tabindex');
+    piece.classList.remove('lt-a11y-focusable');
+    piece.querySelectorAll('.lt-a11y-open').forEach(button => button.remove());
     piece.dataset.ltA11yMoment = '1';
-    const openMoment = () => {
-      const id = piece.dataset.moment;
-      if (typeof win.showDetail === 'function') win.showDetail(id);
-      else piece.click();
-    };
-    // 안에 실제 버튼·링크가 있는 순간(사진·미디어 순간)은 카드 자체를 버튼으로 만들지 않는다.
-    // 그러면 안쪽 '사진 불러오기' 버튼과 중첩 상호작용이 되어 안쪽 버튼이 낭독·탭 순서에서 가려진다(#325).
-    // 대신 키보드로 상세를 여는 실제 버튼을 카드 맨 앞에 하나 둔다(#202의 키보드 열기 유지).
-    if (piece.querySelector(FOCUSABLE)) {
-      if (!piece.querySelector('.lt-a11y-open')) {
-        const open = doc.createElement('button');
-        open.type = 'button';
-        open.className = 'lt-a11y-open';
-        open.textContent = '순간 열기';
-        open.addEventListener('click', openMoment);
-        piece.prepend(open);
-      }
-      return;
-    }
-    piece.tabIndex = 0;
-    piece.setAttribute('role', 'button');
-    piece.classList.add('lt-a11y-focusable');
-    piece.addEventListener('keydown', event => {
-      if (!['Enter', ' ', 'Spacebar'].includes(event.key)) return;
-      event.preventDefault();
-      openMoment();
-    });
   });
   decorateBookMoments();
   const book = doc.querySelector('#book');

@@ -9,8 +9,10 @@
     const outgoing = tree.edges.filter(e => e.kind === 'parent' && e.from === m.id);
     return {id:m.id,title:m.title,date:m.date,emotion:m.emotion,memo:m.note,mediaMetadata:m.mediaMetadata||null,
       whyNext:outgoing.map(e=>e.reason).filter(Boolean).join(' / '),
+      kind:context.exampleMedia?.[m.id]?.type||(media?.kind==='photo'?'photo':media?.kind==='video'||media?.kind==='youtube'?'video':m.url?'link':'memo'),
       type:context.exampleMedia?.[m.id]?.type||(media?.kind==='photo'?'photo':media?.kind==='video'||media?.kind==='youtube'?'video':m.url?'link':'memo'),source:context.exampleMedia?'예시 이미지':media?.openUrl?new URL(media.openUrl).hostname:'불러온 기록',image:context.exampleMedia?.[m.id]?.image||'',externalUrl:m.url||'',
       first:m.parentId===null,next:outgoing[0]?.to||null,branch:outgoing[1]?.to||null,
+      parentId:m.parentId,relation:m.relation||'',startSeconds:m.startSeconds,endSeconds:m.endSeconds,
       x:m.x,y:m.y,rot:m.rot,pinStyle:m.pinStyle,cardStyle:m.cardStyle,color:m.color,keywords:m.keywords||[],createdAt:m.createdAt};
   });
   if(context.source==='server')addEventListener('DOMContentLoaded',()=>{for(const label of document.querySelectorAll('#detail .section .label'))if(label.textContent==='감상 예시'){label.textContent='내 기록';label.nextElementSibling.textContent='상단에서 수정·연결을 관리할 수 있어요.';}});
@@ -28,7 +30,7 @@
   // #464(2026-11-13): 예시(demoData)도 읽기 전용이다 — 고칠 수 없는 화면이다. 예전에는 source==='share'만
   // 보아 예시 책에 "이 순간에 남기고 싶은 마음을 적어 보세요…"와 "✎ 고치기"가 보였다(CTO 지적).
   const readOnly = context.source === 'share' || context.source === 'example' || !!demo;
-  window.LTDEMO = {title:tree.title,moments,edges:tree.edges,example:!!demo,readOnly,prefs:context.prefs||{titleDisplay:'both'},
+  window.LTDEMO = {title:tree.title,treeId:tree.id,source:context.source,writable:context.source==='server'&&!!context.writable,moments,edges:tree.edges,example:!!demo,readOnly,prefs:context.prefs||{titleDisplay:'both'},
     get:()=>context.momentId,
     select:id=>{if(moments.some(m=>m.id===id)){context.momentId=id;parent.postMessage({type:'lt-selection',id},location.origin)}}};
 })();

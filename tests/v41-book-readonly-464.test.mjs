@@ -54,13 +54,14 @@ test('#464 편집 손잡이는 읽기 전용에서 하나도 나오지 않는다
   assert.equal(mine.guide, true, '내 책에서는 지금 그대로 마음 안내가 보인다');
 });
 
-test('#464 책 렌더는 editAffordances 한 곳으로만 손잡이를 정한다(다른 경로가 남아 있지 않다)', () => {
-  assert.match(bookExtra, /const hands=editAffordances\(\{readOnly:!!LTDEMO\.readOnly,/, '판정은 한 곳에서');
-  // 안내 문구와 '고치기'는 hands를 통해서만 붙는다 — 예전처럼 무조건 붙는 자리가 없어야 한다.
+test('#464 책 렌더는 writable로 손잡이를 정한다(쓸 수 없는 책에는 "✎ 고치기"가 없다)', () => {
+  // 지키려던 것: 읽기 전용(공유·예시) 책에 편집 손잡이와 '✎ 고치기'가 보이지 않게 한다.
+  assert.match(bookExtra, /const hands=editAffordances\(\{readOnly:!LTDEMO\.writable,/, '판정은 writable 한 곳에서');
+  // 안내 문구와 '고치기'는 writable을 통해서만 붙는다 — 예전처럼 무조건 붙는 자리가 없어야 한다.
   // #537: 마음 한마디가 비었을 때의 흐린 안내("…적어 보세요")는 내용처럼 읽혀 아예 그리지 않는다.
-  // (판정 자체는 그대로 editAffordances 한 곳이 맡는다 — hands.guide는 다른 곳에서 쓸 수 있게 남겨 둔다.)
+  // (판정 자체는 그대로 editAffordances가 맡는다 — hands.guide는 다른 곳에서 쓸 수 있게 남겨 둔다.)
   assert.doesNotMatch(bookExtra, /class="moment-note is-empty/, '빈 마음 안내는 그리지 않는다(#537)');
-  assert.match(bookExtra, /hands\.hint\?'<button type="button" class="title-edit-hint"/, '"고치기"는 hands.hint일 때만');
+  assert.match(bookExtra, /const edit=LTDEMO\.writable&&!m\.synthetic\?'<button type="button" class="moment-edit"/, '"✎ 고치기"는 쓸 수 있는 책에서만');
 });
 
 // ── ② 한 장/두 장: 지금 고른 쪽이 눈으로 보인다 ──

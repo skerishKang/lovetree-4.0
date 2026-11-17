@@ -76,7 +76,7 @@ function messagesHarness({ owned = true, source = 'server', current = 'track59-s
   const saved = globals();
   const els = {};
   const events = {};
-  const calls = {notify: [], panels: [], shown: [], editors: [], writeEntries: [], logins: [], links: 0, writes: 0, chooses: [], samples: [], journeys: [], menus: [], moves: []};
+  const calls = {notify: [], panels: [], shown: [], editors: [], writeEntries: [], logins: [], links: 0, writes: 0, chooses: [], samples: [], journeys: [], menus: [], moves: [], applies: [], replies: []};
   const requests = [];
   globalThis.addEventListener = (type, fn) => { events[type] = fn; };
   globalThis.location = {origin: 'https://lovetree-4-0.pages.dev', hostname: 'lovetree-4-0.pages.dev', hash: ''};
@@ -87,10 +87,10 @@ function messagesHarness({ owned = true, source = 'server', current = 'track59-s
   els['community-panel'] = dialog;
   els['community-menu'] = button;
   els['account-entry'] = fakeElement();
-  els['view'] = fakeElement();
+  els['view'] = fakeElement({contentWindow: {postMessage: (message, origin) => calls.replies.push([message, origin])}});
 
   let ownedNow = owned;
-  const member = {snapshot: () => ({owned: ownedNow, writable: true, dirty: false})};
+  const member = {snapshot: () => ({owned: ownedNow, writable: true, dirty: false}), apply: (...args) => calls.applies.push(args)};
   const shareApi = {
     preview: async payload => { requests.push(['preview', payload]); return {ok: true, preview: {previewToken: 'tok-1', tree: {title: '윤슬', moments: [{title: '첫 순간', emotion: '설렘', date: '2026-11-01'}]}}}; },
     create: async payload => { requests.push(['create', payload]); return {ok: true, share: {id: 'share-1', view: 'book'}}; },
@@ -153,6 +153,38 @@ test('lt41-select는 화면이 보낸 순간으로 선택을 옮기고 주소를
     h.receive({type: 'lt41-select', id: 'nope'});
     assert.equal(h.calls.links, 1);
   } finally { h.restore(); }
+});
+
+test('책의 두 순간 사이 한마디는 서버 편집 경로로 이어진 다음 순간에 저장한다', () => {
+  const child = {id: 'm2', parentId: 'm1', title: '두 번째', note: '기억', emotion: '그리움', date: '2026-11-17', relation: '', url: '', links: []};
+  const model = {trees: [{id: 'tree1', moments: [{id: 'm1', parentId: null}, child]}]};
+  const h = messagesHarness({model});
+  try {
+    h.receive({type: 'lt41-story-save', treeId: 'tree1', fromMomentId: 'm1', momentId: 'm2', relation: ' 무대 뒤에서 다시 떠올랐어요 '});
+    assert.equal(h.calls.applies.length, 1);
+    assert.equal(h.calls.applies[0][0], 'edit');
+    assert.equal(h.calls.applies[0][1].relation, '무대 뒤에서 다시 떠올랐어요');
+    assert.deepEqual(h.calls.applies[0][2], {treeId: 'tree1', momentId: 'm2'});
+    assert.deepEqual(h.calls.replies[0][0], {type: 'lt41-story-saved', ok: true, treeId: 'tree1', fromMomentId: 'm1', momentId: 'm2', relation: '무대 뒤에서 다시 떠올랐어요', error: ''});
+  } finally { h.restore(); }
+});
+
+test('책 한마디 저장은 공유 화면·다른 부모 연결·100자 초과를 거부한다', () => {
+  const model = {trees: [{id: 'tree1', moments: [{id: 'm1', parentId: null}, {id: 'm2', parentId: 'm1', title: '둘째'}]}]};
+  const shared = messagesHarness({source: 'share', model});
+  try {
+    shared.receive({type: 'lt41-story-save', treeId: 'tree1', fromMomentId: 'm1', momentId: 'm2', relation: '한마디'});
+    assert.equal(shared.calls.applies.length, 0);
+    assert.equal(shared.calls.replies[0][0].ok, false);
+  } finally { shared.restore(); }
+
+  const writable = messagesHarness({model});
+  try {
+    writable.receive({type: 'lt41-story-save', treeId: 'tree1', fromMomentId: 'other', momentId: 'm2', relation: '한마디'});
+    writable.receive({type: 'lt41-story-save', treeId: 'tree1', fromMomentId: 'm1', momentId: 'm2', relation: '가'.repeat(101)});
+    assert.equal(writable.calls.applies.length, 0);
+    assert.equal(writable.calls.replies.every(([reply]) => reply.ok === false), true);
+  } finally { writable.restore(); }
 });
 
 test('lt41-move(상세의 다른 트리로 옮기기)는 내 기록에서만 트리 목록 입구를 연다', () => {

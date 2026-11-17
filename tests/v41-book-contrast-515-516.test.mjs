@@ -98,9 +98,9 @@ test('#515·#516 정원 책: 이유 줄·보기 알약(고른 쪽/안 고른 쪽
         assert.equal(errors.length, 0, `${width}·${theme}: 페이지 오류 ${errors.join(' | ')}`);
         assert.ok(pageLabel, `${width}·${theme}: 페이지 수를 찾지 못함`);
         if (theme === 'night') {
-          // 밤은 이번에 바꾸지 않는다 — 값 자체를 고정한다.
+          // 지키려던 것: 밤 테마 연결 줄의 색·불투명도를 고정한다. #800에서 한마디 줄은 opacity 1로 바뀜(book-usability.css 288행).
           assert.equal(why?.color, 'rgb(228, 210, 203)', `${width}·밤: 이유 줄 색이 바뀌면 안 됨`);
-          assert.equal(why?.opacity, '0.78', `${width}·밤: 이유 줄 opacity가 바뀌면 안 됨`);
+          assert.equal(why?.opacity, '1', `${width}·밤: 이유 줄 opacity가 바뀌면 안 됨`);
         } else {
           assert.ok(why, `${width}·정원: 이유 줄이 화면에 보이지 않음`);
           if (why.ratio < 4.5) failures.push(`${width}·정원 이유 줄 ${why.color}/${why.bg} = ${why.ratio}:1`);

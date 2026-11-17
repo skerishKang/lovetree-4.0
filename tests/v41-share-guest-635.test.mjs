@@ -186,13 +186,18 @@ test('#635 규칙(정적): 감상 화면에서 다음 이야기 안내를 감추
 });
 
 test('#635 규칙(정적): 감상 화면의 빈 이유 안내를 감추고, 제목 중복 줄을 가른다', () => {
+  // 지키려던 것: 감상 화면에서 빈 이유 띠를 숨기고 제목 중복 줄을 가른다. #800은 빈 이유 띠를 아예 없앴다.
   const usability = read('public/v41/book-usability.mjs');
   // connectionLine: 감상 화면에서는 이유가 비었을 때 줄 자체를 내지 않는다.
   assert.match(usability, /hideEmptyWhy = false/, 'connectionLine에 hideEmptyWhy 옵션');
   assert.match(usability, /if \(hideEmptyWhy && !why\) return null;/, '이유가 비면 null(줄을 숨긴다)');
   const extra = read('public/v41/views/book/book-extra.js');
-  // 책 안내줄(#whyMargin)과 상세 판 둘 다 감상 화면에서는 감춘다.
-  assert.match(extra, /connectionLine\(next&&next\.reason,\{hideEmptyWhy:!!LTDEMO\.readOnly\}\)|connectionLine\(next&&next\.title,next&&next\.reason,\{hideEmptyWhy:!!LTDEMO\.readOnly\}\)/, '안내줄이 감상 판정을 넘긴다');
+  // 책 안내줄(#whyMargin): #800에서 '아직 적지 않았어요' 띠를 없애고 두 순간 사이 한마디로 바꿨다.
+  assert.doesNotMatch(extra, /connectionLine\(next&&next\.reason,\{hideEmptyWhy:!!LTDEMO\.readOnly\}\)/, '빈 이유 안내 띠는 그리지 않는다(#800)');
+  assert.doesNotMatch(extra, /이어진 이유를 아직 적지 않았어요/, '빈 이유 띠 문구가 책에 남아 있지 않다(#800)');
+  assert.match(extra, /class="story-action"/, '빈 연결에는 한마디 입력 버튼을 둔다(#800)');
+  assert.match(extra, /if\(!tip&&!action\)\{host\.hidden=true;host\.replaceChildren\(\);return\}/, '할 말이 없으면 연결 줄 자체를 숨긴다(#800)');
+  // 상세 판은 감상 판정을 넘겨 빈 이유를 감춘다.
   assert.match(extra, /connectionLine\(nextInfo\?\.title,nextInfo\?\.reason,\{hideEmptyWhy:!!LTDEMO\.readOnly\}\)/, '상세 판도 감상 판정을 넘긴다');
   assert.match(extra, /\(line\?'<div class="detail-why">'\)?\+?t\(line\)|line\?'<div class="detail-why">'/, '상세 판은 줄이 있을 때만 그린다');
   // 제목 중복: 사용자 제목과 영상 제목의 같음 판정은 앞뒤 공백·대소문자를 무시한다.
