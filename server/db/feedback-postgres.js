@@ -149,6 +149,20 @@ export function createFeedbackRepo(pool) {
       return rows[0] ? feedbackRow(rows[0]) : null;
     },
 
+    async relinkAuthor({ productId, id, expectedSubjectId, toSubjectId }) {
+      const numeric = Number(id);
+      if (!Number.isSafeInteger(numeric) || numeric <= 0) return null;
+      if (typeof toSubjectId !== 'string' || !toSubjectId) return null;
+      const { rows } = await pool.query(
+        `UPDATE lovetree_feedback
+            SET subject_id = $3, updated_at = now()
+          WHERE product_id = $1 AND id = $2 AND subject_id IS NOT DISTINCT FROM $4
+          RETURNING *`,
+        [productId, numeric, toSubjectId, expectedSubjectId ?? null]
+      );
+      return rows[0] ? feedbackRow(rows[0]) : null;
+    },
+
     async addReply({ productId, postId, authorType, authorSubjectId = null, body }) {
       const { rows } = await pool.query(
         `INSERT INTO lovetree_feedback_replies (product_id, post_id, author_type, author_subject_id, body)
