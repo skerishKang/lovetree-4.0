@@ -1864,3 +1864,52 @@ test('#657 후속 261117: 좁은 화면 소수 카드(≤8) 계정은 궤도 카
     await new Promise((resolve) => server.close(resolve));
   }
 });
+
+// 2026-11-17 CTO 캡처 후속: 390에서 궤도 카드가 0장이어도 다른 층 카드가 바닥 링크 줄에 겹치지 않는다.
+// 눈이 아니라 수치로 판정한다 — 보이는 카드 수, 카드↔링크 겹침 쌍 0, 카드 아래끝 ≤ 링크 줄 top−8(1440도 겹침 0).
+test('#657 후속 261117: 카드 층은 바닥 링크 줄 위에서 자른다(390 few·many, 1440)', { skip: REQUIRE ? false : skip, timeout: 180000 }, async () => {
+  const { createTree, addMoment } = await import('../public/v41/domain.mjs');
+  const treeWith = (n) => {
+    let t = createTree({ subject: '시험', title: '카드 계정', note: '기록', emotion: '설렘', date: '2026-11-11', url: '' }, '2026-11-16T00:00:00.000Z');
+    for (let i = 1; i < n; i++) {
+      t = addMoment(t, { subject: '시험', title: `순간 ${i}`, note: '기록', emotion: '설렘', date: '2026-11-11', url: '' }, t.moments[i - 1].id, `2026-11-16T00:0${i % 10}:00.000Z`);
+      t.moments[i].mediaMetadata = { thumbnail: 'data:image/svg+xml;base64,' + Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><rect width="640" height="360" fill="#8a5a6e"/></svg>').toString('base64') };
+    }
+    return t;
+  };
+  const server = await serve();
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch();
+  try {
+    for (const [label, width, count] of [['few-390', 390, 3], ['many-390', 390, 12], ['many-1440', 1440, 12]]) {
+      const ctx = await browser.newContext({ viewport: { width, height: width === 390 ? 844 : 900 }, reducedMotion: 'reduce' });
+      await ctx.addInitScript(() => { try { localStorage.setItem('lt41.theme', 'night'); localStorage.setItem('lt41.homeCards', 'mine'); } catch {} });
+      await ctx.route('**://i.ytimg.com/**', THUMB);
+      await ctx.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
+      await ctx.route('**/api/workspace**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ revision: 1, state: { version: 1, trees: [treeWith(count)], prefs: {} }, subject: '시험계정', writeSubjectBound: true, savedAt: '2026-11-16T00:00:00.000Z' }) }));
+      const page = await ctx.newPage();
+      await page.goto(`${base}/v41/?account=1`, { waitUntil: 'load', timeout: 30000 });
+      await page.waitForTimeout(6000);
+      const measured = await page.evaluate(() => {
+        const frames = [...document.querySelectorAll('#view,#view-next')].filter((f) => f.getClientRects().length > 0 && !f.hidden);
+        const sh = (frames[0] || document.getElementById('view'))?.contentDocument?.getElementById('orbit')?.shadowRoot;
+        const cards = sh ? [...sh.querySelectorAll('button.card')].filter((c) => c.style.display !== 'none' && getComputedStyle(c).display !== 'none') : [];
+        const rects = cards.map((c) => {
+          const a = c.getBoundingClientRect(), s = c.querySelector('.surface')?.getBoundingClientRect() || a;
+          return { l: Math.min(a.left, s.left), r: Math.max(a.right, s.right), t: Math.min(a.top, s.top), b: Math.max(a.bottom, s.bottom) };
+        });
+        const links = [...document.querySelectorAll('.home-links a,.home-links button')].map((e) => { const r = e.getBoundingClientRect(); return { l: r.left, r: r.right, t: r.top, b: r.bottom }; }).filter((r) => r.r > r.l && r.b > r.t);
+        const overlaps = rects.reduce((n, c) => n + links.filter((l) => Math.min(c.r, l.r) - Math.max(c.l, l.l) > 0 && Math.min(c.b, l.b) - Math.max(c.t, l.t) > 0).length, 0);
+        const lr = document.querySelector('.home-links')?.getBoundingClientRect();
+        return { count: cards.length, overlaps, ceiling: lr ? Math.round(lr.top) - 8 : null, lowest: rects.length ? Math.round(Math.max(...rects.map((c) => c.b))) : null };
+      });
+      assert.equal(measured.overlaps, 0, `${label}: 카드↔바닥 링크 겹침 ${measured.overlaps}쌍`);
+      if (label === 'few-390') assert.equal(measured.count, 0, `390 소수 카드 계정: 보이는 카드 ${measured.count}장(기존 궤도 숨김 유지)`);
+      if (measured.ceiling !== null && measured.lowest !== null) assert.ok(measured.lowest <= measured.ceiling, `${label}: 카드 아래끝 ${measured.lowest} > 링크 줄 위 ${measured.ceiling}`);
+      await ctx.close();
+    }
+  } finally {
+    await browser.close();
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
