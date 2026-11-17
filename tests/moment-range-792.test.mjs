@@ -7,6 +7,7 @@ import { createTree, addMoment, validateState, validateMomentInput as serverVali
 import { validateMomentInput as browserValidate } from '../public/v41/domain.mjs';
 import * as server from '../src/moment-range.js';
 import * as browser from '../public/v41/domain.mjs';
+import {CAPTURE_DEFAULT_SECONDS, capturedRange, endForDuration, endTextForDuration, loopBoundaryReached, createSegmentCapture} from '../public/v41/segment-capture.mjs';
 
 const BASE = { title: '기억할 순간', date: '2026-11-17', url: '' };
 const START_ERROR = '시작 시간은 01:30 또는 01:02:30 형식으로 적어 주세요.';
@@ -130,4 +131,74 @@ test('저장→불러오기 왕복: 서버가 startSeconds·endSeconds를 지우
   assert.equal(read.state.trees[0].moments[0].startSeconds, 42);
   assert.equal(read.state.trees[0].moments[0].endSeconds, 68);
   assert.equal(typeof read.state.trees[0].moments[1].startSeconds, 'undefined', '값이 없는 순간은 키 자체가 없다');
+});
+
+
+test('#792 2단계: 재생 위치를 시작으로 담고 길이 단추별 끝·반복 경계를 만든다', () => {
+  assert.deepEqual(capturedRange(90.7), { start: 90, end: 100 }, '지금 위치(내림)+기본 10초');
+  assert.deepEqual(capturedRange(89.9, 5), { start: 89, end: 94 });
+  assert.equal(CAPTURE_DEFAULT_SECONDS, 10);
+  assert.equal(endForDuration(90, '5'), 95);
+  assert.equal(endForDuration(90, '10'), 100);
+  assert.equal(endForDuration(90, '15'), 105);
+  assert.equal(endForDuration(90, 'none'), null, '끝 없이는 책갈피');
+  assert.equal(endTextForDuration(90, '5'), '1:35');
+  assert.equal(endTextForDuration(90, '15'), '1:45');
+  assert.equal(endTextForDuration(90, 'none'), '', '끝 칸을 비운다');
+  assert.equal(loopBoundaryReached(99.8, 90, 100), true, '끝에 닿으면 시작으로');
+  assert.equal(loopBoundaryReached(99.0, 90, 100), false);
+  assert.equal(loopBoundaryReached(100, 100, 100), false, '끝이 시작과 같으면 반복하지 않는다');
+  assert.equal(loopBoundaryReached(100, 90, 90), false);
+});
+
+
+test('#792 2단계: 재생기에서 담기·길이 단추·반복이 칸 값을 바꾼다', async () => {
+  const listeners = new Map();
+  const element = (extra = {}) => ({
+    hidden: false, value: '', checked: false, textContent: '', dataset: {},
+    addEventListener(type, fn) { const list = listeners.get(this)?.get(type) || []; list.push(fn); listeners.set(this, (listeners.get(this) || new Map()).set(type, list)); },
+    setAttribute(name, value) { this[name] = String(value); },
+    querySelectorAll() { return []; },
+    fire(type) { for (const fn of listeners.get(this)?.get(type) || []) fn({}); },
+    ...extra
+  });
+  const start = element(), end = element();
+  const loop = element({ checked: false });
+  const status = element({ hidden: true });
+  const capture = element();
+  const durations = ['5', '10', '15', 'none'].map((value) => element({ dataset: { segmentDuration: value } }));
+  const block = element();
+  block.querySelectorAll = () => durations;
+  const byId = { 'segment-capture': block, 'segment-loop': loop, 'segment-status': status, 'segment-capture-start': capture };
+  const scope = { querySelector: (selector) => byId[selector.slice(1)] || null };
+  const form = { elements: { startSeconds: start, endSeconds: end } };
+  let time = 90, plays = 0;
+  const seeks = [];
+  const player = { getCurrentTime: () => time, seekTo: (seconds) => { seeks.push(seconds); time = seconds; }, playVideo: () => { plays += 1; } };
+  const controller = createSegmentCapture({ player, form, scope });
+  assert.ok(controller, '컨트롤을 연결한다');
+
+  capture.fire('click');
+  assert.equal(start.value, '1:30', '지금 위치(90초)가 시작');
+  assert.equal(end.value, '1:40', '기본 10초 뒤가 끝');
+  assert.equal(status.hidden, false);
+
+  durations[0].fire('click');
+  assert.equal(end.value, '1:35', '5초');
+  durations[2].fire('click');
+  assert.equal(end.value, '1:45', '15초');
+  durations[3].fire('click');
+  assert.equal(end.value, '', '끝 없이 — 끝 칸을 비운다');
+  durations[1].fire('click');
+  assert.equal(end.value, '1:40', '10초');
+
+  start.value = '1:30'; end.value = '1:40';
+  loop.checked = true;
+  loop.fire('change');
+  assert.equal(seeks.at(-1), 90, '반복을 켜면 시작으로 돌아간다');
+  time = 100;
+  await new Promise((resolve) => setTimeout(resolve, 320));
+  assert.equal(seeks.at(-1), 90, '끝에 닿으면 시작으로 돌아간다');
+  assert.ok(plays >= 2, '반복 재생한다');
+  controller.destroy();
 });

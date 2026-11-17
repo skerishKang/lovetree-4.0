@@ -76,7 +76,7 @@ function messagesHarness({ owned = true, source = 'server', current = 'track59-s
   const saved = globals();
   const els = {};
   const events = {};
-  const calls = {notify: [], panels: [], shown: [], editors: [], writeEntries: [], logins: [], links: 0, writes: 0, chooses: [], samples: [], journeys: [], menus: [], moves: [], applies: [], replies: []};
+  const calls = {notify: [], panels: [], shown: [], editors: [], writeEntries: [], logins: [], links: 0, writes: 0, chooses: [], samples: [], journeys: [], menus: [], moves: [], cleanups: [], applies: [], replies: []};
   const requests = [];
   globalThis.addEventListener = (type, fn) => { events[type] = fn; };
   globalThis.location = {origin: 'https://lovetree-4-0.pages.dev', hostname: 'lovetree-4-0.pages.dev', hash: ''};
@@ -126,6 +126,7 @@ function messagesHarness({ owned = true, source = 'server', current = 'track59-s
     openLoginStart: intent => calls.logins.push(intent),
     openAccountMenu: () => calls.menus.push('account'),
     openMovePicker: options => calls.moves.push(options),
+    openCleanup: options => calls.cleanups.push(options ?? null),
     sample: (selection, view) => calls.samples.push([selection, view]),
     applyTheme: () => {},
     paintThemeControls: () => {},
@@ -185,6 +186,20 @@ test('책 한마디 저장은 공유 화면·다른 부모 연결·100자 초과
     assert.equal(writable.calls.applies.length, 0);
     assert.equal(writable.calls.replies.every(([reply]) => reply.ok === false), true);
   } finally { writable.restore(); }
+});
+
+test('lt41-cleanup(첫 화면 모아둔 순간 숫자)은 모아둔 정리 창을 연다', () => {
+  const h = messagesHarness();
+  try {
+    h.receive({type: 'lt41-cleanup'});
+    assert.deepEqual(h.calls.cleanups, [{}], '셸 cleanup 모듈의 openCleanup을 연다');
+    // 공유·예시 기록에서는 열지 않는다(#327 — 공유 감상은 쓰기 도구가 없다).
+    const shared = messagesHarness({source: 'share'});
+    try {
+      shared.receive({type: 'lt41-cleanup'});
+      assert.deepEqual(shared.calls.cleanups, []);
+    } finally { shared.restore(); }
+  } finally { h.restore(); }
 });
 
 test('lt41-move(상세의 다른 트리로 옮기기)는 내 기록에서만 트리 목록 입구를 연다', () => {

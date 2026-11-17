@@ -309,6 +309,9 @@ async function playInPlace(root){
  let embed=null;
  try{const usability=await import('/v41/book-usability.mjs');embed=fromStart?usability.embedUrl(m.videoId,0):(rangeUsed?rangeEmbedUrl(m.videoId,start,end):usability.embedUrl(m.videoId,start));}catch{}
  if(!embed){delete root.dataset.ltPlaying;if(status)status.textContent='바로 재생할 수 없어요. 아래 원본 링크에서 열어 주세요.';return;}
+ // #792 2단계: 추가·고치기 창의 미리보기만 IFrame API로 재생 위치를 읽는다. 다른 화면은 지금 그대로다.
+ const segmentEditor=!!root.closest('#moment-form');
+ if(segmentEditor)embed+=(embed.includes('?')?'&':'?')+'enablejsapi=1&origin='+encodeURIComponent(location.origin);
  if(!root.isConnected){delete root.dataset.ltPlaying;return;}
  const frame=document.createElement('iframe');
  frame.className='lt-yt-frame';frame.src=embed;frame.title=root.dataset.ltTitle||'YouTube 영상';
@@ -317,6 +320,7 @@ async function playInPlace(root){
  // strict-origin-when-cross-origin 으로 같은 영상이 그 자리에서 재생된다.
  frame.setAttribute('referrerpolicy','strict-origin-when-cross-origin');
  body.replaceChildren(frame);
+ if(segmentEditor)root.dispatchEvent(new CustomEvent('lt41:media-playing',{bubbles:true,detail:{frame,videoId:m.videoId,start}}));
  if(rangeUsed&&!fromStart){const again=document.createElement('button');again.type='button';again.className='lt-from-start';again.dataset.ltFromStart='';again.textContent='처음부터 보기';body.append(again);}
  delete root.dataset.ltPlaying;
  delete root.dataset.ltFromStart;
