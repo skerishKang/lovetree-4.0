@@ -247,6 +247,56 @@ export const AUDIT_FN = function audit(opts) {
     }
   }
 
+  // 점검 LT-01·02·04: 아래 고정 요소끼리 겹침 0(390·1440 × 정원·밤).
+  // 새 소식 카드 ↔ (아래 링크 줄·＋·시네마·프레임 마지막 줄), #toast ↔ 열린 창 조작,
+  // 새 소식 창 바닥 줄 ↔ 본문 글자 — 어떤 쌍도 1px²라도 겹치면 실패다.
+  const bottomHits = [];
+  const rect = (el) => el.getBoundingClientRect();
+  const area = (a, b) => Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left))
+    * Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
+  const shown = (el) => !!el && !el.hidden && visible(el);
+  const cardEl = document.getElementById('updates-card');
+  if (shown(cardEl)) {
+    const cr = rect(cardEl);
+    for (const s of ['.home-links', '#mobile-add', '#toolCinema', '[data-cinema]', '.cinema-btn']) {
+      for (const el of document.querySelectorAll(s)) {
+        if (!shown(el)) continue;
+        const a = area(cr, rect(el));
+        if (a > 0) bottomHits.push({ pair: 'updates-card×' + s, area: Math.round(a) });
+      }
+    }
+    for (const f of document.querySelectorAll('iframe')) {
+      let d = null; try { d = f.contentDocument; } catch {}
+      if (!d) continue;
+      const fr = rect(f);
+      for (const el of d.querySelectorAll('.lt-post:last-child,.lt-post-row:last-child,.card:last-child')) {
+        if (!el || el.hidden) continue;
+        const er = rect(el);
+        const abs = { left: er.left + fr.left, right: er.right + fr.left, top: er.top + fr.top, bottom: er.bottom + fr.top };
+        const a = area(cr, abs);
+        if (a > 0) bottomHits.push({ pair: 'updates-card×frame-last-row', area: Math.round(a) });
+      }
+    }
+  }
+  if (shown(toastEl)) {
+    for (const d of document.querySelectorAll('dialog[open]')) {
+      for (const el of d.querySelectorAll('.panel-heading .close,[data-close],.updates-foot button')) {
+        if (!shown(el)) continue;
+        const a = area(rect(toastEl), rect(el));
+        if (a > 0) bottomHits.push({ pair: 'toast×dialog-control', area: Math.round(a) });
+      }
+    }
+  }
+  const foot = document.querySelector('#updates-panel .updates-foot');
+  if (shown(foot)) {
+    const fr = rect(foot);
+    for (const el of document.querySelectorAll('#updates-panel .updates-version *')) {
+      if (!shown(el) || el.children.length || !el.textContent.trim()) continue;
+      const a = area(fr, rect(el));
+      if (a > 0) bottomHits.push({ pair: 'updates-foot×body-text', area: Math.round(a) });
+    }
+  }
+
   // 책 상태 단정(261116 책 글자 다듬기): 날짜·'이어진 순간' 칩 글자는 12px 이상(#548 기준선)이고, 접힌 제목
   // 단추는 두 줄(펼침 전)이다. 펼친 제목(.title-open)과 단추가 아예 없는 감상 화면(제목이 h3)은 대상이 아니다.
   const bookState = [];
@@ -265,11 +315,11 @@ export const AUDIT_FN = function audit(opts) {
     }
   }
 
-  return { issues, covered, bad, overflow, clipped, small, cards, toastHits, contrast, bookState };
+  return { issues, covered, bad, overflow, clipped, small, cards, toastHits, bottomHits, contrast, bookState };
 };
 
 // 페이지와 그 안의 모든 프레임(같은 출처)에 검사를 돌려 한 묶음으로 모은다.
-const EMPTY = () => ({ issues: [], covered: [], bad: [], clipped: [], small: [], overflowList: [], toastHits: [], errors: [], cardsList: [], contrast: [], bookState: [] });
+const EMPTY = () => ({ issues: [], covered: [], bad: [], clipped: [], small: [], overflowList: [], toastHits: [], bottomHits: [], errors: [], cardsList: [], contrast: [], bookState: [] });
 export async function auditPage(page, screen) {
   const out = EMPTY();
   for (const frame of page.frames()) {
@@ -280,7 +330,7 @@ export async function auditPage(page, screen) {
       continue;
     }
     const url = frame.url().replace(/^https?:\/\/[^/]+/, '');
-    for (const key of ['issues', 'covered', 'clipped', 'small', 'toastHits', 'contrast', 'bookState']) for (const item of res[key] || []) out[key].push({ 화면: screen, 프레임: url, ...item });
+    for (const key of ['issues', 'covered', 'clipped', 'small', 'toastHits', 'bottomHits', 'contrast', 'bookState']) for (const item of res[key] || []) out[key].push({ 화면: screen, 프레임: url, ...item });
     for (const b of res.bad || []) out.bad.push({ 화면: screen, 프레임: url, 값: b });
     if (res.cards) out.cardsList.push({ 화면: screen, 프레임: url, ...res.cards });
     if ((res.overflow || 0) > 0) out.overflowList.push({ 화면: screen, 프레임: url, overflow: res.overflow });
@@ -297,6 +347,7 @@ export function lineOf(res) {
   if (res.항목 === '잘림') return `${res.화면} 잘림 ${res.el} "${res.text}" ${res.sw}>${res.cw}`;
   if (res.항목 === '작은글자') return `${res.화면} 작은글자 ${res.px}px${res.단추 ? '(단추)' : ''} ${res.el} "${res.text}"`;
   if (res.항목 === '알림줄겹침') return `${res.화면} 알림줄겹침 ${res.el} × ${res.by} @(${res.x},${res.y})`;
+  if (res.항목 === '아래겹침') return `${res.화면} 아래겹침 ${res.pair} ${res.area}px²`;
   if (res.항목 === '대비') return `${res.화면} 대비 ${res.el} ${res.ratio}:1 < 4.5:1 "${res.text}"`;
   if (res.항목 === '책글자') return `${res.화면} 책글자 ${res.el} — ${res.검사}(${res.실측})`;
   return JSON.stringify(res);
@@ -318,6 +369,7 @@ export function failuresOf(res, 크기, 테마) {
     if (String(c.화면).startsWith('보드') && c.maxW < 기준) rows.push(['작은카드', `${c.화면} 작은카드 보이는 카드 ${c.n}장 중 가장 넓은 폭 ${c.maxW}px < ${기준}px`]);
   }
   for (const t of res.toastHits) rows.push(['알림줄겹침', lineOf({ 항목: '알림줄겹침', ...t })]);
+  for (const b of res.bottomHits || []) rows.push(['아래겹침', lineOf({ 항목: '아래겹침', ...b })]);
   for (const c of res.contrast || []) rows.push(['대비', lineOf({ 항목: '대비', ...c })]);
   return rows.map(([항목, 줄]) => ({ 항목, 줄: `${줄} · ${크기}·${테마}` }));
 }
