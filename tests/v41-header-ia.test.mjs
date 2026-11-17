@@ -261,7 +261,7 @@ const MIME644 = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript',
 const ROOT644 = existsSync644(new URL('../dist/v41/home.html', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'))
   ? new URL('../dist', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')
   : new URL('../public', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
-const PREFS644 = { titleDisplay: 'both', displayName: '', accentColor: '', dateStyle: 'dot', startPlace: 'resume', shareView: 'book', shareDiscover: false };
+const PREFS644 = { titleDisplay: 'both', displayName: '', accentColor: '', dateStyle: 'dot', startPlace: 'resume', shareView: 'book', shareDiscover: false, treeChipOrder: [] };
 const doc644 = (trees) => ({ version: 1, trees, prefs: PREFS644 });
 const tree644 = (subject, title) => createTree({ subject, title, note: '기록', emotion: '설렘', date: '2026-11-15', url: '' }, '2026-11-15T00:00:00.000Z');
 
