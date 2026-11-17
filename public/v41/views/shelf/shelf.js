@@ -176,6 +176,8 @@ import { createReader } from './shelf-reader.js';
         var newCard=rail.querySelector('.book-card--new');
         if(newCard){
           var placedNew=carouselTransform(state.shelfList.length-center);
+          // 390·360에서는 진열 끝 빈 책이 오른쪽으로 넘치지 않게 간격·배율을 줄인다(다른 카드는 그대로).
+          if(window.innerWidth<=780){placedNew.x=Math.round(placedNew.x*0.55);placedNew.scale=0.66;}
           newCard.style.setProperty('--x',placedNew.x+'px');
           newCard.style.setProperty('--y',placedNew.y+'px');
           newCard.style.setProperty('--z',placedNew.z+'px');
