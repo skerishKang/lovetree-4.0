@@ -1269,11 +1269,26 @@ for(const b of document.querySelectorAll('[data-share-view]'))b.onclick=()=>{
  try{member.apply('setPrefs',{shareView:b.dataset.shareView});}catch(e){notify('공유 기본값을 저장하지 못했어요. 잠시 뒤 다시 시도해 주세요.');return;}
  paintShareControls();notify('공유 창이 이 보기로 열려요.');
 };
-// #538: '둘러보기에도 올리기' 설정은 공개 기본으로 바뀌면서 정리됐다. 비공개는 Plus 전용 —
-// 잠금 표시만 남기고, 누르면 안내를 보여 준다(실제 판단은 서버가 한다).
-for(const b of document.querySelectorAll('[data-share-private-lock]'))b.onclick=()=>{
- notify('비공개는 Plus 전용이에요. 지금은 모든 트리가 공개로 유지돼요.');
-};
+// #538: '둘러보기에도 올리기' 설정은 공개 기본으로 바뀌면서 정리됐다. 비공개는 누구나 무료 —
+// 전 트리를 한 번에 바꾼다. 본인 트리만 바꿀 수 있는 규칙은 서버가 판단한다(#830).
+let shareVisibility='public';
+function paintShareVisibility(){
+ const scope=$('settings-share-scope');if(scope)scope.textContent=shareVisibility==='private'?'전 트리 비공개':'전 트리 공개';
+ for(const b of document.querySelectorAll('[data-share-public]')){b.setAttribute('aria-checked',String(shareVisibility==='public'));b.classList.toggle('settings-current',shareVisibility==='public');}
+ for(const b of document.querySelectorAll('[data-share-private]')){b.setAttribute('aria-checked',String(shareVisibility==='private'));b.classList.toggle('settings-current',shareVisibility==='private');}
+}
+async function setAllVisibility(visibility){
+ const trees=Array.isArray(model?.trees)?model.trees:[];
+ if(!member?.snapshot().owned){notify('로그인한 뒤 공개 상태를 바꿀 수 있어요.');return;}
+ if(!trees.length){notify('바꿀 트리가 없어요.');return;}
+ shareVisibility=visibility;paintShareVisibility();
+ const results=await Promise.all(trees.map(t=>shareApi.setTreeVisibility(t.id,visibility).catch(()=>({ok:false}))));
+ const ok=results.every(r=>r&&r.ok!==false);
+ notify(ok?(visibility==='private'?'전 트리를 비공개로 바꿨어요.':'전 트리를 공개로 바꿨어요.'):'공개 상태를 다 바꾸지 못했어요. 잠시 뒤 다시 시도해 주세요.');
+}
+for(const b of document.querySelectorAll('[data-share-public]'))b.onclick=()=>setAllVisibility('public');
+for(const b of document.querySelectorAll('[data-share-private]'))b.onclick=()=>setAllVisibility('private');
+paintShareVisibility();
 paintShareControls();
 // 보관 파일 용량 보기 — 보관 파일 창과 같은 값(/api/media)을 같은 형식으로 보여 준다. 새 API 없음.
 async function paintSettingsUsage(){

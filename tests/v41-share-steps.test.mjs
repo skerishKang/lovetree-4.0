@@ -155,7 +155,7 @@ test('복사하면 복사했어요 안내를 role=status 자리에 띄운다', a
   } finally { h.restore(); }
 });
 
-// (261116 결정) 비공개 전환 단추는 공유 판에서 정리됐다 — 링크까지 막는 완전 비공개는 Plus 안내만 남는다.
+// (261116 결정) 비공개 전환 단추는 공유 판에서 정리됐다 — 링크까지 막는 완전 비공개는 무료 안내만 남는다(#830).
 // 대신 둘러보기 소개 스위치가 고른 값을 discover PUT으로 저장하고 상태 줄·단추가 같은 값을 따른다.
 test('둘러보기 소개 스위치: 고른 값은 discover PUT으로 저장되고 상태 줄이 따라 바뀐다', async () => {
   const h = shareHarness({});
@@ -193,7 +193,7 @@ test('공유 창 화면에는 발견이라는 말이 없고, 단계·이유·공
   assert.match(shareHtml, /<span id="share-discover-state" role="status">/);
   assert.match(shareHtml, /<button id="share-discover-toggle" type="button" data-state="off">소개 켜기<\/button>/, '둘러보기 소개 스위치(261116 결정 — 기본 꺼짐·무료, 글자는 행동)');
   assert.match(shareHtml, /둘러보기 소개는 기본 꺼짐/);
-  assert.match(shareHtml, /링크까지 막는 완전 비공개는 Plus/);
+  assert.match(shareHtml, /링크 공유·완전 비공개도 무료예요/);
   assert.equal(shareHtml.includes('둘러보기에도 올리기'), false, '스위치 문구는 정리됐다');
   assert.match(shareHtml, /<details class="share-scope-more"><summary>자세히<\/summary>/);
   // 공개되는 범위(261117 고객 의견): 공개 응답(서버 projectSharedTree)에 트리 제목·순간(메모·날짜·감정·링크)이

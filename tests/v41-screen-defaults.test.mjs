@@ -106,11 +106,12 @@ test('공유 기본값: 공유 창이 처음 열 보기를 설정값으로 시�
   assert.match(html, /data-share-view="board"[^>]*>보드</);
   assert.match(html, /data-share-view="network"[^>]*>지도</);
   assert.doesNotMatch(html, />기억책</);
-  // #538: '둘러보기에도 올리기' 행은 정리됐고, 트리 공개 행은 공개 기본 + Plus 전용 비공개 잠금이다.
+  // #538: '둘러보기에도 올리기' 행은 정리됐고, 트리 공개 행은 공개·비공개 선택이다(#830: 비공개는 무료).
   assert.doesNotMatch(html, /data-share-discover/);
   assert.match(html, /id="settings-share-public-label"[^>]*>트리 공개</);
-  assert.match(html, /data-share-private-lock>비공개</);
-  assert.match(html, /Plus 전용/);
+  assert.match(html, /data-share-private>비공개</);
+  assert.doesNotMatch(html, /Plus 전용/);
+  assert.doesNotMatch(html, /data-share-private-lock/);
   assert.match(html, /공개돼도 내 이름·아이디·이메일은 다른 사람에게 보이지 않아요/);
   assert.equal(normalizeShareView(undefined), 'book');
   assert.equal(normalizeShareDiscover(undefined), false, '옛 저장본의 shareDiscover 값은 읽기만 하고 화면은 없다');

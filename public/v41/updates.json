@@ -3,7 +3,8 @@
     "version": "4.1.11",
     "date": "2026.11.17",
     "items": [
-      {"kind": "new", "text": "서재에서 바로 새 트리를 만들고 고칠 수 있어요", "source": "user", "issue": "#810"}
+      {"kind": "new", "text": "서재에서 바로 새 트리를 만들고 고칠 수 있어요", "source": "user", "issue": "#810"},
+      {"kind": "fix", "text": "내 트리를 누구나 비공개로 둘 수 있어요", "source": "ai_tester", "issue": "#830"}
     ]
   },
   {

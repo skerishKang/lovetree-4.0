@@ -427,8 +427,7 @@ export function createMessages(deps) {
           ? `이 트리의 순간 ${count}개 · 둘러보기에 소개할지 공유 판에서 고를 수 있어요.`
           : `이 트리의 순간 ${count}개 · 순간 3개를 담으면 소개할지 묻는 질문이 나와요.`);
   }
-  // 둘러보기 소개 스위치(261116 대표 결정 — 기본 꺼짐·무료로 켜고 끈다). 링크 공유는 지금처럼,
-  // 링크까지 막는 완전 비공개는 Plus(#739의 discover GET/PUT 같은 경로).
+  // 둘러보기 소개 스위치(261116 대표 결정 — 기본 꺼짐·무료로 켜고 끈다). 링크 공유·완전 비공개도 무료다(#830).
   async function paintShareDiscover() {
     const treeId = window.LT41?.tree?.id;
     const state = $('share-discover-state'), toggle = $('share-discover-toggle');

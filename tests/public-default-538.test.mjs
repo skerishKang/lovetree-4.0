@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-// #538 공개가 기본: 비공개는 Plus 전용(서버 판단). 저장 성공 뒤 같은 훅에서 자동 공유 행과 moment_count를 동기화한다.
+// #538 공개가 기본: 비공개는 누구나 무료(본인 트리만, #830). 저장 성공 뒤 같은 훅에서 자동 공유 행과 moment_count를 동기화한다.
 // 2026-11-16 대표 결정으로 '둘러보기 소개'는 기본 꼬짐이 됐다 — 고객이 켜야 둘러보기·다른 팬 보기에 나오고(무료),
 // 마이그레이션은 지금 나오던 트리를 켜짐으로 채운다. 이 파일의 나열 시험은 그 결정을 따른다.
 import { createTree, addMoment, removeMoment } from '../src/domain.js';
@@ -41,7 +41,6 @@ async function setup({ roles = {} } = {}) {
   let n = 0;
   const shareService = createShareService({
     shareRepo, workspaceRepo, visibilityRepo, discoverRepo, productId: PRODUCT,
-    plusEntitled: () => false, // 결제 미도입 — 비공개는 항상 거절
     makeId: () => String(++n).padStart(24, 'a')
   });
   const workspace = createWorkspaceService({
@@ -164,17 +163,28 @@ test('순간 2개면 둘러보기에 나오지 않고, 3개부터 나온다 — 
   assert.equal(items[0].cover.url, '', '공개 카드 대표 그림은 올린 사진을 쓰지 않는다(#427 전까지)');
 });
 
-test('비공개 시도는 서버가 Plus 전용으로 거절한다(화면 잠금만으로 막지 않는다)', async () => {
+test('비공개는 누구나 무료로 바꿀 수 있다 — 둘러보기·공유 링크에서는 빠지고 내 서재에는 남는다(#830)', async () => {
   const h = await setup();
   const tree = treeWithMoments(3);
   await h.workspace.write(principal('alice'), { state: { version: 1, trees: [tree] }, expectedRevision: 0, clientKey: 'seed-3' });
-  await h.discoverOn(tree); // 켠 뒤 비공개 거절을 본다
-  const denied = await h.request(h.shareHandle, 'PUT', `/api/trees/${tree.id}/visibility`, { visibility: 'private' }, 'alice');
-  assert.equal(denied.status, 403);
-  assert.equal(denied.body.error.code, 'plus_required_private');
+  await h.discoverOn(tree); // 켠 뒤 비공개를 본다
+  const [auto] = await h.shareRepo.list({ productId: PRODUCT, subjectId: 'alice' });
+  assert.equal((await h.browse()).items.length, 1, '켜면 둘러보기에 나온다');
+  const made = await h.request(h.shareHandle, 'PUT', `/api/trees/${tree.id}/visibility`, { visibility: 'private' }, 'alice');
+  assert.equal(made.status, 200, '무료 계정도 비공개 지정이 성공한다');
+  assert.equal(made.body.visibility, 'private');
   const state = await h.request(h.shareHandle, 'GET', `/api/trees/${tree.id}/visibility`, null, 'alice');
-  assert.equal(state.body.visibility, 'public', '거절됐으므로 공개가 유지된다');
-  assert.equal((await h.browse()).items.length, 1, '비공개로 바뀌지 않았으므로 둘러보기에 계속 나온다');
+  assert.equal(state.body.visibility, 'private', '바꾼 상태가 유지된다');
+  assert.deepEqual((await h.browse()).items, [], '비공개 트리는 공개 목록에 나오지 않는다');
+  const read = await h.request(h.shareHandle, 'GET', `/api/public/shares/${auto.shareId}`);
+  assert.equal(read.status, 403, '비공개 트리는 공유 링크로도 안 보인다');
+  assert.equal(read.body.error.code, 'share_private');
+  // 남의 트리는 여전히 바꿀 수 없다 — 내 목록에 없는 것과 같다.
+  const other = await h.request(h.shareHandle, 'PUT', `/api/trees/${tree.id}/visibility`, { visibility: 'private' }, 'bob');
+  assert.equal(other.status, 404, '남의 트리 비공개 지정은 거절된다');
+  // 내 서재(내 기록)에는 그대로 보인다.
+  const mine = await h.workspaceRepo.load({ productId: PRODUCT, subjectId: 'alice' });
+  assert.equal(mine.doc.trees.some(t => t.id === tree.id), true, '비공개여도 내 기록에는 남는다');
 });
 
 test('주인이 트리를 지우면 자동 공개도 즉시 내려간다', async () => {
