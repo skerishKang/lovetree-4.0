@@ -26,7 +26,7 @@ export function createTagManager(deps) {
   function fail(message) { $('tag-error').textContent = message || ''; }
 
   // 입구는 트리 ▾ 드롭다운의 '꼬리표 정리' 한 곳이다(기존 '정리' 옆).
-  function open() {
+  function open(opts = {}) {
     if (getSource() !== 'server' || !writable()) { notify('내 기록을 불러온 뒤 꼬리표를 정리할 수 있어요.'); return false; }
     const current = tree();
     if (!current) { notify('트리를 먼저 불러와 주세요.'); return false; }
@@ -34,6 +34,7 @@ export function createTagManager(deps) {
     editing = ''; merging = ''; picked = new Set();
     render();
     panel('tag-panel');
+    if (opts.suggest === true && !$('tag-suggest-box').hidden) onSuggest();
     return true;
   }
 
