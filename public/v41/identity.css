@@ -6,6 +6,7 @@
 /* 4.1 공통 색·모양 토큰 (대표 결정 2026-11-05: 첫 화면 SRC064가 디자인 원본). 값은 SRC064 원본에서 그대로 뽑았다.
    새 UI의 색·모서리는 이 토큰만 쓴다. 원본 화면의 :root 색은 이 파일의 화면별 덮어쓰기로만 바꾼다. 새 hex를 흩뿌리지 않는다. */
 :root{
+ --lt-bottom-links-space:calc(max(10px, env(safe-area-inset-bottom)) + 52px);
  --lt-stage:#040407;--lt-stage-2:#0a0a11;            /* 무대: 첫 화면 배경 radial 중심/가장자리 */
  --lt-pearl:#f5f1e9;--lt-muted:#9b98a6;              /* 무대 위 글자 */
  --lt-gold:#ffe6a6;--lt-gold-deep:#e6b14c;--lt-gold-ink:#8a6420; /* 금테: 선택·강조·프레임 (ink는 종이 위 글자용) */

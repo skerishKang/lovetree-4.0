@@ -55,7 +55,7 @@ html[data-lt-theme=garden] .g-empty .g-empty-cta:hover,html[data-lt-theme=garden
 .g-empty[hidden]{display:none!important}
 
 /* 꼬리표 없는 순간 선반(아래) — 시간 순서로 흐리게, '꼬리표 한 번에 제안받기' 자리 */
-.g-shelf{position:absolute;left:18px;right:18px;bottom:2px;display:flex;align-items:center;gap:10px;pointer-events:none}
+.g-shelf{position:absolute;left:18px;right:18px;bottom:var(--lt-bottom-links-space,62px);display:flex;align-items:center;gap:10px;pointer-events:none}
 .g-shelf-label{font-size:12.5px;color:var(--lt-muted);white-space:nowrap;pointer-events:auto}
 .g-shelf-hint{pointer-events:auto;font-size:13px;color:var(--lt-gold);border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-pill);padding:4px 10px;background:rgba(255,230,166,.05);white-space:nowrap}
 .g-shelf-hint:hover{background:rgba(255,230,166,.12)}
