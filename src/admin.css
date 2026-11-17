@@ -184,8 +184,8 @@ body {
 .lt-badge[data-issue-state="open"] { color: var(--lt-gold); border-color: var(--lt-gold-line); }
 .lt-badge[data-issue-state="closed"] { color: #8fd0a0; border-color: #3f6b4c; }
 /* [고침으로 바꾸기]는 큰 lt-btn 대신 '고객에게: …' 상태 칩과 같은 높이의 작은 단추 — 칩 왼쪽, 같은 오른쪽 열(대표 요청 2026-11-17). */
-.lt-fix-btn { min-height: 0; height: auto; padding: 3px 9px; border-radius: var(--lt-r-pill); font-size: 11px; line-height: 1.4; align-self: center; }
-.lt-fix-btn:hover { border-color: var(--lt-gold-line); color: var(--lt-gold); }
+.lt-btn.lt-fix-btn { min-height: 0; height: auto; padding: 3px 9px; border-radius: var(--lt-r-pill); font-size: 11px; line-height: 1.4; align-self: center; }
+.lt-btn.lt-fix-btn:hover { border-color: var(--lt-gold-line); color: var(--lt-gold); }
 .lt-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
 .lt-btn { min-height: 44px; padding: 0 16px; border-radius: var(--lt-r-pill); border: 1px solid var(--lt-line); background: rgba(255,255,255,.04); color: var(--lt-pearl); font: inherit; font-size: 13px; cursor: pointer; }
 .lt-btn.primary { background: var(--lt-primary); color: var(--lt-primary-ink); border-color: transparent; font-weight: 600; }
