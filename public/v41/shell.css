@@ -304,7 +304,7 @@ html[data-lt-theme=garden] .settings-more-fold>summary:hover{color:var(--lt-ink)
 .settings-row:first-of-type{border-top:0}
 .settings-label{flex:0 0 auto;min-width:72px;font-size:13px;color:var(--lt-muted)}
 .settings-choice{display:flex;flex-wrap:wrap;gap:6px;min-width:0}
-.settings-choice button{min-height:34px;padding:0 12px;border:1px solid var(--lt-line);border-radius:9px;background:rgba(255,255,255,.04);color:var(--lt-pearl);font-size:13px}
+.settings-choice button{min-width:44px;min-height:44px;padding:0 12px;border:1px solid var(--lt-line);border-radius:9px;background:rgba(255,255,255,.04);color:var(--lt-pearl);font-size:13px}
 .settings-choice button[aria-checked="true"],.settings-choice button[aria-pressed="true"]{background:var(--lt-primary);color:var(--lt-primary-ink);border-color:var(--lt-primary)}
 /* 이슈 465 2: 움직임 켬/끔 스위치(role=switch) — 상태 글자가 보이는 한 칸. */
 .settings-choice button[role=switch]{min-width:76px;justify-content:center}
@@ -526,7 +526,7 @@ nav #record-menu{min-height:40px;font-size:13px;letter-spacing:0}
 .home-links{position:fixed;left:14px;bottom:max(10px,env(safe-area-inset-bottom));z-index:24;display:flex;gap:2px;align-items:center}
 /* 개인정보 처리방침·이용약관 링크(2026-11-16): 같은 줄의 작은 링크와 같은 글자·색. 줄이 좁으면
    두 개로 나누어 넘치지 않게 한다(가로 넘침 0 — 390 실측). 누름 영역은 44px 이상. */
-.home-links a.feedback-link{display:inline-flex;align-items:center;min-height:44px;font-size:14px}
+.home-links .feedback-link{display:inline-flex;align-items:center;min-height:44px;font-size:14px}
 /* 390에서는 처리방침·약관을 아래 고정 줄에 두지 않는다(설정 창 맨 아래·안내 패널에만). */
 @media(max-width:520px){.home-links a.feedback-link{display:none}}
 /* 390 지도·책: 조작 줄·책 테두리와 겹치던 아래 링크 줄을 숨긴다(1440은 지금 자리). */
@@ -539,8 +539,8 @@ nav #record-menu{min-height:40px;font-size:13px;letter-spacing:0}
 .updates-card[hidden]{display:none!important}
 .updates-card-text{margin:0;font-size:13px;color:var(--lt-pearl);white-space:nowrap;word-break:keep-all}
 .updates-card-actions{display:flex;gap:6px;align-items:center}
-.updates-card-actions button{min-height:40px;padding:0 14px;border-radius:var(--lt-r-pill);border:1px solid var(--lt-gold-line);background:rgba(255,230,166,.08);color:var(--lt-gold);font-size:13px;white-space:nowrap;word-break:keep-all;cursor:pointer}
-.updates-card-actions button:last-child{min-width:40px;padding:0;border-radius:50%;font-size:18px;line-height:1}
+.updates-card-actions button{min-height:44px;padding:0 14px;border-radius:var(--lt-r-pill);border:1px solid var(--lt-gold-line);background:rgba(255,230,166,.08);color:var(--lt-gold);font-size:13px;white-space:nowrap;word-break:keep-all;cursor:pointer}
+.updates-card-actions button:last-child{min-width:44px;padding:0;border-radius:50%;font-size:18px;line-height:1}
 /* #book-dup: 좁은 폭에서 카드를 머리줄 바로 아래(top:76px)에 붙이면 '순간 목록'·테마 단추를 가렸다(390 실측).
    화면 아래, 링크 줄(.home-links, 아래 10px~42px)과 ＋ 단추(오른쪽 아래 12~68px) 위로 올린다. */
 @media(max-width:780px){.updates-card{left:16px;right:16px;top:auto;bottom:calc(max(10px, env(safe-area-inset-bottom)) + 76px);max-width:none}

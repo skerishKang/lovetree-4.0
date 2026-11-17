@@ -75,7 +75,7 @@ identity.textContent=`:host{--ui:'Pretendard Variable',Pretendard,system-ui,sans
 shadow.append(identity);
 // 2026-11-08 #213 2번: 도구 줄 버튼은 둘(보기·순간 목록)이고, 시각 높이 36·누르는 영역 44로 맞춘다.
 const cardUI=document.createElement('style');
-cardUI.textContent=`.top-actions>.menuBtn{position:relative;height:36px;min-height:36px;display:inline-flex;align-items:center;padding-block:0}.top-actions>.menuBtn:after{content:'';position:absolute;inset:-4px;border-radius:999px}[data-home-account],.home-community{display:none}`;
+cardUI.textContent=`.top-actions>.menuBtn{position:relative;min-height:44px;display:inline-flex;align-items:center;padding-block:0}.top-actions>.menuBtn:after{content:'';position:absolute;inset:0;border-radius:999px}[data-home-account],.home-community{display:none}`;
 shadow.append(cardUI);
 // #380(2026-11-11): 로그인 전 [＋ 첫 순간 추가·둘러보기·어떻게 쓰나요] / 로그인 후 [＋ 순간 추가·둘러보기](#426: 세 번째 자리는 숨김, 최근 순간 카드가 "이어 보기"를 대신).
 // 로그인 전이면 지금 두 줄 그대로, 로그인 후면 상태에 따라 큰 제목 아래 둘째 줄도 함께 갱신한다(아래 상태 블록).
