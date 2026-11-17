@@ -29,9 +29,9 @@ const STATES = [
     name: '로그인·트리 없음',
     make: () => ({ owned: true, trees: 0, tree: null, source: 'server' }),
     expect: {
-      // 로그인했어도 트리가 없으면 기억책·보드·관계 지도 탭은 숨긴다(1-B 이전 동작 그대로).
-      treeViews: false, recordMenu: false, writeMenu: true, shareMenu: false,
-      picker: '트리 고르기', write: '＋ 순간 추가', aria: '서재·이 트리 보기'
+      // 2026-11-17 대표 결정: 로그인 상태면 트리 수와 관계없이 트리 고르기·네 탭을 늘 보인다.
+      treeViews: true, recordMenu: true, writeMenu: true, shareMenu: false,
+      picker: '트리 없음', write: '＋ 순간 추가', aria: '서재·이 트리 보기'
     }
   },
   {
