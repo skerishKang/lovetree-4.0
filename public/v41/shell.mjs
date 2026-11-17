@@ -1297,8 +1297,6 @@ for(const b of document.querySelectorAll('button[data-board-theme]'))b.onclick=(
  notify(next==='night'?'보드·지도 판을 밤 테마로 바꿨어요.':'보드·지도 판을 종이 테마로 바꿨어요.');
 };
 paintBoardThemeControls();
-// 261117 대표 결정: 위 메뉴의 테마 단추 — 누르면 바로 밤/정원을 바꾼다(설정 탭의 테마 줄과 같은 값).
-const themeToggleTop=$('theme-toggle');if(themeToggleTop)themeToggleTop.onclick=()=>toggleTheme();
 window.addEventListener('message',e=>{
  if(e.origin!==location.origin)return;
  if(e.data?.type==='lt41-home-moment'){
