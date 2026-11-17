@@ -1995,3 +1995,59 @@ test('#657 후속 261117: 상단 탭 글자 통일과 고른 탭 칸 높이(390�
     await new Promise((resolve) => server.close(resolve));
   }
 });
+// 2026-11-17 대표 결정: 트리 0개 계정에서도 서재·책·보드·지도 탭이 보이고 각 화면의 빈 상태가 뜬다.
+test('#657 후속 261117: 트리 0개 계정의 탭 4개와 화면별 빈 상태(390·1440 × 정원·밤)', { skip: REQUIRE ? false : skip, timeout: 240000 }, async () => {
+  const server = await serve();
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch();
+  try {
+    for (const theme of ['night', 'garden']) {
+      for (const width of [1440, 390]) {
+        const ctx = await browser.newContext({ viewport: { width, height: width === 390 ? 844 : 900 }, reducedMotion: 'reduce' });
+        await ctx.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); } catch {} }, theme);
+        await ctx.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
+        await ctx.route('**/api/workspace**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ revision: 1, state: { version: 1, trees: [], prefs: {} }, subject: '시험계정', writeSubjectBound: true, savedAt: '2026-11-17T00:00:00.000Z' }) }));
+        const page = await ctx.newPage();
+        await page.goto(`${base}/v41/?account=1`, { waitUntil: 'load', timeout: 30000 });
+        await page.waitForFunction(() => !document.getElementById('tree-views')?.hidden, null, { timeout: 10000 });
+        const tabs = await page.evaluate(() => {
+          const buttons = [...document.querySelectorAll('#tree-views button[data-view]')].map((b) => {
+            const r = b.getBoundingClientRect();
+            return { view: b.dataset.view, text: b.textContent.trim(), w: Math.round(r.width), h: Math.round(r.height) };
+          });
+          return { buttons, overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth };
+        });
+        assert.equal(tabs.buttons.length, 4, `${width}/${theme}: 탭 4개`);
+        assert.ok(tabs.buttons.every((b) => b.w > 0 && b.h > 0), `${width}/${theme}: 탭 rect>0 — ${JSON.stringify(tabs.buttons)}`);
+        assert.ok(tabs.overflow <= 0, `${width}/${theme}: 가로 넘침 ${tabs.overflow}px`);
+        for (const [view, heading, action] of [
+          ['track32-bookshelf.html', '아직 책장이 비어 있어요.', '＋ 새 트리'],
+          ['track59-sketchbook.html', '아직 트리가 없어요.', '＋ 첫 순간 추가'],
+          ['track58-pinboard.html', '아직 트리가 없어요.', '＋ 첫 순간 추가'],
+          ['track56-network.html', '아직 트리가 없어요.', '＋ 첫 순간 추가']
+        ]) {
+          await page.locator(`#tree-views button[data-view="${view}"]`).click();
+          await page.waitForTimeout(350);
+          const state = await page.evaluate(() => ({
+            hash: location.hash,
+            home: document.body.classList.contains('home-screen'),
+            emptyShown: !document.getElementById('empty')?.hidden,
+            heading: document.querySelector('#empty h1')?.textContent?.trim(),
+            action: document.getElementById('empty-records')?.textContent?.trim(),
+            current: document.querySelector('#tree-views button[aria-current="true"]')?.dataset.view || ''
+          }));
+          assert.equal(state.hash, '#' + { 'track32-bookshelf.html': 'shelf', 'track59-sketchbook.html': 'book', 'track58-pinboard.html': 'board', 'track56-network.html': 'network' }[view], `${width}/${theme}/${view}: 주소가 탭에 남는다`);
+          assert.equal(state.home, false, `${width}/${theme}/${view}: 첫 화면으로 튕기지 않는다`);
+          assert.ok(state.emptyShown, `${width}/${theme}/${view}: 빈 상태가 보인다`);
+          assert.equal(state.heading, heading, `${width}/${theme}/${view}: 빈 상태 문구`);
+          assert.equal(state.action, action, `${width}/${theme}/${view}: 빈 상태 단추`);
+          assert.equal(state.current, view, `${width}/${theme}/${view}: 탭 표시 유지`);
+        }
+        await ctx.close();
+      }
+    }
+  } finally {
+    await browser.close();
+    await new Promise((resolve) => server.close(resolve));
+  }
+});

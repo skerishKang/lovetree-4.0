@@ -50,8 +50,9 @@ export function treePickerLabel(treeTitle) {
 // 트리 선택 버튼 문구(전체). 로그인 상태에서 트리가 열려 있으면 "트리: <이름> ▾" 형태로 보여 준다.
 // 로그아웃이면 예시 트리가 열려 있어도 "트리 고르기"다(내 트리가 아니다).
 // 브라우저에만 남은 미저장 기록이 있으면 "저장 안 된 기록"으로 구분해 보여 준다.
-export function treePickerText({ owned = false, treeTitle = '', pendingDraft = false } = {}) {
+export function treePickerText({ owned = false, treeTitle = '', pendingDraft = false, treeCount = 1 } = {}) {
   if (!owned) return pendingDraft ? '저장 안 된 기록' : '트리 고르기';
+  if (!pendingDraft && Number(treeCount) === 0) return '트리 없음';
   const title = clean(treeTitle);
   return title ? `트리: ${title}` : '트리 고르기';
 }
@@ -72,7 +73,7 @@ export function headerState({ owned = false, treeCount = 0, publicReading = fals
 
 const HEADER_PARTS = Object.freeze({
   out: { account: 'login', browse: true, treePicker: false, treeViews: false, write: false, share: false },
-  'in-empty': { account: 'avatar', browse: true, treePicker: false, treeViews: false, write: true, share: false },
+  'in-empty': { account: 'avatar', browse: true, treePicker: true, treeViews: true, write: true, share: false },
   'in-trees': { account: 'avatar', browse: true, treePicker: true, treeViews: true, write: true, share: true },
   share: { account: 'avatar', browse: true, treePicker: false, treeViews: false, write: false, share: false }
 });

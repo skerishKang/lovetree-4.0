@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {
-  headerState, headerParts, headerPartsFor,
+  headerState, headerParts, headerPartsFor, treePickerText,
   FIRST_TREE_TIPS, TIPS_KEY, readTipsSeen, writeTipsSeen, tipsWanted,
   unsavedNoticeText, writeMenuLabel
 } from '../public/v41/header-state.mjs';
@@ -33,13 +33,16 @@ test('2. 로그아웃: 첫 화면·내 책장·둘러보기 + 로그인만 남�
   );
 });
 
-test('3. 로그인·트리 없음: 계정 동그라미 + 새 트리 만들기, 트리 탭·트리 선택·공유는 숨김', () => {
+test('3. 로그인·트리 없음: 계정 동그라미·새 트리 만들기·트리 선택·트리 탭이 모두 보인다', () => {
   const parts = headerPartsFor({owned: true, treeCount: 0});
   assert.equal(parts.account, 'avatar');
   assert.equal(parts.write, true, '가운데·헤더의 "새 트리 만들기"는 남는다');
-  assert.equal(parts.treePicker, false, '트리 선택은 숨긴다');
-  assert.equal(parts.treeViews, false);
+  assert.equal(parts.treePicker, true, '트리 없음도 트리 선택을 보여 준다');
+  assert.equal(parts.treeViews, true, '트리 0개에서도 서재·책·보드·지도 탭을 보여 준다');
   assert.equal(parts.share, false);
+  assert.equal(treePickerText({owned: true, treeCount: 0}), '트리 없음');
+  assert.equal(treePickerText({owned: true, treeCount: 1, treeTitle: '모아둔 순간'}), '트리: 모아둔 순간');
+  assert.equal(treePickerText({owned: false, treeCount: 0}), '트리 고르기');
 });
 
 test('4. 트리 1개 이상: 트리 선택·기억책·보드·관계 지도·순간 남기기·공유가 모두 보인다', () => {

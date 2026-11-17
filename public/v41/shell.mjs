@@ -545,6 +545,8 @@ const shellScreens=createScreens({
   hasTree:()=>!!window.LT41,
   takeNetworkOpen,
   flowNavigation,
+  paintEmptyForScreen,
+  paintEmptyCopy,
   applyTheme,
   writeLocation,
   links,
@@ -747,8 +749,17 @@ function choose(id,momentId){const tree=model.trees.find(t=>t.id===id);window.LT
  if(tree||current==='src064-orbit.html')show(current,false,id||'');else{flowNavigation();document.body.classList.remove('home-screen');hideFrames();$('empty').hidden=false;links();}}
 // #453 D2: 빈 화면 문구·단추는 계정 상태에 맞춘다. 로그인한 사람에게 '로그인한 계정의 기록을 불러오세요'는 어색하고,
 // 백업 파일 열기는 계정 없이 쓰는 입구라 로그인 상태에서는 숨긴다(로그아웃은 지금 그대로 둔다).
+// 2026-11-17 대표 결정: 트리 0개 계정이 서재·책·보드·지도탭을 열면 그 화면의 빈 상태를 보여 준다.
+function paintEmptyForScreen(file){
+  const shelf=file==='track32-bookshelf.html';
+  $('empty').querySelector('h1').textContent=shelf?'아직 책장이 비어 있어요.':'아직 트리가 없어요.';
+  $('empty').querySelector('p').textContent=shelf?'첫 순간을 담으면 책장에 책이 꽂혀요.':'좋아하는 영상 주소 하나면 시작돼요.';
+  $('empty-records').textContent=shelf?'＋ 새 트리':'＋ 첫 순간 추가';
+  $('empty-records').hidden=false;$('empty-records').classList.add('primary');
+  $('empty-sample').hidden=true;$('empty-file').hidden=true;
+}
 function paintEmptyCopy(){
- const owned=!!member?.snapshot().owned;
+  const owned=!!member?.snapshot().owned;
  $('empty').querySelector('h1').textContent=owned?'아직 트리가 없어요.':'다시 펼칠 순간을 기다리고 있어요.';
  // #463(2026-11-13): 트리 0개(로그인)는 처음 온 사람용 한 줄로. 예전 문구는 다시 온 사람용이었고
  // ("예시를 둘러보거나..."), 떠 있는 카드가 예시라는 것도 모호했다.
