@@ -380,3 +380,7 @@ html[data-book-view=single][data-book-shape=wide] .flip-face.back{border-radius:
 /* 이슈 327 2부: 순간 상세의 '다른 트리로 옮기기'(셸 정리 창을 연다). */
 .detail-actions .ui-btn[data-detail-move]{border-color:rgba(255,230,166,.45);color:inherit}
 .video-title{margin:3px 0 0;font-family:var(--ui-sans);font-size:11px;line-height:1.45;letter-spacing:.01em;color:var(--lt-muted,#8d7f73)}
+
+/* 트리를 바꿨는데 순간이 없을 때 — 빈 책 안내(의견 #26). --lt-* 토큰만 쓴다. */
+.book-empty{position:fixed;inset:0;display:grid;place-content:center;text-align:center;padding:24px;color:var(--lt-pearl);font:500 15px/1.7 var(--lt-ui)}
+html[data-lt-theme=garden] .book-empty{color:var(--lt-ink)}

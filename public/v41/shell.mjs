@@ -547,7 +547,7 @@ function watchFrameSheet(frame){
 function frames(){return shellScreens.frames();}
 function hideFrames(){return shellScreens.hideFrames();}
 function showInFrame(url,title){return shellScreens.showInFrame(url,title);}
-function show(file,write=true){return shellScreens.show(file,write);}
+function show(file,write=true,treeKey=''){return shellScreens.show(file,write,treeKey);}
 function frameLoaded(frame){return shellScreens.frameLoaded(frame);}
 
 // #380 5번: '정리하기' 입구는 트리 ▾ 드롭다운 한 곳에서만 그린다(renderTreeMenu). 헤더 단추는 없앴다.
@@ -673,7 +673,7 @@ $('tree-tips-rename')?.addEventListener('click',()=>shellPanels.openTreeManager(
 const navBar=document.querySelector('.app-header nav');
 const narrowNav=()=>matchMedia('(max-width:780px)').matches;
 function choose(id,momentId){const tree=model.trees.find(t=>t.id===id);window.LT41=tree?{tree,trees:model.trees,source,momentId:tree.moments.find(m=>m.id===momentId)?.id||tree.moments.find(m=>m.parentId===null)?.id||tree.moments[0]?.id,prefs:currentPrefs(),writable:source==='server'&&!!member?.snapshot().writable,}:null;
- if(tree||current==='src064-orbit.html')show(current,false);else{flowNavigation();document.body.classList.remove('home-screen');hideFrames();$('empty').hidden=false;links();}}
+ if(tree||current==='src064-orbit.html')show(current,false,id||'');else{flowNavigation();document.body.classList.remove('home-screen');hideFrames();$('empty').hidden=false;links();}}
 // #453 D2: 빈 화면 문구·단추는 계정 상태에 맞춘다. 로그인한 사람에게 '로그인한 계정의 기록을 불러오세요'는 어색하고,
 // 백업 파일 열기는 계정 없이 쓰는 입구라 로그인 상태에서는 숨긴다(로그아웃은 지금 그대로 둔다).
 function paintEmptyCopy(){
