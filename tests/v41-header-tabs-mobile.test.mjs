@@ -74,7 +74,7 @@ test('메뉴 순서: [트리 ▾ │ 서재·책·보드·지도] 한 묶음 →
   // 첫 화면·내 책장 탭은 없다: 첫 화면은 로고(#home 링크), 책장은 드롭다운 맨 아래.
   assert.doesNotMatch(nav, />첫 화면</);
   assert.doesNotMatch(nav, />내 책장</);
-  const order = ['class="tree-frame"', 'id="record-menu"', 'class="shelf-tab"', '>서재<', 'class="tree-views"', '>책<', '>보드<', '>지도<', 'id="community-menu"'];
+  const order = ['class="tree-frame"', 'id="record-menu"', 'class="tree-views"', '>서재<', '>책<', '>보드<', '>지도<', 'id="community-menu"'];
   let at = -1;
   for (const token of order) {
     const next = nav.indexOf(token, at + 1);

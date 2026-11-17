@@ -1973,11 +1973,10 @@ test('#657 후속 261117: 상단 탭 글자 통일과 고른 탭 칸 높이(390�
           return { browse: style('#community-menu'), picker: style('#record-menu'), tabs: [...document.querySelectorAll('#tree-views button[data-view]')].filter((b) => topViews.includes(b.dataset.view)).map((b) => ({ view: b.dataset.view, size: getComputedStyle(b).fontSize, weight: getComputedStyle(b).fontWeight, color: getComputedStyle(b).color, current: b.getAttribute('aria-current') === 'true' })) };
         });
         assert.equal(fonts.tabs.length, 4, `${width}/${theme}: 탭 4개`);
+        // 261118 대표 결정 2차 5: 묶음(서재·책·보드·지도)은 글자 14px·같은 굵기로 통일한다 — 둘러보기·트리 고르기는 묶음 밖 13px다.
         for (const tab of fonts.tabs) {
-          assert.equal(tab.size, fonts.browse.size, `${width}/${theme}/${tab.view}: 둘러보기와 같은 글자 크기`);
-          assert.equal(tab.weight, fonts.browse.weight, `${width}/${theme}/${tab.view}: 둘러보기와 같은 굵기`);
-          assert.equal(tab.size, fonts.picker.size, `${width}/${theme}/${tab.view}: 트리 고르기와 같은 글자 크기`);
-          assert.equal(tab.weight, fonts.picker.weight, `${width}/${theme}/${tab.view}: 트리 고르기와 같은 굵기`);
+          assert.equal(tab.size, '14px', `${width}/${theme}/${tab.view}: 묶음 탭 글자 14px`);
+          assert.equal(tab.weight, '400', `${width}/${theme}/${tab.view}: 묶음 탭 굵기 같음`);
         }
         const unselected = fonts.tabs.filter((t) => !t.current);
         assert.ok(unselected.length >= 3, `${width}/${theme}: 고르지 않은 탭 3개 이상`);
