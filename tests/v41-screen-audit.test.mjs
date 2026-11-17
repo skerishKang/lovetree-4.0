@@ -1390,7 +1390,8 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     const graphByHash = await frameOf(page8, /track60-graph/);
     assert.ok(graphByHash, '#my/graph 주소로 그래프 보기가 열린다(메뉴 연결 없이 주소로만)');
     // 프레임이 열렸어도 주소가 틀리면 배포가 4.0 첫 화면으로 되돌려 준다(2026-11-16 보고) — 문서 표시까지 본다.
-    assert.match(graphByHash.url(), /views\/graph\/track60-graph\.html$/, '#my/graph 프레임 주소에 그래프 하위 폴더가 있다');
+    // 의견 #26 수정으로 트리 값이 쿼리에 붙을 수 있다 — 하위 폴더 경로 자체는 그대로다.
+    assert.match(graphByHash.url(), /views\/graph\/track60-graph\.html(?:\?|$)/, '#my/graph 프레임 주소에 그래프 하위 폴더가 있다');
     assert.equal(await graphByHash.evaluate(() => document.documentElement.getAttribute('data-v41-screen')), 'graph', '#my/graph 프레임 문서가 그래프 화면이다');
     await ctx8.close();
 
