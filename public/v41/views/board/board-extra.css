@@ -293,4 +293,3 @@ html[data-lt-theme=garden] .boardModeSwitch .modeSwitchBtn[aria-pressed="true"]{
 #detailMapBtn{margin-top:0}
 
 /* 4. 말풍선 설명(#584와 같은 동작, 보드 도구에 단다) */
-.lt-tip-bubble{position:fixed;z-index:80;max-width:min(320px,80vw);padding:6px 10px;border-radius:10px;border:1px solid rgba(255,230,166,.45);background:rgba(20,16,10,.94);color:#f5ece6;font-size:13px;line-height:1.45;pointer-events:none;box-shadow:0 6px 18px rgba(0,0,0,.35)}

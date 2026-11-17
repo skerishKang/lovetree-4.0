@@ -100,7 +100,7 @@ html[data-lt-theme=garden] .lt-media-body button{color:var(--lt-paper)}
 /* #327 1부: 내 기록 YouTube 썸네일(처음부터 보임) + 썸네일 전체를 덮는 재생 단추 + 그 자리 재생 iframe */
 .lt-yt-preview{position:relative;margin:0;width:100%}
 .lt-yt-preview .lt-yt-play{position:absolute;inset:0;width:100%;min-height:44px;min-width:44px;border:0;padding:0;background:transparent;cursor:pointer;display:grid;place-items:center}
-.lt-yt-preview .lt-yt-play>span{display:grid;place-items:center;min-width:56px;min-height:56px;border-radius:50%;background:#1a1620d9;color:#ffffff;border:1px solid rgba(255,255,255,.4);font-size:22px;line-height:1}
+.lt-yt-preview .lt-yt-play>span{display:grid;place-items:center;min-width:56px;min-height:56px;border-radius:50%;background:var(--lt-ink);color:var(--lt-paper);border:2px solid var(--lt-paper);box-shadow:0 2px 10px rgba(0,0,0,.42);font-size:22px;line-height:1}
 .lt-yt-frame{display:block;width:100%;aspect-ratio:16/9;border:0;border-radius:8px;background:#000}
 /* #393 1: 세로 영상(쇼츠 주소·세로 비율 정보)은 세로 틀(9:16). 썸네일·재생 모두 같은 비율, 잘림 없음. */
 .lt-media-toolbar{display:flex;justify-content:flex-end;margin:0 0 8px}
@@ -212,6 +212,9 @@ html[data-lt-theme=garden] .account-popover button{color:var(--lt-ink);backgroun
 html[data-lt-theme=garden] .account-popover button:hover,html[data-lt-theme=garden] .account-popover button:focus-visible,html[data-lt-theme=garden] .account-popover button:active{background:rgba(152,80,94,.08)}
 html[data-lt-theme=garden] .account-popover[data-lt-opened-by=mouse] button:focus-visible:not(:hover){background:transparent;outline:0;box-shadow:none}
 html[data-lt-theme=garden] .account-email{color:var(--lt-muted);border-bottom-color:var(--lt-line)}
+/* 공통 도움말 풍선은 각 테마의 배경·글자·테두리 토큰 쌍을 쓴다. */
+.lt-tip-bubble{position:fixed;z-index:80;max-width:min(320px,80vw);padding:6px 10px;border:1px solid var(--lt-gold-line);border-radius:10px;background:var(--lt-glass-strong);color:var(--lt-pearl);font-size:13px;line-height:1.45;pointer-events:none;box-shadow:0 6px 18px rgba(0,0,0,.35)}
+html[data-lt-theme=garden] .lt-tip-bubble{border-color:var(--lt-line-paper);background:var(--lt-paper);color:var(--lt-ink);box-shadow:0 6px 18px rgba(75,51,42,.16)}
 /* 이슈 644: 토스트는 밤·정원 모두 어두운 판 위에 뜬다. 정원에서는 --lt-pearl이 어두운 잉크가 되어 읽히지 않으므로 밝은 종이 토큰을 쓴다. */
 html[data-lt-theme=garden] #toast{color:var(--lt-paper)}
 /* 2026-11-12 #414 한 틀(트리 ▾│책│보드│지도)이 밝은 테마에서 어두운 회색으로 보이던 것: 밝은 바탕·진한 글자로 */
@@ -408,6 +411,7 @@ html[data-v41-screen=book] .yt-play:has(.lt-fallback-card) .yt-play-label{displa
 .lt-media[data-lt-vertical="1"] .lt-media-body:has(.lt-fallback-card){height:auto}
 .lt-media[data-lt-vertical="1"] .lt-yt-preview:has(.lt-fallback-card){width:100%;height:auto;aspect-ratio:auto}
 html[data-lt-theme=garden] .lt-fallback-card,:host([data-lt-theme=garden]) .lt-fallback-card{background:linear-gradient(155deg,color-mix(in srgb,var(--lt-tone) 22%,var(--lt-paper)),color-mix(in srgb,var(--lt-tone) 12%,var(--lt-stage)));border-color:color-mix(in srgb,var(--lt-tone) 42%,var(--lt-line-paper));color:var(--lt-ink)}
+html[data-lt-theme=garden][data-v41-screen=book] .book-title-btn{color:var(--lt-ink)}
 html[data-lt-theme=garden] .lt-fallback-head,html[data-lt-theme=garden] .lt-fallback-site,html[data-lt-theme=garden] .lt-fallback-title,:host([data-lt-theme=garden]) .lt-fallback-head,:host([data-lt-theme=garden]) .lt-fallback-site,:host([data-lt-theme=garden]) .lt-fallback-title{color:var(--lt-ink)}
 html[data-lt-theme=garden] .lt-fallback-emotion,:host([data-lt-theme=garden]) .lt-fallback-emotion{background:color-mix(in srgb,var(--lt-tone) 26%,var(--lt-paper));color:var(--lt-ink)}
 html[data-lt-theme=garden] .lt-fallback-action,:host([data-lt-theme=garden]) .lt-fallback-action{background:var(--lt-paper);color:var(--lt-ink);border-color:var(--lt-gold-line)}
