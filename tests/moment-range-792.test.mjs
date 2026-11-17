@@ -33,6 +33,22 @@ for (const [name, lib] of [['서버', server], ['화면', browser]]) {
     assert.equal(lib.formatRange(null, 42), '');
   });
 
+  test(`${name}: formatTimecode는 초를 입력 칸 표기(1:30·1:02:30)로 되돌린다`, () => {
+    assert.equal(lib.formatTimecode(0), '0:00');
+    assert.equal(lib.formatTimecode(42), '0:42');
+    assert.equal(lib.formatTimecode(90), '1:30');
+    assert.equal(lib.formatTimecode(3723), '1:02:03');
+    assert.equal(lib.formatTimecode(null), '');
+    assert.equal(lib.formatTimecode('90'), '1:30');
+  });
+
+  test(`${name}: fillStartFromUrl은 빈 시작 칸만 주소의 t=로 채운다`, () => {
+    assert.equal(lib.fillStartFromUrl('https://youtu.be/x?t=90s', ''), 90);
+    assert.equal(lib.fillStartFromUrl('https://www.youtube.com/watch?v=x&start=1:30', '  '), 90);
+    assert.equal(lib.fillStartFromUrl('https://youtu.be/x?t=90s', '1:00'), null, '이미 적은 값은 건드리지 않는다');
+    assert.equal(lib.fillStartFromUrl('https://youtu.be/x', ''), null);
+  });
+
   test(`${name}: youtubeRangeEmbedUrl은 끝이 시작보다 클 때만 end를 붙인다`, () => {
     assert.equal(lib.youtubeRangeEmbedUrl('abcdefghijk', 42, 68), 'https://www.youtube.com/embed/abcdefghijk?start=42&end=68&rel=0');
     assert.equal(lib.youtubeRangeEmbedUrl('abcdefghijk', 42, 42), 'https://www.youtube.com/embed/abcdefghijk?start=42&rel=0');
@@ -62,6 +78,10 @@ for (const [name, lib] of [['서버', server], ['화면', browser]]) {
 test('두 사본의 순수 함수는 같은 입력에 같은 값을 준다', () => {
   const samples = ['0', '01:30', '1:02:30', '90', '12:00:00', '1:60', 'abc', null];
   for (const value of samples) assert.equal(server.parseTimecode(value), browser.parseTimecode(value), `parseTimecode ${value}`);
+  for (const seconds of [0, 42, 90, 3723, null, '90']) assert.equal(server.formatTimecode(seconds), browser.formatTimecode(seconds), `formatTimecode ${seconds}`);
+  for (const [url, value] of [['https://youtu.be/x?t=90s', ''], ['https://youtu.be/x', ''], ['https://youtu.be/x?t=90s', '1:00']]) {
+    assert.equal(server.fillStartFromUrl(url, value), browser.fillStartFromUrl(url, value), `fillStartFromUrl ${url} ${value}`);
+  }
   const ranges = [[42, 68], [42, null], [0, 42], [3723, 3750], [null, 42]];
   for (const [a, b] of ranges) {
     assert.equal(server.formatRange(a, b), browser.formatRange(a, b));

@@ -7,7 +7,7 @@
   const moments = demo ? demo.moments.map(m => ({...m})) : tree.moments.map(m => {
     const media=window.LTMedia?.describe(m.url||'');
     const outgoing = tree.edges.filter(e => e.kind === 'parent' && e.from === m.id);
-    return {id:m.id,title:m.title,date:m.date,emotion:m.emotion,memo:m.note,mediaMetadata:m.mediaMetadata||null,
+    return {id:m.id,title:m.title,date:m.date,emotion:m.emotion,memo:m.note,mediaMetadata:m.mediaMetadata||null,startSeconds:m.startSeconds,endSeconds:m.endSeconds,
       whyNext:outgoing.map(e=>e.reason).filter(Boolean).join(' / '),
       kind:context.exampleMedia?.[m.id]?.type||(media?.kind==='photo'?'photo':media?.kind==='video'||media?.kind==='youtube'?'video':m.url?'link':'memo'),
       type:context.exampleMedia?.[m.id]?.type||(media?.kind==='photo'?'photo':media?.kind==='video'||media?.kind==='youtube'?'video':m.url?'link':'memo'),source:context.exampleMedia?'예시 이미지':media?.openUrl?new URL(media.openUrl).hostname:'불러온 기록',image:context.exampleMedia?.[m.id]?.image||'',externalUrl:m.url||'',
@@ -19,7 +19,7 @@
   if(typeof document!=='undefined')addEventListener('DOMContentLoaded',()=>{
     const detail=document.querySelector('#detailNote');
     if(detail&&window.LTMedia){const host=document.createElement('div');detail.parentElement.after(host);let last=null;
-      const update=()=>{const id=context.momentId;if(id===last)return;last=id;const m=tree.moments.find(m=>m.id===id);host.innerHTML=m?.url?window.LTMedia.markup(m.url,m.title,m.mediaMetadata,m.id,null,{emotion:m.emotion,date:m.date,note:m.note,treeId:tree.id}):'';
+      const update=()=>{const id=context.momentId;if(id===last)return;last=id;const m=tree.moments.find(m=>m.id===id);host.innerHTML=m?.url?window.LTMedia.markup(m.url,m.title,m.mediaMetadata,m.id,null,{emotion:m.emotion,date:m.date,note:m.note,treeId:tree.id,startSeconds:m.startSeconds,endSeconds:m.endSeconds}):'';
         // #327 2부: 내 기록(서버)의 순간 상세에서 다른 트리로 옮기기. 공유·예시는 숨긴다.
         if(m&&context.source==='server'){const button=document.createElement('button');button.type='button';button.className='lt-move-btn';button.textContent='다른 트리로 옮기기';button.addEventListener('click',()=>parent.postMessage({type:'lt41-move',momentId:m.id},location.origin));host.append(button);}};
       new MutationObserver(update).observe(document.getElementById('detailTitle'),{childList:true,subtree:true});update();

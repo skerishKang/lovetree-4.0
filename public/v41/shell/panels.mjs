@@ -2,7 +2,7 @@
 // 2026-11-08 리팩터링: 동작·문구·디자인·저장 계약 변경 0.
 // shell.mjs에서 조건·조회 방식·인자 형태를 바꾸지 않고 그대로 옮겼다(원칙 7).
 // 셸은 자기 상태(member·source·window.LT41·업로드)를 읽기 함수로 넘기고, 이 파일은 패널만 만진다.
-import {parentCandidates, suggestMomentTitle, coverModeOf, latestMomentId} from '../domain.mjs';
+import {parentCandidates, suggestMomentTitle, coverModeOf, latestMomentId, validateRange, startFromUrl, fillStartFromUrl, formatTimecode} from '../domain.mjs';
 import {localDateOnly} from '../local-date.mjs';
 import {displayTreeTitle} from '../tree-name.mjs';
 import {mountPrivateUpload} from '../private-upload.mjs';
@@ -127,6 +127,9 @@ export function createPanels(deps) {
     form.reset();
     $('relation-label').hidden = mode !== 'add';
     for (const name of ['title', 'note', 'emotion', 'date', 'url', 'relation']) form.elements[name].value = mode === 'edit' ? m[name] || '' : name === 'emotion' ? '설렘' : name === 'date' ? localDateOnly() : ''; // #547: 기기의 오늘
+    // #792: 시작·끝 구간 칸 — 고치기는 저장된 초를 시간 표기로 되돌려 채우고, 추가는 빈 칸(주소의 t=는 미리보기에서 채운다).
+    if (form.elements.startSeconds) form.elements.startSeconds.value = mode === 'edit' && m.startSeconds !== undefined && m.startSeconds !== null ? formatTimecode(m.startSeconds) : '';
+    if (form.elements.endSeconds) form.elements.endSeconds.value = mode === 'edit' && m.endSeconds !== undefined && m.endSeconds !== null ? formatTimecode(m.endSeconds) : '';
     // #627: 추가 모드는 날짜를 자동으로 채워 두므로 무대 날짜 안내를 보인다; 수정 모드의 날짜는 이미 정해진 값이다.
     $('stage-date-hint').hidden = mode !== 'add';
     // 2026-11-08 수정 모드에서 이미 적어 둔 제목·감정·날짜가 있으면 '더 적기'를 펼친 상태로 연다.
@@ -271,6 +274,15 @@ export function createPanels(deps) {
     // #462: 주소가 비었을 때의 긴 안내는 칸 이름·파일 고르기와 같은 말이라 비운다(주소를 넣으면 종류·형식만 알린다).
     $('url-media-hint').textContent = info.kind === 'none' ? '' : info.kind === 'invalid' ? '링크 형식을 확인해 주세요.' : info.label;
     $('url-media-preview').innerHTML = url ? LTMedia.markup(url, form.elements.title.value) : '';
+    // #792: 시작·끝 구간 칸은 YouTube 주소일 때만 보인다. 주소에 t=·start=가 있으면 빈 시작 칸을 채운다(이미 적은 값은 그대로).
+    const rangeFields = $('range-fields');
+    if (rangeFields) rangeFields.hidden = info.kind !== 'youtube';
+    if (info.kind === 'youtube' && form.elements.startSeconds) {
+      const fill = fillStartFromUrl(url, form.elements.startSeconds.value);
+      if (fill !== null) form.elements.startSeconds.value = formatTimecode(fill);
+    }
+    const rangeError = $('range-error');
+    if (rangeError) { rangeError.hidden = true; rangeError.textContent = ''; }
     // #344: 미리보기 때 서버 oEmbed 프록시로 영상 제목을 받아 둔다(실패는 조용히). 저장 시 mediaMetadata.title로 함께 넘긴다.
     editorVideoTitle = '';
     editorVideoUrl = info.kind === 'youtube' && info.videoId ? url : '';
@@ -377,6 +389,21 @@ export function createPanels(deps) {
     if (parentDirty()) {
       $('form-error').textContent = '이전 순간 변경은 아래 버튼으로 먼저 저장해 주세요.';
       return;
+    }
+    // #792: 시작·끝 구간 검사 — 틀리면 칸 아래에 validateRange의 문구 그대로 알리고 저장하지 않는다.
+    const rangeForm = $('moment-form');
+    const rangeStart = rangeForm.elements.startSeconds, rangeEnd = rangeForm.elements.endSeconds;
+    if (rangeStart || rangeEnd) {
+      try {
+        validateRange({ startSeconds: rangeStart?.value ?? '', endSeconds: rangeEnd?.value ?? '' }, rangeForm.elements.url.value.trim());
+        const rangeError = $('range-error');
+        if (rangeError) { rangeError.hidden = true; rangeError.textContent = ''; }
+      } catch (error) {
+        const rangeError = $('range-error');
+        if (rangeError) { rangeError.textContent = error.message; rangeError.hidden = false; }
+        rangeStart?.focus?.();
+        return;
+      }
     }
     try {
       // #344: 미리보기 때 받아 둔 영상 제목을 저장 입력에 함께 넘긴다(사용자 입력 제목이 항상 우선 — 도메인 판정).
