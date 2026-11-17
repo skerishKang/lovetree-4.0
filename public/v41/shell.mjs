@@ -1350,7 +1350,7 @@ $('account-form').onsubmit=async event=>{
  notify(answer.commonAccountDeleted
   ? '러브트리 탈퇴와 함께 공통 로그인 계정과 인증 세션을 폐기했습니다.'
   : '러브트리에서 탈퇴했습니다. 다른 서비스 연결이 남아 있어 공통 계정은 유지됩니다.');
-};$('logout').onclick=async()=>{if(member){await member.act('logout');if(member.snapshot().dirty)notify('미저장 기록이 있어 로그아웃하지 않았어요. 다시 저장하거나 백업해 주세요.');}else{const answer=await createWorkspaceApi().logout();if(answer.ok)clearCachedWorkspace(localStorage);notify(answer.ok?'로그아웃했습니다.':'로그아웃하지 못했어요. 다시 시도해 주세요.');}};
+};$('logout').onclick=async()=>{if(member){await member.act('logout');if(member.snapshot().dirty){notify('미저장 기록이 있어 로그아웃하지 않았어요. 다시 저장하거나 백업해 주세요.');return;}/* 로그아웃 뒤 머리글만 바뀌고 첫 화면 본문·카드·숫자 줄이 회원 상태로 남았다 — 새 문서로 다시 열어 셸 전체를 비로그인 상태로 그린다(account=1·#my/... 같은 기록 주소도 함께 사라진다). */try{sessionStorage.setItem('lt41.logoutNotice','1');}catch{}location.replace(location.pathname);return;}const answer=await createWorkspaceApi().logout();if(answer.ok)clearCachedWorkspace(localStorage);notify(answer.ok?'로그아웃했습니다.':'로그아웃하지 못했어요. 다시 시도해 주세요.');};
 $('file').onchange=async()=>{
  const f=$('file').files[0];
  if(!f)return;
@@ -1406,5 +1406,7 @@ addEventListener('beforeunload',e=>{
  if(member?.snapshot().dirty||formDirty()||treeDirty()){e.preventDefault();e.returnValue='';}
 });
 if(shouldLoadMemberRecords(location.search,document.cookie,location.hash)||shellIntake.pending())startMember();
+// 로그아웃으로 다시 연 문서에서는 '로그인이 필요해요' 대신 이 안내를 한 번 띄운다.
+try{if(sessionStorage.getItem('lt41.logoutNotice')==='1'){sessionStorage.removeItem('lt41.logoutNotice');notify('로그아웃했어요.');}}catch{}
 
 
