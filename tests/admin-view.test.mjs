@@ -445,6 +445,7 @@ test('운영센터 탭 셋 + 옛 주소 3개 거르기 + 종류×상태 숫자',
       menuCounts: [...document.querySelectorAll('header nav .lt-menu-count')].map(b => Number(b.textContent.trim())),
       activeTab: document.querySelector('header nav [data-tab].is-active')?.textContent.trim(),
       kinds: [...document.querySelectorAll('[data-kind-tab]')].map(b => ({label: b.textContent.trim().replace(/\s*\d+$/, ''), active: b.classList.contains('is-active')})),
+      kindChips: [...document.querySelectorAll('.lt-post-top [data-kind]')].map(b => b.textContent.trim()),
       statuses: [...document.querySelectorAll('[data-status-tab]')].map(b => ({label: b.textContent.trim().replace(/\s*\d+$/, ''), active: b.classList.contains('is-active')})),
       cards: document.querySelectorAll('.lt-post').length,
       reportCards: document.querySelectorAll('[data-report-act]').length,
@@ -462,8 +463,9 @@ test('운영센터 탭 셋 + 옛 주소 3개 거르기 + 종류×상태 숫자',
         // 고객 글 탭을 고장·불편·요청으로 나누고 사용 일지·신고를 탭으로 돌린다(대표 요청 2026-11-17).
         assert.deepEqual(board.tabs, ['한눈에', '고객', '고장·불편 1', '요청', '사용 일지', '신고', '고치는 일'], width + '·' + theme + ': 탭 일곱(새 글 수는 고장·불편에만 보인다)');
       assert.equal(board.activeTab.replace(/\s*\d+$/, ''), '고장·불편');
-      assert.equal(board.kinds.length, 0, '종류 줄은 없앤다 — 상단 탭과 상태 줄이 대신한다');
-      assert.deepEqual(board.menuCounts, [1], '고장·불편의 새 글 1(요청 0은 숨긴다)');
+        assert.equal(board.kinds.length, 0, '종류 줄은 없앤다 — 상단 탭과 상태 줄이 대신한다');
+        assert.deepEqual(board.kindChips, [], '탭이 이미 의견만 보여 주므로 카드의 종류 칩도 없다');
+        assert.deepEqual(board.menuCounts, [1], '고장·불편의 새 글 1(요청 0은 숨긴다)');
         assert.deepEqual(board.statuses.map(s => s.label), ['할 일', '고침', '더 보기 ▾']);
         assert.equal(board.statuses.find(s => s.label === '할 일').active, true, '첫 열기는 할 일');
         assert.equal(board.cards, 2, width + '·' + theme + ': 고장·불편 할 일 2건(새 의견+확인 중 의견)');
@@ -490,6 +492,7 @@ test('운영센터 탭 셋 + 옛 주소 3개 거르기 + 종류×상태 숫자',
       const got = await read();
       // 탭 글자에는 새 글 수 숫자가 붙을 수 있다(고장·불편 1) — 탭 이름만 비교한다.
       assert.equal(String(got.activeTab || '').replace(/\s*\d+$/, ''), wantTab, hash + ' → ' + wantTab + ' 탭');
+      assert.deepEqual(got.kindChips, [], hash + ' → 목록 카드의 종류 칩 없음(탭이 이미 종류를 가리킨다)');
       if (hash === '#reports') {
         assert.equal(got.reportCards, 2, '신고 카드에 처리 단추 2개');
         await page.screenshot({ path: `${shotDir}/pr1-reports.png` });

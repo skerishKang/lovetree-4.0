@@ -352,7 +352,7 @@ async function renderList() {
   const listTitle = route.kind === 'journal' ? '사용 일지' : route.kind === 'report' ? '신고' : route.cat === 'request' ? '요청' : '고장·불편';
   const list = visible.length
     ? visible.map(row => row.kind === 'report' ? reportCard(row.report) : `<article class="lt-post" data-open="${escapeText(row.id)}" tabindex="0" role="button">
-        <div class="lt-post-top">${kindBadge(row.kind)}${statusBadge(row.status)}${row.kind === 'journal' && row.score ? `<span class="lt-badge">점수 ${escapeText(row.score)}</span>` : ''}${row.kind === 'journal' && row.journalDate ? `<span class="lt-badge">${escapeText(row.journalDate)}</span>` : ''}<span class="lt-post-date">${escapeText(formatTime(row.createdAt))}</span></div>
+        <div class="lt-post-top">${statusBadge(row.status)}${row.kind === 'journal' && row.score ? `<span class="lt-badge">점수 ${escapeText(row.score)}</span>` : ''}${row.kind === 'journal' && row.journalDate ? `<span class="lt-badge">${escapeText(row.journalDate)}</span>` : ''}<span class="lt-post-date">${escapeText(formatTime(row.createdAt))}</span></div>
         <h3 class="lt-post-title">${escapeText(row.displayTitle || '(제목 없음)')}</h3>
         <div class="lt-post-meta"><span class="lt-post-author" data-author="${escapeText(row.subjectId || '')}">${escapeText(authorLabel(row))}</span>${issueLink(row.issueNumber) ? `<span class="lt-post-issue">이슈 ${issueLink(row.issueNumber)}</span>` : ''}<span>답글 ${row.replyCount || 0}</span></div>
       </article>`).join('')
@@ -374,7 +374,7 @@ function reportCard(report) {
   const hide = report.hidden ? 'disabled' : '';
   const restore = !report.hidden && report.status === 'dismissed' ? 'disabled' : '';
   return `<article class="lt-post lt-report-card" data-report="${escapeText(report.id)}">
-    <div class="lt-post-top">${kindBadge('report')}<span class="lt-badge">${escapeText(stateLabel)}</span><span class="lt-badge">${escapeText(visibility)}</span><span class="lt-post-date">${escapeText(formatTime(report.createdAt))}</span></div>
+    <div class="lt-post-top"><span class="lt-badge">${escapeText(stateLabel)}</span><span class="lt-badge">${escapeText(visibility)}</span><span class="lt-post-date">${escapeText(formatTime(report.createdAt))}</span></div>
     <h3 class="lt-post-title">${escapeText(String(report.reason || '').slice(0, 90) || '신고')}</h3>
     <div class="lt-post-meta">공유 ${escapeText(report.shareId)}</div>
     <div class="lt-actions">
