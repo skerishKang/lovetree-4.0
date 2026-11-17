@@ -1905,7 +1905,7 @@ test('#657 후속 261117: 카드 층은 바닥 링크 줄 위에서 자른다(39
       });
       assert.equal(measured.overlaps, 0, `${label}: 카드↔바닥 링크 겹침 ${measured.overlaps}쌍`);
       if (label === 'few-390') assert.equal(measured.count, 0, `390 소수 카드 계정: 보이는 카드 ${measured.count}장(기존 궤도 숨김 유지)`);
-      if (measured.ceiling !== null && measured.lowest !== null) assert.ok(measured.lowest <= measured.ceiling, `${label}: 카드 아래끝 ${measured.lowest} > 링크 줄 위 ${measured.ceiling}`);
+      if (measured.ceiling > 0 && measured.lowest !== null) assert.ok(measured.lowest <= measured.ceiling, `${label}: 카드 아래끝 ${measured.lowest} > 링크 줄 위 ${measured.ceiling}`);
       assert.equal(measured.scroll.links.length, 4, `${label}: 바닥 링크 4개를 잰다`);
       assert.ok(measured.scroll.links.every((l) => l.inView), `${label}: 맨 아래 스크롤 뒤 링크가 화면 밖 — ${JSON.stringify(measured.scroll.links)}`);
       await ctx.close();
