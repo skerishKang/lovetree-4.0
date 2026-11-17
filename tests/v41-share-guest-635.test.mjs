@@ -631,8 +631,11 @@ test('#635 PR C 화면: 메뉴 시작 입구·첫날 표기·크게 보기 대�
             await card.waitFor({ state: 'visible', timeout: 8000 }).catch(() => {});
             const cardBox = await card.boundingBox();
             assert.ok(cardBox, `${width}·${theme}: 첫 화면에 새 소식 카드가 보이지 않는다`);
-            const menuBtn = await frame.locator('.menuBtn').first().boundingBox();
-            const themeBtn = await frame.locator('.theme-quick').first().boundingBox();
+            // 로그아웃/게스트에서는 첫 화면의 '순간 목록'·◐를 두지 않는다(#776 규칙) — 없으면 널로 센다.
+            const menuCount = await frame.locator('.menuBtn').count();
+            const themeCount = await frame.locator('.theme-quick').count();
+            const menuBtn = menuCount ? await frame.locator('.menuBtn').first().boundingBox() : null;
+            const themeBtn = themeCount ? await frame.locator('.theme-quick').first().boundingBox() : null;
             const overlapWith = (b) => cardBox && b ? Math.max(0, Math.min(cardBox.x + cardBox.width, b.x + b.width) - Math.max(cardBox.x, b.x)) * Math.max(0, Math.min(cardBox.y + cardBox.height, b.y + b.height) - Math.max(cardBox.y, b.y)) : 0;
             assert.equal(overlapWith(menuBtn), 0, `${width}·${theme}: 새 소식 카드가 '순간 목록' 단추와 겹친다`);
             assert.equal(overlapWith(themeBtn), 0, `${width}·${theme}: 새 소식 카드가 테마 단추와 겹친다`);

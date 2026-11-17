@@ -185,30 +185,9 @@ addEventListener('message',event=>{
  // 이미 열려 있을 때 showModal을 다시 부르면 InvalidStateError가 나므로 열려 있으면 무시한다.
  else if(type==='lt41-open-guide'){if(!guideDialog.open)openGuide();}
 });
-if(!loggedIn){
- const topActions=shadow.querySelector('.top-actions');
- if(topActions){
-  const quick=document.createElement('button');
-  quick.type='button';
-  quick.className='menuBtn theme-quick';
-  quick.setAttribute('data-theme-quick','');
-  const paint=()=>{
-   const now=readTheme(localStorage);
-   quick.textContent='◐';
-   const label=now==='garden'?'화면 테마 바꾸기: 지금 정원, 누르면 밤':'화면 테마 바꾸기: 지금 밤, 누르면 정원';
-   quick.setAttribute('aria-label',label);
-   quick.title=label;
-  };
-  quick.onclick=()=>{
-   const next=writeTheme(localStorage,readTheme(localStorage)==='garden'?'night':'garden');
-   applyTheme(next);
-   paint();
-   parent.postMessage({type:'lt41-theme',theme:next},location.origin);
-  };
-  paint();
-  topActions.append(quick);
- }
-}
+// #776 규칙: 테마는 머리줄 #theme-toggle 하나로 통일 — 첫 화면 ◐ 빠른 단추는 두지 않는다.
+// 로그아웃은 내 순간이 없으므로 '순간 목록' 입구도 두지 않는다(예시 카드는 '감상 예시' 안내 그대로).
+if(!loggedIn)shadow.querySelector('[data-do="index"]')?.remove();
 // 2026-11-08 #213 2번: 도구 줄 버튼은 "보기"·"순간 목록" 둘만 남긴다. 공통 헤더가 이미 둘러보기·로그인을 맡으므로
 // 첫 화면 안의 중복 버튼은 만들지 않고, 궤도가 넣어 둔 계정 자리도 지운다(화면 낭독기 순서에서도 사라진다).
 shadow.querySelector('[data-home-account]')?.remove();

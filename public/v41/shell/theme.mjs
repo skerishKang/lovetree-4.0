@@ -2,7 +2,7 @@
 // 2026-11-08 리팩터링: 동작·겉모습 변경 0. 계산은 header-state.mjs, 화면 반영은 여기서 한다.
 // 저장 키(lt41.theme)와 버튼 id·문구는 그대로다.
 import {memberLoginUrl} from '../member-entry.mjs';
-import {readTheme, writeTheme, nextTheme, themeButtonLabel, themeButtonAriaLabel, themePressed, appliedTheme, applyThemeAttribute} from '../header-state.mjs';
+import {readTheme, writeTheme, nextTheme, themeButtonLabel, themeButtonAriaLabel, themeIconGlyph, themePressed, appliedTheme, applyThemeAttribute} from '../header-state.mjs';
 import {themedViewFor} from './navigation.mjs';
 
 const $ = id => document.getElementById(id);
@@ -19,6 +19,12 @@ export function paintThemeControls(theme = readTheme(localStorage)) {
     button.textContent = themeButtonLabel(theme);
     // 계정 메뉴 안에서는 role="menuitemcheckbox"라 aria-pressed가 아니라 aria-checked를 쓴다.
     button.setAttribute('aria-checked', String(themePressed(theme)));
+    button.setAttribute('aria-label', themeButtonAriaLabel(theme));
+    button.title = themeButtonAriaLabel(theme);
+  }
+  // 머리줄 44px 원형 단추 — aria-label은 다른 테마 조절과 같은 값(themeButtonAriaLabel)을 쓴다.
+  for (const button of document.querySelectorAll('[data-lt-theme-icon]')) {
+    button.textContent = themeIconGlyph(theme);
     button.setAttribute('aria-label', themeButtonAriaLabel(theme));
     button.title = themeButtonAriaLabel(theme);
   }
