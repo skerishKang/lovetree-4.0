@@ -308,7 +308,7 @@ export function createQuickAdd(deps) {
       return;
     }
     const meta = await fetchTikTokMetadata(url, fetchImpl);
-    if (meta) tiktokCache.set(url, {title: meta.title || '', tiktokId: meta.videoId || ''});
+    if (meta) tiktokCache.set(url, {title: meta.title || '', tiktokId: meta.videoId || '', author: meta.author || ''});
     if (node && token === previewToken && node.isConnected !== false && meta?.title) node.textContent = meta.title;
   }
 
@@ -379,6 +379,7 @@ export function createQuickAdd(deps) {
       const mediaMetadata = {};
       if (meta.title) mediaMetadata.title = meta.title;
       if (meta.tiktokId) mediaMetadata.tiktokId = meta.tiktokId;
+      if (meta.author) mediaMetadata.tiktokAuthor = meta.author;
       return Object.keys(mediaMetadata).length ? { mediaMetadata } : {};
     }
     return {};

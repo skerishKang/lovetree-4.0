@@ -15,6 +15,12 @@ function tiktokVideoIdFromParsed(parsed) {
   const matched = (parsed.pathname || '').match(/^\/@[A-Za-z0-9_.]+\/video\/(\d{15,25})\/?$/);
   return matched ? matched[1] : '';
 }
+/** 정본 주소 경로의 @계정 이름(짧은 주소는 모른다 — 서버가 푼 것을 mediaMetadata.tiktokAuthor로 준다). */
+function tiktokHandleFromParsed(parsed) {
+  if (TIKTOK_SHORT_HOSTS.has(parsed.hostname)) return '';
+  const matched = (parsed.pathname || '').match(/^\/@([A-Za-z0-9_.]+)\/video\/\d{15,25}\/?$/);
+  return matched ? matched[1] : '';
+}
 /** 틱톡 공식 재생기 주소(iframe). oEmbed가 주는 html과 같은 주소 모양이다. */
 function tiktokPlayerUrl(videoId) {
   const id = String(videoId ?? '').trim();
@@ -315,8 +321,10 @@ function markup(url,title='',mediaMetadata=null,momentId='',context=null,momentM
  // #791: 틱톡 — 썸네일이 없어도 세로 패널(구석 표식+재생)로 두고, 재생기는 누를 때만 붙인다.
  // 짧은 주소는 저장 때 서버가 푼 id(mediaMetadata.tiktokId)를 재생기 id로 쓴다.
  const tiktokId=m.kind==='tiktok'?(m.videoId||((mediaMetadata&&typeof mediaMetadata.tiktokId==='string')?mediaMetadata.tiktokId.trim():'')||((momentMeta&&typeof momentMeta.tiktokId==='string')?momentMeta.tiktokId.trim():'')):'';
+ // #791: @계정 이름 — 저장 때 서버가 푼 것(tiktokAuthor)을 쓰고, 정본 주소는 주소 경로에서 바로 푼다. 없으면 생략한다.
+ const tiktokAuthor=m.kind==='tiktok'?(((mediaMetadata&&typeof mediaMetadata.tiktokAuthor==='string')?mediaMetadata.tiktokAuthor.trim():'')||tiktokHandleFromParsed(new URL(m.openUrl))):'';
  const tiktokPanel=m.kind==='tiktok'
-  ?'<figure class="lt-tt-preview lt-yt-preview" data-lt-thumb-host><span class="lt-tt-mark" aria-hidden="true">TikTok</span><button type="button" class="lt-yt-play" data-lt-play aria-label="바로 재생"><span aria-hidden="true">▶</span></button></figure>'
+  ?'<figure class="lt-tt-preview lt-yt-preview" data-lt-thumb-host><span class="lt-tt-mark" aria-hidden="true">TikTok</span><button type="button" class="lt-yt-play" data-lt-play aria-label="바로 재생"><span aria-hidden="true">▶</span></button>'+(tiktokAuthor?'<span class="lt-tt-author">@'+esc(tiktokAuthor)+'</span>':'')+'</figure>'
   :'';
  const body=auto
   // 내 기록: 썸네일을 처음부터 보여 준다(no-referrer·lazy). 재생 표시는 썸네일 전체를 덮는 단추라

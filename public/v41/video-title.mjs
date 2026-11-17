@@ -36,10 +36,12 @@ export async function fetchTikTokMetadata(value, fetchImpl = (...args) => global
     const authorName = typeof data?.authorName === 'string' ? data.authorName.trim() : '';
     const thumbnailUrl = typeof data?.thumbnailUrl === 'string' ? data.thumbnailUrl.trim() : '';
     const videoId = typeof data?.videoId === 'string' ? data.videoId.trim() : '';
+    // #791: @계정 이름 — 짧은 주소는 서버가 푼 정본 주소에서 온다.
+    const author = typeof data?.author === 'string' ? data.author.trim() : '';
     const width = Number(data?.width) || 0;
     const height = Number(data?.height) || 0;
-    if (!title && !authorName && !thumbnailUrl && !videoId) return null;
-    return { title, authorName, thumbnailUrl, videoId, width, height };
+    if (!title && !authorName && !thumbnailUrl && !videoId && !author) return null;
+    return { title, authorName, thumbnailUrl, videoId, author, width, height };
   } catch {
     return null;
   }

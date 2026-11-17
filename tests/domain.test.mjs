@@ -328,3 +328,12 @@ test('#791 mediaMetadata.tiktokId: 짧은 주소가 서버에서 푼 id를 함�
   const bad = addMoment(badBase, { ...fields, url: 'https://vm.tiktok.com/ZGd3XTri5/', mediaMetadata: { tiktokId: 'not-an-id' } }, badBase.moments[0].id);
   assert.equal(Object.prototype.hasOwnProperty.call(bad.moments[1], 'mediaMetadata'), false);
 });
+
+test('#791 mediaMetadata.tiktokAuthor: @계정 이름을 남기고 글자 한도를 넘으면 저장이 거부된다(title·channel과 같은 규칙)', () => {
+  const fields = input();
+  const base = createTree(fields);
+  const tree = addMoment(base, { ...fields, url: 'https://vm.tiktok.com/ZGd3XTri5/', mediaMetadata: { tiktokId: '7252913073450106158', tiktokAuthor: 'enhypen' } }, base.moments[0].id);
+  assert.deepEqual(tree.moments[1].mediaMetadata, { title: '', channel: '', source: 'vm.tiktok.com', tiktokId: '7252913073450106158', tiktokAuthor: 'enhypen' });
+  const longBase = createTree(fields);
+  assert.throws(() => addMoment(longBase, { ...fields, url: 'https://vm.tiktok.com/ZGd3XTri5/', mediaMetadata: { tiktokId: '7252913073450106158', tiktokAuthor: 'a'.repeat(121) } }, longBase.moments[0].id));
+});

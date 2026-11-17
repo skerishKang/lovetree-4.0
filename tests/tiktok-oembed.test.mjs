@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { tiktokVideoId, tiktokShortUrl, exposedMetadata, createTiktokOembedClient, createTiktokOembedHandler } from '../server/tiktok-oembed.js';
+import { tiktokVideoId, tiktokShortUrl, tiktokAuthor, exposedMetadata, createTiktokOembedClient, createTiktokOembedHandler } from '../server/tiktok-oembed.js';
 import { ApiError } from '../server/errors.js';
 
 // #791 1단계: 틱톡 oEmbed 프록시 — 유튜브 oEmbed와 같은 길. 짧은 주소(vm·vt)는 서버만 푼다.
@@ -59,6 +59,17 @@ test('성공 응답은 캐시하고 두 번째부터는 업스트림을 다시 �
   assert.equal(client.size(), 1);
 });
 
+test('@계정 이름은 정본 주소 경로에서만 풀고 짧은 주소·평문 id는 모른다', () => {
+  assert.equal(tiktokAuthor(CANONICAL), 'tiktokofficial');
+  assert.equal(tiktokAuthor('https://tiktok.com/@some.user/video/' + ID), 'some.user');
+  assert.equal(tiktokAuthor(`${CANONICAL}?_t=abc`), 'tiktokofficial');
+  assert.equal(tiktokAuthor('https://vm.tiktok.com/ZGd3XTri5/'), '');
+  assert.equal(tiktokAuthor(ID), '');
+  assert.equal(tiktokAuthor('https://www.tiktok.com/@x/photo/' + ID), '');
+  assert.equal(tiktokAuthor('https://evil.example/@x/video/' + ID), '');
+  assert.equal(tiktokAuthor(''), '');
+});
+
 test('짧은 주소는 서버에서 따라가 정본 id로 푼다', async () => {
   const seen = [];
   const client = createTiktokOembedClient({ fetchImpl: async (url, init) => {
@@ -70,6 +81,7 @@ test('짧은 주소는 서버에서 따라가 정본 id로 푼다', async () => 
   } });
   const resolved = await client.metadata('https://vm.tiktok.com/ZGd3XTri5/');
   assert.equal(resolved.videoId, ID);
+  assert.equal(resolved.author, 'tiktokofficial', '짧은 주소의 @이름은 따라간 정본 주소에서 온다');
   assert.equal(seen[0][0], 'https://vm.tiktok.com/ZGd3XTri5/');
   assert.equal(seen[0][1].redirect, 'follow');
   assert.equal(seen.length, 2);

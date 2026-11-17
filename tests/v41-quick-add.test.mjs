@@ -473,6 +473,16 @@ test('#638 제목을 받아 둔 뒤 담으면 mediaMetadata가 저장 입력에 
   assert.equal(h.calls.apply.length, 1);
 });
 
+test('#791 틱톡 짧은 주소 — 서버가 푼 id·@계정 이름을 저장 입력에 함께 넣는다', async () => {
+  const h = harness638({ fetchImpl: async () => ({ ok: true, json: async () => ({ title: '', authorName: '', thumbnailUrl: '', videoId: '7680930477414583573', author: 'enhypen', width: 325, height: 578 }) }) });
+  h.els['quick-url'].value = 'https://vm.tiktok.com/ZSqN7mvxd/';
+  h.api.renderPreview();
+  await new Promise(resolve => setImmediate(resolve));
+  await new Promise(resolve => setImmediate(resolve));
+  h.api.submitQuick({ preventDefault() {} });
+  assert.deepEqual(h.calls.apply[0], ['quickAdd', { url: 'https://vm.tiktok.com/ZSqN7mvxd/', treeId: 't-second', mediaMetadata: { tiktokId: '7680930477414583573', tiktokAuthor: 'enhypen' } }]);
+});
+
 test('#638 끌어다 놓기로 바로 담았을 때도(미리보기 요청이 없어도) 제목이 오면 채운다', async () => {
   const h = harness638();
   h.api.saveUrl(URL_OK); // 미리보기 없이 바로 담는다

@@ -64,3 +64,18 @@ test('#791 틱톡 카드는 세로 패널+구석 표식+원본 링크로 그리�
   assert.match(html, /TikTok에서 열기 ↗/);
   assert.doesNotMatch(html, /기억할 구간/);
 });
+
+test('#791 틱톡 패널 아래 @계정 이름 — 서버가 푼 이름·정본 주소 경로에서 풀고 없으면 생략한다', () => {
+  // 짧은 주소는 서버가 푼 이름(mediaMetadata.tiktokAuthor)으로 보인다.
+  const withMeta = media.markup('https://vm.tiktok.com/ZGd3XTri5/', '틱톡', { tiktokId: '7252913073450106158', tiktokAuthor: 'enhypen' });
+  assert.match(withMeta, /lt-tt-author">@enhypen<\/span>/);
+  // 정본 주소는 주소 경로의 @계정을 바로 푼다.
+  const fromUrl = media.markup('https://www.tiktok.com/@tiktokofficial/video/7252913073450106158', '틱톡');
+  assert.match(fromUrl, /lt-tt-author">@tiktokofficial<\/span>/);
+  // 이름을 모르면(짧은 주소·메타 없음) 줄 자체를 넣지 않는다.
+  const none = media.markup('https://vm.tiktok.com/ZGd3XTri5/', '틱톡');
+  assert.doesNotMatch(none, /lt-tt-author/);
+  // 저장 때 온 이름이 주소 경로보다 이긴다(짧은 주소의 정본 이름을 그대로 쓴다).
+  const metaWins = media.markup('https://www.tiktok.com/@tiktokofficial/video/7252913073450106158', '틱톡', { tiktokId: '7252913073450106158', tiktokAuthor: 'enhypen' });
+  assert.match(metaWins, /@enhypen<\/span>/);
+});

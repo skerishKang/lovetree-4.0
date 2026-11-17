@@ -148,12 +148,15 @@ function normalizeMediaMetadata(value, url) {
   const thumbnail = safeMediaThumbnail(value.thumbnail);
   // #791: 틱톡 영상 id — 짧은 주소가 서버에서 풀어 준 id를 함께 남긴다.
   const tiktokId = /^\d{15,25}$/.test(String(value.tiktokId ?? '').trim()) ? String(value.tiktokId).trim() : '';
-  if (!title && !channel && !thumbnail && !tiktokId) return null;
+  // #791: 틱톡 @계정 이름 — 짧은 주소는 서버가 푼 정본 주소에서 온다.
+  const tiktokAuthor = optionalText(value.tiktokAuthor, '미디어 작성자', 120);
+  if (!title && !channel && !thumbnail && !tiktokId && !tiktokAuthor) return null;
   const source = url ? new URL(url).hostname : '';
   if (!source) return null;
   const result = {title, channel, source};
   if (thumbnail) result.thumbnail = thumbnail;
   if (tiktokId) result.tiktokId = tiktokId;
+  if (tiktokAuthor) result.tiktokAuthor = tiktokAuthor;
   return result;
 }
 function shortened(value, max = 40) {

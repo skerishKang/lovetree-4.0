@@ -51,6 +51,17 @@ export function tiktokShortUrl(value = '') {
   return /^[A-Za-z0-9]{4,32}$/.test(code) ? parsed.href : null;
 }
 
+/** 정본 주소 경로의 @계정 이름. 짧은 주소·평문 id는 모른다('' — 짧은 주소는 따라간 뒤에 안다). */
+export function tiktokAuthor(value = '') {
+  const raw = String(value ?? '').trim();
+  if (!raw) return '';
+  let parsed;
+  try { parsed = new URL(raw); } catch { return ''; }
+  if (!TIKTOK_HOSTS.has(parsed.hostname)) return '';
+  const matched = (parsed.pathname || '').match(/^\/@([A-Za-z0-9_.]+)\/video\/\d{15,25}\/?$/);
+  return matched ? matched[1] : '';
+}
+
 function safeText(value, max) {
   const trimmed = typeof value === 'string' ? value.trim() : '';
   return trimmed ? trimmed.slice(0, max) : '';
@@ -103,12 +114,12 @@ export function createTiktokOembedClient({ fetchImpl = (...args) => fetch(...arg
     if (!finalUrl) throw new ApiError(502, 'tiktok_unreachable', '영상 정보를 불러오지 못했어요. 잠시 뒤 다시 시도해 주세요.');
     const videoId = tiktokVideoId(finalUrl);
     if (!videoId) throw new ApiError(400, 'tiktok_unresolved', '짧은 주소가 틱톡 영상으로 열리지 않아요. 정본 주소로 넣어 주세요.');
-    return videoId;
+    return { videoId, author: tiktokAuthor(finalUrl) };
   }
 
   async function resolveInput(value) {
     const direct = tiktokVideoId(value);
-    if (direct) return direct;
+    if (direct) return { videoId: direct, author: tiktokAuthor(value) };
     const short = tiktokShortUrl(value);
     if (short) {
       const controller = new AbortController();
@@ -124,7 +135,7 @@ export function createTiktokOembedClient({ fetchImpl = (...args) => fetch(...arg
 
   return {
     async metadata(input) {
-      const videoId = await resolveInput(input);
+      const { videoId, author } = await resolveInput(input);
       const cached = read(videoId);
       if (cached) return { ...cached, cached: true };
 
@@ -143,7 +154,9 @@ export function createTiktokOembedClient({ fetchImpl = (...args) => fetch(...arg
       let data;
       try { data = await response.json(); } catch { throw new ApiError(502, 'tiktok_metadata', '영상 정보 형식을 알아보지 못했어요.'); }
 
-      const value = exposedMetadata(videoId, data);
+      // @계정 이름은 oEmbed가 주지 않으면 따라간 정본 주소(또는 입력 정본)에서 푼다(2026-11-19 실측:
+      // oEmbed는 지금 제목·작성자·썸네일을 주지 않는다). 짧은 주소도 이 author로 @이름을 남긴다.
+      const value = { ...exposedMetadata(videoId, data), author: safeText(author, MAX_AUTHOR) };
       remember(videoId, value);
       return { ...value, cached: false };
     },
