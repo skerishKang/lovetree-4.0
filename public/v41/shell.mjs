@@ -1285,7 +1285,8 @@ function paintTreeVisibilityList(){
   row.setAttribute('role','group');
   row.setAttribute('aria-label', '트리 공개 '+(tree.title||''));
   row.dataset.treeId=tree.id;
-  row.innerHTML='<span class="settings-label">'+escapeTreeName(tree.title||'제목 없는 트리')+'</span><div class="settings-choice">'+
+  const count=Array.isArray(tree.moments)?tree.moments.length:0;
+  row.innerHTML='<span class="settings-label">'+escapeTreeName(tree.title||'제목 없는 트리')+' <small>순간 '+count+'개</small></span><div class="settings-choice">'+
    '<button type="button" role="radio" data-tree-visibility-tree="'+escapeTreeName(tree.id)+'" data-tree-visibility-value="public" aria-checked="'+String(visibility==='public')+'" class="'+(visibility==='public'?'settings-current':'')+'">공개</button>'+
    '<button type="button" role="radio" data-tree-visibility-tree="'+escapeTreeName(tree.id)+'" data-tree-visibility-value="private" aria-checked="'+String(visibility==='private')+'" class="'+(visibility==='private'?'settings-current':'')+'">비공개</button></div>';
   box.append(row);
