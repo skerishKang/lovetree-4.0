@@ -227,6 +227,8 @@ export function createSyncController({getState, replaceState, api, draftStorage 
       if (!answer.ok) return emit(status({phase:'rejected',detail:'로그아웃하지 못했어요.',actions:actions.logout}));
       clearCachedWorkspace(cacheStorage, activeSubject);
       owned = false; revision = null; editCount = 0; replaceState(EMPTY_STATE()); navigate('#start');
+      // 4.0의 act('logout')과 같은 알림 — 빠지면 셸이 로그인 상태로 남아 계정 동그라미가 지워지지 않는다.
+      return emit(status({phase:'login',actions:actions.login}));
     }
     return current;
   }
