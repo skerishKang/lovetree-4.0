@@ -269,10 +269,12 @@ momentContent=function(m,compact=false){
    // #791: 틱톡 — 썸네일 없이 세로 패널(구석 표식+재생). 재생기는 누를 때만 붙는다.
    // 짧은 주소는 저장 때 서버가 푼 id(mediaMetadata.tiktokId)를 재생기 id로 쓴다.
    const tiktokId=media.videoId||((safe.mediaMetadata&&typeof safe.mediaMetadata.tiktokId==='string')?safe.mediaMetadata.tiktokId.trim():'');
+   // #791: @계정명 — 저장 때 서버가 푼 tiktokAuthor를 쓰고, 없으면 정본 주소 경로에서 푼다(짧은 주소는 모른다).
+   const tiktokAuthor=((safe.mediaMetadata&&typeof safe.mediaMetadata.tiktokAuthor==='string'&&safe.mediaMetadata.tiktokAuthor.trim())||(()=>{try{const matched=new URL(media.openUrl).pathname.match(/^\/@([A-Za-z0-9_.]+)\/video\/\d{15,25}\/?$/);return matched?matched[1]:'';}catch{return ''}})());
    const piece='<div class="clipping moment" data-moment="'+t(safe.id)+'">'+
     '<button type="button" class="yt-play is-vertical" data-lt-thumb-host data-tt-play="'+t(tiktokId)+'" data-yt-vertical="1" aria-label="TikTok 영상 재생">'+
     '<span class="lt-tt-mark tt-corner" aria-hidden="true">TikTok</span>'+
-    '<span class="yt-play-label">▶ 재생</span></button>'+
+    '<span class="yt-play-label">▶ 재생</span>'+(tiktokAuthor?'<span class="lt-tt-author">@'+t(tiktokAuthor)+'</span>':'')+'</button>'+
     '<div class="media-links"><a class="media-source-link" href="'+t(media.openUrl)+'" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">TikTok ↗</a>'+
     '<button type="button" data-yt-expand="'+t(safe.id)+'">크게 보기</button></div></div>';
    return piece+paintTitle(safe);
