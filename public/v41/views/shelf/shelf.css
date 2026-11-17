@@ -209,3 +209,43 @@ html[data-v41-screen=shelf][data-lt-theme=garden] .shelf-spine--new {
   border-color: var(--lt-line-paper);
   color: var(--lt-muted,#6f605a);
 }
+
+/* #810: 책등⋯ — 책등 묶음. 책등 규칙은 이 파일에 둔다(겉모습 덧칠 파일에 섞지 않는다). */
+html[data-v41-screen=shelf] .shelf-spine-wrap { position: relative; flex: 0 0 auto; }
+html[data-v41-screen=shelf] .shelf-spine-wrap .shelf-spine { padding-top: 62px; }
+html[data-v41-screen=shelf] .shelf-spine-manage {
+  position: absolute;
+  top: 2px;
+  left: 1px;
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  border: 1px solid var(--lt-gold-line);
+  border-radius: 50%;
+  background: var(--lt-glass-strong);
+  color: var(--lt-pearl);
+  font-size: 20px;
+  line-height: 1;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity .2s ease, visibility .2s;
+}
+html[data-v41-screen=shelf] .shelf-spine-wrap:hover .shelf-spine-manage,
+html[data-v41-screen=shelf] .shelf-spine-wrap:focus-within .shelf-spine-manage,
+html[data-v41-screen=shelf] .shelf-spine-wrap.show-manage .shelf-spine-manage,
+html[data-v41-screen=shelf] .shelf-spine-manage:focus-visible {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+html[data-v41-screen=shelf][data-lt-theme=garden] .shelf-spine-manage {
+  border-color: var(--lt-line-paper);
+  background: var(--lt-ink);
+  color: var(--lt-paper);
+}

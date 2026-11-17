@@ -730,7 +730,7 @@ body.lt-frame-dialog-open #toast{top:calc(72px + env(safe-area-inset-top));botto
 /* 열린 더보기 메뉴는 0폭 자리 규칙에서 빼내 실제 크기로 누를 수 있게 한다 — 헤더보다 위에 뜬다. */
 .app-header>#header-overflow.is-open{width:auto;min-width:190px;height:auto;overflow:visible;z-index:70}
 
-/* #784: discovery is a cover-first grid; controls stay in one compact toolbar. */
+/* Issue 784: discovery is a cover-first grid; controls stay in one compact toolbar. */
 #community-panel{background:var(--lt-stage);background-image:none;color:var(--lt-pearl);overflow-y:auto;overscroll-behavior:contain}
 #community-panel::backdrop{background:color-mix(in srgb,var(--lt-stage) 74%,transparent);backdrop-filter:blur(2px)}
 #community-panel .community-top{max-width:1500px;margin:0 auto 8px;padding-top:26px}
@@ -811,3 +811,16 @@ body.lt-frame-dialog-open #toast{top:calc(72px + env(safe-area-inset-top));botto
 @media(max-width:780px){#community-panel{padding:14px 14px 28px}#community-panel .community-top{padding-top:20px}#community-panel .community-toolbar{grid-template-columns:minmax(0,1fr) auto;gap:8px}#community-panel .community-search-submit{display:none}#community-panel #community-list{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}#community-panel .community-card-title{margin:10px 10px 0;font-size:15px}#community-panel .community-card-moment{margin:4px 10px 0;font-size:13px}#community-panel .community-card-meta{margin:6px 10px 11px;font-size:12px}#community-panel .community-policy{font-size:12px}}
 @media(max-width:600px){#community-preview{inset:auto 0 0;transform:none;margin:0;width:100%;max-width:100vw;max-height:88dvh;padding-bottom:calc(12px + env(safe-area-inset-bottom));border-radius:var(--lt-r-panel) var(--lt-r-panel) 0 0}#community-preview>.community-cover{aspect-ratio:1.55;max-height:22dvh}#community-preview .community-preview-body{padding:12px 16px 16px;gap:7px}#community-preview .community-preview-body h3{font-size:21px}#community-preview .community-more-panel{min-width:min(360px,calc(100vw - 40px))}}
 @media(prefers-reduced-motion:reduce){#community-panel .community-card{transition:none}}
+/* 2026-11-17 대표 결정: 트리 0개 계정의 서재 빈 상태는 '+ 새 트리' 빈 책과 같은 점선 모양으로 둔다. */
+#empty[data-empty-view=shelf] .empty-tree-art{display:none}
+#empty[data-empty-view=shelf] #empty-records{display:flex;align-items:center;justify-content:center;width:180px;height:250px;margin:12px auto 0;border:2px dashed var(--lt-line,rgba(255,255,255,.3));border-radius:12px;background:rgba(255,255,255,.05);color:var(--lt-pearl);font-size:16px}
+html[data-lt-theme=garden] #empty[data-empty-view=shelf] #empty-records{background:rgba(73,61,58,.05);border-color:var(--lt-line-paper);color:var(--lt-ink)}
+/* 2026-11-17 대표 지적: 390 빈 상태의 세로 카드 그림이 새 소식 카드·알림에 닿는다 — 그림을 줄이고 위로 올려 단추까지 안전 구역에 둔다. */
+@media(max-width:600px){
+  #empty{align-content:start;padding-top:56px}
+  #empty:not([data-empty-view=shelf]) .empty-tree-art{width:min(140px,100%);margin:0 auto 2px}
+  #empty:not([data-empty-view=shelf]) .empty-tree-art svg{width:auto;height:150px;max-width:100%}
+  #empty:not([data-empty-view=shelf]) .empty-tree-art::before{inset:-10% -8% -6%}
+}
+/* 고르지 않은 탭은 밤·정원 모두 같은 토큰 색을 쓴다(빈 상태에서 색이 어긋나지 않게). */
+.tree-frame .tree-views>button:not([aria-current=true]),.tree-frame .tree-views>button:not([aria-current=true]):hover{color:var(--lt-muted)}

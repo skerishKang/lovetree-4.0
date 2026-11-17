@@ -26,6 +26,7 @@ export function createMessages(deps) {
   const links = deps.links;
   const writeLocation = deps.writeLocation;
   const choose = deps.choose;
+  const openTreeManager = deps.openTreeManager;
   const openEditor = deps.openEditor;
   // 이슈 671: 새로 추가(new·add)는 입구와 상관없이 같은 쓰기 창(openWrite)으로 연다 — 대표 결정(2026-11-12).
   const openWriteEntry = deps.openWriteEntry || (() => {});
@@ -176,6 +177,10 @@ export function createMessages(deps) {
     }
     if (data?.type === 'lt41-open-book' && getModel()?.trees.some(t => t.id === data.treeId && t.moments.some(m => m.id === data.id))) {
       setCurrent('track59-sketchbook.html'); choose(data.treeId, data.id); writeLocation();
+    }
+    // #810: 서재 ⋯ — 그 트리로 고른 뒤 기존 트리 관리 창을 연다(새 창 만들지 않음). 없는 트리는 무시한다.
+    if (data?.type === 'lt41-manage-tree' && getSource() === 'server' && getModel()?.trees.some(t => t.id === data.treeId)) {
+      choose(data.treeId); openTreeManager?.();
     }
     // #582: 보드 상세의 '지도에서 관계 보기' — 지도→책 이동과 같은 셸 방식(LT41.momentId로 그 순간을 연다).
     // 지도 파일은 건드리지 않는다. 지도는 뜰 때 LTDEMO.get()(=LT41.momentId)의 순간을 선택한다.
