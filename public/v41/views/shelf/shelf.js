@@ -72,7 +72,7 @@ import { createReader } from './shelf-reader.js';
           // #256-3: 디자인 표지는 shelf-model coverChoice 판정(book.design)을 그대로 쓴다. 없으면 속성도 없다(기존 화면 변화 0).
           return '<article class="book-card" data-book-index="'+index+'"><button type="button" data-book-id="'+esc(book.id)+'" aria-label="'+esc(book.name)+' 책 열기">'+
             '<div class="book-cover"'+(book.design?' data-cover-design="'+esc(book.design)+'"':'')+' style="'+coverStyle(book)+'">'+(book.inbox?'<span class="inbox-chip">'+INBOX_LABEL+'</span>':'')+(book.coverMedia?'<img class="book-cover-media" src="'+esc(book.coverMedia)+'"'+coverFallbackAttrs(book.coverCandidates||[book.coverMedia])+' alt="" loading="lazy" referrerpolicy="no-referrer">':'')+'<span class="cover-symbol"><span>'+esc(book.symbol)+'</span></span><strong class="cover-title">'+esc(book.name)+'</strong></div>'+
-            '<span class="book-card-meta"><span>'+esc(bookMeta(book))+'</span></span></button></article>';
+            '<span class="book-card-meta"><span>'+esc(bookMeta(book))+'</span></span></button><button type="button" class="book-manage" data-manage-id="'+esc(book.id)+'" aria-label="'+esc(book.name)+' 고치기">⋯</button></article>';
         }).join(''):'<div class="empty"><strong>찾는 책이 없어요.</strong><span>트리 이름·좋아하는 대상·순간 제목으로 검색해 보세요.</span></div>')
         // 261117 대표 확정: 책장 진열 끝에 '+ 새 트리' 빈 책 한 권 — 누르면 지금의 새 트리 만들기 흐름(lt41-write new).
         +'<article class="book-card book-card--new"><button type="button" data-new-book aria-label="새 트리 만들기"><div class="book-cover"><span class="new-book-plus" aria-hidden="true">＋</span><strong class="cover-title">+ 새 트리</strong></div><span class="book-card-meta"><span>새 트리 만들기</span></span></button></article>';
@@ -86,7 +86,7 @@ import { createReader } from './shelf-reader.js';
         nav.hidden=!visible;
         // 261117 대표 확정: 책등 줄(책 줄) 끝에도 같은 '+ 새 트리' 빈 책이 선다.
         row.innerHTML=(visible?spineItems(list).map(function(item){
-          return '<button type="button" class="shelf-spine" data-book-id="'+esc(item.id)+'" data-book-index="'+item.index+'" style="'+spineStyle(item)+'" aria-label="'+esc(item.name)+' 책으로 넘기기"><span class="shelf-spine-title">'+esc(item.name)+'</span></button>';
+          return '<span class="shelf-spine-wrap"><button type="button" class="shelf-spine" data-book-id="'+esc(item.id)+'" data-book-index="'+item.index+'" style="'+spineStyle(item)+'" aria-label="'+esc(item.name)+' 책으로 넘기기"><span class="shelf-spine-title">'+esc(item.name)+'</span></button><button type="button" class="shelf-spine-manage" data-manage-id="'+esc(item.id)+'" aria-label="'+esc(item.name)+' 고치기">⋯</button></span>';
         }).join(''):'')
         +'<button type="button" class="shelf-spine shelf-spine--new" data-new-book aria-label="새 트리 만들기"><span class="shelf-spine-title">+ 새 트리</span></button>';
         syncSpines(true);
@@ -97,7 +97,7 @@ import { createReader } from './shelf-reader.js';
         var row=$('#shelfSpineRow');
         if(!row||!row.children.length)return;
         var book=state.shelfList[state.shelfIndex],activeId=book?book.id:null;
-        Array.prototype.forEach.call(row.children,function(button){
+        Array.prototype.forEach.call(row.querySelectorAll('.shelf-spine[data-book-id]'),function(button){
           var active=button.dataset.bookId===activeId;
           button.classList.toggle('is-active',active);
           if(active)button.setAttribute('aria-current','true');else button.removeAttribute('aria-current');
@@ -213,34 +213,50 @@ import { createReader } from './shelf-reader.js';
         closeBook = reader.closeBook, turnPage = reader.turnPage, bindBookDrag = reader.bindBookDrag;
       function bindShelfDrag() {
         var rail=$('#shelfRail');
-        rail.addEventListener('click',function(event){if(event.detail===0){var card=event.target.closest('[data-book-index]');if(card)selectShelfIndex(Number(card.dataset.bookIndex));}});
+        var lpTimer=null,lpTarget=null,lpStart=null,lpFired=false;
+        var clearLp=function(){if(lpTimer){clearTimeout(lpTimer);lpTimer=null;}lpStart=null;};
+        rail.addEventListener('click',function(event){if(event.target.closest('[data-manage-id]'))return;if(lpFired){lpFired=false;lpTarget=null;return;}if(event.detail===0){var card=event.target.closest('[data-book-index]');if(card)selectShelfIndex(Number(card.dataset.bookIndex));}});
         rail.addEventListener('pointerdown',function(event){
+          if(event.target.closest('[data-manage-id]'))return;
           var card=event.target.closest('.book-card');
+          lpFired=false;lpTarget=(card&&card.dataset&&card.dataset.bookIndex!==undefined)?card:null;
+          clearLp();lpStart={x:event.clientX,y:event.clientY};
+          if(lpTarget){lpTimer=setTimeout(function(){if(lpTarget){lpTarget.classList.add('show-manage');lpFired=true;}lpTimer=null;},500);}
           shelfDrag.active=true;shelfDrag.startX=event.clientX;shelfDrag.moved=false;shelfDrag.downIndex=card?Number(card.dataset.bookIndex):null;shelfDrag.startIndex=state.shelfIndex;
           rail.classList.add('dragging');rail.setPointerCapture(event.pointerId);
         });
         rail.addEventListener('pointermove',function(event){
+          if(lpTimer&&lpStart&&(Math.abs(event.clientX-lpStart.x)>7||Math.abs(event.clientY-lpStart.y)>7))clearLp();
           if(!shelfDrag.active)return;
           var dx=event.clientX-shelfDrag.startX;
           if(Math.abs(dx)>7)shelfDrag.moved=true;
           if(shelfDrag.moved){state.shelfIndex=Math.max(0,Math.min(state.shelfList.length-1,shelfDrag.startIndex-dx/158));updateCarousel();}
         });
         rail.addEventListener('pointerup',function(){
+          clearLp();
           if(!shelfDrag.active)return;
-          var moved=shelfDrag.moved,downIndex=shelfDrag.downIndex;
+          var moved=shelfDrag.moved,downIndex=shelfDrag.downIndex,longFired=lpFired;
           shelfDrag.active=false;rail.classList.remove('dragging');
           if(moved){state.shelfIndex=Math.round(state.shelfIndex);save();updateCarousel();}
+          else if(longFired){/* 길게 누르기: ⋯만 보이고 책은 열지 않는다 */}
           else if(downIndex!==null)selectShelfIndex(downIndex);
           shelfDrag.downIndex=null;
+          if(!longFired){lpTarget=null;}
         });
-        rail.addEventListener('pointercancel',function(){if(!shelfDrag.active)return;shelfDrag.active=false;rail.classList.remove('dragging');state.shelfIndex=Math.round(state.shelfIndex);updateCarousel();});
+        rail.addEventListener('pointercancel',function(){clearLp();lpFired=false;lpTarget=null;if(!shelfDrag.active)return;shelfDrag.active=false;rail.classList.remove('dragging');state.shelfIndex=Math.round(state.shelfIndex);updateCarousel();});
       }
       function bind() {
         // 261117 대표 확정: '+ 새 트리' 빈 책(책등 줄·진열 끝)은 지금의 새 트리 만들기 흐름을 엔다 —
         // 이어 읽기 칸의 'first' 경로와 같은 lt41-write new(셸 기록 판 · 새 트리의 첫 순간).
         var openNewTree=function(){parent.postMessage({type:'lt41-write',mode:'new'},location.origin);};
+        var openManageTree=function(id){parent.postMessage({type:'lt41-manage-tree',treeId:id},location.origin);};
+        var spineLpTimer=null,spineLpTarget=null,spineLpStart=null,spineLpFired=false;
+        var clearSpineLp=function(){if(spineLpTimer){clearTimeout(spineLpTimer);spineLpTimer=null;}spineLpStart=null;};
         $('#shelfSpineRow').addEventListener('click',function(event){
           if(event.target.closest('[data-new-book]')){openNewTree();return;}
+          var manage=event.target.closest('[data-manage-id]');
+          if(manage){openManageTree(manage.dataset.manageId);return;}
+          if(spineLpFired){spineLpFired=false;spineLpTarget=null;return;}
           // #256 2번: 책등을 누르면 아래 넘기기가 그 책으로 이동한다(책을 바로 열지는 않는다).
           var spine=event.target.closest('[data-book-id]');
           if(!spine)return;
@@ -248,7 +264,20 @@ import { createReader } from './shelf-reader.js';
           if(index<0||index>=state.shelfList.length||index===state.shelfIndex)return;
           state.shelfIndex=index;save();updateCarousel();
         });
-        $('#shelfRail').addEventListener('click',function(event){if(event.target.closest('[data-new-book]'))openNewTree();});
+        $('#shelfSpineRow').addEventListener('pointerdown',function(event){
+          if(event.target.closest('[data-manage-id]')||event.target.closest('[data-new-book]'))return;
+          var wrap=event.target.closest('.shelf-spine-wrap');
+          spineLpFired=false;spineLpTarget=wrap;
+          clearSpineLp();spineLpStart={x:event.clientX,y:event.clientY};
+          if(wrap){spineLpTimer=setTimeout(function(){if(wrap){wrap.classList.add('show-manage');spineLpFired=true;}spineLpTimer=null;},500);}
+        });
+        $('#shelfSpineRow').addEventListener('pointermove',function(event){
+          if(spineLpTimer&&spineLpStart&&(Math.abs(event.clientX-spineLpStart.x)>7||Math.abs(event.clientY-spineLpStart.y)>7))clearSpineLp();
+        });
+        $('#shelfSpineRow').addEventListener('pointerup',clearSpineLp);
+        $('#shelfSpineRow').addEventListener('pointercancel',function(){clearSpineLp();spineLpFired=false;spineLpTarget=null;});
+        $('#shelfRail').addEventListener('click',function(event){if(event.target.closest('[data-new-book]'))openNewTree();var railManage=event.target.closest('[data-manage-id]');if(railManage)openManageTree(railManage.dataset.manageId);});
+        $('#shelfNewTree').addEventListener('click',openNewTree);
         $('#shelfJump').addEventListener('click',function(){state.query='';state.filter='all';$('#searchInput').value='';$$('.filter').forEach(function(item){item.classList.toggle('active',item.dataset.filter==='all');});renderShelf();var book=getShelfCard(state.shelfIndex)?.querySelector('button[data-book-id]');if(book)openReader(book.dataset.bookId,book.closest('.book-card'));});
         $('#searchInput').addEventListener('input',function(event){state.query=event.target.value;renderShelf();});
         $$('.filter').forEach(function(button){button.addEventListener('click',function(){state.filter=button.dataset.filter;$$('.filter').forEach(function(item){item.classList.toggle('active',item===button);});renderShelf();});});
