@@ -240,15 +240,16 @@ const cellCommunity=document.createElement('div');cellCommunity.className='home-
 const communityLine=label=>{const line=infoLine({label,value:'…'});line.dataset.community=label;line.onclick=()=>bridge.actions.community();return line;};
 const communityLines={moments:communityLine('순간'),trees:communityLine('트리')};
 cellCommunity.append(communityLines.moments,communityLines.trees);
-(async()=>{try{
- const answer=await fetch('/api/community/stats',{headers:{accept:'application/json'}});
+(async()=>{const ctrl=new AbortController();const timer=setTimeout(()=>ctrl.abort(),8000);try{
+ const answer=await fetch('/api/community/stats',{headers:{accept:'application/json'},signal:ctrl.signal});
  if(!answer.ok)throw Error('stats unavailable');
  const stats=await answer.json();
  communityLines.moments.querySelector('.home-info-v').textContent=formatCount(stats?.moments);
  communityLines.trees.querySelector('.home-info-v').textContent=formatCount(stats?.trees);
-}catch{ // 집계를 못 가져오면 빈 약속 대신 칸을 숨긴다(숫자 없이 틀만 남기지 않는다).
- cellCommunity.hidden=true;
-}})();
+}catch{ // 집계를 못 가져오거나 8초를 넘기면 빈 약속 대신 칸을 숨긴다(숫자 없이 틀만 남기지 않는다).
+ // 셀은 display:grid라 [hidden] 하나로는 안 가려져서 인라인까지 닫는다 — 안 그러면 '…'가 남는다(#780 후속).
+ cellCommunity.hidden=true;cellCommunity.style.display='none';
+}finally{clearTimeout(timer);}})();
 infoRow.append(cellMoments,cellCommunity);
 // 내 트리 칸(로그인) — '트리 N' / '최근 <트리 이름>'(마지막으로 순간을 넣은 트리, 누르면 그 트리로; 길면 칸 폭에서 '…').
 if(loggedIn){
