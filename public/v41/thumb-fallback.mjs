@@ -3,11 +3,11 @@
 //      → hqdefault → mqdefault → 모두 회색(120×90)/실패면 글 카드 → 제목도 없으면 최소 카드.
 // 썸네일 그림은 우리 서버에 복사하지 않고 주소만 다룬다(저작권 원칙).
 import { userTitleText, formatDisplayDate } from './book-usability.mjs';
-import { YOUTUBE_HOSTS, YTIMG_HOST, VIDEO_ID_RE, youtubeIdFrom } from './youtube-id.mjs';
+import { YOUTUBE_HOSTS, YTIMG_HOST, youtubeIdFrom, safeYoutubeThumb, youtubeStageThumbUrl, isVerticalMoment } from './youtube-id.mjs';
 
 // 유튜브 영상 id 판정은 한 벌(public/v41/youtube-id.mjs)을 쓴다 — 예전 복사본은 지웠다.
 // 예전에 여기 있던 이름 그대로 다시 내보낸다(쓰던 곳의 주소가 바뀌지 않게).
-export { youtubeIdFrom };
+export { youtubeIdFrom, safeYoutubeThumb, youtubeStageThumbUrl, isVerticalMoment };
 
 export const GRAY_THUMB_WIDTH = 120;
 export const GRAY_THUMB_HEIGHT = 90;
@@ -22,35 +22,6 @@ const trimText = (value) => (typeof value === 'string' ? value.trim() : '');
 export const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (ch) => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
 }[ch]));
-
-/** https + ytimg.com 썸네일 주소만 허용한다(서버 복사 없음, 임의 외부 호스트 차단). */
-export function safeYoutubeThumb(value) {
-  const raw = trimText(value);
-  if (!raw || raw.length > 2048) return '';
-  let parsed;
-  try { parsed = new URL(raw); } catch { return ''; }
-  if (parsed.protocol !== 'https:' || parsed.username || parsed.password) return '';
-  return YTIMG_HOST.test(parsed.hostname) ? parsed.href : '';
-}
-
-export function youtubeStageThumbUrl(videoId, stage = 'hqdefault') {
-  const id = trimText(videoId);
-  if (!VIDEO_ID_RE.test(id)) return '';
-  const file = stage === 'oardefault' ? 'oardefault.jpg' : stage === 'mqdefault' ? 'mqdefault.jpg' : 'hqdefault.jpg';
-  return `https://i.ytimg.com/vi/${id}/${file}`;
-}
-
-export function isVerticalMoment(moment) {
-  const url = trimText(moment?.url) || trimText(moment?.externalUrl);
-  if (url) {
-    try {
-      const parsed = new URL(url);
-      if (YOUTUBE_HOSTS.has(parsed.hostname.toLowerCase()) && /^\/shorts\//.test(parsed.pathname || '')) return true;
-    } catch { /* ignore */ }
-  }
-  const meta = moment?.mediaMetadata;
-  return Number(meta?.width) > 0 && Number(meta?.height) > Number(meta?.width);
-}
 
 export function isVideoMoment(moment) {
   const url = trimText(moment?.url) || trimText(moment?.externalUrl);

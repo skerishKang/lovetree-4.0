@@ -2,15 +2,16 @@ import {createCommunityApi} from './community-api.mjs';
 import {memberLoginUrl} from './member-entry.mjs';
 import {readTheme} from './header-state.mjs';
 import {displayTreeTitle} from './tree-name.mjs';
+import {tagKey} from './tags.mjs';
 // #480 L13: 둘러보기 카드·댓글의 날짜도 책·보드·지도와 같은 한 벌로 적는다.
 import {formatDisplayDate} from './book-usability.mjs';
 // #547·#701 규칙: 서버가 내려주는 시각(UTC 타임스탬프)은 기기 지역 날짜로 바꿔 보여 준다(#547 한 벌).
 import {localDateOnly} from './local-date.mjs';
 const el=(tag,className,text)=>{const node=document.createElement(tag);if(className)node.className=className;if(text!=null)node.textContent=text;return node;};
-export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareOwn,hasOwnTree,getDateStyle}){
- const api=createCommunityApi(),form=dialog.querySelector('#community-search-form'),query=dialog.querySelector('#community-query'),emotion=dialog.querySelector('#community-emotion'),list=dialog.querySelector('#community-list'),feedback=dialog.querySelector('#community-feedback'),more=dialog.querySelector('#community-more'),preview=dialog.querySelector('#community-preview');
- let cursor='',loading=false,items=[],selectedId=null;
- const message=text=>{feedback.textContent=text;};
+export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareOwn,hasOwnTree,getDateStyle,getArtistGroups=()=>[]}){
+ const api=createCommunityApi(),form=dialog.querySelector('#community-search-form'),query=dialog.querySelector('#community-query'),list=dialog.querySelector('#community-list'),groups=dialog.querySelector('#community-groups'),feedback=dialog.querySelector('#community-feedback'),more=dialog.querySelector('#community-more'),preview=dialog.querySelector('#community-preview');
+ let cursor='',loading=false,items=[],selectedId=null,selectedArtist='',loadId=0;
+ const message=text=>{feedback.textContent=text;const previewMessage=preview.querySelector('[data-community-preview-message]');if(previewMessage)previewMessage.textContent=text;};
  // #480 L13: 계정 설정의 날짜 표기. 넘겨받지 않으면 기본(dot) — 새 규칙을 만들지 않는다.
  const dateStyle=()=>(typeof getDateStyle==='function'?getDateStyle():'dot');
  // 하은 1회차(261116,#728 후속): 새벽(KST 0~9시, UTC 전날)에 담은 순간의 둘러보기 카드가
@@ -20,7 +21,7 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
  const loginMessage=answer=>answer.status===401?'로그인하면 이 기능을 사용할 수 있어요.':answer.message||'요청을 처리하지 못했어요.';
  function statButton(item,kind,label){
   if(kind==='reaction')return reactionButtons(item,label);
-  const active=kind==='favorite'?item.stats.favored:item.stats.hearted,count=kind==='favorite'?item.stats.favorites:item.stats.hearts,b=el('button','community-mini',`${active?'✓ ':''}${label} ${count}`);b.type='button';b.setAttribute('aria-pressed',String(active));
+  const active=kind==='favorite'?item.stats.favored:item.stats.hearted,count=kind==='favorite'?item.stats.favorites:item.stats.hearts,b=el('button','community-mini',`${active?'✓ ':''}${label} ${count}`);b.type='button';b.dataset.communityAction=kind;b.setAttribute('aria-pressed',String(active));
   b.onclick=async()=>{const answer=await api.favorite(item.shareId,!active);if(!answer.ok){message(loginMessage(answer));return;}item.stats=answer.stats;render();};return b;
  }
  function reactionButtons(item,label){
@@ -38,7 +39,7 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
     const isActive=active(reactionKind);
     if(!count&&!isActive)continue;
     const b=el('button','community-mini community-reaction',`${isActive?'✓ ':''}${labels[reactionKind]||reactionKind} ${count}`);
-    b.type='button';b.dataset.reactionKind=reactionKind;b.setAttribute('aria-pressed',String(isActive));
+    b.type='button';b.dataset.reactionKind=reactionKind;b.dataset.communityAction='reaction';b.setAttribute('aria-pressed',String(isActive));
     b.onclick=async()=>{const answer=await api.react(item.shareId,!isActive,reactionKind);if(!answer.ok){message(loginMessage(answer));return;}item.stats=answer.stats;render();};
     out.push(b);
    }
@@ -47,7 +48,7 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
   const anyVisible=kinds.some(kind=>(counts[kind]||0)>0||active(kind));
   if(!anyVisible){
    const open=el('button','community-mini community-reaction-open','반응 남기기');
-   open.type='button';
+   open.type='button';open.dataset.communityAction='reaction';
    open.onclick=()=>host.replaceChildren(...chips());
    host.append(open);
    return host;
@@ -73,36 +74,120 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
   cancel.onclick=()=>{delete row.dataset.editing;row.replaceChildren();if(head)row.append(head);if(body)row.append(body);if(tools)row.append(tools);};
   row.append(form);
  }
- // #453 D3: 공개 트리가 하나도 없으면 오른쪽 '트리를 선택해 주세요' 큰 칸을 숨기고 빈 안내만 가운데에 둔다.
- function previewCollapses(){return !items.length&&!loading;}
+ function artistGroupList(){
+  let values=[];try{values=getArtistGroups?.()||[];}catch{}
+  const seen=new Set(),out=[];
+  for(const raw of Array.isArray(values)?values:[]){
+   const value=String(raw??'').trim(),key=tagKey(value);
+   if(!value||!key||seen.has(key))continue;
+   seen.add(key);out.push(value);
+   if(out.length===7)break;
+  }
+  return out;
+ }
+ function renderGroups(){
+  const available=artistGroupList();
+  if(selectedArtist&&!available.some(value=>tagKey(value)===tagKey(selectedArtist)))selectedArtist='';
+  const choices=[{value:'',label:'전체'},...available.map(value=>({value,label:value}))];
+  groups.replaceChildren(...choices.map(choice=>{
+   const chip=el('button',`community-group-chip${choice.value===selectedArtist?' is-active':''}`,choice.label);
+   chip.type='button';chip.setAttribute('aria-pressed',String(choice.value===selectedArtist));
+   chip.onclick=()=>{selectedArtist=choice.value;renderGroups();load(false);};
+   return chip;
+  }));
+ }
+ function duplicateLabel(item){
+  const title=displayTreeTitle(item.title),moment=item.cover?.title||'';
+  const matches=items.filter(value=>displayTreeTitle(value.title)===title&&(value.cover?.title||'')===moment);
+  if(matches.length<2)return '';
+  const publicName=String(item.publicDisplayName||'').trim();
+  if(!publicName)return '';
+  return `${item.aiTester===true?'AI 명예회원 ':''}${publicName}님`;
+ }
+ function renderCover(item,{loading='lazy'}={}){
+  const cover=el('div','community-cover'),youtube=item.cover?.type==='youtube',video=['video','youtube'].includes(item.cover?.type),vertical=video&&item.cover?.vertical===true;
+  cover.dataset.mediaKind=vertical?'video-vertical':youtube?'video-youtube':video?'video':'photo';
+  const url=item.cover?.thumbnailUrl||item.cover?.url||'';
+  if(url){
+   const art=el('span','community-cover-art');
+   if(vertical||youtube){const backdrop=el('img','community-cover-backdrop');backdrop.src=url;backdrop.alt='';backdrop.setAttribute('aria-hidden','true');backdrop.loading=loading;art.append(backdrop);}
+   const image=el('img','community-cover-image');image.src=url;image.alt='';image.loading=loading;image.decoding='async';image.referrerPolicy='no-referrer';
+   image.onerror=()=>{if(image.isConnected)image.replaceWith(el('span','community-cover-fallback',item.cover?.title||'순간 사진을 불러오지 못했어요.'));};
+   art.append(image);cover.append(art);
+  }else cover.append(el('span','community-cover-fallback',item.cover?.title||'공개된 순간'));
+  if(item.aiTester===true)cover.append(el('span','community-cover-badge community-ai','AI 명예회원'));
+  cover.append(el('span','community-cover-badge community-count',`순간 ${item.momentCount}`));
+  return cover;
+ }
+ function moreMenu(item){
+  const details=el('details','community-more-menu'),summary=el('summary','community-more-button','⋯');
+  summary.setAttribute('aria-label','댓글, 신고, 차단 메뉴');
+  const panel=el('div','community-more-panel'),commentTitle=el('h4','community-menu-title','댓글'),commentHost=el('div','community-comment-host');
+  const reportForm=el('form','community-report-form'),reportInput=el('input',''),reportButton=el('button','community-link','신고');
+  reportInput.maxLength=500;reportInput.required=true;reportInput.placeholder='신고 이유';reportInput.setAttribute('aria-label','신고 이유');reportButton.type='submit';reportForm.append(reportInput,reportButton);
+  reportForm.onsubmit=async event=>{event.preventDefault();const answer=await api.report(item.shareId,reportInput.value);message(answer.ok?'신고를 접수했어요. 운영 검토 전에는 자동 숨김 처리하지 않아요.':loginMessage(answer));if(answer.ok)reportInput.value='';};
+  const block=el('button','community-link danger','이 공개자의 트리 숨기기');block.type='button';
+  block.onclick=async()=>{if(!confirm('이 공개자의 트리를 내 둘러보기 목록에서 숨길까요?'))return;const answer=await api.block(item.shareId);if(!answer.ok){message(loginMessage(answer));return;}items=items.filter(value=>value.shareId!==item.shareId);selectedId=items[0]?.shareId||null;if(preview.open)preview.close();render();message('내 둘러보기 목록에서 숨겼어요.');if(!selectedId)groups.querySelector('.community-group-chip')?.focus();};
+  panel.append(commentTitle,commentHost,reportForm,block);details.append(summary,panel);
+  details.ontoggle=()=>{if(details.open&&!commentHost.dataset.loaded){commentHost.dataset.loaded='1';comments(item,commentHost);}};
+  return details;
+ }
  function renderPreview(item){
-  preview.replaceChildren(el('p','community-preview-kicker','감상 허브'));
-  if(!item){preview.append(el('h3','','트리를 선택해 주세요'),el('p','','공개 트리를 고르면 여기에 살펴볼 내용이 나타나요.'));return;}
-  const paper=el('div','community-preview-paper'),tag=el('span','community-preview-tag',item.cover.emotion||item.emotions[0]||'공개'),title=el('h3','',displayTreeTitle(item.title)),subject=el('p','community-preview-subject',item.subject),summary=el('p','community-preview-summary',item.summary||item.cover.title||'');
-  // #611 3번: AI 명예회원 기록의 미리보기는 남에게 보이는 곳이라 'AI 명예회원'을 알린다.
-  if(item.aiTester===true){paper.append(el('span','community-ai','AI 명예회원'));}
-  const quote=el('div','community-preview-moment'),mark=el('small','','대표 순간'),moment=el('strong','',item.cover.title||'공개된 순간'),meta=el('p','community-preview-meta',`순간 ${item.momentCount}개 · 공감 ${item.stats.hearts}`);
-  quote.append(mark,moment);paper.append(tag,title,subject,summary,quote,meta);
-  const open=el('button','community-preview-open','이 트리 감상하기 · 대표 순간부터 감상');open.type='button';open.onclick=()=>onOpenShare(item);paper.append(open);preview.append(paper);
+  if(!item){preview.replaceChildren();return;}
+  const head=el('div','community-preview-head'),eyebrow=el('p','community-preview-kicker','공개 순간 미리보기'),close=el('button','community-preview-close','×');
+  close.type='button';close.setAttribute('aria-label','미리보기 닫기');close.onclick=()=>preview.close();head.append(eyebrow,close);
+  const body=el('div','community-preview-body'),title=el('h3','',displayTreeTitle(item.title));title.id='community-preview-title';
+  const subject=el('p','community-preview-subject',item.subject||''),moment=el('p','community-preview-moment-title',item.cover?.title||'공개된 순간');
+  const summary=item.summary?el('p','community-preview-summary',item.summary):null;
+  const meta=el('p','community-preview-meta',`${item.cover?.emotion||item.emotions?.[0]||'공개'} · ${when(item.createdAt)} · 공감 ${item.stats?.hearts||0}`);
+  const actions=el('div','community-preview-actions');actions.append(statButton(item,'favorite','즐겨찾기'),statButton(item,'reaction','공감'));
+  const open=el('button','community-preview-open','대표 순간부터 감상');open.type='button';open.onclick=()=>onOpenShare(item);
+  const start=el('button','community-preview-start','내 기록 새로 시작');start.type='button';start.onclick=()=>onStartRecord(item.subject);
+  const status=el('p','community-preview-message','');status.dataset.communityPreviewMessage='';status.setAttribute('role','status');
+  const choices=el('div','community-preview-choices');choices.append(open,start);
+  body.append(title,subject,moment);if(summary)body.append(summary);body.append(meta,actions,choices,moreMenu(item),status);
+  preview.replaceChildren(head,renderCover(item,{loading:'eager'}),body);
  }
+ function openPreview(item){selectedId=item.shareId;renderPreview(item);if(!preview.open)preview.showModal();}
  function card(item){
-  const article=el('article','community-card'),visual=el('div','community-cover'),copy=el('div','community-copy'),tag=el('span','community-tag',item.cover.emotion||item.emotions[0]||'공개'),title=el('h3','',displayTreeTitle(item.title)),subject=el('p','community-subject',item.subject),summary=el('p','community-summary',item.summary||item.cover.title),meta=el('p','community-muted',`${item.momentCount}개 순간 · ${when(item.createdAt)}`);
-  // #611 3번: AI 명예회원 기록은 둘러보기 카드에 'AI 명예회원' 배지를 단다.
-  if(item.aiTester===true){visual.append(el('span','community-ai','AI 명예회원'));}
-  if(item.cover.url&&!item.cover.url.startsWith('/api/media/'))visual.style.backgroundImage=`url("${item.cover.url.replaceAll('"','%22')}")`;visual.append(tag);copy.append(subject,title,summary,meta);
-  const actions=el('div','community-actions'),inspect=el('button','community-primary','미리보기'),open=el('button','community-mini','대표 순간부터 감상'),start=el('button','community-mini','내 기록 새로 시작');inspect.type=open.type=start.type='button';inspect.setAttribute('aria-pressed',String(selectedId===item.shareId));inspect.onclick=()=>{selectedId=item.shareId;render();if(matchMedia('(max-width:900px)').matches)preview.scrollIntoView({block:'start',behavior:'smooth'});};open.onclick=()=>onOpenShare(item);start.onclick=()=>onStartRecord(item.subject);actions.append(inspect,statButton(item,'favorite','즐겨찾기'),statButton(item,'reaction','공감'));
-  const details=el('details','community-details'),summaryButton=el('summary','','댓글 · 신고 · 차단'),commentHost=el('div','community-comment-host'),reportForm=el('form','community-report-form'),reportInput=el('input',''),reportButton=el('button','community-link','신고'),block=el('button','community-link danger','이 공개자의 트리 숨기기');reportInput.maxLength=500;reportInput.required=true;reportInput.placeholder='신고 이유';reportButton.type='submit';block.type='button';reportForm.append(reportInput,reportButton);reportForm.onsubmit=async event=>{event.preventDefault();const answer=await api.report(item.shareId,reportInput.value);message(answer.ok?'신고를 접수했어요. 운영 검토 전에는 자동 숨김 처리하지 않아요.':loginMessage(answer));if(answer.ok)reportInput.value='';};block.onclick=async()=>{if(!confirm('이 공개자의 트리를 내 둘러보기 목록에서 숨길까요?'))return;const answer=await api.block(item.shareId);if(!answer.ok){message(loginMessage(answer));return;}items=items.filter(value=>value.shareId!==item.shareId);render();message('내 둘러보기 목록에서 숨겼어요.');};details.append(summaryButton,open,start,commentHost,reportForm,block);details.ontoggle=()=>{if(details.open&&!commentHost.dataset.loaded){commentHost.dataset.loaded='1';comments(item,commentHost);}};
-  copy.append(actions,details);article.append(visual,copy);return article;
+  const titleText=displayTreeTitle(item.title),momentText=item.cover?.title||'공개된 순간';
+  const metaText=`${item.cover?.emotion||item.emotions?.[0]||'공개'} · ${when(item.createdAt)} · 공감 ${item.stats?.hearts||0}`;
+  const article=el('button','community-card');article.type='button';article.dataset.shareId=item.shareId;
+  article.setAttribute('aria-label',`${titleText}. ${momentText}. ${metaText}`);
+  const distinct=duplicateLabel(item);
+  article.append(renderCover(item),el('h3','community-card-title',titleText),el('p','community-card-moment',momentText));
+  if(distinct)article.append(el('small','community-card-distinct',distinct));
+  article.append(el('p','community-card-meta',metaText));
+  article.onclick=()=>openPreview(item);return article;
  }
- function render(){list.replaceChildren();if(!items.some(item=>item.shareId===selectedId))selectedId=items[0]?.shareId||null;if(previewCollapses())preview.hidden=true;else preview.hidden=false;renderPreview(items.find(item=>item.shareId===selectedId));for(const item of items)list.append(card(item));if(!items.length&&!loading){
-  // 이슈 457 5번: 공유할 내 트리가 없으면(로그아웃·트리 0개) "내 트리 공유하기"가 아니라 "첫 트리 만들기"로 바꾼다.
-  const canShare=!!hasOwnTree?.();
-  const empty=el('div','community-empty'),text=el('p','','아직 보여 줄 공개 트리가 없어요.'),share=el('button','community-primary',canShare?'내 트리 공유하기':'첫 트리 만들기');
-  share.type='button';share.onclick=canShare?(()=>onShareOwn?.()):(()=>onStartRecord?.());
-  empty.append(text,share);list.append(empty);
- }}
- async function load(append=false){if(loading)return;loading=true;more.disabled=true;message('공개 트리를 불러오는 중이에요.');if(!append){items=[];cursor='';render();}const answer=await api.discover({q:query.value.trim(),emotion:emotion.value,cursor,limit:12});loading=false;if(!answer.ok){message(answer.message||'공개 트리를 불러오지 못했어요.');more.hidden=true;return;}items=append?[...items,...answer.items]:answer.items;cursor=answer.nextCursor||'';more.hidden=!cursor;more.disabled=false;message(answer.totalVisible
-      ? `공개된 트리 ${answer.totalVisible}개를 찾았어요. 새로 공개된 순서예요.`
-      : '아직 공개된 트리가 없어요. 트리를 공개하면 여기에 나타나요.');render();}
- for(const link of dialog.querySelectorAll('[data-community-view]'))link.onclick=()=>{dialog.close();[...document.querySelectorAll('[data-view]')].find(node=>node.dataset.view===link.dataset.communityView)?.click();};const tabs=()=>[...document.querySelectorAll('nav [data-view]')];button.onclick=()=>{if(!dialog.open){dialog.showModal();button.setAttribute('aria-current','true');for(const t of tabs()){if(t.getAttribute('aria-current')==='true'){t.dataset.wasCurrent='1';t.setAttribute('aria-current','false');}}load(false);}};dialog.addEventListener('close',()=>{button.setAttribute('aria-current','false');const emptyShown=!document.getElementById('empty')?.hidden;for(const t of tabs()){if(t.dataset.wasCurrent){delete t.dataset.wasCurrent;if(!emptyShown)t.setAttribute('aria-current','true');}}button.focus();});form.onsubmit=event=>{event.preventDefault();load(false);};emotion.onchange=()=>load(false);more.onclick=()=>load(true);dialog.querySelector('[data-close="community-panel"]').onclick=()=>dialog.close();
+ function render(){
+  const focusedAction=preview.open?document.activeElement?.dataset.communityAction:'';
+  list.replaceChildren(...items.map(card));
+  if(!items.length&&!loading){
+   // 이슈 457 5번: 공유할 내 트리가 없으면(로그아웃·트리 0개) "내 트리 공유하기"가 아니라 "첫 트리 만들기"로 바꾼다.
+   const canShare=!!hasOwnTree?.();
+   const empty=el('div','community-empty'),text=el('p','','아직 보여 줄 공개 트리가 없어요.'),share=el('button','community-primary',canShare?'내 트리 공유하기':'첫 트리 만들기');
+   share.type='button';share.onclick=canShare?(()=>onShareOwn?.()):(()=>onStartRecord?.());
+   empty.append(text,share);list.append(empty);
+  }
+  if(preview.open&&selectedId){const selected=items.find(item=>item.shareId===selectedId);if(selected){renderPreview(selected);if(focusedAction)preview.querySelector(`[data-community-action="${focusedAction}"]`)?.focus();}}
+ }
+ async function load(append=false){
+  if(append&&loading)return;
+  const requestId=++loadId;loading=true;more.disabled=true;message('공개 트리를 불러오는 중이에요.');
+  if(!append){items=[];cursor='';render();}
+  const answer=await api.discover({q:query.value.trim(),artist:selectedArtist,cursor,limit:12});
+  if(requestId!==loadId)return;
+  loading=false;
+  if(!answer.ok){message(answer.message||'공개 트리를 불러오지 못했어요.');more.hidden=true;more.disabled=false;render();return;}
+  items=append?[...items,...answer.items]:answer.items;cursor=answer.nextCursor||'';more.hidden=!cursor;more.disabled=false;
+  message(answer.totalVisible?`공개된 트리 ${answer.totalVisible}개를 찾았어요. 새로 공개된 순서예요.`:'아직 공개된 트리가 없어요. 트리를 공개하면 여기에 나타나요.');render();
+ }
+ for(const link of dialog.querySelectorAll('[data-community-view]'))link.onclick=()=>{dialog.close();[...document.querySelectorAll('[data-view]')].find(node=>node.dataset.view===link.dataset.communityView)?.click();};
+ const tabs=()=>[...document.querySelectorAll('nav [data-view]')];
+ button.onclick=()=>{if(!dialog.open){dialog.showModal();button.setAttribute('aria-current','true');for(const t of tabs()){if(t.getAttribute('aria-current')==='true'){t.dataset.wasCurrent='1';t.setAttribute('aria-current','false');}}renderGroups();load(false);}};
+ dialog.addEventListener('close',()=>{if(preview.open)preview.close();button.setAttribute('aria-current','false');const emptyShown=!document.getElementById('empty')?.hidden;for(const t of tabs()){if(t.dataset.wasCurrent){delete t.dataset.wasCurrent;if(!emptyShown)t.setAttribute('aria-current','true');}}button.focus();});
+ preview.addEventListener('close',()=>[...list.querySelectorAll('.community-card')].find(node=>node.dataset.shareId===selectedId)?.focus());
+ preview.addEventListener('click',event=>{if(event.target===preview)preview.close();});
+ form.onsubmit=event=>{event.preventDefault();load(false);};more.onclick=()=>load(true);dialog.querySelector('[data-close="community-panel"]').onclick=()=>dialog.close();
 }
