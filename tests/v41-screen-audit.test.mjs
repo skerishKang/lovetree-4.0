@@ -133,6 +133,20 @@ firstTree.moments[0].keywords = ['노래:Super Shy', '무대'];
 // 칩을 눌렀을 때 목록이 2건→1건으로 줄어드는 것을 검사할 수 있다. addMoment는 불변이므로 반환 트리를 쓴다.
 const twoMomentTree = addMoment(firstTree, { subject: '시험', title: '뉴진스 Super Shy 직캠 @인기가요 23716', note: '기록', emotion: '설렘', date: '2026-11-15', url: '' }, firstTree.moments[0].id, '2026-11-15T00:01:00.000Z');
 if (!twoMomentTree?.moments || twoMomentTree.moments.length !== 2) throw new Error('시험 트리의 둘째 순간을 만들지 못했다');
+const fiveMomentTree = (() => {
+  let t = twoMomentTree;
+  const rows = [
+    { title: '데뷔 무대의 첫 인사', date: '2026-11-13' },
+    { title: '팬콘에서 함께 부른 노래', date: '2026-11-14' },
+    { title: '다시 펼친 연습 영상', date: '2026-11-15' }
+  ];
+  rows.forEach((row, i) => {
+    t = addMoment(t, { subject: '시험', title: row.title, note: '가짜 화면 점검 기록', emotion: '설렘', date: row.date, url: '' }, t.moments[0].id, `2026-11-15T00:0${i + 2}:00.000Z`);
+    t.moments.at(-1).keywords = [];
+  });
+  return t;
+})();
+if (!fiveMomentTree?.moments || fiveMomentTree.moments.length < 5) throw new Error('화면 점검용 가짜 트리에 순간이 다섯 개 미만이다');
 
 // #627 PR3: '그래프 보기' 상태의 시험 트리 — 꼬리표 허브 8종(무대·노래·멤버·가수)·같은 영상 묶음(stacks)·
 // 꼬리표 없는 순간 3개(선반·제안받기 대상). 도메인 규칙(createTree·addMoment)으로 만들어 셸이 그대로 받게 한다 —
@@ -239,7 +253,20 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     await context.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
     const page = await context.newPage();
     const rows = [];
-    const take = async (p, screen) => rows.push(...failuresOf(await auditPage(p, screen), `${width}`, theme));
+    const take = async (p, screen) => {
+      const audit = await auditPage(p, screen);
+      rows.push(...failuresOf(audit, `${width}`, theme));
+      const required = screen === '셸 첫 화면·알림 줄'
+        ? (width <= 780 ? ['updates-card×.home-links', 'updates-card×#mobile-add'] : ['updates-card×.home-links'])
+        : screen === '새 소식 닫기 버튼' ? ['updates-foot×body-text'] : [];
+      for (const pair of required) {
+        const check = audit.bottomChecks.find((x) => x.pair === pair);
+        assert.ok(check, `${screen} 감사 대상 쌍이 실제로 검사되었다: ${pair}`);
+        assert.ok(check.left?.width > 0 && check.left?.height > 0 && check.right?.width > 0 && check.right?.height > 0,
+          `${screen} ${pair} 양쪽 요소가 실제로 보인다: ${JSON.stringify(check)}`);
+        assert.equal(check.area, 0, `${screen} ${pair} 겹침 면적 0px²: ${JSON.stringify(check)}`);
+      }
+    };
 
     // 첫 화면(예시) → 어떻게 쓰나요 안내
     await page.goto(`${base}/home-host.html`, { waitUntil: 'domcontentloaded' });
@@ -424,6 +451,24 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     await page4.waitForTimeout(1200);
     // #666: 셸 첫 화면(링크 줄 + 새 소식 카드 + ＋ 단추)에서 알림 줄이 이것들을 덮지 않는지 잰다.
     await page4.evaluate(() => document.body.classList.add('lt-fab-ok'));
+    if (width === 390) {
+      await page4.waitForFunction(() => {
+        const card = document.getElementById('updates-card'), fab = document.getElementById('mobile-add');
+        return card && !card.hidden && fab && getComputedStyle(fab).display !== 'none';
+      }, null, { timeout: 8000 });
+      const cardPair = await page4.evaluate(() => {
+        const box = (el) => { const r = el.getBoundingClientRect(); return { left: r.left, right: r.right, top: r.top, bottom: r.bottom, width: r.width, height: r.height }; };
+        const lines = (el) => { const range = document.createRange(); range.selectNodeContents(el); return range.getClientRects().length; };
+        const card = document.getElementById('updates-card'), fab = document.getElementById('mobile-add');
+        const text = document.getElementById('updates-card-text'), view = document.getElementById('updates-view');
+        return { card: box(card), fab: box(fab), gap: Math.round(fab.getBoundingClientRect().top - card.getBoundingClientRect().bottom), text: text.textContent.trim(), textLines: lines(text), viewLines: lines(view) };
+      });
+      assert.equal(cardPair.card.width, 358, `390 새 소식 카드가 원래 전체 폭이다: ${JSON.stringify(cardPair)}`);
+      assert.equal(cardPair.gap, 8, `390 카드 아래와 ＋ 위 간격이 8px이다: ${JSON.stringify(cardPair)}`);
+      assert.equal(cardPair.textLines, 1, `390 새 소식 카드 문구가 한 줄이다: ${JSON.stringify(cardPair)}`);
+      assert.equal(cardPair.viewLines, 1, `390 보기 단추 문구가 한 줄이다: ${JSON.stringify(cardPair)}`);
+      assert.match(cardPair.text, /4\.1\.8/, `390 카드에 버전 글자가 보인다: ${JSON.stringify(cardPair)}`);
+    }
     await raiseToast(page4);
     await take(page4, '셸 첫 화면·알림 줄');
     await lowerToast(page4);
@@ -694,6 +739,16 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     await page4.evaluate(() => document.getElementById('updates-link')?.click());
     await page4.waitForFunction(() => !!document.getElementById('updates-panel')?.open, null, { timeout: 8000 }).catch(() => {});
     await page4.waitForTimeout(500);
+    const footerWhileOpen = await page4.evaluate(() => {
+      const links = document.querySelector('.home-links'), card = document.getElementById('updates-card'), fab = document.getElementById('mobile-add');
+      const foot = document.querySelector('#updates-panel .updates-foot');
+      const text = document.querySelector('#updates-panel .updates-version');
+      const box = (el) => { const r = el?.getBoundingClientRect(); return r && { width: r.width, height: r.height }; };
+      return { linksDisplay: links && getComputedStyle(links).display, links: box(links), card: box(card), fab: box(fab), foot: box(foot), text: box(text) };
+    });
+    assert.equal(footerWhileOpen.linksDisplay, 'none', `창이 열리면 아래 링크 줄을 숨긴다: ${JSON.stringify(footerWhileOpen)}`);
+    assert.equal(footerWhileOpen.links?.width, 0, `창이 열리면 아래 링크 줄의 화면 폭이 0이다: ${JSON.stringify(footerWhileOpen)}`);
+    assert.ok(footerWhileOpen.foot?.width > 0 && footerWhileOpen.text?.width > 0, `새 소식 창 감사 대상(닫기 줄·본문)이 화면에 있다: ${JSON.stringify(footerWhileOpen)}`);
     await take(page4, '새 소식 펼침');
     // #638: '새로워진 것'·'고친 것' 제목은 한 버전에 한 번 — 출처 묶음마다 되풀이되지 않는다(수치로 판정).
     const repeats = await page4.evaluate(() => {
@@ -916,6 +971,7 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
       status: 200, contentType: 'application/json',
       body: JSON.stringify({ revision: 1, state: { version: 1, trees: [firstTree], prefs: {} }, subject: '시험계정', writeSubjectBound: true, savedAt: '2026-11-15T09:00:00.000Z' })
     }));
+    await ctx5.route('**/api/trees/*/discover*', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, discover: true }) }));
     const page5 = await ctx5.newPage();
     // ?account=1 은 '내 기록을 불러오는 자리'라는 표시다(shouldLoadMemberRecords) — 로그인 화면으로 가지 않고 기록을 읽는다.
     await page5.goto(`${base}/v41/?account=1`, { waitUntil: 'load' });
@@ -935,19 +991,21 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     assert.deepEqual({ tips: after.tips, pop: after.pop }, { tips: true, pop: false }, '메뉴를 닫으면 안내가 다시 뜬다(봤음 처리하지 않음)');
     assert.notEqual(after.seen, '1', '접었다고 봤음으로 적지 않는다');
     // #678 후속(꼬리표 걸러 보기): 트리 메뉴의 내 순간 전체 보기로 홈 보기를 열면 순간 목록이
-    // 처음부터 열린다(#394 경로). 꼬리표 칩으로 걸러 보는 것까지 수치로 본다(둘째 순간은 꼬리표가 없어
-    // 칩을 누르면 남는 순간이 줄어든다). 셸의 보기 프레임은 src가 빈 채 내용이 채워지므로
+    // 처음부터 열린다(#394 경로). 화면 점검 계정은 순간 다섯 개이며, 첫 순간의 꼬리표로 걸러 보는 것도 확인한다.
+    // 셸의 보기 프레임은 src가 빈 채 내용이 채워지므로
     // 프레임을 URL이 아니라 내용(orbit 순간 목록 단추)으로 찾는다 — 매 단계 다시 찾는다.
-    // 이 상태에서만 둘째 순간(꼬리표 없음)이 있는 트리를 서브한다 — 걸러 보기로 목록이 줄어드는 것을 보려면.
-    // 앞 상태들(첫 트리 안내)은 '트리 하나·순간 하나'가 조건이라 원래 가짜를 그대로 쓰고, 끝나면 되돌린다.
-    const twoMomentRoute = (r) => r.fulfill({
+    // 이 상태에서만 순간 다섯 개짜리 트리를 쓴다 — 앞 상태들(첫 트리 안내)은 '트리 하나·순간 하나' 조건이라 그대로 둔다.
+    const fiveMomentRoute = (r) => r.fulfill({
       status: 200, contentType: 'application/json',
-      body: JSON.stringify({ revision: 1, state: { version: 1, trees: [twoMomentTree], prefs: {} }, subject: '시험계정', writeSubjectBound: true, savedAt: '2026-11-15T09:00:00.000Z' })
+      body: JSON.stringify({ revision: 1, state: { version: 1, trees: [fiveMomentTree], prefs: {} }, subject: '시험계정', writeSubjectBound: true, savedAt: '2026-11-15T09:00:00.000Z' })
     });
-    await ctx5.route('**/api/workspace**', twoMomentRoute);
+    await ctx5.route('**/api/workspace**', fiveMomentRoute);
     const page5b = await ctx5.newPage();
+    await page5b.addInitScript(() => localStorage.removeItem('lt41.updatesCardDay'));
     await page5b.goto(`${base}/v41/?account=1`, { waitUntil: 'load' });
     await page5b.waitForFunction(() => { const a = document.getElementById('account-avatar'); return a && !a.hidden; }, null, { timeout: 20000 });
+    await page5b.waitForFunction(() => { const t = document.getElementById('toast'); return t && !t.hidden; }, null, { timeout: 8000 });
+    await page5b.waitForFunction(() => { const c = document.getElementById('updates-card'); return c && !c.hidden; }, null, { timeout: 10000 });
     await page5b.click('#record-menu');
     await page5b.waitForFunction(() => !document.getElementById('tree-popover')?.hidden, null, { timeout: 8000 });
     await page5b.click('#tree-popover [data-tree-action="moments"]');
@@ -991,6 +1049,53 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
       await page5b.waitForTimeout(400);
     }
     assert.ok(chips0 && chips0.chips.some((t) => t.includes('노래 · Super Shy')), '꼬리표 칩에 노래 · Super Shy가 있다 — 실측=' + JSON.stringify(chips0));
+    assert.equal(chips0.rows, 5, `순간 목록에 다섯 개의 가짜 순간이 화면에 있다 — 실측=${JSON.stringify(chips0)}`);
+    const listState = await frameEval(() => {
+      const dialog = document.getElementById('orbit')?.shadowRoot?.querySelector('dialog[open]');
+      const list = dialog?.querySelector('.index-list'), r = list?.getBoundingClientRect();
+      return { open: !!dialog, width: r?.width || 0, height: r?.height || 0, rows: list?.querySelectorAll('[data-lt-moment-row]').length || 0 };
+    });
+    assert.ok(listState?.open && listState.width > 0 && listState.height > 0 && listState.rows === 5, `순간 목록 창과 다섯 줄이 화면에 있다: ${JSON.stringify(listState)}`);
+    const listFooter = await page5b.evaluate(() => ({
+      sheet: document.body.classList.contains('lt-sheet-open'),
+      links: getComputedStyle(document.querySelector('.home-links')).display,
+      card: getComputedStyle(document.getElementById('updates-card')).display
+    }));
+    assert.deepEqual(listFooter, { sheet: true, links: 'none', card: 'none' }, `순간 목록 창이 열리면 아래 고정 항목이 숨는다: ${JSON.stringify(listFooter)}`);
+    const toastBox = await page5b.locator('#toast').boundingBox();
+    const shellFrameBox = await page5b.locator('#view').boundingBox();
+    const listFrame = await orbitFrameOf();
+    const listWindowBox = await listFrame.evaluate(() => {
+      const r = document.getElementById('orbit')?.shadowRoot?.querySelector('dialog[open]')?.getBoundingClientRect();
+      return r && { top: r.top, width: r.width, height: r.height };
+    });
+    const lastListRow = await listFrame.evaluate(() => {
+      const rows = [...(document.getElementById('orbit')?.shadowRoot?.querySelectorAll('dialog[open] .index-list [data-lt-moment-row]') || [])];
+      const r = rows.at(-1)?.getBoundingClientRect();
+      return r && { x: r.x, y: r.y, width: r.width, height: r.height };
+    });
+    assert.ok(toastBox?.width > 0 && toastBox?.height > 0 && shellFrameBox?.width > 0 && listWindowBox?.width > 0 && listWindowBox?.height > 0 && lastListRow?.width > 0 && lastListRow?.height > 0,
+      `목록 창 겹침 검사에서 알림·창·마지막 순간·프레임이 모두 보인다: ${JSON.stringify({ toastBox, shellFrameBox, listWindowBox, lastListRow })}`);
+    const rowInPage = { x: shellFrameBox.x + lastListRow.x, y: shellFrameBox.y + lastListRow.y, width: lastListRow.width, height: lastListRow.height };
+    const toastOverlap = Math.max(0, Math.min(toastBox.x + toastBox.width, rowInPage.x + rowInPage.width) - Math.max(toastBox.x, rowInPage.x))
+      * Math.max(0, Math.min(toastBox.y + toastBox.height, rowInPage.y + rowInPage.height) - Math.max(toastBox.y, rowInPage.y));
+    assert.equal(toastOverlap, 0, `알림 줄과 순간 목록 마지막 줄 겹침이 0px²이다: ${JSON.stringify({ toastBox, rowInPage, toastOverlap })}`);
+    assert.ok(toastBox.y + toastBox.height <= shellFrameBox.y + listWindowBox.top, `알림 줄은 목록 창 위쪽 바깥에 있다: ${JSON.stringify({ toastBox, shellFrameBox, listWindowBox })}`);
+    await take(page5b, '순간 목록 다섯 개');
+    const listClose = await frameEval(() => {
+      const b = document.getElementById('orbit')?.shadowRoot?.querySelector('dialog[open] [data-do="close"]');
+      const r = b?.getBoundingClientRect();
+      return r && { x: r.x, y: r.y, width: r.width, height: r.height };
+    });
+    const listFrameBox = await page5b.locator('#view').boundingBox();
+    assert.ok(listClose && listFrameBox, `순간 목록 닫기 단추의 좌표를 읽었다: ${JSON.stringify({ listClose, listFrameBox })}`);
+    await page5b.mouse.click(listFrameBox.x + listClose.x + listClose.width / 2, listFrameBox.y + listClose.y + listClose.height / 2);
+    await page5b.waitForFunction(() => !document.body.classList.contains('lt-sheet-open'), null, { timeout: 8000 });
+    const restoredFooter = await page5b.evaluate(() => ({
+      links: getComputedStyle(document.querySelector('.home-links')).display,
+      card: getComputedStyle(document.getElementById('updates-card')).display
+    }));
+    assert.deepEqual(restoredFooter, { links: 'flex', card: 'flex' }, `순간 목록 창을 닫으면 아래 고정 항목이 돌아온다: ${JSON.stringify(restoredFooter)}`);
     let picked = null;
     for (let i = 0; i < 16; i++) {
       picked = await frameEval(() => {
@@ -1011,10 +1116,11 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     assert.ok(picked.rows >= 1 && picked.rows < chips0.rows, '걸러 보기로 순간 수가 준다');
     assert.ok(picked.minH >= 44, '칩 누름 영역 44px 이상');
     await take(page5b, '순간 목록 꼬리표 걸러 보기');
-    await ctx5.unroute('**/api/workspace**', twoMomentRoute);
+    await ctx5.unroute('**/api/workspace**', fiveMomentRoute);
     await page5b.close();
     // #627 PR B: 꼬리표 줄이 열린 상세(보드) — 확정 칩·직접 입력이 보이는 자리에서 겹침·잘림·작은 글자를 잰다.
     // 같은 문맥에서 보드를 새로 연다(주소에 보기까지 넣는다 — 셸은 불러올 때의 주소로 보기를 정한다).
+    await ctx5.route('**/api/workspace**', fiveMomentRoute);
     const page6 = await ctx5.newPage();
     await page6.goto(`${base}/v41/?account=1#board`, { waitUntil: 'load' });
     await frameOf(page6, /views\/track/);
@@ -1024,6 +1130,18 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     await tagBoard.waitForFunction(() => !!document.getElementById('dTags') && document.getElementById('dTags').childNodes.length > 0, null, { timeout: 10000 }).catch(() => {});
     await tagBoard.evaluate(() => selectMoment(LTDEMO.moments[0].id));
     await page6.waitForTimeout(600);
+    await page6.waitForFunction(() => document.body.classList.contains('lt-sheet-open'), null, { timeout: 8000 });
+    const detailState = await page6.evaluate(() => {
+      const detail = document.querySelector('#view')?.contentDocument?.getElementById('detail');
+      const r = detail?.getBoundingClientRect();
+      return { open: !!detail?.classList.contains('open'), width: r?.width || 0, height: r?.height || 0, footerDisplay: getComputedStyle(document.querySelector('.home-links')).display, cardDisplay: getComputedStyle(document.getElementById('updates-card')).display, fabDisplay: getComputedStyle(document.getElementById('mobile-add')).display, trees: window.LT41?.trees?.length || 0, moments: window.LT41?.tree?.moments?.length || 0 };
+    });
+    assert.equal(detailState.open, true, `순간 상세 창이 실제로 열려 있다: ${JSON.stringify(detailState)}`);
+    assert.ok(detailState.width > 0 && detailState.height > 0, `순간 상세 창이 화면에 있다: ${JSON.stringify(detailState)}`);
+    assert.ok(detailState.trees >= 1 && detailState.moments >= 5, `보드·상세는 트리 하나·순간 다섯 개 이상인 가짜 계정이다: ${JSON.stringify(detailState)}`);
+    assert.equal(detailState.footerDisplay, 'none', `상세 창이 열리면 아래 링크 줄을 숨긴다: ${JSON.stringify(detailState)}`);
+    assert.equal(detailState.cardDisplay, 'none', `상세 창이 열리면 새 소식 카드를 숨긴다: ${JSON.stringify(detailState)}`);
+    assert.equal(detailState.fabDisplay, 'none', `상세 창이 열리면 ＋ 단추를 숨긴다: ${JSON.stringify(detailState)}`);
     // 직접 붙이기는 접힘이 기본이다(261116 대표 지적) — [직접 붙이기]가 보이고 입력 줄은 아직 없다.
     const tagFolded = await tagBoard.evaluate(() => ({
       toggle: !!document.querySelector('#dTags .lt-tagline-toggle'),
