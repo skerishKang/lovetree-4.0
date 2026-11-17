@@ -106,10 +106,11 @@ test('공유 기본값: 공유 창이 처음 열 보기를 설정값으로 시�
   assert.match(html, /data-share-view="board"[^>]*>보드</);
   assert.match(html, /data-share-view="network"[^>]*>지도</);
   assert.doesNotMatch(html, />기억책</);
-  // #538: '둘러보기에도 올리기' 행은 정리됐고, 트리 공개 행은 공개·비공개 선택이다(#830: 비공개는 무료).
+  // #538 + #830 후속: 트리 공개는 트리마다 고르는 줄 묶음이다(전 트리 일괄 변경 제거).
   assert.doesNotMatch(html, /data-share-discover/);
-  assert.match(html, /id="settings-share-public-label"[^>]*>트리 공개</);
-  assert.match(html, /data-share-private>비공개</);
+  assert.match(html, /id="settings-tree-visibility-list"/);
+  assert.match(shell, /settings-tree-visibility-list/);
+  assert.doesNotMatch(html, /data-share-private>/);
   assert.doesNotMatch(html, /Plus 전용/);
   assert.doesNotMatch(html, /data-share-private-lock/);
   assert.match(html, /공개돼도 내 이름·아이디·이메일은 다른 사람에게 보이지 않아요/);

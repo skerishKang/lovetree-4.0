@@ -82,9 +82,9 @@ test('설정 항목의 저장 위치: 코드는 그대로고, 줄 표시는 탭 
   assert.match(shell, /writeWriteTab\(localStorage,b\.dataset\.writeTab\)/, '먼저 보일 탭은 이 기기');
   assert.match(shell, /writePageTurn\(localStorage/, '페이지 넘김은 이 기기');
   assert.match(shell, /member\.apply\('setPrefs',patch\)/, '프로필은 계정');
-  // 줄마다 붙던 '이 기기에만 / 계정에 저장' 표시는 없다 — '전 트리 공개'는 저장 위치가 아니라 상태 표시라 남는다.
+  // 줄마다 붙던 '이 기기에만 / 계정에 저장' 표시는 없다 — 트리마다 공개/비공개 줄 묶음이라 상태 표시 칸은 없다(#830 후속).
   const rows = [...html.matchAll(/class="settings-scope"[^>]*>([^<]+)<\/span>/g)].map(m => m[1]);
-  assert.deepEqual(rows, ['전 트리 공개'], '줄 표시는 전 트리 공개 하나만 남는다');
+  assert.deepEqual(rows, [], '줄 표시는 트리별 줄로 바뀌어 상태 칸이 없다');
   // 대신 탭마다 한 줄 설명에 모았다.
   assert.match(html, /id="settings-screen-note" class="panel-note">테마·움직임·보드·지도 판·관계 지도 보기·페이지 넘김·첫 화면 카드·고급 기능 보기는 이 기기에만 저장되고, 제목 보기·날짜 표기·처음 보여 줄 곳은 계정에 저장됩니다/);
   assert.match(html, /표시 이름·동그라미 색은 계정에 저장됩니다/);

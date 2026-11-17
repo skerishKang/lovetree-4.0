@@ -437,7 +437,7 @@ export function createMessages(deps) {
     toggle.hidden = false;
     const discover = await shareApi.getTreeDiscover(treeId).then(a => a.ok ? a.discover === true : null).catch(() => null);
     if (discover === null) { state.textContent = '소개 상태를 확인하지 못했어요.'; toggle.textContent = '다시 확인'; return; }
-    state.textContent = discover ? '둘러보기에 소개 중 · 무료' : '둘러보기에 소개하지 않음 · 무료';
+    state.textContent = discover ? '둘러보기에 소개 중' : '둘러보기에 소개하지 않음';
     toggle.textContent = discover ? '소개 끄기' : '소개 켜기'; // 글자는 상태가 아니라 행동을 말한다(261116 2차 지적)
     toggle.dataset.next = discover ? 'false' : 'true';
     toggle.dataset.state = discover ? 'on' : 'off'; // 켜짐 강조색·꺼짐 테두리는 CSS가 이 값으로 고른다
@@ -463,7 +463,7 @@ export function createMessages(deps) {
     toggle.hidden = false;
     const answer = await Promise.resolve().then(() => shareApi.getTreeVisibility(treeId)).then(a => (a.ok ? a.visibility : null)).catch(() => null);
     if (answer === null) { state.textContent = '공개 상태를 확인하지 못했어요.'; toggle.textContent = '다시 확인'; return; }
-    state.textContent = answer === 'private' ? '비공개 · 무료' : '공개 · 무료';
+    state.textContent = answer === 'private' ? '비공개' : '공개';
     toggle.textContent = answer === 'private' ? '공개로 바꾸기' : '비공개로 바꾸기';
     toggle.dataset.state = answer === 'private' ? 'private' : 'public';
   }
