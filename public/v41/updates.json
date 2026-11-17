@@ -3,7 +3,8 @@
     "version": "4.1.11",
     "date": "2026.11.17",
     "items": [
-      {"kind": "new", "text": "서재에서 바로 새 트리를 만들고 고칠 수 있어요", "source": "user", "issue": "#810"}
+      {"kind": "new", "text": "서재에서 바로 새 트리를 만들고 고칠 수 있어요", "source": "user", "issue": "#810"},
+      {"kind": "new", "text": "영상을 보다가 바로 그 순간을 담을 수 있어요", "source": "team", "issue": "#792"}
     ]
   },
   {

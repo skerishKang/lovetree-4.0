@@ -7,6 +7,7 @@ import {localDateOnly} from '../local-date.mjs';
 import {displayTreeTitle} from '../tree-name.mjs';
 import {mountPrivateUpload} from '../private-upload.mjs';
 import {fetchVideoTitle} from '../video-title.mjs';
+import {loadYouTubeIframeApi, createSegmentCapture} from '../segment-capture.mjs';
 
 export function createPanels(deps) {
   const {$} = deps;
@@ -269,7 +270,64 @@ export function createPanels(deps) {
   const videoTitleCache = new Map();
   let editorVideoTitle = '';
   let editorVideoUrl = '';
+  // #792 2단계: 영상을 보다가 지금 위치를 담는 재생기 연결. 주소·제목이 바뀌면 끊고 새로 잇는다.
+  let segmentToken = 0, segmentPlayer = null, segmentCapture = null;
+  function hideSegmentCapture() {
+    segmentToken += 1;
+    try { segmentCapture?.destroy?.(); } catch {}
+    segmentCapture = null;
+    const block = $('segment-capture');
+    if (block) block.hidden = true;
+    const status = $('segment-status');
+    if (status) { status.hidden = true; status.textContent = ''; }
+  }
+  function resetSegmentCapture() {
+    hideSegmentCapture();
+    try { segmentPlayer?.destroy?.(); } catch {}
+    segmentPlayer = null;
+  }
+  async function attachSegmentPlayer(frame) {
+    resetSegmentCapture();
+    const token = segmentToken;
+    const block = $('segment-capture');
+    if (block) block.dataset.segmentState = 'loading';
+    try {
+      const YT = await loadYouTubeIframeApi();
+      if (token !== segmentToken || !frame?.isConnected) return;
+      const player = new YT.Player(frame, {
+        events: {
+          onReady: () => {
+            if (token !== segmentToken || !frame.isConnected) return;
+            segmentPlayer = player;
+            segmentCapture = createSegmentCapture({player, form: $('moment-form'), scope: document});
+            if (block) { block.hidden = !segmentCapture; block.dataset.segmentState = segmentCapture ? 'ready' : 'no-ui'; }
+          },
+          // 재생할 수 없는 영상(권한·삭제·오류 153 등)은 단추를 숨기고 글자 입력만 남긴다.
+          onError: (event) => {
+            if (token !== segmentToken) return;
+            if (block) block.dataset.segmentState = 'error:' + (event?.data ?? 'unknown');
+            const mediaStatus = $('url-media-preview').querySelector('.lt-media-status');
+            if (mediaStatus) mediaStatus.textContent = '이 영상은 바로 재생할 수 없어요. 시작·끝 시간을 직접 적어 주세요.';
+            hideSegmentCapture();
+          }
+        }
+      });
+      segmentPlayer = player;
+    } catch (error) {
+      if (token === segmentToken) {
+        if (block) block.dataset.segmentState = 'catch:' + String(error?.message || error).slice(0, 120);
+        const mediaStatus = $('url-media-preview').querySelector('.lt-media-status');
+        if (mediaStatus) mediaStatus.textContent = '이 영상은 바로 재생할 수 없어요. 시작·끝 시간을 직접 적어 주세요.';
+        hideSegmentCapture();
+      }
+    }
+  }
+  $('url-media-preview').addEventListener('lt41:media-playing', (event) => {
+    const frame = event.detail?.frame;
+    if (frame) void attachSegmentPlayer(frame);
+  });
   function updateMediaPreview() {
+    resetSegmentCapture();
     const form = $('moment-form'), url = form.elements.url.value, info = LTMedia.describe(url);
     // #462: 주소가 비었을 때의 긴 안내는 칸 이름·파일 고르기와 같은 말이라 비운다(주소를 넣으면 종류·형식만 알린다).
     $('url-media-hint').textContent = info.kind === 'none' ? '' : info.kind === 'invalid' ? '링크 형식을 확인해 주세요.' : info.label;
