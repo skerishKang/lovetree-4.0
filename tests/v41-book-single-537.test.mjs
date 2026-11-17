@@ -279,10 +279,11 @@ test('#537 실제 화면: 1440·390에서 한 장으로 끝까지 넘기면 모�
 
 /* ── #book-dup(2026-11-15): 메모 장 제목·본문 중복과 390 긴 트리 이름 머리줄 겹침 ── */
 
-// 메모 장(.note-piece)이 보일 때까지 넘긴다. 390(한 장)은 .mobile-content, 1440(두 장)은 .page.
+// 메모 장(#800 이후 .book-card-moment 안의 .moment-note)이 보일 때까지 넘긴다. 390(한 장)은 .mobile-content, 1440(두 장)은 .page.
 const walkToNote = async (frame) => {
   for (let guard = 0; guard < 60; guard++) {
-    const has = await frame.evaluate(() => !!document.querySelector('.mobile-content .note-piece, .page .note-piece'));
+    const has = await frame.evaluate(() => [...document.querySelectorAll('.mobile-content .book-card-moment, .page .book-card-moment')]
+      .some(card => !!card.querySelector('.moment-title .moment-note')?.textContent.trim()));
     if (has) return true;
     const done = await frame.evaluate(() => document.getElementById('nextBtn').disabled);
     if (done) return false;
@@ -294,22 +295,26 @@ const walkToNote = async (frame) => {
   return false;
 };
 
-// 한 장(또는 두 장의 각 쪽)에서: 본문 조각이 그린 제목·본문이 아래 제목 줄에 다시 쓰이지 않는지 잰다.
+// 한 장(또는 두 장의 각 쪽)에서: 제목·본문·날짜·감정이 카드 안에 한 번만 그려지는지 잰다.
 const memoDup = (frame, pageSelector) => frame.evaluate((sel) => {
   const host = document.querySelector(sel);
-  const piece = host && host.querySelector('.note-piece');
+  const piece = host && host.querySelector('.book-card-moment');
   if (!piece || !host) return null;
-  const h2 = (piece.querySelector('h2')?.textContent || '').trim();
-  const note = (piece.querySelector('p')?.textContent || '').trim();
-  const title = host.querySelector('.moment-title');
-  const tText = (title?.textContent || '').trim();
+  const title = piece.querySelector('.moment-title');
+  const h2 = (title?.querySelector('h3, .moment-title-button')?.textContent || '').trim();
+  const note = (title?.querySelector('.moment-note')?.textContent || '').trim();
+  const meta = (title?.querySelector('.moment-meta-copy')?.textContent || '').trim();
+  const source = (window.LTDEMO?.moments || []).find(m => m.id === piece.dataset.moment);
+  const emotion = String(source?.emotion || '').trim();
+  const text = piece.textContent || '';
+  const occurrences = (value) => value ? text.split(value).length - 1 : 0;
   return {
     h2, note,
     momentTitles: host.querySelectorAll('.moment-title').length,
-    dupTitle: !!h2 && tText.includes(h2),
-    dupNote: note.length > 12 && tText.includes(note.slice(0, 20)),
-    keepsDate: /\d{4}\. \d{2}\. \d{2}/.test(tText),
-    keepsEmotion: !!title?.querySelector('.moment-emotion'),
+    dupTitle: !!h2 && occurrences(h2) > 1,
+    dupNote: note.length > 12 && occurrences(note.slice(0, 20)) > 1,
+    keepsDate: /\d{4}\. \d{2}\. \d{2}/.test(meta),
+    keepsEmotion: !!emotion && meta.includes(emotion),
   };
 }, pageSelector);
 
