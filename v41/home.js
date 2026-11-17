@@ -50,6 +50,8 @@ const renderedTitleDisplay=titleDisplayOf(readTitleDisplay(parent.LT41));
  trees:cardTrees,examples:cardsPlan.examples?ORBIT_EXAMPLE.moments.slice(0,cardsPlan.examples):[],
  // 내 것만 0장은 예시로 대체하지 않고 빈 궤도와 첫 순간 안내를 남긴다.
  empty:cardsPlan.kind==='mine-empty',
+ // #780: 큰 제목·부제목은 카드(mix-empty)가 비었는지보다 로그인 여부를 먼저 본다. 카드는 그대로 예시다.
+ loggedIn,
  momentList,
  prefs:parent.LT41?.prefs||null,
  titleDisplay:readTitleDisplay(parent.LT41),
