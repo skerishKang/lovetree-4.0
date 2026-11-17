@@ -44,7 +44,9 @@ test('공통 틀은 열 때 연 버튼을 기억하고 닫히면 초점을 돌�
   assert.match(dialogs, /const openedFromFrame = opener && typeof opener\.contentWindow !== 'undefined' && opener\.tagName === 'IFRAME';/);
   assert.match(dialogs, /if \(openedFromFrame && focusIntoFrame\(opener\)\) return;/);
   assert.match(dialogs, /target\?\.focus\?\.\(\);/);
-  assert.match(shell, /if\(!target\.open\)\{if\(target\.dataset\.ltPanel\)\{shellDialogs\.noteOpener\(id\);if\(target\.dataset\.ltPanel==='full'\)shellDialogs\.syncPanelTop\(\);\}target\.showModal\(\);\}/);
+  // panel()은 data-lt-panel 창을 열고(공통 틀이 닫는다), 새 소식 창만 비모달로 연다(261116 2차 — 위 메뉴가 눌리게).
+  assert.match(shell, /if\(!target\.open\)\{if\(target\.dataset\.ltPanel\)\{shellDialogs\.noteOpener\(id\);if\(target\.dataset\.ltPanel==='full'\)shellDialogs\.syncPanelTop\(\);\}/);
+  assert.match(shell, /if\(id==='updates-panel'\)target\.show\(\);else target\.showModal\(\);/);
 });
 
 test('공통 틀은 Esc·바깥 클릭 모두 쓰던 내용이 있으면 한 번 묻고 닫는다', () => {

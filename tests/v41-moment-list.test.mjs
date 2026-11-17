@@ -21,6 +21,10 @@ test('트리 고르기 칸: 모아둔 순간이 먼저고 이름은 정리 화�
   assert.equal(list[0].label, '모아둔 순간');
   assert.equal(list[1].label, '첫사랑');
   assert.equal(list[0].inbox, true);
+  // 트리마다 고정 색(2026-11-16 대표 지적) — shelfOrder 자리가 색을 정하고 다시 불러도 같다.
+  assert.equal(list[0].color, 'var(--lt-tree-1)', '모아둔 순간(첫 자리)의 고정 색');
+  assert.equal(list[1].color, 'var(--lt-tree-2)', '두 번째 자리의 고정 색');
+  assert.equal(momentListTrees(trees)[1].color, list[1].color, '같은 트리는 다시 불러도 같은 색이다');
 });
 
 test('트리 고르기 칸: id가 없는 트리는 뺀다', () => {

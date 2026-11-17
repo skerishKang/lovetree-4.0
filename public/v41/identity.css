@@ -23,6 +23,8 @@
     가운데 톤으로 잘 보이게 골랐다. 글자는 --lt-pearl을 얹는다. */
  --lt-accent-rose:#b4576b;--lt-accent-gold:#b08a2e;--lt-accent-green:#4e7d5f;--lt-accent-blue:#4a6d9e;
  --lt-accent-purple:#7c5fa3;--lt-accent-orange:#bf7840;--lt-accent-teal:#3f7d78;
+ /* 트리마다 고정 색(2026-11-16 대표 지적) — 순간 목록 행의 트리 꼬리표·트리 칩의 점. 낮은 채도, 글자는 기본색 그대로. */
+ --lt-tree-1:#8a7fb8;--lt-tree-2:#6f9e8a;--lt-tree-3:#b08a6f;--lt-tree-4:#7d94b5;--lt-tree-5:#b5839a;--lt-tree-6:#9a9a6f;
 }
 body{font-family:var(--lt-ui)}
 button,input,select,textarea,summary{font-family:var(--lt-ui)!important}
@@ -183,7 +185,8 @@ html[data-lt-theme=garden]{
  --lt-glass:rgba(255,253,248,.92);--lt-glass-strong:rgba(255,253,248,.98);
  --lt-line:rgba(119,91,82,.18);--lt-line-paper:rgba(119,91,82,.3);
  --lt-primary:#98505e;--lt-primary-ink:#fffdf8;
- --lt-garden-edge:#eee3d5;--lt-garden-shadow:0 18px 40px rgba(75,51,42,.16)
+ --lt-garden-edge:#eee3d5;--lt-garden-shadow:0 18px 40px rgba(75,51,42,.16);
+ --lt-tree-1:#6a5a9e;--lt-tree-2:#4f7e6a;--lt-tree-3:#96704f;--lt-tree-4:#5b7295;--lt-tree-5:#96637a;--lt-tree-6:#7a7a4f;
 }
 /* 정원(명조)은 지금 보이던 글꼴 그대로 — 토큰만 지금 값으로 되돌린다. */
 html[data-lt-theme=garden]{--lt-font-display:var(--lt-reading)}

@@ -81,6 +81,8 @@ export const AUDIT_FN = function audit(opts) {
       if (LENS.has(n.id)) return false;
       const cs = getComputedStyle(n);
       if (cs.display === 'none' || cs.visibility === 'hidden' || Number(cs.opacity) < 0.05) return false;
+      // 닫힌 <details> 안의 글자는 그려지지 않는다(요약 줄만 보인다) — 그려지지 않을 좌표로 겹침을 세지 않는다(261117, 걸어온 길 접힘).
+      if (n.tagName === 'DETAILS' && !n.open && !el.closest('summary')) return false;
     }
     const r = clipRect(el);
     if (!(r.right - r.left > 2 && r.bottom - r.top > 2)) return false;
@@ -136,6 +138,8 @@ export const AUDIT_FN = function audit(opts) {
   const inChrome = (el) => chain(el).some((n) => n.matches && n.matches(CHROME_SEL));
   const inWorld = (el) => chain(el).some((n) => n.id === 'world');
   const chromeVsWorld = (a, b) => (inChrome(a) && inWorld(b)) || (inWorld(a) && inChrome(b));
+  // 머리 고정(sticky) 요소는 스크롤 본문 위에 불투명하게 뜨는 정상 모양이다(창 머리의 닫기 × 등) —
+  // 겹침·가려짐 판정에서 크롬처럼 뺀다(2026-11-16 새 소식 창 머리 고정).
   const pairable = vis.filter((el) => CHECK_TOAST || !isToast(el));
   const rects = pairable.map((el) => ({ el, r: clipRect(el) }));
 

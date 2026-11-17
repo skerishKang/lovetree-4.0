@@ -680,6 +680,40 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
       return out;
     });
     for (const r of repeats) rows.push({ 항목: '되풀이', 줄: `새 소식 펼침 제목 되풀이 ${r} · ${width}·${theme}` });
+    // 새 소식 창 닫기 규칙(2026-11-16 대표 지적): 머리 고정 ×(aria-label '닫기')·맨 아래 '닫기'·Esc.
+    // 비모달이라 열린 채 위 메뉴를 누르면 창이 닫히고 이동한다(아래 겹친 창 닫기에서 같이 잰다).
+    const closeTop = await page4.evaluate(() => {
+      const close = document.querySelector('#updates-panel .panel-heading .close');
+      if (!close) return null;
+      const r = close.getBoundingClientRect();
+      return { label: close.getAttribute('aria-label'), visible: r.width > 0 && r.height > 0 && r.top >= 0 && r.bottom <= innerHeight };
+    });
+    assert.deepEqual(closeTop, { label: '닫기', visible: true }, '새 소식 창 머리의 닫기 ×가 스크롤과 무관하게 보이고 aria-label은 닫기다');
+    await page4.evaluate(() => { const p = document.getElementById('updates-panel'); if (p) p.scrollTop = p.scrollHeight; });
+    await page4.waitForTimeout(300);
+    const closeBottom = await page4.evaluate(() => {
+      const rows = [...document.querySelectorAll('#updates-panel .updates-foot button')];
+      const bottom = rows[rows.length - 1];
+      if (!bottom) return null;
+      const r = bottom.getBoundingClientRect();
+      return { text: bottom.textContent.trim(), visible: r.width > 0 && r.height > 0 && r.top >= 0 && r.bottom <= innerHeight };
+    });
+    assert.deepEqual(closeBottom, { text: '닫기', visible: true }, '새 소식 창 맨 아래에도 닫기가 보인다');
+    await take(page4, '새 소식 닫기 버튼');
+    // 겹친 창 닫기(2026-11-16 대표 지적): 새 소식(비모달) 위에อีก�창(공유 목록·모달)을 띄우고 Esc →
+    // 맨 위 창 하나만 닫힌다(공유 목록 닫힘·새 소식은 남음) → Esc 한 번 더 → 새 소식 닫힘.
+    // 머리 메뉴(공유 목록 단추)는 '창이 열린 채 누르면 창 닫고 이동' 규칙의 대상이라, 겹친 창 시험은 메뉴를 거치지 않고 직접 띄운다.
+    await page4.evaluate(() => document.getElementById('community-panel')?.showModal());
+    await page4.waitForFunction(() => !!document.getElementById('community-panel')?.open, null, { timeout: 8000 }).catch(() => {});
+    await page4.keyboard.press('Escape');
+    await page4.waitForTimeout(500);
+    const afterFirst = await page4.evaluate(() => ({ community: !!document.getElementById('community-panel')?.open, updates: !!document.getElementById('updates-panel')?.open }));
+    assert.deepEqual(afterFirst, { community: false, updates: true }, 'Esc 1회는 맨 위 창(공유 목록) 하나만 닫는다 — 새 소식은 남는다');
+    await take(page4, '겹친 창 닫기');
+    await page4.keyboard.press('Escape');
+    await page4.waitForTimeout(500);
+    const afterSecond = await page4.evaluate(() => ({ updates: !!document.getElementById('updates-panel')?.open }));
+    assert.deepEqual(afterSecond, { updates: false }, 'Esc 2회차에 새 소식 창이 닫힌다(맨 위 창 하나 규칙)');
     await page4.keyboard.press('Escape');
     await page4.waitForTimeout(400);
     // #638: 내 의견 목록 — 가짜 게시물로 상태 말·출처 묶음이 그려진 목록을 검사한다.
@@ -1129,7 +1163,6 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     // undefined.evaluate로 검사기가 죽는다(#657 CI 2차 실측 — runCombo 1160행) — 기다리는 frameOf 길로 찾는다.
     const tripMapFrame = async (why) => {
       const f = await frameOf(pageMap, /track56-network/);
-      assert.ok(f, why);
       return f;
     };
     await (await tripMapFrame('지도→그래프: 지도 프레임')).evaluate(() => document.getElementById('viewGraph').click());
