@@ -3,8 +3,9 @@ import {createCommunityApi} from '../public/v41/community-api.mjs';
 import {createProxy} from '../functions/_lib/proxy.js';
 test('community client uses fixed same-origin routes and idempotency headers',async()=>{
  const calls=[],fetchImpl=async(url,init={})=>{calls.push({url,init});return new Response(JSON.stringify(url.includes('/comments')?{comments:[]}:{items:[],stats:{},report:{}}),{headers:{'content-type':'application/json'}});},api=createCommunityApi({fetchImpl});
- await api.discover({q:'윤슬',limit:12});await api.favorite('s'.repeat(24),true);await api.react('s'.repeat(24),false);await api.comments('s'.repeat(24));await api.comment('s'.repeat(24),'hello');await api.report('s'.repeat(24),'check');await api.block('s'.repeat(24));
+ await api.discover({q:'윤슬',artist:'ILLIT',limit:12});await api.favorite('s'.repeat(24),true);await api.react('s'.repeat(24),false);await api.comments('s'.repeat(24));await api.comment('s'.repeat(24),'hello');await api.report('s'.repeat(24),'check');await api.block('s'.repeat(24));
  assert.equal(calls.every(call=>call.url.startsWith('/api/community/')),true);assert.match(calls[4].init.headers['idempotency-key'],/^comment-/);assert.match(calls[5].init.headers['idempotency-key'],/^report-/);
+ assert.equal(new URL(calls[0].url,'https://front.test').searchParams.get('artist'),'ILLIT');
  const shareId='s'.repeat(24);
  await api.react(shareId,false,'like');
  const removeKind=calls.at(-1);

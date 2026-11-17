@@ -2,6 +2,7 @@
 // 2026-11-08 리팩터링: 동작·문구·주소 형식 변경 0. shell.mjs에서 조건·조회 방식·인자 형태를 바꾸지 않고 그대로 옮겼다.
 import {mountCommunity} from '../community-panel.mjs';
 import {displayTreeTitle} from '../tree-name.mjs';
+import {parseTag,tagKey} from '../tags.mjs';
 // #480 L13: 날짜는 책·보드·지도·첫 화면과 같은 한 벌(formatDisplayDate)로만 적는다.
 import {formatDisplayDate} from '../book-usability.mjs';
 
@@ -463,6 +464,19 @@ export function createMessages(deps) {
     dialog: $('community-panel'),
     // #480 L13: 둘러보기 카드·댓글의 날짜도 계정 설정 한 벌을 따른다.
     getDateStyle: () => getDateStyle(),
+    getArtistGroups: () => {
+      if (getSource() !== 'server' || !getMember()?.snapshot().owned) return [];
+      const groups = [], seen = new Set();
+      for (const tree of getModel()?.trees || []) for (const moment of tree.moments || []) for (const raw of moment.keywords || []) {
+        const parsed = parseTag(raw);
+        if (parsed?.kindId !== 'artist') continue;
+        const key = tagKey(parsed.value);
+        if (!key || seen.has(key)) continue;
+        seen.add(key);
+        groups.push(parsed.value);
+      }
+      return groups;
+    },
     onOpenShare: item => { $('community-panel').close(); location.hash = `#share/${item.shareId}/${item.view || 'book'}`; },
     // 이슈 457 5번: 공유할 내 트리가 있어야 "내 트리 공유하기" — 로그아웃·트리 0개는 "첫 트리 만들기"로 바뀐다.
     hasOwnTree: () => getSource() === 'server' && !!getMember()?.snapshot().owned && (getModel()?.trees?.length || 0) > 0,
