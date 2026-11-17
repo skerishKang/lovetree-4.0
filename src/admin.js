@@ -5,7 +5,7 @@ import {
 } from '../public/v41/header-state.mjs';
 import {
   GITHUB_REPO, KIND_LABEL, STATUS_LABEL, STATUS_ORDER, PERSONA_FIELDS, PENDING_STATUS,
-  escapeText, richParagraph, formatTime, parseHash, viewHash, viewToTab,
+  escapeText, richParagraph, formatTime, parseHash, viewHash, viewToTab, tabClickFilters,
   filterRows, boardKindTabs, boardStatusTabs, filterBoardRows, ALL_STATUS, MENU_TABS,
   linkedIssueNumbers, normalizeIssueNumber, issueStateLabel, needsFixButton,
   statusChangeMessage, buildIssueUrl, issueLink, journalsSummary, journalRowsByCustomer, menuReceivedCounts,
@@ -642,7 +642,8 @@ document.addEventListener('click', async (event) => {
     return;
   }
   const tab = event.target.closest('[data-tab]');
-  if (tab) { moreOpen = false; navigate(tab.dataset.tab); return; }
+  // #801가 단추에 data-cat·data-kind를 달면서도 이 처리가 dataset.tab만 읽어 '요청·사용 일지·신고' 탭이 고장·불편에 붙었다(2026-11-18).
+  if (tab) { moreOpen = false; const filters = tabClickFilters(tab.dataset); navigate(tab.dataset.tab, null, filters); return; }
   // #655: '한눈에' 카드 — 그 조건이 열린 탭 주소로 이동한다(예: #board?status=pending).
   // #743: 답글 0·신고 대기·열린/닫힌 이슈도 조건을 주소로 남겨 그 탭을 걸러 연다.
   const ovCard = event.target.closest('[data-ov-view]');

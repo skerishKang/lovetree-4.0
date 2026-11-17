@@ -1,10 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import {
   STATUS_ORDER, PERSONA_FIELDS,
   richParagraph, formatTime, parseHash, viewHash, viewToTab,
   filterRows, statusTabs, kindTabs, STATUS_LABEL,
+  tabClickFilters,
   BOARD_KIND_TABS, BOARD_STATUS_TABS, boardKindTabs, boardStatusTabs, filterBoardRows, MENU_TABS,
   linkedIssueNumbers, normalizeIssueNumber, issueStateLabel, needsFixButton,
   statusChangeMessage, buildIssueUrl, issueLink, escapeText, statsCards,
@@ -59,6 +60,30 @@ test('화면 상태를 주소 해시로 되돌린다', () => {
   assert.equal(viewHash('issues'), '#issues');
   assert.equal(viewHash('feedback', 'p1'), '#feedback/p1');
   assert.equal(viewHash('persona', '고 객'), '#persona/' + encodeURIComponent('고 객'));
+});
+
+test('상단 탭 7개를 누르면 각자의 화면·거르기로 열린다(2026-11-18 — #801 뒤 3탭이 고장·불편에 붙던 것)', () => {
+  // 단추가 달고 나가는 데이터(#801의 tabBtn) → 클릭 처리가 계산할 주소 → 해시를 연 뒤의 화면 상태.
+  const click = (t) => {
+    const filters = tabClickFilters({ tab: t.view, cat: t.cat, kind: t.kind });
+    const hash = viewHash(t.view, null, filters);
+    return { hash, route: parseHash(hash) };
+  };
+  const byLabel = Object.fromEntries(MENU_TABS.map((t) => [t.label, click(t)]));
+  // 7개 전부: 탭마다 열려야 할 화면·거르기.
+  assert.equal(byLabel['한눈에'].route.view, 'overview');
+  assert.equal(byLabel['고객'].route.view, 'customers');
+  assert.deepEqual([byLabel['고장·불편'].route.view, byLabel['고장·불편'].route.cat], ['board', 'issue']);
+  assert.deepEqual([byLabel['요청'].route.view, byLabel['요청'].route.cat], ['board', 'request']);
+  assert.deepEqual([byLabel['사용 일지'].route.view, byLabel['사용 일지'].route.kind], ['board', 'journal']);
+  assert.deepEqual([byLabel['신고'].route.view, byLabel['신고'].route.kind], ['board', 'report']);
+  assert.equal(byLabel['고치는 일'].route.view, 'issues');
+  // 부러지던 세 탭: 주소가 서로 달라야 한다(전부 #board로 붙던 것이 회귀).
+  const hashes = new Set(MENU_TABS.map((t) => click(t).hash));
+  assert.equal(hashes.size, 7, '7탭의 주소가 모두 달라야 한다');
+  // 클릭 처리는 단추의 dataset을 버리지 않는다.
+  const js = readFileSync(new URL('../src/admin.js', import.meta.url), 'utf8');
+  assert.match(js, /tabClickFilters\(tab\.dataset\)/);
 });
 
 test('글·페르소나 화면은 고객 글 탭이 눌려 있다', () => {
