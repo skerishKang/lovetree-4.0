@@ -343,10 +343,9 @@ export function applyThumbOutcome(img, outcome = {}) {
     const row = img.closest?.('[data-lt-moment-row]');
     const badge = row?.querySelector?.('[data-lt-row-unavailable]');
     if (badge) badge.hidden = false;
-    if (html && img.insertAdjacentHTML) {
-      img.insertAdjacentHTML('afterend', html);
-    }
-    img.remove?.();
+    // 261117 대표 검수: 섬네일이 없으면(불러오기 실패) 빈 자리도 남기지 않는다 — 슬롯째로 지워
+    // 줄 왼쪽을 맞춘다(섬네일이 있으면 지금처럼 자리를 유지한다).
+    img.closest?.('.index-row-thumb')?.remove();
     return step;
   }
   const host = img.closest?.('[data-lt-thumb-host]') || img.parentElement;

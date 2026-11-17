@@ -445,3 +445,20 @@ test('#429 전 화면이 같은 공용 모듈(thumb-fallback.mjs)을 쓰고, 표
   assert.match(coverFallbackAttrs(['https://i.ytimg.com/vi/abc123DEF45/hqdefault.jpg']), /data-lt-fallback-mode="cover"/);
   assert.match(thumbFallbackAttrs({ id: 'm1', url: 'https://youtu.be/abc123DEF45' }), /hqdefault\.jpg.*mqdefault\.jpg/);
 });
+
+// 261117 대표 검수: 순간 목록 줄의 섬네일이 실패하면 빈 자리도 남기지 않는다 — 슬롯째로 지워
+// 줄 왼쪽을 맞춘다(섬네일이 있으면 지금처럼 자리를 유지한다). '영상을 볼 수 없어요' 안내는 행 안에 남는다.
+test('#목록정렬 261117: 목록 줄의 섬네일이 실패하면 빈 슬롯도 지운다', () => {
+  const slot = { removed: false, remove() { this.removed = true; } };
+  const badge = { hidden: true };
+  const row = { querySelector(sel) { return sel === '[data-lt-row-unavailable]' ? badge : null; } };
+  const img = {
+    dataset: { ltFallbackMode: 'thumb-slot', ltCandidates: JSON.stringify(['https://img.test/x.png']), ltCandIndex: '0' },
+    closest(sel) { return sel === '.index-row-thumb' ? slot : sel === '[data-lt-moment-row]' ? row : null; },
+    remove() { this.removedById = true; },
+  };
+  const step = applyThumbOutcome(img, { error: true });
+  assert.equal(slot.removed, true, '빈 슬롯(자리)도 함께 지운다 — 실패한 그림은 슬롯 안에 있어 함께 사라진다');
+  assert.equal(badge.hidden, false, "'영상을 볼 수 없어요' 안내는 행 안에 남는다");
+  assert.equal(step?.status, 'fallback', '마지막 후보 실패로 처리한다');
+});
