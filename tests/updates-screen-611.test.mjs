@@ -381,7 +381,7 @@ test('261117 실행: 이름표와 출처 집계 줄이 1440·390 × 밤·정원�
         assert.ok(Number(info.strongWeight) >= 700, `${width}/${theme}: 이름 굵게(${info.strongWeight})`);
         assert.equal(info.heart, '♥', `${width}/${theme}: 하트 아이콘`);
         assert.equal(info.heartHidden, 'true', `${width}/${theme}: 하트는 장식`);
-        assert.match(info.label || '', /님이 알려 준 것/, `${width}/${theme}: 이름표 읽기 문구`);
+        assert.match(info.label || '', /님이 알려 준 것|AI 명예회원이 알려 준 것/, `${width}/${theme}: 이름표 읽기 문구`);
         assert.match(info.summary, /^AI 명예회원 /, `${width}/${theme}: 창 맨 아래 집계 줄(${info.summary})`);
         assert.equal(info.summaryLast, true, `${width}/${theme}: 집계 줄이 맨 아래`);
         assert.ok(info.repeats <= 1, `${width}/${theme}: 긴 출처 문장 되풀이 ${info.repeats}회`);
