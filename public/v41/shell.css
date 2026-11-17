@@ -494,7 +494,7 @@ nav #record-menu{min-height:40px;font-size:13px;letter-spacing:0}
   .header-actions{gap:6px;margin-left:auto}
   #mobile-more{display:flex!important}
   /* 머리줄 테마 단추(44px)를 넣고도 390에서 가로 넘침 0 — 간격·여백을 조인다. */
-  @media(max-width:520px){.app-header{gap:4px;padding-inline:8px}.header-actions{gap:4px}}
+  @media(max-width:520px){.app-header{gap:4px;padding-inline:8px}.header-actions{gap:4px;flex:0 0 auto}.main-nav{flex:1 1 auto;min-width:0;overflow:hidden}}
  .tree-popover{position:fixed;left:10px;right:10px;top:60px;min-width:0;max-height:70vh}
  #header-overflow.is-open{position:fixed;left:10px;right:10px;top:60px;right:10px}
 }
