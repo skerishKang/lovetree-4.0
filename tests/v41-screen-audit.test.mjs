@@ -1258,7 +1258,7 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
       }));
       const pageNotice = await ctxNotice.newPage();
       await pageNotice.goto(`${base}/v41/?account=1#board`, { waitUntil: 'domcontentloaded' });
-      await frameOf(pageNotice, /track58-pinboard/);
+      await readyFrame(pageNotice, /track58-pinboard/, { root: '#cardLayer', why: '390 보드 첫 진입 프레임' });
       const twoNotices = await pageNotice.evaluate(async () => {
         const boxOf = (el) => { const r = el.getBoundingClientRect(); return { t: r.top, b: r.bottom, l: r.left, rt: r.right }; };
         const overlapArea = (a, b) => Math.max(0, Math.min(a.rt, b.rt) - Math.max(a.l, b.l)) * Math.max(0, Math.min(a.b, b.b) - Math.max(a.t, b.t));
@@ -1271,24 +1271,38 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
           }
           return null;
         };
-        let sawShell = false, sawBoard = false, maxArea = 0, bothAt = -1;
-        for (let i = 0; i < 18; i++) {
+        // 보드 안내는 셸 알림(약 3초)이 사라진 뒤 600ms마다 최대 10번 다시 시도해 뜬다(최대 약 7초).
+        // 고정 횟수로 재면 느린 기기에서 안내가 뜨기 전에 검사가 끝나 빈손 실패가 난다 —
+        // 두 안내를 모두 '실제로 본' 뒤에 끝내고, 못 보면 마지막 관찰 상태를 메시지에 남긴다.
+        const state = () => {
           const shell = document.getElementById('toast');
           const board = boardToast();
-          const shellUp = !!shell && !shell.hidden;
-          const boardUp = !!board && board.classList.contains('show');
-          if (shellUp) sawShell = true;
-          if (boardUp) sawBoard = true;
-          if (shellUp && boardUp) {
-            bothAt = i;
-            maxArea = Math.max(maxArea, overlapArea(boxOf(shell), boxOf(board)));
+          return {
+            shellUp: !!shell && !shell.hidden,
+            boardUp: !!board && board.classList.contains('show'),
+            shellText: shell ? (shell.textContent || '').trim().slice(0, 60) : null,
+            boardText: board ? (board.textContent || '').trim().slice(0, 60) : null,
+            frames: [...document.querySelectorAll('iframe')].map((f) => { try { return f.contentWindow?.location?.href || ''; } catch { return ''; } }).filter((url) => /track58/.test(url))
+          };
+        };
+        let sawShell = false, sawBoard = false, maxArea = 0, bothAt = -1, last = null, samples = 0;
+        const deadline = Date.now() + 15000;
+        while (Date.now() < deadline && !(sawShell && sawBoard)) {
+          last = state();
+          if (last.shellUp) sawShell = true;
+          if (last.boardUp) sawBoard = true;
+          if (last.shellUp && last.boardUp) {
+            bothAt = samples;
+            maxArea = Math.max(maxArea, overlapArea(boxOf(document.getElementById('toast')), boxOf(boardToast())));
           }
-          await new Promise((r) => setTimeout(r, 400));
+          samples += 1;
+          await new Promise((r) => setTimeout(r, 200));
         }
-        return { sawShell, sawBoard, maxArea: Math.round(maxArea), bothAt };
+        const detail = `${samples}회 관찰, 마지막 상태: 셸 알림=${last?.shellUp ? '보임' : '없음'}(${last?.shellText ?? '요소 없음'}), 보드 말풍선=${last?.boardUp ? '보임' : '없음'}(${last?.boardText ?? '요소 없음'}), 보드 프레임=[${(last?.frames || []).join(' | ')}]`;
+        return { sawShell, sawBoard, maxArea: Math.round(maxArea), bothAt, detail };
       });
-      assert.ok(twoNotices.sawShell, '390 셸 알림(기록 불러오기 안내)이 떠 있는 자리를 본다(빈손 통과 금지)');
-      assert.ok(twoNotices.sawBoard, '390 보드 안내 말풍선이 뜨는 자리를 본다(빈손 통과 금지)');
+      assert.ok(twoNotices.sawShell, `390 셸 알림(기록 불러오기 안내)이 떠 있는 자리를 본다(빈손 통과 금지) — ${twoNotices.detail}`);
+      assert.ok(twoNotices.sawBoard, `390 보드 안내 말풍선이 뜨는 자리를 본다(빈손 통과 금지) — ${twoNotices.detail}`);
       assert.equal(twoNotices.maxArea, 0, `390 셸 알림과 보드 안내 말풍선이 같은 자리에 포개지지 않는다(겹침 ${twoNotices.maxArea}px², 동시 노출: ${twoNotices.bothAt < 0 ? '없음' : twoNotices.bothAt + '번째 관찰'})`);
       await pageNotice.close();
       await ctxNotice.close();
