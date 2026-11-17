@@ -67,3 +67,13 @@ test('첫 화면 카드 이름은 화면에 보이는 글자를 그대로 쓴다
 // 소스 글자에서 함수 직접 호출로 옮겼다.
 //  · A → tests/v41-view-a11y-flow.test.mjs (applyViewAccessibility에 keydown을 실제로 보낸다)
 //  · B·C·D → tests/v41-shell-dialogs.test.mjs (trapShellTab·closeAccountMenu·focusReturnTarget 호출)
+
+// 261117 대표 검수: 대화상자를 연 입력 경로(마우스·키보드)를 기록해 — 마우스로 열었으면 닫기 단추의
+// 초점 테두리를 그리지 않고(#795 계정 메뉴와 같은 방식), 키보드로 열었으면 보인다. 배선 계약.
+test('261117 대화상자 열기 경로 기록 — 마우스로 열면 닫기 테두리를 그리지 않는다', () => {
+  const orbit = read('src/views/orbit.js');
+  assert.match(orbit, /dataset\.ltOpenedBy=lastInputWasKeyboard\?'keyboard':'mouse'/, '열기 경로를 대화상자에 남긴다');
+  assert.match(orbit, /dialog\[data-lt-opened-by=mouse\] \.close:focus-visible,dialog\[data-lt-opened-by=mouse\] \.close:focus\{outline:0;box-shadow:none\}/, '마우스로 열었으면 닫기 테두리를 그리지 않는다');
+  assert.match(orbit, /shadow\.addEventListener\('keydown',\(\)=>\{lastInputWasKeyboard=true;\}/, '키보드 입력을 기록한다');
+  assert.match(orbit, /shadow\.addEventListener\('pointerdown',\(\)=>\{lastInputWasKeyboard=false;\}/, '포인터 입력을 기록한다');
+});

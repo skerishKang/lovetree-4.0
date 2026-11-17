@@ -43,6 +43,8 @@ let extraCSS=`:host{display:block;height:100dvh;min-height:540px;font-family:var
 
 // #426: 최근 순간 카드 — 궤도의 금빛 내 카드(.card.mine)와 같은 결(테두리·이중선·금빛 번짐). 390에서는 폭=화면-32px, 세로 썸네일 높이 제한.
 extraCSS+=`.center-note{display:flex;flex-wrap:wrap;justify-content:center;align-items:baseline;gap:2px 10px}.center-hint{color:var(--lt-muted,#9b98a6)}@media(max-width:650px){.center p.note-with-hint{font-size:12px;line-height:1.5;margin-top:8px}}/* #635 PR C: '드래그 · 금테 카드를 눌러 감상' 안내를 단추 묶음 바로 아래(안내 줄 옆)로 올린다 — 화면 아래 고정 링크 줄과 겹치지 않게. */`;
+/* 261117 대표 검수: 마우스로 열었으면 닫기 단추의 초점 테두리를 그리지 않는다(#795 계정 메뉴와 같은 방식) — 키보드로 열었으면 보인다. */
+extraCSS+=`dialog[data-lt-opened-by=mouse] .close:focus-visible,dialog[data-lt-opened-by=mouse] .close:focus{outline:0;box-shadow:none}`;
 extraCSS+=`.recent-card{pointer-events:auto;position:relative;display:block;width:min(430px,86vw);margin:24px auto 0;padding:0;text-align:left;border:3px solid var(--lt-gold-deep);border-radius:16px;background:rgba(10,9,14,.82);box-shadow:0 24px 60px rgba(0,0,0,.38),0 0 0 1px var(--lt-gold-line),0 0 22px var(--lt-gold-glow);cursor:pointer;overflow:hidden;font:inherit;color:inherit}.recent-card:after{content:'';position:absolute;inset:2px;border:1px solid var(--lt-gold-line);border-radius:inherit;pointer-events:none}.recent-card:hover,.recent-card:focus-within{border-color:#ffe6a6;box-shadow:0 24px 60px rgba(0,0,0,.4),0 0 0 2px rgba(255,224,158,.75),0 0 26px rgba(238,190,104,.68);outline:none}.recent-card:hover:after,.recent-card:focus-within:after{border-color:#fff0c7}.recent-open{position:absolute;inset:0;z-index:0;width:100%;height:100%;margin:0;border:0;padding:0;background:transparent;cursor:pointer;font:inherit}.recent-media{position:relative;z-index:1;display:block;width:100%;aspect-ratio:16/9;background:#0b0a10;overflow:hidden}.recent-media.vertical{width:min(100%,calc(min(300px,38dvh)*9/16));aspect-ratio:9/16;margin:0 auto}.recent-media img{width:100%;height:100%;object-fit:cover;display:block}.recent-play{position:absolute;inset:0;width:100%;min-height:44px;min-width:44px;border:0;padding:0;background:transparent;cursor:pointer;display:grid;place-items:center}.recent-play>span{display:grid;place-items:center;min-width:52px;min-height:52px;border-radius:50%;background:#1a1620d9;color:#fff;border:1px solid rgba(255,255,255,.4);font-size:20px;line-height:1}.recent-frame{position:absolute;inset:0;width:100%;height:100%;border:0;background:#000}.recent-meta{position:relative;z-index:1;display:block;padding:10px 14px 12px}.recent-meta small{display:block;font-size:11px;letter-spacing:.04em;color:#b9b2c4}.recent-meta strong{display:block;margin:3px 0 2px;font-size:15px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.recent-media--memo{aspect-ratio:auto;display:grid;place-items:center;padding:16px;min-height:96px}.recent-media--slot{aspect-ratio:auto}.recent-memo{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;font-size:14px;line-height:1.7;color:#e6ddef;overflow-wrap:anywhere}@media(max-width:650px){.center{width:calc(100vw - 16px);max-width:calc(100vw - 16px)}.recent-card{width:calc(100vw - 32px)}.recent-media.vertical{width:min(100%,calc(38dvh*9/16))}}`;
 
 export function mountOrbit(host,{trees,storage,context,actions,authHtml='',onSelect=()=>{},recordNote=null,examples=[],onOpen=null,empty=false,titleDisplay='both',momentList=null,dateStyle='dot',prefs=null,initialPicking=false,initialNotice=null}) {
@@ -138,6 +140,12 @@ export function mountOrbit(host,{trees,storage,context,actions,authHtml='',onSel
  // #394 1번: 상세 창에서 열기 전 목록 순서(트리 고르기 포함) 그대로 앞·뒤로 옮겨 본다.
  // 목록에 없는 순간(예시 채움 카드 등)은 옮겨 볼 목록이 없으니 화살표를 두지 않는다.
  let detailMoment=null;
+ // 261117 대표 검수: 대화상자를 연 입력 경로(마우스·키보드)를 기록한다 — 마우스로 열었으면 닫기 단추의
+ // 초점 테두리를 그리지 않고(#795 계정 메뉴와 같은 방식), 키보드로 열었으면 테두리가 보인다.
+ let lastInputWasKeyboard=false;
+ shadow.addEventListener('keydown',()=>{lastInputWasKeyboard=true;},{capture:true,signal});
+ shadow.addEventListener('pointerdown',()=>{lastInputWasKeyboard=false;},{capture:true,signal});
+ const openDialogCentered=(d)=>{d.dataset.ltOpenedBy=lastInputWasKeyboard?'keyboard':'mouse';d.showModal();};
  function stepDetail(dir){const order=listRows();const at=order.findIndex(x=>x.key===detailMoment?.key);const next=order[at+dir];if(!next)return;renderDetail(next);dialog.querySelector(dir<0?'[data-do=prev]':'[data-do=next]')?.focus();}
  function focus(c){if(!c)return;if(!c.example){onSelect(c.id);rememberCard(c);}if(!dialog.open)opener=shadow.activeElement;renderDetail(c);}
  function renderDetail(c){detailMoment=c;
@@ -156,7 +164,7 @@ export function mountOrbit(host,{trees,storage,context,actions,authHtml='',onSel
   dialog.querySelector('[data-do=work]').onclick=()=>{dialog.close();demo?actions.requestMoment('new'):actions.openWorkspace(c.treeId,c.id)};
   dialog.querySelector('[data-do=prev]')?.addEventListener('click',()=>stepDetail(-1));
   dialog.querySelector('[data-do=next]')?.addEventListener('click',()=>stepDetail(1));
-  if(!dialog.open)dialog.showModal();else dialog.querySelector('.close').focus();
+  if(!dialog.open)openDialogCentered(dialog);else dialog.querySelector('.close').focus();
  }
  // #394: 순간 목록 — 모든 트리의 순간을 최근 순으로, 위에서 트리를 골라 본다([전체][모아둔 순간][트리1]…).
  // 제목은 정리 화면과 같은 규칙(momentHeadTitle): 자동 기본 문구는 표시하지 않고 마음 한마디를 큰 글씨로 쓴다.
@@ -324,7 +332,7 @@ export function mountOrbit(host,{trees,storage,context,actions,authHtml='',onSel
   dialog.querySelectorAll('[data-tag-more]').forEach(b=>b.onclick=()=>{const kind=b.dataset.tagMore||'plain';if(tagExpanded.has(kind))tagExpanded.delete(kind);else tagExpanded.add(kind);index();});
   dialog.querySelectorAll('[data-tag-pick]').forEach(b=>b.onclick=()=>{tagSelected.delete(b.dataset.tagPick||'');index();});
   dialog.querySelector('[data-tag-clear]')?.addEventListener('click',()=>{tagSelected.clear();index();});
-  dialog.showModal();}
+  openDialogCentered(dialog);}
  // #426: 최근 순간 카드 — 본문을 누르면(클릭·Enter·Space) 그 순간을 연다(궤도 카드와 같은 onOpen 경로). ▶는 카드 안 재생/정지로 구분하고, 플레이어는 누른 뒤에만 만든다(첫 화면 열 때 YouTube 요청 0건).
 const openRecent=()=>{if(!recentMoment)return;if(onOpen&&!recentMoment.example){onOpen(recentMoment);return;}actions.openBook(recentMoment.treeId,recentMoment.id,demo);};
 let recentFrame=null;
