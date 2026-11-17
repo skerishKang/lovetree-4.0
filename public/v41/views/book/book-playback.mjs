@@ -2,7 +2,7 @@
 // 첫 재생은 '이어 보기'를 누른 사용자 동작으로 시작하고, 그다음 순간부터는 같은 재생기에서 이어 간다.
 import {formatRange} from '/v41/domain.mjs';
 import {loadYouTubeIframeApi} from '/v41/segment-capture.mjs';
-import {buildPlaybackQueue, stepPlayable, firstPlayable, playbackChipText, segmentReached} from '/v41/playback-core.mjs';
+import {buildPlaybackQueue, stepPlayable, firstPlayable, playbackChipText, segmentReached, playbackStatusOf, STATUS_PLAYING, STATUS_BUFFERING, STATUS_SKIPPED} from '/v41/playback-core.mjs';
 
 const $ = (selector) => document.querySelector(selector);
 const overlay = $('#playback');
@@ -141,7 +141,7 @@ function markUnavailable(at) {
     chip.textContent = playbackChipText(item);
     chip.title = playbackChipText(item);
   }
-  setStatus('이 영상은 볼 수 없어요. 다음 순간으로 넘어갈게요.');
+  setStatus(STATUS_SKIPPED);
   clearTimeout(statusTimer);
   statusTimer = setTimeout(() => { if (open) advance(1); }, 650);
 }
@@ -188,9 +188,10 @@ function onStateChange(event) {
   if (!open) return;
   const state = event?.data;
   if (state === 0) { advance(1); return; }
-  if (state === 1) { $('#pbToggle').textContent = '멈춤'; setStatus('이어 보는 중이에요.'); return; }
-  if (state === 2) { $('#pbToggle').textContent = '재생'; setStatus('멈춤'); return; }
-  if (state === 3) setStatus('영상을 불러오는 중이에요.');
+  if (state === 1) $('#pbToggle').textContent = '멈춤';
+  if (state === 2) $('#pbToggle').textContent = '재생';
+  const text = playbackStatusOf(state);
+  if (text) setStatus(text);
 }
 
 function onError(event) {
@@ -204,9 +205,17 @@ function tick() {
   if (!open || !player || advancing) return;
   const item = currentItem();
   if (!item) return;
-  let now = 0;
-  try { now = Number(player.getCurrentTime()) || 0; } catch { return; }
-  if (segmentReached(now, item.end)) advance(1);
+  let state = -1;
+  try { state = Number(player.getPlayerState?.()) || -1; } catch {}
+  if (state === 1) {
+    // 상태 이벤트를 놓쳐 '불러오는 중'이 남은 경우를 되살린다 — 사용자가 멈춘 문구는 그대로 둔다.
+    const now = $('#pbStatus')?.textContent;
+    if (now === STATUS_BUFFERING) setStatus(STATUS_PLAYING);
+    $('#pbToggle').textContent = '멈춤';
+  }
+  let now2 = 0;
+  try { now2 = Number(player.getCurrentTime()) || 0; } catch { return; }
+  if (segmentReached(now2, item.end)) advance(1);
 }
 
 async function openPlayback() {

@@ -63,3 +63,17 @@ export function segmentReached(currentSeconds, endSeconds, slack = 0.35) {
   const end = Number(endSeconds);
   return Number.isFinite(now) && Number.isFinite(end) && now >= end - slack;
 }
+
+/* 상태 문구는 글자뿐인 순수 계산 — 화면 없이도 시험한다. */
+export const STATUS_PLAYING = '지금 구간 재생 중이에요.';
+export const STATUS_PAUSED = '멈춤';
+export const STATUS_BUFFERING = '영상을 불러오는 중이에요.';
+export const STATUS_SKIPPED = '볼 수 없는 순간을 건너뛰었어요. 다음 순간으로 넘어갈게요.';
+
+/** 플레이어 상태 숫자(1 재생·2 멈춤·3 불러오는 중) → 상태 문구. 모르면 null. */
+export function playbackStatusOf(state) {
+  if (state === 1) return STATUS_PLAYING;
+  if (state === 2) return STATUS_PAUSED;
+  if (state === 3) return STATUS_BUFFERING;
+  return null;
+}

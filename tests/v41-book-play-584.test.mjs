@@ -16,7 +16,7 @@ import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { FALLBACK_SECONDS, playbackItemOf, buildPlaybackQueue, stepPlayable, firstPlayable, playbackChipText, segmentReached } from '../public/v41/playback-core.mjs';
+import { FALLBACK_SECONDS, playbackItemOf, buildPlaybackQueue, stepPlayable, firstPlayable, playbackChipText, segmentReached, playbackStatusOf, STATUS_PLAYING, STATUS_PAUSED, STATUS_BUFFERING, STATUS_SKIPPED } from '../public/v41/playback-core.mjs';
 
 const read = (p) => readFileSync(new URL('../' + p, import.meta.url), 'utf8');
 const MP = read('public/v41/media-preview.js');
@@ -666,6 +666,20 @@ test('792-3: 구간 끝 판정은 끝 0.35초 전부터 참', () => {
   assert.equal(segmentReached(9.6, 10), false);
   assert.equal(segmentReached(10, 10), true);
   assert.equal(segmentReached('x', 10), false);
+});
+
+test('792-3: 상태 문구 — 재생 중엔 지금 구간 재생 중, 건너뛸 땐 건너뛰었어요', () => {
+  assert.equal(playbackStatusOf(1), STATUS_PLAYING);
+  assert.equal(playbackStatusOf(2), STATUS_PAUSED);
+  assert.equal(playbackStatusOf(3), STATUS_BUFFERING);
+  assert.equal(playbackStatusOf(0), null, '끝남(0)은 문구 대신 다음 순간으로 넘어간다');
+  assert.equal(playbackStatusOf(undefined), null);
+  assert.notEqual(STATUS_BUFFERING, STATUS_PLAYING, '불러오는 중 문구가 재생 중에 남지 않게 다른 글자');
+  assert.match(STATUS_SKIPPED, /볼 수 없는 순간을 건너뛰었어요/);
+  const js = read('public/v41/views/book/book-playback.mjs');
+  assert.match(js, /playbackStatusOf/, '상태 문구는 순수 함수에서 온다');
+  assert.match(js, /STATUS_BUFFERING/);
+  assert.match(js, /STATUS_SKIPPED/);
 });
 
 test('792-3: 책 화면에 이어 보기 단추·재생 창·닫기 배선이 있다', () => {
