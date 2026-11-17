@@ -29,9 +29,9 @@ const ORBIT = read('src/views/orbit.js');
 
 /* ── (1) 오류 153: iframe referrerpolicy ─────────────────────────────── */
 test('584-1: 그 자리 재생·크게 보기 iframe은 strict-origin-when-cross-origin을 쓴다(오류 153 수정)', () => {
-  // iframe 두 자리(그 자리 재생·크게 보기)만 바꾼다. img·a의 no-referrer는 그대로 둔다(요청 헤더용).
+  // iframe 세 자리(그 자리 재생·크게 보기·틱톡 공식 재생기 #791)만 바꾼다. img·a의 no-referrer는 그대로 둔다(요청 헤더용).
   const iframePolicies = [...MP.matchAll(/frame\.setAttribute\('referrerpolicy','([^']+)'\)/g)].map(m => m[1]);
-  assert.equal(iframePolicies.length, 2, 'iframe referrerpolicy 지정은 두 자리뿐이다');
+  assert.equal(iframePolicies.length, 3, 'iframe referrerpolicy 지정은 세 자리뿐이다');
   for (const policy of iframePolicies) assert.equal(policy, 'strict-origin-when-cross-origin', 'iframe은 strict-origin-when-cross-origin');
   assert.doesNotMatch(MP, /frame\.setAttribute\('referrerpolicy','no-referrer'\)/, 'iframe에 no-referrer를 남기지 않는다');
   assert.match(MP, /referrerpolicy="no-referrer"/, 'img·a의 no-referrer는 그대로다(요청 헤더용)');

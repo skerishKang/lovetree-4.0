@@ -84,7 +84,10 @@ export function parseQuickUrl(url, describe) {
 export function previewState(parsed) {
   if (!parsed || parsed.status === 'empty') return 'empty';
   if (parsed.status !== 'ok') return 'invalid';
-  return parsed.kind === 'youtube' ? 'youtube' : 'link';
+  if (parsed.kind === 'youtube') return 'youtube';
+  // #791: 틱톡은 유튜브와 같은 영상 미리보기다(썸네일은 없고 세로 패널로 그려진다).
+  if (parsed.kind === 'tiktok') return 'tiktok';
+  return 'link';
 }
 
 // 금테 꼬리표: 어디서 온 주소인지 한눈에. YouTube는 Shorts·Live 모양까지 구분한다.
@@ -97,6 +100,8 @@ export function previewTag(url, kind = '') {
     const shape = (parsed.pathname.match(/^\/(shorts|live)\//) || [])[1];
     return shape ? `YOUTUBE · ${shape.toUpperCase()}` : 'YOUTUBE';
   }
+  // #791: 틱톡 정본·짧은 주소 모두 틱톡 꼬리표다.
+  if (host === 'tiktok.com' || host === 'vm.tiktok.com' || host === 'vt.tiktok.com') return 'TIKTOK';
   return kind === 'youtube' ? 'YOUTUBE' : host;
 }
 

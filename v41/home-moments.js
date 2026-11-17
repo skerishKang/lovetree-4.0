@@ -84,6 +84,8 @@ export function cardOf(treeId, moment, currentOrigin, youtube = null) {
   // #330 판정 재사용: 내 기록(서버 기록·로그인 소유자)만 YouTube 썸네일을 처음부터 카드로 쓴다.
   // 썸네일 주소는 LTMedia.describe의 loadUrl 한 벌에서 온다 — 새로 만들지 않는다(quick-add와 같은 규칙).
   const media = (!image && youtube?.auto) ? youtube.describe?.(text(moment?.url)) : null;
+  // #791: 틱톡 — 썸네일은 없지만 세로 영상 카드로 센다.#330 판정 한 벌(LTMedia.describe)을 그대로 쓴다.
+  const tt = media?.kind === 'tiktok';
   const ytCandidates = (media?.kind === 'youtube' && media.loadUrl)
     ? thumbnailCandidates(moment, { autoLoad: true, currentOrigin })
     : [];
@@ -101,9 +103,12 @@ export function cardOf(treeId, moment, currentOrigin, youtube = null) {
     note: noteOf(moment),
     image: image || thumb,
     thumbCandidates,
-    type: image ? 'photo' : (thumb || video) ? 'video' : 'memo',
+    type: image ? 'photo' : (thumb || video || tt) ? 'video' : 'memo',
     // 궤도 렌더러가 재생 표시를 붙일 때만 보는 표시자다. 저장 값이 보낸 같은 이름 값은 덮어쓴다.
     youtubeThumb: thumb ? true : false,
+    // #791: 틱톡 표시자 — 재생 표시를 붙일 때 세로로 두고 구석에 표식을 둔다.
+    tiktok: tt ? true : false,
+    vertical: tt ? true : false,
     // orbitRecords는 createdAt 내림차순이므로 최근 수정 순서를 그대로 옮긴다.
     createdAt: new Date(stamp(moment) || 0).toISOString(),
   };

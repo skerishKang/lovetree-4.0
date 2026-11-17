@@ -20,6 +20,7 @@ import { createAdminCustomersRepo } from './db/admin-customers-postgres.js';
 import { createAdminCustomersService, createAdminCustomersHandler } from './admin-customers.js';
 import { createFeedbackService, createFeedbackHandler } from './feedback-service.js';
 import { createYoutubeOembedHandler } from './youtube-oembed.js';
+import { createTiktokOembedHandler } from './tiktok-oembed.js';
 import { createPadiemAuthorityAuth } from './padiem-authority-auth.js';
 import { createSharedAccessAuth, sharedAuthEnabled } from './padiem-access-auth.mjs';
 import { createAuthorityRelayClient } from './authority-relay-transport.js';
@@ -255,6 +256,7 @@ const adminCustomersHandler = createAdminCustomersHandler({
  productId: LOVETREE_PRODUCT_ID
 });
 const youtubeOembedHandler = createYoutubeOembedHandler({ authenticate: guardedAuthenticate, productId: LOVETREE_PRODUCT_ID });
+const tiktokOembedHandler = createTiktokOembedHandler({ authenticate: guardedAuthenticate, productId: LOVETREE_PRODUCT_ID });
 const login = await buildLogin(pool);
 const mediaHandler = createMediaHandler({
  authenticate: guardedAuthenticate, productId: LOVETREE_PRODUCT_ID,
@@ -274,6 +276,7 @@ const requestHandler = async (request) => {
  if (path === '/api/feedback' || path.startsWith('/api/admin/feedback') || path.startsWith('/api/admin/journals') || path === '/api/board' || path.startsWith('/api/board/') || path.startsWith('/api/admin/persona/')) return feedbackHandler(request);
  if (path.startsWith('/api/admin/customers')) return adminCustomersHandler(request);
  if (path === '/api/youtube/oembed') return youtubeOembedHandler(request);
+ if (path === '/api/tiktok/oembed') return tiktokOembedHandler(request);
   return storageHandler(request);
 };
 

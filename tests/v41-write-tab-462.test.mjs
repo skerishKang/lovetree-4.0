@@ -259,7 +259,7 @@ test('#462 문구: 입력 칸 안내·용량 한 줄·중복 안내 하나·수�
   const html = readFileSync(new URL('../public/v41/index.html', import.meta.url), 'utf8');
   const upload = readFileSync(new URL('../public/v41/private-upload.mjs', import.meta.url), 'utf8');
   const panelsSource = readFileSync(new URL('../public/v41/shell/panels.mjs', import.meta.url), 'utf8');
-  assert.match(html, /placeholder="YouTube 같은 링크 주소"/);
+  assert.match(html, /placeholder="YouTube·틱톡 같은 링크 주소"/);
   assert.match(upload, />사진 4MB, 영상 8MB까지 · 사진은 나만 볼 수 있어요</);
   const writePanel = html.slice(html.indexOf('<dialog id="write-panel"'), html.indexOf('</dialog>', html.indexOf('<dialog id="write-panel"')));
   const momentSlot = upload.slice(upload.indexOf(':`<span class="file-pick">'));

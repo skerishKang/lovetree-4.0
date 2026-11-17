@@ -22,3 +22,25 @@ export async function fetchVideoTitle(videoId, fetchImpl = (...args) => globalTh
   const meta = await fetchVideoMetadata(videoId, fetchImpl);
   return meta?.title || '';
 }
+
+// 틱톡 영상 정보 한 벌(#791). 서버 틱톡 oEmbed 프록시(/api/tiktok/oembed)만 쓴다.
+// 짧은 주소(vm·vt)도 서버가 정본 id까지 풀어 준다. 실패는 조용히 null.
+export async function fetchTikTokMetadata(value, fetchImpl = (...args) => globalThis.fetch(...args)) {
+  const raw = String(value ?? '').trim();
+  if (!raw) return null;
+  try {
+    const answer = await fetchImpl('/api/tiktok/oembed?url=' + encodeURIComponent(raw), { headers: { accept: 'application/json' } });
+    if (!answer?.ok) return null;
+    const data = await answer.json();
+    const title = typeof data?.title === 'string' ? data.title.trim() : '';
+    const authorName = typeof data?.authorName === 'string' ? data.authorName.trim() : '';
+    const thumbnailUrl = typeof data?.thumbnailUrl === 'string' ? data.thumbnailUrl.trim() : '';
+    const videoId = typeof data?.videoId === 'string' ? data.videoId.trim() : '';
+    const width = Number(data?.width) || 0;
+    const height = Number(data?.height) || 0;
+    if (!title && !authorName && !thumbnailUrl && !videoId) return null;
+    return { title, authorName, thumbnailUrl, videoId, width, height };
+  } catch {
+    return null;
+  }
+}

@@ -284,11 +284,14 @@ function normalizeMediaMetadata(value, url) {
   const title = optionalText(value.title, '미디어 제목', 240);
   const channel = optionalText(value.channel, '미디어 채널', 160);
   const thumbnail = safeMediaThumbnail(value.thumbnail);
-  if (!title && !channel && !thumbnail) return null;
+  // #791: 틱톡 영상 id — 짧은 주소가 서버에서 풀어 준 id를 함께 남긴다.
+  const tiktokId = /^\d{15,25}$/.test(String(value.tiktokId ?? '').trim()) ? String(value.tiktokId).trim() : '';
+  if (!title && !channel && !thumbnail && !tiktokId) return null;
   const source = url ? new URL(url).hostname : '';
   if (!source) return null;
   const result = {title, channel, source};
   if (thumbnail) result.thumbnail = thumbnail;
+  if (tiktokId) result.tiktokId = tiktokId;
   return result;
 }
 function shortened(value, max = 40) {

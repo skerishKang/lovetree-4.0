@@ -6,7 +6,7 @@ import {parentCandidates, suggestMomentTitle, coverModeOf, latestMomentId, valid
 import {localDateOnly} from '../local-date.mjs';
 import {displayTreeTitle} from '../tree-name.mjs';
 import {mountPrivateUpload} from '../private-upload.mjs';
-import {fetchVideoTitle} from '../video-title.mjs';
+import {fetchVideoTitle, fetchTikTokMetadata} from '../video-title.mjs';
 
 export function createPanels(deps) {
   const {$} = deps;
@@ -265,10 +265,12 @@ export function createPanels(deps) {
     queueMicrotask(() => form.elements.title.focus());
   }
 
-  // 편집기가 미리보기에서 받아 둔 영상 제목(#344). videoTitleCache는 같은 영상을 다시 열 때 요청을 줄인다.
+  // 편집기가 미리보기에서 받아 둔 영상 제목(#344)·틱톡 정보(#791). videoTitleCache는 같은 영상을 다시 열 때 요청을 줄인다.
   const videoTitleCache = new Map();
+  const tiktokMetaCache = new Map();
   let editorVideoTitle = '';
   let editorVideoUrl = '';
+  let editorTikTokId = '';
   function updateMediaPreview() {
     const form = $('moment-form'), url = form.elements.url.value, info = LTMedia.describe(url);
     // #462: 주소가 비었을 때의 긴 안내는 칸 이름·파일 고르기와 같은 말이라 비운다(주소를 넣으면 종류·형식만 알린다).
@@ -284,17 +286,37 @@ export function createPanels(deps) {
     const rangeError = $('range-error');
     if (rangeError) { rangeError.hidden = true; rangeError.textContent = ''; }
     // #344: 미리보기 때 서버 oEmbed 프록시로 영상 제목을 받아 둔다(실패는 조용히). 저장 시 mediaMetadata.title로 함께 넘긴다.
+    // #791: 틱톡은 서버 틱톡 oEmbed로 푼다 — 제목(있으면)과 영상 id를 받아 둔다.
     editorVideoTitle = '';
+    editorTikTokId = '';
     editorVideoUrl = info.kind === 'youtube' && info.videoId ? url : '';
     if (editorVideoUrl) {
       const videoId = info.videoId;
       void fetchVideoTitle(videoId).then(title => { if (title && editorVideoUrl === url) { editorVideoTitle = title; videoTitleCache.set(videoId, title); updateQuickEntryHint(); } });
+    }
+    if (info.kind === 'tiktok') {
+      editorVideoUrl = url;
+      const known = tiktokMetaCache.get(url);
+      if (known) { editorVideoTitle = known.title || ''; editorTikTokId = known.tiktokId || ''; updateQuickEntryHint(); }
+      else void fetchTikTokMetadata(url).then(meta => {
+        if (editorVideoUrl !== url || !meta) return;
+        const knownMeta = {title: meta.title || '', tiktokId: meta.videoId || ''};
+        tiktokMetaCache.set(url, knownMeta);
+        editorVideoTitle = knownMeta.title; editorTikTokId = knownMeta.tiktokId;
+        updateQuickEntryHint();
+      });
     }
   }
   function editorMediaTitle() {
     if (!editorVideoUrl) return {};
     const url = $('moment-form').elements.url.value.trim();
     if (url !== editorVideoUrl) return {};
+    if (LTMedia.describe(url).kind === 'tiktok') {
+      const mediaMetadata = {};
+      if (editorVideoTitle) mediaMetadata.title = editorVideoTitle;
+      if (editorTikTokId) mediaMetadata.tiktokId = editorTikTokId;
+      return Object.keys(mediaMetadata).length ? { mediaMetadata } : {};
+    }
     return editorVideoTitle ? { mediaMetadata: { title: editorVideoTitle } } : {};
   }
   function updateQuickEntryHint() {

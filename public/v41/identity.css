@@ -102,6 +102,10 @@ html[data-lt-theme=garden] .lt-media-body button{color:var(--lt-paper)}
 .lt-yt-preview .lt-yt-play{position:absolute;inset:0;width:100%;min-height:44px;min-width:44px;border:0;padding:0;background:transparent;cursor:pointer;display:grid;place-items:center}
 .lt-yt-preview .lt-yt-play>span{display:grid;place-items:center;min-width:56px;min-height:56px;border-radius:50%;background:var(--lt-ink);color:var(--lt-paper);border:2px solid var(--lt-paper);box-shadow:0 2px 10px rgba(0,0,0,.42);font-size:22px;line-height:1}
 .lt-yt-frame{display:block;width:100%;aspect-ratio:16/9;border:0;border-radius:8px;background:#000}
+/* #791: 틱톡 세로 패널 — 공식 oEmbed가 썸네일을 주지 않아(2026-11-18 실측) 색 패널에 표식만 둔다. 재생기는 누를 때만 붙는다. */
+.lt-tt-preview{aspect-ratio:9/16;max-height:360px;border-radius:8px;background:linear-gradient(160deg,var(--lt-ink) 0%,#000 100%)}
+.lt-media[data-lt-vertical="1"] .lt-tt-preview{height:100%;max-height:none}
+.lt-tt-mark{position:absolute;top:10px;right:10px;z-index:2;padding:3px 9px;border-radius:var(--lt-r-pill);background:rgba(0,0,0,.55);color:#fff;font-size:11px;font-weight:700;letter-spacing:.06em}
 /* #393 1: 세로 영상(쇼츠 주소·세로 비율 정보)은 세로 틀(9:16). 썸네일·재생 모두 같은 비율, 잘림 없음. */
 .lt-media-toolbar{display:flex;justify-content:flex-end;margin:0 0 8px}
 .lt-media-toolbar button{min-height:44px;padding:8px 14px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-pill);background:rgba(255,230,166,.08);color:inherit;font-size:13px;cursor:pointer}

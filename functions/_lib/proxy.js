@@ -65,6 +65,8 @@ const ALLOWED = new Map([
   ['/api/admin/journals', new Set(['GET'])],
   ['/api/admin/stats', new Set(['GET'])],
   ['/api/youtube/oembed', new Set(['GET'])],
+  // #791 1단계: 틱톡 영상 정보 — 유튜브 oEmbed와 같은 길. 서버가 짧은 주소도 풀어 준다. GET만 넘긴다.
+  ['/api/tiktok/oembed', new Set(['GET'])],
   ['/api/admin/session', new Set(['GET'])],
   ['/api/admin/roles', new Set(['GET'])],
   // 운영센터 '한눈에' 숫자(#671 후속) — 서버 경로는 있었지만 프록시 허용 목록에 없어 404였다. GET만 넘긴다.

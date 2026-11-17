@@ -129,6 +129,7 @@ test('previewState: 빈 값·지원 주소·지원 안 함을 미리보기 카�
     [{ status: 'empty', kind: 'none' }, 'empty'],
     [null, 'empty'],
     [{ status: 'ok', kind: 'youtube' }, 'youtube'],
+    [{ status: 'ok', kind: 'tiktok' }, 'tiktok'],
     [{ status: 'ok', kind: 'link' }, 'link'],
     [{ status: 'ok', kind: 'photo' }, 'link'],
     [{ status: 'ok', kind: 'video' }, 'link'],
@@ -145,6 +146,9 @@ test('previewTag: YouTube는 Shorts·Live 모양까지, 다른 링크는 호스�
     ['https://www.youtube.com/shorts/9NXOCr-T8LU', 'YOUTUBE · SHORTS'],
     ['https://youtube.com/shorts/xyz', 'YOUTUBE · SHORTS'],
     ['https://www.youtube.com/live/abc', 'YOUTUBE · LIVE'],
+    ['https://www.tiktok.com/@tiktokofficial/video/7252913073450106158', 'TIKTOK'],
+    ['https://vm.tiktok.com/ZGd3XTri5/', 'TIKTOK'],
+    ['https://vt.tiktok.com/ZS1234abc/', 'TIKTOK'],
     ['https://example.com/some/post', 'example.com'],
     ['https://www.example.com/a', 'example.com'],
     ['notaurl', ''],
@@ -192,7 +196,8 @@ test('#343 마크업: 두 줄 설명·크림 버튼 하나·고정 안내 줄(#4
   // #462: '사진은 나만 볼 수 있어요'는 용량 한 줄(private-upload.mjs)로 옮겨 두 번 말하지 않는다.
   assert.match(html, /class="panel-note media-private-note">직접 찍었거나 쓸 권리가 있는 사진만 올려 주세요<\/p>/, '자세한 추가의 사진 안내');
   // #462: 쉬운 추가에는 사진 올리기가 없다(#432) — 입력 칸 안내도 링크만 말한다.
-  assert.match(html, /placeholder="YouTube 같은 링크 주소"/, '금테 입력창 안내');
+  // #791: 틱톡 링크도 같은 칸에서 받는다.
+  assert.match(html, /placeholder="YouTube·틱톡 같은 링크 주소"/, '금테 입력창 안내');
 });
 
 test('#343 CSS: 머리글 금색·미리보기/안내 줄 높이 고정·크림 버튼 폭', () => {

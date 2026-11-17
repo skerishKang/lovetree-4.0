@@ -29,3 +29,38 @@ test('private aliases fetch on the current official host without rewriting store
  }
  assert.equal(media.privateAssetName('https://lovetree-4-0.pages.dev'+path,'https://preview.test'),null);
 });
+
+test('#791 틱톡 정본 주소는 세로 영상(kind=tiktok)으로 판정하고 재생기 주소는 공식 모양이다', () => {
+  const canonical = 'https://www.tiktok.com/@tiktokofficial/video/7252913073450106158';
+  const m = media.describe(canonical);
+  assert.equal(m.kind, 'tiktok');
+  assert.equal(m.videoId, '7252913073450106158');
+  assert.equal(m.vertical, true);
+  assert.equal(m.openUrl, canonical);
+  assert.equal(m.label, 'TikTok 링크');
+  assert.equal(m.actionLabel, 'TikTok에서 열기');
+  assert.equal(media.tiktokPlayerUrl('7252913073450106158'), 'https://www.tiktok.com/player/v1/7252913073450106158?embed_from=oembed&music_info=1&description=1&autoplay=1&muted=1');
+  assert.equal(media.tiktokPlayerUrl('not-an-id'), '');
+  assert.equal(media.verticalVideo(canonical), true);
+});
+
+test('#791 틱톡 짧은 주소는 id 없이 틱톡으로 인정한다(서버 oEmbed가 푼다)', () => {
+  const m = media.describe('https://vm.tiktok.com/ZGd3XTri5/');
+  assert.equal(m.kind, 'tiktok');
+  assert.equal(m.videoId, '');
+  assert.equal(m.short, true);
+  // 닮은 호스트·사진 주소는 틱톡이 아니다.
+  assert.equal(media.describe('https://www.tiktok.com/@x/photo/7252913073450106158').kind, 'link');
+  assert.equal(media.describe('https://www.tiktok.com.evil.test/@x/video/7252913073450106158').kind, 'link');
+});
+
+test('#791 틱톡 카드는 세로 패널+구석 표식+원본 링크로 그리고 외부 요청은 없다', () => {
+  const html = media.markup('https://www.tiktok.com/@tiktokofficial/video/7252913073450106158', '틱톡 영상');
+  assert.doesNotMatch(html, /<img|<video|<iframe|<script/i);
+  assert.match(html, /lt-tt-preview/);
+  assert.match(html, /TikTok/);
+  assert.match(html, /data-lt-tiktok-id="7252913073450106158"/);
+  assert.match(html, /data-lt-play/);
+  assert.match(html, /TikTok에서 열기 ↗/);
+  assert.doesNotMatch(html, /기억할 구간/);
+});

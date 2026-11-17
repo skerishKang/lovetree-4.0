@@ -318,3 +318,13 @@ test('옮겨도 꼬리표는 유지되고 이어진 순간 연결은 원래 트�
   assert.equal(childInSource.parentId, rootId, '이어진 순간은 원래 트리의 위 순간에 다시 붙는다(연결이 끊기지 않는다)');
   validateState(result.state);
 });
+
+test('#791 mediaMetadata.tiktokId: 짧은 주소가 서버에서 푼 id를 함께 남기고 모양이 아니면 버린다', () => {
+  const fields = input();
+  const base = createTree(fields);
+  const tree = addMoment(base, { ...fields, url: 'https://vm.tiktok.com/ZGd3XTri5/', mediaMetadata: { tiktokId: '7252913073450106158' } }, base.moments[0].id);
+  assert.deepEqual(tree.moments[1].mediaMetadata, { title: '', channel: '', source: 'vm.tiktok.com', tiktokId: '7252913073450106158' });
+  const badBase = createTree(fields);
+  const bad = addMoment(badBase, { ...fields, url: 'https://vm.tiktok.com/ZGd3XTri5/', mediaMetadata: { tiktokId: 'not-an-id' } }, badBase.moments[0].id);
+  assert.equal(Object.prototype.hasOwnProperty.call(bad.moments[1], 'mediaMetadata'), false);
+});

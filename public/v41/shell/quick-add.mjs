@@ -2,7 +2,7 @@
 // 판정·문구·추출은 ../quick-add.mjs의 순수 함수가 맡고, 이 파일은 DOM만 만진다(docs/TESTING.md).
 // 저장은 로컬1 계약(member.apply('quickAdd', {url}))을 그대로 부른다 — 화면은 이름만 쓴다.
 import {mountPrivateUpload} from '../private-upload.mjs';
-import {fetchVideoTitle} from '../video-title.mjs';
+import {fetchVideoTitle, fetchTikTokMetadata} from '../video-title.mjs';
 import {suggestMomentTitle} from '../domain.mjs';
 import {displayTreeTitle} from '../tree-name.mjs';
 import {extractDropUrl, hasDropPayload, firstImageFile, parseQuickUrl, dropRoute, previewState, previewTag, savedNoticeText, quickTreeLineText, quickTreeAfterText, quickSubmitText, quickSavedTreeText, QUICK_INBOX_LABEL, QUICK_EMPTY_ERROR, QUICK_INVALID_ERROR, DROP_LOGIN_NOTICE, DROP_READONLY_NOTICE, QUICK_PASTE_LABEL, QUICK_CLEAR_LABEL, QUICK_EMPTY_PREVIEW, QUICK_INVALID_PREVIEW, QUICK_PASTE_EMPTY, QUICK_PASTE_ERROR} from '../quick-add.mjs';
@@ -217,7 +217,7 @@ export function createQuickAdd(deps) {
   // 사진 저장 뒤 칸이 빈 상태에서도 켜져 '주소 없으면 흐림' 규칙이 깨지므로, 전송이 끝난 다음 한 번 다시 맞춘다.
   function syncSubmitState() {
     const state = previewState(parseQuickUrl($('quick-url').value, describe));
-    $('quick-submit').disabled = state !== 'youtube' && state !== 'link';
+    $('quick-submit').disabled = state !== 'youtube' && state !== 'tiktok' && state !== 'link';
   }
 
   // 미리보기 카드: 상태 판정은 previewState, 꼬리표는 previewTag가 정한다(순수 함수).
@@ -234,7 +234,7 @@ export function createQuickAdd(deps) {
     preview.dataset.media = 'no';
     $('quick-paste').textContent = String(input.value ?? '').trim() ? QUICK_CLEAR_LABEL : QUICK_PASTE_LABEL;
     // 레거시 규칙 그대로: 담기 버튼은 저장 가능한 주소일 때만 눌린다(빈 칸·지원 안 함은 흐림).
-    $('quick-submit').disabled = state !== 'youtube' && state !== 'link';
+    $('quick-submit').disabled = state !== 'youtube' && state !== 'tiktok' && state !== 'link';
     clearSavedNotice();
     $('quick-error').textContent = '';
     if (state === 'empty') {
@@ -271,6 +271,7 @@ export function createQuickAdd(deps) {
     meta.append(tag, title);
     preview.append(meta);
     if (state === 'youtube') void loadYouTubeTitle(parsed.videoId, title, token);
+    if (state === 'tiktok') void loadTikTokTitle(parsed.value, title, token);
   }
   // 제목은 기존 서버 oEmbed 프록시에서만 받는다(썸네일이 200이어도 없는 영상일 수 있어 실패는 조용히 넘긴다).
   // 받아 둔 제목은 titleCache에 남고, 저장 시(#344) mediaMetadata.title로 함께 넘어가 자동 제목이 된다.
@@ -294,6 +295,21 @@ export function createQuickAdd(deps) {
     const title = await running;
     if (!title) return;
     if (node && token === previewToken && node.isConnected !== false) node.textContent = title;
+  }
+
+  // #791: 틱톡 영상 정보 — 유튜브와 같은 자리다. 서버 oEmbed가 짧은 주소까지 풀고
+  // 영상 id·제목(있으면)을 돌려준다. id는 저장 시 mediaMetadata.tiktokId로 남긴다.
+  const tiktokCache = new Map();
+  async function loadTikTokTitle(url, node, token) {
+    if (!url) return;
+    if (tiktokCache.has(url)) {
+      const known = tiktokCache.get(url);
+      if (node && known.title) node.textContent = known.title;
+      return;
+    }
+    const meta = await fetchTikTokMetadata(url, fetchImpl);
+    if (meta) tiktokCache.set(url, {title: meta.title || '', tiktokId: meta.videoId || ''});
+    if (node && token === previewToken && node.isConnected !== false && meta?.title) node.textContent = meta.title;
   }
 
   // #638 제목 경합: 제목이 도착하기 전에 담았으면 저장한 순간을 기록해 두었다가, 제목이 도착하면
@@ -352,9 +368,20 @@ export function createQuickAdd(deps) {
   // 기존 도메인 규칙(suggestMomentTitle의 마음 한마디·링크 규칙)으로 물러난다.
   function quickMediaTitle(url) {
     const parsed = parseQuickUrl(url, describe);
-    if (parsed.status !== 'ok' || parsed.kind !== 'youtube' || !parsed.videoId) return {};
-    const title = titleCache.get(parsed.videoId) || '';
-    return title ? { mediaMetadata: { title } } : {};
+    if (parsed.status !== 'ok') return {};
+    if (parsed.kind === 'youtube' && parsed.videoId) {
+      const title = titleCache.get(parsed.videoId) || '';
+      return title ? { mediaMetadata: { title } } : {};
+    }
+    if (parsed.kind === 'tiktok') {
+      const meta = tiktokCache.get(parsed.value);
+      if (!meta) return {};
+      const mediaMetadata = {};
+      if (meta.title) mediaMetadata.title = meta.title;
+      if (meta.tiktokId) mediaMetadata.tiktokId = meta.tiktokId;
+      return Object.keys(mediaMetadata).length ? { mediaMetadata } : {};
+    }
+    return {};
   }
 
   // 저장될 제목(안내 줄 요약)은 저장과 같은 규칙·같은 입력으로 계산한다 — 화면과 저장이 어긋나지 않게.

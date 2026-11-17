@@ -74,7 +74,7 @@ function detailMarkup(m){
  /* #815: 연결 이유는 적었을 때만 보인다(비면 아무것도 그리지 않는다). */
  const line=connectionLine(nextInfo?.title,nextInfo?.reason,{hideEmptyWhy:true});
  const rangeLine=formatRange(m.startSeconds,m.endSeconds);
- const open=m.url&&isYouTubeUrl(m.url)?'YouTube에서 열기 ↗':'원본 링크 열기 ↗';
+ const open=m.url&&(isYouTubeUrl(m.url)?'YouTube에서 열기 ↗':(LTMedia?.describe(m.url)?.kind==='tiktok'?'TikTok에서 열기 ↗':'원본 링크 열기 ↗'));
  // #327 2부: 내 기록(서버)의 순간 상세에서 다른 트리로 옮길 수 있다. 공유·예시는 숨긴다.
  const canMove=(window.parent&&window.parent.LT41)?window.parent.LT41.source==='server':false;
  const view=titleViewFor(m);
@@ -132,9 +132,12 @@ document.addEventListener('keydown',e=>{if(e.key!=='Escape')return;if(document.q
    영향받지 않도록 pointerdown에서 먼저 잡고, 재생 주소를 못 만들면 원본 링크를 새 창으로 연다. */
 function playInline(yt,media){
  const start=Number(yt.dataset.ytStart||0),end=Number(yt.dataset.ytEnd||0);
- const url=(end>start)?(youtubeRangeEmbedUrl(yt.dataset.ytPlay,start,end)+'&autoplay=1'):embedUrl(yt.dataset.ytPlay,start);
+ // #791: 틱톡 — 공식 재생기 주소만 만든다(구간 없음). 주소가 없으면 원본 링크로 물러난다.
+ const ttId=yt.dataset.ttPlay||'';
+ const ttUrl=ttId&&window.LTMedia&&typeof LTMedia.tiktokPlayerUrl==='function'?LTMedia.tiktokPlayerUrl(ttId):'';
+ const url=ttUrl||((end>start)?(youtubeRangeEmbedUrl(yt.dataset.ytPlay,start,end)+'&autoplay=1'):embedUrl(yt.dataset.ytPlay,start));
  if(!url){if(media&&media.openUrl)window.open(media.openUrl,'_blank','noopener');return}
- const frame=document.createElement('iframe');frame.className='yt-frame'+(yt.dataset.ytVertical==='1'?' is-vertical':'');frame.src=url;frame.title='YouTube 영상 재생';
+ const frame=document.createElement('iframe');frame.className='yt-frame'+(yt.dataset.ytVertical==='1'?' is-vertical':'');frame.src=url;frame.title=ttUrl?'TikTok 영상 재생':'YouTube 영상 재생';
  frame.allow='accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';frame.allowFullscreen=true;
  frame.setAttribute('referrerpolicy','strict-origin-when-cross-origin');
  const host=yt.parentElement;if(!host)return;host.replaceChildren(frame);
@@ -148,10 +151,11 @@ document.addEventListener('pointerdown',e=>{
   const frame=document.createElement('iframe');frame.className='yt-frame';frame.src=embedUrl(fromStart.dataset.ytFromStart,0);frame.title='YouTube 영상 재생';
   frame.allow='accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';frame.allowFullscreen=true;
   frame.setAttribute('referrerpolicy','strict-origin-when-cross-origin');host.replaceChildren(frame);return}
- const yt=e.target.closest&&e.target.closest('[data-yt-play]');
+ const yt=e.target.closest&&e.target.closest('[data-yt-play], [data-tt-play]');
  if(!yt||yt.querySelector('.lt-fallback-card'))return;
  e.preventDefault();e.stopPropagation();
- const url=yt.dataset.ytPlay?{openUrl:'https://www.youtube.com/watch?v='+yt.dataset.ytPlay+(Number(yt.dataset.ytStart||0)?'&t='+Number(yt.dataset.ytStart||0):'')}:null;
+ const ttLink=yt.dataset.ttPlay?yt.closest('.clipping')?.querySelector('.media-source-link'):null;
+ const url=yt.dataset.ttPlay?{openUrl:ttLink?ttLink.href:''}:(yt.dataset.ytPlay?{openUrl:'https://www.youtube.com/watch?v='+yt.dataset.ytPlay+(Number(yt.dataset.ytStart||0)?'&t='+Number(yt.dataset.ytStart||0):'')}:null);
  playInline(yt,url);
 },true);
 document.addEventListener('click',e=>{
@@ -169,9 +173,10 @@ document.addEventListener('click',e=>{
  const openTree=e.target.closest('[data-open-tree]');
  if(openTree){e.preventDefault();e.stopPropagation();const momentId=openTree.dataset.openMoment,treeId=openTree.dataset.openTree;if(momentId&&treeId)LTDEMO.openBook(momentId,treeId);return}
  /* 1. YouTube 그 자리 재생: 누른 뒤에만 iframe을 만든다(시작 시점 반영, referrerpolicy 엄격). */
- const yt=e.target.closest('[data-yt-play]');
+ const yt=e.target.closest('[data-yt-play], [data-tt-play]');
  if(yt){if(yt.querySelector('.lt-fallback-card'))return;e.preventDefault();e.stopPropagation();if(!yt.parentElement||yt.parentElement.querySelector('iframe.yt-frame'))return;
-  playInline(yt,{openUrl:'https://www.youtube.com/watch?v='+yt.dataset.ytPlay});return}
+  const ttLink=yt.dataset.ttPlay?yt.closest('.clipping')?.querySelector('.media-source-link'):null;
+  playInline(yt,yt.dataset.ttPlay?{openUrl:ttLink?ttLink.href:''}:{openUrl:'https://www.youtube.com/watch?v='+yt.dataset.ytPlay});return}
  /* 책 글자 다듬기(261116) ③: 잘린 제목은 누르면 펼침·다시 누르면 접힌다(✎ 고치기는 그대로). 폰의 길게 누름(0.42초)은
     돋보기에 배정돼 있으므로 누름(탭)에 배정해 충돌이 없다. 펼침은 읽는 동작 — 단추가 있는 책(내 기록)에서만 온다. */
  const titleBtn=e.target.closest&&e.target.closest('.moment-title-button');
@@ -257,6 +262,18 @@ momentContent=function(m,compact=false){
     face+
     '<span class="yt-play-label">'+t(label)+'</span></button>'+
     '<div class="media-links"><a class="media-source-link" href="'+t(media.openUrl)+'" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">YouTube ↗</a>'+
+    '<button type="button" data-yt-expand="'+t(safe.id)+'">크게 보기</button></div></div>';
+   return piece+paintTitle(safe);
+  }
+  if(media.kind==='tiktok'){
+   // #791: 틱톡 — 썸네일 없이 세로 패널(구석 표식+재생). 재생기는 누를 때만 붙는다.
+   // 짧은 주소는 저장 때 서버가 푼 id(mediaMetadata.tiktokId)를 재생기 id로 쓴다.
+   const tiktokId=media.videoId||((safe.mediaMetadata&&typeof safe.mediaMetadata.tiktokId==='string')?safe.mediaMetadata.tiktokId.trim():'');
+   const piece='<div class="clipping moment" data-moment="'+t(safe.id)+'">'+
+    '<button type="button" class="yt-play is-vertical" data-lt-thumb-host data-tt-play="'+t(tiktokId)+'" data-yt-vertical="1" aria-label="TikTok 영상 재생">'+
+    '<span class="lt-tt-mark tt-corner" aria-hidden="true">TikTok</span>'+
+    '<span class="yt-play-label">▶ 재생</span></button>'+
+    '<div class="media-links"><a class="media-source-link" href="'+t(media.openUrl)+'" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">TikTok ↗</a>'+
     '<button type="button" data-yt-expand="'+t(safe.id)+'">크게 보기</button></div></div>';
    return piece+paintTitle(safe);
   }

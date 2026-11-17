@@ -1,5 +1,12 @@
 [
   {
+    "version": "4.1.12",
+    "date": "2026.11.18",
+    "items": [
+      {"kind": "new", "text": "틱톡 영상도 순간으로 담을 수 있어요", "source": "team", "issue": "#791"}
+    ]
+  },
+  {
     "version": "4.1.11",
     "date": "2026.11.17",
     "items": [
