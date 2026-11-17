@@ -466,3 +466,85 @@ test('642 실행: 재생하지 않은 상태에서 창 크기를 바꾸면 장�
     } finally { await ctx.close(); }
   } finally { await browser.close(); }
 });
+
+// 의견 #26: 트리를 바꾸면 열려 있던 책이 새 트리 내용으로 다시 그려진다(정원·밤 × 1440·390).
+test('26: 책을 열어 둔 채 트리를 바꾸면 책 제목·첫 카드·카드 수가 새 트리 것으로 바뀐다', { skip: skip || false, timeout: 180000 }, async () => {
+  if (skip) assert.fail(`건너뜀=실패 — ${skip}`);
+  const { createTree: makeTree, addMoment: growTree } = await import('../public/v41/domain.mjs');
+  const { serve: serveApp } = await import('./helpers/screen-audit.mjs');
+  const { mkdirSync } = await import('node:fs');
+  const shotDir = process.env.LT_BOOK_SWITCH_SHOT_DIR || 'E:\\lovetree-qa\\local4\\책전환';
+  mkdirSync(shotDir, { recursive: true });
+  let a = makeTree({subject:'A',title:'A',note:'',emotion:'설렘',date:'2026-11-01',url:''},'2026-11-01T00:00:00Z');
+  a = growTree(a,{title:'A 첫 순간',note:'',emotion:'설렘',date:'2026-11-01',url:''},a.moments[0].id,'2026-11-01T00:00:00Z');
+  let b = makeTree({subject:'B',title:'B',note:'',emotion:'설렘',date:'2026-11-03',url:''},'2026-11-03T00:00:00Z');
+  b = growTree(b,{title:'B 첫 순간',note:'',emotion:'설렘',date:'2026-11-03',url:''},b.moments[0].id,'2026-11-03T00:00:00Z');
+  b = growTree(b,{title:'B 둘 순간',note:'',emotion:'설렘',date:'2026-11-04',url:''},b.moments[0].id,'2026-11-04T00:00:00Z');
+  const server = await serveApp();
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch({ headless:true, ...(process.env.LT_BOOK_BROWSER_EXE ? { executablePath: process.env.LT_BOOK_BROWSER_EXE } : {}) });
+  try {
+    for (const [width,height] of [[1440,900],[390,844]]) {
+      for (const theme of ['night','garden']) {
+        const ctx = await browser.newContext({viewport:{width,height},reducedMotion:'reduce'});
+        await ctx.addInitScript(t=>{try{localStorage.setItem('lt41.theme',t)}catch{}},theme);
+        await ctx.route('**/api/**',r=>r.fulfill({status:200,contentType:'application/json',body:'{"ok":true,"items":[]}'}));
+        await ctx.route('**/api/workspace**',r=>r.fulfill({status:200,contentType:'application/json',body:JSON.stringify({revision:1,state:{version:1,trees:[a,b],prefs:{}},subject:'시험계정',writeSubjectBound:true,savedAt:'2026-11-15T09:00:00.000Z'})}));
+        const page = await ctx.newPage();
+        await page.goto(`${base}/v41/?account=1`,{waitUntil:'load'});
+        await page.waitForFunction(()=>!!window.LT41?.trees?.length,null,{timeout:20000});
+        await page.locator('#discover-ask-no').click().catch(()=>{});
+        if (width === 390) {
+          await page.locator('#mobile-more').click();
+          await page.waitForTimeout(150);
+          await page.locator('#header-overflow button',{hasText:'책'}).first().click();
+        } else {
+          await page.locator('.tree-views [data-view="track59-sketchbook.html"]').click();
+        }
+        await page.waitForFunction(()=>document.querySelector('#view')?.contentWindow?.location?.pathname?.includes('track59-sketchbook'),null,{timeout:8000});
+        await page.waitForTimeout(900);
+        const read = () => page.evaluate(() => {
+          const f=document.querySelector('#view');let d=null;try{d=f?.contentDocument}catch{}
+          return {
+            src: f?.contentWindow?.location?.href||'',
+            title: d?.getElementById('bookTitleText')?.textContent?.trim()||'',
+            cards: (()=>{try{return d?.defaultView?.__TRACK59__?.getState?.().total||0}catch{return 0}})(),
+            first: (d?.querySelector('.page-content,.mobile-content')?.textContent||'').slice(0,40),
+            body: (d?.body?.innerText||'')
+          };
+        });
+        const before = await read();
+        assert.match(before.src,/track59-sketchbook/, '책 화면');
+        assert.ok(before.title==='A', '전환 전 책 제목 A');
+
+        if (width === 390) {
+          // 390에서는 책 안의 트리 제목 메뉴로 바꾼다(헤더 트리 선택은 접혀 있다).
+          const frame = page.locator('#view').contentFrame();
+          await frame.locator('#bookTitleBtn').click();
+          await page.waitForTimeout(150);
+          await frame.locator(`#treeMenuPanel [data-tree-id="${b.id}"]`).click();
+        } else {
+          await page.locator('#record-menu').click();
+          await page.waitForTimeout(150);
+          await page.locator(`#tree-popover [data-tree-id="${b.id}"]`).click();
+        }
+        await page.waitForFunction(id=>document.querySelector('#view')?.contentWindow?.location?.search?.includes(id),b.id,{timeout:10000});
+        await page.waitForTimeout(900);
+        const after = await read();
+        console.log(`책전환 ${width}·${theme}: 제목 ${before.title}→${after.title}, 카드 ${before.cards}→${after.cards}`);
+        assert.match(after.src,/[?&]tree=/, '트리 값이 책 프레임 주소에 남는다');
+        assert.ok(after.title==='B', `${width}·${theme} 전환 뒤 책 제목 B (실제 ${after.title})`);
+        assert.ok(after.body.includes('2026. 11. 03') && !after.body.includes('2026. 11. 01'), `${width}·${theme} 책 본문이 B 것`);
+        assert.ok(after.cards > before.cards, `${width}·${theme} 카드 수가 B 것으로 늘어난다(전 ${before.cards} → 후 ${after.cards})`);
+        await page.screenshot({path:`${shotDir}/book-${width}-${theme}.png`});
+        await ctx.close();
+      }
+    }
+  } finally {
+    await browser.close();
+    server.close();
+  }
+});
+
+
+

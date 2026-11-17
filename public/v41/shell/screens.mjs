@@ -148,7 +148,8 @@ export function createScreens(deps) {
     setTimeout(ready, 1500); // load를 놓쳐도 두 번은 넘어가지 않는다(settled)
   }
 
-  function show(file, write = true) {
+  // treeKey: 트리를 바꿀 때 프레임 주소를 달리해 반드시 새 문서로 띄운다(#26 — 같은 주소면 옛 트리 내용이 남았다).
+  function show(file, write = true, treeKey = '') {
     // show()는 화면 파일 이름을 받는다(화면 키가 아니다). 목록에서 그대로 찾는다.
     const screen = screens.find(s => s[1] === file);
     if (!screen) return;
@@ -175,8 +176,10 @@ export function createScreens(deps) {
     // #583 '이 순간 열기': 지도를 특정 순간을 가운데 두고 열 요청이 있으면 프레임 주소에 ?open=<순간>을 붙인다.
     // 요청은 한 번 쓰면 지운다(다른 화면을 먼저 보여 줬으면 끝난 요청이다).
     const openMoment = takeNetworkOpen?.() ?? null;
-    const openQuery = file === 'track56-network.html' && openMoment ? `?open=${encodeURIComponent(openMoment)}` : '';
-    showInFrame(screenUrl(file, getSource(), location.origin) + openQuery, '러브트리 · ' + screenTitle(file));
+    const url = new URL(screenUrl(file, getSource(), location.origin));
+    if (treeKey) url.searchParams.set('tree', treeKey);
+    if (file === 'track56-network.html' && openMoment) url.searchParams.set('open', openMoment);
+    showInFrame(url.href, '러브트리 · ' + screenTitle(file));
     if (write) writeLocation();
     links();
   }

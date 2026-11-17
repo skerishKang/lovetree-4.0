@@ -51,6 +51,10 @@ test('show()는 화면 파일 이름을 받아 그 화면의 iframe 경로로 �
     assert.equal(current, 'track32-bookshelf.html', '화면 이름을 그대로 받는다');
     assert.equal(replaced.at(-1), 'https://lovetree-4-0.pages.dev/v41/views/track32-bookshelf.html');
 
+    // 의견 #26: 트리를 바꾸면 같은 화면이어도 주소에 tree=를 붙여 새 문서로 띄운다(옛 트리 내용이 남지 않게).
+    screens.show('track32-bookshelf.html', false, 'tree-b');
+    assert.match(replaced.at(-1), /[?&]tree=tree-b$/, '트리 값이 프레임 주소에 남는다');
+
     // 목록에 없는 파일은 화면을 바꾸지 않는다.
     const before = replaced.length;
     screens.show('nope.html');
