@@ -243,7 +243,7 @@ export function createMessages(deps) {
     const selected = shares.filter(item => item.treeId === treeId && item.origin !== 'auto');
     if (!selected.length) {
       const p = document.createElement('p');
-      p.textContent = '아직 만든 공유 주소가 없어요. 트리는 공개가 기본이라 순간 3개부터 둘러보기에 소개돼요.';
+      p.textContent = '아직 만든 공유 주소가 없어요. 둘러보기 소개는 기본 꺼짐이에요.';
       host.append(p);
       return;
     }
@@ -348,7 +348,6 @@ export function createMessages(deps) {
     $('share-created').hidden = true;
     $('share-feedback').textContent = '';
     $('share-copy-note').textContent = '';
-    paintShareMomentHint();
     paintShareDiscover();
     paintShareVisibility();
     paintShareSteps('choose');
@@ -412,22 +411,6 @@ export function createMessages(deps) {
       $('share-feedback').textContent = '주소를 선택했어요. 복사해 주세요.';
     }
   };
-  // #538: 순간 수 안내 — 소개 상태(261116 결정: 기본 꺼짐·고객이 고름)에 맞게 적는다.
-  // 상태를 아직 못 확인했으면(null) 상태 말을 두지 않는다 — 상태 줄과 어긋나는 두 줄을 만들지 않으려는 규칙(#753 후속).
-  function paintShareMomentHint() {
-    const hint = $('share-moment-hint');
-    if (!hint) return;
-    // globalThis 경유 — 비동기 꼬리(서버 응답 뒤 다시 그리기)는 가짜 DOM 시험이 전역을 이미 거둔 뒤에도 돈다.
-    const count = globalThis.window?.LT41?.tree?.moments?.length || 0;
-    const discover = discoverOf(globalThis.window?.LT41?.tree?.id);
-    hint.textContent = discover === true
-      ? `이 트리의 순간 ${count}개 · 둘러보기에 소개 중이에요.`
-      : discover === false
-        ? `이 트리의 순간 ${count}개 · 둘러보기에 소개하지 않아요. 공유 판에서 켤 수 있어요.`
-        : (count >= 3
-          ? `이 트리의 순간 ${count}개 · 둘러보기에 소개할지 공유 판에서 고를 수 있어요.`
-          : `이 트리의 순간 ${count}개 · 순간 3개를 담으면 소개할지 묻는 질문이 나와요.`);
-  }
   // 공개 여부·둘러보기 소개: 설정과 같은 두 칸 선택(44px). 상태 글 줄은 없다.
   async function paintShareDiscover() {
     const treeId = window.LT41?.tree?.id;
@@ -438,7 +421,6 @@ export function createMessages(deps) {
     if (off) off.setAttribute('aria-checked', String(discover === false));
     if (on) on.setAttribute('aria-checked', String(discover === true));
     deps.rememberDiscover?.(treeId, discover);
-    paintShareMomentHint();
   }
   const discOff = $('share-disc-off'); if (discOff) discOff.onclick = async () => { await setDiscover(false); };
   const discOn = $('share-disc-on'); if (discOn) discOn.onclick = async () => { await setDiscover(true); };

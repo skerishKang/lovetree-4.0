@@ -166,13 +166,11 @@ test('둘러보기 소개 스위치: 고른 값은 discover PUT으로 저장되�
     assert.equal(h.els['share-disc-off'].getAttribute('aria-checked'), 'true', '기본 꺼짐(#739)은 안 함이 선택');
     assert.equal(h.els['share-disc-on'].getAttribute('aria-checked'), 'false');
     assert.equal(h.els['share-disc-off'].getAttribute('aria-checked'), 'true');
-    assert.match(h.els['share-moment-hint'].textContent, /소개하지 않아요/, '꺼짐 상태에서 힌트 줄도 같은 상태를 말한다');
     await h.els['share-disc-on'].onclick();
     await new Promise(r => setImmediate(r)); // 다시 그리기(paintShareDiscover)의 가짜 GET 한 바퀴
     assert.deepEqual(h.requests.filter(r => r[0] === 'discover'), [['discover', 'tree1', true]], '판단은 서버에 맡긴다');
     // 스위치 뒤 상자 안 문장들(순간 수 힌트·상태 줄)이 같은 상태를 말한다(261116 2차 지적).
     assert.equal(h.els['share-disc-on'].getAttribute('aria-checked'), 'true', '켜짐은 소개가 선택');
-    assert.match(h.els['share-moment-hint'].textContent, /소개 중이에요/, '힌트 줄이 옛 값에 머물지 않는다');
     assert.equal(h.els['share-disc-on'].getAttribute('aria-checked'), 'true');
     assert.equal(h.els['share-disc-off'].getAttribute('aria-checked'), 'false');
     assert.match(h.els['share-feedback'].textContent, /둘러보기에 소개했어요/);
@@ -190,7 +188,6 @@ test('공유 창 화면에는 발견이라는 말이 없고, 단계·이유·공
   assert.match(shareHtml, /<p id="share-create-reason"[^>]*hidden>먼저 미리보기를 확인해 주세요\.<\/p>/);
   assert.match(shareHtml, /<a id="share-open" class="share-open" target="_blank" rel="noopener" hidden>열어 보기<\/a>/);
   assert.match(shareHtml, /<p id="share-copy-note" role="status"><\/p>/);
-  assert.match(shareHtml, /<p id="share-moment-hint" class="panel-note" role="status"><\/p>/, '순간 수 안내 자리');
   assert.match(shareHtml, /공개 여부/);
   assert.match(shareHtml, /둘러보기 소개/);
   assert.match(shareHtml, /id="share-disc-off"/);
