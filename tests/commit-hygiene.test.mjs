@@ -9,6 +9,8 @@ import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import {
   FOOTER_WORD,
+  FOOTER_LINE_PATTERN,
+  findFooterLines,
   BANNED_ENV_NAME,
   MISSING_LIST_WARNING,
   parseBannedWords,
@@ -48,6 +50,26 @@ test('도구 꼬리말이 붙은 커밋 메시지는 목록이 없어도 실패�
   assert.equal(found[0].index, 1);
   assert.equal(found[0].word, FOOTER_WORD);
   assert.match(formatReport(found), /커밋 #1/);
+});
+
+test('Co-authored-by 줄 자체를 제목·본문·커밋에서 예외 없이 잡는다', () => {
+  const cases = [
+    [{ title: 'Co-authored-by: 사람 <p@example.com>' }, 'PR 제목', null],
+    [{ body: '고침\n\nco-authored-by: 도구 <tool@example.com>' }, 'PR 본문', null],
+    [{ commits: ['제목', '본문\n\nCO-AUTHORED-BY: 도구 <tool@example.com>'] }, '커밋', 2]
+  ];
+  for (const [input, where, index] of cases) {
+    const hits = findFooterLines(input);
+    assert.equal(hits.length, 1, JSON.stringify(input));
+    assert.equal(hits[0].where, where);
+    assert.equal(hits[0].index, index);
+    assert.equal(hits[0].word, FOOTER_WORD);
+    // 단어 검사와 합쳐도 같은 줄은 한 번만 보고한다.
+    assert.equal(findViolations(input, resolveWords({}).words).length, 1);
+  }
+  assert.equal(FOOTER_LINE_PATTERN.test('Co-authored-by: x <x@y>'), true);
+  assert.equal(FOOTER_LINE_PATTERN.test('본문에 co-authored-by 라고 적힘'), false);
+  assert.deepEqual(findFooterLines({ body: '공동 작성자 없음' }), []);
 });
 
 test('비밀값 목록의 낱말이 PR 제목·본문·커밋에 있으면 실패한다', () => {
