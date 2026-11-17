@@ -204,12 +204,12 @@ test('261116: 4.1.2·4.1.1은 4.1.3 아래·4.1.0 위에 문구 그대로 들어
   }
 });
 
-// 옛 판을 다시 끼워 넣어도 최신 판(4.1.10)이 그대로라 '새 소식' 점이 다시 뜨면 안 된다(#611 저장 규칙).
-test('261117: 옛 판 복원으로 새 소식 점이 다시 뜨지 않는다', () => {
-  assert.equal(latestEntry(UPDATES).version, '4.1.10', '최신 판은 4.1.10 그대로');
+// 옛 판을 다시 끼워 넣어도 최신 판(4.1.11)이 그대로라 '새 소식' 점이 다시 뜨면 안 된다(#611 저장 규칙).
+test('261118: 옛 판 복원으로 새 소식 점이 다시 뜨지 않는다', () => {
+  assert.equal(latestEntry(UPDATES).version, '4.1.11', '최신 판은 4.1.11 그대로');
   const map = new Map();
   const storage = { getItem: k => (map.has(k) ? map.get(k) : null), setItem: (k, v) => map.set(k, v) };
-  markSeen(storage, '4.1.10');
+  markSeen(storage, '4.1.11');
   const latest = latestEntry(UPDATES).version;
   assert.equal(compareVersions(latest, readSeen(storage)), 0, '본 판과 최신 판이 같아 점이 뜨지 않는다');
   // 4.1.1·4.1.2가 끼어도 그 사이 판을 본 사람에게만 새 소식이 뜬다.

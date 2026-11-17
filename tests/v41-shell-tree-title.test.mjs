@@ -201,11 +201,16 @@ test('3-3. 공유 미리보기 요약도 줄인 이름을 보여 준다(createMe
 });
 
 test('4. 둘러보기(공개 목록)도 같은 이름 규칙을 쓴다(mountCommunity 직접 호출)', async () => {
-  // 전: community-panel.mjs의 import·el() 호출 줄을 글자로 봤다 → 후: 목록을 실제로 띄워 카드·미리보기 제목을 본다.
+  // 카드를 실제로 열어 카드와 미리보기의 표시 이름을 확인한다.
   const h = communityHarness({ items: [COMMUNITY_ITEM] });
   try {
     await h.search();
-    const titles = [...h3s(h.get('community-list')), ...h3s(h.get('community-preview'))].map((n) => n.textContent);
+    const cardTitle = h3s(h.get('community-list'))[0]?.textContent;
+    assert.equal(cardTitle, '리센느', '목록 제목은 자동 꼬리말을 뗀다');
+    assert.equal(h.get('community-preview').open, false, '미리보기는 카드 선택 전에는 닫혀 있다');
+    h.get('community-list').children[0].onclick();
+    const previewTitle = h3s(h.get('community-preview'))[0]?.textContent;
+    const titles = [cardTitle, previewTitle];
     assert.deepEqual(titles, ['리센느', '리센느'], '카드 제목과 미리보기 제목은 모두 줄인 이름이다');
     assert.ok(titles.every((t) => !t.includes('나의 순간들')), '자동 꼬리말이 목록에 보이지 않는다');
   } finally { h.restore(); }

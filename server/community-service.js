@@ -6,6 +6,7 @@ import {ROLE_AI_CUSTOMER,ROLE_TESTER} from './admin-roles.js';
 import {coverModeOf} from '../src/domain.js';
 // 꼬리표 판정은 화면과 같은 한 벌 — 서버에 규칙을 복사하지 않는다(#627 3단계 '다른 팬 보기').
 import {parseTag, tagKey} from '../public/v41/tags.mjs';
+import {isVerticalMoment,safeYoutubeThumb,youtubeIdFrom} from '../public/v41/thumb-fallback.mjs';
 
 export const REACTION_KINDS=Object.freeze(['heart','like','love','laugh','wow','sad','angry']);
 const isReactionKind=value=>typeof value==='string'&&REACTION_KINDS.includes(value);
@@ -47,12 +48,19 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
   let projected;try{projected=projectSharedTree(stored.doc,share.treeId);}catch{return null;}
   if(!projected.tree.moments.length)return null;
   const tree=projected.tree,cover=tree.moments.find(moment=>moment.id===tree.coverMomentId)||tree.moments.find(moment=>moment.id===share.entryMomentId)||tree.moments[0];
+  const coverType=cover?.type||(youtubeIdFrom(cover?.url)?'youtube':'');
   // #425 2번: 표지 주소는 '순간에서(moment)'일 때만 보낸다. 사진 표지는 공개 판정에서
   // 디자인/기본으로 바뀌고(projectSharedTree), 디자인·기본 표지에는 주소가 없다.
   const coverUrl=coverModeOf(tree)==='moment'?(cover?.url||''):'';
+  const thumbnailUrl=coverModeOf(tree)==='moment'
+   ? coverType==='youtube'
+    ? safeYoutubeThumb(cover?.mediaMetadata?.thumbnail||cover?.mediaMetadata?.thumbnailUrl||cover?.thumbnailUrl)
+    : coverUrl
+   : '';
+  const vertical=['video','youtube'].includes(coverType)&&isVerticalMoment(cover);
   const emotions=[...new Set(tree.moments.map(moment=>moment.emotion).filter(Boolean))];
   const stats=statsOverride||await communityRepo.stats({productId,shareId:share.shareId,viewerSubjectId});
-  const card={shareId:share.shareId,title:tree.title,subject:tree.subject,summary:clean(cover?.note,160),emotions,momentCount:tree.moments.length,entryMomentId:share.entryMomentId,view:share.view,cover:{title:cover?.title||tree.title,url:coverUrl,emotion:cover?.emotion||''},createdAt:share.createdAt,lastActivityAt:lastActivityAt||share.createdAt,stats};
+  const card={shareId:share.shareId,title:tree.title,subject:tree.subject,summary:clean(cover?.note,160),emotions,momentCount:tree.moments.length,entryMomentId:share.entryMomentId,view:share.view,cover:{title:cover?.title||tree.title,url:coverUrl,thumbnailUrl,type:coverType,vertical,emotion:cover?.emotion||''},createdAt:share.createdAt,lastActivityAt:lastActivityAt||share.createdAt,stats};
   // #611 3번: AI 명예회원 기록은 남에게 보이는 카드에 'AI 명예회원' 배지 한 비트만 내린다
   // (계정·이메일·subject는 공개 응답에 넣지 않는다).
   if(aiTesterLookup&&await aiTesterLookup(share.subjectId))card.aiTester=true;
@@ -60,7 +68,17 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
   // ('모아둔 순간')이어도 영상 제목에 있는 그룹 이름으로 찾을 수 있게 하려는 것이다. 순간은 카드를 만들 때
   // 이미 읽은 공개 사본(projectSharedTree)에서 가져오므로 쿼리는 늘지 않는다. 응답에 내보내지 않도록
   // 열거하지 않는 속성(non-enumerable)으로 붙인다 — JSON.stringify 와 펼침({...card})에 섞이지 않는다.
-  Object.defineProperty(card,'searchText',{value:tree.moments.slice(0,200).map(moment=>[clean(moment.title,120),clean(moment.mediaMetadata?.title,120)].filter(Boolean).join(' ')).filter(Boolean).join(' '),enumerable:false});
+  const artistTags=new Set(),searchTerms=[];
+  for(const [index,moment] of tree.moments.entries()){
+   if(index<200)searchTerms.push(clean(moment.title,120),clean(moment.mediaMetadata?.title,120));
+   for(const raw of Array.isArray(moment.keywords)?moment.keywords:[]){
+    const parsed=parseTag(raw);if(!parsed)continue;
+    if(index<200)searchTerms.push(parsed.value);
+    if(parsed.kindId==='artist')artistTags.add(tagKey(parsed.value));
+   }
+  }
+  Object.defineProperty(card,'searchText',{value:searchTerms.filter(Boolean).join(' '),enumerable:false});
+  Object.defineProperty(card,'artistTags',{value:[...artistTags],enumerable:false});
   return card;
  }
  return {
@@ -74,8 +92,8 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
    totalsCache={at,value};
    return value;
   },
-  async discover({query='',emotion='',cursor='',limit=12,viewerSubjectId=null}={}){
-   const q=clean(query,80).toLocaleLowerCase('ko-KR'),tag=clean(emotion,12),size=Math.max(1,Math.min(24,Number(limit)||12));
+  async discover({query='',emotion='',artistGroup='',cursor='',limit=12,viewerSubjectId=null}={}){
+   const q=clean(query,80).toLocaleLowerCase('ko-KR'),tag=clean(emotion,12),artistKey=tagKey(clean(artistGroup,24)),size=Math.max(1,Math.min(24,Number(limit)||12));
    // #611 3번: AI 명예회원 배지 비트 — 이번 한 번의 둘러보기 조회에서는 같은 주인이면 한 번만 묻는다.
    // #678 후속: 역할을 한 번만 물어 두고(주인당 한 번) 그 값으로 배지와 시험 계정 거름을 함께 판정한다.
    const roleCache=new Map();
@@ -102,7 +120,7 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
     }));
    }
    const cards=[];
-   for(const item of entries){if(!item)continue;const haystack=(item.title+' '+item.subject+' '+item.summary+' '+(item.searchText||'')).toLocaleLowerCase('ko-KR');if(q&&!haystack.includes(q))continue;if(tag&&!item.emotions.includes(tag))continue;cards.push(item);}
+    for(const item of entries){if(!item)continue;const haystack=(item.title+' '+item.subject+' '+item.summary+' '+(item.searchText||'')).toLocaleLowerCase('ko-KR');if(q&&!haystack.includes(q))continue;if(tag&&!item.emotions.includes(tag))continue;if(artistKey&&!item.artistTags?.includes(artistKey))continue;cards.push(item);}
    const start=cursor?Math.max(0,cards.findIndex(item=>item.shareId===cursor)+1):0,items=cards.slice(start,start+size),next=start+size<cards.length?items.at(-1)?.shareId||null:null;
    return {items,nextCursor:next,totalVisible:cards.length};
   },
@@ -180,7 +198,7 @@ export function createCommunityHandler({authenticate,service,productId}){
   // #627 3단계 '다른 팬 보기' — 공개 경로라 로그인 없이도 부른다. 로그인했으면 자기 트리·차단 관계를 뺀다.
   if(path==='/api/public/tag-moments'&&method==='GET'){const who=await principal(request,false);return {status:200,body:await service.tagMoments({tag:String(query.get('tag')||''),viewerSubjectId:who?.subjectId||null}),headers:NO_STORE};}
   if(path==='/api/community/stats'&&method==='GET'){return {status:200,body:await service.discoverTotals(),headers:{...NO_STORE,'cache-control':'public, max-age=60'}};}
-  if(path==='/api/community/shares'&&method==='GET'){const who=await principal(request,false);return {status:200,body:await service.discover({query:query.get('q')||'',emotion:query.get('emotion')||'',cursor:query.get('cursor')||'',limit:query.get('limit')||12,viewerSubjectId:who?.subjectId||null}),headers:NO_STORE};}
+  if(path==='/api/community/shares'&&method==='GET'){const who=await principal(request,false);return {status:200,body:await service.discover({query:query.get('q')||'',emotion:query.get('emotion')||'',artistGroup:query.get('artist')||'',cursor:query.get('cursor')||'',limit:query.get('limit')||12,viewerSubjectId:who?.subjectId||null}),headers:NO_STORE};}
   if(path==='/api/community/me/favorites'&&method==='GET'){const who=await principal(request);return {status:200,body:{shareIds:await service.favorites(who.subjectId)},headers:NO_STORE};}
   if(path==='/api/community/admin/reports'&&method==='GET'){const who=await principal(request);return {status:200,body:{reports:await service.reports(who)},headers:NO_STORE};}
   const moderate=path.match(/^\/api\/community\/admin\/reports\/([^/]+)$/);
