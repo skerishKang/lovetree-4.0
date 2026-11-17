@@ -7,6 +7,9 @@ import { readFile } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 
 export const FOOTER_WORD = 'co-authored-by';
+// squash 병합 본문은 병합 시점에 생기므로 사전 검사 범위가 아니다 — 커밋·PR에 도구 공동 작성자 줄이 있으면
+// 자동 병합이 그 줄을 본문에 옮긴다. 사람 공동 작성자도 두지 않으므로 예외 없이 줄 자체를 막는다.
+export const FOOTER_LINE_PATTERN = /^\s*co-authored-by\s*:/i;
 export const BANNED_ENV_NAME = 'LT_COMMIT_BANNED_WORDS';
 export const MISSING_LIST_WARNING = `COMMIT_HYGIENE=WARN ${BANNED_ENV_NAME} 없음 — 도구 꼬리말만 검사합니다(포크 PR은 비밀값이 없습니다).`;
 
@@ -44,16 +47,35 @@ export function wordPattern(word) {
     : new RegExp(`(?<![가-힣])${body}(?:${KOREAN_PARTICLES})?(?![가-힣])`, 'i');
 }
 
+/** 제목·본문·커밋 메시지의 'Co-authored-by:' 줄 자체를 모은다(목록 유무와 무관, 예외 없음). */
+export function findFooterLines({ title = '', body = '', commits = [] } = {}) {
+  const hits = [];
+  const check = (value, where, index) => {
+    for (const line of String(value ?? '').split(/\r?\n/)) {
+      if (FOOTER_LINE_PATTERN.test(line)) {
+        hits.push({ where, index, word: FOOTER_WORD, excerpt: line.trim(), excerptMasked: '***' + line.trim().slice(FOOTER_WORD.length) });
+      }
+    }
+  };
+  check(title, 'PR 제목', null);
+  check(body, 'PR 본문', null);
+  commits.forEach((message, position) => check(message, '커밋', position + 1));
+  return hits;
+}
+
 /** 제목·본문·커밋 메시지에서 걸린 곳을 모은다. 걸린 자리 앞뒤 24자만 남긴다. */
 export function findViolations({ title = '', body = '', commits = [] } = {}, words = []) {
   const patterns = (Array.isArray(words) ? words : [])
     .filter((word) => typeof word === 'string' && word.trim().length > 0)
     .map((word) => ({ word, pattern: wordPattern(word) }));
-  const found = [];
+  const footerLines = findFooterLines({ title, body, commits });
+  const found = [...footerLines];
   const scan = (value, where, index) => {
     const text = String(value ?? '');
     if (!text) return;
     for (const { word, pattern } of patterns) {
+      // 줄 자체로 이미 잡힌 꼬리말은 단어 검사로 중복 보고하지 않는다.
+      if (word === FOOTER_WORD && footerLines.some((hit) => hit.where === where && hit.index === index)) continue;
       const match = pattern.exec(text);
       if (!match) continue;
       const from = Math.max(0, match.index - 24);
