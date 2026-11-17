@@ -240,15 +240,16 @@ const cellCommunity=document.createElement('div');cellCommunity.className='home-
 const communityLine=label=>{const line=infoLine({label,value:'…'});line.dataset.community=label;line.onclick=()=>bridge.actions.community();return line;};
 const communityLines={moments:communityLine('순간'),trees:communityLine('트리')};
 cellCommunity.append(communityLines.moments,communityLines.trees);
-(async()=>{try{
- const answer=await fetch('/api/community/stats',{headers:{accept:'application/json'}});
+(async()=>{const ctrl=new AbortController();const timer=setTimeout(()=>ctrl.abort(),8000);try{
+ const answer=await fetch('/api/community/stats',{headers:{accept:'application/json'},signal:ctrl.signal});
  if(!answer.ok)throw Error('stats unavailable');
  const stats=await answer.json();
  communityLines.moments.querySelector('.home-info-v').textContent=formatCount(stats?.moments);
  communityLines.trees.querySelector('.home-info-v').textContent=formatCount(stats?.trees);
-}catch{ // 집계를 못 가져오면 빈 약속 대신 칸을 숨긴다(숫자 없이 틀만 남기지 않는다).
- cellCommunity.hidden=true;
-}})();
+}catch{ // 집계를 못 가져오거나 8초를 넘기면 칸은 그대로 두고 값만 '–'로 바꾼다(세 칸×두 줄 배치가 틀어지지 않게).
+ // '…'가 계속 남지 않게 하고, 화면 낭독기에는 '불러오지 못했어요'로 읽힌다(#780 후속).
+ for(const line of [communityLines.moments,communityLines.trees]){const v=line.querySelector('.home-info-v');if(v){v.textContent='–';v.setAttribute('aria-label','불러오지 못했어요');}}
+}finally{clearTimeout(timer);}})();
 infoRow.append(cellMoments,cellCommunity);
 // 내 트리 칸(로그인) — '트리 N' / '최근 <트리 이름>'(마지막으로 순간을 넣은 트리, 누르면 그 트리로; 길면 칸 폭에서 '…').
 if(loggedIn){
