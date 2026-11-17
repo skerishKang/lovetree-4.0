@@ -1,5 +1,6 @@
 import originalCSS from './orbit-source.css?inline';
 import {titleView, formatDisplayDate, embedUrl} from '../../public/v41/book-usability.mjs';
+import {formatRange} from '../../public/v41/domain.mjs';
 import {localDaysBetween, relativeDayLabel} from '../../public/v41/local-date.mjs';
 import {filterMomentEntries, momentHeadTitle, orderedTrees} from '../../v41/moment-list.js';
 import {movedNotice} from '../../public/v41/inbox-model.mjs';
@@ -171,7 +172,7 @@ export function mountOrbit(host,{trees,storage,context,actions,authHtml='',onSel
   // 표시하지 않고, 직접 쓴 제목이 없으면 마음 한마디를 큰 글씨로 쓴다(둘 다 없으면 제목 칸을 비워 둔다).
   const head=momentHeadTitle(c,titleMode);
   const nav=hasNav?`<button class="detail-nav detail-nav--prev" data-do="prev" aria-label="이전 순간"${atStart?' disabled':''}>←</button><button class="detail-nav detail-nav--next" data-do="next" aria-label="다음 순간"${atEnd?' disabled':''}>→</button>${atStart||atEnd?`<p class="detail-nav-note" role="status">${atStart?'처음 순간':'마지막 순간'}</p>`:''}`:'';
-  dialog.innerHTML=`<button class="close" data-do="close" aria-label="순간 닫기">닫기 ×</button>${nav}<div class="detail-grid"><div data-lt-thumb-host>${c.image?`<img class="detail-image${vertical?' detail-image--vertical':''}" src="${esc(c.image)}" alt="${esc(head.main||c.title)}"${thumbFallbackAttrs(c,{candidates:c.thumbCandidates||[c.image],writable:!demo&&!c.example,variant:'detail'})} referrerpolicy="no-referrer">`:(!demo&&!c.example&&needsFallbackCard(c,{autoLoad:false})?fallbackCardMarkup(c,{writable:!demo&&!c.example,variant:'detail',dateStyle}):`<div class="detail-paper">${esc(c.note)}</div>`)}</div><div class="detail-copy"><small>${demo||c.example?'감상 예시':esc(c.subject||'내 순간')} · ${esc(c.emotion)}</small>${head.main?`<h2>${esc(head.main)}</h2>`:''}${head.sub?`<span class="videoTitle">▶ ${esc(head.sub)}</span>`:''}<small>${esc(dateOf(c))}${(demo||c.example)&&c.type==='video'?' · 영상 포스터 예시':''}</small>${head.memoAsMain?'':`<p>${esc(c.note)}</p>`}${c.relation?`<small>이전 순간에서 이어진 이유</small><p>${esc(c.relation)}</p>`:''}<div class="detail-buttons"><button data-do="book" title="${BOOK_IS_READING}">${READ_BOOK}</button><button data-do="work">${demo||c.example?NEW_TREE:VIEW_TREE}</button>${link ? (link.kind === 'invalid' ? `<span class="media-unrecognized" role="note">${esc(link.text)}</span>` : `<a href="${esc(link.href)}" target="_blank" rel="noopener noreferrer">${esc(link.text)} ↗</a>`) : ''}${homePin&&!demo&&!c.example?`<button data-do="home-pin">${homePin.pinned(c)?'내리기':'첫 화면에 걸기'}</button>`:''}</div>${children.length?`<p>다음으로 이어진 순간</p><div class="detail-buttons">${children.map(x=>`<button data-next="${esc(x.key)}">${esc(mainOf(x))}</button>`).join('')}</div>`:'<p>다음 이야기를 기다리는 순간이에요.</p>'}</div></div>`;
+  dialog.innerHTML=`<button class="close" data-do="close" aria-label="순간 닫기">닫기 ×</button>${nav}<div class="detail-grid"><div data-lt-thumb-host>${c.image?`<img class="detail-image${vertical?' detail-image--vertical':''}" src="${esc(c.image)}" alt="${esc(head.main||c.title)}"${thumbFallbackAttrs(c,{candidates:c.thumbCandidates||[c.image],writable:!demo&&!c.example,variant:'detail'})} referrerpolicy="no-referrer">`:(!demo&&!c.example&&needsFallbackCard(c,{autoLoad:false})?fallbackCardMarkup(c,{writable:!demo&&!c.example,variant:'detail',dateStyle}):`<div class="detail-paper">${esc(c.note)}</div>`)}</div><div class="detail-copy"><small>${demo||c.example?'감상 예시':esc(c.subject||'내 순간')} · ${esc(c.emotion)}</small>${head.main?`<h2>${esc(head.main)}</h2>`:''}${head.sub?`<span class="videoTitle">▶ ${esc(head.sub)}</span>`:''}<small>${esc(dateOf(c))}${(demo||c.example)&&c.type==='video'?' · 영상 포스터 예시':''}</small>${c.startSeconds!==undefined&&c.startSeconds!==null?`<small class="detail-range">기억할 구간 ${esc(formatRange(c.startSeconds,c.endSeconds))}</small>`:''}${head.memoAsMain?'':`<p>${esc(c.note)}</p>`}${c.relation?`<small>이전 순간에서 이어진 이유</small><p>${esc(c.relation)}</p>`:''}<div class="detail-buttons"><button data-do="book" title="${BOOK_IS_READING}">${READ_BOOK}</button><button data-do="work">${demo||c.example?NEW_TREE:VIEW_TREE}</button>${link ? (link.kind === 'invalid' ? `<span class="media-unrecognized" role="note">${esc(link.text)}</span>` : `<a href="${esc(link.href)}" target="_blank" rel="noopener noreferrer">${esc(link.text)} ↗</a>`) : ''}${homePin&&!demo&&!c.example?`<button data-do="home-pin">${homePin.pinned(c)?'내리기':'첫 화면에 걸기'}</button>`:''}</div>${children.length?`<p>다음으로 이어진 순간</p><div class="detail-buttons">${children.map(x=>`<button data-next="${esc(x.key)}">${esc(mainOf(x))}</button>`).join('')}</div>`:'<p>다음 이야기를 기다리는 순간이에요.</p>'}</div></div>`;
   dialog.querySelector('[data-do=book]').onclick=()=>{dialog.close();if(onOpen&&!c.example)onOpen(c);else actions.openBook(c.treeId,c.id,demo)};
   dialog.querySelector('[data-do=work]').onclick=()=>{dialog.close();demo?actions.requestMoment('new'):actions.openWorkspace(c.treeId,c.id)};
   // 261116 PR 2: '첫 화면에 걸기' — 홈이 넘겨준 배선(homePin.toggle)으로 계정 설정에 걸고, 걸려 있으면 '내리기'.
@@ -423,7 +424,7 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
   // #593: 표본 하나를 굽는다. 굽는 동안 placeCard 는 '지금 위상'의 판정 결과를 카드에 직접 쓰므로(밝기·숨김)
   // 숨김은 되돌리고, 판정이 극단값으로 숨긴 표본은 직전 표본 자리를 그대로 쓴다.
   const bake=(k)=>{const th=c.baseAngle+k/ORBIT_STEPS*TWO_PI+c.phaseOffset;let x=Math.cos(th)*cfg.rx,y=Math.sin(th)*cfg.ry+cfg.band+Math.sin(th*1.7+c.phaseOffset*3)*45,z=Math.sin(th+1.1+c.phaseOffset*4)*cfg.zAmp+cfg.zBase+c.zOffset;
-   if(!demo&&cards.length<=8&&w<=650)return null; // 261117 대표 결정: 좁은 화면 소수 카드(≤8)는 궤도 카드를 숨긴다 — 표본 없음=noFit
+   if(w<=650&&((!demo&&cards.length<=8)||(demo&&loggedIn===true)))return null; // 261117 대표 결정: 좁은 화면 소수 카드(≤8)는 궤도 카드를 숨긴다 — 표본 없음=noFit. 로그인 예시(mix-empty 포함)도 390에서 숨긴다(#780 후속)
    if(!demo&&cards.length<=8){const angle=i*TWO_PI/cards.length+k/ORBIT_STEPS*TWO_PI;x=Math.cos(angle)*Math.min(w*.34,420);y=Math.sin(angle)*Math.min(h*.3,250)+(i%2===0?80:-80);z=0;}
    const sc=Math.max(.18,Math.min(narrow?1.1:1.82,1050/(1050-z)));
    const at=placeCard(elements[i],c,i,th,x,y,z,sc,w,h,fit,narrow,zs,warm,last?.side)||last;
@@ -578,7 +579,7 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
    avgScales[i]=avgScaleOf(c,w,h);
    const cfg=(narrow?ringsNarrow:rings)[c.ring],th=c.baseAngle+phase*cfg.speed+c.phaseOffset;
    let x=Math.cos(th)*cfg.rx,y=Math.sin(th)*cfg.ry+cfg.band+Math.sin(th*1.7+c.phaseOffset*3)*45,z=Math.sin(th+1.1+c.phaseOffset*4)*cfg.zAmp+cfg.zBase+c.zOffset;
-   const fewHide=!demo&&cards.length<=8&&w<=650; // 261117 대표 결정: 좁은 화면 소수 카드(≤8)는 궤도 카드를 숨긴다 — 가운데 카드·단추·숫자에 집중(9장 이상은 기존 좁은 화면 궤도)
+   const fewHide=w<=650&&((!demo&&cards.length<=8)||(demo&&loggedIn===true)); // 261117 대표 결정: 좁은 화면 소수 카드(≤8)는 궤도 카드를 숨긴다 — 가운데 카드·단추·숫자에 집중(9장 이상은 기존 좁은 화면 궤도). 로그인 예시(mix-empty 포함)도 390에서 숨긴다(#780 후속)
    if(!fewHide&&!demo&&cards.length<=8){const angle=i*Math.PI*2/cards.length+phase;x=Math.cos(angle)*Math.min(w*.34,420);y=Math.sin(angle)*Math.min(h*.3,250)+(i%2===0?80:-80);z=0;}
    const sc=Math.max(.18,Math.min(narrow?1.1:1.82,1050/(1050-z)));
    if(fewHide){elements[i].style.display='none';noFit[i]=true;console.log('[few] hide',i,'of',cards.length);}
@@ -603,7 +604,7 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
   const zs=safeZone?{l:safeZone.l-12,t:safeZone.t-12,r:safeZone.r+12,b:safeZone.b+12}:null,fit=Math.min(1,w/780,h/850)*(w<=650?.5:1),narrow=w<=650;
   cards.forEach((c,i)=>{const el=elements[i],cfg=(narrow?ringsNarrow:rings)[c.ring];const th=c.baseAngle+phase*cfg.speed+c.phaseOffset;
    let x=Math.cos(th)*cfg.rx,y=Math.sin(th)*cfg.ry+cfg.band+Math.sin(th*1.7+c.phaseOffset*3)*45,z=Math.sin(th+1.1+c.phaseOffset*4)*cfg.zAmp+cfg.zBase+c.zOffset;
-   if(!demo&&cards.length<=8&&w<=650){el.style.display='none';return;} // 261117: 좁은 화면 소수 카드 숨김 유지
+   if(w<=650&&((!demo&&cards.length<=8)||(demo&&loggedIn===true))){el.style.display='none';return;} // 261117: 좁은 화면 소수 카드 숨김 유지. 로그인 예시도 390에서 숨김(#780 후속)
    if(!demo&&cards.length<=8){const angle=i*Math.PI*2/cards.length+phase;x=Math.cos(angle)*Math.min(w*.34,420);y=Math.sin(angle)*Math.min(h*.3,250)+(i%2===0?80:-80);z=0;}
    const sc=Math.max(.18,Math.min(narrow?1.1:1.82,1050/(1050-z)));
    const at=placeCard(el,c,i,th,x,y,z,sc,w,h,fit,narrow,zs,warmups);

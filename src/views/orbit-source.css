@@ -77,3 +77,5 @@ button,a{font:inherit}button{color:inherit}.app{position:relative;width:100%;hei
 /* #347 후속: 카드·상세의 작은 영상 제목 줄 */
 .card .videoTitle,.detail-copy .videoTitle{display:block;margin-top:3px;font-size:8px;letter-spacing:.02em;color:#d9c9bd;font-weight:500;opacity:.92}
 .detail-copy .videoTitle{font-size:10px;margin-top:4px;color:var(--lt-muted,#9b98a6)}
+/* #792: 상세 창의 기억할 구간 한 줄(#548 기준 12px 이상). */
+.detail-copy .detail-range{display:block;margin-top:6px;font-size:12px;line-height:1.5;color:var(--lt-gold,#e8c98a);font-weight:600}
