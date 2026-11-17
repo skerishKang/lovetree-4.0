@@ -4,7 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
-import { momentListTrees, momentListEntries, filterMomentEntries, momentHeadTitle } from '../v41/moment-list.js';
+import { momentListTrees, momentListEntries, filterMomentEntries, momentHeadTitle, orderedTrees } from '../v41/moment-list.js';
 
 const read = file => fs.readFileSync(new URL(`../${file}`, import.meta.url), 'utf8');
 
@@ -117,4 +117,15 @@ test('첫 화면 궤도: 순간 목록은 트리 고르기 칸과 빈 목록 안
   assert.match(orbit, /momentHeadTitle\(c,titleMode\)/);
   // 목록에서 고른 순간은 목록 풀에서 찾는다(다른 트리의 순간도 연다).
   assert.match(orbit, /focus\(findMoment\(b\.dataset\.next\)\)/);
+});
+
+// 트리 칩 순서(2026-11-17, 대표 결정): 계정에 저장한 순서를 칩에 쓴다 — 저장 목록에 없는 트리는
+// 기존 순서(선반 자리) 그대로 뒤에 붙고, '전체' 칩은 화면이 맨 앞에 고정한다(여기서 다루지 않는다).
+test('orderedTrees: 저장한 순서를 앞에 두고 없는 트리는 기존 순서 뒤에 붙인다', () => {
+  const trees = [{ id: 'a', label: '가' }, { id: 'b', label: '나' }, { id: 'c', label: '다' }];
+  assert.deepEqual(orderedTrees(trees, ['c', 'a']).map(t => t.id), ['c', 'a', 'b']);
+  assert.deepEqual(orderedTrees(trees, []).map(t => t.id), ['a', 'b', 'c'], '저장한 순서가 없으면 기존 순서다');
+  assert.deepEqual(orderedTrees(trees, ['x', 'b']).map(t => t.id), ['b', 'a', 'c'], '모르는 id는 건너뛴다');
+  assert.deepEqual(orderedTrees(trees, ['b', 'b', 'b']).map(t => t.id), ['b', 'a', 'c'], '같은 id가 여러 번 저장돼도 한 번만 쓴다');
+  assert.deepEqual(orderedTrees(null, ['a']), [], '목록이 없으면 빈 값을 돌려준다');
 });

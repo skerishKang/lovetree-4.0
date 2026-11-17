@@ -197,6 +197,19 @@ export function normalizeShareDiscover(value) {
 export function normalizeTitleDisplay(value) {
   return TITLE_DISPLAYS.includes(value) ? value : DEFAULT_TITLE_DISPLAY;
 }
+// 순간 목록의 트리 칩 순서(2026-11-17, 대표 결정): 계정 설정 칸(state.prefs)에 트리 id 순서로 저장한다.
+// 문자열만 남기고('전체'='all'은 칩 고정이라 저장하지 않는다) 중복을 지우며, 너무 긴 목록은 64개에서 끊는다.
+export function normalizeTreeChipOrder(value) {
+  const list = Array.isArray(value) ? value : [];
+  const out = [];
+  for (const item of list) {
+    const id = String(item ?? '').trim();
+    if (!id || id === 'all' || out.includes(id)) continue;
+    out.push(id);
+    if (out.length >= 64) break;
+  }
+  return out;
+}
 export function normalizePrefs(value) {
   return {
     titleDisplay: normalizeTitleDisplay(value?.titleDisplay),
@@ -205,7 +218,8 @@ export function normalizePrefs(value) {
     dateStyle: normalizeDateStyle(value?.dateStyle),
     startPlace: normalizeStartPlace(value?.startPlace),
     shareView: normalizeShareView(value?.shareView),
-    shareDiscover: normalizeShareDiscover(value?.shareDiscover)
+    shareDiscover: normalizeShareDiscover(value?.shareDiscover),
+    treeChipOrder: normalizeTreeChipOrder(value?.treeChipOrder)
   };
 }
 export function updatePrefs(state, patch = {}) {

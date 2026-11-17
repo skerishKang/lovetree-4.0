@@ -57,3 +57,18 @@ export function momentHeadTitle(moment, titleDisplay = 'both') {
   if (memo) return { main: memo, sub: '', memoAsMain: true };
   return { main: '', sub: '', memoAsMain: false };
 }
+
+/**
+ * 트리 칩 순서(2026-11-17, 대표 결정): 계정에 저장한 순서(prefs.treeChipOrder)를 앞에 두고,
+ * 저장 목록에 없는 트리는 기존 순서(선반 자리) 그대로 뒤에 붙인다. '전체' 칩은 목록 UI가 맨 앞에 고정한다(여기서 다루지 않는다).
+ */
+export function orderedTrees(trees, chipOrder) {
+  const list = Array.isArray(trees) ? trees : [];
+  const order = Array.isArray(chipOrder) ? chipOrder : [];
+  const pos = new Map();
+  order.forEach((id, i) => { if (!pos.has(id)) pos.set(id, i); });
+  return list
+    .map((tree, i) => ({ tree, rank: pos.has(tree?.id) ? pos.get(tree?.id) : order.length + i }))
+    .sort((a, b) => a.rank - b.rank)
+    .map((x) => x.tree);
+}

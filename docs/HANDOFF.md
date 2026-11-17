@@ -1,6 +1,14 @@
 # LoveTree 4.0 — 핸드오프
 
-## 2026-11-16 — 계정 메뉴 정리 + 설정 탭 넷 (컴1로컬6 레인, ai/local6-account-menu-20261116-1 PR #772 · ai/local6-settings-tabs-20261116-2 PR #775, main d57616da 기준, 대표 지적 2026-11-16)
+## 2026-11-17 — 순간 목록에서 옮기기 + 트리 칩 순서 (컴1로컬6 작업, ai/local6-move-moments-261117, main 55c30a5 기준, 대표 결정 2026-11-16)
+
+- **옮기기**: 순간 목록(orbit 색인 목록)에서 고른 순간들을 다른 트리로 옮긴다 — 저장은 기존 `member.apply('moveMoment')` 한 길(cleanup.mjs와 같다), 여러 개는 한 번씩 돌려 apply한다. 행을 칩에 끌어다 놓기(마우스 끌기·손가락 길게 누른 뒤 메뉴)·'고르기' 모드(행 왼쪽 고르기 칸 + 행별/머리 '옮기기' 단추 — 키보드 길)·되돌리기(안내 줄의 되돌리기 = 짝을 반대로 다시 apply). 옮긴 뒤에는 지금 보기를 다시 그려 목록을 열어 둔다(LT41_MOMENTS_OPEN에 notice·undo 짝을 실어 목록 프레임이 다시 뜰 때 받게 한다). 되돌리기는 출발 트리가 남아 있을 때만(옮기고 비워진 트리는 삭제되므로 — cleanup의 canUndo 규칙과 같다).
+- **칩 순서**: 트리 칩을 끌어 순서를 바꾸면 `prefs.treeChipOrder`(트리 id 배열)에 저장 — 기존 setPrefs 길(normalizePrefs에 treeChipOrder 추가, src/domain.js 서버 쪽도 같은 규칙 — parity 시험이 잠근다). '전체' 칩은 맨 앞 고정, 저장 목록에 없는 트리는 기존 순서 뒤에 붙는다(v41/moment-list.js orderedTrees).
+- **#776가 쓸 문**: 목록 열기 요청(LT41_MOMENTS_OPEN)에 `picking:true`와 `notice`를 받는 인자를 열어 두었다(home.js initialPicking·initialNotice → orbit index(options)). 첫 화면 '모아둔 N' 연결은 #776가 붙인다.
+- **감사기 수리 1건(재배치 중 발견)**: 닫힌 `<details>`(걸어온 길 접힘) 안의 글자는 그려지지 않는데 감사기가 좌표를 재어 허위 겹침을 보고했다(#768 재배치 때 확인) — 보임 판정에 '닫힌 details 안 제외(요약 줄은 검사)'를 넣었다(#768에 같이 들어감).
+- **남은 것**: ㉠ 뿌리 순간(트리의 첫 순간)을 옮기면 남겨진 자식의 부모 표시가 어긋나 도메인이 '시작 순간은 하나'로 거부한다 — 데이터는 안전하고 오류 안내가 뜬다. 뿌리째 옮길 필요가 생기면 detachMoments의 재부착 규칙(detachMoments: 남은 순간 중 최오래전을 뿌리로 승격, 뿌리 자체는 건너뛰는 조건)을 다루는 별도 과제. ㉑ 되돌리기 안내의 트리 이름은 첫 짝 기준(여러 트리에서 고르면 첫 트리 이름만 보인다). ㉒ createdAt이 뿌리보다 이전인 순간(가져오기 등)에서 같은 사이클 거부가 날 수 있다 — 위 ㉠과 같은 근원.
+
+## 2026-11-16 — 계정 메뉴 정리 + 설정 탭 넷 (컴1로컬6 작업, ai/local6-account-menu-20261116-1 PR #772 · ai/local6-settings-tabs-20261116-2 PR #775, main d57616da 기준, 대표 지적 2026-11-16)
 
 - **계정 메뉴(#772)**: 고객 항목 순서 설정 · 새 소식 · 내 의견 · 어떻게 쓰나요 · 내 보관 파일(+고급 기능 보기 — #775에서 설정으로 옮김). 운영센터(관리자만)는 구분선 아래 '운영' 묶음(라벨 + 항목, #account-ops-group role=group)으로 로그아웃 바로 위에 내렸다. '어떻게 쓰나요'는 첫 화면 안내 패널(#635)을 프레임 메시지 `lt41-open-guide`로 연다(home.js 수신기, 이미 열려 있으면 무시) — 로그인 첫 화면에는 안내 단추 자리가 없어(2026-11-14 결정) 메뉴가 유일한 입구다. 셸은 첫 화면이 아니면 show('src064-orbit.html') 뒤 #guidePanel이 만들어질 때까지(최대 3초) 기다렸다 한 번 보낸다(openGuideFromMenu).
 - **id 중복 수리(대표 지적 원인)**: 탈퇴 상태 줄 `<p id="account-feedback">`가 메뉴 단추와 같은 id라 openAccountSettings의 `$('account-feedback').textContent=''`가 설정을 열 때마다 메뉴 단추 '의견 보내기' 글자를 지웠다(정원에서 '운영센터 아래 빈 칸'으로 보였던 것). 상태 줄 id → `account-delete-status`. '의견 보내기' 칸은 메뉴에서 빠지고 내 의견 창 안 #myposts-send로 갔다(같은 feedbackDialog 재사용 — 새 창 없음).
