@@ -200,6 +200,7 @@ export function createTagManager(deps) {
     if (!saved.ok) { fail(saved.error || '저장하지 못했어요.'); return; }
     picked = new Set();
     render();
+    deps.closePanel?.('tag-panel');
   }
 
   $('tag-suggest-open').addEventListener('click', onSuggest);

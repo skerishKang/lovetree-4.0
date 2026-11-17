@@ -266,6 +266,7 @@ const shellTagManager=createTagManager({
   getSource:()=>source,
   notify:text=>notify(text),
   panel:id=>panel(id),
+  closePanel:id=>{ shellDialogs.requestClose(id); const href=$('view')?.contentWindow?.location?.href || ''; if (!href || href === 'about:blank') show(current, false); },
   saveMoments:shellTags.saveMoments
 });
 const shellQuick=createQuickAdd({
