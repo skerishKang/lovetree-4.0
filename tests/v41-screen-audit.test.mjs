@@ -1905,9 +1905,9 @@ test('#657 ?꾩냽 261117: ?곷떒 ??湲???듭씪怨?怨좊Ⅸ ??移??믪씠(3
         await page.goto(`${base}/v41/?account=1`, { waitUntil: 'load', timeout: 30000 });
         await page.waitForFunction(() => !document.getElementById('tree-views')?.hidden, null, { timeout: 10000 });
         const fonts = await page.evaluate(() => {
-          const style = (sel) => { const s = getComputedStyle(document.querySelector(sel)); return { size: s.fontSize, weight: s.fontWeight }; };
+          const style = (sel) => { const s = getComputedStyle(document.querySelector(sel)); return { size: s.fontSize, weight: s.fontWeight, color: s.color }; };
           const topViews = ['track32-bookshelf.html', 'track59-sketchbook.html', 'track58-pinboard.html', 'track56-network.html'];
-          return { browse: style('#community-menu'), picker: style('#record-menu'), tabs: [...document.querySelectorAll('#tree-views button[data-view]')].filter((b) => topViews.includes(b.dataset.view)).map((b) => ({ view: b.dataset.view, size: getComputedStyle(b).fontSize, weight: getComputedStyle(b).fontWeight })) };
+          return { browse: style('#community-menu'), picker: style('#record-menu'), tabs: [...document.querySelectorAll('#tree-views button[data-view]')].filter((b) => topViews.includes(b.dataset.view)).map((b) => ({ view: b.dataset.view, size: getComputedStyle(b).fontSize, weight: getComputedStyle(b).fontWeight, color: getComputedStyle(b).color, current: b.getAttribute('aria-current') === 'true' })) };
         });
         assert.equal(fonts.tabs.length, 4, `${width}/${theme}: ??4媛?);
         for (const tab of fonts.tabs) {
@@ -1916,7 +1916,10 @@ test('#657 ?꾩냽 261117: ?곷떒 ??湲???듭씪怨?怨좊Ⅸ ??移??믪씠(3
           assert.equal(tab.size, fonts.picker.size, `${width}/${theme}/${tab.view}: ?몃━ 怨좊Ⅴ湲곗? 媛숈? 湲???ш린`);
           assert.equal(tab.weight, fonts.picker.weight, `${width}/${theme}/${tab.view}: ?몃━ 怨좊Ⅴ湲곗? 媛숈? 援듦린`);
         }
-        const labels = { 'track32-bookshelf.html': '?쒖옱', 'track59-sketchbook.html': '梨?, 'track58-pinboard.html': '蹂대뱶', 'track56-network.html': '吏?? };
+        const unselected = fonts.tabs.filter((t) => !t.current);
+        assert.ok(unselected.length >= 3, `${width}/${theme}: 고르지 않은 탭 3개 이상`);
+        for (const tab of unselected) assert.equal(tab.color, unselected[0].color, `${width}/${theme}/${tab.view}: 탭 글자색 RGB ${tab.color} = ${unselected[0].color}`);
+        const labels = { 'track32-bookshelf.html': '서재', 'track59-sketchbook.html': '책', 'track58-pinboard.html': '보드', 'track56-network.html': '지도' };
         for (const view of ['track32-bookshelf.html', 'track59-sketchbook.html', 'track58-pinboard.html', 'track56-network.html']) {
           if (width === 390) {
             await page.locator('#mobile-more').click();

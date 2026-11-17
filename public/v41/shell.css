@@ -450,7 +450,7 @@ html[data-lt-theme=garden] .quick-error-line{color:var(--lt-rose-ink)}
 .tree-frame .tree-slot{margin-left:0}
 .tree-frame .tree-views{margin-left:0;padding-left:0;border-left:0;gap:0;align-self:stretch;align-items:stretch}
 /* 2026-11-17 대표 지적: 탭 글자는 둘러보기·트리 고르기와 같은 13px·같은 굵기로 맞춘다. */
-.tree-frame .tree-views>button{min-height:0;align-self:stretch;border-left:1px solid var(--line);border-radius:0;font-size:13px;font-weight:400}
+.tree-frame .tree-views>button{min-height:0;align-self:stretch;border-left:1px solid var(--line);border-radius:0;font-size:13px;font-weight:400;color:var(--lt-muted)}
 .tree-frame .tree-views>button[aria-current=true]{border-radius:0}
 /* 고른 마지막 탭은 묶음의 오른쪽 둥근 모서리를 따라 칠한다(묶음 999px − 1px). */
 .tree-frame .tree-views>button:last-child[aria-current=true]{border-radius:0 998px 998px 0}
