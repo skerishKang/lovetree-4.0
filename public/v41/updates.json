@@ -3,7 +3,8 @@
     "version": "4.1.12",
     "date": "2026.11.18",
     "items": [
-      {"kind": "new", "text": "둘러보기가 사진 중심으로 새로워졌어요", "source": "user", "issue": "#784"}
+      {"kind": "new", "text": "둘러보기가 사진 중심으로 새로워졌어요", "source": "user", "issue": "#784"},
+      {"kind": "fix", "text": "보드 상세에서 크게 보기·YouTube 열기 단추가 두 번씩 보이지 않아요", "source": "ai_tester", "issue": "#840"}
     ]
   },
   {
