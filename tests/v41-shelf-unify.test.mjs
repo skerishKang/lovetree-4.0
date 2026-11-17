@@ -224,3 +224,48 @@ test('#서재 이어 보기 띠는 정원에서 밝은 종이 카드(--lt-paper 
   // 밤 규칙은 그대로다(정원에서만 고쳤다) — 밤 띠 면은 --lt-glass-strong.
   assert.match(extra, /\.resume-strip \{[^}]*background: var\(--lt-glass-strong\)/, '밤 띠는 무대 위 유리 카드');
 });
+
+// 261118 대표 지적 2차 1: 책이 선반에 앉는다 — 카드 아랫단이 레일 바닥(=선반 윗면)에 붙는다.
+test('#서재 책은 선반에 앉고 옆 책 글자는 축소 없이 실제 크기로 렌더된다', () => {
+  const extra = read('public/v41/views/shelf/shelf-extra.css');
+  // 카드는 아랫단 기준으로 놓이고 배율은 아랫단을 축으로 한다(아랫단이 선반에 닿은 채 유지).
+  assert.match(extra, /html\[data-v41-screen=shelf\] \.book-card\{top:auto;bottom:0;transform-origin:50% 100%;/);
+  // 선반은 레일 바로 아래 흐름에 놓여 레일 바닥 = 선반 윗면이다.
+  assert.match(extra, /html\[data-v41-screen=shelf\] \.shelf-base\{position:static;/);
+  // 배율·깊이 이동으로 글자를 줄이지 않는다: 옆 책도 scale 1, z 0.
+  const model = read('public/v41/views/shelf/shelf-model.mjs');
+  assert.match(model, /scale: absolute === 0 \? 1\.06 : 1,/);
+  assert.match(model, /z: 0,/);
+  // 4번째 이후 책도 투명도 0.6으로 남는다.
+  assert.match(model, /alpha: absolute === 0 \? 1 : absolute === 1 \? 0\.9 : absolute === 2 \? 0\.8 : 0\.6,/);
+  // 표지 사진은 가운데를 보여 준다.
+  assert.match(extra, /html\[data-v41-screen=shelf\] \.book-card \.book-cover-media\{object-position:50% 50%\}/);
+});
+
+// 261118 대표 지적 2차 2: 띠의 바깥 상자는 없고 테두리는 띠 자체의 한 겹이다.
+test('#서재 이어 보기 띠는 바깥 상자 없이 한 겹 테두리로 위쪽에 붙는다', () => {
+  const extra = read('public/v41/views/shelf/shelf-extra.css');
+  assert.match(extra, /html\[data-v41-screen=shelf\] \.hero\.strip-mode \{ margin: 20px 0 0; padding: 0; min-height: 0; height: auto; border: 0; background: transparent; box-shadow: none; \}/);
+  // 띠는 위쪽에 붙는다: 책장 세로 중앙 정렬을 풀고 띠 아래 책장이 남은 공간을 쓴다.
+  assert.match(extra, /html\[data-v41-screen=shelf\] \.shelf-screen\{display:flex;flex-direction:column;justify-content:flex-start;/);
+  assert.match(extra, /html\[data-v41-screen=shelf\] \.shelf-viewport\{margin-top:auto;margin-bottom:auto\}/);
+});
+
+// 261118 대표 지적 2차 5: 서재에서 마지막에 본 트리로 콕·보드·지도가 열린다.
+test('#서재 가운데 책의 트리를 셸에 알려 탭 이동이 그 트리로 열린다', () => {
+  const js = read('public/v41/views/shelf/shelf.js');
+  const messages = read('public/v41/shell/messages.mjs');
+  const shellMjs = read('public/v41/shell.mjs');
+  assert.match(js, /type:'lt41-shelf-tree',treeId:centered\.id/, '서재는 가운데 책의 트리를 셸에 알린다');
+  assert.match(messages, /lt41-shelf-tree/, '셸은 그 메시지를 받아 둔다');
+  assert.match(messages, /export function lastShelfTreeId\(\)/);
+  assert.match(shellMjs, /current==='track32-bookshelf\.html'&&b\.dataset\.view!=='track32-bookshelf\.html'\)\{const treeId=lastShelfTreeId\(\);/, '서재에서 탭 이동은 마지막에 본 트리로 고른 뒤 연다');
+  assert.match(shellMjs, /current=b\.dataset\.view;choose\(treeId\);writeLocation\(\);/);
+});
+
+// 261118 대표 결정: 트리 0개 계정이 주소로 바로 들어와도 서재 빈 화면(#817)으로 시작한다.
+test('#서재 트리 0개 주소 진입도 서재 빈 화면으로 시작한다', () => {
+  const shellMjs = read('public/v41/shell.mjs');
+  const choose = shellMjs.slice(shellMjs.indexOf('function choose(id,momentId)'), shellMjs.indexOf('function paintEmptyForScreen'));
+  assert.match(choose, /paintEmptyForScreen\(current\)/, '빈 판은 지금 화면의 빈 상태 문구로 칠한다');
+});

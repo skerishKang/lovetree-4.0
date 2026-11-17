@@ -132,18 +132,19 @@ export function resolveShelfIndex(list, selectedId, shelfIndex) {
   return Math.max(0, Math.min(shelfIndex, list.length - 1));
 }
 
-// 레일 위 카드 배치(거리 → 좌표·배율·투명도). #212에서 중앙 카드를 위로 띄우지 않고 살짝 내린다.
+// 레일 위 카드 배치(거리 → 좌표·배율·투명도). #212에서 중앙 카드를 위로 띄우지 않는다.
+// 261118 대표 지적 2차: 옆 책도 설명 글자가 실제 크기(12px)로 읽혀야 하므로 배율·깊이 이동으로 글자를 줄이지 않는다.
+// 책은 좌우 간격과 살짝 돌림·투명도로만 깊이를 내고, 4번째 이후 책도 투명도 0.6으로 남긴다.
 export function carouselTransform(distance) {
   const absolute = Math.abs(distance);
-  const x = distance * 158 + (distance > 0 ? Math.min(absolute * 8, 22) : distance < 0 ? -Math.min(absolute * 8, 22) : 0);
-  const scale = absolute === 0 ? 1.06 : absolute === 1 ? 0.82 : absolute === 2 ? 0.66 : 0.54;
+  const x = distance * 200;
   return {
     x,
-    y: absolute === 0 ? 6 : Math.min(absolute * 8, 28),
-    z: -absolute * 78,
-    scale,
-    rotate: distance === 0 ? 0 : distance > 0 ? -22 : 22,
-    alpha: absolute === 0 ? 1 : absolute === 1 ? 0.9 : absolute === 2 ? 0.66 : absolute === 3 ? 0.28 : 0,
+    y: 0,
+    z: 0,
+    scale: absolute === 0 ? 1.06 : 1,
+    rotate: distance === 0 ? 0 : distance > 0 ? -12 : 12,
+    alpha: absolute === 0 ? 1 : absolute === 1 ? 0.9 : absolute === 2 ? 0.8 : 0.6,
     zIndex: 100 - absolute,
     pointerEvents: absolute > 3 ? 'none' : 'auto',
     filter: absolute > 2 ? 'saturate(.72) brightness(.86)' : 'none'

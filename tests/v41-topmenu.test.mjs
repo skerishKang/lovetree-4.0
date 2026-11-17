@@ -31,19 +31,23 @@ test('로고가 첫 화면으로 간다 — 링크·키보드(#home 해시)', ()
 test('트리 선택과 보기 방식이 한 틀(.tree-frame)에 붙고 이름은 서재·책·보드·지도다', () => {
   const frame = nav.slice(nav.indexOf('class="tree-frame"'), nav.indexOf('</nav>'));
   assert.ok(frame.includes('id="record-menu"') && frame.includes('id="tree-views"'), '트리 ▾와 보기 묶음이 같은 틀 안에 있다');
-  // 261118 대표 지적 1: 서재 탭은 트리 틀 밖 맨 앞자리로 나왔다. 트리 틀 안은 책·보드·지도만 남는다.
-  const navStart = nav.slice(0, nav.indexOf('class="tree-frame"'));
-  assert.match(navStart, /<button data-view="track32-bookshelf\.html" class="shelf-tab">서재<\/button>/, '서재 탭은 맨 앞자리다');
-  assert.ok(!frame.includes('>서재</button>'), '트리 틀 안에 서재 탭이 남지 않는다');
+  // 261118 대표 지적 2차 5: [서재][책][보드][지도]는 한 묶음 — 서재 탭도 트리 틀 안, 보기 묶음 앞자리다.
+  const tabAt = frame.indexOf('class="shelf-tab"');
+  const viewsAt = frame.indexOf('class="tree-views"');
+  assert.ok(tabAt > -1 && viewsAt > tabAt, '서재 탭은 트리 틀 안, 보기 묶음 앞자리다');
+  assert.match(frame, /<button data-view="track32-bookshelf\.html" class="shelf-tab">서재<\/button>/, '서재 탭은 묶음 첫 자리다');
+  assert.ok(nav.indexOf('id="community-menu"') > nav.lastIndexOf('class="tree-views"'), '둘러보기는 묶음 밖 오른쪽이다');
   assert.match(frame, /role="group" aria-label="이 트리 보기"/);
   assert.match(frame, /data-view="track59-sketchbook\.html">책<\/button>/);
   assert.match(frame, />보드<\/button>/);
   assert.match(frame, />지도<\/button>/);
   assert.doesNotMatch(frame, /기억책|기억 보드|관계 지도/);
-  // 한 틀 모양: 알약 테두리 한 줄, 보기 버튼 사이는 안쪽 구분선.
+  // 한 틀 모양: 알약 테두리 한 줄, 보기 버튼 사이는 안쪽 구분선, 묶음 글자는 14px로 통일.
   assert.match(css, /\.tree-frame\{display:flex;align-items:center;flex:0 0 auto;margin-left:6px;padding:1px;border:1px solid rgba\(255,255,255,\.16\);border-radius:999px/);
   assert.match(css, /\.tree-frame \.tree-views\{margin-left:0;padding-left:0;border-left:0;gap:0;align-self:stretch;align-items:stretch\}/);
-  assert.match(css, /\.tree-frame \.tree-views>button\{min-height:0;align-self:stretch;border-left:1px solid var\(--line\);border-radius:0/);
+  assert.match(css, /\.tree-frame \.tree-views>button\{min-height:0;align-self:stretch;border-left:1px solid var\(--line\);border-radius:0;font-size:14px/);
+  assert.match(css, /\.tree-frame \.shelf-tab\{min-height:40px;align-self:stretch;padding:0 12px;border-left:1px solid var\(--line\);border-radius:0;font-size:14px/);
+  assert.match(css, /\.main-nav>button#community-menu\{margin-left:10px\}/);
 });
 
 test('지금 보는 보기는 눌린 상태(aria-current)로 표시된다', () => {

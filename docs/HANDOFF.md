@@ -1,6 +1,12 @@
 # LoveTree 4.0 — 핸드오프
 
-## 2026-11-18 — 서재 화면 정리 (컴1로컬3 작업, ai/local3-shelf-261118, PR #847, main 542c0d0 기준, 이슈 #839)
+## 2026-11-18 — 서재 화면 정리 2차 수정 (컴1로컬3 작업, ai/local3-shelf-261118, PR #847, 이슈 #839)
+
+- **대표 지적 5가지를 같은 PR에서 고쳤다**: ㉠책이 선반에 앉게(카드 아랫단=레일 바닥, 선반은 레일 바로 아래 흐름 — 실측 책 아랫단 675 vs 선반 윗면 672, 3.5px 얹힘) ㉡이어 보기 띠 바깥 상자 제거(hero border·배경·그림자 0, 띠 위 여백 3px) ㉢옆 책 축소 폐지(가운데만 1.06, 나머지 1 — 설명 실제 렌더 높이 17.2~18.4px, 투명도 0.8~1) ㉣표지 그림 object-position 50% 50% ㉤상단 순서 [트리▾(숨김)│서재·책·보드·지도](묶음 14px·높이 40px 통일) + 둘러보기는 묶음 밖 오른쪽(기존 13px). 서재 화면에서 콕·보드·지도는 마지막에 본 트리(서재 가운데 책)로 연다(shelf.js가 `lt41-shelf-tree`로 셸에 알림, messages.mjs가 저장, shell.mjs 탭 클릭에서 choose). 트리 0개 계정이 주소로 바로 `#my/shelf`에 들어와도 서재 빈 화면(#817)으로 시작한다(choose의 빈 판이 paintEmptyForScreen을 쓴다).
+- **검증**: 관련 시험(v41-shelf-unify·topmenu·header-tabs-mobile·shelf-flow·header-flow·465-small·cover-design·shell-tree-title) pass·0 fail, build·modulepreload --check ✓. dist 재빌드+캐시 끔 실측(가짜 API만): 위 수치 + 띠 겹침 false·하단 링크 겹침 false·390에서 띠 위 여백 0px·빈 계정 emptyView=shelf. 캡처 4장 `E:\lovetree-qa\local3\library\v2\`(trees 1440 밤·정원, 390 정원, 0개 1440 밤). 마지막 트리 이동 실측: 서재에서 다음 책 넘긴 뒤 콕 탭 → `#my/book?tree=<가운데 책 트리>`로 열림.
+- **남은 것**: ㉠CTO 캡처 확인(승인 시 squash 병합, 자동 병합 없음) ㉑띠의 트리 이름은 트리 제목 기준으로 정리됨(가짜 데이터에서 주제=제목 같음) ㉒서재 탭이 tree-frame 안으로 들어가면서 postdeploy 탭 개수 기대값(BASE 1+picker 1+views 3=5)과의 정합은 다음 postdeploy 실행 때 확인.
+
+## 2026-11-18 — 서재 화면 정리 1차 (컴1로컬3 작업, ai/local3-shelf-261118, PR #847, main 542c0d0 기준, 이슈 #839)
 
 - **서재 탭**: main-nav 맨 앞 '서재' 탭(현재 위치면 채움 알약). 서재 화면에서는 '트리: ○○ ▾' record-menu 숨김(header.mjs `onShelf`), 책·보드·지도에서만 보인다.
 - **책등 줄 삭제**: 세로 책등(`#shelfSpines`)·spine 렌더/모델/CSS·`tests/v41-shelf-spines.test.mjs` 전부 삭제, 넘김 목록(표지+흰 이름)만 남김.

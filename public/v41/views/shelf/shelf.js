@@ -139,6 +139,10 @@ import { createReader } from './shelf-reader.js';
           card.style.filter=placed.filter;
         });
         setShelfAtmosphere(state.shelfList[center]);
+        // 261118 대표 지적 2차 5: 서재에서 마지막에 본 트리(가운데 책의 트리)를 셸에 알린다 —
+        // 서재 화면에서 콕·보드·지도 탭을 누르면 그 트리로 열린다.
+        var centered=state.shelfList[center];
+        if(centered&&centered.id!==state.reportedTreeId){state.reportedTreeId=centered.id;try{parent.postMessage({type:'lt41-shelf-tree',treeId:centered.id},location.origin);}catch{}}
       }
       function moveShelf(direction) {
         if(!state.shelfList.length)return;
@@ -179,7 +183,7 @@ import { createReader } from './shelf-reader.js';
           if(!shelfDrag.active)return;
           var dx=event.clientX-shelfDrag.startX;
           if(Math.abs(dx)>7)shelfDrag.moved=true;
-          if(shelfDrag.moved){state.shelfIndex=Math.max(0,Math.min(state.shelfList.length-1,shelfDrag.startIndex-dx/158));updateCarousel();}
+          if(shelfDrag.moved){state.shelfIndex=Math.max(0,Math.min(state.shelfList.length-1,shelfDrag.startIndex-dx/200));updateCarousel();}
         });
         rail.addEventListener('pointerup',function(){
           clearLp();

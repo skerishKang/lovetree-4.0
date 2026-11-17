@@ -32,7 +32,7 @@ function flowNavigation(){
   const showTreeViews=parts.treeViews&&treeViewsVisible({owned,publicReading});
   $('tree-views').hidden=!showTreeViews;for(const b of $('tree-views').querySelectorAll('button')){b.disabled=false;b.title='';}
   $('tree-views').setAttribute('aria-label','이 트리 보기');
-  for(const b of document.querySelectorAll('nav>button'))b.hidden=publicReading;
+  for(const b of document.querySelectorAll('nav>button, .tree-frame>button.shelf-tab'))b.hidden=publicReading;
   // 트리 선택은 뒤쪽 탭 묶음 바로 앞에 있고, 로그인 상태에서만 "트리: <이름> ▾"로 보여 준다.
   // 261118 대표 지적: 서재 화면에서는 트리 선택 칸을 숨긴다 — 책·보드·지도에서만 보인다.
   // 로그아웃이면 "트리 고르기", 브라우저에만 남은 미저장 기록이 있으면 "저장 안 된 기록"이다.

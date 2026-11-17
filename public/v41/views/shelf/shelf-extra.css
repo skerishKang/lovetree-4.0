@@ -53,13 +53,26 @@ html[data-v41-screen=shelf] .book-card .book-cover {
    바닥 고정 링크 줄(새 소식·의견 보내기…)과 선반·책이 겹치지 않게 아래 여백을 확보한다(링크 줄 44px + 여백). */
 html[data-v41-screen=shelf] .app{display:flex;flex-direction:column;padding-bottom:72px}
 html[data-v41-screen=shelf] .page{display:flex;flex-direction:column;flex:1 1 auto;width:100%}
-html[data-v41-screen=shelf] .shelf-screen{display:flex;flex-direction:column;justify-content:center;flex:1 1 auto;min-height:0}
+/* 261118 대표 지적 2차: 이어 보기 띠는 위쪽에 붙이고(위 여백 24px 이내), 남은 세로 공간은 책장이 쓴다. */
+html[data-v41-screen=shelf] .shelf-screen{display:flex;flex-direction:column;justify-content:flex-start;flex:1 1 auto;min-height:0}
+html[data-v41-screen=shelf] .shelf-viewport{margin-top:auto;margin-bottom:auto}
+
+/* ── 261118 대표 지적 2차 1: 책이 선반에 앉게 — 카드 아랫단을 레일 바닥에 붙이고 선반은 레일 바로 아래 흐름으로 놓는다.
+   레일 바닥 = 선반 윗면이 되어 책 바닥과 선반 차이가 0~8px 안으로 들어온다. */
+html[data-v41-screen=shelf] .shelf-viewport{height:auto;padding:18px 51px 14px}
+html[data-v41-screen=shelf] .shelf-rail{height:380px}
+html[data-v41-screen=shelf] .book-card{top:auto;bottom:0;transform-origin:50% 100%;transform:translate(-50%,0) translate3d(var(--x,0px),var(--y,0px),var(--z,0px)) rotateY(var(--rot,0deg)) scale(var(--scale,1))}
+html[data-v41-screen=shelf] .shelf-base{position:static;left:auto;right:auto;bottom:auto;margin:0 29px}
+/* 261118 대표 지적 2차 4: 표지 사진은 가운데를 보여 준다(얼굴·주제가 잘리지 않게). */
+html[data-v41-screen=shelf] .book-card .book-cover-media{object-position:50% 50%}
 
 /* ── 261118 대표 지적 4: 이어 보기 띠 한 줄 — [가로 썸네일] 트리 이름 · 순간 제목 · '이어 보기 ▶'.
    트리가 있으면 소개 문('좋아하는 순간들을 한 권의 책으로.'+'책 열기') 대신 이 띠를 둔다.
    글자는 썸네일 밖에 놓는다(사진 위 겹침 금지), 주소 문구는 넣지 않는다. 색은 identity.css --lt-* 토큰만. */
 html[data-v41-screen=shelf] .hero { display: block; min-height: 0; height: auto; }
-html[data-v41-screen=shelf] .hero.strip-mode { padding: 10px 12px; }
+/* 261118 대표 지적 2차: 띠 위 빈 상자를 없앤다 — 띠 모드에서는 바깥 상자(모서리·배경·그림자) 없이 띠 한 줄만,
+   위 여백은 20px(24px 이내). 띠 자체의 1px 테두리 한 겹만 남는다. */
+html[data-v41-screen=shelf] .hero.strip-mode { margin: 20px 0 0; padding: 0; min-height: 0; height: auto; border: 0; background: transparent; box-shadow: none; }
 html[data-v41-screen=shelf] .hero.strip-mode .hero-copy { display: none; }
 .resume-strip {
   display: flex;

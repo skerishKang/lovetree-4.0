@@ -79,14 +79,15 @@ test('목록이 바뀌면 가운데 책을 다시 고른다', () => {
 
 test('레일 위 카드 배치 표(거리 → 좌표·배율·투명도)', () => {
   const table = [
-    [0, { x: 0, y: 6, z: 0, scale: 1.06, rotate: 0, alpha: 1, zIndex: 100, pointerEvents: 'auto', filter: 'none' }],
-    [1, { x: 166, y: 8, z: -78, scale: 0.82, rotate: -22, alpha: 0.9, zIndex: 99, pointerEvents: 'auto', filter: 'none' }],
-    [-1, { x: -166, y: 8, z: -78, scale: 0.82, rotate: 22, alpha: 0.9, zIndex: 99, pointerEvents: 'auto', filter: 'none' }],
-    [2, { x: 332, y: 16, z: -156, scale: 0.66, rotate: -22, alpha: 0.66, zIndex: 98, pointerEvents: 'auto', filter: 'none' }],
-    [3, { x: 496, y: 24, z: -234, scale: 0.54, rotate: -22, alpha: 0.28, zIndex: 97, pointerEvents: 'auto', filter: 'saturate(.72) brightness(.86)' }],
-    [4, { x: 654, y: 28, z: -312, scale: 0.54, rotate: -22, alpha: 0, zIndex: 96, pointerEvents: 'none', filter: 'saturate(.72) brightness(.86)' }]
+    [0, { x: 0, y: 0, z: 0, scale: 1.06, rotate: 0, alpha: 1, zIndex: 100, pointerEvents: 'auto', filter: 'none' }],
+    [1, { x: 200, y: 0, z: 0, scale: 1, rotate: -12, alpha: 0.9, zIndex: 99, pointerEvents: 'auto', filter: 'none' }],
+    [-1, { x: -200, y: 0, z: 0, scale: 1, rotate: 12, alpha: 0.9, zIndex: 99, pointerEvents: 'auto', filter: 'none' }],
+    [2, { x: 400, y: 0, z: 0, scale: 1, rotate: -12, alpha: 0.8, zIndex: 98, pointerEvents: 'auto', filter: 'none' }],
+    [3, { x: 600, y: 0, z: 0, scale: 1, rotate: -12, alpha: 0.6, zIndex: 97, pointerEvents: 'auto', filter: 'saturate(.72) brightness(.86)' }],
+    [4, { x: 800, y: 0, z: 0, scale: 1, rotate: -12, alpha: 0.6, zIndex: 96, pointerEvents: 'none', filter: 'saturate(.72) brightness(.86)' }]
   ];
-  // z는 원본 계산식(-absolute*78)이라 거리 0에서 -0이 된다. 값은 같으므로 부호만 맞춰 본다.
+  // 261118 대표 지적 2차: 배율·깊이 이동으로 글자를 줄이지 않는다 — 옆 책도 scale 1, 설명 글자는 실제 12px 렌더.
+  // 4번째 이후 책 투명도는 0.6 이상으로 남는다.
   for (const [distance, expected] of table) assert.deepEqual({ ...carouselTransform(distance), z: carouselTransform(distance).z + 0 }, expected, 'distance ' + distance);
 });
 
