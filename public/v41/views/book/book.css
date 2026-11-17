@@ -384,3 +384,59 @@ html[data-book-view=single][data-book-shape=wide] .flip-face.back{border-radius:
 /* 트리를 바꿨는데 순간이 없을 때 — 빈 책 안내(의견 #26). --lt-* 토큰만 쓴다. */
 .book-empty{position:fixed;inset:0;display:grid;place-content:center;text-align:center;padding:24px;color:var(--lt-pearl);font:500 15px/1.7 var(--lt-ui)}
 html[data-lt-theme=garden] .book-empty{color:var(--lt-ink)}
+
+/* 이슈 792 3단계: 책의 순간을 이어 보는 재생 창 — 순간 칩은 재생기 아래(폰) / 위(넓은 화면). */
+.playback{position:fixed;inset:0;z-index:140;display:none;place-items:center;padding:22px;background:rgba(10,7,12,.84);backdrop-filter:blur(9px)}
+.playback.open{display:grid}
+.playback-card{position:relative;width:min(900px,94vw);max-height:calc(100dvh - 44px);overflow:auto;padding:20px;border:1px solid rgba(199,155,168,.35);border-radius:22px;background:linear-gradient(160deg,#24171f,#160f16);color:#f5ece6;box-shadow:0 30px 80px rgba(0,0,0,.55);font-family:var(--ui-sans)}
+.playback-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:10px}
+.playback-head .eyebrow{display:block;position:static;top:auto;left:auto;transform:none;margin:0 0 4px;font:600 11px/1 var(--ui-sans);letter-spacing:.18em;color:var(--gold)}
+.playback-head h2{margin:0;font:700 clamp(21px,2.4vw,29px)/1.25 var(--book-serif);letter-spacing:-.01em;overflow-wrap:anywhere}
+.playback-head p{margin:5px 0 0;font-size:13px;line-height:1.5;color:#c8b6ab}
+#pbClose{flex:none;width:44px;height:44px;border:1px solid rgba(255,255,255,.2);border-radius:50%;background:rgba(255,255,255,.06);color:inherit;font-size:22px;line-height:1;cursor:pointer}
+#pbClose:hover{background:rgba(255,255,255,.14)}
+.playback-chips{display:flex;gap:8px;overflow-x:auto;overscroll-behavior-x:contain;padding:2px 2px 10px;scrollbar-width:thin}
+.playback-chip{flex:0 0 auto;min-height:44px;padding:8px 13px;border:1px solid rgba(255,255,255,.16);border-radius:999px;background:rgba(255,255,255,.06);color:#f5ece6;font:500 13px/1.2 var(--ui-sans);white-space:nowrap;cursor:pointer}
+.playback-chip:hover{border-color:rgba(255,230,166,.5);background:rgba(255,230,166,.1)}
+.playback-chip.is-current{border-color:var(--gold);background:var(--gold);color:#24170d;font-weight:700}
+.playback-chip.is-unavailable{opacity:.48;text-decoration:line-through;cursor:not-allowed;border-style:dashed}
+.playback-stage{position:relative;width:100%;aspect-ratio:16/9;overflow:hidden;border:1px solid rgba(255,255,255,.12);border-radius:14px;background:#000}
+#pbPlayer,.playback-stage iframe{display:block;width:100%;height:100%;border:0}
+.playback-done{position:absolute;inset:0;z-index:2;display:grid;place-content:center;gap:12px;padding:20px;text-align:center;background:rgba(16,11,15,.92);color:var(--paper)}
+.playback-done[hidden]{display:none}
+.playback-done p{margin:0;font:700 clamp(22px,3vw,30px)/1.2 var(--book-serif)}
+#pbRestart{min-height:44px;padding:10px 18px;border:1px solid var(--gold);border-radius:999px;background:var(--gold);color:#24170d;font-weight:700;cursor:pointer}
+.playback-range{margin:9px 2px 0;font:600 13px/1.5 var(--ui-sans);color:#e8dcd2}
+.playback-controls{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.playback-controls button{min-height:44px;padding:10px 16px;border:1px solid rgba(255,255,255,.2);border-radius:999px;background:rgba(255,255,255,.07);color:inherit;font:600 14px/1.2 var(--ui-sans);cursor:pointer}
+.playback-controls button:hover:not(:disabled){border-color:rgba(255,230,166,.55);background:rgba(255,230,166,.1)}
+.playback-controls button:disabled{opacity:.38;cursor:not-allowed}
+#pbToggle{border-color:var(--gold);background:var(--gold);color:#24170d}
+#pbCloseBottom{margin-left:auto}
+.playback-status{min-height:20px;margin:8px 2px 0;font-size:12px;line-height:1.5;color:#c8b6ab}
+html[data-lt-theme=garden] .playback{background:rgba(247,240,232,.86)}
+html[data-lt-theme=garden] .playback-card{border-color:rgba(119,91,82,.28);background:linear-gradient(160deg,#fffdf8,#f3e9dc);color:var(--lt-ink,#433a34);box-shadow:0 30px 80px rgba(75,51,42,.24)}
+html[data-lt-theme=garden] .playback-head .eyebrow{color:var(--lt-gold-deep,#b9905f)}
+html[data-v41-screen=book] .playback-head .eyebrow,html[data-book-shape=phone] .playback-head .eyebrow{display:block}
+html[data-lt-theme=garden] .playback-head p,html[data-lt-theme=garden] .playback-status{color:var(--lt-muted,#8d7f73)}
+html[data-lt-theme=garden] #pbClose{border-color:rgba(119,91,82,.3);background:rgba(255,253,248,.86);color:var(--lt-ink,#433a34)}
+html[data-lt-theme=garden] .playback-chip{border-color:rgba(119,91,82,.28);background:rgba(255,253,248,.88);color:var(--lt-ink,#433a34)}
+html[data-lt-theme=garden] .playback-chip.is-current{border-color:var(--lt-primary,#c76e8b);background:var(--lt-primary,#c76e8b);color:var(--lt-paper,#fffdf8)}
+html[data-lt-theme=garden] .playback-range{color:var(--lt-ink,#433a34)}
+html[data-lt-theme=garden] .playback-controls button{border-color:rgba(119,91,82,.3);background:rgba(255,253,248,.9);color:var(--lt-ink,#433a34)}
+html[data-lt-theme=garden] #pbToggle{border-color:var(--lt-primary,#c76e8b);background:var(--lt-primary,#c76e8b);color:var(--lt-paper,#fffdf8)}
+html[data-lt-theme=garden] .playback-done{background:rgba(247,240,232,.95);color:var(--lt-ink,#433a34)}
+html[data-lt-theme=garden] #pbRestart{border-color:var(--lt-primary,#c76e8b);background:var(--lt-primary,#c76e8b);color:var(--lt-paper,#fffdf8)}
+@media(max-width:780px){.playback{padding:0;place-items:stretch}
+.playback-card{width:100%;height:100dvh;max-height:100dvh;padding:10px 12px 12px;border:0;border-radius:0;display:flex;flex-direction:column;gap:8px;overflow:auto}
+.playback-head{order:0;margin-bottom:0}
+.playback-head h2{font-size:20px}
+.playback-stage{order:1;flex:none}
+.playback-chips{order:2;padding-bottom:2px}
+.playback-range{order:3;margin-top:2px}
+.playback-controls{order:4;position:sticky;bottom:0;margin-top:auto;padding:6px 0 2px;background:linear-gradient(180deg,transparent,rgba(22,15,22,.94) 32%)}
+.playback-status{order:5;margin-top:0}
+.playback-controls button{flex:1 1 0;min-width:0;padding:10px 7px;font-size:13px}
+#pbCloseBottom{margin-left:0}
+}
+html[data-lt-theme=garden] .playback-controls{background:linear-gradient(180deg,transparent,rgba(247,240,232,.96) 32%)}

@@ -16,6 +16,7 @@ import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { FALLBACK_SECONDS, playbackItemOf, buildPlaybackQueue, stepPlayable, firstPlayable, playbackChipText, segmentReached } from '../public/v41/playback-core.mjs';
 
 const read = (p) => readFileSync(new URL('../' + p, import.meta.url), 'utf8');
 const MP = read('public/v41/media-preview.js');
@@ -626,5 +627,58 @@ test('26: 책을 열어 둔 채 트리를 바꾸면 책 제목·첫 카드·카�
   }
 });
 
+/* ── 792 3단계: 책의 순간 이어 보기 ───────────────────────────────── */
+const pbDescribe = (url) => /youtu/.test(url) ? { kind: 'youtube', videoId: 'M7lc1UVf-VE' } : /tiktok/.test(url) ? { kind: 'link' } : { kind: 'none' };
+const pbTitle = (m) => m.title || '순간';
+const pbDate = (m) => m.date || '';
+const pbMoment = (id, extra = {}) => ({ id, title: id, date: '2026-11-17', url: 'https://www.youtube.com/watch?v=M7lc1UVf-VE', ...extra });
 
+test('792-3: YouTube 순간만 책 순서대로 담고, 구간이 없으면 시작+30초', () => {
+  assert.equal(FALLBACK_SECONDS, 30);
+  const items = buildPlaybackQueue([
+    pbMoment('입덕', { startSeconds: 90, endSeconds: 100 }),
+    pbMoment('틱톡', { url: 'https://www.tiktok.com/@a/video/1' }),
+    pbMoment('끝 없이', { startSeconds: 42 }),
+    { id: '사진', title: '사진', url: '', kind: 'photo' }
+  ], pbDescribe, pbTitle, pbDate);
+  assert.deepEqual(items.map((i) => i.title), ['입덕', '끝 없이']);
+  assert.deepEqual(items[0], { id: '입덕', videoId: 'M7lc1UVf-VE', title: '입덕', date: '2026-11-17', start: 90, end: 100, duration: 10, fallback: false, unavailable: false });
+  assert.equal(items[1].start, 42);
+  assert.equal(items[1].end, 72, '끝이 없으면 시작+30초');
+  assert.equal(items[1].fallback, true);
+  assert.equal(playbackItemOf({ id: 'x', url: 'https://www.tiktok.com/@a/video/1' }, pbDescribe), null);
+});
 
+test('792-3: 볼 수 없는 항목을 건너뛰고 처음·다음 자리를 찾는다', () => {
+  const items = [{ unavailable: false }, { unavailable: true }, { unavailable: false }, { unavailable: true }];
+  assert.equal(stepPlayable(items, 0, 1), 2);
+  assert.equal(stepPlayable(items, 2, -1), 0);
+  assert.equal(stepPlayable(items, 2, 1), -1);
+  assert.equal(stepPlayable([{ unavailable: true }], 0, 1), -1);
+  assert.equal(firstPlayable(items), 0);
+  assert.equal(firstPlayable([{ unavailable: true }, { unavailable: false }]), 1);
+  assert.equal(playbackChipText({ title: '입덕', duration: 10, unavailable: false }), '입덕 10초');
+  assert.equal(playbackChipText({ title: '입덕', duration: 10, unavailable: true }), '입덕 10초 · 볼 수 없음');
+});
+
+test('792-3: 구간 끝 판정은 끝 0.35초 전부터 참', () => {
+  assert.equal(segmentReached(9.7, 10), true);
+  assert.equal(segmentReached(9.6, 10), false);
+  assert.equal(segmentReached(10, 10), true);
+  assert.equal(segmentReached('x', 10), false);
+});
+
+test('792-3: 책 화면에 이어 보기 단추·재생 창·닫기 배선이 있다', () => {
+  assert.match(HTML, /id="playAllBtn"/);
+  assert.match(HTML, /id="playback"/);
+  assert.match(HTML, /id="pbChips"/);
+  assert.match(HTML, /id="pbPrev"/);
+  assert.match(HTML, /id="pbNext"/);
+  assert.match(HTML, /id="pbToggle"/);
+  assert.match(HTML, /id="pbClose"/);
+  assert.match(HTML, /id="pbRestart"/);
+  const js = read('public/v41/views/book/book-playback.mjs');
+  assert.match(js, /buildPlaybackQueue/);
+  assert.match(js, /loadVideoById/);
+  assert.match(js, /segmentReached/);
+});
