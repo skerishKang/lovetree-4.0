@@ -1,5 +1,17 @@
 # LoveTree 4.0 — 핸드오프
 
+## 2026-11-18 — 서재 화면 정리 (컴1로컬3 작업, ai/local3-shelf-261118, PR #847, main 542c0d0 기준, 이슈 #839)
+
+- **서재 탭**: main-nav 맨 앞 '서재' 탭(현재 위치면 채움 알약). 서재 화면에서는 '트리: ○○ ▾' record-menu 숨김(header.mjs `onShelf`), 책·보드·지도에서만 보인다.
+- **책등 줄 삭제**: 세로 책등(`#shelfSpines`)·spine 렌더/모델/CSS·`tests/v41-shelf-spines.test.mjs` 전부 삭제, 넘김 목록(표지+흰 이름)만 남김.
+- **'+ 새 트리' 단추 하나**: 점선 책등·넘김 목록 끝 빈 책 카드 삭제, 오른쪽 `#shelfNewTree` 단추만 남김(트리 0개 빈 계정은 #817 그대로).
+- **이어 보기 띠**: '좋아하는 순간들을 한 권의 책으로.'+'책 열기'는 트리 0개일 때만(띠 모드에서 hero-copy 숨김). 트리가 있으면 한 줄 띠(썸네일 96×54 · 트리 이름 · 순간 제목 · '이어 보기 ▶'). 띠 문구는 트리 이름=book.name(주제) 기준 — fake 서버 데이터에서 트리 제목과 주제가 같아 실측에서 '수아'로 나온다.
+- **addedLabel**: 책 설명 '순간 N개 · 오늘/어제/N일 전 추가', 7일 넘으면 'M월 D일 추가'(미래는 오늘 처리). 옆 책 설명 12px 유지.
+- **선반·여백**: `.app/.page/.shelf-screen` flex column + `justify-content:center` + app 아래 여백 72px — 선반 y=456(무대 중앙), 하단 링크 겹침 false.
+- **글꼴**: `html[data-v41-screen=shelf]{--lt-font-display:var(--lt-reading)}`로 제목·표지 명조(MaruBuri), 본문 Pretendard 하나(`--latin: var(--body)`).
+- **검증**: 관련 시험 80건 pass·0 fail, build·modulepreload --check ✓. dist 재빌드 후 실측(가짜 API만, 시험 계정 세션 없음): 책등 0·빈 책 0·새 트리 단추 1·띠 겹침 false·띠 대비 밤 7.1~17.8:1/정원 5.9~11.6:1·책 설명 '어제 추가' 류 12px. 캡처 8장 `E:\lovetree-qa\local3\library\`(trees/empty × 1440·390 × 밤·정원).
+- **남은 것**: ㉠트리 0개 계정이 주소로 바로 `#my/shelf`에 들어오면 기존 동작대로 집 빈 화면(shell.mjs `choose()`의 빈 판)이 열린다 — 서재 탭을 눌러야 '아직 책장이 비어 있어요.' 빈 상태. 시작 위치까지 서재로 열지는 별도 이슈. ㉑띠의 트리 이름을 주제가 아닌 트리 제목으로 바꿀지는 대표 확인 후 결정.
+
 ## 2026-11-17 — PR #807 병합; 책 카드 정리(#800) 진행 중
 
 - **#807 완료**: CTO 캡처 승인과 최신 CI 확인 뒤 squash 병합했다. 병합 커밋 `cb14a1f5e53b003874aac3252fc49aa82ae6bfe3`.
