@@ -428,7 +428,7 @@ html[data-lt-theme=garden] #moment-form input,html[data-lt-theme=garden] #moment
 .cleanup-moment span{min-width:0;overflow-wrap:anywhere}
 .cleanup-moment .is-blank{color:var(--lt-muted)}
 .cleanup-moment-thumb{display:block;flex:0 0 auto;width:56px;height:56px;margin:0;border-radius:6px;object-fit:cover;background:rgba(255,255,255,.06);border:1px solid var(--line)}
-/* #815와 같은 규칙: 정원(밝은 바탕)에서는 정리 창의 입력칸도 정원 종이·선 토큰으로 흰 칸과 견준다. 밤은 기본값 그대로다. */
+/* 순간 추가 폼 입력칸과 같은 규칙: 정원(밝은 바탕)에서는 정리 창의 입력칸도 정원 종이·선 토큰으로 흰 칸과 견준다. 밤은 기본값 그대로다. */
 html[data-lt-theme=garden] #cleanup-panel input:not([type=checkbox]),html[data-lt-theme=garden] #cleanup-panel select{background:var(--lt-paper);border-color:var(--lt-line-paper)}
 #cleanup-count{margin:10px 0 0}
 #cleanup-error{color:var(--lt-rose);font-weight:600}
