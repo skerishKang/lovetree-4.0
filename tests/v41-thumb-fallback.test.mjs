@@ -62,7 +62,8 @@ test('#429 후보 순서: 저장된 썸네일 주소 → [세로 원본] → hqd
   assert.deepEqual(thumbnailCandidates({ url: 'https://youtu.be/abc123DEF45' }, { autoLoad: false }), []);
   assert.deepEqual(thumbnailCandidates({ url: 'https://blog.example.com/post/1' }, { autoLoad: true }), []);
 
-  // 5) 닮은 호스트·http 썸네일은 허용하지 않는다(https + ytimg.com만)
+  // 5) img.youtube.com·ytimg.com은 허용하고 닮은 호스트·http 썸네일은 거부한다.
+  assert.equal(safeYoutubeThumb('https://img.youtube.com/vi/abc123DEF45/hqdefault.jpg'), 'https://img.youtube.com/vi/abc123DEF45/hqdefault.jpg');
   assert.equal(safeYoutubeThumb('https://ytimg.com.evil.example/vi/abc123DEF45/hqdefault.jpg'), '');
   assert.equal(safeYoutubeThumb('http://i.ytimg.com/vi/abc123DEF45/hqdefault.jpg'), '');
   assert.equal(youtubeIdFrom('https://youtube.com.evil.example/watch?v=abc123DEF45'), '');

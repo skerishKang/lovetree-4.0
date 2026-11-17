@@ -216,6 +216,25 @@ test('4. 둘러보기(공개 목록)도 같은 이름 규칙을 쓴다(mountComm
   } finally { h.restore(); }
 });
 
+test('4-1. 같은 이름과 순간은 공개 표시명만 쓰고 순번을 붙이지 않는다', async () => {
+  const same = (shareId, coverTitle, extra = {}) => ({
+    ...COMMUNITY_ITEM, shareId, cover: { ...COMMUNITY_ITEM.cover, title: coverTitle }, ...extra
+  });
+  const h = communityHarness({ items: [
+    same('s1', '첫 순간', { aiTester: true, publicDisplayName: '하은' }),
+    same('s2', '다른 순간', { publicDisplayName: '바다' }),
+    same('s3', '첫 순간', { publicDisplayName: '윤슬' }),
+    same('s4', '첫 순간')
+  ] });
+  try {
+    await h.search();
+    const cards = h.get('community-list').children;
+    const labels = cards.map(card => card.children.find(node => node.className === 'community-card-distinct')?.textContent || '');
+    assert.deepEqual(labels, ['AI 명예회원 하은님', '', '윤슬님', '']);
+    assert.equal(cards.some(card => card.children.some(node => String(node.textContent).includes('같은 이름'))), false);
+  } finally { h.restore(); }
+});
+
 test('5. 긴 이름은 말줄임 — 헤더 트리 이름과 문맥 줄이 폭을 넘지 않는다', () => {
   // #601: 트리를 바꿔도 탭이 흔들리지 않게 칸 폭을 고정한다(11em) — 넘치면 말줄임. (CSS 값은 글자로 유지)
   assert.match(css, /nav #record-menu{flex:0 0 auto;width:11em;/, '헤더 트리 선택 고정 폭');

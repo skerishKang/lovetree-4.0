@@ -6,7 +6,7 @@ import {ROLE_AI_CUSTOMER,ROLE_TESTER} from './admin-roles.js';
 import {coverModeOf} from '../src/domain.js';
 // 꼬리표 판정은 화면과 같은 한 벌 — 서버에 규칙을 복사하지 않는다(#627 3단계 '다른 팬 보기').
 import {parseTag, tagKey} from '../public/v41/tags.mjs';
-import {isVerticalMoment,safeYoutubeThumb,youtubeIdFrom} from '../public/v41/thumb-fallback.mjs';
+import {isVerticalMoment,safeYoutubeThumb,youtubeIdFrom,youtubeStageThumbUrl} from '../public/v41/youtube-id.mjs';
 
 export const REACTION_KINDS=Object.freeze(['heart','like','love','laugh','wow','sad','angry']);
 const isReactionKind=value=>typeof value==='string'&&REACTION_KINDS.includes(value);
@@ -48,16 +48,17 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
   let projected;try{projected=projectSharedTree(stored.doc,share.treeId);}catch{return null;}
   if(!projected.tree.moments.length)return null;
   const tree=projected.tree,cover=tree.moments.find(moment=>moment.id===tree.coverMomentId)||tree.moments.find(moment=>moment.id===share.entryMomentId)||tree.moments[0];
-  const coverType=cover?.type||(youtubeIdFrom(cover?.url)?'youtube':'');
+  const youtubeId=youtubeIdFrom(cover?.url||cover?.externalUrl);
+  const coverType=youtubeId?'youtube':cover?.type||'';
   // #425 2번: 표지 주소는 '순간에서(moment)'일 때만 보낸다. 사진 표지는 공개 판정에서
   // 디자인/기본으로 바뀌고(projectSharedTree), 디자인·기본 표지에는 주소가 없다.
   const coverUrl=coverModeOf(tree)==='moment'?(cover?.url||''):'';
+  const vertical=['video','youtube'].includes(coverType)&&isVerticalMoment(cover);
   const thumbnailUrl=coverModeOf(tree)==='moment'
    ? coverType==='youtube'
-    ? safeYoutubeThumb(cover?.mediaMetadata?.thumbnail||cover?.mediaMetadata?.thumbnailUrl||cover?.thumbnailUrl)
+    ? safeYoutubeThumb(cover?.mediaMetadata?.thumbnail||cover?.mediaMetadata?.thumbnailUrl||cover?.thumbnailUrl)||youtubeStageThumbUrl(youtubeId)
     : coverUrl
    : '';
-  const vertical=['video','youtube'].includes(coverType)&&isVerticalMoment(cover);
   const emotions=[...new Set(tree.moments.map(moment=>moment.emotion).filter(Boolean))];
   const stats=statsOverride||await communityRepo.stats({productId,shareId:share.shareId,viewerSubjectId});
   const card={shareId:share.shareId,title:tree.title,subject:tree.subject,summary:clean(cover?.note,160),emotions,momentCount:tree.moments.length,entryMomentId:share.entryMomentId,view:share.view,cover:{title:cover?.title||tree.title,url:coverUrl,thumbnailUrl,type:coverType,vertical,emotion:cover?.emotion||''},createdAt:share.createdAt,lastActivityAt:lastActivityAt||share.createdAt,stats};

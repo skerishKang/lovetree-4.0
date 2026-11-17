@@ -156,7 +156,7 @@ test('#627: 둘러보기 검색은 트리 순간의 제목(영상 제목 포함)
  const video='https://www.youtube.com/shorts/Rescene0001',thumbnail='https://i.ytimg.com/vi/Rescene0001/hqdefault.jpg';
  let tree=createTree({subject:'윤슬',title:'첫 무대',note:'다시 보고 싶은 빛',emotion:'설렘',date:'2026-11-01',url:PHOTO},CLOCK);
  tree=editTree(tree,{title:'모아둔 순간',subject:tree.subject,coverMomentId:tree.moments[0].id});
- tree=addMoment(tree,{url:video,mediaMetadata:{title:'RESCENE(리센느) 무대 직캠',channel:'기록 채널',source:'youtube.com',thumbnail}},tree.moments[0].id,CLOCK);
+ tree=addMoment(tree,{type:'video',url:video,mediaMetadata:{title:'RESCENE(리센느) 무대 직캠',channel:'기록 채널',source:'youtube.com'}},tree.moments[0].id,CLOCK);
  const videoMoment=tree.moments.find(moment=>moment.url===video);
  tree=editTree(tree,{title:tree.title,subject:tree.subject,coverMomentId:videoMoment.id});
  tree={...tree,moments:tree.moments.map((moment,index)=>index===0?{...moment,keywords:[...(moment.keywords||[]),'가수:IVE','노래:Love Attack','무대:인기가요']}:moment)};
@@ -189,6 +189,7 @@ test('#627: 둘러보기 검색은 트리 순간의 제목(영상 제목 포함)
  assert.equal(artistGroup.body.items[0].cover.type,'youtube');
  assert.equal(artistGroup.body.items[0].cover.vertical,true);
  assert.equal(artistGroup.body.items[0].cover.thumbnailUrl,thumbnail);
+ assert.equal(Object.hasOwn(artistGroup.body.items[0],'publicDisplayName'),false,'계정 표시 이름은 공개 목록 응답에 새로 노출하지 않는다');
  // 뜻 없는 검색어는 그대로 걸러진다(검색이 무조건 통과로 바뀌지 않았다).
  assert.deepEqual((await call(handle,'GET','/api/community/shares',{query:'q=없는검색'})).body.items,[]);
  // 순간 제목을 더 보느라 조회 수가 늘지 않는다(요약 한 번).

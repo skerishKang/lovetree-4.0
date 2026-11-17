@@ -100,7 +100,9 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
   const title=displayTreeTitle(item.title),moment=item.cover?.title||'';
   const matches=items.filter(value=>displayTreeTitle(value.title)===title&&(value.cover?.title||'')===moment);
   if(matches.length<2)return '';
-  return `같은 이름 ${matches.findIndex(value=>value.shareId===item.shareId)+1}`;
+  const publicName=String(item.publicDisplayName||'').trim();
+  if(!publicName)return '';
+  return `${item.aiTester===true?'AI 명예회원 ':''}${publicName}님`;
  }
  function renderCover(item,{loading='lazy'}={}){
   const cover=el('div','community-cover'),video=['video','youtube'].includes(item.cover?.type),vertical=video&&item.cover?.vertical===true;
@@ -115,7 +117,6 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
   }else cover.append(el('span','community-cover-fallback',item.cover?.title||'공개된 순간'));
   if(item.aiTester===true)cover.append(el('span','community-cover-badge community-ai','AI 명예회원'));
   cover.append(el('span','community-cover-badge community-count',`순간 ${item.momentCount}`));
-  const duplicate=duplicateLabel(item);if(duplicate)cover.append(el('span','community-cover-badge community-distinct',duplicate));
   return cover;
  }
  function moreMenu(item){
@@ -153,7 +154,10 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
   const metaText=`${item.cover?.emotion||item.emotions?.[0]||'공개'} · ${when(item.createdAt)} · 공감 ${item.stats?.hearts||0}`;
   const article=el('button','community-card');article.type='button';article.dataset.shareId=item.shareId;
   article.setAttribute('aria-label',`${titleText}. ${momentText}. ${metaText}`);
-  article.append(renderCover(item),el('h3','community-card-title',titleText),el('p','community-card-moment',momentText),el('p','community-card-meta',metaText));
+  const distinct=duplicateLabel(item);
+  article.append(renderCover(item),el('h3','community-card-title',titleText),el('p','community-card-moment',momentText));
+  if(distinct)article.append(el('small','community-card-distinct',distinct));
+  article.append(el('p','community-card-meta',metaText));
   article.onclick=()=>openPreview(item);return article;
  }
  function render(){
