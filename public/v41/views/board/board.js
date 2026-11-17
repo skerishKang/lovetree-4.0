@@ -8,7 +8,8 @@ const colors={rose:ltVar('--lt-thread-rose','#ff659f'),violet:ltVar('--lt-thread
 // #467 보드 판 테마(종이/밤). 판·카드 색은 CSS만 정하고(board-extra.css 끝 html[data-lt-board-theme=night]),
 // 여기서는 html 속성을 붙이고 실·핀 색(--lt-thread-*)을 다시 읽어 칠한다 — 같은 색 값을 JS에 따로 두지 않는다.
 // 원본 보드 테마(body[data-theme], 고급 도구의 진주빛·코르크·…)와는 따로다. 기본은 종이.
-function readBoardTheme(){try{const a=document.documentElement.getAttribute('data-lt-board-theme');if(a==='night'||a==='paper')return a;return localStorage.getItem('lt41.boardTheme')==='night'?'night':'paper'}catch{return 'paper'}}
+// #853: 저장한 값이 없으면 사용자 테마를 따른다 — 밤 테마면 밤 판, 정원(낮)이면 종이 판.
+function readBoardTheme(){try{const a=document.documentElement.getAttribute('data-lt-board-theme');if(a==='night'||a==='paper')return a;const s=localStorage.getItem('lt41.boardTheme');if(s==='night'||s==='paper')return s;return document.documentElement.getAttribute('data-lt-theme')==='garden'?'paper':'night'}catch{return 'night'}}
 function setBoardTheme(theme){
   const v=theme==='night'?'night':'paper';
   document.documentElement.setAttribute('data-lt-board-theme',v);

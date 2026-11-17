@@ -390,6 +390,8 @@ function drawLegend() {
   row.replaceChildren();
   const groups = new Map();
   for (const h of model.graph.hubs) {
+    // #854: 이름이 서지 않는 묶음(빈 값)은 범례에서도 숨긴다 — 색 점만 남는다.
+    if (!String(h.value ?? '').trim()) continue;
     if (!groups.has(h.kindId)) groups.set(h.kindId, []);
     groups.get(h.kindId).push(h);
   }

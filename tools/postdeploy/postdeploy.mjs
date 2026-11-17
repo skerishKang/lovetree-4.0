@@ -831,7 +831,8 @@ async function checkVisualTokens(page, target, opts, stamp) {
     { hash: '', id: 'home', frameBg: null },
     { hash: '#book', id: 'book', frameBg: 'rgb(4, 4, 7)' },
     { hash: '#board', id: 'board', frameBg: 'rgb(4, 4, 7)' },
-    { hash: '#network', id: 'network', frameBg: 'rgb(245, 239, 226)' },
+    // #856: 지도 판 기본값이 사용자 테마를 따른다 — 기본 테마(밤, 저장값 없음)에서는 밤 판(#0a0a11)이 바탕이다.
+    { hash: '#network', id: 'network', frameBg: 'rgb(10, 10, 17)' },
     { hash: '#shelf', id: 'shelf', frameBg: null }
   ];
   await page.setViewportSize({ width: 1280, height: 860 }).catch(() => {});

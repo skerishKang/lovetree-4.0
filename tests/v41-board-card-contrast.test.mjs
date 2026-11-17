@@ -44,7 +44,9 @@ function serve(root) {
 // 보드는 셸이 넘겨주는 예시 트리(parent.LT41)로 그린다 — 로그아웃 셸(/v41/#board)째 열고 보드 프레임 안에서 잰다.
 async function openBoard(browser, base, { plate, appTheme }) {
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
-  await ctx.addInitScript(([p, t]) => { try { localStorage.setItem('lt41.theme', t); if (p === 'night') localStorage.setItem('lt41.boardTheme', 'night'); } catch {} }, [plate, appTheme]);
+  // #853부터 기본 판은 사용자 테마를 따른다(밤 테마면 밤 판). 이 시험의 대상은 '직접 고른 판 값'이므로
+  // 종이도 저장해 두어 기본값 바뀜과 무관하게 같은 것을 검사한다.
+  await ctx.addInitScript(([p, t]) => { try { localStorage.setItem('lt41.theme', t); localStorage.setItem('lt41.boardTheme', p === 'night' ? 'night' : 'paper'); } catch {} }, [plate, appTheme]);
   const page = await ctx.newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push(String(e.message || e)));
@@ -116,7 +118,7 @@ test('보드 안 클릭(카드·전체 보기)은 판을 바꾸지 않는다 —
     await frame.click('#fitBtn');
     await page.waitForTimeout(400);
     const after = await read();
-    assert.equal(after.stored, null, '카드·전체 보기 클릭으로 판 테마가 저장되면 안 된다');
+    assert.equal(after.stored, 'paper', '카드·전체 보기 클릭으로 저장한 판 테마 값이 바뀌지 않는다');
     assert.doesNotMatch(after.toast, /판으로 바꿨어요/, '카드·전체 보기 클릭에 판 바꿈 안내가 뜨면 안 된다');
     await frame.evaluate(() => document.querySelector('button[data-board-theme="night"]').click());
     const night = await read();

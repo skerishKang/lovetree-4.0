@@ -40,7 +40,8 @@ async function openMap(browser, base, { width, appTheme, plate = 'paper' }) {
     if (window.top === window && !localStorage.getItem('map-flow-initialized')) {
       localStorage.setItem('map-flow-initialized', '1');
       localStorage.setItem('lt41.theme', appTheme);
-      localStorage.setItem('lt41.boardTheme', plate);
+      // #853: 'none'은 저장한 판 값이 없는 상태(기본값은 사용자 테마를 따른다)를 본다.
+      if (plate !== 'none') localStorage.setItem('lt41.boardTheme', plate);
     }
     // 완성된 지도 한 장을 칠하는 background fillRect만 센다. 검사 자체는 rAF를 만들지 않는다.
     window.__mapDrawCount = 0;
@@ -269,6 +270,31 @@ test('지도 판 실제 흐름: 설정·저장 복원·두 보기·누르기·�
         } finally { await live.context.close(); }
       });
     }
+    await t.test('판 기본값은 사용자 테마를 따른다 — 저장한 값이 없으면 밤 테마에 밤 판, 정원에 종이 판(#853)', async () => {
+      const live = await openMap(browser, base, { width: 1440, appTheme: 'night', plate: 'none' });
+      try {
+        const map = live.page.frames().find(f => /track56-network/.test(f.url()));
+        assert.ok(map, '지도가 열린다');
+        assert.equal(await map.evaluate(() => document.documentElement.dataset.ltBoardTheme), 'night', '밤 테마인데 저장한 값이 없으면 밤 판');
+        // 테마 바꾸기 단추(밤→정원) — 보드·지도 바탕이 바로 따라 바뀐다.
+        await live.page.evaluate(() => document.getElementById('theme-toggle')?.click());
+        await live.page.waitForTimeout(600);
+        assert.equal(await live.page.evaluate(() => localStorage.getItem('lt41.boardTheme')), 'paper', '전환 뒤 저장 값도 정원에 맞는 종이');
+        assert.equal(await map.evaluate(() => document.documentElement.dataset.ltBoardTheme), 'paper', '열린 지도도 바로 종이 판');
+        await live.page.evaluate(() => { location.hash = 'board'; });
+        await live.page.waitForFunction(() => [...document.querySelectorAll('iframe')].some(f => !f.hidden && /track58-pinboard/.test(f.src || f.contentWindow.location.href) && f.contentDocument?.querySelector('#cardLayer .card')));
+        const board = live.page.frames().find(f => /track58-pinboard/.test(f.url()));
+        assert.equal(await board.evaluate(() => document.documentElement.dataset.ltBoardTheme), 'paper', '보드도 정원에는 종이 판');
+        // 저장한 값이 없는 새로운 문서에서도 정원 기본은 종이다.
+        const fresh = await openMap(browser, base, { width: 1440, appTheme: 'garden', plate: 'none' });
+        try {
+          const map2 = fresh.page.frames().find(f => /track56-network/.test(f.url()));
+          assert.equal(await map2.evaluate(() => document.documentElement.dataset.ltBoardTheme), 'paper', '정원 테마 기본은 종이 판');
+        } finally { await fresh.context.close(); }
+        assert.deepEqual(live.errors, [], '페이지 오류 0');
+      } finally { await live.context.close(); }
+    });
+
     await t.test('보드 도구 줄에서 고른 판도 지도와 설정이 함께 쓴다', async () => {
       const live = await openMap(browser, base, { width: 1440, appTheme: 'night' });
       try {
