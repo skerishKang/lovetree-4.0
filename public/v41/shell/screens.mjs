@@ -12,6 +12,8 @@ export function createScreens(deps) {
     getSource,
     hasTree,
     flowNavigation,
+    paintEmptyForScreen,
+    paintEmptyCopy,
     applyTheme,
     writeLocation,
     links,
@@ -158,15 +160,17 @@ export function createScreens(deps) {
     flowNavigation();
     applyTheme();
     if (!hasTree() && file !== 'src064-orbit.html') {
+      // 2026-11-17 대표 결정: 트리 0개여도 서재·책·보드·지도탭은 그대로 열린다 — 첫 화면으로 되돌리지 않는다.
       document.body.classList.remove('home-screen');
       hideFrames();
-      // #453 D1: 빈 화면은 어느 탭도 '지금 보는 곳'이 아니다. 남아 있던 금테 표시를 지운다.
-      document.querySelectorAll('[data-view]').forEach(b => b.setAttribute('aria-current', 'false'));
+      document.querySelectorAll('[data-view]').forEach(b => b.setAttribute('aria-current', String(b.dataset.view === file || (file === 'track60-graph.html' && b.dataset.view === 'track56-network.html'))));
+      paintEmptyForScreen?.(file);
       $('empty').hidden = false;
       if (write) writeLocation();
       links();
       return;
     }
+    if (file === 'src064-orbit.html' && !hasTree()) paintEmptyCopy?.();
     document.body.classList.toggle('home-screen', file === 'src064-orbit.html');
     // 2026-11-16 대표 결정: 그래프 보기(#627 3단계, track60-graph.html)는 지도 안의 보기 하나다 —
     // 위쪽 메뉴(책·보드·지도)에서는 지도가 켜진 상태로 보인다. 메뉴 단추는 따로 만들지 않는다(navigation.mjs 그대로).
