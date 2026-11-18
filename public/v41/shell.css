@@ -551,11 +551,19 @@ nav .tree-frame{scroll-snap-align:center}
 /* 고객 의견 창구 (이슈 540) — 로그아웃 상태 첫 화면 아래 작은 글씨 링크. */
 .feedback-link{padding:6px 10px;border:0;background:none;color:var(--muted);font-size:13px;letter-spacing:.04em;text-decoration:underline;text-underline-offset:3px;opacity:.75;cursor:pointer}
 .feedback-link:hover{color:var(--lt-pearl);opacity:1}
-/* 이슈 611: 새 소식·의견 보내기가 함께 뜨는 작은 입구. 로그아웃 상태에서도 보인다. */
+/* 이슈 611: 새 소식·의견 보내기가 함께 뜨는 작은 입구. 로그아웃 상태에서도 보인다.
+   261118 대표 지적(이슈 884): 바닥 띠를 거두면서 궤도 카드가 링크 줄 아래를 지나간다. 링크 줄은
+   화면 iframe(#stage>#view z2) 위 층(z-index:24)이라 누름도 링크 자신이 받지만, 글자가 옅은 회색
+   75% 라 카드가 지나가면 묻혀 보였다 — 75% 를 거두고 각 테마의 진한 글자색 + 무대색 후광으로
+   글자만 또렷하게 살린다(배경은 없다). */
 .home-links{position:fixed;left:14px;bottom:max(10px,env(safe-area-inset-bottom));z-index:24;display:flex;gap:2px;align-items:center}
+.home-links .feedback-link{opacity:1;color:var(--lt-pearl);text-shadow:0 1px 1px var(--lt-stage),0 -1px 1px var(--lt-stage),1px 0 1px var(--lt-stage),-1px 0 1px var(--lt-stage),0 0 4px var(--lt-stage),0 0 8px var(--lt-stage),0 0 14px var(--lt-stage),0 0 20px var(--lt-stage)}
 /* 개인정보 처리방침·이용약관 링크(2026-11-16): 같은 줄의 작은 링크와 같은 글자·색. 줄이 좁으면
    두 개로 나누어 넘치지 않게 한다(가로 넘침 0 — 390 실측). 누름 영역은 44px 이상. */
 .home-links .feedback-link{display:inline-flex;align-items:center;min-height:44px;font-size:14px}
+/* 정원: 종이 무대 위 잉크 글자 + 무대색 후광(밤과 같은 방식). 다린 쪽(기본 hover 가 밤 진주색)도 정원에서는 잉크를 유지한다. */
+html[data-lt-theme=garden] .home-links .feedback-link{color:var(--lt-ink)}
+html[data-lt-theme=garden] .home-links .feedback-link:hover{color:var(--lt-ink)}
 /* 390에서는 처리방침·약관을 아래 고정 줄에 두지 않는다(설정 창 맨 아래·안내 패널에만). */
 @media(max-width:520px){.home-links a.feedback-link{display:none}}
 /* 390 지도·책: 조작 줄·책 테두리와 겹치던 아래 링크 줄을 숨긴다(1440은 지금 자리). */

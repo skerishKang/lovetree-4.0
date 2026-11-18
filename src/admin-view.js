@@ -12,13 +12,12 @@
  */
 
 export const KIND_LABEL = {opinion: '의견', journal: '일지', report: '신고'};
-// 운영센터 탭 셋(2026-11-17) — 사용 일지·신고·고치는 일 탭은 없애고 고객 글의 거르기로 옮겼다.
-// 상단 메뉴(대표 요청 2026-11-17) — 고객 글 탭을 고장·불편·요청으로 나누고 일지·신고를 탭으로 돌린다.
+// 운영센터 탭 셋(#888, 2026-11-18) — 고장·불편·요청은 '의견' 탭 하나로 모으고 그 안의 칩으로 구분한다.
+// 사용 일지·신고는 탭으로 둔다. 상태 칩(할 일·고침·더 보기)은 '의견' 탭에만 둔다.
 export const MENU_TABS = [
   {view: 'overview', label: '한눈에'},
   {view: 'customers', label: '고객'},
-  {view: 'board', label: '고장·불편', cat: 'issue', countKey: 'issue'},
-  {view: 'board', label: '요청', cat: 'request', countKey: 'request'},
+  {view: 'board', label: '의견', kind: 'opinion', countKey: 'opinion'},
   {view: 'board', label: '사용 일지', kind: 'journal'},
   {view: 'board', label: '신고', kind: 'report'},
   {view: 'issues', label: '고치는 일'}
@@ -58,7 +57,8 @@ export function parseHash(hash) {
   const id = decodeURIComponent(rest.join('/') || '');
   // #655: 'pending'은 받음·확인 중을 한 번에 보는 보조 조건이다('한눈에' 카드에서 쓴다).
   const status = [...STATUS_ORDER, PENDING_STATUS, ALL_STATUS].includes(params.get('status')) ? params.get('status') : '';
-  const kind = params.get('kind') in KIND_LABEL ? params.get('kind') : '';
+  // #888: 고객 글 보기는 늘 종류 하나를 가리킨다 — 주소에 종류가 없으면 '의견'(opinion)이다.
+  const kind = params.get('kind') in KIND_LABEL ? params.get('kind') : 'opinion';
   // #743: '한눈에' 카드가 각 탭의 조건을 주소로 남긴다 — 답글 0(#board?unanswered=1),
   // 신고 검토 대기(#reports?status=open), 열린·닫힌 이슈(#issues?status=open|closed).
   const unanswered = params.get('unanswered') === '1';
@@ -78,7 +78,8 @@ export function parseHash(hash) {
   if (name === 'issues' || name === 'fixes') return {view: 'issues', id: null, status: issueState, kind: ''};
   // #655: 운영센터를 열면(주소 없이) '한눈에'가 기본이다. 기존 주소(#board 등)는 고장·불편으로 연다(대표 요청 2026-11-17).
   if (!name) return {view: 'overview', id: null, status: '', kind: ''};
-  const cat = params.get('cat') === 'request' ? 'request' : 'issue';
+  // #888: 고장·불편/요청은 탭이 아니라 '의견' 탭 안의 칩이다 — 기본은 칩 없는 '전체'.
+  const cat = ['issue', 'request'].includes(params.get('cat')) ? params.get('cat') : '';
   return unanswered ? {view: 'board', id: null, status, kind, cat, unanswered: true} : {view: 'board', id: null, status, kind, cat};
 }
 
@@ -93,9 +94,10 @@ export function viewHash(view, id = null, filters = {}) {
   if (view === 'board') {
     const params = new URLSearchParams();
     if (filters.status) params.set('status', String(filters.status));
-    if (filters.kind) params.set('kind', String(filters.kind));
+    // #888: 종류는 늘 하나다 — 기본인 '의견'(opinion)은 주소에 적지 않아 짧게 둔다.
+    if (filters.kind && filters.kind !== 'opinion') params.set('kind', String(filters.kind));
     if (filters.unanswered === true || filters.unanswered === '1') params.set('unanswered', '1');
-    if (filters.cat === 'request') params.set('cat', 'request');
+    if (filters.cat) params.set('cat', String(filters.cat));
     const query = params.toString();
     return query ? `#board?${query}` : '#board';
   }
@@ -195,11 +197,10 @@ export function inBoardStatus(row, key) {
   return false;
 }
 
-/** 고객 글 목록 거르기 — 종류는 그대로, 상태의 기본은 '할 일'. */
+/** 고객 글 목록 거르기(#888) — 종류와 갈래(의견 안의 고장·불편/요청)를 함께 거른다. 상태의 기본은 '할 일'. */
 export function filterBoardRows(rows, {kind = '', cat = '', status = PENDING_STATUS} = {}) {
   const list = Array.isArray(rows) ? rows : [];
-  const scoped = kind ? list.filter(row => row?.kind === kind)
-    : cat ? list.filter(row => inBoardCat(row, cat)) : list;
+  const scoped = (kind || cat) ? list.filter(row => (kind ? row?.kind === kind : true) && (cat ? inBoardCat(row, cat) : true)) : list;
   return scoped.filter(row => inBoardStatus(row, status || PENDING_STATUS));
 }
 
@@ -209,18 +210,31 @@ export function boardKindTabs(rows, status = PENDING_STATUS) {
   return BOARD_KIND_TABS.map(tab => ({...tab, count: scoped.filter(row => !tab.key || row?.kind === tab.key).length}));
 }
 
-/** 상태 한 줄 숫자 — 지금 종류 안에서 센다. 숫자 0인 칸은 화면에서 숨긴다. */
+/** 상태 한 줄 숫자 — 지금 종류·갈래 안에서 센다. 숫자 0인 칸은 화면에서 숨긴다. */
 export function boardStatusTabs(rows, kind = '', cat = '') {
   const list = Array.isArray(rows) ? rows : [];
-  const scoped = kind ? list.filter(row => row?.kind === kind)
-    : cat ? list.filter(row => inBoardCat(row, cat)) : list;
+  const scoped = (kind || cat) ? list.filter(row => (kind ? row?.kind === kind : true) && (cat ? inBoardCat(row, cat) : true)) : list;
   return BOARD_STATUS_TABS.map(tab => ({...tab, count: scoped.filter(row => inBoardStatus(row, tab.key)).length}));
 }
 
-/** 상단 메뉴의 새 글(received) 수(대표 요청 2026-11-17) — 고장·불편·요청 탭 각각의 받은 의견 수다. */
+// ── '의견' 탭 안의 갈래 칩(#888, 2026-11-18) — 고장·불편·요청을 탭이 아니라 칩으로 구분한다. ──
+export const BOARD_CAT_TABS = [
+  {key: '', label: '전체'},
+  {key: 'issue', label: '고장·불편'},
+  {key: 'request', label: '요청'}
+];
+
+/** 갈래 칩 줄(#888) — '의견'(opinion) 안에서, 지금 상태 칩이 반영된 목록에서 센다. */
+export function boardCatTabs(rows, status = PENDING_STATUS) {
+  const scoped = filterBoardRows(rows, {kind: 'opinion', status});
+  return BOARD_CAT_TABS.map(tab => ({...tab, count: tab.key ? scoped.filter(row => inBoardCat(row, tab.key)).length : scoped.length}));
+}
+
+/** 상단 메뉴의 새 글(received) 수(#888) — '의견' 탭에는 의견 전체의 받은 수, 참고로 고장·불편·요청 각각의 수도 센다. */
 export function menuReceivedCounts(rows) {
   const base = Array.isArray(rows) ? rows : [];
   return {
+    opinion: base.filter(row => row?.kind === 'opinion' && row?.status === 'received').length,
     issue: base.filter(row => inBoardCat(row, 'issue') && row?.status === 'received').length,
     request: base.filter(row => inBoardCat(row, 'request') && row?.status === 'received').length
   };
@@ -349,6 +363,35 @@ export function journalsSummary(journals, day) {
   };
 }
 
+// ── 사용 일지 탭(#888) — 상태 칩 없이 전체 최신 순. 줄은 고객·날짜·다시 올 점수·제목. 거르기는 고객별 하나. ──
+
+/** 일지 목록 줄(#888). 운영 날짜·만든 시각 기준 최신 순. 안 읽은 것(상태 received)은 '새 글'로 알린다. */
+export function journalListRows(journals) {
+  const list = (Array.isArray(journals) ? journals : []).slice()
+    .sort((a, b) => (journalDayOf(b) + String(b?.createdAt || '')).localeCompare(journalDayOf(a) + String(a?.createdAt || '')));
+  return list.map(row => ({
+    id: row?.id ?? '',
+    subjectId: String(row?.subjectId ?? ''),
+    customer: (row?.authorRole === 'ai_customer' ? 'AI 명예회원 ' : '') + (row?.authorName || '고객'),
+    day: journalDayOf(row),
+    score: row?.score ?? null,
+    title: String(row?.displayTitle || '(제목 없음)'),
+    unread: row?.status === 'received'
+  }));
+}
+
+/** 일지 탭의 거르기 고객 목록(#888) — 일지를 남긴 고객(이름 가나다 순, 같은 고객은 하나). */
+export function journalCustomerOptions(rows) {
+  const seen = new Map();
+  for (const row of Array.isArray(rows) ? rows : []) {
+    if (!row?.subjectId || seen.has(row.subjectId)) continue;
+    seen.set(row.subjectId, row.customer);
+  }
+  return [...seen.entries()]
+    .sort((a, b) => String(a[1]).localeCompare(String(b[1]), 'ko'))
+    .map(([subjectId, name]) => ({subjectId, name}));
+}
+
 // ── '한눈에' 탭(#655) — 이미 있는 API의 응답만 모아 처리할 일을 숫자로 낸다(1차). ──
 
 /**
@@ -386,11 +429,12 @@ export function statsCards(response) {
 
 
 /** '오늘 할 일'(#655): 답이 없는 글(답글 0) 중 오래된 순 5개. 닫은 글은 처리가 끝난 것이므로 세지 않는다.
+ *  사용 일지는 고객의 하루 기록이라 처리할 일이 아니고(#888), 답글도 달 수 없으니(#843) 늘 제외한다.
  *  연결 이슈 번호는 '#584' 같은 표시도 숫자로 맞춰 돌려준다(#636). */
 export function overviewTodos(posts, limit = 5) {
   if (!Array.isArray(posts)) return [];
   return posts
-    .filter(row => (row?.replyCount || 0) === 0 && row?.status !== 'closed')
+    .filter(row => row?.kind !== 'journal' && (row?.replyCount || 0) === 0 && row?.status !== 'closed')
     .slice()
     .sort((a, b) => String(a?.createdAt || '').localeCompare(String(b?.createdAt || '')))
     .slice(0, limit)
@@ -406,11 +450,14 @@ export function overviewModel({feedback, journals, reports, issues} = {}) {
   const posts = feedback?.ok && Array.isArray(feedback.payload?.feedback) ? feedback.payload.feedback : null;
   const journalRows = journals?.ok && Array.isArray(journals.payload?.journals) ? journalRowsByCustomer(journals.payload.journals) : null;
   const reportRows = reports?.ok && Array.isArray(reports.payload?.reports) ? reports.payload.reports : null;
+  // #888: '할 일'·'답 안 단 글' 숫자는 의견만 — 일지는 고객의 하루 기록이라 처리할 일이 아니고(#843),
+  // 답글을 달 수 없어 답 안 단 글로 남는 일도 없다.
+  const opinionPosts = posts ? posts.filter(row => row?.kind !== 'journal') : null;
   const feedbackCard = posts ? {
-    pending: posts.filter(row => isPendingStatus(row?.status)).length,
+    pending: opinionPosts.filter(row => isPendingStatus(row?.status)).length,
     fixed: posts.filter(row => row?.status === 'fixed').length,
     total: posts.length,
-    unanswered: posts.filter(row => (row?.replyCount || 0) === 0 && row?.status !== 'closed').length
+    unanswered: opinionPosts.filter(row => (row?.replyCount || 0) === 0 && row?.status !== 'closed').length
   } : {error: true};
   const reportCard = reportRows
     ? {pending: reportRows.filter(row => row?.status === 'open').length, total: reportRows.length}
