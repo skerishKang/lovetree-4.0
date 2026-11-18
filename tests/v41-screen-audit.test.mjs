@@ -1895,7 +1895,7 @@ test('#657 후속 261117: 좁은 화면 소수 카드(≤8) 계정은 궤도 카
       const els = [...document.querySelectorAll('#view,#view-next')].filter((e) => e.getClientRects().length > 0 && !e.hidden);
       const sh = (els[0] || document.getElementById('view'))?.contentDocument?.getElementById('orbit')?.shadowRoot;
       if (!sh) return null;
-      return [...sh.querySelectorAll('button.card')].filter((c) => c.style.display !== 'none').length;
+      return [...sh.querySelectorAll('button.card')].filter((c) => getComputedStyle(c).display !== 'none').length;
     });
     assert.equal(visible, 0, `390 소수 카드 계정: 궤도 카드 0장(실제 ${visible}장)`);
     await context.close();
@@ -1933,7 +1933,7 @@ test('#657 후속 261117: 카드 층은 바닥 링크 줄 위에서 자른다(39
       const measured = await page.evaluate(() => {
         const frames = [...document.querySelectorAll('#view,#view-next')].filter((f) => f.getClientRects().length > 0 && !f.hidden);
         const sh = (frames[0] || document.getElementById('view'))?.contentDocument?.getElementById('orbit')?.shadowRoot;
-        const cards = sh ? [...sh.querySelectorAll('button.card')].filter((c) => c.style.display !== 'none' && getComputedStyle(c).display !== 'none') : [];
+        const cards = sh ? [...sh.querySelectorAll('button.card')].filter((c) => getComputedStyle(c).display !== 'none') : [];
         const rects = cards.map((c) => {
           const a = c.getBoundingClientRect(), s = c.querySelector('.surface')?.getBoundingClientRect() || a;
           return { l: Math.min(a.left, s.left), r: Math.max(a.right, s.right), t: Math.min(a.top, s.top), b: Math.max(a.bottom, s.bottom) };
