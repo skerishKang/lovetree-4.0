@@ -110,7 +110,8 @@ s('#535 떠 있는 폭이 눈에 보이고, 동작 줄이기면 거의 멈춘다
     const moved = await frame.evaluate(async () => {
       const sr = document.querySelector('main#orbit').shadowRoot;
       const cards = [...sr.querySelectorAll('.card')].filter((e) => e.style.display !== 'none');
-      const el = cards[3];
+      // 부유는 .lt-lift 층이 든다 — .card 겉사각형은 궤도 자리만 안다. 261118: 부유 층을 직접 잰다.
+      const el = cards[3].querySelector('.lt-lift') || cards[3];
       const pts = []; const t0 = performance.now();
       await new Promise((done) => {
         const tick = () => {
@@ -132,7 +133,7 @@ s('#535 떠 있는 폭이 눈에 보이고, 동작 줄이기면 거의 멈춘다
     const still = await openHome(browser, lib.base, { width: 1440, height: 900, member: 'in', reducedMotion: 'reduce' });
     const quiet = await still.frame.evaluate(async () => {
       const sr = document.querySelector('main#orbit').shadowRoot;
-      const el = [...sr.querySelectorAll('.card')].filter((e) => e.style.display !== 'none')[3];
+      const el = [...sr.querySelectorAll('.card')].filter((e) => e.style.display !== 'none')[3].querySelector('.lt-lift') || [...sr.querySelectorAll('.card')].filter((e) => e.style.display !== 'none')[3];
       const a = el.getBoundingClientRect(); const x0 = a.left + a.width / 2, y0 = a.top + a.height / 2;
       const t0 = performance.now();
       await new Promise((done) => { const tick = () => { if (performance.now() - t0 < 3000) requestAnimationFrame(tick); else done(); }; tick(); });
