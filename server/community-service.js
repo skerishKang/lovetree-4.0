@@ -212,7 +212,6 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
    const groups=[...all].sort((a,b)=>b.count-a.count||String(a.value).localeCompare(String(b.value),'ko')).slice(0,8);
    const groupsAll=[...all].sort((a,b)=>String(a.value).localeCompare(String(b.value),'ko')).slice(0,200);
    return {items,nextCursor:next,totalVisible:cards.length,groups,groupsAll};
->>>>>>> b1c120c (둘러보기 그룹 찾기 창 + 검색 자동완성을 넣는다 (#784))
   },
   // #627 3단계 '다른 팬 보기': 같은 꼬리표('종류:값')를 담은 공개 순간(공유 상태 active·비공개 아님)을 찾는다.
   // 화면은 아직 만들지 않는다(회차 진행 중 — 서버 규칙만). 판정은 화면과 같은 한 벌(public/v41/tags.mjs의

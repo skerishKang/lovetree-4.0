@@ -191,11 +191,11 @@ mountCommunity({
 </script></body></html>`;
 
 const GROUPS = [
-  { group: '방탄소년단', count: 5 },
-  { group: '뉴진스', count: 7 },
-  { group: '아이브', count: 2 },
-  { group: 'RIIZE', count: 3 },
-  { group: '탄방소년', count: 1 },
+  { value: '방탄소년단', count: 5 },
+  { value: '뉴진스', count: 7 },
+  { value: '아이브', count: 2 },
+  { value: 'RIIZE', count: 3 },
+  { value: '탄방소년', count: 1 },
 ];
 
 testOrSkip('#784 화면: 창 열림 때 항목 높이 ≥44px / 고른 그룹 칩 1번 / 자동완성 1위 일치 / Esc·초점 복귀 / 가로 넘침 0', async () => {
@@ -225,9 +225,11 @@ testOrSkip('#784 화면: 창 열림 때 항목 높이 ≥44px / 고른 그룹 �
     await page.waitForSelector('.community-group-find');
     await page.waitForTimeout(200);
 
-    // 그룹 찾기 창 열기.
+    // 그룹 찾기 창 열기 — 둘러보기 창은 열린 채로 남는다(미리보기와 같은 집 안에서 열린다).
     await page.getByRole('button', { name: '그룹 찾기' }).click();
     await page.waitForSelector('dialog.community-group-find[open]');
+    const panelStillOpen = await page.evaluate(() => document.getElementById('community-panel')?.open);
+    assert.equal(panelStillOpen, true, '그룹 찾기 창이 열려도 둘러보기 창은 열린다');
     assert.ok((await page.locator('[role=option]').count()) >= 5, '그룹 목록이 뜬 두');
     for (const opt of await page.locator('[role=option]').all()) {
       const box = await opt.boundingBox();

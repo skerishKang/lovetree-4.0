@@ -275,7 +275,7 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
  form.append(suggestions);
  form.onsubmit=event=>{event.preventDefault();hideSuggest();load(false);};more.onclick=()=>load(true);dialog.querySelector('[data-close="community-panel"]').onclick=()=>dialog.close();
  // #784 그룹 찾기 창. 미리보기·둘러보기 판과 같은 <dialog showModal> 한 벌을 쓴다.
- const findDialog=el('dialog','community-group-find');
+ const findDialog=el('dialog','community-group-find');findDialog.id='community-group-find';
  const findHead=el('div','community-group-find-head'),findClose=el('button','community-group-find-close','×');
  findClose.type='button';findClose.setAttribute('aria-label','그룹 찾기 닫기');
  const findTitle=el('h2','community-group-find-title','그룹 찾기');
@@ -318,7 +318,9 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
   if(event.key==='Enter'&&findActive>=0){event.preventDefault();findOptions()[findActive]?.click();}
   if(event.key==='Escape'){event.preventDefault();findDialog.close();}
  });
- (dialog.parentNode||document.body)?.appendChild?.(findDialog) ?? (() => { try { document.body?.appendChild?.(findDialog); } catch {} })();
+ // #784: 미리보기(#community-preview)처럼 찾기 창은 둘러보기 창 안에 둔다 —
+ // 바깥에 뜨면 또 다른 modal dialog는 부모 modal을 닫아 버린다(Chromium). 미리보기와 같은 집 안에서 열린다.
+ (dialog||document.body)?.appendChild?.(findDialog) ?? (() => { try { document.body?.appendChild?.(findDialog); } catch {} })();
  const findButton=el('button','community-group-find','그룹 찾기');findButton.type='button';
  findButton.onclick=()=>{renderFindList('');findQuery.value='';if(!findDialog.open)findDialog.showModal();findQuery.focus();};
  // Esc 기본 동작(바깥 dialog 닫기 복원)을 막고 직접 닫아, 초점을 그룹 찾기 단추로 돌린다.
