@@ -962,3 +962,53 @@ test('하은2회차 손질 ①: 실패 문구를 보일 때 화면에 보이는 
   assert.equal(err.scrolledWith?.block, 'nearest', '문구가 있는 곳이 화면에 보이게 스크롤한다');
   assert.equal(line.momentId, 'm1');
 });
+
+// #37(AI 고객 37회차): 확정 칩을 다시 누르면 저장까지 조용히 끝났다 — 잘못 누른 사람은 꼬리표가 빠진
+// 줄도 모른다. 빼기가 저장되면 '꼬리표를 뺐어요 · 되돌리기'를 5초(시험에선 짧게) 보여 주고, 되돌리기를
+// 누르면 다시 붙여 저장한다. 시간이 지나면 알림은 스스로 거둔다.
+test('#37: 확정 칩을 다시 눌러 빼면 되돌리기 알림을 보여 주고, 되돌리면 다시 저장한다', async () => {
+  const host = fakeEl({ querySelector: () => null });
+  const commits = [];
+  renderTagLine({
+    host,
+    doc: {},
+    moment: { id: 'm1', title: '첫 순간', keywords: ['가수:윤슬'] },
+    knownTags: [],
+    writable: true,
+    undoMs: 30,
+    onCommit: (keywords, momentId) => commits.push({ keywords, momentId }),
+  });
+  // 확정 칩을 다시 누른다(빼기) — 저장은 된다.
+  host.dispatch('click', { target: { closest: (sel) => sel === '[data-tag-raw]' ? { dataset: { tagRaw: '가수:윤슬' } } : null } });
+  assert.deepEqual(commits, [{ keywords: [], momentId: 'm1' }], '빼기도 저장된다');
+  assert.ok(String(host.innerHTML).includes('꼬리표를 뺐어요'), '조용히 지우지 않고 알린다');
+  assert.ok(String(host.innerHTML).includes('되돌리기'), '되돌리기 길을 함께 보인다');
+  // 되돌리기를 누른다 — 다시 붙여 저장한다.
+  host.dispatch('click', { target: { closest: (sel) => sel === '.lt-tagline-undo-btn' ? { dataset: {} } : null } });
+  assert.deepEqual(commits[1], { keywords: ['가수:윤슬'], momentId: 'm1' }, '되돌리기로 다시 붙여 저장한다');
+  assert.equal(String(host.innerHTML).includes('꼬리표를 뺐어요'), false, '되돌렸으면 알림을 거둔다');
+  // 붙이기(되돌리기가 아닌 길)로는 알림을 다시 띄우지 않는다.
+  host.dispatch('click', { target: { closest: (sel) => sel === '[data-tag-raw]' ? { dataset: { tagRaw: '가수:윤슬' } } : null } });
+  assert.deepEqual(commits[2], { keywords: [], momentId: 'm1' });
+  await new Promise((ok) => setTimeout(ok, 60));
+  assert.equal(String(host.innerHTML).includes('꼬리표를 뺐어요'), false, '5초(시험에선 30ms)가 지나면 알림은 스스로 거둔다');
+});
+
+// #37: 다른 순간으로 바뀌면(update) 방금 뺐다는 알림은 그 순간의 이야기라 거둔다.
+test('#37: 순간을 바꾸면 되돌리기 알림을 거둔다', () => {
+  const host = fakeEl({ querySelector: () => null });
+  const commits = [];
+  const line = renderTagLine({
+    host,
+    doc: {},
+    moment: { id: 'm1', title: '첫 순간', keywords: ['가수:윤슬'] },
+    knownTags: [],
+    writable: true,
+    onCommit: (keywords, momentId) => commits.push({ keywords, momentId }),
+  });
+  host.dispatch('click', { target: { closest: (sel) => sel === '[data-tag-raw]' ? { dataset: { tagRaw: '가수:윤슬' } } : null } });
+  assert.ok(String(host.innerHTML).includes('꼬리표를 뺐어요'));
+  line.update({ id: 'm2', title: '다음 순간', keywords: [] });
+  assert.equal(String(host.innerHTML).includes('꼬리표를 뺐어요'), false, '다른 순간의 알림을 가져 가지 않는다');
+  assert.equal(line.momentId, 'm2');
+});
