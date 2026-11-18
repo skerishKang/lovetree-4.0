@@ -27,10 +27,12 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
  // 누른 자리에서 바로 이유를 보게 한다. 칸은 미리보기를 그릴 때 actions 다음에 미리 두고(hidden),
  // 막혔을 때만 보여 준다. 담기에 성공하면 render()가 미리보기를 다시 그려 안내가 지워진다.
  const setVoteNote=(note,text)=>{if(!note)return;note.textContent=text;note.hidden=false;};
+ // 투표 막힘(가입 7일 미만)은 단추 아래 안내 칸 하나만 내리고 상태 줄은 그대로 둔다(#903) — 다른 실패는 상태 줄로.
+ const voteBlocked=answer=>answer?.code==='vote_too_new';
  function statButton(item,kind,label,voteNote){
   if(kind==='reaction')return reactionButtons(item,label,voteNote);
   const active=kind==='favorite'?item.stats.favored:item.stats.hearted,count=kind==='favorite'?item.stats.favorites:item.stats.hearts,b=el('button','community-mini',`${active?'✓ ':''}${smallCountLabel(label,count)}`);b.type='button';b.dataset.communityAction=kind;b.setAttribute('aria-pressed',String(active));
-  b.onclick=async()=>{const answer=await api.favorite(item.shareId,!active);if(!answer.ok){message(loginMessage(answer));setVoteNote(voteNote,loginMessage(answer));return;}item.stats=answer.stats;render();};return b;
+  b.onclick=async()=>{const answer=await api.favorite(item.shareId,!active);if(!answer.ok){const text=loginMessage(answer);if(voteBlocked(answer))setVoteNote(voteNote,text);else message(text);return;}item.stats=answer.stats;render();};return b;
  }
  function reactionButtons(item,label,voteNote){
   const kinds=['heart','like','love','laugh','wow','sad','angry'];
@@ -48,7 +50,7 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
     if(!count&&!isActive)continue;
     const b=el('button','community-mini community-reaction',`${isActive?'✓ ':''}${smallCountLabel(labels[reactionKind]||reactionKind,count)}`);
     b.type='button';b.dataset.reactionKind=reactionKind;b.dataset.communityAction='reaction';b.setAttribute('aria-pressed',String(isActive));
-    b.onclick=async()=>{const answer=await api.react(item.shareId,!isActive,reactionKind);if(!answer.ok){message(loginMessage(answer));setVoteNote(voteNote,loginMessage(answer));return;}item.stats=answer.stats;render();};
+    b.onclick=async()=>{const answer=await api.react(item.shareId,!isActive,reactionKind);if(!answer.ok){const text=loginMessage(answer);if(voteBlocked(answer))setVoteNote(voteNote,text);else message(text);return;}item.stats=answer.stats;render();};
     out.push(b);
    }
    return out;

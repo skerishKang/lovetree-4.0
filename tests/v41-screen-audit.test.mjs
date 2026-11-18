@@ -518,9 +518,13 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
       const note = document.querySelector('#community-preview .community-vote-note');
       const fav = document.querySelector('#community-preview [data-community-action="favorite"]');
       const a = note.getBoundingClientRect(), b = fav.getBoundingClientRect();
-      return { gap: Math.round(a.top - b.bottom), text: note.textContent.trim() };
+      // #903 후속: 투표 막힘 안내는 미리보기 안에서 한 번만 보인다(단추 아래 칸 하나 — 상태 줄에는 내리지 않는다).
+      const texts = [...document.querySelectorAll('#community-preview p, #community-preview small, #community-preview span')]
+        .filter((node) => node.textContent.includes('가입하고 7일')).length;
+      return { gap: Math.round(a.top - b.bottom), text: note.textContent.trim(), noticeCount: texts };
     });
     assert.equal(voteGap.text, '가입하고 7일이 지나면 투표할 수 있어요.', '서버 안내 문구를 그대로 담기 단추 옆에 내린다');
+    assert.equal(voteGap.noticeCount, 1, '미리보기 안에 안내 문구는 하나다(상태 줄에 같은 말을 반복하지 않는다)');
     assert.ok(voteGap.gap >= -1 && voteGap.gap <= 12, `안내가 담기 단추 바로 아래 있다(거리 ${voteGap.gap}px ≤ 12px)`);
     // 하은 1회차(261116,#728 후속): 새벽(KST 0~9시, UTC 전날)에 담은 순간의 둘러보기 카드 날짜가
     // UTC 절단('2026. 11. 15')으로 나왔다 — Asia/Seoul 시간대 문맥에서 한국 날짜로 보이는지 수치로 단정한다.
