@@ -179,7 +179,8 @@ export function createDialogs(deps) {
   // 큰 창이 열릴 때는 앞 창을 공통 판정(requestPanelClose — 더러우면 한 번 묻는다)으로 닫고 열린다.
   // 앞 창을 못 닫았으면(사용자가 취소) 그 위에 겹친다 — 예상 못한 길을 막지 않는다. 확인 질문(confirm)
   // 은 브라우저 판이라 여기서 다루지 않는다.
-  const STACK_ALLOWED = new Set(['move-picker', 'account-assets', 'community-preview']);
+  // #876: 같은 영상 안내 창(video-dup-panel)도 잠깐 판이다 — 순간 추가 창 위에 겹쳐 열린다(창은 #876이 만든다).
+  const STACK_ALLOWED = new Set(['move-picker', 'account-assets', 'community-preview', 'video-dup-panel']);
   let dialogGuard = false;     // 창 기록을 쌓아 둔 상태
   function modalDialogs() { return [...document.querySelectorAll('dialog[open]')].filter(d => d.matches(':modal')); }
   if (view?.history && view.HTMLDialogElement) {
