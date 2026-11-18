@@ -315,7 +315,7 @@ html[data-lt-theme=garden] .moreMenu{background:var(--lt-paper,#fffdf8);color:va
 html[data-lt-theme=garden] .moreItem:hover,html[data-lt-theme=garden] .moreItem:focus-visible{background:rgba(75,51,42,.08)}
 /* 'YouTube ↗' — 영상 바로 아래 작은 링크(#836와 같은 모양). 단추 줄에서 없앴다. */
 .ytLinkRow{padding:8px 0 0}
-.ytLinkRow a{font-size:12px;color:#cfe3ff;text-decoration:underline;text-underline-offset:3px;min-height:24px;display:inline-flex;align-items:center}
+.ytLinkRow a{font-size:13px;color:#cfe3ff;text-decoration:underline;text-underline-offset:3px;min-height:24px;display:inline-flex;align-items:center}
 html[data-lt-theme=garden] .ytLinkRow a{color:var(--lt-link,#3b5bdb)}
 
 /* ===== #894: 보드 끌기 ===== */
