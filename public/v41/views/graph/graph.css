@@ -45,6 +45,8 @@ html[data-lt-theme=garden] .g-view-switch button[aria-pressed=true]{color:var(--
 .g-mark{font-size:12.5px;font-weight:600;fill:var(--lt-gold);paint-order:stroke;stroke:var(--lt-stage);stroke-width:4px}
 .g-stackcount{font-size:12px;font-weight:700;fill:var(--lt-stage);paint-order:stroke;stroke:var(--lt-pearl);stroke-width:3px}
 .g-empty{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);max-width:min(520px,86%);display:flex;flex-direction:column;gap:14px;align-items:center;justify-content:center;text-align:center;color:var(--lt-muted);font-size:15px}
+/* 발자취 행에 붙는 안내(#864) — top px은 JS가 직접 넣고 이동 고정값은 클래스로 */
+.g-empty.g-empty-riding{transform:translate(-50%,-100%) translateY(-18px)}
 /* 안내 상자는 내용 크기만 차지한다(판 전체를 덮지 않는다) — 아래 선반(아직 묶음에 안 든 순간)을 가리지 않는다(검사기 가려짐 0). */
 /* 묶음 0개 안내(2026-11-16 CTO 지적) — 빈 무대를 고장으로 보지 않게 짧은 안내 + 바로 할 수 있는 단추. */
 .g-empty .g-empty-text{margin:0;font-size:15px;line-height:1.7;color:var(--lt-muted);word-break:keep-all}
@@ -52,10 +54,13 @@ html[data-lt-theme=garden] .g-view-switch button[aria-pressed=true]{color:var(--
 .g-empty .g-empty-cta:hover,.g-empty .g-empty-cta:focus-visible{background:var(--lt-glass-strong);color:var(--lt-pearl)}
 html[data-lt-theme=garden] .g-empty .g-empty-cta:hover,html[data-lt-theme=garden] .g-empty .g-empty-cta:focus-visible{color:var(--lt-ink)}
 /* hidden 속성이 author display:flex에 눌리지 않게 — 이 오버레이가 남아 있으면 무대 전체를 덮어 클릭도 막는다(검사기가 잡았다). */
-.g-empty[hidden]{display:none!important}
+.g-empty[hidden]{display:none}
 
 /* 꼬리표 없는 순간 선반(아래) — 시간 순서로 흐리게, '꼬리표 한 번에 제안받기' 자리 */
 .g-shelf{position:absolute;left:18px;right:18px;bottom:2px;display:flex;align-items:center;gap:10px;pointer-events:none}
+.g-shelf.off{display:none}
+/* 묶음이 없으면 발자취 행 바로 아래 가운데(#864) — 가운데 고정값은 클래스, 바닥 px은 JS가 직접 넣는다 */
+.g-shelf.g-shelf-centered{left:50%;right:auto;transform:translateX(-50%)}
 .g-shelf-label{font-size:12.5px;color:var(--lt-muted);white-space:nowrap;pointer-events:auto}
 .g-shelf-hint{pointer-events:auto;font-size:13px;color:var(--lt-gold);border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-pill);padding:4px 10px;background:rgba(255,230,166,.05);white-space:nowrap}
 .g-shelf-hint:hover{background:rgba(255,230,166,.12)}
@@ -72,6 +77,11 @@ html[data-lt-theme=garden] .g-empty .g-empty-cta:hover,html[data-lt-theme=garden
 .g-legend-item:hover{background:rgba(255,255,255,.05)}
 html[data-lt-theme="garden"] .g-legend-item:hover{background:rgba(64,53,54,.07)}
 .g-legend-item i{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+/* 묶음 종류 색(이전 JS 인라인 background를 클래스로 — 종류별 고정값) */
+.g-kind-stage{background:var(--lt-gold-deep)}
+.g-kind-song{background:var(--lt-rose)}
+.g-kind-member{background:var(--lt-violet,#8b69e8)}
+.g-kind-artist{background:var(--lt-blue,#547cd0)}
 .g-legend-item small{margin-left:auto;color:var(--lt-muted);font-size:12px}
 
 .g-detail .d-kicker{font-size:12px;letter-spacing:.12em;color:var(--lt-gold);margin-bottom:4px}
@@ -79,6 +89,11 @@ html[data-lt-theme="garden"] .g-legend-item:hover{background:rgba(64,53,54,.07)}
 .g-detail .d-date{font-size:13px;color:var(--lt-muted);margin-bottom:9px}
 .d-chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
 .d-chip{font-size:12.5px;padding:4px 10px;border-radius:var(--lt-r-pill);border:1px solid var(--lt-line);color:var(--lt-pearl);background:rgba(255,255,255,.04)}
+/* 칩 테두리 색(이전 JS 인라인 borderColor를 클래스로 — 종류별 고정값. 기본은 --lt-line) */
+.d-chip.d-chip-stage{border-color:var(--lt-gold-deep)}
+.d-chip.d-chip-song{border-color:var(--lt-rose)}
+.d-chip.d-chip-member{border-color:var(--lt-violet,#8b69e8)}
+.d-chip.d-chip-artist{border-color:var(--lt-blue,#547cd0)}
 html[data-lt-theme="garden"] .d-chip{background:rgba(255,253,248,.7)}
 .d-chip.emo{border-color:var(--lt-rose);color:var(--lt-rose)}
 .d-chip .chip-kind{color:var(--lt-muted);margin-right:4px}

@@ -22,7 +22,16 @@ button{font:inherit;color:inherit;cursor:pointer}
 .hero{position:absolute;left:50%;top:68px;transform:translateX(-50%);z-index:16;text-align:center;pointer-events:none;width:min(800px,calc(100vw - 52px));transition:opacity .28s ease,transform .28s ease}.hero.dim{opacity:.07;transform:translateX(-50%) translateY(-14px)}
 .eyebrow{font-size:12px;letter-spacing:.23em;color:rgba(50,45,57,.38);margin-bottom:8px}.hero h1{margin:0;font-weight:650;font-size:clamp(28px,3.25vw,48px);letter-spacing:-.055em;line-height:1.07;color:#2b2831}.hero p{margin:9px auto 0;max-width:680px;font-size:12px;line-height:1.66;color:rgba(50,45,57,.52)}
 .left-rail{position:absolute;left:18px;top:114px;bottom:20px;z-index:26;width:222px;display:flex;flex-direction:column;justify-content:space-between;pointer-events:none}.legend,.controls{pointer-events:auto;border:1px solid rgba(76,68,86,.11);border-radius:20px;background:rgba(255,255,255,.75);backdrop-filter:blur(18px);padding:13px;box-shadow:0 14px 40px rgba(69,56,76,.06)}
-.legend h3,.controls h3{font-size:13px;letter-spacing:.14em;color:rgba(47,43,52,.42);margin:0 0 9px}.legend-row{display:flex;align-items:center;gap:9px;padding:5px 0;font-size:12px;color:rgba(47,43,52,.64)}.swatch{width:7px;height:7px;border-radius:50%}
+.legend h3,.controls h3{font-size:13px;letter-spacing:.14em;color:rgba(47,43,52,.42);margin:0 0 9px}.legend-row{display:flex;align-items:center;gap:9px;padding:5px 0;font-size:12px;color:rgba(47,43,52,.64)}.swatch{width:7px;height:7px;border-radius:50%}/* 묶음 색 점(이전 인라인 background를 클래스로 — 행 번호(data-g)로 켠다) */
+.legend-row[data-g="1"] .swatch{background:var(--lt-map-group-1)}
+.legend-row[data-g="2"] .swatch{background:var(--lt-map-group-2)}
+.legend-row[data-g="3"] .swatch{background:var(--lt-map-group-3)}
+.legend-row[data-g="4"] .swatch{background:var(--lt-map-group-4)}
+.legend-row[data-g="5"] .swatch{background:var(--lt-map-group-5)}
+.legend-row[data-g="6"] .swatch{background:var(--lt-map-group-6)}
+/* 캔버스 커서(이전 JS 인라인 cursor를 클래스로) */
+#stage.is-point{cursor:pointer}
+#stage.is-grab{cursor:grab}
 .controls{display:grid;gap:7px}.control-row{display:grid;grid-template-columns:1fr 1fr;gap:6px}.mini{height:35px;border:1px solid rgba(76,68,86,.10);background:rgba(250,248,249,.85);border-radius:11px;font-size:13px;color:rgba(47,43,52,.64)}.mini:hover,.mini:focus-visible{outline:none;color:#26242d;border-color:rgba(76,68,86,.24);background:#fff}.mini.origin{background:linear-gradient(135deg,rgba(228,93,141,.10),rgba(139,105,232,.10));font-weight:650}
 .progress-rail{position:absolute;right:18px;top:114px;bottom:24px;z-index:25;width:40px;border-radius:22px;border:1px solid rgba(75,67,84,.10);background:rgba(255,255,255,.69);backdrop-filter:blur(16px);display:flex;flex-direction:column;align-items:center;padding:13px 0;pointer-events:auto;box-shadow:0 12px 34px rgba(62,51,69,.06)}
 .progress-line{position:relative;flex:1;width:2px;background:rgba(59,54,65,.10);border-radius:99px;margin:8px 0}.progress-thumb{position:absolute;left:50%;width:12px;height:12px;border-radius:50%;transform:translate(-50%,-50%);background:#3b3742;border:3px solid #fff;box-shadow:0 2px 9px rgba(45,39,50,.20)}.progress-label{font-size:12px;letter-spacing:.08em;color:rgba(47,43,52,.40);writing-mode:vertical-rl;transform:rotate(180deg)}
@@ -57,7 +66,7 @@ button{font:inherit;color:inherit;cursor:pointer}
  .mobile-ribbon{display:flex;flex-wrap:wrap;position:absolute;left:8px;right:8px;bottom:calc(38px + env(safe-area-inset-bottom, 0px));z-index:29;gap:6px;padding:6px;overflow-x:auto;scrollbar-width:none;border:1px solid rgba(73,65,83,.10);border-radius:16px;background:rgba(255,255,255,.90);box-shadow:0 12px 32px rgba(55,44,64,.12);backdrop-filter:blur(18px)}.mobile-ribbon::-webkit-scrollbar{display:none}.mobile-ribbon button{flex:0 0 auto;height:42px;padding:0 12px;border-radius:12px;border:0;background:transparent;font-size:10px;color:rgba(47,43,52,.56)}.mobile-ribbon button.active{background:#302c35;color:#fff}.mobile-ribbon button.origin{background:linear-gradient(135deg,rgba(228,93,141,.12),rgba(139,105,232,.12));color:#403847;font-weight:700}
  .route-status{left:8px;right:8px;bottom:152px;transform:none;min-width:0;max-width:none}.route-status span{white-space:normal}.toast{top:54px;bottom:auto;max-width:calc(100vw - 22px);border-radius:15px;text-align:center}.branch-chooser{top:auto;bottom:152px;transform:translate(-50%,16px) scale(.96)}.branch-chooser.open{transform:translate(-50%,0) scale(1)}
 }
-@media(prefers-reduced-motion:reduce){*{animation:none!important;transition-duration:.01ms!important}}
+@media(prefers-reduced-motion:reduce){html[data-v41-screen=network] *{animation:none;transition-duration:.01ms}}
 
 /* === 정원 테마 (2026-11-08): 이미 종이 바탕이라 무대·강조·제목 글꼴만 토큰에 맞춘다. === */
 html[data-lt-theme=garden]{--bg:var(--lt-stage);--bg2:var(--lt-stage-2);--ink:var(--lt-ink);--muted:var(--lt-muted);
