@@ -164,3 +164,52 @@ test('D3: 결과가 있어도 미리보기는 닫혀 있고, 카드를 누를 �
     await loading.resolveFetch({ items: [], totalVisible: 0, nextCursor: '' });
   } finally { loading.restore(); }
 });
+
+// #824 결정 7·1·2(2026-11-18): 3 미만 숫자 숨김 · 이번 주 담은 수 · '많이 담긴 순' 정렬.
+test('#824: 3 미만 숫자는 라벨만 남기고, 3부터 숫자가 보인다', async () => {
+  const small = communityHarness({ items: [{ ...COMMUNITY_ITEM, stats: { ...COMMUNITY_ITEM.stats, favorites: 0, hearts: 2, weeklyFavorites: 2 } }] });
+  try {
+    await small.search();
+    const card = small.get('community-list').children.find(node => node.dataset.shareId === 's1');
+    const meta = card.children.find(node => node.className === 'community-card-meta').textContent;
+    assert.doesNotMatch(meta, /공감 2/, '공감 2는 숫자를 숨긴다');
+    assert.doesNotMatch(meta, /이번 주/, '이번 주 2명도 숨긴다');
+    card.onclick();
+    const body = small.get('community-preview').children.find(node => node.className === 'community-preview-body');
+    const fav = body.children.find(node => node.className === 'community-preview-actions').children[0].textContent;
+    assert.equal(fav, '즐겨찾기', '즐겨찾기 0은 라벨만 남긴다');
+    const previewMeta = body.children.find(node => node.className === 'community-preview-meta').textContent;
+    assert.doesNotMatch(previewMeta, /공감 2/);
+  } finally { small.restore(); }
+  const big = communityHarness({ items: [{ ...COMMUNITY_ITEM, stats: { ...COMMUNITY_ITEM.stats, favorites: 3, hearts: 4, weeklyFavorites: 5 } }] });
+  try {
+    await big.search();
+    const card = big.get('community-list').children.find(node => node.dataset.shareId === 's1');
+    const meta = card.children.find(node => node.className === 'community-card-meta').textContent;
+    assert.match(meta, /공감 4/, '3 이상은 숫자를 보여 준다');
+    assert.match(meta, /이번 주 5명/, '이번 주 담은 수는 3 이상일 때 따라온다');
+    card.onclick();
+    const body = big.get('community-preview').children.find(node => node.className === 'community-preview-body');
+    const fav = body.children.find(node => node.className === 'community-preview-actions').children[0].textContent;
+    assert.equal(fav, '즐겨찾기 3', '즐겨찾기 3은 숫자를 보여 준다');
+  } finally { big.restore(); }
+});
+
+test('#824: 정렬 고르기로 많이 담긴 순을 고르면 sort=popular로 부른다', async () => {
+  const h = communityHarness({ items: [COMMUNITY_ITEM] });
+  try {
+    const calls = [];
+    const previous = globalThis.fetch;
+    globalThis.fetch = async (input) => { calls.push(String(typeof input === 'string' ? input : input.url)); return { ok: true, status: 200, json: async () => ({ items: [COMMUNITY_ITEM], totalVisible: 1, nextCursor: '' }) }; };
+    h.open();
+    await new Promise((r) => setTimeout(r, 0));
+    assert.equal(calls.some(url => url.includes('sort=popular')), false, '기본(최신순)으로는 popular를 부르지 않는다');
+    const sortSelect = h.get('community-sort');
+    sortSelect.value = 'popular';
+    sortSelect.onchange();
+    await new Promise((r) => setTimeout(r, 0));
+    assert.equal(calls.some(url => url.includes('sort=popular')), true, '많이 담긴 순을 고르면 sort=popular로 부른다');
+    assert.match(h.get('community-feedback').textContent, /많이 담긴 순서예요\./, '안내 말도 정렬을 따라간다');
+    globalThis.fetch = previous;
+  } finally { h.restore(); }
+});
