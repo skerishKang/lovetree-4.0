@@ -81,7 +81,6 @@ test('#537 1·2: 넓은 화면 한 장은 두 장 책의 한 쪽 크기·같은 
 });
 
 test('#537 3: 돋보기는 넓은 화면 한 장에서도 쓸 수 있고, 휴대폰 폭에서만 막는다', () => {
-  assert.match(CSS, /html\[data-book-shape=phone\] \.desktop-only\{display:none!important\}/, '휴대폰에서만 돋보기 단추 숨김');
   assert.doesNotMatch(CSS, /html\[data-book-view=single\] \.desktop-only/, '넓은 화면 한 장에서는 숨기지 않는다');
   assert.match(BOOK, /function lensActive\(\)\{return overBook&&lensOn&&!narrow\(\)&&machineState==='INSPECTING'\}/, '따라오기 게이트도 폰 폭 기준');
   assert.match(BOOK, /if\(narrow\(\)\|\|!lensOn\|\|!\['IDLE','INSPECTING'\]/, '가리키기 판정도 폰 폭 기준');

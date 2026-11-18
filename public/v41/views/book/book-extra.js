@@ -406,7 +406,8 @@ const treeCoverSpan=(tree,index=0)=>{
  const chosen=choice.coverMedia?coverMomentFor(tree):null;
  const coverCands=chosen?thumbnailCandidates(chosen,{autoLoad:true}):(choice.coverMedia?[choice.coverMedia]:[]);
  const thumb=choice.coverMedia?'<img src="'+t(choice.coverMedia)+'"'+coverFallbackAttrs(coverCands)+' alt="" loading="lazy" referrerpolicy="no-referrer">':'';
- return '<span class="tree-cover"'+(choice.design?' data-cover-design="'+t(choice.design)+'"':'')+' style="background-color:'+t(choice.color)+'" aria-hidden="true">'+thumb+'</span>';
+ const coverIdx=COVER_PALETTE.indexOf(choice.color);
+ return '<span class="tree-cover'+(coverIdx>=0?' tree-cover-'+(coverIdx+1):'')+'"'+(choice.design?' data-cover-design="'+t(choice.design)+'"':'')+' aria-hidden="true">'+thumb+'</span>';
 };
 function otherTreesBlock(){
  if(LTDEMO.readOnly)return '';/* 공유·예시에서는 다른 트리로 갈 수 없다(셸의 이동 규칙도 막힌다) — #635: 빈 문자열을 돌려준다(맨 return은 undefined가 문자열에 그대로 붙었다) */

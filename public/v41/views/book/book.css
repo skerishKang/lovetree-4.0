@@ -19,11 +19,15 @@ body:before{content:"MEMORY\A SKETCHBOOK";white-space:pre;position:fixed;left:3.
 .book-title-btn[aria-expanded=true] .book-title-caret{transform:rotate(180deg)}
 /* 트리 목록 — 셸의 트리 드롭다운(.tree-item·.tree-cover)과 같은 내용·같은 모양, 종이 테마 색으로 */
 .tree-menu{position:absolute;z-index:95;top:calc(100% + 6px);left:0;min-width:300px;max-height:min(70vh,520px);overflow:auto;padding:8px;border:1px solid rgba(199,155,168,.4);border-radius:14px;background:var(--paper);box-shadow:0 18px 40px rgba(40,24,18,.3)}
-.tree-menu[hidden]{display:none!important}
+.tree-menu[hidden]{display:none}
 .tree-menu .tree-item{display:flex;align-items:center;gap:10px;width:100%;min-height:52px;padding:5px 7px;border:0;border-radius:10px;background:none;color:var(--ink);text-align:left;font:13px var(--ui-sans);cursor:pointer}
 .tree-menu .tree-item:hover,.tree-menu .tree-item:focus-visible{background:rgba(64,44,38,.07)}
 .tree-menu .tree-item[aria-checked=true]{background:rgba(185,144,95,.12);box-shadow:inset 0 0 0 1px var(--gold)}
 .tree-cover{width:36px;height:46px;flex:0 0 auto;border-radius:6px;border:1px solid rgba(120,91,62,.3);overflow:hidden;background-color:var(--gold);box-shadow:inset 8px 0 0 rgba(0,0,0,.13);display:block}
+.tree-cover-1{background-color:var(--lt-cover-1)}
+.tree-cover-2{background-color:var(--lt-cover-2)}
+.tree-cover-3{background-color:var(--lt-cover-3)}
+.tree-cover-4{background-color:var(--lt-cover-4)}
 .tree-cover img{width:100%;height:100%;object-fit:cover;display:block}
 .tree-menu .tree-name{min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
 .tree-menu .tree-count{flex:none;font-size:11px;color:#8b796e;white-space:nowrap}
@@ -58,6 +62,8 @@ html[data-lt-theme=garden] .shelf-back:hover{background:var(--lt-glass-strong);b
 .folio{position:absolute;bottom:14px;color:#6f605a;font:12px var(--book-serif)}
 .left .folio{left:23px}
 .right .folio{right:23px}
+.folio-left{left:23px}
+.folio-right{right:23px}
 .edge-zone{position:absolute;z-index:42;top:5%;bottom:5%;width:38px;cursor:ew-resize}
 .edge-zone.prev{left:-4px}
 .edge-zone.next{right:-4px}
@@ -99,7 +105,7 @@ html[data-lt-theme=garden] .shelf-back:hover{background:var(--lt-glass-strong);b
 .flip-sheet.next.curl{clip-path:polygon(2% 0,100% 1.5%,97% 98.5%,1% 100%)}
 .flip-sheet.prev.curl{clip-path:polygon(0 1.5%,98% 0,99% 100%,0 98.5%)}
 /* #393 3: 움직임 줄이기 — 종이 넘김 대신 0.35초 교차 페이드. 낡은 펼침 면 전체를 덮고 opacity만 1→0. */
-.flip-sheet.reduced{width:100%;left:0!important;filter:none}
+.flip-sheet.reduced{width:100%;left:0;filter:none}
 .flip-sheet.reduced .flip-face{backface-visibility:visible}
 .flip-sheet.reduced .flip-face.back{display:none}
 .reduced-faces{display:grid;grid-template-columns:1fr 1fr;width:100%;height:100%}
@@ -198,6 +204,10 @@ html[data-lt-theme=garden] .shelf-back:hover{background:var(--lt-glass-strong);b
 .viewer-top{display:flex;justify-content:flex-end}
 .viewer-top .close{background:#decfc2;color:#5b4943}
 .viewer-media{height:min(56vh,500px);display:grid;place-items:center;overflow:hidden;background:#e7ddcf;border-radius:10px}
+.viewer-note{padding:10px;text-align:center}
+.viewer-link-card{padding:38px;font-family:var(--book-serif);font-size:24px;line-height:1.6;text-align:center}
+.viewer-link-meta{font:11px var(--ui-sans);color:#89776f}
+.viewer-text-card{padding:38px;font-family:var(--book-serif);font-size:25px;line-height:1.75}
 .viewer-media img,.viewer-media video{width:100%;height:100%;object-fit:contain}
 .viewer-card h2{font:500 28px var(--book-serif);margin:16px 8px 6px}
 .viewer-card p{margin:0 8px 10px;color:#76665d;line-height:1.7}
@@ -246,9 +256,9 @@ html[data-lt-theme=garden] .shelf-back:hover{background:var(--lt-glass-strong);b
 .toast.show{opacity:1;transform:translate(-50%,0)}
 .mobile-page{display:none}
 .mobile-inspect{display:none}
-.moment-title h3,.note-piece h2,.letter h2,.clipping h2,.viewer-card h2,.detail h2{font-family:var(--book-serif)!important;letter-spacing:-.025em}
-.note-piece p,.letter p,.clipping p,.detail-why,.turn-why span,.why-margin{font-family:var(--book-serif)!important;word-break:keep-all}
-.moment-title p,.archive-item,.chip,.ui-btn,.source,.eyebrow,.mobile-kicker,.folio,.page-label,.tag{font-family:var(--ui-sans)!important}
+.moment-title h3,.note-piece h2,.letter h2,.clipping h2,.viewer-card h2,.detail h2{font-family:var(--book-serif);letter-spacing:-.025em}
+.note-piece p,.letter p,.clipping p,.detail-why,.turn-why span,.why-margin{font-family:var(--book-serif);word-break:keep-all}
+.moment-title p,.archive-item,.chip,.ui-btn,.source,.eyebrow,.mobile-kicker,.folio,.page-label,.tag{font-family:var(--ui-sans)}
 .link-thumb{width:100%;height:118px;object-fit:cover;border-radius:7px;margin:8px 0 12px;box-shadow:0 8px 16px rgba(67,49,42,.12);filter:saturate(.88)}
 .link-domain{font:700 9px var(--ui-sans);letter-spacing:.12em;text-transform:uppercase;color:#9f667a;margin-bottom:7px}
 .link-url{font:10px/1.45 var(--ui-sans);color:#8b7b70;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -272,7 +282,7 @@ html[data-book-shape=phone] .book-title-btn{max-width:100%}
 html[data-book-shape=phone] #bookTitleText{font-size:14px}
 html[data-book-shape=phone] .tools{gap:4px}
 html[data-book-shape=phone] .tools .ui-btn{padding:7px 9px;font-size:13px}
-html[data-book-shape=phone] .desktop-only{display:none!important}
+html[data-book-shape=phone] .topbar > .tools .desktop-only{display:none}
 html[data-book-shape=phone] .stage{inset:60px 0 0;padding:18px 8px 110px}
 html[data-book-shape=phone] .book-wrap{width:min(92vw,430px);height:min(67vh,620px);min-height:500px;filter:drop-shadow(0 28px 32px rgba(0,0,0,.35))}
 html[data-book-shape=phone] .book-cover{inset:-10px -9px -14px;border-radius:14px;background:linear-gradient(100deg,#543744,#6c4b56,#49323e)}
@@ -308,10 +318,10 @@ html[data-book-shape=phone] .why-margin{top:calc(100% + 48px);bottom:auto;width:
 html[data-book-shape=phone] .nav-pill{bottom:-38px}
 html[data-book-shape=phone] .branch-tab{right:-13px;top:auto;bottom:44px;width:126px;border-radius:10px 0 0 10px;border-left:1px solid rgba(199,155,168,.32);padding:9px 12px;font-size:13px}
 html[data-book-shape=phone] .edge-zone{display:none}
-html[data-book-shape=phone] .flip-sheet{width:100%;left:0!important}
+html[data-book-shape=phone] .flip-sheet{width:100%;left:0}
 html[data-book-shape=phone] .flip-sheet.next{transform-origin:left center}
 html[data-book-shape=phone] .flip-sheet.prev{transform-origin:right center}
-html[data-book-shape=phone] .flip-sheet .flip-face{border-radius:7px 13px 13px 7px!important}
+html[data-book-shape=phone] .flip-sheet .flip-face{border-radius:7px 13px 13px 7px}
 html[data-book-shape=phone] .turn-why{width:84vw;top:48%;padding:12px}
 html[data-book-shape=phone] .turn-why span{font-size:12px}
 html[data-book-shape=phone] .lens,
@@ -357,7 +367,7 @@ html[data-book-view=single][data-book-shape=wide] .eyebrow{display:none}
 html[data-book-view=single][data-book-shape=wide] .page.right{border-radius:12px;box-shadow:inset 0 0 55px rgba(112,84,54,.06),inset 0 0 0 1px rgba(120,91,62,.12)}
 html[data-book-view=single][data-book-shape=wide] .book:before,
 html[data-book-view=single][data-book-shape=wide] .book:after{display:none}
-html[data-book-view=single][data-book-shape=wide] .flip-sheet{width:100%;left:0!important}
+html[data-book-view=single][data-book-shape=wide] .flip-sheet{width:100%;left:0}
 html[data-book-view=single][data-book-shape=wide] .flip-sheet.next{transform-origin:left center}
 html[data-book-view=single][data-book-shape=wide] .flip-sheet.prev{transform-origin:right center}
 html[data-book-view=single][data-book-shape=wide] .flip-face.front,
@@ -370,10 +380,10 @@ html[data-book-view=single][data-book-shape=wide] .flip-face.back{border-radius:
 .tree-menu{min-width:240px}
 .tools .ui-btn:nth-child(3){display:none}
 }
-@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}
+@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto}
 .moment.landed{animation:none}
-.flip-sheet{transition:none!important}
-.ui-btn,.detail,.archive-panel,.viewer,.branch-modal,.overview{transition-duration:.01ms!important}
+.flip-sheet{transition:none}
+.ui-btn,.detail,.archive-panel,.viewer,.branch-modal,.overview{transition-duration:.01ms}
 }
 .example-video-label{position:absolute;bottom:10px;left:10px;padding:5px 8px;border-radius:8px;background:rgba(24,18,25,.8);color:#fff;font:11px sans-serif}
 
