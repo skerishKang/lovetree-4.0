@@ -143,6 +143,68 @@ test('#549+#845 순간 추가 창을 열면 안내 판이 숨고, 닫으면 다�
   } finally { await browser.close(); }
 });
 
+test('#845 2단계 뒤로가기는 창을 닫는다(주소 그대로·초점은 연 단추로)', { skip: REQUIRE ? false : skip }, async () => {
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    const errors = [];
+    page.on('pageerror', (e) => errors.push(String(e.message || e)));
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Page.addScriptToEvaluateOnNewDocument', { source: "window.__log=[];const st=()=>{new MutationObserver((ms)=>{for(const m of ms)if(m.target.id==='tree-tips')window.__log.push(m.target.getAttribute('hidden'))}).observe(document,{subtree:true,attributes:true,attributeFilter:['hidden']})};if(document.documentElement)st();else document.addEventListener('readystatechange',st,{once:true});" });
+    await openWithFirstTree(page);
+    const before = page.url();
+    await page.click('#write-menu');
+    await page.waitForFunction(() => document.getElementById('write-panel').open, null, { timeout: 10000 });
+    // 뒤로가기 → 창이 닫히고 주소는 그대로다(✕·Esc와 같은 판정을 탄다).
+    await page.goBack();
+    // 창이 닫히고 안내 판이 다시 보이는 최종 상태를 기다린다(닫힘 직후 한 박자 늦게 다시 띄우는 판이 있어도 기다린다).
+    await page.waitForFunction(() => !document.getElementById('write-panel').open && document.getElementById('tree-tips').hidden === false, null, { timeout: 10000 });
+    const after = await page.evaluate(() => ({
+      url: location.href,
+      panelOpen: document.getElementById('write-panel').open,
+      focused: document.activeElement?.id || '',
+      tips: document.getElementById('tree-tips').hidden,
+      seen: localStorage.getItem('lt41.tips.firstTree'),
+    }));
+    assert.equal(after.url, before, '주소가 뒤로 가지 않는다(창 닫기로 쓴다)');
+    assert.equal(after.panelOpen, false, '뒤로가기로 창이 닫힌다');
+    assert.equal(after.focused, 'write-menu', '창을 연 단추로 초점이 돌아온다');
+    assert.equal(after.tips, false, '창이 닫혔으므로 안내 판이 다시 보인다');
+    assert.equal(after.seen, null, '봇음 미기록');
+    // 창이 없어진 뒤에는 뒤로가기가 원래대로 주소를 뒤로 간다.
+    await page.goBack();
+    await page.waitForTimeout(500);
+    assert.notEqual(page.url(), before, '창이 없으면 뒤로가기는 주소를 뒤로 간다');
+    assert.deepEqual(errors, [], '페이지 오류 없음');
+  } finally { await browser.close(); }
+});
+
+test('#845 2단계 더러운 창은 뒤로가기로 닫을 때 한 번 묻는다(✕·Esc와 같은 판정)', { skip: REQUIRE ? false : skip }, async () => {
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    const errors = [];
+    page.on('pageerror', (e) => errors.push(String(e.message || e)));
+    await openWithFirstTree(page);
+    const before = page.url();
+    await page.click('#write-menu');
+    await page.waitForFunction(() => document.getElementById('write-panel').open, null, { timeout: 10000 });
+    // 제목을 적어 더럽힌다 — 닫을 때 '저장하지 않고 닫을까요?'를 묻는다(#380 4 규칙).
+    await page.fill('#quick-url', 'https://example.com/back-check');
+    // 취소하면 창이 남고, 가드가 다시 쌓여 다음 뒤로가기도 같은 질문을 한다.
+    page.once('dialog', (d) => d.dismiss());
+    await page.goBack();
+    await page.waitForTimeout(600);
+    assert.equal(await page.evaluate(() => document.getElementById('write-panel').open), true, '확인을 취소하면 창이 남는다');
+    // 받아들이면 닫힌다.
+    page.once('dialog', (d) => d.accept());
+    await page.goBack();
+    await page.waitForFunction(() => !document.getElementById('write-panel').open, null, { timeout: 10000 });
+    assert.equal(page.url(), before, '주소가 그대로다(창 닫기로 썼다)');
+    assert.deepEqual(errors, [], '페이지 오류 없음');
+  } finally { await browser.close(); }
+});
+
 test('#845 내 의견 창을 열면 안내 판이 숨고, 닫으면 다시 보인다', { skip: REQUIRE ? false : skip }, async () => {
   const browser = await chromium.launch();
   try {
