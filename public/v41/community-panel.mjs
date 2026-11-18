@@ -10,7 +10,7 @@ import {localDateOnly} from './local-date.mjs';
 const el=(tag,className,text)=>{const node=document.createElement(tag);if(className)node.className=className;if(text!=null)node.textContent=text;return node;};
 export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareOwn,hasOwnTree,getDateStyle,getArtistGroups=()=>[]}){
  const api=createCommunityApi(),form=dialog.querySelector('#community-search-form'),query=dialog.querySelector('#community-query'),list=dialog.querySelector('#community-list'),groups=dialog.querySelector('#community-groups'),feedback=dialog.querySelector('#community-feedback'),more=dialog.querySelector('#community-more'),preview=dialog.querySelector('#community-preview'),sortSelect=dialog.querySelector('#community-sort');
- let cursor='',loading=false,items=[],selectedId=null,selectedArtist='',loadId=0;
+  let cursor='',loading=false,items=[],selectedId=null,selectedArtist='',loadId=0,publicGroups=[];
  const message=text=>{feedback.textContent=text;const previewMessage=preview.querySelector('[data-community-preview-message]');if(previewMessage)previewMessage.textContent=text;};
  // #480 L13: 계정 설정의 날짜 표기. 넘겨받지 않으면 기본(dot) — 새 규칙을 만들지 않는다.
  const dateStyle=()=>(typeof getDateStyle==='function'?getDateStyle():'dot');
@@ -78,17 +78,18 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
   cancel.onclick=()=>{delete row.dataset.editing;row.replaceChildren();if(head)row.append(head);if(body)row.append(body);if(tools)row.append(tools);};
   row.append(form);
  }
- function artistGroupList(){
-  let values=[];try{values=getArtistGroups?.()||[];}catch{}
-  const seen=new Set(),out=[];
-  for(const raw of Array.isArray(values)?values:[]){
-   const value=String(raw??'').trim(),key=tagKey(value);
-   if(!value||!key||seen.has(key))continue;
-   seen.add(key);out.push(value);
-   if(out.length===7)break;
+  function artistGroupList(){
+   let values=[];try{values=getArtistGroups?.()||[];}catch{}
+   const seen=new Set(),out=[];
+   const add=raw=>{
+    const value=String(raw??'').trim(),key=tagKey(value);
+    if(!value||!key||seen.has(key))return;
+    seen.add(key);out.push(value);
+   };
+   for(const raw of Array.isArray(values)?values:[])add(raw);
+   for(const group of publicGroups)add(group?.value??group);
+   return out.slice(0,7);
   }
-  return out;
- }
  function renderGroups(){
   const available=artistGroupList();
   if(selectedArtist&&!available.some(value=>tagKey(value)===tagKey(selectedArtist)))selectedArtist='';
@@ -185,6 +186,7 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
   loading=false;
   if(!answer.ok){message(answer.message||'공개 트리를 불러오지 못했어요.');more.hidden=true;more.disabled=false;render();return;}
   items=append?[...items,...answer.items]:answer.items;cursor=answer.nextCursor||'';more.hidden=!cursor;more.disabled=false;
+  if(!append){publicGroups=Array.isArray(answer.groups)?answer.groups:[];renderGroups();}
   message(answer.totalVisible?`공개된 트리 ${answer.totalVisible}개를 찾았어요. ${(sortSelect?.value==='popular')?'많이 담긴 순서예요.':'새로 공개된 순서예요.'}`:'아직 공개된 트리가 없어요. 트리를 공개하면 여기에 나타나요.');render();
  }
  // #824 결정 2: 정렬을 바꾸면 목록을 처음부터 다시 불러온다.
