@@ -224,7 +224,7 @@ function infoLine({label,value,gold=false,dim=false,ellipsis=false}){
  node.append(k,v);
  return node;
 }
-const infoRow=document.createElement('div');infoRow.className='home-info';
+const infoRow=document.createElement('div');infoRow.className='home-info';infoRow.dataset.ltKeepClear='';
 // 숫자판은 내 기록의 숫자만 둔다(261118 도현 의견 1-2). 전에는 둘러보기 공개 집계('순간 117'·'트리 9')가
 // 늘 함께 붙어 '트리 0'(내 트리)과 '트리 9'(공개 트리 수)이 같은 라벨으로 나란히 보였고, '순간 117'은
 // 남의 것까지 센 수인데 내 숫자로 읽혔다. 로그인은 내 것만 남긴다(모아둔 N·전체 N·트리 N·최근 —

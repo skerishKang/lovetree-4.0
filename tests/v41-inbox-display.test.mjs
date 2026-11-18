@@ -94,11 +94,14 @@ test('moveAvailable: 내 기록이면 일반 트리에서도 옮기기를 보여
  for(const [input,want] of rows)assert.equal(moveAvailable(input),want,JSON.stringify(input));
 });
 
-test('책장: inbox 트리를 맨 앞으로 정렬해 그리고 표시를 붙인다',()=>{
+test('책장: inbox 트리를 맨 앞으로 정렬하고 표지에는 이름 하나만 보인다(#896)',()=>{
  const shelf=read('../public/v41/views/shelf/shelf.js');
  assert.match(shelf,/buildShelf\(shelfOrder\(LTDEMO\.library\)/);
- assert.match(shelf,/inbox-chip/);
- assert.match(shelf,/import \{ shelfOrder, INBOX_LABEL \} from '\.\.\/\.\.\/inbox-model\.mjs'/);
+ // #896: 표지 위 '모아둔 순간' 이름표는 표지 제목과 겹쳐 보였다 — 이름표를 없애고 표지 제목(트리 이름) 하나만 남는다.
+ assert.doesNotMatch(shelf,/inbox-chip/,'표지에서 이름표를 뺐다');
+ assert.match(shelf,/import \{ shelfOrder \} from '\.\.\/\.\.\/inbox-model\.mjs'/);
+ const css=read('../public/v41/views/shelf/shelf.css');
+ assert.doesNotMatch(css,/\.inbox-chip/,'이름표 규칙도 거둔다');
  const model=read('../public/v41/views/shelf/shelf-model.mjs');
  assert.match(model,/inbox: tree\.inbox === true/);
  // 보기 데이터(LTDEMO.library)에도 inbox 표시가 그대로 옮겨진다.

@@ -186,7 +186,9 @@ export function createPanels(deps) {
     if (mode === 'new') { openFirstJourney(); return; }
     setEditorMode(mode, parentId);
     panel('write-panel');
-    queueMicrotask(() => $('moment-form').elements.note.focus());
+    // #898: 창을 열 때는 맨 위부터 — 쉬운 추가에서 내용을 읽다가 '지금 다듬기'로 넘어오면 스크롤이 중간에 남고,
+    // 초점을 노트 칸으로 옮기는 것만으로도 창이 스크롤된다. 초점을 준 뒤에 맨 위로 되돌린다.
+    queueMicrotask(() => { $('moment-form').elements.note.focus(); $('write-panel').scrollTop = 0; });
   }
 
   // #380 5번: 표지를 정하는 방법은 한 줄에서 하나만 고른다(첫 순간(기본)·순간에서·디자인·사진).

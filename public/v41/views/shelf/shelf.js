@@ -7,7 +7,7 @@ import {
   resolveShelfIndex, resumeCard, resumeName, shelfRowLayout,
   treeTitleOf, youtubeId as youtubeIdOf
 } from './shelf-model.mjs';
-import { shelfOrder, INBOX_LABEL } from '../../inbox-model.mjs';
+import { shelfOrder } from '../../inbox-model.mjs';
 import { titleView, titleDisplayOf, shouldReloadForTitleDisplay } from '../../book-usability.mjs';
 import { coverFallbackAttrs, mountThumbFallback } from '../../thumb-fallback.mjs';
 import { localDateOnly } from '../../local-date.mjs';
@@ -69,7 +69,7 @@ import { createReader } from './shelf-reader.js';
           // #212: 표지에 이름 한 번만. 표지 아래는 "순간 N개 · 마지막 YYYY-MM-DD" 하나만. "책 · 02"·"기본 표지" 같은 내부 표시는 없다.
           // #256-3: 디자인 표지는 shelf-model coverChoice 판정(book.design)을 그대로 쓴다. 없으면 속성도 없다(기존 화면 변화 0).
           return '<article class="book-card" data-book-index="'+index+'"><button type="button" data-book-id="'+esc(book.id)+'" aria-label="'+esc(book.name)+' 책 열기">'+
-            '<div class="book-cover"'+(book.design?' data-cover-design="'+esc(book.design)+'"':'')+' style="'+coverStyle(book)+'">'+(book.inbox?'<span class="inbox-chip">'+INBOX_LABEL+'</span>':'')+(book.coverMedia?'<img class="book-cover-media" src="'+esc(book.coverMedia)+'"'+coverFallbackAttrs(book.coverCandidates||[book.coverMedia])+' alt="" loading="lazy" referrerpolicy="no-referrer">':'')+'<span class="cover-symbol"><span>'+esc(book.symbol)+'</span></span><strong class="cover-title">'+esc(book.name)+'</strong></div>'+
+            '<div class="book-cover"'+(book.design?' data-cover-design="'+esc(book.design)+'"':'')+' style="'+coverStyle(book)+'">'+(book.coverMedia?'<img class="book-cover-media" src="'+esc(book.coverMedia)+'"'+coverFallbackAttrs(book.coverCandidates||[book.coverMedia])+' alt="" loading="lazy" referrerpolicy="no-referrer">':'')+'<span class="cover-symbol"><span>'+esc(book.symbol)+'</span></span><strong class="cover-title">'+esc(book.name)+'</strong></div>'+
             '<span class="book-card-meta"><span>'+esc(bookMeta(book))+'</span></span></button><button type="button" class="book-manage" data-manage-id="'+esc(book.id)+'" aria-label="'+esc(book.name)+' 고치기">⋯</button></article>';
         }).join(''):'<div class="empty"><strong>찾는 책이 없어요.</strong><span>트리 이름·좋아하는 대상·순간 제목으로 검색해 보세요.</span></div>');
         updateCarousel(false);
