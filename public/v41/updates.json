@@ -7,6 +7,7 @@
       {"kind": "fix", "text": "보드 상세에서 크게 보기·YouTube 열기 단추가 두 번씩 보이지 않아요", "source": "ai_tester", "issue": "#840"},
       {"kind": "fix", "text": "순간 추가·내 의견 같은 큰 창이 열려 있는 동안 '첫 트리를 만들었어요' 안내가 창을 가리지 않아요", "source": "ai_tester", "tester": "레인", "issue": "#845"},
       {"kind": "new", "text": "창이 열려 있을 때는 뒤로가기가 창을 닫는 일을 해요", "source": "ai_tester", "tester": "레인", "issue": "#845"},
+      {"kind": "new", "text": "같은 영상을 다시 담을 때는 막지 않고, 담기 전에 한 번 알려 줘요", "source": "ai_tester", "tester": "레인", "issue": "#876"},
       {"kind": "fix", "text": "밤 테마에서 보드와 지도도 어둡게 보여요.", "source": "ai_tester", "issue": "#856"},
       {"kind": "fix", "text": "지도 그래프에서 아직 묶음에 안 든 순간이 날짜·제목으로 깔끔하게 보여요", "source": "user", "issue": "#842"},
       {"kind": "fix", "text": "의견을 보낸 직후 내 의견 목록에 내 의견이 바로 보여요", "source": "user", "issue": "#846"},

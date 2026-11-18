@@ -3,6 +3,8 @@
 // 화면 배선(붙여넣기 리스너·진입 소비·로그인 라운드트립)은 shell/quick-intake.mjs가 맡는다(docs/TESTING.md).
 // 데이터 규칙(quickAdd·inbox)은 로컬1 계약을 쓴다 — 화면은 이름만 부른다.
 import { parseQuickUrl } from './quick-add.mjs';
+import { rangeFields } from './domain.mjs';
+import { videoKey } from './same-stage.mjs';
 import { fetchVideoTitle } from './video-title.mjs';
 
 // share_target params 가 싣고 오는 쿼리 이름(매니페스트와 한 벌).
@@ -76,18 +78,44 @@ export function canonicalUrl(value) {
   try { return new URL(text).href; } catch { return text; }
 }
 
-// inbox(모아둔 순간) 트리에 같은 주소가 이미 있는지 — '같은 주소 두 번 담기' 방지.
-// 모르는 모양은 조용히 거짓(막지 않는다).
-export function isInboxDuplicate(trees, url) {
-  const target = canonicalUrl(url);
-  if (!target) return false;
-  return (Array.isArray(trees) ? trees : []).some(tree =>
-    tree?.inbox === true
-    && Array.isArray(tree.moments)
-    && tree.moments.some(moment => moment?.url && canonicalUrl(moment.url) === target));
+// #876: 같은 영상 판정(대표 결정 2026-11-18) — 같은 영상을 다시 담을 때 막지 말고 담기 전에 한 번 알려 준다.
+// '같은 영상'은 유튜브 영상 id가 같은 것(youtube-id·same-stage 한 벌을 쓴다 — 주소 모양이 달라도 id가 같으면
+// 같다: youtu.be·shorts·watch?v=). 유튜브가 아니면 주소가 같을 때만 같은 것으로 본다(기존 '같은 주소' 규칙 유지).
+// '같은 장면'은 구간까지 같거나 둘 다 없을 때다 — 구간이 다르면 다른 장면이라 다시 담는다(규칙 2).
+// 구간 비교는 저장될 값끼리 한다 — rangeFields 한 벌(domain.mjs)로 새 입력과 이미 담은 순간을 같은 모양으로
+// 정규화한다. 저장값이 없으면 주소의 t=·start=에서 읽는다(#792 규칙 — 쉬운 추가는 구간 칸이 없어 주소에만
+// 구간이 남는다). 빈 칸·주소 자동 채움 처리를 포함한 기존 규칙을 그대로 쓴다.
+function rangeKeyOf(url, stored = {}) {
+  const range = rangeFields({ startSeconds: stored?.startSeconds, endSeconds: stored?.endSeconds }, url);
+  return JSON.stringify([range.startSeconds ?? null, range.endSeconds ?? null]);
+}
+export function isSameVideoMoment(moment, url) {
+  if (!moment?.url || !url) return false;
+  const a = videoKey(moment.url);
+  const b = videoKey(url);
+  if (a && b) return a === b && rangeKeyOf(moment.url, moment) === rangeKeyOf(url);
+  return canonicalUrl(moment.url) === canonicalUrl(url);
 }
 
-export const INTAKE_DUP_TEXT = '이미 모아둔 순간에 있는 주소예요.';   // 같은 주소 두 번 담기 방지 안내(문구 계약).
+// 규칙 1: 같은 트리 안의 같은 영상·같은 장면 순간을 찾는다. 없으면 null.
+export function findSameVideoInTree(tree, url) {
+  if (!tree || !Array.isArray(tree.moments)) return null;
+  return tree.moments.find(moment => isSameVideoMoment(moment, url)) || null;
+}
+
+// 규칙 3: 다른 트리에 같은 영상이 있는 트리들 — 막지 않고 담은 뒤 한 줄 알린다. 구간은 보지 않는다.
+export function treesWithSameVideo(trees, { excludeTreeId = '', url = '' } = {}) {
+  const target = String(url || '');
+  if (!target) return [];
+  return (Array.isArray(trees) ? trees : []).filter(tree =>
+    tree && tree.id !== excludeTreeId && Array.isArray(tree.moments)
+    && tree.moments.some(moment => {
+      const a = videoKey(moment?.url);
+      const b = videoKey(target);
+      if (a && b) return a === b;
+      return !!moment?.url && canonicalUrl(moment.url) === canonicalUrl(target);
+    }));
+}
 export const INTAKE_LOGIN_RETRY_TEXT = '로그인한 뒤 다시 공유해 주세요.';   // 두 번째 로그아웃 안내 — 로그인 고리를 끊는 자리(문구 계약, #342 후속).
 
 // 세션 상태에 따른 한 걸음 판정(#342 후속: 공유 진입 로그인 고리 차단).

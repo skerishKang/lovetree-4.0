@@ -5,10 +5,12 @@ import {
   QUICK_INVALID_ERROR, QUICK_SAVED_TEXT, DROP_LOGIN_NOTICE, DROP_READONLY_NOTICE, extractDropUrl, parseQuickUrl,
 } from '../quick-add.mjs';
 import {
-  INTAKE_DUP_TEXT, INTAKE_LOGIN_RETRY_TEXT, INTAKE_STEP_LOGIN, INTAKE_STEP_NOTICE, INTAKE_STEP_SKIP, INTAKE_STEP_WAIT,
-  classifyIntake, createLoginAttemptSlot, createPendingSlot, intakeStep, isInboxDuplicate, loginAttempted,
-  readIntakeParams, resolveIntakeCandidate, resolveMediaMetadata,
+  INTAKE_LOGIN_RETRY_TEXT, INTAKE_STEP_LOGIN, INTAKE_STEP_NOTICE, INTAKE_STEP_SKIP, INTAKE_STEP_WAIT,
+  classifyIntake, createLoginAttemptSlot, createPendingSlot, findSameVideoInTree, intakeStep, loginAttempted,
+  readIntakeParams, resolveIntakeCandidate, resolveMediaMetadata, treesWithSameVideo,
 } from '../quick-intake.mjs';
+import {formatDisplayDate} from '../book-usability.mjs';
+import {displayTreeTitle} from '../tree-name.mjs';
 
 export function createQuickIntake(deps) {
   const doc = deps.document || (typeof document !== 'undefined' ? document : null);
@@ -44,7 +46,7 @@ export function createQuickIntake(deps) {
     return { source: deps.getSource?.(), owned: snap?.owned === true, phase: String(snap?.phase ?? '') };
   }
 
-  function intakeSave(url, via) {
+  function intakeSave(url, via, options = {}) {
     const step = intakeStep(sessionState(), { attempted: loginAttempted(attempts.read(), url) });
     if (step === INTAKE_STEP_SKIP) return;                                // 공유 감상: 담지 않는다
     if (step === INTAKE_STEP_WAIT) {                                       // 아직 모름: 로그인도 담기도 미룬다
@@ -65,12 +67,33 @@ export function createQuickIntake(deps) {
     if (!snap?.writable) { notify(DROP_READONLY_NOTICE); return; }
     let trees = [];
     try { trees = member.state?.()?.trees ?? []; } catch { trees = []; }
-    if (isInboxDuplicate(trees, url)) { slot.clear(); attempts.clear(); notify(INTAKE_DUP_TEXT); return; }
+    // #876(규칙 1·4): 붙여넣기·공유로 담을 때(담을 곳은 '모아둔 순간')도 같은 규칙 — 같은 영상·같은 장면이
+    // 이미 있으면 조용히 막지 말고 안내 창으로 한 번 알려 준다. [그래도 담기]를 누르면(force) 이 판정을
+    // 다시 보지 않고 담는다. 창을 닫으면 아무것도 담지 않고 끝낸다(붙여넣기 값은 이미 소비했다).
+    if (!options.force) {
+      const inboxTree = trees.find(tree => tree?.inbox === true) || null;
+      const dup = inboxTree ? findSameVideoInTree(inboxTree, url) : null;
+      if (dup) {
+        slot.clear(); attempts.clear();
+        deps.videoDup?.open({
+          treeId: String(inboxTree.id || ''),
+          momentId: String(dup.id || ''),
+          treeName: displayTreeTitle(String(inboxTree?.title || inboxTree?.subject || '') || '모아둔 순간'),
+          dateText: formatDisplayDate(dup.date, 'long'),
+          onContinue: () => { intakeSave(url, via, { force: true }); },
+        });
+        return;
+      }
+    }
     const commit = (media) => {
       try {
         member.apply('quickAdd', { url, ...media });
         slot.clear(); attempts.clear();
-        notify(QUICK_SAVED_TEXT);
+        // #876 규칙 3: 다른 트리에 같은 영상이 있으면 막지 않고 담은 뒤 한 줄 알린다 — 담았다는 안내와 한 줄로.
+        const others = treesWithSameVideo(trees, { excludeTreeId: String(trees.find(tree => tree?.inbox === true)?.id || ''), url });
+        const names = others.map(tree => displayTreeTitle(String(tree?.title || tree?.subject || '') || '트리'));
+        const otherLine = !names.length ? '' : names.length === 1 ? `'${names[0]}' 트리에도 있어요` : `'${names[0]}' 외 ${names.length - 1}개 트리에도 있어요`;
+        notify(otherLine ? `${QUICK_SAVED_TEXT}. ${otherLine}` : QUICK_SAVED_TEXT);
       } catch (error) {
         notify(typeof error?.message === 'string' ? error.message : String(error));
       }

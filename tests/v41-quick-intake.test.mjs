@@ -3,8 +3,9 @@ import assert from 'node:assert/strict';
 // 빠른 담기 입구의 순수 계산: 파라미터 소비·추출·분류·중복 판정·세션 보관 (docs/TESTING.md).
 // DOM 배선은 tests/v41-quick-intake-flow.test.mjs가 가짜 객체로 직접 부른다.
 import {
-  INTAKE_URL_PARAM, INTAKE_TEXT_PARAM, INTAKE_TITLE_PARAM, INTAKE_MAX_URL_LENGTH, INTAKE_DUP_TEXT,
-  readIntakeParams, classifyIntake, firstHttpUrl, resolveIntakeCandidate, canonicalUrl, isInboxDuplicate, createPendingSlot,
+  INTAKE_URL_PARAM, INTAKE_TEXT_PARAM, INTAKE_TITLE_PARAM, INTAKE_MAX_URL_LENGTH,
+  readIntakeParams, classifyIntake, firstHttpUrl, resolveIntakeCandidate, canonicalUrl, isSameVideoMoment,
+  findSameVideoInTree, treesWithSameVideo, createPendingSlot,
   resolveMediaMetadata, INTAKE_TITLE_WAIT_MS,
 } from '../public/v41/quick-intake.mjs';
 
@@ -81,20 +82,57 @@ test('canonicalUrl: URL로 읽히면 정규화하고, 아니면 원문', () => {
   assert.equal(canonicalUrl(''), '');
 });
 
-test('isInboxDuplicate: inbox의 같은 주소만 잡는다(모양이 나빠도 조용히 거짓)', () => {
+test('#876 isSameVideoMoment: 같은 영상은 id로, 구간이 같거나 둘 다 없을 때 같은 장면으로 본다', () => {
+  const base = { id: 'm0', url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' };
+  // 주소 모양이 달라도 영상 id가 같으면 같은 영상(규칙 5) — youtu.be·shorts·watch.
+  assert.equal(isSameVideoMoment(base, 'https://youtu.be/dQw4w9WgXcQ'), true, 'youtu.be도 같은 영상');
+  assert.equal(isSameVideoMoment(base, 'https://www.youtube.com/shorts/dQw4w9WgXcQ'), true, 'shorts도 같은 영상');
+  assert.equal(isSameVideoMoment(base, 'https://www.youtube.com/watch?v=다른id가아니라같은id'), false, '다른 영상은 다르다');
+  // 구간이 다르면 다른 장면(규칙 2) — 막지 않고 그냥 담는다.
+  assert.equal(isSameVideoMoment({ ...base, startSeconds: 90 }, 'https://youtu.be/dQw4w9WgXcQ?t=30'), false, '구간이 다르면 다른 장면');
+  assert.equal(isSameVideoMoment({ ...base, startSeconds: 30 }, 'https://youtu.be/dQw4w9WgXcQ?t=30'), true, '같은 구간은 같은 장면');
+  assert.equal(isSameVideoMoment(base, 'https://youtu.be/dQw4w9WgXcQ?t=30'), false, '없음과 있음은 다른 장면');
+  assert.equal(isSameVideoMoment({ ...base, startSeconds: 30, endSeconds: 60 }, 'https://youtu.be/dQw4w9WgXcQ?t=30'), false, '끝이 다르면 다른 장면');
+  // 유튜브가 아니면 주소가 같을 때만 같은 것으로 본다(기존 규칙 유지).
+  assert.equal(isSameVideoMoment({ id: 'm1', url: 'https://example.com/a' }, 'https://EXAMPLE.com/a'), true, '같은 주소');
+  assert.equal(isSameVideoMoment({ id: 'm1', url: 'https://example.com/a' }, 'https://example.com/b'), false);
+  // 모양이 나빠도 조용히 거짓(막지 않는다).
+  assert.equal(isSameVideoMoment({}, 'https://example.com/a'), false);
+  assert.equal(isSameVideoMoment({ id: 'm1' }, 'https://example.com/a'), false);
+  assert.equal(isSameVideoMoment(base, ''), false);
+  assert.equal(isSameVideoMoment(null, 'https://example.com/a'), false);
+});
+
+test('#876 findSameVideoInTree: 같은 트리 안의 같은 영상·같은 장면 순간을 찾는다', () => {
+  const tree = {
+    id: 't0', inbox: true,
+    moments: [
+      { id: 'm0', url: 'https://example.com/a' },
+      { id: 'm1', url: 'https://youtu.be/dQw4w9WgXcQ' },
+      {},
+    ],
+  };
+  assert.equal(findSameVideoInTree(tree, 'https://www.youtube.com/watch?v=dQw4w9WgXcQ')?.id, 'm1', '모양이 달라도 같은 영상');
+  assert.equal(findSameVideoInTree(tree, 'https://example.com/a')?.id, 'm0', '같은 주소(유튜브 아님)');
+  assert.equal(findSameVideoInTree(tree, 'https://example.com/z'), null);
+  assert.equal(findSameVideoInTree(null, 'https://example.com/a'), null);
+  assert.equal(findSameVideoInTree({ id: 'x', moments: [{}] }, 'https://example.com/a'), null);
+  assert.equal(findSameVideoInTree({ id: 'x' }, 'https://example.com/a'), null);
+});
+
+test('#876 treesWithSameVideo: 다른 트리에 같은 영상이 있는 트리들을 찾는다(구간은 보지 않는다)', () => {
   const trees = [
-    { id: 't0', inbox: true, moments: [{ id: 'm0', url: 'https://example.com/a' }, { id: 'm1' }] },
-    { id: 't1', inbox: false, moments: [{ id: 'm2', url: 'https://example.com/a' }] },
-    { id: 't2', inbox: true, moments: [{ id: 'm3', url: 'HTTPS://EXAMPLE.com/a' }] },
+    { id: 't0', moments: [{ id: 'm0', url: 'https://youtu.be/dQw4w9WgXcQ' }] },
+    { id: 't1', moments: [{ id: 'm1', url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=99' }] },
+    { id: 't2', moments: [{ id: 'm2', url: 'https://youtu.be/다른영상' }] },
+    { id: 't3', moments: [{}] },
   ];
-  assert.equal(isInboxDuplicate(trees, 'https://example.com/a'), true, '이미 inbox에 있다');
-  assert.equal(isInboxDuplicate(trees, 'https://EXAMPLE.com/a'), true, '정규화해서 비교한다(대문자 호스트)');
-  assert.equal(isInboxDuplicate(trees, 'https://example.com/b'), false);
-  assert.equal(isInboxDuplicate([trees[1]], 'https://example.com/a'), false, '일반 트리는 세지 않는다');
-  assert.equal(isInboxDuplicate([{ id: 'x', inbox: true, moments: [{}] }], 'https://example.com/a'), false);
-  assert.equal(isInboxDuplicate(null, 'https://example.com/a'), false);
-  assert.equal(isInboxDuplicate(trees, ''), false);
-  assert.equal(isInboxDuplicate(trees, '그냥-글자'), false);
+  const found = treesWithSameVideo(trees, { excludeTreeId: 't0', url: 'https://youtu.be/dQw4w9WgXcQ' });
+  assert.deepEqual(found.map(tree => tree.id), ['t1'], '같은 영상이 있는 다른 트리만(구간 무관)');
+  assert.deepEqual(treesWithSameVideo(trees, { excludeTreeId: 't1', url: 'https://youtu.be/dQw4w9WgXcQ' }).map(tree => tree.id), ['t0']);
+  assert.deepEqual(treesWithSameVideo(trees, { url: 'https://youtu.be/dQw4w9WgXcQ' }).map(tree => tree.id), ['t0', 't1'], '빼는 트리가 없으면 전부');
+  assert.deepEqual(treesWithSameVideo(trees, { excludeTreeId: 't0', url: '' }), [], '주소가 없으면 아무것도 보지 않는다');
+  assert.deepEqual(treesWithSameVideo(null, { url: 'https://youtu.be/dQw4w9WgXcQ' }), []);
 });
 
 test('createPendingSlot: 한 번 보관·덮어쓰기·지우기, 저장소를 못 쓰면 조용하다', () => {
@@ -118,8 +156,6 @@ test('createPendingSlot: 한 번 보관·덮어쓰기·지우기, 저장소를 �
   const noop = createPendingSlot(null);
   noop.write('https://example.com');
   assert.equal(noop.read(), null);
-  assert.equal(typeof INTAKE_DUP_TEXT, 'string');
-  assert.ok(INTAKE_DUP_TEXT.length > 0);
   assert.equal(INTAKE_URL_PARAM, 'quickadd');
   assert.equal(INTAKE_TEXT_PARAM, 'qtext');
   assert.equal(INTAKE_TITLE_PARAM, 'qtitle');

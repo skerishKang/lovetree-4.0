@@ -1,5 +1,13 @@
 # LoveTree 4.0 — 핸드오프
 
+## 2026-11-18 — #876: 같은 영상을 다시 담을 때 막지 말고 담기 전에 알려 주기 (컴1로컬3, 브랜치 ai/local3-dup-876)
+
+- **범위(한 줄)**: 같은 트리에 같은 영상(유튜브 id 같음 — youtu.be·shorts·watch 같은 id, 규칙 5)을 다시 담을 때 구간까지 같거나 둘 다 없으면 담기 전에 안내 창을 한 번 열어 준다('이 트리에 이미 담은 영상이에요 (11월 13일)' + [그 순간 보기] [그래도 담기]); 구간이 다르면 다른 장면이라 그냥 담고, 다른 트리에 같은 영상이 있으면 막지 않고 담은 뒤 한 줄 알린다("'○○' 트리에도 있어요"). 쉬운 추가·자세한 추가·붙여넣기/공유 입구가 같은 규칙이고, 입구의 '조용히 막기'(isInboxDuplicate·INTAKE_DUP_TEXT)를 안내 방식으로 바꿨다. 확인 질문(confirm)은 이번 범위 밖.
+- **파일**: 판정은 `public/v41/quick-intake.mjs`(isSameVideoMoment·findSameVideoInTree·treesWithSameVideo — same-stage.mjs의 videoKey·domain.mjs의 rangeFields 재사용, 새 판정을 만들지 않는다), 창은 `public/v41/shell/video-dup.mjs` + index.html의 `#video-dup-panel`(data-lt-panel=center, #845 잠깐 판 — 순간 추가 창 위에 겹쳐 열리고 Esc·뒤로가기·×로 닫으면 아무것도 담지 않는다; 3단계(PR #879) STACK_ALLOWED에 'video-dup-panel'을 넣어 두었다), 배선은 shell/quick-add.mjs(saveUrl)·shell/panels.mjs(편집기 onsubmit — 'add'만, 수정은 보지 않는다)·shell/quick-intake.mjs(intakeSave)·shell.mjs.
+- **시험**: v41-quick-intake.test.mjs(순수 판정 3건 — id 같음·구간 같음/다름·모양 나빠도 거짓), v41-quick-intake-flow.test.mjs(공유 진입 안내 창 2건 — 옛 '조용히 막기' 시험을 안내 방식으로 대체), v41-tree-tips-549.test.mjs(브라우저 5건 — 안내 창·그래도 담기 +1·그 순간 보기 +0·구간 다름 바로 +1·다른 트리 알림 1줄·Esc/뒤로가기 닫힘). 151 pass / 0 fail(위 파일들), build ✓, modulepreload ✓.
+- **캡처**: 안내 창 1440·390 — `E:\lovetree-qa\local3\dup\`(내용 판독은 CTO 몫).
+- **남은 것**: CI 초록 → CTO 확인 → squash 병합.
+
 ## 2026-11-18 — #845 2단계: 뒤로가기=창 닫기·세 닫기 길 한 판정 (컴1로컬3, 브랜치 ai/local3-back-845, PR #866)
 
 - **범위(한 줄)**: 모달 창이 열려 있는 동안 브라우저 뒤로가기는 주소를 뒤로 가지 않고 맨 위 창을 닫는다(✕·Esc와 같은 requestClose 판정 — 더러우면 '저장하지 않고 닫을까요?' 한 번), 창을 다른 길로 닫으면 쌓아 둔 주소 기록 한 칸을 소비해 뒤로가기가 밀리지 않게 한다; 초점 되돌리기는 창 close의 공통 규칙(data-lt-return)이 뒤로가기로 닫아도 그대로 맡는다.
