@@ -84,11 +84,11 @@ function renderAccount(){const owned=!!getMember()?.snapshot().owned;
  const view=accountPresentation({owned,email:accountEmail,name:prefs.displayName||deps.getCachedName?.()||''});
  const accent=owned?normalizeAccentColor(prefs.accentColor):'';
  const login=$('account-entry'),avatar=$('account-avatar');
- if(view.mode==='login'){login.hidden=false;login.textContent='로그인';login.removeAttribute('aria-label');avatar.hidden=true;avatar.textContent='';avatar.removeAttribute('data-accent');const init=$('account-initial');if(init){init.textContent='';init.removeAttribute('data-accent');}const mail=$('account-email');if(mail)mail.textContent='';closeAccountMenu();try{localStorage.removeItem('lt41.avatarLetter')}catch{}}
+ if(view.mode==='login'){login.hidden=false;login.textContent='로그인';login.removeAttribute('aria-label');avatar.hidden=true;avatar.textContent='';avatar.removeAttribute('data-accent');const init=$('account-initial');if(init){init.textContent='';init.removeAttribute('data-accent');}const mail=$('account-email');if(mail){mail.textContent='';mail.removeAttribute('title');}closeAccountMenu();try{localStorage.removeItem('lt41.avatarLetter')}catch{}}
  else{const shown=view.initial==='나'?(lastLetter()||view.initial):view.initial;
  login.hidden=true;avatar.hidden=false;avatar.textContent=shown;avatar.setAttribute('aria-label',view.ariaLabel);avatar.title=deps.getAccountTip?.()||'내 계정';avatar.dataset.accent=accent;
  const init=$('account-initial');if(init){init.textContent=shown;init.dataset.accent=accent;}
- $('account-email').textContent=view.label;rememberLetter(shown);}
+ const mailEl=$('account-email');mailEl.textContent=view.label;mailEl.title=view.label;rememberLetter(shown);}
   // #368: 설정 "프로필" 묶음도 같은 이메일 값을 쓴다(셸이 넘긴 콜백).
   deps.onEmailChange?.(accountEmail);}
 function openAccountMenu(via='keyboard'){const owned=!!getMember()?.snapshot().owned;if(!owned){return;}const pop=$('account-popover');pop.hidden=false;pop.dataset.ltOpenedBy=via;$('account-avatar').setAttribute('aria-expanded','true');pop.querySelector('button:not([hidden])')?.focus();if(!accountEmail&&!emailTried)void loadAccountEmail();}
