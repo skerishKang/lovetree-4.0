@@ -225,6 +225,11 @@ function infoLine({label,value,gold=false,dim=false,ellipsis=false}){
  return node;
 }
 const infoRow=document.createElement('div');infoRow.className='home-info';
+// 숫자판은 내 기록의 숫자만 둔다(261118 도현 의견 1-2). 전에는 둘러보기 공개 집계('순간 117'·'트리 9')가
+// 늘 함께 붙어 '트리 0'(내 트리)과 '트리 9'(공개 트리 수)이 같은 라벨으로 나란히 보였고, '순간 117'은
+// 남의 것까지 센 수인데 내 숫자로 읽혔다. 로그인은 내 것만 남긴다(모아둔 N·전체 N·트리 N·최근 —
+// 둘러보기 입구는 바로 위 '둘러보기' 단추에 있다). 로그아웃은 내 숫자가 없으니 0 두 줄 대신
+// 둘러보기 공개 집계만 '예시' 표시로 남긴다(카드와 같은 '감상 예시' 자리라는 뜻을 숫자에도 붙인다).
 // 순간 목록 칸 — '모아둔 37'(금빛, 누르면 모아둔 정리 창) / '전체 42'(누르면 전체 목록). 모아둔 0이면 그 줄 흐리게(누를 수 없음).
 const inboxTree=(Array.isArray(context.trees)?context.trees:[]).find(t=>t?.inbox===true);
 const inboxCount=Array.isArray(inboxTree?.moments)?inboxTree.moments.length:0;
@@ -238,22 +243,28 @@ else inboxLine.setAttribute('aria-disabled','true');
 const allLine=infoLine({label:'전체',value:formatCount(totalCount),dim:totalCount===0});
 if(totalCount>0)allLine.onclick=()=>orbit?.index?.('all');
 cellMoments.append(inboxLine,allLine);
-// 둘러보기 칸 — 로그인 없이 보이는 공개 집계(1분 캐시). '순간 N' / '트리 N', 누르면 둘러보기.
-const cellCommunity=document.createElement('div');cellCommunity.className='home-info-cell';cellCommunity.dataset.cell='community';
-const communityLine=label=>{const line=infoLine({label,value:'…'});line.dataset.community=label;line.onclick=()=>bridge.actions.community();return line;};
-const communityLines={moments:communityLine('순간'),trees:communityLine('트리')};
-cellCommunity.append(communityLines.moments,communityLines.trees);
-(async()=>{const ctrl=new AbortController();const timer=setTimeout(()=>ctrl.abort(),8000);try{
- const answer=await fetch('/api/community/stats',{headers:{accept:'application/json'},signal:ctrl.signal});
- if(!answer.ok)throw Error('stats unavailable');
- const stats=await answer.json();
- communityLines.moments.querySelector('.home-info-v').textContent=formatCount(stats?.moments);
- communityLines.trees.querySelector('.home-info-v').textContent=formatCount(stats?.trees);
-}catch{ // 집계를 못 가져오거나 8초를 넘기면 칸은 그대로 두고 값만 '–'로 바꾼다(세 칸×두 줄 배치가 틀어지지 않게).
- // '…'가 계속 남지 않게 하고, 화면 낭독기에는 '불러오지 못했어요'로 읽힌다(#780 후속).
- for(const line of [communityLines.moments,communityLines.trees]){const v=line.querySelector('.home-info-v');if(v){v.textContent='–';v.setAttribute('aria-label','불러오지 못했어요');}}
-}finally{clearTimeout(timer);}})();
-infoRow.append(cellMoments,cellCommunity);
+if(loggedIn)infoRow.append(cellMoments);
+// 둘러보기 칸(로그아웃만) — 로그인 없이 보이는 공개 집계(1분 캐시). 내 기록이 아니라는 뜻을 '예시'로 표시한다.
+if(!loggedIn){
+ const cellCommunity=document.createElement('div');cellCommunity.className='home-info-cell';cellCommunity.dataset.cell='community';
+ cellCommunity.style.gridColumn='2'; // 로그인 전: 단추는 지금처럼, 숫자는 둘러보기 것만(가운데 칸).
+ const communityLine=label=>{const line=infoLine({label,value:'…'});line.dataset.community=label;line.onclick=()=>bridge.actions.community();return line;};
+ const communityLines={moments:communityLine('예시 순간'),trees:communityLine('예시 트리')};
+ cellCommunity.append(communityLines.moments,communityLines.trees);
+ infoRow.append(cellCommunity);
+ (async()=>{const ctrl=new AbortController();const timer=setTimeout(()=>ctrl.abort(),8000);try{
+  const answer=await fetch('/api/community/stats',{headers:{accept:'application/json'},signal:ctrl.signal});
+  if(!answer.ok)throw Error('stats unavailable');
+  const stats=await answer.json();
+  communityLines.moments.querySelector('.home-info-v').textContent=formatCount(stats?.moments);
+  communityLines.moments.setAttribute('aria-label',`둘러보기 공개 순간 ${formatCount(stats?.moments)}개 — 내 기록이 아니에요`);
+  communityLines.trees.querySelector('.home-info-v').textContent=formatCount(stats?.trees);
+  communityLines.trees.setAttribute('aria-label',`둘러보기 공개 트리 ${formatCount(stats?.trees)}개 — 내 기록이 아니에요`);
+ }catch{ // 집계를 못 가져오거나 8초를 넘기면 칸은 그대로 두고 값만 '–'로 바꾼다(세 칸×두 줄 배치가 틀어지지 않게).
+  // '…'가 계속 남지 않게 하고, 화면 낭독기에는 '불러오지 못했어요'로 읽힌다(#780 후속).
+  for(const line of [communityLines.moments,communityLines.trees]){const v=line.querySelector('.home-info-v');if(v){v.textContent='–';v.setAttribute('aria-label','불러오지 못했어요');}}
+ }finally{clearTimeout(timer);}})();
+}
 // 내 트리 칸(로그인) — '트리 N' / '최근 <트리 이름>'(마지막으로 순간을 넣은 트리, 누르면 그 트리로; 길면 칸 폭에서 '…').
 if(loggedIn){
  const cellTrees=document.createElement('div');cellTrees.className='home-info-cell';cellTrees.dataset.cell='trees';
@@ -265,12 +276,12 @@ if(loggedIn){
  if(recentTree)recentLine.onclick=()=>bridge.actions.openMine(recentTree.treeId,recentTree.id);
  cellTrees.append(treesLine,recentLine);
  infoRow.append(cellTrees);
+ infoRow.dataset.cells='2'; // 둘러보기 집계 칸을 치웠으므로 두 칸(순간 목록·내 트리)을 나란히 중앙에 둔다.
 }
-if(!loggedIn)cellCommunity.style.gridColumn='2'; // 로그인 전: 단추는 지금처럼, 숫자는 둘러보기 것만(가운데 칸).
 actionsRow?.after(infoRow);
 // 261116 PR 2 모양: 정보 줄·머리글 메뉴. 색은 identity.css의 --lt-* 토큰만(정원은 종이 위 글자 — gold-ink·muted).
 const infoStyle=document.createElement('style');
-infoStyle.textContent=`.home-add-top{margin-top:12px;font-size:15px}@media(max-width:650px){.home-add-top{font-size:14px}}.center .actions[data-inline]{flex-direction:row;align-items:stretch}.center .actions[data-inline] .subtleBtn{flex:1 1 0%;width:auto;max-width:176px}.home-info{display:grid;grid-template-columns:repeat(3,minmax(0,176px));gap:10px;justify-content:center;margin:12px auto 0;width:100%;max-width:560px}.home-info-cell{display:grid;align-content:start;min-width:0}.home-info-line{pointer-events:auto;display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:44px;padding:0 12px;border:0;background:none;cursor:pointer;font:inherit;font-size:12px;line-height:1.4;color:#d4cee0;text-align:left;min-width:0;width:100%}span.home-info-line{cursor:default}.home-info-line.gold{color:var(--lt-gold,#ffe6a6)}.home-info-line.dim{color:var(--lt-muted,#9b98a6)}.home-info-k{flex:none}.home-info-v{font-variant-numeric:tabular-nums;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right}.home-info-line:focus-visible{outline:2px solid #e8b8c9;outline-offset:1px;border-radius:8px}:host([data-lt-theme=garden]) .home-info-line{color:var(--lt-muted)}:host([data-lt-theme=garden]) .home-info-line.gold{color:var(--lt-gold-ink)}:host([data-lt-theme=garden]) .home-info-line.dim{opacity:.72}.recent-menu{position:fixed;z-index:4000;min-width:220px;max-width:min(300px,86vw);max-height:min(60dvh,420px);overflow:auto;padding:6px;border:1px solid var(--lt-line,rgba(255,255,255,.14));border-radius:14px;background:#07070c;box-shadow:0 18px 44px rgba(0,0,0,.5)}.recent-menu button{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;min-height:44px;padding:0 12px;border:0;border-radius:8px;background:none;cursor:pointer;font:inherit;font-size:13px;color:#e6ddef;text-align:left}.recent-menu button[aria-checked="true"]{color:var(--lt-gold,#ffe6a6)}.recent-menu button[disabled]{color:var(--lt-muted,#9b98a6);cursor:default}.recent-menu button:focus-visible{outline:2px solid #e8b8c9;outline-offset:-2px}.recent-menu .recent-menu-sub{padding-left:22px;font-size:12px;color:#cfc6dd}:host([data-lt-theme=garden]) .recent-menu{background:var(--lt-paper,#f7f0e8);border-color:var(--lt-line-paper)}:host([data-lt-theme=garden]) .recent-menu button{color:var(--lt-ink)}:host([data-lt-theme=garden]) .recent-menu button[aria-checked="true"]{color:var(--lt-gold-ink)}:host([data-lt-theme=garden]) .recent-menu button[disabled],:host([data-lt-theme=garden]) .recent-menu .recent-menu-sub{color:var(--lt-muted)}@media(max-width:650px){.home-info{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;max-width:none;padding:0 6px}.home-info-line{padding:0 8px}}`;
+infoStyle.textContent=`.home-add-top{margin-top:12px;font-size:15px}@media(max-width:650px){.home-add-top{font-size:14px}}.center .actions[data-inline]{flex-direction:row;align-items:stretch}.center .actions[data-inline] .subtleBtn{flex:1 1 0%;width:auto;max-width:176px}.home-info{display:grid;grid-template-columns:repeat(3,minmax(0,176px));gap:10px;justify-content:center;margin:12px auto 0;width:100%;max-width:560px}.home-info[data-cells="2"]{grid-template-columns:repeat(2,minmax(0,176px))}.home-info-cell{display:grid;align-content:start;min-width:0}.home-info-line{pointer-events:auto;display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:44px;padding:0 12px;border:0;background:none;cursor:pointer;font:inherit;font-size:12px;line-height:1.4;color:#d4cee0;text-align:left;min-width:0;width:100%}span.home-info-line{cursor:default}.home-info-line.gold{color:var(--lt-gold,#ffe6a6)}.home-info-line.dim{color:var(--lt-muted,#9b98a6)}.home-info-k{flex:none}.home-info-v{font-variant-numeric:tabular-nums;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right}.home-info-line:focus-visible{outline:2px solid #e8b8c9;outline-offset:1px;border-radius:8px}:host([data-lt-theme=garden]) .home-info-line{color:var(--lt-muted)}:host([data-lt-theme=garden]) .home-info-line.gold{color:var(--lt-gold-ink)}:host([data-lt-theme=garden]) .home-info-line.dim{opacity:.72}.recent-menu{position:fixed;z-index:4000;min-width:220px;max-width:min(300px,86vw);max-height:min(60dvh,420px);overflow:auto;padding:6px;border:1px solid var(--lt-line,rgba(255,255,255,.14));border-radius:14px;background:#07070c;box-shadow:0 18px 44px rgba(0,0,0,.5)}.recent-menu button{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;min-height:44px;padding:0 12px;border:0;border-radius:8px;background:none;cursor:pointer;font:inherit;font-size:13px;color:#e6ddef;text-align:left}.recent-menu button[aria-checked="true"]{color:var(--lt-gold,#ffe6a6)}.recent-menu button[disabled]{color:var(--lt-muted,#9b98a6);cursor:default}.recent-menu button:focus-visible{outline:2px solid #e8b8c9;outline-offset:-2px}.recent-menu .recent-menu-sub{padding-left:22px;font-size:12px;color:#cfc6dd}:host([data-lt-theme=garden]) .recent-menu{background:var(--lt-paper,#f7f0e8);border-color:var(--lt-line-paper)}:host([data-lt-theme=garden]) .recent-menu button{color:var(--lt-ink)}:host([data-lt-theme=garden]) .recent-menu button[aria-checked="true"]{color:var(--lt-gold-ink)}:host([data-lt-theme=garden]) .recent-menu button[disabled],:host([data-lt-theme=garden]) .recent-menu .recent-menu-sub{color:var(--lt-muted)}@media(max-width:650px){.home-info{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;max-width:none;padding:0 6px}.home-info[data-cells="2"]{grid-template-columns:repeat(2,minmax(0,1fr))}.home-info-line{padding:0 8px}}`;
 shadow.append(infoStyle);
 const mobileFit=document.createElement('style');mobileFit.textContent='@media(max-width:768px){.topbar{gap:12px;flex-wrap:wrap;align-items:center;padding:8px 12px}.top-actions{gap:6px;flex-shrink:0;flex-wrap:wrap;margin-left:auto}.topbar .menuBtn{white-space:nowrap;padding:10px 9px;font-size:14px}.actions .subtleBtn{font-size:14px}.center .center-note{font-size:14px}.hint{font-size:14px}}';shadow.append(mobileFit);
 // #380 5번: 첫 화면 오른쪽 위 "보기 ▾" 메뉴(테마·움직임·카드 출처)는 없앴다.
