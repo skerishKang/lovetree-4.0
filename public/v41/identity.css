@@ -222,8 +222,11 @@ html[data-lt-theme=garden] .account-email{color:var(--lt-muted);border-bottom-co
 html[data-lt-theme=garden] .lt-tip-bubble{border-color:var(--lt-line-paper);background:var(--lt-paper);color:var(--lt-ink);box-shadow:0 6px 18px rgba(75,51,42,.16)}
 /* 이슈 644: 토스트는 밤·정원 모두 어두운 판 위에 뜬다. 정원에서는 --lt-pearl이 어두운 잉크가 되어 읽히지 않으므로 밝은 종이 토큰을 쓴다. */
 html[data-lt-theme=garden] #toast{color:var(--lt-paper)}
-/* 2026-11-12 #414 한 틀(트리 ▾│책│보드│지도)이 밝은 테마에서 어두운 회색으로 보이던 것: 밝은 바탕·진한 글자로 */
-html[data-lt-theme=garden] .tree-frame{background:rgba(255,253,248,.9);border-color:rgba(119,91,82,.3)}
+/* 261119 대표 결정: 탭을 감싸는 판을 없애 정원에서도 판 배경을 칠하지 않는다(글자 링크). 탭·트리 단추 글자색만 정원 잉크를 쓴다. */
+html[data-lt-theme=garden] .tree-frame{padding:0;border:0;background:none;box-shadow:none}
+/* 종이 바탕에서는 흰색 옅은 바탕이 보이지 않는다 — hover·초점은 장미색 옅은 바탕으로(밤과 같은 '옅은 바탕' 규칙). */
+html[data-lt-theme=garden] .tree-frame .tree-views>button:hover,html[data-lt-theme=garden] .tree-frame .tree-views>button:focus-visible{background:rgba(152,80,94,.08)}
+html[data-lt-theme=garden] .tree-item:hover,html[data-lt-theme=garden] .tree-item:focus-visible,html[data-lt-theme=garden] .tree-foot button:hover,html[data-lt-theme=garden] .tree-foot button:focus-visible{background:rgba(152,80,94,.08)}
 html[data-lt-theme=garden] .tree-frame .tree-views>button{border-left-color:rgba(119,91,82,.22)}
 html[data-lt-theme=garden] .tree-frame button{color:var(--lt-ink)}
 html[data-lt-theme=garden] .header-actions #header-overflow{background:var(--lt-glass-strong);border-color:var(--lt-line)}

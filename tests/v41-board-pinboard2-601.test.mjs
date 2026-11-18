@@ -246,12 +246,13 @@ test('#601 확대 단추: [－][＋][전체 보기]와 말풍선 설명', () => 
   assert.match(extras, /id='lt-tip-bubble'|id="lt-tip-bubble"/);
 });
 
-test('#601 셸: 트리 칸은 고정 폭(11em) — 탭이 흔들리지 않는다', () => {
+test('#601 셸: 트리 칸은 글자에 맞춰 늘고 넘치면 말줄임 — 탭이 흔들리지 않는다', () => {
   const css = fs.readFileSync(new URL('../public/v41/shell.css', import.meta.url), 'utf8');
   const header = read('shell/header.mjs');
-  assert.match(css, /nav #record-menu\{flex:0 0 auto;width:11em;/);
+  // 261119 대표 결정: 트리 칸은 고정 폭이 아니라 글자에 맞춘다(긴 이름은 상한에서 말줄임).
+  // 숫자 계약(⌄ 오른쪽 여백 ±2px·폭 ≤ 상한·긴 이름 말줄임)은 tests/v41-topmenu-885.test.mjs가 실제 화면에서 잰다.
   assert.match(css, /nav #record-menu #source-label\{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap\}/);
-  // 좁은 폭에서는 여전히 줄어든다(112px 상한 유지).
+  // 좁은 폭에서는 여전히 줄어든다(상한 유지).
   assert.match(css, /nav #record-menu\{width:auto;max-width:112px;/);
   // 마우스 올림·초점에 전체 이름(말줄임 보완).
   assert.match(header, /트리: \$\{displayTreeTitle\(window\.LT41\?\.tree\.title\|\|''\)\} — 다른 트리를 고릅니다\./);

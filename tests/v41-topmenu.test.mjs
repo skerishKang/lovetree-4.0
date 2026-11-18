@@ -42,14 +42,8 @@ test('트리 선택과 보기 방식이 한 틀(.tree-frame)에 붙고 이름은
   assert.match(frame, />보드<\/button>/);
   assert.match(frame, />지도<\/button>/);
   assert.doesNotMatch(frame, /기억책|기억 보드|관계 지도/);
-  // 한 틀 모양: 알약 테두리 한 줄, 보기 버튼 사이는 안쪽 구분선, 묶음 글자는 14px로 통일.
-  assert.match(css, /\.tree-frame\{display:flex;align-items:center;flex:0 0 auto;margin-left:6px;padding:1px;border:1px solid rgba\(255,255,255,\.16\);border-radius:999px/);
-  assert.match(css, /\.tree-frame \.tree-views\{margin-left:0;padding-left:0;border-left:0;gap:0;align-self:stretch;align-items:stretch;min-height:40px\}/);
-  assert.match(css, /\.tree-frame \.tree-views>button\{min-height:0;align-self:stretch;border:0;border-radius:0;font-size:14px/);
-  // 고른 탭은 묶음 안을 꽉 채운다(서재 탭과 같은 채움). 마지막 탭은 오른쪽 둥근 모서리를 따라 칠한다.
-  assert.match(css, /\.tree-frame \.tree-views>button\[aria-current=true\]\{background:var\(--lt-primary\)/);
-  assert.match(css, /\.tree-frame \.tree-views>button:last-child\[aria-current=true\]\{border-radius:0 998px 998px 0\}/);
-  assert.match(css, /\.tree-frame:has\(> \.tree-slot > #record-menu\[hidden\]\) \.tree-views>button:first-child\[aria-current=true\]\{border-radius:998px 0 0 998px\}/);
+  // 261119 대표 결정: 탭을 감싸는 판을 없애고 글자 링크로 바꿔 이 자리의 옛 규칙(알약 틀·칸 채움)은 지웠다.
+  // 지금의 숫자 계약(판 배경 없음·밑줄 2px·누름 영역 44px·⌄ 오른쪽 여백)은 tests/v41-topmenu-885.test.mjs가 실제 화면에서 잰다.
   assert.match(css, /\.main-nav>button#community-menu\{margin-left:0\}/);
   assert.match(css, /\.tree-frame \.tree-views>button#community-menu\{border-left:1px solid var\(--line\);margin-left:8px\}/);
 });
@@ -89,8 +83,7 @@ test('모바일 접기 메뉴(메뉴 더보기)도 같은 구조다', () => {
 test('간단·고급 모드와 상관없이 맨 위 메뉴 높이 규칙은 유지된다', () => {
   // 2026-11-10 메뉴 정리의 높이 규칙(최소 64px + 아래 경계선)을 그대로 둔다.
   assert.match(css, /\.app-header\{min-height:64px;padding:10px 20px/);
-  // 한 틀 안의 버튼도 40px 높이 규칙을 쓴다 — 틀이 메뉴 높이를 키우지 않는다(변경 전 65px 유지).
-  assert.match(css, /\.tree-frame \.tree-views>button\{min-height:0;align-self:stretch;/);
+  // 한 틀 안의 버튼은 44px 누름 영역을 쓴다 — 틀이 메뉴 높이를 키우지 않는다(변경 전 65px 유지).
   // 고급 기능 보기(lt-advanced)는 계정 메뉴 안의 일이라 맨 위 메뉴 구조를 바꾸지 않는다.
   assert.match(shell, /document\.body\.classList\.toggle\('lt-advanced',on\)/);
   assert.doesNotMatch(css, /\.lt-advanced [^{]*\.tree-frame/);
