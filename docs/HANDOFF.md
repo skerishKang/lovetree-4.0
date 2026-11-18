@@ -7,6 +7,13 @@
 - **실데이터 적용(판독기로 번호 확인)**: 증상을 적은 건은 일지 id=36 하나(같은 계정 의견 #20·#21·#23·#24에는 증상 없음). ops-reply로 id=36에 내부 메모 '보낸 직후에도 내 의견 목록이 바로 보이게 고쳤어요.'(reply id=37, internal) + 상태 fixed + 연결 이슈 846 — 판독기 재실행으로 DB 실값 확인.
 - **남긴 것**: ① comp2에 설치된 `/usr/local/sbin/lovetree-api-autodeploy`가 옛판이라 감시 목록에 tools/ops-reply.mjs가 없어 자동 설치가 걸리지 않았다 — 이번엔 수동 반영했고, 설치본 갱신이 필요하다. ② ops-reply 출력 문구의 authorType 고정값은 별도 PR로 바로잡는다. ③ #851은 사용자 보이는 고침이라 새 소식(updates.json) 한 줄은 소식 모아 만드는 레인 몫이다.
 
+## 2026-11-18 — #845 1단계: 창이 열려 있는 동안 첫 트리 안내 판 숨기기 (컴1로컬3, 브랜치 ai/local3-tips-845, PR 예정)
+
+- **바꾼 것**: #566의 '창 안 맨 위로 옮겨 붙이기'(.lt-tips-embedded)를 폐지했다. #845·#846 사용 일지(PR #851 캡처)에서 안내 판이 순간 추가·내 의견 창 내용 위에 포개지는 일이 반복됐다. 261118 대표 결정: 모달 창(#845 설계안의 15개)이 하나라도 열려 있는 동안은 안내 판을 숨기고(`tipsFollowDialogs`), 창이 모두 닫히면 다시 띄운다 — 이때 '봇음'으로 적지 않는다(#666 계정 메뉴 미루기와 같은 규칙, `tipsHeld` 플래그 공유). 창 열림 감지는 `panel()`(showModal 직후)·write-panel의 `onModalShown`·문서 'close' 이벤트(캡처 단계) 3곳이다. `dialog[open]`이라 새 소식 창(비모달)도 포함한다.
+- **파일**: `public/v41/shell.mjs`(tipsRestore·placeTreeTips 삭제 → tipsFollowDialogs·anyDialogOpen, showTreeTips 창 가드 추가, closeTreeTips에서 자리 돌리기 제거), `public/v41/shell.css`(.lt-tips-embedded 규칙 삭제), 시험 2파일 갱신(v41-tree-tips-549 — 숨김/복귀/봇음 미기록 + 내 의견 창 시험 추가, v41-tree-rename-tips-571 — 창 열림 동안 숨김·저장 뒤 다시 보임).
+- **실측(가짜 /api, 트리 1개·순간 1개)**: 1440·390 모두 — 창 열림 시 tipsHidden=true·.lt-tips-embedded 0·부모 body·봇음 null, 창 닫힘 → 다시 보임·봇음 여전히 null, 계정 메뉴 열림(#666)도 숨김 유지, 트리 관리 [이름 바꾸기]→저장→닫기 → 다시 보임. 캡처 2장 `E:\lovetree-qa\local3\dialogs\`(write-open-1440·myposts-open-1440). 전체 시험 1837 pass / 0 fail, build ✓, modulepreload ✓.
+- **남은 것**: ㉠CTO 캡처 확인 → squash 병합(자동 병합 없음, Refs #845) ㉑#845 설계 나머지(창 15개 겹침 규칙표·Esc/✕/뒤로가기·포커스 되돌리기 통일)는 이슈 코멘트로 기록 — 2~3단계 PR로 나눠 간다.
+
 ## 2026-11-18 — 서재 탭 구조 되돌림(감사기 3건 수리) (컴1로컬3, PR #847, d1e3e06)
 
 - CI 빨강 3개의 원인: 서재 탭을 #tree-views 밖 따로 단추(.shelf-tab)로 꺼낸 구조. main에는 원래 서재 탭이 묶음 첫 버튼이었다. 390에서는 묶음 접기 규칙(.main-nav .tree-views 숨김)이 서재 탭에 먹지 않아 테마 단추와 6px 겹침 + 단추 글자 12px(감사기 화면 실패 16건), '탭 글자 통일'·'트리 0개 탭 4개' 시험의 #tree-views 4버튼 기대와 어긋남.

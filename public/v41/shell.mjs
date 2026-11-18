@@ -213,7 +213,7 @@ const shellAuth=createAuth({
 function startLogin(intent=''){return shellAuth.startLogin(intent);}
 function openLoginStart(intent='first'){return shellAuth.openLoginStart(intent);}
 // #425: 순간 추가 한 창 — 쉬운 추가·자세한 추가를 한 창의 탭으로 오간다(shell/write-panel.mjs).
-const shellWrite=createWritePanel({$,onModalShown:()=>placeTreeTips()});
+const shellWrite=createWritePanel({$,onModalShown:()=>tipsFollowDialogs()});
 // 헤더·계정 메뉴는 shell/header.mjs가 맡는다(#231 1-B②-2). 셸은 자기 상태를 읽기 함수로 넘긴다.
 addEventListener('lovetree-auth-required',()=>shellAuth.authRequired());
 window.LT41=null;
@@ -457,9 +457,9 @@ function panel(id){const target=$(id);if(!target.open){if(target.dataset.ltPanel
  // 새 소식 창은 비모달로 연다(2026-11-16 대표 지적) — 위 메뉴가 눌리고 메뉴가 흐리게 덮이지 않는다.
  // 나머지 창은 그대로 showModal(맨 위 창 하나 규칙은 dialogs.mjs의 topDialog가 맡는다).
  if(id==='updates-panel')target.show();else target.showModal();}
- // #549: 창을 새로 띄울 때 첫 트리 안내가 이미 떠 있으면 창 안 맨 위로 옮긴다 —
- // 모달 창이 열려 있는 동안에는 창 밖 안내가 눌리지 않기 때문이다.
- placeTreeTips();}
+ // #549: 모달 창이 열려 있는 동안에는 창 밖 요소가 전부 inert가 되어 창 밖의 안내가 눌리지 않는다.
+ // 261118 대표 결정(#845): 창 안으로 옮겨 붙이지 않고, 창이 열려 있는 동안은 안내 판을 숨긴다.
+ tipsFollowDialogs();}
 // 대화상자 접근성(Tab 순환·Esc 복귀·포커스 되돌리기)은 shell/dialogs.mjs가 맡는다(#231 1-B 후속).
 const shellDialogs=createDialogs({
   $,
@@ -676,29 +676,26 @@ function links(){viewContext();const c=window.LT41;$('connections').replaceChild
  connectionShown=connectionSignature(c.tree,c.momentId);
 }
 // #213 3번: 첫 트리 안내 말풍선. 한 번만 보여 주고, 닫으면 기억한다(저장소가 막히면 다시 보여 준다).
-// #549: 순간 추가 창(showModal)이 열려 있는 동안에는 창 밖 요소가 전부 inert가 되어 '알겠어요'가
-// 눌리지 않았다(빈 알림 요소가 가로채는 것이 아니라 모달 창 자체가 누름을 막는다. 창 위에 popover로
-// 띄워도 이 크롬은 누름을 창에 막았다). 그래서 모달 창이 열려 있는 동안은 안내를 창 안 맨 위로
-// 옮겨 띄우고(placeTreeTips), 창이 닫히면 제자리로 돌려 놓는다.
+// #549: 모달 창이 열려 있는 동안에는 창 밖 요소가 전부 inert가 되어 '알겠어요'가 눌리지 않았다(빈 알림
+// 요소가 가로채는 것이 아니라 모달 창 자체가 누름을 막는다). #566에서는 창 안 맨 위로 옮겨 붙였지만
+// 안내 판이 창 내용 위에 포개지는 일이 반복됐다(#845·#846 사용 일지 — 순간 추가·내 의견 창, PR #851 캡처).
+// 261118 대표 결정: 창 안으로 옮기지 않고, 창(#845 설계안의 15개 모달 창)이 하나라도 열려 있는 동안은
+// 안내 판을 숨긴다. 창이 모두 닫히면 다시 띄우고, 이때 '봤음'으로 적지 않는다(#666의 계정 메뉴 미루기와
+// 같은 규칙 — 미뤘다고 본 것으로 치지 않는다).
 let tipsReturnFocus=null;
-const tipsBox=$('tree-tips');
-const tipsNextSibling=tipsBox?tipsBox.nextElementSibling:null;
-function tipsRestore(){
-  if(!tipsBox||!tipsBox.classList.contains('lt-tips-embedded'))return;
-  tipsBox.classList.remove('lt-tips-embedded');
-  if(tipsNextSibling&&tipsNextSibling.isConnected)document.body.insertBefore(tipsBox,tipsNextSibling);
-  else document.body.append(tipsBox);
-}
-function modalDialogOpen(){return [...document.querySelectorAll('dialog[open]')].find(d=>d.matches(':modal'))||null;}
-function placeTreeTips(){
-  const box=$('tree-tips');if(!box||box.hidden)return;
-  const dialog=modalDialogOpen();
-  if(dialog&&box.parentElement!==dialog){box.classList.add('lt-tips-embedded');dialog.prepend(box);}
-  else if(!dialog)tipsRestore();
+function anyDialogOpen(){return !!document.querySelector('dialog[open]');}
+function tipsFollowDialogs(){
+  const box=$('tree-tips');if(!box)return;
+  if(anyDialogOpen()){
+    if(!box.hidden){tipsHeld=true;box.hidden=true;}
+    return;
+  }
+  if(!tipsHeld)return;
+  tipsHeld=false;
+  syncTreeTips();
 }
 function closeTreeTips(remember=true){
   const box=$('tree-tips');if(!box||box.hidden)return;
-  tipsRestore();
   box.hidden=true;if(remember)writeTipsSeen(localStorage);
   const back=tipsReturnFocus||$('tree-views')?.querySelector('button')||$('mobile-more');tipsReturnFocus=null;
   if(back&&document.contains(back)&&!back.hidden)back.focus();
@@ -720,12 +717,11 @@ function tipsFollowAccountMenu(){
 }
 function showTreeTips(){
   const box=$('tree-tips');if(!box||!box.hidden)return;
-  if(accountMenuOpen()){tipsHeld=true;return;}
+  if(accountMenuOpen()||anyDialogOpen()){tipsHeld=true;return;}
   const list=$('tree-tips-list');
   if(list&&!list.children.length)for(const tip of FIRST_TREE_TIPS){const li=document.createElement('li');const strong=document.createElement('strong');const span=document.createElement('span');strong.textContent=tip.title;span.textContent=tip.body;li.append(strong,span);list.append(li);}
   if(!tipsReturnFocus)tipsReturnFocus=document.activeElement;
   box.hidden=false;
-  placeTreeTips();
   $('tree-tips-close')?.focus();
 }
 function syncTreeTips(){
@@ -733,15 +729,15 @@ function syncTreeTips(){
   const wanted=tipsWanted({owned:!!member?.snapshot().owned,treeCount:model?.trees?.length||0,momentCount,seen:readTipsSeen(localStorage),source});
   if(wanted)showTreeTips();else closeTreeTips(false);
 }
-// 모달 창이 열리거나 닫힐 때 안내의 자리를 다시 맞춘다(창이 열려 있으면 창 안, 없으면 제자리).
-document.addEventListener('close',()=>placeTreeTips(),true);
+// 창이 닫힐 때마다 안내를 다시 맞춘다 — 열려 있는 창이 없어지면 숨긴 안내를 다시 띄운다(#845).
+document.addEventListener('close',()=>tipsFollowDialogs(),true);
 // 계정 메뉴가 열리고 닫힐 때마다 안내와의 순서를 다시 맞춘다(메뉴를 여는 길이 여럿이라 상태 변화를 본다).
 const accountPopoverBox=$('account-popover');
 if(accountPopoverBox)new MutationObserver(()=>tipsFollowAccountMenu()).observe(accountPopoverBox,{attributes:true,attributeFilter:['hidden']});
 $('tree-tips-close')?.addEventListener('click',()=>closeTreeTips());
 // #571: 안내의 [이름 바꾸기]는 트리 관리 창을 바로 열고 이름 칸에 초점을 둔다(openTreeManager가 초점을 옮긴다).
-// 안내는 닫지 않고 그대로 둔다 — 이름 창을 닫고 돌아오면 두 번째 안내와 알겠어요가 그대로 있다.
-// 순간 추가 창이 열려 있는 동안에도 눌린다: 안내는 #566 placeTreeTips로 창 안으로 옮겨 뜬다.
+// 창이 열려 있는 동안은 안내 판이 숨고(#845), 이름 창을 닫고 돌아오면 두 번째 안내와 알겠어요가 다시 보인다 —
+// 이때 '봤음'으로 적지 않는다. 순간 추가 창이 열려 있는 동안에는 안내가 숨어 누르지 않는다(#845 결정).
 $('tree-tips-rename')?.addEventListener('click',()=>shellPanels.openTreeManager());
 // 2026-11-07: 390·360에서 탭 7개가 폭을 넘는다. 탭 줄은 가로 스크롤이고, 화면을 바꿀 때 현재 탭을 가운데로 당겨 보이게 한다.
 // 넘치는 쪽 끝에만 페이드를 켜서 잘린 것이 아니라 더 있다는 신호를 준다. 데스크톱(넓은 폭)은 스크롤이 없어 아무 일도 하지 않는다.
