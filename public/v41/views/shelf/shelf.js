@@ -50,9 +50,10 @@ import { createReader } from './shelf-reader.js';
       var coverStyle = coverStyleOf;
       function openModal(id) { $('#'+id).classList.remove('hidden'); }
       function closeModal(id) { $('#'+id).classList.add('hidden'); }
-      function renderShelf() {
-        var list=filterShelf(allBooks(), state.filter, state.query);
-        state.shelfList=list;
+       function renderShelf() {
+         var list=filterShelf(allBooks(), state.filter, state.query);
+
+         state.shelfList=list;
         state.shelfIndex=resolveShelfIndex(list, state.selectedId, state.shelfIndex);
         $('#resultCount').textContent='트리 '+list.length+'개';
         // #465: 넘길 책이 없으면(1권 이하) 좌우 넘김 화살표를 숨긴다.
@@ -206,7 +207,7 @@ import { createReader } from './shelf-reader.js';
       }
       function bind() {
         // 261118 대표 지적 3: '+ 새 트리' 입구는 오른쪽 단추(#shelfNewTree) 하나다.
-        var openNewTree=function(){parent.postMessage({type:'lt41-write',mode:'new'},location.origin);};
+        var openNewTree=function(){parent.postMessage({type:'lt41-new-tree'},location.origin);};
         var openManageTree=function(id){parent.postMessage({type:'lt41-manage-tree',treeId:id},location.origin);};
         $('#shelfRail').addEventListener('click',function(event){var railManage=event.target.closest('[data-manage-id]');if(railManage)openManageTree(railManage.dataset.manageId);});
         $('#shelfNewTree').addEventListener('click',openNewTree);
@@ -242,8 +243,20 @@ import { createReader } from './shelf-reader.js';
 // #481: 제목 보기가 바뀌면 책장의 제목(이어 읽기·표지)도 다시 그려야 한다. 다만 날짜 표기와 같은 판정으로
 // '지금 그린 값과 다르고, 기기 미러가 이미 그 값일 때'만 다시 띄운다 — 받을 때마다 새로고침하면 고리가 된다.
 const renderedTitleDisplay=titleDisplayOf((()=>{try{return parent.LT41?.prefs?.titleDisplay||'both'}catch{return 'both'}})());
+window.__shelfListenerInstalled=true;
 if(typeof addEventListener==='function')addEventListener('message',e=>{
  if(e.data?.type==='lt41-trees-renamed'){
+  var fresh=window.parent&&window.parent.LT41?window.parent.LT41.trees:null;
+  if(Array.isArray(fresh)&&fresh.length!==books.length){location.reload();return;}
+  if(Array.isArray(fresh)){
+   let changed=false;
+   for(const t of fresh){
+    const book=books.find(b=>b.id===t.id);
+    if(book&&book.name!==treeTitle(t.title)){book.name=treeTitle(t.title);changed=true;}
+   }
+   if(changed)renderShelf();
+   return;
+  }
   let changed=false;
   for(const t of (Array.isArray(e.data.titles)?e.data.titles:[])){
    const book=books.find(b=>b.id===t.id),name=treeTitle(t.title);
