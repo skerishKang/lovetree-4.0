@@ -506,6 +506,26 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     assert.equal(reactions.previewOpen, true, '카드를 누르면 둘러보기 미리보기가 열린다');
     assert.ok(reactions.open >= 1, '반응이 없으면 미리보기에서 반응 남기기 단추가 보인다');
     assert.equal(reactions.zeroChips, 0, '0짜리 반응 칩은 보이지 않는다');
+    // #903: 가입 7일 미만이 담기를 누르면 서버 안내가 담기 단추 바로 다음 줄에 뜬다 —
+    // 단추와 안내의 세로 거리를 1440·390에서 모두 12px 이하로 잰다(눈이 아니라 수치로).
+    await ctx4.route('**/api/community/shares/*/favorite', (r) => r.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ error: { code: 'vote_too_new', message: '가입하고 7일이 지나면 투표할 수 있어요.' } }) }));
+    await page4.evaluate(() => document.querySelector('#community-preview [data-community-action="favorite"]')?.click());
+    await page4.waitForFunction(() => {
+      const note = document.querySelector('#community-preview .community-vote-note');
+      return Boolean(note && !note.hidden && note.textContent.trim());
+    }, null, { timeout: 8000 });
+    const voteGap = await page4.evaluate(() => {
+      const note = document.querySelector('#community-preview .community-vote-note');
+      const fav = document.querySelector('#community-preview [data-community-action="favorite"]');
+      const a = note.getBoundingClientRect(), b = fav.getBoundingClientRect();
+      // #903 후속: 투표 막힘 안내는 미리보기 안에서 한 번만 보인다(단추 아래 칸 하나 — 상태 줄에는 내리지 않는다).
+      const texts = [...document.querySelectorAll('#community-preview p, #community-preview small, #community-preview span')]
+        .filter((node) => node.textContent.includes('가입하고 7일')).length;
+      return { gap: Math.round(a.top - b.bottom), text: note.textContent.trim(), noticeCount: texts };
+    });
+    assert.equal(voteGap.text, '가입하고 7일이 지나면 투표할 수 있어요.', '서버 안내 문구를 그대로 담기 단추 옆에 내린다');
+    assert.equal(voteGap.noticeCount, 1, '미리보기 안에 안내 문구는 하나다(상태 줄에 같은 말을 반복하지 않는다)');
+    assert.ok(voteGap.gap >= -1 && voteGap.gap <= 12, `안내가 담기 단추 바로 아래 있다(거리 ${voteGap.gap}px ≤ 12px)`);
     // 하은 1회차(261116,#728 후속): 새벽(KST 0~9시, UTC 전날)에 담은 순간의 둘러보기 카드 날짜가
     // UTC 절단('2026. 11. 15')으로 나왔다 — Asia/Seoul 시간대 문맥에서 한국 날짜로 보이는지 수치로 단정한다.
     const ctxDate = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce', timezoneId: 'Asia/Seoul' });

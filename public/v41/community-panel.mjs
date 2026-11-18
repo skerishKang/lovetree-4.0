@@ -23,12 +23,18 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
  // '이번 주 담은 사람 수'(결정 1)도 같은 규칙 — 3 이상일 때만 카드·미리보기에 한 줄로 따라온다.
  const smallCountLabel=(label,count)=>Number(count)>=3?`${label} ${count}`:label;
  const weeklyNote=item=>{const n=Number(item.stats?.weeklyFavorites||0);return n>=3?`이번 주 ${n}명`:'';};
- function statButton(item,kind,label){
-  if(kind==='reaction')return reactionButtons(item,label);
+ // #903: 담기·공감이 서버에 막히면(가입 7일 미만 등) 서버 문구를 단추 바로 다음 줄 안내 칸에도 내린다 —
+ // 누른 자리에서 바로 이유를 보게 한다. 칸은 미리보기를 그릴 때 actions 다음에 미리 두고(hidden),
+ // 막혔을 때만 보여 준다. 담기에 성공하면 render()가 미리보기를 다시 그려 안내가 지워진다.
+ const setVoteNote=(note,text)=>{if(!note)return;note.textContent=text;note.hidden=false;};
+ // 투표 막힘(가입 7일 미만)은 단추 아래 안내 칸 하나만 내리고 상태 줄은 그대로 둔다(#903) — 다른 실패는 상태 줄로.
+ const voteBlocked=answer=>answer?.code==='vote_too_new';
+ function statButton(item,kind,label,voteNote){
+  if(kind==='reaction')return reactionButtons(item,label,voteNote);
   const active=kind==='favorite'?item.stats.favored:item.stats.hearted,count=kind==='favorite'?item.stats.favorites:item.stats.hearts,b=el('button','community-mini',`${active?'✓ ':''}${smallCountLabel(label,count)}`);b.type='button';b.dataset.communityAction=kind;b.setAttribute('aria-pressed',String(active));
-  b.onclick=async()=>{const answer=await api.favorite(item.shareId,!active);if(!answer.ok){message(loginMessage(answer));return;}item.stats=answer.stats;render();};return b;
+  b.onclick=async()=>{const answer=await api.favorite(item.shareId,!active);if(!answer.ok){const text=loginMessage(answer);if(voteBlocked(answer))setVoteNote(voteNote,text);else message(text);return;}item.stats=answer.stats;render();};return b;
  }
- function reactionButtons(item,label){
+ function reactionButtons(item,label,voteNote){
   const kinds=['heart','like','love','laugh','wow','sad','angry'];
   const labels={heart:'공감',like:'좋아요',love:'사랑',laugh:'웃음',wow:'놀람',sad:'슬픔',angry:'화남'};
   const host=el('span','community-reaction-group');host.setAttribute('role','group');host.setAttribute('aria-label',label||'반응');
@@ -44,7 +50,7 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
     if(!count&&!isActive)continue;
     const b=el('button','community-mini community-reaction',`${isActive?'✓ ':''}${smallCountLabel(labels[reactionKind]||reactionKind,count)}`);
     b.type='button';b.dataset.reactionKind=reactionKind;b.dataset.communityAction='reaction';b.setAttribute('aria-pressed',String(isActive));
-    b.onclick=async()=>{const answer=await api.react(item.shareId,!isActive,reactionKind);if(!answer.ok){message(loginMessage(answer));return;}item.stats=answer.stats;render();};
+    b.onclick=async()=>{const answer=await api.react(item.shareId,!isActive,reactionKind);if(!answer.ok){const text=loginMessage(answer);if(voteBlocked(answer))setVoteNote(voteNote,text);else message(text);return;}item.stats=answer.stats;render();};
     out.push(b);
    }
    return out;
@@ -144,12 +150,15 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
   const subject=el('p','community-preview-subject',item.subject||''),moment=el('p','community-preview-moment-title',item.cover?.title||'공개된 순간');
   const summary=item.summary?el('p','community-preview-summary',item.summary):null;
   const weekly=weeklyNote(item),meta=el('p','community-preview-meta',`${item.cover?.emotion||item.emotions?.[0]||'공개'} · ${when(item.createdAt)} · ${smallCountLabel('공감',item.stats?.hearts||0)}${weekly?` · ${weekly}`:''}`);
-  const actions=el('div','community-preview-actions');actions.append(statButton(item,'favorite','즐겨찾기'),statButton(item,'reaction','공감'));
+  const actions=el('div','community-preview-actions');
+  // #903: 안내 칸은 actions 바로 다음 줄자리에 미리 두고(hidden) 막혔을 때만 보인다 — 격자 간격이 흔들리지 않게.
+  const voteNote=el('p','community-vote-note');voteNote.setAttribute('role','status');voteNote.hidden=true;
+  actions.append(statButton(item,'favorite','즐겨찾기',voteNote),statButton(item,'reaction','공감',voteNote));
   const open=el('button','community-preview-open','대표 순간부터 감상');open.type='button';open.onclick=()=>onOpenShare(item);
   const start=el('button','community-preview-start','내 기록 새로 시작');start.type='button';start.onclick=()=>onStartRecord(item.subject);
   const status=el('p','community-preview-message','');status.dataset.communityPreviewMessage='';status.setAttribute('role','status');
   const choices=el('div','community-preview-choices');choices.append(open,start);
-  body.append(title,subject,moment);if(summary)body.append(summary);body.append(meta,actions,choices,moreMenu(item),status);
+  body.append(title,subject,moment);if(summary)body.append(summary);body.append(meta,actions,voteNote,choices,moreMenu(item),status);
   preview.replaceChildren(head,renderCover(item,{loading:'eager'}),body);
  }
  function openPreview(item){selectedId=item.shareId;renderPreview(item);if(!preview.open)preview.showModal();}
