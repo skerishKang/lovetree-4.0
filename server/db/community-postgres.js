@@ -191,6 +191,35 @@ export function createCommunityRepo(pool){
    const {rows}=await pool.query(`SELECT share_id FROM lovetree_community_favorites WHERE product_id=$1 AND subject_id=$2 ORDER BY created_at DESC LIMIT 200`,[productId,subjectId]);
    return rows.map(row=>row.share_id);
   },
+  // 투표 기록(#824 대표 결정). append-only — 이미 표가 있으면 아무것도 하지 않고 '이미 있다'로 돌려 준다
+  // (1인 1표 영구: 해제·재담기를 반복해도 새 표로 세지 않는다). 대상 종류는 'tree'(공개 트리 카드)와
+  // 'stage'(무대 영상 — #792 4단계와 함께) 둘 다 받는다.
+  async recordVote({productId,targetKind,targetId,subjectId}){
+   const {rowCount}=await pool.query(
+    `INSERT INTO lovetree_community_votes(product_id,target_kind,target_id,subject_id) VALUES($1,$2,$3,$4) ON CONFLICT DO NOTHING`,
+    [productId,targetKind,targetId,subjectId]
+   );
+   return {recorded:rowCount===1};
+  },
+  async hasVoted({productId,targetKind,targetId,subjectId}){
+   const {rows}=await pool.query(
+    `SELECT EXISTS(SELECT 1 FROM lovetree_community_votes WHERE product_id=$1 AND target_kind=$2 AND target_id=$3 AND subject_id=$4) AS voted`,
+    [productId,targetKind,targetId,subjectId]
+   );
+   return !!rows[0]?.voted;
+  },
+  // 이번 주(주 시작 시각 since 이후) 대상별 표 수. 주 경계(월~일 KST)는 부르는 쪽이 정해 since로 넘긴다
+  // — 주 규칙을 SQL 곳곳에 복제하지 않게 하려는 것이다(#824 결정 4).
+  async weeklyVoteCounts({productId,targetKind,since}){
+   const {rows}=await pool.query(
+    `SELECT target_id, count(*)::int AS n FROM lovetree_community_votes
+      WHERE product_id=$1 AND target_kind=$2 AND voted_at >= $3 GROUP BY target_id`,
+    [productId,targetKind,since]
+   );
+   const counts={};
+   for(const row of rows)counts[row.target_id]=Number(row.n);
+   return counts;
+  },
   async setReaction({productId,shareId,subjectId,enabled,kind='heart'}){
    if(enabled) await pool.query(`INSERT INTO lovetree_community_reactions(product_id,share_id,subject_id,kind) VALUES($1,$2,$3,$4) ON CONFLICT DO NOTHING`,[productId,shareId,subjectId,kind]);
    else await pool.query(`DELETE FROM lovetree_community_reactions WHERE product_id=$1 AND share_id=$2 AND subject_id=$3 AND kind=$4`,[productId,shareId,subjectId,kind]);

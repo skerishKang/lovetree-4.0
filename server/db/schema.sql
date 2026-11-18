@@ -144,6 +144,24 @@ CREATE TABLE IF NOT EXISTS lovetree_community_favorites (
 CREATE INDEX IF NOT EXISTS lovetree_community_favorites_owner_idx
   ON lovetree_community_favorites (product_id, subject_id, created_at DESC);
 
+-- 투표 기록(#824 대표 결정 2026-11-18, docs/METRICS.md). '담은 사람 수'를 이번 주로 세는 근원 표다.
+-- 즐겨찾기 표는 해제 때 행을 지우므로(community-postgres.js setFavorite) 여기는 append-only로 남긴다 —
+-- 해제·재담기를 반복해도 표는 하나다(1인 1표 영구). 대상은 두 벌이다:
+--   target_kind='tree'  → 공개 트리 카드 투표(target_id = share_id, 1차 — 기존 담기 기반)
+--   target_kind='stage' → 무대 영상 투표(target_id = 무대 묶음 기준 키, 2차 — #792 4단계와 함께)
+-- 구조는 처음부터 둘 다 담을 수 있게 잡았다(2차 때 표 구조 변경 없음). 투표 가능 시점(가입 7일) 검사는
+-- 서비스 계층이 account_emails.created_at 으로 한다(이 표와 무관).
+CREATE TABLE IF NOT EXISTS lovetree_community_votes (
+  product_id text NOT NULL,
+  target_kind text NOT NULL CHECK (target_kind IN ('tree','stage')),
+  target_id text NOT NULL,
+  subject_id text NOT NULL,
+  voted_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (product_id, target_kind, target_id, subject_id)
+);
+CREATE INDEX IF NOT EXISTS lovetree_community_votes_week_idx
+  ON lovetree_community_votes (product_id, target_kind, voted_at);
+
 CREATE TABLE IF NOT EXISTS lovetree_community_reactions (
   product_id text NOT NULL,
   share_id text NOT NULL,
