@@ -7,7 +7,7 @@ export function createMemberSession({api,onState=()=>{},onStatus=()=>{},navigate
  let document=EMPTY_STATE(),subject=null,bound=false,active=true,mismatch=false;
  const wrapped={get:async()=>{const result=await api.get();if(!active)return {ok:false,status:401};
    if(result.ok){if(subject&&subject!==result.subject){mismatch=true;bound=false;return {ok:false,status:401,code:'account_changed'};}subject=result.subject;bound=result.writeSubjectBound===true&&typeof subject==='string'&&!!subject;}return result;},
- put:body=>{if(!active||!bound||mismatch||!subject)return Promise.resolve({ok:false,status:401});return api.put({...body,expectedSubject:subject});},logout:()=>api.logout()};
+ put:(body,options)=>{if(!active||!bound||mismatch||!subject)return Promise.resolve({ok:false,status:401});return api.put({...body,expectedSubject:subject},options);},logout:()=>api.logout()};
  const sync=createSyncController({getState:()=>document,replaceState:s=>{if(!active)return;document=validateState(s);onState(structuredClone(document));},api:wrapped,draftStorage,cacheStorage,delay,makeClientKey,navigate:url=>navigate(url.startsWith('/auth/login')?'/auth/login?next=/v41/':url),onChange:s=>{if(active)onStatus({...s,writable:sync.snapshot().owned&&bound&&!mismatch,dirty:sync.snapshot().dirty});}});
  // 이슈 644 3번: 탭을 다시 보거나 창으로 돌아오면 최신 기록을 확인한다. 이 화면에서 고친 게 없을 때만
  // 조용히 최신 기록을 불러온다(띠 없음) — 확인 자체는 sync 컨트롤러의 check()가 판정한다. 4초에 한 번 넘지 않게 쉰다.
@@ -18,8 +18,16 @@ export function createMemberSession({api,onState=()=>{},onStatus=()=>{},navigate
    lastQuietCheck = at;
    void sync.check();
  };
- const onVisible = () => { if (globalThis.document?.visibilityState === 'visible') quietCheck(); };
+ // 숨김·닫힘 때 아직 서버에 못 보낸 바뀜을 즉시 보낸다(창 닫힘 유실 막음 — 운영센터 의견 #35).
+ // 담은 직후 꼬리표 칩을 확정하고 900ms 저장 대기 안에 창을 닫으면(탭 닫기·앱 전환·휴대폰 화면 꺼짐)
+ // 저장이 영영 사라졌다. keepalive로 보내므로 창이 닫혀도 요청은 끝까지 나간다.
+ const onHide = () => { sync.flushOnHide(); };
+ const onVisible = () => {
+   if (globalThis.document?.visibilityState === 'visible') { quietCheck(); return; }
+   onHide();
+ };
  globalThis.document?.addEventListener?.('visibilitychange', onVisible);
+ globalThis.addEventListener?.('pagehide', onHide);
  globalThis.addEventListener?.('focus', quietCheck);
  function apply(action,input={},selection={}){
    const snap=sync.snapshot();if(!active||!snap.owned||!bound||mismatch||['checking','login','conflict'].includes(sync.status().phase))throw Error('먼저 내 기록을 불러오고 저장 연결을 확인해 주세요.');
@@ -85,5 +93,5 @@ export function createMemberSession({api,onState=()=>{},onStatus=()=>{},navigate
    }
    document=validateState({version:1,trees,prefs:document.prefs});onState(structuredClone(document),{treeId,momentId});sync.markLocalSave();return {treeId,momentId};
  }
- return {start:()=>sync.start(),apply,act:name=>sync.act(name),snapshot:()=>({...sync.snapshot(),subject,writable:sync.snapshot().owned&&bound&&!mismatch,phase:sync.status().phase}),state:()=>structuredClone(document),dispose:()=>{active=false;bound=false;globalThis.document?.removeEventListener?.('visibilitychange',onVisible);globalThis.removeEventListener?.('focus',quietCheck);},status:()=>sync.status()};
+ return {start:()=>sync.start(),apply,act:name=>sync.act(name),flushOnHide:()=>sync.flushOnHide(),snapshot:()=>({...sync.snapshot(),subject,writable:sync.snapshot().owned&&bound&&!mismatch,phase:sync.status().phase}),state:()=>structuredClone(document),dispose:()=>{active=false;bound=false;globalThis.document?.removeEventListener?.('visibilitychange',onVisible);globalThis.removeEventListener?.('pagehide',onHide);globalThis.removeEventListener?.('focus',quietCheck);},status:()=>sync.status()};
 }

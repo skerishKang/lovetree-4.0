@@ -237,6 +237,15 @@ import { createReader } from './shelf-reader.js';
 // '지금 그린 값과 다르고, 기기 미러가 이미 그 값일 때'만 다시 띄운다 — 받을 때마다 새로고침하면 고리가 된다.
 const renderedTitleDisplay=titleDisplayOf((()=>{try{return parent.LT41?.prefs?.titleDisplay||'both'}catch{return 'both'}})());
 if(typeof addEventListener==='function')addEventListener('message',e=>{
+ if(e.data?.type==='lt41-trees-renamed'){
+  let changed=false;
+  for(const t of (Array.isArray(e.data.titles)?e.data.titles:[])){
+   const book=books.find(b=>b.id===t.id),name=treeTitle(t.title);
+   if(book&&book.name!==name){book.name=name;changed=true;}
+  }
+  if(changed)renderShelf();
+  return;
+ }
  if(e.data?.type!=='lt41-title-display')return;
  let mirror=null;try{mirror=localStorage.getItem('lt41.titleDisplay');}catch{}
  if(shouldReloadForTitleDisplay({value:e.data.value,rendered:renderedTitleDisplay,mirror}))location.reload();

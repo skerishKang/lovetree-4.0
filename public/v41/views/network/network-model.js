@@ -262,23 +262,32 @@ window.LT56Model = (() => {
     // 색·범례가 뜻하는 대상이 없어 화면에 내지 않는다(network.js가 hubs가 비었을 때 치운다).
     const tree = bfsOrder(moments, edgesOf(opts), opts.fanMin ?? 8);
     if (tree.fanHeavy) return fanLayout(moments, box, opts, tree, { maxR, firstR, gap, hubR, inset });
+    // #869: 묶음 점(타원 가운데)부터 영역 안쪽 여백(가로·세로 10% 이상) 안에 앉힌다 — 묶음 칸이 상자 전체(작은 트리)이거나
+    // 가장자리 칸이면 타원이 상자 끝까지 늘어나 노드가 모서리에 붙고 시작 순간에서 뻗는 선이 화면 끝·하단 링크 줄까지 갔다.
+    // 묶음 점이 안쪽에 모이면 노드도 묶음 원·시작 노드 근처에 모인다.
+    const mx = box.w * 0.1, my = box.h * 0.1, iw = box.w - 2 * mx, ih = box.h - 2 * my;
     const hubs = [];
     for (let i = 0; i < k; i++) {
       const row = Math.floor(i / cols), inRow = Math.min(cols, k - row * cols);
       let col = i - row * cols;
       if (row % 2) col = inRow - 1 - col;
       const shift = (cols - inRow) / 2;
-      hubs.push({ x: box.x + (col + shift + 0.5) * cw, y: box.y + (row + 0.5) * ch, w: cw, h: ch });
+      hubs.push({ x: box.x + mx + (col + shift + 0.5) * (iw / cols), y: box.y + my + (row + 0.5) * (ih / rows), w: iw / cols, h: ih / rows });
     }
     // 칸 안 타원: 가장자리에서 inset+점 반지름만큼 들어오고(위아래는 맨 위에 앉는 첫 순간의 고리 firstR까지), 납작함은 2배까지만.
     let rx = Math.max(6, cw / 2 - inset - maxR), ry = Math.max(6, ch / 2 - Math.max(inset + maxR, firstR + 2));
     rx = Math.min(rx, ry * 2); ry = Math.min(ry, rx * 2);
+    // #869: 타원도 안쪽 여백 안에 머물게 한다. 이웃 묶음이 있으면 타원 꼭대기 둘이 맞닿지 않을 간격(점 반지름+간격의 절반)까지 막는다.
+    const gx = cols > 1 ? iw / cols / 2 - maxR - gap / 2 : Infinity;
+    const gy = rows > 1 ? ih / rows / 2 - maxR - gap / 2 : Infinity;
     const points = {}, firstIdx = Math.max(0, moments.findIndex(m => m.first));
     moments.forEach((m) => {
       const { g, j, size } = slot[m.id] || { g: 0, j: 0, size: 1 }, c = hubs[g];
       const th = -Math.PI / 2 + (2 * Math.PI * j) / size;
       const f = size === 1 ? 0.55 : 1;
-      points[m.id] = { x: c.x + Math.cos(th) * rx * f, y: c.y + Math.sin(th) * ry * f };
+      const rX = Math.max(6, Math.min(rx, gx, c.x - (box.x + mx), (box.x + box.w - mx) - c.x));
+      const rY = Math.max(6, Math.min(ry, gy, c.y - (box.y + my), (box.y + box.h - my) - c.y));
+      points[m.id] = { x: c.x + Math.cos(th) * rX * f, y: c.y + Math.sin(th) * rY * f };
     });
     // 점 반지름: 이웃(같은 묶음)·묶음 점과 gap 이상 떨어지는 가장 큰 값(2.5~maxR).
     const ids = moments.map(m => m.id);
@@ -301,7 +310,7 @@ window.LT56Model = (() => {
       return true;
     };
     while (dotR > 2.5 && !fits(dotR)) dotR -= 0.25;
-    return { points, hubs, groupSize: gs, cols, rows, cell: { w: cw, h: ch }, rx, ry, dotR, hubR, box };
+    return { points, hubs, groupSize: gs, cols, rows, cell: { w: iw / cols, h: ih / rows }, rx, ry, dotR, hubR, box };
   }
 
   // #583 부채꼴 배치: 가장 많이 이어진 순간(첫 순간)을 상자 가운데에 두고, 나머지 순간을 상자에 맞춘
@@ -312,6 +321,9 @@ window.LT56Model = (() => {
     const { maxR, firstR, gap, hubR, inset } = sizes, n = moments.length;
     let rx = Math.max(6, box.w / 2 - inset - maxR), ry = Math.max(6, box.h / 2 - Math.max(inset + maxR, firstR + 2));
     rx = Math.min(rx, ry * 2); ry = Math.min(ry, rx * 2);
+    // #869: 그물 보기의 부채꼴 나무도 노드를 영역 안쪽 여백(가로·세로 10% 이상) 안에 둔다 —
+    // 타원이 상자 끝까지 늘어나 선이 화면 끝·하단 링크 줄까지 뻗던 모양을 막는다.
+    rx = Math.max(6, Math.min(rx, box.w * 0.4)); ry = Math.max(6, Math.min(ry, box.h * 0.4));
     const center = { x: box.x + box.w / 2, y: box.y + box.h / 2 };
     const points = {};
     tree.order.forEach((id, j) => {

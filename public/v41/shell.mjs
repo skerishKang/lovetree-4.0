@@ -84,7 +84,7 @@ async function runTitleBackfill(state,session){
 }
 function themedView(){return themedViewFor(current);}
 function applyTheme(theme=readTheme(localStorage)){return applyThemeFor(current,theme);}
-function toggleTheme(){return toggleThemeFor(current);}
+function toggleTheme(){const theme=toggleThemeFor(current);syncBoardThemeToApp(theme);return theme;}
 const moreButton=$('mobile-more'),moreMenu=$('header-overflow');
 const treePopover=$('tree-popover'),treeTrigger=$('record-menu');
 function closeMore(){moreMenu.classList.remove('is-open');moreMenu.hidden=true;moreButton.setAttribute('aria-expanded','false');}
@@ -166,7 +166,14 @@ $('record-menu').addEventListener('click',event=>{event.stopPropagation();if(tre
 if(treePopover)treePopover.addEventListener('keydown',event=>{const items=[...treePopover.querySelectorAll('button')];const at=items.indexOf(document.activeElement);if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();const next=event.key==='ArrowDown'?(at+1)%items.length:(at-1+items.length)%items.length;items[next]?.focus();}else if(event.key==='Home'){event.preventDefault();items[0]?.focus();}else if(event.key==='End'){event.preventDefault();items.at(-1)?.focus();}});
 document.addEventListener('click',event=>{if(treePopover&&!treePopover.hidden&&!event.target.closest('.tree-slot'))closeTreeMenu();});
 document.addEventListener('keydown',event=>{if(event.key==='Escape'&&treePopover&&!treePopover.hidden){closeTreeMenu();treeTrigger.focus();}});
-addEventListener('lt41-trees-changed',()=>{if(treePopover&&!treePopover.hidden)renderTreeMenu();paintQuickTargetControls();});
+addEventListener('lt41-trees-changed',()=>{
+ if(treePopover&&!treePopover.hidden)renderTreeMenu();
+ paintQuickTargetControls();
+ try {
+  const titles=(window.LT41?.trees||[]).map(t=>({id:t.id,title:t.title}));
+  for(const f of frames()) f?.postMessage({type:'lt41-trees-renamed',titles},location.origin);
+ } catch {}
+});
 $('mobile-more').addEventListener('click',event=>{
  event.stopPropagation();
  if(moreMenu.hidden){buildFoldMenu();moreMenu.hidden=false;moreMenu.classList.add('is-open');moreButton.setAttribute('aria-expanded','true');}
@@ -1008,7 +1015,7 @@ function applyAdvanced(){const on=readAdvanced();document.body.classList.toggle(
 // #368: 설정 "내 데이터"의 내 보관 파일 열기. 창 위에 보관 파일 창이 열리고 닫으면 이 버튼으로 초점이 돌아온다.
 $('settings-assets-open').onclick=()=>openAssets($('settings-assets-open'));
  $('editor-assets-open').onclick=()=>openAssets($('editor-assets-open'));
- for(const b of document.querySelectorAll('[data-set-theme]'))b.onclick=()=>{writeTheme(localStorage,b.dataset.setTheme);applyTheme();paintThemeControls();};
+ for(const b of document.querySelectorAll('[data-set-theme]'))b.onclick=()=>{writeTheme(localStorage,b.dataset.setTheme);applyTheme();paintThemeControls();syncBoardThemeToApp(b.dataset.setTheme);};
 const themeToggleTop=$('theme-toggle');if(themeToggleTop)themeToggleTop.onclick=()=>{toggleTheme();};
  // 고급 기능 보기 스위치는 설정 '화면' 탭의 '더 보기(고급)' 안에 있다(2026-11-16 계정 메뉴에서 옮김). 저장 키(lt41.advanced.<subject>)는 그대로다.
  $('settings-advanced').onclick=()=>{const next=!readAdvanced();try{localStorage.setItem(advancedKey(),next?'1':'0')}catch{}applyAdvanced();};
@@ -1297,8 +1304,11 @@ for(const b of document.querySelectorAll('[data-page-turn]'))b.onclick=()=>{
 paintPageTurnControls();
 // #467: 보드 판 테마(종이/밤) — 이 기기에만 저장한다(localStorage lt41.boardTheme). 기본은 종이이고,
 // 바꾸면 열린 보드·지도에 바로 반영한다(프레임 속성 + lt41-board-theme 메시지).
+// #853(도현 1~2회차): 기본값은 사용자 테마를 따른다 — 밤 테마면 밤 판, 정원(낮)이면 종이 판.
+// 사용자가 [종이|밤]으로 직접 고른 값은 저장해 계속 쓰고, 앱 테마를 바꾸면(syncBoardThemeToApp)
+// 다시 그 테마에 맞는 판으로 함께 바뀐다.
 const BOARD_THEME_KEY='lt41.boardTheme';
-function currentBoardTheme(){try{return localStorage.getItem(BOARD_THEME_KEY)==='night'?'night':'paper'}catch{return 'paper'}}
+function currentBoardTheme(){try{const saved=localStorage.getItem(BOARD_THEME_KEY);if(saved==='night'||saved==='paper')return saved;return readTheme(localStorage)==='garden'?'paper':'night'}catch{return 'night'}}
 function paintBoardThemeControls(){const value=currentBoardTheme();for(const b of document.querySelectorAll('button[data-board-theme]'))b.setAttribute('aria-checked',String(b.dataset.boardTheme===value));}
 function applyBoardThemeToFrame(frame){
  const message=frameMessage('boardTheme',currentBoardTheme());
@@ -1312,6 +1322,14 @@ for(const b of document.querySelectorAll('button[data-board-theme]'))b.onclick=(
  for(const f of frames())applyBoardThemeToFrame(f);
  notify(next==='night'?'보드·지도 판을 밤 테마로 바꿨어요.':'보드·지도 판을 종이 테마로 바꿨어요.');
 };
+// #853: 앱 테마(밤/정원)를 바꾸면 보드·지도 판도 그 테마에 맞춘다 — 밤이면 밤 판, 정원이면 종이 판.
+// 열린 화면에 바로 반영하고 저장해 두어 다음에 뜨는 보드·지도도 같은 값을 쓴다.
+function syncBoardThemeToApp(theme){
+ const plate=theme==='garden'?'paper':'night';
+ try{localStorage.setItem(BOARD_THEME_KEY,plate)}catch{}
+ paintBoardThemeControls();
+ for(const f of frames())applyBoardThemeToFrame(f);
+}
 paintBoardThemeControls();
 window.addEventListener('message',e=>{
  if(e.origin!==location.origin)return;

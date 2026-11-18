@@ -107,3 +107,46 @@ test('reparent preserves selection, descendants, links, retry, and reload',async
   assert.equal(tree.moments.find(moment=>moment.id===b.momentId).parentId,a.momentId);
   validateState(restored.state());
 });
+
+// 창 닫힘 유실(운영센터 의견 #35): 담은 직후 꼬리표 칩을 확정하면 저장은 900ms 대기에 들어가고,
+// 그 안에 창이 닫히면(탭 닫기·앱 전환·휴대폰 화면 꺼짐) 칩은 '확정'으로 보였지만 요청은 나가지 않았다.
+// 페이지가 숨거나 닫히는 순간 flushOnHide()가 keepalive로 즉시 보낸다 — 재현은 순간 담기(boardSync와 같은
+// 저장 대기)로 하고, 숨김 신호 대신 셸이 부르는 것과 같은 flushOnHide()를 직접 누른다.
+test('담은 직후 꼬리표 확정 뒤 창이 닫혀도(숨겨져도) 아직 못 보낸 저장을 즉시 보낸다',async()=>{
+  const {session,writes}=setup();
+  await session.start();
+  const made=session.apply('quickAdd',{url:'https://www.youtube.com/watch?v=gdZLi9oWNZg'});
+  assert.equal(writes.length,0,'900ms 저장 대기 중에는 요청이 나가지 않는다(창 닫힘 전 상태)');
+  const sent=session.flushOnHide();
+  assert.equal(sent,true,'숨김 때 못 보낸 저장을 즉시 보낸다');
+  await session.act('noop').catch(()=>{});
+  assert.equal(writes.length,1,'keepalive 저장 1회');
+  assert.equal(writes[0].state.trees.find(t=>t.id===made.treeId).moments.find(m=>m.id===made.momentId).keywords,undefined,'담은 순간 자체가 서버에 도달한다');
+});
+test('보낼 것이 없으면 숨김 때 요청을 보내지 않는다',async()=>{
+  const {session,writes}=setup();
+  await session.start();
+  assert.equal(session.flushOnHide(),false);
+  assert.equal(writes.length,0);
+});
+test('숨김 저장은 keepalive로 보낸다 — api.put에 keepalive 표시가 함께 간다',async()=>{
+  const seen=[];
+  const server={version:1,trees:[]};let revision=0;
+  const api={get:async()=>({ok:true,revision,state:server,subject:'member-A',writeSubjectBound:true}),
+    put:async(body,options)=>{seen.push(options||null);server=structuredClone(body.state);return {ok:true,revision:++revision};},
+    logout:async()=>({ok:true})};
+  const session=createMemberSession({api,delay:()=>new Promise(()=>{}),makeClientKey:()=>'key-1'});
+  await session.start();
+  session.apply('quickAdd',{url:'https://www.youtube.com/watch?v=gdZLi9oWNZg'});
+  session.flushOnHide();
+  assert.equal(seen.length,1);
+  assert.equal(seen[0]?.keepalive,true,'창이 닫혀도 요청이 끝까지 나가는 keepalive다');
+});
+test('keepalive 한도(64KB)를 넘는 큰 기록은 숨김 저장을 건너뛴다 — 기존 900ms 저장이 맡는다',async()=>{
+  const {session,writes}=setup();
+  await session.start();
+  const first=session.apply('new',fields);
+  for(let i=0;i<130;i++)session.apply('add',{...fields,title:'',note:'가'.repeat(500)},first);
+  assert.equal(session.flushOnHide(),false,'한도를 넘으면 보내지 않는다');
+  assert.equal(writes.length,0);
+});

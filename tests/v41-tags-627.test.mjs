@@ -253,6 +253,16 @@ test('제목 해석의 한계(문서화한 대로) — 멤버 사전이 없으�
 });
 
 // ── #627 2차: 가수 종류와 제목 해석 다듬기 ─────────────────────────────────────────
+test('#856: 값이 실질적으로 빈 꼬리표는 카드·상세 칩에도 보이지 않는다(데이터는 그대로)', () => {
+  // '가수: .'처럼 tagKey가 ''가 되는 값은 지도 그래프에서 이미 숨긴다 — 카드·상세 칩도 같은 판정을 쓴다.
+  const keywords = ['가수:아이유', '가수: .', '노래:Love wins'];
+  assert.deepEqual(cardTags(keywords).map((t) => t.value), ['아이유', 'Love wins'], "'.' 칩은 카드에 없다");
+  const line = tagLineChips({ keywords, title: '' });
+  assert.deepEqual(line.confirmed.map((c) => c.value), ['아이유', 'Love wins'], '상세 꼬리표 줄에도 이름 없는 칩은 없다');
+  // 칩을 숨긴다고 저장 값이 줄지 않는다 — 이 함수들은 화면에 보일 목록만 정한다.
+  assert.equal(keywords.length, 3);
+});
+
 test('가수 종류: 접두어는 3자라 값 예산이 21자로 노래·멤버와 같다(24자 한도는 그대로)', () => {
   assert.equal(makeTag('artist', 'Hearts2Hearts'), '가수:Hearts2Hearts');
   assert.equal(parseTag('가수:RESCENE').kindId, 'artist');
@@ -931,6 +941,15 @@ test('하은2회차 손질 ②: 저장이 실패하면 누른 칩만 꺼진다 �
   assert.deepEqual(commits[1], ['노래:Supernova', '가수:ILLIT'], '실패 뒤 칩은 꺼진 모양이다 — 켜진 채면(예전) 다시 누름이 또 끄기가 된다');
   assert.equal(err.hidden, false, '실패 문구는 계속 보인다');
   assert.equal(line.momentId, 'm1');
+});
+
+test('영문 병기 괄호 안 단어는 멤버 후보가 아니다(도현 1-2)', () => {
+  const title = 'BTS (방탄소년단) "피 땀 눈물 (Blood Sweat & Tears)" Official MV';
+  const plain = suggestTagsFromTitle(title).proposals.map((p) => p.raw);
+  const reused = suggestTagsFromTitle(title, { knownTags: ['멤버:Tears'] }).proposals.map((p) => p.raw);
+  assert.deepEqual(plain, ['가수:BTS', '노래:피 땀 눈물']);
+  assert.deepEqual(reused, ['가수:BTS', '노래:피 땀 눈물'], '재사용으로도 멤버 후보가 살아나지 않는다');
+  assert.equal(reused.filter((raw) => raw.startsWith('member:')).length, 0, '멤버 후보 0개');
 });
 
 // 하은 2회차 손질 ①: 실패 문구가 고정 단추(쉬운 추가의 '담기')에 가리지 않게 — 문구를 눈앞으로 데려온다.

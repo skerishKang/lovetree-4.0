@@ -48,6 +48,18 @@ test('허브는 같은 값이 순간 2개 이상일 때만 — 1개뿐인 값은
   assert.deepEqual(a2.alsoHubIds, [], '1개뿐인 노래:With는 허브가 아니라 함께 속함에도 없다');
 });
 
+test('이름 없는 묶음은 만들지 않는다 — 값이 실질적으로 빈 꼬리표(점·기호뿐)는 허브 후보에서 뺀다(#854)', () => {
+  // '가수: .'같은 꼬리표는 tagKey가 ''가 되어 범례에 이름 없는 색 점을 남겼다.
+  const graph = buildGraph([
+    M('b1', '2026-11-01', [artist('아이유'), artist('.')]),
+    M('b2', '2026-11-02', [artist('아이유'), artist('.')]),
+  ]);
+  assert.deepEqual(graph.hubs.map((h) => [h.kindId, h.value]), [['artist', '아이유']], '이름이 서는 묶음만 남는다');
+  assert.ok(graph.hubs.every((h) => String(h.value).trim() !== ''), '이름 없는 허브 0');
+  const b1 = graph.moments.find((m) => m.id === 'b1');
+  assert.equal(b1.hubId, 'artist:아이유', '이름 없는 값은 소속으로도 섞지 않는다');
+});
+
 test('순간 10개: 꼬리표로 허브·1차 소속·함께 속함·선반이 만들어진다', () => {
   const moments = [
     M('s1', '2026-11-05', [stage('쇼챔피언'), song('15-LOVE'), artist('RESCENE'), member('지우')]),

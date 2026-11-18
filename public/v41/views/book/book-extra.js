@@ -497,6 +497,14 @@ function paintTreeTitles(){
  if(document.body.dataset.treeName!==name)document.body.dataset.treeName=name;
 }
 paintTreeTitles();
+if(typeof addEventListener==='function')addEventListener('message',e=>{
+ if(e.data?.type!=='lt41-trees-renamed')return;
+ const current=window.parent&&window.parent.LT41?window.parent.LT41.tree:null;
+ const fresh=(Array.isArray(e.data.titles)?e.data.titles:[]).find(t=>t.id===current?.id);
+ if(!fresh)return;
+ LTDEMO.title=fresh.title;
+ paintTreeTitles();
+});
 mountTips();
 /* 원본 화면은 이 모듈보다 먼저 한 번 그린다. 새 규칙으로 다시 그린다(저장·선택은 그대로). */
 /* #295 보완: 넘침 판정을 렌더 때만 하면 이미지가 늦게 로드되어 페이지가 나중에 넘칠 때 다시 잘린다.

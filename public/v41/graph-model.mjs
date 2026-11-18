@@ -77,6 +77,9 @@ export function buildGraph(moments) {
     const seen = new Set();
     for (const t of listOf(m.keywords)) {
       if (!HUB_KIND_IDS.includes(t.kindId)) continue;
+      // #854: 값이 실질적으로 빈 꼬리표('가수: .'처럼 종류 접두어 뒤에 점·기호만 남은 것)는 이름 없는
+      // 묶음이 된다 — 범례에 이름 없는 색 점이 그려졌다. 이름이 서지 않으면 묶음 자체를 만들지 않는다.
+      if (!tagKey(t.value)) continue;
       const key = t.kindId + ':' + tagKey(t.value);
       if (seen.has(key)) continue;
       seen.add(key);
