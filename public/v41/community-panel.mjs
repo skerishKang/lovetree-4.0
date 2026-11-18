@@ -79,15 +79,23 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
   row.append(form);
  }
   function artistGroupList(){
-   let values=[];try{values=getArtistGroups?.()||[];}catch{}
+   const present=new Map();
+   for(const item of items){
+    for(const raw of Array.isArray(item.groups)?item.groups:[]){
+     const value=String(raw??'').trim(),key=tagKey(value);
+     if(value&&key&&!present.has(key))present.set(key,value);
+    }
+   }
+   let mine=[];try{mine=getArtistGroups?.()||[];}catch{}
    const seen=new Set(),out=[];
    const add=raw=>{
     const value=String(raw??'').trim(),key=tagKey(value);
-    if(!value||!key||seen.has(key))return;
-    seen.add(key);out.push(value);
+    if(!value||!key||!present.has(key)||seen.has(key))return;
+    seen.add(key);out.push(present.get(key));
    };
-   for(const raw of Array.isArray(values)?values:[])add(raw);
+   for(const raw of Array.isArray(mine)?mine:[])add(raw);
    for(const group of publicGroups)add(group?.value??group);
+   for(const value of present.values())add(value);
    return out.slice(0,7);
   }
  function renderGroups(){
@@ -187,13 +195,13 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
   if(!answer.ok){message(answer.message||'공개 트리를 불러오지 못했어요.');more.hidden=true;more.disabled=false;render();return;}
   items=append?[...items,...answer.items]:answer.items;cursor=answer.nextCursor||'';more.hidden=!cursor;more.disabled=false;
   if(!append){publicGroups=Array.isArray(answer.groups)?answer.groups:[];renderGroups();}
-  message(answer.totalVisible?`공개된 트리 ${answer.totalVisible}개를 찾았어요. ${(sortSelect?.value==='popular')?'많이 담긴 순서예요.':'새로 공개된 순서예요.'}`:'아직 공개된 트리가 없어요. 트리를 공개하면 여기에 나타나요.');render();
+  message(answer.totalVisible?`공개된 트리 ${answer.totalVisible}개를 찾았어요. ${(sortSelect?.value==='popular')?'많이 담긴 순서예요.':'새로 공개된 순서예요.'}`:'');render();
  }
  // #824 결정 2: 정렬을 바꾸면 목록을 처음부터 다시 불러온다.
  sortSelect.onchange=()=>load(false);
  for(const link of dialog.querySelectorAll('[data-community-view]'))link.onclick=()=>{dialog.close();[...document.querySelectorAll('[data-view]')].find(node=>node.dataset.view===link.dataset.communityView)?.click();};
  const tabs=()=>[...document.querySelectorAll('nav [data-view]')];
- button.onclick=()=>{if(!dialog.open){dialog.showModal();button.setAttribute('aria-current','true');for(const t of tabs()){if(t.getAttribute('aria-current')==='true'){t.dataset.wasCurrent='1';t.setAttribute('aria-current','false');}}renderGroups();load(false);}};
+  button.onclick=()=>{if(!dialog.open){dialog.showModal();button.setAttribute('aria-current','true');for(const t of tabs()){if(t.getAttribute('aria-current')==='true'){t.dataset.wasCurrent='1';t.setAttribute('aria-current','false');}}load(false);}};
  dialog.addEventListener('close',()=>{if(preview.open)preview.close();button.setAttribute('aria-current','false');const emptyShown=!document.getElementById('empty')?.hidden;for(const t of tabs()){if(t.dataset.wasCurrent){delete t.dataset.wasCurrent;if(!emptyShown)t.setAttribute('aria-current','true');}}button.focus();});
  preview.addEventListener('close',()=>[...list.querySelectorAll('.community-card')].find(node=>node.dataset.shareId===selectedId)?.focus());
  preview.addEventListener('click',event=>{if(event.target===preview)preview.close();});

@@ -105,6 +105,7 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
   Object.defineProperty(card,'searchText',{value:searchTerms.filter(Boolean).join(' '),enumerable:false});
   Object.defineProperty(card,'artistTags',{value:[...artistTags],enumerable:false});
   Object.defineProperty(card,'artistNames',{value:artistNames,enumerable:false});
+  card.groups=[...artistNames.values()];
   return card;
  }
  return {
