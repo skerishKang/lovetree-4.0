@@ -285,9 +285,11 @@ test('지도 판 실제 흐름: 설정·저장 복원·두 보기·누르기·�
         assert.ok(map, '지도가 열린다');
         assert.equal(await map.evaluate(() => document.documentElement.dataset.ltBoardTheme), 'night', '밤 테마인데 저장한 값이 없으면 밤 판');
         // 테마 바꾸기 단추(밤→정원) — 보드·지도 바탕이 바로 따라 바뀐다.
+        // #891(13:59 대표 결정): 판 고르기는 세 상태 — 테마 따라가기(auto)가 기본이고 저장값이 없다.
+        // 앱 테마를 바꾸면 따라가기는 저장값 없이 그 테마에 맞는 판으로 함께 바뀐다.
         await live.page.evaluate(() => document.getElementById('theme-toggle')?.click());
         await live.page.waitForTimeout(600);
-        assert.equal(await live.page.evaluate(() => localStorage.getItem('lt41.boardTheme')), 'paper', '전환 뒤 저장 값도 정원에 맞는 종이');
+        assert.equal(await live.page.evaluate(() => localStorage.getItem('lt41.boardTheme')), null, '테마 따라가기는 저장값이 없다(auto)');
         assert.equal(await map.evaluate(() => document.documentElement.dataset.ltBoardTheme), 'paper', '열린 지도도 바로 종이 판');
         await live.page.evaluate(() => { location.hash = 'board'; });
         await live.page.waitForFunction(() => [...document.querySelectorAll('iframe')].some(f => !f.hidden && /track58-pinboard/.test(f.src || f.contentWindow.location.href) && f.contentDocument?.querySelector('#cardLayer .card')));
@@ -311,9 +313,12 @@ test('지도 판 실제 흐름: 설정·저장 복원·두 보기·누르기·�
         await live.page.waitForTimeout(800); // 셸이 가려진 이전 장을 비우는 600ms 교대가 끝난 뒤
         const board = live.page.frames().find(f => /track58-pinboard/.test(f.url()));
         assert.ok(board, '예시 보드가 열린다');
-        await board.locator('button[data-board-theme="night"]').first().click();
+        // #891②: 보드 도구 줄의 '배경 ▾' 드롭 — 열어서 밤을 고른다.
+        await board.locator('#boardBgBtn').click();
+        await board.locator('#boardBgMenu button[data-bg="night"]').click();
         await live.page.waitForTimeout(150);
         assert.equal(await live.page.evaluate(() => localStorage.getItem('lt41.boardTheme')), 'night', '보드 도구 줄 저장');
+        assert.equal(await board.evaluate(() => document.querySelector('#boardBgMenu button[data-bg="night"]').getAttribute('aria-checked')), 'true', '보드 드롭도 밤을 고른 상태');
         assert.equal(await live.page.locator('#account-settings button[data-board-theme="night"]').getAttribute('aria-checked'), 'true', '셸 설정도 밤을 고른 상태');
         await live.page.evaluate(() => { location.hash = 'network'; });
         await live.page.waitForFunction(() => [...document.querySelectorAll('iframe')].some(f => !f.hidden && f.contentWindow?.__lt?.dots().length));

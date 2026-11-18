@@ -19,6 +19,7 @@ export function createLocation(deps) {
   const startMember = deps.startMember;
   const showPublicRoute = deps.showPublicRoute;
   const requestNetworkOpen = deps.requestNetworkOpen;
+  const requestBoardOpen = deps.requestBoardOpen;
   const journey = deps.journey;
   const gotoJourneyStep = deps.gotoJourneyStep;
   const openFirstJourney = deps.openFirstJourney;
@@ -58,6 +59,8 @@ export function createLocation(deps) {
       // 지도가 그 순간을 가운데 두고 열리게 한다(찾지 못했으면 시작 순간 안내만 — 가운데 뜸 없음).
       // choose()가 안에서 show()로 지도 프레임을 새로 띄우므로, 표시는 choose 전에 남긴다.
       if (route.view === 'network' && route.momentId && resolved.position.momentId === route.momentId) requestNetworkOpen(route.momentId);
+      // #891: 보드 주소가 특정 순간을 가리키고 그 순간을 찾았을 때만 상세 판 자동 열림을 요청한다.
+      if (route.view === 'board' && route.momentId && resolved.position.momentId === route.momentId) requestBoardOpen(route.momentId);
       choose(resolved.position.treeId, resolved.position.momentId);
       if (resolved.treeMissing || resolved.momentMissing) {
         writeLocation('replace');

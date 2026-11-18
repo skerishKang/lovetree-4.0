@@ -16,7 +16,18 @@ const themeSignature=()=>[document.documentElement.getAttribute('data-lt-theme')
 let drawnTheme=themeSignature();
 function refreshTheme(){const next=themeSignature();if(next===drawnTheme)return;drawnTheme=next;tokenVersion++;tokenCache.clear();paletteV=-1;scheduleDraw()}
 new MutationObserver(refreshTheme).observe(document.documentElement,{attributes:true,attributeFilter:['data-lt-theme','data-lt-board-theme']});
-addEventListener('message',e=>{if(e.origin!==location.origin||e.data?.type!=='lt41-board-theme')return;const v=plateValue(e.data.value);if(document.documentElement.getAttribute('data-lt-board-theme')!==v)document.documentElement.setAttribute('data-lt-board-theme',v);refreshTheme()});
+addEventListener('message',e=>{if(e.origin!==location.origin||e.data?.type!=='lt41-board-theme')return;const v=plateValue(e.data.value);if(document.documentElement.getAttribute('data-lt-board-theme')!==v)document.documentElement.setAttribute('data-lt-board-theme',v);refreshTheme();paintNetBgMenu()});
+// #891(13:59 대표 결정): 지도 도구 줄에도 보드와 같은 '배경 ▾' 드롭을 둔다(그물형·동심원형 같은 머리줄).
+// 보드와 같은 저장값(lt41.boardTheme)을 쓰고, 고른 값은 셸이 한 곳에서 저장한다.
+function netBgChoice(){try{const s=localStorage.getItem('lt41.boardTheme');return s==='paper'||s==='night'?s:'auto'}catch{return 'auto'}}
+function paintNetBgMenu(){const v=netBgChoice();document.querySelectorAll('#netBgMenu .lt-bg-item').forEach(b=>b.setAttribute('aria-checked',String(b.dataset.bg===v)));}
+paintNetBgMenu();
+(function(){const btn=document.getElementById('netBgBtn'),menu=document.getElementById('netBgMenu');if(!btn||!menu)return;
+btn.onclick=()=>{const open=menu.hidden;menu.hidden=!open;btn.setAttribute('aria-expanded',String(open))};
+document.addEventListener('click',e=>{if(menu.hidden)return;if(e.target.closest?.('#netBgBtn')||e.target.closest?.('#netBgMenu'))return;menu.hidden=true;btn.setAttribute('aria-expanded','false')});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!menu.hidden){menu.hidden=true;btn.setAttribute('aria-expanded','false');btn.focus()}});
+menu.addEventListener('click',e=>{const item=e.target.closest?.('.lt-bg-item');if(!item)return;menu.hidden=true;btn.setAttribute('aria-expanded','false');try{if(window.parent!==window)window.parent.postMessage({type:'lt41-board-theme-choice',value:item.dataset.bg},location.origin)}catch{}});
+})();
 const PALETTE=()=>{if(paletteV!==tokenVersion){paletteV=tokenVersion;palette=Array.from({length:6},(_,i)=>paint('group-'+(i+1)))}return palette};
 const colorOf=n=>PALETTE()[((n.colorIndex??n.cluster??n.index??0)%6+6)%6];const rgba=(hex,a)=>{const[r,g,b]=hexRgb(hex);return `rgba(${r},${g},${b},${a})`};
 // #601 묶음은 데이터에 맞는 쪽 — 부채꼴 나무(평평한 트리)는 감정별(색), 사슬·깊은 나무는 월별.

@@ -120,7 +120,8 @@ test('보드 안 클릭(카드·전체 보기)은 판을 바꾸지 않는다 —
     const after = await read();
     assert.equal(after.stored, 'paper', '카드·전체 보기 클릭으로 저장한 판 테마 값이 바뀌지 않는다');
     assert.doesNotMatch(after.toast, /판으로 바꿨어요/, '카드·전체 보기 클릭에 판 바꿈 안내가 뜨면 안 된다');
-    await frame.evaluate(() => document.querySelector('button[data-board-theme="night"]').click());
+    await frame.evaluate(() => document.getElementById('boardBgBtn').click());
+    await frame.evaluate(() => document.querySelector('#boardBgMenu [data-bg="night"]').click());
     const night = await read();
     assert.equal(night.attr, 'night');
     assert.equal(night.stored, 'night');

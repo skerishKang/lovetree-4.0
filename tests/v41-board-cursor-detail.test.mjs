@@ -211,7 +211,7 @@ const detailSnapshot = (frame) => frame.evaluate(() => {
   const actions = [...document.querySelectorAll('#detail button, #detail a')]
     .filter(visible)
     .map((el) => (el.textContent || '').trim().replace(/\s+/g, ' '))
-    .filter((t) => t.startsWith('YouTube에서 열기') || t === '크게 보기' || t.startsWith('원본 링크 열기'));
+    .filter((t) => t === 'YouTube ↗' || t === '크게 보기' || t.startsWith('원본 링크 열기'));
   return {
     title: document.getElementById('dTitle')?.textContent || '',
     heart: document.getElementById('dHeart')?.textContent || '',
@@ -236,7 +236,7 @@ test('5. 화면: 카드를 바꿔 누르면 상세 판이 그 순간으로 바�
   assert.match(a.title, /가 순간/, '판 제목은 A 것이다: ' + a.title);
   assert.equal(a.heart, '가 순간에 남긴 마음', '마음도 A 것이다: ' + a.heart);
   assert.ok(a.player, '영상 칸이 A 것으로 그려진다');
-  assert.deepEqual(a.actions, { '크게 보기': 1, 'YouTube에서 열기': 1 }, `단추는 아래 줄의 한 벌만 있다: ${JSON.stringify(a.actions)}`);
+  assert.deepEqual(a.actions, { '크게 보기': 1, 'YouTube ↗': 1 }, `단추·링크는 한 벌만 있다(#891: YouTube는 영상 아래 작은 링크): ${JSON.stringify(a.actions)}`);
   assert.ok(a.chips.some((c) => c.text === '가수 · 아이유' && c.confirmed), 'A의 꼬리표 칩이 확정으로 보인다: ' + JSON.stringify(a.chips));
 
   // 카드 B를 누른다 — 판 전부가 B 것으로 바뀐다(칩 포함).
@@ -247,7 +247,7 @@ test('5. 화면: 카드를 바꿔 누르면 상세 판이 그 순간으로 바�
   assert.match(b.title, /나 순간/, '판 제목은 B 것이다: ' + b.title);
   assert.equal(b.heart, '나 순간에 남긴 마음', '마음도 B 것이다: ' + b.heart);
   assert.ok(b.player, '영상 칸이 B 것으로 다시 그려진다');
-  assert.deepEqual(b.actions, { '크게 보기': 1, 'YouTube에서 열기': 1 }, `바뀐 뒤에도 단추는 각 1개다: ${JSON.stringify(b.actions)}`);
+  assert.deepEqual(b.actions, { '크게 보기': 1, 'YouTube ↗': 1 }, `바뀐 뒤에도 단추·링크는 각 1개다: ${JSON.stringify(b.actions)}`);
   assert.ok(b.chips.some((c) => c.text === '노래 · Blueming' && c.confirmed), 'B의 꼬리표 칩이 확정으로 다시 그려진다: ' + JSON.stringify(b.chips));
   assert.ok(!b.chips.some((c) => c.text.includes('아이유')), 'A의 꼬리표 칩이 남아 있지 않다: ' + JSON.stringify(b.chips));
 

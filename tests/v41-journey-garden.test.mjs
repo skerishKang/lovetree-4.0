@@ -73,7 +73,9 @@ test('셸은 첫 여정 iframe에만 테마 속성을 넘기고 화면마다 다
   // #211: 화면 두 장이 교대하므로 load 마다 그 화면에 테마를 다시 계산한다.
   // #231 1-B②: 화면 한 장이 준비될 때마다 테마를 다시 계산하는 일은 shell/screens.mjs가 맡는다.
   assert.match(screenModule, /function frameLoaded\(frame\) \{\s*applyTheme\(\);/);
-  assert.match(shell, /for\(const f of frames\(\)\)f\.addEventListener\('load',\(\)=>frameLoaded\(f\)\);/);
+  // 'for(const f of frames())f.addEventListener(load,()=>frameLoaded(f))' 글자 검사는 #894에서 load 핸들러가
+  // 움직임 끄기 알림을 함께 보내는 블록이 되면서 지웠다 — load마다 테마를 다시 계산하는 동작은 위의
+  // frameLoaded 검사(applyTheme 호출)와 화면 시험이 지킨다.
   assert.match(shell, /function openFirstJourney/, '첫 여정은 셸이 여는 iframe 하나뿐이다');
 });
 

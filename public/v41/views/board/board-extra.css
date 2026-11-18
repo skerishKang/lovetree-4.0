@@ -82,6 +82,9 @@ html[data-lt-theme=garden] .modalIntro{color:var(--lt-muted)!important}
 html[data-lt-theme=garden] .detail h3,html[data-lt-theme=garden] .detail b,html[data-lt-theme=garden] .leftPanel b{color:var(--lt-ink)}
 html[data-lt-theme=garden][data-v41-screen=board] header .headbtn{background:var(--lt-paper);border-color:var(--lt-line);color:var(--lt-ink);box-shadow:none}
 html[data-lt-theme=garden][data-v41-screen=board] header .headbtn.primary{background:var(--lt-primary);border-color:var(--lt-primary);color:var(--lt-primary-ink)}
+/* #891(CTO): 낮 테마 도구 줄의 '배경 ▾'도 다른 단추(#headbtn)와 같은 모양·같은 글자색 — 기본 .tool 색(#ddcfe4)은 밝은 머리줄에서 대비가 부족하다(--lt-ink on --lt-paper ≥ 4.5:1). */
+html[data-lt-theme=garden][data-v41-screen=board] header .tool:not(.modeSwitchBtn){height:36px;padding:0 14px;border:1px solid var(--lt-line);border-radius:18px;background:var(--lt-paper);color:var(--lt-ink);box-shadow:none}
+html[data-lt-theme=garden][data-v41-screen=board] header .tool:not(.modeSwitchBtn):hover{background:#fff;border-color:var(--lt-line-paper)}
 /* 이슈 644: 정원의 보드 머리줄은 밝은 판이므로 트리 이름·목록도 잉크색으로 — 밤의 연분홍(#e8deee)은 흰 바탕 위에서 읽히지 않는다. */
 html[data-lt-theme=garden][data-v41-screen=board] .tree-title-btn{color:var(--lt-ink)}
 html[data-lt-theme=garden][data-v41-screen=board] .tree-title-btn:hover,html[data-lt-theme=garden][data-v41-screen=board] .tree-title-btn:focus-visible{background:rgba(152,80,94,.08)}
@@ -293,3 +296,32 @@ html[data-lt-theme=garden] .boardModeSwitch .modeSwitchBtn[aria-pressed="true"]{
 #detailMapBtn{margin-top:0}
 
 /* 4. 말풍선 설명(#584와 같은 동작, 보드 도구에 단다) */
+
+/* ===== #891: 보드 순간 상세 판 — 밀기·한 벌 스크롤·고정 줄 ===== */
+/* 판이 열리면 무대(#viewport) 오른쪽 여백이 판 너비만큼 벌어진다(board.js syncBoardPush가 인라인으로 넣는다).
+   좁은 화면(<760)은 아래 시트 그대로 덮으므로 흔들림 없앰. */
+#viewport{transition:margin-right .35s cubic-bezier(.2,.9,.2,1)}
+@media(max-width:760px){#viewport{transition:none}}
+/* 고정 줄: 주 단추 2개(크게 보기·여기부터 시네마) + ⋯ 더 보기. 간격 8px·높이 44px(#891 확인 기준). */
+#detailActions{flex-wrap:nowrap;align-items:center;gap:8px}
+#detailActions .miniBtn{height:44px;min-height:44px}
+#detailActions .miniBtn.accent{flex:1 1 0;min-width:0;white-space:nowrap}
+.moreWrap{position:relative;flex:0 0 auto}
+.moreWrap .miniBtn{height:44px;min-height:44px}
+.moreMenu{position:absolute;right:0;bottom:calc(100% + 8px);min-width:190px;display:grid;gap:2px;padding:6px;border:1px solid var(--lt-line,rgba(255,255,255,.14));border-radius:14px;background:var(--lt-glass-strong,rgba(25,15,33,.96));box-shadow:0 14px 40px rgba(0,0,0,.4);z-index:5}
+.moreItem{display:flex;align-items:center;min-height:44px;padding:0 12px;border:0;border-radius:10px;background:none;color:inherit;font:inherit;font-size:13px;text-align:left;cursor:pointer;white-space:nowrap}
+.moreItem:hover,.moreItem:focus-visible{background:rgba(255,255,255,.08)}
+html[data-lt-theme=garden] .moreMenu{background:var(--lt-paper,#fffdf8);color:var(--lt-ink,#34283d)}
+html[data-lt-theme=garden] .moreItem:hover,html[data-lt-theme=garden] .moreItem:focus-visible{background:rgba(75,51,42,.08)}
+/* 'YouTube ↗' — 영상 바로 아래 작은 링크(#836와 같은 모양). 단추 줄에서 없앴다. */
+.ytLinkRow{padding:8px 0 0}
+.ytLinkRow a{font-size:13px;color:#cfe3ff;text-decoration:underline;text-underline-offset:3px;min-height:24px;display:inline-flex;align-items:center}
+html[data-lt-theme=garden] .ytLinkRow a{color:var(--lt-link,#3b5bdb)}
+
+/* ===== #894: 보드 끌기 ===== */
+/* 보드 무대에서는 글자 선택·기본 끌기를 하지 않는다 — 카드를 끌 때 그림·글자가 따라 나오지 않고,
+   끌기가 셸로 새어 나가 '놓으면 담아요' 판이 뜨지 않는다. 입력칸은 무대 밖 판에 있어 그대로 선택된다. */
+#viewport{user-select:none;-webkit-user-select:none}
+/* '내 배치' 끌기 중 다른 카드 실시간 비켜주기(#894) — 180ms 전환, 움직임 끄기면 즉시. */
+.card.shiftPreview{transition:left .18s ease,top .18s ease}
+#cardLayer.motion-off .card.shiftPreview{transition:none}
