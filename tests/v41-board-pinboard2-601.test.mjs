@@ -211,9 +211,12 @@ test('#601 상세: 플레이어가 맨 위, 내 마음은 크게, 이어진 순�
   assert.match(html, /id="dHeartSave"[^>]*>마음 저장</);
   assert.match(html, /id="detailActions"/);
   assert.match(html, /id="editMomentBtn"[^>]*>수정</);
-  assert.match(html, /id="detailYtBtn"[^>]*hidden>YouTube에서 열기</);
+  // #891: 'YouTube ↗'는 영상 바로 아래 작은 링크(#836 모양) — 단추 줄에서 없앴다.
+  assert.match(html, /id="ytLinkRow" hidden><a id="detailYtLink"/);
   assert.match(html, /id="openMoment"[^>]*>크게 보기</);
   assert.match(html, /id="cinemaFromMoment"[^>]*>여기부터 시네마</);
+  assert.match(html, /id="detailMoreBtn"[^>]*>⋯ 더 보기</, '주 단추 2개 + ⋯ 더 보기(#891)');
+  assert.match(html, /id="detailMoreMenu"[^>]*hidden><button[^>]*id="editMomentBtn"/);
   assert.doesNotMatch(html, /id="nextMoment"/, "'다음 순간 보기' 단추는 이어진 순간 카드로 대체됐다");
   assert.doesNotMatch(html, /id="prevMoment"/);
   // #619-3: 플레이어는 자동 재생하지 않는다. 재생 단추를 눌러야 재생된다.
@@ -226,8 +229,9 @@ test('#601 상세: 플레이어가 맨 위, 내 마음은 크게, 이어진 순�
   assert.match(extras, /class="connCard" data-cid=/);
   assert.match(extras, /function connThumb\(t\)/);
   assert.match(extras, /b\.dataset\.dir==='next'\)moveViaConnection\(c\);else pulseConnection\(c,\(\)=>focusBoardMoment\(c\.a\)\)/);
-  // 지도 단추는 할 일 줄에 놓인다.
-  assert.match(extras, /\$\('#detailActions'\)\.append\(mapBtn\)/);
+  // 지도·옮기기 단추는 '⋯ 더 보기' 메뉴 안에 있고, 누름 길은 여기서 맞춘다(#891).
+  assert.match(extras, /const mapBtn=\$\('#detailMapBtn'\);if\(mapBtn\)mapBtn\.onclick=/);
+  assert.match(extras, /const mv=\$\('#detailMoveBtn'\);if\(mv\)mv\.onclick=/);
 });
 
 test('#601 확대 단추: [－][＋][전체 보기]와 말풍선 설명', () => {
@@ -452,14 +456,19 @@ test('#601 화면: 카드 높이 상한·마지막 줄이 판 안, 상세는 플
       heartSaveShown: !document.getElementById('dHeartSave').hidden,
       basic: document.getElementById('dBasic').textContent,
       connCards: document.querySelectorAll('#dConn .connCard').length,
-      actions: ['editMomentBtn', 'detailYtBtn', 'openMoment', 'detailMapBtn', 'cinemaFromMoment'].map((id) => !!document.getElementById(id))
+      // #891: 고정 줄은 주 단추 2개 + 더 보기 — 나머지(수정·지도·옮기기)는 더 보기 메뉴 안에 있다.
+      actions: ['openMoment', 'cinemaFromMoment', 'detailMoreBtn'].map((id) => !!document.getElementById(id)),
+      moreItems: ['editMomentBtn', 'detailMapBtn', 'detailMoveBtn'].map((id) => !!document.getElementById(id)),
+      ytLink: !!document.getElementById('detailYtLink')
     }));
     assert.equal(detail.playerHasMedia, true, '플레이어가 있다');
     // #619-3: 상세 플레이어는 autoplay 를 제거했고, 누르면 재생 단추로 직접 재생한다.
     assert.equal(detail.hasAutoplay === false, true, '상세 플레이어는 autoplay 속성이 없다');
     assert.equal(detail.heartInputShown && detail.heartSaveShown, true, '마음이 비어 있으면 입력칸과 저장 단추가 보인다');
     assert.match(detail.basic, /설렘/, '감정이 보인다');
-    assert.deepEqual(detail.actions, [true, true, true, true, true], '할 일 단추 한 줄(수정·YouTube에서 열기·크게 보기·지도·시네마)');
+    assert.deepEqual(detail.actions, [true, true, true], '할 일 고정 줄: 크게 보기·여기부터 시네마·⋯ 더 보기(#891)');
+    assert.deepEqual(detail.moreItems, [true, true, true], '더 보기 메뉴: 수정·지도에서 관계 보기·다른 트리로 옮기기');
+    assert.equal(detail.ytLink, true, "'YouTube ↗' 작은 링크가 있다(#891)");
     // 마음을 남기면 기존 저장 경로로 note가 간다.
     await frame.fill('#dHeartInput', '이 순간이 좋았어요');
     await frame.click('#dHeartSave');
@@ -513,6 +522,9 @@ test('#644 화면: 보드 상세의 다른 트리로 옮기기 — 단추가 보
         assert.ok(card, `${width}px에서 누를 카드가 화면 안에 있다`);
         await page.mouse.click(card.x, card.y);
         await page.waitForTimeout(700);
+        // #891: 옮기기 단추는 '⋯ 더 보기' 메뉴 안에 있다 — 메뉴를 열어 보이게 한 뒤 잰다.
+        await frame.click('#detailMoreBtn');
+        await page.waitForTimeout(250);
         // 상세의 '다른 트리로 옮기기' — 누르는 자리(44px)와 보임을 수치로 판정한다.
         const btn = await frame.evaluate(() => {
           const b = document.getElementById('detailMoveBtn');
@@ -559,6 +571,9 @@ test('#662 화면: 상세 판의 행동 단추를 실제 좌표 클릭으로 누
         assert.ok(card, `${width}px에서 누를 카드가 화면 안에 있다`);
         await page.mouse.click(card.x, card.y);
         await page.waitForTimeout(700);
+        // #891: 지도·옮기기 단추는 '⋯ 더 보기' 메뉴 안에 있다 — 메뉴를 열고 잰다.
+        await frame.click('#detailMoreBtn');
+        await page.waitForTimeout(250);
         // 각 행동 단추의 중심에서 elementFromPoint가 그 단추를 가리키는지 — 판 표면이 가로막으면 실패다(#601).
         const hit = await frame.evaluate(() => {
           return ['openMoment', 'cinemaFromMoment', 'detailMapBtn'].map((id) => {
@@ -584,7 +599,9 @@ test('#662 화면: 상세 판의 행동 단추를 실제 좌표 클릭으로 누
         assert.equal(await frame.evaluate(() => document.getElementById('viewerModal').classList.contains('open')), true, `${width}px: '크게 보기'를 실제 클릭으로 누르면 감상 창이 열린다`);
         await frame.evaluate(() => document.getElementById('viewerModal').classList.remove('open'));
         await page.waitForTimeout(200);
-        // 지도에서 관계 보기 → 셸로 lt41-open-network이 간다.
+        // 지도에서 관계 보기 → 셸로 lt41-open-network이 간다(메뉴를 다시 연다 — 크게 보기 누름에서 닫혔다).
+        await frame.click('#detailMoreBtn');
+        await page.waitForTimeout(250);
         const mb = await center('detailMapBtn');
         await page.mouse.click(mb.x, mb.y);
         await page.waitForTimeout(400);

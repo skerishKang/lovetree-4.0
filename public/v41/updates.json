@@ -94,6 +94,34 @@
         "text": "꼬리표를 빼면 바로 되돌릴 수 있고, 담은 뒤 다듬기 안내가 잘 보여요",
         "source": "user",
         "issue": "#37"
+      },
+      {
+        "kind": "new",
+        "text": "보드에서 순간을 누르면 상세 판이 열리고 카드가 판을 비켜나요",
+        "source": "ai_tester",
+        "tester": "레인",
+        "issue": "#891"
+      },
+      {
+        "kind": "new",
+        "text": "보드 상세의 수정·지도·옮기기는 ⋯ 더 보기에 모았어요",
+        "source": "ai_tester",
+        "tester": "레인",
+        "issue": "#891"
+      },
+      {
+        "kind": "new",
+        "text": "보드·지도에서 배경(테마 따라가기·종이·밤)을 바로 골라요",
+        "source": "ai_tester",
+        "tester": "레인",
+        "issue": "#891"
+      },
+      {
+        "kind": "new",
+        "text": "내 배치에서 카드를 끌면 다른 카드가 실시간으로 비켜 줘요",
+        "source": "ai_tester",
+        "tester": "레인",
+        "issue": "#894"
       }
     ]
   },

@@ -176,7 +176,7 @@ test('#536 기억한 자리도 판 규칙을 거친다: 판이 화면보다 좁�
   } finally { await browser.close(); server.close(); }
 });
 
-test('#536 머리줄 [종이|밤]: 고급을 켜지 않아도 보이고, 한 벌이며, 누르면 판·저장값이 바뀐다', { skip: REQUIRE ? false : skip, timeout: 180000 }, async () => {
+test('#536 머리줄 배경 드롭: 고급을 켜지 않아도 보이고, 한 벌이며, 누르면 판·저장값이 바뀐다(#891)', { skip: REQUIRE ? false : skip, timeout: 180000 }, async () => {
   if (skip) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip}`);
   const tree = chainTree(3);
   const server = await serve({ '/__host-3.html': hostHTML(tree) });
@@ -186,28 +186,31 @@ test('#536 머리줄 [종이|밤]: 고급을 켜지 않아도 보이고, 한 벌
     const { context, page, frame } = await openHost(browser, `${base}/__host-3.html`, { width: 1440, height: 900 });
     const state = await frame.evaluate(() => {
       const header = document.querySelector('header');
-      const sw = document.querySelector('.boardThemeSwitch');
+      const drop = document.getElementById('boardBgDrop');
       return {
-        inHeader: !!sw && header.contains(sw),
-        toolbarSwitch: !!document.querySelector('.toolbar .boardThemeSwitch'),
-        visible: sw && getComputedStyle(sw).display !== 'none' && sw.getBoundingClientRect().width > 0,
-        pressed: document.querySelector('[data-board-theme="paper"]')?.getAttribute('aria-pressed')
+        inHeader: !!drop && header.contains(drop),
+        toolbarSwitch: !!document.querySelector('.toolbar #boardBgDrop'),
+        visible: drop && getComputedStyle(drop).display !== 'none' && drop.getBoundingClientRect().width > 0,
+        checked: document.querySelector('#boardBgMenu [data-bg="auto"]')?.getAttribute('aria-checked')
       };
     });
-    assert.equal(state.inHeader, true, '전환은 머리줄에 있다');
+    assert.equal(state.inHeader, true, '배경 드롭은 머리줄에 있다');
     assert.equal(state.toolbarSwitch, false, '도구 줄에는 두 벌째가 없다');
     assert.equal(state.visible, true, '고급을 켜지 않아도 보인다');
-    await frame.locator('header .boardThemeSwitch [data-board-theme="night"]').click();
+    assert.equal(state.checked, 'true', '처음에는 테마 따라가기(기본)가 눌려 있다');
+    await frame.locator('#boardBgBtn').click();
+    await frame.locator('#boardBgMenu [data-bg="night"]').click();
     await page.waitForTimeout(400);
     const after = await frame.evaluate(() => ({
       plate: document.documentElement.getAttribute('data-lt-board-theme'),
       stored: localStorage.getItem('lt41.boardTheme'),
-      pressedNight: document.querySelector('[data-board-theme="night"]')?.getAttribute('aria-pressed')
+      checkedNight: document.querySelector('#boardBgMenu [data-bg="night"]')?.getAttribute('aria-checked')
     }));
     assert.equal(after.plate, 'night', '누르면 열린 보드 판이 바로 밤이 된다');
     assert.equal(after.stored, 'night', '설정과 같은 값(lt41.boardTheme)을 쓴다');
-    assert.equal(after.pressedNight, 'true', '눌린 쪽이 표시된다');
-    await frame.locator('header .boardThemeSwitch [data-board-theme="paper"]').click();
+    assert.equal(after.checkedNight, 'true', '눌린 쪽이 표시된다');
+    await frame.locator('#boardBgBtn').click();
+    await frame.locator('#boardBgMenu [data-bg="paper"]').click();
     await page.waitForTimeout(300);
     assert.equal(await frame.evaluate(() => localStorage.getItem('lt41.boardTheme')), 'paper', '종이로 되돌린다');
     await context.close();
@@ -236,11 +239,11 @@ test('#536 표시·390 머리줄: 자기 기록에는 읽기 전용 표시가 �
             const b = badge.getBoundingClientRect(), p = picker.getBoundingClientRect();
             overlap = Math.max(0, Math.round(Math.min(b.right, p.right) - Math.max(b.left, p.left))) * Math.max(0, Math.round(Math.min(b.bottom, p.bottom) - Math.max(b.top, p.top)));
           }
-          return { badge: badge?.textContent.trim(), overflow: header.scrollWidth - header.clientWidth, overlap, switchVisible: getComputedStyle(document.querySelector('.boardThemeSwitch')).display !== 'none' };
+          return { badge: badge?.textContent.trim(), overflow: header.scrollWidth - header.clientWidth, overlap, switchVisible: getComputedStyle(document.getElementById('boardBgBtn')).display !== 'none' };
         });
         assert.ok(!m.badge.includes('읽기 전용'), `${w} ${advanced ? '고급' : '단순'}: 자기 기록에 '읽기 전용' 표시가 없다 (${m.badge})`);
         assert.equal(m.overflow, 0, `${w} ${advanced ? '고급' : '단순'}: 머리줄 넘침 0`);
-        assert.equal(m.switchVisible, true, `${w} ${advanced ? '고급' : '단순'}: 머리줄 전환이 보인다`);
+        assert.equal(m.switchVisible, true, `${w} ${advanced ? '고급' : '단순'}: 머리줄 배경 드롭이 보인다`);
         if (mobile) assert.equal(m.overlap, 0, '390: 읽기 전용 표시·선택 줄 겹침 0 유지(#521)');
         await context.close();
       }

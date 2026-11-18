@@ -27,10 +27,11 @@ test('보드·지도 판 테마 수신: 어떤 화면에서도 다시 띄우지 
   }
 });
 
-test('설정 창 화면 탭: 보드·지도 판(종이/밤) 행이 있다(2026-11-16: 더 보기(고급) 접힘 안, 저장 위치는 탭 맨 아래 한 줄)', () => {
+test('설정 창 화면 탭: 보드·지도 판(테마 따라가기/종이/밤) 행이 있다(2026-11-16: 더 보기(고급) 접힘 안, 저장 위치는 탭 맨 아래 한 줄)', () => {
   const html = read('public/v41/index.html');
   const screen = html.slice(html.indexOf('id="account-settings-screen"'), html.indexOf('id="account-settings-profile"'));
   assert.match(screen, /id="settings-board-theme-label">보드·지도 판<\/span>/);
+  assert.match(screen, /data-board-theme="auto"[^>]*>테마 따라가기<\/button>/);
   assert.match(screen, /data-board-theme="paper"[^>]*>종이<\/button>/);
   assert.match(screen, /data-board-theme="night"[^>]*>밤<\/button>/);
   // 줄마다 붙던 '이 기기에만' 표시는 없다 — 화면 탭 맨 아래 한 줄 설명에 모았다.
@@ -38,30 +39,41 @@ test('설정 창 화면 탭: 보드·지도 판(종이/밤) 행이 있다(2026-1
   assert.match(screen, /테마·움직임·보드·지도 판·관계 지도 보기·페이지 넘김·첫 화면 카드·고급 기능 보기는 이 기기에만 저장되고/);
 });
 
-test('보드 화면 마크업: 도구 줄 및 패널에 종이/밤 전환 단추가 있다', () => {
+test('보드 화면 마크업: 머리줄은 배경 드롭 하나(#891) — 종이/밤 두 단추 나란히는 없다', () => {
   const boardHtml = read('public/v41/views/track58-pinboard.html');
-  assert.match(boardHtml, /class="boardThemeSwitch"/);
-  assert.match(boardHtml, /data-board-theme="paper"[^>]*>종이<\/button>/);
-  assert.match(boardHtml, /data-board-theme="night"[^>]*>밤<\/button>/);
+  assert.match(boardHtml, /id="boardBgBtn"[^>]*>배경 ▾<\/button>/);
+  assert.match(boardHtml, /id="boardBgMenu"[^>]*role="menu"/);
+  assert.match(boardHtml, /data-bg="auto"[^>]*>테마 따라가기<\/button>/);
+  assert.match(boardHtml, /data-bg="paper"[^>]*>종이<\/button>/);
+  assert.match(boardHtml, /data-bg="night"[^>]*>밤<\/button>/);
+  assert.doesNotMatch(boardHtml, /class="boardThemeSwitch"/);
   assert.match(boardHtml, /id="themeBadge"/);
 });
 
-test('셸 배선: 보드·지도 판 테마를 프레임에 알리고 메시지를 주고받는다', () => {
+test('지도 화면 마크업: 도구 줄에도 같은 배경 드롭이 있다(#891)', () => {
+  const netHtml = read('public/v41/views/track56-network.html');
+  assert.match(netHtml, /id="netBgBtn"[^>]*>배경 ▾<\/button>/);
+  assert.match(netHtml, /id="netBgMenu"[^>]*role="menu"/);
+  assert.match(netHtml, /data-bg="auto"[^>]*>테마 따라가기<\/button>/);
+});
+
+test('셸 배선: 판 상태 세 가지를 저장하고 프레임에는 해결된 판을 알린다(#891)', () => {
   const shell = read('public/v41/shell.mjs');
   assert.match(shell, /applyBoardThemeToFrame\(frame\)/);
-  assert.match(shell, /const message=frameMessage\('boardTheme',currentBoardTheme\(\)\)/);
+  assert.match(shell, /frameMessage\('boardTheme',resolveBoardTheme\(\)\)/, '프레임에는 종이/밤으로 해결한 값을 넘긴다');
   assert.match(shell, /setAttribute\('data-lt-board-theme',message\.value\)/);
-  assert.match(shell, /localStorage\.setItem\(BOARD_THEME_KEY,next\)/);
+  assert.match(shell, /saveBoardTheme/, '고른 값은 한 곳(saveBoardTheme)에서 저장·반영한다');
+  assert.match(shell, /lt41-board-theme-choice/, '보드·지도 드롭의 고르기 요청을 받는다');
   assert.match(shell, /lt41-board-theme/);
 });
 
 // 대비는 tests/v41-board-card-contrast.test.mjs가 실제 그려진 화면에서 카드 종류별로 잰다(변수 값끼리 계산하지 않는다).
 
-test('보드 배선: 판 바꾸기는 [종이|밤] 단추만 받고, 원본 보드 테마(body[data-theme])는 건드리지 않는다', () => {
+test('보드 배선: 배경 드롭은 메뉴 항목만 받고, 원본 보드 테마(body[data-theme])는 건드리지 않는다(#891)', () => {
   const board = read('public/v41/views/board/board.js');
   const extras = read('public/v41/views/board/board-extras.js');
-  assert.match(board, /closest\?\.\('button\[data-board-theme\]'\)/, '문서 클릭은 button[data-board-theme]에만 반응한다');
-  assert.doesNotMatch(board, /closest\('\[data-board-theme\]'\)/, '속성만 보는 closest는 body·html 속성에 걸려 모든 클릭을 판 바꾸기로 읽는다');
+  assert.match(board, /#boardBgMenu \.lt-bg-item/, '고르기는 배경 드롭의 항목으로만 한다');
+  assert.match(board, /lt41-board-theme-choice/, '고른 값은 셸에 요청으로 넘긴다(보드가 저장소에 직접 쓰지 않는다)');
   assert.match(extras, /document\.body\.dataset\.theme='pearl';/, '원본 보드 테마 기본(진주빛) 그대로');
   assert.doesNotMatch(extras, /dataset\.theme\s*=\s*[^;]*'night'/, '밤 판이라고 원본 "밤" 보드 테마(어두운 카드)를 켜지 않는다');
   assert.doesNotMatch(board, /#ff7da7|#7ee4ff|#ffd67d|#c4b0ff/, '밤 실 색은 CSS 한 곳(board.css)에만 둔다');

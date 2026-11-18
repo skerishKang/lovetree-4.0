@@ -502,14 +502,20 @@ export function createQuickAdd(deps) {
     veil.hidden = false;
   }
   function mountDrop(target) {
+    // #894: 같은 화면(셸 문서) 안에서 시작한 끌기는 안내 판을 띄우지 않는다 — 바깥에서 끌어 온 것만.
+    // 보드 안의 카드 끌기는 보드 쪽에서 draggable=false·user-select:none으로 아예 시작되지 않게 막았다.
+    let innerDrag = false;
+    target.addEventListener('dragstart', () => { innerDrag = true; }, true);
+    target.addEventListener('dragend', () => { innerDrag = false; }, true);
+    target.addEventListener('drop', () => { innerDrag = false; }, true);
     target.addEventListener('dragenter', event => {
-      if (!hasDropPayload(event.dataTransfer)) return;
+      if (innerDrag || !hasDropPayload(event.dataTransfer)) return;
       event.preventDefault();
       veilDepth += 1;
       showVeil(routeFor(!!firstImageFile(event.dataTransfer)).veil);
     });
     target.addEventListener('dragover', event => {
-      if (!hasDropPayload(event.dataTransfer)) return;
+      if (innerDrag || !hasDropPayload(event.dataTransfer)) return;
       event.preventDefault();
       if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy';
       if ($('drop-veil').hidden) showVeil(routeFor(!!firstImageFile(event.dataTransfer)).veil);

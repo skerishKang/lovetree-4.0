@@ -8,6 +8,27 @@
 - **캡처**: 확정 뒤(is-lit)·되돌리기 알림 각 1440·390 — `E:\lovetree-qa\local3\tags\`(내용 판독은 CTO 몫).
 - **남은 것**: CI 초록 → CTO 확인 → squash 병합 → ops-reply #37(컴2 고정 위치 도구).
 
+# LoveTree 4.0 — 핸드오프
+
+<<<<<<< HEAD
+## 2026-11-18 — #37(AI 고객 37회차): 꼬리표 칩 — 빼기 되돌리기·담은 뒤 안내 도드리기 (컴1로컬3, 브랜치 ai/local3-tags-37)
+
+- **범위(한 줄)**: 쉬운 추가에서 확정 칩을 다시 눌러 빼면 조용히 지우지 않고 '꼬리표를 뺐어요 · 되돌리기' 알림을 5초 보여 준다(되돌리기를 누르면 다시 붙여 저장한다), 꼬리표 확정이 저장되면 '✓ 담았어요 · 지금 다듬기 →' 안내 줄을 눈앞에 데려오고 도드라지게 띄운다(is-lit — 안내 글자 금색·다듬기 단추에 테). 확정 뒤 변화가 없어 '지금 다듬기'를 따로 눌렀다는 의견과, 잘못 누르면 확정 꼬리표가 조용히 지워졌다는 의견을 함께 다룬다.
+- **파일**: 되돌리기는 `public/v41/tag-line.mjs`(renderTagLine — 책·보드·지도 상세·꼬리표 정리 창이 쓰는 같은 한 벌이라 모든 자리에서 탄다; undoMs 기본 5000) + tag-line.css, 안내 도드리기는 `public/v41/shell/quick-add.mjs`(lightSavedNotice — 창 안 #quick-notice-row만; 떠 있는 안내 모양은 이미 눈에 보여 그대로 둔다) + shell.css·index.html(id 추가).
+- **시험**: v41-tags-627.test.mjs 2건(빼기 → 알림·되돌리기 재저장·시간 지나면 거둠 / 순간을 바꾸면 알림 거둠), v41-tree-tips-549.test.mjs 1건(브라우저 — 직접 붙이기 확정 → keywords ['가수:윤슬']·is-lit·다듬기 단추 보임 → 다시 누름 → []·알림 → 되돌리기 → ['가수:윤슬'] 복원·알림 거둠). 134 pass / 0 fail(위 파일들), build ✓, modulepreload ✓.
+- **캡처**: 확정 뒤(is-lit)·되돌리기 알림 각 1440·390 — `E:\lovetree-qa\local3\tags\`(내용 판독은 CTO 몫).
+- **남은 것**: CI 초록 → CTO 확인 → squash 병합 → ops-reply #37(컴2 고정 위치 도구).
+=======
+## 2026-11-18 — #891·#894: 보드 순간 상세 판 한 벌 + 내 배치 실시간 비켜주기 (컴1로컬3, 브랜치 ai/local3-board-891)
+
+- **범위(한 줄)**: 보드에서 순간을 누르면 오른쪽 상세 판이 열리고 카드가 판을 비켜나게(무대 여백 밀기) 바뀌고, 상세의 단추를 정리(크게 보기·여기부터 시네마 고정 줄 + ⋯ 더 보기 메뉴에 수정·지도·옮기기, YouTube는 영상 바로 아래 작은 링크)하며, 주소가 순간을 가리킬 때(#my/board?tree=…&moment=…, 공유 주소의 entryMomentId)만 판을 자동으로 연다(탭 진입은 닫힘). 보드·지도에 '배경 ▾' 드롭(테마 따라가기·종이·밤)을 두고, 내 배치 끌기에서 다른 카드가 실시간으로 비켜난다(previewShift). 쉬운 추가의 '＋ 순간 추가' 단추는 치웠다(#891⑤).
+- **파일**: `views/track58-pinboard.html`(detailActions 고정 줄·moreMenu·ytLinkRow·boardBgDrop·boardTitle을 무대 밖으로 — #856 제목 잘림 재발 방지), `views/board/board.js`(bootDetailPanel·syncBoardPush·previewShift·배경 메뉴), `board-extras.js`(더 보기 메뉴 배선·끌기 img draggable=false), `board-extra.css`(고정 줄·shiftPreview·배경 드롭), `views/track56-network.html`+`network.js`(지도 같은 배경 드롭), `shell.mjs`(requestBoardOpen·saveBoardTheme·lt41-board-theme-choice·lt41-motion 전체 전달), `shell/screens.mjs`(?open=), `shell/location.mjs`(보드 자동 열림 판정), `shell/quick-add.mjs`(같은 문서 끌기는 안내 판 안 띄움), `identity.css`(.lt-bg-menu), `index.html`(설정 '테마 따라가기' 행).
+- **시험**: v41-board-theme-flow(9)·pinboard2-601(14)·cursor-detail(6)·wide-view-536(6)·date-edit-608(4)·touch-targets(14)·order-619·stack-619·readonly-520-521·map-tree-title·merge-pinboard·pinboard-582(9)·card-contrast·quick-add(60)·shell-location·share-list·date-style(26) 전부 pass, build ✓, modulepreload ✓.
+- **실측(가짜 /api, 실제 셸)**: 탭 진입 판 닫힘 → 카드 클릭 열림·무대 여백 382px·판-카드 겹침 0·단추 높이 44·간격 8px·YouTube ↗·스크롤 맨 위/아래·더 보기 메뉴 3개; 주소 진입(#my/board?…&moment=m3) 자동 열림·?open=m3; 390은 아래 시트(밀기 없음); 밤→종이→테마 따라가기 저장 규칙(localStorage lt41.boardTheme, auto는 값 없음); 내 배치 끌기 shiftPreview·다른 카드 left 실시간 이동; 카드 img draggable=false·user-select:none. 캡처: `E:\lovetree-qa\local3\board891\`(내용 판독은 CTO 몫).
+- **메모**: 이슈 #891⑥의 '시네마·도움말(◐) 겹침'은 재현되지 않았다 — 보드 프레임·셸 모두에 떠 있는 도움말 요소가 없다('보기 ◐'는 #380 5번부터 설정 창 안). #380의 '＋ 순간 추가' 유지 결정은 #891⑤(보드 도구줄에서 제거)와 화면이 다른 자리라 그대로 뒀다.
+- **남은 것**: CI 초록 → CTO 캡처 확인 → squash 병합.
+>>>>>>> 4624adf (보드 순간 상세 판을 한 벌로 정리하고 내 배치 끌기 비켜주기를 더한다)
+
 ## 2026-11-18 — #876: 같은 영상을 다시 담을 때 막지 말고 담기 전에 알려 주기 (컴1로컬3, 브랜치 ai/local3-dup-876)
 
 - **범위(한 줄)**: 같은 트리에 같은 영상(유튜브 id 같음 — youtu.be·shorts·watch 같은 id, 규칙 5)을 다시 담을 때 구간까지 같거나 둘 다 없으면 담기 전에 안내 창을 한 번 열어 준다('이 트리에 이미 담은 영상이에요 (11월 13일)' + [그 순간 보기] [그래도 담기]); 구간이 다르면 다른 장면이라 그냥 담고, 다른 트리에 같은 영상이 있으면 막지 않고 담은 뒤 한 줄 알린다("'○○' 트리에도 있어요"). 쉬운 추가·자세한 추가·붙여넣기/공유 입구가 같은 규칙이고, 입구의 '조용히 막기'(isInboxDuplicate·INTAKE_DUP_TEXT)를 안내 방식으로 바꿨다. 확인 질문(confirm)은 이번 범위 밖.
