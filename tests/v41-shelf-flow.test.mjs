@@ -3,7 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  COVER_PALETTE, allBooks, bookMeta, buildShelf, carouselTransform, coverStyle, escapeShelf,
+  COVER_PALETTE, addedLabel, allBooks, bookMeta, buildShelf, carouselTransform, coverStyle, escapeShelf,
   filterShelf, findBook, lastMomentDate, leftPageMarkup, pageMeta, pageTarget, resolveShelfIndex,
   resumeCard, rightPageMarkup, shelfBook, treeTitleOf, youtubeId
 } from '../public/v41/views/shelf/shelf-model.mjs';
@@ -41,9 +41,15 @@ test('책 설명·꼬리표·장 목록은 실제 기록에서 오고 note는 me
   assert.equal(lastMomentDate({ moments: [] }), '');
 });
 
-test('표지 아래 정보 줄은 "순간 N개 · 마지막 날짜" 하나다', () => {
-  assert.equal(bookMeta({ chapters: [1, 2, 3], lastDate: '2026-10-02' }), '3개 순간 · 마지막 2026-10-02');
-  assert.equal(bookMeta({ chapters: [], lastDate: '' }), '0개 순간 · 마지막 -');
+test('표지 아래 정보 줄은 "순간 N개 · 언제 담았는지" 하나다(261118 대표 지적 5)', () => {
+  const now = new Date(2026, 9, 9, 12, 0, 0); // 2026-10-09
+  assert.equal(bookMeta({ chapters: [1, 2, 3], lastDate: '2026-10-02' }, now), '3개 순간 · 7일 전 추가');
+  assert.equal(bookMeta({ chapters: [1], lastDate: '2026-10-08' }, now), '1개 순간 · 어제 추가');
+  assert.equal(bookMeta({ chapters: [1], lastDate: '2026-10-09' }, now), '1개 순간 · 오늘 추가');
+  assert.equal(bookMeta({ chapters: [], lastDate: '' }, now), '0개 순간');
+  assert.equal(addedLabel('2026-10-04', now), '5일 전 추가');
+  assert.equal(addedLabel('2026-10-01', now), '10월 1일 추가');
+  assert.equal(addedLabel('2026-10-10', now), '오늘 추가'); // 미래 날짜는 오늘로 본다
   assert.equal(coverStyle({ id: 'a', color: 'c1', accent: 'c2' }), '--cover:c1;--cover-accent:c2;--tilt:-1deg;');
   assert.equal(coverStyle({ id: 'ab', color: 'c1', accent: 'c2' }), '--cover:c1;--cover-accent:c2;--tilt:0deg;');
   assert.equal(escapeShelf('<b>&"</b>'), '&lt;b&gt;&amp;&quot;&lt;/b&gt;');
@@ -73,14 +79,15 @@ test('목록이 바뀌면 가운데 책을 다시 고른다', () => {
 
 test('레일 위 카드 배치 표(거리 → 좌표·배율·투명도)', () => {
   const table = [
-    [0, { x: 0, y: 6, z: 0, scale: 1.06, rotate: 0, alpha: 1, zIndex: 100, pointerEvents: 'auto', filter: 'none' }],
-    [1, { x: 166, y: 8, z: -78, scale: 0.82, rotate: -22, alpha: 0.9, zIndex: 99, pointerEvents: 'auto', filter: 'none' }],
-    [-1, { x: -166, y: 8, z: -78, scale: 0.82, rotate: 22, alpha: 0.9, zIndex: 99, pointerEvents: 'auto', filter: 'none' }],
-    [2, { x: 332, y: 16, z: -156, scale: 0.66, rotate: -22, alpha: 0.66, zIndex: 98, pointerEvents: 'auto', filter: 'none' }],
-    [3, { x: 496, y: 24, z: -234, scale: 0.54, rotate: -22, alpha: 0.28, zIndex: 97, pointerEvents: 'auto', filter: 'saturate(.72) brightness(.86)' }],
-    [4, { x: 654, y: 28, z: -312, scale: 0.54, rotate: -22, alpha: 0, zIndex: 96, pointerEvents: 'none', filter: 'saturate(.72) brightness(.86)' }]
+    [0, { x: 0, y: 0, z: 0, scale: 1.06, rotate: 0, alpha: 1, zIndex: 100, pointerEvents: 'auto', filter: 'none' }],
+    [1, { x: 200, y: 0, z: 0, scale: 1, rotate: -12, alpha: 0.9, zIndex: 99, pointerEvents: 'auto', filter: 'none' }],
+    [-1, { x: -200, y: 0, z: 0, scale: 1, rotate: 12, alpha: 0.9, zIndex: 99, pointerEvents: 'auto', filter: 'none' }],
+    [2, { x: 400, y: 0, z: 0, scale: 1, rotate: -12, alpha: 0.8, zIndex: 98, pointerEvents: 'auto', filter: 'none' }],
+    [3, { x: 600, y: 0, z: 0, scale: 1, rotate: -12, alpha: 0.6, zIndex: 97, pointerEvents: 'auto', filter: 'saturate(.72) brightness(.86)' }],
+    [4, { x: 800, y: 0, z: 0, scale: 1, rotate: -12, alpha: 0.6, zIndex: 96, pointerEvents: 'none', filter: 'saturate(.72) brightness(.86)' }]
   ];
-  // z는 원본 계산식(-absolute*78)이라 거리 0에서 -0이 된다. 값은 같으므로 부호만 맞춰 본다.
+  // 261118 대표 지적 2차: 배율·깊이 이동으로 글자를 줄이지 않는다 — 옆 책도 scale 1, 설명 글자는 실제 12px 렌더.
+  // 4번째 이후 책 투명도는 0.6 이상으로 남는다.
   for (const [distance, expected] of table) assert.deepEqual({ ...carouselTransform(distance), z: carouselTransform(distance).z + 0 }, expected, 'distance ' + distance);
 });
 
@@ -208,8 +215,8 @@ test('이어 읽기 칸 표(출처·저장 위치·문구)', () => {
     ['server', 'tree1', '', 'resume', '지난번 p1 순간까지 봤어요', 'tree1', 'p1'],      // 위치 없으면 첫 순간
     ['server', 'gone', 'gone', 'resume', '지난번 p1 순간까지 봤어요', 'tree1', 'p1'],  // 지워진 트리 → 첫 책
     ['server', '', '', 'resume', '지난번 p1 순간까지 봤어요', 'tree1', 'p1'],
-    ['example', '', '', 'example', '예시 책 펼쳐 보기', 'tree1', null],
-    ['file', '', '', 'example', '예시 책 펼쳐 보기', 'tree1', null],
+    ['example', '', '', 'example', '예시 책 펼쳐 보기', 'tree1', 'p1'],
+    ['file', '', '', 'example', '예시 책 펼쳐 보기', 'tree1', 'p1'],
     ['server', '', '', 'first', '첫 책을 펼쳐 보세요', null, null] // books 비면(빈 계정) 아래에서 따로
   ];
   for (const [source, treeId, momentId, kind, title, bookId, momentId2] of cases.slice(0, -1)) {
@@ -218,13 +225,17 @@ test('이어 읽기 칸 표(출처·저장 위치·문구)', () => {
     assert.equal(info.title, title);
     assert.equal(info.book ? info.book.id : null, bookId);
     assert.equal(info.moment ? info.moment.id : null, momentId2);
-    assert.equal(info.action, kind === 'resume' ? '이어 보기' : '');
+    assert.equal(info.action, kind === 'resume' ? '이어 보기' : '펼쳐 보기');
+    // 이어 보기 띠(261118 대표 지적 4)가 쓰는 값: 트리 이름·순간 제목. 주소 문구는 없다.
+    assert.equal(info.treeName, bookId ? '첫사랑, 나의 순간들' : '');
+    if (momentId2) assert.equal(info.momentTitle, info.moment.title.replace(/[.。!?！？]+$/u, ''));
+    assert.ok(!('url' in info));
   }
   // 기록이 없는(트리 0개) 계정
   const empty = resumeCard({ source: 'server', treeId: '', momentId: '', books: [] });
   assert.deepEqual({ kind: empty.kind, title: empty.title, book: empty.book }, { kind: 'first', title: '첫 책을 펼쳐 보세요', book: null });
-  // 예시 칸은 이어 보기 문구를 쓰지 않는다
-  assert.equal(resumeCard({ source: 'example', books }).action, '');
+  // 예시 칸은 '펼쳐 보기'로 부른다 — '이어 보기'는 저장 위치가 있을 때만.
+  assert.equal(resumeCard({ source: 'example', books }).action, '펼쳐 보기');
 });
 
 test('이어 읽기 문구는 자동 제목 끝의 마침표를 덧붙이지 않는다', () => {
@@ -235,7 +246,7 @@ test('이어 읽기 문구는 자동 제목 끝의 마침표를 덧붙이지 않
 
 // ── #256-1 보완(CTO 검토): 칸은 책 목록이 바뀔 때 다시 그린다 ──
 // shelf.js를 가짜 DOM으로 싣어 본다. 모델 시험만으로는 "다시 그림"이 보이지 않기 때문이다.
-test('새 책을 만들면 이어 읽기 칸을 다시 그린다 · 검색으로 좁아져도 칸은 그대로', async () => {
+test('새 책을 만들면 이어 보기 띠를 다시 그린다 · 검색으로 좁아져도 띠는 그대로', async () => {
   const els = new Map();
   const el = (selector) => {
     if (!els.has(selector)) els.set(selector, fakeEl({
@@ -262,21 +273,21 @@ test('새 책을 만들면 이어 읽기 칸을 다시 그린다 · 검색으로
   globalThis.LTDEMO = { library: library.list, moments: [], get: () => globalThis.parent.LT41.momentId, select() {}, openBook() {} };
   globalThis.CSS = { escape: (value) => String(value).replace(/"/g, '\\"') };
   await import('../public/v41/views/shelf/shelf.js');
-  const title = () => el('#resumeTitle').textContent;
-  // 처음: 책이 없으면 "첫 책을 펼쳐 보세요"
-  assert.equal(el('#resumeCard').dataset.resumeKind, 'first');
-  assert.equal(title(), '첫 책을 펼쳐 보세요');
-  // 새 책 만들기 폼을 제출하면 칸이 다시 그려진다("첫 책을..."이 남지 않는다)
+  // 처음: 책이 없으면 띠를 숨긴다(소개 문이 그 자리를 쓴다 — 트리 0개 화면은 #817)
+  assert.equal(el('#resumeStrip').hidden, true, '책이 없으면 이어 보기 띠를 숨긴다');
+  // 새 책 만들기 폼을 제출하면 띠가 다시 그려진다(숨은 채로 남지 않는다)
   el('#newBookName').value = '가을 산책';
   el('#newBookUrl').value = 'https://example.com/a';
   el('#newBookForm').dispatch('submit', { preventDefault() {} });
-  assert.equal(el('#resumeCard').dataset.resumeKind, 'resume', '새 책 뒤에는 칸이 resume으로 바뀐다');
-  assert.match(title(), /^지난번 /);
-  assert.notEqual(title(), '첫 책을 펼쳐 보세요');
-  // 검색으로 레일이 좁아져도(0권) 칸은 전체 책 기준이라 그대로다
+  assert.equal(el('#resumeStrip').hidden, false, '새 책 뒤에는 띠가 보인다');
+  assert.equal(el('#resumeStrip').dataset.resumeKind, 'resume');
+  assert.equal(el('#resumeTree').textContent, '가을 산책');
+  assert.match(el('#resumeMoment').textContent, /처음 마음이 움직인 장면|첫 마음/);
+  assert.equal(el('#resumeGo').textContent, '이어 보기 ▶');
+  // 검색으로 레일이 좁아져도(0권) 띠는 전체 책 기준이라 그대로다
   el('#searchInput').value = '찾을 수 없는 책 이름';
   el('#searchInput').dispatch('input', { target: el('#searchInput') });
   assert.equal(el('#resultCount').textContent, '트리 0개');
-  assert.equal(el('#resumeCard').dataset.resumeKind, 'resume', '검색으로 좁아져도 칸은 바뀌지 않는다');
-  assert.match(title(), /^지난번 /);
+  assert.equal(el('#resumeStrip').hidden, false, '검색으로 좁아져도 띠는 바뀌지 않는다');
+  assert.equal(el('#resumeStrip').dataset.resumeKind, 'resume');
 });

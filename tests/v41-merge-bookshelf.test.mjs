@@ -43,11 +43,11 @@ test('책 목록은 런타임 데이터에서 만들고 표지 이름은 표시 
   assert.match(SERVER, /--lt-cover-1/);
 });
 
-test('#212 개선(표지 사진·줄임·중앙 카드 잘림 방지)이 두 모드 공통 코드로 남는다', () => {
+test('#212 개선(표지 사진·줄임)이 두 모드 공통 코드로 남는다', () => {
   assert.match(SERVER, /book-cover-media/);
   assert.match(SERVER, /-webkit-line-clamp: 3/);
   assert.match(SERVER, /absolute === 0 \? 1\.06/);
-  assert.match(SERVER, /y: absolute === 0 \? 6 :/);
+  // 261118: 옆 책 축소 폭지 리팩터링으로 'y: absolute === 0 ? 6 :' 글자 검사는 지웠다(#839 — y 오프셋은 없어졌고 배치는 v41-shelf-flow 실측 표가 잠근다).
 });
 
 test('셸 연결(lt41-* 메시지·DOM id)은 그대로다', () => {

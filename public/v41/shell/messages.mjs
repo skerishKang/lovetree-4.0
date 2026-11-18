@@ -6,6 +6,11 @@ import {parseTag,tagKey} from '../tags.mjs';
 // #480 L13: 날짜는 책·보드·지도·첫 화면과 같은 한 벌(formatDisplayDate)로만 적는다.
 import {formatDisplayDate} from '../book-usability.mjs';
 
+// 261118 대표 지적 2차 5: 서재 화면이 알려 준 '마지막에 본 트리'(가운데 책의 트리).
+// 서재 화면에서 콕·보드·지도 탭을 누르면 이 트리로 열린다(shell.mjs의 data-view 눌림에서 쓴다).
+let shelfTreeId = '';
+export function lastShelfTreeId() { return shelfTreeId; }
+
 export function createMessages(deps) {
   const {$} = deps;
   const getCurrent = deps.getCurrent;
@@ -115,6 +120,7 @@ export function createMessages(deps) {
         getMember().apply('cacheMediaMetadata', {url: data.url, mediaMetadata: data.mediaMetadata}, {treeId: tree.id, momentId: moment.id});
       } catch {}
     }
+    if (data?.type === 'lt41-shelf-tree' && getModel()?.trees?.some(t => t.id === data.treeId)) { shelfTreeId = data.treeId; return; }
     if (data?.type === 'lt41-navigate') {
       if (data.view === 'track32-bookshelf.html' && !getMember()?.snapshot().owned) { openLoginStart('shelf'); return; }
       show(data.view);

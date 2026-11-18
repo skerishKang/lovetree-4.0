@@ -6,6 +6,7 @@
 /* 4.1 공통 색·모양 토큰 (대표 결정 2026-11-05: 첫 화면 SRC064가 디자인 원본). 값은 SRC064 원본에서 그대로 뽑았다.
    새 UI의 색·모서리는 이 토큰만 쓴다. 원본 화면의 :root 색은 이 파일의 화면별 덮어쓰기로만 바꾼다. 새 hex를 흩뿌리지 않는다. */
 :root{
+ --lt-bottom-links-space:calc(max(10px, env(safe-area-inset-bottom)) + 52px);
  --lt-stage:#040407;--lt-stage-2:#0a0a11;            /* 무대: 첫 화면 배경 radial 중심/가장자리 */
  --lt-pearl:#f5f1e9;--lt-muted:#9b98a6;              /* 무대 위 글자 */
  --lt-gold:#ffe6a6;--lt-gold-deep:#e6b14c;--lt-gold-ink:#8a6420; /* 금테: 선택·강조·프레임 (ink는 종이 위 글자용) */
@@ -39,7 +40,7 @@ html[data-v41-screen=book] body:before{content:none}
 html[data-v41-screen=book] .topbar .tools,html[data-v41-screen=board] header .headbtn,html[data-v41-screen=network] .top-actions{font-family:var(--lt-ui)}
 
 /* Adapter UI sizes; source artwork and canvas overview scaling stay intact. */
-html[data-v41-screen=shelf] .eyebrow,html[data-v41-screen=shelf] .stage-label,html[data-v41-screen=shelf] .stage-hint{font-size:12px;letter-spacing:.04em}
+html[data-v41-screen=shelf] .eyebrow{font-size:12px;letter-spacing:.04em}
 html[data-v41-screen=shelf] .filter,html[data-v41-screen=shelf] .shelf-jump,html[data-v41-screen=shelf] .ghost{font-size:14px;min-height:44px}
 html[data-v41-screen=shelf] .search input{font-size:16px;min-height:44px}
 html[data-v41-screen=shelf] .shelf-arrow{width:44px;height:44px}
@@ -266,11 +267,8 @@ html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .hero h1{color:var(--lt-
 html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .hero h1 em{color:var(--lt-muted);font-style:normal}
 html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .hero-copy p:not(.eyebrow){color:var(--lt-muted)}
 html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .eyebrow{color:var(--lt-gold)}
-html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .hero-note{border-color:var(--lt-gold-line);color:var(--lt-pearl);background:rgba(255,230,166,.07)}
 html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .shelf-jump{border-color:var(--lt-gold-line);color:var(--lt-pearl);background:var(--lt-primary);color:var(--lt-primary-ink);font-weight:600}
 html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .shelf-jump:focus-visible{outline-color:var(--lt-gold)}
-html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .hero-stage{border-color:var(--lt-gold-line);background:radial-gradient(circle at 68% 24%,rgba(238,190,104,.14),transparent 26%),radial-gradient(circle at 30% 72%,rgba(120,146,201,.1),transparent 30%),linear-gradient(135deg,var(--lt-stage-2),var(--lt-stage) 82%)}
-html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .stage-label{color:var(--lt-gold)}
 html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .stage-hint{color:var(--lt-muted)}
 html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .search input{border-color:var(--lt-line);color:var(--lt-pearl);background:rgba(10,10,17,.66)}
 html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .search input::placeholder{color:var(--lt-muted)}
@@ -321,11 +319,6 @@ html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .reader-control{border-c
 html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .reader-control:hover{border-color:var(--lt-gold-line);background:rgba(255,230,166,.14)}
 html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .toast{color:var(--lt-pearl);background:var(--lt-glass-strong);border-color:var(--lt-line)}
 /* #256 2번: 책등 목차 밤 모양. 표지와 같은 책 색 위에 진주 글자, 눌린 책등에는 금테. 그림자는 밤 바닥에 맞춘다. */
-html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .shelf-spine{color:var(--lt-pearl);box-shadow:6px 9px 14px rgba(0,0,0,.5),inset 8px 0 0 rgba(0,0,0,.16)}
-html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .shelf-spine.is-active{box-shadow:0 0 0 1px var(--lt-gold-line),9px 14px 20px rgba(0,0,0,.55),inset 8px 0 0 rgba(0,0,0,.16)}
-html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .shelf-spine:hover{box-shadow:8px 12px 17px rgba(0,0,0,.52),inset 8px 0 0 rgba(0,0,0,.16)}
-html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .shelf-spine:focus-visible{outline-color:var(--lt-gold)}
-html[data-v41-screen=shelf]:not([data-lt-theme=garden]) .shelf-spine-row::-webkit-scrollbar-thumb{background:var(--lt-line)}
 /* 첫 화면과 같은 기본 글꼴(Pretendard)을 밤 책장에서도 쓴다. 책·순간 제목만 MaruBuri(시각 통일 기준). */
 html[data-v41-screen=shelf]:not([data-lt-theme=garden]) body,html[data-v41-screen=shelf]:not([data-lt-theme=garden]) button,html[data-v41-screen=shelf]:not([data-lt-theme=garden]) input{font-family:var(--lt-ui)}
 /* #212 표지 색: 밤은 장미색이 아닌 보드·지도 구분색, 정원은 지금 크림색 책장의 표지 색을 유지한다.

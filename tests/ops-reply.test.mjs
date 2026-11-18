@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseOpsArgs, shouldSkip, buildPatch } from '../tools/ops-reply.mjs';
+import { parseOpsArgs, shouldSkip, buildPatch, replyMode } from '../tools/ops-reply.mjs';
 
 test('#596 후속: ops-reply 인자 검사', () => {
   const args = parseOpsArgs(['--id', '7', '--reply', '/tmp/r.txt', '--status', 'fixed', '--issue', '584']);
@@ -59,4 +59,14 @@ test('#596 후속: 이미 답글이 있으면 건너뛴다', () => {
   assert.equal(shouldSkip({replyCount: 2}), true);
   assert.equal(shouldSkip({}), false);
   assert.equal(shouldSkip(null), false);
+});
+
+test('#846 후속: 사용 일지는 내부 메모·상태 갱신만 하고 고객 답변은 남기지 않는다', () => {
+  const replyArgs = {statusOnly: false};
+  const statusOnlyArgs = {statusOnly: true};
+  assert.equal(replyMode({kind: 'journal'}, replyArgs), 'internal');
+  assert.equal(replyMode({kind: 'journal'}, statusOnlyArgs), null);
+  assert.equal(replyMode({kind: 'opinion'}, replyArgs), 'customer');
+  assert.equal(replyMode({kind: 'opinion'}, statusOnlyArgs), null);
+  assert.equal(replyMode({kind: 'other'}, replyArgs), 'unknown-kind');
 });

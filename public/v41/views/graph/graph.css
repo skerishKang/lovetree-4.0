@@ -59,6 +59,7 @@ html[data-lt-theme=garden] .g-empty .g-empty-cta:hover,html[data-lt-theme=garden
 .g-shelf-label{font-size:12.5px;color:var(--lt-muted);white-space:nowrap;pointer-events:auto}
 .g-shelf-hint{pointer-events:auto;font-size:13px;color:var(--lt-gold);border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-pill);padding:4px 10px;background:rgba(255,230,166,.05);white-space:nowrap}
 .g-shelf-hint:hover{background:rgba(255,230,166,.12)}
+@media(min-width:781px){.g-shelf{bottom:var(--lt-bottom-links-space,62px)}}
 
 /* 오른쪽 레일(1440)·아래 시트(390) */
 .g-rail{flex:0 0 336px;display:flex;flex-direction:column;gap:12px;min-height:0;overflow:auto}
