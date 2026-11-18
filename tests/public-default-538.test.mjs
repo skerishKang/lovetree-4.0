@@ -27,7 +27,7 @@ function treeWithMoments(count, { url = '' } = {}) {
   return tree;
 }
 
-async function setup({ roles = {} } = {}) {
+async function setup({ roles = {}, stageIndex = null } = {}) {
   const workspaceRepo = createMemoryWorkspaceRepo();
   const shareRepo = createMemoryShareRepo();
   const visibilityRepo = createMemoryTreeVisibilityRepo();
@@ -40,15 +40,15 @@ async function setup({ roles = {} } = {}) {
   });
   let n = 0;
   const shareService = createShareService({
-    shareRepo, workspaceRepo, visibilityRepo, discoverRepo, productId: PRODUCT,
+    shareRepo, workspaceRepo, visibilityRepo, discoverRepo, stageIndex, productId: PRODUCT,
     makeId: () => String(++n).padStart(24, 'a')
   });
   const workspace = createWorkspaceService({
     repo: workspaceRepo, productId: PRODUCT,
-    onCommit: ({ subjectId, doc }) => shareService.syncSharesAfterSave(subjectId, doc)
+    onCommit: ({ subjectId }) => shareService.syncSharesAfterSave(subjectId)
   });
   const communityService = createCommunityService({
-    communityRepo, shareRepo, workspaceRepo, visibilityRepo, productId: PRODUCT,
+    communityRepo, shareRepo, workspaceRepo, visibilityRepo, stageIndex, productId: PRODUCT,
     admin: { roleFor: async value => roles[value.subjectId] ?? (value.subjectId === 'admin' ? 'admin' : null) },
     makeId: () => String(++n).padStart(24, 'c')
   });
@@ -75,6 +75,47 @@ async function setup({ roles = {} } = {}) {
     request(shareHandle, 'PUT', `/api/trees/${tree.id}/discover`, { discover: true }, who);
   return { workspace, workspaceRepo, shareRepo, visibilityRepo, discoverRepo, shareService, shareHandle, communityHandle, request, browse, discoverOn };
 }
+
+test('오래된 저장 요청을 재시도해도 현재 트리의 공유와 소개 동의가 유지된다', async () => {
+  const h = await setup();
+  const who = principal('alice'), oldTree = treeWithMoments(1), currentTree = treeWithMoments(3);
+  const first = { state: { version: 1, trees: [oldTree] }, expectedRevision: 0, clientKey: 'old-seed' };
+  await h.workspace.write(who, first);
+  await h.workspace.write(who, { state: { version: 1, trees: [currentTree] }, expectedRevision: 1, clientKey: 'next-seed' });
+  await h.discoverOn(currentTree);
+  await h.workspace.write(who, first);
+  const shares = await h.shareService.list('alice');
+  assert.equal(shares.find(row => row.treeId === oldTree.id).status, 'revoked');
+  assert.deepEqual(shares.filter(row => row.status === 'active').map(row => [row.treeId, row.discover]), [[currentTree.id, true]]);
+});
+
+test('무대 소속 갱신이 실패해도 저장·공개·회수·운영 숨김·복구·삭제 결과를 반환한다', async (t) => {
+  const calls = [];
+  const logger = t.mock.method(console, 'error', () => {});
+  const h = await setup({ stageIndex: { async reconcile(input) { calls.push(input); throw new Error('test failure'); } } });
+  const owner = principal('alice'), tree = treeWithMoments(3);
+  await h.workspace.write(owner, { state: { version: 1, trees: [tree] }, expectedRevision: 0, clientKey: 'indexed-save' });
+  assert.equal((await h.discoverOn(tree)).status, 200);
+  assert.equal((await h.shareService.setTreeVisibility('alice', tree.id, 'public')).visibility, 'public');
+  const input = { treeId: tree.id };
+  const preview = await h.shareService.projection('alice', input);
+  const made = await h.shareService.create('alice', { ...input, previewToken: preview.previewToken });
+  assert.equal((await h.shareService.revoke('alice', made.share.id)).status, 'revoked');
+
+  const [active] = (await h.shareService.list('alice')).filter(row => row.status === 'active');
+  const report = await h.request(h.communityHandle, 'POST', `/api/community/shares/${active.id}/report`,
+    { reason: '확인이 필요해요' }, 'bob', 'stage-report-1');
+  assert.equal(report.status, 201);
+  for (const [status, visibility] of [['resolved', 'hidden'], ['dismissed', 'visible']]) {
+    const result = await h.request(h.communityHandle, 'PATCH', `/api/community/admin/reports/${report.body.report.id}`,
+      { status, visibility }, 'admin');
+    assert.equal(result.body.report.hidden, visibility === 'hidden');
+  }
+  assert.equal((await h.workspace.deleteTree(owner, tree.id)).deleted, true);
+  assert.deepEqual(calls, Array(8).fill(owner));
+  assert.equal(logger.mock.callCount(), calls.length);
+  assert.ok(logger.mock.calls.every(call => call.arguments.length === 1 && !call.arguments[0].includes('test failure')));
+});
 
 test('새 트리는 공개가 기본이다 — 공유 링크 없이 저장만으로 자동 공개 행이 생긴다', async () => {
   const h = await setup();

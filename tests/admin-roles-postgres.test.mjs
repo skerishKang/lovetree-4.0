@@ -33,7 +33,9 @@ async function withRepo(run) {
 test('부여·조회·회수와 감사 이력이 실제 테이블에서 동작한다', { skip }, async () => {
   await withRepo(async (pool) => {
     const productId = `lovetree-admin-test-${suffix()}`;
-    const admin = createAdminRoleService({ store: createAdminRoleRepo(pool), productId });
+    const refreshed = [];
+    const stageIndex = { reconcile: async (input) => refreshed.push(input) };
+    const admin = createAdminRoleService({ store: createAdminRoleRepo(pool, { stageIndex }), productId });
     await pool.query('INSERT INTO lovetree_product_roles (product_id, subject_id, role) VALUES ($1, $2, $3)', [productId, ADMIN, ROLE_ADMIN]);
     const actor = { productId, subjectId: ADMIN };
     const target = { productId, subjectId: MEMBER };
@@ -53,6 +55,7 @@ test('부여·조회·회수와 감사 이력이 실제 테이블에서 동작�
     assert.equal(revoked.revocation.revoked, true);
     assert.equal(revoked.revocation.previousRole, ROLE_ADMIN);
     assert.equal(await admin.roleFor(target), null);
+    assert.deepEqual(refreshed, [target, target, target], '역할 부여·재부여·회수 뒤 모두 대상 계정의 무대 소속을 대조한다');
 
     const history = await admin.history({ limit: 10 });
     // 첫 행은 운영 절차의 직접 INSERT라 이력이 아니고, 이력은 서비스 경계를 지난 것만 남긴다.

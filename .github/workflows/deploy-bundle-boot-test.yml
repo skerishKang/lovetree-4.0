@@ -21,6 +21,9 @@ on:
       - 'deploy/host-com2/lovetree-api/**'
       - 'server/**'
       - 'src/domain.js'
+      - 'src/moment-range.js'
+      - 'src/stage-key.js'
+      - 'tools/admin-role.mjs'
       - 'package.json'
       - 'package-lock.json'
   workflow_dispatch:
@@ -104,6 +107,8 @@ jobs:
             --source-root "$RUNNER_TEMP/src077"
           test -f "$BOOT_APP/server/index.js"
           test -f "$BOOT_APP/src/domain.js"
+          test -f "$BOOT_APP/src/moment-range.js"
+          test -f "$BOOT_APP/src/stage-key.js"
 
       - name: Unit ExecCondition passes with job-generated temp values
         run: |

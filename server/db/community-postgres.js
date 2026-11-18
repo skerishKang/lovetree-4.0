@@ -1,3 +1,5 @@
+import { rankingOwnerCondition } from './stage-visibility-sql.js';
+
 const iso=value=>value instanceof Date?value.toISOString():value?String(value):null;
 const shareRow=value=>value&&({shareId:value.share_id,subjectId:value.subject_id,treeId:value.tree_id,entryMomentId:value.entry_moment_id,view:value.initial_view,status:value.status,createdAt:iso(value.created_at)});
 const commentRow=value=>value&&({id:value.comment_id,shareId:value.share_id,subjectId:value.subject_id,body:value.body,status:value.status,createdAt:iso(value.created_at),updatedAt:iso(value.updated_at),editedAt:value.edited_at?iso(value.edited_at):null});
@@ -42,12 +44,15 @@ export function createCommunityRepo(pool){
    const weekSelect=weekSince?`,\n      (SELECT count(*)::int FROM lovetree_community_votes v WHERE v.product_id=s.product_id AND v.target_kind='tree' AND v.target_id=s.share_id AND v.voted_at >= $4) AS week_votes`:'';
    const baseOrder="COALESCE((SELECT max(created_at) FROM lovetree_community_comments WHERE product_id=s.product_id AND share_id=s.share_id AND status='visible'), s.created_at) DESC, s.created_at DESC, s.share_id DESC";
    const orderSql=(sort==='popular'&&weekSince)?`week_votes DESC, ${baseOrder}`:baseOrder;
+   const rankOwners = sort === 'popular';
    const params=weekSince?[productId,viewerSubjectId,limit,weekSince]:[productId,viewerSubjectId,limit];
    const {rows}=await pool.query(
     `WITH picked AS (
        SELECT DISTINCT ON (s.tree_id) s.*
        FROM lovetree_shares s
+       ${rankOwners ? 'LEFT JOIN lovetree_product_roles owner_role USING (product_id, subject_id)' : ''}
        WHERE s.product_id=$1 AND s.status='active' AND s.moment_count>=3
+         ${rankOwners ? 'AND ' + rankingOwnerCondition : ''}
          AND EXISTS (
            SELECT 1 FROM lovetree_tree_discover d
            WHERE d.product_id=s.product_id AND d.subject_id=s.subject_id AND d.tree_id=s.tree_id AND d.discover=true

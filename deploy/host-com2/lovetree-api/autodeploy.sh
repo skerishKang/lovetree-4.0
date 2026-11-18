@@ -167,8 +167,8 @@ fi
 has_api=0
 for file in "${changed[@]}"; do
   case "$file" in
-    server/*|src/domain.js|public/v41/tags.mjs|public/v41/youtube-id.mjs|package.json|package-lock.json|\
-    tools/export-ai-customer-db.mjs|tools/ops-reply.mjs|tools/relink-opinion-author.mjs|\
+    server/*|src/domain.js|src/moment-range.js|src/stage-key.js|public/v41/tags.mjs|public/v41/youtube-id.mjs|package.json|package-lock.json|\
+    tools/admin-role.mjs|tools/export-ai-customer-db.mjs|tools/ops-reply.mjs|tools/relink-opinion-author.mjs|\
     deploy/host-com2/lovetree-api/install.sh|\
     deploy/host-com2/lovetree-api/check_config.mjs|\
     deploy/host-com2/lovetree-api/preflight_imports.mjs) has_api=1 ;;

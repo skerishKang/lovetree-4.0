@@ -1,3 +1,5 @@
+import { createTreeDiscoverRepo } from './tree-discover-postgres.js';
+
 const iso = value => value instanceof Date ? value.toISOString() : value ? String(value) : null;
 const row = value => value && ({
   shareId: value.share_id, subjectId: value.subject_id, treeId: value.tree_id,
@@ -8,11 +10,29 @@ const row = value => value && ({
 });
 export function createShareRepo(pool) {
   return {
+    // 최신 원본과 공유행·소개 동의 정리를 한 트랜잭션에서 맞춘다.
+    async withCurrentWorkspace({ productId, subjectId }, sync) {
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        const { rows } = await client.query(
+          'SELECT doc FROM lovetree_workspaces WHERE product_id=$1 AND subject_id=$2 FOR UPDATE',
+          [productId, subjectId]
+        );
+        if (rows.length) await sync(rows[0].doc, createShareRepo(client), createTreeDiscoverRepo(client));
+        await client.query('COMMIT');
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
     async create(input) {
       const result = await pool.query(
-        `INSERT INTO lovetree_shares (product_id, share_id, subject_id, tree_id, entry_moment_id, initial_view)
-         VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT (product_id, share_id) DO NOTHING RETURNING *`,
-        [input.productId,input.shareId,input.subjectId,input.treeId,input.entryMomentId,input.view]
+        `INSERT INTO lovetree_shares (product_id, share_id, subject_id, tree_id, entry_moment_id, initial_view, moment_count)
+         VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (product_id, share_id) DO NOTHING RETURNING *`,
+        [input.productId,input.shareId,input.subjectId,input.treeId,input.entryMomentId,input.view,input.momentCount ?? 0]
       );
       return row(result.rows[0]);
     },

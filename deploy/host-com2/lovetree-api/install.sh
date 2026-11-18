@@ -54,6 +54,9 @@ install -m 0644 "$source_root/src/domain.js" "$app/src/domain.js"
 if [[ -f "$source_root/src/moment-range.js" ]]; then
   install -m 0644 "$source_root/src/moment-range.js" "$app/src/moment-range.js"
 fi
+if [[ -f "$source_root/src/stage-key.js" ]]; then
+  install -m 0644 "$source_root/src/stage-key.js" "$app/src/stage-key.js"
+fi
 # 서버가 공개 꼬리표 규칙과 YouTube ID/썸네일 안전 판정을 화면과 공유한다.
 # 둘 다 다른 파일을 import하지 않으므로 정적 import 그래프에는 이 두 파일만 복사하면 된다.
 install -d -m 0755 "$app/public/v41"
@@ -65,6 +68,10 @@ install -m 0644 "$source_root/public/v41/youtube-id.mjs" "$app/public/v41/youtub
 if [[ -f "$source_root/tools/export-ai-customer-db.mjs" ]]; then
   install -d -m 0755 "$app/tools"
   install -m 0644 "$source_root/tools/export-ai-customer-db.mjs" "$app/tools/export-ai-customer-db.mjs"
+fi
+if [[ -f "$source_root/tools/admin-role.mjs" ]]; then
+  install -d -m 0755 "$app/tools"
+  install -m 0644 "$source_root/tools/admin-role.mjs" "$app/tools/admin-role.mjs"
 fi
 if [[ -f "$source_root/tools/ops-reply.mjs" ]]; then
   install -d -m 0755 "$app/tools"
