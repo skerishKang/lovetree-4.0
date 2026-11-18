@@ -319,7 +319,9 @@ async function playInPlace(root){
  // #584: no-referrer 는 YouTube 플레이어 구성 오류(오류 153)를 낸다(2026-11-14 실측).
  // strict-origin-when-cross-origin 으로 같은 영상이 그 자리에서 재생된다.
  frame.setAttribute('referrerpolicy','strict-origin-when-cross-origin');
- body.replaceChildren(frame);
+ // #833: 쇼츠는 재생 중 YouTube가 전체 화면 단추를 숨기므로 칸 모서리 단추로 크게 본다(안 되면 덮는 창).
+ try{const {mountExpandControls}=await import('/v41/yt-expand.mjs');const cell=mountExpandControls(body,{url:m.openUrl||root.dataset.ltUrl,openUrl:m.openUrl||root.dataset.ltUrl,vertical:root.hasAttribute('data-lt-vertical'),lightbox:(u,t,v)=>openLightbox(u,t,v)});cell.stage.append(frame);}
+ catch{body.replaceChildren(frame);}
  if(segmentEditor)root.dispatchEvent(new CustomEvent('lt41:media-playing',{bubbles:true,detail:{frame,videoId:m.videoId,start}}));
  if(rangeUsed&&!fromStart){const again=document.createElement('button');again.type='button';again.className='lt-from-start';again.dataset.ltFromStart='';again.textContent='처음부터 보기';body.append(again);}
  delete root.dataset.ltPlaying;

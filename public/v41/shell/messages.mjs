@@ -32,6 +32,7 @@ export function createMessages(deps) {
   const writeLocation = deps.writeLocation;
   const choose = deps.choose;
   const openTreeManager = deps.openTreeManager;
+  const openNewTree = deps.openNewTree || (() => {});
   const openEditor = deps.openEditor;
   // 이슈 671: 새로 추가(new·add)는 입구와 상관없이 같은 쓰기 창(openWrite)으로 연다 — 대표 결정(2026-11-12).
   const openWriteEntry = deps.openWriteEntry || (() => {});
@@ -129,6 +130,7 @@ export function createMessages(deps) {
       window.LT41.momentId = data.id; links(); writeLocation();
     }
     // #315: 공유 감상(share)은 읽기 전용이다. 안쪽 화면의 버튼 정리를 통과한 쓰기 메시지가 남아도 여기서 막는다(이중).
+    if (data?.type === 'lt41-new-tree') { openNewTree(); return; }
     if (data?.type === 'lt41-write' && getSource() === 'share') return;
     if (data?.type === 'lt41-write' && data.mode === 'edit' && data.momentId) {
       const targetTree = data.treeId

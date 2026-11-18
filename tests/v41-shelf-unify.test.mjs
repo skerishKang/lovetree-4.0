@@ -212,7 +212,8 @@ test('#서재 책등 줄은 없고 "+ 새 트리" 입구는 오른쪽 단추 하
   assert.ok(html.includes('id="shelfNewTree"'), "오른쪽 '+ 새 트리' 단추를 둔다");
   assert.ok(!/book-card--new|data-new-book|new-book-plus/.test(js + html), '점선 빈 책을 두지 않는다');
   assert.match(js, /\$\('#shelfNewTree'\)\.addEventListener\('click',openNewTree\)/, '단추는 새 트리 만들기 흐름을 연다');
-  assert.equal((js.match(/lt41-write',mode:'new'/g) || []).length, 2, '이어 보기 띠 first 경로 + 새 트리 단추');
+  assert.equal((js.match(/lt41-write',mode:'new'/g) || []).length, 1, '이어 보기 띠 first 경로만 순간 추가');
+  assert.equal((js.match(/lt41-new-tree'/g) || []).length, 1, '새 트리 단추는 트리 만들기 메시지');
 });
 
 // 261118 대표 지적 4: 이어 보기 띠가 테마를 따른다 — 정원에서도 검은 밤 카드로 남지 않는다.

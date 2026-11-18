@@ -24,6 +24,7 @@ import {createPanels} from './shell/panels.mjs';
 import {createQuickAdd} from './shell/quick-add.mjs';
 import {createWritePanel, readWriteTab, writeWriteTab} from './shell/write-panel.mjs';
 import {createQuickIntake} from './shell/quick-intake.mjs';
+import {createVideoDup} from './shell/video-dup.mjs';
 import {createJourney} from './shell/journey.mjs';
 import {createMessages, lastShelfTreeId} from './shell/messages.mjs';
 import {createCleanup} from './shell/cleanup.mjs';
@@ -221,6 +222,9 @@ function startLogin(intent=''){return shellAuth.startLogin(intent);}
 function openLoginStart(intent='first'){return shellAuth.openLoginStart(intent);}
 // #425: 순간 추가 한 창 — 쉬운 추가·자세한 추가를 한 창의 탭으로 오간다(shell/write-panel.mjs).
 const shellWrite=createWritePanel({$,onModalShown:()=>tipsFollowDialogs()});
+// #876: 같은 영상을 다시 담을 때 담기 전에 한 번 알려 주는 창(shell/video-dup.mjs). 잠깐 판 — 순간 추가 창
+// 위에 겹쳐 열리고(#845 3단계 STACK_ALLOWED), ×·Esc·뒤로가기로 닫으면 아무것도 담지 않는다.
+const shellVideoDup=createVideoDup({$,onModalShown:()=>tipsFollowDialogs(),requestClose:id=>shellDialogs.requestClose(id),choose:(id,momentId)=>choose(id,momentId),openEditor:(mode,parentId)=>openEditor(mode,parentId)});
 // 헤더·계정 메뉴는 shell/header.mjs가 맡는다(#231 1-B②-2). 셸은 자기 상태를 읽기 함수로 넘긴다.
 addEventListener('lovetree-auth-required',()=>shellAuth.authRequired());
 window.LT41=null;
@@ -245,7 +249,9 @@ const shellPanels=createPanels({
   // #425: 같은 창의 탭(쉬운 추가·자세한 추가)과 제목을 이 모듈이 정한다.
   writePanel:shellWrite,
   // #380 4 2차: 편집기의 취소 버튼도 공통 닫기 규칙(×·바깥·Esc와 같은 확인·업로드 중 막기)을 쓴다.
-  requestClose:id=>shellDialogs.requestClose(id)
+  requestClose:id=>shellDialogs.requestClose(id),
+  // #876: 같은 영상 안내 창 — 자세한 추가도 쉬운 추가와 같은 규칙.
+  videoDup:shellVideoDup
 });
 function openEditor(mode,parentId=''){
   // 2026-11-16 대표 요청: 자세한 추가도 쉬운 추가와 같은 기본 트리를 쓴다 — 늘 같은 트리를 골랐고
@@ -291,6 +297,8 @@ const shellQuick=createQuickAdd({
   openLoginStart:intent=>openLoginStart(intent),
   writePanel:shellWrite,
   requestClose:id=>shellDialogs.requestClose(id),
+  // #876: 같은 영상 안내 창 — 담기 전에 한 번 알려 주고 [그래도 담기]·[그 순간 보기]를 맡긴다.
+  videoDup:shellVideoDup,
   // #638: 쉬운 추가가 지금 고른 트리에 담기게 — 지금 트리·트리 목록은 트리 메뉴와 같은 재료(window.LT41)에서 읽는다.
   currentTreeId: () => window.LT41?.tree?.id || '',
   listTrees: () => (Array.isArray(window.LT41?.trees) ? window.LT41.trees : []),
@@ -313,6 +321,8 @@ const shellIntake=createQuickIntake({
   // 담기·중복·로그인 필요 안내는 방금 한 행동의 결과다 — 상태 안내가 곧바로 덮지 않게 hold로 띄운다(#353 후속).
   notify:text=>notify(text,{hold:true}),
   openLoginStart:intent=>openLoginStart(intent),
+  // #876: 같은 영상 안내 창 — 붙여넣기·공유로 담을 때도 쉬운 추가와 같은 규칙(조용히 막기를 대체).
+  videoDup:shellVideoDup,
   describe:(url)=>globalThis.LTMedia?.describe?.(url),
 });
 // #327 2부: 모아둔 순간 정리 창. #380 5번: 입구는 트리 ▾ 드롭다운의 '정리 전 N개 정리하기' 한 곳뿐이고,
@@ -392,6 +402,7 @@ const shellMessages=createMessages({
   openTreeManager:()=>shellPanels.openTreeManager(),
   openTagManager:opts=>shellTagManager.open(opts),
   openEditor:(mode,parentId)=>openEditor(mode,parentId),
+  openNewTree:()=>openEditor('new'),
   // 이슈 671: lt41-write의 새로 추가(new·add)는 쓰기 창 한 길로 — 목적지(트리·이어질 순간)를 함께 넘긴다.
   openWriteEntry:target=>shellQuick.openWrite(target),
   focusTitleInput:()=>shellPanels.focusTitleInput?.(),

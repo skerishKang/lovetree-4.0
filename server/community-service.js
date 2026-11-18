@@ -60,17 +60,28 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
   const coverType=youtubeId?'youtube':cover?.type||'';
   // #425 2번: 표지 주소는 '순간에서(moment)'일 때만 보낸다. 사진 표지는 공개 판정에서
   // 디자인/기본으로 바뀌고(projectSharedTree), 디자인·기본 표지에는 주소가 없다.
-  const coverUrl=coverModeOf(tree)==='moment'?(cover?.url||''):'';
+  const coverIsMoment=coverModeOf(tree)==='moment';
+  const coverUrl=coverIsMoment?(cover?.url||''):'';
   const vertical=['video','youtube'].includes(coverType)&&isVerticalMoment(cover);
   const safeCoverThumbnail=safeYoutubeThumb(cover?.mediaMetadata?.thumbnail||cover?.mediaMetadata?.thumbnailUrl||cover?.thumbnailUrl);
   const thumbnailId=youtubeId||youtubeIdFrom(safeCoverThumbnail);
   const youtubeThumbnail=youtubeStageThumbUrl(thumbnailId,'mqdefault')||safeCoverThumbnail;
-  const thumbnailUrl=coverModeOf(tree)==='moment'
+  // #887: 표지 후보 사슬 — 명시 표지(모드 moment) → 사진 표지(같은 자리) → 첫 YouTube 순간 썸네일(mqdefault) → 글자 칸.
+  // 기본·디자인 표지 트리도 썸네일을 비워 보내면 카드가 글자 칸만 남는다(운영 7카드 전부 해당 — 261118 확인).
+  // 사진 주소는 #425 규칙 그대로 모드가 'moment'일 때만 내보내고, 없는 트리는 공개 YouTube 썸네일
+  // (i.ytimg.com mqdefault)로만 채운다 — 개인 미디어 주소는 흘리지 않는다.
+  let thumbnailUrl=coverIsMoment
    ? coverType==='youtube'?youtubeThumbnail:coverUrl
    : '';
+  let cardCoverType=coverType,cardVertical=vertical;
+  if(!thumbnailUrl){
+   const ytMoment=tree.moments.find(moment=>youtubeIdFrom(moment.url||moment.externalUrl));
+   const fallbackThumb=youtubeStageThumbUrl(ytMoment?youtubeIdFrom(ytMoment.url||ytMoment.externalUrl):null,'mqdefault')||'';
+   if(fallbackThumb){thumbnailUrl=fallbackThumb;cardCoverType='youtube';cardVertical=isVerticalMoment(ytMoment);}
+  }
   const emotions=[...new Set(tree.moments.map(moment=>moment.emotion).filter(Boolean))];
   const stats=statsOverride||await communityRepo.stats({productId,shareId:share.shareId,viewerSubjectId});
-  const card={shareId:share.shareId,title:tree.title,subject:tree.subject,summary:clean(cover?.note,160),emotions,momentCount:tree.moments.length,entryMomentId:share.entryMomentId,view:share.view,cover:{title:cover?.title||tree.title,url:coverUrl,thumbnailUrl,type:coverType,vertical,emotion:cover?.emotion||''},createdAt:share.createdAt,lastActivityAt:lastActivityAt||share.createdAt,stats};
+  const card={shareId:share.shareId,title:tree.title,subject:tree.subject,summary:clean(cover?.note,160),emotions,momentCount:tree.moments.length,entryMomentId:share.entryMomentId,view:share.view,cover:{title:cover?.title||tree.title,url:coverUrl,thumbnailUrl,type:cardCoverType,vertical:cardVertical,emotion:cover?.emotion||''},createdAt:share.createdAt,lastActivityAt:lastActivityAt||share.createdAt,stats};
   // #611 3번: AI 명예회원 기록은 남에게 보이는 카드에 'AI 명예회원' 배지 한 비트만 내린다
   // (계정·이메일·subject는 공개 응답에 넣지 않는다).
   if(aiTesterLookup&&await aiTesterLookup(share.subjectId))card.aiTester=true;
@@ -102,8 +113,10 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
    totalsCache={at,value};
    return value;
   },
-  async discover({query='',emotion='',artistGroup='',cursor='',limit=12,viewerSubjectId=null}={}){
+  async discover({query='',emotion='',artistGroup='',cursor='',limit=12,viewerSubjectId=null,sort='latest'}={}){
    const q=clean(query,80).toLocaleLowerCase('ko-KR'),tag=clean(emotion,12),artistKey=tagKey(clean(artistGroup,24)),size=Math.max(1,Math.min(24,Number(limit)||12));
+   // #824 결정 2: sort='popular'면 이번 주 표 수 내림차순. 모르는 값은 기본(latest)으로 돌린다.
+   const sortKey=sort==='popular'?'popular':'latest';
    // #611 3번: AI 명예회원 배지 비트 — 이번 한 번의 둘러보기 조회에서는 같은 주인이면 한 번만 묻는다.
    // #678 후속: 역할을 한 번만 물어 두고(주인당 한 번) 그 값으로 배지와 시험 계정 거름을 함께 판정한다.
    const roleCache=new Map();
@@ -115,7 +128,7 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
    const isTesterLookup=roleOf?async subjectId=>await roleOf(subjectId)===ROLE_TESTER:null;
    let entries;
    if(typeof communityRepo.listDiscoverableSummaries==='function'){
-    const summaries=await communityRepo.listDiscoverableSummaries({productId,viewerSubjectId,limit:240});
+    const summaries=await communityRepo.listDiscoverableSummaries({productId,viewerSubjectId,limit:240,sort:sortKey,weekSince:new Date(weekStartKst()).toISOString()});
     entries=await Promise.all(summaries.map(async summary=>{
      // 시험 계정(tester 역할) 트리는 둘러보기 목록·검색에서 뺀다(#678 후속 — 공유 링크 직접 열기는 그대로).
      if(await isTesterLookup(summary.share.subjectId))return null;
@@ -236,7 +249,7 @@ export function createCommunityHandler({authenticate,service,productId}){
   // #627 3단계 '다른 팬 보기' — 공개 경로라 로그인 없이도 부른다. 로그인했으면 자기 트리·차단 관계를 뺀다.
   if(path==='/api/public/tag-moments'&&method==='GET'){const who=await principal(request,false);return {status:200,body:await service.tagMoments({tag:String(query.get('tag')||''),viewerSubjectId:who?.subjectId||null}),headers:NO_STORE};}
   if(path==='/api/community/stats'&&method==='GET'){return {status:200,body:await service.discoverTotals(),headers:{...NO_STORE,'cache-control':'public, max-age=60'}};}
-  if(path==='/api/community/shares'&&method==='GET'){const who=await principal(request,false);return {status:200,body:await service.discover({query:query.get('q')||'',emotion:query.get('emotion')||'',artistGroup:query.get('artist')||'',cursor:query.get('cursor')||'',limit:query.get('limit')||12,viewerSubjectId:who?.subjectId||null}),headers:NO_STORE};}
+  if(path==='/api/community/shares'&&method==='GET'){const who=await principal(request,false);return {status:200,body:await service.discover({query:query.get('q')||'',emotion:query.get('emotion')||'',artistGroup:query.get('artist')||'',cursor:query.get('cursor')||'',limit:query.get('limit')||12,viewerSubjectId:who?.subjectId||null,sort:query.get('sort')||'latest'}),headers:NO_STORE};}
   if(path==='/api/community/me/favorites'&&method==='GET'){const who=await principal(request);return {status:200,body:{shareIds:await service.favorites(who.subjectId)},headers:NO_STORE};}
   if(path==='/api/community/admin/reports'&&method==='GET'){const who=await principal(request);return {status:200,body:{reports:await service.reports(who)},headers:NO_STORE};}
   const moderate=path.match(/^\/api\/community\/admin\/reports\/([^/]+)$/);

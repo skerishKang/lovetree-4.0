@@ -4,6 +4,7 @@ import {formatRange,youtubeRangeEmbedUrl} from '/v41/domain.mjs';
 import {coverChoice,COVER_PALETTE} from '/v41/views/shelf/shelf-model.mjs';
 import {coverMomentFor} from '/v41/views/shelf/shelf-model.mjs';
 import {thumbnailCandidates,thumbFallbackAttrs,coverFallbackAttrs,fallbackCardMarkup,mountThumbFallback,VIDEO_UNAVAILABLE_TEXT} from '/v41/thumb-fallback.mjs';
+import {mountExpandControls,ytOpenUrl} from '/v41/yt-expand.mjs';
 mountThumbFallback(document);
 const $b=s=>document.querySelector(s);
 // #347 후속: 제목 보기 설정은 계정(LTDEMO.prefs)에서 읽고, 화면은 한 벌(titleView)로 그린다.
@@ -137,7 +138,11 @@ function playInline(yt,media){
  const frame=document.createElement('iframe');frame.className='yt-frame'+(yt.dataset.ytVertical==='1'?' is-vertical':'');frame.src=url;frame.title='YouTube 영상 재생';
  frame.allow='accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';frame.allowFullscreen=true;
  frame.setAttribute('referrerpolicy','strict-origin-when-cross-origin');
- const host=yt.parentElement;if(!host)return;host.replaceChildren(frame);
+ const host=yt.parentElement;if(!host)return;
+ // #833: 쇼츠는 재생 중 YouTube가 전체 화면 단추를 숨기므로 칸 모서리 단추로 크게 본다(안 되면 덮는 창).
+ const watch=(media&&media.openUrl)?media.openUrl:('https://www.youtube.com/watch?v='+yt.dataset.ytPlay);
+ const cell=mountExpandControls(host,{url:watch,openUrl:watch,vertical:yt.dataset.ytVertical==='1',lightbox:(u,ti,v)=>{window.LTMedia&&LTMedia.openLightbox(u,ti,v)}});
+ cell.stage.append(frame);
  if(end>start)host.insertAdjacentHTML('beforeend','<button type="button" class="yt-from-start" data-yt-from-start="'+t(yt.dataset.ytPlay)+'">처음부터 보기</button>');
 }
 document.addEventListener('pointerdown',e=>{
@@ -147,7 +152,10 @@ document.addEventListener('pointerdown',e=>{
  if(fromStart){e.preventDefault();e.stopPropagation();const host=fromStart.parentElement;if(!host||host.querySelector('iframe.yt-frame'))return;
   const frame=document.createElement('iframe');frame.className='yt-frame';frame.src=embedUrl(fromStart.dataset.ytFromStart,0);frame.title='YouTube 영상 재생';
   frame.allow='accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';frame.allowFullscreen=true;
-  frame.setAttribute('referrerpolicy','strict-origin-when-cross-origin');host.replaceChildren(frame);return}
+  frame.setAttribute('referrerpolicy','strict-origin-when-cross-origin');
+  // #833: '처음부터 보기' 재생 칸도 같은 모서리 단추를 둔다.
+  const cell=mountExpandControls(host,{url:ytOpenUrl(fromStart.dataset.ytFromStart),openUrl:ytOpenUrl(fromStart.dataset.ytFromStart),lightbox:(u,ti,v)=>{window.LTMedia&&LTMedia.openLightbox(u,ti,v)}});
+  cell.stage.append(frame);return}
  const yt=e.target.closest&&e.target.closest('[data-yt-play]');
  if(!yt||yt.querySelector('.lt-fallback-card'))return;
  e.preventDefault();e.stopPropagation();
@@ -325,9 +333,11 @@ let storyTipOpen=false,storyRequest=null;
 try{storyTipOpen=LTDEMO.moments.length>=2&&localStorage.getItem(STORY_TIP_KEY)!=='1';if(storyTipOpen)localStorage.setItem(STORY_TIP_KEY,'1')}catch{storyTipOpen=LTDEMO.moments.length>=2}
 function storyTipMarkup(){return storyTipOpen?'<div class="story-tip" role="note"><span>두 순간 사이에 한마디를 남기면, 책이 이야기처럼 이어져요. 안 적어도 괜찮아요.</span><button type="button" data-story-tip-dismiss>알겠어요</button></div>':''}
 updateConnectionSummary=function(id){
- const next=nextMomentOf(id),host=$b('#whyMargin'),momentId=String(id||'');
+ const next=nextMomentOf(id),host=$b('#whyMargin'),tipHost=$b('#storyTipHost'),momentId=String(id||'');
  if(!host)return;
  const tip=storyTipMarkup();
+ /* #875: 안내 말풍선은 책 바깥 아래 host로 — 책 안에 두면 오른쪽 페이지 아래 글을 가린다. */
+ if(tipHost){if(tip){tipHost.hidden=false;tipHost.innerHTML=tip}else{tipHost.hidden=true;tipHost.replaceChildren()}}
  let action='';
  if(next){
   const reason=String(next.reason||'').trim();
@@ -336,13 +346,16 @@ updateConnectionSummary=function(id){
    action='<button type="button" class="story-action" data-story-open data-from-moment="'+t(momentId)+'" data-to-moment="'+t(next.id)+'">'+t(label)+'</button>';
   }else if(reason){action='<span class="story-action story-readonly">→ '+t(reason)+'</span>'}
  }
- if(!tip&&!action){host.hidden=true;host.replaceChildren();return}
+ if(!action){host.hidden=true;host.replaceChildren();return}
  host.hidden=false;
- host.innerHTML=tip+(action?'<div class="story-action-wrap">'+action+'</div>':'');
+ host.innerHTML='<div class="story-action-wrap">'+action+'</div>';
 };
 function openStoryEditor(fromMomentId,toMomentId,initial=''){
  const host=$b('#whyMargin');if(!host)return;
- host.innerHTML=storyTipMarkup()+'<form class="story-editor" data-story-form data-from-moment="'+t(fromMomentId)+'" data-to-moment="'+t(toMomentId)+'"><input name="relation" maxlength="100" aria-label="두 순간을 잇는 한마디" placeholder="두 순간을 잇는 한마디" value="'+t(initial)+'"><button type="submit">저장</button><button type="button" data-story-cancel>취소</button></form>';
+ /* #875: 안내는 책 바깥 아래 host로, 편집 칸은 지금 자리(#800)에 둔다. */
+ const tip=storyTipMarkup(),tipHost=$b('#storyTipHost');
+ if(tipHost){if(tip){tipHost.hidden=false;tipHost.innerHTML=tip}else{tipHost.hidden=true;tipHost.replaceChildren()}}
+ host.innerHTML='<form class="story-editor" data-story-form data-from-moment="'+t(fromMomentId)+'" data-to-moment="'+t(toMomentId)+'"><input name="relation" maxlength="100" aria-label="두 순간을 잇는 한마디" placeholder="두 순간을 잇는 한마디" value="'+t(initial)+'"><button type="submit">저장</button><button type="button" data-story-cancel>취소</button></form>';
  host.hidden=false;
  const input=host.querySelector('input[name="relation"]');input?.focus();
 }

@@ -343,3 +343,158 @@ test('#845 3단계 앞 창이 더러우면 한 번 묻고, 취소하면 겹친�
     assert.deepEqual(errors, [], '페이지 오류 없음');
   } finally { await browser.close(); }
 });
+// #876: 같은 영상을 다시 담을 때 — 막지 말고 담기 전에 한 번 알려 준다(대표 결정 2026-11-18).
+// 쉬운 추가 창에서 같은 트리·같은 영상(주소 모양이 달라도 id가 같음)을 담으면 안내 창이 열리고,
+// [그래도 담기]는 담고, [그 순간 보기]는 담지 않고 이미 담은 순간을 열어 준다. 구간이 다르면 다른
+// 장면이라 그냥 담고, 다른 트리에 같은 영상이 있으면 담은 뒤 한 줄 알린다.
+const YT_ID = 'dQw4w9WgXcQ';
+const momentShape = (id, date, url, extra = {}) => ({
+  id, parentId: null, links: [], createdAt: '2026-11-15T00:00:00.000Z',
+  title: `순간 ${id}`, note: '', emotion: '설렘', date, relation: '', url, ...extra,
+});
+const WORKSPACE_DUP = {
+  revision: 1, subject: 'trial-subject', writeSubjectBound: true,
+  state: { version: 1, prefs: {}, trees: [{
+    id: 'tree1', subject: '시험 사용자', title: '모아둔 순간', coverMomentId: '', inbox: false,
+    createdAt: '2026-11-15T00:00:00.000Z', updatedAt: '2026-11-15T00:00:00.000Z',
+    moments: [momentShape('m1', '2026-11-13', `https://youtu.be/${YT_ID}`)],
+  }] },
+};
+const WORKSPACE_DUP_TWO_TREES = {
+  revision: 1, subject: 'trial-subject', writeSubjectBound: true,
+  state: { version: 1, prefs: {}, trees: [
+    {
+      id: 'tree1', subject: '시험 사용자', title: '모아둔 순간', coverMomentId: '', inbox: false,
+      createdAt: '2026-11-15T00:00:00.000Z', updatedAt: '2026-11-15T00:00:00.000Z',
+      moments: [momentShape('m1', '2026-11-13', `https://youtu.be/${YT_ID}`)],
+    },
+    {
+      id: 'tree2', subject: '리센느', title: '리센느', coverMomentId: '', inbox: false,
+      createdAt: '2026-11-15T00:00:00.000Z', updatedAt: '2026-11-15T00:00:00.000Z',
+      moments: [momentShape('m2', '2026-11-14', '')],
+    },
+  ] },
+};
+
+async function openWith(page, workspace) {
+  await page.route('**/api/workspace*', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(workspace) }));
+  await page.goto(`${base}/v41/?account=1`, { waitUntil: 'load' });
+  await page.waitForFunction(() => Array.isArray(window.LT41?.trees) && window.LT41.trees.length > 0, null, { timeout: 20000 });
+}
+async function openQuickAndFill(page, url) {
+  await page.click('#write-menu');
+  await page.waitForFunction(() => document.getElementById('write-panel').open, null, { timeout: 10000 });
+  await page.fill('#quick-url', url);
+  await page.click('#quick-submit');
+}
+const momentCount = (page, treeIndex = 0) => page.evaluate((i) => window.LT41.trees[i].moments.length, treeIndex);
+
+test('#876 같은 트리 같은 영상: 안내 창이 열리고 [그래도 담기]로 담는다(주소 모양이 달라도)', { skip: REQUIRE ? false : skip }, async () => {
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    const errors = [];
+    page.on('pageerror', (e) => errors.push(String(e.message || e)));
+    await openWith(page, WORKSPACE_DUP);
+    // 이미 담은 순간은 youtu.be, 다시 담는 주소는 watch?v= — 주소 모양이 달라도 같은 영상이다(규칙 5).
+    await openQuickAndFill(page, `https://www.youtube.com/watch?v=${YT_ID}`);
+    await page.waitForFunction(() => document.getElementById('video-dup-panel').open, null, { timeout: 10000 });
+    const text = await page.evaluate(() => document.getElementById('video-dup-text').textContent);
+    assert.ok(text.includes('이미 담은 영상이에요'), `안내 문구: ${text}`);
+    assert.ok(text.includes('11월 13일'), `담은 날짜가 함께 보인다: ${text}`);
+    assert.equal(await momentCount(page), 1, '안내 창에서는 아직 담지 않는다');
+    // [그래도 담기]: 원래 하려던 담기를 그대로 한다.
+    await page.click('#video-dup-continue');
+    await page.waitForFunction(() => !document.getElementById('video-dup-panel').open, null, { timeout: 10000 });
+    assert.equal(await momentCount(page), 2, '그래도 담기로 담는다');
+    assert.deepEqual(errors, [], '페이지 오류 없음');
+  } finally { await browser.close(); }
+});
+
+test('#876 같은 트리 같은 영상: [그 순간 보기]는 담지 않고 이미 담은 순간을 열어 준다', { skip: REQUIRE ? false : skip }, async () => {
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    const errors = [];
+    page.on('pageerror', (e) => errors.push(String(e.message || e)));
+    await openWith(page, WORKSPACE_DUP);
+    // 구간을 적지 않은 같은 영상 — '둘 다 없음'이라 같은 장면으로 본다(규칙 1).
+    await openQuickAndFill(page, `https://youtu.be/${YT_ID}`);
+    await page.waitForFunction(() => document.getElementById('video-dup-panel').open, null, { timeout: 10000 });
+    // 그 순간 보기: 순간 추가 창을 닫는다 — 적어 둔 값이 있으면 기존 규칙대로 한 번 묻는다(받아들인다).
+    page.once('dialog', (d) => d.accept());
+    await page.click('#video-dup-view');
+    await page.waitForFunction(() => !document.getElementById('video-dup-panel').open, null, { timeout: 10000 });
+    await page.waitForFunction(() => document.getElementById('write-panel').open, null, { timeout: 10000 });
+    assert.equal(await momentCount(page), 1, '아무것도 담지 않는다');
+    const editing = await page.evaluate(() => document.getElementById('moment-form')?.elements?.url?.value || '');
+    assert.ok(editing.includes(YT_ID), '이미 담은 순간을 편집기로 열어 준다');
+    assert.deepEqual(errors, [], '페이지 오류 없음');
+  } finally { await browser.close(); }
+});
+
+test('#876 구간이 다르면 다른 장면이라 안내 없이 담는다(규칙 2)', { skip: REQUIRE ? false : skip }, async () => {
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    const errors = [];
+    page.on('pageerror', (e) => errors.push(String(e.message || e)));
+    // 이미 담은 순간의 구간은 90초 — 30초부터의 장면은 다른 장면이다.
+    const workspace = JSON.parse(JSON.stringify(WORKSPACE_DUP));
+    workspace.state.trees[0].moments[0].startSeconds = 90;
+    await openWith(page, workspace);
+    await openQuickAndFill(page, `https://youtu.be/${YT_ID}?t=30`);
+    await page.waitForFunction(() => !document.getElementById('quick-url').value, null, { timeout: 10000 });
+    assert.equal(await page.evaluate(() => document.getElementById('video-dup-panel').open), false, '안내 창을 열지 않는다');
+    assert.equal(await momentCount(page), 2, '바로 담는다');
+    assert.deepEqual(errors, [], '페이지 오류 없음');
+  } finally { await browser.close(); }
+});
+
+test('#876 다른 트리에 같은 영상: 막지 않고 담은 뒤 한 줄 알린다(규칙 3)', { skip: REQUIRE ? false : skip }, async () => {
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    const errors = [];
+    page.on('pageerror', (e) => errors.push(String(e.message || e)));
+    await openWith(page, WORKSPACE_DUP_TWO_TREES);
+    await page.click('#write-menu');
+    await page.waitForFunction(() => document.getElementById('write-panel').open, null, { timeout: 10000 });
+    // 담을 트리를 리센느(tree2)로 바꾼다 — 같은 영상은 모아둔 순간(tree1)에 있다.
+    await page.selectOption('#quick-tree-select', 'tree2');
+    await page.fill('#quick-url', `https://youtu.be/${YT_ID}`);
+    await page.click('#quick-submit');
+    await page.waitForFunction(() => !document.getElementById('quick-url').value, null, { timeout: 10000 });
+    assert.equal(await page.evaluate(() => document.getElementById('video-dup-panel').open), false, '안내 창을 열지 않는다');
+    assert.equal(await momentCount(page, 1), 2, '리센느에 담는다');
+    const toast = await page.evaluate(() => ({ text: document.getElementById('toast').textContent, hidden: document.getElementById('toast').hidden }));
+    assert.equal(toast.hidden, false, '알림이 보인다');
+    assert.ok(toast.text.includes("'모아둔 순간' 트리에도 있어요"), `알림 한 줄: ${toast.text}`);
+    assert.deepEqual(errors, [], '페이지 오류 없음');
+  } finally { await browser.close(); }
+});
+
+test('#876 안내 창도 #845 창 규칙을 탄다 — Esc·뒤로가기로 닫히면 아무것도 담지 않는다', { skip: REQUIRE ? false : skip }, async () => {
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    const errors = [];
+    page.on('pageerror', (e) => errors.push(String(e.message || e)));
+    await openWith(page, WORKSPACE_DUP);
+    await openQuickAndFill(page, `https://youtu.be/${YT_ID}`);
+    await page.waitForFunction(() => document.getElementById('video-dup-panel').open, null, { timeout: 10000 });
+    // Esc: 맨 위 창(안내 창)만 닫고 아무것도 담지 않는다 — 순간 추가 창은 그대로 남는다.
+    await page.keyboard.press('Escape');
+    await page.waitForFunction(() => !document.getElementById('video-dup-panel').open, null, { timeout: 10000 });
+    assert.equal(await page.evaluate(() => document.getElementById('write-panel').open), true, '순간 추가 창은 남는다');
+    assert.equal(await momentCount(page), 1, '아무것도 담지 않는다');
+    // 뒤로가기: 같은 창을 다시 열어 뒤로가기로 닫는다(#845 2단계 — 창이 열려 있으면 뒤로가기는 창을 닫는다).
+    await page.click('#quick-submit');
+    await page.waitForFunction(() => document.getElementById('video-dup-panel').open, null, { timeout: 10000 });
+    await page.evaluate(() => history.back());
+    await page.waitForFunction(() => !document.getElementById('video-dup-panel').open, null, { timeout: 10000 });
+    assert.equal(await momentCount(page), 1, '뒤로가기로 닫아도 아무것도 담지 않는다');
+    assert.equal(await page.evaluate(() => location.href.includes('youtu.be')), false, '주소가 그대로다');
+    assert.deepEqual(errors, [], '페이지 오류 없음');
+  } finally { await browser.close(); }
+});

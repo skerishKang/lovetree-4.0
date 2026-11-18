@@ -3,6 +3,9 @@
 // shell.mjs에서 조건·조회 방식·인자 형태를 바꾸지 않고 그대로 옮겼다(원칙 7).
 // 셸은 자기 상태(member·source·window.LT41·업로드)를 읽기 함수로 넘기고, 이 파일은 패널만 만진다.
 import {parentCandidates, suggestMomentTitle, coverModeOf, latestMomentId, validateRange, startFromUrl, fillStartFromUrl, formatTimecode} from '../domain.mjs';
+// #876: 같은 영상 판정(quick-intake 한 벌)과 안내 창 날짜 표기(book-usability 한 벌) — 새 규칙을 만들지 않는다.
+import {findSameVideoInTree, treesWithSameVideo} from '../quick-intake.mjs';
+import {formatDisplayDate} from '../book-usability.mjs';
 import {localDateOnly} from '../local-date.mjs';
 import {displayTreeTitle} from '../tree-name.mjs';
 import {mountPrivateUpload} from '../private-upload.mjs';
@@ -16,6 +19,12 @@ export function createPanels(deps) {
   const getSource = deps.getSource;
   const getUploads = deps.getUploads;
   const notify = deps.notify;
+  // #876 규칙 3의 한 줄: 다른 트리 이름으로 알린다. 여러 트리면 첫 이름과 나머지 개수로(토스트 한 줄 계약).
+  function otherTreesLine(others) {
+    const names = (Array.isArray(others) ? others : []).map(tree => displayTreeTitle(String(tree?.title || tree?.subject || '') || '트리'));
+    if (!names.length) return '';
+    return names.length === 1 ? `'${names[0]}' 트리에도 있어요` : `'${names[0]}' 외 ${names.length - 1}개 트리에도 있어요`;
+  }
   const panel = deps.panel;
   // #368: 읽기 전용 안내는 설정 "내 데이터" 묶음으로 연다(옛 내 기록 창 자리).
   const openSettingsData = deps.openSettingsData;
@@ -442,6 +451,20 @@ export function createPanels(deps) {
   for (const name of ['title', 'note', 'url']) $('moment-form').elements[name].addEventListener('input', () => { if (name === 'url' || name === 'title') updateMediaPreview(); updateQuickEntryHint(); });
   // #627: 사용자가 무대 날짜를 직접 고치면 자동 채움 안내를 감춘다.
   $('moment-form').elements.date.addEventListener('input', () => { $('stage-date-hint').hidden = true; });
+  // #876(규칙 1·4): 자세한 추가도 쉬운 추가와 같은 규칙 — 같은 트리에 같은 영상·같은 장면이 이미 있으면
+  // 막지 말고 담기 전에 한 번 알려 준다. [그래도 담기]는 이 판정을 다시 보지 않고(requestSubmit에
+  // editorDupBypass 표시) 원래 저장을 그대로 한다. 수정('edit')은 이미 담긴 순간을 고치는 길이라 보지 않는다.
+  let editorDupBypass = false;
+  function editorDupCheck() {
+    if (editorMode !== 'add' || editorDupBypass) return null;
+    const url = $('moment-form').elements.url.value.trim();
+    if (!url) return null;
+    const treeId = String(selection()?.treeId || '');
+    const trees = getMember()?.state?.()?.trees || [];
+    const targetTree = trees.find(tree => tree.id === treeId) || null;
+    const dup = targetTree ? findSameVideoInTree(targetTree, url) : null;
+    return dup ? { dup, treeId, treeName: displayTreeTitle(String(targetTree?.title || targetTree?.subject || '') || '트리') } : null;
+  }
   $('moment-form').onsubmit = e => {
     e.preventDefault();
     if (getUploads().busy) return;
@@ -464,6 +487,19 @@ export function createPanels(deps) {
         return;
       }
     }
+    // #876 규칙 1: 담기 전에 같은 영상·같은 장면을 한 번 알려 준다(막지 않는다). 창의 [그래도 담기]가
+    // requestSubmit으로 돌아오면 editorDupBypass 때문에 이 판정을 다시 보지 않고 저장한다.
+    const dupInfo = editorDupCheck();
+    if (dupInfo) {
+      deps.videoDup?.open({
+        treeId: dupInfo.treeId,
+        momentId: dupInfo.dup.id,
+        treeName: dupInfo.treeName,
+        dateText: formatDisplayDate(dupInfo.dup.date, 'long'),
+        onContinue: () => { editorDupBypass = true; try { $('moment-form').requestSubmit(); } finally { editorDupBypass = false; } },
+      });
+      return;
+    }
     try {
       // #344: 미리보기 때 받아 둔 영상 제목을 저장 입력에 함께 넘긴다(사용자 입력 제목이 항상 우선 — 도메인 판정).
       // '가' 결정: 자세한 추가의 부모는 편집기를 열 때 정한 이전 순간(고르지 않았으면 가장 최근 순간)이다.
@@ -471,7 +507,11 @@ export function createPanels(deps) {
       formBaseline = new URLSearchParams(new FormData(e.target)).toString();
       $('write-panel').close();
       if (editorMode === 'new') show('track59-sketchbook.html');
-      notify('서버에 저장하고 있어요.');
+      // #876 규칙 3: 다른 트리에 같은 영상이 있으면 담은 뒤 한 줄 알린다(막지 않는다) — 저장 안내와 한 줄로.
+      const url = $('moment-form').elements.url.value.trim();
+      const others = treesWithSameVideo(getMember()?.state?.()?.trees || [], { excludeTreeId: String(selection()?.treeId || ''), url });
+      const otherLine = others.length ? otherTreesLine(others) : '';
+      notify(otherLine ? `서버에 저장하고 있어요. ${otherLine}` : '서버에 저장하고 있어요.');
     } catch (error) { $('form-error').textContent = error.message; }
   };
   // #380 4 2차: Esc·바깥 클릭·× 닫기와 "저장하지 않고 닫을까요?" 확인은 shell/dialogs.mjs 공통 틀이 맡는다
