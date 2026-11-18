@@ -2,8 +2,8 @@
 // 계약:
 //  1) 닫힌 겹은 탭이 들어가지 못한다(inert) — 이 화면의 겹 몇몇은 display:none 대신 transform·opacity로
 //     치워 둬서, 닫혀도 탭 가능한 채 남았다(보이지 않는 단추에 초점이 머물렀다).
-//  2) 겹을 닫으면 연 곳으로 돌아간다. 화면이 뜰 때 저절로 열린 겹(보드 첫 순간 상세)은 연 곳이 없으므로
-//     지금 고른 순간 카드로 돌아간다.
+//  2) 겹을 닫으면 연 곳으로 돌아간다. 사용자가 카드를 눌러 연 겹(보드 상세)은 닫으면 지금 고른 순간 카드로 돌아간다
+//     (#891①: 탭 진입에서는 판이 닫히고 주소가 순간을 가리킬 때만 저절로 열린다).
 //  3) 사용자가 연 겹(책 목차)은 닫으면 원래 단추로 돌아간다(기존 동작 유지).
 // 어댑터(public/v41/view-a11y.mjs)를 되돌리면 1)·2)가 빨갛다.
 import test from 'node:test';
@@ -26,9 +26,18 @@ try {
 const REQUIRE = process.env.LT_VIEW_A11Y_REQUIRE === '1';
 
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.woff2': 'font/woff2' };
+// #891①: 탭 진입에서는 상세 판이 닫히고 주소(#my/board?…&moment=…)가 순간을 가리킬 때만 자동으로 열린다.
+// 이 계약을 실제 주소로 검사하려면 회원 모드가 필요해 가짜 /api를 띄운다(예시 모드는 주소로 판을 열지 않는다).
+const CLOCK = '2026-11-18T00:00:00.000Z';
+const momentRow = (id, title, parentId) => ({ id, title, note: '', emotion: '설렘', date: '2026-11-18', url: `https://www.youtube.com/watch?v=${id}`, startSeconds: null, endSeconds: null, keywords: [], parentId, relation: '', links: [], createdAt: CLOCK, mediaMetadata: { title } });
+const WORKSPACE = { ok: true, revision: 7, subject: '시험', writeSubjectBound: true, savedAt: CLOCK, state: { version: 1, trees: [{ id: 'tree-1', subject: 's1', title: '첫 트리', coverMomentId: '', coverDesign: '', inbox: false, createdAt: CLOCK, updatedAt: CLOCK, moments: [momentRow('m1', '첫 순간', null), momentRow('m2', '둘째 순간', 'm1'), momentRow('m3', '셋째 순간', 'm2')] }], prefs: {} } };
 function serve(root) {
   const server = createServer(async (req, res) => {
-    const clean = decodeURIComponent((req.url || '/').split('?')[0]);
+    const url = new URL(req.url || '/', 'http://x');
+    const clean = decodeURIComponent(url.pathname);
+    if (clean === '/api/workspace') { res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify(WORKSPACE)); return; }
+    if (clean === '/api/account') { res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify({ ok: true, email: 't@t.test', name: '시험' })); return; }
+    if (clean.startsWith('/api/')) { res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify({ ok: true })); return; }
     for (const file of [path.join(root, clean), path.join(root, clean, 'index.html')]) {
       if (!file.startsWith(root)) continue;
       try { if ((await stat(file)).isFile()) { res.writeHead(200, { 'content-type': TYPES[path.extname(file)] || 'application/octet-stream' }); createReadStream(file).pipe(res); return; } } catch {}
@@ -40,7 +49,7 @@ function serve(root) {
 
 async function openScreen(browser, base, hash) {
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce', locale: 'ko-KR' });
-  await ctx.addInitScript(() => { try { localStorage.setItem('lt41.theme', 'night'); localStorage.setItem('lt41.tips.firstTree', '1'); } catch {} });
+  await ctx.addInitScript(() => { try { localStorage.setItem('lt41.theme', 'night'); localStorage.setItem('lt41.tips.firstTree', '1'); localStorage.setItem('lt41.discoverAsked', JSON.stringify(['tree-1'])); } catch {} });
   const page = await ctx.newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push(String(e.message || e)));
@@ -73,10 +82,11 @@ test('보드 상세: 열린 겹은 탭 가능, 닫으면 겹은 탭 불가(inert
   let browser;
   try {
     browser = await chromium.launch({ headless: true });
-    const { ctx, page, errors } = await openScreen(browser, base, '#board');
+    const { ctx, page, errors } = await openScreen(browser, base, '?account=1#my/board?tree=tree-1&moment=m3');
     try {
       assert.ok(await waitFrame(page, 'track58-pinboard'), '보드 프레임이 열리지 않음');
-      // 화면이 뜰 때 첫 순간 상세가 저절로 열린다(700px 이상).
+      if (await page.evaluate(() => !!document.getElementById('discover-ask')?.open)) await page.click('#discover-ask-no');
+      // #891①: 주소(#my/board?tree=…&moment=m3)가 순간을 가리키면 그 순간의 상세 판이 저절로 열린다.
       await page.waitForFunction(`(() => { const f = [...document.querySelectorAll('#view,#view-next')].filter((x) => !x.hidden).pop(); const d = f.contentDocument.getElementById('detail'); return d && d.classList.contains('open'); })()`, null, { timeout: 15000 });
       const opened = await page.evaluate(`(() => {
         const f = [...document.querySelectorAll('#view,#view-next')].filter((x) => !x.hidden).pop();
@@ -135,7 +145,7 @@ test('390 보드: 닫힌 상세는 처음부터 탭이 들어가지 않는다', 
   try {
     browser = await chromium.launch({ headless: true });
     const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce', locale: 'ko-KR' });
-    await ctx.addInitScript(() => { try { localStorage.setItem('lt41.theme', 'night'); localStorage.setItem('lt41.tips.firstTree', '1'); } catch {} });
+    await ctx.addInitScript(() => { try { localStorage.setItem('lt41.theme', 'night'); localStorage.setItem('lt41.tips.firstTree', '1'); localStorage.setItem('lt41.discoverAsked', JSON.stringify(['tree-1'])); } catch {} });
     const page = await ctx.newPage();
     try {
       await page.goto(`${base}/v41/#board`, { waitUntil: 'load' });
