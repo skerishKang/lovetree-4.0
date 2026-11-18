@@ -5,7 +5,8 @@ const $=id=>document.getElementById(id), dpr=Math.min(2,devicePixelRatio||1), re
 const ltVar=(n,f)=>{const k=(tokenVersion+' '+n);if(!tokenCache.has(k))tokenCache.set(k,getComputedStyle(document.documentElement).getPropertyValue(n).trim()||f);return tokenCache.get(k)};
 // 보드와 같은 판 선택. 뜰 때와 설정 변경 때 같은 속성·그리기를 쓰며 문서는 다시 띄우지 않는다.
 const plateValue=v=>v==='night'?'night':'paper';
-function readPlate(){try{return plateValue(document.documentElement.getAttribute('data-lt-board-theme')||localStorage.getItem('lt41.boardTheme'))}catch{return 'paper'}}
+// #853: 저장한 값이 없으면 사용자 테마를 따른다 — 밤 테마면 밤 판(어두운 바탕·밝은 글자), 정원이면 종이 판.
+function readPlate(){try{const a=document.documentElement.getAttribute('data-lt-board-theme');if(a==='night'||a==='paper')return plateValue(a);const s=localStorage.getItem('lt41.boardTheme');if(s==='night'||s==='paper')return plateValue(s);return document.documentElement.getAttribute('data-lt-theme')==='garden'?'paper':'night'}catch{return 'night'}}
 document.documentElement.setAttribute('data-lt-board-theme',readPlate());
 // 색은 CSS 한 벌에서 읽는다. 같은 값의 속성/메시지가 연달아 와도 한 번만 그린다.
 let tokenVersion=0;const tokenCache=new Map();let paletteV=-1,palette=null;

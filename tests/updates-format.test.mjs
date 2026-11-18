@@ -21,7 +21,8 @@ test('611: updates.json 은 버전·날짜·항목(kind·text·source·tester?) 
       assert.equal(typeof item.text, 'string', '한 줄 문구');
       assert.ok(item.text.trim(), '문구가 비지 않는다');
       assert.ok(!item.text.includes('\n'), '한 줄로 적는다');
-      assert.ok(['ai_tester', 'user', 'team'].includes(item.source), `source는 ai_tester|user|team (받음: ${JSON.stringify(item)})`);
+      // 2026-11-18 대표 결정: 고객용 줄은 내부 표기(source·tester)를 넣지 않을 수 있다 — source는 선택.
+      if (item.source !== undefined) assert.ok(['ai_tester', 'user', 'team'].includes(item.source), `source는 ai_tester|user|team (받음: ${JSON.stringify(item)})`);
       if (item.source === 'ai_tester' && item.tester !== undefined) assert.equal(typeof item.tester, 'string', 'AI 명예회원 출처에 이름이 있으면 문자열이다 (받음: ' + JSON.stringify(item) + ')');
       // 이달용 이슈 번호는 연결용으로만 두는 필드 — 화면 문구에는 넣지 않는다.
       if (item.issue !== undefined) assert.match(item.issue, /^#[\w.-]+$/, '이슈 연결 모양');
