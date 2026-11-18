@@ -308,6 +308,12 @@ html[data-book-shape=phone][data-v41-screen=book] .story-editor{width:100%}
 /* #800: desktop places the relationship at the bottom center of the open pages, above page controls. */
 html[data-v41-screen=book] .why-margin{left:calc(50% + 150px);top:auto;bottom:24px;transform:translateX(-50%);width:min(320px,30vw)}
 html[data-v41-screen=book] .why-margin>.story-tip,html[data-v41-screen=book] .why-margin>.story-action-wrap{width:100%;max-width:100%;box-sizing:border-box}
+/* #875: 한마디 안내 말풍선은 책 바깥 아래 여백에 둔다 — 책 안 오른쪽 아래(bottom:24px)에 겹치면
+   오른쪽 페이지 아래 글을 가린다(2560·1440 지적). 안내만 host로 옮기고 편집 단추(#800)는 지금 자리에 둔다.
+   책 아래 중앙에는 페이지 이동 알약(.nav-pill, 책 아래 4~48px)이 있으므로 그 아래(58px)에 둔다. */
+html[data-v41-screen=book] .story-tip-host{position:absolute;left:50%;top:calc(100% + 52px);transform:translateX(-50%);width:min(640px,70vw);z-index:45;display:flex;justify-content:center}
+html[data-v41-screen=book] .story-tip-host[hidden]{display:none!important}
+html[data-book-shape=phone][data-v41-screen=book] .story-tip-host{position:static;left:auto;top:auto;bottom:auto;transform:none;width:auto;max-width:none;order:2;margin:6px 10px 0}
 html[data-v41-screen=book] .story-tip span{color:var(--lt-ink);opacity:1}
 /* #800 새 연결 글자는 옛 .why-margin span의 11px를 이어받지 않도록 최소 12px를 지킨다(다른 크기·색·배치는 그대로). */
 html[data-v41-screen=book] .why-margin .moment-meta-copy,html[data-v41-screen=book] .why-margin .story-action,html[data-v41-screen=book] .why-margin .story-tip span{font-size:12px}

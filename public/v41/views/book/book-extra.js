@@ -333,9 +333,11 @@ let storyTipOpen=false,storyRequest=null;
 try{storyTipOpen=LTDEMO.moments.length>=2&&localStorage.getItem(STORY_TIP_KEY)!=='1';if(storyTipOpen)localStorage.setItem(STORY_TIP_KEY,'1')}catch{storyTipOpen=LTDEMO.moments.length>=2}
 function storyTipMarkup(){return storyTipOpen?'<div class="story-tip" role="note"><span>두 순간 사이에 한마디를 남기면, 책이 이야기처럼 이어져요. 안 적어도 괜찮아요.</span><button type="button" data-story-tip-dismiss>알겠어요</button></div>':''}
 updateConnectionSummary=function(id){
- const next=nextMomentOf(id),host=$b('#whyMargin'),momentId=String(id||'');
+ const next=nextMomentOf(id),host=$b('#whyMargin'),tipHost=$b('#storyTipHost'),momentId=String(id||'');
  if(!host)return;
  const tip=storyTipMarkup();
+ /* #875: 안내 말풍선은 책 바깥 아래 host로 — 책 안에 두면 오른쪽 페이지 아래 글을 가린다. */
+ if(tipHost){if(tip){tipHost.hidden=false;tipHost.innerHTML=tip}else{tipHost.hidden=true;tipHost.replaceChildren()}}
  let action='';
  if(next){
   const reason=String(next.reason||'').trim();
@@ -344,13 +346,16 @@ updateConnectionSummary=function(id){
    action='<button type="button" class="story-action" data-story-open data-from-moment="'+t(momentId)+'" data-to-moment="'+t(next.id)+'">'+t(label)+'</button>';
   }else if(reason){action='<span class="story-action story-readonly">→ '+t(reason)+'</span>'}
  }
- if(!tip&&!action){host.hidden=true;host.replaceChildren();return}
+ if(!action){host.hidden=true;host.replaceChildren();return}
  host.hidden=false;
- host.innerHTML=tip+(action?'<div class="story-action-wrap">'+action+'</div>':'');
+ host.innerHTML='<div class="story-action-wrap">'+action+'</div>';
 };
 function openStoryEditor(fromMomentId,toMomentId,initial=''){
  const host=$b('#whyMargin');if(!host)return;
- host.innerHTML=storyTipMarkup()+'<form class="story-editor" data-story-form data-from-moment="'+t(fromMomentId)+'" data-to-moment="'+t(toMomentId)+'"><input name="relation" maxlength="100" aria-label="두 순간을 잇는 한마디" placeholder="두 순간을 잇는 한마디" value="'+t(initial)+'"><button type="submit">저장</button><button type="button" data-story-cancel>취소</button></form>';
+ /* #875: 안내는 책 바깥 아래 host로, 편집 칸은 지금 자리(#800)에 둔다. */
+ const tip=storyTipMarkup(),tipHost=$b('#storyTipHost');
+ if(tipHost){if(tip){tipHost.hidden=false;tipHost.innerHTML=tip}else{tipHost.hidden=true;tipHost.replaceChildren()}}
+ host.innerHTML='<form class="story-editor" data-story-form data-from-moment="'+t(fromMomentId)+'" data-to-moment="'+t(toMomentId)+'"><input name="relation" maxlength="100" aria-label="두 순간을 잇는 한마디" placeholder="두 순간을 잇는 한마디" value="'+t(initial)+'"><button type="submit">저장</button><button type="button" data-story-cancel>취소</button></form>';
  host.hidden=false;
  const input=host.querySelector('input[name="relation"]');input?.focus();
 }
