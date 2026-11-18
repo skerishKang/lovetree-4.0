@@ -84,6 +84,9 @@ export function createDialogs(deps) {
     if (PANEL_DIRTY[d.id]?.() && !confirm('저장하지 않고 닫을까요?')) return false;
     return true;
   }
+  // #380 4 2차: × 버튼도 바깥 클릭·Esc와 같은 규칙을 쓴다(막을 상태면 막고, 더러우면 한 번 묻고, 닫으면 초점 복귀).
+  // #845 2단계: 뒤로가기도 같은 판정을 탄다 — 공통 판정을 함수로 뽑아 세 길이(×·Esc·뒤로가기) 하나로 간다.
+  function requestPanelClose(id) { const d = $(id); if (!d) return false; if (!panelConfirmClose(d)) return false; d.close(); return true; }
   // 닫은 뒤 초점이 갈 곳: 연 버튼 → data-lt-return 순서는 focusReturnTarget이 정한다.
   // 모바일에서는 연 버튼이 '더보기' 메뉴 안에 접혀 보이지 않으므로, 그때는 더보기 버튼으로 돌려준다(초점을 잃지 않게).
   function panelReturnFocus(opener, fallback) {
@@ -159,6 +162,42 @@ export function createDialogs(deps) {
   // #368: 공통 틀 밖 대화상자가 없어졌으므로 옛 바깥 클릭 규칙(dialog:not([data-lt-panel]))도 함께 지웠다.
   // 모든 dialog는 위 공통 틀(×·바깥 클릭·Esc·초점 복귀)이 닫는다.
 
+  // #845 2단계: 뒤로가기는 창을 닫는 일로 쓴다(261118 대표 결정 — 이슈 #845 규칙표). 모달 창이 하나라도
+  // 열려 있으면 뒤로가기는 주소를 뒤로 가지 않고 맨 위 창을 닫는다 — ✕·Esc와 같은 판정(requestClose:
+  // 막을 상태면 막고, 더러우면 '저장하지 않고 닫을까요?'를 한 번 묻는다)을 탄다. 창이 모두 닫히면 원래
+  // 뒤로가기로 돌아간다.
+  //
+  // 이동을 막는 방법: 창을 열 때 주소가 그대로인 기록 한 칸을 쌓는다(pushState). 뒤로가기는 이 기록을
+  // 판다 — 주소가 그대로므로 화면도 그대로이고, 여기서 맨 위 창을 닫는다. 창을 ✕·Esc·저장 등 다른 길로
+  // 닫으면 이 기록이 한 칸 남아 다음 뒤로가기 한 번이 그것을 판다(화면 변화 없음). 창이 닫히는 순간
+  // 되돌아가서 기록을 소비하는 방식은 쓰지 않는다 — 뒤로가기는 프레임 기록까지 함께 훑어 지도·책 같은
+  // 안쪽 문서를 다시 띄운다(261118 지도 판 흐름 시험 — 설정 창을 닫았을 뿐인데 지도 프레임이 다시 떴다).
+  // 초점 되돌리기는 창 'close'의 공통 규칙이 그대로 맡는다 — 뒤로가기로 닫아도 연 버튼으로 돌아간다.
+  const view = document.defaultView;
+  let dialogGuard = false;     // 창 기록을 쌓아 둔 상태
+  function modalDialogs() { return [...document.querySelectorAll('dialog[open]')].filter(d => d.matches(':modal')); }
+  if (view?.history && view.HTMLDialogElement) {
+    const showModalOriginal = view.HTMLDialogElement.prototype.showModal;
+    view.HTMLDialogElement.prototype.showModal = function (...args) {
+      const result = showModalOriginal.apply(this, args);
+      if (!dialogGuard && this.open && this.matches(':modal')) {
+        view.history.pushState({ lt41Dialog: true }, '');
+        dialogGuard = true;
+      }
+      return result;
+    };
+    view.addEventListener('popstate', () => {
+      const modals = modalDialogs();
+      const top = modals[modals.length - 1] || null;
+      if (top) {
+        const closed = requestPanelClose(top.id);
+        // 닫기가 막혔거나(더러움 확인 취소) 창이 남았으면 기록을 다시 쌓는다 — 뒤로가기를 계속 '닫기'로 쓰게.
+        if (!closed || modalDialogs().length) { view.history.pushState({ lt41Dialog: true }, ''); dialogGuard = true; }
+        else dialogGuard = false;
+      } else dialogGuard = false;
+    });
+  }
+
   return {
     shellFocusables,
     trapShellTab,
@@ -172,7 +211,8 @@ export function createDialogs(deps) {
       assetsOpener = null;
     },
     // #380 4 2차: × 버튼도 바깥 클릭·Esc와 같은 규칙을 쓴다(막을 상태면 막고, 더러우면 한 번 묻고, 닫으면 초점 복귀).
-    requestClose: id => { const d = $(id); if (!d) return false; if (!panelConfirmClose(d)) return false; d.close(); return true; },
+    // #845 2단계: 뒤로가기도 같은 판정(requestPanelClose)을 탄다 — 세 길이(×·Esc·뒤로가기)가 하나로 간다.
+    requestClose: id => requestPanelClose(id),
     syncPanelTop
   };
 }

@@ -117,7 +117,9 @@ test('편집기 규칙이 공통 틀보다 우선한다 — 업로드 중에는 
 test('편집기의 취소 버튼도 공통 닫기 규칙을 쓴다', () => {
   assert.match(panels, /\$\('editor-cancel'\)\.onclick = \(\) => \{ requestClose\?\.\('write-panel'\); \};/);
   assert.match(shell, /requestClose:id=>shellDialogs\.requestClose\(id\)/);
-  assert.match(dialogs, /requestClose: id => \{ const d = \$\(id\); if \(!d\) return false; if \(!panelConfirmClose\(d\)\) return false; d\.close\(\); return true; \}/);
+  // requestClose 본문 글자 검사는 지웠다(#845 2단계 리팩터링 — 공통 판정을 requestPanelClose 함수로 뽑았다).
+  // 판정 동작(×·Esc·뒤로가기가 같은 '저장하지 않고 닫을까요?'를 타는지)은 v41-shell-dialogs와
+  // v41-tree-tips-549의 브라우저 시험이 검사한다.
 });
 
 test('순간 잇기는 고른 연결이 저장 전이면 더러움이다', () => {
