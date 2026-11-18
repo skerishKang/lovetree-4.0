@@ -21,7 +21,7 @@ async function setup({url=PHOTO,coverMode='',coverDesign='',admin=null,signupAtF
  await workspace.write(principal('alice'),{state:{version:1,trees:[tree]},expectedRevision:0,clientKey:'seed'});
  const shareRepo=createMemoryShareRepo();let share=await shareRepo.create({productId:PRODUCT,shareId:'s'.repeat(24),subjectId:'alice',treeId:tree.id,entryMomentId:tree.moments[0].id,view:'book',momentCount:3});
  share=await shareRepo.setDiscoverable({productId:PRODUCT,subjectId:'alice',shareId:share.shareId,discoverable:true});
- const communityRepo=createMemoryCommunityRepo();communityRepo.seedShares([share]);
+ const communityRepo=createMemoryCommunityRepo({now:()=>CLOCK});communityRepo.seedShares([share]);
  const adminStub=admin||{roleFor:async value=>value.subjectId==='admin'?'admin':null};
  let id=0;
  const service=createCommunityService({communityRepo,shareRepo,workspaceRepo,productId:PRODUCT,admin:adminStub,makeId:()=>String(++id).padStart(24,'c'),now:()=>Date.UTC(2026,10,1),signupAtFor});
@@ -29,6 +29,78 @@ async function setup({url=PHOTO,coverMode='',coverDesign='',admin=null,signupAtF
  return {tree,workspaceRepo,shareRepo,communityRepo,service,handle:createCommunityHandler({authenticate,service,productId:PRODUCT})};
 }
 const call=(handle,method,path,{body,account,key,query}={})=>handle({method,path,query:new URLSearchParams(query||''),headers:{...(account?{account}:{}),...(body?{'content-type':'application/json'}:{}),...(key?{'idempotency-key':key}:{})},body:body?JSON.stringify(body):''});
+
+// SQL 소속·표의 정합성은 격리 PostgreSQL에서, 여기서는 인증·경계·응답 계약을 검사한다.
+function stageRequests({ at, now=()=>at, signupAtFor, stageVoteRepo }) {
+ const service=createCommunityService({productId:PRODUCT,now,signupAtFor,stageVoteRepo});
+ return createCommunityHandler({productId:PRODUCT,service,authenticate:async ({headers})=>{
+  if(!headers.account)throw new ApiError(401,'unauthenticated','로그인이 필요해요.');
+  return principal(headers.account);
+ }});
+}
+
+test('무대 PUT은 가입 7일 정각부터 허용하고 철회된 무대와 비로그인 쓰기를 막는다',async()=>{
+ const at=Date.parse('2026-11-22T15:00:00Z'), week=7*86400000, writes=[];
+ const stageVoteRepo={
+  detail:async ({stageId})=>stageId==='visible'?{stageId}:null,
+  setVote:async input=>{writes.push(input);return input.enabled&&input.stageId==='visible'?{saved:true,voted:true,weeklyVoters:null}:null;}
+ };
+ const signupAtFor=async ({subjectId})=>({eligible:new Date(at-week),young:new Date(at-week+1),invalid:'invalid'}[subjectId]);
+ const handle=stageRequests({at,signupAtFor,stageVoteRepo});
+ const vote=(account,id='visible',method='PUT')=>call(handle,method,'/api/community/stages/'+id+'/vote',{account});
+ for(const account of ['young','missing','invalid']){
+  const denied=await vote(account);
+  assert.equal(denied.status,403);
+  assert.equal(denied.body.error.code,'vote_too_new');
+  assert.match(denied.headers['cache-control'],/no-store/);
+ }
+ assert.equal((await vote('young','withdrawn')).status,404);
+ for(const method of ['PUT','DELETE'])assert.equal((await vote(undefined,'visible',method)).status,401);
+ assert.equal(writes.length,0);
+ const admitted=await vote('eligible');
+ assert.equal(admitted.status,200);
+ assert.deepEqual(admitted.body,{saved:true,voted:true,weeklyVoters:null});
+ assert.deepEqual(writes[0],{productId:PRODUCT,stageId:'visible',subjectId:'eligible',enabled:true,votedAt:'2026-11-22T15:00:00.000Z',
+  since:'2026-11-22T15:00:00.000Z',until:'2026-11-29T15:00:00.000Z'});
+ assert.equal((await vote('eligible','withdrawn')).body.error.code,'stage_not_found');
+ const removed=await vote('young','withdrawn','DELETE');
+ assert.equal(removed.status,204);
+ assert.equal(removed.body,undefined);
+ assert.equal(writes.at(-1).enabled,false);
+ let clock=at-1;
+ const crossing=stageRequests({now:()=>clock,stageVoteRepo,signupAtFor:async()=>{
+  clock=at;
+  return new Date(at-week);
+ }});
+ assert.equal((await call(crossing,'PUT','/api/community/stages/visible/vote',{account:'crossing'})).status,403);
+ assert.equal(writes.some(input=>input.subjectId==='crossing'),false);
+});
+
+test('공개 무대 조회는 열람자·한국 주 경계·다른 트리 커서를 전달하고 쓰기 횟수를 제한한다',async()=>{
+ const at=Date.parse('2026-11-22T14:59:59.999Z'), calls=[];
+ const shareId='s'.repeat(24),cursor='t'.repeat(24);
+ const stageVoteRepo={
+  resolveMoment:async input=>{calls.push(input);return {stageId:'public-stage'};},
+  detail:async input=>{calls.push(input);return {stageId:input.stageId};},
+  popular:async input=>{calls.push(input);return [];},
+  setVote:async()=>undefined
+ };
+ const handle=stageRequests({at,stageVoteRepo});
+ const resolved=await call(handle,'GET','/api/community/shares/'+shareId+'/moments/m0/stage');
+ assert.deepEqual(resolved.body,{stageId:'public-stage'});
+ assert.deepEqual(calls.at(-1),{productId:PRODUCT,viewerSubjectId:null,shareId,momentId:'m0'});
+ const popular=await call(handle,'GET','/api/community/stages/popular');
+ assert.deepEqual(popular.body,{weekStart:'2026-11-15T15:00:00.000Z',weekEndExclusive:'2026-11-22T15:00:00.000Z',items:[]});
+ const detail=await call(handle,'GET','/api/community/stages/public-stage',{account:'viewer',query:{currentShareId:shareId,cursor}});
+ assert.equal(detail.status,200);
+ assert.equal(calls.at(-1).viewerSubjectId,'viewer');
+ assert.equal(calls.at(-1).currentShareId,shareId);
+ assert.equal(calls.at(-1).afterShareId,cursor);
+ assert.equal((await call(handle,'GET','/api/community/stages/public-stage',{query:{cursor:'?'}})).status,400);
+ for(const res of [resolved,popular,detail])assert.match(res.headers['cache-control'],/no-store/);
+ for(let i=0;i<40;i++)assert.equal((await call(handle,'DELETE','/api/community/stages/s/vote',{account:'viewer'})).status,204);
+ assert.equal((await call(handle,'PUT','/api/community/stages/s/vote',{account:'viewer'})).status,429);
+});
 
 test('discovery exposes only the live projected share and supports search and emotion filters',async()=>{
  const {handle,tree}=await setup();

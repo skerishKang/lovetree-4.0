@@ -7,6 +7,27 @@ import { createProxy, upstreamOrigin, DEFAULT_RESPONSE_LIMIT_BYTES } from '../fu
 import { DEFAULT_MAX_BODY_BYTES } from '../server/http.js';
 
 const UPSTREAM = 'https://api.lovetree.example';
+
+test('무대 조회와 투표만 전달하고 담기 해제의 빈 204를 보존한다', async () => {
+  const share='s'.repeat(24), base='https://lovetree.example';
+  const detail='/api/community/stages/stage-1', vote=detail+'/vote';
+  const resolve='/api/community/shares/'+share+'/moments/m0/stage';
+  for (const [path,method] of [[resolve,'GET'],[detail+'?cursor='+share,'GET'],['/api/community/stages/popular','GET'],[vote,'PUT'],[vote,'DELETE']]) {
+    const reply=method==='DELETE'?new Response(null,{status:204}):new Response('{}',{headers:{'content-type':'application/json','cache-control':'no-store'}});
+    const fetcher=recorder(reply);
+    const result=await onRequest(createProxy({fetcher}),base+path,{method});
+    assert.equal(fetcher.calls[0].url,UPSTREAM+path);
+    assert.equal(fetcher.calls[0].method,method);
+    assert.equal(result.status,method==='DELETE'?204:200);
+    assert.match(result.headers.get('cache-control'),/no-store/);
+    if(method==='DELETE')assert.equal(await result.text(),'');
+  }
+  for (const [path,method,status] of [[resolve,'PUT',405],[detail,'POST',405],[vote,'GET',405],[detail+'/votes','PUT',404]]) {
+    const fetcher=recorder(new Response());
+    assert.equal((await onRequest(createProxy({fetcher}),base+path,{method})).status,status);
+    assert.equal(fetcher.calls.length,0);
+  }
+});
 const onRequest = (proxy, url, init) => proxy({ request: new Request(url, init), env: { LOVETREE_API_ORIGIN: UPSTREAM } });
 
 function recorder(reply) {

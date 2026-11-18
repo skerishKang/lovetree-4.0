@@ -27,16 +27,27 @@ function jsonBody(request){
 function clientKey(request){const value=String(request?.headers?.['idempotency-key']||'');if(!IDEMPOTENCY.test(value))throw new ApiError(400,'idempotency_key_required','안전한 중복 방지 키가 필요해요.');return value;}
 function publicComment(row,viewer,isAdmin=false){const mine=!!viewer&&row.subjectId===viewer;const edited=!!(row.editedAt||(row.updatedAt&&row.createdAt&&String(row.updatedAt)>String(row.createdAt)));return {id:row.id,body:row.body,createdAt:row.createdAt,updatedAt:row.updatedAt,edited,mine,canDelete:mine||isAdmin,canEdit:mine,authorLabel:mine?'나':'기록한 사람'};}
 
-export function createCommunityService({communityRepo,shareRepo,workspaceRepo,visibilityRepo=null,productId,admin=null,stageIndex=null,now=()=>Date.now(),makeId=()=>randomUUID(),signupAtFor=null}){
+export function createCommunityService({communityRepo,shareRepo,workspaceRepo,visibilityRepo=null,productId,admin=null,stageIndex=null,stageVoteRepo=null,now=()=>Date.now(),makeId=()=>randomUUID(),signupAtFor=null}){
  const writes=new Map();
  let totalsCache=null;
  // 이번 주의 시작(월요일 0시, KST — #824 결정 4 '주 = 월~일 KST'). KST는 UTC+9 고정이라 서머타임
  // 보정이 없다. 주 규칙은 여기 한 곳에서만 계산한다 — SQL·화면에 복제하지 않는다.
- function weekStartKst(at=now()){
+ function votingWeek(at=now()){
   const KST_OFFSET_MS=9*60*60*1000,DAY_MS=24*60*60*1000;
   const kstDay=Math.floor((at+KST_OFFSET_MS)/DAY_MS);
   const monday=kstDay-((kstDay+3)%7); // 1970-01-01(목) 기준, 월요일=0 — 목요일이 3이 나온다
-  return (monday*DAY_MS)-KST_OFFSET_MS;
+  const start=monday*DAY_MS-KST_OFFSET_MS;
+  return {since:new Date(start).toISOString(),until:new Date(start+7*DAY_MS).toISOString()};
+ }
+ async function oldEnoughToVote(subjectId,at=now()){
+  const signedUpAt=await signupAtFor?.({productId,subjectId});
+  const age=signedUpAt ? at-new Date(signedUpAt).getTime() : NaN;
+  return age >= 7*24*60*60*1000;
+ }
+ const tooNew=()=>new ApiError(403,'vote_too_new','가입하고 7일이 지나면 투표할 수 있어요.');
+ function publicStage(result){
+  if(!result)throw new ApiError(404,'stage_not_found','공개 무대를 찾을 수 없어요.');
+  return result;
  }
  function rate(subjectId,kind,limit=20){
   const key=subjectId+'\0'+kind,cut=now()-60_000,list=(writes.get(key)||[]).filter(at=>at>cut);
@@ -104,6 +115,32 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
   return card;
  }
  return {
+  async momentStage({viewerSubjectId,shareId,momentId}){
+   return publicStage(await stageVoteRepo.resolveMoment({productId,viewerSubjectId,shareId,momentId}));
+  },
+  async stageDetail({viewerSubjectId,stageId,currentShareId,afterShareId}){
+   if((currentShareId&&!SHARE_ID.test(currentShareId))||(afterShareId&&!SHARE_ID.test(afterShareId))){
+    throw new ApiError(400,'invalid_stage_page','공개 트리 목록의 주소를 확인해 주세요.');
+   }
+   return publicStage(await stageVoteRepo.detail({productId,viewerSubjectId,stageId,currentShareId,afterShareId,...votingWeek()}));
+  },
+  async popularStages(viewerSubjectId){
+   const week=votingWeek();
+   const items=await stageVoteRepo.popular({productId,viewerSubjectId,...week});
+   return {weekStart:week.since,weekEndExclusive:week.until,items};
+  },
+  async voteStage(subjectId,stageId,enabled){
+   rate(subjectId,'stage-vote',40);
+   const requestedAt=now();
+   const scope={productId,stageId,...votingWeek(requestedAt)};
+   if(enabled && !await oldEnoughToVote(subjectId,requestedAt)){
+    // 공개 근거가 사라진 무대는 가입 시각에 관계없이 같은 404를 돌려준다.
+    publicStage(await stageVoteRepo.detail({...scope,viewerSubjectId:subjectId}));
+    throw tooNew();
+   }
+   const result=await stageVoteRepo.setVote({...scope,subjectId,enabled,votedAt:new Date(requestedAt).toISOString()});
+   if(enabled)return publicStage(result);
+  },
   // 첫 화면 둘러보기 숫자(261116 PR 2) — 공개 집계(로그인 없이 읽는다). 서버에서 1분 메모리 캐시를 두고,
   // 응답 헤더에도 cache-control: max-age=60을 실어 브라우저·중간 단계가 같은 한도로 재활용하게 한다.
   async discoverTotals(){
@@ -129,7 +166,8 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
    const isTesterLookup=roleOf?async subjectId=>await roleOf(subjectId)===ROLE_TESTER:null;
    let entries;
    if(typeof communityRepo.listDiscoverableSummaries==='function'){
-    const summaries=await communityRepo.listDiscoverableSummaries({productId,viewerSubjectId,limit:240,sort:sortKey,weekSince:new Date(weekStartKst()).toISOString()});
+    const {since,until}=votingWeek();
+    const summaries=await communityRepo.listDiscoverableSummaries({productId,viewerSubjectId,limit:240,sort:sortKey,weekSince:since,weekUntil:until});
     entries=await Promise.all(summaries.map(async summary=>{
      // 시험 계정(tester 역할) 트리는 둘러보기 목록·검색에서 뺀다(#678 후속 — 공유 링크 직접 열기는 그대로).
      if(await isTesterLookup(summary.share.subjectId))return null;
@@ -200,11 +238,7 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
   async favorite(subjectId,shareId,enabled){
    await activeShare(shareId);rate(subjectId,'favorite',40);
    if(enabled){
-    if(signupAtFor){
-     const signedUpAt=await signupAtFor({productId,subjectId});
-     const age=signedUpAt?now()-new Date(signedUpAt).getTime():null;
-     if(age===null||!Number.isFinite(age)||age<7*24*60*60*1000)throw new ApiError(403,'vote_too_new','가입하고 7일이 지나면 투표할 수 있어요.');
-    }
+    if(signupAtFor && !await oldEnoughToVote(subjectId))throw tooNew();
     await communityRepo.setFavorite({productId,shareId,subjectId,enabled:true});
     await communityRepo.recordVote({productId,targetKind:'tree',targetId:shareId,subjectId});
    }else{
@@ -212,7 +246,7 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
    }
    const stats=await communityRepo.stats({productId,shareId,viewerSubjectId:subjectId});
    const voted=await communityRepo.hasVoted({productId,targetKind:'tree',targetId:shareId,subjectId});
-   const weeklyFavorites=(await communityRepo.weeklyVoteCounts({productId,targetKind:'tree',since:new Date(weekStartKst()).toISOString()}))[shareId]||0;
+   const weeklyFavorites=(await communityRepo.weeklyVoteCounts({productId,targetKind:'tree',...votingWeek()}))[shareId]||0;
    return {...stats,voted,weeklyFavorites};
   },
   async favorites(subjectId){return communityRepo.listFavorites({productId,subjectId});},
@@ -227,7 +261,7 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
    // #824 결정 7: 담기·공감 응답 모양을 같게 — 화면이 카드를 다시 그릴 때 이번 주 표 수가 사라지지 않게 한다.
    const stats=await communityRepo.stats({productId,shareId,viewerSubjectId:subjectId});
    const voted=await communityRepo.hasVoted({productId,targetKind:'tree',targetId:shareId,subjectId});
-   const weeklyFavorites=(await communityRepo.weeklyVoteCounts({productId,targetKind:'tree',since:new Date(weekStartKst()).toISOString()}))[shareId]||0;
+   const weeklyFavorites=(await communityRepo.weeklyVoteCounts({productId,targetKind:'tree',...votingWeek()}))[shareId]||0;
    return {...stats,voted,weeklyFavorites};},
   async comments(shareId,viewerSubjectId){await activeShare(shareId);const isAdmin=!!viewerSubjectId&&!!admin&&await admin.roleFor({productId,subjectId:viewerSubjectId})==='admin';return (await communityRepo.listComments({productId,shareId,limit:50})).map(row=>publicComment(row,viewerSubjectId,isAdmin));},
   async comment(subjectId,shareId,body,key){const share=await activeShare(shareId);rate(subjectId,'comment',12);if(communityRepo?.isBlocked){const blocked=await communityRepo.isBlocked({productId,blockerSubjectId:subjectId,blockedSubjectId:share.subjectId});if(blocked)throw new ApiError(403,'comment_blocked','차단한 기록에는 댓글을 남길 수 없어요.');}const text=clean(body,1000);if(!text)throw new ApiError(400,'comment_empty','댓글을 입력해 주세요.');const row=await communityRepo.createComment({productId,commentId:makeId(),shareId,subjectId,body:text,clientKey:key});return publicComment(row,subjectId);},
@@ -255,6 +289,27 @@ export function createCommunityHandler({authenticate,service,productId}){
  }
  async function handle(request){
   const path=String(request?.path||''),method=request?.method||'GET',query=request?.query||new URLSearchParams();
+  if(path==='/api/community/stages/popular'&&method==='GET'){
+   const who=await principal(request,false);
+   return {status:200,body:await service.popularStages(who?.subjectId??null),headers:NO_STORE};
+  }
+  const momentStage=path.match(/^\/api\/community\/shares\/([A-Za-z0-9_-]{20,64})\/moments\/([A-Za-z0-9_-]{1,80})\/stage$/);
+  if(momentStage&&method==='GET'){
+   const who=await principal(request,false);
+   return {status:200,body:await service.momentStage({viewerSubjectId:who?.subjectId??null,shareId:momentStage[1],momentId:momentStage[2]}),headers:NO_STORE};
+  }
+  const stageDetail=path.match(/^\/api\/community\/stages\/([A-Za-z0-9_-]{1,80})$/);
+  if(stageDetail&&method==='GET'){
+   const who=await principal(request,false);
+   return {status:200,body:await service.stageDetail({viewerSubjectId:who?.subjectId??null,stageId:stageDetail[1],
+    currentShareId:query.get('currentShareId'),afterShareId:query.get('cursor')}),headers:NO_STORE};
+  }
+  const stageVote=path.match(/^\/api\/community\/stages\/([A-Za-z0-9_-]{1,80})\/vote$/);
+  if(stageVote&&(method==='PUT'||method==='DELETE')){
+   const who=await principal(request);
+   const result=await service.voteStage(who.subjectId,stageVote[1],method==='PUT');
+   return {status:method==='PUT'?200:204,body:result,headers:NO_STORE};
+  }
   // #627 3단계 '다른 팬 보기' — 공개 경로라 로그인 없이도 부른다. 로그인했으면 자기 트리·차단 관계를 뺀다.
   if(path==='/api/public/tag-moments'&&method==='GET'){const who=await principal(request,false);return {status:200,body:await service.tagMoments({tag:String(query.get('tag')||''),viewerSubjectId:who?.subjectId||null}),headers:NO_STORE};}
   if(path==='/api/community/stats'&&method==='GET'){return {status:200,body:await service.discoverTotals(),headers:{...NO_STORE,'cache-control':'public, max-age=60'}};}

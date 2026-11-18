@@ -1,17 +1,16 @@
-// 현재 공개된 원본과 소개 동의가 판단 기준이다. 영구 무대와 저장된 소속만으로 공개할 수 없다.
-// #824의 향후 명예회원 제외 정책을 적용할 때 트리·무대 인기 조회가 같은 조건을 사용한다.
-const visibleOwnerCondition = "owner_role.role IS DISTINCT FROM 'tester'";
-export const rankingOwnerCondition = visibleOwnerCondition;
+import { ROLE_AI_CUSTOMER } from '../admin-roles.js';
+import { rankingOwnerSql } from './ranking-policy-sql.js';
 
+// 현재 공개된 원본과 소개 동의가 판단 기준이다. 영구 무대와 저장된 소속만으로 공개할 수 없다.
 // 소유자 동기화와 개인화된 공개 읽기는 각각 두 번째 매개변수에 계정을 전달한다.
-export function eligibleStageTreesSql({ ownerParam = false, viewerParam = false, forRanking = false } = {}) {
-  const visibleRole = forRanking ? rankingOwnerCondition : visibleOwnerCondition;
+export function eligibleStageTreesSql({ ownerParam = false, viewerParam = false, forRanking = false, hasRealCustomers = false } = {}) {
+  const visibleRole = rankingOwnerSql(forRanking && hasRealCustomers);
   return `SELECT picked.product_id, picked.subject_id, picked.tree_id, picked.share_id,
            picked.ai_tester, w.revision AS source_revision, t.tree_doc
     FROM (
       SELECT DISTINCT ON (s.subject_id, s.tree_id)
              s.product_id, s.subject_id, s.tree_id, s.share_id,
-             COALESCE(owner_role.role = 'ai_customer', false) AS ai_tester
+             COALESCE(owner_role.role = '${ROLE_AI_CUSTOMER}', false) AS ai_tester
       FROM lovetree_shares s
       JOIN lovetree_tree_discover d USING (product_id, subject_id, tree_id)
       LEFT JOIN lovetree_tree_visibility v USING (product_id, subject_id, tree_id)
@@ -39,19 +38,29 @@ export function eligibleStageTreesSql({ ownerParam = false, viewerParam = false,
       AND CASE WHEN jsonb_typeof(t.tree_doc->'moments') = 'array' THEN jsonb_array_length(t.tree_doc->'moments') >= 3 ELSE false END`;
 }
 
+// 소속 revision과 현재 공개 순간을 함께 확인한다. 표현에 필요한 제목·주소·구간만 투영한다.
+export function visibleStageMomentsSql({ forRanking = false, hasRealCustomers = false } = {}) {
+  const eligible = eligibleStageTreesSql({ viewerParam: true, forRanking, hasRealCustomers });
+  return `SELECT m.stage_id, m.subject_id, m.tree_id, m.moment_id, m.source_revision, e.share_id, e.ai_tester,
+      e.tree_doc->>'title' AS tree_title, p.moment->>'url' AS moment_url,
+      p.moment->'startSeconds' AS start_seconds, p.moment->'endSeconds' AS end_seconds,
+      COALESCE(NULLIF(p.moment #>> '{mediaMetadata,title}',''), NULLIF(p.moment->>'title',''), e.tree_doc->>'title') AS title
+    FROM (${eligible}) e
+    JOIN lovetree_stage_moments m USING (product_id, subject_id, tree_id, source_revision)
+    CROSS JOIN LATERAL (
+      SELECT t.moment FROM jsonb_array_elements(
+        CASE WHEN jsonb_typeof(e.tree_doc->'moments')='array' THEN e.tree_doc->'moments' ELSE '[]'::jsonb END
+      ) AS t(moment) WHERE t.moment->>'id'=m.moment_id LIMIT 1
+    ) p`;
+}
+
 // 서버 내부 결과. 소유자 키는 같은 로컬 tree_id를 사용하는 계정을 구분하는 데 쓴다.
-export async function listVisibleStageMoments(db, { productId, viewerSubjectId = null, stageId = null, forRanking = false }) {
+export async function listVisibleStageMoments(db, { productId, viewerSubjectId = null, stageId = null, forRanking = false, hasRealCustomers = false }) {
   const { rows } = await db.query(`
-    WITH eligible AS (${eligibleStageTreesSql({ viewerParam: true, forRanking })})
-    SELECT m.stage_id, m.subject_id, m.tree_id, m.moment_id, m.source_revision, e.share_id, e.ai_tester
-    FROM eligible e JOIN lovetree_stage_moments m USING (product_id, subject_id, tree_id, source_revision)
-    WHERE ($3::text IS NULL OR m.stage_id = $3)
-      AND EXISTS (
-        SELECT 1 FROM jsonb_array_elements(
-          CASE WHEN jsonb_typeof(e.tree_doc->'moments') = 'array' THEN e.tree_doc->'moments' ELSE '[]'::jsonb END
-        ) AS t(moment) WHERE t.moment->>'id' = m.moment_id
-      )
-    ORDER BY m.stage_id, m.subject_id, m.tree_id, m.moment_id`,
+    SELECT stage_id, subject_id, tree_id, moment_id, source_revision, share_id, ai_tester
+    FROM (${visibleStageMomentsSql({ forRanking, hasRealCustomers })}) visible
+    WHERE $3::text IS NULL OR stage_id=$3
+    ORDER BY stage_id, subject_id, tree_id, moment_id`,
     [productId, viewerSubjectId, stageId]);
   return rows;
 }

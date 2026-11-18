@@ -1,11 +1,12 @@
-import { rankingOwnerCondition } from './stage-visibility-sql.js';
+import { countedVoterSql, rankingOwnerSql } from './ranking-policy-sql.js';
 
 const iso=value=>value instanceof Date?value.toISOString():value?String(value):null;
 const shareRow=value=>value&&({shareId:value.share_id,subjectId:value.subject_id,treeId:value.tree_id,entryMomentId:value.entry_moment_id,view:value.initial_view,status:value.status,createdAt:iso(value.created_at)});
 const commentRow=value=>value&&({id:value.comment_id,shareId:value.share_id,subjectId:value.subject_id,body:value.body,status:value.status,createdAt:iso(value.created_at),updatedAt:iso(value.updated_at),editedAt:value.edited_at?iso(value.edited_at):null});
 const reportRow=value=>value&&({id:value.report_id,shareId:value.share_id,reporterSubjectId:value.reporter_subject_id,reason:value.reason,status:value.status,createdAt:iso(value.created_at),resolvedAt:iso(value.resolved_at),hidden:value.is_hidden===true||value.hidden===true});
 
-export function createCommunityRepo(pool){
+export function createCommunityRepo(pool, { hasRealCustomers = false } = {}){
+ const countedVoter = countedVoterSql(hasRealCustomers);
  return {
   // 첫 화면 둘러보기 숫자(261116 PR 2) — 둘러보기에 소개된 트리 수와 그 순간 수(공개 집계, 읽기만).
   // 둘러보기 목록(listDiscoverableSummaries)과 같은 규칙(active·3개 이상·discover 켬·숨김·비공개 제외)을
@@ -38,21 +39,24 @@ export function createCommunityRepo(pool){
    const row=rows[0]||{};
    return {trees:Number(row.trees||0),moments:Number(row.moments||0)};
   },
-  async listDiscoverableSummaries({productId,viewerSubjectId=null,limit=240,sort='latest',weekSince=null}){
+  async listDiscoverableSummaries({productId,viewerSubjectId=null,limit=240,sort='latest',weekSince=null,weekUntil=null}){
    // #824 결정 1·2: 카드 stats에 이번 주 표 수(week_votes)를 더고, sort='popular'면 그 내림차순으로 정렬한다.
    // 집계 대상은 picked(공개·소개 켬·숨김·비공개 제외)로 한정 — 삭제·비공개된 트리의 표는 집계에서 빠지고 표 행은 남는다.
-   const weekSelect=weekSince?`,\n      (SELECT count(*)::int FROM lovetree_community_votes v WHERE v.product_id=s.product_id AND v.target_kind='tree' AND v.target_id=s.share_id AND v.voted_at >= $4) AS week_votes`:'';
+   const weekSelect=weekSince?`,
+      (SELECT count(*)::int FROM lovetree_community_votes v
+       WHERE v.product_id=s.product_id AND v.target_kind='tree' AND v.target_id=s.share_id
+         AND v.voted_at >= $4 AND ($5::timestamptz IS NULL OR v.voted_at < $5) AND ${countedVoter}) AS week_votes`:'';
    const baseOrder="COALESCE((SELECT max(created_at) FROM lovetree_community_comments WHERE product_id=s.product_id AND share_id=s.share_id AND status='visible'), s.created_at) DESC, s.created_at DESC, s.share_id DESC";
    const orderSql=(sort==='popular'&&weekSince)?`week_votes DESC, ${baseOrder}`:baseOrder;
    const rankOwners = sort === 'popular';
-   const params=weekSince?[productId,viewerSubjectId,limit,weekSince]:[productId,viewerSubjectId,limit];
+   const params=weekSince?[productId,viewerSubjectId,limit,weekSince,weekUntil]:[productId,viewerSubjectId,limit];
    const {rows}=await pool.query(
     `WITH picked AS (
        SELECT DISTINCT ON (s.tree_id) s.*
        FROM lovetree_shares s
        ${rankOwners ? 'LEFT JOIN lovetree_product_roles owner_role USING (product_id, subject_id)' : ''}
        WHERE s.product_id=$1 AND s.status='active' AND s.moment_count>=3
-         ${rankOwners ? 'AND ' + rankingOwnerCondition : ''}
+         ${rankOwners ? 'AND ' + rankingOwnerSql(hasRealCustomers) : ''}
          AND EXISTS (
            SELECT 1 FROM lovetree_tree_discover d
            WHERE d.product_id=s.product_id AND d.subject_id=s.subject_id AND d.tree_id=s.tree_id AND d.discover=true
@@ -218,13 +222,14 @@ export function createCommunityRepo(pool){
    );
    return !!rows[0]?.voted;
   },
-  // 이번 주(주 시작 시각 since 이후) 대상별 표 수. 주 경계(월~일 KST)는 부르는 쪽이 정해 since로 넘긴다
-  // — 주 규칙을 SQL 곳곳에 복제하지 않게 하려는 것이다(#824 결정 4).
-  async weeklyVoteCounts({productId,targetKind,since}){
+  // 주 경계(월~일 KST)는 서비스가 전달한다. 시작을 포함하고 다음 주 시작은 제외한다.
+  async weeklyVoteCounts({productId,targetKind,since,until=null}){
    const {rows}=await pool.query(
-    `SELECT target_id, count(*)::int AS n FROM lovetree_community_votes
-      WHERE product_id=$1 AND target_kind=$2 AND voted_at >= $3 GROUP BY target_id`,
-    [productId,targetKind,since]
+    `SELECT v.target_id, count(*)::int AS n FROM lovetree_community_votes v
+      WHERE v.product_id=$1 AND v.target_kind=$2 AND v.voted_at >= $3
+        AND ($4::timestamptz IS NULL OR v.voted_at < $4) AND ${countedVoter}
+      GROUP BY v.target_id`,
+    [productId,targetKind,since,until]
    );
    const counts={};
    for(const row of rows)counts[row.target_id]=Number(row.n);
