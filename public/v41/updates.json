@@ -7,7 +7,15 @@
       {"kind": "fix", "text": "보드 상세에서 크게 보기·YouTube 열기 단추가 두 번씩 보이지 않아요", "source": "ai_tester", "issue": "#840"},
       {"kind": "fix", "text": "순간 추가·내 의견 같은 큰 창이 열려 있는 동안 '첫 트리를 만들었어요' 안내가 창을 가리지 않아요", "source": "ai_tester", "tester": "레인", "issue": "#845"},
       {"kind": "new", "text": "창이 열려 있을 때는 뒤로가기가 창을 닫는 일을 해요", "source": "ai_tester", "tester": "레인", "issue": "#845"},
-      {"kind": "fix", "text": "밤 테마에서 보드와 지도도 어둡게 보여요.", "issue": "#856"}
+      {"kind": "fix", "text": "밤 테마에서 보드와 지도도 어둡게 보여요.", "source": "ai_tester", "issue": "#856"},
+      {"kind": "fix", "text": "지도 그래프에서 아직 묶음에 안 든 순간이 날짜·제목으로 깔끔하게 보여요", "source": "user", "issue": "#842"},
+      {"kind": "fix", "text": "의견을 보낸 직후 내 의견 목록에 내 의견이 바로 보여요", "source": "user", "issue": "#846"},
+      {"kind": "fix", "text": "지도·그래프 화면이 아래 새 소식·의견 링크와 겹치지 않게 여유를 두었어요", "source": "ai_tester", "issue": "#850"},
+      {"kind": "fix", "text": "순간을 담은 직후 창이 닫혀도 꼬리표가 저장에서 사라지지 않아요", "source": "user", "issue": "#844"},
+      {"kind": "fix", "text": "첫 화면 숫자판에는 내 기록의 숫자만 보이고, 예시로 둔 숫자는 예시라고 구분돼요", "source": "user", "issue": "#860"},
+      {"kind": "fix", "text": "트리 이름을 바꾸면 서재 표지와 책 제목이 새로고침 없이 바로 바뀌어요", "source": "team", "issue": "#862"},
+      {"kind": "fix", "text": "지도 그래프가 여유 있게 정리됐어요 — 묶음이 없으면 발자취가 화면 가운데에서 안내하고 글자가 겹치지 않아요", "source": "ai_tester", "issue": "#864"},
+      {"kind": "fix", "text": "계정 메뉴에서 긴 이메일도 한 줄로 보여요", "source": "ai_tester"}
     ]
   },
   {
