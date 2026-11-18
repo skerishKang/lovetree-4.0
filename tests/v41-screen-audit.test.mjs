@@ -2002,17 +2002,37 @@ test('#657 후속 261117: 상단 탭 글자 통일과 고른 탭 칸 높이(390�
             await page.locator(`#tree-views button[data-view="${view}"]`).click();
           }
           await page.waitForTimeout(250);
+          // 누른 탭 위에 마우스가 남아 있으면 hover 바탕이 섞인다 — 바탕0 계약은 마우스를 치운 뒤에 잰다.
+          await page.mouse.move(2, 300);
           if (width === 1440) {
+            // 261119 대표 결정: 탭은 판 안 칸이 아니라 글자 링크다 — 감싸는 판 배경·테두리 0,
+            // 고른 탭은 채움 대신 '밑줄 2px + 진한 글자', 누름 영역은 44px 이상, 고른 탭은 1개.
             const box = await page.evaluate(() => {
-              const frame = document.querySelector('.tree-frame').getBoundingClientRect();
+              const frame = document.querySelector('.tree-frame');
+              const fcs = getComputedStyle(frame);
               const btn = document.querySelector('#tree-views button[aria-current="true"]');
+              const cs = getComputedStyle(btn);
+              const others = [...document.querySelectorAll('#tree-views button[data-view]')].filter((b) => b !== btn);
               const r = btn.getBoundingClientRect();
-              return { innerTop: Math.round(frame.top + 2), innerBottom: Math.round(frame.bottom - 2), innerHeight: Math.round(frame.height - 4), top: Math.round(r.top), bottom: Math.round(r.bottom), height: Math.round(r.height), radius: getComputedStyle(btn).borderTopRightRadius, last: btn === document.querySelector('#tree-views button:last-child') };
+              return {
+                frameBg: fcs.backgroundColor, frameBorder: parseFloat(fcs.borderTopWidth) || 0,
+                bg: cs.backgroundColor, deco: cs.textDecorationLine, thickness: cs.textDecorationThickness, color: cs.color,
+                height: Math.round(r.height),
+                otherBg: others.map((b) => getComputedStyle(b).backgroundColor),
+                otherDeco: others.map((b) => getComputedStyle(b).textDecorationLine),
+                current: document.querySelectorAll('#tree-views button[aria-current="true"]').length
+              };
             });
-            assert.ok(Math.abs(box.height - box.innerHeight) <= 2, `${width}/${theme}/${view}: 칠한 높이 ${box.height} = 묶음 안쪽 ${box.innerHeight}`);
-            assert.ok(Math.abs(box.top - box.innerTop) <= 2, `${width}/${theme}/${view}: 위 여백 ${box.top - box.innerTop}px`);
-            assert.ok(Math.abs(box.bottom - box.innerBottom) <= 2, `${width}/${theme}/${view}: 아래 여백 ${box.innerBottom - box.bottom}px`);
-            if (box.last) assert.ok(parseFloat(box.radius) >= 900, `${width}/${theme}/${view}: 마지막 탭 오른쪽 둥글기 ${box.radius}`);
+            assert.equal(box.frameBg, 'rgba(0, 0, 0, 0)', `${width}/${theme}/${view}: 탭을 감싸는 판 배경 없음`);
+            assert.equal(box.frameBorder, 0, `${width}/${theme}/${view}: 탭을 감싸는 판 테두리 없음`);
+            assert.equal(box.bg, 'rgba(0, 0, 0, 0)', `${width}/${theme}/${view}: 고른 탭 칸을 칠하지 않는다`);
+            assert.equal(box.deco, 'underline', `${width}/${theme}/${view}: 고른 탭은 밑줄로 표시한다`);
+            assert.equal(box.thickness, '2px', `${width}/${theme}/${view}: 밑줄 두께 2px`);
+            assert.ok(box.height >= 44, `${width}/${theme}/${view}: 탭 누름 영역 ${box.height}px ≥ 44`);
+            assert.equal(box.current, 1, `${width}/${theme}/${view}: 현재 화면 표시는 1개`);
+            assert.notEqual(box.color, unselected[0].color, `${width}/${theme}/${view}: 고른 탭 글자가 더 진하다`);
+            for (const d of box.otherDeco) assert.equal(d, 'none', `${width}/${theme}/${view}: 고르지 않은 탭에 밑줄 없음`);
+            for (const b of box.otherBg) assert.equal(b, 'rgba(0, 0, 0, 0)', `${width}/${theme}/${view}: 고르지 않은 탭 배경 투명`);
           }
         }
         await ctx.close();
