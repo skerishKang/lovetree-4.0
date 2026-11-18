@@ -41,7 +41,7 @@ export function createCommunityRepo(pool){
    // 집계 대상은 picked(공개·소개 켬·숨김·비공개 제외)로 한정 — 삭제·비공개된 트리의 표는 집계에서 빠지고 표 행은 남는다.
    const weekSelect=weekSince?`,\n      (SELECT count(*)::int FROM lovetree_community_votes v WHERE v.product_id=s.product_id AND v.target_kind='tree' AND v.target_id=s.share_id AND v.voted_at >= $4) AS week_votes`:'';
    const baseOrder="COALESCE((SELECT max(created_at) FROM lovetree_community_comments WHERE product_id=s.product_id AND share_id=s.share_id AND status='visible'), s.created_at) DESC, s.created_at DESC, s.share_id DESC";
-   const orderSql=(sort==='popular'&&weekSince)?`ORDER BY week_votes DESC, ${baseOrder}`:`ORDER BY ${baseOrder}`;
+   const orderSql=(sort==='popular'&&weekSince)?`week_votes DESC, ${baseOrder}`:baseOrder;
    const params=weekSince?[productId,viewerSubjectId,limit,weekSince]:[productId,viewerSubjectId,limit];
    const {rows}=await pool.query(
     `WITH picked AS (
