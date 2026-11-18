@@ -226,9 +226,10 @@ html[data-lt-theme=garden] .header-actions #header-overflow{background:var(--lt-
 html[data-lt-theme=garden] body,html[data-lt-theme=garden] .app-header{transition:background-color .28s ease,color .28s ease,border-color .28s ease}
 @media(prefers-reduced-motion:reduce){html[data-lt-theme=garden] body,html[data-lt-theme=garden] .app-header{transition:none}}
 /* 첫 화면 정원: 궤도 배치·움직임·카메라를 그대로 두고 색만 바꾼다. 이 파일은 첫 화면 그림자 루트에도 들어가므로 :host를 쓴다. */
-:host([data-lt-theme=garden]) .app{background:radial-gradient(circle at 50% 46%,var(--lt-stage-2) 0%,var(--lt-stage) 52%,var(--lt-garden-edge) 100%)}
-/* 원본의 어두운 비네트(.app:before, z-index 4)는 크림 무대를 회색으로 죽인다. 깊이감은 따뜻한 옅은 비네트로 남긴다. */
-:host([data-lt-theme=garden]) .app:before{background:radial-gradient(circle at 50% 50%,transparent 0 30%,rgba(119,91,82,.05) 46%,rgba(75,51,42,.12) 78%,rgba(75,51,42,.2) 100%)}
+:host([data-lt-theme=garden]) .app{background:radial-gradient(circle at 50% 46%,var(--lt-stage-2) 0%,var(--lt-stage) 52%,var(--lt-stage) 100%)}
+/* 261118 대표 지적 1번(이슈 #884): 가장자리를 어둡게 깐 비네트가 바닥에 회색 띠를 만들었다 — 거둬서
+   무대 색이 바닥까지 그대로 이어지게 한다(밤은 원래 #000 으로 이어져 그대로 둔다). */
+:host([data-lt-theme=garden]) .app:before{background:none}
 :host([data-lt-theme=garden]) .center h1{color:var(--lt-ink)}
 :host([data-lt-theme=garden]) .center p,:host([data-lt-theme=garden]) .center .center-note{color:var(--lt-muted)}
 :host([data-lt-theme=garden]) .center-scrim{background:radial-gradient(ellipse 62% 58% at 50% 49%,rgba(247,240,232,.92) 0%,rgba(247,240,232,.72) 44%,rgba(247,240,232,0) 100%)}
@@ -236,7 +237,8 @@ html[data-lt-theme=garden] body,html[data-lt-theme=garden] .app-header{transitio
 :host([data-lt-theme=garden]) .card.memo{border-color:var(--lt-ink)}
 :host([data-lt-theme=garden]) .menuBtn,:host([data-lt-theme=garden]) .subtleBtn{background:rgba(255,253,248,.9);border-color:rgba(119,91,82,.34);color:var(--lt-ink)}
 :host([data-lt-theme=garden]) .menuBtn:hover,:host([data-lt-theme=garden]) .subtleBtn:hover{background:var(--lt-paper);border-color:rgba(119,91,82,.58)}
-:host([data-lt-theme=garden]) .primary-cta{background:var(--lt-primary)!important;color:var(--lt-primary-ink)!important;border-color:var(--lt-primary)!important}
+/* 261118 대표 지적 3번(이슈 #884): 첫 화면 강조 단추를 진한 장미 채움으로 바꾼 덮어쓰기를 거둔다 —
+   SRC064 원본의 밝은 채움(#eee7e0, orbit-source.css .primary-cta)이 낮에서도 그대로 보이게 한다. */
 :host([data-lt-theme=garden]) .hint,:host([data-lt-theme=garden]) .caption{color:var(--lt-muted);text-shadow:none}
 :host([data-lt-theme=garden]) .firstMark{border-color:var(--lt-rose);background:rgba(255,253,248,.86);color:var(--lt-ink);box-shadow:none}
 :host([data-lt-theme=garden]) .orbit-dialog{background:var(--lt-paper);border-color:rgba(119,91,82,.3);color:var(--lt-ink)}
