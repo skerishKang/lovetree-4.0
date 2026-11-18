@@ -113,8 +113,10 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
    totalsCache={at,value};
    return value;
   },
-  async discover({query='',emotion='',artistGroup='',cursor='',limit=12,viewerSubjectId=null}={}){
+  async discover({query='',emotion='',artistGroup='',cursor='',limit=12,viewerSubjectId=null,sort='latest'}={}){
    const q=clean(query,80).toLocaleLowerCase('ko-KR'),tag=clean(emotion,12),artistKey=tagKey(clean(artistGroup,24)),size=Math.max(1,Math.min(24,Number(limit)||12));
+   // #824 결정 2: sort='popular'면 이번 주 표 수 내림차순. 모르는 값은 기본(latest)으로 돌린다.
+   const sortKey=sort==='popular'?'popular':'latest';
    // #611 3번: AI 명예회원 배지 비트 — 이번 한 번의 둘러보기 조회에서는 같은 주인이면 한 번만 묻는다.
    // #678 후속: 역할을 한 번만 물어 두고(주인당 한 번) 그 값으로 배지와 시험 계정 거름을 함께 판정한다.
    const roleCache=new Map();
@@ -126,7 +128,7 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
    const isTesterLookup=roleOf?async subjectId=>await roleOf(subjectId)===ROLE_TESTER:null;
    let entries;
    if(typeof communityRepo.listDiscoverableSummaries==='function'){
-    const summaries=await communityRepo.listDiscoverableSummaries({productId,viewerSubjectId,limit:240});
+    const summaries=await communityRepo.listDiscoverableSummaries({productId,viewerSubjectId,limit:240,sort:sortKey,weekSince:new Date(weekStartKst()).toISOString()});
     entries=await Promise.all(summaries.map(async summary=>{
      // 시험 계정(tester 역할) 트리는 둘러보기 목록·검색에서 뺀다(#678 후속 — 공유 링크 직접 열기는 그대로).
      if(await isTesterLookup(summary.share.subjectId))return null;
@@ -220,7 +222,12 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
     const blocked=await communityRepo.isBlocked({productId,blockerSubjectId:subjectId,blockedSubjectId:share.subjectId});
     if(blocked)throw new ApiError(403,'reaction_blocked','차단한 기록에는 반응할 수 없어요.');
    }
-   await communityRepo.setReaction({productId,shareId,subjectId,kind,enabled});return communityRepo.stats({productId,shareId,viewerSubjectId:subjectId});},
+   await communityRepo.setReaction({productId,shareId,subjectId,kind,enabled});
+   // #824 결정 7: 담기·공감 응답 모양을 같게 — 화면이 카드를 다시 그릴 때 이번 주 표 수가 사라지지 않게 한다.
+   const stats=await communityRepo.stats({productId,shareId,viewerSubjectId:subjectId});
+   const voted=await communityRepo.hasVoted({productId,targetKind:'tree',targetId:shareId,subjectId});
+   const weeklyFavorites=(await communityRepo.weeklyVoteCounts({productId,targetKind:'tree',since:new Date(weekStartKst()).toISOString()}))[shareId]||0;
+   return {...stats,voted,weeklyFavorites};},
   async comments(shareId,viewerSubjectId){await activeShare(shareId);const isAdmin=!!viewerSubjectId&&!!admin&&await admin.roleFor({productId,subjectId:viewerSubjectId})==='admin';return (await communityRepo.listComments({productId,shareId,limit:50})).map(row=>publicComment(row,viewerSubjectId,isAdmin));},
   async comment(subjectId,shareId,body,key){const share=await activeShare(shareId);rate(subjectId,'comment',12);if(communityRepo?.isBlocked){const blocked=await communityRepo.isBlocked({productId,blockerSubjectId:subjectId,blockedSubjectId:share.subjectId});if(blocked)throw new ApiError(403,'comment_blocked','차단한 기록에는 댓글을 남길 수 없어요.');}const text=clean(body,1000);if(!text)throw new ApiError(400,'comment_empty','댓글을 입력해 주세요.');const row=await communityRepo.createComment({productId,commentId:makeId(),shareId,subjectId,body:text,clientKey:key});return publicComment(row,subjectId);},
   async updateComment(subjectId,commentId,body){if(!ITEM_ID.test(commentId))throw new ApiError(404,'comment_not_found','댓글을 찾을 수 없어요.');rate(subjectId,'comment',12);const text=clean(body,1000);if(!text)throw new ApiError(400,'comment_empty','댓글을 입력해 주세요.');const current=await communityRepo.getComment?.({productId,commentId});if(!current||current.status!=='visible')throw new ApiError(404,'comment_not_found','댓글을 찾을 수 없어요.');if(current.subjectId!==subjectId)throw new ApiError(403,'comment_forbidden','이 댓글을 수정할 수 없어요.');const share=await shareRepo.load({productId,shareId:current.shareId});if(!share||share.status!=='active')throw new ApiError(404,'share_not_found','공개 트리를 찾을 수 없어요.');if(communityRepo?.isBlocked){const blocked=await communityRepo.isBlocked({productId,blockerSubjectId:subjectId,blockedSubjectId:share.subjectId});if(blocked)throw new ApiError(403,'comment_blocked','차단한 기록에는 댓글을 남길 수 없어요.');}const row=await communityRepo.updateComment({productId,commentId,subjectId,body:text});if(!row)throw new ApiError(403,'comment_forbidden','이 댓글을 수정할 수 없어요.');return publicComment(row,subjectId);},
@@ -242,7 +249,7 @@ export function createCommunityHandler({authenticate,service,productId}){
   // #627 3단계 '다른 팬 보기' — 공개 경로라 로그인 없이도 부른다. 로그인했으면 자기 트리·차단 관계를 뺀다.
   if(path==='/api/public/tag-moments'&&method==='GET'){const who=await principal(request,false);return {status:200,body:await service.tagMoments({tag:String(query.get('tag')||''),viewerSubjectId:who?.subjectId||null}),headers:NO_STORE};}
   if(path==='/api/community/stats'&&method==='GET'){return {status:200,body:await service.discoverTotals(),headers:{...NO_STORE,'cache-control':'public, max-age=60'}};}
-  if(path==='/api/community/shares'&&method==='GET'){const who=await principal(request,false);return {status:200,body:await service.discover({query:query.get('q')||'',emotion:query.get('emotion')||'',artistGroup:query.get('artist')||'',cursor:query.get('cursor')||'',limit:query.get('limit')||12,viewerSubjectId:who?.subjectId||null}),headers:NO_STORE};}
+  if(path==='/api/community/shares'&&method==='GET'){const who=await principal(request,false);return {status:200,body:await service.discover({query:query.get('q')||'',emotion:query.get('emotion')||'',artistGroup:query.get('artist')||'',cursor:query.get('cursor')||'',limit:query.get('limit')||12,viewerSubjectId:who?.subjectId||null,sort:query.get('sort')||'latest'}),headers:NO_STORE};}
   if(path==='/api/community/me/favorites'&&method==='GET'){const who=await principal(request);return {status:200,body:{shareIds:await service.favorites(who.subjectId)},headers:NO_STORE};}
   if(path==='/api/community/admin/reports'&&method==='GET'){const who=await principal(request);return {status:200,body:{reports:await service.reports(who)},headers:NO_STORE};}
   const moderate=path.match(/^\/api\/community\/admin\/reports\/([^/]+)$/);

@@ -28,11 +28,12 @@ export function createMemoryCommunityRepo({isPrivateTree=null,isDiscoverOn=null}
  return {
   queryCount:0,
   async listDiscoverable({productId,viewerSubjectId}){this.queryCount+=1;const out=[];for await(const row of candidates.call(this,productId,viewerSubjectId))out.push(copy(row));return out;},
-  async listDiscoverableSummaries({productId,viewerSubjectId}){
+  async listDiscoverableSummaries({productId,viewerSubjectId,sort='latest',weekSince=null}){
    this.queryCount+=1;
    const filtered=[];
    for await(const row of candidates.call(this,productId,viewerSubjectId))filtered.push(row);
-   return filtered.map(share=>{
+   const sinceMs=weekSince?new Date(weekSince).getTime():null;
+   let out=filtered.map(share=>{
     const prefix=key(productId,share.shareId)+'\0';
     const reqs=reactionKeys().filter(v=>v.startsWith(prefix));
     const heartCount=reqs.filter(v=>v.split('\0')[3]==='heart').length;
@@ -41,8 +42,11 @@ export function createMemoryCommunityRepo({isPrivateTree=null,isDiscoverOn=null}
     const mine=reqs.filter(v=>viewerSubjectId&&v.split('\0')[2]===viewerSubjectId).map(v=>v.split('\0')[3]||'heart').sort();
     const visible=[...comments.values()].filter(v=>v.productId===productId&&v.shareId===share.shareId&&v.status==='visible');
     const lastActivityAt=visible.length?visible.map(v=>v.createdAt).sort().at(-1):share.createdAt;
-    return {share:copy(share),lastActivityAt,stats:{favorites:[...favorites].filter(v=>v.startsWith(prefix)).length,hearts:heartCount,comments:visible.length,favored:favorites.has(key(productId,share.shareId,viewerSubjectId)),hearted:reactionSet.has(key(productId,share.shareId,viewerSubjectId,'heart')),reactions,mine}};
+    const weekFavorites=sinceMs===null?0:[...votes.values()].filter(v=>v.productId===productId&&v.targetKind==='tree'&&v.targetId===share.shareId&&new Date(v.votedAt).getTime()>=sinceMs).length;
+    return {share:copy(share),lastActivityAt,stats:{favorites:[...favorites].filter(v=>v.startsWith(prefix)).length,hearts:heartCount,comments:visible.length,favored:favorites.has(key(productId,share.shareId,viewerSubjectId)),hearted:reactionSet.has(key(productId,share.shareId,viewerSubjectId,'heart')),weeklyFavorites:weekFavorites,reactions,mine}};
    });
+   if(sort==='popular'&&sinceMs!==null)out.sort((a,b)=>(b.stats.weeklyFavorites-a.stats.weeklyFavorites)||String(b.lastActivityAt).localeCompare(String(a.lastActivityAt))||String(b.share.shareId).localeCompare(String(a.share.shareId)));
+   return out;
   },
   seedShares(rows){this.shares=rows.map(copy);},
   // #627 3단계: 태그 검색이 훑을 공개 공유 행 — active, 사람×트리당 한 행(auto 우선), 숨김·비공개·

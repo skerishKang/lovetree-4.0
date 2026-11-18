@@ -402,6 +402,7 @@ const shellMessages=createMessages({
   openTreeManager:()=>shellPanels.openTreeManager(),
   openTagManager:opts=>shellTagManager.open(opts),
   openEditor:(mode,parentId)=>openEditor(mode,parentId),
+  openNewTree:()=>openEditor('new'),
   // 이슈 671: lt41-write의 새로 추가(new·add)는 쓰기 창 한 길로 — 목적지(트리·이어질 순간)를 함께 넘긴다.
   openWriteEntry:target=>shellQuick.openWrite(target),
   focusTitleInput:()=>shellPanels.focusTitleInput?.(),
