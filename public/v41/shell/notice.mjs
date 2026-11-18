@@ -7,9 +7,10 @@ export const NOTICE_HIDE_MS = 6500;
 
 // #549: 'synced' 상태 안내 문구 한 벌. 기록(순간)이 0개인 새 계정에 '내 기록을 불러왔어요.'는
 // 어색하므로 첫 순간 안내로 바꾼다. momentCount는 모든 트리의 순간 수 합계다.
-export function syncedNoticeText({ writable = false, previousDirty = false, momentCount = 0 } = {}) {
+// #905: 자동 저장 성공('서버에 저장됐어요.')은 알리지 않는다 — previousDirty 는 이제 셸에서
+// '알림을 거두는 조건'으로만 쓴다. 이 함수는 처음 기록을 읽었을 때의 안내만 만든다.
+export function syncedNoticeText({ writable = false, momentCount = 0 } = {}) {
   if (!writable) return '기록을 읽었어요. 서버 편집 연결은 아직 준비되지 않았어요.';
-  if (previousDirty) return '서버에 저장됐어요.';
   return momentCount > 0 ? '내 기록을 불러왔어요.' : '반가워요. 첫 순간을 남겨 보세요.';
 }
 

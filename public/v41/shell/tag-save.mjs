@@ -22,7 +22,9 @@ export function createTagSave(deps) {
 
   // {treeId, momentId, keywords} → 바뀐 부분만 저장. 바뀐 것이 없으면 저장하지 않는다(조용히 같은 값).
   // 돌려주는 값: {ok, keywords, changed, error?} — 화면은 keywords로 칩을 다시 맞춘다.
-  function save({ treeId, momentId, keywords, notice = '꼬리표를 저장했어요.', quiet = false } = {}) {
+  // #905: 자동 저장 성공은 알리지 않는다 — 기본 notice 는 없고, 꼬리표 관리 창처럼 직접 누른
+  // 동작만 자기 문구를 넘겨 알린다. 실패는 저장하지 못했어요 답으로 알린다.
+  function save({ treeId, momentId, keywords, notice = '', quiet = false } = {}) {
     const member = getMember();
     if (!member?.snapshot().owned || !member.snapshot().writable) return { ok: false, error: 'readonly' };
     const tree = (getModel()?.trees || []).find((t) => t.id === treeId);
@@ -43,7 +45,7 @@ export function createTagSave(deps) {
   }
 
   // 여러 순간을 한 번에 바꾼다(이름 바꾸기·합치기·제안 한 번에 저장). 이미 계산된 moments 배열을 넘긴다.
-  function saveMoments({ treeId, moments, notice = '꼬리표를 저장했어요.' } = {}) {
+  function saveMoments({ treeId, moments, notice = '' } = {}) {
     const member = getMember();
     if (!member?.snapshot().owned || !member.snapshot().writable) return { ok: false, error: 'readonly' };
     const tree = (getModel()?.trees || []).find((t) => t.id === treeId);

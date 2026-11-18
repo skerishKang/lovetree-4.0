@@ -171,7 +171,7 @@ let editBtn=[...$('#detail').querySelectorAll('button')].find(b=>b.textContent.t
 /* #315: 공유 감상은 쓰기·편집 도구(순간 추가·되돌리기·수정)를 렌더하지 않는다. */
 if(LTDEMO.readOnly){if(editBtn)editBtn.hidden=true;for(const id of ['addBtn','undoBtn']){const b=document.getElementById(id);if(b)b.hidden=true;}}
 // #601: 내 마음 입력 — 기존 순간 저장 경로(boardPayload의 note)로 그대로 저장한다.
-$('#dHeartSave').onclick=()=>{let m=moments.find(x=>x.id===selected);if(!m)return;const v=$('#dHeartInput').value.trim();if(!v){toast('마음을 적어 주세요.');return}snapshot();m.memo=v;persistBoard();selectMoment(m.id,false);toast('마음을 남겼어요.')};
+$('#dHeartSave').onclick=()=>{let m=moments.find(x=>x.id===selected);if(!m)return;const v=$('#dHeartInput').value.trim();if(!v){toast('마음을 적어 주세요.');return}snapshot();m.memo=v;persistBoard();selectMoment(m.id,false)};/* #905: 자동 저장 성공은 알리지 않는다 — 마음이 카드에 바로 보인다. */
 function focusBoardMoment(id,open=true){let m=moments.find(x=>x.id===id),el=cardLayer.querySelector(`[data-id="${id}"]`);if(!m||!el)return;let cx=m.x+el.offsetWidth/2,cy=m.y+el.offsetHeight/2,vw=viewport.clientWidth,vh=viewport.clientHeight;
 /* #267: 좁은 판에서는 위의 탐색 판(선택·책 열기) 아래부터 카드가 보이게 한다 — 고정 156px는 판이 현재 위치(99~179)보다 위라 카드 머리가 판에 덮였다. */
 let topOffset=156;if(vw<700){const pk=document.querySelector('.lt-moment-picker');if(pk){const r=pk.getBoundingClientRect(),vr=viewport.getBoundingClientRect();if(r.width)topOffset=Math.round(r.bottom-vr.top+12)}}

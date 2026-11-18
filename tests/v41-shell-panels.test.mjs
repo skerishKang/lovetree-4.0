@@ -224,7 +224,7 @@ test('편집기 저장은 editorMode와 폼 값·선택을 member.apply에 그�
     assert.equal(h.calls[0][1].note, '저장할 마음');
     assert.equal(h.calls[0][2].treeId, 'tree1', '선택을 그대로 넘긴다');
     assert.equal(h.els['write-panel'].open, false, '저장하면 닫는다');
-    assert.deepEqual(h.notes, ['서버에 저장하고 있어요.']);
+    assert.deepEqual(h.notes, [], '#905: 자동 저장 성공은 알리지 않는다');
   } finally { h.restore(); }
 });
 
