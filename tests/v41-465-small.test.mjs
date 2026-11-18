@@ -18,8 +18,7 @@ test('#465 1: 책장 — 넘길 책이 없으면 화살표를 숨긴다(261118: 
   assert.match(shelfExtraCss, /#shelfPrev\[hidden\],#shelfNext\[hidden\]\{display:none\}/);
 });
 
-test('#465 5: 둘러보기 안내를 사람 말로 — 0개면 아직 없다는 말, 있으면 정렬에 맞는 말(#824)', () => {
-  assert.match(community, /'아직 공개된 트리가 없어요\. 트리를 공개하면 여기에 나타나요\.'/);
+test('#465 5: 둘러보기 안내를 사람 말로 — 빈 상태 안내는 가운데 카드 한 곳, 있으면 정렬에 맞는 말(#824)', () => {
   assert.match(community, /\(sortSelect\?\.value==='popular'\)\?'많이 담긴 순서예요\.'\:'새로 공개된 순서예요\.'/);
   assert.doesNotMatch(community, /공개 허용된 트리/);
   assert.doesNotMatch(community, /인기·추천 순위가 아니에요/);

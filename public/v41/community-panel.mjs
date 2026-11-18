@@ -10,7 +10,7 @@ import {localDateOnly} from './local-date.mjs';
 const el=(tag,className,text)=>{const node=document.createElement(tag);if(className)node.className=className;if(text!=null)node.textContent=text;return node;};
 export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareOwn,hasOwnTree,getDateStyle,getArtistGroups=()=>[]}){
  const api=createCommunityApi(),form=dialog.querySelector('#community-search-form'),query=dialog.querySelector('#community-query'),list=dialog.querySelector('#community-list'),groups=dialog.querySelector('#community-groups'),feedback=dialog.querySelector('#community-feedback'),more=dialog.querySelector('#community-more'),preview=dialog.querySelector('#community-preview'),sortSelect=dialog.querySelector('#community-sort');
- let cursor='',loading=false,items=[],selectedId=null,selectedArtist='',loadId=0;
+  let cursor='',loading=false,items=[],selectedId=null,selectedArtist='',loadId=0,publicGroups=[];
  const message=text=>{feedback.textContent=text;const previewMessage=preview.querySelector('[data-community-preview-message]');if(previewMessage)previewMessage.textContent=text;};
  // #480 L13: 계정 설정의 날짜 표기. 넘겨받지 않으면 기본(dot) — 새 규칙을 만들지 않는다.
  const dateStyle=()=>(typeof getDateStyle==='function'?getDateStyle():'dot');
@@ -84,17 +84,19 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
   cancel.onclick=()=>{delete row.dataset.editing;row.replaceChildren();if(head)row.append(head);if(body)row.append(body);if(tools)row.append(tools);};
   row.append(form);
  }
- function artistGroupList(){
-  let values=[];try{values=getArtistGroups?.()||[];}catch{}
-  const seen=new Set(),out=[];
-  for(const raw of Array.isArray(values)?values:[]){
-   const value=String(raw??'').trim(),key=tagKey(value);
-   if(!value||!key||seen.has(key))continue;
-   seen.add(key);out.push(value);
-   if(out.length===7)break;
+  function artistGroupList(){
+   let mine=[];try{mine=getArtistGroups?.()||[];}catch{}
+   const available=new Map();
+   for(const group of publicGroups){
+    const value=String(group?.value??group??'').trim(),key=tagKey(value);
+    if(value&&key&&!available.has(key))available.set(key,value);
+   }
+   const seen=new Set(),out=[];
+   const add=key=>{if(key&&available.has(key)&&!seen.has(key)){seen.add(key);out.push(available.get(key));}};
+   for(const raw of Array.isArray(mine)?mine:[])add(tagKey(String(raw??'').trim()));
+   for(const key of available.keys())add(key);
+   return out.slice(0,7);
   }
-  return out;
- }
  function renderGroups(){
   const available=artistGroupList();
   if(selectedArtist&&!available.some(value=>tagKey(value)===tagKey(selectedArtist)))selectedArtist='';
@@ -194,13 +196,14 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
   loading=false;
   if(!answer.ok){message(answer.message||'공개 트리를 불러오지 못했어요.');more.hidden=true;more.disabled=false;render();return;}
   items=append?[...items,...answer.items]:answer.items;cursor=answer.nextCursor||'';more.hidden=!cursor;more.disabled=false;
-  message(answer.totalVisible?`공개된 트리 ${answer.totalVisible}개를 찾았어요. ${(sortSelect?.value==='popular')?'많이 담긴 순서예요.':'새로 공개된 순서예요.'}`:'아직 공개된 트리가 없어요. 트리를 공개하면 여기에 나타나요.');render();
+  if(!append){publicGroups=Array.isArray(answer.groups)?answer.groups:[];renderGroups();}
+  message(answer.totalVisible?`공개된 트리 ${answer.totalVisible}개를 찾았어요. ${(sortSelect?.value==='popular')?'많이 담긴 순서예요.':'새로 공개된 순서예요.'}`:'');render();
  }
  // #824 결정 2: 정렬을 바꾸면 목록을 처음부터 다시 불러온다.
  sortSelect.onchange=()=>load(false);
  for(const link of dialog.querySelectorAll('[data-community-view]'))link.onclick=()=>{dialog.close();[...document.querySelectorAll('[data-view]')].find(node=>node.dataset.view===link.dataset.communityView)?.click();};
  const tabs=()=>[...document.querySelectorAll('nav [data-view]')];
- button.onclick=()=>{if(!dialog.open){dialog.showModal();button.setAttribute('aria-current','true');for(const t of tabs()){if(t.getAttribute('aria-current')==='true'){t.dataset.wasCurrent='1';t.setAttribute('aria-current','false');}}renderGroups();load(false);}};
+  button.onclick=()=>{if(!dialog.open){dialog.showModal();button.setAttribute('aria-current','true');for(const t of tabs()){if(t.getAttribute('aria-current')==='true'){t.dataset.wasCurrent='1';t.setAttribute('aria-current','false');}}load(false);}};
  dialog.addEventListener('close',()=>{if(preview.open)preview.close();button.setAttribute('aria-current','false');const emptyShown=!document.getElementById('empty')?.hidden;for(const t of tabs()){if(t.dataset.wasCurrent){delete t.dataset.wasCurrent;if(!emptyShown)t.setAttribute('aria-current','true');}}button.focus();});
  preview.addEventListener('close',()=>[...list.querySelectorAll('.community-card')].find(node=>node.dataset.shareId===selectedId)?.focus());
  preview.addEventListener('click',event=>{if(event.target===preview)preview.close();});
