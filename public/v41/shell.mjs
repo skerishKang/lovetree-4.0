@@ -219,6 +219,11 @@ let model=null,current=screenForView(initialRoute.view)[1],source='example',load
 let networkOpenMoment=null;
 const requestNetworkOpen=id=>{networkOpenMoment=id||null};
 const takeNetworkOpen=()=>{const v=networkOpenMoment;networkOpenMoment=null;return v};
+// #891: 보드도 같은 길 — 주소(공유·이어 보기)가 특정 순간을 가리켜 실제로 찾았을 때만 보드 프레임 주소에
+// ?open=<순간>을 붙여 보낸다. 탭·메뉴로 들어오면 요청이 없으므로 보드는 상세 판을 닫은 채 연다.
+let boardOpenMoment=null;
+const requestBoardOpen=id=>{boardOpenMoment=id||null};
+const takeBoardOpen=()=>{const v=boardOpenMoment;boardOpenMoment=null;return v};
 setMemberRefreshStarted(false);
 const shareApi=createShareApi();
 const accountApi=createWorkspaceApi();
@@ -460,6 +465,7 @@ const shellLocation=createLocation({
   startMember:()=>startMember(),
   showPublicRoute:route=>showPublicRoute(route),
   requestNetworkOpen,
+  requestBoardOpen,
   journey:shellJourney,
   gotoJourneyStep:step=>gotoJourneyStep(step),
   openFirstJourney:options=>openFirstJourney(options),
@@ -577,6 +583,7 @@ const shellScreens=createScreens({
   getSource:()=>source,
   hasTree:()=>!!window.LT41,
   takeNetworkOpen,
+  takeBoardOpen,
   flowNavigation,
   paintEmptyForScreen,
   paintEmptyCopy,
@@ -989,7 +996,9 @@ async function startMember(){setMemberRefreshStarted(true);if(!leaveMember())ret
    if(!initialized){if(route)requested=route;else if(!selection)requested=saved;
     // #583 '이 순간 열기': 맨 처음 주소(#my/network?tree=…&moment=…)로 열 때도 지도가 그 순간을 가운데 두게 한다 —
     // 뒤의 주소 이동(applyBrowserLocation)과 같은 규칙. 이후 동기화 때는 다시 정하지 않는다(initialized 뒤).
-    if(!initialized&&route?.scope==='owner'&&route.view==='network'&&route.momentId)requestNetworkOpen(route.momentId);
+    if(!initialized&&route?.scope==='owner'&&(route.view==='network'||route.view==='board')&&route.momentId){
+     if(route.view==='network')requestNetworkOpen(route.momentId);else requestBoardOpen(route.momentId);
+    }
     // #368 3차: 로그인 후 처음 보여 줄 곳(첫 화면/내 트리 전체 보기/이어 읽기). resume이 지금 동작이라 기본값이고,
     // 주소(#my/…·#share/…·#home 등)가 있으면 그 주소가 이긴다(기존 규칙 그대로).
     const startPlace=(()=>{try{return normalizeStartPlace(state.prefs?.startPlace)}catch{return 'resume'}})();
@@ -1140,7 +1149,10 @@ const themeToggleTop=$('theme-toggle');if(themeToggleTop)themeToggleTop.onclick=
   paintScreenControls();
   notify(tab==='detailed'?'순간 추가를 자세한 추가로 엽니다.':'순간 추가를 쉬운 추가로 엽니다.');
  };
- $on('settings-motion',()=>{motionPaused=!motionPaused;paintScreenControls();try{$('view').contentWindow.postMessage({type:'lt41-motion',paused:motionPaused},location.origin)}catch{}notify(motionPaused?'첫 화면 움직임을 멈췄어요.':'첫 화면 움직임을 다시 켰어요.');});
+ $on('settings-motion',()=>{motionPaused=!motionPaused;paintScreenControls();try{$('view').contentWindow.postMessage({type:'lt41-motion',paused:motionPaused},location.origin)}catch{};
+  // #894: 보드·지도 같은 안쪽 화면에도 움직임 끄기를 알린다 — 끌기 미리 보기 등 화면 움직임이 즉시(전환 없이) 따라 바뀐다.
+  for(const f of frames()){try{f.contentWindow.postMessage({type:'lt41-motion',paused:motionPaused},location.origin)}catch{}}
+  notify(motionPaused?'첫 화면 움직임을 멈췄어요.':'첫 화면 움직임을 다시 켰어요.');});
  paintScreenControls();
  $('account-logout').onclick=async()=>{closeAccountMenu();$('logout').click();};
 document.addEventListener('click',e=>{
@@ -1381,31 +1393,44 @@ paintPageTurnControls();
 // 사용자가 [종이|밤]으로 직접 고른 값은 저장해 계속 쓰고, 앱 테마를 바꾸면(syncBoardThemeToApp)
 // 다시 그 테마에 맞는 판으로 함께 바뀐다.
 const BOARD_THEME_KEY='lt41.boardTheme';
-function currentBoardTheme(){try{const saved=localStorage.getItem(BOARD_THEME_KEY);if(saved==='night'||saved==='paper')return saved;return readTheme(localStorage)==='garden'?'paper':'night'}catch{return 'night'}}
+// #891(13:59 대표 결정): 판 고르기는 세 상태 — 테마 따라가기(auto, 기본)·종이·밤. 저장값이 없거나
+// 'auto'면 앱 테마를 따른다(#853). 화면 단추·메뉴는 저장한 상태를 그대로 보여 주고, 프레임에는
+// 해결된 판(종이/밤)을 넘긴다.
+function storedBoardTheme(){try{const saved=localStorage.getItem(BOARD_THEME_KEY);return saved==='night'||saved==='paper'?saved:'auto'}catch{return 'auto'}}
+function resolveBoardTheme(){return storedBoardTheme()==='auto'?(readTheme(localStorage)==='garden'?'paper':'night'):storedBoardTheme()}
+function currentBoardTheme(){return storedBoardTheme()}
 function paintBoardThemeControls(){const value=currentBoardTheme();for(const b of document.querySelectorAll('button[data-board-theme]'))b.setAttribute('aria-checked',String(b.dataset.boardTheme===value));}
 function applyBoardThemeToFrame(frame){
- const message=frameMessage('boardTheme',currentBoardTheme());
+ const message=frameMessage('boardTheme',resolveBoardTheme());
  try{frame.contentDocument?.documentElement?.setAttribute('data-lt-board-theme',message.value);}catch{}
  sendToFrame(frame,message);
 }
-for(const b of document.querySelectorAll('button[data-board-theme]'))b.onclick=()=>{
- const next=b.dataset.boardTheme==='night'?'night':'paper';
- try{localStorage.setItem(BOARD_THEME_KEY,next)}catch{}
+function saveBoardTheme(value){
+ try{if(value==='auto')localStorage.removeItem(BOARD_THEME_KEY);else localStorage.setItem(BOARD_THEME_KEY,value)}catch{}
  paintBoardThemeControls();
  for(const f of frames())applyBoardThemeToFrame(f);
- notify(next==='night'?'보드·지도 판을 밤 테마로 바꿨어요.':'보드·지도 판을 종이 테마로 바꿨어요.');
+}
+for(const b of document.querySelectorAll('button[data-board-theme]'))b.onclick=()=>{
+ const next=b.dataset.boardTheme==='night'?'night':b.dataset.boardTheme==='paper'?'paper':'auto';
+ saveBoardTheme(next);
+ notify(next==='night'?'보드·지도 판을 밤 테마로 바꿨어요.':next==='paper'?'보드·지도 판을 종이 테마로 바꿨어요.':'보드·지도 판이 앱 테마를 따라가게 됐어요.');
 };
-// #853: 앱 테마(밤/정원)를 바꾸면 보드·지도 판도 그 테마에 맞춘다 — 밤이면 밤 판, 정원이면 종이 판.
-// 열린 화면에 바로 반영하고 저장해 두어 다음에 뜨는 보드·지도도 같은 값을 쓴다.
+// #853: 앱 테마(밤/정원)를 바꾸면 '테마 따라가기' 판도 함께 바뀐다. 사용자가 종이·밤을 직접 골랐으면
+// 그 선택을 존중해 그대로 둔다. 열린 화면에 바로 반영한다.
 function syncBoardThemeToApp(theme){
- const plate=theme==='garden'?'paper':'night';
- try{localStorage.setItem(BOARD_THEME_KEY,plate)}catch{}
  paintBoardThemeControls();
  for(const f of frames())applyBoardThemeToFrame(f);
 }
 paintBoardThemeControls();
 window.addEventListener('message',e=>{
  if(e.origin!==location.origin)return;
+ // #891: 보드·지도 드롭의 고르기 요청 — 보드가 이미 적용·저장했으므로 셸은 같은 값으로 맞추고
+ // 다른 화면(지도·설정)에 알린다. 알림 문구는 보르지 않는다(판이 바로 바뀌어 보이므로).
+ if(e.data?.type==='lt41-board-theme-choice'){
+  const value=e.data.value==='night'?'night':e.data.value==='paper'?'paper':'auto';
+  saveBoardTheme(value);
+  return;
+ }
  if(e.data?.type==='lt41-home-moment'){
   // 261116 PR 2: 첫 화면 카드 모드 저장 — 기기 미러를 먼저 쓰고 계정 설정(이미 있는 setPrefs 길)에 반영한다.
   const value=normalizeHomeMoment(e.data.value);
@@ -1504,14 +1529,19 @@ async function showPublicRoute(route){
  $('empty').querySelector('p').textContent='소유자가 공개한 트리 한 개만 확인합니다.';
  $('empty-sample').hidden=true;$('empty-records').hidden=true;$('view').hidden=true;$('empty').hidden=false;
  const answer=await shareApi.read(route.shareId||'');if(generation!==loadGeneration)return;if(!answer.ok){publicProblem(answer);return;}
- activeShareId=answer.share.id;const view=['book','board','network'].includes(route.view)?route.view:answer.share.view;current=screenForView(view)[1];load({revision:0,state:{version:1,trees:[answer.tree]}},'share',{treeId:answer.tree.id,momentId:answer.share.entryMomentId});activeShareId=answer.share.id;show(current,false);writeLocation('replace');notify('공개된 트리를 감상하는 화면이에요. 감상만 할 수 있어요.'+(answer.aiTester?' AI 명예회원이 만든 트리예요.':'')+(answer.omittedPrivateMedia?' 올린 사진 '+answer.omittedPrivateMedia+'장은 나만 볼 수 있어요.':''));
+ activeShareId=answer.share.id;const view=['book','board','network'].includes(route.view)?route.view:answer.share.view;current=screenForView(view)[1];load({revision:0,state:{version:1,trees:[answer.tree]}},'share',{treeId:answer.tree.id,momentId:answer.share.entryMomentId});
+ // #891: 공유 주소가 특정 순간을 가리키면(시작 순간) 보드만 그 순간의 상세 판을 열어 보여 준다.
+ if(view==='board'&&answer.share.entryMomentId)requestBoardOpen(answer.share.entryMomentId);
+ activeShareId=answer.share.id;show(current,false);writeLocation('replace');notify('공개된 트리를 감상하는 화면이에요. 감상만 할 수 있어요.'+(answer.aiTester?' AI 명예회원이 만든 트리예요.':'')+(answer.omittedPrivateMedia?' 올린 사진 '+answer.omittedPrivateMedia+'장은 나만 볼 수 있어요.':''));
 }
 document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{if(b.dataset.view==='track32-bookshelf.html'&&!member?.snapshot().owned){openLoginStart('shelf');return;}
  // 261118 대표 지적 2차 5: 서재 화면에서 콕·보드·지도는 마지막에 본 트리(서재 가운데 책의 트리)로 연다.
  if(current==='track32-bookshelf.html'&&b.dataset.view!=='track32-bookshelf.html'){const treeId=lastShelfTreeId();
   if(treeId&&model?.trees?.some(t=>t.id===treeId)&&window.LT41?.tree?.id!==treeId){current=b.dataset.view;choose(treeId);writeLocation();return;}}
  show(b.dataset.view);});
-for(const f of frames())f.addEventListener('load',()=>frameLoaded(f));
+for(const f of frames())f.addEventListener('load',()=>{frameLoaded(f);
+ // #894: 새로 뜬 안쪽 화면에도 움직임 끄기 상태를 알린다(메모리 상태 — 화면을 다시 열면 처음 상태).
+ try{f.contentWindow.postMessage({type:'lt41-motion',paused:motionPaused},location.origin)}catch{}});
 paintThemeControls();applyTheme();paintTitleDisplayControls();applyAdvanced();
 if(initialRoute.scope==='public')showPublicRoute(initialRoute);else load(null,'example');
 

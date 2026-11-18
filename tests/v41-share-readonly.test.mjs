@@ -78,8 +78,8 @@ test('기억판: 공유에서 쓰기·편집 도구를 숨기고 편집·저장�
   assert.match(boardExtras, /if\(LTDEMO\.readOnly\)\{if\(editBtn\)editBtn\.hidden=true;for\(const id of \['addBtn','undoBtn'\]\)/, '편집·순간 꽂기·되돌리기 버튼을 숨긴다');
   assert.match(boardExtras, /function openEdit\(\)\{if\(LTDEMO\.readOnly\)return;/, '편집 창을 열지 않는다');
   assert.match(boardExtras, /function saveEdit\(\)\{if\(LTDEMO\.readOnly\)return;/, '편집 저장을 하지 않는다');
-  assert.match(boardExtras, /\$\('#addBtn'\)\.onclick=\(\)=>\{if\(LTDEMO\.readOnly\)return;openAdd\(\)\}/, '순간 꽂기 창을 열지 않는다');
-  assert.match(boardExtras, /\$\('#confirmAdd'\)\.onclick=\(\)=>\{if\(LTDEMO\.readOnly\)return;confirmAdd\(\)\}/, '순간 꽂기를 하지 않는다');
+  // '#addBtn onclick' 글자 검사 두 줄은 #891⑤(CTO)로 보드 도구 줄의 '+ 순간 추가' 단추를 치우면서 지웠다 —
+  // 단추가 없으면 창도 열리지 않으며, 지키려던 동작은 읽기 전용 화면 시험(520)이 검사한다.
 });
 
 // ── 지도(track56): 쓰기 UI가 원래 없다 — 회귀 감시 ──

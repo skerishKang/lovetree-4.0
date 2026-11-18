@@ -21,15 +21,29 @@ function setBoardTheme(theme){
   return v;
 }
 setBoardTheme(readBoardTheme());
-addEventListener('message',e=>{if(e.origin!==location.origin||e.data?.type!=='lt41-board-theme')return;setBoardTheme(e.data.value)});
-// 판 바꾸기는 [종이|밤] 단추(button[data-board-theme])만 받는다. 다른 클릭(카드·판·전체 보기)은 지나간다.
-document.addEventListener('click',e=>{
-  const b=e.target.closest?.('button[data-board-theme]');if(!b)return;
-  const v=setBoardTheme(b.dataset.boardTheme);
-  try{localStorage.setItem('lt41.boardTheme',v)}catch{}
-  toast(v==='night'?'밤 판으로 바꿨어요.':'종이 판으로 바꿨어요.');
-  try{if(window.parent!==window)window.parent.postMessage({type:'lt41-board-theme',value:v},location.origin)}catch{}
-});
+addEventListener('message',e=>{if(e.origin!==location.origin||e.data?.type!=='lt41-board-theme')return;setBoardTheme(e.data.value);paintBoardBgMenu()});
+// #891(13:59 대표 결정): 머리줄의 [종이|밤] 두 단추를 '배경 ▾' 드롭 하나로 바꾼다. 항목은
+// 테마 따라가기(기본)·종이·밤 — '테마 따라가기'는 저장값이 없는 상태(#853)로, 앱 테마를 따른다.
+// 고른 값은 셸이 한 곳에서 저장한다(localStorage lt41.boardTheme) — 보드는 요청만 넘긴다.
+function boardBgChoice(){try{const s=localStorage.getItem('lt41.boardTheme');return s==='paper'||s==='night'?s:'auto'}catch{return 'auto'}}
+function paintBoardBgMenu(){const v=boardBgChoice();document.querySelectorAll('#boardBgMenu .lt-bg-item').forEach(b=>b.setAttribute('aria-checked',String(b.dataset.bg===v)));}
+paintBoardBgMenu();
+const bgBtn=document.getElementById('boardBgBtn'),bgMenu=document.getElementById('boardBgMenu');
+if(bgBtn&&bgMenu){
+ bgBtn.onclick=()=>{const open=bgMenu.hidden;bgMenu.hidden=!open;bgBtn.setAttribute('aria-expanded',String(open))};
+ document.addEventListener('click',e=>{if(bgMenu.hidden)return;if(e.target.closest?.('#boardBgBtn')||e.target.closest?.('#boardBgMenu'))return;bgMenu.hidden=true;bgBtn.setAttribute('aria-expanded','false')});
+ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!bgMenu.hidden){bgMenu.hidden=true;bgBtn.setAttribute('aria-expanded','false');bgBtn.focus()}});
+ bgMenu.addEventListener('click',e=>{
+  const item=e.target.closest?.('.lt-bg-item');if(!item)return;
+  const v=item.dataset.bg;
+  bgMenu.hidden=true;bgBtn.setAttribute('aria-expanded','false');
+  // 보드가 바로 적용한다(셸 없이 열린 화면에서도 같게) — 셸은 같은 값을 저장하고 다른 화면에도 알린다.
+  if(v==='auto'){try{localStorage.removeItem('lt41.boardTheme')}catch{};setBoardTheme(readBoardTheme())}
+  else{try{localStorage.setItem('lt41.boardTheme',v)}catch{};setBoardTheme(v)}
+  paintBoardBgMenu();
+  try{if(window.parent!==window)window.parent.postMessage({type:'lt41-board-theme-choice',value:v},location.origin)}catch{}
+ });
+}
 
 // 기억 보드는 예시 판본과, 서버 기록을 쓰기 가능한 계정으로 연 경우에 편집할 수 있다.
 // 공유 감상(share)은 읽기 전용이다. 서버 쓰기 가능 여부는 셸이 LT41.writable로 넘긴다.
@@ -98,6 +112,23 @@ function commitInsert(id,index){const seq=momentOrder.filter((x)=>x!==id);const 
 // 놓은 뒤에는 '내 배치' 순서대로 보여야 한다(날짜순으로 다시 쌓으면 방금 끼운 자리가 안 보인다 — #619-6).
 if(boardMode!=='mine')setBoardMode('mine');else{placeAll();settlePlacedCards()}
 persistBoard()}
+
+// #894: '내 배치'에서 끄는 동안 다른 카드가 실시간으로 비켜 준다 — 끼어들 자리에 놓였을 때의
+// 자리를 미리 계산해 나머지 카드를 옮겨 둔다(180ms 전환). 움직임 끄기(셸 설정·lt41-motion)면 즉시.
+// 끌고 있는 카드 자체는 포인터를 그대로 따라오고, 놓으면 commitInsert가 같은 자리로 확정한다.
+let boardMotionOff=false,previewSig='';
+addEventListener('message',e=>{if(e.origin!==location.origin||e.data?.type!=='lt41-motion')return;boardMotionOff=!!e.data.paused;cardLayer.classList.toggle('motion-off',boardMotionOff)});
+function previewShift(dragId,hit){
+ if(boardMode!=='mine'||!hit){clearPreviewShift();return}
+ const seq=momentOrder.filter(x=>x!==dragId);const at=Math.max(0,Math.min(seq.length,hit.index));seq.splice(at,0,dragId);
+ const sig=at+'|'+seq.join(',');if(sig===previewSig)return;previewSig=sig;
+ const layout=LT58Model.stackLayout(seq,{cols:LT58Model.gridColumns(innerWidth),reservedOf:(id2)=>reservedHeights.get(id2)||BASE_RESERVED_H});
+ let i=0;
+ for(const id2 of seq){const s=layout.get(id2);if(!s)continue;const pos=LT58Model.gridPosition(s.col,s.y,i++);if(id2===dragId)continue;
+  const el=cardLayer.querySelector(`[data-id="${id2}"]`);if(!el)continue;
+  el.classList.add('shiftPreview');el.style.left=pos.x+'px';el.style.top=pos.y+'px'}
+}
+function clearPreviewShift(){previewSig='';cardLayer.querySelectorAll('.shiftPreview').forEach(el=>el.classList.remove('shiftPreview'))}
 
 let connections=LTDEMO.edges.map((e,i)=>({id:'c'+i,kind:e.kind,a:e.from,b:e.to,why:e.kind==='related'?'관련 순간':e.reason||'',color:e.kind==='related'?'cyan':(canEditBoard?['rose','violet','cyan','amber'][Math.max(0,moments.findIndex(m=>m.id===e.from))%4]:'rose')}));
 
@@ -216,16 +247,15 @@ function boardStartView(){if(innerWidth<700){if(typeof focusBoardMoment==='funct
 let vw=viewport.clientWidth,vh=viewport.clientHeight,cards=boardCards(),saved=userView||readBoardView();
 // #536: 기억한 자리의 적용·버림 판정까지 모델(LT58Model.startView)이 맡는다 — 처음 자리와 같은
 // 판 규칙(덮거나 가운데)을 함께 거치게 해 넓은 화면에서 판이 한쪽으로 쏠리지 않게 한다.
-growBoard();let v=LT58Model.startView({viewport:{w:vw,h:vh},safe:boardSafeArea(true),cards,world:worldSize,focusId:LTDEMO.get?.(),firstId:moments.find(m=>m.first)?.id,saved,title:titleRect()});
+growBoard();let v=LT58Model.startView({viewport:{w:vw,h:vh},safe:boardSafeArea(true),cards,world:worldSize,focusId:LTDEMO.get?.(),firstId:moments.find(m=>m.first)?.id,saved});
 viewMode=v.mode==='user'?'user':'start';if(v.mode==='user')userView=saved;
 Object.assign(view,{x:v.x,y:v.y,z:v.z});applyView(false)}
 // 전체 보기: 순간이 있는 곳 전부를 보이는 칸에 맞춘다(최대 0.92배). 순간이 없으면 무대 전체.
-// #856: 맞춤 상자에 판 제목('기억 보드'·설명 줄) 자리도 함께 넣는다 — 제목은 무대 왼편(88px)에
-// 붙어 있어 순간 카드만 맞추면 화면 왼쪽 밖으로 밀려 잘렸다. 사용자가 직접 옮긴 자리는 그대로 둔다.
-function titleRect(){const t=document.querySelector('.boardTitle');if(!t)return null;return{x:t.offsetLeft,y:t.offsetTop,w:t.offsetWidth,h:t.offsetHeight}}
-function fitAll(animated=true){let vw=viewport.clientWidth,vh=viewport.clientHeight,cards=boardCards(),tb=titleRect();
-if(!cards.length&&!tb){let z=LT58Model.fitZoom(vw,vh);view.z=z;view.x=(vw-2400*z)/2;view.y=(vh-2200*z)/2}
-else{let v=LT58Model.fitViewBox(cards,tb,boardSafeArea(),.92);if(!v){let z=LT58Model.fitZoom(vw,vh);v={z,x:(vw-2400*z)/2,y:(vh-2200*z)/2}}view.z=v.z;view.x=v.x;view.y=v.y}
+// #856의 '제목 자리 함께 재기'는 판 제목이 무대 밖 머리글로 나가면서(#891 CTO) 필요 없어졌다 —
+// 제목은 판(#viewport) 바깥에 있고 판은 제목 아래끝 + 16px부터 시작하므로 카드가 제목에 닿거나 잘릴 수 없다.
+function fitAll(animated=true){let vw=viewport.clientWidth,vh=viewport.clientHeight,cards=boardCards();
+if(!cards.length){let z=LT58Model.fitZoom(vw,vh);view.z=z;view.x=(vw-2400*z)/2;view.y=(vh-2200*z)/2}
+else{let v=LT58Model.fitViewBox(cards,null,boardSafeArea(),.92);if(!v){let z=LT58Model.fitZoom(vw,vh);v={z,x:(vw-2400*z)/2,y:(vh-2200*z)/2}}view.z=v.z;view.x=v.x;view.y=v.y}
 viewMode='fit';applyView(animated)}
 // 창 크기가 바뀌면: 전체 보기 중이면 다시 맞추고, 아니면 처음 자리(또는 기억한 자리)를 다시 계산한다.
 function boardResize(){if(innerWidth<700||cinema)return;placeAll();if(viewMode==='fit')fitAll(false);else boardStartView()}
@@ -349,6 +379,7 @@ function animateHotTip(path,dur=1900){return new Promise(resolve=>{let tip=$('#h
 async function startCinema(fromIndex=0){if(cinema)return;
 cinema=true;
 $('#detail').classList.remove('open');
+syncBoardPush();
 $('#cinemaOverlay').classList.add('active');
 $('#cinemaTitle').classList.add('show');
 $('#finalCTA').classList.remove('show');
@@ -396,7 +427,7 @@ let wheelZooming=false,wheelPause=0;
 function zoomDecorPause(){wheelZooming=true;if(typeof applyDecorMotion==='function')applyDecorMotion();clearTimeout(wheelPause);wheelPause=setTimeout(()=>{wheelZooming=false;if(typeof applyDecorMotion==='function')applyDecorMotion()},160)}
 viewport.addEventListener('wheel',e=>{if(cinema)return;e.preventDefault();let before=screenToWorld(e.clientX,e.clientY),factor=Math.exp(-e.deltaY*.0012),nz=Math.max(.38,Math.min(1.45,view.z*factor));let r=viewport.getBoundingClientRect();view.z=nz;view.x=e.clientX-r.left-before.x*nz;view.y=e.clientY-r.top-before.y*nz;applyView(false);noteUserView();zoomDecorPause()},{passive:false});
 
-$('#addBtn').onclick=openAdd;
+if($('#addBtn'))$('#addBtn').onclick=openAdd;
 $('#cancelAdd').onclick=()=>$('#addModal').classList.remove('open');
 $('#confirmAdd').onclick=confirmAdd;
 $('#typeGrid').onclick=e=>{let b=e.target.closest('.typeBtn');
@@ -405,7 +436,7 @@ addType=b.dataset.type;
 document.querySelectorAll('.typeBtn').forEach(x=>x.classList.toggle('active',x===b));
 formFor(addType)}
 ;
-$('#detailClose').onclick=()=>$('#detail').classList.remove('open');
+$('#detailClose').onclick=()=>{$('#detail').classList.remove('open');syncBoardPush()};
 $('#openMoment').onclick=()=>openViewer(selected);
 $('#closeViewer').onclick=()=>{let v=$('#viewerMedia video');
 if(v)v.pause();
@@ -437,3 +468,14 @@ $('#backBoard').onclick=endCinema;
 $('#finalOpen').onclick=()=>{endCinema();
 selectMoment('m6',true)}
 ;
+// #891: 보드를 탭·메뉴로 열면 상세 판은 닫은 채 둔다 — 카드를 눌렀을 때만 열린다. 주소가 특정 순간을
+// 가리켜 ?open=<순간>으로 들어왔을 때만(공유·이어 보기) 그 순간의 상세 판을 자동으로 연다.
+// 셸(screens.mjs)이 주소 판정에서 ?open=을 붙이는 한 벌이므로 여기서는 주소만 본다.
+function bootDetailPanel(){const openId=new URLSearchParams(location.search).get('open');const target=openId||LTDEMO.get();
+if(openId)selectMoment(target,true);
+else{selectMoment(target,false);$('#detail').classList.remove('open')}}
+// #891: 상세 판이 열리면 보드를 덮지 않고 민다(넓은 화면 ≥760). 판 너비만큼 무대 오른쪽 여백을 벌려
+// 카드가 줄어든 영역에 다시 쌓이게 한다. 좁은 화면은 아래 시트 그대로(덮음) — 예전 규칙을 유지한다.
+function syncBoardPush(){if(innerWidth<760)return;const dt=$('#detail');if(!dt)return;const open=dt.classList.contains('open');
+viewport.style.marginRight=open?(dt.offsetWidth+32)+'px':'0px';
+placeAll();if(viewMode==='fit')fitAll(false);else boardStartView()}

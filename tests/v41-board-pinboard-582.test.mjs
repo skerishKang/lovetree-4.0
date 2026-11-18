@@ -142,9 +142,11 @@ test('#601 배치 모드 전환이 있고, 읽기 전용 가드를 끌어 꽂기
 
 test('#582 상세에 지도 단추가 있고 셸 화면 이동 메시지를 보낸다(#583의 이전·다음 단추는 유지)', () => {
   const extras = read('views/board/board-extras.js');
+  const html = read('views/track58-pinboard.html');
   const shell = read('shell/messages.mjs');
-  assert.match(extras, /id='detailMapBtn'/);
-  assert.match(extras, /mapBtn\.textContent='지도에서 관계 보기'/);
+  // #891: 지도 단추는 판 HTML의 '⋯ 더 보기' 메뉴 안에 있고, 누름 길은 board-extras가 맞춘다.
+  assert.match(html, /id="detailMapBtn"[^>]*>지도에서 관계 보기</);
+  assert.match(extras, /const mapBtn=\$\('#detailMapBtn'\);if\(mapBtn\)mapBtn\.onclick=/);
   assert.match(extras, /type:'lt41-open-network',treeId:window\.parent\?\.LT41\?\.tree\?\.id,momentId:selected/);
   // 셸이 받는다 — 지도 파일은 건드리지 않았다(지도→책 이동과 같은 방식).
   assert.match(shell, /data\?\.type === 'lt41-open-network'/);

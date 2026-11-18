@@ -154,6 +154,8 @@ test('#608 화면: 날짜를 바꾸면 카드 글·날짜순 자리가 바뀌고
   assert.ok(firstSlot, '최신 카드의 자리를 잰다');
   // 카드를 눌러 상세를 열고 '수정'을 누른다 — 날짜 입력이 오늘 값이 아니라 그 순간의 날짜로 채워진다.
   await frame.click('.card[data-id="m1"]');
+  // #891: 수정 단추는 '⋯ 더 보기' 메뉴 안에 있다 — 메뉴를 열고 누른다.
+  await frame.click('#detailMoreBtn');
   await frame.waitForSelector('#editMomentBtn', { timeout: 5000 });
   await frame.click('#editMomentBtn');
   await frame.waitForSelector('#editModal.open', { timeout: 5000 });
@@ -201,6 +203,8 @@ test('#608 화면: 날짜를 바꾸면 카드 글·날짜순 자리가 바뀌고
   await page.waitForFunction((n) => window.LT41_MESSAGES.length > n, syncCountBefore, { timeout: 8000 });
   const dragSync = (await page.evaluate(() => window.LT41_MESSAGES)).at(-1).moments.find((m) => m.id === dragId);
   await frame.click(`.card[data-id="${dragId}"]`);
+  // #891: 수정 단추는 '⋯ 더 보기' 메뉴 안에 있다 — 메뉴를 열고 누른다.
+  await frame.click('#detailMoreBtn');
   await frame.waitForSelector('#editMomentBtn', { timeout: 5000 });
   await frame.click('#editMomentBtn');
   await frame.waitForSelector('#editModal.open', { timeout: 5000 });
@@ -236,6 +240,7 @@ test('#736 편집 창은 고정 목록에 없는 꼬리표를 지우지 않는�
   });
   const openEdit = async () => {
     await frame.click('.card[data-id="m1"]');
+    await frame.click('#detailMoreBtn');
     await frame.waitForSelector('#editMomentBtn', { timeout: 5000 });
     await frame.click('#editMomentBtn');
     await frame.waitForSelector('#editModal.open', { timeout: 5000 });

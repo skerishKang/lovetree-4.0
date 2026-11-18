@@ -77,7 +77,7 @@ test('#393 3 + #368 2차: 움직임 줄이기·페이지 넘김(부드럽게) �
  assert.match(prepare,/smoothTurn\(\)\?' reduced':''/,'페이드 모드(움직임 줄이기·부드럽게)에서는 페이드 전용 면을 쓴다');
  assert.match(prepare,/reduced-faces/,'컴퓨터는 펼침 두 면을 한 장의 덮개로');
  assert.match(finish,/smoothTurn\(\)\?350:/,'페이드 0.35초');
- assert.match(CSS,/\.flip-sheet\.reduced\{width:100%;left:0!important;filter:none\}/);
+ assert.match(CSS,/\.flip-sheet\.reduced\{width:100%;left:0;filter:none\}/);
  assert.match(CSS,/\.reduced-faces\{display:grid;grid-template-columns:1fr 1fr/);
  const setTurn=between(BOOK,'function setTurnProgress','function prepareTurn');
  assert.match(setTurn,/if\(smoothTurn\(\)\)\{sh\.style\.opacity=\(1-p\)\.toFixed\(3\);return\}/,'페이드 모드는 opacity만 바꾼다');

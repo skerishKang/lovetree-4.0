@@ -18,6 +18,7 @@ export function createScreens(deps) {
     writeLocation,
     links,
     takeNetworkOpen,
+    takeBoardOpen,
     onFrameReady
   } = deps;
 
@@ -180,9 +181,12 @@ export function createScreens(deps) {
     // #583 '이 순간 열기': 지도를 특정 순간을 가운데 두고 열 요청이 있으면 프레임 주소에 ?open=<순간>을 붙인다.
     // 요청은 한 번 쓰면 지운다(다른 화면을 먼저 보여 줬으면 끝난 요청이다).
     const openMoment = takeNetworkOpen?.() ?? null;
+    const openBoardMoment = takeBoardOpen?.() ?? null;
     const url = new URL(screenUrl(file, getSource(), location.origin));
     if (treeKey) url.searchParams.set('tree', treeKey);
     if (file === 'track56-network.html' && openMoment) url.searchParams.set('open', openMoment);
+    // #891: 보드는 주소가 특정 순간을 가리켰을 때만 ?open=을 붙인다 — 판 자동 열림의 한 벌 판정.
+    if (file === 'track58-pinboard.html' && openBoardMoment) url.searchParams.set('open', openBoardMoment);
     showInFrame(url.href, '러브트리 · ' + screenTitle(file));
     if (write) writeLocation();
     links();

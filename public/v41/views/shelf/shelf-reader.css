@@ -116,7 +116,7 @@
     .page-counter { min-width: 71px; color: rgba(255,249,239,.72); font: 700 10px var(--latin); text-align: center; }
 
     .transfer-book { position: fixed; z-index: 100; pointer-events: none; overflow: visible; transform-origin: center center; transition: left .72s cubic-bezier(.2,.76,.24,1), top .72s cubic-bezier(.2,.76,.24,1), width .72s cubic-bezier(.2,.76,.24,1), height .72s cubic-bezier(.2,.76,.24,1), transform .72s cubic-bezier(.2,.76,.24,1); }
-    .transfer-book > .book-cover { width: 100% !important; height: 100% !important; margin: 0 !important; transform: rotateY(0) rotateZ(0) !important; box-shadow: 18px 26px 30px rgba(0,0,0,.34) !important; }
+    .transfer-book > .book-cover { width: 100%; height: 100%; margin: 0; transform: rotateY(0) rotateZ(0); box-shadow: 18px 26px 30px rgba(0,0,0,.34); }
 
     .reader-info { display: flex; flex-direction: column; min-height: 720px; padding: 25px; border: 1px solid rgba(119,91,82,.14); border-radius: 24px; background: rgba(255,252,247,.89); box-shadow: var(--shadow-lg); }
     .reader-info h2 { margin: 0 0 7px; font: 400 31px var(--display); letter-spacing: -.08em; }
@@ -138,6 +138,11 @@
     .toast { position: fixed; left: 50%; bottom: 24px; z-index: 100; max-width: calc(100vw - 40px); padding: 12px 17px; border: 1px solid rgba(255,255,255,.62); border-radius: 999px; color: #fffaf5; background: rgba(73,61,58,.92); box-shadow: 0 14px 34px rgba(66,46,40,.14); opacity: 0; pointer-events: none; transform: translate(-50%,12px); transition: .25s ease; font-size: 12px; }
     .toast.show { opacity: 1; transform: translate(-50%,0); }
     .modal-backdrop { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; padding: 20px; background: rgba(37,30,31,.38); backdrop-filter: blur(8px); }
+    .modal-backdrop.hidden { display: none; }
+    .chapter-node-1{--node:var(--lt-cover-1)}
+    .chapter-node-2{--node:var(--lt-cover-2)}
+    .chapter-node-3{--node:var(--lt-cover-3)}
+    .chapter-node-4{--node:var(--lt-cover-4)}
     .modal { position: relative; width: min(620px,100%); padding: 28px; border: 1px solid rgba(255,255,255,.7); border-radius: 25px; background: var(--paper-strong); box-shadow: var(--shadow-xl); }
     .modal h2 { margin: 0 0 9px; font: 400 28px var(--display); letter-spacing: -.07em; }
     .modal > p { color: var(--muted); font-size: 12px; line-height: 1.7; }
