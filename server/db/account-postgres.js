@@ -5,6 +5,7 @@
  */
 export const ACCOUNT_USER_TABLES = Object.freeze([
   { table: 'lovetree_community_favorites', where: 'subject_id = $2' },
+  { table: 'lovetree_stage_saves', where: 'subject_id = $2' },
   // 투표 기록(#824) — 대상 주인이 아니라 표를 던진 사람의 키다(#824 1인 1표). 탈퇴하면 표도 함께 사라진다.
   { table: 'lovetree_community_votes', where: 'subject_id = $2' },
   { table: 'lovetree_community_reactions', where: 'subject_id = $2' },
@@ -17,6 +18,7 @@ export const ACCOUNT_USER_TABLES = Object.freeze([
   },
   { table: 'lovetree_community_moderation_audit', where: 'actor_subject_id = $2' },
   { table: 'lovetree_feedback_replies', where: 'author_subject_id = $2 OR post_id IN (SELECT id FROM lovetree_feedback WHERE product_id = $1 AND subject_id = $2)' },
+  { table: 'lovetree_stage_moments', where: 'subject_id = $2' },
   { table: 'lovetree_shares', where: 'subject_id = $2' },
   { table: 'lovetree_tree_visibility', where: 'subject_id = $2' },
   { table: 'lovetree_tree_discover', where: 'subject_id = $2' },
