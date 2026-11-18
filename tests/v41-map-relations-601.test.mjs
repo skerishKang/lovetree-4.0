@@ -165,15 +165,16 @@ test('②③④ 지도 화면: 이름표·썸네일·묶음 판·두 보기 판 
       }
     } finally { await ctx.close(); await browser.close(); }
 
-    // ④ 감정이 하나뿐인 부채꼴 나무는 묶음 판을 숨긴다(빈 묶음 대신).
+    // ④ 감정이 하나뿐인 부채꼴 나무도 묶음 판이 1줄로 보인다(점·이름 일치 — 없는 색 점이 남지 않는다).
     {
       const one = flat26();
       one.demo = one.demo.map(m => ({ ...m, emotion: '설렘' }));
       one.moments = one.moments.map(m => ({ ...m, emotion: '설렘' }));
       const { ctx, page, browser } = await openMap(base, { width: 1440, stub: lt41Stub(one, 'm01') });
       try {
-        const hidden = await page.evaluate(() => document.querySelector('.legend')?.hidden === true);
-        assert.ok(hidden, '묶음이 한 가지면 묶음 판을 숨긴다');
+        const rows = await page.evaluate(() => [...document.querySelectorAll('.legend-row')].filter(r => getComputedStyle(r).display !== 'none').map(r => ({ text: r.textContent.trim(), dot: !!r.querySelector('.swatch') })));
+        assert.equal(rows.length, 1, '묶음이 한 가지면 묶음 판에 1줄만 보인다');
+        assert.ok(rows[0].text && rows[0].dot, '한 가지 묶음 행은 색 점과 이름이 든다');
       } finally { await ctx.close(); await browser.close(); }
     }
   } finally { server.close(); }

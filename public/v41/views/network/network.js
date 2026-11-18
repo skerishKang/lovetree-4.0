@@ -77,7 +77,7 @@ function generateCluster(c){
 // #601 묶음 이름은 감정(색)과 개수 — "01 설렘 · 7개". 묶음이 한 가지뿐이면 판을 숨긴다.
 const groupLabel=i=>`${String(i+1).padStart(2,'0')} ${CLUSTERS[i]?.name||''} · ${CLUSTERS[i]?.count||0}개`;
 const legendBox=document.querySelector('.legend');
-if(legendBox)legendBox.hidden=CLUSTERS.length<=1;
+if(legendBox)legendBox.hidden=CLUSTERS.length===0;
 document.querySelectorAll('.legend-row').forEach((row,i)=>{const c=CLUSTERS[i],sw=row.querySelector('.swatch');row.hidden=!c;if(sw)sw.dataset.g=String(i+1);row.replaceChildren(...(sw?[sw]:[]),document.createTextNode(c?groupLabel(i):''))});
 // #366 배치는 LT56Model 보기별 함수 한 벌. #461: 두 보기 모두 화면에서 도구가 덮지 않는 상자(BOX)에 맞춰 화면 좌표로 펼친다.
 let BOX={x:0,y:0,w:1200,h:800},NETFIT=null,CONCENTRIC=null;

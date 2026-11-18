@@ -1,17 +1,23 @@
-export function createMemoryCommunityRepo({isPrivateTree=null,isDiscoverOn=null}={}){
+import { ROLE_AI_CUSTOMER, ROLE_TESTER } from '../admin-roles.js';
+
+export function createMemoryCommunityRepo({isPrivateTree=null,isDiscoverOn=null,hasRealCustomers=false,roleFor=null,now=()=>new Date().toISOString()}={}){
  const favorites=new Set(),reactionSet=new Set(),comments=new Map(),reports=new Map(),blocks=new Set(),hiddenShares=new Set(),audits=[],votes=new Map();
- const key=(...parts)=>parts.join('\0'),copy=value=>structuredClone(value),now=()=>new Date().toISOString();
+ const key=(...parts)=>parts.join('\0'),copy=value=>structuredClone(value);
  const reactionKeys=()=>[...reactionSet];
  // #538: 둘러보기 후보는 활성 공유 행 가운데 moment_count>=3(직접 올린 사진만 있는 순간도 센다)이고,
  // 2026-11-16 대표 결정으로 '둘러보기 소개'가 켜진 트리만이다(기본 꺼짐 — 고객이 켠다). 켠 트리는
  // 트리당 하나의 행(auto 우선)으로 뽑는다. isDiscoverOn 이 없으면(예전 모형) 켜짐으로 본다 — 기존 시험 호환.
  // 숨김은 행이 아니라 트리 단위로 판단한다(어느 행이 숨겨져도 그 트리는 둘러보기에서 내려간다).
- const candidates=async function*(productId,viewerSubjectId){
+ const candidates=async function*(productId,viewerSubjectId,forRanking=false){
   const picked=new Map();
   for(const row of (this.shares||[])){
    if(row.productId!==productId||row.status!=='active')continue;
    if(Number(row.momentCount??0)<3)continue;
    if(isDiscoverOn&&!await isDiscoverOn(productId,row.subjectId,row.treeId))continue;
+   if(forRanking && roleFor){
+    const role=await roleFor({productId,subjectId:row.subjectId});
+    if(role===ROLE_TESTER || (hasRealCustomers && role===ROLE_AI_CUSTOMER))continue;
+   }
    const prev=picked.get(row.treeId);
    if(!prev||(row.origin==='auto'&&prev.origin!=='auto'))picked.set(row.treeId,row);
   }
@@ -28,11 +34,11 @@ export function createMemoryCommunityRepo({isPrivateTree=null,isDiscoverOn=null}
  return {
   queryCount:0,
   async listDiscoverable({productId,viewerSubjectId}){this.queryCount+=1;const out=[];for await(const row of candidates.call(this,productId,viewerSubjectId))out.push(copy(row));return out;},
-  async listDiscoverableSummaries({productId,viewerSubjectId,sort='latest',weekSince=null}){
+  async listDiscoverableSummaries({productId,viewerSubjectId,sort='latest',weekSince=null,weekUntil=null}){
    this.queryCount+=1;
    const filtered=[];
-   for await(const row of candidates.call(this,productId,viewerSubjectId))filtered.push(row);
-   const sinceMs=weekSince?new Date(weekSince).getTime():null;
+   for await(const row of candidates.call(this,productId,viewerSubjectId,sort==='popular'))filtered.push(row);
+   const weekCounts=weekSince?await this.weeklyVoteCounts({productId,targetKind:'tree',since:weekSince,until:weekUntil}):{};
    let out=filtered.map(share=>{
     const prefix=key(productId,share.shareId)+'\0';
     const reqs=reactionKeys().filter(v=>v.startsWith(prefix));
@@ -42,10 +48,10 @@ export function createMemoryCommunityRepo({isPrivateTree=null,isDiscoverOn=null}
     const mine=reqs.filter(v=>viewerSubjectId&&v.split('\0')[2]===viewerSubjectId).map(v=>v.split('\0')[3]||'heart').sort();
     const visible=[...comments.values()].filter(v=>v.productId===productId&&v.shareId===share.shareId&&v.status==='visible');
     const lastActivityAt=visible.length?visible.map(v=>v.createdAt).sort().at(-1):share.createdAt;
-    const weekFavorites=sinceMs===null?0:[...votes.values()].filter(v=>v.productId===productId&&v.targetKind==='tree'&&v.targetId===share.shareId&&new Date(v.votedAt).getTime()>=sinceMs).length;
+    const weekFavorites=weekCounts[share.shareId]||0;
     return {share:copy(share),lastActivityAt,stats:{favorites:[...favorites].filter(v=>v.startsWith(prefix)).length,hearts:heartCount,comments:visible.length,favored:favorites.has(key(productId,share.shareId,viewerSubjectId)),hearted:reactionSet.has(key(productId,share.shareId,viewerSubjectId,'heart')),weeklyFavorites:weekFavorites,reactions,mine}};
    });
-   if(sort==='popular'&&sinceMs!==null)out.sort((a,b)=>(b.stats.weeklyFavorites-a.stats.weeklyFavorites)||String(b.lastActivityAt).localeCompare(String(a.lastActivityAt))||String(b.share.shareId).localeCompare(String(a.share.shareId)));
+   if(sort==='popular'&&weekSince)out.sort((a,b)=>(b.stats.weeklyFavorites-a.stats.weeklyFavorites)||String(b.lastActivityAt).localeCompare(String(a.lastActivityAt))||String(b.share.shareId).localeCompare(String(a.share.shareId)));
    return out;
   },
   seedShares(rows){this.shares=rows.map(copy);},
@@ -89,7 +95,16 @@ export function createMemoryCommunityRepo({isPrivateTree=null,isDiscoverOn=null}
   // 투표 기록(#824) — append-only 메모리 모형. 이미 있으면 새 표로 세지 않는다(1인 1표 영구).
   async recordVote({productId,targetKind,targetId,subjectId,votedAt:at}){const value=key(productId,targetKind,targetId,subjectId);if(votes.has(value))return {recorded:false};votes.set(value,{productId,targetKind,targetId,subjectId,votedAt:at||now()});return {recorded:true};},
   async hasVoted({productId,targetKind,targetId,subjectId}){return votes.has(key(productId,targetKind,targetId,subjectId));},
-  async weeklyVoteCounts({productId,targetKind,since}){const counts={};for(const row of votes.values())if(row.productId===productId&&row.targetKind===targetKind&&new Date(row.votedAt).getTime()>=new Date(since).getTime())counts[row.targetId]=(counts[row.targetId]||0)+1;return counts;},
+  async weeklyVoteCounts({productId,targetKind,since,until=null}){
+   const counts={},start=new Date(since).getTime(),end=until===null?Infinity:new Date(until).getTime();
+   for(const row of votes.values()){
+    const at=new Date(row.votedAt).getTime();
+    if(row.productId!==productId || row.targetKind!==targetKind || !(at>=start && at<end))continue;
+    if(hasRealCustomers && roleFor && await roleFor({productId,subjectId:row.subjectId})===ROLE_AI_CUSTOMER)continue;
+    counts[row.targetId]=(counts[row.targetId]||0)+1;
+   }
+   return counts;
+  },
   async listFavorites({productId,subjectId}){return [...favorites].filter(v=>v.startsWith(key(productId)+'\0')&&v.endsWith('\0'+subjectId)).map(v=>v.split('\0')[1]);},
   async setReaction({productId,shareId,subjectId,enabled,kind='heart'}){const value=key(productId,shareId,subjectId,kind);enabled?reactionSet.add(value):reactionSet.delete(value);},
   async isBlocked({productId,blockerSubjectId,blockedSubjectId}){return blocks.has(key(productId,blockerSubjectId,blockedSubjectId))||blocks.has(key(productId,blockedSubjectId,blockerSubjectId));},

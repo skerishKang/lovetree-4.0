@@ -7,6 +7,8 @@ import { createStageIndexRepo } from './db/stage-index-postgres.js';
 import { createTreeVisibilityRepo } from './db/tree-visibility-postgres.js';
 import { createTreeDiscoverRepo } from './db/tree-discover-postgres.js';
 import { createCommunityRepo } from './db/community-postgres.js';
+import { hasRealCustomersFromEnv } from './db/ranking-policy-sql.js';
+import { createStageVoteRepo } from './db/stage-votes-postgres.js';
 import { createAdminRoleRepo } from './db/admin-roles-postgres.js';
 import { createAdminRoleService } from './admin-roles.js';
 import { createAdminStatsService } from './admin-stats.js';
@@ -228,10 +230,12 @@ const shareHandler = createShareHandler({
  service: shareService,
  productId: LOVETREE_PRODUCT_ID
 });
+const rankingPolicy = { hasRealCustomers: hasRealCustomersFromEnv(process.env) };
 const communityHandler = createCommunityHandler({
  authenticate: guardedAuthenticate,
  service: createCommunityService({
-  communityRepo: createCommunityRepo(pool), shareRepo, workspaceRepo: repo, visibilityRepo, stageIndex,
+  communityRepo: createCommunityRepo(pool, rankingPolicy), stageVoteRepo: createStageVoteRepo(pool, rankingPolicy),
+  shareRepo, workspaceRepo: repo, visibilityRepo, stageIndex,
   productId: LOVETREE_PRODUCT_ID, admin,
   // 가입일(첫 로그인 시각) — 담기 투표의 7일 게이트(#824 대표 결정)가 쓴다.
   signupAtFor: ({productId: p, subjectId: s}) => accountRepo.createdAtFor({productId: p, subjectId: s})

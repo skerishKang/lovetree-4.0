@@ -35,6 +35,15 @@ export const ACCOUNT_USER_TABLES = Object.freeze([
 // lovetree_login_states: state 해시와 만료 시각만 있고 계정과 연결되지 않는다(로그인 1회용).
 export const ACCOUNT_PRESERVED_TABLES = Object.freeze(['lovetree_login_states', 'lovetree_account_deletions', 'lovetree_account_delete_rpc_requests']);
 
+// 탈퇴가 처리되는 동안 해당 계정의 진행 중인 무대 담기와 정리 순서를 맞춘다.
+export async function lockStageVoterAccount(client, { productId, subjectId }, { exclusive = false } = {}) {
+  const lock = exclusive ? 'pg_advisory_xact_lock' : 'pg_advisory_xact_lock_shared';
+  await client.query(
+    `SELECT ${lock}(hashtext('lovetree-stage-voter-account'), hashtext($1))`,
+    [JSON.stringify([productId, subjectId])]
+  );
+}
+
 export function createAccountRepo(pool) {
   if (!pool || typeof pool.query !== 'function' || typeof pool.connect !== 'function') throw new Error('PostgreSQL pool이 필요합니다.');
 
@@ -88,6 +97,7 @@ export function createAccountRepo(pool) {
       const client = await pool.connect();
       try {
         await client.query('BEGIN');
+        await lockStageVoterAccount(client, { productId, subjectId }, { exclusive: true });
         const tables = {};
         for (const entry of ACCOUNT_USER_TABLES) {
           const result = await client.query(
