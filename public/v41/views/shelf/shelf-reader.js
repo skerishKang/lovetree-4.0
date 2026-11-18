@@ -3,6 +3,7 @@
 // 화면(DOM)을 다루므로 node에서는 createReader(가짜 DOM)로 시험한다.
 import { escapeShelf, leftPageMarkup, pageMeta, pageTarget, rightPageMarkup, youtubeId as youtubeIdOf } from './shelf-model.mjs';
 import { coverFallbackAttrs } from '../../thumb-fallback.mjs';
+import { mountExpandControls } from '../../yt-expand.mjs';
 
 export function createReader(deps) {
   const { $, $$, state, getBook, showToast, save, renderShelf, getShelfCard } = deps;
@@ -65,8 +66,10 @@ export function createReader(deps) {
         frame.allow='autoplay; encrypted-media; picture-in-picture';
         frame.allowFullscreen=true;
         frame.src='https://www.youtube.com/embed/'+id+'?autoplay=1&rel=0';
+        // #833: 서재 읽기 재생 칸도 모서리 단추로 크게 본다(안 되면 덮는 창).
         holder.innerHTML='';
-        holder.appendChild(frame);
+        const cell=mountExpandControls(holder,{url:chapter.url,openUrl:chapter.url,title:chapter.title,vertical:/youtube\.com\/shorts/i.test(chapter.url||''),lightbox:(u,t,v)=>window.LTMedia&&LTMedia.openLightbox(u,t,v)});
+        cell.stage.appendChild(frame);
       }
   function applyOpenProgress() {
         var book3d=$('#book3d');

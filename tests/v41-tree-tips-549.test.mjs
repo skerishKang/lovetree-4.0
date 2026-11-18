@@ -143,6 +143,68 @@ test('#549+#845 순간 추가 창을 열면 안내 판이 숨고, 닫으면 다�
   } finally { await browser.close(); }
 });
 
+test('#845 2단계 뒤로가기는 창을 닫는다(주소 그대로·초점은 연 단추로)', { skip: REQUIRE ? false : skip }, async () => {
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    const errors = [];
+    page.on('pageerror', (e) => errors.push(String(e.message || e)));
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Page.addScriptToEvaluateOnNewDocument', { source: "window.__log=[];const st=()=>{new MutationObserver((ms)=>{for(const m of ms)if(m.target.id==='tree-tips')window.__log.push(m.target.getAttribute('hidden'))}).observe(document,{subtree:true,attributes:true,attributeFilter:['hidden']})};if(document.documentElement)st();else document.addEventListener('readystatechange',st,{once:true});" });
+    await openWithFirstTree(page);
+    const before = page.url();
+    await page.click('#write-menu');
+    await page.waitForFunction(() => document.getElementById('write-panel').open, null, { timeout: 10000 });
+    // 뒤로가기 → 창이 닫히고 주소는 그대로다(✕·Esc와 같은 판정을 탄다).
+    await page.evaluate(() => history.back());
+    // 창이 닫히고 안내 판이 다시 보이는 최종 상태를 기다린다(닫힘 직후 한 박자 늦게 다시 띄우는 판이 있어도 기다린다).
+    await page.waitForFunction(() => !document.getElementById('write-panel').open && document.getElementById('tree-tips').hidden === false, null, { timeout: 10000 });
+    const after = await page.evaluate(() => ({
+      url: location.href,
+      panelOpen: document.getElementById('write-panel').open,
+      focused: document.activeElement?.id || '',
+      tips: document.getElementById('tree-tips').hidden,
+      seen: localStorage.getItem('lt41.tips.firstTree'),
+    }));
+    assert.equal(after.url, before, '주소가 뒤로 가지 않는다(창 닫기로 쓴다)');
+    assert.equal(after.panelOpen, false, '뒤로가기로 창이 닫힌다');
+    assert.equal(after.focused, 'write-menu', '창을 연 단추로 초점이 돌아온다');
+    assert.equal(after.tips, false, '창이 닫혔으므로 안내 판이 다시 보인다');
+    assert.equal(after.seen, null, '봇음 미기록');
+    // 창이 없어진 뒤에는 뒤로가기가 원래대로 주소를 뒤로 간다.
+    await page.evaluate(() => history.back());
+    await page.waitForTimeout(500);
+    assert.notEqual(page.url(), before, '창이 없으면 뒤로가기는 주소를 뒤로 간다');
+    assert.deepEqual(errors, [], '페이지 오류 없음');
+  } finally { await browser.close(); }
+});
+
+test('#845 2단계 더러운 창은 뒤로가기로 닫을 때 한 번 묻는다(✕·Esc와 같은 판정)', { skip: REQUIRE ? false : skip }, async () => {
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    const errors = [];
+    page.on('pageerror', (e) => errors.push(String(e.message || e)));
+    await openWithFirstTree(page);
+    const before = page.url();
+    await page.click('#write-menu');
+    await page.waitForFunction(() => document.getElementById('write-panel').open, null, { timeout: 10000 });
+    // 제목을 적어 더럽힌다 — 닫을 때 '저장하지 않고 닫을까요?'를 묻는다(#380 4 규칙).
+    await page.fill('#quick-url', 'https://example.com/back-check');
+    // 취소하면 창이 남고, 가드가 다시 쌓여 다음 뒤로가기도 같은 질문을 한다.
+    page.once('dialog', (d) => d.dismiss());
+    await page.evaluate(() => history.back());
+    await page.waitForTimeout(600);
+    assert.equal(await page.evaluate(() => document.getElementById('write-panel').open), true, '확인을 취소하면 창이 남는다');
+    // 받아들이면 닫힌다.
+    page.once('dialog', (d) => d.accept());
+    await page.evaluate(() => history.back());
+    await page.waitForFunction(() => !document.getElementById('write-panel').open, null, { timeout: 10000 });
+    assert.equal(page.url(), before, '주소가 그대로다(창 닫기로 썼다)');
+    assert.deepEqual(errors, [], '페이지 오류 없음');
+  } finally { await browser.close(); }
+});
+
 test('#845 내 의견 창을 열면 안내 판이 숨고, 닫으면 다시 보인다', { skip: REQUIRE ? false : skip }, async () => {
   const browser = await chromium.launch();
   try {
@@ -201,5 +263,238 @@ test('#619-5 트리가 2 개·순간이 26 개여도 첫 트리 안내는 뜨지
     const tipsAgain = await page.$('#tree-tips');
     const hiddenAgain = await page.evaluate((el) => el && el.hidden === true, tipsAgain);
     assert.equal(hiddenAgain, true, '보드 전환 후에도 첫 트리 안내는 뜨지 않는다');
+  } finally { await browser.close(); }
+});
+
+// #845 3단계: 창 위에 창을 여는 규칙(이슈 #845 규칙표). showModal을 여는 입장에서 판정한다 —
+// 잠깐 판(옮길 트리 고르기·내 보관 파일 고르기·둘러보기 미리보기)은 위에 겹침을 허용하고, 그 밖의
+// 큰 창이 열릴 때는 앞 창을 공통 판정(requestPanelClose)으로 닫고 열린다.
+test('#845 3단계 잠깐 판은 위에 겹친다 — 순간 추가 위에 내 보관 파일 고르기', { skip: REQUIRE ? false : skip }, async () => {
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    const errors = [];
+    page.on('pageerror', (e) => errors.push(String(e.message || e)));
+    await openWithFirstTree(page);
+    await page.click('#write-menu');
+    await page.waitForFunction(() => document.getElementById('write-panel').open, null, { timeout: 10000 });
+    // 내 보관 파일에서 고르기 단추는 자세한 추가 탭 안에 있다.
+    await page.click('#write-tab-detailed');
+    await page.click('#editor-assets-open');
+    await page.waitForFunction(() => document.getElementById('account-assets').open, null, { timeout: 10000 });
+    const both = await page.evaluate(() => ({
+      write: document.getElementById('write-panel').open,
+      assets: document.getElementById('account-assets').open,
+    }));
+    assert.equal(both.write, true, '앞 창(순간 추가)이 닫히지 않는다');
+    assert.equal(both.assets, true, '잠깐 판(내 보관 파일 고르기)이 위에 열린다');
+    // 고르기를 닫으면 앞 창으로 돌아온다.
+    await page.click('[data-close="account-assets"]');
+    await page.waitForFunction(() => !document.getElementById('account-assets').open, null, { timeout: 10000 });
+    assert.equal(await page.evaluate(() => document.getElementById('write-panel').open), true, '고르기를 닫아도 순간 추가가 남는다');
+    assert.deepEqual(errors, [], '페이지 오류 없음');
+  } finally { await browser.close(); }
+});
+
+test('#845 3단계 큰 창 위에 큰 창을 열면 앞 창을 닫고 연다', { skip: REQUIRE ? false : skip }, async () => {
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    const errors = [];
+    page.on('pageerror', (e) => errors.push(String(e.message || e)));
+    await openWithFirstTree(page);
+    const before = page.url();
+    await page.click('#write-menu');
+    await page.waitForFunction(() => document.getElementById('write-panel').open, null, { timeout: 10000 });
+    // 트리 관리 위에 순간 추가가 겹치는 길은 지금 화면에 없다(모달 뒤는 눌리지 않는다) — 열림 한곳의
+    // 규칙을 직접 showModal로 확인한다. 규칙표: 새 창이 큰 창이면 앞 창을 닫고 연다.
+    await page.evaluate(() => document.getElementById('tree-manager').showModal());
+    await page.waitForFunction(() => document.getElementById('tree-manager').open, null, { timeout: 10000 });
+    const after = await page.evaluate(() => ({
+      write: document.getElementById('write-panel').open,
+      tree: document.getElementById('tree-manager').open,
+    }));
+    assert.equal(after.tree, true, '새 큰 창(트리 관리)이 열린다');
+    assert.equal(after.write, false, '앞 창(순간 추가)이 닫힌다');
+    assert.equal(page.url(), before, '주소가 그대로다');
+    assert.deepEqual(errors, [], '페이지 오류 없음');
+  } finally { await browser.close(); }
+});
+
+test('#845 3단계 앞 창이 더러우면 한 번 묻고, 취소하면 겹친다', { skip: REQUIRE ? false : skip }, async () => {
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    const errors = [];
+    page.on('pageerror', (e) => errors.push(String(e.message || e)));
+    await openWithFirstTree(page);
+    await page.click('#write-menu');
+    await page.waitForFunction(() => document.getElementById('write-panel').open, null, { timeout: 10000 });
+    await page.fill('#quick-url', 'https://example.com/stack-check');
+    // 취소하면 앞 창이 남고 — 규칙표대로 새 창은 그 위에 겹친다(예상 못한 길을 막지 않는다).
+    page.once('dialog', (d) => d.dismiss());
+    await page.evaluate(() => document.getElementById('tree-manager').showModal());
+    await page.waitForFunction(() => document.getElementById('tree-manager').open, null, { timeout: 10000 });
+    assert.equal(await page.evaluate(() => document.getElementById('write-panel').open), true, '취소하면 앞 창이 남는다');
+    // 받아들이면 앞 창이 닫히고 새 창만 남는다.
+    page.once('dialog', (d) => d.accept());
+    await page.evaluate(() => { document.getElementById('tree-manager').close(); document.getElementById('tree-manager').showModal(); });
+    await page.waitForFunction(() => document.getElementById('tree-manager').open && !document.getElementById('write-panel').open, null, { timeout: 10000 });
+    assert.deepEqual(errors, [], '페이지 오류 없음');
+  } finally { await browser.close(); }
+});
+// #876: 같은 영상을 다시 담을 때 — 막지 말고 담기 전에 한 번 알려 준다(대표 결정 2026-11-18).
+// 쉬운 추가 창에서 같은 트리·같은 영상(주소 모양이 달라도 id가 같음)을 담으면 안내 창이 열리고,
+// [그래도 담기]는 담고, [그 순간 보기]는 담지 않고 이미 담은 순간을 열어 준다. 구간이 다르면 다른
+// 장면이라 그냥 담고, 다른 트리에 같은 영상이 있으면 담은 뒤 한 줄 알린다.
+const YT_ID = 'dQw4w9WgXcQ';
+const momentShape = (id, date, url, extra = {}) => ({
+  id, parentId: null, links: [], createdAt: '2026-11-15T00:00:00.000Z',
+  title: `순간 ${id}`, note: '', emotion: '설렘', date, relation: '', url, ...extra,
+});
+const WORKSPACE_DUP = {
+  revision: 1, subject: 'trial-subject', writeSubjectBound: true,
+  state: { version: 1, prefs: {}, trees: [{
+    id: 'tree1', subject: '시험 사용자', title: '모아둔 순간', coverMomentId: '', inbox: false,
+    createdAt: '2026-11-15T00:00:00.000Z', updatedAt: '2026-11-15T00:00:00.000Z',
+    moments: [momentShape('m1', '2026-11-13', `https://youtu.be/${YT_ID}`)],
+  }] },
+};
+const WORKSPACE_DUP_TWO_TREES = {
+  revision: 1, subject: 'trial-subject', writeSubjectBound: true,
+  state: { version: 1, prefs: {}, trees: [
+    {
+      id: 'tree1', subject: '시험 사용자', title: '모아둔 순간', coverMomentId: '', inbox: false,
+      createdAt: '2026-11-15T00:00:00.000Z', updatedAt: '2026-11-15T00:00:00.000Z',
+      moments: [momentShape('m1', '2026-11-13', `https://youtu.be/${YT_ID}`)],
+    },
+    {
+      id: 'tree2', subject: '리센느', title: '리센느', coverMomentId: '', inbox: false,
+      createdAt: '2026-11-15T00:00:00.000Z', updatedAt: '2026-11-15T00:00:00.000Z',
+      moments: [momentShape('m2', '2026-11-14', '')],
+    },
+  ] },
+};
+
+async function openWith(page, workspace) {
+  await page.route('**/api/workspace*', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(workspace) }));
+  await page.goto(`${base}/v41/?account=1`, { waitUntil: 'load' });
+  await page.waitForFunction(() => Array.isArray(window.LT41?.trees) && window.LT41.trees.length > 0, null, { timeout: 20000 });
+}
+async function openQuickAndFill(page, url) {
+  await page.click('#write-menu');
+  await page.waitForFunction(() => document.getElementById('write-panel').open, null, { timeout: 10000 });
+  await page.fill('#quick-url', url);
+  await page.click('#quick-submit');
+}
+const momentCount = (page, treeIndex = 0) => page.evaluate((i) => window.LT41.trees[i].moments.length, treeIndex);
+
+test('#876 같은 트리 같은 영상: 안내 창이 열리고 [그래도 담기]로 담는다(주소 모양이 달라도)', { skip: REQUIRE ? false : skip }, async () => {
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    const errors = [];
+    page.on('pageerror', (e) => errors.push(String(e.message || e)));
+    await openWith(page, WORKSPACE_DUP);
+    // 이미 담은 순간은 youtu.be, 다시 담는 주소는 watch?v= — 주소 모양이 달라도 같은 영상이다(규칙 5).
+    await openQuickAndFill(page, `https://www.youtube.com/watch?v=${YT_ID}`);
+    await page.waitForFunction(() => document.getElementById('video-dup-panel').open, null, { timeout: 10000 });
+    const text = await page.evaluate(() => document.getElementById('video-dup-text').textContent);
+    assert.ok(text.includes('이미 담은 영상이에요'), `안내 문구: ${text}`);
+    assert.ok(text.includes('11월 13일'), `담은 날짜가 함께 보인다: ${text}`);
+    assert.equal(await momentCount(page), 1, '안내 창에서는 아직 담지 않는다');
+    // [그래도 담기]: 원래 하려던 담기를 그대로 한다.
+    await page.click('#video-dup-continue');
+    await page.waitForFunction(() => !document.getElementById('video-dup-panel').open, null, { timeout: 10000 });
+    assert.equal(await momentCount(page), 2, '그래도 담기로 담는다');
+    assert.deepEqual(errors, [], '페이지 오류 없음');
+  } finally { await browser.close(); }
+});
+
+test('#876 같은 트리 같은 영상: [그 순간 보기]는 담지 않고 이미 담은 순간을 열어 준다', { skip: REQUIRE ? false : skip }, async () => {
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    const errors = [];
+    page.on('pageerror', (e) => errors.push(String(e.message || e)));
+    await openWith(page, WORKSPACE_DUP);
+    // 구간을 적지 않은 같은 영상 — '둘 다 없음'이라 같은 장면으로 본다(규칙 1).
+    await openQuickAndFill(page, `https://youtu.be/${YT_ID}`);
+    await page.waitForFunction(() => document.getElementById('video-dup-panel').open, null, { timeout: 10000 });
+    // 그 순간 보기: 순간 추가 창을 닫는다 — 적어 둔 값이 있으면 기존 규칙대로 한 번 묻는다(받아들인다).
+    page.once('dialog', (d) => d.accept());
+    await page.click('#video-dup-view');
+    await page.waitForFunction(() => !document.getElementById('video-dup-panel').open, null, { timeout: 10000 });
+    await page.waitForFunction(() => document.getElementById('write-panel').open, null, { timeout: 10000 });
+    assert.equal(await momentCount(page), 1, '아무것도 담지 않는다');
+    const editing = await page.evaluate(() => document.getElementById('moment-form')?.elements?.url?.value || '');
+    assert.ok(editing.includes(YT_ID), '이미 담은 순간을 편집기로 열어 준다');
+    assert.deepEqual(errors, [], '페이지 오류 없음');
+  } finally { await browser.close(); }
+});
+
+test('#876 구간이 다르면 다른 장면이라 안내 없이 담는다(규칙 2)', { skip: REQUIRE ? false : skip }, async () => {
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    const errors = [];
+    page.on('pageerror', (e) => errors.push(String(e.message || e)));
+    // 이미 담은 순간의 구간은 90초 — 30초부터의 장면은 다른 장면이다.
+    const workspace = JSON.parse(JSON.stringify(WORKSPACE_DUP));
+    workspace.state.trees[0].moments[0].startSeconds = 90;
+    await openWith(page, workspace);
+    await openQuickAndFill(page, `https://youtu.be/${YT_ID}?t=30`);
+    await page.waitForFunction(() => !document.getElementById('quick-url').value, null, { timeout: 10000 });
+    assert.equal(await page.evaluate(() => document.getElementById('video-dup-panel').open), false, '안내 창을 열지 않는다');
+    assert.equal(await momentCount(page), 2, '바로 담는다');
+    assert.deepEqual(errors, [], '페이지 오류 없음');
+  } finally { await browser.close(); }
+});
+
+test('#876 다른 트리에 같은 영상: 막지 않고 담은 뒤 한 줄 알린다(규칙 3)', { skip: REQUIRE ? false : skip }, async () => {
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    const errors = [];
+    page.on('pageerror', (e) => errors.push(String(e.message || e)));
+    await openWith(page, WORKSPACE_DUP_TWO_TREES);
+    await page.click('#write-menu');
+    await page.waitForFunction(() => document.getElementById('write-panel').open, null, { timeout: 10000 });
+    // 담을 트리를 리센느(tree2)로 바꾼다 — 같은 영상은 모아둔 순간(tree1)에 있다.
+    await page.selectOption('#quick-tree-select', 'tree2');
+    await page.fill('#quick-url', `https://youtu.be/${YT_ID}`);
+    await page.click('#quick-submit');
+    await page.waitForFunction(() => !document.getElementById('quick-url').value, null, { timeout: 10000 });
+    assert.equal(await page.evaluate(() => document.getElementById('video-dup-panel').open), false, '안내 창을 열지 않는다');
+    assert.equal(await momentCount(page, 1), 2, '리센느에 담는다');
+    const toast = await page.evaluate(() => ({ text: document.getElementById('toast').textContent, hidden: document.getElementById('toast').hidden }));
+    assert.equal(toast.hidden, false, '알림이 보인다');
+    assert.ok(toast.text.includes("'모아둔 순간' 트리에도 있어요"), `알림 한 줄: ${toast.text}`);
+    assert.deepEqual(errors, [], '페이지 오류 없음');
+  } finally { await browser.close(); }
+});
+
+test('#876 안내 창도 #845 창 규칙을 탄다 — Esc·뒤로가기로 닫히면 아무것도 담지 않는다', { skip: REQUIRE ? false : skip }, async () => {
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    const errors = [];
+    page.on('pageerror', (e) => errors.push(String(e.message || e)));
+    await openWith(page, WORKSPACE_DUP);
+    await openQuickAndFill(page, `https://youtu.be/${YT_ID}`);
+    await page.waitForFunction(() => document.getElementById('video-dup-panel').open, null, { timeout: 10000 });
+    // Esc: 맨 위 창(안내 창)만 닫고 아무것도 담지 않는다 — 순간 추가 창은 그대로 남는다.
+    await page.keyboard.press('Escape');
+    await page.waitForFunction(() => !document.getElementById('video-dup-panel').open, null, { timeout: 10000 });
+    assert.equal(await page.evaluate(() => document.getElementById('write-panel').open), true, '순간 추가 창은 남는다');
+    assert.equal(await momentCount(page), 1, '아무것도 담지 않는다');
+    // 뒤로가기: 같은 창을 다시 열어 뒤로가기로 닫는다(#845 2단계 — 창이 열려 있으면 뒤로가기는 창을 닫는다).
+    await page.click('#quick-submit');
+    await page.waitForFunction(() => document.getElementById('video-dup-panel').open, null, { timeout: 10000 });
+    await page.evaluate(() => history.back());
+    await page.waitForFunction(() => !document.getElementById('video-dup-panel').open, null, { timeout: 10000 });
+    assert.equal(await momentCount(page), 1, '뒤로가기로 닫아도 아무것도 담지 않는다');
+    assert.equal(await page.evaluate(() => location.href.includes('youtu.be')), false, '주소가 그대로다');
+    assert.deepEqual(errors, [], '페이지 오류 없음');
   } finally { await browser.close(); }
 });

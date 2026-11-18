@@ -152,7 +152,7 @@ const pool = await createPool(LOVETREE_DATABASE_URL);
 const repo = createWorkspaceRepo(pool);
 // #538 공개가 기본: 공유 행이 트리의 공개 핸들이다. 저장 성공 뒤 같은 훅에서 자동 공개 행과
 // moment_count 를 동기화하고, 둘러보기 SQL 은 moment_count>=3 으로 거른다.
-// 결제는 아직 없으므로 Plus 자격은 항상 false — 비공개 지정은 서버가 403 으로 거절한다.
+// 비공개는 누구나 무료로 바꿀 수 있다 — 본인 트리만 바꿀 수 있다(#830).
 const shareRepo = createShareRepo(pool);
 const visibilityRepo = createTreeVisibilityRepo(pool);
 // 둘러보기 소개 표시(2026-11-16 대표 결정 — 기본 꺼짐, 고객이 켠다. 무료). 켠 트리만 행이 쌓인다.
@@ -168,7 +168,6 @@ const shareService = createShareService({
   visibilityRepo,
   discoverRepo,
   productId: LOVETREE_PRODUCT_ID,
-  plusEntitled: () => false,
   admin
 });
 const service = createWorkspaceService({
@@ -230,7 +229,9 @@ const communityHandler = createCommunityHandler({
  authenticate: guardedAuthenticate,
  service: createCommunityService({
   communityRepo: createCommunityRepo(pool), shareRepo, workspaceRepo: repo, visibilityRepo,
-  productId: LOVETREE_PRODUCT_ID, admin
+  productId: LOVETREE_PRODUCT_ID, admin,
+  // 가입일(첫 로그인 시각) — 담기 투표의 7일 게이트(#824 대표 결정)가 쓴다.
+  signupAtFor: ({productId: p, subjectId: s}) => accountRepo.createdAtFor({productId: p, subjectId: s})
  }),
  productId: LOVETREE_PRODUCT_ID
 });

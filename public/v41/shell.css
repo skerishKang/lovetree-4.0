@@ -158,7 +158,7 @@ nav #record-menu[hidden]{display:none!important}
 /* 261117 대표 결정: 위 메뉴의 테마 단추(☾/☀) — 아바타와 같은 44px 원형. 나중에 언어 단추가 옆에 붙는다. */
 #theme-toggle{width:44px;height:44px;min-width:44px;min-height:44px;padding:0;border-radius:50%;font-size:17px;line-height:1}
 #theme-toggle[hidden]{display:none!important}
-.account-popover{position:absolute;right:0;top:calc(100% + 8px);z-index:30;min-width:232px;padding:8px;border:1px solid var(--lt-line);border-radius:var(--lt-r-card);background:var(--lt-glass-strong);backdrop-filter:blur(24px);box-shadow:0 12px 30px #0008;display:grid;gap:4px}
+.account-popover{position:absolute;right:0;top:calc(100% + 8px);z-index:30;width:232px;padding:8px;border:1px solid var(--lt-line);border-radius:var(--lt-r-card);background:var(--lt-glass-strong);backdrop-filter:blur(24px);box-shadow:0 12px 30px #0008;display:grid;grid-template-columns:minmax(0,1fr);gap:4px}
 .account-popover[hidden]{display:none!important}
 .account-email{margin:0;padding:8px 10px 10px;border-bottom:1px solid var(--lt-line);font-size:12px;line-height:1.6;color:var(--lt-muted);overflow-wrap:anywhere}
 .account-popover button{justify-content:flex-start;width:100%;min-height:44px;padding:0 10px;border:0;border-radius:10px;background:transparent;font-size:13px;letter-spacing:.02em;color:var(--lt-pearl)}
@@ -208,7 +208,7 @@ html[data-v41-screen=book] .tools .ui-btn::after,html[data-v41-screen=board] hea
  nav #record-menu{width:auto;max-width:112px;margin-left:6px;padding-left:6px;font-size:12px}
  .header-actions #write-menu.primary-action{max-width:112px;overflow:hidden;text-overflow:ellipsis}
  .account-avatar{width:44px;height:44px}
- .account-popover{right:-4px;min-width:210px}
+ .account-popover{right:-4px;width:210px}
  .header-actions #header-overflow{top:52px}
 }
 /* 넘치는 쪽 끝의 페이드. 스크롤 위치에 따라 켜고 끄는 클래스는 shell.mjs가 붙인다. */
@@ -496,7 +496,7 @@ nav .tree-frame{scroll-snap-align:center}
 .account-head strong{display:block;font-size:13px}
 /* 이슈 368: 계정 메뉴 맨 위는 이메일 전체(자기 계정 메뉴는 가리지 않는다). */
 .account-identity{min-width:0}
-#account-email{display:block;font-size:13px;font-weight:600;color:var(--lt-pearl);line-height:1.4;overflow-wrap:anywhere}
+#account-email{display:block;font-size:13px;font-weight:600;color:var(--lt-pearl);line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
 #share-menu{display:none!important}
 #header-overflow{display:none}
 #header-overflow.is-open{display:grid;position:absolute;top:64px;right:16px;z-index:70;min-width:190px;padding:8px;border:1px solid var(--lt-line);border-radius:var(--lt-r-card);background:var(--lt-glass-strong);backdrop-filter:blur(24px);box-shadow:0 18px 50px #0009}
@@ -668,8 +668,11 @@ body.lt-frame-dialog-open #toast{top:calc(72px + env(safe-area-inset-top));botto
    공유 판 문장은 단어 중간에서 줄바꿈하지 않는다(keep-all). */
 .share-visibility-row{display:flex;flex-direction:column;align-items:flex-start;gap:10px;margin:8px 0 0}
 .share-visibility-row #share-discover-state{font-size:13px;color:var(--lt-pearl)}
-#share-discover-toggle{min-height:44px;padding:10px 16px;border-radius:var(--lt-r-pill);border:1px solid var(--lt-gold-line);background:transparent;color:var(--lt-gold);font-size:14px}
-#share-discover-toggle[data-state="on"]{background:var(--lt-primary);color:var(--lt-primary-ink);border-color:transparent}
+.share-visibility-row-2{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:6px 0;border-top:1px solid var(--lt-line)}
+.share-visibility-row-2:first-of-type{border-top:0}
+.share-visibility-row-2>span{flex:0 0 auto;min-width:72px;font-size:13px;color:var(--lt-muted)}
+#share-discover-toggle,#share-visibility-toggle{min-height:44px;padding:10px 16px;border-radius:var(--lt-r-pill);border:1px solid var(--lt-gold-line);background:transparent;color:var(--lt-gold);font-size:14px}
+#share-discover-toggle[data-state="on"],#share-visibility-toggle[data-state="private"]{background:var(--lt-primary);color:var(--lt-primary-ink);border-color:transparent}
 #share-panel p{word-break:keep-all}
 .share-visibility-lock{display:inline-flex;align-items:center;min-height:34px;padding:0 12px;border:1px dashed var(--lt-gold-line);border-radius:9px;color:var(--lt-gold);font-size:11px;white-space:nowrap}
 .settings-choice .settings-current{display:inline-flex;align-items:center;min-height:34px;padding:0 12px;border:1px solid var(--lt-primary);border-radius:9px;background:var(--lt-primary);color:var(--lt-primary-ink);font-size:13px}

@@ -6,6 +6,9 @@ import {fetchVideoTitle} from '../video-title.mjs';
 import {suggestMomentTitle} from '../domain.mjs';
 import {displayTreeTitle} from '../tree-name.mjs';
 import {extractDropUrl, hasDropPayload, firstImageFile, parseQuickUrl, dropRoute, previewState, previewTag, savedNoticeText, quickTreeLineText, quickTreeAfterText, quickSubmitText, quickSavedTreeText, QUICK_INBOX_LABEL, QUICK_EMPTY_ERROR, QUICK_INVALID_ERROR, DROP_LOGIN_NOTICE, DROP_READONLY_NOTICE, QUICK_PASTE_LABEL, QUICK_CLEAR_LABEL, QUICK_EMPTY_PREVIEW, QUICK_INVALID_PREVIEW, QUICK_PASTE_EMPTY, QUICK_PASTE_ERROR} from '../quick-add.mjs';
+// #876: 같은 영상 판정(quick-intake 한 벌)과 안내 창 날짜 표기(book-usability 한 벌) — 새 규칙을 만들지 않는다.
+import {findSameVideoInTree, treesWithSameVideo} from '../quick-intake.mjs';
+import {formatDisplayDate} from '../book-usability.mjs';
 // #627 PR B: 담은 직후 안내에 붙는 꼬리표 줄 — 그리기·누르기는 tag-line.mjs 한 벌, 규칙은 tag-model.mjs 한 벌.
 // 저장은 deps.saveTags(셸 tag-save.mjs)가 기존 경로로 keywords만 바꾼다. 쓰기 창 자체 흐름은 바꾸지 않는다.
 import {renderTagLine} from '../tag-line.mjs';
@@ -365,13 +368,38 @@ export function createQuickAdd(deps) {
   // 저장 한 번 = member.apply('quickAdd', {url, treeId?, mediaMetadata?}). #638: 지금 고른 트리(quickTreeId)에 담는다 —
   // 트리가 0개거나 고르지 못했으면 treeId를 빼 기존 규칙(기본 트리 생성·inbox)으로 물러난다. 성공하면 칸을 비우고
   // 초점을 유지해 연속 추가가 된다. 칸을 비울 때 renderPreview가 지난 안내를 먼저 지우므로, 안내는 저장 직후 값으로 다시 세운다.
-  function saveUrl(url) {
+  // #876(규칙 1): 같은 트리에 같은 영상·같은 장면이 이미 있으면 막지 말고 담기 전에 한 번 알려 준다 —
+  // [그래도 담기]를 누르면(force) 이 판정을 다시 보지 않고 담는다. [그 순간 보기]·닫기는 아무것도 담지 않는다.
+  // #876(규칙 3): 다른 트리에 같은 영상이 있으면 막지 않고 담은 뒤 한 줄 알린다.
+  function sameVideoNotice(trees, treeId, url) {
+    const others = treesWithSameVideo(trees, { excludeTreeId: treeId, url });
+    if (!others.length) return '';
+    const names = others.map(tree => displayTreeTitle(String(tree?.title || tree?.subject || '') || '트리'));
+    return names.length === 1 ? `'${names[0]}' 트리에도 있어요` : `'${names[0]}' 외 ${names.length - 1}개 트리에도 있어요`;
+  }
+  function saveUrl(url, options = {}) {
     const parsed = parseQuickUrl(url, describe);
     // #638: 담을 트리는 저장 시점에 정한다 — 창을 열지 않고 끌어다 놓기로 바로 담는 길에서도 지금 고른 트리에 담긴다.
     if (!quickTreeId || !treeChoices().some(tree => tree.id === quickTreeId)) quickTreeId = resolveQuickTreeId(treeChoices());
     // 이슈 671: '그 순간 다음에 담기' 목적지가 지금 고른 트리에 유효하면 저장에 함께 넘긴다.
     if (quickTarget && quickTarget.treeId !== quickTreeId) quickTarget = null;
     const targetParent = quickTarget?.treeId === quickTreeId ? quickTarget.id : '';
+    // #876 규칙 1: 담기 전에 같은 영상·같은 장면을 한 번 알려 준다(막지 않는다). 판정은 quick-intake 한 벌.
+    if (!options.force) {
+      const trees = deps.listTrees?.() || [];
+      const targetTree = trees.find(tree => tree.id === quickTreeId) || null;
+      const dup = targetTree ? findSameVideoInTree(targetTree, url) : null;
+      if (dup) {
+        deps.videoDup?.open({
+          treeId: quickTreeId,
+          momentId: dup.id,
+          treeName: selectedTreeName(),
+          dateText: formatDisplayDate(dup.date, 'long'),
+          onContinue: () => { saveUrl(url, { force: true }); },
+        });
+        return false;
+      }
+    }
     const input = { url, ...(quickTreeId ? { treeId: quickTreeId } : {}), ...(targetParent ? { parentId: targetParent } : {}), ...quickMediaTitle(url) };
     let result = null;
     try { result = deps.getMember().apply('quickAdd', input) || null; }
@@ -390,6 +418,9 @@ export function createQuickAdd(deps) {
       $('quick-url').focus();
     }
     showSaved(url, result, savedTitle);
+    // #876 규칙 3: 다른 트리에 같은 영상이 있으면 담은 뒤 한 줄 알린다(막지 않는다). 창 안 안내는 '담았어요'를 그대로 말한다.
+    const otherTreeNotice = sameVideoNotice(deps.listTrees?.() || [], result?.treeId || quickTreeId, url);
+    if (otherTreeNotice) deps.notify?.(otherTreeNotice);
     return true;
   }
 

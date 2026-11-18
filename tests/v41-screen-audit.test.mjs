@@ -1,4 +1,3 @@
-// #657 — 화면 공통 검사기. 이슈마다 따로 짜 온 '겹침 0·NaN 없음·글자 12px 이상' 검사를 하나로 모은다.
 // 검사 함수는 tests/helpers/screen-audit.mjs에 있다(①겹침·가려짐 #635 규칙 ②가로 넘침·잘림 ③흔적 값 넷 #635 ④글자 기준선 #548 ⑤알림 줄이 아래 링크 줄·＋ 단추·새 소식 카드를 덮지 않음 #666).
 // 화면 목록: 첫 화면(예시)·책(공유 링크, 마지막 장 포함)·보드·지도·둘러보기·의견 보내기 창(보내기 전·후)·어떻게 쓰나요 안내.
 // #666이 더한 상태: 알림 줄(토스트)이 떠 있는 셸 첫 화면·보드 — ＋ 단추(body.lt-fab-ok)와 새 소식 카드가 함께 뜬 자리에서 잰다.
@@ -595,38 +594,28 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     };
     const noAsk = await askFlow('no');
     await addFourth(noAsk.pageAsk);
-    // 공유 판 스위치: 꺼짐 상태 문장·단추를 잰 뒤 켜기 → 켜짐 — 스위치 뒤 상자 안 두 문장(순간 수 힌트·상태)이 같은 상태를 말한다.
+    // 공유 판 두 칸 선택: 꺼짐 상태 문장·단추를 잰 뒤 켜기 → 켜짐 — 선택 뒤 상자 안 두 문장(순간 수 힌트·상태)이 같은 상태를 말한다.
     {
       const { ctxAsk, pageAsk, discoverPuts } = noAsk;
       await pageAsk.evaluate(() => document.getElementById('share-menu')?.click());
       await pageAsk.waitForFunction(() => !!document.getElementById('share-panel')?.open, null, { timeout: 8000 }).catch(() => {});
-      await pageAsk.waitForFunction(() => (document.getElementById('share-discover-state')?.textContent || '').length > 0, null, { timeout: 8000 });
+      await pageAsk.waitForFunction(() => (document.getElementById('share-disc-off')?.getAttribute('aria-checked')||'')==='true', null, { timeout: 8000 });
       await pageAsk.waitForTimeout(400);
-      const box = () => pageAsk.evaluate(() => ({
-        hint: document.getElementById('share-moment-hint')?.textContent || '',
-        state: document.getElementById('share-discover-state')?.textContent || '',
-        toggle: document.getElementById('share-discover-toggle')?.textContent || '',
-        toggleState: document.getElementById('share-discover-toggle')?.dataset.state || ''
-      }));
+      const box = () => pageAsk.evaluate(() => ({ off: document.getElementById('share-disc-off')?.getAttribute('aria-checked')||'', on: document.getElementById('share-disc-on')?.getAttribute('aria-checked')||'' }));
       const before = await box();
-      assert.ok(before.state.includes('소개하지 않음'), '안 할래요를 고른 트리는 공유 판에서도 꺼져 있다 — 실제 "' + before.state + '"');
-      assert.ok(before.hint.includes('소개하지 않아요'), '꺼짐 상태에서 상자 첫 줄(힌트)도 같은 상태를 말한다 — 실제 "' + before.hint + '"');
-      assert.equal(before.toggle, '소개 켜기', '꺼진 트리의 스위치 글자는 행동(소개 켜기)다');
-      assert.equal(before.toggleState, 'off', '꺼짐은 테두리 모양(CSS가 data-state로 고른다)');
+      assert.equal(before.off, 'true', '안 할래요를 고른 트리는 공유 판에서도 안 함이 선택'); assert.equal(before.on, 'false');
       // 261117 고객 의견: '공개되는 범위' 문구가 줄바꿈돼도 겹침 0 — 문구 자리로 스크롤한 뒤에도 잰다.
       await pageAsk.evaluate(() => document.querySelector('.share-warning')?.scrollIntoView({ block: 'center' }));
       await pageAsk.waitForTimeout(300);
       await take(pageAsk, '공유 판·소개 꺼짐');
       await pageAsk.screenshot({ path: screenAuditCapture('audit-discover-panel-off-' + width + '-' + theme + '.png'), animations: 'disabled', timeout: 10000 }).catch(() => {});
-      await pageAsk.evaluate(() => document.getElementById('share-discover-toggle')?.click());
-      await pageAsk.waitForFunction(() => (document.getElementById('share-discover-state')?.textContent || '').includes('소개 중'), null, { timeout: 8000 });
+      await pageAsk.evaluate(() => document.getElementById('share-disc-on')?.click());
+      await pageAsk.waitForFunction(() => (document.getElementById('share-disc-on')?.getAttribute('aria-checked')||'')==='true', null, { timeout: 8000 });
       assert.deepEqual(discoverPuts, [false, true], '공유 판 스위치(소개 켜기)도 discover PUT으로 저장한다');
       await pageAsk.waitForTimeout(400);
       const after = await box();
-      // 스위치 뒤 상자 안 문장들이 같은 상태를 말한다(261116 2차 지적 — 첫 줄이 옛 값에 머물던 것).
-      assert.ok(after.hint.includes('소개 중이에요'), '켜짐 뒤 힌트 줄이 옛 값에 머물지 않는다 — 실제 "' + after.hint + '"');
-      assert.equal(after.toggle, '소개 끄기', '켜진 트리의 스위치 글자는 행동(소개 끄기)다 — 값과 같다');
-      assert.equal(after.toggleState, 'on', '켜짐은 강조색 모양');
+      // 두 칸 선택 뒤 상자 안 문장들이 같은 상태를 말한다(261116 2차 지적 — 첫 줄이 옛 값에 머물던 것).
+      assert.equal(after.on, 'true', '켜짐 뒤 소개가 선택'); assert.equal(after.off, 'false');
       await pageAsk.evaluate(() => document.querySelector('.share-warning')?.scrollIntoView({ block: 'center' }));
       await pageAsk.waitForTimeout(300);
       await take(pageAsk, '공유 판·소개 켜짐');

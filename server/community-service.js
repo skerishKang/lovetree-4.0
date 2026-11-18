@@ -26,9 +26,17 @@ function jsonBody(request){
 function clientKey(request){const value=String(request?.headers?.['idempotency-key']||'');if(!IDEMPOTENCY.test(value))throw new ApiError(400,'idempotency_key_required','안전한 중복 방지 키가 필요해요.');return value;}
 function publicComment(row,viewer,isAdmin=false){const mine=!!viewer&&row.subjectId===viewer;const edited=!!(row.editedAt||(row.updatedAt&&row.createdAt&&String(row.updatedAt)>String(row.createdAt)));return {id:row.id,body:row.body,createdAt:row.createdAt,updatedAt:row.updatedAt,edited,mine,canDelete:mine||isAdmin,canEdit:mine,authorLabel:mine?'나':'기록한 사람'};}
 
-export function createCommunityService({communityRepo,shareRepo,workspaceRepo,visibilityRepo=null,productId,admin=null,now=()=>Date.now(),makeId=()=>randomUUID()}){
+export function createCommunityService({communityRepo,shareRepo,workspaceRepo,visibilityRepo=null,productId,admin=null,now=()=>Date.now(),makeId=()=>randomUUID(),signupAtFor=null}){
  const writes=new Map();
  let totalsCache=null;
+ // 이번 주의 시작(월요일 0시, KST — #824 결정 4 '주 = 월~일 KST'). KST는 UTC+9 고정이라 서머타임
+ // 보정이 없다. 주 규칙은 여기 한 곳에서만 계산한다 — SQL·화면에 복제하지 않는다.
+ function weekStartKst(at=now()){
+  const KST_OFFSET_MS=9*60*60*1000,DAY_MS=24*60*60*1000;
+  const kstDay=Math.floor((at+KST_OFFSET_MS)/DAY_MS);
+  const monday=kstDay-((kstDay+3)%7); // 1970-01-01(목) 기준, 월요일=0 — 목요일이 3이 나온다
+  return (monday*DAY_MS)-KST_OFFSET_MS;
+ }
  function rate(subjectId,kind,limit=20){
   const key=subjectId+'\0'+kind,cut=now()-60_000,list=(writes.get(key)||[]).filter(at=>at>cut);
   if(list.length>=limit)throw new ApiError(429,'rate_limited','잠시 뒤 다시 시도해 주세요.');
@@ -169,7 +177,30 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
    items.sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))||String(a.shareId).localeCompare(String(b.shareId)));
    return {tag:parsed.raw,items:items.slice(0,TAG_MOMENT_LIMIT)};
   },
-  async favorite(subjectId,shareId,enabled){await activeShare(shareId);rate(subjectId,'favorite',40);await communityRepo.setFavorite({productId,shareId,subjectId,enabled});return communityRepo.stats({productId,shareId,viewerSubjectId:subjectId});},
+  // 담기 = 트리 투표(#824 대표 결정). 켤 때만 두 일을 한다:
+  // ① 가입 7일 게이트 — 가입일(첫 로그인 시각)이 7일 미만이면 막는다(403 vote_too_new).
+  //    가입일을 못 읽으면(행 없음·미연결) 보수적으로 신규와 같이 막는다 — 뚫리는 쪽으로 잘못 나가지 않게.
+  //    signupAtFor 가 아예 연결되지 않은 조립(기존 시험)에서는 게이트가 꺼진다 — 운영 조립(index.js)은 항상 연결한다.
+  // ② 즐겨찾기 행 + 투표 표 기록 — 표는 append-only(1인 1표 영구, 재담기도 새 표 아님).
+  // 해제는 자유 — 즐겨찾기 행만 지고, 표는 남는다.
+  async favorite(subjectId,shareId,enabled){
+   await activeShare(shareId);rate(subjectId,'favorite',40);
+   if(enabled){
+    if(signupAtFor){
+     const signedUpAt=await signupAtFor({productId,subjectId});
+     const age=signedUpAt?now()-new Date(signedUpAt).getTime():null;
+     if(age===null||!Number.isFinite(age)||age<7*24*60*60*1000)throw new ApiError(403,'vote_too_new','가입하고 7일이 지나면 투표할 수 있어요.');
+    }
+    await communityRepo.setFavorite({productId,shareId,subjectId,enabled:true});
+    await communityRepo.recordVote({productId,targetKind:'tree',targetId:shareId,subjectId});
+   }else{
+    await communityRepo.setFavorite({productId,shareId,subjectId,enabled:false});
+   }
+   const stats=await communityRepo.stats({productId,shareId,viewerSubjectId:subjectId});
+   const voted=await communityRepo.hasVoted({productId,targetKind:'tree',targetId:shareId,subjectId});
+   const weeklyFavorites=(await communityRepo.weeklyVoteCounts({productId,targetKind:'tree',since:new Date(weekStartKst()).toISOString()}))[shareId]||0;
+   return {...stats,voted,weeklyFavorites};
+  },
   async favorites(subjectId){return communityRepo.listFavorites({productId,subjectId});},
   async react(subjectId,shareId,enabled,kind='heart'){
    if(!isReactionKind(kind))throw new ApiError(400,'reaction_kind_invalid','지원하지 않는 반응이에요.');

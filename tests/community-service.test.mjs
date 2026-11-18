@@ -14,7 +14,7 @@ const PRODUCT='lovetree-test',principal=subjectId=>({productId:PRODUCT,subjectId
 const CLOCK='2026-11-01T00:00:00.000Z';
 const PHOTO='https://front.test/api/media/123e4567-e89b-42d3-a456-426614174000.jpg';
 function sampleTree(url=PHOTO){return createTree({subject:'윤슬',title:'첫 무대',note:'다시 보고 싶은 빛',emotion:'설렘',date:'2026-11-01',url},CLOCK);}
-async function setup({url=PHOTO,coverMode='',coverDesign='',admin=null}={}){
+async function setup({url=PHOTO,coverMode='',coverDesign='',admin=null,signupAtFor=null}={}){
  const workspaceRepo=createMemoryWorkspaceRepo(),workspace=createWorkspaceService({repo:workspaceRepo,productId:PRODUCT});
  let tree=sampleTree(url);
  if(coverMode)tree=editTree(tree,{title:tree.title,subject:tree.subject,coverMomentId:tree.moments[0].id,coverDesign,coverMode});
@@ -24,7 +24,7 @@ async function setup({url=PHOTO,coverMode='',coverDesign='',admin=null}={}){
  const communityRepo=createMemoryCommunityRepo();communityRepo.seedShares([share]);
  const adminStub=admin||{roleFor:async value=>value.subjectId==='admin'?'admin':null};
  let id=0;
- const service=createCommunityService({communityRepo,shareRepo,workspaceRepo,productId:PRODUCT,admin:adminStub,makeId:()=>String(++id).padStart(24,'c'),now:()=>Date.UTC(2026,10,1)});
+ const service=createCommunityService({communityRepo,shareRepo,workspaceRepo,productId:PRODUCT,admin:adminStub,makeId:()=>String(++id).padStart(24,'c'),now:()=>Date.UTC(2026,10,1),signupAtFor});
  const authenticate=async request=>{const subjectId=request.headers?.account;if(!subjectId)throw new ApiError(401,'unauthenticated','login');return principal(subjectId);};
  return {tree,workspaceRepo,shareRepo,communityRepo,service,handle:createCommunityHandler({authenticate,service,productId:PRODUCT})};
 }
@@ -78,6 +78,57 @@ test('favorites and reactions are authenticated, idempotent and remain outside w
  assert.deepEqual((await call(handle,'GET','/api/community/me/favorites',{account:'bob'})).body.shareIds,[shareId]);
  const stored=await workspaceRepo.load({productId:PRODUCT,subjectId:'alice'});
  assert.equal(JSON.stringify(stored.doc).includes('favorites'),false);assert.equal(JSON.stringify(stored.doc).includes('reaction'),false);
+});
+
+// 담기 = 트리 투표(#824 대표 결정): 1인 1표 영구 + 가입 7일 게이트.
+test('담기는 표를 남긴다 — 재담기에도 표는 하나고 응답에 표 유무·이번 주 수가 있다',async()=>{
+ const DAY=24*60*60*1000,NOW=Date.UTC(2026,10,1); // 2026-11-01(일) — 이번 주는 10-26(월) 00:00 KST 시작
+ const signupAtFor=async({subjectId})=>new Date(NOW-8*DAY).toISOString(); // bob: 가입 8일째 → 투표 가능
+ const {handle,communityRepo}=await setup({signupAtFor}),shareId='s'.repeat(24);
+ const first=await call(handle,'PUT',`/api/community/shares/${shareId}/favorite`,{account:'bob'});
+ assert.equal(first.status,200);
+ assert.equal(first.body.stats.voted,true,'담으면 표가 있다');
+ assert.equal(first.body.stats.weeklyFavorites,1,'이번 주 표 수가 응답에 따라온다');
+ // 해제 뒤 재담기 — 표는 새로 세지 않는다(1인 1표 영구)
+ await call(handle,'DELETE',`/api/community/shares/${shareId}/favorite`,{account:'bob'});
+ const again=await call(handle,'PUT',`/api/community/shares/${shareId}/favorite`,{account:'bob'});
+ assert.equal(again.status,200);
+ assert.equal(again.body.stats.voted,true);
+ assert.equal(again.body.stats.weeklyFavorites,1,'재담기로 표가 늘지 않는다');
+ assert.equal(await communityRepo.hasVoted({productId:PRODUCT,targetKind:'tree',targetId:shareId,subjectId:'bob'}),true);
+});
+
+test('가입 7일 미만은 담기(투표)가 막힌다 — 403 vote_too_new, 안내 문구는 대표 결정 그대로',async()=>{
+ const DAY=24*60*60*1000,NOW=Date.UTC(2026,10,1);
+ const cases=[
+  {label:'가입 3일째',at:new Date(NOW-3*DAY).toISOString()},
+  {label:'가입 6일 23시간',at:new Date(NOW-7*DAY+60*1000).toISOString()},
+  {label:'가입일을 못 읽음(행 없음)',at:null}
+ ];
+ for(const c of cases){
+  const signupAtFor=async({subjectId})=>c.at;
+  const {handle,communityRepo}=await setup({signupAtFor}),shareId='s'.repeat(24);
+  const res=await call(handle,'PUT',`/api/community/shares/${shareId}/favorite`,{account:'bob'});
+  assert.equal(res.status,403,c.label);
+  assert.equal(res.body.error?.code,'vote_too_new',c.label);
+  assert.equal(res.body.error?.message,'가입하고 7일이 지나면 투표할 수 있어요.',c.label);
+  assert.equal(await communityRepo.hasVoted({productId:PRODUCT,targetKind:'tree',targetId:shareId,subjectId:'bob'}),false,c.label+': 표도 남지 않는다');
+  const list=await call(handle,'GET','/api/community/shares');
+  assert.equal(list.body.items[0].stats.favorites,0,c.label+': 즐겨찾기도 남지 않는다');
+ }
+ // 경계: 정확히 7일째 되는 순간부터는 통과한다
+ const boundary=await setup({signupAtFor:async()=>new Date(NOW-7*DAY).toISOString()}),shareId='s'.repeat(24);
+ assert.equal((await call(boundary.handle,'PUT',`/api/community/shares/${shareId}/favorite`,{account:'bob'})).status,200,'7일째 되면 투표할 수 있다');
+});
+
+test('이번 주 표 수는 주 시작(월요일 0시 KST) 이후만 센다',async()=>{
+ const DAY=24*60*60*1000,NOW=Date.UTC(2026,10,1);
+ const {handle,communityRepo}=await setup({signupAtFor:async()=>new Date(NOW-30*DAY).toISOString()}),shareId='s'.repeat(24);
+ // 지난 주(주 시작 전)에 남은 표 — 백필된 옛 담기 같은 경우
+ await communityRepo.recordVote({productId:PRODUCT,targetKind:'tree',targetId:shareId,subjectId:'old-fan',votedAt:new Date(NOW-8*DAY).toISOString()});
+ const res=await call(handle,'PUT',`/api/community/shares/${shareId}/favorite`,{account:'bob'});
+ assert.equal(res.status,200);
+ assert.equal(res.body.stats.weeklyFavorites,1,'지난 주 표는 이번 주 수에서 빠진다');
 });
 
 test('comments use an idempotency key, hide account ids and enforce author or admin delete',async()=>{

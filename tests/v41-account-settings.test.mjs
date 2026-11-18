@@ -198,7 +198,7 @@ test('설정 입구는 로그인 상태에서만 열리고, 묶음 이름으로 
   assert.match(shell, /settingsTabList\.addEventListener\('keydown'/);
   assert.match(shell, /const foldFor=\{data:'account-settings-more',records:'account-settings-records-more',write:'account-settings-records-more',share:'account-settings-records-more',look:'account-settings-screen-more'\};/);
   assert.match(shell, /void openAccountSettings\(\{section:'data'\}\);/);
-  assert.match(shell, /paintSettingsProfile\(\);\s*fillProfileForm\(\);\s*paintDateStyleControls\(\);paintStartPlaceControls\(\);paintNetworkViewControls\(\);paintShareControls\(\);paintQuickTargetControls\(\);\s*void paintSettingsUsage\(\);\s*panel\('account-settings'\);\s*focusSettingsSection\(section\);/);
+  assert.match(shell, /paintSettingsProfile\(\);\s*fillProfileForm\(\);\s*paintDateStyleControls\(\);paintStartPlaceControls\(\);paintNetworkViewControls\(\);paintShareControls\(\);paintQuickTargetControls\(\);\s*void paintSettingsUsage\(\);void loadTreeVisibility\(\);\s*panel\('account-settings'\);\s*focusSettingsSection\(section\);/);
 });
 
 test('옛 내 기록 입구는 설정 "내 데이터"(로그아웃이면 로그인)로 열린다', () => {

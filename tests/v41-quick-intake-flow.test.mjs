@@ -45,7 +45,7 @@ function strictDescribe(value) {
   return { kind: 'link', original: value, label: parsed.hostname.replace(/^www\./, ''), openUrl: parsed.href };
 }
 
-function setup({ member, source = 'server', browser = fakeBrowser(), describe = strictDescribe, storage, fetchImpl, titleWaitMs } = {}) {
+function setup({ member, source = 'server', browser = fakeBrowser(), describe = strictDescribe, storage, fetchImpl, titleWaitMs, videoDup } = {}) {
   const notifies = [];
   const logins = [];
   const doc = fakeDocument();
@@ -62,6 +62,7 @@ function setup({ member, source = 'server', browser = fakeBrowser(), describe = 
     storage: storage ?? memoryStorage(),
     fetchImpl,
     titleWaitMs,
+    videoDup,
   });
   return { intake, doc, notifies, logins, state, ...browser, member };
 }
@@ -262,15 +263,31 @@ test('공유 시트 진입: 주소가 아닌 문구는 안내하고 지운다', 
   assert.equal(intake.pending(), null, '주소가 아닌 값은 보관하지 않는다');
 });
 
-test('공유 시트 진입: 이미 담아둔 주소면 막고, 새로고침 중복도 같은 규칙이다', () => {
+test('#876 공유 시트 진입: 이미 담은 같은 영상이면 막지 말고 안내 창을 열고, 그래도 담기로 담는다', () => {
   const url = 'https://b.test/1';
-  const member = memberFixture({ trees: [{ id: 'inbox', inbox: true, moments: [{ id: 'm0', url }] }] });
+  const member = memberFixture({ trees: [{ id: 'inbox', inbox: true, title: '모아둔 순간', moments: [{ id: 'm0', url }] }] });
   const browser = fakeBrowser({ search: `?quickadd=${encodeURIComponent(url)}` });
-  const { intake, notifies } = setup({ member, browser });
+  const opened = [];
+  const { intake, notifies } = setup({ member, browser, videoDup: { open: (info) => opened.push(info) } });
+  intake.flush();
+  assert.equal(member.calls.applied.length, 0, '담기 전에 한 번 알려 준다');
+  assert.equal(intake.pending(), null, '안내 창을 닫으면 아무것도 담지 않는다(보관도 비운다)');
+  assert.equal(opened.length, 1);
+  assert.equal(opened[0].treeName, '모아둔 순간');
+  assert.equal(notifies.length, 0, '조용히 막지 않는다 — 창으로 알린다');
+  // [그래도 담기]: 원래 하려던 담기를 그대로 한다.
+  opened[0].onContinue();
+  assert.deepEqual(member.calls.applied, [['quickAdd', { url }]]);
+});
+
+test('#876 공유 시트 진입: 주소 모양이 달라도 영상 id가 같으면 안내 창을 연다(규칙 5)', () => {
+  const member = memberFixture({ trees: [{ id: 'inbox', inbox: true, title: '모아둔 순간', moments: [{ id: 'm0', url: 'https://youtu.be/abc12345678' }] }] });
+  const browser = fakeBrowser({ search: `?quickadd=${encodeURIComponent('https://www.youtube.com/watch?v=abc12345678')}` });
+  const opened = [];
+  const { intake } = setup({ member, browser, videoDup: { open: (info) => opened.push(info) } });
   intake.flush();
   assert.equal(member.calls.applied.length, 0);
-  assert.deepEqual(notifies, ['이미 모아둔 순간에 있는 주소예요.']);
-  assert.equal(intake.pending(), null);
+  assert.equal(opened.length, 1, 'youtu.be로 담은 영상을 watch?v=로 다시 담으면 같은 영상이다');
 });
 
 test('공유 시트 진입: 쓰기 불가면 안내하고, 준비되면 이어서 담는다', () => {
