@@ -499,8 +499,8 @@ html[data-lt-theme=garden] select{color-scheme:light}
 
 /* #891: '배경 ▾' 드롭(보드·지도 머리줄 공통) — 테마 따라가기(기본)·종이·밤. 색은 --lt-* 토큰만 쓴다. */
 .lt-bg-menu{position:absolute;right:0;top:calc(100% + 6px);min-width:170px;display:grid;gap:2px;padding:6px;border:1px solid var(--lt-line);border-radius:14px;background:var(--lt-glass-strong);box-shadow:0 14px 40px rgba(0,0,0,.4);z-index:60}
-/* display:grid가 원본 [hidden](UA)을 이기면 닫힌 메뉴가 항상 떠 있다(지도 화면에서 실측됨 — #891) — 구성요소에서 스스로 닫힌다. */
-.lt-bg-menu[hidden]{display:none!important}
+/* display:grid가 원본 [hidden](UA)을 이기면 닫힌 메뉴가 항상 떠 있다(지도 화면에서 실측됨 — #891) — 구성요소에서 스스로 닫힌다. 속성 선택자라 .lt-bg-menu보다 우선한다(!important 없이 — #886 줄이기 흐름). */
+.lt-bg-menu[hidden]{display:none}
 .lt-bg-item{display:flex;align-items:center;gap:8px;min-height:44px;padding:0 12px;border:0;border-radius:10px;background:none;color:inherit;font:inherit;font-size:13px;text-align:left;cursor:pointer;white-space:nowrap}
 .lt-bg-item:hover,.lt-bg-item:focus-visible{background:rgba(255,255,255,.08)}
 .lt-bg-item[aria-checked="true"]{color:var(--lt-gold);font-weight:700}
