@@ -587,8 +587,15 @@ function drawShelf() {
   const shelfBar = document.getElementById('gShelf');
   if (model.graph.hubs.length === 0 && model.footprintRowY != null && untagged.length > 0) {
     shelfBar.style.bottom = Math.max(6, Math.round(svg.parentElement.clientHeight - model.footprintRowY - 40)) + 'px';
+    /* #864 CTO 2차: 선반 글자 줄도 발자취 덩어리 안으로 — 왼쪽 따로가 아니라 점 행 바로 아래 가운데. */
+    shelfBar.style.left = '50%';
+    shelfBar.style.right = 'auto';
+    shelfBar.style.transform = 'translateX(-50%)';
   } else {
     shelfBar.style.bottom = '';
+    shelfBar.style.left = '';
+    shelfBar.style.right = '';
+    shelfBar.style.transform = '';
   }
   const badge = document.getElementById('gBadge');
   const n = model.graph.moments.length;
@@ -691,10 +698,16 @@ function drawEmptyNote() {
   /* 묶음이 없으면(#864) 안내 문구·제안 단추를 발자취 줄 바로 위에 붙여 한 덩어리로 —
      화면 한가운데 떠 있는 안내가 아니라 발자취의 안내문이 되게. */
   const rideWithRow = () => {
-    if (model.footprintRowY != null) {
-      empty.style.top = model.footprintRowY + 'px';
-      empty.style.transform = 'translate(-50%,-100%) translateY(-14px)';
-    }
+    if (model.footprintRowY == null) return;
+    /* #864 CTO 2차: 단추 아래모서리가 '처음'·'지금' 표식 글자에 걸리지 않게 —
+       표식 글자가 있으면 그 가장 위 글자 위 18px까지 올려 붙인다(없으면 점 행 위 16px). */
+    const wrapTop = svg.parentElement.getBoundingClientRect().top;
+    const markTops = [...svg.querySelectorAll('.g-mark')]
+      .map((t) => t.getBoundingClientRect().top - wrapTop)
+      .filter((v) => Number.isFinite(v) && v > 0);
+    const refY = markTops.length ? Math.min(...markTops) : model.footprintRowY;
+    empty.style.top = refY + 'px';
+    empty.style.transform = 'translate(-50%,-100%) translateY(-18px)';
   };
   const rideOff = () => { empty.style.top = ''; empty.style.transform = ''; };
   if (n === 0) { rideOff(); empty.replaceChildren(); empty.hidden = false; empty.textContent = '아직 남긴 순간이 없어요. 순간을 남기면 흐름이 보여요.'; }
