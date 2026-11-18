@@ -135,9 +135,23 @@ export function resolveShelfIndex(list, selectedId, shelfIndex) {
 // 레일 위 카드 배치(거리 → 좌표·배율·투명도). #212에서 중앙 카드를 위로 띄우지 않는다.
 // 261118 대표 지적 2차: 옆 책도 설명 글자가 실제 크기(12px)로 읽혀야 하므로 배율·깊이 이동으로 글자를 줄이지 않는다.
 // 책은 좌우 간격과 살짝 돌림·투명도로만 깊이를 내고, 4번째 이후 책도 투명도 0.6으로 남긴다.
-export function carouselTransform(distance) {
+// wide(넓은 화면, 레일 1800px 이상)에서는 흐림 기준을 ±2→±4로 완화한다(#서재-빈공간):
+// 흐림 필터는 4칸까지 없고(선명 5권), 6칸까지는 누를 수 있다. 좌표·배율·돌림은 그대로다.
+export function carouselTransform(distance, wide = false) {
   const absolute = Math.abs(distance);
   const x = distance * 200;
+  if (wide) {
+    const alpha = absolute === 0 ? 1 : absolute === 1 ? 0.9 : absolute === 2 ? 0.85 : absolute === 3 ? 0.8 : absolute === 4 ? 0.75 : 0.6;
+    return {
+      x, y: 0, z: 0,
+      scale: absolute === 0 ? 1.06 : 1,
+      rotate: distance === 0 ? 0 : distance > 0 ? -12 : 12,
+      alpha,
+      zIndex: 100 - absolute,
+      pointerEvents: absolute > 6 ? 'none' : 'auto',
+      filter: absolute > 4 ? 'saturate(.72) brightness(.86)' : 'none'
+    };
+  }
   return {
     x,
     y: 0,
@@ -148,6 +162,21 @@ export function carouselTransform(distance) {
     zIndex: 100 - absolute,
     pointerEvents: absolute > 3 ? 'none' : 'auto',
     filter: absolute > 2 ? 'saturate(.72) brightness(.86)' : 'none'
+  };
+}
+
+// 책 가로 배치 방식(#서재-빈공간). 책 수가 레일에 다 들어갈 때는 왼쪽부터 차례로 늘어놓고
+// 묶음을 가운데 정렬한다(빈 반쪽이 생기지 않는다). 넘칠 때는 지금처럼 고른 책을 가운데 두고 넘긴다.
+// 넓은 화면(레일 1760px 이상 — 1920 물리 화면은 스크롤바 때문에 레일이 1778px쯤 된다)에서만 이 방식을 쓴다 — 1440 같은 화면에서는 지금과 같은 넘김 배치를 유지한다.
+export function shelfRowLayout(count, railWidth, { pitch = 200, cardW = 190, pad = 24, wideRail = 1760 } = {}) {
+  const needed = (Math.max(count, 1) - 1) * pitch + cardW;
+  const wide = railWidth >= wideRail;
+  const mode = wide && needed + 2 * pad <= railWidth ? 'row' : 'carousel';
+  return {
+    mode,
+    wide,
+    // 레일 가운데가 0인 좌표. row: 묶음을 가운데 정렬한 순서 배치. carousel: 고른 책(center)이 가운데.
+    xOf: (index, center) => (mode === 'row' ? (index - (count - 1) / 2) * pitch : (index - center) * pitch)
   };
 }
 
