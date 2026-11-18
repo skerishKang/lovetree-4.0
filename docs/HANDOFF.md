@@ -13,7 +13,6 @@
 - **도구(PR #854, main 3b56d9f)**: ops-reply가 일지를 아예 거부하던 것을 고침 — 일지는 내부 메모(authorType=internal)·상태·연결 이슈 갱신만, 의견은 종전대로 고객 답변. replyMode 순수 함수 + tests/ops-reply.test.mjs 6건.
 - **실데이터 적용(판독기로 번호 확인)**: 증상을 적은 건은 일지 id=36 하나(같은 계정 의견 #20·#21·#23·#24에는 증상 없음). ops-reply로 id=36에 내부 메모 '보낸 직후에도 내 의견 목록이 바로 보이게 고쳤어요.'(reply id=37, internal) + 상태 fixed + 연결 이슈 846 — 판독기 재실행으로 DB 실값 확인.
 - **남긴 것**: ① comp2에 설치된 `/usr/local/sbin/lovetree-api-autodeploy`가 옛판이라 감시 목록에 tools/ops-reply.mjs가 없어 자동 설치가 걸리지 않았다 — 이번엔 수동 반영했고, 설치본 갱신이 필요하다. ② ops-reply 출력 문구의 authorType 고정값은 별도 PR로 바로잡는다. ③ #851은 사용자 보이는 고침이라 새 소식(updates.json) 한 줄은 소식 모아 만드는 레인 몫이다.
->>>>>>> origin/main
 
 ## 2026-11-18 — #845 1단계: 창이 열려 있는 동안 첫 트리 안내 판 숨기기 (컴1로컬3, 브랜치 ai/local3-tips-845, PR 예정)
 
