@@ -12,6 +12,10 @@ import {mountPrivateUpload} from '../private-upload.mjs';
 import {fetchVideoTitle} from '../video-title.mjs';
 import {loadYouTubeIframeApi, createSegmentCapture} from '../segment-capture.mjs';
 
+// #934: 링크 칸에 열 수 없는 주소가 남았을 때의 안내 — 미리보기 경고('링크를 열 수 없어요')와
+// 저장 판정이 같은 뜻을 말하도록 한 문장으로 둔다. 칸을 비우면 링크 없이 저장하는 길을 알려 준다.
+export const LINK_FORMAT_ERROR = '링크 칸의 주소를 열 수 없어요. 주소를 고치거나 칸을 비우면 링크 없이 저장돼요.';
+
 export function createPanels(deps) {
   const {$} = deps;
   const getMember = deps.getMember;
@@ -467,9 +471,30 @@ export function createPanels(deps) {
     const dup = targetTree ? findSameVideoInTree(targetTree, url) : null;
     return dup ? { dup, treeId, treeName: displayTreeTitle(String(targetTree?.title || targetTree?.subject || '') || '트리') } : null;
   }
+  // #934: 링크 칸에 열 수 없는 값이 남아 있으면 저장하지 않는다.
+  //  전에는 미리보기만 '링크를 열 수 없어요'를 띄우고 저장은 그대로 됐다 — 경고와 결과가 어긋났다.
+  //  판정은 미리보기가 경고를 띄우는 그 함수(LTMedia.describe의 kind==='invalid')를 그대로 쓴다.
+  //  그래서 '경고가 뜨면 저장도 막힌다'가 한 곳에서 정해진다(쉬운 추가와도 같은 답 — v41-934 시험).
+  //  칸을 비우면 링크 없이 저장하는 길은 그대로 열어 둔다.
+  function linkFieldError() {
+    const field = $('moment-form').elements.url;
+    const value = String(field?.value ?? '').trim();
+    if (!value) return '';
+    let info = null;
+    try { info = LTMedia.describe(value); } catch { info = null; }
+    // 판정을 못 받았으면(미리보기가 아직 없는 화면) 막지 않는다 — 막는 쪽은 'invalid'라는 분명한 답이 있을 때만.
+    if (!info || info.kind !== 'invalid') return '';
+    return LINK_FORMAT_ERROR;
+  }
   $('moment-form').onsubmit = e => {
     e.preventDefault();
     if (getUploads().busy) return;
+    const linkError = linkFieldError();
+    if (linkError) {
+      $('form-error').textContent = linkError;
+      $('moment-form').elements.url.focus?.();
+      return;
+    }
     if (parentDirty()) {
       $('form-error').textContent = '이전 순간 변경은 아래 버튼으로 먼저 저장해 주세요.';
       return;
