@@ -5,6 +5,8 @@
 
 ## 파일
 
+실제 고객이 생긴 뒤에는 API 서비스 환경에 `LOVETREE_HAS_REAL_CUSTOMERS=1`을 설정하고 서비스를 재시작한다. 기본은 꺼짐이며 `true`도 켜짐으로 인식한다. 이 설정은 트리와 무대의 주간 득표에서 AI 명예회원 표를 제외하고 인기 목록에서 명예회원 소유 트리를 제외한다. 설정 전환은 기존 표를 다시 쓰지 않는다.
+
 | 저장소 | 설치 위치 (COM2) |
 | --- | --- |
 | `deploy/host-com2/lovetree-api/autodeploy.sh` | `/usr/local/sbin/lovetree-api-autodeploy` |
