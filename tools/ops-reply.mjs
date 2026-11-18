@@ -118,7 +118,7 @@ async function main() {
     const patch = buildPatch(args);
     const updated = await service.update(principal, String(args.id), patch);
     if (args.statusOnly) console.log(`updated id=${updated.id} status=${updated.status} issue=${updated.issueNumber || ''} replies=${updated.replyCount}`);
-    else console.log(`replied id=${updated.id} replyId=${reply.id} authorType=customer status=${updated.status} issue=${updated.issueNumber || ''} replies=${updated.replyCount}`);
+    else console.log(`replied id=${updated.id} replyId=${reply.id} authorType=${mode} status=${updated.status} issue=${updated.issueNumber || ''} replies=${updated.replyCount}`);
   } finally {
     await pool.end().catch(() => {});
   }
