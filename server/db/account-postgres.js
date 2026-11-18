@@ -5,6 +5,8 @@
  */
 export const ACCOUNT_USER_TABLES = Object.freeze([
   { table: 'lovetree_community_favorites', where: 'subject_id = $2' },
+  // 투표 기록(#824) — 대상 주인이 아니라 표를 던진 사람의 키다(#824 1인 1표). 탈퇴하면 표도 함께 사라진다.
+  { table: 'lovetree_community_votes', where: 'subject_id = $2' },
   { table: 'lovetree_community_reactions', where: 'subject_id = $2' },
   { table: 'lovetree_community_comments', where: 'subject_id = $2' },
   { table: 'lovetree_community_reports', where: 'reporter_subject_id = $2' },
