@@ -307,6 +307,10 @@ html[data-book-shape=phone][data-v41-screen=book] .story-action{display:-webkit-
 html[data-book-shape=phone][data-v41-screen=book] .story-editor{width:100%}
 /* #800: desktop places the relationship at the bottom center of the open pages, above page controls. */
 html[data-v41-screen=book] .why-margin{left:calc(50% + 150px);top:auto;bottom:24px;transform:translateX(-50%);width:min(320px,30vw)}
+/* #910: 오른쪽 페이지의 한마디 단추가 순간 제목 아래 줄을 가리지 않게 페이지 아래에 단추 자리만큼 여백을 둔다.
+   단추는 bottom 24px + 높이(100자까지 최대 83px)라 위끝이 책 아래에서 최대 107px에 닿는다 — 제목 아래에 8px 이상 여백이 남도록
+   content 아래 여백을 116px로 둔다(자리 확보 전 제목은 37px 자리 끝에 박혀 단추와 32px 겹쳤다). 단추 자체 자리·갈림길 탭(#897)·말풍선(#893)은 그대로다. */
+html[data-v41-screen=book] .page-content{padding-bottom:116px}
 html[data-v41-screen=book] .why-margin>.story-tip,html[data-v41-screen=book] .why-margin>.story-action-wrap{width:100%;max-width:100%;box-sizing:border-box}
 /* #875: 한마디 안내 말풍선은 책 바깥 아래 여백에 둔다 — 책 안 오른쪽 아래(bottom:24px)에 겹치면
    오른쪽 페이지 아래 글을 가린다(2560·1440 지적). 안내만 host로 옮기고 편집 단추(#800)는 지금 자리에 둔다.
