@@ -332,6 +332,10 @@ test('#627: 둘러보기 검색은 트리 순간의 제목(영상 제목 포함)
   // 검색용으로 모은 순간 제목은 응답에 내보내지 않는다(공개 카드 모양 그대로 — 실제 응답은 JSON 직렬화를 거친다).
   assert.equal(Object.prototype.propertyIsEnumerable.call(list.body.items[0],'searchText'),false);
   assert.ok(Array.isArray(list.body.groups),'그룹 칩 목록을 함께 준다');
+  assert.ok(Array.isArray(list.body.groupsAll),'찾기 창 전체 목록을 함께 준다');
+  // #784: discover 응답은 groups/groupsAll가 그룹 이름('IVE')을 정규 표시로만 같이 내려 준다.
+  // 카드(items)에는 계속 내보내지 않는다 — 누출 검증은 카드에만 걸어 가명(tagKey) 누출을 그대로 본다.
+  assert.equal(JSON.stringify(list.body.items).includes('IVE'),false);
   assert.equal(JSON.stringify(list.body).includes('artistTags'),false);
   assert.equal(JSON.stringify(list.body).includes('searchText'),false);
  }
