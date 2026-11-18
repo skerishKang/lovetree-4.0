@@ -2,7 +2,7 @@
 // 계산(표지 색·이름·정보 줄·검색·카드 배치·페이지)은 shelf-model.mjs로 옮기고 여기서는 화면만 다룬다.
 // 조건·문구·id·순서 변경 0. #291(궤도)와 같이 모듈로 불러 쓴다.
 import {
-  COVER_PALETTE, allBooks as allBooksOf, bookMeta, buildShelf, carouselTransform, coverStyle as coverStyleOf,
+  COVER_PALETTE, allBooks as allBooksOf, bookMeta, buildShelf, carouselTransform,
   escapeShelf, filterShelf, findBook, lastMomentDate as lastMomentDateOf,
   resolveShelfIndex, resumeCard, resumeName, shelfRowLayout,
   treeTitleOf, youtubeId as youtubeIdOf
@@ -47,7 +47,13 @@ import { createReader } from './shelf-reader.js';
       var esc = escapeShelf;
       var youtubeId = function (url) { return youtubeIdOf(url, window.LTMedia && window.LTMedia.describe); };
       function showToast(message) { var toast=$('#toast'); toast.textContent=message; toast.classList.add('show'); clearTimeout(showToast.timer); showToast.timer=setTimeout(function(){toast.classList.remove('show');},2400); }
-      var coverStyle = coverStyleOf;
+      function coverClasses(book) {
+        var cIdx = COVER_PALETTE.indexOf(book.color);
+        var aIdx = COVER_PALETTE.indexOf(book.accent);
+        var tilt = (String(book.id || '').length % 5) - 2;
+        var tiltName = tilt === -2 ? 'tilt-m2' : tilt === -1 ? 'tilt-m1' : tilt === 0 ? 'tilt-0' : tilt === 1 ? 'tilt-p1' : 'tilt-p2';
+        return (cIdx >= 0 ? ' cover-c' + (cIdx + 1) : '') + (aIdx >= 0 ? ' cover-a' + (aIdx + 1) : '') + ' ' + tiltName;
+      }
       function openModal(id) { $('#'+id).classList.remove('hidden'); }
       function closeModal(id) { $('#'+id).classList.add('hidden'); }
        function renderShelf() {
@@ -69,7 +75,7 @@ import { createReader } from './shelf-reader.js';
           // #212: 표지에 이름 한 번만. 표지 아래는 "순간 N개 · 마지막 YYYY-MM-DD" 하나만. "책 · 02"·"기본 표지" 같은 내부 표시는 없다.
           // #256-3: 디자인 표지는 shelf-model coverChoice 판정(book.design)을 그대로 쓴다. 없으면 속성도 없다(기존 화면 변화 0).
           return '<article class="book-card" data-book-index="'+index+'"><button type="button" data-book-id="'+esc(book.id)+'" aria-label="'+esc(book.name)+' 책 열기">'+
-            '<div class="book-cover"'+(book.design?' data-cover-design="'+esc(book.design)+'"':'')+' style="'+coverStyle(book)+'">'+(book.coverMedia?'<img class="book-cover-media" src="'+esc(book.coverMedia)+'"'+coverFallbackAttrs(book.coverCandidates||[book.coverMedia])+' alt="" loading="lazy" referrerpolicy="no-referrer">':'')+'<span class="cover-symbol"><span>'+esc(book.symbol)+'</span></span><strong class="cover-title">'+esc(book.name)+'</strong></div>'+
+            '<div class="book-cover'+coverClasses(book)+'"'+(book.design?' data-cover-design="'+esc(book.design)+'"':'')+'>'+(book.coverMedia?'<img class="book-cover-media" src="'+esc(book.coverMedia)+'"'+coverFallbackAttrs(book.coverCandidates||[book.coverMedia])+' alt="" loading="lazy" referrerpolicy="no-referrer">':'')+'<span class="cover-symbol"><span>'+esc(book.symbol)+'</span></span><strong class="cover-title">'+esc(book.name)+'</strong></div>'+
             '<span class="book-card-meta"><span>'+esc(bookMeta(book))+'</span></span></button><button type="button" class="book-manage" data-manage-id="'+esc(book.id)+'" aria-label="'+esc(book.name)+' 고치기">⋯</button></article>';
         }).join(''):'<div class="empty"><strong>찾는 책이 없어요.</strong><span>트리 이름·좋아하는 대상·순간 제목으로 검색해 보세요.</span></div>');
         updateCarousel(false);

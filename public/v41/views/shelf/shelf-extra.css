@@ -47,7 +47,7 @@ html[data-v41-screen=shelf] .book-card .book-cover {
 /* #256-3 디자인 표지 질감은 identity.css 한 곳에 둔다(책장·펼친 책·책 정보 관리 창이 같은 규칙을 쓴다). */
 
 /* #465: 넘길 책이 없으면 화살표를 숨긴다. */
-#shelfPrev[hidden],#shelfNext[hidden]{display:none!important}
+#shelfPrev[hidden],#shelfNext[hidden]{display:none}
 
 /* ── 261118 대표 지적 6: 책장 한 줄을 무대 세로 가운데쯤에 세워 넘김 목록 위·아래 빈 공간을 나누고,
    바닥 고정 링크 줄(새 소식·의견 보내기…)과 선반·책이 겹치지 않게 아래 여백을 확보한다(링크 줄 44px + 여백). */

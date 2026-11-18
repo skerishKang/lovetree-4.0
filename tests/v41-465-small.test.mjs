@@ -15,7 +15,7 @@ test('#465 1: 책장 — 넘길 책이 없으면 화살표를 숨긴다(261118: 
   assert.match(shelf, /if\(prevArrow\)prevArrow\.hidden=list\.length<=1;/);
   assert.match(shelf, /if\(nextArrow\)nextArrow\.hidden=list\.length<=1;/);
   // 숨김 확실 가드. 소개 상자 높이 규칙은 이어 보기 띠(261118 대표 지적 4)로 바뀌었다.
-  assert.match(shelfExtraCss, /#shelfPrev\[hidden\],#shelfNext\[hidden\]\{display:none!important\}/);
+  assert.match(shelfExtraCss, /#shelfPrev\[hidden\],#shelfNext\[hidden\]\{display:none\}/);
 });
 
 test('#465 5: 둘러보기 안내를 사람 말로 — 0개면 아직 없다는 말, 있으면 정렬에 맞는 말(#824)', () => {

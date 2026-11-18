@@ -32,7 +32,9 @@ export function createReader(deps) {
       }
   function renderChapterList(book) {
         $('#chapterList').innerHTML=book.chapters.map(function(chapter,index){
-          return '<button class="chapter-item '+(index===state.chapterIndex?'active':'')+'" type="button" data-index="'+index+'" style="--node:'+(index%2?book.accent:book.color)+'"><span class="num">'+String(index+1).padStart(2,'0')+'</span><span><strong>'+esc(chapter.title)+'</strong><small>'+esc(chapter.mood)+'</small></span><span class="arrow">›</span></button>';
+          var nodeValue = index%2?book.accent:book.color;
+          var nodeMatch = String(nodeValue||'').match(/--lt-cover-(\d)/);
+          return '<button class="chapter-item '+(index===state.chapterIndex?'active':'')+(nodeMatch?' chapter-node-'+nodeMatch[1]:'')+'" type="button" data-index="'+index+'"><span class="num">'+String(index+1).padStart(2,'0')+'</span><span><strong>'+esc(chapter.title)+'</strong><small>'+esc(chapter.mood)+'</small></span><span class="arrow">›</span></button>';
         }).join('');
         $$('#chapterList [data-index]').forEach(function(item){item.addEventListener('click',function(){var index=Number(item.dataset.index);if(state.open){turnPage(index>state.chapterIndex?1:-1,index);}else{state.chapterIndex=index;save();renderChapterList(book);showToast('순간 '+String(index+1).padStart(2,'0')+'을 선택했어요. 책을 열어보세요.');}});});
       }
