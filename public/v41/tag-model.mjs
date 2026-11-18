@@ -17,9 +17,12 @@ export function chipText(tag) {
 }
 
 // 카드(보드·책)에 보일 확정 꼬리표 — 최대 max개(기본 3개), 노래 → 멤버 → 무대 순서.
+// #856: 값이 실질적으로 빈 꼬리표('가수: .'처럼 tagKey가 ''가 되는 값)는 지도 그래프와 같은 판정으로
+// 칩에도 보이지 않게 한다 — 이름 없는 묶음을 만든 값이 카드에서는 '.'로 남았다. 데이터(keywords)는 그대로 둔다.
 export function cardTags(keywords, max = 3) {
   return listOf(keywords)
     .map((t, i) => ({ t, i }))
+    .filter(({ t }) => !!tagKey(t.value))
     .sort((a, b) => (kindRank(a.t) - kindRank(b.t)) || (a.i - b.i))
     .slice(0, Math.max(0, max) || 3)
     .map(({ t }) => ({ kindId: t.kindId, label: t.label, value: t.value, raw: t.raw }));
@@ -31,8 +34,13 @@ export function cardTags(keywords, max = 3) {
 // 보이지 않는다(#678 회차 지적 — 회색 '24자를 넘어요' 칩은 누를 수 없는 소음이었다). tags.mjs가
 // 돌려주는 tooLong 표시는 계약으로 남는다(너무 길다는 사실을 조용히 버리지 않는다).
 export function tagLineChips({ keywords, title, knownTags } = {}) {
-  const confirmed = listOf(keywords).map((t) => ({ state: 'confirmed', kindId: t.kindId, label: t.label, value: t.value, raw: t.raw }));
-  const seen = new Set(confirmed.map((c) => tagKey(c.value)));
+  // #856: 값이 실질적으로 빈 확정 꼬리표(tagKey '')는 상세 판 꼬리표 줄에도 보이지 않게 한다(지도 그래프와
+  // 같은 판정). 보이지 않는다고 지워지는 것은 아니다 — state.keywords는 그대로라 저장 값이 유지된다.
+  const all = listOf(keywords);
+  const confirmed = all.filter((t) => !!tagKey(t.value))
+    .map((t) => ({ state: 'confirmed', kindId: t.kindId, label: t.label, value: t.value, raw: t.raw }));
+  // 같은 값 제안 거름은 빈 값 꼬리표까지 포함한 전체 목록으로 본다 — 숨긴다고 제안이 새로 생기지 않게.
+  const seen = new Set(all.map((t) => tagKey(t.value)));
   const { proposals } = suggestTagsFromTitle(title ?? '', { knownTags: Array.isArray(knownTags) ? knownTags : [] });
   const suggested = [];
   for (const p of proposals) {

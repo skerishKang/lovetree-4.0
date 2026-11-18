@@ -192,6 +192,16 @@ window.LT58Model = (() => {
     return { z, x: safe.x + (safe.w - box.w * z) / 2 - box.x * z, y: safe.y + (safe.h - box.h * z) / 2 - box.y * z };
   }
 
+  // #856: 전체 맞춤 상자에 판 제목 자리도 함께 넣는다. 제목('기억 보드'·설명 줄)은 무대 왼편(88px)에
+  // 붙어 있지만 순간 카드만 재면 제목이 화면 왼쪽 밖으로 밀려 잘렸다. title이 없으면(화면에 없거나
+  // 잰 전) 카드만 맞춘다 — 카드가 하나도 없으면 null(부른 쪽에서 무대 전체 맞춤을 쓴다).
+  function fitViewBox(cards, title, safe, maxZoom) {
+    const list = title ? [...(cards || []), title] : (cards || []);
+    const box = contentBox(list);
+    if (!box) return null;
+    return fitBox(box, safe, maxZoom);
+  }
+
   // 사각형 rect가 칸 area보다 크게 보이면, area 안에 빈 곳(rect 밖)이 드러나지 않게 민다. 작으면 그대로 둔다.
   function clampAxis(t, z, start, size, areaStart, areaSize) {
     if (size * z < areaSize) return t;
@@ -235,8 +245,11 @@ window.LT58Model = (() => {
   // cards=[{id,x,y,w,h}], focusId=마지막으로 보던 순간(없으면 firstId → 첫 카드).
   // 다 들어와도 읽을 수 있으면(0.8배 이상) 한눈에, 아니면 0.8배로 그 순간 근처를 보여 준다.
   // saved=기억한 자리({cx,cy,z}) — 같은 판 규칙(덮거나 가운데)을 거쳐 연다(#536).
-  function startView({ viewport, safe, cards, focusId = null, firstId = null, world = boardSize(cards), saved = null }) {
+  function startView({ viewport, safe, cards, focusId = null, firstId = null, world = boardSize(cards), saved = null, title = null }) {
     const box = contentBox(cards);
+    // #856: '한눈' 맞춤도 판 제목 자리를 함께 재는다 — 제목은 무대 왼편(88px)에 붙어 있어 순간 카드만
+    // 재면 화면 왼쪽 밖으로 밀려 잘렸다. 기억한 자리(user)는 사용자가 고른 자리라 그대로 둔다.
+    const fullBox = title ? contentBox([...cards, title]) : box;
     // #536: 기억한 자리도 판 규칙을 따른다. 전에는 저장된 배율·자리를 그대로 써서 넓은 화면에서
     // 판이 한쪽으로 쏠렸다. 순간이 하나도 안 보이는 자리는 버린다(예전 규칙).
     if (saved) {
@@ -249,7 +262,7 @@ window.LT58Model = (() => {
       const z = fitZoom(viewport.w, viewport.h);
       return { z, x: (viewport.w - 2400 * z) / 2, y: (viewport.h - 2200 * z) / 2, mode: 'empty' };
     }
-    const fit = fitBox(box, safe, START_MAX_ZOOM);
+    const fit = fitBox(fullBox, safe, START_MAX_ZOOM);
     let v = fit, mode = 'fit', f = null;
     if (fit.z < READABLE_ZOOM) {
       f = cards.find((c) => c.id === focusId) || cards.find((c) => c.id === firstId) || cards[0];
@@ -259,11 +272,20 @@ window.LT58Model = (() => {
     }
     // 판이 화면을 채우게(양옆·위아래 빈 띠 없이) 민다 — 판이 화면보다 좁은 축은 가운데 둔다(#536).
     // 그다음 순간 묶음이 보이는 칸에 맞게 한 번 더 민다(순간이 우선).
-    const board = boardRect(box, world);
+    const board = boardRect(fullBox, world);
     v = coverView(v, board, { x: 0, y: 0, w: viewport.w, h: viewport.h });
-    v = settleView(v, box, safe);
+    v = settleView(v, mode === 'fit' ? fullBox : box, safe);
     // 그 순간 카드는 도구·상세 창에 가리지 않고 보이는 칸 안에 있어야 한다(마지막으로 한 번 더).
     if (f) v = settleView(v, { x: f.x, y: f.y, w: f.w || 242, h: f.h || 260 }, safe);
+    // #856: 초점 보기(읽히는 배율)에서는 카드만 가운데 두므로 제목이 왼쪽 밖으로 밀릴 수 있다 —
+    // 제목 왼편이 24px 안쪽에 오게 오른쪽으로 옮기되, 초점 카드가 칸 오른쪽을 벗어나지 않는 만큼만.
+    if (title && mode !== 'user') {
+      const need = 24 - (title.x * v.z + v.x);
+      if (need > 0) {
+        const room = f ? (safe.x + safe.w) - ((f.x + (f.w || 242)) * v.z + v.x) : Infinity;
+        v = { ...v, x: v.x + Math.min(need, Math.max(room, 0)) };
+      }
+    }
     return { ...v, mode };
   }
 
@@ -383,5 +405,5 @@ window.LT58Model = (() => {
   }
 
   // 지우기 허용 판단: 실제 기록(읽기 전용)이면 안내 문구를 함께 준다. (#582: 보드에서 줄을 만들거나 지우지 않으므로 연결 지우기는 지도가 맡는다)
-  return { escapeHTML, gridColumns, dateDescOrder, stackLayout, ORDER_Y_BASE, isOrderY, orderOfMoments, orderFromSaved, pinboardSpread, gridRowTops, gridPosition, slotOf, isPinboardSlot, settleColumnGaps, fitZoom, boardSize, contentBox, fitBox, clampView, startView, visibleCards, rememberView, savedView, editGuard, collectPath, nextConnections, detailButtonState, cinemaBeats, filterVisible, maxCreatedOrder, decorationMotion };
+  return { escapeHTML, gridColumns, dateDescOrder, stackLayout, ORDER_Y_BASE, isOrderY, orderOfMoments, orderFromSaved, pinboardSpread, gridRowTops, gridPosition, slotOf, isPinboardSlot, settleColumnGaps, fitZoom, boardSize, contentBox, fitBox, fitViewBox, clampView, startView, visibleCards, rememberView, savedView, editGuard, collectPath, nextConnections, detailButtonState, cinemaBeats, filterVisible, maxCreatedOrder, decorationMotion };
 })();

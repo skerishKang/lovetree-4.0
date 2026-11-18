@@ -253,6 +253,16 @@ test('제목 해석의 한계(문서화한 대로) — 멤버 사전이 없으�
 });
 
 // ── #627 2차: 가수 종류와 제목 해석 다듬기 ─────────────────────────────────────────
+test('#856: 값이 실질적으로 빈 꼬리표는 카드·상세 칩에도 보이지 않는다(데이터는 그대로)', () => {
+  // '가수: .'처럼 tagKey가 ''가 되는 값은 지도 그래프에서 이미 숨긴다 — 카드·상세 칩도 같은 판정을 쓴다.
+  const keywords = ['가수:아이유', '가수: .', '노래:Love wins'];
+  assert.deepEqual(cardTags(keywords).map((t) => t.value), ['아이유', 'Love wins'], "'.' 칩은 카드에 없다");
+  const line = tagLineChips({ keywords, title: '' });
+  assert.deepEqual(line.confirmed.map((c) => c.value), ['아이유', 'Love wins'], '상세 꼬리표 줄에도 이름 없는 칩은 없다');
+  // 칩을 숨긴다고 저장 값이 줄지 않는다 — 이 함수들은 화면에 보일 목록만 정한다.
+  assert.equal(keywords.length, 3);
+});
+
 test('가수 종류: 접두어는 3자라 값 예산이 21자로 노래·멤버와 같다(24자 한도는 그대로)', () => {
   assert.equal(makeTag('artist', 'Hearts2Hearts'), '가수:Hearts2Hearts');
   assert.equal(parseTag('가수:RESCENE').kindId, 'artist');

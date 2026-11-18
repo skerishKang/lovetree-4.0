@@ -216,13 +216,16 @@ function boardStartView(){if(innerWidth<700){if(typeof focusBoardMoment==='funct
 let vw=viewport.clientWidth,vh=viewport.clientHeight,cards=boardCards(),saved=userView||readBoardView();
 // #536: 기억한 자리의 적용·버림 판정까지 모델(LT58Model.startView)이 맡는다 — 처음 자리와 같은
 // 판 규칙(덮거나 가운데)을 함께 거치게 해 넓은 화면에서 판이 한쪽으로 쏠리지 않게 한다.
-growBoard();let v=LT58Model.startView({viewport:{w:vw,h:vh},safe:boardSafeArea(true),cards,world:worldSize,focusId:LTDEMO.get?.(),firstId:moments.find(m=>m.first)?.id,saved});
+growBoard();let v=LT58Model.startView({viewport:{w:vw,h:vh},safe:boardSafeArea(true),cards,world:worldSize,focusId:LTDEMO.get?.(),firstId:moments.find(m=>m.first)?.id,saved,title:titleRect()});
 viewMode=v.mode==='user'?'user':'start';if(v.mode==='user')userView=saved;
 Object.assign(view,{x:v.x,y:v.y,z:v.z});applyView(false)}
 // 전체 보기: 순간이 있는 곳 전부를 보이는 칸에 맞춘다(최대 0.92배). 순간이 없으면 무대 전체.
-function fitAll(animated=true){let vw=viewport.clientWidth,vh=viewport.clientHeight,box=LT58Model.contentBox(boardCards());
-if(!box){let z=LT58Model.fitZoom(vw,vh);view.z=z;view.x=(vw-2400*z)/2;view.y=(vh-2200*z)/2}
-else{let v=LT58Model.fitBox(box,boardSafeArea(),.92);view.z=v.z;view.x=v.x;view.y=v.y}
+// #856: 맞춤 상자에 판 제목('기억 보드'·설명 줄) 자리도 함께 넣는다 — 제목은 무대 왼편(88px)에
+// 붙어 있어 순간 카드만 맞추면 화면 왼쪽 밖으로 밀려 잘렸다. 사용자가 직접 옮긴 자리는 그대로 둔다.
+function titleRect(){const t=document.querySelector('.boardTitle');if(!t)return null;return{x:t.offsetLeft,y:t.offsetTop,w:t.offsetWidth,h:t.offsetHeight}}
+function fitAll(animated=true){let vw=viewport.clientWidth,vh=viewport.clientHeight,cards=boardCards(),tb=titleRect();
+if(!cards.length&&!tb){let z=LT58Model.fitZoom(vw,vh);view.z=z;view.x=(vw-2400*z)/2;view.y=(vh-2200*z)/2}
+else{let v=LT58Model.fitViewBox(cards,tb,boardSafeArea(),.92);if(!v){let z=LT58Model.fitZoom(vw,vh);v={z,x:(vw-2400*z)/2,y:(vh-2200*z)/2}}view.z=v.z;view.x=v.x;view.y=v.y}
 viewMode='fit';applyView(animated)}
 // 창 크기가 바뀌면: 전체 보기 중이면 다시 맞추고, 아니면 처음 자리(또는 기억한 자리)를 다시 계산한다.
 function boardResize(){if(innerWidth<700||cinema)return;placeAll();if(viewMode==='fit')fitAll(false);else boardStartView()}
