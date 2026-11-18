@@ -36,7 +36,7 @@ test('트리 선택과 보기 방식이 한 틀(.tree-frame)에 붙고 이름은
   const shelfAt = views.indexOf('data-view="track32-bookshelf.html"');
   const bookAt = views.indexOf('data-view="track59-sketchbook.html"');
   assert.ok(shelfAt > -1 && bookAt > shelfAt, '서재 탭은 묶음 첫 자리다');
-  assert.ok(nav.indexOf('id="community-menu"') > nav.lastIndexOf('class="tree-views"'), '둘러보기는 묶음 밖 오른쪽이다');
+  assert.ok(views.indexOf('id="community-menu"') > views.indexOf('data-view="track56-network.html"'), '둘러보기는 묶음 맨 끝이다');
   assert.match(frame, /role="group" aria-label="이 트리 보기"/);
   assert.match(frame, /data-view="track59-sketchbook\.html">책<\/button>/);
   assert.match(frame, />보드<\/button>/);
@@ -45,12 +45,13 @@ test('트리 선택과 보기 방식이 한 틀(.tree-frame)에 붙고 이름은
   // 한 틀 모양: 알약 테두리 한 줄, 보기 버튼 사이는 안쪽 구분선, 묶음 글자는 14px로 통일.
   assert.match(css, /\.tree-frame\{display:flex;align-items:center;flex:0 0 auto;margin-left:6px;padding:1px;border:1px solid rgba\(255,255,255,\.16\);border-radius:999px/);
   assert.match(css, /\.tree-frame \.tree-views\{margin-left:0;padding-left:0;border-left:0;gap:0;align-self:stretch;align-items:stretch;min-height:40px\}/);
-  assert.match(css, /\.tree-frame \.tree-views>button\{min-height:0;align-self:stretch;border-left:1px solid var\(--line\);border-radius:0;font-size:14px/);
+  assert.match(css, /\.tree-frame \.tree-views>button\{min-height:0;align-self:stretch;border:0;border-radius:0;font-size:14px/);
   // 고른 탭은 묶음 안을 꽉 채운다(서재 탭과 같은 채움). 마지막 탭은 오른쪽 둥근 모서리를 따라 칠한다.
   assert.match(css, /\.tree-frame \.tree-views>button\[aria-current=true\]\{background:var\(--lt-primary\)/);
   assert.match(css, /\.tree-frame \.tree-views>button:last-child\[aria-current=true\]\{border-radius:0 998px 998px 0\}/);
   assert.match(css, /\.tree-frame:has\(> \.tree-slot > #record-menu\[hidden\]\) \.tree-views>button:first-child\[aria-current=true\]\{border-radius:998px 0 0 998px\}/);
-  assert.match(css, /\.main-nav>button#community-menu\{margin-left:10px\}/);
+  assert.match(css, /\.main-nav>button#community-menu\{margin-left:0\}/);
+  assert.match(css, /\.tree-frame \.tree-views>button#community-menu\{border-left:1px solid var\(--line\);margin-left:8px\}/);
 });
 
 test('지금 보는 보기는 눌린 상태(aria-current)로 표시된다', () => {
@@ -110,9 +111,9 @@ test('화면 제목과 안내 글도 줄인 이름을 쓴다', () => {
 });
 
 test('postdeploy 기대값도 새 메뉴 구조를 센다', () => {
-  // 기본 탭은 둘러보기 하나. 트리 있음 = 둘러보기 + 트리 ▾ + 책·보드·지도 = 5.
-  assert.match(postdeploy, /const BASE_HEADER_TABS = 1;/);
-  assert.match(postdeploy, /tabs: state === 'in-trees' \? 5 : 1/);
+  // 둘러보기는 탭 묶음 맨 끝. 로그아웃이면 탭 0, 트리 있음 = 트리 ▾ + 서재·책·보드·지도·둘러보기 = 6.
+  assert.match(postdeploy, /const BASE_HEADER_TABS = 0;/);
+  assert.match(postdeploy, /tabs: state === 'in-trees' \? 6 : 0/);
   // 없어진 내 책장 탭을 클릭하는 검사는 남아 있으면 안 된다.
   assert.doesNotMatch(postdeploy, /nav button\[data-view="track32-bookshelf\.html"\]/);
   assert.match(postdeploy, /내 트리 전체 보기/);

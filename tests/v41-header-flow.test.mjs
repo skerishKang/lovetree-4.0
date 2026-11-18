@@ -69,8 +69,7 @@ test('상태 4 × 화면 5: 보이는 버튼·문구·접근성 이름이 표대
           aria: h.els['tree-views'].getAttribute('aria-label')
         };
         const want = { ...state.expect };
-        // 261118 대표 지적 1: 서재 화면에서는 트리 선택 칸('트리: ○○ ▾')을 숨긴다 — 책·보드·지도에서만 보인다.
-        if (file === 'track32-bookshelf.html') want.recordMenu = false;
+        // 2026-11-18 13:49 대표 결정: 트리 선택은 서재를 포함한 모든 화면에서 같게 보인다.
         assert.deepEqual(got, want, `${state.name} × ${label}`);
         table.push(`${state.name} × ${label}: ${JSON.stringify(got)}`);
       } finally {
