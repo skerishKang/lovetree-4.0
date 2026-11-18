@@ -1,6 +1,6 @@
 // 트리 공개 상태 저장소 (#538 공개가 기본).
 // 스파스 운용: 비공개 행만 쌓이고, 행이 없으면 공개다.
-// 비공개는 Plus 전용이며, 판단은 서비스층(plusEntitled)이 한다 — 이 저장소는 값만 유지한다.
+// 비공개는 누구나 무료로 바꿀 수 있다 — 본인 트리만 바꿀 수 있다(#830). 이 저장소는 값만 유지한다.
 const iso = value => value instanceof Date ? value.toISOString() : value ? String(value) : null;
 
 export function createTreeVisibilityRepo(pool) {

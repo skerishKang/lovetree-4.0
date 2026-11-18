@@ -174,11 +174,20 @@ export function createDialogs(deps) {
   // 안쪽 문서를 다시 띄운다(261118 지도 판 흐름 시험 — 설정 창을 닫았을 뿐인데 지도 프레임이 다시 떴다).
   // 초점 되돌리기는 창 'close'의 공통 규칙이 그대로 맡는다 — 뒤로가기로 닫아도 연 버튼으로 돌아간다.
   const view = document.defaultView;
+  // #845 3단계: 창 위에 창을 여는 규칙(이슈 #845 규칙표). 새 창이 '잠깐 판'(옮길 트리 고르기·내 보관
+  // 파일 고르기·둘러보기 미리보기 — 닫히면 앞 일에 돌아가는 창)이면 위에 겹침을 그대로 허용하고, 그 밖의
+  // 큰 창이 열릴 때는 앞 창을 공통 판정(requestPanelClose — 더러우면 한 번 묻는다)으로 닫고 열린다.
+  // 앞 창을 못 닫았으면(사용자가 취소) 그 위에 겹친다 — 예상 못한 길을 막지 않는다. 확인 질문(confirm)
+  // 은 브라우저 판이라 여기서 다루지 않는다.
+  // #876: 같은 영상 안내 창(video-dup-panel)도 잠깐 판이다 — 순간 추가 창 위에 겹쳐 열린다(창은 #876이 만든다).
+  const STACK_ALLOWED = new Set(['move-picker', 'account-assets', 'community-preview', 'video-dup-panel']);
   let dialogGuard = false;     // 창 기록을 쌓아 둔 상태
   function modalDialogs() { return [...document.querySelectorAll('dialog[open]')].filter(d => d.matches(':modal')); }
   if (view?.history && view.HTMLDialogElement) {
     const showModalOriginal = view.HTMLDialogElement.prototype.showModal;
     view.HTMLDialogElement.prototype.showModal = function (...args) {
+      const front = modalDialogs()[modalDialogs().length - 1] || null;
+      if (front && front !== this && !STACK_ALLOWED.has(this.id)) requestPanelClose(front.id);
       const result = showModalOriginal.apply(this, args);
       if (!dialogGuard && this.open && this.matches(':modal')) {
         view.history.pushState({ lt41Dialog: true }, '');

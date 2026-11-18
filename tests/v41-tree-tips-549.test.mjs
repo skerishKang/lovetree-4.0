@@ -266,6 +266,83 @@ test('#619-5 트리가 2 개·순간이 26 개여도 첫 트리 안내는 뜨지
   } finally { await browser.close(); }
 });
 
+// #845 3단계: 창 위에 창을 여는 규칙(이슈 #845 규칙표). showModal을 여는 입장에서 판정한다 —
+// 잠깐 판(옮길 트리 고르기·내 보관 파일 고르기·둘러보기 미리보기)은 위에 겹침을 허용하고, 그 밖의
+// 큰 창이 열릴 때는 앞 창을 공통 판정(requestPanelClose)으로 닫고 열린다.
+test('#845 3단계 잠깐 판은 위에 겹친다 — 순간 추가 위에 내 보관 파일 고르기', { skip: REQUIRE ? false : skip }, async () => {
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    const errors = [];
+    page.on('pageerror', (e) => errors.push(String(e.message || e)));
+    await openWithFirstTree(page);
+    await page.click('#write-menu');
+    await page.waitForFunction(() => document.getElementById('write-panel').open, null, { timeout: 10000 });
+    // 내 보관 파일에서 고르기 단추는 자세한 추가 탭 안에 있다.
+    await page.click('#write-tab-detailed');
+    await page.click('#editor-assets-open');
+    await page.waitForFunction(() => document.getElementById('account-assets').open, null, { timeout: 10000 });
+    const both = await page.evaluate(() => ({
+      write: document.getElementById('write-panel').open,
+      assets: document.getElementById('account-assets').open,
+    }));
+    assert.equal(both.write, true, '앞 창(순간 추가)이 닫히지 않는다');
+    assert.equal(both.assets, true, '잠깐 판(내 보관 파일 고르기)이 위에 열린다');
+    // 고르기를 닫으면 앞 창으로 돌아온다.
+    await page.click('[data-close="account-assets"]');
+    await page.waitForFunction(() => !document.getElementById('account-assets').open, null, { timeout: 10000 });
+    assert.equal(await page.evaluate(() => document.getElementById('write-panel').open), true, '고르기를 닫아도 순간 추가가 남는다');
+    assert.deepEqual(errors, [], '페이지 오류 없음');
+  } finally { await browser.close(); }
+});
+
+test('#845 3단계 큰 창 위에 큰 창을 열면 앞 창을 닫고 연다', { skip: REQUIRE ? false : skip }, async () => {
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    const errors = [];
+    page.on('pageerror', (e) => errors.push(String(e.message || e)));
+    await openWithFirstTree(page);
+    const before = page.url();
+    await page.click('#write-menu');
+    await page.waitForFunction(() => document.getElementById('write-panel').open, null, { timeout: 10000 });
+    // 트리 관리 위에 순간 추가가 겹치는 길은 지금 화면에 없다(모달 뒤는 눌리지 않는다) — 열림 한곳의
+    // 규칙을 직접 showModal로 확인한다. 규칙표: 새 창이 큰 창이면 앞 창을 닫고 연다.
+    await page.evaluate(() => document.getElementById('tree-manager').showModal());
+    await page.waitForFunction(() => document.getElementById('tree-manager').open, null, { timeout: 10000 });
+    const after = await page.evaluate(() => ({
+      write: document.getElementById('write-panel').open,
+      tree: document.getElementById('tree-manager').open,
+    }));
+    assert.equal(after.tree, true, '새 큰 창(트리 관리)이 열린다');
+    assert.equal(after.write, false, '앞 창(순간 추가)이 닫힌다');
+    assert.equal(page.url(), before, '주소가 그대로다');
+    assert.deepEqual(errors, [], '페이지 오류 없음');
+  } finally { await browser.close(); }
+});
+
+test('#845 3단계 앞 창이 더러우면 한 번 묻고, 취소하면 겹친다', { skip: REQUIRE ? false : skip }, async () => {
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    const errors = [];
+    page.on('pageerror', (e) => errors.push(String(e.message || e)));
+    await openWithFirstTree(page);
+    await page.click('#write-menu');
+    await page.waitForFunction(() => document.getElementById('write-panel').open, null, { timeout: 10000 });
+    await page.fill('#quick-url', 'https://example.com/stack-check');
+    // 취소하면 앞 창이 남고 — 규칙표대로 새 창은 그 위에 겹친다(예상 못한 길을 막지 않는다).
+    page.once('dialog', (d) => d.dismiss());
+    await page.evaluate(() => document.getElementById('tree-manager').showModal());
+    await page.waitForFunction(() => document.getElementById('tree-manager').open, null, { timeout: 10000 });
+    assert.equal(await page.evaluate(() => document.getElementById('write-panel').open), true, '취소하면 앞 창이 남는다');
+    // 받아들이면 앞 창이 닫히고 새 창만 남는다.
+    page.once('dialog', (d) => d.accept());
+    await page.evaluate(() => { document.getElementById('tree-manager').close(); document.getElementById('tree-manager').showModal(); });
+    await page.waitForFunction(() => document.getElementById('tree-manager').open && !document.getElementById('write-panel').open, null, { timeout: 10000 });
+    assert.deepEqual(errors, [], '페이지 오류 없음');
+  } finally { await browser.close(); }
+});
 // #876: 같은 영상을 다시 담을 때 — 막지 말고 담기 전에 한 번 알려 준다(대표 결정 2026-11-18).
 // 쉬운 추가 창에서 같은 트리·같은 영상(주소 모양이 달라도 id가 같음)을 담으면 안내 창이 열리고,
 // [그래도 담기]는 담고, [그 순간 보기]는 담지 않고 이미 담은 순간을 열어 준다. 구간이 다르면 다른

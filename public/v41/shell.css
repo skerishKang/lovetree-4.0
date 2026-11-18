@@ -668,8 +668,11 @@ body.lt-frame-dialog-open #toast{top:calc(72px + env(safe-area-inset-top));botto
    공유 판 문장은 단어 중간에서 줄바꿈하지 않는다(keep-all). */
 .share-visibility-row{display:flex;flex-direction:column;align-items:flex-start;gap:10px;margin:8px 0 0}
 .share-visibility-row #share-discover-state{font-size:13px;color:var(--lt-pearl)}
-#share-discover-toggle{min-height:44px;padding:10px 16px;border-radius:var(--lt-r-pill);border:1px solid var(--lt-gold-line);background:transparent;color:var(--lt-gold);font-size:14px}
-#share-discover-toggle[data-state="on"]{background:var(--lt-primary);color:var(--lt-primary-ink);border-color:transparent}
+.share-visibility-row-2{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:6px 0;border-top:1px solid var(--lt-line)}
+.share-visibility-row-2:first-of-type{border-top:0}
+.share-visibility-row-2>span{flex:0 0 auto;min-width:72px;font-size:13px;color:var(--lt-muted)}
+#share-discover-toggle,#share-visibility-toggle{min-height:44px;padding:10px 16px;border-radius:var(--lt-r-pill);border:1px solid var(--lt-gold-line);background:transparent;color:var(--lt-gold);font-size:14px}
+#share-discover-toggle[data-state="on"],#share-visibility-toggle[data-state="private"]{background:var(--lt-primary);color:var(--lt-primary-ink);border-color:transparent}
 #share-panel p{word-break:keep-all}
 .share-visibility-lock{display:inline-flex;align-items:center;min-height:34px;padding:0 12px;border:1px dashed var(--lt-gold-line);border-radius:9px;color:var(--lt-gold);font-size:11px;white-space:nowrap}
 .settings-choice .settings-current{display:inline-flex;align-items:center;min-height:34px;padding:0 12px;border:1px solid var(--lt-primary);border-radius:9px;background:var(--lt-primary);color:var(--lt-primary-ink);font-size:13px}

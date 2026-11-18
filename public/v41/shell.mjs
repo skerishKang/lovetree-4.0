@@ -1288,11 +1288,58 @@ for(const b of document.querySelectorAll('[data-share-view]'))b.onclick=()=>{
  try{member.apply('setPrefs',{shareView:b.dataset.shareView});}catch(e){notify('공유 기본값을 저장하지 못했어요. 잠시 뒤 다시 시도해 주세요.');return;}
  paintShareControls();notify('공유 창이 이 보기로 열려요.');
 };
-// #538: '둘러보기에도 올리기' 설정은 공개 기본으로 바뀌면서 정리됐다. 비공개는 Plus 전용 —
-// 잠금 표시만 남기고, 누르면 안내를 보여 준다(실제 판단은 서버가 한다).
-for(const b of document.querySelectorAll('[data-share-private-lock]'))b.onclick=()=>{
- notify('비공개는 Plus 전용이에요. 지금은 모든 트리가 공개로 유지돼요.');
-};
+// #538: 트리 공개는 트리마다 고른다(전 트리 일괄 변경은 실수 위험이라 하지 않는다 — #830 후속).
+// 각 줄: 트리 이름 | [공개][비공개]. 서버 상태를 같은 API로 읽고 쓴다.
+const visibilityByTreeId=new Map();
+function escapeTreeName(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function paintTreeVisibilityList(){
+ const box=$('settings-tree-visibility-list');if(!box)return;
+ const trees=Array.isArray(model?.trees)?model.trees:[];
+ if(!trees.length){box.replaceChildren();const p=document.createElement('p');p.className='panel-note';p.textContent='바꿀 트리가 없어요.';box.append(p);return;}
+ box.replaceChildren();
+ for(const tree of trees){
+  const visibility=visibilityByTreeId.get(tree.id)||'public';
+  const row=document.createElement('div');
+  row.className='settings-row';
+  row.setAttribute('role','group');
+  row.setAttribute('aria-label', '트리 공개 '+(tree.title||''));
+  row.dataset.treeId=tree.id;
+  const count=Array.isArray(tree.moments)?tree.moments.length:0;
+  row.innerHTML='<span class="settings-label">'+escapeTreeName(tree.title||'제목 없는 트리')+' <small>순간 '+count+'개</small></span><div class="settings-choice">'+
+   '<button type="button" role="radio" data-tree-visibility-tree="'+escapeTreeName(tree.id)+'" data-tree-visibility-value="public" aria-checked="'+String(visibility==='public')+'" class="'+(visibility==='public'?'settings-current':'')+'">공개</button>'+
+   '<button type="button" role="radio" data-tree-visibility-tree="'+escapeTreeName(tree.id)+'" data-tree-visibility-value="private" aria-checked="'+String(visibility==='private')+'" class="'+(visibility==='private'?'settings-current':'')+'">비공개</button></div>';
+  box.append(row);
+ }
+ for(const b of box.querySelectorAll('[data-tree-visibility-value]'))b.onclick=()=>setTreeVisibility(b.dataset.treeVisibilityTree,b.dataset.treeVisibilityValue);
+}
+async function setTreeVisibility(treeId,visibility){
+ if(!member?.snapshot().owned){notify('로그인한 뒤 공개 상태를 바꿀 수 있어요.');return;}
+ const answer=await shareApi.setTreeVisibility(treeId,visibility).catch(()=>({ok:false}));
+ if(answer&&answer.ok!==false){visibilityByTreeId.set(treeId,visibility);paintTreeVisibilityList();notify(visibility==='private'?'이 트리를 비공개로 바꿨어요.':'이 트리를 공개로 바꿨어요.');}
+ else notify('공개 상태를 바꾸지 못했어요. 잠시 뒤 다시 시도해 주세요.');
+}
+async function loadTreeVisibility(){
+ const trees=Array.isArray(model?.trees)?model.trees:[];
+ if(!trees.length){paintTreeVisibilityList();return;}
+ for(const tree of trees){
+  const answer=await shareApi.getTreeVisibility(tree.id).then(a=>(a.ok?a.visibility:null)).catch(()=>null);
+  if(answer==='private'||answer==='public')visibilityByTreeId.set(tree.id,answer);
+ }
+ paintTreeVisibilityList();
+}
+paintTreeVisibilityList();
+// 트리 관리 창(#810): 같은 선택, 같은 값.
+async function paintTreeManagerVisibility(){
+ const treeId=window.LT41?.tree?.id;if(!treeId)return;
+ const answer=await shareApi.getTreeVisibility(treeId).then(a=>(a.ok?a.visibility:null)).catch(()=>null);
+ if(answer!=='public'&&answer!=='private')return;
+ visibilityByTreeId.set(treeId,answer);
+ for(const b of document.querySelectorAll('[data-tree-manager-public]')){b.setAttribute('aria-checked',String(answer==='public'));b.classList.toggle('settings-current',answer==='public');}
+ for(const b of document.querySelectorAll('[data-tree-manager-private]')){b.setAttribute('aria-checked',String(answer==='private'));b.classList.toggle('settings-current',answer==='private');}
+}
+for(const b of document.querySelectorAll('[data-tree-manager-public]'))b.onclick=()=>{const id=window.LT41?.tree?.id;if(id)setTreeVisibility(id,'public');};
+for(const b of document.querySelectorAll('[data-tree-manager-private]'))b.onclick=()=>{const id=window.LT41?.tree?.id;if(id)setTreeVisibility(id,'private');};
+try{$('tree-manager')?.addEventListener('open',paintTreeManagerVisibility);}catch{}
 paintShareControls();
 // 보관 파일 용량 보기 — 보관 파일 창과 같은 값(/api/media)을 같은 형식으로 보여 준다. 새 API 없음.
 async function paintSettingsUsage(){
@@ -1372,7 +1419,7 @@ async function openAccountSettings({section=''}={}){
  paintSettingsProfile();
  fillProfileForm();
  paintDateStyleControls();paintStartPlaceControls();paintNetworkViewControls();paintShareControls();paintQuickTargetControls();
- void paintSettingsUsage();
+ void paintSettingsUsage();void loadTreeVisibility();
  panel('account-settings');
  focusSettingsSection(section);
  // #540 마무리: '운영' 묶음은 관리자 계정에만 보인다(서버가 알려 준 역할). 열림 때마다 다시 판정한다.
