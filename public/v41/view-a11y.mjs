@@ -36,6 +36,30 @@ export function focusReturnTarget(opener, fallback) {
   return fallback;
 }
 
+// #923: 닫힘 뒤 초점을 준 카드가 재렌더(요소 교체)로 떨어져 나가 초점이 몸통으로 빠지는 것을 막는다.
+// 회원 화면이 뜬 직후에는 카드 층이 여러 번 다시 그려지므로, 잠시(holdMs) 동안 카드 층을 지켜보면서
+// 초점이 몸통에 남아 있을 때마다 같은 순간 id의 카드를 다시 찾아 초점을 돌려준다. 다른 곳에 초점이
+// 있으면(사용자가 옮긴 것) 건드리지 않고, id의 카드가 없어지면(순간이 사라짐) 지켜보기를 끝낸다.
+export function watchCardReturn(doc, momentId, holdMs = 3000) {
+  const layer = doc.getElementById('cardLayer');
+  if (!layer || !momentId) return () => {};
+  let stopped = false;
+  const refocus = () => {
+    if (stopped) return;
+    const active = doc.activeElement;
+    if (active && active !== doc.body && active !== doc.documentElement) return;
+    let card = null;
+    try { card = layer.querySelector(`article.card[data-id="${CSS.escape(momentId)}"]`); } catch { return; }
+    if (!card) { stopped = true; observer.disconnect(); return; }
+    card.focus?.({ preventScroll: true });
+  };
+  const observer = new MutationObserver(refocus);
+  observer.observe(layer, { childList: true, subtree: true });
+  const stop = () => { stopped = true; observer.disconnect(); };
+  setTimeout(stop, holdMs);
+  return stop;
+}
+
 const isOpen = (el, mode) => {
   if (!el) return false;
   if (mode === 'hidden') return !el.classList.contains('hidden') && el.getClientRects().length > 0;
@@ -206,6 +230,11 @@ export function applyViewAccessibility(doc, win = doc?.defaultView) {
           const fallback = doc.querySelector('#cardLayer article.card.selected');
           const target = focusReturnTarget(entry.opener, fallback);
           if (target) setTimeout(() => target.focus?.({ preventScroll: true }), 0);
+          // #923: 회원 화면이 뜬 직후 카드가 다시 그려지면(요소 교체) 방금 초점 준 카드가 떨어져 나가
+          // 초점이 몸통으로 빠진다 — 초점 대상을 요소가 아니라 순간 id로 기억했다가, 카드 층이 다시
+          // 그려질 때 같은 id의 카드를 다시 찾아 초점을 돌려준다(짧은 시간 동안만 지켜본다).
+          const returnId = target?.dataset?.id || fallback?.dataset?.id;
+          if (returnId) watchCardReturn(doc, returnId);
         }
       }
     }
