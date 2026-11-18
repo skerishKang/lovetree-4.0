@@ -432,7 +432,7 @@ export function createPanels(deps) {
       treeBaseline = new URLSearchParams(new FormData(e.target)).toString();
       if(typeof dispatchEvent==='function')dispatchEvent(new Event('lt41-trees-changed'));
       $('tree-manager').close();
-      notify('트리 정보를 서버에 저장하고 있어요.');
+      // #905: 저장 진행·성공은 알리지 않는다 — apply 는 동기이라 1초 안에 끝나고, 실패는 폼 오류 줄로 알린다.
     } catch (error) { $('tree-form-error').textContent = error.message; }
   };
   $('tree-delete').onclick = () => {
@@ -509,11 +509,12 @@ export function createPanels(deps) {
       formBaseline = new URLSearchParams(new FormData(e.target)).toString();
       $('write-panel').close();
       if (editorMode === 'new') show('track59-sketchbook.html');
-      // #876 규칙 3: 다른 트리에 같은 영상이 있으면 담은 뒤 한 줄 알린다(막지 않는다) — 저장 안내와 한 줄로.
+      // #876 규칙 3: 다른 트리에 같은 영상이 있으면 담은 뒤 한 줄 알린다(막지 않는다).
+      // #905: 저장 자체의 진행·성공 안내는 띄우지 않는다 — 같은 영상이 있을 때만 한 줄 알린다.
       const url = $('moment-form').elements.url.value.trim();
       const others = treesWithSameVideo(getMember()?.state?.()?.trees || [], { excludeTreeId: String(selection()?.treeId || ''), url });
       const otherLine = others.length ? otherTreesLine(others) : '';
-      notify(otherLine ? `서버에 저장하고 있어요. ${otherLine}` : '서버에 저장하고 있어요.');
+      if (otherLine) notify(`담은 영상이 ${otherLine}`);
     } catch (error) { $('form-error').textContent = error.message; }
   };
   // #380 4 2차: Esc·바깥 클릭·× 닫기와 "저장하지 않고 닫을까요?" 확인은 shell/dialogs.mjs 공통 틀이 맡는다
@@ -525,7 +526,7 @@ export function createPanels(deps) {
       formBaseline = new URLSearchParams(new FormData($('moment-form'))).toString();
       parentBaseline = parentValue();
       setEditorMode('edit');
-      notify('이전 순간을 바꾸고 서버에 저장하고 있어요.');
+      // #905: 저장 진행·성공은 알리지 않는다 — 이전 순간 바꾸기는 화면에서 바로 보인다.
       queueMicrotask(() => $('change-parent').focus());
     } catch (e) { $('form-error').textContent = e.message; }
   };

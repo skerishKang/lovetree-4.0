@@ -64,7 +64,8 @@ test('synced 안내 문구(#549): 기록 0개 새 계정은 첫 순간 안내로
   assert.equal(syncedNoticeText({ writable: true, previousDirty: false, momentCount: 0 }), '반가워요. 첫 순간을 남겨 보세요.');
   assert.equal(syncedNoticeText({ writable: true, previousDirty: false, momentCount: 1 }), '내 기록을 불러왔어요.');
   assert.equal(syncedNoticeText({ writable: true, previousDirty: false, momentCount: 12 }), '내 기록을 불러왔어요.');
-  assert.equal(syncedNoticeText({ writable: true, previousDirty: true, momentCount: 0 }), '서버에 저장됐어요.', '방금 저장한 뒤라면 저장 안내가 우선');
+  // #905: 자동 저장 성공 안내('서버에 저장됐어요.')는 거뒀다 — previousDirty 를 넘겨도 저장 안내가 나지 않는다.
+  assert.equal(syncedNoticeText({ writable: true, previousDirty: true, momentCount: 0 }), '반가워요. 첫 순간을 남겨 보세요.');
   assert.equal(syncedNoticeText({ writable: false, previousDirty: false, momentCount: 0 }), '기록을 읽었어요. 서버 편집 연결은 아직 준비되지 않았어요.');
 });
 

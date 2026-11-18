@@ -493,14 +493,15 @@ import { createTagSave } from '../public/v41/shell/tag-save.mjs';
 function tagSaveOf(keywordsList, { frameCount = 2, owned = true } = {}) {
   const applied = [];
   const posted = [];
+  const notes = [];
   const tree = realTreeOf(keywordsList);
   const made = createTagSave({
     getMember: () => ({ snapshot: () => ({ owned, writable: owned }), apply: (action, input, opts) => applied.push({ action, input, opts }) }),
     getModel: () => ({ trees: [tree] }),
-    notify: () => {},
+    notify: (text) => notes.push(text),
     frames: () => Array.from({ length: frameCount }, (_, i) => ({ postMessage: (msg, origin) => posted.push({ i, msg, origin }) }))
   });
-  return { save: made.save, saveMoments: made.saveMoments, tree, applied, posted };
+  return { save: made.save, saveMoments: made.saveMoments, tree, applied, posted, notes };
 }
 
 test('결함 ③: 셸이 직접 저장해도 열린 화면마다 lt41-tags-saved(답 모양)를 알린다', () => {
@@ -516,6 +517,15 @@ test('결함 ③: 셸이 직접 저장해도 열린 화면마다 lt41-tags-saved
     assert.equal(msg.momentId, tree.moments[1].id);
     assert.deepEqual(msg.keywords, ['무대:뮤직뱅크']);
   }
+});
+
+test('#905: 꼬리표 자동 저장(칩 붙이기)은 성공 알림이 없다 — 직접 누른 꼬리표 관리 동작만 문구를 넘긴다', () => {
+  const { save, saveMoments, tree, notes } = tagSaveOf([['노래:Supernova'], []]);
+  const out = save({ treeId: tree.id, momentId: tree.moments[1].id, keywords: ['무대:뮤직뱅크'] });
+  assert.equal(out.ok, true);
+  assert.deepEqual(notes, [], '#905: 기본 notice 는 없다 — 칩 붙이기는 조용히 저장된다');
+  saveMoments({ treeId: tree.id, moments: tree.moments, notice: '꼬리표 이름을 바꿨어요. 모든 순간에 반영했어요.' });
+  assert.deepEqual(notes, ['꼬리표 이름을 바꿨어요. 모든 순간에 반영했어요.'], '직접 누른 동작이 넘긴 문구는 그대로 알린다');
 });
 
 test('결함 ③: 같은 값 저장·읽기 전용·못 찾은 순간은 아무것도 알리지 않는다', () => {

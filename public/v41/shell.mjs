@@ -956,8 +956,10 @@ function memberStatus(status){
  if(status.phase==='checking')notify('내 기록을 불러오고 있어요.');
  else if(status.phase==='synced'){
   // #549: 기록(순간)이 0개인 새 계정의 첫 안내는 '불러왔어요' 대신 첫 순간 안내로(문구는 notice.mjs 한 벌).
+  // #905: 자동 저장이 성공하면 알리지 않는다 — 직전에 저장 안 됨이었다면(previousDirty) 방금 저장된 것이다.
+  // 알림은 실패·오프라인·충돌(저장 안내 떠)과 사용자가 누른 큰 동작의 완료 확인만 띄운다.
   const momentCount=(model?.trees||[]).reduce((n,tree)=>n+((tree.moments||[]).length),0);
-  notify(syncedNoticeText({writable:status.writable,previousDirty,momentCount}));
+  if(!previousDirty)notify(syncedNoticeText({writable:status.writable,previousDirty,momentCount}));
   // 소개 질문(2026-11-16 대표 결정): 아직 안 물은 트리 중 순간 3개 이상인 것이 있으면 묻는다 —
   // 2→3 저장 직후가 대표 경로다. 직전 관측 스냅샷(상태마다 재촬영)은 두지 않는다(#718 원인): 재촬영하면
   // syncing에서 before==after가 되어 전이를 놓친다. 질문은 트리당 1회(discoverAsked), 백필(이미 켜진)은 건너뛴다.
