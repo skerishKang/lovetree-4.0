@@ -1,19 +1,23 @@
-// #833: 재생 중인 영상 칸 모서리의 '크게 보기' 단추 + 'YouTube에서 보기' 링크.
-// YouTube 쇼츠 플레이어는 좁은 칸(약 280px)에서 전체 화면 단추를 자동으로 숨기므로,
-// 칸 바깥 모서리에 우리 단추를 둔다. 누르면 영상 칸을 화면 가득(requestFullscreen) 띄우고,
-// 지원 안 되면 화면을 덮는 창(LTMedia.openLightbox)으로 물러난다. 세로 영상은 세로 비율 유지·가운데.
-// 단추 스타일은 문서당 한 번만 넣는다(책·보드·서재는 문서가 따로다).
-const STYLE_ID = 'lt-yt-corner-style';
+// #833: 쇼츠 재생 칸의 '크게 보기' 단추 + 'YouTube에서 보기' 링크 — 영상 칸 아래 한 줄(#836 2차).
+// YouTube 쇼츠 플레이어는 좁은 칸(약 280px)에서 전체 화면 단추를 자동으로 숨기므로 크게 보기 길을
+// 우리가 둔다. 영상 위에 겹쳐 두지 않고(#836 1차 반려) 칸 아래 단추 줄로 둔다 — 보드 상세 판의
+// 아래 단추 줄과 같은 모양이고, 재생 전(책 .media-links 줄)과 재생 중에 같은 자리에 있다.
+// 누르면 영상 칸을 화면 가득(requestFullscreen) 띄우고, 지원 안 되면 화면을 덮는 창
+// (LTMedia.openLightbox)으로 물러난다. 크게 본 동안 단추는 '✕ 닫기'로 바뀌고 Esc·뒤로가기로도
+// 닫는다(#845 2단계와 같은 판 — 뒤로가기는 주소를 뒤로 가지 않고 크게 보기를 닫는 일로 쓴다).
+// 단추 줄 스타일은 문서당 한 번만 넣는다(책·보드·서재는 문서가 따로다).
+const STYLE_ID = 'lt-yt-expand-style';
 const STYLE_TEXT = `
-.yt-video-cell{position:relative}
+.yt-video-cell{display:flex;flex-direction:column;gap:6px}
 .yt-video-stage{display:flex;flex-direction:column;align-items:center}
-.yt-video-corner{position:absolute;top:8px;right:8px;z-index:5;display:flex;gap:8px;align-items:center}
-.yt-video-corner a,.yt-video-corner button{display:inline-flex;align-items:center;min-height:44px;padding:8px 14px;border-radius:999px;border:1px solid rgba(255,255,255,.35);background:rgba(12,10,16,.78);color:#f5f1e9;font-size:13px;line-height:1.2;white-space:nowrap;text-decoration:none}
-.yt-video-corner button{cursor:pointer}
-.yt-video-corner a:focus-visible,.yt-video-corner button:focus-visible{outline:2px solid #e8b8c9;outline-offset:2px}
-.yt-video-cell:fullscreen{background:#000}
-.yt-video-cell:fullscreen .yt-video-corner{position:fixed;top:12px;right:12px}
-.yt-video-cell:fullscreen .yt-video-stage{display:flex;align-items:center;justify-content:center;width:100%;height:100%}
+.yt-video-row{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:0 2px}
+.yt-video-row.no-open{justify-content:flex-end}
+.yt-video-row a,.yt-video-row button{display:inline-flex;align-items:center;min-height:44px;padding:8px 14px;border-radius:var(--lt-r-pill,999px);border:1px solid var(--lt-gold-line,rgba(255,230,166,.45));background:rgba(255,230,166,.08);color:inherit;font-size:13px;line-height:1.2;white-space:nowrap;text-decoration:none}
+.yt-video-row button{cursor:pointer}
+.yt-video-row a:hover,.yt-video-row button:hover{background:rgba(255,230,166,.18)}
+.yt-video-row a:focus-visible,.yt-video-row button:focus-visible{outline:2px solid #e8b8c9;outline-offset:2px}
+.yt-video-cell:fullscreen{background:#000;justify-content:center;gap:12px;padding:12px;box-sizing:border-box}
+.yt-video-cell:fullscreen .yt-video-stage{flex:1;min-height:0}
 .yt-video-cell:fullscreen .yt-video-stage iframe{width:min(100%,177.78vh);aspect-ratio:16/9;height:auto;border:0}
 .yt-video-cell.is-vertical:fullscreen .yt-video-stage iframe{width:auto;height:min(100%,177.78vw);aspect-ratio:9/16}
 `;
@@ -29,42 +33,91 @@ function esc(text) {
 }
 /**
  * 재생 중 iframe을 넣을 칸을 만든다. host 안의 기존 내용은 비우고
- * 래퍼(.yt-video-cell)+모서리 단추줄+무대(.yt-video-stage)를 만든다.
+ * 칸(.yt-video-cell)=무대(.yt-video-stage)+아래 단추 줄(.yt-video-row)을 만든다.
  * 무대에 iframe을 넣으면 되고, 미리 넣지 않는다(iframe을 옮기면 재생이 끊긴다).
+ * showOpen:false 면 링크를 거둔다(보드 상세처럼 YouTube 링크를 이미 아래 줄에 둔 판).
  */
-export function mountExpandControls(host, { url, openUrl = '', title = '', vertical = false, lightbox = null } = {}) {
+export function mountExpandControls(host, { url, openUrl = '', title = '', vertical = false, lightbox = null, showOpen = true } = {}) {
   const doc = host?.ownerDocument;
   const wrap = doc.createElement('div');
   wrap.className = 'yt-video-cell' + (vertical ? ' is-vertical' : '');
   const stage = doc.createElement('div');
   stage.className = 'yt-video-stage';
-  const corner = doc.createElement('div');
-  corner.className = 'yt-video-corner';
-  const open = doc.createElement('a');
-  open.className = 'yt-video-open';
-  open.href = openUrl || url || '#';
-  open.target = '_blank';
-  open.rel = 'noopener noreferrer';
-  open.referrerPolicy = 'no-referrer';
-  open.textContent = 'YouTube에서 보기 ↗';
+  const row = doc.createElement('div');
+  row.className = 'yt-video-row' + (showOpen ? '' : ' no-open');
+  if (showOpen) {
+    const open = doc.createElement('a');
+    open.className = 'yt-video-open';
+    open.href = openUrl || url || '#';
+    open.target = '_blank';
+    open.rel = 'noopener noreferrer';
+    open.referrerPolicy = 'no-referrer';
+    open.textContent = 'YouTube ↗';
+    row.append(open);
+  }
   const button = doc.createElement('button');
   button.type = 'button';
   button.className = 'yt-video-expand';
-  button.textContent = '⤢ 크게 보기';
+  button.textContent = '크게 보기';
   button.setAttribute('aria-label', '영상 크게 보기');
+  row.append(button);
+  wrap.append(stage, row);
+  ensureStyle(doc);
+  host.replaceChildren(wrap);
+  const context = { wrap, stage, row, button };
   button.addEventListener('click', (event) => {
     event.preventDefault();
     event.stopPropagation();
-    void expandVideo(wrap, { url, title, vertical, lightbox });
+    if (doc.fullscreenElement === wrap) {
+      void doc.exitFullscreen?.();
+      return;
+    }
+    void expandVideo(wrap, { url, title, vertical, lightbox }).then((result) => {
+      if (result === 'fullscreen') setExpanded(context, doc, true);
+    });
   });
-  corner.append(open, button);
-  wrap.append(stage, corner);
-  ensureStyle(doc);
-  host.replaceChildren(wrap);
-  return { wrap, stage, expand: () => expandVideo(wrap, { url, title, vertical, lightbox }) };
+  // 크게 본 동안 단추는 '✕ 닫기' — Esc로 나가면 전체 화면 변화에서 되돌린다.
+  const onFullscreenChange = () => setExpanded(context, doc, doc.fullscreenElement === wrap);
+  doc.addEventListener('fullscreenchange', onFullscreenChange);
+  // #845 2단계와 같은 판: 크게 본 동안 뒤로가기는 주소를 뒤로 가지 않고 크게 보기를 닫는 일로 쓴다.
+  // 열 때 주소가 그대로인 기록 한 칸을 쌓고, 뒤로가기(popstate)가 오면 전체 화면을 닫는다.
+  // 닫는 다른 길(단추·Esc)에서는 기록을 소비하지 않는다(#866 261118 실측 — 소비하면 프레임 기록까지
+  // 훑어 안쪽 문서가 다시 뜬다. 한 번 밀리는 것은 창 판과 같은 값으로 둔다).
+  context.pushForExpand = () => {
+    try { history.pushState({ ltYtExpand: 1 }, ''); } catch { /* 파일 문서 등 pushState 가 막힌 곳 */ }
+  };
+  const onPopState = () => {
+    if (doc.fullscreenElement === wrap) void doc.exitFullscreen?.();
+  };
+  window.addEventListener('popstate', onPopState);
+  // Esc 닫힘은 브라우저가 전체 화면에서 원래 해 주지만, 초점이 이 문서에 있을 때는 확실히 돌린다.
+  const onKeyDown = (event) => {
+    if (event.key !== 'Escape' || doc.fullscreenElement !== wrap) return;
+    event.stopPropagation();
+    void doc.exitFullscreen?.();
+  };
+  doc.addEventListener('keydown', onKeyDown, true);
+  context.teardown = () => {
+    doc.removeEventListener('fullscreenchange', onFullscreenChange);
+    window.removeEventListener('popstate', onPopState);
+    doc.removeEventListener('keydown', onKeyDown, true);
+  };
+  return context;
+}
+function setExpanded(context, doc, on) {
+  const { wrap, button } = context;
+  if (on) {
+    button.textContent = '✕ 닫기';
+    button.setAttribute('aria-label', '크게 보기 닫기');
+    context.pushForExpand?.();
+  } else {
+    button.textContent = '크게 보기';
+    button.setAttribute('aria-label', '영상 크게 보기');
+  }
 }
 /** 영상 칸을 화면 가득 띄우려 하고, 안 되면 덮는 창으로 물러난다. 결과는 'fullscreen'|'lightbox'|'none'. */
 export async function expandVideo(wrap, { url, title = '', vertical = false, lightbox = null } = {}) {
+  const doc = wrap?.ownerDocument;
   const request = wrap?.requestFullscreen?.bind(wrap);
   if (request) {
     try {
