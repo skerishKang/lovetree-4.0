@@ -21,6 +21,13 @@ button.lt-tag-chip:hover{border-color:var(--lt-gold-deep)}
 .lt-tag-chip.is-card{padding:1px 7px;border:1px solid var(--lt-line-paper);background:transparent;color:var(--lt-ink)}
 .book-page .chip.lt-tag-chip,.moment-title .lt-tag-chip{font-size:12px;padding:1px 7px}
 
+/* #37(AI 고객 37회차): 확정 칩을 다시 눌러 빼면 조용히 지우지 않는다 — '꼬리표를 뺐어요 · 되돌리기'를
+   5초 보여 준다. 실패 문구(.lt-tagline-error)와 같은 자리 감으로 한 줄을 차지한다. */
+.lt-tagline-undo{display:flex;align-items:center;gap:8px;width:100%;margin:2px 0 0;font-size:12px;color:var(--lt-muted)}
+.lt-tagline-undo-btn{min-height:24px;padding:2px 10px;border-radius:var(--lt-r-pill);border:1px solid var(--lt-gold-line);
+  background:transparent;color:var(--lt-gold);font-size:12px;font-family:inherit;cursor:pointer}
+.lt-tagline-undo-btn:hover{border-color:var(--lt-gold-deep)}
+
 /* 직접 붙이기(261116 대표 지적): 접힘이 기본 — 안내 한 줄+[직접 붙이기](칩이 있으면 칩 아래 작은 링크만).
    누르면 한 줄로 펼친다: [가수 ▾][예: ILLIT][붙이기] — 라벨 없이 select의 갈래 이름·placeholder 예시로 뜻을 알리고,
    세 요소 높이를 44px로 같게 한다. 옛 라벨(column flex) 안에서 flex-basis가 높이로 작동해 칸이 120~150px로

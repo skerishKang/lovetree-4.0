@@ -177,8 +177,8 @@ test('큰 제목 아래 둘째 줄: 치웠다(261116 PR 2) — 모아둔 숫자�
   assert.match(homeSrc,/inboxLine\.onclick=\(\)=>bridge\.actions\.cleanup\(\)/,'모아둔 칸 클릭은 정리 창 액션');
   assert.match(homeSrc,/setAttribute\('aria-label',`모아둔 순간 \$\{inboxCount\}개 정리하기`\)/,'모아둔 칸 이름');
   assert.match(homeSrc,/setAttribute\('aria-disabled','true'\)/,'모아둔 0은 비활성 표기');
-  assert.match(homeSrc,/\.home-info-line\{pointer-events:auto/,'모아둔 칸은 눌을 수 있게 화면 위로 올린다');
-  assert.match(homeSrc,/\.home-info-line\{pointer-events:auto;display:flex/,'모아둔 칸 최소 높이 44px');
+  // 261118 규칙: 소스 글자를 검사하던 두 단추(격자 표기·display:flex)는 한 줄 배치 리팩터링으로 거뒀다 —
+  // 배치 결과는 화면 시험(v41-home-layout)의 숫자 검사로 본다.
 });
 
 test('가운데 위 모아둔 순간 알약은 첫 화면에서 제거됐다',()=>{
@@ -237,10 +237,8 @@ test('첫 화면 숫자판: 로그인은 내 것만, 로그아웃 집계는 예�
   assert.match(homeSrc,/communityLine\('예시 트리'\)/,'공개 트리 집계는 예시 표시');
   assert.match(homeSrc,/둘러보기 공개 순간 \$\{formatCount\(stats\?\.moments\)\}개 — 내 기록이 아니에요/,'낭독기에도 내 기록이 아님을 알린다');
   assert.match(homeSrc,/둘러보기 공개 트리 \$\{formatCount\(stats\?\.trees\)\}개 — 내 기록이 아니에요/,'트리 집계 낭독기 이름');
-  // 로그인 숫자판은 두 칸(순간 목록·내 트리)이므로 3칸 격자를 두 칸으로 좁힌다(휴대폰 규칙도 함께).
-  assert.match(homeSrc,/infoRow\.dataset\.cells='2'/,'두 칸 표시');
-  assert.match(homeSrc,/\.home-info\[data-cells="2"\]\{grid-template-columns:repeat\(2,minmax\(0,176px\)\)\}/,'두 칸 격자 규칙');
-  assert.match(homeSrc,/\.home-info\[data-cells="2"\]\{grid-template-columns:repeat\(2,minmax\(0,1fr\)\)\}/,'휴대폰 두 칸 격자 규칙');
+  // 261118 규칙: 두 칸 격자를 검사하던 소스 글자 단추 넉 줄(infoRow.dataset.cells·data-cells 격자)은
+  // 한 줄 배치 리팩터링으로 거뒀다 — 배치 결과는 화면 시험의 숫자 검사로 본다.
   // 기존 규칙 유지: 모아둔 칸 누르면 정리 창, 0이면 비활성 표기.
   assert.match(homeSrc,/inboxLine\.onclick=\(\)=>bridge\.actions\.cleanup\(\)/);
   assert.match(homeSrc,/setAttribute\('aria-disabled','true'\)/);

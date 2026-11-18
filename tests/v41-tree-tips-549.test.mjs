@@ -498,3 +498,48 @@ test('#876 안내 창도 #845 창 규칙을 탄다 — Esc·뒤로가기로 닫�
     assert.deepEqual(errors, [], '페이지 오류 없음');
   } finally { await browser.close(); }
 });
+
+// #37(AI 고객 37회차): 쉬운 추가에서 꼬리표 칩 — ① 확정이 저장되면 '담았어요 · 지금 다듬기 →'가
+// 눈에 띄게 뜨고(is-lit), ② 확정 칩을 다시 눌러 빼면 조용히 지우지 않고 '꼬리표를 뺐어요 · 되돌리기'
+// 알림(5초)을 보여 준다. 되돌리기를 누르면 다시 붙여 저장한다.
+test('#37 꼬리표 칩: 확정 뒤 안내가 도드라지고, 다시 눌러 빼면 되돌리기 알림이 뜬다', { skip: REQUIRE ? false : skip }, async () => {
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    const errors = [];
+    page.on('pageerror', (e) => errors.push(String(e.message || e)));
+    await openWith(page, WORKSPACE_DUP);
+    // #876 안내에 걸리지 않는 다른 영상을 담는다.
+    await openQuickAndFill(page, 'https://youtu.be/xGFc2kvAbM8');
+    await page.waitForFunction(() => !document.getElementById('quick-url').value, null, { timeout: 10000 });
+    const keywordsOf = () => page.evaluate(() => JSON.stringify(window.LT41.trees[0].moments.find((m) => m.id !== 'm1')?.keywords ?? []));
+    assert.equal(await keywordsOf(), '[]', '담은 직후 꼬리표는 없다');
+    // 직접 붙이기로 꼬리표를 확정한다 — 제안이 없는 제목이라 직접 붙이는 길을 쓴다.
+    await page.click('#quick-tagline .lt-tagline-toggle');
+    await page.fill('#quick-tagline .lt-tagline-value', '윤슬');
+    await page.click('#quick-tagline .lt-tagline-add');
+    await page.waitForFunction(() => document.querySelector('#quick-tagline .lt-tag-chip.is-confirmed'), null, { timeout: 10000 });
+    assert.equal(await keywordsOf(), '["가수:윤슬"]', '확정한 꼬리표가 저장된다');
+    // ① 확정이 저장되면 안내 줄이 도드라진다 — '담았어요 · 지금 다듬기 →'가 눈에 보인다.
+    const lit = await page.evaluate(() => ({
+      row: document.getElementById('quick-notice-row').classList.contains('is-lit'),
+      notice: document.getElementById('quick-notice').textContent,
+      refine: !document.getElementById('quick-refine').hidden,
+    }));
+    assert.equal(lit.row, true, '안내 줄이 도드라진다(is-lit)');
+    assert.ok(lit.notice.includes('담았어요'), `안내: ${lit.notice}`);
+    assert.equal(lit.refine, true, '지금 다듬기 단추가 보인다');
+    // ② 확정 칩을 다시 누른다(빼기) — 조용히 지우지 않고 되돌리기 알림을 보여 준다.
+    await page.click('#quick-tagline .lt-tag-chip.is-confirmed');
+    await page.waitForFunction(() => document.querySelector('#quick-tagline .lt-tagline-undo'), null, { timeout: 10000 });
+    assert.equal(await keywordsOf(), '[]', '빼기도 저장된다');
+    const undo = await page.evaluate(() => document.querySelector('#quick-tagline .lt-tagline-undo')?.textContent || '');
+    assert.ok(undo.includes('꼬리표를 뺐어요'), `알림: ${undo}`);
+    assert.ok(undo.includes('되돌리기'), `되돌리기 길: ${undo}`);
+    // 되돌리기를 누르면 다시 붙여 저장한다.
+    await page.click('#quick-tagline .lt-tagline-undo-btn');
+    await page.waitForFunction(() => JSON.stringify(window.LT41.trees[0].moments.find((m) => m.id !== 'm1')?.keywords ?? []) === '["가수:윤슬"]', null, { timeout: 10000 });
+    assert.equal(await page.evaluate(() => !!document.querySelector('#quick-tagline .lt-tagline-undo')), false, '되돌렸으면 알림을 거둔다');
+    assert.deepEqual(errors, [], '페이지 오류 없음');
+  } finally { await browser.close(); }
+});

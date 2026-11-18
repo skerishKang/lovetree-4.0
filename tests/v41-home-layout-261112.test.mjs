@@ -58,18 +58,17 @@ test('가운데 안전 구역: 제목·버튼 묶음 사각형+여백을 재고,
   // #491: 좁은 화면에서는 그려지는 배율(cScale)로 투영한다(넓은 화면은 fit=1이라 cScale===sc).
   assert.match(orbit, /const cScale=narrow\?sc\*Math\.max\(\.58,fit\):sc;/, '판정 배율은 좁은 화면에서만 그림 배율을 따른다');
   assert.match(orbit, /const sxp=w\/2\+\(Cx0-w\/2\+x2\*cScale\)\*k/, '카드 위치까지 포함한 원근 투영 계산');
-  assert.match(orbit, /const pushL=maxX-zs\.l,pushR=zs\.r-minX,pushT=maxY-zs\.t,pushB=zs\.b-minY/, '가장 얇은 쪽으로 밀어낸다');
+  // 261118 규칙: '가장 얇은 쪽으로 밀어낸다' 소스 글자 단추는 방사 방향 밀어내기로 바꾸면서 거뒀다 —
+  // 실제 겹침·안전 구역 침범은 535 실행 시험(v41-orbit-535-float-overlap)이 숫자로 잰다.
   // 옛 고정 타원 밀어내기는 안전 구역 판정으로 대체됐다.
   assert.doesNotMatch(orbit, /Math\.hypot\(x\/520,y\/260\)/);
 });
 
 test('#457 좁은 화면(≤650): 가로는 먼저 화면 안으로 당기고, 안전 구역과 겹치면 위·아래 띠로만 민다', () => {
-  // 넓은 화면은 네 쪽 중 가장 얇은 쪽(가로 포함)으로 민다 — 기존 동작(#440) 유지.
-  assert.match(orbit, /const pushL=maxX-zs\.l,pushR=zs\.r-minX,pushT=maxY-zs\.t,pushB=zs\.b-minY,m=Math\.min\(pushL,pushR,pushT,pushB\);/, '넓은 화면은 그대로');
-  assert.match(orbit, /if\(m===pushL\)px-=pushL;else if\(m===pushR\)px\+=pushR;else if\(m===pushT\)py-=pushT;else py\+=pushB;/);
+  // 261118 규칙: 넓은 화면 '가장 얇은 쪽' 밀어내기 소스 글자 단추 두 개도 같이 거뒀다(535 실행 시험이 대신 잰다).
   // 좁은 화면 분기: 가로를 먼저 화면 안(0..w)으로 당긴다.
   assert.match(orbit, /if\(narrow\)\{/);
-  const narrowBlock = orbit.split('if(narrow){')[1]?.split('} else if(maxX>zs.l')[0] || '';
+  const narrowBlock = orbit.split('if(narrow){')[1]?.split('else if(maxX>zs.l')[0] || '';
   assert.match(narrowBlock, /if\(minX<0\)\{px-=minX;maxX-=minX;minX=0;\}else if\(maxX>w-fabPad\)\{const over=maxX-\(w-fabPad\);px-=over;maxX-=over;minX-=over;\}/, '가로 클램프가 세로 밀기보다 먼저(셸 ＋ 단추 자리 data-lt-fab만큼 더 비낀다)');
   // 가로로 당긴 뒤의 위치로 안전 구역과 겹치는지 다시 보고, 겹치면 위·아래 띠로만 민다(가로는 더 건드리지 않는다).
   assert.match(narrowBlock, /const pushT=maxY-zs\.t,pushB=zs\.b-minY,upFits=minY-pushT>=0,downFits=maxY\+pushB<=h;/);

@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import {
   COVER_PALETTE, addedLabel, allBooks, bookMeta, buildShelf, carouselTransform, coverStyle, escapeShelf,
   filterShelf, findBook, lastMomentDate, leftPageMarkup, pageMeta, pageTarget, resolveShelfIndex,
-  resumeCard, rightPageMarkup, shelfBook, treeTitleOf, youtubeId
+  resumeCard, rightPageMarkup, shelfBook, shelfRowLayout, treeTitleOf, youtubeId
 } from '../public/v41/views/shelf/shelf-model.mjs';
 import { createReader } from '../public/v41/views/shelf/shelf-reader.js';
 import { fakeEl } from './helpers/fake-dom.mjs';
@@ -89,6 +89,45 @@ test('레일 위 카드 배치 표(거리 → 좌표·배율·투명도)', () =>
   // 261118 대표 지적 2차: 배율·깊이 이동으로 글자를 줄이지 않는다 — 옆 책도 scale 1, 설명 글자는 실제 12px 렌더.
   // 4번째 이후 책 투명도는 0.6 이상으로 남는다.
   for (const [distance, expected] of table) assert.deepEqual({ ...carouselTransform(distance), z: carouselTransform(distance).z + 0 }, expected, 'distance ' + distance);
+});
+
+test('#서재-빈공간: 넓은 화면(레일 1800px 이상)에서는 흐림 기준이 ±2→±4로 완화된다 — 좌표·배율·돌림은 그대로', () => {
+  const base = carouselTransform(3);
+  const wide = carouselTransform(3, true);
+  assert.equal(wide.x, base.x, '좌표는 같다');
+  assert.equal(wide.rotate, base.rotate, '돌림은 같다');
+  assert.equal(wide.filter, 'none', '3칸 옆 책은 흐리지 않는다(기준 ±4)');
+  assert.equal(carouselTransform(4, true).filter, 'none', '4칸까지 선명');
+  assert.equal(carouselTransform(5, true).filter, 'saturate(.72) brightness(.86)', '5칸부터 흐린다');
+  assert.equal(carouselTransform(2, true).alpha, 0.85, '2칸 옆 책 투명도 완화');
+  assert.equal(carouselTransform(4, true).alpha, 0.75);
+  assert.equal(carouselTransform(6, true).pointerEvents, 'auto', '6칸까지는 누를 수 있다');
+  assert.equal(carouselTransform(7, true).pointerEvents, 'none');
+  // 좁은 화면(기존)은 그대로다.
+  assert.equal(carouselTransform(3, false).filter, 'saturate(.72) brightness(.86)');
+  assert.equal(carouselTransform(3).filter, 'saturate(.72) brightness(.86)');
+});
+
+test('#서재-빈공간: 책이 레일에 다 들어가는 넓은 화면에서는 왼쪽부터 순서 배치(묶음 가운데), 넘치거나 좁으면 넘김 배치', () => {
+  // 2560(레일 1818): 책 6권은 다 들어간다 → 순서 배치. 첫 책이 왼쪽 끝, 묶음은 가운데(빈 반쪽 없음).
+  const row = shelfRowLayout(6, 1818);
+  assert.equal(row.mode, 'row');
+  assert.equal(row.wide, true);
+  assert.equal(row.xOf(0), -500, '첫 책은 묶음 왼쪽 끝');
+  assert.equal(row.xOf(5), 500, '끝 책은 묶음 오른쪽 끝');
+  assert.equal(row.xOf(2), -100);
+  // 2560에서 책 12권(needed 2390)은 넘친다 → 지금처럼 가운데 기준 넘김.
+  const over = shelfRowLayout(12, 1818);
+  assert.equal(over.mode, 'carousel');
+  assert.equal(over.wide, true, '넘쳐도 넓은 화면 흐림 완화는 유지');
+  assert.equal(over.xOf(3, 4), -200, '고른 책(4번) 기준 좌표');
+  // 1440(레일 1300): 지금과 같은 넘김 배치를 유지한다(레일이 넓은 화면 기준 미만).
+  const narrow = shelfRowLayout(6, 1300);
+  assert.equal(narrow.mode, 'carousel');
+  assert.equal(narrow.wide, false);
+  assert.equal(narrow.xOf(2, 0), 400);
+  // 책 1권도 순서 배치(가운데).
+  assert.equal(shelfRowLayout(1, 1818).xOf(0), 0);
 });
 
 test('페이지 표시·화살표 상태·넘김 가능 범위', () => {
