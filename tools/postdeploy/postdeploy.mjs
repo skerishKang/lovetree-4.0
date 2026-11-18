@@ -37,14 +37,14 @@ try {
   treePickerText = null;
 }
 // 둘러보기는 모든 상태에서 남는 기본 탭이다(#380 2번: 첫 화면은 로고, 내 책장은 트리 드롭다운 맨 아래로 옮겨 갔다).
-const BASE_HEADER_TABS = 1;
+const BASE_HEADER_TABS = 0;
 function headerExpectation({ owned = false, treeCount = 0, publicReading = false } = {}) {
   if (!headerPartsFor) {
     const state = owned ? (Number(treeCount) > 0 ? 'in-trees' : 'in-empty') : 'out';
-    return { state, treePicker: state === 'in-trees', treeViews: state === 'in-trees', write: owned, tabs: state === 'in-trees' ? 5 : 1, source: 'fallback' };
+    return { state, treePicker: state === 'in-trees', treeViews: state === 'in-trees', write: owned, tabs: state === 'in-trees' ? 6 : 0, source: 'fallback' };
   }
   const parts = headerPartsFor({ owned, treeCount, publicReading });
-  const tabs = BASE_HEADER_TABS + (parts.treePicker ? 1 : 0) + (parts.treeViews ? 3 : 0);
+  const tabs = BASE_HEADER_TABS + (parts.treePicker ? 1 : 0) + (parts.treeViews ? 5 : 0);
   return { ...parts, tabs, source: 'public/v41/header-state.mjs' };
 }
 function expectedPickerLabel({ owned, treeTitle = '', pendingDraft = false } = {}) {

@@ -31,7 +31,7 @@ test('1. 드롭다운 빈 표지 기본값은 트리 관리 "기본" 칩과 같�
 test('2. 드롭다운 트리 클릭이 보기를 유지하는 대상(책·보드·지도)을 고정한다', () => {
   // 클릭 배선 전체(wasTreeView→choose→show→writeLocation)는 tests/v41-topmenu.test.mjs가
   // 같은 줄을 한 벌로 지킨다. 여기서는 어느 보기가 유지 대상인지(TREE_VIEWS 집합 내용)만 고정한다.
-  assert.match(shell, /const TREE_VIEWS=new Set\(\['track59-sketchbook\.html','track58-pinboard\.html','track56-network\.html'\]\)/, '보기 유지 대상');
+  assert.match(shell, /const TREE_VIEWS=new Set\(\['track32-bookshelf\.html','track59-sketchbook\.html','track58-pinboard\.html','track56-network\.html'\]\)/, '보기 유지 대상');
 });
 
 test('3. 정리 목록은 주입된 화면 규칙으로 제목·썸네일을 그린다', async () => {
