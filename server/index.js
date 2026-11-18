@@ -230,7 +230,9 @@ const communityHandler = createCommunityHandler({
  authenticate: guardedAuthenticate,
  service: createCommunityService({
   communityRepo: createCommunityRepo(pool), shareRepo, workspaceRepo: repo, visibilityRepo,
-  productId: LOVETREE_PRODUCT_ID, admin
+  productId: LOVETREE_PRODUCT_ID, admin,
+  // 가입일(첫 로그인 시각) — 담기 투표의 7일 게이트(#824 대표 결정)가 쓴다.
+  signupAtFor: ({productId: p, subjectId: s}) => accountRepo.createdAtFor({productId: p, subjectId: s})
  }),
  productId: LOVETREE_PRODUCT_ID
 });
