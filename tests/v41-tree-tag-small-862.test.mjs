@@ -38,11 +38,13 @@ async function openShell(browser, origin, tree, width, height) {
   });
   const page = await ctx.newPage();
   const errors = [];
+  const saved = [];
   page.on('pageerror', (e) => errors.push(String(e.message || e)));
+  page.on('response', (r) => { if (r.request().method() === 'PUT' && /api\/workspace/.test(r.url())) saved.push(new Date().toISOString()); });
   await page.goto(`${origin}/v41/?account=1`, { waitUntil: 'load' });
   await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
   await page.locator('#discover-ask-no').click().catch(() => {});
-  return { ctx, page, errors };
+  return { ctx, page, errors, saved };
 }
 
 async function openManager(page) {
@@ -56,7 +58,7 @@ test('#862 표지 이름 즉시 갱신·주제 빈 칸·정리 판 960px', { ski
   const origin = `http://127.0.0.1:${server.address().port}`;
   const browser = await chromium.launch({ headless: true });
   try {
-    const { ctx: c1, page, errors } = await openShell(browser, origin, fixtureTree(), 1440, 900);
+    const { ctx: c1, page, errors, saved } = await openShell(browser, origin, fixtureTree(), 1440, 900);
     await page.evaluate(() => { location.hash = '#my/shelf'; });
     let shelf = null;
     for (let i = 0; i < 40 && !shelf; i++) {
@@ -81,19 +83,35 @@ test('#862 표지 이름 즉시 갱신·주제 빈 칸·정리 판 960px', { ski
     assert.ok(subject.placeholder.length > 0, 'placeholder가 있다');
     await page.fill('#tree-form [name="title"]', '우리의 첫 가을');
     await page.click('#tree-form button[type="submit"]');
-    await page.waitForFunction(() => [...document.querySelectorAll('iframe')].some((f) => {
-      try { return f.contentDocument?.querySelector('.cover-title')?.textContent?.includes('우리의 첫 가을'); } catch { return false; }
-    }), null, { timeout: 10000 });
-    const after = await page.evaluate(() => {
-      const f = [...document.querySelectorAll('iframe')].find((x) => /track32-bookshelf/.test(x.contentWindow?.location?.href || ''));
-      return (f?.contentDocument?.querySelector('.cover-title')?.textContent || '').trim();
-    });
+    await page.waitForResponse((r) => r.request().method() === 'PUT' && /api\/workspace/.test(r.url()), { timeout: 10000 });
+    const savedAt = saved.at(-1);
     const sameFrame = await page.evaluate(() => [...document.querySelectorAll('iframe')].some((f) => f.__ltToken === 'kept'));
+    assert.equal(sameFrame, true, '저장 중 새로고침 없음');
+
+    await page.evaluate(() => { location.hash = '#my/home'; });
+    await page.waitForTimeout(300);
+    await page.evaluate(() => { location.hash = '#my/shelf'; });
+    await page.waitForFunction(() => [...document.querySelectorAll('iframe')].some((f) => {
+      try {
+        const text = (f.contentDocument?.querySelector('.cover-title')?.textContent || '').trim();
+        return /track32-bookshelf/.test(f.contentWindow.location.href) && text.length > 0;
+      } catch { return false; }
+    }), null, { timeout: 10000 });
+    await page.waitForTimeout(300);
+    const fresh = await page.evaluate(() => {
+      const f = [...document.querySelectorAll('iframe')].find((x) => /track32-bookshelf/.test(x.contentWindow?.location?.href || ''));
+      const d = f?.contentDocument;
+      return {
+        cover: (d?.querySelector('.cover-title')?.textContent || '').trim(),
+        strip: (d?.querySelector('#resumeTree')?.textContent || '').trim(),
+        toast: (document.getElementById('toast')?.textContent || '').trim()
+      };
+    });
     assert.equal(before, '모아둔 순간');
-    assert.equal(after, '우리의 첫 가을');
-    assert.equal(sameFrame, true, '새로고침 없이갱신');
+    assert.equal(fresh.cover, '우리의 첫 가을', '저장 응답 뒤 표지 이름');
+    assert.equal(fresh.strip, '우리의 첫 가을', '저장 응답 뒤 이어 보기 띠 이름');
     assert.deepEqual(errors, [], '페이지 오류 없음');
-    if (SHOT) { mkdirSync(SHOT, { recursive: true }); await page.screenshot({ path: path.join(SHOT, '01-shelf-after-rename-1440.png') }); }
+    if (SHOT) { mkdirSync(SHOT, { recursive: true }); await page.screenshot({ path: path.join(SHOT, '01-shelf-after-save-1440.png') }); }
     await c1.close();
 
     const { ctx: c2, page: wide, errors: wideErrors } = await openShell(browser, origin, fixtureTree(), 2560, 1080);
@@ -106,14 +124,16 @@ test('#862 표지 이름 즉시 갱신·주제 빈 칸·정리 판 960px', { ski
     const panel = await wide.evaluate(() => {
       const head = document.querySelector('#tag-panel .panel-heading').getBoundingClientRect();
       const list = document.querySelector('#tag-panel .tag-manage-list').getBoundingClientRect();
-      return { head: { x: Math.round(head.left), w: Math.round(head.width) }, list: { x: Math.round(list.left), w: Math.round(list.width) } };
+      const text = document.getElementById('tag-panel').innerText;
+      return { head: { x: Math.round(head.left), w: Math.round(head.width) }, list: { x: Math.round(list.left), w: Math.round(list.width) }, emptyCount: (text.match(/아직 꼬리표가 없어요/g) || []).length };
     });
     assert.ok(panel.head.w <= 960, `판 제목 폭 ${panel.head.w} <= 960`);
     assert.ok(panel.list.w <= 960, `목록 폭 ${panel.list.w} <= 960`);
     assert.ok(panel.head.x > 780, `판 제목이 가운데(Left ${panel.head.x})`);
+    assert.equal(panel.emptyCount, 1, '빈 안내는 목록 자리 한 번만');
     assert.deepEqual(wideErrors, [], '페이지 오류 없음');
     if (SHOT) await wide.screenshot({ path: path.join(SHOT, '02-tag-panel-2560.png') });
-    console.log(JSON.stringify({ before, after, subject, sameFrame, panel }));
+    console.log(JSON.stringify({ before, savedAt, sameFrame, fresh, subject, panel }));
     await c2.close();
   } finally {
     await browser.close();
