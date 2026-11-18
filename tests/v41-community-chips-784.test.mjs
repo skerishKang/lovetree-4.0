@@ -66,7 +66,11 @@ test('#784 그룹 칩 한 줄·내 가수 먼저·페이지 넘침 0', { skip: s
       if (width === 390) assert.ok(m.railOverflow > 0, '좁은 화면에서 칩 줄 안 가로 스크롤');
       assert.equal(m.pageOverflow, 0, '페이지 가로 넘침 0');
       assert.ok(m.minHeight >= 44, '칩 누름 영역 44px');
-      await page.evaluate(() => { for (const d of document.querySelectorAll('dialog[open]')) d.close(); });
+      await page.evaluate(() => {
+        const updates=document.getElementById('updates-card'); if(updates)updates.hidden=true;
+        for(const d of document.querySelectorAll('dialog[open]')) if(d.id!=='community-panel') d.close();
+      });
+      await page.locator('#community-groups .community-group-chip').first().waitFor({state:'visible'});
       if (SHOT) { mkdirSync(SHOT, { recursive: true }); await page.screenshot({ path: `${SHOT}/chips-${width}.png` }); }
       console.log('CHIPS', width, JSON.stringify(m));
       await ctx.close();
