@@ -131,6 +131,37 @@ test('이번 주 표 수는 주 시작(월요일 0시 KST) 이후만 센다',asy
  assert.equal(res.body.stats.weeklyFavorites,1,'지난 주 표는 이번 주 수에서 빠진다');
 });
 
+// #824 결정 2: 둘러보기 카드에 이번 주 표 수가 따라오고, sort=popular로 많이 담긴 순 정렬이 된다.
+test('둘러보기 카드 stats에 weeklyFavorites가 있고 sort=popular로 정렬된다',async()=>{
+ const DAY=24*60*60*1000,NOW=Date.UTC(2026,10,1);
+ const workspaceRepo=createMemoryWorkspaceRepo(),workspace=createWorkspaceService({repo:workspaceRepo,productId:PRODUCT});
+ const treeA=sampleTree(),treeB=sampleTree();
+ await workspace.write(principal('alice'),{state:{version:1,trees:[treeA]},expectedRevision:0,clientKey:'seed'});
+ await workspace.write(principal('carol'),{state:{version:1,trees:[treeB]},expectedRevision:0,clientKey:'seed'});
+ const shareRepo=createMemoryShareRepo();
+ const sA=await shareRepo.create({productId:PRODUCT,shareId:'a'.repeat(24),subjectId:'alice',treeId:treeA.id,entryMomentId:treeA.moments[0].id,view:'book',momentCount:3});
+ const sB=await shareRepo.create({productId:PRODUCT,shareId:'b'.repeat(24),subjectId:'carol',treeId:treeB.id,entryMomentId:treeB.moments[0].id,view:'book',momentCount:3});
+ await shareRepo.setDiscoverable({productId:PRODUCT,subjectId:'alice',shareId:sA.shareId,discoverable:true});
+ await shareRepo.setDiscoverable({productId:PRODUCT,subjectId:'carol',shareId:sB.shareId,discoverable:true});
+ const communityRepo=createMemoryCommunityRepo();communityRepo.seedShares([sA,sB]);
+ // sB에 이번 주 표 2개, sA에 이번 주 1개 + 지난 주 1개
+ await communityRepo.recordVote({productId:PRODUCT,targetKind:'tree',targetId:sB.shareId,subjectId:'v1',votedAt:new Date(NOW-1*DAY).toISOString()});
+ await communityRepo.recordVote({productId:PRODUCT,targetKind:'tree',targetId:sB.shareId,subjectId:'v2',votedAt:new Date(NOW-2*DAY).toISOString()});
+ await communityRepo.recordVote({productId:PRODUCT,targetKind:'tree',targetId:sA.shareId,subjectId:'v3',votedAt:new Date(NOW-1*DAY).toISOString()});
+ await communityRepo.recordVote({productId:PRODUCT,targetKind:'tree',targetId:sA.shareId,subjectId:'v0',votedAt:new Date(NOW-8*DAY).toISOString()});
+ let id=0;
+ const service=createCommunityService({communityRepo,shareRepo,workspaceRepo,productId:PRODUCT,admin:{roleFor:async()=>null},makeId:()=>String(++id).padStart(24,'c'),now:()=>NOW});
+ const popular=await service.discover({sort:'popular'});
+ assert.deepEqual(popular.items.map(i=>i.shareId),[sB.shareId,sA.shareId],'많이 담긴 순으로 정렬된다');
+ assert.equal(popular.items[0].stats.weeklyFavorites,2);
+ assert.equal(popular.items[1].stats.weeklyFavorites,1,'지난 주 표는 카드 집계에서 빠진다');
+ const latest=await service.discover({});
+ assert.deepEqual(latest.items.map(i=>i.shareId),[sA.shareId,sB.shareId],'기본 정렬은 기존 순서를 유지한다');
+ assert.equal(latest.items[0].stats.weeklyFavorites,1,'기본 정렬에서도 이번 주 수는 응답에 있다');
+ const weird=await service.discover({sort:'nonsense'});
+ assert.deepEqual(weird.items.map(i=>i.shareId),[sA.shareId,sB.shareId],'모르는 sort 값은 기본으로 돌린다');
+});
+
 test('comments use an idempotency key, hide account ids and enforce author or admin delete',async()=>{
  const {handle,communityRepo}=await setup(),shareId='s'.repeat(24),path=`/api/community/shares/${shareId}/comments`;
  assert.equal((await call(handle,'POST',path,{account:'bob',body:{body:'좋은 순간이에요'}})).body.error.code,'idempotency_key_required');
