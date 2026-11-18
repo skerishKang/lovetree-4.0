@@ -398,7 +398,14 @@ function findStage(t) {
 function findSong(t) {
   // 1) 따옴표 묶음이 노래 제목이다(공식 뮤직비디오·직캠 모두 이 모양을 쓴다) — 따옴표는 믿는다.
   const q = t.match(QUOTED);
-  if (q) return cleanText(q[1]).replace(NOISE, '').replace(CAM_MARKS, '').trim();
+  if (q) {
+    let value = cleanText(q[1]).replace(NOISE, '').replace(CAM_MARKS, '').trim();
+    if (/[가-힣]/.test(value)) value = value.replace(/\(([^()]*)\)/g, (whole, inner) => {
+      const words = inner.trim().split(/\s+/).filter(Boolean);
+      return words.length >= 2 && !/^(feat\.|with\s)/i.test(inner.trim()) ? ' ' : whole;
+    }).replace(/\s+/g, ' ').trim();
+    return value;
+  }
   // 2) '가수 - 노래 @무대' 모양(방송·공연 클립이 이 모양을 쓴다) — 붙임표 덩어리는 의심한다:
   //    직캠·화질·날짜·무대 이름·구분선이 섞인 덩어리는 노래라고 단정할 수 없어 제안하지 않는다.
   const dash = t.match(/-\s*([^@|#]+?)(?=\s*@|\s*$)/);
@@ -431,11 +438,13 @@ export function suggestTagsFromTitle(title, options = {}) {
 
   // 1) 내가 쓴 꼬리표 가운데 제목에 맞는 것부터(표기 차이·대소문자 정도는 tagKey로 맞춘다).
   const hay = foldTitle(t);
+  const outsideParens = foldTitle(t.replace(/\([^()]*\)/g, ' '));
   for (const k of known) {
     const p = parseTag(k);
     if (!p) continue;
     const needle = tagKey(p.value);
-    if (needle.length >= 2 && hay.includes(needle)) push(p.kindId, p.value, 'reuse');
+    const matches = p.kindId === 'member' ? outsideParens.includes(needle) : hay.includes(needle);
+    if (needle.length >= 2 && matches) push(p.kindId, p.value, 'reuse');
   }
 
   // 2) 제목 규칙: 가수 → 멤버(확실한 모양만) → 노래 → 무대(방송·시상식·공연 이름 — 날짜 숫자는 값에 섞지 않는다).
