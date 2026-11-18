@@ -97,9 +97,10 @@ test('보드 상세: 열린 겹은 탭 가능, 닫으면 겹은 탭 불가(inert
       assert.equal(opened.focus, 'detailClose', '열린 상세의 첫 초점은 닫기 단추다');
 
       await page.keyboard.press('Escape');
-      // 닫힘·inert·초점 복귀는 느린 환경(CI)에서 순서대로 늦게 안착한다 — 상태가 채워질 때까지 기다린다.
+      // 닫힘·inert·초점 복귀는 순서대로 안착한다 — 상태가 채워지는 순간을 기다렸다 바로 잰다.
+      // (회원 모드에서는 뜬 직후 카드 재렌더가 카드 요소를 갈아끼워 그 뒤에는 초점이 몸통으로 돌아간다 —
+      //  이 시험의 계약은 닫는 순간의 복귀이고, 재렌더 뒤의 소음은 계약 밖이다.)
       await page.waitForFunction(`(() => { const f = [...document.querySelectorAll('#view,#view-next')].filter((x) => !x.hidden).pop(); const d = f.contentDocument.getElementById('detail'); if (!d || d.classList.contains('open') || !d.inert) return false; const ae = f.contentDocument.activeElement; const card = f.contentDocument.querySelector('#cardLayer article.card.selected'); return !!card && (ae === card || card.contains(ae)); })()`, null, { timeout: 10000 });
-      await page.waitForTimeout(600);
       const closed = await page.evaluate(`(() => {
         const f = [...document.querySelectorAll('#view,#view-next')].filter((x) => !x.hidden).pop();
         const d = f.contentDocument.getElementById('detail');
