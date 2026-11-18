@@ -79,23 +79,16 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
   row.append(form);
  }
   function artistGroupList(){
-   const present=new Map();
-   for(const item of items){
-    for(const raw of Array.isArray(item.groups)?item.groups:[]){
-     const value=String(raw??'').trim(),key=tagKey(value);
-     if(value&&key&&!present.has(key))present.set(key,value);
-    }
-   }
    let mine=[];try{mine=getArtistGroups?.()||[];}catch{}
+   const available=new Map();
+   for(const group of publicGroups){
+    const value=String(group?.value??group??'').trim(),key=tagKey(value);
+    if(value&&key&&!available.has(key))available.set(key,value);
+   }
    const seen=new Set(),out=[];
-   const add=raw=>{
-    const value=String(raw??'').trim(),key=tagKey(value);
-    if(!value||!key||!present.has(key)||seen.has(key))return;
-    seen.add(key);out.push(present.get(key));
-   };
-   for(const raw of Array.isArray(mine)?mine:[])add(raw);
-   for(const group of publicGroups)add(group?.value??group);
-   for(const value of present.values())add(value);
+   const add=key=>{if(key&&available.has(key)&&!seen.has(key)){seen.add(key);out.push(available.get(key));}};
+   for(const raw of Array.isArray(mine)?mine:[])add(tagKey(String(raw??'').trim()));
+   for(const key of available.keys())add(key);
    return out.slice(0,7);
   }
  function renderGroups(){

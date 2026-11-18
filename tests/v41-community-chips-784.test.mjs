@@ -35,6 +35,7 @@ const GROUP_ORDER = [
   { value: '뉴진스', count: 5 }
 ];
 const GROUP_BY_TITLE = Object.fromEntries(CARDS.map(card => [card.title, card.groups]));
+const BASE_GROUPS = [...new Set(CARDS.flatMap(card => card.groups))];
 
 function tree() {
   let t = createTree({ subject: '시험', title: '시험 트리', note: '', emotion: '설렘', date: '2026-11-18', url: '' }, '2026-11-18T00:00:00Z');
@@ -44,29 +45,30 @@ function tree() {
   return t;
 }
 
-const measure = (page) => page.evaluate((groupByTitle) => {
+const measure = (page) => page.evaluate(({ groupByTitle, baseGroups }) => {
   const rail = document.getElementById('community-groups');
   const chipNodes = [...rail.querySelectorAll('.community-group-chip')];
   const chips = chipNodes.map(chip => (chip.textContent || '').trim());
   const chipGroups = chips.filter(label => label !== '전체');
+  const selectedChips = chipNodes.filter(chip => chip.getAttribute('aria-pressed') === 'true' && (chip.textContent || '').trim() !== '전체').map(chip => (chip.textContent || '').trim());
   const cards = [...document.querySelectorAll('#community-list .community-card')];
   const cardGroups = [...new Set(cards.flatMap(card => groupByTitle[card.querySelector('.community-card-title')?.textContent || ''] || []))];
   const feedback = document.getElementById('community-feedback')?.textContent || '';
   const listText = document.getElementById('community-list')?.textContent || '';
   return {
-    chips, chipGroups,
+    chips, chipGroups, selectedChips,
     cardCount: cards.length,
     cardGroups,
-    missingChips: chipGroups.filter(group => !cardGroups.includes(group)),
+    missingChips: chipGroups.filter(group => !baseGroups.includes(group)),
     emptyNotices: ((feedback + ' ' + listText).match(/공개(된)? 트리가 없/g) || []).length,
     rows: new Set(chipNodes.map(chip => Math.round(chip.getBoundingClientRect().top))).size,
     pageOverflow: Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth),
     minHeight: Math.min(...chipNodes.map(chip => Math.round(chip.getBoundingClientRect().height))),
     flexWrap: getComputedStyle(rail).flexWrap
   };
-}, GROUP_BY_TITLE);
+}, { groupByTitle: GROUP_BY_TITLE, baseGroups: BASE_GROUPS });
 
-test('#784 칩은 지금 목록에 있는 그룹만·빈 상태 안내 한 곳·한 줄·페이지 넘침 0', { skip: skip || !REQUIRE ? skip || 'LT_CHIPS_REQUIRE=1 일 때 실행' : false }, async () => {
+test('#784 칩은 필터 전 목록 그룹만·선택 후에도 칩 줄 유지·빈 안내 한 곳·한 줄·넘침 0', { skip: skip || !REQUIRE ? skip || 'LT_CHIPS_REQUIRE=1 일 때 실행' : false }, async () => {
   const server = await serve();
   const origin = `http://127.0.0.1:${server.address().port}`;
   const browser = await chromium.launch({ headless: true });
@@ -82,7 +84,7 @@ test('#784 칩은 지금 목록에 있는 그룹만·빈 상태 안내 한 곳·
     await ctx.route('**/api/community/shares**', (r) => {
       const artist = new URL(r.request().url()).searchParams.get('artist') || '';
       const items = empty ? [] : CARDS.filter(card => !artist || card.groups.includes(artist));
-      const groups = empty ? GROUP_ORDER : GROUP_ORDER.filter(group => !artist || items.some(card => card.groups.includes(group.value)));
+      const groups = empty ? [] : GROUP_ORDER.filter(group => CARDS.some(card => card.groups.includes(group.value)));
       return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ items, totalVisible: items.length, nextCursor: '', groups }) });
     });
     const page = await ctx.newPage();
@@ -107,6 +109,7 @@ test('#784 칩은 지금 목록에 있는 그룹만·빈 상태 안내 한 곳·
       assert.equal(m.chipGroups.length, 3, '칩 그룹 3개');
       assert.equal(m.cardGroups.length, 3, '카드 그룹 3개');
       assert.equal(m.missingChips.length, 0, '목록에 없는 그룹 칩 0개');
+      assert.equal(m.selectedChips.length, 0, '처음에는 선택 표시 0개');
       assert.deepEqual(m.chipGroups.slice(0, 2), MINE, '내 가수 먼저');
       assert.ok(m.chipGroups.every(group => !/\d/.test(group)), '칩에 숫자 없음');
       assert.equal(m.rows, 1, '칩 한 줄');
@@ -114,18 +117,26 @@ test('#784 칩은 지금 목록에 있는 그룹만·빈 상태 안내 한 곳·
       assert.equal(m.pageOverflow, 0, '페이지 가로 넘침 0');
       assert.ok(m.minHeight >= 44, '칩 누름 영역 44px');
       await page.locator('#community-groups .community-group-chip').first().waitFor({ state: 'visible' });
-      if (SHOT) { mkdirSync(SHOT, { recursive: true }); await page.screenshot({ path: `${SHOT}/chips-${width}.png` }); }
       console.log('CHIPS', width, JSON.stringify(m));
       if (selected) {
         await page.locator('#community-groups .community-group-chip:text-is("BTS")').click();
         await page.waitForFunction(() => document.querySelectorAll('#community-list .community-card').length === 2, null, { timeout: 10000 });
         const s = await measure(page);
         assert.equal(s.cardCount, 2, '칩 누른 뒤 카드 2개');
-        assert.deepEqual(s.chipGroups, ['BTS'], '칩 누른 뒤 그룹 칩 1개');
-        assert.equal(s.cardGroups.length, 1, '칩 누른 뒤 카드 그룹 1개');
-        assert.equal(s.missingChips.length, 0, '칩 누른 뒤 목록에 없는 그룹 칩 0개');
-        if (SHOT) await page.screenshot({ path: `${SHOT}/chips-selected-${width}.png` });
+        assert.equal(s.chipGroups.length, m.chipGroups.length, '칩 선택 전·후 칩 수 같음');
+        assert.deepEqual(s.chipGroups, m.chipGroups, '칩 줄 그대로');
+        assert.deepEqual(s.selectedChips, ['BTS'], '선택 표시 1개');
+        assert.equal(s.missingChips.length, 0, '칩 누른 뒤 없는 그룹 칩 0개');
+        if (SHOT) { mkdirSync(SHOT, { recursive: true }); await page.screenshot({ path: `${SHOT}/chips-selected-${width}.png` }); }
         console.log('CHIPS_SELECTED', width, JSON.stringify(s));
+        await page.locator('#community-groups .community-group-chip:text-is("RESCENE")').click();
+        await page.waitForFunction(() => document.querySelectorAll('#community-list .community-card').length === 1, null, { timeout: 10000 });
+        const t = await measure(page);
+        assert.equal(t.cardCount, 1, '다른 칩 누른 뒤 카드 1개');
+        assert.deepEqual(t.chipGroups, m.chipGroups, '다른 칩 눌러도 칩 줄 그대로');
+        assert.deepEqual(t.selectedChips, ['RESCENE'], '다른 칩 선택 표시 1개');
+        assert.equal(t.missingChips.length, 0, '다른 칩 누른 뒤 없는 그룹 칩 0개');
+        console.log('CHIPS_SWITCH', width, JSON.stringify(t));
       }
     }
     await ctx.close();

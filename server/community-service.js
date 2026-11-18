@@ -105,7 +105,6 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
   Object.defineProperty(card,'searchText',{value:searchTerms.filter(Boolean).join(' '),enumerable:false});
   Object.defineProperty(card,'artistTags',{value:[...artistTags],enumerable:false});
   Object.defineProperty(card,'artistNames',{value:artistNames,enumerable:false});
-  card.groups=[...artistNames.values()];
   return card;
  }
  return {
@@ -148,11 +147,12 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
      return card(share,viewerSubjectId,null,null,aiTesterLookup);
     }));
    }
-   const cards=[];
-    for(const item of entries){if(!item)continue;const haystack=(item.title+' '+item.subject+' '+item.summary+' '+(item.searchText||'')).toLocaleLowerCase('ko-KR');if(q&&!haystack.includes(q))continue;if(tag&&!item.emotions.includes(tag))continue;if(artistKey&&!item.artistTags?.includes(artistKey))continue;cards.push(item);}
-   const start=cursor?Math.max(0,cards.findIndex(item=>item.shareId===cursor)+1):0,items=cards.slice(start,start+size),next=start+size<cards.length?items.at(-1)?.shareId||null:null;
-    const groupCounts=new Map();
-    for(const item of cards){
+    const baseCards=[];
+     for(const item of entries){if(!item)continue;const haystack=(item.title+' '+item.subject+' '+item.summary+' '+(item.searchText||'')).toLocaleLowerCase('ko-KR');if(q&&!haystack.includes(q))continue;if(tag&&!item.emotions.includes(tag))continue;baseCards.push(item);}
+    const cards=artistKey?baseCards.filter(item=>item.artistTags?.includes(artistKey)):baseCards;
+    const start=cursor?Math.max(0,cards.findIndex(item=>item.shareId===cursor)+1):0,items=cards.slice(start,start+size),next=start+size<cards.length?items.at(-1)?.shareId||null:null;
+     const groupCounts=new Map();
+     for(const item of baseCards){
      for(const [key,name] of (item.artistNames||[])){
       const current=groupCounts.get(key)||{value:name,count:0};
       current.count++;
