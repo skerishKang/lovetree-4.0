@@ -548,7 +548,7 @@ nav .tree-frame{scroll-snap-align:center}
 .feedback-link{padding:6px 10px;border:0;background:none;color:var(--muted);font-size:13px;letter-spacing:.04em;text-decoration:underline;text-underline-offset:3px;opacity:.75;cursor:pointer}
 .feedback-link:hover{color:var(--lt-pearl);opacity:1}
 /* 이슈 611: 새 소식·의견 보내기가 함께 뜨는 작은 입구. 로그아웃 상태에서도 보인다.
-   261118 대표 지적(이슈 #884): 바닥 띠를 거두면서 궤도 카드가 링크 줄 아래를 지나간다. 링크 줄은
+   261118 대표 지적(이슈 884): 바닥 띠를 거두면서 궤도 카드가 링크 줄 아래를 지나간다. 링크 줄은
    화면 iframe(#stage>#view z2) 위 층(z-index:24)이라 누름도 링크 자신이 받지만, 글자가 옅은 회색
    75% 라 카드가 지나가면 묻혀 보였다 — 75% 를 거두고 각 테마의 진한 글자색 + 무대색 후광으로
    글자만 또렷하게 살린다(배경은 없다). */

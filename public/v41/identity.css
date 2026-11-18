@@ -201,7 +201,7 @@ html[data-lt-theme=garden] nav button:hover{background:rgba(152,80,94,.08);color
 html[data-lt-theme=garden] nav button[aria-current=true]{color:var(--lt-ink);background:rgba(200,110,121,.12);box-shadow:inset 0 0 0 1px var(--lt-gold-line)}
 html[data-lt-theme=garden] .header-actions button,html[data-lt-theme=garden] .login{color:var(--lt-ink);background:rgba(255,253,248,.9);border-color:rgba(119,91,82,.3)}
 html[data-lt-theme=garden] .header-actions button:hover,html[data-lt-theme=garden] .login:hover{background:var(--lt-paper);border-color:rgba(119,91,82,.55)}
-/* 261118 대표 지적 3번(이슈 #884): 머리줄 '+ 순간 추가'의 진한 장미 채움도 거두고 다른 머리줄 단추와
+/* 261118 대표 지적 3번(이슈 884): 머리줄 '+ 순간 추가'의 진한 장미 채움도 거두고 다른 머리줄 단추와
    같은 원래 스타일(크림 채움·잉크 글자)로 — shell.css 의 #write-menu ID 규칙(밤 금색)이 이기므로
    같은 자리에서 정원 값을 덮는다. 가운데 단추는 SRC064 원본 밝은 채움(#eee7e0)으로 이미 되돌렸다. */
 html[data-lt-theme=garden] .header-actions #write-menu.primary-action{background:rgba(255,253,248,.9);border-color:rgba(119,91,82,.3);color:var(--lt-ink);box-shadow:none}
@@ -231,7 +231,7 @@ html[data-lt-theme=garden] body,html[data-lt-theme=garden] .app-header{transitio
 @media(prefers-reduced-motion:reduce){html[data-lt-theme=garden] body,html[data-lt-theme=garden] .app-header{transition:none}}
 /* 첫 화면 정원: 궤도 배치·움직임·카메라를 그대로 두고 색만 바꾼다. 이 파일은 첫 화면 그림자 루트에도 들어가므로 :host를 쓴다. */
 :host([data-lt-theme=garden]) .app{background:radial-gradient(circle at 50% 46%,var(--lt-stage-2) 0%,var(--lt-stage) 52%,var(--lt-stage) 100%)}
-/* 261118 대표 지적 1번(이슈 #884): 가장자리를 어둡게 깐 비네트가 바닥에 회색 띠를 만들었다 — 거둬서
+/* 261118 대표 지적 1번(이슈 884): 가장자리를 어둡게 깐 비네트가 바닥에 회색 띠를 만들었다 — 거둬서
    무대 색이 바닥까지 그대로 이어지게 한다(밤은 원래 #000 으로 이어져 그대로 둔다). */
 :host([data-lt-theme=garden]) .app:before{background:none}
 :host([data-lt-theme=garden]) .center h1{color:var(--lt-ink)}
@@ -241,7 +241,7 @@ html[data-lt-theme=garden] body,html[data-lt-theme=garden] .app-header{transitio
 :host([data-lt-theme=garden]) .card.memo{border-color:var(--lt-ink)}
 :host([data-lt-theme=garden]) .menuBtn,:host([data-lt-theme=garden]) .subtleBtn{background:rgba(255,253,248,.9);border-color:rgba(119,91,82,.34);color:var(--lt-ink)}
 :host([data-lt-theme=garden]) .menuBtn:hover,:host([data-lt-theme=garden]) .subtleBtn:hover{background:var(--lt-paper);border-color:rgba(119,91,82,.58)}
-/* 261118 대표 지적 3번(이슈 #884): 첫 화면 강조 단추를 진한 장미 채움으로 바꾼 덮어쓰기를 거둔다 —
+/* 261118 대표 지적 3번(이슈 884): 첫 화면 강조 단추를 진한 장미 채움으로 바꾼 덮어쓰기를 거둔다 —
    SRC064 원본의 밝은 채움(#eee7e0, orbit-source.css .primary-cta)이 낮에서도 그대로 보이게 한다. */
 :host([data-lt-theme=garden]) .hint,:host([data-lt-theme=garden]) .caption{color:var(--lt-muted);text-shadow:none}
 :host([data-lt-theme=garden]) .firstMark{border-color:var(--lt-rose);background:rgba(255,253,248,.86);color:var(--lt-ink);box-shadow:none}
