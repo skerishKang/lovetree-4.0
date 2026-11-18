@@ -83,3 +83,41 @@ test('마이그레이션: 기존 즐겨찾기를 트리 표로 옮겨 적고 재
     assert.equal(after[0].n, 3, '재실행해도 행이 늘지 않는다');
   } finally { await pool.end(); }
 });
+
+test('목록 집계: 이번 주 표 수는 공개·소개 중인 트리만 세고 sort=popular로 정렬된다', { skip }, async () => {
+  assertIsolatedTestDatabase(DATABASE_URL);
+  const pool = await createPool(DATABASE_URL, { max: 2 });
+  try {
+    await applySchema(pool);
+    const repo = createCommunityRepo(pool), tag = suffix(), productId = 'lt-' + tag;
+    const mk = (ch) => ch.repeat(24);
+    // 공개·소개 켠 트리 2개(sX·sY) + 소개 꺼진 트리 1개(sZ)
+    for (const [ch, owner] of [['a', 'own-x'], ['b', 'own-y'], ['c', 'own-z']]) {
+      await pool.query(
+        `INSERT INTO lovetree_shares(product_id,share_id,subject_id,tree_id,entry_moment_id,initial_view,discoverable,moment_count)
+         VALUES ($1,$2,$3,$4,'moment','book',true,3)`,
+        [productId, mk(ch), owner, 'tree-' + ch]
+      );
+      if (ch !== 'c') {
+        await pool.query(
+          `INSERT INTO lovetree_tree_discover(product_id,subject_id,tree_id,discover) VALUES($1,$2,$3,true)`,
+          [productId, owner, 'tree-' + ch]
+        );
+      }
+    }
+    const now = new Date(), weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), old = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
+    // sX: 이번 주 2표 / sY: 이번 주 1표 + 지난 주 1표 / sZ(소개 꺼짐): 이번 주 5표 — 목록 집계에서 빠져야 한다
+    const vote = (target, subject, at) => pool.query(
+      `INSERT INTO lovetree_community_votes(product_id,target_kind,target_id,subject_id,voted_at) VALUES($1,'tree',$2,$3,$4) ON CONFLICT DO NOTHING`,
+      [productId, mk(target), subject, at]
+    );
+    await vote('a', 'r1', now); await vote('a', 'r2', now);
+    await vote('b', 'r3', now); await vote('b', 'r4', old);
+    for (let i = 0; i < 5; i++) await vote('c', 'z' + i, now);
+    const popular = await repo.listDiscoverableSummaries({ productId, sort: 'popular', weekSince: weekAgo });
+    assert.deepEqual(popular.map((r) => r.share.shareId), [mk('a'), mk('b')], '소개 꺼진 트리는 목록 자체에 없고, 많이 담긴 순으로 정렬된다');
+    assert.deepEqual(popular.map((r) => r.stats.weeklyFavorites), [2, 1], '지난 주 표는 이번 주 집계에서 빠진다');
+    const latest = await repo.listDiscoverableSummaries({ productId, weekSince: weekAgo });
+    assert.deepEqual(latest.map((r) => r.stats.weeklyFavorites), [2, 1], '기본 정렬에서도 주간 수는 응답에 있다');
+  } finally { await pool.end(); }
+});

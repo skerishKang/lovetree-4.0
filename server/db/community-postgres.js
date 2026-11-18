@@ -36,7 +36,13 @@ export function createCommunityRepo(pool){
    const row=rows[0]||{};
    return {trees:Number(row.trees||0),moments:Number(row.moments||0)};
   },
-  async listDiscoverableSummaries({productId,viewerSubjectId=null,limit=240}){
+  async listDiscoverableSummaries({productId,viewerSubjectId=null,limit=240,sort='latest',weekSince=null}){
+   // #824 결정 1·2: 카드 stats에 이번 주 표 수(week_votes)를 더고, sort='popular'면 그 내림차순으로 정렬한다.
+   // 집계 대상은 picked(공개·소개 켬·숨김·비공개 제외)로 한정 — 삭제·비공개된 트리의 표는 집계에서 빠지고 표 행은 남는다.
+   const weekSelect=weekSince?`,\n      (SELECT count(*)::int FROM lovetree_community_votes v WHERE v.product_id=s.product_id AND v.target_kind='tree' AND v.target_id=s.share_id AND v.voted_at >= $4) AS week_votes`:'';
+   const baseOrder="COALESCE((SELECT max(created_at) FROM lovetree_community_comments WHERE product_id=s.product_id AND share_id=s.share_id AND status='visible'), s.created_at) DESC, s.created_at DESC, s.share_id DESC";
+   const orderSql=(sort==='popular'&&weekSince)?`week_votes DESC, ${baseOrder}`:baseOrder;
+   const params=weekSince?[productId,viewerSubjectId,limit,weekSince]:[productId,viewerSubjectId,limit];
    const {rows}=await pool.query(
     `WITH picked AS (
        SELECT DISTINCT ON (s.tree_id) s.*
@@ -48,7 +54,7 @@ export function createCommunityRepo(pool){
          )
        ORDER BY s.tree_id,(s.origin='auto') DESC,s.created_at DESC,s.share_id DESC
      )
-     SELECT s.*,
+     SELECT s.*${weekSelect},
       (SELECT count(*)::int FROM lovetree_community_favorites WHERE product_id=s.product_id AND share_id=s.share_id) AS fav_count,
       (SELECT count(*)::int FROM lovetree_community_comments WHERE product_id=s.product_id AND share_id=s.share_id AND status='visible') AS comment_count,
       (SELECT max(created_at) FROM lovetree_community_comments WHERE product_id=s.product_id AND share_id=s.share_id AND status='visible') AS last_activity_at,
@@ -76,15 +82,14 @@ export function createCommunityRepo(pool){
          SELECT 1 FROM lovetree_community_blocks b
          WHERE b.product_id=s.product_id AND b.blocker_subject_id=$2 AND b.blocked_subject_id=s.subject_id
        ))
-     ORDER BY COALESCE((SELECT max(created_at) FROM lovetree_community_comments WHERE product_id=s.product_id AND share_id=s.share_id AND status='visible'), s.created_at) DESC,
-              s.created_at DESC, s.share_id DESC LIMIT $3`,
-    [productId,viewerSubjectId,limit]
+     ORDER BY ${orderSql} LIMIT $3`,
+    params
    );
    return rows.map(row=>{
     const share=shareRow(row);
     const reactions={heart:0,like:0,love:0,laugh:0,wow:0,sad:0,angry:0};
     if(row.reactions_json&&typeof row.reactions_json==='object')for(const [kind,n] of Object.entries(row.reactions_json))if(Object.prototype.hasOwnProperty.call(reactions,kind))reactions[kind]=Number(n)||0;
-    const stats={favorites:Number(row.fav_count||0),hearts:Number(row.heart_count||0),comments:Number(row.comment_count||0),favored:!!row.favored,hearted:!!row.hearted,reactions,mine:Array.isArray(row.mine_kinds)?row.mine_kinds.filter(Boolean):[]};
+    const stats={favorites:Number(row.fav_count||0),hearts:Number(row.heart_count||0),comments:Number(row.comment_count||0),favored:!!row.favored,hearted:!!row.hearted,weeklyFavorites:Number(row.week_votes||0),reactions,mine:Array.isArray(row.mine_kinds)?row.mine_kinds.filter(Boolean):[]};
     return {share,stats,lastActivityAt:row.last_activity_at?iso(row.last_activity_at):share.createdAt};
    });
   },
