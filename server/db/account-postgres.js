@@ -45,6 +45,17 @@ export function createAccountRepo(pool) {
     return result.rowCount > 0 ? result.rows[0].email : null;
   }
 
+  // 가입일(첫 로그인 시각, #655 2차). 투표 자격 판정(가입 7일, #824 대표 결정)에 쓴다.
+  // 행이 없으면 null — 부르는 쪽이 어떻게 다룰지 정한다(서비스층은 보수적으로 '신규와 같이 막는다').
+  async function createdAtFor({ productId, subjectId }) {
+    if (typeof productId !== 'string' || !productId || typeof subjectId !== 'string' || !subjectId) return null;
+    const result = await pool.query(
+      'SELECT created_at FROM lovetree_account_emails WHERE product_id = $1 AND subject_id = $2',
+      [productId, subjectId]
+    );
+    return result.rowCount > 0 ? result.rows[0].created_at : null;
+  }
+
   // created_at 은 첫 로그인 시각(가입일, #655 2차)이다. INSERT 때만 찍히고 ON CONFLICT DO UPDATE 에서
   // 일부러 빠져 있다 — 로그인할 때마다 가입일이 밀리면 '새 계정'을 셀 수 없다.
   async function upsertEmail({ productId, subjectId, email }) {
@@ -69,6 +80,7 @@ export function createAccountRepo(pool) {
   return {
     isDeleted,
     emailFor,
+    createdAtFor,
     upsertEmail,
     async deleteAll({ productId, subjectId, subjectHash, at = null }) {
       const client = await pool.connect();

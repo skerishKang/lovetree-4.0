@@ -1,5 +1,5 @@
 export function createMemoryCommunityRepo({isPrivateTree=null,isDiscoverOn=null}={}){
- const favorites=new Set(),reactionSet=new Set(),comments=new Map(),reports=new Map(),blocks=new Set(),hiddenShares=new Set(),audits=[];
+ const favorites=new Set(),reactionSet=new Set(),comments=new Map(),reports=new Map(),blocks=new Set(),hiddenShares=new Set(),audits=[],votes=new Map();
  const key=(...parts)=>parts.join('\0'),copy=value=>structuredClone(value),now=()=>new Date().toISOString();
  const reactionKeys=()=>[...reactionSet];
  // #538: 둘러보기 후보는 활성 공유 행 가운데 moment_count>=3(직접 올린 사진만 있는 순간도 센다)이고,
@@ -82,6 +82,10 @@ export function createMemoryCommunityRepo({isPrivateTree=null,isDiscoverOn=null}
    return {favorites:[...favorites].filter(v=>v.startsWith(prefix)).length,hearts:heartCount,comments:[...comments.values()].filter(v=>v.productId===productId&&v.shareId===shareId&&v.status==='visible').length,favored:favorites.has(key(productId,shareId,viewerSubjectId)),hearted:reactionSet.has(key(productId,shareId,viewerSubjectId,'heart')),reactions,mine};
   },
   async setFavorite({productId,shareId,subjectId,enabled}){const value=key(productId,shareId,subjectId);enabled?favorites.add(value):favorites.delete(value);},
+  // 투표 기록(#824) — append-only 메모리 모형. 이미 있으면 새 표로 세지 않는다(1인 1표 영구).
+  async recordVote({productId,targetKind,targetId,subjectId,votedAt:at}){const value=key(productId,targetKind,targetId,subjectId);if(votes.has(value))return {recorded:false};votes.set(value,{productId,targetKind,targetId,subjectId,votedAt:at||now()});return {recorded:true};},
+  async hasVoted({productId,targetKind,targetId,subjectId}){return votes.has(key(productId,targetKind,targetId,subjectId));},
+  async weeklyVoteCounts({productId,targetKind,since}){const counts={};for(const row of votes.values())if(row.productId===productId&&row.targetKind===targetKind&&new Date(row.votedAt).getTime()>=new Date(since).getTime())counts[row.targetId]=(counts[row.targetId]||0)+1;return counts;},
   async listFavorites({productId,subjectId}){return [...favorites].filter(v=>v.startsWith(key(productId)+'\0')&&v.endsWith('\0'+subjectId)).map(v=>v.split('\0')[1]);},
   async setReaction({productId,shareId,subjectId,enabled,kind='heart'}){const value=key(productId,shareId,subjectId,kind);enabled?reactionSet.add(value):reactionSet.delete(value);},
   async isBlocked({productId,blockerSubjectId,blockedSubjectId}){return blocks.has(key(productId,blockerSubjectId,blockedSubjectId))||blocks.has(key(productId,blockedSubjectId,blockerSubjectId));},
