@@ -5,12 +5,26 @@ import {displayTreeTitle} from './tree-name.mjs';
 import {tagKey} from './tags.mjs';
 // #480 L13: 둘러보기 카드·댓글의 날짜도 책·보드·지도와 같은 한 벌로 적는다.
 import {formatDisplayDate} from './book-usability.mjs';
+import {matchGroups,sectionGroups} from './group-search.mjs';
 // #547·#701 규칙: 서버가 내려주는 시각(UTC 타임스탬프)은 기기 지역 날짜로 바꿔 보여 준다(#547 한 벌).
 import {localDateOnly} from './local-date.mjs';
 const el=(tag,className,text)=>{const node=document.createElement(tag);if(className)node.className=className;if(text!=null)node.textContent=text;return node;};
 export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareOwn,hasOwnTree,getDateStyle,getArtistGroups=()=>[]}){
  const api=createCommunityApi(),form=dialog.querySelector('#community-search-form'),query=dialog.querySelector('#community-query'),list=dialog.querySelector('#community-list'),groups=dialog.querySelector('#community-groups'),feedback=dialog.querySelector('#community-feedback'),more=dialog.querySelector('#community-more'),preview=dialog.querySelector('#community-preview'),sortSelect=dialog.querySelector('#community-sort');
   let cursor='',loading=false,items=[],selectedId=null,selectedArtist='',loadId=0,publicGroups=[];
+ // #784 그룹 찾기 창·자동완성 상태. publicGroupsAll는 서버가 내려주는 전체 목록(discover)이며
+ // publicGroups(칩용 상위 8)와 내 트리의 가수(getArtistGroups)를 tagKey로 하나로 합쳐 쓴다.
+ // 새 저장소 키는 없다(#914와 같다).
+ let publicGroupsAll=[];
+ const suggestions=el('ul','community-suggest');suggestions.setAttribute('role','listbox');suggestions.id='community-suggest';suggestions.hidden=true;
+ let suggestActive=-1;
+ const groupIndex=()=>{
+  const seen=new Map();
+  const add=(name,count)=>{const key=tagKey(name||'');if(!key)return;if(!seen.has(key))seen.set(key,{group:String(name).trim(),count});};
+  for(const g of publicGroupsAll||[])add(g.value,g.count);
+  for(const g of publicGroups||[])add(g.value,g.count);
+  return [...seen.values()].sort((a,b)=>String(a.group).localeCompare(String(b.group),'ko'));
+ };
  const message=text=>{feedback.textContent=text;const previewMessage=preview.querySelector('[data-community-preview-message]');if(previewMessage)previewMessage.textContent=text;};
  // #480 L13: 계정 설정의 날짜 표기. 넘겨받지 않으면 기본(dot) — 새 규칙을 만들지 않는다.
  const dateStyle=()=>(typeof getDateStyle==='function'?getDateStyle():'dot');
@@ -98,10 +112,20 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
    return out.slice(0,7);
   }
  function renderGroups(){
-  const available=artistGroupList();
-  if(selectedArtist&&!available.some(value=>tagKey(value)===tagKey(selectedArtist)))selectedArtist='';
-  const choices=[{value:'',label:'전체'},...available.map(value=>({value,label:value}))];
-  groups.replaceChildren(...choices.map(choice=>{
+  // 고른 그룹 → 전체 → 내 가수 → 공개 많은 순(최대 8칩, 한 줄 — #914 규칙 그대로).
+  // artistGroupList가 내 가수·공개 상위 8을 tagKey 한 줄로 맞춘 순서를 준다.
+  const seen=new Set();
+  const choices=[];
+  const push=(value,label)=>{
+   const key=tagKey(value||'');
+   if(seen.has(key))return;
+   seen.add(key);choices.push({value,label});
+  };
+  if(selectedArtist)push(selectedArtist,selectedArtist);
+  push('','전체');
+  for(const value of artistGroupList())if(choices.length<8)push(value,value);
+  const visible=choices.slice(0,8);
+  groups.replaceChildren(...visible.map(choice=>{
    const chip=el('button',`community-group-chip${choice.value===selectedArtist?' is-active':''}`,choice.label);
    chip.type='button';chip.setAttribute('aria-pressed',String(choice.value===selectedArtist));
    chip.onclick=()=>{selectedArtist=choice.value;renderGroups();load(false);};
@@ -181,7 +205,9 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
   if(!items.length&&!loading){
    // 이슈 457 5번: 공유할 내 트리가 없으면(로그아웃·트리 0개) "내 트리 공유하기"가 아니라 "첫 트리 만들기"로 바꾼다.
    const canShare=!!hasOwnTree?.();
-   const empty=el('div','community-empty'),text=el('p','','아직 보여 줄 공개 트리가 없어요.'),share=el('button','community-primary',canShare?'내 트리 공유하기':'첫 트리 만들기');
+   // #784: 그룹을 골라 공개 트리가 없을 때 빈 안내를 두 번 겹치지 않는다 — 가운데 카드만 남긴다.
+   const emptyText=selectedArtist?`'${selectedArtist}' 그룹의 공개 트리가 아직 없어요. 다른 그룹을 고르거나 검색을 바꿔 보세요.`:'아직 보여 줄 공개 트리가 없어요.';
+   const empty=el('div','community-empty'),text=el('p','',emptyText),share=el('button','community-primary',canShare?'내 트리 공유하기':'첫 트리 만들기');
    share.type='button';share.onclick=canShare?(()=>onShareOwn?.()):(()=>onStartRecord?.());
    empty.append(text,share);list.append(empty);
   }
@@ -196,8 +222,11 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
   loading=false;
   if(!answer.ok){message(answer.message||'공개 트리를 불러오지 못했어요.');more.hidden=true;more.disabled=false;render();return;}
   items=append?[...items,...answer.items]:answer.items;cursor=answer.nextCursor||'';more.hidden=!cursor;more.disabled=false;
-  if(!append){publicGroups=Array.isArray(answer.groups)?answer.groups:[];renderGroups();}
-  message(answer.totalVisible?`공개된 트리 ${answer.totalVisible}개를 찾았어요. ${(sortSelect?.value==='popular')?'많이 담긴 순서예요.':'새로 공개된 순서예요.'}`:'');render();
+  if(!append){publicGroups=Array.isArray(answer.groups)?answer.groups:[];publicGroupsAll=Array.isArray(answer.groupsAll)?answer.groupsAll:[];renderGroups();}
+  // #784: 고른 그룹에 공개 트리가 없을 때 빈 안내를 위 한 줄에도 내지 않는다 — 가운데 카드에 하나만 남긴다.
+  if(selectedArtist&&!answer.totalVisible)message('');
+  else message(answer.totalVisible?`공개된 트리 ${answer.totalVisible}개를 찾았어요. ${(sortSelect?.value==='popular')?'많이 담긴 순서예요.':'새로 공개된 순서예요.'}`:'아직 공개된 트리가 없어요. 트리를 공개하면 여기에 나타나요.');
+  render();
  }
  // #824 결정 2: 정렬을 바꾸면 목록을 처음부터 다시 불러온다.
  sortSelect.onchange=()=>load(false);
@@ -207,5 +236,94 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
  dialog.addEventListener('close',()=>{if(preview.open)preview.close();button.setAttribute('aria-current','false');const emptyShown=!document.getElementById('empty')?.hidden;for(const t of tabs()){if(t.dataset.wasCurrent){delete t.dataset.wasCurrent;if(!emptyShown)t.setAttribute('aria-current','true');}}button.focus();});
  preview.addEventListener('close',()=>[...list.querySelectorAll('.community-card')].find(node=>node.dataset.shareId===selectedId)?.focus());
  preview.addEventListener('click',event=>{if(event.target===preview)preview.close();});
- form.onsubmit=event=>{event.preventDefault();load(false);};more.onclick=()=>load(true);dialog.querySelector('[data-close="community-panel"]').onclick=()=>dialog.close();
+ // #784 자동완성(#784 ②): 검색칸 입력마다 화면에서만 돌린다(네트워크 왕복 없음).
+ // 후보를 누르거나 Enter하면 그 그룹을 고른 것으로(칩 맨 앞 + 목록 거름) 동작한다.
+ const chooseGroup=name=>{selectedArtist=name;renderGroups();load(false);hideSuggest();};
+ const hideSuggest=()=>{suggestions.hidden=true;suggestions.replaceChildren();suggestActive=-1;query.removeAttribute('aria-activedescendant');};
+ const renderSuggest=list=>{
+  suggestActive=-1;
+  if(!list.length){suggestions.hidden=false;suggestions.replaceChildren(el('li','community-suggest-empty','이 이름과 맞는 그룹이 없어요. 검색을 이어서 해 보세요.'));return;}
+  suggestions.hidden=false;
+  suggestions.replaceChildren(...list.map((g,i)=>{
+   const li=el('li',''),opt=el('button','community-suggest-option',`${g.group}  ·  공개 트리 ${g.count??0}`);
+   li.id=`community-suggest-option-${i}`;opt.type='button';opt.setAttribute('role','option');opt.setAttribute('aria-selected','false');
+   opt.onclick=()=>{query.value=g.group;chooseGroup(g.group);};
+   li.append(opt);return li;
+  }));
+ };
+ const updateSuggest=()=>{
+  const q=query.value.trim();
+  if(!q){hideSuggest();return;}
+  renderSuggest(matchGroups(groupIndex(),q,{limit:5}));
+ };
+ const suggestMove=delta=>{
+  const opts=[...suggestions.querySelectorAll('[role=option]')];
+  if(!opts.length)return;
+  suggestActive=(suggestActive+delta+opts.length)%opts.length;
+  opts.forEach((opt,i)=>opt.setAttribute('aria-selected',String(i===suggestActive)));
+  query.setAttribute('aria-activedescendant',`community-suggest-option-${suggestActive}`);
+ };
+ query.addEventListener('input',updateSuggest);
+ query.addEventListener('keydown',event=>{
+  if(suggestions.hidden)return;
+  if(event.key==='ArrowDown'){event.preventDefault();suggestMove(1);}
+  if(event.key==='ArrowUp'){event.preventDefault();suggestMove(-1);}
+  if(event.key==='Enter'&&suggestActive>=0){event.preventDefault();suggestions.querySelectorAll('[role=option]')[suggestActive]?.click();}
+  if(event.key==='Escape'){event.stopPropagation();hideSuggest();}
+ });
+ query.setAttribute('aria-expanded','false');
+ form.append(suggestions);
+ form.onsubmit=event=>{event.preventDefault();hideSuggest();load(false);};more.onclick=()=>load(true);dialog.querySelector('[data-close="community-panel"]').onclick=()=>dialog.close();
+ // #784 그룹 찾기 창. 미리보기·둘러보기 판과 같은 <dialog showModal> 한 벌을 쓴다.
+ const findDialog=el('dialog','community-group-find');
+ const findHead=el('div','community-group-find-head'),findClose=el('button','community-group-find-close','×');
+ findClose.type='button';findClose.setAttribute('aria-label','그룹 찾기 닫기');
+ const findTitle=el('h2','community-group-find-title','그룹 찾기');
+ findHead.append(findTitle,findClose);
+ const findQuery=el('input','community-group-find-query');
+ findQuery.type='search';findQuery.placeholder='그룹 이름 찾기';findQuery.autocomplete='off';findQuery.setAttribute('aria-label','그룹 이름 찾기');
+ const findList=el('div','community-group-find-list');findList.id='community-group-find-list';
+ findDialog.append(findHead,findQuery,findList);
+ findList.setAttribute('role','listbox');findList.setAttribute('aria-label','그룹 목록');
+ let findActive=-1;
+ const findOptions=()=>[...findList.querySelectorAll('[role=option]')];
+ const renderFindList=q=>{
+  const pool=groupIndex();
+  const matched=q?matchGroups(pool,q,{limit:200}):pool;
+  findList.replaceChildren();
+  findActive=-1;
+  if(!matched.length){findList.append(el('p','community-group-find-empty','이 이름과 맞는 그룹이 없어요. 다른 이름으로 찾기 말을 적어 보세요.'));return;}
+  for(const section of sectionGroups(matched)){
+   findList.append(el('h3','community-group-find-section',section.label));
+   for(const g of section.items){
+    const opt=el('button','community-group-find-option',`${g.group}  ·  공개 트리 ${g.count??0}`);
+    opt.type='button';opt.setAttribute('role','option');opt.setAttribute('aria-selected','false');
+    opt.dataset.groupName=g.group;
+    opt.onclick=()=>{chooseGroup(g.group);findDialog.close();};
+    findList.append(opt);
+   }
+  }
+ };
+ const findMove=delta=>{
+  const opts=findOptions();
+  if(!opts.length)return;
+  findActive=(findActive+delta+opts.length)%opts.length;
+  opts.forEach((opt,i)=>opt.setAttribute('aria-selected',String(i===findActive)));
+  findQuery.setAttribute('aria-activedescendant',opts[findActive]?.id||'');
+ };
+ findQuery.addEventListener('input',()=>renderFindList(findQuery.value.trim()));
+ findQuery.addEventListener('keydown',event=>{
+  if(event.key==='ArrowDown'){event.preventDefault();findMove(1);}
+  if(event.key==='ArrowUp'){event.preventDefault();findMove(-1);}
+  if(event.key==='Enter'&&findActive>=0){event.preventDefault();findOptions()[findActive]?.click();}
+  if(event.key==='Escape'){event.preventDefault();findDialog.close();}
+ });
+ (dialog.parentNode||document.body)?.appendChild?.(findDialog) ?? (() => { try { document.body?.appendChild?.(findDialog); } catch {} })();
+ const findButton=el('button','community-group-find','그룹 찾기');findButton.type='button';
+ findButton.onclick=()=>{renderFindList('');findQuery.value='';if(!findDialog.open)findDialog.showModal();findQuery.focus();};
+ // Esc 기본 동작(바깥 dialog 닫기 복원)을 막고 직접 닫아, 초점을 그룹 찾기 단추로 돌린다.
+ findDialog.addEventListener('close',()=>{findButton.focus();});
+ findClose.onclick=()=>findDialog.close();
+ const rail=dialog.querySelector('.community-group-rail');
+ if(rail&&typeof rail.appendChild==='function')rail.appendChild(findButton);
 }
