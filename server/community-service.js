@@ -60,17 +60,28 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
   const coverType=youtubeId?'youtube':cover?.type||'';
   // #425 2번: 표지 주소는 '순간에서(moment)'일 때만 보낸다. 사진 표지는 공개 판정에서
   // 디자인/기본으로 바뀌고(projectSharedTree), 디자인·기본 표지에는 주소가 없다.
-  const coverUrl=coverModeOf(tree)==='moment'?(cover?.url||''):'';
+  const coverIsMoment=coverModeOf(tree)==='moment';
+  const coverUrl=coverIsMoment?(cover?.url||''):'';
   const vertical=['video','youtube'].includes(coverType)&&isVerticalMoment(cover);
   const safeCoverThumbnail=safeYoutubeThumb(cover?.mediaMetadata?.thumbnail||cover?.mediaMetadata?.thumbnailUrl||cover?.thumbnailUrl);
   const thumbnailId=youtubeId||youtubeIdFrom(safeCoverThumbnail);
   const youtubeThumbnail=youtubeStageThumbUrl(thumbnailId,'mqdefault')||safeCoverThumbnail;
-  const thumbnailUrl=coverModeOf(tree)==='moment'
+  // #887: 표지 후보 사슬 — 명시 표지(모드 moment) → 사진 표지(같은 자리) → 첫 YouTube 순간 썸네일(mqdefault) → 글자 칸.
+  // 기본·디자인 표지 트리도 썸네일을 비워 보내면 카드가 글자 칸만 남는다(운영 7카드 전부 해당 — 261118 확인).
+  // 사진 주소는 #425 규칙 그대로 모드가 'moment'일 때만 내보내고, 없는 트리는 공개 YouTube 썸네일
+  // (i.ytimg.com mqdefault)로만 채운다 — 개인 미디어 주소는 흘리지 않는다.
+  let thumbnailUrl=coverIsMoment
    ? coverType==='youtube'?youtubeThumbnail:coverUrl
    : '';
+  let cardCoverType=coverType,cardVertical=vertical;
+  if(!thumbnailUrl){
+   const ytMoment=tree.moments.find(moment=>youtubeIdFrom(moment.url||moment.externalUrl));
+   const fallbackThumb=youtubeStageThumbUrl(ytMoment?youtubeIdFrom(ytMoment.url||ytMoment.externalUrl):null,'mqdefault')||'';
+   if(fallbackThumb){thumbnailUrl=fallbackThumb;cardCoverType='youtube';cardVertical=isVerticalMoment(ytMoment);}
+  }
   const emotions=[...new Set(tree.moments.map(moment=>moment.emotion).filter(Boolean))];
   const stats=statsOverride||await communityRepo.stats({productId,shareId:share.shareId,viewerSubjectId});
-  const card={shareId:share.shareId,title:tree.title,subject:tree.subject,summary:clean(cover?.note,160),emotions,momentCount:tree.moments.length,entryMomentId:share.entryMomentId,view:share.view,cover:{title:cover?.title||tree.title,url:coverUrl,thumbnailUrl,type:coverType,vertical,emotion:cover?.emotion||''},createdAt:share.createdAt,lastActivityAt:lastActivityAt||share.createdAt,stats};
+  const card={shareId:share.shareId,title:tree.title,subject:tree.subject,summary:clean(cover?.note,160),emotions,momentCount:tree.moments.length,entryMomentId:share.entryMomentId,view:share.view,cover:{title:cover?.title||tree.title,url:coverUrl,thumbnailUrl,type:cardCoverType,vertical:cardVertical,emotion:cover?.emotion||''},createdAt:share.createdAt,lastActivityAt:lastActivityAt||share.createdAt,stats};
   // #611 3번: AI 명예회원 기록은 남에게 보이는 카드에 'AI 명예회원' 배지 한 비트만 내린다
   // (계정·이메일·subject는 공개 응답에 넣지 않는다).
   if(aiTesterLookup&&await aiTesterLookup(share.subjectId))card.aiTester=true;

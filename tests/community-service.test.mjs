@@ -249,6 +249,43 @@ test('#627: 둘러보기 검색은 트리 순간의 제목(영상 제목 포함)
  assert.equal(communityRepo.queryCount,1);
 });
 
+test('#887: 표지 미지정 트리의 둘러보기 카드는 첫 YouTube 순간 썸네일(mqdefault)로 채운다',async()=>{
+ // 기본 표지(coverMomentId 없음) 트리도 카드 표지가 비면 글자 칸만 남는다(#887 — 운영 7카드 전부 해당).
+ // 사슬: 명시 표지 → 사진 표지 → 첫 YouTube 순간 썸네일(mqdefault) → 글자 칸.
+ const workspaceRepo=createMemoryWorkspaceRepo(),workspace=createWorkspaceService({repo:workspaceRepo,productId:PRODUCT});
+ const video='https://www.youtube.com/shorts/rescene0001';
+ let tree=sampleTree(PHOTO); // 첫 순간: 사진(표지 미지정 — 기본 표지)
+ tree=addMoment(tree,{type:'video',url:video,mediaMetadata:{title:'RESCENE(리센느) 무대 직캠',channel:'기록 채널',source:'youtube.com'}},tree.moments[0].id,CLOCK);
+ tree=addMoment(tree,{type:'note',note:'둘러보기 후보 조건(순간 3개)를 맞추는 메모'},tree.moments[0].id,CLOCK);
+ await workspace.write(principal('alice'),{state:{version:1,trees:[tree]},expectedRevision:0,clientKey:'seed-cover-887'});
+ const shareRepo=createMemoryShareRepo();
+ const share=await shareRepo.create({productId:PRODUCT,shareId:'c'.repeat(24),subjectId:'alice',treeId:tree.id,entryMomentId:tree.moments[0].id,view:'book',momentCount:3});
+ const discoverable=await shareRepo.setDiscoverable({productId:PRODUCT,subjectId:'alice',shareId:share.shareId,discoverable:true});
+ const communityRepo=createMemoryCommunityRepo();communityRepo.seedShares([discoverable]);
+ const service=createCommunityService({communityRepo,shareRepo,workspaceRepo,productId:PRODUCT,admin:{roleFor:async()=>null},now:()=>Date.UTC(2026,10,1)});
+ const authenticate=async request=>{const subjectId=request.headers?.account;if(!subjectId)throw new ApiError(401,'unauthenticated','login');return principal(subjectId);};
+ const handle=createCommunityHandler({authenticate,service,productId:PRODUCT});
+ const list=await call(handle,'GET','/api/community/shares',{});
+ assert.equal(list.status,200);
+ assert.equal(list.body.items.length,1);
+ const cover=list.body.items[0].cover;
+ assert.equal(cover.thumbnailUrl,'https://i.ytimg.com/vi/rescene0001/mqdefault.jpg','첫 YouTube 순간의 mqdefault로 채운다');
+ assert.equal(cover.type,'youtube','표지 종류도 YouTube로 맞춰 화면이 영상 표지로 그린다');
+ assert.equal(cover.url,'','사진·개인 미디어 주소는 기본 표지 트리에 흘리지 않는다(#425 유지)');
+ // YouTube 순간이 아예 없는 기본 표지 트리는 글자 칸(빈 표지) — 사진 주소도 흘리지 않는다.
+ let tree2=sampleTree(PHOTO);
+ tree2=addMoment(tree2,{type:'note',note:'메모'},tree2.moments[0].id,CLOCK);
+ tree2=addMoment(tree2,{type:'note',note:'메모2'},tree2.moments[0].id,CLOCK);
+ await workspace.write(principal('alice'),{state:{version:1,trees:[tree2]},expectedRevision:1,clientKey:'seed-cover-887-2'});
+ const share2=await shareRepo.create({productId:PRODUCT,shareId:'d'.repeat(24),subjectId:'alice',treeId:tree2.id,entryMomentId:tree2.moments[0].id,view:'book',momentCount:3});
+ const discoverable2=await shareRepo.setDiscoverable({productId:PRODUCT,subjectId:'alice',shareId:share2.shareId,discoverable:true});
+ communityRepo.seedShares([discoverable,discoverable2]);
+ const list2=await call(handle,'GET','/api/community/shares',{});
+ const photoCard=list2.body.items.find(item=>item.shareId===share2.shareId);
+ assert.equal(photoCard.cover.thumbnailUrl,'','YouTube 순간이 없으면 글자 칸으로 둔다');
+ assert.equal(photoCard.cover.url,'','사진 주소는 표지 모드가 moment일 때만(#425 유지)');
+});
+
 test('#627: 비공개 트리는 순간 제목으로도 검색되지 않는다',async()=>{
  const workspaceRepo=createMemoryWorkspaceRepo(),workspace=createWorkspaceService({repo:workspaceRepo,productId:PRODUCT});
  let tree=createTree({subject:'윤슬',title:'첫 무대',note:'다시 보고 싶은 빛',emotion:'설렘',date:'2026-11-01',url:PHOTO},CLOCK);
