@@ -213,3 +213,34 @@ test('#824: 정렬 고르기로 많이 담긴 순을 고르면 sort=popular로 �
     globalThis.fetch = previous;
   } finally { h.restore(); }
 });
+
+test('#824: 가입 7일 미만이 담기를 누르면 안내가 뜨고 하트 상태는 그대로다', async () => {
+  const item = { ...COMMUNITY_ITEM, stats: { ...COMMUNITY_ITEM.stats, favorites: 5, favored: false } };
+  const h = communityHarness({ items: [item] });
+  try {
+    const calls = [];
+    const previous = globalThis.fetch;
+    globalThis.fetch = async (input, init) => {
+      const url = String(typeof input === 'string' ? input : input.url), method = String(init?.method || 'GET');
+      calls.push(method + ' ' + url);
+      if (method === 'PUT' && url.includes('/favorite')) {
+        return { ok: false, status: 403, json: async () => ({ error: { code: 'vote_too_new', message: '가입하고 7일이 지나면 투표할 수 있어요.' } }), message: undefined };
+      }
+      return { ok: true, status: 200, json: async () => ({ items: [item], totalVisible: 1, nextCursor: '' }) };
+    };
+    h.open();
+    await new Promise((r) => setTimeout(r, 0));
+    const card = h.get('community-list').children.find(node => node.dataset.shareId === 's1');
+    card.onclick();
+    const body = h.get('community-preview').children.find(node => node.className === 'community-preview-body');
+    const fav = body.children.find(node => node.className === 'community-preview-actions').children.find(node => node.dataset.communityAction === 'favorite');
+    assert.equal(fav.textContent, '즐겨찾기 5', '누르기 전에는 담지 않은 상태다');
+    fav.onclick();
+    await new Promise((r) => setTimeout(r, 0));
+    assert.equal(h.get('community-feedback').textContent, '가입하고 7일이 지나면 투표할 수 있어요.', '서버 안내 문구가 그대로 뜬다');
+    assert.equal(fav.textContent, '즐겨찾기 5', '막힌 담기는 하트 상태를 바꾸지 않는다');
+    assert.equal(fav.attrs['aria-pressed'], 'false', '눌림 표시도 원래대로다');
+    assert.equal(calls.some(call => call.startsWith('PUT ') && call.includes('/favorite')), true, '담기 요청은 서버로 나갔다');
+    globalThis.fetch = previous;
+  } finally { h.restore(); }
+});
