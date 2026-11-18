@@ -286,6 +286,7 @@ async function serve644() {
       try { body = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'); } catch { body = {}; }
       puts.push(body);
       const reply = () => {
+        if (ctrl.failPut) return send(500, { error: { code: 'server', message: '서버가 잠시 멈췄어요.' } });
         if (body.expectedRevision !== state.revision) return send(409, { error: { code: 'revision_conflict', currentRevision: state.revision, message: '다른 곳에서 먼저 저장했어요.' } });
         state.doc = body.state; state.revision += 1;
         return send(200, { revision: state.revision, savedAt: '2026-11-15T09:00:00.000Z' });
@@ -797,6 +798,71 @@ test('계정 메뉴 테두리: 마우스로 열면 0/none, 키보드 Enter로 �
         await ctx.close();
       }
     }
+  } finally {
+    await browser.close();
+    server.close();
+  }
+});
+
+test('이슈 905 화면(1440): 자동 저장 성공은 알림이 없고, 저장 실패(가짜 500) 때만 띠·다시 시도가 뜬다', { skip: REQUIRE_644 ? false : skip644, timeout: 300000 }, async () => {
+  if (skip644) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip644}`);
+  const { server, state, ctrl } = await serve644();
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await pwChromium644.launch({ headless: true });
+  try {
+    const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const p1 = await context.newPage();
+    await p1.goto(`${base}/v41/?account=1`, { waitUntil: 'load' });
+    await waitSynced644(p1);
+    // 토스트 관측기: #905 검사는 '뜬 적이 없다'를 봐야 하므로 뜨는 순간마다 기록해 둔다.
+    // (첫 안내 '내 기록을 불러왔어요.'는 남아 있을 수 있으니, 기록을 비운 뒤부터 잰다.)
+    const watchToasts = () => p1.evaluate(() => {
+      window.__n905 = [];
+      const t = document.getElementById('toast');
+      const rec = () => { if (t && !t.hidden && t.textContent) window.__n905.push(t.textContent); };
+      new MutationObserver(rec).observe(t, { attributes: true, childList: true, characterData: true, subtree: true });
+      rec();
+    });
+    await p1.waitForFunction(() => document.getElementById('toast')?.hidden, null, { timeout: 15000 });
+    await watchToasts();
+    // (1) 배치 옮기기 성공: 보드 화면을 열고 안쪽 화면이 lt41-board-sync로 배치를 보낸다 — 토스트가 뜨지 않는다(#905).
+    await p1.click('nav button:has-text("보드")');
+    await p1.waitForFunction(() => [...document.querySelectorAll('iframe')].some(f => /track58-pinboard/.test(f.contentWindow?.location?.href || '')), null, { timeout: 20000 });
+    const frame = p1.frames().find(f => /track58-pinboard/.test(f.url()));
+    assert.ok(frame, '기억 보드 화면이 열려 있다');
+    await frame.waitForFunction(() => Array.isArray(window.LTDEMO?.moments) && LTDEMO.moments.length > 0, null, { timeout: 15000 });
+    await frame.evaluate(() => {
+      const moments = LTDEMO.moments.map(m => ({ ...m, x: (m.x || 0) + 3, y: (m.y || 0) + 3 }));
+      window.parent.postMessage({ type: 'lt41-board-sync', treeId: window.parent.LT41.tree.id, moments }, location.origin);
+    });
+    await until644(() => state.revision === 2);
+    await wait644(1200);
+    assert.deepEqual(await p1.evaluate(() => window.__n905.filter(t => /저장/.test(t))), [], '배치 저장 성공에는 저장 토스트가 없다(#905) — 보드를 열 때의 안내 토스트는 별개다');
+    // (2) 쉬운 추가(자동 저장) 성공 — 역시 토스트가 없다. 창 안의 '담았어요' 안내 줄은 추가 동작의 확인이다.
+    await quickAdd644(p1, 'https://example.com/905-a.jpg');
+    await until644(() => state.revision === 3);
+    await wait644(1200);
+    assert.deepEqual(await p1.evaluate(() => window.__n905.filter(t => /저장/.test(t))), [], '자동 저장 성공에는 저장 토스트가 없다(#905)');
+    // #892: 담은 뒤 창은 '담았어요 · 지금 다듬기'를 보여 주며 열려 있다 — 다음 단계 전에 닫는다.
+    await p1.keyboard.press('Escape');
+    await p1.waitForFunction(() => !document.getElementById('write-panel')?.open, null, { timeout: 5000 });
+    // (3) 저장 실패(가짜 500): 띠가 뜨고 '다시 시도' 단추가 있다.
+    ctrl.failPut = true;
+    await quickAdd644(p1, 'https://example.com/905-b.jpg');
+    await p1.waitForFunction(() => !document.getElementById('save-feedback')?.hidden, null, { timeout: 20000 });
+    assert.match(await p1.evaluate(() => document.getElementById('save-message')?.textContent || ''), /저장되지 않았어요/, '실패 안내가 뜬다(알림 1)');
+    const retry = p1.locator('#save-actions button', { hasText: '다시 시도' });
+    assert.equal(await retry.count(), 1, '다시 시도 단추가 하나 있다');
+    // 저장이 실패한 동안 창은 닫히지 않는다(내용이 남아 있다) — 다시 시도를 누르려면 창을 먼저 닫는다.
+    await p1.keyboard.press('Escape');
+    await p1.waitForFunction(() => !document.getElementById('write-panel')?.open, null, { timeout: 5000 });
+    // (4) 서버가 돌아오면 다시 시도가 저장한다 — 띠가 사라지고 성공 토스트도 없다.
+    ctrl.failPut = false;
+    await retry.click();
+    await until644(() => state.revision === 4);
+    await p1.waitForFunction(() => document.getElementById('save-feedback')?.hidden === true, null, { timeout: 10000 });
+    await wait644(1200);
+    assert.deepEqual(await p1.evaluate(() => window.__n905.filter(t => /저장/.test(t))), [], '재저장 성공 뒤에도 저장 토스트가 없다(#905)');
   } finally {
     await browser.close();
     server.close();
