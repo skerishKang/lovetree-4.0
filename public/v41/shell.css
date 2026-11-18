@@ -820,6 +820,9 @@ body.lt-frame-dialog-open #toast{top:calc(72px + env(safe-area-inset-top));botto
 #community-preview .community-preview-subject,#community-preview .community-preview-moment,#community-preview .community-preview-summary,#community-preview .community-preview-meta{margin:0;color:var(--lt-ink);font-size:14px;line-height:1.55}
 #community-preview .community-preview-moment-title{margin:4px 0;padding:10px 12px;border-left:3px solid var(--lt-gold);color:var(--lt-ink);font-size:16px;font-weight:700;line-height:1.45}
 #community-preview .community-preview-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px}
+/* 이슈 903: 담기가 서버에 막힌 이유(가입 7일 미만 안내)는 담기 단추 바로 다음 줄 같은 묶음 안에서 본다. */
+#community-preview .community-vote-note{margin:0;color:var(--lt-ink);font-size:13px;line-height:1.5}
+#community-preview .community-vote-note[hidden]{display:none}
 #community-preview .community-mini,#community-preview .community-link,#community-preview .community-preview-start,#community-preview .community-preview-open{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:9px 14px;border:1px solid var(--lt-line-paper);border-radius:var(--lt-r-pill);background:var(--lt-paper);color:var(--lt-ink);font-size:14px;font-weight:600}
 #community-preview .community-link{border-color:var(--lt-line-paper)!important;background:var(--lt-paper)!important;color:var(--lt-ink)!important}
 #community-preview .community-preview-open{width:100%;border:0;background:var(--lt-primary);color:var(--lt-primary-ink);font-weight:700}

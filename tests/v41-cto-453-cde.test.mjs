@@ -214,17 +214,19 @@ test('#824: 정렬 고르기로 많이 담긴 순을 고르면 sort=popular로 �
   } finally { h.restore(); }
 });
 
-test('#824: 가입 7일 미만이 담기를 누르면 안내가 뜨고 하트 상태는 그대로다', async () => {
+test('#824·#903: 가입 7일 미만이 담기를 누르면 안내가 단추 바로 다음 줄에 뜨고, 담기에 성공하면 지워진다', async () => {
   const item = { ...COMMUNITY_ITEM, stats: { ...COMMUNITY_ITEM.stats, favorites: 5, favored: false } };
   const h = communityHarness({ items: [item] });
   try {
     const calls = [];
+    let failFavorite = true;
     const previous = globalThis.fetch;
     globalThis.fetch = async (input, init) => {
       const url = String(typeof input === 'string' ? input : input.url), method = String(init?.method || 'GET');
       calls.push(method + ' ' + url);
       if (method === 'PUT' && url.includes('/favorite')) {
-        return { ok: false, status: 403, json: async () => ({ error: { code: 'vote_too_new', message: '가입하고 7일이 지나면 투표할 수 있어요.' } }), message: undefined };
+        if (failFavorite) return { ok: false, status: 403, json: async () => ({ error: { code: 'vote_too_new', message: '가입하고 7일이 지나면 투표할 수 있어요.' } }), message: undefined };
+        return { ok: true, status: 200, json: async () => ({ ok: true, stats: { ...item.stats, favored: true, favorites: 6 } }) };
       }
       return { ok: true, status: 200, json: async () => ({ items: [item], totalVisible: 1, nextCursor: '' }) };
     };
@@ -235,12 +237,30 @@ test('#824: 가입 7일 미만이 담기를 누르면 안내가 뜨고 하트 �
     const body = h.get('community-preview').children.find(node => node.className === 'community-preview-body');
     const fav = body.children.find(node => node.className === 'community-preview-actions').children.find(node => node.dataset.communityAction === 'favorite');
     assert.equal(fav.textContent, '즐겨찾기 5', '누르기 전에는 담지 않은 상태다');
+    // #903: 안내 칸은 담기 단추 묶음(community-preview-actions) 바로 다음 줄이다 — 막히기 전에는 숨어 있다.
+    const noteOf = (nowBody) => {
+      const nowActions = nowBody.children.find(node => node.className === 'community-preview-actions');
+      return nowBody.children[nowBody.children.indexOf(nowActions) + 1];
+    };
+    const note = noteOf(body);
+    assert.equal(note.className, 'community-vote-note', '안내 칸은 actions 바로 다음 줄자리에 둔다');
+    assert.equal(note.hidden, true, '막히기 전에는 안내 칸이 보이지 않는다');
     fav.onclick();
     await new Promise((r) => setTimeout(r, 0));
     assert.equal(h.get('community-feedback').textContent, '가입하고 7일이 지나면 투표할 수 있어요.', '서버 안내 문구가 그대로 뜬다');
     assert.equal(fav.textContent, '즐겨찾기 5', '막힌 담기는 하트 상태를 바꾸지 않는다');
     assert.equal(fav.attrs['aria-pressed'], 'false', '눌림 표시도 원래대로다');
     assert.equal(calls.some(call => call.startsWith('PUT ') && call.includes('/favorite')), true, '담기 요청은 서버로 나갔다');
+    assert.equal(note.hidden, false, '막히면 안내 칸을 단추 바로 다음 줄에 보인다');
+    assert.equal(note.textContent, '가입하고 7일이 지나면 투표할 수 있어요.', '서버 안내 문구를 그대로 단추 옆에 내린다');
+    // 담기에 성공하면 안내는 지워진다(미리보기를 다시 그려 새 안내 칸은 숨은 채로 둔다).
+    failFavorite = false;
+    fav.onclick();
+    await new Promise((r) => setTimeout(r, 0));
+    const body2 = h.get('community-preview').children.find(node => node.className === 'community-preview-body');
+    const fav2 = body2.children.find(node => node.className === 'community-preview-actions').children.find(node => node.dataset.communityAction === 'favorite');
+    assert.equal(fav2.textContent, '✓ 즐겨찾기 6', '성공한 담기는 하트 상태를 바꾼다');
+    assert.equal(noteOf(body2).hidden, true, '담기에 성공하면 안내 칸은 다시 숨는다');
     globalThis.fetch = previous;
   } finally { h.restore(); }
 });
