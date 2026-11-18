@@ -166,7 +166,14 @@ $('record-menu').addEventListener('click',event=>{event.stopPropagation();if(tre
 if(treePopover)treePopover.addEventListener('keydown',event=>{const items=[...treePopover.querySelectorAll('button')];const at=items.indexOf(document.activeElement);if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();const next=event.key==='ArrowDown'?(at+1)%items.length:(at-1+items.length)%items.length;items[next]?.focus();}else if(event.key==='Home'){event.preventDefault();items[0]?.focus();}else if(event.key==='End'){event.preventDefault();items.at(-1)?.focus();}});
 document.addEventListener('click',event=>{if(treePopover&&!treePopover.hidden&&!event.target.closest('.tree-slot'))closeTreeMenu();});
 document.addEventListener('keydown',event=>{if(event.key==='Escape'&&treePopover&&!treePopover.hidden){closeTreeMenu();treeTrigger.focus();}});
-addEventListener('lt41-trees-changed',()=>{if(treePopover&&!treePopover.hidden)renderTreeMenu();paintQuickTargetControls();});
+addEventListener('lt41-trees-changed',()=>{
+ if(treePopover&&!treePopover.hidden)renderTreeMenu();
+ paintQuickTargetControls();
+ try {
+  const titles=(window.LT41?.trees||[]).map(t=>({id:t.id,title:t.title}));
+  for(const f of frames()) f?.postMessage({type:'lt41-trees-renamed',titles},location.origin);
+ } catch {}
+});
 $('mobile-more').addEventListener('click',event=>{
  event.stopPropagation();
  if(moreMenu.hidden){buildFoldMenu();moreMenu.hidden=false;moreMenu.classList.add('is-open');moreButton.setAttribute('aria-expanded','true');}

@@ -220,3 +220,28 @@ test('첫 화면 안내 패널에 처리방침·약관 링크가 있다(새 창,
   // 누름 영역 44px.
   assert.match(homeSrc, /#guidePanel \.guide-policy a\{min-height:44px/);
 });
+
+// 261118 도현 의견 1-2: 첫 화면 숫자판에 '트리 0'(내 트리)과 '트리 9'(둘러보기 공개 집계)가 같은 라벨로
+// 나란히 보였고, '순간 117'은 남의 것까지 센 공개 집계라 내 숫자로 읽혔다. 로그인은 내 것만 남기고
+// (모아둔 N·전체 N·트리 N·최근 — 둘러보기 입구는 바로 위 '둘러보기' 단추에 있다), 로그아웃은 내 숫자가
+// 없으니 0 두 줄 대신 둘러보기 공개 집계만 '예시' 표시로 남긴다. 같은 뜻 숫자가 두 번 보이지 않게 한다.
+test('첫 화면 숫자판: 로그인은 내 것만, 로그아웃 집계는 예시 표시(261118 도현 의견 1-2)',()=>{
+  // 로그인: 둘러보기 공개 집계 칸을 만들지 않는다 — 모아둔·전체 칸은 로그인일 때만 붙인다.
+  assert.match(homeSrc,/if\(loggedIn\)infoRow\.append\(cellMoments\)/,'모아둔·전체 칸은 로그인만');
+  assert.doesNotMatch(homeSrc,/infoRow\.append\(cellMoments,cellCommunity\)/,'로그인에도 공개 집계를 붙이던 옛 배선은 뺐다');
+  assert.doesNotMatch(homeSrc,/communityLine\('순간'\)/,'공개 집계를 그냥 순간으로 부르던 라벨은 뺐다');
+  assert.doesNotMatch(homeSrc,/communityLine\('트리'\)/,'공개 집계를 그냥 트리로 부르던 라벨은 뺐다(내 트리 칸과 같은 뜻 숫자 두 번 금지)');
+  // 로그아웃: 둘러보기 칸만 남기고 '예시'로 표시한다 — 내 기록이 아니라는 뜻을 글자·낭독기에 함께 둔다.
+  assert.match(homeSrc,/if\(!loggedIn\)\{\s*const cellCommunity=/,'둘러보기 집계 칸은 로그아웃에만');
+  assert.match(homeSrc,/communityLine\('예시 순간'\)/,'공개 순간 집계는 예시 표시');
+  assert.match(homeSrc,/communityLine\('예시 트리'\)/,'공개 트리 집계는 예시 표시');
+  assert.match(homeSrc,/둘러보기 공개 순간 \$\{formatCount\(stats\?\.moments\)\}개 — 내 기록이 아니에요/,'낭독기에도 내 기록이 아님을 알린다');
+  assert.match(homeSrc,/둘러보기 공개 트리 \$\{formatCount\(stats\?\.trees\)\}개 — 내 기록이 아니에요/,'트리 집계 낭독기 이름');
+  // 로그인 숫자판은 두 칸(순간 목록·내 트리)이므로 3칸 격자를 두 칸으로 좁힌다(휴대폰 규칙도 함께).
+  assert.match(homeSrc,/infoRow\.dataset\.cells='2'/,'두 칸 표시');
+  assert.match(homeSrc,/\.home-info\[data-cells="2"\]\{grid-template-columns:repeat\(2,minmax\(0,176px\)\)\}/,'두 칸 격자 규칙');
+  assert.match(homeSrc,/\.home-info\[data-cells="2"\]\{grid-template-columns:repeat\(2,minmax\(0,1fr\)\)\}/,'휴대폰 두 칸 격자 규칙');
+  // 기존 규칙 유지: 모아둔 칸 누르면 정리 창, 0이면 비활성 표기.
+  assert.match(homeSrc,/inboxLine\.onclick=\(\)=>bridge\.actions\.cleanup\(\)/);
+  assert.match(homeSrc,/setAttribute\('aria-disabled','true'\)/);
+});

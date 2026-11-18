@@ -44,7 +44,7 @@ export function createTagManager(deps) {
     const groups = tagInventory(current);
     $('tag-desc').textContent = groups.length
       ? `이 트리에서 쓴 꼬리표 ${groups.length}종이에요. 이름을 바꾸면 모든 순간에 반영돼요.`
-      : '아직 꼬리표가 없어요. 아래에서 제목으로 꼬리표를 제안받아 붙일 수 있어요.';
+      : '아래에서 제목으로 꼬리표를 제안받아 붙일 수 있어요.';
     const host = $('tag-list');
     host.replaceChildren();
     if (!groups.length) {

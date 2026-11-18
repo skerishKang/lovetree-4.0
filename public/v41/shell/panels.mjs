@@ -246,7 +246,7 @@ export function createPanels(deps) {
     }
     const tree = window.LT41.tree, form = $('tree-form');
     form.elements.title.value = tree.title;
-    form.elements.subject.value = tree.subject;
+    form.elements.subject.value = tree.subject === '모아둔 순간' ? '' : tree.subject;
     fillTreeCoverOptions(tree);
     $('tree-cover').value = tree.coverMomentId || firstMomentId(tree);
     // #256-3 2단계: 새 사진 표지 만들기는 로그인·서버 기록에서만 보인다(방법 '사진'을 골랐을 때만 보인다).
@@ -412,6 +412,7 @@ export function createPanels(deps) {
       // #380 5번: 고른 방법 하나만 표지가 된다. 고르지 않은 곳의 저장값(사진 표지 순간·디자인)은 지우지 않는다.
       const tree = window.LT41?.tree, mode = treeCoverMode();
       const values = Object.fromEntries(new FormData(e.target));
+      if (!values.subject) values.subject = tree?.subject || '모아둔 순간';
       values.coverMode = mode;
       // 고르지 않은 방법의 저장값은 덮어쓰지 않는다 — 첫 순간(기본)·디자인은 저장해 둔 표지 순간을 그대로 두고,
       // 순간에서·사진만 지금 고른 순간으로 바꾼다(되돌리면 그대로 다시 보인다).
