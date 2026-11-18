@@ -404,6 +404,10 @@ html[data-lt-theme=garden] #moment-form input,html[data-lt-theme=garden] #moment
 .quick-notice-row:has(.quick-notice:empty):has(.quick-refine[hidden]){display:none}
 .quick-refine{flex:0 0 auto;min-height:44px;padding:0;border:0;background:none;color:var(--lt-gold);font-size:13px;white-space:nowrap}
 .quick-refine:hover{text-decoration:underline}
+/* #37(AI 고객 37회차): 꼬리표를 확정한 뒤에도 '담았어요 · 지금 다듬기 →'가 그대로 흐린 안내라
+   확정이 저장될 때마다 이 줄을 도드라지게 띄운다(is-lit) — 안내 글자를 금색으로, 다듬기 단추에 테를 둔다. */
+.quick-notice-row.is-lit .quick-notice{color:var(--lt-gold)}
+.quick-notice-row.is-lit .quick-refine{border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-pill);padding:0 12px}
 .quick-submit{width:100%;min-height:52px;margin-top:16px;border-radius:14px;font-size:15px;font-weight:600}
 /* 하은 2회차 손질 ①(261116): 실패 문구 아래에 숨을 벌린다 — 고정 단추의 그림자(10px)가 문구 아래를 덮지 않게. */
 .quick-tagline .lt-tagline-error{margin-bottom:16px}

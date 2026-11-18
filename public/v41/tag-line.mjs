@@ -21,7 +21,7 @@ function chipHTML(tag) {
 }
 
 // 꼬리표 줄 하나를 host에 그린다. update(moment)로 같은 자리에 다시 그리고, destroy로 지운다.
-export function renderTagLine({ host, doc = document, moment, knownTags = [], writable = false, onCommit, emptyText = '아직 꼬리표가 없어요', errorReserve = 0 }) {
+export function renderTagLine({ host, doc = document, moment, knownTags = [], writable = false, onCommit, emptyText = '아직 꼬리표가 없어요', errorReserve = 0, undoMs = 5000 }) {
   // #739: 눌러 듣는 귀는 이 줄 인스턴스에 묶는다 — destroy로 함께 거둔다. 안 그러면 같은 host에 줄을
   // 다시 그릴 때(쉬운 추가 연속 담기) 옛 줄의 귀가 살아 남아 옛 순간에 저장하고, 같은 칩을 다시 누르면
   // 옛 줄이 해제 저장해 어디에도 남지 않는다(하은 1회차 실측 — 세 순간 모두 keywords []).
@@ -32,7 +32,9 @@ export function renderTagLine({ host, doc = document, moment, knownTags = [], wr
     knownTags: Array.isArray(knownTags) ? [...knownTags] : [],
     manualOpen: false, // 직접 붙이기 칸은 접힘이 기본이다(261116 대표 지적 — 다음 영상을 바로 담는 사람을 막지 않게)
     kind: 'artist',
-    errorReserve: Number(errorReserve) || 0 // 실패 문구를 데려올 때 비켜 앉힐 높이(고정 단추가 있는 곳만 넘긴다)
+    errorReserve: Number(errorReserve) || 0, // 실패 문구를 데려올 때 비켜 앉힐 높이(고정 단추가 있는 곳만 넘긴다)
+    undo: null, // #37: 방금 뺀 꼬리표(되돌리기 알림이 떠 있는 동안만 채운다)
+    undoTimer: 0
   };
   if (!host) return null;
   host.classList.add('lt-tagline-host');
@@ -54,9 +56,11 @@ export function renderTagLine({ host, doc = document, moment, knownTags = [], wr
           + `<button type="button" class="lt-tagline-add">붙이기</button></div></div>`;
     // '꼬리표' 낱말은 줄 안에 한 번만 보인다(#754 이후) — 빈 상태에서는 라벨을 숨기고
     // '아직 꼬리표가 없어요' 빈 문구만 그린다. 칩이 보일 때만 라벨이 나란히 붙는다.
+    const undoLine = state.undo ? `<p class="lt-tagline-undo" role="status"><span>꼬리표를 뺐어요</span><button type="button" class="lt-tagline-undo-btn">되돌리기</button></p>` : '';
     host.innerHTML = `<div class="lt-tagline">`
       + (chips.length ? `<span class="lt-tagline-name">꼬리표</span><span class="lt-tagline-chips">${chips.map(chipHTML).join('')}</span>`
         : `<span class="lt-tagline-empty">${esc(emptyText)}</span>`)
+      + undoLine
       + (writable ? manual : '')
       + `<p class="lt-tagline-error" role="alert" hidden></p>`
       + `</div>`;
@@ -88,8 +92,27 @@ export function renderTagLine({ host, doc = document, moment, knownTags = [], wr
     else if (r.top < port.top) scroller.scrollTop -= (port.top - r.top);
   }
 
+  // #37(AI 고객 37회차): 확정 칩을 다시 눌러 빼는 것은 저장까지 조용히 끝났다 — 잘못 누른 사람은 눈치채지
+  // 못한다. 빼기가 저장되면 '꼬리표를 뺐어요 · 되돌리기'를 5초 보여 주고, 되돌리기를 누르면 다시 붙여 저장한다.
+  function armUndo(raw) {
+    if (state.undoTimer) clearTimeout(state.undoTimer);
+    state.undo = raw;
+    draw();
+    state.undoTimer = setTimeout(() => {
+      state.undoTimer = 0;
+      if (!alive() || state.undo !== raw) return;
+      state.undo = null;
+      draw();
+    }, undoMs);
+  }
+  function clearUndo() {
+    if (state.undoTimer) { clearTimeout(state.undoTimer); state.undoTimer = 0; }
+    state.undo = null;
+  }
+
   function commit(next) {
     const prev = [...state.keywords];
+    clearUndo();
     state.keywords = Array.isArray(next) ? [...next] : [];
     draw();
     // #735: onCommit에 '지금 보고 있는 순간 id'를 함께 넘긴다 — 줄을 처음 만든 순간의 id를 클로저로
@@ -110,7 +133,9 @@ export function renderTagLine({ host, doc = document, moment, knownTags = [], wr
       // 하은 2회차 ④(261116): 저장이 실패했다고 바깥이 알려주면({ok:false}) 눌렀던 칩을 꺼진 모양으로
       // 되돌리고 실패 문구를 보인다 — 칩만 붙고 저장은 안 된 거짓 성공을 막는다.
       // 성공({ok:true})과 결과를 돌려주지 않는 옛 부름(화면 저장 요청 postMessage)은 그대로다.
+      const removed = clicked && before.has(clicked) && !after.has(clicked);
       if (saved && saved.ok === false) revert(saved.error || '저장하지 못했어요. 다시 시도해 주세요.');
+      else if (removed) armUndo(clicked);
     } catch (error) { revert(error?.message || '저장하지 못했어요. 다시 시도해 주세요.'); }
   }
 
@@ -124,6 +149,15 @@ export function renderTagLine({ host, doc = document, moment, knownTags = [], wr
     if (!chip) return;
     fail('');
     commit(toggledKeywords(state.keywords, chip.dataset.tagRaw));
+  }, when);
+  // 되돌리기: 방금 뺀 꼬리표를 다시 붙여 저장한다(빠진 값이니 toggledKeywords는 붙이는 쪽으로 돌아온다).
+  host.addEventListener('click', (event) => {
+    if (!alive()) return;
+    if (!event.target.closest('.lt-tagline-undo-btn')) return;
+    const raw = state.undo;
+    if (!raw) return;
+    fail('');
+    commit(toggledKeywords(state.keywords, raw));
   }, when);
   // 직접 입력: 쓰기 창 안에도 붙으므로 form 대신 group으로 두고 Enter·단추로 붙인다(중첩 form 금지).
   function submitInput() {
@@ -163,6 +197,7 @@ export function renderTagLine({ host, doc = document, moment, knownTags = [], wr
   return {
     update(moment) {
       if (!moment) return;
+      clearUndo(); // #37: 다른 순간으로 바뀌면 방금 뺐다는 알림도 그 순간의 이야기라 거둔다.
       state.momentId = moment.id || state.momentId;
       state.title = moment.title || '';
       state.keywords = Array.isArray(moment.keywords) ? [...moment.keywords] : [];
@@ -170,7 +205,7 @@ export function renderTagLine({ host, doc = document, moment, knownTags = [], wr
     },
     setKnownTags(tags) { state.knownTags = Array.isArray(tags) ? [...tags] : []; draw(); },
     get momentId() { return state.momentId; },
-    destroy() { off.abort(); host.replaceChildren(); host.classList.remove('lt-tagline-host'); host.hidden = true; }
+    destroy() { clearUndo(); off.abort(); host.replaceChildren(); host.classList.remove('lt-tagline-host'); host.hidden = true; }
   };
 }
 
