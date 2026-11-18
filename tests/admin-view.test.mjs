@@ -469,7 +469,14 @@ test('운영센터 탭 셋(#888) + 사용 일지 탭 + 의견 갈래 칩 + 옛 �
       {id: 'j4', kind: 'journal', status: 'reviewing', replyCount: 0, score: 2, journalDate: '2026-11-17', subjectId: 'c2', authorName: '라마바', displayTitle: '일지 4', createdAt: '2026-11-17T09:00:00Z'},
       {id: 'j5', kind: 'journal', status: 'fixed', replyCount: 0, score: 1, journalDate: '2026-11-15', subjectId: 'c2', authorName: '라마바', displayTitle: '일지 5', createdAt: '2026-11-15T09:00:00Z'}
     ]}) }));
-    await context.route('**/api/admin/journals', r => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ok: true, journals: []}) }));
+    await context.route('**/api/admin/journals', r => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ok: true, journals: [
+      {id: 'j1', kind: 'journal', status: 'received', score: 4, journalDate: '2026-11-18', subjectId: 'c1', authorName: '가나다', displayTitle: '일지 1', createdAt: '2026-11-18T08:00:00Z'},
+      {id: 'j2', kind: 'journal', status: 'received', score: 3, journalDate: '2026-11-17', subjectId: 'c1', authorName: '가나다', displayTitle: '일지 2', createdAt: '2026-11-17T08:00:00Z'},
+      {id: 'j3', kind: 'journal', status: 'received', score: 5, journalDate: '2026-11-16', subjectId: 'c1', authorName: '가나다', displayTitle: '일지 3', createdAt: '2026-11-16T08:00:00Z'},
+      {id: 'j4', kind: 'journal', status: 'reviewing', score: 2, journalDate: '2026-11-17', subjectId: 'c2', authorName: '라마바', displayTitle: '일지 4', createdAt: '2026-11-17T09:00:00Z'},
+      {id: 'j5', kind: 'journal', status: 'fixed', score: 1, journalDate: '2026-11-15', subjectId: 'c2', authorName: '라마바', displayTitle: '일지 5', createdAt: '2026-11-15T09:00:00Z'}
+    ]}) }));
+    await context.route('**/api/admin/stats', r => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ok: true, stats: {checkedAt: '2026-11-18T00:00:00Z', window: {days: 7, since: '2026-11-11T00:00:00Z'}, accounts: {total: 8, real: 2, aiTester: 4, tester: 2, new: {total: 3, real: 1, aiTester: 1, tester: 1}}, trees: {total: 9, real: 4, aiTester: 3, tester: 2, titles: [], public: {total: 3, real: 2, aiTester: 1, tester: 0, titles: []}, featured: {total: 1, real: 1, aiTester: 0, tester: 0, titles: []}}, moments: {total: 40, real: 21, aiTester: 12, tester: 7, new: {total: 6, real: 3, aiTester: 2, tester: 1}}}}) }));
     await context.route('**/api/community/admin/reports', r => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ok: true, reports: [
       {id: 'r1', status: 'open', hidden: false, reason: '둘러보기 신고 내용', shareId: 'sh_1', createdAt: '2026-11-18T13:00:00Z'}
     ]}) }));
@@ -555,10 +562,15 @@ test('운영센터 탭 셋(#888) + 사용 일지 탭 + 의견 갈래 칩 + 옛 �
     await page.waitForSelector('.lt-ov-cards .lt-ov-card', { timeout: 8000 });
     const ov = await page.evaluate(() => ({
       cards: [...document.querySelectorAll('.lt-ov-cards .lt-ov-card .lt-ov-value')].map(el => el.textContent.trim()),
-      todos: [...document.querySelectorAll('.is-overview .lt-post-title')].map(el => el.textContent.trim())
+      todos: [...document.querySelectorAll('.is-overview .lt-post-title')].map(el => el.textContent.trim()),
+      journalRows: [...document.querySelectorAll('.lt-card')].filter(sec => (sec.querySelector('.lt-h2')?.textContent || '').includes('사용 일지')).flatMap(sec => [...sec.querySelectorAll('.lt-post-row')].map(r => r.textContent.replace(/\s+/g, ' ').trim())),
+      statFail: Boolean(document.querySelector('.lt-ov-fail'))
     }));
     assert.deepEqual(ov.cards, ['4', '4', '1'], '할 일 4·답 안 단 글 4(의견만 — 일지 0)·신고 대기 1');
     assert.equal(ov.todos.filter(title => title.startsWith('일지')).length, 0, '오늘 할 일에 일지 없다');
+    assert.deepEqual(ov.journalRows, ['가나다최근 2026-11-18다시 올 4점', '라마바최근 2026-11-17다시 올 2점'],
+      '사용 일지 · 고객별 최근 기록은 /api/admin/journals 응답을 그대로 보여 준다(#843 때 함께 빠지지 않는다)');
+    assert.equal(ov.statFail, false, '전체 숫자 카드는 응답이 오면 그대로 산다');
     await page.screenshot({ path: `${shotDir}/ops888-한눈에-1440.png` });
 
     // ⑧ 탭 여섯 모두 클릭 전환.
@@ -761,7 +773,14 @@ test('운영센터 폭 통일 + 한눈에 카드 4·3 + 고객 칸 이름(1440·
       {id: 'p2', kind: 'opinion', status: 'reviewing', replyCount: 0, displayTitle: '확인 중', createdAt: '2026-11-16T10:00:00Z'},
       {id: 'p3', kind: 'journal', status: 'received', replyCount: 0, score: 4, journalDate: '2026-11-16', displayTitle: '일지', createdAt: '2026-11-16T11:00:00Z'}
     ]}) }));
-    await context.route('**/api/admin/journals', r => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ok: true, journals: []}) }));
+    await context.route('**/api/admin/journals', r => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ok: true, journals: [
+      {id: 'j1', kind: 'journal', status: 'received', score: 4, journalDate: '2026-11-18', subjectId: 'c1', authorName: '가나다', displayTitle: '일지 1', createdAt: '2026-11-18T08:00:00Z'},
+      {id: 'j2', kind: 'journal', status: 'received', score: 3, journalDate: '2026-11-17', subjectId: 'c1', authorName: '가나다', displayTitle: '일지 2', createdAt: '2026-11-17T08:00:00Z'},
+      {id: 'j3', kind: 'journal', status: 'received', score: 5, journalDate: '2026-11-16', subjectId: 'c1', authorName: '가나다', displayTitle: '일지 3', createdAt: '2026-11-16T08:00:00Z'},
+      {id: 'j4', kind: 'journal', status: 'reviewing', score: 2, journalDate: '2026-11-17', subjectId: 'c2', authorName: '라마바', displayTitle: '일지 4', createdAt: '2026-11-17T09:00:00Z'},
+      {id: 'j5', kind: 'journal', status: 'fixed', score: 1, journalDate: '2026-11-15', subjectId: 'c2', authorName: '라마바', displayTitle: '일지 5', createdAt: '2026-11-15T09:00:00Z'}
+    ]}) }));
+    await context.route('**/api/admin/stats', r => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ok: true, stats: {checkedAt: '2026-11-18T00:00:00Z', window: {days: 7, since: '2026-11-11T00:00:00Z'}, accounts: {total: 8, real: 2, aiTester: 4, tester: 2, new: {total: 3, real: 1, aiTester: 1, tester: 1}}, trees: {total: 9, real: 4, aiTester: 3, tester: 2, titles: [], public: {total: 3, real: 2, aiTester: 1, tester: 0, titles: []}, featured: {total: 1, real: 1, aiTester: 0, tester: 0, titles: []}}, moments: {total: 40, real: 21, aiTester: 12, tester: 7, new: {total: 6, real: 3, aiTester: 2, tester: 1}}}}) }));
     await context.route('**/api/community/admin/reports', r => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ok: true, reports: [{id: 'r1', status: 'open', hidden: false, reason: '신고', shareId: 'sh_1', createdAt: '2026-11-16T12:00:00Z'}]}) }));
     await context.route('**/api/admin/stats', r => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(stats) }));
     await context.route('**/api/admin/customers/views*', r => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ok: true, views: []}) }));
