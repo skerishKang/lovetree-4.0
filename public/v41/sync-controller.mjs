@@ -133,7 +133,7 @@ export function createSyncController({getState, replaceState, api, draftStorage 
     return emit(status({phase:'synced',actions:actions.logout}));
   }
 
-  async function push() {
+  async function push(options = {}) {
     if (!owned || revision === null || inflight || !dirty || current.phase === 'conflict') return current;
     inflight = true;
     const gen = generation;
@@ -143,7 +143,7 @@ export function createSyncController({getState, replaceState, api, draftStorage 
     const sent = attempt;
     emit(status({phase:'syncing'}));
     let answer;
-    try { answer = await api.put({state:JSON.parse(sent.serial),expectedRevision:sent.expected,clientKey:sent.key}); }
+    try { answer = await api.put({state:JSON.parse(sent.serial),expectedRevision:sent.expected,clientKey:sent.key}, {keepalive:options.keepalive === true}); }
     catch { answer = {ok:false,status:0}; }
     inflight = false;
     if (gen !== generation) return current;
@@ -169,6 +169,18 @@ export function createSyncController({getState, replaceState, api, draftStorage 
     if (answer.status === 409 && answer.code === 'client_key_conflict') attempt = null;
     return emit(status({phase:answer.status === 0 ? 'offline' : 'rejected',
       detail:'서버에 저장되지 않았어요. 이 화면을 닫기 전에 다시 시도해 주세요.',actions:actions.retry}));
+  }
+
+  // 숨김·닫힘 때의 마지막 저장(창 닫힘 유실 막음): 900ms 저장 대기 중에 창이 닫히면(탭 닫기·앱 전환·휴대폰 화면 꺼짐)
+  // 아직 서버에 못 보낸 바뀜이 영영 사라진다 — 담은 직후 꼬리표 칩을 확정하고 곧장 창을 닫으면 칩은 '확정'으로 보였지만
+  // 서버에는 꼬리표가 없었다(운영센터 의견 #35). 페이지가 숨거나 닫히는 순간 keepalive로 즉시 보낸다 — 같은 요청 키로
+  // 같은 내용을 보내면 서버가 같은 요청으로 묶으니(되묻기 안전) 눌러 보내도 어긋나지 않고, 창이 살아 돌아오면 이 push가
+  // 답을 받아 상태를 맞춘다. keepalive 몸통 한도(64KB)를 넘는 큰 기록은 보내지 않는다 — 기존 900ms 저장이 맡는다.
+  function flushOnHide() {
+    if (!owned || revision === null || inflight || !dirty || current.phase === 'conflict') return false;
+    if (JSON.stringify(getState()).length > 60000) return false;
+    void push({ keepalive: true });
+    return true;
   }
 
   // 이슈 644 3번: 다른 곳에서 기록이 바뀌었는지 조용히 확인한다. 이 화면에서 고친 게 없을 때만 서버 기록을
@@ -232,6 +244,6 @@ export function createSyncController({getState, replaceState, api, draftStorage 
     }
     return current;
   }
-  return {start, act, check, markLocalSave, status:() => current,
+  return {start, act, check, markLocalSave, flushOnHide, status:() => current,
     subscribe:fn => {listener=fn}, snapshot:() => ({owned,revision,dirty})};
 }
