@@ -16,6 +16,7 @@
       {"kind": "fix", "text": "첫 화면 숫자판에는 내 기록의 숫자만 보이고, 예시로 둔 숫자는 예시라고 구분돼요", "source": "user", "issue": "#860"},
       {"kind": "fix", "text": "트리 이름을 바꾸면 서재 표지와 책 제목이 새로고침 없이 바로 바뀌어요", "source": "team", "issue": "#862"},
       {"kind": "fix", "text": "지도 그래프가 여유 있게 정리됐어요 — 묶음이 없으면 발자취가 화면 가운데에서 안내하고 글자가 겹치지 않아요", "source": "ai_tester", "issue": "#864"},
+      {"kind": "fix", "text": "의견·사용 일지·신고를 살피는 안내 화면을 탭 몇 개로 깔끔하게 나눴어요", "source": "ai_tester", "issue": "#888"},
       {"kind": "fix", "text": "계정 메뉴에서 긴 이메일도 한 줄로 보여요", "source": "ai_tester"}
     ]
   },

@@ -6,10 +6,10 @@ import {
   richParagraph, formatTime, parseHash, viewHash, viewToTab,
   filterRows, statusTabs, kindTabs, STATUS_LABEL,
   tabClickFilters,
-  BOARD_KIND_TABS, BOARD_STATUS_TABS, boardKindTabs, boardStatusTabs, filterBoardRows, MENU_TABS,
+  BOARD_KIND_TABS, BOARD_STATUS_TABS, BOARD_CAT_TABS, boardKindTabs, boardStatusTabs, boardCatTabs, filterBoardRows, MENU_TABS,
   linkedIssueNumbers, normalizeIssueNumber, issueStateLabel, needsFixButton,
   statusChangeMessage, buildIssueUrl, issueLink, escapeText, statsCards,
-  journalsSummary, journalRowsByCustomer, journalStage,
+  journalsSummary, journalRowsByCustomer, journalStage, journalListRows, journalCustomerOptions,
   isPendingStatus, overviewModel, overviewTodos,
   customerSummaryCards, customerRows, customerDetailModel, customerViewRows
 } from '../src/admin-view.js';
@@ -18,7 +18,8 @@ test('주소 해시를 화면 상태로 바꾼다(#564 2)', () => {
   // #655: 운영센터를 열면(주소 없이) '한눈에'가 기본이다. 기존 주소(#board 등)는 그대로다.
   assert.deepEqual(parseHash(''), {view: 'overview', id: null, status: '', kind: ''});
   assert.deepEqual(parseHash('#overview'), {view: 'overview', id: null, status: '', kind: ''});
-  assert.deepEqual(parseHash('#board'), {view: 'board', id: null, status: '', kind: '', cat: 'issue'});
+  // #888: 고객 글 보기는 늘 종류 하나 — 주소에 종류가 없으면 '의견'(opinion), 갈래 칩은 '전체'(빈 값).
+  assert.deepEqual(parseHash('#board'), {view: 'board', id: null, status: '', kind: 'opinion', cat: ''});
   // 2026-11-17: 없어진 탭의 옛 주소는 고객 글 거르기로 연다.
   assert.deepEqual(parseHash('#reports'), {view: 'board', id: null, status: 'pending', kind: 'report'});
   assert.deepEqual(parseHash('#issues'), {view: 'issues', id: null, status: '', kind: ''});
@@ -26,30 +27,32 @@ test('주소 해시를 화면 상태로 바꾼다(#564 2)', () => {
   assert.deepEqual(parseHash('#feedback/abc'), {view: 'feedback', id: 'abc', status: '', kind: ''});
   assert.deepEqual(parseHash('#persona/고객-01'), {view: 'persona', id: '고객-01', status: '', kind: ''});
   // 모르는 모양은 목록으로 돌린다.
-  assert.deepEqual(parseHash('#unknown'), {view: 'board', id: null, status: '', kind: '', cat: 'issue'});
-  assert.deepEqual(parseHash('#feedback/'), {view: 'board', id: null, status: '', kind: '', cat: 'issue'});
+  assert.deepEqual(parseHash('#unknown'), {view: 'board', id: null, status: '', kind: 'opinion', cat: ''});
+  assert.deepEqual(parseHash('#feedback/'), {view: 'board', id: null, status: '', kind: 'opinion', cat: ''});
   // id에 /가 들어가도 잃지 않는다.
   assert.deepEqual(parseHash('#feedback/a/b'), {view: 'feedback', id: 'a/b', status: '', kind: ''});
 });
 
 test('탭 거르기를 주소에 남기고 되돌린다(#570 2)', () => {
-  assert.deepEqual(parseHash('#board?status=reviewing'), {view: 'board', id: null, status: 'reviewing', kind: '', cat: 'issue'});
-  assert.deepEqual(parseHash('#board?kind=opinion'), {view: 'board', id: null, status: '', kind: 'opinion', cat: 'issue'});
-  assert.deepEqual(parseHash('#board?status=reviewing&kind=opinion'), {view: 'board', id: null, status: 'reviewing', kind: 'opinion', cat: 'issue'});
+  assert.deepEqual(parseHash('#board?status=reviewing'), {view: 'board', id: null, status: 'reviewing', kind: 'opinion', cat: ''});
+  assert.deepEqual(parseHash('#board?kind=opinion'), {view: 'board', id: null, status: '', kind: 'opinion', cat: ''});
+  assert.deepEqual(parseHash('#board?status=reviewing&kind=opinion'), {view: 'board', id: null, status: 'reviewing', kind: 'opinion', cat: ''});
   // 모르는 값은 버린다.
-  assert.deepEqual(parseHash('#board?status=bogus'), {view: 'board', id: null, status: '', kind: '', cat: 'issue'});
-  assert.deepEqual(parseHash('#board?kind=journal&x=1'), {view: 'board', id: null, status: '', kind: 'journal', cat: 'issue'});
+  assert.deepEqual(parseHash('#board?status=bogus'), {view: 'board', id: null, status: '', kind: 'opinion', cat: ''});
+  assert.deepEqual(parseHash('#board?kind=journal&x=1'), {view: 'board', id: null, status: '', kind: 'journal', cat: ''});
   // 상세 주소에는 탭 상태가 따라가지 않는다.
   assert.deepEqual(parseHash('#feedback/6?status=closed'), {view: 'feedback', id: '6', status: '', kind: ''});
-  assert.equal(viewHash('board', null, {status: 'reviewing', kind: 'opinion'}), '#board?status=reviewing&kind=opinion');
+  assert.equal(viewHash('board', null, {status: 'reviewing', kind: 'opinion'}), '#board?status=reviewing', '기본 종류(의견)는 주소에 적지 않는다');
   assert.equal(viewHash('board', null, {status: 'closed'}), '#board?status=closed');
   assert.equal(viewHash('board', null, {}), '#board');
-  // 고장·불편·요청 두 탭(대표 요청 2026-11-17): 요청만 cat=request, 고장·불편은 기본 #board와 같다.
-  assert.deepEqual(parseHash('#board?cat=request'), {view: 'board', id: null, status: '', kind: '', cat: 'request'});
+  // #888: 고장·불편·요청은 '의견' 탭 안의 갈래 칩 — 주소에 cat으로 남는다(기본은 칩 없는 전체).
+  assert.deepEqual(parseHash('#board?cat=request'), {view: 'board', id: null, status: '', kind: 'opinion', cat: 'request'});
+  assert.deepEqual(parseHash('#board?cat=issue'), {view: 'board', id: null, status: '', kind: 'opinion', cat: 'issue'});
   assert.equal(viewHash('board', null, {cat: 'request'}), '#board?cat=request');
-  assert.equal(viewHash('board', null, {cat: 'issue'}), '#board');
+  assert.equal(viewHash('board', null, {cat: 'issue'}), '#board?cat=issue');
+  assert.equal(viewHash('board', null, {cat: ''}), '#board');
   // 왕복: 해시 → 상태 → 해시가 같다.
-  for (const hash of ['#overview', '#board', '#board?status=reviewing', '#board?status=pending', '#board?kind=journal', '#board?status=closed&kind=opinion', '#board?kind=report', '#board?status=fixed', '#feedback/p1', '#persona/x']) {
+  for (const hash of ['#overview', '#board', '#board?status=reviewing', '#board?status=pending', '#board?kind=journal', '#board?status=closed', '#board?kind=report', '#board?status=fixed', '#board?cat=request', '#feedback/p1', '#persona/x']) {
     const view = parseHash(hash);
     assert.equal(viewHash(view.view, view.id, view), hash);
   }
@@ -62,7 +65,7 @@ test('화면 상태를 주소 해시로 되돌린다', () => {
   assert.equal(viewHash('persona', '고 객'), '#persona/' + encodeURIComponent('고 객'));
 });
 
-test('상단 탭 7개를 누르면 각자의 화면·거르기로 열린다(2026-11-18 — #801 뒤 3탭이 고장·불편에 붙던 것)', () => {
+test('상단 탭 여섯을 누르면 각자의 화면·거르기로 열린다(#888 — 고장·불편·요청을 의견 탭 하나로)', () => {
   // 단추가 달고 나가는 데이터(#801의 tabBtn) → 클릭 처리가 계산할 주소 → 해시를 연 뒤의 화면 상태.
   const click = (t) => {
     const filters = tabClickFilters({ tab: t.view, cat: t.cat, kind: t.kind });
@@ -70,17 +73,16 @@ test('상단 탭 7개를 누르면 각자의 화면·거르기로 열린다(2026
     return { hash, route: parseHash(hash) };
   };
   const byLabel = Object.fromEntries(MENU_TABS.map((t) => [t.label, click(t)]));
-  // 7개 전부: 탭마다 열려야 할 화면·거르기.
+  // 여섯 전부: 탭마다 열려야 할 화면·거르기.
   assert.equal(byLabel['한눈에'].route.view, 'overview');
   assert.equal(byLabel['고객'].route.view, 'customers');
-  assert.deepEqual([byLabel['고장·불편'].route.view, byLabel['고장·불편'].route.cat], ['board', 'issue']);
-  assert.deepEqual([byLabel['요청'].route.view, byLabel['요청'].route.cat], ['board', 'request']);
+  assert.deepEqual([byLabel['의견'].route.view, byLabel['의견'].route.kind, byLabel['의견'].route.cat], ['board', 'opinion', '']);
   assert.deepEqual([byLabel['사용 일지'].route.view, byLabel['사용 일지'].route.kind], ['board', 'journal']);
   assert.deepEqual([byLabel['신고'].route.view, byLabel['신고'].route.kind], ['board', 'report']);
   assert.equal(byLabel['고치는 일'].route.view, 'issues');
-  // 부러지던 세 탭: 주소가 서로 달라야 한다(전부 #board로 붙던 것이 회귀).
+  // 탭 주소가 서로 달라야 한다(전부 #board로 붙던 것이 회귀).
   const hashes = new Set(MENU_TABS.map((t) => click(t).hash));
-  assert.equal(hashes.size, 7, '7탭의 주소가 모두 달라야 한다');
+  assert.equal(hashes.size, 6, '6탭의 주소가 모두 달라야 한다');
   // 클릭 처리는 단추의 dataset을 버리지 않는다.
   const js = readFileSync(new URL('../src/admin.js', import.meta.url), 'utf8');
   assert.match(js, /tabClickFilters\(tab\.dataset\)/);
@@ -291,7 +293,8 @@ test("#655 '한눈에' 카드 숫자 — 가짜 응답으로 각 카드 계산�
     {id: 'j3', subjectId: 'c2', authorName: '고객2', journalDate: '2026-11-15', createdAt: '2026-11-15T02:00:00Z'}
   ]}};
   const model = overviewModel({feedback, journals, reports, issues: {ok: true, states: new Map([[584, 'open']])}});
-  assert.deepEqual(model.feedbackCard, {pending: 2, fixed: 1, total: 5, unanswered: 2});
+  // #888·#843: '할 일'·'답 안 단 글' 숫자에 일지(a4)는 섞지 않는다 — 여기서는 의견 숫자와 같다.
+  assert.deepEqual(model.feedbackCard, {pending: 2, fixed: 1, total: 5, unanswered: 1}, '답 안 단 글은 의견만 — a2는 답글 2, a4는 일지, a5는 닫음');
   assert.deepEqual(model.reportCard, {pending: 2, total: 3});
   // '#584'와 '584'는 같은 이슈다(#636 정규화) — 열린 1로 센다.
   assert.deepEqual(model.issueCard, {open: 1, closed: 0});
@@ -299,10 +302,9 @@ test("#655 '한눈에' 카드 숫자 — 가짜 응답으로 각 카드 계산�
   assert.equal(model.journalCard.rows[0].name, 'AI 명예회원 고객1');
   assert.equal(model.journalCard.rows[0].lastDay, '2026-11-15');
   assert.equal(model.journalCard.rows[0].latestScore, 2);
-  // 오늘 할 일: 답 안 단 글 오래된 순, 닫은 글은 빠지고, 이슈 번호는 숫자로 돌아온다.
-  assert.deepEqual(model.todos.map(t => t.id), ['a1', 'a4']);
+  // 오늘 할 일: 답 안 단 의견 오래된 순 — 일지(a4)는 빠지고(#888·#843), 닫은 글도 빠지며, 이슈 번호는 숫자로 돌아온다.
+  assert.deepEqual(model.todos.map(t => t.id), ['a1']);
   assert.equal(model.todos[0].issueNumber, '584');
-  assert.equal(model.todos[1].issueNumber, '');
 });
 
 test('#655 오늘 할 일 — 오래된 순 5개로 자르고 닫은 글은 뺀다', () => {
@@ -331,7 +333,7 @@ test('#655 한 API가 실패해도 나머지 카드는 계산된다', () => {
 });
 
 test('#655 처리 대기(pending) 조건 — 받음·확인 중을 한 번에 거르고 주소에 남긴다', () => {
-  assert.deepEqual(parseHash('#board?status=pending'), {view: 'board', id: null, status: 'pending', kind: '', cat: 'issue'});
+  assert.deepEqual(parseHash('#board?status=pending'), {view: 'board', id: null, status: 'pending', kind: 'opinion', cat: ''});
   assert.equal(viewHash('board', null, {status: 'pending'}), '#board?status=pending');
   assert.equal(viewToTab('overview'), 'overview');
   const rows = [{status: 'received'}, {status: 'reviewing'}, {status: 'fixed'}, {status: 'closed'}];
@@ -398,9 +400,9 @@ test('journal_date가 비어 있으면 만든 시각을 한국 시각 날짜로 
 });
 
 test('#743 한눈에 카드: 갈 탭이 있는 카드가 자기 조건으로 그 탭을 여는 주소를 만든다', () => {
-  // 답글 0 카드 → 고객 글 탭에서 답글 0만 남긴다(주소 왕복).
-  assert.equal(viewHash('board', null, {unanswered: true}), '#board?unanswered=1');
-  assert.deepEqual(parseHash('#board?unanswered=1'), {view: 'board', id: null, status: '', kind: '', cat: 'issue', unanswered: true});
+  // 답글 0 카드 → '의견' 탭에서 답글 0만 남긴다(주소 왕복, #888).
+  assert.equal(viewHash('board', null, {unanswered: true, kind: 'opinion'}), '#board?unanswered=1');
+  assert.deepEqual(parseHash('#board?unanswered=1'), {view: 'board', id: null, status: '', kind: 'opinion', cat: '', unanswered: true});
   assert.equal(viewHash(parseHash('#board?unanswered=1').view, null, parseHash('#board?unanswered=1')), '#board?unanswered=1');
   // 신고 대기 카드 → 고객 글의 종류 신고 + 할 일.
   assert.equal(viewHash('reports', null, {status: 'open'}), '#board?kind=report&status=pending');
@@ -413,9 +415,9 @@ test('#743 한눈에 카드: 갈 탭이 있는 카드가 자기 조건으로 그
   // 모르는 값은 버린다(주소는 늘 해석된다).
   assert.equal(parseHash('#reports?status=bogus').status, 'pending');
   assert.equal(parseHash('#issues?status=pending').status, '');
-  // 두 카드(전체·고침)는 지금처럼 상태 조건만 쓴다.
-  assert.equal(viewHash('board', null, {status: 'fixed', kind: '', unanswered: false}), '#board?status=fixed');
-  assert.equal(viewHash('board', null, {status: '', kind: '', unanswered: false}), '#board');
+  // 두 카드(전체·고침)는 지금처럼 상태 조건만 쓴다(#888: 종류 기본은 의견이라 주소에 적지 않는다).
+  assert.equal(viewHash('board', null, {status: 'fixed', kind: 'opinion', unanswered: false}), '#board?status=fixed');
+  assert.equal(viewHash('board', null, {status: '', kind: 'opinion', unanswered: false}), '#board');
 
   // 거르기도 같은 뜻이다 — 답글 0은 닫힌 글을 빼고 센다('한눈에' 카드 숫자와 같은 규칙).
   const rows = [
@@ -441,10 +443,10 @@ try {
   if (!candidates.some(p => p && existsSync(p))) adminSkip = 'Playwright Chromium이 없어 운영센터 화면 시험을 건너뜀';
 } catch { adminSkip = 'playwright 패키지가 없어 운영센터 화면 시험을 건너뜀'; }
 
-test('운영센터 탭 셋 + 옛 주소 3개 거르기 + 종류×상태 숫자', { skip: adminSkip || false, timeout: 180000 }, async () => {
+test('운영센터 탭 셋(#888) + 사용 일지 탭 + 의견 갈래 칩 + 옛 주소 거르기', { skip: adminSkip || false, timeout: 180000 }, async () => {
   if (adminSkip) assert.fail(`건너뜀=실패 — ${adminSkip}`);
   const { mkdirSync } = await import('node:fs');
-  const shotDir = process.env.LT_OPS_SHOT_DIR || 'E:\\lovetree-qa\\local4\\운영센터';
+  const shotDir = process.env.LT_OPS_SHOT_DIR || 'E:\\lovetree-qa\\ops-captures';
   mkdirSync(shotDir, { recursive: true });
   const { serve } = await import('./helpers/screen-audit.mjs');
   const server = await serve();
@@ -454,75 +456,116 @@ test('운영센터 탭 셋 + 옛 주소 3개 거르기 + 종류×상태 숫자',
   try {
     const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
     await context.route('**/api/admin/session', r => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ok: true, authenticated: true, admin: true}) }));
+    // 가짜 데이터(대표 지적 2026-11-18): 일지 5·고장 3·요청 2.
     await context.route('**/api/admin/feedback', r => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ok: true, feedback: [
-      {id: 'p1', kind: 'opinion', category: 'bug', status: 'received', replyCount: 0, issueNumber: '', displayTitle: '새 의견', createdAt: '2026-11-16T09:00:00Z'},
-      {id: 'p2', kind: 'opinion', category: 'inconvenient', status: 'reviewing', replyCount: 0, issueNumber: '584', displayTitle: '확인 중 의견', createdAt: '2026-11-16T10:00:00Z'},
-      {id: 'p3', kind: 'opinion', category: 'other', status: 'fixed', replyCount: 1, issueNumber: 584, displayTitle: '고침 의견', createdAt: '2026-11-16T11:00:00Z'},
-      {id: 'p4', kind: 'journal', status: 'received', replyCount: 0, issueNumber: '', score: 4, journalDate: '2026-11-16', displayTitle: '사용 일지', createdAt: '2026-11-16T12:00:00Z'},
-      {id: 'p5', kind: 'opinion', category: 'other', status: 'later', replyCount: 1, issueNumber: '', displayTitle: '다음에', createdAt: '2026-11-15T12:00:00Z'}
+      {id: 'o1', kind: 'opinion', category: 'bug', status: 'received', replyCount: 0, issueNumber: '', displayTitle: '고장 의견 1', createdAt: '2026-11-18T09:00:00Z'},
+      {id: 'o2', kind: 'opinion', category: 'inconvenient', status: 'reviewing', replyCount: 0, issueNumber: '', displayTitle: '고장 의견 2', createdAt: '2026-11-18T10:00:00Z'},
+      {id: 'o3', kind: 'opinion', category: 'other', status: 'fixed', replyCount: 1, issueNumber: '', displayTitle: '고장 의견 3', createdAt: '2026-11-18T11:00:00Z'},
+      {id: 'o4', kind: 'opinion', category: 'feature', status: 'received', replyCount: 0, issueNumber: '', displayTitle: '요청 1', createdAt: '2026-11-18T12:00:00Z'},
+      {id: 'o5', kind: 'opinion', category: 'feature', status: 'received', replyCount: 0, issueNumber: '', displayTitle: '요청 2', createdAt: '2026-11-18T13:00:00Z'},
+      {id: 'j1', kind: 'journal', status: 'received', replyCount: 0, score: 4, journalDate: '2026-11-18', subjectId: 'c1', authorName: '가나다', displayTitle: '일지 1', createdAt: '2026-11-18T08:00:00Z'},
+      {id: 'j2', kind: 'journal', status: 'received', replyCount: 0, score: 3, journalDate: '2026-11-17', subjectId: 'c1', authorName: '가나다', displayTitle: '일지 2', createdAt: '2026-11-17T08:00:00Z'},
+      {id: 'j3', kind: 'journal', status: 'received', replyCount: 0, score: 5, journalDate: '2026-11-16', subjectId: 'c1', authorName: '가나다', displayTitle: '일지 3', createdAt: '2026-11-16T08:00:00Z'},
+      {id: 'j4', kind: 'journal', status: 'reviewing', replyCount: 0, score: 2, journalDate: '2026-11-17', subjectId: 'c2', authorName: '라마바', displayTitle: '일지 4', createdAt: '2026-11-17T09:00:00Z'},
+      {id: 'j5', kind: 'journal', status: 'fixed', replyCount: 0, score: 1, journalDate: '2026-11-15', subjectId: 'c2', authorName: '라마바', displayTitle: '일지 5', createdAt: '2026-11-15T09:00:00Z'}
     ]}) }));
+    await context.route('**/api/admin/journals', r => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ok: true, journals: []}) }));
     await context.route('**/api/community/admin/reports', r => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ok: true, reports: [
-      {id: 'r1', status: 'open', hidden: false, reason: '둘러보기 신고 내용', shareId: 'sh_1', createdAt: '2026-11-16T13:00:00Z'}
+      {id: 'r1', status: 'open', hidden: false, reason: '둘러보기 신고 내용', shareId: 'sh_1', createdAt: '2026-11-18T13:00:00Z'}
     ]}) }));
     const page = await context.newPage();
     const read = () => page.evaluate(() => ({
       tabs: [...document.querySelectorAll('header nav [data-tab]')].map(b => b.textContent.trim()),
-      menuCounts: [...document.querySelectorAll('header nav .lt-menu-count')].map(b => Number(b.textContent.trim())),
-      activeTab: document.querySelector('header nav [data-tab].is-active')?.textContent.trim(),
-      kinds: [...document.querySelectorAll('[data-kind-tab]')].map(b => ({label: b.textContent.trim().replace(/\s*\d+$/, ''), active: b.classList.contains('is-active')})),
-      kindChips: [...document.querySelectorAll('.lt-post-top [data-kind]')].map(b => b.textContent.trim()),
+      activeTab: (document.querySelector('header nav [data-tab].is-active')?.textContent || '').replace(/\s*\d+$/, '').trim(),
+      catChips: [...document.querySelectorAll('[data-cat-tab]')].map(b => ({label: b.textContent.trim().replace(/\s*\d+$/, ''), active: b.classList.contains('is-active')})),
+      catCounts: [...document.querySelectorAll('[data-cat-tab] .lt-tab-count')].map(b => b.textContent.trim()),
       statuses: [...document.querySelectorAll('[data-status-tab]')].map(b => ({label: b.textContent.trim().replace(/\s*\d+$/, ''), active: b.classList.contains('is-active')})),
       cards: document.querySelectorAll('.lt-post').length,
-      reportCards: document.querySelectorAll('[data-report-act]').length,
-      scoreBadges: [...document.querySelectorAll('.lt-post .lt-badge')].filter(b => b.textContent.includes('점수')).length,
-      h1: document.querySelector('.lt-h1')?.textContent.trim()
+      unread: document.querySelectorAll('[data-unread]').length,
+      filterOptions: document.querySelector('[data-journal-filter]') ? [...document.querySelector('[data-journal-filter]').options].map(o => o.textContent.trim()) : null,
+      h1: (document.querySelector('.lt-h1')?.textContent || '').replace(/\s+/g, ' ').trim()
     }));
+    const clickNav = async (label) => {
+      await page.evaluate((want) => {
+        const btn = [...document.querySelectorAll('header nav [data-tab]')].find(b => b.textContent.replace(/\s*\d+$/, '').trim() === want);
+        btn?.click();
+      }, label);
+      await page.waitForTimeout(600);
+    };
 
-    for (const [width, height] of [[1440, 900], [390, 844]]) {
-      await page.setViewportSize({ width, height });
-      for (const theme of ['night', 'garden']) {
-        await page.evaluate(t => { if (t === 'garden') document.documentElement.setAttribute('data-lt-theme', 'garden'); else document.documentElement.removeAttribute('data-lt-theme'); }, theme);
-        await page.goto(`${base}/admin.html#board`, { waitUntil: 'domcontentloaded' });
-        await page.waitForSelector('.lt-post', { timeout: 8000 });
-        const board = await read();
-        // 고객 글 탭을 고장·불편·요청으로 나누고 사용 일지·신고를 탭으로 돌린다(대표 요청 2026-11-17).
-        assert.deepEqual(board.tabs, ['한눈에', '고객', '고장·불편 1', '요청', '사용 일지', '신고', '고치는 일'], width + '·' + theme + ': 탭 일곱(새 글 수는 고장·불편에만 보인다)');
-      assert.equal(board.activeTab.replace(/\s*\d+$/, ''), '고장·불편');
-        assert.equal(board.kinds.length, 0, '종류 줄은 없앤다 — 상단 탭과 상태 줄이 대신한다');
-        assert.deepEqual(board.kindChips, [], '탭이 이미 의견만 보여 주므로 카드의 종류 칩도 없다');
-        assert.deepEqual(board.menuCounts, [1], '고장·불편의 새 글 1(요청 0은 숨긴다)');
-        assert.deepEqual(board.statuses.map(s => s.label), ['할 일', '고침', '더 보기 ▾']);
-        assert.equal(board.statuses.find(s => s.label === '할 일').active, true, '첫 열기는 할 일');
-        assert.equal(board.cards, 2, width + '·' + theme + ': 고장·불편 할 일 2건(새 의견+확인 중 의견)');
-        assert.match(board.h1, /고장·불편 2건 · 최신 순/);
-        await page.screenshot({ path: `${shotDir}/pr1-board-${width}-${theme}.png` });
-      }
-    }
+    // ① '의견' 탭 — 첫 열기는 전체 5건, 갈래 칩 전체 5·고장 3·요청 2, 상태 칩도 의견 탭에만 있다.
+    await page.goto(`${base}/admin.html#board`, { waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('.lt-post', { timeout: 8000 });
+    const opinion = await read();
+    assert.deepEqual(opinion.tabs, ['한눈에', '고객', '의견 3', '사용 일지', '신고', '고치는 일'], '탭 여섯(#888) — 의견 탭에 새 글 3');
+    assert.equal(opinion.activeTab, '의견');
+    assert.deepEqual(opinion.catChips.map(c => c.label), ['전체', '고장·불편', '요청'], '갈래 칩은 의견 탭 안에');
+    assert.deepEqual(opinion.catCounts, ['5', '3', '2'], '칩 숫자 전체 5·고장 3·요청 2');
+    assert.equal(opinion.cards, 5, '의견 5건(고장 3·요청 2)');
+    assert.match(opinion.h1, /의견 5건/);
+    await page.screenshot({ path: `${shotDir}/ops888-의견-1440.png` });
 
-    await page.setViewportSize({ width: 1440, height: 900 });
-    const cases = [
-      ['#journals', 'journal'],
-      ['#reports', 'report'],
-      ['#fixes', '']
-    ];
-    for (const [hash, tabLabel, kind] of cases) {
-      const wantTab = hash === '#journals' ? '사용 일지' : hash === '#reports' ? '신고' : '고치는 일';
+    // ② 갈래 칩 전환 — 요청 2건 ↔ 전체 5건.
+    await page.evaluate(() => [...document.querySelectorAll('[data-cat-tab]')].find(b => b.dataset.catTab === 'request')?.click());
+    await page.waitForFunction(() => document.querySelectorAll('.lt-post').length === 2, null, { timeout: 8000 });
+    assert.match((await read()).h1, /의견 2건/, '요청 칩 → 2건');
+    await page.evaluate(() => [...document.querySelectorAll('[data-cat-tab]')].find(b => !b.dataset.catTab)?.click());
+    await page.waitForFunction(() => document.querySelectorAll('.lt-post').length === 5, null, { timeout: 8000 });
+    assert.match((await read()).h1, /의견 5건/, '전체 칩 → 5건');
+
+    // ③ 사용 일지 탭 — 상태 칩 0, 전체 5건 최신 순, 새 글 3, 거르기는 고객별 하나.
+    await clickNav('사용 일지');
+    await page.waitForFunction(() => (document.querySelector('.lt-h1')?.textContent || '').includes('사용 일지'), null, { timeout: 8000 });
+    const journal = await read();
+    assert.equal(journal.activeTab, '사용 일지');
+    assert.deepEqual(journal.statuses, [], '일지 탭에 상태 칩 없다(#888)');
+    assert.deepEqual(journal.catChips, [], '일지 탭에 갈래 칩도 없다');
+    assert.equal(journal.cards, 5, '일지 5건 전부');
+    assert.equal(journal.unread, 3, '안 읽은 일지 새 글 3');
+    assert.deepEqual(journal.filterOptions, ['전체 고객', '가나다', '라마바'], '거르기는 고객별 하나');
+    assert.match(journal.h1, /사용 일지 5건/);
+    await page.screenshot({ path: `${shotDir}/ops888-사용일지-1440.png` });
+
+    // ④ 고객 거르기 — 가나다 3건.
+    await page.evaluate(() => { const sel = document.querySelector('[data-journal-filter]'); sel.value = 'c1'; sel.dispatchEvent(new Event('change', {bubbles: true})); });
+    await page.waitForFunction(() => document.querySelectorAll('.lt-post').length === 3, null, { timeout: 8000 });
+    assert.match((await read()).h1, /사용 일지 3건/, '고객 거르기 → 3건');
+
+    // ⑤ 신고 탭 — 처리 단추가 있는 신고 카드.
+    await clickNav('신고');
+    await page.waitForFunction(() => (document.querySelector('.lt-h1')?.textContent || '').includes('신고'), null, { timeout: 8000 });
+    const report = await read();
+    assert.equal(report.activeTab, '신고');
+    assert.equal(await page.evaluate(() => document.querySelectorAll('[data-report-act]').length), 2, '신고 카드 처리 단추 2개');
+    await page.screenshot({ path: `${shotDir}/ops888-신고-1440.png` });
+
+    // ⑥ 옛 주소도 새 탭 구조로 열린다.
+    for (const [hash, wantTab] of [['#journals', '사용 일지'], ['#reports', '신고'], ['#fixes', '고치는 일']]) {
       await page.goto(`${base}/admin.html${hash}`, { waitUntil: 'domcontentloaded' });
-      // 해시만 바뀌는 이동은 문서를 다시 읽지 않는다 — 본문(h1)과 눌린 탭이 모두 새 주소를 가리킬 때까지 기다린다.
-      await page.waitForFunction((h) => {
+      await page.waitForFunction((want) => {
         const h1 = (document.querySelector('.lt-h1')?.textContent || '').trim();
         const tab = (document.querySelector('header nav [data-tab].is-active')?.textContent || '').replace(/\s*\d+$/, '').trim();
-        return h1.includes(h) && tab === h;
+        return h1.includes(want) && tab === want;
       }, wantTab, { timeout: 8000 });
-      const got = await read();
-      // 탭 글자에는 새 글 수 숫자가 붙을 수 있다(고장·불편 1) — 탭 이름만 비교한다.
-      assert.equal(String(got.activeTab || '').replace(/\s*\d+$/, ''), wantTab, hash + ' → ' + wantTab + ' 탭');
-      assert.deepEqual(got.kindChips, [], hash + ' → 목록 카드의 종류 칩 없음(탭이 이미 종류를 가리킨다)');
-      if (hash === '#reports') {
-        assert.equal(got.reportCards, 2, '신고 카드에 처리 단추 2개');
-        await page.screenshot({ path: `${shotDir}/pr1-reports.png` });
-      }
-      if (hash === '#journals') assert.ok(got.scoreBadges >= 1, '일지 카드에 다시 올 점수 배지');
+      assert.equal((await read()).activeTab, wantTab, hash + ' → ' + wantTab + ' 탭');
+    }
+
+    // ⑦ 한눈에 — '할 일'·'답 안 단 글' 숫자에 일지가 섞이지 않는다(#888·#843).
+    await clickNav('한눈에');
+    await page.waitForSelector('.lt-ov-cards .lt-ov-card', { timeout: 8000 });
+    const ov = await page.evaluate(() => ({
+      cards: [...document.querySelectorAll('.lt-ov-cards .lt-ov-card .lt-ov-value')].map(el => el.textContent.trim()),
+      todos: [...document.querySelectorAll('.is-overview .lt-post-title')].map(el => el.textContent.trim())
+    }));
+    assert.deepEqual(ov.cards, ['4', '4', '1'], '할 일 4·답 안 단 글 4(의견만 — 일지 0)·신고 대기 1');
+    assert.equal(ov.todos.filter(title => title.startsWith('일지')).length, 0, '오늘 할 일에 일지 없다');
+    await page.screenshot({ path: `${shotDir}/ops888-한눈에-1440.png` });
+
+    // ⑧ 탭 여섯 모두 클릭 전환.
+    for (const [label, wantH1] of [['한눈에', '한눈에'], ['고객', '고객'], ['의견', '의견'], ['사용 일지', '사용 일지'], ['신고', '신고'], ['고치는 일', '고치는 일']]) {
+      await clickNav(label);
+      await page.waitForFunction((want) => (document.querySelector('.lt-h1')?.textContent || '').includes(want), wantH1, { timeout: 8000 });
+      assert.equal((await read()).activeTab, label, label + ' 탭 클릭 전환');
     }
     await context.close();
   } finally {
@@ -587,10 +630,9 @@ test('없는 시각(null·빈 값)은 —로 보이고 1970년으로 찍히지 �
 });
 
 // 2026-11-17 운영센터 탭 셋 + 고객 글 한 줄 거르기.
-test('머리줄 탭은 한눈에·고객·고장·불편·요청·사용 일지·신고 여섯이다(대표 요청 2026-11-17)', () => {
-  assert.deepEqual(MENU_TABS.map(t => t.label), ['한눈에', '고객', '고장·불편', '요청', '사용 일지', '신고', '고치는 일']);
-  assert.deepEqual(MENU_TABS.filter(t => t.cat).map(t => t.cat), ['issue', 'request']);
-  assert.deepEqual(MENU_TABS.filter(t => t.kind).map(t => t.kind), ['journal', 'report']);
+test('머리줄 탭은 한눈에·고객·의견·사용 일지·신고·고치는 일 여섯이다(#888, 2026-11-18)', () => {
+  assert.deepEqual(MENU_TABS.map(t => t.label), ['한눈에', '고객', '의견', '사용 일지', '신고', '고치는 일']);
+  assert.deepEqual(MENU_TABS.filter(t => t.kind).map(t => t.kind), ['opinion', 'journal', 'report']);
   assert.deepEqual(MENU_TABS.find(t => t.view === 'issues').label, '고치는 일');
 });
 
@@ -638,6 +680,49 @@ test('고객 글 종류 묶음: 전체·의견·일지·신고 숫자가 현재 
   assert.deepEqual(tabs.map(t => t.count), [4, 2, 1, 1]);
   assert.equal(tabs[0].count, tabs.slice(1).reduce((sum, t) => sum + t.count, 0), '전체 = 의견+일지+신고');
   assert.deepEqual(boardKindTabs(rows, 'all').map(t => t.count), [7, 5, 1, 1]);
+});
+
+test('#888 의견 탭의 갈래 칩 — 전체·고장·불편·요청 숫자를 상태 안에서 센다', () => {
+  const rows = [
+    {id: 1, kind: 'opinion', category: 'bug', status: 'received'},
+    {id: 2, kind: 'opinion', category: 'bug', status: 'reviewing'},
+    {id: 3, kind: 'opinion', category: 'bug', status: 'fixed'},
+    {id: 4, kind: 'opinion', category: 'feature', status: 'received'},
+    {id: 5, kind: 'opinion', category: 'feature', status: 'received'},
+    {id: 6, kind: 'journal', status: 'received'}
+  ];
+  assert.deepEqual(BOARD_CAT_TABS.map(t => t.label), ['전체', '고장·불편', '요청']);
+  const tabs = boardCatTabs(rows, 'all');
+  assert.deepEqual(tabs.map(t => t.count), [5, 3, 2], '전체 5·고장 3·요청 2 — 일지는 칩에 섞지 않는다');
+  assert.deepEqual(boardCatTabs(rows, 'pending').map(t => t.count), [4, 2, 2], '상태를 고르면 그 상태 안의 숫자다');
+  assert.equal(tabs[0].count, tabs[1].count + tabs[2].count, '전체 = 고장·불편+요청');
+});
+
+test('#888 사용 일지 탭 — 전체 최신 순 줄과 고객 거르기 목록', () => {
+  const journals = [
+    {id: 'j1', subjectId: 'c1', authorName: '가나다', status: 'received', score: 4, journalDate: '2026-11-18', createdAt: '2026-11-18T08:00:00Z', displayTitle: '일지 1'},
+    {id: 'j2', subjectId: 'c2', authorName: '라마바', status: 'fixed', score: 1, journalDate: '2026-11-15', createdAt: '2026-11-15T09:00:00Z', displayTitle: '일지 5'},
+    {id: 'j3', subjectId: 'c1', authorName: '가나다', authorRole: 'ai_customer', status: 'reviewing', journalDate: '', createdAt: '2026-11-17T08:00:00Z', displayTitle: '일지 2'}
+  ];
+  const rows = journalListRows(journals);
+  assert.deepEqual(rows.map(r => r.id), ['j1', 'j3', 'j2'], '운영 날짜·만든 시각 기준 최신 순');
+  assert.deepEqual(rows.map(r => r.unread), [true, false, false], "새 글 표시는 아직 안 읽은(받음) 일지에만");
+  assert.equal(rows[1].customer, 'AI 명예회원 가나다', 'AI 고객은 호칭을 붙여 보인다');
+  assert.ok(rows[1].day.startsWith('2026-11-1'), 'journal_date가 비면 만든 시각의 한국 날짜로 읽는다');
+  assert.deepEqual(journalCustomerOptions(rows),
+    [{subjectId: 'c1', name: '가나다'}, {subjectId: 'c2', name: '라마바'}],
+    '거르기는 일지를 남긴 고객별 하나 — 가나다 순, 같은 고객은 하나');
+  assert.equal(journalListRows(null).length, 0, '응답이 없으면 빈 목록');
+});
+
+test('#843·#888 오늘 할 일·답 안 단 글 숫자에 일지는 섞이지 않는다', () => {
+  const posts = [
+    {id: 'j1', kind: 'journal', status: 'received', replyCount: 0, createdAt: '2026-11-10T00:00:00Z', displayTitle: '일지', issueNumber: ''},
+    {id: 'o1', kind: 'opinion', status: 'received', replyCount: 0, createdAt: '2026-11-11T00:00:00Z', displayTitle: '의견', issueNumber: ''}
+  ];
+  assert.deepEqual(overviewTodos(posts).map(t => t.id), ['o1'], '일지는 처리할 일이 아니다(답글도 달 수 없다)');
+  const model = overviewModel({feedback: {ok: true, payload: {feedback: posts}}, journals: {ok: true, payload: {journals: []}}, reports: {ok: true, payload: {reports: []}}, issues: {ok: true, states: new Map()}});
+  assert.deepEqual([model.feedbackCard.pending, model.feedbackCard.unanswered], [1, 1], '할 일·답 안 단 글 숫자는 의견만');
 });
 
 test('첫 열기는 할 일, 숫자 0인 칸은 화면에서 숨긴다', () => {
@@ -728,7 +813,8 @@ test('운영센터 폭 통일 + 한눈에 카드 4·3 + 고객 칸 이름(1440·
             ], '이메일 @ 앞부분은 보통 굵기, 표시 이름은 굵게');
             assert.equal(got.sub, '열 때마다 열람 기록이 남아요');
           }
-          await page.screenshot({ path: `${shotDir}/pr2-${name}-${width}-${theme}.png` });
+          // 캡처는 1440에서만(#888 검사 규칙 — 390은 숫자 판정만 한다).
+          if (width === 1440) await page.screenshot({ path: `${shotDir}/pr2-${name}-${width}-${theme}.png` });
         }
       }
       assert.equal(new Set(Object.values(widths)).size, 1, width + '에서 세 탭 본문 폭이 같다');
