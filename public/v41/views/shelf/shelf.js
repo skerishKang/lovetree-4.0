@@ -4,7 +4,7 @@
 import {
   COVER_PALETTE, allBooks as allBooksOf, bookMeta, buildShelf, carouselTransform, coverStyle as coverStyleOf,
   escapeShelf, filterShelf, findBook, lastMomentDate as lastMomentDateOf,
-  resolveShelfIndex, resumeCard, resumeName,
+  resolveShelfIndex, resumeCard, resumeName, shelfRowLayout,
   treeTitleOf, youtubeId as youtubeIdOf
 } from './shelf-model.mjs';
 import { shelfOrder, INBOX_LABEL } from '../../inbox-model.mjs';
@@ -121,13 +121,16 @@ import { createReader } from './shelf-reader.js';
         var rail=$('#shelfRail');
         if(!rail)return;
         var center=state.shelfIndex;
+        // #서재-빈공간: 책이 레일에 다 들어가는 넓은 화면에서는 왼쪽부터 차례로 늘어놓고(묶음 가운데 정렬),
+        // 넘칠 때는 지금처럼 고른 책을 가운데 두고 넘긴다. 흐림 기준(±2→±4)도 넓은 화면에서 함께 완화한다.
+        var layout=shelfRowLayout(state.shelfList.length, rail.clientWidth);
         state.shelfList.forEach(function(book,index){
           var card=rail.querySelector('[data-book-index="'+index+'"]');
           if(!card)return;
           // #212: 중앙 카드는 레일 높이(375)보다 큰 352px이라 위로 뜨면 표지 윗부분이 잘렸다.
           // 중앙은 위로 띄우지 않고 아래로 살짝 내리고, 배율을 레일 안에 들어가는 값으로 조정한다.
-          var placed=carouselTransform(index-center);
-          card.style.setProperty('--x',placed.x+'px');
+          var placed=carouselTransform(index-center, layout.wide);
+          card.style.setProperty('--x',layout.xOf(index,center)+'px');
           card.style.setProperty('--y',placed.y+'px');
           card.style.setProperty('--z',placed.z+'px');
           card.style.setProperty('--scale',placed.scale);
@@ -197,6 +200,9 @@ import { createReader } from './shelf-reader.js';
           if(!longFired){lpTarget=null;}
         });
         rail.addEventListener('pointercancel',function(){clearLp();lpFired=false;lpTarget=null;if(!shelfDrag.active)return;shelfDrag.active=false;rail.classList.remove('dragging');state.shelfIndex=Math.round(state.shelfIndex);updateCarousel();});
+        // #서재-빈공간: 레일 폭이 정해진 뒤에도 배치를 다시 잡는다 — 화면이 뜨는 동안 폭이 정해지기 전에
+        // 그려지면 '왼쪽부터 순서 배치'가 그대로 남는다. 폭이 변할 때만 다시 그리므로 되풀이되지 않는다.
+        if (typeof ResizeObserver !== 'undefined') { var shelfRailRo = new ResizeObserver(function () { updateCarousel(); }); shelfRailRo.observe(rail); }
       }
       function bind() {
         // 261118 대표 지적 3: '+ 새 트리' 입구는 오른쪽 단추(#shelfNewTree) 하나다.
