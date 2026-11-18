@@ -1,5 +1,8 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {applySchema,createPool} from '../server/db/postgres.js';
+import {createAccountRepo} from '../server/db/account-postgres.js';
+import {subjectHash} from '../server/account-service.js';
+import {createTree} from '../src/domain.js';
 import {createCommunityRepo} from '../server/db/community-postgres.js';
 import {createTreeVisibilityRepo} from '../server/db/tree-visibility-postgres.js';
 import {createTreeDiscoverRepo} from '../server/db/tree-discover-postgres.js';
@@ -36,6 +39,67 @@ test('community rows are independent, idempotent and auditable',{skip},async()=>
   await repo.blockOwner({productId,blockerSubjectId:'reader',blockedSubjectId:'owner-'+tag});
   assert.equal((await repo.listDiscoverable({productId,viewerSubjectId:'reader'})).length,0);
  }finally{await pool.end();}
+});
+test('탈퇴하면 해당 제품에서 내 무대 소속·담기·표만 지워지고 공유 무대와 구간 배정은 보존된다', { skip }, async () => {
+  assertIsolatedTestDatabase(DATABASE_URL);
+  const pool = await createPool(DATABASE_URL, { max: 2 });
+  try {
+    await applySchema(pool);
+    const productId = 'lt-' + suffix();
+    const otherProductId = productId + '-other';
+    const videoId = 'aBcDeFgHiJ1';
+    const stages = new Map();
+    for (const [product, members] of [[productId, ['leaving', 'remaining']], [otherProductId, ['leaving']]]) {
+      const { rows } = await pool.query(
+        `INSERT INTO lovetree_stages(product_id, platform, video_id, kind)
+         VALUES ($1, 'youtube', $2, 'whole') RETURNING stage_id`, [product, videoId]
+      );
+      const stageId = rows[0].stage_id;
+      stages.set(product, stageId);
+      await pool.query(
+        `INSERT INTO lovetree_stage_assignments(product_id, key_version, platform, video_id, kind, stage_id)
+         VALUES ($1, 1, 'youtube', $2, 'whole', $3)`, [product, videoId, stageId]
+      );
+      for (const subject of members) {
+        const tree = createTree({ subject: '무대', title: '공연', emotion: '설렘', url: 'https://youtu.be/' + videoId });
+        await pool.query(
+          'INSERT INTO lovetree_workspaces(product_id, subject_id, doc) VALUES ($1, $2, $3)',
+          [product, subject, { version: 1, trees: [tree] }]
+        );
+        await pool.query(
+          `INSERT INTO lovetree_stage_moments(product_id, subject_id, tree_id, moment_id, stage_id, source_revision)
+           VALUES ($1, $2, $3, $4, $5, 1)`, [product, subject, tree.id, tree.moments[0].id, stageId]
+        );
+        await pool.query(
+          `INSERT INTO lovetree_community_votes(product_id, target_kind, target_id, subject_id)
+           VALUES ($1, 'stage', $2, $3)`, [product, stageId, subject]
+        );
+        await pool.query(
+          'INSERT INTO lovetree_stage_saves(product_id, stage_id, subject_id) VALUES ($1, $2, $3)',
+          [product, stageId, subject]
+        );
+      }
+    }
+
+    const { tables } = await createAccountRepo(pool).deleteAll({
+      productId, subjectId: 'leaving', subjectHash: subjectHash('leaving')
+    });
+    for (const table of ['lovetree_stage_moments', 'lovetree_stage_saves', 'lovetree_community_votes']) {
+      assert.equal(tables[table], 1, table);
+      for (const [product, remainingSubject] of [[productId, 'remaining'], [otherProductId, 'leaving']]) {
+        const { rows } = await pool.query(`SELECT subject_id FROM ${table} WHERE product_id = $1`, [product]);
+        assert.deepEqual(rows, [{ subject_id: remainingSubject }], table);
+      }
+    }
+    for (const table of ['lovetree_stages', 'lovetree_stage_assignments']) {
+      for (const [product, stageId] of stages) {
+        const { rows } = await pool.query(`SELECT stage_id FROM ${table} WHERE product_id = $1`, [product]);
+        assert.deepEqual(rows, [{ stage_id: stageId }], table);
+      }
+    }
+  } finally {
+    await pool.end();
+  }
 });
 test('browse reaction counts keep every kind and deletes remove only the requested kind',{skip},async()=>{
  assertIsolatedTestDatabase(DATABASE_URL);const pool=await createPool(DATABASE_URL,{max:3});

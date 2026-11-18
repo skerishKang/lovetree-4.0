@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
 import { readFile, readdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { createPool } from '../server/db/postgres.js';
@@ -268,3 +269,96 @@ test('둘러보기 소개 백필: 나오던 트리만 켜짐으로 채우고 재
     await pool.end();
   }
 });
+
+for (const install of ['schema.sql', 'stage-schema-261119.sql']) {
+  test(`무대 저장 구조 — ${install} 설치·재실행과 키 제약`, { skip }, async (t) => {
+    assertIsolatedTestDatabase(DATABASE_URL);
+    const pool = await createPool(DATABASE_URL, { max: 1 });
+    const client = await pool.connect();
+    const dbSchema = 'stage_test_' + randomUUID().replaceAll('-', '');
+    t.after(async () => {
+      try { await client.query(`DROP SCHEMA IF EXISTS ${dbSchema} CASCADE`); }
+      finally { client.release(); await pool.end(); }
+    });
+    await client.query(`CREATE SCHEMA ${dbSchema}`);
+    await client.query(`SET search_path TO ${dbSchema}`);
+    const migration = await readFile(new URL('../server/db/migrations/stage-schema-261119.sql', import.meta.url), 'utf8');
+    const schemaSql = await readFile(SCHEMA_PATH, 'utf8');
+    if (install === 'schema.sql') {
+      await client.query(schemaSql);
+    } else {
+      // 기존 두 표만 둔다. 신규 표·함수는 이 migration 자체가 만들어야 한다.
+      await client.query(`
+        CREATE TABLE lovetree_workspaces (product_id text, subject_id text, doc jsonb NOT NULL,
+          revision bigint NOT NULL DEFAULT 1, PRIMARY KEY (product_id, subject_id));
+        CREATE TABLE lovetree_community_votes (product_id text, target_kind text, target_id text,
+          subject_id text, voted_at timestamptz NOT NULL, PRIMARY KEY (product_id, target_kind, target_id, subject_id))`);
+    }
+    const video = 'AbC123xyZ_0';
+    const originalTime = '2026-11-15T14:59:59.123Z';
+    await client.query(`INSERT INTO lovetree_workspaces(product_id, subject_id, doc)
+      VALUES ('p','owner',$1)`, [{ trees: [{ id: 'tree', moments: [{ id: 'm', url: 'https://youtu.be/' + video }] }] }]);
+    await client.query(`INSERT INTO lovetree_community_votes(product_id,target_kind,target_id,subject_id,voted_at)
+      VALUES ('p','tree','tree','reader',$1)`, [originalTime]);
+    if (install !== 'schema.sql') await client.query(migration);
+    for (const table of ['lovetree_stages', 'lovetree_stage_assignments', 'lovetree_stage_moments', 'lovetree_stage_saves']) {
+      assert.equal((await client.query(`SELECT count(*)::int AS n FROM ${table}`)).rows[0].n, 0, table);
+    }
+
+    const addAnchor = (kind, start, end) => client.query(`INSERT INTO lovetree_stages
+      (product_id,platform,video_id,kind,start_seconds,end_seconds) VALUES ('p','youtube',$1,$2,$3,$4)
+      RETURNING stage_id, registration_order`, [video, kind, start, end]);
+    const assign = (id, kind, start, end, { product = 'p', videoId = video, version = 1, platform = 'youtube' } = {}) => client.query(`INSERT INTO lovetree_stage_assignments
+      (product_id,key_version,platform,video_id,kind,start_seconds,end_seconds,stage_id)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`, [product, version, platform, videoId, kind, start, end, id]);
+    let previousOrder = 0;
+    for (const [kind, start, end] of [['whole', null, null], ['bookmark', 0, null], ['range', 0, 43200]]) {
+      const anchor = (await addAnchor(kind, start, end)).rows[0];
+      assert.ok(anchor.stage_id && anchor.registration_order > previousOrder);
+      previousOrder = anchor.registration_order;
+      await assign(anchor.stage_id, kind, start, end);
+      await assert.rejects(addAnchor(kind, start, end), { code: '23505' });
+      await assert.rejects(assign(anchor.stage_id, kind, start, end), { code: '23505' });
+    }
+
+    const range = (await addAnchor('range', 10, 22)).rows[0];
+    await assign(range.stage_id, 'range', 14, 26);
+    for (const mismatch of [{ product: 'elsewhere' }, { videoId: video.toLowerCase() }, { version: 2 }, { platform: 'other' }]) {
+      await assert.rejects(assign(range.stage_id, 'range', 14, 26, mismatch), { code: '23503' });
+    }
+    await assert.rejects(assign(range.stage_id, 'bookmark', 10, null), { code: '23503' });
+    for (const [kind, start, end] of [['whole', 0, null], ['bookmark', null, null], ['bookmark', -1, null],
+      ['range', null, 5], ['range', 1, null], ['range', 5, 5], ['range', 0, 43201]]) {
+      await assert.rejects(addAnchor(kind, start, end), { code: '23514' });
+      await assert.rejects(assign(range.stage_id, kind, start, end), { code: '23514' });
+    }
+
+    const addMoment = (owner, revision, stageId = range.stage_id) => client.query(`INSERT INTO lovetree_stage_moments
+      (product_id,subject_id,tree_id,moment_id,stage_id,source_revision)
+      VALUES ('p',$1,'tree','m',$2,$3)`, [owner, stageId, revision]);
+    const save = (stageId = range.stage_id) => client.query(`INSERT INTO lovetree_stage_saves(product_id,stage_id,subject_id)
+      VALUES ('p',$1,'reader')`, [stageId]);
+    await assert.rejects(save('missing'), { code: '23503' });
+    await assert.rejects(addMoment('owner', 1, 'missing'), { code: '23503' });
+    await assert.rejects(addMoment('other', 1), { code: '23503' });
+    await assert.rejects(addMoment('owner', 0), { code: '23514' });
+    await addMoment('owner', 1);
+    await assert.rejects(addMoment('owner', 1), { code: '23505' });
+    await save();
+    await assert.rejects(save(), { code: '23505' });
+
+    await client.query(install === 'schema.sql' ? schemaSql : migration);
+    for (const table of ['lovetree_stages', 'lovetree_stage_assignments']) {
+      await assert.rejects(client.query(`UPDATE ${table} SET video_id=$1 WHERE stage_id=$2`, [video.toLowerCase(), range.stage_id]), { code: '55000' });
+      await assert.rejects(client.query(`DELETE FROM ${table} WHERE stage_id=$1`, [range.stage_id]), { code: '55000' });
+    }
+    const preserved = await client.query(`SELECT s.stage_id,s.registration_order FROM lovetree_stages s
+      JOIN lovetree_stage_assignments a USING (product_id,stage_id)
+      JOIN lovetree_stage_moments m USING (product_id,stage_id)
+      JOIN lovetree_stage_saves f USING (product_id,stage_id)
+      WHERE a.start_seconds=14 AND a.end_seconds=26 AND m.source_revision=1`);
+    assert.deepEqual(preserved.rows, [range]);
+    const votes = await client.query('SELECT target_kind, target_id, voted_at FROM lovetree_community_votes');
+    assert.deepEqual(votes.rows, [{ target_kind: 'tree', target_id: 'tree', voted_at: new Date(originalTime) }]);
+  });
+}
