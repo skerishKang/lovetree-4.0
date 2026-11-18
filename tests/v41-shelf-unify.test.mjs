@@ -267,6 +267,6 @@ test('#서재 가운데 책의 트리를 셸에 알려 탭 이동이 그 트리�
 // 261118 대표 결정: 트리 0개 계정이 주소로 바로 들어와도 서재 빈 화면(#817)으로 시작한다.
 test('#서재 트리 0개 주소 진입도 서재 빈 화면으로 시작한다', () => {
   const shellMjs = read('public/v41/shell.mjs');
-  const choose = shellMjs.slice(shellMjs.indexOf('function choose(id,momentId)'), shellMjs.indexOf('function paintEmptyForScreen'));
+  const choose = shellMjs.slice(shellMjs.indexOf('function choose(id,momentId,skipShow=false)'), shellMjs.indexOf('function paintEmptyForScreen'));
   assert.match(choose, /paintEmptyForScreen\(current\)/, '빈 판은 지금 화면의 빈 상태 문구로 칠한다');
 });
