@@ -361,7 +361,7 @@ html[data-lt-theme=garden] .settings-more-fold>summary:hover{color:var(--lt-ink)
  #write-panel{inset:var(--lt-vv-top,0px) 0 auto 0;width:100vw;max-width:none;height:var(--lt-vv-h,100dvh);max-height:var(--lt-vv-h,100dvh);margin:0;border:0;border-radius:0;padding-bottom:0}
  .write-tabs [role=tab]{min-height:44px}
  .write-tab-panel{padding:12px 0 18px;border-top:0}
- .quick-preview[data-state=empty]{display:none}
+  .quick-preview[data-state=empty]{display:flex;height:120px}
  .quick-submit{position:sticky;bottom:calc(10px + env(safe-area-inset-bottom));z-index:1;box-shadow:0 0 0 10px var(--lt-glass-strong)}
  #moment-form>.button-row{position:sticky;bottom:0;z-index:1;margin:16px -18px 0;padding:10px 18px calc(10px + env(safe-area-inset-bottom));background:linear-gradient(var(--lt-glass-strong),var(--lt-glass-strong)),var(--lt-stage);border-top:1px solid var(--lt-line)}
 }
@@ -375,11 +375,12 @@ html[data-lt-theme=garden] .settings-more-fold>summary:hover{color:var(--lt-ink)
 .quick-paste:hover{border-color:var(--lt-gold-line)}
 .quick-drop-hint{margin:8px 0 0!important;padding-left:14px;font-size:13px;color:var(--lt-muted)}
 /* 미리보기 카드: 높이 고정 — 빈 상태·입력·담은 뒤 어느 쪽이든 아래 버튼 y가 같다(이슈 343). */
-.quick-preview{position:relative;display:flex;flex-direction:column;height:300px;margin-top:12px;border:1px solid var(--lt-line);border-radius:var(--lt-r-card);background:var(--lt-stage-2);overflow:hidden}
+.quick-preview{position:relative;display:flex;flex-direction:column;height:120px;margin-top:12px;border:1px solid var(--lt-line);border-radius:var(--lt-r-card);background:var(--lt-stage-2);overflow:hidden}
+.quick-preview[data-media=yes]{height:auto;aspect-ratio:16/9}
 .quick-preview[data-state=empty]{border-style:dashed;background:repeating-linear-gradient(135deg,rgba(255,255,255,.035) 0 12px,transparent 12px 24px),var(--lt-stage-2)}
 .quick-preview-empty,.quick-preview-invalid{margin:auto;padding:0 24px;text-align:center;font-size:13px;line-height:1.8;color:var(--lt-muted)}
-.quick-preview-media{display:flex;align-items:center;justify-content:center;flex:1;min-height:0;padding:12px 12px 0;background:var(--lt-stage)}
-.quick-preview-media img{display:block;width:100%;height:100%;object-fit:contain}
+.quick-preview-media{display:flex;align-items:center;justify-content:center;flex:1;min-height:0;padding:0;background:var(--lt-stage)}
+.quick-preview-media img{display:block;width:100%;height:100%;object-fit:cover}
 .quick-preview-meta{display:flex;flex-direction:column;gap:8px;padding:12px 14px;flex:0 0 auto}
 .quick-preview[data-media=no] .quick-preview-meta{margin:auto 0;max-height:100%;overflow:hidden}
 .quick-preview-tag{align-self:flex-start;padding:4px 10px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-pill);color:var(--lt-gold);font-size:10px;font-weight:700;letter-spacing:.12em}
@@ -391,7 +392,7 @@ html[data-lt-theme=garden] .quick-error-line{color:var(--lt-rose-ink)}
 html[data-lt-theme=garden] #moment-form input,html[data-lt-theme=garden] #moment-form textarea{background:var(--lt-paper);border-color:var(--lt-line-paper)}
 /* 안내 줄: 높이 고정. 담은 뒤에만 채우고, 새 입력이 시작되면 renderPreview가 비운다(이슈 343). */
 /* 이슈 638: 담을 트리 한 줄 — 고른 트리 이름을 보이고 그 자리에서 바꾼다. 색은 --lt-* 토큰만 쓴다. */
-.quick-tree-row{display:flex;align-items:center;gap:10px;min-height:44px;margin-top:8px}
+.quick-tree-row{display:flex;align-items:center;gap:10px;min-height:44px;margin-top:6px}
 .quick-tree-line{flex:1;min-width:0;margin:0!important;font-size:13px;line-height:1.6;color:var(--lt-pearl);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #quick-tree-select{flex:0 1 auto;max-width:46%;min-height:36px;padding:0 8px;border:1px solid var(--lt-line);border-radius:10px;background:rgba(255,255,255,.04);color:var(--lt-pearl);font-size:13px}
 #quick-tree-select:focus-visible{outline:2px solid var(--lt-gold);outline-offset:2px}
@@ -404,7 +405,7 @@ html[data-lt-theme=garden] #moment-form input,html[data-lt-theme=garden] #moment
 .quick-submit{width:100%;min-height:52px;margin-top:12px;border-radius:14px;font-size:15px;font-weight:600}
 /* 하은 2회차 손질 ①(261116): 실패 문구 아래에 숨을 벌린다 — 고정 단추의 그림자(10px)가 문구 아래를 덮지 않게. */
 .quick-tagline .lt-tagline-error{margin-bottom:16px}
-@media(max-width:780px){.quick-preview{height:220px}}
+@media(max-width:780px){.quick-preview{height:120px}}
 #drop-veil{position:fixed;inset:0;z-index:28;display:grid;place-items:center;background:rgba(4,4,7,.62);backdrop-filter:blur(3px);pointer-events:none}
 #drop-veil[hidden]{display:none}
 #drop-veil p{margin:0;padding:16px 22px;border:1px dashed var(--lt-gold-line);border-radius:var(--lt-r-card);background:var(--lt-glass-strong);color:var(--lt-gold);font-size:15px;letter-spacing:.02em;box-shadow:0 10px 40px #0007;text-align:center}

@@ -240,7 +240,7 @@ test('#462 키보드: 보이는 화면 높이·위치를 창에 넘긴다(모바
   assert.match(mobile, /\.quick-submit\{position:sticky;bottom:/, '담기 단추는 창 아래에 붙는다');
   assert.match(mobile, /#moment-form>\.button-row\{position:sticky;bottom:0;/, '저장하기·취소는 창 아래에 붙는다');
   assert.match(mobile, /\.write-tabs \[role=tab\]\{min-height:44px\}/, '탭 누름 영역 44px');
-  assert.match(mobile, /\.quick-preview\[data-state=empty\]\{display:none\}/, '주소를 넣기 전에는 빈 미리보기 칸을 숨긴다');
+  assert.match(mobile, /\.quick-preview\[data-state=empty\]\{display:flex;height:120px\}/, '주소를 넣기 전 빈 미리보기 칸은 120px로 낮게 보여 준다');
 });
 
 test('#462 끌어다 놓기를 못 하는 기기에서는 끌어다 놓기 안내를 보이지도 읽지도 않는다', () => {
