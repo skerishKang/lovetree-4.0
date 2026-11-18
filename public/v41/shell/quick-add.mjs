@@ -110,6 +110,22 @@ export function createQuickAdd(deps) {
     // #627: 지난 안내의 꼬리표 줄도 함께 치운다. #739: 옛 줄 인스턴스도 거둔다(귀까지).
     if (quickTagLine) { quickTagLine.destroy(); quickTagLine = null; }
     $('quick-tagline')?.replaceChildren();
+    // #37: 확정 때 띄운 '담았어요 · 지금 다듬기 →' 강조도 함께 거둔다.
+    $('quick-notice-row')?.classList.remove('is-lit');
+  }
+
+  // #37(AI 고객 37회차): 꼬리표를 확정해도 눈에 보이는 변화가 없어 '지금 다듬기'를 따로 눌러야 한다고
+  // 느꼈다 — 확정이 저장되면 '✓ 담았어요 · 지금 다듬기 →' 안내를 눈앞에 데려오고 도드라지게 띄운다.
+  function lightSavedNotice(result) {
+    if (!$('write-panel')?.open) return;
+    const notice = $('quick-notice');
+    if (!notice) return;
+    if (!notice.textContent) notice.textContent = savedNoticeText('');
+    notice.hidden = false;
+    setRefineTarget($('quick-refine'), result);
+    const row = $('quick-notice-row');
+    row?.scrollIntoView?.({ block: 'nearest' });
+    row?.classList.add('is-lit');
   }
 
   // #627: 담은 직후 안내에 꼬리표 줄을 붙인다(창 안 #quick-tagline·떠 있는 안내 #quick-saved-tags 두 모양 같은 한 벌).
@@ -143,6 +159,7 @@ export function createQuickAdd(deps) {
             : saved.error === 'notfound' ? '이 순간을 찾을 수 없어요. 순간을 다시 열어 붙여 주세요.'
             : '꼬리표를 저장하지 못했어요. 다시 시도해 주세요.' });
         }
+        lightSavedNotice(result);
         return saved;
       }
     });

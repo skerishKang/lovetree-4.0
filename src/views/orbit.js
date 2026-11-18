@@ -44,8 +44,8 @@ let extraCSS=`:host{display:block;height:100dvh;min-height:540px;font-family:var
 
 extraCSS += '@media(min-width:651px){.detail-grid{padding-left:64px;padding-right:64px}}@media(max-width:650px){.detail-grid{padding-top:60px}.detail-nav{top:6px;transform:none}.detail-nav--prev{left:12px}.detail-nav--next{left:64px;right:auto}.detail-nav-note{top:20px}}';
 // #426: 최근 순간 카드 — 궤도의 금빛 내 카드(.card.mine)와 같은 결(테두리·이중선·금빛 번짐). 390에서는 폭=화면-32px, 세로 썸네일 높이 제한.
-// 2026-11-17: 카드 층(.world)에만 아래 경계를 둔다. 링크 줄과 .app·body의 넘침은 건드리지 않는다.
-extraCSS+=`.world{bottom:56px;overflow:hidden}`;
+// 261118 대표 지적 1번(이슈 #884): 카드 층 아래 경계를 둔 것이 바닥에 빈 회색 띠를 만들었다 —
+// .world 를 다시 바닥까지 이어 붙이고(링크 줄은 셸이 위에 그리므로 그대로 보인다), 잘림도 거둔다.
 extraCSS+=`.center-note{display:flex;flex-wrap:wrap;justify-content:center;align-items:baseline;gap:2px 10px}.center-hint{color:var(--lt-muted,#9b98a6)}@media(max-width:650px){.center p.note-with-hint{font-size:12px;line-height:1.5;margin-top:8px}}/* #635 PR C: '드래그 · 금테 카드를 눌러 감상' 안내를 단추 묶음 바로 아래(안내 줄 옆)로 올린다 — 화면 아래 고정 링크 줄과 겹치지 않게. */`;
 /* 261117 대표 검수: 마우스로 열었으면 닫기 단추의 초점 테두리를 그리지 않는다(#795 계정 메뉴와 같은 방식) — 키보드로 열었으면 보인다. */
 extraCSS+=`dialog[data-lt-opened-by=mouse] .close:focus-visible,dialog[data-lt-opened-by=mouse] .close:focus{outline:0;box-shadow:none}`;
@@ -534,13 +534,16 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
     if(minY<0){py-=minY;maxY-=minY;minY=0;}else if(maxY>h){const over=maxY-h;py-=over;maxY-=over;minY-=over;}
     // 마지막 안전망: 그래도 겹치는 극단 경우는 숨긴다(침범 0 보장).
     if(maxX>zs.l&&minX<zs.r&&maxY>zs.t&&minY<zs.b){el.style.display='none';return;}
-   } else if(maxX>zs.l&&minX<zs.r&&maxY>zs.t&&minY<zs.b){
-    const pushL=maxX-zs.l,pushR=zs.r-minX,pushT=maxY-zs.t,pushB=zs.b-minY,m=Math.min(pushL,pushR,pushT,pushB);
-    // #593: 키프레임을 구울 때는 앞 표본과 같은 쪽으로 민다 — 표본 사이는 직선으로 이어지므로, 쪽이 바뀌면
-    // 그 사이에서 카드가 가운데 구역을 가로지른다(실측 390에서 1장 침범). 크게 밀려야 하면(1.4배 초과) 그때만 가장 얇은 쪽.
-    const side=pushL<=m*1.4?'l':pushR<=m*1.4?'r':pushT<=m*1.4?'t':pushB<=m*1.4?'b':null;
-    if(prefer&&side===prefer){if(prefer==='l')px-=pushL;else if(prefer==='r')px+=pushR;else if(prefer==='t')py-=pushT;else py+=pushB;outSide=prefer;}
-    else{if(m===pushL)px-=pushL;else if(m===pushR)px+=pushR;else if(m===pushT)py-=pushT;else py+=pushB;outSide=m===pushL?'l':m===pushR?'r':m===pushT?'t':'b';}
+   }
+   // 261118 대표 지적 5·6번(이슈 #884): 넓은 화면에서 '가장 얇은 쪽으로 밀고 같은 쪽에 붙이는'(prefer)
+   // 밀어내기는 거둔다 — 카드가 양옆에 세워져 위아래로만 출렁였고, 좌우 밀린 양이 어긋나 화면이 쏠렸다.
+   // 대신 가운데 구역 중심에서 카드 쪽으로 뻗는 방사 방향으로만 벗어나게 민다 — 방향이 위상에 따라
+   // 부드럽게 돌아 카드가 구역 둘레를 흐른다(원래 궤도 동작). 밀린 양은 분리 축 계산이라 침범 0 이 보장된다.
+   else if(maxX>zs.l&&minX<zs.r&&maxY>zs.t&&minY<zs.b){
+    const zx=(zs.l+zs.r)/2,zy=(zs.t+zs.b)/2,cx=(minX+maxX)/2,cy=(minY+maxY)/2;
+    let dx=cx-zx,dy=cy-zy;const len=Math.hypot(dx,dy)||1;dx/=len;dy/=len;
+    const need=Math.max(0,Math.abs(dx)*(zs.r-zs.l)/2+Math.abs(dy)*(zs.b-zs.t)/2+Math.abs(dx)*(maxX-minX)/2+Math.abs(dy)*(maxY-minY)/2-len);
+    if(need>0){px+=dx*need;py+=dy*need;}
    }
    // #593: 모델을 계산한 표본은 밀어내지 않았어도 판정 사각형을 남긴다 — 굽는 쪽이 '표본 사이 직선'이
    // 가운데 구역을 지나는지 검사할 때 쓴다(비어 있으면 그 구간을 건너뛰어 침범이 남았다).
@@ -599,7 +602,7 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
  // 끄는 동안·관성 동안의 자리 쓰기. 유휴에는 부르지 않는다 — 그때는 애니메이션만 돈다.
  let jsMode=false;
  function dragDraw(){
-  if(!drag&&!glide)return;
+  if((!drag&&!glide)||!jsMode)return;
   const w=layoutBox?.w||app.clientWidth,h=layoutBox?.h||app.clientHeight;
   const zs=safeZone?{l:safeZone.l-12,t:safeZone.t-12,r:safeZone.r+12,b:safeZone.b+12}:null,fit=Math.min(1,w/780,h/850)*(w<=650?.5:1),narrow=w<=650;
   cards.forEach((c,i)=>{const el=elements[i],cfg=(narrow?ringsNarrow:rings)[c.ring];const th=c.baseAngle+phase*cfg.speed+c.phaseOffset;
@@ -628,8 +631,11 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
   schedule();
  }
  function schedule(){if(!raf&&!document.hidden)raf=requestAnimationFrame(frame);}
- app.addEventListener('pointerdown',e=>{if(e.target.closest('.center,.topbar'))return;drag={x:e.clientX,id:e.pointerId,at:performance.now()};moved=0;spin=0;glide=0;jsMode=true;setBusy(true);schedule();},{signal});
+ app.addEventListener('pointerdown',e=>{if(e.target.closest('.center,.topbar'))return;drag={x:e.clientX,id:e.pointerId,at:performance.now()};moved=0;spin=0;glide=0;},{signal});
+ // 261118 대표 지적 4번(이슈 #884): 누르는 것만으로는 무대를 움직이지 않는다 — 카드가 잠깐 흔들렸다.
+ // 실제로 누른 채 끌 때(6px 넘을 때)만 끌기 모드로 들어가 자리를 손으로 쓴다. 카드 클릭은 원래 동작 그대로.
  app.addEventListener('pointermove',e=>{if(!drag||e.pointerId!==drag.id)return;const dx=e.clientX-drag.x;moved+=Math.abs(dx);
+  if(!jsMode){if(moved>6){jsMode=true;setBusy(true);}else{drag.x=e.clientX;return;}} // 임계값 전에는 위상도 쓰지 않는다(클릭 전후 자리 변화 0)
   // #535-3: 손 움직임 대비 회전량을 화면 폭에 맞춘다. 전에는 화면 폭과 무관한 dx*.0038 이라
   // 1440에서 한 화면 폭을 끌면 313°, 390에서는 85°로 크게 달랐다. 화면 폭만큼 끌면 어디서나 172°가 되게 한다.
   const k=3.0/Math.max(360,app.clientWidth);phase+=dx*k;spin=dx*k;

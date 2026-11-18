@@ -9,7 +9,7 @@ import {formatDisplayDate} from './book-usability.mjs';
 import {localDateOnly} from './local-date.mjs';
 const el=(tag,className,text)=>{const node=document.createElement(tag);if(className)node.className=className;if(text!=null)node.textContent=text;return node;};
 export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareOwn,hasOwnTree,getDateStyle,getArtistGroups=()=>[]}){
- const api=createCommunityApi(),form=dialog.querySelector('#community-search-form'),query=dialog.querySelector('#community-query'),list=dialog.querySelector('#community-list'),groups=dialog.querySelector('#community-groups'),feedback=dialog.querySelector('#community-feedback'),more=dialog.querySelector('#community-more'),preview=dialog.querySelector('#community-preview');
+ const api=createCommunityApi(),form=dialog.querySelector('#community-search-form'),query=dialog.querySelector('#community-query'),list=dialog.querySelector('#community-list'),groups=dialog.querySelector('#community-groups'),feedback=dialog.querySelector('#community-feedback'),more=dialog.querySelector('#community-more'),preview=dialog.querySelector('#community-preview'),sortSelect=dialog.querySelector('#community-sort');
  let cursor='',loading=false,items=[],selectedId=null,selectedArtist='',loadId=0;
  const message=text=>{feedback.textContent=text;const previewMessage=preview.querySelector('[data-community-preview-message]');if(previewMessage)previewMessage.textContent=text;};
  // #480 L13: 계정 설정의 날짜 표기. 넘겨받지 않으면 기본(dot) — 새 규칙을 만들지 않는다.
@@ -19,9 +19,13 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
  // localDateOnly(#547 한 벌)로 기기 지역 날짜를 만들어 formatDisplayDate에 넘긴다.
  const when=value=>formatDisplayDate(localDateOnly(value),dateStyle());
  const loginMessage=answer=>answer.status===401?'로그인하면 이 기능을 사용할 수 있어요.':answer.message||'요청을 처리하지 못했어요.';
+ // #824 결정 7: 3 미만 숫자는 보여 주지 않는다 — 라벨만 남긴다(0·1·2 모두 같은 규칙, 3부터 숫자가 보인다).
+ // '이번 주 담은 사람 수'(결정 1)도 같은 규칙 — 3 이상일 때만 카드·미리보기에 한 줄로 따라온다.
+ const smallCountLabel=(label,count)=>Number(count)>=3?`${label} ${count}`:label;
+ const weeklyNote=item=>{const n=Number(item.stats?.weeklyFavorites||0);return n>=3?`이번 주 ${n}명`:'';};
  function statButton(item,kind,label){
   if(kind==='reaction')return reactionButtons(item,label);
-  const active=kind==='favorite'?item.stats.favored:item.stats.hearted,count=kind==='favorite'?item.stats.favorites:item.stats.hearts,b=el('button','community-mini',`${active?'✓ ':''}${label} ${count}`);b.type='button';b.dataset.communityAction=kind;b.setAttribute('aria-pressed',String(active));
+  const active=kind==='favorite'?item.stats.favored:item.stats.hearted,count=kind==='favorite'?item.stats.favorites:item.stats.hearts,b=el('button','community-mini',`${active?'✓ ':''}${smallCountLabel(label,count)}`);b.type='button';b.dataset.communityAction=kind;b.setAttribute('aria-pressed',String(active));
   b.onclick=async()=>{const answer=await api.favorite(item.shareId,!active);if(!answer.ok){message(loginMessage(answer));return;}item.stats=answer.stats;render();};return b;
  }
  function reactionButtons(item,label){
@@ -38,7 +42,7 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
     const count=counts[reactionKind]||0;
     const isActive=active(reactionKind);
     if(!count&&!isActive)continue;
-    const b=el('button','community-mini community-reaction',`${isActive?'✓ ':''}${labels[reactionKind]||reactionKind} ${count}`);
+    const b=el('button','community-mini community-reaction',`${isActive?'✓ ':''}${smallCountLabel(labels[reactionKind]||reactionKind,count)}`);
     b.type='button';b.dataset.reactionKind=reactionKind;b.dataset.communityAction='reaction';b.setAttribute('aria-pressed',String(isActive));
     b.onclick=async()=>{const answer=await api.react(item.shareId,!isActive,reactionKind);if(!answer.ok){message(loginMessage(answer));return;}item.stats=answer.stats;render();};
     out.push(b);
@@ -139,7 +143,7 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
   const body=el('div','community-preview-body'),title=el('h3','',displayTreeTitle(item.title));title.id='community-preview-title';
   const subject=el('p','community-preview-subject',item.subject||''),moment=el('p','community-preview-moment-title',item.cover?.title||'공개된 순간');
   const summary=item.summary?el('p','community-preview-summary',item.summary):null;
-  const meta=el('p','community-preview-meta',`${item.cover?.emotion||item.emotions?.[0]||'공개'} · ${when(item.createdAt)} · 공감 ${item.stats?.hearts||0}`);
+  const weekly=weeklyNote(item),meta=el('p','community-preview-meta',`${item.cover?.emotion||item.emotions?.[0]||'공개'} · ${when(item.createdAt)} · ${smallCountLabel('공감',item.stats?.hearts||0)}${weekly?` · ${weekly}`:''}`);
   const actions=el('div','community-preview-actions');actions.append(statButton(item,'favorite','즐겨찾기'),statButton(item,'reaction','공감'));
   const open=el('button','community-preview-open','대표 순간부터 감상');open.type='button';open.onclick=()=>onOpenShare(item);
   const start=el('button','community-preview-start','내 기록 새로 시작');start.type='button';start.onclick=()=>onStartRecord(item.subject);
@@ -151,7 +155,7 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
  function openPreview(item){selectedId=item.shareId;renderPreview(item);if(!preview.open)preview.showModal();}
  function card(item){
   const titleText=displayTreeTitle(item.title),momentText=item.cover?.title||'공개된 순간';
-  const metaText=`${item.cover?.emotion||item.emotions?.[0]||'공개'} · ${when(item.createdAt)} · 공감 ${item.stats?.hearts||0}`;
+  const weekly=weeklyNote(item),metaText=`${item.cover?.emotion||item.emotions?.[0]||'공개'} · ${when(item.createdAt)} · ${smallCountLabel('공감',item.stats?.hearts||0)}${weekly?` · ${weekly}`:''}`;
   const article=el('button','community-card');article.type='button';article.dataset.shareId=item.shareId;
   article.setAttribute('aria-label',`${titleText}. ${momentText}. ${metaText}`);
   const distinct=duplicateLabel(item);
@@ -176,13 +180,15 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
   if(append&&loading)return;
   const requestId=++loadId;loading=true;more.disabled=true;message('공개 트리를 불러오는 중이에요.');
   if(!append){items=[];cursor='';render();}
-  const answer=await api.discover({q:query.value.trim(),artist:selectedArtist,cursor,limit:12});
+  const answer=await api.discover({q:query.value.trim(),artist:selectedArtist,cursor,limit:12,sort:sortSelect?.value||''});
   if(requestId!==loadId)return;
   loading=false;
   if(!answer.ok){message(answer.message||'공개 트리를 불러오지 못했어요.');more.hidden=true;more.disabled=false;render();return;}
   items=append?[...items,...answer.items]:answer.items;cursor=answer.nextCursor||'';more.hidden=!cursor;more.disabled=false;
-  message(answer.totalVisible?`공개된 트리 ${answer.totalVisible}개를 찾았어요. 새로 공개된 순서예요.`:'아직 공개된 트리가 없어요. 트리를 공개하면 여기에 나타나요.');render();
+  message(answer.totalVisible?`공개된 트리 ${answer.totalVisible}개를 찾았어요. ${(sortSelect?.value==='popular')?'많이 담긴 순서예요.':'새로 공개된 순서예요.'}`:'아직 공개된 트리가 없어요. 트리를 공개하면 여기에 나타나요.');render();
  }
+ // #824 결정 2: 정렬을 바꾸면 목록을 처음부터 다시 불러온다.
+ sortSelect.onchange=()=>load(false);
  for(const link of dialog.querySelectorAll('[data-community-view]'))link.onclick=()=>{dialog.close();[...document.querySelectorAll('[data-view]')].find(node=>node.dataset.view===link.dataset.communityView)?.click();};
  const tabs=()=>[...document.querySelectorAll('nav [data-view]')];
  button.onclick=()=>{if(!dialog.open){dialog.showModal();button.setAttribute('aria-current','true');for(const t of tabs()){if(t.getAttribute('aria-current')==='true'){t.dataset.wasCurrent='1';t.setAttribute('aria-current','false');}}renderGroups();load(false);}};

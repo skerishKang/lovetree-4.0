@@ -6,9 +6,9 @@ import {
 import {
   GITHUB_REPO, KIND_LABEL, STATUS_LABEL, STATUS_ORDER, PERSONA_FIELDS, PENDING_STATUS,
   escapeText, richParagraph, formatTime, parseHash, viewHash, viewToTab, tabClickFilters,
-  filterRows, boardKindTabs, boardStatusTabs, filterBoardRows, ALL_STATUS, MENU_TABS,
+  filterRows, boardKindTabs, boardStatusTabs, boardCatTabs, filterBoardRows, ALL_STATUS, MENU_TABS,
   linkedIssueNumbers, normalizeIssueNumber, issueStateLabel, needsFixButton,
-  statusChangeMessage, buildIssueUrl, issueLink, journalsSummary, journalRowsByCustomer, menuReceivedCounts,
+  statusChangeMessage, buildIssueUrl, issueLink, journalListRows, journalCustomerOptions, menuReceivedCounts,
   isPendingStatus, overviewModel, statsCards,
   customerSummaryCards, customerRows, customerDetailModel, customerViewRows
 } from './admin-view.js';
@@ -28,10 +28,11 @@ import {
 
 let route = parseHash(globalThis.location?.hash);
 
-// 상단 메뉴(대표 요청 2026-11-17): 고객 글 탭을 고장·불편(cat=issue)·요청(cat=request)으로 나누고
-// 사용 일지(kind=journal)·신고(kind=report)를 탭으로 돌린다. 상세·페르소나는 원래 글의 탭이 눌린다.
+// 상단 메뉴(#888, 2026-11-18): 고장·불편·요청을 '의견' 탭 하나로 모으고 그 안의 칩으로 구분한다.
+// 사용 일지·신고는 탭으로 둔다. 상세·페르소나는 원래 글의 탭이 눌린다.
 let feedbackCache = [];
-let detailCat = 'issue';
+let detailKind = 'opinion'; // 상세·페르소나 화면에서 눌릴 탭(원래 글의 종류).
+let journalFilterSubject = ''; // 사용 일지 탭의 거르기(#888) — 고객별 하나. 기본은 전체.
 let replyKind = 'internal'; // 상세 화면에서만 쓰는 답글 종류(#564 8). 기본은 내부 메모.
 
 async function read(path, init = {}) {
@@ -77,11 +78,11 @@ function head() {
   // 고객 글 탭을 고장·불편·요청으로 나누고 사용 일지·신고를 탭으로 돌린다(대표 요청 2026-11-17).
   // 새 글(received) 수는 고장·불편·요청 탭 옆에 작게 — 0이면 숨긴다. 숫자는 마지막으로 읽은 고객 글에서 센다.
   const counts = menuReceivedCounts(feedbackCache);
-  const activeCat = route.view === 'feedback' ? (detailCat === 'request' ? 'request' : detailCat === 'journal' ? '' : 'issue') : (route.cat || '');
-  const activeKind = route.view === 'feedback' && detailCat === 'journal' ? 'journal' : (route.kind || '');
+  // #888: 탭이 곧 종류다 — 상세·페르소나는 원래 글의 종류(의견·일지) 탭이 눌린다.
+  const activeKind = route.view === 'feedback' || route.view === 'persona' ? (detailKind || 'opinion') : (route.kind || '');
   const isActive = t => (t.view === 'board'
-    ? route.view === 'board' && (t.kind ? activeKind === t.kind : !activeKind && activeCat === t.cat)
-    : route.view === t.view) || (route.view === 'feedback' && t.view === 'board' && (detailCat === 'journal' ? t.kind === 'journal' : (detailCat === 'request' ? t.cat === 'request' : t.cat === 'issue')));
+    ? route.view === 'board' && activeKind === t.kind
+    : route.view === t.view) || (route.view === 'feedback' && t.view === 'board' && activeKind === t.kind);
   const tabBtn = (t) => `<button type="button" data-tab="${t.view}"${t.cat ? ` data-cat="${t.cat}"` : ''}${t.kind ? ` data-kind="${t.kind}"` : ''} class="${isActive(t) ? 'is-active' : ''}">${t.label}${t.countKey && counts[t.countKey] ? ` <span class="lt-menu-count">${counts[t.countKey]}</span>` : ''}</button>`
   // 밤/정원 전환(2026-11-15 2단계) — 본 사이트와 같은 저장 키·문구(header-state.mjs 한 벌).
   const theme = readTheme(localStorage);
@@ -122,8 +123,6 @@ async function render() {
   if (route.view === 'customers') { await renderCustomers(); return; }
   if (route.view === 'customer' && route.id) { await renderCustomerDetail(route.id); return; }
   if (route.view === 'issues') { await renderIssues(); return; }
-  if (route.view === 'reports') { await renderReports(); return; }
-  if (route.view === 'journals') { await renderJournals(); return; }
   if (route.view === 'feedback' && route.id) { await renderDetail(route.id); return; }
   if (route.view === 'persona' && route.id) { await renderPersona(route.id); return; }
   await renderList();
@@ -340,19 +339,27 @@ async function renderList() {
     displayTitle: String(report.reason || '').slice(0, 90) || '신고', createdAt: report.createdAt, replyCount: 0
   }));
   const rows = [...posts, ...reportRows];
-  const activeStatus = route.status || PENDING_STATUS;
+  // #888: 사용 일지는 처리할 일이 아니라 고객의 하루 기록 — 상태 칩 없이 전체 최신 순으로 따로 보여 준다.
+  if (route.kind === 'journal') { renderJournalTab(posts.filter(row => row?.kind === 'journal')); return; }
+  // #888: 갈래 칩(전체·고장·불편·요청)과 상태 칩은 '의견' 탭에만 둔다. 갈래 칩의 기본은 '전체'.
+  // 첫 열기는 상태를 고르지 않은 '전체'다(#888 — 일지·신고처럼 탭은 그 종류 전체를 보여 주고, 좁히는 건 칩이 한다).
+  const activeStatus = route.status || ALL_STATUS;
   const visible = filterBoardRows(rows, {kind: route.kind, cat: route.cat, status: activeStatus});
   const tabBtn = (data, value, label, count, active) =>
     `<button type="button" ${data}="${escapeText(value)}" class="lt-tab${active ? ' is-active' : ''}" aria-label="${escapeText(label)} ${count}건">${escapeText(label)} <span class="lt-tab-count">${count}</span></button>`;
-  // 종류 묶음(전체·의견·일지·신고)은 상단 탭으로 갈라졌다 — 없앤다(대표 요청 2026-11-17).
-  // 상태 줄('할 일·고침·더 보기')은 그대로 — 탭 범위(고장·불편/요청/일지/신고) 안에서 센다. 0인 칸은 숨긴다.
-  const statusRow = boardStatusTabs(rows, route.kind, route.cat)
-    .filter(t => t.count > 0)
-    .map(t => tabBtn('data-status-tab', t.key, t.label, t.count, activeStatus === t.key)).join('');
-  const listTitle = route.kind === 'journal' ? '사용 일지' : route.kind === 'report' ? '신고' : route.cat === 'request' ? '요청' : '고장·불편';
+  // #888: 갈래 칩(전체·고장·불편·요청)과 상태 칩은 '의견' 탭에만 둔다. 갈래 칩의 기본은 '전체'.
+  const isOpinionTab = route.kind === 'opinion';
+  const catRow = isOpinionTab
+    ? boardCatTabs(rows, activeStatus).map(t => tabBtn('data-cat-tab', t.key, t.label, t.count, (route.cat || '') === t.key)).join('')
+    : '';
+  const statusRow = isOpinionTab
+    ? boardStatusTabs(rows, route.kind, route.cat).filter(t => t.count > 0)
+      .map(t => tabBtn('data-status-tab', t.key, t.label, t.count, activeStatus === t.key)).join('')
+    : '';
+  const listTitle = route.kind === 'report' ? '신고' : '의견';
   const list = visible.length
     ? visible.map(row => row.kind === 'report' ? reportCard(row.report) : `<article class="lt-post" data-open="${escapeText(row.id)}" tabindex="0" role="button">
-        <div class="lt-post-top">${statusBadge(row.status)}${row.kind === 'journal' && row.score ? `<span class="lt-badge">점수 ${escapeText(row.score)}</span>` : ''}${row.kind === 'journal' && row.journalDate ? `<span class="lt-badge">${escapeText(row.journalDate)}</span>` : ''}<span class="lt-post-date">${escapeText(formatTime(row.createdAt))}</span></div>
+        <div class="lt-post-top">${statusBadge(row.status)}<span class="lt-post-date">${escapeText(formatTime(row.createdAt))}</span></div>
         <h3 class="lt-post-title">${escapeText(row.displayTitle || '(제목 없음)')}</h3>
         <div class="lt-post-meta"><span class="lt-post-author" data-author="${escapeText(row.subjectId || '')}">${escapeText(authorLabel(row))}</span>${issueLink(row.issueNumber) ? `<span class="lt-post-issue">이슈 ${issueLink(row.issueNumber)}</span>` : ''}<span>답글 ${row.replyCount || 0}</span></div>
       </article>`).join('')
@@ -361,8 +368,36 @@ async function renderList() {
     <div class="lt-board-head">
       <h1 class="lt-h1">${listTitle} <small>${visible.length}건 · 최신 순</small></h1>
     </div>
-    <div class="lt-tabs lt-status-row" role="group" aria-label="상태">${statusRow}</div>
+    ${catRow ? `<div class="lt-tabs lt-cat-row" role="group" aria-label="갈래">${catRow}</div>` : ''}
+    ${statusRow ? `<div class="lt-tabs lt-status-row" role="group" aria-label="상태">${statusRow}</div>` : ''}
     ${route.unanswered ? '<p class="lt-post-meta">답글 0인 글만 보는 중 · <button type="button" class="lt-btn" data-clear-filter="board">조건 지우기</button></p>' : ''}
+    <div class="lt-post-list">${list}</div>
+  </div>`;
+}
+
+/** 사용 일지 탭(#888) — 상태 칩 없이 전체 최신 순(고객·날짜·다시 올 점수·제목). 거르기는 고객별 하나.
+ *  안 읽은 일지(상태 received)는 '새 글'로 알리고, 열어 보면(상세 판) 읽은 것으로 바뀌어 표시가 사라진다. */
+function renderJournalTab(journals) {
+  const all = journalListRows(journals);
+  const options = journalCustomerOptions(all);
+  const visible = journalFilterSubject ? all.filter(row => row.subjectId === journalFilterSubject) : all;
+  const list = visible.length
+    ? visible.map(row => `<article class="lt-post" data-open="${escapeText(row.id)}" tabindex="0" role="button">
+        <div class="lt-post-top">${row.unread ? '<span class="lt-badge" data-unread="1">새 글</span>' : ''}<span class="lt-post-date">${escapeText(row.day || '—')}</span>${row.score == null ? '' : `<span class="lt-badge">다시 올 ${escapeText(row.score)}점</span>`}</div>
+        <h3 class="lt-post-title">${escapeText(row.title)}</h3>
+        <div class="lt-post-meta"><span class="lt-post-author">${escapeText(row.customer)}</span></div>
+      </article>`).join('')
+    : '<p class="lt-empty">아직 사용 일지가 없습니다.</p>';
+  // 거르기는 고객별 하나(#888) — 일지를 남긴 고객만 갈래로 나온다.
+  const filter = options.length
+    ? `<label class="lt-field lt-journal-filter"><span>고객별로 보기</span><select data-journal-filter aria-label="고객별로 거르기">
+        <option value="">전체 고객</option>
+        ${options.map(option => `<option value="${escapeText(option.subjectId)}"${option.subjectId === journalFilterSubject ? ' selected' : ''}>${escapeText(option.name)}</option>`).join('')}
+      </select></label>`
+    : '';
+  host.innerHTML = `${head()}<div class="admin-shell lt-board">
+    <div class="lt-board-head"><h1 class="lt-h1">사용 일지 <small>${visible.length}건 · 최신 순</small></h1><p class="lt-sub">고객의 하루 기록을 모아 본다 · 줄을 누르면 본문·내부 메모를 읽는다</p></div>
+    ${filter}
     <div class="lt-post-list">${list}</div>
   </div>`;
 }
@@ -385,9 +420,16 @@ function reportCard(report) {
 }
 
 async function renderDetail(id) {
-  const res = await read('/api/admin/feedback/' + encodeURIComponent(id));
-  const post = res.ok ? res.payload?.feedback : null;
+  let res = await read('/api/admin/feedback/' + encodeURIComponent(id));
+  let post = res.ok ? res.payload?.feedback : null;
   if (!post) { navigate('board'); return; }
+  // #888: 안 읽은 일지('새 글')는 열어 보는 순간 읽은 것으로 바꾼다 — 목록의 '새 글' 표시가 사라진다.
+  // 상태를 바꾸는 운영 경로는 이미 상세 판의 '처리'에 있다(#843).
+  if (post.kind === 'journal' && post.status === 'received') {
+    const marked = await read('/api/admin/feedback/' + encodeURIComponent(id), {method: 'PATCH', body: JSON.stringify({status: 'reviewing'})});
+    if (marked.ok && marked.payload?.feedback) { post = marked.payload.feedback; res = marked; }
+  }
+  detailKind = post.kind === 'journal' ? 'journal' : 'opinion';
   replyKind = 'internal'; // 글을 다시 열면 내부 메모부터(#564 8).
   const replies = Array.isArray(post.replies) ? post.replies : [];
   const persona = post.persona && post.persona.name ? post.persona : null;
@@ -443,7 +485,7 @@ async function renderDetail(id) {
 }
 
 async function renderPersona(subjectId) {
-  detailCat = 'issue';
+  detailKind = 'opinion';
   const res = await read('/api/admin/persona/' + encodeURIComponent(subjectId));
   const persona = res.ok ? res.payload?.persona : {name: '', intro: {}};
   const postsRes = await loadFeedback();
@@ -469,102 +511,6 @@ async function renderPersona(subjectId) {
       <p class="lt-status" data-persona-status role="status"></p>
     </section>
     <section class="lt-card"><h2 class="lt-h2">이 고객의 글</h2><div class="lt-post-list">${postRows}</div></section>
-  </div>`;
-}
-
-/** #596 사용 일지 탭 — 오늘 요약 + 고객별 줄(누르면 그 고객 일지를 날짜 내림차순으로 펼쳐 읽는다). */
-async function renderJournals() {
-  const [journalsRes, feedbackRes] = await Promise.all([read('/api/admin/journals'), loadFeedback()]);
-  const journals = journalsRes.ok && Array.isArray(journalsRes.payload?.journals) ? journalsRes.payload.journals : [];
-  const feedback = feedbackRes.ok && Array.isArray(feedbackRes.payload?.feedback) ? feedbackRes.payload.feedback : [];
-  // 오늘(운영 기준 KST 날짜) 요약. 일지 날짜는 journal_date(운영 기준 날짜), 의견 날짜는 만든 시각의 KST 날짜로 잡는다.
-  const today = new Date().toLocaleDateString('sv-SE', {timeZone: 'Asia/Seoul'});
-  const kstDay = value => new Date(value).toLocaleDateString('sv-SE', {timeZone: 'Asia/Seoul'});
-  const summary = journalsSummary(journals, today);
-  const rows = journalRowsByCustomer(journals);
-  // 그날 그 고객이 보낸 의견(같은 KST 날짜) — 펼친 일지 안에서 그날 의견으로 바로 가는 링크(#596).
-  const opinionsByCustomerDay = new Map();
-  for (const row of feedback) {
-    if (row.kind !== 'opinion' || !row.subjectId) continue;
-    const key = `${row.subjectId}|${kstDay(row.createdAt)}`;
-    if (!opinionsByCustomerDay.has(key)) opinionsByCustomerDay.set(key, []);
-    opinionsByCustomerDay.get(key).push(row);
-  }
-  window.__ltJournalsData = {journals, rows, opinionsByCustomerDay};
-  const summaryItem = (label, value) => `<div class="lt-jsum-item"><span class="lt-jsum-value">${escapeText(value)}</span><span class="lt-jsum-label">${escapeText(label)}</span></div>`;
-  const flowDots = row => row.flow.map(point => `<i class="lt-flow-dot" data-score="${escapeText(point.score ?? '')}" title="${escapeText(point.day)}${point.score == null ? '' : ' · ' + escapeText(point.score)}점" aria-hidden="true"></i>`).join('');
-  const customerRows = rows.length
-    ? rows.map(row => `<div class="lt-jrow-wrap">
-        <article class="lt-jrow" data-customer="${escapeText(row.subjectId)}" tabindex="0" role="button" aria-expanded="false">
-          <div class="lt-jrow-head">
-            <span class="lt-jrow-name">${escapeText(row.name)}</span>
-            <span class="lt-badge">${escapeText(row.stage)}</span>
-            ${row.atRisk ? '<span class="lt-badge warn">떠남 위험</span>' : ''}
-            <span class="lt-jrow-score">최근 ${escapeText(row.latestScore ?? '—')}점</span>
-            <span class="lt-jrow-flow" role="img" aria-label="날짜별 점수 흐름 ${escapeText(row.flow.map(point => point.day.slice(5) + ' ' + (point.score ?? '없음') + '점').join(', '))}">${flowDots(row)}</span>
-            <span class="lt-post-date">${escapeText(row.lastDay || '—')}</span>
-            <span class="lt-jrow-count">일지 ${row.journals.length}건</span>
-          </div>
-        </article>
-        <div class="lt-jdetail" hidden data-customer-body="${escapeText(row.subjectId)}"></div>
-      </div>`).join('')
-    : '<p class="lt-empty">아직 사용 일지가 없습니다.</p>';
-  host.innerHTML = `${head()}<div class="admin-shell lt-board">
-    <div class="lt-board-head"><h1 class="lt-h1">사용 일지</h1><p class="lt-sub">고객별로 날짜 내림차순 · 줄을 누르면 펼쳐 읽기</p></div>
-    <div class="lt-jsum" role="group" aria-label="오늘 요약">
-      ${summaryItem('오늘 활동 고객', summary.activeCustomers)}
-      ${summaryItem('오늘 일지', summary.journalCount)}
-      ${summaryItem('평균 다시 올 점수', summary.avgScore ?? '—')}
-      ${summaryItem('떠남 위험(이틀 연속 2 이하)', summary.atRisk)}
-    </div>
-    <div class="lt-post-list">${customerRows}</div>
-  </div>`;
-}
-
-/** 펼친 고객 일지(#596) — 날짜 내림차순, 본문 줄바꿈 유지, 그날 의견 링크. */
-function journalDetailHtml(subjectId) {
-  const data = window.__ltJournalsData;
-  const row = data?.rows.find(entry => entry.subjectId === subjectId);
-  if (!row) return '<p class="lt-empty">일지를 찾지 못했습니다.</p>';
-  return row.journals.map(journal => {
-    const day = String(journal.journalDate || '');
-    const opinions = data.opinionsByCustomerDay.get(`${subjectId}|${day}`) || [];
-    const links = opinions.map(op => `<a class="lt-journal-opinion" href="#feedback/${escapeText(op.id)}">그날 의견 · ${escapeText(op.displayTitle || '(제목 없음)')}</a>`).join('');
-    return `<article class="lt-journal">
-      <div class="lt-post-top"><span class="lt-post-date">${escapeText(day)}</span>${statusBadge(journal.status)}<span class="lt-badge">다시 올 점수 ${escapeText(journal.score ?? '—')}</span></div>
-      <h3 class="lt-post-title">${escapeText(journal.displayTitle || '(제목 없음)')}</h3>
-      <p class="lt-body">${richParagraph(journal.body)}</p>
-      ${links ? `<div class="lt-journal-links">${links}</div>` : ''}
-    </article>`;
-  }).join('');
-}
-
-async function renderReports() {
-  const res = await read('/api/community/admin/reports');
-  const reports = res.ok && Array.isArray(res.payload?.reports) ? res.payload.reports : [];
-  // #743: '한눈에'의 신고 대기 카드가 #reports?status=open 으로 열면 검토 대기만 보여 준다.
-  const shown = route.status ? reports.filter(report => report?.status === route.status) : reports;
-  const rows = shown.length
-    ? reports.map(report => {
-        const stateLabel = report.status === 'open' ? '검토 대기' : report.status === 'resolved' ? '처리 완료' : '기각';
-        const visibility = report.hidden ? '발견 숨김' : '발견 노출';
-        const hide = report.hidden ? 'disabled' : '';
-        const restore = !report.hidden && report.status === 'dismissed' ? 'disabled' : '';
-        return `<article class="lt-card" data-report="${escapeText(report.id)}">
-          <div class="lt-post-top"><span class="lt-badge">${escapeText(stateLabel)}</span><span class="lt-badge">${escapeText(visibility)}</span><span class="lt-post-date">${escapeText(formatTime(report.createdAt))}</span></div>
-          <p class="lt-body">${richParagraph(report.reason)}</p>
-          <div class="lt-post-meta">공유 ${escapeText(report.shareId)}</div>
-          <div class="lt-actions">
-            <button type="button" class="lt-btn" data-report-act="hide" data-id="${escapeText(report.id)}" ${hide}>검토 완료·발견 숨김</button>
-            <button type="button" class="lt-btn" data-report-act="restore" data-id="${escapeText(report.id)}" ${restore}>신고 기각·발견 복구</button>
-          </div>
-        </article>`;
-      }).join('')
-    : '<p class="lt-empty">접수된 신고가 없습니다.</p>';
-  host.innerHTML = `${head()}<div class="admin-shell lt-board">
-    <div class="lt-board-head"><h1 class="lt-h1">발견·커뮤니티 신고 검토</h1><p class="lt-sub">신고 ${shown.length}건 · 자동 숨김 없이 관리자가 명시적으로 처리합니다.</p></div>
-    ${route.status ? '<p class="lt-post-meta">검토 대기만 보는 중 · <button type="button" class="lt-btn" data-clear-filter="reports">조건 지우기</button></p>' : ''}
-    <div class="lt-post-list">${rows}</div>
   </div>`;
 }
 
@@ -649,7 +595,8 @@ document.addEventListener('click', async (event) => {
   const ovCard = event.target.closest('[data-ov-view]');
   if (ovCard) {
     const view = ovCard.dataset.ovView;
-    navigate(view, null, {status: ovCard.dataset.ovStatus || '', kind: '', unanswered: ovCard.dataset.ovUnanswered === '1'});
+    // #888: 고객 글 카드는 '의견' 탭(opinion)으로 연다 — 일지 요약 줄은 사용 일지 탭(#board?kind=journal).
+    navigate(view, null, {status: ovCard.dataset.ovStatus || '', kind: view === 'board' ? 'opinion' : '', unanswered: ovCard.dataset.ovUnanswered === '1'});
     return;
   }
   // #743: 갈 탭이 없는 카드(계정·트리·순간…)는 카드 아래 내역을 펼친다(다시 누르면 접힘).
@@ -668,13 +615,20 @@ document.addEventListener('click', async (event) => {
   // #743: 걸러 본 탭에서 조건을 지운다(신고·고치는 일).
   const clearFilter = event.target.closest('[data-clear-filter]');
   if (clearFilter) { navigate(clearFilter.dataset.clearFilter, null, {}); return; }
+  // #888: '의견' 탭 안의 갈래 칩(전체·고장·불편·요청). 고른 칩을 다시 누르면 '전체'로 푼다.
+  const catTab = event.target.closest('[data-cat-tab]');
+  if (catTab) {
+    const next = (route.cat || '') === catTab.dataset.catTab ? '' : catTab.dataset.catTab;
+    navigate('board', null, {status: route.status, kind: route.kind, cat: next});
+    return;
+  }
   // 탭 거르기(#570 2): 다시 누르면 해제한다. 상태는 주소(#board?status=..&kind=..)에 남는다.
   const statusTab = event.target.closest('[data-status-tab]');
   if (statusTab) {
-    // 고른 칩을 다시 누르면 조건을 푼다(status=all — 칸 없는 값이라 종류의 모든 글이 보인다).
-    const active = route.status || PENDING_STATUS;
+    // 고른 칩을 다시 누르면 조건을 푼다(status=all — 칸 없는 값이라 그 종류의 모든 글이 보인다).
+    const active = route.status || ALL_STATUS;
     const next = active === statusTab.dataset.statusTab ? ALL_STATUS : statusTab.dataset.statusTab;
-    navigate('board', null, {status: next, kind: route.kind});
+    navigate('board', null, {status: next, kind: route.kind, cat: route.cat});
     return;
   }
   const kindTab = event.target.closest('[data-kind-tab]');
@@ -700,17 +654,6 @@ document.addEventListener('click', async (event) => {
     return;
   }
   if (event.target.closest('[data-back-customers]')) { navigate('customers'); return; }
-  const jrow = event.target.closest('[data-customer]');
-  if (jrow && !event.target.closest('a')) {
-    const body = document.querySelector(`[data-customer-body="${CSS.escape(jrow.dataset.customer)}"]`);
-    if (body) {
-      if (!body.dataset.filled) body.innerHTML = journalDetailHtml(jrow.dataset.customer);
-      body.hidden = !body.hidden;
-      jrow.setAttribute('aria-expanded', String(!body.hidden));
-      jrow.classList.toggle('is-open', !body.hidden);
-    }
-    return;
-  }
   const persona = event.target.closest('[data-persona]');
   if (persona && persona.dataset.persona) { navigate('persona', persona.dataset.persona); return; }
   if (event.target.closest('[data-back]')) { navigate('board'); return; }
@@ -766,6 +709,14 @@ document.addEventListener('click', async (event) => {
     if (el) el.textContent = res.ok ? '소개를 저장했어요.' : (res.payload?.error?.message || '저장에 실패했어요.');
     return;
   }
+});
+
+// 사용 일지 탭의 고객 거르기(#888) — 바꾸면 그 고객의 일지만 남긴다.
+document.addEventListener('change', (event) => {
+  const filter = event.target.closest('[data-journal-filter]');
+  if (!filter) return;
+  journalFilterSubject = filter.value || '';
+  render();
 });
 
 document.addEventListener('submit', async (event) => {

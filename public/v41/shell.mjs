@@ -47,11 +47,13 @@ const $=id=>document.getElementById(id);
 // #666: 알림 줄(토스트)은 화면 아래에 늘 붙어 있는 것들 — '새 소식·의견 보내기' 링크 줄, ＋ 단추, 새 소식 카드 —
 // 을 덮지 않는다. 붙어 있는 것들의 가장 높은 윗변을 좌표로 재서 그 위로 올린다(글자 크기·화면 폭이 달라도 겹침 0).
 // 390 실측: 링크 줄 아래 10~37px·＋ 단추 12~68px·카드 86~152px → 알림 줄 아래 134px.
+function keepClearEls(doc){const out=[];const walk=(root)=>{for(const el of root.querySelectorAll('[data-lt-keep-clear]'))out.push(el);for(const el of root.querySelectorAll('*'))if(el.shadowRoot)walk(el.shadowRoot)};walk(doc);return out}
 function placeToast(){let above=0;for(const el of document.querySelectorAll('.home-links,#mobile-add,.updates-card')){if(el.hidden)continue;const cs=getComputedStyle(el);if(cs.display==='none'||cs.visibility==='hidden'||Number(cs.opacity)===0)continue;const r=el.getBoundingClientRect();if(r.width<1||r.height<1)continue;above=Math.max(above,document.documentElement.clientHeight-r.top+10)}
- // 화면 안의 아래쪽 내용(data-lt-keep-clear 표식 — 책의 페이지 알약·이유 안내·갈림길 책갈피)도 알림이 덮지 않게 한다.
+ // 화면 안의 아래쪽 내용(data-lt-keep-clear 표식 — 책의 페이지 알약·이유 안내·갈림길 책갈피, 첫 화면 숫자판)도 알림이 덮지 않게 한다.
  // 보이는 프레임 문서까지 같은 좌표로 잰다(3회차 보람 회차 — 알림이 책 아래 안내 줄에 포개졌다).
- const keepFrame=[...document.querySelectorAll('#view,#view-next')].find(f=>!f.hidden&&f.contentDocument&&f.contentDocument.querySelector('[data-lt-keep-clear]'));
- if(keepFrame){const fr=keepFrame.getBoundingClientRect();for(const el of keepFrame.contentDocument.querySelectorAll('[data-lt-keep-clear]')){const cs=keepFrame.contentDocument.defaultView.getComputedStyle(el);if(cs.display==='none'||cs.visibility==='hidden'||Number(cs.opacity)===0)continue;const r=el.getBoundingClientRect();if(r.width<1||r.height<1)continue;above=Math.max(above,document.documentElement.clientHeight-(fr.top+r.top)+10)}}
+ // 첫 화면 숫자판은 그림자 뿌리(#898) 안에 있으므로 그림자 뿌리까지 걸어 들어가 표식을 모은다.
+ const keepFrame=[...document.querySelectorAll('#view,#view-next')].find(f=>!f.hidden&&f.contentDocument&&keepClearEls(f.contentDocument).length);
+ if(keepFrame){const fr=keepFrame.getBoundingClientRect();for(const el of keepClearEls(keepFrame.contentDocument)){const cs=keepFrame.contentDocument.defaultView.getComputedStyle(el);if(cs.display==='none'||cs.visibility==='hidden'||Number(cs.opacity)===0)continue;const r=el.getBoundingClientRect();if(r.width<1||r.height<1)continue;above=Math.max(above,document.documentElement.clientHeight-(fr.top+r.top)+10)}}
  const style=document.documentElement.style;if(above>0)style.setProperty('--lt-toast-bottom',Math.round(above)+'px');else style.removeProperty('--lt-toast-bottom')}
 addEventListener('resize',placeToast);
 addEventListener('orientationchange',()=>setTimeout(placeToast,0));

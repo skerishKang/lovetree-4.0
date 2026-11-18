@@ -24,9 +24,9 @@ test('community client uses fixed same-origin routes and idempotency headers',as
 });
 test('4.1 discovery explains explicit-public scope and separates bookmark from new private writing',()=>{
  const html=fs.readFileSync(new URL('../public/v41/index.html',import.meta.url),'utf8'),shell=fs.readFileSync(new URL('../public/v41/shell.mjs',import.meta.url),'utf8')+fs.readFileSync(new URL('../public/v41/shell/messages.mjs',import.meta.url),'utf8'),panel=fs.readFileSync(new URL('../public/v41/community-panel.mjs',import.meta.url),'utf8'),css=fs.readFileSync(new URL('../public/v41/shell.css',import.meta.url),'utf8'),admin=fs.readFileSync(new URL('../src/admin.js',import.meta.url),'utf8'),schema=fs.readFileSync(new URL('../server/db/schema.sql',import.meta.url),'utf8');
- assert.match(html,/id="community-menu"/);assert.match(html,/공개 트리 가운데 순간 3개 이상인 트리를 최신 공개 순으로 보여요/);assert.match(html,/인기·추천 순위는 표시하지 않아요/);assert.match(html,/원본을 복사하지 않고/);
+ assert.match(html,/id="community-menu"/);assert.match(html,/최신순이 기본이고, 많이 담긴 순으로도 볼 수 있어요/);assert.match(html,/<option value="popular">많이 담긴 순<\/option>/);assert.match(html,/원본을 복사하지 않고/);
  assert.match(shell,/mountCommunity/);assert.match(panel,/대표 순간부터 감상/);assert.match(panel,/내 기록 새로 시작/);assert.doesNotMatch(panel,/adopt|clone|copyTree/);
- assert.match(css,/#community-list/);assert.match(css,/@media\(max-width:780px\)/);assert.match(admin,/발견·커뮤니티 신고 검토/);assert.match(admin,/visibility: hide \? 'hidden' : 'visible'/);assert.match(schema,/lovetree_community_hidden_shares/);assert.match(schema,/hide_comment/);
+ assert.match(css,/#community-list/);assert.match(css,/@media\(max-width:780px\)/);assert.match(admin,/visibility: hide \? 'hidden' : 'visible'/);assert.match(schema,/lovetree_community_hidden_shares/);assert.match(schema,/hide_comment/);
 });
 
 test('Pages proxy constrains community routes and forwards idempotency only',async()=>{
