@@ -55,6 +55,7 @@ function shareHarness({ confirmAnswer = true, clipboard = null, visibilityAnswer
     list: async () => ({ok: true, shares: requests.filter(r => r[0] === 'list').length ? {id: 'share-1', treeId: 'tree1', status: 'active', view: 'book', createdAt: '2026-11-12T09:00:00Z', discoverable: false} : []}),
     setDiscoverable: async (id, next) => { requests.push(['discoverable', id, next]); return {ok: true}; },
     setTreeVisibility: async (treeId, visibility) => { requests.push(['visibility', treeId, visibility]); return visibilityAnswer; },
+    getTreeVisibility: async () => ({ok: true, visibility: 'public'}), // #830: 비공개는 누구나 무료 — 조회는 공개로 본다
     getTreeDiscover: async () => ({ok: true, discover: discoverNow.discover}),
     setTreeDiscover: async (treeId, next) => { requests.push(['discover', treeId, next]); discoverNow.discover = next === true; return {ok: true}; }, // 261116 결정 — 스위치가 쓰는 discover 한 벌
     revoke: async id => { requests.push(['revoke', id]); return {ok: true}; }
@@ -155,25 +156,23 @@ test('복사하면 복사했어요 안내를 role=status 자리에 띄운다', a
   } finally { h.restore(); }
 });
 
-// (261116 결정) 비공개 전환 단추는 공유 판에서 정리됐다 — 링크까지 막는 완전 비공개는 Plus 안내만 남는다.
+// (261116 결정) 비공개 전환 단추는 공유 판에서 정리됐다 — 링크까지 막는 완전 비공개는 무료 안내만 남는다(#830).
 // 대신 둘러보기 소개 스위치가 고른 값을 discover PUT으로 저장하고 상태 줄·단추가 같은 값을 따른다.
 test('둘러보기 소개 스위치: 고른 값은 discover PUT으로 저장되고 상태 줄이 따라 바뀐다', async () => {
   const h = shareHarness({});
   try {
     await h.messages.openSharePanel();
     await new Promise(r => setImmediate(r)); // paintShareDiscover의 가짜 GET 응답 한 바퀴
-    assert.match(h.els['share-discover-state'].textContent, /소개하지 않음/, '기본 꺼짐(#739)을 먼저 확인해 보여 준다');
-    assert.equal(h.els['share-discover-toggle'].textContent, '소개 켜기', '글자는 행동을 말한다');
-    assert.equal(h.els['share-discover-toggle'].dataset.state, 'off', '꺼짐은 테두리 모양(CSS가 data-state로 고른다)');
-    assert.match(h.els['share-moment-hint'].textContent, /소개하지 않아요/, '꺼짐 상태에서 힌트 줄도 같은 상태를 말한다');
-    await h.els['share-discover-toggle'].onclick();
+    assert.equal(h.els['share-disc-off'].getAttribute('aria-checked'), 'true', '기본 꺼짐(#739)은 안 함이 선택');
+    assert.equal(h.els['share-disc-on'].getAttribute('aria-checked'), 'false');
+    assert.equal(h.els['share-disc-off'].getAttribute('aria-checked'), 'true');
+    await h.els['share-disc-on'].onclick();
     await new Promise(r => setImmediate(r)); // 다시 그리기(paintShareDiscover)의 가짜 GET 한 바퀴
     assert.deepEqual(h.requests.filter(r => r[0] === 'discover'), [['discover', 'tree1', true]], '판단은 서버에 맡긴다');
     // 스위치 뒤 상자 안 문장들(순간 수 힌트·상태 줄)이 같은 상태를 말한다(261116 2차 지적).
-    assert.match(h.els['share-discover-state'].textContent, /소개 중/);
-    assert.match(h.els['share-moment-hint'].textContent, /소개 중이에요/, '힌트 줄이 옛 값에 머물지 않는다');
-    assert.equal(h.els['share-discover-toggle'].textContent, '소개 끄기', '글자는 행동을 말한다');
-    assert.equal(h.els['share-discover-toggle'].dataset.state, 'on', '켜짐은 강조색 모양');
+    assert.equal(h.els['share-disc-on'].getAttribute('aria-checked'), 'true', '켜짐은 소개가 선택');
+    assert.equal(h.els['share-disc-on'].getAttribute('aria-checked'), 'true');
+    assert.equal(h.els['share-disc-off'].getAttribute('aria-checked'), 'false');
     assert.match(h.els['share-feedback'].textContent, /둘러보기에 소개했어요/);
   } finally { h.restore(); }
 });
@@ -189,11 +188,13 @@ test('공유 창 화면에는 발견이라는 말이 없고, 단계·이유·공
   assert.match(shareHtml, /<p id="share-create-reason"[^>]*hidden>먼저 미리보기를 확인해 주세요\.<\/p>/);
   assert.match(shareHtml, /<a id="share-open" class="share-open" target="_blank" rel="noopener" hidden>열어 보기<\/a>/);
   assert.match(shareHtml, /<p id="share-copy-note" role="status"><\/p>/);
-  assert.match(shareHtml, /<p id="share-moment-hint" class="panel-note" role="status"><\/p>/, '순간 수 안내 자리');
-  assert.match(shareHtml, /<span id="share-discover-state" role="status">/);
-  assert.match(shareHtml, /<button id="share-discover-toggle" type="button" data-state="off">소개 켜기<\/button>/, '둘러보기 소개 스위치(261116 결정 — 기본 꺼짐·무료, 글자는 행동)');
+  assert.match(shareHtml, /공개 여부/);
+  assert.match(shareHtml, /둘러보기 소개/);
+  assert.match(shareHtml, /id="share-disc-off"/);
+  assert.equal(shareHtml.includes('share-disc-on') && shareHtml.includes('id="share-disc-on"'), true, '소개 칸이 있다');
+  assert.match(shareHtml, /id="share-disc-on"[^>]*>/);
   assert.match(shareHtml, /둘러보기 소개는 기본 꺼짐/);
-  assert.match(shareHtml, /링크까지 막는 완전 비공개는 Plus/);
+  assert.equal(shareHtml.includes('링크 공유와 완전 비공개도'), false, '뜻 불명 문장은 삭제');
   assert.equal(shareHtml.includes('둘러보기에도 올리기'), false, '스위치 문구는 정리됐다');
   assert.match(shareHtml, /<details class="share-scope-more"><summary>자세히<\/summary>/);
   // 공개되는 범위(261117 고객 의견): 공개 응답(서버 projectSharedTree)에 트리 제목·순간(메모·날짜·감정·링크)이

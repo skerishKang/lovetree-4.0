@@ -20,7 +20,7 @@ export function createShareApi({fetchImpl=(...args)=>fetch(...args)}={}) {
     setDiscoverable:(id,enabled)=>call('/api/shares/'+encodeURIComponent(id)+'/discovery',{method:enabled?'PUT':'DELETE'}),
     revoke:id=>call('/api/shares/'+encodeURIComponent(id),{method:'DELETE'}),
     read:id=>call('/api/public/shares/'+encodeURIComponent(id)),
-    // #538: 트리 공개 상태. 비공개는 Plus 전용 — 판단은 서버가 한다.
+    // #538: 트리 공개 상태. 비공개는 누구나 무료 — 본인 트리만 바꿀 수 있다(#830).
     setTreeVisibility:(treeId,visibility)=>call('/api/trees/'+encodeURIComponent(treeId)+'/visibility',{method:'PUT',body:JSON.stringify({visibility})}),
     getTreeVisibility:treeId=>call('/api/trees/'+encodeURIComponent(treeId)+'/visibility')
   };

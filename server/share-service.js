@@ -50,7 +50,7 @@ function shareSummary(row) {
   return { id: row.shareId, treeId: row.treeId, entryMomentId: row.entryMomentId, view: row.view, status: row.status, createdAt: row.createdAt, revokedAt: row.revokedAt || null, discoverable: row.discoverable === true, discoverableAt: row.discoverableAt || null, origin: row.origin || 'owner', momentCount: Number(row.momentCount ?? 0) };
 }
 
-export function createShareService({ shareRepo, workspaceRepo, visibilityRepo = null, discoverRepo = null, admin = null, productId, plusEntitled = () => false, makeId = () => randomBytes(18).toString('base64url') }) {
+export function createShareService({ shareRepo, workspaceRepo, visibilityRepo = null, discoverRepo = null, admin = null, productId, makeId = () => randomBytes(18).toString('base64url') }) {
   async function projection(subjectId, input) {
     if (!input || typeof input !== 'object' || !RECORD_ID.test(input.treeId || ''))
       throw new ApiError(400, 'invalid_share_request', '공유할 트리를 다시 선택해 주세요.');
@@ -156,13 +156,11 @@ export function createShareService({ shareRepo, workspaceRepo, visibilityRepo = 
       await shareRepo.revokeSharesNotIn({ productId, subjectId, treeIds: [...counts.keys()] });
       if (discoverRepo) await discoverRepo.deleteNotIn({ productId, subjectId, treeIds: [...counts.keys()] });
     },
-    // #538: 트리 공개 상태. 비공개는 Plus 전용 — 판단은 서버가 한다.
+    // #538: 트리 공개 상태. 비공개는 누구나 무료로 바꿀 수 있다 — 본인 트리만 바꿀 수 있다(#830).
     // 응답에 소개 여부(discover)를 함께 돌려준다 — 화면이 두 값을 한 번에 본다.
     async setTreeVisibility(subjectId, treeId, visibility) {
       if (visibility !== 'public' && visibility !== 'private') throw new ApiError(400, 'visibility_invalid', '공개 상태 값을 확인해 주세요.');
       await ownTree(subjectId, treeId);
-      if (visibility === 'private' && !plusEntitled(subjectId))
-        throw new ApiError(403, 'plus_required_private', '비공개는 Plus 전용이에요. 지금은 모든 트리가 공개로 유지돼요.');
       if (visibilityRepo) await visibilityRepo.set({ productId, subjectId, treeId, visibility });
       return { treeId, visibility, discover: (await treeDiscover(subjectId, treeId)).discover };
     },
@@ -172,7 +170,7 @@ export function createShareService({ shareRepo, workspaceRepo, visibilityRepo = 
       if (!stored) throw new ApiError(404, 'tree_not_found', '트리를 찾을 수 없어요.');
       return { treeId, visibility: await treeVisibility(subjectId, treeId), discover: (await treeDiscover(subjectId, treeId)).discover };
     },
-    // 둘러보기 소개 켜기·끄기(2026-11-16 대표 결정). 본인 트리만, 무료다(비공개 전환만 Plus 전용).
+    // 둘러보기 소개 켜기·끄기(2026-11-16 대표 결정). 본인 트리만, 무료다.
     // 응답에 지금 상태를 돌려준다 — 화면은 응답값으로 스위치를 세운다.
     async getTreeDiscover(subjectId, treeId) {
       await ownTree(subjectId, treeId);
@@ -216,7 +214,7 @@ export function createShareHandler({ authenticate, service, productId }) {
       if (method !== 'PUT' && method !== 'DELETE') throw new ApiError(405, 'method_not_allowed', '이 요청은 지원하지 않아요.');
       return { status: 200, body: { share: await service.setDiscoverable(subjectId, discovery[1], method === 'PUT') }, headers: NO_STORE };
     }
-    // #538: 트리 공개 상태. 비공개 지정은 Plus 전용 — 서버가 판단한다.
+    // #538: 트리 공개 상태. 비공개는 누구나 무료 — 본인 트리만 바꿀 수 있다(#830).
     const visibility = path.match(/^\/api\/trees\/([^/]+)\/visibility$/);
     if (visibility) {
       if (method === 'PUT') {
