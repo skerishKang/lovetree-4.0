@@ -90,17 +90,22 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
   // ('모아둔 순간')이어도 영상 제목에 있는 그룹 이름으로 찾을 수 있게 하려는 것이다. 순간은 카드를 만들 때
   // 이미 읽은 공개 사본(projectSharedTree)에서 가져오므로 쿼리는 늘지 않는다. 응답에 내보내지 않도록
   // 열거하지 않는 속성(non-enumerable)으로 붙인다 — JSON.stringify 와 펼침({...card})에 섞이지 않는다.
-  const artistTags=new Set(),searchTerms=[];
+  const artistTags=new Set(),artistNames=new Map(),searchTerms=[];
   for(const [index,moment] of tree.moments.entries()){
    if(index<200)searchTerms.push(clean(moment.title,120),clean(moment.mediaMetadata?.title,120));
    for(const raw of Array.isArray(moment.keywords)?moment.keywords:[]){
     const parsed=parseTag(raw);if(!parsed)continue;
     if(index<200)searchTerms.push(parsed.value);
-    if(parsed.kindId==='artist')artistTags.add(tagKey(parsed.value));
+    if(parsed.kindId==='artist'){
+     const key=tagKey(parsed.value);
+     artistTags.add(key);
+     if(!artistNames.has(key))artistNames.set(key,parsed.value);
+    }
    }
   }
   Object.defineProperty(card,'searchText',{value:searchTerms.filter(Boolean).join(' '),enumerable:false});
   Object.defineProperty(card,'artistTags',{value:[...artistTags],enumerable:false});
+  Object.defineProperty(card,'artistNames',{value:artistNames,enumerable:false});
   return card;
  }
  return {
@@ -143,10 +148,20 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
      return card(share,viewerSubjectId,null,null,aiTesterLookup);
     }));
    }
-   const cards=[];
-    for(const item of entries){if(!item)continue;const haystack=(item.title+' '+item.subject+' '+item.summary+' '+(item.searchText||'')).toLocaleLowerCase('ko-KR');if(q&&!haystack.includes(q))continue;if(tag&&!item.emotions.includes(tag))continue;if(artistKey&&!item.artistTags?.includes(artistKey))continue;cards.push(item);}
-   const start=cursor?Math.max(0,cards.findIndex(item=>item.shareId===cursor)+1):0,items=cards.slice(start,start+size),next=start+size<cards.length?items.at(-1)?.shareId||null:null;
-   return {items,nextCursor:next,totalVisible:cards.length};
+    const baseCards=[];
+     for(const item of entries){if(!item)continue;const haystack=(item.title+' '+item.subject+' '+item.summary+' '+(item.searchText||'')).toLocaleLowerCase('ko-KR');if(q&&!haystack.includes(q))continue;if(tag&&!item.emotions.includes(tag))continue;baseCards.push(item);}
+    const cards=artistKey?baseCards.filter(item=>item.artistTags?.includes(artistKey)):baseCards;
+    const start=cursor?Math.max(0,cards.findIndex(item=>item.shareId===cursor)+1):0,items=cards.slice(start,start+size),next=start+size<cards.length?items.at(-1)?.shareId||null:null;
+     const groupCounts=new Map();
+     for(const item of baseCards){
+     for(const [key,name] of (item.artistNames||[])){
+      const current=groupCounts.get(key)||{value:name,count:0};
+      current.count++;
+      groupCounts.set(key,current);
+     }
+    }
+    const groups=[...groupCounts.values()].sort((a,b)=>b.count-a.count||String(a.value).localeCompare(String(b.value),'ko')).slice(0,8);
+    return {items,nextCursor:next,totalVisible:cards.length,groups};
   },
   // #627 3단계 '다른 팬 보기': 같은 꼬리표('종류:값')를 담은 공개 순간(공유 상태 active·비공개 아님)을 찾는다.
   // 화면은 아직 만들지 않는다(회차 진행 중 — 서버 규칙만). 판정은 화면과 같은 한 벌(public/v41/tags.mjs의
