@@ -455,9 +455,10 @@ html[data-lt-theme=garden] #cleanup-panel input:not([type=checkbox]),html[data-l
 .main-nav>button{min-height:40px;padding:0 10px;font-size:13px}
 /* 261118 대표 지적 2차 5: [서재][책][보드][지도]는 한 묶음(같은 크기·글자 14px) — 서재 탭을 트리 틀 안에 두고
    묶음 안 글자를 14px로 맞춘다. [둘러보기]는 묶음 밖 오른쪽에 따로 띄운다. */
-.main-nav>button#community-menu{margin-left:10px}
+.main-nav>button#community-menu{margin-left:0}
 /* 2026-11-17 대표 지적: 탭 글자는 둘러보기·트리 고르기와 같은 13px·같은 굵기로 맞춘다. → 261118 2차: 묶음(서재·책·보드·지도)은 14px로 통일하고 둘러보기는 묶음 밖에 둔다. */
-.tree-frame .tree-views>button{min-height:0;align-self:stretch;border-left:1px solid var(--line);border-radius:0;font-size:14px;font-weight:400;color:var(--lt-muted)}
+.tree-frame .tree-views>button{min-height:0;align-self:stretch;border:0;border-radius:0;font-size:14px;font-weight:400;color:var(--lt-muted)}
+.tree-frame .tree-views>button#community-menu{border-left:1px solid var(--line);margin-left:8px}
 .tree-frame{display:flex;align-items:center;flex:0 0 auto;margin-left:6px;padding:1px;border:1px solid rgba(255,255,255,.16);border-radius:999px;background:rgba(9,8,14,.45)}
 /* 이슈 421 2회차: 트리 선택·보기 탭이 모두 숨겨진 상태(로그아웃·트리 없음·공유)에서는 빈 틀이 점으로 남지 않게 틀 자체를 숨긴다. */
 .tree-frame:has(> .tree-slot > #record-menu[hidden]):has(> .tree-views[hidden]){display:none}
@@ -469,10 +470,10 @@ html[data-lt-theme=garden] #cleanup-panel input:not([type=checkbox]),html[data-l
 .tree-frame .tree-views>button:last-child[aria-current=true]{border-radius:0 998px 998px 0}
 /* 서재 화면에서는 트리 선택이 숨어 서재 탭이 묶음의 왼쪽 끝이 된다 — 왼쪽 둥근 모서리를 따라 칠한다. */
 .tree-frame:has(> .tree-slot > #record-menu[hidden]) .tree-views>button:first-child[aria-current=true]{border-radius:998px 0 0 998px}
-@media(max-width:780px){.tree-frame .tree-views>button{font-size:12px}}
+@media(max-width:780px){.tree-frame .tree-views>button{font-size:14px}}
 .tree-slot{position:relative;display:flex;align-items:center;flex:0 0 auto;margin-left:6px}
-nav #record-menu{min-height:40px;font-size:13px;letter-spacing:0}
-@media(max-width:780px){nav #record-menu{font-size:12px}}
+nav #record-menu{min-height:40px;font-size:14px;letter-spacing:0;margin-left:0;padding:0 12px;border:1px solid var(--lt-line);border-left:0;border-radius:var(--lt-r-pill);background:var(--lt-glass)}
+@media(max-width:780px){nav #record-menu{font-size:14px}}
 nav .tree-frame{scroll-snap-align:center}
 /* 2026-11-11 407번: 둘러보기 패널의 닫기 버튼이 맨 위 메뉴의 계정 버튼과 겹치지 않게 맨 위 메뉴 아래로 내린다. */
 #community-panel .community-top{padding-top:44px}
@@ -820,6 +821,9 @@ body.lt-frame-dialog-open #toast{top:calc(72px + env(safe-area-inset-top));botto
 #community-preview .community-preview-subject,#community-preview .community-preview-moment,#community-preview .community-preview-summary,#community-preview .community-preview-meta{margin:0;color:var(--lt-ink);font-size:14px;line-height:1.55}
 #community-preview .community-preview-moment-title{margin:4px 0;padding:10px 12px;border-left:3px solid var(--lt-gold);color:var(--lt-ink);font-size:16px;font-weight:700;line-height:1.45}
 #community-preview .community-preview-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px}
+/* 이슈 903: 담기가 서버에 막힌 이유(가입 7일 미만 안내)는 담기 단추 바로 다음 줄 같은 묶음 안에서 본다. */
+#community-preview .community-vote-note{margin:0;color:var(--lt-ink);font-size:13px;line-height:1.5}
+#community-preview .community-vote-note[hidden]{display:none}
 #community-preview .community-mini,#community-preview .community-link,#community-preview .community-preview-start,#community-preview .community-preview-open{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:9px 14px;border:1px solid var(--lt-line-paper);border-radius:var(--lt-r-pill);background:var(--lt-paper);color:var(--lt-ink);font-size:14px;font-weight:600}
 #community-preview .community-link{border-color:var(--lt-line-paper)!important;background:var(--lt-paper)!important;color:var(--lt-ink)!important}
 #community-preview .community-preview-open{width:100%;border:0;background:var(--lt-primary);color:var(--lt-primary-ink);font-weight:700}

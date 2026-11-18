@@ -47,11 +47,13 @@ const $=id=>document.getElementById(id);
 // #666: 알림 줄(토스트)은 화면 아래에 늘 붙어 있는 것들 — '새 소식·의견 보내기' 링크 줄, ＋ 단추, 새 소식 카드 —
 // 을 덮지 않는다. 붙어 있는 것들의 가장 높은 윗변을 좌표로 재서 그 위로 올린다(글자 크기·화면 폭이 달라도 겹침 0).
 // 390 실측: 링크 줄 아래 10~37px·＋ 단추 12~68px·카드 86~152px → 알림 줄 아래 134px.
+function keepClearEls(doc){const out=[];const walk=(root)=>{for(const el of root.querySelectorAll('[data-lt-keep-clear]'))out.push(el);for(const el of root.querySelectorAll('*'))if(el.shadowRoot)walk(el.shadowRoot)};walk(doc);return out}
 function placeToast(){let above=0;for(const el of document.querySelectorAll('.home-links,#mobile-add,.updates-card')){if(el.hidden)continue;const cs=getComputedStyle(el);if(cs.display==='none'||cs.visibility==='hidden'||Number(cs.opacity)===0)continue;const r=el.getBoundingClientRect();if(r.width<1||r.height<1)continue;above=Math.max(above,document.documentElement.clientHeight-r.top+10)}
- // 화면 안의 아래쪽 내용(data-lt-keep-clear 표식 — 책의 페이지 알약·이유 안내·갈림길 책갈피)도 알림이 덮지 않게 한다.
+ // 화면 안의 아래쪽 내용(data-lt-keep-clear 표식 — 책의 페이지 알약·이유 안내·갈림길 책갈피, 첫 화면 숫자판)도 알림이 덮지 않게 한다.
  // 보이는 프레임 문서까지 같은 좌표로 잰다(3회차 보람 회차 — 알림이 책 아래 안내 줄에 포개졌다).
- const keepFrame=[...document.querySelectorAll('#view,#view-next')].find(f=>!f.hidden&&f.contentDocument&&f.contentDocument.querySelector('[data-lt-keep-clear]'));
- if(keepFrame){const fr=keepFrame.getBoundingClientRect();for(const el of keepFrame.contentDocument.querySelectorAll('[data-lt-keep-clear]')){const cs=keepFrame.contentDocument.defaultView.getComputedStyle(el);if(cs.display==='none'||cs.visibility==='hidden'||Number(cs.opacity)===0)continue;const r=el.getBoundingClientRect();if(r.width<1||r.height<1)continue;above=Math.max(above,document.documentElement.clientHeight-(fr.top+r.top)+10)}}
+ // 첫 화면 숫자판은 그림자 뿌리(#898) 안에 있으므로 그림자 뿌리까지 걸어 들어가 표식을 모은다.
+ const keepFrame=[...document.querySelectorAll('#view,#view-next')].find(f=>!f.hidden&&f.contentDocument&&keepClearEls(f.contentDocument).length);
+ if(keepFrame){const fr=keepFrame.getBoundingClientRect();for(const el of keepClearEls(keepFrame.contentDocument)){const cs=keepFrame.contentDocument.defaultView.getComputedStyle(el);if(cs.display==='none'||cs.visibility==='hidden'||Number(cs.opacity)===0)continue;const r=el.getBoundingClientRect();if(r.width<1||r.height<1)continue;above=Math.max(above,document.documentElement.clientHeight-(fr.top+r.top)+10)}}
  const style=document.documentElement.style;if(above>0)style.setProperty('--lt-toast-bottom',Math.round(above)+'px');else style.removeProperty('--lt-toast-bottom')}
 addEventListener('resize',placeToast);
 addEventListener('orientationchange',()=>setTimeout(placeToast,0));
@@ -148,8 +150,19 @@ function renderTreeMenu(){
  const shelfEntry=member?.snapshot().owned?'<button type="button" role="menuitem" data-tree-action="shelf">서재 전체 보기</button>':'';
  treePopover.innerHTML=rows+`<div class="tree-foot" role="none">${cleanupRow}${tagsRow}<button type="button" role="menuitem" data-tree-action="new">＋ 새 트리</button>${manage?'<button type="button" role="menuitem" data-tree-action="manage">이 트리 관리 (이름·표지)</button><button type="button" role="menuitem" data-tree-action="share">이 트리 공유</button>':''}${shelfEntry}${momentsEntry}</div>`;
   // 트리를 누르면 그 트리로 이동한다: 책·보드·지도를 보던 중이면 같은 보기로, 그 외(첫 화면·내 트리·둘러보기)에는 그 트리의 책으로. 주소도 따라오게 남긴다.
-  const TREE_VIEWS=new Set(['track59-sketchbook.html','track58-pinboard.html','track56-network.html']);
-  treePopover.querySelectorAll('[data-tree-id]').forEach(b=>b.onclick=()=>{const id=b.dataset.treeId;closeTreeMenu();if(!id)return;const wasTreeView=TREE_VIEWS.has(current);choose(id);if(!wasTreeView)show('track59-sketchbook.html',false);flowNavigation();writeLocation();});
+  const TREE_VIEWS=new Set(['track32-bookshelf.html','track59-sketchbook.html','track58-pinboard.html','track56-network.html']);
+  treePopover.querySelectorAll('[data-tree-id]').forEach(b=>b.onclick=()=>{
+   const id=b.dataset.treeId;closeTreeMenu();if(!id)return;
+   // 서재는 프레임을 다시 띄우지 않고 가운데 책만 고른 트리로 옮긴다(2026-11-18 13:49 결정).
+   if(current==='track32-bookshelf.html'){
+    choose(id,'',true);
+    renderAccount();
+    flowNavigation();
+    try{for(const f of document.querySelectorAll('iframe'))f.contentWindow?.postMessage({type:'lt41-shelf-select-tree',treeId:id},location.origin);}catch{}
+    writeLocation();return;
+   }
+   const wasTreeView=TREE_VIEWS.has(current);choose(id);if(!wasTreeView)show('track59-sketchbook.html',false);flowNavigation();writeLocation();
+  });
  treePopover.querySelector('[data-tree-action="new"]')?.addEventListener('click',()=>{closeTreeMenu();if(member?.snapshot().writable)openEditor('new');else openLoginStart('new-tree');});
  treePopover.querySelector('[data-tree-action="cleanup"]')?.addEventListener('click',()=>{closeTreeMenu();shellCleanup.open({});});
  // #627 PR B: 기존 '정리' 옆의 두 번째 입구 — 꼬리표 정리(이름 바꾸기·합치기·제안).
@@ -768,9 +781,9 @@ $('tree-tips-rename')?.addEventListener('click',()=>shellPanels.openTreeManager(
 // 넘치는 쪽 끝에만 페이드를 켜서 잘린 것이 아니라 더 있다는 신호를 준다. 데스크톱(넓은 폭)은 스크롤이 없어 아무 일도 하지 않는다.
 const navBar=document.querySelector('.app-header nav');
 const narrowNav=()=>matchMedia('(max-width:780px)').matches;
-function choose(id,momentId){const tree=model.trees.find(t=>t.id===id);window.LT41=tree?{tree,trees:model.trees,source,momentId:tree.moments.find(m=>m.id===momentId)?.id||tree.moments.find(m=>m.parentId===null)?.id||tree.moments[0]?.id,prefs:currentPrefs(),writable:source==='server'&&!!member?.snapshot().writable,}:null;
- if(tree||current==='src064-orbit.html')show(current,false,id||'');
- else{flowNavigation();document.body.classList.remove('home-screen');hideFrames();
+function choose(id,momentId,skipShow=false){const tree=model.trees.find(t=>t.id===id);window.LT41=tree?{tree,trees:model.trees,source,momentId:tree.moments.find(m=>m.id===momentId)?.id||tree.moments.find(m=>m.parentId===null)?.id||tree.moments[0]?.id,prefs:currentPrefs(),writable:source==='server'&&!!member?.snapshot().writable,}:null;
+ if(!skipShow&&(tree||current==='src064-orbit.html'))show(current,false,id||'');
+ else if(!skipShow||!tree){flowNavigation();document.body.classList.remove('home-screen');hideFrames();
   // 261118 대표 결정: 트리 0개 계정이 주소(#my/shelf 등)로 바로 들어와도 그 화면의 빈 상태(#817)를 보여 준다 —
   // 탭을 눌러 열 때와 같은 문구('아직 책장이 비어 있어요.' 등)로 시작한다.
   paintEmptyForScreen(current);$('empty').hidden=false;links();}}
@@ -950,8 +963,10 @@ function memberStatus(status){
  if(status.phase==='checking')notify('내 기록을 불러오고 있어요.');
  else if(status.phase==='synced'){
   // #549: 기록(순간)이 0개인 새 계정의 첫 안내는 '불러왔어요' 대신 첫 순간 안내로(문구는 notice.mjs 한 벌).
+  // #905: 자동 저장이 성공하면 알리지 않는다 — 직전에 저장 안 됨이었다면(previousDirty) 방금 저장된 것이다.
+  // 알림은 실패·오프라인·충돌(저장 안내 떠)과 사용자가 누른 큰 동작의 완료 확인만 띄운다.
   const momentCount=(model?.trees||[]).reduce((n,tree)=>n+((tree.moments||[]).length),0);
-  notify(syncedNoticeText({writable:status.writable,previousDirty,momentCount}));
+  if(!previousDirty)notify(syncedNoticeText({writable:status.writable,previousDirty,momentCount}));
   // 소개 질문(2026-11-16 대표 결정): 아직 안 물은 트리 중 순간 3개 이상인 것이 있으면 묻는다 —
   // 2→3 저장 직후가 대표 경로다. 직전 관측 스냅샷(상태마다 재촬영)은 두지 않는다(#718 원인): 재촬영하면
   // syncing에서 before==after가 되어 전이를 놓친다. 질문은 트리당 1회(discoverAsked), 백필(이미 켜진)은 건너뛴다.

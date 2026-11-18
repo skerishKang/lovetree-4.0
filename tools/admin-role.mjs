@@ -19,6 +19,7 @@ import { createHash } from 'node:crypto';
 import { parseEnvFile } from './export-ai-customer-db.mjs';
 import { createPool } from '../server/db/postgres.js';
 import { createAdminRoleRepo } from '../server/db/admin-roles-postgres.js';
+import { createStageIndexRepo } from '../server/db/stage-index-postgres.js';
 import { ROLE_TESTER, ROLES } from '../server/admin-roles.js';
 
 const DEFAULT_ENV = '/opt/padiem/lovetree-api/.env';
@@ -79,7 +80,7 @@ async function main() {
   if (emails.length === 0) fail('이메일 목록이 비어 있습니다.', 2);
 
   const pool = await createPool(databaseUrl, { max: 2 });
-  const roles = createAdminRoleRepo(pool);
+  const roles = createAdminRoleRepo(pool, { stageIndex: createStageIndexRepo(pool) });
   const actor = 'operator:ops-admin-role';
   let found = 0;
   let missing = 0;

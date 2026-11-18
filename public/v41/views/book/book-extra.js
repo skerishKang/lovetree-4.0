@@ -390,7 +390,7 @@ addEventListener('message',event=>{
  const edge=LTDEMO.edges.find(item=>item.kind==='parent'&&item.from===request.fromMomentId&&item.to===request.momentId);
  if(edge)edge.reason=String(data.relation||'');
  updateConnectionSummary(request.fromMomentId);
- toast('한마디를 저장했어요.');
+ /* #905: 자동 저장 성공은 알리지 않는다 — 연결 요약이 바로 바뀐다. */
 });
 /* #537: 한 장의 작은 '탭하여 보기' 줄은 없앴다(순간마다 한 쪽 전체). 마지막 순간 뒤의 다음 순간 안내는
    renderSpread가 두 장의 빈 오른쪽 페이지와 같은 자리에 붙인다. */

@@ -3,6 +3,7 @@ import { createServer } from 'node:http';
 import { pathToFileURL } from 'node:url';
 import { createPool, createWorkspaceRepo } from './db/postgres.js';
 import { createShareRepo } from './db/shares-postgres.js';
+import { createStageIndexRepo } from './db/stage-index-postgres.js';
 import { createTreeVisibilityRepo } from './db/tree-visibility-postgres.js';
 import { createTreeDiscoverRepo } from './db/tree-discover-postgres.js';
 import { createCommunityRepo } from './db/community-postgres.js';
@@ -154,16 +155,18 @@ const repo = createWorkspaceRepo(pool);
 // moment_count 를 동기화하고, 둘러보기 SQL 은 moment_count>=3 으로 거른다.
 // 비공개는 누구나 무료로 바꿀 수 있다 — 본인 트리만 바꿀 수 있다(#830).
 const shareRepo = createShareRepo(pool);
+const stageIndex = createStageIndexRepo(pool);
 const visibilityRepo = createTreeVisibilityRepo(pool);
 // 둘러보기 소개 표시(2026-11-16 대표 결정 — 기본 꺼짐, 고객이 켠다. 무료). 켠 트리만 행이 쌓인다.
 const discoverRepo = createTreeDiscoverRepo(pool);
 // #67 제품 역할. 표가 아직 없거나 저장이 망가진 자리에서는 역할 없음으로 닫힌다(fail-closed).
-const admin = createAdminRoleService({ store: createAdminRoleRepo(pool), productId: LOVETREE_PRODUCT_ID });
+const admin = createAdminRoleService({ store: createAdminRoleRepo(pool, { stageIndex }), productId: LOVETREE_PRODUCT_ID });
 // #655 2차 운영센터 전체 숫자. 집계는 저장소 안에서 한 번에 끝내고(전체 행을 읽어 오지 않는다)
 // 서비스는 숫자만 다듬는다. 이 자리는 운영센터 화면만 부르며 권한은 storageHandler 가 판정한다.
 const adminStats = createAdminStatsService({ repo: createStatsRepo(pool), productId: LOVETREE_PRODUCT_ID });
 const shareService = createShareService({
   shareRepo,
+  stageIndex,
   workspaceRepo: repo,
   visibilityRepo,
   discoverRepo,
@@ -173,7 +176,7 @@ const shareService = createShareService({
 const service = createWorkspaceService({
   repo,
   productId: LOVETREE_PRODUCT_ID,
-  onCommit: ({ subjectId, doc }) => shareService.syncSharesAfterSave(subjectId, doc)
+  onCommit: ({ subjectId }) => shareService.syncSharesAfterSave(subjectId)
 });
 const legacyAuthenticate = await buildAuthenticate();
 const authenticate = createSharedAccessAuth({ enabled: sharedAuthEnabled(LOVETREE_SHARED_AUTH_ENABLED), legacy: legacyAuthenticate });
@@ -228,7 +231,7 @@ const shareHandler = createShareHandler({
 const communityHandler = createCommunityHandler({
  authenticate: guardedAuthenticate,
  service: createCommunityService({
-  communityRepo: createCommunityRepo(pool), shareRepo, workspaceRepo: repo, visibilityRepo,
+  communityRepo: createCommunityRepo(pool), shareRepo, workspaceRepo: repo, visibilityRepo, stageIndex,
   productId: LOVETREE_PRODUCT_ID, admin,
   // 가입일(첫 로그인 시각) — 담기 투표의 7일 게이트(#824 대표 결정)가 쓴다.
   signupAtFor: ({productId: p, subjectId: s}) => accountRepo.createdAtFor({productId: p, subjectId: s})

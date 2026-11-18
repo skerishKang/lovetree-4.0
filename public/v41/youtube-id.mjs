@@ -11,8 +11,8 @@ export const VIDEO_ID_RE = /^[A-Za-z0-9_-]{11}$/;
 
 const trimText = (value) => (typeof value === 'string' ? value.trim() : '');
 
-/** YouTube 시청/쇼츠/라이브/임베드 주소 또는 ytimg 썸네일 주소에서 11자리 영상 ID를 뽑는다. */
-export function youtubeIdFrom(value) {
+/** YouTube 영상 ID를 뽑는다. 시청 주소만 받는 호출에서는 allowThumbnail을 끈다. */
+export function youtubeIdFrom(value, { allowThumbnail = true } = {}) {
   const raw = trimText(value);
   if (!raw || raw.length > 2048) return '';
   let parsed;
@@ -31,7 +31,7 @@ export function youtubeIdFrom(value) {
     const matched = (parsed.pathname || '').match(/^\/(?:shorts|live|embed)\/([^/?#]+)/);
     return matched && VIDEO_ID_RE.test(matched[1]) ? matched[1] : '';
   }
-  if (YTIMG_HOST.test(host)) {
+  if (allowThumbnail && YTIMG_HOST.test(host)) {
     const matched = (parsed.pathname || '').match(/^\/vi(?:_webp)?\/([^/?#]+)\//);
     return matched && VIDEO_ID_RE.test(matched[1]) ? matched[1] : '';
   }

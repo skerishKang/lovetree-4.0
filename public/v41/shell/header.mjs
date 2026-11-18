@@ -34,11 +34,10 @@ function flowNavigation(){
   $('tree-views').setAttribute('aria-label','이 트리 보기');
   for(const b of document.querySelectorAll('nav>button'))b.hidden=publicReading;
   // 트리 선택은 뒤쪽 탭 묶음 바로 앞에 있고, 로그인 상태에서만 "트리: <이름> ▾"로 보여 준다.
-  // 261118 대표 지적: 서재 화면에서는 트리 선택 칸을 숨긴다 — 책·보드·지도에서만 보인다.
+  // 2026-11-18 13:49 대표 결정: 트리 선택은 모든 페이지에서 똑같이 보인다(서재 포함).
   // 로그아웃이면 "트리 고르기", 브라우저에만 남은 미저장 기록이 있으면 "저장 안 된 기록"이다.
-  const onShelf=getCurrent()==='track32-bookshelf.html';
   const pendingDraft=hasPendingDraft(sessionStorage,getMember()?.snapshot().subject||null);
-  $('record-menu').hidden=!parts.treePicker||publicReading||onShelf;
+  $('record-menu').hidden=!parts.treePicker||publicReading;
   $('source-label').textContent=treePickerText({owned,treeTitle:displayTreeTitle(window.LT41?.tree.title||''),pendingDraft,treeCount:getModel()?.trees?.length||0});
   // #601: 칸 폭이 고정되어 있으므로(11em) 긴 이름은 말줄임 — 마우스 올림·초점에 전체 이름을 보여 준다.
   $('record-menu').title=owned?(window.LT41?`트리: ${displayTreeTitle(window.LT41?.tree.title||'')} — 다른 트리를 고릅니다.`:'열어볼 트리를 고릅니다.'):(pendingDraft?'로그인하면 저장하지 못한 기록을 복원합니다.':'로그인하면 내 트리를 고를 수 있습니다.');

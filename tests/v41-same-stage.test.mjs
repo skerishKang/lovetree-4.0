@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 // #627 후속: 같은 영상·같은 무대 찾기 한 벌(same-stage.mjs) — 동작 시험만 한다(소스 글자 검사 없다).
 import { videoKey, findDuplicates, findSameStage } from '../public/v41/same-stage.mjs';
+import { stageKeyForMoment, findMatchingStageId } from '../src/stage-key.js';
 import { timingRatio, TIMING_RATIO_LIMIT, TIMING_CEILING_MS } from './helpers/timing-ratio.mjs';
 
 test('videoKey — 주소 모양 열여덟 가지(watch·youtu.be·shorts·m.youtube·embed·t=·ytimg)', () => {
@@ -132,4 +133,74 @@ test('findSameStage — 묶음 열쇠는 값에 나올 수 없는 구분자로 �
   assert.deepEqual(groups[0].momentIds, ['m1', 'm3'], '같은 무대·노래·날짜인 m1·m3만 한 무더기');
   assert.equal(groups[0].stage, 'A');
   assert.equal(groups[0].song, 'B|C');
+});
+
+const videoId = 'AbC123xyZ_0';
+const watchUrl = `https://www.youtube.com/watch?v=${videoId}`;
+const stageKey = (fields = {}) => stageKeyForMoment({ url: watchUrl, ...fields });
+const rangeKey = (startSeconds, endSeconds) => stageKey({ startSeconds, endSeconds });
+
+test('무대 키는 영상 전체, 시작만 있는 책갈피, 시작과 끝이 있는 구간을 구분한다', () => {
+  const source = { version: 1, platform: 'youtube', videoId };
+  const cases = [
+    [{}, 'whole', null, null],
+    [{ url: `https://youtube.com/shorts/${videoId}` }, 'whole', null, null],
+    [{ startSeconds: 0 }, 'bookmark', 0, null],
+    [{ url: `https://youtu.be/${videoId}?t=42s` }, 'bookmark', 42, null],
+    [{ url: watchUrl + '#start=9', endSeconds: 74 }, 'range', 9, 74],
+    [{ url: watchUrl + '&t=9', startSeconds: 10, endSeconds: 74 }, 'range', 10, 74],
+    [{ endSeconds: 43200 }, 'range', 0, 43200],
+  ];
+  for (const [fields, kind, startSeconds, endSeconds] of cases) {
+    assert.deepEqual(stageKey(fields), { ...source, kind, startSeconds, endSeconds });
+  }
+});
+
+test('무대 키는 시청할 수 없는 주소와 잘못된 명시 구간을 제외한다', () => {
+  for (const fields of [
+    { url: `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg` },
+    { url: 'https://www.tiktok.com/@artist/video/12345' },
+    { url: '/api/media/example.mp4' },
+    { url: `https://youtube.com.example/watch?v=${videoId}` },
+    { startSeconds: -1 }, { startSeconds: 1.5 }, { endSeconds: 43201 },
+    { startSeconds: 10, endSeconds: 10 }, { startSeconds: 11, endSeconds: 10 },
+  ]) {
+    assert.equal(stageKey(fields), null, JSON.stringify(fields));
+  }
+});
+
+test('무대의 영상 전체·책갈피는 입력 종류와 영상이 일치할 때만 연결된다', () => {
+  const whole = stageKey();
+  const bookmark = stageKey({ startSeconds: 0 });
+  const anchors = [
+    { stageId: 'whole-id', registrationOrder: 1, key: whole },
+    { stageId: 'bookmark-id', registrationOrder: 2, key: bookmark },
+  ];
+  assert.equal(findMatchingStageId(whole, anchors), 'whole-id');
+  assert.equal(findMatchingStageId(bookmark, anchors), 'bookmark-id');
+  for (const key of [
+    rangeKey(0, 30), stageKey({ startSeconds: 1 }),
+    { ...whole, platform: 'tiktok' }, { ...whole, version: 2 },
+    stageKey({ url: `https://youtu.be/${videoId.toLowerCase()}` }),
+  ]) {
+    assert.equal(findMatchingStageId(key, anchors), null);
+  }
+});
+
+test('구간은 고정 기준과의 교집합/합집합이 50% 이상일 때만 같은 무대다', () => {
+  const anchors = [{ stageId: 'anchor-id', registrationOrder: 1, key: rangeKey(10, 22) }];
+  assert.equal(findMatchingStageId(rangeKey(14, 26), anchors), 'anchor-id'); // 8/16
+  assert.equal(findMatchingStageId(rangeKey(15, 27), anchors), null); // 7/17
+  assert.equal(findMatchingStageId(rangeKey(18, 30), anchors), null); // 14~26초를 거쳐 이어지지 않는다
+  assert.equal(findMatchingStageId(rangeKey(22, 30), anchors), null); // 끝점에서만 만난다
+  assert.equal(findMatchingStageId(rangeKey(10, 11), anchors), null); // 포함된 1초 장면
+});
+
+test('고정 기준이 여럿이면 겹침 비율을 먼저, 동률이면 등록 순서를 따른다', () => {
+  const early = { stageId: 'z-first', registrationOrder: 2, key: rangeKey(0, 10) };
+  const late = { stageId: 'a-second', registrationOrder: 10, key: rangeKey(5, 15) };
+  for (const anchors of [[early, late], [late, early]]) {
+    assert.equal(findMatchingStageId(rangeKey(2, 14), anchors), 'a-second'); // 8/14와 9/13
+    assert.equal(findMatchingStageId(rangeKey(2, 13), anchors), 'z-first'); // 둘 다 8/13
+  }
 });

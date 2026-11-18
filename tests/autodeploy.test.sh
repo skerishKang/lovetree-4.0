@@ -241,6 +241,17 @@ latest_backup=$(ls -1t "$state/backups"/lovetree-api-*.tar.gz | head -n 1)
 assert_eq "600" "$(stat -c '%a' "$latest_backup")" backup_mode
 pass next_sha_and_retention
 
+# 서버·화면 공통 판정 파일이 단독으로 바뀌어도 그 커밋을 설치한다.
+mkdir -p "$seed/public/v41"
+for module in src/domain.js src/moment-range.js src/stage-key.js public/v41/tags.mjs public/v41/youtube-id.mjs; do
+  printf '\n// updated\n' >> "$seed/$module"
+  release=$(push_commit "update $module")
+  run_autodeploy
+  assert_eq installed "$(field result)" "$module"
+  assert_eq "$release" "$(field installed_sha)" "$module"
+done
+pass shared_server_modules
+
 # 8) 수동 install.sh가 같은 잠금 파일을 쓰는지(정적 확인 — 적용 경로에 flock이 있어야 한다)
 grep -q 'lovetree-api-deploy.lock' "$repo_root/deploy/host-com2/lovetree-api/install.sh" || fail install_lock_path_missing
 grep -q 'flock -w 300 9' "$repo_root/deploy/host-com2/lovetree-api/install.sh" || fail install_lock_flock_missing

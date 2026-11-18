@@ -1,10 +1,12 @@
+import { refreshStageIndex } from '../stage-index-refresh.js';
+
 const iso = (value) => (value instanceof Date ? value.toISOString() : value === null || value === undefined ? null : String(value));
 
 /**
  * 제품 역할의 PostgreSQL 저장소(#67). `server/admin-roles.js`가 요구하는 계약만 구현한다.
  * 질의는 전부 매개변수화 — 역할 자리에 들어올 수 있는 값은 서버가 확인한 canonical subject뿐이다.
  */
-export function createAdminRoleRepo(pool) {
+export function createAdminRoleRepo(pool, { stageIndex = null } = {}) {
   if (!pool || typeof pool.query !== 'function') throw new Error('PostgreSQL pool이 필요합니다.');
 
   return {
@@ -37,6 +39,7 @@ export function createAdminRoleRepo(pool) {
          VALUES ($1, $2, 'assign', $3, $4, $5, $6)`,
         [productId, subjectId, previousRole, saved.role, grantedBy, reason]
       );
+      await refreshStageIndex(stageIndex, { productId, subjectId });
       return { subjectId: saved.subject_id, role: saved.role, grantedBy: saved.granted_by, updatedAt: iso(saved.updated_at) };
     },
 
@@ -51,6 +54,7 @@ export function createAdminRoleRepo(pool) {
          VALUES ($1, $2, 'revoke', $3, NULL, $4)`,
         [productId, subjectId, previous?.role ?? null, revokedBy]
       );
+      if (previous) await refreshStageIndex(stageIndex, { productId, subjectId });
       return previous ? { subjectId, updatedAt: iso(previous.updated_at) } : null;
     },
 

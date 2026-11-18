@@ -9,7 +9,6 @@ import { fileURLToPath } from 'node:url';
 const preflight = fileURLToPath(new URL('../deploy/host-com2/lovetree-api/preflight_imports.mjs', import.meta.url));
 const repoRoot = fileURLToPath(new URL('..', import.meta.url));
 const installShPath = fileURLToPath(new URL('../deploy/host-com2/lovetree-api/install.sh', import.meta.url));
-const autodeployShPath = fileURLToPath(new URL('../deploy/host-com2/lovetree-api/autodeploy.sh', import.meta.url));
 
 // 설치 때와 같은 조건을 만든다: LOVETREE_* 환경값을 모두 비워 index.js가
 // 본문(서버 기동)이 아니라 import 해석 단계에서만 평가되게 한다.
@@ -73,9 +72,6 @@ test('server/의 정적 import 그래프는 install.sh가 복사하는 파일 �
   assert.ok(singleFiles.includes('src/domain.js'), 'src/domain.js는 서버·화면 한 벌로 복사된다');
   assert.ok(singleFiles.includes('public/v41/tags.mjs'), 'public/v41/tags.mjs는 꼬리표 판정 한 벌(#695) — 누락되면 운영 설치가 preflight에서 멈춘다');
   assert.ok(singleFiles.includes('public/v41/youtube-id.mjs'), 'public/v41/youtube-id.mjs는 YouTube 표지 URL 판정 한 벌 — 설치 파일에 있어야 한다');
-  // 공개 꼬리표·YouTube 썸네일 규칙이 바뀌면 서버가 다시 설치되게 한다(autodeploy has_api 목록).
-  const autodeploy = await readFile(autodeployShPath, 'utf8');
-  assert.match(autodeploy, /src\/domain\.js\|public\/v41\/tags\.mjs\|public\/v41\/youtube-id\.mjs\|/, '공개 꼬리표·YouTube ID 규칙 변경도 has_api에 든다');
 
   const dir = await mkdtemp(join(tmpdir(), 'lovetree-install-graph-'));
   t.after(() => rm(dir, { recursive: true, force: true }));

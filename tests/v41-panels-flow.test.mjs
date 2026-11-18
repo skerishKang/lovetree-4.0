@@ -341,7 +341,9 @@ test('편집기 저장은 같은 member.apply 경로로 나간다', () => {
     assert.equal(h.calls.apply[0].payload.note, '저장할 글');
     // #601 '가' 결정: 추가 모드에서 부모를 고르지 않으면 가장 최근 순간(m2)에 이어진다.
     assert.deepEqual(h.calls.apply[0].sel, { treeId: 'tree-1', momentId: 'm2' });
-    assert.match(h.calls.notify.at(-1), /서버에 저장하고 있어요/);
+    // #905: 자동 저장 성공은 알리지 않는다 — 저장 단추를 눌러도 새 알림이 뜨지 않는다.
+    const notifyCount = h.calls.notify.length;
+    assert.equal(notifyCount, 0, '편집기 저장은 알림 없이 저장된다');
 
     // 수정 모드에서는 같은 폼이 'edit'으로 나가야 한다(모드가 add로 굳으면 여기서 잡힌다).
     h.panels.setEditorMode('edit');
@@ -366,6 +368,20 @@ const TREE_B = {
     { id: 'b1', title: '눈', note: '', emotion: '설렘', date: '2026-11-03', url: '', relation: '', parentId: null }
   ]
 };
+
+test('#905: 트리 이름 저장(트리 관리 창)은 알림 없이 저장된다 — 진행 중 안내도 띄우지 않는다', () => {
+  const h = harness({ lt41: { tree: TREE_A, momentId: 'a1' } });
+  try {
+    const form = h.elements['tree-form'];
+    h.panels.openTreeManager();
+    form.elements.title.value = '이름을 바꾼 책';
+    const notifyCount = h.calls.notify.length;
+    form.onsubmit({ preventDefault() {}, target: form });
+    assert.equal(h.calls.apply.at(-1)?.mode, 'editTree', '저장은 editTree 한 번');
+    assert.equal(h.elements['tree-manager'].open, false, '저장하면 닫는다');
+    assert.equal(h.calls.notify.length, notifyCount, '#905: 저장 진행·성공 알림이 없다(실패는 폼 오류 줄로)');
+  } finally { h.restore(); }
+});
 
 test('#314 회귀: 책 A(격자) → B(디자인 없음) → 다시 A를 연속으로 열어도 폼이 책마다 다시 정해진다', () => {
   const h = harness({ lt41: { tree: TREE_A, momentId: 'a1' } });

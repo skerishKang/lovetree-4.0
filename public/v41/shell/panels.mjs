@@ -186,7 +186,9 @@ export function createPanels(deps) {
     if (mode === 'new') { openFirstJourney(); return; }
     setEditorMode(mode, parentId);
     panel('write-panel');
-    queueMicrotask(() => $('moment-form').elements.note.focus());
+    // #898: 창을 열 때는 맨 위부터 — 쉬운 추가에서 내용을 읽다가 '지금 다듬기'로 넘어오면 스크롤이 중간에 남고,
+    // 초점을 노트 칸으로 옮기는 것만으로도 창이 스크롤된다. 초점을 준 뒤에 맨 위로 되돌린다.
+    queueMicrotask(() => { $('moment-form').elements.note.focus(); $('write-panel').scrollTop = 0; });
   }
 
   // #380 5번: 표지를 정하는 방법은 한 줄에서 하나만 고른다(첫 순간(기본)·순간에서·디자인·사진).
@@ -430,7 +432,7 @@ export function createPanels(deps) {
       treeBaseline = new URLSearchParams(new FormData(e.target)).toString();
       if(typeof dispatchEvent==='function')dispatchEvent(new Event('lt41-trees-changed'));
       $('tree-manager').close();
-      notify('트리 정보를 서버에 저장하고 있어요.');
+      // #905: 저장 진행·성공은 알리지 않는다 — apply 는 동기이라 1초 안에 끝나고, 실패는 폼 오류 줄로 알린다.
     } catch (error) { $('tree-form-error').textContent = error.message; }
   };
   $('tree-delete').onclick = () => {
@@ -507,11 +509,12 @@ export function createPanels(deps) {
       formBaseline = new URLSearchParams(new FormData(e.target)).toString();
       $('write-panel').close();
       if (editorMode === 'new') show('track59-sketchbook.html');
-      // #876 규칙 3: 다른 트리에 같은 영상이 있으면 담은 뒤 한 줄 알린다(막지 않는다) — 저장 안내와 한 줄로.
+      // #876 규칙 3: 다른 트리에 같은 영상이 있으면 담은 뒤 한 줄 알린다(막지 않는다).
+      // #905: 저장 자체의 진행·성공 안내는 띄우지 않는다 — 같은 영상이 있을 때만 한 줄 알린다.
       const url = $('moment-form').elements.url.value.trim();
       const others = treesWithSameVideo(getMember()?.state?.()?.trees || [], { excludeTreeId: String(selection()?.treeId || ''), url });
       const otherLine = others.length ? otherTreesLine(others) : '';
-      notify(otherLine ? `서버에 저장하고 있어요. ${otherLine}` : '서버에 저장하고 있어요.');
+      if (otherLine) notify(`담은 영상이 ${otherLine}`);
     } catch (error) { $('form-error').textContent = error.message; }
   };
   // #380 4 2차: Esc·바깥 클릭·× 닫기와 "저장하지 않고 닫을까요?" 확인은 shell/dialogs.mjs 공통 틀이 맡는다
@@ -523,7 +526,7 @@ export function createPanels(deps) {
       formBaseline = new URLSearchParams(new FormData($('moment-form'))).toString();
       parentBaseline = parentValue();
       setEditorMode('edit');
-      notify('이전 순간을 바꾸고 서버에 저장하고 있어요.');
+      // #905: 저장 진행·성공은 알리지 않는다 — 이전 순간 바꾸기는 화면에서 바로 보인다.
       queueMicrotask(() => $('change-parent').focus());
     } catch (e) { $('form-error').textContent = e.message; }
   };

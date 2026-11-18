@@ -2,6 +2,7 @@ import {randomUUID} from 'node:crypto';
 import {ApiError} from './errors.js';
 import {parsePrincipal} from './principal.js';
 import {projectSharedTree} from './share-service.js';
+import {refreshStageIndex} from './stage-index-refresh.js';
 import {ROLE_AI_CUSTOMER,ROLE_TESTER} from './admin-roles.js';
 import {coverModeOf} from '../src/domain.js';
 // 꼬리표 판정은 화면과 같은 한 벌 — 서버에 규칙을 복사하지 않는다(#627 3단계 '다른 팬 보기').
@@ -26,7 +27,7 @@ function jsonBody(request){
 function clientKey(request){const value=String(request?.headers?.['idempotency-key']||'');if(!IDEMPOTENCY.test(value))throw new ApiError(400,'idempotency_key_required','안전한 중복 방지 키가 필요해요.');return value;}
 function publicComment(row,viewer,isAdmin=false){const mine=!!viewer&&row.subjectId===viewer;const edited=!!(row.editedAt||(row.updatedAt&&row.createdAt&&String(row.updatedAt)>String(row.createdAt)));return {id:row.id,body:row.body,createdAt:row.createdAt,updatedAt:row.updatedAt,edited,mine,canDelete:mine||isAdmin,canEdit:mine,authorLabel:mine?'나':'기록한 사람'};}
 
-export function createCommunityService({communityRepo,shareRepo,workspaceRepo,visibilityRepo=null,productId,admin=null,now=()=>Date.now(),makeId=()=>randomUUID(),signupAtFor=null}){
+export function createCommunityService({communityRepo,shareRepo,workspaceRepo,visibilityRepo=null,productId,admin=null,stageIndex=null,now=()=>Date.now(),makeId=()=>randomUUID(),signupAtFor=null}){
  const writes=new Map();
  let totalsCache=null;
  // 이번 주의 시작(월요일 0시, KST — #824 결정 4 '주 = 월~일 KST'). KST는 UTC+9 고정이라 서머타임
@@ -235,7 +236,15 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
   async report(subjectId,shareId,reason,key){await activeShare(shareId);rate(subjectId,'report',6);const text=clean(reason,500);if(!text)throw new ApiError(400,'report_reason_required','신고 이유를 입력해 주세요.');const row=await communityRepo.createReport({productId,reportId:makeId(),shareId,subjectId,reason:text,clientKey:key});return {id:row.id,status:row.status,createdAt:row.createdAt};},
   async block(subjectId,shareId){const share=await activeShare(shareId);if(share.subjectId===subjectId)throw new ApiError(400,'cannot_block_self','내 공개 트리는 차단할 수 없어요.');await communityRepo.blockOwner({productId,blockerSubjectId:subjectId,blockedSubjectId:share.subjectId});return {blocked:true};},
   async reports(principal){if(!admin||await admin.roleFor(principal)!=='admin')throw new ApiError(403,'admin_forbidden','관리자 권한이 필요해요.');return communityRepo.listReports({productId,limit:100});},
-  async moderate(principal,reportId,{status,visibility}){if(!admin||await admin.roleFor(principal)!=='admin')throw new ApiError(403,'admin_forbidden','관리자 권한이 필요해요.');if(!['resolved','dismissed'].includes(status))throw new ApiError(400,'moderation_status_invalid','처리 상태를 확인해 주세요.');if(!['hidden','visible'].includes(visibility))throw new ApiError(400,'moderation_visibility_invalid','공개 상태를 확인해 주세요.');const row=await communityRepo.moderateReport({productId,reportId,status,visibility,actorSubjectId:principal.subjectId});if(!row)throw new ApiError(404,'report_not_found','신고를 찾을 수 없어요.');return {id:row.id,status:row.status,hidden:row.hidden,resolvedAt:row.resolvedAt};}
+  async moderate(principal,reportId,{status,visibility}){
+   if(!admin||await admin.roleFor(principal)!=='admin')throw new ApiError(403,'admin_forbidden','관리자 권한이 필요해요.');
+   if(!['resolved','dismissed'].includes(status))throw new ApiError(400,'moderation_status_invalid','처리 상태를 확인해 주세요.');
+   if(!['hidden','visible'].includes(visibility))throw new ApiError(400,'moderation_visibility_invalid','공개 상태를 확인해 주세요.');
+   const row=await communityRepo.moderateReport({productId,reportId,status,visibility,actorSubjectId:principal.subjectId});
+   if(!row)throw new ApiError(404,'report_not_found','신고를 찾을 수 없어요.');
+   await refreshStageIndex(stageIndex,{productId,shareId:row.shareId},shareRepo);
+   return {id:row.id,status:row.status,hidden:row.hidden,resolvedAt:row.resolvedAt};
+  }
  };
 }
 
