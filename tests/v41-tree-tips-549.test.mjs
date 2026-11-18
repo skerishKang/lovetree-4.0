@@ -156,7 +156,7 @@ test('#845 2단계 뒤로가기는 창을 닫는다(주소 그대로·초점은 
     await page.click('#write-menu');
     await page.waitForFunction(() => document.getElementById('write-panel').open, null, { timeout: 10000 });
     // 뒤로가기 → 창이 닫히고 주소는 그대로다(✕·Esc와 같은 판정을 탄다).
-    await page.goBack();
+    await page.evaluate(() => history.back());
     // 창이 닫히고 안내 판이 다시 보이는 최종 상태를 기다린다(닫힘 직후 한 박자 늦게 다시 띄우는 판이 있어도 기다린다).
     await page.waitForFunction(() => !document.getElementById('write-panel').open && document.getElementById('tree-tips').hidden === false, null, { timeout: 10000 });
     const after = await page.evaluate(() => ({
@@ -172,7 +172,7 @@ test('#845 2단계 뒤로가기는 창을 닫는다(주소 그대로·초점은 
     assert.equal(after.tips, false, '창이 닫혔으므로 안내 판이 다시 보인다');
     assert.equal(after.seen, null, '봇음 미기록');
     // 창이 없어진 뒤에는 뒤로가기가 원래대로 주소를 뒤로 간다.
-    await page.goBack();
+    await page.evaluate(() => history.back());
     await page.waitForTimeout(500);
     assert.notEqual(page.url(), before, '창이 없으면 뒤로가기는 주소를 뒤로 간다');
     assert.deepEqual(errors, [], '페이지 오류 없음');
@@ -193,12 +193,12 @@ test('#845 2단계 더러운 창은 뒤로가기로 닫을 때 한 번 묻는다
     await page.fill('#quick-url', 'https://example.com/back-check');
     // 취소하면 창이 남고, 가드가 다시 쌓여 다음 뒤로가기도 같은 질문을 한다.
     page.once('dialog', (d) => d.dismiss());
-    await page.goBack();
+    await page.evaluate(() => history.back());
     await page.waitForTimeout(600);
     assert.equal(await page.evaluate(() => document.getElementById('write-panel').open), true, '확인을 취소하면 창이 남는다');
     // 받아들이면 닫힌다.
     page.once('dialog', (d) => d.accept());
-    await page.goBack();
+    await page.evaluate(() => history.back());
     await page.waitForFunction(() => !document.getElementById('write-panel').open, null, { timeout: 10000 });
     assert.equal(page.url(), before, '주소가 그대로다(창 닫기로 썼다)');
     assert.deepEqual(errors, [], '페이지 오류 없음');
