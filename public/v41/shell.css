@@ -393,6 +393,7 @@ html[data-lt-theme=garden] #moment-form input,html[data-lt-theme=garden] #moment
 /* 안내 줄: 높이 고정. 담은 뒤에만 채우고, 새 입력이 시작되면 renderPreview가 비운다(이슈 343). */
 /* 이슈 638: 담을 트리 한 줄 — 고른 트리 이름을 보이고 그 자리에서 바꾼다. 색은 --lt-* 토큰만 쓴다. */
 .quick-tree-row{display:flex;align-items:center;gap:10px;min-height:44px;margin-top:6px}
+.quick-tree-row:has(#quick-tree-select[hidden]){min-height:0}
 .quick-tree-line{flex:1;min-width:0;margin:0!important;font-size:13px;line-height:1.6;color:var(--lt-pearl);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #quick-tree-select{flex:0 1 auto;max-width:46%;min-height:36px;padding:0 8px;border:1px solid var(--lt-line);border-radius:10px;background:rgba(255,255,255,.04);color:var(--lt-pearl);font-size:13px}
 #quick-tree-select:focus-visible{outline:2px solid var(--lt-gold);outline-offset:2px}
@@ -400,9 +401,10 @@ html[data-lt-theme=garden] #moment-form input,html[data-lt-theme=garden] #moment
 .quick-notice-row{display:flex;align-items:center;gap:10px;min-height:44px;margin-top:8px}
 .quick-notice{flex:1;min-width:0;margin:0!important;font-size:13px;line-height:1.6;color:var(--lt-pearl);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .quick-notice:empty{display:none}
+.quick-notice-row:has(.quick-notice:empty):has(.quick-refine[hidden]){display:none}
 .quick-refine{flex:0 0 auto;min-height:44px;padding:0;border:0;background:none;color:var(--lt-gold);font-size:13px;white-space:nowrap}
 .quick-refine:hover{text-decoration:underline}
-.quick-submit{width:100%;min-height:52px;margin-top:12px;border-radius:14px;font-size:15px;font-weight:600}
+.quick-submit{width:100%;min-height:52px;margin-top:16px;border-radius:14px;font-size:15px;font-weight:600}
 /* 하은 2회차 손질 ①(261116): 실패 문구 아래에 숨을 벌린다 — 고정 단추의 그림자(10px)가 문구 아래를 덮지 않게. */
 .quick-tagline .lt-tagline-error{margin-bottom:16px}
 @media(max-width:780px){.quick-preview{height:120px}}
