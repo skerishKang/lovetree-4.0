@@ -199,8 +199,9 @@ test('#343 CSS: 머리글 금색·미리보기/안내 줄 높이 고정·크림 
   const css = readFileSync(new URL('../public/v41/shell.css', import.meta.url), 'utf8');
   // #425: 빠른 추가는 한 창(write-panel)의 쉬운 추가 탭이다 — 머리글 금색 규칙도 한 창 선택자로 옮겼다.
   assert.match(css, /#write-panel \.eyebrow\{color:var\(--lt-gold\)\}/, '밤 테마 머리글은 금색');
-  assert.match(css, /\.quick-preview\{[^}]*height:300px/, '미리보기 카드 높이 고정');
-  assert.match(css, /@media\(max-width:780px\)\{\.quick-preview\{height:220px\}\}/, '좁은 화면도 높이 고정');
+  assert.match(css, /\.quick-preview\{[^}]*height:120px/, '빈 미리보기 칸은 낮게');
+  assert.match(css, /\.quick-preview\[data-media=yes\]\{height:auto;aspect-ratio:16\/9\}/, '미리보기가 생기면 영상 비율');
+  assert.match(css, /@media\(max-width:780px\)\{\.quick-preview\{height:120px\}\}/, '좁은 화면도 같은 높이');
   assert.match(css, /\.quick-notice-row\{[^}]*min-height:44px/, '안내 줄 높이 고정');
   // #425 2번: 쉬운 추가의 사진 칸을 없앴으니 그 스타일도 남지 않는다.
   assert.equal(/\.quick-or|\.quick-photo/.test(css), false, '쉬운 추가의 또는·사진 칸 스타일은 없다');

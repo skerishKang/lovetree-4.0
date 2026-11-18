@@ -57,7 +57,9 @@ function serve(extra = {}) {
 
 // 내 기록 보드 호스트: 셸처럼 data-member="in"을 본문에 남긴다.
 const hostHTML = (tree) => `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>보드 호스트</title></head><body data-member="in" data-record-source="server">
-<script>window.LT41={source:'server',writable:true,owned:true,momentId:${JSON.stringify(tree.moments[0].id)},prefs:{},tree:${JSON.stringify(tree)}};</script>
+<script>window.LT41={source:'server',writable:true,owned:true,momentId:${JSON.stringify(tree.moments[0].id)},prefs:{},tree:${JSON.stringify(tree)}};
+addEventListener('message',e=>{if(e.data&&e.data.type==='lt41-tags')(window.__tagMessages=window.__tagMessages||[]).push({momentId:e.data.momentId,keywords:e.data.keywords})});
+</script>
 <iframe src="/v41/views/track58-pinboard.html" style="position:fixed;inset:0;width:100vw;height:100vh;border:0"></iframe></body></html>`;
 
 async function openHost(browser, url, { width = 1440, height = 900 } = {}) {
@@ -189,4 +191,89 @@ test('4. 화면: 이전 순간 단추도 있다 — 사슬 끝에서 누르면 �
   await frame.click('#dConn .connCard[data-dir="prev"]');
   await frame.waitForFunction(() => document.querySelector('.card.selected')?.dataset.id === 'm5', null, { timeout: 8000 });
   await frame.waitForFunction(() => document.querySelector('#dTitle')?.textContent.includes('순간 5'), null, { timeout: 5000 });
+});
+
+// #840(운영센터 의견 34): 카드를 바꿔 누르면 상세 판 전부(제목·영상·마음·꼬리표 칩)가 그 순간으로 바뀌고,
+// 이전 순간의 '확정' 칩이 남아 이전 순간의 꼬리표를 바꾸는 사고가 없어야 한다.
+// 영상 칸 안의 '크게 보기'·'YouTube에서 열기'는 아래 단추 줄과 두 번씩 보이지 않는다(각 1개).
+const tagDetailTree = (() => {
+  const V = 'https://www.youtube.com/watch?v=';
+  const moments = [
+    { id: 'm1', title: '가 순간', date: '2026-11-01', emotion: '설렘', note: '가 순간에 남긴 마음', parentId: null, relation: '', url: V + 'aqz-KE-bpKQ', x: null, y: null, rot: 0, color: 'rose', keywords: ['가수:아이유'] },
+    { id: 'm2', title: '나 순간', date: '2026-11-02', emotion: '그리움', note: '나 순간에 남긴 마음', parentId: 'm1', relation: '이어서', url: V + 'M7lc1UVf-VE', x: null, y: null, rot: 0, color: 'cyan', keywords: ['노래:Blueming'] }
+  ];
+  return { id: 't-tag-detail', title: '꼬리표 사슬', moments, edges: [{ id: 'e2', kind: 'parent', from: 'm1', to: 'm2', reason: '이어서' }] };
+})();
+
+const detailSnapshot = (frame) => frame.evaluate(() => {
+  const visible = (el) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
+  const chipOf = (el) => ({ text: el.textContent.trim(), confirmed: el.classList.contains('is-confirmed') });
+  const actions = [...document.querySelectorAll('#detail button, #detail a')]
+    .filter(visible)
+    .map((el) => (el.textContent || '').trim().replace(/\s+/g, ' '))
+    .filter((t) => t.startsWith('YouTube에서 열기') || t === '크게 보기' || t.startsWith('원본 링크 열기'));
+  return {
+    title: document.getElementById('dTitle')?.textContent || '',
+    heart: document.getElementById('dHeart')?.textContent || '',
+    chips: [...document.querySelectorAll('#dTags .lt-tag-chip')].filter(visible).map(chipOf),
+    player: !!document.querySelector('#detailPlayer .lt-media, #detailPlayer video, #detailPlayer img, #detailPlayer .detailNoteMedia'),
+    actions: actions.reduce((acc, t) => { acc[t] = (acc[t] || 0) + 1; return acc; }, {})
+  };
+});
+
+test('5. 화면: 카드를 바꿔 누르면 상세 판이 그 순간으로 바뀌고 꼬리표 칩도 다시 그려진다(#840)', { skip: REQUIRE ? false : skip }, async (t) => {
+  const browser = await chromium.launch();
+  const server = await serve({ '/host.html': hostHTML(tagDetailTree) });
+  t.after(async () => { await browser.close(); server.close(); });
+  const { context, page, frame, problems } = await openHost(browser, `http://127.0.0.1:${server.address().port}/host.html`);
+  assert.deepEqual(problems, [], '화면 오류 없음: ' + problems.join(' | '));
+
+  // 카드 A를 눌러 상세를 연다 — 판 제목·마음·꼬리표 칩이 A 것이다.
+  await frame.click('.card[data-id="m1"]');
+  await frame.waitForFunction(() => document.querySelector('#dTitle')?.textContent.includes('가 순간'), null, { timeout: 5000 });
+  await frame.waitForFunction(() => !!document.querySelector('#dTags .lt-tag-chip'), null, { timeout: 8000 });
+  const a = await detailSnapshot(frame);
+  assert.match(a.title, /가 순간/, '판 제목은 A 것이다: ' + a.title);
+  assert.equal(a.heart, '가 순간에 남긴 마음', '마음도 A 것이다: ' + a.heart);
+  assert.ok(a.player, '영상 칸이 A 것으로 그려진다');
+  assert.deepEqual(a.actions, { '크게 보기': 1, 'YouTube에서 열기': 1 }, `단추는 아래 줄의 한 벌만 있다: ${JSON.stringify(a.actions)}`);
+  assert.ok(a.chips.some((c) => c.text === '가수 · 아이유' && c.confirmed), 'A의 꼬리표 칩이 확정으로 보인다: ' + JSON.stringify(a.chips));
+
+  // 카드 B를 누른다 — 판 전부가 B 것으로 바뀐다(칩 포함).
+  await frame.click('.card[data-id="m2"]');
+  await frame.waitForFunction(() => document.querySelector('#dTitle')?.textContent.includes('나 순간'), null, { timeout: 5000 });
+  await frame.waitForFunction(() => document.querySelector('#dTags .lt-tag-chip')?.textContent.includes('Blueming'), null, { timeout: 8000 });
+  const b = await detailSnapshot(frame);
+  assert.match(b.title, /나 순간/, '판 제목은 B 것이다: ' + b.title);
+  assert.equal(b.heart, '나 순간에 남긴 마음', '마음도 B 것이다: ' + b.heart);
+  assert.ok(b.player, '영상 칸이 B 것으로 다시 그려진다');
+  assert.deepEqual(b.actions, { '크게 보기': 1, 'YouTube에서 열기': 1 }, `바뀐 뒤에도 단추는 각 1개다: ${JSON.stringify(b.actions)}`);
+  assert.ok(b.chips.some((c) => c.text === '노래 · Blueming' && c.confirmed), 'B의 꼬리표 칩이 확정으로 다시 그려진다: ' + JSON.stringify(b.chips));
+  assert.ok(!b.chips.some((c) => c.text.includes('아이유')), 'A의 꼬리표 칩이 남아 있지 않다: ' + JSON.stringify(b.chips));
+
+  // B에서 칩을 누르면 저장 시도는 B에만 간다 — A의 꼬리표는 0건 바뀐다.
+  await frame.click('#dTags .lt-tag-chip');
+  await page.waitForTimeout(600);
+  const messages = await page.evaluate(() => window.__tagMessages || []);
+  assert.ok(messages.length >= 1, '칩 누름이 저장 경로에 닿는다: ' + JSON.stringify(messages));
+  assert.ok(messages.every((m) => m.momentId === 'm2'), `저장 시도는 지금 순간(B)에만 간다: ${JSON.stringify(messages)}`);
+  assert.ok(messages.every((m) => !m.keywords.includes('가수:아이유')), 'A의 꼬리표가 저장 시도에 섞이지 않는다: ' + JSON.stringify(messages));
+  const keywords = await page.evaluate(() => window.LT41.tree.moments.map((m) => ({ id: m.id, keywords: m.keywords })));
+  assert.deepEqual(keywords.find((m) => m.id === 'm1').keywords, ['가수:아이유'], 'A의 꼬리표는 그대로다(변경 0건)');
+});
+
+test('6. 화면: 판 제목(기억 보드·설명 줄)은 무대 밖 고정 머리글 — 화면 왼쪽에서 잘리지 않는다(#856)', { skip: REQUIRE ? false : skip }, async (t) => {
+  // #856: 제목이 팬(이동)하는 무대(#world) 안에 있으면 맞춤·초점 계산이 왼쪽으로 밀 때 화면 끝에서 잘렸다.
+  const tree = chainTree(6);
+  const browser = await chromium.launch();
+  const server = await serve({ '/host.html': hostHTML(tree) });
+  t.after(async () => { await browser.close(); server.close(); });
+  const { context, page, frame, problems } = await openHost(browser, `http://127.0.0.1:${server.address().port}/host.html`);
+  assert.deepEqual(problems, [], '화면 오류 없음: ' + problems.join(' | '));
+  const left = () => frame.$eval('.boardTitle h1', (el) => Math.round(el.getBoundingClientRect().left));
+  // 처음 자리에서도, 전체 보기로 다시 맞춘 뒤에도 왼쪽 24px 안쪽에서 시작한다.
+  assert.ok(await left() >= 24, `처음 자리 제목 왼편 ${(await left())}px — 24px 이상`);
+  await frame.evaluate(() => fitAll(true));
+  await page.waitForTimeout(1200);
+  assert.ok(await left() >= 24, `전체 보기 뒤 제목 왼편 ${(await left())}px — 24px 이상`);
 });

@@ -175,7 +175,7 @@ test('3-1. 헤더가 실제로 줄인 이름을 보여 준다(함수 직접 호�
   try {
     assert.match(els['source-label'].textContent, /리센느/);
     assert.doesNotMatch(els['source-label'].textContent, /나의 순간들/, '자동 꼬리말은 헤더에 보이지 않는다');
-    assert.equal(els['tree-views'].getAttribute('aria-label'), '서재 · 리센느 보기');
+    assert.equal(els['tree-views'].getAttribute('aria-label'), '이 트리 보기');
   } finally { restore(); }
 });
 
@@ -183,7 +183,7 @@ test('3-2. 직접 쓴 이름은 헤더에서도 그대로다', () => {
   const {els, restore} = headerHarness({title: '리센느의 기록'});
   try {
     assert.equal(els['source-label'].textContent.includes('리센느의 기록'), true);
-    assert.equal(els['tree-views'].getAttribute('aria-label'), '서재 · 리센느의 기록 보기');
+    assert.equal(els['tree-views'].getAttribute('aria-label'), '이 트리 보기');
   } finally { restore(); }
 });
 
@@ -201,13 +201,52 @@ test('3-3. 공유 미리보기 요약도 줄인 이름을 보여 준다(createMe
 });
 
 test('4. 둘러보기(공개 목록)도 같은 이름 규칙을 쓴다(mountCommunity 직접 호출)', async () => {
-  // 전: community-panel.mjs의 import·el() 호출 줄을 글자로 봤다 → 후: 목록을 실제로 띄워 카드·미리보기 제목을 본다.
+  // 카드를 실제로 열어 카드와 미리보기의 표시 이름을 확인한다.
   const h = communityHarness({ items: [COMMUNITY_ITEM] });
   try {
     await h.search();
-    const titles = [...h3s(h.get('community-list')), ...h3s(h.get('community-preview'))].map((n) => n.textContent);
+    const cardTitle = h3s(h.get('community-list'))[0]?.textContent;
+    assert.equal(cardTitle, '리센느', '목록 제목은 자동 꼬리말을 뗀다');
+    assert.equal(h.get('community-preview').open, false, '미리보기는 카드 선택 전에는 닫혀 있다');
+    h.get('community-list').children[0].onclick();
+    const previewTitle = h3s(h.get('community-preview'))[0]?.textContent;
+    const titles = [cardTitle, previewTitle];
     assert.deepEqual(titles, ['리센느', '리센느'], '카드 제목과 미리보기 제목은 모두 줄인 이름이다');
     assert.ok(titles.every((t) => !t.includes('나의 순간들')), '자동 꼬리말이 목록에 보이지 않는다');
+  } finally { h.restore(); }
+});
+
+test('4-1. 같은 이름과 순간은 공개 표시명만 쓰고 순번을 붙이지 않는다', async () => {
+  const same = (shareId, coverTitle, extra = {}) => ({
+    ...COMMUNITY_ITEM, shareId, cover: { ...COMMUNITY_ITEM.cover, title: coverTitle }, ...extra
+  });
+  const h = communityHarness({ items: [
+    same('s1', '첫 순간', { aiTester: true, publicDisplayName: '하은' }),
+    same('s2', '다른 순간', { publicDisplayName: '바다' }),
+    same('s3', '첫 순간', { publicDisplayName: '윤슬' }),
+    same('s4', '첫 순간')
+  ] });
+  try {
+    await h.search();
+    const cards = h.get('community-list').children;
+    const labels = cards.map(card => card.children.find(node => node.className === 'community-card-distinct')?.textContent || '');
+    assert.deepEqual(labels, ['AI 명예회원 하은님', '', '윤슬님', '']);
+    assert.equal(cards.some(card => card.children.some(node => String(node.textContent).includes('같은 이름'))), false);
+  } finally { h.restore(); }
+});
+
+test('4-2. 가로 YouTube 표지는 넓게 그리고 세로 표지는 흐린 배경을 유지한다', async () => {
+  const horizontal = { ...COMMUNITY_ITEM, shareId: 'wide', cover: { ...COMMUNITY_ITEM.cover, type: 'youtube', url: 'https://www.youtube.com/watch?v=M7lc1UVf-VE', thumbnailUrl: 'https://img.youtube.com/vi/M7lc1UVf-VE/hqdefault.jpg', vertical: false } };
+  const vertical = { ...COMMUNITY_ITEM, shareId: 'tall', cover: { ...COMMUNITY_ITEM.cover, type: 'youtube', url: 'https://www.youtube.com/shorts/aqz-KE-bpKQ', thumbnailUrl: 'https://img.youtube.com/vi/aqz-KE-bpKQ/hqdefault.jpg', vertical: true } };
+  const h = communityHarness({ items: [horizontal, vertical] });
+  try {
+    await h.search();
+    const [wideCard, tallCard] = h.get('community-list').children;
+    const wideCover = wideCard.children[0], tallCover = tallCard.children[0];
+    assert.equal(wideCover.dataset.mediaKind, 'video-youtube');
+    assert.equal(tallCover.dataset.mediaKind, 'video-vertical');
+    assert.equal(wideCover.children[0].children.some(node => node.className === 'community-cover-backdrop'), true);
+    assert.equal(tallCover.children[0].children.some(node => node.className === 'community-cover-backdrop'), true);
   } finally { h.restore(); }
 });
 

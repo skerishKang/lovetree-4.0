@@ -98,7 +98,12 @@ function layoutModel(W, H) {
   }
   const orderAt = new Map(model.graph.footprint.order.map((id, i) => [id, i]));
   hubs.forEach((h, i) => {
-    if (narrow) {
+    if (hubs.length === 1) {
+      /* 묶음 1개(#864): 위 몰림 배치(-π/2 → 꼭대기) 대신 무대 가운데 — 발자취가 화면의 주인공이 되게.
+         좁은 무대는 이름 두 줄(고리 아래 17·37px)이 선반에 닿지 않게 한계를 둔다. */
+      h.x = cx;
+      h.y = narrow ? Math.min(top + ((H - shelfH - 16) - top) / 2, (H - shelfH - 16) - h.cr - 46) : cy;
+    } else if (narrow) {
       const col = i % cols, row = Math.floor(i / cols);
       h.x = (col + .5) * W / cols;
       h.y = top + row * model.rowH + model.maxCr + 10;
@@ -126,11 +131,14 @@ function layoutModel(W, H) {
     const p = stack ? leadPos.get(stack.leadId) : null;
     m.x = p ? p.x : W / 2; m.y = p ? p.y : (H - shelfH) / 2;
   }
-  /* 꼬리표 없는 순간 선반: 시간 순서대로 가운데에서 양쪽으로(시안 v2 방식). */
+  /* 꼬리표 없는 순간 선반: 시간 순서대로 가운데에서 양쪽으로(시안 v2 방식).
+     묶음이 없으면(#864) 발자취 줄이 주인공 — 바닥 대신 무대 가운데 가까이(쓸 수 있는 높이의 56%). */
   const shelf = moments.filter((m) => m.hubId === null).sort((a, b) => (orderAt.get(a.id) ?? 0) - (orderAt.get(b.id) ?? 0));
-  const gap = narrow ? (W - 76) / Math.max(1, shelf.length - 1) : 54;
+  const gap = narrow ? (W - 76) / Math.max(1, shelf.length - 1) : Math.min(54, (W - 60) / Math.max(1, shelf.length - 1));
   const x0 = (W - gap * Math.max(0, shelf.length - 1)) / 2;
-  shelf.forEach((m, i) => { m.x = x0 + i * gap; m.y = H - shelfH; });
+  const rowY = hubs.length === 0 ? Math.round(top + (usableBottom - top) * 0.56) : H - shelfH;
+  shelf.forEach((m, i) => { m.x = x0 + i * gap; m.y = rowY; });
+  model.footprintRowY = rowY;
   model.narrow = narrow; model.W = W; model.H = H; model.s = s; model.dotR = dotR; model.shelfH = shelfH; model.cx = cx; model.cy = cy;
 }
 
@@ -210,9 +218,9 @@ function render() {
     if (anchor === 'start' && ax + tw > W - 4) { anchor = 'end'; ax = m.x - 15; }
     if (anchor === 'end' && ax - tw < 4) { anchor = 'start'; ax = m.x + 15; }
     ax = anchor === 'start' ? Math.min(ax, W - tw - 4) : Math.max(ax, tw + 4);
-    let ay = m.y - 12;
+    let ay = m.y - 16; /* 점 위 12px → 16px: 글자 아래 4px 이상 띄워 '맞닿아 보임'을 없앤다(#864 캡처 판독) */
     if (ay < 16) ay = m.y + 24;
-    for (let tries = 0; tries < 4 && hit(ax, ay, anchor); tries++) ay += 16;
+    for (let tries = 0; tries < 6 && hit(ax, ay, anchor); tries++) ay += 16;
     el('text', { x: ax, y: ay, class: 'g-mark', 'text-anchor': anchor }, trailG).textContent = text;
   };
   const marks = [];
@@ -381,7 +389,17 @@ function render() {
     const r = t.getBoundingClientRect();
     avoidBoxes.push({ left: r.left - wrapBox.left, top: r.top - wrapBox.top, right: r.right - wrapBox.left, bottom: r.bottom - wrapBox.top });
   }
-  for (const [m, text] of marks) markDot(m, text, avoidBoxes);
+  /* '처음'·'지금' 표식이 점(노드)에 겹치지 않게 — 점·허브 점 상자도 피한다(#864 캡처 53).
+     자기 점은 15px 옆이라 상자(반경 8.5)와 닿지 않는다. */
+  const nodeBoxes = [];
+  for (const m of moments) {
+    if (m.x == null) continue;
+    if (m.stackId && leadOf.get(m.stackId) !== m.id) continue;
+    const rr = model.dotR + (m.stackId ? 15 : 0);
+    nodeBoxes.push({ left: m.x - rr, right: m.x + rr, top: m.y - rr, bottom: m.y + rr });
+  }
+  for (const h of hubs) nodeBoxes.push({ left: h.x - h.hr, right: h.x + h.hr, top: h.y - h.hr, bottom: h.y + h.hr });
+  for (const [m, text] of marks) markDot(m, text, avoidBoxes.concat(nodeBoxes));
 }
 
 /* ── 범례(묶음 (꼬리표 허브)) ── */
@@ -390,6 +408,8 @@ function drawLegend() {
   row.replaceChildren();
   const groups = new Map();
   for (const h of model.graph.hubs) {
+    // #854: 이름이 서지 않는 묶음(빈 값)은 범례에서도 숨긴다 — 색 점만 남는다.
+    if (!String(h.value ?? '').trim()) continue;
     if (!groups.has(h.kindId)) groups.set(h.kindId, []);
     groups.get(h.kindId).push(h);
   }
@@ -564,6 +584,21 @@ function drawShelf() {
   const guideShown = model.graph.moments.length > 1 && model.graph.hubs.length === 0;
   document.getElementById('shelfHint').hidden = guideShown;
   document.getElementById('gShelf').style.display = untagged.length > 0 ? 'flex' : 'none';
+  /* 묶음이 없으면(#864) 선반 글자 줄도 점 행을 따라 가운데로 — 바닥에 남겨 두면 점과 흩어진다.
+     점 행 아래 40px(점 반경 8.5 + 여백). 묶음이 생기면 기본 자리(CSS)로 돌아간다. */
+  const shelfBar = document.getElementById('gShelf');
+  if (model.graph.hubs.length === 0 && model.footprintRowY != null && untagged.length > 0) {
+    shelfBar.style.bottom = Math.max(6, Math.round(svg.parentElement.clientHeight - model.footprintRowY - 40)) + 'px';
+    /* #864 CTO 2차: 선반 글자 줄도 발자취 덩어리 안으로 — 왼쪽 따로가 아니라 점 행 바로 아래 가운데. */
+    shelfBar.style.left = '50%';
+    shelfBar.style.right = 'auto';
+    shelfBar.style.transform = 'translateX(-50%)';
+  } else {
+    shelfBar.style.bottom = '';
+    shelfBar.style.left = '';
+    shelfBar.style.right = '';
+    shelfBar.style.transform = '';
+  }
   const badge = document.getElementById('gBadge');
   const n = model.graph.moments.length;
   badge.textContent = n > 0 ? '순간 ' + n + ' · 묶음 ' + model.graph.hubs.length : '';
@@ -581,29 +616,42 @@ document.getElementById('gViewConc')?.addEventListener('click', () => goMapWithV
    (2026-11-16 CTO 지적: '꼬리표 없는'이 아니라 '아직 묶음에 안 든'이다). */
 function showSuggestions() {
   const untagged = model.graph.moments.filter((m) => m.hubId === null).map((m) => MOMENT_OF.get(m.id)).filter(Boolean);
-  const suggestions = suggestForMoments(untagged);
+  try { parent.postMessage({ type: 'lt-suggest-request', momentIds: untagged.map((m) => m.id) }, location.origin); } catch {}
+  try { parent.postMessage({ type: 'lt41-open-tags', suggest: true }, location.origin); } catch {}
+  const requestSuggestions = ctx.suggestForMoments || suggestForMoments;
+  const byMoment = new Map((requestSuggestions(untagged) || []).map((s) => [s.momentId, s.suggestions]));
   const card = document.getElementById('detailCard');
   card.replaceChildren();
   const head = document.createElement('div'); head.className = 'd-kicker'; head.textContent = '아직 묶음에 안 든 순간 ' + untagged.length + ' — 꼬리표 한 번에 제안받기';
-  const note = document.createElement('p'); note.className = 'd-memo';
-  note.innerHTML = '<b>제안일 뿐</b> — 확인한 것만 저장된다. 꼬리표 정리 화면에서 확인해 저장하세요(지금 화면은 저장하지 않는다).';
+  const note = document.createElement('p'); note.className = 'd-memo'; note.textContent = '제안을 고르면 바로 붙어요.';
   const list = document.createElement('ul'); list.className = 'd-list';
-  let shown = 0;
-  for (const s of suggestions) {
-    if (!s.suggestions?.length) continue;
-    shown += 1;
+  for (const moment of untagged) {
     const li = document.createElement('li');
     const b = document.createElement('button'); b.type = 'button';
-    const d = document.createElement('small'); d.textContent = dayOf(model.graph.moments.find((m) => m.id === s.momentId) || {});
-    const t = document.createElement('span'); t.textContent = s.title + ' — ' + s.suggestions.map((p) => p.raw).join(', ');
-    b.append(d, t);
-    b.addEventListener('click', () => { stopWalk(); selected = { type: 'moment', id: s.momentId }; refresh(); });
+    const title = String(moment.title || moment.subject || '').trim() || '제목 없음';
+    const date = String(moment.date || '').trim();
+    const d = document.createElement('small'); d.textContent = [date, title].filter(Boolean).join(' · ');
+    b.append(d);
+    const tags = (Array.isArray(byMoment.get(moment.id)) ? byMoment.get(moment.id) : [])
+      .map((p) => (typeof p === 'string' ? p : p?.raw)).map((x) => String(x ?? '').trim()).filter(Boolean);
+    if (tags.length) { const t = document.createElement('span'); t.textContent = ' — ' + tags.join(', '); b.append(t); }
+    b.addEventListener('click', () => { stopWalk(); selected = { type: 'moment', id: moment.id }; refresh(); });
     li.appendChild(b); list.appendChild(li);
   }
-  if (!shown) { const li = document.createElement('li'); const b = document.createElement('button'); b.type = 'button'; b.textContent = '지금 제안할 꼬리표가 없어요'; li.appendChild(b); list.appendChild(li); }
+  if (!untagged.length) { const li = document.createElement('li'); const b = document.createElement('button'); b.type = 'button'; b.textContent = '지금 제안할 꼬리표가 없어요'; li.appendChild(b); list.appendChild(li); }
   card.append(head, note, list);
 }
 document.getElementById('shelfHint').addEventListener('click', () => showSuggestions());
+window.addEventListener('message', (event) => {
+  if (event.origin !== location.origin || event.data?.type !== 'lt41-tags-saved' || !event.data.ok) return;
+  const moment = MOMENT_OF.get(event.data.momentId);
+  if (!moment) return;
+  moment.keywords = Array.isArray(event.data.keywords) ? event.data.keywords : [];
+  const rebuilt = buildGraph([...MOMENT_OF.values()].map((m) => ({ ...m, keywords: Array.isArray(m.keywords) ? m.keywords : [] })));
+  model.graph = rebuilt;
+  if (!momentById(selected?.id)) selected = rebuilt.moments.length ? { type: 'moment', id: rebuilt.footprint.order[0] } : { type: null };
+  refresh();
+});
 
 /* ── 발자초 걷기(시간 순서 전체를 한 점씩 밝히며 걷는다) ── */
 const walkBtn = document.getElementById('walkBtn');
@@ -649,9 +697,25 @@ function drawEmptyNote() {
   const n = model.graph.moments.length;
   const hubs = model.graph.hubs.length;
   const empty = document.getElementById('gEmpty');
-  if (n === 0) { empty.replaceChildren(); empty.hidden = false; empty.textContent = '아직 남긴 순간이 없어요. 순간을 남기면 흐름이 보여요.'; }
-  else if (n === 1) { empty.replaceChildren(); empty.hidden = false; empty.textContent = '순간이 하나예요. 다음 순간을 남기면 흐름이 보여요.'; }
+  /* 묶음이 없으면(#864) 안내 문구·제안 단추를 발자취 줄 바로 위에 붙여 한 덩어리로 —
+     화면 한가운데 떠 있는 안내가 아니라 발자취의 안내문이 되게. */
+  const rideWithRow = () => {
+    if (model.footprintRowY == null) return;
+    /* #864 CTO 2차: 단추 아래모서리가 '처음'·'지금' 표식 글자에 걸리지 않게 —
+       표식 글자가 있으면 그 가장 위 글자 위 18px까지 올려 붙인다(없으면 점 행 위 16px). */
+    const wrapTop = svg.parentElement.getBoundingClientRect().top;
+    const markTops = [...svg.querySelectorAll('.g-mark')]
+      .map((t) => t.getBoundingClientRect().top - wrapTop)
+      .filter((v) => Number.isFinite(v) && v > 0);
+    const refY = markTops.length ? Math.min(...markTops) : model.footprintRowY;
+    empty.style.top = refY + 'px';
+    empty.style.transform = 'translate(-50%,-100%) translateY(-18px)';
+  };
+  const rideOff = () => { empty.style.top = ''; empty.style.transform = ''; };
+  if (n === 0) { rideOff(); empty.replaceChildren(); empty.hidden = false; empty.textContent = '아직 남긴 순간이 없어요. 순간을 남기면 흐름이 보여요.'; }
+  else if (n === 1) { rideWithRow(); empty.replaceChildren(); empty.hidden = false; empty.textContent = '순간이 하나예요. 다음 순간을 남기면 흐름이 보여요.'; }
   else if (hubs === 0) {
+    rideWithRow();
     const p = document.createElement('p');
     p.className = 'g-empty-text';
     p.textContent = '같은 가수·노래·무대 꼬리표가 붙은 순간이 2개 이상이면 여기에 묶여요.';
@@ -663,7 +727,7 @@ function drawEmptyNote() {
     empty.replaceChildren(p, cta);
     empty.hidden = false;
   }
-  else { empty.replaceChildren(); empty.hidden = true; }
+  else { rideOff(); empty.replaceChildren(); empty.hidden = true; }
 }
 
 refresh();

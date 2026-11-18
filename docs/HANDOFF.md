@@ -1,5 +1,78 @@
 # LoveTree 4.0 — 핸드오프
 
+## 2026-11-18 — 새 소식 4.1.12 모음 + 계정 메뉴 이메일 한 줄 말줄임(컴1로컬4)
+
+- **새 소식 모음**: 오늘(11-18) 병합된 PR 중 아직 updates.json에 없는 고객용 변화 7줄(#842·#846·#850·#844·#860·#862·#864) + 계정 메뉴 이메일 한 줄 처리 1줄을 4.1.12에 더했다(3→11줄). 이미 4.1.9~4.1.12에 들어간 #792·#800·#810·#815·#784·#839·#840·#845와 운영 도구·문서 PR(#827·#828·#837·#849·#854·#859)은 제외. updates.json 형식 시험 통과.
+- **계정 메뉴 이메일**: 긴 이메일이 두 줄로 끊기던 것을 한 줄 말줄임으로 고침. 원인은 둘 — ① #account-email의 overflow-wrap:anywhere, ② .account-popover가 shrink-to-fit + grid 트랙 max-content라 이메일 넣은 폭으로 메뉴가 늘어남. 고침: popover width 고정(232/210)+grid-template-columns:minmax(0,1fr), #account-email에 nowrap·ellipsis, header.mjs에서 title 속성에 전체 값.
+- **실측(가짜 /api, 긴 이메일, 밤)**: 1440·390 모두 이메일 줄 수 1, 말줄임 동작(scrollWidth>clientWidth), title 설정, 메뉴 폭 232/210 고정·화면 안, dialog 수 0. 캡처: `E:\lovetree-qa\local4\account-email\`.
+- **기존 결함 보고(이번 범위 밖)**: `tests/v41-header-ia.test.mjs`의 #666 고급 기능 스위치 대비 시험이 순수 main에서도 실패(1.02:1, rgb(10,9,13)) — 이 PR 변경과 무관. #644 옮기기 창 포커스 시험은 1회 실패 후 재실행 통과(일시적).
+
+## 2026-11-18 — 지도 그래프 다듬기: 빈 무대에서 발자취가 주인공(#864, 컴1로컬4, PR #867)
+
+- **바꾼 것**: ① 머리글 'GRAPH VIEW' → '그래프'. ② 묶음 0개일 때 꼬리표 없는 순간 줄(발자취)을 바닥 대신 무대 가운데 가까이(쓸 수 있는 높이의 56%)로, 선반 글자 줄도 점 행 아래 40px로 따라 감. 안내 문구·제안 단추는 발자취 줄 바로 위에 붙임(drawEmptyNote가 model.footprintRowY를 씀). ③ 묶음 1개 허브를 위 몰림(-π/2) 대신 무대 가운데로(좁은 무대는 이름 두 줄이 선반에 닿지 않게 한계). ④ '처음'·'지금' 표식이 점·허브 점 상자를 피하고 점 위 간격 12→16px. ⑤ 넓은 무대에서 점 많으면 줄 간격을 폭에 맞춰 축소(화면 밖 넘침 방지).
+- **파일**: `public/v41/views/graph/graph.js`(layoutModel·markDot·drawShelf·drawEmptyNote), `track60-graph.html`(머리글). 그물형·동심원형(network.js) 미변경, `prototypes/graph-view.html`의 시안 표기는 기록이라 유지.
+- **실측(가짜 /api, 밤, 1440·390)**: 순간3·묶음0 / 순간3·묶음1 / 예시 40순간 / 꼬리표 많은 40순간(허브 7) — 발자취 줄 비율 0.52·0.46(묶음0·예시), 허브 중심 0.46·0.42(묶음1), '처음'×노드 겹침 전부 false, 이름표 겹침 쌍 0, 'GRAPH VIEW' 0, 발자취 글자 줄×점 겹침 false. 그래프 모델 시험 통과, build ✓, modulepreload ✓. 캡처 8장 + numbers.json: `E:\lovetree-qa\local4\graph-layout\`.
+- **가짜 데이터 주의**: 시험용 트리는 뿌리 순간 1개(parentId null) + 나머지는 자식으로 — 뿌리를 여러 개 넣으면 워크스페이스 검증이 조용히 실패해 셸 부팅이 멈춘다(화면도 요청도 없이 빈 채로 끝).
+- **2차 수리(CTO 캡처 확인 반영)**: ① 제안 단추 아래모서리가 '처음'·'지금' 표식 글자에 걸림 → 안내 덩어리를 표식 글자 가장 위 가장자리 위 18px로 올림(drawEmptyNote가 .g-mark rect를 재). 실측 간격 18px(1440·390). ② '아직 묶음에 안 든 순간 N'이 왼쪽에 따로 → 점 행 바로 아래 가운데로(drawShelf가 선반 줄을 left 50%·translateX(-50%)). 실측 가운데 어긋남 0px·점·표식과 겹침 false. 하단 링크 겹침 false 유지. 캡처는 empty3 1440·390 두 장 갱신.
+- **남은 것**: CTO 캡처 확인 → squash 병합(자동 병합 없음). 이 모델은 이미지를 볼 수 없어 화면 판정을 '통과'로 적지 않음 — 캡처 2장(묶음 0·1)을 비전 모델로 판독했고 그 판독의 '맞닿아 보임'을 간격 16px로 반영했다.
+
+## 2026-11-18 — '내 의견 빈 화면' 수리와 일지 처리(#846, 컴1로컬4, PR #851·#854)
+
+- **고침(PR #851, main fcabc5f)**: 완료 창의 '내 의견 열기'가 창만 열고 목록을 다시 불러오지 않았다(shell.mjs가 `panel('myposts-panel')`만 호출) — 보낸 직후 `/api/board/mine` 요청 0번·빈 목록. `feedbackBoard.openMyPosts()`로 바꿈. 불러오는 중 문구 '불러오는 중이에요.', `#myposts-panel` 내용 최대 960px 가운데 정렬(2560 실측: 목록 960·항목 960·덧붙임 입력칸 843·가운데 true). 실측: 의견 2건 보낸 뒤 열기 → 항목 2개(#2·#1), 요청 GET /api/board/mine 1회씩. 캡처 `E:\lovetree-qa\local4\my-opinions\`.
+- **도구(PR #854, main 3b56d9f)**: ops-reply가 일지를 아예 거부하던 것을 고침 — 일지는 내부 메모(authorType=internal)·상태·연결 이슈 갱신만, 의견은 종전대로 고객 답변. replyMode 순수 함수 + tests/ops-reply.test.mjs 6건.
+- **실데이터 적용(판독기로 번호 확인)**: 증상을 적은 건은 일지 id=36 하나(같은 계정 의견 #20·#21·#23·#24에는 증상 없음). ops-reply로 id=36에 내부 메모 '보낸 직후에도 내 의견 목록이 바로 보이게 고쳤어요.'(reply id=37, internal) + 상태 fixed + 연결 이슈 846 — 판독기 재실행으로 DB 실값 확인.
+- **남긴 것**: ① comp2에 설치된 `/usr/local/sbin/lovetree-api-autodeploy`가 옛판이라 감시 목록에 tools/ops-reply.mjs가 없어 자동 설치가 걸리지 않았다 — 이번엔 수동 반영했고, 설치본 갱신이 필요하다. ② ops-reply 출력 문구의 authorType 고정값은 별도 PR로 바로잡는다. ③ #851은 사용자 보이는 고침이라 새 소식(updates.json) 한 줄은 소식 모아 만드는 레인 몫이다.
+
+## 2026-11-18 — #845 1단계: 창이 열려 있는 동안 첫 트리 안내 판 숨기기 (컴1로컬3, 브랜치 ai/local3-tips-845, PR 예정)
+
+- **바꾼 것**: #566의 '창 안 맨 위로 옮겨 붙이기'(.lt-tips-embedded)를 폐지했다. #845·#846 사용 일지(PR #851 캡처)에서 안내 판이 순간 추가·내 의견 창 내용 위에 포개지는 일이 반복됐다. 261118 대표 결정: 모달 창(#845 설계안의 15개)이 하나라도 열려 있는 동안은 안내 판을 숨기고(`tipsFollowDialogs`), 창이 모두 닫히면 다시 띄운다 — 이때 '봇음'으로 적지 않는다(#666 계정 메뉴 미루기와 같은 규칙, `tipsHeld` 플래그 공유). 창 열림 감지는 `panel()`(showModal 직후)·write-panel의 `onModalShown`·문서 'close' 이벤트(캡처 단계) 3곳이다. `dialog[open]`이라 새 소식 창(비모달)도 포함한다.
+- **파일**: `public/v41/shell.mjs`(tipsRestore·placeTreeTips 삭제 → tipsFollowDialogs·anyDialogOpen, showTreeTips 창 가드 추가, closeTreeTips에서 자리 돌리기 제거), `public/v41/shell.css`(.lt-tips-embedded 규칙 삭제), 시험 2파일 갱신(v41-tree-tips-549 — 숨김/복귀/봇음 미기록 + 내 의견 창 시험 추가, v41-tree-rename-tips-571 — 창 열림 동안 숨김·저장 뒤 다시 보임).
+- **실측(가짜 /api, 트리 1개·순간 1개)**: 1440·390 모두 — 창 열림 시 tipsHidden=true·.lt-tips-embedded 0·부모 body·봇음 null, 창 닫힘 → 다시 보임·봇음 여전히 null, 계정 메뉴 열림(#666)도 숨김 유지, 트리 관리 [이름 바꾸기]→저장→닫기 → 다시 보임. 캡처 2장 `E:\lovetree-qa\local3\dialogs\`(write-open-1440·myposts-open-1440). 전체 시험 1837 pass / 0 fail, build ✓, modulepreload ✓.
+- **남은 것**: ㉠CTO 캡처 확인 → squash 병합(자동 병합 없음, Refs #845) ㉑#845 설계 나머지(창 15개 겹침 규칙표·Esc/✕/뒤로가기·포커스 되돌리기 통일)는 이슈 코멘트로 기록 — 2~3단계 PR로 나눠 간다.
+
+## 2026-11-18 — 서재 탭 구조 되돌림(감사기 3건 수리) (컴1로컬3, PR #847, d1e3e06)
+
+- CI 빨강 3개의 원인: 서재 탭을 #tree-views 밖 따로 단추(.shelf-tab)로 꺼낸 구조. main에는 원래 서재 탭이 묶음 첫 버튼이었다. 390에서는 묶음 접기 규칙(.main-nav .tree-views 숨김)이 서재 탭에 먹지 않아 테마 단추와 6px 겹침 + 단추 글자 12px(감사기 화면 실패 16건), '탭 글자 통일'·'트리 0개 탭 4개' 시험의 #tree-views 4버튼 기대와 어긋남.
+- 고침(d1e3e06): 서재 탭을 #tree-views 첫 버튼으로 되돌림 — [서재·책·보드·지도] 한 묶음. 2차 결정 유지: 둘러보기는 묶음 밖 오른쪽, 묶음 글자 14px, 서재 화면에서 트리 선택 숨김. 고른 탭은 묶음 안을 꽉 채움(마지막 탭 오른쪽 둥근 모서리, 서재 화면 첫 탭 왼쪽 둥근 모서리), 서재 화면에서 묶음 높이 40px 유지(.tree-views min-height:40px). 390은 묶음이 접혀 접기 메뉴로만 열림.
+- 실측(가짜 서버+ego-browser): 390 겹침 0·접기 메뉴에 서재; 1440 서재 화면 알약 44px·탭 40px·14px 채움; 1440 책 화면 기록 칸 40px 정상. 시험 96 pass / 0 fail, build ✓, modulepreload ✓.
+- 감사기 시험 6은 글자 크기 기대만 14px로 갱신(261118 결정), 7은 본문 무변경.
+
+## 2026-11-18 — 서재 선반 착지 재수정 (컴1로컬3, PR #847, d669e04)
+
+- **원인 바로잡기**: 지난 실측 672/675는 셸 iframe 안 좌표였고 화면 좌표는 +65px(헤더)다. 보이는 갈색 막대 = `.shelf-base`(wood gradient, 화면 top 737·높이 13). 진짜 원인은 카드 고정 높이 352px — 표지 아래 설명 칸에 ~120px 빈 칸이 '책↔선반 130px 빔'으로 보였다.
+- **고침**: 카드 `height:auto`(shelf-extra.css) — 표지 바로 아래 8px 뒤 설명, 카드 아랫단=막대 윗면. 실측(화면 좌표): 1440 막대 737 / 가운데 책 737(차이 0)·양옆 740(3px 얹힘), 390 막대 727 / 책 727. PNG 픽셀 검사 일치(x=120 갈색 첫 픽셀 738). 캡처 2장 `E:\lovetree-qa\local3\library\v3\`. 표지 잘림·단색 썸네일은 대표 지시대로 그대로 둠.
+- **남은 것**: CTO 캡처 확인 → squash 병합(자동 병합 없음) → 병합 뒤 postdeploy 탭 개수 기대값 확인(서재 탭이 tree-frame 안으로 들어감 — BASE 1+picker 1+views 3=5 유지인지).
+
+## 2026-11-18 — 서재 화면 정리 2차 수정 (컴1로컬3 작업, ai/local3-shelf-261118, PR #847, 이슈 #839)
+
+- **대표 지적 5가지를 같은 PR에서 고쳤다**: ㉠책이 선반에 앉게(카드 아랫단=레일 바닥, 선반은 레일 바로 아래 흐름 — 실측 책 아랫단 675 vs 선반 윗면 672, 3.5px 얹힘) ㉡이어 보기 띠 바깥 상자 제거(hero border·배경·그림자 0, 띠 위 여백 3px) ㉢옆 책 축소 폐지(가운데만 1.06, 나머지 1 — 설명 실제 렌더 높이 17.2~18.4px, 투명도 0.8~1) ㉣표지 그림 object-position 50% 50% ㉤상단 순서 [트리▾(숨김)│서재·책·보드·지도](묶음 14px·높이 40px 통일) + 둘러보기는 묶음 밖 오른쪽(기존 13px). 서재 화면에서 콕·보드·지도는 마지막에 본 트리(서재 가운데 책)로 연다(shelf.js가 `lt41-shelf-tree`로 셸에 알림, messages.mjs가 저장, shell.mjs 탭 클릭에서 choose). 트리 0개 계정이 주소로 바로 `#my/shelf`에 들어와도 서재 빈 화면(#817)으로 시작한다(choose의 빈 판이 paintEmptyForScreen을 쓴다).
+- **검증**: 관련 시험(v41-shelf-unify·topmenu·header-tabs-mobile·shelf-flow·header-flow·465-small·cover-design·shell-tree-title) pass·0 fail, build·modulepreload --check ✓. dist 재빌드+캐시 끔 실측(가짜 API만): 위 수치 + 띠 겹침 false·하단 링크 겹침 false·390에서 띠 위 여백 0px·빈 계정 emptyView=shelf. 캡처 4장 `E:\lovetree-qa\local3\library\v2\`(trees 1440 밤·정원, 390 정원, 0개 1440 밤). 마지막 트리 이동 실측: 서재에서 다음 책 넘긴 뒤 콕 탭 → `#my/book?tree=<가운데 책 트리>`로 열림.
+- **남은 것**: ㉠CTO 캡처 확인(승인 시 squash 병합, 자동 병합 없음) ㉑띠의 트리 이름은 트리 제목 기준으로 정리됨(가짜 데이터에서 주제=제목 같음) ㉒서재 탭이 tree-frame 안으로 들어가면서 postdeploy 탭 개수 기대값(BASE 1+picker 1+views 3=5)과의 정합은 다음 postdeploy 실행 때 확인.
+
+## 2026-11-18 — 서재 화면 정리 1차 (컴1로컬3 작업, ai/local3-shelf-261118, PR #847, main 542c0d0 기준, 이슈 #839)
+
+- **서재 탭**: main-nav 맨 앞 '서재' 탭(현재 위치면 채움 알약). 서재 화면에서는 '트리: ○○ ▾' record-menu 숨김(header.mjs `onShelf`), 책·보드·지도에서만 보인다.
+- **책등 줄 삭제**: 세로 책등(`#shelfSpines`)·spine 렌더/모델/CSS·`tests/v41-shelf-spines.test.mjs` 전부 삭제, 넘김 목록(표지+흰 이름)만 남김.
+- **'+ 새 트리' 단추 하나**: 점선 책등·넘김 목록 끝 빈 책 카드 삭제, 오른쪽 `#shelfNewTree` 단추만 남김(트리 0개 빈 계정은 #817 그대로).
+- **이어 보기 띠**: '좋아하는 순간들을 한 권의 책으로.'+'책 열기'는 트리 0개일 때만(띠 모드에서 hero-copy 숨김). 트리가 있으면 한 줄 띠(썸네일 96×54 · 트리 이름 · 순간 제목 · '이어 보기 ▶'). 띠 문구는 트리 이름=book.name(주제) 기준 — fake 서버 데이터에서 트리 제목과 주제가 같아 실측에서 '수아'로 나온다.
+- **addedLabel**: 책 설명 '순간 N개 · 오늘/어제/N일 전 추가', 7일 넘으면 'M월 D일 추가'(미래는 오늘 처리). 옆 책 설명 12px 유지.
+- **선반·여백**: `.app/.page/.shelf-screen` flex column + `justify-content:center` + app 아래 여백 72px — 선반 y=456(무대 중앙), 하단 링크 겹침 false.
+- **글꼴**: `html[data-v41-screen=shelf]{--lt-font-display:var(--lt-reading)}`로 제목·표지 명조(MaruBuri), 본문 Pretendard 하나(`--latin: var(--body)`).
+- **검증**: 관련 시험 80건 pass·0 fail, build·modulepreload --check ✓. dist 재빌드 후 실측(가짜 API만, 시험 계정 세션 없음): 책등 0·빈 책 0·새 트리 단추 1·띠 겹침 false·띠 대비 밤 7.1~17.8:1/정원 5.9~11.6:1·책 설명 '어제 추가' 류 12px. 캡처 8장 `E:\lovetree-qa\local3\library\`(trees/empty × 1440·390 × 밤·정원).
+- **남은 것**: ㉠트리 0개 계정이 주소로 바로 `#my/shelf`에 들어오면 기존 동작대로 집 빈 화면(shell.mjs `choose()`의 빈 판)이 열린다 — 서재 탭을 눌러야 '아직 책장이 비어 있어요.' 빈 상태. 시작 위치까지 서재로 열지는 별도 이슈. ㉑띠의 트리 이름을 주제가 아닌 트리 제목으로 바꿀지는 대표 확인 후 결정.
+
+## 2026-11-18 — #784 둘러보기 사진 격자 (branch `ai/com1-784-discover-grid`, PR #826)
+
+- **구현**: 카드 커버 썸네일 표시 원인을 수리하고, 표지 중심 격자·단일 검색/정렬·가로 스크롤 그룹 칩·카드 미리보기와 `⋯` 메뉴를 적용했다. 신고·차단·AI 명예회원 표시 및 공개 범위 규칙을 유지했다. 버전 4.1.12에는 사용자 요청 문구 `둘러보기가 사진 중심으로 새로워졌어요`를 넣었다.
+- **동기화/커밋**: 최신 main `878005822b9303a280733eaa8bb9098a459cfbf1`을 병합했다. 초기 구현 `a6c9845`, v2 구현 `d35ba2e`, main 동기화 `e665bc8`. PR #826은 열어 두며 병합하지 않는다.
+- **v2 수리**: YouTube URL에서 YouTube ID로 안전 썸네일을 만들고, 서버 의존성을 import 없는 `public/v41/youtube-id.mjs`에 모았다. install/autodeploy 복사·감지 목록과 preflight 시험을 고쳤다. 동일 제목·대표 순간은 순번 대신 선택적인 공개 표시명만 표시하며 계정 표시명은 API에 추가하지 않았다.
+- **v3 썸네일 후속**: 가로 YouTube 표지는 띠가 있는 `hqdefault` 대신 `mqdefault`(320×180)를 쓰고, 16:9 그림 뒤 블러 배경으로 표지 칸을 채운다. 미리보기도 16:9다. 세로 블러 처리와 사진/대체 그림 경로는 유지했다. 수정 전 480×360·띠 보임, 수정 후 320×180·띠 없음 측정값은 `E:\lovetree-qa\luna\784\v3\REPORT.md`에 있다.
+- **캡처**: 최종 캡처와 실패 분석은 `E:\lovetree-qa\luna\784\v2\REPORT.md`·PNG·`capture-metrics.json`. 1440·390 정원에서 `img.youtube.com` 썸네일 2장이 HTTP 200/image/jpeg로 표시되고 세로 영상 흐림 배경을 눈으로 확인했다. 비교용 초기 화면은 `E:\lovetree-qa\luna\784\REPORT.md`를 본다.
+- **v3 캡처**: `E:\lovetree-qa\luna\784\v3\REPORT.md`와 PNG 두 장만 둔다. `garden-grid-1440.png`와 `vertical-video-preview-390.png`를 CTO가 확인한 뒤 병합 여부를 정한다.
+- **확인**: 카드 액션 0(렌더 시험도 카드 안에 단추가 없음을 확인), 검색 입력 1개, 그룹 칩 한 줄, 가로 넘침 0, `.firstMark` 겹침 0, 대상 rect 0인 항목 0. 관련 시험 124/124, `npm run build`, modulepreload 검사 통과.
+- **전체 시험**: 기존 `npm test` 한 번의 1,812 통과·8 실패·158 건너뜀을 v2 보고서에서 테스트별 원인과 이번 변경 관련 여부로 기록했다. PR당 전체 시험 한 번 제한에 따라 재실행하지 않았다.
+- 캡처용 브라우저 세션과 로컬 Vite 서버는 종료했다.
+
 ## 2026-11-17 — PR #807 병합; 책 카드 정리(#800) 진행 중
 
 - **#807 완료**: CTO 캡처 승인과 최신 CI 확인 뒤 squash 병합했다. 병합 커밋 `cb14a1f5e53b003874aac3252fc49aa82ae6bfe3`.

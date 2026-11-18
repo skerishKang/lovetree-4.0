@@ -11,7 +11,7 @@ const BOARD = fs.readFileSync(new URL('../public/v41/views/board/board.js', impo
 const EXTRAS = fs.readFileSync(new URL('../public/v41/views/board/board-extras.js', import.meta.url), 'utf8');
 
 test('0. 보드 한 벌: 화면이 부르는 함수가 전부 있다', () => {
-  assert.deepEqual(Object.keys(M).sort(), ['ORDER_Y_BASE', 'boardSize', 'cinemaBeats', 'clampView', 'collectPath', 'contentBox', 'dateDescOrder', 'decorationMotion', 'detailButtonState', 'editGuard', 'escapeHTML', 'filterVisible', 'fitBox', 'fitZoom', 'gridColumns', 'gridPosition', 'gridRowTops', 'isOrderY', 'isPinboardSlot', 'maxCreatedOrder', 'nextConnections', 'orderFromSaved', 'orderOfMoments', 'pinboardSpread', 'rememberView', 'savedView', 'settleColumnGaps', 'slotOf', 'stackLayout', 'startView', 'visibleCards']);
+  assert.deepEqual(Object.keys(M).sort(), ['ORDER_Y_BASE', 'boardSize', 'cinemaBeats', 'clampView', 'collectPath', 'contentBox', 'dateDescOrder', 'decorationMotion', 'detailButtonState', 'editGuard', 'escapeHTML', 'filterVisible', 'fitBox', 'fitViewBox', 'fitZoom', 'gridColumns', 'gridPosition', 'gridRowTops', 'isOrderY', 'isPinboardSlot', 'maxCreatedOrder', 'nextConnections', 'orderFromSaved', 'orderOfMoments', 'pinboardSpread', 'rememberView', 'savedView', 'settleColumnGaps', 'slotOf', 'stackLayout', 'startView', 'visibleCards']);
   for (const fn of Object.keys(M)) assert.ok(typeof M[fn] === 'function' || fn === 'ORDER_Y_BASE', fn); // #619-6: ORDER_Y_BASE는 순서 상수(함수가 아니다)
 });
 
@@ -263,6 +263,41 @@ test('#460 카드 묶음 사각형과 맞춤: 실제 순간이 있는 곳만 기
   assert.equal(M.fitBox({ x: 0, y: 0, w: 100, h: 100 }, { x: 0, y: 0, w: 1000, h: 1000 }, 0.92).z, 0.92);
 });
 
+test('#856: 전체 맞춤은 판 제목 자리도 함께 재는다 — 제목이 화면 왼쪽에서 잘리지 않는다', () => {
+  // 실제로 잘리던 모양(1440·밤): 카드가 오른쪽으로 넓게 퍼져 있고 제목은 무대 왼편(88px)에 붙어 있다.
+  const cards = [{ x: 340, y: 300, w: 242, h: 300 }, { x: 1200, y: 300, w: 242, h: 300 }, { x: 1700, y: 640, w: 242, h: 300 }];
+  const title = { x: 88, y: 76, w: 290, h: 60 };
+  const safe = { x: 16, y: 12, w: 1408, h: 936 };
+  const without = M.fitViewBox(cards, null, safe, 0.92);
+  assert.ok(88 * without.z + without.x < 24, `제목 없이 맞추면 제목이 잘린다(${(88 * without.z + without.x).toFixed(1)}px)`);
+  const v = M.fitViewBox(cards, title, safe, 0.92);
+  assert.ok(88 * v.z + v.x >= 24, `제목 왼편 ${(88 * v.z + v.x).toFixed(1)}px — 24px 이상`);
+  // 제목을 넣었다고 카드가 칸을 벗어나지 않는다.
+  const x1 = Math.max(...cards.map((c) => c.x + c.w));
+  assert.ok(x1 * v.z + v.x <= safe.x + safe.w + 1, `맨 오른쪽 카드도 칸 안(${(x1 * v.z + v.x).toFixed(1)}px ≤ ${safe.x + safe.w})`);
+  // 제목이 없으면(잰 전·없는 화면) 카드만 맞춘다 — 기존 계산과 같다.
+  assert.deepEqual(M.fitViewBox(cards, null, safe, 0.92), M.fitBox(M.contentBox(cards), safe, 0.92));
+  assert.equal(M.fitViewBox([], null, safe, 0.92), null);
+});
+
+test('#856: 처음 자리(초점 보기)에서도 판 제목이 화면 왼쪽에서 잘리지 않는다 — 초점 카드는 칸 안에 남는다', () => {
+  // 넓은 판(맞춤 배율이 0.8 미만) → 초점 보기. 초점 카드가 오른쪽에 있으면 제목이 왼쪽 밖으로 밀렸다.
+  // 제목을 지킬 자리가 있으면(초점 카드 오른쪽에 빈 칸이 있으면) 24px를 지킨다 — 카드를 우선해야 할
+  // 만큼 자리가 없으면(초점 카드가 칸 오른쪽 끝에 닿았으면) 카드를 남긴다.
+  const cards = [];
+  for (let c = 0; c < 4; c++) for (let r = 0; r < 3; r++) cards.push({ id: 'm' + (c * 3 + r), x: 340 + c * 560, y: 300 + r * 340, w: 242, h: 300 });
+  const title = { x: 88, y: 76, w: 290, h: 60 };
+  const safe = { x: 16, y: 12, w: 1408, h: 936 };
+  const vp = { w: 1440, h: 960 };
+  const v = M.startView({ viewport: vp, safe, cards, focusId: 'm2', firstId: 'm0', title });
+  assert.notEqual(v.mode, 'user');
+  assert.ok(88 * v.z + v.x >= 24, `제목 왼편 ${(88 * v.z + v.x).toFixed(1)}px — 24px 이상(모드 ${v.mode})`);
+  // 초점 카드도 여전히 보이는 칸 안에 있다(제목을 지킨다고 카드를 내치지 않는다).
+  const f = cards.find((c) => c.id === 'm2');
+  assert.ok((f.x + f.w) * v.z + v.x <= safe.x + safe.w + 1, `초점 카드 오른편 ${( ((f.x + f.w) * v.z + v.x)).toFixed(1)}px ≤ ${safe.x + safe.w}`);
+  assert.ok(f.x * v.z + v.x <= safe.x + safe.w, '초점 카드 왼편도 칸 안');
+});
+
 test('#460 처음 열 때(1440): 많은 트리는 0.8배(제목 12.8px)로 그 순간 근처, 적은 트리는 한눈에', () => {
   for (const n of [15, 40]) {
     const cards = grid(n);
@@ -327,7 +362,8 @@ test('#460 보던 자리 기억: 트리별로 남기고, 최근 20개만, 이상
 test('#460 화면은 처음 자리·전체 보기·기억을 이 계산으로 하고, 휴대폰(700 미만)은 지금 순간을 읽히는 배율로 둔다(#662)', () => {
   const DETAIL = fs.readFileSync(new URL('../public/v41/views/board/board-detail.js', import.meta.url), 'utf8');
   assert.match(BOARD, /LT58Model\.startView\(/);
-  assert.match(BOARD, /LT58Model\.contentBox\(/);
+  // #856: 전체 맞춤은 모델의 fitViewBox(제목 자리 포함)로 한다 — contentBox 직접 호출을 fitViewBox가 대신한다.
+  assert.match(BOARD, /LT58Model\.fitViewBox\(/);
   assert.match(BOARD, /LT58Model\.rememberView\(/);
   // #662(CTO 지시): 좁은 판 초기 화면은 전체 맞춤(40장을 손톱만 하게 몰아 넣음)이 아니라 지금 순간 카드를
   // 읽히는 배율로 크게 보이는 초점 보기다. 판이 아직 없으면(모듈 로드 순서) 전체 맞춤으로 대체한다.

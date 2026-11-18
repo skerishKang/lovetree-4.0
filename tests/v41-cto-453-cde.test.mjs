@@ -138,26 +138,29 @@ test('D2: 빈 화면 문구·단추는 계정 상태에 맞춘다', () => {
   assert.match(shell, /if\(kind!=='share'\)\{[\s\S]{0,120}?paintEmptyCopy\(\);/);
 });
 
-test('D3: 공개 트리가 0개면 미리보기 칸을 숨기고, 결과가 있으면 보인다', async () => {
-  // 전: previewCollapses 정의와 hidden 대입 줄을 글자로 봤다 → 후: 목록을 실제로 불러와 본다.
+test('D3: 결과가 있어도 미리보기는 닫혀 있고, 카드를 누를 때 연다', async () => {
   const empty = communityHarness({ items: [] });
   try {
     await empty.search();
-    assert.equal(empty.get('community-preview').hidden, true, '빈 결과는 미리보기 칸을 숨긴다');
+    assert.equal(empty.get('community-preview').open, false, '빈 결과에서는 미리보기가 닫혀 있다');
   } finally { empty.restore(); }
   const some = communityHarness({ items: [COMMUNITY_ITEM] });
   try {
     await some.search();
-    assert.equal(some.get('community-preview').hidden, false, '결과가 있으면 미리보기 칸을 보인다');
+    assert.equal(some.get('community-preview').open, false, '목록을 불러와도 미리보기는 열리지 않는다');
+    const card=some.get('community-list').children.find(node=>node.dataset.shareId==='s1');
+    assert.equal(card.tagName,'BUTTON','카드 전체가 키보드로도 열리는 단추다');
+    assert.equal(card.children.some(node=>node.tagName==='BUTTON'),false,'카드 안에는 별도 액션 단추가 없다');
+    card.onclick();
+    assert.equal(some.get('community-preview').open,true,'카드를 누르면 미리보기가 열린다');
+    const close=some.get('community-preview').children[0].children.find(node=>node.className==='community-preview-close');
+    close.onclick();
+    assert.equal(some.get('community-preview').open,false,'닫기 단추로 미리보기를 닫는다');
   } finally { some.restore(); }
   const loading = communityHarness({ defer: true });
   try {
     loading.searchNow();
-    assert.equal(loading.get('community-preview').hidden, false, '불러오는 중에는 미리보기 칸을 숨기지 않는다');
+    assert.equal(loading.get('community-preview').open, false, '불러오는 중에도 미리보기는 닫혀 있다');
     await loading.resolveFetch({ items: [], totalVisible: 0, nextCursor: '' });
-    assert.equal(loading.get('community-preview').hidden, true, '빈 결과로 끝나면 그때 숨긴다');
   } finally { loading.restore(); }
-  // 빈 결과 배치는 CSS 값 — 글자 검사로 유지한다(docs/TESTING.md 규칙 2).
-  assert.match(css, /\.community-layout:has\(#community-preview\[hidden\]\)\{grid-template-columns:minmax\(0,1fr\)\}/);
-  assert.match(css, /\.community-layout:has\(#community-preview\[hidden\]\) \.community-empty\{[^}]*text-align:center/);
 });

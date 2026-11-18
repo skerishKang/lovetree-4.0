@@ -136,7 +136,7 @@ test('디자인 표지 질감은 identity.css 한 곳에 있고 6종 모두 책�
 
 test('이어 읽기 칸 표지도 같은 판정(book.design)을 쓰고 질감 규칙을 같이 쓴다(구조 검사)', () => {
   const shelf = readFileSync('public/v41/views/shelf/shelf.js', 'utf8');
-  assert.match(shelf, /if\(info\.book\.design\)cover\.setAttribute\('data-cover-design',info\.book\.design\)/, '이어 읽기 칸은 book.design을 그대로 쓴다');
+  assert.match(shelf, /if\(info\.book\.design\)thumb\.setAttribute\('data-cover-design',info\.book\.design\)/, '이어 보기 띠 썸네일은 book.design을 그대로 쓴다');
   assert.doesNotMatch(shelf, /resume.*coverDesign/, '이어 읽기 칸에 판정 사본이 없다');
   const css = readFileSync('public/v41/identity.css', 'utf8');
   for (const id of serverDomain.COVER_DESIGN_IDS) {

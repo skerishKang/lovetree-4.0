@@ -11,11 +11,18 @@
 // 크롬(Playwright chromium)이 없는 곳에서는 건너뛴다 — CI(LT_SCREEN_AUDIT_REQUIRE=1)에서는 건너뜀을 실패로 본다.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync } from 'node:fs';
+import { existsSync, mkdirSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { serve, auditPage, failuresOf } from './helpers/screen-audit.mjs';
 import { createTree, addMoment } from '../public/v41/domain.mjs';
 
 const REQUIRE = process.env.LT_SCREEN_AUDIT_REQUIRE === '1';
+const SCREEN_AUDIT_CAPTURE_DIR = fileURLToPath(new URL('../test-results/v41-screen-audit/', import.meta.url));
+const screenAuditCapture = (name) => {
+  mkdirSync(SCREEN_AUDIT_CAPTURE_DIR, { recursive: true });
+  return join(SCREEN_AUDIT_CAPTURE_DIR, name);
+};
 let chromium, skip = false;
 try {
   ({ chromium } = await import('playwright'));
@@ -69,7 +76,7 @@ const MINE_POSTS = [
 // #678 후속(회차 지적): 둘러보기 상태 — 반응이 하나도 없는 공개 트리 카드. 0짜리 칩 7개 대신
 // '반응 남기기' 한 개만 보이는지 검사한다. 카드 글자 중 main에서 이미 10·11px인 것은 KNOWN으로 넘긴다.
 const COMMUNITY_CARDS = [
-  { shareId: 'c0000000000000000000000a', title: '화면 확인용 공개 트리', subject: '확인 대상', summary: '첫 순간 소개', createdAt: '2026-11-15T09:00:00.000Z', momentCount: 3, aiTester: false, emotions: ['설렘'], cover: { url: '', title: '첫 순간', emotion: '설렘' }, stats: { favorites: 0, hearts: 0, favored: false, hearted: false, reactions: { heart: 0, like: 0, love: 0, laugh: 0, wow: 0, sad: 0, angry: 0 }, mine: [] } }
+  { shareId: 'c0000000000000000000000a', title: '화면 확인용 공개 트리', subject: '확인 대상', summary: '첫 순간 소개', createdAt: '2026-11-15T09:00:00.000Z', momentCount: 3, aiTester: false, emotions: ['설렘'], cover: { url: 'https://i.ytimg.com/vi/qaScreenAudit001/hqdefault.jpg', title: '첫 순간', emotion: '설렘' }, stats: { favorites: 0, hearts: 0, favored: false, hearted: false, reactions: { heart: 0, like: 0, love: 0, laugh: 0, wow: 0, sad: 0, angry: 0 }, mine: [] } }
 ];
 
 const knownHit = (항목, 줄) => KNOWN.some((k) => 줄.startsWith(k.화면) && k.항목 === 항목 && new RegExp(k.찾을).test(줄));
@@ -480,16 +487,26 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     // (2026-11-16) '자동 공개 안내' 토스트는 질문 창(아래 '둘러보기 소개 질문' 상태)으로 대신해 남기지 않는다.
     await page4.evaluate(() => document.getElementById('community-menu')?.click());
     await page4.waitForFunction(() => !!document.getElementById('community-panel')?.open, null, { timeout: 8000 }).catch(() => {});
-    // #678 후속(회차 지적): 반응이 없는 카드는 0짜리 칩 대신 '반응 남기기' 한 개만 보인다(수치로 판정).
-    await page4.waitForFunction(() => !!document.querySelector('.community-reaction-open'), null, { timeout: 8000 }).catch(() => {});
-    await page4.waitForTimeout(400);
-    const reactions = await page4.evaluate(() => ({
-      open: document.querySelectorAll('.community-reaction-open').length,
-      zeroChips: [...document.querySelectorAll('.community-reaction')].filter((b) => / 0$/.test(b.textContent.trim())).length
-    }));
-    assert.ok(reactions.open >= 1, '반응이 없으면 반응 남기기 단추가 보인다');
-    assert.equal(reactions.zeroChips, 0, '0짜리 반응 칩은 보이지 않는다');
+    await page4.waitForFunction(() => !!document.querySelector('.community-card'), null, { timeout: 8000 });
     await take(page4, '둘러보기');
+    // #784: 반응 단추는 격자 카드에 없고, 카드를 열어야 미리보기에서 보인다.
+    await page4.locator('.community-card').first().click();
+    await page4.waitForFunction(() => {
+      const preview = document.getElementById('community-preview');
+      return preview?.open && preview.querySelector('.community-reaction-open');
+    }, null, { timeout: 8000 });
+    await page4.waitForTimeout(400);
+    const reactions = await page4.evaluate(() => {
+      const preview = document.getElementById('community-preview');
+      return {
+        previewOpen: Boolean(preview?.open),
+        open: preview?.querySelectorAll('.community-reaction-open').length || 0,
+        zeroChips: [...(preview?.querySelectorAll('.community-reaction') || [])].filter((b) => / 0$/.test(b.textContent.trim())).length
+      };
+    });
+    assert.equal(reactions.previewOpen, true, '카드를 누르면 둘러보기 미리보기가 열린다');
+    assert.ok(reactions.open >= 1, '반응이 없으면 미리보기에서 반응 남기기 단추가 보인다');
+    assert.equal(reactions.zeroChips, 0, '0짜리 반응 칩은 보이지 않는다');
     // 하은 1회차(261116,#728 후속): 새벽(KST 0~9시, UTC 전날)에 담은 순간의 둘러보기 카드 날짜가
     // UTC 절단('2026. 11. 15')으로 나왔다 — Asia/Seoul 시간대 문맥에서 한국 날짜로 보이는지 수치로 단정한다.
     const ctxDate = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce', timezoneId: 'Asia/Seoul' });
@@ -503,10 +520,10 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     await pageDate.waitForTimeout(1200);
     await pageDate.evaluate(() => document.getElementById('community-menu')?.click());
     await pageDate.waitForFunction(() => !!document.getElementById('community-panel')?.open, null, { timeout: 8000 }).catch(() => {});
-    await pageDate.waitForFunction(() => !!document.querySelector('.community-card'), null, { timeout: 8000 }).catch(() => {});
+    await pageDate.waitForFunction(() => !!document.querySelector('.community-card-meta')?.textContent.trim(), null, { timeout: 8000 }).catch(() => {});
     await pageDate.waitForTimeout(400);
     const cardDate = await pageDate.evaluate((crossing) => {
-      const meta = [...document.querySelectorAll('.community-muted')].map((p) => p.textContent).find((t) => /개 순간/.test(t)) || '';
+      const meta = document.querySelector('.community-card-meta')?.textContent || '';
       const d = new Date(crossing);
       const localToday = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
       return { meta, localToday };
@@ -514,7 +531,7 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     const utcCut = '2026. 11. 15';
     assert.ok(cardDate.meta.includes(cardDate.localToday.replace(/-/g, '. ')), `새벽 순간의 카드 날짜는 지역(한국) 날짜다 — 실제 "${cardDate.meta}" / 기대 ${cardDate.localToday}`);
     assert.ok(!cardDate.meta.includes(utcCut), `카드 날짜가 UTC 절단(어제)으로 나온다: "${cardDate.meta}"`);
-    await pageDate.screenshot({ path: 'E:/lovetree-qa/lane/local3-graph/audit-community-date-' + width + '.png', animations: 'disabled', timeout: 10000 }).catch(() => {});
+    await pageDate.screenshot({ path: screenAuditCapture('audit-community-date-' + width + '.png'), animations: 'disabled', timeout: 10000 }).catch(() => {});
     await ctxDate.close();
     // 둘러보기 소개 질문(2026-11-16 대표 결정) — 새 계정의 쉬운 추가 3번째 저장에서 한 번 묻는다.
     // [지금은 안 할래요] → discover false·다시 안 물음, [소개하기] → discover true, 공유 판 스위치가 같은 값,
@@ -563,7 +580,7 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
       const buttons = await pageAsk.evaluate(() => [document.getElementById('discover-ask-yes')?.textContent, document.getElementById('discover-ask-no')?.textContent]);
       assert.deepEqual(buttons, ['소개하기', '지금은 안 할래요'], '질문 창 단추는 소개하기·지금은 안 할래요다');
       await take(pageAsk, '둘러보기 소개 질문'); // 겹침·잘림 0 검사에 창이 함께 든다(390·1440 × 밤·정원)
-      await pageAsk.screenshot({ path: 'E:/lovetree-qa/lane/local3-graph/audit-discover-ask-' + width + '-' + theme + '.png', animations: 'disabled', timeout: 10000 }).catch(() => {});
+      await pageAsk.screenshot({ path: screenAuditCapture('audit-discover-ask-' + width + '-' + theme + '.png'), animations: 'disabled', timeout: 10000 }).catch(() => {});
       await pageAsk.evaluate((a) => document.getElementById(a === 'yes' ? 'discover-ask-yes' : 'discover-ask-no')?.click(), answer);
       await pageAsk.waitForFunction(() => !document.getElementById('discover-ask')?.open, null, { timeout: 8000 });
       assert.deepEqual(discoverPuts, [answer === 'yes'], '[소개하기]는 true, [지금은 안 할래요]는 false로 저장된다');
@@ -592,7 +609,7 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
       await pageAsk.evaluate(() => document.querySelector('.share-warning')?.scrollIntoView({ block: 'center' }));
       await pageAsk.waitForTimeout(300);
       await take(pageAsk, '공유 판·소개 꺼짐');
-      await pageAsk.screenshot({ path: 'E:/lovetree-qa/lane/local3-graph/audit-discover-panel-off-' + width + '-' + theme + '.png', animations: 'disabled', timeout: 10000 }).catch(() => {});
+      await pageAsk.screenshot({ path: screenAuditCapture('audit-discover-panel-off-' + width + '-' + theme + '.png'), animations: 'disabled', timeout: 10000 }).catch(() => {});
       await pageAsk.evaluate(() => document.getElementById('share-discover-toggle')?.click());
       await pageAsk.waitForFunction(() => (document.getElementById('share-discover-state')?.textContent || '').includes('소개 중'), null, { timeout: 8000 });
       assert.deepEqual(discoverPuts, [false, true], '공유 판 스위치(소개 켜기)도 discover PUT으로 저장한다');
@@ -603,7 +620,7 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
       await pageAsk.evaluate(() => document.querySelector('.share-warning')?.scrollIntoView({ block: 'center' }));
       await pageAsk.waitForTimeout(300);
       await take(pageAsk, '공유 판·소개 켜짐');
-      await pageAsk.screenshot({ path: 'E:/lovetree-qa/lane/local3-graph/audit-discover-panel-on-' + width + '-' + theme + '.png', animations: 'disabled', timeout: 10000 }).catch(() => {});
+      await pageAsk.screenshot({ path: screenAuditCapture('audit-discover-panel-on-' + width + '-' + theme + '.png'), animations: 'disabled', timeout: 10000 }).catch(() => {});
       await ctxAsk.close();
     }
     const yesAsk = await askFlow('yes');
@@ -686,7 +703,7 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
       assert.ok(folded.text.includes('가수·노래를 붙여 두면 나중에 저절로 묶여요'), '제안이 없을 때는 안내 한 줄이 보인다 — 실제 "' + folded.text + '"');
       assert.ok(!/종류|꼬리표 값/.test(folded.text), '접힌 말에 개발 용어가 없다 — 실제 "' + folded.text + '"');
       await take(pageTag, '꼬리표 직접 붙이기');
-      await pageTag.screenshot({ path: 'E:/lovetree-qa/lane/local3-graph/tagline-after-folded-' + width + '-' + theme + '.png', animations: 'disabled', timeout: 10000 }).catch(() => {});
+      await pageTag.screenshot({ path: screenAuditCapture('tagline-after-folded-' + width + '-' + theme + '.png'), animations: 'disabled', timeout: 10000 }).catch(() => {});
       await pageTag.evaluate(() => document.querySelector('#quick-tagline .lt-tagline-toggle')?.click());
       await pageTag.waitForFunction(() => !!document.querySelector('#quick-tagline .lt-tagline-kind'), null, { timeout: 8000 });
       await pageTag.waitForTimeout(300);
@@ -712,14 +729,14 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
       });
       assert.equal(wordPlaceholder, '예: 입덕 순간, 무대, 직캠', '갈래 없음의 예시는 문장 꼬리표 예시로 보인다');
       assert.ok(!/종류|꼬리표 값/.test(open.text), '펼친 말에도 개발 용어가 없다 — 실제 "' + open.text + '"');
-      await pageTag.screenshot({ path: 'E:/lovetree-qa/lane/local3-graph/tagline-after-open-' + width + '-' + theme + '.png', animations: 'disabled', timeout: 10000 }).catch(() => {});
+      await pageTag.screenshot({ path: screenAuditCapture('tagline-after-open-' + width + '-' + theme + '.png'), animations: 'disabled', timeout: 10000 }).catch(() => {});
       // 빈 값으로 [붙이기] → 오류 한 줄(칸 바로 아래).
       await pageTag.evaluate(() => document.querySelector('#quick-tagline .lt-tagline-add')?.click());
       await pageTag.waitForFunction(() => { const e = document.querySelector('#quick-tagline .lt-tagline-error'); return !!e && !e.hidden; }, null, { timeout: 8000 });
       const errText = await pageTag.evaluate(() => document.querySelector('#quick-tagline .lt-tagline-error')?.textContent || '');
       assert.equal(errText, '붙일 내용을 적어 주세요.', '빈 값 오류는 눌렀을 때만 한 줄로 보인다');
       await take(pageTag, '꼬리표 직접 붙이기');
-      await pageTag.screenshot({ path: 'E:/lovetree-qa/lane/local3-graph/tagline-after-error-' + width + '-' + theme + '.png', animations: 'disabled', timeout: 10000 }).catch(() => {});
+      await pageTag.screenshot({ path: screenAuditCapture('tagline-after-error-' + width + '-' + theme + '.png'), animations: 'disabled', timeout: 10000 }).catch(() => {});
       // 'ILLIT' 붙이기 → 방금 담은 순간에 '가수:ILLIT' 저장(첫 순간이 아니다 — #742와 같은 순간 id).
       await pageTag.fill('#quick-tagline .lt-tagline-value', 'ILLIT');
       await pageTag.evaluate(() => document.querySelector('#quick-tagline .lt-tagline-add')?.click());
@@ -1946,11 +1963,13 @@ test('#657 후속 261117: 상단 탭 글자 통일과 고른 탭 칸 높이(390�
           return { browse: style('#community-menu'), picker: style('#record-menu'), tabs: [...document.querySelectorAll('#tree-views button[data-view]')].filter((b) => topViews.includes(b.dataset.view)).map((b) => ({ view: b.dataset.view, size: getComputedStyle(b).fontSize, weight: getComputedStyle(b).fontWeight, color: getComputedStyle(b).color, current: b.getAttribute('aria-current') === 'true' })) };
         });
         assert.equal(fonts.tabs.length, 4, `${width}/${theme}: 탭 4개`);
-        for (const tab of fonts.tabs) {
-          assert.equal(tab.size, fonts.browse.size, `${width}/${theme}/${tab.view}: 둘러보기와 같은 글자 크기`);
-          assert.equal(tab.weight, fonts.browse.weight, `${width}/${theme}/${tab.view}: 둘러보기와 같은 굵기`);
-          assert.equal(tab.size, fonts.picker.size, `${width}/${theme}/${tab.view}: 트리 고르기와 같은 글자 크기`);
-          assert.equal(tab.weight, fonts.picker.weight, `${width}/${theme}/${tab.view}: 트리 고르기와 같은 굵기`);
+        // 261118 대표 결정 2차 5: 묶음(서재·책·보드·지도)은 글자 14px·같은 굵기로 통일한다 — 둘러보기·트리 고르기는 묶음 밖 13px다.
+        // 390에서는 묶음이 접혀 보이지 않으므로(접기 메뉴가 대신 열린다) 글자 크기는 펼친 폭에서만 잰다.
+        if (width !== 390) {
+          for (const tab of fonts.tabs) {
+            assert.equal(tab.size, '14px', `${width}/${theme}/${tab.view}: 묶음 탭 글자 14px`);
+            assert.equal(tab.weight, '400', `${width}/${theme}/${tab.view}: 묶음 탭 굵기 같음`);
+          }
         }
         const unselected = fonts.tabs.filter((t) => !t.current);
         assert.ok(unselected.length >= 3, `${width}/${theme}: 고르지 않은 탭 3개 이상`);

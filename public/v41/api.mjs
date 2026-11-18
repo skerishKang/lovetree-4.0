@@ -23,7 +23,7 @@ export async function refreshUnauthorized({fetchImpl, request, response, refresh
 }
 
 export function createWorkspaceApi({ fetchImpl = (...args) => globalThis.fetch(...args), base = '', timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS } = {}) {
-  async function call(path, init, { requiresRevision = false, requiresState = false, binary = false, requestTimeout = timeoutMs, signal = null } = {}) {
+  async function call(path, init, { requiresRevision = false, requiresState = false, binary = false, requestTimeout = timeoutMs, signal = null, keepalive = false } = {}) {
     // 타이머는 응답 본문까지 읽고 나서 해제한다. 본문을 다 읽지 못한 채 끝나면 아직 성공이 아니다.
     const controller = typeof AbortController === 'function' ? new AbortController() : null;
     let expired = false;
@@ -32,7 +32,8 @@ export function createWorkspaceApi({ fetchImpl = (...args) => globalThis.fetch(.
     if (signal?.aborted) cancel();
     const timer = controller ? setTimeout(() => { expired = true; controller.abort(); }, Math.max(0, requestTimeout)) : null;
     try {
-      const request = () => fetchImpl(`${base}${path}`, { credentials: 'same-origin', ...init, ...(controller ? { signal: controller.signal } : {}) });
+      // keepalive: 창이 닫히는 순간에도 요청이 끝까지 나간다(브라우저가 페이지 뒤에서 보낸다).
+      const request = () => fetchImpl(`${base}${path}`, { credentials: 'same-origin', ...init, ...(controller ? { signal: controller.signal } : {}), ...(keepalive ? { keepalive: true } : {}) });
       let response = await request();
       if (response.status === 401 && path.startsWith('/api/')) {
         response = await refreshUnauthorized({fetchImpl, request, response, refreshUrl:`${base}/auth/refresh`, signal:controller?.signal, canRefresh:memberRefreshAllowed});
@@ -86,9 +87,10 @@ export function createWorkspaceApi({ fetchImpl = (...args) => globalThis.fetch(.
     removeMedia: (name, subject) => call('/api/media/'+encodeURIComponent(name), {method:'DELETE',headers:{'x-lovetree-subject':subject}}),
     fetchMedia: name => call('/api/media/'+encodeURIComponent(name), {method:'GET'}, {binary:true,requestTimeout:60_000}),
     get: () => call('/api/workspace', { method: 'GET', headers: { accept: 'application/json' } }, { requiresRevision: true, requiresState: true }),
-    put: (body) => call('/api/workspace', {
+    // keepalive(창이 닫혀도 요청이 나간다)는 페이지가 숨거나 닫히는 순간의 마지막 저장 몫이다.
+    put: (body, options = {}) => call('/api/workspace', {
       method: 'PUT', headers: { 'content-type': 'application/json', accept: 'application/json' }, body: JSON.stringify(body)
-    }, { requiresRevision: true }),
+    }, { requiresRevision: true, keepalive: options?.keepalive === true }),
     logout: () => call('/auth/logout', { method: 'POST', headers: { accept: 'application/json' } }),
     account: () => call('/api/account', { method: 'GET', headers: { accept: 'application/json' } }),
     deleteAccount: (confirm) => call('/api/account/delete', {

@@ -82,6 +82,12 @@ export function parseHash(hash) {
   return unanswered ? {view: 'board', id: null, status, kind, cat, unanswered: true} : {view: 'board', id: null, status, kind, cat};
 }
 
+/** 상단 탭 단추(dataset)가 고르는 고객 글 거르기 — #801(bffa9c7c)가 단추에 data-cat·data-kind를 달면서
+ * 클릭 처리(#564의 navigate(tab.dataset.tab))는 이를 버려 '요청·사용 일지·신고' 탭이 전부 고장·불편(#board)에 붙었다(2026-11-18 대표 지적). */
+export function tabClickFilters(dataset) {
+  return { cat: dataset?.cat || '', kind: dataset?.kind || '' };
+}
+
 /** 화면 상태를 주소 해시로. 탭 거르기는 #board 물음표 뒤에 남긴다(#570 2). */
 export function viewHash(view, id = null, filters = {}) {
   if (view === 'board') {

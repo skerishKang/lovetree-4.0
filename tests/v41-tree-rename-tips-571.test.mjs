@@ -1,9 +1,11 @@
 // #571(#549-2 대표 결정 '나'): '첫 트리를 만들었어요' 안내의 첫 항목을 '트리 이름은 지금 바꿀 수 있어요'로
 // 바꾸고 [이름 바꾸기] 단추를 둔다(그림 E:\lovetree-qa\549\549-mock-na-390.png). 단추는 트리 관리 창의
 // 이름 칸을 바로 열고(openTreeManager가 이름 칸에 초점을 둔다), 이름을 바꾸면 머리줄 '트리: …'와
-// 트리 목록이 곧바로 바뀐다. 순간 추가 창(showModal)이 열려 있는 동안에도 눌린다 — 안내는 #566의
-// placeTreeTips로 창 안으로 옮겨 뜨기 때문이다. 실제 크롬으로 로그인 상태(가짜 /api/workspace 응답)까지
-// 부팅해 확인한다. 크롬이 없는 곳에서는 건너뛴다 — CI(LT_TREE_RENAME_571_REQUIRE=1)에서는 건너뜀을 실패로 본다.
+// 트리 관리 창의 이름 칸을 바로 열고(openTreeManager가 이름 칸에 초점을 둔다), 이름을 바꾸면 머리줄 '트리: …'와
+// 트리 목록이 곧바로 바뀐다. 261118 대표 결정(#845 1단계)으로 창이 열려 있는 동안은 안내 판이 숨고
+// (#566의 창 안 붙이기는 없어졌다), 창을 닫으면 다시 보인다 — '봇음'으로 적지 않는다. 실제 크롬으로
+// 로그인 상태(가짜 /api/workspace 응답)까지 부팅해 확인한다. 크롬이 없는 곳에서는 건너뛴다 —
+// CI(LT_TREE_RENAME_571_REQUIRE=1)에서는 건너뜀을 실패로 본다.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
@@ -78,7 +80,7 @@ let server, base;
 test.before(async () => { server = await serve(path.resolve(fileURLToPath(new URL('../public', import.meta.url)))); base = `http://127.0.0.1:${server.address().port}`; });
 test.after(() => new Promise((ok) => server.close(ok)));
 
-test('#571 안내 첫 항목이 이름 바꾸기 안내로 바뀌고, 창이 열려 있어도 [이름 바꾸기]가 트리 관리의 이름 칸을 연다', { skip: REQUIRE ? false : skip, timeout: 60000 }, async () => {
+test('#571 안내 첫 항목이 이름 바꾸기 안내로 바뀌고, [이름 바꾸기]가 트리 관리의 이름 칸을 연다(창 열림 동안 안내 숨깄 — #845)', { skip: REQUIRE ? false : skip, timeout: 60000 }, async () => {
   if (skip) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip}`);
   const browser = await chromium.launch();
   try {
@@ -97,11 +99,15 @@ test('#571 안내 첫 항목이 이름 바꾸기 안내로 바뀌고, 창이 열
     assert.match(tips.body, /모아둔 순간/, '자동 이름을 말해 주는 설명');
     assert.equal(tips.rename, '이름 바꾸기');
     assert.equal(tips.close, '알겠어요');
-    // 순간 추가 창을 연다(#566: 안내가 창 안으로 옮겨 뜬다) — 이 상태에서 이름 바꾸기를 누른다.
-    await page.click('#mobile-add');
-    await page.waitForFunction(() => document.getElementById('write-panel').open, null, { timeout: 10000 });
+    // [이름 바꾸기]로 트리 관리 창을 연다 — 창이 열려 있는 동안 안내 판은 숨는다(#845 1단계).
     await page.click('#tree-tips-rename');
     await page.waitForFunction(() => document.getElementById('tree-manager').open, null, { timeout: 10000 });
+    const held = await page.evaluate(() => ({
+      tips: document.getElementById('tree-tips').hidden,
+      embedded: document.querySelectorAll('.lt-tips-embedded').length,
+      seen: localStorage.getItem('lt41.tips.firstTree'),
+    }));
+    assert.deepEqual(held, { tips: true, embedded: 0, seen: null }, '트리 관리 창이 열려 있는 동안 안내 판 숨김·봇음 미기록');
     const manager = await page.evaluate(() => ({
       focused: document.activeElement === document.querySelector('#tree-form [name="title"]'),
       value: document.querySelector('#tree-form [name="title"]').value,
@@ -113,6 +119,9 @@ test('#571 안내 첫 항목이 이름 바꾸기 안내로 바뀌고, 창이 열
     await page.click('#tree-form button[type="submit"]');
     await page.waitForFunction(() => document.getElementById('source-label')?.textContent.includes('우리의 첫 가을'), null, { timeout: 10000 });
     assert.equal(await page.evaluate(() => document.getElementById('tree-manager').open), false, '저장하면 트리 관리 창이 닫힌다');
+    // 창이 닫히면 안내 판이 다시 보인다 — 이름 바꾸기를 마쳐도 봇음으로 적지 않는다(#845·#571).
+    await page.waitForFunction(() => document.getElementById('tree-tips').hidden === false, null, { timeout: 10000 });
+    assert.equal(await page.evaluate(() => localStorage.getItem('lt41.tips.firstTree')), null, '이름 바꾸기를 마쳐도 봇음 미기록');
     assert.deepEqual(errors, [], '페이지 오류 없음');
   } finally { await browser.close(); }
 });

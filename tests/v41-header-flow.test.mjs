@@ -22,7 +22,7 @@ const STATES = [
     make: () => ({ owned: false, trees: 0, tree: null, source: 'example' }),
     expect: {
       treeViews: false, recordMenu: false, writeMenu: false, shareMenu: false,
-      picker: '트리 고르기', write: '＋ 순간 추가', aria: '서재·이 트리 보기'
+      picker: '트리 고르기', write: '＋ 순간 추가', aria: '이 트리 보기'
     }
   },
   {
@@ -31,7 +31,7 @@ const STATES = [
     expect: {
       // 2026-11-17 대표 결정: 로그인 상태면 트리 수와 관계없이 트리 고르기·네 탭을 늘 보인다.
       treeViews: true, recordMenu: true, writeMenu: true, shareMenu: false,
-      picker: '트리 없음', write: '＋ 순간 추가', aria: '서재·이 트리 보기'
+      picker: '트리 없음', write: '＋ 순간 추가', aria: '이 트리 보기'
     }
   },
   {
@@ -39,7 +39,7 @@ const STATES = [
     make: () => ({ owned: true, trees: 2, tree: { title: '리센느, 나의 순간들' }, source: 'server' }),
     expect: {
       treeViews: true, recordMenu: true, writeMenu: true, shareMenu: true,
-      picker: '트리: 리센느', write: '＋ 순간 추가', aria: '서재 · 리센느 보기'
+      picker: '트리: 리센느', write: '＋ 순간 추가', aria: '이 트리 보기'
     }
   },
   {
@@ -47,7 +47,7 @@ const STATES = [
     make: () => ({ owned: true, trees: 2, tree: { title: '리센느, 나의 순간들' }, source: 'share' }),
     expect: {
       treeViews: false, recordMenu: false, writeMenu: false, shareMenu: false,
-      picker: '트리: 리센느', write: '＋ 순간 추가', aria: '서재 · 리센느 보기'
+      picker: '트리: 리센느', write: '＋ 순간 추가', aria: '이 트리 보기'
     }
   }
 ];
@@ -69,6 +69,8 @@ test('상태 4 × 화면 5: 보이는 버튼·문구·접근성 이름이 표대
           aria: h.els['tree-views'].getAttribute('aria-label')
         };
         const want = { ...state.expect };
+        // 261118 대표 지적 1: 서재 화면에서는 트리 선택 칸('트리: ○○ ▾')을 숨긴다 — 책·보드·지도에서만 보인다.
+        if (file === 'track32-bookshelf.html') want.recordMenu = false;
         assert.deepEqual(got, want, `${state.name} × ${label}`);
         table.push(`${state.name} × ${label}: ${JSON.stringify(got)}`);
       } finally {

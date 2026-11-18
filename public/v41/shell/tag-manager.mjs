@@ -26,7 +26,7 @@ export function createTagManager(deps) {
   function fail(message) { $('tag-error').textContent = message || ''; }
 
   // 입구는 트리 ▾ 드롭다운의 '꼬리표 정리' 한 곳이다(기존 '정리' 옆).
-  function open() {
+  function open(opts = {}) {
     if (getSource() !== 'server' || !writable()) { notify('내 기록을 불러온 뒤 꼬리표를 정리할 수 있어요.'); return false; }
     const current = tree();
     if (!current) { notify('트리를 먼저 불러와 주세요.'); return false; }
@@ -34,6 +34,7 @@ export function createTagManager(deps) {
     editing = ''; merging = ''; picked = new Set();
     render();
     panel('tag-panel');
+    if (opts.suggest === true && !$('tag-suggest-box').hidden) onSuggest();
     return true;
   }
 
@@ -43,7 +44,7 @@ export function createTagManager(deps) {
     const groups = tagInventory(current);
     $('tag-desc').textContent = groups.length
       ? `이 트리에서 쓴 꼬리표 ${groups.length}종이에요. 이름을 바꾸면 모든 순간에 반영돼요.`
-      : '아직 꼬리표가 없어요. 아래에서 제목으로 꼬리표를 제안받아 붙일 수 있어요.';
+      : '아래에서 제목으로 꼬리표를 제안받아 붙일 수 있어요.';
     const host = $('tag-list');
     host.replaceChildren();
     if (!groups.length) {
@@ -199,6 +200,7 @@ export function createTagManager(deps) {
     if (!saved.ok) { fail(saved.error || '저장하지 못했어요.'); return; }
     picked = new Set();
     render();
+    deps.closePanel?.('tag-panel');
   }
 
   $('tag-suggest-open').addEventListener('click', onSuggest);

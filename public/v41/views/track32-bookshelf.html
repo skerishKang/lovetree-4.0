@@ -20,20 +20,21 @@
 
     <main class="page">
       <section class="shelf-screen" id="shelfScreen">
-        <section class="hero">
-          <div class="hero-copy">
+        <section class="hero" id="shelfHero">
+          <div class="hero-copy" id="heroIntro">
             <p class="eyebrow">서재</p>
             <h1>좋아하는 순간들을<br /><em>한 권의 책</em>으로.</h1>
             <p>불러온 트리의 책을 선택하고 표지를 열어 보세요.</p>
-            <div class="hero-note"><strong>선택한 트리</strong><span>다른 화면에서도 같은 순간을 이어서 볼 수 있어요.</span></div>
             <button class="shelf-jump" id="shelfJump" type="button">선택한 책 보러 가기 ↓</button>
           </div>
           <!-- #212 4번: 실제 책과 무관한 예시 4권과 겹치는 안내 글자를 뺤다. 아래 책장이 실제 내 책을 보여 준다. -->
-          <!-- #256-1: 오른쪽 위 작은 책장(빠른 이동)을 이어 읽기 칸으로 바꾼다. 마지막 위치는 셸이 저장·복원하는 계정 위치를 읽어 쓴다. -->
-          <button class="hero-stage resume" id="resumeCard" type="button" hidden>
-            <span class="stage-label">이어 읽기</span>
-            <span class="resume-cover" id="resumeCover" aria-hidden="true"></span>
-            <span class="resume-copy"><strong id="resumeTitle"></strong><em id="resumeAction"></em></span>
+          <!-- 261118 대표 지적 4: 트리가 있으면 소개 문 대신 이어 보기 띠 한 줄 —
+               [가로 썸네일] 트리 이름 · 순간 제목 · '이어 보기 ▶'. 글자는 썸네일 밖에 놓는다(사진 위 겹침 금지),
+               주소 문구(동영상 사이트 이름)는 넣지 않는다. 트리 0개일 때만 위 소개 문('…한 권의 책으로.'+'책 열기')이 보인다. -->
+          <button class="resume-strip" id="resumeStrip" type="button" hidden>
+            <span class="resume-thumb" id="resumeThumb" aria-hidden="true"></span>
+            <span class="resume-line"><strong id="resumeTree"></strong><span class="resume-dot" aria-hidden="true">·</span><span class="resume-moment" id="resumeMoment"></span></span>
+            <span class="resume-go" id="resumeGo">이어 보기 ▶</span>
           </button>
         </section>
         <div class="shelf-controls">
@@ -41,10 +42,7 @@
           <span class="count" id="resultCount"></span>
           <button class="shelf-new-tree" id="shelfNewTree" type="button" aria-label="새 트리 만들기">＋ 새 트리</button>
         </div>
-        <!-- #256 2번: 책이 3권부터 책등을 목차처럼 한 줄로 세운다. 책등을 누르면 아래 넘기기가 그 책으로 이동한다. -->
-        <nav class="shelf-spines" id="shelfSpines" aria-label="트리 목차" hidden>
-          <div class="shelf-spine-row" id="shelfSpineRow"></div>
-        </nav>
+        <!-- 261118 대표 지적 2: 왼쪽 위 세로 책등 줄은 지운다. 아래 넘김 목록(표지+흰 이름)만 남는다. -->
         <section class="shelf-viewport" id="shelfViewport" aria-label="서재">
           <button class="shelf-arrow left" id="shelfPrev" type="button" aria-label="이전 책">‹</button>
           <div class="shelf-rail" id="shelfRail"></div>

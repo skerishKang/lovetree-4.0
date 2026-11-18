@@ -2,8 +2,14 @@
 // 2026-11-08 리팩터링: 동작·문구·주소 형식 변경 0. shell.mjs에서 조건·조회 방식·인자 형태를 바꾸지 않고 그대로 옮겼다.
 import {mountCommunity} from '../community-panel.mjs';
 import {displayTreeTitle} from '../tree-name.mjs';
+import {parseTag,tagKey} from '../tags.mjs';
 // #480 L13: 날짜는 책·보드·지도·첫 화면과 같은 한 벌(formatDisplayDate)로만 적는다.
 import {formatDisplayDate} from '../book-usability.mjs';
+
+// 261118 대표 지적 2차 5: 서재 화면이 알려 준 '마지막에 본 트리'(가운데 책의 트리).
+// 서재 화면에서 콕·보드·지도 탭을 누르면 이 트리로 열린다(shell.mjs의 data-view 눌림에서 쓴다).
+let shelfTreeId = '';
+export function lastShelfTreeId() { return shelfTreeId; }
 
 export function createMessages(deps) {
   const {$} = deps;
@@ -64,6 +70,11 @@ export function createMessages(deps) {
       catch (error) { reply(false, error?.message || '저장하지 못했어요.'); }
       return;
     }
+    if (data?.type === 'lt41-open-tags') {
+      const ok = deps.openTagManager?.({ suggest: data.suggest === true }) === true;
+      try { event.source?.postMessage({ type: 'lt41-tags-opened', ok }, location.origin); } catch {}
+      return;
+    }
     // #627 PR B: 화면의 꼬리표 줄이 확인한 것 — keywords만 기존 저장 경로(shellTags → boardSync)로 바꾼다.
     // 답(lt41-tags-saved)을 보낸 화면에만 돌려 화면 사본이 칩을 다시 맞추게 한다. iframe을 다시 그리지 않는다.
     if (data?.type === 'lt41-tags') {
@@ -109,6 +120,7 @@ export function createMessages(deps) {
         getMember().apply('cacheMediaMetadata', {url: data.url, mediaMetadata: data.mediaMetadata}, {treeId: tree.id, momentId: moment.id});
       } catch {}
     }
+    if (data?.type === 'lt41-shelf-tree' && getModel()?.trees?.some(t => t.id === data.treeId)) { shelfTreeId = data.treeId; return; }
     if (data?.type === 'lt41-navigate') {
       if (data.view === 'track32-bookshelf.html' && !getMember()?.snapshot().owned) { openLoginStart('shelf'); return; }
       show(data.view);
@@ -462,6 +474,19 @@ export function createMessages(deps) {
     dialog: $('community-panel'),
     // #480 L13: 둘러보기 카드·댓글의 날짜도 계정 설정 한 벌을 따른다.
     getDateStyle: () => getDateStyle(),
+    getArtistGroups: () => {
+      if (getSource() !== 'server' || !getMember()?.snapshot().owned) return [];
+      const groups = [], seen = new Set();
+      for (const tree of getModel()?.trees || []) for (const moment of tree.moments || []) for (const raw of moment.keywords || []) {
+        const parsed = parseTag(raw);
+        if (parsed?.kindId !== 'artist') continue;
+        const key = tagKey(parsed.value);
+        if (!key || seen.has(key)) continue;
+        seen.add(key);
+        groups.push(parsed.value);
+      }
+      return groups;
+    },
     onOpenShare: item => { $('community-panel').close(); location.hash = `#share/${item.shareId}/${item.view || 'book'}`; },
     // 이슈 457 5번: 공유할 내 트리가 있어야 "내 트리 공유하기" — 로그아웃·트리 0개는 "첫 트리 만들기"로 바뀐다.
     hasOwnTree: () => getSource() === 'server' && !!getMember()?.snapshot().owned && (getModel()?.trees?.length || 0) > 0,

@@ -831,7 +831,8 @@ async function checkVisualTokens(page, target, opts, stamp) {
     { hash: '', id: 'home', frameBg: null },
     { hash: '#book', id: 'book', frameBg: 'rgb(4, 4, 7)' },
     { hash: '#board', id: 'board', frameBg: 'rgb(4, 4, 7)' },
-    { hash: '#network', id: 'network', frameBg: 'rgb(245, 239, 226)' },
+    // #856: 지도 판 기본값이 사용자 테마를 따른다 — 기본 테마(밤, 저장값 없음)에서는 밤 판(#0a0a11)이 바탕이다.
+    { hash: '#network', id: 'network', frameBg: 'rgb(10, 10, 17)' },
     { hash: '#shelf', id: 'shelf', frameBg: null }
   ];
   await page.setViewportSize({ width: 1280, height: 860 }).catch(() => {});
@@ -844,6 +845,23 @@ async function checkVisualTokens(page, target, opts, stamp) {
     url.search = `?vt=${Date.now()}`;
     url.hash = s.hash;
     await page.goto(url.href, { waitUntil: 'load', timeout: opts.timeout }).catch(() => {});
+    // #847 261118: 느린(cold) 미리보기에서 goto가 기한을 넘기면 .catch가 실패를 삼키고, 재는 곳은
+    // 이전 화면이 남은 채로 된다 — '안쪽 화면 표시 book (기대 board)' 거짓 실패가 이 길로 나왔다
+    // (run 44188344806·44193702219. 로컬 같은 배포 재현 시 board 정상 — 이동이 늦어 이전 화면을 잰 것).
+    // 주소·안쪽 화면이 기대에 닿을 때까지 기다리고, 닿지 못했으면 한 번 더 띄운 뒤 잰다.
+    const innerScreenNow = () => page.evaluate(() => {
+      const fr = [document.getElementById('view'), document.getElementById('view-next')].find((el) => el && !el.hidden && el.getClientRects().length > 0);
+      try { return (fr && fr.contentDocument.documentElement.getAttribute('data-v41-screen')) || ''; } catch { return ''; }
+    }).catch(() => '');
+    const settled = async () => {
+      if (s.hash) {
+        if (!page.url().endsWith(s.hash)) return false;
+        return (await innerScreenNow()) === s.id;
+      }
+      return /\/v41\//.test(page.url());
+    };
+    if (!(await settled())) await page.goto(url.href, { waitUntil: 'load', timeout: opts.timeout }).catch(() => {});
+    for (let waited = 0; waited < 12000 && !(await settled()); waited += 400) await sleep(400);
     await sleep(2500);
     const top = await page.evaluate(() => {
       const vis = (el) => el && !el.hidden && getComputedStyle(el).display !== 'none' && el.getClientRects().length > 0;

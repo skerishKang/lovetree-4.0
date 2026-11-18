@@ -21,7 +21,8 @@ test('611: updates.json 은 버전·날짜·항목(kind·text·source·tester?) 
       assert.equal(typeof item.text, 'string', '한 줄 문구');
       assert.ok(item.text.trim(), '문구가 비지 않는다');
       assert.ok(!item.text.includes('\n'), '한 줄로 적는다');
-      assert.ok(['ai_tester', 'user', 'team'].includes(item.source), `source는 ai_tester|user|team (받음: ${JSON.stringify(item)})`);
+      // 2026-11-18 대표 결정: 고객용 줄은 내부 표기(source·tester)를 넣지 않을 수 있다 — source는 선택.
+      if (item.source !== undefined) assert.ok(['ai_tester', 'user', 'team'].includes(item.source), `source는 ai_tester|user|team (받음: ${JSON.stringify(item)})`);
       if (item.source === 'ai_tester' && item.tester !== undefined) assert.equal(typeof item.tester, 'string', 'AI 명예회원 출처에 이름이 있으면 문자열이다 (받음: ' + JSON.stringify(item) + ')');
       // 이달용 이슈 번호는 연결용으로만 두는 필드 — 화면 문구에는 넣지 않는다.
       if (item.issue !== undefined) assert.match(item.issue, /^#[\w.-]+$/, '이슈 연결 모양');
@@ -204,12 +205,12 @@ test('261116: 4.1.2·4.1.1은 4.1.3 아래·4.1.0 위에 문구 그대로 들어
   }
 });
 
-// 옛 판을 다시 끼워 넣어도 최신 판(4.1.11)이 그대로라 '새 소식' 점이 다시 뜨면 안 된다(#611 저장 규칙).
-test('261117: 옛 판 복원으로 새 소식 점이 다시 뜨지 않는다', () => {
-  assert.equal(latestEntry(UPDATES).version, '4.1.11', '최신 판은 4.1.11 그대로');
+// 옛 판을 다시 끼워 넣어도 최신 판(4.1.12)이 그대로라 '새 소식' 점이 다시 뜨면 안 된다(#611 저장 규칙).
+test('261118: 옛 판 복원으로 새 소식 점이 다시 뜨지 않는다', () => {
+  assert.equal(latestEntry(UPDATES).version, '4.1.12', '최신 판은 4.1.12 그대로');
   const map = new Map();
   const storage = { getItem: k => (map.has(k) ? map.get(k) : null), setItem: (k, v) => map.set(k, v) };
-  markSeen(storage, '4.1.11');
+  markSeen(storage, '4.1.12');
   const latest = latestEntry(UPDATES).version;
   assert.equal(compareVersions(latest, readSeen(storage)), 0, '본 판과 최신 판이 같아 점이 뜨지 않는다');
   // 4.1.1·4.1.2가 끼어도 그 사이 판을 본 사람에게만 새 소식이 뜬다.

@@ -153,10 +153,13 @@ test('comment edit is own-only, sets edited flag, keeps existing comments, and b
 test('#627: 둘러보기 검색은 트리 순간의 제목(영상 제목 포함)도 본다',async()=>{
  // 트리 이름은 자동 이름('모아둔 순간')이고, 그룹 이름은 순간의 영상 제목에만 있다.
  const workspaceRepo=createMemoryWorkspaceRepo(),workspace=createWorkspaceService({repo:workspaceRepo,productId:PRODUCT});
- const video='https://www.youtube.com/watch?v=rescene00001';
+ const video='https://www.youtube.com/shorts/Rescene0001',savedThumbnail='https://img.youtube.com/vi/Rescene0001/hqdefault.jpg',thumbnail='https://i.ytimg.com/vi/Rescene0001/mqdefault.jpg';
  let tree=createTree({subject:'윤슬',title:'첫 무대',note:'다시 보고 싶은 빛',emotion:'설렘',date:'2026-11-01',url:PHOTO},CLOCK);
  tree=editTree(tree,{title:'모아둔 순간',subject:tree.subject,coverMomentId:tree.moments[0].id});
- tree=addMoment(tree,{url:video,mediaMetadata:{title:'RESCENE(리센느) 무대 직캠',channel:'기록 채널',source:'youtu.be'}},tree.moments[0].id,CLOCK);
+ tree=addMoment(tree,{type:'video',url:video,mediaMetadata:{title:'RESCENE(리센느) 무대 직캠',channel:'기록 채널',source:'youtube.com',thumbnail:savedThumbnail}},tree.moments[0].id,CLOCK);
+ const videoMoment=tree.moments.find(moment=>moment.url===video);
+ tree=editTree(tree,{title:tree.title,subject:tree.subject,coverMomentId:videoMoment.id});
+ tree={...tree,moments:tree.moments.map((moment,index)=>index===0?{...moment,keywords:[...(moment.keywords||[]),'가수:IVE','노래:Love Attack','무대:인기가요']}:moment)};
  await workspace.write(principal('alice'),{state:{version:1,trees:[tree]},expectedRevision:0,clientKey:'seed-rescene'});
  const shareRepo=createMemoryShareRepo();
  const share=await shareRepo.setDiscoverable({productId:PRODUCT,subjectId:'alice',shareId:'r'.repeat(24),discoverable:true,treeId:tree.id,entryMomentId:tree.moments[0].id,view:'book',momentCount:3}).catch(()=>null)
@@ -174,9 +177,19 @@ test('#627: 둘러보기 검색은 트리 순간의 제목(영상 제목 포함)
   assert.equal(list.body.items[0].title,'모아둔 순간');
   // 검색용으로 모은 순간 제목은 응답에 내보내지 않는다(공개 카드 모양 그대로 — 실제 응답은 JSON 직렬화를 거친다).
   assert.equal(Object.prototype.propertyIsEnumerable.call(list.body.items[0],'searchText'),false);
-  assert.equal(JSON.stringify(list.body).includes('RESCENE'),false);
+  assert.equal(JSON.stringify(list.body).includes('IVE'),false);
+  assert.equal(JSON.stringify(list.body).includes('artistTags'),false);
   assert.equal(JSON.stringify(list.body).includes('searchText'),false);
  }
+ const artistSearch=await call(handle,'GET','/api/community/shares',{query:'q=IVE'});
+ assert.equal(artistSearch.body.items.length,1,'가수 꼬리표도 검색한다');
+ const artistGroup=await call(handle,'GET','/api/community/shares',{query:'artist=IVE'});
+ assert.equal(artistGroup.body.items.length,1,'가수 그룹은 붙인 꼬리표와 정확히 맞춘다');
+ assert.equal((await call(handle,'GET','/api/community/shares',{query:'artist=ITZY'})).body.items.length,0);
+ assert.equal(artistGroup.body.items[0].cover.type,'youtube');
+ assert.equal(artistGroup.body.items[0].cover.vertical,true);
+ assert.equal(artistGroup.body.items[0].cover.thumbnailUrl,thumbnail);
+ assert.equal(Object.hasOwn(artistGroup.body.items[0],'publicDisplayName'),false,'계정 표시 이름은 공개 목록 응답에 새로 노출하지 않는다');
  // 뜻 없는 검색어는 그대로 걸러진다(검색이 무조건 통과로 바뀌지 않았다).
  assert.deepEqual((await call(handle,'GET','/api/community/shares',{query:'q=없는검색'})).body.items,[]);
  // 순간 제목을 더 보느라 조회 수가 늘지 않는다(요약 한 번).

@@ -31,12 +31,14 @@ function flowNavigation(){
   const parts=headerPartsFor({owned,treeCount:getModel()?.trees?.length||0,publicReading});
   const showTreeViews=parts.treeViews&&treeViewsVisible({owned,publicReading});
   $('tree-views').hidden=!showTreeViews;for(const b of $('tree-views').querySelectorAll('button')){b.disabled=false;b.title='';}
-  $('tree-views').setAttribute('aria-label',window.LT41?.tree.title?'서재 · '+displayTreeTitle(window.LT41.tree.title)+' 보기':'서재·이 트리 보기');
+  $('tree-views').setAttribute('aria-label','이 트리 보기');
   for(const b of document.querySelectorAll('nav>button'))b.hidden=publicReading;
   // 트리 선택은 뒤쪽 탭 묶음 바로 앞에 있고, 로그인 상태에서만 "트리: <이름> ▾"로 보여 준다.
+  // 261118 대표 지적: 서재 화면에서는 트리 선택 칸을 숨긴다 — 책·보드·지도에서만 보인다.
   // 로그아웃이면 "트리 고르기", 브라우저에만 남은 미저장 기록이 있으면 "저장 안 된 기록"이다.
+  const onShelf=getCurrent()==='track32-bookshelf.html';
   const pendingDraft=hasPendingDraft(sessionStorage,getMember()?.snapshot().subject||null);
-  $('record-menu').hidden=!parts.treePicker||publicReading;
+  $('record-menu').hidden=!parts.treePicker||publicReading||onShelf;
   $('source-label').textContent=treePickerText({owned,treeTitle:displayTreeTitle(window.LT41?.tree.title||''),pendingDraft,treeCount:getModel()?.trees?.length||0});
   // #601: 칸 폭이 고정되어 있으므로(11em) 긴 이름은 말줄임 — 마우스 올림·초점에 전체 이름을 보여 준다.
   $('record-menu').title=owned?(window.LT41?`트리: ${displayTreeTitle(window.LT41?.tree.title||'')} — 다른 트리를 고릅니다.`:'열어볼 트리를 고릅니다.'):(pendingDraft?'로그인하면 저장하지 못한 기록을 복원합니다.':'로그인하면 내 트리를 고를 수 있습니다.');
@@ -82,11 +84,11 @@ function renderAccount(){const owned=!!getMember()?.snapshot().owned;
  const view=accountPresentation({owned,email:accountEmail,name:prefs.displayName||deps.getCachedName?.()||''});
  const accent=owned?normalizeAccentColor(prefs.accentColor):'';
  const login=$('account-entry'),avatar=$('account-avatar');
- if(view.mode==='login'){login.hidden=false;login.textContent='로그인';login.removeAttribute('aria-label');avatar.hidden=true;avatar.textContent='';avatar.removeAttribute('data-accent');const init=$('account-initial');if(init){init.textContent='';init.removeAttribute('data-accent');}const mail=$('account-email');if(mail)mail.textContent='';closeAccountMenu();try{localStorage.removeItem('lt41.avatarLetter')}catch{}}
+ if(view.mode==='login'){login.hidden=false;login.textContent='로그인';login.removeAttribute('aria-label');avatar.hidden=true;avatar.textContent='';avatar.removeAttribute('data-accent');const init=$('account-initial');if(init){init.textContent='';init.removeAttribute('data-accent');}const mail=$('account-email');if(mail){mail.textContent='';mail.removeAttribute('title');}closeAccountMenu();try{localStorage.removeItem('lt41.avatarLetter')}catch{}}
  else{const shown=view.initial==='나'?(lastLetter()||view.initial):view.initial;
  login.hidden=true;avatar.hidden=false;avatar.textContent=shown;avatar.setAttribute('aria-label',view.ariaLabel);avatar.title=deps.getAccountTip?.()||'내 계정';avatar.dataset.accent=accent;
  const init=$('account-initial');if(init){init.textContent=shown;init.dataset.accent=accent;}
- $('account-email').textContent=view.label;rememberLetter(shown);}
+ const mailEl=$('account-email');mailEl.textContent=view.label;mailEl.title=view.label;rememberLetter(shown);}
   // #368: 설정 "프로필" 묶음도 같은 이메일 값을 쓴다(셸이 넘긴 콜백).
   deps.onEmailChange?.(accountEmail);}
 function openAccountMenu(via='keyboard'){const owned=!!getMember()?.snapshot().owned;if(!owned){return;}const pop=$('account-popover');pop.hidden=false;pop.dataset.ltOpenedBy=via;$('account-avatar').setAttribute('aria-expanded','true');pop.querySelector('button:not([hidden])')?.focus();if(!accountEmail&&!emailTried)void loadAccountEmail();}

@@ -69,12 +69,12 @@ test('맨 위 메뉴는 한 줄이고 "선택한 트리" 둘째 줄이 없다', 
   assert.match(css, /\.app-header\{min-height:64px;padding:10px 20px/);
 });
 
-test('메뉴 순서: 둘러보기 → [트리 ▾ │ 책·보드·지도] 한 틀 → 추가 → S (#380 2번)', () => {
+test('메뉴 순서: [트리 ▾ │ 서재·책·보드·지도] 한 묶음 → 둘러보기 → 추가 → S (261118 2차 지적 5)', () => {
   const nav = html.slice(html.indexOf('<nav class="main-nav"'), html.indexOf('</nav>'));
   // 첫 화면·내 책장 탭은 없다: 첫 화면은 로고(#home 링크), 책장은 드롭다운 맨 아래.
   assert.doesNotMatch(nav, />첫 화면</);
   assert.doesNotMatch(nav, />내 책장</);
-  const order = ['둘러보기', 'class="tree-frame"', 'id="record-menu"', 'class="tree-views"', '>책<', '>보드<', '>지도<'];
+  const order = ['class="tree-frame"', 'id="record-menu"', 'class="tree-views"', '>서재<', '>책<', '>보드<', '>지도<', 'id="community-menu"'];
   let at = -1;
   for (const token of order) {
     const next = nav.indexOf(token, at + 1);
