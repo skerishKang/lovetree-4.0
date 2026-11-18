@@ -122,6 +122,21 @@ test('833-2: 크게 보기 → 전체 화면에서 단추는 ✕ 닫기, Esc로 
       const closed = await page.evaluate(() => ({ on: document.fullscreenElement === window.__cell.wrap, text: window.__cell.button.textContent }));
       assert.equal(closed.on, false, 'Esc(또는 ✕ 닫기)로 전체 화면이 닫힌다');
       assert.equal(closed.text, '크게 보기', '닫으면 단추가 돌아온다');
+      // 크게 본 동안 검은 바탕 위 단추 대비 — 밝은 글자로 4.5:1 이상(#836 2차 지적).
+      await page.locator('.yt-video-expand').click();
+      await page.waitForFunction(() => document.fullscreenElement != null, null, { timeout: 3000 }).catch(() => {});
+      const contrast = await page.evaluate(() => {
+        const lum = (rgb) => { const c = rgb.map(v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; };
+        const parse = (s) => s.match(/[d.]+/g).slice(0, 3).map(Number);
+        const b = window.__cell.button, cs = getComputedStyle(b);
+        const bg = cs.backgroundColor, m = bg.match(/[d.]+/g).map(Number);
+        const alpha = m.length > 3 ? m[3] : 1;
+        // 검은 바탕(전체 화면) 위 반투명 배경 합성
+        const comp = parse(bg).map((v, i) => Math.round(v * alpha));
+        const l1 = lum(parse(cs.color)), l2 = lum(comp);
+        return { color: cs.color, bg, ratio: Math.round(((Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05)) * 100) / 100 };
+      });
+      assert.ok(contrast.ratio >= 4.5, '전체 화면 단추 대비 4.5:1 이상(실측 ' + contrast.ratio + ':1, 글자 ' + contrast.color + ')');
     } else {
       // 전체 화면을 못 쓰는 환경이면 덮는 창으로 물러난다 — 그 결과를 기록으로 남긴다.
       assert.equal(expanded.text, '크게 보기', '전체 화면 실패 시 단추는 그대로(덮는 창이 담당)');

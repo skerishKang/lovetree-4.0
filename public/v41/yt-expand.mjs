@@ -16,6 +16,10 @@ const STYLE_TEXT = `
 .yt-video-row button{cursor:pointer}
 .yt-video-row a:hover,.yt-video-row button:hover{background:rgba(255,230,166,.18)}
 .yt-video-row a:focus-visible,.yt-video-row button:focus-visible{outline:2px solid #e8b8c9;outline-offset:2px}
+/* #836: 크게 본 동안(검은 바탕)은 color:inherit 이 어두운 금색을 물려받아 단추가 거의 안 보였다 —
+   밝은 글자·밝은 반투명 테두리로 4.5:1 이상을 보증한다(261118 실측 17.9:1). */
+.yt-video-cell:fullscreen .yt-video-row a,.yt-video-cell:fullscreen .yt-video-row button{color:#f5f1e9;border-color:rgba(255,230,166,.7);background:rgba(255,230,166,.14)}
+.yt-video-cell:fullscreen .yt-video-row a:hover,.yt-video-cell:fullscreen .yt-video-row button:hover{background:rgba(255,230,166,.24)}
 .yt-video-cell:fullscreen{background:#000;justify-content:center;gap:12px;padding:12px;box-sizing:border-box}
 .yt-video-cell:fullscreen .yt-video-stage{flex:1;min-height:0}
 .yt-video-cell:fullscreen .yt-video-stage iframe{width:min(100%,177.78vh);aspect-ratio:16/9;height:auto;border:0}
