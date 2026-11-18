@@ -95,11 +95,11 @@ test('보드 상세: 열린 겹은 탭 가능, 닫으면 겹은 탭 불가(inert
       })()`);
       assert.equal(opened.inert, false, '열린 상세가 inert이면 안 된다');
       assert.equal(opened.focus, 'detailClose', '열린 상세의 첫 초점은 닫기 단추다');
+      // 재렌더 비교용 — 닫기 전의 카드 요소를 기록해 둔다(#923).
+      await page.evaluate(`(() => { const f = [...document.querySelectorAll('#view,#view-next')].filter((x) => !x.hidden).pop(); f.contentWindow.__cardAtOpen = f.contentDocument.querySelector('#cardLayer article.card.selected'); })()`);
 
       await page.keyboard.press('Escape');
-      // 닫힘·inert·초점 복귀는 순서대로 안착한다 — 상태가 채워지는 순간을 기다렸다 바로 잰다.
-      // (회원 모드에서는 뜬 직후 카드 재렌더가 카드 요소를 갈아끼워 그 뒤에는 초점이 몸통으로 돌아간다 —
-      //  이 시험의 계약은 닫는 순간의 복귀이고, 재렌더 뒤의 소음은 계약 밖이다.)
+      // 닫힘·inert·초점 복귀는 순서대로 안착한다 — 상태가 채워지는 순간을 기다렸다 바로 잰다(#923).
       await page.waitForFunction(`(() => { const f = [...document.querySelectorAll('#view,#view-next')].filter((x) => !x.hidden).pop(); const d = f.contentDocument.getElementById('detail'); if (!d || d.classList.contains('open') || !d.inert) return false; const ae = f.contentDocument.activeElement; const card = f.contentDocument.querySelector('#cardLayer article.card.selected'); return !!card && (ae === card || card.contains(ae)); })()`, null, { timeout: 10000 });
       const closed = await page.evaluate(`(() => {
         const f = [...document.querySelectorAll('#view,#view-next')].filter((x) => !x.hidden).pop();
@@ -109,6 +109,7 @@ test('보드 상세: 열린 겹은 탭 가능, 닫으면 겹은 탭 불가(inert
         return {
           open: d.classList.contains('open'), inert: d.inert,
           focusId: ae.id || '', focusTag: ae.tagName,
+          focusMomentId: ae.dataset?.id || '',
           focusOnCard: card ? ae === card || card.contains(ae) : false,
           cardVisible: card ? card.getClientRects().length > 0 : false
         };
@@ -116,7 +117,16 @@ test('보드 상세: 열린 겹은 탭 가능, 닫으면 겹은 탭 불가(inert
       assert.equal(closed.open, false, 'Esc로 상세가 닫혀야 한다');
       assert.equal(closed.inert, true, '닫힌 상세는 탭이 들어가지 않아야 한다(inert)');
       assert.equal(closed.focusOnCard, true, `닫은 뒤 초점은 고른 순간 카드여야 한다(지금: ${closed.focusTag}#${closed.focusId})`);
+      assert.equal(closed.focusMomentId, 'm3', '닫는 순간 초점의 카드는 주소가 가리킨 순간이다');
       assert.equal(closed.cardVisible, true, '초점이 돌아간 카드가 화면에 보여야 한다');
+
+      // #923: 회원 화면이 뜬 직후 카드가 다시 그려지면(요소 교체) 초점이 몸통으로 빠지지 않는다 —
+      // 재렌더가 지나간 뒤에도 activeElement는 같은 순간 id의 새 카드여야 한다.
+      await page.waitForFunction(`(() => { const f = [...document.querySelectorAll('#view,#view-next')].filter((x) => !x.hidden).pop(); const d = f.contentDocument; const card = d.querySelector('#cardLayer article.card[data-id="m3"]'); return card && card !== f.contentWindow.__cardAtOpen && d.activeElement === card; })()`, null, { timeout: 15000 });
+      const rerendered = await page.evaluate(`(() => { const f = [...document.querySelectorAll('#view,#view-next')].filter((x) => !x.hidden).pop(); const d = f.contentDocument; const card = d.querySelector('#cardLayer article.card[data-id="m3"]'); return { focusTag: d.activeElement.tagName, focusMomentId: d.activeElement.dataset?.id || '', replaced: card && card !== f.contentWindow.__cardAtOpen, cardVisible: card ? card.getClientRects().length > 0 : false }; })()`);
+      assert.equal(rerendered.replaced, true, '카드가 실제로 다시 그려졌어야 한다(요소 교체 확인)');
+      assert.equal(rerendered.focusMomentId, 'm3', `재렌더 뒤 초점도 같은 순간의 카드여야 한다(지금: ${rerendered.focusTag}#${rerendered.focusMomentId})`);
+      assert.equal(rerendered.cardVisible, true, '재렌더 뒤 초점 카드도 화면에 보여야 한다');
 
       // 닫힌 상세로 탭이 들어가지 않는다: 카드에서 Tab을 밟아도 상세 안에 머물지 않는다.
       for (let i = 0; i < 6; i += 1) {
