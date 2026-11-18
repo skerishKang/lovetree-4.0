@@ -14,6 +14,7 @@ test('#897 책 갈림길 탭: 책 안쪽 오른쪽 가장자리에 붙인다(밖
   assert.match(rule, /right:0/, '탭은 책 판 오른쪽 가장자리 안에 붙는다');
   assert.doesNotMatch(rule, /right:-\d+px/, '책 밖으로 삐져나오던 옛 자리는 뺐다');
   assert.match(rule, /border-radius:10px 0 0 10px/, '안쪽 가장자리에 붙은 탭 모양(왼쪽만 둥글게)');
+  assert.match(rule, /bottom:44px/, '본문과 겹치지 않게 페이지 아래 줄 자리(오른쪽 쪽수 위)');
   assert.doesNotMatch(rule, /border-left:0/, '왼쪽 테두리를 다시 둔다');
   // 390(휴대폰)은 페이지 아래 줄 — 지금처럼 유지한다.
   const phone = bookCss.match(/html\[data-book-shape=phone\] \.branch-tab\{[^}]*\}/)?.[0] || '';
