@@ -25,6 +25,9 @@ const PUBLIC_SHARE_ITEM = /^\/api\/public\/shares\/[A-Za-z0-9_-]{1,128}$/;
 const COMMUNITY_SHARE_ACTION = /^\/api\/community\/shares\/[A-Za-z0-9_-]{1,128}\/(comments|favorite|reaction|report|block)$/;
 const COMMUNITY_COMMENT_ITEM = /^\/api\/community\/comments\/[A-Za-z0-9_-]{1,128}$/;
 const COMMUNITY_REPORT_ITEM = /^\/api\/community\/admin\/reports\/[A-Za-z0-9_-]{1,128}$/;
+const MOMENT_STAGE = /^\/api\/community\/shares\/[A-Za-z0-9_-]{20,64}\/moments\/[A-Za-z0-9_-]{1,80}\/stage$/;
+const STAGE_DETAIL = /^\/api\/community\/stages\/[A-Za-z0-9_-]{1,80}$/;
+const STAGE_VOTE = /^\/api\/community\/stages\/[A-Za-z0-9_-]{1,80}\/vote$/;
 const ADMIN_FEEDBACK_ITEM = /^\/api\/admin\/feedback\/[0-9]{1,20}$/;
 const ADMIN_FEEDBACK_REPLY = /^\/api\/admin\/feedback\/[0-9]{1,20}\/reply$/;
 const MY_POST_FOLLOWUP = /^\/api\/board\/mine\/[0-9]{1,20}\/followup$/;
@@ -35,6 +38,8 @@ const ADMIN_PERSONA_ITEM = /^\/api\/admin\/persona\/[A-Za-z0-9_-]{1,128}$/;
 const ADMIN_CUSTOMER_ITEM = /^\/api\/admin\/customers\/sub_[A-Za-z0-9_-]{1,128}$/;
 const ADMIN_CUSTOMER_MEDIA = /^\/api\/admin\/customers\/sub_[A-Za-z0-9_-]{1,128}\/media\/[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}\.(?:png|jpg|gif|webp|mp4|webm)$/;
 function communityMethods(path) {
+  if(MOMENT_STAGE.test(path)||STAGE_DETAIL.test(path))return new Set(['GET']);
+  if(STAGE_VOTE.test(path))return new Set(['PUT','DELETE']);
   const action=path.match(COMMUNITY_SHARE_ACTION)?.[1];
   if(action==='comments')return new Set(['GET','POST']);
   if(action==='favorite'||action==='reaction')return new Set(['PUT','DELETE']);
@@ -199,9 +204,10 @@ export function createProxy({ fetcher = (...args) => fetch(...args), timeoutMs =
 
       // 정적 호스트 폴백(HTML)이나 계약 밖 형식은 성공이 아니다.
       const type = String(upstream.headers.get('content-type') || '').toLowerCase();
+      const stageVoteDeleted = upstream.status === 204 && request.method === 'DELETE' && STAGE_VOTE.test(incoming.pathname);
       const mediaBinary = (MEDIA_ITEM.test(incoming.pathname) || ADMIN_CUSTOMER_MEDIA.test(incoming.pathname)) && request.method === 'GET' && upstream.ok && /^(?:image\/(?:png|jpeg|gif|webp)|video\/(?:mp4|webm))(?:;|$)/.test(type);
       const invalid = type.includes('text/html')
-        || (incoming.pathname.startsWith('/api/') && !(type.includes('application/json') || (media && mediaBinary)));
+        || (incoming.pathname.startsWith('/api/') && !stageVoteDeleted && !(type.includes('application/json') || (media && mediaBinary)));
       if (invalid) {
         await upstream.body?.cancel().catch(() => {});
         return jsonError(502, 'upstream_invalid_response', type.includes('text/html')
@@ -217,6 +223,7 @@ export function createProxy({ fetcher = (...args) => fetch(...args), timeoutMs =
         const value = upstream.headers.get(name);
         if (value) out.set(name, value);
       }
+      if (stageVoteDeleted) out.set('cache-control', 'no-store');
       const cookies = typeof upstream.headers.getSetCookie === 'function' ? upstream.headers.getSetCookie() : [];
       for (const cookie of cookies) out.append('set-cookie', cookie);
 
