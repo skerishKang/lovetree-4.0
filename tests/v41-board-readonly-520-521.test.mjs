@@ -64,7 +64,7 @@ async function openSampleBoard(browser, base, { width, theme, plate }) {
   return { context, page, frame };
 }
 
-test('읽기 전용 보드: 390 × 밤·정원 × 판 종이·밤에서 ＋ 순간 꽂기가 숨는다(1440도 유지)', { skip: REQUIRE ? false : skip, timeout: 240000 }, async () => {
+test('읽기 전용 보드: 390 × 밤·정원 × 판 종이·밤에서 도구 줄에 ＋ 순간 꽂기가 없다(1440도 유지)', { skip: REQUIRE ? false : skip, timeout: 240000 }, async () => {
   if (skip) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip}`);
   const server = await serve();
   const base = `http://127.0.0.1:${server.address().port}`;
@@ -75,12 +75,9 @@ test('읽기 전용 보드: 390 × 밤·정원 × 판 종이·밤에서 ＋ 순�
       for (const theme of ['night', 'garden']) {
         for (const plate of ['paper', 'night']) {
           const { context, frame } = await openSampleBoard(browser, base, { width, theme, plate });
-          const add = frame.locator('#addBtn');
-          const visible = await add.isVisible().catch(() => false);
-          const state = await frame.evaluate(() => { const b = document.getElementById('addBtn'); return { hidden: b?.hasAttribute('hidden'), display: getComputedStyle(b).display, readOnly: window.LTDEMO?.readOnly }; });
+          const state = await frame.evaluate(() => { const b = document.getElementById('addBtn'); return { exists: !!b, readOnly: window.LTDEMO?.readOnly }; });
           assert.equal(state.readOnly, true, `${width} ${theme}/${plate}: 예시 보드는 읽기 전용으로 판정된다`);
-          assert.equal(state.hidden, true, `${width} ${theme}/${plate}: 읽기 전용에서 addBtn에 hidden 속성이 붙는다`);
-          assert.equal(visible, false, `${width} ${theme}/${plate}: 읽기 전용에서 ＋ 순간 꽂기가 보이지 않는다(전: 390에서 보였음)`);
+          assert.equal(state.exists, false, `${width} ${theme}/${plate}: 도구 줄에 '+ 순간 추가' 단추가 없다(#891⑤ — 머리줄 한 벌만 둔다)`);
           await context.close();
         }
       }
@@ -124,36 +121,5 @@ test('390 보드: 읽기 전용 표시가 순간 선택 패널에 가려지지 �
   }
 });
 
-test('쓰기 가능 내 보드: 390에서 ＋ 순간 꽂기가 보이고 눌리면 창이 열린다(LT41 서버·쓰기 가능 스텁)', { skip: REQUIRE ? false : skip, timeout: 120000 }, async () => {
-  if (skip) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip}`);
-  const server = await serve();
-  const base = `http://127.0.0.1:${server.address().port}`;
-  let browser;
-  try {
-    browser = await chromium.launch({ headless: true });
-    const context = await browser.newContext({ viewport: { width: 390, height: 852 }, isMobile: true, hasTouch: true, reducedMotion: 'reduce' });
-    const page = await context.newPage();
-    await page.goto(`${base}/__lt-board-host.html`, { waitUntil: 'load' });
-    let frame = null;
-    for (let i = 0; i < 80 && !frame; i++) {
-      frame = page.frames().find((f) => /track58-pinboard/.test(f.url()));
-      if (!frame) await page.waitForTimeout(250);
-    }
-    assert.ok(frame, '쓰기 가능 보드 프레임이 열린다');
-    await frame.waitForFunction(() => document.querySelectorAll('#cardLayer .card').length > 0, null, { timeout: 15000 });
-    await page.waitForTimeout(1000);
-    const state = await frame.evaluate(() => ({ readOnly: window.LTDEMO?.readOnly, hidden: document.getElementById('addBtn')?.hasAttribute('hidden'), display: getComputedStyle(document.getElementById('addBtn')).display }));
-    assert.equal(state.readOnly, false, '쓰기 가능 보드는 읽기 전용이 아니다');
-    assert.equal(state.hidden, false, '쓰기 가능 보드의 addBtn에 hidden이 없다');
-    const add = frame.locator('#addBtn');
-    assert.equal(await add.isVisible(), true, '390에서 ＋ 순간 꽂기가 보인다');
-    await add.click();
-    await page.waitForTimeout(600);
-    const opened = await frame.evaluate(() => { const m = document.getElementById('addModal'); return m && (m.classList.contains('open') || getComputedStyle(m).display !== 'none'); });
-    assert.equal(opened, true, '누르면 순간 꽂기 창이 열린다');
-    await context.close();
-  } finally {
-    await browser?.close();
-    server.close();
-  }
-});
+// '쓰기 가능 내 보드: 390에서 ＋ 순간 꽂기가 보이고 눌리면 창이 열린다' 시험은 #891⑤(CTO)로 보드 도구 줄의
+// '+ 순간 추가' 단추를 치우면서 함께 지웠다 — 쓰기 입구는 셸 머리줄 한 벌(quick-add 흐름 시험이 지킨다).

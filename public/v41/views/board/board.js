@@ -247,16 +247,15 @@ function boardStartView(){if(innerWidth<700){if(typeof focusBoardMoment==='funct
 let vw=viewport.clientWidth,vh=viewport.clientHeight,cards=boardCards(),saved=userView||readBoardView();
 // #536: 기억한 자리의 적용·버림 판정까지 모델(LT58Model.startView)이 맡는다 — 처음 자리와 같은
 // 판 규칙(덮거나 가운데)을 함께 거치게 해 넓은 화면에서 판이 한쪽으로 쏠리지 않게 한다.
-growBoard();let v=LT58Model.startView({viewport:{w:vw,h:vh},safe:boardSafeArea(true),cards,world:worldSize,focusId:LTDEMO.get?.(),firstId:moments.find(m=>m.first)?.id,saved,title:titleRect()});
+growBoard();let v=LT58Model.startView({viewport:{w:vw,h:vh},safe:boardSafeArea(true),cards,world:worldSize,focusId:LTDEMO.get?.(),firstId:moments.find(m=>m.first)?.id,saved});
 viewMode=v.mode==='user'?'user':'start';if(v.mode==='user')userView=saved;
 Object.assign(view,{x:v.x,y:v.y,z:v.z});applyView(false)}
 // 전체 보기: 순간이 있는 곳 전부를 보이는 칸에 맞춘다(최대 0.92배). 순간이 없으면 무대 전체.
-// #856: 맞춤 상자에 판 제목('기억 보드'·설명 줄) 자리도 함께 넣는다 — 제목은 무대 왼편(88px)에
-// 붙어 있어 순간 카드만 맞추면 화면 왼쪽 밖으로 밀려 잘렸다. 사용자가 직접 옮긴 자리는 그대로 둔다.
-function titleRect(){const t=document.querySelector('.boardTitle');if(!t)return null;return{x:t.offsetLeft,y:t.offsetTop,w:t.offsetWidth,h:t.offsetHeight}}
-function fitAll(animated=true){let vw=viewport.clientWidth,vh=viewport.clientHeight,cards=boardCards(),tb=titleRect();
-if(!cards.length&&!tb){let z=LT58Model.fitZoom(vw,vh);view.z=z;view.x=(vw-2400*z)/2;view.y=(vh-2200*z)/2}
-else{let v=LT58Model.fitViewBox(cards,tb,boardSafeArea(),.92);if(!v){let z=LT58Model.fitZoom(vw,vh);v={z,x:(vw-2400*z)/2,y:(vh-2200*z)/2}}view.z=v.z;view.x=v.x;view.y=v.y}
+// #856의 '제목 자리 함께 재기'는 판 제목이 무대 밖 머리글로 나가면서(#891 CTO) 필요 없어졌다 —
+// 제목은 판(#viewport) 바깥에 있고 판은 제목 아래끝 + 16px부터 시작하므로 카드가 제목에 닿거나 잘릴 수 없다.
+function fitAll(animated=true){let vw=viewport.clientWidth,vh=viewport.clientHeight,cards=boardCards();
+if(!cards.length){let z=LT58Model.fitZoom(vw,vh);view.z=z;view.x=(vw-2400*z)/2;view.y=(vh-2200*z)/2}
+else{let v=LT58Model.fitViewBox(cards,null,boardSafeArea(),.92);if(!v){let z=LT58Model.fitZoom(vw,vh);v={z,x:(vw-2400*z)/2,y:(vh-2200*z)/2}}view.z=v.z;view.x=v.x;view.y=v.y}
 viewMode='fit';applyView(animated)}
 // 창 크기가 바뀌면: 전체 보기 중이면 다시 맞추고, 아니면 처음 자리(또는 기억한 자리)를 다시 계산한다.
 function boardResize(){if(innerWidth<700||cinema)return;placeAll();if(viewMode==='fit')fitAll(false);else boardStartView()}
@@ -428,7 +427,7 @@ let wheelZooming=false,wheelPause=0;
 function zoomDecorPause(){wheelZooming=true;if(typeof applyDecorMotion==='function')applyDecorMotion();clearTimeout(wheelPause);wheelPause=setTimeout(()=>{wheelZooming=false;if(typeof applyDecorMotion==='function')applyDecorMotion()},160)}
 viewport.addEventListener('wheel',e=>{if(cinema)return;e.preventDefault();let before=screenToWorld(e.clientX,e.clientY),factor=Math.exp(-e.deltaY*.0012),nz=Math.max(.38,Math.min(1.45,view.z*factor));let r=viewport.getBoundingClientRect();view.z=nz;view.x=e.clientX-r.left-before.x*nz;view.y=e.clientY-r.top-before.y*nz;applyView(false);noteUserView();zoomDecorPause()},{passive:false});
 
-$('#addBtn').onclick=openAdd;
+if($('#addBtn'))$('#addBtn').onclick=openAdd;
 $('#cancelAdd').onclick=()=>$('#addModal').classList.remove('open');
 $('#confirmAdd').onclick=confirmAdd;
 $('#typeGrid').onclick=e=>{let b=e.target.closest('.typeBtn');

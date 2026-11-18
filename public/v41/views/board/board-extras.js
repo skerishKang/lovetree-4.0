@@ -244,7 +244,7 @@ startCinema=function(fromIndex=0){startCinemaV11(fromIndex,null)};endCinema=func
 $('#cinemaBtn').onclick=()=>startCinemaV11(0);$('#toolCinema').onclick=()=>startCinemaV11(0);$('#cinemaFromMoment').onclick=()=>startCinemaV11(0,selected);$('#cinPlay').onclick=()=>{cinemaV11.paused=!cinemaV11.paused;$('#cinPlay').textContent=cinemaV11.paused?'계속 보기':'일시정지';cinemaV11.last=performance.now()};$('#cinPrev').onclick=()=>setCinemaPosition(cinemaV11.index-1,0);$('#cinNext').onclick=()=>setCinemaPosition(cinemaV11.index+1,0);$('#cinRestart').onclick=()=>setCinemaPosition(0,0);$('#cinExit').onclick=()=>endCinemaV11(true);$('#cinProgress').oninput=e=>{let pct=+e.target.value/100,n=cinemaV11.beats.length-1,pos=pct*n,idx=Math.floor(pos),p=pos-idx;cinemaV11.paused=true;$('#cinPlay').textContent='계속 보기';setCinemaPosition(idx,p)};$('#enterBeat').onclick=()=>{let id=cinemaV11.focused;endCinemaV11(false);if(id){focusBoardMoment(id);selectMoment(id,true);toast('Cinema의 이 장면에서 기억 보드로 들어왔어요.')}};$('#walkAgain').onclick=()=>startCinemaV11(0,cinemaV11.fromMoment);$('#backBoard').onclick=()=>endCinemaV11(true);$('#finalOpen').onclick=()=>{let id=cinemaV11.focused;endCinemaV11(false);if(id){focusBoardMoment(id);openViewer(id)}};
 /* Wire theme/style inspector quick controls */
 let styleSec=document.createElement('div');styleSec.className='section';styleSec.hidden=false;styleSec.id='styleSection';styleSec.innerHTML=`<div class="label">STYLE</div><div class="ctaRow" style="margin-top:8px"><button class="miniBtn" id="quickPin">핀 바꾸기</button><button class="miniBtn" id="quickCard">카드 바꾸기</button></div>`;$('#detail .section.ctaRow').before(styleSec);$('#quickPin').onclick=()=>{let m=moments.find(x=>x.id===selected);snapshot();m.pinStyle=LT_PIN_STYLES[(LT_PIN_STYLES.indexOf(m.pinStyle)+1)%LT_PIN_STYLES.length];renderCards();selectMoment(m.id,true);persistBoard()};$('#quickCard').onclick=()=>{let m=moments.find(x=>x.id===selected);snapshot();m.cardStyle=LT_CARD_STYLES[(LT_CARD_STYLES.indexOf(m.cardStyle)+1)%LT_CARD_STYLES.length];renderCards();selectMoment(m.id,true);persistBoard()};
-$('#addBtn').onclick=()=>{if(LTDEMO.readOnly)return;openAdd()};$('#confirmAdd').onclick=()=>{if(LTDEMO.readOnly)return;confirmAdd()};renderCards();renderThreads();updateKeywordFilter();formFor(addType);fitAll(false);applyPathHighlight();setTimeout(()=>{/* #891: 탭으로 들어오면 닫힘, ?open= 주소만 자동 열림(board.js bootDetailPanel) */bootDetailPanel()},100);
+if($('#addBtn'))$('#addBtn').onclick=()=>{if(LTDEMO.readOnly)return;openAdd()};$('#confirmAdd').onclick=()=>{if(LTDEMO.readOnly)return;confirmAdd()};renderCards();renderThreads();updateKeywordFilter();formFor(addType);fitAll(false);applyPathHighlight();setTimeout(()=>{/* #891: 탭으로 들어오면 닫힘, ?open= 주소만 자동 열림(board.js bootDetailPanel) */bootDetailPanel()},100);
 window.__LT58V11={youtubeId,youtubeThumb,youtubeThumbUrl,openEdit,saveEdit,chooseNext,highlightPath,startCinema:startCinemaV11,endCinema:endCinemaV11,setCinemaPosition,theme:t=>{document.body.dataset.theme=t},setMomentStyle:(id,pin,card)=>{let m=moments.find(x=>x.id===id);m.pinStyle=pin;m.cardStyle=card;renderCards()},get cinema(){return{active:cinemaV11.active,paused:cinemaV11.paused,index:cinemaV11.index,beat:cinemaV11.beats[cinemaV11.index]?.label,focused:cinemaV11.focused}},get state(){return{moments:moments.length,connections:connections.length,theme:document.body.dataset.theme,selected,keywords:[...new Set(moments.flatMap(m=>m.keywords||[]))]}}};
 
 addEventListener('message',e=>{if(e.data?.type==='lt41-title-display'){if(typeof renderCards==='function')renderCards();if(typeof renderThreads==='function')renderThreads();if(selected)selectMoment(selected,$('#detail').classList.contains('open'));}});
@@ -266,14 +266,19 @@ function syncMomentPickerTop(){
   if(bottom>0) document.documentElement.style.setProperty('--lt-board-picker-top',Math.round(bottom+7)+'px');
   else document.documentElement.style.removeProperty('--lt-board-picker-top');
   const headBottom=head?head.getBoundingClientRect().bottom:0;
-  if(headBottom>0) document.documentElement.style.setProperty('--lt-board-frame-top',Math.round(headBottom)+'px');
+  /* #891(CTO): 판 제목(기억 보드·설명 줄)은 무대 밖 머리글 — 카드 무대(판)는 제목 아래끝 + 16px부터 시작한다.
+     제목이 없으면 이처럼 머리줄 아래끝을 판 시작으로 쓴다(두 줄 머리줄 화면도 함께 이긴다). */
+  const title=document.querySelector('.boardTitle');
+  const titleBottom=title?title.getBoundingClientRect().bottom:0;
+  const frameTop=titleBottom>0?titleBottom+16:headBottom;
+  if(frameTop>0) document.documentElement.style.setProperty('--lt-board-frame-top',Math.round(frameTop)+'px');
   else document.documentElement.style.removeProperty('--lt-board-frame-top');
 }
 syncMomentPickerTop();
 addEventListener('resize',syncMomentPickerTop);
 if(typeof ResizeObserver==='function'){
   const pickerTopObserver=new ResizeObserver(syncMomentPickerTop);
-  [document.querySelector('header'),document.getElementById('themeBadge')].filter(Boolean).forEach(el=>pickerTopObserver.observe(el));
+  [document.querySelector('header'),document.getElementById('themeBadge'),document.querySelector('.boardTitle')].filter(Boolean).forEach(el=>pickerTopObserver.observe(el));
 }
 /* #662: 좁은 폭(≤580)에서는 머리줄이 두 줄이 되는데 테마 표시가 top:66 고정이라 머리줄 둘째 줄(배치 전환) 밑에 깔린다 —
    좁은 폭에서는 표시를 머리줄 안으로 옮겨 둘째 줄에서 함께 흐르게 하고, 넓어지면 제자리(main 안)로 되돌린다. */
