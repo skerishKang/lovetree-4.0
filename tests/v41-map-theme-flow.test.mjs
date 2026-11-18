@@ -80,14 +80,22 @@ async function fingerprint(frame) {
   });
 }
 
-// 그려진 화면 지문은 연출·글꼴이 다 끝난 뒤에야 같아진다. 느린 환경에서는 한 번 읽어 비교하면 가끔 어긋나므로,
-// 같아질 때까지 잠깐씩 다시 읽는다(최대 약 4초). 끝내 다르면 마지막 값으로 단언이 실패한다.
-async function fingerprintMatching(frame, expected) {
+// 그려진 화면 지문은 연출·글꼴·이름표 사진이 다 끝난 뒤에야 같아진다. 느린·바쁜 환경에서는
+// 고정 대기(2100ms) 뒤 한 번 읽으면 아직 칠하는 중(썸네일 디코드·글꼴 부분 적용)의 픽셀을 읽어
+// 간헐 불일치가 난다 — re-read 상한(4초) 안에 수렴하면 운 좋게 통과하고, 그렇지 않으면 떨어진다.
+// 그래서 지문은 두 번 연속 같은 값을 보인 뒤에야 한 번 읽는다(화면이 멈췄다는 뜻). 단언 자체는
+// 그대로 엄밀히 deepEqual으로 비교한다 — 비교 대상을 완화하지 않는다.
+async function settledFingerprint(frame) {
+  let prev = '';
   let got = await fingerprint(frame);
-  for (let i = 0; i < 12 && JSON.stringify(got) !== JSON.stringify(expected); i += 1) {
+  for (let i = 0; i < 40; i += 1) {
+    const key = JSON.stringify(got);
+    if (key === prev) return got;
+    prev = key;
     await new Promise(r => setTimeout(r, 350));
     got = await fingerprint(frame);
   }
+  // 끝내 멈추지 않으면 마지막 값으로 단언이 잡는다.
   return got;
 }
 
@@ -243,25 +251,25 @@ test('지도 판 실제 흐름: 설정·저장 복원·두 보기·누르기·�
       await t.test(`${width} ${appTheme}: 종이 ↔ 밤, 저장한 첫 화면과 일치`, async () => {
         const live = await openMap(browser, base, { width, appTheme });
         try {
-          const initialLoads = live.loads(), paper = await fingerprint(live.frame);
+          const initialLoads = live.loads(), paper = await settledFingerprint(live.frame);
           await settingsPlate(live.page, live.frame, 'night');
-          const switched = await fingerprint(live.frame);
+          const switched = await settledFingerprint(live.frame);
           assert.notEqual(switched.canvas, paper.canvas, '밤 판은 실제 그려진 픽셀이 달라진다');
           const fresh = await openMap(browser, base, { width, appTheme, plate: 'night' });
           try {
-            assert.deepEqual(await fingerprintMatching(fresh.frame, switched), switched, '바로 바꾼 밤 판 = 저장 후 처음 연 밤 판 (캔버스 픽셀·패널 색·점 자리)');
+            assert.deepEqual(await settledFingerprint(fresh.frame), switched, '바로 바꾼 밤 판 = 저장 후 처음 연 밤 판 (캔버스 픽셀·패널 색·점 자리)');
             assert.deepEqual(fresh.errors, [], '저장 복원 페이지 오류 0');
           } finally { await fresh.context.close(); }
           await settingsPlate(live.page, live.frame, 'paper');
-          assert.deepEqual(await fingerprintMatching(live.frame, paper), paper, '바로 바꾼 종이 판 = 저장 후 처음 연 종이 판');
+          assert.deepEqual(await settledFingerprint(live.frame), paper, '바로 바꾼 종이 판 = 저장 후 처음 연 종이 판');
           await settingsPlate(live.page, live.frame, 'night');
           await assertIdle(live.frame, live.page, 'night');
           await interactions({ ...live, width });
           const positions = rows => rows.map(({ id, x, y }) => ({ id, x, y }));
-          const beforePaperSwitch = positions((await fingerprint(live.frame)).dots);
+          const beforePaperSwitch = positions((await settledFingerprint(live.frame)).dots);
           await settingsPlate(live.page, live.frame, 'paper');
           // 크기 변경은 기존 배치를 다시 잰다. 판 전환 전후의 같은 상태끼리 비교한다.
-          assert.deepEqual(positions((await fingerprint(live.frame)).dots), beforePaperSwitch, '판 전환 자체는 배치를 바꾸지 않는다');
+          assert.deepEqual(positions((await settledFingerprint(live.frame)).dots), beforePaperSwitch, '판 전환 자체는 배치를 바꾸지 않는다');
           await interactions({ ...live, width });
           assert.equal(live.loads(), initialLoads, '판 전환·클릭·반복 메시지에서 프레임 다시 뜨기 0');
           assert.deepEqual(live.errors, [], '페이지 오류 0');
