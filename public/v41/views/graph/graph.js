@@ -421,7 +421,7 @@ function drawLegend() {
     wrap.appendChild(title);
     for (const h of groups.get(kind)) {
       const b = document.createElement('button'); b.type = 'button'; b.className = 'g-legend-item';
-      const dot = document.createElement('i'); dot.style.background = KIND_COLOR[h.kindId];
+      const dot = document.createElement('i'); dot.className = 'g-kind-' + h.kindId;
       const label = document.createElement('span'); label.textContent = h.value;
       const n = document.createElement('small'); n.textContent = String(h.momentIds.length || h.linkedIds.length);
       b.append(dot, label, n);
@@ -442,7 +442,9 @@ const chipEl = (kindLabel, value, color) => {
   const c = document.createElement('span'); c.className = 'd-chip';
   const k = document.createElement('span'); k.className = 'chip-kind'; k.textContent = kindLabel;
   const v = document.createElement('b'); v.textContent = value;
-  if (color) c.style.borderColor = color;
+  /* 칩 테두리 색(이전 JS 인라인 borderColor를 클래스로 — 종류별 고정값. 기본 --lt-line과 같은 색은 생략) */
+  const chipClass = { 'var(--lt-gold-deep)': 'd-chip-stage', 'var(--lt-rose)': 'd-chip-song', 'var(--lt-violet, #8b69e8)': 'd-chip-member', 'var(--lt-blue, #547cd0)': 'd-chip-artist' }[color];
+  if (chipClass) c.classList.add(chipClass);
   c.append(k, v);
   return c;
 };
@@ -583,21 +585,18 @@ function drawShelf() {
      묶음이 생겨 안내가 사라지면 단추는 지금처럼 보인다. */
   const guideShown = model.graph.moments.length > 1 && model.graph.hubs.length === 0;
   document.getElementById('shelfHint').hidden = guideShown;
-  document.getElementById('gShelf').style.display = untagged.length > 0 ? 'flex' : 'none';
+  const gShelf = document.getElementById('gShelf');
+  gShelf.classList.toggle('off', untagged.length === 0);
   /* 묶음이 없으면(#864) 선반 글자 줄도 점 행을 따라 가운데로 — 바닥에 남겨 두면 점과 흩어진다.
      점 행 아래 40px(점 반경 8.5 + 여백). 묶음이 생기면 기본 자리(CSS)로 돌아간다. */
   const shelfBar = document.getElementById('gShelf');
   if (model.graph.hubs.length === 0 && model.footprintRowY != null && untagged.length > 0) {
     shelfBar.style.bottom = Math.max(6, Math.round(svg.parentElement.clientHeight - model.footprintRowY - 40)) + 'px';
     /* #864 CTO 2차: 선반 글자 줄도 발자취 덩어리 안으로 — 왼쪽 따로가 아니라 점 행 바로 아래 가운데. */
-    shelfBar.style.left = '50%';
-    shelfBar.style.right = 'auto';
-    shelfBar.style.transform = 'translateX(-50%)';
+    shelfBar.classList.add('g-shelf-centered');
   } else {
     shelfBar.style.bottom = '';
-    shelfBar.style.left = '';
-    shelfBar.style.right = '';
-    shelfBar.style.transform = '';
+    shelfBar.classList.remove('g-shelf-centered');
   }
   const badge = document.getElementById('gBadge');
   const n = model.graph.moments.length;
@@ -709,9 +708,9 @@ function drawEmptyNote() {
       .filter((v) => Number.isFinite(v) && v > 0);
     const refY = markTops.length ? Math.min(...markTops) : model.footprintRowY;
     empty.style.top = refY + 'px';
-    empty.style.transform = 'translate(-50%,-100%) translateY(-18px)';
+    empty.classList.add('g-empty-riding');
   };
-  const rideOff = () => { empty.style.top = ''; empty.style.transform = ''; };
+  const rideOff = () => { empty.style.top = ''; empty.classList.remove('g-empty-riding'); };
   if (n === 0) { rideOff(); empty.replaceChildren(); empty.hidden = false; empty.textContent = '아직 남긴 순간이 없어요. 순간을 남기면 흐름이 보여요.'; }
   else if (n === 1) { rideWithRow(); empty.replaceChildren(); empty.hidden = false; empty.textContent = '순간이 하나예요. 다음 순간을 남기면 흐름이 보여요.'; }
   else if (hubs === 0) {
