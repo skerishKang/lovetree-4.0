@@ -679,6 +679,8 @@ body.lt-frame-dialog-open #toast{top:calc(72px + env(safe-area-inset-top));botto
 #journal-form textarea{min-height:140px;resize:vertical}
 /* 내 의견 창: 넓은 화면에서 한 줄이 끝까지 늘어나지 않게 960px로 가운데 둔다(덧붙임 입력칸은 목록 안에 있다). */
 #myposts-panel .panel-heading,#myposts-panel>.panel-note,#myposts-panel>.button-row,#myposts-panel .myposts-list{max-width:960px;margin-left:auto;margin-right:auto}
+/* 꼬리표 정리 창도 넓은 화면에서 960px로 가운데 둔다(이름·단추가 양 끝으로 벌어지지 않게). */
+#tag-panel .panel-heading,#tag-panel>.panel-note,#tag-panel>.tag-manage-list,#tag-panel>#tag-suggest-box,#tag-panel>#tag-error{max-width:960px;margin-left:auto;margin-right:auto}
 .myposts-list{display:grid;gap:12px;margin-top:12px}
 .myposts-item{border:1px solid var(--lt-line);border-radius:var(--lt-r-card);padding:14px 16px;background:var(--lt-glass)}
 .myposts-head{display:flex;gap:8px;align-items:center;font-size:12px;color:var(--lt-muted)}

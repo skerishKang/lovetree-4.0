@@ -933,6 +933,15 @@ test('하은2회차 손질 ②: 저장이 실패하면 누른 칩만 꺼진다 �
   assert.equal(line.momentId, 'm1');
 });
 
+test('영문 병기 괄호 안 단어는 멤버 후보가 아니다(도현 1-2)', () => {
+  const title = 'BTS (방탄소년단) "피 땀 눈물 (Blood Sweat & Tears)" Official MV';
+  const plain = suggestTagsFromTitle(title).proposals.map((p) => p.raw);
+  const reused = suggestTagsFromTitle(title, { knownTags: ['멤버:Tears'] }).proposals.map((p) => p.raw);
+  assert.deepEqual(plain, ['가수:BTS', '노래:피 땀 눈물']);
+  assert.deepEqual(reused, ['가수:BTS', '노래:피 땀 눈물'], '재사용으로도 멤버 후보가 살아나지 않는다');
+  assert.equal(reused.filter((raw) => raw.startsWith('member:')).length, 0, '멤버 후보 0개');
+});
+
 // 하은 2회차 손질 ①: 실패 문구가 고정 단추(쉬운 추가의 '담기')에 가리지 않게 — 문구를 눈앞으로 데려온다.
 test('하은2회차 손질 ①: 실패 문구를 보일 때 화면에 보이는 자리로 데려온다(scrollIntoView)', () => {
   const err = fakeEl({ hidden: true, scrolledWith: null });
