@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { validateState, coverModeOf, normalizeCoverDesign } from '../src/domain.js';
 import { ApiError } from './errors.js';
+import { refreshStageIndex } from './stage-index-refresh.js';
 import { parsePrincipal } from './principal.js';
 import { ROLE_AI_CUSTOMER } from './admin-roles.js';
 
@@ -50,7 +51,8 @@ function shareSummary(row) {
   return { id: row.shareId, treeId: row.treeId, entryMomentId: row.entryMomentId, view: row.view, status: row.status, createdAt: row.createdAt, revokedAt: row.revokedAt || null, discoverable: row.discoverable === true, discoverableAt: row.discoverableAt || null, origin: row.origin || 'owner', momentCount: Number(row.momentCount ?? 0) };
 }
 
-export function createShareService({ shareRepo, workspaceRepo, visibilityRepo = null, discoverRepo = null, admin = null, productId, makeId = () => randomBytes(18).toString('base64url') }) {
+export function createShareService({ shareRepo, workspaceRepo, visibilityRepo = null, discoverRepo = null, admin = null, stageIndex = null, productId, makeId = () => randomBytes(18).toString('base64url') }) {
+  const refreshStages = subjectId => refreshStageIndex(stageIndex, { productId, subjectId });
   async function projection(subjectId, input) {
     if (!input || typeof input !== 'object' || !RECORD_ID.test(input.treeId || ''))
       throw new ApiError(400, 'invalid_share_request', '공유할 트리를 다시 선택해 주세요.');
@@ -93,6 +95,7 @@ export function createShareService({ shareRepo, workspaceRepo, visibilityRepo = 
         row = await shareRepo.create({ productId, subjectId, shareId: makeId(), treeId: preview.tree.id, entryMomentId: preview.entryMomentId, view: preview.view, momentCount: preview.tree.moments.length });
       }
       if (!row) throw new ApiError(503, 'share_unavailable', '공유 주소를 만들지 못했어요. 잠시 뒤 다시 시도해 주세요.');
+      await refreshStages(subjectId);
       return { share: shareSummary(row), preview };
     },
     async list(subjectId) {
@@ -116,7 +119,9 @@ export function createShareService({ shareRepo, workspaceRepo, visibilityRepo = 
       const existing = await shareRepo.load({ productId, shareId });
       if (!existing) throw new ApiError(404, 'share_not_found', '공유 주소를 찾을 수 없어요.');
       if (existing.subjectId !== subjectId) throw new ApiError(403, 'share_forbidden', '다른 계정의 공유는 바꿀 수 없어요.');
-      return shareSummary(await shareRepo.revoke({ productId, subjectId, shareId }));
+      const row = await shareRepo.revoke({ productId, subjectId, shareId });
+      await refreshStages(subjectId);
+      return shareSummary(row);
     },
     async read(shareId) {
       if (!SHARE_ID.test(shareId)) throw new ApiError(404, 'share_invalid', '공유 주소 형식이 올바르지 않아요.');
@@ -140,21 +145,30 @@ export function createShareService({ shareRepo, workspaceRepo, visibilityRepo = 
     // ① 살아 있는 공유 행(주인 만든 행 포함)의 moment_count 를 갱신하고,
     // ② 공유 행이 없는 트리(순간 1개 이상)에 자동 공개 행(origin='auto')을 만들며,
     // ③ 문서에서 사라진 트리의 공유 행(자동·주인 모두)은 즉시 내리고, 그 트리의 소개 행도 지운다.
-    async syncSharesAfterSave(subjectId, doc) {
-      const counts = new Map();
-      for (const tree of (doc?.trees || [])) counts.set(tree.id, Array.isArray(tree.moments) ? tree.moments.length : 0);
-      const existing = await shareRepo.list({ productId, subjectId });
-      const activeTrees = new Set(existing.filter(row => row.status === 'active').map(row => row.treeId));
-      for (const [treeId, momentCount] of counts) {
-        if (momentCount <= 0) continue;
-        await shareRepo.updateMomentCount({ productId, subjectId, treeId, momentCount });
-        if (activeTrees.has(treeId)) continue;
-        const tree = doc.trees.find(item => item.id === treeId);
-        const entry = tree.moments.find(moment => moment.parentId === null) || tree.moments[0];
-        await shareRepo.upsertAutoShare({ productId, subjectId, shareId: makeId(), treeId, entryMomentId: entry.id, momentCount });
+    async syncSharesAfterSave(subjectId) {
+      async function sync(doc, shares, discover) {
+        const trees = doc.trees;
+        const existing = await shares.list({ productId, subjectId });
+        const activeTrees = new Set(existing.filter(row => row.status === 'active').map(row => row.treeId));
+        for (const tree of trees) {
+          const treeId = tree.id, momentCount = tree.moments.length;
+          if (!momentCount) continue;
+          await shares.updateMomentCount({ productId, subjectId, treeId, momentCount });
+          if (activeTrees.has(treeId)) continue;
+          const entry = tree.moments.find(moment => moment.parentId === null) || tree.moments[0];
+          await shares.upsertAutoShare({ productId, subjectId, shareId: makeId(), treeId, entryMomentId: entry.id, momentCount });
+        }
+        const treeIds = trees.map(tree => tree.id);
+        await shares.revokeSharesNotIn({ productId, subjectId, treeIds });
+        if (discover) await discover.deleteNotIn({ productId, subjectId, treeIds });
       }
-      await shareRepo.revokeSharesNotIn({ productId, subjectId, treeIds: [...counts.keys()] });
-      if (discoverRepo) await discoverRepo.deleteNotIn({ productId, subjectId, treeIds: [...counts.keys()] });
+      if (shareRepo.withCurrentWorkspace) {
+        await shareRepo.withCurrentWorkspace({ productId, subjectId }, sync);
+      } else {
+        const stored = await workspaceRepo.load({ productId, subjectId });
+        if (stored) await sync(stored.doc, shareRepo, discoverRepo);
+      }
+      await refreshStages(subjectId);
     },
     // #538: 트리 공개 상태. 비공개는 누구나 무료로 바꿀 수 있다 — 본인 트리만 바꿀 수 있다(#830).
     // 응답에 소개 여부(discover)를 함께 돌려준다 — 화면이 두 값을 한 번에 본다.
@@ -162,6 +176,7 @@ export function createShareService({ shareRepo, workspaceRepo, visibilityRepo = 
       if (visibility !== 'public' && visibility !== 'private') throw new ApiError(400, 'visibility_invalid', '공개 상태 값을 확인해 주세요.');
       await ownTree(subjectId, treeId);
       if (visibilityRepo) await visibilityRepo.set({ productId, subjectId, treeId, visibility });
+      await refreshStages(subjectId);
       return { treeId, visibility, discover: (await treeDiscover(subjectId, treeId)).discover };
     },
     async getTreeVisibility(subjectId, treeId) {
@@ -180,6 +195,7 @@ export function createShareService({ shareRepo, workspaceRepo, visibilityRepo = 
       if (typeof discover !== 'boolean') throw new ApiError(400, 'discover_invalid', '소개 설정 값을 확인해 주세요.');
       await ownTree(subjectId, treeId);
       if (discoverRepo) await discoverRepo.set({ productId, subjectId, treeId, discover });
+      await refreshStages(subjectId);
       return { treeId, discover };
     }
   };

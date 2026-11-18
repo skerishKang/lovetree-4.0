@@ -1,8 +1,14 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {applySchema,createPool} from '../server/db/postgres.js';
+import {applySchema,createPool,createWorkspaceRepo} from '../server/db/postgres.js';
 import {createAccountRepo} from '../server/db/account-postgres.js';
 import {subjectHash} from '../server/account-service.js';
-import {createTree} from '../src/domain.js';
+import {createTree,addMoment} from '../src/domain.js';
+import {createShareRepo} from '../server/db/shares-postgres.js';
+import {createShareService} from '../server/share-service.js';
+import {createStageIndexRepo} from '../server/db/stage-index-postgres.js';
+import {lockVideo} from '../server/db/stage-assignments-postgres.js';
+import {stageKeyForMoment} from '../src/stage-key.js';
+import {listVisibleStageMoments} from '../server/db/stage-visibility-sql.js';
 import {createCommunityRepo} from '../server/db/community-postgres.js';
 import {createTreeVisibilityRepo} from '../server/db/tree-visibility-postgres.js';
 import {createTreeDiscoverRepo} from '../server/db/tree-discover-postgres.js';
@@ -16,6 +22,186 @@ import {createModelAdminRoleStore} from '../server/testing/model-admin-role-stor
 import {assertIsolatedTestDatabase} from '../server/testing/isolated-test-database.js';
 const DATABASE_URL=process.env.LOVETREE_TEST_DATABASE_URL??'',skip=DATABASE_URL?false:'isolated PostgreSQL unavailable';
 const suffix=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,9);
+const stageTestUrl = 'https://youtu.be/AbC123xyZ_0';
+
+async function publishStageTestTree(pool, productId, subjectId, clips) {
+  const input = { title: '순간', emotion: '설렘' };
+  let tree = createTree({ subject: '공연', ...input, ...clips[0] });
+  // 계정별로 복원한 트리·순간은 서로 같은 로컬 ID를 가질 수 있다.
+  tree.id = 'same-tree';
+  tree.moments[0].id = 'm0';
+  for (let i = 1; i < Math.max(3, clips.length); i++) {
+    tree = addMoment(tree, { ...input, ...clips[i] }, 'm0');
+    tree.moments[i].id = 'm' + i;
+  }
+  const shareId = ('share-' + subjectId).padEnd(24, 'x');
+  await pool.query('INSERT INTO lovetree_workspaces(product_id,subject_id,doc) VALUES($1,$2,$3)',
+    [productId, subjectId, { version: 1, trees: [tree] }]);
+  await createShareRepo(pool).upsertAutoShare({ productId, subjectId, treeId: tree.id, shareId,
+    entryMomentId: 'm0', momentCount: tree.moments.length });
+  await createTreeDiscoverRepo(pool).set({ productId, subjectId, treeId: tree.id, discover: true });
+  return { tree, shareId };
+}
+
+test('공개 무대 백필은 기준 구간을 고정하고 재실행·동시 등록에도 같은 ID를 보존한다', { skip }, async () => {
+  assertIsolatedTestDatabase(DATABASE_URL);
+  const pool = await createPool(DATABASE_URL, { max: 4 });
+  try {
+    await applySchema(pool);
+    const productId = 'lt-' + suffix();
+    const repo = createStageIndexRepo(pool);
+    const clip = (startSeconds, endSeconds) => ({ url: stageTestUrl, startSeconds, endSeconds });
+    const bookmark = { url: stageTestUrl + '?t=42s' };
+    await publishStageTestTree(pool, productId, 'a-middle', [clip(14, 26), bookmark]);
+    await publishStageTestTree(pool, productId, 'b-last', [clip(18, 30), { url: stageTestUrl, startSeconds: 42 }]);
+    await publishStageTestTree(pool, productId, 'z-first', [clip(10, 22), clip(10, 22)]);
+    const readIds = async () => new Map((await listVisibleStageMoments(pool, { productId }))
+      .map(row => [row.subject_id + '/' + row.moment_id, row.stage_id]));
+    const audit = () => repo.audit({ productId });
+    assert.deepEqual(await audit(), { expected: 6, actual: 0, missing: 6, extra: 0, invalidTrees: 0 });
+    await repo.reconcile({ productId });
+    assert.deepEqual(await audit(), { expected: 6, actual: 6, missing: 0, extra: 0, invalidTrees: 0 });
+    const ids = await readIds();
+    assert.equal(ids.size, 6);
+    assert.equal(ids.get('z-first/m0'), ids.get('z-first/m1'));
+    assert.equal(ids.get('z-first/m0'), ids.get('a-middle/m0'), '시작 초 순서로 등록한 고정 기준과 정확히 절반 겹친다');
+    assert.notEqual(ids.get('z-first/m0'), ids.get('b-last/m0'), '가운데 구간을 거쳐 연쇄 병합하지 않는다');
+    assert.equal(ids.get('a-middle/m1'), ids.get('b-last/m1'), '옛 URL의 책갈피는 같은 초의 저장된 책갈피와 같다');
+    assert.notEqual(ids.get('a-middle/m1'), ids.get('a-middle/m0'));
+    assert.deepEqual(await repo.reconcile({ productId }), { owners: 3, inserted: 0, updated: 0, removed: 0, invalidTrees: 0 });
+    assert.deepEqual(await readIds(), ids);
+    await pool.query('UPDATE lovetree_workspaces SET revision=revision+1 WHERE product_id=$1 AND subject_id=$2',
+      [productId, 'a-middle']);
+    assert.deepEqual(await audit(), { expected: 6, actual: 6, missing: 2, extra: 2, invalidTrees: 0 });
+    await repo.reconcile({ productId, subjectId: 'a-middle' });
+    assert.deepEqual(await audit(), { expected: 6, actual: 6, missing: 0, extra: 0, invalidTrees: 0 });
+
+    const newClip = { url: 'https://youtu.be/ZZZ123xyZ_0', startSeconds: 0, endSeconds: 10 };
+    for (const owner of ['concurrent-a', 'concurrent-b']) await publishStageTestTree(pool, productId, owner, [newClip]);
+    await Promise.all(['concurrent-a', 'concurrent-b'].map(subjectId => repo.reconcile({ productId, subjectId })));
+    const concurrentIds = await readIds();
+    assert.ok(concurrentIds.get('concurrent-a/m0'));
+    assert.equal(concurrentIds.get('concurrent-a/m0'), concurrentIds.get('concurrent-b/m0'));
+    await repo.reconcile({ productId });
+    assert.deepEqual(await readIds(), concurrentIds);
+    const { rows } = await pool.query(`SELECT
+      (SELECT count(*)::int FROM lovetree_stages WHERE product_id=$1) AS stages,
+      (SELECT count(*)::int FROM lovetree_stage_assignments WHERE product_id=$1) AS assignments,
+      (SELECT count(*)::int FROM lovetree_community_votes WHERE product_id=$1) AS votes`, [productId]);
+    assert.deepEqual(rows, [{ stages: 4, assignments: 5, votes: 0 }]);
+  } finally { await pool.end(); }
+});
+
+test('첫 무대 등록이 영상 잠금을 기다리는 동안 소개를 철회하면 영구 배정을 만들지 않는다', { skip }, async () => {
+  assertIsolatedTestDatabase(DATABASE_URL);
+  const pool = await createPool(DATABASE_URL, { max: 3 });
+  try {
+    await applySchema(pool);
+    const productId = 'lt-' + suffix(), subjectId = 'owner';
+    const { tree } = await publishStageTestTree(pool, productId, subjectId, [{ url: stageTestUrl }]);
+    const blocker = await pool.connect();
+    let pending, failure;
+    try {
+      await blocker.query('BEGIN');
+      await lockVideo(blocker, productId, stageKeyForMoment(tree.moments[0]));
+      const pid = (await blocker.query('SELECT pg_backend_pid() AS pid')).rows[0].pid;
+      pending = createStageIndexRepo(pool).reconcile({ productId, subjectId }).catch(error => { failure = error; });
+      // 실제로 두 번째 세션이 이 영상 잠금에서 대기하는 것을 확인한 뒤 소개를 끈다.
+      const deadline = Date.now() + 5000;
+      for (;;) {
+        if (failure) throw failure;
+        const waiting = await pool.query(
+          `SELECT EXISTS(SELECT 1 FROM pg_locks l WHERE NOT l.granted AND l.locktype='advisory'
+             AND $1::int = ANY(pg_blocking_pids(l.pid))) AS waiting`, [pid]
+        );
+        if (waiting.rows[0].waiting) break;
+        assert.ok(Date.now() < deadline, '첫 등록이 영상 잠금에 도달해야 한다');
+        await new Promise(resolve => setTimeout(resolve, 10));
+      }
+      await createTreeDiscoverRepo(pool).set({ productId, subjectId, treeId: tree.id, discover: false });
+    } finally {
+      await blocker.query('ROLLBACK');
+      blocker.release();
+      await pending;
+    }
+    if (failure) throw failure;
+    const { rows } = await pool.query(`SELECT
+      (SELECT count(*)::int FROM lovetree_stages WHERE product_id=$1) AS stages,
+      (SELECT count(*)::int FROM lovetree_stage_assignments WHERE product_id=$1) AS assignments,
+      (SELECT count(*)::int FROM lovetree_stage_moments WHERE product_id=$1) AS moments`, [productId]);
+    assert.deepEqual(rows[0], { stages: 0, assignments: 0, moments: 0 });
+  } finally { await pool.end(); }
+});
+
+test('공개 무대 읽기는 원본 revision·소개·공개·별칭 숨김·차단·역할을 요청마다 확인한다', { skip }, async () => {
+  assertIsolatedTestDatabase(DATABASE_URL);
+  const pool = await createPool(DATABASE_URL, { max: 3 });
+  try {
+    await applySchema(pool);
+    const productId = 'lt-' + suffix();
+    const repo = createStageIndexRepo(pool);
+    const shares = createShareRepo(pool);
+    const discover = createTreeDiscoverRepo(pool);
+    const visibility = createTreeVisibilityRepo(pool);
+    const context = { productId, subjectId: 'owner', treeId: 'same-tree' };
+    const clip = { url: stageTestUrl };
+    const { tree, shareId } = await publishStageTestTree(pool, productId, 'owner', [clip]);
+    await publishStageTestTree(pool, productId, 'honor', [clip]);
+    await publishStageTestTree(pool, productId, 'tester', [clip]);
+    await publishStageTestTree(pool, productId, 'unlisted', [{ url: 'https://youtu.be/XyZ123abc_1' }]);
+    await discover.set({ ...context, subjectId: 'unlisted', discover: false });
+    await pool.query(`INSERT INTO lovetree_product_roles(product_id,subject_id,role)
+      VALUES($1,'honor','ai_customer'),($1,'tester','tester')`, [productId]);
+    const alias = 'owner-alias'.padEnd(24, 'x');
+    await shares.create({ ...context, shareId: alias, entryMomentId: 'm0', view: 'book', momentCount: 3 });
+    await repo.reconcile({ productId });
+    assert.equal((await pool.query('SELECT stage_id FROM lovetree_stages WHERE product_id=$1 AND video_id=$2',
+      [productId, 'XyZ123abc_1'])).rowCount, 0, '링크로만 공유한 영상은 무대 등록부에도 넣지 않는다');
+    const visible = (options = {}) => listVisibleStageMoments(pool, { productId, ...options });
+    const owners = async (options) => (await visible(options)).map(row => row.subject_id).sort();
+    const initial = await visible();
+    assert.deepEqual(initial.map(row => row.subject_id).sort(), ['honor', 'owner']);
+    const stageId = initial.find(row => row.subject_id === 'owner').stage_id;
+    assert.equal(initial.find(row => row.subject_id === 'owner').share_id, shareId);
+    assert.equal(initial.find(row => row.subject_id === 'honor').ai_tester, true);
+    assert.deepEqual(await owners({ stageId }), ['honor', 'owner']);
+    assert.deepEqual(await visible({ stageId: 'missing' }), []);
+
+    const community = createCommunityRepo(pool);
+    await community.blockOwner({ productId, blockerSubjectId: 'viewer-a', blockedSubjectId: 'owner' });
+    await community.blockOwner({ productId, blockerSubjectId: 'owner', blockedSubjectId: 'viewer-b' });
+    for (const viewerSubjectId of ['viewer-a', 'viewer-b']) assert.deepEqual(await owners({ viewerSubjectId }), ['honor']);
+    await pool.query(`INSERT INTO lovetree_community_hidden_shares(product_id,share_id,hidden_by) VALUES($1,$2,'admin')`, [productId, alias]);
+    assert.deepEqual(await owners(), ['honor'], '대표가 아닌 공유 주소를 숨겨도 같은 트리 모든 주소가 빠진다');
+    await pool.query('DELETE FROM lovetree_community_hidden_shares WHERE product_id=$1 AND share_id=$2', [productId, alias]);
+    await shares.revoke({ ...context, shareId });
+    assert.equal((await visible()).find(row => row.subject_id === 'owner').share_id, alias);
+    await shares.revoke({ ...context, shareId: alias });
+    assert.deepEqual(await owners(), ['honor']);
+    await shares.upsertAutoShare({ ...context, shareId, entryMomentId: 'm0', momentCount: 3 });
+    await visibility.set({ ...context, visibility: 'private' });
+    assert.deepEqual(await owners(), ['honor']);
+    await visibility.set({ ...context, visibility: 'public' });
+    await discover.set({ ...context, discover: false });
+    assert.deepEqual(await owners(), ['honor']);
+    await repo.reconcile(context);
+    await discover.set({ ...context, discover: true });
+    await repo.reconcile(context);
+    assert.deepEqual(await owners({ stageId }), ['honor', 'owner']);
+
+    const replaceTree = (value) => pool.query(
+      'UPDATE lovetree_workspaces SET revision=revision+1, doc=$2 WHERE product_id=$1 AND subject_id=$3',
+      [productId, { version: 1, trees: [value] }, context.subjectId]);
+    await replaceTree(tree);
+    assert.deepEqual(await owners(), ['honor'], '미갱신 소속은 같은 내용이어도 현재 revision이 아니면 숨긴다');
+    const sharing = createShareService({ productId, shareRepo: shares, workspaceRepo: createWorkspaceRepo(pool), stageIndex: repo });
+    await sharing.syncSharesAfterSave(context.subjectId);
+    assert.deepEqual(await owners({ stageId }), ['honor', 'owner']);
+    await replaceTree({ ...tree, moments: tree.moments.slice(0, 2) });
+    await repo.reconcile(context);
+    assert.deepEqual(await owners(), ['honor'], '공유 행의 moment_count가 아직 3이어도 원본이 2면 제외한다');
+  } finally { await pool.end(); }
+});
 test('community rows are independent, idempotent and auditable',{skip},async()=>{
  assertIsolatedTestDatabase(DATABASE_URL);const pool=await createPool(DATABASE_URL,{max:3});
  try{
