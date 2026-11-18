@@ -221,13 +221,11 @@ html[data-v41-screen=shelf][data-lt-theme=garden] .book-card > .book-manage {
 }
 
 /* ── 큰 화면(가로 1900px 이상) 서재(#서재-빈공간): 2560 같은 화면에서 .page가 1480px에 묶여
-   왼·오른쪽에 빈 공간이 남았다. 1920px까지 넓히고, 이어 보기·검색 줄·책장을 한 묶음으로
-   세로 가운데에 세운다(묶음 위·아래 여백을 나눠 갖고, 검색 줄 아래 여백을 없애 책장과의
-   간격을 48px로 묶는다). 기준을 1900px로 둔 것은 1920 물리 화면이 스크롤바 때문에
-   가로 1918px쯤으로 읽히기 때문이다. 1440 같은 화면은 이 블록의 영향을 받지 않는다(지금 배치 그대로). */
+   왼·오른쪽에 빈 공간이 남았다. 1920px까지 넓힌다. 11-19 대표 결정으로 책장 세로 중심은
+   화면 폭과 무관하게 남은 화면(이어 보기·검색 줄 아래) 가운데에 둔다 — 위쪽 자동 여백으로
+   밀지 않는다. 기준을 1900px로 둔 것은 1920 물리 화면이 스크롤바 때문에 가로 1918px쯤으로
+   읽히기 때문이다. */
 @media (min-width: 1900px) {
   html[data-v41-screen=shelf] .page { max-width: 1920px; }
-  html[data-v41-screen=shelf] .shelf-screen > .hero { margin-top: auto; }
-  html[data-v41-screen=shelf] .shelf-controls { margin-bottom: 0; }
-  html[data-v41-screen=shelf] .shelf-viewport { margin-top: 48px; margin-bottom: auto; }
+  html[data-v41-screen=shelf] .shelf-viewport { margin-top: auto; margin-bottom: auto; }
 }

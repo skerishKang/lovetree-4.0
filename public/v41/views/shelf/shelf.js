@@ -62,10 +62,8 @@ import { createReader } from './shelf-reader.js';
          state.shelfList=list;
         state.shelfIndex=resolveShelfIndex(list, state.selectedId, state.shelfIndex);
         $('#resultCount').textContent='트리 '+list.length+'개';
-        // #465: 넘길 책이 없으면(1권 이하) 좌우 넘김 화살표를 숨긴다.
-        var prevArrow=$('#shelfPrev'),nextArrow=$('#shelfNext');
-        if(prevArrow)prevArrow.hidden=list.length<=1;
-        if(nextArrow)nextArrow.hidden=list.length<=1;
+        // #889 원래 결정: 화살표는 책이 한 줄에 다 안 들어갈 때(넘김 배치일 때)만 둔다.
+        applyShelfArrows(list.length,($('#shelfRail')&&$('#shelfRail').clientWidth)||0);
         // 261118 대표 지적 4: 트리가 있으면 소개 문 대신 이어 보기 띠 한 줄. 트리 0개일 때만 소개 문('…한 권의 책으로.'+'책 열기')이 보인다.
         var hero=document.querySelector('.hero');
         if(hero)hero.classList.toggle('strip-mode',list.length>0);
@@ -124,12 +122,20 @@ import { createReader } from './shelf-reader.js';
         viewport.style.setProperty('--shelf-accent',book.color);
         viewport.setAttribute('data-selected-book',book.id);
       }
+      // 화살표 0개(다 들어감) / 2개(넘침). 레일 폭이 정해지기 전에는 잠시 숨기고, ResizeObserver가 다시 맞춘다.
+      function applyShelfArrows(count, railWidth) {
+        var show=railWidth>0&&shelfRowLayout(count, railWidth).mode==='carousel'&&count>0;
+        var prevArrow=$('#shelfPrev'),nextArrow=$('#shelfNext');
+        if(prevArrow)prevArrow.hidden=!show;
+        if(nextArrow)nextArrow.hidden=!show;
+      }
       function updateCarousel() {
         var rail=$('#shelfRail');
         if(!rail)return;
+        applyShelfArrows(state.shelfList.length, rail.clientWidth);
         var center=state.shelfIndex;
-        // #서재-빈공간: 책이 레일에 다 들어가는 넓은 화면에서는 왼쪽부터 차례로 늘어놓고(묶음 가운데 정렬),
-        // 넘칠 때는 지금처럼 고른 책을 가운데 두고 넘긴다. 흐림 기준(±2→±4)도 넓은 화면에서 함께 완화한다.
+        // 11-19 대표 결정: 책이 다 들어가면 화면 폭과 무관하게 왼쪽부터 나란히,
+        // 넘칠 때만 고른 책을 가운데 두고 넘긴다. 흐림 기준(±2→±4)은 넓은 화면에서 함께 완화한다.
         var layout=shelfRowLayout(state.shelfList.length, rail.clientWidth);
         state.shelfList.forEach(function(book,index){
           var card=rail.querySelector('[data-book-index="'+index+'"]');
@@ -137,6 +143,9 @@ import { createReader } from './shelf-reader.js';
           // #212: 중앙 카드는 레일 높이(375)보다 큰 352px이라 위로 뜨면 표지 윗부분이 잘렸다.
           // 중앙은 위로 띄우지 않고 아래로 살짝 내리고, 배율을 레일 안에 들어가는 값으로 조정한다.
           var placed=carouselTransform(index-center, layout.wide);
+          // 책장처럼 나란히 세울 때는 모든 책을 같은 크기·각도로(선반에 앉은 채) 놓는다 —
+          // 가운데 책만 커지면 첫 책 왼쪽 끝이 안쪽 여백에서 어긋난다(#938).
+          if(layout.mode==='row'){placed.scale=1;placed.rotate=0;placed.alpha=1;placed.zIndex=1;placed.pointerEvents='auto';placed.filter='none';}
           card.style.setProperty('--x',layout.xOf(index,center)+'px');
           card.style.setProperty('--y',placed.y+'px');
           card.style.setProperty('--z',placed.z+'px');

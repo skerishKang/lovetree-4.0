@@ -165,18 +165,25 @@ export function carouselTransform(distance, wide = false) {
   };
 }
 
-// 책 가로 배치 방식(#서재-빈공간). 책 수가 레일에 다 들어갈 때는 왼쪽부터 차례로 늘어놓고
-// 묶음을 가운데 정렬한다(빈 반쪽이 생기지 않는다). 넘칠 때는 지금처럼 고른 책을 가운데 두고 넘긴다.
-// 넓은 화면(레일 1760px 이상 — 1920 물리 화면은 스크롤바 때문에 레일이 1778px쯤 된다)에서만 이 방식을 쓴다 — 1440 같은 화면에서는 지금과 같은 넘김 배치를 유지한다.
+// 책 가로 배치 방식(#889 원래 결정, 11-19 대표 결정으로 화면 폭 조건 제거).
+// 책이 한 줄에 다 들어가면 화면 폭과 무관하게 책장처럼 왼쪽 안쪽 여백부터 나란히 세우고,
+// 한 줄에 다 안 들어갈 때만 지금처럼 고른 책을 가운데 두고 좌우 화살표로 넘긴다.
+// 좌표는 레일 가운데가 0. 카드 left:50% + translate(-50%)라서 --x=0이면 카드가 가운데에 온다.
+// 첫 책 왼쪽 끝을 레일 왼쪽(책장 안쪽 여백)에 맞추려면 leftX = cardW/2 - railWidth/2, 이후 pitch만큼 더한다.
 export function shelfRowLayout(count, railWidth, { pitch = 200, cardW = 190, pad = 24, wideRail = 1760 } = {}) {
   const needed = (Math.max(count, 1) - 1) * pitch + cardW;
   const wide = railWidth >= wideRail;
-  const mode = wide && needed + 2 * pad <= railWidth ? 'row' : 'carousel';
+  // 왼쪽 시작점은 책장 안쪽 여백이라 오른쪽 여백(pad)만 남기면 된다.
+  const fits = needed + pad <= railWidth;
+  const mode = fits ? 'row' : 'carousel';
+  const leftX = cardW / 2 - railWidth / 2;
   return {
     mode,
     wide,
-    // 레일 가운데가 0인 좌표. row: 묶음을 가운데 정렬한 순서 배치. carousel: 고른 책(center)이 가운데.
-    xOf: (index, center) => (mode === 'row' ? (index - (count - 1) / 2) * pitch : (index - center) * pitch)
+    fits,
+    leftX,
+    // row: 왼쪽 안쪽 여백부터 차례로. carousel: 고른 책(center)이 가운데.
+    xOf: (index, center) => (mode === 'row' ? leftX + index * pitch : (index - center) * pitch)
   };
 }
 

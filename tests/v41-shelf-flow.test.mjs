@@ -108,26 +108,41 @@ test('#서재-빈공간: 넓은 화면(레일 1800px 이상)에서는 흐림 기
   assert.equal(carouselTransform(3).filter, 'saturate(.72) brightness(.86)');
 });
 
-test('#서재-빈공간: 책이 레일에 다 들어가는 넓은 화면에서는 왼쪽부터 순서 배치(묶음 가운데), 넘치거나 좁으면 넘김 배치', () => {
-  // 2560(레일 1818): 책 6권은 다 들어간다 → 순서 배치. 첫 책이 왼쪽 끝, 묶음은 가운데(빈 반쪽 없음).
-  const row = shelfRowLayout(6, 1818);
-  assert.equal(row.mode, 'row');
-  assert.equal(row.wide, true);
-  assert.equal(row.xOf(0), -500, '첫 책은 묶음 왼쪽 끝');
-  assert.equal(row.xOf(5), 500, '끝 책은 묶음 오른쪽 끝');
-  assert.equal(row.xOf(2), -100);
-  // 2560에서 책 12권(needed 2390)은 넘친다 → 지금처럼 가운데 기준 넘김.
+test('#서재-빈공간 → 11-19 대표 결정: 책이 다 들어가면 화면 폭 무관하게 왼쪽부터 나란히, 넘칠 때만 넘김 배치', () => {
+  // 1440(레일 1300): 책 1·3·4·6권은 다 들어간다 → 책장처럼 왼쪽 안쪽 여백부터 나란히.
+  const row = shelfRowLayout(6, 1300);
+  assert.equal(row.mode, 'row', '1440에서도 왼쪽부터');
+  assert.equal(row.fits, true);
+  assert.equal(row.wide, false, '1440은 넓은 화면 흐림 완화 대상이 아니다');
+  assert.equal(row.leftX, 95 - 1300 / 2, '첫 책 시작점 = 책장 왼쪽 안쪽 여백');
+  assert.equal(row.xOf(0), row.leftX, '첫 책은 왼쪽 안쪽 여백');
+  assert.equal(row.xOf(5), row.leftX + 5 * 200, '끝 책도 같은 간격으로 나란히');
+  assert.equal(row.xOf(2) - row.xOf(1), 200, '책 간격 고르게');
+  assert.equal(row.xOf(3) - row.xOf(2), 200, '책 간격 고르게');
+  // 2560(레일 1818)도 같은 규칙. 첫 책은 왼쪽 끝에 그대로 있고 오른쪽만 여유가 늘어난다.
+  const wide = shelfRowLayout(6, 1818);
+  assert.equal(wide.mode, 'row');
+  assert.equal(wide.wide, true);
+  assert.equal(wide.xOf(0), 95 - 1818 / 2, '2560에서도 첫 책은 왼쪽 끝');
+  assert.equal(wide.xOf(2) - wide.xOf(1), 200);
+  // 책 1권도 왼쪽 끝에 고정(가운데에 두지 않는다).
+  assert.equal(shelfRowLayout(1, 1300).xOf(0), 95 - 1300 / 2);
+  assert.equal(shelfRowLayout(1, 1818).mode, 'row');
+  // 390(레일 ≈ 280)에서도 1권은 왼쪽부터, 3·4권은 안 들어가 넘김 배치.
+  assert.equal(shelfRowLayout(1, 280).mode, 'row');
+  assert.equal(shelfRowLayout(1, 280).xOf(0), 95 - 280 / 2);
+  const small = shelfRowLayout(3, 280);
+  assert.equal(small.mode, 'carousel');
+  assert.equal(small.fits, false);
+  // 넘치면(2560에서 책 12권, needed 2390) 지금처럼 가운데 기준 넘김 + 좌우 화살표.
   const over = shelfRowLayout(12, 1818);
   assert.equal(over.mode, 'carousel');
+  assert.equal(over.fits, false, '화살표 2개');
   assert.equal(over.wide, true, '넘쳐도 넓은 화면 흐림 완화는 유지');
   assert.equal(over.xOf(3, 4), -200, '고른 책(4번) 기준 좌표');
-  // 1440(레일 1300): 지금과 같은 넘김 배치를 유지한다(레일이 넓은 화면 기준 미만).
-  const narrow = shelfRowLayout(6, 1300);
-  assert.equal(narrow.mode, 'carousel');
-  assert.equal(narrow.wide, false);
-  assert.equal(narrow.xOf(2, 0), 400);
-  // 책 1권도 순서 배치(가운데).
-  assert.equal(shelfRowLayout(1, 1818).xOf(0), 0);
+  // 화살표 판정은 fits 하나에서 나온다: 다 들어가면 0개, 넘치면 2개.
+  assert.equal(shelfRowLayout(3, 1300).fits, true, '다 들어가면 화살표 0개');
+  assert.equal(shelfRowLayout(3, 280).fits, false, '넘치면 화살표 2개');
 });
 
 test('페이지 표시·화살표 상태·넘김 가능 범위', () => {
