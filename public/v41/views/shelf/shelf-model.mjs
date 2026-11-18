@@ -92,8 +92,26 @@ export const findBook = (list, id) => list.find((book) => book.id === id);
 
 export const coverStyle = (book) => '--cover:' + book.color + ';--cover-accent:' + book.accent + ';--tilt:' + ((book.id.length % 5) - 2) + 'deg;';
 
-// #212: 표지 아래 정보 줄은 "순간 N개 · 마지막 YYYY-MM-DD" 하나만.
-export const bookMeta = (book) => book.chapters.length + '개 순간 · 마지막 ' + (book.lastDate || '-');
+// #212: 표지 아래 정보 줄은 "순간 N개 · …" 하나만.
+// 261118 대표 지적 5: 뒤쪽은 언제 담았는지를 쉰 말로 — '어제 추가'·'3일 전 추가'.
+// 7일이 넘으면 날짜('11월 8일 추가')로 쓴다. '마지막 2026-11-13' 같은 기계 표기는 쓰지 않는다.
+export function addedLabel(lastDate, now = new Date()) {
+  if (!lastDate) return '';
+  const [y, m, d] = String(lastDate).split('-').map(Number);
+  if (!y || !m || !d) return '';
+  const then = new Date(y, m - 1, d);
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const days = Math.round((today - then) / 86400000);
+  if (days <= 0) return '오늘 추가';
+  if (days === 1) return '어제 추가';
+  if (days <= 7) return days + '일 전 추가';
+  return (then.getMonth() + 1) + '월 ' + then.getDate() + '일 추가';
+}
+
+export const bookMeta = (book, now) => {
+  const label = addedLabel(book.lastDate, now);
+  return book.chapters.length + '개 순간' + (label ? ' · ' + label : '');
+};
 
 export function filterShelf(books, filter, query) {
   const needle = String(query || '').trim().toLowerCase();
@@ -114,18 +132,19 @@ export function resolveShelfIndex(list, selectedId, shelfIndex) {
   return Math.max(0, Math.min(shelfIndex, list.length - 1));
 }
 
-// 레일 위 카드 배치(거리 → 좌표·배율·투명도). #212에서 중앙 카드를 위로 띄우지 않고 살짝 내린다.
+// 레일 위 카드 배치(거리 → 좌표·배율·투명도). #212에서 중앙 카드를 위로 띄우지 않는다.
+// 261118 대표 지적 2차: 옆 책도 설명 글자가 실제 크기(12px)로 읽혀야 하므로 배율·깊이 이동으로 글자를 줄이지 않는다.
+// 책은 좌우 간격과 살짝 돌림·투명도로만 깊이를 내고, 4번째 이후 책도 투명도 0.6으로 남긴다.
 export function carouselTransform(distance) {
   const absolute = Math.abs(distance);
-  const x = distance * 158 + (distance > 0 ? Math.min(absolute * 8, 22) : distance < 0 ? -Math.min(absolute * 8, 22) : 0);
-  const scale = absolute === 0 ? 1.06 : absolute === 1 ? 0.82 : absolute === 2 ? 0.66 : 0.54;
+  const x = distance * 200;
   return {
     x,
-    y: absolute === 0 ? 6 : Math.min(absolute * 8, 28),
-    z: -absolute * 78,
-    scale,
-    rotate: distance === 0 ? 0 : distance > 0 ? -22 : 22,
-    alpha: absolute === 0 ? 1 : absolute === 1 ? 0.9 : absolute === 2 ? 0.66 : absolute === 3 ? 0.28 : 0,
+    y: 0,
+    z: 0,
+    scale: absolute === 0 ? 1.06 : 1,
+    rotate: distance === 0 ? 0 : distance > 0 ? -12 : 12,
+    alpha: absolute === 0 ? 1 : absolute === 1 ? 0.9 : absolute === 2 ? 0.8 : 0.6,
     zIndex: 100 - absolute,
     pointerEvents: absolute > 3 ? 'none' : 'auto',
     filter: absolute > 2 ? 'saturate(.72) brightness(.86)' : 'none'
@@ -146,28 +165,6 @@ export function pageTarget(index, count, direction, forcedIndex) {
   const next = typeof forcedIndex === 'number' ? forcedIndex : index + direction;
   if (next < 0 || next >= count) return null;
   return next;
-}
-
-// #256 2번: 책이 3권부터 책등을 목차처럼 한 줄로 세운다. 0~2권은 목차가 시끄러우니 숨긴다.
-export const spineVisible = (count) => count >= 3;
-
-// 책등 목차 항목: 책장 순서 그대로 한 줄에 세운다. 눈금마다 살짝 기울여 책장에 꽂힌 모양을 낸다.
-export function spineItems(books) {
-  return books.map((book, index) => ({ id: book.id, name: book.name, index, color: book.color, tilt: ((index % 3) - 1) * 2 }));
-}
-
-// 책등에 새울 모양(표지 색 변수 + 기울임). 실제 색값은 identity.css의 --lt-cover-N이 테마별로 정한다.
-export const spineStyle = (item) => '--cover:' + item.color + ';--tilt:' + item.tilt + 'deg;';
-
-// 책등을 눌렀을 때 아래 넘기기(레일)가 이동할 자리. 목차에 없는 책이면 -1(화면이 무시한다).
-export const spineTargetIndex = (books, id) => books.findIndex((book) => book.id === id);
-
-// 활성 책등을 목차 줄 가운데로 모는 가로 위치. 줄(row) 안에서만 자른다 —
-// scrollIntoView와 달리 스크롤 가능한 조상(책장 문서·셸 부모 문서)을 움직이지 않게 하기 위한 계산(#256 2번 후속).
-export function spineScrollLeft(rowClientWidth, rowScrollWidth, itemLeft, itemWidth) {
-  const max = Math.max(0, rowScrollWidth - rowClientWidth);
-  const ideal = itemLeft + itemWidth / 2 - rowClientWidth / 2;
-  return Math.max(0, Math.min(ideal, max));
 }
 
 export function youtubeId(url, describe) {
@@ -217,17 +214,18 @@ export const RESUME_COPY = { example: '예시 책 펼쳐 보기', first: '첫 �
 
 // 자동 제목이 메모의 마침표를 그대로 물려받아 "기록.까지 봤어요"가 되던 표시를 다듬는다.
 // 저장 데이터는 바꾸지 않고 이 칸의 문구만 정리한다.
-const resumeName = (value) => String(value || '').trim().replace(/[.。!?！？]+$/u, '');
+export const resumeName = (value) => String(value || '').trim().replace(/[.。!?！？]+$/u, '');
 
-// source: 'server'면 실제 기록(로그인), 그 외(예시·파일·공유)는 예시 칸으로 본다.
+// 이어 보기 띠가 쓸 값. source: 'server'면 실제 기록(로그인), 그 외(예시·파일·공유)는 예시 칸으로 본다.
 export function resumeCard({ source = 'server', treeId = '', momentId = '', books = [] } = {}) {
   if (source !== 'server') {
     const book = books[0] || null;
-    return { kind: 'example', book, moment: null, title: RESUME_COPY.example, action: '' };
+    const moment = book ? book.chapters[0] || null : null;
+    return { kind: 'example', book, moment, treeName: book ? book.name : '', momentTitle: moment ? resumeName(moment.title) : '', title: RESUME_COPY.example, action: '펼쳐 보기' };
   }
   // 저장 위치의 트리가 지워졌으면 첫 책으로 대신 보여 준다(셸의 resolveAccountPosition과 같은 방향).
   const book = books.find((item) => item.id === treeId) || books[0] || null;
-  if (!book) return { kind: 'first', book: null, moment: null, title: RESUME_COPY.first, action: '' };
+  if (!book) return { kind: 'first', book: null, moment: null, treeName: '', momentTitle: '', title: RESUME_COPY.first, action: '' };
   const moment = book.chapters.find((chapter) => chapter.id === momentId) || book.chapters[0] || null;
-  return { kind: 'resume', book, moment, title: '지난번 ' + resumeName(moment ? moment.title : book.name) + '까지 봤어요', action: RESUME_ACTION };
+  return { kind: 'resume', book, moment, treeName: book.name, momentTitle: moment ? resumeName(moment.title) : '', title: '지난번 ' + resumeName(moment ? moment.title : book.name) + '까지 봤어요', action: RESUME_ACTION };
 }

@@ -12,6 +12,7 @@
 //       --issue는 숫자만 받고(#636), 이슈 값을 비우려면 --issue-clear를 쓴다(#678 — 'none' 같은 값은 받지 않는다. 답변 모드에서도 같다).
 //       --issue와 --issue-clear를 함께 쓰면 거절한다.
 //       답변을 달 때(--reply)는 상태를 함께 바꾸고 연결 이슈는 --issue/--issue-clear를 준 만큼만 바꾼다(답변은 고객에게 보이는 답변 authorType=customer).
+//       사용 일지(#846 후속)는 고객 답변을 남길 수 없다(서버 규칙 journal_internal_only) — --status-only로 상태·연결 이슈만 바꾸거나, --reply면 고객에게 보이지 않는 내부 메모(authorType=internal)로 남긴다.
 //
 // 실행: node /opt/padiem/lovetree-api/tools/ops-reply.mjs --id 7 --reply /tmp/reply.txt --status fixed --issue 584
 
@@ -62,6 +63,13 @@ export function buildPatch(args) {
 /** 이미 답글이 있으면 건너뛴다(아무 것도 바꾸지 않는다). */
 export const shouldSkip = row => Boolean(row && (row.replyCount ?? 0) > 0);
 
+/** 답변 모드(순수) — 의견은 고객 답변, 사용 일지는 내부 메모만(서버 규칙). 상태만 바꿀 때는 null. */
+export function replyMode(current, args) {
+  if (current.kind === 'journal') return args.statusOnly ? null : 'internal';
+  if (current.kind !== 'opinion') return 'unknown-kind';
+  return args.statusOnly ? null : 'customer';
+}
+
 function fail(message, code) {
   console.error(message);
   process.exit(code);
@@ -91,7 +99,8 @@ async function main() {
 
     const current = await repo.get({ productId, id: Number(args.id) });
     if (!current) fail('의견을 찾을 수 없습니다(번호 확인).', 4);
-    if (current.kind !== 'opinion') fail('사용 일지에는 고객 답변을 남길 수 없습니다.', 4);
+    const mode = replyMode(current, args);
+    if (mode === 'unknown-kind') fail('글 종류를 확인해 주세요.', 4);
     if (shouldSkip(current) && !args.statusOnly) {
       console.log(`skipped id=${current.id} status=${current.status} replies=${current.replyCount}`);
       return;
@@ -103,13 +112,13 @@ async function main() {
     if (!adminSubject) fail('관리자 역할 계정을 찾을 수 없습니다.', 4);
     const principal = { productId, subjectId: adminSubject };
 
-    const reply = args.statusOnly ? null : await service.reply(principal, String(args.id), {authorType: 'customer', body: replyText});
+    const reply = mode ? await service.reply(principal, String(args.id), {authorType: mode, body: replyText}) : null;
     // 이슈를 생략하면 patch에 넣지 않아 운영센터와 같은 update가 기존 값을 그대로 둔다(#678·#689 후속).
     // --issue-clear는 운영센터가 이슈를 지울 때 보내는 빈 값('')을 그대로 서비스에 넘긴다(DB 직접 쓰기 없음).
     const patch = buildPatch(args);
     const updated = await service.update(principal, String(args.id), patch);
     if (args.statusOnly) console.log(`updated id=${updated.id} status=${updated.status} issue=${updated.issueNumber || ''} replies=${updated.replyCount}`);
-    else console.log(`replied id=${updated.id} replyId=${reply.id} authorType=customer status=${updated.status} issue=${updated.issueNumber || ''} replies=${updated.replyCount}`);
+    else console.log(`replied id=${updated.id} replyId=${reply.id} authorType=${mode} status=${updated.status} issue=${updated.issueNumber || ''} replies=${updated.replyCount}`);
   } finally {
     await pool.end().catch(() => {});
   }

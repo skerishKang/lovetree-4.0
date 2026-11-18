@@ -581,29 +581,42 @@ document.getElementById('gViewConc')?.addEventListener('click', () => goMapWithV
    (2026-11-16 CTO 지적: '꼬리표 없는'이 아니라 '아직 묶음에 안 든'이다). */
 function showSuggestions() {
   const untagged = model.graph.moments.filter((m) => m.hubId === null).map((m) => MOMENT_OF.get(m.id)).filter(Boolean);
-  const suggestions = suggestForMoments(untagged);
+  try { parent.postMessage({ type: 'lt-suggest-request', momentIds: untagged.map((m) => m.id) }, location.origin); } catch {}
+  try { parent.postMessage({ type: 'lt41-open-tags', suggest: true }, location.origin); } catch {}
+  const requestSuggestions = ctx.suggestForMoments || suggestForMoments;
+  const byMoment = new Map((requestSuggestions(untagged) || []).map((s) => [s.momentId, s.suggestions]));
   const card = document.getElementById('detailCard');
   card.replaceChildren();
   const head = document.createElement('div'); head.className = 'd-kicker'; head.textContent = '아직 묶음에 안 든 순간 ' + untagged.length + ' — 꼬리표 한 번에 제안받기';
-  const note = document.createElement('p'); note.className = 'd-memo';
-  note.innerHTML = '<b>제안일 뿐</b> — 확인한 것만 저장된다. 꼬리표 정리 화면에서 확인해 저장하세요(지금 화면은 저장하지 않는다).';
+  const note = document.createElement('p'); note.className = 'd-memo'; note.textContent = '제안을 고르면 바로 붙어요.';
   const list = document.createElement('ul'); list.className = 'd-list';
-  let shown = 0;
-  for (const s of suggestions) {
-    if (!s.suggestions?.length) continue;
-    shown += 1;
+  for (const moment of untagged) {
     const li = document.createElement('li');
     const b = document.createElement('button'); b.type = 'button';
-    const d = document.createElement('small'); d.textContent = dayOf(model.graph.moments.find((m) => m.id === s.momentId) || {});
-    const t = document.createElement('span'); t.textContent = s.title + ' — ' + s.suggestions.map((p) => p.raw).join(', ');
-    b.append(d, t);
-    b.addEventListener('click', () => { stopWalk(); selected = { type: 'moment', id: s.momentId }; refresh(); });
+    const title = String(moment.title || moment.subject || '').trim() || '제목 없음';
+    const date = String(moment.date || '').trim();
+    const d = document.createElement('small'); d.textContent = [date, title].filter(Boolean).join(' · ');
+    b.append(d);
+    const tags = (Array.isArray(byMoment.get(moment.id)) ? byMoment.get(moment.id) : [])
+      .map((p) => (typeof p === 'string' ? p : p?.raw)).map((x) => String(x ?? '').trim()).filter(Boolean);
+    if (tags.length) { const t = document.createElement('span'); t.textContent = ' — ' + tags.join(', '); b.append(t); }
+    b.addEventListener('click', () => { stopWalk(); selected = { type: 'moment', id: moment.id }; refresh(); });
     li.appendChild(b); list.appendChild(li);
   }
-  if (!shown) { const li = document.createElement('li'); const b = document.createElement('button'); b.type = 'button'; b.textContent = '지금 제안할 꼬리표가 없어요'; li.appendChild(b); list.appendChild(li); }
+  if (!untagged.length) { const li = document.createElement('li'); const b = document.createElement('button'); b.type = 'button'; b.textContent = '지금 제안할 꼬리표가 없어요'; li.appendChild(b); list.appendChild(li); }
   card.append(head, note, list);
 }
 document.getElementById('shelfHint').addEventListener('click', () => showSuggestions());
+window.addEventListener('message', (event) => {
+  if (event.origin !== location.origin || event.data?.type !== 'lt41-tags-saved' || !event.data.ok) return;
+  const moment = MOMENT_OF.get(event.data.momentId);
+  if (!moment) return;
+  moment.keywords = Array.isArray(event.data.keywords) ? event.data.keywords : [];
+  const rebuilt = buildGraph([...MOMENT_OF.values()].map((m) => ({ ...m, keywords: Array.isArray(m.keywords) ? m.keywords : [] })));
+  model.graph = rebuilt;
+  if (!momentById(selected?.id)) selected = rebuilt.moments.length ? { type: 'moment', id: rebuilt.footprint.order[0] } : { type: null };
+  refresh();
+});
 
 /* ── 발자초 걷기(시간 순서 전체를 한 점씩 밝히며 걷는다) ── */
 const walkBtn = document.getElementById('walkBtn');

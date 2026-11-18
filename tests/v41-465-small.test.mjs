@@ -9,16 +9,13 @@ const shelf = read('public/v41/views/shelf/shelf.js');
 const shelfExtraCss = read('public/v41/views/shelf/shelf-extra.css');
 const community = read('public/v41/community-panel.mjs');
 
-test('#465 1: 책장 — 넘길 책이 없으면 화살표를 숨기고, 책 1~2권이면 소개 상자를 낮게 둔다', () => {
+test('#465 1: 책장 — 넘길 책이 없으면 화살표를 숨긴다(261118: 책등 목차는 지워졌다)', () => {
   // 렌더 때 목록 길이로 화살표를 숨긴다(검색 필터가 1권으로 줄어도 같다).
   assert.match(shelf, /var prevArrow=\$\('#shelfPrev'\),nextArrow=\$\('#shelfNext'\);/);
   assert.match(shelf, /if\(prevArrow\)prevArrow\.hidden=list\.length<=1;/);
   assert.match(shelf, /if\(nextArrow\)nextArrow\.hidden=list\.length<=1;/);
-  // 소개 상자는 책등 목차 기준(3권부터)을 그대로 쓴다 — 1~2권이면 낮게.
-  assert.match(shelf, /hero\.classList\.toggle\('compact',!spineVisible\(list\.length\)\)/);
-  // 숨김 확실 가드와 낮은 소개 상자 스타일.
+  // 숨김 확실 가드. 소개 상자 높이 규칙은 이어 보기 띠(261118 대표 지적 4)로 바뀌었다.
   assert.match(shelfExtraCss, /#shelfPrev\[hidden\],#shelfNext\[hidden\]\{display:none!important\}/);
-  assert.match(shelfExtraCss, /\.hero\.compact\{min-height:0;padding:16px 26px\}/);
 });
 
 test('#465 5: 둘러보기 안내를 사람 말로 — 0개면 아직 없다는 말, 있으면 새로 공개된 순서', () => {

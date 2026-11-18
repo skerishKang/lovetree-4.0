@@ -110,7 +110,7 @@ export function createFeedbackBoard({$, notify, show, showFull, onReplyCount, on
 
   async function openMyPosts() {
     if (!ppanel) return;
-    plist.innerHTML = '<p class="panel-note">불러오는 중…</p>';
+    plist.innerHTML = '<p class="panel-note">불러오는 중이에요.</p>';
     if (typeof showFull === 'function') showFull(); else ppanel.showModal();
     const res = await api.call('/api/board/mine');
     const posts = res.ok && Array.isArray(res.posts) ? res.posts : [];
