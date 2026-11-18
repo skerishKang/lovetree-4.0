@@ -1,5 +1,11 @@
 # LoveTree 4.0 — 핸드오프
 
+## 2026-11-19 — #792 무대 담기와 주간 투표 API (4단계 ④)
+
+- 서버와 Pages 프록시에서 `GET /api/community/shares/:shareId/moments/:momentId/stage`, `GET /api/community/stages/popular`, `GET /api/community/stages/:stageId`, `PUT/DELETE /api/community/stages/:stageId/vote`를 처리한다. 상세는 `currentShareId`로 현재 트리를 다른 트리 목록에서 빼고, 다음 12개를 읽을 때 직전 응답의 `nextCursor`를 `cursor`로 보낸다.
+- 기존 ② 표와 ③ 공개 색인을 사용한다. 가입 7일 이후 첫 PUT은 현재 담기와 평생 최초 표를 함께 기록한다. DELETE는 본인의 담기만 해제한다. 공개 자격과 원본 revision을 매 요청 확인하며 마지막 공개 근거가 사라지면 조회와 새 담기는 404다.
+- 주간 최초 표는 한국 시간 월요일 0시부터 다음 월요일 0시 직전까지 센다. 새 API에서 3 미만의 집계 수는 `null`이다. 실제 고객 운영 플래그는 트리·무대 순위가 함께 사용한다. 이용자 화면은 ⑤에서 연결한다.
+
 ## 2026-11-19 — #792 공개 순간의 무대 색인과 공개 철회 (4단계 ③)
 
 - 공개·소개 동의·활성 공유·현재 순간 3개 이상인 트리에서 YouTube 순간을 배정한다. 같은 소유자의 여러 공유 주소는 한 트리로 센다. 운영 숨김, 시험 계정, 양방향 차단, 현재 문서 revision을 읽을 때 다시 확인한다. 명예회원은 배지 정보와 함께 포함한다.
