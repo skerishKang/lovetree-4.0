@@ -868,3 +868,34 @@ test('이슈 905 화면(1440): 자동 저장 성공은 알림이 없고, 저장 
     server.close();
   }
 });
+
+// 이슈 185 후속(상단 계정 메뉴 흰 띠): 칩 모양 규칙이 판 안 단추까지 내려가 줄마다 뒤를 흐리게 하던 문제.
+// 화면에서 잰다 — 판 안 단추는 backdrop-filter none, 상단 칩은 blur(8px) 유지.
+test('#185 후속 화면(1440): 계정 메뉴 안 단추는 backdrop-filter가 없고 상단 칩은 blur를 유지한다', { skip: REQUIRE_644 ? false : skip644, timeout: 300000 }, async () => {
+  if (skip644) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip644}`);
+  const { server } = await serve644();
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await pwChromium644.launch({ headless: true });
+  try {
+    const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const page = await context.newPage();
+    await page.goto(`${base}/v41/?account=1`, { waitUntil: 'load' });
+    await waitSynced644(page);
+    await page.click('#account-avatar');
+    await page.waitForFunction(() => !document.getElementById('account-popover')?.hidden, null, { timeout: 8000 });
+    const bf = await page.evaluate(() => {
+      const read = (el) => getComputedStyle(el).backdropFilter;
+      const menu = [...document.querySelectorAll('#account-popover button')].map((b) => ({ id: b.id, bf: read(b) }));
+      return {
+        menu,
+        chips: ['theme-toggle', 'write-menu', 'account-avatar'].map((id) => ({ id, bf: read(document.getElementById(id)) })),
+      };
+    });
+    assert.ok(bf.menu.length >= 6, `계정 메뉴 단추가 열려 있다(${bf.menu.length}개)`);
+    assert.deepEqual([...new Set(bf.menu.map((b) => b.bf))], ['none'], `메뉴 안 모든 단추 backdrop-filter none(${JSON.stringify(bf.menu)})`);
+    assert.deepEqual([...new Set(bf.chips.map((b) => b.bf))], ['blur(8px)'], `상단 칩은 blur(8px)를 유지한다(${JSON.stringify(bf.chips)})`);
+  } finally {
+    await browser.close();
+    server.close();
+  }
+});
