@@ -1,4 +1,6 @@
-import test from 'node:test';import assert from 'node:assert/strict';import {readFileSync} from 'node:fs';
+import test from 'node:test';import assert from 'node:assert/strict';import {readFileSync, existsSync} from 'node:fs';
+import {serve} from './helpers/screen-audit.mjs';
+import {createTree, addMoment} from '../public/v41/domain.mjs';
 // #327 2부: 모아둔 순간 표시·정리 화면. 계산은 inbox-model.mjs 한 벌이고, 화면은 그 결과를 그린다.
 import {INBOX_LABEL, isInboxTree, shelfOrder, pickerLabel, headerBadge, josaRo, cleanupTargets, cleanupState, movedNotice, cleanupAvailable, moveAvailable} from '../public/v41/inbox-model.mjs';
 const read=p=>readFileSync(new URL(p,import.meta.url),'utf8');
@@ -101,5 +103,91 @@ test('안내 바는 첫 트리 말풍선 위에 온다(말풍선이 안내를 �
  const move=zOf('#move-feedback');
  assert.equal(tips,25,'말풍선 z-index 기준');
  assert.ok(move!==null&&move>tips,'안내 바(#move-feedback)가 말풍선보다 위여야 한다');
+});
+
+// ─── 이슈 970: 모아둔 순간을 실제 화면에서 본다(가짜 데이터만, 390·1440) ───
+// 목록(넓은 화면은 보드 카드, 휴대폰은 고르기 줄)이 보이고, 하나를 누르면 그 순간의 상세가
+// 열리고, 닫으면 초점이 연 곳으로 돌아온다. 운영 API·운영 계정 없이 가짜 작업장만 쓴다.
+// LT_970_REQUIRE=1 일 때 실행(CI 화면 잡 — 건너뜀=실패).
+const REQUIRE970 = process.env.LT_970_REQUIRE === '1';
+let chromium970, skip970 = false;
+try {
+  ({chromium: chromium970} = await import('playwright'));
+  if (!existsSync(chromium970.executablePath())) skip970 = 'Playwright Chromium이 없어 화면 시험을 건너뜀';
+} catch { skip970 = 'playwright 패키지가 없어 화면 시험을 건너뜀'; }
+
+function inboxFixture() {
+  const clock = '2026-11-18T00:00:00Z';
+  let box = createTree({subject: '모아둔 순간', title: '첫 담은 순간', note: '첫 마음', emotion: '설렘', date: '2026-11-18', url: ''}, clock);
+  box = addMoment(box, {title: '바다 무대 직캠', note: '둘째 마음', emotion: '설렘', date: '2026-11-18', url: ''}, box.moments[0].id, '2026-11-18T00:01:00Z');
+  box = addMoment(box, {title: '새벽 연습실', note: '셋째 마음', emotion: '위로', date: '2026-11-18', url: ''}, box.moments[1].id, '2026-11-18T00:02:00Z');
+  box.inbox = true;
+  const other = createTree({subject: '우리의 이야기', title: '다른 트리 순간', note: '', emotion: '설렘', date: '2026-11-18', url: ''}, clock);
+  return {box, other};
+}
+
+test('970 실행: 모아둔 순간 — 목록·누르면 맞는 상세·닫으면 초점 복귀(가짜 데이터)', {skip: skip970 || !REQUIRE970 ? skip970 || 'LT_970_REQUIRE=1 일 때 실행' : false, timeout: 180000}, async () => {
+  const server = await serve();
+  const origin = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium970.launch({headless: true});
+  try {
+    const {box, other} = inboxFixture();
+    for (const width of [1440, 390]) {
+      const ctx = await browser.newContext({viewport: {width, height: width === 390 ? 844 : 900}, reducedMotion: 'reduce'});
+      await ctx.addInitScript(() => { try { localStorage.setItem('lt41.theme', 'night'); } catch {} });
+      await ctx.route('**://i.ytimg.com/**', (r) => r.fulfill({status: 200, contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="10" height="10" fill="#333"/></svg>'}));
+      await ctx.route('**/api/**', (r) => r.fulfill({status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}'}));
+      const state = {version: 1, trees: [other, box], prefs: {}};
+      await ctx.route('**/api/workspace**', (r) => r.fulfill({status: 200, contentType: 'application/json', body: JSON.stringify({revision: 1, state, subject: '시험계정', writeSubjectBound: true, savedAt: '2026-11-18T09:00:00.000Z'})}));
+      const page = await ctx.newPage();
+      await page.goto(`${origin}/v41/?account=1#my/board?tree=${box.id}`, {waitUntil: 'load', timeout: 60000});
+      await page.waitForFunction(() => !!window.LT41?.trees?.length, null, {timeout: 20000});
+      await page.locator('#discover-ask-no').click().catch(() => {});
+      // 보드 프레임이 순간 카드를 다 그릴 때까지 기다린다.
+      await page.waitForFunction((n) => [...document.querySelectorAll('iframe')].some((f) => { try { return /track58-pinboard/.test(f.contentWindow.location.href) && f.contentDocument.querySelectorAll('.card').length >= n; } catch { return false; } }), box.moments.length, {timeout: 20000});
+      const frame = page.frames().find((f) => /track58-pinboard/.test(f.url()));
+      assert.ok(frame, `${width}: 보드 프레임이 열리지 않음`);
+      assert.match(await page.evaluate(() => document.getElementById('source-label')?.textContent || ''), /모아둔 순간/, `${width}: 머리줄에 모아둔 순간 표시`);
+
+      const target = box.moments[1];
+      if (width === 1440) {
+        // 목록: 카드 셋이 제목과 함께 보인다.
+        const cards = await frame.evaluate(() => [...document.querySelectorAll('.card')].map((c) => ({id: c.dataset.id, title: c.querySelector('.cardTitle')?.textContent || '', visible: c.getClientRects().length > 0})));
+        assert.deepEqual(cards.map((c) => c.id).sort(), box.moments.map((m) => m.id).sort(), `${width}: 목록에 모아둔 순간 셋`);
+        for (const m of box.moments) assert.ok(cards.find((c) => c.id === m.id && c.title === m.title && c.visible), `${width}: 카드 '${m.title}'가 목록에 보인다`);
+        // 하나를 누르면 맞는 상세가 열린다(자리 잡힘이 끝날 때까지 기다려 누른다).
+        await frame.locator(`.card[data-id="${target.id}"]`).click({timeout: 10000});
+        await frame.waitForFunction(() => document.getElementById('detail')?.classList.contains('open'), null, {timeout: 10000});
+        assert.equal(await frame.evaluate(() => document.getElementById('dTitle')?.textContent || ''), target.title, `${width}: 누른 순간의 상세 제목`);
+        // 닫으면 초점이 연 카드로 돌아온다.
+        await frame.click('#detailClose');
+        await frame.waitForFunction(() => !document.getElementById('detail')?.classList.contains('open'), null, {timeout: 5000});
+        await page.waitForTimeout(150);
+        const focus = await frame.evaluate((id) => {
+          const a = document.activeElement;
+          return {tag: a?.tagName || '', id: a?.id || '', isCard: !!(a?.classList?.contains('card') && a?.dataset?.id === id)};
+        }, target.id);
+        assert.equal(focus.isCard, true, `${width}: 상세를 닫으면 초점이 연 카드로 돌아온다(지금 초점: ${focus.tag}#${focus.id})`);
+      } else {
+        // 휴대폰 목록: 고르기(select)에 순간 셋이 순서대로 있다.
+        const options = await frame.evaluate(() => [...document.querySelectorAll('.lt-moment-picker select option')].map((o) => o.value));
+        assert.deepEqual(options, box.moments.map((m) => m.id), `${width}: 고르기 목록에 모아둔 순간 셋`);
+        await frame.selectOption('.lt-moment-picker select', target.id);
+        await frame.click('.lt-moment-picker button');
+        await frame.waitForFunction(() => document.getElementById('detail')?.classList.contains('open'), null, {timeout: 10000});
+        assert.equal(await frame.evaluate(() => document.getElementById('dTitle')?.textContent || ''), target.title, `${width}: 누른 순간의 상세 제목`);
+        // 닫으면 초점이 연 단추(고르기 줄)로 돌아온다.
+        await frame.click('#detailClose');
+        await frame.waitForFunction(() => !document.getElementById('detail')?.classList.contains('open'), null, {timeout: 5000});
+        await page.waitForTimeout(150);
+        const focus = await frame.evaluate(() => {
+          const a = document.activeElement;
+          return {tag: a?.tagName || '', id: a?.id || '', inPicker: !!a?.closest?.('.lt-moment-picker')};
+        });
+        assert.equal(focus.inPicker, true, `${width}: 상세를 닫으면 초점이 고르기 줄로 돌아온다(지금 초점: ${focus.tag}#${focus.id})`);
+      }
+      await ctx.close();
+    }
+  } finally { await browser.close(); await new Promise((ok) => server.close(ok)); }
 });
 

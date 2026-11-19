@@ -153,3 +153,132 @@ test('#571 바꾼 이름이 트리 목록에도 보이고, 알겠어요를 누�
     assert.equal(await page.evaluate(() => document.getElementById('tree-tips').hidden), true, '다시 부팅해도 안내하지 않는다');
   } finally { await browser.close(); }
 });
+
+// 이슈 970: 표지 — 책 표지에 제목이 보이고 잘리지 않는다(390·1440 좌표 판정). 표지 바꾸기(서재 ⋯ → 트리 관리)를
+// 열어 디자인을 고르면 저장·반영되고, 취소하면 그대로다. 가짜 작업장만 쓴다(운영 API·운영 계정 없음).
+// LT_970_REQUIRE=1 일 때 실행(CI 화면 잡 — 건너뜀=실패).
+const REQUIRE970 = process.env.LT_970_REQUIRE === '1';
+const CLOCK970 = '2026-11-19T00:00:00.000Z';
+const COVER_TREE = {
+  id: 'tree1', subject: '리센느', title: '리센느의 기록', coverMomentId: '', coverDesign: '', inbox: false,
+  createdAt: CLOCK970, updatedAt: CLOCK970,
+  moments: [
+    { id: 'm1', parentId: null, links: [], createdAt: CLOCK970, title: '첫 순간', note: '처음 남기는 마음', emotion: '설렘', date: '2026-11-19', relation: '', url: '' },
+    { id: 'm2', parentId: 'm1', links: [], createdAt: CLOCK970, title: '두 번째 순간', note: '', emotion: '위로', date: '2026-11-19', relation: '이어서', url: '' },
+  ],
+};
+
+test('970 실행: 표지 — 제목 보임·안 잘림(390·1440), 고르면 반영·취소하면 그대로', { skip: skip || !REQUIRE970 ? skip || 'LT_970_REQUIRE=1 일 때 실행' : false, timeout: 180000 }, async () => {
+  if (skip) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip}`);
+  const browser = await chromium.launch();
+  const findings = [];
+  try {
+    for (const [w, h] of [[1440, 900], [390, 844]]) {
+      const page = await browser.newPage({ viewport: { width: w, height: h } });
+      const errors = [];
+      page.on('pageerror', (e) => errors.push(String(e.message || e)));
+      // 가짜 작업장: PUT으로 받은 트리를 그대로 보관한다 — 다시 열어도 저장한 표지가 보여야 한다.
+      let storedTree = JSON.parse(JSON.stringify(COVER_TREE));
+      let rev = 1;
+      const puts = [];
+      const workspace = () => ({ ok: true, revision: rev, subject: '시험 사용자', writeSubjectBound: true, savedAt: CLOCK970, state: { version: 1, prefs: {}, trees: [storedTree] } });
+      await page.route('**/api/workspace*', (route) => {
+        const req = route.request();
+        if (req.method() === 'PUT') {
+          const body = JSON.parse(req.postData() || '{}');
+          puts.push(body);
+          const edited = body?.state?.trees?.find((t) => t.id === 'tree1');
+          if (edited) storedTree = edited;
+          rev += 1;
+          return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, revision: rev }) });
+        }
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(workspace()) });
+      });
+      await page.route('**/api/account', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, email: 't@t.test', name: '시험' }) }));
+      const confirms = [];
+      page.on('dialog', (d) => { confirms.push(d.message()); d.accept(); });
+      const findShelf = async () => {
+        let frame = null;
+        for (let i = 0; i < 80 && !frame; i++) {
+          frame = page.frames().find((f) => /views\/track32-bookshelf/.test(f.url()));
+          if (!frame) await page.waitForTimeout(250);
+        }
+        assert.ok(frame, `${w}: 서재(책장) 프레임이 열린다`);
+        await frame.waitForSelector('.book-card .cover-title', { timeout: 20000 });
+        await page.waitForTimeout(800);
+        return frame;
+      };
+      await page.goto(`${base}/v41/?account=1#my/shelf`, { waitUntil: 'load', timeout: 60000 });
+      let frame = await findShelf();
+      // ① 책 표지 제목 — 보이는 자리(표지 안·화면 안)에 있고 잘리지 않는다(좌표·스크롤 크기 판정).
+      const cover = await frame.evaluate(() => {
+        const title = document.querySelector('.book-card .cover-title');
+        const box = document.querySelector('.book-card .book-cover');
+        const t = title.getBoundingClientRect(), b = box.getBoundingClientRect();
+        return {
+          text: title.textContent.trim(),
+          insideCover: t.left >= b.left - 1 && t.top >= b.top - 1 && t.right <= b.right + 1 && t.bottom <= b.bottom + 1,
+          insideScreen: t.left >= 0 && t.top >= 0 && t.right <= innerWidth && t.bottom <= innerHeight,
+          clipped: title.scrollHeight > title.clientHeight + 1 || title.scrollWidth > title.clientWidth + 1,
+          w: Math.round(t.width), h: Math.round(t.height),
+        };
+      });
+      assert.equal(cover.text, '리센느의 기록', `${w}: 표지 제목 글자`);
+      assert.equal(cover.insideCover, true, `${w}: 제목이 표지 안에 있다 ${JSON.stringify(cover)}`);
+      assert.equal(cover.insideScreen, true, `${w}: 제목이 화면 안에 있다`);
+      assert.equal(cover.clipped, false, `${w}: 제목이 잘리지 않는다(보이는 폭·높이 ${cover.w}×${cover.h})`);
+      // ② 표지 바꾸기 — 서재 ⋯ → 트리 관리 → 디자인 고르기 → 저장.
+      const openManager = async () => {
+        await frame.locator('.book-card').first().hover();
+        await frame.locator('.book-manage[data-manage-id="tree1"]').click();
+        await page.waitForFunction(() => document.getElementById('tree-manager')?.open === true, null, { timeout: 10000 });
+      };
+      await openManager();
+      await page.evaluate(() => {
+        document.querySelector('#tree-form input[name="coverMode"][value="design"]').click();
+        document.querySelector('#tree-form input[name="coverDesign"][value="texture-3"]').click();
+      });
+      await page.click('#tree-form button[type="submit"]');
+      await page.waitForFunction(() => document.getElementById('tree-manager').open === false, null, { timeout: 10000 });
+      for (let i = 0; i < 40 && puts.length < 1; i++) await page.waitForTimeout(250);
+      assert.equal(puts.length, 1, `${w}: 저장은 한 번(PUT)`);
+      const savedTree = puts[0]?.state?.trees?.find((t) => t.id === 'tree1');
+      assert.equal(savedTree?.coverMode, 'design', `${w}: 저장한 표지 방법은 디자인`);
+      assert.equal(savedTree?.coverDesign, 'texture-3', `${w}: 저장한 디자인은 texture-3`);
+      // ③ 반영 — 머리줄 트리 목록의 표지는 고른 디자인으로 바로 보인다.
+      if (w === 1440) {
+        await page.click('#record-menu');
+        await page.waitForFunction(() => document.getElementById('tree-popover')?.hidden === false, null, { timeout: 10000 });
+        const listDesign = await page.evaluate(() => {
+          const row = [...document.querySelectorAll('#tree-popover .tree-item')].find((r) => r.textContent.includes('리센느의 기록'));
+          return row?.querySelector('.tree-cover')?.getAttribute('data-cover-design') || '';
+        });
+        assert.equal(listDesign, 'texture-3', `${w}: 트리 목록 표지가 고른 디자인으로 반영`);
+        await page.keyboard.press('Escape');
+      }
+      // 서재 책 표지 — 라이브 값을 기록하고, 다시 열면 저장한 디자인이 보여야 한다.
+      const liveDesign = await frame.evaluate(() => document.querySelector('.book-card .book-cover')?.getAttribute('data-cover-design') || '');
+      if (liveDesign !== 'texture-3') findings.push(`${w}: 서재 책 표지 라이브 값 '${liveDesign}' — 다시 열기 전까지 갱신 안 됨`);
+      await page.reload({ waitUntil: 'load' });
+      frame = await findShelf();
+      const afterDesign = await frame.evaluate(() => document.querySelector('.book-card .book-cover')?.getAttribute('data-cover-design') || '');
+      assert.equal(afterDesign, 'texture-3', `${w}: 다시 열면 표지가 저장한 디자인으로 보인다`);
+      // ④ 취소 — 다른 디자인을 고르고 닫으면 한 번 묻고, 저장 없이 그대로다.
+      await openManager();
+      const preChecked = await page.evaluate(() => document.querySelector('#tree-form input[name="coverDesign"]:checked')?.value || '');
+      assert.equal(preChecked, 'texture-3', `${w}: 창을 다시 열면 저장한 디자인이 checked`);
+      await page.evaluate(() => {
+        document.querySelector('#tree-form input[name="coverDesign"][value="texture-5"]').click();
+      });
+      await page.keyboard.press('Escape');
+      await page.waitForFunction(() => document.getElementById('tree-manager').open === false, null, { timeout: 10000 });
+      assert.ok(confirms.some((m) => m.includes('저장하지 않고 닫을까요?')), `${w}: 쓰던 내용이 있으면 닫기 전 한 번 묻는다`);
+      assert.equal(puts.length, 1, `${w}: 취소는 저장하지 않는다`);
+      const keptDesign = await frame.evaluate(() => document.querySelector('.book-card .book-cover')?.getAttribute('data-cover-design') || '');
+      assert.equal(keptDesign, 'texture-3', `${w}: 취소하면 표지가 그대로다`);
+      assert.deepEqual(errors, [], `${w}: 페이지 오류 없음`);
+      await page.close();
+    }
+    if (findings.length) console.log('970 표지 관찰: ' + findings.join(' | '));
+  } finally { await browser.close(); }
+});

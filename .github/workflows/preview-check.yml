@@ -282,6 +282,17 @@ jobs:
           node --test --test-concurrency=1 tests/v41-book-play-584.test.mjs
           echo "책 재생·두 장 모드 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
 
+      # 이슈 970: 정리 창(모아둔 순간)의 고르기·취소·저장·닫기 확인과 모바일 아래 ＋ 단추의 자리·동작을
+      # 실제 화면에서 잰다. 건너뜀=실패(크롬이 준비된 이 잡에서 돈다).
+      - name: 정리 창·아래 ＋ 단추 동작 시험(건너뜀=실패 — #970)
+        env:
+          LT_970_REQUIRE: '1'
+        if: needs.screen-changes.outputs.changed == 'true'
+        run: |
+          start=$(date +%s)
+          node --test --test-concurrency=1 tests/v41-970-cleanup-fab.test.mjs
+          echo "정리 창·아래 ＋ 단추 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+
       # 이슈 952: 미디어·담기 — 세로 영상 틀(9:16)·크게 보기(열기·Esc 닫힘·초점 복귀)·그 자리 재생 주소·
       # 쉬운 추가 창의 초기 상태와 배치를 실제 화면에서 잰다. 소스 글자 검사를 동작 검사로 바꾼 자리다.
       # 첫 화면은 vite 번들이라 먼저 build 한다. 건너뜀=실패(크롬이 준비된 이 잡에서 돈다).
@@ -349,12 +360,16 @@ jobs:
       - name: 감상 화면 흔적 값·어떻게 쓰나요 안내 시험(건너뜀=실패 — #635)
         env:
           LT_635A_REQUIRE: '1'
+          LT_BOOK_LONG_NOTE_REQUIRE: '1'
         if: needs.screen-changes.outputs.changed == 'true'
         run: |
           start=$(date +%s)
           npx vite build > /dev/null
           node --test --test-concurrency=1 tests/v41-share-guest-635.test.mjs
           echo "감상 화면 흔적 값·어떻게 쓰나요 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+          # #952: 책의 넘침 판정·넘친 페이지 스크롤을 실제 화면에서 잰다(같은 빌드 결과를 쓴다).
+          node --test --test-concurrency=1 tests/v41-book-long-note.test.mjs
+          echo "책 넘침 화면 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
 
       # #631: 의견 보내기 창 — 1440×900 에서 스크롤 없이 들어오고, 체크 상자와 글자가 같은 줄이며,
       # 보낸 뒤 제목·주 단추·안내가 바뀌는지 수치로 잰다. 건너뜀=실패(크롬이 준비된 이 잡에서 돈다).
@@ -458,6 +473,18 @@ jobs:
           cat /tmp/map-fan.log || true
           [ $r1 -eq 0 ] && [ $r2 -eq 0 ] || exit 1
           echo "지도 실제 대비·부채꼴 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+
+      # 이슈 970: 서재(책이 왼쪽부터·책장 세로 가운데·넘칠 때만 화살표)와 날짜 표시(시계 고정)를
+      # 실제 화면에서 잰다. 서재 여백 수치는 고정하지 않는다(#972 여백 수정과 겹치지 않게).
+      # 건너뜀=실패(크롬이 준비된 이 잡에서 돈다).
+      - name: 서재·날짜 표시 동작 시험(건너뜀=실패 — #970)
+        env:
+          LT_970_REQUIRE: '1'
+        if: needs.screen-changes.outputs.changed == 'true'
+        run: |
+          start=$(date +%s)
+          node --test --test-concurrency=1 tests/v41-970-shelf-date.test.mjs
+          echo "서재·날짜 표시 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
 
       - name: 화면 변경 없으면 건너뜀을 남긴다
         if: always()
@@ -690,6 +717,33 @@ jobs:
           start=$(date +%s)
           node --test --test-concurrency=1 tests/v41-tree-tips-549.test.mjs tests/v41-tree-rename-tips-571.test.mjs
           echo "첫 트리 안내 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+
+      # 이슈 970: 쓰기 창 탭(입력 유지·방향키·aria-selected), 모아둔 순간(목록·상세·초점 복귀),
+      # 빈 화면(안내·단추·창 연결)을 실제 화면에서 잰다. 셋 다 가짜 작업장만 쓴다(운영 API·운영 계정 없음).
+      # 새 화면 시험은 가장 짧은 잡에 붙인다(261119 실측: 이 잡 86초). 첫 화면 번들이 필요해 먼저 build한다. 건너뜀=실패.
+      - name: 쓰기 창 탭·모아둔 순간·빈 화면 시험(건너뜀=실패 — 이슈 970)
+        env:
+          LT_970_REQUIRE: '1'
+        if: needs.screen-changes.outputs.changed == 'true'
+        run: |
+          start=$(date +%s)
+          npx vite build > /dev/null
+          node --test --test-concurrency=1 tests/v41-write-tab-462.test.mjs tests/v41-inbox-display.test.mjs tests/v41-empty-tree-463.test.mjs
+          echo "쓰기 창 탭·모아둔 순간·빈 화면 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+
+      # 이슈 970: 표지(제목 보임·안 잘림·고르면 반영·취소하면 그대로), 썸네일(영상·사진 화면 안 보임·
+      # 불러오기 실패면 대체 표시·깨진 그림 아이콘 없음), 관리자 화면(비관리자 차단·관리자 목록)을 실제 화면에서 잰다.
+      # 셋 다 가짜 데이터·가짜 응답만 쓴다(운영 API·운영 계정 없음). 새 화면 시험은 가장 짧은 잡에 붙인다.
+      # 첫 화면 번들이 필요해 먼저 build한다. 건너뜀=실패.
+      - name: 표지·썸네일·관리자 화면 시험(건너뜀=실패 — 이슈 970)
+        env:
+          LT_970_REQUIRE: '1'
+        if: needs.screen-changes.outputs.changed == 'true'
+        run: |
+          start=$(date +%s)
+          npx vite build > /dev/null
+          node --test --test-concurrency=1 --test-name-pattern='^970' tests/v41-tree-rename-tips-571.test.mjs tests/v41-board-yt-overlap-553.test.mjs tests/admin-view.test.mjs
+          echo "표지·썸네일·관리자 화면 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
 
       - name: 화면 변경 없으면 건너뜀을 남긴다
         if: always()

@@ -128,7 +128,8 @@ test('#467 화면: 지도 도구 줄에도 같은 배경 드롭이 있고, 고�
   assert.equal(await frame.evaluate(() => document.getElementById('netBgBtn')?.hidden === false), true, '지도 도구 줄에 배경 드롭이 보인다');
   await frame.click('#netBgBtn');
   await frame.waitForSelector('#netBgMenu:not([hidden])', { timeout: 5000 });
-  const bgs = await frame.evaluate(() => [...document.querySelectorAll('#netBgMenu .lt-bg-item')].map((b) => b.dataset.bg));
+  // #951 ①: 지도의 배경 드롭은 ⋯ 메뉴 안으로 들어갔다(같은 항목 + '사용법') — 배경 항목만 골라 센다.
+  const bgs = await frame.evaluate(() => [...document.querySelectorAll('#netBgMenu .lt-bg-item[data-bg]')].map((b) => b.dataset.bg));
   assert.deepEqual(bgs, ['auto', 'paper', 'night']);
   await frame.click('#netBgMenu .lt-bg-item[data-bg="night"]');
   await page.waitForTimeout(400);

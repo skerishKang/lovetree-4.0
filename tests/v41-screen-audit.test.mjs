@@ -2183,3 +2183,110 @@ test('#657 후속 261117: 트리 있는 계정의 탭 글자색도 같다(정원
     await new Promise((resolve) => server.close(resolve));
   }
 });
+
+// #972: 눈검사에서 찾은 다섯 가지를 화면의 실제 위치와 크기로 검사한다.
+test('#972 서재·책 상세·둘러보기·새 소식 화면 치수', { skip: REQUIRE ? false : skip, timeout: 180000 }, async () => {
+  if (skip) assert.fail(`화면 시험을 건너뛸 수 없다: ${skip}`);
+  const server = await serve();
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch();
+  try {
+    for (const theme of ['night', 'garden']) for (const [width, height] of [[390, 844], [1440, 900], [2560, 1440]]) {
+      const ctx = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
+      try {
+        await ctx.addInitScript((value) => localStorage.setItem('lt41.theme', value), theme);
+        const groups = ['BTS', 'Hearts2Hearts', 'RIIZE'].map(value => ({ value, count: 2 }));
+        await ctx.route('**/api/community/**', route => {
+          const body = route.request().url().includes('/shares')
+            ? { items: [], nextCursor: null, totalVisible: 0, groups, groupsAll: groups }
+            : { items: [] };
+          return route.fulfill({ contentType: 'application/json', body: JSON.stringify(body) });
+        });
+        const page = await ctx.newPage();
+        await page.goto(`${base}/v41/#shelf`);
+        await page.waitForFunction(() => document.querySelector('#view')?.contentDocument?.querySelector('.book-card')?.getBoundingClientRect().width > 0);
+        const shelf = await page.frameLocator('#view').locator('.shelf-screen').evaluate(async el => {
+          // 레일 크기 재계산과 책의 이동 효과가 끝난 실제 배치에서 측정한다.
+          await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+          await Promise.allSettled(el.getAnimations({ subtree: true })
+            .filter(a => Number.isFinite(a.effect.getComputedTiming().endTime))
+            .map(a => a.finished));
+          const rect = sel => el.querySelector(sel).getBoundingClientRect();
+          const s = rect('.shelf-viewport'), c = rect('.shelf-controls'), h = rect('.resume-strip');
+          const card = rect('.book-card'), cover = rect('.book-cover'), rail = rect('.shelf-rail'), base = rect('.shelf-base');
+          return { count: el.querySelectorAll('.book-card').length, upper: c.top - h.bottom, lower: s.top - c.bottom,
+            balance: Math.abs(h.top - (innerHeight - s.bottom)), innerGap: cover.top - s.top,
+            cardToBase: base.top - card.bottom, firstLeft: card.left - rail.left,
+            arrows: [...el.querySelectorAll('.shelf-arrow')].filter(n => !n.hidden).length,
+            overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth };
+        });
+        assert.equal(shelf.count, 1);
+        assert.ok(shelf.upper >= 0 && shelf.upper <= 48, `${theme}/${width}: 펼쳐 보기 아래 여백 ${shelf.upper}px`);
+        assert.ok(shelf.lower >= 0 && shelf.lower <= 24, `${theme}/${width}: 검색 아래 여백 ${shelf.lower}px`);
+        assert.ok(shelf.balance <= 40, `${theme}/${width}: 세 요소 묶음의 위·아래 여백 차이 ${shelf.balance}px`);
+        assert.ok(shelf.innerGap >= 0 && shelf.innerGap <= 65, `${theme}/${width}: 책장 안 표지 위 여백 ${shelf.innerGap}px`);
+        assert.ok(shelf.cardToBase >= -1 && shelf.cardToBase <= 8, `${theme}/${width}: 책과 선반 사이 ${shelf.cardToBase}px`);
+        assert.ok(Math.abs(shelf.firstLeft) <= 4, `${theme}/${width}: 첫 책 왼쪽 오차 ${shelf.firstLeft}px`);
+        assert.equal(shelf.arrows, 0, `${theme}/${width}: 한 권이면 화살표 숨김`);
+        assert.ok(shelf.overflow <= 1, `${theme}/${width}: 서재 가로 넘침 ${shelf.overflow}px`);
+
+        await page.goto(`${base}/v41/#book`);
+        await page.waitForFunction(() => document.querySelector('#view')?.contentWindow?.__TRACK59__?.pageSteps?.().length > 0);
+        const frame = page.frames().find(f => f.url().includes('track59-sketchbook'));
+        await frame.waitForSelector('.moment[data-moment]');
+        await frame.evaluate(() => {
+          const card = [...document.querySelectorAll('.moment[data-moment]')].find(el => el.getBoundingClientRect().width > 0);
+          showDetail(card.dataset.moment);
+        });
+        await frame.waitForSelector('#detailSide:not([hidden])');
+        const meta = await frame.locator('#detailSide').evaluate(el => ({
+          lines: [...el.querySelectorAll('.detail-kicker')].map(n => n.textContent.trim()),
+          close: el.querySelector('[data-detail-close]').getBoundingClientRect().height
+        }));
+        assert.equal(meta.lines.length, 1, `${theme}/${width}: 상세 메타 줄 수`);
+        assert.match(meta.lines[0], /사진 · 2026\. 01\. 01 · 끌림/);
+        assert.ok(meta.close > 0, '상세 닫기 단추가 남는다');
+
+        if (width === 390 || width === 2560) {
+          await page.goto(`${base}/v41/#shelf`);
+          await page.waitForFunction(() => typeof document.querySelector('#community-menu')?.onclick === 'function');
+          await page.evaluate(() => document.querySelector('#community-menu').click());
+          await page.waitForSelector('#community-panel[open] .community-group-chip:nth-child(4)');
+          const discover = await page.evaluate(() => {
+            const rect = sel => document.querySelector(sel).getBoundingClientRect();
+            const rail = rect('#community-groups'), last = rect('#community-groups .community-group-chip:last-child');
+            const button = rect('button.community-group-find'), popular = rect('#community-popular-stages');
+            const form = rect('#community-search-form'), head = rect('#community-panel .panel-heading'), list = rect('.community-results');
+            const overlap = Math.max(0, Math.min(last.right, button.right) - Math.max(last.left, button.left)) *
+              Math.max(0, Math.min(last.bottom, button.bottom) - Math.max(last.top, button.top));
+            return { clip: Math.max(0, last.right - rail.right), overlap, gap: button.left - rail.right,
+              chipHeight: last.height, alignment: Math.max(...[form, head, list].flatMap(r => [Math.abs(popular.left - r.left), Math.abs(popular.width - r.width)])) };
+          });
+          assert.ok(discover.clip <= 1, `${theme}/${width}: 마지막 칩 잘림 ${discover.clip}px`);
+          assert.equal(discover.overlap, 0, `${theme}/${width}: 칩과 단추 겹침`);
+          assert.ok(discover.gap >= 8 && discover.chipHeight >= 44, '칩과 단추 사이 여백 및 터치 높이');
+          assert.ok(discover.alignment <= 1, `${theme}/${width}: 인기 무대 제목·검색·목록 정렬 오차 ${discover.alignment}px`);
+        }
+
+        if (width !== 390) {
+          await page.goto(`${base}/v41/#shelf`);
+          await page.waitForFunction(() => typeof document.querySelector('#updates-link')?.onclick === 'function');
+          await page.evaluate(() => document.querySelector('#updates-link').click());
+          await page.waitForSelector('#updates-panel[open] .updates-version');
+          const updates = await page.evaluate(() => {
+            const head = document.querySelector('#updates-panel .panel-heading').getBoundingClientRect();
+            const cards = [...document.querySelectorAll('#updates-panel .updates-version')].map(el => el.getBoundingClientRect());
+            return { count: cards.length, maxWidth: Math.max(...cards.map(r => r.width)),
+              alignment: Math.max(...cards.map(r => Math.abs(r.left - head.left))) };
+          });
+          assert.ok(updates.count > 0);
+          assert.ok(updates.maxWidth <= 960 && updates.maxWidth >= 900, `${theme}/${width}: 새 소식 카드 폭 ${updates.maxWidth}px`);
+          assert.ok(updates.alignment <= 1, `${theme}/${width}: 새 소식 제목과 카드 정렬`);
+        }
+      } finally { await ctx.close(); }
+    }
+  } finally {
+    await browser.close();
+    await new Promise(resolve => server.close(resolve));
+  }
+});
