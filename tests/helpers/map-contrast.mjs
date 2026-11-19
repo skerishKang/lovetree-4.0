@@ -248,7 +248,8 @@ export function measureMapDOMInPage() {
   const roles = [
     ['toolbar', '.topbar button, #modePill'], ['hint', '.hero p'],
     ['legend', '.legend h3, .legend-row'], ['explorer', '.controls h3, .controls button'],
-    ['detail', '.detail.open .detail-kicker, .detail.open h2, .detail.open .chip, .detail.open .detail-block span, .detail.open .detail-block p, .detail.open button'],
+    // #951 ⑤: 상세 판을 보드와 같은 틀로 바꿨다 — 칩·detail-block 대신 제목·마음·날짜·이어진 순간·아래 단추를 잰다.
+    ['detail', '.detail.open .detail-kicker, .detail.open h2, .detail.open .detail-label, .detail.open .heartText, .detail.open .value, .detail.open .connName, .detail.open .connWhy, .detail.open button'],
     ['ribbon', '.mobile-ribbon button'], ['route', '.route-status.show b, .route-status.show span'], ['tooltip', '.edge-tip.show'],
     ['picker', '.lt-moment-picker label>span,.lt-moment-picker select,.lt-moment-picker button']
   ];
