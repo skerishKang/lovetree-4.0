@@ -355,19 +355,43 @@ jobs:
             npx playwright install --with-deps chromium
           fi
           node -e "import('playwright-core').then(()=>console.log('playwright-core 확인')).catch(e=>{console.error(e.message);process.exit(1)})"
+      - uses: actions/cache@v4
+        with:
+          path: ~/.fonts
+          key: fonts-noto-cjk-${{ runner.os }}-1
+      # 이슈 947: apt-get이 가끔 10분 넘게 멈춘다(실측 — 지도 도구 줄 잡 10분 단계 초과). 매번 apt로 받지 않고
+      # 글꼴 파일(~/.fonts)을 캐시에 두고, 캐시가 있으면 fc-cache만 한다. 없을 때만 설치해 캐시에 쌓는다.
+      - name: 한글 글꼴 준비(캐시, 없으면 설치)
+        timeout-minutes: 10
+        run: |
+          start=$(date +%s)
+          # 두 갈래만 둔다(실행기마다 글꼴 구성이 달라 fc-list로 판단하면 캐시를 채울 기회를 놓친다 — 실측).
+          if [ -f "$HOME/.fonts/NotoSansCJK-Regular.ttc" ]; then
+            echo "캐시된 한글 글꼴 사용($(ls "$HOME/.fonts" | wc -l)개 파일)"
+          else
+            echo "캐시된 한글 글꼴 없음 — fonts-noto-cjk 설치해 ~/.fonts에 쌓는다"
+            sudo apt-get update -qq || true
+            ok=0
+            for i in 1 2 3; do
+              if sudo timeout 150 apt-get install -y -qq --no-install-recommends fonts-noto-cjk; then ok=1; break; fi
+              echo "apt-get install $i번째 시도 실패/멈춤 — 다시 시도"
+              sleep 5
+            done
+            [ $ok -eq 1 ] || { echo "fonts-noto-cjk 설치 실패"; exit 1; }
+            mkdir -p "$HOME/.fonts"
+            sudo cp /usr/share/fonts/opentype/noto/*.tt* "$HOME/.fonts/" 2>/dev/null || sudo find /usr/share/fonts -name 'Noto*CJK*.ttc' -exec cp {} "$HOME/.fonts/" \; 2>/dev/null || true
+            echo "쌓은 글꼴 파일 $(ls "$HOME/.fonts" | wc -l)개"
+          fi
+          fc-cache -f >/dev/null 2>&1 || true
+          echo "한글 글꼴 $(fc-list :lang=ko | wc -l)개 · 대표 $(fc-match 'sans-serif:lang=ko' | head -1)"
+          echo "한글 글꼴 준비 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
       - name: 지도 실제 대비 시험(건너뜀=실패)
         env:
           LT_MAP_CONTRAST_REQUIRE: '1'
         if: needs.screen-changes.outputs.changed == 'true'
         run: |
           start=$(date +%s)
-          # #529: 이름표 대비는 실제로 그려진 한글 글자를 잰다. 실행기에 한글 글꼴이 없으면 준비한다(있으면 건너뜀).
-          if ! fc-list :lang=ko | grep -q .; then
-            echo "한글 글꼴 없음 — fonts-noto-cjk 설치"
-            sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends fonts-noto-cjk
-          fi
-          fc-cache -f >/dev/null 2>&1 || true
-          echo "한글 글꼴 $(fc-list :lang=ko | wc -l)개 · 대표 $(fc-match 'sans-serif:lang=ko' | head -1)"
+          # #529: 이름표 대비는 실제로 그려진 한글 글자를 잰다 — 한글 글꼴은 앞의 '한글 글꼴 준비' 단계에서 둔다.
           # 시험 안에서 조합(크기×테마×판 8개)을 둘씩 동시에 돌린다(지도 잡 시간 단축 — 픽셀 해석이
           # 렌더러 프로세스별로 나뉜다). 판 흐름 시험은 지도 도구 줄 잡으로 옮겼다(지도 잡이 3분 안에 들도록).
           # #583 부채꼴·'이 순간 열기' 시험(약 10초)은 대비 시험과 나란히 돌린다 — 실행기 코어 4개에
@@ -423,20 +447,44 @@ jobs:
             npx playwright install --with-deps chromium
           fi
           node -e "import('playwright-core').then(()=>console.log('playwright-core 확인')).catch(e=>{console.error(e.message);process.exit(1)})"
+      - uses: actions/cache@v4
+        with:
+          path: ~/.fonts
+          key: fonts-noto-cjk-${{ runner.os }}-1
+      # 이슈 947: apt-get이 가끔 10분 넘게 멈춘다(실측 — 지도 도구 줄 잡 10분 단계 초과). 매번 apt로 받지 않고
+      # 글꼴 파일(~/.fonts)을 캐시에 두고, 캐시가 있으면 fc-cache만 한다. 없을 때만 설치해 캐시에 쌓는다.
+      - name: 한글 글꼴 준비(캐시, 없으면 설치)
+        timeout-minutes: 10
+        run: |
+          start=$(date +%s)
+          # 두 갈래만 둔다(실행기마다 글꼴 구성이 달라 fc-list로 판단하면 캐시를 채울 기회를 놓친다 — 실측).
+          if [ -f "$HOME/.fonts/NotoSansCJK-Regular.ttc" ]; then
+            echo "캐시된 한글 글꼴 사용($(ls "$HOME/.fonts" | wc -l)개 파일)"
+          else
+            echo "캐시된 한글 글꼴 없음 — fonts-noto-cjk 설치해 ~/.fonts에 쌓는다"
+            sudo apt-get update -qq || true
+            ok=0
+            for i in 1 2 3; do
+              if sudo timeout 150 apt-get install -y -qq --no-install-recommends fonts-noto-cjk; then ok=1; break; fi
+              echo "apt-get install $i번째 시도 실패/멈춤 — 다시 시도"
+              sleep 5
+            done
+            [ $ok -eq 1 ] || { echo "fonts-noto-cjk 설치 실패"; exit 1; }
+            mkdir -p "$HOME/.fonts"
+            sudo cp /usr/share/fonts/opentype/noto/*.tt* "$HOME/.fonts/" 2>/dev/null || sudo find /usr/share/fonts -name 'Noto*CJK*.ttc' -exec cp {} "$HOME/.fonts/" \; 2>/dev/null || true
+            echo "쌓은 글꼴 파일 $(ls "$HOME/.fonts" | wc -l)개"
+          fi
+          fc-cache -f >/dev/null 2>&1 || true
+          echo "한글 글꼴 $(fc-list :lang=ko | wc -l)개 · 대표 $(fc-match 'sans-serif:lang=ko' | head -1)"
+          echo "한글 글꼴 준비 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
       - name: 지도 도구 줄·책 이동 시험(#517·#518, 건너뜀=실패)
-        timeout-minutes: 15
+        timeout-minutes: 10
         env:
           LT_MAP_CONTRAST_REQUIRE: '1'
         if: needs.screen-changes.outputs.changed == 'true'
         run: |
           start=$(date +%s)
-          # #529: 이름표 대비는 실제로 그려진 한글 글자를 잰다. 실행기에 한글 글꼴이 없으면 준비한다(있으면 건너뜀).
-          if ! fc-list :lang=ko | grep -q .; then
-            echo "한글 글꼴 없음 — fonts-noto-cjk 설치"
-            sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends fonts-noto-cjk
-          fi
-          fc-cache -f >/dev/null 2>&1 || true
-          echo "한글 글꼴 $(fc-list :lang=ko | wc -l)개 · 대표 $(fc-match 'sans-serif:lang=ko' | head -1)"
+          # #529: 이름표 대비는 실제로 그려진 한글 글자를 잰다 — 한글 글꼴은 앞의 '한글 글꼴 준비' 단계에서 둔다.
           # #517·#518: 390·360 지도 도구 줄 넘침·겹침과 상세 '기억책에서 보기'의 책 이동을 실제 화면에서 잰다.
           # #601: 관계 지도 다듬기 시험(새 순간 기본 연결·점 이름표·묶음·두 보기 판 일치·이어진 선)을 나란히 돌린다
           # (지도 대비 잡의 나란히 돌리기와 같은 요령 — 종료 코드를 받아 두고 로그를 항상 출력한 뒤 판정한다).
