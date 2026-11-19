@@ -3,6 +3,7 @@
 // CTO 지적(2026-11-12 18시): ① 첫 화면 문구가 다시 온 사람용("기억은 아직 여기에서 이어지고 있어요"),
 // ② "감상 예시 · 내 기록에는 저장되지 않아요"가 모호, ③ 빈 화면에서 '예시 둘러보기'가 강조되고
 // '첫 트리 만들기'는 덜 강조, ④ 빈 화면 바탕이 너무 비어 보인다(대표 결정: 점선 빈 카드 3장 + 금빛 실).
+import {waitForShownScreen} from './helpers/visible-frame.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
@@ -148,10 +149,7 @@ test('970 실행: 빈 화면(순간 0개) — 안내·단추가 화면 안에, �
       // 단추를 누르면 맞는 창이 열린다 — 트리 0개에서는 '첫 트리 만들기' 첫 여정 화면.
       // 첫 여정은 iframe을 location.replace로 연다(src 속성이 아니라 실제 주소로 판정).
       await page.click('#empty-records');
-      await page.waitForFunction(() => {
-        const f = document.getElementById('view');
-        try { return !f.hidden && /first-journey\.html/.test(f.contentWindow.location.href); } catch { return false; }
-      }, null, { timeout: 10000 });
+      await waitForShownScreen(page, {path: 'first-journey\\.html'}, 10000);
       assert.equal(await page.evaluate(() => document.getElementById('empty').hidden), true, `${width}: 첫 여정이 열리면 빈 안내는 숨는다`);
       await ctx.close();
     }

@@ -174,7 +174,7 @@ if (!browserSkip) {
         };
         let screen = '';
         try {
-          const frame = document.querySelector('#view');
+          const frame = [...document.querySelectorAll('#view, #view-next')].find((f) => !f.hidden && f.getClientRects().length > 0) || document.querySelector('#view');
           const file = (frame?.contentWindow?.location?.pathname || '').split('/').pop();
           screen = names[file] || frame?.contentDocument?.documentElement?.dataset?.v41Screen || '';
         } catch {}
