@@ -125,7 +125,7 @@ test('#951 ①② 위 단추 한 줄(높이 같음·줄 수 1) + 순간 3개 작
   let browser;
   try {
     browser = await chromium.launch({ headless: true });
-    for (const [width, height] of [[1440, 900], [390, 844]]) {
+    for (const [width, height] of [[1440, 900], [390, 844], [375, 812]]) {
       const context = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
       await context.addInitScript(() => { try { localStorage.setItem('lt41.theme', 'night'); localStorage.removeItem('lt41.boardTheme'); } catch {} });
       const page = await context.newPage();
@@ -139,11 +139,18 @@ test('#951 ①② 위 단추 한 줄(높이 같음·줄 수 1) + 순간 3개 작
         const vis = (el) => { if (!el) return false; const cs = getComputedStyle(el); if (cs.display === 'none' || cs.visibility === 'hidden') return false; const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
         const rect = (el) => { const r = el.getBoundingClientRect(); return { l: Math.round(r.left), r: Math.round(r.right), t: Math.round(r.top), b: Math.round(r.bottom), h: Math.round(r.height) }; };
         const heroes = [...document.querySelectorAll('.top-actions button')].filter(vis);
-        const boxes = heroes.map((b) => ({ id: b.id || b.textContent.trim().slice(0, 8), ...rect(b), oneLine: b.scrollHeight - b.clientHeight <= 1 }));
+        // #951 ①: 보기 방식 묶음은 좁으면 안에서 가로로 민다 — 묶음 칸 밖으로 나간 부분은 잘린 것으로 보고 잰다.
+        const visRect = (b) => {
+          const sw = b.closest('.view-switch'), r = b.getBoundingClientRect(), st = sw ? sw.getBoundingClientRect() : null;
+          const l = st ? Math.max(r.left, st.left) : r.left, rr = st ? Math.min(r.right, st.right) : r.right;
+          return { left: l, right: rr, top: r.top, bottom: r.bottom, width: Math.max(0, rr - l), height: r.height };
+        };
+        const boxes = heroes.map((b) => ({ id: b.id || b.textContent.trim().slice(0, 8), l: Math.round(visRect(b).left), r: Math.round(visRect(b).right), t: Math.round(visRect(b).top), b: Math.round(visRect(b).bottom), h: Math.round(b.getBoundingClientRect().height), oneLine: b.scrollHeight - b.clientHeight <= 1 }));
         // 단추끼리 겹침: 단추의 가운데 높이 세 점이 그 단추(또는 그 안 자식)에게 잡히지 않으면 가려진 것이다.
         const overlaps = [];
         for (const b of heroes) {
-          const r = b.getBoundingClientRect();
+          const r = visRect(b);
+          if (r.width < 2) continue; // 묶음 칸 밖으로 완전히 밀린 단추는 그려지지 않는다
           const own = (t) => !!t && (t === b || b.contains(t));
           const points = [[Math.max(r.left, r.left + 10), r.top + r.height / 2], [r.right - 10, r.top + r.height / 2], [r.left + r.width / 2, r.top + r.height / 2]];
           if (!points.every(([x, y]) => own(document.elementFromPoint(x, y)))) overlaps.push(b.id || b.textContent.trim());
@@ -164,13 +171,31 @@ test('#951 ①② 위 단추 한 줄(높이 같음·줄 수 1) + 순간 3개 작
           compact: window.__lt.compact(), edgeMax: Math.max(0, ...window.__lt.edgeLen()),
           cx: Math.round(cx), cy: Math.round(cy), missing, dots: dots.length,
           switchFit: !!swRect && swRect.right <= innerWidth + 1 && visibleSwitch.every((b) => b.l >= (swRect.left - 1) && b.r <= swRect.right + 1 && b.t >= swRect.top - 1 && b.b <= swRect.bottom + 1),
-          overflow: Math.max(0, document.documentElement.scrollWidth - innerWidth, ...boxes.map((b) => Math.max(0, b.r - innerWidth)))
+          overflow: Math.max(0, document.documentElement.scrollWidth - innerWidth, ...boxes.map((b) => Math.max(0, b.r - innerWidth))),
+          // CTO 지적(11-19): 390에서 트리 선택 단추가 보기 방식 묶음에 가려 '뉴진'만 보였다 — 겹침 0과 네 글자 보임을 함께 잰다.
+          firstViewFull: (() => { const b = document.getElementById('viewNet'), sw = document.querySelector('.view-switch'); const r = b.getBoundingClientRect(), st = sw.getBoundingClientRect(); return r.left >= st.left - 0.5 && r.right <= st.right + 0.5; })(),
+          title: (() => {
+            const el = document.getElementById('treeTitleText'), btn = document.getElementById('treeTitleBtn');
+            const cs = getComputedStyle(el), probe = document.createElement('span');
+            probe.style.cssText = `position:absolute;visibility:hidden;white-space:pre;font:${cs.font}`;
+            probe.textContent = (el.textContent || '').trim().slice(0, 4);
+            document.body.append(probe);
+            const four = probe.getBoundingClientRect().width; probe.remove();
+            const tb = btn.getBoundingClientRect();
+            const clamp = (b) => { const sw = b.closest('.view-switch'), st = sw ? sw.getBoundingClientRect() : null, r = b.getBoundingClientRect(); return { id: b.id, left: st ? Math.max(r.left, st.left) : r.left, right: st ? Math.min(r.right, st.right) : r.right, top: r.top, bottom: r.bottom }; };
+            const over = [...document.querySelectorAll('.top-actions button')].filter(vis).map(clamp).filter((b) => tb.left < b.right - 0.5 && b.left < tb.right - 0.5 && tb.top < b.bottom - 0.5 && b.top < tb.bottom - 0.5).map((b) => b.id);
+            const net = document.getElementById('viewNet').getBoundingClientRect();
+            return { client: Math.round(el.clientWidth), four: Math.round(four), over };
+          })()
         };
       });
       assert.equal(m.boxes.length, 5, `${width}: 위 단추 5개(보기 3·⤢·⋯)`);
       assert.deepEqual(m.heights, [m.heights[0]], `${width}: 위 단추 높이 모두 같음(${m.heights})`);
       assert.ok(m.oneLineAll, `${width}: 위 단추 글자 줄 수 1`);
       assert.deepEqual(m.overlaps, [], `${width}: 위 단추끼리 겹침 없음(${m.overlaps})`);
+      assert.deepEqual(m.title.over, [], `${width}: 트리 선택이 위 단추에 가리지 않는다(${m.title.over})`);
+      assert.ok(m.firstViewFull, `${width}: '그물형'은 잘리지 않고 다 보인다`);
+      assert.ok(m.title.client >= m.title.four, `${width}: 트리 이름 네 글자 이상 보인다(보이는 폭 ${m.title.client} ≥ 네 글자 ${m.title.four})`);
       assert.equal(m.overflow, 0, `${width}: 화면 가로 넘침 0`);
       assert.ok(m.switchFit, `${width}: 보기 방식 붙은 단추는 한 덩어리로 화면 안에 있다`);
       assert.match(m.meta, /^순간 3 · 이어진 선 2개$/, `${width}: 아래 작은 글자`);
