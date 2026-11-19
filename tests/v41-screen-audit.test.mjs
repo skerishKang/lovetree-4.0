@@ -392,7 +392,7 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
       };
     }).catch(() => null);
     assert.ok(mapHeader, '지도 머리줄을 잰다');
-    assert.deepEqual(mapHeader.labels, ['그물형', '동심원형', '그래프'], `보기 고르기 세 단추(실제 ${JSON.stringify(mapHeader.labels)})`);
+    assert.deepEqual(mapHeader.labels, ['이어진 길', '묶음', '시간 순'], `보기 고르기 세 단추(실제 ${JSON.stringify(mapHeader.labels)})`);
     assert.equal(mapHeader.netPressed, 'true', '현재 보기(그물형) aria-pressed=true');
     assert.equal(mapHeader.graphPressed, 'false', '그래프 단추는 지도에서 눌리지 않은 상태');
     assert.equal(mapHeader.overflowX, 0, `지도 머리줄 가로 넘침 0(실제 ${mapHeader.overflowX})`);
@@ -1444,7 +1444,7 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
       };
     }).catch(() => null);
     assert.ok(graphSwitch, '그래프 머리줄 보기 고르기를 잰다');
-    assert.deepEqual(graphSwitch.labels, ['그물형', '동심원형', '그래프'], `보기 고르기 세 단추(실제 ${JSON.stringify(graphSwitch.labels)})`);
+    assert.deepEqual(graphSwitch.labels, ['이어진 길', '묶음', '시간 순'], `보기 고르기 세 단추(실제 ${JSON.stringify(graphSwitch.labels)})`);
     assert.deepEqual(graphSwitch.pressed, ['false', 'false', 'true'], '현재 보기(그래프)만 aria-pressed=true');
     assert.equal(graphSwitch.overflow, 0, `그래프 머리줄에서 가로 넘침 0(실제 ${graphSwitch.overflow})`);
     await take(page7, '그래프 보기');

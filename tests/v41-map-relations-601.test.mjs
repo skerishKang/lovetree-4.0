@@ -146,8 +146,13 @@ test('②③④ 지도 화면: 이름표·썸네일·묶음 판·두 보기 판 
       assert.ok(first, '첫 순간 이름표');
       assert.ok(first.text.includes('밤새 다시 본 직캠'), `자동 제목 대신 영상 제목: ${first.text}`);
       assert.ok(!/에서 간직한 순간/.test(first.text), '자동 제목 문구가 이름표에 없다');
-      // ② 썸네일: 그림이 읽히면 이름표 앞에 붙는다(이름표 넓이에 반영).
-      await page.waitForFunction(() => window.__lt.labels().find(l => l.id === 'm01')?.tw > 0, null, { timeout: 8000 });
+      // ② 썸네일(#951 ③: 이름표 앞 → 점 자리 원형): 그림이 읽히면 그 순간 점 자리에 작은 원으로 온다.
+      await page.waitForFunction(() => (window.__lt.thumbRects?.() || []).length > 0, null, { timeout: 8000 });
+      const thumb = await page.evaluate(() => {
+        const d = window.__lt.dots().find(x => x.id === 'm01'), r = (window.__lt.thumbRects() || [])[0];
+        return r && d ? { dx: Math.round(Math.hypot(r.x + r.w / 2 - d.x, r.y + r.h / 2 - d.y)), d: Math.round(r.w) } : null;
+      });
+      assert.ok(thumb && thumb.dx <= 2, `그림이 점 자리 가운데에 있다(${JSON.stringify(thumb)})`);
       // ④ 묶음 판: 감정별 행 — 이름·개수가 있고 빈 행이 없다.
       const rows = await page.evaluate(() => [...document.querySelectorAll('.legend-row')].filter(r => !r.hidden).map(r => r.textContent.trim()));
       assert.ok(rows.length >= 2 && rows.length <= 6, `묶음 행 개수: ${rows.length}`);

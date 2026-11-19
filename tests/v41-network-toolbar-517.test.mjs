@@ -27,7 +27,23 @@ const mapHostHTML = (n) => {
   };
   return `<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>지도 호스트</title></head><body data-member="in" data-record-source="server"><script>window.LT41={source:'server',writable:true,owned:true,momentId:'m1',prefs:{},tree:${JSON.stringify(tree)},trees:[]};location.hash='#network';</script><iframe src="/v41/views/track56-network.html" style="position:fixed;inset:0;width:100vw;height:100vh;border:0"></iframe></body></html>`;
 };
-const EXTRA_ROUTES = { '/map-host-3.html': mapHostHTML(3), '/map-host-8.html': mapHostHTML(8) };
+const PNG16 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAOUlEQVR42u3NMQEAAAgDoC251a3gLzSgmXBPFEVRFEVRFEVRFEVRFEVRFEVRFEVRFEVRFEVRFEVRFEXxWnwXTQGx6y1+AAAAAElFTkSuQmCC';
+// #951 ③: 점 자리 썸네일 세 경우(그림 있음 · 깨진 주소 · 그림 없음)를 한 판에 둔다.
+const mapHostThumbHTML = () => {
+  const tree = {
+    id: 't1', title: '뉴진스 순간', subject: '뉴진스',
+    moments: [
+      { id: 'm1', title: 'Ditto 직캠', date: '2026-11-10', emotion: '설렘', note: '공연', url: '', parentId: null },
+      { id: 'm2', title: 'OMG 앵콜', date: '2026-11-11', emotion: '설렘', note: '공연', url: '', parentId: 'm1' },
+      { id: 'm3', title: 'Hype Boy 연습실', date: '2026-11-12', emotion: '설렘', note: '공연', url: '', parentId: 'm2' }
+    ],
+    edges: [{ kind: 'parent', from: 'm1', to: 'm2', reason: '' }, { kind: 'parent', from: 'm2', to: 'm3', reason: '' }]
+  };
+  // 그림은 셸이 exampleMedia로 넘긴다(runtime.js의 image 경로) — m1 있음 · m2 깨진 주소 · m3 없음.
+  const media = { m1: { image: PNG16, type: 'photo' }, m2: { image: '/v41/definitely-missing-thumb.png', type: 'photo' } };
+  return `<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>지도 호스트</title></head><body data-member="in" data-record-source="server"><script>window.LT41={source:'server',tree:${JSON.stringify(tree)},exampleMedia:${JSON.stringify(media)},momentId:'m1'};</script><iframe src="/v41/views/track56-network.html" style="position:fixed;inset:0;width:100%;height:100%;border:0"></iframe></body></html>`;
+};
+const EXTRA_ROUTES = { '/map-host-3.html': mapHostHTML(3), '/map-host-8.html': mapHostHTML(8), '/map-host-thumb.html': mapHostThumbHTML() };
 async function serve() {
   const server = createServer(async (req, res) => {
     const clean = decodeURIComponent((req.url || '/').split('?')[0]);
@@ -250,6 +266,80 @@ test('#951 ①② 위 단추 한 줄(높이 같음·줄 수 1) + 순간 3개 작
       await frame.click('#netBgBtn');
       await frame.click('#netBgMenu .lt-bg-item[data-bg=night]');
       assert.equal(await frame.evaluate(() => document.documentElement.getAttribute('data-lt-board-theme')), 'night', `${width}: '밤'을 고르면 밤 판이 된다`);
+      await context.close();
+    }
+  } finally {
+    await browser?.close();
+    server.close();
+  }
+});
+
+// ── #951 ③④ (CTO 261120): 점 자리에 순간 썸네일(작은 원·테두리는 점 색), 보기 이름 새 이름 ──
+test('#951 ③④ 점 자리 썸네일(있음·깨짐·없음) + 이름표 말줄임 없음 + 보기 새 이름', { skip: REQUIRE ? false : skip, timeout: 240000 }, async () => {
+  if (skip) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip}`);
+  const server = await serve();
+  const base = `http://127.0.0.1:${server.address().port}`;
+  let browser;
+  try {
+    browser = await chromium.launch({ headless: true });
+    for (const [width, height] of [[375, 812], [1440, 900]]) {
+      const context = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
+      await context.addInitScript(() => { try { localStorage.setItem('lt41.theme', 'night'); localStorage.removeItem('lt41.boardTheme'); } catch {} });
+      const page = await context.newPage(), errors = [];
+      page.on('pageerror', (e) => errors.push(String(e.message || e)));
+      await page.goto(`${base}/map-host-thumb.html`, { waitUntil: 'load' });
+      let frame = null;
+      for (let i = 0; i < 80 && !frame; i++) { frame = page.frames().find((f) => /track56-network/.test(f.url())); if (!frame) await page.waitForTimeout(250); }
+      assert.ok(frame, `${width}: 지도 프레임이 열린다`);
+      await frame.waitForFunction(() => (window.__lt?.dots?.()?.length || 0) > 0, null, { timeout: 20000 });
+      // 그림을 읽은 뒤 한 번 다시 그린다(지연 로드) — 점 자리 사진이 그려질 때까지.
+      await frame.waitForFunction(() => (window.__lt.thumbRects?.() || []).length > 0, null, { timeout: 10000 }).catch(() => {});
+      await page.waitForTimeout(400);
+      const m = await frame.evaluate(() => {
+        const dots = window.__lt.dots(), rects = window.__lt.thumbRects?.() || [], labels = window.__lt.labels();
+        const thumbs = window.__lt.thumbs();
+        const near = (id, r) => {
+          const d = dots.find((x) => x.id === id);
+          if (!d) return null;
+          const cx = r.x + r.w / 2, cy = r.y + r.h / 2;
+          return Math.round(Math.hypot(cx - d.x, cy - d.y));
+        };
+        return {
+          dots: dots.length, rects: rects.length, thumbs,
+          atDot: rects.map((r) => ({ w: Math.round(r.w), h: Math.round(r.h), m1: near('m1', r) })),
+          // 그림이 없는 순간(m2 깨짐·m3 없음)은 지금의 점으로 남는다 — 그 점 근처에 사진이 없어야 한다.
+          strayNearM2: rects.filter((r) => (() => { const d = dots.find((x) => x.id === 'm2'); return d && Math.hypot(r.x + r.w / 2 - d.x, r.y + r.h / 2 - d.y) < 12; })()).length,
+          labels: labels.map((l) => ({ id: l.id, text: l.text, rect: l.rect })),
+          viewNames: [...document.querySelectorAll('.view-switch .pill')].map((b) => ({ id: b.id, text: b.textContent.trim() })),
+          ribbon: [...document.querySelectorAll('#mobileRibbon button')].map((b) => b.textContent.trim())
+        };
+      });
+      assert.deepEqual(errors, [], `${width}: 지도 화면 오류 없음`);
+      assert.equal(m.dots, 3, `${width}: 순간 3개`);
+      assert.equal(m.rects, 1, `${width}: 사진이 있는 순간 하나만 원형 사진(깨짐·없음은 점) — ${JSON.stringify(m)}`);
+      assert.ok(m.atDot[0].m1 != null && m.atDot[0].m1 <= 2, `${width}: 사진이 점 자리 가운데에 있다(중심 차 ${m.atDot[0]?.m1}px)`);
+      assert.ok(m.atDot[0].w >= 18 && Math.abs(m.atDot[0].w - m.atDot[0].h) <= 1, `${width}: 사진은 작은 원(지름 ${m.atDot[0].w}×${m.atDot[0].h})`);
+      assert.equal(m.strayNearM2, 0, `${width}: 깨진 그림 순간에는 사진이 남지 않는다`);
+      assert.ok(m.thumbs.some((t) => t.id === 'm1' && t.ok), `${width}: 그림을 읽었다(지연 로드)`);
+      // 이름표: 375에서도 'Ditto 직캠'이 다 보이고(말줄임 없음), 셋 다 있으며 서로·점과 겹치지 않는다.
+      assert.deepEqual(m.labels.map((l) => l.id).sort(), ['m1', 'm2', 'm3'], `${width}: 이름표 셋 다 있다`);
+      const ditto = m.labels.find((l) => l.id === 'm1');
+      // 첫 순간은 '여기서 시작 · '가 앞에 붙는다 — 이름 자체가 잘리지 않았는지만 본다.
+      assert.ok(ditto.text.endsWith('Ditto 직캠') && !ditto.text.includes('…'), `${width}: 짧은 이름은 말줄임 없이 다 보인다(${ditto.text})`);
+      const ov = [];
+      for (let i = 0; i < m.labels.length; i++) {
+        for (let j = i + 1; j < m.labels.length; j++) {
+          const a = m.labels[i].rect, b = m.labels[j].rect;
+          if (a.l < b.r + 2 && a.r > b.l - 2 && a.t < b.b + 2 && a.b > b.t - 2) ov.push([m.labels[i].id, m.labels[j].id]);
+        }
+      }
+      assert.deepEqual(ov, [], `${width}: 이름표끼리 겹침 없음(${JSON.stringify(ov)})`);
+      // ④ 보기 이름: 무엇을 보는지로 — 저장값(id)은 그대로다.
+      assert.deepEqual(m.viewNames, [{ id: 'viewNet', text: '이어진 길' }, { id: 'viewConc', text: '묶음' }, { id: 'viewGraph', text: '시간 순' }], `${width}: 보기 이름`);
+      await frame.click('#viewConc');
+      assert.equal(await frame.evaluate(() => window.__lt.state.view), 'concentric', `${width}: [묶음]을 누르면 동심원 보기`);
+      await frame.click('#viewNet');
+      assert.equal(await frame.evaluate(() => window.__lt.state.view), 'network', `${width}: [이어진 길]을 누르면 그물 보기`);
       await context.close();
     }
   } finally {
