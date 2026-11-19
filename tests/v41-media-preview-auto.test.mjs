@@ -64,15 +64,11 @@ test('비공개 /api/media 사진·영상 불러오기와 일반 링크는 내 �
 
 test('그 자리 재생 주소는 book-usability.mjs 의 embedUrl 한 벌에서 만든다',()=>{
  // 재생 단추를 누른 뒤 만들어지는 embed 주소(autoplay 포함)는 기존 한 벌을 재사용한다.
+ // 재생 단추 → iframe 이 실제로 그 주소로 열리는 연결은 v41-media-vertical 의 '952 실행' 시험이
+ // 화면에서 확인한다(이슈 952 — 소스 글자 검사를 동작 검사로 바꾼 자리).
  assert.equal(embedUrl('abc123DEF45',83),'https://www.youtube-nocookie.com/embed/abc123DEF45?autoplay=1&rel=0&start=83');
  assert.equal(embedUrl('abc123DEF45',0),'https://www.youtube-nocookie.com/embed/abc123DEF45?autoplay=1&rel=0');
  assert.equal(embedUrl('short',1),null);
- // 페이지 스크립트 동작(재생 단추 → embedUrl 로 iframe 교체)은 글자 검사로 연결을 고정한다.
- const src=readFileSync(new URL('../public/v41/media-preview.js',import.meta.url),'utf8');
- assert.match(src,/import\('\/v41\/book-usability\.mjs'\)/,'재생 주소는 book-usability 의 embedUrl 에서만 만든다');
- assert.match(src,/usability\.embedUrl\(m\.videoId,m\.startSeconds\)/,'시작 시간을 유지한다');
- assert.match(src,/youtube-nocookie|embedUrl/);
- assert.match(src,/data-lt-play/);
 });
 
 test('markup 은 기존 호출(문맥 인수 없음)과도 같은 결과를 낸다 — 화면 고침 없이 판정을 쓴다',()=>{
