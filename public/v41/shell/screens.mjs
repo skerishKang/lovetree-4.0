@@ -28,6 +28,15 @@ export function createScreens(deps) {
   // 준비(load + 글꼴 준비)가 끝나면 두 장의 앞뒤만 바꾼다. 이전 화면은 그 순간까지 그대로 보인다.
   let viewToken = 0;
 
+  // #984: 화면을 넘긴 뒤 옛 장을 600ms 뒤에 지우는 타이머가, 그 사이 같은 장에 새로 띄운 화면까지
+  // 지우던 경합을 막는다(두 장이 모두 about:blank가 되어 화면이 사라지고 저장 알림도 유실됐다).
+  // 장을 다시 항해시킬 때 그 장에 걸린 지우기 타이머를 취소한다.
+  const blankTimers = new WeakMap();
+  function navigateFrame(frame, url) {
+    const pending = blankTimers.get(frame);
+    if (pending) { clearTimeout(pending); blankTimers.delete(frame); }
+    frame.contentWindow.location.replace(url);
+  }
   // #428: 숨은 프레임은 초점을 받지 않게 둔다(inert + aria-hidden + tabindex=-1). 불러온 문서가
   // autofocus·focus()·접근성 트랩으로 초점을 청해도 크로미움이 그 자리로 가려고 .app(overflow:hidden)을
   // 몰래 굴리는 일이 없다. 보여 주는 순간(revealFrame)에만 푼다. #219의 두 장 교대와 #415의
@@ -55,7 +64,7 @@ export function createScreens(deps) {
     for (const f of frames()) {
       f.hidden = true;
       setFrameFocusGuard(f, true);
-      try { f.contentWindow.location.replace('about:blank'); } catch {}
+      try { navigateFrame(f, 'about:blank'); } catch {}
     }
   }
 
@@ -101,7 +110,7 @@ export function createScreens(deps) {
       // #428: 이 자리는 곧바로 보이는 장이므로 초점 가드를 푼다(이전 hideFrames에서 막혔을 수 있다).
       setFrameFocusGuard(active, false);
       active.title = title;
-      active.contentWindow.location.replace(url);
+      navigateFrame(active, url);
       return;
     }
     // #428: 뒤에서 불러오는 동안 이 장은 초점을 받지 않는다.
@@ -121,7 +130,8 @@ export function createScreens(deps) {
         next.classList.add('lt-arrive');
       }
       links();
-      setTimeout(() => { try { active.contentWindow.location.replace('about:blank'); } catch {} }, 600);
+      const prevBlank = blankTimers.get(active); if (prevBlank) clearTimeout(prevBlank);
+      blankTimers.set(active, setTimeout(() => { blankTimers.delete(active); try { active.contentWindow.location.replace('about:blank'); } catch {} }, 600));
     };
     const ready = () => {
       if (token !== viewToken) return;
@@ -149,7 +159,7 @@ export function createScreens(deps) {
       setTimeout(done, 1200); // 글꼴이 늦어도 화면은 넘어간다
     };
     next.addEventListener('load', ready, {once: true});
-    next.contentWindow.location.replace(url);
+    navigateFrame(next, url);
     setTimeout(ready, 1500); // load를 놓쳐도 두 번은 넘어가지 않는다(settled)
   }
 

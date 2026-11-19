@@ -4,7 +4,7 @@
 import {
   COVER_PALETTE, allBooks as allBooksOf, bookMeta, buildShelf, carouselTransform,
   escapeShelf, filterShelf, findBook, lastMomentDate as lastMomentDateOf,
-  resolveShelfIndex, resumeCard, resumeName, shelfRowLayout,
+  resolveShelfIndex, resumeCard, resumeName, shelfBook, shelfRowLayout,
   treeTitleOf, youtubeId as youtubeIdOf
 } from './shelf-model.mjs';
 import { shelfOrder } from '../../inbox-model.mjs';
@@ -265,6 +265,27 @@ if(typeof addEventListener==='function')addEventListener('message',e=>{
   window.__pickSeen=e.data.treeId;
   var picked=books.findIndex(b=>b.id===e.data.treeId);
   if(picked>=0){var rail=$('#shelfRail');state.shelfIndex=picked;state.shelfOffset=shelfRowLayout(state.shelfList.length,rail?rail.clientWidth:0).offsetFor(picked,state.shelfOffset||0);updateCarousel();}
+  return;
+ }
+ if(e.data?.type==='lt41-trees-saved'){
+  // #984: 저장이 서버에서 확인되면 책장·열린 책의 표지를 바로 다시 그린다(다시 열 필요 없이).
+  // 저장 실패 때는 이 메시지가 오지 않는다 — 책장은 원래 표지를 그대로 두고, 셸의 저장 안내 떠가 실패를 알린다.
+  var freshTrees=window.parent&&window.parent.LT41?window.parent.LT41.trees:null;
+  if(!Array.isArray(freshTrees))return;
+  if(freshTrees.length!==books.length){location.reload();return;}
+  var savedChanged=false,savedOpenChanged=false;
+  for(const t of freshTrees){
+   var at=books.findIndex(function(b){return b.id===t.id;});
+   var lib=LTDEMO.library.find(function(x){return x.id===t.id;});
+   if(at<0||!lib){location.reload();return;}
+   lib.title=t.title;lib.subject=t.subject;lib.coverMode=t.coverMode||'';lib.coverDesign=t.coverDesign||'';lib.coverMomentId=t.coverMomentId||'';lib.inbox=t.inbox===true;
+   var freshBook=shelfBook(lib,at,palette,namer);
+   if(JSON.stringify(books[at])===JSON.stringify(freshBook))continue;
+   books[at]=freshBook;savedChanged=true;
+   if(state.selectedId===t.id)savedOpenChanged=true;
+  }
+  if(savedChanged)renderShelf();
+  if(savedOpenChanged){var savedOpenBook=getBook(state.selectedId);if(savedOpenBook)setCover(savedOpenBook);}
   return;
  }
  if(e.data?.type==='lt41-trees-renamed'){
