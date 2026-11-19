@@ -19,6 +19,59 @@ const REPO = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
 const BUILT = path.join(REPO, 'dist');
 const ROOT = path.resolve(process.env.LT_ORBIT535_ROOT || (existsSync(path.join(BUILT, 'v41', 'home.html')) ? BUILT : path.join(REPO, 'public')));
 const REQUIRE = process.env.LT_ORBIT535_REQUIRE === '1';
+// #949: CI 글꼴(Noto Sans CJK KR) 재현 — LT_ORBIT535_CI_FONT=1 이면 시험 안에서만 @font-face 로 강제한다(컴1에 설치하지 않는다).
+// 파일은 LT_ORBIT535_FONT_FILE 로 지정(기본: 윈도의 NotoSansKR-VF.ttf — Noto Sans KR 과 같은 글줄기). CI 에서는 fonts-noto-cjk 의 .ttc 를 준다.
+const CI_FONT = process.env.LT_ORBIT535_CI_FONT === '1';
+const CI_FONT_FILE = process.env.LT_ORBIT535_FONT_FILE || 'C:/Windows/Fonts/NotoSansKR-VF.ttf';
+// #949: 가드와 같은 구역 함수 — 공용 모듈 소스를 페이지에 그대로 넣는다(순수 함수).
+const ZONE_SRC = readFileSync(path.join(REPO, 'public', 'v41', 'orbit-safe-zone.mjs'), 'utf8').replace(/^export /gm, '');
+const injectZone = (frame) => frame.evaluate((src) => { new Function(src + ';window.__ltZoneOf=safeZoneOf;window.__ltZoneOverlap=zoneOverlapArea;')(); }, ZONE_SRC);
+// 가운데 구역(가드가 쓰는 값)과 카드 사각형(안쪽 img — 실제로 그려진 크기)을 같은 함수로 잰다.
+const measureHome = async (frame, { worst = false } = {}) => {
+  await injectZone(frame);
+  return frame.evaluate(() => {
+    const sr = document.querySelector('main#orbit').shadowRoot;
+    const c = sr.querySelector('.center');
+    const zone = c ? window.__ltZoneOf(c.getBoundingClientRect(), sr.querySelector('.app').getBoundingClientRect()) : null;
+    const visible = [...sr.querySelectorAll('.card')].filter((el) => {
+      if (getComputedStyle(el).display === 'none' || el.classList.contains('clash')) return false;
+      const r = el.getBoundingClientRect();
+      return r.width >= 2 && r.right >= 0 && r.bottom >= 0 && r.left <= innerWidth && r.top <= innerHeight;
+    });
+    // 카드 사각형은 안쪽 img(실제로 그려진 크기)로 잰다 — img 의 꾸밈 배율(transform:scale)은 카드 크기가
+    // 아니므로 중심 기준으로 나눠 카드 크기로 되돌린다(button.card 는 3D 변환 직후 0×0 인 일이 있다).
+    const rects = visible.map((el) => {
+      const inner = el.querySelector('.surface img') || el.querySelector('.surface') || el;
+      const r = inner.getBoundingClientRect();
+      let k = 1;
+      const t = getComputedStyle(inner).transform;
+      if (t && t !== 'none') { const m = t.match(/^matrix\(([^)]+)\)/); if (m) { const v = m[1].split(',').map(Number); k = Math.hypot(v[0], v[1]) || 1; } }
+      const cx = r.left + r.width / 2, cy = r.top + r.height / 2, w = r.width / k, h = r.height / k;
+      return { l: cx - w / 2, t: cy - h / 2, r: cx + w / 2, b: cy + h / 2 };
+    });
+    let pairs = 0, area = 0;
+    for (let i = 0; i < rects.length; i++) for (let j = i + 1; j < rects.length; j++) {
+      const a = rects[i], b = rects[j];
+      const iw = Math.max(0, Math.min(a.r, b.r) - Math.max(a.l, b.l));
+      const ih = Math.max(0, Math.min(a.b, b.b) - Math.max(a.t, b.t));
+      const ar = iw * ih;
+      if (ar >= 400) { pairs++; area += ar; }
+    }
+    let intrude = 0;
+    const intruders = [];
+    const cc = c?.getBoundingClientRect();
+    const centerRect = cc ? { l: Math.round(cc.left), t: Math.round(cc.top), r: Math.round(cc.right), b: Math.round(cc.bottom) } : null;
+    if (zone) for (const [i, el] of visible.entries()) {
+      const r = rects[i]; const ar = window.__ltZoneOverlap(zone, r);
+      if (ar > 1) { intrude++; intruders.push({ index: i, cls: el.className, rect: [Math.round(r.l), Math.round(r.t), Math.round(r.r), Math.round(r.b)], overlap: Math.round(ar) }); }
+    }
+    const font = c ? { family: getComputedStyle(c).fontFamily, size: getComputedStyle(c).fontSize, loaded: document.fonts.check('12px "Noto Sans CJK KR"') } : null;
+    // 가드가 실제로 본 구역(host 에 남긴 진단 값) — 시험이 잰 구역과 같아야 한다.
+    const guardZoneRaw = document.querySelector('main#orbit').dataset.ltGuardZone || '';
+    const guardZone = guardZoneRaw ? guardZoneRaw.split(',').map(Number) : null;
+    return { cards: rects.length, pairs, area: Math.round(area), intrude, intruders, centerRect, zone: zone ? { l: Math.round(zone.l), t: Math.round(zone.t), r: Math.round(zone.r), b: Math.round(zone.b) } : null, guardZone, font, lg: visible.filter((el) => el.classList.contains('lg')).length };
+  });
+};
 let chromium, skip = false;
 try {
   ({ chromium } = await import('playwright'));
@@ -26,7 +79,32 @@ try {
 } catch { skip = 'playwright 패키지가 없어 #535 시험을 건너뜀'; }
 if (!skip && !existsSync(path.join(ROOT, 'v41', 'home.html'))) skip = `빌드 결과가 없어 #535 시험을 건너뜀(${ROOT}/v41/home.html 없음 — npx vite build 필요)`;
 
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.webp': 'image/webp', '.woff2': 'font/woff2' };
+const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.webp': 'image/webp', '.woff2': 'font/woff2', '.ttf': 'font/ttf', '.ttc': 'font/collection', '.otf': 'font/otf' };
+// CI 글꼴 강제: 첫 화면 문서(head)에 Noto Sans CJK KR 을 맨 앞으로 세우는 @font-face 를 넣는다.
+// 그림자 안 --ui 토큰도 같은 글꼴을 맨 앞으로 다시 쓴다(문서 글꼴은 상속되지만 토큰이 이긴다).
+const CI_FONT_CSS = `@font-face{font-family:'Noto Sans CJK KR';src:url('/__lt-ci-font') format('truetype');font-weight:100 900;font-display:block}`;
+const addCiFont = async (page) => {
+  if (!CI_FONT) return;
+  await page.addInitScript((css) => {
+    const put = () => {
+      if (!document.head) return;
+      if (!document.getElementById('__lt-ci-font-style')) { const s = document.createElement('style'); s.id = '__lt-ci-font-style'; s.textContent = css; document.head.append(s); }
+      if (document.body) document.body.style.fontFamily = "'Noto Sans CJK KR',system-ui,sans-serif";
+    };
+    put(); new MutationObserver(put).observe(document, { childList: true, subtree: true });
+  }, CI_FONT_CSS);
+};
+// 그림자 안 궤도(--ui 토큰)의 CI 글꼴 강제는 문서 준비 뒤 결정적으로 넣는다 —
+// 문서 MutationObserver 는 그림자 DOM 변형을 보지 못해 경쟁이 생긴다(실측: 가끔 빠짐).
+const forceShadowFont = async (frame) => {
+  if (!CI_FONT) return;
+  await frame.evaluate(() => {
+    const root = document.getElementById('orbit')?.shadowRoot;
+    if (root && !root.getElementById('__lt-ci-font-shadow')) { const s = document.createElement('style'); s.id = '__lt-ci-font-shadow'; s.textContent = `:host{--ui:'Noto Sans CJK KR','Pretendard Variable',Pretendard,system-ui,sans-serif}`; root.append(s); }
+    return document.fonts.ready;
+  });
+  await frame.waitForTimeout(600);
+};
 
 // 로그인 상태 재현용 호스트: 첫 화면과 같은 문서를 띄우고 LT41(로그인·트리 3개)만 넣는다.
 const HOST = `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>첫 화면 호스트</title></head>
@@ -42,7 +120,11 @@ function serve() {
     const clean = decodeURIComponent((req.url || '/').split('?')[0]);
     if (clean === '/__lt535-host.html') {
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
-      res.end(HOST); return;
+      res.end(CI_FONT ? HOST.replace('</head>', `<style>${CI_FONT_CSS}</style></head>`) : HOST); return;
+    }
+    if (clean === '/__lt-ci-font') {
+      try { res.writeHead(200, { 'content-type': MIME[path.extname(CI_FONT_FILE)] || 'application/octet-stream' }); createReadStream(CI_FONT_FILE).pipe(res); } catch { res.writeHead(404); res.end(); }
+      return;
     }
     for (const file of [path.join(ROOT, clean), path.join(ROOT, clean, 'index.html')]) {
       if (path.relative(ROOT, file).startsWith('..')) continue;
@@ -71,10 +153,12 @@ const openHome = async (browser, base, { width, height, member, reducedMotion = 
   const mobile = width <= 650;
   const context = await browser.newContext({ viewport: { width, height }, isMobile: mobile, hasTouch: mobile, reducedMotion });
   const page = await context.newPage();
+  await addCiFont(page);
   await page.goto(`${base}${member === 'in' ? '/__lt535-host.html' : '/v41/'}`, { waitUntil: 'domcontentloaded' });
   const frame = await frameOf(page);
   assert.ok(frame, '첫 화면 안쪽 문서가 열린다');
   await page.waitForTimeout(2500);
+  await forceShadowFont(frame);
   return { context, page, frame };
 };
 
@@ -190,49 +274,13 @@ s('#535 카드끼리 겹친 면적을 줄였다(1440·1920·390, 안전 구역 �
         const { context, page, frame } = await openHome(browser, lib.base, { width: w, height: h, member, reducedMotion: 'reduce' });
         let best = { pairs: 0, area: 0, intrude: 0, cards: 0 };
         for (let round = 0; round < 3; round++) {
-          const d = await frame.evaluate(() => {
-            const sr = document.querySelector('main#orbit').shadowRoot;
-            const visible = [...sr.querySelectorAll('.card')].filter((el) => {
-              if (getComputedStyle(el).display === 'none') return false;
-              const r = el.getBoundingClientRect();
-              return r.width >= 2 && r.right >= 0 && r.bottom >= 0 && r.left <= innerWidth && r.top <= innerHeight;
-            });
-            const rects = visible.map((el) => { const r = el.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom }; });
-            let pairs = 0, area = 0;
-            for (let i = 0; i < rects.length; i++) for (let j = i + 1; j < rects.length; j++) {
-              const a = rects[i], b = rects[j];
-              const iw = Math.max(0, Math.min(a.r, b.r) - Math.max(a.l, b.l));
-              const ih = Math.max(0, Math.min(a.b, b.b) - Math.max(a.t, b.t));
-              const ar = iw * ih;
-              if (ar >= 400) { pairs++; area += ar; }
-            }
-            const c = sr.querySelector('.center');
-            let intrude = 0;
-            const intruders = [];
-            let centerRect = null, others = [], font = null;
-            if (c) {
-              const cc = c.getBoundingClientRect();
-              centerRect = { l: Math.round(cc.left), t: Math.round(cc.top), r: Math.round(cc.right), b: Math.round(cc.bottom), w: Math.round(cc.width), h: Math.round(cc.height) };
-              font = { family: getComputedStyle(c).fontFamily, size: getComputedStyle(c).fontSize, loaded: document.fonts.check('12px "Noto Sans CJK KR"') };
-              const overlap = (r) => Math.round(Math.max(0, Math.min(cc.right, r.r) - Math.max(cc.left, r.l)) * Math.max(0, Math.min(cc.bottom, r.b) - Math.max(cc.top, r.t)));
-              for (const [i, el] of visible.entries()) {
-                const r = rects[i]; const ar = overlap(r);
-                if (ar > 1) { intrude++; intruders.push({ kind: 'card', index: i, cls: el.className, rect: [Math.round(r.l), Math.round(r.t), Math.round(r.r), Math.round(r.b)], overlap: ar }); }
-              }
-              const top = window.parent?.document || document;
-              for (const el of top.querySelectorAll('#toast,.updates-card,#mobile-add,.home-links a,.home-links button,.lt-header,[role=status]')) {
-                const r = el.getBoundingClientRect(); if (r.width < 2 || r.height < 2) continue;
-                const ar = overlap({ l: r.left, t: r.top, r: r.right, b: r.bottom });
-                if (ar > 1) others.push({ kind: 'other', tag: el.tagName, id: el.id, cls: String(el.className).slice(0, 60), rect: [Math.round(r.left), Math.round(r.top), Math.round(r.right), Math.round(r.bottom)], overlap: ar });
-              }
-            }
-            return { cards: rects.length, pairs, area: Math.round(area), intrude, intruders, centerRect, others, font };
-          });
+          // #949: 가드와 같은 구역 함수(safeZoneOf)·안쪽 img 사각형으로 잰다(measureHome).
+          const d = await measureHome(frame);
           if (d.intrude > 0 && w === 390 && member === 'out') {
             const dir = process.env.LT_ORBIT535_DIAG_DIR || path.join(process.cwd(), 'test-results', 'orbit535-diag');
             mkdirSync(dir, { recursive: true });
             await page.screenshot({ path: path.join(dir, 'intrusion-390-out.png') });
-            console.log('INTRUSION_DIAG', tag, member, JSON.stringify({ centerRect: d.centerRect, intruders: d.intruders, others: d.others, font: d.font }));
+            console.log('INTRUSION_DIAG', tag, member, JSON.stringify({ centerRect: d.centerRect, zone: d.zone, guardZone: d.guardZone, intruders: d.intruders, font: d.font }));
           }
           if (d.pairs > best.pairs || d.area > best.area) best = d;
           best.cards = Math.max(best.cards, d.cards);
@@ -240,6 +288,7 @@ s('#535 카드끼리 겹친 면적을 줄였다(1440·1920·390, 안전 구역 �
           await page.waitForTimeout(500);
         }
         await context.close();
+        console.log('OVERLAP_949', tag, member, JSON.stringify({ cards: best.cards, pairs: best.pairs, area: best.area, intrude: best.intrude, zone: best.zone, centerRect: best.centerRect, font: best.font }));
         assert.equal(best.intrude, 0, `${tag}/${member}: 가운데 안전 구역 침범 0`);
         // 261116 PR 2: 로그인 첫 화면은 위쪽 '+ 순간 추가'·정보 줄이 가운데를 차지해 좁은 폭에서 궤도가 더 숨긴다. #780 후속: 390 로그인 예시(mix-empty 포함)는 궤도를 숨기므로 기준 0장, 나머지는 9장을 유지한다.
         const minCards = (w === 390 && member === 'in') ? 0 : 9;
@@ -336,15 +385,16 @@ s('#942 궤도는 한 방향으로 60~120초에 한 바퀴, 정지·튐 0, 클�
       for (const a of root.getAnimations({ subtree: true })) if (a.id === 'lt-float') a.pause();
       const cx = innerWidth / 2, cy = innerHeight / 2;
       const series = cards.map(() => []);
-      const sample = (t) => cards.forEach((c, i) => { const r = c.getBoundingClientRect(); series[i].push([t, r.left + r.width / 2, r.top + r.height / 2]); });
+      // 표본 시각은 애니메이션 시계(currentTime)로 찍는다 — setInterval 이 늦게 오면 벽시계 간격이
+      // 실제 이동 간격과 어긋나 속도(튐) 판정이 흔들린다(실측 23px/50ms 거짓 실패).
+      const sample = () => cards.forEach((c, i) => { const r = c.getBoundingClientRect(); const a = c.getAnimations().find((x) => x.id === 'lt-orbit'); const t = a ? Number(a.currentTime) : performance.now(); series[i].push([t, r.left + r.width / 2, r.top + r.height / 2]); });
       const run = async (ms) => {
         const t0 = performance.now();
-        sample(0);
+        sample();
         await new Promise((done) => {
           const id = setInterval(() => {
-            const t = performance.now() - t0;
-            sample(t);
-            if (t >= ms) { clearInterval(id); done(); }
+            sample();
+            if (performance.now() - t0 >= ms) { clearInterval(id); done(); }
           }, 50);
         });
         return performance.now() - t0;
@@ -405,24 +455,15 @@ s('#942 모든 자리 lg 카드도 가운데를 침범하지 않는다(390·1440
       const ctx = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 1, reducedMotion: 'reduce' });
       await ctx.addInitScript(() => { globalThis.__LT_FORCE_LG__ = true; });
       const page = await ctx.newPage();
+      await addCiFont(page);
       await page.goto(`${lib.base}/v41/`, { waitUntil: 'domcontentloaded', timeout: 30000 });
       const frame = await frameOf(page);
       assert.ok(frame, `${w}: 첫 화면이 열린다`);
       await page.waitForTimeout(3000);
-      const d = await frame.evaluate(() => {
-        const sr = document.querySelector('main#orbit').shadowRoot;
-        const c = sr.querySelector('.center'), cc = c.getBoundingClientRect();
-        const cards = [...sr.querySelectorAll('.card')].filter((el) => getComputedStyle(el).display !== 'none');
-        const intruders = [];
-        for (const [i, el] of cards.entries()) {
-          const r = el.getBoundingClientRect();
-          const iw = Math.max(0, Math.min(cc.right, r.right) - Math.max(cc.left, r.left));
-          const ih = Math.max(0, Math.min(cc.bottom, r.bottom) - Math.max(cc.top, r.top));
-          if (iw * ih > 1) intruders.push({ index: i, cls: el.className, rect: [Math.round(r.left), Math.round(r.top), Math.round(r.right), Math.round(r.bottom)], overlap: Math.round(iw * ih) });
-        }
-        return { cards: cards.length, lg: cards.filter((el) => el.classList.contains('lg')).length, center: [Math.round(cc.left), Math.round(cc.top), Math.round(cc.right), Math.round(cc.bottom)], intruders };
-      });
-      console.log('WORST_LG', w, JSON.stringify(d));
+      await forceShadowFont(frame);
+      // #949: 겹침 시험과 같은 구역 함수·안쪽 img 사각형으로 잰다.
+      const d = await measureHome(frame);
+      console.log('WORST_LG', w, JSON.stringify({ cards: d.cards, lg: d.lg, center: d.centerRect ? [d.centerRect.l, d.centerRect.t, d.centerRect.r, d.centerRect.b] : null, zone: d.zone, intruders: d.intruders }));
       assert.equal(d.lg, d.cards, `${w}: 모든 자리가 lg 카드`);
       assert.equal(d.intruders.length, 0, `${w}: lg 카드도 가운데 침범 0(실제 ${d.intruders.length}장)`);
       await ctx.close();
