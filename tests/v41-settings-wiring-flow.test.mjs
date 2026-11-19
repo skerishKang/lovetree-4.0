@@ -106,14 +106,6 @@ test('흐름 대조: 예전 판정(받으면 무조건 다시 띄우기)이면 �
   assert.equal(loads, maxLoads, '무조건 판정은 상한까지 돈다(사고 그대로)');
 });
 
-test('배선 계약: 셸이 이 모듈의 함수로 값을 만들고, 메시지 타입을 따로 적지 않는다', async () => {
-  const { readFileSync } = await import('node:fs');
-  const shell = readFileSync(new URL('../public/v41/shell.mjs', import.meta.url), 'utf8');
-  assert.match(shell, /import \{frameMessage, frameReadyMessages, FRAME_MESSAGE_TYPES\} from '\.\/frame-wiring\.mjs';/);
-  assert.match(shell, /const ready=frameReadyMessages\(\{dateStyle:currentDateStyle\(\),pageTurn:currentPageTurn\(\)==='on'\}\);/);
-  assert.match(shell, /const message=frameMessage\('dateStyle',currentDateStyle\(\)\);/);
-  assert.match(shell, /postMessage\(frameMessage\('titleDisplay',titleDisplayValue\(\)\),location\.origin\)/);
-  // 셸이 메시지 타입 문자열을 직접 적지 않는다(한 곳에서만 정한다).
-  assert.doesNotMatch(shell, /type:'lt41-date-style',value:/, '날짜 표기 메시지를 직접 만들지 않는다');
-  assert.doesNotMatch(shell, /type:'lt41-title-display',value:/, '제목 보기 메시지를 직접 만들지 않는다');
-});
+// '배선 계약: 셸이 이 모듈의 함수로 값을 만들고, 메시지 타입을 따로 적지 않는다' 글자 검사는 지웠다(이슈 952).
+// 이 모듈이 지키는 실제 계약 — 다시 띄우기 판정·보내는 시점·흐름 — 은 위 실행 시험들이 확인하고,
+// 셸 연결 글자는 #477 사고의 방어(shouldReloadOnFrameMessage 판정)를 대신하지 못하는 문자열 고정이었다.

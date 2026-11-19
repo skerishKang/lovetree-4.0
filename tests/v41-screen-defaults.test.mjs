@@ -29,111 +29,35 @@ test('날짜 표기 3종: 한 벌(formatDisplayDate)이 2026. 11. 10 / 2026-11-1
   // normalize는 도메인 한 벌(dot이 지금 표기).
   assert.equal(normalizeDateStyle('dash'), 'dash');
   assert.equal(normalizeDateStyle(undefined), 'dot');
-  // book-usability가 스타일을 도메인 한 벌로 고른다.
-  assert.match(usability, /import \{normalizeDateStyle\} from '\.\/domain\.mjs';/);
-  assert.match(usability, /const chosen = normalizeDateStyle\(style\);/);
+  // 'book-usability가 도메인 한 벌을 고른다' import 배선 글자 2는 지웠다(이슈 952) —
+  // 같은 한 벌을 쓰는 결과는 위 formatDisplayDate 값과 각 화면 시험의 날짜 표기로 확인한다.
 });
 
-test('날짜 표기 배선: 책·보드·지도·첫 화면 목록이 같은 한 벌을 따르고, 바꾸면 다시 그린다', () => {
-  // 책: book-extra가 스타일을 attribute에서 읽어 창 함수에 심고, 메시지로 다시 그린다.
-  // 스타일은 프레임 속성 → 기기 캐시(lt41.dateStyle) → 기본 순으로 읽는다. 첫 그림(파싱 시점)에도 올바르고,
-  // 이후 바뀌면 lt41-date-style 메시지로 다시 그린다(보드·지도·첫 화면 목록과 같은 순서).
-  assert.match(bookExtra, /const cached=localStorage\.getItem\('lt41\.dateStyle'\);if\(cached\)return cached;/);
-  assert.match(bookExtra, /const styledDate=v=>formatDisplayDate\(v,ltDateStyle\(\)\);/);
-  // momentContent 재정의(제목 고치기 칸)의 날짜칸도 같은 스타일을 따른다.
-  assert.equal((bookExtra.match(/formatDisplayDate\(m\.date\)/g) || []).length, 0, '스타일 없는 날짜 호출 잔재 없다');
-  assert.ok(bookExtra.includes('formatDisplayDate(m.date,ltDateStyle())'), '재정의 템플릿도 스타일을 따른다');
-  assert.match(shell, /localStorage\.setItem\('lt41\.dateStyle',b\.dataset\.dateStyle\)/);
-  assert.match(bookExtra, /window\.LTBookTitle=\{view:titleViewFor,date:styledDate\}/);
-  assert.match(bookExtra, /type!=='lt41-date-style'/);
-  assert.match(bookExtra, /renderSpread\(current,LTDEMO\.get\(\),false\)/);
-  // 보드: track58의 LTTitle이 스타일을 따르고, 보드는 다시 그림 이벤트를 듣는다.
-  assert.match(boardHtml, /formatDisplayDate:v=>formatDisplayDate\(v,ltDateStyle\(\)\)/);
-  assert.match(boardHtml, /dispatchEvent\(new Event\('lt-date-style-changed'\)\)/);
-  assert.match(read('public/v41/views/board/board-extras.js'), /addEventListener\('lt-date-style-changed',\(\)=>\{try\{renderCards\(\)\}catch\{\}try\{renderThreads\(\)\}catch\{\}\}\);/);
-  // 지도: track56이 같은 한 벌을 심고, network 상세 날짜가 dateText를 쓴다.
-  assert.match(networkHtml, /window\.LTTitle=Object\.assign\(window\.LTTitle\|\|\{\},\{formatDisplayDate:v=>formatDisplayDate\(v,ltDateStyle\(\)\)\}\)/);
-  assert.match(network, /const dateText=v=>\{try\{return window\.LTTitle\?\.formatDisplayDate\?\.\(v\)\|\|v\|\|''\}catch\{return v\|\|''\}\};/);
-  assert.match(network, /\$\('detailDate'\)\.textContent=dateText\(n\.date\);/);
-  // 첫 화면 순간 목록(home-moments)도 같은 한 벌.
-  assert.match(homeMoments, /import \{ formatDisplayDate \} from '\.\.\/public\/v41\/book-usability\.mjs';/);
-  assert.match(homeMoments, /date: text\(formatDisplayDate\(moment\?\.date, ltDateStyle\(\)\)\)/);
-  // 셸: 프레임 속성+메시지(페이지 넘김과 같은 방식), 새 화면에도 알린다.
-  // #481 T6: 셸은 날짜 표기 메시지를 frame-wiring 한 곳에서 만들고(문자열 직접 작성 없음),
-  // 보내는 시점·받는 쪽 동작은 tests/v41-settings-wiring-flow.test.mjs가 실행으로 확인한다.
-  assert.match(shell, /function applyDateStyleToFrame\(frame\)\{/);
-  assert.match(shell, /const message=frameMessage\('dateStyle',currentDateStyle\(\)\);/);
-  assert.match(shell, /setAttribute\('data-lt-date-style',message\.value\)/);
-  assert.match(shell, /sendToFrame\(frame,message\)/);
-  assert.match(shell, /applyPageTurnToFrame\(frame\);applyDateStyleToFrame\(frame\);/);
-  assert.match(shell, /try\{member\.apply\('setPrefs',\{dateStyle:b\.dataset\.dateStyle\}\);/);
-  // 이슈 #466 M5: 로그인 onState에서 기기 미러(localStorage lt41.dateStyle)를 계정값으로 채운다 —
-  // 다른 기기의 첫 그림이 기본(dot)에서 멈춰 있던 결함.
-  assert.match(shell, /try\{localStorage\.setItem\('lt41\.dateStyle',normalizeDateStyle\(state\.prefs\?\.dateStyle\)\);\}catch\{\}/);
-});
+// '날짜 표기 배선' 소스 글자 시험(20 단정)은 지웠다(이슈 952) — 셸이 프레임으로 보내는 값·시점·
+// 다시 띄우기 판정은 tests/v41-settings-wiring-flow.test.mjs가 frame-wiring 함수를 실행해 확인하고,
+// 책·보드·지도·첫 화면 목록이 같은 한 벌을 쓰는 결과는 각 화면의 시험(책 재생·보드·지도·첫 화면 감사)이
+// 그려진 날짜로 확인한다. 기기 미러 채움(#466 M5)도 문자열 고정으로는 #477 같은 사고를 막지 못했다.
 
 test('처음 보여 줄 곳: 첫 화면·서재 전체 보기·이어 읽기(기본), 주소가 이기면 그 주소다', () => {
-  assert.match(html, /data-start-place="resume"[^>]*>이어 읽기</);
-  assert.match(html, /data-start-place="home"[^>]*>첫 화면</);
-  assert.match(html, /data-start-place="shelf"[^>]*>서재 전체 보기</);
   assert.equal(normalizeStartPlace(undefined), 'resume', '옛 저장본은 지금 동작(이어 읽기)이다');
-  // 셸 진입 경로에서만 처리하고, 주소(해시·owner 경로)가 있으면 설정보다 이긴다.
-  assert.match(shell, /const startPlace=\(\(\)=>\{try\{return normalizeStartPlace\(state\.prefs\?\.startPlace\)\}catch\{return 'resume'\}\}\)\(\);/);
-  assert.match(shell, /if\(startPlace!=='resume'&&!route&&active\?\.scope!=='owner'&&\!\(active\?\.scope==='screen'&&active\.explicit\)&&!pending\)view=startPlace==='shelf'\?'shelf':'home';/);
-  assert.match(shell, /view=startPlace==='shelf'\?'shelf':'home';/);
-  assert.doesNotMatch(shell, /orbit\.js/, 'orbit.js는 건드리지 않는다');
+  // '셸 진입 경로' 소스 글자 4와 설정 라디오 마크업 글자 3은 지웠다(이슈 952) — 주소(해시)가
+  // 설정을 이기는 결과는 tests/v41-shell-location.test.mjs의 createLocation 시험과 첫 화면
+  // 진입 화면 시험이 확인하고, 옵션 나열은 화면 카피라 글자로 고정하지 않는다.
 });
 
-test('보기 기본값(2026-11-16 탭 정리): 관계 지도 기본 보기는 화면 탭 더 보기(고급) 안에 있고, 옛 보기 기본값 묶음은 없다', () => {
-  const screen = html.slice(html.indexOf('id="account-settings-screen"'), html.indexOf('id="account-settings-profile"'));
-  const more = screen.slice(screen.indexOf('account-settings-screen-more'));
-  assert.match(more, /data-network-view="network"[^>]*>그물</);
-  assert.match(more, /data-network-view="concentric"[^>]*>동심원</);
-  assert.match(more, /지도를 다시 열 때 처음 보이는 보기입니다/);
-  // network.js가 쓰는 같은 키·같은 값이다.
-  assert.match(network, /const VIEW_KEY='lt41\.network\.view';/);
-  assert.match(shell, /const NETWORK_VIEW_KEY='lt41\.network\.view';/);
-  assert.match(network, /if\(\(e\.data\.value==='network'\|\|e\.data\.value==='concentric'\)&&state\.view!==e\.data\.value\)setView\(e\.data\.value\);/);
-  // 옛 '보기 기본값' 묶음은 탭 정리에서 해체됐다(관계 지도 보기 → 화면 탭 더 보기, 쉬운 추가로 담을 곳 → 기록 보기 탭).
-  assert.doesNotMatch(html, /id="account-settings-look"/);
-  assert.doesNotMatch(html, /id="settings-look-title"/);
-});
+// '보기 기본값' 소스 글자 시험(7 단정)은 지웠다(이슈 952) — 관계 지도 보기 전환의 실제 결과는
+// tests/v41-map-theme-flow.test.mjs가(같은 키 lt41.network.view로 지도 보기가 바뀌는지) 화면에서 확인하고,
+// 설정 마크업 문구는 화면 카피라 글자로 고정하지 않는다.
 
 test('공유 기본값: 공유 창이 처음 열 보기를 설정값으로 시작한다(#538: 둘러보기 올림 설정은 공개 기본으로 정리)', () => {
-  assert.match(html, /id="settings-share-title"[^>]*>공유</);
-  // #453 C5: 설정의 공유 이름은 화면 탭과 같은 말(책·보드·지도)을 쓴다.
-  assert.match(html, /data-share-view="book"[^>]*>책</);
-  assert.match(html, /data-share-view="board"[^>]*>보드</);
-  assert.match(html, /data-share-view="network"[^>]*>지도</);
-  assert.doesNotMatch(html, />기억책</);
-  // #538 + #830 후속: 트리 공개는 트리마다 고르는 줄 묶음이다(전 트리 일괄 변경 제거).
-  assert.doesNotMatch(html, /data-share-discover/);
-  assert.match(html, /id="settings-tree-visibility-list"/);
-  assert.match(shell, /settings-tree-visibility-list/);
-  assert.doesNotMatch(html, /data-share-private>/);
-  assert.doesNotMatch(html, /Plus 전용/);
-  assert.doesNotMatch(html, /data-share-private-lock/);
-  assert.match(html, /공개돼도 내 이름·아이디·이메일은 다른 사람에게 보이지 않아요/);
+  // 설정 마크업·문구 글자 검사 9는 지웠다(이슈 952) — 화면 카피·마크업 모양 고정이었다.
+  // 트리마다 공개 줄 묶음(#830)의 동작은 share-steps·share-api 시험이 확인한다.
   assert.equal(normalizeShareView(undefined), 'book');
   assert.equal(normalizeShareDiscover(undefined), false, '옛 저장본의 shareDiscover 값은 읽기만 하고 화면은 없다');
-  // 셸이 설정값을 공급하고, 공유 창 열기 때 처음 열 보기가 그 값을 따른다.
-  assert.match(shell, /getShareDefaults:\(\)=>\(\{view:currentShareView\(\)\}\)/);
-  assert.match(messages, /const getShareDefaults = deps\.getShareDefaults \|\| \(\(\) => \(\{view: 'book'\}\)\);/);
-  assert.match(messages, /\$\('share-view'\)\.value = getShareDefaults\(\)\.view;/);
-  assert.match(shell, /try\{member\.apply\('setPrefs',\{shareView:b\.dataset\.shareView\}\);/);
-  assert.doesNotMatch(shell, /shareDiscover:b\.dataset\.shareDiscover/);
+  // '셸이 설정값을 공급하고 공유 창이 그 값을 따른다' 소스 글자 5는 지웠다(이슈 952) —
+  // 공유 창의 실제 열림·기본 보기는 tests/v41-share-steps.test.mjs의 판 흐름 시험이 확인한다.
 });
 
-test('내 데이터: 보관 파일 용량은 보관 파일 창과 같은 값·같은 형식이고, 새 API는 없다', () => {
-  assert.match(html, /id="settings-usage" class="panel-note" hidden/);
-  // private-upload.mjs의 사용량 줄과 같은 형식(usedBytes/quotaBytes · items/maxItems).
-  assert.match(read('public/v41/private-upload.mjs'), /\(data\.usedBytes\/1000000\)\.toFixed\(1\)\+' \/ '\+\(data\.quotaBytes\/1000000\)\+' MB · '\+data\.items\.length\+' \/ '\+data\.maxItems\+'개'/);
-  // #453 C4: 설정 용량은 '0 MB / 105 MB 사용 · n / 200개'로 읽힌다(보관 파일 창과 같은 값).
-  assert.match(shell, /async function paintSettingsUsage\(\)\{[\s\S]*?accountApi\.listMedia\(\)[\s\S]*?Math\.round\(data\.usedBytes\/1000000\)\+' MB \/ '\+Math\.round\(data\.quotaBytes\/1000000\)\+' MB 사용 · '\+data\.items\.length\+' \/ '\+data\.maxItems\+'개'/);
-  assert.match(shell, /void paintSettingsUsage\(\);/);
-});
-
-test('계정 묶음: 탈퇴 안내가 둘러보기 말로 통일됐다(#369 후속)', () => {
-  assert.match(html, /공유 링크와 둘러보기 노출, 즐겨찾기·좋아요/);
-  assert.doesNotMatch(html, /발견 목록 노출/);
-});
+// '내 데이터 용량'(3 단정)·'탈퇴 안내 문구'(2 단정) 소스 글자 시험은 지웠다(이슈 952) —
+// 용량 형식은 private-upload·보관 파일 창의 동작 시험과 화면 감사가, 안내 문구는 화면 카피라
+// 글자로 고정하지 않는다.

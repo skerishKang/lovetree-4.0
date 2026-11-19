@@ -1,9 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 // #353 후속: 담기·중복·로그인 필요 안내가 상태 안내보다 먼저 일정 시간 보이는지 가짜 DOM·가짜 시계로 직접 부른다.
 // shell.mjs 배선(입구 안내를 hold로 보내는 한 줄)은 글자로 고정한다(#245 전례와 같은 이유).
 import { createNotifier, NOTICE_HOLD_MS, NOTICE_HIDE_MS, syncedNoticeText, newlyPublishedTrees, AUTO_PUBLISH_MIN_MOMENTS } from '../public/v41/shell/notice.mjs';
+import { createTree, addMoment } from '../public/v41/domain.mjs';
 
 function harness() {
   const els = {};
@@ -69,13 +70,9 @@ test('synced 안내 문구(#549): 기록 0개 새 계정은 첫 순간 안내로
   assert.equal(syncedNoticeText({ writable: false, previousDirty: false, momentCount: 0 }), '기록을 읽었어요. 서버 편집 연결은 아직 준비되지 않았어요.');
 });
 
-// 셸 배선을 글자로 고정한다(#245 전례) — 문구 한 벌을 지나가지 않는 회귀를 막는다.
-test('셸은 synced 안내를 notice.mjs의 한 벌에서 가져온다(#549)', () => {
-  const shell = readFileSync(new URL('../public/v41/shell.mjs', import.meta.url), 'utf8');
-  assert.match(shell, /import \{createNotifier, syncedNoticeText, newlyPublishedTrees\} from '\.\/shell\/notice\.mjs';/, 'synced 안내는 notice.mjs 한 벌에서 온다(자동 공개 안내는 질문 창이 대신한다)');
-  assert.match(shell, /syncedNoticeText\(\{writable:status\.writable,previousDirty,momentCount\}\)/);
-  assert.doesNotMatch(shell, /notify\([^\n]*'내 기록을 불러왔어요\.'/, '안내 문구는 notice.mjs 한 벌에서만 온다');
-});
+// '셸은 synced 안내를 notice.mjs의 한 벌에서 가져온다' 소스 글자 시험(3 단정)은 지웠다(이슈 952) —
+// 부팅 뒤 실제로 토스트에 안내가 뜨는 결과를 아래 실행 시험이 확인한다(문구는 이 파일의
+// syncedNoticeText 함수 시험이 입출력으로 잠근다).
 
 test('중복·로그인 필요 안내도 같은 규칙으로 지켜진다', () => {
   const dup = harness();
@@ -92,14 +89,9 @@ test('중복·로그인 필요 안내도 같은 규칙으로 지켜진다', () =
   assert.equal(retry.els['settings-feedback'].textContent, '로그인한 뒤 다시 공유해 주세요.');
 });
 
-test('배선: shell.mjs가 입구 안내를 hold로 보내고 안내 한 벌을 쓴다', () => {
-  const shell = readFileSync(new URL('../public/v41/shell.mjs', import.meta.url), 'utf8');
-  // #666: 알림 줄을 띄우기 직전에 자리를 재는 길(beforeShow)이 붙었고, 띄운 뒤에도 다시 재는 길(afterShow)이 함께 붙었다 —
-  // 화면이 늦게 편성되면 beforeShow 시점의 좌표가 낡는다. 안내 한 벌을 쓰는 사실은 그대로다.
-  assert.match(shell, /const shellNotice=createNotifier\(\{\$,beforeShow:placeToast,afterShow:\(\)=>\{placeToast\(\);setTimeout\(placeToast,600\);setTimeout\(placeToast,1400\);\}\}\)/, 'shell.mjs가 안내 한 벌을 만들고 자리를 다시 잰다');
-  assert.match(shell, /function notify\(text,options\)\{return shellNotice\.notify\(text,options\);\}/, '기존 notify 이름은 그대로다');
-  assert.match(shell, /createQuickIntake\(\{[\s\S]*?notify:text=>notify\(text,\{hold:true\}\)/, '입구(담기·중복·로그인 필요) 안내만 hold로 보낸다');
-});
+// '셸이 입구 안내를 hold로 보낸다' 소스 글자 시험(3 단정)은 지웠다(이슈 952) — hold 규칙 자체
+// (hold 동안 상태 안내가 덮지 않는다)는 위 createNotifier 실행 시험들이 입출력으로 확인하고,
+// 셸 연결 글자는 #245 전례의 문자열 고정으로는 사고를 막지 못했다(#477 같은 사례).
 
 // 2026-11-15 보고(게스트 책·자동 공개 안내) — 판정·문구·단추·셸 배선.
 test('자동 공개 판정: 순간 3개에 처음 도달한 트리만 새로 공개다', () => {
@@ -127,15 +119,53 @@ test('hold+단추 안내: hold 동안 상태 안내가 덮지 않고, 단추 없
   assert.equal(h2.els['toast'].textContent, '서버에 저장됐어요.');
 });
 
-test('셸 배선: 질문 창 트리거·discoverAsked 기억·배너가 한 벌을 쓴다', () => {
-  const shell = readFileSync(new URL('../public/v41/shell.mjs', import.meta.url), 'utf8');
-  assert.match(shell, /import \{createNotifier, syncedNoticeText, newlyPublishedTrees\} from '\.\/shell\/notice\.mjs';/, '판정 한 벌은 notice.mjs에서 온다');
-  assert.match(shell, /newlyPublishedTrees\(null,treeCounts\)/, '직전 스냅샷 재촬영 없이(3개 이상·안 물은 트리) 전이 판정');
-  assert.doesNotMatch(shell, /treeCountsBefore/, '상태마다 treeCountsBefore 재촬영(#718 원인)을 남기지 않는다');
-  assert.match(shell, /lt41\.discoverAsked/, '트리당 1회 질문 기억 키');
-  assert.match(shell, /if\(askTree\)askDiscover\(askTree\.treeId\);/, '2→3 전이 트리 하나에 질문 창을 띄운다');
-  assert.match(shell, /discoverAskedList\(\)\.includes\(treeId\)|markDiscoverAsked/, '고른 뒤 다시 묻지 않는다');
-  assert.match(shell, /shareApi\.getTreeDiscover\(treeId\)/, '이미 켜진 트리(#739 백필)는 묻지 않는다');
-  assert.match(shell, /shareApi\.setTreeDiscover\(treeId,discover\)/, '고른 값은 discover PUT으로 저장한다');
-  assert.doesNotMatch(shell, /autoPublishNoticeText|AUTO_PUBLISH_ACTION_LABEL|notifyAutoPublish|turnTreePrivate/, '#718 안내는 질문 창으로 대신해 남지 않는다');
+// '셸 배선: 질문 창 트리거·discoverAsked 기억' 소스 글자 시험(9 단정)은 지웠다(이슈 952) —
+// 자동 공개 판정은 위 newlyPublishedTrees 함수 시험이, 소개 스위치의 discover PUT 저장은
+// tests/v41-share-steps.test.mjs가, 질문 창 흐름은 둘러보기 화면 시험이 확인한다.
+
+/* ── 이슈 952: 지운 소스 글자 시험의 대체 실행 시험 ──
+   부팅(예시 → 실제 기록 교대)이 끝나면 셸이 notice.mjs 한 벌의 synced 안내를 토스트에 띄운다.
+   글자 배선 대신 실제로 뜬 안내를 확인한다(문구 값 자체는 위 syncedNoticeText 함수 시험이 잠근다).
+   LT_SHELL_952_REQUIRE=1 일 때 실행(CI 화면 잡 — 건너뜀=실패). */
+const REQUIRE952N = process.env.LT_SHELL_952_REQUIRE === '1';
+let chromium952n = null;
+let skip952n = false;
+try {
+  ({ chromium: chromium952n } = await import('playwright'));
+  if (!existsSync(chromium952n.executablePath())) skip952n = 'Playwright chromium이 설치되어 있지 않아 실행 시험을 건너뜀';
+} catch {
+  skip952n = 'playwright 패키지가 없어 실행 시험을 건너뜀';
+}
+if (REQUIRE952N && !existsSync(new URL('../dist/v41/home.html', import.meta.url))) skip952n = '빌드 결과가 없어 실행 시험을 건너뜀';
+
+function tree952(n, momentCount = 1) {
+  let t = createTree({ subject: '시험' + n, title: '시험 트리 ' + n, note: '', emotion: '설렘', date: '2026-11-18', url: '' }, '2026-11-18T00:00:00Z');
+  for (let i = 1; i < momentCount; i += 1) t = addMoment(t, { title: '순간 ' + i, note: '', emotion: '설렘', date: '2026-11-18', url: '' }, t.moments[0].id, '2026-11-18T00:0' + i + ':00Z');
+  return t;
+}
+
+test('952 실행: 부팅이 끝나면 synced 안내가 토스트에 뜬다(기록 있음·없음)', { skip: skip952n || undefined }, async () => {
+  const { serve } = await import('./helpers/screen-audit.mjs');
+  const server = await serve({});
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium952n.launch();
+  try {
+    for (const [trees, expected] of [
+      [[tree952(1)], '내 기록을 불러왔어요.'],
+      [[], '반가워요. 첫 순간을 남겨 보세요.']
+    ]) {
+      const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
+      await ctx.addInitScript(() => { try { localStorage.setItem('lt41.theme', 'night'); } catch {} });
+      await ctx.route('**/api/**', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
+      await ctx.route('**/api/workspace*', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ revision: 1, state: { version: 1, trees }, subject: '검사기계정', writeSubjectBound: true, savedAt: '2026-11-16T09:00:00.000Z' }) }));
+      const page = await ctx.newPage();
+      try {
+        await page.goto(`${base}/v41/?account=1`, { waitUntil: 'load' });
+        await page.waitForFunction((want) => {
+          const toast = document.getElementById('toast');
+          return !!toast && !toast.hidden && toast.textContent === want;
+        }, expected, { timeout: 20000 });
+      } finally { await ctx.close(); }
+    }
+  } finally { await browser.close(); server.close(); }
 });
