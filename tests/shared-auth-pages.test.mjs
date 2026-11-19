@@ -175,22 +175,8 @@ test('로그인 시작 주소의 next가 /v41/?intent=… 로 봉인되어 콜�
   }
 });
 
-test('계정 동그라미 메뉴 맨 아래에 로그아웃이 있고 기존 로그아웃 동작을 부른다', async () => {
-  const { readFileSync } = await import('node:fs');
-  const html = readFileSync(new URL('../public/v41/index.html', import.meta.url), 'utf8');
-  const popoverHtml = (() => {
-    const start = html.indexOf('<div id="account-popover"');
-    const logout = html.indexOf('id="account-logout"', start);
-    const end = html.indexOf('</button>', logout);
-    return html.slice(start, end + '</button>'.length);
-  })();
-  const roles = [...popoverHtml.matchAll(/id="([^"]+)"[^>]*>([^<]*)</g)].map(m => m[1]);
-  assert.equal(roles.at(-1), 'account-logout', '로그아웃은 메뉴 마지막 항목');
-  assert.match(popoverHtml, /id="account-logout">로그아웃</);
-  assert.match(html.match(/<div id="account-popover"[^>]*>/)[0], /role="menu"/);
-  const shell = readFileSync(new URL('../public/v41/shell.mjs', import.meta.url), 'utf8');
-  assert.match(shell, /\$\('account-logout'\)\.onclick=async\(\)=>\{closeAccountMenu\(\);\$\('logout'\)\.click\(\);\}/, '기존 #logout 경로를 부른다');
-});
+// #952: 계정 메뉴 글자 검사 3개(로그아웃이 마지막 항목·role=menu·onclick 배선)를 걷어냈다.
+// 메뉴 열기·닫기·바깥 누름은 v41-shell-header가 fake DOM으로 동작을 확인한다.
 
 async function pagesEnv(overrides = {}) {
   const keys = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
