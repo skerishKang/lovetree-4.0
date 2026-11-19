@@ -1,3 +1,4 @@
+import {waitForShownScreen} from './helpers/visible-frame.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync, existsSync, createReadStream} from 'node:fs';
@@ -81,7 +82,7 @@ test('#295 화면: 넘친 페이지만 그 안에서 세로로 넘겨 보고, �
     await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
     await page.locator('#discover-ask-no').click().catch(() => {});
     await page.locator('.tree-views [data-view="track59-sketchbook.html"]').click();
-    await page.waitForFunction(() => document.querySelector('#view')?.contentWindow?.location?.pathname?.includes('track59-sketchbook'), null, { timeout: 15000 });
+    await waitForShownScreen(page, {path: 'track59-sketchbook'}, 15000);
     const frame = page.frames().find(f => /track59-sketchbook/.test(f.url()));
     assert.ok(frame, '책 프레임이 열리지 않음');
     await frame.waitForSelector('.page-content, .mobile-content', { timeout: 20000 });

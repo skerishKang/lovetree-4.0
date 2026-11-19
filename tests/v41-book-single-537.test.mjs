@@ -2,6 +2,7 @@
 // 그리고 한 장은 펼침면(순간 둘)이 아니라 순간 하나씩 넘긴다(순간 26개면 1/26 … 26/26).
 // 여기서는 (1) 계산 한 벌을 실제로 실행해 순서·전환을 확인하고, (2) 실제 책 화면을 열어
 // 모든 순간이 한 번씩 크게 나오는지·높이·돋보기·머리줄을 잰다(크롬이 없으면 건너뛴다).
+import {shownFrameBox} from './helpers/visible-frame.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
@@ -362,7 +363,7 @@ test('#book-dup2 실제 화면: 390에서 책 테두리·갈라짐 띠가 링크
       const phone = await openBook(browser, base, 390, 844, 'single', theme);
 
       // 측정 도우미: 책 안 좌표(띠·테두리·머리줄)와 셸 좌표(링크 줄)를 함께 읽는다.
-      const iframeBox = await phone.page.locator('#view').boundingBox();
+      const iframeBox = await shownFrameBox(phone.page);
       assert.ok(iframeBox, `${theme}: 책 iframe 자리를 못 읽었다`);
       const readBook = () => phone.frame.evaluate(() => {
         const box = (el) => { const b = el.getBoundingClientRect(); return { l: b.left, t: b.top, r: b.right, b: b.bottom }; };

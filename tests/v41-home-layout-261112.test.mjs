@@ -32,7 +32,7 @@ test('상한을 넘는 카드는 frame에서 숨기고, 폭이 넓어지면 다�
   assert.match(orbit, /if\(el\.classList\.contains\('off'\)\)el\.classList\.remove\('off'\);/);
 });
 
-test('카드는 언제나 불투명하고, blur 대신 밝기로 깊이를 낸다', () => {
+test('카드는 언제나 불투명하고, 크기·밝기·흐림으로 깊이를 낸다', () => {
   assert.doesNotMatch(orbit, /el\.style\.opacity=/, '카드 opacity 인라인 없음');
   // 카드 규칙(.card를 포함한 선택자) 하나하를 훑어 반투명·mix-blend·blur가 없음을 확인한다.
   const rules=[...orbitCSS.matchAll(/([^{}]+)\{([^{}]*)\}/g)];
@@ -43,17 +43,20 @@ test('카드는 언제나 불투명하고, blur 대신 밝기로 깊이를 낸�
     assert.doesNotMatch(body, /mix-blend/, `mix-blend 없음: ${sel.trim().slice(0,40)}`);
     assert.doesNotMatch(body, /blur/, `blur 없음: ${sel.trim().slice(0,40)}`);
   }
-  assert.match(orbit, /el\.style\.filter=`brightness\(/, '깊이 = 밝기');
+  assert.match(orbit, /el\.style\.filter=`brightness\(\$\{fv\}\) blur\(\$\{bv\}px\)`/, '깊이 = 밝기 + 흐림');
   assert.match(orbit, /0\.78\+0\.22\*depth/, '뒤쪽 카드는 밝기 0.78까지');
+  assert.match(orbit, /\(1-depth\)\*2\.2/, '뒤쪽 카드는 흐림 2.2px까지');
+  assert.match(orbit, /ORBIT_MS=90000/, '한 바퀴 90초');
   // 원형 배치(8장 이하)는 같은 깊이이므로 전체가 어두워지지 않게 밝기 1이다.
   assert.match(orbit, /const depth=\(!demo&&cards\.length<=8\)\?1:/);
 });
 
 test('가운데 안전 구역: 제목·버튼 묶음 사각형+여백을 재고, 창이 바뀌면 다시 잰다', () => {
+  // #949: 구역 함수는 공용 모듈(public/v41/orbit-safe-zone.mjs)로 옮겼다 — 가드와 겹침 시험이 같은 함수를 쓴다.
   assert.match(orbit, /const measureSafeZone=\(\)=>\{const c=shadow\.querySelector\('\.center'\)/);
-  assert.match(orbit, /,M=32;/, '안전 구역 여백 32px');
+  const zoneSrc = readFileSync(new URL('../public/v41/orbit-safe-zone.mjs', import.meta.url), 'utf8');
+  assert.match(zoneSrc, /SAFE_MARGIN = 32/, '안전 구역 여백 32px');
   assert.match(orbit, /fitNotice=\(\)=>\{host\.style\.height=`calc\(100dvh - \$\{noticeOuter\(\)\}px\)`;appBox=app\.getBoundingClientRect\(\);safeZoneDirty=true;schedule\(\);/, '창 크기 변경(fitNotice)마다 다시 잰다(#586: 패럴랙스 rect 캐시도 함께 재운다)');
-  assert.match(orbit, /setTimeout\(\(\)=>\{safeZoneDirty=true;schedule\(\);\},1500\)/, '글꼴 도착 뒤에도 다시 잰다(fonts.ready 접근은 뼈대 완성을 늦추므로 타이머를 쓴다)');
   // 카드 사각형(회전 여유 18%)과 겹치면 가장 얇은 쪽으로 민다 — 겹침 0 보장.
   // #491: 좁은 화면에서는 그려지는 배율(cScale)로 투영한다(넓은 화면은 fit=1이라 cScale===sc).
   assert.match(orbit, /const cScale=narrow\?sc\*Math\.max\(\.58,fit\):sc;/, '판정 배율은 좁은 화면에서만 그림 배율을 따른다');
