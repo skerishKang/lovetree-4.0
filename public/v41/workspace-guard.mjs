@@ -5,8 +5,9 @@ import {validateState} from './domain.mjs';
 // 그래서 읽을 때 트리 하나씩 검사한다.
 //   ① 고칠 수 있는 값(시각·이름·표지)만 기본값으로 채워 읽고
 //   ② 그래도 규칙에 맞지 않으면 그 트리만 빼고 나머지로 연다.
-// 뺀 트리의 원본은 손대지 않고 그대로 돌려준다 — 다음 저장(PUT)에 다시 붙여
-// 어긋난 트리가 저장 한 번에 사라지지 않게 하기 위해서다(withPreservedTrees).
+// #986: 뺀 트리의 원본 보존은 서버 몫이다 — 서버가 저장할 때 격리 원본을 다시 붙여 보관하고
+// 읽을 때는 빠진 개수(quarantined)만 응답에 알린다. 화면은 본문에 원본을 붙이지 않는다(붙이면
+// 서버 전체 검사에 400 invalid_document로 거절되어 그 계정은 영영 저장하지 못하게 된다).
 const isObject = value => !!value && typeof value === 'object' && !Array.isArray(value);
 const idValid = value => typeof value === 'string' && /^[a-zA-Z0-9_-]{1,80}$/.test(value);
 const timeValid = value => typeof value === 'string' && value.length <= 40 && !Number.isNaN(Date.parse(value));
@@ -41,13 +42,12 @@ function repairTree(tree, now) {
   return { tree: out, fields };
 }
 
-// raw는 서버가 준 state. 돌려주는 값:
+// raw는 서버(또는 저장본)가 준 state. 돌려주는 값:
 //   state     — 읽을 수 있는 트리만 담은 검증된 상태(셸·도메인이 쓰는 값)
 //   skipped   — 뺀 트리 [{id, reason}] (화면 안내·콘솔 경고에 쓴다)
 //   repaired  — 기본값으로 고쳐 읽은 트리 [{id, fields}]
-//   preserved — 뺀 트리의 원본(저장할 때 그대로 다시 붙인다)
 export function guardWorkspaceState(value, { now = new Date().toISOString() } = {}) {
-  const skipped = [], repaired = [], preserved = [];
+  const skipped = [], repaired = [];
   const unreadable = !isObject(value) || value.version !== 1 || !Array.isArray(value.trees)
     ? '지원하지 않는 러브트리 파일이에요.' : null;
   let state = { version: 1, trees: [], prefs: isObject(value) ? value.prefs : undefined };
@@ -62,17 +62,10 @@ export function guardWorkspaceState(value, { now = new Date().toISOString() } = 
         id: idValid(raw?.id) ? raw.id : null,
         reason: error?.message || '트리 데이터가 올바르지 않아요.'
       });
-      preserved.push(raw);
       continue;
     }
     state = next;
     if (fields.length && idValid(tree?.id)) repaired.push({ id: tree.id, fields });
   }
-  return { state, skipped, repaired, preserved, unreadable };
-}
-
-// 저장(PUT) 본문에 빼 둔 트리의 원본을 그대로 다시 붙인다(데이터 유실 0).
-export function withPreservedTrees(state, preserved = []) {
-  if (!Array.isArray(preserved) || !preserved.length) return state;
-  return { ...state, trees: [...state.trees, ...preserved] };
+  return { state, skipped, repaired, unreadable };
 }

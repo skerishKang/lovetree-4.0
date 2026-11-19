@@ -298,3 +298,78 @@ test('큰 본문은 413으로 응답하고 끊긴 요청은 서버를 쓰러뜨�
     await new Promise(resolve => server.close(resolve));
   }
 });
+
+// #986: 규칙이 바뀐 예전 문서처럼 저장소에 어긋난 트리가 남아 있어도 읽기·저장이 막히지 않는다.
+// 어긋난 트리는 시작 순간이 둘(parentId === null 2개)이라 화면에서도 고칠 수 없다.
+function deviantTree() {
+  const tree = createTree({ ...base, title: '어긋난 옛 트리' }, CLOCK);
+  const grown = addMoment(tree, { ...base, title: '둘째 줄기', relation: '직접 만나고 싶어서' }, tree.moments[0].id, CLOCK);
+  return { ...grown, moments: grown.moments.map(m => m.id === grown.moments[1].id ? { ...m, parentId: null } : m) };
+}
+
+const seedDoc = (repo, subjectId, doc) => repo.commit({ productId: PRODUCT, subjectId, doc, expectedRevision: 0, clientKey: `seed-${subjectId}`, requestHash: 'seed' });
+
+test('a stored deviant tree is quarantined on read and kept in storage through a save', async () => {
+  const { handle, repo } = buildHandle();
+  const state = sampleState();
+  const deviant = deviantTree();
+  await seedDoc(repo, 'usr_a', { version: 1, trees: [...state.trees, deviant] });
+
+  const first = await get(handle);
+  assert.equal(first.status, 200);
+  assert.deepEqual(first.body.state.trees.map(tree => tree.title), ['윤슬, 나의 순간들']);
+  assert.equal(first.body.quarantined, 1, '빠진 트리는 개수만 알린다');
+  assert.equal(JSON.stringify(first.body).includes('둘째 줄기'), false, '격리 원본 내용은 응답에 없다');
+
+  // #986 방식(원본을 본문에 다시 붙이기)과 달리, 깨끗한 본문만 보내도 저장은 400이 아니라 200이다.
+  const grown = addMoment(state.trees[0], { ...base, title: '다시 저장한 순간', relation: '직접 만나고 싶어서' }, state.trees[0].moments[0].id, CLOCK);
+  assert.equal((await put(handle, { state: { version: 1, trees: [grown] }, expectedRevision: 1, clientKey: 'k-986' })).status, 200);
+
+  // 저장소 문서에는 어긋난 트리 원본이 손대지 않은 채 남아 있다.
+  const stored = (await repo.load({ productId: PRODUCT, subjectId: 'usr_a' })).doc;
+  assert.deepEqual(stored.trees.find(tree => tree.id === deviant.id), deviant);
+
+  const again = await get(handle);
+  assert.equal(again.status, 200);
+  assert.equal(again.body.quarantined, 1);
+  assert.deepEqual(again.body.state.trees.map(tree => tree.title), ['윤슬, 나의 순간들']);
+  assert.equal(again.body.state.trees[0].moments.some(m => m.title === '다시 저장한 순간'), true);
+});
+
+test('a new tree with the id of a quarantined tree replaces the kept original', async () => {
+  const { handle, repo } = buildHandle({ principal: { productId: PRODUCT, subjectId: 'usr_b' } });
+  const deviant = deviantTree();
+  await seedDoc(repo, 'usr_b', { version: 1, trees: [deviant] });
+  const replacement = { ...createTree({ ...base, title: '새로 만든 트리' }, CLOCK), id: deviant.id };
+  const saved = await put(handle, { state: { version: 1, trees: [replacement] }, expectedRevision: 1, clientKey: 'k-986b' });
+  assert.equal(saved.status, 200);
+  const stored = (await repo.load({ productId: PRODUCT, subjectId: 'usr_b' })).doc;
+  assert.deepEqual(stored.trees, [validateState({ version: 1, trees: [replacement] }).trees[0]], '새 트리가 이기고 원본은 비운다');
+  assert.equal((await get(handle)).body.quarantined, undefined);
+});
+
+test('deleting a tree leaves quarantined originals in storage', async () => {
+  const { handle, repo } = buildHandle();
+  const state = sampleState();
+  const deviant = deviantTree();
+  await seedDoc(repo, 'usr_a', { version: 1, trees: [...state.trees, deviant] });
+  const deleted = await handle({ method: 'DELETE', path: `/api/workspace/trees/${state.trees[0].id}`, headers: {} });
+  assert.equal(deleted.status, 200);
+  const stored = (await repo.load({ productId: PRODUCT, subjectId: 'usr_a' })).doc;
+  assert.deepEqual(stored.trees, [deviant], '읽을 수 있는 트리만 지워지고 격리 원본은 그대로다');
+  const got = await get(handle);
+  assert.equal(got.status, 200);
+  assert.deepEqual(got.body.state.trees, []);
+  assert.equal(got.body.quarantined, 1);
+});
+
+test('a stored tree with broken timestamps and names is repaired on read, not quarantined', async () => {
+  const { handle, repo } = buildHandle({ principal: { productId: PRODUCT, subjectId: 'usr_d' } });
+  const tree = createTree({ ...base, title: '고쳐 읽는 트리' }, CLOCK);
+  await seedDoc(repo, 'usr_d', { version: 1, trees: [{ ...tree, updatedAt: '지난주', subject: '' }] });
+  const got = await get(handle);
+  assert.equal(got.status, 200);
+  assert.equal(got.body.quarantined, undefined, '고쳐 읽은 트리는 빠진 트리가 아니다');
+  assert.equal(got.body.state.trees[0].updatedAt, tree.createdAt);
+  assert.equal(got.body.state.trees[0].subject, '윤슬, 나의 순간들', '빈 대상 이름은 제목으로 채운다');
+});

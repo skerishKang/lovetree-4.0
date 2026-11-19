@@ -65,16 +65,20 @@ placeToast();
 const shellNotice=createNotifier({$,beforeShow:placeToast,afterShow:()=>{placeToast();setTimeout(placeToast,600);setTimeout(placeToast,1400);}});
 function notify(text,options){return shellNotice.notify(text,options);}
 // #977: 서버 기록에 형식이 어긋난 트리가 섞여 있으면 그 트리만 빼고 셸을 연다(읽기는 workspace-guard.mjs).
+// #986: 서버가 읽지 못해 빼 둔 트리는 개수(quarantined)만 응답에 온다 — 화면 안내에 함께 센다.
 // 화면에는 짧은 안내 한 줄, 콘솔에는 어느 트리가 왜 어긋났는지 한 줄만 남긴다 — 같은 기록을 다시 읽어도 한 번만.
 let guardNoticeKey='';
 function workspaceGuardNotice(read){
  const skipped=Array.isArray(read?.skipped)?read.skipped:[];
- if(!skipped.length)return;
- const key=skipped.map(item=>`${item?.id||''}:${item?.reason||''}`).join('|');
+ const quarantined=Number.isSafeInteger(read?.quarantined)?read.quarantined:0;
+ const total=skipped.length+quarantined;
+ if(!total)return;
+ const key=`${skipped.map(item=>`${item?.id||''}:${item?.reason||''}`).join('|')}#${quarantined}`;
  if(guardNoticeKey===key)return;
  guardNoticeKey=key;
- console.warn(`[LT41] 열 수 없는 트리 ${skipped.length}개를 잠시 빼고 열었어요: ${skipped.map(item=>`${item?.id||'(아이디 없음)'}(${item?.reason||'형식을 읽을 수 없어요.'})`).join(', ')}`);
- notify(`열 수 없는 트리 ${skipped.length}개를 잠시 빼고 열었어요.`,{hold:true});
+ if(skipped.length)console.warn(`[LT41] 열 수 없는 트리 ${skipped.length}개를 잠시 빼고 열었어요: ${skipped.map(item=>`${item?.id||'(아이디 없음)'}(${item?.reason||'형식을 읽을 수 없어요.'})`).join(', ')}`);
+ if(quarantined)console.warn(`[LT41] 서버 기록에서 열 수 없는 트리 ${quarantined}개를 빼고 열었어요(개수만 전해 왔어요).`);
+ notify(`열 수 없는 트리 ${total}개를 잠시 빼고 열었어요.`,{hold:true});
 }
 // #977: 셸을 세우다 예외가 나도 빈 화면에 멈추지 않는다 — 읽을 수 있는 기록으로 한 번 더 열고 안내를 남긴다.
 function openFallbackShell(error){

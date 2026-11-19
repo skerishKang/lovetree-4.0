@@ -219,7 +219,7 @@ function guardTree(subject) {
   return tree;
 }
 
-async function withGuardWorkspace(trees, { width = 1440, height = 900 } = {}, fn) {
+async function withGuardWorkspace(trees, { width = 1440, height = 900, quarantined = 0 } = {}, fn) {
   const server = await serve();
   const origin = `http://127.0.0.1:${server.address().port}`;
   const browser = await chromium.launch({ headless: true });
@@ -235,7 +235,10 @@ async function withGuardWorkspace(trees, { width = 1440, height = 900 } = {}, fn
         route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"revision":2}' });
         return;
       }
-      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ revision: 1, state: { version: 1, trees, prefs: {} }, subject: '시험계정', writeSubjectBound: true }) });
+      const served = { revision: 1, state: { version: 1, trees, prefs: {} }, subject: '시험계정', writeSubjectBound: true };
+      // #986: 서버가 읽지 못해 빼 둔 트리는 개수(quarantined)만 응답에 실린다.
+      if (quarantined) served.quarantined = quarantined;
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(served) });
     });
     const page = await ctx.newPage();
     const errors = [], warnings = [];
@@ -280,7 +283,7 @@ test('어긋난 트리 1개 + 정상 2개: 셸이 열리고 정상 트리 2개�
   }
 });
 
-test('어긋난 트리가 있어도 순간을 저장하면 그 트리가 PUT 본문에 그대로 남는다', async (t) => {
+test('어긋난 트리가 있어도 순간을 저장하면 PUT 본문에는 어긋난 트리가 들어가지 않는다', async (t) => {
   if (skip) { t.skip(skip); return; }
   await withGuardWorkspace([guardTree('첫 트리'), MALFORMED_TREE, guardTree('둘째 트리')], {}, async ({ page, errors, puts }) => {
     await page.locator('#write-menu').click();
@@ -291,9 +294,23 @@ test('어긋난 트리가 있어도 순간을 저장하면 그 트리가 PUT 본
     for (let i = 0; i < 120 && !puts.length; i += 1) await page.waitForTimeout(100);
     assert.equal(puts.length, 1, '저장(PUT)이 한 번 나간다');
     const saved = puts[0].state.trees;
-    assert.equal(saved.length, 3, '정상 트리 2 + 어긋난 트리 1');
-    assert.deepEqual(saved.find((tree) => tree.id === 't2'), MALFORMED_TREE, '어긋난 트리가 손대지 않은 그대로 남는다');
-    assert.ok(saved.some((tree) => tree.id !== 't2' && tree.moments.length === 3), '새 순간은 정상 트리에 담긴다');
+    // #986: 원본 보존은 서버 몫이다 — 본문에 어긋난 트리를 다시 붙이면 서버 전체 검사에
+    // 400 invalid_document로 거절되어 그 계정은 영영 저장하지 못하게 된다.
+    assert.equal(saved.some((tree) => tree.id === 't2'), false, '어긋난 트리 원본이 본문에 다시 붙지 않는다');
+    assert.deepEqual(saved.length, 2, '본문에는 정상 트리 2개만 담긴다');
+    assert.ok(saved.some((tree) => tree.moments.length === 3), '새 순간은 정상 트리에 담긴다');
+    assert.deepEqual(errors, [], '페이지 오류 없음');
+  });
+});
+
+test('서버가 읽지 못해 빼 둔 트리는 개수(quarantined)로도 안내를 띄운다', async (t) => {
+  if (skip) { t.skip(skip); return; }
+  // 서버는 이미 어긋난 트리를 빼고 정상 트리만 돌려주고, 개수만 quarantined로 알린다.
+  await withGuardWorkspace([guardTree('첫 트리'), guardTree('둘째 트리')], { quarantined: 1 }, async ({ page, errors, warnings }) => {
+    const facts = await shellFacts(page);
+    assert.deepEqual(facts.trees.length, 2, '서버가 돌려준 정상 트리 2개가 열린다');
+    assert.match(facts.toast, /열 수 없는 트리 1개를 잠시 빼고 열었어요/, '서버 개수로 안내 한 줄');
+    assert.equal(warnings.filter((text) => /열 수 없는 트리/.test(text)).length, 1, '콘솔 경고 한 줄');
     assert.deepEqual(errors, [], '페이지 오류 없음');
   });
 });

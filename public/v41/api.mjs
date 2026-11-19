@@ -69,6 +69,8 @@ export function createWorkspaceApi({ fetchImpl = (...args) => globalThis.fetch(.
         deleted: payload?.deleted === true,
         commonAccountDeleted: payload?.commonAccountDeleted === true,
         savedAt: payload?.savedAt ?? null,
+        // #986: 서버가 읽지 못해 빼 둔 트리는 개수만 응답에 온다(원본 내용은 보내지 않는다).
+        quarantined: Number.isSafeInteger(payload?.quarantined) ? payload.quarantined : 0,
         ...(path.startsWith('/api/media') ? {media:payload} : {}),
         state: payload?.state ?? null
       };

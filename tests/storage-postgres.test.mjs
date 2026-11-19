@@ -167,3 +167,42 @@ test('an invalid document never reaches the table', { skip }, async () => {
     assert.deepEqual(loaded.body.state, validateState(state));
   });
 });
+
+// #986: 규칙이 바뀐 예전 문서처럼 저장소에 어긋난 트리(시작 순간이 둘)가 남아 있어도
+// 읽기는 200으로 정상 트리만 돌려주고, 저장은 격리 원본을 지우지 않는다.
+function deviantTree() {
+  const tree = createTree({ ...base, title: '어긋난 옛 트리' }, CLOCK);
+  const grown = addMoment(tree, { ...base, title: '둘째 줄기', relation: '직접 만나고 싶어서' }, tree.moments[0].id, CLOCK);
+  return { ...grown, moments: grown.moments.map(m => m.id === grown.moments[1].id ? { ...m, parentId: null } : m) };
+}
+
+test('a stored deviant tree is quarantined on read and kept in storage through a save', { skip }, async () => {
+  await withRepo(async repo => {
+    const subject = `usr_q_${suffix()}`;
+    const handle = buildHandle(repo, subject);
+    const state = sampleState();
+    const deviant = deviantTree();
+    await repo.commit({
+      productId: PRODUCT, subjectId,
+      doc: { version: 1, trees: [...state.trees, deviant] },
+      expectedRevision: 0, clientKey: `ck-seed-${suffix()}`, requestHash: 'seed'
+    });
+
+    const first = await read(handle);
+    assert.equal(first.status, 200);
+    assert.equal(first.body.quarantined, 1, '빠진 트리는 개수만 알린다');
+    assert.deepEqual(first.body.state.trees.map(tree => tree.title), ['윤슬, 나의 순간들']);
+    assert.equal(JSON.stringify(first.body).includes('둘째 줄기'), false, '격리 원본 내용은 응답에 없다');
+
+    const grown = addMoment(state.trees[0], { ...base, title: '다시 저장한 순간', relation: '직접 만나고 싶어서' }, state.trees[0].moments[0].id, CLOCK);
+    assert.equal((await put(handle, { state: { version: 1, trees: [grown] }, expectedRevision: 1, clientKey: `ck-${suffix()}` })).status, 200);
+
+    const stored = (await repo.load({ productId: PRODUCT, subjectId })).doc;
+    assert.deepEqual(stored.trees.find(tree => tree.id === deviant.id), deviant, '저장해도 격리 원본이 남아 있다');
+
+    const again = await read(handle);
+    assert.equal(again.status, 200);
+    assert.equal(again.body.quarantined, 1);
+    assert.equal(again.body.state.trees[0].moments.some(m => m.title === '다시 저장한 순간'), true);
+  });
+});

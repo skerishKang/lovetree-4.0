@@ -1,5 +1,5 @@
 import { EMPTY_STATE, validateState } from './domain.mjs';
-import { guardWorkspaceState, withPreservedTrees } from './workspace-guard.mjs';
+import { guardWorkspaceState } from './workspace-guard.mjs';
 import { readCachedWorkspace, writeCachedWorkspace, clearCachedWorkspace } from './workspace-cache.mjs';
 
 const LABELS = {
@@ -44,13 +44,13 @@ export function createSyncController({getState, replaceState, api, draftStorage 
   let current = status({phase:'checking'}), listener = () => {};
   let owned = false, revision = null, dirty = false, generation = 0, activeSubject = null;
   let queued = 0, inflight = false, attempt = null, seenRevision = null;
-  // #977: 형식이 어긋나 빼 둔 트리의 원본. 화면·도메인은 보지 않고, 다음 저장(PUT)에 다시 붙인다.
-  // 그래야 어긋난 트리가 저장 한 번에 사라지지 않는다.
-  let preserved = [];
-  const adoptState = raw => {
+  // #977: 형식이 어긋난 트리는 읽을 때 트리 하나씩 검사해 빼고 연다(#986에서 원본 보존은
+  // 서버 몫이 됐다 — 서버가 저장할 때 격리 원본을 다시 붙이고, 응답에는 빠진 개수만 온다).
+  const adoptState = (raw, quarantined = 0) => {
     const read = guardWorkspaceState(raw);
-    preserved = read.preserved;
-    if (read.skipped.length || read.repaired.length) onGuard(read);
+    // 서버가 읽지 못해 빼 둔 트리는 개수만 응답에 온다. 화면에서도 그 개수로 안내한다.
+    if (Number.isSafeInteger(quarantined) && quarantined > 0) read.quarantined = quarantined;
+    if (read.skipped.length || read.repaired.length || read.quarantined) onGuard(read);
     replaceState(read.state);
     return read;
   };
@@ -138,7 +138,7 @@ export function createSyncController({getState, replaceState, api, draftStorage 
       return emit(status({phase:'offline',detail:'서버를 확인하지 못했어요. 다시 시도해 주세요.',actions:[...actions.retry,...actions.login]}));
     }
     owned = true; revision = result.revision; dirty = false; attempt = null; seenRevision = null; editCount = 0; activeSubject = result.subject || null;
-    adoptState(result.state);
+    adoptState(result.state, result.quarantined);
     writeCachedWorkspace(cacheStorage, activeSubject, getState());
     if (restorePendingDraft(activeSubject, revision)) return current;
     return emit(status({phase:'synced',actions:actions.logout}));
@@ -154,7 +154,7 @@ export function createSyncController({getState, replaceState, api, draftStorage 
     const sent = attempt;
     emit(status({phase:'syncing'}));
     let answer;
-    try { answer = await api.put({state:withPreservedTrees(JSON.parse(sent.serial), preserved),expectedRevision:sent.expected,clientKey:sent.key}, {keepalive:options.keepalive === true}); }
+    try { answer = await api.put({state:JSON.parse(sent.serial),expectedRevision:sent.expected,clientKey:sent.key}, {keepalive:options.keepalive === true}); }
     catch { answer = {ok:false,status:0}; }
     inflight = false;
     if (gen !== generation) return current;
@@ -189,7 +189,7 @@ export function createSyncController({getState, replaceState, api, draftStorage 
   // 답을 받아 상태를 맞춘다. keepalive 몸통 한도(64KB)를 넘는 큰 기록은 보내지 않는다 — 기존 900ms 저장이 맡는다.
   function flushOnHide() {
     if (!owned || revision === null || inflight || !dirty || current.phase === 'conflict') return false;
-    if (JSON.stringify(withPreservedTrees(getState(), preserved)).length > 60000) return false;
+    if (JSON.stringify(getState()).length > 60000) return false;
     void push({ keepalive: true });
     return true;
   }
@@ -202,7 +202,7 @@ export function createSyncController({getState, replaceState, api, draftStorage 
     if (gen !== generation || dirty || inflight) return current;
     if (!result.ok || result.revision === revision) return current;
     revision = result.revision; seenRevision = null;
-    adoptState(result.state);
+    adoptState(result.state, result.quarantined);
     writeCachedWorkspace(cacheStorage, activeSubject, getState());
     return emit(status({phase:'synced',actions:actions.logout}));
   }
@@ -226,7 +226,7 @@ export function createSyncController({getState, replaceState, api, draftStorage 
       if (!result.ok) return emit(status({phase:'offline',detail:'서버 기록을 불러오지 못했어요.',actions:actions.retry}));
       revision = result.revision; dirty = false; attempt = null; seenRevision = null; editCount = 0;
       clearPendingDraft();
-      adoptState(result.state);
+      adoptState(result.state, result.quarantined);
       writeCachedWorkspace(cacheStorage, activeSubject, getState());
       return emit(status({phase:'synced',actions:actions.logout}));
     }
