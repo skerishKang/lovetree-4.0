@@ -20,18 +20,15 @@ function hasViewOnlyRule(html) {
 }
 
 test('보기 전용 규칙이 없다 — 숨김 목록·핀 포인터 차단 제거, [hidden]만 유지', () => {
-  assert.equal(hasViewOnlyRule(HTML), false);
-  assert.match(HTML, /\[hidden\]\{display:none!important\}/);
+  // #952: 소스 글자 대신 화면에서 본다 — 쓰기 가능한 내 보드에서 도구 단추가 보이고 눌린다
+  // (v41-board-readonly-520-521: 390 × 테마 × 쓰기 가능/읽기 전용 대조). 옛 규칙 탐지기는 아래 자체 시험으로 남긴다.
   // 강도 증명: 옛 규칙을 되돌리면 이 시험이 실제로 잡는다.
   assert.equal(hasViewOnlyRule('<style>#addBtn,#toolAdd,#editMomentBtn,#undoBtn,#quickPin,#quickCard,[hidden]{display:none!important}.pin{pointer-events:none}</style>'), true);
   assert.equal(hasViewOnlyRule('<style>.pin{pointer-events:none}</style>'), true);
 });
 
-test('#replayFrom은 HTML·보드 스크립트에서 사라졌다', () => {
-  assert.equal(HTML.includes('replayFrom'), false);
-  assert.equal(BOARD_JS.includes('replayFrom'), false);
-  assert.equal(EXTRAS_JS.includes('replayFrom'), false);
-});
+// #952: HTML·보드 스크립트에 'replayFrom' 글자가 없음을 세던 시험은 지웠다(없는 기능 이름 = 구현 모양).
+// 재생 기능이 없다는 화면 결과는 보드 화면 시험이 단추 목록으로 본다.
 
 test('lt-advanced 메시지로 body 클래스가 켜지고 꺼진다 — 메시지가 없으면 단순', () => {
   const classes = new Set();
@@ -98,12 +95,8 @@ test('보드 배치 형식이 틀리면 그 항목만 버린다', () => {
   }
 });
 
-test('보드 저장 다리: lt41-board-sync/boardSync가 연결되어 있다', () => {
-  assert.match(BOARD_JS, /lt41-board-sync/);
-  assert.match(BOARD_JS, /lt41-board-saved/);
-  assert.match(read('public/v41/shell/messages.mjs'), /lt41-board-sync/);
-  assert.match(read('public/v41/member-session.mjs'), /boardSync/);
-});
+// #952: 저장 다리(lt41-board-sync·boardSync)를 파일 글자로 고정하던 시험은 지웠다 — 실제 저장은
+// v41-board-pinboard2-601 화면 시험이 마음을 남겨 lt41-board-sync 메시지에 note가 실리는 것을 확인한다.
 
 // 옛 서버 호환: main의 검증기는 validateMomentInput 허용 목록이므로 모르는 칸(x·y·rot 등)을
 // 400 대신 조용히 버린다. 이 허용 목록 행동은 main과 현재가 같아야 옛 서버·새 화면이 안전하다.
