@@ -85,6 +85,92 @@ const THUMB = (route) => route.fulfill({ status: 200, contentType: 'image/png', 
 
 // 시험 트리(#635와 같은 모양 — 순간 3개 사슬, 첫 순간은 유튜브). 가짜 데이터다.
 // 첫 순간이 두 갈래(e2·e3)를 나가므로 첫 장에 갈림길 탭이 보인다 — #700 후속 탭 글자 크기·잘림 검사 대상.
+
+// #942: 첫 화면의 추가 단추는 밤·정원 모두 장미색 바탕과 흰 글씨를 유지한다.
+test('#942 첫 화면 추가 단추 장미색과 흰 글씨 대비', { skip: REQUIRE ? false : skip, timeout: 180000 }, async () => {
+  if (skip) assert.fail(skip);
+  const server = await serve(), base = 'http://127.0.0.1:' + server.address().port;
+  const browser = await chromium.launch({headless:true});
+  const dest = process.env.LT_HOME_CTA_CAPTURE;
+  if(dest)mkdirSync(dest,{recursive:true});
+  const make = (subject,count) => {
+    const input=i=>({subject,title:'시험 순간 '+(i+1),date:'2026-11-'+String(i+1).padStart(2,'0'),emotion:'설렘',note:'화면 확인용 가짜 기록',url:i%3===0?'https://audit.invalid/photo.jpg':i%3===1?'https://www.youtube.com/watch?v=dQw4w9WgXcQ':''});
+    let tree=createTree(input(0));
+    for(let i=1;i<count;i++)tree=addMoment(tree,input(i),tree.moments[0].id);
+    return tree;
+  };
+  const trees=[make('좋아하는 순간들',8),make('여름',3),make('함께 부른 노래',3)];
+  const workspace={revision:1,state:{version:1,trees,prefs:{displayName:'화면검사 시험계정'}},subject:'visual-audit-fake',writeSubjectBound:true,savedAt:'2026-11-20T00:00:00.000Z'};
+  const share={id:'audit-share-000000000001',treeId:trees[0].id,view:'book',status:'active',origin:'manual',createdAt:'2026-11-20T00:00:00.000Z'};
+  const failures=[];
+  const measure=(e)=>{
+    const s=getComputedStyle(e), token=document.createElement('span');
+    token.style.color='var(--lt-cta-rose)';e.parentElement.append(token);
+    const rose=getComputedStyle(token).color;token.remove();
+    const rgb=color=>(color.match(/[\d.]+/g)||[]).map(Number);
+    const blend=(front,back)=>front.slice(0,3).map((v,i)=>v*(front[3]??1)+back[i]*(1-(front[3]??1)));
+    const L=color=>color.slice(0,3).map(v=>v/255).map(v=>v<=0.04045?v/12.92:((v+0.055)/1.055)**2.4).reduce((sum,v,i)=>sum+v*[.2126,.7152,.0722][i],0);
+    const parents=[];
+    for(let p=e.parentElement;p;p=p.parentElement)parents.unshift(p);
+    const backdrop=parents.reduce((b,p)=>blend(rgb(getComputedStyle(p).backgroundColor),b),[0,0,0]);
+    const bg=L(blend(rgb(s.backgroundColor),backdrop)), ink=L(rgb(s.color));
+    return {text:e.textContent.trim(),bg:s.backgroundColor,ink:s.color,rose,contrast:(Math.max(bg,ink)+.05)/(Math.min(bg,ink)+.05),visible:!!e.getClientRects().length,width:e.getBoundingClientRect().width};
+  };
+  try{
+    for(const theme of ['night','garden'])for(const [width,height] of [[390,844],[1440,900]])for(const member of [false,true]){
+      const ctx=await browser.newContext({viewport:{width,height},reducedMotion:'reduce'});
+      try{
+        await ctx.addInitScript(t=>localStorage.setItem('lt41.theme',t),theme);
+        await ctx.route('**/*',r=>{
+          const u=new URL(r.request().url());
+          if(u.origin!==base)return u.hostname==='i.ytimg.com'||u.hostname==='audit.invalid'?THUMB(r):r.abort();
+          if(u.pathname==='/api/workspace'&&member)return r.fulfill({status:200,json:workspace});
+          if(u.pathname==='/api/shares'&&member)return r.fulfill({status:200,json:{ok:true,items:[share],shares:[share]}});
+          if(u.pathname.startsWith('/api/'))return r.fulfill({status:200,json:{ok:true,items:[]}});
+          return r.continue();
+        });
+        const page=await ctx.newPage();
+        await page.goto(base+'/v41/'+(member?'?account=1':'')+'#home');
+        if(member){
+          await page.waitForFunction(()=>window.LT41?.trees?.length===3&&!document.querySelector('#account-avatar')?.hidden);
+          const ask=page.locator('#discover-ask-no');
+          await ask.waitFor({state:'visible',timeout:4000}).catch(()=>{});
+          if(await ask.isVisible())await ask.click();
+          await ask.waitFor({state:'hidden'});
+        }
+        const sel=member?'.home-add-top':'.center [data-do=start]';
+        const home=await frameOf(page,/home\.html/);
+        assert.ok(home,'첫 화면 프레임');
+        // 로그인 뒤 홈 프레임이 다시 열릴 수 있어서 현재 프레임을 찾는다.
+        let current=home;
+        for(let i=0;i<20;i++){
+          try{ if(await current.locator(sel).count())break; }catch{}
+          await page.waitForTimeout(250);
+          current=await frameOf(page,/home\.html/)||current;
+        }
+        await current.locator(sel).waitFor({state:'visible'});
+        await current.waitForFunction(()=>document.fonts.status==='loaded');
+        await current.waitForFunction(()=>!!document.getElementById('orbit')?.shadowRoot?.querySelector('link[href="/v41/identity.css"]')?.sheet);
+        await page.waitForTimeout(300);
+        const center=await current.locator(sel).evaluate(measure);
+        const header=await page.locator('#write-menu').evaluate(measure);
+        const others=await current.locator('.center [data-do=community],.center [data-do=guide]').evaluateAll(es=>es.map(e=>({text:e.textContent.trim(),bg:getComputedStyle(e).backgroundColor,ink:getComputedStyle(e).color})));
+        const values={center,header,others};
+        console.log('#942',width,theme,member?'member':'guest',JSON.stringify(values));
+        if(dest)await page.screenshot({path:join(dest,'home-'+width+'-'+theme+'-'+(member?'member':'guest')+'.png'),animations:'disabled'});
+        {
+          for(const b of [center,header]){
+            if(b.bg!==b.rose||b.ink!=='rgb(255, 255, 255)'||b.contrast<4.5)failures.push([width,theme,member,b]);
+          }
+          assert.equal(center.visible,true);
+          assert.equal(header.visible,member&&width>780);
+        }
+      }finally{await ctx.close()}
+    }
+  }finally{await browser.close();await new Promise(r=>server.close(r))}
+  assert.deepEqual(failures,[]);
+});
+
 const VIDEO_TITLE = 'Super Shy — Official MV';
 const tree = (() => {
   const moments = [
