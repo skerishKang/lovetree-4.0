@@ -68,7 +68,7 @@ button{font:inherit;color:inherit;cursor:pointer}
  html[data-v41-screen=network] #treeTitleText{display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom}
  .pill{padding-left:9px;padding-right:9px}
  /* #951 ①: 세 보기 방식이 390에서도 다 보이게 붙은 단추 안쪽 여백만 줄인다(모서리는 묶음이 정한다). */
- html[data-v41-screen=network] .top-actions .view-switch .pill{padding:0 7px;font-size:11px}
+ html[data-v41-screen=network] .top-actions .view-switch .pill{padding:0 5px;font-size:13px}
  /* #517: 내려온 도구 줄 아래에 순간 선택 패널이 오게 한다 — 패널 top은 measureInsets가 재어 넘긴
     머리 아래 끝(--lt-picker-top)을 따른다(도구 줄이 한 줄이든 두 줄이든 겹침 0). */
  html[data-v41-screen=network] .lt-moment-picker{top:var(--lt-picker-top,118px)}
