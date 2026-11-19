@@ -394,8 +394,14 @@ function collectSiteApiPaths() {
   ]) found.add(p);
   return found;
 }
-// 일부러 프록시하지 않는 경로가 생기면 여기에 이유와 함께 적는다(지금은 해당 없음).
-const INTENTIONALLY_NOT_PROXIED = [];
+// 일부러 프록시하지 않는 경로가 생기면 여기에 이유와 함께 적는다.
+const INTENTIONALLY_NOT_PROXIED = [
+  // #792 ⑤: community-api.mjs의 momentStage는 '/api/community/shares/' + id + '/moments/' + id + '/stage' 조각으로
+  // 만들어져 수집기가 '/shares/fake/stage'로 읽는다 — 실제 서버 경로가 아니다(무대는 순간 아래에 있다).
+  // 실제 경로 '/api/community/shares/<24자>/moments/<id>/stage'는 프록시가 넘긴다(공유 번호가 20자 이상이어야 해서
+  // 수집기의 가짜 id로는 프록시 정규식에 걸리지 않는다). tests/v41-community.test.mjs가 실제 모양으로 확인한다.
+  { path: '/api/community/shares/fake/stage' }
+];
 const FAKE_IDS = ['fake', '42', 'sub_fake', '00000000-0000-4000-8000-000000000000.png'];
 const METHODS = ['GET', 'PUT', 'POST', 'PATCH', 'DELETE'];
 
