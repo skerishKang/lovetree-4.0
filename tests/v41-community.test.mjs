@@ -36,3 +36,108 @@ test('Pages proxy constrains community routes and forwards idempotency only',asy
  const denied=await proxy({request:new Request('https://front.test/api/community/unknown'),env:{LOVETREE_API_ORIGIN:'https://api.test'}});assert.equal(denied.status,404);
  assert.equal(calls.some(call=>call.headers['idempotency-key']==='community-key-1'),true);
 });
+
+// ── #792 4단계 ⑤: 공개 무대 담기 화면 계약 ──
+import {publicStageCount,stageCountLabel,stageVoteLabel,stageVoteNotice,stageShareId,stageMomentTitle,readStage,toggleStage,STAGE_VOTE_LABEL,VOTE_TOO_NEW_NOTICE,POPULAR_STAGE_TITLE,POPULAR_STAGE_EMPTY} from '../public/v41/community-stages.mjs';
+
+test('#792 ⑤ community-api: 무대 조회·인기 무대·담기 경로와 메서드', async () => {
+  const calls = [];
+  const fetchImpl = async (url, init = {}) => { calls.push({ url, method: init.method }); return new Response(JSON.stringify({ ok: true, items: [] }), { headers: { 'content-type': 'application/json' } }); };
+  const api = createCommunityApi({ fetchImpl });
+  const shareId = 's'.repeat(24), momentId = 'm-1', stageId = 'stage-1';
+  await api.momentStage(shareId, momentId);
+  await api.popularStages();
+  await api.stageDetail(stageId, { currentShareId: shareId, cursor: 'cur' });
+  await api.voteStage(stageId, true);
+  await api.voteStage(stageId, false);
+  assert.equal(calls[0].url, `/api/community/shares/${shareId}/moments/${momentId}/stage`);
+  assert.equal(calls[0].method, undefined);
+  assert.equal(calls[1].url, '/api/community/stages/popular');
+  assert.match(calls[2].url, new RegExp(`^/api/community/stages/${stageId}\?`));
+  assert.equal(new URL(calls[2].url, 'https://front.test').searchParams.get('cursor'), 'cur');
+  assert.equal(calls[3].url, `/api/community/stages/${stageId}/vote`);
+  assert.equal(calls[3].method, 'PUT');
+  assert.equal(calls[4].method, 'DELETE');
+});
+
+test('#792 ⑤ 프록시: 무대 경로는 허용 목록에 있고, 담기는 누르기(PUT)·취소(DELETE)만 통과한다', async () => {
+  const calls = [];
+  const fetcher = async (url, init) => { calls.push({ url, method: init.method }); return new Response('{}', { headers: { 'content-type': 'application/json' } }); };
+  const proxy = createProxy({ fetcher });
+  const shareId = 's'.repeat(24);
+  const allowed = [
+    ['/api/community/stages/popular', 'GET'],
+    ['/api/community/shares/' + shareId + '/moments/m-1/stage', 'GET'],
+    ['/api/community/stages/stage-1', 'GET'],
+    ['/api/community/stages/stage-1/vote', 'PUT'],
+    ['/api/community/stages/stage-1/vote', 'DELETE'],
+  ];
+  for (const [path, method] of allowed) {
+    const response = await proxy({ request: new Request('https://front.test' + path, { method }), env: { LOVETREE_API_ORIGIN: 'https://api.test' } });
+    assert.equal(response.status, 200, `${method} ${path}`);
+  }
+  const notAllowed = await proxy({ request: new Request('https://front.test/api/community/stages/stage-1/vote', { method: 'POST' }), env: { LOVETREE_API_ORIGIN: 'https://api.test' } });
+  assert.equal(notAllowed.status, 405, '담기는 PUT·DELETE만');
+  const denied = await proxy({ request: new Request('https://front.test/api/community/stages/extra/path', { method: 'GET' }), env: { LOVETREE_API_ORIGIN: 'https://api.test' } });
+  assert.equal(denied.status, 404, '무대 경로가 아니라서 막는다');
+});
+
+test('#792 ⑤ 화면 규칙: 3 미만은 숫자를 숨기고, 담은 상태는 ✓, 가입 7일 안내는 화면에서 한 번만', () => {
+  assert.equal(publicStageCount(2), null);
+  assert.equal(publicStageCount(3), 3);
+  assert.equal(publicStageCount(null), null);
+  assert.equal(stageCountLabel('이번 주 담은 사람', 2), '이번 주 담은 사람');
+  assert.equal(stageCountLabel('이번 주 담은 사람', 5), '이번 주 담은 사람 5');
+  assert.equal(stageVoteLabel(false), STAGE_VOTE_LABEL);
+  assert.equal(stageVoteLabel(true), '✓ 이 무대 담기');
+  assert.equal(stageVoteNotice({ code: 'vote_too_new' }), VOTE_TOO_NEW_NOTICE);
+  assert.equal(stageVoteNotice({ code: 'rate_limited', message: '잠시 뒤 다시 시도해 주세요.' }), '잠시 뒤 다시 시도해 주세요.');
+  assert.equal(stageShareId('#share/' + 'r'.repeat(24) + '/book'), 'r'.repeat(24));
+  assert.equal(stageShareId('#my/board?tree=t1'), '');
+  assert.equal(stageMomentTitle({ title: '  Super Shy  ' }), 'Super Shy');
+  assert.equal(stageMomentTitle({}), '공개 무대');
+  // #792 ⑤ 결정: 7일 안내 문구는 화면 소스에 정확히 하나만 둔다(사용자에게는 한 번만 보인다).
+  const moduleFiles = ['community-stages.mjs', 'community-panel.mjs', 'views/book/book-extra.js'];
+  for (const file of moduleFiles) {
+    const source = fs.readFileSync(new URL('../public/v41/' + file, import.meta.url), 'utf8');
+    const count = source.split(VOTE_TOO_NEW_NOTICE).length - 1;
+    assert.equal(count, file === 'community-stages.mjs' ? 1 : 0, `7일 안내 문구는 ${file}에 ${count}곳`);
+  }
+});
+
+test('#792 ⑤ readStage: 표지 순간이 공개 무대일 때만 상태를 준다 (없으면 null)', async () => {
+  const moments = { ok: true, stageId: 'stage-9' };
+  let detailCalled = 0;
+  const api = {
+    momentStage: async () => moments,
+    stageDetail: async () => { detailCalled += 1; return { ok: true, voted: true, saved: true, weeklyVoters: 2, title: 'Super Shy' }; },
+    voteStage: async () => ({ ok: true, weeklyVoters: 4 }),
+  };
+  const stage = await readStage({ api, shareId: 's'.repeat(24), momentId: 'm-1' });
+  assert.equal(stage.stageId, 'stage-9');
+  assert.equal(stage.voted, true);
+  assert.equal(stage.weeklyVoters, null, '2표는 null(3 미만 — 숫자 숨김)');
+  assert.equal(detailCalled, 1);
+  assert.equal(await readStage({ api, shareId: 's'.repeat(24), momentId: '' }), null, '표지 순간이 없으면 확인하지 않는다');
+  assert.equal(await readStage({ api: { momentStage: async () => ({ ok: false, code: 'stage_not_found' }) }, shareId: 's'.repeat(24), momentId: 'm-2' }), null, '공개 무대가 아니면 단추를 만들지 않는다');
+});
+
+test('#792 ⑤ toggleStage: 성공하면 누름 상태와 3 미만 규칙 숫자를 돌려준다', async () => {
+  const api = { voteStage: async () => ({ ok: true, weeklyVoters: 7 }) };
+  const done = await toggleStage({ api, stageId: 'stage-1', voted: false });
+  assert.equal(done.ok, true);
+  assert.equal(done.voted, true);
+  assert.equal(done.weeklyVoters, 7);
+  const blocked = await toggleStage({ api: { voteStage: async () => ({ ok: false, code: 'vote_too_new', message: VOTE_TOO_NEW_NOTICE }) }, stageId: 'stage-1', voted: false });
+  assert.equal(blocked.ok, false);
+  assert.equal(stageVoteNotice(blocked.answer), VOTE_TOO_NEW_NOTICE);
+});
+
+test('#792 ⑤ 둘러보기 제목·빈 안내 문자열이 화면에 있다', async () => {
+  const html = fs.readFileSync(new URL('../public/v41/index.html', import.meta.url), 'utf8');
+  const panel = fs.readFileSync(new URL('../public/v41/community-panel.mjs', import.meta.url), 'utf8');
+  assert.match(panel, /POPULAR_STAGE_TITLE/);
+  assert.equal(POPULAR_STAGE_EMPTY, '이번 주 인기 무대를 모으고 있어요');
+  assert.equal(panel.includes('POPULAR_STAGE_EMPTY'), true, '빈 안내도 같은 문구를 쓴다');
+  assert.doesNotMatch(html, /이 무대 담기/, '단추는 코드로 붙는다(둘러보기에 정적 텍스트로 박지 않는다)');
+});
