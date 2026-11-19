@@ -683,6 +683,19 @@ jobs:
           node --test --test-concurrency=1 tests/v41-tree-tips-549.test.mjs tests/v41-tree-rename-tips-571.test.mjs
           echo "첫 트리 안내 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
 
+      # 이슈 970: 쓰기 창 탭(입력 유지·방향키·aria-selected), 모아둔 순간(목록·상세·초점 복귀),
+      # 빈 화면(안내·단추·창 연결)을 실제 화면에서 잰다. 셋 다 가짜 작업장만 쓴다(운영 API·운영 계정 없음).
+      # 새 화면 시험은 가장 짧은 잡에 붙인다(261119 실측: 이 잡 86초). 첫 화면 번들이 필요해 먼저 build한다. 건너뜀=실패.
+      - name: 쓰기 창 탭·모아둔 순간·빈 화면 시험(건너뜀=실패 — 이슈 970)
+        env:
+          LT_970_REQUIRE: '1'
+        if: needs.screen-changes.outputs.changed == 'true'
+        run: |
+          start=$(date +%s)
+          npx vite build > /dev/null
+          node --test --test-concurrency=1 tests/v41-write-tab-462.test.mjs tests/v41-inbox-display.test.mjs tests/v41-empty-tree-463.test.mjs
+          echo "쓰기 창 탭·모아둔 순간·빈 화면 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+
       - name: 화면 변경 없으면 건너뜀을 남긴다
         if: always()
         run: |
