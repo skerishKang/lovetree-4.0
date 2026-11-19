@@ -76,9 +76,8 @@ async function openHost(browser, url) {
 test('#417 화면: 제목 ▾는 셸 목록을 정리 전 트리부터 보여 주고, 행을 누르면 같은 보기로 열어 달라 한다', { skip: REQUIRE ? false : skip, timeout: 240000 }, async (t) => {
   const browser = await chromium.launch();
   const server = await serve({ '/host.html': hostHTML({ source: 'server', writable: true, trees: TREES, treeId: 't1' }) });
-  t.after(async () => { await browser.close(); server.close(); });
   const { context, page, frame, problems } = await openHost(browser, `http://127.0.0.1:${server.address().port}/host.html`);
-  t.after(async () => { await context.close(); });
+  t.after(async () => { await context.close().catch(() => {}); await browser.close(); server.close(); });
   assert.deepEqual(problems, [], '화면 오류 없음: ' + problems.join(' | '));
 
   // 머리 줄: ← 서재 + 지금 트리 제목 + ▾ — 셋 다 보인다.
@@ -153,9 +152,8 @@ test('#417 화면: 제목 ▾는 셸 목록을 정리 전 트리부터 보여 �
 test('#417 화면: 공유·예시(읽기 전용)에서는 ▾와 ← 서재를 숨기고 목록을 열지 않는다', { skip: REQUIRE ? false : skip, timeout: 240000 }, async (t) => {
   const browser = await chromium.launch();
   const server = await serve({ '/host.html': hostHTML({ source: 'share', writable: false, trees: TREES, treeId: 't1' }) });
-  t.after(async () => { await browser.close(); server.close(); });
   const { context, page, frame, problems } = await openHost(browser, `http://127.0.0.1:${server.address().port}/host.html`);
-  t.after(async () => { await context.close(); });
+  t.after(async () => { await context.close().catch(() => {}); await browser.close(); server.close(); });
   assert.deepEqual(problems, [], '화면 오류 없음: ' + problems.join(' | '));
   const ro = await frame.evaluate(() => ({
     caret: document.querySelector('.tree-title-caret')?.hidden === true,

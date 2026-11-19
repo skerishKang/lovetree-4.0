@@ -91,9 +91,8 @@ test('1. 화면: 커서 동그라미가 없고, 판·카드는 grab·끌면 grab
   const tree = chainTree(6);
   const browser = await chromium.launch();
   const server = await serve({ '/host.html': hostHTML(tree) });
-  t.after(async () => { await browser.close(); server.close(); });
   const { context, page, frame, problems } = await openHost(browser, `http://127.0.0.1:${server.address().port}/host.html`);
-  t.after(async () => { await context.close(); });
+  t.after(async () => { await context.close().catch(() => {}); await browser.close(); server.close(); });
   assert.deepEqual(problems, [], '화면 오류 없음: ' + problems.join(' | '));
   const look = await frame.evaluate(() => ({
     rings: document.querySelectorAll('.cursorRing,.cursorFX,[class*="cursor-burst"],[class*="cursor-ripple"]').length,

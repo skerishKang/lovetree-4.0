@@ -92,9 +92,8 @@ test('보드·지도 판 테마 수신: 어떤 화면에서도 다시 띄우지 
 test('#467 화면: 보드 배경 드롭에서 고른 값이 셸로 가고 판이 그 자리에서 바뀐다', { skip: REQUIRE ? false : skip, timeout: 240000 }, async (t) => {
   const browser = await chromium.launch();
   const server = await serve({ '/host.html': HOST('track58-pinboard.html') });
-  t.after(async () => { await browser.close(); server.close(); });
   const { context, page, frame, problems } = await openFrame(browser, `http://127.0.0.1:${server.address().port}/host.html`, /views\/track58-pinboard/);
-  t.after(async () => { await context.close(); });
+  t.after(async () => { await context.close().catch(() => {}); await browser.close(); server.close(); });
   assert.deepEqual(problems, [], '화면 오류 없음: ' + problems.join(' | '));
   assert.equal(await frame.evaluate(() => document.getElementById('boardBgBtn')?.hidden === false), true, '머리 줄에 배경 드롭이 보인다');
   await frame.click('#boardBgBtn');
@@ -123,9 +122,8 @@ test('#467 화면: 보드 배경 드롭에서 고른 값이 셸로 가고 판이
 test('#467 화면: 지도 도구 줄에도 같은 배경 드롭이 있고, 고른 값이 셸로 간다', { skip: REQUIRE ? false : skip, timeout: 240000 }, async (t) => {
   const browser = await chromium.launch();
   const server = await serve({ '/host.html': HOST('track56-network.html') });
-  t.after(async () => { await browser.close(); server.close(); });
   const { context, page, frame, problems } = await openFrame(browser, `http://127.0.0.1:${server.address().port}/host.html`, /views\/track56-network/);
-  t.after(async () => { await context.close(); });
+  t.after(async () => { await context.close().catch(() => {}); await browser.close(); server.close(); });
   assert.deepEqual(problems, [], '화면 오류 없음: ' + problems.join(' | '));
   assert.equal(await frame.evaluate(() => document.getElementById('netBgBtn')?.hidden === false), true, '지도 도구 줄에 배경 드롭이 보인다');
   await frame.click('#netBgBtn');
