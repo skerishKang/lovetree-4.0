@@ -54,6 +54,15 @@ test('584-6: 목차·이어진 순간에도 한 줄 설명이 있고 이름이 �
 
 /* ── 실제 화면(크롬) ─────────────────────────────────────────────────── */
 const ROOT = path.resolve(fileURLToPath(new URL('../public', import.meta.url)));
+let server = null, base = '';
+// 훅은 첫 시험보다 먼저 등록한다(#952). 시험 뒤에 등록하면 실행기에 따라 after가 먼저 돌아
+// 서버가 닫히지 않은 채 실행이 끝나지 않는다(CI 잡이 25분 뒤 취소됨).
+const booting = (async () => { server = await serve(ROOT); base = `http://127.0.0.1:${server.address().port}`; })();
+test.before(() => booting);
+test.after(async () => {
+  await booting.catch(() => {});
+  if (server) await new Promise((ok) => server.close(ok));
+});
 const REQUIRE = process.env.LT_BOOK_584_REQUIRE === '1';
 let chromium = null;
 let skip = false;
@@ -118,9 +127,7 @@ function tree26() {
   return { id: 'tree1', subject: '시험 사용자', title: '시험 트리', coverMomentId: '', inbox: false, moments, edges: [] };
 }
 
-let server, base;
-test.before(async () => { server = await serve(ROOT); base = `http://127.0.0.1:${server.address().port}`; });
-test.after(() => new Promise((ok) => server.close(ok)));
+
 
 async function openBook(browser, width, height, extraRoutes = [], tree = tree26()) {
   const ctx = await browser.newContext({ viewport: { width, height } });
