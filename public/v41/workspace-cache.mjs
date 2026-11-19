@@ -2,6 +2,7 @@
 // 서버본이 항상 이긴다(읽기는 시작 화면용일 뿐). 저장본을 보는 동안 편집은 셸의 checking 단계가 잠근다.
 // 로그아웃하면 지운다(공용 컴퓨터). 1MB가 넘으면 저장하지 않는다. 읽기·쓰기는 전부 try/catch.
 import { validateState } from './domain.mjs';
+import { guardWorkspaceState } from './workspace-guard.mjs';
 
 const KEY_PREFIX = 'lovetree.v41.workspace-cache:';
 const LAST_KEY = 'lovetree.v41.workspace-cache:last';
@@ -18,7 +19,17 @@ export function readCachedWorkspace(storage) {
     if (!raw) return null;
     const entry = JSON.parse(raw);
     if (entry?.version !== 1 || entry.subject !== subject) throw new Error('invalid_cache_entry');
-    return { subject, state: validateState(entry.state) };
+    // #986: 옛 저장본에는 어긋난 트리가 섞여 있을 수 있다. 저장본 통째를 버리지 않고
+    // 어긋난 트리만 빼서 읽는다(안내는 서버 응답의 quarantined 개수가 알려 준다).
+    // 뼈대 자체가 어긋난 저장본은 여전히 깨진 저장본이다 — 지운다.
+    let state;
+    try { state = validateState(entry.state); }
+    catch {
+      const guarded = guardWorkspaceState(entry.state);
+      if (guarded.unreadable) throw new Error('invalid_cache_entry');
+      state = guarded.state;
+    }
+    return { subject, state };
   } catch {
     // 깨진 저장본은 남기지 않는다(다음 접속에 다시 실패하지 않게).
     try { if (subjectValid(subject)) storage.removeItem(KEY_PREFIX + subject); } catch { /* 저장소 접근 불가 */ }

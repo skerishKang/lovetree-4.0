@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
-import { validateState, coverModeOf, normalizeCoverDesign } from '../src/domain.js';
+import { coverModeOf, normalizeCoverDesign } from '../src/domain.js';
 import { ApiError } from './errors.js';
+import { readStoredDocument } from './workspace-service.js';
 import { refreshStageIndex } from './stage-index-refresh.js';
 import { parsePrincipal } from './principal.js';
 import { aiTesterFor } from './admin-roles.js';
@@ -24,10 +25,11 @@ function privateMedia(value) {
   catch { return true; }
 }
 export function projectSharedTree(document, treeId) {
-  let state;
-  try { state = validateState(document); }
-  catch { throw new ApiError(500, 'stored_document_invalid', '보관된 기록을 읽을 수 없어요.'); }
-  const source = state.trees.find(tree => tree.id === treeId);
+  // #986: 저장된 문서에 격리 트리가 섞여 있어도, 읽을 수 있는 트리의 공유는 그대로 동작한다.
+  // 문서 전체를 검사하면 트리 하나 때문에 공유 만들기·공개 읽기·커뮤니티 카드가 함께 실패한다.
+  const scan = readStoredDocument(document);
+  if (!scan) throw new ApiError(500, 'stored_document_invalid', '보관된 기록을 읽을 수 없어요.');
+  const source = scan.state.trees.find(tree => tree.id === treeId);
   if (!source) throw new ApiError(410, 'share_removed', '공유된 트리가 삭제되었거나 더 이상 존재하지 않아요.');
   let omittedPrivateMedia = 0;
   const tree = {
@@ -79,8 +81,9 @@ export function createShareService({ shareRepo, workspaceRepo, visibilityRepo = 
     const stored = await workspaceRepo.load({ productId, subjectId });
     if (!stored) throw new ApiError(404, 'tree_not_found', '트리를 찾을 수 없어요.');
     let doc;
-    try { doc = validateState(stored.doc); }
-    catch { throw new ApiError(500, 'stored_document_invalid', '보관된 기록을 읽을 수 없어요.'); }
+    try { doc = readStoredDocument(stored.doc)?.state ?? null; }
+    catch { doc = null; }
+    if (!doc) throw new ApiError(500, 'stored_document_invalid', '보관된 기록을 읽을 수 없어요.');
     if (!doc.trees.some(tree => tree.id === treeId)) throw new ApiError(404, 'tree_not_found', '트리를 찾을 수 없어요.');
     return doc;
   }

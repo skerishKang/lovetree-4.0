@@ -3,12 +3,12 @@ import {EMPTY_STATE,validateState,createTree,editTree,addMoment,editMoment,repar
 // Reuses 4.0 persistence, retries and revision conflicts; demo/file records cannot enter this session.
 function sessionDraftStorage(){try{return globalThis.sessionStorage||null;}catch{return null;}}
 function sessionCacheStorage(){try{return globalThis.localStorage||null;}catch{return null;}}
-export function createMemberSession({api,onState=()=>{},onStatus=()=>{},navigate=()=>{},delay,makeClientKey=()=>`v41-${newId()}`,draftStorage=sessionDraftStorage(),cacheStorage=sessionCacheStorage()}){
+export function createMemberSession({api,onState=()=>{},onStatus=()=>{},onGuard=()=>{},navigate=()=>{},delay,makeClientKey=()=>`v41-${newId()}`,draftStorage=sessionDraftStorage(),cacheStorage=sessionCacheStorage()}){
  let document=EMPTY_STATE(),subject=null,bound=false,active=true,mismatch=false;
  const wrapped={get:async()=>{const result=await api.get();if(!active)return {ok:false,status:401};
    if(result.ok){if(subject&&subject!==result.subject){mismatch=true;bound=false;return {ok:false,status:401,code:'account_changed'};}subject=result.subject;bound=result.writeSubjectBound===true&&typeof subject==='string'&&!!subject;}return result;},
  put:(body,options)=>{if(!active||!bound||mismatch||!subject)return Promise.resolve({ok:false,status:401});return api.put({...body,expectedSubject:subject},options);},logout:()=>api.logout()};
- const sync=createSyncController({getState:()=>document,replaceState:s=>{if(!active)return;document=validateState(s);onState(structuredClone(document));},api:wrapped,draftStorage,cacheStorage,delay,makeClientKey,navigate:url=>navigate(url.startsWith('/auth/login')?'/auth/login?next=/v41/':url),onChange:s=>{if(active)onStatus({...s,writable:sync.snapshot().owned&&bound&&!mismatch,dirty:sync.snapshot().dirty});}});
+ const sync=createSyncController({getState:()=>document,replaceState:s=>{if(!active)return;document=validateState(s);onState(structuredClone(document));},onGuard,api:wrapped,draftStorage,cacheStorage,delay,makeClientKey,navigate:url=>navigate(url.startsWith('/auth/login')?'/auth/login?next=/v41/':url),onChange:s=>{if(active)onStatus({...s,writable:sync.snapshot().owned&&bound&&!mismatch,dirty:sync.snapshot().dirty});}});
  // 이슈 644 3번: 탭을 다시 보거나 창으로 돌아오면 최신 기록을 확인한다. 이 화면에서 고친 게 없을 때만
  // 조용히 최신 기록을 불러온다(띠 없음) — 확인 자체는 sync 컨트롤러의 check()가 판정한다. 4초에 한 번 넘지 않게 쉰다.
  let lastQuietCheck = 0;
