@@ -36,19 +36,10 @@ jobs:
           base='${{ github.event.pull_request.base.sha }}'
           head='${{ github.event.pull_request.head.sha }}'
           git diff --name-only "$base...$head" > /tmp/changed-files.txt 2>/dev/null || { echo "diff 실패 — 바뀜으로 둔다"; echo "changed=true" >> "$GITHUB_OUTPUT"; exit 0; }
-          changed=false
-          while IFS= read -r f; do
-            [ -z "$f" ] && continue
-            case "$f" in
-              public/*|src/views/*|*v41*|vite.config*|package.json|package-lock.json|index.html|.github/workflows/preview-check.yml|tests/v41-*|tests/*screen*|tests/*browser*|tests/admin-view*)
-                echo "화면 바뀜: $f"; changed=true;;
-              docs/*|*.md|reference/*|scripts/*|src/server/*|deploy/*|.github/*|.gitignore|LICENSE|AGENTS.md)
-                echo "화면 밖: $f";;
-              *) echo "애매 — 바뀜으로: $f"; changed=true;;
-            esac
-          done < /tmp/changed-files.txt
-          echo "화면 바뀜: $changed ($(wc -l < /tmp/changed-files.txt)개 파일)"
-          echo "changed=$changed" >> "$GITHUB_OUTPUT"
+          # 판정은 tools/ci/screen-changes.mjs가 한다. 화면 시험 목록은 이 워크플로의 화면 잡 구간에서
+          # 자동으로 뽑는다(손으로 따로 적지 않는다) — 시험 파일은 화면 잡이 실제로 실행하는 파일과
+          # 그 helpers가 바뀌었을 때만 화면 바뀜이다(이슈 947 — #958 같은 시험 정리 PR도 다 돌던 것을 줄인다).
+          node tools/ci/screen-changes.mjs /tmp/changed-files.txt
 
   # 2026-11-14: 화면 시험이 한 잡에 줄지어 18분 걸리던 것을 잡 여러 개로 나눠 동시에 돌린다.
   # 필수 검사 이름 '미리보기 postdeploy(로그아웃)'은 맨 아래 모음 잡이 그대로 쓴다 — 아래 잡이 하나라도
