@@ -197,7 +197,9 @@ test('⑤ 이어진 선 약속 숫자는 그려진 연결 수와 같다', { skip
     const pill = await frame.evaluate(() => document.getElementById('connection-tool').textContent.trim());
     const drawn = await page.evaluate(() => window.LT41.tree.edges.length);
     assert.match(pill, /이어진 선 \d+개/);
-    assert.equal(Number(pill.replace(/\D/g, '')), drawn, `약속 숫자(${pill}) = 그려진 연결 ${drawn}개`);
+    // #951 ①: 이 글자는 이제 '순간 N · 이어진 선 M개'다 — 연결 수는 '이어진 선' 뒤 숫자만 읽는다.
+    const shown = Number(/이어진 선 (\d+)개/.exec(pill)?.[1]);
+    assert.equal(shown, drawn, `약속 숫자(${pill}) = 그려진 연결 ${drawn}개`);
     await context.close(); await browser.close();
   } finally { server.close(); }
 });

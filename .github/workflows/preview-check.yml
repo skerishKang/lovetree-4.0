@@ -466,6 +466,18 @@ jobs:
           [ $r1 -eq 0 ] && [ $r2 -eq 0 ] || exit 1
           echo "지도 실제 대비·부채꼴 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
 
+      # 이슈 970: 서재(책이 왼쪽부터·책장 세로 가운데·넘칠 때만 화살표)와 날짜 표시(시계 고정)를
+      # 실제 화면에서 잰다. 서재 여백 수치는 고정하지 않는다(#972 여백 수정과 겹치지 않게).
+      # 건너뜀=실패(크롬이 준비된 이 잡에서 돈다).
+      - name: 서재·날짜 표시 동작 시험(건너뜀=실패 — #970)
+        env:
+          LT_970_REQUIRE: '1'
+        if: needs.screen-changes.outputs.changed == 'true'
+        run: |
+          start=$(date +%s)
+          node --test --test-concurrency=1 tests/v41-970-shelf-date.test.mjs
+          echo "서재·날짜 표시 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+
       - name: 화면 변경 없으면 건너뜀을 남긴다
         if: always()
         run: |

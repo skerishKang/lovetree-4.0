@@ -262,6 +262,9 @@ window.LT56Model = (() => {
     // 색·범례가 뜻하는 대상이 없어 화면에 내지 않는다(network.js가 hubs가 비었을 때 치운다).
     const tree = bfsOrder(moments, edgesOf(opts), opts.fanMin ?? 8);
     if (tree.fanHeavy) return fanLayout(moments, box, opts, tree, { maxR, firstR, gap, hubR, inset });
+    // #951 ②: 순간이 적으면(≤8) 묶음 칸으로 쪼개 화면 끝까지 벌리지 않고, 상자 가운데 작은 무리로 모은다.
+    // 첫 순간은 가운데, 나머지는 반지름 r의 고리에 앉아 가장 먼 두 점도 2r ≤ 상한(기본 240px) 안에 든다.
+    if (n > 0 && n <= (opts.compactMax ?? 8)) return compactLayout(moments, box, opts, tree, { maxR, firstR, gap, hubR, inset });
     // #869: 묶음 점(타원 가운데)부터 영역 안쪽 여백(가로·세로 10% 이상) 안에 앉힌다 — 묶음 칸이 상자 전체(작은 트리)이거나
     // 가장자리 칸이면 타원이 상자 끝까지 늘어나 노드가 모서리에 붙고 시작 순간에서 뻗는 선이 화면 끝·하단 링크 줄까지 갔다.
     // 묶음 점이 안쪽에 모이면 노드도 묶음 원·시작 노드 근처에 모인다.
@@ -311,6 +314,44 @@ window.LT56Model = (() => {
     };
     while (dotR > 2.5 && !fits(dotR)) dotR -= 0.25;
     return { points, hubs, groupSize: gs, cols, rows, cell: { w: iw / cols, h: ih / rows }, rx, ry, dotR, hubR, box };
+  }
+
+  // #951 ② 작은 무리: 순간 8개 이하는 화면 가운데에 모으고 선 길이 상한(기본 240px)을 지킨다.
+  // 첫 순간은 상자 가운데, 나머지는 BFS 순서대로 오른쪽(0°)부터 고른 반지름 r의 고리에 앉힌다(고리 지름 = 상한).
+  function compactLayout(moments, box, opts, tree, sizes) {
+    const { maxR, firstR, gap, hubR, inset } = sizes, n = moments.length;
+    const center = { x: box.x + box.w / 2, y: box.y + box.h / 2 };
+    const span = Math.max(80, Math.min(opts.compactSpan ?? 240, box.w - 2 * (inset + maxR), box.h - 2 * (inset + Math.max(firstR, maxR))));
+    let r = span / 2;
+    const rest = tree.order.slice(1);
+    const points = {};
+    points[tree.order[0]] = { x: center.x, y: center.y };
+    if (rest.length) {
+      // 고리 위에서 이웃끼리 gap 이상 떨어지게 반지름을 조금 키운다(점 반지름은 아래에서 줄여 맞춘다).
+      const minR = (gap + 2 * maxR) / (2 * Math.sin(Math.PI / Math.max(2, rest.length)));
+      r = Math.max(r, Math.min(minR, span / 2));
+      rest.forEach((id, j) => {
+        const th = (2 * Math.PI * j) / rest.length;
+        points[id] = { x: center.x + Math.cos(th) * r, y: center.y + Math.sin(th) * r };
+      });
+    }
+    // 점 반지름: 이웃·첫 순간과 gap 이상 떨어지는 가장 큰 값(2.5~maxR) — 다른 배치와 같은 규칙.
+    const ids = tree.order.slice();
+    const firstId = ids[0];
+    let dotR = maxR;
+    const fits = rr => {
+      for (let i = 1; i < ids.length; i++) {
+        const a = points[ids[i]];
+        if (Math.hypot(a.x - points[firstId].x, a.y - points[firstId].y) < Math.max(firstR, rr) + rr + gap) return false;
+        for (let j = i + 1; j < ids.length; j++) {
+          const b = points[ids[j]];
+          if (Math.hypot(a.x - b.x, a.y - b.y) < rr + rr + gap) return false;
+        }
+      }
+      return true;
+    };
+    while (dotR > 2.5 && !fits(dotR)) dotR -= 0.25;
+    return { points, hubs: [], groupSize: n, cols: 1, rows: 1, cell: { w: box.w, h: box.h }, rx: r, ry: r, dotR, hubR, box, center, compact: true, fanHub: tree.fanHub, order: tree.order.slice() };
   }
 
   // #583 부채꼴 배치: 가장 많이 이어진 순간(첫 순간)을 상자 가운데에 두고, 나머지 순간을 상자에 맞춘

@@ -35,7 +35,7 @@ test('#461 지도 상자 값은 실측 덮개로 만든 fitBox 결과와 같다'
   assert.deepEqual(M.fitBox(388, 785, { top: 180, bottom: 82 }, 16), SCREENS[390]);
 });
 
-function check(points, box, radius, label, extra = []) {
+function check(points, box, radius, label, extra = [], fill = true) {
   const ids = Object.keys(points);
   for (const id of ids) {
     const p = points[id], r = radius(id);
@@ -50,15 +50,33 @@ function check(points, box, radius, label, extra = []) {
   }
   const xs = ids.map(id => points[id].x), ys = ids.map(id => points[id].y);
   const l = Math.min(...xs) - box.x, r = box.x + box.w - Math.max(...xs), t = Math.min(...ys) - box.y, b = box.y + box.h - Math.max(...ys);
-  if (ids.length >= 5) {
+  if (fill && ids.length >= 5) {
     assert.ok((Math.max(...xs) - Math.min(...xs)) / box.w >= 0.7, `${label}: 가로 70% 이상 (${((Math.max(...xs) - Math.min(...xs)) / box.w * 100).toFixed(0)}%)`);
     assert.ok((Math.max(...ys) - Math.min(...ys)) / box.h >= 0.7, `${label}: 세로 70% 이상 (${((Math.max(...ys) - Math.min(...ys)) / box.h * 100).toFixed(0)}%)`);
   }
   assert.ok(Math.abs(l - r) <= box.w * 0.15 && Math.abs(t - b) <= box.h * 0.15, `${label}: 빈 띠 쏠림 (좌${l.toFixed(0)}·우${r.toFixed(0)}·위${t.toFixed(0)}·아래${b.toFixed(0)})`);
 }
 
+// #951 ②: 순간 8개 이하는 상자를 꽉 채우지 않고 화면 가운데 작은 무리로 모인다(선 ≤240px) — 예전 '70% 이상' 기준은
+// 순간이 많은 판(15·40)에만 남긴다. 작은 판은 아래 '작은 무리' 시험이 가운데·상한으로 잰다.
 for (const [screen, box] of Object.entries(SCREENS)) {
   for (const n of [5, 15, 40]) {
+    if (n <= 8) {
+      test(`#951 ② 그물형 ${screen}·순간 ${n}: 가운데 작은 무리(선 ≤240px·겹침 없음·상자 안)`, () => {
+        const { moments } = exampleTree(n);
+        const L = M.networkLayout(moments, { box, dotR: 5, firstR: 20, gap: 8, hubR: 9 });
+        const firstId = moments.find(m => m.first).id;
+        // #951 ②: 작은 판은 상자를 채우지 않는다 — 채움 기준(70%)은 빼고 가운데·상한만 잰다.
+        check(L.points, box, id => (id === firstId ? 20 : L.dotR), `작은 무리 ${screen}·${n}`, L.hubs.map(h => ({ x: h.x, y: h.y, r: L.hubR })), false);
+        assert.ok(L.compact, '순간 8개 이하는 작은 무리 배치');
+        const xs = Object.keys(L.points).map(id => L.points[id].x), ys = Object.keys(L.points).map(id => L.points[id].y);
+        assert.ok(Math.max(...xs) - Math.min(...xs) <= 240 && Math.max(...ys) - Math.min(...ys) <= 240, `선 상한 240px (${Math.round(Math.max(...xs) - Math.min(...xs))}×${Math.round(Math.max(...ys) - Math.min(...ys))})`);
+        const cx = xs.reduce((a, b) => a + b, 0) / xs.length, cy = ys.reduce((a, b) => a + b, 0) / ys.length;
+        assert.ok(Math.abs(cx - (box.x + box.w / 2)) <= box.w * 0.1 && Math.abs(cy - (box.y + box.h / 2)) <= box.h * 0.1, `무리 중심 가운데 ±10% (${cx.toFixed(0)},${cy.toFixed(0)})`);
+        assert.ok(!L.hubs.length, '작은 무리는 묶음 점을 그리지 않는다');
+      });
+      continue;
+    }
     test(`#461 그물형 ${screen}·순간 ${n}: 상자 안·겹침 없음·70% 이상·쏠림 없음`, () => {
       const { moments } = exampleTree(n);
       const L = M.networkLayout(moments, { box, dotR: 5, firstR: 20, gap: 8, hubR: 9 });
