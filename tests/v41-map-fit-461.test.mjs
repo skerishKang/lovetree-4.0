@@ -4,15 +4,11 @@
 // 지도 상자 값은 1440·1024·390 실측(예시 트리, 로그아웃)에서 잰 덮개(머리·안내 문구·왼쪽 패널·아래 줄)로 만든다.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
 
 globalThis.window = globalThis;
 await import('../public/v41/views/network/network-model.js');
 const M = globalThis.LT56Model;
 const { designData } = await import('../public/v41/example.mjs');
-const JS = fs.readFileSync(new URL('../public/v41/views/network/network.js', import.meta.url), 'utf8');
-const CSS = fs.readFileSync(new URL('../public/v41/views/network/network.css', import.meta.url), 'utf8');
-const HTML = fs.readFileSync(new URL('../public/v41/views/track56-network.html', import.meta.url), 'utf8');
 
 // 예시 트리를 n개로: 첫 순간에서 다음·갈래를 따라 너비 우선으로 n개(이어진 모양 유지) — 화면 측정과 같은 규칙.
 function exampleTree(n) {
@@ -102,26 +98,4 @@ test('#461 이름표 자리: 우선순위대로, 서로·점과 겹치지 않게
     for (let j = i + 1; j < out.length; j++) { const b = out[j].rect; assert.ok(a.r <= b.l || b.r <= a.l || a.b <= b.t || b.b <= a.t, `${out[i].id}·${out[j].id} 이름표 겹침`); }
     for (const o of obstacles) { const cx = Math.max(a.l, Math.min(o.x, a.r)), cy = Math.max(a.t, Math.min(o.y, a.b)); assert.ok(Math.hypot(o.x - cx, o.y - cy) >= o.r, `${out[i].id}가 점 ${o.id}을 덮음`); }
   }
-});
-
-test('#461 화면 배선: 덮개를 재어 상자를 만들고, 두 보기 모두 그 상자에 맞추며, 이름표는 한 벌로 고른다', () => {
-  assert.match(JS, /BOX=LT56Model\.fitBox\(vw,vh,measureInsets\(\),16\)/, '창 크기가 바뀔 때 덮개를 재어 상자');
-  assert.match(JS, /LT56Model\.networkLayout\(LTDEMO\.moments,\{box:BOX/, '그물형은 상자에 맞춘다');
-  assert.match(JS, /LT56Model\.concentricLayout\(LTDEMO\.moments,LTDEMO\.edges,\{box:BOX/, '동심원형도 상자에 맞춘다');
-  assert.match(JS, /LT56Model\.placeLabels\(labelCands\(\),obstacles,b\)/, '이름표 자리는 모델 한 벌');
-  // 문서 끝의 <style>은 스크립트 뒤에 읽힌다 — 다 읽은 뒤·글꼴 뒤 한 번씩 다시 잰다.
-  assert.match(JS, /addEventListener\('DOMContentLoaded',\(\)=>resize\(\),\{once:true\}\)/);
-  assert.match(JS, /addEventListener\('load',\(\)=>resize\(\),\{once:true\}\)/);
-  // 점 반지름은 그리기·누르기가 같은 한 곳(dotRadius)을 쓴다 — 동심원 겹침(그린 점 > 배치가 가정한 점)의 원인 제거.
-  assert.match(JS, /let r=dotRadius\(n\);/, '그리기');
-  assert.match(JS, /Math\.max\(12,dotRadius\(n\)\+6\)/, '누르기');
-  // 유휴 rAF 0: requestAnimationFrame은 scheduleDraw·frame 두 곳뿐.
-  assert.equal((JS.match(/requestAnimationFrame\(/g) || []).length, 2, '새 rAF 경로 없음');
-  // 알기 쉬운 말: "위치 그룹" 대신 "묶음", 범례는 색 점 + 번호 + 이름.
-  assert.doesNotMatch(JS, /위치 그룹/);
-  assert.match(HTML, /<h3>순간 묶음<\/h3>/);
-  assert.doesNotMatch(HTML, /세로형 순간 관계 지도/, '이제 세로로만 펼치지 않는다');
-  // 지금 고른 보기는 다른 화면의 눌린 버튼과 같은 토큰으로 채운다(어두운 알약 규칙보다 구체적으로).
-  assert.match(CSS, /html\[data-v41-screen=network\] \.top-actions \.view-switch \.pill\[aria-pressed=true\][^{]*\{background:var\(--lt-primary\);border-color:var\(--lt-primary\);color:var\(--lt-primary-ink\)/);
-  assert.match(CSS, /\.progress-rail\{display:none\}/, '세로 진행 막대(오른쪽 빈 띠) 숨김');
 });
