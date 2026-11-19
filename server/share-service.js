@@ -3,7 +3,7 @@ import { validateState, coverModeOf, normalizeCoverDesign } from '../src/domain.
 import { ApiError } from './errors.js';
 import { refreshStageIndex } from './stage-index-refresh.js';
 import { parsePrincipal } from './principal.js';
-import { ROLE_AI_CUSTOMER } from './admin-roles.js';
+import { aiTesterFor } from './admin-roles.js';
 
 const SHARE_ID = /^[A-Za-z0-9_-]{20,64}$/;
 const RECORD_ID = /^[A-Za-z0-9_-]{1,80}$/;
@@ -138,7 +138,7 @@ export function createShareService({ shareRepo, workspaceRepo, visibilityRepo = 
       const shared = { share: shareSummary(row), tree, omittedPrivateMedia };
       // #611 3번: AI 명예회원 기록은 공개 읽기 결과에 'AI 명예회원' 배지 한 비트만 내린다.
       // 사본 화면(내 트리)에서는 붙이지 않는다 — 여기 read()는 남에게 보이는 공개 응답뿐이다.
-      if (admin && await admin.roleFor({ productId, subjectId: row.subjectId }) === ROLE_AI_CUSTOMER) shared.aiTester = true;
+      if (await aiTesterFor({ admin, productId, subjectId: row.subjectId })) shared.aiTester = true;
       return shared;
     },
     // #538: /api/workspace 저장 성공 뒤 같은 훅에서 부른다.

@@ -99,6 +99,9 @@ async function groupSetup() {
   // 내 꼬리표 표기 차이('IVE' 과 'Ive')는 하나로 묶이고, 첫 표기가 표시 이름이다.
   trees.push(mkTree(5, ['가수:IVE']));
   trees.push(mkTree(6, ['가수:Ive']));
+  // #935: 채널 이름이 '가수' 꼬리표로 잘못 들어가 있어도 칩에는 오르지 않는다(저장 값은 그대로).
+  trees.push(mkTree(7, ['가수:RIIZE Choreography']));
+  trees.push(mkTree(8, ['가수:RIIZE Official']));
   await workspace.write(principal('alice'), { state: { version: 1, trees }, expectedRevision: 0, clientKey: 'seed-784' });
   const shareRepo = createMemoryShareRepo();
   const shares = [];
@@ -132,6 +135,9 @@ test('#784 discover: groups는 공개 트리 수 상위 8, groupsAll는 가나�
   const sorted = [...allNames].sort((a, b) => a.localeCompare(b, 'ko'));
   assert.deepEqual(allNames, sorted, 'groupsAll는 가나다순이다');
   assert.ok(list.body.groupsAll.length <= 200);
+  // #935: 채널 이름은 가수 칩에 0개 — 잘못 붙은 '가수' 꼬리표가 있어도 집계에서만 거른다.
+  assert.equal(names.filter((value) => /Choreography|Official/i.test(value)).length, 0, '칩에 채널 이름 없음');
+  assert.equal(allNames.filter((value) => /Choreography|Official/i.test(value)).length, 0, '찾기 창에도 채널 이름 없음');
   // 표기 차이(IVE/Ive)는 tagKey로 하나로 묶고, 첫 표기가 표시 이름이다.
   const ive = list.body.groupsAll.filter((g) => /^ive$/i.test(g.value));
   assert.equal(ive.length, 1);
