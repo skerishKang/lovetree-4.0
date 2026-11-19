@@ -153,10 +153,13 @@ test('#987 공유 창 폭·단추·대비와 설정 정렬·동그라미·배치
           const look=e=>{const s=css(e);return {radius:s.borderTopLeftRadius,bg:s.backgroundColor,border:s.borderTopColor,color:s.color,height:rect(e).height}};
           const buttons=[...panel.querySelectorAll('.share-item-actions button')].map(look), ref=look(preview);
           const section=panel.querySelector(':scope > section:last-of-type');
-          return {formWidth:fr.width,centerOffset:Math.abs((fr.left+fr.right-r.left-r.right)/2),otherWidths:[...panel.querySelectorAll(':scope > .share-steps,:scope > .share-visibility,:scope > .panel-note,:scope > section:not([hidden])')].map(e=>rect(e).width),buttons,ref,contrast:[outline($('#share-moment')),outline($('#share-view')),outline(preview)],topGap:rect(panel.querySelector('.panel-heading')).top-r.top,bottomGap:r.bottom-rect(section).bottom,overflow:panel.scrollWidth-panel.clientWidth};
+          // 공유 제목의 실제 글자 아래끝과 선택 상자 위끝 사이를 잰다.
+          const labelGaps=['#share-moment','#share-view'].map(id=>{const select=$(id),range=document.createRange();range.selectNode(select.parentElement.firstChild);return rect(select).top-range.getBoundingClientRect().bottom});
+          return {labelGaps,formWidth:fr.width,centerOffset:Math.abs((fr.left+fr.right-r.left-r.right)/2),otherWidths:[...panel.querySelectorAll(':scope > .share-steps,:scope > .share-visibility,:scope > .panel-note,:scope > section:not([hidden])')].map(e=>rect(e).width),buttons,ref,contrast:[outline($('#share-moment')),outline($('#share-view')),outline(preview)],topGap:rect(panel.querySelector('.panel-heading')).top-r.top,bottomGap:r.bottom-rect(section).bottom,overflow:panel.scrollWidth-panel.clientWidth};
         });
         console.log('#987 share',width,theme,JSON.stringify(shared));
         await snap('share','#share-panel');
+        if(width===390||width===1440)check(shared.labelGaps.every(gap=>gap>=6),'공유 제목과 선택 상자 간격 '+width+' '+theme+' '+JSON.stringify(shared.labelGaps));
         check(shared.formWidth<=960.5&&shared.otherWidths.every(w=>w<=960.5)&&shared.centerOffset<=2&&shared.overflow<=1,'공유 폭 '+width+' '+theme);
         check(shared.buttons.length===2&&shared.buttons.every(b=>b.radius===shared.ref.radius&&b.bg===shared.ref.bg&&b.border===shared.ref.border&&b.color===shared.ref.color&&b.height>=44),'공유 단추 '+width+' '+theme);
         if(theme==='garden')check(shared.contrast.every(n=>n>=3),'공유 정원 대비 '+width+' '+JSON.stringify(shared.contrast));
