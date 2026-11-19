@@ -43,7 +43,19 @@ const mapHostThumbHTML = () => {
   const media = { m1: { image: PNG16, type: 'photo' }, m2: { image: '/v41/definitely-missing-thumb.png', type: 'photo' } };
   return `<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>지도 호스트</title></head><body data-member="in" data-record-source="server"><script>window.LT41={source:'server',tree:${JSON.stringify(tree)},exampleMedia:${JSON.stringify(media)},momentId:'m1'};</script><iframe src="/v41/views/track56-network.html" style="position:fixed;inset:0;width:100%;height:100%;border:0"></iframe></body></html>`;
 };
-const EXTRA_ROUTES = { '/map-host-3.html': mapHostHTML(3), '/map-host-8.html': mapHostHTML(8), '/map-host-thumb.html': mapHostThumbHTML() };
+// #951 ⑤(CTO 261120): 서재에서 내 트리 지도로 들어온 상태 — 셸이 넘기는 문맥(source:'server'·writable:true)과 같게 둔다.
+// 이 상태에서만 '← 서재'가 보인다(읽기 전용인 공유·예시에서는 일부러 숨긴다 — tree-title.mjs의 readOnly).
+const mapHostMemberHTML = (n) => {
+  const titles = ['Super Shy 무대', 'Ditto 직캠', 'OMG 앵콜', 'Hype Boy 연습실', 'Attention 무대', 'Cookie 직캠', 'ETA 뮤비', 'Get Up 무대'];
+  const ids = Array.from({ length: n }, (_, i) => `m${i + 1}`);
+  const tree = {
+    id: 't1', title: '뉴진스 순간', subject: '뉴진스', owned: true,
+    moments: ids.map((id, i) => ({ id, title: titles[i] || `순간 ${i + 1}`, date: `2026-11-${String(10 + i).padStart(2, '0')}`, emotion: '설렘', note: '공연', url: '', parentId: i ? ids[i - 1] : null })),
+    edges: ids.slice(1).map((id, i) => ({ kind: 'parent', from: ids[i], to: id, reason: '이 다음 장면이 궁금해서' }))
+  };
+  return `<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>지도 호스트</title></head><body data-member="in" data-record-source="server"><script>window.LT41={source:'server',writable:true,tree:${JSON.stringify(tree)},trees:[${JSON.stringify(tree)}],momentId:'m1'};</script><iframe src="/v41/views/track56-network.html" style="position:fixed;inset:0;width:100%;height:100%;border:0"></iframe></body></html>`;
+};
+const EXTRA_ROUTES = { '/map-host-3.html': mapHostHTML(3), '/map-host-8.html': mapHostHTML(8), '/map-host-thumb.html': mapHostThumbHTML(), '/map-host-member-3.html': mapHostMemberHTML(3), '/map-host-member-8.html': mapHostMemberHTML(8) };
 async function serve() {
   const server = createServer(async (req, res) => {
     const clean = decodeURIComponent((req.url || '/').split('?')[0]);
@@ -341,6 +353,84 @@ test('#951 ③④ 점 자리 썸네일(있음·깨짐·없음) + 이름표 말�
       await frame.click('#viewNet');
       assert.equal(await frame.evaluate(() => window.__lt.state.view), 'network', `${width}: [이어진 길]을 누르면 그물 보기`);
       await context.close();
+    }
+  } finally {
+    await browser?.close();
+    server.close();
+  }
+});
+
+// ── #951 ⑤ (CTO 261120): 서재에서 지도로 들어오면 '← 서재' 단추가 하나, 묶음 단추는 '1묶음 · 1–2월' ──
+test('#951 ⑤ 서재에서 들어온 지도: ← 서재 단추 1개 + 묶음 단추 글자 형식(겹침·잘림 0) + 보기 이름', { skip: REQUIRE ? false : skip, timeout: 240000 }, async () => {
+  if (skip) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip}`);
+  const server = await serve();
+  const base = `http://127.0.0.1:${server.address().port}`;
+  let browser;
+  try {
+    browser = await chromium.launch({ headless: true });
+    for (const [width, height] of [[360, 780], [390, 844], [1440, 900]]) {
+      for (const n of [3, 8]) {
+        const context = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
+        await context.addInitScript(() => { try { localStorage.setItem('lt41.theme', 'night'); localStorage.removeItem('lt41.boardTheme'); } catch {} });
+        const page = await context.newPage(), errors = [];
+        page.on('pageerror', (e) => errors.push(String(e.message || e)));
+        await page.goto(`${base}/map-host-member-${n}.html`, { waitUntil: 'load' });
+        let frame = null;
+        for (let i = 0; i < 80 && !frame; i++) { frame = page.frames().find((f) => /track56-network/.test(f.url())); if (!frame) await page.waitForTimeout(250); }
+        assert.ok(frame, `${width}/${n}: 지도 프레임이 열린다`);
+        await frame.waitForFunction(() => (window.__lt?.dots?.()?.length || 0) > 0, null, { timeout: 20000 });
+        await page.waitForTimeout(500);
+        const m = await frame.evaluate(() => {
+          const vis = (el) => { if (!el) return false; const cs = getComputedStyle(el); if (cs.display === 'none' || cs.visibility === 'hidden') return false; const r = el.getBoundingClientRect(); return r.width > 1 && r.height > 1; };
+          const box = (el) => { const r = el.getBoundingClientRect(); return { l: Math.round(r.left), r: Math.round(r.right), t: Math.round(r.top), b: Math.round(r.bottom) }; };
+          const backs = [...document.querySelectorAll('#shelfBackBtn')].filter(vis);
+          const topBtns = [...document.querySelectorAll('.topbar button')].filter(vis);
+          const overlap = [];
+          for (let i = 0; i < topBtns.length; i++) for (let j = i + 1; j < topBtns.length; j++) {
+            const sw = topBtns[i].closest('.view-switch'), sw2 = topBtns[j].closest('.view-switch');
+            if (sw && sw === sw2) continue; // 붙은 단추 하나 안의 이웃은 겹침으로 보지 않는다
+            const a = box(topBtns[i]), b = box(topBtns[j]);
+            if (a.l < b.r - 1 && b.l < a.r - 1 && a.t < b.b - 1 && b.t < a.b - 1) overlap.push((topBtns[i].id || topBtns[i].textContent.trim()) + '×' + (topBtns[j].id || topBtns[j].textContent.trim()));
+          }
+          const chips = [...document.querySelectorAll('#mobileRibbon button[data-i]')].filter(vis).map((b) => ({ text: b.textContent.trim(), ...box(b), h: Math.round(b.getBoundingClientRect().height), fs: parseFloat(getComputedStyle(b).fontSize) }));
+          const chipOverlap = [];
+          for (let i = 0; i < chips.length; i++) for (let j = i + 1; j < chips.length; j++) {
+            const a = chips[i], b = chips[j];
+            if (a.l < b.r - 1 && b.l < a.r - 1 && a.t < b.b - 1 && b.t < a.b - 1) chipOverlap.push([a.text, b.text]);
+          }
+          return {
+            vw: innerWidth,
+            back: backs.map((b) => ({ text: b.textContent.trim(), aria: b.getAttribute('aria-label'), ...box(b) })),
+            overlap, chips, chipOverlap,
+            chipClip: chips.filter((c) => c.l < -1 || c.r > innerWidth + 1).map((c) => c.text),
+            views: [...document.querySelectorAll('.view-switch .pill')].map((b) => b.textContent.trim()),
+            barClip: Math.max(0, document.querySelector('.topbar').getBoundingClientRect().right - innerWidth),
+            legend: [...document.querySelectorAll('.legend-row')].filter((r) => !r.hidden).map((r) => r.textContent.trim())
+          };
+        });
+        const tag = `${width}/${n}`;
+        assert.deepEqual(errors, [], `${tag}: 지도 화면 오류 없음`);
+        assert.equal(m.back.length, 1, `${tag}: '← 서재' 단추가 하나 보인다(${JSON.stringify(m.back)})`);
+        assert.equal(m.back[0].text, '← 서재', `${tag}: 단추 글자`);
+        assert.equal(m.back[0].aria, '서재로 돌아가기', `${tag}: 단추 읽어주기(aria-label)`);
+        assert.ok(m.back[0].l >= 0 && m.back[0].l < 30, `${tag}: 단추가 왼쪽 위에 있다(${m.back[0].l})`);
+        assert.deepEqual(m.overlap, [], `${tag}: 위 단추끼리 겹침 없음(${JSON.stringify(m.overlap)})`);
+        assert.equal(m.barClip, 0, `${tag}: 위 줄이 화면 밖으로 넘치지 않는다`);
+        assert.deepEqual(m.views, ['이어진 길', '묶음', '시간 순'], `${tag}: 보기 이름`);
+        // 묶음 단추(좁은 화면의 아래 조작 줄): '1묶음 · 1–2월' — 앞 0 없음, 범례와 같은 번호, 겹침·잘림 0.
+        // 641px 이상에서는 아래 줄이 숨고 범례가 그 자리를 맡는다(예전과 같다).
+        if (width <= 640) {
+          assert.ok(m.chips.length >= 1, `${tag}: 묶음 단추가 있다`);
+          for (const c of m.chips) assert.match(c.text, /^[1-9]\d*묶음 · .+/, `${tag}: 묶음 단추 글자 형식(${c.text})`);
+          assert.deepEqual(m.chips.map((c) => c.text.split('묶음')[0]), m.legend.map((t) => String(Number(t.slice(0, 2)))), `${tag}: 범례와 같은 번호(${JSON.stringify(m.chips.map((c) => c.text))} / ${JSON.stringify(m.legend)})`);
+          assert.deepEqual(m.chipOverlap, [], `${tag}: 묶음 단추끼리 겹침 없음(${JSON.stringify(m.chipOverlap)})`);
+          assert.deepEqual(m.chipClip, [], `${tag}: 묶음 단추가 화면 밖으로 잘리지 않는다(${JSON.stringify(m.chipClip)})`);
+          assert.ok(m.chips.every((c) => c.h <= 48), `${tag}: 단추 높이 안에 글자가 들어 있다(${JSON.stringify(m.chips.map((c) => c.h))})`);
+        } else {
+          assert.ok(m.legend.length >= 1, `${tag}: 넓은 화면은 범례가 묶음을 보여 준다`);
+        }
+        await context.close();
+      }
     }
   } finally {
     await browser?.close();
