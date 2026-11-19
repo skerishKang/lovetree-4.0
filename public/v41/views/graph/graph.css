@@ -69,6 +69,8 @@ html[data-lt-theme=garden] .g-empty .g-empty-cta:hover,html[data-lt-theme=garden
 /* 오른쪽 레일(1440)·아래 시트(390) */
 .g-rail{flex:0 0 336px;display:flex;flex-direction:column;gap:12px;min-height:0;overflow:auto}
 .g-card{border:1px solid var(--lt-line);border-radius:var(--lt-r-card);background:var(--lt-glass);padding:13px 14px}
+/* #937: 범례 판은 묶음이 있을 때만 그린다 — 숨김이 화면 규칙에 묻히지 않게 한 줄로 둔다. */
+.g-card[hidden]{display:none}
 .g-card h3{margin:0 0 8px;font-size:12px;font-weight:700;letter-spacing:var(--lt-track);color:var(--lt-muted)}
 .g-legend-row{display:flex;gap:6px 16px;flex-wrap:wrap}
 .g-legend-group{display:grid;gap:3px;min-width:86px}

@@ -406,6 +406,8 @@ function render() {
 function drawLegend() {
   const row = document.getElementById('legendRow');
   row.replaceChildren();
+  // #937: 범례 판(.g-card)은 묶음이 있을 때만 보인다 — 묶음 0이면 제목만 있는 빈 줄이 남았다.
+  const card = row.closest ? (row.closest('.g-card') || row.parentElement) : row.parentElement;
   const groups = new Map();
   for (const h of model.graph.hubs) {
     // #854: 이름이 서지 않는 묶음(빈 값)은 범례에서도 숨긴다 — 색 점만 남는다.
@@ -435,6 +437,8 @@ function drawLegend() {
     all.addEventListener('click', () => { filterHub = null; refresh(); });
     row.appendChild(all);
   }
+  // #937: 그릴 것이 하나도 없으면 판 자체를 숨긴다(빈 줄 0). 하나라도 서면 다시 보인다.
+  if (card) card.hidden = !row.childElementCount;
 }
 
 /* ── 상세 판 — 순간(발자취 이웃)·허브('이 노래의 내 순간들' 시간 순서) ── */
