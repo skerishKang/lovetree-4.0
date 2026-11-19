@@ -355,7 +355,7 @@ export const AUDIT_FN = function audit(opts) {
 
 // 페이지와 그 안의 모든 프레임(같은 출처)에 검사를 돌려 한 묶음으로 모은다.
 const EMPTY = () => ({ issues: [], covered: [], bad: [], clipped: [], small: [], overflowList: [], toastHits: [], bottomHits: [], bottomChecks: [], errors: [], cardsList: [], contrast: [], bookState: [] });
-export async function auditPage(page, screen) {
+const auditOnce = async (page, screen) => {
   const out = EMPTY();
   for (const frame of page.frames()) {
     let res;
@@ -369,6 +369,19 @@ export async function auditPage(page, screen) {
     for (const b of res.bad || []) out.bad.push({ 화면: screen, 프레임: url, 값: b });
     if (res.cards) out.cardsList.push({ 화면: screen, 프레임: url, ...res.cards });
     if ((res.overflow || 0) > 0) out.overflowList.push({ 화면: screen, 프레임: url, overflow: res.overflow });
+  }
+  return out;
+};
+
+export async function auditPage(page, screen) {
+  // 이슈 956: 셸은 첫 화면을 두 번 띄우고(예시 → 실제 기록 교대) 담기 뒤에도 첫 화면을 다시 읽는다.
+  // 탐색이 검사 도중에 걸리면 그 프레임의 실행 문맥이 없어져('Execution context was destroyed'·
+  // 'Frame was detached') 검사오류 줄이 남는다 — 멈춘 화면을 재료로 삼지 않게, 교대가 끝난 뒤
+  // 프레임을 다시 고르고 다시 잰다(단정 기준은 그대로). 세 번까지 이렇게 하고 그래도 나면 그대로 둔다.
+  let out = await auditOnce(page, screen);
+  for (let i = 0; i < 3 && out.errors.some((e) => /Execution context was destroyed|Frame was detached/.test(e.오류)); i++) {
+    await page.waitForTimeout(900);
+    out = await auditOnce(page, screen);
   }
   return out;
 }
