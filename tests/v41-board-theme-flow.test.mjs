@@ -52,7 +52,8 @@ test('보드 화면 마크업: 머리줄은 배경 드롭 하나(#891) — 종�
 
 test('지도 화면 마크업: 도구 줄에도 같은 배경 드롭이 있다(#891)', () => {
   const netHtml = read('public/v41/views/track56-network.html');
-  assert.match(netHtml, /id="netBgBtn"[^>]*>배경 ▾<\/button>/);
+  // #951 ①: 배경 드롭은 위 단추 줄의 ⋯ 안으로 들어갔다(같은 메뉴·같은 항목, 입구만 ⋯).
+  assert.match(netHtml, /id="netBgBtn"[^>]*aria-label="더 보기"[^>]*>⋯<\/button>/);
   assert.match(netHtml, /id="netBgMenu"[^>]*role="menu"/);
   assert.match(netHtml, /data-bg="auto"[^>]*>테마 따라가기<\/button>/);
 });

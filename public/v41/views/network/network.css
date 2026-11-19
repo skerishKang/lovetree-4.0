@@ -14,9 +14,18 @@ button{font:inherit;color:inherit;cursor:pointer}
  linear-gradient(180deg,#fbfaf8 0%,#f7f4f2 52%,#f1eff5 100%)}
 #stage{position:absolute;inset:0;width:100%;height:100%;touch-action:none}
 .paper-noise{position:absolute;inset:0;pointer-events:none;opacity:.12;mix-blend-mode:multiply;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.72' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.08'/%3E%3C/svg%3E")}
-.topbar{position:absolute;left:18px;right:18px;top:14px;z-index:40;display:flex;align-items:center;justify-content:space-between;gap:14px;pointer-events:none}
+.topbar{position:absolute;left:18px;right:18px;top:14px;z-index:40;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:nowrap;pointer-events:none}
 .top-actions{pointer-events:auto}
-.top-actions{display:flex;align-items:center;gap:7px}.mode-pill{height:36px;padding:0 12px;border-radius:999px;border:1px solid rgba(87,79,96,.10);background:rgba(255,255,255,.72);font-size:13px;letter-spacing:.08em;color:rgba(55,50,61,.55);backdrop-filter:blur(16px)}
+.top-actions{display:flex;align-items:center;gap:6px;flex-wrap:nowrap;margin-left:auto;min-width:0}
+/* #951 ① 보기 방식은 붙은 단추 하나(그물형|동심원형|그래프) — 좁으면 이 묶음만 안에서 가로로 민다. */
+.view-switch{display:inline-flex;align-items:center;gap:0;min-width:0;overflow-x:auto;scrollbar-width:none;border-radius:999px;pointer-events:auto}
+.view-switch::-webkit-scrollbar{display:none}
+.view-switch .pill{border-radius:0;border-right-width:0}
+.view-switch .pill:first-child{border-radius:999px 0 0 999px}
+.view-switch .pill:last-child{border-radius:0 999px 999px 0;border-right-width:1px}
+.pill.icon{min-width:44px;padding:0;font-size:16px;line-height:1;display:inline-flex;align-items:center;justify-content:center}
+/* '이어진 선 N개'는 단추가 아니라 단추 줄 아래 작은 글자다(누르면 연결 목록 창이 열린다). */
+.map-meta{position:absolute;right:0;top:calc(100% + 4px);pointer-events:auto;padding:0;border:0;background:none;font-size:12px;letter-spacing:.02em;color:rgba(47,43,52,.74);white-space:nowrap}.mode-pill{height:36px;padding:0 12px;border-radius:999px;border:1px solid rgba(87,79,96,.10);background:rgba(255,255,255,.72);font-size:13px;letter-spacing:.08em;color:rgba(55,50,61,.55);backdrop-filter:blur(16px)}
 .pill{height:36px;padding:0 13px;border-radius:999px;border:1px solid rgba(77,71,87,.12);background:rgba(255,255,255,.74);font-size:13px;color:rgba(51,47,57,.65);box-shadow:0 8px 24px rgba(70,60,78,.05);backdrop-filter:blur(16px)}
 .pill:hover,.pill:focus-visible{outline:none;border-color:rgba(79,70,91,.28);background:#fff;color:#26242d}
 .hero{position:absolute;left:50%;top:68px;transform:translateX(-50%);z-index:16;text-align:center;pointer-events:none;width:min(800px,calc(100vw - 52px));transition:opacity .28s ease,transform .28s ease}.hero.dim{opacity:.07;transform:translateX(-50%) translateY(-14px)}
@@ -46,13 +55,20 @@ button{font:inherit;color:inherit;cursor:pointer}
 @media(min-width:981px){.left-rail{bottom:var(--lt-bottom-links-space,62px)}}
 @media(max-width:980px){.left-rail{display:none}.hero{top:64px}.detail{right:14px;width:340px}.progress-rail{right:8px}.mode-pill{display:none}}
 @media(max-width:640px){
- .topbar{left:8px;right:8px;top:8px}.top-actions > .pill:first-of-type{display:none}.hero{top:58px;width:calc(100vw - 28px)}.hero h1{font-size:26px}.hero p{font-size:11px;line-height:1.5;max-width:345px}.progress-rail{display:none}
+ .topbar{left:8px;right:8px;top:8px}.hero{top:58px;width:calc(100vw - 28px)}.hero h1{font-size:26px}.hero p{font-size:11px;line-height:1.5;max-width:345px}.progress-rail{display:none}
  /* #421: 좁은 폭에서 단추 글자가 세로로 쪼개지는(두 줄로 쌓이는) 것을 막는다. */
  .pill,.shelf-back{white-space:nowrap}.shelf-back{padding:0 10px;font-size:9px}.top-actions{gap:5px}
  /* #517: 390·360에서 도구 줄이 오른쪽으로 넘치던 것(사용법 9px 잘림·이어진 선 n개 화면 밖 404~504px)을
     제목 줄 + 단추 줄 두 줄로 내려 보내 없앤다. 모든 단추가 흐름 없이 화면 안에 있고 누름 높이는 44px(문서 style)을 유지한다. */
- .topbar{flex-wrap:wrap;row-gap:6px}.spacer{display:none}.top-actions{flex-wrap:wrap;justify-content:flex-start;width:100%}
+ .topbar{gap:8px}.spacer{display:none}.top-actions{flex-wrap:nowrap;justify-content:flex-end;gap:4px}
+ /* #951 ①: 좁으면 보기 방식 묶음만 안에서 가로로 민다 — ⤢·⋯은 항상 버티어 나온다. 왼쪽(← 서재 · 트리 제목)이 먼저 줄어든다. */
+ .view-switch{flex:0 1 auto}.top-actions > .pill.icon,.bgDrop{flex:0 0 auto}
+ html[data-v41-screen=network] body .topbar-left{flex:1 1 0;min-width:96px;overflow:hidden}
+ html[data-v41-screen=network] .tree-title{min-width:0;overflow:hidden}
+ html[data-v41-screen=network] #treeTitleText{display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom}
  .pill{padding-left:9px;padding-right:9px}
+ /* #951 ①: 세 보기 방식이 390에서도 다 보이게 붙은 단추 안쪽 여백만 줄인다(모서리는 묶음이 정한다). */
+ html[data-v41-screen=network] .top-actions .view-switch .pill{padding:0 7px;font-size:11px}
  /* #517: 내려온 도구 줄 아래에 순간 선택 패널이 오게 한다 — 패널 top은 measureInsets가 재어 넘긴
     머리 아래 끝(--lt-picker-top)을 따른다(도구 줄이 한 줄이든 두 줄이든 겹침 0). */
  html[data-v41-screen=network] .lt-moment-picker{top:var(--lt-picker-top,118px)}
@@ -229,3 +245,5 @@ html[data-v41-screen=network][data-lt-board-theme=night] body .controls .mini:ho
 html[data-v41-screen=network] body .controls .mini.origin,
 html[data-lt-theme=garden][data-v41-screen=network] body .controls .mini.origin,
 html[data-v41-screen=network][data-lt-board-theme=night] body .controls .mini.origin{background:linear-gradient(135deg,rgba(228,93,141,.30),rgba(139,105,232,.30));color:#fff;font-weight:650}
+/* #951 ①: ⋯(배경·도움말)와 '순간 N · 이어진 선 N' 작은 글자도 판 색을 따른다. */
+html[data-v41-screen=network][data-lt-board-theme=night] body .map-meta{color:var(--lt-map-ui-text,rgba(233,226,240,.92))}
