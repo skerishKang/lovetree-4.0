@@ -136,41 +136,6 @@ test('#601 모델: isPinboardSlot — 칸 x(±2px 스냅)만 저장 자리다', 
   assert.equal(LT58Model.isPinboardSlot(NaN), false);
 });
 
-test('#601 화면: 저장 자리 판정·보존·복원이 한 벌을 쓴다', () => {
-  const board = read('views/board/board.js');
-  // 근본 수리: 처음 저장 판정은 핀보드 칸 x만 통과시킨다.
-  assert.match(board, /const saved=Number\.isFinite\(m\.x\)&&Number\.isFinite\(m\.y\)&&LT58Model\.isPinboardSlot\(m\.x\)/);
-  // '날짜순'에서 재꽂아도 저장 값을 지우지 않는다(savedXY 보존 → 저장 메시지는 원본 x·y).
-  assert.match(board, /savedXY:saved\?\{x:m\.x,y:m\.y,rot:/);
-  assert.match(board, /m\.savedPos&&m\.savedXY&&boardMode==='date'\?\{x:m\.savedXY\.x,y:m\.savedXY\.y,rot:m\.savedXY\.rot\}/);
-  // '내 배치'는 좌표 복원이 아니라 순서 배치다(#619-6) — 옛 저장 자리 restore는 없다.
-  assert.doesNotMatch(board, /if\(mode==='mine'\)for\(const m of moments\)\{if\(m\.savedPos&&m\.savedXY\)\{m\.x=m\.savedXY\.x/);
-  assert.match(board, /LT58Model\.orderOfMoments\(LTDEMO\.moments\)/);
-  // 모드는 트리별로 기억한다.
-  assert.match(board, /const BOARD_MODE_KEY='lt41\.boardMode'/);
-  assert.match(board, /function boardModeKey\(\)\{const id=boardTreeId\(\);return id\?BOARD_MODE_KEY\+':'\+id:BOARD_MODE_KEY\}/);
-  // 판 크기: 카드 예약 높이로 자란다(마지막 줄이 판 밖으로 나가지 않는다).
-  assert.match(board, /LT58Model\.boardSize\(moments\.map\(m=>\(\{x:m\.x,y:m\.y,h:reservedHeights\.get\(m\.id\)\|\|BASE_RESERVED_H\}\)\)\)/);
-});
-
-test('#619 약속: 자동 재생 없음·전환 뒤 자동 맞춤·꾸밈 스타일은 예시만·썸네일 내려가기', () => {
-  const board = read('views/board/board.js');
-  const extras = read('views/board/board-extras.js');
-  // 3: 상세 플레이어는 autoplay 없이, 누를 때만 재생한다.
-  assert.doesNotMatch(extras, /class="detailVideo"[^>]*autoplay/);
-  assert.doesNotMatch(extras, /querySelector\('\[data-lt-play\]'\);if\(b\)b\.click\(\)/);
-  // 4: 배치 모드를 바꾼 뒤 화면에 카드가 없으면 자동으로 전체 맞춤.
-  assert.match(board, /function visibleCardCount\(\)/);
-  assert.match(board, /if\(replace&&!visibleCardCount\(\)\)fitAll\(false\)/);
-  // 6a: 꾸밈 카드 스타일(필름의 검은 테두리 등)은 예시 보드에서만 돌아가며 붙인다(exampleBoard 한 곳 판단).
-  assert.match(extras, /m\.cardStyle=m\.cardStyle\|\|\(exampleBoard\?LT_CARD_STYLES\[i%LT_CARD_STYLES\.length\]:'photo'\)/);
-  // 6b: 이어진 순간 썸네일은 공용 후보(저장 주소 → oardefault/hqdefault → mqdefault)와 내려가기 속성을 쓴다.
-  assert.match(extras, /function connThumb\(t\)\{/);
-  assert.match(extras, /api\.thumbnailCandidates\(moment,\{autoLoad:true\}\)/);
-  assert.match(extras, /api\.coverFallbackAttrs\(list\)/);
-  assert.match(extras, /thumbApi\(\)\?\.mountThumbFallback\?\.\(document\)/);
-});
-
 test('#601 화면: 카드는 훑기용 — 큰 썸네일·제목 2줄·감정·날짜 한 줄', () => {
   const extras = read('views/board/board-extras.js');
   const detail = read('views/board/board-detail.js');
@@ -191,74 +156,11 @@ test('#601 화면: 카드는 훑기용 — 큰 썸네일·제목 2줄·감정·�
   assert.match(css, /\.card \.lt-media\[data-lt-vertical="1"\][^{]*\{[^}]*height:300px/, '세로 영상은 9:16, 높이 상한 300px');
 });
 
-test('#601 공용 마크업: compact — 카드에는 썸네일 한 장만', () => {
-  const mp = read('media-preview.js');
-  assert.match(mp, /momentMeta=null,opts=null\)/);
-  assert.match(mp, /const compact=!!opts\?\.compact/);
-  assert.match(mp, /const cached=\(caption&&!compact\)/);
-  assert.match(mp, /const status=compact\?'':/);
-  assert.match(mp, /const expand=canLoad&&!compact&&/);
-  assert.match(mp, /\(compact\?\'\'\:'<p class="lt-media-status"/);
-});
+// #952: 저장 자리·자동 재생·카드/상세 마크업·확대 단추·셸 칸을 파일 글자로 고정하던 단정들을 걷어냈다.
+// 그 결과는 이 파일 아래 실브라우저 시험이 직접 잰다 — 상세 판의 주 단추/더 보기 구성(#662 실제 좌표 클릭),
+// ＋/전체 보기 말풍선(13px·fixed), 마음 저장이 lt41-board-sync의 note로 가는지, 이어진 순간 카드 이동,
+// 날짜순/내 배치와 저장 자리(v41-board-order-619·stack-619 모델 시험)까지.
 
-test('#601 상세: 플레이어가 맨 위, 내 마음은 크게, 이어진 순간은 카드, 할 일은 한 줄', () => {
-  const html = read('views/track58-pinboard.html');
-  const extras = read('views/board/board-extras.js');
-  // 구조: 플레이어 → 내 마음(큰 글씨·입력칸) → 감정·날짜·트리 → 이어진 순간 → 할 단 한 줄.
-  assert.match(html, /id="detailPlayer"/);
-  assert.match(html, /id="dHeart" hidden/, '내 마음 큰 글씨');
-  assert.match(html, /id="dHeartInput"[^>]*placeholder="이 순간에 남기고 싶은 마음을 적어 보세요"/);
-  assert.match(html, /id="dHeartSave"[^>]*>마음 저장</);
-  assert.match(html, /id="detailActions"/);
-  assert.match(html, /id="editMomentBtn"[^>]*>수정</);
-  // #891: 'YouTube ↗'는 영상 바로 아래 작은 링크(#836 모양) — 단추 줄에서 없앴다.
-  assert.match(html, /id="ytLinkRow" hidden><a id="detailYtLink"/);
-  assert.match(html, /id="openMoment"[^>]*>크게 보기</);
-  assert.match(html, /id="cinemaFromMoment"[^>]*>여기부터 시네마</);
-  assert.match(html, /id="detailMoreBtn"[^>]*>⋯ 더 보기</, '주 단추 2개 + ⋯ 더 보기(#891)');
-  assert.match(html, /id="detailMoreMenu"[^>]*hidden><button[^>]*id="editMomentBtn"/);
-  assert.doesNotMatch(html, /id="nextMoment"/, "'다음 순간 보기' 단추는 이어진 순간 카드로 대체됐다");
-  assert.doesNotMatch(html, /id="prevMoment"/);
-  // #619-3: 플레이어는 자동 재생하지 않는다. 재생 단추를 눌러야 재생된다.
-  assert.match(extras, /function detailPlayerHTML\(m\)/);
-  assert.doesNotMatch(extras, /querySelector\('\[data-lt-play\]'\);if\(b\)b\.click\(\)/, '상세를 열 때 자동으로 재생 단추를 누르지 않는다');
-  assert.match(extras, /controls muted playsinline>/, '영상은 controls 로 두고 사용자가 누를 때 재생한다');
-  // 내 마음 저장은 기존 저장 경로(persistBoard → lt41-board-sync)로 간다.
-  assert.match(extras, /\$\('#dHeartSave'\)\.onclick=[\s\S]{0,200}m\.memo=v;persistBoard\(\)/);
-  // 이어진 순간: 작은 썸네일 카드(connCard), 누르면 판이 이동한다(#583 규칙 유지).
-  assert.match(extras, /class="connCard" data-cid=/);
-  assert.match(extras, /function connThumb\(t\)/);
-  assert.match(extras, /b\.dataset\.dir==='next'\)moveViaConnection\(c\);else pulseConnection\(c,\(\)=>focusBoardMoment\(c\.a\)\)/);
-  // 지도·옮기기 단추는 '⋯ 더 보기' 메뉴 안에 있고, 누름 길은 여기서 맞춘다(#891).
-  assert.match(extras, /const mapBtn=\$\('#detailMapBtn'\);if\(mapBtn\)mapBtn\.onclick=/);
-  assert.match(extras, /const mv=\$\('#detailMoveBtn'\);if\(mv\)mv\.onclick=/);
-});
-
-test('#601 확대 단추: [－][＋][전체 보기]와 말풍선 설명', () => {
-  const html = read('views/track58-pinboard.html');
-  const extras = read('views/board/board-extras.js');
-  assert.match(html, /id="minusBtn"[^>]*data-lt-tip="작게 보기[^"]*"/);
-  assert.match(html, /id="plusBtn"[^>]*data-lt-tip="크게 보기[^"]*"/);
-  assert.match(html, /id="resetBtn"[^>]*>전체 보기</, "'보기 초기화'는 지도처럼 '전체 보기'로 부른다");
-  assert.match(html, /id="resetBtn"[^>]*data-lt-tip="전체 보기[^"]*"/);
-  // 말풍선: 마우스 올림·초점·길게 누름(#584와 같은 동작).
-  assert.match(extras, /function showBoardTip\(el\)/);
-  assert.match(extras, /id='lt-tip-bubble'|id="lt-tip-bubble"/);
-});
-
-test('#601 셸: 트리 칸은 글자에 맞춰 늘고 넘치면 말줄임 — 탭이 흔들리지 않는다', () => {
-  const css = fs.readFileSync(new URL('../public/v41/shell.css', import.meta.url), 'utf8');
-  const header = read('shell/header.mjs');
-  // 261119 대표 결정: 트리 칸은 고정 폭이 아니라 글자에 맞춘다(긴 이름은 상한에서 말줄임).
-  // 숫자 계약(⌄ 오른쪽 여백 ±2px·폭 ≤ 상한·긴 이름 말줄임)은 tests/v41-topmenu-885.test.mjs가 실제 화면에서 잰다.
-  assert.match(css, /nav #record-menu #source-label\{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap\}/);
-  // 좁은 폭에서는 여전히 줄어든다(상한 유지).
-  assert.match(css, /nav #record-menu\{width:auto;max-width:112px;/);
-  // 마우스 올림·초점에 전체 이름(말줄임 보완).
-  assert.match(header, /트리: \$\{displayTreeTitle\(window\.LT41\?\.tree\.title\|\|''\)\} — 다른 트리를 고릅니다\./);
-});
-
-// === 화면(실행) ===
 test('#601 화면: 옛 관계 배치 x·y가 남아도 처음은 날짜순 바둑판이다(근본 수리)', { skip: REQUIRE ? false : skip, timeout: 300000 }, async () => {
   if (skip) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip}`);
   const tree = starTree(26, true);
@@ -470,6 +372,22 @@ test('#601 화면: 카드 높이 상한·마지막 줄이 판 안, 상세는 플
     assert.deepEqual(detail.actions, [true, true, true], '할 일 고정 줄: 크게 보기·여기부터 시네마·⋯ 더 보기(#891)');
     assert.deepEqual(detail.moreItems, [true, true, true], '더 보기 메뉴: 수정·지도에서 관계 보기·다른 트리로 옮기기');
     assert.equal(detail.ytLink, true, "'YouTube ↗' 작은 링크가 있다(#891)");
+    // #952: 카드 모양(CSS 글자) 대신 화면에서 잰다 — 제목 2줄 말줄임·큰 썸네일·세로 영상 높이 상한.
+    const cardStyle = await frame.evaluate(() => {
+      const cards = [...document.querySelectorAll('#cardLayer .card')];
+      const title = cards[0]?.querySelector('.cardTitle');
+      const media = cards.map((c) => c.querySelector('.media')).find(Boolean) || null;
+      return {
+        clamp: title ? getComputedStyle(title).webkitLineClamp : 'none',
+        mediaHeight: media ? Math.round(media.getBoundingClientRect().height) : 0,
+        vertical: media ? media.querySelector('[data-lt-vertical="1"]') !== null : false
+      };
+    });
+    assert.equal(cardStyle.clamp, '2', `카드 제목은 2줄에서 말 줄임(${cardStyle.clamp})`);
+    if (cardStyle.mediaHeight) {
+      const want = cardStyle.vertical ? [300] : [200];
+      assert.ok(want.includes(cardStyle.mediaHeight), `썸네일 높이는 규칙대로(${cardStyle.mediaHeight}px, 세로=${cardStyle.vertical})`);
+    }
     // 마음을 남기면 기존 저장 경로로 note가 간다.
     await frame.fill('#dHeartInput', '이 순간이 좋았어요');
     await frame.click('#dHeartSave');

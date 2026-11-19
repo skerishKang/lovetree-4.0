@@ -1,68 +1,170 @@
-import test from 'node:test';import assert from 'node:assert/strict';import {readFileSync} from 'node:fs';
-const BOARD_HTML=readFileSync(new URL('../public/v41/views/track58-pinboard.html',import.meta.url),'utf8');
-const NETWORK_HTML=readFileSync(new URL('../public/v41/views/track56-network.html',import.meta.url),'utf8');
-const MODULE=readFileSync(new URL('../public/v41/views/tree-title.mjs',import.meta.url),'utf8');
-const CSS=readFileSync(new URL('../public/v41/views/tree-title.css',import.meta.url),'utf8');
-const BOARD_CSS=readFileSync(new URL('../public/v41/views/board/board.css',import.meta.url),'utf8');
-const MESSAGES=readFileSync(new URL('../public/v41/shell/messages.mjs',import.meta.url),'utf8');
-const IDENTITY=readFileSync(new URL('../public/v41/identity.css',import.meta.url),'utf8');
+// #417: 보드·지도 머리의 트리 제목 ▾ — 책(#416)과 같은 내용·키보드 동작.
+// #952: 화면 배선을 글자로 고정하던 33개 단정을 걷어내고, 보드 화면을 띄워 결과로 잰다 —
+// 제목 글자·▾ 열기·행 순서(정리 전 먼저)·지금 트리 표시·행을 눌러 lt41-open-view·← 서재는
+// lt41-navigate·Esc 닫기(단추로 초점 복귀)·위아래 이동·바깥 누르기·읽기 전용에서 숨김.
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { createServer } from 'node:http';
+import { createReadStream } from 'node:fs';
+import { stat } from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-test('#417: 보드·지도 머리는 책(#416)과 같은 왼쪽 묶음이다 — ← 서재 + 지금 트리 제목 + ▾',()=>{
- for(const [name,html] of [['보드',BOARD_HTML],['지도',NETWORK_HTML]]){
-  assert.match(html,/class="topbar-left"><button[^>]*id="shelfBackBtn"[^>]*>← 서재<\/button>/,name+': 왼쪽 끝이 ← 서재다');
-  assert.match(html,/id="treeTitleBtn" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="treeMenuPanel"/,name+': 제목 단추는 팝업 단추로 자신을 알린다');
-  assert.match(html,/class="tree-title-caret" aria-hidden="true">▾</,name+': ▾ 표시');
-  assert.match(html,/id="treeMenuPanel" role="menu" aria-label="다른 트리" hidden/,name+': 트리 목록 자리');
-  assert.doesNotMatch(html,/class="brand"/,name+': 안쪽 brand(러브트리)는 맨 위 메뉴 로고에 맡기고 뺀다');
-  assert.match(html,/\/v41\/views\/tree-title\.mjs/,name+': 공통 모듈을 부른다');
-  assert.match(html,/\/v41\/views\/tree-title\.css/,name+': 공통 모양을 부른다');
- }
- assert.match(BOARD_HTML,/id="treeTitleText">기억 보드</,'보드 제목 글자 자리');
- assert.match(NETWORK_HTML,/id="treeTitleText">관계 지도</,'지도 제목 글자 자리');
- assert.doesNotMatch(BOARD_HTML,/class="crumb"/,'보드 crumb(기억 보드)도 이 자리로 바꿔 넣는다');
+const ROOT = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
+const PUB = path.join(ROOT, 'public');
+let chromium, skip = false;
+const REQUIRE = process.env.LT_BOARD_417_REQUIRE === '1';
+try {
+  ({ chromium } = await import('playwright'));
+  const { existsSync } = await import('node:fs');
+  if (!existsSync(chromium.executablePath())) skip = 'Playwright Chromium이 없어 트리 제목 시험을 건너뜀';
+} catch { skip = 'playwright 패키지가 없어 트리 제목 시험을 건너뜀'; }
+const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.woff2': 'font/woff2' };
+
+function serve(extra = {}) {
+  const server = createServer(async (req, res) => {
+    const clean = decodeURIComponent((req.url || '/').split('?')[0]);
+    if (extra[clean]) { res.writeHead(200, { 'content-type': MIME['.html'] }); res.end(extra[clean]); return; }
+    for (const file of [path.join(PUB, clean), path.join(PUB, clean, 'index.html')]) {
+      if (path.relative(PUB, file).startsWith('..')) continue;
+      try {
+        if (!(await stat(file)).isFile()) continue;
+        res.writeHead(200, { 'content-type': MIME[path.extname(file)] || 'application/octet-stream' });
+        createReadStream(file).pipe(res); return;
+      } catch {}
+    }
+    res.writeHead(404); res.end('not found');
+  });
+  return new Promise((ok) => server.listen(0, '127.0.0.1', () => ok(server)));
+}
+
+const moment = (id, title) => ({ id, title, date: '2026-01-01', emotion: '설렘', note: '메모', parentId: null, url: '', x: 120, y: 120, rot: 0, color: 'rose', keywords: [] });
+
+// 셸 흉내: 보기·읽기 전용 여부와 트리 목록을 넘기고, 프레임이 보내는 메시지를 모은다.
+const hostHTML = ({ source, writable, trees, treeId }) => `<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>보드 호스트</title></head><body>
+<script>
+window.__msgs=[];
+addEventListener('message',e=>{if(e.data&&/^lt41-/.test(String(e.data.type||'')))window.__msgs.push(e.data)});
+window.LT41={source:${JSON.stringify(source)},writable:${writable},owned:true,momentId:${JSON.stringify(trees[0].moments[0].id)},prefs:{},trees:${JSON.stringify(trees)},tree:${JSON.stringify(trees.find(t => t.id === treeId))}};
+</script>
+<iframe src="/v41/views/track58-pinboard.html" style="position:fixed;inset:0;width:100vw;height:100vh;border:0"></iframe></body></html>`;
+
+const TREES = [
+  { id: 't1', title: '지금 보는 트리', moments: [moment('a1', '첫 순간'), moment('a2', '둘째 순간')], edges: [] },
+  { id: 't2', title: '정리 전 트리', inbox: true, moments: [moment('b1', '쌓인 순간')], edges: [] },
+  { id: 't3', title: '다른 트리', moments: [moment('c1', '한 순간')], edges: [] }
+];
+
+async function openHost(browser, url) {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
+  const problems = [];
+  const page = await context.newPage();
+  page.on('pageerror', (e) => problems.push('pageerror: ' + String(e).slice(0, 300)));
+  page.on('console', (m) => { if (m.type() === 'error') problems.push('console: ' + m.text().slice(0, 300)); });
+  await page.goto(url, { waitUntil: 'domcontentloaded' });
+  let frame = null;
+  for (let i = 0; i < 80 && !frame; i++) {
+    frame = page.frames().find((f) => f !== page.mainFrame() && /views\/track58-pinboard/.test(f.url()));
+    if (!frame) await page.waitForTimeout(250);
+  }
+  assert.ok(frame, '보드 프레임이 열린다');
+  await frame.waitForSelector('#treeTitleBtn', { timeout: 20000 });
+  await page.waitForTimeout(400);
+  return { context, page, frame, problems };
+}
+
+test('#417 화면: 제목 ▾는 셸 목록을 정리 전 트리부터 보여 주고, 행을 누르면 같은 보기로 열어 달라 한다', { skip: REQUIRE ? false : skip, timeout: 240000 }, async (t) => {
+  const browser = await chromium.launch();
+  const server = await serve({ '/host.html': hostHTML({ source: 'server', writable: true, trees: TREES, treeId: 't1' }) });
+  t.after(async () => { await browser.close(); server.close(); });
+  const { context, page, frame, problems } = await openHost(browser, `http://127.0.0.1:${server.address().port}/host.html`);
+  t.after(async () => { await context.close(); });
+  assert.deepEqual(problems, [], '화면 오류 없음: ' + problems.join(' | '));
+
+  // 머리 줄: ← 서재 + 지금 트리 제목 + ▾ — 셋 다 보인다.
+  const head = await frame.evaluate(() => ({
+    back: !!document.getElementById('shelfBackBtn') && document.getElementById('shelfBackBtn').hidden === false,
+    title: document.getElementById('treeTitleText')?.textContent.trim(),
+    caretHidden: document.querySelector('.tree-title-caret')?.hidden === true,
+    menuHidden: document.getElementById('treeMenuPanel').hidden
+  }));
+  assert.equal(head.back, true, '← 서재가 보인다');
+  assert.equal(head.title, '지금 보는 트리', `제목은 지금 트리(${head.title})`);
+  assert.equal(head.caretHidden, false, '▾ 표시가 보인다');
+  assert.equal(head.menuHidden, true, '목록은 처음에 닫혀 있다');
+
+  // 단추를 누르면 목록이 열리고, 행 순서는 셸과 같다(정리 전이 먼저).
+  await frame.click('#treeTitleBtn');
+  await frame.waitForSelector('#treeMenuPanel:not([hidden])', { timeout: 5000 });
+  const menu = await frame.evaluate(() => {
+    const rows = [...document.querySelectorAll('#treeMenuPanel .tree-item')];
+    return {
+      expanded: document.getElementById('treeTitleBtn').getAttribute('aria-expanded'),
+      role: document.getElementById('treeMenuPanel').getAttribute('role'),
+      ids: rows.map((r) => r.dataset.treeId),
+      checked: rows.filter((r) => r.getAttribute('aria-checked') === 'true').map((r) => r.dataset.treeId),
+      counts: rows.map((r) => r.querySelector('.tree-count')?.textContent.trim()),
+      focusedRow: document.activeElement?.dataset?.treeId || null
+    };
+  });
+  assert.equal(menu.expanded, 'true', '열림 상태를 단추에 남긴다');
+  assert.equal(menu.role, 'menu', '목록은 메뉴로 알린다');
+  assert.deepEqual(menu.ids, ['t2', 't1', 't3'], '정리 전 트리가 먼저 온다');
+  assert.deepEqual(menu.checked, ['t1'], '지금 트리 하나만 체크된다');
+  assert.deepEqual(menu.counts, ['정리 전 1', '2개의 순간', '1개의 순간'], '개수 문구는 셸과 같다');
+  assert.equal(menu.focusedRow, 't2', '열면 첫 행에 초점이 간다');
+
+  // 위아래 이동·Esc 닫기(단추로 초점 복귀) — 책(#416)과 같은 규칙.
+  await page.keyboard.press('ArrowDown');
+  await frame.waitForTimeout(120);
+  assert.equal(await frame.evaluate(() => document.activeElement?.dataset?.treeId), 't1', '아래로 가면 다음 행');
+  await page.keyboard.press('ArrowUp');
+  await frame.waitForTimeout(120);
+  assert.equal(await frame.evaluate(() => document.activeElement?.dataset?.treeId), 't2', '위로 가면 앞 행');
+  await page.keyboard.press('Escape');
+  await frame.waitForTimeout(200);
+  const closed = await frame.evaluate(() => ({ hidden: document.getElementById('treeMenuPanel').hidden, expanded: document.getElementById('treeTitleBtn').getAttribute('aria-expanded'), focused: document.activeElement?.id }));
+  assert.equal(closed.hidden, true, 'Esc 로 닫는다');
+  assert.equal(closed.expanded, 'false', '닫힘을 단추에 알린다');
+  assert.equal(closed.focused, 'treeTitleBtn', 'Esc 뒤 초점은 단추로 돌아온다');
+
+  // 바깥을 누르면 닫힌다.
+  await frame.click('#treeTitleBtn');
+  await frame.waitForSelector('#treeMenuPanel:not([hidden])', { timeout: 5000 });
+  await page.mouse.click(720, 700);
+  await frame.waitForTimeout(250);
+  assert.equal(await frame.evaluate(() => document.getElementById('treeMenuPanel').hidden), true, '바깥을 누르면 닫힌다');
+
+  // 다른 트리를 누르면 셸에 같은 보기로 열어 달라고 한다(보드가 스스로 화면을 바꾸지 않는다).
+  await frame.click('#treeTitleBtn');
+  await frame.waitForSelector('#treeMenuPanel:not([hidden])', { timeout: 5000 });
+  await frame.click('#treeMenuPanel .tree-item[data-tree-id="t3"]');
+  await page.waitForTimeout(300);
+  const msgs = await page.evaluate(() => window.__msgs);
+  assert.deepEqual(msgs.at(-1), { type: 'lt41-open-view', treeId: 't3', view: 'board' }, '행을 누르면 lt41-open-view로 같은 보기를 연다');
+  // ← 서재는 책장으로 간다.
+  await frame.click('#shelfBackBtn');
+  await page.waitForTimeout(300);
+  const last = await page.evaluate(() => window.__msgs.at(-1));
+  assert.equal(last?.type, 'lt41-navigate', '← 서재는 lt41-navigate로 책장에 간다');
+  assert.match(String(last?.view), /track32-bookshelf/, `책장 화면으로(${last?.view})`);
 });
 
-test('#417: 트리 목록은 셸 데이터(parent LT41)에서 읽고, 이동은 셸이 듣는 lt41-open-view로 같은 보기로 간다',()=>{
- assert.match(MODULE,/window\.parent\.LT41 \|\| null/,'목록은 셸이 넘긴 LT41(tree·trees)에서 읽는다');
- assert.match(MODULE,/Number\(b\.inbox\) - Number\(a\.inbox\)/,'정리 전 트리가 먼저(셸과 같은 순서)');
- assert.match(MODULE,/role="menuitemradio" class="tree-item" data-tree-id=/,'셸과 같은 행 구조');
- assert.match(MODULE,/aria-checked="'\s*\+\s*\(row\.id === cur\)/,'지금 트리는 aria-checked');
- assert.match(MODULE,/row\.inbox \? '정리 전 ' \+ row\.count/,'개수 문구도 셸과 같다');
- assert.match(MODULE,/import \{coverChoice, COVER_PALETTE\} from '\/v41\/views\/shelf\/shelf-model\.mjs';/,'표지 판정은 책장과 같은 규칙을 재사용한다');
- assert.match(MODULE,/parent\.postMessage\(\{type: 'lt41-open-view', treeId: id, view\}, location\.origin\)/,'이동은 셸이 듣는 lt41-open-view 메시지로 간다');
- assert.match(MODULE,/parent\.postMessage\(\{type: 'lt41-navigate', view: 'track32-bookshelf\.html'\}, location\.origin\)/,'← 서재는 기존 lt41-navigate(책장) 메시지로 간다');
- assert.match(MESSAGES,/data\?\.type === 'lt41-open-view' && \['board', 'network'\]\.includes\(data\.view\)/,'셸은 보기가 board·network일 때만 받는다');
- assert.match(MESSAGES,/getModel\(\)\?\.trees\.some\(t => t\.id === data\.treeId\)/,'없는 트리는 무시한다');
- assert.match(IDENTITY,/html\[data-v41-screen=shelf\],html\[data-v41-screen=board\],html\[data-v41-screen=network\],#tree-design\{--lt-cover-1/,'표지 색 팔레트는 책장 것을 같이 쓴다(복사하지 않는다)');
-});
-
-test('#417: 공유·예시(읽기 전용)에서는 ▾와 ← 서재를 숨긴다',()=>{
- assert.match(MODULE,/return !c \|\| c\.source !== 'server' \|\| c\.writable !== true;/,'읽기 전용은 셸의 저장 판정(board.js)과 같은 근거로 내린다');
- assert.match(MODULE,/if \(ro\) \{ if \(caret\) caret\.hidden = true; if \(back\) back\.hidden = true; \}/,'▾와 ← 서재를 숨긴다');
- assert.match(MODULE,/if \(ro\) return;/,'읽기 전용에서는 목록을 열지 않는다');
-});
-
-test('#417: 목차 키보드 동작은 책(#416)과 같다 — Esc 닫기·위아래 이동·바깥 누르면 닫기',()=>{
- assert.match(MODULE,/e\.key === 'Escape' && !menu\.hidden/,'Esc로 닫고');
- assert.match(MODULE,/trigger\.focus\(\); close\(\);/,'단추로 초점을 돌려 준다(숨기기 전에 옮긴다)');
- assert.match(MODULE,/e\.key === 'ArrowDown' \|\| e\.key === 'Down'/,'아래로');
- assert.match(MODULE,/e\.key === 'ArrowUp' \|\| e\.key === 'Up'/,'위로');
- assert.match(MODULE,/!e\.target\.closest\('\.tree-title'\)\) close\(\)/,'바깥을 누르면 닫는다');
- assert.match(MODULE,/trigger\.setAttribute\('aria-expanded', 'true'\)/,'열림 상태를 단추에 남긴다');
-});
-
-test('#417: 좁은 폭에서 제목이 줄어들고 겹치지 않는다 — 보드 모바일에서도 ← 서재가 살아 있다',()=>{
- assert.match(CSS,/\.topbar-left\{display:flex;align-items:center;gap:10px;min-width:0;flex:0 1 auto\}/,'묶음은 줄어들 수 있다');
- assert.match(CSS,/\.tree-title-btn\{display:inline-flex;align-items:center;gap:7px;max-width:100%;min-width:0;min-height:44px;/,'제목 단추는 줄어들되 44px 손끝 크기는 지킨다');
- assert.match(CSS,/#treeTitleText\{font-weight:700;font-size:18px;/,'제목은 크고');
- assert.match(CSS,/overflow:hidden;text-overflow:ellipsis;white-space:nowrap\}/,'넘치면 줄임표');
- assert.match(BOARD_CSS,/\.headbtn\{display:none\}\.headbtn\.primary\{display:block[^}]*\}#shelfBackBtn\{display:inline-flex;min-height:44px;height:auto\}/,'보드 폰 폭에서 되돌리기 등은 숨기되 ← 서재는 남긴다');
- assert.match(CSS,/html\[data-v41-screen=network\] \.topbar-left\{pointer-events:auto;margin-right:auto\}/,'지도 topbar는 클릭을 막아 두었으므로 묶음을 다시 받고(#421) 왼쪽을 지킨다');
-});
-
-test('#421: 지도 390 — 왼쪽 묶음은 0으로 눌리지 않고, 제목은 줄임표, 도구 줄은 책(#431)과 같이 가로 스크롤로 넘침을 막는다',()=>{
- assert.match(CSS,/html\[data-v41-screen=network\] \.topbar-left\{flex:0 0 auto\}/,'← 서재가 들어간 묶음은 0으로 눌리지 않는다');
- assert.match(CSS,/html\[data-v41-screen=network\] \.tree-title-btn\{max-width:30vw\}/,'제목은 30vw 안에서 줄어든다(책 #431과 같은 원칙)');
- assert.match(CSS,/html\[data-v41-screen=network\] \.top-actions\{flex:0 1 auto;min-width:0;overflow-x:auto;justify-content:flex-start;scrollbar-width:none\}/,'도구 줄은 책(#431)과 같이 가로 스크롤로 넘침을 막는다');
- assert.match(CSS,/html\[data-v41-screen=network\] \.top-actions::-webkit-scrollbar\{display:none\}/,'스크롤 막대는 보이지 않게 한다');
+test('#417 화면: 공유·예시(읽기 전용)에서는 ▾와 ← 서재를 숨기고 목록을 열지 않는다', { skip: REQUIRE ? false : skip, timeout: 240000 }, async (t) => {
+  const browser = await chromium.launch();
+  const server = await serve({ '/host.html': hostHTML({ source: 'share', writable: false, trees: TREES, treeId: 't1' }) });
+  t.after(async () => { await browser.close(); server.close(); });
+  const { context, page, frame, problems } = await openHost(browser, `http://127.0.0.1:${server.address().port}/host.html`);
+  t.after(async () => { await context.close(); });
+  assert.deepEqual(problems, [], '화면 오류 없음: ' + problems.join(' | '));
+  const ro = await frame.evaluate(() => ({
+    caret: document.querySelector('.tree-title-caret')?.hidden === true,
+    back: document.getElementById('shelfBackBtn')?.hidden === true
+  }));
+  assert.equal(ro.caret, true, '읽기 전용에서는 ▾를 숨긴다');
+  assert.equal(ro.back, true, '읽기 전용에서는 ← 서재를 숨긴다');
+  await frame.click('#treeTitleBtn');
+  await page.waitForTimeout(300);
+  assert.equal(await frame.evaluate(() => document.getElementById('treeMenuPanel').hidden), true, '읽기 전용에서는 목록을 열지 않는다');
+  assert.deepEqual(await page.evaluate(() => window.__msgs), [], '셸로 보내는 메시지가 없다');
 });
