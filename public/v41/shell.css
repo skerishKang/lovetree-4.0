@@ -551,8 +551,8 @@ nav .tree-frame{scroll-snap-align:center}
  /* 이슈 666: 알림 줄(#toast)은 아래에 붙은 것들(링크 줄 10~37px·＋ 단추 12~68px) 위로 올라가므로
     오른쪽을 비켜 설 필요가 없다(자리는 셸이 --lt-toast-bottom으로 잰다). */
 }
-/* 이슈 458: 접기 메뉴(☰)에서 지금 보고 있는 화면 표시 — 금테(테마 토큰). */
-#header-overflow button[aria-current="true"]{box-shadow:inset 0 0 0 1px var(--lt-gold-deep);font-weight:600}
+/* #987: 접힌 메뉴에서도 현재 화면의 글자에만 밑줄을 표시한다. */
+#header-overflow button[aria-current="true"]{box-shadow:none;border:0;font-weight:600;text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:6px}
 
 /* 고객 의견 창구 (이슈 540) — 로그아웃 상태 첫 화면 아래 작은 글씨 링크. */
 .feedback-link{padding:6px 10px;border:0;background:none;color:var(--muted);font-size:13px;letter-spacing:.04em;text-decoration:underline;text-underline-offset:3px;opacity:.75;cursor:pointer}
@@ -762,7 +762,16 @@ body.lt-frame-dialog-open #toast{top:calc(72px + env(safe-area-inset-top));botto
 .toast-action{flex-shrink:0;margin-left:10px;padding:5px 12px;border:1px solid rgba(255,230,166,.45);border-radius:999px;background:rgba(255,230,166,.1);color:inherit;font-size:13px;letter-spacing:.02em}
 .toast-action:hover{background:rgba(255,230,166,.18)}
 /* 261117 대표 결정: 위 메뉴의 테마 단추(☾/☀)가 390 헤더에 들어서면 간격을 4px로 줄여 넘치지 않게 한다(단추 44px은 유지). */
-@media(max-width:650px){.header-actions{gap:4px;position:absolute;right:8px;top:10px}.app-header{position:relative;padding-right:8px}.header-actions > button,.account-slot > button,.account-slot > .login{padding:0 8px}}
+/* #987: 트리 이름만 줄이고 테마·계정·더보기 단추의 자리를 확보한다. */
+@media(max-width:650px){
+ .app-header{gap:4px;padding-inline:8px}
+ .header-actions{gap:4px;position:static;flex:0 0 auto;margin-left:0}
+ .header-actions > button,.account-slot > button,.account-slot > .login{padding:0 8px}
+ .main-nav{flex:1 1 0;min-width:0;overflow:visible}
+ .main-nav .tree-frame,.tree-frame .tree-slot{flex:1 1 0;min-width:0}
+ nav #record-menu{flex:1 1 auto;width:100%;min-width:0;padding-inline:8px;justify-content:space-between}
+ nav #record-menu #source-label{flex:1;min-width:0;text-align:left}
+}
 /* 261117: share-menu·header-overflow는 그리드 자동 배치에서 암시적 열을 만들어 390 헤더를 밀었다 —
    0폭 자리(1행 전체)에 박아 둔다. 실제 보기는 hidden 속성으로 여전히 동작한다. */
 .app-header>#share-menu,.app-header>#header-overflow{grid-column:1/-1;grid-row:1;width:0;min-width:0;height:0;min-height:0;padding:0;border:0;overflow:hidden}

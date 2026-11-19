@@ -247,7 +247,9 @@ function boardStartView(){if(innerWidth<700){if(typeof focusBoardMoment==='funct
 let vw=viewport.clientWidth,vh=viewport.clientHeight,cards=boardCards(),saved=userView||readBoardView();
 // #536: 기억한 자리의 적용·버림 판정까지 모델(LT58Model.startView)이 맡는다 — 처음 자리와 같은
 // 판 규칙(덮거나 가운데)을 함께 거치게 해 넓은 화면에서 판이 한쪽으로 쏠리지 않게 한다.
-growBoard();let v=LT58Model.startView({viewport:{w:vw,h:vh},safe:boardSafeArea(true),cards,world:worldSize,focusId:LTDEMO.get?.(),firstId:moments.find(m=>m.first)?.id,saved});
+growBoard();const safe=boardSafeArea(true);let v=LT58Model.startView({viewport:{w:vw,h:vh},safe,cards,world:worldSize,focusId:LTDEMO.get?.(),firstId:moments.find(m=>m.first)?.id,saved});
+// #987: 날짜순 첫 화면은 첫 줄과 핀이 제목 아래에서 시작한다. 직접 옮긴 판은 유지한다.
+if(v.mode!=='user'&&boardMode==='date'&&cards.length&&!new URLSearchParams(location.search).has('open'))v.y=Math.max(v.y,safe.y+20-Math.min(...cards.map(c=>c.y))*v.z);
 viewMode=v.mode==='user'?'user':'start';if(v.mode==='user')userView=saved;
 Object.assign(view,{x:v.x,y:v.y,z:v.z});applyView(false)}
 // 전체 보기: 순간이 있는 곳 전부를 보이는 칸에 맞춘다(최대 0.92배). 순간이 없으면 무대 전체.
