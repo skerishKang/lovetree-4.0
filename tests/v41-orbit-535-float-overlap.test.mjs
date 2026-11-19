@@ -182,7 +182,8 @@ s('#535 가만히 있을 때 그리기 횟수는 크게 늘지 않는다', async
 // #535 이전 값(1440 269k·292k / 1920 277k·301k / 390 44k·36k)과 같은 수준이다.
 const LIMITS = {
   '1440x900': { pairs: 24, area: 282000 },
-  '1920x1080': { pairs: 26, area: 301000 },
+  // #942: 회전 주기를 대표 요청(7~8분 → 90초)으로 바꾸면서 옛 느린 궤도에서 잰 겹침 한도가 맞지 않아 0.08% 올린다. 다른 기준은 그대로.
+  '1920x1080': { pairs: 26, area: 302000 },
   // 261116 PR 2: 가운데(위쪽 '+ 순간 추가'·정보 줄)가 커져 390 로그인 궤도의 겹친 쌍이 늘었다(실측 13쌍 —
   // 궤도 위상에 따라 11~13 사이에서 흔들린다). 실측 상한에 여유를 둔다. 면적 한도는 실측 범위 안이라 그대로.
   '390x844': { pairs: 14, area: 44500 }
@@ -386,5 +387,51 @@ s('#942 궤도는 한 방향으로 60~120초에 한 바퀴, 정지·튐 0, 클�
     assert.ok(report.maxJump < 10, `튀는 카드 0(최대 ${report.maxJump}px/50ms)`);
     assert.equal(report.clickStyleChanged, 0, `클릭 전후 카드 변형 변화 0(실제 ${report.clickStyleChanged}장)`);
     await context.close();
+  } finally { await browser.close(); }
+}, { timeout: 180000 });
+
+// #942 2번: 두 '+ 순간 추가' 단추의 computed 배경·글자색을 b221f32 시점 값으로 고정한다(1440·390 × 밤·정원, 대비 4.5:1).
+s('#942 가운데·헤더 추가 단추 색이 원래 값이다', async () => {
+  const expected = {
+    night: { centerBg: 'rgb(238, 231, 224)', centerFg: 'rgb(40, 33, 43)', headerBg: 'rgba(255, 230, 166, 0.1)', headerFg: 'rgb(255, 230, 166)' },
+    garden: { centerBg: 'rgb(152, 80, 94)', centerFg: 'rgb(255, 253, 248)', headerBg: 'rgba(200, 110, 121, 0.14)', headerFg: 'rgb(138, 75, 87)' }
+  };
+  const browser = await chromium.launch({ headless: true });
+  try {
+    for (const width of [1440, 390]) {
+      for (const theme of ['night', 'garden']) {
+        const ctx = await browser.newContext({ viewport: { width, height: width === 390 ? 844 : 900 }, deviceScaleFactor: 1 });
+        await ctx.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); } catch {} }, theme);
+        const page = await ctx.newPage();
+        await page.goto(`${lib.base}/v41/`, { waitUntil: 'load', timeout: 30000 });
+        await page.waitForTimeout(2500);
+        const got = await page.evaluate(() => {
+          const pick = (el) => { if (!el) return null; const s = getComputedStyle(el); return { bg: s.backgroundColor, fg: s.color }; };
+          const header = document.querySelector('#write-menu.primary-action') || document.querySelector('.header-actions .primary-action');
+          let center = null;
+          for (const frame of [...document.querySelectorAll('#view,#view-next')].filter((f) => !f.hidden && f.contentDocument)) {
+            const root = frame.contentDocument.getElementById('orbit')?.shadowRoot;
+            if (root) center = pick(root.querySelector('.home-add-top') || root.querySelector('.center .actions .primary-cta'));
+          }
+          return { center, header: pick(header), stage: getComputedStyle(document.body).backgroundColor };
+        });
+        const want = expected[theme];
+        assert.equal(got.center?.bg, want.centerBg, `${width}/${theme}: 가운데 단추 배경`);
+        assert.equal(got.center?.fg, want.centerFg, `${width}/${theme}: 가운데 단추 글자색`);
+        assert.equal(got.header?.bg, want.headerBg, `${width}/${theme}: 헤더 단추 배경`);
+        assert.equal(got.header?.fg, want.headerFg, `${width}/${theme}: 헤더 단추 글자색`);
+        const nums = (value) => (String(value).match(/[\d.]+/g) || []).map(Number);
+        const over = (fg, bg) => { const [r, g, b, a = 1] = nums(fg), [br, b2, bb] = nums(bg); return [r * a + br * (1 - a), g * a + b2 * (1 - a), b * a + bb * (1 - a)]; };
+        const lum = ([r, g, b]) => { const f = (v) => { v /= 255; return v <= .03928 ? v / 12.92 : Math.pow((v + .055) / 1.055, 2.4); }; return .2126 * f(r) + .7152 * f(g) + .0722 * f(b); };
+        const contrast = (a, b) => { const l1 = lum(a), l2 = lum(b); return (Math.max(l1, l2) + .05) / (Math.min(l1, l2) + .05); };
+        const stage = nums(got.stage).length >= 3 ? got.stage : 'rgb(0, 0, 0)';
+        const centerContrast = contrast(nums(got.center.bg), nums(got.center.fg));
+        const headerContrast = contrast(over(got.header.bg, stage), nums(got.header.fg));
+        assert.ok(centerContrast >= 4.5, `${width}/${theme}: 가운데 단추 대비 ${centerContrast.toFixed(2)}`);
+        assert.ok(headerContrast >= 4.5, `${width}/${theme}: 헤더 단추 대비 ${headerContrast.toFixed(2)}`);
+        console.log('BUTTON_COLOR', width, theme, JSON.stringify(got), centerContrast.toFixed(2), headerContrast.toFixed(2));
+        await ctx.close();
+      }
+    }
   } finally { await browser.close(); }
 }, { timeout: 180000 });
