@@ -5,15 +5,14 @@ test('share client uses only fixed same-origin endpoints',async()=>{
  const api=createShareApi({fetchImpl});await api.preview({treeId:'t'});await api.create({treeId:'t'});await api.list();await api.setDiscoverable('abc',true);await api.revoke('abc');await api.read('abc');
  assert.deepEqual(calls.map(c=>c.slice(0,2)),[['/api/shares/preview','POST'],['/api/shares','POST'],['/api/shares','GET'],['/api/shares/abc/discovery','PUT'],['/api/shares/abc','DELETE'],['/api/public/shares/abc','GET']]);
 });
-test('4.1 shell gates link creation behind preview and public reading behind the public endpoint',()=>{
- const shell=fs.readFileSync(new URL('../public/v41/shell.mjs',import.meta.url),'utf8')+fs.readFileSync(new URL('../public/v41/shell/messages.mjs',import.meta.url),'utf8'),html=fs.readFileSync(new URL('../public/v41/index.html',import.meta.url),'utf8'),css=fs.readFileSync(new URL('../public/v41/shell.css',import.meta.url),'utf8');
- assert.match(shell,/sharePreviewKey !== JSON\.stringify\(payload\)/);assert.match(shell,/shareApi\.read\(route\.shareId/);assert.match(shell,/source='share'/);assert.match(shell,/share_revoked:\['공유가 취소됐어요/);
- assert.match(html,/id="share-create"[^>]*disabled/);
- // 공개 범위 문구(261117 고객 의견): 공개 응답(projectSharedTree)대로 — 트리 제목·순간(메모·날짜·감정·링크)은 보이고,
- // 업로드 파일(/api/media/)과 다른 트리는 빠진다. 사진을 올린 적 없는 사람도 이해하게 짧게.
- assert.match(html,/지금 트리 하나의 제목과 순간\(메모·날짜·감정·링크\)이 그대로 보여요/);assert.match(html,/사진·영상 파일과 다른 트리는 공개되지 않아요/);
- assert.match(html,/이미 받은 사본·캡처/);assert.match(css,/\[hidden\]\{display:none!important\}/);
- // #538 + 2026-11-16 결정: 둘러보기 올림·비공개 전환 단추는 정리됐다 — 고른 소개 값은 discover PUT(판단은 서버),
- // 링크 공유·완전 비공개는 무료다(#830). 설정의 트리 공개 행은 visibility PUT을 쓴다(본인 트리만, 서버 판단).
- assert.doesNotMatch(shell,/shareApi\.setDiscoverable/);assert.match(shell,/shareApi\.setTreeVisibility/);assert.match(shell,/shareApi\.setTreeDiscover\(treeId,discover\)/);assert.doesNotMatch(html,/링크 공유와 완전 비공개도 그대로/);assert.doesNotMatch(html,/무료/);assert.match(html,/공개 여부/);assert.doesNotMatch(html,/비공개는 Plus/);
+// #952: 셸·HTML·CSS 글자 검사 16개를 걷어냈다. 링크 만들기 전 미리보기 확인·공개 읽기 경로·회수 안내·
+// 공개 범위 문구는 이제 동작 시험이 본다 — 공유 창 단계(v41-share-steps: 미리보기 전 링크 막힘·3단계·discover PUT),
+// 손님 화면(v41-share-guest-635: ?open=·쓰기 0건), 공개 응답(pages-search-preview: 회수 안내·noindex·카드).
+// 남은 것은 셸이 실제로 부르는 api 표면이다.
+test('4.1 share api 표면: 트리 공개는 setTreeVisibility·둘러보기 소개는 setTreeDiscover로 부른다', () => {
+ const api=createShareApi({fetchImpl:async()=>new Response('{}',{headers:{'content-type':'application/json'}})});
+ assert.equal(typeof api.setTreeVisibility,'function','설정의 트리 공개는 setTreeVisibility(visibility PUT)');
+ assert.equal(typeof api.setTreeDiscover,'function','둘러보기 소개는 setTreeDiscover(서버가 판단)');
+ // 옛 setDiscoverable은 share-api.mjs에 남아 있지만 부르는 곳이 없다(셸은 discover PUT을 쓴다 — v41-share-steps 5번).
+ // 지울지는 제품 코드 정리 건으로 따로 볼 일이라 이 PR에서 손대지 않는다.
 });
