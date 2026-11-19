@@ -151,10 +151,22 @@ export async function measureMapPixelsInPage([png, overlaysArg]) {
   const dots = window.__lt.dots(), hubs = window.__lt.hubs();
   for (const d of dots) {
     if (!visible(d.x, d.y)) continue;
-    const samples = [];
-    for (let y = -d.r; y <= d.r; y += .5) for (let x = -d.r; x <= d.r; x += .5) {
-      if (x * x + y * y > (d.r + .3) ** 2) continue;
-      if (visible(d.x + x, d.y + y)) samples.push(sample(d.x + x, d.y + y));
+    let samples = [];
+    // #951 ③: 점 자리에 사진(작은 원)이 있으면 사진 속 색 대신 그 점의 테두리 선(점 색)을 잰다 —
+    // 사진 자체는 대비 보장 대상이 아니다(사진은 임의 색). 겹침 판정은 점 원으로 그대로 둔다.
+    if (d.thumb && d.tr) {
+      for (let a = 0; a < 96; a++) {
+        const theta = a * Math.PI / 48;
+        for (const rr of [d.tr, d.tr - 0.3, d.tr + 0.3]) {
+          const x = d.x + Math.cos(theta) * rr, y = d.y + Math.sin(theta) * rr;
+          if (visible(x, y)) samples.push(sample(x, y));
+        }
+      }
+    } else {
+      for (let y = -d.r; y <= d.r; y += .5) for (let x = -d.r; x <= d.r; x += .5) {
+        if (x * x + y * y > (d.r + .3) ** 2) continue;
+        if (visible(d.x + x, d.y + y)) samples.push(sample(d.x + x, d.y + y));
+      }
     }
     // A selected dot may have a light centre; its visible coloured boundary
     // is the non-text indicator, so retain the strongest quarter of the disc.
@@ -347,7 +359,8 @@ export function worstMapRoles(results) {
 // 스크린샷을 두 번 찍어 시간이 절반 더 들고, 스크린샷과 픽셀 해석의 시점도 어긋났다). 세대 번호가
 // quiet ms 동안 그대로일 때만 잰다(화면 코드는 손대지 않는다).
 export async function settlePaint(frame, { timeout = 6000, gap = 25, quiet = 250 } = {}) {
-  const snap = () => frame.evaluate(() => (window.__mapPaint?.gen || 0) + '#' + (window.__imgPending || 0));
+  // #951 ③: 점 자리 썸네일이 읽히는 동안에는 한 번 더 그린다 — 다 읽기 전에 재면 스틸 프레임을 잰다.
+  const snap = () => frame.evaluate(() => (window.__mapPaint?.gen || 0) + '#' + (window.__imgPending || 0) + '#' + (window.__lt?.thumbsSettled?.() === false ? 'p' : 's'));
   const start = Date.now(); let prev = await snap(), last = Date.now();
   while (Date.now() - start < timeout) {
     await new Promise(r => setTimeout(r, gap));

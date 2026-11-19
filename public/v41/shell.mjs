@@ -745,7 +745,8 @@ function tipsFollowDialogs(){
   }
   if(!tipsHeld)return;
   tipsHeld=false;
-  syncTreeTips();
+  // #845 2단계: 창이 닫히면서 자동으로 다시 뜰 때는 초점을 뺏지 않는다 — 초점은 창을 연 단추로 돌아간다.
+  syncTreeTips(false);
 }
 function closeTreeTips(remember=true){
   const box=$('tree-tips');if(!box||box.hidden)return;
@@ -766,23 +767,28 @@ function tipsFollowAccountMenu(){
   }
   if(!tipsHeld)return;
   tipsHeld=false;
-  syncTreeTips();
+  // 메뉴가 닫히며 자동으로 다시 뜰 때도 초점은 계정 동그라미로 돌아간다(#845 2단계와 같은 규칙).
+  syncTreeTips(false);
 }
-function showTreeTips(){
+function showTreeTips(takeFocus=true){
   const box=$('tree-tips');if(!box||!box.hidden)return;
   if(accountMenuOpen()||anyDialogOpen()){tipsHeld=true;return;}
+  // #845 2단계: 창이 닫히면 close 이벤트보다 먼저 주소 처리가 안내를 다시 띄우는 길이 있다.
+  // 창·메뉴 때문에 숨었던 판이 다시 뜨는 때는 초점을 뺏지 않는다 — 초점은 창을 연 단추로 돌아간다.
+  const resuming=tipsHeld;tipsHeld=false;
   const list=$('tree-tips-list');
   if(list&&!list.children.length)for(const tip of FIRST_TREE_TIPS){const li=document.createElement('li');const strong=document.createElement('strong');const span=document.createElement('span');strong.textContent=tip.title;span.textContent=tip.body;li.append(strong,span);list.append(li);}
   if(!tipsReturnFocus)tipsReturnFocus=document.activeElement;
   box.hidden=false;
-  $('tree-tips-close')?.focus();
+  // 초점은 직접 열 때만 가져간다. 자동으로 뜬 판은 Tab으로만 들어간다 — 닫기 단추는 Tab 순서에 그대로 있다.
+  if(takeFocus&&!resuming)$('tree-tips-close')?.focus();
 }
-function syncTreeTips(){
+function syncTreeTips(takeFocus=true){
   const momentCount=model?.trees?.reduce((n,t)=>n+((t.moments||[]).length),0)||0;
   // 이슈 933: 새 트리 만들기(첫 여정) 화면에서는 안내 판을 띄우지 않는다 — 아직 트리를 만든 적이 없는데
   // '첫 트리를 만들었어요' 판이 미리보기 카드를 덮었다. 트리를 실제로 만든 뒤(다른 화면)에만 띄운다.
   const wanted=current!=='first-journey.html'&&tipsWanted({owned:!!member?.snapshot().owned,treeCount:model?.trees?.length||0,momentCount,seen:readTipsSeen(localStorage),source});
-  if(wanted)showTreeTips();else closeTreeTips(false);
+  if(wanted)showTreeTips(takeFocus);else closeTreeTips(false);
 }
 // 창이 닫힐 때마다 안내를 다시 맞춘다 — 열려 있는 창이 없어지면 숨긴 안내를 다시 띄운다(#845).
 document.addEventListener('close',()=>tipsFollowDialogs(),true);
@@ -1294,7 +1300,7 @@ function applyNetworkViewToFrame(frame){try{frame.contentWindow?.postMessage({ty
 for(const b of document.querySelectorAll('[data-network-view]'))b.onclick=()=>{
  try{localStorage.setItem(NETWORK_VIEW_KEY,b.dataset.networkView)}catch{}
  paintNetworkViewControls();for(const f of frames())applyNetworkViewToFrame(f);
- notify(b.dataset.networkView==='concentric'?'지도를 동심원 보기로 열어요.':'지도를 그물 보기로 열어요.');
+ notify(b.dataset.networkView==='concentric'?'지도를 묶음 보기로 열어요.':'지도를 이어진 길 보기로 열어요.');
 };
 paintNetworkViewControls();
 // 2026-11-16 대표 요청: 쉬운 추가가 처음 고르는 트리 — 지금 보고 있는 트리(기본) 또는 늘 같은 트리.
