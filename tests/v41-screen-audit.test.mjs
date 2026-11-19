@@ -2205,17 +2205,29 @@ test('#972 서재·책 상세·둘러보기·새 소식 화면 치수', { skip: 
         const page = await ctx.newPage();
         await page.goto(`${base}/v41/#shelf`);
         await page.waitForFunction(() => document.querySelector('#view')?.contentDocument?.querySelector('.book-card')?.getBoundingClientRect().width > 0);
-        const shelf = await page.frameLocator('#view').locator('.shelf-screen').evaluate(el => {
+        const shelf = await page.frameLocator('#view').locator('.shelf-screen').evaluate(async el => {
+          // 레일 크기 재계산과 책의 이동 효과가 끝난 실제 배치에서 측정한다.
+          await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+          await Promise.allSettled(el.getAnimations({ subtree: true })
+            .filter(a => Number.isFinite(a.effect.getComputedTiming().endTime))
+            .map(a => a.finished));
           const rect = sel => el.querySelector(sel).getBoundingClientRect();
-          const s = rect('.shelf-viewport'), c = rect('.shelf-controls'), h = rect('.hero'), p = el.getBoundingClientRect();
-          const top = innerWidth <= 780 ? c.bottom : h.bottom;
-          return { count: el.querySelectorAll('.book-card').length, gap: s.top - c.bottom,
-            centerError: Math.abs((s.top + s.bottom) / 2 - (top + p.bottom) / 2),
-            areaHeight: p.bottom - top, overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth };
+          const s = rect('.shelf-viewport'), c = rect('.shelf-controls'), h = rect('.resume-strip');
+          const card = rect('.book-card'), cover = rect('.book-cover'), rail = rect('.shelf-rail'), base = rect('.shelf-base');
+          return { count: el.querySelectorAll('.book-card').length, upper: c.top - h.bottom, lower: s.top - c.bottom,
+            balance: Math.abs(h.top - (innerHeight - s.bottom)), innerGap: cover.top - s.top,
+            cardToBase: base.top - card.bottom, firstLeft: card.left - rail.left,
+            arrows: [...el.querySelectorAll('.shelf-arrow')].filter(n => !n.hidden).length,
+            overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth };
         });
         assert.equal(shelf.count, 1);
-        assert.ok(shelf.gap >= 0 && shelf.gap <= 32, `${theme}/${width}: 검색 아래 여백 ${shelf.gap}px`);
-        assert.ok(shelf.centerError <= shelf.areaHeight * .05 + 2, `${theme}/${width}: 책장 중심 오차 ${shelf.centerError}px`);
+        assert.ok(shelf.upper >= 0 && shelf.upper <= 48, `${theme}/${width}: 펼쳐 보기 아래 여백 ${shelf.upper}px`);
+        assert.ok(shelf.lower >= 0 && shelf.lower <= 24, `${theme}/${width}: 검색 아래 여백 ${shelf.lower}px`);
+        assert.ok(shelf.balance <= 40, `${theme}/${width}: 세 요소 묶음의 위·아래 여백 차이 ${shelf.balance}px`);
+        assert.ok(shelf.innerGap >= 0 && shelf.innerGap <= 65, `${theme}/${width}: 책장 안 표지 위 여백 ${shelf.innerGap}px`);
+        assert.ok(shelf.cardToBase >= -1 && shelf.cardToBase <= 8, `${theme}/${width}: 책과 선반 사이 ${shelf.cardToBase}px`);
+        assert.ok(Math.abs(shelf.firstLeft) <= 4, `${theme}/${width}: 첫 책 왼쪽 오차 ${shelf.firstLeft}px`);
+        assert.equal(shelf.arrows, 0, `${theme}/${width}: 한 권이면 화살표 숨김`);
         assert.ok(shelf.overflow <= 1, `${theme}/${width}: 서재 가로 넘침 ${shelf.overflow}px`);
 
         await page.goto(`${base}/v41/#book`);
