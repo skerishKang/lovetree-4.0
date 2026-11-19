@@ -200,13 +200,12 @@ s('#535 카드끼리 겹친 면적을 줄였다(1440·1920·390, 안전 구역 �
         for (let round = 0; round < 3; round++) {
           const d = await frame.evaluate(() => {
             const sr = document.querySelector('main#orbit').shadowRoot;
-            const rects = [];
-            for (const el of sr.querySelectorAll('.card')) {
-              if (getComputedStyle(el).display === 'none') continue;
+            const visible = [...sr.querySelectorAll('.card')].filter((el) => {
+              if (getComputedStyle(el).display === 'none') return false;
               const r = el.getBoundingClientRect();
-              if (r.width < 2 || r.right < 0 || r.bottom < 0 || r.left > innerWidth || r.top > innerHeight) continue;
-              rects.push({ l: r.left, t: r.top, r: r.right, b: r.bottom });
-            }
+              return r.width >= 2 && r.right >= 0 && r.bottom >= 0 && r.left <= innerWidth && r.top <= innerHeight;
+            });
+            const rects = visible.map((el) => { const r = el.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom }; });
             let pairs = 0, area = 0;
             for (let i = 0; i < rects.length; i++) for (let j = i + 1; j < rects.length; j++) {
               const a = rects[i], b = rects[j];
@@ -217,16 +216,32 @@ s('#535 카드끼리 겹친 면적을 줄였다(1440·1920·390, 안전 구역 �
             }
             const c = sr.querySelector('.center');
             let intrude = 0;
+            const intruders = [];
+            let centerRect = null, others = [], font = null;
             if (c) {
               const cc = c.getBoundingClientRect();
-              for (const r of rects) {
-                const iw = Math.max(0, Math.min(cc.right, r.r) - Math.max(cc.left, r.l));
-                const ih = Math.max(0, Math.min(cc.bottom, r.b) - Math.max(cc.top, r.t));
-                if (iw * ih > 1) intrude++;
+              centerRect = { l: Math.round(cc.left), t: Math.round(cc.top), r: Math.round(cc.right), b: Math.round(cc.bottom), w: Math.round(cc.width), h: Math.round(cc.height) };
+              font = { family: getComputedStyle(c).fontFamily, size: getComputedStyle(c).fontSize, loaded: document.fonts.check('12px "Noto Sans CJK KR"') };
+              const overlap = (r) => Math.round(Math.max(0, Math.min(cc.right, r.r) - Math.max(cc.left, r.l)) * Math.max(0, Math.min(cc.bottom, r.b) - Math.max(cc.top, r.t)));
+              for (const [i, el] of visible.entries()) {
+                const r = rects[i]; const ar = overlap(r);
+                if (ar > 1) { intrude++; intruders.push({ kind: 'card', index: i, cls: el.className, rect: [Math.round(r.l), Math.round(r.t), Math.round(r.r), Math.round(r.b)], overlap: ar }); }
+              }
+              const top = window.parent?.document || document;
+              for (const el of top.querySelectorAll('#toast,.updates-card,#mobile-add,.home-links a,.home-links button,.lt-header,[role=status]')) {
+                const r = el.getBoundingClientRect(); if (r.width < 2 || r.height < 2) continue;
+                const ar = overlap({ l: r.left, t: r.top, r: r.right, b: r.bottom });
+                if (ar > 1) others.push({ kind: 'other', tag: el.tagName, id: el.id, cls: String(el.className).slice(0, 60), rect: [Math.round(r.left), Math.round(r.top), Math.round(r.right), Math.round(r.bottom)], overlap: ar });
               }
             }
-            return { cards: rects.length, pairs, area: Math.round(area), intrude };
+            return { cards: rects.length, pairs, area: Math.round(area), intrude, intruders, centerRect, others, font };
           });
+          if (d.intrude > 0 && w === 390 && member === 'out') {
+            const dir = process.env.LT_ORBIT535_DIAG_DIR || path.join(process.cwd(), 'test-results', 'orbit535-diag');
+            mkdirSync(dir, { recursive: true });
+            await page.screenshot({ path: path.join(dir, 'intrusion-390-out.png') });
+            console.log('INTRUSION_DIAG', tag, member, JSON.stringify({ centerRect: d.centerRect, intruders: d.intruders, others: d.others, font: d.font }));
+          }
           if (d.pairs > best.pairs || d.area > best.area) best = d;
           best.cards = Math.max(best.cards, d.cards);
           best.intrude = Math.max(best.intrude, d.intrude);
