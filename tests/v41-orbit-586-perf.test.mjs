@@ -68,10 +68,9 @@ s('#586 끄는 동안에는 hover 모양을 바꾸지 않는다(소스 계약)',
   assert.match(src, /:host\(:not\(\[data-lt-busy\]\)\) \.card:hover/, 'hover 규칙을 끄는 동안엔 적용하지 않는다');
   assert.match(src, /:host\(\[data-lt-busy\]\) \.recent-card:hover/, '최근 순간 카드의 hover도 끄는 동안엔 고정한다');
 });
-s('#586 패럴랙스는 rect 캐시를 쓴다(소스 계약)', () => {
+s('#942 클릭·탭은 배경을 움직이지 않는다(소스 계약)', () => {
   const src = readFileSync(path.join(REPO, 'src', 'views', 'orbit.js'), 'utf8');
-  assert.match(src, /let appBox=null/, 'rect 캐시를 둔다');
-  assert.match(src, /const box=appBox\|\|app\.getBoundingClientRect\(\)/, 'pointermove마다 다시 재지 않는다');
+  assert.doesNotMatch(src, /app\.addEventListener\('pointermove',e=>\{if\(!finePointer\.matches/, '가리키기용 카메라 움직임 없음');
   assert.match(src, /const fitNotice=\(\)=>\{.*appBox=app\.getBoundingClientRect\(\)/, '창이 바뀔 때 캐시를 다시 재운다');
 });
 s('#586 첫 화면 문서는 src/styles.css 를 읽지 않고 --ui 토큰만 인라인로 둔다(소스 계약)', () => {

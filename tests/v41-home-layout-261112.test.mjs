@@ -32,7 +32,7 @@ test('상한을 넘는 카드는 frame에서 숨기고, 폭이 넓어지면 다�
   assert.match(orbit, /if\(el\.classList\.contains\('off'\)\)el\.classList\.remove\('off'\);/);
 });
 
-test('카드는 언제나 불투명하고, blur 대신 밝기로 깊이를 낸다', () => {
+test('카드는 언제나 불투명하고, 크기·밝기·흐림으로 깊이를 낸다', () => {
   assert.doesNotMatch(orbit, /el\.style\.opacity=/, '카드 opacity 인라인 없음');
   // 카드 규칙(.card를 포함한 선택자) 하나하를 훑어 반투명·mix-blend·blur가 없음을 확인한다.
   const rules=[...orbitCSS.matchAll(/([^{}]+)\{([^{}]*)\}/g)];
@@ -43,8 +43,10 @@ test('카드는 언제나 불투명하고, blur 대신 밝기로 깊이를 낸�
     assert.doesNotMatch(body, /mix-blend/, `mix-blend 없음: ${sel.trim().slice(0,40)}`);
     assert.doesNotMatch(body, /blur/, `blur 없음: ${sel.trim().slice(0,40)}`);
   }
-  assert.match(orbit, /el\.style\.filter=`brightness\(/, '깊이 = 밝기');
+  assert.match(orbit, /el\.style\.filter=`brightness\(\$\{fv\}\) blur\(\$\{bv\}px\)`/, '깊이 = 밝기 + 흐림');
   assert.match(orbit, /0\.78\+0\.22\*depth/, '뒤쪽 카드는 밝기 0.78까지');
+  assert.match(orbit, /\(1-depth\)\*2\.2/, '뒤쪽 카드는 흐림 2.2px까지');
+  assert.match(orbit, /ORBIT_MS=90000/, '한 바퀴 90초');
   // 원형 배치(8장 이하)는 같은 깊이이므로 전체가 어두워지지 않게 밝기 1이다.
   assert.match(orbit, /const depth=\(!demo&&cards\.length<=8\)\?1:/);
 });

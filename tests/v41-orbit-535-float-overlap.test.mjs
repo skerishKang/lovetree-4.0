@@ -8,7 +8,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
-import { createReadStream, existsSync, readFileSync } from 'node:fs';
+import { createReadStream, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -109,6 +109,8 @@ s('#535 떠 있는 폭이 눈에 보이고, 동작 줄이기면 거의 멈춘다
     const { context, frame } = await openHome(browser, lib.base, { width: 1440, height: 900, member: 'in' });
     const moved = await frame.evaluate(async () => {
       const sr = document.querySelector('main#orbit').shadowRoot;
+      // #942: 궤도는 90초로 빨라졌다 — 부유 폭만 재려면 궤도 애니메이션을 멈춘다.
+      for (const a of sr.getAnimations({ subtree: true })) if (a.id === 'lt-orbit') a.pause();
       const cards = [...sr.querySelectorAll('.card')].filter((e) => getComputedStyle(e).display !== 'none');
       // 부유는 .lt-lift 층이 든다 — .card 겉사각형은 궤도 자리만 안다. 261118: 부유 층을 직접 잰다.
       const el = cards[3].querySelector('.lt-lift') || cards[3];
@@ -133,6 +135,7 @@ s('#535 떠 있는 폭이 눈에 보이고, 동작 줄이기면 거의 멈춘다
     const still = await openHome(browser, lib.base, { width: 1440, height: 900, member: 'in', reducedMotion: 'reduce' });
     const quiet = await still.frame.evaluate(async () => {
       const sr = document.querySelector('main#orbit').shadowRoot;
+      for (const a of sr.getAnimations({ subtree: true })) if (a.id === 'lt-orbit') a.pause();
       const el = [...sr.querySelectorAll('.card')].filter((e) => getComputedStyle(e).display !== 'none')[3].querySelector('.lt-lift') || [...sr.querySelectorAll('.card')].filter((e) => getComputedStyle(e).display !== 'none')[3];
       const a = el.getBoundingClientRect(); const x0 = a.left + a.width / 2, y0 = a.top + a.height / 2;
       const t0 = performance.now();
@@ -307,3 +310,81 @@ s('#535 끄는 동안만 레이어를 승격하고, 손을 떼면 관성으로 �
     await context.close();
   } finally { await browser.close(); }
 });
+
+// #942: 운영 실측(14초≈10°, 위아래만 움직이는 카드, 정지 2장, 50ms마다 10~23px 튀는 카드)을 수치로 되잡는다.
+// 홈 iframe의 #orbit shadowRoot 안 button.card 중심을 50ms마다 기록한다 — 눈이 아니라 좌표로 판정.
+// 한 바퀴 시간은 카드마다 같은 애니메이션(currentTime/duration)에서 읽고, 방향·정지·튐·클릭 영향은 중심 좌표로 본다.
+// 50ms 표본이 늦게 오면 이동 거리를 실제 간격으로 나눠 튐으로 오인하지 않는다.
+s('#942 궤도는 한 방향으로 60~120초에 한 바퀴, 정지·튐 0, 클릭 전후 이동 패턴 변화 0', async () => {
+  const browser = await chromium.launch({ headless: true });
+  const CAP = process.env.LT_HOME_CAPTURE_DIR || '';
+  try {
+    const { context, page, frame } = await openHome(browser, lib.base, { width: 1440, height: 900, member: 'in' });
+    await page.waitForTimeout(4000);
+    const measured = await frame.evaluate(async () => {
+      const root = document.querySelector('main#orbit').shadowRoot;
+      const cards = [...root.querySelectorAll('button.card')].filter((c) => getComputedStyle(c).display !== 'none');
+      // 부유(lt-float)는 #535이 따로 재는 움직임 — 클릭으로 생기는 궤도 움직임만 보려고 표본 동안 멈춘다.
+      for (const a of root.getAnimations({ subtree: true })) if (a.id === 'lt-float') a.pause();
+      const cx = innerWidth / 2, cy = innerHeight / 2;
+      const series = cards.map(() => []);
+      const sample = (t) => cards.forEach((c, i) => { const r = c.getBoundingClientRect(); series[i].push([t, r.left + r.width / 2, r.top + r.height / 2]); });
+      const run = async (ms) => {
+        const t0 = performance.now();
+        sample(0);
+        await new Promise((done) => {
+          const id = setInterval(() => {
+            const t = performance.now() - t0;
+            sample(t);
+            if (t >= ms) { clearInterval(id); done(); }
+          }, 50);
+        });
+        return performance.now() - t0;
+      };
+      const stats = () => series.map((pts) => {
+        let path = 0, maxStep = 0, maxAt = 0, angle = 0;
+        for (let i = 1; i < pts.length; i++) {
+          const dx = pts[i][1] - pts[i - 1][1], dy = pts[i][2] - pts[i - 1][2];
+          path += Math.hypot(dx, dy);
+          const speed = Math.hypot(dx, dy) * 50 / Math.max(1, pts[i][0] - pts[i - 1][0]);
+          if (speed > maxStep) { maxStep = speed; maxAt = pts[i][0]; }
+          const a0 = Math.atan2(pts[i - 1][2] - cy, pts[i - 1][1] - cx), a1 = Math.atan2(pts[i][2] - cy, pts[i][1] - cx);
+          let d = a1 - a0; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI;
+          angle += d;
+        }
+        return { path: Math.round(path), maxStep: Math.round(maxStep), maxAt: Math.round(maxAt), angle: Number(angle.toFixed(3)), meanStep: Number((path / Math.max(1, pts.length - 1)).toFixed(2)) };
+      });
+      const animAt = () => cards.map((c) => { const a = c.getAnimations().find((x) => x.id === 'lt-orbit'); return a ? [a.currentTime, a.effect.getTiming().duration, a.playbackRate] : null; });
+      const animStart = animAt();
+      const beforeMs = await run(6000);
+      const animEnd = animAt();
+      const before = stats();
+      const stylesAt = () => cards.map((c) => [c.style.transform || '', c.querySelector('.lt-move')?.style.transform || '']);
+      const styleBefore = stylesAt();
+      const app = root.querySelector('.app');
+      app.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerId: 1, clientX: 30, clientY: 400 }));
+      window.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: 1, clientX: 30, clientY: 400 }));
+      const styleAfterClick = stylesAt();
+      series.forEach((s) => { s.length = 0; });
+      const afterMs = await run(6000);
+      const after = stats();
+      const period = animStart.map((a, i) => a && animEnd[i] ? Math.round(1000 * a[1] / (1000 * a[2]) / 1000) : 0);
+      return { cards: cards.length, beforeMs, afterMs, before, after, period, styleBefore, styleAfterClick };
+    });
+    if (CAP) {
+      mkdirSync(CAP, { recursive: true });
+      for (let i = 1; i <= 6; i++) { await page.screenshot({ path: `${CAP}/motion-${i}.png` }); await page.waitForTimeout(1000); }
+    }
+    const moving = measured.before.filter((row) => row.path >= 20);
+    const signs = new Set(moving.map((row) => Math.sign(row.angle)));
+    const periods = [...new Set(measured.period.filter(Boolean))];
+    const report = { cards: measured.cards, moving: moving.length, periods, maxJump: Math.max(...measured.before.map((row) => row.maxStep)), signs: [...signs], clickStyleChanged: measured.styleBefore.filter((v, i) => JSON.stringify(v) !== JSON.stringify(measured.styleAfterClick[i])).length };
+    console.log('ORBIT_942', JSON.stringify(report));
+    assert.equal(moving.length, measured.cards, `정지 카드 0(실제 ${measured.cards - moving.length}장)`);
+    assert.equal(signs.size, 1, '모든 카드가 같은 방향');
+    assert.ok(periods.length === 1 && periods[0] >= 60 && periods[0] <= 120, `한 바퀴 60~120초(실제 ${periods.join(',')})`);
+    assert.ok(report.maxJump < 10, `튀는 카드 0(최대 ${report.maxJump}px/50ms)`);
+    assert.equal(report.clickStyleChanged, 0, `클릭 전후 카드 변형 변화 0(실제 ${report.clickStyleChanged}장)`);
+    await context.close();
+  } finally { await browser.close(); }
+}, { timeout: 180000 });
