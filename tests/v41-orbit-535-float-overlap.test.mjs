@@ -109,7 +109,7 @@ s('#535 떠 있는 폭이 눈에 보이고, 동작 줄이기면 거의 멈춘다
     const { context, frame } = await openHome(browser, lib.base, { width: 1440, height: 900, member: 'in' });
     const moved = await frame.evaluate(async () => {
       const sr = document.querySelector('main#orbit').shadowRoot;
-      const cards = [...sr.querySelectorAll('.card')].filter((e) => e.style.display !== 'none');
+      const cards = [...sr.querySelectorAll('.card')].filter((e) => getComputedStyle(e).display !== 'none');
       // 부유는 .lt-lift 층이 든다 — .card 겉사각형은 궤도 자리만 안다. 261118: 부유 층을 직접 잰다.
       const el = cards[3].querySelector('.lt-lift') || cards[3];
       const pts = []; const t0 = performance.now();
@@ -133,7 +133,7 @@ s('#535 떠 있는 폭이 눈에 보이고, 동작 줄이기면 거의 멈춘다
     const still = await openHome(browser, lib.base, { width: 1440, height: 900, member: 'in', reducedMotion: 'reduce' });
     const quiet = await still.frame.evaluate(async () => {
       const sr = document.querySelector('main#orbit').shadowRoot;
-      const el = [...sr.querySelectorAll('.card')].filter((e) => e.style.display !== 'none')[3].querySelector('.lt-lift') || [...sr.querySelectorAll('.card')].filter((e) => e.style.display !== 'none')[3];
+      const el = [...sr.querySelectorAll('.card')].filter((e) => getComputedStyle(e).display !== 'none')[3].querySelector('.lt-lift') || [...sr.querySelectorAll('.card')].filter((e) => getComputedStyle(e).display !== 'none')[3];
       const a = el.getBoundingClientRect(); const x0 = a.left + a.width / 2, y0 = a.top + a.height / 2;
       const t0 = performance.now();
       await new Promise((done) => { const tick = () => { if (performance.now() - t0 < 3000) requestAnimationFrame(tick); else done(); }; tick(); });
@@ -198,7 +198,7 @@ s('#535 카드끼리 겹친 면적을 줄였다(1440·1920·390, 안전 구역 �
             const sr = document.querySelector('main#orbit').shadowRoot;
             const rects = [];
             for (const el of sr.querySelectorAll('.card')) {
-              if (el.style.display === 'none') continue;
+              if (getComputedStyle(el).display === 'none') continue;
               const r = el.getBoundingClientRect();
               if (r.width < 2 || r.right < 0 || r.bottom < 0 || r.left > innerWidth || r.top > innerHeight) continue;
               rects.push({ l: r.left, t: r.top, r: r.right, b: r.bottom });
@@ -295,7 +295,7 @@ s('#535 끄는 동안만 레이어를 승격하고, 손을 떼면 관성으로 �
     // 관성으로 조금 더 돈다 — 뗀 직후 0.4초 동안 카드가 계속 움직인다.
     const glide = await frame.evaluate(async () => {
       const sr = document.querySelector('main#orbit').shadowRoot;
-      const el = [...sr.querySelectorAll('.card')].filter((e) => e.style.display !== 'none')[2];
+      const el = [...sr.querySelectorAll('.card')].filter((e) => getComputedStyle(e).display !== 'none')[2];
       const a = el.getBoundingClientRect(); const x0 = a.left + a.width / 2;
       await new Promise((r) => setTimeout(r, 400));
       const b = el.getBoundingClientRect();
