@@ -17,6 +17,6 @@ export function homePresentation(context) {
   trees: [],
   context: {treeId: null, momentId: null, readOnly: true},
   accountLabel: member === 'in' ? '내 계정' : '로그인',
-  centerState: {member, treeCount}
+  centerState: {member, treeCount, momentCount: member==='in'?(context?.trees||[]).reduce((sum,t)=>sum+(t.moments?.length||0),0):0}
  };
 }

@@ -897,6 +897,8 @@ async function checkVisualTokens(page, target, opts, stamp) {
         writeRose: wm ? getComputedStyle(wm).backgroundColor === 'rgb(180, 87, 107)'
           && getComputedStyle(wm).borderColor === 'rgb(180, 87, 107)'
           && getComputedStyle(wm).color === 'rgb(255, 255, 255)' : false,
+        writeGold: wm ? /255, 230, 166/.test(getComputedStyle(wm).borderColor) : false,
+        momentCount: (window.LT41?.trees||[]).reduce((n,t)=>n+(t.moments?.length||0),0),
         writeBg: wm ? getComputedStyle(wm).backgroundColor : '',
         avatarVisible: vis(avatar),
         avatarSize: avatar ? [Math.round(avatar.getBoundingClientRect().width), Math.round(avatar.getBoundingClientRect().height)] : null,
@@ -942,7 +944,7 @@ async function checkVisualTokens(page, target, opts, stamp) {
     } else if (headerExpected.state === 'in-empty') {
       if (!top.treeViewsHidden) problems.push('트리 없는 로그인인데 트리 보기 탭이 보임');
       if (!top.treePickerHidden) problems.push('트리 없는 로그인인데 트리 선택이 보임');
-      if (top.writeMenuHidden) problems.push('트리 없는 로그인인데 순간 남기기 버튼이 숨겨짐');
+      if (s.id !== 'home' && top.writeMenuHidden) problems.push('트리 없는 로그인인데 순간 남기기 버튼이 숨겨짐');
       const label = expectedPickerLabel({ owned: true });
       if (![label, '저장 안 된 기록'].includes(top.recordLabel)) problems.push(`트리 없는 로그인 트리 선택 글자 "${top.recordLabel}" (기대 "${label}")`);
     } else {
@@ -952,7 +954,7 @@ async function checkVisualTokens(page, target, opts, stamp) {
     }
     // 2026-11-07: 트리 선택은 뒤쪽 탭 묶음 바로 앞, 주 버튼은 #write-menu 하나(금색), 연결 보기는 헤더에 없다.
     if (!top.treeViewsHidden && !top.recordBeforeTreeViews) problems.push('트리 선택이 접·보드·지도 탭 앞에 있지 않음');
-    if (!top.writeMenuHidden && !top.writeRose) problems.push(`주 버튼 장미색·흰 글씨 불일치: ${top.pillBorder}`);
+    if (s.id !== 'home' && !top.writeMenuHidden && !top.writeGold) problems.push(`주 버튼 금색 강조 없음: ${top.pillBorder}`);
     if (top.connectionInHeader) problems.push('연결 보기가 아직 헤더에 있음');
     if (!/^LoveTree\s*4\.1$/.test(top.brand.replace(/\s+/g, ' ').trim())) problems.push(`워드마크 "${top.brand}" (기대 LoveTree 4.1)`);
     if (/MEMORY ORBIT/i.test(top.brand)) problems.push('워드마크에 MEMORY ORBIT 남음');
@@ -962,7 +964,9 @@ async function checkVisualTokens(page, target, opts, stamp) {
       if (!top.headerVisible) problems.push('첫 화면에 공통 헤더가 안 보임');
       if (top.headerBg !== 'rgb(4, 4, 7)') problems.push(`헤더 배경 ${top.headerBg} (기대 rgb(4, 4, 7))`);
       if (top.tabs !== expectedTabs) problems.push(`탭 ${top.tabs}개 (기대 ${expectedTabs})`);
-      if (!top.writeRose) problems.push(`행동 버튼 장미색·흰 글씨 불일치: ${top.pillBorder}`);
+      if (owned && top.momentCount > 0) {
+        if (top.writeMenuHidden || !top.writeRose) problems.push(`행동 버튼 장미색·흰 글씨 불일치: ${top.pillBorder}`);
+      } else if (!top.writeMenuHidden) problems.push('첫 순간이 없는데 머리줄 추가 단추가 보임');
     } else {
       if (top.home) problems.push('home-screen 클래스가 남아 있음');
       if (!top.headerVisible) problems.push('공통 헤더가 안 보임');

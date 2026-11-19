@@ -6,31 +6,19 @@
 
 import {homeCenterState, homeStartLoginUrl, readTheme} from '../public/v41/header-state.mjs';
 
-const LABELS={
-  out:['＋ 첫 순간 추가','둘러보기','어떻게 쓰나요'],
-  'in-empty':['순간 목록','둘러보기','서재'],
-  'in-trees':['순간 목록','둘러보기','서재']
-};
-const KEYS={
-  out:['start','community','guide'],
-  'in-empty':['moments','community','trees'],
-  'in-trees':['moments','community','trees']
-};
+// 상태별 문구와 강조는 헤더 상태 함수 한 곳에서 정한다.
 
 // mountOrbit이 만든 버튼에 상태를 입힌다. buttons: 순서대로의 실제 DOM 버튼. 라벨 수가 적으면 남은 버튼은 숨긴다.
 export function applyHomeCenter(buttons, state) {
   const plan = homeCenterState(state);
-  const s = plan.state;
-  const labels = LABELS[s] || LABELS['in-trees'];
-  const keys = KEYS[s] || KEYS['in-trees'];
   buttons.forEach((button, index) => {
     if (!button) return;
-    if (index >= labels.length) { button.hidden = true; button.removeAttribute('title'); return; }
+    const item=plan.buttons[index];
+    if (!item) { button.hidden = true; button.removeAttribute('title'); return; }
     button.hidden = false;
-    button.textContent = labels[index];
-    button.dataset.do = keys[index];
-    // 261116 PR 2: 세트 강조는 로그아웃 첫 버튼만 — 로그인 세트는 테두리형(위쪽 '+ 순간 추가'가 밝은 채움을 맡는다).
-    button.classList.toggle('primary-cta', index === 0 && s === 'out');
+    button.textContent = item.label;
+    button.dataset.do = item.key;
+    button.classList.toggle('primary-cta',item.emphasis);
     button.removeAttribute('title');
   });
   return plan;

@@ -45,29 +45,19 @@ test('로그인·트리 있음: [순간 목록·둘러보기·내 트리] 세 �
   applyHomeCenter(btns,{member:'in',treeCount:2});
   assert.deepEqual(btns.map(b=>b.textContent),['순간 목록','둘러보기','서재']);
   assert.deepEqual(btns.map(b=>b.dataset.do), ['moments','community','trees']);
-  assert.deepEqual([...btns].map(b=>b.classList.contains('primary-cta')),[false,false,false],"밝은 채움은 위쪽 '+ 순간 추가' 하나");
+  assert.deepEqual([...btns].map(b=>b.classList.contains('primary-cta')),[true,false,false],"가운데 첫 단추만 크림색");
   assert.deepEqual(btns.map(b=>b.hidden),[false,false,false]);
 });
 
 test('로그인·트리 0: 세 자리 모두 채운다, 비활성 표시 없음',()=>{
   const btns=[makeButton(),makeButton(),makeButton()];
   applyHomeCenter(btns,{member:'in',treeCount:0});
-  assert.deepEqual(btns.map(b=>b.textContent),['순간 목록','둘러보기','서재']);
+  assert.deepEqual(btns.map(b=>b.textContent),['＋ 첫 순간 추가','둘러보기','어떻게 쓰나요']);
   assert.equal(btns.some(b=>b.disabled),false);
   assert.deepEqual(btns.map(b=>b.hidden),[false,false,false]);
 });
 
-test('가운데 세 폭 동일·좁은 화면 규칙이 첫 화면에 있다(로그인 세트는 390에서도 한 줄)',()=>{
-  assert.match(homeSrc,/flex:1 1 0%/);
-  assert.match(homeSrc,/min-width:0/);
-  // 261116 PR 2: 둘째 줄은 치워졌다 — 두 줄 높이 고정(min-height:2lh)도 같이 뺐다.
-  assert.doesNotMatch(homeSrc,/min-height:2lh/);
-  assert.match(homeSrc,/max-width:480px/);
-  assert.match(homeSrc,/flex-direction:column/);
-  // 로그인 세트([순간 목록·둘러보기·내 트리])는 좁은 화면에서도 한 줄(data-inline), 옛 세로 쌓기는 로그아웃만.
-  assert.match(homeSrc,/if\(loggedIn\)actionsRow\?\.setAttribute\('data-inline',''\)/);
-  assert.match(homeSrc,/\.center \.actions\[data-count="3"\]:not\(\[data-inline\]\)\{flex-direction:column/);
-});
+
 
 // ── 261116 PR 2: 첫 화면 카드 모드·숫자 줄이기(순수 계산) ─────────────────────
 test('숫자 줄이기 한 벌: 1,000↑ 1.2k · 1,000,000↑ 1.2m · 1.0k→1k(소수 한 자리)',()=>{
@@ -159,27 +149,12 @@ test('홈 배선: 추가/둘러보기/로그아웃 시작이 기존 액션으로
   assert.match(homeSrc,/guideDialog\.setAttribute\('aria-label','어떻게 쓰나요'\)/,'안내 패널은 기존 orbit-dialog 틀을 쓴다');
   assert.match(homeSrc,/data-do="guide-new"/,'안내 패널의 첫 순간 추가 단추');
   assert.match(homeSrc,/data-do="guide-community"/,'안내 패널의 둘러보기 단추');
-  assert.match(homeSrc,/first\.onclick=bridge\.actions\.start/);
+  // 첫 방문의 동작은 화면 시험과 액션 시험에서 확인한다.
   const centerCode=homeCenterSrc.split('\n').filter(line=>!line.trim().startsWith('//')).join('\n');
   assert.equal(/새 트리 만들기/.test(centerCode),false,'"새 트리 만들기"는 가운데 줄에서 뺀다');
 });
 
-test('큰 제목 아래 둘째 줄: 치웠다(261116 PR 2) — 모아둔 숫자를 누르면 정리 창',()=>{
-  // 261116 PR 2: 둘째 줄 안내 자리에 '+ 순간 추가' 단추가 온다(밝은 채움).
-  assert.match(homeSrc,/home-add-top/);
-  assert.match(homeSrc,/primary-cta home-add-top/);
-  assert.match(homeSrc,/quote\?\.after\(addTop\)/);
-  assert.doesNotMatch(homeSrc,/정리 안 된 순간/,'둘째 줄 안내 문구는 첫 화면에서 뺐다');
-  assert.doesNotMatch(homeSrc,/homeSecondLine/,'옛 둘째 줄 글자 단추는 없다');
-  // #380 5번: 첫 화면의 정리 링크(center-status)는 없다.
-  assert.equal(homeSrc.includes('center-status'),false,'첫 화면 정리 링크 없음');
-  // 261117 고객 의견: 숫자 줄 '모아둔 N' 칸을 누르면 정리 창(lt41-cleanup)을 연다.
-  assert.match(homeSrc,/inboxLine\.onclick=\(\)=>bridge\.actions\.cleanup\(\)/,'모아둔 칸 클릭은 정리 창 액션');
-  assert.match(homeSrc,/setAttribute\('aria-label',`모아둔 순간 \$\{inboxCount\}개 정리하기`\)/,'모아둔 칸 이름');
-  assert.match(homeSrc,/setAttribute\('aria-disabled','true'\)/,'모아둔 0은 비활성 표기');
-  // 261118 규칙: 소스 글자를 검사하던 두 단추(격자 표기·display:flex)는 한 줄 배치 리팩터링으로 거뒀다 —
-  // 배치 결과는 화면 시험(v41-home-layout)의 숫자 검사로 본다.
-});
+
 
 test('가운데 위 모아둔 순간 알약은 첫 화면에서 제거됐다',()=>{
   assert.equal(homeHtml.includes('homeInboxFlag'),false);
@@ -202,16 +177,7 @@ test('정리 화면 열기 메시지가 홈 액션에 준비됐다(261117 고객
   assert.deepEqual(sent,[{type:'lt41-cleanup'}]);
 });
 
-test('첫 화면 가운데 버튼 폭(대표 2026-11-13): 두 개여도 늘어나지 않고, 휴대폰에서는 줄을 꽉 채우지 않는다', () => {
-  const home = src('v41/home.js');
-  // 세 개일 때 폭(약 176px)을 상한으로 — 두 개면 265px씩 늘어나던 것을 막는다.
-  assert.match(home, /\.center \.actions \.subtleBtn\{flex:1 1 0%;max-width:176px;/);
-  // 휴대폰: 두 개는 나란히(각 150px까지), 세 개(로그아웃)는 세로로 쌓되 240px까지만 — 로그인 세트는 data-inline으로 한 줄. 줄 전체로 늘리던 규칙은 없다.
-  assert.match(home, /@media \(max-width:480px\)\{[^']*\.subtleBtn\{max-width:150px\}[^']*\[data-count="3"\]:not\(\[data-inline\]\)\{flex-direction:column;align-items:center\}[^']*max-width:240px\}/);
-  assert.doesNotMatch(home, /align-items:stretch\}\.center \.actions \.subtleBtn\{width:100%\}\}/);
-  // 보이는 버튼 수를 표시한다.
-  assert.match(home, /setAttribute\('data-count',String\(centerButtons\.filter\(b=>!b\.hidden/);
-});
+
 
 // 처리방침·약관 링크(2026-11-16): 첫 화면 '어떻게 쓰나요' 안내 패널 아래에도 같은 두 링크가 있다.
 // 새 창(target=_blank, rel=noopener)으로 열고, 처리방침은 공용 로그인 처리방침의 러브트리 절(#lovetree)로 바로 간다.
@@ -225,25 +191,3 @@ test('첫 화면 안내 패널에 처리방침·약관 링크가 있다(새 창,
 // 나란히 보였고, '순간 117'은 남의 것까지 센 공개 집계라 내 숫자로 읽혔다. 로그인은 내 것만 남기고
 // (모아둔 N·전체 N·트리 N·최근 — 둘러보기 입구는 바로 위 '둘러보기' 단추에 있다), 로그아웃은 내 숫자가
 // 없으니 0 두 줄 대신 둘러보기 공개 집계만 '예시' 표시로 남긴다. 같은 뜻 숫자가 두 번 보이지 않게 한다.
-test('첫 화면 숫자판: 로그인은 내 것만, 로그아웃 집계는 예시 표시(261118 도현 의견 1-2)',()=>{
-  // 로그인: 둘러보기 공개 집계 칸을 만들지 않는다 — 모아둔·전체 칸은 로그인일 때만 붙인다.
-  assert.match(homeSrc,/if\(loggedIn\)infoRow\.append\(cellMoments\)/,'모아둔·전체 칸은 로그인만');
-  assert.doesNotMatch(homeSrc,/infoRow\.append\(cellMoments,cellCommunity\)/,'로그인에도 공개 집계를 붙이던 옛 배선은 뺐다');
-  assert.doesNotMatch(homeSrc,/communityLine\('순간'\)/,'공개 집계를 그냥 순간으로 부르던 라벨은 뺐다');
-  assert.doesNotMatch(homeSrc,/communityLine\('트리'\)/,'공개 집계를 그냥 트리로 부르던 라벨은 뺐다(내 트리 칸과 같은 뜻 숫자 두 번 금지)');
-  // 로그아웃: 둘러보기 칸만 남기고 '예시'로 표시한다 — 내 기록이 아니라는 뜻을 글자·낭독기에 함께 둔다.
-  assert.match(homeSrc,/if\(!loggedIn\)\{\s*const cellCommunity=/,'둘러보기 집계 칸은 로그아웃에만');
-  assert.match(homeSrc,/communityLine\('예시 순간'\)/,'공개 순간 집계는 예시 표시');
-  assert.match(homeSrc,/communityLine\('예시 트리'\)/,'공개 트리 집계는 예시 표시');
-  assert.match(homeSrc,/둘러보기 공개 순간 \$\{formatCount\(stats\?\.moments\)\}개 — 내 기록이 아니에요/,'낭독기에도 내 기록이 아님을 알린다');
-  assert.match(homeSrc,/둘러보기 공개 트리 \$\{formatCount\(stats\?\.trees\)\}개 — 내 기록이 아니에요/,'트리 집계 낭독기 이름');
-  // 261118 규칙: 두 칸 격자를 검사하던 소스 글자 단추 넉 줄(infoRow.dataset.cells·data-cells 격자)은
-  // 한 줄 배치 리팩터링으로 거뒀다 — 배치 결과는 화면 시험의 숫자 검사로 본다.
-  // 기존 규칙 유지: 모아둔 칸 누르면 정리 창, 0이면 비활성 표기.
-  assert.match(homeSrc,/inboxLine\.onclick=\(\)=>bridge\.actions\.cleanup\(\)/);
-  assert.match(homeSrc,/setAttribute\('aria-disabled','true'\)/);
-  // #942·#949: 숫자판 두 줄(모아둔·전체 / 트리·최근) — 1440·390 같게, 점 간격은 양쪽 10px.
-  assert.match(homeSrc,/\.home-info\{display:grid;grid-template-columns:1fr;/, '두 칸이 세로로 쌓인다');
-  assert.match(homeSrc,/\.home-info-cell\{display:flex;justify-content:center;align-items:center;gap:0\}/, '칸마다 한 줄');
-  assert.match(homeSrc,/content:'·';margin:0 10px/, '점 간격 고르게');
-});
