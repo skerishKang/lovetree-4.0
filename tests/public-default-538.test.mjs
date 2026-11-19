@@ -347,3 +347,36 @@ test('자동 공개 행은 둘러보기 스위치로 바꿀 수 없다(소개 �
   assert.equal(off.body.error.code, 'share_auto_managed');
   assert.equal((await h.browse()).items.length, 1, '그래도 둘러보기에는 나온다');
 });
+
+// #986 후속(CTO 결정): 격리된 트리는 자동 공유하지 않는다. 정상 트리는 지금처럼 자동 공유되고,
+// 격리 트리에 이미 공유·소개 행이 있으면 해제하지 않는다 — 사용자가 트리를 고쳐 저장하면 살아난다.
+function deviantTree() {
+  const tree = createTree({ subject: '어긋남', title: '어긋난 옛 트리', note: '', emotion: '설렘', date: '2026-11-01', url: '' }, CLOCK);
+  return { ...tree, moments: [...tree.moments, { ...tree.moments[0], id: 'moment-second-root', parentId: null }] };
+}
+
+test('격리 트리가 섞인 문서를 저장하면 격리 트리는 자동 공유되지 않고 정상 트리는 지금처럼 공유된다', async () => {
+  const h = await setup();
+  const good = treeWithMoments(2);
+  const deviant = deviantTree();
+  await h.workspaceRepo.commit({
+    productId: PRODUCT, subjectId: 'alice',
+    doc: { version: 1, trees: [good, deviant] },
+    expectedRevision: 0, clientKey: 'seed-quarantined', requestHash: '0'.repeat(64)
+  });
+  // 이미 공유 행이 있던 격리 트리 — 해제하지 않는지 함께 본다.
+  await h.shareRepo.create({ productId: PRODUCT, subjectId: 'alice', shareId: 'share-quarantined', treeId: deviant.id, entryMomentId: deviant.moments[0].id, view: 'book', momentCount: 2 });
+
+  // 실제 저장 경로(onCommit → syncSharesAfterSave)를 밟는다.
+  const grown = addMoment(good, { subject: '윤슬', title: '새 순간', note: '기록', emotion: '설렘', date: '2026-11-02', url: '' }, good.moments[0].id, CLOCK);
+  const saved = await h.workspace.write(principal('alice'), { state: { version: 1, trees: [grown] }, expectedRevision: 1, clientKey: 'k-share' });
+  assert.equal(saved.revision, 2);
+
+  const rows = await h.shareRepo.list({ productId: PRODUCT, subjectId: 'alice' });
+  const auto = rows.filter(row => row.origin === 'auto' && row.status === 'active');
+  assert.deepEqual(auto.map(row => row.treeId), [grown.id], '자동 공유 행은 정상 트리에만 생긴다');
+  assert.equal(auto.find(row => row.treeId === grown.id).momentCount, 3, '정상 트리의 순간 수는 지금처럼 갱신된다');
+  const quarantined = rows.find(row => row.treeId === deviant.id);
+  assert.equal(quarantined.status, 'active', '격리 트리의 기존 공유 행은 해제하지 않는다');
+  assert.equal(quarantined.treeId, deviant.id);
+});
