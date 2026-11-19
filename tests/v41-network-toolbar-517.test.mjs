@@ -441,6 +441,30 @@ test('#951 ⑤ 서재에서 들어온 지도: ← 서재 단추 1개 + 묶음 �
   }
 });
 
+// #951 ⑤(CTO 261120): 판이 열린 상태에서 안내(토스트·묶음 카드)의 겹침·중복을 재는 한 벌.
+// 실제로 보이는 안내만 센다(숨은 토스트는 opacity 0) — 위 단추 줄·순간 고르기 줄·묶음 단추 줄·판 단추와 겹침 0,
+// '지나온 길을 밝' 문구는 화면에 한 번만(카드가 보이는 넓은 화면에서는 토스트를 띄우지 않는다).
+const guideProbe = () => {
+  const vis = (el) => { if (!el) return false; const cs = getComputedStyle(el); if (cs.display === 'none' || cs.visibility === 'hidden' || parseFloat(cs.opacity) === 0) return false; const r = el.getBoundingClientRect(); return r.width > 1 && r.height > 1; };
+  const box = (el) => { const r = el.getBoundingClientRect(); return { l: r.left, r: r.right, t: r.top, b: r.bottom }; };
+  const hit = (a, b) => a.l < b.r - 1 && b.l < a.r - 1 && a.t < b.b - 1 && b.t < a.b - 1;
+  const guides = [];
+  const toastEl = document.getElementById('toast'), rsEl = document.getElementById('routeStatus');
+  if (vis(toastEl)) guides.push({ kind: 'toast', ...box(toastEl) });
+  if (vis(rsEl)) guides.push({ kind: 'routeStatus', ...box(rsEl) });
+  const targets = [
+    ...document.querySelectorAll('.topbar button'),
+    ...document.querySelectorAll('.lt-moment-picker, .lt-moment-picker select, .lt-moment-picker button'),
+    ...document.querySelectorAll('#mobileRibbon button'),
+    ...document.querySelectorAll('#detailActions button, #detailClose')
+  ].filter(vis).map((b) => ({ id: b.id || b.textContent.trim(), ...box(b) }));
+  const guideOverlaps = [];
+  for (const g of guides) for (const t of targets) if (hit(g, t)) guideOverlaps.push(`${g.kind}×${t.id}`);
+  if (guides.length === 2 && hit(guides[0], guides[1])) guideOverlaps.push('toast×routeStatus');
+  const phraseCount = [...document.querySelectorAll('body *')].filter((el) => vis(el) && el.children.length === 0 && /지나온 길을 밝/.test(el.textContent || '')).length;
+  return { guides: guides.map((g) => g.kind), guideOverlaps, phraseCount };
+};
+
 // ── #951 ⑤ (CTO 261120): 지도에서 순간을 누르면 보드 상세 판과 같은 오른쪽 판이 열린다 ──
 test('#951 ⑤ 지도 상세 판: 보드와 같은 틀(제목·사진·마음·날짜·아래 44px 세 단추), 1440 판 밖으로 밀기, 390 시트 겹침 0, Esc 초점 복귀', { skip: REQUIRE ? false : skip, timeout: 300000 }, async () => {
   if (skip) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip}`);
@@ -494,6 +518,8 @@ test('#951 ⑤ 지도 상세 판: 보드와 같은 틀(제목·사진·마음·�
               hScroll: document.getElementById('detailScroll').scrollWidth - document.getElementById('detailScroll').clientWidth
             };
           });
+          // #951 ⑤(CTO 261120): 안내 겹침·중복은 guideProbe 한 벌로 따로 재어 합친다(함수 인자는 직렬화되지 않는다).
+          Object.assign(m, await frame.evaluate('(' + guideProbe.toString() + ')()'));
           assert.deepEqual(errors, [], `${tag}: 지도 화면 오류 없음`);
           assert.equal(m.open, true, `${tag}: 순간을 누르면 상세 판이 열린다`);
           assert.ok(m.title.length > 0 && !/undefined|null|NaN/.test(m.title), `${tag}: 제목 글자(${m.title})`);
@@ -511,6 +537,10 @@ test('#951 ⑤ 지도 상세 판: 보드와 같은 틀(제목·사진·마음·�
           } else {
             assert.equal(m.sheetVsRibbon, false, `${tag}: 시트가 아래 묶음 단추 줄을 덮지 않는다`);
           }
+          // #951 ⑤(CTO 261120): 안내는 위 단추 줄·순간 고르기 줄·묶음 단추 줄과 겹치지 않고, 같은 문구는 화면에 한 번만 보인다.
+          assert.ok(m.guides.length >= 1, `${tag}: 길을 밝혔다는 안내가 보인다(토스트 또는 묶음 카드)`);
+          assert.deepEqual(m.guideOverlaps, [], `${tag}: 안내와 단추 줄·고르기 줄 겹침 0(${JSON.stringify(m.guideOverlaps)})`);
+          assert.equal(m.phraseCount, 1, `${tag}: '지나온 길을 밝' 문구는 화면에 한 번만(${m.phraseCount})`);
           const other = dots.find((d) => d.id !== target.id);
           if (other) {
             if (width > 980) {
@@ -524,9 +554,12 @@ test('#951 ⑤ 지도 상세 판: 보드와 같은 틀(제목·사진·마음·�
             }
             await page.waitForTimeout(600);
             const after = await frame.evaluate(() => ({ open: document.getElementById('detail').classList.contains('open'), title: document.getElementById('detailTitle').textContent.trim(), sel: window.__lt.state.selected?.id || '' }));
+            Object.assign(after, await frame.evaluate('(' + guideProbe.toString() + ')()'));
             assert.equal(after.open, true, `${tag}: 다른 순간을 눌러도 판은 열린 채`);
             assert.equal(after.sel, other.id, `${tag}: 고른 순간이 바뀐다`);
             assert.notEqual(after.title, m.title, `${tag}: 판 내용이 그 순간으로 바뀐다(${after.title})`);
+            assert.deepEqual(after.guideOverlaps, [], `${tag}: 두 번째 순간에서도 안내와 단추 줄 겹침 0(${JSON.stringify(after.guideOverlaps)})`);
+            assert.equal(after.phraseCount, 1, `${tag}: 두 번째 순간에서도 문구는 한 번만(${after.phraseCount})`);
           }
           await frame.evaluate(() => document.getElementById('detailClose').focus());
           await page.keyboard.press('Escape');

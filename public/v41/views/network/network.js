@@ -122,6 +122,7 @@ function measureInsets(){const box=el=>{if(!el)return null;const cs=getComputedS
  document.documentElement.style.setProperty('--lt-picker-top',pickerTop.toFixed(0)+'px');
  /* #951 ⑤: 좁은 화면에서 상세 시트가 아래 묶음 단추 줄을 덮지 않게 그 줄 높이를 재어 넘긴다. */
  document.documentElement.style.setProperty('--lt-sheet-bottom',(bottom?vh-bottom.top+8:104).toFixed(0)+'px');
+ /* #951 ⑤: 토스트가 보이는 동안 시트가 물러난 자리는 창 크기가 바뀌어도 유지한다. */if($('toast').classList.contains('show'))placeToast();
 
  // 순간 고르기 줄은 그 자리에 서므로 잰 위·아래를 쓰지 않고, 높이만 더해 '늘 같은' 아래 끝을 쓴다(그 줄이 늦게 붙어도 같다).
  const picker=box(document.querySelector('.lt-moment-picker'));
@@ -162,7 +163,9 @@ function applyPathHighlight(n){const path=LT56Model.originPath(n.id,LTDEMO.momen
 function clearSelection(){state.selected=null;state.pathIds=new Set();state.pathEdges=new Set();state.revealEdges.clear();state.cluster=null;$('detail').classList.remove('open');setMode('OVERVIEW');document.querySelector('.hero').classList.remove('dim');syncRibbon();scheduleDraw()}
 function selectMoment(n,center=false){mobilePicker?.select(n.id);LTDEMO.select(n.id);cancelPlayback(false);state.selected=n;state.cluster=state.view==='concentric'?null:CLUSTERS[n.cluster];state.mobileCluster=n.cluster;setMode('MOMENT_FOCUS');applyPathHighlight(n);const lv=CONCENTRIC?.levelOf?.[n.id];const p=pathSequenceForNode(n);if(center)centerOn(n,state.mobile?1.8:1.6);paintDetail(n);$('detail').classList.add('open');resize();/* 판 너비만큼 판이 줄면 캔버스 크기가 바뀌어 한 프레임 비어 보인다 — 그 자리에서 바로 한 번 그린다. */typeof draw==='function'&&draw();
  showRouteStatus(state.view==='concentric'?`${lv||0}단계 · ${autoTitleOf(n).clean}`:CLUSTERS[n.cluster].name,`첫 순간에서 ${Math.max(0,state.pathIds.size-1)}단계 지나온 길을 밝힙니다.`);
- syncRibbon();scheduleDraw();toast('첫 순간에서 이 순간까지 지나온 길을 밝혔어요.')}
+ /* #951 ⑤: 같은 뜻의 안내를 두 번 보이지 않는다 — 묶음 카드(routeStatus)가 보이는 화면에서는 카드를 남기고
+    토스트는 띄우지 않는다(보드 #845와 같은 규칙). 카드가 숨는 좁은 화면에서만 토스트로 알린다. */
+ syncRibbon();scheduleDraw();if(getComputedStyle($('routeStatus')).display==='none')toast('첫 순간에서 이 순간까지 지나온 길을 밝혔어요.')}
 /* #951 ⑤: 순간 상세 판 — 보드(#891·#662)와 같은 틀을 쓴다. 판 안: 제목·사진/영상·내가 남긴 마음·날짜와 트리·이어진 순간.
    아래 고정 줄: 크게 보기·여기부터 시네마·⋯ 더 보기. 지도에서 새로 만들지 않고 보드 판의 규칙(한 벌 스크롤·44px 줄)을 그대로 따른다. */
 function escHtml(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
@@ -315,7 +318,19 @@ function scheduleDraw(){if(!rafPending)rafPending=requestAnimationFrame(frame)}
 function frame(now){rafPending=0;if(state.play?.active&&state.animEdge&&!state.branchPause){state.animT+=(now-last)/(reduced?80:760);if(state.animT>=1){state.animT=1;playbackArrive()}}last=now;draw();if(animating())rafPending=requestAnimationFrame(frame)}
 function showRouteStatus(title,text){$('routeStatusTitle').textContent=title;$('routeStatusText').textContent=text;$('routeStatus').classList.add('show')}
 function hideRouteStatus(){if(state.mode==='OVERVIEW')$('routeStatus').classList.remove('show')}
-function toast(t){const el=$('toast');el.textContent=t;el.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>el.classList.remove('show'),2300)}
+/* #951 ⑤: 좁은 화면 토스트 자리 — 아래 묶음 단추 줄 바로 위(위 단추 줄·순간 고르기 줄을 덮지 않는다).
+   시트가 열려 있으면 시트 아래 끝이 토스트 높이+8만큼 물러나 자리를 만든다(시트 위 끝은 그대로).
+   경로 갈림 판이 열려 있으면 그 판 위로 올린다. 넓은 화면은 아래 가운데 그대로. */
+let toastSheetExtra=0;
+function sheetBottomBase(){const r=document.querySelector('.mobile-ribbon');const b=r&&getComputedStyle(r).display!=='none'?r.getBoundingClientRect():null;return b?vh-b.top+8:104}
+function placeToast(){const el=$('toast');const on=el.classList.contains('show');
+ if(!state.mobile){el.style.top='';el.style.bottom='';toastSheetExtra=0;return}
+ el.style.top='auto';
+ const base=sheetBottomBase(),chooser=$('branchChooser'),chooserOpen=chooser.classList.contains('open');
+ el.style.bottom=(on&&chooserOpen?Math.max(base,vh-chooser.getBoundingClientRect().top+8):base)+'px';
+ const extra=(on&&!chooserOpen&&document.querySelector('#detail.open'))?el.offsetHeight+8:0;
+ if(extra!==toastSheetExtra){toastSheetExtra=extra;document.documentElement.style.setProperty('--lt-sheet-bottom',(base+extra).toFixed(0)+'px')}}
+function toast(t){const el=$('toast');el.textContent=t;el.classList.add('show');clearTimeout(toast.t);placeToast();toast.t=setTimeout(()=>{el.classList.remove('show');placeToast()},2300)}
 function cancelPlayback(resetMode=true){state.play=null;state.animEdge=null;state.animT=0;state.trail.clear();state.preview.clear();state.branchPause=false;$('branchChooser').classList.remove('open');if(resetMode&&state.mode==='PATH_PLAYBACK')setMode(state.selected?'MOMENT_FOCUS':'CLUSTER_PATH_OVERVIEW');scheduleDraw()}
 function routeEdges(pid){return LT56Model.routeEdges(pid,pathById,edges)}
 // 재생은 예시 판본에서만 연다. 실제 기록에는 경로 순서 데이터가 따로 없어(pathById는 두 판본 모두
