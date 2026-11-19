@@ -362,6 +362,7 @@ jobs:
       # 이슈 947: apt-get이 가끔 10분 넘게 멈춘다(실측 — 지도 도구 줄 잡 10분 단계 초과). 매번 apt로 받지 않고
       # 글꼴 파일(~/.fonts)을 캐시에 두고, 캐시가 있으면 fc-cache만 한다. 없을 때만 설치해 캐시에 쌓는다.
       - name: 한글 글꼴 준비(캐시, 없으면 설치)
+        if: needs.screen-changes.outputs.changed == 'true'
         timeout-minutes: 10
         run: |
           start=$(date +%s)
@@ -454,6 +455,7 @@ jobs:
       # 이슈 947: apt-get이 가끔 10분 넘게 멈춘다(실측 — 지도 도구 줄 잡 10분 단계 초과). 매번 apt로 받지 않고
       # 글꼴 파일(~/.fonts)을 캐시에 두고, 캐시가 있으면 fc-cache만 한다. 없을 때만 설치해 캐시에 쌓는다.
       - name: 한글 글꼴 준비(캐시, 없으면 설치)
+        if: needs.screen-changes.outputs.changed == 'true'
         timeout-minutes: 10
         run: |
           start=$(date +%s)
