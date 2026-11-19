@@ -28,14 +28,7 @@ test('#458: 화면별로 이미 있는 아래쪽 단추 위로 올린다', () =>
   assert.match(shelf, /@media\(max-width:780px\) and \(max-height:749px\)\{\n  body\.lt-fab-ok\[data-fab-lift="shelf"\] #mobile-add\{bottom:calc\(24px \+ env\(safe-area-inset-bottom\)\)\}\n \}/, '책장은 화면이 낮을 때만 올린다(390×844는 그대로)');
 });
 
-test('#987: 지금 화면 항목은 테두리 없이 글자 밑줄로 표시된다', () => {
-  const at = shellCSS.indexOf('이슈 458: 접기 메뉴');
-  let rule = shellCSS.slice(shellCSS.indexOf('#header-overflow button[aria-current="true"]', at));
-  rule = rule.slice(0, rule.indexOf('}') + 1);
-  assert.match(rule, /text-decoration:underline/, '지금 화면의 글자에 밑줄');
-  assert.match(rule, /box-shadow:none;\s*border:0/, '줄 전체 테두리 없음');
-  assert.doesNotMatch(rule, /#[0-9a-fA-F]{3,8}\b/, '색 상수를 쓰지 않는다');
-});
+// #987: 지금 화면 표시는 v41-screen-audit.test.mjs에서 밤·정원 두 테마의 실제 계산된 글자 밑줄과 테두리 및 나머지 항목을 검사한다.
 
 test('#458: 알림 줄과 첫 화면 안내 줄이 단추와 겹치지 않게 자리를 피한다', () => {
   const block = shellCSS.slice(shellCSS.indexOf('이슈 458: 모바일에서 늘 떠 있는'));
