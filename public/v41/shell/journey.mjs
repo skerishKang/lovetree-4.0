@@ -84,6 +84,8 @@ export function createJourney(deps) {
       openSettingsData?.(); return;
     }
     if (screens.some(screen => screen[1] === getCurrent())) journeyReturn = getCurrent();
+    // #933: '새 트리'로 첫 여정 화면을 열 때도 열려 있던 창(트리 관리)을 닫는다.
+    deps.closePanels?.();
     if ($('community-panel').open) $('community-panel').close();
     const start = routed ? parseJourneyRoute(journeyRouteHash(step))?.step || 0 : 0;
     setCurrent('first-journey.html');

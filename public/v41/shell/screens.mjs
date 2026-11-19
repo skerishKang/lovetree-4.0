@@ -18,6 +18,7 @@ export function createScreens(deps) {
     writeLocation,
     links,
     takeNetworkOpen,
+    closePanels,
     takeBoardOpen,
     onFrameReady
   } = deps;
@@ -156,6 +157,8 @@ export function createScreens(deps) {
     // show()는 화면 파일 이름을 받는다(화면 키가 아니다). 목록에서 그대로 찾는다.
     const screen = screens.find(s => s[1] === file);
     if (!screen) return;
+    // #933: 화면을 옮기면 열려 있던 창은 닫는다 — 트리 관리·순간 추가·설정 창이 새 화면 위에 남지 않게.
+    closePanels?.();
     if ($('community-panel')?.open) $('community-panel').close();
     setCurrent(file);
     flowNavigation();

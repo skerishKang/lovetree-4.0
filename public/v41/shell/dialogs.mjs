@@ -181,19 +181,37 @@ export function createDialogs(deps) {
   // 은 브라우저 판이라 여기서 다루지 않는다.
   // #876: 같은 영상 안내 창(video-dup-panel)도 잠깐 판이다 — 순간 추가 창 위에 겹쳐 열린다(창은 #876이 만든다).
   const STACK_ALLOWED = new Set(['move-picker', 'account-assets', 'community-preview', 'video-dup-panel', 'community-group-find']);
+  // #933: 둘러보기 창은 자기 닫기 규칙(둘러보기 모듈)을 그대로 쓴다 — 이 틀이 대신 닫지 않는다.
+  const PANEL_SKIP_AUTO_CLOSE = new Set(['community-panel', 'community-preview']);
   let dialogGuard = false;     // 창 기록을 쌓아 둔 상태
   function modalDialogs() { return [...document.querySelectorAll('dialog[open]')].filter(d => d.matches(':modal')); }
+  // #933: 창은 한 장만 — 새 창을 열 때(모달·비모달 모두) 또는 화면을 옮길 때 지금 열려 있는 창을
+  // 같은 판정(requestPanelClose: 막을 상태면 막고, 더러우면 한 번 묻는다)으로 닫는다.
+  // 잠깐 판(STACK_ALLOWED — 앞 일로 돌아가는 창)은 #845 3단계 규칙대로 겹침을 그대로 둔다.
+  function busyDialogs() {
+    return [...document.querySelectorAll('dialog[open]')]
+      .filter(d => !PANEL_SKIP_AUTO_CLOSE.has(d.id) && !STACK_ALLOWED.has(d.id));
+  }
+  function closeOpenPanels(exceptId = '') { for (const d of busyDialogs()) { if (d.id !== exceptId) requestPanelClose(d.id); } }
   if (view?.history && view.HTMLDialogElement) {
     const showModalOriginal = view.HTMLDialogElement.prototype.showModal;
     view.HTMLDialogElement.prototype.showModal = function (...args) {
-      const front = modalDialogs()[modalDialogs().length - 1] || null;
-      if (front && front !== this && !STACK_ALLOWED.has(this.id)) requestPanelClose(front.id);
+      // #933: 앞 창이 비모달(새 소식 창)이어도 닫는다 — 열린 창 수를 1로 유지한다.
+      const front = busyDialogs().filter(d => d !== this).pop() || null;
+      if (front && !STACK_ALLOWED.has(this.id)) requestPanelClose(front.id);
       const result = showModalOriginal.apply(this, args);
       if (!dialogGuard && this.open && this.matches(':modal')) {
         view.history.pushState({ lt41Dialog: true }, '');
         dialogGuard = true;
       }
       return result;
+    };
+    // #933: 비모달로 여는 창(새 소식)도 같은 규칙 — 모달 창이 열려 있으면 그 창을 먼저 닫고 연다.
+    const showOriginal = view.HTMLDialogElement.prototype.show;
+    view.HTMLDialogElement.prototype.show = function (...args) {
+      const front = busyDialogs().filter(d => d !== this).pop() || null;
+      if (front && !STACK_ALLOWED.has(this.id)) requestPanelClose(front.id);
+      return showOriginal.apply(this, args);
     };
     view.addEventListener('popstate', () => {
       const modals = modalDialogs();
@@ -222,6 +240,8 @@ export function createDialogs(deps) {
     // #380 4 2차: × 버튼도 바깥 클릭·Esc와 같은 규칙을 쓴다(막을 상태면 막고, 더러우면 한 번 묻고, 닫으면 초점 복귀).
     // #845 2단계: 뒤로가기도 같은 판정(requestPanelClose)을 탄다 — 세 길이(×·Esc·뒤로가기)가 하나로 간다.
     requestClose: id => requestPanelClose(id),
+    // #933: 화면을 옮길 때(서재·책·보드·지도·첫 여정) 열려 있던 창을 닫는다 — 창이 화면 위에 남지 않게.
+    closePanels: id => closeOpenPanels(id),
     syncPanelTop
   };
 }

@@ -40,7 +40,8 @@ function fakeElement(props = {}) {
     focus() { el.focusCount += 1; },
     // 브라우저처럼 close()는 'close' 이벤트를 함께 보낸다(공통 틀의 초점 복귀가 이 이벤트를 듣는다).
     close() { el.open = false; el.listeners?.close?.(); },
-    matches() { return false; },
+    // #933: showModal 패치 시험이 ':modal'을 구분해야 해서 open·modal 값을 그대로 따라간다.
+    matches(sel) { return sel === ':modal' ? !!el.modal : false; },
     getClientRects() { return [{}]; },
     getBoundingClientRect() { return {left: 0, top: 0, right: 100, bottom: 100}; },
     addEventListener(type, fn) { (el.listeners ||= {})[type] = fn; },
@@ -80,6 +81,18 @@ function setup({focusables = [], popoverHidden = true, treeDirty = false, editor
     contains() { return false; },
     getElementById(id) { return elements[id] || null; },
   };
+  // #933: showModal·show 패치(창은 한 장만)를 시험하려면 브라우저처럼 defaultView와 dialog 원형이 있어야 한다.
+  // 원형의 showModal/show는 '연다'만 흉내 낸다 — 앞 창 닫기는 dialogs.mjs 규칙이 정한다.
+  class FakeDialogElement {
+    showModal() { this.modal = true; this.open = true; }
+    show() { this.open = true; }
+  }
+  doc.querySelectorAll = ((original) => (sel) => {
+    if (sel === 'dialog[open]') return dialogs.filter((d) => d.open);
+    return original(sel);
+  })(doc.querySelectorAll);
+  const defaultView = { history: { pushState() {} }, HTMLDialogElement: FakeDialogElement, addEventListener() {} };
+  doc.defaultView = defaultView;
   const calls = [];
   globalThis.document = doc;
   globalThis.getComputedStyle = () => ({visibility: 'visible'});
@@ -100,7 +113,8 @@ function setup({focusables = [], popoverHidden = true, treeDirty = false, editor
   });
   // #481 T8: 순서(index)가 아니라 id로 창을 찾는다 — index.html의 순서가 바뀌어도 시험이 흔들리지 않는다.
   const byId = (id, bag) => (bag ? bag.dialogs : dialogs).find((d) => d.id === id);
-  return {elements, dialogs, byId, keydown, clicks, api, calls};
+  // #933: 패치는 원형에 걸리므로, 가짜 요소로 부르려면 원형을 함께 넘긴다(Proto.showModal.call(el, …)).
+  return {elements, dialogs, byId, keydown, clicks, api, calls, Proto: FakeDialogElement.prototype};
 }
 
 function key(extra) {
@@ -647,4 +661,40 @@ test('의견 창 수치: 1440·390 밤·정원에서 창이 화면 안에 들어
     server.close();
   }
   assert.equal(seen.length, 4);
+});
+
+// #933: 창은 한 장만 — 새 창을 열 때(모달·비모달 모두)와 화면을 옮길 때 열려 있던 창을 닫는다.
+test('#933 새 창을 열면 앞 창을 닫는다 — 열린 창은 한 장', () => {
+  const {byId, Proto, dialogs} = setup();
+  const manager = byId('tree-manager');
+  const write = byId('write-panel');
+  manager.open = true; manager.modal = true;
+  Proto.showModal.call(write);
+  assert.equal(manager.open, false, '트리 관리 창이 남지 않는다');
+  assert.equal(write.open, true, '새 창(순간 추가)은 열린다');
+  // 비모달로 여는 새 소식 창도 같은 규칙을 탄다.
+  const updates = byId('updates-panel');
+  Proto.show.call(updates);
+  assert.equal(write.open, false, '모달 창 위에 새 소식 창만 남는다');
+  assert.equal(dialogs.filter((d) => d.open).map((d) => d.id).join(','), 'updates-panel', '열린 창은 한 장');
+});
+
+test('#933 화면을 옮길 때 열린 창을 닫고, 둘러보기 창은 이 틀이 건드리지 않는다', () => {
+  const {byId, api} = setup();
+  const manager = byId('tree-manager');
+  const community = byId('community-panel');
+  manager.open = true; manager.modal = true;
+  community.open = true; community.modal = true;
+  api.closePanels();
+  assert.equal(manager.open, false, '트리 관리 창은 닫힌다');
+  assert.equal(community.open, true, '둘러보기 창은 자기 규칙(둘러보기 모듈)이 닫는다');
+});
+
+test('#933 잠깐 판(옮길 트리 고르기)은 지금처럼 위에 겹쳐 연다', () => {
+  const {byId, Proto} = setup();
+  const manager = byId('tree-manager');
+  const picker = byId('move-picker');
+  manager.open = true; manager.modal = true;
+  Proto.showModal.call(picker);
+  assert.equal(manager.open, true, '앞 일로 돌아가는 창은 겹침을 허용한다(#845 3단계 그대로)');
 });

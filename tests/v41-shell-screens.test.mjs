@@ -24,6 +24,7 @@ test('show()는 화면 파일 이름을 받아 그 화면의 iframe 경로로 �
     empty: fakeEl(),
     'community-panel': { open: false, close() {} }
   };
+  const closed = [];
   const saved = { document: globalThis.document, location: globalThis.location };
   globalThis.location = { origin: 'https://lovetree-4-0.pages.dev' };
   globalThis.document = {
@@ -43,7 +44,8 @@ test('show()는 화면 파일 이름을 받아 그 화면의 iframe 경로로 �
       applyTheme() {},
       writeLocation() {},
       links() {},
-      onFrameReady() {}
+      onFrameReady() {},
+      closePanels: () => closed.push('panels')
     });
 
     // #231 1.5단계 ⑥: 예시 모드도 실제 기록과 같은 /v41/views/ 한 벌을 연다.
@@ -60,6 +62,9 @@ test('show()는 화면 파일 이름을 받아 그 화면의 iframe 경로로 �
     screens.show('nope.html');
     assert.equal(replaced.length, before);
     assert.equal(current, 'track32-bookshelf.html');
+
+    // #933: 화면을 옮기면 열려 있던 창(트리 관리·순간 추가·설정)을 닫는다 — 창이 새 화면 위에 남지 않게.
+    assert.ok(closed.length >= 1, '화면을 옮길 때 closePanels를 부른다');
   } finally {
     globalThis.document = saved.document;
     if (saved.location === undefined) delete globalThis.location;

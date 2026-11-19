@@ -385,6 +385,7 @@ function updateQuickEntryHint(){return shellPanels.updateQuickEntryHint();}
 // 첫 여정 연결은 shell/journey.mjs, 공유·둘러보기·lt41-* 수신은 shell/messages.mjs가 맡는다(#231 1-B③-3).
 const shellJourney=createJourney({
   $,
+  closePanels:()=>shellDialogs.closePanels(),
   getCurrent:()=>current,
   setCurrent:file=>{current=file;},
   getMember:()=>member,
@@ -586,6 +587,7 @@ const shellScreens=createScreens({
   hasTree:()=>!!window.LT41,
   takeNetworkOpen,
   takeBoardOpen,
+  closePanels:()=>shellDialogs.closePanels(),
   flowNavigation,
   paintEmptyForScreen,
   paintEmptyCopy,
