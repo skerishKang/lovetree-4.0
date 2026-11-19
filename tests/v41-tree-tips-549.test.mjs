@@ -179,6 +179,32 @@ test('#845 2단계 뒤로가기는 창을 닫는다(주소 그대로·초점은 
   } finally { await browser.close(); }
 });
 
+// #845 2단계 초점 순서: 안내 판이 처음 뜰 때(직접 열림)는 닫기 단추에 초점을 둔다. 창이 닫히면서
+// 자동으로 다시 뜰 때는 초점을 뺏지 않는다 — 초점은 창을 연 단추로 돌아가고, 안내 판 안 단추는 Tab으로 닿는다.
+test('#845 2단계 안내 판 초점: 직접 뜨면 닫기 단추, 창 닫힘 뒤 자동 표시는 연 단추 유지·Tab 진입', { skip: REQUIRE ? false : skip }, async () => {
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    const errors = [];
+    page.on('pageerror', (e) => errors.push(String(e.message || e)));
+    await openWithFirstTree(page);
+    assert.equal(await page.evaluate(() => document.activeElement?.id || ''), 'tree-tips-close', '처음 뜬 안내 판은 닫기 단추에 초점을 둔다');
+    await page.click('#write-menu');
+    await page.waitForFunction(() => document.getElementById('write-panel').open, null, { timeout: 10000 });
+    await page.evaluate(() => history.back());
+    await page.waitForFunction(() => !document.getElementById('write-panel').open && document.getElementById('tree-tips').hidden === false, null, { timeout: 10000 });
+    assert.equal(await page.evaluate(() => document.activeElement?.id || ''), 'write-menu', '자동으로 다시 뜬 안내 판은 초점을 뺏지 않는다');
+    // 안내 판 안 단추는 Tab 순서에 그대로 있다 — 닫기 단추에 닿을 수 있다.
+    let reached = false;
+    for (let i = 0; i < 15 && !reached; i++) {
+      await page.keyboard.press('Tab');
+      reached = await page.evaluate(() => document.activeElement?.id === 'tree-tips-close');
+    }
+    assert.equal(reached, true, 'Tab으로 안내 판 닫기 단추에 닿는다');
+    assert.deepEqual(errors, [], '페이지 오류 없음');
+  } finally { await browser.close(); }
+});
+
 test('#845 2단계 더러운 창은 뒤로가기로 닫을 때 한 번 묻는다(✕·Esc와 같은 판정)', { skip: REQUIRE ? false : skip }, async () => {
   const browser = await chromium.launch();
   try {

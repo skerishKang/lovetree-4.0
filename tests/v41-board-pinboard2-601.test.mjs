@@ -344,6 +344,9 @@ test('#601 화면: 카드 높이 상한·마지막 줄이 판 안, 상세는 플
     assert.equal(cardBits.eyebrow || cardBits.videoTitle || cardBits.memo || cardBits.domain || cardBits.status || cardBits.expand || cardBits.openLink, false, '카드에서 치운 것들이 없다');
     assert.equal(cardBits.title && cardBits.meta, true, '제목·감정·날짜는 있다');
     // 상세: 플레이어가 맨 위(첫 번째 내용), 내 마음은 비어 있으면 입력칸.
+    // #987: 날짜순 첫 줄부터 시작하므로 가장 오래된 첫 순간은 판을 그 카드로 옮긴 뒤 누른다.
+    await frame.evaluate(() => focusBoardMoment(document.querySelector('#cardLayer .card').dataset.id, false));
+    await page.waitForTimeout(400);
     const first = await frame.evaluate(() => {
       const c = document.querySelector('#cardLayer .card');
       const r = c.getBoundingClientRect();

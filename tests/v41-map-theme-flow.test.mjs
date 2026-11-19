@@ -86,6 +86,9 @@ async function fingerprint(frame) {
 // 그래서 지문은 두 번 연속 같은 값을 보인 뒤에야 한 번 읽는다(화면이 멈췄다는 뜻). 단언 자체는
 // 그대로 엄밀히 deepEqual으로 비교한다 — 비교 대상을 완화하지 않는다.
 async function settledFingerprint(frame) {
+  // #951 ③: 점 자리 썸네일은 다 읽은 뒤에 그려진다 — 읽는 중에 지문을 재면 '중간 상태'가 멈춘 것처럼 보인다.
+  // 그림이 다 끝난 뒤에 두 번 같은 값을 볼 때까지 기다린다(비교 자체는 그대로 deepEqual).
+  await frame.waitForFunction(() => window.__lt?.thumbsSettled?.() !== false, null, { timeout: 15000 }).catch(() => {});
   let prev = '';
   let got = await fingerprint(frame);
   for (let i = 0; i < 40; i += 1) {
