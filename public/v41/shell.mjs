@@ -1294,7 +1294,7 @@ function applyNetworkViewToFrame(frame){try{frame.contentWindow?.postMessage({ty
 for(const b of document.querySelectorAll('[data-network-view]'))b.onclick=()=>{
  try{localStorage.setItem(NETWORK_VIEW_KEY,b.dataset.networkView)}catch{}
  paintNetworkViewControls();for(const f of frames())applyNetworkViewToFrame(f);
- notify(b.dataset.networkView==='concentric'?'지도를 동심원 보기로 열어요.':'지도를 그물 보기로 열어요.');
+ notify(b.dataset.networkView==='concentric'?'지도를 묶음 보기로 열어요.':'지도를 이어진 길 보기로 열어요.');
 };
 paintNetworkViewControls();
 // 2026-11-16 대표 요청: 쉬운 추가가 처음 고르는 트리 — 지금 보고 있는 트리(기본) 또는 늘 같은 트리.
