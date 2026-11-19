@@ -352,12 +352,16 @@ jobs:
       - name: 감상 화면 흔적 값·어떻게 쓰나요 안내 시험(건너뜀=실패 — #635)
         env:
           LT_635A_REQUIRE: '1'
+          LT_BOOK_LONG_NOTE_REQUIRE: '1'
         if: needs.screen-changes.outputs.changed == 'true'
         run: |
           start=$(date +%s)
           npx vite build > /dev/null
           node --test --test-concurrency=1 tests/v41-share-guest-635.test.mjs
           echo "감상 화면 흔적 값·어떻게 쓰나요 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+          # #952: 책의 넘침 판정·넘친 페이지 스크롤을 실제 화면에서 잰다(같은 빌드 결과를 쓴다).
+          node --test --test-concurrency=1 tests/v41-book-long-note.test.mjs
+          echo "책 넘침 화면 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
 
       # #631: 의견 보내기 창 — 1440×900 에서 스크롤 없이 들어오고, 체크 상자와 글자가 같은 줄이며,
       # 보낸 뒤 제목·주 단추·안내가 바뀌는지 수치로 잰다. 건너뜀=실패(크롬이 준비된 이 잡에서 돈다).
