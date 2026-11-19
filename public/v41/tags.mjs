@@ -152,6 +152,16 @@ const ARTIST_NOISE = new Set([
   'CHOREOGRAPHY', 'CHOREO', // 무용·연습 영상 채널 이름 — 가수가 아니다(AI 고객 회차 지적)
 ]);
 
+// #935: 칩 집계에서만 거르는 채널 이름 판정 — 저장된 꼬리표는 고치지 않는다.
+// 'XX Choreography'·'XX Official'처럼 채널 표시가 붙으면 가수가 아니라 칩에서 뺀다.
+// 방송국·무대 낱말(EP·THE 등)까지 걸으면 진짜 가수가 빠질 수 있어 채널 표시만 좁게 본다.
+const CHANNEL_WORDS = new Set(['CHOREOGRAPHY', 'CHOREO', 'OFFICIAL', 'CHANNEL', '직캠', '팬캠', 'FANCAM']);
+export function isChannelLikeArtist(value) {
+  const name = String(value ?? '').trim();
+  if (!name) return true;
+  return name.split(/[\s()\[\]{}·|/]+/).some((word) => CHANNEL_WORDS.has(word.toUpperCase()));
+}
+
 // 낱말이 온전히 대문자 영문(가운데 숫자·& 허용)인지 — 적어도 글자 2개. 한 낱말짜리 대문자(M 같은)도
 // 잡동사니 걸름에서 같이 본다.
 const isCapsName = (w) => /^[A-Z][A-Z0-9&'’-]*$/.test(w) && (w.replace(/[^A-Z]/g, '').length >= 2);
