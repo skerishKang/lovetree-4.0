@@ -214,3 +214,149 @@ test('#553 화면: 예시 40순간(사슬) 처음 보기는 그대로다 — 0.8
     await context.close();
   } finally { await browser.close(); server.close(); }
 });
+
+// 이슈 970: 썸네일 — 영상·사진 순간의 썸네일이 화면 안에 보이고(390·1440 좌표 판정), 그림을 불러오지 못하면
+// 대체 표시가 뜬다(깨진 그림 아이콘 없음). 가짜 데이터·가짜 그림만 쓴다(외부 요청은 시험 서버가 대답).
+// LT_970_REQUIRE=1 일 때 실행(CI 화면 잡 — 건너뜀=실패).
+const REQUIRE970 = process.env.LT_970_REQUIRE === '1';
+const MEDIA_TREE = {
+  id: 'media1', title: '미디어 순간들',
+  moments: [
+    { id: 'v1', title: '영상 순간', date: '2026-11-19', emotion: '설렘', note: '메모', parentId: null, relation: '', url: 'https://youtu.be/dQw4w9WgXcQ', x: null, y: null, rot: 0, color: 'violet', keywords: [] },
+    { id: 'p1', title: '사진 순간', date: '2026-11-19', emotion: '평온', note: '메모', parentId: 'v1', relation: '', url: 'https://lovetree-4-0.pages.dev/api/media/12345678-1234-4234-8234-123456789abc.png', x: null, y: null, rot: 0, color: 'rose', keywords: [] },
+    { id: 'v2', title: '세로 영상', date: '2026-11-18', emotion: '그리움', note: '메모', parentId: 'v1', relation: '', url: 'https://www.youtube.com/shorts/9NXOCr-T8LU', x: null, y: null, rot: 0, color: 'cyan', keywords: [] },
+    { id: 'v3', title: '또 다른 영상', date: '2026-11-17', emotion: '위로', note: '메모', parentId: 'v1', relation: '', url: 'https://youtu.be/abc123DEF45', x: null, y: null, rot: 0, color: 'amber', keywords: [] },
+  ],
+  edges: [
+    { id: 'e1', kind: 'parent', from: 'v1', to: 'p1', reason: '' },
+    { id: 'e2', kind: 'parent', from: 'v1', to: 'v2', reason: '' },
+    { id: 'e3', kind: 'parent', from: 'v1', to: 'v3', reason: '' },
+  ],
+};
+
+// openHost와 같은 모양이되 그림 응답을 시험이 정한다(성공=가짜 SVG, 실패=404). 사진(/api/media)도 같은 규칙.
+async function openMediaHost(browser, url, { width, height, fail = false }) {
+  const context = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
+  const answer = (route) => fail
+    ? route.fulfill({ status: 404, contentType: 'text/plain', body: 'gone' })
+    : route.fulfill({ contentType: 'image/svg+xml', body: YT_THUMB_SVG });
+  await context.route('**/i.ytimg.com/**', answer);
+  await context.route('**/api/media/**', answer);
+  const problems = [];
+  const page = await context.newPage();
+  page.on('pageerror', (e) => problems.push('pageerror: ' + String(e).slice(0, 300)));
+  page.on('console', (m) => { if (m.type() === 'error') problems.push('console: ' + m.text().slice(0, 300)); });
+  await page.goto(url, { waitUntil: 'domcontentloaded' });
+  let frame = null;
+  for (let i = 0; i < 80 && !frame; i++) {
+    frame = page.frames().find((f) => f !== page.mainFrame() && /views\/track58-pinboard/.test(f.url()));
+    if (!frame) await page.waitForTimeout(250);
+  }
+  assert.ok(frame, '보드 프레임이 열린다');
+  await frame.waitForSelector('.surface', { timeout: 20000 });
+  await frame.waitForFunction(() => document.querySelectorAll('#cardLayer .card').length > 0, null, { timeout: 20000 });
+  await page.waitForTimeout(1200);
+  return { context, page, frame, problems };
+}
+
+test('970 실행: 썸네일 — 영상·사진이 화면 안에 보인다(가짜 그림, 390·1440)', { skip: skip || !REQUIRE970 ? skip || 'LT_970_REQUIRE=1 일 때 실행' : false, timeout: 240000 }, async () => {
+  if (skip) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip}`);
+  const server = await serve({ '/__host-media.html': hostHTML(MEDIA_TREE) });
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch({ headless: true });
+  try {
+    for (const [w, h] of [[1440, 900], [390, 844]]) {
+      const { context, page, frame } = await openMediaHost(browser, `${base}/__host-media.html`, { width: w, height: h });
+      // 전체 보기로 모든 카드를 화면 안에 둔다(머리줄 단추와 같은 fitAll).
+      await frame.evaluate(() => { if (typeof fitAll === 'function') fitAll(false); });
+      await page.waitForTimeout(900);
+      await frame.waitForFunction(() => {
+        const imgs = [...document.querySelectorAll('.lt-yt-preview img')];
+        return imgs.length >= 3 && imgs.every((i) => i.complete && i.naturalWidth > 0);
+      }, null, { timeout: 20000 });
+      // 사진 순간은 카드 안에 '사진 불러오기' 자리가 보인다. 누르기 전에는 그림 요청이 없다.
+      // 카드(compact)에는 .lt-media-status가 없어 누르면 load()가 null에 글자를 쓰며 멈춘다 — 별도 결함으로 보고,
+      // 이 시험은 자리와 깨진 그림 여부만 잰다.
+      const p1Button = await frame.evaluate(() => {
+        const b = document.querySelector('.card[data-id="p1"] [data-lt-load]');
+        if (!b) return null;
+        const r = b.getBoundingClientRect();
+        return { text: b.textContent.trim(), inside: r.left >= -1 && r.top >= -1 && r.right <= innerWidth + 1 && r.bottom <= innerHeight + 1 };
+      });
+      assert.ok(p1Button && p1Button.text.includes('사진 불러오기'), `${w}: 사진 순간에 불러오기 자리가 있다`);
+      assert.equal(p1Button?.inside, true, `${w}: 사진 불러오기 자리가 화면 안에 있다`);
+      const m = await frame.evaluate(() => {
+        const vw = innerWidth, vh = innerHeight;
+        const cards = [...document.querySelectorAll('#cardLayer .card')].map((c) => {
+          const r = c.getBoundingClientRect();
+          const img = c.querySelector('.lt-yt-preview img, .lt-media-body img');
+          const ir = img ? img.getBoundingClientRect() : null;
+          return {
+            id: c.dataset.id,
+            fullyInside: r.left >= -1 && r.top >= -1 && r.right <= vw + 1 && r.bottom <= vh + 1,
+            card: { l: r.left, t: r.top, r: r.right, b: r.bottom },
+            img: ir ? { l: ir.left, t: ir.top, r: ir.right, b: ir.bottom, complete: img.complete, nw: img.naturalWidth } : null,
+          };
+        });
+        const broken = [...document.querySelectorAll('#cardLayer .lt-yt-preview img, #cardLayer .lt-media-body img')].filter((i) => i.complete && i.naturalWidth === 0).length;
+        return { cards, broken, vw, vh };
+      });
+      assert.equal(m.broken, 0, `${w}: 깨진 그림(왔는데 폭 0) 0장`);
+      const visible = m.cards.filter((c) => c.fullyInside && c.img);
+      assert.ok(visible.length >= (w === 1440 ? 3 : 1), `${w}: 화면 안에 썸네일 실린 카드 ${visible.length}장(기대 ${w === 1440 ? 3 : 1}+)`);
+      for (const c of visible) {
+        assert.ok(c.img.complete && c.img.nw > 0, `${w}:${c.id} 썸네일이 실제로 실린다`);
+        assert.ok(c.img.l >= c.card.l - 2 && c.img.t >= c.card.t - 2 && c.img.r <= c.card.r + 2 && c.img.b <= c.card.b + 2, `${w}:${c.id} 썸네일이 카드 안에 있다`);
+        assert.ok(c.img.l >= -2 && c.img.t >= -2 && c.img.r <= m.vw + 2 && c.img.b <= m.vh + 2, `${w}:${c.id} 썸네일이 화면 안에 있다`);
+      }
+      const v1 = m.cards.find((c) => c.id === 'v1');
+      assert.ok(v1 && v1.img && v1.img.nw > 0, `${w}: 영상 순간 썸네일이 실린다`);
+      const p1 = m.cards.find((c) => c.id === 'p1');
+      assert.ok(p1 && p1.fullyInside, `${w}: 사진 순간 카드가 화면 안에 있다`);
+      await context.close();
+    }
+  } finally { await browser.close(); server.close(); }
+});
+
+test('970 실행: 썸네일 — 불러오기 실패면 대체 표시, 깨진 그림 아이콘 없다(390·1440)', { skip: skip || !REQUIRE970 ? skip || 'LT_970_REQUIRE=1 일 때 실행' : false, timeout: 240000 }, async () => {
+  if (skip) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip}`);
+  const server = await serve({ '/__host-media-fail.html': hostHTML(MEDIA_TREE) });
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch({ headless: true });
+  try {
+    for (const [w, h] of [[1440, 900], [390, 844]]) {
+      const { context, page, frame } = await openMediaHost(browser, `${base}/__host-media-fail.html`, { width: w, height: h, fail: true });
+      await frame.evaluate(() => { if (typeof fitAll === 'function') fitAll(false); });
+      await page.waitForTimeout(600);
+      // 영상 후보가 모두 실패하면 글 카드(대체 표시)로 내려간다.
+      await frame.waitForFunction(() => document.querySelectorAll('#cardLayer .lt-fallback-card').length >= 3, null, { timeout: 25000 });
+      const fb = await frame.evaluate(() => {
+        const card = document.querySelector('.card[data-id="v1"]');
+        return {
+          count: document.querySelectorAll('#cardLayer .lt-fallback-card').length,
+          title: card?.querySelector('.lt-fallback-title')?.textContent || '',
+          notice: card?.querySelector('.lt-media-vanished-note')?.textContent || '',
+          badge: card?.querySelector('.lt-media-vanished-badge')?.textContent || '',
+          broken: [...document.querySelectorAll('#cardLayer .lt-yt-preview img, #cardLayer .lt-media-body img')].filter((i) => i.complete && i.naturalWidth === 0).length,
+        };
+      });
+      assert.ok(fb.count >= 3, `${w}: 영상 순간 3개가 대체 표시로 내려간다(${fb.count})`);
+      assert.equal(fb.title, '영상 순간', `${w}: 대체 표시에 사용자 제목이 보인다`);
+      assert.equal(fb.badge, '사라진 영상', `${w}: 대체 표시 배지`);
+      assert.match(fb.notice, /영상이 삭제되었거나 비공개예요/, `${w}: 대체 표시 안내 문구`);
+      assert.equal(fb.broken, 0, `${w}: 깨진 그림 아이콘 없음(실패한 그림은 치워진다)`);
+      // 사진 순간은 누르기 전에는 그림이 없다(비공개 파일은 요청 0).
+      // 카드(compact)의 사진 불러오기는 .lt-media-status 부재로 실패하는 별도 결함 — 이 시험은 자리만 잰다.
+      const pf = await frame.evaluate(() => {
+        const card = document.querySelector('.card[data-id="p1"]');
+        return {
+          retry: !!card?.querySelector('[data-lt-load]'),
+          imgs: card?.querySelectorAll('.lt-media-body img').length ?? -1,
+        };
+      });
+      assert.equal(pf.retry, true, `${w}: 사진 불러오기 자리가 있다`);
+      assert.equal(pf.imgs, 0, `${w}: 누르기 전에는 사진 그림이 없다`);
+      await context.close();
+    }
+  } finally { await browser.close(); server.close(); }
+});

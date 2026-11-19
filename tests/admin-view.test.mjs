@@ -842,3 +842,57 @@ test('운영센터 폭 통일 + 한눈에 카드 4·3 + 고객 칸 이름(1440·
   }
 });
 
+// 이슈 970: 관리자 화면 진입 — 관리자가 아니면 들어갈 수 없고(가짜 응답), 관리자면 목록이 보인다.
+// 운영 API·운영 계정 금지 — 세션·고객 글 모두 가짜 응답이다. LT_970_REQUIRE=1 일 때 실행(CI 화면 잡 — 건너뜀=실패).
+const REQUIRE970 = process.env.LT_970_REQUIRE === '1';
+test('970 실행: 관리자 화면 — 비관리자 차단(가짜 응답)·관리자 목록 보임', { skip: adminSkip || !REQUIRE970 ? adminSkip || 'LT_970_REQUIRE=1 일 때 실행' : false, timeout: 120000 }, async () => {
+  if (adminSkip) assert.fail(`건너뜀=실패 — ${adminSkip}`);
+  const { serve } = await import('./helpers/screen-audit.mjs');
+  const server = await serve();
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await adminChromium.launch({ headless: true,
+    ...(process.env.LT_ADMIN_BROWSER_EXE ? { executablePath: process.env.LT_ADMIN_BROWSER_EXE } : {}) });
+  try {
+    // ① 비관리자 — 로그인은 됐지만 관리자 역할이 없음: 안내만 보이고 목록은 없다.
+    const ctx1 = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
+    await ctx1.route('**/api/admin/session', r => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, authenticated: true, admin: false }) }));
+    let feedbackCalls = 0;
+    await ctx1.route('**/api/admin/feedback', r => { feedbackCalls += 1; return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, feedback: [] }) }); });
+    const p1 = await ctx1.newPage();
+    await p1.goto(`${base}/admin.html#board`, { waitUntil: 'domcontentloaded' });
+    await p1.waitForSelector('.admin-card', { timeout: 10000 });
+    const gate = await p1.evaluate(() => ({
+      title: document.querySelector('.admin-card-head strong')?.textContent || '',
+      note: document.querySelector('.admin-card .admin-note')?.textContent || '',
+      posts: document.querySelectorAll('.lt-post').length,
+      back: !!document.querySelector('.admin-actions a[href="/v41/"]'),
+    }));
+    assert.equal(gate.title, '운영센터는 관리자 계정만 볼 수 있어요', '비관리자 안내 제목');
+    assert.match(gate.note, /관리자 역할이 없습니다/, '비관리자 안내 설명');
+    assert.equal(gate.posts, 0, '비관리자는 목록을 보지 못한다');
+    assert.equal(gate.back, true, '러브트리로 돌아가는 길이 있다');
+    assert.equal(feedbackCalls, 0, '비관리자에게는 고객 글 읽기를 하지 않는다');
+    await ctx1.close();
+    // ② 관리자 — 목록이 보인다(가짜 데이터 2건).
+    const ctx2 = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
+    await ctx2.route('**/api/admin/session', r => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, authenticated: true, admin: true }) }));
+    await ctx2.route('**/api/admin/feedback', r => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, feedback: [
+      { id: 'q1', kind: 'opinion', category: 'bug', status: 'received', replyCount: 0, issueNumber: '', displayTitle: '가짜 의견 1', createdAt: '2026-11-19T09:00:00Z' },
+      { id: 'q2', kind: 'opinion', category: 'feature', status: 'received', replyCount: 0, issueNumber: '', displayTitle: '가짜 의견 2', createdAt: '2026-11-19T10:00:00Z' }
+    ] }) }));
+    const p2 = await ctx2.newPage();
+    await p2.goto(`${base}/admin.html#board`, { waitUntil: 'domcontentloaded' });
+    await p2.waitForSelector('.lt-post', { timeout: 10000 });
+    const list = await p2.evaluate(() => ({
+      posts: document.querySelectorAll('.lt-post').length,
+      titles: [...document.querySelectorAll('.lt-post .lt-post-title')].map(el => el.textContent.trim())
+    }));
+    assert.equal(list.posts, 2, '관리자는 목록을 본다(가짜 2건)');
+    assert.ok(list.titles.some(t => t.includes('가짜 의견 1')) && list.titles.some(t => t.includes('가짜 의견 2')), `가짜 데이터 제목이 보인다: ${list.titles.join(' · ')}`);
+    await ctx2.close();
+  } finally {
+    await browser.close();
+    server.close();
+  }
+});
+

@@ -696,6 +696,20 @@ jobs:
           node --test --test-concurrency=1 tests/v41-write-tab-462.test.mjs tests/v41-inbox-display.test.mjs tests/v41-empty-tree-463.test.mjs
           echo "쓰기 창 탭·모아둔 순간·빈 화면 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
 
+      # 이슈 970: 표지(제목 보임·안 잘림·고르면 반영·취소하면 그대로), 썸네일(영상·사진 화면 안 보임·
+      # 불러오기 실패면 대체 표시·깨진 그림 아이콘 없음), 관리자 화면(비관리자 차단·관리자 목록)을 실제 화면에서 잰다.
+      # 셋 다 가짜 데이터·가짜 응답만 쓴다(운영 API·운영 계정 없음). 새 화면 시험은 가장 짧은 잡에 붙인다.
+      # 첫 화면 번들이 필요해 먼저 build한다. 건너뜀=실패.
+      - name: 표지·썸네일·관리자 화면 시험(건너뜀=실패 — 이슈 970)
+        env:
+          LT_970_REQUIRE: '1'
+        if: needs.screen-changes.outputs.changed == 'true'
+        run: |
+          start=$(date +%s)
+          npx vite build > /dev/null
+          node --test --test-concurrency=1 --test-name-pattern='^970' tests/v41-tree-rename-tips-571.test.mjs tests/v41-board-yt-overlap-553.test.mjs tests/admin-view.test.mjs
+          echo "표지·썸네일·관리자 화면 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+
       - name: 화면 변경 없으면 건너뜀을 남긴다
         if: always()
         run: |
