@@ -220,28 +220,10 @@ test('브라우저에만 남은 미저장 기록을 찾아낸다', () => {
   assert.equal(hasPendingDraft({get length() { throw new Error('blocked'); }, key() { return null; }, getItem() { return null; }}), false);
 });
 
-// #213 0번 확인: #215가 로그인 안내 창(#login-start)을 없앤 뒤에도 #144
-// (쓰기 중 세션 만료 → 쓰던 내용 보존 + 다시 로그인 안내 → 재로그인 후 이어서 저장)가
-// 셸의 저장 실패 안내(#save-feedback)로 그대로 동작하는지 소스로 고정한다.
-test('세션 만료 저장 실패는 없어진 안내 창 대신 #save-feedback으로 다시 로그인을 안내한다', () => {
-  const shell = readSource('public/v41/shell.mjs');
-  const index = readSource('public/v41/index.html');
-
-  // 안내 창은 없다. 로그인이 필요한 진입점은 셸 대화상자가 아니라 바로 /auth/login으로 간다.
-  // (로그인 시작 동작 그 자체는 tests/v41-shell-auth.test.mjs가 openLoginStart를 직접 불러 본다.)
-  assert.equal(index.includes('login-start'), false, 'index.html에 안내 창이 남음');
-
-  // 저장 실패가 로그인 만료이면 상단 저장 안내가 문구와 '새 창에서 로그인' 행동을 그린다.
-  assert.match(shell, /const failed=status\.dirty&&\['offline','rejected','conflict','login'\]\.includes\(status\.phase\)/);
-  assert.match(shell, /\$\('save-feedback'\)\.hidden=!failed/);
-  assert.match(shell, /로그인이 만료되어 서버에 저장하지 못했어요\. 새 창에서 로그인한 뒤 이 탭을 새로고침하면 입력을 복원합니다\./);
-  assert.match(shell, /a\.name==='login'\?'새 창에서 로그인'/);
-  assert.match(shell, /window\.open\(memberLoginUrl\(readTheme\(localStorage\)\)/);
-
-  // 입력은 지우지 않는다. 그 자리에서 백업할 수 있고, 다시 시도(재로그인 후 이어서 저장)도 남아 있다.
-  assert.match(shell, /\['retry','pull','force','login'\]\.includes\(a\.name\)/);
-  assert.match(shell, /b\.textContent='현재 기록 백업'/);
-});
+// '세션 만료 저장 실패 안내' 소스 글자 시험(8 단정)은 지웠다(이슈 952) — 문구·단추 이름 나열은
+// 문자열 고정이었다. 저장 실패 띠의 실제 표시는 아래 644 화면 시험이(충돌 띠 실측), 로그인 시작
+// 동작은 tests/v41-shell-auth.test.mjs가 openLoginStart 직접 호출로 확인한다. 재로그인 후 이어
+// 저장(#144 전체)은 실계정 검증(#14)으로 남는다.
 
 
 // ─── 이슈 644 화면 시험: 두 탭 같은 계정 — 조용한 최신 불러오기·충돌 띠·계정 점·첫 포커스 ───

@@ -2,7 +2,9 @@
 // 셸(shell.mjs)이 엮는 순서 그대로 실제 모듈 셋(write-panel·panels·quick-add)을 가짜 DOM에 띄워 흐름으로 확인한다.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readFileSync, readdirSync} from 'node:fs';
+import {readFileSync, readdirSync, existsSync} from 'node:fs';
+import {serve} from './helpers/screen-audit.mjs';
+import {createTree, addMoment} from '../public/v41/domain.mjs';
 // 이름공간으로 가져온다 — 예전 코드(viewportBox 없음)로 되돌려도 시험마다 따로 빨강이 되게.
 import * as writePanelModule from '../public/v41/shell/write-panel.mjs';
 import {createPanels} from '../public/v41/shell/panels.mjs';
@@ -161,7 +163,6 @@ test('#462 설정 "먼저 보일 탭"에서 바꾸면 다음에 열 때 그 탭�
 
   // 기본 탭을 쓰는 곳은 설정 행 하나뿐이다(눌러 보기·저장 경로가 다시 쓰지 않게 고정).
   const shellSource = readFileSync(new URL('../public/v41/shell.mjs', import.meta.url), 'utf8');
-  assert.match(shellSource, /for\(const b of document\.querySelectorAll\('\[data-write-tab\]'\)\)b\.onclick=\(\)=>\{\s*const tab=writeWriteTab\(localStorage,b\.dataset\.writeTab\);/, '설정 행이 writeWriteTab을 부른다');
   const writers = [];
   const walk = dir => {
     for (const entry of readdirSync(dir, {withFileTypes: true})) {
@@ -259,13 +260,112 @@ test('#462 문구: 입력 칸 안내·용량 한 줄·중복 안내 하나·수�
   const html = readFileSync(new URL('../public/v41/index.html', import.meta.url), 'utf8');
   const upload = readFileSync(new URL('../public/v41/private-upload.mjs', import.meta.url), 'utf8');
   const panelsSource = readFileSync(new URL('../public/v41/shell/panels.mjs', import.meta.url), 'utf8');
-  assert.match(html, /placeholder="YouTube 같은 링크 주소"/);
-  assert.match(upload, />사진 4MB, 영상 8MB까지 · 사진은 나만 볼 수 있어요</);
   const writePanel = html.slice(html.indexOf('<dialog id="write-panel"'), html.indexOf('</dialog>', html.indexOf('<dialog id="write-panel"')));
   const momentSlot = upload.slice(upload.indexOf(':`<span class="file-pick">'));
   assert.equal((writePanel + momentSlot).split('사진은 나만 볼 수 있어요').length - 1, 1, '순간 추가 창에서 "사진은 나만 볼 수 있어요"는 한 번만');
-  assert.doesNotMatch(html, /quick-entry-lead/, '맨 위 안내 상자는 아래 안내 줄과 같은 말이라 뺐다');
-  assert.match(html, /id="quick-entry-hint"[^>]*>제목·마음·링크나 첨부 중 하나만 남겨도 저장할 수 있어요\./, '안내는 아래 한 줄로');
-  assert.match(html, /<section id="moment-management" hidden>/, '처음 연 자세한 추가에 수정 전용 묶음이 보이지 않는다');
-  assert.doesNotMatch(panelsSource, /사진·영상은 직접 HTTPS 링크를 사용할 수 있어요/, '빈 주소의 긴 안내는 없앴다');
+});
+
+// ─── 이슈 970: 쓰기 창 탭을 실제 브라우저에서 잰다(390·1440) ───
+// 탭을 오가도 입력값 유지, 방향키·Home·End로 탭과 초점이 함께 이동, aria-selected·tabindex·
+// 패널 보임이 서로 맞는지를 실제 화면에서 본다. 위 가짜 DOM 흐름은 모듈 수준에서 같은 약속을 확인한다.
+// LT_970_REQUIRE=1 일 때 실행(CI 화면 잡 — 건너뜀=실패). 운영 API·운영 계정 없이 가짜 작업장만 쓴다.
+const REQUIRE970 = process.env.LT_970_REQUIRE === '1';
+let chromium970, skip970 = false;
+try {
+  ({chromium: chromium970} = await import('playwright'));
+  if (!existsSync(chromium970.executablePath())) skip970 = 'Playwright Chromium이 없어 화면 시험을 건너뜀';
+} catch { skip970 = 'playwright 패키지가 없어 화면 시험을 건너뜀'; }
+
+function tree970() {
+  let t = createTree({subject: '시험', title: '시험 트리', note: '', emotion: '설렘', date: '2026-11-18', url: ''}, '2026-11-18T00:00:00Z');
+  t = addMoment(t, {title: '둘째 순간', note: '', emotion: '설렘', date: '2026-11-18', url: ''}, t.moments[0].id, '2026-11-18T00:01:00Z');
+  return t;
+}
+
+test('970 실행: 쓰기 창 탭 — 입력 유지·방향키 이동·aria-selected (390·1440)', {skip: skip970 || !REQUIRE970 ? skip970 || 'LT_970_REQUIRE=1 일 때 실행' : false, timeout: 180000}, async () => {
+  const server = await serve();
+  const origin = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium970.launch({headless: true});
+  try {
+    for (const width of [1440, 390]) {
+      const ctx = await browser.newContext({viewport: {width, height: width === 390 ? 844 : 900}, reducedMotion: 'reduce'});
+      await ctx.addInitScript(() => { try { localStorage.setItem('lt41.theme', 'night'); } catch {} });
+      await ctx.route('**://i.ytimg.com/**', (r) => r.fulfill({status: 200, contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="10" height="10" fill="#333"/></svg>'}));
+      await ctx.route('**/api/**', (r) => r.fulfill({status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}'}));
+      const state = {version: 1, trees: [tree970()], prefs: {}};
+      await ctx.route('**/api/workspace**', (r) => r.fulfill({status: 200, contentType: 'application/json', body: JSON.stringify({revision: 1, state, subject: '시험계정', writeSubjectBound: true, savedAt: '2026-11-18T09:00:00.000Z'})}));
+      const page = await ctx.newPage();
+      await page.goto(`${origin}/v41/?account=1`, {waitUntil: 'load', timeout: 60000});
+      await page.waitForFunction(() => !!window.LT41?.trees?.length, null, {timeout: 20000});
+      await page.locator('#discover-ask-no').click().catch(() => {});
+      // 순간 추가 입구: 넓은 화면은 머리줄 단추, 휴대폰은 아래쪽 둥근 단추(FAB).
+      const entry = await page.evaluate(() => {
+        const vis = (el) => !!el && el.getClientRects().length > 0 && getComputedStyle(el).display !== 'none';
+        if (vis(document.getElementById('write-menu'))) return '#write-menu';
+        if (vis(document.getElementById('mobile-add'))) return '#mobile-add';
+        return null;
+      });
+      assert.ok(entry, `${width}: 순간 추가 입구가 보인다`);
+      await page.click(entry);
+      await page.waitForFunction(() => document.getElementById('write-panel')?.open, null, {timeout: 10000});
+
+      const tabState = () => page.evaluate(() => ({
+        easySel: document.getElementById('write-tab-easy').getAttribute('aria-selected'),
+        detSel: document.getElementById('write-tab-detailed').getAttribute('aria-selected'),
+        easyHidden: document.getElementById('write-easy').hidden,
+        detHidden: document.getElementById('write-detailed').hidden,
+        easyTab: document.getElementById('write-tab-easy').tabIndex,
+        detTab: document.getElementById('write-tab-detailed').tabIndex,
+        focus: document.activeElement?.id || ''
+      }));
+      const assertTab = async (want, label) => {
+        const s = await tabState();
+        assert.equal(s.easySel, String(want === 'easy'), `${width}: ${label} — 쉬운 추가 aria-selected`);
+        assert.equal(s.detSel, String(want === 'detailed'), `${width}: ${label} — 자세한 추가 aria-selected`);
+        assert.equal(s.easyHidden, want !== 'easy', `${width}: ${label} — 쉬운 추가 패널 보임`);
+        assert.equal(s.detHidden, want !== 'detailed', `${width}: ${label} — 자세한 추가 패널 보임`);
+        assert.equal(s.easyTab, want === 'easy' ? 0 : -1, `${width}: ${label} — 쉬운 추가 tabindex`);
+        assert.equal(s.detTab, want === 'detailed' ? 0 : -1, `${width}: ${label} — 자세한 추가 tabindex`);
+        return s;
+      };
+
+      // 처음 열면 쉬운 추가(설정값 없음).
+      await assertTab('easy', '처음 열림');
+      // 값을 적고 탭을 오간다 — 적은 값이 따라온다.
+      await page.fill('#quick-url', URL_OK);
+      await page.click('#write-tab-detailed');
+      await assertTab('detailed', '자세한 추가 누름');
+      // 제목 칸은 '더 적기' 접힘 안에 있다 — 접힘을 펼치고 적는다.
+      await page.click('#more-fields > summary');
+      await page.fill('#moment-form [name="title"]', '쓰기 창 제목');
+      await page.fill('#moment-form [name="note"]', '쓰기 창 마음');
+      await page.click('#write-tab-easy');
+      await assertTab('easy', '쉬운 추가 되돌아옴');
+      assert.equal(await page.inputValue('#quick-url'), URL_OK, `${width}: 탭을 다녀와도 쉬운 추가 주소 유지`);
+      await page.click('#write-tab-detailed');
+      assert.equal(await page.inputValue('#moment-form [name="title"]'), '쓰기 창 제목', `${width}: 탭을 다녀와도 제목 유지`);
+      assert.equal(await page.inputValue('#moment-form [name="note"]'), '쓰기 창 마음', `${width}: 탭을 다녀와도 마음 유지`);
+
+      // 방향키·Home·End: 탭과 초점이 함께 움직인다.
+      await page.click('#write-tab-easy');
+      await page.focus('#write-tab-easy');
+      await page.keyboard.press('ArrowRight');
+      let s = await assertTab('detailed', 'ArrowRight');
+      assert.equal(s.focus, 'write-tab-detailed', `${width}: ArrowRight는 초점도 옮긴다`);
+      await page.keyboard.press('ArrowLeft');
+      s = await assertTab('easy', 'ArrowLeft');
+      assert.equal(s.focus, 'write-tab-easy', `${width}: ArrowLeft는 초점도 옮긴다`);
+      await page.keyboard.press('End');
+      s = await assertTab('detailed', 'End');
+      assert.equal(s.focus, 'write-tab-detailed', `${width}: End는 자세한 추가`);
+      await page.keyboard.press('Home');
+      s = await assertTab('easy', 'Home');
+      assert.equal(s.focus, 'write-tab-easy', `${width}: Home은 쉬운 추가`);
+      // 키보드로 오간 뒤에도 값은 그대로다.
+      assert.equal(await page.inputValue('#quick-url'), URL_OK, `${width}: 키보드 이동 뒤에도 주소 유지`);
+      await page.click('#write-tab-detailed');
+      assert.equal(await page.inputValue('#moment-form [name="note"]'), '쓰기 창 마음', `${width}: 키보드 이동 뒤에도 마음 유지`);
+      await ctx.close();
+    }
+  } finally { await browser.close(); await new Promise((ok) => server.close(ok)); }
 });

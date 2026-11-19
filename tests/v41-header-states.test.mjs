@@ -98,8 +98,8 @@ test('8. 말풍선은 한 번만 — 닫으면 저장하고, 저장소가 막히
   assert.equal(tipsWanted({owned: true, treeCount: 1, seen: false, source: 'server', momentCount: 1}), true, '첫 트리·첫 순간은 뜬다');
   assert.equal(tipsWanted({owned: true, treeCount: 1, seen: false, source: 'server', momentCount: 2}), false, '순간이 2 개 이상이면 안 뜬다');
   assert.equal(tipsWanted({owned: true, treeCount: 2, seen: false, source: 'server', momentCount: 0}), false, '트리가 2 개 이상이면 안 뜬다');
-  // shell.mjs가 현재 source를 넘긴다(예시·공유를 가리키지 않게).
-  assert.match(shell, /tipsWanted\(\{owned:!!member\?\.snapshot\(\)\.owned,treeCount:model\?\.trees\?\.length\|\|0,momentCount,seen:readTipsSeen\(localStorage\),source\}\)/);
+  // 'shell.mjs가 현재 source를 넘긴다' 배선 글자 검사는 지웠다(이슈 952) — 예시·공유에서 말풍선이
+// 뜨지 않는 결과는 위 tipsWanted 표(source 인수 포함)가 함수 입출력으로 확인한다.
 });
 
 test('이슈 571: 첫 항목은 자동 이름("모아둔 순간")을 말해 주고 이름 바꾸기로 안내한다', () => {
@@ -109,17 +109,9 @@ test('이슈 571: 첫 항목은 자동 이름("모아둔 순간")을 말해 주�
   assert.doesNotMatch(FIRST_TREE_TIPS.map((tip) => tip.title).join(' '), /＋ 순간 추가/, '＋ 순간 추가는 머리에 늘 보이므로 안내 항목에서 뺐다');
 });
 
-test('9. 말풍선 마크업·스타일: Esc·포커스 되돌림, 밤·정원 공통 토큰, 390·360 넘침 없음', () => {
-  assert.match(html, /<div id="tree-tips" class="tree-tips" role="dialog" aria-labelledby="tree-tips-title" hidden>/);
-  assert.match(html, /<button type="button" id="tree-tips-close">알겠어요<\/button>/);
-  // Esc·포커스 되돌림은 글자가 아니라 함수로 확인한다(tests/v41-shell-dialogs.test.mjs).
-  const block = css.slice(css.indexOf('.tree-tips{'));
-  assert.ok(block.length > 100, '.tree-tips 스타일이 있다');
-  assert.match(block, /border:1px solid var\(--lt-gold-line\)/, '금테');
-  assert.match(block, /background:var\(--lt-glass-strong\)/, '유리 배경');
-  assert.match(block, /@media\(max-width:780px\)\{\.tree-tips\{top:88px;left:12px;right:12px;width:auto/);
-  assert.doesNotMatch(block, /#(?!000)[0-9a-fA-F]{3,6}\b/, '색은 --lt-* 토큰만 쓴다');
-});
+// '말풍선 마크업·스타일' 글자 검사(마크업 2·CSS 블록 4)는 지웠다(이슈 952) — 말풍선의 실제 모양과
+// Esc·포커스 되돌림은 tests/v41-tree-tips-549.test.mjs의 브라우저 시험이 화면에서 확인하고,
+// 색 토큰 규칙은 디자인 시스템 감사가 맡는다.
 
 // 이슈 644 3번: 머리줄 '저장 안 됨' 표시 — 누르면 같은 설명을 연다. 띠가 숨어 있는 동안(저장 중)에는
 // 저장 중 설명을, 실패 띠가 이미 있을 때는 그 띠를 그대로 쓴다(셸 explainSaveState).

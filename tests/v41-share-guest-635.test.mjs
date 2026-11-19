@@ -173,37 +173,6 @@ const scanBookLayout = (frame) => frame.evaluate(() => {
   };
 });
 
-test('#635 규칙(정적): 감상 화면에서 다음 이야기 안내를 감추고, undefined의 근원을 끊는다', () => {
-  const extra = read('public/v41/views/book/book-extra.js');
-  // undefined의 근원: readOnly에서 맨 return은 문자열에 그대로 붙었다.
-  assert.match(extra, /function otherTreesBlock\(\)\{\s*\n\s*if\(LTDEMO\.readOnly\)return ''/, 'otherTreesBlock은 빈 문자열을 돌려준다');
-  // 감상 화면(공유·예시)에서는 '다음 이야기' 안내 자체를 감춘다 — 한 장·두 장 모두.
-  assert.match(extra, /if\(!LTDEMO\.readOnly\)\{\s*\n\s*const flow=host\.querySelector\('\.page-content'\)\|\|host;/, '한 장: 감상 화면에서 안내를 붙이지 않는다');
-  assert.match(extra, /rightPage\.innerHTML=LTDEMO\.readOnly\?'':'<div class="next-page">/, '두 장: 감상 화면의 마지막 오른쪽 쪽은 깨끗하게 비운다');
-  // 내 트리에서는 안내 문장+단추를 그대로 둔다(감추지 않는다).
-  assert.ok(extra.includes("t(NEXT_PAGE_COPY)"), '내 트리 안내 문장 유지');
-  assert.ok(extra.includes('data-next-moment'), '내 트리 다음 순간 추가 단추 유지');
-});
-
-test('#635 규칙(정적): 감상 화면의 빈 이유 안내를 감추고, 제목 중복 줄을 가른다', () => {
-  // 지키려던 것: 감상 화면에서 빈 이유 띠를 숨기고 제목 중복 줄을 가른다. #800은 빈 이유 띠를 아예 없앴다.
-  const usability = read('public/v41/book-usability.mjs');
-  // connectionLine: 감상 화면에서는 이유가 비었을 때 줄 자체를 내지 않는다.
-  assert.match(usability, /hideEmptyWhy = false/, 'connectionLine에 hideEmptyWhy 옵션');
-  assert.match(usability, /if \(hideEmptyWhy && !why\) return null;/, '이유가 비면 null(줄을 숨긴다)');
-  const extra = read('public/v41/views/book/book-extra.js');
-  // 책 안내줄(#whyMargin): #800에서 '아직 적지 않았어요' 띠를 없애고 두 순간 사이 한마디로 바꿨다.
-  assert.doesNotMatch(extra, /connectionLine\(next&&next\.reason,\{hideEmptyWhy:!!LTDEMO\.readOnly\}\)/, '빈 이유 안내 띠는 그리지 않는다(#800)');
-  assert.doesNotMatch(extra, /이어진 이유를 아직 적지 않았어요/, '빈 이유 띠 문구가 책에 남아 있지 않다(#800)');
-  assert.match(extra, /class="story-action"/, '빈 연결에는 한마디 입력 버튼을 둔다(#800)');
-  // 상세 판은 빈 이유를 항상 감춘다(#815 — 적었을 때만 보인다).
-  assert.doesNotMatch(extra, /연결 이유는 아직 적지 않았어요/, '빈 연결 이유 안내는 상세 판에 없다(#815)');
-  assert.match(extra, /connectionLine\(nextInfo\?\.title,nextInfo\?\.reason,\{hideEmptyWhy:true\}\)/, '상세 판은 빈 이유를 항상 감춘다');
-  assert.match(extra, /\(line\?'<div class="detail-why">'\)?\+?t\(line\)|line\?'<div class="detail-why">'/, '상세 판은 줄이 있을 때만 그린다');
-  // 제목 중복: 사용자 제목과 영상 제목의 같음 판정은 앞뒤 공백·대소문자를 무시한다.
-  assert.match(usability, /title\.toLowerCase\(\) === media\.toLowerCase\(\)/, 'userTitleText의 같음 판정');
-});
-
 test('#635 규칙(단위): connectionLine·userTitleText가 감상·중복 규칙을 지킨다', async () => {
   const { connectionLine, userTitleText, titleView } = await import('../public/v41/book-usability.mjs');
   // 내 트리: 이유가 비면 안내 문장(예전 그대로).
@@ -252,13 +221,7 @@ test('#635 PR B 규칙(정적): 안내 패널 여백·포커스·줄바꿈·단�
   assert.match(reader, /phone\]\[data-v41-screen=book\] \.stage\{[^}]*display:flex;flex-direction:column[^}]*min-height:calc\(100dvh - 60px\)/, 'stage가 남은 화면 높이를 세운다');
   assert.match(reader, /phone\]\[data-v41-screen=book\] \.book-wrap\{[^}]*flex:1 1 auto/, '책이 남은 칸을 채운다');
   assert.match(reader, /phone\]\[data-v41-screen=book\] \.mobile-page\{[^}]*flex:1 1 auto/, '쪽이 책 높이를 채운다');
-  // 영상 칸: 빈 상자 금지 — 보관 썸네일 먼저, 없으면 유튜브 보관 썸네일(#635 PR B 대표 결정), 깨지면 카드로 내려간다.
-  const extra = read('public/v41/views/book/book-extra.js');
-  assert.match(extra, /const candidates=thumbnailCandidates\(m,\{vertical,autoLoad:true\}\);/, '감상에서도 보관된(유튜브) 썸네일을 부른다');
-  assert.match(extra, /thumbFallbackAttrs\(safe,\{candidates:\[thumb\]/, '보관 썸네일(/api/media/)이 깨지면 카드로 내려간다(#393 내려가기 틀)');
-  assert.match(extra, /:'<img src="'\+t\(remoteThumb\)/, '썸네일이 없으면 유튜브 보관 썸네일을 보린다');
-  assert.ok(!extra.includes("'<span class=\"yt-placeholder\"></span>'"), '빈 크림 상자를 그리는 코드는 없다');
-  assert.match(usabilityCss, /\.yt-play \.lt-fallback-card\{width:100%;height:100%/, '글 카드가 영상 칸을 채운다');
+  // 영상 칸(빈 상자 금지·썸네일/글카드)은 아래 화면 시험이 실제로 그려진 칸을 재서 판정한다.
 });
 
 test('#635 화면: 공유 링크 책(로그아웃) 전 장에서 undefined·null·NaN 흔적이 없고, 마지막 장은 깨끗하다', { skip: REQUIRE ? false : skip, timeout: 240000 }, async () => {
@@ -293,9 +256,19 @@ test('#635 화면: 공유 링크 책(로그아웃) 전 장에서 undefined·null
           const emptyRatio = (layout.viewport - layout.wrapBottom) / layout.viewport;
           assert.ok(emptyRatio <= 0.2, `390·${theme}: 책 아래 빈 공간이 화면의 ${Math.round(emptyRatio * 100)}%다`);
         }
-        // 감상 화면에서는 '다음 이야기' 안내가 어디에도 없다.
-        const copy = await frame.evaluate(() => document.body.textContent.includes('이 순간 다음 이야기를 남겨 보세요'));
-        assert.equal(copy, false, `${width}·${theme}: 감상 화면에 다음 이야기 안내가 보인다`);
+        // 감상 화면에서는 '다음 이야기' 안내가 어디에도 없다(글자와 요소 둘 다).
+        const copy = await frame.evaluate(() => ({
+          text: document.body.textContent.includes('이 순간 다음 이야기를 남겨 보세요'),
+          block: !!document.querySelector('.next-page'),
+          nextButton: !!document.querySelector('[data-next-moment]'),
+          emptyWhy: document.body.textContent.includes('이어진 이유를 아직 적지 않았어요') || document.body.textContent.includes('연결 이유는 아직 적지 않았어요'),
+          undefinedTrace: /undefined|null|NaN/.test(document.body.textContent)
+        }));
+        assert.equal(copy.text, false, `${width}·${theme}: 감상 화면에 다음 이야기 안내가 보인다`);
+        assert.equal(copy.block, false, `${width}·${theme}: 감상 화면에 다음 이야기 블록(.next-page)이 남아 있다`);
+        assert.equal(copy.nextButton, false, `${width}·${theme}: 감상 화면에 다음 순간 단추가 남아 있다`);
+        assert.equal(copy.emptyWhy, false, `${width}·${theme}: 감상 화면에 빈 이유 안내가 남아 있다`);
+        assert.equal(copy.undefinedTrace, false, `${width}·${theme}: 감상 화면 글자에 undefined·null·NaN이 있다`);
         // 마지막 장 캡처(390·1440 × 밤·정원).
         if (theme === 'night' || theme === 'garden') await shot(page, `share-last-${width}-${theme}`);
         await context.close();
@@ -320,8 +293,14 @@ test('#635 화면: 내 트리 책(로그인) 전 장에서 흔적 값이 없고,
       assert.deepEqual(found, [], `${width}: 화면 흔적 값 ${JSON.stringify(found)}`);
       assert.equal(problems.length, 0, `${width}: 화면 오류 ${problems.join(' | ')}`);
       // 내 트리에서는 안내 문장+단추가 그대로 보인다.
-      const hasGuide = await frame.evaluate(() => document.body.textContent.includes('이 순간 다음 이야기를 남겨 보세요') && !!document.querySelector('[data-next-moment]'));
-      assert.equal(hasGuide, true, `${width}: 내 트리 마지막 장의 안내 문장·단추`);
+      const hasGuide = await frame.evaluate(() => ({
+        text: document.body.textContent.includes('이 순간 다음 이야기를 남겨 보세요'),
+        button: !!document.querySelector('[data-next-moment]'),
+        block: !!document.querySelector('.next-page')
+      }));
+      assert.equal(hasGuide.text, true, `${width}: 내 트리 마지막 장의 안내 문장`);
+      assert.equal(hasGuide.button, true, `${width}: 내 트리 마지막 장의 다음 순간 단추`);
+      assert.equal(hasGuide.block, true, `${width}: 내 트리 마지막 장의 다음 이야기 블록`);
       await context.close();
     }
   } finally {

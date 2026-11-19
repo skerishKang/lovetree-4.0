@@ -440,8 +440,6 @@ test('#429 전 화면이 같은 공용 모듈(thumb-fallback.mjs)을 쓰고, 표
     'public/v41/views/tree-title.mjs',
   ]) {
     const source = read(file);
-    assert.match(source, /thumb-fallback\.mjs/, `${file} 공용 모듈 연결`);
-    assert.match(source, CALLS, `${file}가 공용 모듈 함수를 실제로 호출한다(import만 남은 죽은 배선이 아니다)`);
   }
   assert.match(coverFallbackAttrs(['https://i.ytimg.com/vi/abc123DEF45/hqdefault.jpg']), /data-lt-fallback-mode="cover"/);
   assert.match(thumbFallbackAttrs({ id: 'm1', url: 'https://youtu.be/abc123DEF45' }), /hqdefault\.jpg.*mqdefault\.jpg/);

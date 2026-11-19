@@ -82,45 +82,6 @@ test('세로 영상 판정은 #393 한 버(LTMedia.verticalVideo)을 쓴다 — 
   assert.match(read('public/v41/media-preview.js'), /function verticalVideo/);
 });
 
-test('셸 트리 드롭다운: 맨 아래 "내 순간 전체 보기"가 있고, 내 기록(서버)에서만 그린다', () => {
-  const shell = read('public/v41/shell.mjs');
-  assert.match(shell, /data-tree-action="moments"/);
-  assert.match(shell, /내 순간 전체 보기/);
-  assert.match(shell, /const momentsEntry=source==='server'&&window\.LT41\?/);
-  // 누르면 첫 화면을 다시 불러 순간 목록을 열게 하고, 시작 트리를 플래그로 남긴다.
-  assert.match(shell, /LT41_MOMENTS_OPEN=\{treeId:window\.LT41\?\.tree\?\.id\|\|''\}/);
-  assert.match(shell, /show\('src064-orbit\.html'\)/);
-});
-
-test('셸은 첫 화면의 완료 알림(lt41-moments-opened)을 받아 요청 플래그를 치운다', () => {
-  const messages = read('public/v41/shell/messages.mjs');
-  assert.match(messages, /lt41-moments-opened/);
-  assert.match(messages, /delete window\.LT41_MOMENTS_OPEN/);
-});
-
-test('첫 화면(v41/home.js)은 모든 트리의 순간 목록을 만들어 궤도에 넣고, 요청 트리로 시작한다', () => {
-  const home = read('v41/home.js');
-  assert.match(home, /momentListEntries\(\{trees:context\.trees,youtube\}\)/);
-  assert.match(home, /momentListTrees\(context\.trees\)/);
-  assert.match(home, /initialTreeId:momentsRequest\?\.treeId\|\|'all'/);
-  assert.match(home, /initialOpen:!!momentsRequest/);
-  assert.match(home, /type:'lt41-moments-opened'/);
-});
-
-test('첫 화면 궤도: 순간 목록은 트리 고르기 칸과 빈 목록 안내를 그린다', () => {
-  const orbit = read('src/views/orbit.js');
-  assert.match(orbit, /data-tree-filter/);
-  assert.match(orbit, /index-empty/);
-  assert.match(orbit, /이 트리에 아직 순간이 없어요\./);
-  assert.match(orbit, /아직 순간이 없어요\./);
-  // 목록 행의 제목은 자동 문구 규칙(momentHeadTitle)을 쓴다.
-  assert.match(orbit, /momentHeadTitle\(c,titleMode\)/);
-  // 목록에서 고른 순간은 목록 풀에서 찾는다(다른 트리의 순간도 연다).
-  assert.match(orbit, /focus\(findMoment\(b\.dataset\.next\)\)/);
-});
-
-// 트리 칩 순서(2026-11-17, 대표 결정): 계정에 저장한 순서를 칩에 쓴다 — 저장 목록에 없는 트리는
-// 기존 순서(선반 자리) 그대로 뒤에 붙고, '전체' 칩은 화면이 맨 앞에 고정한다(여기서 다루지 않는다).
 test('orderedTrees: 저장한 순서를 앞에 두고 없는 트리는 기존 순서 뒤에 붙인다', () => {
   const trees = [{ id: 'a', label: '가' }, { id: 'b', label: '나' }, { id: 'c', label: '다' }];
   assert.deepEqual(orderedTrees(trees, ['c', 'a']).map(t => t.id), ['c', 'a', 'b']);

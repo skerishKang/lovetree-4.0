@@ -1,4 +1,6 @@
-import test from 'node:test';import assert from 'node:assert/strict';import vm from 'node:vm';import {readFileSync} from 'node:fs';
+import test from 'node:test';import assert from 'node:assert/strict';import vm from 'node:vm';import {readFileSync, existsSync} from 'node:fs';
+import {embedUrl} from '../public/v41/book-usability.mjs';
+import {serve} from './helpers/screen-audit.mjs';
 import {parseMomentLink} from '../src/media.js';
 // media-preview.js 는 클래식 스크립트(IIFE)라 vm 으로 읽어 window.LTMedia 를 본다(기존 시험과 같은 방법).
 const scope={window:{},URL,URLSearchParams};vm.runInNewContext(readFileSync(new URL('../public/v41/media-preview.js',import.meta.url),'utf8'),scope);const media=scope.window.LTMedia;
@@ -71,70 +73,94 @@ test('#393 공유·예시·로그아웃: 누르기 전 외부 요청 0 그대로
  assert.doesNotMatch(media.markup('javascript:alert(1)','x',null,'m1',OWNER),/data-lt-expand/);
 });
 
-test('#393 크게 보기 연결: embed 한 벌·전체 화면 허용·바깥 클릭/Esc 복귀·닫으면 재생 정지',()=>{
- const src=read('public/v41/media-preview.js');
- // 재생 주소는 기존 embedUrl 한 벌에서만 만든다(시작 시간 유지).
- assert.match(src,/import\('\/v41\/book-usability\.mjs'\)/);
- assert.match(src,/usability\.embedUrl\(m\.videoId,m\.startSeconds\)/);
- // 유튜브 자체 전체 화면은 그대로 쓸 수 있다.
- assert.match(src,/frame\.allowFullscreen=true/);
- // 바깥 클릭·Esc·닫기 단추로 닫고, 닫으면 노드를 치워 재생도 멈춘다.
- assert.match(src,/if\(e\.target===overlay\)closeLightbox\(\)/);
- assert.match(src,/e\.key==='Escape'/);
- assert.match(src,/node\.remove\(\)/);
- // 초점 복귀·비공개 파일 blob 정리.
- assert.match(src,/opener\.focus\(\{preventScroll:true\}\)/);
- assert.match(src,/URL\.revokeObjectURL\(lightboxBlob\)/);
- // 크게 보기 단추 클릭 연결.
- assert.match(src,/closest\('\[data-lt-expand\]'\)/);
- // 세로 영상 파일은 영상 정보(가로세로)로 틀을 바꾼다.
- assert.match(src,/video\.videoHeight>video\.videoWidth/);
- assert.match(src,/element\.videoHeight>element\.videoWidth/);
+/* ── 이슈 952: 소스 글자 검사(크게 보기·기억책·궤도·공통 CSS)를 동작 검사로 바꾼 자리 ──
+   글자로 고정하던 연결·CSS 규칙은 실제 화면(크롬)에서 잰다. 판정 기준은 느슨해지지 않았다 —
+   세로 틀 9:16·가로 16:9·크게 보기 닫힘·초점 복귀·재생 주소 한 벌을 결과로 확인한다. */
+let chromium952 = null;
+let skip952 = false;
+try {
+  ({ chromium: chromium952 } = await import('playwright'));
+  if (!existsSync(chromium952.executablePath())) skip952 = 'Playwright chromium이 설치되어 있지 않아 실행 시험을 건너뜀';
+} catch {
+  skip952 = 'playwright 패키지가 없어 실행 시험을 건너뜀';
+}
+
+// 미디어 조각만 담는 최소 호스트: media-preview.js와 공통 CSS(identity.css)를 실제로 읽는다.
+const MEDIA_HOST = '<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="/v41/identity.css"></head>' +
+  '<body data-record-source="server" data-member="in"><script src="/v41/media-preview.js"></script><div id="host"></div></body></html>';
+const PIXEL = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64');
+
+let server952, base952;
+test.before(async () => { server952 = await serve({ '/host-media-952': MEDIA_HOST }); base952 = `http://127.0.0.1:${server952.address().port}`; });
+test.after(() => new Promise((ok) => server952.close(ok)));
+
+async function mediaPage952(browser) {
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const page = await ctx.newPage();
+  const outside = (u) => { try { return /(^|\.)?(ytimg\.com|youtube\.com|youtube-nocookie\.com|googlevideo\.com)$/.test(new URL(u).hostname); } catch { return false; } };
+  await page.route(outside, (route) => route.abort());
+  await page.route('**/api/youtube/oembed*', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: '{"videoId":"x","title":"영상","authorName":"채널","thumbnailUrl":""}' }));
+  await page.route('**://i.ytimg.com/**', (route) => route.fulfill({ status: 200, contentType: 'image/png', body: PIXEL }));
+  await page.goto(`${base952}/host-media-952`, { waitUntil: 'load' });
+  return { ctx, page };
+}
+
+const RATIO = (sel) => `(() => { const el = document.querySelector(${JSON.stringify(sel)}); return el ? getComputedStyle(el).aspectRatio : null; })()`;
+
+test('952 실행: 세로 영상 틀은 화면에서 9:16, 가로는 16:9다(미리보기·재생 틀 둘 다)', { skip: skip952 || undefined }, async () => {
+  const browser = await chromium952.launch();
+  try {
+    const { ctx, page } = await mediaPage952(browser);
+    try {
+      await page.evaluate((urls) => {
+        document.getElementById('host').innerHTML =
+          LTMedia.markup(urls.shorts, '세로 영상', null, 'm1', { source: 'server', owned: true }) +
+          LTMedia.markup(urls.watch, '가로 영상', null, 'm2', { source: 'server', owned: true });
+      }, { shorts: SHORTS, watch: WATCH });
+      assert.equal(await page.evaluate(RATIO('.lt-media[data-lt-vertical="1"] .lt-yt-preview')), '9 / 16', '세로 미리보기 틀');
+      // 그 자리 재생: 누른 뒤 만들어지는 재생 틀도 같은 판정을 따르고, 재생 주소는 embedUrl 한 벌에서 온다.
+      await page.evaluate(() => document.querySelector('.lt-media[data-lt-moment-id="m2"] [data-lt-play]')?.click());
+      await page.waitForSelector('.lt-media[data-lt-moment-id="m2"] .lt-yt-frame', { timeout: 10000 });
+      assert.equal(await page.evaluate(RATIO('.lt-media[data-lt-moment-id="m2"] .lt-yt-frame')), '16 / 9', '가로 재생 틀');
+      const playSrc = await page.evaluate(() => document.querySelector('.lt-media[data-lt-moment-id="m2"] .lt-yt-frame')?.getAttribute('src'));
+      assert.equal(playSrc, embedUrl('abc123DEF45', 0), '재생 주소는 book-usability 의 embedUrl 한 벌');
+      await page.evaluate(() => document.querySelector('.lt-media[data-lt-moment-id="m1"] [data-lt-play]')?.click());
+      await page.waitForSelector('.lt-media[data-lt-moment-id="m1"] .lt-yt-frame', { timeout: 10000 });
+      assert.equal(await page.evaluate(RATIO('.lt-media[data-lt-moment-id="m1"] .lt-yt-frame')), '9 / 16', '세로 재생 틀');
+    } finally { await ctx.close(); }
+  } finally { await browser.close(); }
 });
 
-test('#393 기억책 연결: 세로 틀·원본 비율 썸네일·크게 보기·재생 틀까지 같은 판정',()=>{
- const extra=read('public/v41/views/book/book-extra.js');
- const css=read('public/v41/views/book/book-usability.css');
- const book=read('public/v41/views/book/book.js');
- // 판정·주소는 LTMedia 한 벌(화면 하드코딩 없음).
- assert.match(extra,/LTMedia\.verticalVideo\(safe\.url,safe\.mediaMetadata\)/);
- assert.match(extra,/LTMedia\.youtubeThumbUrl\(media\.videoId,true\)/);
- assert.match(extra,/thumbFallbackAttrs\(m,/,'공용 썸네일 내려가기 모듈로 물러난다(#429)');
- assert.doesNotMatch(extra,/i\.ytimg\.com/);
- // 세로 표시·재생 틀.
- assert.match(extra,/class="yt-play'\+\(vertical\?' is-vertical':''\)/);
- assert.match(extra,/data-yt-vertical="1"/);
- assert.match(extra,/frame\.className='yt-frame'\+\(yt\.dataset\.ytVertical==='1'\?' is-vertical':''\)/);
- // 크게 보기 단추와 연결.
- assert.match(extra,/data-yt-expand/);
- assert.match(extra,/LTMedia\.openLightbox\(m\.url,titleViewFor\(m\)\.main,LTMedia\.verticalVideo\(m\.url,m\.mediaMetadata\)\)/);
- // CSS: 가로 16:9, 세로 9:16, 세로 썸네일은 잘리지 않게 contain.
- assert.match(css,/\.yt-play\{[^}]*aspect-ratio:16\/9/);
- assert.match(css,/\.yt-play\.is-vertical\{[^}]*aspect-ratio:9\/16/);
- assert.match(css,/\.yt-play\.is-vertical img\{object-fit:contain\}/);
- assert.match(css,/\.yt-frame\{[^}]*aspect-ratio:16\/9/);
- assert.match(css,/\.yt-frame\.is-vertical\{[^}]*aspect-ratio:9\/16/);
- // 크게 보기 중에는 화살표 넘김·상세 Esc 가 책 뒤에서 동작하지 않는다.
- assert.match(book,/document\.querySelector\('\.lt-lightbox'\)/);
- assert.match(extra,/if\(document\.querySelector\('\.lt-lightbox'\)\)return/);
- // 세로 영상(주소 판정)은 책 페이지 위쪽 크게, 제목·메모는 아래로.
- assert.match(book,/vertical\?media\+`<h2>/);
-});
-
-test('#393 순간 상세 창(첫 화면 궤도 대화상자)도 같은 틀 규칙',()=>{
- const orbit=read('src/views/orbit.js');
- assert.match(orbit,/globalThis\.LTMedia\?\.verticalVideo\?\.\(c\.url,c\.mediaMetadata\)/);
- assert.match(orbit,/detail-image\$\{vertical\?' detail-image--vertical':''\}/);
- assert.match(orbit,/\.detail-image--vertical\{[^}]*aspect-ratio:9\/16/);
-});
-
-test('#393 공통 틀·크게 보기 CSS: 세로 9:16·어두운 깔개·최상단·움직임 줄이기 배려',()=>{
- const css=read('public/v41/identity.css');
- assert.match(css,/\.lt-media\[data-lt-vertical="1"\] \.lt-yt-frame\{[^}]*aspect-ratio:9\/16/);
- assert.match(css,/\.lt-media\[data-lt-vertical="1"\] \.lt-yt-preview\{[^}]*aspect-ratio:9\/16/);
- assert.match(css,/\.lt-media\[data-lt-vertical="1"\] \.lt-media-body img\{[^}]*object-fit:contain!important/);
- assert.match(css,/\.lt-lightbox\{position:fixed;inset:0;z-index:400/);
- assert.match(css,/\.lt-lightbox-vertical \.lt-lightbox-media\{[^}]*aspect-ratio:9\/16/);
- assert.match(css,/\.lt-lightbox-media\{[^}]*aspect-ratio:16\/9/);
- assert.match(css,/@media\(prefers-reduced-motion:reduce\)\{\.lt-lightbox\{backdrop-filter:none\}\}/);
+test('952 실행: 크게 보기는 눌렀을 때 열고, Esc로 닫으며, 초점이 단추로 돌아온다', { skip: skip952 || undefined }, async () => {
+  const browser = await chromium952.launch();
+  try {
+    const { ctx, page } = await mediaPage952(browser);
+    try {
+      await page.evaluate((urls) => {
+        document.getElementById('host').innerHTML =
+          LTMedia.markup(urls.shorts, '세로 영상', null, 'm1', { source: 'server', owned: true }) +
+          LTMedia.markup(urls.watch, '가로 영상', null, 'm2', { source: 'server', owned: true });
+      }, { shorts: SHORTS, watch: WATCH });
+      // 세로: 창이 세로 틀(9:16)로 열린다.
+      await page.evaluate(() => { const b = document.querySelector('.lt-media[data-lt-moment-id="m1"] [data-lt-expand]'); b.focus(); b.click(); });
+      await page.waitForSelector('.lt-lightbox iframe.lt-lightbox-media', { timeout: 10000 });
+      const opened = await page.evaluate(() => ({
+        vertical: document.querySelector('.lt-lightbox').classList.contains('lt-lightbox-vertical'),
+        src: document.querySelector('.lt-lightbox iframe.lt-lightbox-media')?.getAttribute('src'),
+        ratio: getComputedStyle(document.querySelector('.lt-lightbox iframe.lt-lightbox-media')).aspectRatio
+      }));
+      assert.equal(opened.vertical, true, '세로 영상의 크게 보기 창');
+      assert.equal(opened.src, embedUrl('9NXOCr-T8LU', 0), '크게 보기 재생 주소도 embedUrl 한 벌');
+      assert.equal(opened.ratio, '9 / 16', '크게 보기 세로 틀');
+      await page.keyboard.press('Escape');
+      await page.waitForFunction(() => !document.querySelector('.lt-lightbox'), null, { timeout: 5000 });
+      assert.equal(await page.evaluate(() => document.activeElement?.dataset?.ltExpand !== undefined), true, '닫으면 초점이 크게 보기 단추로 돌아온다');
+      // 가로: 같은 창이 16:9로 열린다.
+      await page.evaluate(() => { const b = document.querySelector('.lt-media[data-lt-moment-id="m2"] [data-lt-expand]'); b.focus(); b.click(); });
+      await page.waitForSelector('.lt-lightbox iframe.lt-lightbox-media', { timeout: 10000 });
+      assert.equal(await page.evaluate(RATIO('.lt-lightbox iframe.lt-lightbox-media')), '16 / 9', '크게 보기 가로 틀');
+      await page.keyboard.press('Escape');
+      await page.waitForFunction(() => !document.querySelector('.lt-lightbox'), null, { timeout: 5000 });
+    } finally { await ctx.close(); }
+  } finally { await browser.close(); }
 });

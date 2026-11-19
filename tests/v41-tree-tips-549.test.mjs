@@ -266,6 +266,50 @@ test('#619-5 트리가 2 개·순간이 26 개여도 첫 트리 안내는 뜨지
   } finally { await browser.close(); }
 });
 
+// 이슈 933: 새 트리 만들기(첫 여정) 화면에서는 안내 판을 띄우지 않는다 — 아직 트리를 만든 적이 없는데
+// '첫 트리를 만들었어요' 판이 화면 오른쪽 미리보기 판을 덮던 문제.
+test('#933 새 트리 만들기 화면에서는 첫 트리 안내 판이 뜨지 않고, 만든 뒤 화면에서는 다시 뜬다', { skip: REQUIRE ? false : skip }, async () => {
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    await openWithFirstTree(page);
+    // 트리 고르기 → '+ 새 트리'
+    await page.locator('#record-menu').click();
+    await page.waitForFunction(() => !document.getElementById('tree-popover')?.hidden, null, { timeout: 15000 });
+    // 단추가 실제로 보이는 것을 확인한 뒤 진짜 마우스로 누른다(창 항목은 pointer 이벤트로도 반응한다).
+    const newTree = page.locator('[data-tree-action="new"]').first();
+    await newTree.waitFor({ state: 'visible', timeout: 15000 });
+    await newTree.click();
+    // 느린 곳(CI)에서는 프레임이 새로 붙느라 늦다 — 넉넉히 기다린다.
+    await page.waitForFunction(() => {
+      try { return /first-journey/.test(document.getElementById('view').contentWindow.location.pathname); } catch { return false; }
+    }, null, { timeout: 40000 });
+    const state = await page.evaluate(() => {
+      const shown = (el) => !!el && !el.hidden && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';
+      const frame = document.getElementById('view');
+      const base = frame.getBoundingClientRect();
+      const panes = [...(frame.contentDocument?.querySelectorAll('.pane, .grow, .grow-stage, .steps, .journey-head, .media-host') || [])]
+        .filter((el) => el.getClientRects().length > 0)
+        .map((el) => { const r = el.getBoundingClientRect(); return { l: r.left + base.left, t: r.top + base.top, r: r.right + base.left, b: r.bottom + base.top }; });
+      const tips = document.getElementById('tree-tips');
+      const t = tips.getBoundingClientRect();
+      const overlap = panes.reduce((sum, p) => sum + Math.max(0, Math.min(t.right, p.r) - Math.max(t.left, p.l)) * Math.max(0, Math.min(t.bottom, p.b) - Math.max(t.top, p.t)), 0);
+      return {
+        dialogs: [...document.querySelectorAll('dialog[open]')].map((d) => d.id),
+        tipsShown: shown(tips),
+        tipsOverlapWithPane: Math.round(overlap)
+      };
+    });
+    assert.deepEqual(state.dialogs, [], '트리 관리 창은 닫혀 있다(창 0장)');
+    assert.equal(state.tipsShown, false, '새 트리 만들기 화면에서는 안내 판이 뜨지 않는다');
+    assert.equal(state.tipsOverlapWithPane, 0, '미리보기 판과 겹치는 안내 판이 없다');
+    // 트리를 만든 뒤 화면(서재)으로 돌아오면 다시 보인다 — 안내를 없애 버린 것이 아니다.
+    await page.goto(`${base}/v41/?account=1`, { waitUntil: 'load' });
+    await page.waitForFunction(() => { const tips = document.getElementById('tree-tips'); return tips && tips.hidden === false; }, null, { timeout: 20000 });
+    assert.equal(await page.evaluate(() => document.getElementById('tree-tips').hidden), false, '다른 화면에서는 안내가 그대로 뜬다');
+  } finally { await browser.close(); }
+});
+
 // #845 3단계: 창 위에 창을 여는 규칙(이슈 #845 규칙표). showModal을 여는 입장에서 판정한다 —
 // 잠깐 판(옮길 트리 고르기·내 보관 파일 고르기·둘러보기 미리보기)은 위에 겹침을 허용하고, 그 밖의
 // 큰 창이 열릴 때는 앞 창을 공통 판정(requestPanelClose)으로 닫고 열린다.

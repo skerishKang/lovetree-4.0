@@ -1,4 +1,6 @@
-import test from 'node:test';import assert from 'node:assert/strict';import {readFileSync} from 'node:fs';
+import test from 'node:test';import assert from 'node:assert/strict';import {readFileSync, existsSync} from 'node:fs';
+import {serve} from './helpers/screen-audit.mjs';
+import {createTree, addMoment} from '../public/v41/domain.mjs';
 // #327 2부: 모아둔 순간 표시·정리 화면. 계산은 inbox-model.mjs 한 벌이고, 화면은 그 결과를 그린다.
 import {INBOX_LABEL, isInboxTree, shelfOrder, pickerLabel, headerBadge, josaRo, cleanupTargets, cleanupState, movedNotice, cleanupAvailable, moveAvailable} from '../public/v41/inbox-model.mjs';
 const read=p=>readFileSync(new URL(p,import.meta.url),'utf8');
@@ -94,71 +96,6 @@ test('moveAvailable: 내 기록이면 일반 트리에서도 옮기기를 보여
  for(const [input,want] of rows)assert.equal(moveAvailable(input),want,JSON.stringify(input));
 });
 
-test('책장: inbox 트리를 맨 앞으로 정렬하고 표지에는 이름 하나만 보인다(#896)',()=>{
- const shelf=read('../public/v41/views/shelf/shelf.js');
- assert.match(shelf,/buildShelf\(shelfOrder\(LTDEMO\.library\)/);
- // #896: 표지 위 '모아둔 순간' 이름표는 표지 제목과 겹쳐 보였다 — 이름표를 없애고 표지 제목(트리 이름) 하나만 남는다.
- assert.doesNotMatch(shelf,/inbox-chip/,'표지에서 이름표를 뺐다');
- assert.match(shelf,/import \{ shelfOrder \} from '\.\.\/\.\.\/inbox-model\.mjs'/);
- const css=read('../public/v41/views/shelf/shelf.css');
- assert.doesNotMatch(css,/\.inbox-chip/,'이름표 규칙도 거둔다');
- const model=read('../public/v41/views/shelf/shelf-model.mjs');
- assert.match(model,/inbox: tree\.inbox === true/);
- // 보기 데이터(LTDEMO.library)에도 inbox 표시가 그대로 옮겨진다.
- const nav=read('../public/v41/view-navigation.js');
- assert.match(nav,/inbox:t\.inbox===true/);
-});
-
-test('셸: 헤더 표시·정리 입구·트리 고르기 목록이 inbox-model 을 쓴다',()=>{
- const shell=read('../public/v41/shell.mjs');
- // 트리 드롭다운: inbox를 맨 위에 두고 '정리 전 N'으로 표시한다.
- assert.match(shell,/tree\.inbox===true\?`정리 전 /);
- assert.match(shell,/const ordered=trees\.sort\(\(a,b\)=>Number\(b\?\.inbox===true\)-Number\(a\?\.inbox===true\)\)/);
- // #380 5번: 정리 입구는 트리 ▾ 드롭다운 한 곳뿐(모아둔 순간일 때만) — 헤더 단추는 없앴다.
- assert.match(shell,/cleanupAvailable\(\{source,owned:!!member\?\.snapshot\(\)\.owned,tree:currentTree\}\)/);
- assert.doesNotMatch(shell,/\$\('cleanup-menu'\)/, '옛 헤더 정리 단추 조회가 남지 않는다');
- assert.match(shell,/escHTML\(displayTreeTitle\(tree\.title\|\|tree\.subject\|\|'트리'\)\)/);
- // 정리 창 모듈 연결과 진입(드롭다운 항목).
- assert.match(shell,/createCleanup\(\{/);
- assert.match(shell,/data-tree-action="cleanup"/);
- assert.ok(shell.includes(`[data-tree-action="cleanup"]')?.addEventListener('click',()=>{closeTreeMenu();shellCleanup.open({});})`),'드롭다운 정리 항목이 정리 창을 연다');
- // 보기 메시지의 옮기기 요청(lt41-move)은 소스 글자 대신 동작으로 본다 — tests/v41-shell-messages.test.mjs.
-});
-
-test('정리 창: 순간 고르기·새 트리 만들기·옮기기·안내가 화면에 있다',()=>{
- const html=read('../public/v41/index.html');
- // #380 5번: 옛 헤더 '정리하기' 단추는 없다 — 입구는 트리 ▾ 드롭다운뿐이다.
- assert.equal(html.includes('id="cleanup-menu"'),false,'옛 헤더 단추 없음');
- assert.match(html,/id="cleanup-panel"/);
- assert.match(html,/id="cleanup-moments"/);
- assert.match(html,/id="cleanup-new-name"/);
- assert.match(html,/id="cleanup-target"/);
- assert.match(html,/id="cleanup-create"/);
- assert.match(html,/id="cleanup-move"/);
- assert.match(html,/id="move-feedback"/);
- assert.match(html,/id="move-message"/);
- assert.match(html,/id="move-actions"/);
- const cleanup=read('../public/v41/shell/cleanup.mjs');
- // 저장은 기존 도메인 경로 그대로다.
- assert.match(cleanup,/apply\('treeFromMoments', \{ momentIds: pickedIds\(\), subject: name \}, \{ treeId: fromTreeId \}\)/);
- assert.match(cleanup,/apply\('moveMoment', \{ toTreeId: targetId \}, \{ treeId: fromTreeId, momentId \}\)/);
- // 옮긴 뒤 안내: '가 보기' 단추가 대상 트리로 보내고, 원래 트리에 머문다(트리가 남아 있을 때).
- assert.match(cleanup,/movedNotice\(\{ targetLabel, isNew \}\)/);
- assert.match(cleanup,/button\.textContent = notice\.action/);
- assert.match(cleanup,/choose\(treeId\)/);
- assert.match(cleanup,/stillThere && window\.LT41\?\.tree\?\.id !== fromTreeId/);
- assert.match(cleanup,/choose\(fromTreeId\)/);
- // 대상이 없으면 옮기기 칸을 숨긴다.
- assert.match(cleanup,/\$\('cleanup-move-box'\)\.hidden = !targets\.length/);
-});
-
-test('궤도 첫 화면의 "모아둔 순간" 알약은 #380으로 제거됐다',()=>{
-  const html=read('../v41/home.html');
-  assert.doesNotMatch(html,/homeInboxFlag/);
-  const home=read('../v41/home.js');
-  assert.doesNotMatch(home,/homeInboxFlag/);
-});
-
 test('안내 바는 첫 트리 말풍선 위에 온다(말풍선이 안내를 가리지 않는다)',()=>{
  const css=read('../public/v41/shell.css');
  const zOf=sel=>{const m=css.match(new RegExp(sel+'\\{[^}]*?z-index:(\\d+)'));return m?Number(m[1]):null;};
@@ -168,15 +105,89 @@ test('안내 바는 첫 트리 말풍선 위에 온다(말풍선이 안내를 �
  assert.ok(move!==null&&move>tips,'안내 바(#move-feedback)가 말풍선보다 위여야 한다');
 });
 
-test('순간 상세의 옮기기: 내 기록에서만 보이고 공유·예시는 숨긴다',()=>{
- const book=read('../public/v41/views/book/book-extra.js');
- assert.match(book,/data-detail-move/);
- assert.match(book,/window\.parent\.LT41\.source==='server'/);
- assert.match(book,/lt41-move/);
- const runtime=read('../public/v41/runtime.js');
- assert.match(runtime,/context\.source==='server'/);
- assert.match(runtime,/lt41-move/);
- const board=read('../public/v41/views/board/board-extras.js');
- assert.match(board,/window\.parent\.LT41\.source==='server'&&!LTDEMO\.readOnly/);
- assert.match(board,/lt41-move/);
+// ─── 이슈 970: 모아둔 순간을 실제 화면에서 본다(가짜 데이터만, 390·1440) ───
+// 목록(넓은 화면은 보드 카드, 휴대폰은 고르기 줄)이 보이고, 하나를 누르면 그 순간의 상세가
+// 열리고, 닫으면 초점이 연 곳으로 돌아온다. 운영 API·운영 계정 없이 가짜 작업장만 쓴다.
+// LT_970_REQUIRE=1 일 때 실행(CI 화면 잡 — 건너뜀=실패).
+const REQUIRE970 = process.env.LT_970_REQUIRE === '1';
+let chromium970, skip970 = false;
+try {
+  ({chromium: chromium970} = await import('playwright'));
+  if (!existsSync(chromium970.executablePath())) skip970 = 'Playwright Chromium이 없어 화면 시험을 건너뜀';
+} catch { skip970 = 'playwright 패키지가 없어 화면 시험을 건너뜀'; }
+
+function inboxFixture() {
+  const clock = '2026-11-18T00:00:00Z';
+  let box = createTree({subject: '모아둔 순간', title: '첫 담은 순간', note: '첫 마음', emotion: '설렘', date: '2026-11-18', url: ''}, clock);
+  box = addMoment(box, {title: '바다 무대 직캠', note: '둘째 마음', emotion: '설렘', date: '2026-11-18', url: ''}, box.moments[0].id, '2026-11-18T00:01:00Z');
+  box = addMoment(box, {title: '새벽 연습실', note: '셋째 마음', emotion: '위로', date: '2026-11-18', url: ''}, box.moments[1].id, '2026-11-18T00:02:00Z');
+  box.inbox = true;
+  const other = createTree({subject: '우리의 이야기', title: '다른 트리 순간', note: '', emotion: '설렘', date: '2026-11-18', url: ''}, clock);
+  return {box, other};
+}
+
+test('970 실행: 모아둔 순간 — 목록·누르면 맞는 상세·닫으면 초점 복귀(가짜 데이터)', {skip: skip970 || !REQUIRE970 ? skip970 || 'LT_970_REQUIRE=1 일 때 실행' : false, timeout: 180000}, async () => {
+  const server = await serve();
+  const origin = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium970.launch({headless: true});
+  try {
+    const {box, other} = inboxFixture();
+    for (const width of [1440, 390]) {
+      const ctx = await browser.newContext({viewport: {width, height: width === 390 ? 844 : 900}, reducedMotion: 'reduce'});
+      await ctx.addInitScript(() => { try { localStorage.setItem('lt41.theme', 'night'); } catch {} });
+      await ctx.route('**://i.ytimg.com/**', (r) => r.fulfill({status: 200, contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="10" height="10" fill="#333"/></svg>'}));
+      await ctx.route('**/api/**', (r) => r.fulfill({status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}'}));
+      const state = {version: 1, trees: [other, box], prefs: {}};
+      await ctx.route('**/api/workspace**', (r) => r.fulfill({status: 200, contentType: 'application/json', body: JSON.stringify({revision: 1, state, subject: '시험계정', writeSubjectBound: true, savedAt: '2026-11-18T09:00:00.000Z'})}));
+      const page = await ctx.newPage();
+      await page.goto(`${origin}/v41/?account=1#my/board?tree=${box.id}`, {waitUntil: 'load', timeout: 60000});
+      await page.waitForFunction(() => !!window.LT41?.trees?.length, null, {timeout: 20000});
+      await page.locator('#discover-ask-no').click().catch(() => {});
+      // 보드 프레임이 순간 카드를 다 그릴 때까지 기다린다.
+      await page.waitForFunction((n) => [...document.querySelectorAll('iframe')].some((f) => { try { return /track58-pinboard/.test(f.contentWindow.location.href) && f.contentDocument.querySelectorAll('.card').length >= n; } catch { return false; } }), box.moments.length, {timeout: 20000});
+      const frame = page.frames().find((f) => /track58-pinboard/.test(f.url()));
+      assert.ok(frame, `${width}: 보드 프레임이 열리지 않음`);
+      assert.match(await page.evaluate(() => document.getElementById('source-label')?.textContent || ''), /모아둔 순간/, `${width}: 머리줄에 모아둔 순간 표시`);
+
+      const target = box.moments[1];
+      if (width === 1440) {
+        // 목록: 카드 셋이 제목과 함께 보인다.
+        const cards = await frame.evaluate(() => [...document.querySelectorAll('.card')].map((c) => ({id: c.dataset.id, title: c.querySelector('.cardTitle')?.textContent || '', visible: c.getClientRects().length > 0})));
+        assert.deepEqual(cards.map((c) => c.id).sort(), box.moments.map((m) => m.id).sort(), `${width}: 목록에 모아둔 순간 셋`);
+        for (const m of box.moments) assert.ok(cards.find((c) => c.id === m.id && c.title === m.title && c.visible), `${width}: 카드 '${m.title}'가 목록에 보인다`);
+        // 하나를 누르면 맞는 상세가 열린다(자리 잡힘이 끝날 때까지 기다려 누른다).
+        await frame.locator(`.card[data-id="${target.id}"]`).click({timeout: 10000});
+        await frame.waitForFunction(() => document.getElementById('detail')?.classList.contains('open'), null, {timeout: 10000});
+        assert.equal(await frame.evaluate(() => document.getElementById('dTitle')?.textContent || ''), target.title, `${width}: 누른 순간의 상세 제목`);
+        // 닫으면 초점이 연 카드로 돌아온다.
+        await frame.click('#detailClose');
+        await frame.waitForFunction(() => !document.getElementById('detail')?.classList.contains('open'), null, {timeout: 5000});
+        await page.waitForTimeout(150);
+        const focus = await frame.evaluate((id) => {
+          const a = document.activeElement;
+          return {tag: a?.tagName || '', id: a?.id || '', isCard: !!(a?.classList?.contains('card') && a?.dataset?.id === id)};
+        }, target.id);
+        assert.equal(focus.isCard, true, `${width}: 상세를 닫으면 초점이 연 카드로 돌아온다(지금 초점: ${focus.tag}#${focus.id})`);
+      } else {
+        // 휴대폰 목록: 고르기(select)에 순간 셋이 순서대로 있다.
+        const options = await frame.evaluate(() => [...document.querySelectorAll('.lt-moment-picker select option')].map((o) => o.value));
+        assert.deepEqual(options, box.moments.map((m) => m.id), `${width}: 고르기 목록에 모아둔 순간 셋`);
+        await frame.selectOption('.lt-moment-picker select', target.id);
+        await frame.click('.lt-moment-picker button');
+        await frame.waitForFunction(() => document.getElementById('detail')?.classList.contains('open'), null, {timeout: 10000});
+        assert.equal(await frame.evaluate(() => document.getElementById('dTitle')?.textContent || ''), target.title, `${width}: 누른 순간의 상세 제목`);
+        // 닫으면 초점이 연 단추(고르기 줄)로 돌아온다.
+        await frame.click('#detailClose');
+        await frame.waitForFunction(() => !document.getElementById('detail')?.classList.contains('open'), null, {timeout: 5000});
+        await page.waitForTimeout(150);
+        const focus = await frame.evaluate(() => {
+          const a = document.activeElement;
+          return {tag: a?.tagName || '', id: a?.id || '', inPicker: !!a?.closest?.('.lt-moment-picker')};
+        });
+        assert.equal(focus.inPicker, true, `${width}: 상세를 닫으면 초점이 고르기 줄로 돌아온다(지금 초점: ${focus.tag}#${focus.id})`);
+      }
+      await ctx.close();
+    }
+  } finally { await browser.close(); await new Promise((ok) => server.close(ok)); }
 });
+

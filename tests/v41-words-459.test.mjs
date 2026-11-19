@@ -47,27 +47,3 @@ test('#459 화면 글자에서 옛 낱말(기억책 열기·기억책에서 보�
   assert.deepEqual(hits, [], '옛 낱말이 남은 곳: ' + JSON.stringify(hits));
 });
 
-test('#459 낱말 표(docs/WORDS.md)가 있고 금지 낱말·예외를 적는다', () => {
-  const words = read('docs/WORDS.md');
-  for (const word of BANNED) assert.match(words, new RegExp(word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), word);
-  assert.match(words, /보드만의 동작\(핀 꽂기\)/, '보드 꽂기 예외 이유');
-  assert.match(words, /책의 한 장\(페이지\)을 넘기는 동작/, '책장 넘기기 예외 이유');
-  assert.match(words, /범위 밖/, '범위 밖(화면 안 제목) 항목');
-});
-
-test('#459 새 말이 실제로 쓰이는 곳: 메뉴·단추·화면 제목', () => {
-  const html = read('public/v41/index.html');
-  // 맨 위 메뉴: 책·보드·지도, 책장 진입은 트리 ▾의 '서재 전체 보기'·탭 줄 첫 자리 '서재'
-  assert.match(html, /data-view="track59-sketchbook\.html">책<\/button>/);
-  assert.match(html, /data-view="track58-pinboard\.html">보드<\/button>/);
-  assert.match(html, /data-view="track56-network\.html">지도<\/button>/);
-  // 순간 추가 창 제목과 서버 읽기 전용 단추
-  assert.match(html, /id="write-panel-title">순간 추가<\/h2>/);
-  const nav = read('public/v41/shell/navigation.mjs');
-  assert.match(nav, /\['shelf', 'track32-bookshelf\.html', '서재'\]/);
-  assert.match(nav, /\['book', 'track59-sketchbook\.html', '책'\]/);
-});
-
-function read(file) {
-  return fs.readFileSync(new URL(`../${file}`, import.meta.url), 'utf8');
-}

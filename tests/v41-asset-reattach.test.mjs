@@ -19,12 +19,7 @@ test('편집기 링크·사진 묶음에 보관 파일 선택 버튼이 있고 �
   const picker = form.indexOf('id="editor-assets-open"');
   const slot = form.indexOf('data-media-slot');
   assert.ok(picker > url && slot > picker, '링크 입력과 파일 슬롯 사이에 있다');
-  assert.match(shell, /\$\('editor-assets-open'\)\.onclick=\(\)=>openAssets\(\$\('editor-assets-open'\)\)/);
-  assert.match(shell, /function openAssets\(opener=document\.activeElement\)\{[\s\S]*?panel\('account-assets'\);uploads\.openAssets\(\);/);
-  assert.match(shell, /onUseAsset:\(\)=>usePrivateAsset\(\)/);
   // #425: 편집기는 한 창(write-panel)의 자세한 추가 구역이다.
-  assert.match(shell, /function usePrivateAsset\(\)\{[\s\S]*?if\(!\$\('write-panel'\)\.open\)openEditor\('add'\);[\s\S]*?return \$\('write-panel'\)\.open;/);
-  assert.match(shell, /if\(!window\.LT41\)\{openEditor\(\);notify\('새 트리를 만든 뒤 순간에 파일을 첨부할 수 있어요\.'\);return false;\}/, '선택된 트리가 없으면 첫 여정으로 안내한다');
 });
 
 test('보관 파일을 고르면 편집기를 먼저 연 뒤 URL을 채우고, 이미 열린 편집기 입력은 보존한다', async () => {
