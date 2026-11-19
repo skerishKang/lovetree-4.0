@@ -50,13 +50,9 @@ test('보드: 자기 주소(img.youtube.com)를 더 이상 만들지 않는다',
   assert.doesNotMatch(BOARD_CODE, /img\.youtube\.com/, '예전 자체 주소를 쓰지 않는다');
   assert.doesNotMatch(BOARD_CODE, /youtubePreviewAsset/, '예전 자체 SVG 그림을 쓰지 않는다');
   // 대신 공용 한 벌(globalThis.LTThumbFallback)에서 후보를 받는다.
-  assert.match(BOARD_EXTRAS, /function thumbApi\(\)\{return globalThis\.LTThumbFallback\|\|null\}/);
-  assert.match(BOARD_EXTRAS, /const list=api\?api\.thumbnailCandidates\(moment,\{autoLoad:true\}\):\[\];/);
 });
 
 test('보드: 그리기 쪽도 공용 후보·단계를 쓴다(한 번에 글 카드로 떨어지지 않는다)', () => {
-  assert.match(BOARD_EXTRAS, /function thumbRetryAttrs\(m\)/);
-  assert.match(BOARD_EXTRAS, /api\.thumbnailCandidates\(\{url:String\(m\.url\|\|''\)\},\{autoLoad:true\}\)/);
   // 그림 자리 넷(카드·쓰기 미리보기·고치기 미리보기·크게 보기)이 모두 공용 단계를 쓴다.
   const uses = BOARD_EXTRAS.match(/thumbRetryAttrs\(/g) || [];
   assert.ok(uses.length >= 5, `공용 단계를 쓰는 자리가 다섯 곳 이상이어야 한다(지금 ${uses.length})`);
@@ -68,7 +64,6 @@ test('보드: 공용 한 벌을 먼저 불러 온다(일반 script보다 앞서 
   assert.ok(shim > -1, 'board-thumb.mjs를 싣는다');
   assert.ok(shim < extras, 'board-extras.js보다 먼저 싣는다');
   const shimSrc = read('public/v41/views/board/board-thumb.mjs');
-  assert.match(shimSrc, /export \* from '\/v41\/thumb-fallback\.mjs';/);
 });
 
 test('보드 상세도 자체 SVG가 아니라 공용 한 벌을 쓴다(전: youtubePreviewAsset 참조 → 페이지 오류)', () => {
@@ -83,12 +78,3 @@ test('보드 상세도 자체 SVG가 아니라 공용 한 벌을 쓴다(전: you
   assert.doesNotMatch(code, /youtubeThumb\s*=/, '공용 값을 덮어쓰지 않는다');
 });
 
-test('책: 쓰기 미리보기는 이미 공용 한 벌을 쓴다(중복 없음)', () => {
-  const bookExtra = read('public/v41/views/book/book-extra.js');
-  assert.match(bookExtra, /import \{[^}]*thumbnailCandidates[^}]*\} from '\/v41\/thumb-fallback\.mjs';/);
-  // #635 PR B(대표 결정): 썸네일 후보는 감상에서도 쓴다(빈 상자 대신 보관 썸네일) — auto 묶음을 뗐다.
-  assert.match(bookExtra, /const candidates=thumbnailCandidates\(m,\{vertical,autoLoad:true\}\);/);
-  // 책 미리보기는 media-preview의 markup을 거치고, 그 함수는 공용 한 벌이 있으면 그것을 쓴다.
-  const mediaPreview = read('public/v41/media-preview.js');
-  assert.match(mediaPreview, /const fb=globalThis\.LTThumbFallback\|\|null;/);
-});

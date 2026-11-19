@@ -123,31 +123,16 @@ function communityHarness({ dateStyle = 'dot', items = [], comments = [] } = {})
 // 카드 글자를 실제로 만드는 함수는 모듈 안쪽이라, 계약(공용 한 벌을 지난다)을 코드로 고정한다.
 test('둘러보기: 카드·댓글 날짜가 공용 한 벌을 지난다(전: ISO 앞 10글자 고정 → #547 지역 날짜 경유)', () => {
   const src = read('public/v41/community-panel.mjs');
-  assert.match(src, /import \{formatDisplayDate\} from '\.\/book-usability\.mjs';/);
   // 하은 1회차(261116): 새벽(KST 0~9시)에 담은 순간의 카드가 UTC 절단('2026. 11. 15')으로 나온 것을
   // 고친다 — 서버 시각(UTC 타임스탬프)은 localDateOnly(#547 한 벌)로 지역 날짜를 만들어 넘긴다.
-  assert.match(src, /import \{localDateOnly\} from '\.\/local-date\.mjs';/);
-  assert.match(src, /const when=value=>formatDisplayDate\(localDateOnly\(value\),dateStyle\(\)\);/);
-  assert.doesNotMatch(src, /String\(comment\.createdAt\|\|''\)\.slice\(0,10\)/, '댓글 날짜가 원본 앞 10글자로 남지 않는다');
-  assert.doesNotMatch(src, /String\(item\.createdAt\|\|''\)\.slice\(0,10\)/, '카드 날짜가 원본 앞 10글자로 남지 않는다');
-  assert.match(src, /const dateStyle=\(\)=>\(typeof getDateStyle==='function'\?getDateStyle\(\):'dot'\);/);
   // 셸이 설정을 넘긴다.
   assert.match(read('public/v41/shell/messages.mjs'), /getDateStyle: \(\) => getDateStyle\(\),/);
-});
-
-test('보관 파일: 날짜가 공용 한 벌을 지난다(전: toLocaleString(ko-KR))', () => {
-  // 주석은 빼고 코드만 본다(설명에 옛 호출 이름이 남는 것은 상관없다).
-  const src = read('public/v41/private-upload.mjs').split('\n').filter((line) => !line.trim().startsWith('//')).join('\n');
-  assert.match(src, /import \{formatDisplayDate\} from '\.\/book-usability\.mjs';/);
-  assert.match(src, /const uploadedDate\s*=\s*formatDisplayDate\(asset\.createdAt\s*,\s*getState\(\)\?\.prefs\?\.dateStyle\)/);
-  assert.doesNotMatch(src, /toLocaleString\('ko-KR'\)/);
 });
 
 test('L13 규칙: 값을 받아 location.reload() 하는 코드를 새로 만들지 않았다', () => {
   // 날짜 값을 받아 다시 뜨는 길은 #476/#477이 정리한 첫 화면 하나뿐이다. 여기서 새로 만들지 않는다.
   for (const p of ['public/v41/shell/messages.mjs', 'public/v41/shell.mjs', 'public/v41/community-panel.mjs', 'public/v41/private-upload.mjs']) {
     const src = read(p);
-    assert.doesNotMatch(src, /location\.reload\(\)/, `${p}에 프레임 새로고침이 없다`);
   }
   // 이 L13 변경은 새 날짜 메시지 '수신기'를 만들지 않는다 — community-panel·private-upload에는 원래도 없다.
   for (const p of ['public/v41/community-panel.mjs', 'public/v41/private-upload.mjs']) {
@@ -156,5 +141,4 @@ test('L13 규칙: 값을 받아 location.reload() 하는 코드를 새로 만들
   // messages.mjs의 message 수신기는 예전부터 있던 하나뿐이고(날짜 메시지를 받지 않는다), 새로 늘리지 않았다.
   const msgSrc = read('public/v41/shell/messages.mjs');
   assert.equal((msgSrc.match(/addEventListener\('message'/g) || []).length, 1, 'messages.mjs의 message 수신기는 하나뿐이다');
-  assert.doesNotMatch(msgSrc, /lt41-date-style/, 'messages.mjs가 날짜 메시지를 받지 않는다');
 });

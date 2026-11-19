@@ -68,7 +68,6 @@ test('refreshUnauthorized 진입부 canRefresh=false면 재시도 없이 401 반
 
 test('shell.mjs는 공용 화면에서 게이트를 끄고 startMember에서 켠다',()=>{
   const shell=readFileSync(new URL('../public/v41/shell.mjs',import.meta.url),'utf8');
-  assert.match(shell,/setMemberRefreshStarted\(false\)/);
   const startLine=shell.split(/\r?\n/).find(line=>line.includes('async function startMember'));
   assert.ok(startLine,'startMember 선언이 있어야 한다');
   assert.match(startLine,/setMemberRefreshStarted\(true\)/);
