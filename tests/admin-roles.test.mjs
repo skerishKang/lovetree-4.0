@@ -4,7 +4,7 @@ import { createApiHandler } from '../server/http.js';
 import { createWorkspaceService } from '../server/workspace-service.js';
 import { createMemoryWorkspaceRepo } from '../server/testing/memory-workspace-repo.js';
 import { createModelAdminRoleStore } from '../server/testing/model-admin-role-store.js';
-import { createAdminRoleService, ROLE_ADMIN, ROLE_AI_CUSTOMER, ROLE_TESTER } from '../server/admin-roles.js';
+import { createAdminRoleService, ROLE_ADMIN, ROLE_AI_CUSTOMER, ROLE_TESTER, isAiTesterRole, aiTesterFor } from '../server/admin-roles.js';
 import { parseRoleArgs, emailList, mask } from '../tools/admin-role.mjs';
 import { createAdminStatsService } from '../server/admin-stats.js';
 import { createMemoryStatsRepo } from '../server/testing/memory-stats-repo.js';
@@ -318,4 +318,17 @@ test('시험 계정 부여 도구(#671): 이메일 목록을 다듬고, tester �
   assert.match(masked, /^[0-9a-f]{8}$/);
   assert.ok(!masked.includes('charlie'));
   assert.notEqual(mask('a@b.test'), mask('b@b.test'));
+});
+
+test('#936: AI 명예회원 배지 비트는 역할 하나에서만 정한다', async () => {
+  assert.equal(isAiTesterRole(ROLE_AI_CUSTOMER), true);
+  assert.equal(isAiTesterRole(ROLE_TESTER), false);
+  assert.equal(isAiTesterRole(ROLE_ADMIN), false);
+  assert.equal(isAiTesterRole(null), false);
+  const admin = { roleFor: async ({ subjectId }) => subjectId === 'ai' ? ROLE_AI_CUSTOMER : subjectId === 'bad' ? (() => { throw new Error('store'); })() : null };
+  const lookup = ({ subjectId, admin: a = admin }) => aiTesterFor({ admin: a, productId: 'p', subjectId });
+  assert.equal(await lookup({ subjectId: 'ai' }), true, 'AI 고객은 배지 1');
+  assert.equal(await lookup({ subjectId: 'normal' }), false, '일반 계정은 배지 0');
+  assert.equal(await lookup({ subjectId: 'bad' }), false, '역할 조회 실패도 같은 값(false)');
+  assert.equal(await lookup({ subjectId: 'ai', admin: null }), false, '역할 저장소가 없어도 같은 값(false)');
 });
