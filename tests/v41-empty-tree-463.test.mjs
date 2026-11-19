@@ -5,7 +5,8 @@
 // '첫 트리 만들기'는 덜 강조, ④ 빈 화면 바탕이 너무 비어 보인다(대표 결정: 점선 빈 카드 3장 + 금빛 실).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
+import { serve } from './helpers/screen-audit.mjs';
 
 const read = (p) => readFileSync(new URL('../' + p, import.meta.url), 'utf8');
 const shell = read('public/v41/shell.mjs');
@@ -94,4 +95,65 @@ test('#463 모바일(390)은 세로 3장, 넓은 화면은 가로 3장 (가로 �
 test('#463 흐림(blur)·반투명 겹침을 쓰지 않는다(2026-11-08 대표)', () => {
   const artBlock = identity.slice(identity.lastIndexOf('/* #463(2026-11-13): 트리 0개 빈 화면의'));
   assert.doesNotMatch(artBlock, /filter:blur|backdrop-filter/, '흐림 없음');
+});
+
+// ─── 이슈 970: 빈 화면(순간 0개)을 실제 화면에서 본다(390·1440) ───
+// 로그인 계정에 순간이 0개(트리 0개)면 빈 안내와 다음 할 일 단추가 화면 안에 보이고,
+// 단추를 누르면 맞는 창(첫 트리 만들기 여정)이 열린다. 운영 API·운영 계정 없이 가짜 작업장만 쓴다.
+// LT_970_REQUIRE=1 일 때 실행(CI 화면 잡 — 건너뜀=실패).
+const REQUIRE970 = process.env.LT_970_REQUIRE === '1';
+let chromium970, skip970 = false;
+try {
+  ({ chromium: chromium970 } = await import('playwright'));
+  if (!existsSync(chromium970.executablePath())) skip970 = 'Playwright Chromium이 없어 화면 시험을 건너뜀';
+} catch { skip970 = 'playwright 패키지가 없어 화면 시험을 건너뜀'; }
+
+test('970 실행: 빈 화면(순간 0개) — 안내·단추가 화면 안에, 누르면 맞는 창', { skip: skip970 || !REQUIRE970 ? skip970 || 'LT_970_REQUIRE=1 일 때 실행' : false, timeout: 120000 }, async () => {
+  const server = await serve();
+  const origin = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium970.launch({ headless: true });
+  try {
+    for (const width of [1440, 390]) {
+      const ctx = await browser.newContext({ viewport: { width, height: width === 390 ? 844 : 900 }, reducedMotion: 'reduce' });
+      await ctx.addInitScript(() => { try { localStorage.setItem('lt41.theme', 'night'); } catch {} });
+      await ctx.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
+      const state = { version: 1, trees: [], prefs: {} };
+      await ctx.route('**/api/workspace**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ revision: 1, state, subject: '시험계정', writeSubjectBound: true, savedAt: '2026-11-18T09:00:00.000Z' }) }));
+      const page = await ctx.newPage();
+      // 빈 안내는 기록 화면에서 보인다(홈은 예시 궤도를 보여 준다 — 261118 결정). 책 화면으로 들어간다.
+      await page.goto(`${origin}/v41/?account=1#my/book`, { waitUntil: 'load', timeout: 60000 });
+      await page.waitForFunction(() => document.body.dataset.treeCount === '0' && !document.getElementById('empty')?.hidden, null, { timeout: 20000 });
+      await page.locator('#discover-ask-no').click().catch(() => {});
+      const m = await page.evaluate(() => {
+        const rect = (el) => { const b = el.getBoundingClientRect(); return { l: Math.round(b.left), t: Math.round(b.top), r: Math.round(b.right), b: Math.round(b.bottom) }; };
+        const empty = document.getElementById('empty');
+        const h1 = empty.querySelector('h1'), p = empty.querySelector('p');
+        const btn = document.getElementById('empty-records');
+        return {
+          h1: h1.textContent.trim(), p: p.textContent.trim(),
+          btnText: btn.textContent.trim(), btnPrimary: btn.classList.contains('primary'),
+          btnShown: !btn.hidden && btn.getClientRects().length > 0,
+          h1Rect: rect(h1), pRect: rect(p), btnRect: rect(btn),
+          vw: innerWidth, vh: innerHeight
+        };
+      });
+      assert.ok(m.h1.length > 0, `${width}: 빈 안내 제목이 있다`);
+      assert.ok(m.p.length > 0, `${width}: 빈 안내 한 줄이 있다`);
+      assert.equal(m.btnShown, true, `${width}: 다음 할 일 단추가 보인다`);
+      assert.equal(m.btnPrimary, true, `${width}: 로그인 빈 화면에서는 주 단추로 강조`);
+      const inside = (r) => r.l >= 0 && r.t >= 0 && r.r <= m.vw && r.b <= m.vh;
+      assert.ok(inside(m.h1Rect), `${width}: 안내 제목이 화면 안(${JSON.stringify(m.h1Rect)})`);
+      assert.ok(inside(m.pRect), `${width}: 안내 한 줄이 화면 안(${JSON.stringify(m.pRect)})`);
+      assert.ok(inside(m.btnRect), `${width}: 다음 할 일 단추가 화면 안(${JSON.stringify(m.btnRect)})`);
+      // 단추를 누르면 맞는 창이 열린다 — 트리 0개에서는 '첫 트리 만들기' 첫 여정 화면.
+      // 첫 여정은 iframe을 location.replace로 연다(src 속성이 아니라 실제 주소로 판정).
+      await page.click('#empty-records');
+      await page.waitForFunction(() => {
+        const f = document.getElementById('view');
+        try { return !f.hidden && /first-journey\.html/.test(f.contentWindow.location.href); } catch { return false; }
+      }, null, { timeout: 10000 });
+      assert.equal(await page.evaluate(() => document.getElementById('empty').hidden), true, `${width}: 첫 여정이 열리면 빈 안내는 숨는다`);
+      await ctx.close();
+    }
+  } finally { await browser.close(); await new Promise((ok) => server.close(ok)); }
 });
