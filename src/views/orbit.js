@@ -101,9 +101,13 @@ export function mountOrbit(host,{trees,storage,context,actions,authHtml='',onSel
   if(!demo){const ringNames=Object.keys(rings);const perRing={},slot={};for(const c of all)perRing[c.ring]=(perRing[c.ring]||0)+1;for(const c of all){const k=slot[c.ring]||0;slot[c.ring]=k+1;c.baseAngle=(k/perRing[c.ring])*Math.PI*2;c.phaseOffset=ringNames.indexOf(c.ring)*.78;}}
   // #429 2/2: 화면 폭별 카드 수 상한 — 1280 이상 28장, 900~1279 20장, 650~899 14장, 그 아래(390 포함) 10장.
  // 값은 마운트 때 정하지 않고 frame마다 폭으로 다시 판정해 창 크기가 바뀌면 따라간다(넘치는 카드는 숨긴다).
- const CARD_CAPS=[[1280,28],[900,20],[650,14],[0,10]];
+  // #942: 안전 구역 피하기는 자리에 앉은 카드의 크기 클래스별 이름표(crumb)로 계산한다.
+  // 그림자 안에서 offsetWidth 는 글꼴·썸네일 로딩 전 0/작은 값일 수 있어 lg 카드가 가운데를 스쳤다.
+  const CARD_NOMINAL={wide:{sm:[128,166],md:[180,232],lg:[226,292]},narrow:{sm:[92,120],md:[132,172],lg:[168,218]}};
+  const forceLg=()=>{try{return localStorage.getItem('lt41.forceLg')==='1'}catch{return false}};
+  const CARD_CAPS=[[1280,28],[900,20],[650,14],[0,10]];
  const cardCapFor=w=>{for(const [min,cap] of CARD_CAPS)if(w>=min)return cap;return 10;};
- const cards=all.slice(0,48), last=demo?all[0]:resume(storage,trees);
+  const cards=all.slice(0,48).map((c)=>forceLg()?{...c,sizeClass:'lg'}:c), last=demo?all[0]:resume(storage,trees);
  const lastCard=demo?all[0]:all.find(c=>c.treeId===last?.tree.id&&c.id===last?.moment.id)||all[0];
  // #426: 첫 화면 가운데 "최근 순간 카드" — 모든 트리의 최근 순간 한 장. 궤도가 예시 모드(로그인 후 '섞어서'에서 사진 3장 미만·mix-empty, 또는 예시 고름)여도
  // 순간만 있으면 내 최근 순간 카드를 보여 준다(둘째 줄 안내를 대신한다). 로그아웃은 momentList가 없어 자동으로 카드가 없다.
@@ -573,12 +577,13 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
   if(safeZoneDirty){measureSafeZone();safeZoneDirty=false;}
   // #593: 카드 크기는 배치할 때마다 다시 잰다 — 첫 배치 때 크기 클래스(.lg/.sm)·글꼴이 아직 안 붙어
   // 작게 재면, 안전 구역 밀어내기가 실제보다 작은 사각형으로 계산해 카드가 가운데를 침범한다(실측 52px).
-  cardSizes=elements.map(el=>({w:el.offsetWidth||180,h:el.offsetHeight||232}));
+  const nominal=(w<=650?CARD_NOMINAL.narrow:CARD_NOMINAL.wide);
+  cardSizes=elements.map((el,i)=>{const n=nominal[cards[i].sizeClass]||nominal.md;return {w:Math.max(el.offsetWidth||0,n[0]),h:Math.max(el.offsetHeight||0,n[1])};});
   layoutBox={w,h};
   if(warmups<1)warmups=1;
   const cap=cardCapFor(w);
   // 궤도 애니메이션 — 폭 대역(좁은 화면 반지름 표)이나 안전 구역이 바뀌면 다시 굽고, 아니면 시각만 맞춘다.
-  const band=w<=650?'narrow':'wide',boxKey=`${band}|${Math.round(w)}x${Math.round(h)}|${safeZone?`${Math.round(safeZone.l)},${Math.round(safeZone.t)},${Math.round(safeZone.r)},${Math.round(safeZone.b)}`:'-'}|${warmups}`;
+  const band=w<=650?'narrow':'wide',boxKey=`${band}|${Math.round(w)}x${Math.round(h)}|${safeZone?`${Math.round(safeZone.l)},${Math.round(safeZone.t)},${Math.round(safeZone.r)},${Math.round(safeZone.b)}`:'-'}|${warmups}|${cards.map((c)=>c.sizeClass).join('')}`;
   const needBake=orbitBox!==boxKey;
   // #593: 지금 위상의 자리로 한 번 배치해 밝기·z-index(placeCard)를 쓰고, 떠 있음 애니메이션을 건다.
   // 유휴에는 이 배치를 다시 부르지 않는다 — 프레임마다 쓰던 style 쓰기가 사라진 자리다.

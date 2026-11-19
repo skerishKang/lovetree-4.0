@@ -405,6 +405,39 @@ s('#942 궤도는 한 방향으로 60~120초에 한 바퀴, 정지·튐 0, 클�
   } finally { await browser.close(); }
 }, { timeout: 180000 });
 
+// #942: 최악 경우 — 모든 자리에 lg 카드를 앉혀도 가운데 안전 구역 침범 0. 카드별 이름표 크기로 밀어내는지 확인한다.
+s('#942 모든 자리 lg 카드도 가운데를 침범하지 않는다(390·1440·1920)', async () => {
+  const browser = await chromium.launch({ headless: true });
+  try {
+    for (const [w, h] of [[390, 844], [1440, 900], [1920, 1080]]) {
+      const ctx = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 1, reducedMotion: 'reduce' });
+      await ctx.addInitScript(() => { try { localStorage.setItem('lt41.forceLg', '1'); } catch {} });
+      const page = await ctx.newPage();
+      await page.goto(`${lib.base}/v41/`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+      const frame = await frameOf(page);
+      assert.ok(frame, `${w}: 첫 화면이 열린다`);
+      await page.waitForTimeout(3000);
+      const d = await frame.evaluate(() => {
+        const sr = document.querySelector('main#orbit').shadowRoot;
+        const c = sr.querySelector('.center'), cc = c.getBoundingClientRect();
+        const cards = [...sr.querySelectorAll('.card')].filter((el) => getComputedStyle(el).display !== 'none');
+        const intruders = [];
+        for (const [i, el] of cards.entries()) {
+          const r = el.getBoundingClientRect();
+          const iw = Math.max(0, Math.min(cc.right, r.right) - Math.max(cc.left, r.left));
+          const ih = Math.max(0, Math.min(cc.bottom, r.bottom) - Math.max(cc.top, r.top));
+          if (iw * ih > 1) intruders.push({ index: i, cls: el.className, rect: [Math.round(r.left), Math.round(r.top), Math.round(r.right), Math.round(r.bottom)], overlap: Math.round(iw * ih) });
+        }
+        return { cards: cards.length, lg: cards.filter((el) => el.classList.contains('lg')).length, center: [Math.round(cc.left), Math.round(cc.top), Math.round(cc.right), Math.round(cc.bottom)], intruders };
+      });
+      console.log('WORST_LG', w, JSON.stringify(d));
+      assert.equal(d.lg, d.cards, `${w}: 모든 자리가 lg 카드`);
+      assert.equal(d.intruders.length, 0, `${w}: lg 카드도 가운데 침범 0(실제 ${d.intruders.length}장)`);
+      await ctx.close();
+    }
+  } finally { await browser.close(); }
+}, { timeout: 300000 });
+
 // #942 2번: 두 '+ 순간 추가' 단추의 computed 배경·글자색을 b221f32 시점 값으로 고정한다(1440·390 × 밤·정원, 대비 4.5:1).
 s('#942 가운데·헤더 추가 단추 색이 원래 값이다', async () => {
   const expected = {
