@@ -639,3 +639,38 @@ test('#678 후속: tester 계정 트리는 둘러보기·다른 팬 보기에 �
  assert.ok(direct.tree,'공유 링크 직접 열기는 막히지 않는다');
  assert.equal(direct.tree.title,'시험 계정 트리');
 });
+
+test('#936: 같은 역할 계정의 공개 카드는 배지가 일관되게 — 명예회원 100%, 일반 0%',async()=>{
+ const three=(prefix,date)=>[
+  {title:prefix+' 첫 순간',date,url:TAG_URL,keywords:['가수:RESCENE']},
+  {title:prefix+' 둘 순간',date,url:TAG_URL,keywords:[]},
+  {title:prefix+' 셋 순간',date,url:TAG_URL,keywords:[]}
+ ];
+ const data=await tagSetup({
+  accounts:[
+   {subject:'ai',trees:[
+    {title:'명예회원 첫 트리',moments:three('명예 첫','2026-11-05')},
+    {title:'명예회원 둘 트리',moments:three('명예 둘','2026-11-04')}
+   ]},
+   {subject:'normal',trees:[
+    {title:'일반 첫 트리',moments:three('일반 첫','2026-11-03')},
+    {title:'일반 둘 트리',moments:three('일반 둘','2026-11-02')}
+   ]}
+  ],
+  aiSubjects:['ai']
+ });
+ const list=await call(data.handle,'GET','/api/community/shares');
+ assert.equal(list.status,200);
+ const aiCards=list.body.items.filter(item=>item.title.startsWith('명예회원'));
+ const normalCards=list.body.items.filter(item=>item.title.startsWith('일반'));
+ assert.equal(aiCards.length,2,'명예회원 공개 트리 2개');
+ assert.equal(normalCards.length,2,'일반 공개 트리 2개');
+ assert.ok(aiCards.every(item=>item.aiTester===true),'명예회원 카드 배지 100%');
+ assert.ok(normalCards.every(item=>item.aiTester===undefined),'일반 카드 배지 0%');
+ // 같은 판정이 '다른 팬 보기'에도 적용된다(목록·미리보기·공유 안내가 같은 비트).
+ const tagged=await tagCall(data.handle,'가수:RESCENE');
+ const aiMoments=tagged.body.items.filter(item=>item.treeTitle.startsWith('명예회원'));
+ const normalMoments=tagged.body.items.filter(item=>item.treeTitle.startsWith('일반'));
+ assert.ok(aiMoments.length>0&&aiMoments.every(item=>item.aiTester===true),'명예회원 순간 배지 100%');
+ assert.ok(normalMoments.length>0&&normalMoments.every(item=>item.aiTester!==true),'일반 순간 배지 0%');
+});
