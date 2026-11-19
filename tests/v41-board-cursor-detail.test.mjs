@@ -105,7 +105,18 @@ test('1. 화면: 커서 동그라미가 없고, 판·카드는 grab·끌면 grab
   assert.equal(look.viewport, 'grab', `판 커서는 grab(${look.viewport})`);
   assert.equal(look.card, 'grab', `카드 커서는 grab(${look.card})`);
   // 판을 끌면 panning(grabbing)이 켜지고, 손을 떼면 꺼진다.
-  const box = await frame.$eval('#viewport', (el) => { const r = el.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + 60 }; });
+  const box = await frame.$eval('#viewport', (el) => {
+    const r = el.getBoundingClientRect();
+    // Find a real free portion of the board: card layout changes with the available viewport.
+    for (let y = r.top + 24; y < r.bottom - 24; y += 24) {
+      for (let x = r.left + 24; x < r.right - 24; x += 24) {
+        const hit = document.elementFromPoint(x, y);
+        if (hit && el.contains(hit) && !hit.closest('.card,button,select,input,textarea,a')) return { x, y };
+      }
+    }
+    return null;
+  });
+  assert.ok(box, 'a free board point exists for panning');
   await frame.evaluate(() => { window.__pan = []; const v = document.getElementById('viewport');
     new MutationObserver(() => window.__pan.push(v.classList.contains('panning'))).observe(v, { attributes: true, attributeFilter: ['class'] }); });
   await page.mouse.move(box.x, box.y);

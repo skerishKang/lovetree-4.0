@@ -478,4 +478,5 @@ else{selectMoment(target,false);$('#detail').classList.remove('open')}}
 // 카드가 줄어든 영역에 다시 쌓이게 한다. 좁은 화면은 아래 시트 그대로(덮음) — 예전 규칙을 유지한다.
 function syncBoardPush(){if(innerWidth<760)return;const dt=$('#detail');if(!dt)return;const open=dt.classList.contains('open');
 viewport.style.marginRight=open?(dt.offsetWidth+32)+'px':'0px';
+$('#boardControls').style.marginRight=viewport.style.marginRight;
 placeAll();if(viewMode==='fit')fitAll(false);else boardStartView()}
