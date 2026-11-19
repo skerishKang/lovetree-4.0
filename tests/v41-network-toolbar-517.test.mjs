@@ -17,9 +17,21 @@ try {
   if (!existsSync(chromium.executablePath())) skip = 'Playwright Chromium이 없어 지도 도구 줄 시험을 건너뜀';
 } catch { skip = 'playwright 패키지가 없어 지도 도구 줄 시험을 건너뜀'; }
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.webp': 'image/webp', '.jpg': 'image/jpeg', '.woff2': 'font/woff2' };
+// #951: 순간 3개·8개짜리 주인 트리를 지도 화면에 직접 띄우는 호스트(셸 없이 — #792와 같은 틀).
+const mapHostHTML = (n) => {
+  const titles = ['Super Shy 무대', 'Ditto 직캠', 'OMG 앵콜', 'Hype Boy 연습실', 'Attention 무대', 'Cookie 직캠', 'ETA 뮤비', 'Get Up 무대'];
+  const tree = {
+    id: 't1', title: '뉴진스 순간', subject: '뉴진스',
+    moments: Array.from({ length: n }, (_, i) => ({ id: `m${i + 1}`, title: titles[i] || `순간 ${i + 1}`, date: `2026-11-${String(10 + i).padStart(2, '0')}`, emotion: '설렘', note: '공연의 한 장면', url: '', parentId: i === 0 ? null : `m${i}`, relation: '' })),
+    edges: Array.from({ length: Math.max(0, n - 1) }, (_, i) => ({ kind: 'parent', from: `m${i + 1}`, to: `m${i + 2}`, reason: '이 다음 장면이 궁금해서' }))
+  };
+  return `<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>지도 호스트</title></head><body data-member="in" data-record-source="server"><script>window.LT41={source:'server',writable:true,owned:true,momentId:'m1',prefs:{},tree:${JSON.stringify(tree)},trees:[]};location.hash='#network';</script><iframe src="/v41/views/track56-network.html" style="position:fixed;inset:0;width:100vw;height:100vh;border:0"></iframe></body></html>`;
+};
+const EXTRA_ROUTES = { '/map-host-3.html': mapHostHTML(3), '/map-host-8.html': mapHostHTML(8) };
 async function serve() {
   const server = createServer(async (req, res) => {
     const clean = decodeURIComponent((req.url || '/').split('?')[0]);
+    if (EXTRA_ROUTES[clean]) { res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }); res.end(EXTRA_ROUTES[clean]); return; }
     for (const file of [path.join(ROOT, clean), path.join(ROOT, clean, 'index.html')]) {
       if (path.relative(ROOT, file).startsWith('..')) continue;
       try {
@@ -70,7 +82,11 @@ test('지도 도구 줄: 390·360 × 밤·정원에서 넘침 0·누름 44px·�
             const vw = innerWidth;
             const vis = (el) => { const cs = getComputedStyle(el); if (cs.display === 'none' || cs.visibility === 'hidden') return false; const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
             const row = document.querySelector('.top-actions');
-            const buttons = [...(row?.querySelectorAll('button') || [])].filter(vis).map((b) => { const r = b.getBoundingClientRect(); return { id: b.id || (b.textContent || '').trim().slice(0, 10), l: Math.round(r.left), r: Math.round(r.right), h: Math.round(r.height) }; });
+            // #951 ①: 보기 방식은 붙은 단추 하나이고 좁으면 그 안에서 가로로 민다 — 묶음 칸 밖으로 나간 부분은 잘린 것으로 본다.
+            const buttons = [...(row?.querySelectorAll('button') || [])].filter(vis).map((b) => {
+              const r = b.getBoundingClientRect(), sw = b.closest('.view-switch'), st = sw ? sw.getBoundingClientRect() : null;
+              return { id: b.id || (b.textContent || '').trim().slice(0, 10), l: Math.round(st ? Math.max(r.left, st.left) : r.left), r: Math.round(st ? Math.min(r.right, st.right) : r.right), h: Math.round(r.height) };
+            });
             const rect = (sel) => { const el = document.querySelector(sel); if (!el || !vis(el)) return null; const b = el.getBoundingClientRect(); return { l: b.left, t: b.top, r: b.right, b: b.bottom }; };
             const topbar = rect('.topbar');
             const picker = rect('.lt-moment-picker');
@@ -94,6 +110,147 @@ test('지도 도구 줄: 390·360 × 밤·정원에서 넘침 0·누름 44px·�
           if (m.labelY != null && m.hero) assert.ok(m.labelY >= m.hero.b - 2, `${width} ${theme}: 첫 순간 이름표(${m.labelY})가 안내 문구(아래 ${Math.round(m.hero.b)})와 겹친다`);
           await context.close();
       }
+    }
+  } finally {
+    await browser?.close();
+    server.close();
+  }
+});
+
+// ── #951 ①② (대표 11-19): 위 단추 한 줄·작은 무리는 순간 8개 이하에서 가운데로 ──
+test('#951 ①② 위 단추 한 줄(높이 같음·줄 수 1) + 순간 3개 작은 무리(선 ≤240px·가운데 ±10%·이름표 0개 빠짐)', { skip: REQUIRE ? false : skip, timeout: 240000 }, async () => {
+  if (skip) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip}`);
+  const server = await serve();
+  const base = `http://127.0.0.1:${server.address().port}`;
+  let browser;
+  try {
+    browser = await chromium.launch({ headless: true });
+    for (const [width, height] of [[1440, 900], [390, 844], [375, 812], [360, 780]]) {
+      const context = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
+      await context.addInitScript(() => { try { localStorage.setItem('lt41.theme', 'night'); localStorage.removeItem('lt41.boardTheme'); } catch {} });
+      const page = await context.newPage();
+      await page.goto(`${base}/map-host-3.html`, { waitUntil: 'load' });
+      let frame = null;
+      for (let i = 0; i < 80 && !frame; i++) { frame = page.frames().find(f => /track56-network/.test(f.url())); if (!frame) await page.waitForTimeout(250); }
+      assert.ok(frame, `${width}: 지도 프레임이 열린다`);
+      await frame.waitForFunction(() => (window.__lt?.dots?.()?.length || 0) > 0, null, { timeout: 20000 });
+      await page.waitForTimeout(500);
+      const m = await frame.evaluate(() => {
+        const vis = (el) => { if (!el) return false; const cs = getComputedStyle(el); if (cs.display === 'none' || cs.visibility === 'hidden') return false; const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
+        const rect = (el) => { const r = el.getBoundingClientRect(); return { l: Math.round(r.left), r: Math.round(r.right), t: Math.round(r.top), b: Math.round(r.bottom), h: Math.round(r.height) }; };
+        const heroes = [...document.querySelectorAll('.top-actions button')].filter(vis);
+        // #951 ①: 보기 방식 묶음은 좁으면 안에서 가로로 민다 — 묶음 칸 밖으로 나간 부분은 잘린 것으로 보고 잰다.
+        const visRect = (b) => {
+          const sw = b.closest('.view-switch'), r = b.getBoundingClientRect(), st = sw ? sw.getBoundingClientRect() : null;
+          const l = st ? Math.max(r.left, st.left) : r.left, rr = st ? Math.min(r.right, st.right) : r.right;
+          return { left: l, right: rr, top: r.top, bottom: r.bottom, width: Math.max(0, rr - l), height: r.height };
+        };
+        const boxes = heroes.map((b) => ({ id: b.id || b.textContent.trim().slice(0, 8), l: Math.round(visRect(b).left), r: Math.round(visRect(b).right), t: Math.round(visRect(b).top), b: Math.round(visRect(b).bottom), h: Math.round(b.getBoundingClientRect().height), oneLine: b.scrollHeight - b.clientHeight <= 1 }));
+        // 단추끼리 겹침: 단추의 가운데 높이 세 점이 그 단추(또는 그 안 자식)에게 잡히지 않으면 가려진 것이다.
+        const overlaps = [];
+        for (const b of heroes) {
+          const r = visRect(b);
+          if (r.width < 2) continue; // 묶음 칸 밖으로 완전히 밀린 단추는 그려지지 않는다
+          const own = (t) => !!t && (t === b || b.contains(t));
+          const points = [[Math.max(r.left, r.left + 10), r.top + r.height / 2], [r.right - 10, r.top + r.height / 2], [r.left + r.width / 2, r.top + r.height / 2]];
+          if (!points.every(([x, y]) => own(document.elementFromPoint(x, y)))) overlaps.push(b.id || b.textContent.trim());
+        }
+        const meta = document.getElementById('connection-tool');
+        const dots = window.__lt.dots();
+        const labels = new Set(window.__lt.labels().map((l) => l.id));
+        const missing = dots.map((d) => d.id).filter((id) => !labels.has(id));
+        const cx = dots.reduce((s, d) => s + d.x, 0) / dots.length, cy = dots.reduce((s, d) => s + d.y, 0) / dots.length;
+        const picker = document.querySelector('.lt-moment-picker');
+        const swRect = document.querySelector('.view-switch')?.getBoundingClientRect();
+        const visibleSwitch = boxes.filter((b) => ['viewNet', 'viewConc', 'viewGraph'].includes(b.id));
+        return {
+          vw: innerWidth, vh: innerHeight, boxes, overlaps, heights: [...new Set(heroes.map((b) => Math.round(b.getBoundingClientRect().height)))],
+          oneLineAll: heroes.every((b) => b.scrollHeight - b.clientHeight <= 1),
+          meta: meta && meta.textContent.trim(), metaTop: meta ? rect(meta).t : null,
+          pickerTop: vis(picker) ? rect(picker).t : null,
+          compact: window.__lt.compact(), edgeMax: Math.max(0, ...window.__lt.edgeLen()),
+          cx: Math.round(cx), cy: Math.round(cy), missing, dots: dots.length,
+          switchFit: !!swRect && swRect.right <= innerWidth + 1 && visibleSwitch.every((b) => b.l >= (swRect.left - 1) && b.r <= swRect.right + 1 && b.t >= swRect.top - 1 && b.b <= swRect.bottom + 1),
+          overflow: Math.max(0, document.documentElement.scrollWidth - innerWidth, ...boxes.map((b) => Math.max(0, b.r - innerWidth))),
+          // CTO 지적(11-19): 390에서 트리 선택 단추가 보기 방식 묶음에 가려 '뉴진'만 보였다 — 겹침 0과 네 글자 보임을 함께 잰다.
+          // CTO 지적(11-19): 390·375에서 세 보기 이름이 다 보이고 위 단추끼리 겹치지 않아야 한다.
+          viewsFull: [...document.querySelectorAll('.view-switch .pill')].map((b) => { const r = b.getBoundingClientRect(), st = document.querySelector('.view-switch').getBoundingClientRect(); return [b.textContent.trim(), r.left >= st.left - 0.5 && r.right <= st.right + 0.5, getComputedStyle(b).fontSize]; }),
+          // CTO 지시(261119): 폰 폭은 두 줄 — 첫 줄(되돌아가기·트리 선택·전체 보기·더 보기), 둘째 줄(보기 셋).
+          rows: (() => {
+            const top = (id) => Math.round(document.getElementById(id).getBoundingClientRect().top);
+            return { first: ['shelfBackBtn', 'treeTitleBtn', 'overviewBtn', 'netBgBtn'].map(top), views: ['viewNet', 'viewConc', 'viewGraph'].map(top), barH: Math.round(document.querySelector('.topbar').getBoundingClientRect().height) };
+          })(),
+          // 보기 세 단추: 폭 같음·안쪽 여백 8px 이상·글자가 단추 안에.
+          viewBox: [...document.querySelectorAll('.view-switch .pill')].map((b) => {
+            const cs = getComputedStyle(b), r = b.getBoundingClientRect(), range = document.createRange();
+            range.selectNodeContents(b);
+            return { id: b.id, w: Math.round(r.width * 10) / 10, h: Math.round(r.height), padL: parseFloat(cs.paddingLeft), padR: parseFloat(cs.paddingRight), fs: parseFloat(cs.fontSize), textW: Math.round(range.getBoundingClientRect().width * 10) / 10 };
+          }),
+          // 되돌아가기 화살표는 하나(글자 + ::before) — 예전 폰 규칙이 화살표를 하나 더 그려 '←←'가 됐다.
+          back: (() => { const b = document.getElementById('shelfBackBtn'), before = getComputedStyle(b, '::before').content || ''; return { text: b.textContent.trim(), glyphs: (b.textContent.match(/←/g) || []).length + (before.includes('←') ? 1 : 0), before }; })(),
+          title: (() => {
+            const el = document.getElementById('treeTitleText'), btn = document.getElementById('treeTitleBtn');
+            const cs = getComputedStyle(el), probe = document.createElement('span');
+            probe.style.cssText = `position:absolute;visibility:hidden;white-space:pre;font:${cs.font}`;
+            probe.textContent = (el.textContent || '').trim().slice(0, 4);
+            document.body.append(probe);
+            const four = probe.getBoundingClientRect().width; probe.remove();
+            const tb = btn.getBoundingClientRect();
+            const clamp = (b) => { const sw = b.closest('.view-switch'), st = sw ? sw.getBoundingClientRect() : null, r = b.getBoundingClientRect(); return { id: b.id, left: st ? Math.max(r.left, st.left) : r.left, right: st ? Math.min(r.right, st.right) : r.right, top: r.top, bottom: r.bottom }; };
+            const over = [...document.querySelectorAll('.top-actions button')].filter(vis).map(clamp).filter((b) => tb.left < b.right - 0.5 && b.left < tb.right - 0.5 && tb.top < b.bottom - 0.5 && b.top < tb.bottom - 0.5).map((b) => b.id);
+            const net = document.getElementById('viewNet').getBoundingClientRect();
+            return { client: Math.round(el.clientWidth), four: Math.round(four), over };
+          })()
+        };
+      });
+      assert.equal(m.boxes.length, 5, `${width}: 위 단추 5개(보기 3·⤢·⋯)`);
+      assert.deepEqual(m.heights, [m.heights[0]], `${width}: 위 단추 높이 모두 같음(${m.heights})`);
+      assert.ok(m.oneLineAll, `${width}: 위 단추 글자 줄 수 1`);
+      assert.deepEqual(m.overlaps, [], `${width}: 위 단추끼리 겹침 없음(${m.overlaps})`);
+      assert.deepEqual(m.title.over, [], `${width}: 트리 선택이 위 단추에 가리지 않는다(${m.title.over})`);
+      assert.deepEqual(m.viewsFull.map((v) => v[1]), [true, true, true], `${width}: 보기 방식 세 이름이 다 보인다(${JSON.stringify(m.viewsFull)})`);
+      assert.deepEqual(m.viewsFull.map((v) => parseFloat(v[2]) >= 13), [true, true, true], `${width}: 보기 방식 글자는 13px 이상이다(${JSON.stringify(m.viewsFull)})`);
+      assert.ok(m.title.client >= m.title.four, `${width}: 트리 이름 네 글자 이상 보인다(보이는 폭 ${m.title.client} ≥ 네 글자 ${m.title.four})`);
+      assert.equal(m.back.glyphs, 1, `${width}: 되돌아가기 화살표는 하나다(${JSON.stringify(m.back)})`);
+      assert.ok(m.viewBox.every((v) => v.textW <= v.w - v.padL - v.padR + 1), `${width}: 보기 글자가 단추 안에 있다(${JSON.stringify(m.viewBox.map((v) => [v.textW, v.w]))})`);
+      assert.ok(m.viewBox.every((v) => v.fs >= 13), `${width}: 보기 글자 13px 이상(${JSON.stringify(m.viewBox.map((v) => v.fs))})`);
+      if (width < 431) {
+        // 폰 폭: 두 줄. 첫 줄 네 단추가 같은 높이, 보기 셋이 그 아래 한 줄에 나란히 — 줄 안·줄 사이 겹침 0.
+        assert.equal(new Set(m.rows.first).size, 1, `${width}: 첫 줄 단추 넷이 같은 높이다(${JSON.stringify(m.rows.first)})`);
+        assert.equal(new Set(m.rows.views).size, 1, `${width}: 둘째 줄 보기 셋이 같은 높이다(${JSON.stringify(m.rows.views)})`);
+        assert.ok(Math.min(...m.rows.views) - Math.max(...m.rows.first) >= 40, `${width}: 보기 줄은 첫 줄 아래에 있다(${JSON.stringify(m.rows)})`);
+        assert.ok(m.rows.barH >= 88, `${width}: 위 조작은 두 줄 높이다(${m.rows.barH})`);
+        const ws = m.viewBox.map((v) => v.w);
+        assert.ok(Math.max(...ws) - Math.min(...ws) <= 2, `${width}: 보기 세 단추 폭 차이 ≤2px(${JSON.stringify(ws)})`);
+        assert.ok(m.viewBox.every((v) => v.padL >= 8 && v.padR >= 8), `${width}: 보기 단추 안쪽 여백 ≥8px(${JSON.stringify(m.viewBox.map((v) => [v.padL, v.padR]))})`);
+        assert.ok(m.viewBox.every((v) => v.h >= 44), `${width}: 보기 단추 높이 44px 이상(${JSON.stringify(m.viewBox.map((v) => v.h))})`);
+      } else {
+        // 되돌아가기 단추는 원래 4px 낮게 앉는다(그 단추만 높이가 다르다) — 같은 줄인지만 본다.
+        assert.ok(Math.max(...[...m.rows.first, ...m.rows.views]) - Math.min(...[...m.rows.first, ...m.rows.views]) <= 6, `${width}: 위 단추는 한 줄(${JSON.stringify(m.rows)})`);
+      }
+      assert.equal(m.overflow, 0, `${width}: 화면 가로 넘침 0`);
+      assert.ok(m.switchFit, `${width}: 보기 방식 붙은 단추는 한 덩어리로 화면 안에 있다`);
+      assert.match(m.meta, /^순간 3 · 이어진 선 2개$/, `${width}: 아래 작은 글자`);
+      assert.ok(m.metaTop != null && (m.pickerTop == null || m.metaTop < m.pickerTop), `${width}: 작은 글자는 순간 고르기 줄보다 위`);
+      assert.ok(m.compact, `${width}: 순간 3개는 작은 무리 배치`);
+      assert.ok(m.edgeMax <= 240, `${width}: 선 최대 길이 ≤240px(${m.edgeMax})`);
+      const tolX = m.vw * 0.10, tolY = m.vh * 0.10;
+      assert.ok(Math.abs(m.cx - m.vw / 2) <= tolX && Math.abs(m.cy - m.vh / 2) <= tolY, `${width}: 무리 중심이 화면 가운데 ±10%(${m.cx},${m.cy})`);
+      assert.deepEqual(m.missing, [], `${width}: 이름표 없는 순간 0(${m.dots}개)`);
+      // ⋯ 안: 배경(테마 따라가기·종이·밤)과 사용법이 함께 있고, 배경을 고르면 판 속성이 따라온다.
+      await frame.click('#netBgBtn');
+      const menu = await frame.evaluate(() => {
+        const box = document.getElementById('netBgMenu');
+        return { open: !box.hidden, items: [...box.querySelectorAll('button')].filter((b) => getComputedStyle(b).display !== 'none').map((b) => (b.textContent || '').trim()), expanded: document.getElementById('netBgBtn').getAttribute('aria-expanded') };
+      });
+      assert.ok(menu.open && menu.expanded === 'true', `${width}: ⋯를 누르면 메뉴가 열린다`);
+      assert.deepEqual(menu.items, ['테마 따라가기', '종이', '밤', '사용법'], `${width}: 메뉴는 배경·도움말`);
+      await page.keyboard.press('Escape');
+      assert.ok(await frame.evaluate(() => document.getElementById('netBgMenu').hidden), `${width}: Esc로 메뉴가 닫힌다`);
+      await frame.click('#netBgBtn');
+      await frame.click('#netBgMenu .lt-bg-item[data-bg=night]');
+      assert.equal(await frame.evaluate(() => document.documentElement.getAttribute('data-lt-board-theme')), 'night', `${width}: '밤'을 고르면 밤 판이 된다`);
+      await context.close();
     }
   } finally {
     await browser?.close();
