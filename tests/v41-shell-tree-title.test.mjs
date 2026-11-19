@@ -163,12 +163,8 @@ test('2. 직접 쓴 이름은 그대로 둔다(정확히 일치할 때만 뗀다
   assert.equal(displayTreeTitle(undefined), '');
 });
 
-test('3. 셸 페이지 스크립트의 트리 드롭다운도 displayTreeTitle을 거친다(남김: 내보내기가 없다)', () => {
-  // shell.mjs는 내보내기가 없는 페이지 스크립트라 함수 시험으로 못 옮긴다(docs/TESTING.md 규칙 6) — 배선만 남긴다.
-  assert.match(shell, /import \{displayTreeTitle\} from '\.\/tree-name\.mjs';/);
-  // 트리 드롭다운: 표시 이름은 displayTreeTitle을 거친다.
-  assert.match(shell, /escHTML\(displayTreeTitle\(tree\.title\|\|tree\.subject\|\|'트리'\)\)/);
-});
+// '셸 페이지 스크립트 배선' 글자 검사 2개는 지웠다(이슈 952) — 트리 드롭다운에 실제로 그려진 이름은
+// tests/v41-topmenu-885.test.mjs가 화면에서 잰다(말줄임·⌄ 자리와 함께).
 
 test('3-1. 헤더가 실제로 줄인 이름을 보여 준다(함수 직접 호출)', () => {
   const {els, restore} = headerHarness({title: '리센느, 나의 순간들'});
@@ -253,7 +249,5 @@ test('4-2. 가로 YouTube 표지는 넓게 그리고 세로 표지는 흐린 배
 test('5. 긴 이름은 말줄임 — 헤더 트리 이름과 문맥 줄이 폭을 넘지 않는다', () => {
   // 261119 대표 결정: 칸 폭은 글자에 맞추고 긴 이름만 말줄임(상한 안). 옛 '고정 폭 11em' 단정은 지웠다 —
   // 지금의 폭·말줄임·⌄ 자리는 tests/v41-topmenu-885.test.mjs가 실제 화면에서 숫자로 잰다.
-  assert.match(css, /nav #record-menu #source-label\{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap\}/);
-  const context = css.slice(css.indexOf('#context-tree'));
-  assert.ok(context.length > 0, '#context-tree 스타일이 있다');
+  // css 말줄임 글자 검사도 이슈 952로 지웠다 — 같은 실측이 대신한다.
 });
