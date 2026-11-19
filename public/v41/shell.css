@@ -611,6 +611,8 @@ body.lt-frame-dialog-open #toast{top:calc(72px + env(safe-area-inset-top));botto
 .updates-foot button{min-height:44px;padding:0 24px;border-radius:var(--lt-r-pill);border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.04);color:var(--lt-pearl);font-size:14px}
 /* 새 소식 창은 비모달로 연다(shell.mjs panel — top layer 밖) — 화면 iframe(#stage>#view z2) 위로 보이게 셸 머리글(z5)보다 아래 z-index를 명시한다. */
 #updates-panel{z-index:4}
+/* #972: 새 소식의 제목·공지·연혁·닫기를 다른 전체 창의 본문 폭에 맞춘다. */
+#updates-panel>.panel-heading,#updates-panel>.updates-list,#updates-panel>#eras,#updates-panel>.updates-foot{max-width:960px;margin-left:auto;margin-right:auto}
 .updates-version{border:1px solid var(--lt-line);border-radius:var(--lt-r-card);padding:16px;background:var(--lt-glass)}
 .updates-version[data-active="true"]{border-color:var(--lt-gold-line)}
 .updates-version-title{font-size:19px;margin:0}

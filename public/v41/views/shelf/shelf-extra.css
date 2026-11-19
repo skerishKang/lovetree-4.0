@@ -220,12 +220,16 @@ html[data-v41-screen=shelf][data-lt-theme=garden] .book-card > .book-manage {
   color: var(--lt-paper);
 }
 
-/* ── 큰 화면(가로 1900px 이상) 서재(#서재-빈공간): 2560 같은 화면에서 .page가 1480px에 묶여
-   왼·오른쪽에 빈 공간이 남았다. 1920px까지 넓힌다. 11-19 대표 결정으로 책장 세로 중심은
-   화면 폭과 무관하게 남은 화면(이어 보기·검색 줄 아래) 가운데에 둔다 — 위쪽 자동 여백으로
-   밀지 않는다. 기준을 1900px로 둔 것은 1920 물리 화면이 스크롤바 때문에 가로 1918px쯤으로
-   읽히기 때문이다. */
+/* 큰 화면 서재의 본문은 1920px까지 넓힌다. 1920 화면에서 스크롤바가 생겨도 적용된다. */
 @media (min-width: 1900px) {
   html[data-v41-screen=shelf] .page { max-width: 1920px; }
-  html[data-v41-screen=shelf] .shelf-viewport { margin-top: auto; margin-bottom: auto; }
+}
+
+/* #972: 펼쳐 보기·검색·책장의 간격을 유지하며 세 요소를 함께 세로 가운데에 둔다. */
+html[data-v41-screen=shelf] .shelf-screen:has(.hero.strip-mode) .hero.strip-mode { margin-top: auto; }
+html[data-v41-screen=shelf] .shelf-screen:has(.hero.strip-mode) .shelf-viewport { margin-top: 0; margin-bottom: auto; }
+/* 책은 선반 위에 두고 표지·두 줄 이름표와 그림자에 필요한 높이만 남긴다. */
+html[data-v41-screen=shelf] .shelf-screen:has(.hero.strip-mode) .shelf-rail { height: 280px; }
+@media (max-width: 700px) {
+  html[data-v41-screen=shelf] .shelf-screen:has(.hero.strip-mode) .shelf-rail { height: 224px; }
 }
