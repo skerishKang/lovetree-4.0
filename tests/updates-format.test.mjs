@@ -207,15 +207,15 @@ test('261116: 4.1.2·4.1.1은 4.1.3 아래·4.1.0 위에 문구 그대로 들어
 
 // 옛 판을 다시 끼워 넣어도 최신 판이 그대로라 '새 소식' 점이 다시 뜨면 안 된다(#611 저장 규칙).
 test('261118: 옛 판 복원으로 새 소식 점이 다시 뜨지 않는다', () => {
-  assert.equal(latestEntry(UPDATES).version, '4.1.13', '최신 판은 4.1.13 그대로');
+  // #984: 최신 판 번호를 박지 않는다(새 판을 더할 때마다 깨진다) — 동작만 본다: 본 판과 최신 판이 같으면 점이 없다.
   const map = new Map();
   const storage = { getItem: k => (map.has(k) ? map.get(k) : null), setItem: (k, v) => map.set(k, v) };
-  markSeen(storage, '4.1.13');
   const latest = latestEntry(UPDATES).version;
-  assert.equal(compareVersions(latest, readSeen(storage)), 0, '본 판과 최신 판이 같아 점이 뜨지 않는다');
+  markSeen(storage, latest);
+  assert.equal(compareVersions(latestEntry(UPDATES).version, readSeen(storage)), 0, '본 판과 최신 판이 같아 점이 뜨지 않는다');
   // 4.1.1·4.1.2가 끼어도 그 사이 판을 본 사람에게만 새 소식이 뜬다.
   markSeen(storage, '4.1.0');
-  assert.equal(compareVersions(latest, readSeen(storage)), 1, '4.1.0까지 본 사람에게는 여전히 새 소식이 있다');
+  assert.equal(compareVersions(latestEntry(UPDATES).version, readSeen(storage)), 1, '4.1.0까지 본 사람에게는 여전히 새 소식이 있다');
 });
 
 // 261116(대표 확정): '러브트리가 걸어온 길' — 세대 카드 다섯 장, 옛것 → 지금 순서.
