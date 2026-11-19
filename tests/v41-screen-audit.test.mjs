@@ -148,7 +148,7 @@ test('#942 첫 화면 추가 단추와 숫자 묶음', { skip: REQUIRE ? false :
         const groups=await current.locator('.home-action-group').evaluateAll(es=>es.map(e=>{
           const b=e.querySelector('.subtleBtn'),n=e.querySelector('.home-count'),r=e.getBoundingClientRect(),br=b.getBoundingClientRect(),nr=n.getBoundingClientRect();
           const range=document.createRange();range.selectNodeContents(n);const tr=range.getBoundingClientRect();
-          return {label:b.textContent.trim(),count:n.hidden?'':n.textContent.trim(),x:r.x,y:r.y,w:r.width,h:r.height,inner:n.hidden?null:nr.top-br.bottom,center:n.hidden?null:(tr.left+tr.width/2)-(br.left+br.width/2),overflow:n.hidden?0:Math.max(0,tr.right-br.right,br.left-tr.left)};
+          return {label:b.textContent.trim(),count:n.hidden?'':n.textContent.trim(),x:r.x,y:r.y,w:r.width,h:r.height,inner:n.hidden?null:nr.top-br.bottom,center:n.hidden?null:(tr.left+tr.width/2)-(br.left+br.width/2),font:parseFloat(getComputedStyle(n).fontSize),overflow:n.hidden?0:Math.max(0,tr.right-br.right,br.left-tr.left)};
         }));
         const values={buttons,headers,head,fab,top,groups};const key=width+'-'+theme+'-'+kind;
         console.log('#942',key,JSON.stringify(values));
@@ -165,7 +165,7 @@ test('#942 첫 화면 추가 단추와 숫자 묶음', { skip: REQUIRE ? false :
         check(buttons[0]?.bg==='rgb(238, 231, 224)'&&buttons.slice(1).every(b=>b.bg!=='rgb(238, 231, 224)'&&b.border!=='0px'),key+' 크림색·보조 테두리');
         check(groups.length===3,key+' 묶음 3개');
         check(JSON.stringify(groups.map(g=>g.count))===JSON.stringify(member?['순간 14 · 모아둔 0','공개 트리 17','트리 3']:['',(signedIn?'':'예시 ')+'공개 트리 17 · 순간 123','']),key+' 숫자 귀속');
-        for(const g of groups.filter(g=>g.count))check(g.inner>=4&&g.inner<=6&&Math.abs(g.center)<=2&&g.overflow<=1,key+' 숫자 간격 '+JSON.stringify(g));
+        for(const g of groups.filter(g=>g.count))check(g.inner>=4&&g.inner<=6&&Math.abs(g.center)<=2&&g.font>=12&&g.overflow<=1,key+' 숫자 간격 '+JSON.stringify(g));
         for(let i=1;i<groups.length;i++){
           const a=groups[i-1],b=groups[i],gap=Math.abs(a.y-b.y)<2?b.x-a.x-a.w:b.y-a.y-a.h;
           check(gap>=Math.max(width===1440?16:14,3*5),key+' 묶음 간격 '+gap);
