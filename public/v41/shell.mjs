@@ -859,13 +859,21 @@ function paintEmptyCopy(){
  $('empty-sample').classList.toggle('primary',!owned);
  $('empty-file').hidden=owned;
 }
-// #977: 작업 공간을 읽다 예외가 나도 셸 모델은 비어 있는 채로라도 세운다(빈 화면에 멈추지 않게).
+// #977: 작업 공간을 읽다 예외가 나도 셸 전체가 멈추지 않게 한다.
+// 서버 기록이면 지금 화면을 그대로 두고 안내만 남긴다(모델을 비우면 지도·책 이동까지 막힌다).
+// 파일 고르기·공유는 부른 쪽이 실패를 알 수 있도록 그대로 던진다(기존 동작 유지).
 function projectWorkspace(input){
  try{return workspaceModel(input);}
- catch(error){console.warn('[LT41] 작업 공간을 읽지 못했어요:',error?.message||String(error));notify('기록을 불러오지 못했어요. 화면을 새로고침해 다시 시도해 주세요.');return {revision:0,trees:[],selection:{treeId:null,momentId:null}};}
+ catch(error){console.warn('[LT41] 작업 공간을 읽지 못했어요:',error?.message||String(error));return null;}
 }
 function load(input,kind,selection={},fallback={}){
- model=kind==='example'?{trees:[exampleTree]}:projectWorkspace(input);
+ const projected=kind==='example'?{trees:[exampleTree]}:projectWorkspace(input);
+ if(!projected){
+  if(kind!=='server')throw new Error('기록을 읽을 수 없어요. 파일 형식을 확인해 주세요.');
+  notify('기록을 불러오지 못했어요. 화면을 새로고침해 다시 시도해 주세요.',{hold:true});
+  return {position:{treeId:null,momentId:null},treeMissing:false,momentMissing:false};
+ }
+ model=projected;
  source=kind;
  if(kind!=='share'){
   activeShareId=null;
