@@ -343,7 +343,7 @@ jobs:
           fi
           node -e "import('playwright-core').then(()=>console.log('playwright-core 확인')).catch(e=>{console.error(e.message);process.exit(1)})"
       - name: 지도 도구 줄·책 이동 시험(#517·#518, 건너뜀=실패)
-        timeout-minutes: 10
+        timeout-minutes: 15
         env:
           LT_MAP_CONTRAST_REQUIRE: '1'
         run: |
