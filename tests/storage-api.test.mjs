@@ -373,3 +373,20 @@ test('a stored tree with broken timestamps and names is repaired on read, not qu
   assert.equal(got.body.state.trees[0].updatedAt, tree.createdAt);
   assert.equal(got.body.state.trees[0].subject, '윤슬, 나의 순간들', '빈 대상 이름은 제목으로 채운다');
 });
+
+test('onCommit receives the validated state only — quarantined originals stay out', async () => {
+  const seen = [];
+  const repo = createMemoryWorkspaceRepo();
+  const service = createWorkspaceService({ repo, productId: PRODUCT, onCommit: ({ doc }) => seen.push(doc) });
+  const deviant = deviantTree();
+  await seedDoc(repo, 'usr_e', { version: 1, trees: [deviant] });
+
+  const tree = createTree({ ...base, title: '새 트리' }, CLOCK);
+  await service.write({ productId: PRODUCT, subjectId: 'usr_e' }, { state: { version: 1, trees: [tree] }, expectedRevision: 1, clientKey: 'k-986c' });
+  assert.deepEqual(seen, [validateState({ version: 1, trees: [tree] })], '저장 뒤 onCommit에는 격리 원본이 없다');
+
+  await service.deleteTree({ productId: PRODUCT, subjectId: 'usr_e' }, tree.id);
+  assert.deepEqual(seen[1], { version: 1, trees: [], prefs: seen[1].prefs }, '삭제 뒤 onCommit에도 격리 원본이 없다');
+  const stored = (await repo.load({ productId: PRODUCT, subjectId: 'usr_e' })).doc;
+  assert.ok(stored.trees.some(t => t.id === deviant.id), '저장소에는 격리 원본이 그대로 남는다');
+});

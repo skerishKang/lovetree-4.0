@@ -40,7 +40,8 @@ function repairTreeValues(tree, now) {
 
 // 돌려주는 값: { state — 읽을 수 있는 트리만 담은 검증된 상태, quarantined — 뺀 트리의 원본 배열 }.
 // 문서 뼈대 자체(version·trees)가 어긋나면 트리별 복구가 불가하므로 null을 돌려준다.
-function readStoredDocument(doc, now = new Date().toISOString()) {
+// 공유·커뮤니티처럼 저장된 문서를 읽는 다른 서비스도 같은 판정을 쓴다(#986).
+export function readStoredDocument(doc, now = new Date().toISOString()) {
   if (!doc || doc.version !== 1 || !Array.isArray(doc.trees)) return null;
   const accepted = [], quarantined = [];
   for (const raw of doc.trees) {
@@ -120,7 +121,7 @@ export function createWorkspaceService({ repo, productId, onCommit = null }) {
       if (outcome.status === 'keyConflict') {
         throw new ApiError(409, 'client_key_conflict', '같은 요청 키로 다른 내용을 보내려 해요. 새 키로 다시 시도해 주세요.');
       }
-      await afterCommit(principal.subjectId, doc);
+      await afterCommit(principal.subjectId, validated);
       return { revision: outcome.revision, savedAt: outcome.savedAt };
     },
 
@@ -154,7 +155,7 @@ export function createWorkspaceService({ repo, productId, onCommit = null }) {
       if (outcome.status === 'keyConflict') {
         throw new ApiError(409, 'client_key_conflict', '같은 요청 키로 다른 내용을 보내려 해요. 새 키로 다시 시도해 주세요.');
       }
-      await afterCommit(principal.subjectId, doc);
+      await afterCommit(principal.subjectId, next);
       return { deleted: true, treeId, revision: outcome.revision, savedAt: outcome.savedAt };
     }
   };
