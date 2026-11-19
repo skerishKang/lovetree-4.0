@@ -1,12 +1,74 @@
 // #467: 보드·지도 판 테마(종이/밤) 배선 및 대비(contrast) 검증 시험
+// #952: 마크업·카피·셸 정규식 단정 31개를 걷어냈다. 화면 배선에서 남길 것은 하나다 —
+// 배경 드롭이 실제로 열리고, 고른 값이 셸로 가며, 열린 판이 그 자리에서 바뀌는가.
+// (설정 창의 '보드·지도 판' 행은 카피 고정, 밤 판 카드 대비는 v41-board-card-contrast가 실브라우저로 잰다.)
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
+import { createServer } from 'node:http';
+import { createReadStream } from 'node:fs';
+import { stat } from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   FRAME_MESSAGE_TYPES, frameMessage, shouldReloadOnFrameMessage
 } from '../public/v41/frame-wiring.mjs';
 
-const read = file => fs.readFileSync(new URL(`../${file}`, import.meta.url), 'utf8');
+const ROOT = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
+const PUB = path.join(ROOT, 'public');
+let chromium, skip = false;
+// CI(미리보기 검사)에서는 LT_BOARD_467_REQUIRE=1 — 크롬이 준비된 잡에서 건너뜀을 실패로 본다.
+const REQUIRE = process.env.LT_BOARD_467_REQUIRE === '1';
+try {
+  ({ chromium } = await import('playwright'));
+  const { existsSync } = await import('node:fs');
+  if (!existsSync(chromium.executablePath())) skip = 'Playwright Chromium이 없어 판 테마 화면 시험을 건너뜀';
+} catch { skip = 'playwright 패키지가 없어 판 테마 화면 시험을 건너뜀'; }
+const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.woff2': 'font/woff2' };
+
+function serve(extra = {}) {
+  const server = createServer(async (req, res) => {
+    const clean = decodeURIComponent((req.url || '/').split('?')[0]);
+    if (extra[clean]) { res.writeHead(200, { 'content-type': MIME['.html'] }); res.end(extra[clean]); return; }
+    for (const file of [path.join(PUB, clean), path.join(PUB, clean, 'index.html')]) {
+      if (path.relative(PUB, file).startsWith('..')) continue;
+      try {
+        if (!(await stat(file)).isFile()) continue;
+        res.writeHead(200, { 'content-type': MIME[path.extname(file)] || 'application/octet-stream' });
+        createReadStream(file).pipe(res); return;
+      } catch {}
+    }
+    res.writeHead(404); res.end('not found');
+  });
+  return new Promise((ok) => server.listen(0, '127.0.0.1', () => ok(server)));
+}
+
+const moment = (id, title) => ({ id, title, date: '2026-01-01', emotion: '설렘', note: '메모', parentId: null, url: '', x: 120, y: 120, rot: 0, color: 'rose', keywords: [] });
+// 셸 흉내: 프레임이 보내는 판 테마 요청을 모은다(셸은 이 값을 저장하고 열린 프레임에 되돌려 준다).
+const HOST = (view) => `<!doctype html><html lang="ko" data-lt-theme="garden"><head><meta charset="utf-8"><title>판 테마 호스트</title></head><body>
+<script>
+window.__choices=[];
+const tree={id:'t1',title:'판 테마 트리',moments:[${JSON.stringify(moment('m1', '첫 순간'))},${JSON.stringify(moment('m2', '둘째 순간'))}],edges:[]};
+window.LT41={source:'server',writable:true,owned:true,momentId:'m1',prefs:{},tree};
+addEventListener('message',e=>{if(e.data&&e.data.type==='lt41-board-theme-choice')window.__choices.push(e.data.value)});
+</script>
+<iframe src="/v41/views/${view}" style="position:fixed;inset:0;width:100vw;height:100vh;border:0"></iframe></body></html>`;
+
+async function openFrame(browser, url, re) {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
+  const problems = [];
+  const page = await context.newPage();
+  page.on('pageerror', (e) => problems.push('pageerror: ' + String(e).slice(0, 300)));
+  page.on('console', (m) => { if (m.type() === 'error') problems.push('console: ' + m.text().slice(0, 300)); });
+  await page.goto(url, { waitUntil: 'domcontentloaded' });
+  let frame = null;
+  for (let i = 0; i < 80 && !frame; i++) {
+    frame = page.frames().find((f) => f !== page.mainFrame() && re.test(f.url()));
+    if (!frame) await page.waitForTimeout(250);
+  }
+  assert.ok(frame, `프레임이 열린다(${re})`);
+  await page.waitForTimeout(800);
+  return { context, page, frame, problems };
+}
 
 test('보드·지도 판 테마 메시지: night/paper 정규화 및 모르는 값은 paper 기본', () => {
   assert.equal(FRAME_MESSAGE_TYPES.boardTheme, 'lt41-board-theme');
@@ -27,72 +89,49 @@ test('보드·지도 판 테마 수신: 어떤 화면에서도 다시 띄우지 
   }
 });
 
-test('설정 창 화면 탭: 보드·지도 판(테마 따라가기/종이/밤) 행이 있다(2026-11-16: 더 보기(고급) 접힘 안, 저장 위치는 탭 맨 아래 한 줄)', () => {
-  const html = read('public/v41/index.html');
-  const screen = html.slice(html.indexOf('id="account-settings-screen"'), html.indexOf('id="account-settings-profile"'));
-  assert.match(screen, /id="settings-board-theme-label">보드·지도 판<\/span>/);
-  assert.match(screen, /data-board-theme="auto"[^>]*>테마 따라가기<\/button>/);
-  assert.match(screen, /data-board-theme="paper"[^>]*>종이<\/button>/);
-  assert.match(screen, /data-board-theme="night"[^>]*>밤<\/button>/);
-  // 줄마다 붙던 '이 기기에만' 표시는 없다 — 화면 탭 맨 아래 한 줄 설명에 모았다.
-  assert.doesNotMatch(screen, /settings-scope">이 기기에만</);
-  assert.match(screen, /테마·움직임·보드·지도 판·관계 지도 보기·페이지 넘김·첫 화면 카드·고급 기능 보기는 이 기기에만 저장되고/);
+test('#467 화면: 보드 배경 드롭에서 고른 값이 셸로 가고 판이 그 자리에서 바뀐다', { skip: REQUIRE ? false : skip, timeout: 240000 }, async (t) => {
+  const browser = await chromium.launch();
+  const server = await serve({ '/host.html': HOST('track58-pinboard.html') });
+  const { context, page, frame, problems } = await openFrame(browser, `http://127.0.0.1:${server.address().port}/host.html`, /views\/track58-pinboard/);
+  t.after(async () => { await context.close().catch(() => {}); await browser.close(); server.close(); });
+  assert.deepEqual(problems, [], '화면 오류 없음: ' + problems.join(' | '));
+  assert.equal(await frame.evaluate(() => document.getElementById('boardBgBtn')?.hidden === false), true, '머리 줄에 배경 드롭이 보인다');
+  await frame.click('#boardBgBtn');
+  await frame.waitForSelector('#boardBgMenu:not([hidden])', { timeout: 5000 });
+  const items = await frame.evaluate(() => [...document.querySelectorAll('#boardBgMenu .lt-bg-item')].map((b) => ({ bg: b.dataset.bg, label: b.textContent.trim(), checked: b.getAttribute('aria-checked') })));
+  assert.deepEqual(items.map((i) => i.bg), ['auto', 'paper', 'night'], '테마 따라가기·종이·밤 세 항목');
+  assert.deepEqual(items.map((i) => i.label), ['테마 따라가기', '종이', '밤']);
+  assert.equal(items.filter((i) => i.checked === 'true').length, 1, '지금 고른 하나만 체크');
+  // 밤을 고르면 판이 그 자리에서 바뀌고(다시 뜨지 않는다), 셸에 고른 값이 간다.
+  await frame.click('#boardBgMenu .lt-bg-item[data-bg="night"]');
+  await page.waitForTimeout(400);
+  const night = await frame.evaluate(() => ({ attr: document.documentElement.getAttribute('data-lt-board-theme'), card: getComputedStyle(document.querySelector('#cardLayer .card')).backgroundImage.slice(0, 40) }));
+  assert.equal(night.attr, 'night', '판이 밤으로 바뀐다');
+  assert.match(night.card, /gradient/, '카드는 밝은 종이 카드로 남는다(밤 판 규칙)');
+  assert.deepEqual(await page.evaluate(() => window.__choices), ['night'], '셸에 고른 값을 보낸다(보드가 저장소에 직접 쓰지 않는다)');
+  // 종이를 고르면 다시 종이 판.
+  await frame.click('#boardBgBtn');
+  await frame.waitForSelector('#boardBgMenu:not([hidden])', { timeout: 5000 });
+  await frame.click('#boardBgMenu .lt-bg-item[data-bg="paper"]');
+  await page.waitForTimeout(400);
+  assert.equal(await frame.evaluate(() => document.documentElement.getAttribute('data-lt-board-theme')), 'paper', '종이로 돌아온다');
+  assert.deepEqual(await page.evaluate(() => window.__choices), ['night', 'paper']);
+  assert.deepEqual(problems, [], '판을 바꾸는 동안 오류 없음');
 });
 
-test('보드 화면 마크업: 머리줄은 배경 드롭 하나(#891) — 종이/밤 두 단추 나란히는 없다', () => {
-  const boardHtml = read('public/v41/views/track58-pinboard.html');
-  assert.match(boardHtml, /id="boardBgBtn"[^>]*>배경 ▾<\/button>/);
-  assert.match(boardHtml, /id="boardBgMenu"[^>]*role="menu"/);
-  assert.match(boardHtml, /data-bg="auto"[^>]*>테마 따라가기<\/button>/);
-  assert.match(boardHtml, /data-bg="paper"[^>]*>종이<\/button>/);
-  assert.match(boardHtml, /data-bg="night"[^>]*>밤<\/button>/);
-  assert.doesNotMatch(boardHtml, /class="boardThemeSwitch"/);
-  assert.match(boardHtml, /id="themeBadge"/);
-});
-
-test('지도 화면 마크업: 도구 줄에도 같은 배경 드롭이 있다(#891)', () => {
-  const netHtml = read('public/v41/views/track56-network.html');
-  // #951 ①: 배경 드롭은 위 단추 줄의 ⋯ 안으로 들어갔다(같은 메뉴·같은 항목, 입구만 ⋯).
-  assert.match(netHtml, /id="netBgBtn"[^>]*aria-label="더 보기"[^>]*>⋯<\/button>/);
-  assert.match(netHtml, /id="netBgMenu"[^>]*role="menu"/);
-  assert.match(netHtml, /data-bg="auto"[^>]*>테마 따라가기<\/button>/);
-});
-
-test('셸 배선: 판 상태 세 가지를 저장하고 프레임에는 해결된 판을 알린다(#891)', () => {
-  const shell = read('public/v41/shell.mjs');
-  assert.match(shell, /applyBoardThemeToFrame\(frame\)/);
-  assert.match(shell, /frameMessage\('boardTheme',resolveBoardTheme\(\)\)/, '프레임에는 종이/밤으로 해결한 값을 넘긴다');
-  assert.match(shell, /setAttribute\('data-lt-board-theme',message\.value\)/);
-  assert.match(shell, /saveBoardTheme/, '고른 값은 한 곳(saveBoardTheme)에서 저장·반영한다');
-  assert.match(shell, /lt41-board-theme-choice/, '보드·지도 드롭의 고르기 요청을 받는다');
-  assert.match(shell, /lt41-board-theme/);
-});
-
-// 대비는 tests/v41-board-card-contrast.test.mjs가 실제 그려진 화면에서 카드 종류별로 잰다(변수 값끼리 계산하지 않는다).
-
-test('보드 배선: 배경 드롭은 메뉴 항목만 받고, 원본 보드 테마(body[data-theme])는 건드리지 않는다(#891)', () => {
-  const board = read('public/v41/views/board/board.js');
-  const extras = read('public/v41/views/board/board-extras.js');
-  assert.match(board, /#boardBgMenu \.lt-bg-item/, '고르기는 배경 드롭의 항목으로만 한다');
-  assert.match(board, /lt41-board-theme-choice/, '고른 값은 셸에 요청으로 넘긴다(보드가 저장소에 직접 쓰지 않는다)');
-  assert.match(extras, /document\.body\.dataset\.theme='pearl';/, '원본 보드 테마 기본(진주빛) 그대로');
-  assert.doesNotMatch(extras, /dataset\.theme\s*=\s*[^;]*'night'/, '밤 판이라고 원본 "밤" 보드 테마(어두운 카드)를 켜지 않는다');
-  assert.doesNotMatch(board, /#ff7da7|#7ee4ff|#ffd67d|#c4b0ff/, '밤 실 색은 CSS 한 곳(board.css)에만 둔다');
-});
-
-test('고급 도구의 보드 테마 6종은 그대로 있다', () => {
-  const html = read('public/v41/views/track58-pinboard.html');
-  for (const [k, label] of [['pearl', '진주빛'], ['cork', '따뜻한 코르크'], ['letter', '편지'], ['blossom', '꽃잎'], ['night', '밤'], ['mint', '민트']]) {
-    assert.match(html, new RegExp(`class="themeBtn[^"]*" data-theme="${k}">${label}</button>`));
-  }
-});
-
-test('밤 판 CSS: 카드는 밝은 종이 카드, 판 규칙은 board-extra.css 맨 끝 한 덩어리', () => {
-  const css = read('public/v41/views/board/board-extra.css');
-  const at = css.indexOf('=== #467 밤 판');
-  assert.ok(at > 0, '밤 판 블록이 있다');
-  const block = css.slice(at);
-  assert.match(block, /\[data-lt-board-theme="night"\] body \.card\{background:linear-gradient\(145deg,#fffdf9,#f4eee6\)/);
-  assert.match(block, /\[data-lt-board-theme="night"\] body \.card h3,/);
-  assert.equal(css.lastIndexOf('[data-lt-board-theme') >= at, true);
+test('#467 화면: 지도 도구 줄에도 같은 배경 드롭이 있고, 고른 값이 셸로 간다', { skip: REQUIRE ? false : skip, timeout: 240000 }, async (t) => {
+  const browser = await chromium.launch();
+  const server = await serve({ '/host.html': HOST('track56-network.html') });
+  const { context, page, frame, problems } = await openFrame(browser, `http://127.0.0.1:${server.address().port}/host.html`, /views\/track56-network/);
+  t.after(async () => { await context.close().catch(() => {}); await browser.close(); server.close(); });
+  assert.deepEqual(problems, [], '화면 오류 없음: ' + problems.join(' | '));
+  assert.equal(await frame.evaluate(() => document.getElementById('netBgBtn')?.hidden === false), true, '지도 도구 줄에 배경 드롭이 보인다');
+  await frame.click('#netBgBtn');
+  await frame.waitForSelector('#netBgMenu:not([hidden])', { timeout: 5000 });
+  // #951 ①: 지도의 배경 드롭은 ⋯ 메뉴 안으로 들어갔다(같은 항목 + '사용법') — 배경 항목만 골라 센다.
+  const bgs = await frame.evaluate(() => [...document.querySelectorAll('#netBgMenu .lt-bg-item[data-bg]')].map((b) => b.dataset.bg));
+  assert.deepEqual(bgs, ['auto', 'paper', 'night']);
+  await frame.click('#netBgMenu .lt-bg-item[data-bg="night"]');
+  await page.waitForTimeout(400);
+  assert.deepEqual(await page.evaluate(() => window.__choices), ['night'], '지도에서도 고른 값이 셸로 간다');
 });

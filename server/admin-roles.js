@@ -22,6 +22,18 @@ export const ROLE_AI_CUSTOMER = 'ai_customer';
 export const ROLE_TESTER = 'tester';
 export const ROLES = Object.freeze([ROLE_ADMIN, ROLE_AI_CUSTOMER, ROLE_TESTER]);
 
+// #936: 공개 카드의 'AI 명예회원' 비트는 역할 하나에서만 정한다. 목록·다른 팬 보기·공유 읽기가
+// 같은 규칙을 쓰고, 역할을 못 읽으면 어디서나 같은 값(false)으로 닫힌다.
+export const isAiTesterRole = (role) => role === ROLE_AI_CUSTOMER;
+export async function aiTesterFor({admin, productId, subjectId} = {}) {
+  if (!admin || typeof admin.roleFor !== 'function' || !subjectId) return false;
+  try {
+    return isAiTesterRole(await admin.roleFor({productId, subjectId}));
+  } catch {
+    return false;
+  }
+}
+
 // 권위가 만드는 canonical subject 모양. 이 밖의 값은 역할 자리에 받지 않는다.
 const SUBJECT = /^sub_[0-9a-f]{16,80}$/;
 const ACTOR = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;

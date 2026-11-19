@@ -3,10 +3,10 @@ import {ApiError} from './errors.js';
 import {parsePrincipal} from './principal.js';
 import {projectSharedTree} from './share-service.js';
 import {refreshStageIndex} from './stage-index-refresh.js';
-import {ROLE_AI_CUSTOMER,ROLE_TESTER} from './admin-roles.js';
+import {ROLE_TESTER,isAiTesterRole} from './admin-roles.js';
 import {coverModeOf} from '../src/domain.js';
 // 꼬리표 판정은 화면과 같은 한 벌 — 서버에 규칙을 복사하지 않는다(#627 3단계 '다른 팬 보기').
-import {parseTag, tagKey} from '../public/v41/tags.mjs';
+import {parseTag, tagKey, isChannelLikeArtist} from '../public/v41/tags.mjs';
 import {isVerticalMoment,safeYoutubeThumb,youtubeIdFrom,youtubeStageThumbUrl} from '../public/v41/youtube-id.mjs';
 
 export const REACTION_KINDS=Object.freeze(['heart','like','love','laugh','wow','sad','angry']);
@@ -110,6 +110,8 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
     const parsed=parseTag(raw);if(!parsed)continue;
     if(index<200)searchTerms.push(parsed.value);
     if(parsed.kindId==='artist'){
+     // #935: 채널 이름이 '가수' 꼬리표로 저장돼 있어도 칩(그룹 집계)에는 올리지 않는다 — 저장 값은 그대로.
+     if(isChannelLikeArtist(parsed.value))continue;
      const key=tagKey(parsed.value);
      artistTags.add(key);
      if(!artistNames.has(key))artistNames.set(key,parsed.value);
@@ -169,7 +171,7 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
     if(!roleCache.has(subjectId))roleCache.set(subjectId,await admin.roleFor({productId,subjectId}));
     return roleCache.get(subjectId);
    }:null;
-   const aiTesterLookup=roleOf?async subjectId=>await roleOf(subjectId)===ROLE_AI_CUSTOMER:null;
+   const aiTesterLookup=roleOf?async subjectId=>isAiTesterRole(await roleOf(subjectId)):null;
    const isTesterLookup=roleOf?async subjectId=>await roleOf(subjectId)===ROLE_TESTER:null;
    let entries;
    if(typeof communityRepo.listDiscoverableSummaries==='function'){
@@ -238,7 +240,7 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
     let role=roles.get(share.subjectId);
     if(role===undefined){role=admin?await admin.roleFor({productId,subjectId:share.subjectId}):null;roles.set(share.subjectId,role);}
     if(role===ROLE_TESTER)continue;
-    const aiTester=role===ROLE_AI_CUSTOMER;
+    const aiTester=isAiTesterRole(role);
     for(const moment of tree.moments){
      if(!Array.isArray(moment.keywords)||!moment.keywords.some(matches))continue;
      items.push({
