@@ -293,15 +293,22 @@ jobs:
         timeout-minutes: 10
         run: |
           start=$(date +%s)
-          if fc-list :lang=ko | grep -q .; then
-            echo "실행기에 한글 글꼴 이미 있음"
-          elif ls "$HOME/.fonts"/*.tt* >/dev/null 2>&1; then
+          # 두 갈래만 둔다(실행기마다 글꼴 구성이 달라 fc-list로 판단하면 캐시를 채울 기회를 놓친다 — 실측).
+          if [ -f "$HOME/.fonts/NotoSansCJK-Regular.ttc" ]; then
             echo "캐시된 한글 글꼴 사용($(ls "$HOME/.fonts" | wc -l)개 파일)"
           else
-            echo "한글 글꼴 없음 — fonts-noto-cjk 설치해 ~/.fonts에 쌓는다"
-            sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends fonts-noto-cjk
+            echo "캐시된 한글 글꼴 없음 — fonts-noto-cjk 설치해 ~/.fonts에 쌓는다"
+            sudo apt-get update -qq || true
+            ok=0
+            for i in 1 2 3; do
+              if sudo timeout 150 apt-get install -y -qq --no-install-recommends fonts-noto-cjk; then ok=1; break; fi
+              echo "apt-get install $i번째 시도 실패/멈춤 — 다시 시도"
+              sleep 5
+            done
+            [ $ok -eq 1 ] || { echo "fonts-noto-cjk 설치 실패"; exit 1; }
             mkdir -p "$HOME/.fonts"
-            sudo cp /usr/share/fonts/opentype/noto/*.tt* "$HOME/.fonts/" 2>/dev/null || true
+            sudo cp /usr/share/fonts/opentype/noto/*.tt* "$HOME/.fonts/" 2>/dev/null || sudo find /usr/share/fonts -name 'Noto*CJK*.ttc' -exec cp {} "$HOME/.fonts/" \; 2>/dev/null || true
+            echo "쌓은 글꼴 파일 $(ls "$HOME/.fonts" | wc -l)개"
           fi
           fc-cache -f >/dev/null 2>&1 || true
           echo "한글 글꼴 $(fc-list :lang=ko | wc -l)개 · 대표 $(fc-match 'sans-serif:lang=ko' | head -1)"
@@ -369,15 +376,22 @@ jobs:
         timeout-minutes: 10
         run: |
           start=$(date +%s)
-          if fc-list :lang=ko | grep -q .; then
-            echo "실행기에 한글 글꼴 이미 있음"
-          elif ls "$HOME/.fonts"/*.tt* >/dev/null 2>&1; then
+          # 두 갈래만 둔다(실행기마다 글꼴 구성이 달라 fc-list로 판단하면 캐시를 채울 기회를 놓친다 — 실측).
+          if [ -f "$HOME/.fonts/NotoSansCJK-Regular.ttc" ]; then
             echo "캐시된 한글 글꼴 사용($(ls "$HOME/.fonts" | wc -l)개 파일)"
           else
-            echo "한글 글꼴 없음 — fonts-noto-cjk 설치해 ~/.fonts에 쌓는다"
-            sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends fonts-noto-cjk
+            echo "캐시된 한글 글꼴 없음 — fonts-noto-cjk 설치해 ~/.fonts에 쌓는다"
+            sudo apt-get update -qq || true
+            ok=0
+            for i in 1 2 3; do
+              if sudo timeout 150 apt-get install -y -qq --no-install-recommends fonts-noto-cjk; then ok=1; break; fi
+              echo "apt-get install $i번째 시도 실패/멈춤 — 다시 시도"
+              sleep 5
+            done
+            [ $ok -eq 1 ] || { echo "fonts-noto-cjk 설치 실패"; exit 1; }
             mkdir -p "$HOME/.fonts"
-            sudo cp /usr/share/fonts/opentype/noto/*.tt* "$HOME/.fonts/" 2>/dev/null || true
+            sudo cp /usr/share/fonts/opentype/noto/*.tt* "$HOME/.fonts/" 2>/dev/null || sudo find /usr/share/fonts -name 'Noto*CJK*.ttc' -exec cp {} "$HOME/.fonts/" \; 2>/dev/null || true
+            echo "쌓은 글꼴 파일 $(ls "$HOME/.fonts" | wc -l)개"
           fi
           fc-cache -f >/dev/null 2>&1 || true
           echo "한글 글꼴 $(fc-list :lang=ko | wc -l)개 · 대표 $(fc-match 'sans-serif:lang=ko' | head -1)"
