@@ -8,6 +8,8 @@ import {formatDisplayDate} from './book-usability.mjs';
 import {matchGroups,sectionGroups} from './group-search.mjs';
 // #547·#701 규칙: 서버가 내려주는 시각(UTC 타임스탬프)은 기기 지역 날짜로 바꿔 보여 준다(#547 한 벌).
 import {localDateOnly} from './local-date.mjs';
+// #792 4단계 ⑤: 공개 무대 담기 단추와 '이번 주 인기 무대' 줄의 규칙은 community-stages.mjs 한 곳에 둔다.
+import {POPULAR_STAGE_TITLE,POPULAR_STAGE_EMPTY,POPULAR_STAGE_WEEK_LABEL,publicStageCount,stageVoteLabel,stageVoteNotice,stageMomentTitle,readStage,toggleStage} from './community-stages.mjs';
 const el=(tag,className,text)=>{const node=document.createElement(tag);if(className)node.className=className;if(text!=null)node.textContent=text;return node;};
 export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareOwn,hasOwnTree,getDateStyle,getArtistGroups=()=>[]}){
  const api=createCommunityApi(),form=dialog.querySelector('#community-search-form'),query=dialog.querySelector('#community-query'),list=dialog.querySelector('#community-list'),groups=dialog.querySelector('#community-groups'),feedback=dialog.querySelector('#community-feedback'),more=dialog.querySelector('#community-more'),preview=dialog.querySelector('#community-preview'),sortSelect=dialog.querySelector('#community-sort');
@@ -43,6 +45,24 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
  const setVoteNote=(note,text)=>{if(!note)return;note.textContent=text;note.hidden=false;};
  // 투표 막힘(가입 7일 미만)은 단추 아래 안내 칸 하나만 내리고 상태 줄은 그대로 둔다(#903) — 다른 실패는 상태 줄로.
  const voteBlocked=answer=>answer?.code==='vote_too_new';
+ // #792 ⑤: 표지 순간이 공개 무대일 때만 '이 무대 담기' 단추를 그 자리에서 붙인다(아니면 상자를 열지 않는다).
+ // 안내 칸은 단추 바로 아래에 둔다 — 즐겨찾기·공감 단추는 윗줄에 그대로 선다.
+ async function mountStageVote(item,box){
+  const stage=await readStage({api,shareId:item.shareId,momentId:item.cover?.momentId});
+  if(!stage||!box.isConnected)return;
+  const note=el('p','community-stage-note');note.setAttribute('role','status');note.hidden=true;
+  const button=el('button','community-mini community-stage-vote',stageVoteLabel(stage.voted));
+  button.type='button';button.dataset.communityAction='stage';button.setAttribute('aria-pressed',String(stage.voted));
+  button.onclick=async()=>{
+   button.disabled=true;
+   const result=await toggleStage({api,stageId:stage.stageId,voted:button.getAttribute('aria-pressed')==='true'});
+   button.disabled=false;
+   if(!result.ok){note.textContent=stageVoteNotice(result.answer);note.hidden=false;return;}
+   button.textContent=stageVoteLabel(result.voted);button.setAttribute('aria-pressed',String(result.voted));
+   note.hidden=true;
+  };
+  box.append(button,note);box.hidden=false;
+ }
  function statButton(item,kind,label,voteNote){
   if(kind==='reaction')return reactionButtons(item,label,voteNote);
   const active=kind==='favorite'?item.stats.favored:item.stats.hearted,count=kind==='favorite'?item.stats.favorites:item.stats.hearts,b=el('button','community-mini',`${active?'✓ ':''}${smallCountLabel(label,count)}`);b.type='button';b.dataset.communityAction=kind;b.setAttribute('aria-pressed',String(active));
@@ -179,13 +199,16 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
   const actions=el('div','community-preview-actions');
   // #903: 안내 칸은 actions 바로 다음 줄자리에 미리 두고(hidden) 막혔을 때만 보인다 — 격자 간격이 흔들리지 않게.
   const voteNote=el('p','community-vote-note');voteNote.setAttribute('role','status');voteNote.hidden=true;
-  actions.append(statButton(item,'favorite','즐겨찾기',voteNote),statButton(item,'reaction','공감',voteNote));
+  // #792 ⑤: 담기 단추 자리. 무대가 확인되기 전에는 비어 있고(자리도 차지하지 않는다), 확인되면 그 자리에서 열린다.
+  const stageBox=el('div','community-stage-box');stageBox.hidden=true;
+  actions.append(statButton(item,'favorite','즐겨찾기',voteNote),statButton(item,'reaction','공감',voteNote),stageBox);
   const open=el('button','community-preview-open','대표 순간부터 감상');open.type='button';open.onclick=()=>onOpenShare(item);
   const start=el('button','community-preview-start','내 기록 새로 시작');start.type='button';start.onclick=()=>onStartRecord(item.subject);
   const status=el('p','community-preview-message','');status.dataset.communityPreviewMessage='';status.setAttribute('role','status');
   const choices=el('div','community-preview-choices');choices.append(open,start);
   body.append(title,subject,moment);if(summary)body.append(summary);body.append(meta,actions,voteNote,choices,moreMenu(item),status);
   preview.replaceChildren(head,renderCover(item,{loading:'eager'}),body);
+  if(item.cover?.momentId)mountStageVote(item,stageBox);
  }
  function openPreview(item){selectedId=item.shareId;renderPreview(item);if(!preview.open)preview.showModal();}
  function card(item){
@@ -232,7 +255,7 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
  sortSelect.onchange=()=>load(false);
  for(const link of dialog.querySelectorAll('[data-community-view]'))link.onclick=()=>{dialog.close();[...document.querySelectorAll('[data-view]')].find(node=>node.dataset.view===link.dataset.communityView)?.click();};
  const tabs=()=>[...document.querySelectorAll('nav [data-view]')];
-  button.onclick=()=>{if(!dialog.open){dialog.showModal();button.setAttribute('aria-current','true');for(const t of tabs()){if(t.getAttribute('aria-current')==='true'){t.dataset.wasCurrent='1';t.setAttribute('aria-current','false');}}load(false);}};
+  button.onclick=()=>{if(!dialog.open){dialog.showModal();button.setAttribute('aria-current','true');for(const t of tabs()){if(t.getAttribute('aria-current')==='true'){t.dataset.wasCurrent='1';t.setAttribute('aria-current','false');}}load(false);loadPopularStages();}};
  dialog.addEventListener('close',()=>{if(preview.open)preview.close();button.setAttribute('aria-current','false');const emptyShown=!document.getElementById('empty')?.hidden;for(const t of tabs()){if(t.dataset.wasCurrent){delete t.dataset.wasCurrent;if(!emptyShown)t.setAttribute('aria-current','true');}}button.focus();});
  preview.addEventListener('close',()=>[...list.querySelectorAll('.community-card')].find(node=>node.dataset.shareId===selectedId)?.focus());
  preview.addEventListener('click',event=>{if(event.target===preview)preview.close();});
@@ -328,4 +351,25 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
  findClose.onclick=()=>findDialog.close();
  const rail=dialog.querySelector('.community-group-rail');
  if(rail&&typeof rail.appendChild==='function')rail.appendChild(findButton);
+ // #792 ⑤: 둘러보기 제목 아래·검색칸 위에 '이번 주 인기 무대' 한 줄. 서버가 3표 미만을 빼고 내리므로
+ // 화면도 같은 규칙으로 거른다(3 미만 숫자는 null과 함께 사라진다 — #824 결정 7).
+ const popular=el('section','community-stages');popular.id='community-popular-stages';popular.setAttribute('aria-label',POPULAR_STAGE_TITLE);
+ const popularList=el('div','community-stage-list');
+ popular.append(el('h3','community-stages-title',POPULAR_STAGE_TITLE),popularList);
+ if(typeof form.before==='function')form.before(popular);else dialog.append(popular);
+ const renderPopularStages=rows=>{
+  const shown=(Array.isArray(rows)?rows:[]).filter(stage=>stage&&stage.stageId&&publicStageCount(stage.weeklyVoters)!==null);
+  popularList.replaceChildren();
+  if(!shown.length){popularList.append(el('p','community-stages-empty',POPULAR_STAGE_EMPTY));return;}
+  for(const stage of shown){
+   const row=el('span','community-stage');row.dataset.stageId=stage.stageId;
+   row.append(el('span','community-stage-title',stageMomentTitle(stage)),el('span','community-stage-count',`${POPULAR_STAGE_WEEK_LABEL} ${publicStageCount(stage.weeklyVoters)}`));
+   popularList.append(row);
+  }
+ };
+ async function loadPopularStages(){
+  const answer=await api.popularStages();
+  renderPopularStages(answer?.ok?answer.items:[]);
+ }
+ popularList.append(el('p','community-stages-empty',POPULAR_STAGE_EMPTY));
 }

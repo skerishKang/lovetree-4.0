@@ -284,4 +284,125 @@ testOrSkip('#784 화면: 창 열림 때 항목 높이 ≥44px / 고른 그룹 �
   }
 });
 
+// #792 4단계 ⑤: 둘러보기의 '이번 주 인기 무대' 줄과 미리보기의 '이 무대 담기'.
+// 숫자로만 판정한다: 3표 미만 행 제외, null 숫자 없음, 단추 44px, 안내는 단추 바로 아래(≤12px),
+// 가로 넘침 0, 7일 안내 문구는 화면에 한 번만.
+const STAGE_POPULAR = [
+  { stageId: 'stage-a', platform: 'youtube', videoId: 'popularOne', kind: 'video', title: '이번 주 인기 무대 하나', weeklyVoters: 7, publicTreeCount: 4 },
+  { stageId: 'stage-b', platform: 'youtube', videoId: 'popularTwo', kind: 'video', title: '표가 모자란 무대', weeklyVoters: null, publicTreeCount: 2 },
+];
+const STAGE_CARDS = [{
+  shareId: 'c0000000000000000000000b', title: '무대 있는 공개 트리', subject: '확인 대상', summary: '첫 순간 소개',
+  createdAt: '2026-11-18T09:00:00.000Z', momentCount: 3, emotions: ['설렘'],
+  cover: { momentId: 'm-cover', url: '', title: 'Super Shy', emotion: '설렘', type: 'youtube' },
+  stats: { favorites: 0, hearts: 0, favored: false, hearted: false, reactions: { heart: 0, like: 0, love: 0, laugh: 0, wow: 0, sad: 0, angry: 0 }, mine: [] },
+}];
+
+testOrSkip('#792 ⑤ 화면: 인기 무대 줄(3표 미만 제외)과 미리보기 담기 단추(44px·안내 한 줄·가로 넘침 0)', async () => {
+  const server = createServer(async (req, res) => {
+    const clean = decodeURIComponent((req.url || '/').split('?')[0]);
+    if (clean === '/probe') { res.writeHead(200, { 'content-type': MIME['.html'] }); res.end(PROBE_HTML); return; }
+    const file = path.join(PUB, clean);
+    try {
+      const st = await stat(file);
+      if (!st.isFile()) { res.writeHead(404); res.end(); return; }
+      res.writeHead(200, { 'content-type': MIME[path.extname(file)] || 'application/octet-stream' });
+      createReadStream(file).pipe(res);
+    } catch { res.writeHead(404); res.end(); }
+  });
+  await new Promise((r) => server.listen(0, r));
+  const port = server.address().port;
+  const browser = await chromium.launch();
+  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  const json = (body) => ({ contentType: 'application/json', body: JSON.stringify(body) });
+  try {
+    await page.route('**/api/**', (route) => {
+      const url = route.request().url();
+      if (url.includes('/api/community/stages/popular')) return route.fulfill(json({ weekStart: '2026-11-16', weekEndExclusive: '2026-11-23', items: STAGE_POPULAR }));
+      if (/\/moments\/[^/]+\/stage$/.test(url)) return route.fulfill(json({ stageId: 'stage-a' }));
+      if (/\/stages\/[^/]+\/vote$/.test(url)) return route.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ error: { code: 'vote_too_new', message: '가입하고 7일이 지나면 투표할 수 있어요.' } }) });
+      if (/\/api\/community\/stages\/[^/]+$/.test(url)) return route.fulfill(json({ stageId: 'stage-a', title: 'Super Shy', voted: false, saved: false, weeklyVoters: 5, publicTreeCount: 4, trees: [], nextCursor: null }));
+      if (url.includes('/api/community/shares')) return route.fulfill(json({ items: STAGE_CARDS, nextCursor: null, totalVisible: 1, groups: [], groupsAll: [] }));
+      return route.fulfill(json({ ok: true, items: [] }));
+    });
+    await page.goto(`http://127.0.0.1:${port}/probe`);
+    await page.getByRole('button', { name: '둘러보기' }).click();
+    await page.waitForSelector('#community-panel[open]');
+    await page.waitForSelector('.community-stage', { timeout: 5000 });
+
+    const row = await page.evaluate(() => {
+      const popular = document.getElementById('community-popular-stages');
+      const rows = [...document.querySelectorAll('.community-stage')];
+      const heading = document.querySelector('#community-panel .panel-heading, #community-panel h2');
+      const form = document.getElementById('community-search-form');
+      return {
+        exists: Boolean(popular),
+        rows: rows.length,
+        text: popular?.innerText || '',
+        hasNull: /undefined|null|NaN/.test(popular?.innerText || ''),
+        belowTitle: heading ? Math.round(popular.getBoundingClientRect().top - heading.getBoundingClientRect().bottom) : -999,
+        aboveForm: form ? Math.round(form.getBoundingClientRect().top - popular.getBoundingClientRect().bottom) : -999,
+        overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      };
+    });
+    assert.equal(row.exists, true, '인기 무대 줄이 있다');
+    assert.equal(row.rows, 1, '3표 미만 행은 그리지 않는다');
+    assert.match(row.text, /이번 주 인기 무대/);
+    assert.match(row.text, /이번 주 담은 사람 7/);
+    assert.equal(row.hasNull, false, 'null·undefined·NaN이 없다');
+    assert.ok(row.belowTitle >= -1, `인기 무대 줄은 제목 아래에 있다(${row.belowTitle}px)`);
+    assert.ok(row.aboveForm >= -1, `검색칸 위에 있다(${row.aboveForm}px)`);
+    assert.ok(row.overflow <= 1, `가로 넘침 0: ${row.overflow}`);
+
+    // 미리보기: 표지 순간이 공개 무대면 '이 무대 담기'가 즐겨찾기 옆에 선다.
+    await page.locator('.community-card').first().click();
+    await page.waitForSelector('#community-preview[open]');
+    await page.waitForSelector('#community-preview .community-stage-vote', { timeout: 5000 });
+    const measure = () => page.evaluate(() => {
+      const button = document.querySelector('#community-preview .community-stage-vote');
+      const favorite = document.querySelector('#community-preview [data-community-action="favorite"]');
+      const box = (node) => node.getBoundingClientRect();
+      return {
+        text: button.textContent.trim(),
+        pressed: button.getAttribute('aria-pressed'),
+        height: Math.round(box(button).height),
+        rowDelta: Math.round(box(button).top - box(favorite).top),
+        overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      };
+    });
+    const desktop = await measure();
+    assert.equal(desktop.text, '이 무대 담기');
+    assert.equal(desktop.pressed, 'false');
+    assert.ok(desktop.height >= 44, `담기 단추 높이 44 이상: ${desktop.height}`);
+    assert.ok(Math.abs(desktop.rowDelta) <= 4, `즐겨찾기와 같은 줄에 있다(차이 ${desktop.rowDelta}px)`);
+
+    await page.locator('#community-preview .community-stage-vote').click();
+    await page.waitForFunction(() => {
+      const note = document.querySelector('#community-preview .community-stage-note');
+      return Boolean(note && !note.hidden && note.textContent.trim());
+    }, null, { timeout: 5000 });
+    const blocked = await page.evaluate(() => {
+      const note = document.querySelector('#community-preview .community-stage-note');
+      const button = document.querySelector('#community-preview .community-stage-vote');
+      const texts = [...document.querySelectorAll('#community-preview *')].filter((node) => node.children.length === 0 && node.textContent.includes('가입하고 7일')).length;
+      return { gap: Math.round(note.getBoundingClientRect().top - button.getBoundingClientRect().bottom), text: note.textContent.trim(), noticeCount: texts };
+    });
+    assert.equal(blocked.text, '가입하고 7일이 지나면 투표할 수 있어요.');
+    assert.equal(blocked.noticeCount, 1, '미리보기 안에 7일 안내는 하나다');
+    assert.ok(blocked.gap >= -1 && blocked.gap <= 12, `안내가 담기 단추 바로 아래(${blocked.gap}px ≤ 12px)`);
+
+    // 390에서도 같은 규칙 + 가로 넘침 0.
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.waitForTimeout(200);
+    const mobile = await measure();
+    assert.ok(mobile.height >= 44, `휴대폰 담기 단추 높이 44 이상: ${mobile.height}`);
+    assert.ok(mobile.overflow <= 1, `휴대폰 가로 넘침 0: ${mobile.overflow}`);
+    const mobileRowOverflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    assert.ok(mobileRowOverflow <= 1, `휴대폰 인기 무대 줄 가로 넘침 0: ${mobileRowOverflow}`);
+  } finally {
+    await browser.close();
+    await new Promise((r) => server.close(r));
+  }
+});
+
 if (REQUIRE && skipReason) throw new Error('LT_COMMUNITY_784_REQUIRE=1 인데 화면 시험을 건너뛴다 — 깨진 채로 두지 않는다');

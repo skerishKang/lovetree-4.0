@@ -1,18 +1,14 @@
 // #315: 공유 감상(share)은 읽기 전용 — 쓰기·편집 버튼을 렌더하지 않고, 쓰기 메시지도 막는다.
-// 판정은 runtime.js가 LT41.source에서 한 곳으로 내린다(LTDEMO.readOnly). 화면 연결은 글자 검사로 확인한다.
+// #952: 화면 연결을 고정하던 글자 검사 13개를 걷어냈다 — 그 동작은 실브라우저 시험이 이미 본다:
+// 보드 도구 줄(v41-board-readonly-520-521: 공유·예시 390/1440에서 ＋ 순간 꽂기 없음), 책 손잡이와
+// 마지막 장(v41-book-readonly-464, v41-share-guest-635: → 를 눌러도 쓰기 창·쓰기 메시지 0건),
+// 공유 감상 안내 문구는 배지·안내 표시 시험이 확인한다. 글자 검사는 구현 모양만 고정했다.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const read = (path) => readFileSync(new URL('../' + path, import.meta.url), 'utf8');
-
-const bookExtra = read('public/v41/views/book/book-extra.js');
-const book = read('public/v41/views/book/book.js');
-const boardExtras = read('public/v41/views/board/board-extras.js');
-const network = read('public/v41/views/network/network.js');
-const messages = read('public/v41/shell/messages.mjs');
-const shell = read('public/v41/shell.mjs');
 const runtime = read('public/v41/runtime.js');
 
 // ── 판정: runtime.js가 LT41.source에서 readOnly를 한 곳에서 내린다 ──
@@ -59,41 +55,6 @@ test('#464 예시 트리(demoData)는 source와 무관하게 읽기 전용이다
 });
 
 // ── 기억책(track59) 연결: 버튼을 렌더하지 않고, 남아도 메시지를 보내지 않는다 ──
-test('기억책: 공유에서 제목 고치기·다음 순간 남기기 버튼을 렌더하지 않는다', () => {
-  // 지키려던 것: 공유·예시(읽기 전용) 책에 제목 고치기·다음 순간 남기기 버튼이 보이지 않는다.
-  assert.match(bookExtra, /editAffordances\(\{readOnly:!LTDEMO\.writable,synthetic:!!m\.synthetic/, '편집 손잡이는 공유·예시에서 렌더하지 않는다(editAffordances)');
-  assert.match(bookExtra, /const edit=LTDEMO\.writable&&!m\.synthetic\?'<button type="button" class="moment-edit"/, '"✎ 고치기"도 공유·예시에서 렌더하지 않는다');
-  // 상세 판의 빈 이유 안내는 #815에서 제거돼(LTDEMO.readOnly?'':'...') 꼴이 남는 곳은 책 끝 한 곳이다.
-  assert.equal((bookExtra.match(/LTDEMO\.readOnly\?''/g) || []).length, 1, '다음 순간 남기기 버튼(책 끝)도 공유에서 렌더하지 않는다(상세 판 빈 이유 안내는 #815에서 제거)');
-});
-
-test('기억책: 쓰기 클릭·요청은 공유에서 메시지를 보내지 않는다(이중)', () => {
-  assert.match(bookExtra, /function requestNextMoment\(parentId\)\{[\s\S]*?if\(LTDEMO\.readOnly\)return;/, '순간 추가 요청은 공유에서 조용히 끝난다');
-  assert.match(bookExtra, /if\(next\)\{if\(LTDEMO\.readOnly\)return;/, '다음 순간 남기기 클릭 가드');
-  assert.match(bookExtra, /if\(edit\)\{if\(LTDEMO\.readOnly\)return;/, '제목 고치기 클릭 가드');
-});
-
-// ── 기억판(track58) 연결: 순간 꽂기·되돌리기·편집 도구를 숨기고 동작도 막는다 ──
-test('기억판: 공유에서 쓰기·편집 도구를 숨기고 편집·저장도 막는다', () => {
-  assert.match(boardExtras, /if\(LTDEMO\.readOnly\)\{if\(editBtn\)editBtn\.hidden=true;for\(const id of \['addBtn','undoBtn'\]\)/, '편집·순간 꽂기·되돌리기 버튼을 숨긴다');
-  assert.match(boardExtras, /function openEdit\(\)\{if\(LTDEMO\.readOnly\)return;/, '편집 창을 열지 않는다');
-  assert.match(boardExtras, /function saveEdit\(\)\{if\(LTDEMO\.readOnly\)return;/, '편집 저장을 하지 않는다');
-  // '#addBtn onclick' 글자 검사 두 줄은 #891⑤(CTO)로 보드 도구 줄의 '+ 순간 추가' 단추를 치우면서 지웠다 —
-  // 단추가 없으면 창도 열리지 않으며, 지키려던 동작은 읽기 전용 화면 시험(520)이 검사한다.
-});
-
-// ── 지도(track56): 쓰기 UI가 원래 없다 — 회귀 감시 ──
-test('지도: 쓰기 메시지를 보내는 코드가 없다', () => {
-  assert.ok(!/lt41-write/.test(network), '지도는 lt41-write를 쓰지 않는다');
-});
-
-// ── 셸 이중 가드: share 모드에서 쓰기 메시지는 무시된다 ──
-test('셸: share 모드의 lt41-write·lt41-journey-save 메시지를 무시한다', () => {
-  assert.match(messages, /data\?\.type === 'lt41-write' && getSource\(\) === 'share'\) return;/, '쓰기 메시지 이중 가드');
-  assert.match(messages, /lt41-journey-save'\) \{ if \(getSource\(\) === 'share'\) return;/, '첫 여정 저장 메시지도 공유에서 막는다');
-});
-
-// ── #425 2번: 올린 사진은 공개 화면에서 주소가 빠지고, 내 화면에서는 그대로 보인다 ──
 test('공유 렌더: 공개 응답을 runtime에 넘기면 올린 사진 주소가 0건, 내 화면에는 그대로', async () => {
   const vm = await import('node:vm');
   const { createTree } = await import('../src/domain.js');
@@ -120,8 +81,4 @@ test('공유 렌더: 공개 응답을 runtime에 넘기면 올린 사진 주소�
   assert.equal(shared.moments[0].externalUrl, '', '공개에서는 주소만 빠진다');
   const mine = run(tree, 'server');
   assert.equal(mine.moments[0].externalUrl, photo, '내 화면에서는 올린 사진 주소를 그대로 쓴다');
-});
-
-test('공유 감상 안내(#425 2번): 올린 사진 N장은 나만 볼 수 있어요', () => {
-  assert.match(shell, /answer\.omittedPrivateMedia\?' 올린 사진 '\+answer\.omittedPrivateMedia\+'장은 나만 볼 수 있어요\.'/, '공유 감상 화면 안내 문구');
 });

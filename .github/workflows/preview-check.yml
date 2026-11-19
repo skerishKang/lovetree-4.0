@@ -15,6 +15,32 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # 이슈 947 뒤 사줄: 서버·문서만 바뀐 PR에서도 화면 잡이 6~8분씩 돈다. 맨 앞 작은 잡이 바뀐 파일로
+  # '화면 바뀜'을 가리고(화면 범위 밖이 명확한 파일만 있을 때만 거짓 — 애매하면 바뀜), 화면 잡들은 needs로
+  # 받아 안 바뀌었으면 시험 단계를 건너뛰고 '건너뜀(화면 변경 없음)' 요약을 남기고 성공으로 끝낸다.
+  # 필수 검사 이름 '미리보기 postdeploy(로그아웃)'은 그대로다 — 잡을 통째로 건너뛰지 않으므로 검사 이름이 유지된다.
+  screen-changes:
+    name: 화면 바뀜 검사
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      changed: ${{ steps.diff.outputs.changed }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - name: 바뀐 파일로 화면 바뀜을 가린다
+        id: diff
+        run: |
+          base='${{ github.event.pull_request.base.sha }}'
+          head='${{ github.event.pull_request.head.sha }}'
+          git diff --name-only "$base...$head" > /tmp/changed-files.txt 2>/dev/null || { echo "diff 실패 — 바뀜으로 둔다"; echo "changed=true" >> "$GITHUB_OUTPUT"; exit 0; }
+          # 판정은 tools/ci/screen-changes.mjs가 한다. 화면 시험 목록은 이 워크플로의 화면 잡 구간에서
+          # 자동으로 뽑는다(손으로 따로 적지 않는다) — 시험 파일은 화면 잡이 실제로 실행하는 파일과
+          # 그 helpers가 바뀌었을 때만 화면 바뀜이다(이슈 947 — #958 같은 시험 정리 PR도 다 돌던 것을 줄인다).
+          node tools/ci/screen-changes.mjs /tmp/changed-files.txt
+
   # 2026-11-14: 화면 시험이 한 잡에 줄지어 18분 걸리던 것을 잡 여러 개로 나눠 동시에 돌린다.
   # 필수 검사 이름 '미리보기 postdeploy(로그아웃)'은 맨 아래 모음 잡이 그대로 쓴다 — 아래 잡이 하나라도
   # 실패·취소되면 모음 잡도 실패한다. 새 화면 시험은 가장 짧은 잡에 단계로 붙인다(각 잡 소요는 요약에 적힌다).
@@ -22,6 +48,7 @@ jobs:
     name: 화면 시험 — 보드·접근성·날짜
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    needs: screen-changes
     steps:
       - uses: actions/checkout@v4
         with:
@@ -37,6 +64,7 @@ jobs:
           key: ms-playwright-${{ runner.os }}-1.49.1
       - name: 브라우저 준비(Playwright Chromium, 캐시)
         id: browser
+        if: needs.screen-changes.outputs.changed == 'true'
         run: |
           # 모듈은 항상 설치한다(캐시는 브라우저 바이너리에만 걸린다). 캐시가 있어도 모듈이 없으면 실행이 안 된다.
           npm i --no-save --no-package-lock playwright@1.49.1
@@ -52,6 +80,7 @@ jobs:
       - name: 보드 카드 대비 시험(CI에서 실제로, 건너뜀=실패 — #504)
         env:
           LT_BOARD_CONTRAST_REQUIRE: '1'
+        if: needs.screen-changes.outputs.changed == 'true'
         run: |
           start=$(date +%s)
           node --test tests/v41-board-card-contrast.test.mjs
@@ -61,6 +90,7 @@ jobs:
       - name: 보드 읽기 전용·겹침 시험(390·1440 × 밤·정원 × 판, 건너뜀=실패 — #520·#521)
         env:
           LT_BOARD_CONTRAST_REQUIRE: '1'
+        if: needs.screen-changes.outputs.changed == 'true'
         run: |
           start=$(date +%s)
           node --test tests/v41-board-readonly-520-521.test.mjs
@@ -69,6 +99,7 @@ jobs:
       - name: 보드 넓은 화면·머리줄 판 전환 시험(건너뜀=실패 — #536)
         env:
           LT_BOARD_WIDE_REQUIRE: '1'
+        if: needs.screen-changes.outputs.changed == 'true'
         run: |
           start=$(date +%s)
           node --test tests/v41-board-wide-view-536.test.mjs
@@ -79,6 +110,7 @@ jobs:
       - name: 보드 YouTube 카드 겹침 시험(건너뜀=실패 — #553)
         env:
           LT_BOARD_YT_REQUIRE: '1'
+        if: needs.screen-changes.outputs.changed == 'true'
         run: |
           start=$(date +%s)
           node --test tests/v41-board-yt-overlap-553.test.mjs
@@ -88,6 +120,7 @@ jobs:
       - name: 보드 핀보드 2차 시험(건너뜀=실패 — #601)
         env:
           LT_BOARD_601_REQUIRE: '1'
+        if: needs.screen-changes.outputs.changed == 'true'
         run: |
           start=$(date +%s)
           node --test --test-concurrency=1 tests/v41-board-pinboard2-601.test.mjs
@@ -97,6 +130,7 @@ jobs:
       - name: 보드 쌓기 배치 시험(건너뜀=실패 — #619-5)
         env:
           LT_BOARD_STACK_619_REQUIRE: '1'
+        if: needs.screen-changes.outputs.changed == 'true'
         run: |
           start=$(date +%s)
           node --test --test-concurrency=1 tests/v41-board-stack-619.test.mjs
@@ -106,6 +140,7 @@ jobs:
       - name: 보드 순서 끼워 넣기 시험(건너뜀=실패 — #619-6)
         env:
           LT_BOARD_ORDER_619_REQUIRE: '1'
+        if: needs.screen-changes.outputs.changed == 'true'
         run: |
           start=$(date +%s)
           node --test --test-concurrency=1 tests/v41-board-order-619.test.mjs
@@ -115,6 +150,7 @@ jobs:
       - name: 남은 접근성 항목 시험(#514, 건너뜀=실패)
         env:
           LT_A11Y514_REQUIRE: '1'
+        if: needs.screen-changes.outputs.changed == 'true'
         run: |
           start=$(date +%s)
           node --test tests/v41-a11y-514-remaining.test.mjs
@@ -125,6 +161,7 @@ jobs:
       - name: 지역 날짜(오늘) 시험(시간대 경계, 건너뜀=실패 — #547)
         env:
           LT_LOCAL_DATE_REQUIRE: '1'
+        if: needs.screen-changes.outputs.changed == 'true'
         run: |
           start=$(date +%s)
           node --test --test-concurrency=1 tests/v41-local-date-547.test.mjs
@@ -134,6 +171,7 @@ jobs:
         env:
           LT_BOARD_582_REQUIRE: '1'
           LT_BOARD_583_REQUIRE: '1'
+        if: needs.screen-changes.outputs.changed == 'true'
         run: |
           start=$(date +%s)
           node --test --test-concurrency=1 tests/v41-board-pinboard-582.test.mjs tests/v41-board-cursor-detail.test.mjs
@@ -143,15 +181,23 @@ jobs:
       - name: 보드 날짜 수정 시험(건너뜀=실패 — #608)
         env:
           LT_BOARD_608_REQUIRE: '1'
+        if: needs.screen-changes.outputs.changed == 'true'
         run: |
           start=$(date +%s)
           node --test --test-concurrency=1 tests/v41-board-date-edit-608.test.mjs
           echo "보드 날짜 수정 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
 
+      - name: 화면 변경 없으면 건너뜀을 남긴다
+        if: always()
+        run: |
+          if [ "${{ needs.screen-changes.outputs.changed }}" != "true" ]; then
+            echo "건너뜀(화면 변경 없음)" | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
   screen-home-book:
     name: 화면 시험 — 첫 화면·책
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    needs: screen-changes
     steps:
       - uses: actions/checkout@v4
         with:
@@ -167,6 +213,7 @@ jobs:
           key: ms-playwright-${{ runner.os }}-1.49.1
       - name: 브라우저 준비(Playwright Chromium, 캐시)
         id: browser
+        if: needs.screen-changes.outputs.changed == 'true'
         run: |
           # 모듈은 항상 설치한다(캐시는 브라우저 바이너리에만 걸린다). 캐시가 있어도 모듈이 없으면 실행이 안 된다.
           npm i --no-save --no-package-lock playwright@1.49.1
@@ -181,6 +228,7 @@ jobs:
       - name: 첫 화면 떠 있음·겹침 시험(#535, 건너뜀=실패)
         env:
           LT_ORBIT535_REQUIRE: '1'
+        if: needs.screen-changes.outputs.changed == 'true'
         run: |
           start=$(date +%s)
           npx vite build > /dev/null
@@ -191,6 +239,7 @@ jobs:
       - name: 첫 화면 끌기 성능 계약 시험(#586, 건너뜀=실패)
         env:
           LT_ORBIT586_REQUIRE: '1'
+        if: needs.screen-changes.outputs.changed == 'true'
         run: |
           start=$(date +%s)
           node --test tests/v41-orbit-586-perf.test.mjs
@@ -200,6 +249,7 @@ jobs:
       - name: 책 한 장 보기 시험(1440·390 순간 하나씩, 건너뜀=실패 — #537)
         env:
           LT_BOOK_SINGLE_REQUIRE: '1'
+        if: needs.screen-changes.outputs.changed == 'true'
         run: |
           start=$(date +%s)
           node --test --test-concurrency=1 tests/v41-book-single-537.test.mjs
@@ -208,6 +258,7 @@ jobs:
       - name: 책 YouTube 재생·두 장 모드 시험(건너뜀=실패 — 이슈 584)
         env:
           LT_BOOK_584_REQUIRE: '1'
+        if: needs.screen-changes.outputs.changed == 'true'
         run: |
           start=$(date +%s)
           node --test --test-concurrency=1 tests/v41-book-play-584.test.mjs
@@ -218,6 +269,7 @@ jobs:
       - name: 새 소식 화면 시험(건너뜀=실패 — #611)
         env:
           LT_UPDATES_611_REQUIRE: '1'
+        if: needs.screen-changes.outputs.changed == 'true'
         run: |
           start=$(date +%s)
           node --test --test-concurrency=1 tests/updates-screen-611.test.mjs
@@ -228,6 +280,7 @@ jobs:
       - name: 새 소식 카드·책 단추 겹침 시험(390, 건너뜀=실패 — #611 후속)
         env:
           LT_UPDATES_CARD_611_REQUIRE: '1'
+        if: needs.screen-changes.outputs.changed == 'true'
         run: |
           start=$(date +%s)
           node --test --test-concurrency=1 tests/updates-card-611-followup.test.mjs
@@ -239,6 +292,7 @@ jobs:
       - name: 감상 화면 흔적 값·어떻게 쓰나요 안내 시험(건너뜀=실패 — #635)
         env:
           LT_635A_REQUIRE: '1'
+        if: needs.screen-changes.outputs.changed == 'true'
         run: |
           start=$(date +%s)
           npx vite build > /dev/null
@@ -250,15 +304,23 @@ jobs:
       - name: 의견 보내기 창 배치·보낸 뒤 화면 시험(건너뜀=실패 — #631)
         env:
           LT_FEEDBACK_631_REQUIRE: '1'
+        if: needs.screen-changes.outputs.changed == 'true'
         run: |
           start=$(date +%s)
           node --test --test-concurrency=1 tests/v41-shell-dialogs.test.mjs
           echo "의견 보내기 창 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
 
+      - name: 화면 변경 없으면 건너뜀을 남긴다
+        if: always()
+        run: |
+          if [ "${{ needs.screen-changes.outputs.changed }}" != "true" ]; then
+            echo "건너뜀(화면 변경 없음)" | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
   screen-map-a:
     name: 화면 시험 — 지도 대비
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    needs: screen-changes
     steps:
       - uses: actions/checkout@v4
         with:
@@ -274,6 +336,7 @@ jobs:
           key: ms-playwright-${{ runner.os }}-1.49.1
       - name: 브라우저 준비(Playwright Chromium, 캐시)
         id: browser
+        if: needs.screen-changes.outputs.changed == 'true'
         run: |
           # 모듈은 항상 설치한다(캐시는 브라우저 바이너리에만 걸린다). 캐시가 있어도 모듈이 없으면 실행이 안 된다.
           npm i --no-save --no-package-lock playwright@1.49.1
@@ -283,18 +346,44 @@ jobs:
             npx playwright install --with-deps chromium
           fi
           node -e "import('playwright-core').then(()=>console.log('playwright-core 확인')).catch(e=>{console.error(e.message);process.exit(1)})"
-      - name: 지도 실제 대비 시험(건너뜀=실패)
-        env:
-          LT_MAP_CONTRAST_REQUIRE: '1'
+      - uses: actions/cache@v4
+        with:
+          path: ~/.fonts
+          key: fonts-noto-cjk-${{ runner.os }}-1
+      # 이슈 947: apt-get이 가끔 10분 넘게 멈춘다(실측 — 지도 도구 줄 잡 10분 단계 초과). 매번 apt로 받지 않고
+      # 글꼴 파일(~/.fonts)을 캐시에 두고, 캐시가 있으면 fc-cache만 한다. 없을 때만 설치해 캐시에 쌓는다.
+      - name: 한글 글꼴 준비(캐시, 없으면 설치)
+        if: needs.screen-changes.outputs.changed == 'true'
+        timeout-minutes: 10
         run: |
           start=$(date +%s)
-          # #529: 이름표 대비는 실제로 그려진 한글 글자를 잰다. 실행기에 한글 글꼴이 없으면 준비한다(있으면 건너뜀).
-          if ! fc-list :lang=ko | grep -q .; then
-            echo "한글 글꼴 없음 — fonts-noto-cjk 설치"
-            sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends fonts-noto-cjk
+          # 두 갈래만 둔다(실행기마다 글꼴 구성이 달라 fc-list로 판단하면 캐시를 채울 기회를 놓친다 — 실측).
+          if [ -f "$HOME/.fonts/NotoSansCJK-Regular.ttc" ]; then
+            echo "캐시된 한글 글꼴 사용($(ls "$HOME/.fonts" | wc -l)개 파일)"
+          else
+            echo "캐시된 한글 글꼴 없음 — fonts-noto-cjk 설치해 ~/.fonts에 쌓는다"
+            sudo apt-get update -qq || true
+            ok=0
+            for i in 1 2 3; do
+              if sudo timeout 150 apt-get install -y -qq --no-install-recommends fonts-noto-cjk; then ok=1; break; fi
+              echo "apt-get install $i번째 시도 실패/멈춤 — 다시 시도"
+              sleep 5
+            done
+            [ $ok -eq 1 ] || { echo "fonts-noto-cjk 설치 실패"; exit 1; }
+            mkdir -p "$HOME/.fonts"
+            sudo cp /usr/share/fonts/opentype/noto/*.tt* "$HOME/.fonts/" 2>/dev/null || sudo find /usr/share/fonts -name 'Noto*CJK*.ttc' -exec cp {} "$HOME/.fonts/" \; 2>/dev/null || true
+            echo "쌓은 글꼴 파일 $(ls "$HOME/.fonts" | wc -l)개"
           fi
           fc-cache -f >/dev/null 2>&1 || true
           echo "한글 글꼴 $(fc-list :lang=ko | wc -l)개 · 대표 $(fc-match 'sans-serif:lang=ko' | head -1)"
+          echo "한글 글꼴 준비 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+      - name: 지도 실제 대비 시험(건너뜀=실패)
+        env:
+          LT_MAP_CONTRAST_REQUIRE: '1'
+        if: needs.screen-changes.outputs.changed == 'true'
+        run: |
+          start=$(date +%s)
+          # #529: 이름표 대비는 실제로 그려진 한글 글자를 잰다 — 한글 글꼴은 앞의 '한글 글꼴 준비' 단계에서 둔다.
           # 시험 안에서 조합(크기×테마×판 8개)을 둘씩 동시에 돌린다(지도 잡 시간 단축 — 픽셀 해석이
           # 렌더러 프로세스별로 나뉜다). 판 흐름 시험은 지도 도구 줄 잡으로 옮겼다(지도 잡이 3분 안에 들도록).
           # #583 부채꼴·'이 순간 열기' 시험(약 10초)은 대비 시험과 나란히 돌린다 — 실행기 코어 4개에
@@ -313,10 +402,17 @@ jobs:
           [ $r1 -eq 0 ] && [ $r2 -eq 0 ] || exit 1
           echo "지도 실제 대비·부채꼴 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
 
+      - name: 화면 변경 없으면 건너뜀을 남긴다
+        if: always()
+        run: |
+          if [ "${{ needs.screen-changes.outputs.changed }}" != "true" ]; then
+            echo "건너뜀(화면 변경 없음)" | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
   screen-map-b:
     name: 화면 시험 — 지도 도구 줄·판 흐름·책 이동
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    needs: screen-changes
     steps:
       - uses: actions/checkout@v4
         with:
@@ -332,6 +428,8 @@ jobs:
           key: ms-playwright-${{ runner.os }}-1.49.1
       - name: 브라우저 준비(Playwright Chromium, 캐시)
         id: browser
+        timeout-minutes: 8
+        if: needs.screen-changes.outputs.changed == 'true'
         run: |
           # 모듈은 항상 설치한다(캐시는 브라우저 바이너리에만 걸린다). 캐시가 있어도 모듈이 없으면 실행이 안 된다.
           npm i --no-save --no-package-lock playwright@1.49.1
@@ -341,18 +439,45 @@ jobs:
             npx playwright install --with-deps chromium
           fi
           node -e "import('playwright-core').then(()=>console.log('playwright-core 확인')).catch(e=>{console.error(e.message);process.exit(1)})"
-      - name: 지도 도구 줄·책 이동 시험(#517·#518, 건너뜀=실패)
-        env:
-          LT_MAP_CONTRAST_REQUIRE: '1'
+      - uses: actions/cache@v4
+        with:
+          path: ~/.fonts
+          key: fonts-noto-cjk-${{ runner.os }}-1
+      # 이슈 947: apt-get이 가끔 10분 넘게 멈춘다(실측 — 지도 도구 줄 잡 10분 단계 초과). 매번 apt로 받지 않고
+      # 글꼴 파일(~/.fonts)을 캐시에 두고, 캐시가 있으면 fc-cache만 한다. 없을 때만 설치해 캐시에 쌓는다.
+      - name: 한글 글꼴 준비(캐시, 없으면 설치)
+        if: needs.screen-changes.outputs.changed == 'true'
+        timeout-minutes: 10
         run: |
           start=$(date +%s)
-          # #529: 이름표 대비는 실제로 그려진 한글 글자를 잰다. 실행기에 한글 글꼴이 없으면 준비한다(있으면 건너뜀).
-          if ! fc-list :lang=ko | grep -q .; then
-            echo "한글 글꼴 없음 — fonts-noto-cjk 설치"
-            sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends fonts-noto-cjk
+          # 두 갈래만 둔다(실행기마다 글꼴 구성이 달라 fc-list로 판단하면 캐시를 채울 기회를 놓친다 — 실측).
+          if [ -f "$HOME/.fonts/NotoSansCJK-Regular.ttc" ]; then
+            echo "캐시된 한글 글꼴 사용($(ls "$HOME/.fonts" | wc -l)개 파일)"
+          else
+            echo "캐시된 한글 글꼴 없음 — fonts-noto-cjk 설치해 ~/.fonts에 쌓는다"
+            sudo apt-get update -qq || true
+            ok=0
+            for i in 1 2 3; do
+              if sudo timeout 150 apt-get install -y -qq --no-install-recommends fonts-noto-cjk; then ok=1; break; fi
+              echo "apt-get install $i번째 시도 실패/멈춤 — 다시 시도"
+              sleep 5
+            done
+            [ $ok -eq 1 ] || { echo "fonts-noto-cjk 설치 실패"; exit 1; }
+            mkdir -p "$HOME/.fonts"
+            sudo cp /usr/share/fonts/opentype/noto/*.tt* "$HOME/.fonts/" 2>/dev/null || sudo find /usr/share/fonts -name 'Noto*CJK*.ttc' -exec cp {} "$HOME/.fonts/" \; 2>/dev/null || true
+            echo "쌓은 글꼴 파일 $(ls "$HOME/.fonts" | wc -l)개"
           fi
           fc-cache -f >/dev/null 2>&1 || true
           echo "한글 글꼴 $(fc-list :lang=ko | wc -l)개 · 대표 $(fc-match 'sans-serif:lang=ko' | head -1)"
+          echo "한글 글꼴 준비 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+      - name: 지도 도구 줄·책 이동 시험(#517·#518, 건너뜀=실패)
+        timeout-minutes: 10
+        env:
+          LT_MAP_CONTRAST_REQUIRE: '1'
+        if: needs.screen-changes.outputs.changed == 'true'
+        run: |
+          start=$(date +%s)
+          # #529: 이름표 대비는 실제로 그려진 한글 글자를 잰다 — 한글 글꼴은 앞의 '한글 글꼴 준비' 단계에서 둔다.
           # #517·#518: 390·360 지도 도구 줄 넘침·겹침과 상세 '기억책에서 보기'의 책 이동을 실제 화면에서 잰다.
           # #601: 관계 지도 다듬기 시험(새 순간 기본 연결·점 이름표·묶음·두 보기 판 일치·이어진 선)을 나란히 돌린다
           # (지도 대비 잡의 나란히 돌리기와 같은 요령 — 종료 코드를 받아 두고 로그를 항상 출력한 뒤 판정한다).
@@ -370,8 +495,10 @@ jobs:
       # 지도 판 흐름(설정·저장 복원·두 보기·누르기·유휴 0)은 지도 대비 잡에서 여기로 옮겼다(지도 잡 시간 단축).
       # 브라우저 준비·한글 글꼴은 같은 잡의 앞 단계에서 이미 끝난 것을 쓴다.
       - name: 지도 판 흐름 시험(건너뜀=실패)
+        timeout-minutes: 6
         env:
           LT_MAP_CONTRAST_REQUIRE: '1'
+        if: needs.screen-changes.outputs.changed == 'true'
         run: |
           start=$(date +%s)
           node --test --test-concurrency=1 tests/v41-map-theme-flow.test.mjs
@@ -380,8 +507,10 @@ jobs:
       # 가장 짧은 화면 시험 잡에 단계로 붙인다(각 잡 소요는 요약에 적힌다). 첫 화면이 vite 번들이라 먼저 build 한다.
       # 지도 판 흐름(약 75초)과 함께 이 잡은 약 3분 — 여전히 가장 짧은 화면 시험 잡이다.
       - name: 화면 글자 기준선 시험(이슈 548, 건너뜀=실패)
+        timeout-minutes: 6
         env:
           LT_FONT_FLOOR_REQUIRE: '1'
+        if: needs.screen-changes.outputs.changed == 'true'
         run: |
           start=$(date +%s)
           npx vite build > /dev/null
@@ -391,8 +520,10 @@ jobs:
       # PR 번호('PR #637 · 제목')를 1440·390에서 숫자로 잰다(tests/admin-view.test.mjs — 관리자 세션·GitHub 읽기는 가짜).
       # 긴 화면 공통 검사기보다 앞에 둔다 — 공통 검사기가 흔들려 잡이 빨강이 될 때 이 단계가 가려지지 않게.
       - name: 운영센터 상태 칩 시험(건너뜀=실패)
+        timeout-minutes: 6
         env:
           LT_ADMIN_REQUIRE: '1'
+        if: needs.screen-changes.outputs.changed == 'true'
         run: |
           start=$(date +%s)
           npx vite build > /dev/null
@@ -403,20 +534,46 @@ jobs:
       # 주요 화면(첫 화면·책·보드·지도·둘러보기·의견 창·어떻게 쓰나요) 한 번에 잰다(390·1440 × 밤·정원).
       # 548과 같은 요령: 가장 짧은 화면 시험 잡에 단계로 붙인다. 첫 화면·책이 vite 번들이라 먼저 build 한다.
       # main에서 이미 나는 항목은 시험 파일 안 '알려진 문제' 목록(KNOWN, 이슈 번호 적음)으로 기록하고, 목록 밖의 새 실패만 빨강이다.
+      # 이슈 947: 이 단계가 멈추면 출력 없이 잡 25분에 죽어 로그도 없었다(이슈 947 — 취소된 잡 2개의 step 기록으로
+      # 이 단계가 멈춤을 확인). 시험 판정은 그대로 두고, ①단계 시간 제한(14분 — 넘으면 잡 전체가 아니라 이 단계가
+      # 빨강이 되고 runner가 살아 로그가 남는다) ②출력을 로그 파일로 받고 30초마다 '진행 중 · 마지막 완료 시험'을
+      # 에코해 멈춘 뒤에도 어느 시험까지 끝났는지 남긴다.
       - name: 화면 공통 검사기(건너뜀=실패 — #657)
+        timeout-minutes: 14
         env:
           LT_SCREEN_AUDIT_REQUIRE: '1'
+        if: needs.screen-changes.outputs.changed == 'true'
         run: |
           start=$(date +%s)
           npx vite build > /dev/null
-          node --test tests/v41-screen-audit.test.mjs
+          node --test tests/v41-screen-audit.test.mjs > /tmp/screen-audit.log 2>&1 & pid=$!
+          r=0
+          while kill -0 $pid 2>/dev/null; do
+            sleep 30
+            if ! kill -0 $pid 2>/dev/null; then break; fi
+            last=$(grep -E '^(ok|not ok)' /tmp/screen-audit.log | tail -1)
+            echo "…진행 중 $(( $(date +%s) - start ))초 — 마지막 완료: ${last:-아직 완료한 시험 없음}"
+            echo "…진행 중 $(( $(date +%s) - start ))초 — 마지막 완료: ${last:-아직 완료한 시험 없음}" >> "$GITHUB_STEP_SUMMARY"
+          done
+          wait $pid || r=$?
+          echo "화면 공통 검사기 종료 코드 $r · $(( $(date +%s) - start ))초"
+          echo '— 화면 공통 검사기 출력(마지막 60줄) —'
+          tail -60 /tmp/screen-audit.log || true
           echo "화면 공통 검사기 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+          exit $r
 
 
+      - name: 화면 변경 없으면 건너뜀을 남긴다
+        if: always()
+        run: |
+          if [ "${{ needs.screen-changes.outputs.changed }}" != "true" ]; then
+            echo "건너뜀(화면 변경 없음)" | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
   screen-book-screen:
     name: 화면 시험 — 책 대비·초점
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    needs: screen-changes
     steps:
       - uses: actions/checkout@v4
         with:
@@ -432,6 +589,7 @@ jobs:
           key: ms-playwright-${{ runner.os }}-1.49.1
       - name: 브라우저 준비(Playwright Chromium, 캐시)
         id: browser
+        if: needs.screen-changes.outputs.changed == 'true'
         run: |
           # 모듈은 항상 설치한다(캐시는 브라우저 바이너리에만 걸린다). 캐시가 있어도 모듈이 없으면 실행이 안 된다.
           npm i --no-save --no-package-lock playwright@1.49.1
@@ -450,6 +608,7 @@ jobs:
           LT_BOOK_CONTRAST_REQUIRE: '1'
           LT_BOOK_FOLIO_REQUIRE: '1'
           LT_BOOK_FOCUS_REQUIRE: '1'
+        if: needs.screen-changes.outputs.changed == 'true'
         run: |
           start=$(date +%s)
           node --test --test-concurrency=1 tests/v41-book-contrast-515-516.test.mjs tests/v41-book-folio-contrast-522.test.mjs tests/v41-book-closed-focus-519.test.mjs
@@ -459,6 +618,7 @@ jobs:
       - name: 겹(패널) 초점 계약 시험(건너뜀=실패)
         env:
           LT_VIEW_A11Y_REQUIRE: '1'
+        if: needs.screen-changes.outputs.changed == 'true'
         run: |
           start=$(date +%s)
           node --test tests/v41-view-a11y-panel.test.mjs
@@ -468,11 +628,18 @@ jobs:
         env:
           LT_TREE_TIPS_549_REQUIRE: '1'
           LT_TREE_RENAME_571_REQUIRE: '1'
+        if: needs.screen-changes.outputs.changed == 'true'
         run: |
           start=$(date +%s)
           node --test --test-concurrency=1 tests/v41-tree-tips-549.test.mjs tests/v41-tree-rename-tips-571.test.mjs
           echo "첫 트리 안내 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
 
+      - name: 화면 변경 없으면 건너뜀을 남긴다
+        if: always()
+        run: |
+          if [ "${{ needs.screen-changes.outputs.changed }}" != "true" ]; then
+            echo "건너뜀(화면 변경 없음)" | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
   deploy:
     name: 미리보기 배포 검사(postdeploy·겉모습 비교)
     runs-on: ubuntu-latest

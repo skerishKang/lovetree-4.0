@@ -136,3 +136,134 @@ test("'이 순간 열기': ?open=<순간>으로 열면 그 순간이 고른 상�
     } finally { await plain.ctx.close(); }
   } finally { await browser.close(); server.close(); }
 });
+
+// #952: 예전에 소스 글자(파일 문자열)를 보던 단정을 화면 결과로 바꾼 시험.
+// ① 첫 로드에 안내가 흐려지지 않음 · ③ 연결 이유 툴팁(있는 이유/빈 이유) · 낭독기 속성 ·
+// 눌린 보기 단추(계산된 색) · 오른쪽 진행 막대 숨김 · 키보드 이동·Enter 로 상세 판.
+test('#366 지도 화면 결과: 안내 불투명·연결 이유 툴팁·눌린 보기 단추·진행 막대 숨김·키보드 이동', { skip: REQUIRE ? false : skip, timeout: 180000 }, async () => {
+  if (skip) assert.fail(`CI에서는 지도 부채꼴 시험 건너뜀이 실패다 — ${skip}`);
+  const server = await serve(), base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const { ctx, page, errors } = await openMap(browser, base, { width: 1440 });
+    try {
+      assert.deepEqual(errors, [], '페이지 오류 없이 떠야 한다');
+
+      // ① 첫 로드에 맨 위 한 줄 안내가 흐려지지 않는다(자동 맞춤이 안내를 덮지 않는다).
+      const hero = await page.evaluate(() => {
+        const el = document.querySelector('.hero');
+        return { opacity: Number(getComputedStyle(el).opacity), dim: el.classList.contains('dim') };
+      });
+      assert.equal(hero.dim, false, '첫 로드에 안내가 흐려지지 않는다(dim 없음)');
+      assert.ok(hero.opacity >= 0.9, `안내 불투명도 ${hero.opacity} ≥ 0.9`);
+
+      // ③ 이유가 있는 순간에 올리면 그 이유가 뜨고, 이유가 비면 뜨지 않는다.
+      const targets = await page.evaluate(() => {
+        const lt = window.__lt;
+        const reasonOf = (id) => {
+          const e = lt.edges.find((x) => x.b === id && String(x.reason || '').trim());
+          return e ? String(e.reason).trim() : '';
+        };
+        const dots = lt.dots();
+        const withReason = dots.find((d) => d.id !== 'm01' && reasonOf(d.id));
+        const without = dots.find((d) => !reasonOf(d.id));
+        return {
+          withReason: withReason ? { x: withReason.x, y: withReason.y, text: reasonOf(withReason.id) } : null,
+          without: without ? { x: without.x, y: without.y } : null
+        };
+      });
+      assert.ok(targets.withReason && targets.without, '이유가 있는 순간과 없는 순간이 모두 그려져 있다');
+      const tip = () => page.evaluate(() => {
+        const el = document.getElementById('edgeTip');
+        return { text: (el.textContent || '').trim(), show: el.classList.contains('show') };
+      });
+      await page.mouse.move(targets.withReason.x, targets.withReason.y);
+      await page.waitForTimeout(300);
+      const shown = await tip();
+      assert.equal(shown.show, true, '이유가 있는 순간에 올리면 툴팁이 뜬다');
+      assert.equal(shown.text, targets.withReason.text, `툴팁이 그 연결 이유를 보여 준다 (${shown.text})`);
+      await page.mouse.move(targets.without.x, targets.without.y);
+      await page.waitForTimeout(300);
+      assert.equal((await tip()).show, false, '이유가 비면 툴팁을 띄우지 않는다');
+
+      // 낭독기: 툴팁은 상태 알림으로 읽히고(aria-hidden 아님), 캔버스가 초점·설명을 갖는다.
+      const a11y = await page.evaluate(() => {
+        const el = document.getElementById('edgeTip'), canvas = document.getElementById('stage');
+        return {
+          role: el.getAttribute('role'), live: el.getAttribute('aria-live'), hidden: el.getAttribute('aria-hidden'),
+          described: canvas.getAttribute('aria-describedby'), tab: canvas.getAttribute('tabindex')
+        };
+      });
+      assert.equal(a11y.role, 'status', '툴팁은 상태 알림');
+      assert.equal(a11y.live, 'polite', '낭독기가 읽는다');
+      assert.equal(a11y.hidden, null, 'aria-hidden 으로 숨기지 않는다');
+      assert.equal(a11y.described, 'mapKbHint', '캔버스가 키보드 안내와 이어져 있다');
+      assert.equal(a11y.tab, '0', '캔버스가 키보드 초점을 받는다');
+
+      // 지금 고른 보기 단추는 색으로 구분되고, 오른쪽 진행 막대(빈 띠)는 보이지 않는다.
+      const chrome = await page.evaluate(() => {
+        const on = document.getElementById('viewNet'), off = document.getElementById('viewConc');
+        return {
+          pressed: on.getAttribute('aria-pressed'),
+          onBg: getComputedStyle(on).backgroundColor, offBg: getComputedStyle(off).backgroundColor,
+          rail: getComputedStyle(document.querySelector('.progress-rail')).display
+        };
+      });
+      assert.equal(chrome.pressed, 'true', '그물 보기가 눌린 상태');
+      assert.notEqual(chrome.onBg, chrome.offBg, `눌린 보기 단추가 색으로 구분된다 (${chrome.onBg} / ${chrome.offBg})`);
+      assert.equal(chrome.rail, 'none', '오른쪽 진행 막대는 숨긴다');
+
+      // 누름(탭)으로 바로 고르면 그 이유를 고정(pinned)으로 띄운다 — 손을 떼고 조금 지나도 남는다.
+      await page.mouse.move(targets.withReason.x, targets.withReason.y);
+      await page.mouse.down();
+      await page.mouse.up();
+      await page.waitForTimeout(400);
+      const pinned = await tip();
+      assert.equal(pinned.show, true, '누름(탭)으로 고른 순간의 이유가 뜬다');
+      assert.equal(pinned.text, targets.withReason.text);
+      await page.waitForTimeout(3400);
+      assert.equal((await tip()).show, false, '고정된 이유는 잠시 뒤 스스로 사라진다(3.2초)');
+
+      // 키보드: 방향키로 고른 순간이 옮겨 가고, 길이 밝혀지고, Enter 로 상세 판이 열리고, Escape 로 닫는다.
+      const before = await page.evaluate(() => window.__lt.state.selected?.id || null);
+      await page.locator('#stage').focus();
+      await page.keyboard.press('ArrowRight');
+      await page.waitForTimeout(300);
+      const afterKey = await page.evaluate(() => ({ id: window.__lt.state.selected?.id || null, mode: window.__lt.state.mode }));
+      assert.notEqual(afterKey.id, before, `방향키로 고른 순간이 옮겨 간다 (${before} → ${afterKey.id})`);
+      assert.equal(afterKey.mode, 'MOMENT_FOCUS', '방향키로 고르면 그 순간에 맞춘다');
+      assert.ok(await page.evaluate(() => window.__lt.state.pathEdges.size > 0), '방향키로 고른 순간까지 지나온 길이 밝혀진다');
+      // 키보드로 초점을 받으면 테두리가 보인다(:focus-visible 규칙이 살아 있다).
+      const ring = await page.evaluate(() => {
+        const c = document.getElementById('stage');
+        const cs = getComputedStyle(c);
+        return { visible: c.matches(':focus-visible'), style: cs.outlineStyle, width: parseFloat(cs.outlineWidth) || 0 };
+      });
+      assert.equal(ring.visible, true, '키보드 초점이면 :focus-visible 이 맞는다');
+      assert.equal(ring.style, 'solid', '초점 테두리가 보인다');
+      assert.ok(ring.width >= 1, `초점 테두리 두께 ${ring.width}px`);
+      // Home·End 는 처음/마지막 순간으로 간다.
+      await page.keyboard.press('End');
+      await page.waitForTimeout(250);
+      const end = await page.evaluate(() => window.__lt.state.selected?.id || null);
+      await page.keyboard.press('Home');
+      await page.waitForTimeout(250);
+      const home = await page.evaluate(() => window.__lt.state.selected?.id || null);
+      assert.equal(home, 'm01', 'Home 은 첫 순간으로');
+      assert.notEqual(end, home, 'End 는 마지막 순간으로');
+      await page.keyboard.press('Enter');
+      await page.waitForTimeout(300);
+      assert.equal(await page.evaluate(() => document.getElementById('detail').classList.contains('open')), true, 'Enter 로 상세 판이 열린다');
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(300);
+      const afterEsc = await page.evaluate(() => ({
+        id: window.__lt.state.selected?.id || null,
+        mode: window.__lt.state.mode,
+        tip: document.getElementById('edgeTip').classList.contains('show')
+      }));
+      assert.equal(afterEsc.id, null, 'Escape 로 고른 순간을 놓는다');
+      assert.equal(afterEsc.mode, 'OVERVIEW', 'Escape 뒤에는 전체 보기');
+      assert.equal(afterEsc.tip, false, 'Escape 로 툴팁도 닫힌다');
+    } finally { await ctx.close(); }
+  } finally { await browser.close(); server.close(); }
+});
