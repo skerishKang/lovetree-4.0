@@ -1,3 +1,4 @@
+import {waitForShownScreen} from './helpers/visible-frame.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, mkdirSync } from 'node:fs';
@@ -54,7 +55,7 @@ test('#842·#841 v3 — 실제 셸의 꼬리표 정리 판 연결과 저장 뒤 
     await page.locator('#discover-ask-no').click().catch(() => {});
 
     await page.locator('.tree-views [data-view="track56-network.html"]').click();
-    await page.waitForFunction(() => /track56-network/.test(document.querySelector('#view')?.contentWindow?.location?.href || ''), null, { timeout: 10000 });
+    await waitForShownScreen(page, {path: 'track56-network'}, 10000);
     const mapFrame = page.frames().find((f) => /track56-network/.test(f.url()));
     assert.ok(mapFrame, '지도 화면이 열린다');
     await mapFrame.locator('#viewGraph').waitFor();

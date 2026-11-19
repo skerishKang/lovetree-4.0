@@ -8,6 +8,7 @@
 //      세로 판정도 썸네일 실측(oardefault)으로 보강한다 — oEmbed 가로세로는 watch 주소 기준 항상 200×113이라 신호가 못 된다.
 //  (5·6) 머리줄: 1장|2장 한 묶음, 돋보기 아이콘+금색, 말풍선 설명, '여기까지 온 길'→'이어진 순간'.
 // 크롬이 없는 곳에서는 실행 시험을 건너뛴다 — 이유를 남긴다.
+import {waitForShownScreen} from './helpers/visible-frame.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
@@ -522,16 +523,18 @@ test('26: 책을 열어 둔 채 트리를 바꾸면 책 제목·첫 카드·카�
         } else {
           await page.locator('.tree-views [data-view="track59-sketchbook.html"]').click();
         }
-        await page.waitForFunction(()=>document.querySelector('#view')?.contentWindow?.location?.pathname?.includes('track59-sketchbook'),null,{timeout:8000});
+        await waitForShownScreen(page, {path: 'track59-sketchbook'}, 8000);
         await page.waitForTimeout(900);
+        // 셸이 두 장을 갈아끼우므로 '지금 보이는 쪽'의 문서·주소를 읽는다(#982).
         const read = () => page.evaluate(() => {
-          const f=document.querySelector('#view');let d=null;try{d=f?.contentDocument}catch{}
+          const f = [...document.querySelectorAll('#view, #view-next')].find(x => !x.hidden && x.getClientRects().length > 0);
+          let d = null; try { d = f?.contentDocument; } catch {}
           return {
-            src: f?.contentWindow?.location?.href||'',
-            title: d?.getElementById('bookTitleText')?.textContent?.trim()||'',
-            cards: (()=>{try{return d?.defaultView?.__TRACK59__?.getState?.().total||0}catch{return 0}})(),
-            first: (d?.querySelector('.page-content,.mobile-content')?.textContent||'').slice(0,40),
-            body: (d?.body?.innerText||'')
+            src: f?.contentWindow?.location?.href || '',
+            title: d?.getElementById('bookTitleText')?.textContent?.trim() || '',
+            cards: (() => { try { return d?.defaultView?.__TRACK59__?.getState?.().total || 0; } catch { return 0; } })(),
+            first: (d?.querySelector('.page-content,.mobile-content')?.textContent || '').slice(0, 40),
+            body: (d?.body?.innerText || '')
           };
         });
         const before = await read();
@@ -540,7 +543,7 @@ test('26: 책을 열어 둔 채 트리를 바꾸면 책 제목·첫 카드·카�
 
         if (width === 390) {
           // 390에서는 책 안의 트리 제목 메뉴로 바꾼다(헤더 트리 선택은 접혀 있다).
-          const frame = page.locator('#view').contentFrame();
+          const frame = page.locator('#view:not([hidden]), #view-next:not([hidden])').first().contentFrame();
           await frame.locator('#bookTitleBtn').click();
           await page.waitForTimeout(150);
           await frame.locator(`#treeMenuPanel [data-tree-id="${b.id}"]`).click();
@@ -549,7 +552,10 @@ test('26: 책을 열어 둔 채 트리를 바꾸면 책 제목·첫 카드·카�
           await page.waitForTimeout(150);
           await page.locator(`#tree-popover [data-tree-id="${b.id}"]`).click();
         }
-        await page.waitForFunction(id=>document.querySelector('#view')?.contentWindow?.location?.search?.includes(id),b.id,{timeout:10000});
+        await page.waitForFunction((id) => {
+          const f = [...document.querySelectorAll('#view, #view-next')].find(x => !x.hidden && x.getClientRects().length > 0);
+          try { return (f?.contentWindow?.location?.search || '').includes(id); } catch { return false; }
+        }, b.id, {timeout: 10000});
         await page.waitForTimeout(900);
         const after = await read();
         console.log(`책전환 ${width}·${theme}: 제목 ${before.title}→${after.title}, 카드 ${before.cards}→${after.cards}`);
