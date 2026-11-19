@@ -185,7 +185,8 @@ test('a stored deviant tree is quarantined on read and kept in storage through a
     await repo.commit({
       productId: PRODUCT, subjectId: subject,
       doc: { version: 1, trees: [...state.trees, deviant] },
-      expectedRevision: 0, clientKey: `ck-seed-${suffix()}`, requestHash: 'seed'
+      // 저장소의 요청 해시 열은 64자 제약이 있다 — 심는 문서에도 올바른 모양의 해시를 쓴다.
+      expectedRevision: 0, clientKey: `ck-seed-${suffix()}`, requestHash: '0'.repeat(64)
     });
 
     const first = await read(handle);
