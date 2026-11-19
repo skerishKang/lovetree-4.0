@@ -274,12 +274,16 @@ test('#933 새 트리 만들기 화면에서는 첫 트리 안내 판이 뜨지 
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
     await openWithFirstTree(page);
     // 트리 고르기 → '+ 새 트리'
-    await page.evaluate(() => document.getElementById('record-menu').click());
-    await page.waitForFunction(() => !document.getElementById('tree-popover')?.hidden, null, { timeout: 8000 });
-    await page.evaluate(() => document.querySelector('[data-tree-action="new"]').click());
+    await page.locator('#record-menu').click();
+    await page.waitForFunction(() => !document.getElementById('tree-popover')?.hidden, null, { timeout: 15000 });
+    // 단추가 실제로 보이는 것을 확인한 뒤 진짜 마우스로 누른다(창 항목은 pointer 이벤트로도 반응한다).
+    const newTree = page.locator('[data-tree-action="new"]').first();
+    await newTree.waitFor({ state: 'visible', timeout: 15000 });
+    await newTree.click();
+    // 느린 곳(CI)에서는 프레임이 새로 붙느라 늦다 — 넉넉히 기다린다.
     await page.waitForFunction(() => {
       try { return /first-journey/.test(document.getElementById('view').contentWindow.location.pathname); } catch { return false; }
-    }, null, { timeout: 15000 });
+    }, null, { timeout: 40000 });
     const state = await page.evaluate(() => {
       const shown = (el) => !!el && !el.hidden && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';
       const frame = document.getElementById('view');
