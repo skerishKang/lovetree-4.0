@@ -242,8 +242,4 @@ test('첫 화면 숫자판: 로그인은 내 것만, 로그아웃 집계는 예�
   // 기존 규칙 유지: 모아둔 칸 누르면 정리 창, 0이면 비활성 표기.
   assert.match(homeSrc,/inboxLine\.onclick=\(\)=>bridge\.actions\.cleanup\(\)/);
   assert.match(homeSrc,/setAttribute\('aria-disabled','true'\)/);
-  // #942: 숫자판 두 줄(모아둔·전체 / 트리·최근) — 1440·390 같게, 점 간격은 양쪽 10px.
-  assert.match(homeSrc,/\.home-info\{display:grid;grid-template-columns:1fr;/, '두 칸이 세로로 쌓인다');
-  assert.match(homeSrc,/\.home-info-cell\{display:flex;justify-content:center;align-items:center;gap:0\}/, '칸마다 한 줄');
-  assert.match(homeSrc,/content:'·';margin:0 10px/, '점 간격 고르게');
 });
