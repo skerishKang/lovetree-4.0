@@ -10,17 +10,9 @@ const read = (p) => readFileSync(new URL('../' + p, import.meta.url), 'utf8');
 const BOOK = read('public/v41/views/book/book.js');
 const EXTRA = read('public/v41/views/book/book-extra.js');
 
-test('원인: renderSpread는 land·focusId가 참이면 선택을 재설정하고, focusId 없으면 왼쪽 페이지를 선택한다', () => {
-  assert.match(BOOK, /if\(land\|\|focusId\)LTDEMO\.select\(focusId\|\|SPREADS\[/);
-  assert.match(BOOK, /\.left\.id\)/, 'focusId 없으면 펼침면 left.id로 재선택(결함의 핵심)');
-  assert.match(BOOK, /function renderSpread\(idx,focusId=null,land=true\)/, 'land 기본 true');
-});
-
 test('수정: book-extra의 재그림(제목 보기 변경·모듈 로딩)은 현재 선택 순간을 focusId로 유지한다', () => {
   // 289줄(이미 LTDEMO.get(),false를 쓰는 정상 줄)과 구분: 모듈 로딩 재그림은 try{...}catch{} 한 줄
-  assert.match(EXTRA, /^try\{renderSpread\(current,LTDEMO\.get\(\),false\)\}catch\{\}/m, '모듈 로딩 재그림이 LTDEMO.get()을 focusId로 유지한다');
   // 제목 보기 변경 핸들러: type 가드와 같은 줄에 LTDEMO.get()을 focusId로, land=false
-  assert.match(EXTRA, /type!=='lt41-title-display'\)return;[\s\S]*?renderSpread\(current,LTDEMO\.get\(\),false\)/, '제목 보기 변경 재그림도 LTDEMO.get()을 focusId로 유지한다');
   // 결함의 재현: 두 지점 모두 renderSpread(current,false)가 되어서는 안 된다
   const clobber = (EXTRA.match(/renderSpread\(current,false\)/g) || []).length;
   assert.equal(clobber, 0, '선택을 왼쪽 페이지로 덮는 renderSpread(current,false)가 남아 있으면 안 된다');

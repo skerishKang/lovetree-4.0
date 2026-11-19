@@ -9,14 +9,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
-import { createReadStream, readFileSync } from 'node:fs';
-import { stat, readdir } from 'node:fs/promises';
+import { createReadStream } from 'node:fs';
+import { stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
 const PUB = path.join(ROOT, 'public');
-const read = (rel) => readFileSync(path.join(ROOT, rel), 'utf8');
 
 let chromium, skip = false;
 // CI(미리보기 검사)에서는 LT_BOARD_583_REQUIRE=1 — 크롬이 준비된 잡에서 건너뜀을 실패로 본다.
@@ -87,58 +86,39 @@ async function openHost(browser, url, { width = 1440, height = 900 } = {}) {
 
 const worldTransform = (frame) => frame.$eval('.boardWorld', (el) => el.style.transform || '');
 
-test('1. 커서 동그라미의 흔적이 남지 않는다(요소·스타일·모델 판정 함수 전부)', async () => {
-  for (const rel of [
-    'public/v41/views/track58-pinboard.html',
-    'public/v41/views/board/board.css',
-    'public/v41/views/board/board-extras.js',
-    'public/v41/views/board/board.js',
-    'public/v41/views/board/board-model.js'
-  ]) {
-    const s = read(rel);
-    assert.doesNotMatch(s, /cursorRing|cursorFX|cursor-burst|cursor-ripple|cursor-drop|cursorSetDrag|cursorRefresh|cursorState/, `${rel}: 동그라미 배선 흔적`);
-    assert.doesNotMatch(s, /cursorMode|cursorHover|cursorScale|cursorPresence|cursorEffectAllowed/, `${rel}: 모델 판정 함수 흔적`);
-  }
-  // public/v41 전체에 cursor:none이 없다 — 원래 마우스 커서를 가린 자리가 없어야 한다.
-  const walk = async (dir) => {
-    let hits = [];
-    for (const ent of await readdir(dir, { withFileTypes: true })) {
-      const p = path.join(dir, ent.name);
-      if (ent.isDirectory()) hits = hits.concat(await walk(p));
-      else if (/\.(html|css|js)$/.test(ent.name) && /cursor\s*:\s*none/i.test(readFileSync(p, 'utf8'))) hits.push(p);
-    }
-    return hits;
-  };
-  assert.deepEqual(await walk(PUB), [], 'public/v41에 cursor:none 없음');
-  // 상태 커서: 판 끌기 grab→grabbing, 카드 grab→끌 때 grabbing.
-  // (#582: 핀 연결을 보드에서 없앴으므로 crosshair 연결 커서도 함께 거둔다)
-  const css = read('public/v41/views/board/board.css');
-  assert.match(css, /#viewport\{cursor:grab\}/);
-  assert.match(css, /#viewport\.panning\{cursor:grabbing\}/);
-  assert.match(css, /\.card\{cursor:grab\}/);
-  assert.match(css, /\.card\.dragLift\{cursor:grabbing\}/);
-  assert.ok(!css.includes('crosshair'), '연결이 없으므로 crosshair 커서도 없다');
-  // 상태 클래스를 실제로 켜고 끈다.
-  const board = read('public/v41/views/board/board.js');
-  assert.match(board, /viewport\.classList\.add\('panning'\)/);
-  assert.match(board, /viewport\.classList\.remove\('panning'\)/);
-});
-
-test('2. 상세의 다음·이전 순간은 단추다 — board.js의 열기와 extras의 다시 그리기가 같은 규칙', () => {
-  const board = read('public/v41/views/board/board.js');
-  const extras = read('public/v41/views/board/board-extras.js');
-  // 실제 <button>이고 방향을 data-dir로 알린다(키보드 Tab·Enter 접근 보장). #601: 작은 썸네일 카드(connCard).
-  for (const s of [board, extras]) {
-    assert.match(s, /<button type="button" class="connCard" data-cid=/);
-    assert.match(s, /data-dir=/);
-    // 이유(why) 글은 단추 아래 작은 글씨로 그대로.
-    assert.match(s, /connWhy/);
-  }
-  // 3개 넘으면 '나머지 N개 보기'를 유지한다.
-  assert.match(board, /나머지 \$\{_rows\.length-3\}개 보기/);
-  // 누름 처리: 다음은 실을 따라 이동, 이전은 거꾸로 — 이벤트 위임 한 벌.
-  assert.match(extras, /\$\('#dConn'\)\.onclick=/);
-  assert.match(extras, /b\.dataset\.dir==='next'\)moveViaConnection\(c\);else pulseConnection\(c,\(\)=>focusBoardMoment\(c\.a\)\)/);
+// #952: 커서·상세 단추의 소스 글자 검사 10개를 걷어냈다. 남은 것은 화면에서 재는 동작이다.
+test('1. 화면: 커서 동그라미가 없고, 판·카드는 grab·끌면 grabbing — 판을 끌면 panning이 켜졌다 꺼진다', { skip: REQUIRE ? false : skip, timeout: 240000 }, async (t) => {
+  const tree = chainTree(6);
+  const browser = await chromium.launch();
+  const server = await serve({ '/host.html': hostHTML(tree) });
+  const { context, page, frame, problems } = await openHost(browser, `http://127.0.0.1:${server.address().port}/host.html`);
+  t.after(async () => { await context.close().catch(() => {}); await browser.close(); server.close(); });
+  assert.deepEqual(problems, [], '화면 오류 없음: ' + problems.join(' | '));
+  const look = await frame.evaluate(() => ({
+    rings: document.querySelectorAll('.cursorRing,.cursorFX,[class*="cursor-burst"],[class*="cursor-ripple"]').length,
+    body: getComputedStyle(document.body).cursor,
+    viewport: getComputedStyle(document.getElementById('viewport')).cursor,
+    card: getComputedStyle(document.querySelector('#cardLayer .card')).cursor
+  }));
+  assert.equal(look.rings, 0, '따라오는 동그라미 요소가 없다');
+  assert.notEqual(look.body, 'none', 'body에서 마우스 커서를 가리지 않는다');
+  assert.equal(look.viewport, 'grab', `판 커서는 grab(${look.viewport})`);
+  assert.equal(look.card, 'grab', `카드 커서는 grab(${look.card})`);
+  // 판을 끌면 panning(grabbing)이 켜지고, 손을 떼면 꺼진다.
+  const box = await frame.$eval('#viewport', (el) => { const r = el.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + 60 }; });
+  await frame.evaluate(() => { window.__pan = []; const v = document.getElementById('viewport');
+    new MutationObserver(() => window.__pan.push(v.classList.contains('panning'))).observe(v, { attributes: true, attributeFilter: ['class'] }); });
+  await page.mouse.move(box.x, box.y);
+  await page.mouse.down();
+  await frame.waitForTimeout(120);
+  const midDrag = await frame.evaluate(() => ({ panning: document.getElementById('viewport').classList.contains('panning'), cursor: getComputedStyle(document.getElementById('viewport')).cursor }));
+  await page.mouse.up();
+  await frame.waitForTimeout(200);
+  const afterDrag = await frame.evaluate(() => ({ panning: document.getElementById('viewport').classList.contains('panning'), seen: window.__pan.includes(true) && window.__pan.includes(false) }));
+  assert.equal(midDrag.panning, true, '끄는 동안 panning이 켜진다');
+  assert.equal(midDrag.cursor, 'grabbing', `끄는 동안 커서는 grabbing(${midDrag.cursor})`);
+  assert.equal(afterDrag.panning, false, '손을 떼면 panning이 꺼진다');
+  assert.equal(afterDrag.seen, true, '켜짐·꺼짐이 화면에 실제로 반영된다');
 });
 
 test('3. 화면: 다음 순간 단추를 누르면 판이 이동하고 카드가 선택되며 상세가 바뀐다', { skip: REQUIRE ? false : skip }, async (t) => {

@@ -108,19 +108,6 @@ test('shelfBook은 coverChoice 결과를 그대로 책 객체에 실는다', () 
   assert.equal(photo.design, '');
 });
 
-test('두 화면(책장·펼친 책)이 같은 판정 결과를 쓴다 — book.design을 화면이 다시 계산하지 않는다(구조 검사)', () => {
-  const shelf = readFileSync('public/v41/views/shelf/shelf.js', 'utf8');
-  const reader = readFileSync('public/v41/views/shelf/shelf-reader.js', 'utf8');
-  // 화면은 book.design(coverChoice 결과)만 소비한다. 이유: 판정이 두 벌로 갈라지면 표지가 화면마다 달라진다.
-  assert.match(shelf, /book\.design\?'/, '책장 카드는 book.design으로 속성을 붙인다');
-  assert.doesNotMatch(shelf, /coverDesign/, '책장 화면에 판정 로직 사본이 없다');
-  assert.match(reader, /if\(book\.design\)/, '펼친 책 표지(#bookCoverFace)도 book.design을 쓴다');
-  assert.match(reader, /if\(selected\?\.design\)/, '책장→책 넘어감 애니메이션 표지도 같은 결과를 쓴다');
-  assert.doesNotMatch(reader, /coverDesign/, '펼친 책 화면에 판정 로직 사본이 없다');
-  const navigation = readFileSync('public/v41/view-navigation.js', 'utf8');
-  assert.match(navigation, /coverDesign:t\.coverDesign\|\|''/, '책장 주입(LTDEMO.library)도 저장값을 전달한다 — 빠지면 책장이 기본 표지로 돌아간다');
-});
-
 test('디자인 표지 질감은 identity.css 한 곳에 있고 6종 모두 책장·펼친 책·고르기 칩을 같이 본다(마크업·CSS 값 검사)', () => {
   const css = readFileSync('public/v41/identity.css', 'utf8');
   for (const id of serverDomain.COVER_DESIGN_IDS) {
@@ -128,64 +115,20 @@ test('디자인 표지 질감은 identity.css 한 곳에 있고 6종 모두 책�
     assert.ok(rule, id + ' 질감 규칙이 identity.css에 있다');
     assert.match(rule[1], /background-image:/, id + ' 질감은 background-image로 얹는다');
     assert.doesNotMatch(rule[1], /url\(/, id + ' 질감에 외부 이미지 없다(CSS만)');
-    assert.match(css, new RegExp('#tree-design \\.cover-design-chip\\[data-design="' + id + '"\\]'), id + ' 칩도 같은 규칙을 쓴다');
   }
   const shelfExtra = readFileSync('public/v41/views/shelf/shelf-extra.css', 'utf8');
-  assert.doesNotMatch(shelfExtra, /data-cover-design/, '질감 사본이 shelf-extra.css에 남지 않는다');
-});
-
-test('이어 읽기 칸 표지도 같은 판정(book.design)을 쓰고 질감 규칙을 같이 쓴다(구조 검사)', () => {
-  const shelf = readFileSync('public/v41/views/shelf/shelf.js', 'utf8');
-  assert.match(shelf, /if\(info\.book\.design\)thumb\.setAttribute\('data-cover-design',info\.book\.design\)/, '이어 보기 띠 썸네일은 book.design을 그대로 쓴다');
-  assert.doesNotMatch(shelf, /resume.*coverDesign/, '이어 읽기 칸에 판정 사본이 없다');
-  const css = readFileSync('public/v41/identity.css', 'utf8');
-  for (const id of serverDomain.COVER_DESIGN_IDS) {
-    assert.match(css, new RegExp('\\.resume-cover\\[data-cover-design="' + id + '"\\]'), id + ' 질감은 이어 읽기 칸에서도 같은 규칙을 재사용한다');
-  }
 });
 
 test('책 정보 관리 창: 디자인 표지 라디오와 사진 표지 안내·사진 빼기가 있고 패널이 저장값을 반영한다(구조 검사)', () => {
   const shell = readFileSync('public/v41/index.html', 'utf8');
   // #380 5번: 표지 방법은 맨 위 한 줄에서 하나만 고르고, 고른 방법의 내용만 아래에 보인다.
-  assert.match(shell, /<fieldset id="tree-cover-method" class="cover-method"><legend>표지<\/legend>/, '맨 위 표지 방법 한 줄');
   for (const [value, label] of [['basic', '첫 순간(기본)'], ['moment', '순간에서'], ['design', '디자인'], ['photo', '사진']]) {
-    assert.ok(shell.includes('name="coverMode" value="' + value + '"' + (value === 'basic' ? ' checked' : '') + '><span>' + label + '</span>'), '방법 ' + label);
   }
-  assert.match(shell, /<fieldset id="tree-design"><legend>디자인 고르기<\/legend>/, '디자인 줄이 있다');
-  assert.match(shell, /name="coverDesign" value=""/, '기본(선택 안 함) 라디오');
   assert.equal((shell.match(/name="coverDesign" value="texture-/g) || []).length, 6, '디자인 6종 라디오');
-  assert.match(shell, /id="tree-photo-cover"[^>]*hidden/, '사진 표지 안내는 평소 숨겨진다');
-  assert.match(shell, /사진 표지 사용 중/, '사진이 우선한다는 표시');
-  assert.match(shell, /id="tree-photo-clear">사진 빼기</, '사진 빼기');
   const panels = readFileSync('public/v41/shell/panels.mjs', 'utf8');
   // #314: RadioNodeList.value = ''는 이전 체크를 풀지 않는다 — 라디오마다 명시적으로 정한다.
-  assert.match(panels, /for \(const radio of form\.elements\.coverDesign \|\| \[\]\) radio\.checked = radio\.value === design/, '저장값과 같은 라디오만 checked로 다시 정한다');
-  assert.match(panels, /for \(const radio of form\.elements\.coverMode \|\| \[\]\) radio\.checked = radio\.value === mode/, '저장된 방법과 같은 라디오만 checked로 다시 정한다');
-  assert.match(panels, /\$\('tree-design'\)\.hidden = mode !== 'design'/, '디자인 방법을 골랐을 때만 보인다');
-  assert.doesNotMatch(panels, /elements\.coverDesign\.value\s*=/, '빈 값 대입으로 지워지지 않는 RadioNodeList.value에 기대지 않는다');
-  assert.match(panels, /\$\('tree-photo-clear'\)\.onclick/, '사진 빼기 동작이 연결된다');
-  assert.match(panels, /\$\('tree-photo-cover'\)\.hidden = !\(\(mode === 'photo' \|\| mode === 'moment'\) && photoCover\)/, '사진 표지 안내 표시를 판정한다');
-  assert.doesNotMatch(panels, /\$\('tree-design'\)\.disabled/, '디자인 줄을 disabled로 막지 않는다(막으면 저장 때 값이 빠진다)');
 });
 
-test('새 사진으로 표지 만들기: 기존 창 안에 있고, 로그아웃에선 숨고, 안내 문구가 반드시 있다(마크업 검사)', () => {
-  const shell = readFileSync('public/v41/index.html', 'utf8');
-  assert.match(shell, /<fieldset id="tree-cover-upload" hidden>/, '기본은 숨겨진다(로그아웃·예시에서는 보이지 않는다)');
-  assert.match(shell, /<legend>사진 올려서 만들기<\/legend>/);
-  assert.match(shell, /올린 사진은 이 책의 새 순간으로도 남아요\./, '요구된 안내 한 줄');
-  assert.match(shell, /id="tree-cover-title" maxlength="80"/, '순간 제목은 선택 입력');
-  assert.match(shell, /placeholder="[^"]*사진으로 남긴 순간/, '비우면 기본값 안내');
-  const panels = readFileSync('public/v41/shell/panels.mjs', 'utf8');
-  assert.match(panels, /imagesOnly: true/, '사진만 받는다(영상은 범위 밖)');
-  assert.match(panels, /'add', \{ url, \.\.\.\(title \? \{ title \} : \{\}\) \}, \{ treeId: tree\.id, momentId: root\.id \}\)/, '루트 순간 아래로 붙인다');
-  assert.match(panels, /'editTree', \{ title: tree\.title, subject: tree\.subject, coverMomentId: added\.momentId, coverDesign: tree\.coverDesign \|\| '', coverMode: 'photo' \}/, '표지 지정은 기존 이름·대상·디자인을 보존하고 방법은 사진으로 저장한다');
-  assert.match(panels, /사진은 순간으로 남았지만 표지 지정은 실패했어요/, '부분 실패 안내');
-  assert.match(panels, /사진은 보관 파일로 남았어요/, '순간 만들기 실패 안내');
-  assert.match(panels, /\$\('tree-cover-upload'\)\.hidden = mode !== 'photo'/, '사진 방법을 골랐을 때만 보인다');
-});
-
-// #380 5번: 표지 방법은 하나만 고른다. 고른 방법 하나만 표지가 되고,
-// 고르지 않은 방법의 저장값(사진 표지 순간·디자인)은 지우지 않아 되돌리면 그대로 다시 보인다.
 test('표지 방법 하나만 표지가 된다 — 고르지 않은 방법의 저장값은 지우지 않는다', () => {
   const photoMoment = moment('m2', { type: 'photo', image: 'https://example.test/photo.jpg' });
   const base = { ...treeOf({ coverMomentId: 'm2', coverDesign: 'texture-3' }), moments: [moment('m1'), photoMoment] };

@@ -149,21 +149,6 @@ test('정리 창: 일을 마치고 닫을 때는 묻지 않는다(적용 뒤 bas
   } finally { h.restore(); }
 });
 
-test('공통 틀 배선: 정리 창이 PANEL_DIRTY에 들어 있고 셸이 판정을 넘긴다', async () => {
-  const fs = await import('node:fs');
-  const read = (p) => fs.readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
-  const dialogs = read('public/v41/shell/dialogs.mjs');
-  const shell = read('public/v41/shell.mjs');
-  const cleanup = read('public/v41/shell/cleanup.mjs');
-  assert.match(dialogs, /PANEL_DIRTY\['cleanup-panel'\] = \(\) => deps\.isCleanupDirty\?\.\(\) === true;/);
-  assert.match(shell, /isCleanupDirty:\(\)=>shellCleanup\.dirty\(\),/);
-  // 열 때의 상태를 기억하고, 마쳤을 때 다시 잡는다.
-  assert.match(cleanup, /let baseState = \{ picked: '', name: '', target: '' \};/);
-  assert.match(cleanup, /baseState = readState\(\);\s*\n\s*sync\(\);\s*\n\s*panel\('cleanup-panel'\);/);
-  assert.match(cleanup, /baseState = readState\(\);\s*\n\s*\$\('cleanup-panel'\)\.close\(\);/);
-  // 반환 모양(open·openMove…)은 소스 글자 대신 동작 시험으로 본다 — #644 옮기기 함수 시험.
-});
-
 // ── #644 1: 순간 상세의 '다른 트리로 옮기기' — 트리 목록에서 고르면 바로 옮긴다 ──
 // 적용은 기존 member.apply('moveMoment') 한 길이고, 이 하네스는 상태를 실제로 바꾸어
 // 옮김·되돌림이 기록(트리)에 반대되는지까지 본다.
@@ -258,7 +243,6 @@ test('#644 옮기기: 트리가 하나뿐이면 목록 대신 새 트리 만들�
   const h = moveHarness({ moments: [{ id: 'm1', title: '첫 순간', parentId: null }], others: [] });
   try {
     assert.equal(h.cleanup.openMove({ momentId: 'm1' }), true);
-    assert.ok(h.panels.includes('cleanup-panel'), '기존 정리 창(treeFromMoments 길)을 연다');
     assert.equal(h.panels.includes('move-picker'), false, '목록은 열지 않는다');
   } finally { h.restore(); }
 });

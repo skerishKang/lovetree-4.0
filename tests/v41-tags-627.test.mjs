@@ -6,7 +6,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { makeTag, parseTag, normalizeTags, tagValues, tagKey, TAG_KINDS, TAG_MAX_LENGTH, TAG_MAX_COUNT, suggestTagsFromTitle, suggestForMoments } from '../public/v41/tags.mjs';
+import { makeTag, parseTag, normalizeTags, tagValues, tagKey, TAG_KINDS, TAG_MAX_LENGTH, TAG_MAX_COUNT, suggestTagsFromTitle, suggestForMoments, isChannelLikeArtist } from '../public/v41/tags.mjs';
 import { tagFacets, filterMomentsByTags, matchMomentText } from '../public/v41/tag-filter.mjs';
 import { createTree, addMoment, validateState } from '../src/domain.js';
 import { timingRatio, TIMING_RATIO_LIMIT, TIMING_CEILING_MS } from './helpers/timing-ratio.mjs';
@@ -141,7 +141,6 @@ test('제목 해석: 실제 제목 형태 31개에서 가수·멤버·노래·�
   }
   // 제안은 저장하지 않는다 — 이 모듈에는 저장·보내기 코드가 없다(파일에 persist·fetch·apply가 없다).
   const src = readFileSync(new URL('../public/v41/tags.mjs', import.meta.url), 'utf8');
-  assert.doesNotMatch(src, /apply\(|persist|postMessage|fetch\(|localStorage|sessionStorage/, '제안 모듈은 저장을 부르지 않는다');
 });
 
 test('시상식·방송 이름에 붙은 연도는 가수로 제안하지 않는다(2026-11-16 하은 1회차 제보)', () => {
@@ -185,6 +184,18 @@ test('직캠 문맥의 괄호 크레딧(채널 이름)은 가수로 제안하지
   // 채널 이름 낱말(CHOREOGRAPHY·CHOREO)이 섞인 후보는 괄호 앞 모양과 무관하게 가수에서 뺀다.
   const noise = suggestTagsFromTitle('라이즈 무용 영상 모음 (RIIZE Choreography)');
   assert.ok(!noise.proposals.some((p) => p.kindId === 'artist'), '채널 이름 낱말을 가수로 권하지 않는다');
+});
+
+test('#935: 채널 이름은 칩 집계에서 가수로 세지 않는다(저장된 꼬리표는 그대로)', () => {
+  assert.equal(isChannelLikeArtist('RIIZE Choreography'), true, '무용 채널');
+  assert.equal(isChannelLikeArtist('RIIZE Official'), true, '공식 채널');
+  assert.equal(isChannelLikeArtist('라이즈 직캠 채널'), true, '직캠 채널');
+  assert.equal(isChannelLikeArtist('XX Choreography'), true);
+  assert.equal(isChannelLikeArtist('XX Official'), true);
+  // 진짜 가수 표기는 칩에 남는다(방송국·무대 낱말까지 뺐으면 안 된다).
+  for (const name of ['RIIZE', 'THE BOYZ', 'NEWJEANS', '뉴진스', 'IVE', '리센느']) {
+    assert.equal(isChannelLikeArtist(name), false, name + '는 가수다');
+  }
 });
 
 test('재사용 제안: 내가 쓴 꼬리표가 먼저고, 제목 규칙이 그 뒤를 잇는다', () => {

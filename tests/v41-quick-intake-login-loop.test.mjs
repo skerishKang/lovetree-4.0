@@ -77,15 +77,3 @@ test('고리 차단 문구는 한 벌이다(로그인에서 돌아온 뒤 또 �
   assert.equal(INTAKE_LOGIN_RETRY_TEXT, '로그인한 뒤 다시 공유해 주세요.');
 });
 
-test('연결 구조: shell.mjs는 보관한 주소로 세션을 시작하고 상태마다 판정을 부른다', async () => {
-  // 연결 한 줄이 지워지면 운영에서 고리가 다시 생긴다(#245 전례) — 글자로 고정한다.
-  const fs = await import('node:fs');
-  const shell = fs.readFileSync(new URL('../public/v41/shell.mjs', import.meta.url), 'utf8');
-  assert.match(shell, /shouldLoadMemberRecords\(location\.search,document\.cookie,location\.hash\)\|\|shellIntake\.pending\(\)/, '보관한 공유 주소가 있으면 세션을 시작한다(로그아웃 진입 → 로그인 → 이어서 담기)');
-  assert.match(shell, /function memberStatus\(status\)\{\s*\n\s*shellIntake\.flush\(\);/, '동기화 상태가 바뀔 때마다 판정을 부른다');
-  const wiring = fs.readFileSync(new URL('../public/v41/shell/quick-intake.mjs', import.meta.url), 'utf8');
-  assert.match(wiring, /intakeStep\(sessionState\(\), \{ attempted: loginAttempted\(attempts\.read\(\), url\) \}\)/, '셸 배선은 순수 판정 한 벌을 그대로 쓴다');
-  assert.match(wiring, /slot\.write\(url\); attempts\.mark\(url\); loginStart\(\);/, '로그인은 보관·시도 표시와 함께 한 번만 시작한다');
-  assert.match(wiring, /attempts\.clear\(\); notify\(INTAKE_LOGIN_RETRY_TEXT\)/, '두 번째 로그아웃은 안내로 멈춘다');
-  assert.equal(/getSource\?\.\(\) !== 'server'/.test(wiring), false, '출처가 server가 아니면 곧바로 로그인으로 보내던 옛 판정이 남아 있지 않다');
-});

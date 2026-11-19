@@ -2,7 +2,7 @@
 // 2026-11-08 리팩터링: 동작·문구·주소 형식 변경 0. shell.mjs에서 조건·조회 방식·인자 형태를 바꾸지 않고 그대로 옮겼다.
 import {mountCommunity} from '../community-panel.mjs';
 import {displayTreeTitle} from '../tree-name.mjs';
-import {parseTag,tagKey,suggestTagsFromTitle} from '../tags.mjs';
+import {parseTag,tagKey,isChannelLikeArtist} from '../tags.mjs';
 // #480 L13: 날짜는 책·보드·지도·첫 화면과 같은 한 벌(formatDisplayDate)로만 적는다.
 import {formatDisplayDate} from '../book-usability.mjs';
 
@@ -480,6 +480,8 @@ export function createMessages(deps) {
       if (getSource() !== 'server' || !getMember()?.snapshot().owned) return [];
       const groups = [], seen = new Set();
       const add = value => {
+        // #935: 칩은 저장된 '가수' 꼬리표에서만, 채널 이름은 제외한다(제목 추정은 칩에 넣지 않는다).
+        if (isChannelLikeArtist(value)) return;
         const key = tagKey(value);
         if (!key || seen.has(key)) return;
         seen.add(key);
@@ -489,9 +491,6 @@ export function createMessages(deps) {
         for (const moment of tree.moments || []) for (const raw of moment.keywords || []) {
           const parsed = parseTag(raw);
           if (parsed?.kindId === 'artist') add(parsed.value);
-        }
-        for (const proposal of suggestTagsFromTitle(tree.title || '').proposals) {
-          if (proposal.kindId === 'artist' && !proposal.tooLong) add(proposal.value);
         }
       }
       return groups;

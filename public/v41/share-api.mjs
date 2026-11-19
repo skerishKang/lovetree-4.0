@@ -17,7 +17,6 @@ export function createShareApi({fetchImpl=(...args)=>fetch(...args)}={}) {
     list:()=>call('/api/shares'),
     getTreeDiscover:treeId=>call('/api/trees/'+encodeURIComponent(treeId)+'/discover'),
     setTreeDiscover:(treeId,discover)=>call('/api/trees/'+encodeURIComponent(treeId)+'/discover',{method:'PUT',body:JSON.stringify({discover})}),
-    setDiscoverable:(id,enabled)=>call('/api/shares/'+encodeURIComponent(id)+'/discovery',{method:enabled?'PUT':'DELETE'}),
     revoke:id=>call('/api/shares/'+encodeURIComponent(id),{method:'DELETE'}),
     read:id=>call('/api/public/shares/'+encodeURIComponent(id)),
     // #538: 트리 공개 상태. 비공개는 누구나 무료 — 본인 트리만 바꿀 수 있다(#830).

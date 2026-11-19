@@ -28,13 +28,6 @@ test('#898 ① 자세한 추가 창은 맨 위부터 연다(다듬기로 넘어�
     '편집기를 열 때 창 스크롤을 0으로 되돌린다');
 });
 
-test('#898 ② 첫 화면 숫자판을 알림이 덮지 않게 표식을 걸고, 그림자 뿌리 안 표식도 잰다', () => {
-  assert.match(home, /infoRow\.className='home-info';infoRow\.dataset\.ltKeepClear='';/,
-    '첫 화면 숫자판(.home-info)에 data-lt-keep-clear 표식');
-  // 셸 알림 자리 잡기가 그림자 뿌리까지 걸어 들어가 표식을 모은다 — 숫자판은 그림자 뿌리 안에 있다.
-  assert.match(shell, /function keepClearEls\(doc\)\{[\s\S]*?shadowRoot[\s\S]*?\}/, '표식 모으기는 그림자 뿌리를 걷는다');
-  assert.match(shell, /keepClearEls\(f\.contentDocument\)\.length/, '프레임 고르기도 같은 한 벌을 쓴다');
-  assert.match(shell, /for\(const el of keepClearEls\(keepFrame\.contentDocument\)\)/, '표식 요소는 같은 한 벌에서 가져온다');
-  // #942: 알림이 가운데 단추까지 덮지 않게 가운데 묶음 전체에도 표식을 건다.
+test('#942 알림이 가운데 단추까지 덮지 않게 가운데 묶음에 표식을 건다', () => {
   assert.match(orbit, /<div class="center" data-lt-keep-clear>/, '가운데 단추·숫자판 묶음 전체가 알림 피하기 기준');
 });

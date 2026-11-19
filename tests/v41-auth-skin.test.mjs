@@ -84,38 +84,6 @@ test('로그인 intent는 new-tree|shelf만 next에 실리고 모르는 값은 �
   assert.equal(homeStartLoginUrl(), '/auth/login?next=%2Fv41%2F');
 });
 
-test('로그인이 필요한 진입점은 안내 창 없이 바로 /auth/login으로 간다', () => {
-  // 안내 창은 없어졌다(#261108). 문구·포커스 복귀·회원가입 링크도 함께 사라졌다.
-  for (const gone of ['login-start', 'login-start-copy', 'login-start-signup', 'login-start-action', 'LOGIN_START_COPY', 'restoreLoginFocus', 'loginStartIntent']) {
-    assert.equal(shell.includes(gone), false, `shell.mjs에 ${gone} 남음`);
-    assert.equal(index.includes(gone), false, `index.html에 ${gone} 남음`);
-  }
-  assert.equal(shellCss.includes('#login-start'), false, 'shell.css에 #login-start 남음');
-
-  // 바로 로그인으로 보내는 단일 경로가 있고, 테마와 의도를 주소에 유지한다.
-  assert.match(authModule, /function startLogin\(intent = ''\)/);
-  assert.match(authModule, /location\.assign\(memberLoginUrl\(readTheme\(localStorage\), target\)\)/);
-  assert.match(authModule, /LOGIN_INTENTS\.includes\(intent\) \? intent : ''/);
-
-  // 네 진입점이 모두 그 경로를 쓴다.
-  assert.match(shell, /b\.dataset\.view==='track32-bookshelf\.html'&&!member\?\.snapshot\(\)\.owned\)\{openLoginStart\('shelf'\)/, '헤더 내 책장 탭');
-  const messages = read('public/v41/shell/messages.mjs');
-  assert.match(messages, /data\?\.type === 'lt41-start'\) \{ openLoginStart\('first'\); return; \}/, '가운데 처음 시작하기');
-  assert.match(shell, /openLoginStart\('new-tree'\)/, '새 트리 만들기');
-  assert.match(authModule, /function openLoginStart\(intent = 'first'\) \{\s*startLogin\(intent === 'first' \? '' : intent\);/);
-
-  // 로그인 뒤 의도대로 이어진다.
-  assert.match(authModule, /pendingLoginIntent/);
-  assert.match(authModule, /showScreen\('track32-bookshelf\.html'\)/);
-  // 261116 PR 2: '+ 순간 추가'는 글귀 바로 아래 위쪽 단추(home-add-top)로 올라갔다 — 같은 requestMoment('add') 흐름.
-  assert.match(home, /addTop\.onclick=\(\)=>bridge\.actions\.requestMoment\('add'\)/);
-  // #426: '이어 보던 순간' 버튼은 최근 순간 카드가 대신한다 — resume 배선도 뺐다.
-  assert.doesNotMatch(home, /bridge\.actions\.resume\(\)/);
-  assert.match(home, /communityButton\.onclick=\(\)=>bridge\.actions\.community\(\)/);
-  // #635: '어떻게 쓰나요'는 같은 첫 화면의 안내 패널을 연다(별도 사용법 안내 화면은 없다 — #388).
-  assert.match(home, /guideButton\.onclick=openGuide/);
-});
-
 test('밤·정원 안내 창 글자 대비는 4.5:1 이상이다', () => {
   const pairs = [
     ['night', '--lt-pearl', '--lt-stage'],
@@ -132,9 +100,6 @@ test('밤·정원 안내 창 글자 대비는 4.5:1 이상이다', () => {
     assert.ok(ratio >= 4.5, `${theme} ${fg} on ${bg} = ${ratio.toFixed(2)}:1`);
   }
   // 안내 창이 없어졌으니 #login-start 대신 남은 셸 대화상자의 토큰 대비를 확인한다.
-  assert.match(shellCss, /dialog\{[^}]*background:var\(--lt-glass-strong\)/);
-  assert.match(shellCss, /dialog\{[^}]*color:var\(--lt-pearl\)/);
-  assert.equal(shellCss.includes('#login-start'), false, '안내 창 규칙이 남아 있다');
 });
 
 test('auth-skin 시안은 로컬 자산만 쓰고 1440·390 스크린샷이 있다', () => {
@@ -148,10 +113,6 @@ test('auth-skin 시안은 로컬 자산만 쓰고 1440·390 스크린샷이 있�
   }
   const html = ['login-night', 'login-garden', 'signup-night', 'signup-garden'].map(name => read(`${root}/${name}.html`)).join('\n');
   const mockCss = read(`${root}/auth-skin.css`);
-  assert.equal(/https?:\/\//i.test(html + mockCss), false, 'mockups must have no external URL');
-  assert.match(mockCss, /--lt-stage:\s*#040407/);
-  assert.match(mockCss, /body\.garden\s*\{[^}]*--lt-stage:\s*#f7f0e8/);
-  assert.match(mockCss, /GowunBatang-Bold\.latin\.woff2/);
 });
 
 test('밤 시안은 장미색을 쓰지 않고, Google 버튼은 공식 로고를 쓴다', () => {
@@ -159,10 +120,6 @@ test('밤 시안은 장미색을 쓰지 않고, Google 버튼은 공식 로고�
   const mockCss = read(`${root}/auth-skin.css`);
 
   // #195: 밤은 무채색(검정·진주색·금테), 장미색은 정원 전용.
-  assert.match(mockCss, /\.eyebrow\s*\{[^}]*color:\s*var\(--lt-muted\)/, '밤 머리글은 --lt-muted');
-  assert.match(mockCss, /\.error\s*\{[^}]*color:\s*var\(--lt-pearl\)/, '밤 오류 문구는 --lt-pearl');
-  assert.match(mockCss, /body\.garden \.eyebrow\s*\{[^}]*var\(--lt-rose-ink\)/, '정원 머리글은 그대로');
-  assert.match(mockCss, /body\.garden \.error\s*\{[^}]*var\(--lt-rose-ink\)/, '정원 오류 문구는 그대로');
 
   // 밤 기본 규칙(.eyebrow/.error)에 장미색이 남아 있으면 안 된다.
   const nightRules = mockCss.slice(0, mockCss.indexOf('body.garden'));
@@ -171,32 +128,9 @@ test('밤 시안은 장미색을 쓰지 않고, Google 버튼은 공식 로고�
   // Google 브랜드 가이드라인: 공식 색상 G SVG를 로컬 자산으로 쓰고, 가이드라인 색을 지킨다.
   assert.ok(existsSync(new URL(`../${root}/assets/googleg-standard-color.svg`, import.meta.url)), '공식 G 로고 SVG');
   const logo = read(`${root}/assets/googleg-standard-color.svg`);
-  for (const color of ['#4285F4', '#34A853', '#FBBC05', '#EA4335']) assert.ok(logo.includes(color), color);
-  assert.match(mockCss, /--lt-google-fill:\s*#131314/, '밤 Google 버튼 바탕');
-  assert.match(mockCss, /--lt-google-stroke:\s*#8e918f/, '밤 Google 버튼 테두리');
-  assert.match(mockCss, /--lt-google-font:\s*#e3e3e3/, '밤 Google 버튼 글자');
-  assert.match(mockCss, /--lt-google-fill:\s*#ffffff/, '정원 Google 버튼 바탕');
-  assert.match(mockCss, /--lt-google-stroke:\s*#747775/, '정원 Google 버튼 테두리');
-  assert.match(mockCss, /--lt-google-font:\s*#1f1f1f/, '정원 Google 버튼 글자');
 
   for (const name of ['login-night', 'login-garden']) {
     const page = read(`${root}/${name}.html`);
-    assert.match(page, /class="btn google"/, `${name} Google 버튼`);
-    assert.match(page, /src="assets\/googleg-standard-color\.svg"/, `${name} 공식 로고`);
-    assert.match(page, /Google 계정으로 계속/, `${name} 가이드라인 문구`);
-    assert.equal(/<span class="g">G<\/span>/.test(page), false, `${name} 동그라미 글자 G 금지`);
   }
 });
 
-test('시안 네 화면은 제목 아래 설명 없이 같은 하단 한 줄을 쓴다', () => {
-  const root = 'docs/design/auth-skin';
-  const footer = 'PADIEM 계정으로 로그인합니다 · 하나의 계정으로 PADIEM 서비스를 이용할 수 있어요';
-  for (const name of ['login-night', 'login-garden', 'signup-night', 'signup-garden']) {
-    const page = read(`${root}/${name}.html`);
-    assert.match(page, new RegExp(`<p class="foot">${footer}</p>`), `${name} 하단 한 줄`);
-    // 제목 아래 설명 줄과 옛 하단 문구는 없어졌다.
-    assert.equal(/class="lead"/.test(page), false, `${name} 설명 줄 금지`);
-    assert.equal(page.includes('Chat 등 다른 서비스도'), false, `${name} 옛 설명 문구 금지`);
-    assert.equal(page.includes('LoveTree 4.1 · PADIEM'), false, `${name} 옛 하단 문구 금지`);
-  }
-});

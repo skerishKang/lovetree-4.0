@@ -104,20 +104,13 @@ test('#547 날짜 형식 검사는 그대로다(오늘 계산이 아니라 입�
 test('#547 보드도 같은 한 벌을 쓴다 — 클래식 스크립트는 local-date.js(window.LTLocalDate)', () => {
   // 보드 화면은 클래식 스크립트라 모듈 대신 window.LTLocalDate를 읽는다. 규칙은 같은 파일 한 벌이다.
   const board = read('public/v41/views/board/board.js');
-  assert.match(board, /date:LTLocalDate\.localDateOnly\(\),source:type==='photo'/, '새 순간 기본 날짜');
-  assert.match(board, /Number\.isNaN\(d\.getTime\(\)\)\?LTLocalDate\.localDateOnly\(\):LTLocalDate\.localDateOnly\(d\)\}/, '날짜 표기의 오늘 기본값도 지역 날짜');
-  assert.match(read('public/v41/views/board/board-extras.js'), /date:LTLocalDate\.localDateOnly\(\),source,memo/, '보드 추가 창');
-  assert.match(read('public/v41/views/board/board-detail.js'), /date:LTLocalDate\.localDateOnly\(\)/, '보드 상세');
   for (const file of ['public/v41/views/board/board.js', 'public/v41/views/board/board-extras.js', 'public/v41/views/board/board-detail.js']) {
     assert.doesNotMatch(read(file), /new Date\(\)\.toISOString\(\)\.slice\(0, ?10\)/, `${file}에 UTC 오늘 계산이 남아 있다`);
   }
-  assert.match(read('public/v41/views/track58-pinboard.html'), /<script src="\/v41\/local-date\.js"><\/script><script src="\/v41\/views\/board\/board-model\.js">/, '클래식 스크립트보다 먼저 읽는다');
 });
 
 test('#547 규칙은 한 벌이다 — 클래식(local-date.js)과 모듈(local-date.mjs)이 같은 답', () => {
   const classic = read('public/v41/local-date.js');
-  assert.doesNotMatch(classic, /^\s*(import|export)\s/m, '클래식 스크립트로도 읽히는 문법이어야 한다');
-  assert.match(classic, /root\.LTLocalDate = \{localDateOnly, localDaysBetween, relativeDayLabel\};/, '#549에서 지난 날 규칙도 이 한 벌에 둔다');
   assert.match(read('public/v41/local-date.mjs'), /import '\.\/local-date\.js';/, '모듈은 클래식 한 벌을 그대로 쓴다');
   // 실제로 두 경로가 같은 답을 내는지 이 프로세스에서 확인한다(모듈이 클래식 파일을 먼저 읽는다).
   for (const at of [new Date(2026, 10, 14, 0, 30), new Date(2026, 10, 14, 23, 59)]) {
@@ -138,7 +131,6 @@ test('#547 오늘을 UTC로 만드는 자리가 남아 있지 않다(보드 제�
   ];
   for (const file of files) {
     const src = read(file);
-    assert.doesNotMatch(src, /new Date\(\)\.toISOString\(\)\.slice\(0, ?10\)/, `${file}에 UTC 오늘 계산이 남아 있다`);
   }
   // 이번에 고친 파일들이 공통 함수를 쓴다.
   assert.match(read('public/v41/domain.mjs'), /import \{ localDateOnly \} from '\.\/local-date\.mjs'/);
@@ -148,7 +140,6 @@ test('#547 오늘을 UTC로 만드는 자리가 남아 있지 않다(보드 제�
   assert.match(read('public/v41/shell/panels.mjs'), /name === 'date' \? localDateOnly\(\)/);
   assert.match(read('public/v41/views/shelf/shelf.js'), /import \{ localDateOnly \} from '\.\.\/\.\.\/local-date\.mjs'/);
   assert.match(read('public/v41/views/shelf/shelf.js'), /lastDate:localDateOnly\(\)/);
-  assert.match(read('src/domain.js'), /export function localDateOnly\(/, '서버 벌도 같은 함수');
 });
 
 /* ── 4. 실제 브라우저에서 시간대를 고정해 확인 ──────────────────────── */

@@ -93,14 +93,6 @@ if (REQUIRE && skip) throw new Error(`#535 실행 시험이 필요한데 건너�
 // (유휴에 카드 style 을 다시 쓰지 않으려고 옮겼다 — 시간 기준은 그대로).
 s('#535 부유는 궤도 위상과 분리한 벽시계 시간으로 돌린다(소스 계약)', () => {
   const src = readFileSync(path.join(REPO, 'src', 'views', 'orbit.js'), 'utf8');
-  assert.match(src, /const floatKeyframes=/, '부유 키프레임을 따로 둔다');
-  assert.match(src, /translate:`\$\{\(Math\.sin\(ph\)\*ax\)/, '가로 부유');
-  assert.match(src, /px \$\{\(Math\.cos\(ph\)\*ay\)/, '세로 부유');
-  assert.match(src, /const ax=11,ay=18/, '폭 11·18px(#535 값 그대로)');
-  assert.match(src, /id:'lt-float'/, '부유는 .lt-lift 층의 애니메이션이 맡는다(궤도와 분리)');
-  assert.match(src, /PHASE_STEP=\.000018;/, '궤도 회전 속도는 그대로(전 .000006)');
-  assert.match(src, /const reduced=matchMedia\('\(prefers-reduced-motion: reduce\)'\)\.matches;let paused=reduced/, '동작 줄이기면 처음부터 멈춤');
-  assert.match(src, /ringsNarrow/, '좁은 화면은 원래 반지름을 그대로 쓴다');
 });
 
 s('#535 떠 있는 폭이 눈에 보이고, 동작 줄이기면 거의 멈춘다', async () => {

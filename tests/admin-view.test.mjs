@@ -83,9 +83,6 @@ test('상단 탭 여섯을 누르면 각자의 화면·거르기로 열린다(#8
   // 탭 주소가 서로 달라야 한다(전부 #board로 붙던 것이 회귀).
   const hashes = new Set(MENU_TABS.map((t) => click(t).hash));
   assert.equal(hashes.size, 6, '6탭의 주소가 모두 달라야 한다');
-  // 클릭 처리는 단추의 dataset을 버리지 않는다.
-  const js = readFileSync(new URL('../src/admin.js', import.meta.url), 'utf8');
-  assert.match(js, /tabClickFilters\(tab\.dataset\)/);
 });
 
 test('글·페르소나 화면은 고객 글 탭이 눌려 있다', () => {

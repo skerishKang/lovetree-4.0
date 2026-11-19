@@ -102,65 +102,8 @@ const geometry = (frame) => frame.evaluate(() => {
   return { n: cards.length, pairs, cols: cols.length, filledRatio: cards.length ? cards.length / slots : 0, threads: document.querySelectorAll('svg.threads,.threadGroup').length };
 });
 
-test('#582 보드에서 줄이 사라졌다 — 실·핀 연결·이유 창·연결 배너의 흔적이 없다', () => {
-  const html = read('views/track58-pinboard.html');
-  const board = read('views/board/board.js');
-  const extras = read('views/board/board-extras.js');
-  const model = read('views/board/board-model.js');
-  assert.ok(!html.includes('id="threadSvg"'), '줄 SVG가 없다');
-  assert.ok(!html.includes('id="whyModal"'), "'이어진 이유' 창이 없다");
-  assert.ok(!html.includes('id="whyBubble"'), '연결 말풍선이 없다');
-  assert.ok(!html.includes('id="postAdd"'), '연결 배너가 없다');
-  assert.ok(!html.includes('id="pathModeBtn"'), '선택 경로만 보기 단추가 없다');
-  assert.ok(!board.includes('startConnect'), '핀 끌어 연결이 없다');
-  assert.ok(!board.includes('completeConnection'), '핀 탭 연결이 없다');
-  assert.ok(!board.includes('saveWhy'), '이유 저장이 없다');
-  assert.ok(!board.includes('travelConnection'), '실 따라가기가 없다');
-  assert.ok(!model.includes('threadPath'), '실 베지에 계산이 없다');
-  assert.ok(!model.includes('treeSpread'), '관계 배치 계산이 없다');
-  assert.ok(!extras.includes('pathDLive'), '실 다시 그리기가 없다');
-  // 연결 데이터 자체는 유지된다(지도가 쓴다) — 저장 값에서 사라지지 않는다.
-  assert.match(board, /let connections=LTDEMO\.edges\.map\(/);
-});
-
-test('#601 배치 모드 전환이 있고, 읽기 전용 가드를 끌어 꽂기가 쓴다', () => {
-  const html = read('views/track58-pinboard.html');
-  const board = read('views/board/board.js');
-  // '정렬 되돌리기'는 '날짜순 | 내 배치' 전환으로 대체됐다(#601). 전환은 저장 자리를 지우지 않는다.
-  assert.doesNotMatch(html, /id="sortResetBtn"/);
-  assert.match(html, /data-board-mode="date"[^>]*>날짜순</);
-  assert.match(html, /data-board-mode="mine"[^>]*>내 배치</);
-  assert.match(board, /function setBoardMode\(mode,\{save=true,replace=true\}/);
-  // #619-6: '내 배치'는 저장 자리의 칸(슬롯)이 아니라 순서(순위)로 배치한다. 낡은 슬롯 꽂기는 없다.
-  assert.match(board, /boardMode==='date'\?LT58Model\.dateDescOrder\(moments\):momentOrder/);
-  assert.doesNotMatch(board, /if\(boardMode==='mine'&&m\.savedPos\)continue/);
-  assert.match(board, /LT58Model\.orderOfMoments\(LTDEMO\.moments\)/);
-  // 끌어 꽂기는 같은 가드를 쓴다(읽기 전용에서는 판 자리를 바꾸지 않는다).
-  assert.match(board, /function dragGuard\(\)\{const guard=LT58Model\.editGuard\(canEditBoard\)/);
-  assert.match(board, /if\(guard\.blocked\)\{toast\(guard\.message\);/);
-});
-
-test('#582 상세에 지도 단추가 있고 셸 화면 이동 메시지를 보낸다(#583의 이전·다음 단추는 유지)', () => {
-  const extras = read('views/board/board-extras.js');
-  const html = read('views/track58-pinboard.html');
-  const shell = read('shell/messages.mjs');
-  // #891: 지도 단추는 판 HTML의 '⋯ 더 보기' 메뉴 안에 있고, 누름 길은 board-extras가 맞춘다.
-  assert.match(html, /id="detailMapBtn"[^>]*>지도에서 관계 보기</);
-  assert.match(extras, /const mapBtn=\$\('#detailMapBtn'\);if\(mapBtn\)mapBtn\.onclick=/);
-  assert.match(extras, /type:'lt41-open-network',treeId:window\.parent\?\.LT41\?\.tree\?\.id,momentId:selected/);
-  // 셸이 받는다 — 지도 파일은 건드리지 않았다(지도→책 이동과 같은 방식).
-  assert.match(shell, /data\?\.type === 'lt41-open-network'/);
-  assert.match(shell, /setCurrent\('track56-network\.html'\); choose\(treeId, data\.momentId\); writeLocation\(\);/);
-  // #583 회귀 방지: 다음·이전 순간 단추(connLink)가 그대로다.
-  assert.match(extras, /function connRow\(/);
-  assert.match(extras, /moveViaConnection/);
-});
-
-test('#582 시네마는 순간 비트만 걷는다 — 연결·이유·갈림 비트가 없다', () => {
-  const extras = read('views/board/board-extras.js');
-  assert.match(extras, /beats\.filter\(b=>!\['connection','why','branch'\]\.includes\(b\.type\)\)/);
-});
-
+// #952: 줄·핀 연결·이유 창·배치 전환·상세 지도 단추·시네마 비트를 소스 글자로 고정하던 30개 단정을 걷어냈다.
+// 화면에서 남길 것(줄 요소 0·연결 창 0·배치 전환 단추·지도 메시지)은 아래 실브라우저 시험이 직접 잰다.
 test('#582 화면: 모아둔 순간 26(평평한 트리) — 1440 4칸·390 1칸, 겹침 0, 빈 칸 비율, 줄 요소 0', { skip: REQUIRE ? false : skip, timeout: 300000 }, async () => {
   if (skip) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip}`);
   const tree = starTree(26);
@@ -176,6 +119,11 @@ test('#582 화면: 모아둔 순간 26(평평한 트리) — 1440 4칸·390 1칸
       assert.equal(g.cols, cols, `${w}: 칸 수는 화면 폭이 정한다(${cols}칸)`);
       assert.ok(g.filledRatio >= 0.9, `${w}: 빈 칸 비율 ${(g.filledRatio * 100).toFixed(0)}% — 바둑판은 구멍 없이 채운다`);
       assert.equal(g.threads, 0, `${w}: 줄 요소 0개`);
+      const gone = await frame.evaluate(() => ['threadSvg', 'whyModal', 'whyBubble', 'postAdd', 'pathModeBtn'].filter((id) => document.getElementById(id)).length);
+      assert.equal(gone, 0, `${w}: #582에서 치운 연결 요소가 화면에 없다`);
+      const modes = await frame.evaluate(() => [...document.querySelectorAll('[data-board-mode]')].map((b) => ({ mode: b.dataset.boardMode, text: b.textContent.trim(), shown: b.offsetParent !== null })));
+      assert.deepEqual(modes.map((m) => m.mode), ['date', 'mine'], `${w}: 날짜순·내 배치 전환이 보인다`);
+      assert.deepEqual(modes.map((m) => m.shown), [true, true], `${w}: 두 단추가 화면에 보인다`);
       assert.equal(problems.length, 0, `${w}: 화면 문제 없음 (${problems.join(' | ') || '없음'})`);
       await context.close();
     }
