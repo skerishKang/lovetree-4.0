@@ -270,3 +270,39 @@ test('#536 표시·390 머리줄: 자기 기록에는 읽기 전용 표시가 �
 async function page_stable(frame) {
   await frame.waitForTimeout(600);
 }
+
+test('#972 cinema button stays outside cards and mobile selection is opaque', { skip: REQUIRE ? false : skip, timeout: 180000 }, async () => {
+  if (skip) assert.fail(String(skip));
+  const server = await serve({ '/__host-40.html': hostHTML(chainTree(40)) });
+  const browser = await chromium.launch({ headless: true });
+  const base = `http://127.0.0.1:${server.address().port}`;
+  try {
+    for (const [width, height] of [[390, 844], [1440, 900], [2560, 1440]]) {
+      const { context, frame } = await openHost(browser, `${base}/__host-40.html`, { width, height });
+      try {
+        await frame.evaluate(() => selectMoment('m1', true));
+        await frame.waitForSelector('#detail.open');
+        await page_stable(frame);
+        const geometry = await frame.evaluate(() => {
+          const rect = (selector) => document.querySelector(selector).getBoundingClientRect();
+          const button = rect('#cinemaBtn'), viewport = rect('#viewport'), actions = rect('#detailActions');
+          const overlap = (a, b) => Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left)) *
+            Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
+          return { cardViewport: overlap(button, viewport), actions: overlap(button, actions),
+            buttonHeight: button.height, picker: getComputedStyle(document.querySelector('.lt-moment-picker')).backgroundColor };
+        });
+        assert.ok(geometry.buttonHeight > 0, `${width}: cinema button visible`);
+        assert.equal(geometry.cardViewport, 0, `${width}: cinema button outside clipped card viewport`);
+        assert.equal(geometry.actions, 0, `${width}: cinema button outside detail actions`);
+        if (width === 390) {
+          assert.match(geometry.picker, /^rgb\(/, 'mobile dark picker background is opaque');
+          const garden = await frame.evaluate(() => {
+            document.documentElement.setAttribute('data-lt-theme', 'garden');
+            return getComputedStyle(document.querySelector('.lt-moment-picker')).backgroundColor;
+          });
+          assert.match(garden, /^rgb\(/, 'mobile garden picker background is opaque');
+        }
+      } finally { await context.close(); }
+    }
+  } finally { await browser.close(); server.close(); }
+});
