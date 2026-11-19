@@ -183,7 +183,7 @@ test('a stored deviant tree is quarantined on read and kept in storage through a
     const state = sampleState();
     const deviant = deviantTree();
     await repo.commit({
-      productId: PRODUCT, subjectId,
+      productId: PRODUCT, subjectId: subject,
       doc: { version: 1, trees: [...state.trees, deviant] },
       expectedRevision: 0, clientKey: `ck-seed-${suffix()}`, requestHash: 'seed'
     });
@@ -197,7 +197,7 @@ test('a stored deviant tree is quarantined on read and kept in storage through a
     const grown = addMoment(state.trees[0], { ...base, title: '다시 저장한 순간', relation: '직접 만나고 싶어서' }, state.trees[0].moments[0].id, CLOCK);
     assert.equal((await put(handle, { state: { version: 1, trees: [grown] }, expectedRevision: 1, clientKey: `ck-${suffix()}` })).status, 200);
 
-    const stored = (await repo.load({ productId: PRODUCT, subjectId })).doc;
+    const stored = (await repo.load({ productId: PRODUCT, subjectId: subject })).doc;
     assert.deepEqual(stored.trees.find(tree => tree.id === deviant.id), deviant, '저장해도 격리 원본이 남아 있다');
 
     const again = await read(handle);
