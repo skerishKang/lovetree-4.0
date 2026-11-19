@@ -413,7 +413,7 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
   const c=cards[i],narrow=w<=650,cfg=(narrow?ringsNarrow:rings)[c.ring],fit=Math.min(1,w/780,h/850)*(narrow?.5:1),out=[];
   // #593: 판정 사각형을 떠 있음 폭만큼(+24·+40) 부풀려 잡으므로, 목표 구역도 그만큼 넓혀 잡는다 —
   // 부푼 만큼만 밀면 실제 카드가 그 차이만큼 안쪽(가운데 구역)에 서서 미리보기 검사에 걸린다(실측 20px).
-  const padX=narrow?6:16,padY=narrow?0:20;
+  const padX=narrow?14:16,padY=narrow?10:20;
   const zs=safeZone?{l:safeZone.l-padX,t:safeZone.t-padY,r:safeZone.r+padX,b:safeZone.b+padY}:null;
   // 키프레임을 구울 때 placeCard 는 '지금 위상'의 판정 결과를 카드에 직접 쓴다(밝기·숨김). 굽는 동안의
   // 숨김은 화면 상태가 아니므로 되돌리고, 판정이 극단값으로 숨긴 표본은 직전 표본 자리를 그대로 쓴다.
@@ -582,7 +582,7 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
   const needBake=orbitBox!==boxKey;
   // #593: 지금 위상의 자리로 한 번 배치해 밝기·z-index(placeCard)를 쓰고, 떠 있음 애니메이션을 건다.
   // 유휴에는 이 배치를 다시 부르지 않는다 — 프레임마다 쓰던 style 쓰기가 사라진 자리다.
-  const zs=safeZone?{l:safeZone.l-12,t:safeZone.t-12,r:safeZone.r+12,b:safeZone.b+12}:null,fit=Math.min(1,w/780,h/850)*(w<=650?.5:1),narrow=w<=650;
+  const zs=safeZone?{l:safeZone.l-(w<=650?20:12),t:safeZone.t-(w<=650?20:12),r:safeZone.r+(w<=650?20:12),b:safeZone.b+(w<=650?20:12)}:null,fit=Math.min(1,w/780,h/850)*(w<=650?.5:1),narrow=w<=650;
   // 상한을 넘는 카드도 placeCard 를 거쳐야 숨김(display:none)이 유지된다 — 건너뛰면 화면 가운데에 남는다.
   cards.forEach((c,i)=>{
    avgScales[i]=avgScaleOf(c,w,h);
@@ -610,7 +610,7 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
  function dragDraw(){
   if((!drag&&!glide)||!jsMode)return;
   const w=layoutBox?.w||app.clientWidth,h=layoutBox?.h||app.clientHeight;
-  const zs=safeZone?{l:safeZone.l-12,t:safeZone.t-12,r:safeZone.r+12,b:safeZone.b+12}:null,fit=Math.min(1,w/780,h/850)*(w<=650?.5:1),narrow=w<=650;
+  const zs=safeZone?{l:safeZone.l-(w<=650?20:12),t:safeZone.t-(w<=650?20:12),r:safeZone.r+(w<=650?20:12),b:safeZone.b+(w<=650?20:12)}:null,fit=Math.min(1,w/780,h/850)*(w<=650?.5:1),narrow=w<=650;
   cards.forEach((c,i)=>{const el=elements[i],cfg=(narrow?ringsNarrow:rings)[c.ring];const th=c.baseAngle+phase*cfg.speed+c.phaseOffset;
    let x=Math.cos(th)*cfg.rx,y=Math.sin(th)*cfg.ry+cfg.band,z=Math.sin(th+1.1+c.phaseOffset*4)*cfg.zAmp+cfg.zBase+c.zOffset;
    if(w<=650&&((!demo&&cards.length<=8)||(demo&&loggedIn===true))){el.classList.add('off');return;} // 261117: 좁은 화면 소수 카드 숨김 유지. 로그인 예시도 390에서 숨김(#780 후속)
