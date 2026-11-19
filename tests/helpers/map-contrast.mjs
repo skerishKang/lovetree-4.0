@@ -235,7 +235,20 @@ export async function measureMapPixelsInPage([png, overlaysArg]) {
 export function overlayRectsInPage() {
   return [...document.querySelectorAll('.topbar button,.mode-pill,.hero,.legend,.controls,.detail.open,.route-status.show,.toast.show,.edge-tip.show,.mobile-ribbon,.lt-moment-picker')]
     .filter(el => { const r = el.getBoundingClientRect(), s = getComputedStyle(el); return r.width > 0 && r.height > 0 && s.visibility === 'visible' && Number(s.opacity) > .01; })
-    .map(el => { const r = el.getBoundingClientRect(); return { left: r.left, top: r.top, right: r.right, bottom: r.bottom }; });
+    .map(el => {
+      const r = el.getBoundingClientRect();
+      let left = r.left, top = r.top, right = r.right, bottom = r.bottom;
+      // #951 ⑤: 토스트는 몸체뿐 아니라 그림자(번짐)도 지도를 가린다 — 사각형만 제외하면 그림자 속
+      // 동심원 가이드 링 표본이 어두워진 색으로 재져 대비 미달이 된다(실측 guide-ring 2.44:1 < 3).
+      // 그림자 번짐+옮김만큼 사각형을 넓혀 제외한다(가림 판정은 늘 보수적 — #591와 같은 뜻).
+      if (el.classList.contains('toast')) {
+        const m = /(-?[\d.]+)px\s+(-?[\d.]+)px\s+([\d.]+)px/.exec(getComputedStyle(el).boxShadow || '');
+        const ox = m ? +m[1] : 0, oy = m ? +m[2] : 14, blur = m ? +m[3] : 40;
+        left -= blur + Math.max(0, -ox); right += blur + Math.max(0, ox);
+        top -= blur + Math.max(0, -oy); bottom += blur + Math.max(0, oy);
+      }
+      return { left, top, right, bottom };
+    });
 }
 
 export function measureMapDOMInPage() {
