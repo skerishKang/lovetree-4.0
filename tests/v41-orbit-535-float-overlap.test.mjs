@@ -411,7 +411,7 @@ s('#942 모든 자리 lg 카드도 가운데를 침범하지 않는다(390·1440
   try {
     for (const [w, h] of [[390, 844], [1440, 900], [1920, 1080]]) {
       const ctx = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 1, reducedMotion: 'reduce' });
-      await ctx.addInitScript(() => { try { localStorage.setItem('lt41.forceLg', '1'); } catch {} });
+      await ctx.addInitScript(() => { globalThis.__LT_FORCE_LG__ = true; });
       const page = await ctx.newPage();
       await page.goto(`${lib.base}/v41/`, { waitUntil: 'domcontentloaded', timeout: 30000 });
       const frame = await frameOf(page);
