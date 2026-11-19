@@ -726,3 +726,57 @@ test('공유 책 마지막 장에서 → 를 눌러도 쓰기 창·쓰기 메시
     server.close();
   }
 });
+
+// #792 4단계 ⑤(대표 캡처 지적 후속): 공유 책 순간 상세의 옆 창이 210px 고정이라
+// '순간 열기 · 이 무대 담기' 단추가 창 아래에서 잘렸다. 이제 창 높이는 내용을 따르고 화면보다 길 때만
+// 창 전체가 스크롤한다. 숫자 판정: 두 단추 rect가 창 rect 안에 온전히 있고(잘림 0px), 높이 44px 이상,
+// 창 안쪽 스크롤이 생기지 않는다(1440·390, 밤).
+test('#792 ⑤ 화면: 공유 책 순간 상세에서 순간 열기·이 무대 담기가 창 안에 온전히 있다', { skip: REQUIRE ? false : skip, timeout: 240000 }, async () => {
+  if (skip) assert.fail(`미리보기 검사에서는 화면 시험 건너뜀이 실패다 — ${skip}`);
+  const server = await serve();
+  const base = `http://127.0.0.1:${server.address().port}`;
+  let browser;
+  try {
+    browser = await chromium.launch({ headless: true });
+    for (const [width, height] of [[1440, 900], [390, 844]]) {
+      const { context, page, frame, problems } = await openBook(browser, `${base}/share-host.html`, { width, height, theme: 'night', route: (r) => r.abort() });
+      assert.equal(problems.length, 0, `${width}: 화면 오류 ${problems.join(' | ')}`);
+      // 공유 번호는 주소에서 읽는다 — 시험 호스트에 #share/<id>/book 주소를 만든다.
+      await page.evaluate(() => { location.hash = '#share/' + 's'.repeat(24) + '/book'; });
+      // #792 ⑤: 표지 순간이 공개 무대임을 서버가 알려 주면 단추가 선다(드물게 반만 보이던 때를 재현).
+      await page.route('**/api/**', (route) => {
+        const url = route.request().url();
+        if (/\/moments\/[^/]+\/stage$/.test(url)) return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ stageId: 'stage-a' }) });
+        if (/\/api\/community\/stages\/[^/]+$/.test(url)) return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ stageId: 'stage-a', title: 'Super Shy', voted: false, saved: false, weeklyVoters: 9, publicTreeCount: 6 }) });
+        return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ ok: true, items: [] }) });
+      });
+      // 상세 창을 연다 — book-extra의 placeDetail이 그리는 길(제목 보기 메시지로 그 길을 태운다).
+      await frame.evaluate(() => window.__TRACK59__.showDetail(window.__TRACK59__.pageSteps()[0].id));
+      await frame.evaluate(() => window.postMessage({ type: 'lt41-title-display', value: 'both' }, location.origin));
+      await frame.waitForSelector('#detailSide:not([hidden]) [data-detail-stage]:not([hidden])', { timeout: 8000 });
+      const measured = await frame.evaluate(() => {
+        const panel = document.querySelector('#detailSide').getBoundingClientRect();
+        const fit = (node) => {
+          const r = node.getBoundingClientRect();
+          return { h: Math.round(r.height), top: Math.round(r.top - panel.top), bottom: Math.round(panel.bottom - r.bottom), left: Math.round(r.left - panel.left), right: Math.round(panel.right - r.right) };
+        };
+        return {
+          viewer: fit(document.querySelector('[data-detail-viewer]')),
+          stage: fit(document.querySelector('[data-detail-stage]')),
+          sideScroll: document.querySelector('.side-detail').scrollHeight - document.querySelector('.side-detail').clientHeight,
+          panelScroll: document.querySelector('#detailSide').scrollHeight - document.querySelector('#detailSide').clientHeight
+        };
+      });
+      for (const [label, box] of [['순간 열기', measured.viewer], ['이 무대 담기', measured.stage]]) {
+        assert.ok(box.h >= 44, `${width}: ${label} 단추 높이 44 이상(${box.h})`);
+        assert.ok(box.top >= 0 && box.bottom >= 0 && box.left >= 0 && box.right >= 0,
+          `${width}: ${label} 단추가 창 안에 온전히 있다(잘림 0px — ${JSON.stringify(box)})`);
+      }
+      assert.ok(measured.sideScroll <= 1 && measured.panelScroll <= 1, `${width}: 창이 내용에 맞춰 늘어나고 안에서 잘리지 않는다(side ${measured.sideScroll}px·panel ${measured.panelScroll}px)`);
+      await context.close();
+    }
+  } finally {
+    if (browser) await browser.close().catch(() => {});
+    server.close();
+  }
+});
