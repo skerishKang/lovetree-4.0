@@ -79,14 +79,83 @@ export function createDialogs(deps) {
     if (message) deps.notify?.(message);
     return message;
   }
+  // #978: 앱 안 닫기 확인 틀 — 브라우저 기본 confirm() 대신 앱 모양으로 "저장하지 않고 닫을까요?"를 묻는다.
+  // 지금은 정리 창(cleanup-panel)만 이 틀을 쓴다. 다른 창은 기존 confirm() 동작 그대로다(바꾸지 않는다).
+  // 물음은 비동기(단추를 눌러야 답이 온다)라서, 더러운 정리 창은 일단 닫지 않고(return false) 틀을 띄운 뒤
+  // '예'를 누르면 그때 실제로 닫는다. Esc·바깥 클릭 = 아니요(창은 그대로), 초점은 틀 안에 머물고
+  // 닫히면 원래 자리로 돌아간다. 확인 틀은 패널 무리(한 장 규칙·뒤로가기)에 끼지 않는 잠깐 판이다.
+  const INAPP_CONFIRM = new Set(['cleanup-panel']);
+  const CLOSE_CONFIRM_ID = 'lt-close-confirm';
+  let closeConfirmEl = null;
+  let closeConfirmFor = null;
+  function dismissCloseConfirm() {
+    const el = closeConfirmEl;
+    closeConfirmFor = null;
+    if (el?.open) { try { el.close(); } catch { /* 이미 닫힘 */ } }
+  }
+  function ensureCloseConfirm() {
+    if (closeConfirmEl) return closeConfirmEl;
+    const el = document.createElement('dialog');
+    el.id = CLOSE_CONFIRM_ID;
+    el.className = 'lt-close-confirm';
+    el.setAttribute('aria-labelledby', 'lt-close-confirm-title');
+    const title = document.createElement('h2');
+    title.id = 'lt-close-confirm-title';
+    title.textContent = '저장하지 않고 닫을까요?';
+    const row = document.createElement('div');
+    row.className = 'button-row';
+    const yes = document.createElement('button');
+    yes.type = 'button'; yes.id = 'lt-close-confirm-yes'; yes.className = 'primary'; yes.textContent = '예';
+    const no = document.createElement('button');
+    no.type = 'button'; no.id = 'lt-close-confirm-no'; no.textContent = '아니요';
+    row.append(yes, no);
+    el.append(title, row);
+    document.body.append(el);
+    // 예: 확인 틀을 닫고 원래 창을 실제로 닫는다(초점 복귀는 공통 'close' 규칙이 맡는다).
+    yes.addEventListener('click', () => { const target = closeConfirmFor; dismissCloseConfirm(); target?.close?.(); });
+    // 아니요: 확인 틀만 닫고 원래 창은 그대로 둔다. 초점은 원래 창으로 돌려준다.
+    no.addEventListener('click', () => { const target = closeConfirmFor; dismissCloseConfirm(); refocusPanel(target); });
+    // Esc = 아니요(브라우저 cancel을 막고 직접 닫는다). 바깥 클릭도 아니요.
+    el.addEventListener('cancel', (event) => { event.preventDefault(); const target = closeConfirmFor; dismissCloseConfirm(); refocusPanel(target); });
+    el.addEventListener('click', (event) => {
+      if (event.target !== el) return;
+      const r = el.getBoundingClientRect();
+      if (event.clientX < r.left || event.clientX > r.right || event.clientY < r.top || event.clientY > r.bottom) {
+        const target = closeConfirmFor; dismissCloseConfirm(); refocusPanel(target);
+      }
+    });
+    // 초점은 틀 안에 머물게 한다 — Tab/Shift+Tab은 예·아니요 두 단추 안에서만 순환한다.
+    el.addEventListener('keydown', (event) => {
+      if (event.key !== 'Tab') return;
+      const list = [yes, no];
+      const at = list.indexOf(document.activeElement);
+      event.preventDefault();
+      const next = event.shiftKey ? (at <= 0 ? list.length - 1 : at - 1) : (at < 0 || at === list.length - 1 ? 0 : at + 1);
+      list[next].focus();
+    });
+    closeConfirmEl = el;
+    return el;
+  }
+  function refocusPanel(d) {
+    if (!d?.open) return;
+    const back = d.querySelector('[data-close],input,select,textarea,button');
+    (back || d).focus?.();
+  }
+  function askCloseConfirm(d) {
+    const el = ensureCloseConfirm();
+    closeConfirmFor = d;
+    if (!el.open) { try { el.showModal(); } catch { /* 이미 열림 */ } }
+    el.querySelector('#lt-close-confirm-no')?.focus?.();
+  }
   function panelConfirmClose(d) {
     if (panelBlockedMessage(d)) return false;
-    if (PANEL_DIRTY[d.id]?.() && !confirm('저장하지 않고 닫을까요?')) return false;
-    return true;
+    if (!PANEL_DIRTY[d.id]?.()) return true;
+    if (INAPP_CONFIRM.has(d.id)) { askCloseConfirm(d); return false; }
+    return confirm('저장하지 않고 닫을까요?');
   }
   // #380 4 2차: × 버튼도 바깥 클릭·Esc와 같은 규칙을 쓴다(막을 상태면 막고, 더러우면 한 번 묻고, 닫으면 초점 복귀).
   // #845 2단계: 뒤로가기도 같은 판정을 탄다 — 공통 판정을 함수로 뽑아 세 길이(×·Esc·뒤로가기) 하나로 간다.
-  function requestPanelClose(id) { const d = $(id); if (!d) return false; if (!panelConfirmClose(d)) return false; d.close(); return true; }
+  function requestPanelClose(id) { const d = $(id); if (!d) return false; if (id === CLOSE_CONFIRM_ID) return false; if (!panelConfirmClose(d)) return false; d.close(); return true; }
   // 닫은 뒤 초점이 갈 곳: 연 버튼 → data-lt-return 순서는 focusReturnTarget이 정한다.
   // 모바일에서는 연 버튼이 '더보기' 메뉴 안에 접혀 보이지 않으므로, 그때는 더보기 버튼으로 돌려준다(초점을 잃지 않게).
   function panelReturnFocus(opener, fallback) {
@@ -180,7 +249,7 @@ export function createDialogs(deps) {
   // 앞 창을 못 닫았으면(사용자가 취소) 그 위에 겹친다 — 예상 못한 길을 막지 않는다. 확인 질문(confirm)
   // 은 브라우저 판이라 여기서 다루지 않는다.
   // #876: 같은 영상 안내 창(video-dup-panel)도 잠깐 판이다 — 순간 추가 창 위에 겹쳐 열린다(창은 #876이 만든다).
-  const STACK_ALLOWED = new Set(['move-picker', 'account-assets', 'community-preview', 'video-dup-panel', 'community-group-find']);
+  const STACK_ALLOWED = new Set(['move-picker', 'account-assets', 'community-preview', 'video-dup-panel', 'community-group-find', CLOSE_CONFIRM_ID]);
   // #933: 둘러보기 창은 자기 닫기 규칙(둘러보기 모듈)을 그대로 쓴다 — 이 틀이 대신 닫지 않는다.
   const PANEL_SKIP_AUTO_CLOSE = new Set(['community-panel', 'community-preview']);
   let dialogGuard = false;     // 창 기록을 쌓아 둔 상태
@@ -216,6 +285,13 @@ export function createDialogs(deps) {
     view.addEventListener('popstate', () => {
       const modals = modalDialogs();
       const top = modals[modals.length - 1] || null;
+      // #978: 맨 위가 앱 안 닫기 확인 틀이면 뒤로가기 = 아니요 — 틀만 닫고 원래 창은 그대로 둔다.
+      if (top && top.id === CLOSE_CONFIRM_ID) {
+        const target = closeConfirmFor; dismissCloseConfirm(); refocusPanel(target);
+        if (modalDialogs().length) { view.history.pushState({ lt41Dialog: true }, ''); dialogGuard = true; }
+        else dialogGuard = false;
+        return;
+      }
       if (top) {
         const closed = requestPanelClose(top.id);
         // 닫기가 막혔거나(더러움 확인 취소) 창이 남았으면 기록을 다시 쌓는다 — 뒤로가기를 계속 '닫기'로 쓰게.

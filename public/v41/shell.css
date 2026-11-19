@@ -898,3 +898,13 @@ html[data-lt-theme=garden] #moment-form .segment-loop,html[data-lt-theme=garden]
   .segment-durations{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));width:100%}
   #moment-form .segment-durations button{min-width:0;padding:0 6px}
 }
+/* #978: 앱 안 닫기 확인 틀 — 가운데 작은 창(center 패널과 같은 모양). 예·아니요 두 단추, 누름 영역 44px.
+   정리 창 닫기 확인이 브라우저 기본 confirm() 대신 이 모양을 쓴다. 색은 --lt-* 토큰만. */
+dialog.lt-close-confirm{inset:0;margin:auto;width:min(380px,calc(100vw - 32px));max-width:calc(100vw - 32px);height:fit-content;max-height:calc(100dvh - 88px);padding:24px;border:1px solid var(--line);border-radius:var(--lt-r-card);background:var(--lt-glass-strong);box-shadow:0 18px 60px #0009;overflow:auto}
+dialog.lt-close-confirm h2{font-size:19px;font-weight:600;letter-spacing:-.03em;margin:0 0 6px;line-height:1.5}
+dialog.lt-close-confirm .button-row{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px;margin-top:18px}
+dialog.lt-close-confirm .button-row button{min-height:44px;border-radius:var(--lt-r-pill);border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.04);padding:10px 18px;font-size:14px}
+dialog.lt-close-confirm .button-row .primary{background:var(--lt-primary);color:var(--lt-primary-ink);border-color:var(--lt-primary)}
+html[data-lt-theme=garden] dialog.lt-close-confirm{border-color:var(--lt-line-paper)}
+html[data-lt-theme=garden] dialog.lt-close-confirm .button-row button{background:rgba(255,253,248,.9);color:var(--lt-ink);border-color:var(--lt-line-paper)}
+html[data-lt-theme=garden] dialog.lt-close-confirm .button-row .primary{background:var(--lt-primary);color:var(--lt-primary-ink);border-color:var(--lt-primary)}
