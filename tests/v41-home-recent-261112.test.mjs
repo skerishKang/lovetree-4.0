@@ -43,10 +43,12 @@ test('#426 썸네일은 공용 모듈(#435) 그대로 — 회색이면 글 카�
   assert.match(orbit,/recent-media[^`]*\$\{thumbFallbackAttrs\(c,\{candidates:c\.thumbCandidates\|\|\[c\.image\],writable,variant:'orbit'\}\)\}/);
   assert.match(orbit,/needsFallbackCard\(c,\{autoLoad:false\}\)\?\`<span class="recent-media recent-media--slot">\$\{fallbackCardMarkup\(c,\{writable,variant:'orbit',dateStyle\}\)\}/);
   assert.match(orbit,/recent-media--memo/);
-  // 세로 영상은 9:16(#409), 가로는 16:9.
+  // 세로 영상도 카드 폭을 채우고, 같은 썸네일을 흐리게 깔아 양옆 회색 띠를 없앤다(#942).
   assert.match(orbit,/isVerticalMoment\(c\)/);
   assert.match(orbit,/\.recent-media\{[^}]*aspect-ratio:16\/9/);
-  assert.match(orbit,/\.recent-media\.vertical\{[^}]*aspect-ratio:9\/16/);
+  assert.match(orbit,/\.recent-media\.vertical\{[^}]*aspect-ratio:16\/9/);
+  assert.match(orbit,/class="recent-backdrop"/);
+  assert.match(orbit,/\.recent-media\.vertical \.recent-backdrop\{[^}]*filter:blur\(18px\)/);
 });
 
 test('#426 카드 누르면 그 순간 열기 — 궤도 카드와 같은 onOpen 경로, Enter·Space도 같다',()=>{
@@ -88,7 +90,7 @@ test('#426 이어 보던 순간 버튼은 없다 — 로그인 후 세트는 [�
 test('#426 390: 카드 폭=화면-32px, 세로 썸네일 높이 제한',()=>{
   assert.match(orbit,/\.recent-card\{[^}]*width:min\(430px,86vw\)/);
   assert.match(orbit,/width:calc\(100vw - 32px\)/);
-  assert.match(orbit,/\.recent-media\.vertical\{[^}]*38dvh/);
+  assert.match(orbit,/\.recent-media\.vertical \.recent-thumb\{[^}]*object-fit:contain/);
   // 카드가 .center 안에 있어 #440 안전 구역 측정에 함께 잡힌다.
   assert.match(orbit,/<\/p>\$\{recentMoment\?recentMarkup\(recentMoment\):''\}<div class="actions">/);
 });

@@ -8,6 +8,7 @@ const bookCss = read('public/v41/views/book/book.css');
 const panels = read('public/v41/shell/panels.mjs');
 const shell = read('public/v41/shell.mjs');
 const home = read('v41/home.js');
+const orbit = read('src/views/orbit.js');
 
 test('#897 책 갈림길 탭: 책 안쪽 오른쪽 가장자리에 붙인다(밖으로 삐져나오지 않는다)', () => {
   const rule = bookCss.match(/\.branch-tab\{[^}]*\}/)?.[0] || '';
@@ -27,3 +28,6 @@ test('#898 ① 자세한 추가 창은 맨 위부터 연다(다듬기로 넘어�
     '편집기를 열 때 창 스크롤을 0으로 되돌린다');
 });
 
+test('#942 알림이 가운데 단추까지 덮지 않게 가운데 묶음에 표식을 건다', () => {
+  assert.match(orbit, /<div class="center" data-lt-keep-clear>/, '가운데 단추·숫자판 묶음 전체가 알림 피하기 기준');
+});
