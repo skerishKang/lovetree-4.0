@@ -90,7 +90,7 @@ export function fakeTabButton({id = '', title = '', rect = true} = {}) {
 // 셸 헤더 시험의 공용 하네스. tests/v41-shell-header.test.mjs(#241)에서 쓰던 방식을 그대로 옮겼다.
 export function createHeaderHarness({
   owned = false, writable = true, dirty = false, subject = 's1',
-  trees = 0, tree = null, source = 'example', current = 'src064-orbit.html',
+  trees = 0, moments = trees, tree = null, source = 'example', current = 'src064-orbit.html',
   navBar = null, reduceMotion = false, narrow = true, account = {ok: false}, storage = null
 } = {}) {
   const els = {
@@ -133,7 +133,7 @@ export function createHeaderHarness({
     $: (id) => els[id] ?? null,
     navBar,
     getMember: () => member,
-    getModel: () => ({ trees: Array.from({ length: trees }, (_, i) => ({ id: 't' + i, title: '기록 ' + i })) }),
+    getModel: () => ({ trees: Array.from({ length: trees }, (_, i) => ({ id: 't' + i, title: '기록 ' + i, moments: i<moments?[{id:'m'+i}]:[] })) }),
     getSource: () => source,
     getCurrent: () => currentScreen,
     accountApi: { account: async () => account },

@@ -94,8 +94,9 @@ test('#942 첫 화면 추가 단추와 숫자 묶음', { skip: REQUIRE ? false :
   const dest=process.env.LT_HOME_CTA_CAPTURE;
   if(dest)mkdirSync(dest,{recursive:true});
   const make=(subject,count)=>{
-    const input=i=>({subject,title:'시험 순간 '+(i+1),date:'2026-11-'+String(i+1).padStart(2,'0'),emotion:'설렘',note:'화면 확인용 가짜 기록',url:i%3===0?'https://audit.invalid/photo.jpg':i%3===1?'https://www.youtube.com/watch?v=dQw4w9WgXcQ':''});
-    let tree=createTree(input(0));for(let i=1;i<count;i++)tree=addMoment(tree,input(i),tree.moments[0].id);
+    const input=i=>({subject,title:'시험 순간 '+(i+1),date:'2026-11-'+String(i+1).padStart(2,'0'),emotion:'설렘',note:'화면 확인용 가짜 기록',url:i===count-1?'':i%3===0?'https://audit.invalid/photo.jpg':i%3===1?'https://www.youtube.com/watch?v=dQw4w9WgXcQ':''});
+    const clock=i=>'2026-11-'+String(i+1).padStart(2,'0')+'T00:00:00.000Z';
+    let tree=createTree(input(0),clock(0));for(let i=1;i<count;i++)tree=addMoment(tree,input(i),tree.moments[0].id,clock(i));
     return tree;
   };
   const trees=[make('좋아하는 순간들',8),make('여름',3),make('함께 부른 노래',3)];
@@ -112,7 +113,7 @@ test('#942 첫 화면 추가 단추와 숫자 묶음', { skip: REQUIRE ? false :
   try{
     for(const theme of ['night','garden'])for(const [width,height] of [[390,844],[1440,900]])for(const kind of ['guest','empty','member']){
       const member=kind==='member',signedIn=kind!=='guest';
-      const ctx=await browser.newContext({viewport:{width,height},reducedMotion:'reduce'});
+      const ctx=await browser.newContext({viewport:{width,height},reducedMotion:'no-preference'});
       try{
         await ctx.addInitScript(t=>{localStorage.setItem('lt41.theme',t);localStorage.setItem('lt41.tips.firstTree','1')},theme);
         await ctx.route('**/*',r=>{
@@ -151,7 +152,10 @@ test('#942 첫 화면 추가 단추와 숫자 묶음', { skip: REQUIRE ? false :
         }));
         const values={buttons,headers,head,fab,top,groups};const key=width+'-'+theme+'-'+kind;
         console.log('#942',key,JSON.stringify(values));
-        if(dest)await page.screenshot({path:join(dest,'home-'+key+'.png'),animations:'disabled'});
+        if(dest){
+          if(width===1440)await current.locator('.card:not(.off):not(.clash)').first().waitFor({state:'visible',timeout:8000});
+          await page.screenshot({path:join(dest,'home-'+key+'.png'),animations:'allow'});
+        }
         const rose=theme==='night'?'rgb(180, 87, 107)':'rgb(152, 80, 94)';
         const visibleAdds=[head,fab,top].filter(b=>b?.visible);
         check(visibleAdds.length===(member?2:0),key+' 추가 단추 개수 '+JSON.stringify(visibleAdds));
