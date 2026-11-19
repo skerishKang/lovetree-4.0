@@ -64,6 +64,26 @@ placeToast();
 // 안내 한 벌(#353 후속): 담기·중복·로그인 필요 안내(hold)가 상태 안내보다 먼저 일정 시간 보인다.
 const shellNotice=createNotifier({$,beforeShow:placeToast,afterShow:()=>{placeToast();setTimeout(placeToast,600);setTimeout(placeToast,1400);}});
 function notify(text,options){return shellNotice.notify(text,options);}
+// #977: 서버 기록에 형식이 어긋난 트리가 섞여 있으면 그 트리만 빼고 셸을 연다(읽기는 workspace-guard.mjs).
+// 화면에는 짧은 안내 한 줄, 콘솔에는 어느 트리가 왜 어긋났는지 한 줄만 남긴다 — 같은 기록을 다시 읽어도 한 번만.
+let guardNoticeKey='';
+function workspaceGuardNotice(read){
+ const skipped=Array.isArray(read?.skipped)?read.skipped:[];
+ if(!skipped.length)return;
+ const key=skipped.map(item=>`${item?.id||''}:${item?.reason||''}`).join('|');
+ if(guardNoticeKey===key)return;
+ guardNoticeKey=key;
+ console.warn(`[LT41] 열 수 없는 트리 ${skipped.length}개를 잠시 빼고 열었어요: ${skipped.map(item=>`${item?.id||'(아이디 없음)'}(${item?.reason||'형식을 읽을 수 없어요.'})`).join(', ')}`);
+ notify(`열 수 없는 트리 ${skipped.length}개를 잠시 빼고 열었어요.`,{hold:true});
+}
+// #977: 셸을 세우다 예외가 나도 빈 화면에 멈추지 않는다 — 읽을 수 있는 기록으로 한 번 더 열고 안내를 남긴다.
+function openFallbackShell(error){
+ try{console.warn('[LT41] 셸을 여는 중 문제가 있었어요:',error?.message||String(error));}catch{}
+ let state={version:1,trees:[]};
+ try{state=member?.state?.()||state;}catch{}
+ try{load({revision:0,state},'server');}catch{try{load({revision:0,state:{version:1,trees:[]}},'file');}catch{}}
+ notify('기록을 불러오지 못했어요. 화면을 새로고침해 다시 시도해 주세요.',{hold:true});
+}
 // #347 후속: 계정 제목 보기 설정. 계정 상태(state.prefs.titleDisplay)에 저장하고 화면에 알린다.
 function currentPrefs(){try{return member?.state?.().prefs||{titleDisplay:'both'}}catch{return {titleDisplay:'both'}}}
 function titleDisplayValue(){return normalizeTitleDisplay(currentPrefs().titleDisplay)}
@@ -839,8 +859,13 @@ function paintEmptyCopy(){
  $('empty-sample').classList.toggle('primary',!owned);
  $('empty-file').hidden=owned;
 }
+// #977: 작업 공간을 읽다 예외가 나도 셸 모델은 비어 있는 채로라도 세운다(빈 화면에 멈추지 않게).
+function projectWorkspace(input){
+ try{return workspaceModel(input);}
+ catch(error){console.warn('[LT41] 작업 공간을 읽지 못했어요:',error?.message||String(error));notify('기록을 불러오지 못했어요. 화면을 새로고침해 다시 시도해 주세요.');return {revision:0,trees:[],selection:{treeId:null,momentId:null}};}
+}
 function load(input,kind,selection={},fallback={}){
- model=kind==='example'?{trees:[exampleTree]}:workspaceModel(input);
+ model=kind==='example'?{trees:[exampleTree]}:projectWorkspace(input);
  source=kind;
  if(kind!=='share'){
   activeShareId=null;
@@ -1013,7 +1038,7 @@ function memberStatus(status){
 async function startMember(){setMemberRefreshStarted(true);if(!leaveMember())return;backfillStarted=false;backfillAttempted.clear();const startup=parseSelectionRoute(location.hash);if(startup.scope==='owner')stashPendingOwnerRoute(sessionStorage,location.hash);++loadGeneration;const generation=loadGeneration;clear();
  const api=createWorkspaceApi({fetchImpl:(url,init)=>fetch(init?.method==='GET'&&url==='/api/workspace'?'/api/workspace?features=bound-writes':url,init)});
  let initialized=false,startupNotice='',session;
- session=createMemberSession({api,onState:(state,selection,meta)=>{if(generation!==loadGeneration)return;
+ session=createMemberSession({api,onGuard:read=>workspaceGuardNotice(read),onState:(state,selection,meta)=>{if(generation!==loadGeneration)return;try{
   // 4.1 기억 보드 저장: 화면이 이미 자기 상태를 들고 있으므로 셸은 모델만 갱신하고 iframe을 다시 그리지 않는다.
   if(meta?.board){const projected=workspaceModel({revision:0,state});model=projected;if(window.LT41){const tree=projected.trees.find(t=>t.id===window.LT41.tree.id);if(tree){window.LT41.tree=tree;window.LT41.trees=projected.trees;window.LT41.writable=true}}return;}const snapshot=session.snapshot(),saved=accountPosition(localStorage,snapshot.subject)||{},active=parseSelectionRoute(location.hash),pending=!initialized&&active.scope!=='owner'?pendingOwnerRoute(sessionStorage):null,route=active.scope==='owner'?active:pending;let requested=selection||stateSelection();
    if(!initialized){if(route)requested=route;else if(!selection)requested=saved;
@@ -1039,14 +1064,14 @@ async function startMember(){setMemberRefreshStarted(true);if(!leaveMember())ret
    paintTitleDisplayControls();
    if(!backfillStarted&&snapshot.owned){backfillStarted=true;void runTitleBackfill(state,session);}
    if(snapshot.owned&&resolved.position.treeId){if(viewForFile(current)!=='home')writeLocation('replace');takePendingOwnerRoute(sessionStorage);if(route?.scope==='owner'&&resolved.treeMissing)startupNotice='이 주소의 기록을 현재 계정에서 찾을 수 없어 최근 위치를 열었어요.';else if(route?.scope==='owner'&&resolved.momentMissing)startupNotice='이 주소의 순간을 찾을 수 없어 트리의 시작 순간을 열었어요.';}
- },onStatus:status=>{if(generation===loadGeneration)memberStatus(status);},
+ }catch(error){openFallbackShell(error);}},onStatus:status=>{if(generation===loadGeneration)memberStatus(status);},
  navigate:url=>{
   if(url.startsWith('/auth/login')&&parseSelectionRoute(location.hash).scope==='owner')stashPendingOwnerRoute(sessionStorage,location.hash);
   location.assign(url.startsWith('/auth/login')?memberLoginUrl(readTheme(localStorage)):url==='#start'?'#home':url);
  }
 });
  member=session;
- await session.start();
+ try{await session.start();}catch(error){openFallbackShell(error);}
  if(generation===loadGeneration&&session.snapshot().owned){
   updateAccountControls();
   if(session.snapshot().writable&&sessionStorage.getItem(PENDING_NEW)==='1'){sessionStorage.removeItem(PENDING_NEW);openEditor('new');}
@@ -1185,7 +1210,7 @@ document.addEventListener('click',e=>{
 $('empty-records').onclick=()=>{if(!member?.snapshot().owned){openLoginStart('first');return;}member.snapshot().writable?openEditor():openAccountData();};
 $('empty-sample').onclick=sample;
 $('sample').onclick=sample;$('clear').onclick=()=>{if(!leaveMember())return;++loadGeneration;clear();$('save-feedback').hidden=true;$('file').value='';if($('account-settings').open)$('account-settings').close();};
-$('server').onclick=startMember;
+$('server').onclick=()=>{void startMember().catch(error=>openFallbackShell(error));};
 const ACCOUNT_DELETE_PHRASE='탈퇴합니다';
 let accountExpected=null;
 function accountConfirmMatches(){
@@ -1581,7 +1606,7 @@ function usePrivateAsset(){
 addEventListener('beforeunload',e=>{
  if(member?.snapshot().dirty||formDirty()||treeDirty()){e.preventDefault();e.returnValue='';}
 });
-if(shouldLoadMemberRecords(location.search,document.cookie,location.hash)||shellIntake.pending())startMember();
+if(shouldLoadMemberRecords(location.search,document.cookie,location.hash)||shellIntake.pending())void startMember().catch(error=>openFallbackShell(error));
 // 로그아웃으로 다시 연 문서에서는 '로그인이 필요해요' 대신 이 안내를 한 번 띄운다.
 try{if(sessionStorage.getItem('lt41.logoutNotice')==='1'){sessionStorage.removeItem('lt41.logoutNotice');notify('로그아웃했어요.');}}catch{}
 
