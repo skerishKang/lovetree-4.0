@@ -28,8 +28,8 @@ test('카드 수 상한: 폭별 값을 코드가 약속대로 돌려준다', () 
 });
 
 test('상한을 넘는 카드는 frame에서 숨기고, 폭이 넓어지면 다시 보인다', () => {
-  assert.match(orbit, /if\(i>=cardCapFor\(w\)\)\{el\.style\.display='none';return;\}/);
-  assert.match(orbit, /if\(el\.style\.display==='none'\)el\.style\.display='';/);
+  assert.match(orbit, /if\(i>=cardCapFor\(w\)\)\{el\.classList\.add\('off'\);return;\}/);
+  assert.match(orbit, /if\(el\.classList\.contains\('off'\)\)el\.classList\.remove\('off'\);/);
 });
 
 test('카드는 언제나 불투명하고, blur 대신 밝기로 깊이를 낸다', () => {
@@ -77,10 +77,10 @@ test('#457 좁은 화면(≤650): 가로는 먼저 화면 안으로 당기고, �
   assert.match(narrowBlock, /if\(!upFits&&!downFits\)\{/, '못 담을 때 분기');
   assert.match(narrowBlock, /band\/rectH/, '띠 높이에 맞춰 줄인다');
   assert.match(narrowBlock, /drawShrink\*=shrink;/, '줄임 배율을 그림에 반영한다');
-  assert.doesNotMatch(narrowBlock, /!upFits&&!downFits\)\{el\.style\.display='none';return;\}/, '옛 즉시 숨김이 남지 않는다');
+  assert.doesNotMatch(narrowBlock, /!upFits&&!downFits\)\{el\.classList\.add\('off'\);return;\}/, '옛 즉시 숨김이 남지 않는다');
   // 민 뒤에도 화면 세로 안(0..h)에 남게 마지막으로 다듬고, 그래도 안전 구역과 겹치면 숨긴다(안전 구역 침범 0 보장).
   assert.match(narrowBlock, /if\(minY<0\)\{py-=minY;maxY-=minY;minY=0;\}else if\(maxY>h\)/);
-  assert.match(narrowBlock, /if\(maxX>zs\.l&&minX<zs\.r&&maxY>zs\.t&&minY<zs\.b\)\{el\.style\.display='none';return;\}/);
+  assert.match(narrowBlock, /if\(maxX>zs\.l&&minX<zs\.r&&maxY>zs\.t&&minY<zs\.b\)\{el\.classList\.add\('off'\);return;\}/);
 });
 
 test('둘러보기 감상자 차단 문구에 "발견"이 남지 않는다', () => {

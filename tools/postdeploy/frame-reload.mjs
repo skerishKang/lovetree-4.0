@@ -63,7 +63,7 @@ export function readHomeCardState() {
   let cards = 0, placed = 0, unplaced = 0, inSafeZone = 0;
   const intake = [];
   for (const card of root.querySelectorAll('button.card')) {
-    if (card.style.display === 'none') continue; // 폭별 상한으로 숨긴 카드(#429)
+    if (getComputedStyle(card).display === 'none') continue; // 폭별 상한으로 숨긴 카드(#429)
     cards += 1;
     // #593: 카드 자리는 이제 궤도 애니메이션(WAAPI)이 들고 있다 — 인라인 transform 이 비어 있어도
     //   실제로 자리를 잡았는지는 계산된 transform 으로 본다(유휴 스타일 쓰기를 없앤 변경).
