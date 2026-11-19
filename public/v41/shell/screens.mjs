@@ -19,6 +19,7 @@ export function createScreens(deps) {
     links,
     takeNetworkOpen,
     closePanels,
+    syncTips,
     takeBoardOpen,
     onFrameReady
   } = deps;
@@ -172,6 +173,7 @@ export function createScreens(deps) {
       $('empty').hidden = false;
       if (write) writeLocation();
       links();
+      syncTips?.();
       return;
     }
     if (file === 'src064-orbit.html' && !hasTree()) paintEmptyCopy?.();
@@ -193,6 +195,8 @@ export function createScreens(deps) {
     showInFrame(url.href, '러브트리 · ' + screenTitle(file));
     if (write) writeLocation();
     links();
+    // 이슈 933: 화면을 옮긴 뒤 첫 트리 안내 판을 다시 맞춘다(첫 여정에서는 띄우지 않는다).
+    syncTips?.();
   }
 
   // 화면 한 장이 준비될 때마다: 테마·연결 도구·접근성·클릭 위임을 그 화면에 붙인다.

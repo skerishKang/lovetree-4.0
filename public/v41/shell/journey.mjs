@@ -102,6 +102,8 @@ export function createJourney(deps) {
     frame.contentWindow.location.replace(new URL('/v41/views/first-journey.html' + (suffix ? '?' + suffix : ''), location.origin).href);
     flowNavigation();
     writeJourneyLocation(start, routed ? 'replace' : 'push');
+    // 이슈 933: 첫 여정 화면에서는 첫 트리 안내 판을 띄우지 않는다(아직 트리를 만들기 전이다).
+    deps.syncTips?.();
   }
 
   function saveFirstJourney(draft) {

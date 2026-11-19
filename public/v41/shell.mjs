@@ -386,6 +386,7 @@ function updateQuickEntryHint(){return shellPanels.updateQuickEntryHint();}
 const shellJourney=createJourney({
   $,
   closePanels:()=>shellDialogs.closePanels(),
+  syncTips:()=>syncTreeTips(),
   getCurrent:()=>current,
   setCurrent:file=>{current=file;},
   getMember:()=>member,
@@ -588,6 +589,8 @@ const shellScreens=createScreens({
   takeNetworkOpen,
   takeBoardOpen,
   closePanels:()=>shellDialogs.closePanels(),
+  // 이슈 933: 화면을 옮긴 뒤 안내 판을 다시 맞춘다 — 첫 여정(새 트리 만들기)에서는 띄우지 않는다.
+  syncTips:()=>syncTreeTips(),
   flowNavigation,
   paintEmptyForScreen,
   paintEmptyCopy,
@@ -768,7 +771,9 @@ function showTreeTips(){
 }
 function syncTreeTips(){
   const momentCount=model?.trees?.reduce((n,t)=>n+((t.moments||[]).length),0)||0;
-  const wanted=tipsWanted({owned:!!member?.snapshot().owned,treeCount:model?.trees?.length||0,momentCount,seen:readTipsSeen(localStorage),source});
+  // 이슈 933: 새 트리 만들기(첫 여정) 화면에서는 안내 판을 띄우지 않는다 — 아직 트리를 만든 적이 없는데
+  // '첫 트리를 만들었어요' 판이 미리보기 카드를 덮었다. 트리를 실제로 만든 뒤(다른 화면)에만 띄운다.
+  const wanted=current!=='first-journey.html'&&tipsWanted({owned:!!member?.snapshot().owned,treeCount:model?.trees?.length||0,momentCount,seen:readTipsSeen(localStorage),source});
   if(wanted)showTreeTips();else closeTreeTips(false);
 }
 // 창이 닫힐 때마다 안내를 다시 맞춘다 — 열려 있는 창이 없어지면 숨긴 안내를 다시 띄운다(#845).
