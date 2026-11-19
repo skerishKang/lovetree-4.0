@@ -300,8 +300,15 @@ html[data-lt-theme=garden] .boardModeSwitch .modeSwitchBtn[aria-pressed="true"]{
 /* ===== #891: 보드 순간 상세 판 — 밀기·한 벌 스크롤·고정 줄 ===== */
 /* 판이 열리면 무대(#viewport) 오른쪽 여백이 판 너비만큼 벌어진다(board.js syncBoardPush가 인라인으로 넣는다).
    좁은 화면(<760)은 아래 시트 그대로 덮으므로 흔들림 없앰. */
-#viewport{transition:margin-right .35s cubic-bezier(.2,.9,.2,1)}
-@media(max-width:760px){#viewport{transition:none}}
+/* #972: Keep the cinema button outside the clipped card viewport, even while panning. */
+#viewport{transition:margin-right .35s cubic-bezier(.2,.9,.2,1);bottom:86px}
+#boardControls{position:absolute;inset:0;pointer-events:none;transition:margin-right .35s cubic-bezier(.2,.9,.2,1)}
+#boardControls .toolbar,#boardControls .cinemaBtn{pointer-events:auto}
+@media(max-width:760px){#viewport{transition:none;bottom:74px}#boardControls{transition:none}}
+@media(max-width:699px){
+  html[data-v41-screen=board] .lt-moment-picker[data-tone=dark]{background:var(--lt-stage-2)}
+  html[data-lt-theme=garden][data-v41-screen=board] .lt-moment-picker[data-tone=dark]{background:var(--lt-paper)}
+}
 /* 고정 줄: 주 단추 2개(크게 보기·여기부터 시네마) + ⋯ 더 보기. 간격 8px·높이 44px(#891 확인 기준). */
 #detailActions{flex-wrap:nowrap;align-items:center;gap:8px}
 #detailActions .miniBtn{height:44px;min-height:44px}
