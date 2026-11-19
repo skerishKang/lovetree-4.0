@@ -300,7 +300,7 @@ html[data-lt-theme=garden] .boardModeSwitch .modeSwitchBtn[aria-pressed="true"]{
 /* ===== #891: 보드 순간 상세 판 — 밀기·한 벌 스크롤·고정 줄 ===== */
 /* 판이 열리면 무대(#viewport) 오른쪽 여백이 판 너비만큼 벌어진다(board.js syncBoardPush가 인라인으로 넣는다).
    좁은 화면(<760)은 아래 시트 그대로 덮으므로 흔들림 없앰. */
-/* #972: Keep the cinema button outside the clipped card viewport, even while panning. */
+/* #972: 시네마 버튼이 카드 영역 밖에 있도록 — 판을 끌어도 유지 */
 #viewport{transition:margin-right .35s cubic-bezier(.2,.9,.2,1);bottom:86px}
 #boardControls{position:absolute;inset:0;pointer-events:none;transition:margin-right .35s cubic-bezier(.2,.9,.2,1)}
 #boardControls .toolbar,#boardControls .cinemaBtn{pointer-events:auto}
