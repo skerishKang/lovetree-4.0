@@ -1652,16 +1652,15 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     });
     const page9 = await ctx9.newPage();
     await page9.goto(`${base}/v41/?account=1`, { waitUntil: 'load' });
-    let homeFrame = null;
-    for (let i = 0; i < 80 && !homeFrame; i++) {
-      for (const fr of page9.frames()) {
-        if (fr === page9.mainFrame()) continue;
-        try { if (await fr.evaluate(() => !!document.getElementById('orbit')?.shadowRoot?.querySelector('.card .lt-fallback-title'))) { homeFrame = fr; break; } } catch {}
-      }
-      if (!homeFrame) await page9.waitForTimeout(300);
-    }
-    assert.ok(homeFrame, '첫 화면 글자 카드가 그려진다(내려간 영상 → 글 카드)');
-    const cardCheck = await homeFrame.evaluate(() => {
+    let homeFrame = null, cardCheck = null;
+    /* 이슈 928: 셸은 부팅 때 첫 화면을 두 번 띄운다(기록 도착 전 예시 트리 → 도착 뒤 실제 트리, 두 장 교대).
+       교대 창(reveal 뒤 600ms)에는 숨은 옛 장(#view-next — '다음 화면 준비' 슬롯)에 카드가 온전히 그려져 있고
+       page.frames()가 그 숨은 장을 먼저 돌려준다. 내용만 보고 골랐더니 숨은 장의 rect 0(감정 0/날짜 0)을 재어
+       가짜 결함을 냈다. 그래서 '지금 보이는 장'(frameElement가 hidden·inert가 아닌 장)만 고르고, 재는 사이에
+       장이 바뀌면(hiddenFrame) 다시 고른다 — 단정 기준(3줄·같은 줄·겹침·넘침)은 그대로다. */
+    const measureCards = () => {
+      const fe = window.frameElement;
+      if (!fe || fe.hidden || fe.hasAttribute('inert')) return { hiddenFrame: true, cards: 0, bad: [], overflow: 0 };
       const sh = document.getElementById('orbit').shadowRoot;
       const cards = [...sh.querySelectorAll('.card .lt-fallback-card, .recent-media .lt-fallback-card')];
       const bad = [];
@@ -1698,7 +1697,24 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
         if (ox * oy > 0) bad.push(`'첫 순간' 배지와 감정 칩이 겹친다(${Math.round(ox * oy)}px²)`);
       }
       return { cards: cards.length, bad, overflow: Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth) };
-    });
+    };
+    for (let i = 0; i < 80 && !cardCheck; i++) {
+      for (const fr of page9.frames()) {
+        if (fr === page9.mainFrame()) continue;
+        const shown = await fr.evaluate(() => {
+          const fe = window.frameElement;
+          if (!fe || fe.hidden || fe.hasAttribute('inert')) return false;
+          return !!document.getElementById('orbit')?.shadowRoot?.querySelector('.card .lt-fallback-title');
+        }).catch(() => false);
+        if (!shown) continue;
+        homeFrame = fr;
+        cardCheck = await fr.evaluate(measureCards).catch(() => null);
+        if (cardCheck && !cardCheck.hiddenFrame) break;
+        cardCheck = null; homeFrame = null;
+      }
+      if (!cardCheck) await page9.waitForTimeout(300);
+    }
+    assert.ok(homeFrame && cardCheck, '첫 화면 글자 카드가 그려진다(내려간 영상 → 글 카드, 보이는 장)');
     assert.ok(cardCheck.cards >= 1, `첫 화면 글자 카드 수(실제 ${cardCheck.cards})`);
     assert.deepEqual(cardCheck.bad, [], `첫 화면 글자 카드 줄·말줄임·배치: ${JSON.stringify(cardCheck.bad)}`);
     assert.equal(cardCheck.overflow, 0, `첫 화면 가로 넘침 0(실제 ${cardCheck.overflow})`);
@@ -1895,7 +1911,7 @@ test('#657 후속 261117: 좁은 화면 소수 카드(≤8) 계정은 궤도 카
       const els = [...document.querySelectorAll('#view,#view-next')].filter((e) => e.getClientRects().length > 0 && !e.hidden);
       const sh = (els[0] || document.getElementById('view'))?.contentDocument?.getElementById('orbit')?.shadowRoot;
       if (!sh) return null;
-      return [...sh.querySelectorAll('button.card')].filter((c) => c.style.display !== 'none').length;
+      return [...sh.querySelectorAll('button.card')].filter((c) => getComputedStyle(c).display !== 'none').length;
     });
     assert.equal(visible, 0, `390 소수 카드 계정: 궤도 카드 0장(실제 ${visible}장)`);
     await context.close();
@@ -1933,7 +1949,7 @@ test('#657 후속 261117: 카드 층은 바닥 링크 줄 위에서 자른다(39
       const measured = await page.evaluate(() => {
         const frames = [...document.querySelectorAll('#view,#view-next')].filter((f) => f.getClientRects().length > 0 && !f.hidden);
         const sh = (frames[0] || document.getElementById('view'))?.contentDocument?.getElementById('orbit')?.shadowRoot;
-        const cards = sh ? [...sh.querySelectorAll('button.card')].filter((c) => c.style.display !== 'none' && getComputedStyle(c).display !== 'none') : [];
+        const cards = sh ? [...sh.querySelectorAll('button.card')].filter((c) => getComputedStyle(c).display !== 'none') : [];
         const rects = cards.map((c) => {
           const a = c.getBoundingClientRect(), s = c.querySelector('.surface')?.getBoundingClientRect() || a;
           return { l: Math.min(a.left, s.left), r: Math.max(a.right, s.right), t: Math.min(a.top, s.top), b: Math.max(a.bottom, s.bottom) };
