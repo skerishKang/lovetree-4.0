@@ -84,6 +84,8 @@ export function createJourney(deps) {
       openSettingsData?.(); return;
     }
     if (screens.some(screen => screen[1] === getCurrent())) journeyReturn = getCurrent();
+    // #933: '새 트리'로 첫 여정 화면을 열 때도 열려 있던 창(트리 관리)을 닫는다.
+    deps.closePanels?.();
     if ($('community-panel').open) $('community-panel').close();
     const start = routed ? parseJourneyRoute(journeyRouteHash(step))?.step || 0 : 0;
     setCurrent('first-journey.html');
@@ -100,6 +102,8 @@ export function createJourney(deps) {
     frame.contentWindow.location.replace(new URL('/v41/views/first-journey.html' + (suffix ? '?' + suffix : ''), location.origin).href);
     flowNavigation();
     writeJourneyLocation(start, routed ? 'replace' : 'push');
+    // 이슈 933: 첫 여정 화면에서는 첫 트리 안내 판을 띄우지 않는다(아직 트리를 만들기 전이다).
+    deps.syncTips?.();
   }
 
   function saveFirstJourney(draft) {
