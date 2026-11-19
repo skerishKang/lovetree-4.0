@@ -27,6 +27,9 @@ export function createScreens(deps) {
   // 2026-11-08 #211 화면 전환 깜빡임: 새 화면은 보이지 않는 두 번째 iframe에서 먼저 다 그린다.
   // 준비(load + 글꼴 준비)가 끝나면 두 장의 앞뒤만 바꾼다. 이전 화면은 그 순간까지 그대로 보인다.
   let viewToken = 0;
+  // #996: 화면 교대 뒤 지연 비우기 타이머. 화면을 다시 바꾸면 앞 타이머를 취소하고,
+  // 비우기 직전에 그 프레임이 다시 보이는 장이 되었는지 한 번 더 확인한다.
+  let blankTimer = 0;
 
   // #428: 숨은 프레임은 초점을 받지 않게 둔다(inert + aria-hidden + tabindex=-1). 불러온 문서가
   // autofocus·focus()·접근성 트랩으로 초점을 청해도 크로미움이 그 자리로 가려고 .app(overflow:hidden)을
@@ -107,6 +110,8 @@ export function createScreens(deps) {
     // #428: 뒤에서 불러오는 동안 이 장은 초점을 받지 않는다.
     setFrameFocusGuard(next, true);
     const token = ++viewToken;
+    // #996: 앞 전환이 비우려던 프레임은 이제 새 불러오기의 대상이다 — 대기 중인 비우기를 취소한다.
+    clearTimeout(blankTimer);
     let settled = false;
     const done = () => {
       if (settled || token !== viewToken) return;
@@ -121,7 +126,12 @@ export function createScreens(deps) {
         next.classList.add('lt-arrive');
       }
       links();
-      setTimeout(() => { try { active.contentWindow.location.replace('about:blank'); } catch {} }, 600);
+      blankTimer = setTimeout(() => {
+        // #996: 아직 숨은 프레임만 비운다. 다시 보이는 장이 되었거나 새 전환이 지난 프레임은
+        // 그대로 둔다 — 그렇지 않으면 보이는 화면이 비어 굳는다.
+        if (token !== viewToken || active.hidden !== true || active === $('view')) return;
+        try { active.contentWindow.location.replace('about:blank'); } catch {}
+      }, 600);
     };
     const ready = () => {
       if (token !== viewToken) return;
