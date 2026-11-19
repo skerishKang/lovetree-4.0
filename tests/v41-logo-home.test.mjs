@@ -137,6 +137,10 @@ test('로고로 #home을 pushed 뒤 뒤로 가기 — 로그인 전·후 다섯 
 });
 
 // 화면 이름·주소는 숫자(값)로 판정한다. 크롬이 없는 곳에서는 건너뛴다.
+// #996: 첫 화면은 vite 번들이라 빌드 결과(dist)가 있어야 돈다 — 없으면 이유를 적고 건너뛴다.
+// CI 화면 잡에서는 LT_LOGO_HOME_REQUIRE=1로 돌려 건너뜀=실패로 본다(#782 회귀를 조용히 지나가지 않게).
+const REQUIRE = process.env.LT_LOGO_HOME_REQUIRE === '1';
+const DIST_HOME = existsSync(new URL('../dist/v41/home.html', import.meta.url));
 let chromium = null, launchOptions = {}, browserSkip = '';
 try {
   ({ chromium } = await import('playwright'));
@@ -148,9 +152,10 @@ try {
   else launchOptions = { executablePath: exe };
 } catch { browserSkip = 'playwright 패키지가 없어 로고 화면 시험을 건너뜀'; }
 
-if (!browserSkip) {
+if (!browserSkip && (DIST_HOME || REQUIRE)) {
   const { serve } = await import('./helpers/screen-audit.mjs');
   test('로그인 전 다섯 화면 × 로고 클릭 → 첫 화면·#home', { timeout: 90000 }, async () => {
+    assert.ok(DIST_HOME, '빌드 결과(dist/v41/home.html)가 없다 — npm run build 뒤 실행(REQUIRE=1에서는 건너뜀=실패)');
     const server = await serve();
     const port = server.address().port;
     let browser = null;
@@ -218,6 +223,11 @@ if (!browserSkip) {
       server.close();
     }
   });
+} else if (REQUIRE) {
+  test('로그인 전 다섯 화면 × 로고 클릭 — REQUIRE인데 실행 불가', () => {
+    throw new Error((browserSkip || '빌드 결과(dist/v41/home.html)가 없다 — npm run build 필요') + ' (REQUIRE=1: 건너뜀=실패)');
+  });
 } else {
-  test('로그인 전 다섯 화면 × 로고 클릭 — 건너뜀: ' + browserSkip, { skip: browserSkip }, () => {});
+  const why = browserSkip || '빌드 결과가 없어 로고 화면 시험을 건너뜀(npm run build 뒤 실행)';
+  test('로그인 전 다섯 화면 × 로고 클릭 — 건너뜀: ' + why, { skip: why }, () => {});
 }
