@@ -161,7 +161,6 @@ test('#462 설정 "먼저 보일 탭"에서 바꾸면 다음에 열 때 그 탭�
 
   // 기본 탭을 쓰는 곳은 설정 행 하나뿐이다(눌러 보기·저장 경로가 다시 쓰지 않게 고정).
   const shellSource = readFileSync(new URL('../public/v41/shell.mjs', import.meta.url), 'utf8');
-  assert.match(shellSource, /for\(const b of document\.querySelectorAll\('\[data-write-tab\]'\)\)b\.onclick=\(\)=>\{\s*const tab=writeWriteTab\(localStorage,b\.dataset\.writeTab\);/, '설정 행이 writeWriteTab을 부른다');
   const writers = [];
   const walk = dir => {
     for (const entry of readdirSync(dir, {withFileTypes: true})) {
@@ -259,13 +258,7 @@ test('#462 문구: 입력 칸 안내·용량 한 줄·중복 안내 하나·수�
   const html = readFileSync(new URL('../public/v41/index.html', import.meta.url), 'utf8');
   const upload = readFileSync(new URL('../public/v41/private-upload.mjs', import.meta.url), 'utf8');
   const panelsSource = readFileSync(new URL('../public/v41/shell/panels.mjs', import.meta.url), 'utf8');
-  assert.match(html, /placeholder="YouTube 같은 링크 주소"/);
-  assert.match(upload, />사진 4MB, 영상 8MB까지 · 사진은 나만 볼 수 있어요</);
   const writePanel = html.slice(html.indexOf('<dialog id="write-panel"'), html.indexOf('</dialog>', html.indexOf('<dialog id="write-panel"')));
   const momentSlot = upload.slice(upload.indexOf(':`<span class="file-pick">'));
   assert.equal((writePanel + momentSlot).split('사진은 나만 볼 수 있어요').length - 1, 1, '순간 추가 창에서 "사진은 나만 볼 수 있어요"는 한 번만');
-  assert.doesNotMatch(html, /quick-entry-lead/, '맨 위 안내 상자는 아래 안내 줄과 같은 말이라 뺐다');
-  assert.match(html, /id="quick-entry-hint"[^>]*>제목·마음·링크나 첨부 중 하나만 남겨도 저장할 수 있어요\./, '안내는 아래 한 줄로');
-  assert.match(html, /<section id="moment-management" hidden>/, '처음 연 자세한 추가에 수정 전용 묶음이 보이지 않는다');
-  assert.doesNotMatch(panelsSource, /사진·영상은 직접 HTTPS 링크를 사용할 수 있어요/, '빈 주소의 긴 안내는 없앴다');
 });

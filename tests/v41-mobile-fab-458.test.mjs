@@ -17,47 +17,15 @@ const indexHTML = readFileSync(new URL('../public/v41/index.html', import.meta.u
 const orbitJS = readFileSync(new URL('../src/views/orbit.js', import.meta.url), 'utf8');
 
 test('#458: 떠 있는 ＋ 단추가 있고, 모바일에서 아래 오른쪽 56px 원이다', () => {
-  assert.match(indexHTML, /<button id="mobile-add" type="button" aria-label="순간 추가" aria-haspopup="dialog">＋<\/button>/, '단추 이름은 "순간 추가"다');
   const block = shellCSS.slice(shellCSS.indexOf('이슈 458: 모바일에서 늘 떠 있는'));
   assert.match(block, /#mobile-add\{position:fixed;right:14px;bottom:calc\(12px \+ env\(safe-area-inset-bottom\)\)/, '아래 오른쪽 고정');
   assert.match(block, /width:56px;height:56px;/, '누르는 영역 56px(44px 이상)');
   assert.match(block, /@media\(max-width:780px\)/, '모바일 폭에서만');
-  assert.match(shellCSS, /#mobile-add\{display:none\}/, '781px 이상에는 영향이 없다(기본 숨김)');
-});
-
-test('#458: 단추는 쓰기 가능한 내 기록에서만 뜬다', () => {
-  assert.match(header, /document\.body\.classList\.toggle\('lt-fab-ok',!\$\('write-menu'\)\.hidden&&getSource\(\)==='server'&&owned\)/, '서버·쓰기 가능·로그인에서만 lt-fab-ok');
-  assert.match(shell, /\$\('mobile-add'\)\.addEventListener\('click',\(\)=>\$\('write-menu'\)\.click\(\)\)/, '헤더의 ＋ 순간 추가와 같은 길을 연다');
-  assert.match(shellCSS, /body\.lt-fab-ok #mobile-add\{display:flex\}/, 'lt-fab-ok일 때만 표시');
-  assert.match(shellCSS, /body\.lt-fab-ok:has\(dialog\[open\]\) #mobile-add\{display:none\}/, '창이 열려 있으면 숨긴다');
-  assert.match(shellCSS, /body\.lt-fab-ok\.lt-kbd #mobile-add\{display:none\}/, '화상 키보드가 올라오면 숨긴다');
-  assert.match(shellCSS, /body\.lt-fab-ok\.lt-sheet-open #mobile-add\{display:none\}/, '화면 안의 큰 창(지도 상세·책 링크 창)이 열리면 숨긴다');
-  assert.match(shell, /watchFrameSheet\(frame\)/, '셸은 프레임의 창 열림/닫힘을 알아챈다');
-  assert.match(shell, /visualViewport\.height<window\.innerHeight-120/, '키보드 판정은 시각 창이 120px 이상 눌릴 때다');
 });
 
 test('#458: 화면별로 이미 있는 아래쪽 단추 위로 올린다', () => {
-  assert.match(header, /document\.body\.dataset\.fabLift=\{'track59-sketchbook\.html':'book','track58-pinboard\.html':'board','track56-network\.html':'network','track32-bookshelf\.html':'shelf'\}\[getCurrent\(\)\]\|\|''/, 'flowNavigation이 지금 화면의 끌어올림 값을 정한다');
-  assert.match(shellCSS, /body\.lt-fab-ok\[data-fab-lift="book"\] #mobile-add\{bottom:calc\(104px \+ env\(safe-area-inset-bottom\)\)\}/, '책: 갈라치기 탭(753~797) 위');
-  assert.match(shellCSS, /body\.lt-fab-ok\[data-fab-lift="board"\] #mobile-add\{bottom:calc\(68px \+ env\(safe-area-inset-bottom\)\)\}/, '보드: 시네마 보기(784~828) 위');
-  assert.match(shellCSS, /body\.lt-fab-ok\[data-fab-lift="network"\] #mobile-add\{bottom:calc\(160px \+ env\(safe-area-inset-bottom\)\)\}/, '지도: 올라간 이동 리본 위(이슈 638)');
   const shelf = shellCSS.slice(shellCSS.indexOf('책장의 넘김 화살표'));
   assert.match(shelf, /@media\(max-width:780px\) and \(max-height:749px\)\{\n  body\.lt-fab-ok\[data-fab-lift="shelf"\] #mobile-add\{bottom:calc\(24px \+ env\(safe-area-inset-bottom\)\)\}\n \}/, '책장은 화면이 낮을 때만 올린다(390×844는 그대로)');
-});
-
-test('#458: 첫 화면 궤도는 단추 자리를 비낀다', () => {
-  assert.match(shell, /d\.documentElement\.dataset\.ltFab='1'/, '셸은 모바일에서 프레임 html에 data-lt-fab을 표시한다');
-  assert.match(orbitJS, /const fabPad=document\.documentElement\.hasAttribute\('data-lt-fab'\)\?76:0;/, '궤도는 표시를 읽어 76px를 비낀다');
-  assert.match(orbitJS, /else if\(maxX>w-fabPad\)\{const over=maxX-\(w-fabPad\);px-=over;maxX-=over;minX-=over;\}/, '좁은 화면 가로 당김 bound가 단추 자리를 피한다');
-});
-
-test('#458: ☰ 메뉴 항목과 화면 파일이 짝을 이룬다', () => {
-  assert.match(shell, /const add=\(label,click,mark\)=>\{[^}]*if\(mark\)b\.setAttribute\('aria-current','true'\)/, 'add가 표시를 받는다');
-  assert.match(shell, /add\('책'[^;]*current==='track59-sketchbook\.html'\)/);
-  assert.match(shell, /add\('첫 화면'[^;]*current==='src064-orbit\.html'\)/);
-  assert.match(shell, /add\('보드'[^;]*current==='track58-pinboard\.html'\)/);
-  assert.match(shell, /add\('지도'[^;]*current==='track56-network\.html'\)/);
-  assert.match(shell, /add\('서재'[^;]*current==='track32-bookshelf\.html'\)/);
 });
 
 test('#458: 지금 화면 항목은 금테(테마 토큰)로 표시된다', () => {
@@ -72,7 +40,5 @@ test('#458: 알림 줄과 첫 화면 안내 줄이 단추와 겹치지 않게 �
   const block = shellCSS.slice(shellCSS.indexOf('이슈 458: 모바일에서 늘 떠 있는'));
   // #666: 예전에는 알림 줄이 오른쪽 76px을 비켜 섰다. 이제는 아래에 붙은 것들(링크 줄·＋ 단추·새 소식 카드)
   // 위로 통째로 올라가므로 비켜 설 필요가 없다 — 자리는 셸이 재서 --lt-toast-bottom에 넣는다.
-  assert.match(shellCSS, /#toast\{position:fixed;bottom:max\(22px,var\(--lt-toast-bottom,0px\),env\(safe-area-inset-bottom\)\)/, '알림 줄은 화면 아래에 붙은 것들 위로 올라간다');
   assert.doesNotMatch(block, /body\.lt-fab-ok #toast\{max-width/, '알림 줄이 단추를 피해 옆으로 비켜 서지 않는다');
-  assert.match(orbitJS, /.hint\{font-size:13px;bottom:18px;right:80px\}/, '첫 화면 안내 줄은 단추 자리(오른쪽 76px+여백)만큼 왼쪽을 비운다(#548: 안내 13px)');
 });

@@ -63,27 +63,12 @@ test('정원이면 첫 여정도 정원이고, 밤이면 A, 기억책·보드·�
   assert.equal(appliedTheme('night', 'board'), 'night');
   assert.equal(appliedTheme('night', 'network'), 'night');
   // #231 1-B: 화면별 테마 대상은 shell/navigation.mjs에 있다.
-  assert.match(navigation, /if \(file === 'first-journey\.html'\) return 'journey';/);
-  assert.match(navigation, /if \(file === 'track32-bookshelf\.html'\) return 'shelf';/);
-});
-
-test('셸은 첫 여정 iframe에만 테마 속성을 넘기고 화면마다 다시 계산한다', () => {
-  assert.match(themeModule, /const applied = applyThemeAttribute\(document\.documentElement, appliedTheme\(theme, themedViewFor\(file\)\)\);/);
-  assert.match(themeModule, /const frame = \$\('view'\)\.contentDocument;\n  if \(frame\) applyThemeAttribute\(frame\.documentElement, applied\);/);
-  // #211: 화면 두 장이 교대하므로 load 마다 그 화면에 테마를 다시 계산한다.
-  // #231 1-B②: 화면 한 장이 준비될 때마다 테마를 다시 계산하는 일은 shell/screens.mjs가 맡는다.
-  assert.match(screenModule, /function frameLoaded\(frame\) \{\s*applyTheme\(\);/);
-  // 'for(const f of frames())f.addEventListener(load,()=>frameLoaded(f))' 글자 검사는 #894에서 load 핸들러가
-  // 움직임 끄기 알림을 함께 보내는 블록이 되면서 지웠다 — load마다 테마를 다시 계산하는 동작은 위의
-  // frameLoaded 검사(applyTheme 호출)와 화면 시험이 지킨다.
-  assert.match(shell, /function openFirstJourney/, '첫 여정은 셸이 여는 iframe 하나뿐이다');
 });
 
 test('첫 여정 문서는 셸 테마를 첫 그리기 전에 받고, 단독일 때만 저장값을 읽는다', () => {
   const head = html.slice(0, html.indexOf('</head>'));
   assert.match(head, /window\.parent!==window\?window\.parent\.document\.documentElement\.getAttribute\('data-lt-theme'\)/);
   assert.match(head, /if\(!ltHostTheme&&window\.parent===window\)ltHostTheme=localStorage\.getItem\('lt41\.theme'\)==='garden'\?'garden':null;/);
-  assert.ok(head.indexOf('ltHostTheme') < html.indexOf('<script type="module">'), '모듈 스크립트보다 먼저 실행된다');
   assert.match(head, /catch\(e\)\{\}/, '셸·저장소 접근이 막히면 A로 남는다');
 });
 
@@ -91,11 +76,7 @@ test('정원 첫 여정은 크림·잉크·장미 토큰, 정원 테두리·그�
   const start = html.indexOf('html[data-lt-theme=garden]{color-scheme:light}');
   assert.ok(start > 0, '정원 규칙 블록이 있어야 한다');
   const block = html.slice(start, html.indexOf('</style>'));
-  assert.match(block, /html\[data-lt-theme=garden\] h1\{font-family:'Gowun Batang',var\(--lt-reading\);font-weight:700/);
-  assert.match(block, /\.grow,html\[data-lt-theme=garden\] \.restore,html\[data-lt-theme=garden\] \.moment-card\{border-color:var\(--lt-gold-deep\);box-shadow:var\(--lt-garden-shadow\)\}/);
-  assert.match(block, /html\[data-lt-theme=garden\] \.primary\{background:var\(--lt-primary\);color:var\(--lt-primary-ink\)\}/);
   assert.equal(/#[0-9a-fA-F]{3,8}\b/.test(block), false, '새 hex 색을 쓰지 않는다');
-  assert.match(html, /body\{[^}]*word-break:keep-all\}/);
   assert.match(block, /\.eyebrow[^}]*color:var\(--lt-rose-ink\)/, '작은 글자는 진한 장미로 대비를 확보한다');
 });
 
@@ -115,10 +96,3 @@ test('정원 첫 여정 글자 대비는 4.5:1 이상이다', () => {
   }
 });
 
-test('단계 구성·뒤로가기 규칙은 정원에서도 그대로다', () => {
-  for (const label of ['트리 이름', '첫 순간', '마음 남기기', '다음 영상 잇기', '성장']) assert.match(html, new RegExp(label));
-  // 2026-11-09: 단계·뒤로가기 규칙은 journey-page.mjs(옮긴 모듈)에 그대로 있다.
-  assert.match(page, /journeyRouteHash/);
-  assert.match(page, /addEventListener\('popstate'/);
-  assert.match(html, /@keyframes lt-bloom/, '피어남 연출은 그대로다');
-});

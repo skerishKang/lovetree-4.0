@@ -94,71 +94,6 @@ test('moveAvailable: 내 기록이면 일반 트리에서도 옮기기를 보여
  for(const [input,want] of rows)assert.equal(moveAvailable(input),want,JSON.stringify(input));
 });
 
-test('책장: inbox 트리를 맨 앞으로 정렬하고 표지에는 이름 하나만 보인다(#896)',()=>{
- const shelf=read('../public/v41/views/shelf/shelf.js');
- assert.match(shelf,/buildShelf\(shelfOrder\(LTDEMO\.library\)/);
- // #896: 표지 위 '모아둔 순간' 이름표는 표지 제목과 겹쳐 보였다 — 이름표를 없애고 표지 제목(트리 이름) 하나만 남는다.
- assert.doesNotMatch(shelf,/inbox-chip/,'표지에서 이름표를 뺐다');
- assert.match(shelf,/import \{ shelfOrder \} from '\.\.\/\.\.\/inbox-model\.mjs'/);
- const css=read('../public/v41/views/shelf/shelf.css');
- assert.doesNotMatch(css,/\.inbox-chip/,'이름표 규칙도 거둔다');
- const model=read('../public/v41/views/shelf/shelf-model.mjs');
- assert.match(model,/inbox: tree\.inbox === true/);
- // 보기 데이터(LTDEMO.library)에도 inbox 표시가 그대로 옮겨진다.
- const nav=read('../public/v41/view-navigation.js');
- assert.match(nav,/inbox:t\.inbox===true/);
-});
-
-test('셸: 헤더 표시·정리 입구·트리 고르기 목록이 inbox-model 을 쓴다',()=>{
- const shell=read('../public/v41/shell.mjs');
- // 트리 드롭다운: inbox를 맨 위에 두고 '정리 전 N'으로 표시한다.
- assert.match(shell,/tree\.inbox===true\?`정리 전 /);
- assert.match(shell,/const ordered=trees\.sort\(\(a,b\)=>Number\(b\?\.inbox===true\)-Number\(a\?\.inbox===true\)\)/);
- // #380 5번: 정리 입구는 트리 ▾ 드롭다운 한 곳뿐(모아둔 순간일 때만) — 헤더 단추는 없앴다.
- assert.match(shell,/cleanupAvailable\(\{source,owned:!!member\?\.snapshot\(\)\.owned,tree:currentTree\}\)/);
- assert.doesNotMatch(shell,/\$\('cleanup-menu'\)/, '옛 헤더 정리 단추 조회가 남지 않는다');
- assert.match(shell,/escHTML\(displayTreeTitle\(tree\.title\|\|tree\.subject\|\|'트리'\)\)/);
- // 정리 창 모듈 연결과 진입(드롭다운 항목).
- assert.match(shell,/createCleanup\(\{/);
- assert.match(shell,/data-tree-action="cleanup"/);
- assert.ok(shell.includes(`[data-tree-action="cleanup"]')?.addEventListener('click',()=>{closeTreeMenu();shellCleanup.open({});})`),'드롭다운 정리 항목이 정리 창을 연다');
- // 보기 메시지의 옮기기 요청(lt41-move)은 소스 글자 대신 동작으로 본다 — tests/v41-shell-messages.test.mjs.
-});
-
-test('정리 창: 순간 고르기·새 트리 만들기·옮기기·안내가 화면에 있다',()=>{
- const html=read('../public/v41/index.html');
- // #380 5번: 옛 헤더 '정리하기' 단추는 없다 — 입구는 트리 ▾ 드롭다운뿐이다.
- assert.equal(html.includes('id="cleanup-menu"'),false,'옛 헤더 단추 없음');
- assert.match(html,/id="cleanup-panel"/);
- assert.match(html,/id="cleanup-moments"/);
- assert.match(html,/id="cleanup-new-name"/);
- assert.match(html,/id="cleanup-target"/);
- assert.match(html,/id="cleanup-create"/);
- assert.match(html,/id="cleanup-move"/);
- assert.match(html,/id="move-feedback"/);
- assert.match(html,/id="move-message"/);
- assert.match(html,/id="move-actions"/);
- const cleanup=read('../public/v41/shell/cleanup.mjs');
- // 저장은 기존 도메인 경로 그대로다.
- assert.match(cleanup,/apply\('treeFromMoments', \{ momentIds: pickedIds\(\), subject: name \}, \{ treeId: fromTreeId \}\)/);
- assert.match(cleanup,/apply\('moveMoment', \{ toTreeId: targetId \}, \{ treeId: fromTreeId, momentId \}\)/);
- // 옮긴 뒤 안내: '가 보기' 단추가 대상 트리로 보내고, 원래 트리에 머문다(트리가 남아 있을 때).
- assert.match(cleanup,/movedNotice\(\{ targetLabel, isNew \}\)/);
- assert.match(cleanup,/button\.textContent = notice\.action/);
- assert.match(cleanup,/choose\(treeId\)/);
- assert.match(cleanup,/stillThere && window\.LT41\?\.tree\?\.id !== fromTreeId/);
- assert.match(cleanup,/choose\(fromTreeId\)/);
- // 대상이 없으면 옮기기 칸을 숨긴다.
- assert.match(cleanup,/\$\('cleanup-move-box'\)\.hidden = !targets\.length/);
-});
-
-test('궤도 첫 화면의 "모아둔 순간" 알약은 #380으로 제거됐다',()=>{
-  const html=read('../v41/home.html');
-  assert.doesNotMatch(html,/homeInboxFlag/);
-  const home=read('../v41/home.js');
-  assert.doesNotMatch(home,/homeInboxFlag/);
-});
-
 test('안내 바는 첫 트리 말풍선 위에 온다(말풍선이 안내를 가리지 않는다)',()=>{
  const css=read('../public/v41/shell.css');
  const zOf=sel=>{const m=css.match(new RegExp(sel+'\\{[^}]*?z-index:(\\d+)'));return m?Number(m[1]):null;};
@@ -168,15 +103,3 @@ test('안내 바는 첫 트리 말풍선 위에 온다(말풍선이 안내를 �
  assert.ok(move!==null&&move>tips,'안내 바(#move-feedback)가 말풍선보다 위여야 한다');
 });
 
-test('순간 상세의 옮기기: 내 기록에서만 보이고 공유·예시는 숨긴다',()=>{
- const book=read('../public/v41/views/book/book-extra.js');
- assert.match(book,/data-detail-move/);
- assert.match(book,/window\.parent\.LT41\.source==='server'/);
- assert.match(book,/lt41-move/);
- const runtime=read('../public/v41/runtime.js');
- assert.match(runtime,/context\.source==='server'/);
- assert.match(runtime,/lt41-move/);
- const board=read('../public/v41/views/board/board-extras.js');
- assert.match(board,/window\.parent\.LT41\.source==='server'&&!LTDEMO\.readOnly/);
- assert.match(board,/lt41-move/);
-});

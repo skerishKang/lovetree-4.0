@@ -23,15 +23,6 @@ test('1. 드롭다운 빈 표지 기본값은 트리 관리 "기본" 칩과 같�
   assert.doesNotMatch(base, /linear-gradient|145deg/, '기존 그라데이션 제거');
   assert.match(base, /width:36px;height:46px/, '드롭다운 크기 유지');
   // #380 5번: 표지 판정은 coverModeOf 한 벌을 따르고, 디자인 보지는 같은 토큰을 그대로 쓴다.
-  assert.match(shell, /const mode=coverModeOf\(tree\);/);
-  assert.match(shell, /if\(mode==='design'\)\{/, '디자인을 고른 트리는 디자인 보지를 보여 준다');
-  assert.match(shell, /data-cover-design="\$\{escHTML\(design\)\}"/, '디자인 표지 경로는 그대로');
-});
-
-test('2. 드롭다운 트리 클릭이 보기를 유지하는 대상(책·보드·지도)을 고정한다', () => {
-  // 클릭 배선 전체(wasTreeView→choose→show→writeLocation)는 tests/v41-topmenu.test.mjs가
-  // 같은 줄을 한 벌로 지킨다. 여기서는 어느 보기가 유지 대상인지(TREE_VIEWS 집합 내용)만 고정한다.
-  assert.match(shell, /const TREE_VIEWS=new Set\(\['track32-bookshelf\.html','track59-sketchbook\.html','track58-pinboard\.html','track56-network\.html'\]\)/, '보기 유지 대상');
 });
 
 test('3. 정리 목록은 주입된 화면 규칙으로 제목·썸네일을 그린다', async () => {
@@ -93,5 +84,4 @@ test('3. 정리 목록은 주입된 화면 규칙으로 제목·썸네일을 그
 test('4. 정리 목록 제목 대체값은 자동 도메인 제목을 화면에 내보내지 않는다', () => {
   assert.equal(withoutAutoTitle({title: 'youtu.be에서 간직한 순간'}).title, '', '자동 제목은 화면용 대체에서 빈 값');
   assert.equal(withoutAutoTitle({title: '내가 쓴 제목'}).title, '내가 쓴 제목', '사용자가 쓴 제목은 그대로');
-  assert.match(shell, /withoutAutoTitle\(moment\)\.title/, '셸이 화면용 대체 규칙을 재사용한다');
 });

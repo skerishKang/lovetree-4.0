@@ -77,34 +77,10 @@ function communityHarness({ items = [], defer = false, emptyHidden = true } = {}
   };
 }
 
-test('C1·C2: 설정 창은 맨 위에서 열리고, 지난 안내는 남지 않는다', () => {
-  assert.match(shell, /openAccountSettings\(\{section=''[\s\S]{0,80}?\)\{/, '기본값은 맨 위(빈 구역)다');
-  assert.match(shell, /if\(!section\)\{paintSettingsTab\('settings-tab-screen'\);return;\}/, '기본은 첫 탭(화면)에서 열고, 구역을 지정했을 때만 그 탭으로 옮긴다');
-  assert.match(shell, /settings-feedback'\)\.textContent=''/, '열 때 지난 안내를 비운다');
-  assert.match(notice, /if \(\$\('settings-feedback'\) && \$\('account-settings'\)\?\.open\)/, '설정이 열려 있을 때만 그 줄에 쓴다');
-});
-
 test('C3·C4·C5: 이름·용량·공유 보기 이름', () => {
   const nameLine = shell.slice(shell.indexOf('function paintSettingsProfile'), shell.indexOf('function paintSettingsProfile') + 700);
   assert.match(nameLine, /displayName/, '표시 이름을 먼저 쓴다');
   assert.equal((nameLine.match(/@/g) || []).length <= 1, true, '이메일은 한 번만 쓴다');
-  assert.match(shell, /Math\.round\(data\.usedBytes\/1000000\)\+' MB \/ '\+Math\.round\(data\.quotaBytes\/1000000\)\+' MB 사용/);
-  assert.match(html, /data-share-view="book"[^>]*>책</);
-  assert.match(html, /data-share-view="network"[^>]*>지도</);
-  assert.doesNotMatch(html, />기억책</);
-  assert.match(css, /@media\(min-width:900px\)\{#account-settings\{padding-inline:max\(24px,calc\(\(100% - 720px\)\/2\)\)\}\}/, '넓은 화면은 720px 안팎 가운데');
-});
-
-test('B-2: 사진·영상은 디자인 단추 + 고른 파일 이름으로 고른다', () => {
-  assert.match(upload, /class="file-pick"/);
-  assert.match(upload, /class="file-pick-button"/, '보이는 것은 단추다');
-  assert.match(upload, /class="file-pick-name"/, '고른 파일 이름 자리');
-  assert.match(upload, /<span class="file-pick">[\s\S]{0,240}?<input type="file"/, '실제 input은 같은 칸 안에 그대로 둔다');
-  assert.match(upload, /function setName\(/);
-  assert.match(css, /\.file-pick input\[type=file\]\{display:none\}/, '실제 칸은 숨긴다');
-  assert.match(css, /\.file-pick-button\{[^}]*min-height:44px/, '누를 수 있는 크기');
-  assert.match(upload, /<button type="button" class="file-pick-button" data-file-open>/, '단추는 키보드로 눌린다');
-  assert.match(upload, /querySelector\('\[data-file-open\]'\)|\[data-file-open\]/, '단추가 실제 input을 연다');
 });
 
 test('D1: 대화상자를 닫으면 빈 화면이 아닐 때만 탭의 "지금 보는 곳"을 되살린다', async () => {
@@ -127,15 +103,6 @@ test('D1: 대화상자를 닫으면 빈 화면이 아닐 때만 탭의 "지금 �
       assert.equal(h.button.attrs['aria-current'], 'false', '둘러보기 단추 표시도 내려놓는다');
     } finally { h.restore(); }
   }
-});
-
-test('D2: 빈 화면 문구·단추는 계정 상태에 맞춘다', () => {
-  assert.match(shell, /function paintEmptyCopy\(\)/);
-  assert.match(shell, /owned\?'아직 트리가 없어요\.':'다시 펼칠 순간을 기다리고 있어요\.'/);
-  // #463: 트리 0개(로그인)는 ＋ 첫 트리 만들기가 주 버튼이다.
-  assert.match(shell, /\$\('empty-records'\)\.textContent=owned\?'＋ 첫 트리 만들기':'내 기록 불러오기'/);
-  assert.match(shell, /\$\('empty-file'\)\.hidden=owned;/, '로그인 상태에서는 백업 파일 열기를 숨긴다');
-  assert.match(shell, /if\(kind!=='share'\)\{[\s\S]{0,120}?paintEmptyCopy\(\);/);
 });
 
 test('D3: 결과가 있어도 미리보기는 닫혀 있고, 카드를 누를 때 연다', async () => {

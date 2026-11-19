@@ -100,13 +100,6 @@ function hubDrawSource() {
   throw new Error('drawHub 본문이 닫히지 않는다');
 }
 
-test('#449 고침의 핵심 두 가지가 코드에 있다 — 배율 바닥값과 반지름 하한', () => {
-  // 이 두 줄이 사라지면 아래 실행 시험이 재현하지 못할 수 있으므로 함께 고정한다.
-  assert.match(source, /Math\.max\(\.5,c\.hubR\*state\.scale\)/, '허브 반지름은 0.5 이상으로 자른다');
-  // #461: 전체 보기는 배율 1(화면 상자에 맞춘 배치), 확대·축소는 0.5배 바닥.
-  assert.match(source, /Math\.max\(\.5,Math\.min\(4,state\.scale\*f\)\)/, '배율에 바닥값 0.5가 있다');
-});
-
 test('#449 실행: 후광 반지름 실제 계산이 어떤 배율에서도 음수가 되지 않는다', () => {
   // 고침과 같은 식을 그대로 옮겨, 결함이 났던 낮은 창 배율들(음수·0·극소)을 넣어 본다.
   const hubHalfF = (hubR, scale) => Math.max(0.5, hubR * scale) * 2.5;

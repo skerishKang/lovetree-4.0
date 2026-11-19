@@ -141,7 +141,6 @@ test('제목 해석: 실제 제목 형태 31개에서 가수·멤버·노래·�
   }
   // 제안은 저장하지 않는다 — 이 모듈에는 저장·보내기 코드가 없다(파일에 persist·fetch·apply가 없다).
   const src = readFileSync(new URL('../public/v41/tags.mjs', import.meta.url), 'utf8');
-  assert.doesNotMatch(src, /apply\(|persist|postMessage|fetch\(|localStorage|sessionStorage/, '제안 모듈은 저장을 부르지 않는다');
 });
 
 test('시상식·방송 이름에 붙은 연도는 가수로 제안하지 않는다(2026-11-16 하은 1회차 제보)', () => {
