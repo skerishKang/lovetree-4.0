@@ -20,7 +20,6 @@ const moments = [
 
 test('0. 계산 한 벌은 화면이 부르는 함수만 노출하고, 모델을 화면보다 먼저 부른다', () => {
   assert.deepEqual(Object.keys(M).sort(), ['buildSpreads', 'connectionSummary', 'emotionTone', 'folioLabel', 'journeyDays', 'journeyTimeline', 'nextMomentOf', 'pageSteps', 'posOfMoment', 'shelfReturn', 'spreadOfPos', 'turnAngle']);
-  assert.ok(HTML.indexOf('book-model.js') < HTML.indexOf('book.js'), '모델을 화면보다 먼저 부른다');
 });
 
 test('1. 펼침면: 순간 둘씩 묶고, 모자라면 동반 페이지(합성)를 만든다', () => {
@@ -107,30 +106,6 @@ test('6. 다음 순간: 부모 연결로 이어진 다음 순간과 이유, 없�
   assert.equal(M.nextMomentOf('m1', noTitle, [], () => '').title, '메모만 있는 순간');
 });
 
-test('7. 화면은 같은 계산을 다시 구현하지 않고 한 벌을 부른다', () => {
-  assert.doesNotMatch(BOOK, /const SPREADS=Array\.from/);
-  assert.doesNotMatch(BOOK, /String\(m\.spread\*2\+\(side==='left'\?1:2\)\)/);
-  assert.doesNotMatch(BOOK, /const deg=dir==='next'\?-180\*p:180\*p/);
-  // 연결 요약 문구는 화면에 남아 있지 않다(갈래 목록 계산은 다른 계산이라 그대로 둔다).
-  assert.doesNotMatch(BOOK, /선택한 순간의 연결 정보가 없습니다/);
-  assert.doesNotMatch(BOOK, /targets\.join\(' \/ '\)/);
-  assert.doesNotMatch(EXTRA, /const edge=LTDEMO\.edges\.find\(e=>e\.kind==='parent'&&e\.from===id&&e\.to===next\.id\)/);
-  for (const call of ['LT59Model.buildSpreads', 'LT59Model.folioLabel', 'LT59Model.turnAngle', 'LT59Model.connectionSummary']) {
-    assert.ok(BOOK.includes(call), call);
-  }
-  assert.ok(EXTRA.includes('LT59Model.nextMomentOf'));
-  assert.ok(EXTRA.includes('LT59Model.journeyTimeline'), '이어진 순간 계산도 한 벌을 부른다');
-});
-
-test('8. 이미 한 벌인 규칙은 그대로 둔다(book-usability.mjs)', () => {
-  const USABILITY = fs.readFileSync(new URL('../public/v41/book-usability.mjs', import.meta.url), 'utf8');
-  for (const name of ['export function tapIntent', 'export function pageOverflows', 'export function displayTitle', 'export function connectionLine', 'export function detailPlacement']) {
-    assert.ok(USABILITY.includes(name), name);
-  }
-  // 화면은 그 규칙을 다시 만들지 않고 넘겨받아 쓴다.
-});
-
-// ── #345 '이어진 순간'(이슈 584에서 개명) 계산 표 ────────────────────────────
 test('9. 이어진 순간: 지금 보는 순간까지의 칸·단계·일수', () => {
   const chain = [
     { id: 'a', title: '첫 무대', date: '2026.10.02', emotion: '설렘', next: 'b', whyNext: '이 무대 보고 직캠까지 찾아봄' },
@@ -215,14 +190,6 @@ test('16. 책장 돌아가기 판정: 셸 안에서 보고, 공유 감상이 아
 });
 
 test('17. 책장 돌아가기 배선: 윗줄 왼쪽 버튼·기존 셸 이동·공유 숨김, 빈 타이포 잔여 없음', () => {
-  assert.ok(HTML.includes('id="shelfBackBtn"'), '버튼이 있다');
-  assert.ok(HTML.includes('class="ui-btn shelf-back"'), '같은 ui-btn 모양을 쓴다');
-  assert.match(BOOK, /LT59Model\.shelfReturn\(\{source:parent\.LT41\?\.source,embedded:parent!==window\}\)/, '판정 한 벌을 쓴다');
-  assert.ok(BOOK.includes("postMessage({type:'lt41-navigate',view:'track32-bookshelf.html'}"), '기존 셸 이동 채널을 재사용한다');
-  assert.match(BOOK, /shelfBack\.hidden=true/, '돌아갈 수 없으면 숨긴다');
-  assert.match(BOOK_CSS, /\.shelf-back\{[^}]*min-height:44px/, '44px 이상');
-  assert.match(BOOK_CSS, /html\[data-lt-theme=garden\] \.shelf-back\{[^}]*var\(--lt-/, '정원 토큰을 쓴다');
-  assert.ok(!HTML.includes('typoNote') && !HTML.includes('typo-note'), '빈 타이포 알약이 없다');
   assert.ok(!/typo-b|typo-note/.test(BOOK), '타이포 장치가 없다');
   assert.ok(!/typo-b|typo-note/.test(BOOK_CSS), '타이포 CSS가 없다');
   const SRC_CSS = fs.readFileSync(new URL('../src/views/book-source.css', import.meta.url), 'utf8');

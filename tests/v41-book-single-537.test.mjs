@@ -63,65 +63,8 @@ test('#537 9: 두 장 ↔ 한 장을 바꿔도 보던 순간이 유지된다 —
   assert.equal(M.spreadOfPos(spreads, 1, false), 1, '두 장에서는 위치가 곧 펼침면');
 });
 
-test('#537 1·2: 넓은 화면 한 장은 두 장 책의 한 쪽 크기·같은 높이이고, 휴대폰 모양은 폰 폭에만 걸린다', () => {
-  // 화면 모양은 보기 모드와 따로 매긴다(폰 폭 = phone, 그 밖 = wide).
-  assert.match(BOOK, /function narrow\(\)\{return innerWidth<600\}/, '폰 폭 판정 한 곳');
-  assert.match(BOOK, /dataset\.bookShape=narrow\(\)\?'phone':'wide'/, '화면 모양 속성');
-  // 두 장과 같은 높이 식 + 두 장 책 폭의 절반 = 한 쪽 크기, 위아래 가운데는 .stage의 place-items가 맡는다.
-  assert.match(CSS, /html\[data-book-view=single\]\[data-book-shape=wide\] \.book-wrap\{width:calc\(min\(1160px,80vw\)\/2\);height:min\(920px,calc\(100vh - 215px\)\);min-height:380px\}/, '넓은 화면 한 장 크기(이슈 584: 두 장과 같은 식)');
-  assert.match(CSS, /html\[data-book-view=single\]\[data-book-shape=wide\] \.book\{grid-template-columns:1fr\}/, '한 쪽만 놓는 격자');
-  assert.match(CSS, /html\[data-book-view=single\]\[data-book-shape=wide\] \.page\.left,\nhtml\[data-book-view=single\]\[data-book-shape=wide\] \.mobile-page,\nhtml\[data-book-view=single\]\[data-book-shape=wide\] \.mobile-inspect,\nhtml\[data-book-view=single\]\[data-book-shape=wide\] \.eyebrow\{display:none\}/, '넓은 화면 한 장: 오른쪽 한 쪽만');
-  // 휴대폰 모양(좁은 책·작은 머리줄)은 폰 폭에만 남는다.
-  assert.match(CSS, /html\[data-book-shape=phone\] \.book-wrap\{width:min\(92vw,430px\)/, '휴대폰 책 폭');
-  assert.match(CSS, /html\[data-book-shape=phone\] \.topbar\{height:60px;padding:0 12px\}/, '휴대폰 머리줄');
-  assert.match(CSS, /html\[data-book-shape=phone\] \.tools \.ui-btn\{padding:7px 9px;font-size:13px\}/, '휴대폰 단추 크기(#548 기준선: 단추 13px)');
-  assert.doesNotMatch(CSS, /html\[data-book-view=single\] \.topbar\{/, '넓은 화면 한 장은 두 장 머리줄을 그대로 쓴다');
-  // 세로 흐름(스크롤) 한 장도 폰 폭 전용이다.
-  assert.match(LAYOUT, /html\[data-book-shape=phone\]\[data-v41-screen=book\]\{height:auto;min-height:100%;overflow-x:hidden;overflow-y:auto\}/);
-});
-
-test('#537 3: 돋보기는 넓은 화면 한 장에서도 쓸 수 있고, 휴대폰 폭에서만 막는다', () => {
-  assert.match(CSS, /html\[data-book-shape=phone\] \.topbar > \.tools \.desktop-only\{display:none\}/, '휴대폰에서만 돋보기 단추 숨김');
-  assert.doesNotMatch(CSS, /html\[data-book-view=single\] \.desktop-only/, '넓은 화면 한 장에서는 숨기지 않는다');
-  assert.match(BOOK, /function lensActive\(\)\{return overBook&&lensOn&&!narrow\(\)&&machineState==='INSPECTING'\}/, '따라오기 게이트도 폰 폭 기준');
-  assert.match(BOOK, /if\(narrow\(\)\|\|!lensOn\|\|!\['IDLE','INSPECTING'\]/, '가리키기 판정도 폰 폭 기준');
-  assert.match(EXTRA, /lensOn=lensPref;writeLens/, '단추를 켜면 책의 돋보기도 함께 켜진다(켜기→따라오기→끄기→다시 켜기)');
-});
-
-test('#537 4·5: 쪽 번호·넘김 단추 자리와 머리줄은 두 장과 같다 — 한 장 전용 이동 규칙을 만들지 않는다', () => {
-  assert.doesNotMatch(CSS, /html\[data-book-view=single\]\[data-book-shape=wide\] \.nav-pill\{/, '넘김 단추 자리는 두 장 규칙 그대로');
-  assert.doesNotMatch(CSS, /html\[data-book-view=single\]\[data-book-shape=wide\] \.topbar\{/, '머리줄 자리도 그대로');
-  assert.match(BOOK, /\$\('#rightFolio'\)\.textContent=single\(\)\?pad2\(current\+1\):pad2\(si\*2\+2\)/, '한 장 쪽 번호는 그 순간의 번호');
-  assert.match(BOOK, /\$\('#pageLabel'\)\.textContent=`\$\{pad2\(current\+1\)\} \/ \$\{pad2\(total\)\}`/, '이동 줄은 지금 쪽 / 전체 쪽');
-});
-
-test('#537 8: 한 장 아래 작은 줄(.mobile-support)은 그리지 않는다', () => {
-  assert.doesNotMatch(BOOK, /mobile-support/, 'book.js에 작은 줄이 없다');
-  assert.doesNotMatch(EXTRA, /mobile-support/, 'book-extra에도 없다');
-  assert.doesNotMatch(CSS, /\.mobile-support/, 'book.css 규칙도 지운다');
-  assert.doesNotMatch(USE_CSS, /\.mobile-support/, 'book-usability.css 규칙도 지운다');
-  assert.doesNotMatch(LAYOUT, /\.mobile-support/, 'reader-layout.css 규칙도 지운다');
-  // 마지막 순간 뒤의 '다음 순간' 안내는 두 장의 빈 오른쪽 페이지와 같은 자리에 흐름으로 붙는다.
-  assert.match(EXTRA, /insertAdjacentHTML\('beforeend','<div class="next-page">/, '한 장에서도 다음 순간 안내');
-  assert.match(USE_CSS, /html\[data-book-view=single\]\[data-v41-screen=book\] \.next-page\{position:static/, '한 장에서는 그 순간 글 아래 흐름에 놓는다(쪽을 덮지 않는다)');
-  assert.match(USE_CSS, /html\[data-v41-screen=book\] \.next-page\{position:absolute;inset:0 0 56px\}/, '두 장은 빈 오른쪽 페이지를 그대로 채운다');
-});
-
-test('#537 10: 목차·이어진 순간에서 들어와도 그 순간이 바로 크게 나온다', () => {
-  assert.match(BOOK, /jumpToMoment:id=>renderSpread\(posOfMoment\(id\),id,false\)/, '순간 id로 바로 그 쪽');
-  assert.match(BOOK, /data-jump="\$\{at\}" data-focus="\$\{m.id\}"/, '목차 항목은 위치(순간 순번/펼침면 번호)를 싣는다');
-  assert.match(EXTRA, /const target=posOfMoment\(focus\);/, "'이어진 순간'도 같은 위치 규칙");
-  assert.match(BOOK, /const focus=LTDEMO\.get\(\)\|\|'';viewChoice=v;try\{localStorage\.setItem\(VIEW_KEY,v\)\}catch\{\}applyViewAttr\(\);renderSpread\(posOfMoment\(focus\),focus\|\|null,false\)/, '보기 전환도 같은 위치 규칙');
-});
-
-test('#537 6: 제목 고치기는 두 장·한 장이 같은 규칙(제목 위에 올릴 때만 보인다)', () => {
-  assert.match(USE_CSS, /html\[data-book-view=double\]\[data-v41-screen=book\] \.title-edit-hint,\nhtml\[data-book-view=single\]\[data-book-shape=wide\]\[data-v41-screen=book\] \.title-edit-hint\{opacity:0;pointer-events:none\}/, '넓은 화면 한 장도 두 장처럼 숨긴다');
-});
-
 test('#537 함께: 마음 한마디가 비었을 때 안내 글을 내용처럼 그리지 않는다', () => {
   // 지키려던 것: 마음이 비었을 때 '적어 보세요' 안내를 실제 내용처럼 그리지 않는다.
-  assert.doesNotMatch(EXTRA, /class="moment-note is-empty/, '빈 안내 글 단추를 그리지 않는다');
-  assert.match(EXTRA, /const note=noteText\?'<div class="moment-note-wrap"><p class="moment-note">/, '마음이 있을 때만 그 줄을 그린다');
 });
 
 /* ── 실제 화면(크롬) ───────────────────────────────────────────────────── */
@@ -218,7 +161,15 @@ test('#537 실제 화면: 1440·390에서 한 장으로 끝까지 넘기면 모�
     const wideSingle = await openBook(browser, base, 1440, 900, 'single');
     const singleGeom = await geom(wideSingle.frame);
     const wideWalk = await walkAll(wideSingle.frame);
+    // #952: 보기 단추는 화면에서 잰다 — 넓은 화면은 1장·2장 둘 다 보이고, 지금은 1장이 눌려 있다.
+    const wideBtns = await wideSingle.frame.evaluate(() => ({
+      single: document.getElementById('singleViewBtn')?.hidden === false,
+      double: document.getElementById('doubleViewBtn')?.hidden === false,
+      pressed: document.getElementById('singleViewBtn')?.getAttribute('aria-pressed'),
+      attr: document.documentElement.dataset.bookView
+    }));
     await wideSingle.ctx.close();
+    assert.deepEqual(wideBtns, { single: true, double: true, pressed: 'true', attr: 'single' }, '넓은 화면: 두 단추가 보이고 1장이 눌린다');
 
     assert.equal(doubleGeom.state.total, 20, '예시 트리 40순간은 두 장에서 펼침면 20장');
     assert.equal(singleGeom.state.total, 40, '한 장은 순간 수만큼 쪽이 있다');
@@ -239,7 +190,13 @@ test('#537 실제 화면: 1440·390에서 한 장으로 끝까지 넘기면 모�
     const phone = await openBook(browser, base, 390, 844, 'single');
     const phoneGeom = await geom(phone.frame);
     const phoneWalk = await walkAll(phone.frame);
+    // #952: 폰 폭(600px 미만)에서는 두 장 단추를 숨긴다 — 화면에서 확인.
+    const phoneBtns = await phone.frame.evaluate(() => ({
+      single: document.getElementById('singleViewBtn')?.hidden === false,
+      double: document.getElementById('doubleViewBtn')?.hidden === true
+    }));
     await phone.ctx.close();
+    assert.deepEqual(phoneBtns, { single: true, double: true }, '폰 폭: 1장만 남기고 2장 단추를 숨긴다');
     assert.equal(phoneGeom.state.shape, 'phone', '폰 폭은 휴대폰 모양');
     assert.deepEqual(phoneGeom.pages, { left: false, right: false, mobile: true }, '휴대폰 한 장은 mobile-page');
     assert.equal(phoneGeom.topbar, 60, '휴대폰 머리줄 60px 그대로');

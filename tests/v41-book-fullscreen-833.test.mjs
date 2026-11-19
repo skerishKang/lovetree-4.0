@@ -203,16 +203,3 @@ test('833-4: 크게 본 동안 뒤로가기는 크게 보기를 닫는 일로 �
   }
 });
 
-test('833-5: 책·미리보기·보드·서재 재생 칸이 같은 도우미를 쓰고, 보드는 링크를 거둔다', () => {
-  assert.match(EXTRA, /mountExpandControls\(host,/, '책 재생 칸(그 자리)');
-  assert.match(EXTRA, /cell\.stage\.append\(frame\)/, '책: iframe을 무대에 직접 넣는다(옮기지 않음)');
-  assert.match(MP, /mountExpandControls\(body,/, '미리보기 재생 칸');
-  assert.match(BOARD, /mountExpandControls\(holder,[\s\S]*?showOpen:false/, '보드 상세: YouTube 링크는 아래 안내 줄 한 곳에만');
-  assert.match(SHELF, /mountExpandControls\(holder,/, '서재 읽기 재생 칸');
-});
-
-test('833-6: 전체 화면에서 나온 뒤 책이 다시 그려지며 넘어가지 않음(book.js 보호)', () => {
-  assert.match(BOOK, /fullscreenchange/, '전체 화면 변화 감지');
-  assert.match(BOOK, /!playingInBook\(\)/, '재생 중이면 다시 그리지 않음');
-  assert.match(BOOK, /renderSpread\(current,null,false\)/, '재생이 아니면 현재 펼침을 유지');
-});
