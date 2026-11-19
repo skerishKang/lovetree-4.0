@@ -243,6 +243,40 @@ test('#서재 책은 선반에 앉고 옆 책 글자는 축소 없이 실제 크
   assert.match(extra, /html\[data-v41-screen=shelf\] \.book-card \.book-cover-media\{object-position:50% 50%\}/);
 });
 
+// 11-19 대표 결정(#889 원래 결정): 책이 몇 권뿐이면 화면 폭 무관하게 왼쪽부터 책장처럼 나란히,
+// 책장(선반+책)은 남은 화면 세로 가운데, 한 줄에 다 안 들어갈 때만 좌우 화살표.
+test('#서재 책 배치는 화면 폭 무관하게 왼쪽부터 나란히이고 책장 세로 중심은 남은 화면 가운데다', () => {
+  const model = read('public/v41/views/shelf/shelf-model.mjs');
+  assert.match(model, /const fits = needed \+ pad <= railWidth;/, '한 줄에 다 들어가는지로 배치를 정한다');
+  assert.match(model, /const mode = fits \? 'row' : 'carousel';/, '다 들어가면 왼쪽부터, 넘치면 넘김');
+  assert.match(model, /const leftX = cardW \/ 2 - railWidth \/ 2;/, '첫 책 왼쪽 끝 = 책장 안쪽 여백');
+  assert.match(model, /leftX \+ \(index - offset\) \* pitch/, '왼쪽부터 pitch 간격으로 나란히하고 offset만큼 민다');
+  const js = read('public/v41/views/shelf/shelf.js');
+  assert.match(js, /var railWidth=\(\$\('#shelfRail'\)&&\$\('#shelfRail'\)\.clientWidth\)\|\|0;/);
+  assert.match(js, /applyShelfArrows\(list\.length,railWidth\);/);
+  assert.match(js, /applyShelfArrows\(state\.shelfList\.length, rail\.clientWidth\);/, '폭이 정해진 뒤 화살표를 다시 맞춘다');
+  assert.match(js, /placed\.scale=1;placed\.rotate=0;/, '책장은 모든 책을 같은 크기·각도로');
+  const extra = read('public/v41/views/shelf/shelf-extra.css');
+  assert.match(extra, /html\[data-v41-screen=shelf\] \.shelf-viewport\{margin-top:auto;margin-bottom:auto\}/);
+  assert.doesNotMatch(extra, /margin-top: 48px; margin-bottom: auto;/, '큰 화면에서도 책장을 위로 밀지 않는다');
+  assert.match(extra, /html\[data-v41-screen=shelf\] \.page \{ max-width: 1920px; \}/, '큰 화면 폭 확대는 그대로');
+});
+
+// #944: 넘칠 때도 첫 책은 왼쪽 안쪽 여백에서 시작하고, 화살표는 한 칸씩만 민다.
+test('#서재 책이 넘쳐도 첫 책은 왼쪽 끝에서 시작하고 화살표는 한 칸씩만 민다', () => {
+  const model = read('public/v41/views/shelf/shelf-model.mjs');
+  assert.match(model, /const visible = Math\.max\(1, Math\.floor\(\(railWidth - pad - cardW\) \/ pitch\) \+ 1\);/, '레일에 보이는 책 수를 잰다');
+  assert.match(model, /const maxOffset = Math\.max\(0, count - visible\);/, '넘기는 칸 수는 넘친 책 수만큼');
+  assert.match(model, /offsetFor: \(index, current = 0\) =>/, '고른 책이 보이게만 최소로 민다');
+  assert.doesNotMatch(model, /\(index - center\) \* pitch/, '가운데 강제 배치는 없다');
+  const js = read('public/v41/views/shelf/shelf.js');
+  assert.match(js, /shelfOffset:0/, '화살표 위치는 고른 책과 따로 둔다');
+  assert.match(js, /state\.shelfOffset=Math\.max\(0,Math\.min\(layout\.maxOffset,state\.shelfOffset\|\|0\)\);/, '레일 폭에 맞춰 넘김 범위를 지킨다');
+  assert.match(js, /var next=Math\.max\(0,Math\.min\(layout\.maxOffset,\(state\.shelfOffset\|\|0\)\+direction\)\);/, '화살표 한 번 = 한 칸');
+  assert.match(js, /state\.shelfOffset=shelfRowLayout\(list\.length, railWidth\)\.offsetFor\(state\.shelfIndex, state\.shelfOffset\|\|0\);/, '목록을 다시 그릴 때 고른 책이 보이게만 민다');
+  assert.match(js, /offsetFor\(picked,state\.shelfOffset\|\|0\)/, '트리를 고르면 그 책이 보이게만 민다');
+});
+
 // 261118 대표 지적 2차 2: 띠의 바깥 상자는 없고 테두리는 띠 자체의 한 겹이다.
 test('#서재 이어 보기 띠는 바깥 상자 없이 한 겹 테두리로 위쪽에 붙는다', () => {
   const extra = read('public/v41/views/shelf/shelf-extra.css');
