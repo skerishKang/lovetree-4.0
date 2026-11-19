@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync, existsSync} from 'node:fs';
+import {pathToFileURL, fileURLToPath} from 'node:url';
 import {loginUrlWithTheme, homeStartLoginUrl, readLoginIntent, LOGIN_INTENTS} from '../public/v41/header-state.mjs';
 import {memberLoginUrl, MEMBER_LOGIN_URL} from '../public/v41/member-entry.mjs';
 
@@ -134,3 +135,69 @@ test('밤 시안은 장미색을 쓰지 않고, Google 버튼은 공식 로고�
   }
 });
 
+// ─── 이슈 970: 인증 화면(로그인·가입 시안)을 실제로 써 본다 ───
+// 이 저장소의 인증 화면은 docs/design/auth-skin의 시안 4장이다(실제 화면은 auth.padiem.net이 그린다).
+// 시안은 정적 파일이라 파일 주소로 바로 띄운다 — 운영 API·운영 계정을 쓰지 않고, 네트워크 요청 자체가
+// 없어야 한다(외부 요청 0건을 실제 요청 목록에서 센다).
+// 본다 것: 로그인↔가입 전환 링크, 빈 칸 제출이 기본 검증으로 막히며 안내를 내보내고 화면이 그 자리에
+// 남는지, 오류 문구 자리(role=alert)가 창 안·화면 안에 보이는지. 밤·정원 × 1440·390.
+const REQUIRE970A = process.env.LT_970_REQUIRE === '1';
+let chromium970a, skip970a = false;
+try {
+  ({ chromium: chromium970a } = await import('playwright'));
+  if (!existsSync(chromium970a.executablePath())) skip970a = 'Playwright Chromium이 없어 화면 시험을 건너뜀';
+} catch { skip970a = 'playwright 패키지가 없어 화면 시험을 건너뜀'; }
+
+test('970 실행: 로그인·가입 화면은 서로 오가고, 빈 칸 제출은 막히고, 오류 자리가 화면 안에 있다', { skip: skip970a || undefined, timeout: 180000 }, async () => {
+  const fileUrl = (p) => pathToFileURL(fileURLToPath(new URL('../' + p, import.meta.url))).href;
+  const browser = await chromium970a.launch({ headless: true });
+  try {
+    for (const theme of ['night', 'garden']) {
+      for (const width of [1440, 390]) {
+        const ctx = await browser.newContext({ viewport: { width, height: width === 390 ? 844 : 900 }, reducedMotion: 'reduce' });
+        const urls = [];
+        const page = await ctx.newPage();
+        page.on('request', (r) => urls.push(r.url()));
+        await page.goto(fileUrl(`docs/design/auth-skin/login-${theme}.html`), { waitUntil: 'load' });
+
+        // 로그인 → 가입 → 로그인 전환
+        await page.click('a.alt-link');
+        await page.waitForURL(/signup-/, { timeout: 10000 });
+        assert.equal(await page.evaluate(() => document.querySelector('h1')?.textContent.trim()), '이메일로 회원가입', `${theme}·${width}: 가입 화면으로 옮겨진다`);
+        await page.click('a.alt-link');
+        await page.waitForURL(/login-/, { timeout: 10000 });
+        assert.equal(await page.evaluate(() => document.querySelector('h1')?.textContent.trim()), 'LoveTree에 로그인', `${theme}·${width}: 로그인 화면으로 돌아온다`);
+
+        // 빈 칸 제출: 기본 검증이 막고 안내를 내보내며, 화면은 그 자리에 남는다.
+        await page.click('button.submit');
+        const submit = await page.evaluate(() => {
+          const email = document.querySelector('input[name=email]');
+          return {
+            valid: email.checkValidity(),
+            msg: email.validationMessage,
+            file: location.pathname.split('/').pop()
+          };
+        });
+        assert.equal(submit.valid, false, `${theme}·${width}: 빈 이메일은 검증에 걸린다`);
+        assert.ok(submit.msg.length > 0, `${theme}·${width}: 빈 칸 안내 문구가 내려온다(${submit.msg})`);
+        assert.ok(/login-/.test(submit.file), `${theme}·${width}: 제출이 막혀 화면이 그 자리다`);
+
+        // 오류 자리: role=alert이고, 창(카드) 안·화면 안에 보인다.
+        const err = await page.evaluate(() => {
+          const e = document.querySelector('.error');
+          const r = e.getBoundingClientRect();
+          const card = document.querySelector('.auth-card').getBoundingClientRect();
+          return { role: e.getAttribute('role'), text: e.textContent.trim(), left: r.x, top: r.y, right: r.right, bottom: r.bottom, cardRight: card.right, cardBottom: card.bottom, vw: innerWidth, vh: innerHeight };
+        });
+        assert.equal(err.role, 'alert', `${theme}·${width}: 오류 자리는 role=alert이다`);
+        assert.ok(err.text.length > 0, `${theme}·${width}: 오류 문구가 있다(${err.text})`);
+        assert.ok(err.left >= 0 && err.top >= 0 && err.right <= err.vw + 1 && err.bottom <= err.vh + 1, `${theme}·${width}: 오류 문구가 화면 안에 보인다(${Math.round(err.right)}×${Math.round(err.bottom)} / ${err.vw}×${err.vh})`);
+        assert.ok(err.right <= err.cardRight + 1 && err.bottom <= err.cardBottom + 1, `${theme}·${width}: 오류 문구가 창 안에 있다`);
+
+        const external = urls.filter((u) => !u.startsWith('file:') && !u.startsWith('data:'));
+        assert.deepEqual(external, [], `${theme}·${width}: 외부 요청 0건 — ${JSON.stringify(external.slice(0, 3))}`);
+        await ctx.close();
+      }
+    }
+  } finally { await browser.close(); }
+});
