@@ -70,47 +70,76 @@ async function openCleanup(page) {
   await page.waitForSelector('#cleanup-panel[open]', { timeout: 10000 });
 }
 
-// 닫기 단추를 누르면 브라우저 확인 창이 뜬 채 클릭이 멈춘다 — 창 처리기를 먼저 걸고 누른다.
+// #978: 닫기 확인은 브라우저 기본 confirm()이 아니라 앱 안 공통 틀(#lt-close-confirm)이다.
+// 닫기 단추를 누르면 앱 안 확인 창이 뜨고, 예/아니요 단추를 눌러 답한다. 브라우저 dialog 이벤트는 없어야 한다.
 async function closeConfirm(page, answer) {
-  const seen = [];
-  page.once('dialog', (dialog) => {
-    seen.push(dialog.message());
-    void (answer ? dialog.accept() : dialog.dismiss()).catch(() => {});
-  });
-  await page.locator('#cleanup-panel [data-close="cleanup-panel"]').click({ noWaitAfter: true, timeout: 8000 }).catch(() => {});
-  for (let i = 0; i < 40 && !seen.length; i += 1) await page.waitForTimeout(100);
-  assert.equal(seen.length, 1, '닫을 때 한 번 묻는다');
-  assert.match(seen[0], /저장하지 않고 닫을까요/, seen[0]);
-  await page.waitForTimeout(300);
+  await page.locator('#cleanup-panel [data-close="cleanup-panel"]').click({ timeout: 8000 });
+  await page.waitForSelector('#lt-close-confirm[open]', { timeout: 8000 });
+  assert.match(await page.locator('#lt-close-confirm-title').textContent(), /저장하지 않고 닫을까요/);
+  // 초점은 확인 틀 안에 머물고(아니요 단추), Tab은 틀 안에서만 순환한다.
+  assert.equal(await page.evaluate(() => document.activeElement?.id), 'lt-close-confirm-no', '확인 틀 안(아니요)으로 초점이 간다');
+  await page.locator(answer ? '#lt-close-confirm-yes' : '#lt-close-confirm-no').click();
+  await page.waitForFunction(() => !document.querySelector('#lt-close-confirm')?.open, null, { timeout: 5000 });
+  await page.waitForTimeout(200);
 }
 
 test('정리 창: 고르기·이름은 취소하면 그대로 남고, 닫기 확인을 거쳐야 닫힌다', async (t) => {
   if (skip) { t.skip(skip); return; }
   if (REQUIRE && !existsSync(new URL('../dist/v41/home.html', import.meta.url))) { t.skip('빌드 결과가 없어 화면 시험을 건너뜀'); return; }
+  // #978: 390·1440 둘 다 같은 앱 안 확인 틀을 쓴다. 브라우저 기본 confirm(dialog 이벤트)은 한 번도 불리지 않는다.
+  for (const [width, height] of [[390, 844], [1440, 900]]) {
+    await withShell(sampleTree(), { width, height }, async ({ page, errors, puts }) => {
+      const nativeDialogs = [];
+      page.on('dialog', (dialog) => { nativeDialogs.push(dialog.message()); void dialog.dismiss().catch(() => {}); });
+      await openCleanup(page);
+      const rows = page.locator('#cleanup-moments .cleanup-moment');
+      assert.equal(await rows.count(), 3, `${width}: 순간 3개가 목록에 그려진다`);
+      assert.equal(await page.locator('#cleanup-count').textContent(), '아직 고르지 않았어요.');
+      assert.equal(await page.locator('#cleanup-create').isDisabled(), true, '고르지 않으면 만들기 막힘');
+      assert.equal(await page.locator('#cleanup-move').isDisabled(), true, '고르지 않으면 옮기기 막힘');
+
+      // 하나 고르고 이름을 적으면 문구·단추가 센다.
+      await rows.nth(0).locator('input[type=checkbox]').check();
+      assert.match(await page.locator('#cleanup-count').textContent(), /1개를 골랐어요/);
+      await page.locator('#cleanup-new-name').fill('산책');
+      assert.equal(await page.locator('#cleanup-create').isDisabled(), false, '이름을 적으면 만들기 열림');
+
+      // 쓰다 만 입력이 있는데 닫으려 하면 앱 안 틀로 한 번 묻고, 아니오면 그대로 남는다.
+      await closeConfirm(page, false);
+      assert.equal(await page.locator('#cleanup-panel').getAttribute('open'), '', `${width}: 아니요 → 창이 그대로 열려 있다`);
+      assert.equal(await page.locator('#cleanup-new-name').inputValue(), '산책', `${width}: 이름 그대로`);
+      assert.equal(await page.locator('#cleanup-moments input:checked').count(), 1, `${width}: 고른 순간도 그대로`);
+
+      // 예로 닫으면 아무것도 저장하지 않는다.
+      await closeConfirm(page, true);
+      await page.waitForFunction(() => !document.querySelector('#cleanup-panel')?.open, null, { timeout: 5000 });
+      assert.equal(puts.length, 0, `${width}: 닫기만 하면 저장 호출이 없다`);
+      assert.deepEqual(nativeDialogs, [], `${width}: 브라우저 기본 confirm(dialog)은 한 번도 불리지 않는다`);
+      assert.deepEqual(errors, [], `${width}: 페이지 오류 없음`);
+    });
+  }
+});
+
+// #978: 확인 틀이 열린 동안 Esc = 아니요 — 창·이름·고른 순간 그대로, 초점은 정리 창으로 돌아온다.
+test('정리 창: 닫기 확인 틀에서 Esc는 아니요 — 창이 그대로 남고 초점이 돌아온다', async (t) => {
+  if (skip) { t.skip(skip); return; }
+  if (REQUIRE && !existsSync(new URL('../dist/v41/home.html', import.meta.url))) { t.skip('빌드 결과가 없어 화면 시험을 건너뜀'); return; }
   await withShell(sampleTree(), {}, async ({ page, errors, puts }) => {
+    const nativeDialogs = [];
+    page.on('dialog', (dialog) => { nativeDialogs.push(dialog.message()); void dialog.dismiss().catch(() => {}); });
     await openCleanup(page);
-    const rows = page.locator('#cleanup-moments .cleanup-moment');
-    assert.equal(await rows.count(), 3, '순간 3개가 목록에 그려진다');
-    assert.equal(await page.locator('#cleanup-count').textContent(), '아직 고르지 않았어요.');
-    assert.equal(await page.locator('#cleanup-create').isDisabled(), true, '고르지 않으면 만들기 막힘');
-    assert.equal(await page.locator('#cleanup-move').isDisabled(), true, '고르지 않으면 옮기기 막힘');
-
-    // 하나 고르고 이름을 적으면 문구·단추가 센다.
-    await rows.nth(0).locator('input[type=checkbox]').check();
-    assert.match(await page.locator('#cleanup-count').textContent(), /1개를 골랐어요/);
+    await page.locator('#cleanup-moments .cleanup-moment input[type=checkbox]').nth(0).check();
     await page.locator('#cleanup-new-name').fill('산책');
-    assert.equal(await page.locator('#cleanup-create').isDisabled(), false, '이름을 적으면 만들기 열림');
-
-    // 쓰다 만 입력이 있는데 닫으려 하면 한 번 묻고, 아니오면 그대로 남는다.
-    await closeConfirm(page, false);
-    assert.equal(await page.locator('#cleanup-panel').getAttribute('open'), '', '아니요 → 창이 그대로 열려 있다');
-    assert.equal(await page.locator('#cleanup-new-name').inputValue(), '산책');
-    assert.equal(await page.locator('#cleanup-moments input:checked').count(), 1, '고른 순간도 그대로');
-
-    // 예로 닫으면 아무것도 저장하지 않는다.
-    await closeConfirm(page, true);
-    await page.waitForFunction(() => !document.querySelector('#cleanup-panel')?.open, null, { timeout: 5000 });
-    assert.equal(puts.length, 0, '닫기만 하면 저장 호출이 없다');
+    await page.locator('#cleanup-panel [data-close="cleanup-panel"]').click();
+    await page.waitForSelector('#lt-close-confirm[open]', { timeout: 8000 });
+    await page.keyboard.press('Escape');
+    await page.waitForFunction(() => !document.querySelector('#lt-close-confirm')?.open, null, { timeout: 5000 });
+    assert.equal(await page.locator('#cleanup-panel').getAttribute('open'), '', 'Esc=아니요 → 정리 창 그대로');
+    assert.equal(await page.locator('#cleanup-new-name').inputValue(), '산책', '이름 그대로');
+    assert.equal(await page.locator('#cleanup-moments input:checked').count(), 1, '고른 순간 그대로');
+    assert.equal(await page.evaluate(() => document.querySelector('#cleanup-panel')?.contains(document.activeElement)), true, '초점이 정리 창 안으로 돌아온다');
+    assert.equal(puts.length, 0, '저장 호출 없음');
+    assert.deepEqual(nativeDialogs, [], '브라우저 기본 confirm 없음');
     assert.deepEqual(errors, [], '페이지 오류 없음');
   });
 });

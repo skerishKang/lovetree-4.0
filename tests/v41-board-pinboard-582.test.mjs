@@ -195,13 +195,14 @@ test('#582 화면: 상세의 지도 단추가 셸 메시지를 보내고, 다음
   const browser = await chromium.launch({ headless: true });
   try {
     const { context, page, frame } = await openHost(browser, `${base}/__host-582c.html`, { width: 1440, height: 900 });
-    const vis = await frame.evaluate(() => {
-      for (const c of document.querySelectorAll('#cardLayer .card')) {
-        const r = c.getBoundingClientRect();
-        if (r.top > 80 && r.bottom < 880 && r.left > 0 && r.right < 1430) return { id: c.dataset.id, x: (r.left + r.right) / 2, y: (r.top + r.bottom) / 2 };
-      }
-      return null;
-    });
+    // #987: 날짜순 첫 줄이 먼저 보여도 다음 순간이 있는 뿌리 카드로 이동해 상세 동작을 시험한다.
+    await frame.evaluate(id => focusBoardMoment(id, false), tree.moments[0].id);
+    await page.waitForTimeout(400);
+    const vis = await frame.evaluate(id => {
+      const c = document.querySelector('#cardLayer .card[data-id="' + id + '"]');
+      const r = c.getBoundingClientRect();
+      return { id, x: (r.left + r.right) / 2, y: (r.top + r.bottom) / 2 };
+    }, tree.moments[0].id);
     await page.mouse.click(vis.x, vis.y);
     await page.waitForTimeout(700);
     // 지도 단추 → lt41-open-network

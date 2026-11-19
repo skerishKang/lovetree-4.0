@@ -638,14 +638,14 @@ function watchFrameSheet(frame){
     }
     const nodes=[...(root.nodeType===1?[root]:[]),...root.querySelectorAll('*')];
     for(const el of nodes){
-      if((el.matches('.detail')||el.tagName==='DIALOG')&&!layers.has(el)){
-        layers.add(el);observer.observe(el,{attributes:true,attributeFilter:el.tagName==='DIALOG'?['open']:['class']});
+      if((el.matches('.detail,#detailSide')||el.tagName==='DIALOG')&&!layers.has(el)){
+        layers.add(el);observer.observe(el,{attributes:true,attributeFilter:el.tagName==='DIALOG'?['open']:['class','hidden']});
       }
       if(el.shadowRoot)observeTree(el.shadowRoot);
     }
   };
   const hasOpenLayer=root=>{
-    if(root.querySelector('dialog[open],.detail.open'))return true;
+    if(root.querySelector('dialog[open],.detail.open,#detailSide:not([hidden])'))return true;
     for(const el of root.querySelectorAll('*'))if(el.shadowRoot&&hasOpenLayer(el.shadowRoot))return true;
     return false;
   };
