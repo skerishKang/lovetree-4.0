@@ -16,6 +16,14 @@
    단추는 같은 행의 끝자리에 둔다. */
 #community-panel .community-group-rail{display:flex;align-items:center;gap:8px}
 #community-panel #community-groups{flex:1 1 auto;min-width:0}
+/* #972: 그룹 찾기 단추 위를 덮던 흐림 막을 없애고, 작은 화면에서 칩을 끝까지 읽는다. */
+#community-panel .community-group-rail::after{display:none}
+@media(max-width:520px){
+ #community-panel .community-group-rail{gap:10px}
+ #community-panel #community-groups{gap:6px;scrollbar-width:thin}
+ #community-panel #community-groups::-webkit-scrollbar{display:block;height:4px}
+ #community-panel .community-group-chip{padding-inline:8px}
+}
 .community-group-find{min-height:44px;flex-shrink:0;padding:8px 14px;border:1px dashed var(--lt-gold-line);border-radius:var(--lt-r-pill);background:rgba(255,230,166,.06);color:var(--lt-pearl);font-size:13px}
 
 /* 그룹 찾기 창 — 넓은 화면은 가운데 dialog, 휴대폰은 아래서 올라오는 판(미리보기 규칙). */
@@ -38,7 +46,7 @@ dialog.community-group-find::backdrop{background:transparent}
 
 /* #792 4단계 ⑤ 둘러보기 전용 — '이번 주 인기 무대' 줄과 미리보기의 '이 무대 담기' 단추.
    공통 상단(shell.css)은 그대로 둔다. 새 색은 --lt-* 토큰으로만 쓴다. */
-.community-stages{margin:10px 0 4px;min-width:0}
+.community-stages{max-width:1500px;margin:10px auto 4px;min-width:0}
 .community-stages-title{margin:0 0 6px;font-size:13px;font-weight:700;color:var(--lt-gold);letter-spacing:.02em}
 .community-stage-list{display:flex;flex-wrap:wrap;gap:6px 10px;min-width:0}
 .community-stages-empty{margin:0;color:var(--lt-muted);font-size:13px;line-height:1.6}

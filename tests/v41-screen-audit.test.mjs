@@ -2183,3 +2183,98 @@ test('#657 후속 261117: 트리 있는 계정의 탭 글자색도 같다(정원
     await new Promise((resolve) => server.close(resolve));
   }
 });
+
+// #972: 눈검사에서 찾은 다섯 가지를 화면의 실제 위치와 크기로 검사한다.
+test('#972 서재·책 상세·둘러보기·새 소식 화면 치수', { skip: REQUIRE ? false : skip, timeout: 180000 }, async () => {
+  if (skip) assert.fail(`화면 시험을 건너뛸 수 없다: ${skip}`);
+  const server = await serve();
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch();
+  try {
+    for (const theme of ['night', 'garden']) for (const [width, height] of [[390, 844], [1440, 900], [2560, 1440]]) {
+      const ctx = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
+      try {
+        await ctx.addInitScript((value) => localStorage.setItem('lt41.theme', value), theme);
+        const groups = ['BTS', 'Hearts2Hearts', 'RIIZE'].map(value => ({ value, count: 2 }));
+        await ctx.route('**/api/community/**', route => {
+          const body = route.request().url().includes('/shares')
+            ? { items: [], nextCursor: null, totalVisible: 0, groups, groupsAll: groups }
+            : { items: [] };
+          return route.fulfill({ contentType: 'application/json', body: JSON.stringify(body) });
+        });
+        const page = await ctx.newPage();
+        await page.goto(`${base}/v41/#shelf`);
+        await page.waitForFunction(() => document.querySelector('#view')?.contentDocument?.querySelector('.book-card')?.getBoundingClientRect().width > 0);
+        const shelf = await page.frameLocator('#view').locator('.shelf-screen').evaluate(el => {
+          const rect = sel => el.querySelector(sel).getBoundingClientRect();
+          const s = rect('.shelf-viewport'), c = rect('.shelf-controls'), h = rect('.hero'), p = el.getBoundingClientRect();
+          const top = innerWidth <= 780 ? c.bottom : h.bottom;
+          return { count: el.querySelectorAll('.book-card').length, gap: s.top - c.bottom,
+            centerError: Math.abs((s.top + s.bottom) / 2 - (top + p.bottom) / 2),
+            areaHeight: p.bottom - top, overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth };
+        });
+        assert.equal(shelf.count, 1);
+        assert.ok(shelf.gap >= 0 && shelf.gap <= 32, `${theme}/${width}: 검색 아래 여백 ${shelf.gap}px`);
+        assert.ok(shelf.centerError <= shelf.areaHeight * .05 + 2, `${theme}/${width}: 책장 중심 오차 ${shelf.centerError}px`);
+        assert.ok(shelf.overflow <= 1, `${theme}/${width}: 서재 가로 넘침 ${shelf.overflow}px`);
+
+        await page.goto(`${base}/v41/#book`);
+        await page.waitForFunction(() => document.querySelector('#view')?.contentWindow?.__TRACK59__?.pageSteps?.().length > 0);
+        const frame = page.frames().find(f => f.url().includes('track59-sketchbook'));
+        await frame.waitForSelector('.moment[data-moment]');
+        await frame.evaluate(() => {
+          const card = [...document.querySelectorAll('.moment[data-moment]')].find(el => el.getBoundingClientRect().width > 0);
+          showDetail(card.dataset.moment);
+        });
+        await frame.waitForSelector('#detailSide:not([hidden])');
+        const meta = await frame.locator('#detailSide').evaluate(el => ({
+          lines: [...el.querySelectorAll('.detail-kicker')].map(n => n.textContent.trim()),
+          close: el.querySelector('[data-detail-close]').getBoundingClientRect().height
+        }));
+        assert.equal(meta.lines.length, 1, `${theme}/${width}: 상세 메타 줄 수`);
+        assert.match(meta.lines[0], /사진 · 2026\. 01\. 01 · 끌림/);
+        assert.ok(meta.close > 0, '상세 닫기 단추가 남는다');
+
+        if (width === 390 || width === 2560) {
+          await page.goto(`${base}/v41/#shelf`);
+          await page.waitForFunction(() => typeof document.querySelector('#community-menu')?.onclick === 'function');
+          await page.evaluate(() => document.querySelector('#community-menu').click());
+          await page.waitForSelector('#community-panel[open] .community-group-chip:nth-child(4)');
+          const discover = await page.evaluate(() => {
+            const rect = sel => document.querySelector(sel).getBoundingClientRect();
+            const rail = rect('#community-groups'), last = rect('#community-groups .community-group-chip:last-child');
+            const button = rect('button.community-group-find'), popular = rect('#community-popular-stages');
+            const form = rect('#community-search-form'), head = rect('#community-panel .panel-heading'), list = rect('.community-results');
+            const overlap = Math.max(0, Math.min(last.right, button.right) - Math.max(last.left, button.left)) *
+              Math.max(0, Math.min(last.bottom, button.bottom) - Math.max(last.top, button.top));
+            return { clip: Math.max(0, last.right - rail.right), overlap, gap: button.left - rail.right,
+              chipHeight: last.height, alignment: Math.max(...[form, head, list].flatMap(r => [Math.abs(popular.left - r.left), Math.abs(popular.width - r.width)])) };
+          });
+          assert.ok(discover.clip <= 1, `${theme}/${width}: 마지막 칩 잘림 ${discover.clip}px`);
+          assert.equal(discover.overlap, 0, `${theme}/${width}: 칩과 단추 겹침`);
+          assert.ok(discover.gap >= 8 && discover.chipHeight >= 44, '칩과 단추 사이 여백 및 터치 높이');
+          assert.ok(discover.alignment <= 1, `${theme}/${width}: 인기 무대 제목·검색·목록 정렬 오차 ${discover.alignment}px`);
+        }
+
+        if (width !== 390) {
+          await page.goto(`${base}/v41/#shelf`);
+          await page.waitForFunction(() => typeof document.querySelector('#updates-link')?.onclick === 'function');
+          await page.evaluate(() => document.querySelector('#updates-link').click());
+          await page.waitForSelector('#updates-panel[open] .updates-version');
+          const updates = await page.evaluate(() => {
+            const head = document.querySelector('#updates-panel .panel-heading').getBoundingClientRect();
+            const cards = [...document.querySelectorAll('#updates-panel .updates-version')].map(el => el.getBoundingClientRect());
+            return { count: cards.length, maxWidth: Math.max(...cards.map(r => r.width)),
+              alignment: Math.max(...cards.map(r => Math.abs(r.left - head.left))) };
+          });
+          assert.ok(updates.count > 0);
+          assert.ok(updates.maxWidth <= 960 && updates.maxWidth >= 900, `${theme}/${width}: 새 소식 카드 폭 ${updates.maxWidth}px`);
+          assert.ok(updates.alignment <= 1, `${theme}/${width}: 새 소식 제목과 카드 정렬`);
+        }
+      } finally { await ctx.close(); }
+    }
+  } finally {
+    await browser.close();
+    await new Promise(resolve => server.close(resolve));
+  }
+});

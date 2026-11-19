@@ -73,7 +73,8 @@ function closeDetail(){
  setBookOpen($b('#detail'),false);
  if(card&&card.isConnected){card.classList.remove('detail-open');card.setAttribute('tabindex','-1');try{card.focus({preventScroll:true})}catch{}}
 }
-function detailMarkup(m){
+function detailMeta(m){return t(LTLabels.type(m.kind))+' · '+t(formatDisplayDate(m.date,ltDateStyle()))+' · '+t(m.emotion)}
+function detailMarkup(m,showMeta=true){
  const nextInfo=nextMomentOf(m.id);
  /* #815: 연결 이유는 적었을 때만 보인다(비면 아무것도 그리지 않는다). */
  const line=connectionLine(nextInfo?.title,nextInfo?.reason,{hideEmptyWhy:true});
@@ -82,7 +83,7 @@ function detailMarkup(m){
  // #327 2부: 내 기록(서버)의 순간 상세에서 다른 트리로 옮길 수 있다. 공유·예시는 숨긴다.
  const canMove=(window.parent&&window.parent.LT41)?window.parent.LT41.source==='server':false;
  const view=titleViewFor(m);
- return '<div class="detail-kicker">'+t(LTLabels.type(m.kind))+' · '+t(formatDisplayDate(m.date,ltDateStyle()))+' · '+t(m.emotion)+'</div>'+
+ return (showMeta?'<div class="detail-kicker">'+detailMeta(m)+'</div>':'')+
   (view.main?'<h2>'+t(view.main)+'</h2>'+(view.sub&&view.sub.toLowerCase()!==view.main.trim().toLowerCase()?'<p class="video-title">▶ '+t(view.sub)+'</p>':''):'')+
   '<p>'+t(m.note)+' · 출처: '+t(m.source)+'</p>'+
   (rangeLine?'<p class="detail-range">기억할 구간 '+t(rangeLine)+'</p>':'')+
@@ -127,7 +128,7 @@ function placeDetail(id,card){
   rightPage.innerHTML='<div class="page-detail">'+detailMarkup(m)+'</div>';
  }else{
   const panel=$b('#detailSide');if(!panel)return;
-  panel.innerHTML='<div class="detail-top"><span class="detail-kicker">'+t(LTLabels.type(m.kind))+' · '+t(formatDisplayDate(m.date,ltDateStyle()))+'</span><button type="button" class="close" data-detail-close aria-label="상세 닫기">×</button></div><div class="side-detail">'+detailMarkup(m)+'</div>';
+  panel.innerHTML='<div class="detail-top"><span class="detail-kicker">'+detailMeta(m)+'</span><button type="button" class="close" data-detail-close aria-label="상세 닫기">×</button></div><div class="side-detail">'+detailMarkup(m,false)+'</div>';
   panel.hidden=false;
   if(narrow()){panel.style.top='';}
   else{

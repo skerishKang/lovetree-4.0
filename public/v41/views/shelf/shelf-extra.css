@@ -229,3 +229,9 @@ html[data-v41-screen=shelf][data-lt-theme=garden] .book-card > .book-manage {
   html[data-v41-screen=shelf] .page { max-width: 1920px; }
   html[data-v41-screen=shelf] .shelf-viewport { margin-top: auto; margin-bottom: auto; }
 }
+
+/* #972: 한 권일 때 검색줄을 책장 바로 위로 옮기되 책장은 남은 화면 가운데에 둔다. */
+@media (min-width: 781px) {
+  html[data-v41-screen=shelf] .shelf-screen:has(.shelf-rail > .book-card:only-child) .shelf-controls { margin-top: auto; }
+  html[data-v41-screen=shelf] .shelf-screen:has(.shelf-rail > .book-card:only-child) .shelf-viewport { margin-top: 0; }
+}
