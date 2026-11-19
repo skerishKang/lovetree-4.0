@@ -196,9 +196,8 @@ export function createDialogs(deps) {
   if (view?.history && view.HTMLDialogElement) {
     const showModalOriginal = view.HTMLDialogElement.prototype.showModal;
     view.HTMLDialogElement.prototype.showModal = function (...args) {
-      // #933: 앞 창이 비모달(새 소식 창)이어도 닫는다 — 열린 창 수를 1로 유지한다.
-      const front = busyDialogs().filter(d => d !== this).pop() || null;
-      if (front && !STACK_ALLOWED.has(this.id)) requestPanelClose(front.id);
+      const front = modalDialogs()[modalDialogs().length - 1] || null;
+      if (front && front !== this && !STACK_ALLOWED.has(this.id)) requestPanelClose(front.id);
       const result = showModalOriginal.apply(this, args);
       if (!dialogGuard && this.open && this.matches(':modal')) {
         view.history.pushState({ lt41Dialog: true }, '');
@@ -206,7 +205,8 @@ export function createDialogs(deps) {
       }
       return result;
     };
-    // #933: 비모달로 여는 창(새 소식)도 같은 규칙 — 모달 창이 열려 있으면 그 창을 먼저 닫고 연다.
+    // #933: 비모달로 여는 창(새 소식)은 앞 창(모달·비모달 모두)을 먼저 닫고 연다 — 창이 겹치지 않게.
+    // 모달 쪽은 지금처럼 모달끼리만 판정한다(2026-11-16 결정: 비모달 창 위에 겹치는 길은 그대로 둔다).
     const showOriginal = view.HTMLDialogElement.prototype.show;
     view.HTMLDialogElement.prototype.show = function (...args) {
       const front = busyDialogs().filter(d => d !== this).pop() || null;

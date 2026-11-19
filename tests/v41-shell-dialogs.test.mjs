@@ -672,7 +672,7 @@ test('#933 새 창을 열면 앞 창을 닫는다 — 열린 창은 한 장', ()
   Proto.showModal.call(write);
   assert.equal(manager.open, false, '트리 관리 창이 남지 않는다');
   assert.equal(write.open, true, '새 창(순간 추가)은 열린다');
-  // 비모달로 여는 새 소식 창도 같은 규칙을 탄다.
+  // 비모달로 여는 새 소식 창도 앞 창을 먼저 닫는다(트리 관리 → 새 소식).
   const updates = byId('updates-panel');
   Proto.show.call(updates);
   assert.equal(write.open, false, '모달 창 위에 새 소식 창만 남는다');
