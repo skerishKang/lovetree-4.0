@@ -13,7 +13,8 @@ try {
   ({ chromium } = await import('playwright'));
   if (!existsSync(chromium.executablePath())) skip = 'Playwright Chromium이 없어 화면 시험을 건너뜀';
 } catch { skip = 'playwright 패키지가 없어 화면 시험을 건너뜀'; }
-if (REQUIRE && !existsSync(new URL('../dist/v41/home.html', import.meta.url))) skip = '빌드 결과가 없어 화면 시험을 건너뜀';
+// #996: REQUIRE=1(CI 화면 잡)에서 빌드 결과가 없으면 건너뛰지 않고 실패로 알린다 — 잡이 먼저 build한다.
+const DIST_HOME = new URL('../dist/v41/home.html', import.meta.url);
 
 const THUMB = (route) => route.fulfill({ status: 200, contentType: 'image/png', body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64') });
 
@@ -28,6 +29,8 @@ function fixtureTree() {
 }
 
 test('#842·#841 v3 — 실제 셸의 꼬리표 정리 판 연결과 저장 뒤 묶음', { skip: skip || !REQUIRE ? skip || 'LT_GRAPH_842_REQUIRE=1 일 때 실행' : false }, async () => {
+  assert.ok(chromium && !skip, '브라우저 준비 실패: ' + (skip || '알 수 없음') + ' (REQUIRE=1에서는 건너뜀=실패)');
+  assert.ok(existsSync(DIST_HOME), '빌드 결과(dist/v41/home.html)가 없다 — npm run build 뒤 실행(REQUIRE=1에서는 건너뜀=실패)');
   const server = await serve();
   const origin = `http://127.0.0.1:${server.address().port}`;
   const TREE = fixtureTree();
