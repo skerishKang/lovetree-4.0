@@ -85,6 +85,119 @@ const THUMB = (route) => route.fulfill({ status: 200, contentType: 'image/png', 
 
 // 시험 트리(#635와 같은 모양 — 순간 3개 사슬, 첫 순간은 유튜브). 가짜 데이터다.
 // 첫 순간이 두 갈래(e2·e3)를 나가므로 첫 장에 갈림길 탭이 보인다 — #700 후속 탭 글자 크기·잘림 검사 대상.
+
+// #987: 공유·설정 창은 실제로 열린 상태에서 폭, 위치, 대비와 선택 표시를 잰다.
+test('#987 공유 창 폭·단추·대비와 설정 정렬·동그라미·배치', { skip: REQUIRE ? false : skip, timeout: 240000 }, async () => {
+  if (skip) assert.fail(skip);
+  const server = await serve(), base = 'http://127.0.0.1:' + server.address().port;
+  const browser = await chromium.launch({ headless: true });
+  const dest = process.env.LT_VISUAL_987_CAPTURE;
+  if (dest) mkdirSync(dest, { recursive: true });
+  const failures = [];
+  const check = (condition, reason) => { if (!condition) failures.push(reason); };
+  const make = (title, count) => {
+    const input = i => ({subject:title,title:'화면 검사 순간 ' + (i+1),date:'2026-11-' + String(i+1).padStart(2,'0'),emotion:'설렘',note:'가짜 화면 검사 기록입니다.',url:i%3===0?'https://audit.invalid/photo.jpg':i%3===1?'https://www.youtube.com/watch?v=dQw4w9WgXcQ':''});
+    let t = createTree(input(0));
+    for (let i=1;i<count;i++) t=addMoment(t,input(i),t.moments[0].id);
+    return t;
+  };
+  const trees=[make('좋아하는 무대의 길고 긴 순간들',8),make('여름',3),make('함께 부른 노래',3)];
+  const workspace={revision:1,state:{version:1,trees,prefs:{displayName:'화면검사 시험계정'}},subject:'visual-audit-fake',writeSubjectBound:true,savedAt:'2026-11-20T00:00:00.000Z'};
+  const share={id:'audit-share-000000000001',treeId:trees[0].id,view:'book',status:'active',origin:'manual',createdAt:'2026-11-20T00:00:00.000Z'};
+  const sizes=[[390,844],[1440,900],[2560,1440]], layoutRatios=new Map();
+  try {
+    for (const theme of ['night','garden']) for (const [width,height] of sizes) {
+      const ctx=await browser.newContext({viewport:{width,height},reducedMotion:'reduce'});
+      try {
+        await ctx.addInitScript(t=>localStorage.setItem('lt41.theme',t),theme);
+        await ctx.route('**/*',route=>{
+          const u=new URL(route.request().url());
+          if(u.origin!==base) return u.hostname==='i.ytimg.com'||u.hostname==='audit.invalid'?THUMB(route):route.abort();
+          if(u.pathname==='/api/workspace')return route.fulfill({status:200,json:workspace});
+          if(u.pathname==='/api/account')return route.fulfill({status:200,json:{ok:true,email:'audit@example.invalid',subject:workspace.subject}});
+          if(u.pathname==='/api/shares')return route.fulfill({status:200,json:{ok:true,items:[share],shares:[share]}});
+          if(u.pathname.startsWith('/api/'))return route.fulfill({status:200,json:{ok:true,items:[]}});
+          return route.continue();
+        });
+        const page=await ctx.newPage();
+        await page.goto(base+'/v41/?account=1#shelf');
+        await page.waitForFunction(()=>window.LT41?.trees?.length===3&&!document.querySelector('#account-avatar')?.hidden);
+        const ask=page.locator('#discover-ask-no');
+        if(await ask.isVisible())await ask.click();
+        await page.locator('#record-menu').click();
+        await page.locator('[data-tree-action="shelf"]').click();
+        await page.locator('#record-menu').click();
+        await page.locator('[data-tree-action="share"]').click();
+        await page.locator('#share-panel[open] .share-item-actions button').first().waitFor();
+        const snap=async(label,id)=>{
+          if(!dest)return;
+          const name=label+'-'+width+'-'+theme;
+          await page.screenshot({path:join(dest,name+'.png'),animations:'disabled'});
+          const dialog=page.locator(id);
+          const scroll=await dialog.evaluate(e=>e.scrollHeight>e.clientHeight+20);
+          if(scroll){
+            await dialog.evaluate(e=>e.scrollTop=e.scrollHeight);
+            await page.screenshot({path:join(dest,name+'-bottom.png'),animations:'disabled'});
+            await dialog.evaluate(e=>e.scrollTop=0);
+          }
+        };
+        const shared=await page.evaluate(()=>{
+          const $=s=>document.querySelector(s), rect=e=>e.getBoundingClientRect(), css=e=>getComputedStyle(e);
+          const panel=$('#share-panel'), form=$('#share-form'), r=rect(panel), fr=rect(form), preview=$('#share-preview');
+          const rgb=s=>(s.match(/[\d.]+/g)||[]).map(Number);
+          const mix=(front,back)=>{const a=front[3]??1;return front.slice(0,3).map((v,i)=>v*a+back[i]*(1-a));};
+          const l=c=>c.map(v=>v/255).map(v=>v<=0.04045?v/12.92:((v+0.055)/1.055)**2.4).reduce((s,v,i)=>s+v*[0.2126,0.7152,0.0722][i],0);
+          const ratio=(a,b)=>(Math.max(l(a),l(b))+0.05)/(Math.min(l(a),l(b))+0.05);
+          const bg=mix(rgb(css(panel).backgroundColor),rgb(css(document.documentElement).backgroundColor));
+          const outline=e=>{const s=css(e),surface=mix(rgb(s.backgroundColor),bg);const stroke=mix(rgb(s.borderTopColor),surface);return Math.min(ratio(stroke,surface),ratio(stroke,bg));};
+          const look=e=>{const s=css(e);return {radius:s.borderTopLeftRadius,bg:s.backgroundColor,border:s.borderTopColor,color:s.color,height:rect(e).height}};
+          const buttons=[...panel.querySelectorAll('.share-item-actions button')].map(look), ref=look(preview);
+          const section=panel.querySelector(':scope > section:last-of-type');
+          return {formWidth:fr.width,centerOffset:Math.abs((fr.left+fr.right-r.left-r.right)/2),otherWidths:[...panel.querySelectorAll(':scope > .share-steps,:scope > .share-visibility,:scope > .panel-note,:scope > section:not([hidden])')].map(e=>rect(e).width),buttons,ref,contrast:[outline($('#share-moment')),outline($('#share-view')),outline(preview)],topGap:rect(panel.querySelector('.panel-heading')).top-r.top,bottomGap:r.bottom-rect(section).bottom,overflow:panel.scrollWidth-panel.clientWidth};
+        });
+        console.log('#987 share',width,theme,JSON.stringify(shared));
+        await snap('share','#share-panel');
+        check(shared.formWidth<=960.5&&shared.otherWidths.every(w=>w<=960.5)&&shared.centerOffset<=2&&shared.overflow<=1,'공유 폭 '+width+' '+theme);
+        check(shared.buttons.length===2&&shared.buttons.every(b=>b.radius===shared.ref.radius&&b.bg===shared.ref.bg&&b.border===shared.ref.border&&b.color===shared.ref.color&&b.height>=44),'공유 단추 '+width+' '+theme);
+        if(theme==='garden')check(shared.contrast.every(n=>n>=3),'공유 정원 대비 '+width+' '+JSON.stringify(shared.contrast));
+        if(width===2560)check(Math.abs(shared.topGap-shared.bottomGap)<=70,'공유 세로 배치 '+theme+' '+JSON.stringify([shared.topGap,shared.bottomGap]));
+        await page.locator('#share-panel [data-close]').click();
+        await page.locator('#account-avatar').click();
+        await page.locator('#account-open-settings').click();
+        await page.locator('#account-settings[open]').waitFor();
+        for(const tab of ['records','profile','account','screen']){
+          await page.locator('#settings-tab-'+tab).click();
+          await page.locator('#account-settings-'+tab+':not([hidden])').waitFor();
+          if(tab==='records')await page.locator('#settings-tree-visibility-list .settings-row').first().waitFor();
+          const m=await page.evaluate(tab=>{
+            const $=s=>document.querySelector(s),r=e=>e.getBoundingClientRect(), panel=$('#account-settings'), p=r(panel), layout=r($('.settings-layout')), title=r(panel.querySelector('.panel-heading')), page=r($('#account-settings-'+tab));
+            const rows=[...document.querySelectorAll('#settings-tree-visibility-list .settings-row')].map(e=>{const a=e.querySelector('[data-tree-visibility-value="public"]'),b=e.querySelector('[data-tree-visibility-value="private"]');return [r(a).x,r(b).x]});
+            const circles=[...document.querySelectorAll('#profile-color button')].map(e=>({w:r(e).width,h:r(e).height,y:r(e).y}));
+            return {layoutWidth:layout.width,widthRatio:layout.width/p.width,topGap:title.top-p.top,bottomGap:p.bottom-layout.bottom,centerRatio:(title.top+layout.bottom-2*p.top)/(2*p.height),overflow:panel.scrollWidth-panel.clientWidth,rows,circles,pageWidth:page.width};
+          },tab);
+          console.log('#987 settings',tab,width,theme,JSON.stringify(m));
+          await snap('settings-'+tab,'#account-settings');
+          check(m.overflow<=1,'설정 가로 넘침 '+tab+' '+width+' '+theme);
+          if(tab==='records'){
+            const spread=i=>Math.max(...m.rows.map(r=>r[i]))-Math.min(...m.rows.map(r=>r[i]));
+            check(m.rows.length===3&&spread(0)<=2&&spread(1)<=2,'기록 버튼 열 '+width+' '+theme+' '+JSON.stringify(m.rows));
+          }
+          if(tab==='profile'){
+            check(m.circles.length===8&&m.circles.every(c=>c.h>=44&&Math.abs(c.w/c.h-1)<=0.05),'프로필 원 '+width+' '+theme);
+            if(width===390)check([...new Set(m.circles.map(c=>c.y))].every(y=>m.circles.filter(c=>c.y===y).length===4),'프로필 색상 두 줄 '+theme);
+          }
+          if(width===1440)layoutRatios.set(theme+tab,m);
+          if(width===2560&&(tab==='profile'||tab==='account')){
+            const prev=layoutRatios.get(theme+tab);
+            check(Math.abs(prev.widthRatio-m.widthRatio)<=0.03&&Math.abs(prev.centerRatio-m.centerRatio)<=0.05&&Math.abs(m.topGap-m.bottomGap)<=50,'설정 큰 화면 비율 '+tab+' '+theme);
+          }
+        }
+      } finally {await ctx.close();}
+    }
+  } finally {await browser.close();await new Promise(r=>server.close(r));}
+  assert.deepEqual(failures,[]);
+});
+
 const VIDEO_TITLE = 'Super Shy — Official MV';
 const tree = (() => {
   const moments = [
