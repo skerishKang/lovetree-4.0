@@ -1,13 +1,53 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readFileSync} from 'node:fs';
+import {readFileSync, existsSync, createReadStream} from 'node:fs';
+import {createServer} from 'node:http';
+import {stat} from 'node:fs/promises';
+import path from 'node:path';
+import {fileURLToPath} from 'node:url';
 
 // #295: 기억책에서 긴 노트가 페이지 밖으로 넘치면 잘려 보이는 문제.
 // 안1(넘친 페이지만 안에서 스크롤)을 채택했다 — 안2(페이지 분할)는 펼침 두 쪽·넘기기 구조를 바꾸므로 쓰지 않는다.
 const read = path => readFileSync(new URL('../' + path, import.meta.url), 'utf8');
+const {createTree} = await import('../public/v41/domain.mjs');
 const BOOK_JS = read('public/v41/views/book/book.js');
-const BOOK_USABILITY_CSS = read('public/v41/views/book/book-usability.css');
-const BOOK_CSS = read('public/v41/views/book/book.css');
+
+// 화면 시험: 빌드 결과(있으면)를 정적 서버로 내주고 로그인한 계정의 기록을 흉내 낸다.
+const REPO = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
+const BUILT = path.join(REPO, 'dist');
+const ROOT = path.resolve(existsSync(path.join(BUILT, 'v41', 'book.html')) ? BUILT : path.join(REPO, 'public'));
+const REQUIRE = process.env.LT_BOOK_LONG_NOTE_REQUIRE === '1';
+let chromium = null;
+let skip = false;
+try {
+  ({chromium} = await import('playwright'));
+  if (!existsSync(chromium.executablePath())) skip = 'Playwright chromium이 없어 넘침 화면 시험을 건너뜀';
+} catch { skip = 'playwright 패키지가 없어 넘침 화면 시험을 건너뜀'; }
+const TYPES = {'.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.woff2': 'font/woff2'};
+// 로그인 화면이 뜨려면 기록(/api/workspace) 말고 다른 /api 호출도 200 응답이 있어야 한다 — 404면 책 화면이 빈 채로 남는다.
+function serve(root) {
+  const server = createServer(async (req, res) => {
+    const clean = decodeURIComponent((req.url || '/').split('?')[0]);
+    const send = (code, body) => { res.writeHead(code, {'content-type': 'application/json; charset=utf-8'}); res.end(JSON.stringify(body)); };
+    if (req.method === 'GET' && clean === '/api/workspace') return send(200, WORKSPACE);
+    if (req.method === 'PUT' && clean === '/api/workspace') return send(200, {revision: 2, savedAt: '2026-11-15T09:00:00.000Z'});
+    if (clean.startsWith('/api/') || clean.startsWith('/auth/')) return send(200, {ok: true, items: []});
+    for (const file of [path.join(root, clean), path.join(root, clean, 'index.html')]) {
+      if (!file.startsWith(root)) continue;
+      try { if ((await stat(file)).isFile()) { res.writeHead(200, {'content-type': TYPES[path.extname(file)] || 'application/octet-stream'}); createReadStream(file).pipe(res); return; } } catch {}
+    }
+    res.writeHead(404); res.end('not found');
+  });
+  return new Promise(ok => server.listen(0, '127.0.0.1', () => ok(server)));
+}
+// 시험 기록: 순간 둘(긴 노트·짧은 노트). 넘침 자체는 화면에서 내용을 키워 만든다(아래 시험).
+const PREFS = {};
+const WORKSPACE = (() => {
+  const tree = createTree({subject: '시험 사용자', title: '시험 트리', note: '긴 노트를 한 줄씩 적어 둡니다.', emotion: '설렘', date: '2026-11-01', url: ''}, '2026-11-01T00:00:00.000Z');
+  tree.moments.push({...tree.moments[0], id: 'm2', parentId: tree.moments[0].id, title: '짧은 노트 순간', note: '짧은 한 줄', emotion: '기쁨', date: '2026-11-02', relation: '이어진 이유'});
+  tree.moments[0].title = '긴 노트 순간';
+  return {revision: 1, subject: '시험계정', writeSubjectBound: true, savedAt: '2026-11-15T09:00:00.000Z', state: {version: 1, prefs: PREFS, trees: [tree]}};
+})();
 
 const {pageOverflows, PAGE_OVERFLOW_SLACK} = await import('../public/v41/book-usability.mjs');
 
@@ -25,37 +65,88 @@ test('#295 규칙: 페이지보다 4px 넘게 넘친 내용만 넘침으로 판�
   assert.equal(pageOverflows(664, undefined), false);
 });
 
-test('#295 화면 연결: 넘침 판정을 페이지 렌더링 때마다 다시 매긴다', () => {
-  // 판정 함수는 렌더 지점마다 다시 실행돼야 페이지를 넘겨도 상태가 따라간다
-  assert.ok(BOOK_JS.includes('function markOverflowPages'), 'book.js에 markOverflowPages가 있다');
-  assert.ok(/renderArchive\(\);syncLensClone\(\);markOverflowPages\(\);/.test(BOOK_JS), 'renderSpread가 페이지를 다 그린 뒤 판정한다');
-  // #393 3: 넘김 중에는 다시 그리지 않는다 — 아래 페이지는 prepareTurn에서 한 번 그리고, 그 직후 판정한다.
-  assert.ok(/singlePageContent\(tarM,t,total\)[\s\S]*?\nmarkOverflowPages\(\);turn\.frontFace=front/.test(BOOK_JS), '넘김 준비에서 아래 페이지를 다 그린 뒤 판정한다(넘기는 동안 재그림 없음)');
-  assert.ok(!/setTurnProgress[\s\S]*markOverflowPages\(\)\}/.test(BOOK_JS.slice(BOOK_JS.indexOf('function setTurnProgress'), BOOK_JS.indexOf('function prepareTurn'))), 'setTurnProgress는 매 프레임 판정하지 않는다');
-  // 같은 임계값(4px)을 book.js도 쓴다 — book-usability.mjs의 pageOverflows와 한 값
-  assert.ok(BOOK_JS.includes('scrollHeight-el.clientHeight>4'), 'book.js 판정 임계값 4px');
-  // 모바일: 넘친 쪽이 현재 쪽일 때만 book-wrap에 세로 스크롤을 허용한다
-  assert.ok(BOOK_JS.includes("classList.toggle('lt-page-scroll'"), 'book-wrap 세로 스크롤 토글');
-  assert.ok(BOOK_JS.includes("el.closest('#mobilePage')"), '예시 복제본(flip face)은 book-wrap 판정에서 제외한다');
-});
+test('#295 화면: 넘친 페이지만 그 안에서 세로로 넘겨 보고, 짧은 페이지는 그대로다', { skip: REQUIRE ? false : skip, timeout: 240000 }, async () => {
+  if (skip && REQUIRE) assert.fail(`미리보기 검사에서는 화면 시험 건너뜀이 실패다 — ${skip}`);
+  if (skip) return;
+  const server = await serve(ROOT);
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const ctx = await browser.newContext({ viewport: { width: 1024, height: 768 } });
+    const page = await ctx.newPage();
+    const errors = [];
+    page.on('pageerror', e => errors.push(String(e.message || e)));
+    await page.goto(`${base}/v41/?account=1`, { waitUntil: 'load' });
+    // 기록이 실려 온 뒤(트리 목록이 생긴 뒤) 책 화면으로 옮긴다 — 순서를 지키지 않으면 책이 빈 채로 남는다.
+    await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
+    await page.locator('#discover-ask-no').click().catch(() => {});
+    await page.locator('.tree-views [data-view="track59-sketchbook.html"]').click();
+    await page.waitForFunction(() => document.querySelector('#view')?.contentWindow?.location?.pathname?.includes('track59-sketchbook'), null, { timeout: 15000 });
+    const frame = page.frames().find(f => /track59-sketchbook/.test(f.url()));
+    assert.ok(frame, '책 프레임이 열리지 않음');
+    await frame.waitForSelector('.page-content, .mobile-content', { timeout: 20000 });
 
-test('#295 스타일: 넘친 페이지만 세로 스크롤을 허용하고 짧은 순간은 그대로다', () => {
-  // 기본 규칙은 그대로(페이지 안 스크롤 없음)
-  assert.ok(BOOK_USABILITY_CSS.includes('.page-content{overflow:hidden;overscroll-behavior:auto}'));
-  assert.ok(BOOK_CSS.includes('.page-content{position:absolute;inset:0;padding:43px 46px 37px;display:flex;flex-direction:column;overflow:hidden}'));
-  // 넘친 페이지만: overflow-y:auto + 스크롤 연쇄 차단
-  assert.ok(/\.page-content\.lt-overflow,html\[data-v41-screen=book\] \.mobile-content\.lt-overflow\{overflow-y:auto;overscroll-behavior:contain/.test(BOOK_USABILITY_CSS), 'lt-overflow 규칙');
-  // 내용 중앙 배치의 max-height:100%가 스크롤을 막지 않게 푼다
-  assert.ok(BOOK_USABILITY_CSS.includes('.page-content.lt-overflow>.moment{max-height:none}'));
-  // 모바일 세로 터치 스크롤: book-wrap touch-action:none을 넘친 쪽에서만 연다
-  assert.ok(BOOK_USABILITY_CSS.includes('.book-wrap.lt-page-scroll{touch-action:pan-y}'));
-  assert.ok(BOOK_CSS.includes('touch-action:none'), '기본 book-wrap은 여전히 제자리(짧은 순간 변화 0)');
+    await frame.evaluate(() => {
+      // 이 시험 안에서만 쓰는 측정 도구를 책 화면에 붙인다.
+      window.__LT_MEASURE__ = () => {
+        const shown = [...document.querySelectorAll('.page-content, .mobile-content')].filter(el => el.getClientRects().length > 0);
+        const wrap = document.querySelector('.book-wrap');
+        return {
+          pages: shown.map(el => ({
+            overflows: el.classList.contains('lt-overflow'),
+            overflowY: getComputedStyle(el).overflowY,
+            over: el.scrollHeight - el.clientHeight
+          })),
+          touchAction: wrap ? getComputedStyle(wrap).touchAction : null
+        };
+      };
+      // 사진이 늦게 붙은 것처럼 페이지 내용을 키운 뒤 책의 재판정 입구를 부른다.
+      window.__LT_GROW__ = () => {
+        const shown = [...document.querySelectorAll('.page-content, .mobile-content')].filter(el => el.getClientRects().length > 0);
+        const target = shown[0];
+        if (!target) return false;
+        const box = document.createElement('div');
+        box.id = 'lt-test-grow';
+        box.style.cssText = 'height:700px;flex:none';
+        target.appendChild(box);
+        window.__TRACK59__?.rejudgeOverflow?.();
+        return true;
+      };
+      window.__LT_SHRINK__ = () => {
+        document.getElementById('lt-test-grow')?.remove();
+        window.__TRACK59__?.rejudgeOverflow?.();
+      };
+    });
+    const measure = () => frame.evaluate(() => window.__LT_MEASURE__());
+
+    const before = await measure();
+    assert.ok(before.pages.length >= 1, '그려진 페이지가 있다');
+    for (const p of before.pages) {
+      assert.equal(p.overflows, false, `짧은 페이지에는 넘침 표시가 없다(실측 ${p.over}px)`);
+      assert.equal(p.overflowY, 'hidden', '짧은 페이지는 그 안에서 넘기지 않는다');
+    }
+    assert.equal(await frame.evaluate(() => window.__LT_GROW__()), true, '재는 페이지를 찾았다');
+    await page.waitForTimeout(400);
+    const grown = await measure();
+    const overflowed = grown.pages.filter(p => p.overflows);
+    assert.equal(overflowed.length, 1, `넘친 페이지만 표시가 붙는다(실측 ${JSON.stringify(grown.pages.map(p => p.over))})`);
+    assert.ok(overflowed[0].over > 4, `넘친 페이지는 4px 넘게 넘친다(실측 ${overflowed[0].over}px)`);
+    assert.equal(overflowed[0].overflowY, 'auto', '넘친 페이지는 그 안에서 세로로 넘겨 볼 수 있다');
+    assert.equal(grown.touchAction, 'pan-y', '넘치는 쪽을 볼 때는 위아래로 넘겨 볼 수 있다');
+    await frame.evaluate(() => window.__LT_SHRINK__());
+    await page.waitForTimeout(400);
+    const back = await measure();
+    for (const p of back.pages) {
+      assert.equal(p.overflows, false, `다시 짧아지면 넘침 표시가 사라진다(실측 ${p.over}px)`);
+      assert.equal(p.overflowY, 'hidden', '다시 짧아지면 세로 넘기기도 닫힌다');
+    }
+    assert.deepEqual(errors, [], `페이지 오류: ${errors.join(' | ')}`);
+  } finally { await browser.close().catch(() => {}); server.close(); }
 });
 
 // --- 2026-11-09 보완: 판정을 렌더 때만 하면 이미지가 늦게 로드되어 페이지가 나중에 넘칠 때 다시 잘린다(#301 검토 지적) ---
 
 const BOOK_EXTRA_JS = read('public/v41/views/book/book-extra.js');
-const USABILITY_JS = read('public/v41/book-usability.mjs');
 const { createOverflowRejudge } = await import('../public/v41/book-usability.mjs');
 
 // 가짜 rAF: 스케줄된 판정을 수동으로 실행한다(rAF 묶음 확인용)
@@ -214,11 +305,4 @@ test('#295 보완 강도: book-extra의 실제 연결 코드로 이미지 로드
   load.fn({ target: new FakeImg() });
   t.flush();
   assert.deepEqual(calls, ['judge'], '이미지 로드 뒤 book.js의 markOverflowPages가 다시 실행된다');
-  // book.js 쪽 연결: 렌더가 관찰 대상을 넘기고, 재판정 입구를 연다
-  assert.ok(BOOK_JS.includes('window.__TRACK59__?.overflowRejudge?.observe(els)'), 'markOverflowPages가 현재 페이지를 관찰에 넘긴다');
-  assert.ok(BOOK_JS.includes('rejudgeOverflow:()=>markOverflowPages()'), 'book.js가 재판정 입구를 연다');
-  // book-usability.mjs 연결: load는 캡처로, resize·RO를 같은 rAF 경로로 묶는다
-  assert.ok(USABILITY_JS.includes("addDocListener('load', onDocLoad, true)"), '이미지 load를 캡처로 듣는다');
-  assert.ok(USABILITY_JS.includes("addWinListener('resize', schedule)"), '창 resize를 같은 경로로 묶는다');
-  assert.ok(USABILITY_JS.includes('new ROClass(schedule)'), 'ResizeObserver도 같은 rAF 경로로 묶는다');
 });
