@@ -35,3 +35,19 @@ dialog.community-group-find::backdrop{background:transparent}
 @media(max-width:780px){
  dialog.community-group-find{inset:auto 0 0;width:auto;max-width:none;height:auto;max-height:min(70dvh,720px);margin:0;border-left:0;border-right:0;border-bottom:0;border-radius:var(--lt-r-card) var(--lt-r-card) 0 0}
 }
+
+/* #792 4단계 ⑤ 둘러보기 전용 — '이번 주 인기 무대' 줄과 미리보기의 '이 무대 담기' 단추.
+   공통 상단(shell.css)은 그대로 둔다. 새 색은 --lt-* 토큰으로만 쓴다. */
+.community-stages{margin:10px 0 4px;min-width:0}
+.community-stages-title{margin:0 0 6px;font-size:13px;font-weight:700;color:var(--lt-gold);letter-spacing:.02em}
+.community-stage-list{display:flex;flex-wrap:wrap;gap:6px 10px;min-width:0}
+.community-stages-empty{margin:0;color:var(--lt-muted);font-size:13px;line-height:1.6}
+.community-stage{display:inline-flex;align-items:center;gap:8px;max-width:100%;min-width:0;padding:6px 12px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-pill);background:rgba(255,230,166,.05);font-size:13px;line-height:1.4;color:var(--lt-pearl)}
+.community-stage-title{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.community-stage-count{flex:0 0 auto;color:var(--lt-muted);font-size:12px;white-space:nowrap}
+/* 담기 단추 묶음: 단추는 44px(미리보기 규칙) 그대로, 안내 한 줄은 단추 바로 아래에 선다. */
+.community-stage-box{display:flex;flex-direction:column;gap:4px;min-width:0}
+.community-stage-box[hidden]{display:none}
+.community-stage-vote{white-space:nowrap}
+.community-stage-note{margin:0;color:var(--lt-ink);font-size:13px;line-height:1.5}
+.community-stage-note[hidden]{display:none}

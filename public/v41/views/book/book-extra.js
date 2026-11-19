@@ -5,6 +5,9 @@ import {coverChoice,COVER_PALETTE} from '/v41/views/shelf/shelf-model.mjs';
 import {coverMomentFor} from '/v41/views/shelf/shelf-model.mjs';
 import {thumbnailCandidates,thumbFallbackAttrs,coverFallbackAttrs,fallbackCardMarkup,mountThumbFallback,VIDEO_UNAVAILABLE_TEXT} from '/v41/thumb-fallback.mjs';
 import {mountExpandControls,ytOpenUrl} from '/v41/yt-expand.mjs';
+import {createCommunityApi} from '/v41/community-api.mjs';
+// #792 4단계 ⑤: 공유 책의 순간 상세에서도 같은 규칙으로 '이 무대 담기' 단추를 붙인다.
+import {stageShareId,stageVoteLabel,stageVoteNotice,readStage,toggleStage} from '/v41/community-stages.mjs';
 mountThumbFallback(document);
 const $b=s=>document.querySelector(s);
 // #347 후속: 제목 보기 설정은 계정(LTDEMO.prefs)에서 읽고, 화면은 한 벌(titleView)로 그린다.
@@ -86,9 +89,33 @@ function detailMarkup(m){
   '<div class="chips">'+m.keywords.map(k=>'<span class="chip">#'+t(k)+'</span>').join('')+'</div>'+
   (line?'<div class="detail-why">'+t(line)+'</div>':'')+
   '<div class="detail-actions"><button type="button" data-detail-viewer>순간 열기</button>'+
+  '<button type="button" data-detail-stage hidden>이 무대 담기</button>'+
   (m.url?'<a href="'+t(m.url)+'" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">'+open+'</a>':'')+
   '<button type="button" data-detail-index>목차에서 보기</button>'+
   (canMove?'<button type="button" data-detail-move="'+t(m.id)+'">다른 트리로 옮기기</button>':'')+'</div>';
+}
+/* #792 4단계 ⑤: 표지·고른 순간이 공개 무대일 때만 '순간 열기' 옆에 '이 무대 담기'가 선다.
+   공유 번호는 주소(#share/<id>/<보기>)에서 읽는다 — 셸에 새 값을 넘기지 않는다.
+   단추가 확인되기 전에는 hidden으로 자리도 비워 두지 않는다(상세 줄이 흔들리지 않게). */
+let stageMountToken=0;
+async function mountStageButton(m){
+ const button=$b('[data-detail-stage]');if(!button||!m)return;
+ const host=window.parent!==window&&window.parent.location?window.parent.location:location;
+ const shareId=stageShareId(host.hash);if(!shareId)return;
+ const token=++stageMountToken;
+ const stage=await readStage({api:createCommunityApi(),shareId,momentId:m.id});
+ if(token!==stageMountToken||!button.isConnected||!stage)return;
+ const note=document.createElement('p');note.className='detail-stage-note';note.setAttribute('role','status');note.hidden=true;
+ button.after(note);
+ const paint=voted=>{button.textContent=stageVoteLabel(voted);button.setAttribute('aria-pressed',String(voted));button.hidden=false;};
+ paint(stage.voted);
+ button.addEventListener('click',async()=>{
+  button.disabled=true;
+  const result=await toggleStage({api:createCommunityApi(),stageId:stage.stageId,voted:button.getAttribute('aria-pressed')==='true'});
+  button.disabled=false;
+  if(!result.ok){note.textContent=stageVoteNotice(result.answer);note.hidden=false;return;}
+  note.hidden=true;paint(result.voted);
+ });
 }
 function cardFor(id){return [...document.querySelectorAll('.moment[data-moment]')].find(el=>el.dataset.moment===id&&el.closest('.page,.mobile-page'))||null}
 function placeDetail(id,card){
@@ -119,6 +146,7 @@ function placeDetail(id,card){
  if(detailAnchor&&detailAnchor!==card)detailAnchor.classList.remove('detail-open');
  detailAnchor=card;
  card.classList.add('detail-open');card.setAttribute('tabindex','-1');
+ mountStageButton(m);
 }
 const originalShowDetail=showDetail;
 showDetail=function(id){

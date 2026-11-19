@@ -330,3 +330,9 @@ html[data-book-shape=phone][data-v41-screen=book] .yt-play.is-vertical,
 html[data-book-shape=phone][data-v41-screen=book] .yt-frame.is-vertical{height:clamp(190px,26vh,230px)}
 /* #792: 구간 재생 뒤 '처음부터 보기' — 터치 영역 44px. */
 html[data-v41-screen=book] .yt-from-start{align-self:flex-start;margin:8px 0 2px;min-height:44px;padding:8px 12px;border:1px solid var(--lt-line,#c9b8a8);border-radius:999px;background:none;color:var(--lt-ink);font:inherit;font-size:12px;cursor:pointer}
+
+/* #792 4단계 ⑤: 공유 책 순간 상세의 '이 무대 담기' 단추와 안내 한 줄.
+   단추는 기존 상세 단추(44px) 그대로이고, 확인 전에는 hidden으로 숨긴다. */
+html[data-v41-screen=book] .detail-actions [data-detail-stage][hidden]{display:none}
+html[data-v41-screen=book] .detail-stage-note{flex:1 0 100%;margin:0;color:var(--lt-ink);font-size:12px;line-height:1.5}
+html[data-v41-screen=book] .detail-stage-note[hidden]{display:none}
