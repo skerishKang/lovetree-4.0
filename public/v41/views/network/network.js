@@ -110,7 +110,15 @@ function syncRibbon(){document.querySelectorAll('#mobileRibbon button[data-i]').
 // 창 크기가 바뀔 때만 잰다(가만히 있을 때는 아무것도 하지 않는다 — 유휴 rAF 0).
 // #517: 머리가 두 줄로 감기는 좁은 폭에서는 머리 아래에 순간 선택 패널·안내 문구가 오게 한다 —
 // 머리의 실제 아래 끝을 --lt-picker-top으로 CSS에 넘겨 패널(top)·안내 문구(top)가 도구 줄과 겹치지 않게 한다.
-function measureInsets(){const box=el=>{if(!el)return null;const cs=getComputedStyle(el);if(cs.display==='none'||cs.visibility==='hidden')return null;const r=el.getBoundingClientRect();return r.width>1&&r.height>1?r:null};const tops=['.topbar','.hero p','.lt-moment-picker'].map(s=>box(document.querySelector(s))).filter(Boolean);const left=box(document.querySelector('.left-rail')),right=box(document.querySelector('.progress-rail')),bottom=box(document.querySelector('.mobile-ribbon'));const topbarBottom=box(document.querySelector('.topbar'))?.bottom;/* #951 ①: 위 단추 줄 아래 작은 글자('순간 N · 이어진 선 N')까지 재어 순간 고르기 줄을 그 아래로 내린다(겹침 0). */const metaBottom=box(document.querySelector('.map-meta'))?.bottom||0;document.documentElement.style.setProperty('--lt-picker-top',(Math.max(topbarBottom||102,metaBottom)+0).toFixed(0)+'px');/* #517: 좁은 폭에서는 첫 순간 이름표(점 위, 약 24px)가 안내 문구 아래로 내려오게 상자 위 여백을 더 벌린다 — 이름표가 안내 문구와 겹치지 않게. */return {top:Math.max(0,...tops.map(r=>r.bottom))+(state.mobile?30:0),left:left?left.right:0,right:right?vw-right.left:0,bottom:bottom?vh-bottom.top:0}}
+function measureInsets(){const box=el=>{if(!el)return null;const cs=getComputedStyle(el);if(cs.display==='none'||cs.visibility==='hidden')return null;const r=el.getBoundingClientRect();return r.width>1&&r.height>1?r:null};
+ const left=box(document.querySelector('.left-rail')),right=box(document.querySelector('.progress-rail')),bottom=box(document.querySelector('.mobile-ribbon'));
+ const topbarBottom=box(document.querySelector('.topbar'))?.bottom;
+ /* #951 ①: 위 단추 줄 아래 작은 글자('순간 N · 이어진 선 N')가 앉을 자리(4px 아래·높이 16px + 2px 숨 = 22px)를 늘 비워 둔다.
+    잰 글자 높이에 기대지 않는다 — 글자가 늦게 채워지면 그때마다 판 위 여백이 달라져 같은 판이 다르게 그려졌다.
+    값은 순간 고르기 줄보다 먼저 정하고(그 줄이 그 자리에 서도록), 그 뒤에 재야 재는 값이 흔들리지 않는다. */
+ document.documentElement.style.setProperty('--lt-picker-top',((topbarBottom||102)+22).toFixed(0)+'px');
+ const tops=['.topbar','.hero p','.lt-moment-picker'].map(s=>box(document.querySelector(s))).filter(Boolean);
+ return {top:Math.max(0,...tops.map(r=>r.bottom))+(state.mobile?30:0),left:left?left.right:0,right:right?vw-right.left:0,bottom:bottom?vh-bottom.top:0}}
 function layoutNetwork(){NETFIT=LT56Model.networkLayout(LTDEMO.moments,{box:BOX,dotR:5,firstR:20,gap:8,hubR:9,edges:LTDEMO.edges,groups:GROUPS.map(g=>g.ids)});CLUSTERS.forEach((c,i)=>{const h=NETFIT.hubs[i];if(h){c.x=h.x;c.y=h.y}else if(NETFIT.fan||NETFIT.compact){/* #583 부채꼴 나무: 묶음 점이 뜻하는 묶음 자리가 없다(한 고리에 펼침) — 화면 밖에 치워 점·이름표·누르기에서 치운다 */c.x=-9999;c.y=-9999}})}
 // 전체 보기 = 배율 1(배치가 이미 화면 좌표로 상자에 맞춰져 있다).
 function fitView(){state.scale=1;state.tx=0;state.ty=0}
