@@ -208,3 +208,120 @@ test('아래 ＋ 단추: 1440 폭에서는 보이지 않는다', async (t) => {
     assert.equal(await fab.isVisible(), false, '1440에서는 떠 있는 ＋ 단추가 없다');
   });
 });
+// #977: 작업 공간에 형식이 어긋난 트리가 하나 섞여 있어도 셸은 읽을 수 있는 트리로 열린다.
+// 정식 생성기로 만든 트리 2개 + 손으로 적은 트리 1개(#977 재현 그대로)를 /api/workspace로만 물린다.
+const PIXEL = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64');
+const MALFORMED_TREE = { id: 't2', title: '다른 트리', moments: [] };
+
+function guardTree(subject) {
+  let tree = createTree({ subject, title: subject, note: '', emotion: '설렘', date: '2026-11-20', url: '' }, '2026-11-20T00:00:00Z');
+  tree = addMoment(tree, { title: `${subject} 둘째`, note: '', emotion: '설렘', date: '2026-11-20', url: '' }, tree.moments[0].id, '2026-11-20T00:00:01Z');
+  return tree;
+}
+
+async function withGuardWorkspace(trees, { width = 1440, height = 900, quarantined = 0 } = {}, fn) {
+  const server = await serve();
+  const origin = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch({ headless: true });
+  const ctx = await browser.newContext({ viewport: { width, height }, colorScheme: 'dark' });
+  try {
+    await ctx.addInitScript(() => { try { localStorage.setItem('lt41.theme', 'night'); } catch {} });
+    await ctx.route('**://i.ytimg.com/**', (route) => route.fulfill({ status: 200, contentType: 'image/png', body: PIXEL }));
+    await ctx.route('**/api/**', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
+    const puts = [];
+    await ctx.route('**/api/workspace**', async (route) => {
+      if (route.request().method() === 'PUT') {
+        puts.push(route.request().postDataJSON());
+        route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"revision":2}' });
+        return;
+      }
+      const served = { revision: 1, state: { version: 1, trees, prefs: {} }, subject: '시험계정', writeSubjectBound: true };
+      // #986: 서버가 읽지 못해 빼 둔 트리는 개수(quarantined)만 응답에 실린다.
+      if (quarantined) served.quarantined = quarantined;
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(served) });
+    });
+    const page = await ctx.newPage();
+    const errors = [], warnings = [];
+    page.on('pageerror', (error) => errors.push(String(error.message || error)));
+    page.on('console', (message) => { if (message.type() === 'warning') warnings.push(message.text()); });
+    await page.goto(`${origin}/v41/?account=1`, { waitUntil: 'load' });
+    await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
+    await page.locator('#discover-ask-no').click().catch(() => {});
+    await page.waitForTimeout(300);
+    await fn({ page, errors, warnings, puts });
+  } finally {
+    await browser.close();
+    server.close();
+  }
+}
+
+const shellFacts = (page) => page.evaluate(() => ({
+  trees: (window.LT41?.trees || []).map((tree) => tree.id),
+  titles: (window.LT41?.trees || []).map((tree) => tree.title),
+  source: window.LT41?.source || null,
+  toast: document.querySelector('#toast')?.textContent || ''
+}));
+
+test('어긋난 트리 1개 + 정상 2개: 셸이 열리고 정상 트리 2개만 보이며 안내·콘솔 경고가 한 줄씩 (390·1440)', async (t) => {
+  if (skip) { t.skip(skip); return; }
+  for (const width of [390, 1440]) {
+    await withGuardWorkspace([guardTree('첫 트리'), MALFORMED_TREE, guardTree('둘째 트리')], { width, height: width === 390 ? 844 : 900 }, async ({ page, errors, warnings }) => {
+      const facts = await shellFacts(page);
+      assert.deepEqual(facts.trees.length, 2, `${width}: 정상 트리 2개만 열린다 (${facts.trees.join(', ')})`);
+      assert.equal(facts.trees.includes('t2'), false, `${width}: 어긋난 트리는 빠진다`);
+      assert.deepEqual(facts.titles, ['첫 트리', '둘째 트리'], `${width}: 정상 트리 제목이 그대로`);
+      assert.equal(facts.source, 'server', `${width}: 서버 기록으로 연다`);
+      assert.match(facts.toast, /열 수 없는 트리 1개를 잠시 빼고 열었어요/, `${width}: 화면 안내 한 줄`);
+      assert.equal(warnings.filter((text) => /열 수 없는 트리/.test(text)).length, 1, `${width}: 콘솔 경고 한 줄`);
+      assert.deepEqual(errors, [], `${width}: 페이지 오류 없음`);
+      if (width === 1440) {
+        await page.locator('#record-menu').click();
+        await page.waitForSelector('#tree-popover [data-tree-id]', { timeout: 5000 }).catch(() => {});
+        assert.equal(await page.locator('#tree-popover [data-tree-id]').count(), 2, '트리 메뉴에도 정상 트리 2개만 보인다');
+      }
+    });
+  }
+});
+
+test('어긋난 트리가 있어도 순간을 저장하면 PUT 본문에는 어긋난 트리가 들어가지 않는다', async (t) => {
+  if (skip) { t.skip(skip); return; }
+  await withGuardWorkspace([guardTree('첫 트리'), MALFORMED_TREE, guardTree('둘째 트리')], {}, async ({ page, errors, puts }) => {
+    await page.locator('#write-menu').click();
+    await page.waitForFunction(() => document.getElementById('write-panel')?.open, null, { timeout: 5000 });
+    await page.fill('#quick-url', 'https://www.youtube.com/watch?v=dQw4w9WgXcQ');
+    await page.waitForFunction(() => !document.getElementById('quick-submit')?.disabled, null, { timeout: 5000 });
+    await page.locator('#quick-submit').click();
+    for (let i = 0; i < 120 && !puts.length; i += 1) await page.waitForTimeout(100);
+    assert.equal(puts.length, 1, '저장(PUT)이 한 번 나간다');
+    const saved = puts[0].state.trees;
+    // #986: 원본 보존은 서버 몫이다 — 본문에 어긋난 트리를 다시 붙이면 서버 전체 검사에
+    // 400 invalid_document로 거절되어 그 계정은 영영 저장하지 못하게 된다.
+    assert.equal(saved.some((tree) => tree.id === 't2'), false, '어긋난 트리 원본이 본문에 다시 붙지 않는다');
+    assert.deepEqual(saved.length, 2, '본문에는 정상 트리 2개만 담긴다');
+    assert.ok(saved.some((tree) => tree.moments.length === 3), '새 순간은 정상 트리에 담긴다');
+    assert.deepEqual(errors, [], '페이지 오류 없음');
+  });
+});
+
+test('서버가 읽지 못해 빼 둔 트리는 개수(quarantined)로도 안내를 띄운다', async (t) => {
+  if (skip) { t.skip(skip); return; }
+  // 서버는 이미 어긋난 트리를 빼고 정상 트리만 돌려주고, 개수만 quarantined로 알린다.
+  await withGuardWorkspace([guardTree('첫 트리'), guardTree('둘째 트리')], { quarantined: 1 }, async ({ page, errors, warnings }) => {
+    const facts = await shellFacts(page);
+    assert.deepEqual(facts.trees.length, 2, '서버가 돌려준 정상 트리 2개가 열린다');
+    assert.match(facts.toast, /열 수 없는 트리 1개를 잠시 빼고 열었어요/, '서버 개수로 안내 한 줄');
+    assert.equal(warnings.filter((text) => /열 수 없는 트리/.test(text)).length, 1, '콘솔 경고 한 줄');
+    assert.deepEqual(errors, [], '페이지 오류 없음');
+  });
+});
+
+test('정상 데이터만 있으면 어긋난 트리 안내가 뜨지 않는다', async (t) => {
+  if (skip) { t.skip(skip); return; }
+  await withGuardWorkspace([guardTree('첫 트리'), guardTree('둘째 트리')], {}, async ({ page, errors, warnings }) => {
+    const facts = await shellFacts(page);
+    assert.deepEqual(facts.trees.length, 2, '정상 트리 2개가 그대로 열린다');
+    assert.equal(/열 수 없는 트리/.test(facts.toast), false, '어긋난 트리 안내가 없다');
+    assert.equal(warnings.filter((text) => /열 수 없는 트리/.test(text)).length, 0, '콘솔 경고가 없다');
+    assert.deepEqual(errors, [], '페이지 오류 없음');
+  });
+});

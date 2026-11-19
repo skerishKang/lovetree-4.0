@@ -111,3 +111,47 @@ test('invalid, missing, deleted and account-isolated states stay distinct',async
  const removed=await request(handle,'GET','/api/public/shares/'+made.body.share.id);assert.equal(removed.status,410);assert.equal(removed.body.error.code,'share_removed');
  assert.deepEqual((await request(handle,'GET','/api/shares',null,'bob')).body.shares,[]);
 });
+
+// #986: 규칙이 바뀐 예전 문서처럼 저장소에 어긋난 트리(시작 순간이 둘)가 남아 있어도
+// 읽을 수 있는 트리의 공유·공개 상태 설정은 계속 동작한다.
+function deviantTree() {
+  const tree = createTree({ subject: '어긋남', title: '어긋난 옛 트리', note: '', emotion: '설렘', date: '2026-11-01', url: '' }, CLOCK);
+  const grown = { ...tree, moments: [...tree.moments, { ...tree.moments[0], id: 'moment-second-root', parentId: null }] };
+  return grown;
+}
+
+async function setupWithQuarantinedTree() {
+  const workspaceRepo = createMemoryWorkspaceRepo();
+  const deviant = deviantTree();
+  await workspaceRepo.commit({
+    productId: PRODUCT, subjectId: 'alice',
+    doc: { version: 1, trees: [first, deviant] },
+    expectedRevision: 0, clientKey: 'seed-quarantined', requestHash: '0'.repeat(64)
+  });
+  const shareRepo = createMemoryShareRepo(); let n = 0;
+  const service = createShareService({ shareRepo, workspaceRepo, productId: PRODUCT, makeId: () => String(++n).padStart(24, 's') });
+  const authenticate = async request => principal(request.headers?.account || 'alice');
+  return { deviant, handle: createShareHandler({ authenticate, service, productId: PRODUCT }) };
+}
+
+test('격리 트리가 섞인 기록에서도 공유 만들기·공개 읽기는 읽을 수 있는 트리로 동작한다', async () => {
+  const { handle } = await setupWithQuarantinedTree();
+  const input = { treeId: first.id, entryMomentId: first.moments[0].id, view: 'board' };
+  const preview = await request(handle, 'POST', '/api/shares/preview', input, 'alice');
+  assert.equal(preview.status, 200, '미리보기가 500이 아니라 200이다');
+  const made = await request(handle, 'POST', '/api/shares', { ...input, previewToken: preview.body.preview.previewToken }, 'alice');
+  assert.equal(made.status, 201);
+  const publicRead = await request(handle, 'GET', '/api/public/shares/' + made.body.share.id);
+  assert.equal(publicRead.status, 200, '방문자의 공개 읽기도 500이 아니다');
+  assert.equal(publicRead.body.tree.id, first.id, '읽을 수 있는 트리가 그대로 공유된다');
+  assert.equal(JSON.stringify(publicRead.body).includes('어긋난 옛 트리'), false, '격리 트리 내용은 응답에 없다');
+});
+
+test('격리 트리가 섞인 기록에서도 본인 트리의 공개 상태 스위치는 동작한다', async () => {
+  const { deviant, handle } = await setupWithQuarantinedTree();
+  const shown = await request(handle, 'PUT', '/api/trees/' + first.id + '/visibility', { visibility: 'private' }, 'alice');
+  assert.equal(shown.status, 200, '공개 상태 바꾸기가 500이 아니라 200이다');
+  assert.equal(shown.body.visibility, 'private');
+  const gone = await request(handle, 'PUT', '/api/trees/' + deviant.id + '/visibility', { visibility: 'private' }, 'alice');
+  assert.equal(gone.status, 404, '격리 트리는 화면에 없으므로 대상이 되지 않는다');
+});
