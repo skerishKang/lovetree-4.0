@@ -11,12 +11,15 @@ const community = read('public/v41/community-panel.mjs');
 
 test('#465 1: 책장 — 화살표는 책이 한 줄에 다 안 들어갈 때만(넘김 배치일 때만) 둔다', () => {
   // #889 원래 결정: 목록 길이가 아니라 레일에 다 들어가는지로 화살표를 정한다(검색으로 줄어도 같다).
-  assert.match(shelf, /applyShelfArrows\(list\.length,\(\$\('#shelfRail'\)&&\$\('#shelfRail'\)\.clientWidth\)\|\|0\);/);
+  assert.match(shelf, /var railWidth=\(\$\('#shelfRail'\)&&\$\('#shelfRail'\)\.clientWidth\)\|\|0;/);
+  assert.match(shelf, /applyShelfArrows\(list\.length,railWidth\);/);
   assert.match(shelf, /var show=railWidth>0&&shelfRowLayout\(count, railWidth\)\.mode==='carousel'&&count>0;/);
   assert.match(shelf, /if\(prevArrow\)prevArrow\.hidden=!show;/);
   assert.match(shelf, /if\(nextArrow\)nextArrow\.hidden=!show;/);
   // 레일 폭이 정해진 뒤(ResizeObserver)에도 다시 맞춘다.
   assert.match(shelf, /applyShelfArrows\(state\.shelfList\.length, rail\.clientWidth\);/);
+  // #944: 넘김은 고른 책(shelfIndex)이 아니라 책장 밀림(shelfOffset)으로 한 칸씩 한다.
+  assert.match(shelf, /state\.shelfOffset=next;save\(\);updateCarousel\(\);/);
   // 숨김 확실 가드. 소개 상자 높이 규칙은 이어 보기 띠(261118 대표 지적 4)로 바뀌었다.
   assert.match(shelfExtraCss, /#shelfPrev\[hidden\],#shelfNext\[hidden\]\{display:none\}/);
 });

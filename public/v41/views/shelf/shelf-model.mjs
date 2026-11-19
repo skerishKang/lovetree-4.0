@@ -165,11 +165,12 @@ export function carouselTransform(distance, wide = false) {
   };
 }
 
-// 책 가로 배치 방식(#889 원래 결정, 11-19 대표 결정으로 화면 폭 조건 제거).
-// 책이 한 줄에 다 들어가면 화면 폭과 무관하게 책장처럼 왼쪽 안쪽 여백부터 나란히 세우고,
-// 한 줄에 다 안 들어갈 때만 지금처럼 고른 책을 가운데 두고 좌우 화살표로 넘긴다.
+// 책 가로 배치 방식(#889 원래 결정, 11-19 대표 결정, #944 보완).
+// 책이 한 줄에 다 들어가면 화면 폭과 무관하게 책장처럼 왼쪽 안쪽 여백부터 나란히 세운다.
+// 다 안 들어가도 처음 위치는 같다 — 첫 책 왼쪽 끝을 책장 안쪽 여백에 맞추고,
+// 좌우 화살표로 pitch만큼씩 밀어 넘긴다(고른 책을 가운데에 강제로 두지 않는다, #944).
 // 좌표는 레일 가운데가 0. 카드 left:50% + translate(-50%)라서 --x=0이면 카드가 가운데에 온다.
-// 첫 책 왼쪽 끝을 레일 왼쪽(책장 안쪽 여백)에 맞추려면 leftX = cardW/2 - railWidth/2, 이후 pitch만큼 더한다.
+// 첫 책 왼쪽 끝을 레일 왼쪽(책장 안쪽 여백)에 맞추려면 leftX = cardW/2 - railWidth/2.
 export function shelfRowLayout(count, railWidth, { pitch = 200, cardW = 190, pad = 24, wideRail = 1760 } = {}) {
   const needed = (Math.max(count, 1) - 1) * pitch + cardW;
   const wide = railWidth >= wideRail;
@@ -177,13 +178,25 @@ export function shelfRowLayout(count, railWidth, { pitch = 200, cardW = 190, pad
   const fits = needed + pad <= railWidth;
   const mode = fits ? 'row' : 'carousel';
   const leftX = cardW / 2 - railWidth / 2;
+  // 레일에 끝까지 보이는 책 수: 마지막 카드 오른쪽 끝이 railWidth - pad 안에 들어와야 한다.
+  const visible = Math.max(1, Math.floor((railWidth - pad - cardW) / pitch) + 1);
+  const maxOffset = Math.max(0, count - visible);
   return {
     mode,
     wide,
     fits,
     leftX,
-    // row: 왼쪽 안쪽 여백부터 차례로. carousel: 고른 책(center)이 가운데.
-    xOf: (index, center) => (mode === 'row' ? leftX + index * pitch : (index - center) * pitch)
+    visible,
+    maxOffset,
+    // offset은 왼쪽에서 밀어 낸 책 수. 다 들어가면 maxOffset이 0이라 늘 첫 책이 왼쪽 끝이다.
+    xOf: (index, offset = 0) => leftX + (index - offset) * pitch,
+    // 고른 책이 이미 보이면 그대로, 아니면 최소만 밀어 보이게 한다(가운데 정렬 금지).
+    offsetFor: (index, current = 0) => {
+      const at = Math.max(0, Math.min(maxOffset, current));
+      if (index >= at && index < at + visible) return at;
+      if (index < at) return Math.max(0, index);
+      return Math.min(maxOffset, index - visible + 1);
+    }
   };
 }
 
