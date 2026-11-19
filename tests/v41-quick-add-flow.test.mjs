@@ -433,13 +433,12 @@ test('연결 구조(#425 2번): 쉬운 추가는 업로더를 만들지 않고 w
     // 사진 올리기는 자세한 추가 탭의 업로더만 쓴다 — 쉬운 추가는 업로더를 만들지 않는다.
     assert.equal(h.uploadsCalls.length, 0, 'createQuickAdd는 업로더를 만들지 않는다');
   } finally { h.restore(); }
-  // shell.mjs의 연결은 글자로 고정한다(연결이 지워지면 운영에서 무반응이 되는 #245 전례).
-  const fs = await import('node:fs');
-  const shell = fs.readFileSync(new URL('../public/v41/shell.mjs', import.meta.url), 'utf8');
-  assert.match(shell, /mountUpload:mountPrivateUpload/, 'shell.mjs는 기존 업로더를 quick-add에 그대로 넘긴다(호출 시그니처 유지)');
-  // #425: 순간 남기기는 한 창(write-panel)을 연다 — 고르기 창은 없다.
-  assert.match(shell, /\$\('write-menu'\)\.onclick=\(\)=>\{if\(source!=='server'&&member\?\.snapshot\(\)\.owned\)\{void resumeMember\('write'\);return;\}if\(member\?\.snapshot\(\)\.dirty\)\{explainSaveState\(\);return;\}shellQuick\.openWrite\(\);\}/, '순간 남기기는 한 창을 연다(예시면 내 기록으로 돌아온 뒤, 저장 안 됨이면 그 설명을 연다)');
-  assert.doesNotMatch(shell, /openWriteChooser/, '옛 고르기 창 진입이 남지 않는다');
+  // shell.mjs 글자 검사 세 개는 지웠다(이슈 952):
+  // · mountUpload 전달 — createQuickAdd는 deps.mountUpload를 쓰지 않는다(위 uploadsCalls 0 확인).
+  //   실제 사진 올리기는 private-upload가 자세한 추가 편집기에 붙는다(끌어다 놓기 시험들).
+  // · write-menu 클릭 연결 — 브라우저 시험(v41-header-ia)이 #write-menu를 실제로 누른다
+  //   (저장 안 됨이면 '저장 안 됨' 설명, 예시면 내 기록 복귀 뒤 같은 창).
+  // · openWriteChooser 없음 — 옛 이름의 부정 검사는 문자열 모양만 고정했다.
 });
 
 test('#739 담은 직후 제안 칩을 누르면 방금 담은 순간에 저장된다 — 연속 담기에서 옛 줄은 저장하지 않는다', async () => {
