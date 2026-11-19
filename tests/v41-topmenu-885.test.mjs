@@ -203,3 +203,91 @@ test('상단 메뉴 261119: 트리 단추 폭·⌄ 자리·목록 규칙·메뉴
     }
   } finally { await browser.close(); await new Promise((ok) => server.close(ok)); }
 });
+
+// ─── 이슈 970: 트리 드롭다운을 실제로 열고 닫는 모습을 본다 ───
+// 단추 폭·⌄ 자리·목록 아래 메뉴 순서(새 트리 → 관리 → 공유 → 꼬리표 정리)는 위 261119 시험이
+// 이미 1440·390에서 잰다. 여기서는 닫힘 길과 키보드를 잰다(#940 결정): Esc·바깥 누르기로 닫히고
+// aria-expanded가 false로 돌아오며, Esc에는 초점이 단추로 돌아오고, 키보드로 열어 ↑↓·Home·End로
+// 항목을 옮기고 Enter로 그 트리를 연다. LT_970_REQUIRE=1 일 때 실행(CI 화면 잡 — 건너뜀=실패).
+const REQUIRE970 = process.env.LT_970_REQUIRE === '1';
+
+test('970 실행: 트리 드롭다운은 Esc·바깥 누르기로 닫히고, 키보드로 옮기고 Enter로 연다', { skip: skip || !REQUIRE970 ? skip || 'LT_970_REQUIRE=1 일 때 실행' : false, timeout: 180000 }, async () => {
+  const server = await serve();
+  const origin = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch({ headless: true });
+  try {
+    for (const width of [1440, 390]) {
+      const ctx = await browser.newContext({ viewport: { width, height: width === 390 ? 844 : 900 }, reducedMotion: 'reduce' });
+      await ctx.addInitScript(() => { try { localStorage.setItem('lt41.theme', 'night'); } catch {} });
+      await ctx.route('**://i.ytimg.com/**', (r) => r.fulfill({ status: 200, contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="10" height="10" fill="#333"/></svg>' }));
+      await ctx.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
+      const state = { version: 1, trees: [tree(1), tree(2)], prefs: {} };
+      await ctx.route('**/api/workspace**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ revision: 1, state, subject: '시험계정', writeSubjectBound: true, savedAt: '2026-11-18T09:00:00.000Z' }) }));
+      const page = await ctx.newPage();
+      await page.goto(`${origin}/v41/?account=1`, { waitUntil: 'load', timeout: 60000 });
+      await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
+      await page.locator('#discover-ask-no').click().catch(() => {});
+      await page.waitForTimeout(700);
+
+      // 마우스로 열기 → Esc로 닫기: 초점이 단추로 돌아온다.
+      await page.click('#record-menu');
+      await page.waitForFunction(() => !document.getElementById('tree-popover')?.hidden, null, { timeout: 10000 });
+      assert.equal(await page.evaluate(() => document.getElementById('record-menu')?.getAttribute('aria-expanded')), 'true', `${width}: 열면 aria-expanded=true`);
+      await page.keyboard.press('Escape');
+      await page.waitForFunction(() => document.getElementById('tree-popover')?.hidden, null, { timeout: 5000 });
+      const afterEsc = await page.evaluate(() => ({
+        expanded: document.getElementById('record-menu')?.getAttribute('aria-expanded'),
+        focus: document.activeElement?.id
+      }));
+      assert.equal(afterEsc.expanded, 'false', `${width}: Esc로 닫으면 aria-expanded=false`);
+      assert.equal(afterEsc.focus, 'record-menu', `${width}: Esc로 닫으면 초점이 단추로 돌아온다`);
+
+      // 키보드로 열기(단추에 초점을 남긴 채 Enter) → ↑↓·Home·End로 항목을 옮긴다.
+      await page.keyboard.press('Enter');
+      await page.waitForFunction(() => !document.getElementById('tree-popover')?.hidden, null, { timeout: 5000 });
+      assert.equal(await page.evaluate(() => document.getElementById('tree-popover')?.dataset.ltOpenedBy), 'keyboard', `${width}: 키보드로 열면 opened-by=keyboard`);
+      const moved = await page.evaluate(async () => {
+        const pop = document.getElementById('tree-popover');
+        const items = [...pop.querySelectorAll('button')];
+        const at = () => items.indexOf(document.activeElement);
+        const press = (key) => new Promise((done) => {
+          document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
+          setTimeout(done, 30);
+        });
+        const first = at();
+        await press('ArrowDown'); const down = at();
+        await press('ArrowUp'); const up = at();
+        await press('Home'); const home = at();
+        await press('End'); const end = at();
+        return { count: items.length, first, down, up, home, end, last: items.length - 1 };
+      });
+      assert.equal(moved.first, 0, `${width}: 열면 첫 항목에 초점`);
+      assert.equal(moved.down, 1, `${width}: ↓로 다음 항목`);
+      assert.equal(moved.up, 0, `${width}: ↑로 다시 첫 항목`);
+      assert.equal(moved.home, 0, `${width}: Home은 첫 항목`);
+      assert.equal(moved.end, moved.last, `${width}: End는 마지막 항목`);
+
+      // Enter로 그 트리를 연다: 두 번째 트리 줄에 초점을 옮기고 Enter → 목록이 닫히고 주소가 그 트리를 가리킨다.
+      const wantTree = await page.evaluate(() => {
+        const row = [...document.querySelectorAll('#tree-popover [data-tree-id]')][1];
+        row.focus();
+        return row.dataset.treeId;
+      });
+      await page.keyboard.press('Enter');
+      await page.waitForFunction(() => document.getElementById('tree-popover')?.hidden, null, { timeout: 10000 });
+      assert.equal(await page.evaluate(() => document.getElementById('record-menu')?.getAttribute('aria-expanded')), 'false', `${width}: 트리를 고르면 목록이 닫힌다`);
+      await page.waitForFunction((id) => /tree=/.test(location.hash) && new URLSearchParams(location.hash.split('?')[1] || '').get('tree') === id, wantTree, { timeout: 15000 });
+      assert.ok(page.url().includes(`tree=${wantTree}`), `${width}: Enter로 고른 트리가 열린다(${page.url().split('#')[1] || ''})`);
+
+      // 바깥 누르기로 닫기: aria-expanded가 false로 돌아온다.
+      await page.click('#record-menu');
+      await page.waitForFunction(() => !document.getElementById('tree-popover')?.hidden, null, { timeout: 5000 });
+      // 아이프레임 위 좌표는 부모 문서까지 클릭이 오지 않으므로 부모 머리줄 빈 곳을 누른다.
+      await page.click(".app-header", { position: { x: 5, y: 5 } });
+      await page.waitForFunction(() => document.getElementById('tree-popover')?.hidden, null, { timeout: 5000 });
+      assert.equal(await page.evaluate(() => document.getElementById('record-menu')?.getAttribute('aria-expanded')), 'false', `${width}: 바깥을 누르면 닫히고 aria-expanded=false`);
+      assert.equal(await page.evaluate(() => document.getElementById('tree-popover')?.contains(document.activeElement)), false, `${width}: 닫힌 목록 안에 초점이 남지 않는다`);
+      await ctx.close();
+    }
+  } finally { await browser.close(); await new Promise((ok) => server.close(ok)); }
+});

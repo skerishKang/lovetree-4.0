@@ -287,6 +287,19 @@ jobs:
           node --test --test-concurrency=1 tests/v41-media-vertical.test.mjs tests/v41-quick-add.test.mjs
           echo "미디어·담기 화면 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
 
+      # 이슈 970: 트리 드롭다운(닫힘 길·초점 복귀·키보드)과 인증 화면 시안(전환·빈 칸 안내·오류 자리)을
+      # 실제 화면에서 본다. 드롭다운은 첫 화면 번들이 필요해 먼저 build하고, 인증 시안은 정적 파일(요청 0)이다.
+      # 건너뜀=실패(크롬이 준비된 이 잡에서 돈다).
+      - name: 트리 드롭다운·인증 화면 시험(건너뜀=실패 — 이슈 970)
+        env:
+          LT_970_REQUIRE: '1'
+        if: needs.screen-changes.outputs.changed == 'true'
+        run: |
+          start=$(date +%s)
+          npx vite build > /dev/null
+          node --test --test-concurrency=1 tests/v41-topmenu-885.test.mjs tests/v41-auth-skin.test.mjs
+          echo "트리 드롭다운·인증 화면 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+
       # 이슈 952: 셸·설정·테마 — 설정 창 탭 전환·키보드·더러운 닫기 확인·정책 링크, 390 접기 메뉴,
       # 접근성 이름(axe 수정), 밤/정원 테마 적용과 외부 글꼴 요청 0건, 부팅 synced 안내를 실제 화면에서 잰다.
       # 소스 글자 검사를 동작 검사로 바꾼 자리다. 첫 화면은 vite 번들이라 먼저 build 한다. 건너뜀=실패.
