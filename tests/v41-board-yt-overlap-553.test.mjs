@@ -266,7 +266,7 @@ test('970 실행: 썸네일 — 영상·사진이 화면 안에 보인다(가짜
   const browser = await chromium.launch({ headless: true });
   try {
     for (const [w, h] of [[1440, 900], [390, 844]]) {
-      const { context, page, frame } = await openMediaHost(browser, `${base}/__host-media.html`, { width: w, height: h });
+      const { context, page, frame, problems } = await openMediaHost(browser, `${base}/__host-media.html`, { width: w, height: h });
       // 전체 보기로 모든 카드를 화면 안에 둔다(머리줄 단추와 같은 fitAll).
       await frame.evaluate(() => { if (typeof fitAll === 'function') fitAll(false); });
       await page.waitForTimeout(900);
@@ -275,8 +275,6 @@ test('970 실행: 썸네일 — 영상·사진이 화면 안에 보인다(가짜
         return imgs.length >= 3 && imgs.every((i) => i.complete && i.naturalWidth > 0);
       }, null, { timeout: 20000 });
       // 사진 순간은 카드 안에 '사진 불러오기' 자리가 보인다. 누르기 전에는 그림 요청이 없다.
-      // 카드(compact)에는 .lt-media-status가 없어 누르면 load()가 null에 글자를 쓰며 멈춘다 — 별도 결함으로 보고,
-      // 이 시험은 자리와 깨진 그림 여부만 잰다.
       const p1Button = await frame.evaluate(() => {
         const b = document.querySelector('.card[data-id="p1"] [data-lt-load]');
         if (!b) return null;
@@ -313,6 +311,51 @@ test('970 실행: 썸네일 — 영상·사진이 화면 안에 보인다(가짜
       assert.ok(v1 && v1.img && v1.img.nw > 0, `${w}: 영상 순간 썸네일이 실린다`);
       const p1 = m.cards.find((c) => c.id === 'p1');
       assert.ok(p1 && p1.fullyInside, `${w}: 사진 순간 카드가 화면 안에 있다`);
+      const beforeLoadErrors = problems.length;
+      await frame.locator('.card[data-id="p1"] [data-lt-load]').click();
+      await frame.waitForFunction(() => {
+        const img = document.querySelector('.card[data-id="p1"] .lt-media-body img');
+        return !!img && img.complete && img.naturalWidth > 0;
+      }, null, { timeout: 20000 });
+      const p1Load = await frame.evaluate(() => {
+        const img = document.querySelector('.card[data-id="p1"] .lt-media-body img');
+        const r = img.getBoundingClientRect(), c = img.closest('.card').getBoundingClientRect();
+        return {
+          nw: img.naturalWidth,
+          inCard: r.left >= c.left - 2 && r.top >= c.top - 2 && r.right <= c.right + 2 && r.bottom <= c.bottom + 2,
+          inScreen: r.left >= -2 && r.top >= -2 && r.right <= innerWidth + 2 && r.bottom <= innerHeight + 2,
+          status: !!document.querySelector('.card[data-id="p1"] .lt-media-status'),
+        };
+      });
+      assert.ok(p1Load.nw > 0, `${w}: 카드에서 사진 불러오기를 누르면 그림이 실린다`);
+      assert.equal(p1Load.inCard, true, `${w}: 불러온 사진이 카드 안에 있다`);
+      assert.equal(p1Load.inScreen, true, `${w}: 불러온 사진이 화면 안에 있다`);
+      assert.equal(p1Load.status, false, `${w}: 카드는 상태 글자 없이 그림만 실린다(compact 유지)`);
+      assert.deepEqual(problems.slice(beforeLoadErrors), [], `${w}: 사진 불러오기에서 새 콘솔 오류 0 (${problems.join(' | ') || '없음'})`);
+      // 상세 창의 같은 단추는 비-compact 마크업 — 상태 글자와 함께 계속 동작한다.
+      await frame.evaluate(() => window.openViewer('p1'));
+      await frame.waitForSelector('#viewerModal.open', { timeout: 5000 });
+      const detailBefore = await frame.evaluate(() => {
+        const root = document.querySelector('#viewerMedia .lt-media');
+        return { button: !!root?.querySelector('[data-lt-load]'), status: root?.querySelector('.lt-media-status')?.textContent || '' };
+      });
+      assert.equal(detailBefore.button, true, `${w}: 상세 창에 사진 불러오기 단추가 있다`);
+      assert.ok(detailBefore.status.length > 0, `${w}: 상세 창에는 기존 상태 글이 있다`);
+      const beforeDetailErrors = problems.length;
+      await frame.locator('#viewerMedia [data-lt-load]').click();
+      await frame.waitForFunction(() => document.querySelector('#viewerMedia .lt-media-status')?.textContent === '사진을 불러왔어요.', null, { timeout: 20000 });
+      await frame.waitForFunction(() => {
+        const img = document.querySelector('#viewerMedia .lt-media-body img');
+        return !!img && img.complete && img.naturalWidth > 0;
+      }, null, { timeout: 20000 });
+      const detailAfter = await frame.evaluate(() => ({
+        nw: document.querySelector('#viewerMedia .lt-media-body img')?.naturalWidth || 0,
+        status: document.querySelector('#viewerMedia .lt-media-status')?.textContent || '',
+      }));
+      assert.ok(detailAfter.nw > 0, `${w}: 상세 창에서도 사진이 실린다`);
+      assert.equal(detailAfter.status, '사진을 불러왔어요.', `${w}: 상세 창은 기존 상태 글자를 유지한다`);
+      assert.deepEqual(problems.slice(beforeDetailErrors), [], `${w}: 상세 창 불러오기에서도 새 콘솔 오류 0`);
+      await frame.evaluate(() => document.getElementById('viewerModal').classList.remove('open'));
       await context.close();
     }
   } finally { await browser.close(); server.close(); }
@@ -346,7 +389,6 @@ test('970 실행: 썸네일 — 불러오기 실패면 대체 표시, 깨진 그
       assert.match(fb.notice, /영상이 삭제되었거나 비공개예요/, `${w}: 대체 표시 안내 문구`);
       assert.equal(fb.broken, 0, `${w}: 깨진 그림 아이콘 없음(실패한 그림은 치워진다)`);
       // 사진 순간은 누르기 전에는 그림이 없다(비공개 파일은 요청 0).
-      // 카드(compact)의 사진 불러오기는 .lt-media-status 부재로 실패하는 별도 결함 — 이 시험은 자리만 잰다.
       const pf = await frame.evaluate(() => {
         const card = document.querySelector('.card[data-id="p1"]');
         return {
