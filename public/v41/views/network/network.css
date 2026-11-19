@@ -25,7 +25,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 .view-switch .pill:last-child{border-radius:0 999px 999px 0;border-right-width:1px}
 .pill.icon{min-width:44px;padding:0;font-size:16px;line-height:1;display:inline-flex;align-items:center;justify-content:center}
 /* '이어진 선 N개'는 단추가 아니라 단추 줄 아래 작은 글자다(누르면 연결 목록 창이 열린다). */
-.map-meta{position:absolute;right:0;top:calc(100% + 4px);pointer-events:auto;padding:0;border:0;background:none;font-size:12px;letter-spacing:.02em;color:rgba(47,43,52,.74);white-space:nowrap}.mode-pill{height:36px;padding:0 12px;border-radius:999px;border:1px solid rgba(87,79,96,.10);background:rgba(255,255,255,.72);font-size:13px;letter-spacing:.08em;color:rgba(55,50,61,.55);backdrop-filter:blur(16px)}
+.map-meta{position:absolute;right:0;top:calc(100% + 4px);pointer-events:auto;padding:0;border:0;background:none;font-size:13px;letter-spacing:.02em;color:rgba(47,43,52,.74);white-space:nowrap}.mode-pill{height:36px;padding:0 12px;border-radius:999px;border:1px solid rgba(87,79,96,.10);background:rgba(255,255,255,.72);font-size:13px;letter-spacing:.08em;color:rgba(55,50,61,.55);backdrop-filter:blur(16px)}
 .pill{height:36px;padding:0 13px;border-radius:999px;border:1px solid rgba(77,71,87,.12);background:rgba(255,255,255,.74);font-size:13px;color:rgba(51,47,57,.65);box-shadow:0 8px 24px rgba(70,60,78,.05);backdrop-filter:blur(16px)}
 .pill:hover,.pill:focus-visible{outline:none;border-color:rgba(79,70,91,.28);background:#fff;color:#26242d}
 .hero{position:absolute;left:50%;top:68px;transform:translateX(-50%);z-index:16;text-align:center;pointer-events:none;width:min(800px,calc(100vw - 52px));transition:opacity .28s ease,transform .28s ease}.hero.dim{opacity:.07;transform:translateX(-50%) translateY(-14px)}
