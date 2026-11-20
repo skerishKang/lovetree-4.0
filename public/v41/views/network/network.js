@@ -89,7 +89,7 @@ let BOX={x:0,y:0,w:1200,h:800},NETFIT=null,CONCENTRIC=null;
 LTDEMO.moments.forEach((m,i)=>{const ci=GROUP_INDEX.get(m.id)??0,c=CLUSTERS[ci],p={x:c.x,y:c.y},j=i;const n=momentBase(ci,m.id,p.x,p.y,0,`p${ci}_0`,j,i===0);if(n.first)n.r=10;Object.assign(n,{title:m.title,date:m.date,emotion:m.emotion,note:m.memo||'',why:m.whyNext||'',source:m.source||'예시 기록',mediaMetadata:m.mediaMetadata,image:m.image});nodes.push(n)});
 CLUSTERS.forEach((c,ci)=>{const seq=nodes.filter(n=>n.cluster===ci).map(n=>n.id);addPath({id:`p${ci}_0`,cluster:ci,label:c.name,kind:'primary',nodes:seq,children:[],branchAt:-1})});
 LTDEMO.edges.forEach((e,i)=>addEdge({a:e.from,b:e.to,cluster:nodes.find(n=>n.id===e.from)?.cluster||0,kind:e.kind==='related'?'related':'parent',pathId:nodes.find(n=>n.id===e.from)?.pathId,order:i,reason:e.reason||''}));
-const FIRST=nodes[0];const originTargets=[];
+let FIRST=nodes[0];const originTargets=[];
 // #461 갈림길: 다음 순간이 둘 이상인 순간(멀리서도 이름표를 붙이는 대상).
 const BRANCH=new Set(Object.entries(LTDEMO.edges.filter(e=>e.kind==='parent').reduce((a,e)=>(a[e.from]=(a[e.from]||0)+1,a),{})).filter(([,c])=>c>1).map(([id])=>id));
 const all=[...CLUSTERS,...anchors,...nodes],byId=Object.fromEntries(all.map(n=>[n.id,n]));
@@ -398,4 +398,40 @@ addEventListener('resize',resize);
 const check=()=>{const i=measureInsets(),k=[i.top,i.left,i.right,i.bottom].map(Math.round).join(',');if(k===seen)return;const first=!seen;seen=k;if(!first)resize()};
 const ro=new ResizeObserver(check),watch=()=>{for(const q of SEL){const el=document.querySelector(q);if(el&&!watched.has(el)){watched.add(el);ro.observe(el)}}check()};
 watch();new MutationObserver(watch).observe(document.body,{childList:true});})();/* #461 화면 문서 끝의 <style>(모바일 안내 문구 자리 등)은 이 스크립트 뒤에 읽힌다 — 문서를 다 읽은 뒤·글꼴이 온 뒤 한 번씩 덮개를 다시 재어 맞춘다(한 번뿐, 유휴 반복 없음). */if(document.readyState==='loading')addEventListener('DOMContentLoaded',()=>resize(),{once:true});addEventListener('load',()=>resize(),{once:true});try{document.fonts?.ready?.then(()=>resize())}catch(e){}state.view=readStoredView();document.body.dataset.ltView=state.view;setupMobileRibbon();paintViewButtons();resize();(()=>{if(state.view==='concentric')computeConcentric(true);else overview(false);/* #583 '이 순간 열기': 셸이 주소(#my/network?tree=…&moment=…)로 특정 순간을 열 때 프레임 주소에 ?open=<순간>을 붙여 보낸다 — 그 순간을 가운데 두고 고른 상태(상세 판 열림)로 연다. 주소 약속은 docs/HANDOFF.md. */const openId=new URLSearchParams(location.search).get('open');const n=(openId&&byId[openId]?.kind==='moment')?byId[openId]:nodes.find(n=>n.id===LTDEMO.get());if(n){if(openId&&n.id===openId)selectMoment(n,true);else state.selected=n}})();last=performance.now();scheduleDraw();
+
+/* #1001 (3): 같은 트리 안 순간 변경(고치기·삭제·이전 순간 바꾸기·연결·해제)은 셸이 모델만 갱신하고
+   lt41-moments-saved로 알린다 — 지도를 다시 띄우지 않고 점·선·묶음을 부모 LT41.tree에서 다시 읽어
+   결정적 배치로 같은 자리에 다시 그린다. 고른 순간·보기·배율·열린 상세 판은 그대로 둔다(재적재 0).
+   실제 기록(서버 트리) 기준 — 예시·공유는 읽기 전용이라 이 알림이 오지 않는다. */
+addEventListener('message',e=>{
+ if(e.origin!==location.origin||e.source!==window.parent||e.data?.type!=='lt41-moments-saved')return;
+ if(typeof LTDEMO.refresh!=='function'||!LTDEMO.refresh())return;
+ const selId=state.selected?.id||null,detailOpen=$('detail').classList.contains('open');
+ const view=state.view,scale=state.scale,tx=state.tx,ty=state.ty;
+ const g=LT56Model.pickGroups(LTDEMO.moments,LTDEMO.edges);
+ GROUPS.length=0;g.forEach(x=>GROUPS.push(x));
+ GROUP_INDEX.clear();GROUPS.forEach((gr,i)=>gr.ids.forEach(id=>GROUP_INDEX.set(id,i)));
+ while(CLUSTERS.length>GROUPS.length)CLUSTERS.pop();
+ GROUPS.forEach((gr,i)=>{if(!CLUSTERS[i])CLUSTERS.push({id:`c${i}`,index:i,name:gr.name,sub:'',color:PALETTE()[i],x:0,y:0,count:gr.ids.length,hubR:9});else{CLUSTERS[i].name=gr.name;CLUSTERS[i].count=gr.ids.length;CLUSTERS[i].index=i;CLUSTERS[i].color=PALETTE()[i];}});
+ while(clusterPathIds.length<CLUSTERS.length)clusterPathIds.push([]);
+ nodes.length=0;
+ LTDEMO.moments.forEach((m,i)=>{const ci=GROUP_INDEX.get(m.id)??0,c=CLUSTERS[ci],p={x:c.x,y:c.y},j=i;const n=momentBase(ci,m.id,p.x,p.y,0,`p${ci}_0`,j,i===0);if(n.first)n.r=10;Object.assign(n,{title:m.title,date:m.date,emotion:m.emotion,note:m.memo||'',why:m.whyNext||'',source:m.source||'예시 기록',mediaMetadata:m.mediaMetadata,image:m.image});nodes.push(n)});
+ paths.length=0;for(const k of Object.keys(pathById))delete pathById[k];clusterPathIds.forEach(a=>a.length=0);
+ CLUSTERS.forEach((c,ci)=>{const seq=nodes.filter(n=>n.cluster===ci).map(n=>n.id);addPath({id:`p${ci}_0`,cluster:ci,label:c.name,kind:'primary',nodes:seq,children:[],branchAt:-1})});
+ edges.length=0;
+ LTDEMO.edges.forEach((ed,i)=>addEdge({a:ed.from,b:ed.to,cluster:nodes.find(n=>n.id===ed.from)?.cluster||0,kind:ed.kind==='related'?'related':'parent',pathId:nodes.find(n=>n.id===ed.from)?.pathId,order:i,reason:ed.reason||''}));
+ FIRST=nodes[0];
+ for(const k of Object.keys(byId))delete byId[k];
+ [...CLUSTERS,...anchors,...nodes].forEach(n=>byId[n.id]=n);
+ BRANCH.clear();Object.entries(LTDEMO.edges.filter(ed=>ed.kind==='parent').reduce((a,ed)=>(a[ed.from]=(a[ed.from]||0)+1,a),{})).filter(([,c])=>c>1).forEach(([id])=>BRANCH.add(id));
+ layoutNetwork();
+ if(view==='concentric')computeConcentric(false);else restoreNetworkPoints();
+ state.view=view;state.scale=scale;state.tx=tx;state.ty=ty;
+ if(selId&&byId[selId]?.kind==='moment'){
+  const n=byId[selId];state.selected=n;state.cluster=view==='concentric'?null:CLUSTERS[n.cluster];state.mobileCluster=n.cluster;applyPathHighlight(n);
+  if(detailOpen){const rawM=LTDEMO.moments.find(x=>x.id===n.id);const autoRe=/^(?:[a-z0-9-]+\.)+[a-z]{2,}(?::\d{1,5})?에서 간직한 순간$/i;const cleanTitle=autoRe.test(String(n.title||'').trim())?(String(rawM?.mediaMetadata?.title||'').trim()||n.note||'순간'):n.title;const lv=CONCENTRIC?.levelOf?.[n.id];const p=pathSequenceForNode(n);
+   $('detailKicker').textContent=n.first?'첫 순간':'순간';$('detailTitle').textContent=cleanTitle;$('detailDate').textContent=dateText(n.date);$('detailEmotion').textContent=n.emotion;$('detailCluster').textContent=view==='concentric'?`${lv||0}단계`:groupLabel(n.cluster);$('detailPath').textContent=p?.label||'Context 순간';$('detailNote').textContent=n.note;$('detailNote').parentElement.hidden=!n.note;$('detailWhy').textContent=n.why;$('detailWhy').parentElement.hidden=!n.why||n.why===n.note;}
+ }else if(selId){clearSelection();}
+ paintMapMeta();setupMobileRibbon();paintViewButtons();scheduleDraw();
+});
 })();

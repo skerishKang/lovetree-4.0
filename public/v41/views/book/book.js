@@ -214,3 +214,22 @@ renderSpread(posOfMoment(LTDEMO.get()),LTDEMO.get(),true);setTimeout(syncLensClo
 // #627: 꼬리표 칩 규칙(tag-line.mjs)이 클래식 스크립트 뒤에 도착한다 — 페이지를 한 번 다시 그려 칩을 붙인다.
 addEventListener('lt41-tagline-ready',()=>{if(machineState==='IDLE'&&!document.fullscreenElement)renderSpread(current,null,false)});
 window.__TRACK59__={playbackMoments:()=>allMoments(),getState:()=>({current,machineState,lensOn,recent:[...recent],detail:$('#detail').classList.contains('open'),viewer:$('#viewer').classList.contains('open'),archive:$('#archivePanel').classList.contains('open'),branch:$('#branchModal').classList.contains('open'),page:current,total:pageCount(),pageIds:pageSteps().map(x=>x.id),shape:narrow()?'phone':'wide',mobile:single(),view:single()?'single':'double'}),turnNext:()=>autoTurn('next'),turnPrev:()=>autoTurn('prev'),jump:(i,id)=>renderSpread(i,id,false),jumpToMoment:id=>renderSpread(posOfMoment(id),id,false),pageSteps,pageCount,posOfMoment,momentAtPos,currentSpread,spreadOfPos,setView:setViewChoice,showDetail,openArchive,openBranch,closeBranch,meta:metadataFor,normalizeHttpUrl,youtubeId,rejudgeOverflow:()=>markOverflowPages()};
+/* #1001 (3): 같은 트리 안 순간 변경(고치기·삭제·이전 순간 바꾸기·연결·해제)은 셸이 모델만 갱신하고
+   lt41-moments-saved로 알린다 — 화면을 다시 띄우지 않고 지금 펼침면·고른 순간·열린 상세·스크롤을 그대로 다시 그린다.
+   boardSync·editTree(#997)와 같은 방식: 알림을 받아 화면이 자기 상태를 다시 그린다. 재적재 0. */
+addEventListener('message',e=>{
+ if(e.origin!==location.origin||e.source!==window.parent||e.data?.type!=='lt41-moments-saved')return;
+ if(typeof LTDEMO.refresh!=='function'||!LTDEMO.refresh())return;
+ const fm=LTDEMO.moments.find(m=>m.first)||LTDEMO.moments[0]||null;
+ const next=fm?LT59Model.buildSpreads(LTDEMO.moments):[];
+ SPREADS.length=0;for(const sp of next)SPREADS.push(sp);
+ let sel=LTDEMO.get();
+ if(!LTDEMO.moments.some(m=>m.id===sel)){sel=e.data.momentId||fm?.id||'';if(sel)LTDEMO.select(sel);}
+ if(machineState!=='IDLE')return;
+ // 책의 실제 상세 판은 book-extra.js가 오른쪽 페이지(.page-detail)나 옆 패널(#detailSide)에 배치한다(#detail은 닫힘).
+ const detailWasOpen=!!selectedMomentId&&(!!document.querySelector('.page-detail')||($('#detailSide')&&!$('#detailSide').hidden));
+ renderSpread(current,null,false);
+ if(sel)document.querySelector(`[data-moment="${sel}"]`)?.classList.add('focused');
+ if(detailWasOpen){if(LTDEMO.moments.some(m=>m.id===selectedMomentId))showDetail(selectedMomentId);else{const side=$('#detailSide');if(side)side.hidden=true;}}
+});
+
