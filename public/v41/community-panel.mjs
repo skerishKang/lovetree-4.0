@@ -168,14 +168,14 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
    // #1026 묶음 D: 칸은 처음부터 같은 크기로 잡혀 있다(community-cover의 aspect-ratio).
    // 사진은 다 받은 뒤에만 0.2초로 나타난다 — 반쯤 내려온 그림이나 빈 칸→일부→완성 단계가 보이지 않는다.
    const art=el('span','community-cover-art');
-   const ready=img=>{if(img.isConnected)img.classList.add('is-ready')};
+   const ready=img=>{if(img.isConnected)img.classList?.add('is-ready')};
    if(vertical||youtube){
-    const backdrop=el('img','community-cover-backdrop');backdrop.alt='';backdrop.setAttribute('aria-hidden','true');backdrop.loading=loading;backdrop.classList.add('is-loading');
+    const backdrop=el('img','community-cover-backdrop');backdrop.alt='';backdrop.setAttribute('aria-hidden','true');backdrop.loading=loading;backdrop.classList?.add('is-loading');
     backdrop.addEventListener('load',()=>ready(backdrop),{once:true});
     backdrop.addEventListener('error',()=>{if(backdrop.isConnected)backdrop.remove()},{once:true});
     backdrop.src=url;if(backdrop.complete&&backdrop.naturalWidth)ready(backdrop);art.append(backdrop);
    }
-   const image=el('img','community-cover-image');image.alt='';image.loading=loading;image.decoding='async';image.referrerPolicy='no-referrer';image.classList.add('is-loading');
+   const image=el('img','community-cover-image');image.alt='';image.loading=loading;image.decoding='async';image.referrerPolicy='no-referrer';image.classList?.add('is-loading');
    image.addEventListener('load',()=>ready(image),{once:true});
    image.onerror=()=>{if(image.isConnected)image.replaceWith(el('span','community-cover-fallback',item.cover?.title||'순간 사진을 불러오지 못했어요.'));};
    image.src=url;if(image.complete&&image.naturalWidth)ready(image);
