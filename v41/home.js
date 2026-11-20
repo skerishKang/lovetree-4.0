@@ -12,6 +12,10 @@ import {readTitleDisplay, titleDisplayOf, shouldReloadForTitleDisplay} from '../
 import {momentListEntries, momentListTrees} from './moment-list.js';
 // 261116 PR 2: 카드 모드(마지막·고정·그날·무작위·트리)·숫자 줄이기 — 순수 계산 한 벌.
 import {HOME_MOMENT_KEY, readHomeMoment, normalizeHomeMoment, homeMomentPick, homeDayMoment, homeMomentMenu, formatCount} from './home-card-mode.js';
+const themeHost=document.getElementById('orbit');
+function syncTheme(theme){applyThemeAttribute(themeHost,appliedTheme(theme,'home'));}
+function applyTheme(theme){applyThemeAttribute(document.documentElement,appliedTheme(theme,'home'));syncTheme(theme);}
+applyTheme(readTheme(localStorage));
 const shellBody=parent.document.body;
 const context=parent.LT41||{source:shellBody.dataset.recordSource,member:shellBody.dataset.member,treeCount:Number(shellBody.dataset.treeCount||0)};
 const bridge=createHomeActions({getContext:()=>parent.LT41,send:message=>parent.postMessage(message,location.origin),gallery:true});
@@ -79,11 +83,16 @@ centerStyle.textContent='.center .actions{gap:10px}.center .actions .subtleBtn{f
 shadow.append(centerStyle);
 // 2026-11-07 테마 A/B: 첫 화면 오른쪽 위 도구 줄의 버튼 하나로 밤/정원을 바꾼다. 저장 키는 셸과 같다(lt41.theme).
 // 정원 색은 public/v41/identity.css의 정원 블록에만 있고, 그 파일을 그림자 루트에도 넣어 :host 규칙을 쓴다.
-const themeHost=document.getElementById('orbit');
-const themeStyle=document.createElement('link');themeStyle.rel='stylesheet';themeStyle.href='/v41/identity.css';shadow.append(themeStyle);
-function syncTheme(theme){applyThemeAttribute(themeHost,appliedTheme(theme,'home'));}
-function applyTheme(theme){applyThemeAttribute(document.documentElement,appliedTheme(theme,'home'));syncTheme(theme);}
-applyTheme(readTheme(localStorage));
+// 문서에서 이미 읽은 같은 출처의 스타일을 그림자 영역에도 첫 그림 전에 적용한다.
+// 글꼴 가져오기는 문서에서 처리했으므로 다시 요청하지 않는다.
+const identitySheet=document.querySelector('link[href="/v41/identity.css"]')?.sheet;
+if(identitySheet){
+ const themeStyle=document.createElement('style');
+ themeStyle.textContent=Array.from(identitySheet.cssRules).filter(rule=>rule.type!==CSSRule.IMPORT_RULE).map(rule=>rule.cssText).join('\n');
+ shadow.append(themeStyle);
+}else{
+ const themeStyle=document.createElement('link');themeStyle.rel='stylesheet';themeStyle.href='/v41/identity.css';shadow.append(themeStyle);
+}
 // 셸(계정 메뉴)이 이 문서의 html에 속성을 바꾸면 그림자 루트의 호스트와 버튼 글자를 맞춘다.
 new MutationObserver(()=>syncTheme(readTheme(localStorage))).observe(document.documentElement,{attributes:true,attributeFilter:['data-lt-theme']});
 // 2026-11-05: 공통 헤더가 워드마크·둘러보기·로그인을 맡으므로 첫 화면 안의 것은 숨기고, 고유 버튼(움직임 멈춤·순간 목록)은 다른 화면의 도구 줄과 같은 자리(오른쪽 위)에 둔다.
