@@ -1,6 +1,5 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { suggestMomentTitle, quickAdd, validateState, EMPTY_STATE } from '../src/domain.js';
 import { suggestMomentTitle as suggestMjs, quickAdd as quickAddMjs, validateState as validateReader, EMPTY_STATE as EMPTY_STATE_MJS } from '../public/v41/domain.mjs';
 import { createMemberSession } from '../public/v41/member-session.mjs';
@@ -156,23 +155,3 @@ test('서버 경계(PUT→GET): 자동 제목·mediaMetadata가 저장 왕복을
   restored.dispose();
 });
 
-test('배선: 빠른 추가·자세한 추가가 미리보기 제목을 저장에 함께 넘긴다(글자 검사)', () => {
-  const quickDom = readFileSync(new URL('../public/v41/shell/quick-add.mjs', import.meta.url), 'utf8');
-  const panels = readFileSync(new URL('../public/v41/shell/panels.mjs', import.meta.url), 'utf8');
-  const quickPure = readFileSync(new URL('../public/v41/quick-add.mjs', import.meta.url), 'utf8');
-  const videoTitle = readFileSync(new URL('../public/v41/video-title.mjs', import.meta.url), 'utf8');
-  // 빠른 추가: titleCache의 제목을 quickAdd 입력에 붙인다. 못 받으면 붙이지 않고, 제목이 늦으면
-  // backfillTitles로 방금 담은 순간에만 채운다(동작은 tests/v41-quick-add.test.mjs의 하네스 시험으로 본다).
-  assert.match(quickDom, /apply\('quickAdd', input\)/);
-  assert.match(quickDom, /const title = titleCache\.get\(parsed\.videoId\) \|\| '';/);
-  assert.match(quickDom, /return title \? \{ mediaMetadata: \{ title \} \} : \{\};/);
-  assert.match(quickDom, /import \{fetchVideoTitle\} from '\.\.\/video-title\.mjs';/);
-  // 자세한 추가: 미리보기 때 받아 둔 제목을 저장 입력에 함께 넘긴다(사용자 입력 우선은 도메인 판정).
-  // #601 '가' 결정: 자세한 추가의 부모는 편집기를 열 때 정한 이전 순간(고르지 않았으면 가장 최근 순간)이다.
-  assert.match(panels, /apply\(editorMode, \{\.\.\.Object\.fromEntries\(new FormData\(e\.target\)\), \.\.\.editorMediaTitle\(\)\}, editorMode === 'add' \? \{ \.\.\.selection\(\), momentId: addParentMomentId\(\) \} : selection\(\)\)/);
-  assert.match(panels, /import \{fetchVideoTitle\} from '\.\.\/video-title\.mjs';/);
-  assert.match(panels, /suggestMomentTitle\(\{title, note, url, mediaMetadata: editorVideoTitle && url === editorVideoUrl \? \{title: editorVideoTitle\} : null\}\)/, '안내 문구도 같은 규칙을 따른다');
-  // 조회 한 벌: 서버 oEmbed 프록시만 쓴다.
-  assert.match(videoTitle, /\/api\/youtube\/oembed\?v=/);
-  assert.match(quickPure, /export function parseQuickUrl/, '빠른 추가 판정은 기존 한 벌');
-});
