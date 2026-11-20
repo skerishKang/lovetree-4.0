@@ -1,6 +1,7 @@
 import {ApiError} from './errors.js';
 import {parsePrincipal} from './principal.js';
 import {ROLE_ADMIN, ROLE_AI_CUSTOMER} from './admin-roles.js';
+import {audienceForRole} from './ops-notify.js';
 
 /**
  * 고객 의견 창구 (#540) + 2차 관리자 게시판.
@@ -78,7 +79,7 @@ function publicFollowup(row,viewer){
   return {id:row.id,body:row.body,createdAt:row.createdAt,edited:!!row.editedAt,mine,canEdit:mine,canDelete:mine};
 }
 
-export function createFeedbackService({feedbackRepo,productId,admin=null,now=()=>Date.now()}={}){
+export function createFeedbackService({feedbackRepo,productId,admin=null,opsNotify=null,now=()=>Date.now()}={}){
   if(!feedbackRepo)throw new Error('feedbackRepo가 필요합니다.');
   const writes=new Map();
   function rate(key,limit,windowMs,message){
@@ -87,6 +88,8 @@ export function createFeedbackService({feedbackRepo,productId,admin=null,now=()=
    list.push(now());writes.set(key,list);
   }
   async function roleOf(principal){return principal&&admin?await admin.roleFor(principal):null;}
+  async function notifyAudience(principal){if(!opsNotify)return null;try{return audienceForRole(await roleOf(principal));}catch{return null;}}
+  function notifySaved(kind,title,sourceId,audience){if(opsNotify&&audience)void opsNotify.notify({kind,audience,title,sourceId}).catch(()=>{});}
   async function isAdmin(principal){return await roleOf(principal)===ROLE_ADMIN;}
   async function requireAdmin(principal){if(!await isAdmin(principal))throw new ApiError(403,'admin_forbidden','관리자만 볼 수 있어요.');}
   async function isAiCustomer(principal){return await roleOf(principal)===ROLE_AI_CUSTOMER;}
@@ -107,6 +110,7 @@ export function createFeedbackService({feedbackRepo,productId,admin=null,now=()=
     else rate('ip:'+clientKey(request),3,10*60_000,'같은 곳에서 10분에 3번까지 보낼 수 있어요. 잠시 뒤 다시 시도해 주세요.');
     const masked=maskPersonal(text);
     const row=await feedbackRepo.create({productId,subjectId,kind:'opinion',category,title:firstLine(masked),body:masked,context:sanitizeContext(context)});
+    notifySaved('feedback_new',row.title||firstLine(masked),String(row.id),await notifyAudience(principal));
     return {id:row.id,status:row.status,createdAt:row.createdAt};
    },
 
@@ -125,9 +129,11 @@ export function createFeedbackService({feedbackRepo,productId,admin=null,now=()=
     const today=await feedbackRepo.todayJournal({productId,subjectId:principal.subjectId});
     if(today){
      const row=await feedbackRepo.update({productId,id:today.id,title:text,body:masked,score:value});
+     notifySaved('feedback_append',row.title||text,String(row.id),audienceForRole(ROLE_AI_CUSTOMER));
      return {id:row.id,status:row.status,updated:true,createdAt:row.createdAt};
     }
     const row=await feedbackRepo.create({productId,subjectId:principal.subjectId,kind:'journal',category:'other',title:text,body:masked,score:value,journalDate:seoulDate(now())});
+    notifySaved('feedback_new',row.title||text,String(row.id),audienceForRole(ROLE_AI_CUSTOMER));
     return {id:row.id,status:row.status,updated:false,createdAt:row.createdAt};
    },
 
@@ -172,6 +178,7 @@ export function createFeedbackService({feedbackRepo,productId,admin=null,now=()=
     if(!text)throw new ApiError(400,'body_required','덧붙일 말을 입력해 주세요.');
     rate('followup:'+principal.subjectId,20,10*60_000,'잠시 뒤 다시 시도해 주세요.');
     const reply=await feedbackRepo.addReply({productId,postId:post.id,authorType:'customer',authorSubjectId:principal.subjectId,body:maskPersonal(text)});
+    notifySaved('feedback_append',post.title||firstLine(post.body),String(reply.id),await notifyAudience(principal));
     let status=post.status;
     if(status==='fixed'||status==='closed'){
      const reopened=await feedbackRepo.update({productId,id:post.id,status:'reviewing',memo:null,issueNumber:null,title:null,body:null,score:null});
