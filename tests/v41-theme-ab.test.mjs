@@ -109,6 +109,47 @@ try {
 }
 if (REQUIRE952T && !existsSync(new URL('../dist/v41/home.html', import.meta.url))) skip952t = '빌드 결과가 없어 실행 시험을 건너뜀';
 
+test('#1026 첫 화면은 문서와 카드 영역 모두 처음부터 기기 테마를 사용한다', { skip: skip952t || undefined }, async () => {
+  const { serve } = await import('./helpers/screen-audit.mjs');
+  const server = await serve({});
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium952t.launch();
+  try {
+    for (const theme of ['garden','night']) {
+      const ctx = await browser.newContext({viewport:{width:1440,height:900},reducedMotion:'reduce'});
+      await ctx.addInitScript((value) => {
+        try { localStorage.setItem('lt41.theme',value); } catch {}
+        window.__firstThemeSamples=[];
+        function sample(){
+          const root=document.documentElement, app=document.querySelector('#orbit')?.shadowRoot?.querySelector('.app');
+          if(document.body){
+            const entry={theme:root.getAttribute('data-lt-theme')||'night',app:app?getComputedStyle(app).backgroundImage:null};
+            const last=window.__firstThemeSamples.at(-1);
+            if(!last||last.theme!==entry.theme||last.app!==entry.app)window.__firstThemeSamples.push(entry);
+          }
+          requestAnimationFrame(sample);
+        }
+        requestAnimationFrame(sample);
+      }, theme);
+      await ctx.route('**/api/**',route=>route.fulfill({status:200,contentType:'application/json',body:'{"ok":true,"items":[]}'}));
+      await ctx.route('**/api/workspace*',route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({revision:1,state:{version:1,trees:[]},subject:'시험계정',writeSubjectBound:true,savedAt:'2026-11-20T00:00:00.000Z'})}));
+      await ctx.route('**/assets/v41home-*.js',async route=>{await new Promise(resolve=>setTimeout(resolve,600));await route.continue();});
+      const page=await ctx.newPage();
+      await page.goto(base+'/v41/?account=1#home');
+      await page.waitForFunction(()=>!!document.querySelector('#view')?.contentDocument?.querySelector('#orbit')?.shadowRoot?.querySelector('.app'),null,{timeout:20000});
+      await page.waitForFunction(()=>document.querySelector('#view').contentWindow.__firstThemeSamples?.some(x=>x.app),null,{timeout:5000});
+      const got=await page.evaluate(()=>({shell:window.__firstThemeSamples,home:document.querySelector('#view').contentWindow.__firstThemeSamples}));
+      assert.ok(got.shell.length>0&&got.home.length>0);
+      assert.ok([...got.shell,...got.home].every(x=>x.theme===theme),JSON.stringify(got));
+      const appFrames=got.home.filter(x=>x.app);
+      assert.ok(appFrames.length>0);
+      if(theme==='garden') assert.ok(appFrames.every(x=>x.app.includes('rgb(251, 248, 241)')&&x.app.includes('rgb(247, 240, 232)')),JSON.stringify(got));
+      else assert.ok(appFrames.every(x=>!x.app.includes('rgb(247, 240, 232)')),JSON.stringify(got));
+      await ctx.close();
+    }
+  } finally {await browser.close();server.close();}
+});
+
 test('952 실행: 밤이 기본이고 정원 저장은 다음 부팅에 유지되며 외부 글꼴 요청이 없다', { skip: skip952t || undefined }, async () => {
   const { serve } = await import('./helpers/screen-audit.mjs');
   const server = await serve({});
