@@ -1,7 +1,7 @@
 // #601 관계 지도 다듬기 — 실행형 시험.
 // ① 새 순간 기본 연결(가 결정): 이전 순간을 고르지 않으면 첫 순간이 아니라 가장 최근 순간 다음에 잇는다.
 // ② 점 이름표: 자동 제목('youtube.com에서 간직한 순간')이 제목 자리를 차지하지 않고, 썸네일이 붙는다.
-// ③ 왼쪽 판 통일: 그물형·동심원형 두 보기에서 묶음 판+탐색 판이 같은 자리에 같이 보인다.
+// ③ 왼쪽 판 통일(#951 ⑥ 갱신): 두 보기에서 묶음 판+아래 단추 줄이 같이 보이고, 큰 탐색 판은 숨는다.
 // ④ 순간 묶음: 데이터에 맞는 묶음(부채꼴 나무는 감정별, 사슬은 월별; 빈 묶음 없음, 한 묶음이면 판을 숨김).
 // ⑤ '이어진 선 N개': 지도에 실제 그린 연결 선 수(양 끝이 있는 연결)와 같다.
 // 크롬이 없는 곳에서는 브라우저 몫을 건너뛰고, LT_MAP_RELATIONS_REQUIRE=1에서는 건너뜀을 실패로 본다.
@@ -157,29 +157,45 @@ test('②③④ 지도 화면: 이름표·썸네일·묶음 판·두 보기 판 
       const rows = await page.evaluate(() => [...document.querySelectorAll('.legend-row')].filter(r => !r.hidden).map(r => r.textContent.trim()));
       assert.ok(rows.length >= 2 && rows.length <= 6, `묶음 행 개수: ${rows.length}`);
       assert.ok(rows.every(t => /·\s*\d+개$/.test(t) && !/·\s*0개/.test(t)), `빈 행·이름 없는 행 없음: ${rows.join(' / ')}`);
-      // ③ 두 보기에서 왼쪽 판(묶음+탐색)이 같은 자리에 보인다.
+      // ③ 두 보기에서 묶음 판+아래 단추 줄이 같이 보인다(#951 ⑥: 큰 탐색 판은 숨고 단추 줄이 그 자리를 맡는다).
       for (const view of ['network', 'concentric']) {
         await page.evaluate(v => { document.body.dataset.ltView = v; }, view);
         const vis = await page.evaluate(() => {
           const show = s => { const el = document.querySelector(s); if (!el) return false; const cs = getComputedStyle(el); return cs.display !== 'none' && cs.visibility !== 'hidden' && el.getBoundingClientRect().width > 1; };
-          return { legend: show('.legend'), controls: show('.controls'), minus: !!document.querySelector('#zoomOut'), plus: !!document.querySelector('#zoomIn'), reset: document.querySelector('#resetFocus')?.textContent?.trim() };
+          const ribBtns = [...document.querySelectorAll('#mobileRibbon button')].map(b => b.textContent.trim());
+          return { legend: show('.legend'), ribbon: show('.mobile-ribbon'), controls: show('.controls'), minus: !!document.querySelector('#mobileRibbon button[aria-label="지도 축소(−)"]'), plus: !!document.querySelector('#mobileRibbon button[aria-label="지도 확대(＋)"]'), reset: ribBtns[ribBtns.length - 1] };
         });
-        assert.ok(vis.legend && vis.controls, `${view}: 묶음 판과 탐색 판이 같이 보인다`);
+        assert.ok(vis.legend && vis.ribbon && !vis.controls, `${view}: 묶음 판과 단추 줄이 같이 보이고 큰 탐색 판은 숨는다`);
         assert.ok(vis.minus && vis.plus, `${view}: [−][＋] 단추`);
-        assert.equal(vis.reset, '전체 보기', `${view}: 전체 보기 단추 문구`);
+        const rows = await page.evaluate(() => [...document.querySelectorAll('#mobileRibbon button')].map(b => b.textContent.trim()));
+        assert.equal(vis.reset, '전체 보기', `${view}: 마지막 단추 문구(390과 같은 줄) — 실제 렌더링값 ${JSON.stringify(rows)}`);
       }
     } finally { await ctx.close(); await browser.close(); }
 
-    // ④ 감정이 하나뿐인 부채꼴 나무도 묶음 판이 1줄로 보인다(점·이름 일치 — 없는 색 점이 남지 않는다).
+    // ④ 감정이 하나뿐인 부채꼴 나무: 묶음 1개 → 범례 숨김(#951 ⑥ — 단추 줄이 같은 정보를 맡는다).
     {
       const one = flat26();
       one.demo = one.demo.map(m => ({ ...m, emotion: '설렘' }));
       one.moments = one.moments.map(m => ({ ...m, emotion: '설렘' }));
       const { ctx, page, browser } = await openMap(base, { width: 1440, stub: lt41Stub(one, 'm01') });
       try {
+        const m = await page.evaluate(() => ({ hidden: document.querySelector('.legend').hidden, rows: [...document.querySelectorAll('.legend-row')].filter(r => getComputedStyle(r).display !== 'none').length, ribbon: getComputedStyle(document.querySelector('.mobile-ribbon')).display !== 'none' }));
+        assert.ok(m.hidden && m.rows === 0, '묶음이 한 가지면 범례는 숨는다');
+        assert.ok(m.ribbon, '범례가 숨아도 아래 단추 줄은 보인다');
+      } finally { await ctx.close(); await browser.close(); }
+    }
+    // ④ 감정이 두 가지인 부채꼴 나무: 묶음 2개 → 범례가 이름·개수로 보인다(보이는 쪽도 데이터로 확인).
+    {
+      const two = flat26();
+      const emo = (m, i) => ({ ...m, emotion: i % 2 ? '몰입' : '설렘' });
+      two.demo = two.demo.map(emo);
+      two.moments = two.moments.map(emo);
+      const { ctx, page, browser } = await openMap(base, { width: 1440, stub: lt41Stub(two, 'm01') });
+      try {
         const rows = await page.evaluate(() => [...document.querySelectorAll('.legend-row')].filter(r => getComputedStyle(r).display !== 'none').map(r => ({ text: r.textContent.trim(), dot: !!r.querySelector('.swatch') })));
-        assert.equal(rows.length, 1, '묶음이 한 가지면 묶음 판에 1줄만 보인다');
-        assert.ok(rows[0].text && rows[0].dot, '한 가지 묶음 행은 색 점과 이름이 든다');
+        assert.equal(rows.length, 2, '묶음이 두 가지면 범례에 2줄이 보인다');
+        assert.ok(rows.every(r => r.text && r.dot), '묶음 행은 색 점과 이름이 든다');
+        assert.ok(rows.some(r => r.text.includes('설렘')) && rows.some(r => r.text.includes('몰입')), `감정 이름(${rows.map(r => r.text).join(' / ')})`);
       } finally { await ctx.close(); await browser.close(); }
     }
   } finally { server.close(); }

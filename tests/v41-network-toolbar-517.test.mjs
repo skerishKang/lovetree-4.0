@@ -58,7 +58,19 @@ const mapHostMemberHTML = (n) => {
   const media = Object.fromEntries(ids.map((id) => [id, { image: PHOTO, type: 'photo' }]));
   return `<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>지도 호스트</title></head><body data-member="in" data-record-source="server"><script>window.LT41={source:'server',writable:true,tree:${JSON.stringify(tree)},trees:[${JSON.stringify(tree)}],exampleMedia:${JSON.stringify(media)},momentId:'m1'};</script><iframe src="/v41/views/track56-network.html" style="position:fixed;inset:0;width:100%;height:100%;border:0"></iframe></body></html>`;
 };
-const EXTRA_ROUTES = { '/map-host-3.html': mapHostHTML(3), '/map-host-8.html': mapHostHTML(8), '/map-host-thumb.html': mapHostThumbHTML(), '/map-host-member-3.html': mapHostMemberHTML(3), '/map-host-member-8.html': mapHostMemberHTML(8) };
+// #951 ⑥: 묶음 2개짜리 데이터(사슬 10순간, 10월·11월) — 범례가 보이는 쪽을 확인한다.
+const mapHostMember2GHTML = () => {
+  const titles = ['Super Shy 무대', 'Ditto 직캠', 'OMG 앵콜', 'Hype Boy 연습실', 'Attention 무대', 'Cookie 직캠', 'ETA 뮤비', 'Get Up 무대', '첫 팝업 사진', '라디오 한마디'];
+  const ids = Array.from({ length: 10 }, (_, i) => `m${i + 1}`);
+  const tree = {
+    id: 't1', title: '뉴진스 순간', subject: '뉴진스', owned: true,
+    moments: ids.map((id, i) => ({ id, title: titles[i], date: `2026-${i < 5 ? '10' : '11'}-${String(10 + i).padStart(2, '0')}`, emotion: '설렘', note: '공연', url: '', parentId: i ? ids[i - 1] : null })),
+    edges: ids.slice(1).map((id, i) => ({ kind: 'parent', from: ids[i], to: id, reason: '이 다음 장면이 궁금해서' }))
+  };
+  const media = Object.fromEntries(ids.map((id) => [id, { image: PHOTO, type: 'photo' }]));
+  return `<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>지도 호스트</title></head><body data-member="in" data-record-source="server"><script>window.LT41={source:'server',writable:true,tree:${JSON.stringify(tree)},trees:[${JSON.stringify(tree)}],exampleMedia:${JSON.stringify(media)},momentId:'m1'};</script><iframe src="/v41/views/track56-network.html" style="position:fixed;inset:0;width:100%;height:100%;border:0"></iframe></body></html>`;
+};
+const EXTRA_ROUTES = { '/map-host-3.html': mapHostHTML(3), '/map-host-8.html': mapHostHTML(8), '/map-host-thumb.html': mapHostThumbHTML(), '/map-host-member-3.html': mapHostMemberHTML(3), '/map-host-member-8.html': mapHostMemberHTML(8), '/map-host-member-2g.html': mapHostMember2GHTML() };
 async function serve() {
   const server = createServer(async (req, res) => {
     const clean = decodeURIComponent((req.url || '/').split('?')[0]);
@@ -408,7 +420,10 @@ test('#951 ⑤ 서재에서 들어온 지도: ← 서재 단추 1개 + 묶음 �
             chipClip: chips.filter((c) => c.l < -1 || c.r > innerWidth + 1).map((c) => c.text),
             views: [...document.querySelectorAll('.view-switch .pill')].map((b) => b.textContent.trim()),
             barClip: Math.max(0, document.querySelector('.topbar').getBoundingClientRect().right - innerWidth),
-            legend: [...document.querySelectorAll('.legend-row')].filter((r) => !r.hidden).map((r) => r.textContent.trim())
+            legend: [...document.querySelectorAll('.legend-row')].filter((r) => !r.hidden).map((r) => r.textContent.trim()),
+            ribbon: vis(document.getElementById('mobileRibbon')),
+            ribbonBtns: [...document.querySelectorAll('#mobileRibbon button')].filter(vis).length,
+            controls: vis(document.querySelector('.controls'))
           };
         });
         const tag = `${width}/${n}`;
@@ -420,17 +435,20 @@ test('#951 ⑤ 서재에서 들어온 지도: ← 서재 단추 1개 + 묶음 �
         assert.deepEqual(m.overlap, [], `${tag}: 위 단추끼리 겹침 없음(${JSON.stringify(m.overlap)})`);
         assert.equal(m.barClip, 0, `${tag}: 위 줄이 화면 밖으로 넘치지 않는다`);
         assert.deepEqual(m.views, ['이어진 길', '묶음', '시간 순'], `${tag}: 보기 이름`);
-        // 묶음 단추(좁은 화면의 아래 조작 줄): '1묶음 · 1–2월' — 앞 0 없음, 범례와 같은 번호, 겹침·잘림 0.
-        // 641px 이상에서는 아래 줄이 숨고 범례가 그 자리를 맡는다(예전과 같다).
+        // 묶음 단추(아래 조작 줄): '1묶음 · 1–2월' — 앞 0 없음, 범례와 같은 번호, 겹침·잘림 0.
+        // #951 ⑥: 641px 이상도 아래 단추 줄이 보인다(큰 탐색 판 숨김) — 이 데이터는 묶음 1개라 범례는 숨는다.
         if (width <= 640) {
           assert.ok(m.chips.length >= 1, `${tag}: 묶음 단추가 있다`);
           for (const c of m.chips) assert.match(c.text, /^[1-9]\d*묶음 · .+/, `${tag}: 묶음 단추 글자 형식(${c.text})`);
-          assert.deepEqual(m.chips.map((c) => c.text.split('묶음')[0]), m.legend.map((t) => String(Number(t.slice(0, 2)))), `${tag}: 범례와 같은 번호(${JSON.stringify(m.chips.map((c) => c.text))} / ${JSON.stringify(m.legend)})`);
+          // #951 ⑥: 이 데이터는 묶음 1개 — 범례는 숨는다(2개 이상부터 보임; 보이는 쪽은 아래 ⑥ 시험이 2묶음 데이터로 확인).
+          assert.equal(m.legend.length, 0, `${tag}: 묶음 1개 — 범례 숨김`);
           assert.deepEqual(m.chipOverlap, [], `${tag}: 묶음 단추끼리 겹침 없음(${JSON.stringify(m.chipOverlap)})`);
           assert.deepEqual(m.chipClip, [], `${tag}: 묶음 단추가 화면 밖으로 잘리지 않는다(${JSON.stringify(m.chipClip)})`);
           assert.ok(m.chips.every((c) => c.h <= 48), `${tag}: 단추 높이 안에 글자가 들어 있다(${JSON.stringify(m.chips.map((c) => c.h))})`);
         } else {
-          assert.ok(m.legend.length >= 1, `${tag}: 넓은 화면은 범례가 묶음을 보여 준다`);
+          assert.equal(m.controls, false, `${tag}: 넓은 화면에 큰 탐색 판은 없다`);
+          assert.ok(m.ribbon && m.ribbonBtns >= 4, `${tag}: 넓은 화면 아래 단추 줄(단추 ${m.ribbonBtns}개)`);
+          assert.equal(m.legend.length, 0, `${tag}: 묶음 1개 — 범례 숨김(2개부터 보임은 #951 ⑥ 시험)`);
         }
         await context.close();
       }
@@ -572,6 +590,126 @@ test('#951 ⑤ 지도 상세 판: 보드와 같은 틀(제목·사진·마음·�
           await context.close();
         }
       }
+    }
+  } finally {
+    await browser?.close();
+    server.close();
+  }
+});
+
+// #951 ⑥ 화면 계약 — 큰 탐색 판을 숨기고 아래 단추 줄을 넣는다.
+// 측정 도구·기준값(겹침 0, 44px, 한 줄, 범례 표시 조건)은 그대로 두고
+// 무엇을 재는지(대상 요소)만 '탐색 판' → '단추 줄'로 옮긴다.
+test('#951 ⑥ 넓은 화면 단추 줄: 1440·2560에 큰 판 없음, 단추 44px 한 줄, 열림·닫힘 겹침 0, 범례는 묶음 2개부터', { skip: REQUIRE ? false : skip, timeout: 240000 }, async () => {
+  if (skip) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip}`);
+  const server = await serve();
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const MEASURE = () => {
+    const vis = el => { if (!el) return false; const cs = getComputedStyle(el); if (cs.display === 'none' || cs.visibility === 'hidden' || parseFloat(cs.opacity) === 0) return false; const r = el.getBoundingClientRect(); return r.width > 1 && r.height > 1; };
+    const box = el => { const r = el.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom }; };
+    const rib = document.getElementById('mobileRibbon');
+    const ribB = vis(rib) ? box(rib) : null;
+    const btns = [...rib.querySelectorAll('button')].filter(vis).map(b => ({ text: b.textContent.trim(), fs: parseFloat(getComputedStyle(b).fontSize), h: b.clientHeight, top: Math.round(b.getBoundingClientRect().top) }));
+    const det = document.getElementById('detail');
+    const detB = vis(det) ? box(det) : null;
+    const card = document.getElementById('routeStatus'), toast = document.getElementById('toast');
+    const cardB = vis(card) ? box(card) : null, toastB = vis(toast) ? box(toast) : null;
+    const labels = (window.__lt.labels() || []).map(l => l.rect ? { l: l.rect.left, t: l.rect.top, r: l.rect.right, b: l.rect.bottom } : { l: l.x, t: l.y - l.h, r: l.x + l.w, b: l.y });
+    const hits = (a, b) => a && b && a.l < b.r - 1 && b.l < a.r - 1 && a.t < b.b - 1 && b.t < a.b - 1;
+    const ov = [];
+    if (ribB) {
+      if (detB && hits(ribB, detB)) ov.push('ribbon×detail');
+      if (cardB && hits(ribB, cardB)) ov.push('ribbon×card');
+      if (toastB && hits(ribB, toastB)) ov.push('ribbon×toast');
+      for (const lb of labels) if (hits(ribB, lb)) ov.push('ribbon×label');
+    }
+    if (cardB && toastB && hits(cardB, toastB)) ov.push('card×toast');
+    for (const b of document.querySelectorAll('.topbar button')) if (vis(b) && hits(ribB, box(b))) ov.push('ribbon×topbar');
+    return { ribbon: ribB, buttons: btns, oneRow: btns.length > 0 && new Set(btns.map(b => b.top)).size === 1, detail: detB, detailOpen: det.classList.contains('open'), legendVisible: vis(document.querySelector('.legend')), legendRows: [...document.querySelectorAll('.legend-row')].filter(r => !r.hidden).length, controls: vis(document.querySelector('.controls')), card: cardB, toast: toastB, overlaps: ov, labelCount: labels.length, inViewport: ribB ? (ribB.l >= 0 && ribB.r <= innerWidth + 1 && ribB.b <= innerHeight + 1) : false };
+  };
+  let browser;
+  try {
+    browser = await chromium.launch({ headless: true });
+    // [route, width, bundles] — member-3/8은 묶음 1개(범례 숨김), 2g는 묶음 2개(범례 보임).
+    for (const [route, width, bundles] of [['/map-host-member-3.html', 1440, 1], ['/map-host-member-8.html', 1440, 1], ['/map-host-member-2g.html', 1440, 2], ['/map-host-member-2g.html', 2560, 2]]) {
+      const tag = `${route} ${width}`;
+      const ctx = await browser.newContext({ viewport: { width, height: 900 }, reducedMotion: 'reduce', locale: 'ko-KR' });
+      await ctx.addInitScript(() => { try { localStorage.setItem('lt41.theme', 'night'); localStorage.removeItem('lt41.boardTheme'); } catch {} });
+      const page = await ctx.newPage(), errors = [];
+      page.on('pageerror', e => errors.push(String(e.message || e)));
+      await page.goto(base + route, { waitUntil: 'load' });
+      let frame = null;
+      for (let i = 0; i < 80 && !frame; i++) { frame = page.frames().find(f => /track56-network/.test(f.url())); if (!frame) await page.waitForTimeout(250); }
+      assert.ok(frame, `${tag}: 지도 프레임이 열린다`);
+      await frame.waitForFunction(() => (window.__lt?.dots?.()?.length || 0) > 0, null, { timeout: 20000 });
+      await frame.evaluate(() => document.fonts.ready);
+      await page.waitForTimeout(600);
+      // 닫힘 상태: 큰 판 없음 + 단추 줄 44px 한 줄 + 범례는 묶음 수대로.
+      const closed = await frame.evaluate('(' + MEASURE.toString() + ')()');
+      assert.equal(closed.controls, false, `${tag}: 큰 탐색 판은 숨는다`);
+      assert.ok(closed.ribbon && closed.inViewport, `${tag}: 단추 줄이 화면 안에 보인다`);
+      assert.ok(closed.buttons.length >= 4, `${tag}: 단추 줄에 단추가 있다(${closed.buttons.length}개)`);
+      assert.ok(closed.buttons.every(b => b.h === 44), `${tag}: 넓은 화면 단추 높이 44px(${JSON.stringify(closed.buttons.map(b => b.h))})`);
+      assert.equal(closed.oneRow, true, `${tag}: 단추 한 줄(${JSON.stringify(closed.buttons.map(b => b.top))})`);
+      assert.equal(closed.legendVisible, bundles >= 2, `${tag}: 범례는 묶음 2개부터 보인다`);
+      assert.equal(closed.legendRows, bundles >= 2 ? bundles : 0, `${tag}: 범례 줄 수(묶음 ${bundles}개)`);
+      assert.deepEqual(closed.overlaps, [], `${tag}: 닫힘 겹침 0`);
+      // 열림 상태: 두 번째 순간을 누르면 상세 판이 열린다 — 단추 줄은 판 왼쪽 밖에서만 논다.
+      const canvas = await frame.locator('#stage').boundingBox();
+      const dots = await frame.evaluate(() => window.__lt.dots());
+      const target = dots[Math.min(1, dots.length - 1)];
+      await page.mouse.click(canvas.x + target.x, canvas.y + target.y);
+      await page.waitForTimeout(900);
+      const open = await frame.evaluate('(' + MEASURE.toString() + ')()');
+      assert.ok(open.detailOpen && open.detail, `${tag}: 상세 판 열림`);
+      assert.ok(open.ribbon && open.ribbon.r < open.detail.l - 8, `${tag}: 단추 줄이 판 왼쪽 밖(겹침 0)`);
+      assert.deepEqual(open.overlaps, [], `${tag}: 열림 겹침 0`);
+      // 묶음 단추: 카드+토스트가 같이 떠도 겹침 0.
+      const chip = frame.locator('#mobileRibbon button[data-i]').first();
+      if (await chip.count()) {
+        await chip.click();
+        await page.waitForTimeout(600);
+        const cluster = await frame.evaluate('(' + MEASURE.toString() + ')()');
+        assert.ok(cluster.card, `${tag}: 묶음 카드가 뜬다`);
+        assert.deepEqual(cluster.overlaps, [], `${tag}: 묶음 카드 겹침 0`);
+      }
+      // 전체 보기: 토스트가 떠도 겹침 0.
+      const allBtn = frame.locator('#mobileRibbon button').filter({ hasText: '전체 보기' }).first();
+      if (await allBtn.count()) {
+        await allBtn.click();
+        await page.waitForTimeout(500);
+        const overview = await frame.evaluate('(' + MEASURE.toString() + ')()');
+        assert.ok(overview.toast, `${tag}: 전체 보기 토스트가 뜬다`);
+        assert.deepEqual(overview.overlaps, [], `${tag}: 전체 보기 겹침 0`);
+      }
+      assert.deepEqual(errors, [], `${tag}: 화면 오류 없음`);
+      await ctx.close();
+    }
+    // 390 단추 줄은 지금 그대로(#638): 왼쪽 8·오른쪽 8, 아래 38px 줄 위, 단추 44px(터치 타깃)·글자 14px, 탐색 판 없음.
+    {
+      const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce', locale: 'ko-KR' });
+      const page = await ctx.newPage();
+      await page.goto(base + '/map-host-member-8.html', { waitUntil: 'load' });
+      let frame = null;
+      for (let i = 0; i < 80 && !frame; i++) { frame = page.frames().find(f => /track56-network/.test(f.url())); if (!frame) await page.waitForTimeout(250); }
+      assert.ok(frame, '390: 지도 프레임이 열린다');
+      await frame.waitForFunction(() => (window.__lt?.dots?.()?.length || 0) > 0, null, { timeout: 20000 });
+      await page.waitForTimeout(600);
+      const before = await frame.evaluate(() => {
+        const rib = document.getElementById('mobileRibbon');
+        const r = rib.getBoundingClientRect();
+        const b = rib.querySelector('button');
+        const cs = getComputedStyle(b);
+        return { left: r.left, right: r.right, bottom: r.bottom, h: b.clientHeight, fs: parseFloat(cs.fontSize), controls: getComputedStyle(document.querySelector('.controls')).display !== 'none', legend: getComputedStyle(document.querySelector('.legend')).display !== 'none' };
+      });
+      assert.equal(before.left, 8, '390: 왼쪽 8');
+      assert.equal(before.right, 382, '390: 오른쪽 8(390−8)');
+      assert.equal(before.bottom, 806, '390: 아래 38px 줄 위(844−38)');
+      assert.equal(before.h, 44, '390: 단추 높이 44px(머리말 터치 타깃 min-height 그대로)');
+      assert.equal(before.fs, 14, '390: 단추 글자 14px(identity.css 그대로)');
+      assert.equal(before.controls, false, '390: 탐색 판 없음');
+      assert.equal(before.legend, false, '390: 범례 없음');
+      await ctx.close();
     }
   } finally {
     await browser?.close();
