@@ -69,6 +69,8 @@ test('상태 4 × 화면 5: 보이는 버튼·문구·접근성 이름이 표대
           aria: h.els['tree-views'].getAttribute('aria-label')
         };
         const want = { ...state.expect };
+        // #942: 처음 온 사람의 첫 화면에서만 머리줄 추가 단추를 숨긴다.
+        if (state.name==='로그인·트리 없음' && file==='src064-orbit.html') want.writeMenu=false;
         // 2026-11-18 13:49 대표 결정: 트리 선택은 서재를 포함한 모든 화면에서 같게 보인다.
         assert.deepEqual(got, want, `${state.name} × ${label}`);
         table.push(`${state.name} × ${label}: ${JSON.stringify(got)}`);
@@ -78,6 +80,16 @@ test('상태 4 × 화면 5: 보이는 버튼·문구·접근성 이름이 표대
     }
   }
   assert.equal(table.length, 20, '상태 4 × 화면 5 = 20칸을 모두 확인한다');
+});
+
+test('#942 트리가 있어도 순간이 없으면 첫 화면 추가 단추만 숨긴다', () => {
+  for (const [label,file] of SCREENS) {
+    const h=createHeaderHarness({owned:true,trees:1,moments:0,tree:{title:'빈 트리'},source:'server',current:file});
+    try {
+      h.header.flowNavigation();
+      assert.equal(h.els['write-menu'].hidden,file==='src064-orbit.html',label);
+    } finally {h.restore()}
+  }
 });
 
 test('어느 상태·화면에서도 비활성(disabled)으로 남기지 않고 숨김으로 정리한다', () => {

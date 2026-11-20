@@ -86,6 +86,96 @@ const THUMB = (route) => route.fulfill({ status: 200, contentType: 'image/png', 
 // 시험 트리(#635와 같은 모양 — 순간 3개 사슬, 첫 순간은 유튜브). 가짜 데이터다.
 // 첫 순간이 두 갈래(e2·e3)를 나가므로 첫 장에 갈림길 탭이 보인다 — #700 후속 탭 글자 크기·잘림 검사 대상.
 
+// #942: 초심자·기존 사용자의 추가 단추와 단추별 숫자 묶음을 실제 화면에서 잰다.
+test('#942 첫 화면 추가 단추와 숫자 묶음', { skip: REQUIRE ? false : skip, timeout: 180000 }, async () => {
+  if (skip) assert.fail(skip);
+  const server=await serve(),base='http://127.0.0.1:'+server.address().port;
+  const browser=await chromium.launch({headless:true});
+  const dest=process.env.LT_HOME_CTA_CAPTURE;
+  if(dest)mkdirSync(dest,{recursive:true});
+  const make=(subject,count)=>{
+    const input=i=>({subject,title:'시험 순간 '+(i+1),date:'2026-11-'+String(i+1).padStart(2,'0'),emotion:'설렘',note:'화면 확인용 가짜 기록',url:i===count-1?'':i%3===0?'https://audit.invalid/photo.jpg':i%3===1?'https://www.youtube.com/watch?v=dQw4w9WgXcQ':''});
+    const clock=i=>'2026-11-'+String(i+1).padStart(2,'0')+'T00:00:00.000Z';
+    let tree=createTree(input(0),clock(0));for(let i=1;i<count;i++)tree=addMoment(tree,input(i),tree.moments[0].id,clock(i));
+    return tree;
+  };
+  const trees=[make('좋아하는 순간들',8),make('여름',3),make('함께 부른 노래',3)];
+  const workspace={revision:1,state:{version:1,trees,prefs:{displayName:'화면검사 시험계정'}},subject:'visual-audit-fake',writeSubjectBound:true,savedAt:'2026-11-20T00:00:00.000Z'};
+  const share={id:'audit-share-000000000001',treeId:trees[0].id,view:'book',status:'active',origin:'manual',createdAt:'2026-11-20T00:00:00.000Z'};
+  const measure=e=>{
+    const s=getComputedStyle(e),r=e.getBoundingClientRect();
+    const L=color=>(color.match(/[\d.]+/g)||[]).slice(0,3).map(v=>Number(v)/255).map(v=>v<=.04045?v/12.92:((v+.055)/1.055)**2.4).reduce((n,v,i)=>n+v*[.2126,.7152,.0722][i],0);
+    const a=L(s.backgroundColor),b=L(s.color);
+    return {text:e.textContent.trim(),bg:s.backgroundColor,ink:s.color,border:s.borderTopWidth,contrast:(Math.max(a,b)+.05)/(Math.min(a,b)+.05),visible:!!e.getClientRects().length,x:r.x,y:r.y,w:r.width,h:r.height};
+  };
+  const failures=[];
+  const check=(ok,message)=>{if(!ok)failures.push(message)};
+  try{
+    for(const theme of ['night','garden'])for(const [width,height] of [[390,844],[1440,900]])for(const kind of ['guest','empty','member']){
+      const member=kind==='member',signedIn=kind!=='guest';
+      const ctx=await browser.newContext({viewport:{width,height},reducedMotion:'no-preference'});
+      try{
+        await ctx.addInitScript(t=>{localStorage.setItem('lt41.theme',t);localStorage.setItem('lt41.tips.firstTree','1')},theme);
+        await ctx.route('**/*',r=>{
+          const u=new URL(r.request().url());
+          if(u.origin!==base)return u.hostname==='i.ytimg.com'||u.hostname==='audit.invalid'?THUMB(r):r.abort();
+          if(u.pathname==='/api/workspace'&&signedIn)return r.fulfill({status:200,json:{...workspace,state:{...workspace.state,trees:member?trees:[]}}});
+          if(u.pathname==='/api/shares'&&member)return r.fulfill({status:200,json:{ok:true,items:[share],shares:[share]}});
+          if(u.pathname==='/api/community/stats')return r.fulfill({status:200,json:{trees:17,moments:123}});
+          if(u.pathname.startsWith('/api/'))return r.fulfill({status:200,json:{ok:true,items:[]}});
+          return r.continue();
+        });
+        const page=await ctx.newPage();
+        await page.goto(base+'/v41/'+(signedIn?'?account=1':'')+'#home');
+        if(signedIn)await page.waitForFunction(()=>document.body.dataset.member==='in'&&!document.querySelector('#account-avatar')?.hidden);
+        if(member){
+          await page.waitForFunction(()=>window.LT41?.trees?.length===3);
+          const ask=page.locator('#discover-ask-no');
+          await ask.waitFor({state:'visible',timeout:4000}).catch(()=>{});
+          if(await ask.isVisible())await ask.click();
+          await ask.waitFor({state:'hidden'});
+        }
+        const current=page.frameLocator('#view');
+        const first=member?'moments':'start';
+        await current.locator('.center .actions [data-do='+first+']').waitFor({state:'visible'});
+        await current.locator('.center .actions [data-do='+first+']').evaluate(async e=>{await e.ownerDocument.fonts.ready});
+        await current.locator('.home-count:not([hidden])').first().waitFor({state:'visible'});
+        await page.waitForTimeout(450);
+        const buttons=await current.locator('.center .actions > .subtleBtn,.center .actions > .home-action-group > .subtleBtn').evaluateAll((es,fn)=>es.map(e=>({text:e.textContent.trim(),bg:getComputedStyle(e).backgroundColor,border:getComputedStyle(e).borderTopWidth})));
+        const headers=await page.locator('#write-menu,#mobile-add').evaluateAll(es=>es.map(e=>({id:e.id,visible:!!e.getClientRects().length})));
+        const head=await page.locator('#write-menu').evaluate(measure),fab=await page.locator('#mobile-add').evaluate(measure);
+        const top=await current.locator('.home-add-top').count()?await current.locator('.home-add-top').evaluate(measure):null;
+        const groups=await current.locator('.home-action-group').evaluateAll(es=>es.map(e=>{
+          const b=e.querySelector('.subtleBtn'),n=e.querySelector('.home-count'),r=e.getBoundingClientRect(),br=b.getBoundingClientRect(),nr=n.getBoundingClientRect();
+          const range=document.createRange();range.selectNodeContents(n);const tr=range.getBoundingClientRect();
+          return {label:b.textContent.trim(),count:n.hidden?'':n.textContent.trim(),x:r.x,y:r.y,w:r.width,h:r.height,inner:n.hidden?null:nr.top-br.bottom,center:n.hidden?null:(tr.left+tr.width/2)-(br.left+br.width/2),font:parseFloat(getComputedStyle(n).fontSize),overflow:n.hidden?0:Math.max(0,tr.right-br.right,br.left-tr.left)};
+        }));
+        const values={buttons,headers,head,fab,top,groups};const key=width+'-'+theme+'-'+kind;
+        console.log('#942',key,JSON.stringify(values));
+        if(dest){
+          if(width===1440)await current.locator('.card:not(.off):not(.clash)').first().waitFor({state:'visible',timeout:8000});
+          await page.screenshot({path:join(dest,'home-'+key+'.png'),animations:'allow'});
+        }
+        const rose=theme==='night'?'rgb(180, 87, 107)':'rgb(152, 80, 94)';
+        const visibleAdds=[head,fab,top].filter(b=>b?.visible);
+        check(visibleAdds.length===(member?2:0),key+' 추가 단추 개수 '+JSON.stringify(visibleAdds));
+        for(const b of visibleAdds)check(b.bg===rose&&b.ink==='rgb(255, 255, 255)'&&b.contrast>=4.5,key+' 장미색·대비 '+JSON.stringify(b));
+        check(head.visible===(member&&width===1440)&&fab.visible===(member&&width===390)&&!!top?.visible===member,key+' 추가 단추 위치');
+        check(JSON.stringify(buttons.map(b=>b.text))===JSON.stringify(member?['순간 목록','둘러보기','서재']:['＋ 첫 순간 추가','둘러보기','어떻게 쓰나요']),key+' 가운데 순서');
+        check(buttons[0]?.bg==='rgb(238, 231, 224)'&&buttons.slice(1).every(b=>b.bg!=='rgb(238, 231, 224)'&&b.border!=='0px'),key+' 크림색·보조 테두리');
+        check(groups.length===3,key+' 묶음 3개');
+        check(JSON.stringify(groups.map(g=>g.count))===JSON.stringify(member?['순간 14 · 모아둔 0','공개 트리 17','트리 3']:['',(signedIn?'':'예시 ')+'공개 트리 17 · 순간 123','']),key+' 숫자 귀속');
+        for(const g of groups.filter(g=>g.count))check(g.inner>=4&&g.inner<=6&&Math.abs(g.center)<=2&&g.font>=12&&g.overflow<=1,key+' 숫자 간격 '+JSON.stringify(g));
+        for(let i=1;i<groups.length;i++){
+          const a=groups[i-1],b=groups[i],gap=Math.abs(a.y-b.y)<2?b.x-a.x-a.w:b.y-a.y-a.h;
+          check(gap>=Math.max(width===1440?16:14,3*5),key+' 묶음 간격 '+gap);
+        }
+      }finally{await ctx.close()}
+    }
+  }finally{await browser.close();await new Promise(r=>server.close(r))}
+  assert.deepEqual(failures,[]);
+});
+
 // #987: 공유·설정 창은 실제로 열린 상태에서 폭, 위치, 대비와 선택 표시를 잰다.
 test('#987 공유 창 폭·단추·대비와 설정 정렬·동그라미·배치', { skip: REQUIRE ? false : skip, timeout: 240000 }, async () => {
   if (skip) assert.fail(skip);

@@ -41,7 +41,11 @@ function flowNavigation(){
   $('source-label').textContent=treePickerText({owned,treeTitle:displayTreeTitle(window.LT41?.tree.title||''),pendingDraft,treeCount:getModel()?.trees?.length||0});
   // #601: 칸 폭이 고정되어 있으므로(11em) 긴 이름은 말줄임 — 마우스 올림·초점에 전체 이름을 보여 준다.
   $('record-menu').title=owned?(window.LT41?`트리: ${displayTreeTitle(window.LT41?.tree.title||'')} — 다른 트리를 고릅니다.`:'열어볼 트리를 고릅니다.'):(pendingDraft?'로그인하면 저장하지 못한 기록을 복원합니다.':'로그인하면 내 트리를 고를 수 있습니다.');
-  $('write-menu').hidden=!parts.write||publicReading;$('share-menu').hidden=!parts.share||getSource()!=='server'||!window.LT41;
+  // #942: 첫 화면에서는 실제 내 순간이 하나라도 있을 때만 머리줄·모바일 추가를 보인다.
+  const home=getCurrent()==='src064-orbit.html';
+  const hasMoments=owned&&getSource()==='server'&&(getModel()?.trees||[]).some(t=>t.moments?.length>0);
+  document.body.classList.toggle('home-existing',home&&hasMoments);
+  $('write-menu').hidden=!parts.write||publicReading||(home&&!hasMoments);$('share-menu').hidden=!parts.share||getSource()!=='server'||!window.LT41;
   // 261117 대표 결정: 좁은 화면에서는 '+ 순간 추가'를 '+'로 줄여 위 메뉴(테마 단추 포함)가 넘치지 않게 한다 —
   // 이름은 aria-label이 지킨다. 저장 안 됨('저장 안 됨')은 짧아 그대로다.
   const narrowHeader=window.innerWidth<=650;
