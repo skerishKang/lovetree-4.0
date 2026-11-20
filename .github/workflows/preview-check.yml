@@ -376,6 +376,12 @@ jobs:
           # #1080: 1001 계열은 screen-reload 잡으로 옮겼다 — 나머지 19개 시험만 여기서 실행.
           LT_BOOK_584_REQUIRE=1 node --test --test-concurrency=1 --test-name-pattern='^(?!.*1001)' tests/v41-book-play-584.test.mjs
           echo "책 재생·두 장 모드 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 감상 화면 흔적 값·어떻게 쓰나요 안내 시험(건너뜀=실패 — #635)
+        env:
+          LT_635A_REQUIRE: '1'
+          LT_BOOK_LONG_NOTE_REQUIRE: '1'
+        if: needs.screen-changes.outputs.changed == 'true'
         run: |
           start=$(date +%s)
           npx vite build > /dev/null
