@@ -232,10 +232,12 @@ const inboxTree=(Array.isArray(context.trees)?context.trees:[]).find(t=>t?.inbox
 const inboxCount=inboxTree?.moments?.length||0;
 const totalCount=momentList?.entries?.length||0;
 if(hasMoments){
- const line=showCount('moments',`순간 ${formatCount(totalCount)} · `);
+ // #1010: '순간 3 ·모아둔 0' — .home-count가 flex라 글자 사이 빈칸이 무시됐다. 가름점을 자기 몫 요소로 쓰고 간격은 flex gap으로.
+ const line=showCount('moments',`순간 ${formatCount(totalCount)}`);
+ const countSep=document.createElement('span');countSep.textContent='·';
  const inboxLine=document.createElement(inboxCount?'button':'span');inboxLine.textContent=`모아둔 ${formatCount(inboxCount)}`;
  if(inboxCount){inboxLine.type='button';inboxLine.setAttribute('aria-label',`모아둔 순간 ${inboxCount}개 정리하기`);inboxLine.onclick=()=>bridge.actions.cleanup();}
- line.append(inboxLine);
+ line.append(countSep,inboxLine);
  showCount('trees',`트리 ${formatCount(momentList?.trees?.length||0)}`);
 }
 (async()=>{const ctrl=new AbortController();const timer=setTimeout(()=>ctrl.abort(),8000);try{
@@ -253,7 +255,7 @@ infoStyle.textContent=`.home-add-top{margin-top:12px;font-size:15px}@media(max-w
 .center .actions{gap:18px;align-items:flex-start}
 .center .actions .home-action-group{flex:1 1 0%;max-width:176px;min-width:0;display:flex;flex-direction:column;align-items:stretch;gap:5px}
 .center .actions .home-action-group .subtleBtn{flex:none;width:100%;max-width:none}
-.home-count{display:flex;align-items:center;justify-content:center;font-size:12px;line-height:16px;min-height:16px;white-space:nowrap;color:var(--lt-muted);font-variant-numeric:tabular-nums}
+.home-count{display:flex;align-items:center;justify-content:center;gap:6px;font-size:12px;line-height:16px;min-height:16px;white-space:nowrap;color:var(--lt-muted);font-variant-numeric:tabular-nums}
 .home-count[hidden]{display:none}
 .home-count button{font:inherit;font-size:13px;line-height:inherit;color:var(--lt-gold);padding:0;border:0;background:none;cursor:pointer;pointer-events:auto}
 :host([data-lt-theme=garden]) .home-count button{color:var(--lt-gold-ink)}
