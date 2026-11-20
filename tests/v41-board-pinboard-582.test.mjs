@@ -281,7 +281,7 @@ test('#1026 동작: 그림 지연 도착에도 카드 top 변화 0, 보드 CLS 0
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
   await context.addInitScript(() => {
     window.__shift1026 = [];
-    try { new PerformanceObserver((list) => { for (const e of list.getEntries()) if (!e.hadRecentInput) window.__shift1026.push({ v: e.value, src: (e.sources || []).map(s => s.node ? (s.node.nodeName + (s.node.id ? '#' + s.node.id : '')) : '?') }); }).observe({ type: 'layout-shift', buffered: true }); } catch {}
+    try { new PerformanceObserver((list) => { for (const e of list.getEntries()) if (!e.hadRecentInput) window.__shift1026.push({ v: e.value, src: (e.sources || []).map(s => s.node ? (s.node.nodeName + (s.node.id ? '#' + s.node.id : '') + (typeof s.node.className === 'string' ? '.' + s.node.className.trim().split(/\s+/).slice(0, 2).join('.') : '')) : '?') }); }).observe({ type: 'layout-shift', buffered: true }); } catch {}
   });
   await context.route('**/i.ytimg.com/**', async (route) => {
     await new Promise((ok) => setTimeout(ok, 500));
@@ -297,8 +297,6 @@ test('#1026 동작: 그림 지연 도착에도 카드 top 변화 0, 보드 CLS 0
     }
     assert.ok(frame, '보드 프레임이 열린다');
     await frame.waitForSelector('#cardLayer .card', { timeout: 20000 });
-    // 잰 구간을 '카드가 처음 그려진 뒤 썸네일이 도착하는 때'로 명시한다. 첫 배치 자체는 이 시험의 대상이 아니다.
-    await frame.evaluate(() => { if (window.__shift1026) window.__shift1026.length = 0; });
     const topsBefore = await frame.evaluate(() => [...document.querySelectorAll('#cardLayer .card')].map((el) => el.offsetTop));
     await page.waitForTimeout(1600);
     const result = await frame.evaluate(() => ({
