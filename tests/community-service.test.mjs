@@ -674,3 +674,85 @@ test('#936: 같은 역할 계정의 공개 카드는 배지가 일관되게 — 
  assert.ok(aiMoments.length>0&&aiMoments.every(item=>item.aiTester===true),'명예회원 순간 배지 100%');
  assert.ok(normalMoments.length>0&&normalMoments.every(item=>item.aiTester!==true),'일반 순간 배지 0%');
 });
+
+// #1025 1단계: 공개 세로 순간 무작위 조회 — 비공개·가로·판정 없는 옛 순간은 절대 나오지 않는다.
+const SHORTS_URL=id=>'https://www.youtube.com/shorts/'+id;
+const WATCH_URL=id=>'https://www.youtube.com/watch?v='+id;
+function momentsSetup(){
+ const workspaceRepo=createMemoryWorkspaceRepo(),workspace=createWorkspaceService({repo:workspaceRepo,productId:PRODUCT});
+ const shareRepo=createMemoryShareRepo(),rows=[];let n=0;
+ const save=async(subject,title,moments,privateTree=false)=>{
+  let tree=createTree({subject:'좋아하는 대상',title,note:'기록',emotion:'설렘',date:'2026-11-01',url:moments[0].url},CLOCK);
+  tree=editTree(tree,{title,subject:tree.subject,coverMomentId:''});
+  tree.moments[0].title=moments[0].title;tree.moments[0].keywords=moments[0].keywords||[];
+  for(const m of moments.slice(1)){
+   tree=addMoment(tree,{title:m.title,note:m.note||'기록',emotion:'설렘',date:'2026-11-01',url:m.url},tree.moments[0].id,CLOCK);
+   tree.moments.at(-1).keywords=m.keywords||[];
+  }
+  // 공개 판정(둘러보기와 같은 규칙)은 순간 3개 이상만 훑는다 — 껍질 순간으로 채운다(세로 아님).
+  while(tree.moments.length<3){
+   tree=addMoment(tree,{title:'담은 순간',note:'기록',emotion:'설렘',date:'2026-11-01',url:''},tree.moments[0].id,CLOCK);
+  }
+  await workspace.write(principal(subject),{state:{version:1,trees:[tree]},expectedRevision:0,clientKey:'seed-'+subject});
+  const shareId='mshare'+String(++n).padStart(20,'0');
+  rows.push(await shareRepo.create({productId:PRODUCT,shareId,subjectId:subject,treeId:tree.id,entryMomentId:tree.moments[0].id,view:'book',momentCount:tree.moments.length,origin:'auto'}));
+  return {tree,shareId,privateTree};
+ };
+ const discoverRepo=createMemoryTreeDiscoverRepo();
+ let privateId=null;
+ const communityRepo=createMemoryCommunityRepo({
+  isPrivateTree:(p,s,t)=>t===privateId,
+  isDiscoverOn:(p,s,t)=>discoverRepo.isOn(p,s,t)
+ });
+ let r=0;const random=()=>[0.9,0.1,0.5,0.3][r++%4];
+ const service=createCommunityService({communityRepo,shareRepo,workspaceRepo,productId:PRODUCT,
+  admin:{roleFor:async v=>v.subjectId==='honor'?'ai_customer':(v.subjectId==='tester'?'tester':null)},random});
+ return {workspaceRepo,shareRepo,communityRepo,discoverRepo,service,rows,save,seed:()=>communityRepo.seedShares(rows),setPrivate:id=>{privateId=id;}};
+}
+const momentsCall=(service,query='')=>{const q=Object.fromEntries(new URLSearchParams(query));if(q.exclude)q.exclude=q.exclude.split(',').filter(Boolean);return service.moments(q);};
+
+test('moments: 공개 세로 순간만 무작위로 나오고 비공개·가로·판정 없는 순간·시험계정은 제외된다',async()=>{
+ const d=momentsSetup();
+ await d.save('alice','공개 세로 트리',[
+  {title:'쇼츠 가수',url:SHORTS_URL('aaaa1111111'),keywords:['가수:가수A']},
+  {title:'쇼츠 노래',url:SHORTS_URL('bbbb2222222'),keywords:['노래:노래B']}
+ ]);
+ await d.save('honor','명예회원 트리',[{title:'명예 쇼츠',url:SHORTS_URL('cccc3333333'),keywords:['가수:가수A']}]);
+ await d.save('plain','가로 섞인 트리',[
+  {title:'가로 무대',url:WATCH_URL('dddd4444444')},
+  {title:'판정 없는 watch 쇼츠',url:WATCH_URL('eeee5555555')}
+ ]);
+ const privateOne=await d.save('secret','비공개 트리',[{title:'비공개 쇼츠',url:SHORTS_URL('ffff6666666')}]);
+ d.setPrivate(privateOne.tree.id);
+ await d.save('tester','시험계정 트리',[{title:'시험 쇼츠',url:SHORTS_URL('gggg7777777')}]);
+ for(const row of d.rows)await d.discoverRepo.set({productId:PRODUCT,subjectId:row.subjectId,treeId:row.treeId,discover:true});
+ d.seed();
+ const res=await momentsCall(d.service,'limit=30');
+ assert.equal(res.total,3,'세로 확정 공개 순간 3개(쇼츠 가수·노래·명예)');
+ assert.deepEqual(res.items.map(i=>i.title).sort(),['명예 쇼츠','쇼츠 가수','쇼츠 노래']);
+ assert.equal(res.items.some(i=>i.title.includes('비공개')||i.title.includes('시험')||i.title.includes('가로')),false);
+ assert.ok(res.items.every(i=>i.aiTester===(i.title==='명예 쇼츠')),'AI 명예회원 표시는 그 순간에만');
+ assert.ok(res.items.every(i=>i.videoId&&i.thumbnail.includes('oardefault.jpg')),'세로 포스터 주소');
+ const shuffled=res.items.map(i=>i.title);
+ assert.equal(new Set(shuffled).size,3,'무작위 순서에도 같은 영상 중복 0');
+});
+
+test('moments: 이미 본 영상 id 제외·가수 꼬리표 거르기·상한을 지킨다',async()=>{
+ const d=momentsSetup();
+ await d.save('alice','트리',[
+  {title:'가수A 쇼츠',url:SHORTS_URL('aaaa1111111'),keywords:['가수:가수A']},
+  {title:'가수B 쇼츠',url:SHORTS_URL('bbbb2222222'),keywords:['가수:가수B']},
+  {title:'다른 가수A',url:SHORTS_URL('cccc3333333'),keywords:['가수:가수A']}
+ ]);
+ for(const row of d.rows)await d.discoverRepo.set({productId:PRODUCT,subjectId:row.subjectId,treeId:row.treeId,discover:true});
+ d.seed();
+ const all=await momentsCall(d.service,'limit=2');
+ assert.equal(all.items.length,2,'상한 2개');
+ assert.equal(all.total,3);
+ assert.equal(new Set(all.items.map(i=>i.videoId)).size,2);
+ const excluded=await momentsCall(d.service,'limit=30&exclude=aaaa1111111,cccc3333333');
+ assert.deepEqual(excluded.items.map(i=>i.title),['가수B 쇼츠'],'본 영상 id 두 개 제외');
+ const tagged=await momentsCall(d.service,'limit=30&tag='+encodeURIComponent('가수:가수A'));
+ assert.equal(tagged.total,2,'가수 꼬리표로 거른다');
+ assert.ok(tagged.items.every(i=>i.keywords.includes('가수:가수A')));
+});

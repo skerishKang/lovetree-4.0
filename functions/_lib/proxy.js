@@ -62,6 +62,8 @@ const ALLOWED = new Map([
   ['/api/community/admin/reports', new Set(['GET'])],
   // #627 3단계 '다른 팬 보기' — 같은 꼬리표의 공개 순간(GET만).
   ['/api/public/tag-moments', new Set(['GET'])],
+  // #1025: 공개 세로 순간 무작위 조회(GET만, 로그인 없이 읽는다).
+  ['/api/public/moments', new Set(['GET'])],
   ['/api/feedback', new Set(['POST'])],
   ['/api/board', new Set(['POST'])],
   ['/api/board/mine', new Set(['GET'])],
