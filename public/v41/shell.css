@@ -574,8 +574,14 @@ nav .tree-frame{scroll-snap-align:center}
 /* 정원: 종이 무대 위 잉크 글자 + 무대색 후광(밤과 같은 방식). 다린 쪽(기본 hover 가 밤 진주색)도 정원에서는 잉크를 유지한다. */
 html[data-lt-theme=garden] .home-links .feedback-link{color:var(--lt-ink)}
 html[data-lt-theme=garden] .home-links .feedback-link:hover{color:var(--lt-ink)}
-/* 390에서는 처리방침·약관을 아래 고정 줄에 두지 않는다(설정 창 맨 아래·안내 패널에만). */
+/* #1010(2026-11-20): 390 첫 화면에도 네 링크를 모두 보인다 — 왼쪽 아래에서 둘로 나누어 줄바꿈(가로 넘침 0).
+   자리 제약(#657 계약): 새 소식 카드는 ＋ 단추 윗변보다 8px 위(아래 76px)에 그대로 있어야 하므로
+   링크 줄은 카드 아래(아래 10~72px, 높이 66px 안)에 들어간다 — 두 줄을 각 30px로 낮춘다(30+2+30=62px).
+   줄 폭은 150px 비켜 세운다 — 2+2 줄바꿈(첫 줄 새 소식·의견 보내기, 둘째 줄 처리방침·약관)이고
+   오른쪽 아래 ＋ 단추(#458, 56px·right 14px → 왼쪽 끝 320px)와 겹치지 않는다.
+   첫 화면(body.home-screen)만 — 다른 화면의 링크 줄 규칙은 그대로 둔다. */
 @media(max-width:520px){.home-links a.feedback-link{display:none}}
+@media(max-width:520px){body.home-screen .home-links{flex-wrap:wrap;max-width:calc(100% - 150px)}body.home-screen .home-links a.feedback-link{display:inline-flex}body.home-screen .home-links .feedback-link{min-height:30px;padding:2px 8px}}
 /* 390 지도·책: 조작 줄·책 테두리와 겹치던 아래 링크 줄을 숨긴다(1440은 지금 자리). */
 @media(max-width:520px){body[data-fab-lift=book] .home-links,body[data-fab-lift=network] .home-links{display:none}}
 /* 이슈 611: 계정 단추 점 — 새 소식이나 새 답글이 있을 때. */

@@ -346,6 +346,19 @@ jobs:
           node --test --test-concurrency=1 tests/v41-home-screen-952.test.mjs
           echo "첫 화면 화면 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
 
+      # 이슈 1010: 첫 화면 기존 사용자 — 예시 안내 줄(떠다니는 예시 카드가 보일 때만·금테 빼고),
+      # 예시 카드 누름(자세히 보기 → lt41-example), 숫자 줄 띄어쓰기, 390 바닥 링크 넷(＋ 단추 겹침 0).
+      # 첫 화면은 vite 번들이라 먼저 build 한다. 건너뜀=실패.
+      - name: 첫 화면 기존 사용자 화면 시험(건너뜀=실패 — 이슈 1010)
+        env:
+          LT_HOME_1010_REQUIRE: '1'
+        if: needs.screen-changes.outputs.changed == 'true'
+        run: |
+          start=$(date +%s)
+          npx vite build > /dev/null
+          node --test --test-concurrency=1 tests/v41-home-1010.test.mjs
+          echo "첫 화면 기존 사용자 화면 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+
       # #611: 새 소식(업데이트 노트) 화면 — 알림 카드 한 번만·계정 단추 점·로그아웃 입구·출처 문구.
       # 크롬이 필요한 실행형 시험이라 이 잡에서 돈다. 건너뜀=실패.
       - name: 새 소식 화면 시험(건너뜀=실패 — #611)
