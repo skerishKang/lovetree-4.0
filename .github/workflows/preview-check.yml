@@ -373,7 +373,15 @@ jobs:
         if: needs.screen-changes.outputs.changed == 'true'
         run: |
           start=$(date +%s)
-          node --test --test-concurrency=1 tests/v41-book-play-584.test.mjs
+          # #1080: 1001 계열과 나머지를 나란히 돌린다 — 시험을 빼지 않고 두 갈래로 나눈다.
+          LT_BOOK_584_REQUIRE=1 node --test --test-concurrency=1 --test-name-pattern='1001' tests/v41-book-play-584.test.mjs > /tmp/book-1001.log 2>&1 & p1=$!
+          LT_BOOK_584_REQUIRE=1 node --test --test-concurrency=1 --test-name-pattern='^(?!.*1001)' tests/v41-book-play-584.test.mjs > /tmp/book-rest.log 2>&1 & p2=$!
+          r1=0; wait $p1 || r1=$?
+          r2=0; wait $p2 || r2=$?
+          echo "book-1001 exit=$r1 · book-rest exit=$r2"
+          tail -20 /tmp/book-1001.log || true
+          tail -20 /tmp/book-rest.log || true
+          [ $r1 -eq 0 ] && [ $r2 -eq 0 ] || exit 1
           echo "책 재생·두 장 모드 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
 
       # 이슈 970: 정리 창(모아둔 순간)의 고르기·취소·저장·닫기 확인과 모바일 아래 ＋ 단추의 자리·동작을
