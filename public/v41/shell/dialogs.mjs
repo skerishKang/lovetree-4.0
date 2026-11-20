@@ -3,6 +3,17 @@
 // Tab 순환·Esc 복귀·포커스 되돌리기만 맡는다. 대화상자를 여닫는 일은 셸과 각 패널 모듈이 한다.
 import {focusReturnTarget} from '../view-a11y.mjs';
 
+// #978: 뒤로가기 한 번의 '맨 위 창'은 주소 처리가 창을 닫으려다 확인 물음을 띄우기 전 값이다.
+// 모듈을 읽는 순간(다른 popstate 리스너보다 먼저) 캡처 리스너를 걸어 그 값을 적어 둔다.
+let ltPopstateTop = null;
+if (typeof globalThis.addEventListener === 'function') {
+  globalThis.addEventListener('popstate', () => {
+    const doc = globalThis.document;
+    const modals = doc ? [...doc.querySelectorAll('dialog[open]')].filter(d => d.matches(':modal')) : [];
+    ltPopstateTop = modals[modals.length - 1] || null;
+  }, true);
+}
+
 export function createDialogs(deps) {
   const {$} = deps;
   const closeTreeTips = deps.closeTreeTips;
@@ -80,14 +91,16 @@ export function createDialogs(deps) {
     return message;
   }
   // #978: 앱 안 닫기 확인 틀 — 브라우저 기본 confirm() 대신 앱 모양으로 "저장하지 않고 닫을까요?"를 묻는다.
-  // 지금은 정리 창(cleanup-panel)만 이 틀을 쓴다. 다른 창은 기존 confirm() 동작 그대로다(바꾸지 않는다).
-  // 물음은 비동기(단추를 눌러야 답이 온다)라서, 더러운 정리 창은 일단 닫지 않고(return false) 틀을 띄운 뒤
+  // 공통 닫기 틀의 더러운 창은 모두 이 틀을 쓴다(정리·편집기·트리 관리·순간 잇기·공유·설정).
+  // 물음은 비동기(단추를 눌러야 답이 온다)라서, 더러운 창은 일단 닫지 않고(return false) 틀을 띄운 뒤
   // '예'를 누르면 그때 실제로 닫는다. Esc·바깥 클릭 = 아니요(창은 그대로), 초점은 틀 안에 머물고
   // 닫히면 원래 자리로 돌아간다. 확인 틀은 패널 무리(한 장 규칙·뒤로가기)에 끼지 않는 잠깐 판이다.
-  const INAPP_CONFIRM = new Set(['cleanup-panel']);
   const CLOSE_CONFIRM_ID = 'lt-close-confirm';
   let closeConfirmEl = null;
   let closeConfirmFor = null;
+  // #978: 물음이 열린 시각 — 같은 뒤로가기 처리 중에 뜬 물음(주소 처리가 먼저 창을 닫으려다 띄운 것)은
+  // 사용자가 아직 답하지 않은 물음이라 '아니요'로 세지 않는다.
+  let closeConfirmOpenedAt = 0;
   function dismissCloseConfirm() {
     const el = closeConfirmEl;
     closeConfirmFor = null;
@@ -144,18 +157,22 @@ export function createDialogs(deps) {
   function askCloseConfirm(d) {
     const el = ensureCloseConfirm();
     closeConfirmFor = d;
-    if (!el.open) { try { el.showModal(); } catch { /* 이미 열림 */ } }
+    if (!el.open) { closeConfirmOpenedAt = Date.now(); try { el.showModal(); } catch { /* 이미 열림 */ } }
     el.querySelector('#lt-close-confirm-no')?.focus?.();
   }
+  // #978: 자기 일을 저장하는 중인 창은 잠깐 붙잡는다 — 저장은 동기화 끝에 화면을 다시 그리며 열린 창을
+  // 닫으려 하는데(choose → show → closePanels), 그때는 아직 안 넣은 것이 아니므로 물음도 닫기도 건너뛴다.
+  const HELD_PANELS = new Set();
+  function holdPanel(id, on) { if (!id) return; if (on) HELD_PANELS.add(id); else HELD_PANELS.delete(id); }
   function panelConfirmClose(d) {
     if (panelBlockedMessage(d)) return false;
     if (!PANEL_DIRTY[d.id]?.()) return true;
-    if (INAPP_CONFIRM.has(d.id)) { askCloseConfirm(d); return false; }
-    return confirm('저장하지 않고 닫을까요?');
+    askCloseConfirm(d);
+    return false;
   }
   // #380 4 2차: × 버튼도 바깥 클릭·Esc와 같은 규칙을 쓴다(막을 상태면 막고, 더러우면 한 번 묻고, 닫으면 초점 복귀).
   // #845 2단계: 뒤로가기도 같은 판정을 탄다 — 공통 판정을 함수로 뽑아 세 길이(×·Esc·뒤로가기) 하나로 간다.
-  function requestPanelClose(id) { const d = $(id); if (!d) return false; if (id === CLOSE_CONFIRM_ID) return false; if (!panelConfirmClose(d)) return false; d.close(); return true; }
+  function requestPanelClose(id) { const d = $(id); if (!d) return false; if (id === CLOSE_CONFIRM_ID) return false; if (HELD_PANELS.has(id)) return false; if (!panelConfirmClose(d)) return false; d.close(); return true; }
   // 닫은 뒤 초점이 갈 곳: 연 버튼 → data-lt-return 순서는 focusReturnTarget이 정한다.
   // 모바일에서는 연 버튼이 '더보기' 메뉴 안에 접혀 보이지 않으므로, 그때는 더보기 버튼으로 돌려준다(초점을 잃지 않게).
   function panelReturnFocus(opener, fallback) {
@@ -268,6 +285,9 @@ export function createDialogs(deps) {
       const front = modalDialogs()[modalDialogs().length - 1] || null;
       if (front && front !== this && !STACK_ALLOWED.has(this.id)) requestPanelClose(front.id);
       const result = showModalOriginal.apply(this, args);
+      // #978: 확인 물음이 떠 있는 중에 다른 창이 열리면 물음을 맨 위로 다시 올린다 —
+      // 물음이 새 창 뒤에 가려지면 답할 수 없게 된다(브라우저 confirm 은 항상 맨 위였다).
+      if (closeConfirmEl?.open && this !== closeConfirmEl) { try { closeConfirmEl.close(); closeConfirmEl.showModal(); } catch { /* already top */ } }
       if (!dialogGuard && this.open && this.matches(':modal')) {
         view.history.pushState({ lt41Dialog: true }, '');
         dialogGuard = true;
@@ -283,10 +303,16 @@ export function createDialogs(deps) {
       return showOriginal.apply(this, args);
     };
     view.addEventListener('popstate', () => {
-      const modals = modalDialogs();
-      const top = modals[modals.length - 1] || null;
+      const top = ltPopstateTop;
+      ltPopstateTop = null;
       // #978: 맨 위가 앱 안 닫기 확인 틀이면 뒤로가기 = 아니요 — 틀만 닫고 원래 창은 그대로 둔다.
+      // 단, 이번 뒤로가기 처리 중에 뜬 물음(주소 처리가 먼저 창을 닫으려다 띄운 것)은 사용자가 아직
+      // 답하지 않은 물음이다 — 아니요로 셈하지 않고 그대로 두고 기록만 다시 쌓는다.
       if (top && top.id === CLOSE_CONFIRM_ID) {
+        if (Date.now() - closeConfirmOpenedAt < 400) {
+          view.history.pushState({ lt41Dialog: true }, ''); dialogGuard = true;
+          return;
+        }
         const target = closeConfirmFor; dismissCloseConfirm(); refocusPanel(target);
         if (modalDialogs().length) { view.history.pushState({ lt41Dialog: true }, ''); dialogGuard = true; }
         else dialogGuard = false;
@@ -316,6 +342,8 @@ export function createDialogs(deps) {
     // #380 4 2차: × 버튼도 바깥 클릭·Esc와 같은 규칙을 쓴다(막을 상태면 막고, 더러우면 한 번 묻고, 닫으면 초점 복귀).
     // #845 2단계: 뒤로가기도 같은 판정(requestPanelClose)을 탄다 — 세 길이(×·Esc·뒤로가기)가 하나로 간다.
     requestClose: id => requestPanelClose(id),
+    // #978: 자기 저장 중인 창을 잠깐 붙잡는다(닫힘·물음 없음) — 저장 끝나면 holdPanel(id, false).
+    holdPanel,
     // #933: 화면을 옮길 때(서재·책·보드·지도·첫 여정) 열려 있던 창을 닫는다 — 창이 화면 위에 남지 않게.
     closePanels: id => closeOpenPanels(id),
     syncPanelTop

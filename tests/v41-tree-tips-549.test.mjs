@@ -217,16 +217,21 @@ test('#845 2단계 더러운 창은 뒤로가기로 닫을 때 한 번 묻는다
     await page.waitForFunction(() => document.getElementById('write-panel').open, null, { timeout: 10000 });
     // 제목을 적어 더럽힌다 — 닫을 때 '저장하지 않고 닫을까요?'를 묻는다(#380 4 규칙).
     await page.fill('#quick-url', 'https://example.com/back-check');
-    // 취소하면 창이 남고, 가드가 다시 쌓여 다음 뒤로가기도 같은 질문을 한다.
-    page.once('dialog', (d) => d.dismiss());
+    // #978: 물음은 앱 안 확인 틀이다 — 아니오를 누르면 창이 남고, 다음 뒤로가기도 같은 질문을 한다.
+    const nativeDialogs = [];
+    page.on('dialog', (d) => { nativeDialogs.push(d.message()); void d.dismiss().catch(() => {}); });
     await page.evaluate(() => history.back());
-    await page.waitForTimeout(600);
+    await page.waitForSelector('#lt-close-confirm[open]', { timeout: 8000 });
+    await page.click('#lt-close-confirm-no');
+    await page.waitForFunction(() => !document.querySelector('#lt-close-confirm')?.open, null, { timeout: 5000 });
     assert.equal(await page.evaluate(() => document.getElementById('write-panel').open), true, '확인을 취소하면 창이 남는다');
-    // 받아들이면 닫힌다.
-    page.once('dialog', (d) => d.accept());
+    // 예를 누르면 닫힌다.
     await page.evaluate(() => history.back());
+    await page.waitForSelector('#lt-close-confirm[open]', { timeout: 8000 });
+    await page.click('#lt-close-confirm-yes');
     await page.waitForFunction(() => !document.getElementById('write-panel').open, null, { timeout: 10000 });
     assert.equal(page.url(), before, '주소가 그대로다(창 닫기로 썼다)');
+    assert.deepEqual(nativeDialogs, [], '브라우저 기본 confirm은 불리지 않는다');
     assert.deepEqual(errors, [], '페이지 오류 없음');
   } finally { await browser.close(); }
 });
@@ -403,19 +408,26 @@ test('#845 3단계 앞 창이 더러우면 한 번 묻고, 취소하면 겹친�
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
     const errors = [];
     page.on('pageerror', (e) => errors.push(String(e.message || e)));
+    const nativeDialogs = [];
+    page.on('dialog', (d) => { nativeDialogs.push(d.message()); void d.dismiss().catch(() => {}); });
     await openWithFirstTree(page);
     await page.click('#write-menu');
     await page.waitForFunction(() => document.getElementById('write-panel').open, null, { timeout: 10000 });
     await page.fill('#quick-url', 'https://example.com/stack-check');
-    // 취소하면 앞 창이 남고 — 규칙표대로 새 창은 그 위에 겹친다(예상 못한 길을 막지 않는다).
-    page.once('dialog', (d) => d.dismiss());
+    // #978: 물음은 앱 안 확인 틀 — 아니오를 누르면 앞 창이 남고, 규칙표대로 새 창은 그 위에 겹친다.
+    // (확인 물음은 비동기라 새 창은 먼저 열리고, 아니오를 누르면 확인 틀만 닫힌다.)
     await page.evaluate(() => document.getElementById('tree-manager').showModal());
-    await page.waitForFunction(() => document.getElementById('tree-manager').open, null, { timeout: 10000 });
+    await page.waitForSelector('#lt-close-confirm[open]', { timeout: 8000 });
+    await page.click('#lt-close-confirm-no');
+    await page.waitForFunction(() => !document.querySelector('#lt-close-confirm')?.open, null, { timeout: 5000 });
     assert.equal(await page.evaluate(() => document.getElementById('write-panel').open), true, '취소하면 앞 창이 남는다');
-    // 받아들이면 앞 창이 닫히고 새 창만 남는다.
-    page.once('dialog', (d) => d.accept());
+    assert.equal(await page.evaluate(() => document.getElementById('tree-manager').open), true, '새 창은 겹쳐 열린다');
+    // 예를 누르면 앞 창이 닫히고 새 창만 남는다.
     await page.evaluate(() => { document.getElementById('tree-manager').close(); document.getElementById('tree-manager').showModal(); });
+    await page.waitForSelector('#lt-close-confirm[open]', { timeout: 8000 });
+    await page.click('#lt-close-confirm-yes');
     await page.waitForFunction(() => document.getElementById('tree-manager').open && !document.getElementById('write-panel').open, null, { timeout: 10000 });
+    assert.deepEqual(nativeDialogs, [], '브라우저 기본 confirm은 불리지 않는다');
     assert.deepEqual(errors, [], '페이지 오류 없음');
   } finally { await browser.close(); }
 });
@@ -464,6 +476,20 @@ async function openQuickAndFill(page, url) {
   await page.click('#quick-submit');
 }
 const momentCount = (page, treeIndex = 0) => page.evaluate((i) => window.LT41.trees[i].moments.length, treeIndex);
+
+// #978: 닫기 확인은 앱 안 틀(#lt-close-confirm)이다. 담기 뒤 화면을 다시 그리며 창을 닫으려다
+// 뜨는 물음(옛 브라우저 confirm 을 시험이 자동으로 dismiss 하던 자리)은 '아니요'로 답해 창을 그대로 둔다.
+async function answerCloseConfirmIfAny(page) {
+  for (let i = 0; i < 20; i += 1) {
+    if (await page.evaluate(() => document.getElementById('lt-close-confirm')?.open)) {
+      await page.click('#lt-close-confirm-no');
+      await page.waitForFunction(() => !document.querySelector('#lt-close-confirm')?.open, null, { timeout: 5000 });
+      return true;
+    }
+    await page.waitForTimeout(100);
+  }
+  return false;
+}
 
 test('#876 같은 트리 같은 영상: 안내 창이 열리고 [그래도 담기]로 담는다(주소 모양이 달라도)', { skip: REQUIRE ? false : skip }, async () => {
   const browser = await chromium.launch();
@@ -567,8 +593,12 @@ test('#876 안내 창도 #845 창 규칙을 탄다 — Esc·뒤로가기로 닫�
     // 뒤로가기: 같은 창을 다시 열어 뒤로가기로 닫는다(#845 2단계 — 창이 열려 있으면 뒤로가기는 창을 닫는다).
     await page.click('#quick-submit');
     await page.waitForFunction(() => document.getElementById('video-dup-panel').open, null, { timeout: 10000 });
+    // #978: 담기 뒤 화면 다시 그리기가 띄우는 닫기 물음은 '아니요'로 답해 창을 그대로 둔다.
+    await answerCloseConfirmIfAny(page);
     await page.evaluate(() => history.back());
     await page.waitForFunction(() => !document.getElementById('video-dup-panel').open, null, { timeout: 10000 });
+    // 뒤로가기로 안내 창을 닫은 뒤, 남은 순간 추가 창을 닫으려다 뜨는 물음도 '아니요'로 답한다.
+    await answerCloseConfirmIfAny(page);
     assert.equal(await momentCount(page), 1, '뒤로가기로 닫아도 아무것도 담지 않는다');
     assert.equal(await page.evaluate(() => location.href.includes('youtu.be')), false, '주소가 그대로다');
     assert.deepEqual(errors, [], '페이지 오류 없음');
@@ -588,6 +618,8 @@ test('#37 꼬리표 칩: 확정 뒤 안내가 도드라지고, 다시 눌러 빼
     // #876 안내에 걸리지 않는 다른 영상을 담는다.
     await openQuickAndFill(page, 'https://youtu.be/xGFc2kvAbM8');
     await page.waitForFunction(() => !document.getElementById('quick-url').value, null, { timeout: 10000 });
+    // #978: 담기 뒤 화면 다시 그리기가 띄우는 닫기 물음은 '아니요'로 답해 창을 그대로 둔다.
+    await answerCloseConfirmIfAny(page);
     const keywordsOf = () => page.evaluate(() => JSON.stringify(window.LT41.trees[0].moments.find((m) => m.id !== 'm1')?.keywords ?? []));
     assert.equal(await keywordsOf(), '[]', '담은 직후 꼬리표는 없다');
     // 직접 붙이기로 꼬리표를 확정한다 — 제안이 없는 제목이라 직접 붙이는 길을 쓴다.

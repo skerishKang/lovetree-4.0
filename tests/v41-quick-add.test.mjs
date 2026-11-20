@@ -321,7 +321,7 @@ const VIDEO_TITLE = '테스트 영상 제목';
 function harness638({ trees = [inboxTree, secondTree], currentTreeId = 't-second', applyImpl = null, fetchImpl = null, writeTab = 'easy', quickTarget = null } = {}) {
   // 하은 2회차 ③ 재현을 위해 문자열 대신 함수도 받는다 — 트리를 바꾸고 다시 여는 시험에서 쓴다.
   const nowTreeId = () => (typeof currentTreeId === 'function' ? currentTreeId() : currentTreeId);
-  const calls = { apply: [], notify: [], editors: [] };
+  const calls = { apply: [], notify: [], editors: [], hold: [] };
   const els = {};
   const $ = id => { if (!els[id]) els[id] = fakeEl({ value: '', children: [], replaceChildren(...kids) { this.children = kids; }, append(...kids) { this.children.push(...kids); } }); return els[id]; };
   els['write-panel'] = fakeEl({ value: '', children: [], open: false, replaceChildren(...kids) { this.children = kids; }, append(...kids) { this.children.push(...kids); } });
@@ -353,6 +353,8 @@ function harness638({ trees = [inboxTree, secondTree], currentTreeId = 't-second
     writePanel: { open: () => { els['write-panel'].open = true; return writeTab; } },
     momentTitle: moment => moment.title || '',
     requestClose: () => {},
+    // #978: 담는 동안 열린 창을 붙잡았다가 끝나면 푸는지 본다(셸이 넘기는 holdPanel을 흉내 낸다).
+    holdPanel: (id, on) => calls.hold.push([id, on]),
     currentTreeId: nowTreeId,
     listTrees: () => trees,
     // 2026-11-16 대표 요청: 쉬운 추가로 담을 곳 설정(늘 같은 트리) — 셸이 넘기는 한 벌을 흉내 낸다.
@@ -409,6 +411,22 @@ test('#638 트리가 하나뿐이면 고르기를 숨기고 그 트리 이름을
   h.api.openQuick();
   assert.equal(h.els['quick-tree-select'].hidden, true);
   assert.equal(h.els['quick-tree-line'].textContent, quickTreeLineText(QUICK_INBOX_LABEL));
+});
+
+// #978: 담는 동안에는 열린 창이 닫히지 않게 붙잡고(저장 뒤 화면 다시 그리기가 창을 닫으려 한다),
+// 저장이 끝나면 바로, 실패해도 반드시 푼다.
+test('#978 담는 동안 쓰기 창을 붙잡았다가 끝나면(실패해도) 바로 푼다', () => {
+  const h = harness638();
+  h.els['quick-url'].value = URL_OK;
+  h.api.renderPreview();
+  h.api.submitQuick({ preventDefault() {} });
+  assert.deepEqual(h.calls.hold, [['write-panel', true], ['write-panel', false]], '앞뒤로 한 번씩 붙잡고/풀고');
+
+  const bad = harness638({ applyImpl: () => { throw Error('boom'); } });
+  bad.els['quick-url'].value = URL_OK;
+  bad.api.renderPreview();
+  bad.api.submitQuick({ preventDefault() {} });
+  assert.deepEqual(bad.calls.hold, [['write-panel', true], ['write-panel', false]], '저장이 실패해도 붙잡은 것은 반드시 푼다');
 });
 
 // ---- 이슈 671: 쓰기 창 열림이 목적지('그 순간 다음에 담기')를 받는다 ----
