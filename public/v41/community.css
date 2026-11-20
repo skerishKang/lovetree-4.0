@@ -93,14 +93,16 @@ dialog.community-group-find::backdrop{background:transparent}
 .moments-step{width:48px;height:48px;border:1px solid var(--lt-gold-line);border-radius:50%;background:var(--lt-glass-strong);color:var(--lt-pearl);font-size:16px;cursor:pointer}
 .moments-empty{max-width:560px;margin:80px auto;text-align:center;color:var(--lt-muted)}
 @media(max-width:780px){
- .moments-stage{height:calc(100dvh - 277px);min-height:320px;gap:0}
+ .moments-stage{height:calc(100dvh - 277px);min-height:320px;gap:0;width:fit-content}
  .moments-card{height:100%;width:auto;max-width:100vw;aspect-ratio:9/16;border-radius:0;border-left:0;border-right:0}
- .moments-rail{position:absolute;right:6px;bottom:64px;gap:6px;padding:0;z-index:5}
+ .moments-rail{position:absolute;right:11px;bottom:64px;gap:6px;padding:0;z-index:5}
  .moments-rail-button{min-width:44px;min-height:44px;border-radius:var(--lt-r-pill);background:rgba(0,0,0,.72);color:#fff}
  .moments-rail-label{display:none}
- .moments-nav{display:grid;right:6px;top:auto;bottom:270px;transform:none;z-index:5}
+ .moments-nav{display:grid;right:11px;top:auto;bottom:270px;transform:none;z-index:5}
  .moments-step{width:44px;height:44px;background:rgba(0,0,0,.72);color:#fff}
+ .moments-overlay{padding-right:64px}
 }
+@media(min-width:781px){.moments-rail-button.is-heart{opacity:.6}}
 
 /* #1025 2단계 — 가수 칩 줄·담기 창·선 아이콘. 색은 identity 토큰만 쓴다. */
 .moments-chips{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;max-width:1500px;margin:0 auto 12px}

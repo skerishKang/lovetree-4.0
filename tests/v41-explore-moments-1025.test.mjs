@@ -227,33 +227,51 @@ test('#1075 — 밝은 영상 위에서도 390·1440의 단추 여섯 개가 보
        inView: r.top >= 0 && r.bottom <= innerHeight && r.left >= 0 && r.right <= innerWidth,
        reaches: node === hit || node.contains(hit),
        hit: hit ? String(hit.className || hit.tagName) : '',
-       color: cs.color, background: cs.backgroundColor,
+       color: cs.color, background: cs.backgroundColor, opacity: cs.opacity,
        rect: [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)]
       };
      }));
+     const room = await panel.evaluate(el => {
+      const card = el.querySelector('.moments-card').getBoundingClientRect();
+      const buttons = [...el.querySelectorAll('.moments-rail-button, .moments-step')].map(node => node.getBoundingClientRect());
+      const text = Math.max(...[...el.querySelectorAll('.moments-overlay > *')].map(node => node.getBoundingClientRect().right));
+      return { cardRight: Math.round(card.right), buttonRight: Math.round(Math.max(...buttons.map(r => r.right))), buttonLeft: Math.round(Math.min(...buttons.map(r => r.left))), textRight: Math.round(text) };
+     });
      assert.equal(nodes.length, 6, `${width}·${theme}: 오른쪽 넷 + 위아래 둘`);
      for (const node of nodes) {
       assert.ok(node.visible, `${width}·${theme}: ${node.label}이 보이지 않음 — ${JSON.stringify(node)}`);
       assert.ok(node.inView, `${width}·${theme}: ${node.label}이 화면 밖 — ${JSON.stringify(node)}`);
       assert.ok(node.reaches, `${width}·${theme}: ${node.label}을 다른 요소가 가림 — ${JSON.stringify(node)}`);
      }
-     if (width <= 780) {
-      for (const node of nodes) {
-       assert.equal(node.color, 'rgb(255, 255, 255)', `${width}·${theme}: 밝은 영상 위 흰 글자 — ${node.label} ${node.color}`);
-       const parts = node.background.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
-       assert.ok(parts, `${width}·${theme}: ${node.label}에 어두운 배경이 없음 — ${node.background}`);
-       assert.ok(Number(parts[1]) < 40 && Number(parts[2]) < 40 && Number(parts[3]) < 40 && Number(parts[4] ?? 1) > 0.5, `${width}·${theme}: ${node.label} 스크림이 너무 옅음 — ${node.background}`);
-      }
-      const top = await panel.evaluate(el => ({
-       navBottom: Math.max(...[...el.querySelectorAll('.moments-step')].map(n => n.getBoundingClientRect().bottom)),
-       railTop: Math.min(...[...el.querySelectorAll('.moments-rail-button')].map(n => n.getBoundingClientRect().top))
-      }));
-      assert.ok(top.navBottom < top.railTop, `${width}·${theme}: 위아래 단추가 오른쪽 넷과 겹침 — ${JSON.stringify(top)}`);
-      const before = await panel.locator('.moments-stage').getAttribute('data-lt-moments-id');
-      await panel.locator('.moments-step').nth(1).click();
-      const after = await panel.locator('.moments-stage').getAttribute('data-lt-moments-id');
-      assert.notEqual(before, after, `${width}·${theme}: 다음 순간 단추가 실제로 눌린다`);
-     } else {
+      if (width <= 780) {
+       for (const node of nodes) {
+        assert.equal(node.color, 'rgb(255, 255, 255)', `${width}·${theme}: 밝은 영상 위 흰 글자 — ${node.label} ${node.color}`);
+        assert.equal(node.opacity, '1', `${width}·${theme}: ${node.label}만 흐리게 남음 — ${node.opacity}`);
+        const parts = node.background.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
+        assert.ok(parts, `${width}·${theme}: ${node.label}에 어두운 배경이 없음 — ${node.background}`);
+        assert.ok(Number(parts[1]) < 40 && Number(parts[2]) < 40 && Number(parts[3]) < 40 && Number(parts[4] ?? 1) > 0.5, `${width}·${theme}: ${node.label} 스크림이 너무 옅음 — ${node.background}`);
+       }
+       const inset = room.cardRight - room.buttonRight;
+       assert.ok(inset >= 10 && inset <= 12, `${width}·${theme}: 단추가 카드 가장자리에서 ${inset}px — ${JSON.stringify(room)}`);
+       assert.ok(room.textRight <= room.buttonLeft, `${width}·${theme}: 아래 글이 단추와 겹침 — ${JSON.stringify(room)}`);
+       const top = await panel.evaluate(el => ({
+        navBottom: Math.max(...[...el.querySelectorAll('.moments-step')].map(n => n.getBoundingClientRect().bottom)),
+        railTop: Math.min(...[...el.querySelectorAll('.moments-rail-button')].map(n => n.getBoundingClientRect().top))
+       }));
+       assert.ok(top.navBottom < top.railTop, `${width}·${theme}: 위아래 단추가 오른쪽 넷과 겹침 — ${JSON.stringify(top)}`);
+       const heart = panel.locator('.moments-rail-button').first();
+       assert.equal(await heart.locator('.moments-rail-icon').textContent(), '♡', '기본 마음은 빈 하트');
+       assert.equal(await heart.getAttribute('aria-pressed'), 'false', '기본 누름 상태 아님');
+       await heart.click();
+       assert.equal(await heart.locator('.moments-rail-icon').textContent(), '♥', '누른 마음은 채운 하트');
+       assert.equal(await heart.getAttribute('aria-pressed'), 'true', '누름 상태 표시');
+       await heart.click();
+       assert.equal(await heart.locator('.moments-rail-icon').textContent(), '♡', '다시 누르면 빈 하트');
+       const before = await panel.locator('.moments-stage').getAttribute('data-lt-moments-id');
+       await panel.locator('.moments-step').nth(1).click();
+       const after = await panel.locator('.moments-stage').getAttribute('data-lt-moments-id');
+       assert.notEqual(before, after, `${width}·${theme}: 다음 순간 단추가 실제로 눌린다`);
+      } else {
       const rail = await panel.locator('.moments-rail-button').first().evaluate(el => getComputedStyle(el).backgroundColor);
       assert.equal(rail, 'rgba(0, 0, 0, 0)', `${width}·${theme}: 데스크톱 단추는 그대로 — ${rail}`);
      }
