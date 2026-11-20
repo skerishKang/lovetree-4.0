@@ -77,7 +77,8 @@ html[data-v41-screen=shelf] .book-card .book-cover-media{object-position:50% 50%
 html[data-v41-screen=shelf] .hero { display: block; min-height: 0; height: auto; }
 /* 261118 대표 지적 2차: 띠 위 빈 상자를 없앤다 — 띠 모드에서는 바깥 상자(모서리·배경·그림자) 없이 띠 한 줄만,
    위 여백은 20px(24px 이내). 띠 자체의 1px 테두리 한 겹만 남는다. */
-html[data-v41-screen=shelf] .hero.strip-mode { margin: 20px 0 0; padding: 0; min-height: 0; height: auto; border: 0; background: transparent; box-shadow: none; }
+/* #1026 묶음 C: 띠 자리를 84px로 미리 잡아 둔다. 이어 보기글·썸네일이 늦게 와도 세로 자리가 그대로다. */
+html[data-v41-screen=shelf] .hero.strip-mode { margin: 20px 0 0; padding: 0; min-height: 84px; height: 84px; border: 0; background: transparent; box-shadow: none; }
 html[data-v41-screen=shelf] .hero.strip-mode .hero-copy { display: none; }
 .resume-strip {
   display: flex;

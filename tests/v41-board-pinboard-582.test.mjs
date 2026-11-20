@@ -267,5 +267,44 @@ test('조작 버튼 히트박스는 44x44 이상이다(렌더링 ::after 터치 
       assert.ok(hit.w >= 44 && hit.h >= 44, `${hit.sel} 히트박스 ${hit.w}x${hit.h}가 44 미만이다(inset ${hit.inset})`);
     }
   }
-  await context.close();
+   await context.close();
+ });
+
+// #1026 묶음 C: 썸네일이 늦게 도착해도 카드 자리를 다시 잡지 않는다(보통 조건 CLS 0.01 이하).
+test('#1026 동작: 그림 지연 도착에도 카드 top 변화 0, 보드 CLS 0.01 이하', { skip: REQUIRE ? false : skip, timeout: 180000 }, async () => {
+  if (skip) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip}`);
+  const { chromium: browserChromium } = await import('playwright');
+  const tree = starTree(8);
+  const server = await serve({ '/__host-1026.html': hostHTML(tree) });
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await browserChromium.launch();
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
+  await context.addInitScript(() => {
+    window.__shift1026 = [];
+    try { new PerformanceObserver((list) => { for (const e of list.getEntries()) if (!e.hadRecentInput) window.__shift1026.push(e.value); }).observe({ type: 'layout-shift', buffered: true }); } catch {}
+  });
+  await context.route('**/i.ytimg.com/**', async (route) => {
+    await new Promise((ok) => setTimeout(ok, 500));
+    await route.fulfill({ contentType: 'image/svg+xml', body: YT_THUMB_SVG });
+  });
+  try {
+    const page = await context.newPage();
+    await page.goto(`${base}/__host-1026.html`, { waitUntil: 'domcontentloaded' });
+    let frame = null;
+    for (let i = 0; i < 80 && !frame; i++) {
+      frame = page.frames().find((f) => f !== page.mainFrame() && /views\/track58-pinboard/.test(f.url()));
+      if (!frame) await page.waitForTimeout(100);
+    }
+    assert.ok(frame, '보드 프레임이 열린다');
+    await frame.waitForSelector('#cardLayer .card', { timeout: 20000 });
+    const topsBefore = await frame.evaluate(() => [...document.querySelectorAll('#cardLayer .card')].map((el) => el.offsetTop));
+    await page.waitForTimeout(1600);
+    const result = await frame.evaluate(() => ({
+      tops: [...document.querySelectorAll('#cardLayer .card')].map((el) => el.offsetTop),
+      cls: (window.__shift1026 || []).reduce((sum, value) => sum + value, 0)
+    }));
+    const moved = result.tops.filter((top, i) => top !== topsBefore[i]).length;
+    assert.equal(moved, 0, `그림 도착 뒤 옮겨진 카드 ${moved}개 — 처음 자리가 최종 자리여야 한다`);
+    assert.ok(result.cls <= 0.01, `보드 CLS ${result.cls.toFixed(6)}가 0.01을 넘었다`);
+  } finally { await browser.close(); server.close(); }
 });

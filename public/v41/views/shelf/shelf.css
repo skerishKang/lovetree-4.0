@@ -108,6 +108,9 @@
     .hero-book span { position: absolute; left: 10px; right: 10px; bottom: 14px; z-index: 1; color: rgba(255,255,255,.87); font: 700 11px var(--display); text-align: center; }
     .hero-book i { position: absolute; left: 50%; top: 36%; z-index: 1; display: block; width: 29px; height: 29px; border: 2px solid rgba(255,255,255,.65); border-radius: 50% 0; transform: translate(-50%,-50%) rotate(45deg); }
 
+    /* #1026 묶음 C: 띠 모양·높이를 첫 스타일시트에서 고정한다. 추가 스타일이 늦게 와도 서재가 아래로 밀리지 않는다. */
+    html[data-v41-screen=shelf] .hero.strip-mode { display: block; margin: 20px 0 0; padding: 0; min-height: 84px; height: 84px; border: 0; background: transparent; box-shadow: none; }
+    html[data-v41-screen=shelf] .hero.strip-mode .hero-copy { display: none; }
     .shelf-controls { display: flex; align-items: center; gap: 8px; margin: 16px 0 11px; }
     .search { position: relative; flex: 1; max-width: 390px; }
     .search input { width: 100%; min-height: 43px; padding: 0 15px 0 39px; border: 1px solid var(--line); border-radius: 999px; color: var(--ink); background: rgba(255,252,247,.86); font-size: 12px; }

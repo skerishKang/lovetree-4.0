@@ -176,33 +176,21 @@ else media=`<div class="media ${m.type==='link'||m.type==='youtube'?'linkMedia':
 return `<article class="card ${m.first?'first':''} ${m.type==='note'?'noteCard':''}" data-id="${m.id}" title="끌어서 자리 옮기기" style="left:${m.x}px;top:${m.y}px;--rot:${m.rot}deg;--pin:${colors[m.color]};--halo:${colors[m.color]}55">${m.first?'<div class="firstTag">첫 순간</div>':''}<button class="pin" data-pin="${m.id}" aria-hidden="true" tabindex="-1"></button>${media}<div class="cardBody"><h3 class="cardTitle">${esc(titleMain(m))}</h3><div class="cardMeta"><span class="emotionDot"></span>${esc(m.emotion)} · ${esc(dateText(m.date))}</div></div></article>`}
 
 function renderCards(){cardLayer.innerHTML=moments.map(cardHTML).join('');
-cardLayer.querySelectorAll('.card').forEach(el=>bindCard(el));
-thumbSettleDone=false;
-settlePlacedCards();
+ cardLayer.querySelectorAll('.card').forEach(el=>bindCard(el));
+ settlePlacedCards();
 if(selected)selectMoment(selected,false)}
 
-// #553: 배치가 정한 자리(treeSpread·cardPosition)는 카드를 그린 뒤 실제 높이를 재어 같은 열 위아래
-// 카드가 겹치지 않게 벌린다. innerHTML을 다시 쓰지 않고 top만 고치므로 다시 그리기·깜빡임이 늘지 않는다.
-// 자리를 저장한 순간은 그대로 둔다(#395 계약). 썸네일은 늦게 실리므로 종류별 예약 높이로 자리를
-// 미리 벌려 두고, 실린 뒤에도 한 번만 다시 잰다(예약 높이를 넘친 경우만 움직인다).
-// 다시 재는 것은 썸네일 도착 뒤 '한 번'뿐이다 — 매번 다시 기다리면 썸네일이 전부 실린 상태에서
-// 기다림이 곧바로 끝나며 끝없는 되잡기 사슬이 생겨 화면이 얼어 붙는다(CI #553 2·3차 빨강 원인).
-let thumbSettleWaiting=false,thumbSettleDone=false;
+// #1026 묶음 C: 카드 자리는 처음부터 종류별 예약 높이로 정하고 그 뒤 옮기지 않는다.
+// 썸네일이 늦게 와도 같은 열의 카드 top을 다시 잡지 않으므로 모양 바뀜과 자리 밀림이 없다.
+// 자리를 저장한 순간은 그대로 둔다(#395 계약). 예약 높이는 growBoard도 같은 값을 쓰므로 판 크기와도 맞는다.
 function settlePlacedCards(){
   const els=new Map([...cardLayer.querySelectorAll('.card')].map(el=>[el.dataset.id,el]));
-  const list=moments.filter(m=>els.has(m.id)).map(m=>({id:m.id,x:m.x,y:m.y,h:els.get(m.id).offsetHeight}));
+  const list=moments.filter(m=>els.has(m.id)).map(m=>({id:m.id,x:m.x,y:m.y,h:reservedHeights.get(m.id)||BASE_RESERVED_H}));
   // #619-6: 카드 전부가 쌓기 배치라서 저장 자리가 따로 없고, 전부 열 안에서 벌림 대상이다.
   const moved=LT58Model.settleColumnGaps(list,new Set(moments.map(m=>m.id)),24);
   let changed=false;
   for(const m of moments){const y=moved.get(m.id);if(!Number.isFinite(y)||y===m.y)continue;m.y=y;els.get(m.id).style.top=y+'px';changed=true}
   if(changed)rerenderThreads();
-  const thumbs=cardLayer.querySelectorAll('.lt-yt-preview img');
-  if(thumbs.length&&!thumbSettleWaiting&&!thumbSettleDone){thumbSettleWaiting=true;
-    // 그림 하나가 영영 오지 않아도(회선 끊김·방화벽) 8초 뒤에는 잰다 — 기다림이 남는 일이 없게.
-    Promise.all([...thumbs].map(img=>img.complete?Promise.resolve():new Promise(r=>{img.addEventListener('load',r,{once:true});img.addEventListener('error',r,{once:true});setTimeout(r,8000)})))
-      .then(()=>{thumbSettleWaiting=false;thumbSettleDone=true;settlePlacedCards()})
-      .catch(()=>{thumbSettleWaiting=false});
-  }
 }
 
 function applyView(animated=false){growBoard();world.style.transition=animated?'transform 1s cubic-bezier(.22,.8,.2,1)':'none';
