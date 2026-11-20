@@ -265,14 +265,8 @@ function syncMomentPickerTop(){
   const bottom=bottoms.length?Math.max(...bottoms):0;
   if(bottom>0) document.documentElement.style.setProperty('--lt-board-picker-top',Math.round(bottom+7)+'px');
   else document.documentElement.style.removeProperty('--lt-board-picker-top');
-  const headBottom=head?head.getBoundingClientRect().bottom:0;
-  /* #891(CTO): 판 제목(기억 보드·설명 줄)은 무대 밖 머리글 — 카드 무대(판)는 제목 아래끝 + 16px부터 시작한다.
-     제목이 없으면 이처럼 머리줄 아래끝을 판 시작으로 쓴다(두 줄 머리줄 화면도 함께 이긴다). */
-  const title=document.querySelector('.boardTitle');
-  const titleBottom=title?title.getBoundingClientRect().bottom:0;
-  const frameTop=titleBottom>0?titleBottom+16:headBottom;
-  if(frameTop>0) document.documentElement.style.setProperty('--lt-board-frame-top',Math.round(frameTop)+'px');
-  else document.documentElement.style.removeProperty('--lt-board-frame-top');
+  /* #1026 묶음 C: 판 시작 자리는 CSS가 처음부터 최종값(155px·좁은 화면 100px)으로 잡는다.
+     여기서 머리글 실측값으로 다시 쓰면 글꼴이 늦게 왔을 때 판 전체가 내려앉아 CLS가 생긴다. */
 }
 syncMomentPickerTop();
 addEventListener('resize',syncMomentPickerTop);

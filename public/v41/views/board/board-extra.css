@@ -305,10 +305,10 @@ html[data-lt-theme=garden] .boardModeSwitch .modeSwitchBtn[aria-pressed="true"]{
 /* 판이 열리면 무대(#viewport) 오른쪽 여백이 판 너비만큼 벌어진다(board.js syncBoardPush가 인라인으로 넣는다).
    좁은 화면(<760)은 아래 시트 그대로 덮으므로 흔들림 없앰. */
 /* #972: 시네마 버튼이 카드 영역 밖에 있도록 — 판을 끌어도 유지 */
-#viewport{transition:margin-right .35s cubic-bezier(.2,.9,.2,1);bottom:86px}
+#viewport{transition:margin-right .35s cubic-bezier(.2,.9,.2,1)}
 #boardControls{position:absolute;inset:0;pointer-events:none;transition:margin-right .35s cubic-bezier(.2,.9,.2,1)}
 #boardControls .toolbar,#boardControls .cinemaBtn{pointer-events:auto}
-@media(max-width:760px){#viewport{transition:none;bottom:74px}#boardControls{transition:none}}
+@media(max-width:760px){#viewport{transition:none}#boardControls{transition:none}}
 @media(max-width:699px){
   html[data-v41-screen=board] .lt-moment-picker[data-tone=dark]{background:var(--lt-stage-2)}
   html[data-lt-theme=garden][data-v41-screen=board] .lt-moment-picker[data-tone=dark]{background:var(--lt-paper)}
