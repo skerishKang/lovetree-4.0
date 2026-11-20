@@ -111,6 +111,7 @@ test('#1010 기존 사용자(예시만 궤도) 안내 줄 — 금테를 빼고 �
       assert.match(note.text, /뒤에 떠다니는 카드는 감상 예시예요/, '안내 줄이 떠다니는 예시 카드를 가리킨다: ' + note.text);
       assert.equal(note.hint, '눌러서 감상', '힌트는 누름을 안내한다: ' + note.hint);
       assert.doesNotMatch(note.text, /금테/, '안내 줄에 금테가 없다(마지막 순간 카드와 헷갈리지 않게): ' + note.text);
+      assert.ok(note.text.includes('·'), '안내 줄에 가름점(·)이 그려진다 — 문구와 힌트 사이: ' + note.text);
       const visibleCards = await h.frame.locator('.card').evaluateAll(es => es.filter(e => !e.classList.contains('off')).length);
       assert.ok(visibleCards > 0, `떠다니는 예시 카드가 실제로 보인다(보이는 카드 ${visibleCards}장)`);
     } finally { await close1010(h); }
