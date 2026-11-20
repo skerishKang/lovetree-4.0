@@ -517,6 +517,9 @@ nav .tree-frame{scroll-snap-align:center}
 #header-overflow button{min-height:44px;text-align:left;border:0;border-radius:10px;background:none;color:var(--lt-pearl);padding:0 10px;font-size:13px}
 #mobile-more{display:none;min-width:44px;justify-content:center}
 @media(max-width:1020px){.app-header{padding:9px 14px;gap:10px}.main-nav>button{padding:0 8px;font-size:12px}nav #record-menu{max-width:150px}}
+/* #1029 데스크탑: 트리 이름 길이와 무관하게 단추 폭을 180px로 고정한다. 옆 탭의 x가 밀리지 않고,
+   긴 이름은 이미 있는 #source-label 말줄임으로 잘리며 전체 이름은 title로 남는다. 휴대폰은 아래 폭 규칙을 유지한다. */
+@media(min-width:781px){nav #record-menu{width:180px;max-width:none}}
 @media(max-width:780px){
  .tree-frame{margin-left:0;padding:0;border:0;background:none}
  .app-header{display:flex;min-height:56px;padding:6px 10px;gap:6px;flex-wrap:nowrap}
