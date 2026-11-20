@@ -326,3 +326,35 @@ test('#1018 떠다니는 카드는 바닥 링크 줄·새 소식 카드 자리�
     }
   } finally { await browser.close(); }
 });
+
+// #1026 E: 기존 사용자가 화면을 열 때 example.mjs(1MB 예시 데이터)를 요청하지 않는다.
+// 실제 네트워크 요청 URL을 세는 동작 검사(소스 글자 검사 아님). 로그아웃 예시는 이번에 바꾸지 않는다.
+test('기존 사용자 첫 화면·책·보드·지도·서재 — example.mjs 요청 0', { skip: skip1010 || !REQUIRE1010 ? skip1010 || 'LT_HOME_1010_REQUIRE=1 일 때 실행' : false, timeout: 180000 }, async () => {
+  const server = await serve({});
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium1010.launch({ headless: true });
+  try {
+    for (const hash of ['', '#my/book', '#my/board', '#my/network', '#my/shelf']) {
+      const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
+      const trees = [treeMix1010({ subject: '좋아하는 순간들', count: 6 })];
+      const workspace = { revision: 1, state: { version: 1, trees, prefs: {} }, subject: 'visual-audit-fake', writeSubjectBound: true, savedAt: '2026-11-20T00:00:00.000Z' };
+      const requested = [];
+      await ctx.route('**/*', route => {
+        const u = new URL(route.request().url());
+        requested.push(u.pathname.split('/').pop() || u.pathname);
+        if (u.origin !== base) return u.hostname === 'i.ytimg.com' ? THUMB(route) : route.abort();
+        if (u.pathname === '/api/workspace') return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(workspace) });
+        if (u.pathname.startsWith('/api/')) return route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' });
+        return route.continue();
+      });
+      const page = await ctx.newPage();
+      await page.goto(`${base}/v41/?account=1${hash}`, { waitUntil: 'load', timeout: 60000 });
+      await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
+      await page.waitForTimeout(1500);
+      const exampleRequests = requested.filter(f => f === 'example.mjs');
+      assert.equal(exampleRequests.length, 0, `${hash || '#home'}: 예시 데이터 요청 ${exampleRequests.length}건 — 기존 사용자 화면에서는 0이어야 한다`);
+      console.log('EXAMPLE_REQUESTS', hash || '#home', JSON.stringify({ example: exampleRequests.length, total: requested.length }));
+      await ctx.close();
+    }
+  } finally { await browser.close(); await new Promise(ok => server.close(ok)); }
+});
