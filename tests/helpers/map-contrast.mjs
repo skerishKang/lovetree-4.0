@@ -260,7 +260,8 @@ export function measureMapDOMInPage() {
   const stage = document.getElementById('stage'), canvas = stage.getContext('2d'), d = stage.width / stage.clientWidth;
   const roles = [
     ['toolbar', '.topbar button, #modePill'], ['hint', '.hero p'],
-    ['legend', '.legend h3, .legend-row'], ['explorer', '.controls h3, .controls button'],
+    ['legend', '.legend h3, .legend-row'],
+    // #951 ⑥: 큰 탐색 판은 숨었다 — 그 글자 대비는 아래 단추 줄('ribbon')이 맡는다(대상만 이동, 기준값 4.5 그대로).
     // #951 ⑤: 상세 판을 보드와 같은 틀로 바꿨다 — 칩·detail-block 대신 제목·마음·날짜·이어진 순간·아래 단추를 잰다.
     ['detail', '.detail.open .detail-kicker, .detail.open h2, .detail.open .detail-label, .detail.open .heartText, .detail.open .value, .detail.open .connName, .detail.open .connWhy, .detail.open button'],
     ['ribbon', '.mobile-ribbon button'], ['route', '.route-status.show b, .route-status.show span'], ['tooltip', '.edge-tip.show'],
