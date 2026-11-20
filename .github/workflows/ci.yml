@@ -67,9 +67,9 @@ jobs:
           fail=$(awk '/^# fail /{print $3}' /tmp/pg.tap)
           skipped=$(awk '/^# skipped /{print $3}' /tmp/pg.tap)
           echo "pass=$pass fail=$fail skipped=$skipped"
-          # 7개 파일의 실제 시험 수 합계: 7+3+3+15+5+4+2 = 39건.
-          if [ "${fail:-1}" != "0" ] || [ "${skipped:-1}" != "0" ] || [ "${pass:-0}" -lt 39 ]; then
-            echo "실패: skip 또는 39건 미달 — PostgreSQL 검증이 수행되지 않았습니다."
+          # 7개 파일의 실제 실행 시험 수 합계(루프 생성 1건 포함) = 40건.
+          if [ "${fail:-1}" != "0" ] || [ "${skipped:-1}" != "0" ] || [ "${pass:-0}" -lt 40 ]; then
+            echo "실패: skip 또는 40건 미달 — PostgreSQL 검증이 수행되지 않았습니다."
             exit 1
           fi
   migration:
