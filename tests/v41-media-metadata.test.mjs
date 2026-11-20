@@ -70,3 +70,17 @@ test('member-session persists explicitly loaded metadata through the normal work
   assert.equal(written?.state?.trees[0]?.moments[0]?.mediaMetadata?.channel,'채널 이름');
   session.dispose();
 });
+
+test('#1038: 실측 세로값은 미디어 정보 캐시에 남고 내보내기·가져오기에서도 유지된다', () => {
+  const state = stateWithMoment();
+  const tree = cacheMomentMediaMetadata(state.trees[0],'trial-moment',url,{
+    title:'영상 제목', vertical:true, width:1080, height:1920
+  },timestamp);
+  const exported = validateState({version:1,trees:[tree]});
+  const imported = importTrees({version:1,trees:[]},exported);
+  assert.deepEqual(imported.trees[0].moments[0].mediaMetadata,{
+    title:'영상 제목',channel:'',source:'video.example',vertical:true,width:1080,height:1920
+  });
+  assert.throws(()=>cacheMomentMediaMetadata(state.trees[0],'trial-moment',url,{vertical:'true'},timestamp),/참이나 거짓/);
+  assert.throws(()=>cacheMomentMediaMetadata(state.trees[0],'trial-moment',url,{height:-5},timestamp),/숫자/);
+});

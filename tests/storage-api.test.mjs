@@ -390,3 +390,25 @@ test('onCommit receives the validated state only — quarantined originals stay 
   const stored = (await repo.load({ productId: PRODUCT, subjectId: 'usr_e' })).doc;
   assert.ok(stored.trees.some(t => t.id === deviant.id), '저장소에는 격리 원본이 그대로 남는다');
 });
+
+// #1038: readStoredDocument(트리별 검증·격리)를 거쳐도 저장된 세로 판정값은 그대로 읽힌다.
+test('stored vertical media values survive the readStoredDocument isolation path', async () => {
+  const { handle, repo } = buildHandle();
+  const tree = createTree({ ...base, title: '세로 트리' }, CLOCK);
+  const grown = addMoment(tree, {
+    ...base, title: '쇼츠',
+    url: 'https://www.youtube.com/watch?v=abc123DEF45',
+    mediaMetadata: { title: '쇼츠', vertical: true, width: 1080, height: 1920 }
+  }, tree.moments[0].id, CLOCK);
+  await seedDoc(repo, 'usr_a', { version: 1, trees: [grown] });
+  const got = await get(handle);
+  assert.equal(got.status, 200);
+  assert.equal(got.body.quarantined, undefined, '새 선택 필드 때문에 트리가 격리되지 않는다');
+  const meta = got.body.state.trees[0].moments.find(m => m.url.includes('youtube')).mediaMetadata;
+  assert.deepEqual(meta, { title: '쇼츠', channel: '', source: 'www.youtube.com', vertical: true, width: 1080, height: 1920 });
+  // 다시 저장해도 값이 남는다(왕복 유지).
+  const again = await put(handle, { state: got.body.state, expectedRevision: 1, clientKey: 'k-1038' });
+  assert.equal(again.status, 200);
+  const reread = await get(handle);
+  assert.equal(reread.body.state.trees[0].moments.find(m => m.url.includes('youtube')).mediaMetadata.vertical, true);
+});
