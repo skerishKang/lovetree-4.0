@@ -473,7 +473,9 @@ export function createMessages(deps) {
   }
 
   // 둘러보기(공개 목록) 연결. 항목을 열면 공유 주소로, 내 기록 새로 시작은 첫 여정으로 간다.
-  if(typeof document==='undefined')return {openSharePanel};
+  // #1026 E: Node 단위 시험의 document 흉내에서는 브라우저 전용 모듈을 받지 않는다.
+  const browser = typeof document!=='undefined' && typeof HTMLElement!=='undefined' && !!document.querySelector;
+  if(!browser && !deps.mountCommunity)return {openSharePanel};
   const mountCommunity = deps.mountCommunity || (() => import('../community-panel.mjs').then(m => m.mountCommunity));
   void Promise.resolve(mountCommunity()).then(mount => mount({
     button: $('community-menu'),
