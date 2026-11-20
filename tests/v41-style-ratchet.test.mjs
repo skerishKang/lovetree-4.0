@@ -115,3 +115,22 @@ test('#1015 !important 개수는 대소문자·JS style 문자열을 보고, !im
   assert.equal(countText("el.style.cssText='color:red !important'", '.mjs').inlineStyle, 0);
   assert.equal(countText('if(!importantFlag) return;', '.mjs').important, 0);
 });
+
+test('#1015 .js와 .mjs 템플릿 문자열의 인라인 style도 센다(CSS 변수 전용은 제외)', t => {
+  const jsKey = sortedKeys.find(k => k.endsWith('.js') && baselineFiles[k].inlineStyle > 0);
+  const jsBase = baselineFiles[jsKey].inlineStyle;
+  const tmp = tmpCopy(t);
+  const file = path.join(tmp, 'v41', ...jsKey.replace('public/v41/', '').split('/'));
+  const before = fs.readFileSync(file, 'utf8');
+  const probeLine = before.split(/\r?\n/).length + 1;
+  fs.writeFileSync(file, before + '\nconst probe = \'<div style="color:red"></div>\';\n');
+  const r = runTool(['--root', path.join(tmp, 'v41')]);
+  assert.equal(r.status, 1, r.out);
+  assert.ok(r.out.includes(jsKey), r.out);
+  assert.ok(r.out.includes(`인라인 style ${jsBase} → ${jsBase + 1}`), r.out);
+  assert.ok(r.out.includes('줄 번호:'), r.out);
+  assert.ok(r.out.includes(String(probeLine)), r.out);
+  assert.equal(countText('<div style="--x:${v}"></div>', '.js').inlineStyle, 0);
+  assert.equal(countText('<div style="color:red"></div>', '.js').inlineStyle, 1);
+  assert.equal(countText("el.style.color = 'red'", '.js').inlineStyle, 0);
+});

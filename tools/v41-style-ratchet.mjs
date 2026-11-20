@@ -8,7 +8,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 
 const repoRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
-const EXTS = new Set(['.css', '.html', '.mjs']);
+const EXTS = new Set(['.css', '.html', '.js', '.mjs']);
 const IMPORTANT_RE = /!\s*important\b/gi;
 // style 앞에 공백을 요구해 data-date-style="…" 같은 다른 속자를 세지 않는다.
 const STYLE_ATTR_RE = /\sstyle\s*=\s*(["'])([\s\S]*?)\1/gi;
@@ -24,7 +24,7 @@ export function countText(text, ext) {
   const lineAt = index => text.slice(0, index).split(/\r?\n/).length;
   const importantLines = [...text.matchAll(IMPORTANT_RE)].map(m => lineAt(m.index));
   const inlineStyleLines = [];
-  if (ext === '.html') {
+  if (ext === '.html' || ext === '.js' || ext === '.mjs') {
     for (const m of text.matchAll(STYLE_ATTR_RE)) {
       if (!isVarsOnly(m[2])) inlineStyleLines.push(lineAt(m.index));
     }
