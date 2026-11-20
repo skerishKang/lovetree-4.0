@@ -291,14 +291,13 @@ export function createCleanup(deps) {
     const fromStillThere = getTrees().some(t => t.id === undo.fromTreeId);
     if (!targetStillHas || !fromStillThere) { hideMoveNotice(); return; }
     try {
-      getMember().apply('moveMoment', { toTreeId: undo.fromTreeId, parentId: undo.parentId || undefined }, { treeId: undo.toTreeId, momentId: undo.momentId });
+      getMember().apply('moveMoment', { toTreeId: undo.fromTreeId, parentId: undo.parentId || undefined }, { treeId: undo.toTreeId, momentId: undo.momentId }, {moment:true});
     } catch (error) {
       notify(error?.message || '되돌리지 못했어요. 다시 시도해 주세요.');
       return;
     }
     moveUndo = null;
     hideMoveNotice();
-    choose(undo.fromTreeId, undo.momentId);
   }
   function hideMoveNotice() {
     clearTimeout(noticeTimer);

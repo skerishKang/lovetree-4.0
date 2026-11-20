@@ -34,7 +34,8 @@ export function createMemberSession({api,onState=()=>{},onStatus=()=>{},onGuard=
    // 계정 표시 설정(#347 후속): 나무 없이도 저장한다. 서버에는 상태 전체가 PUT된다.
    if(action==='setPrefs'){
      document=validateState(updatePrefs(document,input));
-     onState(structuredClone(document));
+     // #1001 (d): 설정 값은 이미 각 설정 메시지로 화면에 전달된다 — 화면을 다시 띄우지 않는다.
+     onState(structuredClone(document),undefined,{tree:true});
      sync.markLocalSave();
      return {prefs:document.prefs};
    }
@@ -76,7 +77,7 @@ export function createMemberSession({api,onState=()=>{},onStatus=()=>{},onGuard=
      document=validateState(result.state);
      treeId=result.treeId;
      momentId=result.momentId??document.trees.find(t=>t.id===result.treeId)?.moments.find(m=>m.parentId===null)?.id??null;
-     onState(structuredClone(document),{treeId,momentId});sync.markLocalSave();return {treeId,momentId};
+     onState(structuredClone(document),{treeId,momentId},metaHint);sync.markLocalSave();return {treeId,momentId};
    }
    if(action==='new'){if(trees.length>=MAX_TREES)throw Error('트리는 50개까지 만들 수 있어요.');tree=createTree(input);trees.push(tree);treeId=tree.id;momentId=tree.moments[0].id;}
    else {if(!tree)throw Error('트리를 선택해 주세요.');let next;
@@ -98,7 +99,7 @@ export function createMemberSession({api,onState=()=>{},onStatus=()=>{},onGuard=
    // #1001 (a): 호출부가 metaHint를 주면 그 길로(한마디 저장={moment:true}) — 화면을 다시 띄우지 않아 답이 살아있는 문서에 도착한다.
    // #1001 (3): 같은 트리 안 순간 변경(고치기·삭제·이전 순간 바꾸기·연결·해제)도 모델 전용 — 책·지도가
    // lt41-moments-saved 알림을 받아 지금 펼침면·선택·열린 판을 그대로 다시 그린다(재적재 0). 트리 삭제·옮기기·새 트리는 그대로 재적재.
-   const modelOnly=metaHint??(action==='editTree'?{tree:true}:(action==='edit'||action==='delete'||action==='reparent'||action==='link'||action==='unlink'?{moment:true}:undefined));
+   const modelOnly=metaHint??(action==='editTree'?{tree:true}:(action==='edit'||action==='delete'||action==='reparent'||action==='link'||action==='unlink'||action==='cacheMediaMetadata'?{moment:true}:undefined));
    onState(structuredClone(document),{treeId,momentId},modelOnly);sync.markLocalSave();return {treeId,momentId};
  }
  return {start:()=>sync.start(),apply,act:name=>sync.act(name),flushOnHide:()=>sync.flushOnHide(),snapshot:()=>({...sync.snapshot(),subject,writable:sync.snapshot().owned&&bound&&!mismatch,phase:sync.status().phase}),state:()=>structuredClone(document),dispose:()=>{active=false;bound=false;globalThis.document?.removeEventListener?.('visibilitychange',onVisible);globalThis.removeEventListener?.('pagehide',onHide);globalThis.removeEventListener?.('focus',quietCheck);},status:()=>sync.status()};
