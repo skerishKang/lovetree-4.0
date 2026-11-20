@@ -906,6 +906,10 @@ jobs:
           cp -r "$RUNNER_TEMP/preview-out" ./preview-out 2>/dev/null || true
           echo "postdeploy 채점은 다음 단계(preview-gate)에서 한다(미리보기 Functions 503 예외)."
           exit 0
+      # #1054: 운영 루트 문서의 상대 자산이 <base> 덕분에 /v41/로 풀려 맞는 종류로 200인지 잰다.
+      - name: 루트 주소 자산 종류 검사(#1054)
+        if: steps.preview.outputs.url != ''
+        run: node tools/postdeploy/root-assets.mjs "${{ steps.preview.outputs.url }}"
       - name: 판정(제품 결함 / 환경 문제 나눠 적기)
         if: steps.preview.outputs.url != ''
         run: |
