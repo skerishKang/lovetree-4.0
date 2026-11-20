@@ -285,8 +285,11 @@ export function applyThumbOutcome(img, outcome = {}) {
   if (!candidates.length) return null;
   const index = Number(img.getAttribute?.('data-lt-cand-index') ?? img.dataset?.ltCandIndex ?? 0) || 0;
   const step = nextThumbnailStep(candidates, index, outcome);
+  const mode = img.getAttribute?.('data-lt-fallback-mode') || img.dataset?.ltFallbackMode || 'card';
+  const recent = mode === 'recent-video' ? img.closest?.('.recent-media') : null;
   if (step.status === 'ok') {
     if (img.dataset) img.dataset.ltThumbState = 'ok';
+    if (recent && recent.dataset.recentState !== 'failed') recent.dataset.recentState = 'ready';
     return step;
   }
   if (step.status === 'retry') {
@@ -295,10 +298,15 @@ export function applyThumbOutcome(img, outcome = {}) {
     // 다음 후보는 새 시계로 산다 — 시작한 뒤부터 8초(#679 수리).
     if (img.dataset) delete img.dataset.ltThumbStarted;
     img.src = step.src;
+    const backdrop = recent?.querySelector('.recent-backdrop');
+    if (backdrop) backdrop.src = step.src;
     return step;
   }
   if (img.dataset) img.dataset.ltThumbSettled = '1';
-  const mode = img.getAttribute?.('data-lt-fallback-mode') || img.dataset?.ltFallbackMode || 'card';
+  if (recent) {
+    recent.dataset.recentState = 'failed';
+    return step;
+  }
   const html = img.getAttribute?.('data-lt-fallback-html') || img.dataset?.ltFallbackHtml || '';
   if (mode === 'cover') {
     if (img.id === 'coverMedia') {
@@ -349,7 +357,7 @@ export function sweepPendingThumbs(root, now = Date.now()) {
   if (!root?.querySelectorAll) return;
   const imgs = root.querySelectorAll('img[data-lt-candidates]');
   for (const img of imgs) {
-    if (img.complete || img.dataset?.ltThumbSettled === '1') continue;
+    if (img.complete || img.dataset?.ltThumbSettled === '1' || img.dataset?.ltFallbackMode === 'recent-video') continue;
     const started = Number(img.dataset?.ltThumbStarted || 0);
     if (!started) {
       const lazy = String(img.loading || img.getAttribute?.('loading') || '') === 'lazy';
