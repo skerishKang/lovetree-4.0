@@ -17,7 +17,8 @@
   });
   if(context.source==='server')addEventListener('DOMContentLoaded',()=>{for(const label of document.querySelectorAll('#detail .section .label'))if(label.textContent==='감상 예시'){label.textContent='내 기록';label.nextElementSibling.textContent='상단에서 수정·연결을 관리할 수 있어요.';}});
   if(typeof document!=='undefined')addEventListener('DOMContentLoaded',()=>{
-    const detail=document.querySelector('#detailNote');
+    /* #951 ⑤: 지도 상세 판은 화면(network.js)이 사진·영상을 스스로 그린다(#detailPlayer) — 여기서 또 넣으면 두 번 보인다. */
+    const detail=document.querySelector('#detailPlayer')?null:document.querySelector('#detailNote');
     if(detail&&window.LTMedia){const host=document.createElement('div');detail.parentElement.after(host);let last=null;
       const update=()=>{const id=context.momentId;if(id===last)return;last=id;const m=tree.moments.find(m=>m.id===id);host.innerHTML=m?.url?window.LTMedia.markup(m.url,m.title,m.mediaMetadata,m.id,null,{emotion:m.emotion,date:m.date,note:m.note,treeId:tree.id,startSeconds:m.startSeconds,endSeconds:m.endSeconds}):'';
         // #327 2부: 내 기록(서버)의 순간 상세에서 다른 트리로 옮기기. 공유·예시는 숨긴다.

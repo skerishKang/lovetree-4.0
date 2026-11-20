@@ -238,7 +238,8 @@ const SCREENS = {
   },
   network: {
     title: 'detailTitle',
-    insertAfter: (doc) => doc.querySelector('#detail .chips') || null,
+    // #951 ⑤: 지도 상세 판을 보드와 같은 틀로 바꾸면서 '칩 줄'이 없어졌다 — 꼬리표 줄은 '날짜·트리' 줄 아래에 붙인다(보드와 같다).
+    insertAfter: (doc) => doc.getElementById('dBasic')?.closest('.section') || null,
     buildHost: (doc) => {
       const block = doc.createElement('div');
       block.className = 'detail-block lt-tagline-section';
