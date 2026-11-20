@@ -465,3 +465,104 @@ test('984 이름 바꾸기 실행: 트리 관리에서 이름 저장 → 서재 
     }
   } finally { await browser.close(); }
 });
+
+// #1001 (b)②: 표지 바꾸기 — 업로드 → 추가(add) 뒤에 추가 화면만 뜨고, 표지 편집(editTree)은
+// 모델만 갱신해야 한다(재적재 0회).
+// 전: 업로드로 추가 재적재 + 표지 편집도 재적재 = 2회(같은 흐름에서). 후: 추가 1회 + 편집 0회 = 1회.
+test('970/1001b-2 실행: 표지 사진 올리기 — 저장 뒤 재적재 1회(편집은 모델만 갱신)', { skip: skip || !REQUIRE970 ? skip || 'LT_970_REQUIRE=1 일 때 실행' : false, timeout: 240000 }, async () => {
+  if (skip) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip}`);
+  const { createTree } = await import('../public/v41/domain.mjs');
+  const COVER_TREE = {
+    id: 'tree1', subject: '리센느', title: '리센느의 기록', coverMomentId: '', coverDesign: '', inbox: false,
+    createdAt: '2026-11-19T00:00:00.000Z', updatedAt: '2026-11-19T00:00:00.000Z',
+    moments: [
+      { id: 'm1', parentId: null, links: [], createdAt: '2026-11-19T00:00:00.000Z', title: '첫 순간', note: '처음 남기는 마음', emotion: '설렘', date: '2026-11-19', relation: '', url: '' },
+      { id: 'm2', parentId: 'm1', links: [], createdAt: '2026-11-19T00:00:00.000Z', title: '두 번째 순간', note: '', emotion: '위로', date: '2026-11-19', relation: '이어서', url: '' },
+    ],
+  };
+  const { serve } = await import('./helpers/screen-audit.mjs');
+  const server = await serve();
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch();
+  try {
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
+    let tree = createTree(COVER_TREE);
+    let rev = 1; const puts = [];
+    await ctx.route('**/api/**', r => {
+      if (r.request().url().includes('/api/account')) {
+        // ② #1001: 계정 정보(주제 이름)를 줘서 업로드가 진행되게 한다
+        return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, subject: 'test-account' }) });
+      }
+      return r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' });
+    });
+    await ctx.route('**/api/media*', async r => {
+      // ② #1001: 업로드(POST) 통과 후 onUploaded(url) 로 표지 생성(steps 은 샌드박스에서 가정)
+      if (r.request().method() === 'POST') {
+        // api.mjs call()은 media:payload 전체를 반환하므로 url이 본문 최상위에 있어야 한다.
+        return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, url: `${base}/api/media/cover-test.png`, name: 'cover-test.png' }) });
+      }
+      return r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' });
+    });
+    await ctx.route('**/api/media/cover-test.png**', r => r.fulfill({ status: 200, contentType: 'image/png', body: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", 'base64') }));
+    await ctx.route('**/api/workspace**', r => {
+      const req = r.request();
+      const body = JSON.parse(req.postData() || '{}');
+      if (req.method() === 'PUT') {
+        puts.push({ at: Date.now() });
+        const edited = body?.state?.trees?.find(t => t.id === tree.id);
+        if (edited) tree = edited;
+        rev += 1;
+        return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, revision: rev, subject: 'test-account' }) });
+      }
+      return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, revision: rev, subject: 'test-account', writeSubjectBound: true, savedAt: '2026-11-20T00:00:00.000Z', source: 'server', state: { version: 1, trees: [JSON.parse(JSON.stringify(tree))], prefs: {} } }) });
+    });
+    const page = await ctx.newPage();
+    const navs = [];
+    let counting = false;
+    page.on('framenavigated', f => { if (counting && /\/v41\/(views\/|home\.html)/.test(f.url())) navs.push({ url: f.url(), at: Date.now() }); });
+    await page.goto(`${base}/v41/?account=1`, { waitUntil: 'load' });
+    await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
+    await page.locator('#discover-ask-no').click().catch(() => {});
+    await page.locator('.tree-views [data-view="track59-sketchbook.html"]').click();
+    await page.waitForFunction(() => document.querySelector('[data-popover-target="quick-add"]') === null, null, { timeout: 10000 }).catch(() => {});
+    await page.waitForTimeout(900);
+    // 트리 관리 창 → 사진 표지 모드 → 올리기
+    await page.click('#record-menu');
+    await page.waitForFunction(() => document.getElementById('tree-popover')?.hidden === false, null, { timeout: 10000 });
+    await page.click('[data-tree-action="manage"]');
+    await page.waitForFunction(() => document.getElementById('tree-manager').open, null, { timeout: 10000 });
+    await page.evaluate(() => {
+      const radio = document.querySelector('[name="coverMode"][value="photo"]');
+      radio.checked = true;
+      radio.dispatchEvent(new Event('change', { bubbles: true }));  // 라벨 span 이 덮으므로 JS 로 change 전파
+    });
+    await page.waitForFunction(() => !document.getElementById('tree-cover-upload')?.hidden, null, { timeout: 5000 });
+    await page.waitForFunction(() => document.getElementById('empty-records')?.textContent === '＋ 첫 트리 만들기', null, { timeout: 25000 }).catch(() => {});  // writable 준비 대기
+    counting = true;
+    await page.locator('#tree-form [data-media-file]').setInputFiles({ name: 'cover-test.png', mimeType: 'image/png', buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", 'base64') });
+    const waitPuts = (n) => new Promise((res, rej) => { const t0 = Date.now(); const iv = setInterval(() => { if (puts.length >= n) { clearInterval(iv); res(); } else if (Date.now() - t0 > 25000) { clearInterval(iv); rej(new Error('PUT 대기 초과')); } }, 100); });
+    await waitPuts(1);
+    await page.waitForTimeout(3000);
+    const state = await page.evaluate(() => ({
+      moments: window.LT41?.tree?.moments?.length,
+      coverMomentId: window.LT41?.tree?.coverMomentId,
+      coverMode: window.LT41?.tree?.moments?.find(m => m.id === window.LT41?.tree?.coverMomentId)?.url || '',
+    }));
+    assert.equal(navs.length, 1, `표지 올리기 흐름에서 화면 재적재는 1회여야 한다(실측 ${navs.length}): ${JSON.stringify(navs)}`);
+    assert.equal(state.moments, 2, '표지 추가로 순간이 늘어난다(루트 1 + 사진 순간 1 — 추가 동작 발동)');
+    assert.ok(state.coverMomentId !== '', '추가된 순간이 표지로 지정된다');
+    assert.ok(state.coverMode.includes('/api/media/cover-test.png'), '사진 표지 순간(모델)이 화면에 반영된다');
+    // 표지 편집(editTree)이 모델 전용인지 직접 확인 — 추가(add)의 재적재가 끝난 뒤 이름만 바꿔 저장하면
+    // 책 문서는 그대로여야 한다. 이 검사가 없으면 빠른 흐름에서 두 재적재가 겹쳐 1로 보여 회귀를 놓친다.
+    const bookFrame = page.frames().find(f => /views\/track59-sketchbook/.test(f.url()));
+    assert.ok(bookFrame, '표지 추가 뒤 책 프레임이 열려 있다');
+    await bookFrame.evaluate(() => { window.__coverDoc1001 = 'alive'; });
+    await page.fill('#tree-form [name="title"]', '표지 바꾼 트리');
+    await page.evaluate(() => document.getElementById('tree-form').requestSubmit());
+    await page.waitForTimeout(2500);
+    const keptDoc = await bookFrame.evaluate(() => window.__coverDoc1001 || null);
+    assert.equal(keptDoc, 'alive', '표지·이름 편집(editTree)은 화면을 다시 띄우지 않는다(모델만 갱신)');
+    assert.equal(navs.length, 1, `이름 편집 뒤에도 재적재는 1회(추가 때만)여야 한다(실측 ${navs.length})`);
+    await ctx.close();
+  } finally { await browser.close(); server.close(); }
+});

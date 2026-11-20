@@ -105,7 +105,7 @@ export function createMessages(deps) {
           ...child,
           note: child.note ?? '',
           relation
-        }, {treeId, momentId});
+        }, {treeId, momentId}, {moment:true});
         reply(true, '');
       } catch (error) { reply(false, error?.message || '저장하지 못했어요.'); }
       return;

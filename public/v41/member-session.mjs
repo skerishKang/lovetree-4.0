@@ -29,7 +29,7 @@ export function createMemberSession({api,onState=()=>{},onStatus=()=>{},onGuard=
  globalThis.document?.addEventListener?.('visibilitychange', onVisible);
  globalThis.addEventListener?.('pagehide', onHide);
  globalThis.addEventListener?.('focus', quietCheck);
- function apply(action,input={},selection={}){
+ function apply(action,input={},selection={},metaHint){
    const snap=sync.snapshot();if(!active||!snap.owned||!bound||mismatch||['checking','login','conflict'].includes(sync.status().phase))throw Error('먼저 내 기록을 불러오고 저장 연결을 확인해 주세요.');
    // 계정 표시 설정(#347 후속): 나무 없이도 저장한다. 서버에는 상태 전체가 PUT된다.
    if(action==='setPrefs'){
@@ -49,7 +49,8 @@ export function createMemberSession({api,onState=()=>{},onStatus=()=>{},onGuard=
      }
      if(!changed)return {changed:false};
      document=validateState({...next,prefs:next.prefs});
-     onState(structuredClone(document));
+     // #1001 (b)①: 자동 제목 보정은 같은 트리 안 내용 변경 — 모델만 갱신해 쉬운 추가 직후 이중 재적재를 막는다.
+     onState(structuredClone(document),undefined,{moment:true});
      sync.markLocalSave();
      return {changed:true};
    }
@@ -94,7 +95,8 @@ export function createMemberSession({api,onState=()=>{},onStatus=()=>{},onGuard=
    document=validateState({version:1,trees,prefs:document.prefs});
    // #984: 트리 편집(이름·표지)은 보드 저장과 같은 길 — 화면이 이미 자기 상태를 들고 있으므로 셸은 모델만
    // 갱신하고 화면을 다시 띄우지 않는다. 표지·이름은 lt41-trees-saved/renamed 알림이 바로 다시 그린다.
-   onState(structuredClone(document),{treeId,momentId},action==='editTree'?{tree:true}:undefined);sync.markLocalSave();return {treeId,momentId};
+   // #1001 (a): 호출부가 metaHint를 주면 그 길로(한마디 저장={moment:true}) — 화면을 다시 띄우지 않아 답이 살아있는 문서에 도착한다.
+   onState(structuredClone(document),{treeId,momentId},metaHint??(action==='editTree'?{tree:true}:undefined));sync.markLocalSave();return {treeId,momentId};
  }
  return {start:()=>sync.start(),apply,act:name=>sync.act(name),flushOnHide:()=>sync.flushOnHide(),snapshot:()=>({...sync.snapshot(),subject,writable:sync.snapshot().owned&&bound&&!mismatch,phase:sync.status().phase}),state:()=>structuredClone(document),dispose:()=>{active=false;bound=false;globalThis.document?.removeEventListener?.('visibilitychange',onVisible);globalThis.removeEventListener?.('pagehide',onHide);globalThis.removeEventListener?.('focus',quietCheck);},status:()=>sync.status()};
 }
