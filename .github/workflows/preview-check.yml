@@ -203,10 +203,10 @@ jobs:
           if [ "${{ needs.screen-changes.outputs.changed }}" != "true" ]; then
             echo "건너뜀(화면 변경 없음)" | tee -a "$GITHUB_STEP_SUMMARY"
           fi
-  screen-home-book:
-    name: 화면 시험 — 첫 화면·책
+  screen-home:
+    name: 화면 시험 — 첫 화면
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 12
     needs: screen-changes
     steps:
       - uses: actions/checkout@v4
@@ -225,7 +225,6 @@ jobs:
         id: browser
         if: needs.screen-changes.outputs.changed == 'true'
         run: |
-          # 모듈은 항상 설치한다(캐시는 브라우저 바이너리에만 걸린다). 캐시가 있어도 모듈이 없으면 실행이 안 된다.
           npm i --no-save --no-package-lock playwright@1.49.1
           if ls "$HOME/.cache/ms-playwright" 2>/dev/null | grep -q chromium; then
             echo "캐시된 Chromium 사용"
@@ -233,8 +232,6 @@ jobs:
             npx playwright install --with-deps chromium
           fi
           node -e "import('playwright-core').then(()=>console.log('playwright-core 확인')).catch(e=>{console.error(e.message);process.exit(1)})"
-      # #535: 첫 화면 카드의 '떠 있음'(이동 폭·동작 줄이기), 카드끼리 겹친 면적, 가운데 단추 세 자리,
-      # 끄는 동안의 레이어 승격·관성을 실제 화면에서 잰다. 첫 화면은 vite 번들이라 먼저 build 한다.
       - name: 첫 화면 떠 있음·겹침 시험(#535, 건너뜀=실패)
         env:
           LT_ORBIT535_REQUIRE: '1'
@@ -264,6 +261,103 @@ jobs:
           echo "첫 화면 끌기 성능 계약 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
       # #537: 책의 한 장 보기가 순간 하나씩 넘어가는지, 넓은 화면에서 두 장 책의 한 쪽 크기·같은 높이로
       # 나오는지, 390 휴대폰 모양이 그대로인지를 실제 화면에서 잰다. 건너뜀=실패(크롬이 준비된 이 잡에서 돈다).
+      - name: 첫 화면 화면 시험(건너뜀=실패 — 이슈 952)
+        env:
+          LT_HOME_952_REQUIRE: '1'
+        if: needs.screen-changes.outputs.changed == 'true'
+        run: |
+          start=$(date +%s)
+          npx vite build > /dev/null
+          node --test --test-concurrency=1 tests/v41-home-screen-952.test.mjs
+          echo "첫 화면 화면 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+
+      # 이슈 1010: 첫 화면 기존 사용자 — 예시 안내 줄(떠다니는 예시 카드가 보일 때만·금테 빼고),
+      # 예시 카드 누름(자세히 보기 → lt41-example), 숫자 줄 띄어쓰기, 390 바닥 링크 넷(＋ 단추 겹침 0).
+      # 첫 화면은 vite 번들이라 먼저 build 한다. 건너뜀=실패.
+      - name: 첫 화면 기존 사용자 화면 시험(건너뜀=실패 — 이슈 1010)
+        env:
+          LT_HOME_1010_REQUIRE: '1'
+        if: needs.screen-changes.outputs.changed == 'true'
+        run: |
+          start=$(date +%s)
+          npx vite build > /dev/null
+          node --test --test-concurrency=1 tests/v41-home-1010.test.mjs
+          echo "첫 화면 기존 사용자 화면 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+
+      # #611: 새 소식(업데이트 노트) 화면 — 알림 카드 한 번만·계정 단추 점·로그아웃 입구·출처 문구.
+      # 크롬이 필요한 실행형 시험이라 이 잡에서 돈다. 건너뜀=실패.
+      - name: 미디어·담기 화면 시험(건너뜀=실패 — 이슈 952)
+        env:
+          LT_MEDIA_952_REQUIRE: '1'
+        if: needs.screen-changes.outputs.changed == 'true'
+        run: |
+          start=$(date +%s)
+          npx vite build > /dev/null
+          node --test --test-concurrency=1 tests/v41-media-vertical.test.mjs tests/v41-quick-add.test.mjs
+          echo "미디어·담기 화면 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+
+      # 이슈 970: 트리 드롭다운(닫힘 길·초점 복귀·키보드)과 인증 화면 시안(전환·빈 칸 안내·오류 자리)을
+      # 실제 화면에서 본다. 드롭다운은 첫 화면 번들이 필요해 먼저 build하고, 인증 시안은 정적 파일(요청 0)이다.
+      # 건너뜀=실패(크롬이 준비된 이 잡에서 돈다).
+      - name: 둘러보기 순간 보기 시험(건너뜀=실패 — #1025)
+        env:
+          LT_MOMENTS_1025_REQUIRE: '1'
+        if: needs.screen-changes.outputs.changed == 'true'
+        run: |
+          start=$(date +%s)
+          npx vite build > /dev/null
+          node --test --test-concurrency=1 tests/v41-explore-moments-1025.test.mjs
+          echo "둘러보기 순간 보기 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+
+      # #631: 의견 보내기 창 — 1440×900 에서 스크롤 없이 들어오고, 체크 상자와 글자가 같은 줄이며,
+      # 보낸 뒤 제목·주 단추·안내가 바뀌는지 수치로 잰다. 건너뜀=실패(크롬이 준비된 이 잡에서 돈다).
+      - name: 의견 보내기 창 배치·보낸 뒤 화면 시험(건너뜀=실패 — #631)
+        env:
+          LT_FEEDBACK_631_REQUIRE: '1'
+        if: needs.screen-changes.outputs.changed == 'true'
+        run: |
+          start=$(date +%s)
+          node --test --test-concurrency=1 tests/v41-shell-dialogs.test.mjs
+          echo "의견 보내기 창 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+
+      # #996: 로고 첫 화면 복귀(#782)·빠른 재전환 빈 무대(#996) 시험을 CI에서 실제로 돌린다.
+      # 첫 화면은 vite 번들이라 먼저 build 한다. 건너뜀=실패(크롬이 준비된 이 잡에서 돈다).
+      - name: 화면 변경 없으면 건너뜀을 남긴다
+        if: always()
+        run: |
+          if [ "${{ needs.screen-changes.outputs.changed }}" != "true" ]; then
+            echo "건너뜀(화면 변경 없음)" | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+
+  screen-book:
+    name: 화면 시험 — 책·감상
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    needs: screen-changes
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ms-playwright-${{ runner.os }}-1.49.1
+      - name: 브라우저 준비(Playwright Chromium, 캐시)
+        id: browser
+        if: needs.screen-changes.outputs.changed == 'true'
+        run: |
+          npm i --no-save --no-package-lock playwright@1.49.1
+          if ls "$HOME/.cache/ms-playwright" 2>/dev/null | grep -q chromium; then
+            echo "캐시된 Chromium 사용"
+          else
+            npx playwright install --with-deps chromium
+          fi
+          node -e "import('playwright-core').then(()=>console.log('playwright-core 확인')).catch(e=>{console.error(e.message);process.exit(1)})"
       - name: 책 한 장 보기 시험(1440·390 순간 하나씩, 건너뜀=실패 — #537)
         env:
           LT_BOOK_SINGLE_REQUIRE: '1'
@@ -284,6 +378,70 @@ jobs:
 
       # 이슈 970: 정리 창(모아둔 순간)의 고르기·취소·저장·닫기 확인과 모바일 아래 ＋ 단추의 자리·동작을
       # 실제 화면에서 잰다. 건너뜀=실패(크롬이 준비된 이 잡에서 돈다).
+      - name: 감상 화면 흔적 값·어떻게 쓰나요 안내 시험(건너뜀=실패 — #635)
+        env:
+          LT_635A_REQUIRE: '1'
+          LT_BOOK_LONG_NOTE_REQUIRE: '1'
+        if: needs.screen-changes.outputs.changed == 'true'
+        run: |
+          start=$(date +%s)
+          npx vite build > /dev/null
+          node --test --test-concurrency=1 tests/v41-share-guest-635.test.mjs
+          echo "감상 화면 흔적 값·어떻게 쓰나요 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+          # #952: 책의 넘침 판정·넘친 페이지 스크롤을 실제 화면에서 잰다(같은 빌드 결과를 쓴다).
+          node --test --test-concurrency=1 tests/v41-book-long-note.test.mjs
+          echo "책 넘침 화면 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+
+      # #1025 1단계: 둘러보기 [순간] 보기 — 공개 세로 순간만, iframe ≤2, 10회 넘기기 중복 0, 세 폭 겹침·잘림 0.
+      # vite 번들이라 먼저 build 한다. 건너뜀=실패(크롬이 준비된 이 잡에서 돈다).
+      - name: 새 소식 카드·책 단추 겹침 시험(390, 건너뜀=실패 — #611 후속)
+        env:
+          LT_UPDATES_CARD_611_REQUIRE: '1'
+        if: needs.screen-changes.outputs.changed == 'true'
+        run: |
+          start=$(date +%s)
+          node --test --test-concurrency=1 tests/updates-card-611-followup.test.mjs
+          echo "새 소식 카드 겹침 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+
+      # #635: 감상 화면(공유 링크·예시)의 책에서 undefined·null·NaN 흔적이 없는지 첫 장~마지막 장 전부 넘기며 검사하고,
+      # 첫 화면 '어떻게 쓰나요'가 안내 패널을 여는지(둘러보기가 같이 열리지 않는지) 실제 화면에서 본다.
+      # 첫 화면은 vite 번들이라 먼저 build 한다. 건너뜀=실패(크롬이 준비된 이 잡에서 돈다).
+      - name: 화면 변경 없으면 건너뜀을 남긴다
+        if: always()
+        run: |
+          if [ "${{ needs.screen-changes.outputs.changed }}" != "true" ]; then
+            echo "건너뜀(화면 변경 없음)" | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+
+  screen-shell:
+    name: 화면 시험 — 셸·창·둘러보기
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    needs: screen-changes
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ms-playwright-${{ runner.os }}-1.49.1
+      - name: 브라우저 준비(Playwright Chromium, 캐시)
+        id: browser
+        if: needs.screen-changes.outputs.changed == 'true'
+        run: |
+          npm i --no-save --no-package-lock playwright@1.49.1
+          if ls "$HOME/.cache/ms-playwright" 2>/dev/null | grep -q chromium; then
+            echo "캐시된 Chromium 사용"
+          else
+            npx playwright install --with-deps chromium
+          fi
+          node -e "import('playwright-core').then(()=>console.log('playwright-core 확인')).catch(e=>{console.error(e.message);process.exit(1)})"
       - name: 정리 창·아래 ＋ 단추 동작 시험(건너뜀=실패 — #970)
         env:
           LT_970_REQUIRE: '1'
@@ -296,19 +454,6 @@ jobs:
       # 이슈 952: 미디어·담기 — 세로 영상 틀(9:16)·크게 보기(열기·Esc 닫힘·초점 복귀)·그 자리 재생 주소·
       # 쉬운 추가 창의 초기 상태와 배치를 실제 화면에서 잰다. 소스 글자 검사를 동작 검사로 바꾼 자리다.
       # 첫 화면은 vite 번들이라 먼저 build 한다. 건너뜀=실패(크롬이 준비된 이 잡에서 돈다).
-      - name: 미디어·담기 화면 시험(건너뜀=실패 — 이슈 952)
-        env:
-          LT_MEDIA_952_REQUIRE: '1'
-        if: needs.screen-changes.outputs.changed == 'true'
-        run: |
-          start=$(date +%s)
-          npx vite build > /dev/null
-          node --test --test-concurrency=1 tests/v41-media-vertical.test.mjs tests/v41-quick-add.test.mjs
-          echo "미디어·담기 화면 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
-
-      # 이슈 970: 트리 드롭다운(닫힘 길·초점 복귀·키보드)과 인증 화면 시안(전환·빈 칸 안내·오류 자리)을
-      # 실제 화면에서 본다. 드롭다운은 첫 화면 번들이 필요해 먼저 build하고, 인증 시안은 정적 파일(요청 0)이다.
-      # 건너뜀=실패(크롬이 준비된 이 잡에서 돈다).
       - name: 트리 드롭다운·인증 화면 시험(건너뜀=실패 — 이슈 970)
         env:
           LT_970_REQUIRE: '1'
@@ -336,31 +481,6 @@ jobs:
       # 유튜브 썸네일 카드(#340), 설정의 카드 출처·움직임 배선(#380 5번), 같은 날짜 표기 되풀이
       # 새로고침 금지(#466 M2), 인기 카드 #share/ 이동(#379), 추가·둘러보기·안내 패널(#426·#635·#388)을
       # 그려진 첫 화면에서 잰다. 소스 글자 검사를 동작 검사로 바꾼 자리다. 첫 화면은 vite 번들이라 먼저 build 한다. 건너뜀=실패.
-      - name: 첫 화면 화면 시험(건너뜀=실패 — 이슈 952)
-        env:
-          LT_HOME_952_REQUIRE: '1'
-        if: needs.screen-changes.outputs.changed == 'true'
-        run: |
-          start=$(date +%s)
-          npx vite build > /dev/null
-          node --test --test-concurrency=1 tests/v41-home-screen-952.test.mjs
-          echo "첫 화면 화면 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
-
-      # 이슈 1010: 첫 화면 기존 사용자 — 예시 안내 줄(떠다니는 예시 카드가 보일 때만·금테 빼고),
-      # 예시 카드 누름(자세히 보기 → lt41-example), 숫자 줄 띄어쓰기, 390 바닥 링크 넷(＋ 단추 겹침 0).
-      # 첫 화면은 vite 번들이라 먼저 build 한다. 건너뜀=실패.
-      - name: 첫 화면 기존 사용자 화면 시험(건너뜀=실패 — 이슈 1010)
-        env:
-          LT_HOME_1010_REQUIRE: '1'
-        if: needs.screen-changes.outputs.changed == 'true'
-        run: |
-          start=$(date +%s)
-          npx vite build > /dev/null
-          node --test --test-concurrency=1 tests/v41-home-1010.test.mjs
-          echo "첫 화면 기존 사용자 화면 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
-
-      # #611: 새 소식(업데이트 노트) 화면 — 알림 카드 한 번만·계정 단추 점·로그아웃 입구·출처 문구.
-      # 크롬이 필요한 실행형 시험이라 이 잡에서 돈다. 건너뜀=실패.
       - name: 새 소식 화면 시험(건너뜀=실패 — #611)
         env:
           LT_UPDATES_611_REQUIRE: '1'
@@ -372,57 +492,6 @@ jobs:
 
       # #611 후속: 390 에서 새 소식 카드가 책 화면 '순간 목차' 단추를 가리지 않는지(겹침 0)를
       # 실제 화면에서 잰다. 건너뜀=실패(크롬이 준비된 이 잡에서 돈다).
-      - name: 새 소식 카드·책 단추 겹침 시험(390, 건너뜀=실패 — #611 후속)
-        env:
-          LT_UPDATES_CARD_611_REQUIRE: '1'
-        if: needs.screen-changes.outputs.changed == 'true'
-        run: |
-          start=$(date +%s)
-          node --test --test-concurrency=1 tests/updates-card-611-followup.test.mjs
-          echo "새 소식 카드 겹침 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
-
-      # #635: 감상 화면(공유 링크·예시)의 책에서 undefined·null·NaN 흔적이 없는지 첫 장~마지막 장 전부 넘기며 검사하고,
-      # 첫 화면 '어떻게 쓰나요'가 안내 패널을 여는지(둘러보기가 같이 열리지 않는지) 실제 화면에서 본다.
-      # 첫 화면은 vite 번들이라 먼저 build 한다. 건너뜀=실패(크롬이 준비된 이 잡에서 돈다).
-      - name: 감상 화면 흔적 값·어떻게 쓰나요 안내 시험(건너뜀=실패 — #635)
-        env:
-          LT_635A_REQUIRE: '1'
-          LT_BOOK_LONG_NOTE_REQUIRE: '1'
-        if: needs.screen-changes.outputs.changed == 'true'
-        run: |
-          start=$(date +%s)
-          npx vite build > /dev/null
-          node --test --test-concurrency=1 tests/v41-share-guest-635.test.mjs
-          echo "감상 화면 흔적 값·어떻게 쓰나요 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
-          # #952: 책의 넘침 판정·넘친 페이지 스크롤을 실제 화면에서 잰다(같은 빌드 결과를 쓴다).
-          node --test --test-concurrency=1 tests/v41-book-long-note.test.mjs
-          echo "책 넘침 화면 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
-
-      # #1025 1단계: 둘러보기 [순간] 보기 — 공개 세로 순간만, iframe ≤2, 10회 넘기기 중복 0, 세 폭 겹침·잘림 0.
-      # vite 번들이라 먼저 build 한다. 건너뜀=실패(크롬이 준비된 이 잡에서 돈다).
-      - name: 둘러보기 순간 보기 시험(건너뜀=실패 — #1025)
-        env:
-          LT_MOMENTS_1025_REQUIRE: '1'
-        if: needs.screen-changes.outputs.changed == 'true'
-        run: |
-          start=$(date +%s)
-          npx vite build > /dev/null
-          node --test --test-concurrency=1 tests/v41-explore-moments-1025.test.mjs
-          echo "둘러보기 순간 보기 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
-
-      # #631: 의견 보내기 창 — 1440×900 에서 스크롤 없이 들어오고, 체크 상자와 글자가 같은 줄이며,
-      # 보낸 뒤 제목·주 단추·안내가 바뀌는지 수치로 잰다. 건너뜀=실패(크롬이 준비된 이 잡에서 돈다).
-      - name: 의견 보내기 창 배치·보낸 뒤 화면 시험(건너뜀=실패 — #631)
-        env:
-          LT_FEEDBACK_631_REQUIRE: '1'
-        if: needs.screen-changes.outputs.changed == 'true'
-        run: |
-          start=$(date +%s)
-          node --test --test-concurrency=1 tests/v41-shell-dialogs.test.mjs
-          echo "의견 보내기 창 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
-
-      # #996: 로고 첫 화면 복귀(#782)·빠른 재전환 빈 무대(#996) 시험을 CI에서 실제로 돌린다.
-      # 첫 화면은 vite 번들이라 먼저 build 한다. 건너뜀=실패(크롬이 준비된 이 잡에서 돈다).
       - name: 로고 복귀·빠른 재전환 시험(건너뜀=실패 — #782·#996)
         env:
           LT_LOGO_HOME_REQUIRE: '1'
@@ -434,6 +503,261 @@ jobs:
           node --test --test-concurrency=1 tests/v41-logo-home.test.mjs tests/v41-frame-blank-996.test.mjs
           echo "로고 복귀·빠른 재전환 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
 
+      - name: 화면 변경 없으면 건너뜀을 남긴다
+        if: always()
+        run: |
+          if [ "${{ needs.screen-changes.outputs.changed }}" != "true" ]; then
+            echo "건너뜀(화면 변경 없음)" | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+
+  screen-audit-a:
+    name: 화면 공통 검사기 a/3(#657)
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    needs: screen-changes
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ms-playwright-${{ runner.os }}-1.49.1
+      - name: 브라우저 준비(Playwright Chromium, 캐시)
+        id: browser
+        if: needs.screen-changes.outputs.changed == 'true'
+        run: |
+          npm i --no-save --no-package-lock playwright@1.49.1
+          if ls "$HOME/.cache/ms-playwright" 2>/dev/null | grep -q chromium; then
+            echo "캐시된 Chromium 사용"
+          else
+            npx playwright install --with-deps chromium
+          fi
+          node -e "import('playwright-core').then(()=>console.log('playwright-core 확인')).catch(e=>{console.error(e.message);process.exit(1)})"
+      - uses: actions/cache@v4
+        with:
+          path: ~/.fonts
+          key: fonts-noto-cjk-${{ runner.os }}-1
+      - name: 한글 글꼴 준비(캐시, 없으면 설치)
+        if: needs.screen-changes.outputs.changed == 'true'
+        timeout-minutes: 10
+        run: |
+          start=$(date +%s)
+          if [ -f "$HOME/.fonts/NotoSansCJK-Regular.ttc" ]; then
+            echo "캐시된 한글 글꼴 사용($(ls "$HOME/.fonts" | wc -l)개 파일)"
+          else
+            echo "캐시된 한글 글꼴 없음 — fonts-noto-cjk 설치해 ~/.fonts에 쌓는다"
+            sudo apt-get update -qq || true
+            ok=0
+            for i in 1 2 3; do
+              if sudo timeout 150 apt-get install -y -qq --no-install-recommends fonts-noto-cjk; then ok=1; break; fi
+              echo "apt-get install $i번째 시도 실패/멈춤 — 다시 시도"
+              sleep 5
+            done
+            [ $ok -eq 1 ] || { echo "fonts-noto-cjk 설치 실패"; exit 1; }
+            mkdir -p "$HOME/.fonts"
+            sudo cp /usr/share/fonts/opentype/noto/*.tt* "$HOME/.fonts/" 2>/dev/null || sudo find /usr/share/fonts -name 'Noto*CJK*.ttc' -exec cp {} "$HOME/.fonts/" ; 2>/dev/null || true
+            echo "쌓은 글꼴 파일 $(ls "$HOME/.fonts" | wc -l)개"
+          fi
+          fc-cache -f >/dev/null 2>&1 || true
+          echo "한글 글꼴 $(fc-list :lang=ko | wc -l)개 · 대표 $(fc-match 'sans-serif:lang=ko' | head -1)"
+          echo "한글 글꼴 준비 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+      - name: 화면 공통 검사기 shard a(건너뜀=실패 — #657·#1080)
+        timeout-minutes: 10
+        if: needs.screen-changes.outputs.changed == 'true'
+        run: |
+          start=$(date +%s)
+          npx vite build > /dev/null
+          LT_SCREEN_AUDIT_SHARD=a LT_SCREEN_AUDIT_REQUIRE=1 node --test --test-name-pattern='^#657 화면 공통 검사기' tests/v41-screen-audit.test.mjs > /tmp/screen-audit.log 2>&1 & pid=$!
+          r=0
+          while kill -0 $pid 2>/dev/null; do
+            sleep 30
+            if ! kill -0 $pid 2>/dev/null; then break; fi
+            last=$(grep -E '^(ok|not ok)' /tmp/screen-audit.log | tail -1)
+            echo "…진행 중 $(( $(date +%s) - start ))초 — 마지막 완료: ${last:-아직 완료한 시험 없음}"
+            echo "…진행 중 $(( $(date +%s) - start ))초 — 마지막 완료: ${last:-아직 완료한 시험 없음}" >> "$GITHUB_STEP_SUMMARY"
+          done
+          wait $pid || r=$?
+          echo "화면 공통 검사기 shard a 종료 코드 $r · $(( $(date +%s) - start ))초"
+          echo '— 화면 공통 검사기 출력(마지막 60줄) —'
+          tail -60 /tmp/screen-audit.log || true
+          echo "화면 공통 검사기 shard a $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+          exit $r
+      - name: 화면 변경 없으면 건너뜀을 남긴다
+        if: always()
+        run: |
+          if [ "${{ needs.screen-changes.outputs.changed }}" != "true" ]; then
+            echo "건너뜀(화면 변경 없음)" | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+
+  screen-audit-b:
+    name: 화면 공통 검사기 b/3(#657)
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    needs: screen-changes
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ms-playwright-${{ runner.os }}-1.49.1
+      - name: 브라우저 준비(Playwright Chromium, 캐시)
+        id: browser
+        if: needs.screen-changes.outputs.changed == 'true'
+        run: |
+          npm i --no-save --no-package-lock playwright@1.49.1
+          if ls "$HOME/.cache/ms-playwright" 2>/dev/null | grep -q chromium; then
+            echo "캐시된 Chromium 사용"
+          else
+            npx playwright install --with-deps chromium
+          fi
+          node -e "import('playwright-core').then(()=>console.log('playwright-core 확인')).catch(e=>{console.error(e.message);process.exit(1)})"
+      - uses: actions/cache@v4
+        with:
+          path: ~/.fonts
+          key: fonts-noto-cjk-${{ runner.os }}-1
+      - name: 한글 글꼴 준비(캐시, 없으면 설치)
+        if: needs.screen-changes.outputs.changed == 'true'
+        timeout-minutes: 10
+        run: |
+          start=$(date +%s)
+          if [ -f "$HOME/.fonts/NotoSansCJK-Regular.ttc" ]; then
+            echo "캐시된 한글 글꼴 사용($(ls "$HOME/.fonts" | wc -l)개 파일)"
+          else
+            echo "캐시된 한글 글꼴 없음 — fonts-noto-cjk 설치해 ~/.fonts에 쌓는다"
+            sudo apt-get update -qq || true
+            ok=0
+            for i in 1 2 3; do
+              if sudo timeout 150 apt-get install -y -qq --no-install-recommends fonts-noto-cjk; then ok=1; break; fi
+              echo "apt-get install $i번째 시도 실패/멈춤 — 다시 시도"
+              sleep 5
+            done
+            [ $ok -eq 1 ] || { echo "fonts-noto-cjk 설치 실패"; exit 1; }
+            mkdir -p "$HOME/.fonts"
+            sudo cp /usr/share/fonts/opentype/noto/*.tt* "$HOME/.fonts/" 2>/dev/null || sudo find /usr/share/fonts -name 'Noto*CJK*.ttc' -exec cp {} "$HOME/.fonts/" ; 2>/dev/null || true
+            echo "쌓은 글꼴 파일 $(ls "$HOME/.fonts" | wc -l)개"
+          fi
+          fc-cache -f >/dev/null 2>&1 || true
+          echo "한글 글꼴 $(fc-list :lang=ko | wc -l)개 · 대표 $(fc-match 'sans-serif:lang=ko' | head -1)"
+          echo "한글 글꼴 준비 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+      - name: 화면 공통 검사기 shard b(건너뜀=실패 — #657·#1080)
+        timeout-minutes: 10
+        if: needs.screen-changes.outputs.changed == 'true'
+        run: |
+          start=$(date +%s)
+          npx vite build > /dev/null
+          LT_SCREEN_AUDIT_SHARD=b LT_SCREEN_AUDIT_REQUIRE=1 node --test --test-name-pattern='^#657 화면 공통 검사기' tests/v41-screen-audit.test.mjs > /tmp/screen-audit.log 2>&1 & pid=$!
+          r=0
+          while kill -0 $pid 2>/dev/null; do
+            sleep 30
+            if ! kill -0 $pid 2>/dev/null; then break; fi
+            last=$(grep -E '^(ok|not ok)' /tmp/screen-audit.log | tail -1)
+            echo "…진행 중 $(( $(date +%s) - start ))초 — 마지막 완료: ${last:-아직 완료한 시험 없음}"
+            echo "…진행 중 $(( $(date +%s) - start ))초 — 마지막 완료: ${last:-아직 완료한 시험 없음}" >> "$GITHUB_STEP_SUMMARY"
+          done
+          wait $pid || r=$?
+          echo "화면 공통 검사기 shard b 종료 코드 $r · $(( $(date +%s) - start ))초"
+          echo '— 화면 공통 검사기 출력(마지막 60줄) —'
+          tail -60 /tmp/screen-audit.log || true
+          echo "화면 공통 검사기 shard b $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+          exit $r
+      - name: 화면 변경 없으면 건너뜀을 남긴다
+        if: always()
+        run: |
+          if [ "${{ needs.screen-changes.outputs.changed }}" != "true" ]; then
+            echo "건너뜀(화면 변경 없음)" | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+
+  screen-audit-c:
+    name: 화면 공통 검사기 c/3(#657)
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    needs: screen-changes
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ms-playwright-${{ runner.os }}-1.49.1
+      - name: 브라우저 준비(Playwright Chromium, 캐시)
+        id: browser
+        if: needs.screen-changes.outputs.changed == 'true'
+        run: |
+          npm i --no-save --no-package-lock playwright@1.49.1
+          if ls "$HOME/.cache/ms-playwright" 2>/dev/null | grep -q chromium; then
+            echo "캐시된 Chromium 사용"
+          else
+            npx playwright install --with-deps chromium
+          fi
+          node -e "import('playwright-core').then(()=>console.log('playwright-core 확인')).catch(e=>{console.error(e.message);process.exit(1)})"
+      - uses: actions/cache@v4
+        with:
+          path: ~/.fonts
+          key: fonts-noto-cjk-${{ runner.os }}-1
+      - name: 한글 글꼴 준비(캐시, 없으면 설치)
+        if: needs.screen-changes.outputs.changed == 'true'
+        timeout-minutes: 10
+        run: |
+          start=$(date +%s)
+          if [ -f "$HOME/.fonts/NotoSansCJK-Regular.ttc" ]; then
+            echo "캐시된 한글 글꼴 사용($(ls "$HOME/.fonts" | wc -l)개 파일)"
+          else
+            echo "캐시된 한글 글꼴 없음 — fonts-noto-cjk 설치해 ~/.fonts에 쌓는다"
+            sudo apt-get update -qq || true
+            ok=0
+            for i in 1 2 3; do
+              if sudo timeout 150 apt-get install -y -qq --no-install-recommends fonts-noto-cjk; then ok=1; break; fi
+              echo "apt-get install $i번째 시도 실패/멈춤 — 다시 시도"
+              sleep 5
+            done
+            [ $ok -eq 1 ] || { echo "fonts-noto-cjk 설치 실패"; exit 1; }
+            mkdir -p "$HOME/.fonts"
+            sudo cp /usr/share/fonts/opentype/noto/*.tt* "$HOME/.fonts/" 2>/dev/null || sudo find /usr/share/fonts -name 'Noto*CJK*.ttc' -exec cp {} "$HOME/.fonts/" ; 2>/dev/null || true
+            echo "쌓은 글꼴 파일 $(ls "$HOME/.fonts" | wc -l)개"
+          fi
+          fc-cache -f >/dev/null 2>&1 || true
+          echo "한글 글꼴 $(fc-list :lang=ko | wc -l)개 · 대표 $(fc-match 'sans-serif:lang=ko' | head -1)"
+          echo "한글 글꼴 준비 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+      - name: 화면 공통 검사기 shard c(건너뜀=실패 — #657·#1080)
+        timeout-minutes: 10
+        if: needs.screen-changes.outputs.changed == 'true'
+        run: |
+          start=$(date +%s)
+          npx vite build > /dev/null
+          LT_SCREEN_AUDIT_SHARD=c LT_SCREEN_AUDIT_REQUIRE=1 node --test tests/v41-screen-audit.test.mjs > /tmp/screen-audit.log 2>&1 & pid=$!
+          r=0
+          while kill -0 $pid 2>/dev/null; do
+            sleep 30
+            if ! kill -0 $pid 2>/dev/null; then break; fi
+            last=$(grep -E '^(ok|not ok)' /tmp/screen-audit.log | tail -1)
+            echo "…진행 중 $(( $(date +%s) - start ))초 — 마지막 완료: ${last:-아직 완료한 시험 없음}"
+            echo "…진행 중 $(( $(date +%s) - start ))초 — 마지막 완료: ${last:-아직 완료한 시험 없음}" >> "$GITHUB_STEP_SUMMARY"
+          done
+          wait $pid || r=$?
+          echo "화면 공통 검사기 shard c 종료 코드 $r · $(( $(date +%s) - start ))초"
+          echo '— 화면 공통 검사기 출력(마지막 60줄) —'
+          tail -60 /tmp/screen-audit.log || true
+          echo "화면 공통 검사기 shard c $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+          exit $r
       - name: 화면 변경 없으면 건너뜀을 남긴다
         if: always()
         run: |
@@ -686,31 +1010,7 @@ jobs:
       # 이 단계가 멈춤을 확인). 시험 판정은 그대로 두고, ①단계 시간 제한(14분 — 넘으면 잡 전체가 아니라 이 단계가
       # 빨강이 되고 runner가 살아 로그가 남는다) ②출력을 로그 파일로 받고 30초마다 '진행 중 · 마지막 완료 시험'을
       # 에코해 멈춘 뒤에도 어느 시험까지 끝났는지 남긴다.
-      - name: 화면 공통 검사기(건너뜀=실패 — #657)
-        timeout-minutes: 14
-        env:
-          LT_SCREEN_AUDIT_REQUIRE: '1'
-        if: needs.screen-changes.outputs.changed == 'true'
-        run: |
-          start=$(date +%s)
-          npx vite build > /dev/null
-          node --test tests/v41-screen-audit.test.mjs > /tmp/screen-audit.log 2>&1 & pid=$!
-          r=0
-          while kill -0 $pid 2>/dev/null; do
-            sleep 30
-            if ! kill -0 $pid 2>/dev/null; then break; fi
-            last=$(grep -E '^(ok|not ok)' /tmp/screen-audit.log | tail -1)
-            echo "…진행 중 $(( $(date +%s) - start ))초 — 마지막 완료: ${last:-아직 완료한 시험 없음}"
-            echo "…진행 중 $(( $(date +%s) - start ))초 — 마지막 완료: ${last:-아직 완료한 시험 없음}" >> "$GITHUB_STEP_SUMMARY"
-          done
-          wait $pid || r=$?
-          echo "화면 공통 검사기 종료 코드 $r · $(( $(date +%s) - start ))초"
-          echo '— 화면 공통 검사기 출력(마지막 60줄) —'
-          tail -60 /tmp/screen-audit.log || true
-          echo "화면 공통 검사기 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
-          exit $r
-
-
+      # #1080: 화면 공통 검사기는 screen-audit-a/b/c 잡으로 옮겼다(이 잡의 시간 단축).
       - name: 화면 변경 없으면 건너뜀을 남긴다
         if: always()
         run: |
@@ -996,7 +1296,7 @@ jobs:
     name: 미리보기 postdeploy(로그아웃)
     runs-on: ubuntu-latest
     if: always()
-    needs: [screen-board, screen-home-book, screen-map-a, screen-map-b, screen-book-screen, deploy]
+    needs: [screen-board, screen-home, screen-book, screen-shell, screen-map-a, screen-map-b, screen-book-screen, screen-audit-a, screen-audit-b, screen-audit-c, deploy]
     steps:
       - name: 모든 화면 시험·배포 검사 결과 모으기
         env:
