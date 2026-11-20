@@ -46,9 +46,16 @@ export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin})
  const down=el('button','moments-step','▼');down.type='button';down.setAttribute('aria-label','다음 순간');
  nav.append(up,down);
  stage.append(card,rail,nav);
- // ♡·담기·공유는 2단계 자리 — 지금은 자리만 잡는다(트리 보기는 1단계에서 동작).
+ let liked=false,heartButton=null;
+ const setLiked=(value)=>{
+  liked=!!value;
+  if(!heartButton)return;
+  heartButton.querySelector('.moments-rail-icon').textContent=liked?'♥':'♡';
+  heartButton.classList?.toggle?.('is-liked',liked);
+  heartButton.setAttribute('aria-pressed',String(liked));
+ };
  const railButtons=[
-  {icon:'♡',label:'마음'},
+  {icon:'♡',label:'마음',action:()=>setLiked(!liked)},
   {icon:treeIcon(),label:'트리',action:()=>current()&&onOpenShare?.({shareId:current().shareId,view:'book'})},
   {icon:'＋',label:'담기',action:()=>current()&&openAddDialog(current())},
   {icon:'↗',label:'공유',action:()=>current()&&copyShare(current())}
@@ -61,6 +68,7 @@ export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin})
   button.append(icon,el('span','moments-rail-label',spec.label));
   if(spec.action)button.onclick=spec.action;
   else{button.disabled=true;button.title='랭킹과 함께 정해요';button.setAttribute('aria-disabled','true');}
+  if(spec.label==='마음'){button.classList?.add?.('is-heart');heartButton=button;setLiked(false);}
   rail.append(button);
  }
  const chips=el('div','moments-chips');chips.setAttribute('role','group');chips.setAttribute('aria-label','가수 고르기');
