@@ -61,7 +61,10 @@ export function createMemberSession({api,onState=()=>{},onStatus=()=>{},onGuard=
       if(!tree)throw new Error('트리를 선택해 주세요.');
       const boardMoments=Array.isArray(input?.moments)?input.moments:[];
       if(!boardMoments.length)throw new Error('보드 기록을 확인해 주세요.');
-      const next=validateState({version:1,trees:trees.map(t=>t.id===tree.id?{...t,updatedAt:new Date().toISOString(),moments:boardMoments}:t),prefs:document.prefs});
+      // #1044: 보드는 배치·모양·연결·한마디만 바꾼다. 보드 목록에 없는 구간·만든 시각은 기존 순간 값을 지킨다.
+      const before=new Map((tree.moments||[]).map(m=>[m.id,m]));
+      const mergedMoments=boardMoments.map(bm=>{const old=before.get(bm.id);return old?{...old,...bm,startSeconds:old.startSeconds,endSeconds:old.endSeconds,createdAt:old.createdAt}:bm;});
+      const next=validateState({version:1,trees:trees.map(t=>t.id===tree.id?{...t,updatedAt:new Date().toISOString(),moments:mergedMoments}:t),prefs:document.prefs});
       document=next;
       const chosen=next.trees.find(t=>t.id===treeId);
       momentId=chosen?.moments.some(m=>m.id===momentId)?momentId:(chosen?.moments.find(m=>m.parentId===null)?.id||momentId);

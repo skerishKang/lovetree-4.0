@@ -24,7 +24,7 @@ const popular=mode==='popular'?await fetchPopularCards({limit:HOME_ORBIT_LIMIT})
 // 2026-11-10 CTO 결정(#340): 내 기록(서버·소유자)의 YouTube 순간은 #330 판정 한 벌(autoLoadMedia)로
 // 썸네일 카드를 처음부터 만든다. 판정 입력은 media-preview의 currentContext(셸 기록 상태)와 같은 값이다.
 const mediaState=globalThis.LTMedia?.currentContext?.()||{source:'',owned:false};
-const youtube={describe:url=>globalThis.LTMedia?.describe?.(url)??null,auto:globalThis.LTMedia?.autoLoadMedia?.(mediaState.source,mediaState.owned)===true};
+const youtube={describe:url=>globalThis.LTMedia?.describe?.(url)??null,auto:globalThis.LTMedia?.autoLoadMedia?.(mediaState.source,mediaState.owned)===true || (context.source==='server' && loggedIn && shellBody.dataset.member==='in')};
 const cardsPlan=homeCardsPlan({mode,loggedIn,context,popular,youtube});
 const cardTrees=cardsPlan.cards.length?[{id:'home-cards',title:'첫 화면 카드',moments:cardsPlan.cards}]:[];
 // #394: 순간 목록은 모든 트리의 순간을 최근 순으로 보는 곳. 트리 드롭다운의 "내 순간 전체 보기"로

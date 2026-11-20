@@ -144,3 +144,19 @@ test('952 실행: 밤이 기본이고 정원 저장은 다음 부팅에 유지�
     }
   } finally { await browser.close(); server.close(); }
 });
+
+test('#1026 안쪽 네 문서는 첫 그림 전에 기기 테마와 판 선택을 적용한다', async()=>{
+  const {runInNewContext}=await import('node:vm');
+  for(const [screen,file] of [['book','track59-sketchbook'],['network','track56-network'],['board','track58-pinboard'],['shelf','track32-bookshelf']]){
+    const html=fs.readFileSync(new URL('../public/v41/views/'+file+'.html',import.meta.url),'utf8');
+    if(screen==='board') assert.ok(html.indexOf('href="/v41/views/board/board-extra.css"')>0&&html.indexOf('href="/v41/views/board/board-extra.css"')<html.indexOf('</head>'),'보드 정원 색은 첫 그림 전에 함께 읽는다');
+    const script=html.match(/<script>([\s\S]*?)<\/script>/)?.[1];
+    for(const [theme,plate,want,wantPlate] of [['garden',null,'garden','paper'],['night',null,null,'night'],['garden','night','garden','night'],['night','paper',null,'paper']]){
+      const attrs=new Map(),root={dataset:{v41Screen:screen},setAttribute:(k,v)=>attrs.set(k,v),removeAttribute:k=>attrs.delete(k)};
+      const window={};window.parent=window;
+      runInNewContext(script,{document:{documentElement:root},window,localStorage:{getItem:k=>k==='lt41.theme'?theme:plate}});
+      assert.equal(attrs.get('data-lt-theme')||null,want,screen);
+      assert.equal(attrs.get('data-lt-board-theme')||null,['network','board'].includes(screen)?wantPlate:null,screen);
+    }
+  }
+});

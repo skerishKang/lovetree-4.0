@@ -215,7 +215,17 @@ function upgradeVerticals(root = (typeof document !== 'undefined' ? document : n
     if (el.dataset.ytVertical === '1') continue;
     const id = el.dataset.ytPlay;
     void probeVertical('https://www.youtube.com/watch?v=' + id).then((v) => {
-      if (!v || !el.isConnected) return;
+      if (!el.isConnected) return;
+      // #1038: 실측이 세로를 확인하면 기존 미디어 정보 저장 경로로 한 번 부른다(열 때마다 실측하지 않게).
+      // 다른 제목·채널 값은 그대로 합쳐 보낸다 — 저장값 하나가 나머지를 지우지 않게.
+      if (v) {
+        const momentId = el.closest('[data-moment]')?.dataset.moment;
+        const moment = momentId && typeof window !== 'undefined' ? window.LTDEMO?.moments?.find(m => m.id === momentId) : null;
+        if (moment?.url && window.parent !== window) {
+          try { window.parent.postMessage({ type: 'lt41-media-metadata', momentId, url: moment.url, mediaMetadata: { ...(moment.mediaMetadata || {}), vertical: v } }, location.origin); } catch {}
+        }
+      }
+      if (!v) return;
       // #1030: 같은 영상이 펼침면 양쪽에 있으면 실측 결과를 한 쪽만 적용하지 않는다.
       // 주소 형태가 달라 한 쪽만 판정 전 상태로 남는 일이 없게 같은 videoId의 칸을 함께 올린다.
       const targets = [...root.querySelectorAll('.yt-play[data-yt-play="' + id + '"]')];
@@ -251,6 +261,8 @@ function upgradeVerticals(root = (typeof document !== 'undefined' ? document : n
 function verticalVideo(url, mediaMetadata = null) {
   const m = describe(url);
   if (m.kind !== 'youtube') return false;
+  // #1038: 저장된 실측값이 주소·썸네일 판정보다 먼저다(저장값이 있으면 실측을 다시 하지 않는다).
+  if (typeof mediaMetadata?.vertical === 'boolean') return mediaMetadata.vertical;
   const metaVertical = Number(mediaMetadata?.width) > 0 && Number(mediaMetadata?.height) > Number(mediaMetadata?.width);
   // #584: 썸네일 실측으로 세로가 밝혀진 영상도 세로로 답한다(크게 보기·그 자리 재생이 같은 판정을 쓰게).
   if (verticalProbed.get(m.videoId) === true) return true;

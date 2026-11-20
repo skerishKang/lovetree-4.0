@@ -37,6 +37,7 @@ import { createAccountRepo } from './db/account-postgres.js';
 import { createAccountDeleteRpcRepo } from './db/account-delete-rpc-postgres.js';
 import { createAccountService } from './account-service.js';
 import { createAccountEmailStore } from './account-email-store.js';
+import { handlerForPath } from './route-handler.mjs';
 import { createDeletedAccountGuard } from './account-guard.js';
 import { createTrustedAccountDeleteHandler, createSharedAccountDeletionWorkflow } from './shared-account-deletion.js';
 import { createVerifier } from './padiem-access-verify.mjs';
@@ -271,19 +272,19 @@ const mediaHandler = createMediaHandler({
  additionalPublicOrigins: (process.env.LOVETREE_ADDITIONAL_PUBLIC_ORIGINS || '').split(',').map(x=>x.trim()).filter(Boolean)
 });
 
-const requestHandler = async (request) => {
-  const path = String(request.path ?? '');
-  if (path === '/internal/account/delete') return trustedAccountDelete(request);
-  if (path === '/internal/account/email') return trustedAccountEmail(request);
-  if (path.startsWith('/auth/')) return loginRoute(login, request);
-  if (path.startsWith('/api/media')) return mediaHandler(request);
-  if (path.startsWith('/api/shares') || path.startsWith('/api/public/shares/') || path.startsWith('/api/trees/')) return shareHandler(request);
- if (path.startsWith('/api/community/') || path === '/api/public/tag-moments') return communityHandler(request);
- if (path === '/api/feedback' || path.startsWith('/api/admin/feedback') || path.startsWith('/api/admin/journals') || path === '/api/board' || path.startsWith('/api/board/') || path.startsWith('/api/admin/persona/')) return feedbackHandler(request);
- if (path.startsWith('/api/admin/customers')) return adminCustomersHandler(request);
- if (path === '/api/youtube/oembed') return youtubeOembedHandler(request);
-  return storageHandler(request);
+// 분기는 route-handler.mjs 한 곳에 둔다 — 프록시 허용 경로 표와 같은 함수로 검사한다(#1047).
+const handlers = {
+  trusted: (request) => request.path === '/internal/account/delete' ? trustedAccountDelete(request) : trustedAccountEmail(request),
+  auth: (request) => loginRoute(login, request),
+  media: (request) => mediaHandler(request),
+  share: (request) => shareHandler(request),
+  community: (request) => communityHandler(request),
+  feedback: (request) => feedbackHandler(request),
+  adminCustomers: (request) => adminCustomersHandler(request),
+  youtube: (request) => youtubeOembedHandler(request),
+  storage: (request) => storageHandler(request)
 };
+const requestHandler = async (request) => handlers[handlerForPath(request.path)](request);
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   const { host, port } = resolveListen({ env: process.env });

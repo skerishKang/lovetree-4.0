@@ -57,6 +57,10 @@ export function youtubeStageThumbUrl(videoId, stage = 'hqdefault') {
 }
 
 export function isVerticalMoment(moment) {
+  const meta = moment?.mediaMetadata;
+  // #1038: 저장된 실측값이 주소 형태보다 우선 — watch 주소 쇼츠도 다시 열 때 가로로 시작하지 않는다.
+  if (typeof meta?.vertical === 'boolean') return meta.vertical;
+  if (typeof meta?.width === 'number' && typeof meta?.height === 'number' && meta.width > 0 && meta.height > 0) return meta.height > meta.width;
   const url = trimText(moment?.url) || trimText(moment?.externalUrl);
   if (url) {
     try {
@@ -64,6 +68,5 @@ export function isVerticalMoment(moment) {
       if (YOUTUBE_HOSTS.has(parsed.hostname.toLowerCase()) && /^\/shorts\//.test(parsed.pathname || '')) return true;
     } catch { /* ignore */ }
   }
-  const meta = moment?.mediaMetadata;
   return Number(meta?.width) > 0 && Number(meta?.height) > Number(meta?.width);
 }
