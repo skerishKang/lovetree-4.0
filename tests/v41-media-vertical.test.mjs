@@ -164,3 +164,44 @@ test('952 실행: 크게 보기는 눌렀을 때 열고, Esc로 닫으며, 초�
     } finally { await ctx.close(); }
   } finally { await browser.close(); }
 });
+
+test('#1038: 저장된 세로값은 주소 판정보다 먼저 본다(가로 주소의 세로 쇼츠 포함)', async () => {
+  const { isVerticalMoment } = await import('../public/v41/youtube-id.mjs');
+  const watch = { url: WATCH, mediaMetadata: { vertical: true, width: 1080, height: 1920 } };
+  assert.equal(isVerticalMoment(watch), true, 'watch 주소여도 저장값이 세로면 세로');
+  assert.equal(isVerticalMoment({ url: SHORTS, mediaMetadata: { vertical: false } }), false, '저장값이 가로면 주소보다 우선');
+  assert.equal(isVerticalMoment({ url: WATCH, mediaMetadata: { width: 1080, height: 1920 } }), true, '저장된 크기로도 판정');
+  assert.equal(isVerticalMoment({ url: WATCH }), false, '저장값이 없으면 옛 주소 판정');
+  assert.equal(media.verticalVideo(WATCH, { vertical: true }), true, '화면 판정도 저장값 우선');
+  assert.equal(media.verticalVideo(WATCH, { vertical: false }), false);
+  assert.equal(media.verticalVideo(SHORTS, { vertical: false }), false);
+});
+
+test('#1038 실행: watch 쇼츠를 저장값으로 다시 열면 처음부터 세로 칸, 실측으로 바뀜 0회', { skip: skip952 || undefined }, async () => {
+  const browser = await chromium952.launch();
+  try {
+    const { ctx, page } = await mediaPage952(browser);
+    try {
+      const result = await page.evaluate(async (url) => {
+        const saved = { vertical: true, width: 1080, height: 1920 };
+        // 책이 저장값으로 그리는 것과 같은 순서: 판정 → 칸 클래스 → 실측 호출.
+        const vertical = LTMedia.verticalVideo(url, saved);
+        const host = document.getElementById('host');
+        host.innerHTML = '<div class="clipping moment" data-moment="m1"><button class="yt-play' + (vertical ? ' is-vertical' : '') + '" data-yt-play="abc123DEF45" data-yt-vertical="' + (vertical ? '1' : '0') + '"></button></div>';
+        const el = host.querySelector('.yt-play');
+        const first = { vertical, cls: el.className, attr: el.dataset.ytVertical };
+        let changes = 0;
+        new MutationObserver(() => { changes++; }).observe(el, { attributes: true, attributeFilter: ['class', 'data-yt-vertical'] });
+        window.LTDEMO = { moments: [{ id: 'm1', url, mediaMetadata: saved }] };
+        LTMedia.upgradeVerticals(document);
+        await new Promise(r => setTimeout(r, 400));
+        return { first, changes, after: { cls: el.className, attr: el.dataset.ytVertical } };
+      }, WATCH);
+      assert.equal(result.first.vertical, true, '저장값이 주소보다 먼저다');
+      assert.match(result.first.cls, /is-vertical/, '첫 그림부터 세로 칸');
+      assert.equal(result.first.attr, '1', '세로 표도 처음부터 있다');
+      assert.equal(result.changes, 0, '가로 → 세로로 바뀐 횟수 0');
+      assert.deepEqual(result.after, { cls: result.first.cls, attr: result.first.attr }, '실측 뒤에도 칸이 그대로다');
+    } finally { await ctx.close(); }
+  } finally { await browser.close(); }
+});
