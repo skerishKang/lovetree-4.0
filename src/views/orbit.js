@@ -47,7 +47,7 @@ extraCSS += '@media(min-width:651px){.detail-grid{padding-left:64px;padding-righ
 // #426: 최근 순간 카드 — 궤도의 금빛 내 카드(.card.mine)와 같은 결(테두리·이중선·금빛 번짐). 390에서는 폭=화면-32px, 세로 썸네일 높이 제한.
 // 261118 대표 지적 1번(이슈 #884): 카드 층 아래 경계를 둔 것이 바닥에 빈 회색 띠를 만들었다 —
 // .world 를 다시 바닥까지 이어 붙이고(링크 줄은 셸이 위에 그리므로 그대로 보인다), 잘림도 거둔다.
-extraCSS+=`.center-note{display:flex;flex-wrap:wrap;justify-content:center;align-items:baseline;gap:2px 10px}.center-hint{color:var(--lt-muted,#9b98a6)}@media(max-width:650px){.center p.note-with-hint{font-size:12px;line-height:1.5;margin-top:8px}}/* #635 PR C: '드래그 · 금테 카드를 눌러 감상' 안내를 단추 묶음 바로 아래(안내 줄 옆)로 올린다 — 화면 아래 고정 링크 줄과 겹치지 않게. */`;
+extraCSS+=`.center-note{display:flex;flex-wrap:wrap;justify-content:center;align-items:baseline;gap:2px 10px}.center-note[data-off]{display:none}.center-hint{color:var(--lt-muted,#9b98a6)}@media(max-width:650px){.center p.note-with-hint{font-size:12px;line-height:1.5;margin-top:8px}}/* #635 PR C: '드래그 · 금테 카드를 눌러 감상' 안내를 단추 묶음 바로 아래(안내 줄 옆)로 올린다 — 화면 아래 고정 링크 줄과 겹치지 않게. */`;
 /* 261117 대표 검수: 마우스로 열었으면 닫기 단추의 초점 테두리를 그리지 않는다(#795 계정 메뉴와 같은 방식) — 키보드로 열었으면 보인다. */
 extraCSS+=`dialog[data-lt-opened-by=mouse] .close:focus-visible,dialog[data-lt-opened-by=mouse] .close:focus{outline:0;box-shadow:none}`;
 extraCSS+=`.recent-card{pointer-events:auto;position:relative;display:block;width:min(430px,86vw);margin:24px auto 0;padding:0;text-align:left;border:3px solid var(--lt-gold-deep);border-radius:16px;background:rgba(10,9,14,.82);box-shadow:0 24px 60px rgba(0,0,0,.38),0 0 0 1px var(--lt-gold-line),0 0 22px var(--lt-gold-glow);cursor:pointer;overflow:hidden;font:inherit;color:inherit}.recent-card:after{content:'';position:absolute;inset:2px;border:1px solid var(--lt-gold-line);border-radius:inherit;pointer-events:none}.recent-card:hover,.recent-card:focus-within{border-color:#ffe6a6;box-shadow:0 24px 60px rgba(0,0,0,.4),0 0 0 2px rgba(255,224,158,.75),0 0 26px rgba(238,190,104,.68);outline:none}.recent-card:hover:after,.recent-card:focus-within:after{border-color:#fff0c7}.recent-open{position:absolute;inset:0;z-index:0;width:100%;height:100%;margin:0;border:0;padding:0;background:transparent;cursor:pointer;font:inherit}.recent-media{position:relative;z-index:1;display:block;width:100%;aspect-ratio:16/9;background:#0b0a10;overflow:hidden}.recent-media.vertical{width:100%;aspect-ratio:16/9;margin:0}.recent-media img{width:100%;height:100%;object-fit:cover;display:block}.recent-media.vertical .recent-backdrop{position:absolute;inset:-12px;width:calc(100% + 24px);height:calc(100% + 24px);object-fit:cover;filter:blur(18px);opacity:.78;transform:scale(1.06)}.recent-media.vertical .recent-thumb{position:relative;object-fit:contain}.recent-play{position:absolute;inset:0;width:100%;min-height:44px;min-width:44px;border:0;padding:0;background:transparent;cursor:pointer;display:grid;place-items:center}.recent-play>span{display:grid;place-items:center;min-width:52px;min-height:52px;border-radius:50%;background:#1a1620d9;color:#fff;border:1px solid rgba(255,255,255,.4);font-size:20px;line-height:1}.recent-frame{position:absolute;inset:0;width:100%;height:100%;border:0;background:#000}.recent-meta{position:relative;z-index:1;display:block;padding:10px 14px 12px}.recent-meta small{display:block;font-size:11px;letter-spacing:.04em;color:#b9b2c4}.recent-meta strong{display:block;margin:3px 0 2px;font-size:15px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.recent-media--memo{aspect-ratio:auto;display:grid;place-items:center;padding:16px;min-height:96px}.recent-media--slot{aspect-ratio:auto}.recent-memo{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;font-size:14px;line-height:1.7;color:#e6ddef;overflow-wrap:anywhere}@media(max-width:650px){.center{width:calc(100vw - 16px);max-width:calc(100vw - 16px)}.recent-card{width:calc(100vw - 32px)}.recent-media.vertical{width:min(100%,calc(38dvh*9/16))}}`;
@@ -134,8 +134,10 @@ export function mountOrbit(host,{trees,storage,context,actions,authHtml='',onSel
   // ▶ 단추·제목 달기는 그대로 따로 눌린다(마우스 클릭 범위·Enter·Space는 이전과 같다).
   return `<div class="recent-card mine" data-do="recent"><button type="button" class="recent-open" data-do="recent" aria-label="${esc(head)} 이어 보기"></button>${media}<span class="recent-meta"><button type="button" class="recent-head" data-recent-head aria-haspopup="true" aria-expanded="false" aria-label="첫 화면 카드 고르기: ${recentHeader!==null?esc(recentHeader):'마지막 순간'}">${recentHeader!==null?esc(recentHeader):`마지막 순간${days===null?'':` · ${relativeDayLabel(days)}`}`}<span class="recent-head-arrow" aria-hidden="true"> ▾</span></button><strong>${esc(head)}</strong><small>${esc(c.subject||'내 트리')} · 이어 보기 →</small></span></div>`;
  };
- performance.mark('m1');shadow.innerHTML=`<style>${originalCSS}${extraCSS}.auth-entry{white-space:nowrap}</style><section class="app" aria-label="${SERVICE} 첫 화면"><div class="topbar"><span class="brand">${SERVICE} · MEMORY ORBIT</span><div class="top-actions"><button class="menuBtn" data-do="index">순간 목록</button>${authHtml}</div></div><div class="world"></div><div class="center-scrim" aria-hidden="true"></div><div class="center" data-lt-keep-clear><div class="eyebrow">${titleDemo?'나의 첫 순간':'WELCOME BACK'}</div><h1>${titleDemo?'좋아하는 순간부터.':'다시, 그 순간으로.'}</h1><p>${titleDemo?'간직하고 싶은 장면에 마음을 남겨 보세요.<br>지금 떠오르는 순간 하나면 충분해요.':'기억은 아직 여기에서 이어지고 있어요.'}</p>${recentMoment?recentMarkup(recentMoment):''}<div class="actions"><button class="subtleBtn primary-cta" data-do="${titleDemo?'new':'continue'}">${titleDemo?NEW_TREE:'이어 보던 순간'}</button><button class="subtleBtn" data-do="${titleDemo?'continue':'new'}">${titleDemo?'예시 순간 감상':NEW_TREE}</button><button class="subtleBtn" data-do="trees">${GO_TREES}</button></div><p class="center-note${demo?' note-with-hint':''}"><span>${demo?'감상 예시 · 내 기록에는 저장되지 않아요':esc(recordNote??`${all.length}개의 순간 · 서버에 보관`)}</span>${demo?'<span class="center-hint">드래그 · 금테 카드를 눌러 감상</span>':''}</p></div></section><dialog class="orbit-dialog" aria-label="순간 감상"></dialog>`;
+ performance.mark('m1');shadow.innerHTML=`<style>${originalCSS}${extraCSS}.auth-entry{white-space:nowrap}</style><section class="app" aria-label="${SERVICE} 첫 화면"><div class="topbar"><span class="brand">${SERVICE} · MEMORY ORBIT</span><div class="top-actions"><button class="menuBtn" data-do="index">순간 목록</button>${authHtml}</div></div><div class="world"></div><div class="center-scrim" aria-hidden="true"></div><div class="center" data-lt-keep-clear><div class="eyebrow">${titleDemo?'나의 첫 순간':'WELCOME BACK'}</div><h1>${titleDemo?'좋아하는 순간부터.':'다시, 그 순간으로.'}</h1><p>${titleDemo?'간직하고 싶은 장면에 마음을 남겨 보세요.<br>지금 떠오르는 순간 하나면 충분해요.':'기억은 아직 여기에서 이어지고 있어요.'}</p>${recentMoment?recentMarkup(recentMoment):''}<div class="actions"><button class="subtleBtn primary-cta" data-do="${titleDemo?'new':'continue'}">${titleDemo?NEW_TREE:'이어 보던 순간'}</button><button class="subtleBtn" data-do="${titleDemo?'continue':'new'}">${titleDemo?'예시 순간 감상':NEW_TREE}</button><button class="subtleBtn" data-do="trees">${GO_TREES}</button></div><p class="center-note${demo?' note-with-hint':''}"><span>${demo?(loggedIn===true?'뒤에 떠다니는 카드는 감상 예시예요':'감상 예시 · 내 기록에는 저장되지 않아요'):esc(recordNote??`${all.length}개의 순간 · 서버에 보관`)}</span>${demo?(loggedIn===true?'<span>·</span><span class="center-hint">눌러서 감상</span>':'<span class="center-hint">드래그 · 금테 카드를 눌러 감상</span>'):''}</p></div></section><dialog class="orbit-dialog" aria-label="순간 감상"></dialog>`;
  const app=shadow.querySelector('.app'),world=shadow.querySelector('.world'),dialog=shadow.querySelector('dialog');
+ // #1010: 예시 안내 줄 — 떠다니는 예시 카드가 숨는 좁은 화면에서는 함께 숨긴다(아래 배치에서 data-off를 묻는다).
+ const centerNote=shadow.querySelector('.center-note');
  const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;let paused=reduced,phase=0,raf=0,previous=0,drag=null,moved=0,opener=null,spin=0,glide=0;
   // #942: 가리키기·클릭으로 배경이 움직이지 않게 카메라는 항상 중심(0,0)에 둔다. 회전은 끌 때만 phase 로 누적한다.
   let cameraTarget={x:0,y:0}, camera={x:0,y:0};
@@ -179,7 +181,8 @@ export function mountOrbit(host,{trees,storage,context,actions,authHtml='',onSel
   const head=momentHeadTitle(c,titleMode);
   const nav=hasNav?`<button class="detail-nav detail-nav--prev" data-do="prev" aria-label="이전 순간"${atStart?' disabled':''}>←</button><button class="detail-nav detail-nav--next" data-do="next" aria-label="다음 순간"${atEnd?' disabled':''}>→</button>${atStart||atEnd?`<p class="detail-nav-note" role="status">${atStart?'처음 순간':'마지막 순간'}</p>`:''}`:'';
   dialog.innerHTML=`<button class="close" data-do="close" aria-label="순간 닫기">닫기 ×</button>${nav}<div class="detail-grid"><div data-lt-thumb-host>${c.image?`<img class="detail-image${vertical?' detail-image--vertical':''}" src="${esc(c.image)}" alt="${esc(head.main||c.title)}"${thumbFallbackAttrs(c,{candidates:c.thumbCandidates||[c.image],writable:!demo&&!c.example,variant:'detail'})} referrerpolicy="no-referrer">`:(!demo&&!c.example&&needsFallbackCard(c,{autoLoad:false})?fallbackCardMarkup(c,{writable:!demo&&!c.example,variant:'detail',dateStyle}):`<div class="detail-paper">${esc(c.note)}</div>`)}</div><div class="detail-copy"><small>${demo||c.example?'감상 예시':esc(c.subject||'내 순간')} · ${esc(c.emotion)}</small>${head.main?`<h2>${esc(head.main)}</h2>`:''}${head.sub?`<span class="videoTitle">▶ ${esc(head.sub)}</span>`:''}<small>${esc(dateOf(c))}${(demo||c.example)&&c.type==='video'?' · 영상 포스터 예시':''}</small>${c.startSeconds!==undefined&&c.startSeconds!==null?`<small class="detail-range">기억할 구간 ${esc(formatRange(c.startSeconds,c.endSeconds))}</small>`:''}${head.memoAsMain?'':`<p>${esc(c.note)}</p>`}${c.relation?`<small>이전 순간에서 이어진 이유</small><p>${esc(c.relation)}</p>`:''}<div class="detail-buttons"><button data-do="book" title="${BOOK_IS_READING}">${READ_BOOK}</button><button data-do="work">${demo||c.example?NEW_TREE:VIEW_TREE}</button>${link ? (link.kind === 'invalid' ? `<span class="media-unrecognized" role="note">${esc(link.text)}</span>` : `<a href="${esc(link.href)}" target="_blank" rel="noopener noreferrer">${esc(link.text)} ↗</a>`) : ''}${homePin&&!demo&&!c.example?`<button data-do="home-pin">${homePin.pinned(c)?'내리기':'첫 화면에 걸기'}</button>`:''}</div>${children.length?`<p>다음으로 이어진 순간</p><div class="detail-buttons">${children.map(x=>`<button data-next="${esc(x.key)}">${esc(mainOf(x))}</button>`).join('')}</div>`:'<p>다음 이야기를 기다리는 순간이에요.</p>'}</div></div>`;
-  dialog.querySelector('[data-do=book]').onclick=()=>{dialog.close();if(onOpen&&!c.example)onOpen(c);else actions.openBook(c.treeId,c.id,demo)};
+  // #1010: 예시(데모) 카드의 '책 읽기'도 onOpen으로 새지 않게 !demo를 더한다 — openBook이 기존 lt41-example 경로로 예시 기억책을 연다.
+  dialog.querySelector('[data-do=book]').onclick=()=>{dialog.close();if(onOpen&&!c.example&&!demo)onOpen(c);else actions.openBook(c.treeId,c.id,demo)};
   dialog.querySelector('[data-do=work]').onclick=()=>{dialog.close();demo?actions.requestMoment('new'):actions.openWorkspace(c.treeId,c.id)};
   // 261116 PR 2: '첫 화면에 걸기' — 홈이 넘겨준 배선(homePin.toggle)으로 계정 설정에 걸고, 걸려 있으면 '내리기'.
   dialog.querySelector('[data-do=home-pin]')?.addEventListener('click',()=>homePin?.toggle?.(c));
@@ -389,7 +392,10 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
  surface.setAttribute('role','button');surface.setAttribute('tabindex','0');surface.setAttribute('aria-label',surfaceLabel);
  surface.addEventListener('pointerenter',e=>{if(e.pointerType==='mouse'&&!drag)hoveredCard=surface;},{signal});
  surface.addEventListener('pointerleave',()=>{if(hoveredCard===surface)hoveredCard=null;},{signal});
- surface.addEventListener('click',e=>{if(e.target?.closest?.('[data-lt-title-edit]'))return;if(e.detail===0||moved<9){if(onOpen&&!c.example){onOpen(c);return;}focus(c)}},{signal});
+ // #1010: 예시(데모) 카드 누름은 궤도의 자세히 보기 창으로 돌려 놓는다 — onOpen은 내·공개 카드용이다.
+ // 데모 표본에는 example 자리표가 없어(onOpen&&!c.example) onOpen으로 새어 openMine이 조용히 무시됐다(눌러도 무반응).
+ // 창의 '책 읽기'는 기존 lt41-example 경로로 예시 기억책을 연다(home-actions openBook).
+ surface.addEventListener('click',e=>{if(e.target?.closest?.('[data-lt-title-edit]'))return;if(e.detail===0||moved<9){if(onOpen&&!c.example&&!demo){onOpen(c);return;}focus(c)}},{signal});
  world.append(b);return b;});performance.mark('m3');
  // #429 2/2: 카드 기본 폭·높이와 안전 구역은 둘째 번에 한 번만 잰다. 첫 그리기에서 강제 레이아웃을 하면
  // 뼈대 완성(DOMContentLoaded)이 그 만큼 늦어진다(#400 뼈대 완성 보호 — 첫 그리기는 밀어내기 없이 그린다).
@@ -601,11 +607,14 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
   // 유휴에는 이 배치를 다시 부르지 않는다 — 프레임마다 쓰던 style 쓰기가 사라진 자리다.
   const zs=safeZone?{l:safeZone.l-(w<=650?50:12),t:safeZone.t-(w<=650?50:12),r:safeZone.r+(w<=650?50:12),b:safeZone.b+(w<=650?50:12)}:null,fit=Math.min(1,w/780,h/850)*(w<=650?.5:1),narrow=w<=650;
   // 상한을 넘는 카드도 placeCard 를 거쳐야 숨김(display:none)이 유지된다 — 건너뛰면 화면 가운데에 남는다.
+  // #1010: 떠다니는 예시 카드가 숨는 좁은 화면(390 등)에서는 예시 안내 줄도 함께 숨긴다 — 카드 없는 안내만 남아 헷갈리지 않게.
+  // 신규 사용자(로그아웃 예시)는 390에서도 카드가 보이므로(fewHide=false) 안내 줄이 그대로다.
+  const fewHide=w<=650&&((!demo&&cards.length<=8)||(demo&&loggedIn===true)); // 261117 대표 결정: 좁은 화면 소수 카드(≤8)는 궤도 카드를 숨긴다 — 가운데 카드·단추·숫자에 집중(9장 이상은 기존 좁은 화면 궤도). 로그인 예시(mix-empty 포함)도 390에서 숨긴다(#780 후속)
+  if(demo)centerNote?.toggleAttribute('data-off',fewHide);
   cards.forEach((c,i)=>{
    avgScales[i]=avgScaleOf(c,w,h);
    const cfg=(narrow?ringsNarrow:rings)[c.ring],th=c.baseAngle+phase*cfg.speed+c.phaseOffset;
    let x=Math.cos(th)*cfg.rx,y=Math.sin(th)*cfg.ry+cfg.band,z=Math.sin(th+1.1+c.phaseOffset*4)*cfg.zAmp+cfg.zBase+c.zOffset;
-   const fewHide=w<=650&&((!demo&&cards.length<=8)||(demo&&loggedIn===true)); // 261117 대표 결정: 좁은 화면 소수 카드(≤8)는 궤도 카드를 숨긴다 — 가운데 카드·단추·숫자에 집중(9장 이상은 기존 좁은 화면 궤도). 로그인 예시(mix-empty 포함)도 390에서 숨긴다(#780 후속)
    if(!fewHide&&!demo&&cards.length<=8){const angle=i*Math.PI*2/cards.length+phase;x=Math.cos(angle)*Math.min(w*.34,420);y=Math.sin(angle)*Math.min(h*.3,250)+(i%2===0?80:-80);z=0;}
    const sc=Math.max(.18,Math.min(narrow?1.1:1.82,1050/(1050-z)));
    if(fewHide){elements[i].classList.add('off');noFit[i]=true;console.log('[few] hide',i,'of',cards.length);}
@@ -646,20 +655,38 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
  // 겹치면 그 프레임에서 숨긴다(clash=visibility:hidden, 사각형은 남아 구역 밖으로 나가면 다시 보인다).
  // 카드 사각형은 button.card 대신 안쪽 img(실제로 그려진 크기)로 잰다 — 3D 변환 직후 button 이 0×0 인 일이 있다.
  // 구역은 가드·시험이 같은 함수(safeZoneOf)로 실측한 값이다. 0.25초 들어온 뒤 숨기는 박동은 없다.
- const guardClash=()=>{if(!safeZone||!appBox)return;
+ // #1018: 바닥 고정 UI(셸의 링크 줄·새 소식 카드) 자리 — 떠다니는 예시 카드는 그 뒤를 지나가므로 가운데 구역처럼 숨긴다.
+ // 셸은 부모 문서(같은 출처)다. 링크 묶음 상자+여유 12px, 새 소식 카드+12px을 잰다(이슈 판정 자리).
+ // 넓은 화면(w>780)만 — 390 등 좁은 화면은 기존 동작 그대로(이슈: 390은 바꾸지 않는다). 예시 카드만 해당(내 카드는 그대로).
+ // 0.5초마다 다시 재서 새 소식 카드가 늦게 뜨거나 링크 줄이 바뀌어도 따른다(매 프레임 재측정은 아니다 — #586 캐시).
+ let bottomZones=[],bottomZonesAt=0;
+ const measureBottomZones=()=>{bottomZones=[];
+  if(app.clientWidth<=780)return;
+  try{
+   const shell=parent.document,fr=frameElement?.getBoundingClientRect(),ox=fr?.left||0,oy=fr?.top||0;
+   const add=el=>{if(!el)return;const cs=parent.getComputedStyle(el);if(cs.display==='none'||cs.visibility==='hidden')return;const r=el.getBoundingClientRect();if(r.width<1||r.height<1)return;
+    bottomZones.push({l:r.left-ox-12,t:r.top-oy-12,r:r.right-ox+12,b:r.bottom-oy+12});};
+   add(shell.querySelector('.home-links'));
+   add(shell.getElementById('updates-card'));
+  }catch{ /* 부모 문서를 읽을 수 없으면(다른 출처 등) 바닥 구역 없음 — 가운데 가드만 돈다 */ }
+ };
+ const guardClash=(now)=>{if(!safeZone||!appBox)return;
+  if(now-bottomZonesAt>500){measureBottomZones();bottomZonesAt=now;}
   // 구역은 measureSafeZone 이 같은 함수(safeZoneOf)로 실측해 둔 값 — 매 프레임 다시 재지 않는다(#586 rect 캐시).
   const zone={l:safeZone.l+appBox.left,t:safeZone.t+appBox.top,r:safeZone.r+appBox.left,b:safeZone.b+appBox.top};
   // 진단(#949): 가드가 본 구역을 남긴다 — CI 실패 시 시험이 잰 구역과 비교한다.
   const key=`${Math.round(zone.l)},${Math.round(zone.t)},${Math.round(zone.r)},${Math.round(zone.b)}`;
   if(host.dataset.ltGuardZone!==key)host.dataset.ltGuardZone=key;
-  for(const el of elements){if(el.classList.contains('off'))continue;
+  for(const [i,el] of elements.entries()){if(el.classList.contains('off'))continue;
    const inner=el.querySelector('.surface img')||el.querySelector('.surface')||el;
    const r=inner.getBoundingClientRect();
    // img 꾸밈 배율(transform:scale)은 카드 크기가 아니다 — 중심 기준으로 나눠 시험과 같은 사각형을 쓴다.
    let k=1;const t=getComputedStyle(inner).transform;
    if(t&&t!=='none'){const m=t.match(/^matrix\(([^)]+)\)/);if(m){const v=m[1].split(',').map(Number);k=Math.hypot(v[0],v[1])||1;}}
    const cx=r.left+r.width/2,cy=r.top+r.height/2,w=r.width/k,h=r.height/k;
-   const hit=w>=2&&h>=2&&zoneOverlapArea(zone,{l:cx-w/2,t:cy-h/2,r:cx+w/2,b:cy+h/2})>1;
+   const box={l:cx-w/2,t:cy-h/2,r:cx+w/2,b:cy+h/2};
+   const exampleCard=demo||!!cards[i]?.example;
+   const hit=w>=2&&h>=2&&(zoneOverlapArea(zone,box)>1||(exampleCard&&bottomZones.some(z=>zoneOverlapArea(z,box)>1)));
    el.classList.toggle('clash',hit);}};
  let layoutPending=true;
  function frame(now){performance.mark('f'+warmups);raf=0;
@@ -669,7 +696,7 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
   if(glide){phase+=glide*dt/16.7;glide*=Math.pow(.94,dt/16.7);if(Math.abs(glide)<.0004)glide=0;}
   dragDraw();
   if(!drag&&!glide)endJsMode();
-  guardClash();
+  guardClash(now);
   if(!drag&&!glide&&!cameraSettling()&&!animRunning())return;
   schedule();
  }
@@ -697,7 +724,7 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
  // 구역 함수는 겹침 시험(v41-orbit-535)과 같은 것을 쓴다(public/v41/orbit-safe-zone.mjs).
  // 측정은 getBoundingClientRect 강제 레이아웃을 일으키므로 첫 프레임으로 미룬다(#400 뼈대 완성 보호).
  let safeZone=null,safeZoneDirty=true;
- const measureSafeZone=()=>{const c=shadow.querySelector('.center');if(!c){safeZone=null;return;}safeZone=safeZoneOf(c.getBoundingClientRect(),app.getBoundingClientRect());};
+ const measureSafeZone=()=>{const c=shadow.querySelector('.center');if(!c){safeZone=null;return;}safeZone=safeZoneOf(c.getBoundingClientRect(),app.getBoundingClientRect());measureBottomZones();};
  const fitNotice=()=>{host.style.height=`calc(100dvh - ${noticeOuter()}px)`;appBox=app.getBoundingClientRect();safeZoneDirty=true;schedule();};
  const noticeResize=typeof ResizeObserver==="function"?new ResizeObserver(fitNotice):null;
  const barNow=document.getElementById("sync-bar");

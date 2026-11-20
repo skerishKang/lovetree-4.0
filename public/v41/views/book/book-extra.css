@@ -1,0 +1,14 @@
+/* #886 항목3: track59-sketchbook.html의 인라인 <style> 두 덩어리를 이 파일로 옮긴다.
+   원래 캐스케이드 순서(읽기 스크롤 → book-usability → 터치 타깃)를 유지한다. */
+
+/* member-reading-scroll — Canonical notes can reach 500 characters; keep every line inside the paper. */
+.page-content{overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y}
+.page-content .note-piece,.page-content .clipping{flex:0 0 auto}
+.book-wrap{touch-action:pan-y}
+@media(max-width:820px){.mobile-content{overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y}.mobile-support{position:static;margin-top:22px}.mobile-page .note-piece{min-height:260px}.mobile-page .note-piece p{font-size:15px;line-height:1.8}}
+
+/* 2026-11-08 터치 타깃: 보이는 모양은 그대로 두고 ::after로 누르는 영역만 44px 이상으로 넓힌다. */
+#prevBtn,#nextBtn,#detailClose,#viewerClose,#openViewerBtn,#detailIndexBtn,#branchClose{position:relative}
+#prevBtn::after,#nextBtn::after{content:"";position:absolute;inset:-7px}
+#detailClose::after,#viewerClose::after{content:"";position:absolute;inset:-5px}
+#openViewerBtn::after,#detailIndexBtn::after,#branchClose::after{content:"";position:absolute;inset:-4px 0}
