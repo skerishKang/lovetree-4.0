@@ -270,9 +270,12 @@ test('970 실행: 표지 — 제목 보임·안 잘림(390·1440), 고르면 반
       await page.evaluate(() => {
         document.querySelector('#tree-form input[name="coverDesign"][value="texture-5"]').click();
       });
+      // #978: 닫기 확인은 앱 안 틀(#lt-close-confirm)이다 — 예를 눌러 닫는다(저장 없음).
       await page.keyboard.press('Escape');
+      await page.waitForSelector('#lt-close-confirm[open]', { timeout: 8000 });
+      assert.match(await page.locator('#lt-close-confirm-title').textContent(), /저장하지 않고 닫을까요/, `${w}: 쓰던 내용이 있으면 닫기 전 한 번 묻는다`);
+      await page.click('#lt-close-confirm-yes');
       await page.waitForFunction(() => document.getElementById('tree-manager').open === false, null, { timeout: 10000 });
-      assert.ok(confirms.some((m) => m.includes('저장하지 않고 닫을까요?')), `${w}: 쓰던 내용이 있으면 닫기 전 한 번 묻는다`);
       assert.equal(puts.length, 1, `${w}: 취소는 저장하지 않는다`);
       const keptDesign = await frame.evaluate(() => document.querySelector('.book-card .book-cover')?.getAttribute('data-cover-design') || '');
       assert.equal(keptDesign, 'texture-3', `${w}: 취소하면 표지가 그대로다`);

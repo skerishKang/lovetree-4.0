@@ -432,8 +432,13 @@ export function createPanels(deps) {
       // 고르지 않은 방법의 저장값은 덮어쓰지 않는다 — 첫 순간(기본)·디자인은 저장해 둔 표지 순간을 그대로 두고,
       // 순간에서·사진만 지금 고른 순간으로 바꾼다(되돌리면 그대로 다시 보인다).
       values.coverMomentId = (mode === 'basic' || mode === 'design') ? (tree?.coverMomentId || '') : ($('tree-cover').value || '');
-      getMember().apply('editTree', values, selection());
+      // #978: 기준값을 저장 전에 맞춘다 — apply 가 화면을 다시 그리며 창을 닫으려 할 때(treeDirty)
+      // '저장하지 않고 닫을까요?'를 잘못 묻지 않게 한다. 저장 실패 때는 옛 기준값으로 되돌린다.
+      const prevBaseline = treeBaseline;
       treeBaseline = new URLSearchParams(new FormData(e.target)).toString();
+      try {
+        getMember().apply('editTree', values, selection());
+      } catch (error) { treeBaseline = prevBaseline; throw error; }
       if(typeof dispatchEvent==='function')dispatchEvent(new Event('lt41-trees-changed'));
       $('tree-manager').close();
       // #905: 저장 진행·성공은 알리지 않는다 — apply 는 동기이라 1초 안에 끝나고, 실패는 폼 오류 줄로 알린다.

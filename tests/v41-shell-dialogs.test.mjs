@@ -46,6 +46,15 @@ function fakeElement(props = {}) {
     getBoundingClientRect() { return {left: 0, top: 0, right: 100, bottom: 100}; },
     addEventListener(type, fn) { (el.listeners ||= {})[type] = fn; },
     querySelectorAll() { return props.focusables || []; },
+    showModal() { el.open = true; },
+    // #978: 앱 안 확인 틀이 자식 단추(예·아니요)를 querySelector로 찾는다 — 자식을 함께 둔다.
+    children: [],
+    append(...kids) { el.children.push(...kids); el.byId ||= {}; const walk = (n) => { if (n.id) el.byId[n.id] = n; for (const c of n.children || []) walk(c); }; for (const k of kids) walk(k); },
+    setAttribute(k, v) { (el.attrs ||= {})[k] = v; },
+    querySelector(sel) {
+      if (sel?.startsWith('#')) return el.byId?.[sel.slice(1)] || null;
+      return props.firstFocusable || null;
+    },
     ...props,
   };
   return el;
@@ -69,6 +78,9 @@ function setup({focusables = [], popoverHidden = true, treeDirty = false, editor
   const keydown = [], clicks = [];
   const doc = {
     activeElement: null,
+    // #978: 앱 안 확인 틀은 createElement로 만들어 body에 붙인다 — 가짜 문서도 같은 길을 갖춘다.
+    createElement(tag) { return fakeElement({tagName: tag.toUpperCase()}); },
+    body: fakeElement({id: 'body'}),
     addEventListener(type, fn) { if (type === 'keydown') keydown.push(fn); else clicks.push([type, fn]); },
     querySelectorAll(sel) {
       if (sel === 'dialog') return dialogs;
@@ -122,23 +134,33 @@ function key(extra) {
   return e;
 }
 
+// #978: 닫기 확인은 앱 안 틀(#lt-close-confirm)이다 — 뜬 확인 창과 예/아니요 단추를 돌려준다.
+// 물음은 비동기라 '한 번 묻는다'는 확인 창이 열린 것으로 본다(브라우저 confirm은 불리지 않는다).
+function confirmFrame() {
+  const el = globalThis.document.body.children.find((c) => c.id === 'lt-close-confirm');
+  assert.ok(el?.open, '앱 안 확인 틀이 열린다');
+  return {el, yes: el.byId['lt-close-confirm-yes'], no: el.byId['lt-close-confirm-no']};
+}
+
 // #380 4: 공통 틀의 Esc 규칙 — 쓰던 내용이 있으면 한 번 묻고, 아니오를 고르면 닫지 않는다.
+// #978: 물음은 앱 안 확인 틀(#lt-close-confirm)이다 — 아니오 단추를 누르면 창이 남고, 예 단추를 누르면 닫힌다.
 test('트리 관리 Esc: 더러우면 한 번 묻고, 아니오면 열어 둔다', () => {
   const {byId, api} = setup({treeDirty: true});
   const manager = byId('tree-manager');
   manager.open = true;
   const realConfirm = globalThis.confirm;
   try {
-    let asked = 0;
-    globalThis.confirm = () => { asked += 1; return false; };
+    globalThis.confirm = () => { throw new Error('브라우저 confirm을 쓰지 않는다'); };
     const cancel = {preventDefault() { cancel.prevented = true; }};
     manager.listeners.cancel(cancel);
-    assert.equal(asked, 1, '한 번만 묻는다');
-    assert.equal(cancel.prevented, true, '아니오면 닫지 않는다');
-    assert.equal(manager.open, true, '열린 상태 유지');
-    globalThis.confirm = () => true;
+    assert.equal(cancel.prevented, true, '물음이 떠 있는 동안 닫지 않는다');
+    const {yes, no} = confirmFrame();
+    no.listeners.click();
+    assert.equal(manager.open, true, '아니오면 열린 상태 유지');
     const cancel2 = {preventDefault() {}};
     manager.listeners.cancel(cancel2);
+    const again = confirmFrame();
+    again.yes.listeners.click();
     assert.equal(manager.open, false, '예를 고르면 닫는다');
   } finally { globalThis.confirm = realConfirm; }
 });
@@ -149,11 +171,10 @@ test('트리 관리 Esc: 깨끗하면 묻지 않고 바로 닫는다', () => {
   manager.open = true;
   const realConfirm = globalThis.confirm;
   try {
-    let asked = 0;
-    globalThis.confirm = () => { asked += 1; return false; };
+    globalThis.confirm = () => { throw new Error('깨끗하면 묻지 않는다'); };
     const cancel = {preventDefault() {}};
     manager.listeners.cancel(cancel);
-    assert.equal(asked, 0, '묻지 않는다');
+    assert.equal(globalThis.document.body.children.some((c) => c.id === 'lt-close-confirm' && c.open), false, '확인 틀이 뜨지 않는다');
     assert.equal(manager.open, false, '바로 닫는다');
   } finally { globalThis.confirm = realConfirm; }
 });
@@ -259,15 +280,15 @@ test('편집기 Esc: 쓰던 입력이 있으면 한 번 묻고, 아니오면 열
   editor.open = true;
   const realConfirm = globalThis.confirm;
   try {
-    let asked = 0;
-    globalThis.confirm = () => { asked += 1; return false; };
+    globalThis.confirm = () => { throw new Error('브라우저 confirm을 쓰지 않는다'); };
     const cancel = {preventDefault() { cancel.prevented = true; }};
     editor.listeners.cancel(cancel);
-    assert.equal(asked, 1, '한 번만 묻는다');
-    assert.equal(cancel.prevented, true, '아니오면 닫지 않는다');
-    assert.equal(editor.open, true, '열린 상태 유지');
-    globalThis.confirm = () => true;
+    assert.equal(cancel.prevented, true, '물음이 떠 있는 동안 닫지 않는다');
+    const {yes, no} = confirmFrame();
+    no.listeners.click();
+    assert.equal(editor.open, true, '아니오면 열린 상태 유지');
     editor.listeners.cancel({preventDefault() {}});
+    confirmFrame().yes.listeners.click();
     assert.equal(editor.open, false, '예를 고르면 닫는다');
   } finally { globalThis.confirm = realConfirm; }
 });
@@ -278,14 +299,12 @@ test('편집기 바깥 클릭: 더러우면 한 번 묻고, 아니오면 열어 
   editor.open = true;
   const realConfirm = globalThis.confirm;
   try {
-    let asked = 0;
-    globalThis.confirm = () => { asked += 1; return false; };
+    globalThis.confirm = () => { throw new Error('브라우저 confirm을 쓰지 않는다'); };
     editor.listeners.click({target: editor, clientX: 500, clientY: 500});
-    assert.equal(asked, 1);
+    confirmFrame().no.listeners.click();
     assert.equal(editor.open, true);
-    globalThis.confirm = () => { asked += 1; return true; };
     editor.listeners.click({target: editor, clientX: 500, clientY: 500});
-    assert.equal(asked, 2);
+    confirmFrame().yes.listeners.click();
     assert.equal(editor.open, false);
   } finally { globalThis.confirm = realConfirm; }
 });
@@ -332,14 +351,14 @@ test('순간 잇기 Esc: 고른 연결이 저장 전이면 한 번 묻는다', (
   connection.open = true;
   const realConfirm = globalThis.confirm;
   try {
-    let asked = 0;
-    globalThis.confirm = () => { asked += 1; return false; };
+    globalThis.confirm = () => { throw new Error('브라우저 confirm을 쓰지 않는다'); };
     const cancel = {preventDefault() { cancel.prevented = true; }};
     connection.listeners.cancel(cancel);
-    assert.equal(asked, 1, '한 번만 묻는다');
     assert.equal(cancel.prevented, true);
-    globalThis.confirm = () => true;
+    confirmFrame().no.listeners.click();
+    assert.equal(connection.open, true, '아니오면 열어 둔다');
     connection.listeners.cancel({preventDefault() {}});
+    confirmFrame().yes.listeners.click();
     assert.equal(connection.open, false, '예를 고르면 닫는다');
   } finally { globalThis.confirm = realConfirm; }
 });
@@ -350,17 +369,15 @@ test('빠른 추가 Esc: 주소를 적어 두었으면 한 번 묻고, 비어 �
   quick.open = true;
   const realConfirm = globalThis.confirm;
   try {
-    let asked = 0;
-    globalThis.confirm = () => { asked += 1; return false; };
+    globalThis.confirm = () => { throw new Error('브라우저 confirm을 쓰지 않는다'); };
     const cancel = {preventDefault() { cancel.prevented = true; }};
     quick.listeners.cancel(cancel);
-    assert.equal(asked, 1, '한 번만 묻는다');
-    assert.equal(cancel.prevented, true, '아니오면 열어 둔다');
-    assert.equal(quick.open, true);
+    assert.equal(cancel.prevented, true, '물음이 떠 있는 동안 닫지 않는다');
+    confirmFrame().no.listeners.click();
+    assert.equal(quick.open, true, '아니오면 열어 둔다');
     const clean = setup({quickDirty: false});
     const cleanQuick = clean.byId('write-panel'); // write-panel
     cleanQuick.open = true;
-    globalThis.confirm = () => { throw new Error('깨끗하면 묻지 않는다'); };
     cleanQuick.listeners.cancel({preventDefault() {}});
     assert.equal(cleanQuick.open, false, '바로 닫는다');
   } finally { globalThis.confirm = realConfirm; }
@@ -372,10 +389,9 @@ test('공유 Esc: 설정을 바꿔 링크를 아직 만들지 않았으면 한 �
   share.open = true;
   const realConfirm = globalThis.confirm;
   try {
-    let asked = 0;
-    globalThis.confirm = () => { asked += 1; return true; };
+    globalThis.confirm = () => { throw new Error('브라우저 confirm을 쓰지 않는다'); };
     share.listeners.cancel({preventDefault() {}});
-    assert.equal(asked, 1);
+    confirmFrame().yes.listeners.click();
     assert.equal(share.open, false, '예를 고르면 닫는다');
   } finally { globalThis.confirm = realConfirm; }
 });

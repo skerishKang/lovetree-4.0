@@ -96,20 +96,23 @@ test('설정 창 실행: 고친 내용이 있으면 Esc로 닫을 때 한 번 �
     await openSettings952(page);
     await page.click('#settings-tab-profile');
     await page.fill('#profile-name', '새로운 이름');
-    let answer = false;
-    let keep = true;
-    page.on('dialog', async (d) => { answer = true; if (keep) await d.dismiss(); else await d.accept(); });
-    // 첫 Esc: 확인 창을 내고(취소) 창은 그대로다.
+    // #978: 닫기 확인은 앱 안 틀(#lt-close-confirm)이다 — 브라우저 기본 confirm은 불리지 않는다.
+    const nativeDialogs = [];
+    page.on('dialog', (d) => { nativeDialogs.push(d.message()); void d.dismiss().catch(() => {}); });
+    // 첫 Esc: 확인 창을 내고(아니요) 창은 그대로다.
     await page.keyboard.press('Escape');
-    await page.waitForTimeout(400);
-    assert.equal(answer, true, 'Esc에 확인 창이 떴다');
+    await page.waitForSelector('#lt-close-confirm[open]', { timeout: 8000 });
+    await page.click('#lt-close-confirm-no');
+    await page.waitForFunction(() => !document.querySelector('#lt-close-confirm')?.open, null, { timeout: 5000 });
     assert.equal(await page.evaluate(() => document.getElementById('account-settings')?.open), true, '취소하면 창은 열려 있다');
-    // 다시 Esc: 확인하면 닫히고 초점은 연 단추(계정 동그라미)로 돌아간다.
-    keep = false;
+    // 다시 Esc: 예로 닫히고 초점은 연 단추(계정 동그라미)로 돌아간다.
     await page.keyboard.press('Escape');
+    await page.waitForSelector('#lt-close-confirm[open]', { timeout: 8000 });
+    await page.click('#lt-close-confirm-yes');
     await page.waitForFunction(() => !document.getElementById('account-settings')?.open, null, { timeout: 5000 });
     await page.waitForFunction(() => document.activeElement?.id === 'account-avatar', null, { timeout: 5000 });
     assert.equal(await page.evaluate(() => document.activeElement?.id), 'account-avatar', '닫으면 초점이 연 단추로 돌아간다');
+    assert.deepEqual(nativeDialogs, [], '브라우저 기본 confirm은 불리지 않는다');
   } finally { await browser.close(); server.close(); }
 });
 
