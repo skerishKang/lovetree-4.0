@@ -91,7 +91,10 @@ export function createMemberSession({api,onState=()=>{},onStatus=()=>{},onGuard=
     else throw Error('지원하지 않는 작업이에요.');
     if(next)trees=trees.map(t=>t.id===tree.id?next:t);
    }
-   document=validateState({version:1,trees,prefs:document.prefs});onState(structuredClone(document),{treeId,momentId});sync.markLocalSave();return {treeId,momentId};
+   document=validateState({version:1,trees,prefs:document.prefs});
+   // #984: 트리 편집(이름·표지)은 보드 저장과 같은 길 — 화면이 이미 자기 상태를 들고 있으므로 셸은 모델만
+   // 갱신하고 화면을 다시 띄우지 않는다. 표지·이름은 lt41-trees-saved/renamed 알림이 바로 다시 그린다.
+   onState(structuredClone(document),{treeId,momentId},action==='editTree'?{tree:true}:undefined);sync.markLocalSave();return {treeId,momentId};
  }
  return {start:()=>sync.start(),apply,act:name=>sync.act(name),flushOnHide:()=>sync.flushOnHide(),snapshot:()=>({...sync.snapshot(),subject,writable:sync.snapshot().owned&&bound&&!mismatch,phase:sync.status().phase}),state:()=>structuredClone(document),dispose:()=>{active=false;bound=false;globalThis.document?.removeEventListener?.('visibilitychange',onVisible);globalThis.removeEventListener?.('pagehide',onHide);globalThis.removeEventListener?.('focus',quietCheck);},status:()=>sync.status()};
 }
