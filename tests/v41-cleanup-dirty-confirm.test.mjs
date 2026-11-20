@@ -43,7 +43,7 @@ function harness({ confirmAnswer = true } = {}) {
   const applied = [];
   globalThis.confirm = (text) => { confirms.push(text); return confirmAnswer; };
   globalThis.window = { LT41: { tree, momentId: 'm1' } };
-  globalThis.document = {
+  globalThis.document = { createElementNS: (ns, tag) => ({ tagName: String(tag), namespaceURI: String(ns), attrs: {}, children: [], setAttribute(n,v){this.attrs[n]=String(v)}, getAttribute(n){return this.attrs[n]??null}, append(...k){this.children.push(...k)}, querySelector(){return null}, querySelectorAll(){return []} }), 
     createElement: (tag) => fakeElement({ tagName: tag.toUpperCase() }),
     getElementById: (id) => (els[id] ||= fakeElement({ id })),
     querySelectorAll: () => [],
@@ -162,7 +162,7 @@ function moveHarness({ moments = [{ id: 'm1', title: '첫 순간', parentId: nul
     ...others.map(t => ({ ...t, moments: (t.moments || []).map(m => ({ ...m })) }))
   ] };
   globalThis.window = { LT41: { tree: state.trees[0], momentId: state.trees[0].moments[0].id } };
-  globalThis.document = {
+  globalThis.document = { createElementNS: (ns, tag) => ({ tagName: String(tag), namespaceURI: String(ns), attrs: {}, children: [], setAttribute(n,v){this.attrs[n]=String(v)}, getAttribute(n){return this.attrs[n]??null}, append(...k){this.children.push(...k)}, querySelector(){return null}, querySelectorAll(){return []} }), 
     createElement: (tag) => fakeElement({ tagName: tag.toUpperCase() }),
     getElementById: (id) => (els[id] ||= fakeElement({ id })),
     querySelectorAll: () => [],
@@ -170,8 +170,8 @@ function moveHarness({ moments = [{ id: 'm1', title: '첫 순간', parentId: nul
   };
   const member = {
     snapshot: () => ({ owned: true, writable: true }),
-    apply: (action, input, selection) => {
-      applied.push([action, input, selection]);
+    apply: (action, input, selection, meta) => {
+      applied.push([action, input, selection, meta]);
       if (action === 'moveMoment') {
         const from = state.trees.find(t => t.id === selection.treeId);
         const to = state.trees.find(t => t.id === input.toTreeId);
@@ -189,7 +189,7 @@ function moveHarness({ moments = [{ id: 'm1', title: '첫 순간', parentId: nul
     getMember: () => member,
     getSource: () => 'server',
     getTrees: () => state.trees,
-    choose: (id, momentId) => chosen.push([id, momentId]),
+    choose: (id, momentId, skipShow) => chosen.push([id, momentId, skipShow]),
     notify: text => notices.push(text),
     panel: id => { panels.push(id); (els[id] ||= fakeElement({ id })).showModal(); },
     treeMomentThumb: () => '', thumbCandidatesOf: () => [], fallbackCardOf: () => null, emotionToneOf: () => 'tone'
@@ -215,8 +215,8 @@ test('#644 옮기기: 고르면 바로 옮겨지고(대상 트리에 들어가�
   try {
     h.cleanup.openMove({ momentId: 'm2' });
     h.pickerButtons()[0].dispatch('click');
-    assert.deepEqual(h.applied[0], ['moveMoment', { toTreeId: 'tree2' }, { treeId: 'tree1', momentId: 'm2' }], '기존 moveMoment 한 길');
-    assert.deepEqual(h.chosen, [['tree2', 'm2']], '옮겨진 트리의 그 순간을 보여 준다');
+    assert.deepEqual(h.applied[0], ['moveMoment', { toTreeId: 'tree2' }, { treeId: 'tree1', momentId: 'm2' }, undefined], '기존 moveMoment 한 길(다른 트리는 모델 전용 아님)');
+    assert.deepEqual(h.chosen, [['tree2', 'm2', undefined]], '옮겨진 트리의 그 순간을 보여 준다');
     const inTarget = h.state.trees.find(t => t.id === 'tree2').moments.some(m => m.id === 'm2');
     const outOfFrom = !h.state.trees.find(t => t.id === 'tree1').moments.some(m => m.id === 'm2');
     assert.equal(inTarget && outOfFrom, true, '대상 트리에 들어가고 원래 트리에서 빠진다');
@@ -231,11 +231,11 @@ test('#644 되돌리기: 원래 트리의 원래 부모 아래로 돌린다', ()
     h.cleanup.openMove({ momentId: 'm2' });
     h.pickerButtons()[0].dispatch('click');
     h.els['move-actions'].children[0].onclick();
-    assert.deepEqual(h.applied[1], ['moveMoment', { toTreeId: 'tree1', parentId: 'm1' }, { treeId: 'tree2', momentId: 'm2' }], '원래 부모(m1) 아래로');
+    assert.deepEqual(h.applied[1], ['moveMoment', { toTreeId: 'tree1', parentId: 'm1' }, { treeId: 'tree2', momentId: 'm2' }, { moment: true }], '원래 부모(m1) 아래로, 모델만 갱신');
     const back = h.state.trees.find(t => t.id === 'tree1').moments.find(m => m.id === 'm2');
     assert.equal(back.parentId, 'm1', '원래 자리(원래 부모 아래)로 돌아온다');
     assert.equal(h.els['move-feedback'].hidden, true, '안내를 거둔다');
-    assert.deepEqual(h.chosen.at(-1), ['tree1', 'm2'], '원래 트리로 되돌아가 본다');
+    assert.deepEqual(h.chosen, [['tree2', 'm2', undefined]], '되돌리기는 지금 보기에 머문다(화면 다시 띄우지 않음)');
   } finally { h.restore(); }
 });
 

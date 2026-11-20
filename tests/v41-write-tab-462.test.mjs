@@ -75,7 +75,7 @@ function shell({storage = fakeStorage(), finePointer = true, viewport = null} = 
   globalThis.FormData = FakeFormData;
   globalThis.confirm = () => true;
   globalThis.queueMicrotask = fn => fn();
-  globalThis.document = {querySelectorAll: () => [], addEventListener() {}, createElement: tag => fakeEl({tagName: tag, value: '', children: [], append(...kids) { this.children.push(...kids); }})};
+  globalThis.document = { createElementNS: (ns, tag) => ({ tagName: String(tag), namespaceURI: String(ns), attrs: {}, children: [], setAttribute(n,v){this.attrs[n]=String(v)}, getAttribute(n){return this.attrs[n]??null}, append(...k){this.children.push(...k)}, querySelector(){return null}, querySelectorAll(){return []} }), querySelectorAll: () => [], addEventListener() {}, createElement: tag => fakeEl({tagName: tag, value: '', children: [], append(...kids) { this.children.push(...kids); }})};
 
   const member = {snapshot: () => ({owned: true, writable: true, subject: 's1'}), apply: (mode, payload, sel) => { calls.apply.push({mode, payload, sel}); return {treeId: 'tree-1', momentId: 'm9'}; }, state: () => null};
   const write = createWritePanel({$, storage, visualViewport: viewport});

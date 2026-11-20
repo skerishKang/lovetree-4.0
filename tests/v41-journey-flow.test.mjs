@@ -55,7 +55,7 @@ function harness({
     replaceState(next, _t, url) { calls.historyReplace.push(url); state.lt41Journey = next?.lt41Journey ?? 0; globalThis.location.hash = url; },
     go(n) { calls.go.push(n); }
   };
-  globalThis.document = { body: { classList: { remove: () => {} } }, querySelectorAll: () => [] };
+  globalThis.document = { createElementNS: (ns, tag) => ({ tagName: String(tag), namespaceURI: String(ns), attrs: {}, children: [], setAttribute(n,v){this.attrs[n]=String(v)}, getAttribute(n){return this.attrs[n]??null}, append(...k){this.children.push(...k)}, querySelector(){return null}, querySelectorAll(){return []} }),  body: { classList: { remove: () => {} } }, querySelectorAll: () => [] };
 
   const member = {
     snapshot: () => ({ owned, writable, subject: 's1' }),

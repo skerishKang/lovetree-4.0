@@ -5,6 +5,7 @@ import {displayTreeTitle} from '../tree-name.mjs';
 import {parseTag,tagKey,isChannelLikeArtist} from '../tags.mjs';
 // #480 L13: 날짜는 책·보드·지도·첫 화면과 같은 한 벌(formatDisplayDate)로만 적는다.
 import {formatDisplayDate} from '../book-usability.mjs';
+import {copyPublicMoment} from '../moments-copy.mjs';
 
 // 261118 대표 지적 2차 5: 서재 화면이 알려 준 '마지막에 본 트리'(가운데 책의 트리).
 // 서재 화면에서 콕·보드·지도 탭을 누르면 이 트리로 열린다(shell.mjs의 data-view 눌림에서 쓴다).
@@ -502,6 +503,19 @@ export function createMessages(deps) {
       return groups;
     },
     onOpenShare: item => { $('community-panel').close(); location.hash = `#share/${item.shareId}/${item.view || 'book'}`; },
+    // #1025 2단계: [내 트리에 담기] — 고른 트리에 순간을 새로 복사한다(원본 공개 트리는 건드리지 않는다).
+    onAddToTree: (item, treeId) => {
+      const member = getMember();
+      if (getSource() !== 'server' || !member?.snapshot().owned) return {ok:false,reason:'login'};
+      const tree = (getModel()?.trees || []).find(t => t.id === treeId);
+      if (!tree?.moments?.length) return {ok:false,reason:'tree'};
+      const copied = copyPublicMoment(tree, item, location.origin);
+      try { member.apply('boardSync', {moments: copied.moments}, {treeId, momentId: copied.momentId}); }
+      catch { return {ok:false,reason:'save'}; }
+      return {ok:true,treeId};
+    },
+    notify: (text, options) => notify(text, options),
+    memberLogin: () => openSettingsData('new-tree'),
     // 이슈 457 5번: 공유할 내 트리가 있어야 "내 트리 공유하기" — 로그아웃·트리 0개는 "첫 트리 만들기"로 바뀐다.
     hasOwnTree: () => getSource() === 'server' && !!getMember()?.snapshot().owned && (getModel()?.trees?.length || 0) > 0,
     onShareOwn: () => {

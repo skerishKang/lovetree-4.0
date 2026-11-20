@@ -48,7 +48,7 @@ function journeyHarness({ owned = true, writable = true, source = 'server', curr
     replaceState: (_s, _t, url) => { globalThis.location.hash = url; },
     go: delta => { modal.push(delta); }
   };
-  globalThis.document = {body: {classList: {remove() {}, add() {}}}};
+  globalThis.document = { createElementNS: (ns, tag) => ({ tagName: String(tag), namespaceURI: String(ns), attrs: {}, children: [], setAttribute(n,v){this.attrs[n]=String(v)}, getAttribute(n){return this.attrs[n]??null}, append(...k){this.children.push(...k)}, querySelector(){return null}, querySelectorAll(){return []} }), body: {classList: {remove() {}, add() {}}}};
   els['view'] = fakeElement({contentWindow: {postMessage: (message, origin) => posted.push([message, origin]), location: {replace: url => replacedUrls.push(url)}}});
   els['empty'] = fakeElement();
   els['community-panel'] = fakeElement();
@@ -80,7 +80,7 @@ function messagesHarness({ owned = true, source = 'server', current = 'track59-s
   const requests = [];
   globalThis.addEventListener = (type, fn) => { events[type] = fn; };
   globalThis.location = {origin: 'https://lovetree-4-0.pages.dev', hostname: 'lovetree-4-0.pages.dev', hash: ''};
-  globalThis.document = {createElement: () => fakeElement(), querySelectorAll: () => []};
+  globalThis.document = { createElementNS: (ns, tag) => ({ tagName: String(tag), namespaceURI: String(ns), attrs: {}, children: [], setAttribute(n,v){this.attrs[n]=String(v)}, getAttribute(n){return this.attrs[n]??null}, append(...k){this.children.push(...k)}, querySelector(){return null}, querySelectorAll(){return []} }), createElement: () => fakeElement(), querySelectorAll: () => []};
   globalThis.window = {LT41: {tree: {id: 'tree1', title: '윤슬', moments: [{id: 'm1', title: '첫 순간'}]}, momentId: 'm1', trees: model.trees}};
   const dialog = fakeElement({querySelector: () => fakeElement()});
   const button = fakeElement();

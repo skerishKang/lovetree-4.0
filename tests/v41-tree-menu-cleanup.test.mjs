@@ -43,7 +43,7 @@ test('3. 정리 목록은 주입된 화면 규칙으로 제목·썸네일을 그
   };
   const ids = ['cleanup-moments','cleanup-desc','cleanup-error','cleanup-new-name','cleanup-target','cleanup-count','cleanup-create','cleanup-move','cleanup-move-box','cleanup-panel'];
   const els = Object.fromEntries(ids.map(id => [id, el()]));
-  globalThis.document = {createElement: tag => el(tag)};
+  globalThis.document = { createElementNS: (ns, tag) => ({ tagName: String(tag), namespaceURI: String(ns), attrs: {}, children: [], setAttribute(n,v){this.attrs[n]=String(v)}, getAttribute(n){return this.attrs[n]??null}, append(...k){this.children.push(...k)}, querySelector(){return null}, querySelectorAll(){return []} }), createElement: tag => el(tag)};
   globalThis.window = {LT41: {tree: {id: 'inbox', inbox: true, moments: [
     {id: 'm1', title: 'youtube.com에서 간직한 순간', parentId: null, url: 'https://youtu.be/abcdefghijk', mediaMetadata: {title: '영상 제목', thumbnail: 'https://i.ytimg.com/vi/abcdefghijk/hqdefault.jpg'}},
     {id: 'm2', title: '내 제목', parentId: 'm1', url: 'https://example.com/x', mediaMetadata: {}},

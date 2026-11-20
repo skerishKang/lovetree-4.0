@@ -23,8 +23,10 @@ const items = IDS.map((id, i) => ({
   title: '세로 순간 ' + (i + 1), url: 'https://www.youtube.com/shorts/' + id,
   thumbnail: 'https://i.ytimg.com/vi/' + id + '/oardefault.jpg',
   note: '짧게 남긴 마음 ' + (i + 1), emotion: '설렘', date: '2026-11-20',
-  keywords: ['가수:아이유', '노래:노래' + (i + 1)], aiTester: i === 3
+  keywords: [i % 3 === 0 ? '가수:다른가수' : '가수:아이유', '노래:노래' + (i + 1)], aiTester: i === 3,
+  startSeconds: i === 0 ? 5 : null, endSeconds: i === 0 ? 20 : null
 }));
+const GROUPS = [{value:'아이유',count:8},{value:'다른가수',count:4}];
 
 async function step(page, panel, width, delta) {
   if (width <= 780) {
@@ -44,7 +46,9 @@ async function boot(browser, { width, height, theme }) {
     if (u.origin !== base) return u.hostname === 'i.ytimg.com' ? THUMB(route) : route.abort();
     if (u.pathname === '/api/public/moments') {
       const exclude = new Set(String(u.searchParams.get('exclude') || '').split(',').filter(Boolean));
-      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ items: items.filter(i => !exclude.has(i.videoId)), total: items.length }) });
+      const tag = u.searchParams.get('tag') || '';
+      const matched = items.filter(i => !exclude.has(i.videoId) && (!tag || i.keywords.some(k => k === tag)));
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ items: matched, total: matched.length, groups: GROUPS }) });
     }
     if (u.pathname.startsWith('/api/')) return route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' });
     return route.continue();
@@ -162,4 +166,43 @@ test('#1025 순간 보기 — iframe 2개 이하·10회 넘기기 같은 영상 
       } finally { await h.ctx.close(); await new Promise(r => h.server.close(r)); }
     }
   } finally { await browser.close(); }
+});
+
+test('#1025 2단계 — 가수 칩 필터·구간 주소·나무 선 아이콘·공유 주소 복사', { skip: REQUIRE ? false : skip, timeout: 240000 }, async () => {
+ if (skip) assert.fail(skip);
+ const browser = await chromium.launch({ headless: true });
+ try {
+  const h = await boot(browser, { width: 1440, height: 900, theme: 'night' });
+  try {
+   const panel = h.page.locator('#community-moments-panel');
+   await panel.locator('.moments-chip').first().waitFor({ state: 'visible', timeout: 10000 });
+   const chips = await panel.locator('.moments-chip').allTextContents();
+   assert.deepEqual(chips, ['전체', '아이유', '다른가수'], '칩은 전체 + 서버가 센 상위 가수');
+   // 구간 주소: 첫 순간에 start=5&end=20이 들어간다.
+   const src = await panel.locator('iframe.moments-frame').first().getAttribute('src');
+   assert.match(src, /start=5/, '시작 초가 iframe 주소에 있다: ' + src);
+   assert.match(src, /end=20/, '끝 초가 iframe 주소에 있다: ' + src);
+   const noRange = await panel.locator('iframe.moments-frame').nth(1).getAttribute('src');
+   assert.doesNotMatch(noRange, /start=|end=/, '구간 없는 순간에는 start/end가 없다: ' + noRange);
+   // 가수 칩 — 누르면 그 가수만, 5회 넘기는 동안 다른 가수 0.
+   await panel.locator('.moments-chip', { hasText: '아이유' }).click();
+   await h.page.waitForTimeout(400);
+   const seen = [];
+   for (let i = 0; i < 5; i++) {
+    seen.push(await panel.locator('.moments-stage').getAttribute('data-lt-moments-id'));
+    await step(h.page, panel, 1440, 1);
+   }
+   assert.equal(new Set(seen).size, seen.length, '칩을 골라도 같은 영상 반복 0');
+   console.log('#1025 s2 chip', JSON.stringify({ artist: '아이유', ids: seen }));
+   // 공유 — /t/<shareId> 주소를 복사한다.
+   await h.page.evaluate(() => { globalThis.__copied = []; Object.defineProperty(navigator, 'clipboard', { value: { writeText: async (v) => { globalThis.__copied.push(v); } }, configurable: true }); });
+   await panel.locator('.moments-rail-button').nth(3).click();
+   await h.page.waitForFunction(() => (globalThis.__copied || []).length > 0, null, { timeout: 5000 });
+   const copied = await h.page.evaluate(() => globalThis.__copied[0]);
+   assert.match(copied, /\/t\/share0/, '공개 트리 주소를 복사한다: ' + copied);
+   // 나무 아이콘 — 컬러 이모지 없이 선 아이콘(svg path)이다.
+   const icon = await panel.locator('.moments-rail-svg').evaluate(el => ({ paths: el.querySelectorAll('path').length, stroke: getComputedStyle(el).stroke, text: el.textContent }));
+   assert.ok(icon.paths >= 1 && !/♣/.test(icon.text), '나무 선 아이콘: ' + JSON.stringify(icon));
+  } finally { await h.ctx.close(); await new Promise(r => h.server.close(r)); }
+ } finally { await browser.close(); }
 });

@@ -22,6 +22,7 @@ import { createFeedbackRepo } from './db/feedback-postgres.js';
 import { createAdminCustomersRepo } from './db/admin-customers-postgres.js';
 import { createAdminCustomersService, createAdminCustomersHandler } from './admin-customers.js';
 import { createFeedbackService, createFeedbackHandler } from './feedback-service.js';
+import { createOpsNotifier } from './ops-notify.js';
 import { createYoutubeOembedHandler } from './youtube-oembed.js';
 import { createPadiemAuthorityAuth } from './padiem-authority-auth.js';
 import { createSharedAccessAuth, sharedAuthEnabled } from './padiem-access-auth.mjs';
@@ -245,9 +246,10 @@ const communityHandler = createCommunityHandler({
 });
 // 고객 의견 창구 (#540). 로그인·로그아웃 모두 받는다 — 그래서 인증 경계는 guardedAuthenticate를 그대로 쓰되,
 // 핸들러가 401을 '로그아웃'으로 받아들인다.
+const opsNotify = createOpsNotifier();
 const feedbackHandler = createFeedbackHandler({
  authenticate: guardedAuthenticate,
- service: createFeedbackService({ feedbackRepo: createFeedbackRepo(pool), productId: LOVETREE_PRODUCT_ID, admin }),
+ service: createFeedbackService({ feedbackRepo: createFeedbackRepo(pool), productId: LOVETREE_PRODUCT_ID, admin, opsNotify }),
  productId: LOVETREE_PRODUCT_ID
 });
 // 운영센터 고객 정보(261116 대표 결정) — 읽기만 한다. 자세히 판을 열 때 열람 기록을 남기고,

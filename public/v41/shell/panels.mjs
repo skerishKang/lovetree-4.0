@@ -535,7 +535,7 @@ export function createPanels(deps) {
     try {
       // #344: 미리보기 때 받아 둔 영상 제목을 저장 입력에 함께 넘긴다(사용자 입력 제목이 항상 우선 — 도메인 판정).
       // '가' 결정: 자세한 추가의 부모는 편집기를 열 때 정한 이전 순간(고르지 않았으면 가장 최근 순간)이다.
-      getMember().apply(editorMode, {...Object.fromEntries(new FormData(e.target)), ...editorMediaTitle()}, editorMode === 'add' ? { ...selection(), momentId: addParentMomentId() } : selection());
+      getMember().apply(editorMode, {...Object.fromEntries(new FormData(e.target)), ...editorMediaTitle()}, editorMode === 'add' ? { ...selection(), momentId: addParentMomentId() } : selection(), editorMode === 'add' ? {moment:true} : undefined);
       formBaseline = new URLSearchParams(new FormData(e.target)).toString();
       $('write-panel').close();
       if (editorMode === 'new') show('track59-sketchbook.html');
