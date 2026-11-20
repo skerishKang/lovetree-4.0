@@ -122,7 +122,7 @@ export function mountMoments({panel,onOpenShare}){
  up.onclick=()=>step(-1);
  down.onclick=()=>step(1);
  stage.addEventListener('wheel',event=>{if(Math.abs(event.deltaY)<4)return;event.preventDefault();step(event.deltaY>0?1:-1);},{passive:false});
- window.addEventListener('keydown',event=>{
+ if(typeof window!=='undefined'&&typeof window.addEventListener==='function')window.addEventListener('keydown',event=>{
   if(!panel.closest('dialog')?.open||panel.hidden)return;
   if(event.key==='ArrowDown'){event.preventDefault();step(1);}
   if(event.key==='ArrowUp'){event.preventDefault();step(-1);}
