@@ -419,8 +419,12 @@ export function createQuickAdd(deps) {
     }
     const input = { url, ...(quickTreeId ? { treeId: quickTreeId } : {}), ...(targetParent ? { parentId: targetParent } : {}), ...quickMediaTitle(url) };
     let result = null;
-    try { result = deps.getMember().apply('quickAdd', input) || null; }
-    catch (error) { $('quick-error').textContent = error.message; return false; }
+    // #978: 저장은 동기화 끝에 화면을 다시 그리며 열린 창을 닫으려 한다(choose → show → closePanels). 지금
+    // 담는 중인 창은 '아직 안 넣은 것'이 아니므로 물음 없이 열어 둔다 — 저장이 끝나면 바로 푼다.
+    let held = false;
+    try { deps.holdPanel?.('write-panel', true); held = true; result = deps.getMember().apply('quickAdd', input) || null; }
+    catch (error) { if (held) deps.holdPanel?.('write-panel', false); $('quick-error').textContent = error.message; return false; }
+    if (held) deps.holdPanel?.('write-panel', false);
     quickTarget = null;
     // #638 제목 경합: 제목을 못 받은 채 담았으면(저장 제목이 기본 문구로 떨어짐) 저장한 순간을 기록해 두고,
     // 제목이 도착하면 그 순간의 영상 제목을 채운다. 미리보기 때 요청이 이미 달리고 있으면 그 응답이 채운다.

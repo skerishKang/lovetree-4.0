@@ -317,6 +317,8 @@ const shellQuick=createQuickAdd({
   openLoginStart:intent=>openLoginStart(intent),
   writePanel:shellWrite,
   requestClose:id=>shellDialogs.requestClose(id),
+  // #978: 담는 중에는 열린 창을 닫지 않게 잠시 붙잡는다(저장 뒤 화면 다시 그리기가 창을 닫으려 한다).
+  holdPanel:(id,on)=>shellDialogs.holdPanel(id,on),
   // #876: 같은 영상 안내 창 — 담기 전에 한 번 알려 주고 [그래도 담기]·[그 순간 보기]를 맡긴다.
   videoDup:shellVideoDup,
   // #638: 쉬운 추가가 지금 고른 트리에 담기게 — 지금 트리·트리 목록은 트리 메뉴와 같은 재료(window.LT41)에서 읽는다.
