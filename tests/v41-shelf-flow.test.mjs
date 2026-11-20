@@ -336,7 +336,7 @@ test('새 책을 만들면 이어 보기 띠를 다시 그린다 · 검색으로
   };
   const library = { list: [] };
   globalThis.window = globalThis;
-  globalThis.document = {
+  globalThis.document = { createElementNS: (ns, tag) => ({ tagName: String(tag), namespaceURI: String(ns), attrs: {}, children: [], setAttribute(n,v){this.attrs[n]=String(v)}, getAttribute(n){return this.attrs[n]??null}, append(...k){this.children.push(...k)}, querySelector(){return null}, querySelectorAll(){return []} }), 
     querySelector: (selector) => el(selector),
     querySelectorAll: () => [],
     addEventListener() {},

@@ -28,7 +28,7 @@ test('한 벌: 같은 값이 세 표기로 다르게 적힌다', () => {
 
 function fakeElement(extra = {}) {
   return Object.assign({
-    value: '', textContent: '', hidden: false, open: false, disabled: false, checked: false,
+    value: '', textContent: '', hidden: false, open: false, disabled: false, checked: false, classList: { items:new Set(), add(...v){v.forEach(x=>this.items.add(x))}, remove(...v){v.forEach(x=>this.items.delete(x))}, toggle(v,on){if(on===undefined)on=!this.items.has(v);on?this.items.add(v):this.items.delete(v);return on}, contains(v){return this.items.has(v)} },
     children: [], attrs: {}, dataset: {}, className: '', selectedOptions: [{ textContent: '' }],
     addEventListener() {}, setAttribute(n, v) { this.attrs[n] = v; }, getAttribute(n) { return this.attrs[n] ?? null; },
     replaceChildren(...k) { this.children = k; }, append(...k) { this.children.push(...k); },
@@ -43,7 +43,7 @@ function messagesHarness({ dateStyle = 'dot' } = {}) {
   const els = {};
   globalThis.addEventListener = () => {};
   globalThis.location = { origin: 'https://example.test', hostname: 'lovetree-4-0.pages.dev', hash: '' };
-  globalThis.document = { createElement: () => fakeElement(), querySelectorAll: () => [] };
+  globalThis.document = { createElement: () => fakeElement(), createElementNS: (ns, tag) => fakeElement({ tagName: String(tag), namespaceURI: String(ns) }), querySelectorAll: () => [] };
   globalThis.window = { LT41: { tree: { id: 'tree1', title: '윤슬', moments: [] }, momentId: 'm1' } };
   const get = (id) => (els[id] ||= fakeElement({ id }));
   const messages = createMessages({
@@ -105,7 +105,7 @@ function communityHarness({ dateStyle = 'dot', items = [], comments = [] } = {})
   for (const key of ['window', 'document', 'location', 'addEventListener', 'fetch']) { saved[key] = globalThis[key]; delete globalThis[key]; }
   globalThis.addEventListener = () => {};
   globalThis.location = { origin: 'https://example.test', hostname: 'lovetree-4-0.pages.dev' };
-  globalThis.document = { createElement: () => fakeElement(), querySelectorAll: () => [] };
+  globalThis.document = { createElement: () => fakeElement(), createElementNS: (ns, tag) => fakeElement({ tagName: String(tag), namespaceURI: String(ns) }), querySelectorAll: () => [] };
   globalThis.window = {};
   const els = {};
   const get = (id) => (els[id] ||= fakeElement({ id }));

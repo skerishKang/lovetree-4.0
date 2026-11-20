@@ -271,7 +271,7 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
    const tagValue=parsedTag?.kindId!==null&&parsedTag?.kindId!==undefined?tagKey(parsedTag.value):null;
    const matchesTag=moment=>!tagValue||(Array.isArray(moment.keywords)&&moment.keywords.some(raw=>{const p=parseTag(raw);return !!p&&p.kindId===parsedTag.kindId&&tagKey(p.value)===tagValue;}));
    const shares=await communityRepo.listPublicTagShares({productId,viewerSubjectId,limit:400});
-   const docs=new Map(),roles=new Map(),found=[];
+   const docs=new Map(),roles=new Map(),found=[],groupCounts=new Map();
    for(const share of shares){
     let stored=docs.get(share.subjectId);
     if(stored===undefined){stored=await workspaceRepo.load({productId,subjectId:share.subjectId});docs.set(share.subjectId,stored);}
@@ -284,11 +284,23 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
     const aiTester=isAiTesterRole(role);
     for(const moment of tree.moments){
      // 세로 판정값이 없는 옛 순간(isVerticalMoment=false)은 내보내지 않는다 — 화면에서 한 번 판정한 뒤 다시 요청한다.
-     if(!isVerticalMoment(moment)||!matchesTag(moment))continue;
+     if(!isVerticalMoment(moment))continue;
      const videoId=youtubeIdFrom(moment.url||moment.externalUrl||'');
      const id=videoId||moment.id;
      if(seen.has(id)||seen.has(moment.id))continue;
      seen.add(id);seen.add(moment.id);
+     // 2단계 칩: 공개 세로 순간에서 가수 꼬리표를 센다(순간당 한 번, 채널성 이름 제외) — discover의 같은 규칙.
+     const counted=new Set();
+     for(const raw of (Array.isArray(moment.keywords)?moment.keywords:[])){
+      const parsed=parseTag(raw);
+      if(!parsed||parsed.kindId!=='artist'||isChannelLikeArtist(parsed.value))continue;
+      const key=tagKey(parsed.value);
+      if(counted.has(key))continue;
+      counted.add(key);
+      const rec=groupCounts.get(key);
+      if(rec)rec.count+=1;else groupCounts.set(key,{value:parsed.value,count:1});
+     }
+     if(!matchesTag(moment))continue;
      found.push({
       id:moment.id,
       videoId,
@@ -301,13 +313,16 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
       emotion:moment.emotion||'',
       date:moment.date||'',
       keywords:Array.isArray(moment.keywords)?moment.keywords.slice(0,12):[],
+      startSeconds:Number.isSafeInteger(moment.startSeconds)&&moment.startSeconds>=0?moment.startSeconds:null,
+      endSeconds:Number.isSafeInteger(moment.endSeconds)&&moment.endSeconds>Number(moment.startSeconds||0)?moment.endSeconds:null,
       aiTester
      });
     }
    }
    // Fisher-Yates — 무작위 순서지만 같은 배열 안에서 중복은 없다. random 은 시험에서 고정할 수 있다.
    for(let i=found.length-1;i>0;i--){const j=Math.floor(random()*(i+1));[found[i],found[j]]=[found[j],found[i]];}
-   return {items:found.slice(0,want),total:found.length};
+   const groups=[...groupCounts.values()].sort((a,b)=>b.count-a.count||String(a.value).localeCompare(String(b.value),'ko')).slice(0,6);
+   return {items:found.slice(0,want),total:found.length,groups};
   },
   // 담기 = 트리 투표(#824 대표 결정). 켤 때만 두 일을 한다:
   // ① 가입 7일 게이트 — 가입일(첫 로그인 시각)이 7일 미만이면 막는다(403 vote_too_new).

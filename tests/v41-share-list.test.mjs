@@ -23,7 +23,8 @@ function fakeElement(extra = {}) {
     close() { this.open = false; },
     showModal() { this.open = true; },
     querySelector: () => fakeElement(),
-    querySelectorAll: () => []
+    querySelectorAll: () => [],
+    classList: { items:new Set(), add(...v){v.forEach(x=>this.items.add(x))}, remove(...v){v.forEach(x=>this.items.delete(x))}, toggle(v,on){if(on===undefined)on=!this.items.has(v);on?this.items.add(v):this.items.delete(v);return on}, contains(v){return this.items.has(v)} }
   };
   return Object.assign(node, extra);
 }
@@ -36,7 +37,7 @@ function listHarness({ shares = [], confirmAnswer = true, clipboard = null } = {
   const requests = [];
   globalThis.addEventListener = (type, fn) => { events[type] = fn; };
   globalThis.location = {origin: 'https://lovetree-4-0.pages.dev', hostname: 'lovetree-4-0.pages.dev', hash: ''};
-  globalThis.document = {createElement: () => fakeElement(), querySelectorAll: () => []};
+  globalThis.document = {createElement: () => fakeElement(), createElementNS: (ns, tag) => fakeElement({tagName: String(tag), namespaceURI: String(ns)}), querySelectorAll: () => []};
   globalThis.confirm = () => confirmAnswer;
   if (clipboard) Object.defineProperty(globalThis, 'navigator', {value: {clipboard}, configurable: true});
   globalThis.window = {LT41: {tree: {id: 'tree1', title: '윤슬', moments: [{id: 'm1', title: '첫 순간'}]}, momentId: 'm1', trees: [{id: 'tree1', moments: [{id: 'm1'}]}]}};

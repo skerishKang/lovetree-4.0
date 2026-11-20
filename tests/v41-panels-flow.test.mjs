@@ -99,7 +99,7 @@ function harness({
   // 시험 정비 2차: 확인 창에 어떤 문구가 갔는지 기록한다(트리 삭제 확인 문구 계약).
   globalThis.confirm = (message) => { calls.confirmMessages.push(message); return confirmAnswer; };
   globalThis.queueMicrotask = (fn) => fn();
-  globalThis.document = {
+  globalThis.document = { createElementNS: (ns, tag) => ({ tagName: String(tag), namespaceURI: String(ns), attrs: {}, children: [], setAttribute(n,v){this.attrs[n]=String(v)}, getAttribute(n){return this.attrs[n]??null}, append(...k){this.children.push(...k)}, querySelector(){return null}, querySelectorAll(){return []} }), 
     querySelectorAll: () => [],
     createElement: () => fakeEl({ value: '' })
   };

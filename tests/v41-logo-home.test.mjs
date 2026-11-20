@@ -53,7 +53,7 @@ test('mount는 .brand 클릭에 직접 핸들러를 붙인다', () => {
   const listeners = [];
   const brand = { addEventListener: (type, fn) => listeners.push([type, fn]) };
   const previous = globalThis.document;
-  globalThis.document = { querySelector: sel => sel === '.brand' ? brand : null };
+  globalThis.document = { createElementNS: (ns, tag) => ({ tagName: String(tag), namespaceURI: String(ns), attrs: {}, children: [], setAttribute(n,v){this.attrs[n]=String(v)}, getAttribute(n){return this.attrs[n]??null}, append(...k){this.children.push(...k)}, querySelector(){return null}, querySelectorAll(){return []} }),  querySelector: sel => sel === '.brand' ? brand : null };
   try {
     const { api } = link('track32-bookshelf.html');
     assert.equal(api.mount(), true);

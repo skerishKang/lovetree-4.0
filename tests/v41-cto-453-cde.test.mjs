@@ -17,7 +17,7 @@ const upload = read('public/v41/private-upload.mjs');
 // 가짜 fetch·탭 줄·빈 화면 요소·닫기 흉내를 얹은 모양.
 function fakeElement(extra = {}) {
   return Object.assign({
-    value: '', textContent: '', innerHTML: '', hidden: false, open: false, disabled: false,
+    value: '', textContent: '', innerHTML: '', hidden: false, open: false, disabled: false, classList: { items:new Set(), add(...v){v.forEach(x=>this.items.add(x))}, remove(...v){v.forEach(x=>this.items.delete(x))}, toggle(v,on){if(on===undefined)on=!this.items.has(v);on?this.items.add(v):this.items.delete(v);return on}, contains(v){return this.items.has(v)} },
     children: [], attrs: {}, dataset: {}, className: '', style: {}, tagName: '', listeners: {},
     addEventListener(type, fn) { this.listeners[type] = fn; },
     dispatch(type) { const fn = this.listeners[type]; if (fn) fn(); },
@@ -56,6 +56,7 @@ function communityHarness({ items = [], defer = false, emptyHidden = true } = {}
   const emptyEl = fakeElement({ hidden: emptyHidden });
   globalThis.document = {
     createElement: (tag) => fakeElement({ tagName: String(tag).toUpperCase() }),
+    createElementNS: (ns, tag) => fakeElement({ tagName: String(tag).toUpperCase(), namespaceURI: String(ns) }),
     querySelectorAll: (sel) => (sel === 'nav [data-view]' ? [tab] : []),
     getElementById: (id) => (id === 'empty' ? emptyEl : null)
   };

@@ -44,7 +44,7 @@ function harness({ owned = false, trees = 0, tree = null, source = 'example', cu
     setItem: (key, value) => store.set(key, String(value)),
     removeItem: key => store.delete(key)
   };
-  globalThis.document = { querySelectorAll: () => [] , body: { classList: { add() {}, remove() {}, toggle() {}, contains: () => false }, dataset: {} } };
+  globalThis.document = { createElementNS: (ns, tag) => ({ tagName: String(tag), namespaceURI: String(ns), attrs: {}, children: [], setAttribute(n,v){this.attrs[n]=String(v)}, getAttribute(n){return this.attrs[n]??null}, append(...k){this.children.push(...k)}, querySelector(){return null}, querySelectorAll(){return []} }),  querySelectorAll: () => [] , body: { classList: { add() {}, remove() {}, toggle() {}, contains: () => false }, dataset: {} } };
   globalThis.window = globalThis;
   globalThis.LT41 = tree ? { tree } : null;
   let tips = 0;

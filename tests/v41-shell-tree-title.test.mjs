@@ -58,7 +58,7 @@ const css = readFileSync(new URL('../public/v41/shell.css', import.meta.url), 'u
 // 렌더 하네스용 가짜 DOM — tests/v41-date-style-one-piece.test.mjs와 같은 모양(최소 가짜 DOM).
 function fakeElement(extra = {}) {
   return Object.assign({
-    value: '', textContent: '', innerHTML: '', hidden: false, open: false, disabled: false,
+    value: '', textContent: '', innerHTML: '', hidden: false, open: false, disabled: false, classList: { items:new Set(), add(...v){v.forEach(x=>this.items.add(x))}, remove(...v){v.forEach(x=>this.items.delete(x))}, toggle(v,on){if(on===undefined)on=!this.items.has(v);on?this.items.add(v):this.items.delete(v);return on}, contains(v){return this.items.has(v)} },
     children: [], attrs: {}, dataset: {}, className: '', style: {}, tagName: '', listeners: {},
     addEventListener(type, fn) { this.listeners[type] = fn; },
     dispatch(type) { const fn = this.listeners[type]; if (fn) fn(); },
@@ -79,7 +79,7 @@ function messagesHarness() {
   for (const key of ['window', 'document', 'location', 'addEventListener']) { saved[key] = globalThis[key]; delete globalThis[key]; }
   globalThis.addEventListener = () => {};
   globalThis.location = { origin: 'https://example.test', hostname: 'lovetree-4-0.pages.dev', hash: '' };
-  globalThis.document = { createElement: () => fakeElement(), querySelectorAll: () => [] };
+  globalThis.document = { createElement: () => fakeElement(), createElementNS: (ns, tag) => fakeElement({ tagName: String(tag), namespaceURI: String(ns) }), querySelectorAll: () => [] };
   globalThis.window = { LT41: { tree: { id: 'tree1', title: '리센느, 나의 순간들', moments: [] }, momentId: 'm1' } };
   const els = {};
   const get = (id) => (els[id] ||= fakeElement({ id }));
@@ -124,6 +124,7 @@ function communityHarness({ items = [] } = {}) {
   const get = (id) => (els[id] ||= fakeElement({ id }));
   globalThis.document = {
     createElement: (tag) => fakeElement({ tagName: String(tag).toUpperCase() }),
+    createElementNS: (ns, tag) => fakeElement({ tagName: String(tag).toUpperCase(), namespaceURI: String(ns) }),
     querySelectorAll: () => []
   };
   const dialog = fakeElement({ id: 'community-panel' });

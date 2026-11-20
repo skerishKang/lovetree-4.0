@@ -36,7 +36,7 @@ function shareHarness({ confirmAnswer = true, clipboard = null, visibilityAnswer
   const requests = [];
   globalThis.addEventListener = (type, fn) => { events[type] = fn; };
   globalThis.location = {origin: 'https://lovetree-4-0.pages.dev', hostname: 'lovetree-4-0.pages.dev', hash: ''};
-  globalThis.document = {createElement: () => fakeElement(), querySelectorAll: () => []};
+  globalThis.document = { createElementNS: (ns, tag) => ({ tagName: String(tag), namespaceURI: String(ns), attrs: {}, children: [], setAttribute(n,v){this.attrs[n]=String(v)}, getAttribute(n){return this.attrs[n]??null}, append(...k){this.children.push(...k)}, querySelector(){return null}, querySelectorAll(){return []} }), createElement: () => fakeElement(), querySelectorAll: () => []};
   globalThis.confirm = () => confirmAnswer;
   if (clipboard) Object.defineProperty(globalThis, 'navigator', {value: {clipboard}, configurable: true});
   globalThis.window = {LT41: {tree: {id: 'tree1', title: '윤슬', moments: [{id: 'm1', title: '첫 순간'}]}, momentId: 'm1', trees: [{id: 'tree1', moments: [{id: 'm1'}]}]}};
