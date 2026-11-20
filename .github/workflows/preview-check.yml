@@ -332,6 +332,20 @@ jobs:
           node --test --test-concurrency=1 tests/v41-account-settings.test.mjs tests/v41-header-tabs-mobile.test.mjs tests/v41-a11y-shell-names.test.mjs tests/v41-theme-ab.test.mjs tests/v41-shell-notice.test.mjs
           echo "셸·설정·테마 화면 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
 
+      # 이슈 952: 첫 화면(홈·궤도·설정 배선) — 카드 불투명·밝기 깊이·금빛 테두리(#429), ▶·no-referrer
+      # 유튜브 썸네일 카드(#340), 설정의 카드 출처·움직임 배선(#380 5번), 같은 날짜 표기 되풀이
+      # 새로고침 금지(#466 M2), 인기 카드 #share/ 이동(#379), 추가·둘러보기·안내 패널(#426·#635·#388)을
+      # 그려진 첫 화면에서 잰다. 소스 글자 검사를 동작 검사로 바꾼 자리다. 첫 화면은 vite 번들이라 먼저 build 한다. 건너뜀=실패.
+      - name: 첫 화면 화면 시험(건너뜀=실패 — 이슈 952)
+        env:
+          LT_HOME_952_REQUIRE: '1'
+        if: needs.screen-changes.outputs.changed == 'true'
+        run: |
+          start=$(date +%s)
+          npx vite build > /dev/null
+          node --test --test-concurrency=1 tests/v41-home-screen-952.test.mjs
+          echo "첫 화면 화면 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+
       # #611: 새 소식(업데이트 노트) 화면 — 알림 카드 한 번만·계정 단추 점·로그아웃 입구·출처 문구.
       # 크롬이 필요한 실행형 시험이라 이 잡에서 돈다. 건너뜀=실패.
       - name: 새 소식 화면 시험(건너뜀=실패 — #611)
