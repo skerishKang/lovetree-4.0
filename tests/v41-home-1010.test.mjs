@@ -4,8 +4,9 @@
 //   신규 사용자(로그아웃 예시)의 안내 줄은 이번에 바꾸지 않는다(#635 PR C의 글자를 그대로 쓴다).
 // - 예시 카드 누름: onOpen이 데모 표본을 openMine으로 흘려 보내 조용히 무시됐다(#1009 실측) —
 //   이제 궤도의 자세히 보기 창(감상 예시)이 열리고, 창의 '책 읽기'는 기존 lt41-example 경로로 예시 기억책을 연다.
-// - 숫자 줄: '순간 3 ·모아둔 0' → 가름점을 자기 몫 요소로 쓰고 flex gap으로 벌린다.
+// - 숫자 줄: '순간 3 ·모아둔 0' → 줄을 블록으로 바꾸고 글자 사이 공백(' · ')이 실제로 그려지게 한다(#994 묶음 구조 그대로).
 // - 390 바닥 링크: 새 소식·의견 보내기·개인정보 처리방침·이용약관 넷 모두, 줄바꿈으로 왼쪽 아래에.
+//   새 소식 카드는 ＋ 단추 위 8px 자리(#657 계약) 그대로 — 링크 두 줄은 카드 아래 자리(높이 66px 안)에 들어간다.
 //   오른쪽 아래 ＋ 단추(#458)와 겹치지 않고, ＋ 단추는 그대로 둔다.
 // LT_HOME_1010_REQUIRE=1 일 때 실행(CI 화면 잡 — 건너뜀=실패).
 import test from 'node:test';
@@ -190,25 +191,22 @@ test('#1010 예시 카드를 누르면 감상(자세히 보기)이 열리고, �
   } finally { await browser.close(); }
 });
 
-test('#1010 숫자 줄 띄어쓰기 — 순간 N · 모아둔 M(가름점이 자기 몫 요소로 벌어진다)', { skip: REQUIRE1010 ? false : skip1010, timeout: 180000 }, async () => {
+test('#1010 숫자 줄 띄어쓰기 — 순간 N · 모아둔 M(글자 사이 공백이 실제로 그려진다)', { skip: REQUIRE1010 ? false : skip1010, timeout: 180000 }, async () => {
   if (skip1010) assert.fail(skip1010);
   const browser = await chromium1010.launch({ headless: true });
   try {
     const h = await boot1010(browser, { mix: true });
     try {
       const line = await h.frame.locator('.home-action-group:has([data-do="moments"]) .home-count').evaluate(el => {
-        const sep = [...el.children].find(c => c.textContent === '·');
-        return {
-          text: el.textContent,
-          gap: getComputedStyle(el).columnGap,
-          sepIsElement: !!sep,
-          children: [...el.children].map(c => c.textContent)
-        };
+        const node = el.firstChild, dot = node.textContent.indexOf('·');
+        const rect = (from, to) => { const r = document.createRange(); r.setStart(node, from); r.setEnd(node, to); return r.getBoundingClientRect(); };
+        const word = rect(0, dot - 1), mark = rect(dot, dot + 1);
+        const ir = document.createRange(); ir.selectNodeContents(el.lastChild);
+        const inbox = ir.getBoundingClientRect();
+        return { text: el.textContent, leftGap: mark.left - word.right, rightGap: inbox.left - mark.right };
       });
-      assert.match(line.text, /순간 \d+/, '숫자 줄에 순간 수가 있다: ' + line.text);
-      assert.match(line.text, /모아둔 \d+/, '숫자 줄에 모아둔 수가 있다: ' + line.text);
-      assert.ok(line.sepIsElement, '가름점(·)이 글자 사이 빈치이 아니라 자기 몫 요소다: ' + JSON.stringify(line.children));
-      assert.equal(line.gap, '6px', 'flex gap으로 벌어져 "순간 3 · 모아둔 0"으로 보인다: ' + line.gap);
+      assert.match(line.text, /순간 \d+ · 모아둔 \d+/, '숫자 줄이 "순간 N · 모아둔 M"이다: ' + line.text);
+      assert.ok(line.leftGap >= 2 && line.rightGap >= 2, '가름점 양옆 공백이 실제로 그려진다(붙으면 0): ' + JSON.stringify(line));
     } finally { await close1010(h); }
   } finally { await browser.close(); }
 });
@@ -230,13 +228,14 @@ test('#1010 390 바닥 링크 — 넷 모두 보이고 줄바꿈으로 왼쪽 �
         const fr = fab?.getBoundingClientRect();
         const fabVisible = !!fr && fr.width > 0;
         const overlap = fabVisible && items.some(i => i.visible && i.right > fr.left && i.top < fr.bottom && i.bottom > fr.top);
-        return { items, rowH: Math.round(rowRect.height), fabVisible, fabLeft: fr ? Math.round(fr.left) : null, overlap, rowRight: Math.round(rowRect.right) };
+        return { items, rowH: Math.round(rowRect.height), rowTop: Math.round(rowRect.top), viewportH: innerHeight, fabVisible, fabLeft: fr ? Math.round(fr.left) : null, overlap, rowRight: Math.round(rowRect.right) };
       });
       const labels = links.items.filter(i => i.visible).map(i => i.label);
       for (const want of ['새 소식', '의견 보내기', '개인정보 처리방침', '이용약관']) {
         assert.ok(labels.includes(want), `390 첫 화면 바닥에 "${want}" 링크가 있다: ` + JSON.stringify(labels));
       }
-      assert.ok(links.rowH >= 80, `링크가 두 줄로 나누어 아래에 놓인다(줄 높이 ${links.rowH}px)`);
+      assert.ok(links.rowH >= 56 && links.rowH <= 66, `링크가 두 줄로 카드 아래 자리에 들어간다(줄 높이 ${links.rowH}px — 66px 안)`);
+      assert.ok(links.rowTop >= links.viewportH - 76, `링크 줄이 새 소식 카드 자리(아래 76px) 아래에 있다(윗변 ${links.rowTop}px / ${links.viewportH - 76}px)`);
       assert.ok(!links.overlap, '링크 줄이 오른쪽 아래 ＋ 단추와 겹치지 않는다');
       assert.ok(links.fabVisible, '오른쪽 아래 ＋ 단추(#458)는 그대로 보인다');
       assert.ok(links.rowRight <= (links.fabLeft ?? 9999), `링크 줄이 ＋ 단추 왼쪽 끝(${links.fabLeft}px)을 넘지 않는다(끝 ${links.rowRight}px)`);
