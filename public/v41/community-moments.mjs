@@ -1,14 +1,30 @@
 // #1025 1단계: 공개 '세로' 순간을 숏츠처럼 넘겨 보기.
 // iframe은 지금 것과 다음 것만 둔다 — 넘긴 것은 DOM에서 제거한다(동시에 살아 있는 iframe ≤ 2).
 // 세로 판정은 서버가 화면과 같은 함수(isVerticalMoment)로 해서 내려준다 — 여기서는 새로 만들지 않는다.
-import {parseTag} from './tags.mjs';
+import {parseTag,tagKey} from './tags.mjs';
 const el=(tag,className,text)=>{const node=document.createElement(tag);if(className)node.className=className;if(text!=null)node.textContent=text;return node;};
-// 선 기호(컬러 이모지 금지) — 텍스트 변형 선택자로 흑백 선 모양을 고정하고 현재 글자색을 쓴다.
-const TREE_GLYPH='♣\uFE0E';
+const SVG_NS='http://www.w3.org/2000/svg';
+// 나무 모양 선 아이콘 — 다른 단추와 같은 currentColor·같은 선 굵기(#1025 2단계).
+function treeIcon(){
+ const svg=document.createElementNS(SVG_NS,'svg');
+ for(const [key,value] of Object.entries({viewBox:'0 0 24 24',width:'24',height:'24',fill:'none',stroke:'currentColor','stroke-width':'1.6','stroke-linecap':'round','stroke-linejoin':'round','aria-hidden':'true'}))svg.setAttribute(key,value);
+ const crown=document.createElementNS(SVG_NS,'path');crown.setAttribute('d','M12 3 5 13h4l-4 5h14l-4-5h4L12 3z');
+ const trunk=document.createElementNS(SVG_NS,'path');trunk.setAttribute('d','M12 18v3');
+ svg.append(crown,trunk);
+ return svg;
+}
 const EMBED='https://www.youtube-nocookie.com/embed/';
-const embedSrc=id=>`${EMBED}${encodeURIComponent(id)}?autoplay=1&mute=1&playsinline=1&controls=0&rel=0&modestbranding=1&enablejsapi=1&origin=${encodeURIComponent(location.origin)}`;
+// 구간 재생: 시작·끝 초가 있으면 기존 구간 재생 규칙(start·end)대로 주소에 넣는다.
+const embedSrc=(id,item={})=>{
+ const params=['autoplay=1','mute=1','playsinline=1','controls=0','rel=0','modestbranding=1','enablejsapi=1'];
+ const start=Number(item.startSeconds),end=Number(item.endSeconds);
+ if(Number.isSafeInteger(start)&&start>0)params.push('start='+start);
+ if(Number.isSafeInteger(end)&&end>start)params.push('end='+end);
+ params.push('origin='+encodeURIComponent(location.origin));
+ return `${EMBED}${encodeURIComponent(id)}?${params.join('&')}`;
+};
 
-export function mountMoments({panel,onOpenShare}){
+export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin}){
  const stage=el('div','moments-stage');
  const card=el('div','moments-card');
  const media=el('div','moments-media');
@@ -33,23 +49,73 @@ export function mountMoments({panel,onOpenShare}){
  // ♡·담기·공유는 2단계 자리 — 지금은 자리만 잡는다(트리 보기는 1단계에서 동작).
  const railButtons=[
   {icon:'♡',label:'마음'},
-  {icon:TREE_GLYPH,label:'트리',action:()=>current&&onOpenShare?.({shareId:current.shareId,view:'book'})},
-  {icon:'＋',label:'담기'},
-  {icon:'↗',label:'공유'}
+  {icon:treeIcon(),label:'트리',action:()=>current()&&onOpenShare?.({shareId:current().shareId,view:'book'})},
+  {icon:'＋',label:'담기',action:()=>current()&&openAddDialog(current())},
+  {icon:'↗',label:'공유',action:()=>current()&&copyShare(current())}
  ];
  for(const spec of railButtons){
   const button=el('button','moments-rail-button');
-  button.type='button';button.append(el('span','moments-rail-icon',spec.icon),el('span','moments-rail-label',spec.label));
+  button.type='button';
+  const icon=typeof spec.icon==='string'?el('span','moments-rail-icon',spec.icon):spec.icon;
+  if(typeof spec.icon==='string')icon.classList.add('moments-rail-icon');else icon.classList.add('moments-rail-svg');
+  button.append(icon,el('span','moments-rail-label',spec.label));
   if(spec.action)button.onclick=spec.action;
-  else{button.disabled=true;button.title='2단계에서 열려요';button.setAttribute('aria-disabled','true');}
+  else{button.disabled=true;button.title='랭킹과 함께 정해요';button.setAttribute('aria-disabled','true');}
   rail.append(button);
  }
+ const chips=el('div','moments-chips');chips.setAttribute('role','group');chips.setAttribute('aria-label','가수 고르기');
  const empty=el('p','moments-empty','아직 공개 세로 순간이 없어요. 쇼츠를 담은 공개 트리가 늘면 여기에 나타나요.');
  empty.hidden=true;
- panel.append(stage,empty);
+ panel.append(chips,stage,empty);
 
- let items=[],index=0,loading=false,token=0,frames=[],seen=new Set(),unmuted=false,touchY=null;
+ // 담기 창 — 기존 트리 고르기 창이 따로 없어 이 보기 안에 작은 창을 둔다(트리 목록은 셸 모델을 쓴다).
+ const addDialog=el('div','moments-add-dialog');addDialog.setAttribute('role','dialog');addDialog.setAttribute('aria-modal','true');addDialog.setAttribute('aria-label','어느 트리에 담을까요');addDialog.hidden=true;
+ const addTitle=el('h3','moments-add-title','어느 트리에 담을까요');
+ const addList=el('div','moments-add-list');
+ const addClose=el('button','moments-add-close','×');addClose.type='button';addClose.setAttribute('aria-label','닫기');addClose.onclick=()=>{addDialog.hidden=true;};
+ addDialog.append(addTitle,addClose,addList);panel.append(addDialog);
+ let pendingAdd=null;
+ function openAddDialog(item){
+  pendingAdd=item;
+  const trees=(globalThis.LT41?.trees||[]).filter(t=>t?.id&&t?.moments?.length);
+  if(!trees.length){notify?.('로그인한 뒤 내 트리에 담을 수 있어요.');memberLogin?.();return;}
+  addList.replaceChildren(...trees.map(tree=>{
+   const button=el('button','moments-add-option',tree.title||tree.subject||'트리');button.type='button';
+   button.onclick=()=>{
+    addDialog.hidden=true;
+    const result=onAddToTree?.(pendingAdd,tree.id);
+    if(result?.ok)notify?.('담았어요 · 트리 보기',{action:{label:'트리 보기',run:()=>onOpenShare?.({shareId:pendingAdd?.shareId,view:'book'})}});
+    else notify?.(result?.reason==='login'?'로그인한 뒤 내 트리에 담을 수 있어요.':'담지 못했어요.');
+    if(result?.reason==='login')memberLogin?.();
+   };
+   return button;
+  }));
+  addDialog.hidden=false;
+ }
+ // 공유: 공개 공유가 있는 순간은 /t/<shareId> 주소가 늘 있다 — 복사할 주소가 없으면 원본 영상 주소로 돌린다.
+ async function copyShare(item){
+  const url=item.shareId?new URL('/t/'+encodeURIComponent(item.shareId),location.origin).href:(item.url||'');
+  if(!url){notify?.('복사할 주소가 없어요.');return;}
+  try{
+   if(globalThis.navigator?.clipboard?.writeText)await navigator.clipboard.writeText(url);
+   else{const box=el('textarea');box.value=url;document.body.append(box);box.select();document.execCommand?.('copy');box.remove();}
+   notify?.('주소를 복사했어요');
+  }catch{notify?.('주소를 복사하지 못했어요.');}
+ }
+
+ let items=[],index=0,loading=false,token=0,frames=[],seen=new Set(),unmuted=false,touchY=null,activeTag='',groups=[];
  const current=()=>items[index]||null;
+ // 칩 줄: 전체 + 서버가 센 공개 쇼츠 가수 꼬리표 상위 6개. 누르면 그 가수만 다시 섞는다.
+ function renderChips(){
+  const choices=[{value:'',label:'전체'},...(groups||[]).map(g=>({value:tagKey(g.value)||g.value,label:g.value,tag:'가수:'+g.value}))];
+  chips.replaceChildren(...choices.map(choice=>{
+   const chip=el('button','moments-chip',choice.label);chip.type='button';
+   const active=(choice.value?('가수:'+choice.label):'')===activeTag;
+   chip.classList.toggle('is-active',active);chip.setAttribute('aria-pressed',String(active));
+   chip.onclick=()=>{if(activeTag===(choice.tag||''))return;activeTag=choice.tag||'';items=[];seen=new Set();index=0;clearFrames();void load();};
+   return chip;
+  }));
+ }
 
  function clearFrames(){
   for(const frame of frames){frame.onload=null;frame.src='about:blank';frame.remove();}
@@ -63,7 +129,7 @@ export function mountMoments({panel,onOpenShare}){
   frame.allow='accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';
   frame.referrerpolicy='strict-origin-when-cross-origin';
   frame.setAttribute('allowfullscreen','');
-  frame.src=embedSrc(item.videoId);
+  frame.src=embedSrc(item.videoId,item);
   frame.onload=()=>frame.classList.add('is-ready');
   frames.push(frame);
   return frame;
@@ -104,11 +170,14 @@ export function mountMoments({panel,onOpenShare}){
   loading=true;
   const id=++token;
   const exclude=[...seen].join(',');
+  const query='/api/public/moments?limit=12'+(exclude?'&exclude='+encodeURIComponent(exclude):'')+(activeTag?'&tag='+encodeURIComponent(activeTag):'');
   try{
-   const answer=await fetch('/api/public/moments?limit=12'+(exclude?'&exclude='+encodeURIComponent(exclude):''),{headers:{accept:'application/json'}});
+   const answer=await fetch(query,{headers:{accept:'application/json'}});
    if(!answer.ok)throw new Error('moments_load_failed');
    const data=await answer.json();
    if(id!==token)return;
+   if(activeTag&&!items.length&&!(Array.isArray(data.items)?data.items:[]).length){empty.hidden=false;empty.textContent=`${activeTag.slice('가수:'.length)} 쇼츠가 아직 없어요.`;stage.hidden=true;renderChips();return;}
+   if(Array.isArray(data.groups)){groups=data.groups;renderChips();}
    const fresh=(Array.isArray(data.items)?data.items:[]).filter(item=>item&&item.videoId&&!seen.has(item.videoId));
    if(!fresh.length&&!items.length){items=[];render();return;}
    items=[...items,...fresh];
@@ -133,7 +202,15 @@ export function mountMoments({panel,onOpenShare}){
  if(typeof window!=='undefined'&&typeof window.addEventListener==='function')window.addEventListener('message',event=>{
   if(!currentFrame||event.source!==currentFrame.contentWindow)return;
   let data;try{data=typeof event.data==='string'?JSON.parse(event.data):event.data;}catch{return;}
-  if(data?.event==='onStateChange')media.classList.toggle('is-playing',Number(data.info)===1);
+  if(data?.event==='onStateChange'){
+   const state=Number(data.info),item=current(),start=Number(item?.startSeconds);
+   // 구간이 있는 순간은 끝나면 그 구간 처음으로 돌아간다(기존 구간 재생 규칙과 같은 동작).
+   if(state===0&&item&&Number.isSafeInteger(start)&&start>=0&&Number.isSafeInteger(Number(item.endSeconds))&&Number(item.endSeconds)>start){
+    try{currentFrame.contentWindow.postMessage('{"event":"command","func":"seekTo","args":['+start+',true]}','https://www.youtube.com');currentFrame.contentWindow.postMessage('{"event":"command","func":"playVideo","args":[]}','https://www.youtube.com');}catch{}
+    return;
+   }
+   media.classList.toggle('is-playing',state===1);
+  }
  });
  if(typeof window!=='undefined'&&typeof window.addEventListener==='function')window.addEventListener('keydown',event=>{
   if(!panel.closest('dialog')?.open||panel.hidden)return;

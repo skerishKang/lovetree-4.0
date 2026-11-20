@@ -685,9 +685,11 @@ function momentsSetup(){
   let tree=createTree({subject:'좋아하는 대상',title,note:'기록',emotion:'설렘',date:'2026-11-01',url:moments[0].url},CLOCK);
   tree=editTree(tree,{title,subject:tree.subject,coverMomentId:''});
   tree.moments[0].title=moments[0].title;tree.moments[0].keywords=moments[0].keywords||[];
+  for(const [key,value] of [['startSeconds',moments[0].startSeconds],['endSeconds',moments[0].endSeconds]])if(value!==undefined)tree.moments[0][key]=value;
   for(const m of moments.slice(1)){
    tree=addMoment(tree,{title:m.title,note:m.note||'기록',emotion:'설렘',date:'2026-11-01',url:m.url},tree.moments[0].id,CLOCK);
    tree.moments.at(-1).keywords=m.keywords||[];
+   for(const [key,value] of [['startSeconds',m.startSeconds],['endSeconds',m.endSeconds]])if(value!==undefined)tree.moments.at(-1)[key]=value;
   }
   // 공개 판정(둘러보기와 같은 규칙)은 순간 3개 이상만 훑는다 — 껍질 순간으로 채운다(세로 아님).
   while(tree.moments.length<3){
@@ -755,4 +757,46 @@ test('moments: 이미 본 영상 id 제외·가수 꼬리표 거르기·상한�
  const tagged=await momentsCall(d.service,'limit=30&tag='+encodeURIComponent('가수:가수A'));
  assert.equal(tagged.total,2,'가수 꼬리표로 거른다');
  assert.ok(tagged.items.every(i=>i.keywords.includes('가수:가수A')));
+});
+
+test('moments 2단계: 가수 꼬리표 상위 6개와 구간 값을 함께 준다',async()=>{
+ const d=momentsSetup();
+ const artists=['가수A','가수B','가수C','가수D','가수E','가수F','가수G'];
+ const rows=artists.map((name,i)=>[
+  {title:name+' 쇼츠1',url:SHORTS_URL('a'.repeat(9)+i+'111'),keywords:['가수:'+name],startSeconds:3,endSeconds:12},
+  {title:name+' 쇼츠2',url:SHORTS_URL('b'.repeat(9)+i+'222'),keywords:['가수:'+name]}
+ ]);
+ for(const [i,moments] of rows.entries())await d.save('singer'+i,'트리',moments);
+ for(const row of d.rows)await d.discoverRepo.set({productId:PRODUCT,subjectId:row.subjectId,treeId:row.treeId,discover:true});
+ d.seed();
+ const res=await momentsCall(d.service,'limit=30');
+ assert.equal(res.groups.length,6,'칩은 상위 6개만');
+ assert.ok(res.groups.every(g=>artists.includes(g.value)&&g.count===2),'공개 세로 순간에서 가수별로 셌다: '+JSON.stringify(res.groups));
+ const ranged=res.items.find(i=>i.title==='가수A 쇼츠1');
+ assert.equal(ranged?.startSeconds,3);assert.equal(ranged?.endSeconds,12,'구간 값도 응답에 있다');
+ assert.equal(res.items.find(i=>i.title==='가수A 쇼츠2')?.startSeconds,null,'구간 없는 순간은 null');
+ const filtered=await momentsCall(d.service,'limit=30&tag='+encodeURIComponent('가수:가수A'));
+ assert.equal(filtered.total,2,' tag 인자로 그 가수만');
+ assert.ok(filtered.items.every(i=>i.keywords.includes('가수:가수A')));
+});
+
+test('담기: 공개 순간을 고른 트리에 복사해도 원본 공개 트리는 그대로다',async()=>{
+ const {copyPublicMoment}=await import('../public/v41/moments-copy.mjs');
+ const workspaceRepo=createMemoryWorkspaceRepo(),workspace=createWorkspaceService({repo:workspaceRepo,productId:PRODUCT});
+ let mine=createTree({subject:'내 대상',title:'담을 트리',note:'',emotion:'설렘',date:'2026-11-01',url:''},CLOCK);
+ const originalTitle=mine.title;
+ const item={title:'담은 쇼츠',url:SHORTS_URL('aaaa1111111'),treeTitle:'원본 공개 트리',shareId:'s'.repeat(24),keywords:['가수:아이유','노래:노래1'],note:'원래 마음 글',emotion:'설렘',date:'2026-11-20',startSeconds:5,endSeconds:20};
+ await workspace.write(principal('me'),{state:{version:1,trees:[mine]},expectedRevision:0,clientKey:'seed'});
+ const copied=copyPublicMoment(mine,item,'https://example.test');
+ await workspace.write(principal('me'),{state:{version:1,trees:[{...mine,moments:copied.moments}]},expectedRevision:1,clientKey:'copy'});
+ const after=await workspace.read(principal('me'));
+ const tree=after.state.trees.find(t=>t.id===mine.id);
+ const moment=tree.moments.find(m=>m.id===copied.copiedId);
+ assert.ok(moment,'고른 트리에 새 순간이 생겼다');
+ assert.equal(tree.title,originalTitle,'원본 공개 트리(대상 트리의 기존 값)는 그대로');
+ assert.equal(moment.url,item.url);assert.equal(moment.title,item.title);
+ assert.deepEqual(moment.keywords,item.keywords,'꼬리표 복사');
+ assert.equal(moment.startSeconds,5);assert.equal(moment.endSeconds,20,'구간 복사');
+ assert.ok(moment.note.startsWith('원래 출처: 원본 공개 트리'),'출처 표시: '+moment.note);
+ assert.doesNotMatch(moment.note,/원래 마음 글/,'원래 마음 글은 비운다');
 });

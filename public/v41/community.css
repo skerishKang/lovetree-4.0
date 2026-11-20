@@ -66,7 +66,7 @@ dialog.community-group-find::backdrop{background:transparent}
 .community-tabs button[aria-selected="true"]{border-color:var(--lt-gold);background:var(--lt-primary);color:var(--lt-primary-ink)}
 /* 판 높이를 먼저 정하고(화면 - 머리줄 - 탭 - 위아래 여백) 너비는 9:16로 그 높이에서 계산한다 —
    판 아래 글과 오른쪽 단추 4개가 낮은 화면(1440×700)에서도 화면 밖으로 나가지 않는다(#1025 재검수). */
-.moments-stage{position:relative;display:flex;align-items:center;justify-content:center;gap:18px;max-width:1500px;margin:0 auto;height:calc(100dvh - 261px);min-height:320px;max-height:1180px}
+.moments-stage{position:relative;display:flex;align-items:center;justify-content:center;gap:18px;max-width:1500px;margin:0 auto;height:calc(100dvh - 313px);min-height:320px;max-height:1180px}
 .moments-card{position:relative;height:100%;width:auto;max-width:calc(100vw - 220px);aspect-ratio:9/16;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-card);background:#000;overflow:hidden;box-shadow:var(--lt-garden-shadow)}
 .moments-media{position:absolute;inset:0;overflow:hidden;background:#000}
 .moments-poster,.moments-frame{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border:0;background:#000}
@@ -84,7 +84,7 @@ dialog.community-group-find::backdrop{background:transparent}
 .moments-progress-fill{display:block;width:0;height:100%;background:var(--lt-gold)}
 .moments-progress-fill.is-running{animation:moments-progress 30s linear forwards}
 @keyframes moments-progress{to{width:100%}}
-.moments-rail{display:flex;flex-direction:column;gap:16px;align-self:flex-end;padding-bottom:24px}
+.moments-rail{position:relative;z-index:4;display:flex;flex-direction:column;gap:16px;align-self:flex-end;padding-bottom:24px}
 .moments-rail-button{display:grid;gap:2px;justify-items:center;min-width:52px;min-height:64px;padding:6px;border:0;background:none;color:var(--lt-pearl);font:inherit;cursor:pointer}
 .moments-rail-button:disabled{cursor:default;opacity:.6}
 .moments-rail-icon{font-size:24px;line-height:1}
@@ -93,10 +93,22 @@ dialog.community-group-find::backdrop{background:transparent}
 .moments-step{width:48px;height:48px;border:1px solid var(--lt-gold-line);border-radius:50%;background:var(--lt-glass-strong);color:var(--lt-pearl);font-size:16px;cursor:pointer}
 .moments-empty{max-width:560px;margin:80px auto;text-align:center;color:var(--lt-muted)}
 @media(max-width:780px){
- .moments-stage{height:calc(100dvh - 225px);min-height:320px;gap:0}
+ .moments-stage{height:calc(100dvh - 277px);min-height:320px;gap:0}
  .moments-card{height:100%;width:auto;max-width:100vw;aspect-ratio:9/16;border-radius:0;border-left:0;border-right:0}
  .moments-rail{position:absolute;right:6px;bottom:64px;gap:6px;padding:0}
  .moments-rail-button{min-width:44px;min-height:44px}
  .moments-rail-label{display:none}
  .moments-nav{display:none}
 }
+
+/* #1025 2단계 — 가수 칩 줄·담기 창·선 아이콘. 색은 identity 토큰만 쓴다. */
+.moments-chips{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;max-width:1500px;margin:0 auto 12px}
+.moments-chip{min-height:40px;padding:0 14px;border:1px solid var(--lt-line);border-radius:var(--lt-r-pill);background:var(--lt-glass);color:var(--lt-muted);font:inherit;font-size:13px;cursor:pointer}
+.moments-chip.is-active{border-color:var(--lt-gold);background:var(--lt-primary);color:var(--lt-primary-ink)}
+.moments-rail-svg{width:24px;height:24px;display:block;color:currentColor}
+.moments-add-dialog{position:fixed;z-index:60;inset:0;margin:auto;width:min(420px,92vw);height:fit-content;max-height:80dvh;padding:20px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-panel);background:var(--lt-glass-strong);color:var(--lt-pearl);overflow:auto}
+.moments-add-dialog[hidden]{display:none}
+.moments-add-title{margin:0 0 12px;font-size:17px}
+.moments-add-close{position:absolute;right:10px;top:8px;min-width:44px;min-height:44px;border:0;background:none;color:inherit;font-size:20px;cursor:pointer}
+.moments-add-list{display:grid;gap:8px}
+.moments-add-option{min-height:46px;padding:0 14px;border:1px solid var(--lt-line);border-radius:var(--lt-r-pill);background:var(--lt-glass);color:inherit;font:inherit;font-size:14px;text-align:left;cursor:pointer}

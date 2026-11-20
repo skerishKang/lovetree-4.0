@@ -16,12 +16,12 @@ const el=(tag,className,text)=>{const node=document.createElement(tag);if(classN
 // 셸이 낯선 주소를 #home으로 바꾸기 전에(module import 시점) 직접 들어온 주소를 기억한다(#1025).
 const hashNow=()=>typeof location!=='undefined'?(location.hash||''):'';
 const ENTER_MOMENTS=typeof location!=='undefined'&&location.hash==='#explore/moments';
-export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareOwn,hasOwnTree,getDateStyle,getArtistGroups=()=>[]}){
+export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareOwn,hasOwnTree,getDateStyle,getArtistGroups=()=>[],onAddToTree,notify,memberLogin}){
  const api=createCommunityApi(),form=dialog.querySelector('#community-search-form'),query=dialog.querySelector('#community-query'),list=dialog.querySelector('#community-list'),groups=dialog.querySelector('#community-groups'),feedback=dialog.querySelector('#community-feedback'),more=dialog.querySelector('#community-more'),preview=dialog.querySelector('#community-preview'),sortSelect=dialog.querySelector('#community-sort');
  // #1025: [트리] [순간] 탭 — 주소 #explore/moments 는 새로고침·공유로 유지한다.
  const treeTab=dialog.querySelector('#community-tab-trees'),momentsTab=dialog.querySelector('#community-tab-moments');
  const treePanel=dialog.querySelector('#community-tree-panel'),momentsPanel=dialog.querySelector('#community-moments-panel');
- const moments=momentsPanel?mountMoments({panel:momentsPanel,onOpenShare}):null;
+ const moments=momentsPanel?mountMoments({panel:momentsPanel,onOpenShare,onAddToTree,notify,memberLogin}):null;
  let currentTab='trees',hashGuard=false;
  const writeHash=value=>{
   if(typeof history==='undefined'||typeof history.pushState!=='function'||typeof history.replaceState!=='function')return;
