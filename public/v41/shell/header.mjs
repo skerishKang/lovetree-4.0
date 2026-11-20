@@ -94,7 +94,7 @@ function renderAccount(){const owned=!!getMember()?.snapshot().owned;
  const mailEl=$('account-email');mailEl.textContent=view.label;mailEl.title=view.label;rememberLetter(shown);}
   // #368: 설정 "프로필" 묶음도 같은 이메일 값을 쓴다(셸이 넘긴 콜백).
   deps.onEmailChange?.(accountEmail);}
-function openAccountMenu(via='keyboard'){const owned=!!getMember()?.snapshot().owned;if(!owned){return;}const pop=$('account-popover');pop.hidden=false;pop.dataset.ltOpenedBy=via;$('account-avatar').setAttribute('aria-expanded','true');pop.querySelector('button:not([hidden])')?.focus();if(!accountEmail&&!emailTried)void loadAccountEmail();}
+function openAccountMenu(via='keyboard'){const owned=!!getMember()?.snapshot().owned;if(!owned){return;}if($('toast'))$('toast').hidden=true;const pop=$('account-popover');pop.hidden=false;pop.dataset.ltOpenedBy=via;$('account-avatar').setAttribute('aria-expanded','true');pop.querySelector('button:not([hidden])')?.focus();if(!accountEmail&&!emailTried)void loadAccountEmail();}
 // #368 보완 1·2: 이메일을 메뉴를 열 때가 아니라 로그인 직후 불러와 동그라미·라벨이 처음부터 이메일을 쓰게 한다.
 // 한 번 시험한 뒤에는 성공해도(이메일 없는 계정) 다시 부르지 않고, 실패했을 때만 다시 시험한다.
  let emailTried=false;
