@@ -16,22 +16,26 @@
 .videoSourceChoice{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
 .videoSourceChoice label{display:flex;align-items:center;gap:7px;padding:9px 10px;border:1px solid rgba(255,255,255,.09);border-radius:12px;color:#d7c8df;font-size:11px;background:rgba(255,255,255,.035)}
 .videoSourceChoice label:has(input:checked){border-color:rgba(255,102,159,.52);background:rgba(255,102,159,.08);color:#fff}
-.videoSourcePanel{margin-top:8px}.videoSourcePanel[hidden]{display:none!important}
+.videoSourcePanel{margin-top:8px}
 .netNote{font-size:9px;color:#9987a4;line-height:1.5;margin-top:6px}
-#viewerMedia{max-width:100%}
+#viewerModal .modal{max-width:760px}
+#viewerMedia{margin:14px 0;border-radius:18px;overflow:hidden;background:#0f0a14;min-height:180px;display:grid;place-items:center;max-width:100%}
+#vMeta{color:#bcaac3;font-size:12px;line-height:1.6}
+#keywordFilter{margin-top:6px}
+#editModal h2{margin:5px 0}
 @media(max-width:760px){
 
-  #viewerModal .modal{width:calc(100vw - 16px)!important;max-width:none!important;max-height:92vh;overflow:auto;padding:16px!important}
+  #viewerModal .modal{width:calc(100vw - 16px);max-width:none;max-height:92vh;overflow:auto;padding:16px}
   .viewerYouTube{padding:0;gap:8px}.viewerYouTube iframe{min-height:0;width:100%;aspect-ratio:16/9;max-height:46vh}
   .viewerFallback{font-size:12px;padding:4px 0}.viewerFallback .miniBtn{width:100%;margin:0}
-  .videoSourceChoice{grid-template-columns:1fr}.typeGrid{grid-template-columns:repeat(2,1fr)!important}
-  #addModal .modal,#editModal .modal{padding:15px!important;width:calc(100vw - 12px)!important;max-height:94vh!important}
-  #composerPreviewWrap,#editPreview{position:static!important;max-width:100%;overflow:hidden}
+  .videoSourceChoice{grid-template-columns:1fr}.typeGrid{grid-template-columns:repeat(2,1fr)}
+  #addModal .modal,#editModal .modal{padding:15px;width:calc(100vw - 12px);max-height:94vh}
+  #composerPreviewWrap,#editPreview{position:static;max-width:100%;overflow:hidden}
   .previewCard{min-height:250px}.previewMedia{height:min(180px,31vh)}
   .modalActions,.editActions{position:sticky;bottom:-1px;background:linear-gradient(180deg,rgba(24,15,30,0),rgba(24,15,30,.98) 26%);padding-top:20px;padding-bottom:2px;z-index:8}
   .cinemaControls{max-width:calc(100vw - 12px);left:6px;right:6px;width:auto;gap:4px;transform:none}.cinCtl{min-width:0;padding:0 5px;font-size:9px}.enterBeat{font-size:9px}
 }
-@media(max-width:380px){#addModal .modal,#editModal .modal,#viewerModal .modal{width:calc(100vw - 8px)!important;padding:12px!important}.typeBtn{font-size:9px;padding:8px 4px}.field{font-size:12px}.cinemaControls{left:4px;right:4px;transform:none}}
+@media(max-width:380px){#addModal .modal,#editModal .modal,#viewerModal .modal{width:calc(100vw - 8px);padding:12px}.typeBtn{font-size:9px;padding:8px 4px}.field{font-size:12px}.cinemaControls{left:4px;right:4px;transform:none}}
 
 /* === 정원 테마 (2026-11-08): 무대를 종이로, 새 색은 만들지 않고 identity.css의 --lt-* 토큰만 쓴다. === */
 html[data-lt-theme=garden],html[data-lt-theme=garden] body{background:var(--lt-stage);color:var(--lt-ink)}
@@ -78,7 +82,7 @@ html[data-lt-theme=garden] .modal .hint,html[data-lt-theme=garden] .minihint{col
 /* #504: 순간 추가 창의 종류 단추는 밤용 밝은 글자(#e9dfee)라 정원의 밝은 창 위에서 1.1:1로 읽히지 않는다. 정원에서는 잉크색으로 */
 html[data-lt-theme=garden] .typeBtn{color:var(--lt-ink);border-color:var(--lt-line-paper);background:var(--lt-paper)}
 /* #504: 창 안내 글(#aa97b2)도 정원의 밝은 창 위에서 2.66:1로 미달 — 보조 글자 토큰으로 */
-html[data-lt-theme=garden] .modalIntro{color:var(--lt-muted)!important}
+html[data-lt-theme=garden] .modalIntro{color:var(--lt-muted)}
 html[data-lt-theme=garden] .detail h3,html[data-lt-theme=garden] .detail b,html[data-lt-theme=garden] .leftPanel b{color:var(--lt-ink)}
 html[data-lt-theme=garden][data-v41-screen=board] header .headbtn{background:var(--lt-paper);border-color:var(--lt-line);color:var(--lt-ink);box-shadow:none}
 html[data-lt-theme=garden][data-v41-screen=board] header .headbtn.primary{background:var(--lt-primary);border-color:var(--lt-primary);color:var(--lt-primary-ink)}
@@ -115,7 +119,7 @@ html[data-lt-theme=garden][data-v41-screen=board] .postAdd b,html[data-lt-theme=
 /* 예시 기록의 인라인 색(#bca9c5 등)은 밤용이라 정원에서 읽히지 않는다: 정원에서만 토큰으로 덮는다. */
 html[data-lt-theme=garden][data-v41-screen=board] #dBasic,html[data-lt-theme=garden][data-v41-screen=board] #dBasic span,
 html[data-lt-theme=garden][data-v41-screen=board] #dConn,html[data-lt-theme=garden][data-v41-screen=board] #dConn span,
-html[data-lt-theme=garden][data-v41-screen=board] .postAdd div{color:var(--lt-muted)!important}
+html[data-lt-theme=garden][data-v41-screen=board] .postAdd div{color:var(--lt-muted)}
 /* 정원: 모바일 '선택한 순간' 줄(lt-moment-picker)이 밤 검정으로 남지 않게 토큰으로. */
 html[data-lt-theme=garden][data-v41-screen=board] .lt-moment-picker{background:var(--lt-glass-strong);border-color:var(--lt-line);color:var(--lt-ink)}
 html[data-lt-theme=garden][data-v41-screen=board] .lt-moment-picker button{background:var(--lt-paper);border-color:var(--lt-line);color:var(--lt-ink)}
@@ -137,17 +141,17 @@ body:not(.lt-advanced) #startPathHere,
 body:not(.lt-advanced) #editMomentBtn,
 body:not(.lt-advanced) #quickPin,
 body:not(.lt-advanced) #quickCard,
-body:not(.lt-advanced) #styleSection { display: none !important; }
+body:not(.lt-advanced) #styleSection { display: none; }
 @media(max-width:700px){
   /* 단순 모드의 추가·전체 보기는 모바일에서도 쓸 수 있게 한다(기존 .headbtn 숨김보다 ID가 우선).
      #520: 읽기 전용(예시·공유)에서는 board-extras.js가 addBtn·undoBtn에 hidden 속성을 붙인다 —
      !important 강제 표시가 hidden을 이기지 않게 :not([hidden])로 좁혀, 1440과 같이 읽기 전용에서는 숨긴다. */
   body:not(.lt-advanced) #fitBtn,
-  body:not(.lt-advanced) #addBtn:not([hidden]) { display: inline-flex !important; align-items: center; min-height: 44px; white-space: nowrap; }
+  body:not(.lt-advanced) #addBtn:not([hidden]) { display: inline-flex; align-items: center; min-height: 44px; white-space: nowrap; }
   body:not(.lt-advanced) #fitBtn { padding: 0 8px; }
   body:not(.lt-advanced) #addBtn:not([hidden]) { padding: 0 10px; }
   /* 고급 모드의 되돌리기는 모바일에서도 쓸 수 있게 한다(나머지 도구는 도구 드로어). 읽기 전용에서는 hidden을 유지한다. */
-  body.lt-advanced #undoBtn:not([hidden]) { display: inline-flex !important; align-items: center; min-height: 44px; padding: 0 8px; white-space: nowrap; }
+  body.lt-advanced #undoBtn:not([hidden]) { display: inline-flex; align-items: center; min-height: 44px; padding: 0 8px; white-space: nowrap; }
   /* #521: 모바일 순간 선택 패널(top 64px)이 '진주빛 보드 · 읽기 전용' 표시(top 78~89px)를 덮던 것을
      패널을 96px로 내려 표시가 온전히 보이게 한다(겹침 0). 보드 화면에만 적용한다. */
   /* #514 메모: 고정 96px 대신 머리줄·테마 표시의 실제 아래끝에서 계산한 값을 쓴다(board-extras.js syncMomentPickerTop). */
