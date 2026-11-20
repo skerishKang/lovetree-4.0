@@ -27,7 +27,7 @@ test('show()는 화면 파일 이름을 받아 그 화면의 iframe 경로로 �
   const closed = [];
   const saved = { document: globalThis.document, location: globalThis.location };
   globalThis.location = { origin: 'https://lovetree-4-0.pages.dev' };
-  globalThis.document = {
+  globalThis.document = { createElementNS: (ns, tag) => ({ tagName: String(tag), namespaceURI: String(ns), attrs: {}, children: [], setAttribute(n,v){this.attrs[n]=String(v)}, getAttribute(n){return this.attrs[n]??null}, append(...k){this.children.push(...k)}, querySelector(){return null}, querySelectorAll(){return []} }), 
     body: { classList: { add() {}, remove() {}, toggle() {}, contains: () => false } },
     querySelectorAll: () => []
   };
@@ -78,7 +78,7 @@ test('실제 기록(source=server)이면 views/ 판본, 트리가 없으면 빈 
   const elements = { view: blank, 'view-next': null, empty: { ...blank, hidden: true }, 'community-panel': { open: false, close() {} } };
   const saved = { document: globalThis.document, location: globalThis.location };
   globalThis.location = { origin: 'https://lovetree-4-0.pages.dev' };
-  globalThis.document = { body: { classList: { add() {}, remove() {}, toggle() {}, contains: () => false } }, querySelectorAll: () => [] };
+  globalThis.document = { createElementNS: (ns, tag) => ({ tagName: String(tag), namespaceURI: String(ns), attrs: {}, children: [], setAttribute(n,v){this.attrs[n]=String(v)}, getAttribute(n){return this.attrs[n]??null}, append(...k){this.children.push(...k)}, querySelector(){return null}, querySelectorAll(){return []} }),  body: { classList: { add() {}, remove() {}, toggle() {}, contains: () => false } }, querySelectorAll: () => [] };
   try {
     let source = 'server', hasTree = true, linksCalled = 0, framesHidden = 0;
     const screens = createScreens({
@@ -133,7 +133,7 @@ test("show()는 [data-view] 단추에 지금 보는 화면만 aria-current=true�
   const elements = { view: fakeEl(), 'view-next': fakeEl(), empty: fakeEl(), 'community-panel': { open: false, close() {} } };
   const saved = { document: globalThis.document, location: globalThis.location };
   globalThis.location = { origin: 'https://lovetree-4-0.pages.dev' };
-  globalThis.document = {
+  globalThis.document = { createElementNS: (ns, tag) => ({ tagName: String(tag), namespaceURI: String(ns), attrs: {}, children: [], setAttribute(n,v){this.attrs[n]=String(v)}, getAttribute(n){return this.attrs[n]??null}, append(...k){this.children.push(...k)}, querySelector(){return null}, querySelectorAll(){return []} }), 
     body: { classList: { add() {}, remove() {}, toggle() {}, contains: () => false } },
     querySelectorAll: sel => (sel === '[data-view]' ? tabs : [])
   };
@@ -182,7 +182,7 @@ test("show()는 '이 순간 열기' 요청을 지도 프레임 주소 ?open=으�
   const elements = { view: fakeEl(), 'view-next': fakeEl(), empty: fakeEl(), 'community-panel': { open: false, close() {} } };
   const saved = { document: globalThis.document, location: globalThis.location };
   globalThis.location = { origin: 'https://lovetree-4-0.pages.dev' };
-  globalThis.document = {
+  globalThis.document = { createElementNS: (ns, tag) => ({ tagName: String(tag), namespaceURI: String(ns), attrs: {}, children: [], setAttribute(n,v){this.attrs[n]=String(v)}, getAttribute(n){return this.attrs[n]??null}, append(...k){this.children.push(...k)}, querySelector(){return null}, querySelectorAll(){return []} }), 
     body: { classList: { add() {}, remove() {}, toggle() {}, contains: () => false } },
     querySelectorAll: () => []
   };
@@ -229,7 +229,7 @@ test('show()는 그래프 화면 주소에 views/graph/ 하위 폴더를 붙인�
   const elements = { view: fakeEl(), 'view-next': fakeEl(), empty: fakeEl(), 'community-panel': { open: false, close() {} } };
   const saved = { document: globalThis.document, location: globalThis.location };
   globalThis.location = { origin: 'https://lovetree-4-0.pages.dev' };
-  globalThis.document = {
+  globalThis.document = { createElementNS: (ns, tag) => ({ tagName: String(tag), namespaceURI: String(ns), attrs: {}, children: [], setAttribute(n,v){this.attrs[n]=String(v)}, getAttribute(n){return this.attrs[n]??null}, append(...k){this.children.push(...k)}, querySelector(){return null}, querySelectorAll(){return []} }), 
     body: { classList: { add() {}, remove() {}, toggle() {}, contains: () => false } },
     querySelectorAll: () => []
   };

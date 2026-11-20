@@ -57,7 +57,7 @@ export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin})
   const button=el('button','moments-rail-button');
   button.type='button';
   const icon=typeof spec.icon==='string'?el('span','moments-rail-icon',spec.icon):spec.icon;
-  if(typeof spec.icon==='string')icon.classList.add('moments-rail-icon');else icon.classList.add('moments-rail-svg');
+  if(typeof spec.icon!=='string')icon.setAttribute('class','moments-rail-svg');
   button.append(icon,el('span','moments-rail-label',spec.label));
   if(spec.action)button.onclick=spec.action;
   else{button.disabled=true;button.title='랭킹과 함께 정해요';button.setAttribute('aria-disabled','true');}

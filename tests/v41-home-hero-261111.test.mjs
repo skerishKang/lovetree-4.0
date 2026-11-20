@@ -154,7 +154,7 @@ test('정리 창 빈 제목 대체를 그려진 행에서 본다: 영상/비영�
     { id: 'm', parentId: 'p1', note: '글 기록' },
     { id: 't', parentId: 'p1', title: '있는 제목' },
   ] } } };
-  globalThis.document = { createElement: () => element() };
+  globalThis.document = { createElementNS: (ns, tag) => ({ tagName: String(tag), namespaceURI: String(ns), attrs: {}, children: [], setAttribute(n,v){this.attrs[n]=String(v)}, getAttribute(n){return this.attrs[n]??null}, append(...k){this.children.push(...k)}, querySelector(){return null}, querySelectorAll(){return []} }),  createElement: () => element() };
   try {
     const cleanup = createCleanup({
       $: id => {

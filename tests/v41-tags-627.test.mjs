@@ -761,7 +761,7 @@ function tagLineHarness({ screen, moments }) {
   const anchors = { dBasic: makeNode(), detailChips: makeNode(), '#detail .chips': makeNode() };
   const dBasicSection = makeNode();
   anchors.dBasic.closest = (sel) => (sel === '.section' ? dBasicSection : null);
-  globalThis.document = {
+  globalThis.document = { createElementNS: (ns, tag) => ({ tagName: String(tag), namespaceURI: String(ns), attrs: {}, children: [], setAttribute(n,v){this.attrs[n]=String(v)}, getAttribute(n){return this.attrs[n]??null}, append(...k){this.children.push(...k)}, querySelector(){return null}, querySelectorAll(){return []} }), 
     getElementById: (id) => ({ detail: detailRoot, ...titles, ...anchors }[id] || null),
     createElement: () => makeNode(),
     querySelector: (sel) => anchors[sel] || null,

@@ -54,7 +54,7 @@ function harness({ owned = true, writable = true, source = 'server', busy = fals
   };
   const LT41 = tree ? { tree, momentId: tree.moments[0]?.id, trees: [tree] } : null;
   globalThis.window = { LT41 };
-  globalThis.document = { createElement: () => fakeElement(), querySelectorAll: () => [] };
+  globalThis.document = { createElementNS: (ns, tag) => ({ tagName: String(tag), namespaceURI: String(ns), attrs: {}, children: [], setAttribute(n,v){this.attrs[n]=String(v)}, getAttribute(n){return this.attrs[n]??null}, append(...k){this.children.push(...k)}, querySelector(){return null}, querySelectorAll(){return []} }),  createElement: () => fakeElement(), querySelectorAll: () => [] };
   // 패널은 HTMLFormElement를 그대로 FormData로 만든다. 최소 폼 데이터로 같은 경로를 태운다.
   globalThis.FormData = class {
     constructor(form) { this.pairs = Object.entries(form.elements).map(([key, field]) => [key, field.value ?? '']); }

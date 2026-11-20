@@ -54,7 +54,7 @@ test('M5: 로그인 기기 미러(ltDateStyle)는 문서 속성을 localStorage�
       setItem: (k, v) => store.set(k, String(v)),
       removeItem: (k) => store.delete(k),
     };
-    globalThis.document = { documentElement: { attrs: {}, getAttribute(name) { return this.attrs[name] ?? null; } } };
+    globalThis.document = { createElementNS: (ns, tag) => ({ tagName: String(tag), namespaceURI: String(ns), attrs: {}, children: [], setAttribute(n,v){this.attrs[n]=String(v)}, getAttribute(n){return this.attrs[n]??null}, append(...k){this.children.push(...k)}, querySelector(){return null}, querySelectorAll(){return []} }),  documentElement: { attrs: {}, getAttribute(name) { return this.attrs[name] ?? null; } } };
 
     assert.equal(ltDateStyle(), 'dot', '아무것도 없으면 기본 dot');
 

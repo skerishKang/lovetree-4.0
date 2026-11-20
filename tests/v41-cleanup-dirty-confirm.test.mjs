@@ -43,7 +43,7 @@ function harness({ confirmAnswer = true } = {}) {
   const applied = [];
   globalThis.confirm = (text) => { confirms.push(text); return confirmAnswer; };
   globalThis.window = { LT41: { tree, momentId: 'm1' } };
-  globalThis.document = {
+  globalThis.document = { createElementNS: (ns, tag) => ({ tagName: String(tag), namespaceURI: String(ns), attrs: {}, children: [], setAttribute(n,v){this.attrs[n]=String(v)}, getAttribute(n){return this.attrs[n]??null}, append(...k){this.children.push(...k)}, querySelector(){return null}, querySelectorAll(){return []} }), 
     createElement: (tag) => fakeElement({ tagName: tag.toUpperCase() }),
     getElementById: (id) => (els[id] ||= fakeElement({ id })),
     querySelectorAll: () => [],
@@ -162,7 +162,7 @@ function moveHarness({ moments = [{ id: 'm1', title: '첫 순간', parentId: nul
     ...others.map(t => ({ ...t, moments: (t.moments || []).map(m => ({ ...m })) }))
   ] };
   globalThis.window = { LT41: { tree: state.trees[0], momentId: state.trees[0].moments[0].id } };
-  globalThis.document = {
+  globalThis.document = { createElementNS: (ns, tag) => ({ tagName: String(tag), namespaceURI: String(ns), attrs: {}, children: [], setAttribute(n,v){this.attrs[n]=String(v)}, getAttribute(n){return this.attrs[n]??null}, append(...k){this.children.push(...k)}, querySelector(){return null}, querySelectorAll(){return []} }), 
     createElement: (tag) => fakeElement({ tagName: tag.toUpperCase() }),
     getElementById: (id) => (els[id] ||= fakeElement({ id })),
     querySelectorAll: () => [],

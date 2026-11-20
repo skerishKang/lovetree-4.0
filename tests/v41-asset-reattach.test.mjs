@@ -39,7 +39,7 @@ test('보관 파일을 고르면 편집기를 먼저 연 뒤 URL을 채우고, �
   slot.querySelector = key => slotElements.get(key);
   for (const key of ['[data-assets]', '[data-usage]', '[data-refresh]']) assetElements.set(key, new Element());
   assetsEl.querySelector = key => assetElements.get(key);
-  globalThis.document = {createElement: () => new Element()};
+  globalThis.document = { createElementNS: (ns, tag) => ({ tagName: String(tag), namespaceURI: String(ns), attrs: {}, children: [], setAttribute(n,v){this.attrs[n]=String(v)}, getAttribute(n){return this.attrs[n]??null}, append(...k){this.children.push(...k)}, querySelector(){return null}, querySelectorAll(){return []} }), createElement: () => new Element()};
   globalThis.window = {LTMedia: {privateAssetName: () => null}};
   globalThis.location = {origin: 'https://example.test'};
   globalThis.fetch = () => new Promise(resolve => pending.push(resolve));
