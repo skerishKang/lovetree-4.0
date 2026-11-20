@@ -109,30 +109,16 @@ test('시작 시간(?t=90)이 붙어도 같은 썸네일 한 벌을 쓴다', () 
   assert.equal(photos[0].image, 'https://i.ytimg.com/vi/abc123DEF45/hqdefault.jpg');
 });
 
-test('궤도 연결: 재생 표시·no-referrer·예시 문구 분리를 소스로 고정한다', () => {
-  const orbit = readFileSync(new URL('../src/views/orbit.js', import.meta.url), 'utf8');
-  // YouTube 썸네일 카드만 video 타입으로 세운다(사진·글 카드와 예시는 그대로).
-  assert.match(orbit, /type:m\.youtubeThumb&&m\.image\?'video':\(m\.image\?'photo':'memo'\)/);
-  // 재생 표시는 꾸미기 요소다(aria-hidden). 카드 자체가 누르는 곳이다.
-  assert.match(orbit, /c\.youtubeThumb&&c\.image\?'<span class="playGlyph" aria-hidden="true">▶<\/span>':''/);
-  // 썸네일 요청은 #330과 같은 no-referrer·lazy다.
-  assert.match(orbit, /c\.youtubeThumb\?' referrerpolicy="no-referrer" loading="lazy" decoding="async"':''/);
-  // '영상 포스터 예시' 문구는 예시 카드에만 붙는다 — 내 YouTube 카드가 예시로 읽히지 않게 한다.
-  assert.match(orbit, /\(demo\|\|c\.example\)&&c\.type==='video'\?' · 영상 포스터 예시':''/);
-  assert.equal(/\$\{c\.type==='video'\?' · 영상 포스터 예시'/.test(orbit), false, '기록 상태 없이 붙던 예시 문구 판정은 남기지 않는다');
-  // 재생 표시 모양은 기존 궤도 CSS 한 벌(.card.video .playGlyph)을 쓴다.
-  const css = readFileSync(new URL('../src/views/orbit-source.css', import.meta.url), 'utf8');
-  assert.match(css, /\.card\.video \.playGlyph\{/);
-});
-
-test('첫 화면 배선: home.js는 LTMedia 판정 한 벌을 homeCardsPlan에 넘긴다', () => {
-  const home = readFileSync(new URL('../v41/home.js', import.meta.url), 'utf8');
-  const cards = readFileSync(new URL('../v41/home-cards.js', import.meta.url), 'utf8');
-  const moments = readFileSync(new URL('../v41/home-moments.js', import.meta.url), 'utf8');
-  assert.match(home, /LTMedia\?\.currentContext\?\.\(\)/);
-  assert.match(home, /LTMedia\?\.autoLoadMedia\?\.\(mediaState\.source,mediaState\.owned\)===true/);
-  assert.match(home, /homeCardsPlan\(\{mode,loggedIn,context,popular,youtube\}\)/);
-  assert.match(cards, /youtube = null/);
-  assert.match(cards, /homeMomentCards\(context, limit, origin, youtube\)/);
-  assert.match(moments, /media\?\.kind === 'youtube' && media\.loadUrl/);
+// #952: 궤도 쪽 계약(재생 표시·no-referrer·예시 문구 분리, LTMedia 판정이 첫 화면 카드까지 닿는 것)
+// 은 그려진 첫 화면에서 잰다 — tests/v41-home-screen-952.test.mjs. 여기서는 home-cards.js의
+// youtube 기본값 함수 입출력을 검사한다.
+test('homeCardsPlan은 youtube 판정을 homeMomentCards에 그대로 넘긴다 — 없으면 영상 순간도 글 카드', () => {
+  const ytMoment = moment('y1', { url: 'https://youtu.be/abc123DEF45' });
+  // youtube 판정을 넘기지 않으면(기본 null) YouTube 순간은 썸네일 카드로 세지 않는다.
+  const plain = homeCardsPlan({ mode: 'mine', loggedIn: true, context: member([ytMoment]) });
+  assert.equal(plain.kind, 'mine');
+  assert.ok(plain.cards.every(c => c.type !== 'video' && c.youtubeThumb === false), '판정 없이는 영상 카드를 만들지 않는다');
+  // 판정을 넘기면 같은 순간이 영상 썸네일 카드가 된다.
+  const judged = homeCardsPlan({ mode: 'mine', loggedIn: true, context: member([ytMoment]), youtube: owner });
+  assert.equal(judged.cards.map(c => c.type === 'video' && c.youtubeThumb).includes(true), true);
 });
