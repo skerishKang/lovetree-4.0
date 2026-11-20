@@ -25,7 +25,7 @@ test('611: updates.json 은 버전·날짜·항목(kind·text·source·tester?) 
       if (item.source !== undefined) assert.ok(['ai_tester', 'user', 'team'].includes(item.source), `source는 ai_tester|user|team (받음: ${JSON.stringify(item)})`);
       if (item.source === 'ai_tester' && item.tester !== undefined) assert.equal(typeof item.tester, 'string', 'AI 명예회원 출처에 이름이 있으면 문자열이다 (받음: ' + JSON.stringify(item) + ')');
       // 이달용 이슈 번호는 연결용으로만 두는 필드 — 화면 문구에는 넣지 않는다.
-      if (item.issue !== undefined) assert.match(item.issue, /^#[\w.-]+$/, '이슈 연결 모양');
+      if (item.issue !== undefined) assert.match(item.issue, /^#[\w·.#-]+$/, '이슈 연결 모양 — 두 PR을 한 줄에 묶을 때는 가운뎃점(#973·#989)');
     }
   }
 });
