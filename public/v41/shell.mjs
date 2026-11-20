@@ -8,7 +8,7 @@ import {hasPendingDraft} from './sync-controller.mjs';
 import {clearCachedWorkspace, readCachedWorkspace} from './workspace-cache.mjs';
 // #1026 E: 예시 데이터(1MB)는 정적으로 부르지 않는다 — 로그인 사용자의 화면 로딩을 막지 않게
 // 예시가 실제로 필요한 순간에만 동적으로 부른다(로그아웃 첫 화면, 예시 카드 열기, 예시 둘러보기).
-let exampleTree=null,examplePromise=null;
+let exampleTree=null,examplePromise=null,exampleInitializing=false;
 function loadExampleTree(){if(!examplePromise)examplePromise=import('./example.mjs').then(mod=>{exampleTree=mod.exampleTree;return exampleTree});return examplePromise;}
 import {parseSelectionRoute,memberStartupView,ownerSelectionRoute,accountPosition,rememberAccountPosition,resolveAccountPosition,stashPendingOwnerRoute,pendingOwnerRoute,takePendingOwnerRoute} from './selection-location.mjs';
 import {applyViewAccessibility,connectionLabel} from './view-a11y.mjs';
@@ -636,7 +636,8 @@ const shellScreens=createScreens({
   hasTree:()=>!!window.LT41,
   takeNetworkOpen,
   takeBoardOpen,
-  closePanels:()=>shellDialogs.closePanels(),
+  // #1026 E: 로그아웃 예시를 동적으로 받는 동안에는 사용자가 연 창을 닫지 않는다.
+  closePanels:()=>{if(exampleInitializing)return;shellDialogs.closePanels();},
   // 이슈 933: 화면을 옮긴 뒤 안내 판을 다시 맞춘다 — 첫 여정(새 트리 만들기)에서는 띄우지 않는다.
   syncTips:()=>syncTreeTips(),
   flowNavigation,
@@ -1638,7 +1639,8 @@ else if(shouldLoadMemberRecords(location.search,document.cookie,location.hash)||
  clear();
 }else{
  // 로그아웃·신규 사용자는 예시가 실제 내용이므로 필요한 이 순간에만 동적으로 받는다.
- void loadExampleTree().then(tree=>{if(source!=='server'&&source!=='share')load(null,'example',{}, {},tree);}).catch(()=>{});
+ exampleInitializing=true;
+ void loadExampleTree().then(tree=>{if(source!=='server'&&source!=='share')load(null,'example',{}, {},tree);exampleInitializing=false;}).catch(()=>{exampleInitializing=false;});
 }
 
 function backup(){const data=member?.state();if(!data){notify('백업할 내 기록이 없어요.');return;}const a=document.createElement('a'),url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));a.href=url;a.download='lovetree-draft.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),0);}
