@@ -51,7 +51,7 @@ export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin})
   liked=!!value;
   if(!heartButton)return;
   heartButton.querySelector('.moments-rail-icon').textContent=liked?'♥':'♡';
-  heartButton.classList.toggle('is-liked',liked);
+  heartButton.classList?.toggle?.('is-liked',liked);
   heartButton.setAttribute('aria-pressed',String(liked));
  };
  const railButtons=[
@@ -68,7 +68,7 @@ export function mountMoments({panel,onOpenShare,onAddToTree,notify,memberLogin})
   button.append(icon,el('span','moments-rail-label',spec.label));
   if(spec.action)button.onclick=spec.action;
   else{button.disabled=true;button.title='랭킹과 함께 정해요';button.setAttribute('aria-disabled','true');}
-  if(spec.label==='마음'){button.classList.add('is-heart');heartButton=button;setLiked(false);}
+  if(spec.label==='마음'){button.classList?.add?.('is-heart');heartButton=button;setLiked(false);}
   rail.append(button);
  }
  const chips=el('div','moments-chips');chips.setAttribute('role','group');chips.setAttribute('aria-label','가수 고르기');
