@@ -17,7 +17,7 @@ function build({ repo = createMemoryAccountRepo(), verify = async () => ({ accou
   return { handler, repo, post };
 }
 
-test('a bearer token writes email for its own account and next sign-in overwrites', async () => {
+test('a bearer token fills its own account and never overwrites a stored email', async () => {
   const { post, repo } = build();
   const first = await post({ email: 'Owner@Example.test', canonical_subject_id: 'sub_a' }, 'Bearer tok');
   assert.equal(first.status, 200);
@@ -25,14 +25,14 @@ test('a bearer token writes email for its own account and next sign-in overwrite
 
   const second = await post({ email: 'new@Example.test' }, 'Bearer tok');
   assert.equal(second.status, 200);
-  assert.equal(await repo.emailFor({ productId: PRODUCT, subjectId: 'sub_a' }), 'new@Example.test');
+  assert.equal(await repo.emailFor({ productId: PRODUCT, subjectId: 'sub_a' }), 'Owner@Example.test', '저장값이 본문값으로 바뀌지 않는다');
   assert.equal(await repo.emailFor({ productId: PRODUCT, subjectId: 'sub_other' }), null);
 });
 
 test('a token cannot write a subject it did not authenticate; naming the body subject is optional', async () => {
   const rows = [];
   const { post } = build({
-    repo: { upsertEmail: async (row) => rows.push(row) },
+    repo: { upsertEmail: async (row) => rows.push(row), emailFor: async () => null },
     verify: async () => ({ subject: 'sub_a' })
   });
 
@@ -69,7 +69,7 @@ test('bearer problems yield 401, key lookup trouble yields 503', async () => {
 
 test('body and route problems are answered before anything is written', async () => {
   const rows = [];
-  const { handler, post } = build({ repo: { upsertEmail: async (row) => rows.push(row) } });
+  const { handler, post } = build({ repo: { upsertEmail: async (row) => rows.push(row), emailFor: async () => null } });
 
   assert.equal((await post('{oops')).status, 400);
   assert.equal((await post([])).status, 400);
@@ -84,7 +84,7 @@ test('body and route problems are answered before anything is written', async ()
 });
 
 test('a repository failure is 503', async () => {
-  const { post } = build({ repo: { upsertEmail: async () => { throw new Error('db down'); } } });
+  const { post } = build({ repo: { upsertEmail: async () => { throw new Error('db down'); }, emailFor: async () => null } });
   const res = await post({ email: 'a@b.test' }, 'Bearer tok');
   assert.equal(res.status, 503);
   assert.equal(res.body.error.code, 'account_email_unavailable');
@@ -107,4 +107,29 @@ test('memory account repo keeps the first sign-in time as created_at and only mo
   // 다른 제품의 계정은 섞이지 않는다.
   await repo.upsertEmail({ productId: 'other-product', subjectId: 'sub_b', email: 'b@example.test' });
   assert.deepEqual((await repo.accounts({ productId: PRODUCT })).map((row) => row.subjectId), ['sub_a']);
+});
+
+test('본문 이메일로 저장값을 덮어쓰려는 요청은 기록만 남기고 저장값을 지킨다', async (t) => {
+  const warnings = [];
+  const warn = t.mock.method(console, 'warn', (...args) => warnings.push(args.join(' ')));
+  try {
+    const { post, repo } = build();
+    assert.equal((await post({ email: 'first@example.test' }, 'Bearer tok')).status, 200);
+    const blocked = await post({ email: 'attacker@example.test' }, 'Bearer tok');
+    assert.equal(blocked.status, 200, '로그인 흐름을 끊지 않는다');
+    assert.equal(await repo.emailFor({ productId: PRODUCT, subjectId: 'sub_a' }), 'first@example.test');
+    assert.equal(warn.mock.callCount(), 1);
+    assert.match(warnings[0], /overwrite_attempt/);
+    assert.equal(warnings[0].includes('attacker@example.test'), false, '기록에 이메일 값이 없다');
+  } finally { warn.mock.restore(); }
+});
+
+test('저장된 이메일과 같은 값으로 다시 오면 정상 처리된다', async (t) => {
+  const warn = t.mock.method(console, 'warn', () => {});
+  try {
+    const { post } = build();
+    assert.equal((await post({ email: 'same@example.test' }, 'Bearer tok')).status, 200);
+    assert.equal((await post({ email: 'same@example.test' }, 'Bearer tok')).status, 200);
+    assert.equal(warn.mock.callCount(), 0);
+  } finally { warn.mock.restore(); }
 });

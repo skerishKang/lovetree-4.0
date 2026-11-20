@@ -1,6 +1,6 @@
 /** 내부 전용: 검증된 access 토큰이 인증한 계정의 이메일을 모아 둔다. */
 export function createAccountEmailStore({ repo, productId, verify, now = () => new Date() }) {
-  if (!repo || typeof repo.upsertEmail !== 'function') throw new Error('account repo가 필요합니다');
+  if (!repo || typeof repo.upsertEmail !== 'function' || typeof repo.emailFor !== 'function') throw new Error('account repo가 필요합니다');
   if (typeof verify !== 'function') throw new Error('토큰 검증기가 필요합니다');
 
   return async (request) => {
@@ -37,7 +37,7 @@ export function createAccountEmailStore({ repo, productId, verify, now = () => n
     }
 
     const canonical = verified?.accountId ?? verified?.subject;
-    const email = typeof body.email === 'string' ? body.email.trim() : '';
+    let email = typeof body.email === 'string' ? body.email.trim() : '';
 
     if (typeof canonical !== 'string' || !/^sub_[A-Za-z0-9_-]{1,128}$/.test(canonical)) {
       return { status: 401, body: { error: { code: 'unauthorized' } } };
@@ -48,6 +48,16 @@ export function createAccountEmailStore({ repo, productId, verify, now = () => n
     }
     if (!email || email.length > 320 || /[\u0000-\u001f\u007f]/.test(email)) {
       return { status: 400, body: { error: { code: 'invalid_email' } } };
+    }
+
+    let stored;
+    try { stored = await repo.emailFor({ productId, subjectId: canonical }); }
+    catch { return { status: 503, body: { error: { code: 'account_email_unavailable', message: '이메일을 확인하지 못했어요. 다시 로그인하면 채워집니다.' } } }; }
+
+    // 이미 저장된 이메일은 요청 본문으로 바꾸지 않는다 — 본문을 고친 요청은 기록만 남기고 저장값을 지킨다.
+    if (typeof stored === 'string' && stored.trim()) {
+      if (stored.trim().toLowerCase() !== email.toLowerCase()) console.warn('[lovetree-account-email]', JSON.stringify({ result: 'overwrite_attempt' }));
+      email = stored.trim();
     }
 
     try {
