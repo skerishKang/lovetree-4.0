@@ -758,8 +758,9 @@ test('1001b 실행: 책 순간 변경(고치기·연결·해제·이전 순간·
     await frame.evaluate(id => { window.__TRACK59__.showDetail(id); }, m2);
     await frame.waitForFunction(() => !document.querySelector('#detailSide')?.hidden || !!document.querySelector('.page-detail'), null, { timeout: 10000 });
     await page.waitForTimeout(200);
-    const before = await frame.evaluate(() => ({ sel: LTDEMO.get(), st: window.__TRACK59__.getState(), scroll: window.scrollY, sideOpen: !document.querySelector('#detailSide')?.hidden, pageDetail: !!document.querySelector('.page-detail') }));
+    const before = await frame.evaluate(() => ({ sel: LTDEMO.get(), st: window.__TRACK59__.getState(), scroll: window.scrollY, sideOpen: !document.querySelector('#detailSide')?.hidden, pageDetail: !!document.querySelector('.page-detail'), focused: !!document.querySelector(`[data-moment="${LTDEMO.get()}"]`)?.classList.contains('focused') }));
     assert.equal(before.sel, m2, '둘 순간이 선택된다');
+    assert.ok(before.focused, '고른 순간에 선택 테두리가 있다');
     assert.ok(before.sideOpen || before.pageDetail, '상세 판이 열린다(옆 패널 또는 오른쪽 페이지)');
     const openEditor = async (id) => { await frame.evaluate(x => parent.postMessage({ type: 'lt41-write', mode: 'edit', momentId: x }, location.origin), id); await page.waitForFunction(() => document.querySelector('#write-panel')?.open === true, null, { timeout: 8000 }); await page.waitForTimeout(200); };
     const waitPut = async (n) => { const dl = Date.now() + 10000; while (Date.now() < dl && puts.length < n) await page.waitForTimeout(150); };
@@ -770,12 +771,13 @@ test('1001b 실행: 책 순간 변경(고치기·연결·해제·이전 순간·
     await waitPut(1);
     await frame.waitForFunction(() => document.body.innerText.includes('고친 제목'), null, { timeout: 10000 });
     await page.waitForTimeout(1500);
-    const afterEdit = await frame.evaluate(() => ({ doc: window.__doc1001b, msg: window.__msg1001b, sel: LTDEMO.get(), st: window.__TRACK59__.getState(), scroll: window.scrollY, sideOpen: !document.querySelector('#detailSide')?.hidden, pageDetail: !!document.querySelector('.page-detail'), detailText: (document.querySelector('#detailSide')?.textContent || '') + (document.querySelector('.page-detail')?.textContent || '') }));
+    const afterEdit = await frame.evaluate(() => ({ doc: window.__doc1001b, msg: window.__msg1001b, sel: LTDEMO.get(), st: window.__TRACK59__.getState(), scroll: window.scrollY, sideOpen: !document.querySelector('#detailSide')?.hidden, pageDetail: !!document.querySelector('.page-detail'), focused: !!document.querySelector(`[data-moment="${LTDEMO.get()}"]`)?.classList.contains('focused'), detailText: (document.querySelector('#detailSide')?.textContent || '') + (document.querySelector('.page-detail')?.textContent || '') }));
     assert.equal(afterEdit.doc, 'alive', '고치기 뒤에도 같은 문서다(재적재 없음)');
     assert.ok(afterEdit.msg >= 1, 'lt41-moments-saved 알림이 책에 도착한다');
     assert.equal(afterEdit.sel, m2, '고른 순간이 그대로다');
     assert.equal(afterEdit.st.current, before.st.current, '보던 펼침면이 그대로다');
     assert.equal(afterEdit.scroll, before.scroll, '스크롤 위치가 그대로다');
+    assert.equal(afterEdit.focused, before.focused, '고른 순간의 선택 테두리가 그대로다');
     assert.ok(afterEdit.sideOpen || afterEdit.pageDetail, '열린 상세 판이 그대로다');
     assert.ok(afterEdit.detailText.includes('고친 제목'), '상세 판이 새 제목으로 다시 그려진다');
     // ② 연결·해제·이전 순간 바꾸기: 각각 재적재 0.

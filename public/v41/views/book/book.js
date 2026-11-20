@@ -229,6 +229,7 @@ addEventListener('message',e=>{
  // 책의 실제 상세 판은 book-extra.js가 오른쪽 페이지(.page-detail)나 옆 패널(#detailSide)에 배치한다(#detail은 닫힘).
  const detailWasOpen=!!selectedMomentId&&(!!document.querySelector('.page-detail')||($('#detailSide')&&!$('#detailSide').hidden));
  renderSpread(current,null,false);
+ if(sel)document.querySelector(`[data-moment="${sel}"]`)?.classList.add('focused');
  if(detailWasOpen){if(LTDEMO.moments.some(m=>m.id===selectedMomentId))showDetail(selectedMomentId);else{const side=$('#detailSide');if(side)side.hidden=true;}}
 });
 
