@@ -96,7 +96,10 @@ export function createMemberSession({api,onState=()=>{},onStatus=()=>{},onGuard=
    // #984: 트리 편집(이름·표지)은 보드 저장과 같은 길 — 화면이 이미 자기 상태를 들고 있으므로 셸은 모델만
    // 갱신하고 화면을 다시 띄우지 않는다. 표지·이름은 lt41-trees-saved/renamed 알림이 바로 다시 그린다.
    // #1001 (a): 호출부가 metaHint를 주면 그 길로(한마디 저장={moment:true}) — 화면을 다시 띄우지 않아 답이 살아있는 문서에 도착한다.
-   onState(structuredClone(document),{treeId,momentId},metaHint??(action==='editTree'?{tree:true}:undefined));sync.markLocalSave();return {treeId,momentId};
+   // #1001 (3): 같은 트리 안 순간 변경(고치기·삭제·이전 순간 바꾸기·연결·해제)도 모델 전용 — 책·지도가
+   // lt41-moments-saved 알림을 받아 지금 펼침면·선택·열린 판을 그대로 다시 그린다(재적재 0). 트리 삭제·옮기기·새 트리는 그대로 재적재.
+   const modelOnly=metaHint??(action==='editTree'?{tree:true}:(action==='edit'||action==='delete'||action==='reparent'||action==='link'||action==='unlink'?{moment:true}:undefined));
+   onState(structuredClone(document),{treeId,momentId},modelOnly);sync.markLocalSave();return {treeId,momentId};
  }
  return {start:()=>sync.start(),apply,act:name=>sync.act(name),flushOnHide:()=>sync.flushOnHide(),snapshot:()=>({...sync.snapshot(),subject,writable:sync.snapshot().owned&&bound&&!mismatch,phase:sync.status().phase}),state:()=>structuredClone(document),dispose:()=>{active=false;bound=false;globalThis.document?.removeEventListener?.('visibilitychange',onVisible);globalThis.removeEventListener?.('pagehide',onHide);globalThis.removeEventListener?.('focus',quietCheck);},status:()=>sync.status()};
 }

@@ -224,3 +224,82 @@ test('⑤ 이어진 선 약속 숫자는 그려진 연결 수와 같다', { skip
     await context.close(); await browser.close();
   } finally { server.close(); }
 });
+
+// #1001 (3): 지도의 같은 트리 안 순간 변경(고치기·삭제·연결)은 모델만 갱신하고 화면을 다시 띄우지 않는다 —
+// lt41-moments-saved 알림을 받아 지도가 점·선·묶음을 결정적 배치로 같은 자리에 다시 그리고, 고른 순간·보기·
+// 배율·열린 상세 판을 그대로 둔다(보드 boardSync·#997 editTree와 같은 방식). 재적재 0.
+test('1001b 실행: 지도 순간 변경(고치기·연결·삭제) — 재적재 0·선택/보기/배율/상세 보존', { skip: skip || !REQUIRE ? skip || 'LT_MAP_RELATIONS_REQUIRE=1 일 때 실행' : false, timeout: 180000 }, async () => {
+  if (skip) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip}`);
+  const { createTree: makeTree, addMoment: growTree, linkMoments: linkTree } = await import('../public/v41/domain.mjs');
+  const { serve: serveApp } = await import('./helpers/screen-audit.mjs');
+  const { waitForShownScreen: waitShown } = await import('./helpers/visible-frame.mjs');
+  let tree = makeTree({ subject: '시험', title: '지도 트리', note: '', emotion: '설렘', date: '2026-11-01', url: '' }, '2026-11-01T00:00:00Z');
+  const root = tree.moments[0].id;
+  tree = growTree(tree, { title: '둘 순간', note: '둘 마음', emotion: '몰입', date: '2026-11-02', url: '' }, root, '2026-11-02T00:00:00Z');
+  const m2 = tree.moments.at(-1).id;
+  tree = growTree(tree, { title: '셋 순간', note: '셋 마음', emotion: '그리움', date: '2026-11-03', url: '' }, root, '2026-11-03T00:00:00Z');
+  const m3 = tree.moments.at(-1).id;
+  tree = growTree(tree, { title: '넷 순간', note: '넷 마음', emotion: '벅참', date: '2026-11-04', url: '' }, m2, '2026-11-04T00:00:00Z');
+  const m4 = tree.moments.at(-1).id;
+  tree = linkTree(tree, m2, m3);
+  const server = await serveApp();
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch();
+  try {
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
+    let rev = 1, stored = JSON.parse(JSON.stringify(tree));
+    const puts = [];
+    await ctx.route('**/api/**', r => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
+    await ctx.route('**/api/workspace**', r => {
+      const req = r.request();
+      if (req.method() === 'PUT') { const body = JSON.parse(req.postData() || '{}'); puts.push(1); const ed = body?.state?.trees?.find(t => t.id === tree.id); if (ed) stored = ed; rev += 1; return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, revision: rev, subject: '시험계정' }) }); }
+      return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, revision: rev, subject: '시험계정', writeSubjectBound: true, savedAt: '2026-11-20T00:00:00.000Z', state: { version: 1, trees: [stored], prefs: {} } }) });
+    });
+    const page = await ctx.newPage();
+    const navs = []; let counting = false;
+    page.on('framenavigated', f => { if (counting && /\/v41\/(views\/|home\.html)/.test(f.url())) navs.push(f.url()); });
+    page.on('dialog', d => d.accept());
+    await page.goto(`${base}/v41/?account=1`, { waitUntil: 'load' });
+    await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
+    await page.locator('#discover-ask-no').click().catch(() => {});
+    await page.locator('.tree-views [data-view="track56-network.html"]').click();
+    await waitShown(page, { path: 'track56-network' }, 8000);
+    await page.waitForTimeout(1200);
+    const frame = page.frames().find(f => /views\/track56-network/.test(f.url()));
+    assert.ok(frame, '지도 프레임이 열린다');
+    await frame.evaluate(() => { window.__doc1001b = 'alive'; window.__msg1001b = 0; addEventListener('message', e => { if (e.data?.type === 'lt41-moments-saved') window.__msg1001b += 1; }); });
+    await frame.evaluate(id => { const n = window.__lt.nodes.find(n => n.id === id); window.__lt.selectMoment(n, true); }, m3);
+    await page.waitForTimeout(500);
+    const before = await frame.evaluate(() => ({ sel: window.__lt.state.selected?.id, view: window.__lt.state.view, scale: window.__lt.state.scale, nodes: window.__lt.nodes.length, detailOpen: document.querySelector('#detail').classList.contains('open'), detailTitle: document.querySelector('#detailTitle').textContent }));
+    assert.equal(before.sel, m3, '셋 순간이 선택된다');
+    assert.ok(before.detailOpen, '상세 판이 열린다');
+    const openEditor = async (id) => { await frame.evaluate(x => parent.postMessage({ type: 'lt41-write', mode: 'edit', momentId: x }, location.origin), id); await page.waitForFunction(() => document.querySelector('#write-panel')?.open === true, null, { timeout: 8000 }); await page.waitForTimeout(200); };
+    const waitPut = async (n) => { const dl = Date.now() + 10000; while (Date.now() < dl && puts.length < n) await page.waitForTimeout(150); };
+    counting = true;
+    // ① 고치기: 제목 변경 — 선택·보기·배율·상세 판이 그대로이고 상세 제목만 새 값으로 다시 그려진다.
+    await openEditor(m3);
+    await page.evaluate(() => { const f = document.querySelector('#moment-form'); f.elements.title.value = '지도 고친 제목'; f.elements.title.dispatchEvent(new Event('input', { bubbles: true })); f.requestSubmit(); });
+    await waitPut(1); await page.waitForTimeout(1800);
+    const afterEdit = await frame.evaluate(() => ({ doc: window.__doc1001b, msg: window.__msg1001b, sel: window.__lt.state.selected?.id, view: window.__lt.state.view, scale: window.__lt.state.scale, nodes: window.__lt.nodes.length, detailOpen: document.querySelector('#detail').classList.contains('open'), detailTitle: document.querySelector('#detailTitle').textContent }));
+    assert.equal(afterEdit.doc, 'alive', '고치기 뒤에도 같은 문서다(재적재 없음)');
+    assert.ok(afterEdit.msg >= 1, 'lt41-moments-saved 알림이 지도에 도착한다');
+    assert.equal(afterEdit.sel, m3, '고른 순간이 그대로다');
+    assert.equal(afterEdit.view, before.view, '보기(그물/동심원)가 그대로다');
+    assert.ok(Math.abs(afterEdit.scale - before.scale) < 0.01, '배율이 그대로다');
+    assert.equal(afterEdit.nodes, before.nodes, '점 개수가 그대로다');
+    assert.ok(afterEdit.detailOpen, '열린 상세 판이 그대로다');
+    assert.equal(afterEdit.detailTitle, '지도 고친 제목', '상세 판 제목이 새 값으로 다시 그려진다');
+    // ② 연결: 재적재 0.
+    await openEditor(m3); await page.evaluate(id => { document.querySelector('#related-target').value = id; }, m4); await page.click('#link-moment'); await waitPut(2); await page.waitForTimeout(1500);
+    const afterLink = await frame.evaluate(() => ({ doc: window.__doc1001b, sel: window.__lt.state.selected?.id, msg: window.__msg1001b }));
+    assert.equal(afterLink.doc, 'alive', '연결 뒤에도 같은 문서다');
+    assert.equal(afterLink.sel, m3, '연결 뒤에도 고른 순간이 그대로다');
+    // ③ 삭제: 점이 사라지고 재적재 0.
+    await openEditor(m3); await page.click('#delete-moment'); await waitPut(3); await page.waitForTimeout(1800);
+    const afterDelete = await frame.evaluate(() => ({ doc: window.__doc1001b, nodes: window.__lt.nodes.length }));
+    assert.equal(afterDelete.doc, 'alive', '삭제 뒤에도 같은 문서다');
+    assert.equal(afterDelete.nodes, before.nodes - 1, '점이 하나 줄어든다');
+    assert.equal(navs.length, 0, `저장 흐름에서 화면 파일 항해는 0회여야 한다(실측 ${navs.length}: ${JSON.stringify(navs)})`);
+    await ctx.close();
+  } finally { await browser.close(); server.close(); }
+});
