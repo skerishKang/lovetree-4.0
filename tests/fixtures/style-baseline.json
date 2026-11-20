@@ -1,0 +1,60 @@
+{
+  "files": {
+    "public/v41/community.css": {
+      "important": 1,
+      "inlineStyle": 0
+    },
+    "public/v41/identity.css": {
+      "important": 25,
+      "inlineStyle": 0
+    },
+    "public/v41/shell.css": {
+      "important": 32,
+      "inlineStyle": 0
+    },
+    "public/v41/view-a11y.mjs": {
+      "important": 31,
+      "inlineStyle": 0
+    },
+    "public/v41/views/board/board-detail.js": {
+      "important": 0,
+      "inlineStyle": 15
+    },
+    "public/v41/views/board/board-extra.css": {
+      "important": 3,
+      "inlineStyle": 0
+    },
+    "public/v41/views/board/board-extras.js": {
+      "important": 0,
+      "inlineStyle": 21
+    },
+    "public/v41/views/board/board.css": {
+      "important": 12,
+      "inlineStyle": 0
+    },
+    "public/v41/views/board/board.js": {
+      "important": 0,
+      "inlineStyle": 7
+    },
+    "public/v41/views/network/network.js": {
+      "important": 0,
+      "inlineStyle": 1
+    },
+    "public/v41/views/orbit/orbit.css": {
+      "important": 10,
+      "inlineStyle": 0
+    },
+    "public/v41/views/orbit/orbit.js": {
+      "important": 0,
+      "inlineStyle": 3
+    },
+    "public/v41/views/tree-title.css": {
+      "important": 1,
+      "inlineStyle": 0
+    },
+    "public/v41/views/tree-title.mjs": {
+      "important": 0,
+      "inlineStyle": 1
+    }
+  }
+}
