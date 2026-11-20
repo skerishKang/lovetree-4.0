@@ -153,6 +153,8 @@ test('#212 클래식 판본(tree-name.js)이 모듈과 같은 결과를 낸다',
 // 261118 대표 지적 4: 책장 어댑터(view-navigation.js)는 트리 0개 소개 문의 보조 문·단추 말만 덮는다 —
 // 이어 보기 띠 문구는 shelf.js·shelf-model이 정한다.
 test('#256-1 책장 마크업 태그 균형(div·section·button)', () => {
+  const markup = shelf.match(/<body[\s\S]*?<\/body>/i)?.[0] || '';
+  assert.ok(markup,'책장 본문이 있어야 태그 균형을 검사한다');
   for (const tag of ['div', 'section', 'button', 'span']) {
     const open = (markup.match(new RegExp('<' + tag + '(\\s|>)', 'g')) || []).length;
     const close = (markup.match(new RegExp('</' + tag + '>', 'g')) || []).length;
