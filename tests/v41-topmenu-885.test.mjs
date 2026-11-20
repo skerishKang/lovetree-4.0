@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { serve } from './helpers/screen-audit.mjs';
 import { createTree, addMoment } from '../public/v41/domain.mjs';
 
@@ -289,5 +289,104 @@ test('970 실행: 트리 드롭다운은 Esc·바깥 누르기로 닫히고, 키
       assert.equal(await page.evaluate(() => document.getElementById('tree-popover')?.contains(document.activeElement)), false, `${width}: 닫힌 목록 안에 초점이 남지 않는다`);
       await ctx.close();
     }
+  } finally { await browser.close(); await new Promise((ok) => server.close(ok)); }
+});
+
+// #1028: 데스크탑(701px 이상)에서 메뉴 전체 스크롤 0, 목록 칸만 스크롤, 동작 4개 고정,
+// 15개에서 트리 찾기·키보드·고른 트리 보이기를 숫자로 잰다. 휴대폰은 모양만 캡처한다.
+test('1028 실행: 트리 목록만 스크롤하고 동작 칸은 고정이며 찾기·키보드가 동작한다', { skip: skip || !REQUIRE970 ? skip || 'LT_970_REQUIRE=1 일 때 실행' : false, timeout: 300000 }, async () => {
+  const server = await serve();
+  const origin = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch({ headless: true });
+  const numbers = [];
+  async function openMenu(width, height, theme, count) {
+    const ctx = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
+    await ctx.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); } catch {} }, theme);
+    await ctx.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
+    const trees = Array.from({ length: count }, (_, i) => tree(i + 1));
+    const state = { version: 1, trees, prefs: {} };
+    await ctx.route('**/api/workspace**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ revision: 1, state, subject: '시험계정', writeSubjectBound: true, savedAt: '2026-11-18T09:00:00.000Z' }) }));
+    const page = await ctx.newPage();
+    const current = trees.at(-1);
+    await page.goto(`${origin}/v41/?account=1#my/board?tree=${current.id}&moment=${current.moments[0].id}`, { waitUntil: 'load', timeout: 60000 });
+    await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
+    await page.locator('#discover-ask-no').click().catch(() => {});
+    await page.waitForTimeout(600);
+    await page.click('#record-menu');
+    await page.waitForFunction(() => !document.getElementById('tree-popover')?.hidden, null, { timeout: 10000 });
+    return { ctx, page, trees };
+  }
+  try {
+    for (const width of [1440, 1920]) {
+      for (const theme of ['night', 'garden']) {
+        for (const count of [3, 6, 15]) {
+          const { ctx, page, trees } = await openMenu(width, 900, theme, count);
+          const m = await page.evaluate(() => {
+            const pop = document.getElementById('tree-popover');
+            const list = pop.querySelector('.tree-list');
+            const search = pop.querySelector('[data-tree-search]');
+            const actions = ['new', 'manage', 'share', 'tags'].map((a) => pop.querySelector(`[data-tree-action="${a}"]`));
+            const inView = (el) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.top >= 0 && r.bottom <= innerHeight; };
+            const active = pop.querySelector('[data-tree-id][aria-checked="true"]');
+            const ar = active?.getBoundingClientRect(), lr = list?.getBoundingClientRect();
+            return {
+              menuScroll: pop.scrollHeight - pop.clientHeight,
+              menuOverflow: getComputedStyle(pop).overflow,
+              docScroll: document.documentElement.scrollHeight - document.documentElement.clientHeight,
+              listExists: !!list,
+              listOver: list ? list.scrollHeight - list.clientHeight : -1,
+              listVisibleRows: list ? [...list.querySelectorAll('[data-tree-id]')].filter((b) => !b.hidden).length : -1,
+              searchExists: !!search,
+              actionsInView: actions.map((a) => !!a && inView(a)),
+              listScrollTop: list ? Math.round(list.scrollTop) : -1,
+              chosenInList: !!(lr && ar && ar.top >= lr.top - 1 && ar.bottom <= lr.bottom + 1)
+            };
+          });
+          assert.equal(m.menuScroll, 0, `${width}/${theme}/${count}: 메뉴 바깥 스크롤 ${m.menuScroll}px`);
+          assert.ok(m.menuOverflow.startsWith('visible'), `${width}/${theme}/${count}: 메뉴 자체 스크롤 없음(${m.menuOverflow})`);
+          assert.equal(m.docScroll, 0, `${width}/${theme}/${count}: 문서 스크롤 ${m.docScroll}px`);
+          assert.equal(m.listExists, true, `${width}/${theme}/${count}: 목록 칸 존재`);
+          assert.deepEqual(m.actionsInView, [true, true, true, true], `${width}/${theme}/${count}: 동작 4개 화면 안`);
+          if (count === 15) {
+            assert.ok(m.listOver > 0, `${width}/${theme}/15: 목록만 스크롤 가능(${m.listOver}px)`);
+            assert.equal(m.searchExists, true, `${width}/${theme}/15: 트리 찾기 칸 존재`);
+            assert.ok(m.listScrollTop > 0, `${width}/${theme}/15: 고른 트리로 목록이 스크롤됨(${m.listScrollTop}px)`);
+            assert.equal(m.chosenInList, true, `${width}/${theme}/15: 고른 트리 줄이 보임`);
+            await page.fill('[data-tree-search]', trees.at(-1).subject);
+            const found = await page.evaluate(() => [...document.querySelectorAll('#tree-popover [data-tree-id]')].filter((b) => !b.hidden).map((b) => b.querySelector('.tree-name').textContent.trim()));
+            assert.deepEqual(found, [trees.at(-1).subject], `${width}/${theme}/15: 찾기로 한 줄만 남음(${JSON.stringify(found)})`);
+            m.searchFound = found.length;
+            await page.fill('[data-tree-search]', '');
+            await page.evaluate(() => document.querySelector('#tree-popover [data-tree-id]')?.focus());
+            await page.keyboard.press('ArrowDown');
+            m.keyboardDown = await page.evaluate((id) => document.activeElement?.getAttribute('data-tree-id') === id, trees[1].id);
+            assert.equal(m.keyboardDown, true, `${width}/${theme}/15: ↓로 두 번째 줄`);
+            await page.keyboard.press('Escape');
+            await page.waitForFunction(() => document.getElementById('tree-popover')?.hidden, null, { timeout: 5000 });
+            m.escapeClosed = await page.evaluate(() => document.getElementById('record-menu')?.getAttribute('aria-expanded') === 'false');
+            assert.equal(m.escapeClosed, true, `${width}/${theme}/15: Esc로 닫힘`);
+          } else {
+            assert.equal(m.listOver, 0, `${width}/${theme}/${count}: 넘치지 않으면 목록 스크롤 0`);
+            assert.equal(m.searchExists, false, `${width}/${theme}/${count}: 8개 미만은 찾기 칸 없음`);
+          }
+          if (SHOT) {
+            mkdirSync(SHOT, { recursive: true });
+            if (await page.evaluate(() => document.getElementById('tree-popover')?.hidden)) await page.click('#record-menu');
+            await page.screenshot({ path: `${SHOT}/desktop-${width}-${theme}-${count}.png` });
+          }
+          numbers.push({ width, theme, count, ...m });
+          await ctx.close();
+        }
+      }
+    }
+    // 휴대폰은 바꾸지 않고 현재 모양만 캡처한다.
+    for (const theme of ['night', 'garden']) {
+      const { ctx, page } = await openMenu(390, 844, theme, 15);
+      if (SHOT) { mkdirSync(SHOT, { recursive: true }); await page.screenshot({ path: `${SHOT}/phone-390-${theme}-15.png` }); }
+      numbers.push({ width: 390, theme, count: 15, phoneCapture: true });
+      await ctx.close();
+    }
+    if (SHOT) writeFileSync(`${SHOT}/numbers.json`, JSON.stringify(numbers, null, 2));
+    console.log('MENU_1028_NUMBERS', JSON.stringify(numbers));
   } finally { await browser.close(); await new Promise((ok) => server.close(ok)); }
 });

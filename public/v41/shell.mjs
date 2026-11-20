@@ -154,6 +154,8 @@ function renderTreeMenu(){
  if(!treePopover)return;
  const trees=Array.isArray(model?.trees)?[...model.trees]:[];
  const ordered=trees.sort((a,b)=>Number(b?.inbox===true)-Number(a?.inbox===true));
+ // #1028: 데스크탑에서만 목록 칸을 감싸고, 트리가 8개 이상이면 이름 거르는 칸을 맨 위에 둔다. 휴대폰은 기존 모양.
+ const desktop=matchMedia('(min-width:701px)').matches;
  const currentId=window.LT41?.tree?.id||'';
  const rows=ordered.map(tree=>{
   const active=tree.id===currentId;
@@ -174,7 +176,15 @@ function renderTreeMenu(){
  const shelfEntry=member?.snapshot().owned?'<button type="button" role="menuitem" data-tree-action="shelf">서재 전체 보기</button>':'';
  // 261119 대표 결정: 목록 아래 메뉴 순서는 ＋ 새 트리 → 이 트리 관리 → 이 트리 공유 → 꼬리표 정리.
  // '정리 전 N개 정리하기'는 #380 5번대로 목록 바로 아래(맨 앞)에 둔다.
- treePopover.innerHTML=rows+`<div class="tree-foot" role="none">${cleanupRow}<button type="button" role="menuitem" data-tree-action="new">＋ 새 트리</button>${manage?'<button type="button" role="menuitem" data-tree-action="manage">이 트리 관리 (이름·표지)</button><button type="button" role="menuitem" data-tree-action="share">이 트리 공유</button>':''}${tagsRow}${shelfEntry}${momentsEntry}</div>`;
+ const list=desktop?`<div class="tree-list" role="none">${ordered.length>=8?'<div class="tree-search" role="none"><input type="search" data-tree-search placeholder="트리 찾기" aria-label="트리 찾기" autocomplete="off" /></div>':''}${rows}</div>`:rows;
+ treePopover.innerHTML=list+`<div class="tree-foot" role="none">${cleanupRow}<button type="button" role="menuitem" data-tree-action="new">＋ 새 트리</button>${manage?'<button type="button" role="menuitem" data-tree-action="manage">이 트리 관리 (이름·표지)</button><button type="button" role="menuitem" data-tree-action="share">이 트리 공유</button>':''}${tagsRow}${shelfEntry}${momentsEntry}</div>`;
+ const search=treePopover.querySelector('[data-tree-search]');
+ search?.addEventListener('input',()=>{
+  const q=search.value.trim().toLowerCase();
+  treePopover.querySelectorAll('[data-tree-id]').forEach(b=>{ const name=b.querySelector('.tree-name')?.textContent||''; b.hidden=!!q && !name.toLowerCase().includes(q); });
+  const active=treePopover.querySelector('[data-tree-id][aria-checked="true"]');
+  if(active&&!active.hidden)scrollTreeItemIntoView(active);
+ });
   // 트리를 누르면 그 트리로 이동한다: 책·보드·지도를 보던 중이면 같은 보기로, 그 외(첫 화면·내 트리·둘러보기)에는 그 트리의 책으로. 주소도 따라오게 남긴다.
   const TREE_VIEWS=new Set(['track32-bookshelf.html','track59-sketchbook.html','track58-pinboard.html','track56-network.html']);
   treePopover.querySelectorAll('[data-tree-id]').forEach(b=>b.onclick=()=>{
@@ -200,10 +210,17 @@ function renderTreeMenu(){
  // #380 2번: 드롭다운 맨 아래 "내 트리 전체 보기" → 책장 화면. 로그인 상태에서만 이 버튼이 그려진다.
  treePopover.querySelector('[data-tree-action="shelf"]')?.addEventListener('click',()=>{closeTreeMenu();show('track32-bookshelf.html');});
 }
-function openTreeMenu(via='keyboard'){if(!treePopover)return;renderTreeMenu();treePopover.dataset.ltOpenedBy=via;treePopover.hidden=false;treeTrigger.setAttribute('aria-expanded','true');treePopover.querySelector('button')?.focus();}
+// #1028: 목록 칸만 스크롤해 고른 줄이 보이게 한다(페이지 전체 스크롤은 건드리지 않는다).
+function scrollTreeItemIntoView(item){
+ const list=item.closest('.tree-list');if(!list||list.scrollHeight<=list.clientHeight)return;
+ const a=item.getBoundingClientRect(),box=list.getBoundingClientRect();
+ if(a.bottom>box.bottom)list.scrollTop+=a.bottom-box.bottom+4;
+ else if(a.top<box.top)list.scrollTop-=box.top-a.top+4;
+}
+function openTreeMenu(via='keyboard'){if(!treePopover)return;renderTreeMenu();treePopover.dataset.ltOpenedBy=via;treePopover.hidden=false;treeTrigger.setAttribute('aria-expanded','true');const active=treePopover.querySelector('[data-tree-id][aria-checked="true"]');treePopover.querySelector('button')?.focus();if(active&&!active.hidden)scrollTreeItemIntoView(active);}
 function closeTreeMenu(){if(!treePopover)return;treePopover.hidden=true;treeTrigger.setAttribute('aria-expanded','false');}
 $('record-menu').addEventListener('click',event=>{event.stopPropagation();if(treePopover?.hidden)openTreeMenu(event.detail===0?'keyboard':'mouse');else closeTreeMenu();});
-if(treePopover)treePopover.addEventListener('keydown',event=>{const items=[...treePopover.querySelectorAll('button')];const at=items.indexOf(document.activeElement);if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();const next=event.key==='ArrowDown'?(at+1)%items.length:(at-1+items.length)%items.length;items[next]?.focus();}else if(event.key==='Home'){event.preventDefault();items[0]?.focus();}else if(event.key==='End'){event.preventDefault();items.at(-1)?.focus();}});
+if(treePopover)treePopover.addEventListener('keydown',event=>{const items=[...treePopover.querySelectorAll('button')].filter(b=>!b.hidden);const at=items.indexOf(document.activeElement);if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();const next=event.key==='ArrowDown'?(at+1)%items.length:(at-1+items.length)%items.length;items[next]?.focus();}else if(event.key==='Home'){event.preventDefault();items[0]?.focus();}else if(event.key==='End'){event.preventDefault();items.at(-1)?.focus();}});
 document.addEventListener('click',event=>{if(treePopover&&!treePopover.hidden&&!event.target.closest('.tree-slot'))closeTreeMenu();});
 document.addEventListener('keydown',event=>{if(event.key==='Escape'&&treePopover&&!treePopover.hidden){closeTreeMenu();treeTrigger.focus();}});
 addEventListener('lt41-trees-changed',()=>{
