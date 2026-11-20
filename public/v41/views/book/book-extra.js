@@ -262,6 +262,19 @@ function paintTitle(m){
 }
 /* 3. 한 페이지에 다 들어오게 + 1. YouTube는 그 자리에서 재생(누르기 전 외부 요청 0). */
 function localThumb(m){const src=String(m.image||'');if(src.startsWith('data:image/'))return src;if(src.startsWith('/api/media/'))return src;return ''}
+/* #1030: 같은 영상(videoId)은 책 전체에서 하나의 세로 판정을 쓴다.
+   주소가 /shorts/인 순간과 watch인 순간이 섞여 있으면 한 쪽만 세로로 잡히고 다른 쪽은 가로 칸이 됐다.
+   여기서는 새 판정 없이 이미 있는 LTMedia.verticalVideo 결과만 videoId별로 묶는다(새 판정 함수는 만들지 않는다). */
+function sharedVerticalById(){
+ const byId=new Map();
+ for(const m of (LTDEMO.moments||[])){
+  const info=window.LTMedia?.describe?.(m.url||m.externalUrl||'');
+  if(info?.kind!=='youtube')continue;
+  const vertical=!!window.LTMedia?.verticalVideo?.(m.url||m.externalUrl||'',m.mediaMetadata);
+  byId.set(info.videoId,(byId.get(info.videoId)||false)||vertical);
+ }
+ return byId;
+}
 const originalMomentContent=momentContent;
 momentContent=function(m,compact=false){
  const safe=withoutAutoTitle(m);
@@ -275,7 +288,8 @@ momentContent=function(m,compact=false){
    // 먼저 보이게 한다(재생 임베드는 여전히 누르기 전까지 없다). 썸네일이 없거나 깨지면 #393 내려가기 틀로
    // 제목 글 카드가 된다(회색·빈 상자 금지). 보관 썸네일(data:·/api/media/)이 있으면 그것이 먼저다.
    const thumb=localThumb(safe);
-   const vertical=LTMedia.verticalVideo(safe.url,safe.mediaMetadata);
+    // #1030: 같은 영상은 펼침면·한 장 보기·넘기는 면 모두에서 같은 판정을 쓴다.
+    const vertical=sharedVerticalById().get(media.videoId)??LTMedia.verticalVideo(safe.url,safe.mediaMetadata);
    const defaultThumb=vertical?LTMedia.youtubeThumbUrl(media.videoId,true):media.loadUrl;
    const candidates=thumbnailCandidates(m,{vertical,autoLoad:true});
    const remoteThumb=candidates[0]||defaultThumb;
