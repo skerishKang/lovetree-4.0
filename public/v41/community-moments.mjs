@@ -2,6 +2,8 @@
 // iframe은 지금 것과 다음 것만 둔다 — 넘긴 것은 DOM에서 제거한다(동시에 살아 있는 iframe ≤ 2).
 // 세로 판정은 서버가 화면과 같은 함수(isVerticalMoment)로 해서 내려준다 — 여기서는 새로 만들지 않는다.
 const el=(tag,className,text)=>{const node=document.createElement(tag);if(className)node.className=className;if(text!=null)node.textContent=text;return node;};
+// 선 기호(컬러 이모지 금지) — 텍스트 변형 선택자로 흑백 선 모양을 고정하고 현재 글자색을 쓴다.
+const TREE_GLYPH='♣\uFE0E';
 const EMBED='https://www.youtube-nocookie.com/embed/';
 const embedSrc=id=>`${EMBED}${encodeURIComponent(id)}?autoplay=1&mute=1&playsinline=1&controls=0&rel=0&modestbranding=1&enablejsapi=1&origin=${encodeURIComponent(location.origin)}`;
 
@@ -10,6 +12,8 @@ export function mountMoments({panel,onOpenShare}){
  const card=el('div','moments-card');
  const media=el('div','moments-media');
  const poster=el('img','moments-poster');poster.alt='';poster.loading='lazy';
+ // 썸네일이 안 떠도 판이 비지 않게 — 세로 포스터가 없으면 기존 가로 포스터로 한 번 더 시도한다.
+ poster.onerror=()=>{const item=current();if(item?.videoId&&!/hqdefault\.jpg/.test(poster.getAttribute('src')||''))poster.src='https://i.ytimg.com/vi/'+encodeURIComponent(item.videoId)+'/hqdefault.jpg';};
  const overlay=el('div','moments-overlay');
  const treeLine=el('div','moments-tree');
  const titleLine=el('div','moments-title');
@@ -28,7 +32,7 @@ export function mountMoments({panel,onOpenShare}){
  // ♡·담기·공유는 2단계 자리 — 지금은 자리만 잡는다(트리 보기는 1단계에서 동작).
  const railButtons=[
   {icon:'♡',label:'마음'},
-  {icon:'🌳',label:'트리',action:()=>current&&onOpenShare?.({shareId:current.shareId,view:'book'})},
+  {icon:TREE_GLYPH,label:'트리',action:()=>current&&onOpenShare?.({shareId:current.shareId,view:'book'})},
   {icon:'＋',label:'담기'},
   {icon:'↗',label:'공유'}
  ];
@@ -67,7 +71,8 @@ export function mountMoments({panel,onOpenShare}){
   const item=current();
   if(!item){empty.hidden=false;stage.hidden=true;return;}
   empty.hidden=true;stage.hidden=false;
-  // 사진이 실제로 보이는지 먼저 확인된 뒤에만 iframe을 붙인다(빈 화면 캡처 금지).
+  // 썸네일이 늘 보이게 깔고 iframe은 그 아래에 둔다 — 유튜브가 안 떠도 판이 비지 않는다(#1025 재검수).
+  media.classList.remove('is-playing');
   poster.src=item.thumbnail||'';
   poster.alt=item.title||'';
   treeLine.replaceChildren();
@@ -122,6 +127,12 @@ export function mountMoments({panel,onOpenShare}){
  up.onclick=()=>step(-1);
  down.onclick=()=>step(1);
  stage.addEventListener('wheel',event=>{if(Math.abs(event.deltaY)<4)return;event.preventDefault();step(event.deltaY>0?1:-1);},{passive:false});
+ // 유튜브가 실제로 재생을 시작한 뒤에만 썸네일을 걷는다 — 그 전에는 썸네일이 판을 채운다(빈 판 방지).
+ if(typeof window!=='undefined'&&typeof window.addEventListener==='function')window.addEventListener('message',event=>{
+  if(!currentFrame||event.source!==currentFrame.contentWindow)return;
+  let data;try{data=typeof event.data==='string'?JSON.parse(event.data):event.data;}catch{return;}
+  if(data?.event==='onStateChange')media.classList.toggle('is-playing',Number(data.info)===1);
+ });
  if(typeof window!=='undefined'&&typeof window.addEventListener==='function')window.addEventListener('keydown',event=>{
   if(!panel.closest('dialog')?.open||panel.hidden)return;
   if(event.key==='ArrowDown'){event.preventDefault();step(1);}
@@ -140,7 +151,6 @@ export function mountMoments({panel,onOpenShare}){
   try{currentFrame.contentWindow?.postMessage('{"event":"command","func":"setVolume","args":[100]}','https://www.youtube.com');}catch{}
   unmuted=true;
   stage.dataset.ltMomentsMuted='false';
-  media.classList.add('is-unmuted');
  });
  function activate(){if(!items.length&&!loading)void load();else render();}
  function deactivate(){clearFrames();media.querySelectorAll('.moments-frame').forEach(node=>node.remove());}

@@ -15,7 +15,7 @@ try {
 } catch { skip = 'playwright 패키지가 없어 순간 보기 시험을 건너뜀'; }
 if (REQUIRE && !existsSync(new URL('../dist/v41/home.html', import.meta.url))) skip = '빌드 결과가 없어 순간 보기 시험을 건너뜀';
 
-const THUMB = (route) => route.fulfill({ status: 200, contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="360" height="640"><rect width="360" height="640" fill="#6a4a6e"/></svg>' });
+const THUMB = (route) => route.fulfill({ status: 200, contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="360" height="640"><defs><linearGradient id="g" x2="1" y2="1"><stop stop-color="#1b3a6b"/><stop offset="0.5" stop-color="#a23b6e"/><stop offset="1" stop-color="#e0a24f"/></linearGradient></defs><rect width="360" height="640" fill="url(#g)"/><circle cx="180" cy="280" r="110" fill="#f3d9a4"/><path d="M60 520 Q180 430 300 520 L300 640 L60 640Z" fill="#12233f"/><text x="180" y="590" fill="#fff" font-size="34" text-anchor="middle">SHORTS</text></svg>' });
 const IDS = ['m001111111a','m002222222b','m003333333c','m004444444d','m005555555e','m006666666f','m007777777g','m008888888h','m009999999i','m010101010j','m011111111k','m012121212l'];
 const items = IDS.map((id, i) => ({
   id: 'moment-' + id, videoId: id, shareId: 'share' + String(i).padStart(20, '0'),
@@ -62,6 +62,27 @@ async function boot(browser, { width, height, theme }) {
   }
 }
 
+// 판 영역의 실제 픽셀 다양성 —naturalWidth만 보면 빈 판을 통과시킨다(#1025 CTO 재검수).
+async function panelPixels(page, panel) {
+  const box = await panel.locator('.moments-card').boundingBox();
+  const shot = await page.screenshot({ animations: 'allow', scale: 'css' });
+  return page.evaluate(async ({ dataUrl, box }) => {
+    const img = new Image(); img.src = dataUrl; await img.decode();
+    const canvas = document.createElement('canvas'); canvas.width = img.width; canvas.height = img.height;
+    const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0);
+    const x = Math.max(0, Math.round(box.x)), y = Math.max(0, Math.round(box.y));
+    const w = Math.min(img.width - x, Math.round(box.width)), h = Math.min(img.height - y, Math.round(box.height));
+    const data = ctx.getImageData(x, y, w, h).data;
+    const colors = new Set(); let sum = 0, sum2 = 0, n = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      colors.add(`${data[i] >> 3},${data[i + 1] >> 3},${data[i + 2] >> 3}`);
+      const lum = 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2];
+      sum += lum; sum2 += lum * lum; n += 1;
+    }
+    return { colors: colors.size, std: Math.round(Math.sqrt(Math.max(0, sum2 / n - (sum / n) ** 2)) * 10) / 10, pixels: n };
+  }, { dataUrl: 'data:image/png;base64,' + shot.toString('base64'), box });
+}
+
 test('#1025 순간 보기 — iframe 2개 이하·10회 넘기기 같은 영상 반복 0·세로만·가로넘침 0', { skip: REQUIRE ? false : skip, timeout: 300000 }, async () => {
   if (skip) assert.fail(skip);
   const browser = await chromium.launch({ headless: true });
@@ -89,6 +110,30 @@ test('#1025 순간 보기 — iframe 2개 이하·10회 넘기기 같은 영상 
         assert.ok(seen.every(id => /^[A-Za-z0-9_-]+$/.test(id)), '세로 영상 id만');
         const ai = await panel.locator('.moments-ai').count();
         assert.ok(ai >= 0, 'AI 명예회원 표시 자리');
+        // 빈 판이 아니라는 증명 — 썸네일이 판을 실제로 채운다(색 종류·명도 표준편차).
+        const pixels = await panelPixels(h.page, panel);
+        assert.ok(pixels.colors > 20 && pixels.std > 8, `${width}·${theme}: 판 픽셀 다양성 부족(빈 판 의심) — ${JSON.stringify(pixels)}`);
+        const look = await panel.evaluate(el => {
+          const card = el.querySelector('.moments-card'), poster = el.querySelector('.moments-poster');
+          const frame = el.querySelector('iframe.moments-frame');
+          const overlay = el.querySelector('.moments-overlay');
+          return {
+            cardBg: getComputedStyle(card).backgroundColor,
+            posterOpacity: Number(getComputedStyle(poster).opacity),
+            posterZ: Number(getComputedStyle(poster).zIndex),
+            frameZ: frame ? Number(getComputedStyle(frame).zIndex) : 0,
+            overlayBg: getComputedStyle(overlay).backgroundImage,
+            color: getComputedStyle(overlay).color
+          };
+        });
+        assert.equal(look.cardBg, 'rgb(0, 0, 0)', `${width}·${theme}: 판 바탕은 테마와 무관한 검정 — ${look.cardBg}`);
+        assert.ok(look.posterOpacity > 0 && look.posterZ > look.frameZ, `${width}·${theme}: 썸네일이 iframe 위에 늘 보인다 — ${JSON.stringify(look)}`);
+        assert.match(look.overlayBg, /rgba\(0, 0, 0, 0\.92\)/, `${width}·${theme}: 판 아래 검은 그라데이션`);
+        assert.equal(look.color, 'rgb(255, 255, 255)', `${width}·${theme}: 겹친 글은 흰색`);
+        // 흰 글자 대비 — 그라데이션 최약 지점(alpha .55) 위에 하얀 썸네일이 있어도 4.5:1 이상.
+        const bg = 255 * (1 - 0.55), lin = v => { v /= 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
+        const contrast = 1.05 / (lin(bg) + 0.05);
+        assert.ok(contrast >= 4.5, `${width}·${theme}: 글 대비 ${contrast.toFixed(2)}:1 < 4.5:1`);
         // ↑ 단추와 키보드도 같은 동작
         const beforeUp = await panel.locator('.moments-stage').getAttribute('data-lt-moments-id');
         if (width <= 780) await panel.evaluate(el => el.querySelector('.moments-stage').dispatchEvent(new WheelEvent('wheel', { deltaY: -100, bubbles: true, cancelable: true })));
@@ -102,7 +147,7 @@ test('#1025 순간 보기 — iframe 2개 이하·10회 넘기기 같은 영상 
         const audit = await auditPage(h.page, '둘러보기 순간 보기');
         const structural = failuresOf(audit, String(width), theme).filter(row => ['겹침', '가려짐', '잘림', '가로넘침'].includes(row[0]));
         assert.deepEqual(structural, [], `${width}·${theme}: ${JSON.stringify(structural)}`);
-        console.log('#1025', width, theme, JSON.stringify({ maxFrames, unique: new Set(seen).size, advances: seen.length - 1, structural: structural.length }));
+        console.log('#1025', width, theme, JSON.stringify({ maxFrames, unique: new Set(seen).size, advances: seen.length - 1, structural: structural.length, pixels: { colors: pixels.colors, std: pixels.std }, contrast: Number(contrast.toFixed(2)) }));
       } finally { await h.ctx.close(); await new Promise(r => h.server.close(r)); }
     }
   } finally { await browser.close(); }
