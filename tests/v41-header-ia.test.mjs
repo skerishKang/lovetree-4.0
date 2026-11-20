@@ -90,21 +90,22 @@ test('첫 화면 로그인·트리 0: 세 자리 [순간 목록·둘러보기·�
   assert.deepEqual(plan.buttons.map(b => b.disabled), [false, false, false]);
 });
 
-test('첫 화면 로그인·트리 있음: 같은 세 자리, 세트는 테두리형(261116 PR 2)', () => {
+test('첫 화면 로그인·트리 있음: 아래 셋은 모두 밝은 단추(#1084)', () => {
   const plan = homeCenterState({member: 'in', treeCount: 2});
   assert.equal(plan.state, 'in-trees');
   assert.deepEqual(plan.buttons.map(b => b.label), ['순간 목록', '둘러보기', '서재']);
-  assert.deepEqual(plan.buttons.map(b => b.emphasis), [true, false, false]);
+  assert.deepEqual(plan.buttons.map(b => b.emphasis), [false, false, false]);
   assert.deepEqual(plan.buttons.map(b => b.disabled), [false, false, false]);
 });
 
-test('흰 강조: 로그아웃 첫 버튼 하나, 로그인은 위쪽 \'+ 순간 추가\' 하나(세트에 없다)', () => {
+test('자주색 단추는 한 화면에 하나 — 신규는 아래 첫 자리, 기존은 위쪽 \'+ 순간 추가\'(#1084)', () => {
   const out = homeCenterState({member: 'out'});
   assert.equal(out.buttons.filter(b => b.emphasis).length, 1, '로그아웃 첫 버튼');
-  for (const state of [{member: 'in', treeCount: 0}, {member: 'in', treeCount: 3}]) {
-    const plan = homeCenterState(state);
-    assert.equal(plan.buttons.filter(b => b.emphasis).length, 1, JSON.stringify(state));
-  }
+  const empty = homeCenterState({member: 'in', treeCount: 0, momentCount: 0});
+  assert.equal(empty.buttons.filter(b => b.emphasis).length, 1, '신규 첫 순간 추가');
+  assert.equal(empty.buttons[0].label, '＋ 첫 순간 추가');
+  const trees = homeCenterState({member: 'in', treeCount: 3});
+  assert.equal(trees.buttons.filter(b => b.emphasis).length, 0, '기존은 아래 셋에 강조가 없다');
 });
 
 test('로그아웃 첫 버튼의 로그인 주소는 4.1 첫 화면으로 돌아온다', () => {

@@ -248,7 +248,7 @@ html[data-lt-theme=garden] body,html[data-lt-theme=garden] .app-header{transitio
 :host([data-lt-theme=garden]) .recent-card{background:var(--lt-paper);color:var(--lt-ink)}
 :host([data-lt-theme=garden]) .recent-media{background:var(--lt-paper)}
 :host([data-lt-theme=garden]) .recent-media.vertical{width:100%}
-:host([data-lt-theme=garden]) .recent-media.vertical .recent-backdrop{opacity:.22}
+ :host([data-lt-theme=garden]) .recent-media.vertical::before{opacity:.7}
 :host([data-lt-theme=garden]) .recent-meta{background:var(--lt-paper);border-top:1px solid var(--lt-line-paper)}
 :host([data-lt-theme=garden]) .recent-head,:host([data-lt-theme=garden]) .recent-head-arrow,:host([data-lt-theme=garden]) .recent-meta small{color:var(--lt-muted)}
 :host([data-lt-theme=garden]) .recent-head:hover,:host([data-lt-theme=garden]) .recent-memo{color:var(--lt-ink)}
@@ -256,6 +256,10 @@ html[data-lt-theme=garden] body,html[data-lt-theme=garden] .app-header{transitio
 :host([data-lt-theme=garden]) .menuBtn:hover,:host([data-lt-theme=garden]) .subtleBtn:hover{background:var(--lt-paper);border-color:rgba(119,91,82,.58)}
 /* #942: 첫 화면의 순간 추가 단추만 장미색으로 되돌린다. 둘러보기·안내·궤도는 그대로 둔다. */
 :host .center .home-add-top.primary-cta,:host .center .home-add-top.primary-cta:hover,:host([data-lt-theme=garden]) .center .home-add-top.primary-cta,:host([data-lt-theme=garden]) .center .home-add-top.primary-cta:hover{background:var(--lt-cta-rose);border-color:var(--lt-cta-rose);color:var(--lt-cta-white)}
+:host .center .actions .subtleBtn{background:var(--lt-primary);color:var(--lt-primary-ink);border-color:var(--lt-primary)}
+:host .center .actions .subtleBtn:hover,:host .center .actions .subtleBtn:active{filter:brightness(.94)}
+:host([data-lt-theme=garden]) .center .actions .subtleBtn{background:var(--lt-paper);color:var(--lt-ink);border-color:var(--lt-line-paper)}
+:host .center .actions .primary-cta,:host .center .actions .primary-cta:hover,:host([data-lt-theme=garden]) .center .actions .primary-cta,:host([data-lt-theme=garden]) .center .actions .primary-cta:hover{background:var(--lt-cta-rose);border-color:var(--lt-cta-rose);color:var(--lt-cta-white)}
 :host([data-lt-theme=garden]) .hint,:host([data-lt-theme=garden]) .caption{color:var(--lt-muted);text-shadow:none}
 :host([data-lt-theme=garden]) .firstMark{border-color:var(--lt-rose);background:rgba(255,253,248,.86);color:var(--lt-ink);box-shadow:none}
 :host([data-lt-theme=garden]) .orbit-dialog{background:var(--lt-paper);border-color:rgba(119,91,82,.3);color:var(--lt-ink)}

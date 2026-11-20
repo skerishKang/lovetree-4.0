@@ -153,7 +153,7 @@ export function homeCenterState({ member = 'out', treeCount = 0, momentCount = t
   const labels = hasMoments ? [['moments','순간 목록'],['community','둘러보기'],['trees','서재']] : [['start','＋ 첫 순간 추가'],['community','둘러보기'],['guide','어떻게 쓰나요']];
   return {
     state: !signedIn ? 'out' : hasMoments ? 'in-trees' : 'in-empty',
-    buttons: labels.map(([key,label],i)=>({key,label,emphasis:i===0,disabled:false}))
+    buttons: labels.map(([key,label],i)=>({key,label,emphasis:!hasMoments&&i===0,disabled:false}))
   };
 }
 

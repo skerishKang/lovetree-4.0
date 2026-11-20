@@ -313,13 +313,12 @@ test('#1027 정원 이어 보기 카드의 종이색과 글 대비, 세로 영�
             await h.page.setViewportSize({width,height:width === 390 ? 844 : 900});
             const stats = await h.frame.locator('.recent-card').evaluate(card => {
               const media = card.querySelector('.recent-media'), meta = card.querySelector('.recent-meta');
-              const backdrop = card.querySelector('.recent-backdrop'), thumb = card.querySelector('.recent-thumb');
+              const before = getComputedStyle(media, '::before'), thumb = card.querySelector('.recent-thumb');
               const style = el => getComputedStyle(el);
               return {card:style(card).backgroundColor,media:style(media).backgroundColor,meta:style(meta).backgroundColor,
                 border:style(meta).borderTopWidth, width:media.getBoundingClientRect().width, metaWidth:meta.getBoundingClientRect().width,
                 height:media.getBoundingClientRect().height, fit:thumb && style(thumb).objectFit,
-                blur:backdrop && style(backdrop).filter, opacity:backdrop && style(backdrop).opacity,
-                sameThumb:backdrop && backdrop.src === thumb.src,
+                blur:before.filter, opacity:before.opacity, bgImage:before.backgroundImage, thumbSrc:thumb && thumb.src,
                 colors:[...card.querySelectorAll('.recent-head,.recent-head-arrow,.recent-meta strong,.recent-meta small,.recent-memo')].map(e=>style(e).color)};
             });
             if (theme === 'garden') {
@@ -331,15 +330,15 @@ test('#1027 정원 이어 보기 카드의 종이색과 글 대비, 세로 영�
               assert.ok(Math.abs(stats.width-stats.metaWidth)<1, JSON.stringify(stats));
               if (kind === 'vertical') {
                 assert.equal(stats.fit,'contain');
-                assert.equal(stats.blur,'blur(18px)');
-                assert.equal(stats.opacity,'0.22');
-                assert.ok(stats.sameThumb);
+                assert.match(stats.blur,/blur\(18px\)/);
+                assert.equal(stats.opacity,'0.7');
+                assert.ok(stats.bgImage.includes(stats.thumbSrc),'같은 썸네일을 CSS 변수로 깐다(#1084): '+JSON.stringify(stats));
               }
             } else {
               assert.equal(stats.card,'rgba(10, 9, 14, 0.82)');
               assert.equal(stats.media,'rgb(11, 10, 16)');
               assert.equal(stats.border,'0px');
-              if (kind === 'vertical') assert.equal(stats.opacity,'0.78');
+              if (kind === 'vertical') assert.equal(stats.opacity,'0.86');
             }
             if (kind === 'horizontal') assert.equal(stats.fit,'cover');
           }
