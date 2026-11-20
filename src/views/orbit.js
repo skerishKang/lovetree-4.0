@@ -150,7 +150,11 @@ export function mountOrbit(host,{trees,storage,context,actions,authHtml='',onSel
  const setBusy=(on)=>{const v=on?'1':null;
   if(v===host.getAttribute('data-lt-busy'))return;
   if(v)host.setAttribute('data-lt-busy','1');else host.removeAttribute('data-lt-busy');};
- const setMotionPaused=(next)=>{paused=!!next;if(paused)neutralizePointer();schedule();};
+ // #952 후속(261120): 멈춤·재생 모두 이미 걸린 WAAPI 궤도·떠 있음 애니메이션의 재생 속도를 즉시 맞춘다.
+ // syncMotion을 부르지 않으면(수정 전) 스위치를 꺼도 rAF 루프만 멈추고 애니메이션은 계속 돌아 카드가 멈추지 않았다.
+ // 다만 유효 상태(animRunning)가 실제로 바뀔 때만 맞춘다 — 동작 줄이기 기기에서 셸이 뜰 때 보내는
+ // lt41-motion(paused:false)이 syncMotion의 떠 있음 위상 리셋을 새로 발동시켜 #535가 재던 자리를 바꾸지 않게.
+ const setMotionPaused=(next)=>{const running=animRunning();paused=!!next;if(paused)neutralizePointer();if(animRunning()!==running)syncMotion();schedule();};
  function rememberCard(c){if(!demo)remember(storage,c.treeId,c.id);}
  // #394 1번: 상세 창에서 열기 전 목록 순서(트리 고르기 포함) 그대로 앞·뒤로 옮겨 본다.
  // 목록에 없는 순간(예시 채움 카드 등)은 옮겨 볼 목록이 없으니 화살표를 두지 않는다.
@@ -402,7 +406,7 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
  let hoveredCard=null;
   const TWO_PI=Math.PI*2, ORBIT_MS=90000, ORBIT_STEPS=48, PHASE_STEP=.000018;
  const orbitAnims=cards.map(()=>null), floatAnims=cards.map(()=>null);
- const animRunning=()=>!paused&&!dialog.open&&!document.hidden;
+ const animRunning=()=>!paused&&!reduced&&!dialog.open&&!document.hidden;
  const floatDelay=cards.map((c,i)=>i*370);
  // 멈춤(동작 줄이기·보기 메뉴)·팝업·숨은 탭이면 애니메이션만 세운다. 멈출 때는 떠 있음 위상을 첫 자리(0·18px)로
  // 되돌려, 예전에 elapsed 가 0 에 얼어 있던 화면과 같은 자리를 보여 준다.
