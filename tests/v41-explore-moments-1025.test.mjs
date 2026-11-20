@@ -87,7 +87,7 @@ test('#1025 순간 보기 — iframe 2개 이하·10회 넘기기 같은 영상 
   if (skip) assert.fail(skip);
   const browser = await chromium.launch({ headless: true });
   try {
-    for (const [width, height] of [[390, 844], [1440, 900], [2560, 1440]]) for (const theme of ['night', 'garden']) {
+    for (const [width, height] of [[390, 844], [1440, 900], [1440, 700], [2560, 1440]]) for (const theme of ['night', 'garden']) {
       const h = await boot(browser, { width, height, theme });
       try {
         const panel = h.page.locator('#community-moments-panel');
@@ -130,6 +130,17 @@ test('#1025 순간 보기 — iframe 2개 이하·10회 넘기기 같은 영상 
         assert.ok(look.posterOpacity > 0 && look.posterZ > look.frameZ, `${width}·${theme}: 썸네일이 iframe 위에 늘 보인다 — ${JSON.stringify(look)}`);
         assert.match(look.overlayBg, /rgba\(0, 0, 0, 0\.92\)/, `${width}·${theme}: 판 아래 검은 그라데이션`);
         assert.equal(look.color, 'rgb(255, 255, 255)', `${width}·${theme}: 겹친 글은 흰색`);
+        // 판 전체와 오른쪽 단추 4개가 화면 안에 있다(낮은 화면 1440×700 포함).
+        const bounds = await panel.evaluate(el => {
+          const card = el.querySelector('.moments-card').getBoundingClientRect();
+          const rail = [...el.querySelectorAll('.moments-rail-button')].map(node => node.getBoundingClientRect());
+          return { viewport: innerHeight, cardBottom: Math.round(card.bottom), cardTop: Math.round(card.top), railCount: rail.length, railBottom: Math.round(Math.max(...rail.map(r => r.bottom))), railTop: Math.round(Math.min(...rail.map(r => r.top))) };
+        });
+        assert.ok(bounds.cardTop >= 0 && bounds.cardBottom <= bounds.viewport, `${width}·${theme}: 판이 화면 밖 — ${JSON.stringify(bounds)}`);
+        assert.equal(bounds.railCount, 4, `${width}·${theme}: 단추 4개`);
+        assert.ok(bounds.railTop >= 0 && bounds.railBottom <= bounds.viewport, `${width}·${theme}: 단추가 화면 밖 — ${JSON.stringify(bounds)}`);
+        const tags = await panel.locator('.moments-tags').textContent();
+        assert.ok(!tags.includes(':'), `${width}·${theme}: 꼬리표 머리말을 뺀 값만 — ${tags}`);
         // 흰 글자 대비 — 그라데이션 최약 지점(alpha .55) 위에 하얀 썸네일이 있어도 4.5:1 이상.
         const bg = 255 * (1 - 0.55), lin = v => { v /= 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
         const contrast = 1.05 / (lin(bg) + 0.05);
@@ -147,7 +158,7 @@ test('#1025 순간 보기 — iframe 2개 이하·10회 넘기기 같은 영상 
         const audit = await auditPage(h.page, '둘러보기 순간 보기');
         const structural = failuresOf(audit, String(width), theme).filter(row => ['겹침', '가려짐', '잘림', '가로넘침'].includes(row[0]));
         assert.deepEqual(structural, [], `${width}·${theme}: ${JSON.stringify(structural)}`);
-        console.log('#1025', width, theme, JSON.stringify({ maxFrames, unique: new Set(seen).size, advances: seen.length - 1, structural: structural.length, pixels: { colors: pixels.colors, std: pixels.std }, contrast: Number(contrast.toFixed(2)) }));
+        console.log('#1025', width, theme, JSON.stringify({ maxFrames, unique: new Set(seen).size, advances: seen.length - 1, structural: structural.length, pixels: { colors: pixels.colors, std: pixels.std }, contrast: Number(contrast.toFixed(2)), cardBottom: bounds.cardBottom, railBottom: bounds.railBottom, viewport: bounds.viewport, tags }));
       } finally { await h.ctx.close(); await new Promise(r => h.server.close(r)); }
     }
   } finally { await browser.close(); }

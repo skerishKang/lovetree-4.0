@@ -1,6 +1,7 @@
 // #1025 1단계: 공개 '세로' 순간을 숏츠처럼 넘겨 보기.
 // iframe은 지금 것과 다음 것만 둔다 — 넘긴 것은 DOM에서 제거한다(동시에 살아 있는 iframe ≤ 2).
 // 세로 판정은 서버가 화면과 같은 함수(isVerticalMoment)로 해서 내려준다 — 여기서는 새로 만들지 않는다.
+import {parseTag} from './tags.mjs';
 const el=(tag,className,text)=>{const node=document.createElement(tag);if(className)node.className=className;if(text!=null)node.textContent=text;return node;};
 // 선 기호(컬러 이모지 금지) — 텍스트 변형 선택자로 흑백 선 모양을 고정하고 현재 글자색을 쓴다.
 const TREE_GLYPH='♣\uFE0E';
@@ -79,7 +80,8 @@ export function mountMoments({panel,onOpenShare}){
   if(item.aiTester)treeLine.append(el('span','moments-ai','AI 명예회원'));
   treeLine.append(el('span','moments-tree-name',item.treeTitle||''));
   titleLine.textContent=item.title||'';
-  tagLine.textContent=(item.keywords||[]).slice(0,4).join(' · ');
+  // 꼬리표는 '가수:아이유' 같은 머리말을 뺀 값만 — 기존 parseTag 한 벌을 그대로 쓴다.
+  tagLine.textContent=(item.keywords||[]).slice(0,4).map(raw=>parseTag(raw)?.value||raw).filter(Boolean).join(' · ');
   noteLine.textContent=item.note||'';
   noteLine.hidden=!item.note;
   // 지금 것 + 다음 것만 iframe — 나머지는 포스터로 남긴다.

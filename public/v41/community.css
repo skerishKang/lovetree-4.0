@@ -64,8 +64,10 @@ dialog.community-group-find::backdrop{background:transparent}
 .community-tabs{display:flex;gap:8px;justify-content:center;margin:6px auto 14px;max-width:1500px}
 .community-tabs button{min-width:88px;min-height:44px;padding:0 18px;border:1px solid var(--lt-line);border-radius:var(--lt-r-pill);background:var(--lt-glass);color:var(--lt-muted);font:inherit;font-size:14px;cursor:pointer}
 .community-tabs button[aria-selected="true"]{border-color:var(--lt-gold);background:var(--lt-primary);color:var(--lt-primary-ink)}
-.moments-stage{position:relative;display:flex;align-items:center;justify-content:center;gap:18px;max-width:1500px;margin:0 auto;min-height:min(72dvh,860px)}
-.moments-card{position:relative;width:min(calc((100dvh - 150px)*9/16),calc(100vw - 220px));max-width:560px;aspect-ratio:9/16;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-card);background:#000;overflow:hidden;box-shadow:var(--lt-garden-shadow)}
+/* 판 높이를 먼저 정하고(화면 - 머리줄 - 탭 - 위아래 여백) 너비는 9:16로 그 높이에서 계산한다 —
+   판 아래 글과 오른쪽 단추 4개가 낮은 화면(1440×700)에서도 화면 밖으로 나가지 않는다(#1025 재검수). */
+.moments-stage{position:relative;display:flex;align-items:center;justify-content:center;gap:18px;max-width:1500px;margin:0 auto;height:calc(100dvh - 261px);min-height:320px;max-height:1180px}
+.moments-card{position:relative;height:100%;width:auto;max-width:calc(100vw - 220px);aspect-ratio:9/16;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-card);background:#000;overflow:hidden;box-shadow:var(--lt-garden-shadow)}
 .moments-media{position:absolute;inset:0;overflow:hidden;background:#000}
 .moments-poster,.moments-frame{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border:0;background:#000}
 .moments-poster{z-index:2;opacity:1;transition:opacity .25s}
@@ -91,8 +93,8 @@ dialog.community-group-find::backdrop{background:transparent}
 .moments-step{width:48px;height:48px;border:1px solid var(--lt-gold-line);border-radius:50%;background:var(--lt-glass-strong);color:var(--lt-pearl);font-size:16px;cursor:pointer}
 .moments-empty{max-width:560px;margin:80px auto;text-align:center;color:var(--lt-muted)}
 @media(max-width:780px){
- .moments-stage{min-height:calc(100dvh - 150px);gap:0}
- .moments-card{width:100vw;max-width:none;height:calc(100dvh - 150px);aspect-ratio:auto;border-radius:0;border-left:0;border-right:0}
+ .moments-stage{height:calc(100dvh - 225px);min-height:320px;gap:0}
+ .moments-card{height:100%;width:auto;max-width:100vw;aspect-ratio:9/16;border-radius:0;border-left:0;border-right:0}
  .moments-rail{position:absolute;right:6px;bottom:64px;gap:6px;padding:0}
  .moments-rail-button{min-width:44px;min-height:44px}
  .moments-rail-label{display:none}
