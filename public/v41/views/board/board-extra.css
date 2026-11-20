@@ -336,3 +336,22 @@ html[data-lt-theme=garden] .ytLinkRow a{color:var(--lt-link,#3b5bdb)}
 /* '내 배치' 끌기 중 다른 카드 실시간 비켜주기(#894) — 180ms 전환, 움직임 끄기면 즉시. */
 .card.shiftPreview{transition:left .18s ease,top .18s ease}
 #cardLayer.motion-off .card.shiftPreview{transition:none}
+
+/* #886 항목 3: track58-pinboard.html의 <style> 블록을 이 파일 끝으로 옮겼다.
+   원래 이 파일 바로 뒤(모바일 배치 → 터치 타깃 순)에 있었으므로 끝에 붙여 캐스케이드 순서를 보존한다. */
+/* 전역 hidden 리셋 — 원 track58-pinboard.html head의 <style>[hidden]{display:none!important}</style>.
+   .moreMenu처럼 자체 [hidden] 규칙이 없는 요소는 이 리셋이 있어야 숨김이 유지된다
+   (없으면 .moreMenu{display:grid} 같은 author 규칙이 UA [hidden]{display:none}을 이겨 숨김 메뉴가 드러난다). */
+[hidden]{display:none!important}
+/* 모바일 배치 — 원 track58-pinboard.html <style>. */
+.mobileTools{display:none}
+@media(max-width:760px){.mobileTools{display:block;min-height:44px}.leftPanel:not(.mobileOpen){display:none}.leftPanel.mobileOpen{top:64px;bottom:auto;max-height:calc(100% - 140px);transform:none;z-index:60}.detail{bottom:72px;max-height:48%;}.toolbar{z-index:58}.tool,.collapseBtn{min-width:44px;min-height:44px}.cinemaBtn{bottom:14px;min-height:44px}.detail .close{min-width:44px;min-height:44px}/* #520: 읽기 전용(예시·공유)에서는 addBtn에 hidden 속성이 붙는다 — 강제 표시가 hidden을 이기지 않게 :not([hidden]). */.headbtn.primary:not([hidden]){display:block;min-height:44px}}
+/* 터치 타깃 — 원 track58-pinboard.html <style id="lt-touch-targets">. */
+/* 2026-11-08 터치 타깃: 보이는 모양은 그대로 두고 ::after로 누르는 영역만 44px 이상으로 넓힌다. */
+#minusBtn,#plusBtn,#resetBtn,#openMoment,#detailYtLink,#cinemaFromMoment,#dHeartSave,.modeSwitchBtn,#toolCinema,#toolFit{position:relative}
+/* #421: 닫기(×) 단추는 board.css의 position:absolute(오른쪽 위)를 지켜야 한다. relative로
+   덮어 쓰면 ×가 "순간 상세" 글자 위에 앉는다. absolute여도 ::after 터치 영역은 그대로 동작한다. */
+#minusBtn::after{content:"";position:absolute;inset:-3px -5px}
+#plusBtn::after{content:"";position:absolute;inset:-3px -2px}
+#resetBtn::after,#openMoment::after,#detailYtLink::after,#cinemaFromMoment::after,#dHeartSave::after,#toolCinema::after,#toolFit::after{content:"";position:absolute;inset:-5px 0}
+#detailClose::after{content:"";position:absolute;inset:-11px}
