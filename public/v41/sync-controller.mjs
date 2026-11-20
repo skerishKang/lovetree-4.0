@@ -72,13 +72,13 @@ export function createSyncController({getState, replaceState, api, draftStorage 
     try { draftStorage.removeItem(key); } catch { /* session storage may be unavailable */ }
   }
 
-  function savePendingDraft(sent) {
+  function savePendingDraft(sent, reason = 'auth') {
     const key = pendingDraftKey(activeSubject);
     if (!draftStorage || !key) return;
     try {
       draftStorage.setItem(key, JSON.stringify({
         version: 1, subject: activeSubject, expectedRevision: sent.expected,
-        clientKey: sent.key, state: JSON.parse(sent.serial)
+        clientKey: sent.key, state: JSON.parse(sent.serial), reason, editCount
       }));
     } catch { /* quota or browser policy: keep the in-page retry state */ }
   }
@@ -95,7 +95,8 @@ export function createSyncController({getState, replaceState, api, draftStorage 
           !Number.isSafeInteger(draft.expectedRevision) || draft.expectedRevision < 0 ||
           typeof draft.clientKey !== 'string' || !draft.clientKey || draft.clientKey.length > 200) throw new Error('invalid_pending_draft');
       const state = validateState(draft.state);
-      return { key, state, serial: JSON.stringify(state), expectedRevision: draft.expectedRevision, clientKey: draft.clientKey };
+      return { key, state, serial: JSON.stringify(state), expectedRevision: draft.expectedRevision, clientKey: draft.clientKey,
+        reason: draft.reason === 'hide' ? 'hide' : 'auth', editCount: Number.isSafeInteger(draft.editCount) ? draft.editCount : 0 };
     } catch {
       clearPendingDraft(subject);
       return null;
@@ -107,7 +108,19 @@ export function createSyncController({getState, replaceState, api, draftStorage 
     if (!draft) return false;
     replaceState(draft.state);
     dirty = true;
+    editCount = draft.editCount;
     attempt = { serial: draft.serial, expected: draft.expectedRevision, key: draft.clientKey };
+    // #1045: 창을 닫을 때 기기에 적어 둔 분은 같은 개정이면 곧바로 이어 보낸다.
+    // 서버가 이미 앞서면 일반 저장 충돌과 같은 띠·선택지를 보여 준다(자동 덮어쓰기 없음).
+    if (draft.reason === 'hide') {
+      seenRevision = serverRevision;
+      if (draft.expectedRevision === serverRevision) {
+        void push();
+        return true;
+      }
+      return emit(status({phase:'conflict',detail:conflictDetail(),changes:editCount,
+        actions:[{name:'pull',label:'최신 기록 불러오기'},{name:'force',label:'이 화면 것으로 덮어쓰기'}]}));
+    }
     if (draft.expectedRevision === serverRevision) {
       return emit(status({phase:'rejected',detail:'로그인 전에 저장하지 못한 내용을 복원했어요. 다시 저장해 주세요.',actions:actions.retry}));
     }
@@ -186,10 +199,19 @@ export function createSyncController({getState, replaceState, api, draftStorage 
   // 아직 서버에 못 보낸 바뀜이 영영 사라진다 — 담은 직후 꼬리표 칩을 확정하고 곧장 창을 닫으면 칩은 '확정'으로 보였지만
   // 서버에는 꼬리표가 없었다(운영센터 의견 #35). 페이지가 숨거나 닫히는 순간 keepalive로 즉시 보낸다 — 같은 요청 키로
   // 같은 내용을 보내면 서버가 같은 요청으로 묶으니(되묻기 안전) 눌러 보내도 어긋나지 않고, 창이 살아 돌아오면 이 push가
-  // 답을 받아 상태를 맞춘다. keepalive 몸통 한도(64KB)를 넘는 큰 기록은 보내지 않는다 — 기존 900ms 저장이 맡는다.
+  // 답을 받아 상태를 맞춘다. keepalive 몸통 한도(64KB)를 넘는 큰 기록이나 요청이 이미 나간 중이면
+  // 보내지 않는 대신 미전송분을 기기 보관함에 동기로 적는다(#1045) — 다음 접속이 개정을 견줘 이어 보낸다.
   function flushOnHide() {
-    if (!owned || revision === null || inflight || !dirty || current.phase === 'conflict') return false;
-    if (JSON.stringify(getState()).length > 60000) return false;
+    if (!owned || revision === null || !dirty || current.phase === 'conflict') return false;
+    const serial = JSON.stringify(getState());
+    if (!attempt || attempt.serial !== serial || attempt.expected !== revision)
+      attempt = {serial, expected:revision, key:makeClientKey()};
+    // #1045: 큰 기록(keepalive 한도 초과)이나 이미 나간 요청이 있으면 동기 저장도 못 한다.
+    // 로그인 만료 임시 보관과 같은 길에 남기고, 다음 접속에서 개정을 견줘 이어 보낸다.
+    if (inflight || serial.length > 60000) {
+      savePendingDraft(attempt, 'hide');
+      return false;
+    }
     void push({ keepalive: true });
     return true;
   }
