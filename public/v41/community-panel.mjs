@@ -10,9 +10,25 @@ import {matchGroups,sectionGroups} from './group-search.mjs';
 import {localDateOnly} from './local-date.mjs';
 // #792 4단계 ⑤: 공개 무대 담기 단추와 '이번 주 인기 무대' 줄의 규칙은 community-stages.mjs 한 곳에 둔다.
 import {POPULAR_STAGE_TITLE,POPULAR_STAGE_EMPTY,POPULAR_STAGE_WEEK_LABEL,publicStageCount,stageVoteLabel,stageVoteNotice,stageMomentTitle,readStage,toggleStage} from './community-stages.mjs';
+// #1025: [순간] 탭 — 공개 세로 순간 숏츠 보기(서버 조회·세로 판정은 기존 한 벌 재사용).
+import {mountMoments} from './community-moments.mjs';
 const el=(tag,className,text)=>{const node=document.createElement(tag);if(className)node.className=className;if(text!=null)node.textContent=text;return node;};
+// 셸이 낯선 주소를 #home으로 바꾸기 전에(module import 시점) 직접 들어온 주소를 기억한다(#1025).
+const hashNow=()=>typeof location!=='undefined'?(location.hash||''):'';
+const ENTER_MOMENTS=typeof location!=='undefined'&&location.hash==='#explore/moments';
 export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareOwn,hasOwnTree,getDateStyle,getArtistGroups=()=>[]}){
  const api=createCommunityApi(),form=dialog.querySelector('#community-search-form'),query=dialog.querySelector('#community-query'),list=dialog.querySelector('#community-list'),groups=dialog.querySelector('#community-groups'),feedback=dialog.querySelector('#community-feedback'),more=dialog.querySelector('#community-more'),preview=dialog.querySelector('#community-preview'),sortSelect=dialog.querySelector('#community-sort');
+ // #1025: [트리] [순간] 탭 — 주소 #explore/moments 는 새로고침·공유로 유지한다.
+ const treeTab=dialog.querySelector('#community-tab-trees'),momentsTab=dialog.querySelector('#community-tab-moments');
+ const treePanel=dialog.querySelector('#community-tree-panel'),momentsPanel=dialog.querySelector('#community-moments-panel');
+ const moments=momentsPanel?mountMoments({panel:momentsPanel,onOpenShare}):null;
+ let currentTab='trees',hashGuard=false;
+ const writeHash=value=>{
+  if(typeof history==='undefined'||typeof history.pushState!=='function'||typeof history.replaceState!=='function')return;
+  hashGuard=true;
+  (value?history.pushState:history.replaceState).call(history,null,'',value||'#home');
+  setTimeout(()=>{hashGuard=false;},0);
+ };
   let cursor='',loading=false,items=[],selectedId=null,selectedArtist='',loadId=0,publicGroups=[];
  // #784 그룹 찾기 창·자동완성 상태. publicGroupsAll는 서버가 내려주는 전체 목록(discover)이며
  // publicGroups(칩용 상위 8)와 내 트리의 가수(getArtistGroups)를 tagKey로 하나로 합쳐 쓴다.
@@ -255,8 +271,38 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
  sortSelect.onchange=()=>load(false);
  for(const link of dialog.querySelectorAll('[data-community-view]'))link.onclick=()=>{dialog.close();[...document.querySelectorAll('[data-view]')].find(node=>node.dataset.view===link.dataset.communityView)?.click();};
  const tabs=()=>[...document.querySelectorAll('nav [data-view]')];
-  button.onclick=()=>{if(!dialog.open){dialog.showModal();button.setAttribute('aria-current','true');for(const t of tabs()){if(t.getAttribute('aria-current')==='true'){t.dataset.wasCurrent='1';t.setAttribute('aria-current','false');}}load(false);loadPopularStages();}};
- dialog.addEventListener('close',()=>{if(preview.open)preview.close();button.setAttribute('aria-current','false');const emptyShown=!document.getElementById('empty')?.hidden;for(const t of tabs()){if(t.dataset.wasCurrent){delete t.dataset.wasCurrent;if(!emptyShown)t.setAttribute('aria-current','true');}}button.focus();});
+  // #1025: 탭을 바꿀 때마다 주소를 갱신한다(새로고침·공유로 같은 보기를 연다).
+  function selectTab(which,{writeHash=true}={}){
+   currentTab=which;
+   const momentsOn=which==='moments';
+   if(treeTab){treeTab.setAttribute('aria-selected',String(!momentsOn));treeTab.tabIndex=momentsOn?-1:0;}
+   if(momentsTab){momentsTab.setAttribute('aria-selected',String(momentsOn));momentsTab.tabIndex=momentsOn?0:-1;}
+   if(treePanel)treePanel.hidden=momentsOn;
+   if(momentsPanel)momentsPanel.hidden=!momentsOn;
+   if(moments)momentsOn?moments.activate():moments.deactivate();
+   if(writeHash&&hashNow()!==(momentsOn?'#explore/moments':'#explore'))writeHash(momentsOn?'#explore/moments':'#explore');
+  }
+  treeTab?.addEventListener('click',()=>selectTab('trees'));
+  momentsTab?.addEventListener('click',()=>selectTab('moments'));
+  const openPanel=()=>{
+   if(dialog.open)return;
+   dialog.showModal();button.setAttribute('aria-current','true');
+   for(const t of tabs()){if(t.getAttribute('aria-current')==='true'){t.dataset.wasCurrent='1';t.setAttribute('aria-current','false');}}
+   const wantMoments=ENTER_MOMENTS||hashNow()==='#explore/moments';
+   selectTab(wantMoments?'moments':'trees',{writeHash:false});
+   if(!wantMoments){load(false);loadPopularStages();}
+  };
+  button.onclick=openPanel;
+  // 주소로 직접 들어온 경우(#explore/moments)에도 같은 보기를 연다.
+  // 셸의 첫 화면 적용(screens.mjs가 패널을 닫는다)이 끝난 뒤에 연다.
+  if(ENTER_MOMENTS||hashNow()==='#explore/moments')setTimeout(openPanel,0);
+  if(typeof window!=='undefined'&&typeof window.addEventListener==='function')window.addEventListener('hashchange',()=>{
+   if(hashGuard)return;
+   if(hashNow()==='#explore/moments'){openPanel();selectTab('moments',{writeHash:false});}
+  });
+ dialog.addEventListener('close',()=>{if(preview.open)preview.close();moments?.deactivate();button.setAttribute('aria-current','false');const emptyShown=!document.getElementById('empty')?.hidden;for(const t of tabs()){if(t.dataset.wasCurrent){delete t.dataset.wasCurrent;if(!emptyShown)t.setAttribute('aria-current','true');}}button.focus();
+  if(hashNow()==='#explore/moments'||hashNow()==='#explore')writeHash('');
+ });
  preview.addEventListener('close',()=>[...list.querySelectorAll('.community-card')].find(node=>node.dataset.shareId===selectedId)?.focus());
  preview.addEventListener('click',event=>{if(event.target===preview)preview.close();});
  // #784 자동완성(#784 ②): 검색칸 입력마다 화면에서만 돌린다(네트워크 왕복 없음).
