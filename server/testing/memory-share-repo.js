@@ -13,7 +13,8 @@ export function createMemoryShareRepo({now=Date.UTC(2026,10,1)}={}) {
     // #538: 자동 공개 행이 없으면 만들고, 취소돼 있으면 되살린다(트리 하나에 자동 행 하나).
     async upsertAutoShare({productId,subjectId,shareId,treeId,entryMomentId,momentCount}){
       const existing=[...rows.values()].find(v=>v.productId===productId&&v.subjectId===subjectId&&v.treeId===treeId&&v.origin==='auto');
-      if(existing){existing.status='active';existing.revokedAt=null;existing.entryMomentId=entryMomentId;existing.momentCount=momentCount;return structuredClone(existing);}
+      // #1046: 이미 있는 자동 행은 되살리지 않는다 — 주인이 취소한 행은 revoked 그대로 둔다.
+      if(existing)return structuredClone(existing);
       const value={productId,shareId,subjectId,treeId,entryMomentId,view:'book',origin:'auto',momentCount,status:'active',createdAt:stamp(),revokedAt:null,discoverable:false,discoverableAt:null};
       rows.set(key(productId,shareId),value);return structuredClone(value);
     },

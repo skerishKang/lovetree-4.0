@@ -220,7 +220,7 @@ export function createMessages(deps) {
       if (getMember()?.snapshot().owned) openAccountMenu(); else $('account-entry').click();
     }
     if (data?.type === 'lt41-community') $('community-menu').click();
-    if (data?.type === 'lt41-example' && exampleTree.moments.some(m => m.id === data.momentId) && ['track59-sketchbook.html', 'track58-pinboard.html'].includes(data.view)) {
+    if (data?.type === 'lt41-example' && exampleTree?.moments?.some(m => m.id === data.momentId) && ['track59-sketchbook.html', 'track58-pinboard.html'].includes(data.view)) {
       sample({treeId: exampleTree.id, momentId: data.momentId}, data.view);
     }
     if (data?.type === 'lt-selection' || data?.type === 'lt41-choose') { links(); writeLocation(); }

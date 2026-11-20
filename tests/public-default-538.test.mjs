@@ -380,3 +380,33 @@ test('격리 트리가 섞인 문서를 저장하면 격리 트리는 자동 공
   assert.equal(quarantined.status, 'active', '격리 트리의 기존 공유 행은 해제하지 않는다');
   assert.equal(quarantined.treeId, deviant.id);
 });
+
+test('#1046: 공유 취소 뒤 저장이 있어도 옛 자동 주소는 410으로 남고, 직접 다시 공유만 새 주소를 연다', async () => {
+  const h = await setup();
+  const tree = treeWithMoments(3);
+  await h.workspace.write(principal('alice'), { state: { version: 1, trees: [tree] }, expectedRevision: 0, clientKey: 'seed-revoke-1046' });
+  const [auto] = await h.shareRepo.list({ productId: PRODUCT, subjectId: 'alice' });
+  assert.equal(auto.status, 'active', '처음엔 자동 공개가 열려 있다');
+  const oldId = auto.shareId;
+  assert.equal((await h.request(h.shareHandle, 'GET', `/api/public/shares/${oldId}`)).status, 200);
+
+  assert.equal((await h.shareService.revoke('alice', oldId)).status, 'revoked');
+  assert.equal((await h.request(h.shareHandle, 'GET', `/api/public/shares/${oldId}`)).status, 410, '취소 직후 차단');
+
+  // 아무 저장이나 한 번 — 저장 뒤 동기화가 같은 주소를 다시 켜지 않는다.
+  const grown = addMoment(tree, { subject: '윤슬', title: '새 순간', note: '기록', emotion: '위로', date: '2026-11-02', url: '' }, tree.moments[0].id, CLOCK);
+  await h.workspace.write(principal('alice'), { state: { version: 1, trees: [grown] }, expectedRevision: 1, clientKey: 'save-after-revoke-1046' });
+  const still = await h.shareRepo.load({ productId: PRODUCT, shareId: oldId });
+  assert.equal(still.status, 'revoked', '저장 뒤에도 자동 행이 되살아나지 않는다');
+  assert.ok(still.revokedAt, '주인이 내림 표식이 남는다');
+  assert.equal((await h.request(h.shareHandle, 'GET', `/api/public/shares/${oldId}`)).status, 410, '공개 읽기가 계속 410');
+
+  // 다시 공유는 공유 창에서 직접 켤 때만 — 새 주소로 열리고 옛 주소는 그대로 막힌다.
+  const input = { treeId: grown.id, entryMomentId: grown.moments[0].id, view: 'book' };
+  const preview = await h.request(h.shareHandle, 'POST', '/api/shares/preview', input, 'alice');
+  const made = await h.request(h.shareHandle, 'POST', '/api/shares', { ...input, previewToken: preview.body.preview.previewToken }, 'alice');
+  assert.equal(made.status, 201);
+  assert.notEqual(made.body.share.id, oldId, '직접 공유는 새 주소를 만든다');
+  assert.equal((await h.request(h.shareHandle, 'GET', `/api/public/shares/${made.body.share.id}`)).status, 200, '새 주소는 열린다');
+  assert.equal((await h.request(h.shareHandle, 'GET', `/api/public/shares/${oldId}`)).status, 410, '옛 주소는 여전히 410');
+});

@@ -182,6 +182,11 @@ test('공개 무대 읽기는 원본 revision·소개·공개·별칭 숨김·�
     await shares.revoke({ ...context, shareId: alias });
     assert.deepEqual(await owners(), ['honor']);
     await shares.upsertAutoShare({ ...context, shareId, entryMomentId: 'm0', momentCount: 3 });
+    assert.equal((await shares.load({ productId, shareId })).status, 'revoked', '#1046: 동기화가 주인이 내린 자동 행을 되살리지 않는다');
+    assert.deepEqual(await owners(), ['honor'], '#1046: 옛 주소는 여전히 공개되지 않는다');
+    // #1046: 다시 공유는 공유 창에서 직접 켤 때만 — 새 주소로 만든다.
+    const resharedId = 'owner-reshared'.padEnd(24, 'x');
+    await shares.create({ ...context, shareId: resharedId, entryMomentId: 'm0', view: 'book', momentCount: 3 });
     await visibility.set({ ...context, visibility: 'private' });
     assert.deepEqual(await owners(), ['honor']);
     await visibility.set({ ...context, visibility: 'public' });
