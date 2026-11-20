@@ -6,7 +6,10 @@ import {createShareApi} from './share-api.mjs';
 import {createMemberSession} from './member-session.mjs';
 import {hasPendingDraft} from './sync-controller.mjs';
 import {clearCachedWorkspace, readCachedWorkspace} from './workspace-cache.mjs';
-import {exampleTree} from './example.mjs';
+// #1026 E: 예시 데이터(1MB)는 정적으로 부르지 않는다 — 로그인 사용자의 화면 로딩을 막지 않게
+// 예시가 실제로 필요한 순간에만 동적으로 부른다(로그아웃 첫 화면, 예시 카드 열기, 예시 둘러보기).
+let exampleTree=null,examplePromise=null,exampleInitializing=false;
+function loadExampleTree(){if(!examplePromise)examplePromise=import('./example.mjs').then(mod=>{exampleTree=mod.exampleTree;return exampleTree});return examplePromise;}
 import {parseSelectionRoute,memberStartupView,ownerSelectionRoute,accountPosition,rememberAccountPosition,resolveAccountPosition,stashPendingOwnerRoute,pendingOwnerRoute,takePendingOwnerRoute} from './selection-location.mjs';
 import {applyViewAccessibility,connectionLabel} from './view-a11y.mjs';
 import {accountPresentation,treePickerLabel,treePickerText,treeViewsVisible,writeMenuLabel,headerState,headerPartsFor,readTipsSeen,writeTipsSeen,tipsWanted,unsavedNoticeText,FIRST_TREE_TIPS,homeCenterState,homeStartLoginUrl,readTheme,readLoginIntent,writeTheme,nextTheme,themeButtonLabel,themeButtonAriaLabel,themePressed,appliedTheme,applyThemeAttribute,LOGIN_INTENTS,readPageTurn,writePageTurn} from './header-state.mjs';
@@ -483,7 +486,7 @@ const shellMessages=createMessages({
   applyTheme:(theme)=>applyTheme(theme),
   paintThemeControls:()=>paintThemeControls(),
   viewForFile:file=>viewForFile(file),
-  exampleTree,
+  get exampleTree(){return exampleTree;},
   journey:shellJourney,
   // #368 3차: 공유 창 시작값(처음 열 보기·둘러보기 올림 기본)은 계정 설정에서 온다.
   getShareDefaults:()=>({view:currentShareView()})
@@ -633,7 +636,8 @@ const shellScreens=createScreens({
   hasTree:()=>!!window.LT41,
   takeNetworkOpen,
   takeBoardOpen,
-  closePanels:()=>shellDialogs.closePanels(),
+  // #1026 E: 로그아웃 예시를 동적으로 받는 동안에는 사용자가 연 창을 닫지 않는다.
+  closePanels:()=>{if(exampleInitializing)return;shellDialogs.closePanels();},
   // 이슈 933: 화면을 옮긴 뒤 안내 판을 다시 맞춘다 — 첫 여정(새 트리 만들기)에서는 띄우지 않는다.
   syncTips:()=>syncTreeTips(),
   flowNavigation,
@@ -891,8 +895,8 @@ function projectWorkspace(input){
  try{return workspaceModel(input);}
  catch(error){console.warn('[LT41] 작업 공간을 읽지 못했어요:',error?.message||String(error));return null;}
 }
-function load(input,kind,selection={},fallback={}){
- const projected=kind==='example'?{trees:[exampleTree]}:projectWorkspace(input);
+function load(input,kind,selection={},fallback={},example=null){
+ const projected=kind==='example'?{trees:[example||exampleTree].filter(Boolean)}:projectWorkspace(input);
  if(!projected){
   if(kind!=='server')throw new Error('기록을 읽을 수 없어요. 파일 형식을 확인해 주세요.');
   notify('기록을 불러오지 못했어요. 화면을 새로고침해 다시 시도해 주세요.',{hold:true});
@@ -1117,7 +1121,7 @@ async function startMember(){setMemberRefreshStarted(true);if(!leaveMember())ret
  }
  if(generation===loadGeneration){const startupJourney=parseJourneyRoute(location.hash);if(startupJourney){if(session.snapshot().owned&&session.snapshot().writable)openFirstJourney({step:startupJourney.step,route:true});else{history.replaceState(null,'','#home');handledHash='#home';}}}
 }
-function sample(selection={},view){if(!pauseMember())return;++loadGeneration;if(view)current=view;load(null,'example',selection);if(view)writeLocation();$('save-feedback').hidden=true;if($('account-settings').open)$('account-settings').close();}
+async function sample(selection={},view){if(!pauseMember())return;const tree=await loadExampleTree();++loadGeneration;if(view)current=view;load(null,'example',selection,{},tree);if(view)writeLocation();$('save-feedback').hidden=true;if($('account-settings').open)$('account-settings').close();}
 $('account-entry').onclick=e=>{
  if(member?.snapshot().owned){e.preventDefault();openAccountMenu();}
  else if(parseSelectionRoute(location.hash).scope==='owner')stashPendingOwnerRoute(sessionStorage,location.hash);
@@ -1627,7 +1631,17 @@ for(const f of frames())f.addEventListener('load',()=>{frameLoaded(f);
  // #894: 새로 뜬 안쪽 화면에도 움직임 끄기 상태를 알린다(메모리 상태 — 화면을 다시 열면 처음 상태).
  try{f.contentWindow.postMessage({type:'lt41-motion',paused:motionPaused},location.origin)}catch{}});
 paintThemeControls();applyTheme();paintTitleDisplayControls();applyAdvanced();
-if(initialRoute.scope==='public')showPublicRoute(initialRoute);else load(null,'example');
+if(initialRoute.scope==='public')showPublicRoute(initialRoute);
+else if(/^#explore/.test(location.hash)){/* #1025: 둘러보기 패널이 자기 주소를 연다 — 예시 로드로 주소를 덮지 않는다. */}
+else if(shouldLoadMemberRecords(location.search,document.cookie,location.hash)||shellIntake.pending()){
+ // #1026 E: 기존 사용자는 예시를 받지 않는다. 주소가 정해지는 즉시 빈 틀을 세우고,
+ // 아래 startMember()가 기록을 받는 대로 화면 iframe을 연다 — example.mjs 요청 0.
+ clear();
+}else{
+ // 로그아웃·신규 사용자는 예시가 실제 내용이므로 필요한 이 순간에만 동적으로 받는다.
+ exampleInitializing=true;
+ void loadExampleTree().then(tree=>{if(source!=='server'&&source!=='share')load(null,'example',{}, {},tree);exampleInitializing=false;}).catch(()=>{exampleInitializing=false;});
+}
 
 function backup(){const data=member?.state();if(!data){notify('백업할 내 기록이 없어요.');return;}const a=document.createElement('a'),url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));a.href=url;a.download='lovetree-draft.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),0);}
 function openAssets(opener=document.activeElement){if(!member?.snapshot().owned){notify('로그인한 뒤 내 보관 파일을 확인할 수 있어요.');return;}shellDialogs.rememberOpener(opener);panel('account-assets');uploads.openAssets();}

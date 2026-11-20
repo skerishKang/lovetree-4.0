@@ -69,14 +69,14 @@ export function createShareRepo(pool) {
       );
       return result.rowCount;
     },
-    // #538: 자동 공개 행이 없으면 만들고, 취소돼 있으면 되살린다(트리 하나에 자동 행 하나).
+    // #538: 자동 공개 행이 없으면 만든다(트리 하나에 자동 행 하나).
+    // #1046: 주인이 취소한 행(status='revoked', revoked_at 있음)은 되살리지 않는다 — ON CONFLICT DO NOTHING.
+    // 다시 공유는 공유 창에서 직접 새 링크를 만들 때만 이뤄진다(동기화가 같은 주소를 다시 켜지 않는다).
     async upsertAutoShare({productId,subjectId,shareId,treeId,entryMomentId,momentCount}) {
       const result = await pool.query(
         `INSERT INTO lovetree_shares (product_id,share_id,subject_id,tree_id,entry_moment_id,initial_view,origin,moment_count)
          VALUES ($1,$2,$3,$4,$5,'book','auto',$6)
-         ON CONFLICT (product_id,subject_id,tree_id) WHERE origin='auto' DO UPDATE
-           SET status='active', revoked_at=NULL, entry_moment_id=EXCLUDED.entry_moment_id,
-               moment_count=EXCLUDED.moment_count, updated_at=now()
+         ON CONFLICT (product_id,subject_id,tree_id) WHERE origin='auto' DO NOTHING
          RETURNING *`,
         [productId,shareId,subjectId,treeId,entryMomentId,momentCount]
       );
