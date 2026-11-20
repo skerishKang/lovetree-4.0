@@ -318,3 +318,23 @@ test('옮겨도 꼬리표는 유지되고 이어진 순간 연결은 원래 트�
   assert.equal(childInSource.parentId, rootId, '이어진 순간은 원래 트리의 위 순간에 다시 붙는다(연결이 끊기지 않는다)');
   validateState(result.state);
 });
+
+// #1038: 세로 판정값은 선택 필드 — 없는 옛 문서는 그대로 읽히고(이전 불필요), 있는 값만 형식 검사한다.
+test('#1038: 미디어 세로값은 저장·왕복되고 문자열·음수는 거부된다', () => {
+  const youtube = 'https://www.youtube.com/watch?v=abc123DEF45';
+  const media = { title: '무대 영상', channel: '채널', vertical: true, width: 1080, height: 1920 };
+  const first = createTree(input());
+  const grown = addMoment(first, { ...input('쇼츠'), url: youtube, mediaMetadata: media }, first.moments[0].id);
+  const saved = validateState(JSON.parse(JSON.stringify(stateOf(grown)))).trees[0].moments.at(-1).mediaMetadata;
+  assert.deepEqual(saved, { title: '무대 영상', channel: '채널', source: 'www.youtube.com', vertical: true, width: 1080, height: 1920 });
+  assert.equal(saved.vertical, true, '세로값이 왕복 뒤에도 남는다');
+  // 값만 있는 경우도 미디어 정보로 유지된다(제목·채널 없이 실측 결과만 저장하는 길).
+  const only = validateMomentInput({ ...input('쇼츠'), url: youtube, mediaMetadata: { vertical: true } });
+  assert.deepEqual(only.mediaMetadata, { title: '', channel: '', source: 'www.youtube.com', vertical: true });
+  // 옛 문서(새 필드 없음)는 변하지 않는다 — 운영 데이터 이전이 필요 없다.
+  const old = validateMomentInput({ ...input('옛 영상'), url: youtube, mediaMetadata: { title: '영상' } });
+  assert.equal('vertical' in old.mediaMetadata, false);
+  assert.throws(() => validateMomentInput({ ...input('잘못'), url: youtube, mediaMetadata: { vertical: 'true' } }), /참이나 거짓/);
+  assert.throws(() => validateMomentInput({ ...input('잘못'), url: youtube, mediaMetadata: { width: -1 } }), /숫자/);
+  assert.throws(() => validateMomentInput({ ...input('잘못'), url: youtube, mediaMetadata: { height: '1920' } }), /숫자/);
+});

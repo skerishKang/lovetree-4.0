@@ -240,3 +240,6 @@ export function createProxy({ fetcher = (...args) => fetch(...args), timeoutMs =
     }
   };
 }
+
+// 프록시가 넘기는 전체 경로 — 서버 진입 분기 표 검사에서 쓴다(#1047). 값은 그대로 두고 읽기용으로만 내보낸다.
+export const ALLOWED_PATHS = ALLOWED;

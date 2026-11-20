@@ -140,16 +140,33 @@ function safeMediaThumbnail(value) {
     return '';
   }
 }
+// #1038: 세로 판정값(선택) — 없는 값은 '모름'으로 두고, 있으면 형식만 엄격히 지킨다.
+// 문자열·음수·Infinity·NaN은 저장하지 않고 거부한다(새 필드가 생겨도 옛 문서는 그대로 읽힌다 → 이전 불필요).
+function normalizeVerticalMedia(value) {
+  const out = {};
+  if (value.vertical !== undefined && value.vertical !== null) {
+    if (typeof value.vertical !== 'boolean') throw new Error('미디어 세로 값은 참이나 거짓이어야 해요.');
+    out.vertical = value.vertical;
+  }
+  for (const key of ['width', 'height']) {
+    const number = value[key];
+    if (number === undefined || number === null) continue;
+    if (typeof number !== 'number' || !Number.isFinite(number) || number < 0 || number > 100000) throw new Error('미디어 가로세로 크기는 0 이상의 숫자여야 해요.');
+    out[key] = number;
+  }
+  return out;
+}
 function normalizeMediaMetadata(value, url) {
   if (value === undefined || value === null) return null;
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('미디어 정보를 확인해 주세요.');
   const title = optionalText(value.title, '미디어 제목', 240);
   const channel = optionalText(value.channel, '미디어 채널', 160);
   const thumbnail = safeMediaThumbnail(value.thumbnail);
-  if (!title && !channel && !thumbnail) return null;
+  const vertical = normalizeVerticalMedia(value);
+  if (!title && !channel && !thumbnail && !Object.keys(vertical).length) return null;
   const source = url ? new URL(url).hostname : '';
   if (!source) return null;
-  const result = {title, channel, source};
+  const result = {title, channel, source, ...vertical};
   if (thumbnail) result.thumbnail = thumbnail;
   return result;
 }
