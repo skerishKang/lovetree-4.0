@@ -84,7 +84,7 @@ export function cardOf(treeId, moment, currentOrigin, youtube = null) {
   // #330 판정 재사용: 내 기록(서버 기록·로그인 소유자)만 YouTube 썸네일을 처음부터 카드로 쓴다.
   // 썸네일 주소는 LTMedia.describe의 loadUrl 한 벌에서 온다 — 새로 만들지 않는다(quick-add와 같은 규칙).
   const media = (!image && youtube?.auto) ? youtube.describe?.(text(moment?.url)) : null;
-  const ytCandidates = (media?.kind === 'youtube' && media.loadUrl)
+  const ytCandidates = (!image && youtube?.auto)
     ? thumbnailCandidates(moment, { autoLoad: true, currentOrigin })
     : [];
   const thumb = ytCandidates[0] || (media?.kind === 'youtube' && media.loadUrl ? media.loadUrl : '');
