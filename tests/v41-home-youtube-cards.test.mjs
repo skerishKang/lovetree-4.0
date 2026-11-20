@@ -122,3 +122,8 @@ test('homeCardsPlan은 youtube 판정을 homeMomentCards에 그대로 넘긴다 
   const judged = homeCardsPlan({ mode: 'mine', loggedIn: true, context: member([ytMoment]), youtube: owner });
   assert.equal(judged.cards.map(c => c.type === 'video' && c.youtubeThumb).includes(true), true);
 });
+
+test('#1026 영상 주소만 있어도 메타데이터 조회 없이 썸네일 후보를 얻는다', () => {
+  const {photos}=homeMomentCards(member([yt('y1')]),40,undefined,{auto:true});
+  assert.equal(photos[0].image,'https://i.ytimg.com/vi/abc123DEF45/hqdefault.jpg');
+});
