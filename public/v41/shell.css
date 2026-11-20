@@ -483,6 +483,13 @@ nav .tree-frame{scroll-snap-align:center}
 #community-panel .community-top{padding-top:44px}
 .tree-popover{position:absolute;top:calc(100% + 8px);left:0;z-index:50;min-width:340px;max-height:min(72vh,560px);overflow:auto;padding:8px;border:1px solid var(--lt-line);border-radius:var(--lt-r-card);background:var(--lt-glass-strong);backdrop-filter:blur(24px);box-shadow:0 18px 50px #0009;display:grid;gap:3px}
 .tree-popover[hidden]{display:none}
+/* #1028 데스크탑: 메뉴 전체 대신 트리 목록 칸만 스크롤한다. 줄 7개(52px+3px 간격)=382px가 기본이고,
+   화면이 작으면 머리줄·동작 칸 자리를 뺀 만큼만 목록에 쓴다. 아래 동작 칸은 늘 메뉴 안에 고정된다. */
+@media(min-width:701px){
+ .tree-popover{max-height:none;overflow:visible}
+ .tree-list{display:grid;gap:3px;min-height:0;max-height:min(382px,calc(100dvh - 470px));overflow-y:auto;overscroll-behavior:contain}
+ .tree-search input{width:100%;min-height:44px;padding:8px 12px;border:1px solid var(--lt-line);border-radius:10px;background:rgba(255,255,255,.04);color:var(--lt-pearl);font:inherit;font-size:13px}
+}
 .tree-item{display:flex;align-items:center;gap:10px;width:100%;min-height:52px;padding:5px 7px;border:0;border-radius:10px;background:none;color:var(--lt-pearl);text-align:left;font-size:13px}
 .tree-item:hover,.tree-item:focus-visible{background:rgba(255,255,255,.07)}
 /* 계정 메뉴와 같은 규칙: 목록 판은 한 색, 항목 바탕은 투명, 강조는 hover·초점과 지금 트리의 ✓뿐이다. */
@@ -517,6 +524,9 @@ nav .tree-frame{scroll-snap-align:center}
 #header-overflow button{min-height:44px;text-align:left;border:0;border-radius:10px;background:none;color:var(--lt-pearl);padding:0 10px;font-size:13px}
 #mobile-more{display:none;min-width:44px;justify-content:center}
 @media(max-width:1020px){.app-header{padding:9px 14px;gap:10px}.main-nav>button{padding:0 8px;font-size:12px}nav #record-menu{max-width:150px}}
+/* #1029 데스크탑: 트리 이름 길이와 무관하게 단추 폭을 180px로 고정한다. 옆 탭의 x가 밀리지 않고,
+   긴 이름은 이미 있는 #source-label 말줄임으로 잘리며 전체 이름은 title로 남는다. 휴대폰은 아래 폭 규칙을 유지한다. */
+@media(min-width:781px){nav #record-menu{width:180px;max-width:none}}
 @media(max-width:780px){
  .tree-frame{margin-left:0;padding:0;border:0;background:none}
  .app-header{display:flex;min-height:56px;padding:6px 10px;gap:6px;flex-wrap:nowrap}

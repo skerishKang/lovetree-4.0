@@ -958,3 +958,49 @@ test('1001d 실행: 자세한 추가·설정·영상 정보·서재 ⋯ 같은 �
     await ctx.close();
   } finally { await browser.close(); server.close(); }
 });
+
+/* #1030: 같은 영상이 /shorts/ 주소와 watch 주소로 섞여 있어도 펼침면·한 장 보기에서 같은 칸을 쓴다. */
+test('1030 실행: 같은 종류 영상의 펼침면 칸 크기 차이 0(1440·390 × 정원·밤)', { skip: skip || !REQUIRE ? (skip || 'LT_BOOK_584_REQUIRE=1 일 때 실행') : false, timeout: 180000 }, async () => {
+  const browser = await chromium.launch();
+  const A = 'a0000000001', B = 'b0000000002';
+  const mk = (id, url) => ({ id, parentId: id === 'm01' ? null : 'm01', links: [], createdAt: '2026-11-01T00:00:00.000Z', title: '순간 ' + id, note: '메모 ' + id, emotion: '설렘', date: '2026.11.01', relation: '', url });
+  const tree1030 = {
+    id: 'tree1030', subject: '검증', title: '검증 트리', coverMomentId: '', inbox: false, moments: [
+      mk('m01', 'https://www.youtube.com/shorts/' + A), mk('m02', 'https://www.youtube.com/watch?v=' + A),
+      mk('m03', 'https://www.youtube.com/watch?v=' + B), mk('m04', 'https://www.youtube.com/watch?v=' + B),
+      mk('m05', 'https://www.youtube.com/shorts/' + A), mk('m06', 'https://www.youtube.com/watch?v=' + B),
+      mk('m07', 'https://www.youtube.com/watch?v=v0000000001'), mk('m08', 'https://www.youtube.com/watch?v=v0000000001')
+    ], edges: []
+  };
+  const sameKind = [['m01','m02'],['m03','m04'],['m07','m08']];
+  try {
+    for (const [width, height] of [[1440, 900], [390, 844]]) {
+      for (const theme of ['garden', 'night']) {
+        const { ctx, frame, errors } = await openBook(browser, width, height, [], tree1030);
+        try {
+          await frame.evaluate(t => { document.documentElement.dataset.ltTheme = t; }, theme);
+          for (const [a, b] of sameKind) {
+            const sizes = [];
+            if (width > 500) {
+              const spread = Math.floor(tree1030.moments.findIndex(m => m.id === a) / 2);
+              await frame.evaluate(i => window.__TRACK59__.jump(i), spread);
+              await frame.waitForTimeout(150);
+              if (a === 'm07') await frame.waitForFunction(() => [...document.querySelectorAll('#leftPage .yt-play,#rightPage .yt-play')].every(el => el.dataset.ytVertical === '1'), null, { timeout: 15000 });
+              sizes.push(...await frame.evaluate(() => ['left','right'].map(s => { const el = document.querySelector('#' + s + 'Page .yt-play'); return { w: el.offsetWidth, h: el.offsetHeight, cls: el.className }; })));
+            } else {
+              for (const id of [a, b]) {
+                await frame.evaluate(i => window.__TRACK59__.jump(i), tree1030.moments.findIndex(m => m.id === id));
+                await frame.waitForTimeout(150);
+                if (a === 'm07') await frame.waitForFunction(() => document.querySelector('#mobilePage .yt-play')?.dataset.ytVertical === '1', null, { timeout: 15000 });
+                sizes.push(await frame.evaluate(() => { const el = document.querySelector('#mobilePage .yt-play'); return { w: el.offsetWidth, h: el.offsetHeight, cls: el.className }; }));
+              }
+            }
+            assert.equal(Math.abs(sizes[0].w - sizes[1].w), 0, `${width}/${theme} ${a}+${b} 칸 너비 차이 0 (${sizes.map(s => s.w).join(' vs ')})`);
+            assert.equal(Math.abs(sizes[0].h - sizes[1].h), 0, `${width}/${theme} ${a}+${b} 칸 높이 차이 0 (${sizes.map(s => s.h).join(' vs ')})`);
+          }
+          assert.deepEqual(errors, [], `${width}/${theme} 페이지 오류 없음`);
+        } finally { await ctx.close(); }
+      }
+    }
+  } finally { await browser.close(); }
+});

@@ -74,3 +74,73 @@ test('실행(390): 머리줄은 접어 한 줄로 남고, 더보기 메뉴에 �
     assert.ok(true, '항목을 누르면 메뉴가 닫힌다');
   } finally { await browser.close(); server.close(); }
 });
+
+// #1029: 트리 이름 길이가 바뀌어도 단추 폭과 옆 탭(좁은 화면에서는 계정 단추) x가 그대로인지 수치로 잡는다.
+function tree1029(title) {
+  const t = createTree({ subject: '제목', title, note: '', emotion: '기쁨', date: '2026-11-18', url: '' }, '2026-11-18T00:00:00Z');
+  t.title = title;
+  return addMoment(t, { title: '기억', note: '', emotion: '기쁨', date: '2026-11-18', url: '' }, t.moments[0].id, '2026-11-18T00:01:00Z');
+}
+
+test('#1029 트리 이름 2·8·20자 × 1440·390 × 정원·밤: 단추 폭·탭 x 같음, 글자 넘침 0', { skip: skip952 || undefined, timeout: 300000 }, async (t) => {
+  const server = await serve({});
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium952.launch();
+  const rows = [];
+  try {
+    for (const width of [1440, 390]) {
+      for (const theme of ['garden', 'night']) {
+        for (const len of [2, 8, 20]) {
+          const name = '가'.repeat(len);
+          const ctx = await browser.newContext({ viewport: { width, height: 900 }, reducedMotion: 'reduce' });
+          await ctx.addInitScript((value) => { try { localStorage.setItem('lt41.theme', value); } catch {} }, theme);
+          await ctx.route('**/api/**', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
+          await ctx.route('**/api/workspace*', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ revision: 1, state: { version: 1, trees: [tree1029(name)] }, subject: '시험 계정', writeSubjectBound: true, savedAt: '2026-11-16T09:00:00.000Z' }) }));
+          const page = await ctx.newPage();
+          await page.goto(`${base}/v41/?account=1`, { waitUntil: 'load' });
+          await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
+          await page.waitForFunction(() => !document.getElementById('account-avatar')?.hidden, null, { timeout: 10000 });
+          await page.waitForTimeout(200);
+          const m = await page.evaluate(() => {
+            const b = document.getElementById('record-menu');
+            const l = document.getElementById('source-label');
+            const br = b.getBoundingClientRect();
+            const tab = document.querySelector('#tree-views button[data-view]')?.getBoundingClientRect();
+            // 390에서는 탭이 접혀 있으므로 그 자리를 대신하는 계정 단추 x를 잰다.
+            const nextX = tab && tab.width > 0 ? tab.x : document.getElementById('account-avatar').getBoundingClientRect().x;
+            let glyphOverflow = 0;
+            for (const child of b.querySelectorAll('*')) {
+              const r = child.getBoundingClientRect();
+              if (!r.width && !r.height) continue;
+              glyphOverflow = Math.max(glyphOverflow, r.right - br.right, br.left - r.left, r.bottom - br.bottom, br.top - r.top);
+            }
+            return {
+              buttonWidth: Math.round(br.width * 100) / 100,
+              nextX: Math.round(nextX * 100) / 100,
+              glyphOverflow: Math.round(Math.max(0, glyphOverflow) * 100) / 100,
+              pageOverflow: Math.round((document.documentElement.scrollWidth - document.documentElement.clientWidth) * 100) / 100,
+              label: l.textContent,
+              title: b.title,
+              inViewport: br.left >= 0 && br.right <= window.innerWidth
+            };
+          });
+          rows.push({ width, theme, len, ...m });
+          assert.equal(m.label, `트리: ${name}`, `${width}·${theme}·${len}자: 버튼 글자`);
+          assert.ok(m.title.includes(name), `${width}·${theme}·${len}자: title에 전체 이름`);
+          assert.equal(m.inViewport, true, `${width}·${theme}·${len}자: 버튼이 화면 안`);
+          await ctx.close();
+        }
+      }
+    }
+  } finally { await browser.close(); server.close(); }
+  t.diagnostic(JSON.stringify(rows));
+  for (const width of [1440, 390]) {
+    for (const theme of ['garden', 'night']) {
+      const group = rows.filter((r) => r.width === width && r.theme === theme);
+      assert.equal(group.length, 3, `${width}·${theme}: 이름 길이 3종`);
+      assert.equal(new Set(group.map((r) => r.buttonWidth)).size, 1, `${width}·${theme}: 단추 폭 차이 0`);
+      assert.equal(new Set(group.map((r) => r.nextX)).size, 1, `${width}·${theme}: 탭·계정 단추 x 차이 0`);
+    }
+  }
+  assert.equal(rows.filter((r) => r.glyphOverflow > 0 || r.pageOverflow > 0).length, 0, '글자 넘침 0');
+});
