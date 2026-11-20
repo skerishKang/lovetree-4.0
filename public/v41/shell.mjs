@@ -176,7 +176,8 @@ function renderTreeMenu(){
  const shelfEntry=member?.snapshot().owned?'<button type="button" role="menuitem" data-tree-action="shelf">서재 전체 보기</button>':'';
  // 261119 대표 결정: 목록 아래 메뉴 순서는 ＋ 새 트리 → 이 트리 관리 → 이 트리 공유 → 꼬리표 정리.
  // '정리 전 N개 정리하기'는 #380 5번대로 목록 바로 아래(맨 앞)에 둔다.
- const list=desktop?`<div class="tree-list" role="none">${ordered.length>=8?'<div class="tree-search" role="none"><input type="search" data-tree-search placeholder="트리 찾기" aria-label="트리 찾기" autocomplete="off" /></div>':''}${rows}</div>`:rows;
+ const searchBox=desktop&&ordered.length>=8?'<div class="tree-search" role="none"><input type="search" data-tree-search placeholder="트리 찾기" aria-label="트리 찾기" autocomplete="off" /></div>':'';
+ const list=desktop?`${searchBox}<div class="tree-list" role="none">${rows}</div>`:rows;
  treePopover.innerHTML=list+`<div class="tree-foot" role="none">${cleanupRow}<button type="button" role="menuitem" data-tree-action="new">＋ 새 트리</button>${manage?'<button type="button" role="menuitem" data-tree-action="manage">이 트리 관리 (이름·표지)</button><button type="button" role="menuitem" data-tree-action="share">이 트리 공유</button>':''}${tagsRow}${shelfEntry}${momentsEntry}</div>`;
  const search=treePopover.querySelector('[data-tree-search]');
  search?.addEventListener('input',()=>{

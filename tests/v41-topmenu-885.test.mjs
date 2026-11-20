@@ -337,6 +337,7 @@ test('1028 실행: 트리 목록만 스크롤하고 동작 칸은 고정이며 �
               listOver: list ? list.scrollHeight - list.clientHeight : -1,
               listVisibleRows: list ? [...list.querySelectorAll('[data-tree-id]')].filter((b) => !b.hidden).length : -1,
               searchExists: !!search,
+              searchOutsideList: !!search && !search.closest('.tree-list'),
               actionsInView: actions.map((a) => !!a && inView(a)),
               listScrollTop: list ? Math.round(list.scrollTop) : -1,
               chosenInList: !!(lr && ar && ar.top >= lr.top - 1 && ar.bottom <= lr.bottom + 1)
@@ -350,8 +351,20 @@ test('1028 실행: 트리 목록만 스크롤하고 동작 칸은 고정이며 �
           if (count === 15) {
             assert.ok(m.listOver > 0, `${width}/${theme}/15: 목록만 스크롤 가능(${m.listOver}px)`);
             assert.equal(m.searchExists, true, `${width}/${theme}/15: 트리 찾기 칸 존재`);
+            assert.equal(m.searchOutsideList, true, `${width}/${theme}/15: 찾기 칸은 스크롤되는 목록 밖에 고정`);
             assert.ok(m.listScrollTop > 0, `${width}/${theme}/15: 고른 트리로 목록이 스크롤됨(${m.listScrollTop}px)`);
             assert.equal(m.chosenInList, true, `${width}/${theme}/15: 고른 트리 줄이 보임`);
+            const fixed = await page.evaluate(() => {
+              const pop = document.getElementById('tree-popover');
+              const list = pop.querySelector('.tree-list');
+              const search = pop.querySelector('[data-tree-search]');
+              list.scrollTop = list.scrollHeight;
+              const s = search.getBoundingClientRect(), p = pop.getBoundingClientRect();
+              return { searchTop: Math.round(s.top), menuTop: Math.round(p.top), searchBottom: Math.round(s.bottom), menuBottom: Math.round(p.bottom), listScrollTop: Math.round(list.scrollTop) };
+            });
+            assert.ok(fixed.searchTop >= fixed.menuTop, `${width}/${theme}/15: 목록 맨 아래에서도 찾기 칸이 메뉴 안(top ${fixed.searchTop} ≥ ${fixed.menuTop})`);
+            assert.ok(fixed.searchBottom <= fixed.menuBottom, `${width}/${theme}/15: 찾기 칸 아래쪽도 메뉴 안(bottom ${fixed.searchBottom} ≤ ${fixed.menuBottom})`);
+            m.searchFixed = fixed;
             await page.fill('[data-tree-search]', trees.at(-1).subject);
             const found = await page.evaluate(() => [...document.querySelectorAll('#tree-popover [data-tree-id]')].filter((b) => !b.hidden).map((b) => b.querySelector('.tree-name').textContent.trim()));
             assert.deepEqual(found, [trees.at(-1).subject], `${width}/${theme}/15: 찾기로 한 줄만 남음(${JSON.stringify(found)})`);
