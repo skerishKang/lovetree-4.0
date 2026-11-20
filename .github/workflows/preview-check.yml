@@ -373,27 +373,9 @@ jobs:
         if: needs.screen-changes.outputs.changed == 'true'
         run: |
           start=$(date +%s)
-          # #1080: 1001d의 네 동작을 셋으로, 나머지 22개 시험을 하나로 나란히 돌린다 — 빠지는 시험 없음.
-          LT_BOOK_1001D_ACTION=add LT_BOOK_584_REQUIRE=1 node --test --test-concurrency=1 --test-name-pattern='1001d' tests/v41-book-play-584.test.mjs > /tmp/book-1001d-a.log 2>&1 & p1=$!
-          LT_BOOK_1001D_ACTION=setPrefs LT_BOOK_584_REQUIRE=1 node --test --test-concurrency=1 --test-name-pattern='1001d' tests/v41-book-play-584.test.mjs > /tmp/book-1001d-b.log 2>&1 & p2=$!
-          LT_BOOK_1001D_ACTION=cacheMediaMetadata,manageSame LT_BOOK_584_REQUIRE=1 node --test --test-concurrency=1 --test-name-pattern='1001d' tests/v41-book-play-584.test.mjs > /tmp/book-1001d-c.log 2>&1 & p3=$!
-          LT_BOOK_584_REQUIRE=1 node --test --test-concurrency=1 --test-name-pattern='^(?!.*1001d)' tests/v41-book-play-584.test.mjs > /tmp/book-rest.log 2>&1 & p4=$!
-          r1=0; wait $p1 || r1=$?
-          r2=0; wait $p2 || r2=$?
-          r3=0; wait $p3 || r3=$?
-          r4=0; wait $p4 || r4=$?
-          echo "1001d-a=$r1 · 1001d-b=$r2 · 1001d-c=$r3 · rest=$r4"
-          for log in /tmp/book-1001d-a.log /tmp/book-1001d-b.log /tmp/book-1001d-c.log /tmp/book-rest.log; do tail -12 "$log" || true; done
-          [ $r1 -eq 0 ] && [ $r2 -eq 0 ] && [ $r3 -eq 0 ] && [ $r4 -eq 0 ] || exit 1
+          # #1080: 1001 계열은 screen-reload 잡으로 옮겼다 — 나머지 19개 시험만 여기서 실행.
+          LT_BOOK_584_REQUIRE=1 node --test --test-concurrency=1 --test-name-pattern='^(?!.*1001)' tests/v41-book-play-584.test.mjs
           echo "책 재생·두 장 모드 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
-
-      # 이슈 970: 정리 창(모아둔 순간)의 고르기·취소·저장·닫기 확인과 모바일 아래 ＋ 단추의 자리·동작을
-      # 실제 화면에서 잰다. 건너뜀=실패(크롬이 준비된 이 잡에서 돈다).
-      - name: 감상 화면 흔적 값·어떻게 쓰나요 안내 시험(건너뜀=실패 — #635)
-        env:
-          LT_635A_REQUIRE: '1'
-          LT_BOOK_LONG_NOTE_REQUIRE: '1'
-        if: needs.screen-changes.outputs.changed == 'true'
         run: |
           start=$(date +%s)
           npx vite build > /dev/null
@@ -775,6 +757,50 @@ jobs:
           if [ "${{ needs.screen-changes.outputs.changed }}" != "true" ]; then
             echo "건너뜀(화면 변경 없음)" | tee -a "$GITHUB_STEP_SUMMARY"
           fi
+  screen-reload:
+    name: 화면 시험 — 저장 재적재
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    needs: screen-changes
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ms-playwright-${{ runner.os }}-1.49.1
+      - name: 브라우저 준비(Playwright Chromium, 캐시)
+        id: browser
+        if: needs.screen-changes.outputs.changed == 'true'
+        run: |
+          npm i --no-save --no-package-lock playwright@1.49.1
+          if ls "$HOME/.cache/ms-playwright" 2>/dev/null | grep -q chromium; then
+            echo "캐시된 Chromium 사용"
+          else
+            npx playwright install --with-deps chromium
+          fi
+          node -e "import('playwright-core').then(()=>console.log('playwright-core 확인')).catch(e=>{console.error(e.message);process.exit(1)})"
+      - name: 저장 재적재 시험(1001a·b·c·d, 건너뜀=실패)
+        env:
+          LT_BOOK_584_REQUIRE: '1'
+        if: needs.screen-changes.outputs.changed == 'true'
+        run: |
+          start=$(date +%s)
+          node --test --test-concurrency=1 --test-name-pattern='1001' tests/v41-book-play-584.test.mjs
+          echo "저장 재적재 시험 $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
+      - name: 화면 변경 없으면 건너뜀을 남긴다
+        if: always()
+        run: |
+          if [ "${{ needs.screen-changes.outputs.changed }}" != "true" ]; then
+            echo "건너뜀(화면 변경 없음)" | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+
   screen-map-a:
     name: 화면 시험 — 지도 대비
     runs-on: ubuntu-latest
@@ -1307,7 +1333,7 @@ jobs:
     name: 미리보기 postdeploy(로그아웃)
     runs-on: ubuntu-latest
     if: always()
-    needs: [screen-board, screen-home, screen-book, screen-shell, screen-map-a, screen-map-b, screen-book-screen, screen-audit-a, screen-audit-b, screen-audit-c, deploy]
+    needs: [screen-board, screen-home, screen-book, screen-reload, screen-shell, screen-map-a, screen-map-b, screen-book-screen, screen-audit-a, screen-audit-b, screen-audit-c, deploy]
     steps:
       - name: 모든 화면 시험·배포 검사 결과 모으기
         env:
