@@ -109,42 +109,6 @@ try {
 }
 if (REQUIRE952T && !existsSync(new URL('../dist/v41/home.html', import.meta.url))) skip952t = '빌드 결과가 없어 실행 시험을 건너뜀';
 
-test('952 실행: 밤이 기본이고 정원 저장은 다음 부팅에 유지되며 외부 글꼴 요청이 없다', { skip: skip952t || undefined }, async () => {
-  const { serve } = await import('./helpers/screen-audit.mjs');
-  const server = await serve({});
-  const base = `http://127.0.0.1:${server.address().port}`;
-  const browser = await chromium952t.launch();
-  try {
-    const cases = [
-      { stored: null, want: 'night', gowun: false, stage: 'rgb(4, 4, 7)' },
-      { stored: 'garden', want: 'garden', gowun: true, stage: 'rgb(247, 240, 232)' }
-    ];
-    for (const c of cases) {
-      const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
-      const urls = [];
-      if (c.stored) await ctx.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); } catch {} }, c.stored);
-      await ctx.route('**/api/**', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
-      await ctx.route('**/api/workspace*', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ revision: 1, state: { version: 1, trees: [] }, subject: '검사기계정', writeSubjectBound: true, savedAt: '2026-11-16T09:00:00.000Z' }) }));
-      const page = await ctx.newPage();
-      page.on('request', (r) => urls.push(r.url()));
-      await page.goto(`${base}/v41/?account=1`, { waitUntil: 'load' });
-      await page.waitForFunction(() => !!document.querySelector('.brand > span'), null, { timeout: 15000 });
-      const got = await page.evaluate(() => ({
-        theme: document.documentElement.dataset.ltTheme,
-        stage: getComputedStyle(document.documentElement).backgroundColor,
-        brandFont: getComputedStyle(document.querySelector('.brand > span')).fontFamily
-      }));
-      // 밤은 data-lt-theme 속성이 없는 값이다(applyThemeAttribute: 정원만 속성을 남긴다).
-      assert.equal(got.theme || 'night', c.want, `저장값이 없으면 밤, 정원을 저장했으면 정원(${c.stored})`);
-      assert.equal(got.stage, c.stage, `${c.want}: 무대 색은 그 테마의 --lt-stage다`);
-      assert.equal(got.brandFont.includes('Gowun Batang'), c.gowun, `${c.want}: 워드마크 글꼴 ${c.gowun ? 'Gowun Batang' : 'Gowun Batang 아님'}`);
-      const external = urls.filter((u) => /fonts\.(googleapis|gstatic)\.com|^https?:\/\/fonts\./.test(u));
-      assert.deepEqual(external, [], `${c.want}: 외부 글꼴 요청 0건 — ${JSON.stringify(external)}`);
-      await ctx.close();
-    }
-  } finally { await browser.close(); server.close(); }
-});
-
 test('#1026 첫 화면은 문서와 카드 영역 모두 처음부터 기기 테마를 사용한다', { skip: skip952t || undefined }, async () => {
   const { serve } = await import('./helpers/screen-audit.mjs');
   const server = await serve({});
@@ -184,4 +148,40 @@ test('#1026 첫 화면은 문서와 카드 영역 모두 처음부터 기기 테
       await ctx.close();
     }
   } finally {await browser.close();server.close();}
+});
+
+test('952 실행: 밤이 기본이고 정원 저장은 다음 부팅에 유지되며 외부 글꼴 요청이 없다', { skip: skip952t || undefined }, async () => {
+  const { serve } = await import('./helpers/screen-audit.mjs');
+  const server = await serve({});
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium952t.launch();
+  try {
+    const cases = [
+      { stored: null, want: 'night', gowun: false, stage: 'rgb(4, 4, 7)' },
+      { stored: 'garden', want: 'garden', gowun: true, stage: 'rgb(247, 240, 232)' }
+    ];
+    for (const c of cases) {
+      const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
+      const urls = [];
+      if (c.stored) await ctx.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); } catch {} }, c.stored);
+      await ctx.route('**/api/**', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
+      await ctx.route('**/api/workspace*', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ revision: 1, state: { version: 1, trees: [] }, subject: '검사기계정', writeSubjectBound: true, savedAt: '2026-11-16T09:00:00.000Z' }) }));
+      const page = await ctx.newPage();
+      page.on('request', (r) => urls.push(r.url()));
+      await page.goto(`${base}/v41/?account=1`, { waitUntil: 'load' });
+      await page.waitForFunction(() => !!document.querySelector('.brand > span'), null, { timeout: 15000 });
+      const got = await page.evaluate(() => ({
+        theme: document.documentElement.dataset.ltTheme,
+        stage: getComputedStyle(document.documentElement).backgroundColor,
+        brandFont: getComputedStyle(document.querySelector('.brand > span')).fontFamily
+      }));
+      // 밤은 data-lt-theme 속성이 없는 값이다(applyThemeAttribute: 정원만 속성을 남긴다).
+      assert.equal(got.theme || 'night', c.want, `저장값이 없으면 밤, 정원을 저장했으면 정원(${c.stored})`);
+      assert.equal(got.stage, c.stage, `${c.want}: 무대 색은 그 테마의 --lt-stage다`);
+      assert.equal(got.brandFont.includes('Gowun Batang'), c.gowun, `${c.want}: 워드마크 글꼴 ${c.gowun ? 'Gowun Batang' : 'Gowun Batang 아님'}`);
+      const external = urls.filter((u) => /fonts\.(googleapis|gstatic)\.com|^https?:\/\/fonts\./.test(u));
+      assert.deepEqual(external, [], `${c.want}: 외부 글꼴 요청 0건 — ${JSON.stringify(external)}`);
+      await ctx.close();
+    }
+  } finally { await browser.close(); server.close(); }
 });
