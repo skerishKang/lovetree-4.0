@@ -16,6 +16,7 @@ try {
 if (REQUIRE && !existsSync(new URL('../dist/v41/home.html', import.meta.url))) skip = '빌드 결과가 없어 순간 보기 시험을 건너뜀';
 
 const THUMB = (route) => route.fulfill({ status: 200, contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="360" height="640"><defs><linearGradient id="g" x2="1" y2="1"><stop stop-color="#1b3a6b"/><stop offset="0.5" stop-color="#a23b6e"/><stop offset="1" stop-color="#e0a24f"/></linearGradient></defs><rect width="360" height="640" fill="url(#g)"/><circle cx="180" cy="280" r="110" fill="#f3d9a4"/><path d="M60 520 Q180 430 300 520 L300 640 L60 640Z" fill="#12233f"/><text x="180" y="590" fill="#fff" font-size="34" text-anchor="middle">SHORTS</text></svg>' });
+const BRIGHT_THUMB = (route) => route.fulfill({ status: 200, contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="360" height="640"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#ffffff"/><stop offset="1" stop-color="#f7f2df"/></linearGradient></defs><rect width="360" height="640" fill="url(#g)"/><circle cx="180" cy="250" r="120" fill="#fff8c8"/><text x="180" y="500" fill="#5b5240" font-size="30" text-anchor="middle">BRIGHT STAGE</text></svg>' });
 const IDS = ['m001111111a','m002222222b','m003333333c','m004444444d','m005555555e','m006666666f','m007777777g','m008888888h','m009999999i','m010101010j','m011111111k','m012121212l'];
 const items = IDS.map((id, i) => ({
   id: 'moment-' + id, videoId: id, shareId: 'share' + String(i).padStart(20, '0'),
@@ -36,14 +37,14 @@ async function step(page, panel, width, delta) {
   }
 }
 
-async function boot(browser, { width, height, theme }) {
+async function boot(browser, { width, height, theme, thumb = THUMB }) {
   const server = await serve();
   const base = `http://127.0.0.1:${server.address().port}`;
   const ctx = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce', hasTouch: width <= 780, isMobile: width <= 780 });
   await ctx.addInitScript(t => { try { localStorage.setItem('lt41.theme', t); } catch {} }, theme);
   await ctx.route('**/*', (route) => {
     const u = new URL(route.request().url());
-    if (u.origin !== base) return u.hostname === 'i.ytimg.com' ? THUMB(route) : route.abort();
+    if (u.origin !== base) return u.hostname === 'i.ytimg.com' ? thumb(route) : route.abort();
     if (u.pathname === '/api/public/moments') {
       const exclude = new Set(String(u.searchParams.get('exclude') || '').split(',').filter(Boolean));
       const tag = u.searchParams.get('tag') || '';
@@ -206,3 +207,59 @@ test('#1025 2단계 — 가수 칩 필터·구간 주소·나무 선 아이콘·
   } finally { await h.ctx.close(); await new Promise(r => h.server.close(r)); }
  } finally { await browser.close(); }
 });
+
+test('#1075 — 밝은 영상 위에서도 390·1440의 단추 여섯 개가 보이고 눌린다', { skip: REQUIRE ? false : skip, timeout: 240000 }, async () => {
+  if (skip) assert.fail(skip);
+  const browser = await chromium.launch({ headless: true });
+  try {
+   for (const [width, height] of [[390, 844], [1440, 900]]) for (const theme of ['night', 'garden']) {
+    const h = await boot(browser, { width, height, theme, thumb: BRIGHT_THUMB });
+    try {
+     const panel = h.page.locator('#community-moments-panel');
+     const nodes = await panel.evaluate(el => [...el.querySelectorAll('.moments-rail-button, .moments-step')].map(node => {
+      const r = node.getBoundingClientRect();
+      const x = Math.round(r.left + r.width / 2), y = Math.round(r.top + r.height / 2);
+      const hit = document.elementFromPoint(x, y);
+      const cs = getComputedStyle(node);
+      return {
+       label: node.getAttribute('aria-label') || node.textContent.trim(),
+       visible: cs.display !== 'none' && r.width > 0 && r.height > 0,
+       inView: r.top >= 0 && r.bottom <= innerHeight && r.left >= 0 && r.right <= innerWidth,
+       reaches: node === hit || node.contains(hit),
+       hit: hit ? String(hit.className || hit.tagName) : '',
+       color: cs.color, background: cs.backgroundColor,
+       rect: [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)]
+      };
+     }));
+     assert.equal(nodes.length, 6, `${width}·${theme}: 오른쪽 넷 + 위아래 둘`);
+     for (const node of nodes) {
+      assert.ok(node.visible, `${width}·${theme}: ${node.label}이 보이지 않음 — ${JSON.stringify(node)}`);
+      assert.ok(node.inView, `${width}·${theme}: ${node.label}이 화면 밖 — ${JSON.stringify(node)}`);
+      assert.ok(node.reaches, `${width}·${theme}: ${node.label}을 다른 요소가 가림 — ${JSON.stringify(node)}`);
+     }
+     if (width <= 780) {
+      for (const node of nodes) {
+       assert.equal(node.color, 'rgb(255, 255, 255)', `${width}·${theme}: 밝은 영상 위 흰 글자 — ${node.label} ${node.color}`);
+       const parts = node.background.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
+       assert.ok(parts, `${width}·${theme}: ${node.label}에 어두운 배경이 없음 — ${node.background}`);
+       assert.ok(Number(parts[1]) < 40 && Number(parts[2]) < 40 && Number(parts[3]) < 40 && Number(parts[4] ?? 1) > 0.5, `${width}·${theme}: ${node.label} 스크림이 너무 옅음 — ${node.background}`);
+      }
+      const top = await panel.evaluate(el => ({
+       navBottom: Math.max(...[...el.querySelectorAll('.moments-step')].map(n => n.getBoundingClientRect().bottom)),
+       railTop: Math.min(...[...el.querySelectorAll('.moments-rail-button')].map(n => n.getBoundingClientRect().top))
+      }));
+      assert.ok(top.navBottom < top.railTop, `${width}·${theme}: 위아래 단추가 오른쪽 넷과 겹침 — ${JSON.stringify(top)}`);
+      const before = await panel.locator('.moments-stage').getAttribute('data-lt-moments-id');
+      await panel.locator('.moments-step').nth(1).click();
+      const after = await panel.locator('.moments-stage').getAttribute('data-lt-moments-id');
+      assert.notEqual(before, after, `${width}·${theme}: 다음 순간 단추가 실제로 눌린다`);
+     } else {
+      const rail = await panel.locator('.moments-rail-button').first().evaluate(el => getComputedStyle(el).backgroundColor);
+      assert.equal(rail, 'rgba(0, 0, 0, 0)', `${width}·${theme}: 데스크톱 단추는 그대로 — ${rail}`);
+     }
+     console.log('#1075', width, theme, JSON.stringify({ reached: nodes.filter(n => n.reaches).length, nav: nodes.slice(4).map(n => n.rect), rail: nodes.slice(0, 4).map(n => n.rect) }));
+    } finally { await h.ctx.close(); await new Promise(r => h.server.close(r)); }
+   }
+  } finally { await browser.close(); }
+});
+
