@@ -624,15 +624,16 @@ test('이슈 666 화면: 고급 기능 스위치 — 설정 화면 탭 더 보�
         assert.equal(on.button.h, off.button.h, '켜져도 누를 자리 크기는 그대로다');
 
         // 대비 3:1 — 스위치 글자 대 스위치 바탕(반투명이면 설정 창 바탕 위에 얹어 계산).
-        const ratios = await page.evaluate(({ colors, dlgBg, bodyBg }) => {
+        const ratios = await page.evaluate(({ pairs, bodyBg }) => {
           const f = (() => {
             const parse = (c) => { const m = String(c).match(/rgba?\(([^)]+)\)/); if (!m) return null; const p = m[1].split(',').map(Number); return { r: p[0], g: p[1], b: p[2], a: p.length > 3 ? p[3] : 1 }; };
             const over = (fg, bg) => ({ r: fg.r * fg.a + bg.r * (1 - fg.a), g: fg.g * fg.a + bg.g * (1 - fg.a), b: fg.b * fg.a + bg.b * (1 - fg.a), a: 1 });
             const lum = (c) => { const ch = (v) => { const x = v / 255; return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4; }; return 0.2126 * ch(c.r) + 0.7152 * ch(c.g) + 0.0722 * ch(c.b); };
             return (fg, bg, base2) => { const b = over(parse(bg), parse(base2) && parse(base2).a > 0 ? parse(base2) : { r: 0, g: 0, b: 0, a: 1 }); const fg2 = over(parse(fg), b); const [light, dark] = [lum(fg2), lum(b)].sort((x, y) => y - x); return (light + 0.05) / (dark + 0.05); };
           })();
-          return colors.map((c) => Number(f(c, dlgBg, bodyBg).toFixed(2)));
-        }, { colors: [off.color, on.color], dlgBg: on.dlgBg, bodyBg: on.bodyBg });
+          // 스위치 글자는 스위치 자기 바탕 위에 있다 — 설정 창 바탕이 아니라.
+        return pairs.map(([fg, bg]) => Number(f(fg, bg, bodyBg).toFixed(2)));
+        }, { pairs: [[off.color, off.bg], [on.color, on.bg]], bodyBg: on.bodyBg });
         assert.ok(ratios[0] >= 3, `${width}·${theme} 꺼짐 스위치 대비 3:1 이상(${ratios[0]}:1, ${off.color})`);
         assert.ok(ratios[1] >= 3, `${width}·${theme} 켜짐 스위치 대비 3:1 이상(${ratios[1]}:1, ${on.color})`);
         rows.push({ 크기: `${width}`, 테마: theme, 꺼짐: `${off.text} ${off.color} ${ratios[0]}:1`, 켜짐: `${on.text} ${on.color} ${ratios[1]}:1`, 단추높이: off.button.h });
