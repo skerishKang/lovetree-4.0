@@ -461,3 +461,28 @@ test('#목록정렬 261117: 목록 줄의 섬네일이 실패하면 빈 슬롯�
   assert.equal(badge.hidden, false, "'영상을 볼 수 없어요' 안내는 행 안에 남는다");
   assert.equal(step?.status, 'fallback', '마지막 후보 실패로 처리한다');
 });
+
+test('#1026 마지막 순간 영상은 후보를 기다리고 같은 칸에서만 결과를 바꾼다', () => {
+  const urls=['https://i.ytimg.com/vi/abc123DEF45/hqdefault.jpg','https://i.ytimg.com/vi/abc123DEF45/mqdefault.jpg'];
+  const make=()=>{
+    const media={dataset:{recentState:'loading'},querySelector:()=>backdrop};
+    const backdrop={src:urls[0]};
+    const attrs={'data-lt-candidates':JSON.stringify(urls),'data-lt-cand-index':'0','data-lt-fallback-mode':'recent-video'};
+    const img={dataset:{ltFallbackMode:'recent-video'},complete:false,src:urls[0],getAttribute:k=>attrs[k],setAttribute:(k,v)=>attrs[k]=v,closest:()=>media,remove(){assert.fail('영상 칸을 지우지 않는다')}};
+    return {img,media,backdrop};
+  };
+  const good=make();
+  sweepPendingThumbs({querySelectorAll:()=>[good.img]},1000);
+  sweepPendingThumbs({querySelectorAll:()=>[good.img]},20000);
+  assert.equal(good.media.dataset.recentState,'loading');
+  assert.equal(good.img.src,urls[0]);
+  assert.equal(applyThumbOutcome(good.img,{error:true}).status,'retry');
+  assert.equal(good.backdrop.src,urls[1]);
+  assert.equal(good.media.dataset.recentState,'loading');
+  assert.equal(applyThumbOutcome(good.img,{naturalWidth:480,naturalHeight:360}).status,'ok');
+  assert.equal(good.media.dataset.recentState,'ready');
+  const bad=make();
+  applyThumbOutcome(bad.img,{error:true});
+  assert.equal(applyThumbOutcome(bad.img,{error:true}).status,'fallback');
+  assert.equal(bad.media.dataset.recentState,'failed');
+});

@@ -82,7 +82,7 @@ if(replace&&!visibleCardCount())fitAll(false)}
 // '날짜순'에서는 저장 자리도 날짜순 바둑판으로 다시 꽂는다(보여 주기만 — 저장 값을 지우지 않는다).
 function gridPlan(vw){const slots=LT58Model.pinboardSpread(LT58Model.dateDescOrder(moments),{cols:LT58Model.gridColumns(vw),saved:boardMode==='mine'?savedSlotsOf(moments):null});
 const tops=LT58Model.gridRowTops(slots,(id)=>reservedHeights.get(id)||BASE_RESERVED_H);return{slots,tops}}
-let moments=LTDEMO.moments.map((m,i)=>{const saved=Number.isFinite(m.x)&&Number.isFinite(m.y)&&LT58Model.isPinboardSlot(m.x);return{id:m.id,type:m.type==='memo'?'note':'photo',originalType:m.type==='memo'?'note':m.type,createdOrder:i+1,title:m.title,emotion:m.emotion,date:m.date,source:m.source||'예시 기록',mediaMetadata:m.mediaMetadata||null,memo:m.memo||m.whyNext||'',x:saved?m.x:0,y:saved?m.y:0,rot:saved?(Number.isFinite(m.rot)?m.rot:0):0,savedPos:saved,savedXY:saved?{x:m.x,y:m.y,rot:Number.isFinite(m.rot)?m.rot:0}:null,pinStyle:m.pinStyle,cardStyle:m.cardStyle,keywords:Array.isArray(m.keywords)?m.keywords:[],color:m.color||['rose','violet','cyan','amber'][i%4],asset:m.image,url:m.externalUrl||'',first:!!m.first}});
+let moments=LTDEMO.moments.map((m,i)=>{const saved=Number.isFinite(m.x)&&Number.isFinite(m.y)&&LT58Model.isPinboardSlot(m.x);return{id:m.id,type:m.type==='memo'?'note':'photo',originalType:m.type==='memo'?'note':m.type,createdOrder:i+1,title:m.title,emotion:m.emotion,date:m.date,source:m.source||'예시 기록',mediaMetadata:m.mediaMetadata||null,memo:m.memo||'',cardMemo:m.memo||m.whyNext||'',x:saved?m.x:0,y:saved?m.y:0,rot:saved?(Number.isFinite(m.rot)?m.rot:0):0,savedPos:saved,savedXY:saved?{x:m.x,y:m.y,rot:Number.isFinite(m.rot)?m.rot:0}:null,pinStyle:m.pinStyle,cardStyle:m.cardStyle,keywords:Array.isArray(m.keywords)?m.keywords:[],color:m.color||['rose','violet','cyan','amber'][i%4],asset:m.image,url:m.externalUrl||'',first:!!m.first}});
 // #619-6: '내 배치'의 순서는 좌표가 아니라 저장된 순서다(서버 변경 없이 y에 순위를 실어 보낸다 — board-model의 orderOfMoments).
 // 순서 값이 없으면 옛 x·y(핀보드 칸 자리)를 순서로 한 번 바꿔 읽고, 좌표는 그대로 둔다(지우지 않는다).
 let momentOrder=(()=>{const saved=LT58Model.orderOfMoments(LTDEMO.moments);if(saved)return saved;
@@ -169,7 +169,7 @@ function dateText(v){return window.LTTitle?.formatDisplayDate?.(v)||v||''}
 
 function cardHTML(m){let media='';
 if(m.url)media=LTMedia.markup(m.url,m.title,m.mediaMetadata,m.id,null,null,{compact:true});
-else if(m.type==='note') media=`<div class="noteText">“${esc(m.memo)}”</div>`;
+else if(m.type==='note') media=`<div class="noteText">“${esc(m.cardMemo||m.memo)}”</div>`;
 else if(m.type==='video') media=`<div class="media"><video muted playsinline loop poster="${m.asset}" src="${m.video}"></video><span class="playBadge">▶</span><span class="duration">${m.duration||'00:03'}</span></div>`;
 else media=`<div class="media ${m.type==='link'||m.type==='youtube'?'linkMedia':''}"><img src="${m.asset}" alt=""><span class="${m.type==='youtube'?'playBadge':''}">${m.type==='youtube'?'▶':''}</span></div>`;
 // #601: 카드는 훑기용 — 큰 썸네일 + 제목 2줄 + 감정·날짜 한 줄만. 나머지(마음·출처·키워드·크게 보기)는 상세가 맡는다.

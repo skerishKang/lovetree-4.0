@@ -35,7 +35,7 @@ function tree952({ subject, count, youtube = false }) {
   return t;
 }
 
-async function boot952(browser, { width = 1440, member = false, motion = 'reduce', initStorage = {}, routes = {} } = {}) {
+async function boot952(browser, { width = 1440, member = false, motion = 'reduce', initStorage = {}, routes = {}, thumb = THUMB, waitUntil = 'load' } = {}) {
   const server = await serve({});
   const base = `http://127.0.0.1:${server.address().port}`;
   const ctx = await browser.newContext({ viewport: { width, height: width === 390 ? 844 : 900 }, reducedMotion: motion });
@@ -46,7 +46,7 @@ async function boot952(browser, { width = 1440, member = false, motion = 'reduce
   const workspace = { revision: 1, state: { version: 1, trees, prefs: { displayName: '화면검사 시험계정' } }, subject: 'visual-audit-fake', writeSubjectBound: true, savedAt: '2026-11-20T00:00:00.000Z' };
   await ctx.route('**/*', (route) => {
     const u = new URL(route.request().url());
-    if (u.origin !== base) return u.hostname === 'i.ytimg.com' || u.hostname === 'audit.invalid' ? THUMB(route) : route.abort();
+    if (u.origin !== base) return u.hostname === 'i.ytimg.com' || u.hostname === 'audit.invalid' ? thumb(route, u) : route.abort();
     for (const [pattern, handler] of Object.entries(routes)) {
       if (new RegExp(pattern).test(u.pathname + u.search)) return handler(route, u);
     }
@@ -55,7 +55,7 @@ async function boot952(browser, { width = 1440, member = false, motion = 'reduce
     return route.continue();
   });
   const page = await ctx.newPage();
-  await page.goto(`${base}/v41/${member ? '?account=1' : ''}#home`, { waitUntil: 'load' });
+  await page.goto(`${base}/v41/${member ? '?account=1' : ''}#home`, { waitUntil });
   if (member) {
     await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
     const ask = page.locator('#discover-ask-no');
@@ -347,4 +347,33 @@ test('#1027 정원 이어 보기 카드의 종이색과 글 대비, 세로 영�
       }
     }
   } finally { await browser.close(); }
+});
+
+test('#1026 마지막 순간 영상은 확인 전 실패를 보이지 않고 높이를 유지한다', {skip: REQUIRE952 ? false : skip952, timeout:180000}, async()=>{
+  if(skip952)assert.fail(skip952);
+  const browser=await chromium952.launch({headless:true});
+  try {
+    for(const failed of [false,true]){
+      const tree=createTree({subject:'시험 트리',title:'두 줄이 될 만큼 긴 제목을 가진 영상 순간',date:'2026-11-20',emotion:'설렘',url:'https://youtu.be/abc123DEF45'},'2026-11-20T00:00:00.000Z');
+      const workspace={revision:1,state:{version:1,trees:[tree],prefs:{}},subject:'visual-audit-fake',writeSubjectBound:true};
+      let release;const pending=new Promise(r=>release=r);
+      const h=await boot952(browser,{member:true,width:390,motion:'no-preference',waitUntil:'domcontentloaded',initStorage:{'lt41.theme':'garden'},routes:{'/api/workspace':route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(workspace)})},thumb:async route=>{await pending;return failed?route.abort():THUMB(route)}});
+      try{
+        const card=h.frame.locator('.recent-card'), media=card.locator('.recent-media');
+        const before=await card.boundingBox();
+        assert.equal(await media.getAttribute('data-recent-state'),'loading');
+        assert.equal(await media.locator('.recent-video-status').isVisible(),false);
+        release();
+        await media.locator('.recent-thumb').evaluate(img=>new Promise(r=>{if(img.complete&&img.naturalWidth)r();else img.addEventListener('load',r,{once:true});setTimeout(r,5000)}));
+        await h.frame.waitForFunction(v=>document.querySelector('#orbit').shadowRoot.querySelector('.recent-media').dataset.recentState===v,failed?'failed':'ready');
+        assert.equal(await media.locator('.recent-video-status').isVisible(),failed);
+        const after=await card.boundingBox();
+        assert.equal(after.height,before.height);
+        if(failed){
+          const notice=await media.locator('.recent-video-status').boundingBox(),title=await card.locator('.recent-meta strong').boundingBox();
+          assert.ok(notice.y+notice.height<=title.y,'안내와 제목 겹침 없음');
+        }
+      }finally{release();await close952(h)}
+    }
+  }finally{await browser.close()}
 });

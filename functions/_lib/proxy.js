@@ -62,6 +62,8 @@ const ALLOWED = new Map([
   ['/api/community/admin/reports', new Set(['GET'])],
   // #627 3단계 '다른 팬 보기' — 같은 꼬리표의 공개 순간(GET만).
   ['/api/public/tag-moments', new Set(['GET'])],
+  // #1025: 공개 세로 순간 무작위 조회(GET만, 로그인 없이 읽는다).
+  ['/api/public/moments', new Set(['GET'])],
   ['/api/feedback', new Set(['POST'])],
   ['/api/board', new Set(['POST'])],
   ['/api/board/mine', new Set(['GET'])],
@@ -238,3 +240,6 @@ export function createProxy({ fetcher = (...args) => fetch(...args), timeoutMs =
     }
   };
 }
+
+// 프록시가 넘기는 전체 경로 — 서버 진입 분기 표 검사에서 쓴다(#1047). 값은 그대로 두고 읽기용으로만 내보낸다.
+export const ALLOWED_PATHS = ALLOWED;
