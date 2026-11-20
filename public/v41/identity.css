@@ -244,6 +244,14 @@ html[data-lt-theme=garden] body,html[data-lt-theme=garden] .app-header{transitio
 :host([data-lt-theme=garden]) .center-scrim{background:radial-gradient(ellipse 62% 58% at 50% 49%,rgba(247,240,232,.92) 0%,rgba(247,240,232,.72) 44%,rgba(247,240,232,0) 100%)}
 :host([data-lt-theme=garden]) .card{border-color:var(--lt-gold-deep);box-shadow:var(--lt-garden-shadow)}
 :host([data-lt-theme=garden]) .card.memo{border-color:var(--lt-ink)}
+/* #1027: 정원 이어 보기 카드만 종이와 잉크로 맞춘다. */
+:host([data-lt-theme=garden]) .recent-card{background:var(--lt-paper);color:var(--lt-ink)}
+:host([data-lt-theme=garden]) .recent-media{background:var(--lt-paper)}
+:host([data-lt-theme=garden]) .recent-media.vertical{width:100%}
+:host([data-lt-theme=garden]) .recent-media.vertical .recent-backdrop{opacity:.22}
+:host([data-lt-theme=garden]) .recent-meta{background:var(--lt-paper);border-top:1px solid var(--lt-line-paper)}
+:host([data-lt-theme=garden]) .recent-head,:host([data-lt-theme=garden]) .recent-head-arrow,:host([data-lt-theme=garden]) .recent-meta small{color:var(--lt-muted)}
+:host([data-lt-theme=garden]) .recent-head:hover,:host([data-lt-theme=garden]) .recent-memo{color:var(--lt-ink)}
 :host([data-lt-theme=garden]) .menuBtn,:host([data-lt-theme=garden]) .subtleBtn{background:rgba(255,253,248,.9);border-color:rgba(119,91,82,.34);color:var(--lt-ink)}
 :host([data-lt-theme=garden]) .menuBtn:hover,:host([data-lt-theme=garden]) .subtleBtn:hover{background:var(--lt-paper);border-color:rgba(119,91,82,.58)}
 /* #942: 첫 화면의 순간 추가 단추만 장미색으로 되돌린다. 둘러보기·안내·궤도는 그대로 둔다. */
