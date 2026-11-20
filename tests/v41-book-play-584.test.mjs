@@ -797,3 +797,76 @@ test('1001b 실행: 책 순간 변경(고치기·연결·해제·이전 순간·
     await ctx.close();
   } finally { await browser.close(); server.close(); }
 });
+
+// #1001 (c): 쓰기 판에서 날짜·감정·비공개 첨부만 바꿔도 화면을 다시 띄우지 않는다.
+// 같은 트리 안 내용 변경이므로 (3)이 만든 meta.moment 모델 전용 길을 그대로 쓴다(새 경로 없음).
+test('1001c 실행: 쓰기 판 날짜·감정·비공개 변경 — 재적재 0·고른 순간/펼침면/스크롤/열린 판 보존', { skip: skip || !REQUIRE ? skip || 'LT_BOOK_584_REQUIRE=1 일 때 실행' : false, timeout: 180000 }, async () => {
+  if (skip) assert.fail(`CI에서 이 시험은 건너뛰도록 설계됐다 — ${skip}`);
+  const { createTree: makeTree, addMoment: growTree } = await import('../public/v41/domain.mjs');
+  const { serve: serveApp } = await import('./helpers/screen-audit.mjs');
+  const { waitForShownScreen: waitShown } = await import('./helpers/visible-frame.mjs');
+  let tree = makeTree({ subject: '시험', title: '검증 트리', note: '', emotion: '설렘', date: '2026-11-01', url: '' }, '2026-11-01T00:00:00Z');
+  const root = tree.moments[0].id;
+  tree = growTree(tree, { title: '둘 순간', note: '새 마음', emotion: '그리움', date: '2026-11-02', url: '' }, root, '2026-11-02T00:00:00Z');
+  const m2 = tree.moments.at(-1).id;
+  const server = await serveApp();
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch();
+  try {
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
+    let rev = 1, stored = JSON.parse(JSON.stringify(tree));
+    const puts = [];
+    await ctx.route('**/api/**', r => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
+    await ctx.route('**/api/workspace**', r => {
+      const req = r.request();
+      if (req.method() === 'PUT') { const body = JSON.parse(req.postData() || '{}'); puts.push(1); const ed = body?.state?.trees?.find(t => t.id === tree.id); if (ed) stored = ed; rev += 1; return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, revision: rev, subject: '시험계정' }) }); }
+      return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, revision: rev, subject: '시험계정', writeSubjectBound: true, savedAt: '2026-11-20T00:00:00.000Z', state: { version: 1, trees: [stored], prefs: {} } }) });
+    });
+    const page = await ctx.newPage();
+    const navs = []; let counting = false;
+    page.on('framenavigated', f => { if (counting && /\/v41\/(views\/|home\.html)/.test(f.url())) navs.push(f.url()); });
+    page.on('dialog', d => d.accept());
+    await page.goto(`${base}/v41/?account=1`, { waitUntil: 'load' });
+    await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
+    await page.locator('#discover-ask-no').click().catch(() => {});
+    await page.locator('.tree-views [data-view="track59-sketchbook.html"]').click();
+    await waitShown(page, { path: 'track59-sketchbook' }, 8000);
+    await page.waitForTimeout(900);
+    const frame = page.frames().find(f => /views\/track59-sketchbook/.test(f.url()));
+    assert.ok(frame, '책 프레임이 열린다');
+    await frame.waitForSelector(`[data-moment="${m2}"]`, { timeout: 10000 });
+    await frame.evaluate(id => { window.__TRACK59__.showDetail(id); }, m2);
+    await frame.waitForFunction(() => !document.querySelector('#detailSide')?.hidden || !!document.querySelector('.page-detail'), null, { timeout: 10000 });
+    await page.waitForTimeout(200);
+    const before = await frame.evaluate(() => ({ sel: LTDEMO.get(), st: window.__TRACK59__.getState(), scroll: window.scrollY, sideOpen: !document.querySelector('#detailSide')?.hidden, pageDetail: !!document.querySelector('.page-detail') }));
+    assert.equal(before.sel, m2, '둘 순간이 선택된다');
+    assert.ok(before.sideOpen || before.pageDetail, '상세 판이 열린다');
+    const openEditor = async () => { await frame.evaluate(x => parent.postMessage({ type: 'lt41-write', mode: 'edit', momentId: x }, location.origin), m2); await page.waitForFunction(() => document.querySelector('#write-panel')?.open === true, null, { timeout: 8000 }); await page.waitForTimeout(200); };
+    const waitPut = async n => { const dl = Date.now() + 10000; while (Date.now() < dl && puts.length < n) await page.waitForTimeout(150); };
+    const privateUrl = `${base}/api/media/private.png`;
+    const edits = [
+      { field: 'date', value: '2026-12-25', shown: '2026. 12. 25' },
+      { field: 'emotion', value: '벅참', shown: '벅참' },
+      { field: 'url', value: privateUrl, shown: null }
+    ];
+    counting = true;
+    for (let i = 0; i < edits.length; i++) {
+      const { field, value, shown } = edits[i];
+      await openEditor();
+      await page.evaluate(({ field, value }) => { const f = document.querySelector('#moment-form'); f.elements[field].value = value; f.elements[field].dispatchEvent(new Event('input', { bubbles: true })); }, { field, value });
+      await page.evaluate(() => document.querySelector('#moment-form').requestSubmit());
+      await waitPut(i + 1);
+      await page.waitForTimeout(1300);
+      const liveFrame = page.frames().find(f => /views\/track59-sketchbook/.test(f.url())) || frame;
+      const after = await liveFrame.evaluate(() => ({ sel: LTDEMO.get(), st: window.__TRACK59__.getState(), scroll: window.scrollY, sideOpen: !document.querySelector('#detailSide')?.hidden, pageDetail: !!document.querySelector('.page-detail'), body: document.body.innerText.slice(0, 3000) }));
+      assert.equal(navs.length, 0, `${field} 뒤 화면 재적재는 0회여야 한다(실측 ${navs.length}: ${JSON.stringify(navs)})`);
+      assert.equal(after.sel, m2, `${field} 뒤에도 고른 순간이 그대로다`);
+      assert.equal(after.st.current, before.st.current, `${field} 뒤에도 보던 펼침면이 그대로다`);
+      assert.equal(after.scroll, before.scroll, `${field} 뒤에도 스크롤 위치가 그대로다`);
+      assert.ok(after.sideOpen || after.pageDetail, `${field} 뒤에도 열린 상세 판이 그대로다`);
+      if (shown) assert.ok(after.body.includes(shown), `${field}의 새 값이 같은 문서에 그려진다`);
+      else { const savedUrl = await page.evaluate(id => window.LT41.trees.flatMap(t => t.moments).find(m => m.id === id)?.url, m2); assert.equal(savedUrl, privateUrl, '비공개 첨부 주소가 모델에 저장된다'); }
+    }
+    await ctx.close();
+  } finally { await browser.close(); server.close(); }
+});
