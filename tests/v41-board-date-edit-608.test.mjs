@@ -283,3 +283,81 @@ test('#736 편집 창은 고정 목록에 없는 꼬리표를 지우지 않는�
   assert.equal(problems.length, 0, `화면 문제 없음 (${problems.join(' | ') || '없음'})`);
   await context.close();
 });
+
+// #1044: 보드는 배치·모양·연결·한마디만 바꾼다 — 구간·만든 시각은 기존 값을 지킨다.
+const fixedAt = '2026-01-01T00:00:00.000Z';
+const segmentTree = () => ({
+  id: 'seg1', title: '구간 트리', subject: '별', coverMomentId: '', inbox: false, createdAt: fixedAt, updatedAt: fixedAt,
+  moments: [
+    { id: 'm1', title: '영상 순간', note: '', date: '2026-01-01', emotion: '설렘', url: 'https://youtu.be/dQw4w9WgXcQ', startSeconds: 90, endSeconds: 120, createdAt: fixedAt, parentId: null, relation: '', links: [], mediaMetadata: { title: '영상 제목' } },
+    { id: 'm2', title: '빈 한마디 순간', note: '', date: '2026-01-02', emotion: '설렘', url: '', createdAt: fixedAt, parentId: 'm1', relation: '첫 번째 이유', links: [] },
+    { id: 'm3', title: '셋 순간', note: '셋째 마음', date: '2026-01-03', emotion: '설렘', url: '', createdAt: fixedAt, parentId: 'm2', relation: '이어진 이유', links: [] }
+  ],
+  edges: [
+    { id: 'e1', kind: 'parent', from: 'm1', to: 'm2', reason: '첫 번째 이유' },
+    { id: 'e2', kind: 'parent', from: 'm2', to: 'm3', reason: '이어진 이유' }
+  ]
+});
+
+function sessionOn(tree) {
+  const state = { version: 1, trees: [structuredClone(tree)], prefs: {} };
+  const api = {
+    get: async () => ({ ok: true, revision: 1, state, subject: 'member-A', writeSubjectBound: true }),
+    put: async (body) => { state.trees = structuredClone(body.state.trees); return { ok: true, revision: 2 }; },
+    logout: async () => ({ ok: true })
+  };
+  return createMemberSession({ api, delay: () => new Promise(() => {}), makeClientKey: (() => { let i = 0; return () => 'key-' + (++i); })() });
+}
+
+test('#1044 셸 모델: 보드 저장 뒤 구간·만든 시각·빈 한마디가 그대로다', async () => {
+  const tree = segmentTree();
+  const session = sessionOn(tree);
+  await session.start();
+  // 보드가 보내는 목록: 구간 필드가 없고, 만든 시각은 새 값, 한마디는 빈 채.
+  const moments = tree.moments.map(m => {
+    const copy = structuredClone(m);
+    delete copy.startSeconds; delete copy.endSeconds;
+    return { ...copy, createdAt: '2026-11-21T12:00:00.000Z' };
+  });
+  session.apply('boardSync', { moments }, { treeId: tree.id, momentId: 'm1' });
+  const saved = session.state().trees[0].moments.find(m => m.id === 'm1');
+  assert.equal(saved.startSeconds, 90, '시작 구간 보존');
+  assert.equal(saved.endSeconds, 120, '끝 구간 보존');
+  assert.equal(saved.createdAt, fixedAt, '만든 시각 보존');
+  assert.equal(saved.note, '', '빈 한마디 유지');
+  validateState(session.state());
+});
+
+test('#1044 화면: 보드에서 저장한 뒤 셸 모델에 구간·만든 시각·빈 한마디가 그대로다', { skip: REQUIRE ? false : skip, timeout: 300000 }, async (t) => {
+  if (skip) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip}`);
+  const tree = segmentTree();
+  const server = await serve({ '/host.html': hostHTML(tree) });
+  const browser = await chromium.launch({ headless: true });
+  t.after(async () => { await browser.close(); server.close(); });
+  const { context, page, frame, problems } = await openHost(browser, 'http://127.0.0.1:' + server.address().port + '/host.html');
+  // 카드에 보이는 글은 '이어진 이유'여도, 저장할 한마디는 빈 채로 남는다.
+  const cardText = await frame.evaluate(() => document.querySelector('.card[data-id="m2"] .noteText')?.textContent || '');
+  assert.ok(cardText.includes('이어진 이유'), `빈 한마디 카드에는 연결 이유가 보인다(${cardText})`);
+  const before = await page.evaluate(() => window.LT41_MESSAGES.filter((m) => m.type === 'lt41-board-sync').length);
+  await frame.click('.card[data-id="m1"]');
+  await frame.click('#detailMoreBtn');
+  await frame.waitForSelector('#editMomentBtn', { timeout: 5000 });
+  await frame.click('#editMomentBtn');
+  await frame.waitForSelector('#editModal.open', { timeout: 5000 });
+  await frame.click('#editSave');
+  await page.waitForFunction((n) => window.LT41_MESSAGES.filter((m) => m.type === 'lt41-board-sync').length > n, before, { timeout: 8000 });
+  const sync = await page.evaluate(() => window.LT41_MESSAGES.filter((m) => m.type === 'lt41-board-sync').at(-1));
+  assert.equal(sync.moments.find(m => m.id === 'm1').note, '', '보드가 보낸 한마디는 빈 채');
+  assert.equal(sync.moments.find(m => m.id === 'm2').note, '', '연결 이유가 있는 빈 한마디도 빈 채로 보낸다');
+  // 화면이 보낸 목록을 실제 셸 모델에 적용해 최종 저장 값을 확인한다.
+  const merged = sessionOn(tree);
+  await merged.start();
+  merged.apply('boardSync', { moments: sync.moments }, { treeId: tree.id, momentId: 'm1' });
+  const saved = merged.state().trees[0].moments.find(m => m.id === 'm1');
+  assert.equal(saved.startSeconds, 90, '화면 저장 뒤 시작 구간 보존');
+  assert.equal(saved.endSeconds, 120, '화면 저장 뒤 끝 구간 보존');
+  assert.equal(saved.createdAt, fixedAt, '화면 저장 뒤 만든 시각 보존');
+  assert.equal(saved.note, '', '화면 저장 뒤 빈 한마디 유지');
+  assert.deepEqual(problems, [], `화면 문제 없음 (${problems.join(' | ') || '없음'})`);
+  await context.close();
+});
