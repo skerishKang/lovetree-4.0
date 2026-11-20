@@ -8,6 +8,8 @@
 // - 390 바닥 링크: 새 소식·의견 보내기·개인정보 처리방침·이용약관 넷 모두, 줄바꿈으로 왼쪽 아래에.
 //   새 소식 카드는 ＋ 단추 위 8px 자리(#657 계약) 그대로 — 링크 두 줄은 카드 아래 자리(높이 66px 안)에 들어간다.
 //   오른쪽 아래 ＋ 단추(#458)와 겹치지 않고, ＋ 단추는 그대로 둔다.
+// - 이슈 1018: 떠다니는 예시 카드는 셸 바닥 링크 줄·새 소식 카드 자리(묶음 상자+여유 12px)를 지나가지 않는다.
+//   1440·1920 × 밤·정원, 움직임 켬, 3초×0.5초 간격 교차 0(보이는 카드만). 카드를 자리 침범 위상에 놓고 재서 빈손 통과를 막는다.
 // LT_HOME_1010_REQUIRE=1 일 때 실행(CI 화면 잡 — 건너뜀=실패).
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -47,15 +49,16 @@ function treeMix1010({ subject, count }) {
   return t;
 }
 
-async function boot1010(browser, { width = 1440, member = true, mix = false, theme = '' } = {}) {
+async function boot1010(browser, { width = 1440, member = true, mix = false, theme = '', motion = false } = {}) {
   const server = await serve({});
   const base = `http://127.0.0.1:${server.address().port}`;
-  const ctx = await browser.newContext({ viewport: { width, height: width === 390 ? 844 : 900 }, reducedMotion: 'reduce' });
+  const ctx = await browser.newContext({ viewport: { width, height: width === 390 ? 844 : width === 1920 ? 1080 : 900 }, reducedMotion: motion ? 'no-preference' : 'reduce' });
   // 셸 문서가 받는 메시지를 기록한다 — 예시 카드 누름이 lt41-example로 이어지는지 잰다.
-  await ctx.addInitScript(() => {
+  await ctx.addInitScript(t => {
     window.__lt1010msgs = [];
     addEventListener('message', e => { try { window.__lt1010msgs.push(e.data); } catch {} });
-  });
+    if (t) { try { localStorage.setItem('lt41.theme', t); } catch {} }
+  }, theme);
   const trees = mix
     ? [treeMix1010({ subject: '좋아하는 순간들', count: 8 }), tree1010({ subject: '모아두는 곳', count: 2, inbox: true })]
     : [tree1010({ subject: '좋아하는 순간들', count: 5 }), tree1010({ subject: '모아두는 곳', count: 2, inbox: true })];
@@ -69,7 +72,6 @@ async function boot1010(browser, { width = 1440, member = true, mix = false, the
   });
   const page = await ctx.newPage();
   await page.goto(`${base}/v41/${member ? '?account=1' : ''}#home`, { waitUntil: 'load' });
-  if (theme) await page.evaluate(t => { try { localStorage.setItem('lt41.theme', t); } catch {} document.documentElement.setAttribute('data-lt-theme', t); }, theme);
   if (member) {
     await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
     const ask = page.locator('#discover-ask-no');
@@ -241,5 +243,86 @@ test('#1010 390 바닥 링크 — 넷 모두 보이고 줄바꿈으로 왼쪽 �
       assert.ok(links.fabVisible, '오른쪽 아래 ＋ 단추(#458)는 그대로 보인다');
       assert.ok(links.rowRight <= (links.fabLeft ?? 9999), `링크 줄이 ＋ 단추 왼쪽 끝(${links.fabLeft}px)을 넘지 않는다(끝 ${links.rowRight}px)`);
     } finally { await close1010(h); }
+  } finally { await browser.close(); }
+});
+
+// 이슈 1018: 떠다니는 카드는 셸 바닥 링크 줄·새 소식 카드 자리를 지나가지 않는다(가드 확장 — 가운데 구역과 같은 방식).
+// 판정: 1440·1920 × 밤·정원, 움직임 켬, 3초 동안 0.5초 간격 7회 — 보이는 카드(숨김 제외)×링크 글자 상자·링크 줄·새 소식 카드 교차 0.
+// 빈손 통과 방지: 각 카드를 한 바퀴 중 바닥 자리를 가장 많이 겹치는 위상에 놓고 잰다(궤도 경로가 실제로 자리를 지나는지 단정).
+const SAMPLE1018 = () => {
+  const root = document.getElementById('orbit')?.shadowRoot;
+  const all = root ? [...root.querySelectorAll('button.card')] : [];
+  const rectOf = c => {
+    const inner = c.querySelector('.surface img') || c.querySelector('.surface') || c;
+    const r = inner.getBoundingClientRect();
+    let k = 1; const t = getComputedStyle(inner).transform;
+    if (t && t !== 'none') { const m = t.match(/^matrix\(([^)]+)\)/); if (m) { const v = m[1].split(',').map(Number); k = Math.hypot(v[0], v[1]) || 1; } }
+    const cx = r.left + r.width / 2, cy = r.top + r.height / 2, w = r.width / k, h = r.height / k;
+    return { l: cx - w / 2, t: cy - h / 2, r: cx + w / 2, b: cy + h / 2 };
+  };
+  const visible = all.filter(c => { const cs = getComputedStyle(c); return cs.display !== 'none' && cs.visibility !== 'hidden' && !c.classList.contains('off'); });
+  const shell = parent.document;
+  const fr = frameElement?.getBoundingClientRect(); const ox = fr?.left || 0, oy = fr?.top || 0;
+  const vis = el => { if (!el) return null; const cs = parent.getComputedStyle(el); if (cs.display === 'none' || cs.visibility === 'hidden') return null; const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 ? { l: r.left - ox, t: r.top - oy, r: r.right - ox, b: r.bottom - oy } : null; };
+  const links = [...shell.querySelectorAll('.home-links a,.home-links button')].map(vis).filter(Boolean);
+  const row = vis(shell.querySelector('.home-links'));
+  const updates = vis(shell.getElementById('updates-card'));
+  const zones = [...links, ...(row ? [row] : []), ...(updates ? [updates] : [])];
+  const hit = (a, b) => Math.max(0, Math.min(a.r, b.r) - Math.max(a.l, b.l)) * Math.max(0, Math.min(a.b, b.b) - Math.max(a.t, b.t));
+  let pairs = 0, maxArea = 0;
+  for (const c of visible.map(rectOf)) for (const z of zones) { const a = hit(c, z); if (a > 0) { pairs++; maxArea = Math.max(maxArea, a); } }
+  const track = all.find(c => !c.classList.contains('off'));
+  const first = track ? rectOf(track) : null;
+  return { visible: visible.length, links: links.length, updates: !!updates, pairs, maxArea: Math.round(maxArea), firstCenter: first ? [Math.round((first.l + first.r) / 2), Math.round((first.t + first.b) / 2)] : null };
+};
+
+test('#1018 떠다니는 카드는 바닥 링크 줄·새 소식 카드 자리를 지나가지 않는다(1440·1920 × 밤·정원, 움직임 켬, 3초×0.5초)', { skip: REQUIRE1010 ? false : skip1010, timeout: 300000 }, async () => {
+  if (skip1010) assert.fail(skip1010);
+  const browser = await chromium1010.launch({ headless: true });
+  try {
+    for (const theme of ['night', 'garden']) for (const width of [1440, 1920]) {
+      const h = await boot1010(browser, { width, theme, motion: true });
+      try {
+        await h.frame.waitForFunction(() => { const r = document.getElementById('orbit')?.shadowRoot; return r && [...r.querySelectorAll('button.card')].some(c => !c.classList.contains('off') && getComputedStyle(c).display !== 'none'); }, null, { timeout: 20000 });
+        await h.page.waitForFunction(() => { const c = document.getElementById('updates-card'); return c && !c.hidden && c.getBoundingClientRect().width > 0; }, null, { timeout: 8000 });
+        await h.page.waitForTimeout(1200);
+        const crossed = await h.frame.evaluate(() => {
+          const root = document.getElementById('orbit').shadowRoot;
+          const cards = [...root.querySelectorAll('button.card')].filter(c => !c.classList.contains('off') && getComputedStyle(c).display !== 'none');
+          const shell = parent.document;
+          const fr = frameElement?.getBoundingClientRect(); const ox = fr?.left || 0, oy = fr?.top || 0;
+          const zoneOf = el => { if (!el) return null; const r = el.getBoundingClientRect(); return r.width > 0 ? { l: r.left - ox - 12, t: r.top - oy - 12, r: r.right - ox + 12, b: r.bottom - oy + 12 } : null; };
+          const zones = [zoneOf(shell.querySelector('.home-links')), zoneOf(shell.getElementById('updates-card'))].filter(Boolean);
+          const rectOf = c => { const inner = c.querySelector('.surface img') || c.querySelector('.surface') || c; const r = inner.getBoundingClientRect(); let k = 1; const t = getComputedStyle(inner).transform; if (t && t !== 'none') { const m = t.match(/^matrix\(([^)]+)\)/); if (m) { const v = m[1].split(',').map(Number); k = Math.hypot(v[0], v[1]) || 1; } } const cx = r.left + r.width / 2, cy = r.top + r.height / 2, w = r.width / k, h = r.height / k; return { l: cx - w / 2, t: cy - h / 2, r: cx + w / 2, b: cy + h / 2 }; };
+          const hit = (a, b) => Math.max(0, Math.min(a.r, b.r) - Math.max(a.l, b.l)) * Math.max(0, Math.min(a.b, b.b) - Math.max(a.t, b.t));
+          let maxCross = 0;
+          for (const c of cards) {
+            const a = c.getAnimations().find(x => x.id === 'lt-orbit');
+            if (!a) continue;
+            const d = a.effect.getTiming().duration;
+            let best = 0, bestT = 0;
+            for (let k = 0; k < 48; k++) {
+              a.currentTime = k / 48 * d;
+              const r = rectOf(c);
+              const area = zones.reduce((n, z) => n + hit(r, z), 0);
+              if (area > best) { best = area; bestT = k / 48 * d; }
+            }
+            a.currentTime = bestT;
+            maxCross = Math.max(maxCross, best);
+          }
+          return maxCross;
+        });
+        assert.ok(crossed > 0, `${width}·${theme}: 궤도 경로가 바닥 자리를 지난다(최대 교차 ${Math.round(crossed)}px²) — 빈손 통과가 아니다`);
+        await h.page.waitForTimeout(150);
+        const samples = [];
+        for (let i = 0; i < 7; i++) { samples.push(await h.frame.evaluate(SAMPLE1018)); if (i < 6) await h.page.waitForTimeout(500); }
+        const totalPairs = samples.reduce((n, s) => n + s.pairs, 0);
+        const moved = samples[0].firstCenter && samples[6].firstCenter && Math.hypot(samples[0].firstCenter[0] - samples[6].firstCenter[0], samples[0].firstCenter[1] - samples[6].firstCenter[1]) > 3;
+        console.log('#1018', width, theme, JSON.stringify({ crossed: Math.round(crossed), perSample: samples.map(s => s.pairs), visible: samples.map(s => s.visible), links: samples[0].links, updates: samples[0].updates, moved }));
+        assert.ok(samples.every(s => s.links === 4 && s.updates), `${width}·${theme}: 바닥 링크 4개·새 소식 카드가 보이는 자리에서 잰다: ${JSON.stringify(samples[0])}`);
+        assert.ok(moved, `${width}·${theme}: 움직임이 켜져 있다(3초 동안 카드 중심이 움직인다)`);
+        assert.equal(totalPairs, 0, `${width}·${theme}: 3초×0.5초 간격 보이는 카드×바닥 자리 교차 ${totalPairs}쌍(최대 ${Math.max(...samples.map(s => s.maxArea))}px²)`);
+      } finally { await close1010(h); }
+    }
   } finally { await browser.close(); }
 });

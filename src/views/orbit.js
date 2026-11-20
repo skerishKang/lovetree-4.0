@@ -655,20 +655,38 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
  // 겹치면 그 프레임에서 숨긴다(clash=visibility:hidden, 사각형은 남아 구역 밖으로 나가면 다시 보인다).
  // 카드 사각형은 button.card 대신 안쪽 img(실제로 그려진 크기)로 잰다 — 3D 변환 직후 button 이 0×0 인 일이 있다.
  // 구역은 가드·시험이 같은 함수(safeZoneOf)로 실측한 값이다. 0.25초 들어온 뒤 숨기는 박동은 없다.
- const guardClash=()=>{if(!safeZone||!appBox)return;
+ // #1018: 바닥 고정 UI(셸의 링크 줄·새 소식 카드) 자리 — 떠다니는 예시 카드는 그 뒤를 지나가므로 가운데 구역처럼 숨긴다.
+ // 셸은 부모 문서(같은 출처)다. 링크 묶음 상자+여유 12px, 새 소식 카드+12px을 잰다(이슈 판정 자리).
+ // 넓은 화면(w>780)만 — 390 등 좁은 화면은 기존 동작 그대로(이슈: 390은 바꾸지 않는다). 예시 카드만 해당(내 카드는 그대로).
+ // 0.5초마다 다시 재서 새 소식 카드가 늦게 뜨거나 링크 줄이 바뀌어도 따른다(매 프레임 재측정은 아니다 — #586 캐시).
+ let bottomZones=[],bottomZonesAt=0;
+ const measureBottomZones=()=>{bottomZones=[];
+  if(app.clientWidth<=780)return;
+  try{
+   const shell=parent.document,fr=frameElement?.getBoundingClientRect(),ox=fr?.left||0,oy=fr?.top||0;
+   const add=el=>{if(!el)return;const cs=parent.getComputedStyle(el);if(cs.display==='none'||cs.visibility==='hidden')return;const r=el.getBoundingClientRect();if(r.width<1||r.height<1)return;
+    bottomZones.push({l:r.left-ox-12,t:r.top-oy-12,r:r.right-ox+12,b:r.bottom-oy+12});};
+   add(shell.querySelector('.home-links'));
+   add(shell.getElementById('updates-card'));
+  }catch{ /* 부모 문서를 읽을 수 없으면(다른 출처 등) 바닥 구역 없음 — 가운데 가드만 돈다 */ }
+ };
+ const guardClash=(now)=>{if(!safeZone||!appBox)return;
+  if(now-bottomZonesAt>500){measureBottomZones();bottomZonesAt=now;}
   // 구역은 measureSafeZone 이 같은 함수(safeZoneOf)로 실측해 둔 값 — 매 프레임 다시 재지 않는다(#586 rect 캐시).
   const zone={l:safeZone.l+appBox.left,t:safeZone.t+appBox.top,r:safeZone.r+appBox.left,b:safeZone.b+appBox.top};
   // 진단(#949): 가드가 본 구역을 남긴다 — CI 실패 시 시험이 잰 구역과 비교한다.
   const key=`${Math.round(zone.l)},${Math.round(zone.t)},${Math.round(zone.r)},${Math.round(zone.b)}`;
   if(host.dataset.ltGuardZone!==key)host.dataset.ltGuardZone=key;
-  for(const el of elements){if(el.classList.contains('off'))continue;
+  for(const [i,el] of elements.entries()){if(el.classList.contains('off'))continue;
    const inner=el.querySelector('.surface img')||el.querySelector('.surface')||el;
    const r=inner.getBoundingClientRect();
    // img 꾸밈 배율(transform:scale)은 카드 크기가 아니다 — 중심 기준으로 나눠 시험과 같은 사각형을 쓴다.
    let k=1;const t=getComputedStyle(inner).transform;
    if(t&&t!=='none'){const m=t.match(/^matrix\(([^)]+)\)/);if(m){const v=m[1].split(',').map(Number);k=Math.hypot(v[0],v[1])||1;}}
    const cx=r.left+r.width/2,cy=r.top+r.height/2,w=r.width/k,h=r.height/k;
-   const hit=w>=2&&h>=2&&zoneOverlapArea(zone,{l:cx-w/2,t:cy-h/2,r:cx+w/2,b:cy+h/2})>1;
+   const box={l:cx-w/2,t:cy-h/2,r:cx+w/2,b:cy+h/2};
+   const exampleCard=demo||!!cards[i]?.example;
+   const hit=w>=2&&h>=2&&(zoneOverlapArea(zone,box)>1||(exampleCard&&bottomZones.some(z=>zoneOverlapArea(z,box)>1)));
    el.classList.toggle('clash',hit);}};
  let layoutPending=true;
  function frame(now){performance.mark('f'+warmups);raf=0;
@@ -678,7 +696,7 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
   if(glide){phase+=glide*dt/16.7;glide*=Math.pow(.94,dt/16.7);if(Math.abs(glide)<.0004)glide=0;}
   dragDraw();
   if(!drag&&!glide)endJsMode();
-  guardClash();
+  guardClash(now);
   if(!drag&&!glide&&!cameraSettling()&&!animRunning())return;
   schedule();
  }
@@ -706,7 +724,7 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
  // 구역 함수는 겹침 시험(v41-orbit-535)과 같은 것을 쓴다(public/v41/orbit-safe-zone.mjs).
  // 측정은 getBoundingClientRect 강제 레이아웃을 일으키므로 첫 프레임으로 미룬다(#400 뼈대 완성 보호).
  let safeZone=null,safeZoneDirty=true;
- const measureSafeZone=()=>{const c=shadow.querySelector('.center');if(!c){safeZone=null;return;}safeZone=safeZoneOf(c.getBoundingClientRect(),app.getBoundingClientRect());};
+ const measureSafeZone=()=>{const c=shadow.querySelector('.center');if(!c){safeZone=null;return;}safeZone=safeZoneOf(c.getBoundingClientRect(),app.getBoundingClientRect());measureBottomZones();};
  const fitNotice=()=>{host.style.height=`calc(100dvh - ${noticeOuter()}px)`;appBox=app.getBoundingClientRect();safeZoneDirty=true;schedule();};
  const noticeResize=typeof ResizeObserver==="function"?new ResizeObserver(fitNotice):null;
  const barNow=document.getElementById("sync-bar");
