@@ -18,6 +18,8 @@ const IDEMPOTENCY=/^[A-Za-z0-9._:-]{8,128}$/;
 const NO_STORE={'cache-control':'no-store, max-age=0',pragma:'no-cache','x-content-type-options':'nosniff'};
 // '다른 팬 보기' 응답의 개수 제한(#627 3단계) — 요청 파라미터로 늘리지 않는다.
 const TAG_MOMENT_LIMIT=30;
+// #1025 1단계 '순간' 보기 — 한 번에 내려주는 세로 순간 상한(요청으로 늘리지 않는다).
+const MOMENT_FEED_LIMIT=30;
 const clean=(value,max)=>typeof value==='string'?value.trim().slice(0,max):'';
 function jsonBody(request){
  if(!String(request?.headers?.['content-type']||'').toLowerCase().startsWith('application/json'))throw new ApiError(415,'unsupported_media_type','JSON 요청만 사용할 수 있어요.');
@@ -27,7 +29,7 @@ function jsonBody(request){
 function clientKey(request){const value=String(request?.headers?.['idempotency-key']||'');if(!IDEMPOTENCY.test(value))throw new ApiError(400,'idempotency_key_required','안전한 중복 방지 키가 필요해요.');return value;}
 function publicComment(row,viewer,isAdmin=false){const mine=!!viewer&&row.subjectId===viewer;const edited=!!(row.editedAt||(row.updatedAt&&row.createdAt&&String(row.updatedAt)>String(row.createdAt)));return {id:row.id,body:row.body,createdAt:row.createdAt,updatedAt:row.updatedAt,edited,mine,canDelete:mine||isAdmin,canEdit:mine,authorLabel:mine?'나':'기록한 사람'};}
 
-export function createCommunityService({communityRepo,shareRepo,workspaceRepo,visibilityRepo=null,productId,admin=null,stageIndex=null,stageVoteRepo=null,now=()=>Date.now(),makeId=()=>randomUUID(),signupAtFor=null}){
+export function createCommunityService({communityRepo,shareRepo,workspaceRepo,visibilityRepo=null,productId,admin=null,stageIndex=null,stageVoteRepo=null,now=()=>Date.now(),makeId=()=>randomUUID(),signupAtFor=null,random=Math.random}){
  const writes=new Map();
  let totalsCache=null;
  // 이번 주의 시작(월요일 0시, KST — #824 결정 4 '주 = 월~일 KST'). KST는 UTC+9 고정이라 서머타임
@@ -258,6 +260,55 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
    items.sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))||String(a.shareId).localeCompare(String(b.shareId)));
    return {tag:parsed.raw,items:items.slice(0,TAG_MOMENT_LIMIT)};
   },
+  // #1025 1단계: 공개 순간 중 '세로 영상'만 무작위로 내려준다.
+  // 공개 판정은 공개 읽기 경로(listPublicTagShares + projectSharedTree)를 그대로 쓰고,
+  // 세로 판정도 화면과 같은 한 벌(isVerticalMoment)을 쓴다 — 서버에 규칙을 복사하지 않는다.
+  // 이미 본 영상 id(youtube id)는 요청에서 받아 제외한다(세션 동안 같은 영상 반복 0).
+  async moments({limit=MOMENT_FEED_LIMIT,exclude=[],tag='',viewerSubjectId=null}={}){
+   const want=Number.isFinite(Number(limit))?Math.max(1,Math.min(MOMENT_FEED_LIMIT,Math.floor(Number(limit)||MOMENT_FEED_LIMIT))):MOMENT_FEED_LIMIT;
+   const seen=new Set((Array.isArray(exclude)?exclude:[]).map(x=>String(x||'').trim()).filter(Boolean));
+   const parsedTag=tag?parseTag(clean(tag,28)):null;
+   const tagValue=parsedTag?.kindId!==null&&parsedTag?.kindId!==undefined?tagKey(parsedTag.value):null;
+   const matchesTag=moment=>!tagValue||(Array.isArray(moment.keywords)&&moment.keywords.some(raw=>{const p=parseTag(raw);return !!p&&p.kindId===parsedTag.kindId&&tagKey(p.value)===tagValue;}));
+   const shares=await communityRepo.listPublicTagShares({productId,viewerSubjectId,limit:400});
+   const docs=new Map(),roles=new Map(),found=[];
+   for(const share of shares){
+    let stored=docs.get(share.subjectId);
+    if(stored===undefined){stored=await workspaceRepo.load({productId,subjectId:share.subjectId});docs.set(share.subjectId,stored);}
+    if(!stored)continue;
+    let tree;
+    try{tree=projectSharedTree(stored.doc,share.treeId).tree;}catch{continue;}
+    let role=roles.get(share.subjectId);
+    if(role===undefined){role=admin?await admin.roleFor({productId,subjectId:share.subjectId}):null;roles.set(share.subjectId,role);}
+    if(role===ROLE_TESTER)continue;
+    const aiTester=isAiTesterRole(role);
+    for(const moment of tree.moments){
+     // 세로 판정값이 없는 옛 순간(isVerticalMoment=false)은 내보내지 않는다 — 화면에서 한 번 판정한 뒤 다시 요청한다.
+     if(!isVerticalMoment(moment)||!matchesTag(moment))continue;
+     const videoId=youtubeIdFrom(moment.url||moment.externalUrl||'');
+     const id=videoId||moment.id;
+     if(seen.has(id)||seen.has(moment.id))continue;
+     seen.add(id);seen.add(moment.id);
+     found.push({
+      id:moment.id,
+      videoId,
+      shareId:share.shareId,
+      treeTitle:tree.title,
+      title:moment.title,
+      url:moment.url||'',
+      thumbnail:safeYoutubeThumb(moment.mediaMetadata?.thumbnail||moment.thumbnailUrl||'')||(videoId?youtubeStageThumbUrl(videoId,'oardefault'):'')||moment.mediaMetadata?.thumbnail||'',
+      note:moment.note||'',
+      emotion:moment.emotion||'',
+      date:moment.date||'',
+      keywords:Array.isArray(moment.keywords)?moment.keywords.slice(0,12):[],
+      aiTester
+     });
+    }
+   }
+   // Fisher-Yates — 무작위 순서지만 같은 배열 안에서 중복은 없다. random 은 시험에서 고정할 수 있다.
+   for(let i=found.length-1;i>0;i--){const j=Math.floor(random()*(i+1));[found[i],found[j]]=[found[j],found[i]];}
+   return {items:found.slice(0,want),total:found.length};
+  },
   // 담기 = 트리 투표(#824 대표 결정). 켤 때만 두 일을 한다:
   // ① 가입 7일 게이트 — 가입일(첫 로그인 시각)이 7일 미만이면 막는다(403 vote_too_new).
   //    가입일을 못 읽으면(행 없음·미연결) 보수적으로 신규와 같이 막는다 — 뚫리는 쪽으로 잘못 나가지 않게.
@@ -341,6 +392,8 @@ export function createCommunityHandler({authenticate,service,productId}){
   }
   // #627 3단계 '다른 팬 보기' — 공개 경로라 로그인 없이도 부른다. 로그인했으면 자기 트리·차단 관계를 뺀다.
   if(path==='/api/public/tag-moments'&&method==='GET'){const who=await principal(request,false);return {status:200,body:await service.tagMoments({tag:String(query.get('tag')||''),viewerSubjectId:who?.subjectId||null}),headers:NO_STORE};}
+  // #1025: 공개 세로 순간 무작위 조회(로그인 없이도 부른다). exclude=쉼표로 구분한 본 영상 id.
+  if(path==='/api/public/moments'&&method==='GET'){const who=await principal(request,false);return {status:200,body:await service.moments({limit:query.get('limit')||MOMENT_FEED_LIMIT,exclude:String(query.get('exclude')||'').split(',').map(x=>x.trim()).filter(Boolean),tag:String(query.get('tag')||''),viewerSubjectId:who?.subjectId||null}),headers:NO_STORE};}
   if(path==='/api/community/stats'&&method==='GET'){return {status:200,body:await service.discoverTotals(),headers:{...NO_STORE,'cache-control':'public, max-age=60'}};}
   if(path==='/api/community/shares'&&method==='GET'){const who=await principal(request,false);return {status:200,body:await service.discover({query:query.get('q')||'',emotion:query.get('emotion')||'',artistGroup:query.get('artist')||'',cursor:query.get('cursor')||'',limit:query.get('limit')||12,viewerSubjectId:who?.subjectId||null,sort:query.get('sort')||'latest'}),headers:NO_STORE};}
   if(path==='/api/community/me/favorites'&&method==='GET'){const who=await principal(request);return {status:200,body:{shareIds:await service.favorites(who.subjectId)},headers:NO_STORE};}
