@@ -62,7 +62,7 @@ test('지도 상세 책에서 보기: 누르면 지도에서 고른 그 순간�
     browser = await chromium.launch({ headless: true });
     const { context, page, frame, errors } = await openMap(browser, base, 1440);
     // 첫 순간을 고른다(상세 창이 열린다) → '책에서 보기' 클릭
-    await frame.locator('#focusFirst').click({ timeout: 8000 });
+    await frame.locator('#mobileRibbon button.origin').click({ timeout: 8000 }); // #951 ⑥: 첫 순간 보기는 아래 단추 줄(큰 탐색 판 숨김)
     await page.waitForTimeout(700);
     assert.equal(await frame.evaluate(() => document.getElementById('detail')?.classList.contains('open')), true, '순간 상세가 열린다');
     // #951 ⑤: '책에서 보기'는 판 아래 '⋯ 더 보기' 메뉴 안으로 옮겼다(보드와 같은 틀) — 먼저 메뉴를 연다.

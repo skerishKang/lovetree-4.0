@@ -34,7 +34,7 @@ const PALETTE=()=>{if(paletteV!==tokenVersion){paletteV=tokenVersion;palette=Arr
 const colorOf=n=>PALETTE()[((n.colorIndex??n.cluster??n.index??0)%6+6)%6];const rgba=(hex,a)=>{const[r,g,b]=hexRgb(hex);return `rgba(${r},${g},${b},${a})`};
 // #601 묶음은 데이터에 맞는 쪽 — 부채꼴 나무(평평한 트리)는 감정별(색), 사슬·깊은 나무는 월별.
 // 7개씩 자른 순서 묶음은 뜻이 없었다('01 youtub…부터 7개'). 묶음·색은 LT56Model.pickGroups가 데이터에서
-// 만든다(최대 6묶음 = 색 6벌, 빈 묶음 없음). 묶음이 한 가지뿐이면 묶음 판을 숨긴다(아래 legend 뒤).
+// 만든다(최대 6묶음 = 색 6벌, 빈 묶음 없음). 묶음이 2개 미만이면 범례를 숨긴다(아래 legend 뒤, #951 ⑥).
 const GROUPS=LT56Model.pickGroups(LTDEMO.moments,LTDEMO.edges);
 const GROUP_INDEX=new Map();GROUPS.forEach((g,i)=>g.ids.forEach(id=>GROUP_INDEX.set(id,i)));
 const CLUSTERS=GROUPS.map((g,i)=>({id:`c${i}`,index:i,name:g.name,sub:'',color:PALETTE()[i],x:0,y:0,count:g.ids.length,hubR:9}));
@@ -76,13 +76,14 @@ function generateCluster(c){
  return hub;
 }
 // Use the same forty sample moments and actual links as the orbit.
-// #601 묶음 이름은 감정(색)과 개수 — "01 설렘 · 7개". 묶음이 한 가지뿐이면 판을 숨긴다.
+// #601 묶음 이름은 감정(색)과 개수 — "01 설렘 · 7개". 묶음이 2개 미만이면 범례를 숨긴다(#951 ⑥).
 const groupLabel=i=>`${String(i+1).padStart(2,'0')} ${CLUSTERS[i]?.name||''} · ${CLUSTERS[i]?.count||0}개`;
 /* CTO 결정(261120): 아래 조작 줄의 묶음 단추는 '1묶음 · 1–2월' 형식 — 범례와 같은 번호, 앞 0 없음. */
 const clusterChip=(i,name)=>`${i+1}묶음 · ${name||''}`;
 const legendBox=document.querySelector('.legend');
-if(legendBox)legendBox.hidden=CLUSTERS.length===0;
-document.querySelectorAll('.legend-row').forEach((row,i)=>{const c=CLUSTERS[i],sw=row.querySelector('.swatch');row.hidden=!c;if(sw)sw.dataset.g=String(i+1);row.replaceChildren(...(sw?[sw]:[]),document.createTextNode(c?groupLabel(i):''))});
+if(legendBox)legendBox.hidden=CLUSTERS.length<2;/* #951 ⑥: 묶음이 2개 이상일 때만 범례 — 1개면 숨긴다(단추 줄이 같은 정보를 맡는다). */
+if(CLUSTERS.length<2)document.querySelectorAll('.legend-row').forEach(row=>{row.hidden=true});
+else document.querySelectorAll('.legend-row').forEach((row,i)=>{const c=CLUSTERS[i],sw=row.querySelector('.swatch');row.hidden=!c;if(sw)sw.dataset.g=String(i+1);row.replaceChildren(...(sw?[sw]:[]),document.createTextNode(c?groupLabel(i):''))});
 // #366 배치는 LT56Model 보기별 함수 한 벌. #461: 두 보기 모두 화면에서 도구가 덮지 않는 상자(BOX)에 맞춰 화면 좌표로 펼친다.
 let BOX={x:0,y:0,w:1200,h:800},NETFIT=null,CONCENTRIC=null;
 LTDEMO.moments.forEach((m,i)=>{const ci=GROUP_INDEX.get(m.id)??0,c=CLUSTERS[ci],p={x:c.x,y:c.y},j=i;const n=momentBase(ci,m.id,p.x,p.y,0,`p${ci}_0`,j,i===0);if(n.first)n.r=10;Object.assign(n,{title:m.title,date:m.date,emotion:m.emotion,note:m.memo||'',why:m.whyNext||'',source:m.source||'예시 기록',mediaMetadata:m.mediaMetadata,image:m.image});nodes.push(n)});
@@ -122,6 +123,8 @@ function measureInsets(){const box=el=>{if(!el)return null;const cs=getComputedS
  document.documentElement.style.setProperty('--lt-picker-top',pickerTop.toFixed(0)+'px');
  /* #951 ⑤: 좁은 화면에서 상세 시트가 아래 묶음 단추 줄을 덮지 않게 그 줄 높이를 재어 넘긴다. */
  document.documentElement.style.setProperty('--lt-sheet-bottom',(bottom?vh-bottom.top+8:104).toFixed(0)+'px');
+ /* #951 ⑥: 넓은 화면 묶음 카드·토스트는 아래 단추 줄 위에 앉는다 — 줄 위 끝(화면 아래에서부터의 높이)을 넘긴다. */
+ document.documentElement.style.setProperty('--lt-bottom-cover',(bottom?vh-bottom.top:118).toFixed(0)+'px');
  /* #951 ⑤: 토스트가 보이는 동안 시트가 물러난 자리는 창 크기가 바뀌어도 유지한다. */if($('toast').classList.contains('show'))placeToast();
 
  // 순간 고르기 줄은 그 자리에 서므로 잰 위·아래를 쓰지 않고, 높이만 더해 '늘 같은' 아래 끝을 쓴다(그 줄이 늦게 붙어도 같다).
@@ -324,7 +327,12 @@ function hideRouteStatus(){if(state.mode==='OVERVIEW')$('routeStatus').classList
 let toastSheetExtra=0;
 function sheetBottomBase(){const r=document.querySelector('.mobile-ribbon');const b=r&&getComputedStyle(r).display!=='none'?r.getBoundingClientRect():null;return b?vh-b.top+8:104}
 function placeToast(){const el=$('toast');const on=el.classList.contains('show');
- if(!state.mobile){el.style.top='';el.style.bottom='';toastSheetExtra=0;return}
+ if(!state.mobile){/* #951 ⑥: 넓은 화면 토스트는 아래 단추 줄 위 — 묶음 카드가 보이면 그 카드 위(겹침 0). */
+  el.style.top='';
+  const rb=document.querySelector('.mobile-ribbon'),r=rb&&getComputedStyle(rb).display!=='none'?rb.getBoundingClientRect():null;
+  const card=$('routeStatus'),cardOn=card.classList.contains('show')&&getComputedStyle(card).display!=='none';
+  el.style.bottom=(cardOn?vh-card.getBoundingClientRect().top+8:(r?vh-r.top+8:80))+'px';
+  toastSheetExtra=0;return}
  el.style.top='auto';
  const base=sheetBottomBase(),chooser=$('branchChooser'),chooserOpen=chooser.classList.contains('open');
  el.style.bottom=(on&&chooserOpen?Math.max(base,vh-chooser.getBoundingClientRect().top+8):base)+'px';
