@@ -1,4 +1,4 @@
-import {fetchVideoStatus, readVideoStatusCache, writeVideoStatusCache} from '../../public/v41/video-status.mjs';
+import {fetchVideoStatus} from '../../public/v41/video-status.mjs';
 import originalCSS from './orbit-source.css?inline';
 import {titleView, formatDisplayDate, embedUrl} from '../../public/v41/book-usability.mjs';
 import {formatRange} from '../../public/v41/domain.mjs';
@@ -122,11 +122,8 @@ export function mountOrbit(host,{trees,storage,context,actions,authHtml='',onSel
   const media=card?.querySelector('[data-recent-video]');
   const id=media?.dataset.recentVideo;
   if(!id)return;
-  let store=null;try{store=globalThis.localStorage}catch{}
-  const cached=readVideoStatusCache(store,id);
-  Promise.resolve(cached||fetchVideoStatus(id)).then(status=>{
+  fetchVideoStatus(id).then(status=>{
    if(!media.isConnected)return;
-   if(status==='ok'||status==='gone')writeVideoStatusCache(store,id,status);
    if(status==='gone'||status==='private')media.dataset.recentState='failed';
   }).catch(()=>{});
  };
