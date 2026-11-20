@@ -39,6 +39,7 @@ import { createAccountDeleteRpcRepo } from './db/account-delete-rpc-postgres.js'
 import { createAccountService } from './account-service.js';
 import { createAccountEmailStore } from './account-email-store.js';
 import { handlerForPath } from './route-handler.mjs';
+import { verifyProxyProof } from './proxy-proof.js';
 import { createDeletedAccountGuard } from './account-guard.js';
 import { createTrustedAccountDeleteHandler, createSharedAccountDeletionWorkflow } from './shared-account-deletion.js';
 import { createVerifier } from './padiem-access-verify.mjs';
@@ -48,6 +49,8 @@ const {
   LOVETREE_DATABASE_URL = '',
   LOVETREE_PRODUCT_ID = '',
   LOVETREE_MAX_BODY_BYTES = '',
+  LOVETREE_PROXY_SECRET = '',
+  LOVETREE_PROXY_ENFORCE = '',
   LOVETREE_AUTHORITY_TRANSPORT = '',
   LOVETREE_AUTHORITY_RELAY_URL = '',
   LOVETREE_CALLER_SECRET = '',
@@ -286,7 +289,15 @@ const handlers = {
   youtube: (request) => youtubeOembedHandler(request),
   storage: (request) => storageHandler(request)
 };
-const requestHandler = async (request) => handlers[handlerForPath(request.path)](request);
+const requestHandler = async (request) => {
+  const proof = verifyProxyProof(request, {
+    secret: LOVETREE_PROXY_SECRET,
+    enforce: LOVETREE_PROXY_ENFORCE === '1',
+    log: entry => console.warn('[lovetree-proxy-proof]', JSON.stringify(entry))
+  });
+  if (!proof.ok) return { status: 403, body: { error: { code: 'proxy_proof_required', message: '요청 출처를 확인할 수 없어요.' } } };
+  return handlers[handlerForPath(request.path)](request);
+};
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   const { host, port } = resolveListen({ env: process.env });
