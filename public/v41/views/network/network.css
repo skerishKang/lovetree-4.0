@@ -30,7 +30,8 @@ button{font:inherit;color:inherit;cursor:pointer}
 .pill:hover,.pill:focus-visible{outline:none;border-color:rgba(79,70,91,.28);background:#fff;color:#26242d}
 .hero{position:absolute;left:50%;top:68px;transform:translateX(-50%);z-index:16;text-align:center;pointer-events:none;width:min(800px,calc(100vw - 52px));transition:opacity .28s ease,transform .28s ease}.hero.dim{opacity:.07;transform:translateX(-50%) translateY(-14px)}
 .eyebrow{font-size:12px;letter-spacing:.23em;color:rgba(50,45,57,.38);margin-bottom:8px}.hero h1{margin:0;font-weight:650;font-size:clamp(28px,3.25vw,48px);letter-spacing:-.055em;line-height:1.07;color:#2b2831}.hero p{margin:9px auto 0;max-width:680px;font-size:12px;line-height:1.66;color:rgba(50,45,57,.52)}
-.left-rail{position:absolute;left:18px;top:114px;bottom:20px;z-index:26;width:222px;display:flex;flex-direction:column;justify-content:space-between;pointer-events:none}.legend,.controls{pointer-events:auto;border:1px solid rgba(76,68,86,.11);border-radius:20px;background:rgba(255,255,255,.75);backdrop-filter:blur(18px);padding:13px;box-shadow:0 14px 40px rgba(69,56,76,.06)}
+/* #951 ⑥: 왼쪽 레일은 범례 하나만 남는다(탐색 판은 아래 단추 줄로) — 범례가 숨으면 레일 폭도 0이 되어 지도가 왼쪽을 더 쓴다. */
+.left-rail{position:absolute;left:18px;top:114px;bottom:20px;z-index:26;width:max-content;display:flex;flex-direction:column;justify-content:space-between;pointer-events:none}.legend,.controls{pointer-events:auto;border:1px solid rgba(76,68,86,.11);border-radius:20px;background:rgba(255,255,255,.75);backdrop-filter:blur(18px);padding:13px;box-shadow:0 14px 40px rgba(69,56,76,.06)}.legend{width:222px}
 .legend h3,.controls h3{font-size:13px;letter-spacing:.14em;color:rgba(47,43,52,.42);margin:0 0 9px}.legend-row{display:flex;align-items:center;gap:9px;padding:5px 0;font-size:12px;color:rgba(47,43,52,.64)}.legend-row[hidden]{display:none}/* flex가 hidden 기본 none을 덮어 이름 없는 점이 남는 것을 막는다 */.swatch{width:7px;height:7px;border-radius:50%}/* 묶음 색 점(이전 인라인 background를 클래스로 — 행 번호(data-g)로 켠다) */
 .legend-row[data-g="1"] .swatch{background:var(--lt-map-group-1)}
 .legend-row[data-g="2"] .swatch{background:var(--lt-map-group-2)}
@@ -41,7 +42,8 @@ button{font:inherit;color:inherit;cursor:pointer}
 /* 캔버스 커서(이전 JS 인라인 cursor를 클래스로) */
 #stage.is-point{cursor:pointer}
 #stage.is-grab{cursor:grab}
-.controls{display:grid;gap:7px}.control-row{display:grid;grid-template-columns:1fr 1fr;gap:6px}.mini{height:35px;border:1px solid rgba(76,68,86,.10);background:rgba(250,248,249,.85);border-radius:11px;font-size:13px;color:rgba(47,43,52,.64)}.mini:hover,.mini:focus-visible{outline:none;color:#26242d;border-color:rgba(76,68,86,.24);background:#fff}.mini.origin{background:linear-gradient(135deg,rgba(228,93,141,.10),rgba(139,105,232,.10));font-weight:650}
+/* #951 ⑥: '탐색 모드' 큰 판은 모든 폭에서 숨는다 — 같은 단추를 아래 떠 있는 단추 줄(.mobile-ribbon)이 맡는다. */
+.controls{display:none}.control-row{display:grid;grid-template-columns:1fr 1fr;gap:6px}.mini{height:35px;border:1px solid rgba(76,68,86,.10);background:rgba(250,248,249,.85);border-radius:11px;font-size:13px;color:rgba(47,43,52,.64)}.mini:hover,.mini:focus-visible{outline:none;color:#26242d;border-color:rgba(76,68,86,.24);background:#fff}.mini.origin{background:linear-gradient(135deg,rgba(228,93,141,.10),rgba(139,105,232,.10));font-weight:650}
 .progress-rail{position:absolute;right:18px;top:114px;bottom:24px;z-index:25;width:40px;border-radius:22px;border:1px solid rgba(75,67,84,.10);background:rgba(255,255,255,.69);backdrop-filter:blur(16px);display:flex;flex-direction:column;align-items:center;padding:13px 0;pointer-events:auto;box-shadow:0 12px 34px rgba(62,51,69,.06)}
 .progress-line{position:relative;flex:1;width:2px;background:rgba(59,54,65,.10);border-radius:99px;margin:8px 0}.progress-thumb{position:absolute;left:50%;width:12px;height:12px;border-radius:50%;transform:translate(-50%,-50%);background:#3b3742;border:3px solid #fff;box-shadow:0 2px 9px rgba(45,39,50,.20)}.progress-label{font-size:12px;letter-spacing:.08em;color:rgba(47,43,52,.40);writing-mode:vertical-rl;transform:rotate(180deg)}
 .detail{position:absolute;right:70px;top:114px;bottom:24px;width:360px;z-index:31;border-radius:24px;border:1px solid rgba(81,72,91,.12);background:linear-gradient(150deg,rgba(255,255,255,.96),rgba(248,246,249,.91));backdrop-filter:blur(24px);box-shadow:0 28px 74px rgba(59,46,68,.14);padding:18px;transform:translateX(calc(100% + 105px));opacity:0;transition:.34s cubic-bezier(.2,.8,.2,1);overflow:auto}.detail.open{transform:none;opacity:1}
@@ -51,7 +53,18 @@ button{font:inherit;color:inherit;cursor:pointer}
 .route-status{position:absolute;left:50%;bottom:24px;z-index:34;transform:translateX(-50%);min-width:280px;max-width:min(620px,calc(100vw - 40px));padding:10px 14px;border-radius:16px;border:1px solid rgba(76,68,86,.10);background:rgba(255,255,255,.88);box-shadow:0 12px 38px rgba(63,50,70,.10);backdrop-filter:blur(18px);opacity:0;pointer-events:none;transition:.2s ease}.route-status.show{opacity:1}.route-status b{font-size:13px}.route-status span{display:block;margin-top:3px;font-size:12px;color:rgba(47,43,52,.54);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .branch-chooser{position:absolute;left:50%;top:50%;z-index:45;transform:translate(-50%,-40%) scale(.96);width:min(390px,calc(100vw - 28px));padding:15px;border-radius:20px;border:1px solid rgba(74,66,83,.13);background:rgba(255,255,255,.96);box-shadow:0 26px 80px rgba(49,39,56,.18);opacity:0;pointer-events:none;transition:.22s ease}.branch-chooser.open{opacity:1;pointer-events:auto;transform:translate(-50%,-50%) scale(1)}.branch-chooser h3{margin:0 0 4px;font-size:16px;letter-spacing:-.025em}.branch-chooser p{margin:0 0 10px;font-size:13px;line-height:1.55;color:rgba(47,43,52,.55)}.branch-options{display:grid;gap:7px}.branch-options button{min-height:42px;text-align:left;border:1px solid rgba(75,67,84,.10);border-radius:12px;background:#fff;padding:9px 11px;font-size:13px}.branch-options button:hover{border-color:rgba(139,105,232,.34);background:#faf8ff}
 .toast{position:absolute;left:50%;bottom:80px;z-index:50;transform:translate(-50%,16px);opacity:0;pointer-events:none;padding:10px 15px;border-radius:999px;background:rgba(45,41,49,.88);font-size:13px;color:#fff;transition:.25s ease}.toast.show{opacity:1;transform:translate(-50%,0)}
-.mobile-ribbon{display:none}
+/* #951 ⑥: 떠 있는 단추 줄은 모든 폭에서 보인다 — 390에서 쓰는 구조·이름·단추 크기(44px)를 그대로 가져다 쓴다.
+   넓은 화면은 왼쪽 아래(셸 링크 줄 위), 좁은 화면은 아래 640 블록의 원래 자리. 상세 판이 열리면 판 왼쪽까지만 쓴다(가림 0). */
+.mobile-ribbon{display:flex;flex-wrap:wrap;position:absolute;left:18px;bottom:var(--lt-bottom-links-space,62px);z-index:29;gap:6px;padding:6px;width:max-content;max-width:calc(100% - 36px);overflow-x:auto;scrollbar-width:none;border:1px solid rgba(73,65,83,.10);border-radius:16px;background:rgba(255,255,255,.90);box-shadow:0 12px 32px rgba(55,44,64,.12);backdrop-filter:blur(18px)}
+.mobile-ribbon::-webkit-scrollbar{display:none}
+.mobile-ribbon button{flex:0 0 auto;white-space:nowrap;height:44px;padding:0 12px;border-radius:12px;border:0;background:transparent;font-size:13px;color:rgba(47,43,52,.56)}
+.mobile-ribbon button.active{background:#302c35;color:#fff}
+.mobile-ribbon button.origin{background:linear-gradient(135deg,rgba(228,93,141,.12),rgba(139,105,232,.12));color:#403847;font-weight:700}
+/* 상세 판이 열리면 단추 줄은 판 왼쪽 밖에서만 논다 — 판에 가리지 않는다(오른쪽 판 자리 446/384px + 간격). */
+@media(min-width:981px){body:has(#detail.open) .mobile-ribbon{max-width:calc(100% - 460px)}}
+@media(min-width:641px) and (max-width:980px){body:has(#detail.open) .mobile-ribbon{max-width:calc(100% - 384px)}}
+/* 넓은 화면 묶음 카드는 단추 줄 위에 앉는다(줄 높이는 measureInsets가 --lt-bottom-cover로 넘긴다). */
+@media(min-width:641px){.route-status{bottom:calc(var(--lt-bottom-cover,118px) + 8px)}}
 @media(min-width:981px){.left-rail{bottom:var(--lt-bottom-links-space,62px)}}
 @media(max-width:980px){.left-rail{display:none}.hero{top:64px}.detail{right:14px;width:340px}.progress-rail{right:8px}.mode-pill{display:none}}
 @media(max-width:640px){
@@ -104,9 +117,10 @@ html[data-v41-screen=network] .top-actions .view-switch .pill{padding:0 5px;font
  .detail{left:6px;right:6px;top:auto;bottom:6px;width:auto;max-height:67svh;border-radius:23px 23px 17px 17px;padding:16px;padding-bottom:max(16px,env(safe-area-inset-bottom));transform:translateY(calc(100% + 40px))}.detail.open{transform:translateY(0);z-index:35}.detail h2{font-size:21px}.path-actions{grid-template-columns:1fr}.action{min-height:48px}
   /* #638: 390 - the control ribbon overlapped the shell's 'new news / send feedback' links row; raise it above.
      묶음 단추 이름을 줄여도 한 줄에 다 담지 못하므로(첫 순간 보기·−·＋·묶음 4개·전체 보기) 두 줄로 쌓는다 — 잘림 0.
-     두 줄이 되면 조작 줄 위가 높아지므로 상태 판·묶음 고르기도 그 위로 올린다. */
- .mobile-ribbon{display:flex;flex-wrap:wrap;position:absolute;left:8px;right:8px;bottom:calc(38px + env(safe-area-inset-bottom, 0px));z-index:29;gap:6px;padding:6px;overflow-x:auto;scrollbar-width:none;border:1px solid rgba(73,65,83,.10);border-radius:16px;background:rgba(255,255,255,.90);box-shadow:0 12px 32px rgba(55,44,64,.12);backdrop-filter:blur(18px)}.mobile-ribbon::-webkit-scrollbar{display:none}.mobile-ribbon button{flex:0 0 auto;white-space:nowrap;height:42px;padding:0 12px;border-radius:12px;border:0;background:transparent;font-size:10px;color:rgba(47,43,52,.56)}.mobile-ribbon button.active{background:#302c35;color:#fff}.mobile-ribbon button.origin{background:linear-gradient(135deg,rgba(228,93,141,.12),rgba(139,105,232,.12));color:#403847;font-weight:700}
- .route-status{left:8px;right:8px;bottom:152px;transform:none;min-width:0;max-width:none}.route-status span{white-space:normal}.toast{top:54px;bottom:auto;max-width:calc(100vw - 22px);border-radius:15px;text-align:center}.branch-chooser{top:auto;bottom:152px;transform:translate(-50%,16px) scale(.96)}.branch-chooser.open{transform:translate(-50%,0) scale(1)}
+     두 줄이 되면 조작 줄 위가 높아지므로 상태 판·묶음 고르기도 그 위로 올린다.
+     #951 ⑥: 기본 모양은 넓은 화면과 한 벌(위) — 여기서는 좁은 화면 자리·단추 크기만 덮어쓴다(390은 전과 같다). */
+ .mobile-ribbon{left:8px;right:8px;bottom:calc(38px + env(safe-area-inset-bottom, 0px));width:auto;max-width:none}.mobile-ribbon button{height:42px;font-size:10px}
+ .route-status{left:8px;right:8px;bottom:152px;transform:none;min-width:0;max-width:none}.route-status span{white-space:normal}.toast{top:auto;bottom:var(--lt-sheet-bottom,104px);max-width:calc(100vw - 22px);border-radius:15px;text-align:center}.branch-chooser{top:auto;bottom:152px;transform:translate(-50%,16px) scale(.96)}.branch-chooser.open{transform:translate(-50%,0) scale(1)}
 }
 @media(prefers-reduced-motion:reduce){html[data-v41-screen=network] *{animation:none;transition-duration:.01ms}}
 
@@ -273,3 +287,56 @@ html[data-lt-theme=garden][data-v41-screen=network] body .controls .mini.origin,
 html[data-v41-screen=network][data-lt-board-theme=night] body .controls .mini.origin{background:linear-gradient(135deg,rgba(228,93,141,.30),rgba(139,105,232,.30));color:#fff;font-weight:650}
 /* #951 ①: ⋯(배경·도움말)와 '순간 N · 이어진 선 N' 작은 글자도 판 색을 따른다. */
 html[data-v41-screen=network][data-lt-board-theme=night] body .map-meta{color:var(--lt-map-ui-text,rgba(233,226,240,.92))}
+
+/* ===== #951 ⑤: 순간 상세 판 — 보드 #891/#662와 같은 틀 =====
+   판은 한 벌로 굴리고(.detailScroll) 아래 행동 줄(#detailActions)은 굴리는 영역 밖에 붙인다.
+   단추 높이 44px·간격 8px, 판 안쪽 여백 18px는 보드 판과 같은 값이다. */
+.detail{display:flex;flex-direction:column;padding:0;overflow:hidden}
+/* 좁은 화면 시트는 아래 묶음 단추 줄 위에서 멈춘다 — 줄 높이(--lt-ribbon-h)는 화면이 잰다(겹침 0). */
+@media(max-width:640px){.detail{bottom:var(--lt-sheet-bottom,104px);max-height:calc(100svh - var(--lt-sheet-top,190px) - var(--lt-sheet-bottom,104px))}}
+.detailScroll{flex:1 1 auto;min-height:0;overflow:auto;padding:18px}
+.detail .close{position:relative;left:auto;right:auto;top:auto;flex:0 0 auto;align-self:flex-end;margin:10px 14px 0;z-index:2;background:none;border:0;color:inherit;font-size:18px}
+.detail h2{margin:6px 0 10px;max-width:calc(100% - 46px)}
+.detail .detailSub{margin:-4px 0 8px;font-size:12px;color:var(--lt-map-paper-muted,rgba(47,43,52,.55))}
+.detailPlayer{margin:2px 0 10px;border-radius:16px;overflow:hidden;background:rgba(24,18,32,.06)}
+.detailPlayer img,.detailPlayer video{width:100%;max-height:300px;object-fit:cover;display:block}
+.detailPlayer .detailNoteMedia{padding:22px 16px;font-size:16px;line-height:1.6;white-space:pre-wrap}
+.detail .section{padding:12px 0;border-top:1px solid rgba(75,67,84,.10)}
+.detail .section:first-of-type{border-top:0}
+.detail-label{font-size:12px;letter-spacing:.12em;font-weight:800;color:var(--lt-map-paper-muted,rgba(47,43,52,.45))}
+.detail .value{font-size:13px;line-height:1.55;margin-top:6px}
+.detail .heartText{font-size:15px;line-height:1.6;font-weight:600;white-space:pre-wrap;overflow-wrap:anywhere;margin-top:6px}
+.connCards{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+.connCard{display:flex;align-items:center;gap:10px;width:100%;min-height:44px;padding:8px 10px;border:1px solid rgba(75,67,84,.14);border-radius:12px;background:rgba(255,255,255,.6);color:inherit;font:inherit;text-align:left;cursor:pointer}
+.connCard:hover,.connCard:focus-visible{border-color:var(--lt-map-ui-accent,#c79a4e);background:rgba(246,216,146,.18)}
+.connName{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;font-weight:600}
+.connWhy{flex:0 0 auto;max-width:40%;font-size:12px;color:var(--lt-map-paper-muted,rgba(47,43,52,.5));overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.detail .ctaRow{flex:0 0 auto;display:flex;gap:8px;align-items:center;flex-wrap:nowrap;padding:12px 18px calc(12px + env(safe-area-inset-bottom, 0px));border-top:1px solid rgba(75,67,84,.10)}
+.ctaRow .miniBtn{height:44px;min-height:44px;padding:0 12px;border-radius:12px;font-size:13px;font-weight:700;border:1px solid rgba(75,67,84,.16);background:rgba(255,255,255,.72);color:inherit;cursor:pointer}
+.ctaRow .miniBtn.accent{flex:1 1 0;min-width:0;white-space:nowrap;border-color:rgba(199,154,78,.5);background:rgba(246,216,146,.26)}
+.moreWrap{position:relative;flex:0 0 auto}
+.moreMenu{position:absolute;right:0;bottom:calc(100% + 8px);min-width:186px;display:grid;gap:2px;padding:6px;border:1px solid rgba(75,67,84,.16);border-radius:14px;background:var(--lt-map-panel,#fffdf9);box-shadow:0 14px 40px rgba(55,44,64,.28);z-index:6}
+.moreMenu[hidden]{display:none}
+.moreItem{display:flex;align-items:center;min-height:44px;padding:0 12px;border:0;border-radius:10px;background:none;color:inherit;font:inherit;font-size:13px;text-align:left;cursor:pointer;white-space:nowrap}
+.moreItem:hover,.moreItem:focus-visible{background:rgba(75,67,84,.08)}
+.ytLinkRow{padding:6px 0 0;font-size:13px}
+.ytLinkRow[hidden]{display:none}
+.ytLinkRow a{color:inherit;text-decoration:underline;text-underline-offset:3px}
+/* 크게 보기 — 보드 VIEWER(#662)와 같은 틀: 어두운 깔개 위 판 하나. */
+#ltViewer{position:absolute;inset:0;z-index:80;background:rgba(8,5,13,.62);backdrop-filter:blur(8px);display:none;place-items:center;padding:18px;overflow:auto}
+#ltViewer.open{display:grid}
+#ltViewer .modal{width:min(760px,100%);max-height:calc(100% - 36px);overflow:auto;border-radius:22px;padding:18px;border:1px solid rgba(75,67,84,.16);background:var(--lt-map-panel,#fffdf9);box-shadow:0 24px 60px rgba(34,24,44,.35)}
+#ltViewer h2{margin:8px 0 12px;font-size:20px}
+#viewerMedia{border-radius:16px;overflow:hidden;background:rgba(24,18,32,.9);min-height:180px;display:grid;place-items:center}
+#viewerMedia img,#viewerMedia video{width:100%;max-height:64svh;object-fit:contain;display:block}
+#vMeta{font-size:12px;line-height:1.6;margin-top:10px;color:var(--lt-map-paper-muted,rgba(47,43,52,.6))}
+#ltViewer .modalActions{display:flex;justify-content:flex-end;margin-top:12px}
+html[data-v41-screen=network][data-lt-board-theme=night] body :is(.connCard,#ltViewer .modal,.moreMenu){background:var(--lt-map-control);border-color:var(--lt-map-ui-border);color:var(--lt-map-ui-text)}
+html[data-v41-screen=network][data-lt-board-theme=night] body :is(.detail-label,.connWhy,.detailSub,.detail .value,#vMeta){color:var(--lt-map-ui-muted)}
+html[data-v41-screen=network][data-lt-board-theme=night] body .ctaRow .miniBtn{background:var(--lt-map-control);border-color:var(--lt-map-ui-border);color:var(--lt-map-ui-text)}
+html[data-v41-screen=network][data-lt-board-theme=night] body .ctaRow .miniBtn.accent{background:var(--lt-map-ui-accent);border-color:var(--lt-map-ui-accent);color:var(--lt-map-ui-accent-ink)}
+html[data-v41-screen=network][data-lt-board-theme=night] body .detailPlayer{background:rgba(0,0,0,.35)}
+
+/* 좁은 화면 시트에서는 사진이 판을 다 차지하지 않게 줄인다 — 제목·마음·날짜·이어진 순간이 한눈에 들어온다.
+   (파일 끝에 둔다 — 위의 .detailPlayer img 기본값보다 나중에 읽혀야 이긴다.) */
+@media(max-width:640px){.detailPlayer img,.detailPlayer video{max-height:124px}}

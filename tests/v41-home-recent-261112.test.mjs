@@ -73,19 +73,7 @@ test('#426 ▶ 재생은 누른 뒤에만 — 첫 화면이 열릴 때는 플레
   assert.match(orbit,/if\(play\)\{e\.stopPropagation\(\);toggleRecentPlay\(play\);return;\}/);
 });
 
-test('#426 이어 보던 순간 버튼은 없다 — 로그인 후 세트는 [순간 목록·둘러보기·내 트리](261116 PR 2)',()=>{
-  assert.doesNotMatch(homeCenter,/resume/);
-  // 2026-11-14 대표 결정: 셋째 자리에 '내 트리'(trees)를 둔다. 순서·문구는 header-state 한 곳에서 온다.
-  assert.match(homeCenter,/button\.hidden = true/,'자리가 모자라면 숨긴다');
-  // 261116 PR 2: 첫 자리는 '순간 목록'(moments) — 오른쪽 위 단추는 없앴다.
-  assert.match(homeCenter,/'in-trees':\['moments','community','trees'\]/);
-  assert.match(homeCenter,/'in-empty':\['moments','community','trees'\]/);
-  assert.doesNotMatch(home,/top-actions > \.menuBtn\[data-do="index"\]\?\.append/);
-  assert.match(home,/menuBtn\[data-do="index"\]'\)\?\.remove\(\)/,'오른쪽 위 순간 목록 단추는 없앤다(261116 PR 2)');
-  // 둘째 줄에서도 마지막 순간 문구를 뺀다(카드가 대신) — 안내 문구에는 마지막 순간 표기가 남지 않는다.
-  assert.doesNotMatch(homePresentation,/마지막 순간 「/);
-  assert.doesNotMatch(homePresentation,/`마지막 순간 ·/);
-});
+
 
 test('#426 390: 카드 폭=화면-32px, 세로 썸네일 높이 제한',()=>{
   assert.match(orbit,/\.recent-card\{[^}]*width:min\(430px,86vw\)/);

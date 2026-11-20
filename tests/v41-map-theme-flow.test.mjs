@@ -212,11 +212,12 @@ async function interactions({ page, frame, width }) {
   await frame.locator('#viewNet').click();
   assert.equal(await frame.evaluate(() => window.__lt.state.view), 'network', '그물형 전환');
   if (width > 980) {
-    await frame.locator('#zoomIn').click();
+    // #951 ⑥: 큰 탐색 판은 숨고 아래 단추 줄이 같은 단추를 맡는다 — 클릭 대상만 줄로 옮긴다(배율 단언 그대로).
+    await frame.locator('#mobileRibbon button[aria-label="지도 확대(＋)"]').click();
     assert.ok(await frame.evaluate(() => window.__lt.state.scale > 1), '확대 단추');
-    await frame.locator('#zoomOut').click();
+    await frame.locator('#mobileRibbon button[aria-label="지도 축소(−)"]').click();
     assert.ok(await frame.evaluate(() => window.__lt.state.scale < 1.18), '축소 단추');
-    await frame.locator('#focusFirst').click();
+    await frame.locator('#mobileRibbon button.origin').click();
   } else {
     // 모바일에서는 탐색 창을 숨긴다. 실제 캔버스 확대·축소 입력과 아래 첫 순간 단추를 쓴다.
     const point = await frame.evaluate(() => window.__lt.dots().find(n => document.elementFromPoint(n.x, n.y)?.id === 'stage'));

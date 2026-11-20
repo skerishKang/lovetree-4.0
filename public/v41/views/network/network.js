@@ -34,7 +34,7 @@ const PALETTE=()=>{if(paletteV!==tokenVersion){paletteV=tokenVersion;palette=Arr
 const colorOf=n=>PALETTE()[((n.colorIndex??n.cluster??n.index??0)%6+6)%6];const rgba=(hex,a)=>{const[r,g,b]=hexRgb(hex);return `rgba(${r},${g},${b},${a})`};
 // #601 묶음은 데이터에 맞는 쪽 — 부채꼴 나무(평평한 트리)는 감정별(색), 사슬·깊은 나무는 월별.
 // 7개씩 자른 순서 묶음은 뜻이 없었다('01 youtub…부터 7개'). 묶음·색은 LT56Model.pickGroups가 데이터에서
-// 만든다(최대 6묶음 = 색 6벌, 빈 묶음 없음). 묶음이 한 가지뿐이면 묶음 판을 숨긴다(아래 legend 뒤).
+// 만든다(최대 6묶음 = 색 6벌, 빈 묶음 없음). 묶음이 2개 미만이면 범례를 숨긴다(아래 legend 뒤, #951 ⑥).
 const GROUPS=LT56Model.pickGroups(LTDEMO.moments,LTDEMO.edges);
 const GROUP_INDEX=new Map();GROUPS.forEach((g,i)=>g.ids.forEach(id=>GROUP_INDEX.set(id,i)));
 const CLUSTERS=GROUPS.map((g,i)=>({id:`c${i}`,index:i,name:g.name,sub:'',color:PALETTE()[i],x:0,y:0,count:g.ids.length,hubR:9}));
@@ -76,19 +76,20 @@ function generateCluster(c){
  return hub;
 }
 // Use the same forty sample moments and actual links as the orbit.
-// #601 묶음 이름은 감정(색)과 개수 — "01 설렘 · 7개". 묶음이 한 가지뿐이면 판을 숨긴다.
+// #601 묶음 이름은 감정(색)과 개수 — "01 설렘 · 7개". 묶음이 2개 미만이면 범례를 숨긴다(#951 ⑥).
 const groupLabel=i=>`${String(i+1).padStart(2,'0')} ${CLUSTERS[i]?.name||''} · ${CLUSTERS[i]?.count||0}개`;
 /* CTO 결정(261120): 아래 조작 줄의 묶음 단추는 '1묶음 · 1–2월' 형식 — 범례와 같은 번호, 앞 0 없음. */
 const clusterChip=(i,name)=>`${i+1}묶음 · ${name||''}`;
 const legendBox=document.querySelector('.legend');
-if(legendBox)legendBox.hidden=CLUSTERS.length===0;
-document.querySelectorAll('.legend-row').forEach((row,i)=>{const c=CLUSTERS[i],sw=row.querySelector('.swatch');row.hidden=!c;if(sw)sw.dataset.g=String(i+1);row.replaceChildren(...(sw?[sw]:[]),document.createTextNode(c?groupLabel(i):''))});
+if(legendBox)legendBox.hidden=CLUSTERS.length<2;/* #951 ⑥: 묶음이 2개 이상일 때만 범례 — 1개면 숨긴다(단추 줄이 같은 정보를 맡는다). */
+if(CLUSTERS.length<2)document.querySelectorAll('.legend-row').forEach(row=>{row.hidden=true});
+else document.querySelectorAll('.legend-row').forEach((row,i)=>{const c=CLUSTERS[i],sw=row.querySelector('.swatch');row.hidden=!c;if(sw)sw.dataset.g=String(i+1);row.replaceChildren(...(sw?[sw]:[]),document.createTextNode(c?groupLabel(i):''))});
 // #366 배치는 LT56Model 보기별 함수 한 벌. #461: 두 보기 모두 화면에서 도구가 덮지 않는 상자(BOX)에 맞춰 화면 좌표로 펼친다.
 let BOX={x:0,y:0,w:1200,h:800},NETFIT=null,CONCENTRIC=null;
 LTDEMO.moments.forEach((m,i)=>{const ci=GROUP_INDEX.get(m.id)??0,c=CLUSTERS[ci],p={x:c.x,y:c.y},j=i;const n=momentBase(ci,m.id,p.x,p.y,0,`p${ci}_0`,j,i===0);if(n.first)n.r=10;Object.assign(n,{title:m.title,date:m.date,emotion:m.emotion,note:m.memo||'',why:m.whyNext||'',source:m.source||'예시 기록',mediaMetadata:m.mediaMetadata,image:m.image});nodes.push(n)});
 CLUSTERS.forEach((c,ci)=>{const seq=nodes.filter(n=>n.cluster===ci).map(n=>n.id);addPath({id:`p${ci}_0`,cluster:ci,label:c.name,kind:'primary',nodes:seq,children:[],branchAt:-1})});
 LTDEMO.edges.forEach((e,i)=>addEdge({a:e.from,b:e.to,cluster:nodes.find(n=>n.id===e.from)?.cluster||0,kind:e.kind==='related'?'related':'parent',pathId:nodes.find(n=>n.id===e.from)?.pathId,order:i,reason:e.reason||''}));
-const FIRST=nodes[0];const originTargets=[];
+let FIRST=nodes[0];const originTargets=[];
 // #461 갈림길: 다음 순간이 둘 이상인 순간(멀리서도 이름표를 붙이는 대상).
 const BRANCH=new Set(Object.entries(LTDEMO.edges.filter(e=>e.kind==='parent').reduce((a,e)=>(a[e.from]=(a[e.from]||0)+1,a),{})).filter(([,c])=>c>1).map(([id])=>id));
 const all=[...CLUSTERS,...anchors,...nodes],byId=Object.fromEntries(all.map(n=>[n.id,n]));
@@ -102,7 +103,7 @@ const w2s=(x,y)=>({x:x*state.scale+state.tx,y:y*state.scale+state.ty}),s2w=(x,y)
 function setMode(mode){state.mode=mode;$('modePill').textContent=LTLabels.mode(mode);}
 // #368 3차: 날짜 표기는 책·보드와 같은 한 벌(window.LTTitle.formatDisplayDate — track56 html이 formatDisplayDate로 심는다).
 const dateText=v=>{try{return window.LTTitle?.formatDisplayDate?.(v)||v||''}catch{return v||''}};
-addEventListener('lt-date-style-changed',()=>{const n=state.selected;if(n)$('detailDate').textContent=dateText(n.date);});
+/* #951 ⑤: 판의 날짜는 '날짜·감정·트리' 한 줄(#dBasic)에 있다 — 표기 값이 바뀌면 그 줄을 그 순간으로 다시 그린다. */addEventListener('lt-date-style-changed',()=>{const n=state.selected;if(n&&typeof paintDetail==='function')paintDetail(n);});
 // #368 3차: 설정의 '관계 지도 기본 보기' — 셸이 lt41-network-view로 알려 주면 지금 화면도 같은 보기로 바꾼다.
 addEventListener('message',e=>{if(e.data?.type!=='lt41-network-view')return;if((e.data.value==='network'||e.data.value==='concentric')&&state.view!==e.data.value)setView(e.data.value);});
 function setupMobileRibbon(){const r=$('mobileRibbon');r.innerHTML='';const o=document.createElement('button');o.textContent='첫 순간 보기';o.className='origin';o.onclick=()=>{if(state.view==='concentric')centerConcentricFirst();else selectMoment(FIRST,true)};r.appendChild(o);/* #601 왼쪽 판과 같은 확대·축소·전체 보기 — 좁은 화면에서 왼쪽 판은 숨으므로 아래 줄에도 둔다. */const zm=document.createElement('button');zm.textContent='−';zm.setAttribute('aria-label','지도 축소(−)');zm.onclick=()=>{zoomAt(.84);scheduleDraw()};r.appendChild(zm);const zp=document.createElement('button');zp.textContent='＋';zp.setAttribute('aria-label','지도 확대(＋)');zp.onclick=()=>{zoomAt(1.18);scheduleDraw()};r.appendChild(zp);if(state.view==='network'&&NETFIT?.compact){/* #951 ②: 작은 무리는 묶음 단추 없이 '전체 보기'만 둔다. */const ov0=document.createElement('button');ov0.textContent='전체 보기';ov0.onclick=()=>overview();r.appendChild(ov0)}else if(state.view==='network'&&!NETFIT?.fan){/* #638: 390 조작 줄 잘림 0 — 묶음 단추는 줄여 쓴다('01 2026년 1–2월 · 10개' → '01 1–2월').
@@ -120,10 +121,21 @@ function measureInsets(){const box=el=>{if(!el)return null;const cs=getComputedS
     값은 순간 고르기 줄보다 먼저 정하고(그 줄이 그 자리에 서도록), 그 뒤에 재야 재는 값이 흔들리지 않는다. */
  const pickerTop=(topbarBottom||102)+22;
  document.documentElement.style.setProperty('--lt-picker-top',pickerTop.toFixed(0)+'px');
+ /* #951 ⑤: 좁은 화면에서 상세 시트가 아래 묶음 단추 줄을 덮지 않게 그 줄 높이를 재어 넘긴다. */
+ document.documentElement.style.setProperty('--lt-sheet-bottom',(bottom?vh-bottom.top+8:104).toFixed(0)+'px');
+ /* #951 ⑥: 넓은 화면 묶음 카드·토스트는 아래 단추 줄 위에 앉는다 — 줄 위 끝(화면 아래에서부터의 높이)을 넘긴다. */
+ document.documentElement.style.setProperty('--lt-bottom-cover',(bottom?vh-bottom.top:118).toFixed(0)+'px');
+ /* #951 ⑤: 토스트가 보이는 동안 시트가 물러난 자리는 창 크기가 바뀌어도 유지한다. */if($('toast').classList.contains('show'))placeToast();
+
  // 순간 고르기 줄은 그 자리에 서므로 잰 위·아래를 쓰지 않고, 높이만 더해 '늘 같은' 아래 끝을 쓴다(그 줄이 늦게 붙어도 같다).
  const picker=box(document.querySelector('.lt-moment-picker'));
+ /* 좁은 화면 상세 시트의 위 끝 — 순간 고르기 줄 아래에서 시작한다(줄과 겹치지 않게). */
+ document.documentElement.style.setProperty('--lt-sheet-top',(picker?pickerTop+picker.height+8:190).toFixed(0)+'px');
+ /* #951 ⑤: 넓은 화면(981px 이상)에서 상세 판이 열리면 지도 판이 판 너비만큼 왼쪽으로 줄어든다(보드 #891과 같게).
+    판에 가려진 자리에 고른 순간이 놓이지 않도록 오른쪽 여백으로 판을 비켜 준다. 좁은 화면은 아래 시트라 그대로 덮는다. */
+ const detailOpen=vw>980&&!!document.querySelector('#detail.open'),detailInset=detailOpen?446:0;
  const tops=['.topbar','.hero p'].map(s=>box(document.querySelector(s))).filter(Boolean);
- return {top:Math.max(0,...tops.map(r=>r.bottom),picker?pickerTop+picker.height+4:0)+(state.mobile?30:0),left:left?left.right:0,right:right?vw-right.left:0,bottom:bottom?vh-bottom.top:0}}
+ return {top:Math.max(0,...tops.map(r=>r.bottom),picker?pickerTop+picker.height+4:0)+(state.mobile?30:0),left:left?left.right:0,right:Math.max(right?vw-right.left:0,detailInset),bottom:bottom?vh-bottom.top:0}}
 function layoutNetwork(){NETFIT=LT56Model.networkLayout(LTDEMO.moments,{box:BOX,dotR:5,firstR:20,gap:8,hubR:9,edges:LTDEMO.edges,groups:GROUPS.map(g=>g.ids)});CLUSTERS.forEach((c,i)=>{const h=NETFIT.hubs[i];if(h){c.x=h.x;c.y=h.y}else if(NETFIT.fan||NETFIT.compact){/* #583 부채꼴 나무: 묶음 점이 뜻하는 묶음 자리가 없다(한 고리에 펼침) — 화면 밖에 치워 점·이름표·누르기에서 치운다 */c.x=-9999;c.y=-9999}})}
 // 전체 보기 = 배율 1(배치가 이미 화면 좌표로 상자에 맞춰져 있다).
 function fitView(){state.scale=1;state.tx=0;state.ty=0}
@@ -152,7 +164,71 @@ function originReveal(){cancelPlayback();state.selected=FIRST;state.cluster=null
 // #366 길 강조 대상 계산: 첫 순간부터 이 순간까지 지나온 길(부모 연결)만 밝힌다. 세기는 LT56Model.pathEmphasis 한 곳.
 function applyPathHighlight(n){const path=LT56Model.originPath(n.id,LTDEMO.moments,LTDEMO.edges);state.pathIds=new Set(path);const idx=new Map(path.map((id,i)=>[id,i]));state.pathEdges=new Set();for(const e of edges){if(e.kind!=='parent')continue;const ia=idx.get(e.a),ib=idx.get(e.b);if(ia!=null&&ib!=null&&Math.abs(ia-ib)===1)state.pathEdges.add(e.id)}state.revealEdges=new Set(state.pathEdges)}
 function clearSelection(){state.selected=null;state.pathIds=new Set();state.pathEdges=new Set();state.revealEdges.clear();state.cluster=null;$('detail').classList.remove('open');setMode('OVERVIEW');document.querySelector('.hero').classList.remove('dim');syncRibbon();scheduleDraw()}
-function selectMoment(n,center=false){mobilePicker?.select(n.id);LTDEMO.select(n.id);cancelPlayback(false);state.selected=n;state.cluster=state.view==='concentric'?null:CLUSTERS[n.cluster];state.mobileCluster=n.cluster;setMode('MOMENT_FOCUS');applyPathHighlight(n);const lv=CONCENTRIC?.levelOf?.[n.id];const p=pathSequenceForNode(n);if(center)centerOn(n,state.mobile?1.8:1.6);const rawM=LTDEMO.moments.find(x=>x.id===n.id);const autoRe=/^(?:[a-z0-9-]+\.)+[a-z]{2,}(?::\d{1,5})?에서 간직한 순간$/i;const cleanTitle=autoRe.test(String(n.title||'').trim())?(String(rawM?.mediaMetadata?.title||'').trim()||n.note||'순간'):n.title;$('detailKicker').textContent=n.first?'첫 순간':'순간';$('detailTitle').textContent=cleanTitle;$('detailDate').textContent=dateText(n.date);$('detailEmotion').textContent=n.emotion;$('detailCluster').textContent=state.view==='concentric'?`${lv||0}단계`:groupLabel(n.cluster);$('detailPath').textContent=p?.label||'Context 순간';$('detailNote').textContent=n.note;$('detailNote').parentElement.hidden=!n.note;$('detailWhy').textContent=n.why;$('detailWhy').parentElement.hidden=!n.why||n.why===n.note;$('detailNext').textContent='첫 순간부터 이 순간까지 지나온 길을 밝게 표시합니다.';$('detail').classList.add('open');showRouteStatus(state.view==='concentric'?`${lv||0}단계 · ${cleanTitle}`:CLUSTERS[n.cluster].name,`첫 순간에서 ${Math.max(0,state.pathIds.size-1)}단계 지나온 길을 밝힙니다.`);syncRibbon();scheduleDraw();toast('첫 순간에서 이 순간까지 지나온 길을 밝혔어요.')}
+function selectMoment(n,center=false){mobilePicker?.select(n.id);LTDEMO.select(n.id);cancelPlayback(false);state.selected=n;state.cluster=state.view==='concentric'?null:CLUSTERS[n.cluster];state.mobileCluster=n.cluster;setMode('MOMENT_FOCUS');applyPathHighlight(n);const lv=CONCENTRIC?.levelOf?.[n.id];const p=pathSequenceForNode(n);if(center)centerOn(n,state.mobile?1.8:1.6);paintDetail(n);$('detail').classList.add('open');resize();/* 판 너비만큼 판이 줄면 캔버스 크기가 바뀌어 한 프레임 비어 보인다 — 그 자리에서 바로 한 번 그린다. */typeof draw==='function'&&draw();
+ showRouteStatus(state.view==='concentric'?`${lv||0}단계 · ${autoTitleOf(n).clean}`:CLUSTERS[n.cluster].name,`첫 순간에서 ${Math.max(0,state.pathIds.size-1)}단계 지나온 길을 밝힙니다.`);
+ /* #951 ⑤: 같은 뜻의 안내를 두 번 보이지 않는다 — 묶음 카드(routeStatus)가 보이는 화면에서는 카드를 남기고
+    토스트는 띄우지 않는다(보드 #845와 같은 규칙). 카드가 숨는 좁은 화면에서만 토스트로 알린다. */
+ syncRibbon();scheduleDraw();if(getComputedStyle($('routeStatus')).display==='none')toast('첫 순간에서 이 순간까지 지나온 길을 밝혔어요.')}
+/* #951 ⑤: 순간 상세 판 — 보드(#891·#662)와 같은 틀을 쓴다. 판 안: 제목·사진/영상·내가 남긴 마음·날짜와 트리·이어진 순간.
+   아래 고정 줄: 크게 보기·여기부터 시네마·⋯ 더 보기. 지도에서 새로 만들지 않고 보드 판의 규칙(한 벌 스크롤·44px 줄)을 그대로 따른다. */
+function escHtml(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function autoTitleOf(n){const raw=LTDEMO.moments.find(x=>x.id===n.id);const autoRe=/^(?:[a-z0-9-]+\.)+[a-z]{2,}(?::\d{1,5})?에서 간직한 순간$/i;const t=String(n.title||'').trim();const clean=autoRe.test(t)?(String(raw?.mediaMetadata?.title||'').trim()||n.note||'순간'):n.title;return {raw,clean}}
+function detailMediaHTML(n){
+ const m=LTDEMO.moments.find(x=>x.id===n.id)||{};
+ if(m.url&&window.LTMedia)return window.LTMedia.markup(m.url,m.title,m.mediaMetadata,m.id,null,null,{compact:true});
+ const img=m.image||m.asset||'';
+ if(img)return `<img class="detailPhoto" src="${escHtml(img)}" alt="">`;
+ if(m.video)return `<video class="detailVideo" src="${escHtml(m.video)}" controls muted playsinline></video>`;
+ return '';
+}
+function paintDetail(n){
+ const {raw,clean}=autoTitleOf(n);
+ $('detailKicker').textContent=n.first?'첫 순간':'순간';
+ $('detailTitle').textContent=clean;
+ const sub=String(raw?.mediaMetadata?.title||'').trim(),ds=$('detailSub');if(ds){const show=!!sub&&sub!==clean;ds.textContent=show?'▶ '+sub:'';ds.hidden=!show}
+ const player=$('detailPlayer'),media=detailMediaHTML(n);player.innerHTML=media;player.hidden=!media;
+ const ytUrl=/youtu/i.test(String(raw?.url||''))?raw.url:'';const ytRow=$('ytLinkRow');if(ytRow){ytRow.hidden=!ytUrl;if(ytUrl)$('detailYtLink').href=ytUrl}
+ const heart=$('detailNote');heart.textContent=n.note||'';heart.closest('.section').hidden=!n.note;
+ const treeName=document.getElementById('treeTitleText')?.textContent?.trim()||'';
+ $('dBasic').innerHTML=`<b>${escHtml(n.emotion||'')}</b> · ${escHtml(dateText(n.date))}${n.first?' <span class="firstMark" title="첫 순간">●</span>':''}${treeName?` · ${escHtml(treeName)}`:''}`;
+ const linked=(list)=>list.map(e=>({e,m:byId[e.to]||byId[e.a]})).filter(x=>x.m);
+ const outs=linked(LTDEMO.edges.filter(e=>e.kind==='parent'&&e.from===n.id));
+ const ins=linked(LTDEMO.edges.filter(e=>e.kind==='parent'&&e.to===n.id));
+ const row=x=>`<button type="button" class="connCard" data-id="${escHtml(x.m.id)}"><span class="connName">${escHtml(x.m.title||'순간')}</span>${x.e.reason&&x.e.reason!=='관련 순간'?`<span class="connWhy">${escHtml(x.e.reason)}</span>`:''}</button>`;
+ const pick=outs.length?outs:ins;
+ $('dConn').innerHTML=pick.length?pick.slice(0,3).map(row).join(''):'<span class="connNone">이어진 순간이 아직 없어요</span>';
+ /* '여기부터 시네마'는 이 순간에서 이어진 길이 있을 때만 — 보드의 detailButtonState와 같은 뜻이다. */
+ const cin=$('cinemaFromMoment'),canGo=outs.length>0;cin.disabled=!canGo;cin.title=canGo?'':'이 순간에서 이어진 길이 없어요';
+}
+function closeDetail(){const id=state.selected?.id;$('detail').classList.remove('open');hideMoreMenu();resize();typeof draw==='function'&&draw();
+ /* 닫은 뒤 초점은 누른 순간(캔버스 위 그 순간)으로 돌아간다 — 캔버스가 그 순간을 이고 있으므로 캔버스로 초점을 돌리고 표시를 남긴다. */
+ if(id)canvas.dataset.ltFocusMoment=id;canvas.focus({preventScroll:true})}
+function hideMoreMenu(){const menu=$('detailMoreMenu'),btn=$('detailMoreBtn');if(!menu||!btn)return;menu.hidden=true;btn.setAttribute('aria-expanded','false')}
+function openViewer(){const n=state.selected;if(!n)return;const {clean}=autoTitleOf(n);$('vTitle').textContent=clean;
+ const media=detailMediaHTML(n);$('viewerMedia').innerHTML=media||'<div class="detail-label" style="padding:22px">크게 볼 사진이나 영상이 없어요</div>';
+ $('vMeta').textContent=[n.emotion,dateText(n.date),n.note].filter(Boolean).join(' · ');
+ const v=$('ltViewer');v.classList.add('open');v.setAttribute('aria-hidden','false');$('closeViewer').focus()}
+function closeViewer(){const v=$('ltViewer');v.classList.remove('open');v.setAttribute('aria-hidden','true');$('detailOpen').focus()}
+function wireDetail(){
+ const back=$('detailClose');if(back)back.onclick=closeDetail;
+ const open=$('detailOpen');if(open)open.onclick=openViewer;
+ const closeV=$('closeViewer');if(closeV)closeV.onclick=closeViewer;
+ const cin=$('cinemaFromMoment');if(cin)cin.onclick=()=>{if(cin.disabled)return;startPlayback()};
+ const moreBtn=$('detailMoreBtn'),moreMenu=$('detailMoreMenu');
+ if(moreBtn&&moreMenu){moreBtn.onclick=e=>{e.stopPropagation();const openNow=moreMenu.hidden;moreMenu.hidden=!openNow;moreBtn.setAttribute('aria-expanded',String(openNow))}}
+ const help=$('detailHelpBtn');if(help)help.onclick=()=>{hideMoreMenu();$('helpBtn')?.click()};
+ const conn=$('dConn');if(conn)conn.onclick=e=>{const b=e.target.closest?.('.connCard');if(!b)return;const n=byId[b.dataset.id];if(n){closeDetail();selectMoment(n,true)}};
+ const viewer=$('ltViewer');if(viewer)viewer.onclick=e=>{if(e.target===viewer)closeViewer()};
+}
+wireDetail();
+// Esc: 판이 열려 있으면 판만 닫고 초점을 누른 순간으로 돌린다(캔버스의 Esc=선택 풀기보다 먼저 — 캡처 단계).
+addEventListener('keydown',e=>{
+ if(e.key!=='Escape')return;
+ if($('ltViewer')?.classList.contains('open')){e.preventDefault();e.stopPropagation();closeViewer();return}
+ if($('detailMoreMenu')&&!$('detailMoreMenu').hidden&&!e.target.closest?.('#detailMoreBtn')){e.preventDefault();e.stopPropagation();hideMoreMenu();$('detailMoreBtn')?.focus();return}
+ if($('detail')?.classList.contains('open')){e.preventDefault();e.stopPropagation();closeDetail()}
+},true);
+document.addEventListener('click',e=>{if($('detailMoreMenu')?.hidden)return;if(e.target.closest?.('#detailMoreBtn')||e.target.closest?.('#detailMoreMenu'))return;hideMoreMenu()});
 // #461 누르는 범위는 화면 px로 잰다(배치가 화면 좌표라 확대해도 묶음 점이 옆 순간을 가로채지 않게).
 function hitTest(sx,sy){const w=s2w(sx,sy);let best=null,bd=Infinity;for(const n of [...nodes,...anchors,...CLUSTERS]){if(!shouldDrawNode(n))continue;/* 묶음 원본에는 kind/r가 없다. 누르기에서만 분류해 기존 이름표·배치 계산은 보존한다. */const hub=CLUSTERS.includes(n),d=Math.hypot(w.x-n.x,w.y-n.y)*state.scale,hit=hub?16:n.kind==='anchor'?18:Math.max(12,dotRadius(n)+6);if(d<hit&&d<bd){best=n;bd=d}}return best}
 // #461 점 반지름 한 곳: 그리기·누르기·측정이 같은 값을 쓴다. 배치가 정한 반지름(dotR)에 확대를 조금만(최대 1.6배) 따른다.
@@ -245,7 +321,24 @@ function scheduleDraw(){if(!rafPending)rafPending=requestAnimationFrame(frame)}
 function frame(now){rafPending=0;if(state.play?.active&&state.animEdge&&!state.branchPause){state.animT+=(now-last)/(reduced?80:760);if(state.animT>=1){state.animT=1;playbackArrive()}}last=now;draw();if(animating())rafPending=requestAnimationFrame(frame)}
 function showRouteStatus(title,text){$('routeStatusTitle').textContent=title;$('routeStatusText').textContent=text;$('routeStatus').classList.add('show')}
 function hideRouteStatus(){if(state.mode==='OVERVIEW')$('routeStatus').classList.remove('show')}
-function toast(t){const el=$('toast');el.textContent=t;el.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>el.classList.remove('show'),2300)}
+/* #951 ⑤: 좁은 화면 토스트 자리 — 아래 묶음 단추 줄 바로 위(위 단추 줄·순간 고르기 줄을 덮지 않는다).
+   시트가 열려 있으면 시트 아래 끝이 토스트 높이+8만큼 물러나 자리를 만든다(시트 위 끝은 그대로).
+   경로 갈림 판이 열려 있으면 그 판 위로 올린다. 넓은 화면은 아래 가운데 그대로. */
+let toastSheetExtra=0;
+function sheetBottomBase(){const r=document.querySelector('.mobile-ribbon');const b=r&&getComputedStyle(r).display!=='none'?r.getBoundingClientRect():null;return b?vh-b.top+8:104}
+function placeToast(){const el=$('toast');const on=el.classList.contains('show');
+ if(!state.mobile){/* #951 ⑥: 넓은 화면 토스트는 아래 단추 줄 위 — 묶음 카드가 보이면 그 카드 위(겹침 0). */
+  el.style.top='';
+  const rb=document.querySelector('.mobile-ribbon'),r=rb&&getComputedStyle(rb).display!=='none'?rb.getBoundingClientRect():null;
+  const card=$('routeStatus'),cardOn=card.classList.contains('show')&&getComputedStyle(card).display!=='none';
+  el.style.bottom=(cardOn?vh-card.getBoundingClientRect().top+8:(r?vh-r.top+8:80))+'px';
+  toastSheetExtra=0;return}
+ el.style.top='auto';
+ const base=sheetBottomBase(),chooser=$('branchChooser'),chooserOpen=chooser.classList.contains('open');
+ el.style.bottom=(on&&chooserOpen?Math.max(base,vh-chooser.getBoundingClientRect().top+8):base)+'px';
+ const extra=(on&&!chooserOpen&&document.querySelector('#detail.open'))?el.offsetHeight+8:0;
+ if(extra!==toastSheetExtra){toastSheetExtra=extra;document.documentElement.style.setProperty('--lt-sheet-bottom',(base+extra).toFixed(0)+'px')}}
+function toast(t){const el=$('toast');el.textContent=t;el.classList.add('show');clearTimeout(toast.t);placeToast();toast.t=setTimeout(()=>{el.classList.remove('show');placeToast()},2300)}
 function cancelPlayback(resetMode=true){state.play=null;state.animEdge=null;state.animT=0;state.trail.clear();state.preview.clear();state.branchPause=false;$('branchChooser').classList.remove('open');if(resetMode&&state.mode==='PATH_PLAYBACK')setMode(state.selected?'MOMENT_FOCUS':'CLUSTER_PATH_OVERVIEW');scheduleDraw()}
 function routeEdges(pid){return LT56Model.routeEdges(pid,pathById,edges)}
 // 재생은 예시 판본에서만 연다. 실제 기록에는 경로 순서 데이터가 따로 없어(pathById는 두 판본 모두
@@ -291,9 +384,9 @@ canvas.addEventListener('wheel',e=>{e.preventDefault();if(e.ctrlKey||Math.abs(e.
 /* #951 ① '순간 N · 이어진 선 N개' — 단추가 아니라 위 단추 줄 아래 작은 글자다(셸의 links()도 같은 값을 쓴다). */
 function paintMapMeta(){const el=$('connection-tool');if(!el)return;const ids=new Set(LTDEMO.moments.map(m=>m.id));const n=LTDEMO.edges.filter(e=>ids.has(e.from)&&ids.has(e.to)).length;el.textContent=`순간 ${LTDEMO.moments.length} · 이어진 선 ${n}개`}
 paintMapMeta();
-$('zoomIn').onclick=()=>{zoomAt(1.18);scheduleDraw()};$('zoomOut').onclick=()=>{zoomAt(.84);scheduleDraw()};$('overviewBtn').onclick=()=>overview();$('resetFocus').onclick=()=>overview();$('focusFirst').onclick=()=>{if(state.view==='concentric')centerConcentricFirst();else selectMoment(FIRST,true)};$('viewNet').onclick=()=>setView('network');$('viewConc').onclick=()=>setView('concentric');/* 2026-11-16 대표 결정: 그래프 보기(#627 3단계)는 지도 안의 보기 하나 — 이 화면 안에서 그리지 않고 기존 화면 전환 메시지(lt41-navigate) 한 길로 셸에 넘긴다. 지금 트리·순간은 셸이 그대로 유지한다. */$('viewGraph').onclick=()=>{try{parent.postMessage({type:'lt41-navigate',view:'track60-graph.html'},location.origin)}catch(e){}};$('detailClose').onclick=()=>$('detail').classList.remove('open');$('followPath').onclick=startPlayback;
+$('zoomIn').onclick=()=>{zoomAt(1.18);scheduleDraw()};$('zoomOut').onclick=()=>{zoomAt(.84);scheduleDraw()};$('overviewBtn').onclick=()=>overview();$('resetFocus').onclick=()=>overview();$('focusFirst').onclick=()=>{if(state.view==='concentric')centerConcentricFirst();else selectMoment(FIRST,true)};$('viewNet').onclick=()=>setView('network');$('viewConc').onclick=()=>setView('concentric');/* 2026-11-16 대표 결정: 그래프 보기(#627 3단계)는 지도 안의 보기 하나 — 이 화면 안에서 그리지 않고 기존 화면 전환 메시지(lt41-navigate) 한 길로 셸에 넘긴다. 지금 트리·순간은 셸이 그대로 유지한다. */$('viewGraph').onclick=()=>{try{parent.postMessage({type:'lt41-navigate',view:'track60-graph.html'},location.origin)}catch(e){}};
 window.__lovetreeStats={moments:nodes.length,paths:paths.length,edges:edges.length,clusters:CLUSTERS.map(c=>({name:c.name,count:c.count,primaryPaths:paths.filter(p=>p.cluster===c.index&&p.kind==='primary').length})),edgeKinds:edges.reduce((a,e)=>(a[e.kind]=(a[e.kind]||0)+1,a),{})};
-window.__lt={edgeLen:()=>edges.filter(e=>byId[e.a]&&byId[e.b]).map(e=>{const a=w2s(byId[e.a].x,byId[e.a].y),b=w2s(byId[e.b].x,byId[e.b].y);return Math.round(Math.hypot(b.x-a.x,b.y-a.y))}),compact:()=>!!NETFIT?.compact,dots:()=>nodes.filter(n=>n.kind==='moment'&&shouldDrawNode(n)).map(n=>{const p=w2s(n.x,n.y),r=dotRadius(n);const ra=nodeAlpha(n);const te=dotThumbOf(n,r,ra);return {id:n.id,x:p.x,y:p.y,r,first:!!n.first,thumb:!!te,tr:te}}),hubs:()=>state.view==='concentric'?[]:CLUSTERS.filter(shouldDrawNode).map(c=>{const p=w2s(c.x,c.y);return {id:c.id,x:p.x,y:p.y,r:Math.max(8,c.hubR*state.scale)}}),box:()=>BOX,labels:()=>LAST_LABELS,fan:()=>!!NETFIT?.fan,thumbs:()=>[...thumbs.entries()].map(([id,e])=>({id,ok:e.ok})),thumbsSettled:()=>[...thumbs.values()].every(e=>e.ready),thumbRects:()=>THUMB_RECTS,overview,originReveal,selectCluster,selectMoment,startPlayback,chooseBranch,state,CLUSTERS,nodes,edges,paths,pathById,FIRST};
+window.__lt={edgeLen:()=>edges.filter(e=>byId[e.a]&&byId[e.b]).map(e=>{const a=w2s(byId[e.a].x,byId[e.a].y),b=w2s(byId[e.b].x,byId[e.b].y);return Math.round(Math.hypot(b.x-a.x,b.y-a.y))}),compact:()=>!!NETFIT?.compact,dots:()=>nodes.filter(n=>n.kind==='moment'&&shouldDrawNode(n)).map(n=>{const p=w2s(n.x,n.y),r=dotRadius(n);const ra=nodeAlpha(n);const te=dotThumbOf(n,r,ra);return {id:n.id,x:p.x,y:p.y,r,first:!!n.first,thumb:!!te,tr:te}}),hubs:()=>state.view==='concentric'?[]:CLUSTERS.filter(shouldDrawNode).map(c=>{const p=w2s(c.x,c.y);return {id:c.id,x:p.x,y:p.y,r:Math.max(8,c.hubR*state.scale)}}),box:()=>BOX,labels:()=>LAST_LABELS,fan:()=>!!NETFIT?.fan,thumbs:()=>[...thumbs.entries()].map(([id,e])=>({id,ok:e.ok})),thumbsSettled:()=>[...thumbs.values()].every(e=>e.ready),thumbRects:()=>THUMB_RECTS,measureInsets,resize,overview,originReveal,selectCluster,selectMoment,startPlayback,chooseBranch,state,CLUSTERS,nodes,edges,paths,pathById,FIRST};
 mobilePicker=LTMobileMoments({moments:LTDEMO.moments,selected:LTDEMO.get(),onSelect:id=>selectMoment(byId[id],true),onOpen:id=>{selectMoment(byId[id],true);$('openMoment').click();},openLabel:'책 열기'});
 addEventListener('resize',resize);
 /* #951 ①: 셸이 순간 고르기 줄을 늦게 붙이면(--lt-picker-top 아래) 그때 한 번 다시 맞춘다 —
@@ -305,4 +398,40 @@ addEventListener('resize',resize);
 const check=()=>{const i=measureInsets(),k=[i.top,i.left,i.right,i.bottom].map(Math.round).join(',');if(k===seen)return;const first=!seen;seen=k;if(!first)resize()};
 const ro=new ResizeObserver(check),watch=()=>{for(const q of SEL){const el=document.querySelector(q);if(el&&!watched.has(el)){watched.add(el);ro.observe(el)}}check()};
 watch();new MutationObserver(watch).observe(document.body,{childList:true});})();/* #461 화면 문서 끝의 <style>(모바일 안내 문구 자리 등)은 이 스크립트 뒤에 읽힌다 — 문서를 다 읽은 뒤·글꼴이 온 뒤 한 번씩 덮개를 다시 재어 맞춘다(한 번뿐, 유휴 반복 없음). */if(document.readyState==='loading')addEventListener('DOMContentLoaded',()=>resize(),{once:true});addEventListener('load',()=>resize(),{once:true});try{document.fonts?.ready?.then(()=>resize())}catch(e){}state.view=readStoredView();document.body.dataset.ltView=state.view;setupMobileRibbon();paintViewButtons();resize();(()=>{if(state.view==='concentric')computeConcentric(true);else overview(false);/* #583 '이 순간 열기': 셸이 주소(#my/network?tree=…&moment=…)로 특정 순간을 열 때 프레임 주소에 ?open=<순간>을 붙여 보낸다 — 그 순간을 가운데 두고 고른 상태(상세 판 열림)로 연다. 주소 약속은 docs/HANDOFF.md. */const openId=new URLSearchParams(location.search).get('open');const n=(openId&&byId[openId]?.kind==='moment')?byId[openId]:nodes.find(n=>n.id===LTDEMO.get());if(n){if(openId&&n.id===openId)selectMoment(n,true);else state.selected=n}})();last=performance.now();scheduleDraw();
+
+/* #1001 (3): 같은 트리 안 순간 변경(고치기·삭제·이전 순간 바꾸기·연결·해제)은 셸이 모델만 갱신하고
+   lt41-moments-saved로 알린다 — 지도를 다시 띄우지 않고 점·선·묶음을 부모 LT41.tree에서 다시 읽어
+   결정적 배치로 같은 자리에 다시 그린다. 고른 순간·보기·배율·열린 상세 판은 그대로 둔다(재적재 0).
+   실제 기록(서버 트리) 기준 — 예시·공유는 읽기 전용이라 이 알림이 오지 않는다. */
+addEventListener('message',e=>{
+ if(e.origin!==location.origin||e.source!==window.parent||e.data?.type!=='lt41-moments-saved')return;
+ if(typeof LTDEMO.refresh!=='function'||!LTDEMO.refresh())return;
+ const selId=state.selected?.id||null,detailOpen=$('detail').classList.contains('open');
+ const view=state.view,scale=state.scale,tx=state.tx,ty=state.ty;
+ const g=LT56Model.pickGroups(LTDEMO.moments,LTDEMO.edges);
+ GROUPS.length=0;g.forEach(x=>GROUPS.push(x));
+ GROUP_INDEX.clear();GROUPS.forEach((gr,i)=>gr.ids.forEach(id=>GROUP_INDEX.set(id,i)));
+ while(CLUSTERS.length>GROUPS.length)CLUSTERS.pop();
+ GROUPS.forEach((gr,i)=>{if(!CLUSTERS[i])CLUSTERS.push({id:`c${i}`,index:i,name:gr.name,sub:'',color:PALETTE()[i],x:0,y:0,count:gr.ids.length,hubR:9});else{CLUSTERS[i].name=gr.name;CLUSTERS[i].count=gr.ids.length;CLUSTERS[i].index=i;CLUSTERS[i].color=PALETTE()[i];}});
+ while(clusterPathIds.length<CLUSTERS.length)clusterPathIds.push([]);
+ nodes.length=0;
+ LTDEMO.moments.forEach((m,i)=>{const ci=GROUP_INDEX.get(m.id)??0,c=CLUSTERS[ci],p={x:c.x,y:c.y},j=i;const n=momentBase(ci,m.id,p.x,p.y,0,`p${ci}_0`,j,i===0);if(n.first)n.r=10;Object.assign(n,{title:m.title,date:m.date,emotion:m.emotion,note:m.memo||'',why:m.whyNext||'',source:m.source||'예시 기록',mediaMetadata:m.mediaMetadata,image:m.image});nodes.push(n)});
+ paths.length=0;for(const k of Object.keys(pathById))delete pathById[k];clusterPathIds.forEach(a=>a.length=0);
+ CLUSTERS.forEach((c,ci)=>{const seq=nodes.filter(n=>n.cluster===ci).map(n=>n.id);addPath({id:`p${ci}_0`,cluster:ci,label:c.name,kind:'primary',nodes:seq,children:[],branchAt:-1})});
+ edges.length=0;
+ LTDEMO.edges.forEach((ed,i)=>addEdge({a:ed.from,b:ed.to,cluster:nodes.find(n=>n.id===ed.from)?.cluster||0,kind:ed.kind==='related'?'related':'parent',pathId:nodes.find(n=>n.id===ed.from)?.pathId,order:i,reason:ed.reason||''}));
+ FIRST=nodes[0];
+ for(const k of Object.keys(byId))delete byId[k];
+ [...CLUSTERS,...anchors,...nodes].forEach(n=>byId[n.id]=n);
+ BRANCH.clear();Object.entries(LTDEMO.edges.filter(ed=>ed.kind==='parent').reduce((a,ed)=>(a[ed.from]=(a[ed.from]||0)+1,a),{})).filter(([,c])=>c>1).forEach(([id])=>BRANCH.add(id));
+ layoutNetwork();
+ if(view==='concentric')computeConcentric(false);else restoreNetworkPoints();
+ state.view=view;state.scale=scale;state.tx=tx;state.ty=ty;
+ if(selId&&byId[selId]?.kind==='moment'){
+  const n=byId[selId];state.selected=n;state.cluster=view==='concentric'?null:CLUSTERS[n.cluster];state.mobileCluster=n.cluster;applyPathHighlight(n);
+  if(detailOpen){const rawM=LTDEMO.moments.find(x=>x.id===n.id);const autoRe=/^(?:[a-z0-9-]+\.)+[a-z]{2,}(?::\d{1,5})?에서 간직한 순간$/i;const cleanTitle=autoRe.test(String(n.title||'').trim())?(String(rawM?.mediaMetadata?.title||'').trim()||n.note||'순간'):n.title;const lv=CONCENTRIC?.levelOf?.[n.id];const p=pathSequenceForNode(n);
+   $('detailKicker').textContent=n.first?'첫 순간':'순간';$('detailTitle').textContent=cleanTitle;$('detailDate').textContent=dateText(n.date);$('detailEmotion').textContent=n.emotion;$('detailCluster').textContent=view==='concentric'?`${lv||0}단계`:groupLabel(n.cluster);$('detailPath').textContent=p?.label||'Context 순간';$('detailNote').textContent=n.note;$('detailNote').parentElement.hidden=!n.note;$('detailWhy').textContent=n.why;$('detailWhy').parentElement.hidden=!n.why||n.why===n.note;}
+ }else if(selId){clearSelection();}
+ paintMapMeta();setupMobileRibbon();paintViewButtons();scheduleDraw();
+});
 })();

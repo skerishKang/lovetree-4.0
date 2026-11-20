@@ -1,7 +1,10 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {createMemberSession} from '../public/v41/member-session.mjs';
 import {validateState,createTree} from '../public/v41/domain.mjs';
-function setup(options={}){let server={version:1,trees:[]},revision=0;const writes=[],events=[],gets=[];const api={get:async()=>{gets.push(1);return {ok:true,revision,state:server,subject:'member-A',writeSubjectBound:true,...options.read};},put:async body=>{writes.push(body);if(options.put)return options.put(body,writes);server=structuredClone(body.state);return {ok:true,revision:++revision};},logout:async()=>({ok:true})};const session=createMemberSession({api,delay:()=>new Promise(()=>{}),makeClientKey:(()=>{let i=0;return()=>`key-${++i}`})(),onState:s=>events.push(s)});return {session,writes,events,api,gets,changeServer:next=>{server=next;revision+=1;}};}
+// 저장소 고정(환경 가정 제거): Node 26은 전역 sessionStorage를 노출하지만 CI의 Node 22는 노출하지 않는다.
+// 고정하지 않으면 앞 시험이 401로 남긴 초안이 전역 저장소를 통해 뒤 시험으로 새어 들어간다
+// (같은 subject·revision에서 복원 → 'rejected'·dirty). 저장소 없이 도는 CI 환경과 같게 명시적으로 고정한다.
+function setup(options={}){let server={version:1,trees:[]},revision=0;const writes=[],events=[],gets=[];const api={get:async()=>{gets.push(1);return {ok:true,revision,state:server,subject:'member-A',writeSubjectBound:true,...options.read};},put:async body=>{writes.push(body);if(options.put)return options.put(body,writes);server=structuredClone(body.state);return {ok:true,revision:++revision};},logout:async()=>({ok:true})};const session=createMemberSession({api,delay:()=>new Promise(()=>{}),makeClientKey:(()=>{let i=0;return()=>`key-${++i}`})(),onState:s=>events.push(s),draftStorage:null,cacheStorage:null});return {session,writes,events,api,gets,changeServer:next=>{server=next;revision+=1;}};}
 const fields={subject:'별',title:'처음',note:'기억할 마음',date:'2026-10-31',emotion:'설렘',url:''};
 test('old API is readable but cannot write without subject-binding capability',async()=>{const {session,writes}=setup({read:{writeSubjectBound:false}});await session.start();assert.equal(session.snapshot().owned,true);assert.throws(()=>session.apply('new',fields));assert.equal(writes.length,0);});
 test('create/add/edit/connect/delete use canonical domain and bound server writes',async()=>{const {session,writes}=setup();await session.start();const first=session.apply('new',fields);const second=session.apply('add',{...fields,title:'다음'},first);session.apply('edit',{...fields,title:'수정됨'},second);session.apply('link',{targetId:first.momentId},second);let tree=session.state().trees[0];assert.equal(tree.moments[1].id,second.momentId);assert.equal(tree.moments[1].parentId,first.momentId);assert.ok(tree.moments[0].links.includes(second.momentId));session.apply('unlink',{targetId:first.momentId},second);session.apply('delete',{},second);validateState(session.state());await session.act('retry');assert.equal(writes.length,1);assert.equal(writes[0].expectedSubject,'member-A');assert.equal(writes[0].expectedRevision,0);assert.equal(writes[0].state.trees[0].moments.length,1);assert.equal(session.snapshot().dirty,false);});
@@ -15,7 +18,7 @@ test('disposed session cannot restore late account read',async()=>{let resolve;c
 test('로그아웃 성공 뒤 로그인 상태 알림이 와서 계정 동그라미가 사라진다',async()=>{
   const statuses=[];const server={version:1,trees:[]};let revision=0;
   const api={get:async()=>({ok:true,revision,state:server,subject:'member-A',writeSubjectBound:true}),put:async()=>({ok:true,revision:++revision}),logout:async()=>({ok:true})};
-  const session=createMemberSession({api,delay:()=>new Promise(()=>{}),onStatus:s=>statuses.push(s),navigate:()=>{}});
+  const session=createMemberSession({api,delay:()=>new Promise(()=>{}),onStatus:s=>statuses.push(s),navigate:()=>{},draftStorage:null,cacheStorage:null});
   await session.start();
   assert.equal(session.snapshot().owned,true);
   assert.equal(statuses.at(-1).phase,'synced');
@@ -135,7 +138,7 @@ test('숨김 저장은 keepalive로 보낸다 — api.put에 keepalive 표시가
   const api={get:async()=>({ok:true,revision,state:server,subject:'member-A',writeSubjectBound:true}),
     put:async(body,options)=>{seen.push(options||null);server=structuredClone(body.state);return {ok:true,revision:++revision};},
     logout:async()=>({ok:true})};
-  const session=createMemberSession({api,delay:()=>new Promise(()=>{}),makeClientKey:()=>'key-1'});
+  const session=createMemberSession({api,delay:()=>new Promise(()=>{}),makeClientKey:()=>'key-1',draftStorage:null,cacheStorage:null});
   await session.start();
   session.apply('quickAdd',{url:'https://www.youtube.com/watch?v=gdZLi9oWNZg'});
   session.flushOnHide();

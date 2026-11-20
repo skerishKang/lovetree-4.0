@@ -171,7 +171,6 @@ const COVER_TREE = {
 test('970 실행: 표지 — 제목 보임·안 잘림(390·1440), 고르면 반영·취소하면 그대로', { skip: skip || !REQUIRE970 ? skip || 'LT_970_REQUIRE=1 일 때 실행' : false, timeout: 180000 }, async () => {
   if (skip) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip}`);
   const browser = await chromium.launch();
-  const findings = [];
   try {
     for (const [w, h] of [[1440, 900], [390, 844]]) {
       const page = await browser.newPage({ viewport: { width: w, height: h } });
@@ -256,9 +255,8 @@ test('970 실행: 표지 — 제목 보임·안 잘림(390·1440), 고르면 반
         assert.equal(listDesign, 'texture-3', `${w}: 트리 목록 표지가 고른 디자인으로 반영`);
         await page.keyboard.press('Escape');
       }
-      // 서재 책 표지 — 라이브 값을 기록하고, 다시 열면 저장한 디자인이 보여야 한다.
-      const liveDesign = await frame.evaluate(() => document.querySelector('.book-card .book-cover')?.getAttribute('data-cover-design') || '');
-      if (liveDesign !== 'texture-3') findings.push(`${w}: 서재 책 표지 라이브 값 '${liveDesign}' — 다시 열기 전까지 갱신 안 됨`);
+      // 서재 책 표지 — #984: 저장 직후(다시 열기 없이) 라이브 값이 새 디자인이어야 한다.
+      await frame.waitForFunction(() => document.querySelector('.book-card .book-cover')?.getAttribute('data-cover-design') === 'texture-3', null, { timeout: 10000 });
       await page.reload({ waitUntil: 'load' });
       frame = await findShelf();
       const afterDesign = await frame.evaluate(() => document.querySelector('.book-card .book-cover')?.getAttribute('data-cover-design') || '');
@@ -282,6 +280,292 @@ test('970 실행: 표지 — 제목 보임·안 잘림(390·1440), 고르면 반
       assert.deepEqual(errors, [], `${w}: 페이지 오류 없음`);
       await page.close();
     }
-    if (findings.length) console.log('970 표지 관찰: ' + findings.join(' | '));
   } finally { await browser.close(); }
+});
+
+// 이슈 984: 표지 저장 직후 반영 — 서재 책장과 열린 책(리더)이 다시 열기 없이 새 표지로 바뀐다.
+// 저장 실패(가짜 500)면 원래 표지 그대로 + 셸의 기존 저장 안내 떠가 실패를 알린다.
+// 가짜 작업장·가짜 응답만 쓴다(운영 API·운영 계정 없음). 390·1440.
+// LT_TREE_RENAME_571_REQUIRE=1 일 때 실행(CI 첫 트리 안내 잡 — 건너뜀=실패).
+async function findShelfFrame984(page, w) {
+  let frame = null;
+  for (let i = 0; i < 80 && !frame; i++) {
+    frame = page.frames().find((f) => /views\/track32-bookshelf/.test(f.url()));
+    if (!frame) await page.waitForTimeout(250);
+  }
+  assert.ok(frame, `${w}: 서재(책장) 프레임이 열린다`);
+  await frame.waitForSelector('.book-card .cover-title', { timeout: 20000 });
+  await page.waitForTimeout(800);
+  return frame;
+}
+
+function mockWorkspace984(page, { storedTree, puts, failPut }) {
+  let rev = 1;
+  const workspace = () => ({ ok: true, revision: rev, subject: '시험 사용자', writeSubjectBound: true, savedAt: CLOCK970, state: { version: 1, prefs: {}, trees: [storedTree.tree] } });
+  return page.route('**/api/workspace*', (route) => {
+    const req = route.request();
+    if (req.method() === 'PUT') {
+      const body = JSON.parse(req.postData() || '{}');
+      puts.push(body);
+      if (failPut) {
+        return route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ ok: false, error: { code: 'server_error', message: '가짜 서버 오류' } }) });
+      }
+      const edited = body?.state?.trees?.find((t) => t.id === 'tree1');
+      if (edited) storedTree.tree = edited;
+      rev += 1;
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, revision: rev }) });
+    }
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(workspace()) });
+  });
+}
+
+async function pickDesign984(page, design) {
+  await page.waitForFunction(() => document.getElementById('tree-manager')?.open === true, null, { timeout: 10000 });
+  await page.evaluate((value) => {
+    document.querySelector('#tree-form input[name="coverMode"][value="design"]').click();
+    document.querySelector(`#tree-form input[name="coverDesign"][value="${value}"]`).click();
+  }, design);
+  await page.click('#tree-form button[type="submit"]');
+  await page.waitForFunction(() => document.getElementById('tree-manager').open === false, null, { timeout: 10000 });
+}
+
+test('984 실행: 표지 — 저장 직후 서재·열린 책 반영, 실패하면 원래 표지·안내(390·1440)', { skip: REQUIRE ? false : skip, timeout: 240000 }, async () => {
+  if (skip) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip}`);
+  const browser = await chromium.launch();
+  try {
+    for (const [w, h] of [[1440, 900], [390, 844]]) {
+      // ① 저장 성공 → 서재 책장 표지가 새로고침 없이 바로 새 값.
+      {
+        const page = await browser.newPage({ viewport: { width: w, height: h } });
+        const errors = [];
+        page.on('pageerror', (e) => errors.push(String(e.message || e)));
+        const storedTree = { tree: JSON.parse(JSON.stringify(COVER_TREE)) };
+        const puts = [];
+        await mockWorkspace984(page, { storedTree, puts, failPut: false });
+        await page.route('**/api/account', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, email: 't@t.test', name: '시험' }) }));
+        await page.goto(`${base}/v41/?account=1#my/shelf`, { waitUntil: 'load', timeout: 60000 });
+        const frame = await findShelfFrame984(page, w);
+        const before = await frame.evaluate(() => document.querySelector('.book-card .book-cover')?.getAttribute('data-cover-design') || '');
+        assert.equal(before, '', `${w}: 처음 표지는 디자인 없음(기본)`);
+        await frame.locator('.book-card').first().hover();
+        await frame.locator('.book-manage[data-manage-id="tree1"]').click();
+        await pickDesign984(page, 'texture-3');
+        for (let i = 0; i < 40 && puts.length < 1; i++) await page.waitForTimeout(250);
+        assert.equal(puts.length, 1, `${w}: 저장은 한 번(PUT)`);
+        assert.equal(puts[0]?.state?.trees?.find((t) => t.id === 'tree1')?.coverDesign, 'texture-3', `${w}: 저장한 디자인은 texture-3`);
+        await frame.waitForFunction(() => document.querySelector('.book-card .book-cover')?.getAttribute('data-cover-design') === 'texture-3', null, { timeout: 10000 });
+        assert.deepEqual(errors, [], `${w}: 페이지 오류 없음(성공)`);
+        await page.close();
+      }
+      // ② 열린 책(리더) — 저장 성공 직후 표지가 새 값. 책 화면으로의 넘어감을 가짜 응답으로 늦춰 리더를 관찰한다.
+      {
+        const page = await browser.newPage({ viewport: { width: w, height: h } });
+        const errors = [];
+        page.on('pageerror', (e) => errors.push(String(e.message || e)));
+        const storedTree = { tree: { ...JSON.parse(JSON.stringify(COVER_TREE)), coverMode: 'design', coverDesign: 'texture-3' } };
+        const puts = [];
+        await mockWorkspace984(page, { storedTree, puts, failPut: false });
+        await page.route('**/api/account', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, email: 't@t.test', name: '시험' }) }));
+        await page.route('**/views/track59-sketchbook.html*', async (route) => {
+          await new Promise((resolve) => setTimeout(resolve, 10000));
+          await route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><html lang="ko"><head><title>책</title></head><body>책</body></html>' });
+        });
+        await page.goto(`${base}/v41/?account=1#my/shelf`, { waitUntil: 'load', timeout: 60000 });
+        const frame = await findShelfFrame984(page, w);
+        await frame.locator('.book-card button[data-book-id="tree1"]').click();
+        await frame.waitForSelector('#readerScreen.active', { timeout: 10000 });
+        const readerBefore = await frame.evaluate(() => document.getElementById('bookCoverFace')?.getAttribute('data-cover-design') || '');
+        assert.equal(readerBefore, 'texture-3', `${w}: 열린 책 표지는 저장된 디자인`);
+        await page.click('#record-menu');
+        await page.waitForFunction(() => document.getElementById('tree-popover')?.hidden === false, null, { timeout: 10000 });
+        await page.click('#tree-popover [data-tree-action="manage"]');
+        await pickDesign984(page, 'texture-5');
+        for (let i = 0; i < 40 && puts.length < 1; i++) await page.waitForTimeout(250);
+        assert.equal(puts.length, 1, `${w}: 저장은 한 번(PUT)`);
+        await frame.waitForFunction(() => document.getElementById('bookCoverFace')?.getAttribute('data-cover-design') === 'texture-5', null, { timeout: 8000 });
+        await frame.waitForFunction(() => document.querySelector('.book-card .book-cover')?.getAttribute('data-cover-design') === 'texture-5', null, { timeout: 8000 });
+        assert.deepEqual(errors, [], `${w}: 페이지 오류 없음(열린 책)`);
+        await page.close();
+      }
+      // ③ 저장 실패(가짜 500) → 원래 표지 그대로 + 기존 저장 안내 떠. 새로고침 없음.
+      {
+        const page = await browser.newPage({ viewport: { width: w, height: h } });
+        const errors = [];
+        page.on('pageerror', (e) => errors.push(String(e.message || e)));
+        const storedTree = { tree: JSON.parse(JSON.stringify(COVER_TREE)) };
+        const puts = [];
+        await mockWorkspace984(page, { storedTree, puts, failPut: true });
+        await page.route('**/api/account', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, email: 't@t.test', name: '시험' }) }));
+        await page.goto(`${base}/v41/?account=1#my/shelf`, { waitUntil: 'load', timeout: 60000 });
+        const frame = await findShelfFrame984(page, w);
+        await page.evaluate(() => { window.__lt984Page = 'kept'; });
+        await frame.evaluate(() => { window.__lt984Frame = 'kept'; });
+        await frame.locator('.book-card').first().hover();
+        await frame.locator('.book-manage[data-manage-id="tree1"]').click();
+        await pickDesign984(page, 'texture-3');
+        for (let i = 0; i < 40 && puts.length < 1; i++) await page.waitForTimeout(250);
+        assert.equal(puts.length, 1, `${w}: 저장은 한 번 시도(PUT)`);
+        await page.waitForFunction(() => document.getElementById('save-feedback')?.hidden === false, null, { timeout: 10000 });
+        const message = await page.evaluate(() => document.getElementById('save-message')?.textContent || '');
+        assert.match(message, /서버에 저장되지 않았어요/, `${w}: 기존 실패 안내 문구`);
+        const retry = await page.evaluate(() => [...document.querySelectorAll('#save-actions button')].some((b) => b.textContent.includes('다시 시도')));
+        assert.equal(retry, true, `${w}: 실패 안내에 다시 시도 단추`);
+        const kept = await frame.evaluate(() => document.querySelector('.book-card .book-cover')?.getAttribute('data-cover-design') || '');
+        assert.equal(kept, '', `${w}: 실패하면 원래 표지 그대로`);
+        assert.equal(await page.evaluate(() => window.__lt984Page), 'kept', `${w}: 페이지 새로고침 없음`);
+        assert.equal(await frame.evaluate(() => window.__lt984Frame), 'kept', `${w}: 책장 프레임 새로고침 없음`);
+        assert.deepEqual(errors, [], `${w}: 페이지 오류 없음(실패)`);
+        await page.close();
+      }
+    }
+  } finally { await browser.close(); }
+});
+
+// 이슈 984 후속: 이름 바꾸기 알림(lt41-trees-renamed)도 표지 알림과 같은 원인이었다 — 셸의 frames()는
+// iframe 요소를 돌려주는데 f?.postMessage로 보내려다 TypeError가 나고 catch에 삼켜져 한 번도 나가지 않았다.
+// 트리 관리에서 이름만 바꾸면 서재 책 제목이 다시 열기 없이 바로 바뀌어야 한다(프레임 새로고침 없음).
+// 가짜 작업장·가짜 응답만 쓴다(운영 API·운영 계정 없음). LT_TREE_RENAME_571_REQUIRE=1 일 때 실행. 390·1440.
+test('984 이름 바꾸기 실행: 트리 관리에서 이름 저장 → 서재 책 제목이 다시 열기 없이 바로 바뀜(390·1440)', { skip: REQUIRE ? false : skip, timeout: 180000 }, async () => {
+  if (skip) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip}`);
+  const browser = await chromium.launch();
+  try {
+    for (const [w, h] of [[1440, 900], [390, 844]]) {
+      const page = await browser.newPage({ viewport: { width: w, height: h } });
+      const errors = [];
+      page.on('pageerror', (e) => errors.push(String(e.message || e)));
+      const storedTree = { tree: JSON.parse(JSON.stringify(COVER_TREE)) };
+      const puts = [];
+      await mockWorkspace984(page, { storedTree, puts, failPut: false });
+      await page.route('**/api/account', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, email: 't@t.test', name: '시험' }) }));
+      await page.goto(`${base}/v41/?account=1#my/shelf`, { waitUntil: 'load', timeout: 60000 });
+      const frame = await findShelfFrame984(page, w);
+      await frame.evaluate(() => {
+        window.__lt984RenameFrame = 'kept';
+        // 이름 바꾸기 알림이 실제로 서재에 도착하는지 센다(표지 알림과 별개의 길 — 190줄 수리의 계약).
+        window.__lt984RenamedMsgs = 0;
+        addEventListener('message', (e) => { if (e.data?.type === 'lt41-trees-renamed') window.__lt984RenamedMsgs += 1; });
+      });
+      const before = await frame.evaluate(() => document.querySelector('.book-card .cover-title')?.textContent || '');
+      assert.equal(before, '리센느의 기록', `${w}: 처음 책 제목`);
+      await frame.locator('.book-card').first().hover();
+      await frame.locator('.book-manage[data-manage-id="tree1"]').click();
+      await page.waitForFunction(() => document.getElementById('tree-manager')?.open === true, null, { timeout: 10000 });
+      await page.evaluate(() => {
+        const input = document.querySelector('#tree-form input[name="title"]');
+        input.value = '바뀐 트리 이름';
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+      await page.click('#tree-form button[type="submit"]');
+      await page.waitForFunction(() => document.getElementById('tree-manager').open === false, null, { timeout: 10000 });
+      for (let i = 0; i < 40 && puts.length < 1; i++) await page.waitForTimeout(250);
+      assert.equal(puts.length, 1, `${w}: 저장은 한 번(PUT)`);
+      assert.equal(puts[0]?.state?.trees?.find((t) => t.id === 'tree1')?.title, '바뀐 트리 이름', `${w}: 저장한 이름`);
+      await frame.waitForFunction(() => window.__lt984RenamedMsgs >= 1, null, { timeout: 10000 });
+      await frame.waitForFunction(() => document.querySelector('.book-card .cover-title')?.textContent === '바뀐 트리 이름', null, { timeout: 10000 });
+      assert.equal(await frame.evaluate(() => window.__lt984RenameFrame), 'kept', `${w}: 책장 프레임 새로고침 없음`);
+      assert.deepEqual(errors, [], `${w}: 페이지 오류 없음`);
+      await page.close();
+    }
+  } finally { await browser.close(); }
+});
+
+// #1001 (b)②: 표지 바꾸기 — 업로드 → 추가(add) 뒤에 추가 화면만 뜨고, 표지 편집(editTree)은
+// 모델만 갱신해야 한다(재적재 0회).
+// 전: 업로드로 추가 재적재 + 표지 편집도 재적재 = 2회(같은 흐름에서). 후: 추가 1회 + 편집 0회 = 1회.
+test('970/1001b-2 실행: 표지 사진 올리기 — 저장 뒤 재적재 1회(편집은 모델만 갱신)', { skip: skip || !REQUIRE970 ? skip || 'LT_970_REQUIRE=1 일 때 실행' : false, timeout: 240000 }, async () => {
+  if (skip) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip}`);
+  const { createTree } = await import('../public/v41/domain.mjs');
+  const COVER_TREE = {
+    id: 'tree1', subject: '리센느', title: '리센느의 기록', coverMomentId: '', coverDesign: '', inbox: false,
+    createdAt: '2026-11-19T00:00:00.000Z', updatedAt: '2026-11-19T00:00:00.000Z',
+    moments: [
+      { id: 'm1', parentId: null, links: [], createdAt: '2026-11-19T00:00:00.000Z', title: '첫 순간', note: '처음 남기는 마음', emotion: '설렘', date: '2026-11-19', relation: '', url: '' },
+      { id: 'm2', parentId: 'm1', links: [], createdAt: '2026-11-19T00:00:00.000Z', title: '두 번째 순간', note: '', emotion: '위로', date: '2026-11-19', relation: '이어서', url: '' },
+    ],
+  };
+  const { serve } = await import('./helpers/screen-audit.mjs');
+  const server = await serve();
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch();
+  try {
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
+    let tree = createTree(COVER_TREE);
+    let rev = 1; const puts = [];
+    await ctx.route('**/api/**', r => {
+      if (r.request().url().includes('/api/account')) {
+        // ② #1001: 계정 정보(주제 이름)를 줘서 업로드가 진행되게 한다
+        return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, subject: 'test-account' }) });
+      }
+      return r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' });
+    });
+    await ctx.route('**/api/media*', async r => {
+      // ② #1001: 업로드(POST) 통과 후 onUploaded(url) 로 표지 생성(steps 은 샌드박스에서 가정)
+      if (r.request().method() === 'POST') {
+        // api.mjs call()은 media:payload 전체를 반환하므로 url이 본문 최상위에 있어야 한다.
+        return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, url: `${base}/api/media/cover-test.png`, name: 'cover-test.png' }) });
+      }
+      return r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' });
+    });
+    await ctx.route('**/api/media/cover-test.png**', r => r.fulfill({ status: 200, contentType: 'image/png', body: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", 'base64') }));
+    await ctx.route('**/api/workspace**', r => {
+      const req = r.request();
+      const body = JSON.parse(req.postData() || '{}');
+      if (req.method() === 'PUT') {
+        puts.push({ at: Date.now() });
+        const edited = body?.state?.trees?.find(t => t.id === tree.id);
+        if (edited) tree = edited;
+        rev += 1;
+        return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, revision: rev, subject: 'test-account' }) });
+      }
+      return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, revision: rev, subject: 'test-account', writeSubjectBound: true, savedAt: '2026-11-20T00:00:00.000Z', source: 'server', state: { version: 1, trees: [JSON.parse(JSON.stringify(tree))], prefs: {} } }) });
+    });
+    const page = await ctx.newPage();
+    const navs = [];
+    let counting = false;
+    page.on('framenavigated', f => { if (counting && /\/v41\/(views\/|home\.html)/.test(f.url())) navs.push({ url: f.url(), at: Date.now() }); });
+    await page.goto(`${base}/v41/?account=1`, { waitUntil: 'load' });
+    await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
+    await page.locator('#discover-ask-no').click().catch(() => {});
+    await page.locator('.tree-views [data-view="track59-sketchbook.html"]').click();
+    await page.waitForFunction(() => document.querySelector('[data-popover-target="quick-add"]') === null, null, { timeout: 10000 }).catch(() => {});
+    await page.waitForTimeout(900);
+    // 트리 관리 창 → 사진 표지 모드 → 올리기
+    await page.click('#record-menu');
+    await page.waitForFunction(() => document.getElementById('tree-popover')?.hidden === false, null, { timeout: 10000 });
+    await page.click('[data-tree-action="manage"]');
+    await page.waitForFunction(() => document.getElementById('tree-manager').open, null, { timeout: 10000 });
+    await page.evaluate(() => {
+      const radio = document.querySelector('[name="coverMode"][value="photo"]');
+      radio.checked = true;
+      radio.dispatchEvent(new Event('change', { bubbles: true }));  // 라벨 span 이 덮으므로 JS 로 change 전파
+    });
+    await page.waitForFunction(() => !document.getElementById('tree-cover-upload')?.hidden, null, { timeout: 5000 });
+    await page.waitForFunction(() => document.getElementById('empty-records')?.textContent === '＋ 첫 트리 만들기', null, { timeout: 25000 }).catch(() => {});  // writable 준비 대기
+    counting = true;
+    await page.locator('#tree-form [data-media-file]').setInputFiles({ name: 'cover-test.png', mimeType: 'image/png', buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", 'base64') });
+    const waitPuts = (n) => new Promise((res, rej) => { const t0 = Date.now(); const iv = setInterval(() => { if (puts.length >= n) { clearInterval(iv); res(); } else if (Date.now() - t0 > 25000) { clearInterval(iv); rej(new Error('PUT 대기 초과')); } }, 100); });
+    await waitPuts(1);
+    await page.waitForTimeout(3000);
+    const state = await page.evaluate(() => ({
+      moments: window.LT41?.tree?.moments?.length,
+      coverMomentId: window.LT41?.tree?.coverMomentId,
+      coverMode: window.LT41?.tree?.moments?.find(m => m.id === window.LT41?.tree?.coverMomentId)?.url || '',
+    }));
+    assert.equal(navs.length, 1, `표지 올리기 흐름에서 화면 재적재는 1회여야 한다(실측 ${navs.length}): ${JSON.stringify(navs)}`);
+    assert.equal(state.moments, 2, '표지 추가로 순간이 늘어난다(루트 1 + 사진 순간 1 — 추가 동작 발동)');
+    assert.ok(state.coverMomentId !== '', '추가된 순간이 표지로 지정된다');
+    assert.ok(state.coverMode.includes('/api/media/cover-test.png'), '사진 표지 순간(모델)이 화면에 반영된다');
+    // 표지 편집(editTree)이 모델 전용인지 직접 확인 — 추가(add)의 재적재가 끝난 뒤 이름만 바꿔 저장하면
+    // 책 문서는 그대로여야 한다. 이 검사가 없으면 빠른 흐름에서 두 재적재가 겹쳐 1로 보여 회귀를 놓친다.
+    const bookFrame = page.frames().find(f => /views\/track59-sketchbook/.test(f.url()));
+    assert.ok(bookFrame, '표지 추가 뒤 책 프레임이 열려 있다');
+    await bookFrame.evaluate(() => { window.__coverDoc1001 = 'alive'; });
+    await page.fill('#tree-form [name="title"]', '표지 바꾼 트리');
+    await page.evaluate(() => document.getElementById('tree-form').requestSubmit());
+    await page.waitForTimeout(2500);
+    const keptDoc = await bookFrame.evaluate(() => window.__coverDoc1001 || null);
+    assert.equal(keptDoc, 'alive', '표지·이름 편집(editTree)은 화면을 다시 띄우지 않는다(모델만 갱신)');
+    assert.equal(navs.length, 1, `이름 편집 뒤에도 재적재는 1회(추가 때만)여야 한다(실측 ${navs.length})`);
+    await ctx.close();
+  } finally { await browser.close(); server.close(); }
 });

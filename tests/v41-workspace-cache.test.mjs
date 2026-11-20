@@ -194,3 +194,16 @@ test('#400 cacheStorage가 없으면 저장소를 건드리지 않는다(기존 
   assert.equal(events.length, 1);
   assert.equal(session.state().trees[0].moments[0].title, '서버');
 });
+// #986: 옛 버전이 남긴 저장본에 어긋난 트리가 섞여 있어도 저장본 통째를 버리지 않고
+// 그 트리만 빼서 읽는다(안내는 서버 응답의 quarantined 개수가 알려 준다).
+test('#986 저장본에 어긋난 트리가 섞여 있으면 그 트리만 빼고 읽는다', () => {
+  const storage = fakeStorage();
+  writeCachedWorkspace(storage, 'member-A', stateOf('정상 기록'));
+  const entry = JSON.parse(storage.getItem(entryKey('member-A')));
+  entry.state.trees.push({ id: 't-broken', title: '어긋난 트리', moments: [] });
+  storage.setItem(entryKey('member-A'), JSON.stringify(entry));
+  const cached = readCachedWorkspace(storage);
+  assert.equal(cached.subject, 'member-A');
+  assert.deepEqual(cached.state.trees.map(tree => tree.subject), ['별'], '어긋난 트리만 빠진다');
+  assert.ok(storage.getItem(entryKey('member-A')), '저장본을 지우지 않는다');
+});

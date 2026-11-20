@@ -623,3 +623,177 @@ test('792-3: 상태 문구 — 재생 중엔 지금 구간 재생 중, 건너뛸
   assert.notEqual(STATUS_BUFFERING, STATUS_PLAYING, '불러오는 중 문구가 재생 중에 남지 않게 다른 글자');
   assert.match(STATUS_SKIPPED, /볼 수 없는 순간을 건너뛰었어요/);
 });
+
+// #1001 (a): 책 '한마디'(storySave) 저장 — 답이 살아있는 화면에 도착하고 프레임은 다시 뜨지 않는다.
+// 전: 저장이 화면을 통째로 다시 띄워 답(lt41-story-saved)이 옛 문서에 도착해 버려졌다(재적재 1).
+// 후: 모델만 갱신(meta.moment) — 같은 문서에서 답을 받아 연결 요약이 제자리 갱신된다(재적재 0).
+test('1001a 실행: 책 한마디 저장 — 답이 같은 문서에 도착·연결 요약 제자리 갱신·재적재 0', { skip: skip || !REQUIRE ? skip || 'LT_BOOK_584_REQUIRE=1 일 때 실행' : false, timeout: 180000 }, async () => {
+  if (skip) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip}`);
+  const { createTree: makeTree, addMoment: growTree } = await import('../public/v41/domain.mjs');
+  const { serve: serveApp } = await import('./helpers/screen-audit.mjs');
+  const { waitForShownScreen: waitShown } = await import('./helpers/visible-frame.mjs');
+  let tree = makeTree({ subject: '시험', title: '한마디 트리', note: '', emotion: '설렘', date: '2026-11-01', url: '' }, '2026-11-01T00:00:00Z');
+  tree = growTree(tree, { title: '첫 순간', note: '첫 마음', emotion: '설렘', date: '2026-11-01', url: '' }, tree.moments[0].id, '2026-11-01T00:00:00Z');
+  tree = growTree(tree, { title: '둘 순간', note: '둘 마음', emotion: '몰입', date: '2026-11-02', url: '' }, tree.moments[0].id, '2026-11-02T00:00:00Z');
+  const server = await serveApp();
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch();
+  try {
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
+    let rev = 1, stored = JSON.parse(JSON.stringify(tree));
+    const puts = [];
+    await ctx.route('**/api/**', r => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
+    await ctx.route('**/api/workspace**', r => {
+      const req = r.request();
+      if (req.method() === 'PUT') {
+        const body = JSON.parse(req.postData() || '{}');
+        puts.push({ at: Date.now(), trees: body?.state?.trees?.length });
+        const edited = body?.state?.trees?.find(t => t.id === tree.id);
+        if (edited) stored = edited;
+        rev += 1;
+        return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, revision: rev, subject: '시험계정' }) });
+      }
+      return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, revision: rev, subject: '시험계정', writeSubjectBound: true, savedAt: '2026-11-20T00:00:00.000Z', state: { version: 1, trees: [stored], prefs: {} } }) });
+    });
+    const page = await ctx.newPage();
+    const navs = [];
+    let counting = false;
+    page.on('framenavigated', f => { if (counting && /\/v41\/(views\/|home\.html)/.test(f.url())) navs.push({ url: f.url(), at: Date.now() }); });
+    await page.goto(`${base}/v41/?account=1`, { waitUntil: 'load' });
+    await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
+    await page.locator('#discover-ask-no').click().catch(() => {});
+    await page.locator('.tree-views [data-view="track59-sketchbook.html"]').click();
+    await waitShown(page, { path: 'track59-sketchbook' }, 8000);
+    await page.waitForTimeout(900);
+    const frame = page.frames().find(f => /views\/track59-sketchbook/.test(f.url()));
+    assert.ok(frame, '책 프레임이 열린다');
+    // 문서 표식 + 답 도착 카운터를 지금 문서에 심는다 — 재적재가 있으면 둘 다 사라진다.
+    await frame.evaluate(() => {
+      window.__doc1001 = 'alive';
+      window.__reply1001 = 0;
+      addEventListener('message', e => { if (e.data?.type === 'lt41-story-saved') window.__reply1001 += 1; });
+      const host = document.querySelector('#whyMargin');
+      if (host) host.__mark1001 = 'kept';
+    });
+    await frame.waitForSelector('[data-story-open]', { timeout: 10000 });
+    counting = true;
+    const actionT = Date.now();
+    await frame.locator('[data-story-open]').first().click();
+    await frame.waitForSelector('[data-story-form] input[name="relation"]', { timeout: 10000 });
+    await frame.evaluate(() => {
+      const input = document.querySelector('[data-story-form] input[name="relation"]');
+      input.value = '방금 저장한 한마디';
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      document.querySelector('[data-story-form]').requestSubmit();
+    });
+    // 답이 화면에 실제로 도착해 연결 요약이 저장된 한마디로 바뀔 때까지 기다린다.
+    await frame.waitForFunction(() => (document.querySelector('#whyMargin')?.textContent || '').includes('방금 저장한 한마디'), null, { timeout: 15000 });
+    await page.waitForFunction(() => true, null, { timeout: 100 }).catch(() => {});
+    // 저장 PUT이 실제로 나갔는지 + 저장 확인 방송 창까지 관찰한다.
+    const deadline = Date.now() + 12000;
+    while (Date.now() < deadline && puts.length < 1) await page.waitForTimeout(200);
+    await page.waitForTimeout(2500);
+    const state = await frame.evaluate(() => ({
+      doc: window.__doc1001 || null,
+      replies: window.__reply1001 || 0,
+      mark: document.querySelector('#whyMargin')?.__mark1001 || null,
+      label: (document.querySelector('#whyMargin')?.textContent || '').trim()
+    }));
+    assert.ok(puts.length >= 1, '저장 PUT이 실제로 나간다');
+    assert.equal(state.doc, 'alive', '저장 뒤에도 같은 문서다(프레임 재적재 없음)');
+    assert.equal(state.mark, 'kept', '연결 요약 자리가 새 문서로 교체되지 않는다');
+    assert.ok(state.replies >= 1, `답(lt41-story-saved)이 살아있는 문서에 도착한다(실측 ${state.replies}회)`);
+    assert.ok(state.label.includes('방금 저장한 한마디'), '저장된 한마디가 연결 요약에 보인다');
+    assert.equal(navs.length, 0, `저장 흐름에서 화면 파일 항해는 0회여야 한다(실측 ${navs.length}: ${JSON.stringify(navs)})`);
+    await ctx.close();
+  } finally { await browser.close(); server.close(); }
+});
+
+// #1001 (3): 책의 같은 트리 안 순간 변경(고치기·삭제·이전 순간 바꾸기·연결·해제)은 모델만 갱신하고
+// 화면을 다시 띄우지 않는다 — lt41-moments-saved 알림을 받아 책이 지금 펼침면·고른 순간·열린 상세·스크롤을
+// 그대로 다시 그린다(보드 boardSync·#997 editTree와 같은 방식). 재적재 0.
+test('1001b 실행: 책 순간 변경(고치기·연결·해제·이전 순간·삭제) — 재적재 0·펼침면/선택/상세/스크롤 보존', { skip: skip || !REQUIRE ? skip || 'LT_BOOK_584_REQUIRE=1 일 때 실행' : false, timeout: 180000 }, async () => {
+  if (skip) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip}`);
+  const { createTree: makeTree, addMoment: growTree, linkMoments: linkTree } = await import('../public/v41/domain.mjs');
+  const { serve: serveApp } = await import('./helpers/screen-audit.mjs');
+  const { waitForShownScreen: waitShown } = await import('./helpers/visible-frame.mjs');
+  let tree = makeTree({ subject: '시험', title: '검증 트리', note: '', emotion: '설렘', date: '2026-11-01', url: '' }, '2026-11-01T00:00:00Z');
+  const root = tree.moments[0].id;
+  tree = growTree(tree, { title: '둘 순간', note: '둘 마음', emotion: '몰입', date: '2026-11-02', url: '' }, root, '2026-11-02T00:00:00Z');
+  const m2 = tree.moments.at(-1).id;
+  tree = growTree(tree, { title: '셋 순간', note: '셋 마음', emotion: '그리움', date: '2026-11-03', url: '' }, root, '2026-11-03T00:00:00Z');
+  const m3 = tree.moments.at(-1).id;
+  tree = growTree(tree, { title: '넷 순간', note: '넷 마음', emotion: '벅참', date: '2026-11-04', url: '' }, m2, '2026-11-04T00:00:00Z');
+  const m4 = tree.moments.at(-1).id;
+  tree = linkTree(tree, m2, m3);
+  const server = await serveApp();
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch();
+  try {
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
+    let rev = 1, stored = JSON.parse(JSON.stringify(tree));
+    const puts = [];
+    await ctx.route('**/api/**', r => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
+    await ctx.route('**/api/workspace**', r => {
+      const req = r.request();
+      if (req.method() === 'PUT') { const body = JSON.parse(req.postData() || '{}'); puts.push(1); const ed = body?.state?.trees?.find(t => t.id === tree.id); if (ed) stored = ed; rev += 1; return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, revision: rev, subject: '시험계정' }) }); }
+      return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, revision: rev, subject: '시험계정', writeSubjectBound: true, savedAt: '2026-11-20T00:00:00.000Z', state: { version: 1, trees: [stored], prefs: {} } }) });
+    });
+    const page = await ctx.newPage();
+    const navs = []; let counting = false;
+    page.on('framenavigated', f => { if (counting && /\/v41\/(views\/|home\.html)/.test(f.url())) navs.push(f.url()); });
+    page.on('dialog', d => d.accept());
+    await page.goto(`${base}/v41/?account=1`, { waitUntil: 'load' });
+    await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
+    await page.locator('#discover-ask-no').click().catch(() => {});
+    await page.locator('.tree-views [data-view="track59-sketchbook.html"]').click();
+    await waitShown(page, { path: 'track59-sketchbook' }, 8000);
+    await page.waitForTimeout(900);
+    const frame = page.frames().find(f => /views\/track59-sketchbook/.test(f.url()));
+    assert.ok(frame, '책 프레임이 열린다');
+    await frame.evaluate(() => { window.__doc1001b = 'alive'; window.__msg1001b = 0; addEventListener('message', e => { if (e.data?.type === 'lt41-moments-saved') window.__msg1001b += 1; }); });
+    // 보이는 순간(둘 순간)을 고르고 상세 판을 연다 — 저장 뒤에도 이 상태가 그대로여야 한다.
+    // 카드가 실제로 그려진 뒤에 상세를 열고, 판이 열릴 때까지 기다린다(고정 대기는 타이밍에 따라 흔들린다).
+    await frame.waitForSelector(`[data-moment="${m2}"]`, { timeout: 10000 });
+    await frame.evaluate(id => { window.__TRACK59__.showDetail(id); }, m2);
+    await frame.waitForFunction(() => !document.querySelector('#detailSide')?.hidden || !!document.querySelector('.page-detail'), null, { timeout: 10000 });
+    await page.waitForTimeout(200);
+    const before = await frame.evaluate(() => ({ sel: LTDEMO.get(), st: window.__TRACK59__.getState(), scroll: window.scrollY, sideOpen: !document.querySelector('#detailSide')?.hidden, pageDetail: !!document.querySelector('.page-detail'), focused: !!document.querySelector(`[data-moment="${LTDEMO.get()}"]`)?.classList.contains('focused') }));
+    assert.equal(before.sel, m2, '둘 순간이 선택된다');
+    assert.ok(before.focused, '고른 순간에 선택 테두리가 있다');
+    assert.ok(before.sideOpen || before.pageDetail, '상세 판이 열린다(옆 패널 또는 오른쪽 페이지)');
+    const openEditor = async (id) => { await frame.evaluate(x => parent.postMessage({ type: 'lt41-write', mode: 'edit', momentId: x }, location.origin), id); await page.waitForFunction(() => document.querySelector('#write-panel')?.open === true, null, { timeout: 8000 }); await page.waitForTimeout(200); };
+    const waitPut = async (n) => { const dl = Date.now() + 10000; while (Date.now() < dl && puts.length < n) await page.waitForTimeout(150); };
+    counting = true;
+    // ① 고치기: 제목을 바꾸면 화면이 다시 뜨지 않고 그 자리에 새 제목이 보인다.
+    await openEditor(m2);
+    await page.evaluate(() => { const f = document.querySelector('#moment-form'); f.elements.title.value = '고친 제목'; f.elements.title.dispatchEvent(new Event('input', { bubbles: true })); f.requestSubmit(); });
+    await waitPut(1);
+    await frame.waitForFunction(() => document.body.innerText.includes('고친 제목'), null, { timeout: 10000 });
+    await page.waitForTimeout(1500);
+    const afterEdit = await frame.evaluate(() => ({ doc: window.__doc1001b, msg: window.__msg1001b, sel: LTDEMO.get(), st: window.__TRACK59__.getState(), scroll: window.scrollY, sideOpen: !document.querySelector('#detailSide')?.hidden, pageDetail: !!document.querySelector('.page-detail'), focused: !!document.querySelector(`[data-moment="${LTDEMO.get()}"]`)?.classList.contains('focused'), detailText: (document.querySelector('#detailSide')?.textContent || '') + (document.querySelector('.page-detail')?.textContent || '') }));
+    assert.equal(afterEdit.doc, 'alive', '고치기 뒤에도 같은 문서다(재적재 없음)');
+    assert.ok(afterEdit.msg >= 1, 'lt41-moments-saved 알림이 책에 도착한다');
+    assert.equal(afterEdit.sel, m2, '고른 순간이 그대로다');
+    assert.equal(afterEdit.st.current, before.st.current, '보던 펼침면이 그대로다');
+    assert.equal(afterEdit.scroll, before.scroll, '스크롤 위치가 그대로다');
+    assert.equal(afterEdit.focused, before.focused, '고른 순간의 선택 테두리가 그대로다');
+    assert.ok(afterEdit.sideOpen || afterEdit.pageDetail, '열린 상세 판이 그대로다');
+    assert.ok(afterEdit.detailText.includes('고친 제목'), '상세 판이 새 제목으로 다시 그려진다');
+    // ② 연결·해제·이전 순간 바꾸기: 각각 재적재 0.
+    await openEditor(m2); await page.evaluate(id => { document.querySelector('#related-target').value = id; }, m4); await page.click('#link-moment'); await waitPut(2); await page.waitForTimeout(1200);
+    await openEditor(m2); await page.evaluate(id => { document.querySelector('#related-target').value = id; }, m4); await page.click('#unlink-moment'); await waitPut(3); await page.waitForTimeout(1200);
+    await openEditor(m4); await page.evaluate(id => { document.querySelector('#parent-target').value = id; }, m3); await page.click('#change-parent'); await waitPut(4); await page.waitForTimeout(1200);
+    const afterLinks = await frame.evaluate(() => ({ doc: window.__doc1001b, msg: window.__msg1001b }));
+    assert.equal(afterLinks.doc, 'alive', '연결·해제·이전 순간 뒤에도 같은 문서다');
+    assert.ok(afterLinks.msg >= 4, '각 변경의 알림이 도착한다');
+    // ③ 삭제: 고른 순간이 사라지면 선택은 이어지는 순간으로 폴백하고 화면은 다시 뜨지 않는다.
+    await openEditor(m2); await page.click('#delete-moment'); await waitPut(5); await page.waitForTimeout(1800);
+    const afterDelete = await frame.evaluate(() => ({ doc: window.__doc1001b, sel: LTDEMO.get(), count: LTDEMO.moments.length }));
+    assert.equal(afterDelete.doc, 'alive', '삭제 뒤에도 같은 문서다');
+    assert.equal(afterDelete.count, 3, '순간이 하나 줄어든다');
+    assert.notEqual(afterDelete.sel, m2, '사라진 순간 대신 다른 순간이 선택된다');
+    assert.equal(navs.length, 0, `저장 흐름에서 화면 파일 항해는 0회여야 한다(실측 ${navs.length}: ${JSON.stringify(navs)})`);
+    await ctx.close();
+  } finally { await browser.close(); server.close(); }
+});

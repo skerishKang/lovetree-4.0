@@ -56,6 +56,7 @@
 - **시험 점검 뒤 규칙(2026-11-15 — 수리 하나에 30분이 넘게 걸림).** 점검 결과 CI는 빠르다(필수 check 약 1분, 화면 잡 약 6분). 느린 곳은 한 PC에서 여러 작업이 동시에 크롬 화면 시험을 돌려 생기는 거짓 실패와, 소스 글자를 검사하는 시험(전체의 약 40%) 갱신이었다.
   - `npm test` 는 크롬 화면 시험을 돌리지 않는다(`tests/helpers/no-browser.mjs` 가 `playwright` 를 '브라우저 없음' 대역으로 바꿔 화면 시험이 원래의 건너뜀 길을 탄다). 화면을 바꿨으면 그 화면 시험만 `node --test tests/<파일>.test.mjs` 로 돌린다. 전부는 `npm run test:all`(거의 쓰지 않는다 — CI 화면 잡이 `LT_…_REQUIRE=1` 로 직접 돌린다).
   - 소스 코드 글자를 검사하는 시험(`src.includes('…')` 류)은 새로 만들지 않는다. 기존 것이 리팩터링으로 깨지면 고쳐 맞추지 말고 지운다 — 실제 고장을 막던 것이면 동작(화면 결과·함수 입출력) 검사로 바꾸고, PR 본문에 지운 시험과 이유를 적는다.
+  - **새 `!important`·인라인 style(`style="…"`)을 넣지 않는다(#1015 래칫, CSS 변수만 넣는 `style="--x:…"`은 세지 않는다).** 꼭 필요하면 PR에 이유를 쓰고 CTO 승인 뒤 기준 파일(`tests/fixtures/style-baseline.json`)을 올린다. 줄어든 쪽은 `node tools/v41-style-ratchet.mjs --write`로 낮춘다.
   - 이슈마다 새 시험 파일을 만들지 않는다. 그 화면의 기존 시험 파일에 더한다(첫 화면·책·보드·지도·둘러보기·운영센터).
   - 화면 시험은 눈이 아니라 수치로 판정한다(겹침 0, 간격·대비·글자 크기, 화면 글자에 `undefined`·`null`·`NaN` 없음). 시험 파일 안에 PC 경로를 박지 않는다.
   - 자동 병합(`--auto`)은 걸지 않는다. PR 을 열고 CI 초록을 확인해 보고한 뒤, 병합은 CTO 지시가 있을 때만 squash 로 한다.
@@ -81,4 +82,6 @@
 - 레인 공통: 커밋에 `Co-authored-by` 꼬리말을 넣지 않고, 자동 병합은 `gh pr merge <번호> --squash --auto --subject "<제목>" --body "<본문>"`처럼 `--subject`·`--body`를 모두 명시한다(생략하면 squash 본문에 도구 꼬리말이 모인다).
 - 검사: `.github/workflows/commit-hygiene.yml`이 PR마다 제목·본문·커밋 메시지를 읽어 비밀값 목록의 낱말이나 도구 꼬리말이 있으면 실패한다. 비밀값이 없는 곳(포크 PR)에서는 꼬리말만 검사한다.
 - 낱말 경계로 비교한다 — 다른 낱말 속 글자는 걸리지 않고, 한글은 조사가 붙어도 같은 이름으로 본다.
+- 커밋 전 `git var GIT_AUTHOR_IDENT`로 작성자가 `skerishKang <36503867+skerishKang@users.noreply.github.com>`인지 확인한다(컴1 전역 설정이 Kilo였다 — CTO가 저장소 설정을 고쳤다).
+- 병합은 `gh pr merge <번호> --squash --subject "<PR 제목> (#<번호>)" --body "<한두 줄 요약>"`처럼 제목·본문을 직접 넣는다. GitHub 기본 메시지를 쓰지 않는다(작성자가 다르면 `Co-authored-by`가 자동으로 붙는다 — #998 병합 커밋 051dc70 사례).
 

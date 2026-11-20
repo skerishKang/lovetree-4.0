@@ -24,6 +24,8 @@
     가운데 톤으로 잘 보이게 골랐다. 글자는 --lt-pearl을 얹는다. */
  --lt-accent-rose:#b4576b;--lt-accent-gold:#b08a2e;--lt-accent-green:#4e7d5f;--lt-accent-blue:#4a6d9e;
  --lt-accent-purple:#7c5fa3;--lt-accent-orange:#bf7840;--lt-accent-teal:#3f7d78;
+ /* #942: 장미색 추가 단추에 흰 글씨를 쓰고 밤·정원 모두 대비 4.5:1을 넘긴다. */
+ --lt-cta-rose:var(--lt-accent-rose);--lt-cta-white:#fff;
  /* 트리마다 고정 색(2026-11-16 대표 지적) — 순간 목록 행의 트리 꼬리표·트리 칩의 점. 낮은 채도, 글자는 기본색 그대로. */
  --lt-tree-1:#8a7fb8;--lt-tree-2:#6f9e8a;--lt-tree-3:#b08a6f;--lt-tree-4:#7d94b5;--lt-tree-5:#b5839a;--lt-tree-6:#9a9a6f;
 }
@@ -186,6 +188,7 @@ html[data-lt-theme=garden]{
  --lt-glass:rgba(255,253,248,.92);--lt-glass-strong:rgba(255,253,248,.98);
  --lt-line:rgba(119,91,82,.18);--lt-line-paper:rgba(119,91,82,.3);
  --lt-primary:#98505e;--lt-primary-ink:#fffdf8;
+ --lt-cta-rose:var(--lt-rose-ink);
  --lt-garden-edge:#eee3d5;--lt-garden-shadow:0 18px 40px rgba(75,51,42,.16);
  --lt-tree-1:#6a5a9e;--lt-tree-2:#4f7e6a;--lt-tree-3:#96704f;--lt-tree-4:#5b7295;--lt-tree-5:#96637a;--lt-tree-6:#7a7a4f;
 }
@@ -201,11 +204,10 @@ html[data-lt-theme=garden] nav button:hover{background:rgba(152,80,94,.08);color
 html[data-lt-theme=garden] nav button[aria-current=true]{color:var(--lt-ink);background:rgba(200,110,121,.12);box-shadow:inset 0 0 0 1px var(--lt-gold-line)}
 html[data-lt-theme=garden] .header-actions button,html[data-lt-theme=garden] .login{color:var(--lt-ink);background:rgba(255,253,248,.9);border-color:rgba(119,91,82,.3)}
 html[data-lt-theme=garden] .header-actions button:hover,html[data-lt-theme=garden] .login:hover{background:var(--lt-paper);border-color:rgba(119,91,82,.55)}
-/* 261118 대표 지적 3번(이슈 884): 머리줄 '+ 순간 추가'의 진한 장미 채움도 거두고 다른 머리줄 단추와
-   같은 원래 스타일(크림 채움·잉크 글자)로 — shell.css 의 #write-menu ID 규칙(밤 금색)이 이기므로
-   같은 자리에서 정원 값을 덮는다. 가운데 단추는 SRC064 원본 밝은 채움(#eee7e0)으로 이미 되돌렸다. */
+/* #942: 정원 머리줄의 추가 단추에도 같은 장미색 추가 단추 토큰을 쓴다. */
 html[data-lt-theme=garden] .header-actions #write-menu.primary-action{background:rgba(255,253,248,.9);border-color:rgba(119,91,82,.3);color:var(--lt-ink);box-shadow:none}
 html[data-lt-theme=garden] .header-actions #write-menu.primary-action:hover{background:var(--lt-paper);border-color:rgba(119,91,82,.55);color:var(--lt-ink)}
+html[data-lt-theme=garden] body.home-existing .header-actions #write-menu.primary-action,html[data-lt-theme=garden] body.home-existing .header-actions #write-menu.primary-action:hover{background:var(--lt-cta-rose);border-color:var(--lt-cta-rose);color:var(--lt-cta-white);box-shadow:none}
 html[data-lt-theme=garden] .account-avatar{background:rgba(200,110,121,.16);border-color:var(--lt-gold-line);color:var(--lt-gold-ink)}
 html[data-lt-theme=garden] .account-popover{background:var(--lt-glass-strong);border-color:var(--lt-line);box-shadow:0 12px 30px rgba(75,51,42,.16)}
 /* 2026-11-16 계정 메뉴 대비: 알림 숫자 배지(--lt-rose 배경 × 흰 글자)는 정원에서 3.1:1로 4.5:1에 못 미친다 —
@@ -244,8 +246,8 @@ html[data-lt-theme=garden] body,html[data-lt-theme=garden] .app-header{transitio
 :host([data-lt-theme=garden]) .card.memo{border-color:var(--lt-ink)}
 :host([data-lt-theme=garden]) .menuBtn,:host([data-lt-theme=garden]) .subtleBtn{background:rgba(255,253,248,.9);border-color:rgba(119,91,82,.34);color:var(--lt-ink)}
 :host([data-lt-theme=garden]) .menuBtn:hover,:host([data-lt-theme=garden]) .subtleBtn:hover{background:var(--lt-paper);border-color:rgba(119,91,82,.58)}
-/* 261118 대표 지적 3번(이슈 884): 첫 화면 강조 단추를 진한 장미 채움으로 바꾼 덮어쓰기를 거둔다 —
-   SRC064 원본의 밝은 채움(#eee7e0, orbit-source.css .primary-cta)이 낮에서도 그대로 보이게 한다. */
+/* #942: 첫 화면의 순간 추가 단추만 장미색으로 되돌린다. 둘러보기·안내·궤도는 그대로 둔다. */
+:host .center .home-add-top.primary-cta,:host .center .home-add-top.primary-cta:hover,:host([data-lt-theme=garden]) .center .home-add-top.primary-cta,:host([data-lt-theme=garden]) .center .home-add-top.primary-cta:hover{background:var(--lt-cta-rose);border-color:var(--lt-cta-rose);color:var(--lt-cta-white)}
 :host([data-lt-theme=garden]) .hint,:host([data-lt-theme=garden]) .caption{color:var(--lt-muted);text-shadow:none}
 :host([data-lt-theme=garden]) .firstMark{border-color:var(--lt-rose);background:rgba(255,253,248,.86);color:var(--lt-ink);box-shadow:none}
 :host([data-lt-theme=garden]) .orbit-dialog{background:var(--lt-paper);border-color:rgba(119,91,82,.3);color:var(--lt-ink)}

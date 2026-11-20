@@ -29,7 +29,8 @@ test('주입은 끝났다: 화면이 어댑터 파일을 직접 싣고 주입 �
 });
 
 test('실제 기록 동작은 그대로 남는다(제자리 재생·읽기 스크롤·돋보기 예외·연결 이유·정원 제목)', () => {
-  assert.match(SERVER, /member-reading-scroll/);
+  // #886 책 단계: 읽기 스크롤 CSS는 book-extra.css로 옮겼다. 소스 마커 단정은 지우고
+  // 실동작 넘침 검사는 tests/v41-book-long-note.test.mjs(#295, 계산된 overflowY까지 확인)가 맡는다.
   assert.match(SERVER, /\.lt-media/, '미디어 위 돋보기 예외');
   assert.match(SERVER, /LTDEMO\.edges\.filter\(e=>e\.kind==='parent'/);
   // #722: '링크 순간 추가' 창을 지우면서 그 폼이 만들던 synthetic 동반 순간도 함께 사라졌다(단정 삭제).

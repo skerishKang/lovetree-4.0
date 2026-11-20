@@ -102,7 +102,8 @@ test('지도 실제 대비: 앱 2 × 판 2 × 1440·390, 두 보기·선택 상�
         }
         const worst = worstMapRoles(results), canvasRoles = new Set(worst.filter(r => r.kind === 'canvas').map(r => r.role)), domRoles = new Set(worst.filter(r => r.kind === 'dom').map(r => r.role));
         for (const role of ['label', 'hub-number', 'dot', 'first-dot', 'first-inner-ring', 'first-ring', 'line', 'arrow', 'guide-ring']) assert.ok(canvasRoles.has(role), `${width}-${appTheme}-${plate}: ${role} 캡처 픽셀 누락`);
-        for (const role of ['toolbar', 'hint', 'detail', width === 1440 ? 'legend' : 'ribbon', ...(width === 1440 ? ['explorer'] : ['picker'])]) assert.ok(domRoles.has(role), `${width}-${appTheme}-${plate}: ${role} 글자 측정 누락`);
+        // #951 ⑥: 탐색 판('explorer') 대신 단추 줄('ribbon')을 모든 폭에서 잰다 — 범례는 넓은 화면(묶음 2개 이상)에서만 보인다.
+        for (const role of ['toolbar', 'hint', 'detail', 'ribbon', ...(width === 1440 ? ['legend'] : ['picker'])]) assert.ok(domRoles.has(role), `${width}-${appTheme}-${plate}: ${role} 글자 측정 누락`);
         assert.deepEqual(errors, [], `${width}-${appTheme}-${plate}: 페이지 오류`);
         console.log(JSON.stringify({ combination: `${width}-${appTheme}-${plate}`, minimums: worst.map(({ kind, role, ratio, fg, bg }) => ({ kind, role, ratio, fg, bg })) }));
       } finally { await ctx.close(); }

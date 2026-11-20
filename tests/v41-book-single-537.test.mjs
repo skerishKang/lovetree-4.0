@@ -418,3 +418,53 @@ test('#book-dup2 실제 화면: 390에서 책 테두리·갈라짐 띠가 링크
     server.close();
   }
 });
+
+// #886 책 단계: 터치 타깃 CSS가 track59-sketchbook.html 인라인 <style id="lt-touch-targets">에서
+// book-extra.css로 이동했다. 소스 글자 단정(v41-touch-targets의 하드코딩 크기 파싱)은 지우고
+// 실제 렌더링 히트박스를 잰다 — 버튼 rect + ::after inset(음수 확장)으로 실효 누름 영역을 계산한다.
+test('책 조작 버튼 히트박스는 44x44 이상이다(렌더링 ::after 터치 영역)', { skip: REQUIRE ? false : skip, timeout: 120000 }, async () => {
+  if (skip && REQUIRE) assert.fail(`미리보기 검사에서는 이 시험의 건너뜀이 실패다 — ${skip}`);
+  const server = await serve(ROOT);
+  const base = `http://127.0.0.1:${server.address().port}`;
+  let browser;
+  try {
+    browser = await chromium.launch({ headless: true });
+    const wide = await openBook(browser, base, 1440, 900, 'double');
+    const measure = sel => wide.frame.evaluate((s) => {
+      const el = document.querySelector(s);
+      if (!el) return { sel: s, missing: true };
+      const r = el.getBoundingClientRect();
+      const af = getComputedStyle(el, '::after');
+      const parts = (af.inset || '').trim().split(/\s+/).map(parseFloat);
+      let t = 0, rr = 0, b = 0, l = 0;
+      if (parts.length === 1) t = rr = b = l = parts[0];
+      else if (parts.length === 2) { t = b = parts[0]; rr = l = parts[1]; }
+      else if (parts.length === 3) { t = parts[0]; rr = l = parts[1]; b = parts[2]; }
+      else if (parts.length >= 4) { t = parts[0]; rr = parts[1]; b = parts[2]; l = parts[3]; }
+      const expand = af.content && af.content !== 'none' && af.position === 'absolute';
+      return { sel: s, rw: Math.round(r.width), rh: Math.round(r.height), w: Math.round(r.width - (expand ? l + rr : 0)), h: Math.round(r.height - (expand ? t + b : 0)), expand, inset: af.inset, content: af.content, pos: af.position };
+    }, sel);
+    const check = hit => {
+      assert.ok(!hit.missing, `${hit.sel} 버튼이 있다`);
+      assert.ok(hit.rw > 0 && hit.rh > 0, `${hit.sel} 버튼이 보인다(${hit.rw}x${hit.rh})`);
+      assert.ok(hit.expand && hit.inset && hit.inset !== 'auto', `${hit.sel}에 ::after inset 터치 규칙이 있다(content ${hit.content}, inset ${hit.inset})`);
+      assert.ok(hit.w >= 44 && hit.h >= 44, `${hit.sel} 히트박스 ${hit.w}x${hit.h}가 44 미만이다(inset ${hit.inset})`);
+    };
+    for (const sel of ['#prevBtn', '#nextBtn']) check(await measure(sel));
+
+    await wide.frame.evaluate(() => window.showDetail?.(window.LTDEMO.moments[0].id));
+    await wide.page.waitForTimeout(300);
+    for (const sel of ['#detailClose', '#openViewerBtn', '#detailIndexBtn']) check(await measure(sel));
+    await wide.frame.evaluate(() => window.openViewer?.());
+    await wide.page.waitForTimeout(300);
+    check(await measure('#viewerClose'));
+    await wide.frame.evaluate(() => window.setBookOpen?.(document.getElementById('branchModal'), true));
+    await wide.page.waitForTimeout(300);
+    check(await measure('#branchClose'));
+    assert.deepEqual(wide.errors, [], '책 화면 오류 없음');
+    await wide.ctx.close();
+  } finally {
+    if (browser) await browser.close().catch(() => {});
+    server.close();
+  }
+});

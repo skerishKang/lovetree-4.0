@@ -45,6 +45,8 @@ const mapHostThumbHTML = () => {
 };
 // #951 ⑤(CTO 261120): 서재에서 내 트리 지도로 들어온 상태 — 셸이 넘기는 문맥(source:'server'·writable:true)과 같게 둔다.
 // 이 상태에서만 '← 서재'가 보인다(읽기 전용인 공유·예시에서는 일부러 숨긴다 — tree-title.mjs의 readOnly).
+// 1×1 사진 — 상세 판 사진 칸이 비지 않게(그림 내용은 시험 대상이 아니다).
+const PHOTO = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==';
 const mapHostMemberHTML = (n) => {
   const titles = ['Super Shy 무대', 'Ditto 직캠', 'OMG 앵콜', 'Hype Boy 연습실', 'Attention 무대', 'Cookie 직캠', 'ETA 뮤비', 'Get Up 무대'];
   const ids = Array.from({ length: n }, (_, i) => `m${i + 1}`);
@@ -53,9 +55,22 @@ const mapHostMemberHTML = (n) => {
     moments: ids.map((id, i) => ({ id, title: titles[i] || `순간 ${i + 1}`, date: `2026-11-${String(10 + i).padStart(2, '0')}`, emotion: '설렘', note: '공연', url: '', parentId: i ? ids[i - 1] : null })),
     edges: ids.slice(1).map((id, i) => ({ kind: 'parent', from: ids[i], to: id, reason: '이 다음 장면이 궁금해서' }))
   };
-  return `<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>지도 호스트</title></head><body data-member="in" data-record-source="server"><script>window.LT41={source:'server',writable:true,tree:${JSON.stringify(tree)},trees:[${JSON.stringify(tree)}],momentId:'m1'};</script><iframe src="/v41/views/track56-network.html" style="position:fixed;inset:0;width:100%;height:100%;border:0"></iframe></body></html>`;
+  const media = Object.fromEntries(ids.map((id) => [id, { image: PHOTO, type: 'photo' }]));
+  return `<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>지도 호스트</title></head><body data-member="in" data-record-source="server"><script>window.LT41={source:'server',writable:true,tree:${JSON.stringify(tree)},trees:[${JSON.stringify(tree)}],exampleMedia:${JSON.stringify(media)},momentId:'m1'};</script><iframe src="/v41/views/track56-network.html" style="position:fixed;inset:0;width:100%;height:100%;border:0"></iframe></body></html>`;
 };
-const EXTRA_ROUTES = { '/map-host-3.html': mapHostHTML(3), '/map-host-8.html': mapHostHTML(8), '/map-host-thumb.html': mapHostThumbHTML(), '/map-host-member-3.html': mapHostMemberHTML(3), '/map-host-member-8.html': mapHostMemberHTML(8) };
+// #951 ⑥: 묶음 2개짜리 데이터(사슬 10순간, 10월·11월) — 범례가 보이는 쪽을 확인한다.
+const mapHostMember2GHTML = () => {
+  const titles = ['Super Shy 무대', 'Ditto 직캠', 'OMG 앵콜', 'Hype Boy 연습실', 'Attention 무대', 'Cookie 직캠', 'ETA 뮤비', 'Get Up 무대', '첫 팝업 사진', '라디오 한마디'];
+  const ids = Array.from({ length: 10 }, (_, i) => `m${i + 1}`);
+  const tree = {
+    id: 't1', title: '뉴진스 순간', subject: '뉴진스', owned: true,
+    moments: ids.map((id, i) => ({ id, title: titles[i], date: `2026-${i < 5 ? '10' : '11'}-${String(10 + i).padStart(2, '0')}`, emotion: '설렘', note: '공연', url: '', parentId: i ? ids[i - 1] : null })),
+    edges: ids.slice(1).map((id, i) => ({ kind: 'parent', from: ids[i], to: id, reason: '이 다음 장면이 궁금해서' }))
+  };
+  const media = Object.fromEntries(ids.map((id) => [id, { image: PHOTO, type: 'photo' }]));
+  return `<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>지도 호스트</title></head><body data-member="in" data-record-source="server"><script>window.LT41={source:'server',writable:true,tree:${JSON.stringify(tree)},trees:[${JSON.stringify(tree)}],exampleMedia:${JSON.stringify(media)},momentId:'m1'};</script><iframe src="/v41/views/track56-network.html" style="position:fixed;inset:0;width:100%;height:100%;border:0"></iframe></body></html>`;
+};
+const EXTRA_ROUTES = { '/map-host-3.html': mapHostHTML(3), '/map-host-8.html': mapHostHTML(8), '/map-host-thumb.html': mapHostThumbHTML(), '/map-host-member-3.html': mapHostMemberHTML(3), '/map-host-member-8.html': mapHostMemberHTML(8), '/map-host-member-2g.html': mapHostMember2GHTML() };
 async function serve() {
   const server = createServer(async (req, res) => {
     const clean = decodeURIComponent((req.url || '/').split('?')[0]);
@@ -405,7 +420,10 @@ test('#951 ⑤ 서재에서 들어온 지도: ← 서재 단추 1개 + 묶음 �
             chipClip: chips.filter((c) => c.l < -1 || c.r > innerWidth + 1).map((c) => c.text),
             views: [...document.querySelectorAll('.view-switch .pill')].map((b) => b.textContent.trim()),
             barClip: Math.max(0, document.querySelector('.topbar').getBoundingClientRect().right - innerWidth),
-            legend: [...document.querySelectorAll('.legend-row')].filter((r) => !r.hidden).map((r) => r.textContent.trim())
+            legend: [...document.querySelectorAll('.legend-row')].filter((r) => !r.hidden).map((r) => r.textContent.trim()),
+            ribbon: vis(document.getElementById('mobileRibbon')),
+            ribbonBtns: [...document.querySelectorAll('#mobileRibbon button')].filter(vis).length,
+            controls: vis(document.querySelector('.controls'))
           };
         });
         const tag = `${width}/${n}`;
@@ -417,20 +435,281 @@ test('#951 ⑤ 서재에서 들어온 지도: ← 서재 단추 1개 + 묶음 �
         assert.deepEqual(m.overlap, [], `${tag}: 위 단추끼리 겹침 없음(${JSON.stringify(m.overlap)})`);
         assert.equal(m.barClip, 0, `${tag}: 위 줄이 화면 밖으로 넘치지 않는다`);
         assert.deepEqual(m.views, ['이어진 길', '묶음', '시간 순'], `${tag}: 보기 이름`);
-        // 묶음 단추(좁은 화면의 아래 조작 줄): '1묶음 · 1–2월' — 앞 0 없음, 범례와 같은 번호, 겹침·잘림 0.
-        // 641px 이상에서는 아래 줄이 숨고 범례가 그 자리를 맡는다(예전과 같다).
+        // 묶음 단추(아래 조작 줄): '1묶음 · 1–2월' — 앞 0 없음, 범례와 같은 번호, 겹침·잘림 0.
+        // #951 ⑥: 641px 이상도 아래 단추 줄이 보인다(큰 탐색 판 숨김) — 이 데이터는 묶음 1개라 범례는 숨는다.
         if (width <= 640) {
           assert.ok(m.chips.length >= 1, `${tag}: 묶음 단추가 있다`);
           for (const c of m.chips) assert.match(c.text, /^[1-9]\d*묶음 · .+/, `${tag}: 묶음 단추 글자 형식(${c.text})`);
-          assert.deepEqual(m.chips.map((c) => c.text.split('묶음')[0]), m.legend.map((t) => String(Number(t.slice(0, 2)))), `${tag}: 범례와 같은 번호(${JSON.stringify(m.chips.map((c) => c.text))} / ${JSON.stringify(m.legend)})`);
+          // #951 ⑥: 이 데이터는 묶음 1개 — 범례는 숨는다(2개 이상부터 보임; 보이는 쪽은 아래 ⑥ 시험이 2묶음 데이터로 확인).
+          assert.equal(m.legend.length, 0, `${tag}: 묶음 1개 — 범례 숨김`);
           assert.deepEqual(m.chipOverlap, [], `${tag}: 묶음 단추끼리 겹침 없음(${JSON.stringify(m.chipOverlap)})`);
           assert.deepEqual(m.chipClip, [], `${tag}: 묶음 단추가 화면 밖으로 잘리지 않는다(${JSON.stringify(m.chipClip)})`);
           assert.ok(m.chips.every((c) => c.h <= 48), `${tag}: 단추 높이 안에 글자가 들어 있다(${JSON.stringify(m.chips.map((c) => c.h))})`);
         } else {
-          assert.ok(m.legend.length >= 1, `${tag}: 넓은 화면은 범례가 묶음을 보여 준다`);
+          assert.equal(m.controls, false, `${tag}: 넓은 화면에 큰 탐색 판은 없다`);
+          assert.ok(m.ribbon && m.ribbonBtns >= 4, `${tag}: 넓은 화면 아래 단추 줄(단추 ${m.ribbonBtns}개)`);
+          assert.equal(m.legend.length, 0, `${tag}: 묶음 1개 — 범례 숨김(2개부터 보임은 #951 ⑥ 시험)`);
         }
         await context.close();
       }
+    }
+  } finally {
+    await browser?.close();
+    server.close();
+  }
+});
+
+// #951 ⑤(CTO 261120): 판이 열린 상태에서 안내(토스트·묶음 카드)의 겹침·중복을 재는 한 벌.
+// 실제로 보이는 안내만 센다(숨은 토스트는 opacity 0) — 위 단추 줄·순간 고르기 줄·묶음 단추 줄·판 단추와 겹침 0,
+// '지나온 길을 밝' 문구는 화면에 한 번만(카드가 보이는 넓은 화면에서는 토스트를 띄우지 않는다).
+const guideProbe = () => {
+  const vis = (el) => { if (!el) return false; const cs = getComputedStyle(el); if (cs.display === 'none' || cs.visibility === 'hidden' || parseFloat(cs.opacity) === 0) return false; const r = el.getBoundingClientRect(); return r.width > 1 && r.height > 1; };
+  const box = (el) => { const r = el.getBoundingClientRect(); return { l: r.left, r: r.right, t: r.top, b: r.bottom }; };
+  const hit = (a, b) => a.l < b.r - 1 && b.l < a.r - 1 && a.t < b.b - 1 && b.t < a.b - 1;
+  const guides = [];
+  const toastEl = document.getElementById('toast'), rsEl = document.getElementById('routeStatus');
+  if (vis(toastEl)) guides.push({ kind: 'toast', ...box(toastEl) });
+  if (vis(rsEl)) guides.push({ kind: 'routeStatus', ...box(rsEl) });
+  const targets = [
+    ...document.querySelectorAll('.topbar button'),
+    ...document.querySelectorAll('.lt-moment-picker, .lt-moment-picker select, .lt-moment-picker button'),
+    ...document.querySelectorAll('#mobileRibbon button'),
+    ...document.querySelectorAll('#detailActions button, #detailClose')
+  ].filter(vis).map((b) => ({ id: b.id || b.textContent.trim(), ...box(b) }));
+  const guideOverlaps = [];
+  for (const g of guides) for (const t of targets) if (hit(g, t)) guideOverlaps.push(`${g.kind}×${t.id}`);
+  if (guides.length === 2 && hit(guides[0], guides[1])) guideOverlaps.push('toast×routeStatus');
+  const phraseCount = [...document.querySelectorAll('body *')].filter((el) => vis(el) && el.children.length === 0 && /지나온 길을 밝/.test(el.textContent || '')).length;
+  return { guides: guides.map((g) => g.kind), guideOverlaps, phraseCount };
+};
+
+// ── #951 ⑤ (CTO 261120): 지도에서 순간을 누르면 보드 상세 판과 같은 오른쪽 판이 열린다 ──
+test('#951 ⑤ 지도 상세 판: 보드와 같은 틀(제목·사진·마음·날짜·아래 44px 세 단추), 1440 판 밖으로 밀기, 390 시트 겹침 0, Esc 초점 복귀', { skip: REQUIRE ? false : skip, timeout: 300000 }, async () => {
+  if (skip) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip}`);
+  const server = await serve();
+  const base = `http://127.0.0.1:${server.address().port}`;
+  let browser;
+  try {
+    browser = await chromium.launch({ headless: true });
+    for (const [width, height] of [[360, 780], [390, 844], [1440, 900]]) {
+      for (const n of [3, 8]) {
+        for (const theme of ['night', 'garden']) {
+          const context = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
+          await context.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); localStorage.removeItem('lt41.boardTheme'); } catch {} }, theme);
+          const page = await context.newPage(), errors = [];
+          page.on('pageerror', (e) => errors.push(String(e.message || e)));
+          await page.goto(`${base}/map-host-member-${n}.html`, { waitUntil: 'load' });
+          let frame = null;
+          for (let i = 0; i < 80 && !frame; i++) { frame = page.frames().find((f) => /track56-network/.test(f.url())); if (!frame) await page.waitForTimeout(250); }
+          assert.ok(frame, `${width}/${n}/${theme}: 지도 프레임이 열린다`);
+          await frame.waitForFunction(() => (window.__lt?.dots?.()?.length || 0) > 0, null, { timeout: 20000 });
+          await page.waitForTimeout(500);
+          const tag = `${width}/${n}/${theme}`;
+          const canvas = await frame.locator('#stage').boundingBox();
+          const dots = await frame.evaluate(() => window.__lt.dots());
+          const target = dots[Math.min(1, dots.length - 1)];
+          await page.mouse.click(canvas.x + target.x, canvas.y + target.y);
+          await page.waitForTimeout(700);
+          const m = await frame.evaluate(() => {
+            const vis = (el) => { if (!el) return false; const cs = getComputedStyle(el); if (cs.display === 'none' || cs.visibility === 'hidden') return false; const r = el.getBoundingClientRect(); return r.width > 1 && r.height > 1; };
+            const box = (el) => { const r = el.getBoundingClientRect(); return { l: r.left, r: r.right, t: r.top, b: r.bottom, w: r.width, h: r.height }; };
+            const hit = (a, b) => a.l < b.r - 1 && b.l < a.r - 1 && a.t < b.b - 1 && b.t < a.b - 1;
+            const det = document.getElementById('detail'), sel = window.__lt.state.selected;
+            const dot = window.__lt.dots().find((d) => d.id === sel?.id);
+            const labels = (window.__lt.labels() || []).filter((l) => l.id === sel?.id).map((l) => l.rect);
+            const panel = box(det), acts = box(document.getElementById('detailActions'));
+            const ribbon = document.getElementById('mobileRibbon'), rib = vis(ribbon) ? box(ribbon) : null;
+            const btns = [...document.querySelectorAll('#detailActions button')].filter(vis).map((b) => ({ id: b.id, text: b.textContent.trim(), ...box(b) }));
+            const dotBox = dot ? { l: dot.x - dot.r, r: dot.x + dot.r, t: dot.y - dot.r, b: dot.y + dot.r } : null;
+            const labelHit = labels.some((r) => hit(panel, r));
+            return {
+              open: det.classList.contains('open'),
+              title: document.getElementById('detailTitle').textContent.trim(),
+              media: !!document.getElementById('detailPlayer').innerHTML.trim(),
+              note: document.getElementById('detailNote').textContent.trim(),
+              basic: document.getElementById('dBasic').textContent.trim(),
+              btns, panel, acts, dotInPanel: dotBox ? hit(panel, dotBox) : null, labelHit,
+              sheetVsRibbon: rib ? hit(panel, rib) : false,
+              actsInsidePanel: acts.t >= panel.t - 1 && acts.b <= panel.b + 1,
+              selId: sel?.id || '',
+              active: document.activeElement?.id || '',
+              hScroll: document.getElementById('detailScroll').scrollWidth - document.getElementById('detailScroll').clientWidth
+            };
+          });
+          // #951 ⑤(CTO 261120): 안내 겹침·중복은 guideProbe 한 벌로 따로 재어 합친다(함수 인자는 직렬화되지 않는다).
+          Object.assign(m, await frame.evaluate('(' + guideProbe.toString() + ')()'));
+          assert.deepEqual(errors, [], `${tag}: 지도 화면 오류 없음`);
+          assert.equal(m.open, true, `${tag}: 순간을 누르면 상세 판이 열린다`);
+          assert.ok(m.title.length > 0 && !/undefined|null|NaN/.test(m.title), `${tag}: 제목 글자(${m.title})`);
+          assert.ok(m.media, `${tag}: 판에 사진/영상 칸이 찬다`);
+          assert.ok(m.basic.includes('·'), `${tag}: 날짜·감정·트리 줄(${m.basic})`);
+          assert.ok(!/undefined|null|NaN/.test(m.basic + m.note), `${tag}: 판 글자에 빈 값 없음`);
+          assert.equal(m.hScroll, 0, `${tag}: 판 안에서 옆으로 넘치지 않는다`);
+          assert.deepEqual(m.btns.map((b) => b.text), ['크게 보기', '여기부터 시네마', '⋯ 더 보기'], `${tag}: 단추 세 개`);
+          assert.deepEqual(m.btns.map((b) => Math.round(b.h)), [44, 44, 44], `${tag}: 단추 높이 44`);
+          assert.ok(m.actsInsidePanel, `${tag}: 단추 줄은 판 안(굴리는 영역 밖)에 붙는다`);
+          assert.ok(m.btns.every((b) => b.l >= m.panel.l - 1 && b.r <= m.panel.r + 1), `${tag}: 단추가 판 밖으로 나가지 않는다`);
+          if (width > 980) {
+            assert.equal(m.dotInPanel, false, `${tag}: 고른 순간이 판에 가려지지 않는다`);
+            assert.equal(m.labelHit, false, `${tag}: 고른 순간 이름표도 판 밖`);
+          } else {
+            assert.equal(m.sheetVsRibbon, false, `${tag}: 시트가 아래 묶음 단추 줄을 덮지 않는다`);
+          }
+          // #951 ⑤(CTO 261120): 안내는 위 단추 줄·순간 고르기 줄·묶음 단추 줄과 겹치지 않고, 같은 문구는 화면에 한 번만 보인다.
+          assert.ok(m.guides.length >= 1, `${tag}: 길을 밝혔다는 안내가 보인다(토스트 또는 묶음 카드)`);
+          assert.deepEqual(m.guideOverlaps, [], `${tag}: 안내와 단추 줄·고르기 줄 겹침 0(${JSON.stringify(m.guideOverlaps)})`);
+          assert.equal(m.phraseCount, 1, `${tag}: '지나온 길을 밝' 문구는 화면에 한 번만(${m.phraseCount})`);
+          const other = dots.find((d) => d.id !== target.id);
+          if (other) {
+            if (width > 980) {
+              // 넓은 화면: 지도에 보이는 다른 순간을 그대로 누른다(판이 열린 채 내용만 바뀐다).
+              const dots2 = await frame.evaluate(() => window.__lt.dots());
+              const o = dots2.find((d) => d.id === other.id) || other;
+              await page.mouse.click(canvas.x + o.x, canvas.y + o.y);
+            } else {
+              // 좁은 화면: 시트가 지도를 덮으므로 '순간 고르기' 줄과 같은 길(selectMoment)로 고른다.
+              await frame.evaluate((id) => window.__lt.selectMoment(window.__lt.nodes.find((n) => n.id === id), true), other.id);
+            }
+            await page.waitForTimeout(600);
+            const after = await frame.evaluate(() => ({ open: document.getElementById('detail').classList.contains('open'), title: document.getElementById('detailTitle').textContent.trim(), sel: window.__lt.state.selected?.id || '' }));
+            Object.assign(after, await frame.evaluate('(' + guideProbe.toString() + ')()'));
+            assert.equal(after.open, true, `${tag}: 다른 순간을 눌러도 판은 열린 채`);
+            assert.equal(after.sel, other.id, `${tag}: 고른 순간이 바뀐다`);
+            assert.notEqual(after.title, m.title, `${tag}: 판 내용이 그 순간으로 바뀐다(${after.title})`);
+            assert.deepEqual(after.guideOverlaps, [], `${tag}: 두 번째 순간에서도 안내와 단추 줄 겹침 0(${JSON.stringify(after.guideOverlaps)})`);
+            assert.equal(after.phraseCount, 1, `${tag}: 두 번째 순간에서도 문구는 한 번만(${after.phraseCount})`);
+          }
+          await frame.evaluate(() => document.getElementById('detailClose').focus());
+          await page.keyboard.press('Escape');
+          await page.waitForTimeout(500);
+          const esc = await frame.evaluate(() => ({ open: document.getElementById('detail').classList.contains('open'), active: document.activeElement?.id || '', sel: window.__lt.state.selected?.id || '', focusMoment: document.getElementById('stage').dataset.ltFocusMoment || '' }));
+          assert.equal(esc.open, false, `${tag}: Esc로 판이 닫힌다`);
+          assert.equal(esc.active, 'stage', `${tag}: 닫은 뒤 초점은 지도(누른 순간)로 돌아온다`);
+          assert.equal(esc.focusMoment, esc.sel, `${tag}: 초점이 기억한 순간 = 고른 순간(${esc.focusMoment})`);
+          assert.deepEqual(errors, [], `${tag}: 닫는 동안 오류 없음`);
+          await context.close();
+        }
+      }
+    }
+  } finally {
+    await browser?.close();
+    server.close();
+  }
+});
+
+// #951 ⑥ 화면 계약 — 큰 탐색 판을 숨기고 아래 단추 줄을 넣는다.
+// 측정 도구·기준값(겹침 0, 44px, 한 줄, 범례 표시 조건)은 그대로 두고
+// 무엇을 재는지(대상 요소)만 '탐색 판' → '단추 줄'로 옮긴다.
+test('#951 ⑥ 넓은 화면 단추 줄: 1440·2560에 큰 판 없음, 단추 44px 한 줄, 열림·닫힘 겹침 0, 범례는 묶음 2개부터', { skip: REQUIRE ? false : skip, timeout: 240000 }, async () => {
+  if (skip) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip}`);
+  const server = await serve();
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const MEASURE = () => {
+    const vis = el => { if (!el) return false; const cs = getComputedStyle(el); if (cs.display === 'none' || cs.visibility === 'hidden' || parseFloat(cs.opacity) === 0) return false; const r = el.getBoundingClientRect(); return r.width > 1 && r.height > 1; };
+    const box = el => { const r = el.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom }; };
+    const rib = document.getElementById('mobileRibbon');
+    const ribB = vis(rib) ? box(rib) : null;
+    const btns = [...rib.querySelectorAll('button')].filter(vis).map(b => ({ text: b.textContent.trim(), fs: parseFloat(getComputedStyle(b).fontSize), h: b.clientHeight, top: Math.round(b.getBoundingClientRect().top) }));
+    const det = document.getElementById('detail');
+    const detB = vis(det) ? box(det) : null;
+    const card = document.getElementById('routeStatus'), toast = document.getElementById('toast');
+    const cardB = vis(card) ? box(card) : null, toastB = vis(toast) ? box(toast) : null;
+    const labels = (window.__lt.labels() || []).map(l => l.rect ? { l: l.rect.left, t: l.rect.top, r: l.rect.right, b: l.rect.bottom } : { l: l.x, t: l.y - l.h, r: l.x + l.w, b: l.y });
+    const hits = (a, b) => a && b && a.l < b.r - 1 && b.l < a.r - 1 && a.t < b.b - 1 && b.t < a.b - 1;
+    const ov = [];
+    if (ribB) {
+      if (detB && hits(ribB, detB)) ov.push('ribbon×detail');
+      if (cardB && hits(ribB, cardB)) ov.push('ribbon×card');
+      if (toastB && hits(ribB, toastB)) ov.push('ribbon×toast');
+      for (const lb of labels) if (hits(ribB, lb)) ov.push('ribbon×label');
+    }
+    if (cardB && toastB && hits(cardB, toastB)) ov.push('card×toast');
+    for (const b of document.querySelectorAll('.topbar button')) if (vis(b) && hits(ribB, box(b))) ov.push('ribbon×topbar');
+    return { ribbon: ribB, buttons: btns, oneRow: btns.length > 0 && new Set(btns.map(b => b.top)).size === 1, detail: detB, detailOpen: det.classList.contains('open'), legendVisible: vis(document.querySelector('.legend')), legendRows: [...document.querySelectorAll('.legend-row')].filter(r => !r.hidden).length, controls: vis(document.querySelector('.controls')), card: cardB, toast: toastB, overlaps: ov, labelCount: labels.length, inViewport: ribB ? (ribB.l >= 0 && ribB.r <= innerWidth + 1 && ribB.b <= innerHeight + 1) : false };
+  };
+  let browser;
+  try {
+    browser = await chromium.launch({ headless: true });
+    // [route, width, bundles] — member-3/8은 묶음 1개(범례 숨김), 2g는 묶음 2개(범례 보임).
+    for (const [route, width, bundles] of [['/map-host-member-3.html', 1440, 1], ['/map-host-member-8.html', 1440, 1], ['/map-host-member-2g.html', 1440, 2], ['/map-host-member-2g.html', 2560, 2]]) {
+      const tag = `${route} ${width}`;
+      const ctx = await browser.newContext({ viewport: { width, height: 900 }, reducedMotion: 'reduce', locale: 'ko-KR' });
+      await ctx.addInitScript(() => { try { localStorage.setItem('lt41.theme', 'night'); localStorage.removeItem('lt41.boardTheme'); } catch {} });
+      const page = await ctx.newPage(), errors = [];
+      page.on('pageerror', e => errors.push(String(e.message || e)));
+      await page.goto(base + route, { waitUntil: 'load' });
+      let frame = null;
+      for (let i = 0; i < 80 && !frame; i++) { frame = page.frames().find(f => /track56-network/.test(f.url())); if (!frame) await page.waitForTimeout(250); }
+      assert.ok(frame, `${tag}: 지도 프레임이 열린다`);
+      await frame.waitForFunction(() => (window.__lt?.dots?.()?.length || 0) > 0, null, { timeout: 20000 });
+      await frame.evaluate(() => document.fonts.ready);
+      await page.waitForTimeout(600);
+      // 닫힘 상태: 큰 판 없음 + 단추 줄 44px 한 줄 + 범례는 묶음 수대로.
+      const closed = await frame.evaluate('(' + MEASURE.toString() + ')()');
+      assert.equal(closed.controls, false, `${tag}: 큰 탐색 판은 숨는다`);
+      assert.ok(closed.ribbon && closed.inViewport, `${tag}: 단추 줄이 화면 안에 보인다`);
+      assert.ok(closed.buttons.length >= 4, `${tag}: 단추 줄에 단추가 있다(${closed.buttons.length}개)`);
+      assert.ok(closed.buttons.every(b => b.h === 44), `${tag}: 넓은 화면 단추 높이 44px(${JSON.stringify(closed.buttons.map(b => b.h))})`);
+      assert.equal(closed.oneRow, true, `${tag}: 단추 한 줄(${JSON.stringify(closed.buttons.map(b => b.top))})`);
+      assert.equal(closed.legendVisible, bundles >= 2, `${tag}: 범례는 묶음 2개부터 보인다`);
+      assert.equal(closed.legendRows, bundles >= 2 ? bundles : 0, `${tag}: 범례 줄 수(묶음 ${bundles}개)`);
+      assert.deepEqual(closed.overlaps, [], `${tag}: 닫힘 겹침 0`);
+      // 열림 상태: 두 번째 순간을 누르면 상세 판이 열린다 — 단추 줄은 판 왼쪽 밖에서만 논다.
+      const canvas = await frame.locator('#stage').boundingBox();
+      const dots = await frame.evaluate(() => window.__lt.dots());
+      const target = dots[Math.min(1, dots.length - 1)];
+      await page.mouse.click(canvas.x + target.x, canvas.y + target.y);
+      await page.waitForTimeout(900);
+      const open = await frame.evaluate('(' + MEASURE.toString() + ')()');
+      assert.ok(open.detailOpen && open.detail, `${tag}: 상세 판 열림`);
+      assert.ok(open.ribbon && open.ribbon.r < open.detail.l - 8, `${tag}: 단추 줄이 판 왼쪽 밖(겹침 0)`);
+      assert.deepEqual(open.overlaps, [], `${tag}: 열림 겹침 0`);
+      // 묶음 단추: 카드+토스트가 같이 떠도 겹침 0.
+      const chip = frame.locator('#mobileRibbon button[data-i]').first();
+      if (await chip.count()) {
+        await chip.click();
+        await page.waitForTimeout(600);
+        const cluster = await frame.evaluate('(' + MEASURE.toString() + ')()');
+        assert.ok(cluster.card, `${tag}: 묶음 카드가 뜬다`);
+        assert.deepEqual(cluster.overlaps, [], `${tag}: 묶음 카드 겹침 0`);
+      }
+      // 전체 보기: 토스트가 떠도 겹침 0.
+      const allBtn = frame.locator('#mobileRibbon button').filter({ hasText: '전체 보기' }).first();
+      if (await allBtn.count()) {
+        await allBtn.click();
+        await page.waitForTimeout(500);
+        const overview = await frame.evaluate('(' + MEASURE.toString() + ')()');
+        assert.ok(overview.toast, `${tag}: 전체 보기 토스트가 뜬다`);
+        assert.deepEqual(overview.overlaps, [], `${tag}: 전체 보기 겹침 0`);
+      }
+      assert.deepEqual(errors, [], `${tag}: 화면 오류 없음`);
+      await ctx.close();
+    }
+    // 390 단추 줄은 지금 그대로(#638): 왼쪽 8·오른쪽 8, 아래 38px 줄 위, 단추 44px(터치 타깃)·글자 14px, 탐색 판 없음.
+    {
+      const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce', locale: 'ko-KR' });
+      const page = await ctx.newPage();
+      await page.goto(base + '/map-host-member-8.html', { waitUntil: 'load' });
+      let frame = null;
+      for (let i = 0; i < 80 && !frame; i++) { frame = page.frames().find(f => /track56-network/.test(f.url())); if (!frame) await page.waitForTimeout(250); }
+      assert.ok(frame, '390: 지도 프레임이 열린다');
+      await frame.waitForFunction(() => (window.__lt?.dots?.()?.length || 0) > 0, null, { timeout: 20000 });
+      await page.waitForTimeout(600);
+      const before = await frame.evaluate(() => {
+        const rib = document.getElementById('mobileRibbon');
+        const r = rib.getBoundingClientRect();
+        const b = rib.querySelector('button');
+        const cs = getComputedStyle(b);
+        return { left: r.left, right: r.right, bottom: r.bottom, h: b.clientHeight, fs: parseFloat(cs.fontSize), controls: getComputedStyle(document.querySelector('.controls')).display !== 'none', legend: getComputedStyle(document.querySelector('.legend')).display !== 'none' };
+      });
+      assert.equal(before.left, 8, '390: 왼쪽 8');
+      assert.equal(before.right, 382, '390: 오른쪽 8(390−8)');
+      assert.equal(before.bottom, 806, '390: 아래 38px 줄 위(844−38)');
+      assert.equal(before.h, 44, '390: 단추 높이 44px(머리말 터치 타깃 min-height 그대로)');
+      assert.equal(before.fs, 14, '390: 단추 글자 14px(identity.css 그대로)');
+      assert.equal(before.controls, false, '390: 탐색 판 없음');
+      assert.equal(before.legend, false, '390: 범례 없음');
+      await ctx.close();
     }
   } finally {
     await browser?.close();

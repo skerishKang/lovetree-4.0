@@ -596,3 +596,77 @@ test('트리 한 줄 문구: 이름을 그대로 쓰고, 이름이 트리로 끝
   assert.equal(quickTreeAfterText('담는 순간', '두 번째 트리'), '담는 순간 다음에 두 번째 트리에 담겨요');
   assert.equal(quickTreeAfterText('담는 순간', '모아둔 순간'), '담는 순간 다음에 모아둔 순간에 담겨요');
 });
+
+// #1001 (b)①: 쉬운 추가(quickAdd) 뒤 자동 제목 보정(backfillTitles)이 같은 저장 흐름에서
+// 화면을 두 번 다시 띄우던 결함 — 한 번만 다시 떠야 한다.
+// 보정 조회(/api/youtube/oembed)를 쉬운 추가의 PUT 뒤까지 늦춰 두 동작이 한 흐름에 겹치게 한다.
+// 전: quickAdd 재적재 + backfillTitles 재적재 = 2회. 후: quickAdd 1회 + 보정은 모델만 갱신 = 1회.
+test('952/1001a 실행: 쉬운 추가 뒤 자동 제목 보정 — 같은 흐름에서 화면 재적재는 1회', { skip: skip952 || !REQUIRE952 ? skip952 || 'LT_MEDIA_952_REQUIRE=1 일 때 실행' : false, timeout: 180000 }, async () => {
+  if (skip952) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip952}`);
+  const { createTree: makeTree, addMoment: growTree } = await import('../public/v41/domain.mjs');
+  const { serve: serveApp } = await import('./helpers/screen-audit.mjs');
+  let tree = makeTree({ subject: '시험', title: '보정 흐름 트리', note: '', emotion: '설렘', date: '2026-11-01', url: '' }, '2026-11-01T00:00:00Z');
+  tree = growTree(tree, { title: 'youtube.com에서 간직한 순간', note: '', emotion: '설렘', date: '2026-11-01', url: 'https://www.youtube.com/watch?v=OLDVIDEO123' }, tree.moments[0].id, '2026-11-01T00:00:00Z');
+  const server = await serveApp();
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium952.launch();
+  try {
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
+    let rev = 1, stored = JSON.parse(JSON.stringify(tree));
+    const puts = [];
+    let releaseOld = null;
+    const oldGate = new Promise(r => { releaseOld = r; });
+    await ctx.route('**/api/**', r => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
+    await ctx.route('**/api/youtube/oembed*', async r => {
+      const url = r.request().url();
+      if (url.includes('OLDVIDEO123')) {
+        await oldGate;
+        return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ title: '보정된 영상 제목', authorName: '시험 채널', thumbnailUrl: '' }) });
+      }
+      return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ title: '새 미리보기 제목', authorName: '시험 채널', thumbnailUrl: '' }) });
+    });
+    await ctx.route('**/api/workspace**', r => {
+      const req = r.request();
+      if (req.method() === 'PUT') {
+        const body = JSON.parse(req.postData() || '{}');
+        puts.push({ at: Date.now() });
+        const edited = body?.state?.trees?.find(t => t.id === tree.id);
+        if (edited) stored = edited;
+        rev += 1;
+        return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, revision: rev, subject: '시험계정' }) });
+      }
+      return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, revision: rev, subject: '시험계정', writeSubjectBound: true, savedAt: '2026-11-20T00:00:00.000Z', state: { version: 1, trees: [stored], prefs: {} } }) });
+    });
+    const page = await ctx.newPage();
+    const navs = [];
+    let counting = false;
+    page.on('framenavigated', f => { if (counting && /\/v41\/(views\/|home\.html)/.test(f.url())) navs.push({ url: f.url(), at: Date.now() }); });
+    await page.goto(`${base}/v41/?account=1`, { waitUntil: 'load' });
+    await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
+    await page.locator('#discover-ask-no').click().catch(() => {});
+    await page.waitForTimeout(2000);
+    await page.evaluate(() => document.getElementById('write-menu').click());
+    await page.waitForFunction(() => !!document.getElementById('quick-url') && document.getElementById('quick-url').getClientRects().length, null, { timeout: 10000 });
+    await page.evaluate(() => {
+      const input = document.getElementById('quick-url');
+      input.value = 'https://www.youtube.com/watch?v=NEWVIDEO456';
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await page.waitForFunction(() => { const b = document.getElementById('quick-submit'); return b && !b.disabled; }, null, { timeout: 15000 });
+    counting = true;
+    await page.evaluate(() => document.getElementById('quick-submit').click());
+    // 쉬운 추가의 PUT이 나간 뒤에 보정 조회를 풀어, 보정이 같은 흐름 뒤에 겹치게 한다.
+    let deadline = Date.now() + 20000;
+    while (Date.now() < deadline && puts.length < 1) await page.waitForTimeout(150);
+    assert.ok(puts.length >= 1, '쉬운 추가 저장 PUT이 나간다');
+    releaseOld();
+    deadline = Date.now() + 20000;
+    while (Date.now() < deadline && puts.length < 2) await page.waitForTimeout(150);
+    assert.ok(puts.length >= 2, '자동 제목 보정 저장 PUT이 이어 나간다(보정이 실제로 흐름에 겹침)');
+    await page.waitForTimeout(2500);
+    const fixed = stored.moments.find(m => (m.url || '').includes('OLDVIDEO123'));
+    assert.equal(fixed?.title, '보정된 영상 제목', '보정이 실제로 제목을 바로잡았다(흐름이 헛돌지 않음)');
+    assert.equal(navs.length, 1, `같은 저장 흐름에서 화면 재적재는 1회여야 한다(실측 ${navs.length}: ${JSON.stringify(navs)})`);
+    await ctx.close();
+  } finally { await browser.close(); server.close(); }
+});

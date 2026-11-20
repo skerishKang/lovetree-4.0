@@ -195,13 +195,14 @@ test('#582 화면: 상세의 지도 단추가 셸 메시지를 보내고, 다음
   const browser = await chromium.launch({ headless: true });
   try {
     const { context, page, frame } = await openHost(browser, `${base}/__host-582c.html`, { width: 1440, height: 900 });
-    const vis = await frame.evaluate(() => {
-      for (const c of document.querySelectorAll('#cardLayer .card')) {
-        const r = c.getBoundingClientRect();
-        if (r.top > 80 && r.bottom < 880 && r.left > 0 && r.right < 1430) return { id: c.dataset.id, x: (r.left + r.right) / 2, y: (r.top + r.bottom) / 2 };
-      }
-      return null;
-    });
+    // #987: 날짜순 첫 줄이 먼저 보여도 다음 순간이 있는 뿌리 카드로 이동해 상세 동작을 시험한다.
+    await frame.evaluate(id => focusBoardMoment(id, false), tree.moments[0].id);
+    await page.waitForTimeout(400);
+    const vis = await frame.evaluate(id => {
+      const c = document.querySelector('#cardLayer .card[data-id="' + id + '"]');
+      const r = c.getBoundingClientRect();
+      return { id, x: (r.left + r.right) / 2, y: (r.top + r.bottom) / 2 };
+    }, tree.moments[0].id);
     await page.mouse.click(vis.x, vis.y);
     await page.waitForTimeout(700);
     // 지도 단추 → lt41-open-network
@@ -220,4 +221,51 @@ test('#582 화면: 상세의 지도 단추가 셸 메시지를 보내고, 다음
     assert.notEqual(after.title, before.title, '상세가 다음 순간으로 바뀐다');
     await context.close();
   } finally { await browser.close(); server.close(); }
+});
+// #886 항목3: 터치 타깃 CSS가 track58-pinboard.html 인라인 <style id="lt-touch-targets">에서 board-extra.css로 이동했다.
+// 소스 글자 단정(v41-touch-targets의 lt-touch-targets 블록 파싱·하드코딩 크기)은 리팩터링에 깨지고 실제 크기와도 어긋나
+// (예: #detailYtLink 실제 높이 24px를 34px로 잘못 가정) 거짓 통과를 냈다. 그 단정은 지우고 실제 렌더링 히트박스를 잰다.
+// 보이는 버튼 rect + ::after inset(음수만큼 확장)으로 실효 누름 영역을 계산한다.
+test('조작 버튼 히트박스는 44x44 이상이다(렌더링 ::after 터치 영역)', { skip: REQUIRE ? false : skip }, async (t) => {
+  // 별 모양 8순간(카드가 고르게 퍼져 클릭 가능). note를 비워 memo가 없게 하면 #dHeartSave(마음 입력)가 보이고,
+  // s1은 YouTube 주소가 있어 #detailYtLink도 보인다.
+  const tree = starTree(8);
+  tree.moments.forEach((m) => { m.note = ''; });
+  const browser = await chromium.launch();
+  const server = await serve({ '/host.html': hostHTML(tree) });
+  t.after(async () => { await browser.close(); server.close(); });
+  const { context, page, frame, problems } = await openHost(browser, `http://127.0.0.1:${server.address().port}/host.html`, { width: 1440, height: 900 });
+  assert.deepEqual(problems, [], '화면 오류 없음: ' + problems.join(' | '));
+  await frame.evaluate(() => document.body.classList.add('lt-advanced'));
+  await frame.click('.card[data-id="s1"]');
+  await frame.waitForFunction(() => document.querySelector('.card.selected')?.dataset.id === 's1', null, { timeout: 5000 });
+  await page.waitForTimeout(500);
+  const TARGETS = ['#minusBtn', '#plusBtn', '#resetBtn', '#openMoment', '#detailYtLink', '#cinemaFromMoment', '#dHeartSave', '#toolCinema', '#toolFit', '#detailClose'];
+  const hits = await frame.evaluate((sels) => sels.map((sel) => {
+    const el = document.querySelector(sel); if (!el) return { sel, missing: true };
+    const r = el.getBoundingClientRect(); const af = getComputedStyle(el, '::after');
+    const parts = (af.inset || '').trim().split(/\s+/).map(parseFloat);
+    let tt = 0, rr = 0, bb = 0, ll = 0;
+    if (parts.length === 1) { tt = rr = bb = ll = parts[0]; }
+    else if (parts.length === 2) { tt = bb = parts[0]; rr = ll = parts[1]; }
+    else if (parts.length === 3) { tt = parts[0]; rr = ll = parts[1]; bb = parts[2]; }
+    else if (parts.length >= 4) { tt = parts[0]; rr = parts[1]; bb = parts[2]; ll = parts[3]; }
+    const expand = af.content && af.content !== 'none' && af.position === 'absolute';
+    const w = r.width - (expand ? ll + rr : 0); const h = r.height - (expand ? tt + bb : 0);
+    return { sel, w: Math.round(w), h: Math.round(h), rw: Math.round(r.width), rh: Math.round(r.height), inset: af.inset, content: af.content, pos: af.position, expand };
+  }), TARGETS);
+  for (const hit of hits) {
+    assert.ok(!hit.missing, `${hit.sel} 버튼이 있다`);
+    assert.ok(hit.rw > 0 && hit.rh > 0, `${hit.sel} 버튼이 보인다(${hit.rw}x${hit.rh})`);
+    // 터치 타깃 ::after 메커니즘이 살아있다(이동이 규칙을 잃지 않았다).
+    assert.ok(hit.expand && hit.inset && hit.inset !== 'auto', `${hit.sel}에 ::after inset 터치 규칙이 있다(content ${hit.content}, inset ${hit.inset})`);
+    if (hit.sel === '#detailYtLink') {
+      // 사전 존재 격차: 링크 실제 높이 24px + inset 10px = 34px(<44). 옛 소스 시험은 하드코딩 34px로 44로 잘못 통과시켰다.
+      // #886은 화면 변화 0이라 이 값을 그대로 보존한다(별도 접근성 과제). 여기서는 보존된 실제 값만 확인한다.
+      assert.equal(hit.h, 34, `#detailYtLink 히트박스 높이는 보존된 34px이다(실제 ${hit.h})`);
+    } else {
+      assert.ok(hit.w >= 44 && hit.h >= 44, `${hit.sel} 히트박스 ${hit.w}x${hit.h}가 44 미만이다(inset ${hit.inset})`);
+    }
+  }
+  await context.close();
 });

@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readFileSync} from 'node:fs';
 import {
   HOME_CARDS_KEY, readHomeCardsMode, writeHomeCardsMode, homeCardsMenu,
   homeCardsLabel, homeCardsPlan, clickWithin,
 } from '../v41/home-cards.js';
 import {homeMomentCards, HOME_TEXT_LIMIT} from '../v41/home-moments.js';
+import {fetchPopularCards} from '../v41/home-popular.js';
 
 // 2026-11-08 첫 화면 카드 출처: 예시/인기/내 것만/섞어서, 선명한 예시, 금빛 내 카드.
 
@@ -165,33 +165,38 @@ test('공식 별칭의 보관 파일도 현재 출처 경로로만 쓴다', () =
   assert.equal(cards.photos[0].image, `${PRIVATE_ORIGIN}/api/media/00000004-0000-4000-8000-000000000004.png`);
 });
 
-test('궤도 어댑터: 예시 불투명도를 낮추지 않고 내 카드에만 금빛 표시를 쓴다', () => {
-  const orbit = readFileSync(new URL('../src/views/orbit.js', import.meta.url), 'utf8');
-  assert.equal(/c\.example\?\.\d/.test(orbit), false, '예시 카드 불투명도 보정이 없다');
-  // #429 2/2: 카드는 언제나 불투명(opacity를 인라인으로 낮추지 않는다), 깊이는 밝기로만 낸다.
-  assert.doesNotMatch(orbit, /el\.style\.opacity=/, '카드 opacity를 인라인으로 쓰지 않는다');
-  assert.match(orbit, /el\.style\.filter=`brightness\(/, '깊이를 밝기(brightness)로 낸다');
-  assert.doesNotMatch(orbit, /\.card[^{]*\{[^}]*blur/, '카드 규칙에 blur가 없다');
-  assert.match(orbit, /\.card\.mine\{/);
-  assert.match(orbit, /var\(--lt-gold/);
-  for (const start of [orbit.indexOf('.card.mine{'), orbit.indexOf('.card.mine:after{')]) {
-    const css = orbit.slice(start, orbit.indexOf('}', start) + 1);
-    assert.equal(/#[0-9a-fA-F]{3,8}\b/.test(css), false, '새 hex 없이 토큰만 쓴다');
-  }
-});
-
-test('첫 화면 배선: 모드 저장 키, 인기 API, 공개 카드 클릭 경로를 쓴다', () => {
-  const home = readFileSync(new URL('../v41/home.js', import.meta.url), 'utf8');
-  const cards = readFileSync(new URL('../v41/home-cards.js', import.meta.url), 'utf8');
-  assert.match(cards, /lt41\.homeCards/);
-  assert.match(home, /homeCardsPlan\(/);
-  assert.match(home, /fetchPopularCards/);
-  assert.match(home, /#share\//);
-  const popular = readFileSync(new URL('../v41/home-popular.js', import.meta.url), 'utf8');
-  assert.match(popular, /createCommunityApi/);
-  assert.match(popular, /\.discover\(/);
-  assert.match(popular, /createShareApi/);
-  assert.equal(/fetch\('/.test(popular), false, '직접 fetch로 새 API를 만들지 않는다');
+// #952: 궤도 카드의 불투명·밝기 깊이·내 카드 금빛은 그려진 첫 화면의 계산된 스타일로 잰다
+// (tests/v41-home-screen-952.test.mjs — #429 2/2 계약). 인기 카드 배선은 아래 함수 시험이 검사한다.
+test('인기 카드: 둘러보기의 공개 API 한 벌(community.discover·shares.read)로만 만든다', async () => {
+  const calls = [];
+  const community = {
+    discover: async (params) => { calls.push(['discover', params]); return { ok: true, items: [
+      { shareId: 's2', view: 'gallery' },
+      { shareId: 's1' },
+    ] }; },
+  };
+  const shares = {
+    read: async (id) => { calls.push(['read', id]);
+      if (id === 's1') return { tree: { id: 't1', moments: [
+        { id: 'm1', title: '최신', createdAt: '2026-11-02T00:00:00Z', mediaMetadata: { thumbnail: '/media/a.jpg' } },
+        { id: 'm2', title: '사진 없는 순간', createdAt: '2026-11-01T00:00:00Z' },
+      ] } };
+      return { tree: { id: 't2', moments: [
+        { id: 'm3', title: '가운데', createdAt: '2026-11-03T00:00:00Z', attachment: { url: 'data:image/png;base64,AAAA' } },
+      ] } };
+    },
+  };
+  const cards = await fetchPopularCards({ community, shares });
+  assert.deepEqual(calls, [['discover', { limit: 12 }], ['read', 's2'], ['read', 's1']], 'discover 한 번·공개 트리마다 read 한 번');
+  // 사진이 없는 순간은 카드에서 뺀다. 남은 카드는 최신순이다.
+  assert.deepEqual(cards.map(c => c.id), ['m3', 'm1']);
+  assert.ok(cards.every(c => c.source === 'public' && c.key === `${c.shareId}/${c.id}`));
+  assert.equal(cards.find(c => c.id === 'm3').view, 'gallery', '공개 항목의 보기 값을 그대로 쓴다');
+  assert.equal(cards.find(c => c.id === 'm1').view, 'book', '보기 값이 없으면 책 기본');
+  // 발견이 막히거나 이상하면 카드 0장 — 주입된 API 외의 길은 없다.
+  assert.deepEqual(await fetchPopularCards({ community: { discover: async () => { throw new Error('down'); } }, shares }), []);
+  assert.deepEqual(await fetchPopularCards({ community: { discover: async () => ({ ok: false }) }, shares }), []);
+  assert.deepEqual(await fetchPopularCards({ community: { discover: async () => ({ ok: true, items: 'nope' }) }, shares }), []);
 });
 
 test('카드 메뉴: shadow DOM 클릭은 document retarget에도 안쪽으로 판정한다', () => {
@@ -208,20 +213,5 @@ test('카드 메뉴: shadow DOM 클릭은 document retarget에도 안쪽으로 �
   assert.equal(clickWithin({target: button}, null), false);
 });
 
-test('첫 화면 카드·움직임은 설정 창이 맡고 첫 화면은 메시지로만 받는다', () => {
-  const home = readFileSync(new URL('../v41/home.js', import.meta.url), 'utf8');
-  const shell = readFileSync(new URL('../public/v41/shell.mjs', import.meta.url), 'utf8');
-  // #380 5번: 첫 화면의 보기 메뉴를 없앴다 — 카드 출처·움직임은 설정 창 "화면" 묶음에서 고른다.
-  assert.match(shell, /for\(const b of document\.querySelectorAll\('\[data-home-cards\]'\)\)b\.onclick=/, '설정의 카드 출처 단추');
-  assert.match(shell, /localStorage\.setItem\('lt41\.homeCards',b\.dataset\.homeCards\)/, '저장 키는 그대로');
-  assert.match(shell, /postMessage\(\{type:'lt41-home-cards'/, '첫 화면에 다시 그리라고 알린다');
-  assert.match(shell, /postMessage\(\{type:'lt41-motion'/, '첫 화면의 움직임을 멈추거나 켠다');
-  assert.match(home, /type==='lt41-home-cards'[^\n]*location\.reload\(\)/, '첫 화면은 다시 그린다');
-  assert.match(home, /type==='lt41-motion'[^\n]*orbit\?\.motion\?\.set/, '첫 화면은 궤도 움직임을 바꾼다');
-  // 이슈 #466 M2: 책·보드·지도는 lt41-date-style로 즉시 반영되는데 첫 화면만 안 되던 결함 — 다시 그린다.
-  // 2026-11-12 사고: 받을 때마다 새로고침하면 셸이 프레임이 뜰 때마다 보내는 같은 값 때문에 끝없이 이어진다.
-  // 값이 실제로 바뀌었을 때만 다시 띄운다(판정은 shouldReloadForDateStyle — tests/v41-home-date-style-loop.test.mjs).
-  assert.match(home, /type==='lt41-date-style'\)\{[\s\S]{0,200}shouldReloadForDateStyle\(\{value:event\.data\.value,rendered:renderedDateStyle,mirror\}\)\)location\.reload\(\)/, '날짜 표기가 바뀌면 첫 화면도 다시 그린다');
-  assert.doesNotMatch(home, /type==='lt41-date-style'\)\{location\.reload\(\);\}/, '받을 때마다 무조건 새로고침하지 않는다');
-  assert.doesNotMatch(home, /createViewMenu|data-lt-view-menu/, '첫 화면에 옛 보기 메뉴가 없다');
-});
+// #952: 설정 창의 카드 출처·움직임 배선(#380 5번)과 날짜 표기 다시 띄우기 판정(#466 M2·2026-11-12 사고)
+// 은 실제 화면에서 잰다 — tests/v41-home-screen-952.test.mjs.

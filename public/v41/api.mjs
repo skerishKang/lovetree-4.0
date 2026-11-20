@@ -1,4 +1,4 @@
-import {validateState} from './domain.mjs';
+import {guardWorkspaceState} from './workspace-guard.mjs';
 export const DEFAULT_REQUEST_TIMEOUT_MS = 8_000;
 
 // 회원 셸 startMember() 전에는 갱신 쿠키가 없어 401을 그대로 돌려준다.
@@ -44,7 +44,9 @@ export function createWorkspaceApi({ fetchImpl = (...args) => globalThis.fetch(.
       let payload = null;
       try { payload = text ? JSON.parse(text) : null; } catch { payload = null; }
       // 모양뿐 아니라 문서 검증까지 통과해야 서버 기록으로 다룬다.
-      const documentOk = (state) => { try { validateState(state); return true; } catch { return false; } };
+      // #977: 트리 하나가 어긋났다고 응답 전체를 '서버 없음'으로 버리지 않는다 — 읽을 수 있는
+      // 트리는 셸이 열고, 어긋난 트리는 workspace-guard가 빼 둔 뒤 저장 때 그대로 다시 붙인다.
+      const documentOk = (state) => { try { return guardWorkspaceState(state).unreadable === null; } catch { return false; } };
       const shaped = Number.isSafeInteger(payload?.revision) && (!requiresState || documentOk(payload.state));
       if (response.ok && requiresRevision && !shaped) {
         // 정적 프리뷰는 없는 API 경로에 index.html을 200으로 돌려준다. 문서가 아닌 응답을
@@ -67,6 +69,8 @@ export function createWorkspaceApi({ fetchImpl = (...args) => globalThis.fetch(.
         deleted: payload?.deleted === true,
         commonAccountDeleted: payload?.commonAccountDeleted === true,
         savedAt: payload?.savedAt ?? null,
+        // #986: 서버가 읽지 못해 빼 둔 트리는 개수만 응답에 온다(원본 내용은 보내지 않는다).
+        quarantined: Number.isSafeInteger(payload?.quarantined) ? payload.quarantined : 0,
         ...(path.startsWith('/api/media') ? {media:payload} : {}),
         state: payload?.state ?? null
       };

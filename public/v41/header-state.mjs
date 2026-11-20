@@ -146,42 +146,14 @@ export function writeMenuLabel({ owned = false, dirty = false, reading = false, 
   return '순간 추가';
 }
 
-// 첫 화면 가운데 버튼 3개. 자리와 개수는 그대로 두고 첫 버튼 문구만 상태로 바꾼다.
-// 261116 PR 2(대표 확정): 로그인 상태는 '+ 순간 추가'가 글귀 바로 아래 위쪽 단추(밝은 채움)로 올라가고,
-// 가운데 세트는 [순간 목록·둘러보기·서재] 테두리형 — 강조는 세트에 없다(위쪽 단추 하나뿐). 261117 대표 확정: '내 트리' → '서재'.
-// 로그아웃은 지금처럼 첫 버튼만 흰 강조다.
-export function homeCenterState({ member = 'out', treeCount = 0 } = {}) {
+// #942: 내 순간 0개와 기록이 있는 사람의 첫 화면을 구분한다.
+export function homeCenterState({ member = 'out', treeCount = 0, momentCount = treeCount } = {}) {
   const signedIn = member === 'in';
-  const hasTree = signedIn && Number(treeCount) > 0;
-  if (!signedIn) {
-    return {
-      state: 'out',
-      buttons: [
-        { key: 'start', label: '처음 시작하기', emphasis: true, disabled: false, title: '로그인하거나 가입하고 첫 순간을 남겨 보세요.' },
-        { key: 'new', label: '새 트리 만들기', emphasis: false, disabled: false, title: '로그인한 뒤 새 트리를 만들 수 있어요.' },
-        { key: 'trees', label: '서재', emphasis: false, disabled: false, title: '서재를 엽니다.' }
-      ]
-    };
-  }
-  // 2026-11-14 대표 결정: 로그인한 첫 화면도 로그아웃과 같은 세 자리를 쓴다(261116 PR 2에서 첫 자리는 '순간 목록').
-  // 폭·여백은 #505 의 .center .actions 규칙이 그대로 맡으므로, 두 상태의 단추 크기·간격이 같아진다.
-  if (!hasTree) {
-    return {
-      state: 'in-empty',
-      buttons: [
-        { key: 'moments', label: '순간 목록', emphasis: false, disabled: false, title: '모아 둔 순간을 한곳에서 봅니다.' },
-        { key: 'community', label: '둘러보기', emphasis: false, disabled: false, title: '다른 사람의 순간을 둘러봅니다.' },
-        { key: 'trees', label: '서재', emphasis: false, disabled: false, title: '서재를 엽니다.' }
-      ]
-    };
-  }
+  const hasMoments = signedIn && Number(momentCount) > 0;
+  const labels = hasMoments ? [['moments','순간 목록'],['community','둘러보기'],['trees','서재']] : [['start','＋ 첫 순간 추가'],['community','둘러보기'],['guide','어떻게 쓰나요']];
   return {
-    state: 'in-trees',
-    buttons: [
-      { key: 'moments', label: '순간 목록', emphasis: false, disabled: false, title: '모아 둔 순간을 한곳에서 봅니다.' },
-      { key: 'community', label: '둘러보기', emphasis: false, disabled: false, title: '다른 사람의 순간을 둘러봅니다.' },
-      { key: 'trees', label: '서재', emphasis: false, disabled: false, title: '서재를 엽니다.' }
-    ]
+    state: !signedIn ? 'out' : hasMoments ? 'in-trees' : 'in-empty',
+    buttons: labels.map(([key,label],i)=>({key,label,emphasis:i===0,disabled:false}))
   };
 }
 
