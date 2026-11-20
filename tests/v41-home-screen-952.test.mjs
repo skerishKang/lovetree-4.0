@@ -290,3 +290,61 @@ test('#426·#635 추가·둘러보기 단추와 안내 패널이 실제로 동�
     } finally { await close952(g); }
   } finally { await browser.close(); }
 });
+
+test('#1027 정원 이어 보기 카드의 종이색과 글 대비, 세로 영상 칸', { skip: REQUIRE952 ? false : skip952, timeout: 180000 }, async () => {
+  if (skip952) assert.fail(skip952);
+  const browser = await chromium952.launch({ headless: true });
+  const contrast = (fg, bg) => {
+    const luminance = color => color.match(/[\d.]+/g).slice(0, 3).map(Number).map(v => {
+      const c = v / 255;
+      return c <= .04045 ? c / 12.92 : ((c + .055) / 1.055) ** 2.4;
+    }).reduce((sum, v, i) => sum + v * [.2126, .7152, .0722][i], 0);
+    const a = luminance(fg), b = luminance(bg);
+    return (Math.max(a, b) + .05) / (Math.min(a, b) + .05);
+  };
+  try {
+    for (const [kind, url] of [['vertical', 'https://www.youtube.com/shorts/abc123DEF45'], ['horizontal', 'https://youtu.be/abc123DEF45'], ['memo', '']]) {
+      const tree = createTree({subject:'시험 트리',title:'시험 순간',note:'사진 없는 글',date:'2026-11-18',emotion:'여운',url}, '2026-11-18T00:00:00.000Z');
+      const workspace = {revision:1,state:{version:1,trees:[tree],prefs:{}},subject:'visual-audit-fake',writeSubjectBound:true};
+      for (const theme of ['garden', 'night']) {
+        const h = await boot952(browser, { member:true, width:390, initStorage:{'lt41.theme':theme}, routes:{'/api/workspace':route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(workspace)})} });
+        try {
+          for (const width of [390, 1440]) {
+            await h.page.setViewportSize({width,height:width === 390 ? 844 : 900});
+            const stats = await h.frame.locator('.recent-card').evaluate(card => {
+              const media = card.querySelector('.recent-media'), meta = card.querySelector('.recent-meta');
+              const backdrop = card.querySelector('.recent-backdrop'), thumb = card.querySelector('.recent-thumb');
+              const style = el => getComputedStyle(el);
+              return {card:style(card).backgroundColor,media:style(media).backgroundColor,meta:style(meta).backgroundColor,
+                border:style(meta).borderTopWidth, width:media.getBoundingClientRect().width, metaWidth:meta.getBoundingClientRect().width,
+                height:media.getBoundingClientRect().height, fit:thumb && style(thumb).objectFit,
+                blur:backdrop && style(backdrop).filter, opacity:backdrop && style(backdrop).opacity,
+                sameThumb:backdrop && backdrop.src === thumb.src,
+                colors:[...card.querySelectorAll('.recent-head,.recent-head-arrow,.recent-meta strong,.recent-meta small,.recent-memo')].map(e=>style(e).color)};
+            });
+            if (theme === 'garden') {
+              assert.equal(stats.card,'rgb(255, 253, 248)');
+              assert.equal(stats.meta,stats.card);
+              assert.equal(stats.media,stats.card);
+              assert.equal(stats.border,'1px');
+              assert.ok(stats.colors.every(color=>contrast(color,stats.meta)>=4.5), JSON.stringify(stats));
+              assert.ok(Math.abs(stats.width-stats.metaWidth)<1, JSON.stringify(stats));
+              if (kind === 'vertical') {
+                assert.equal(stats.fit,'contain');
+                assert.equal(stats.blur,'blur(18px)');
+                assert.equal(stats.opacity,'0.22');
+                assert.ok(stats.sameThumb);
+              }
+            } else {
+              assert.equal(stats.card,'rgba(10, 9, 14, 0.82)');
+              assert.equal(stats.media,'rgb(11, 10, 16)');
+              assert.equal(stats.border,'0px');
+              if (kind === 'vertical') assert.equal(stats.opacity,'0.78');
+            }
+            if (kind === 'horizontal') assert.equal(stats.fit,'cover');
+          }
+        } finally { await close952(h); }
+      }
+    }
+  } finally { await browser.close(); }
+});
