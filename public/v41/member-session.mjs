@@ -3,12 +3,12 @@ import {EMPTY_STATE,validateState,createTree,editTree,addMoment,editMoment,repar
 // Reuses 4.0 persistence, retries and revision conflicts; demo/file records cannot enter this session.
 function sessionDraftStorage(){try{return globalThis.sessionStorage||null;}catch{return null;}}
 function sessionCacheStorage(){try{return globalThis.localStorage||null;}catch{return null;}}
-export function createMemberSession({api,onState=()=>{},onStatus=()=>{},navigate=()=>{},delay,makeClientKey=()=>`v41-${newId()}`,draftStorage=sessionDraftStorage(),cacheStorage=sessionCacheStorage()}){
+export function createMemberSession({api,onState=()=>{},onStatus=()=>{},onGuard=()=>{},navigate=()=>{},delay,makeClientKey=()=>`v41-${newId()}`,draftStorage=sessionDraftStorage(),cacheStorage=sessionCacheStorage()}){
  let document=EMPTY_STATE(),subject=null,bound=false,active=true,mismatch=false;
  const wrapped={get:async()=>{const result=await api.get();if(!active)return {ok:false,status:401};
    if(result.ok){if(subject&&subject!==result.subject){mismatch=true;bound=false;return {ok:false,status:401,code:'account_changed'};}subject=result.subject;bound=result.writeSubjectBound===true&&typeof subject==='string'&&!!subject;}return result;},
  put:(body,options)=>{if(!active||!bound||mismatch||!subject)return Promise.resolve({ok:false,status:401});return api.put({...body,expectedSubject:subject},options);},logout:()=>api.logout()};
- const sync=createSyncController({getState:()=>document,replaceState:s=>{if(!active)return;document=validateState(s);onState(structuredClone(document));},api:wrapped,draftStorage,cacheStorage,delay,makeClientKey,navigate:url=>navigate(url.startsWith('/auth/login')?'/auth/login?next=/v41/':url),onChange:s=>{if(active)onStatus({...s,writable:sync.snapshot().owned&&bound&&!mismatch,dirty:sync.snapshot().dirty});}});
+ const sync=createSyncController({getState:()=>document,replaceState:s=>{if(!active)return;document=validateState(s);onState(structuredClone(document));},onGuard,api:wrapped,draftStorage,cacheStorage,delay,makeClientKey,navigate:url=>navigate(url.startsWith('/auth/login')?'/auth/login?next=/v41/':url),onChange:s=>{if(active)onStatus({...s,writable:sync.snapshot().owned&&bound&&!mismatch,dirty:sync.snapshot().dirty});}});
  // 이슈 644 3번: 탭을 다시 보거나 창으로 돌아오면 최신 기록을 확인한다. 이 화면에서 고친 게 없을 때만
  // 조용히 최신 기록을 불러온다(띠 없음) — 확인 자체는 sync 컨트롤러의 check()가 판정한다. 4초에 한 번 넘지 않게 쉰다.
  let lastQuietCheck = 0;
@@ -91,7 +91,10 @@ export function createMemberSession({api,onState=()=>{},onStatus=()=>{},navigate
     else throw Error('지원하지 않는 작업이에요.');
     if(next)trees=trees.map(t=>t.id===tree.id?next:t);
    }
-   document=validateState({version:1,trees,prefs:document.prefs});onState(structuredClone(document),{treeId,momentId});sync.markLocalSave();return {treeId,momentId};
+   document=validateState({version:1,trees,prefs:document.prefs});
+   // #984: 트리 편집(이름·표지)은 보드 저장과 같은 길 — 화면이 이미 자기 상태를 들고 있으므로 셸은 모델만
+   // 갱신하고 화면을 다시 띄우지 않는다. 표지·이름은 lt41-trees-saved/renamed 알림이 바로 다시 그린다.
+   onState(structuredClone(document),{treeId,momentId},action==='editTree'?{tree:true}:undefined);sync.markLocalSave();return {treeId,momentId};
  }
  return {start:()=>sync.start(),apply,act:name=>sync.act(name),flushOnHide:()=>sync.flushOnHide(),snapshot:()=>({...sync.snapshot(),subject,writable:sync.snapshot().owned&&bound&&!mismatch,phase:sync.status().phase}),state:()=>structuredClone(document),dispose:()=>{active=false;bound=false;globalThis.document?.removeEventListener?.('visibilitychange',onVisible);globalThis.removeEventListener?.('pagehide',onHide);globalThis.removeEventListener?.('focus',quietCheck);},status:()=>sync.status()};
 }

@@ -548,6 +548,30 @@ if(typeof addEventListener==='function')addEventListener('message',e=>{
  LTDEMO.title=fresh.title;
  paintTreeTitles();
 });
+// #984: 저장이 서버에서 확인되면 책 화면의 트리 표지(트리 메뉴·다른 트리 보기)도 바로 새 값으로 본다.
+// 저장 실패 때는 이 메시지가 오지 않는다 — 표지는 그대로이고, 셸의 저장 안내 떠가 실패를 알린다.
+if(typeof addEventListener==='function')addEventListener('message',e=>{
+ if(e.data?.type!=='lt41-trees-saved')return;
+ const fresh=window.parent&&window.parent.LT41?window.parent.LT41.trees:null;
+ if(!Array.isArray(fresh)||!Array.isArray(LTDEMO.library))return;
+ if(fresh.length!==LTDEMO.library.length){location.reload();return;}
+ let savedChanged=false;
+ for(const t of fresh){
+  const lib=LTDEMO.library.find(x=>x.id===t.id);
+  if(!lib){location.reload();return;}
+  const next={title:t.title,subject:t.subject,coverMode:t.coverMode||'',coverDesign:t.coverDesign||'',coverMomentId:t.coverMomentId||'',inbox:t.inbox===true};
+  if(Object.keys(next).some(k=>lib[k]!==next[k])){Object.assign(lib,next);savedChanged=true;}
+ }
+ if(!savedChanged)return;
+ if(treeMenu&&!treeMenu.hidden)openTreeMenu();
+ const others=orderedTrees().filter(tree=>tree.id!==currentTreeId()).slice(0,3);
+ document.querySelectorAll('.other-tree[data-open-tree]').forEach(btn=>{
+  const index=others.findIndex(tree=>tree.id===btn.dataset.openTree);
+  if(index<0)return;
+  const span=btn.querySelector('.tree-cover');
+  if(span)span.outerHTML=treeCoverSpan(others[index],index);
+ });
+});
 mountTips();
 /* 원본 화면은 이 모듈보다 먼저 한 번 그린다. 새 규칙으로 다시 그린다(저장·선택은 그대로). */
 /* #295 보완: 넘침 판정을 렌더 때만 하면 이미지가 늦게 로드되어 페이지가 나중에 넘칠 때 다시 잘린다.

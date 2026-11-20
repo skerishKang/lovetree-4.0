@@ -698,6 +698,10 @@ body.lt-frame-dialog-open #toast{top:calc(72px + env(safe-area-inset-top));botto
 #share-discover-toggle,#share-visibility-toggle{min-height:44px;padding:10px 16px;border-radius:var(--lt-r-pill);border:1px solid var(--lt-gold-line);background:transparent;color:var(--lt-gold);font-size:14px}
 #share-discover-toggle[data-state="on"],#share-visibility-toggle[data-state="private"]{background:var(--lt-primary);color:var(--lt-primary-ink);border-color:transparent}
 #share-panel p{word-break:keep-all}
+/* 공유 제목과 선택 상자 사이를 위 입력 칸과 같은 간격으로 띄운다. */
+#share-form > label{display:block}
+#share-form > label + label{margin-top:12px}
+#share-form > label > select{display:block;margin-top:8px}
 /* #987: 공유 단계부터 주소 목록까지 한 폭으로 모으고, 정원에서도 경계를 알아볼 수 있게 한다. */
 #share-panel > *{max-width:960px;margin-inline:auto}
 @media(min-width:900px){#share-panel{align-content:safe center}}

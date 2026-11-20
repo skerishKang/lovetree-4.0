@@ -147,10 +147,12 @@ export function createReader(deps) {
         renderReader();
         var targetRect=$('#bookCoverFace').getBoundingClientRect();
         animateSharedBook(sourceRect,targetRect,function(){
+          // #984: 애니메이션이 끝나면 리더 숨김을 먼저 푼다 — 책 화면으로의 넘어감이 늦어도 읽던 책이 보인다
+          // (예전에는 넘어감을 기다리며 리더가 숨김(is-preparing)으로 남아, 표지 라이브 갱신도 볼 수 없었다).
+          $('#readerScreen').classList.remove('is-preparing');
           if(LTDEMO.openBook){LTDEMO.openBook(book.chapters[state.chapterIndex].id,book.id);return;}
           $('#shelfScreen').style.display='none';
           $('#shelfScreen').classList.remove('is-leaving');
-          $('#readerScreen').classList.remove('is-preparing');
           window.scrollTo({top:0,behavior:'smooth'});
         });
       }

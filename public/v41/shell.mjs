@@ -64,6 +64,30 @@ placeToast();
 // 안내 한 벌(#353 후속): 담기·중복·로그인 필요 안내(hold)가 상태 안내보다 먼저 일정 시간 보인다.
 const shellNotice=createNotifier({$,beforeShow:placeToast,afterShow:()=>{placeToast();setTimeout(placeToast,600);setTimeout(placeToast,1400);}});
 function notify(text,options){return shellNotice.notify(text,options);}
+// #977: 서버 기록에 형식이 어긋난 트리가 섞여 있으면 그 트리만 빼고 셸을 연다(읽기는 workspace-guard.mjs).
+// #986: 서버가 읽지 못해 빼 둔 트리는 개수(quarantined)만 응답에 온다 — 화면 안내에 함께 센다.
+// 화면에는 짧은 안내 한 줄, 콘솔에는 어느 트리가 왜 어긋났는지 한 줄만 남긴다 — 같은 기록을 다시 읽어도 한 번만.
+let guardNoticeKey='';
+function workspaceGuardNotice(read){
+ const skipped=Array.isArray(read?.skipped)?read.skipped:[];
+ const quarantined=Number.isSafeInteger(read?.quarantined)?read.quarantined:0;
+ const total=skipped.length+quarantined;
+ if(!total)return;
+ const key=`${skipped.map(item=>`${item?.id||''}:${item?.reason||''}`).join('|')}#${quarantined}`;
+ if(guardNoticeKey===key)return;
+ guardNoticeKey=key;
+ if(skipped.length)console.warn(`[LT41] 열 수 없는 트리 ${skipped.length}개를 잠시 빼고 열었어요: ${skipped.map(item=>`${item?.id||'(아이디 없음)'}(${item?.reason||'형식을 읽을 수 없어요.'})`).join(', ')}`);
+ if(quarantined)console.warn(`[LT41] 서버 기록에서 열 수 없는 트리 ${quarantined}개를 빼고 열었어요(개수만 전해 왔어요).`);
+ notify(`열 수 없는 트리 ${total}개를 잠시 빼고 열었어요.`,{hold:true});
+}
+// #977: 셸을 세우다 예외가 나도 빈 화면에 멈추지 않는다 — 읽을 수 있는 기록으로 한 번 더 열고 안내를 남긴다.
+function openFallbackShell(error){
+ try{console.warn('[LT41] 셸을 여는 중 문제가 있었어요:',error?.message||String(error));}catch{}
+ let state={version:1,trees:[]};
+ try{state=member?.state?.()||state;}catch{}
+ try{load({revision:0,state},'server');}catch{try{load({revision:0,state:{version:1,trees:[]}},'file');}catch{}}
+ notify('기록을 불러오지 못했어요. 화면을 새로고침해 다시 시도해 주세요.',{hold:true});
+}
 // #347 후속: 계정 제목 보기 설정. 계정 상태(state.prefs.titleDisplay)에 저장하고 화면에 알린다.
 function currentPrefs(){try{return member?.state?.().prefs||{titleDisplay:'both'}}catch{return {titleDisplay:'both'}}}
 function titleDisplayValue(){return normalizeTitleDisplay(currentPrefs().titleDisplay)}
@@ -187,7 +211,8 @@ addEventListener('lt41-trees-changed',()=>{
  paintQuickTargetControls();
  try {
   const titles=(window.LT41?.trees||[]).map(t=>({id:t.id,title:t.title}));
-  for(const f of frames()) f?.postMessage({type:'lt41-trees-renamed',titles},location.origin);
+  // #984: frames()는 iframe 요소다 — contentWindow로 보내야 한다(f?.postMessage는 TypeError로 삼켜져 한 번도 나가지 않았다).
+  for(const f of frames()) f.contentWindow?.postMessage({type:'lt41-trees-renamed',titles},location.origin);
  } catch {}
 });
 $('mobile-more').addEventListener('click',event=>{
@@ -839,8 +864,21 @@ function paintEmptyCopy(){
  $('empty-sample').classList.toggle('primary',!owned);
  $('empty-file').hidden=owned;
 }
+// #977: 작업 공간을 읽다 예외가 나도 셸 전체가 멈추지 않게 한다.
+// 서버 기록이면 지금 화면을 그대로 두고 안내만 남긴다(모델을 비우면 지도·책 이동까지 막힌다).
+// 파일 고르기·공유는 부른 쪽이 실패를 알 수 있도록 그대로 던진다(기존 동작 유지).
+function projectWorkspace(input){
+ try{return workspaceModel(input);}
+ catch(error){console.warn('[LT41] 작업 공간을 읽지 못했어요:',error?.message||String(error));return null;}
+}
 function load(input,kind,selection={},fallback={}){
- model=kind==='example'?{trees:[exampleTree]}:workspaceModel(input);
+ const projected=kind==='example'?{trees:[exampleTree]}:projectWorkspace(input);
+ if(!projected){
+  if(kind!=='server')throw new Error('기록을 읽을 수 없어요. 파일 형식을 확인해 주세요.');
+  notify('기록을 불러오지 못했어요. 화면을 새로고침해 다시 시도해 주세요.',{hold:true});
+  return {position:{treeId:null,momentId:null},treeMissing:false,momentMissing:false};
+ }
+ model=projected;
  source=kind;
  if(kind!=='share'){
   activeShareId=null;
@@ -985,6 +1023,9 @@ function memberStatus(status){
  }
  if(status.phase==='checking')notify('내 기록을 불러오고 있어요.');
  else if(status.phase==='synced'){
+  // #984: 저장이 서버에서 확인되면(직전 미저장→synced) 열린 화면에 표지·이름 다시 그리기를 알린다.
+  // 실패(rejected·offline·conflict·login)에서는 알리지 않는다 — 화면은 원래 표지를 그대로 두고 저장 안내 떠가 실패를 알린다.
+  if(previousDirty){try{for(const f of frames())f.contentWindow?.postMessage({type:'lt41-trees-saved'},location.origin);}catch{}}
   // #549: 기록(순간)이 0개인 새 계정의 첫 안내는 '불러왔어요' 대신 첫 순간 안내로(문구는 notice.mjs 한 벌).
   // #905: 자동 저장이 성공하면 알리지 않는다 — 직전에 저장 안 됨이었다면(previousDirty) 방금 저장된 것이다.
   // 알림은 실패·오프라인·충돌(저장 안내 떠)과 사용자가 누른 큰 동작의 완료 확인만 띄운다.
@@ -1013,9 +1054,9 @@ function memberStatus(status){
 async function startMember(){setMemberRefreshStarted(true);if(!leaveMember())return;backfillStarted=false;backfillAttempted.clear();const startup=parseSelectionRoute(location.hash);if(startup.scope==='owner')stashPendingOwnerRoute(sessionStorage,location.hash);++loadGeneration;const generation=loadGeneration;clear();
  const api=createWorkspaceApi({fetchImpl:(url,init)=>fetch(init?.method==='GET'&&url==='/api/workspace'?'/api/workspace?features=bound-writes':url,init)});
  let initialized=false,startupNotice='',session;
- session=createMemberSession({api,onState:(state,selection,meta)=>{if(generation!==loadGeneration)return;
-  // 4.1 기억 보드 저장: 화면이 이미 자기 상태를 들고 있으므로 셸은 모델만 갱신하고 iframe을 다시 그리지 않는다.
-  if(meta?.board){const projected=workspaceModel({revision:0,state});model=projected;if(window.LT41){const tree=projected.trees.find(t=>t.id===window.LT41.tree.id);if(tree){window.LT41.tree=tree;window.LT41.trees=projected.trees;window.LT41.writable=true}}return;}const snapshot=session.snapshot(),saved=accountPosition(localStorage,snapshot.subject)||{},active=parseSelectionRoute(location.hash),pending=!initialized&&active.scope!=='owner'?pendingOwnerRoute(sessionStorage):null,route=active.scope==='owner'?active:pending;let requested=selection||stateSelection();
+ session=createMemberSession({api,onGuard:read=>workspaceGuardNotice(read),onState:(state,selection,meta)=>{if(generation!==loadGeneration)return;try{
+  // 4.1 기억 보드 저장·트리 편집(#984): 화면이 이미 자기 상태를 들고 있으므로 셸은 모델만 갱신하고 iframe을 다시 그리지 않는다.
+  if(meta?.board||meta?.tree){const projected=workspaceModel({revision:0,state});model=projected;if(window.LT41){const tree=projected.trees.find(t=>t.id===window.LT41.tree.id);if(tree){window.LT41.tree=tree;window.LT41.trees=projected.trees;window.LT41.writable=meta.board?true:(source==='server'&&!!member?.snapshot().writable)}}return;}const snapshot=session.snapshot(),saved=accountPosition(localStorage,snapshot.subject)||{},active=parseSelectionRoute(location.hash),pending=!initialized&&active.scope!=='owner'?pendingOwnerRoute(sessionStorage):null,route=active.scope==='owner'?active:pending;let requested=selection||stateSelection();
    if(!initialized){if(route)requested=route;else if(!selection)requested=saved;
     // #583 '이 순간 열기': 맨 처음 주소(#my/network?tree=…&moment=…)로 열 때도 지도가 그 순간을 가운데 두게 한다 —
     // 뒤의 주소 이동(applyBrowserLocation)과 같은 규칙. 이후 동기화 때는 다시 정하지 않는다(initialized 뒤).
@@ -1039,14 +1080,14 @@ async function startMember(){setMemberRefreshStarted(true);if(!leaveMember())ret
    paintTitleDisplayControls();
    if(!backfillStarted&&snapshot.owned){backfillStarted=true;void runTitleBackfill(state,session);}
    if(snapshot.owned&&resolved.position.treeId){if(viewForFile(current)!=='home')writeLocation('replace');takePendingOwnerRoute(sessionStorage);if(route?.scope==='owner'&&resolved.treeMissing)startupNotice='이 주소의 기록을 현재 계정에서 찾을 수 없어 최근 위치를 열었어요.';else if(route?.scope==='owner'&&resolved.momentMissing)startupNotice='이 주소의 순간을 찾을 수 없어 트리의 시작 순간을 열었어요.';}
- },onStatus:status=>{if(generation===loadGeneration)memberStatus(status);},
+ }catch(error){openFallbackShell(error);}},onStatus:status=>{if(generation===loadGeneration)memberStatus(status);},
  navigate:url=>{
   if(url.startsWith('/auth/login')&&parseSelectionRoute(location.hash).scope==='owner')stashPendingOwnerRoute(sessionStorage,location.hash);
   location.assign(url.startsWith('/auth/login')?memberLoginUrl(readTheme(localStorage)):url==='#start'?'#home':url);
  }
 });
  member=session;
- await session.start();
+ try{await session.start();}catch(error){openFallbackShell(error);}
  if(generation===loadGeneration&&session.snapshot().owned){
   updateAccountControls();
   if(session.snapshot().writable&&sessionStorage.getItem(PENDING_NEW)==='1'){sessionStorage.removeItem(PENDING_NEW);openEditor('new');}
@@ -1185,7 +1226,7 @@ document.addEventListener('click',e=>{
 $('empty-records').onclick=()=>{if(!member?.snapshot().owned){openLoginStart('first');return;}member.snapshot().writable?openEditor():openAccountData();};
 $('empty-sample').onclick=sample;
 $('sample').onclick=sample;$('clear').onclick=()=>{if(!leaveMember())return;++loadGeneration;clear();$('save-feedback').hidden=true;$('file').value='';if($('account-settings').open)$('account-settings').close();};
-$('server').onclick=startMember;
+$('server').onclick=()=>{void startMember().catch(error=>openFallbackShell(error));};
 const ACCOUNT_DELETE_PHRASE='탈퇴합니다';
 let accountExpected=null;
 function accountConfirmMatches(){
@@ -1581,7 +1622,7 @@ function usePrivateAsset(){
 addEventListener('beforeunload',e=>{
  if(member?.snapshot().dirty||formDirty()||treeDirty()){e.preventDefault();e.returnValue='';}
 });
-if(shouldLoadMemberRecords(location.search,document.cookie,location.hash)||shellIntake.pending())startMember();
+if(shouldLoadMemberRecords(location.search,document.cookie,location.hash)||shellIntake.pending())void startMember().catch(error=>openFallbackShell(error));
 // 로그아웃으로 다시 연 문서에서는 '로그인이 필요해요' 대신 이 안내를 한 번 띄운다.
 try{if(sessionStorage.getItem('lt41.logoutNotice')==='1'){sessionStorage.removeItem('lt41.logoutNotice');notify('로그아웃했어요.');}}catch{}
 

@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
-import { validateState, coverModeOf, normalizeCoverDesign } from '../src/domain.js';
+import { coverModeOf, normalizeCoverDesign } from '../src/domain.js';
 import { ApiError } from './errors.js';
+import { readStoredDocument } from './workspace-service.js';
 import { refreshStageIndex } from './stage-index-refresh.js';
 import { parsePrincipal } from './principal.js';
 import { aiTesterFor } from './admin-roles.js';
@@ -24,10 +25,11 @@ function privateMedia(value) {
   catch { return true; }
 }
 export function projectSharedTree(document, treeId) {
-  let state;
-  try { state = validateState(document); }
-  catch { throw new ApiError(500, 'stored_document_invalid', '보관된 기록을 읽을 수 없어요.'); }
-  const source = state.trees.find(tree => tree.id === treeId);
+  // #986: 저장된 문서에 격리 트리가 섞여 있어도, 읽을 수 있는 트리의 공유는 그대로 동작한다.
+  // 문서 전체를 검사하면 트리 하나 때문에 공유 만들기·공개 읽기·커뮤니티 카드가 함께 실패한다.
+  const scan = readStoredDocument(document);
+  if (!scan) throw new ApiError(500, 'stored_document_invalid', '보관된 기록을 읽을 수 없어요.');
+  const source = scan.state.trees.find(tree => tree.id === treeId);
   if (!source) throw new ApiError(410, 'share_removed', '공유된 트리가 삭제되었거나 더 이상 존재하지 않아요.');
   let omittedPrivateMedia = 0;
   const tree = {
@@ -79,8 +81,9 @@ export function createShareService({ shareRepo, workspaceRepo, visibilityRepo = 
     const stored = await workspaceRepo.load({ productId, subjectId });
     if (!stored) throw new ApiError(404, 'tree_not_found', '트리를 찾을 수 없어요.');
     let doc;
-    try { doc = validateState(stored.doc); }
-    catch { throw new ApiError(500, 'stored_document_invalid', '보관된 기록을 읽을 수 없어요.'); }
+    try { doc = readStoredDocument(stored.doc)?.state ?? null; }
+    catch { doc = null; }
+    if (!doc) throw new ApiError(500, 'stored_document_invalid', '보관된 기록을 읽을 수 없어요.');
     if (!doc.trees.some(tree => tree.id === treeId)) throw new ApiError(404, 'tree_not_found', '트리를 찾을 수 없어요.');
     return doc;
   }
@@ -145,9 +148,13 @@ export function createShareService({ shareRepo, workspaceRepo, visibilityRepo = 
     // ① 살아 있는 공유 행(주인 만든 행 포함)의 moment_count 를 갱신하고,
     // ② 공유 행이 없는 트리(순간 1개 이상)에 자동 공개 행(origin='auto')을 만들며,
     // ③ 문서에서 사라진 트리의 공유 행(자동·주인 모두)은 즉시 내리고, 그 트리의 소개 행도 지운다.
+    // #986 후속(CTO 결정): 자동 공유·순간 수 갱신의 대상은 읽을 수 있는 트리뿐이다 — 격리 트리는
+    // 새로 공유하지 않는다. 대신 격리 트리에 이미 공유·소개 행이 있으면 해제하지 않고 그대로 둔다 —
+    // 사용자가 같은 id로 트리를 새로 저장해 다시 읽을 수 있게 되면 공유가 그대로 살아난다.
+    // 문서 뼈대 자체를 읽지 못하면 아무것도 해제하지 않는다(한꺼번에 내리는 사고를 막는다).
     async syncSharesAfterSave(subjectId) {
-      async function sync(doc, shares, discover) {
-        const trees = doc.trees;
+      async function sync(scan, shares, discover) {
+        const trees = scan.state.trees;
         const existing = await shares.list({ productId, subjectId });
         const activeTrees = new Set(existing.filter(row => row.status === 'active').map(row => row.treeId));
         for (const tree of trees) {
@@ -158,15 +165,20 @@ export function createShareService({ shareRepo, workspaceRepo, visibilityRepo = 
           const entry = tree.moments.find(moment => moment.parentId === null) || tree.moments[0];
           await shares.upsertAutoShare({ productId, subjectId, shareId: makeId(), treeId, entryMomentId: entry.id, momentCount });
         }
-        const treeIds = trees.map(tree => tree.id);
-        await shares.revokeSharesNotIn({ productId, subjectId, treeIds });
-        if (discover) await discover.deleteNotIn({ productId, subjectId, treeIds });
+        const keptIds = [...trees, ...scan.quarantined].map(tree => tree?.id).filter(id => typeof id === 'string');
+        await shares.revokeSharesNotIn({ productId, subjectId, treeIds: keptIds });
+        if (discover) await discover.deleteNotIn({ productId, subjectId, treeIds: keptIds });
       }
+      const readScan = doc => readStoredDocument(doc);
       if (shareRepo.withCurrentWorkspace) {
-        await shareRepo.withCurrentWorkspace({ productId, subjectId }, sync);
+        await shareRepo.withCurrentWorkspace({ productId, subjectId }, (doc, shares, discover) => {
+          const scan = readScan(doc);
+          if (scan) return sync(scan, shares, discover);
+        });
       } else {
         const stored = await workspaceRepo.load({ productId, subjectId });
-        if (stored) await sync(stored.doc, shareRepo, discoverRepo);
+        const scan = stored ? readScan(stored.doc) : null;
+        if (scan) await sync(scan, shareRepo, discoverRepo);
       }
       await refreshStages(subjectId);
     },

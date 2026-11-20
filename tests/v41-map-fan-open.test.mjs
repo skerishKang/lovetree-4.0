@@ -254,6 +254,10 @@ test('#366 지도 화면 결과: 안내 불투명·연결 이유 툴팁·눌린 
       await page.keyboard.press('Enter');
       await page.waitForTimeout(300);
       assert.equal(await page.evaluate(() => document.getElementById('detail').classList.contains('open')), true, 'Enter 로 상세 판이 열린다');
+      // #951 ⑤: Esc는 먼저 열린 상세 판을 닫는다(초점은 누른 순간으로). 판이 닫힌 뒤의 Esc가 선택을 푼다.
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(300);
+      assert.equal(await page.evaluate(() => document.getElementById('detail').classList.contains('open')), false, 'Escape 로 상세 판이 닫힌다');
       await page.keyboard.press('Escape');
       await page.waitForTimeout(300);
       const afterEsc = await page.evaluate(() => ({

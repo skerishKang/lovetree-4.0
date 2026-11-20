@@ -65,6 +65,8 @@ test('지도 상세 책에서 보기: 누르면 지도에서 고른 그 순간�
     await frame.locator('#focusFirst').click({ timeout: 8000 });
     await page.waitForTimeout(700);
     assert.equal(await frame.evaluate(() => document.getElementById('detail')?.classList.contains('open')), true, '순간 상세가 열린다');
+    // #951 ⑤: '책에서 보기'는 판 아래 '⋯ 더 보기' 메뉴 안으로 옮겼다(보드와 같은 틀) — 먼저 메뉴를 연다.
+    await frame.locator('#detailMoreBtn').click({ timeout: 8000 });
     await frame.locator('#openMoment').click({ timeout: 8000 });
     await page.waitForTimeout(1800);
     assert.equal(await page.evaluate(() => location.hash), '#book', '책 화면으로 옮겨간다');
