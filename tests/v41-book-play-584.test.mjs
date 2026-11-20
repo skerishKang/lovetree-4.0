@@ -871,6 +871,94 @@ test('1001c 실행: 쓰기 판 날짜·감정·비공개 변경 — 재적재 0�
   } finally { await browser.close(); server.close(); }
 });
 
+// #1001 (d): 남은 '불필요한 재적재' — 같은 트리 안 추가·설정·영상 정보·서재 ⋯(같은 트리)는
+// (3)이 만든 meta 모델 전용 길을 그대로 쓴다. 다른 트리 선택은 적절한 재적재를 유지한다.
+test('1001d 실행: 자세한 추가·설정·영상 정보·서재 ⋯ 같은 트리 — 재적재 0·갱신 결과 = 새로고침 결과(같은 펼침면)', { skip: skip || !REQUIRE ? skip || 'LT_BOOK_584_REQUIRE=1 일 때 실행' : false, timeout: 420000 }, async () => {
+  if (skip) assert.fail(`CI에서 이 시험은 건너뛰도록 설계됐다 — ${skip}`);
+  const { createTree: makeTree, addMoment: growTree } = await import('../public/v41/domain.mjs');
+  const { serve: serveApp } = await import('./helpers/screen-audit.mjs');
+  const { waitForShownScreen: waitShown } = await import('./helpers/visible-frame.mjs');
+  let t1 = makeTree({ subject: '시험', title: '트리 하나', note: '', emotion: '설렘', date: '2026-11-01', url: '' }, '2026-11-01T00:00:00Z');
+  const m1 = t1.moments[0].id;
+  t1 = growTree(t1, { title: '둘 순간', note: '기록', emotion: '그리움', date: '2026-11-02', url: 'https://youtu.be/dQw4w9WgXcQ' }, m1, '2026-11-02T00:00:00Z');
+  const m2 = t1.moments.at(-1).id;
+  const t2 = makeTree({ subject: '시험2', title: '트리 둘', note: '', emotion: '설렘', date: '2026-11-01', url: '' }, '2026-11-01T00:00:00Z');
+  const server = await serveApp();
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch();
+  const openBook = async (page) => {
+    await page.goto(`${base}/v41/?account=1`, { waitUntil: 'load' });
+    await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
+    await page.locator('#discover-ask-no').click().catch(() => {});
+    await page.locator('.tree-views [data-view="track59-sketchbook.html"]').click();
+    await waitShown(page, { path: 'track59-sketchbook' }, 8000);
+    await page.waitForTimeout(1000);
+    return page.frames().find(f => f.url().includes('views/track59-sketchbook'));
+  };
+  const snapshot = (frame) => frame.evaluate(() => {
+    const branch = document.querySelector('#branchTab');
+    return { current: window.__TRACK59__.getState().current, folio: document.querySelector('#pageLabel')?.textContent, branchHidden: branch ? branch.hidden : null, branchText: branch ? branch.textContent.trim() : null, toc: window.__TRACK59__.pageSteps().map(s => s.id) };
+  });
+  try {
+    for (const action of ['add', 'setPrefs', 'cacheMediaMetadata', 'manageSame']) {
+      const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
+      let rev = 1, stored = [t1, t2].map(x => JSON.parse(JSON.stringify(x)));
+      const puts = [];
+      await ctx.route('**/api/**', r => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
+      await ctx.route('**/api/workspace**', r => {
+        const req = r.request();
+        if (req.method() === 'PUT') { puts.push(1); const body = JSON.parse(req.postData() || '{}'); if (Array.isArray(body?.state?.trees)) stored = JSON.parse(JSON.stringify(body.state.trees)); rev += 1; return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, revision: rev, subject: '시험계정' }) }); }
+        return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, revision: rev, subject: '시험계정', writeSubjectBound: true, savedAt: '2026-11-20T00:00:00.000Z', state: { version: 1, trees: stored, prefs: {} } }) });
+      });
+      const page = await ctx.newPage();
+      const navs = []; let counting = false;
+      page.on('framenavigated', f => { if (counting && /\/v41\/(views\/|home\.html)/.test(f.url())) navs.push(f.url()); });
+      page.on('dialog', d => d.accept());
+      let frame = await openBook(page);
+      await frame.waitForFunction(id => !!document.querySelector(`[data-moment="${id}"]`), m2, { timeout: 10000 }).catch(() => {});
+      counting = true;
+      if (action === 'add') {
+        await page.evaluate(() => document.querySelector('#write-menu').click());
+        await page.waitForFunction(() => document.querySelector('#write-panel')?.open === true, null, { timeout: 8000 });
+        await page.locator('#write-tab-detailed').click();
+        await page.evaluate(() => { const f = document.querySelector('#moment-form'); f.elements.title.value = '새로 추가한 순간'; f.elements.title.dispatchEvent(new Event('input', { bubbles: true })); f.elements.note.value = '추가 기록'; f.requestSubmit(); });
+      } else if (action === 'setPrefs') {
+        await page.evaluate(() => document.querySelector('[data-date-style="dash"]').click());
+      } else if (action === 'cacheMediaMetadata') {
+        await frame.evaluate(x => parent.postMessage({ type: 'lt41-media-metadata', momentId: x.m2, url: x.url, mediaMetadata: { title: '새 영상 제목' } }, location.origin), { m2, url: 'https://youtu.be/dQw4w9WgXcQ' });
+      } else if (action === 'manageSame') {
+        await frame.evaluate(id => parent.postMessage({ type: 'lt41-manage-tree', treeId: id }, location.origin), t1.id);
+      }
+      await page.waitForTimeout(2600);
+      frame = page.frames().find(f => f.url().includes('views/track59-sketchbook'));
+      const inPlace = await snapshot(frame);
+      assert.equal(navs.length, 0, `${action} 뒤 화면 재적재는 0회여야 한다(실측 ${navs.length}: ${JSON.stringify(navs)})`);
+      await page.reload({ waitUntil: 'load' });
+      frame = await openBook(page);
+      await frame.waitForFunction(id => !!document.querySelector(`[data-moment="${id}"]`), m2, { timeout: 10000 }).catch(() => {});
+      await frame.evaluate(current => window.__TRACK59__.jump(current), inPlace.current);
+      await page.waitForTimeout(500);
+      const afterReload = await snapshot(frame);
+      assert.deepEqual(afterReload, inPlace, `${action}: 갱신 결과 = 새로고침 결과(같은 펼침면 기준)`);
+      await ctx.close();
+    }
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
+    let rev = 1;
+    await ctx.route('**/api/**', r => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
+    await ctx.route('**/api/workspace**', r => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, revision: rev++, subject: '시험계정', writeSubjectBound: true, savedAt: '2026-11-20T00:00:00.000Z', state: { version: 1, trees: [t1, t2], prefs: {} } }) }));
+    const page = await ctx.newPage();
+    const navs = []; let counting = false;
+    page.on('framenavigated', f => { if (counting && /\/v41\/(views\/|home\.html)/.test(f.url())) navs.push(f.url()); });
+    page.on('dialog', d => d.accept());
+    const frame = await openBook(page);
+    counting = true;
+    await frame.evaluate(id => parent.postMessage({ type: 'lt41-manage-tree', treeId: id }, location.origin), t2.id);
+    await page.waitForTimeout(2200);
+    assert.equal(navs.length, 1, `다른 트리 서재 ⋯ 은 적절한 재적재 1회를 유지한다(실측 ${navs.length})`);
+    await ctx.close();
+  } finally { await browser.close(); server.close(); }
+});
+
 /* #1030: 같은 영상이 /shorts/ 주소와 watch 주소로 섞여 있어도 펼침면·한 장 보기에서 같은 칸을 쓴다. */
 test('1030 실행: 같은 종류 영상의 펼침면 칸 크기 차이 0(1440·390 × 정원·밤)', { skip: skip || !REQUIRE ? (skip || 'LT_BOOK_584_REQUIRE=1 일 때 실행') : false, timeout: 180000 }, async () => {
   const browser = await chromium.launch();
