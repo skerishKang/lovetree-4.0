@@ -17,7 +17,10 @@ import {
   resolveWords,
   wordPattern,
   findViolations,
-  formatReport
+  formatReport,
+  HAN_PATTERN,
+  maskCode,
+  findHanLines
 } from '../scripts/commit-hygiene.mjs';
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -136,4 +139,44 @@ test('검사기는 걸리면 1, 통과하면 0으로 끝나고, 비밀값이 없
   const secretClean = spawnSync(process.execPath, argv(clean), { cwd: ROOT, encoding: 'utf8', env: withSecret });
   assert.equal(secretClean.status, 0, secretClean.stdout + secretClean.stderr);
   assert.match(secretClean.stdout, /COMMIT_HYGIENE=PASS words=3 secret_list=yes/);
+});
+
+test('한자가 들어간 본문은 실패하고 어디 몇째 줄인지 그 줄을 보여 준다', () => {
+  assert.equal(HAN_PATTERN.test('한글'), false);
+  assert.equal(HAN_PATTERN.test('方法'), true);
+  const hits = findHanLines({ title: '제목엔 없음', body: '첫 줄\n둘째 줄 方法이 섞임\n셋째 줄', commits: ['커밋 제목', '본문에 漢字'] });
+  assert.equal(hits.length, 2);
+  assert.equal(hits[0].where, 'PR 본문');
+  assert.equal(hits[0].line, 2);
+  assert.match(hits[0].excerpt, /둘째 줄/);
+  assert.equal(hits[1].where, '커밋');
+  assert.equal(hits[1].index, 2);
+  assert.equal(hits[1].line, 1);
+  assert.match(formatReport(hits), /PR 본문 2번 줄: '한자'/);
+});
+
+test('코드 블록 안의 한자는 통과한다(줄 번호는 그대로 유지)', () => {
+  const body = '설명 첫 줄\n\n```\nconst label = "方法";\n```\n\n마지막 줄';
+  assert.deepEqual(findHanLines({ body }), []);
+  assert.match(maskCode(body), /설명 첫 줄/);
+  // 코드 블록 뒤에 한자가 나오면 줄 번호를 잃지 않고 잡는다.
+  const dirty = body + '\n진짜 方法';
+  assert.equal(findHanLines({ body: dirty })[0].line, 8);
+});
+
+test('한글·영문만 있으면 통과한다', () => {
+  const clean = {
+    title: '첫 화면 숫자 줄 띄어쓰기 수리',
+    body: '영문 English 낱말과 한글이 섞여도 괜찮다.\n\n검증: tests/commit-hygiene.test.mjs 통과.',
+    commits: ['가나는 이번 범위 밖', '한글과 English만 쓴다']
+  };
+  assert.deepEqual(findHanLines(clean), []);
+  assert.deepEqual(findViolations(clean, resolveWords({}).words), []);
+});
+
+test('일본어 가나는 통과한다(한자만 막는다)', () => {
+  const body = '해외 팬 페르소나 이름 さくら입니다. ド래그 금테 카드를 눌러 감상.';
+  assert.equal(HAN_PATTERN.test('さくら'), false);
+  assert.equal(HAN_PATTERN.test('です'), false);
+  assert.deepEqual(findHanLines({ body }), []);
 });

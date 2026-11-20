@@ -1,15 +1,19 @@
 name: 커밋·PR 문구 검사
-# 공개 저장소에 도구 꼬리말·금지어가 남지 않게 PR마다 본다(2026-11-16 CTO 결정).
+# 공개 저장소에 도구 꼬리말·금지어·한자가 남지 않게 PR마다 본다(2026-11-16 CTO 결정, 한자는 #1022).
 # 금지어 목록은 저장소 비밀값 LT_COMMIT_BANNED_WORDS(줄마다 하나)에서 온다 — 이 파일·AGENTS.md·시험에는 낱말을 적지 않는다.
 # 비밀값이 없는 곳(포크 PR)에서는 도구 꼬리말만 검사하고 경고 한 줄을 남긴다.
+# squash 병합 본문은 사전 검사 범위 밖이므로 main push 때 마지막 커밋 1개를 다시 검사한다(이미 들어간 것은 고치지 않는다).
 on:
   pull_request:
     types: [opened, edited, synchronize, reopened]
+  push:
+    branches: [main]
 permissions:
   contents: read
 jobs:
   hygiene:
-    name: PR 제목·본문·커밋 메시지에 도구 이름·꼬리말이 없다
+    name: PR 제목·본문·커밋 메시지에 도구 이름·꼬리말·한자가 없다
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -22,3 +26,19 @@ jobs:
         env:
           LT_COMMIT_BANNED_WORDS: ${{ secrets.LT_COMMIT_BANNED_WORDS }}
         run: node scripts/commit-hygiene.mjs --event "$GITHUB_EVENT_PATH" --base "${{ github.base_ref }}"
+
+  main_push:
+    name: main 마지막 커밋 문구 검사
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: 마지막 커밋 1개 검사
+        env:
+          LT_COMMIT_BANNED_WORDS: ${{ secrets.LT_COMMIT_BANNED_WORDS }}
+        run: node scripts/commit-hygiene.mjs --range "HEAD~1..HEAD"

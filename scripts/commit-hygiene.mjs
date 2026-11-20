@@ -1,8 +1,9 @@
 #!/usr/bin/env node
-// PR 제목·본문·커밋 메시지에 도구 꼬리말·금지어가 남았는지 본다(2026-11-16 CTO 결정).
+// PR 제목·본문·커밋 메시지에 도구 꼬리말·금지어·한자가 남았는지 본다(2026-11-16 CTO 결정, 한자는 #1022).
 // 공개 저장소에는 어떤 도구로 만들었는지·누가 만들었는지를 남기지 않는다. 이미 들어간 기록은 고치지 않는다.
 // 금지어 목록은 **저장소 비밀값 LT_COMMIT_BANNED_WORDS**(줄마다 하나)에서 온다 — 문서·코드·시험에 적지 않는다.
 // 비밀값이 없는 곳(포크 PR)에서는 도구 꼬리말만 검사한다.
+// 한자는 한글·영문과 섞이면 안 된다 — 가나는 해외 팬 페르소나에 쓸 수 있으므로 범위 밖, 코드 블록·인라인 코드는 통과시킨다.
 import { readFile } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 
@@ -63,6 +64,37 @@ export function findFooterLines({ title = '', body = '', commits = [] } = {}) {
   return hits;
 }
 
+/** 한자 문자 — 가나는 이번 범위 밖(해외 팬 페르소나 이야기에서 쓸 수 있다). */
+export const HAN_PATTERN = /\p{Script=Han}/u;
+
+/**
+ * 코드 블록(``` 안)·인라인 코드(`…`) 안을 공백으로 가린다 — 경로·식별자 예시는 통과시킨다.
+ * 줄바꿈은 그대로 두어 원문의 줄 번호를 잃지 않는다.
+ */
+export function maskCode(text) {
+  return String(text ?? '')
+    .replace(/```[\s\S]*?```/g, (block) => block.replace(/[^\n]/g, ' '))
+    .replace(/`[^`\n]*`/g, (code) => code.replace(/[^\n]/g, ' '));
+}
+
+/** 제목·본문·커밋에서 한자가 있는 줄을 모은다 — 어디·몇째 줄·그 줄을 함께 적는다. */
+export function findHanLines({ title = '', body = '', commits = [] } = {}) {
+  const hits = [];
+  const check = (value, where, index) => {
+    const text = String(value ?? '');
+    if (!text) return;
+    const lines = text.split(/\r?\n/);
+    maskCode(text).split(/\r?\n/).forEach((maskedLine, position) => {
+      if (!HAN_PATTERN.test(maskedLine)) return;
+      hits.push({ where, index, word: '한자', line: position + 1, excerpt: (lines[position] ?? '').trim() });
+    });
+  };
+  check(title, 'PR 제목', null);
+  check(body, 'PR 본문', null);
+  commits.forEach((message, position) => check(message, '커밋', position + 1));
+  return hits;
+}
+
 /** 제목·본문·커밋 메시지에서 걸린 곳을 모은다. 걸린 자리 앞뒤 24자만 남긴다. */
 export function findViolations({ title = '', body = '', commits = [] } = {}, words = []) {
   const patterns = (Array.isArray(words) ? words : [])
@@ -99,13 +131,14 @@ export function findViolations({ title = '', body = '', commits = [] } = {}, wor
   return found;
 }
 
-/** 보고용 한 줄씩. 커밋은 몇 번째 커밋인지 함께 적는다. 걸린 낱말 자체는 목록 비밀을 지키려고 가린다. */
+/** 보고용 한 줄씩. 커밋은 몇 번째 커밋, 한자는 몇째 줄인지 함께 적는다. 걸린 낱말 자체는 목록 비밀을 지키려고 가린다. */
 export function formatReport(violations, { hideWords = false } = {}) {
   return violations
     .map((v) => {
       const label = hideWords ? '금지어' : `'${v.word}'`;
       const excerpt = hideWords ? v.excerptMasked : v.excerpt;
-      return `${v.where}${v.index ? ` #${v.index}` : ''}: ${label} … ${excerpt}`;
+      const place = v.line ? `${v.where} ${v.line}번 줄` : `${v.where}${v.index ? ` #${v.index}` : ''}`;
+      return `${place}: ${label} … ${excerpt}`;
     })
     .join('\n');
 }
@@ -156,12 +189,18 @@ async function main() {
   const range = args.range && args.range !== 'true' ? args.range : `origin/${base}..HEAD`;
   const commits = readMessageRange(range);
 
-  const violations = findViolations({ title: pullRequest.title, body: pullRequest.body, commits }, words);
+  const message = { title: pullRequest.title, body: pullRequest.body, commits };
+  const hanLines = findHanLines(message);
+  const violations = [...findViolations(message, words), ...hanLines];
   if (violations.length > 0) {
     console.log('COMMIT_HYGIENE=FAIL');
     // 비밀값 목록에서 온 낱말은 로그에 되풀이하지 않는다(꼬리말만 이름을 밝힌다).
     console.log(formatReport(violations, { hideWords: hasSecretList }));
-    console.log('고치는 법: 제목·본문·커밋 메시지에서 도구 이름·꼬리말 줄을 지우세요(이미 머지된 기록은 그대로 둡니다).');
+    if (hanLines.length > 0) {
+      console.log('고치는 법: 제목·본문·커밋 메시지의 한자를 지우세요(코드 블록·인라인 코드는 제외). 이미 머지된 기록은 그대로 둡니다.');
+    } else {
+      console.log('고치는 법: 제목·본문·커밋 메시지에서 도구 이름·꼬리말 줄을 지우세요(이미 머지된 기록은 그대로 둡니다).');
+    }
     process.exit(1);
   }
   console.log(`COMMIT_HYGIENE=PASS words=${words.length} secret_list=${hasSecretList ? 'yes' : 'no'} commits=${commits.length} range=${range}`);
