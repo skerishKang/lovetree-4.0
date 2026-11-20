@@ -17,3 +17,26 @@ test('share rows are owner-scoped, revocable, and schema application is repeatab
   assert.equal(await repo.create({productId,subjectId,shareId,treeId:'tree-b',entryMomentId:'moment-b',view:'board'}),null);
  }finally{await pool.end();}
 });
+
+test('#1046: 저장 뒤 동기화가 취소한 자동 공유 행을 되살리지 않는다', {skip}, async () => {
+  assertIsolatedTestDatabase(DATABASE_URL);const pool=await createPool(DATABASE_URL,{max:3});
+  try{
+    await applySchema(pool);
+    const repo=createShareRepo(pool),tag=suffix(),productId='lt-'+tag,subjectId='u-'+tag,treeId='tree-'+tag;
+    const auto=await repo.upsertAutoShare({productId,subjectId,shareId:('a'+tag).padEnd(24,'x').slice(0,24),treeId,entryMomentId:'moment-a',momentCount:3});
+    assert.equal(auto.status,'active');
+    const revoked=await repo.revoke({productId,subjectId,shareId:auto.shareId});
+    assert.equal(revoked.status,'revoked');
+    // 저장 뒤 동기화가 같은 트리에 다시 upsert해도 revoked 상태를 유지한다.
+    const again=await repo.upsertAutoShare({productId,subjectId,shareId:('b'+tag).padEnd(24,'x').slice(0,24),treeId,entryMomentId:'moment-b',momentCount:4});
+    assert.ok(!again,'이미 있는 자동 행은 그대로 둔다');
+    const loaded=await repo.load({productId,shareId:auto.shareId});
+    assert.equal(loaded.status,'revoked','되살아나지 않는다');
+    assert.ok(loaded.revokedAt,'주인이 내림 표식이 남는다');
+    // 사용자가 공유 창에서 직접 켜면 새 주소로 열린다.
+    const fresh=await repo.create({productId,subjectId,shareId:('c'+tag).padEnd(24,'x').slice(0,24),treeId,entryMomentId:'moment-a',view:'book'});
+    assert.equal(fresh.status,'active');
+    assert.equal((await repo.load({productId,shareId:fresh.shareId})).status,'active');
+    assert.equal((await repo.load({productId,shareId:auto.shareId})).status,'revoked','옛 주소는 그대로 막힌다');
+  }finally{await pool.end();}
+});
