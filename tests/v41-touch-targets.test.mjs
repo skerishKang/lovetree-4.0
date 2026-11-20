@@ -6,10 +6,8 @@ import {readFileSync} from 'node:fs';
 const read = path => readFileSync(new URL('../' + path, import.meta.url), 'utf8');
 
 const TARGETS = {
-  'public/v41/views/track59-sketchbook.html': {
-    '#prevBtn': [34, 30], '#nextBtn': [34, 30], '#detailClose': [34, 34], '#viewerClose': [34, 34],
-    '#openViewerBtn': [85, 37], '#detailIndexBtn': [113, 37], '#branchClose': [54, 37],
-  },
+  // #886 책 단계: track59-sketchbook.html의 터치 타깃 CSS가 book-extra.css로 이동해 이 소스 파싱 단정은 깨졌다.
+  // 실제 렌더링 히트박스 검사는 tests/v41-book-single-537.test.mjs의 '책 조작 버튼 히트박스는 44x44 이상이다(렌더링 ::after 터치 영역)'가 맡는다.
   // #886 항목3: track58-pinboard.html의 터치 타깃 CSS가 board-extra.css로 이동해 이 소스 파싱 단정은 깨졌다.
   // 하드코딩 크기가 실제와도 어긋나(#detailYtLink 실제 24px를 34px로 가정) 거짓 통과를 내던 참이라 지운다.
   // 실제 렌더링 히트박스 검사는 tests/v41-board-pinboard-582.test.mjs의 '조작 버튼 히트박스는 44x44 이상이다(렌더링 ::after 터치 영역)'가 맡는다.
