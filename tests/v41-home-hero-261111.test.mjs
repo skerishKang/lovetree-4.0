@@ -1,18 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readFileSync} from 'node:fs';
 import {applyHomeCenter} from '../v41/home-center.js';
 import {createHomeActions} from '../v41/home-actions.js';
+import {createCleanup} from '../public/v41/shell/cleanup.mjs';
 // 261116 PR 2: 첫 화면 카드 모드·숫자 줄이기 — 같은 첫 화면의 기존 시험 파일에 더한다.
 import {formatCount, homeMomentPick, homeMomentMenu, homeDayMoment, readHomeMoment, HOME_MOMENT_KEY} from '../v41/home-card-mode.js';
 
-const src=path=>readFileSync(new URL('../'+path,import.meta.url),'utf8');
-const homeCenterSrc=src('v41/home-center.js');
-const homeSrc=src('v41/home.js');
-const homeHtml=src('v41/home.html');
-const identityCss=src('public/v41/identity.css');
-const cleanupSrc=src('public/v41/shell/cleanup.mjs');
-const shellCss=src('public/v41/shell.css');
 
 // #380 2026-11-11: 가운데 버튼 — 로그인 전 [＋ 첫 순간 남기기·둘러보기·어떻게 쓰나요] / 로그인 후 [＋ 순간 추가·둘러보기·내 트리](2026-11-14 대표 결정으로 셋째 자리를 채운다).
 // 왼쪽 첫 버튼만 흰색 채움(primary-cta), 나머지 테두리. 로그인 후에는 버튼 2개라 셋째 자리는 숨긴다.
@@ -140,37 +133,49 @@ test('카드 모드 값: 계정 설정(prefs)을 먼저 보고 기기 미러, �
   assert.deepEqual(readHomeMoment({prefs:null,storage}).mode,'last','막힌 미러는 기본으로');
 });
 
-test('홈 배선: 추가/둘러보기/로그아웃 시작이 기존 액션으로 연결되고 resume 버튼은 없다(#426)',()=>{
-  assert.match(homeSrc,/bridge\.actions\.requestMoment\('add'\)/);
-  assert.doesNotMatch(homeSrc,/bridge\.actions\.resume\(\)/,'이어 보던 순간 버튼 배선 제거');
-  assert.match(homeSrc,/communityButton\.onclick=\(\)=>bridge\.actions\.community\(\)/,'둘러보기 연결');
-  // #635: '어떻게 쓰나요'는 같은 첫 화면의 안내 패널을 연다(별도 사용법 안내 화면은 없다 — #388).
-  assert.match(homeSrc,/guideButton\.onclick=openGuide/,'어떻게 쓰나요 = 안내 패널');
-  assert.match(homeSrc,/guideDialog\.setAttribute\('aria-label','어떻게 쓰나요'\)/,'안내 패널은 기존 orbit-dialog 틀을 쓴다');
-  assert.match(homeSrc,/data-do="guide-new"/,'안내 패널의 첫 순간 추가 단추');
-  assert.match(homeSrc,/data-do="guide-community"/,'안내 패널의 둘러보기 단추');
-  // 첫 방문의 동작은 화면 시험과 액션 시험에서 확인한다.
-  const centerCode=homeCenterSrc.split('\n').filter(line=>!line.trim().startsWith('//')).join('\n');
-  assert.equal(/새 트리 만들기/.test(centerCode),false,'"새 트리 만들기"는 가운데 줄에서 뺀다');
+// #952: 추가·둘러보기·안내 패널 배선(#426·#635·#388)은 실제 화면에서 잰다 —
+// tests/v41-home-screen-952.test.mjs(단추 누름 → 메시지·화면 전환·안내 창 내용).
+
+test('정리 창 빈 제목 대체를 그려진 행에서 본다: 영상/비영상 구분, 흐린 글자', () => {
+  // v41-cleanup-dirty-confirm.test.mjs의 가짜 DOM 흉내로 createCleanup을 직접 돌린다.
+  const els = {};
+  const element = () => ({
+    textContent: '', className: '', value: '', dataset: {}, children: [], listeners: {},
+    classList: { set: new Set(), add(n) { this.set.add(n); }, remove(n) { this.set.delete(n); }, contains(n) { return this.set.has(n); } },
+    setAttribute() {}, append(...kids) { this.children.push(...kids); },
+    replaceChildren(...kids) { this.children = kids; },
+    addEventListener(type, fn) { (this.listeners[type] ||= []).push(fn); },
+    removeEventListener() {},
+    querySelectorAll: () => [],
+  });
+  const opened = [];
+  globalThis.window = { LT41: { tree: { id: 't1', moments: [
+    { id: 'v', parentId: 'p1', mediaMetadata: { poster: '/media/v.jpg' } },
+    { id: 'm', parentId: 'p1', note: '글 기록' },
+    { id: 't', parentId: 'p1', title: '있는 제목' },
+  ] } } };
+  globalThis.document = { createElement: () => element() };
+  try {
+    const cleanup = createCleanup({
+      $: id => {
+        const el = (els[id] = els[id] || element());
+        // <select> 흉내 — sync가 targetLabel을 만든다.
+        if (id === 'cleanup-target') el.selectedOptions = el.selectedOptions || [{ textContent: '' }];
+        return el;
+      },
+      getMember: () => ({ snapshot: () => ({ owned: true, writable: true }) }),
+      getSource: () => 'server', getTrees: () => [],
+      choose: () => {}, notify: () => {}, panel: id => opened.push(id),
+      momentTitle: m => m.title || '', treeMomentThumb: () => '',
+    });
+    assert.equal(cleanup.open(), true);
+    const rows = els['cleanup-moments'].children;
+    // 행 = [체크 상자, 글자] — 썸네일이 없어 img는 끼지 않는다.
+    assert.deepEqual(rows.map(r => r.children[1].textContent), ['제목 없는 영상', '제목 없는 순간', '있는 제목']);
+    assert.deepEqual(rows.map(r => r.children[1].classList.contains('is-blank')), [true, true, false], '빈 제목만 흐린 글자로');
+    assert.deepEqual(opened, ['cleanup-panel']);
+  } finally { delete globalThis.window; delete globalThis.document; }
 });
-
-
-
-test('가운데 위 모아둔 순간 알약은 첫 화면에서 제거됐다',()=>{
-  assert.equal(homeHtml.includes('homeInboxFlag'),false);
-  assert.match(homeHtml,/<main id="orbit"/);
-  assert.equal(identityCss.includes('.inbox-flag'),false);
-  assert.equal(homeSrc.includes('homeInboxFlag'),false);
-});
-
-test('정리 화면 빈 제목 대체: 영상/비영상 구분, 흐린 글자, 원본 노출 없음',()=>{
-  assert.match(cleanupSrc,/제목 없는 영상/);
-  assert.match(cleanupSrc,/제목 없는 순간/);
-  assert.match(cleanupSrc,/is-blank/);
-  assert.equal(/String\(moment\.title/.test(cleanupSrc),false);
-  assert.match(shellCss,/\.cleanup-moment \.is-blank/);
-});
-
 test('정리 화면 열기 메시지가 홈 액션에 준비됐다(261117 고객 의견 — 모아둔 순간 정리 창)',()=>{
   const sent=[];
   createHomeActions({getContext:()=>null,send:m=>sent.push(m)}).actions.cleanup();
@@ -179,13 +184,8 @@ test('정리 화면 열기 메시지가 홈 액션에 준비됐다(261117 고객
 
 
 
-// 처리방침·약관 링크(2026-11-16): 첫 화면 '어떻게 쓰나요' 안내 패널 아래에도 같은 두 링크가 있다.
-// 새 창(target=_blank, rel=noopener)으로 열고, 처리방침은 공용 로그인 처리방침의 러브트리 절(#lovetree)로 바로 간다.
-test('첫 화면 안내 패널에 처리방침·약관 링크가 있다(새 창, 러브트리 절)', () => {
-  assert.match(homeSrc, /<div class="guide-policy"><a href="https:\/\/auth\.padiem\.net\/privacy#lovetree" target="_blank" rel="noopener">개인정보 처리방침<\/a><a href="https:\/\/auth\.padiem\.net\/terms" target="_blank" rel="noopener">이용약관<\/a><\/div>/);
-  // 누름 영역 44px.
-  assert.match(homeSrc, /#guidePanel \.guide-policy a\{min-height:44px/);
-});
+// #952: 처리방침·약관 링크(2026-11-16)는 그려진 안내 패널에서 잰다 —
+// tests/v41-home-screen-952.test.mjs(주소·새 창·누름 영역 44px).
 
 // 261118 도현 의견 1-2: 첫 화면 숫자판에 '트리 0'(내 트리)과 '트리 9'(둘러보기 공개 집계)가 같은 라벨로
 // 나란히 보였고, '순간 117'은 남의 것까지 센 공개 집계라 내 숫자로 읽혔다. 로그인은 내 것만 남기고
