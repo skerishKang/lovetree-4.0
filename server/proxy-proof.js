@@ -12,18 +12,25 @@ function headerValue(headers, name) {
   return '';
 }
 
-export function verifyProxyProof(request, { secret = '', enforce = false, log = () => {} } = {}) {
+export function logProxyProofStartup({ secret = '', enforce = false, log = () => {} } = {}) {
+  const expected = typeof secret === 'string' ? secret.trim() : '';
+  if (expected && expected.length >= 32) return true;
+  log({ result: 'unavailable' });
+  return false;
+}
+
+export function verifyProxyProof(request, { secret = '', enforce = false } = {}) {
   const path = String(request?.path || '');
   if (path.startsWith('/internal/')) return { ok: true, reason: 'internal' };
   const expected = typeof secret === 'string' ? secret.trim() : '';
   const got = headerValue(request?.headers, PROXY_PROOF_HEADER);
   if (!expected || expected.length < 32) {
-    log({ result: 'unavailable' });
-    return { ok: true, reason: 'unavailable' };
+    // 요청마다 기록하지 않는다 — 서버 시작 때 logProxyProofStartup이 한 번 남긴다.
+    return { ok: !enforce, reason: 'unavailable' };
   }
   const a = Buffer.from(got), b = Buffer.from(expected);
   const matched = a.length === b.length && timingSafeEqual(a, b);
   if (matched) return { ok: true, reason: 'valid' };
-  log({ result: 'mismatch' });
+  // mismatch 기록은 서버가 reason을 보고 한 번 남긴다(요청마다 여기서 남기지 않는다).
   return { ok: !enforce, reason: 'mismatch' };
 }
