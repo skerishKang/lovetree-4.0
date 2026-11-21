@@ -202,13 +202,15 @@ test('#824·#903: 가입 7일 미만이 담기를 누르면 안내가 단추 바
     const body = h.get('community-preview').children.find(node => node.className === 'community-preview-body');
     const fav = body.children.find(node => node.className === 'community-preview-actions').children.find(node => node.dataset.communityAction === 'favorite');
     assert.equal(fav.textContent, '즐겨찾기 5', '누르기 전에는 담지 않은 상태다');
-    // #903: 안내 칸은 담기 단추 묶음(community-preview-actions) 바로 다음 줄이다 — 막히기 전에는 숨어 있다.
+    // #903: 안내 칸은 담기 단추 묶음(community-preview-actions) 안에서 담기 단추 바로 다음 자리다 — 막히기 전에는 숨어 있다.
+    // (#903 후속 2026-11-22: 반응 칩이 펼쳐져 묶음이 여러 줄이 되어도 안내가 담기 단추 바로 다음 줄에 오게 묶음 안 풀폭 줄로 옮겼다.)
     const noteOf = (nowBody) => {
       const nowActions = nowBody.children.find(node => node.className === 'community-preview-actions');
-      return nowBody.children[nowBody.children.indexOf(nowActions) + 1];
+      const nowFav = nowActions.children.find(node => node.dataset.communityAction === 'favorite');
+      return nowActions.children[nowActions.children.indexOf(nowFav) + 1];
     };
     const note = noteOf(body);
-    assert.equal(note.className, 'community-vote-note', '안내 칸은 actions 바로 다음 줄자리에 둔다');
+    assert.equal(note.className, 'community-vote-note', '안내 칸은 담기 단추 바로 다음 자리에 둔다');
     assert.equal(note.hidden, true, '막히기 전에는 안내 칸이 보이지 않는다');
     fav.onclick();
     await new Promise((r) => setTimeout(r, 0));
