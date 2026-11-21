@@ -358,3 +358,29 @@ test('기존 사용자 첫 화면·책·보드·지도·서재 — example.mjs �
     }
   } finally { await browser.close(); await new Promise(ok => server.close(ok)); }
 });
+
+// #1026 E 2단계: 창 전용 모듈을 동적으로 받아도 여는 단추의 첫 클릭이 사라지지 않는다(동작 검사).
+test('지연 창 모듈 — 정리·꼬리표 첫 클릭으로 창이 열린다', { skip: skip1010 || !REQUIRE1010 ? skip1010 || 'LT_HOME_1010_REQUIRE=1 일 때 실행' : false, timeout: 180000 }, async () => {
+  const browser = await chromium1010.launch({ headless: true });
+  try {
+    for (const [action, panelId, pickInbox] of [['tags', 'tag-panel', false], ['cleanup', 'cleanup-panel', true]]) {
+      const h = await boot1010(browser, { member: true, mix: true, width: 1440 });
+      try {
+        if (pickInbox) {
+          await h.page.click('#record-menu');
+          await h.page.waitForFunction(() => !document.getElementById('tree-popover')?.hidden, null, { timeout: 10000 });
+          await h.page.locator('#tree-popover [data-tree-id]').first().click();
+          await h.page.waitForTimeout(700);
+        }
+        await h.page.click('#record-menu');
+        await h.page.waitForFunction(() => !document.getElementById('tree-popover')?.hidden, null, { timeout: 10000 });
+        const btn = h.page.locator(`#tree-popover [data-tree-action="${action}"]`);
+        await btn.waitFor({ state: 'visible', timeout: 10000 });
+        await btn.click();
+        await h.page.waitForFunction(id => { const d = document.getElementById(id); return d && d.open && !d.hidden && d.getBoundingClientRect().width > 0; }, panelId, { timeout: 15000 });
+        assert.equal(await h.page.locator(`#${panelId}`).evaluate(d => d.open), true, `${action}: 첫 클릭으로 창이 열렸다`);
+        console.log('LAZY_PANEL_OPEN', action, panelId);
+      } finally { await close1010(h); }
+    }
+  } finally { await browser.close(); }
+});

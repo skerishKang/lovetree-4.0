@@ -132,6 +132,8 @@ function messagesHarness({ owned = true, source = 'server', current = 'track59-s
     paintThemeControls: () => {},
     viewForFile: file => (file === 'track59-sketchbook.html' ? 'book' : 'home'),
     exampleTree: {id: 'example', moments: [{id: 'e1'}]},
+    // #1026 E: 둘러보기 창 모듈은 동적 import로 바뀌었다 — 단위 시험에서는 실제 브라우저 모듈을 받지 않도록 주입한다.
+    mountCommunity: () => () => {},
     journey
   });
   return {
