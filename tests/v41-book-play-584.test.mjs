@@ -58,10 +58,10 @@ const ROOT = path.resolve(fileURLToPath(new URL('../public', import.meta.url)));
 let server = null, base = '';
 // 훅은 첫 시험보다 먼저 등록한다(#952). 시험 뒤에 등록하면 실행기에 따라 after가 먼저 돌아
 // 서버가 닫히지 않은 채 실행이 끝나지 않는다(CI 잡이 25분 뒤 취소됨).
-const booting = (async () => { server = await serve(ROOT); base = `http://127.0.0.1:${server.address().port}`; })();
-test.before(() => booting);
+// 서버는 시험 필터와 무관하게 모듈을 읽는 시점에 먼저 띄운다(이름으로 골라 돌려도 주소가 비지 않게).
+server = await serve(ROOT);
+base = `http://127.0.0.1:${server.address().port}`;
 test.after(async () => {
-  await booting.catch(() => {});
   if (server) await new Promise((ok) => server.close(ok));
 });
 const REQUIRE = process.env.LT_BOOK_584_REQUIRE === '1';
@@ -142,7 +142,13 @@ async function openBook(browser, width, height, extraRoutes = [], tree = tree26(
   const external = (u) => { try { return /(^|\.)?(ytimg\.com|youtube\.com|youtube-nocookie\.com|googlevideo\.com)$/.test(new URL(u).hostname); } catch { return false; } };
   await page.route(external, (route) => route.abort());
   await page.route('**/api/youtube/oembed*', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ videoId: 'x', title: '영상', authorName: '채널', thumbnailUrl: '' }) }));
-  await page.route('**/i.ytimg.com/vi/v0000000001/oardefault.jpg*', (route) => route.fulfill({ status: 200, contentType: 'image/png', body: VERTICAL_PNG }));
+  // #1102: 외부 썸네일을 시험 안에서 전부 고정 응답으로 대체한다. 크기를 아는 작은 그림만 쓴다.
+  // 세로 실측 대상(v0 oardefault)만 1×2, 나머지는 16:9 — 네트워크 상태에 따라 판정이 흔들리지 않는다.
+  await page.route('**/i.ytimg.com/**', (route) => {
+    const url = route.request().url();
+    const vertical = /\/vi\/v0000000001\/oardefault\.jpg/.test(url);
+    return route.fulfill({ status: 200, contentType: vertical ? 'image/png' : 'image/svg+xml', body: vertical ? VERTICAL_PNG : LANDSCAPE_SVG });
+  });
   for (const [pattern, handler] of extraRoutes) await page.route(pattern, handler);
   await page.goto(`${base}/host584`, { waitUntil: 'load' });
   let frame = null;
@@ -156,6 +162,7 @@ async function openBook(browser, width, height, extraRoutes = [], tree = tree26(
 }
 
 const VERTICAL_PNG = readFileSync(new URL('./fixtures/vertical-1x2.png', import.meta.url));
+const LANDSCAPE_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="160" height="90"><rect width="160" height="90" fill="#6b5a72"/></svg>';
 
 // 페이지 넘김은 부드러운 애니메이션이라 라벨이 바뀔 때까지 기다려야 다음 자리를 잰다.
 async function step(frame) {
@@ -268,8 +275,8 @@ test('584 실행: 세로 판정 보강 — watch 주소의 세로 영상도 썸�
   try {
     const { ctx, frame, errors } = await openBook(browser, 1440, 900);
     try {
-      // 가로 영상은 가로 틀을 유지한다(실측 실패 = 가로) — 첫 펼침면에서 잰다.
-      await frame.waitForTimeout(600);
+      // 가로 영상은 가로 틀을 유지한다(실측 실패 = 가로) — 썸네일이 모두 도착한 뒤에 잰다.
+      await frame.waitForFunction(() => [...document.querySelectorAll('.yt-play img')].every(img => img.complete), null, { timeout: 10000 });
       const horiz = await frame.evaluate(() => {
         const el = document.querySelector('.yt-play[data-yt-play^="h0"]');
         return { vertical: el.dataset.ytVertical === '1', cls: el.classList.contains('is-vertical') };
@@ -664,7 +671,6 @@ test('1001a 실행: 책 한마디 저장 — 답이 같은 문서에 도착·연
     await page.locator('#discover-ask-no').click().catch(() => {});
     await page.locator('.tree-views [data-view="track59-sketchbook.html"]').click();
     await waitShown(page, { path: 'track59-sketchbook' }, 8000);
-    await page.waitForTimeout(900);
     const frame = page.frames().find(f => /views\/track59-sketchbook/.test(f.url()));
     assert.ok(frame, '책 프레임이 열린다');
     // 문서 표식 + 답 도착 카운터를 지금 문서에 심는다 — 재적재가 있으면 둘 다 사라진다.
@@ -677,22 +683,16 @@ test('1001a 실행: 책 한마디 저장 — 답이 같은 문서에 도착·연
     });
     await frame.waitForSelector('[data-story-open]', { timeout: 10000 });
     counting = true;
-    const actionT = Date.now();
     await frame.locator('[data-story-open]').first().click();
-    await frame.waitForSelector('[data-story-form] input[name="relation"]', { timeout: 10000 });
-    await frame.evaluate(() => {
-      const input = document.querySelector('[data-story-form] input[name="relation"]');
-      input.value = '방금 저장한 한마디';
-      input.dispatchEvent(new Event('input', { bubbles: true }));
-      document.querySelector('[data-story-form]').requestSubmit();
-    });
+    // 칸이 실제로 보일 때까지 기다린 뒤 넣는다(고정 시간 대기 금지).
+    const relation = frame.locator('[data-story-form] input[name="relation"]');
+    await relation.waitFor({ state: 'visible', timeout: 10000 });
+    const putSeen = page.waitForResponse(r => /\/api\/workspace/.test(r.url()) && r.request().method() === 'PUT', { timeout: 12000 });
+    await relation.fill('방금 저장한 한마디');
+    await frame.locator('[data-story-form]').evaluate(el => el.requestSubmit());
     // 답이 화면에 실제로 도착해 연결 요약이 저장된 한마디로 바뀔 때까지 기다린다.
     await frame.waitForFunction(() => (document.querySelector('#whyMargin')?.textContent || '').includes('방금 저장한 한마디'), null, { timeout: 15000 });
-    await page.waitForFunction(() => true, null, { timeout: 100 }).catch(() => {});
-    // 저장 PUT이 실제로 나갔는지 + 저장 확인 방송 창까지 관찰한다.
-    const deadline = Date.now() + 12000;
-    while (Date.now() < deadline && puts.length < 1) await page.waitForTimeout(200);
-    await page.waitForTimeout(2500);
+    await putSeen;
     const state = await frame.evaluate(() => ({
       doc: window.__doc1001 || null,
       replies: window.__reply1001 || 0,
