@@ -162,7 +162,9 @@ test('#942 첫 화면 추가 단추와 숫자 묶음', { skip: REQUIRE ? false :
         for(const b of visibleAdds)check(b.bg===rose&&b.ink==='rgb(255, 255, 255)'&&b.contrast>=4.5,key+' 장미색·대비 '+JSON.stringify(b));
         check(head.visible===(member&&width===1440)&&fab.visible===(member&&width===390)&&!!top?.visible===member,key+' 추가 단추 위치');
         check(JSON.stringify(buttons.map(b=>b.text))===JSON.stringify(member?['순간 목록','둘러보기','서재']:['＋ 첫 순간 추가','둘러보기','어떻게 쓰나요']),key+' 가운데 순서');
-        check(buttons[0]?.bg==='rgb(238, 231, 224)'&&buttons.slice(1).every(b=>b.bg!=='rgb(238, 231, 224)'&&b.border!=='0px'),key+' 크림색·보조 테두리');
+        const light=theme==='night'?'rgb(238, 233, 224)':'rgb(255, 253, 248)';
+        check(member?buttons.every(b=>b.bg===light):buttons[0]?.bg===rose,key+' 자주색 하나·나머지는 밝은 단추(#1084) '+JSON.stringify(buttons.map(b=>b.bg)));
+        check(buttons.slice(member?0:1).every(b=>b.bg===light&&b.border!=='0px'),key+' 밝은 바탕·얇은 테두리 '+JSON.stringify(buttons));
         check(groups.length===3,key+' 묶음 3개');
         check(JSON.stringify(groups.map(g=>g.count))===JSON.stringify(member?['순간 14 · 모아둔 0','공개 트리 17','트리 3']:['',(signedIn?'':'예시 ')+'공개 트리 17 · 순간 123','']),key+' 숫자 귀속');
         for(const g of groups.filter(g=>g.count))check(g.inner>=4&&g.inner<=6&&Math.abs(g.center)<=2&&g.font>=12&&g.overflow<=1,key+' 숫자 간격 '+JSON.stringify(g));
