@@ -472,7 +472,8 @@ addEventListener('message',e=>{
  state.scale=scale;state.tx=tx;state.ty=ty;
  if(selId&&byId[selId]?.kind==='moment'){
   const n=byId[selId];state.selected=n;state.cluster=view==='network'?CLUSTERS[n.cluster]:null;state.mobileCluster=view==='tag'?(TAG_INDEX.get(n.id)??0):n.cluster;applyPathHighlight(n);
- }
+  if(detailOpen)paintDetail(n);
+ }else if(selId){clearSelection();}
  paintLegend();paintTagEmpty();
  paintMapMeta();setupMobileRibbon();paintViewButtons();scheduleDraw();
 });
