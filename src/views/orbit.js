@@ -684,11 +684,11 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
  // 구역은 가드·시험이 같은 함수(safeZoneOf)로 실측한 값이다. 0.25초 들어온 뒤 숨기는 박동은 없다.
  // #1018: 바닥 고정 UI(셸의 링크 줄·새 소식 카드) 자리 — 떠다니는 예시 카드는 그 뒤를 지나가므로 가운데 구역처럼 숨긴다.
  // 셸은 부모 문서(같은 출처)다. 링크 묶음 상자+여유 12px, 새 소식 카드+12px을 잰다(이슈 판정 자리).
- // 넓은 화면(w>780)만 — 390 등 좁은 화면은 기존 동작 그대로(이슈: 390은 바꾸지 않는다). 예시 카드만 해당(내 카드는 그대로).
+ // #1077: 좁은 화면도 같은 규칙 — 390 로그아웃 첫 화면의 예시 카드가 바닥 링크를 가리지 않게 한다.
+ // 예시 카드만 해당(내 카드는 그대로).
  // 0.5초마다 다시 재서 새 소식 카드가 늦게 뜨거나 링크 줄이 바뀌어도 따른다(매 프레임 재측정은 아니다 — #586 캐시).
  let bottomZones=[],bottomZonesAt=0;
  const measureBottomZones=()=>{bottomZones=[];
-  if(app.clientWidth<=780)return;
   try{
    const shell=parent.document,fr=frameElement?.getBoundingClientRect(),ox=fr?.left||0,oy=fr?.top||0;
    const add=el=>{if(!el)return;const cs=parent.getComputedStyle(el);if(cs.display==='none'||cs.visibility==='hidden')return;const r=el.getBoundingClientRect();if(r.width<1||r.height<1)return;
