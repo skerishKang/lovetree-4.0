@@ -161,6 +161,50 @@ test('#601 화면: 카드는 훑기용 — 큰 썸네일·제목 2줄·감정·�
 // ＋/전체 보기 말풍선(13px·fixed), 마음 저장이 lt41-board-sync의 note로 가는지, 이어진 순간 카드 이동,
 // 날짜순/내 배치와 저장 자리(v41-board-order-619·stack-619 모델 시험)까지.
 
+// #1059 표 시험: 유튜브 주소 한 벌을 모든 진입 함수(정본·보드 화면)가 같은 id로 판정한다.
+const YT_CORPUS = [
+  'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+  'https://youtu.be/dQw4w9WgXcQ?t=42',
+  'https://www.youtube.com/shorts/dQw4w9WgXcQ',
+  'https://www.youtube.com/live/dQw4w9WgXcQ',
+  'https://www.youtube.com/embed/dQw4w9WgXcQ',
+  'http://m.youtube.com/watch?v=dQw4w9WgXcQ',
+  'https://music.youtube.com/watch?v=dQw4w9WgXcQ',
+  'https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=PL123',
+  'https://www.youtube.com/playlist?list=PL123',
+  'https://youtube.com.evil.test/watch?v=dQw4w9WgXcQ',
+  'https://user:pass@www.youtube.com/watch?v=dQw4w9WgXcQ',
+  'ftp://youtu.be/dQw4w9WgXcQ',
+  'https://www.youtube.com/shorts/abcdefghijkEXTRA',
+  'https://youtu.be/short',
+  'https://www.youtube.com/watch?v=toolongid123456',
+  'javascript:alert(1)'
+];
+
+test('#1059 화면: 보드 youtubeId 가 정본과 같은 판정이다(주소 표)', { skip: REQUIRE ? false : skip, timeout: 120000 }, async () => {
+  if (skip) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip}`);
+  const tree = starTree(2);
+  const server = await serve({ '/__host-1059.html': hostHTML(tree) });
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const { context, frame, problems } = await openHost(browser, `${base}/__host-1059.html`, { width: 1440, height: 900 });
+    const diffs = await frame.evaluate(async (corpus) => {
+      const { youtubeIdFrom } = await import('/v41/youtube-id.mjs');
+      const out = [];
+      for (const url of corpus) {
+        const a = youtubeId(url);
+        const b = youtubeIdFrom(url, { allowThumbnail: false });
+        if (a !== b) out.push(`${url} :: board=${a} canon=${b}`);
+      }
+      return out;
+    }, YT_CORPUS);
+    assert.deepEqual(diffs, [], `보드 youtubeId 와 정본이 같다 (${diffs.join(' | ')})`);
+    assert.equal(problems.length, 0, `화면 문제 없음 (${problems.join(' | ') || '없음'})`);
+    await context.close();
+  } finally { await browser.close(); server.close(); }
+});
+
 test('#601 화면: 옛 관계 배치 x·y가 남아도 처음은 날짜순 바둑판이다(근본 수리)', { skip: REQUIRE ? false : skip, timeout: 300000 }, async () => {
   if (skip) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip}`);
   const tree = starTree(26, true);
