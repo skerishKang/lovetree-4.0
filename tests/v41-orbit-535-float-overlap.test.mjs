@@ -311,7 +311,7 @@ s('#535 로그인·로그아웃 가운데 단추가 같은 세 자리·같은 �
         shape[`${w}/${member}`] = await frame.evaluate(() => {
           const sr = document.querySelector('main#orbit').shadowRoot;
           const wrap = sr.querySelector('.center .actions');
-          const bs = [...wrap.querySelectorAll('button')].filter((b) => !b.hidden && b.style.display !== 'none');
+          const bs = [...wrap.querySelectorAll('.subtleBtn')].filter((b) => !b.hidden && b.style.display !== 'none');
           const boxes = bs.map((b) => { const r = b.getBoundingClientRect(); return { label: b.textContent, w: Math.round(r.width), h: Math.round(r.height), l: Math.round(r.left), t: Math.round(r.top) }; });
           const gaps = boxes.slice(1).map((b, i) => (b.t !== boxes[i].t ? Math.round(b.t - (boxes[i].t + boxes[i].h)) : Math.round(b.l - (boxes[i].l + boxes[i].w))));
           return { count: Number(wrap.getAttribute('data-count')), labels: boxes.map((b) => b.label), w: boxes.map((b) => b.w), h: boxes.map((b) => b.h), t: boxes.map((b) => b.t), gaps };
