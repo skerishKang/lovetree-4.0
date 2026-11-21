@@ -113,12 +113,15 @@
 </div>
 </div>
 </dialog><input id="file" type="file" accept=".json,application/json" hidden>
-<dialog id="cleanup-panel" data-lt-panel="card" data-lt-return="record-menu" aria-labelledby="cleanup-title"><div class="panel-heading"><div><span class="eyebrow">모아둔 순간 정리</span><h2 id="cleanup-title">순간을 정리해요</h2></div><button data-close="cleanup-panel" aria-label="정리 창 닫기" class="close">×</button></div>
+<dialog id="cleanup-panel" data-lt-panel="card" data-lt-return="record-menu" aria-labelledby="cleanup-title"><div class="panel-heading"><div><span class="eyebrow">모아둔 순간 정리</span><h2 id="cleanup-title">순간을 정리해요</h2></div><button data-close="cleanup-panel" aria-label="닫기" class="close">×</button></div>
+<div class="cleanup-scroll">
 <p id="cleanup-desc" class="panel-note"></p>
 <fieldset id="cleanup-pick"><legend>옮길 순간 고르기</legend><div id="cleanup-moments" class="cleanup-moments"></div><p id="cleanup-count" class="panel-note" role="status"></p></fieldset>
-<fieldset id="cleanup-create-box"><legend>새 트리로 만들기</legend><label>새 트리 이름<input id="cleanup-new-name" maxlength="60" autocomplete="off" placeholder="예: 산책에서 본 것들"></label><div class="button-row"><button type="button" id="cleanup-create" class="primary">새 트리 만들기</button></div></fieldset>
-<fieldset id="cleanup-move-box"><legend>다른 트리로 옮기기</legend><label>대상 트리<select id="cleanup-target"></select></label><div class="button-row"><button type="button" id="cleanup-move">옮기기</button></div></fieldset>
+<fieldset id="cleanup-create-box"><legend>새 트리로 만들기</legend><label>새 트리 이름<input id="cleanup-new-name" maxlength="60" autocomplete="off" placeholder="예: 산책에서 본 것들"></label></fieldset>
+<fieldset id="cleanup-move-box"><legend>다른 트리로 옮기기</legend><label>대상 트리<select id="cleanup-target"></select></label></fieldset>
 <p id="cleanup-error" role="alert"></p>
+</div>
+<div class="panel-foot"><button type="button" id="cleanup-create" class="primary">새 트리 만들기</button><button type="button" id="cleanup-move">옮기기</button></div>
 </dialog>
 <dialog id="tag-panel" data-lt-panel="full" data-lt-return="record-menu" aria-labelledby="tag-panel-title"><div class="panel-heading"><div><span class="eyebrow">꼬리표</span><h2 id="tag-panel-title">꼬리표 정리</h2></div><button data-close="tag-panel" aria-label="꼬리표 정리 닫기" class="close">×</button></div>
 <p id="tag-desc" class="panel-note"></p>
