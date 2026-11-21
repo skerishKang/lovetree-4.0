@@ -1230,14 +1230,37 @@ const themeToggleTop=$('theme-toggle');if(themeToggleTop)themeToggleTop.onclick=
   const motion=$('settings-motion');
   // #465 2: 움직임은 켬/끔 스위치(role=switch) — 켬(기본, aria-checked=true)·끔(멈춤)으로 상태가 보인다.
  if(motion){motion.setAttribute('aria-checked',String(!motionPaused));motion.textContent=motionPaused?'끔':'켬';}
+ paintHomeMomentChoice();
  }
- for(const b of document.querySelectorAll('[data-home-cards]'))b.onclick=()=>{
-  if(!HOME_CARD_MODES.includes(b.dataset.homeCards))return;
-  try{localStorage.setItem('lt41.homeCards',b.dataset.homeCards)}catch{}
-  paintScreenControls();
-  try{$('view').contentWindow.postMessage({type:'lt41-home-cards',mode:b.dataset.homeCards},location.origin)}catch{}
-  notify('첫 화면 카드를 바꿨어요. 첫 화면으로 돌아가면 그대로 보입니다.');
- };
+  const HOME_MOMENT_MODES=[['last','마지막'],['pin','고정'],['day','그날'],['random','무작위']];
+  function readHomeMomentValue(){try{const v=JSON.parse(localStorage.getItem('lt41.homeMoment')||'null');return v&&typeof v==='object'?v:{mode:'last'}}catch{return {mode:'last'}}}
+  function paintHomeMomentChoice(){
+   const box=$('settings-card-pick');if(!box)return;
+   const cur=readHomeMomentValue();box.replaceChildren();
+   const add=(label,mode,treeId)=>{
+    const b=document.createElement('button');b.type='button';b.setAttribute('role','radio');b.textContent=label;
+    b.dataset.homeMoment=mode;if(treeId)b.dataset.homeMomentTree=treeId;
+    b.setAttribute('aria-checked',String(treeId?cur.mode==='tree'&&cur.treeId===treeId:cur.mode===mode&&cur.mode!=='tree'));
+    b.onclick=()=>{
+     const value=treeId?{mode:'tree',treeId}:{mode};
+     try{localStorage.setItem('lt41.homeMoment',JSON.stringify(value))}catch{}
+     if(member?.snapshot().owned){try{member.apply('setPrefs',{homeMoment:value});if(window.LT41)window.LT41.prefs=member.state().prefs}catch{}}
+     paintHomeMomentChoice();
+     try{$('view').contentWindow.postMessage({type:'lt41-home-moment-set',value},location.origin)}catch{}
+     notify('첫 화면 카드를 바꿨어요.');
+    };
+    box.append(b);
+   };
+   for(const [mode,label] of HOME_MOMENT_MODES)add(label,mode);
+   for(const tree of (window.LT41?.trees||[]))add(tree.title||tree.subject||'트리','tree',tree.id);
+  }
+  for(const b of document.querySelectorAll('[data-home-cards]'))b.onclick=()=>{
+   if(!HOME_CARD_MODES.includes(b.dataset.homeCards))return;
+   try{localStorage.setItem('lt41.homeCards',b.dataset.homeCards)}catch{}
+   paintScreenControls();
+   try{$('view').contentWindow.postMessage({type:'lt41-home-cards',mode:b.dataset.homeCards},location.origin)}catch{}
+   notify('첫 화면 카드를 바꿨어요. 첫 화면으로 돌아가면 그대로 보입니다.');
+  };
  for(const b of document.querySelectorAll('[data-write-tab]'))b.onclick=()=>{
   const tab=writeWriteTab(localStorage,b.dataset.writeTab);
   paintScreenControls();
