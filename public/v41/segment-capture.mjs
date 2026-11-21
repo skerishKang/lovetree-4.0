@@ -74,15 +74,16 @@ export function loadYouTubeIframeApi(timeoutMs = 8000) {
  * 재생기와 시작·끝 칸을 잇는다. 반환값이 null이면 화면에 필요한 요소가 없어 연결하지 않은 것이다.
  * 오류·재생 불가면 호출 쪽(panels)이 이 컨트롤을 버리고 단추 묶음을 숨긴다.
  */
-export function createSegmentCapture({ player, form, scope = document } = {}) {
-  const find = (id) => (scope?.querySelector?.(`#${id}`) || document.getElementById(id));
+export function createSegmentCapture({ player = null, form, scope = document } = {}) {
+  // #1097: 재생기 없이도 길이 칩은 칸 값을 채운다 — 재생기는 반복 미리보기에서만 필요하다.
+  const find = (id) => { try { return scope?.querySelector?.(`#${id}`) || document.getElementById?.(id) || null; } catch { return null; } };
   const block = find('segment-capture');
   const startInput = form?.elements?.startSeconds;
   const endInput = form?.elements?.endSeconds;
   const loopInput = find('segment-loop');
   const status = find('segment-status');
   const captureButton = find('segment-capture-start');
-  if (!block || !startInput || !endInput || !loopInput || !player) return null;
+  if (!block || !startInput || !endInput || !loopInput) return null;
 
   const durationButtons = [...block.querySelectorAll('[data-segment-duration]')];
   const listeners = new AbortController();

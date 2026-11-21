@@ -336,8 +336,7 @@ test('970 실행: 쓰기 창 탭 — 입력 유지·방향키 이동·aria-selec
       await page.fill('#quick-url', URL_OK);
       await page.click('#write-tab-detailed');
       await assertTab('detailed', '자세한 추가 누름');
-      // 제목 칸은 '더 적기' 접힘 안에 있다 — 접힘을 펼치고 적는다.
-      await page.click('#more-fields > summary');
+      // #1097: 제목은 접히지 않아 바로 적는다.
       await page.fill('#moment-form [name="title"]', '쓰기 창 제목');
       await page.fill('#moment-form [name="note"]', '쓰기 창 마음');
       await page.click('#write-tab-easy');

@@ -780,15 +780,15 @@ test('1001b 실행: 책 순간 변경(고치기·연결·해제·이전 순간·
     assert.equal(afterEdit.focused, before.focused, '고른 순간의 선택 테두리가 그대로다');
     assert.ok(afterEdit.sideOpen || afterEdit.pageDetail, '열린 상세 판이 그대로다');
     assert.ok(afterEdit.detailText.includes('고친 제목'), '상세 판이 새 제목으로 다시 그려진다');
-    // ② 연결·해제·이전 순간 바꾸기: 각각 재적재 0.
-    await openEditor(m2); await page.evaluate(id => { document.querySelector('#related-target').value = id; }, m4); await page.click('#link-moment'); await waitPut(2); await page.waitForTimeout(1200);
-    await openEditor(m2); await page.evaluate(id => { document.querySelector('#related-target').value = id; }, m4); await page.click('#unlink-moment'); await waitPut(3); await page.waitForTimeout(1200);
-    await openEditor(m4); await page.evaluate(id => { document.querySelector('#parent-target').value = id; }, m3); await page.click('#change-parent'); await waitPut(4); await page.waitForTimeout(1200);
+    // ② 연결·해제·이전 순간 바꾸기(#1097: 저장하기 한 번에 함께 — edit + 연결 1씩): 각각 재적재 0.
+    await openEditor(m2); await page.evaluate(id => { const s = document.querySelector('#related-target'); s.value = id; s.dispatchEvent(new Event('change', {bubbles: true})); document.querySelector('#moment-form').requestSubmit(); }, m4); await waitPut(3); await page.waitForTimeout(1200);
+    await openEditor(m2); await page.evaluate(() => { document.querySelector('.related-chip-cut')?.click(); document.querySelector('#moment-form').requestSubmit(); }); await waitPut(5); await page.waitForTimeout(1200);
+    await openEditor(m4); await page.evaluate(id => { const s = document.querySelector('#parent-target'); s.value = id; s.dispatchEvent(new Event('change', {bubbles: true})); document.querySelector('#moment-form').requestSubmit(); }, m3); await waitPut(7); await page.waitForTimeout(1200);
     const afterLinks = await frame.evaluate(() => ({ doc: window.__doc1001b, msg: window.__msg1001b }));
     assert.equal(afterLinks.doc, 'alive', '연결·해제·이전 순간 뒤에도 같은 문서다');
     assert.ok(afterLinks.msg >= 4, '각 변경의 알림이 도착한다');
     // ③ 삭제: 고른 순간이 사라지면 선택은 이어지는 순간으로 폴백하고 화면은 다시 뜨지 않는다.
-    await openEditor(m2); await page.click('#delete-moment'); await waitPut(5); await page.waitForTimeout(1800);
+    await openEditor(m2); await page.click('#delete-moment'); await waitPut(8); await page.waitForTimeout(1800);
     const afterDelete = await frame.evaluate(() => ({ doc: window.__doc1001b, sel: LTDEMO.get(), count: LTDEMO.moments.length }));
     assert.equal(afterDelete.doc, 'alive', '삭제 뒤에도 같은 문서다');
     assert.equal(afterDelete.count, 3, '순간이 하나 줄어든다');
