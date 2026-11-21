@@ -266,9 +266,10 @@ test('검색을 열기 전에는 개발·운영 주소 문서 모두 X-Robots-Ta
   // 루트(/): 개발 주소는 4.0 문서, 운영 주소는 /v41/ 문서로 바꿔 serve 하고 둘 다 noindex 를 붙인다.
   const devRoot = await prodRoot({ request: new Request(`${DEV}/`), env: assets('<html>4.0</html>'), next: nextStatic });
   assert.equal(devRoot.headers.get('x-robots-tag'), 'noindex');
-  const prodRootResponse = await prodRoot({ request: new Request(`${PROD}/`), env: assets('<html><link href="shell.css"><link href="identity.css"><script src="shell.mjs"></html>'), next: nextStatic });
+  const prodRootResponse = await prodRoot({ request: new Request(`${PROD}/`), env: assets('<html><head><link href="shell.css"><link href="identity.css"><script src="shell.mjs"></head></html>'), next: nextStatic });
   const rootHtml = await prodRootResponse.text();
-  assert.match(rootHtml, /href="\/v41\/shell\.css"/, '운영 주소 루트는 기존처럼 자산 주소를 바꾼다');
+  assert.match(rootHtml, /<base href="\/v41\/">/, '운영 주소 루트는 기준 주소로 모든 상대 자산을 /v41/에 둔다');
+  assert.match(rootHtml, /href="shell\.css"/, '글자 바꾸기 없이 원문 주소가 남는다');
   assert.equal(prodRootResponse.headers.get('x-robots-tag'), 'noindex', '서비스 시작 전에는 운영 주소도 noindex');
   // /v41/: 검색을 열기 전에는 운영·개발 주소 모두 noindex 를 붙인다.
   const prodV41 = await v41Root({ request: new Request(`${PROD}/v41/`), env: assets('<html>app</html>'), next: nextStatic });
