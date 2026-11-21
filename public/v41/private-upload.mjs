@@ -35,7 +35,7 @@ export function mountPrivateUpload({form,assets,getSubject,getState,onChange,onU
   if(problem){status.textContent=problem;return;}
   const generation=version;controller=new AbortController();setBusy(true);status.textContent=onUploaded?'사진을 전송하고 있어요…':'파일을 전송하고 있어요… 완료 후 순간을 저장해 주세요.';
   try{
-   const result=await api.uploadMedia(file,subject,id,controller.signal);
+   const result=await api.uploadMedia(file,subject,id,controller.signal,file.name);
    if(generation!==version||getSubject()!==subject)return;
    if(!result.ok){status.textContent=result.message||(result.code==='cancelled'?'전송을 멈췄어요. 서버에 보관됐을 수 있으니 내가 올린 사진·영상을 확인해 주세요.':result.code==='timeout'?'응답이 늦어요. 같은 파일로 다시 시도하거나 내가 올린 사진·영상을 확인해 주세요.':'파일을 올리지 못했어요. 로그인과 연결을 확인한 뒤 다시 시도해 주세요.');return;}
    if(typeof result.media?.url!=='string'||!result.media.url.startsWith(location.origin+'/api/media/')){status.textContent='파일 보관 응답을 확인하지 못했어요. 내가 올린 사진·영상을 확인해 주세요.';return;}
@@ -60,6 +60,14 @@ export function mountPrivateUpload({form,assets,getSubject,getState,onChange,onU
  });
  stop.onclick=()=>controller?.abort();
  function assetName(url){return window.LTMedia?.privateAssetName(url)||null;}
+ // 표시 이름: 내부 번호 대신 올릴 때 원래 파일 이름, 없으면 종류·날짜.
+ function assetLabel(asset){
+  if(asset?.label)return String(asset.label);
+  const kind=asset?.mime?.startsWith('image/')?'사진':'영상';
+  const date=asset?.createdAt?new Date(asset.createdAt):null;
+  if(date&&!Number.isNaN(date.getTime()))return kind+' · '+(date.getMonth()+1)+'월 '+date.getDate()+'일';
+  return kind;
+ }
  function usingMoments(asset){return (getState()?.trees||[]).flatMap(t=>t.moments).filter(m=>assetName(m.url)===asset.name);}
  // #1097: 목록은 4열 격자(파일 이름 · 쓰는 순간 수)다. 파일을 누르면 아래에 쓰는 순간과 지우기·첨부가 보인다.
  let assetTab='all',lastMedia=null;
@@ -68,7 +76,7 @@ export function mountPrivateUpload({form,assets,getSubject,getState,onChange,onU
   const host=A('[data-assets-detail]');if(!host)return;
   const using=usingMoments(asset),prefs=getState()?.prefs;
   host.replaceChildren();
-  const head=document.createElement('p');head.className='assets-detail-head';head.textContent=asset.name;host.append(head);
+  const head=document.createElement('p');head.className='assets-detail-head';head.textContent=assetLabel(asset);host.append(head);
   if(using.length){
    const list=document.createElement('ul');list.className='assets-detail-list';
    for(const moment of using){const item=document.createElement('li');const when=formatDisplayDate(moment.date,prefs?.dateStyle);item.textContent=moment.title+(when?' · '+when:'');list.append(item);}
@@ -77,23 +85,24 @@ export function mountPrivateUpload({form,assets,getSubject,getState,onChange,onU
   const row=document.createElement('div');row.className='button-row';
   const use=document.createElement('button');use.type='button';use.textContent='이 파일 첨부';use.onclick=()=>{if(busy||getSubject()!==subject)return;const url=location.origin+'/api/media/'+asset.name;assets.close();const accepted=onUseAsset?onUseAsset(url):true;if(accepted===false)return;form.elements.url.value=url;onChange();form.elements.url.focus?.();status.textContent='첨부할 파일을 골랐어요. 순간을 저장해 주세요.';};
   const remove=document.createElement('button');remove.type='button';remove.textContent='파일 삭제';remove.className='danger';
-  remove.onclick=async()=>{if(busy||getSubject()!==subject||!confirm((using.length?using.length+'개 순간에서 사용 중입니다. 삭제하면 해당 사진·영상이 사라집니다. ':'')+'이 파일을 영구 삭제할까요? 순간의 글과 연결은 유지됩니다.'))return;remove.disabled=true;const result=await api.removeMedia(asset.name,subject);if(getSubject()!==subject)return;if(result.ok){if(assetName(form.elements.url.value)===asset.name){form.elements.url.value='';onChange();}host.replaceChildren();await refresh();}else{status.textContent=result.message||'삭제하지 못했어요. 다시 시도해 주세요.';remove.disabled=false;}};
+  remove.onclick=async()=>{if(busy||getSubject()!==subject||!confirm('이 파일을 지우면 이 파일을 쓴 순간에서도 볼 수 없게 돼요. 지울까요?'))return;remove.disabled=true;const result=await api.removeMedia(asset.name,subject);if(getSubject()!==subject)return;if(result.ok){if(assetName(form.elements.url.value)===asset.name){form.elements.url.value='';onChange();}host.replaceChildren();await refresh();}else{status.textContent=result.message||'삭제하지 못했어요. 다시 시도해 주세요.';remove.disabled=false;}};
   row.append(use,remove);host.append(row);
  }
  function renderAssets(data,subject){
   const host=A('[data-assets]');if(!host)return;
-  A('[data-usage]').textContent=(data.usedBytes/1000000).toFixed(1)+' / '+(data.quotaBytes/1000000).toFixed(1)+' MB · '+data.items.length+' / '+data.maxItems+'개';
+  // 용량은 한 단위로 맞춘다(한도가 100MiB면 MiB 기준).
+  A('[data-usage]').textContent=Math.round((data.usedBytes||0)/1048576)+' / '+Math.round((data.quotaBytes||0)/1048576)+' MiB · '+data.items.length+' / '+data.maxItems+'개';
   const fill=A('[data-usage-fill]');if(fill?.style?.setProperty)fill.style.setProperty('--fill',(data.quotaBytes>0?Math.min(100,Math.round(data.usedBytes/data.quotaBytes*100)):0)+'%');
   const items=(data.items||[]).filter(assetFiltered);
   if(!items.length){host.textContent=(data.items||[]).length?'이 보기에서는 파일이 없어요.':'보관한 파일이 없어요.';return;}
   for(const asset of items){
    const references=usingMoments(asset).length;
    const card=document.createElement('div');card.className='asset-card';
-   const open=document.createElement('button');open.type='button';open.className='asset-card-open';open.setAttribute('aria-label',asset.name+' 보기');
+   const open=document.createElement('button');open.type='button';open.className='asset-card-open';open.setAttribute('aria-label',assetLabel(asset)+' 보기');
    const thumb=document.createElement('span');thumb.className='asset-thumb';
    if(asset.mime.startsWith('image/')){const img=document.createElement('img');img.src=location.origin+'/api/media/'+asset.name;img.alt='';img.loading='lazy';thumb.append(img);}
    else{const mark=document.createElement('span');mark.className='asset-thumb-video';mark.textContent='▶';thumb.append(mark);}
-   const name=document.createElement('span');name.className='asset-name';name.textContent=asset.name;
+   const name=document.createElement('span');name.className='asset-name';name.textContent=assetLabel(asset);
    const count=document.createElement('span');count.className='asset-count';count.textContent=references?references+'개 순간에서 사용':'연결된 순간 없음';
    open.append(thumb,name,count);open.onclick=()=>showAssetDetail(asset,subject);
    card.append(open);host.append(card);
@@ -105,7 +114,7 @@ export function mountPrivateUpload({form,assets,getSubject,getState,onChange,onU
   const problem=fileProblem(chosen);if(problem){A('[data-usage]').textContent=problem;return;}
   const generation=version;controller=new AbortController();setBusy(true);A('[data-usage]').textContent='파일을 전송하고 있어요…';
   try{
-   const result=await api.uploadMedia(chosen,subject,crypto.randomUUID(),controller.signal);
+   const result=await api.uploadMedia(chosen,subject,crypto.randomUUID(),controller.signal,chosen.name);
    if(generation!==version||getSubject()!==subject)return;
    if(!result.ok){A('[data-usage]').textContent=result.message||'파일을 올리지 못했어요. 로그인과 연결을 확인한 뒤 다시 시도해 주세요.';return;}
    if(typeof result.media?.url!=='string'||!result.media.url.startsWith(location.origin+'/api/media/')){A('[data-usage]').textContent='파일 보관 응답을 확인하지 못했어요.';return;}

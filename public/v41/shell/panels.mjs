@@ -2,7 +2,7 @@
 // 2026-11-08 리팩터링: 동작·문구·디자인·저장 계약 변경 0.
 // shell.mjs에서 조건·조회 방식·인자 형태를 바꾸지 않고 그대로 옮겼다(원칙 7).
 // 셸은 자기 상태(member·source·window.LT41·업로드)를 읽기 함수로 넘기고, 이 파일은 패널만 만진다.
-import {parentCandidates, suggestMomentTitle, coverModeOf, latestMomentId, validateRange, startFromUrl, fillStartFromUrl, formatTimecode} from '../domain.mjs';
+import {parentCandidates, coverModeOf, latestMomentId, validateRange, startFromUrl, fillStartFromUrl, formatTimecode} from '../domain.mjs';
 // #876: 같은 영상 판정(quick-intake 한 벌)과 안내 창 날짜 표기(book-usability 한 벌) — 새 규칙을 만들지 않는다.
 import {findSameVideoInTree, treesWithSameVideo} from '../quick-intake.mjs';
 import {formatDisplayDate} from '../book-usability.mjs';
@@ -176,7 +176,30 @@ export function createPanels(deps) {
     intendedLinks = new Set(); baselineLinks = []; baselineParentId = '';
     $('editor-context').textContent = '';
     $('form-error').textContent = '';
-    updateMediaPreview(); updateQuickEntryHint();
+    updateMediaPreview();
+  }
+  // #1097: 감정은 누르는 칩(하나만 고르기, role=radio) — 값은 히든 칸 emotion에 두고 칩이 눌림 상태만 비춘다.
+  function emotionChips() { try { return [...$('emotion-chips').querySelectorAll('[data-emotion]')]; } catch { return []; } }
+  function syncEmotionChips() {
+    const current = $('moment-form').elements.emotion?.value || '';
+    let tabbable = false;
+    for (const chip of emotionChips()) {
+      const checked = chip.dataset?.emotion === current;
+      try { chip.setAttribute('aria-checked', checked ? 'true' : 'false'); } catch {}
+      if (checked) tabbable = true;
+    }
+    // 고른 칩 하나만 탭 정지점에 둔다(고른 게 없으면 첫 칩).
+    let first = true;
+    for (const chip of emotionChips()) {
+      const checked = chip.dataset?.emotion === current;
+      try { chip.tabIndex = checked || (!tabbable && first) ? 0 : -1; } catch {}
+      first = false;
+    }
+  }
+  function pickEmotionChip(value) {
+    const input = $('moment-form').elements.emotion;
+    if (input) input.value = value;
+    syncEmotionChips();
   }
   function onWriteTab(tab) {
     if (tab !== 'detailed' || formBaseline) return;
@@ -242,6 +265,7 @@ export function createPanels(deps) {
     $('delete-moment').hidden = mode !== 'edit';
     setMediaChangeOpen(false);
     for (const name of ['title', 'note', 'emotion', 'date', 'url', 'relation']) form.elements[name].value = mode === 'edit' ? m[name] || '' : name === 'emotion' ? '설렘' : name === 'date' ? localDateOnly() : ''; // #547: 기기의 오늘
+    syncEmotionChips();
     // #792: 시작·끝 구간 칸 — 고치기는 저장된 초를 시간 표기로 되돌려 채우고, 추가는 빈 칸(주소의 t=는 미리보기에서 채운다).
     if (form.elements.startSeconds) form.elements.startSeconds.value = mode === 'edit' && m.startSeconds !== undefined && m.startSeconds !== null ? formatTimecode(m.startSeconds) : '';
     if (form.elements.endSeconds) form.elements.endSeconds.value = mode === 'edit' && m.endSeconds !== undefined && m.endSeconds !== null ? formatTimecode(m.endSeconds) : '';
@@ -275,7 +299,7 @@ export function createPanels(deps) {
     fillRelatedOptions();
     updateParentPreview();
     renderContinueSummary();
-    updateMediaPreview(); updateQuickEntryHint();
+    updateMediaPreview();
     formBaseline = new URLSearchParams(new FormData(form)).toString();
     parentBaseline = parentValue();
   }
@@ -503,7 +527,7 @@ export function createPanels(deps) {
     editorVideoUrl = info.kind === 'youtube' && info.videoId ? url : '';
     if (editorVideoUrl) {
       const videoId = info.videoId;
-      void fetchVideoTitle(videoId).then(title => { if (title && editorVideoUrl === url) { editorVideoTitle = title; videoTitleCache.set(videoId, title); updateQuickEntryHint(); } });
+      void fetchVideoTitle(videoId).then(title => { if (title && editorVideoUrl === url) { editorVideoTitle = title; videoTitleCache.set(videoId, title); } });
     }
   }
   function editorMediaTitle() {
@@ -512,13 +536,6 @@ export function createPanels(deps) {
     if (url !== editorVideoUrl) return {};
     return editorVideoTitle ? { mediaMetadata: { title: editorVideoTitle } } : {};
   }
-  function updateQuickEntryHint() {
-    const form = $('moment-form'), title = form.elements.title.value.trim(), note = form.elements.note.value.trim(), url = form.elements.url.value.trim();
-    let suggested = '';
-    try { suggested = suggestMomentTitle({title, note, url, mediaMetadata: editorVideoTitle && url === editorVideoUrl ? {title: editorVideoTitle} : null}); } catch {}
-    $('quick-entry-hint').textContent = title ? '입력한 제목으로 저장합니다.' : suggested ? `제목은 “${suggested}”(으)로 자동 정리됩니다.` : '제목·마음·링크나 첨부 중 하나만 남겨도 저장할 수 있어요.';
-  }
-
   // 계정 메뉴·편집기 버튼은 셸이 열고, 이 파일은 폼 상태만 본다.
   // #481 L15: #manage-tree는 index.html에 없는 죽은 가드였다 — 열기 버튼은 셸이 직접 openTreeManager를 부른다.
   $('tree-cover').onchange = updateTreeCoverHint;
@@ -601,7 +618,32 @@ export function createPanels(deps) {
   // × 버튼(data-close)은 shell.mjs의 기존 규칙(바쁠 때·바뀐 값이 있으면 확인)을 그대로 쓴다.
   // '순간 추가'는 이제 shell/quick-add.mjs가 고르기 창을 연다(#빠른 추가 ②). 이 파일은 편집기만 맡는다.
 
-  for (const name of ['title', 'note', 'url']) $('moment-form').elements[name].addEventListener('input', () => { if (name === 'url' || name === 'title') updateMediaPreview(); updateQuickEntryHint(); });
+  for (const name of ['title', 'note', 'url']) $('moment-form').elements[name].addEventListener('input', () => { if (name === 'url' || name === 'title') updateMediaPreview(); });
+  // 감정 칩: 누르기 + 화살표 키로 고르기(선택이 곧 초점이 된다, 표준 라디오 묶음 동작).
+  try {
+    const chipHost = $('emotion-chips');
+    chipHost.addEventListener('click', (event) => {
+      const chip = event.target?.closest?.('[data-emotion]');
+      if (chip?.dataset?.emotion && chip.dataset.emotion !== $('moment-form').elements.emotion.value) pickEmotionChip(chip.dataset.emotion);
+      else if (chip?.dataset?.emotion) syncEmotionChips();
+    });
+    chipHost.addEventListener('keydown', (event) => {
+      const keys = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'];
+      if (!keys.includes(event.key)) return;
+      const chips = emotionChips();
+      if (!chips.length) return;
+      const currentIndex = chips.findIndex(chip => chip.dataset?.emotion === $('moment-form').elements.emotion.value);
+      let next;
+      if (event.key === 'Home') next = 0;
+      else if (event.key === 'End') next = chips.length - 1;
+      else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') next = (currentIndex <= 0 ? chips.length - 1 : currentIndex - 1);
+      else next = (currentIndex >= chips.length - 1 || currentIndex < 0 ? 0 : currentIndex + 1);
+      event.preventDefault();
+      pickEmotionChip(chips[next].dataset.emotion);
+      try { chips[next].focus(); } catch {}
+    });
+  } catch {}
+  syncEmotionChips();
   // #627: 사용자가 무대 날짜를 직접 고치면 자동 채움 안내를 감춘다.
   $('moment-form').elements.date.addEventListener('input', () => { $('stage-date-hint').hidden = true; });
   // #876(규칙 1·4): 자세한 추가도 쉬운 추가와 같은 규칙 — 같은 트리에 같은 영상·같은 장면이 이미 있으면
@@ -751,7 +793,6 @@ export function createPanels(deps) {
   // 업로드 모듈이 파일을 바꾼 뒤 미리보기·자동 제목 안내를 다시 그린다.
   function uploadsChanged() {
     updateMediaPreview();
-    updateQuickEntryHint();
   }
 
   function focusTitleInput() {
@@ -770,7 +811,6 @@ export function createPanels(deps) {
     openTreeManager,
     updateTreeCoverHint,
     updateMediaPreview,
-    updateQuickEntryHint,
     uploadsChanged,
     formDirty,
     detailedDirty,

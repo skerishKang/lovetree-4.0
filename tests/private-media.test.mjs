@@ -13,6 +13,19 @@ import {createWorkspaceApi} from '../public/v41/api.mjs';
 const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jOasAAAAASUVORK5CYII=','base64');
 const A={productId:'lovetree-4-0',subjectId:'upload-test-A'},B={...A,subjectId:'upload-test-B'};
 async function setup(t,options={}){const directory=await mkdtemp(join(tmpdir(),'lt-media-'));t.after(()=>rm(directory,{recursive:true,force:true}));return {directory,store:createPrivateMediaStore({directory,...options})};}
+test('original file name is stored for display and unsafe values are cleaned',async t=>{
+ const {store}=await setup(t),named=await store.put(A,{id:randomUUID(),mime:'image/png',bytes:png,label:encodeURIComponent('내 무대 사진.png')});
+ assert.equal(named.label,'내 무대 사진.png');
+ const plain=await store.put(A,{id:randomUUID(),mime:'image/png',bytes:png});
+ const rows=(await store.list(A)).items;
+ assert.equal(rows.find(item=>item.id===plain.id).label,null);
+ assert.equal(rows.find(item=>item.id===named.id).label,'내 무대 사진.png');
+ const cross=await store.put(A,{id:randomUUID(),mime:'image/png',bytes:png,label:encodeURIComponent('..\\server\\secret.txt')});
+ assert.equal(cross.label,'secret.txt');
+ const tooLong=await store.put(A,{id:randomUUID(),mime:'image/png',bytes:png,label:'x'.repeat(200)});
+ assert.equal(tooLong.label?.length,100);
+ await assert.rejects(store.put(A,{id:'../outside',mime:'image/png',bytes:png,label:'x' }),{status:400});
+});
 test('private media round trip, account/product isolation, restart and deletion',async t=>{
  const {directory,store}=await setup(t),id=randomUUID(),asset=await store.put(A,{id,mime:'image/png',bytes:png});
  assert.deepEqual((await store.get(A,asset.name)).bytes,png);

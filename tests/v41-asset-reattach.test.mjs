@@ -13,8 +13,16 @@ const form = html.slice(formStart, html.indexOf('</form>', formStart));
 
 // 2026-11-08 보관 파일 다시 첨부: 편집기 안 선택 버튼, reset 뒤 URL 유지, Esc 시 입력 보존.
 
-// #1097: 소스를 정규식으로 보던 검사는 새 화면 구조(영상 바꾸기 펼침)로 바뀌어 지운다.
-//  선택 버튼이 같은 목록을 여는 동작은 아래 흐름 시험이 직접 보인다.
+test('편집기 링크 묶음에 보관 파일 선택 버튼이 있고 계정 메뉴와 같은 목록을 연다', () => {
+  assert.match(form, /id="editor-assets-open"[^>]*aria-haspopup="dialog"[^>]*>내가 올린 사진·영상에서 고르기</);
+  // #1097: 선택 버튼은 '영상 바꾸기' 펼침(media-change-box) 안에 있다(링크 입력 뒤, 파일 슬롯도 같은 펼침).
+  const url = form.indexOf('name="url"');
+  const changeBox = form.indexOf('id="media-change-box"');
+  const slot = form.indexOf('data-media-slot');
+  const picker = form.indexOf('id="editor-assets-open"');
+  assert.ok(changeBox >= 0 && url > changeBox && slot > url && picker > slot, '영상 바꾸기 펼침 안에서 링크·슬롯 뒤에 있다');
+  // #425: 편집기는 한 창(write-panel)의 자세한 추가 구역이다.
+});
 
 test('보관 파일을 고르면 편집기를 먼저 연 뒤 URL을 채우고, 이미 열린 편집기 입력은 보존한다', async () => {
   const oldDocument = globalThis.document, oldFetch = globalThis.fetch, oldWindow = globalThis.window, oldLocation = globalThis.location;
