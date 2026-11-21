@@ -1,8 +1,4 @@
 /* === V1.2 FOCUSED REVISION: ACTUAL YOUTUBE MEDIA + MOBILE HARDENING === */
-/* #1105: 글꼴·배치가 늦게 붙어도 도구 줄과 머리글 단추가 밀리지 않게 폭을 미리 잡는다. */
-html[data-v41-screen=board] .tree-title-btn{width:140px;justify-content:flex-start}
-html[data-v41-screen=board] .cinemaBtn{width:134px}
-html[data-v41-screen=board] .card .cardBody{height:80px;overflow:hidden}
 /* #619-6: 끼워 넣기 자리 표시 — 들어갈 카드의 앞(왼쪽) 또는 뒤(오른쪽)에 테두리를 두른다. */
 .card.insert-target{box-shadow:0 0 0 3px var(--lt-accent, #d9a05b);outline:none}
 .card.insert-target::after{content:"";position:absolute;top:-4px;bottom:-4px;left:-9px;width:4px;border-radius:2px;background:var(--lt-accent, #d9a05b)}
