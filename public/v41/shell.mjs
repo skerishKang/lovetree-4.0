@@ -1186,12 +1186,12 @@ else if(shouldLoadMemberRecords(location.search,document.cookie,location.hash)||
 }
 
 function backup(){const data=member?.state();if(!data){notify('백업할 내 기록이 없어요.');return;}const a=document.createElement('a'),url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));a.href=url;a.download='lovetree-draft.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),0);}
-function openAssets(opener=document.activeElement){if(!member?.snapshot().owned){notify('로그인한 뒤 내 보관 파일을 확인할 수 있어요.');return;}shellDialogs.rememberOpener(opener);panel('account-assets');uploads.openAssets();}
+function openAssets(opener=document.activeElement){if(!member?.snapshot().owned){notify('로그인한 뒤 내가 올린 사진·영상을 확인할 수 있어요.');return;}shellDialogs.rememberOpener(opener);panel('account-assets');uploads.openAssets();}
 function usePrivateAsset(){
  if(source!=='server'||!member?.snapshot().owned){openLoginStart('new-tree');return false;}
  if(!member.snapshot().writable){notify('서버 편집 연결이 아직 준비되지 않았어요. 기록은 안전하게 읽을 수 있습니다.');openAccountData();return false;}
  if(!window.LT41){openEditor();notify('새 트리를 만든 뒤 순간에 파일을 첨부할 수 있어요.');return false;}
- if(!window.LT41.momentId){notify('순간을 먼저 연 뒤 내 보관 파일을 첨부할 수 있어요.');return false;}
+ if(!window.LT41.momentId){notify('순간을 먼저 연 뒤 내가 올린 사진·영상을 첨부할 수 있어요.');return false;}
  if(!$('write-panel').open)openEditor('add');
  return $('write-panel').open;
 }
