@@ -478,10 +478,10 @@ testOrSkip('#1098 1단계: 판 아래에 최근 댓글 3개·댓글 모두 보�
     assert.equal(state.articles, 3, `판 아래에는 최근 댓글 3개만: ${state.articles}`);
     assert.equal(state.firstBody, '1번째 댓글', '최신 댓글부터');
     assert.equal(state.hasMore, true, '댓글 모두 보기 단추가 있다');
-    assert.match(state.metaText, /반응 7/, '겉에 반응 수(7종 합계)가 보인다');
+    assert.doesNotMatch(state.metaText, /반응/, '한 줄 정보에는 반응 수를 두지 않는다(반응 수는 ♡ 단추 한 곳)');
     assert.match(state.metaText, /댓글 5/, '겉에 댓글 수가 보인다');
     assert.equal(state.heading, '댓글 5', '댓글 줄 머리글에도 수가 있다');
-    assert.equal(state.heartCount, '5', '♡ 단추에도 공감 수가 보인다');
+    assert.equal(state.heartCount, '7', '♡ 단추에 반응 전체 수가 보인다(공감 5+좋아요 1+사랑 1)');
     assert.equal(state.menuLabel, '신고, 차단 메뉴', '⋯ 메뉴는 신고·차단만');
     assert.equal(state.menuHasReport, true, '⋯ 안에 신고가 남는다');
     assert.equal(state.menuHasComment, false, '⋯ 안에는 댓글이 없다');
@@ -535,12 +535,14 @@ testOrSkip('#1098 1단계: ♡는 크게 하나 — 빠르게 누르면 공감 �
         pressed: heart?.getAttribute('aria-pressed') || '',
         label: heart?.getAttribute('aria-label') || '',
         height: heart ? Math.round(heart.getBoundingClientRect().height) : 0,
+        favHeight: (() => { const fav = document.querySelector('#community-preview [data-community-action="favorite"]'); return fav ? Math.round(fav.getBoundingClientRect().height) : 0; })(),
       };
     });
     assert.equal(before.chips, 1, '기본에는 ♡ 하나만 선다');
     assert.equal(before.pressed, 'false');
-    assert.equal(before.label, '공감 5', '♡ 단추 이름에 공감 수가 들어간다');
+    assert.equal(before.label, '공감 · 반응 7', '♡ 단추 이름에 반응 전체 수가 들어간다');
     assert.ok(before.height >= 44, `누르는 자리 44px 이상: ${before.height}`);
+    assert.ok(before.height > before.favHeight, `♡가 즐겨찾기보다 크다: ♡ ${before.height} > 즐겨찾기 ${before.favHeight}`);
     // 빠르게 누르면 공감(heart) 토글 한 번.
     await page.locator('#community-preview [data-reaction-kind="heart"]').click();
     await page.waitForFunction(() => document.querySelector('#community-preview [data-reaction-kind="heart"]')?.getAttribute('aria-pressed') === 'true', null, { timeout: 3000 });

@@ -55,10 +55,10 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
  // '이번 주 담은 사람 수'(결정 1)도 같은 규칙 — 3 이상일 때만 카드·미리보기에 한 줄로 따라온다.
  const smallCountLabel=(label,count)=>Number(count)>=3?`${label} ${count}`:label;
  const weeklyNote=item=>{const n=Number(item.stats?.weeklyFavorites||0);return n>=3?`이번 주 ${n}명`:'';};
- // #1098 1단계: 반응 수(7종 합계)·댓글 수를 판 겉에 보이게 — 3 미만 숫자는 #824 결정 7 규칙을 그대로 따른다.
+ // #1098 1단계 후속(대표 지정 2026-11-22): 반응 수는 ♡ 단추 한 곳에만 보이게 — 한 줄 정보에는 댓글 수만 남긴다.
  // 반응 통계가 없는 응답(예전 모양)에서는 예전과 같이 심장(공감) 수로 센다.
  const reactionTotal=item=>{const counts=item.stats?.reactions;if(counts)return Object.values(counts).reduce((sum,value)=>sum+Number(value||0),0);return Number(item.stats?.hearts||0);};
- const previewMetaText=item=>`${item.cover?.emotion||item.emotions?.[0]||'공개'} · ${when(item.createdAt)} · ${smallCountLabel('반응',reactionTotal(item))} · ${smallCountLabel('댓글',item.stats?.comments||0)}${weeklyNote(item)?` · ${weeklyNote(item)}`:''}`;
+ const previewMetaText=item=>`${item.cover?.emotion||item.emotions?.[0]||'공개'} · ${when(item.createdAt)} · ${smallCountLabel('댓글',item.stats?.comments||0)}${weeklyNote(item)?` · ${weeklyNote(item)}`:''}`;
  // #903: 담기·공감이 서버에 막히면(가입 7일 미만 등) 서버 문구를 단추 바로 다음 줄 안내 칸에도 내린다 —
  // 누른 자리에서 바로 이유를 보게 한다. 칸은 미리보기를 그릴 때 actions 다음에 미리 두고(hidden),
  // 막혔을 때만 보여 준다. 담기에 성공하면 render()가 미리보기를 다시 그려 안내가 지워진다.
@@ -94,7 +94,7 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
  const SVG_NS='http://www.w3.org/2000/svg';
  function heartIcon(filled){
   const svg=document.createElementNS(SVG_NS,'svg');
-  for(const [key,value] of Object.entries({viewBox:'0 0 24 24',width:'22',height:'22','aria-hidden':'true',focusable:'false'}))svg.setAttribute(key,value);
+  for(const [key,value] of Object.entries({viewBox:'0 0 24 24',width:'26',height:'26','aria-hidden':'true',focusable:'false'}))svg.setAttribute(key,value);
   const path=document.createElementNS(SVG_NS,'path');
   path.setAttribute('d','M12 20.2 5 13.2a4.6 4.6 0 1 1 6.5-6.5l.5.5.5-.5a4.6 4.6 0 1 1 6.5 6.5L12 20.2Z');
   path.setAttribute('fill',filled?'currentColor':'none');path.setAttribute('stroke','currentColor');path.setAttribute('stroke-width','1.7');path.setAttribute('stroke-linejoin','round');
@@ -120,13 +120,13 @@ export function mountCommunity({button,dialog,onOpenShare,onStartRecord,onShareO
    }
    return out;
   };
-  const heartCount=Number(counts.heart||0),heartActive=active('heart');
+  const reactionCount=reactionTotal(item),heartActive=active('heart');
   const main=el('button','community-mini community-reaction community-heart-main');
   main.type='button';main.dataset.communityAction='reaction';main.dataset.reactionKind='heart';
   main.setAttribute('aria-pressed',String(heartActive));
-  main.setAttribute('aria-label',heartCount>=3?`${labels.heart} ${heartCount}`:labels.heart);
+  main.setAttribute('aria-label',reactionCount>=3?`${labels.heart} · 반응 ${reactionCount}`:labels.heart);
   main.append(heartIcon(heartActive));
-  if(heartCount>=3)main.append(el('span','community-heart-count',String(heartCount)));
+  if(reactionCount>=3)main.append(el('span','community-heart-count',String(reactionCount)));
   let pressTimer=null,revealed=false;
   const reveal=()=>{if(pressTimer){clearTimeout(pressTimer);pressTimer=null;}if(revealed)return;revealed=true;host.replaceChildren(...chips());};
   const cancelPress=()=>{if(pressTimer){clearTimeout(pressTimer);pressTimer=null;}};

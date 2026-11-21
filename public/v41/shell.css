@@ -900,6 +900,9 @@ html[data-lt-theme=garden] #share-form select,html[data-lt-theme=garden] #share-
 #community-preview .community-preview-choices{display:flex;gap:8px}
 #community-preview .community-preview-choices .community-preview-open,#community-preview .community-preview-choices .community-preview-start{width:auto;min-width:0;flex:1 1 0;padding:8px;font-size:13px;white-space:nowrap}
 #community-preview .community-reaction-group{display:flex;flex-wrap:wrap;gap:8px}
+/* #1098 1단계 후속(대표 지정 2026-11-22): ♡는 이 줄의 주 단추 — 즐겨찾기보다 크게(390에서도). 색·모서리는 기존 토큰 규칙을 그대로 쓴다. */
+#community-preview .community-preview-actions{align-items:center}
+#community-preview .community-heart-main{min-height:52px;padding:10px 20px;font-size:16px;font-weight:700;gap:6px}
 #community-preview .community-more-menu{position:relative;justify-self:start}
 #community-preview .community-more-button{display:grid;place-items:center;width:44px;height:44px;border:1px solid var(--lt-line-paper);border-radius:var(--lt-r-pill);background:var(--lt-paper);color:var(--lt-ink);font-size:22px;list-style:none;cursor:pointer}
 #community-preview .community-more-button::-webkit-details-marker{display:none}
