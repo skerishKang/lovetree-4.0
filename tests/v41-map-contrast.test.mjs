@@ -93,7 +93,11 @@ test('지도 실제 대비: 앱 2 × 판 2 × 1440·390, 두 보기·선택 상�
               const threshold = ['label', 'hub-number'].includes(row.role) ? 4.5 : 3;
               if (row.ratio < threshold) failures.push(`${tag} canvas ${row.role}(${row.id}) ${row.fg}/${row.bg} ${row.ratio}:1 < ${threshold}${row.why ? ' ' + JSON.stringify(row.why) : ''}`);
             }
-            for (const row of measured.dom) if (row.ratio < 4.5) failures.push(`${tag} DOM ${row.role}(${row.id}) ${row.fg}/${row.bg} ${row.ratio}:1 < 4.5`);
+            for (const row of measured.dom) {
+              assert.deepEqual(row.unparsed || [], [], `${tag} DOM ${row.role}(${row.id}) 배경 이미지 해석 실패: ${(row.unparsed || []).join(' | ')}`);
+              assert.deepEqual(row.unmeasurable || [], [], `${tag} DOM ${row.role}(${row.id}) 대비 측정 불가: ${(row.unmeasurable || []).join(' | ')}`);
+              if (row.ratio < 4.5) failures.push(`${tag} DOM ${row.role}(${row.id}) ${row.fg}/${row.bg} ${row.ratio}:1 < 4.5`);
+            }
             evidence.push({ tag, canvas: measured.canvas, dom: measured.dom });
             if (OUT) await writeFile(path.join(OUT, `${tag}.png`), measured.screenshot);
             if (state === 'focus') { await frame.locator('#detailClose').click(); await frame.locator('#overviewBtn').click(); await settleMap(frame); }

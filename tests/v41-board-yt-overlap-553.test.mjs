@@ -185,6 +185,11 @@ test('#553 화면: 썸네일이 실린 모아둔 순간 26 — 인접 겹침 0�
   try {
     for (const [w, h] of [[1440, 900], [390, 844]]) {
       const { context, frame } = await openHost(browser, `${base}/__host-star.html`, { width: w, height: h });
+      // 새 Chromium에서는 그림이 늦게 실려 카드가 먼저 그려진다. 전제(썸네일 25장)가 실제로 채워질 때까지 기다린 뒤 잰다(기준 그대로).
+      await frame.waitForFunction(() => {
+        const imgs = [...document.querySelectorAll('#cardLayer img')];
+        return imgs.length >= 25 && imgs.every(i => i.complete && i.naturalWidth > 0);
+      }, null, { timeout: 20000 });
       const g = await geometry(frame);
       assert.equal(g.pairs, 0, `${w}: 겹친 카드 쌍 0 (전: 22쌍)`);
       assert.equal(g.area, 0, `${w}: 겹친 면적 0px² (전: 390 153,337px²·1440 98,136px²)`);
