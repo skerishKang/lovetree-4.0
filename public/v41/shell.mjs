@@ -75,8 +75,7 @@ const shellNotice=createNotifier({$,beforeShow:placeToast,afterShow:()=>{placeTo
 // #1103: 세 안내가 같은 줄을 차례로 지나간다. 판·띠가 떠 있는 동안 토스트는 띄우지 않는다.
 const noticeQueue=createNoticeQueue();
 function hideToast(){const toast=$('toast');if(toast)toast.hidden=true;}
-function noticeBlocked(){const tips=$('tree-tips'),card=$('updates-card');return !!(tips&&!tips.hidden)||!!(card&&!card.hidden);}
-function notify(text,options){if(noticeBlocked())return false;return shellNotice.notify(text,options);}
+function notify(text,options){return shellNotice.notify(text,options);}
 // 새 소식 띠도 같은 줄을 탄다 — 먼저 뜬 안내가 내려간 뒤에 올라온다.
 const updatesCardBox=$('updates-card');
 if(updatesCardBox)new MutationObserver(()=>{
