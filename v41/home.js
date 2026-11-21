@@ -183,47 +183,53 @@ const setHomeMoment=next=>{
  orbit?.recent?.set(picked.moment,picked.header);
  closeRecentMenu();
 };
-let recentMenu=null,recentMenuOpener=null;
-function closeRecentMenu(){recentMenu?.remove();recentMenu=null;if(recentMenuOpener){recentMenuOpener.setAttribute('aria-expanded','false');recentMenuOpener=null;}}
-function openRecentMenu(button){
- closeRecentMenu();
- recentMenuOpener=button;button.setAttribute('aria-expanded','true');
- recentMenu=document.createElement('div');recentMenu.className='recent-menu';recentMenu.setAttribute('role','menu');recentMenu.setAttribute('aria-label','첫 화면 카드 고르기');
- for(const item of homeMomentMenu(homeMomentValue,{trees:momentList?.trees||[]})){
-  const head=document.createElement('button');head.type='button';head.setAttribute('role','menuitemradio');
-  head.setAttribute('aria-checked',String(homeMomentValue.mode===item.mode));head.textContent=item.label;
-  if(item.mode!=='tree')head.dataset.mode=item.mode;
-  if(item.disabled)head.disabled=true;
-  head.onclick=()=>{closeRecentMenu();if(item.disabled||item.mode==='tree')return;setHomeMoment({mode:item.mode,momentId:item.mode==='pin'?homeMomentValue.momentId:'',treeId:item.mode==='pin'?homeMomentValue.treeId:''});};
-  recentMenu.append(head);
-  if(item.mode==='tree'){for(const tree of item.trees){
-   const tb=document.createElement('button');tb.type='button';tb.className='recent-menu-sub';tb.setAttribute('role','menuitemradio');
-   tb.setAttribute('aria-checked',String(homeMomentValue.mode==='tree'&&homeMomentValue.treeId===tree.id));tb.textContent=tree.label;
-   tb.onclick=()=>{closeRecentMenu();setHomeMoment({mode:'tree',treeId:tree.id});};
-   recentMenu.append(tb);
-  }}
+ let recentMenu=null,recentMenuOpener=null;
+ function closeRecentMenu(){
+  const menu=recentMenu,opener=recentMenuOpener;
+  recentMenu=null;recentMenuOpener=null;
+  if(menu){try{if(menu.open)menu.close();}catch{} menu.remove();}
+  if(opener)opener.setAttribute('aria-expanded','false');
  }
- shadow.append(recentMenu);
- // 카드 위 작은 목록 — 261117 대표 검수: 머리글 바로 위(카드 위쪽 가장자리에 붙여)로 열고,
- // 화면 위로 넘치면 아래로 연다. 좌우는 화면 안으로만 잡는다.
- const card=shadow.querySelector('.recent-card'),rect=card?.getBoundingClientRect(),menu=recentMenu.getBoundingClientRect();
- if(rect&&menu){
-  const width=Math.ceil(menu.width),height=Math.ceil(menu.height);
-  let left=Math.round(rect.left+rect.width/2-width/2),top=Math.round(rect.top-height);
-  if(top<8)top=Math.round(rect.bottom+6);
-  if(top+height>document.documentElement.clientHeight-8)top=Math.max(8,Math.round(document.documentElement.clientHeight-height-8));
-  if(top<8)top=8;
-  left=Math.max(8,Math.min(left,document.documentElement.clientWidth-width-8));
-  recentMenu.style.left=`${left}px`;recentMenu.style.top=`${top}px`;
+ function openRecentMenu(button){
+  closeRecentMenu();
+  recentMenuOpener=button;button.setAttribute('aria-expanded','true');
+  recentMenu=document.createElement('dialog');recentMenu.className='recent-menu';recentMenu.setAttribute('aria-label','첫 화면 카드 고르기');
+  const list=document.createElement('div');list.className='recent-menu-list';list.setAttribute('role','menu');
+  for(const item of homeMomentMenu(homeMomentValue,{trees:momentList?.trees||[]})){
+   const head=document.createElement('button');head.type='button';head.setAttribute('role','menuitemradio');
+   head.setAttribute('aria-checked',String(homeMomentValue.mode===item.mode));head.textContent=item.label;
+   if(item.mode!=='tree')head.dataset.mode=item.mode;
+   if(item.disabled)head.disabled=true;
+   head.onclick=()=>{closeRecentMenu();if(item.disabled||item.mode==='tree')return;setHomeMoment({mode:item.mode,momentId:item.mode==='pin'?homeMomentValue.momentId:'',treeId:item.mode==='pin'?homeMomentValue.treeId:''});};
+   list.append(head);
+   if(item.mode==='tree'){for(const tree of item.trees){
+    const tb=document.createElement('button');tb.type='button';tb.className='recent-menu-sub';tb.setAttribute('role','menuitemradio');
+    tb.setAttribute('aria-checked',String(homeMomentValue.mode==='tree'&&homeMomentValue.treeId===tree.id));tb.textContent=tree.label;
+    tb.onclick=()=>{closeRecentMenu();setHomeMoment({mode:'tree',treeId:tree.id});};
+    list.append(tb);
+   }}
+  }
+  recentMenu.append(list);
+  recentMenu.addEventListener('click',event=>{if(event.target===recentMenu)closeRecentMenu();});
+  recentMenu.addEventListener('cancel',event=>{event.preventDefault();const opener=recentMenuOpener;closeRecentMenu();opener?.focus();});
+  shadow.append(recentMenu);
+  recentMenu.showModal();
+  const card=shadow.querySelector('.recent-card'),rect=card?.getBoundingClientRect(),menu=recentMenu.getBoundingClientRect();
+  if(rect&&menu){
+   const width=Math.ceil(menu.width),height=Math.ceil(menu.height);
+   let left=Math.round(rect.left+rect.width/2-width/2),top=Math.round(rect.top-height-6);
+   if(top<8)top=Math.round(rect.bottom+6);
+   if(top+height>document.documentElement.clientHeight-8)top=Math.max(8,Math.round(document.documentElement.clientHeight-height-8));
+   if(top<8)top=8;
+   left=Math.max(8,Math.min(left,document.documentElement.clientWidth-width-8));
+   recentMenu.style.left=`${left}px`;recentMenu.style.top=`${top}px`;
+  }
+  recentMenu.querySelector('button:not([disabled])')?.focus();
  }
- const first=recentMenu.querySelector('button:not([disabled])');first?.focus();
-}
- shadow.addEventListener('click',event=>{
-  const head=event.target.closest?.('[data-recent-head],[data-recent-change]');
-  if(head){if(recentMenu)closeRecentMenu();else openRecentMenu(head);return;}
- if(recentMenu&&!event.target.closest?.('.recent-menu'))closeRecentMenu();
-});
-shadow.addEventListener('keydown',event=>{if(event.key==='Escape'&&recentMenu){event.stopPropagation();const opener=recentMenuOpener;closeRecentMenu();opener?.focus();}},true);
+  shadow.addEventListener('click',event=>{
+   const head=event.target.closest?.('[data-recent-head],[data-recent-change]');
+   if(head){if(recentMenu)closeRecentMenu();else openRecentMenu(head);return;}
+  });
 // #942·#1087: 숫자는 단추 바로 아래 두 줄로 둔다. 공개 집계는 기존 API를 재사용한다.
 const countLines=new Map();
 for(const button of centerButtons){
@@ -304,7 +310,7 @@ infoStyle.textContent=`.home-add-top{margin-top:12px;font-size:15px}@media(max-w
 .home-count button:focus-visible{outline:2px solid #e8b8c9;outline-offset:2px;border-radius:4px}
 :host([data-lt-theme=garden]) .home-count button{color:var(--lt-gold-ink)}
 @media(max-width:480px){.center .actions:not([data-inline]){flex-direction:column;align-items:center}.center .actions:not([data-inline]) .home-action-group{flex:none;width:100%;max-width:240px}.center .actions[data-inline] .home-action-group{max-width:150px}}
-.recent-menu{position:fixed;z-index:4000;min-width:220px;max-width:min(300px,86vw);max-height:min(60dvh,420px);overflow:auto;padding:6px;border:1px solid var(--lt-line,rgba(255,255,255,.14));border-radius:14px;background:#07070c;box-shadow:0 18px 44px rgba(0,0,0,.5)}.recent-menu button{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;min-height:44px;padding:0 12px;border:0;border-radius:8px;background:none;cursor:pointer;font:inherit;font-size:13px;color:#e6ddef;text-align:left}.recent-menu button[aria-checked="true"]{color:var(--lt-gold,#ffe6a6)}.recent-menu button[disabled]{color:var(--lt-muted,#9b98a6);cursor:default}.recent-menu button:focus-visible{outline:2px solid #e8b8c9;outline-offset:-2px}.recent-menu .recent-menu-sub{padding-left:22px;font-size:12px;color:#cfc6dd}:host([data-lt-theme=garden]) .recent-menu{background:var(--lt-paper,#f7f0e8);border-color:var(--lt-line-paper)}:host([data-lt-theme=garden]) .recent-menu button{color:var(--lt-ink)}:host([data-lt-theme=garden]) .recent-menu button[aria-checked="true"]{color:var(--lt-gold-ink)}:host([data-lt-theme=garden]) .recent-menu button[disabled],:host([data-lt-theme=garden]) .recent-menu .recent-menu-sub{color:var(--lt-muted)}`;
+.recent-menu{position:fixed;z-index:4000;inset:auto;margin:0;min-width:220px;max-width:min(300px,86vw);max-height:calc(100dvh - 16px);overflow:hidden;padding:6px;border:1px solid var(--lt-line,rgba(255,255,255,.14));border-radius:14px;background:#07070c;box-shadow:0 18px 44px rgba(0,0,0,.5)}.recent-menu::backdrop{background:transparent}.recent-menu-list{display:grid;gap:1px;max-height:min(60dvh,420px);overflow-y:auto;overscroll-behavior:contain}.recent-menu button{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;min-height:44px;padding:0 12px;border:0;border-radius:8px;background:none;cursor:pointer;font:inherit;font-size:13px;color:#e6ddef;text-align:left}.recent-menu button[aria-checked="true"]{color:var(--lt-gold,#ffe6a6)}.recent-menu button[disabled]{color:var(--lt-muted,#9b98a6);cursor:default}.recent-menu button:focus-visible{outline:2px solid #e8b8c9;outline-offset:-2px}.recent-menu .recent-menu-sub{padding-left:22px;font-size:12px;color:#cfc6dd}:host([data-lt-theme=garden]) .recent-menu{background:var(--lt-paper,#f7f0e8);border-color:var(--lt-line-paper)}:host([data-lt-theme=garden]) .recent-menu button{color:var(--lt-ink)}:host([data-lt-theme=garden]) .recent-menu button[aria-checked="true"]{color:var(--lt-gold-ink)}:host([data-lt-theme=garden]) .recent-menu button[disabled],:host([data-lt-theme=garden]) .recent-menu .recent-menu-sub{color:var(--lt-muted)}`;
 shadow.append(infoStyle);
 const mobileFit=document.createElement('style');mobileFit.textContent='@media(max-width:768px){.topbar{gap:12px;flex-wrap:wrap;align-items:center;padding:8px 12px}.top-actions{gap:6px;flex-shrink:0;flex-wrap:wrap;margin-left:auto}.topbar .menuBtn{white-space:nowrap;padding:10px 9px;font-size:14px}.actions .subtleBtn{font-size:14px}.center .center-note{font-size:14px}.hint{font-size:14px}}';shadow.append(mobileFit);
 // #380 5번: 첫 화면 오른쪽 위 "보기 ▾" 메뉴(테마·움직임·카드 출처)는 없앴다.
