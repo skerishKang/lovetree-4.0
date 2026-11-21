@@ -369,6 +369,15 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
    if(!admin||await admin.roleFor(principal)!=='admin')throw new ApiError(403,'admin_forbidden','관리자 권한이 필요해요.');
    if(!['resolved','dismissed'].includes(status))throw new ApiError(400,'moderation_status_invalid','처리 상태를 확인해 주세요.');
    if(!['hidden','visible'].includes(visibility))throw new ApiError(400,'moderation_visibility_invalid','공개 상태를 확인해 주세요.');
+   // #1098 2단계: 순간 댓글 신고(comment_id 있음)는 같은 운영센터 길에서 그 댓글만 숨긴다 — 트리는 숨기지 않는다.
+   if(typeof communityRepo.moderateMomentCommentReport==='function'){
+    const current=await communityRepo.getReport?.({productId,reportId});
+    if(current&&current.commentId){
+     const momentRow=await communityRepo.moderateMomentCommentReport({productId,reportId,status,visibility,actorSubjectId:principal.subjectId});
+     if(!momentRow)throw new ApiError(404,'report_not_found','신고를 찾을 수 없어요.');
+     return {id:momentRow.id,status:momentRow.status,hidden:momentRow.hidden,resolvedAt:momentRow.resolvedAt};
+    }
+   }
    const row=await communityRepo.moderateReport({productId,reportId,status,visibility,actorSubjectId:principal.subjectId});
    if(!row)throw new ApiError(404,'report_not_found','신고를 찾을 수 없어요.');
    await refreshStageIndex(stageIndex,{productId,shareId:row.shareId},shareRepo);
