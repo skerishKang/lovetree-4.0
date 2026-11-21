@@ -104,6 +104,8 @@ test('#1029 트리 이름 2·8·20자 × 1440·390 × 정원·밤: 단추 폭·�
           const m = await page.evaluate(() => {
             const b = document.getElementById('record-menu');
             const l = document.getElementById('source-label');
+            const prefix = document.querySelector('.tree-prefix');
+            const prefixVisible = prefix ? getComputedStyle(prefix).display !== 'none' && prefix.getBoundingClientRect().width > 0 : false;
             const br = b.getBoundingClientRect();
             const tab = document.querySelector('#tree-views button[data-view]')?.getBoundingClientRect();
             // 390에서는 탭이 접혀 있으므로 그 자리를 대신하는 계정 단추 x를 잰다.
@@ -120,14 +122,18 @@ test('#1029 트리 이름 2·8·20자 × 1440·390 × 정원·밤: 단추 폭·�
               glyphOverflow: Math.round(Math.max(0, glyphOverflow) * 100) / 100,
               pageOverflow: Math.round((document.documentElement.scrollWidth - document.documentElement.clientWidth) * 100) / 100,
               label: l.textContent,
+              prefixVisible, prefixText: prefix ? prefix.textContent.trim() : '', aria: b.getAttribute('aria-label'),
               title: b.title,
               inViewport: br.left >= 0 && br.right <= window.innerWidth
             };
           });
           rows.push({ width, theme, len, ...m });
-          assert.equal(m.label, `트리: ${name}`, `${width}·${theme}·${len}자: 버튼 글자`);
+          assert.equal(m.label, name, `${width}·${theme}·${len}자: 단추 안에는 이름만`);
           assert.ok(m.title.includes(name), `${width}·${theme}·${len}자: title에 전체 이름`);
           assert.equal(m.inViewport, true, `${width}·${theme}·${len}자: 버튼이 화면 안`);
+          assert.equal(m.prefixVisible, width === 1440, `${width}: 밖의 '트리' 글자 ${width === 1440 ? '보임' : '숨김'}`);
+          if (width === 1440) assert.equal(m.prefixText, '트리', '1440: 고정 글자는 트리');
+          assert.equal(m.aria, `트리: ${name}, 트리 바꾸기`, '스크린리더 이름');
           await ctx.close();
         }
       }

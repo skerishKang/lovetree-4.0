@@ -950,7 +950,8 @@ async function checkVisualTokens(page, target, opts, stamp) {
     } else {
       if (top.treeViewsHidden) problems.push('로그인 상태인데 트리 보기 탭이 숨겨짐');
       if (top.treePickerHidden) problems.push('로그인 상태인데 트리 선택이 숨겨짐');
-      if (!/^트리: /.test(top.recordLabel)) problems.push(`로그인 트리 선택 글자 "${top.recordLabel}" (기대 "트리: <이름>")`);
+      const expectedLabel = expectedPickerLabel({ owned: true }).replace(/^트리: /, '');
+      if (![expectedLabel, '저장 안 된 기록'].includes(top.recordLabel)) problems.push(`로그인 트리 선택 글자 "${top.recordLabel}" (기대 "${expectedLabel}")`);
     }
     // 2026-11-07: 트리 선택은 뒤쪽 탭 묶음 바로 앞, 주 버튼은 #write-menu 하나(금색), 연결 보기는 헤더에 없다.
     if (!top.treeViewsHidden && !top.recordBeforeTreeViews) problems.push('트리 선택이 접·보드·지도 탭 앞에 있지 않음');
