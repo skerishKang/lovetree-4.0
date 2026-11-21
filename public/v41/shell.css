@@ -232,6 +232,13 @@ html[data-v41-screen=book] .tools .ui-btn::after,html[data-v41-screen=board] hea
  .account-popover{right:-4px;width:210px}
  .header-actions #header-overflow{top:52px}
 }
+/* 책/목록 토글(상단 단추)이 보일 때만 머리줄을 감아 트리 줄을 온전히 남긴다. */
+@media(max-width:780px){
+ .app-header:has(#book-display-toggle:not([hidden])){flex-wrap:wrap}
+ .app-header:has(#book-display-toggle:not([hidden])) .main-nav{flex-basis:100%;order:3}
+ /* 머리줄이 두 줄이 되면 트리 팝오버도 그 아래에서 열린다. */
+ .app-header:has(#book-display-toggle:not([hidden])) .tree-popover{top:108px}
+}
 /* 넘치는 쪽 끝의 페이드. 스크롤 위치에 따라 켜고 끄는 클래스는 shell.mjs가 붙인다. */
 @media(max-width:780px){
  .app-header{--nav-fade:28px}
