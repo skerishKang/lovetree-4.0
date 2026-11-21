@@ -120,8 +120,8 @@ test('#549+#845 순간 추가 창을 열면 안내 판이 숨고, 닫으면 다�
     const errors = [];
     page.on('pageerror', (e) => errors.push(String(e.message || e)));
     await openWithFirstTree(page);
-    // 순간 추가 창을 실제 입구로 열어 본다 — 390에서는 화면 오른쪽 아래 ＋ 단추(#mobile-add)가 입구다.
-    await page.click('#mobile-add');
+    // 첫 화면에서는 가운데 ＋가 유일한 강조 단추다(#1084) — 셸의 같은 입구를 직접 눌러 창을 연다.
+    await page.evaluate(() => document.getElementById('write-menu').click());
     await page.waitForFunction(() => document.getElementById('write-panel').open, null, { timeout: 10000 });
     // 창이 열려 있는 동안 안내 판은 숨는다 — 창 안으로 옮겨지지 않는다(#845 1단계).
     const held = await page.evaluate(() => ({

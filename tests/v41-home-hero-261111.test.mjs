@@ -33,12 +33,12 @@ test('로그인 전: [＋ 첫 순간 남기기·둘러보기·어떻게 쓰나�
 
 // 2026-11-14 대표 결정: 로그인한 첫 화면도 로그아웃과 같은 세 자리를 쓴다. 261116 PR 2(대표 확정)로
 // 첫 자리는 '＋ 순간 추가'→'순간 목록'으로 바뀌고, '+ 순간 추가'는 글귀 바로 아래 위쪽 단추(밝은 채움)로 올라갔다.
-test('로그인·트리 있음: [순간 목록·둘러보기·내 트리] 세 개, 세트는 테두리형',()=>{
+test('로그인·트리 있음: [순간 목록·둘러보기·서재] 세 개 모두 밝은 단추(#1084)',()=>{
   const btns=[makeButton(),makeButton(),makeButton()];
   applyHomeCenter(btns,{member:'in',treeCount:2});
   assert.deepEqual(btns.map(b=>b.textContent),['순간 목록','둘러보기','서재']);
   assert.deepEqual(btns.map(b=>b.dataset.do), ['moments','community','trees']);
-  assert.deepEqual([...btns].map(b=>b.classList.contains('primary-cta')),[true,false,false],"가운데 첫 단추만 크림색");
+  assert.deepEqual([...btns].map(b=>b.classList.contains('primary-cta')),[false,false,false],"주 단추는 위의 '＋ 순간 추가' 하나");
   assert.deepEqual(btns.map(b=>b.hidden),[false,false,false]);
 });
 

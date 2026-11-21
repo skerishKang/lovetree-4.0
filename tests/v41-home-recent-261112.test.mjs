@@ -47,8 +47,8 @@ test('#426 썸네일은 공용 모듈(#435) 그대로 — 회색이면 글 카�
   assert.match(orbit,/isVerticalMoment\(c\)/);
   assert.match(orbit,/\.recent-media\{[^}]*aspect-ratio:16\/9/);
   assert.match(orbit,/\.recent-media\.vertical\{[^}]*aspect-ratio:16\/9/);
-  assert.match(orbit,/class="recent-backdrop"/);
-  assert.match(orbit,/\.recent-media\.vertical \.recent-backdrop\{[^}]*filter:blur\(18px\)/);
+  assert.match(orbit,/\$\{bgStyle\(candidates\[0\]\)\}/,'세로 배경 그림은 CSS 변수로 넘긴다(#1084)');
+  assert.match(orbit,/\.recent-media\.vertical::before\{[^}]*background-image:var\(--lt-recent-bg\)[^}]*filter:blur\(18px\)/,'같은 썸네일을 흐려 깐다(#1084)');
 });
 
 test('#426 카드 누르면 그 순간 열기 — 궤도 카드와 같은 onOpen 경로, Enter·Space도 같다',()=>{
