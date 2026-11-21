@@ -298,7 +298,8 @@ test('970 실행: 쓰기 창 탭 — 입력 유지·방향키 이동·aria-selec
       await page.goto(`${origin}/v41/?account=1`, {waitUntil: 'load', timeout: 60000});
       await page.waitForFunction(() => !!window.LT41?.trees?.length, null, {timeout: 20000});
       await page.locator('#discover-ask-no').click().catch(() => {});
-      // 순간 추가 입구: 넓은 화면은 머리줄 단추, 휴대폰은 아래쪽 둥근 단추(FAB).
+      // 첫 화면에서는 ＋가 가운데만 남으므로(#1084) 쓰기 창은 다른 화면 입구로 연다.
+      await page.evaluate(() => { location.hash = '#shelf'; });
       const entry = await page.evaluate(() => {
         const vis = (el) => !!el && el.getClientRects().length > 0 && getComputedStyle(el).display !== 'none';
         if (vis(document.getElementById('write-menu'))) return '#write-menu';
