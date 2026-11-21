@@ -162,8 +162,7 @@ function renderTreeMenu(){
  if(!treePopover)return;
  const trees=Array.isArray(model?.trees)?[...model.trees]:[];
  const ordered=trees.sort((a,b)=>Number(b?.inbox===true)-Number(a?.inbox===true));
- // #1028: 데스크탑에서만 목록 칸을 감싸고, 트리가 8개 이상이면 이름 거르는 칸을 맨 위에 둔다. 휴대폰은 기존 모양.
- const desktop=matchMedia('(min-width:701px)').matches;
+ // #1028·#1079: 모든 폭에서 목록 칸을 감싸고, 트리가 8개 이상이면 이름 거르는 칸을 맨 위에 둔다.
  const currentId=window.LT41?.tree?.id||'';
  const rows=ordered.map(tree=>{
   const active=tree.id===currentId;
@@ -184,8 +183,8 @@ function renderTreeMenu(){
  const shelfEntry=member?.snapshot().owned?'<button type="button" role="menuitem" data-tree-action="shelf">서재 전체 보기</button>':'';
  // 261119 대표 결정: 목록 아래 메뉴 순서는 ＋ 새 트리 → 이 트리 관리 → 이 트리 공유 → 꼬리표 정리.
  // '정리 전 N개 정리하기'는 #380 5번대로 목록 바로 아래(맨 앞)에 둔다.
- const searchBox=desktop&&ordered.length>=8?'<div class="tree-search" role="none"><input type="search" data-tree-search placeholder="트리 찾기" aria-label="트리 찾기" autocomplete="off" /></div>':'';
- const list=desktop?`${searchBox}<div class="tree-list" role="none">${rows}</div>`:rows;
+ const searchBox=ordered.length>=8?'<div class="tree-search" role="none"><input type="search" data-tree-search placeholder="트리 찾기" aria-label="트리 찾기" autocomplete="off" /></div>':'';
+ const list=`${searchBox}<div class="tree-list" role="none">${rows}</div>`;
  treePopover.innerHTML=list+`<div class="tree-foot" role="none">${cleanupRow}<button type="button" role="menuitem" data-tree-action="new">＋ 새 트리</button>${manage?'<button type="button" role="menuitem" data-tree-action="manage">이 트리 관리 (이름·표지)</button><button type="button" role="menuitem" data-tree-action="share">이 트리 공유</button>':''}${tagsRow}${shelfEntry}${momentsEntry}</div>`;
  const search=treePopover.querySelector('[data-tree-search]');
  search?.addEventListener('input',()=>{

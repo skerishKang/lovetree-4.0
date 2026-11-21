@@ -489,14 +489,15 @@ nav #record-menu{min-height:40px;font-size:14px;letter-spacing:0;margin-left:0;p
 nav .tree-frame{scroll-snap-align:center}
 /* 2026-11-11 407번: 둘러보기 패널의 닫기 버튼이 맨 위 메뉴의 계정 버튼과 겹치지 않게 맨 위 메뉴 아래로 내린다. */
 #community-panel .community-top{padding-top:44px}
-.tree-popover{position:absolute;top:calc(100% + 8px);left:0;z-index:50;min-width:340px;max-height:min(72vh,560px);overflow:auto;padding:8px;border:1px solid var(--lt-line);border-radius:var(--lt-r-card);background:var(--lt-glass-strong);backdrop-filter:blur(24px);box-shadow:0 18px 50px #0009;display:grid;gap:3px}
+.tree-popover{position:absolute;top:calc(100% + 8px);left:0;z-index:50;min-width:340px;max-height:min(72vh,560px);overflow:hidden;padding:8px;border:1px solid var(--lt-line);border-radius:var(--lt-r-card);background:var(--lt-glass-strong);backdrop-filter:blur(24px);box-shadow:0 18px 50px #0009;display:grid;gap:3px}
 .tree-popover[hidden]{display:none}
 /* #1028 데스크탑: 메뉴 전체 대신 트리 목록 칸만 스크롤한다. 줄 7개(52px+3px 간격)=382px가 기본이고,
    화면이 작으면 머리줄·동작 칸 자리를 뺀 만큼만 목록에 쓴다. 아래 동작 칸은 늘 메뉴 안에 고정된다. */
+/* #1028·#1079: 모든 폭에서 목록만 스크롤하고 동작 칸은 고정 — 줄 7개(52px+3px)=382px가 기본. */
+.tree-list{display:grid;gap:3px;min-height:0;max-height:min(382px,calc(100dvh - 470px));overflow-y:auto;overscroll-behavior:contain}
+.tree-search input{width:100%;min-height:44px;padding:8px 12px;border:1px solid var(--lt-line);border-radius:10px;background:rgba(255,255,255,.04);color:var(--lt-pearl);font:inherit;font-size:13px}
 @media(min-width:701px){
  .tree-popover{max-height:none;overflow:visible}
- .tree-list{display:grid;gap:3px;min-height:0;max-height:min(382px,calc(100dvh - 470px));overflow-y:auto;overscroll-behavior:contain}
- .tree-search input{width:100%;min-height:44px;padding:8px 12px;border:1px solid var(--lt-line);border-radius:10px;background:rgba(255,255,255,.04);color:var(--lt-pearl);font:inherit;font-size:13px}
 }
 .tree-item{display:flex;align-items:center;gap:10px;width:100%;min-height:52px;padding:5px 7px;border:0;border-radius:10px;background:none;color:var(--lt-pearl);text-align:left;font-size:13px}
 .tree-item:hover,.tree-item:focus-visible{background:rgba(255,255,255,.07)}
@@ -548,6 +549,7 @@ nav .tree-frame{scroll-snap-align:center}
   /* 머리줄 테마 단추(44px)를 넣고도 390에서 가로 넘침 0 — 간격·여백을 조인다. */
   @media(max-width:520px){.app-header{gap:4px;padding-inline:8px}.header-actions{gap:4px;flex:0 0 auto}.main-nav{flex:1 1 auto;min-width:0;overflow:hidden}}
  .tree-popover{position:fixed;left:10px;right:10px;top:60px;min-width:0;max-height:70vh}
+ .tree-list{max-height:calc(70dvh - 380px);min-height:120px}
  #header-overflow.is-open{position:fixed;left:10px;right:10px;top:60px;right:10px}
 }
 /* 이슈 458: 모바일에서 늘 떠 있는 ＋ 순간 추가(아래 오른쪽, 엄지 닿는 자리). 쓰기 가능한 내 기록(body.lt-fab-ok)에서만 뜬다 —
