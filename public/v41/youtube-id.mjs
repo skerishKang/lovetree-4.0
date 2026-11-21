@@ -9,8 +9,10 @@ export const YOUTUBE_HOSTS = new Set(['youtube.com', 'www.youtube.com', 'm.youtu
 export const YTIMG_HOST = /^(?:img\.youtube\.com|(?:[a-z0-9-]+\.)*ytimg\.com)$/i;
 export const VIDEO_ID_RE = /^[A-Za-z0-9_-]{11}$/;
 // #1059: 정본을 전역 스크립트에서도 부를 수 있게 한 벌을 globalThis에 남긴다(모듈 로드 뒤부터).
+// #1060: 단계 주소 함수도 같은 자리에 함께 남긴다 — 클래식 스크립트가 ytimg 주소 글자를
+// 직접 만들지 않고 옵션(크기·세로)만 넘겨 이 정본을 부르게 한다.
 // 전역 스크립트 화면(책·보드·서재)은 이 값을 먼저 보고, 없으면 LTMedia를 거친다.
-if (typeof globalThis !== 'undefined') globalThis.LTYouTubeId = { youtubeIdFrom };
+if (typeof globalThis !== 'undefined') globalThis.LTYouTubeId = { youtubeIdFrom, youtubeStageThumbUrl };
 
 const trimText = (value) => (typeof value === 'string' ? value.trim() : '');
 
@@ -52,10 +54,14 @@ export function safeYoutubeThumb(value) {
   return YTIMG_HOST.test(parsed.hostname) ? parsed.href : '';
 }
 
+/** ytimg 단계 주소 한 벌. 크기·세로는 stage 옵션으로만 고른다(보드 상세 maxres→hq→mq 포함). */
 export function youtubeStageThumbUrl(videoId, stage = 'hqdefault') {
   const id = trimText(videoId);
   if (!VIDEO_ID_RE.test(id)) return '';
-  const file = stage === 'oardefault' ? 'oardefault.jpg' : stage === 'mqdefault' ? 'mqdefault.jpg' : 'hqdefault.jpg';
+  const file = stage === 'maxresdefault' ? 'maxresdefault.jpg'
+    : stage === 'oardefault' ? 'oardefault.jpg'
+    : stage === 'mqdefault' ? 'mqdefault.jpg'
+    : 'hqdefault.jpg';
   return `https://i.ytimg.com/vi/${id}/${file}`;
 }
 

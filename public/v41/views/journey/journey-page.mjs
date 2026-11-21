@@ -9,6 +9,9 @@ import {
   clearJourneyDraft, normalizeJourneyDraft,
   journeyRouteHash, parseJourneyRoute,
 } from '../../first-journey.mjs';
+// #1060: media-preview.js가 클래식 스크립트라 단계 주소 정본(youtube-id.mjs)을 전역에서 부른다.
+// 이 화면은 다른 모듈을 거쳐 정본이 로드되지 않으므로 여기서 먼저 등록한다(주소 글자 변경 0).
+import '../../youtube-id.mjs';
 
 export function createJourneyPage(env = {}) {
   const window = env.window ?? globalThis.window;

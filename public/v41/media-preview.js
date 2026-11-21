@@ -127,10 +127,16 @@ function privateAssetName(value,currentOrigin=globalThis.location?.origin){
   return /^\/api\/media\/([a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}\.(?:png|jpg|gif|webp|mp4|webm))$/.exec(u.pathname)?.[1]||null;
  }catch{return null;}
 }
-// #393: 썸네일 주소 한 벌. 세로(쇼츠)는 원본 비율(oardefault·잘림 없음), 가로는 hqdefault.
+// #1060: ytimg 주소 글자는 정본(youtube-id.mjs) 한 벌에서만 만든다. 클래식 스크립트라
+// 모듈이 등록한 globalThis.LTYouTubeId 로 단계(크기·세로)만 넘겨 부른다.
+// #393: 세로(쇼츠)는 원본 비율(oardefault·잘림 없음), 가로는 hqdefault.
 // oardefault 가 없는 영상(일반 가로 등)은 부르는 쪽에서 hqdefault 로 물러난다.
+function stageThumb(videoId, stage) {
+  const api = globalThis.LTYouTubeId || globalThis.LTThumbFallback;
+  return api && typeof api.youtubeStageThumbUrl === 'function' ? api.youtubeStageThumbUrl(videoId, stage) : '';
+}
 function youtubeThumbUrl(videoId, vertical = false) {
-  return 'https://i.ytimg.com/vi/' + videoId + '/' + (vertical ? 'oardefault.jpg' : 'hqdefault.jpg');
+  return stageThumb(videoId, vertical ? 'oardefault' : 'hqdefault');
 }
 function safeSavedYoutubeThumb(value) {
   const raw = String(value ?? '').trim();
@@ -147,7 +153,7 @@ function youtubeCandidates(videoId, vertical = false, mediaMetadata = null) {
   if (videoId) {
     if (!saved && vertical) list.push(youtubeThumbUrl(videoId, true));
     list.push(youtubeThumbUrl(videoId, false));
-    list.push('https://i.ytimg.com/vi/' + videoId + '/mqdefault.jpg');
+    list.push(stageThumb(videoId, 'mqdefault'));
   }
   return [...new Set(list.filter(Boolean))];
 }
@@ -202,7 +208,7 @@ function probeVertical(url) {
     const img = new Image();
     img.onload = () => resolve(verticalFromProbe({ width: img.naturalWidth, height: img.naturalHeight }));
     img.onerror = () => resolve(false);
-    img.src = 'https://i.ytimg.com/vi/' + encodeURIComponent(id) + '/oardefault.jpg';
+    img.src = stageThumb(id, 'oardefault');
   });
   verticalPending.set(id, p);
   return p.then((v) => { verticalProbed.set(id, v); verticalPending.delete(id); return v; });

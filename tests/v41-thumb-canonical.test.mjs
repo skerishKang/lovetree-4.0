@@ -5,7 +5,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import vm from 'node:vm';
 import { thumbnailCandidates, nextThumbnailStep } from '../public/v41/thumb-fallback.mjs';
+import { youtubeIdFrom, youtubeStageThumbUrl } from '../public/v41/youtube-id.mjs';
+import { videoKey } from '../public/v41/same-stage.mjs';
+import { cardImageFor } from '../functions/_lib/tree-preview.mjs';
 
 const read = (p) => readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
 const BOARD_EXTRAS = read('public/v41/views/board/board-extras.js');
@@ -76,5 +80,83 @@ test('보드 상세도 자체 SVG가 아니라 공용 한 벌을 쓴다(전: you
   // 이 파일이 youtubeThumb·youtubeThumbUrl을 다시 정의하면 화면마다 주소가 달라진다 — 정의하지 않는다.
   assert.doesNotMatch(code, /youtubeThumbUrl\s*=/, '공용 값을 덮어쓰지 않는다');
   assert.doesNotMatch(code, /youtubeThumb\s*=/, '공용 값을 덮어쓰지 않는다');
+});
+
+// ── #1060 표 시험: 주소 형식 × 크기(옵션)로 정본과 각 자리 결과를 대조한다(#1127 방식) ──
+const ID = 'dQw4w9WgXcQ';
+const FORMS = [
+  `https://www.youtube.com/watch?v=${ID}`,
+  `https://www.youtube.com/watch?v=${ID}&t=83s`,
+  `https://youtu.be/${ID}`,
+  `https://www.youtube.com/shorts/${ID}`,
+  `https://www.youtube.com/live/${ID}`,
+  `https://www.youtube.com/embed/${ID}`,
+  `https://m.youtube.com/watch?v=${ID}`,
+  `https://music.youtube.com/watch?v=${ID}`,
+  `https://www.youtube.com/watch?v=${ID}&list=PL123`,
+  `https://youtube.com.evil.test/watch?v=${ID}`,
+  `https://user:pass@www.youtube.com/watch?v=${ID}`,
+  'ftp://youtu.be/dQw4w9WgXcQ',
+  'https://www.youtube.com/watch?v=short',
+  'javascript:alert(1)',
+  '',
+];
+// 크기 옵션 → 정본이 만들어야 할 파일 이름. 알 수 없는 값은 종전처럼 hqdefault다.
+const STAGES = [
+  ['hqdefault', 'hqdefault.jpg'],
+  ['mqdefault', 'mqdefault.jpg'],
+  ['oardefault', 'oardefault.jpg'],
+  ['maxresdefault', 'maxresdefault.jpg'],
+  ['unknown-stage', 'hqdefault.jpg'],
+];
+
+const mediaScope = { window: {}, URL, URLSearchParams, LTYouTubeId: globalThis.LTYouTubeId };
+vm.runInNewContext(read('public/v41/media-preview.js'), mediaScope);
+const media = mediaScope.window.LTMedia;
+
+test('#1060 크기 표: 단계 함수는 옵션마다 정본 주소를 만든다(보드 상세 maxres 포함)', () => {
+  for (const [stage, file] of STAGES) {
+    assert.equal(youtubeStageThumbUrl(ID, stage), `https://i.ytimg.com/vi/${ID}/${file}`, stage);
+  }
+  assert.equal(youtubeStageThumbUrl('bad-id', 'hqdefault'), '', '11자리 아니면 주소를 만들지 않는다');
+});
+
+test('#1060 주소 형식 × 자리 표: 정본·공유 카드·미리보기·그래프·후보가 같은 주소를 쓴다', () => {
+  for (const url of FORMS) {
+    const id = youtubeIdFrom(url);
+    const hq = youtubeStageThumbUrl(id, 'hqdefault');
+    const oar = youtubeStageThumbUrl(id, 'oardefault');
+    // functions/ 공유 링크 카드(정본 hq)와 public/ 그래프(videoKey→정본 hq, 세로 구분 없음)가 같다.
+    assert.equal(cardImageFor({ url }), hq, `공유 카드 ${url}`);
+    assert.equal(youtubeStageThumbUrl(videoKey(url), 'hqdefault'), hq, `그래프 ${url}`);
+    // 화면 미리보기는 세로 옵션만 골라 정본을 부른다.
+    assert.equal(media.youtubeThumbUrl(id, false), hq, `미리보기 가로 ${url}`);
+    assert.equal(media.youtubeThumbUrl(id, true), oar, `미리보기 세로 ${url}`);
+    // 후보 목록도 같은 단계 함수를 쓴다(저장 주소가 없을 때 hq→mq, 세로면 oar→hq→mq).
+    const list = thumbnailCandidates({ url }, { autoLoad: true });
+    assert.deepEqual(list, id ? (list[0] === oar ? [oar, hq, youtubeStageThumbUrl(id, 'mqdefault')] : [hq, youtubeStageThumbUrl(id, 'mqdefault')]) : [], `후보 ${url}`);
+  }
+});
+
+test('#1060 남은 자리도 같은 단계 옵션으로 정본을 부른다(주소 글자 직접 생성 없음)', () => {
+  const files = {
+    'board-detail': 'public/v41/views/board/board-detail.js',
+    'board-extras': 'public/v41/views/board/board-extras.js',
+    'book-model': 'public/v41/views/book/book-model.js',
+    book: 'public/v41/views/book/book.js',
+    'community-moments': 'public/v41/community-moments.mjs',
+    graph: 'public/v41/views/graph/graph.js',
+    'media-preview': 'public/v41/media-preview.js',
+  };
+  for (const [name, path] of Object.entries(files)) {
+    const code = read(path).split('\n').filter((line) => !line.trim().startsWith('//')).join('\n');
+    assert.doesNotMatch(code, /https:\/\/i\.ytimg\.com/, `${name}: ytimg 주소 글자를 직접 만들지 않는다`);
+  }
+  const detail = read(files['board-detail']);
+  for (const stage of ['maxresdefault', 'hqdefault', 'mqdefault']) {
+    assert.match(detail, new RegExp(`stageThumb\\(id,'${stage}'\\)`), `보드 상세가 ${stage} 옵션을 그대로 넘긴다`);
+  }
+  assert.match(read(files['community-moments']), /youtubeStageThumbUrl\(item\.videoId,'hqdefault'\)/, '둘러보기 포스터는 hq 옵션');
+  assert.match(read(files.graph), /youtubeStageThumbUrl\(key, 'hqdefault'\)/, '그래프는 세로 구분 없이 hq 옵션');
 });
 
