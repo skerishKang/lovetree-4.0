@@ -268,6 +268,8 @@ async function serve644() {
       try { body = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'); } catch { body = {}; }
       puts.push(body);
       const reply = () => {
+        if (ctrl.putMode === '400') return send(400, { error: { code: 'invalid_document', message: '기록 형식을 확인해 주세요.' } });
+        if (ctrl.putMode === '413') return send(413, { error: { code: 'payload_too_large', message: '보내는 기록이 너무 커요. 일부만 나눠서 저장해 주세요.' } });
         if (ctrl.failPut) return send(500, { error: { code: 'server', message: '서버가 잠시 멈췄어요.' } });
         if (body.expectedRevision !== state.revision) return send(409, { error: { code: 'revision_conflict', currentRevision: state.revision, message: '다른 곳에서 먼저 저장했어요.' } });
         state.doc = body.state; state.revision += 1;
@@ -879,6 +881,61 @@ test('#185 후속 화면(1440): 계정 메뉴 안 단추는 backdrop-filter가 �
     assert.ok(bf.menu.length >= 6, `계정 메뉴 단추가 열려 있다(${bf.menu.length}개)`);
     assert.deepEqual([...new Set(bf.menu.map((b) => b.bf))], ['none'], `메뉴 안 모든 단추 backdrop-filter none(${JSON.stringify(bf.menu)})`);
     assert.deepEqual([...new Set(bf.chips.map((b) => b.bf))], ['blur(8px)'], `상단 칩은 blur(8px)를 유지한다(${JSON.stringify(bf.chips)})`);
+  } finally {
+    await browser.close();
+    server.close();
+  }
+});
+
+// A-07(#1056): 400·413 거부는 서버 문구와 백업 단추 — 같은 본을 다시 보내는 재시도는 붙지 않는다.
+test('저장 실패 안내: 400·413은 서버 문구와 백업, 연결 끊김은 재시도', { skip: REQUIRE_644 ? false : skip644, timeout: 300000 }, async () => {
+  if (skip644) assert.fail(skip644);
+  const { server, ctrl } = await serve644();
+  const origin = `http://127.0.0.1:${server.address().port}`;
+  const browser = await pwChromium644.launch({ headless: true });
+  try {
+    for (const [mode, want, label] of [
+      ['400', /기록 형식을 확인해 주세요/, '백업 내려받기'],
+      ['413', /너무 커요/, '백업 내려받기']
+    ]) {
+      const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, acceptDownloads: true });
+      try {
+        await context.addInitScript(() => { window.__blobs = []; const orig = URL.createObjectURL; URL.createObjectURL = (b) => { window.__blobs.push(b.size); return orig.call(URL, b); }; });
+        const page = await context.newPage();
+        await page.goto(`${origin}/v41/?account=1#home`, { waitUntil: 'load' });
+        await waitSynced644(page);
+        await page.locator('#discover-ask-no').click().catch(() => {});
+        ctrl.putMode = mode;
+        await quickAdd644(page, `https://example.com/1056-${mode}.jpg`);
+        await wait644(800);
+        await page.waitForFunction(() => !document.getElementById('save-feedback')?.hidden, null, { timeout: 20000 });
+        const notice = await page.evaluate(() => ({
+          message: document.getElementById('save-message')?.textContent || '',
+          buttons: [...document.querySelectorAll('#save-actions button')].map((b) => b.textContent.trim())
+        }));
+        assert.match(notice.message, want, `${mode}: 서버 문구가 보인다 — ${notice.message}`);
+        assert.ok(notice.buttons.includes(label), `${mode}: 백업 단추가 보인다 — ${JSON.stringify(notice.buttons)}`);
+        assert.ok(!notice.buttons.includes('다시 시도'), `${mode}: 재시도 단추가 없다 — ${JSON.stringify(notice.buttons)}`);
+        await page.evaluate(() => document.getElementById('write-panel')?.close());
+        await page.locator('#save-actions button', { hasText: label }).click();
+        await page.waitForFunction(() => (window.__blobs || []).length > 0, null, { timeout: 5000 });
+        assert.ok((await page.evaluate(() => window.__blobs)).some((size) => size > 0), `${mode}: 백업 파일을 만든다`);
+        ctrl.putMode = '';
+      } finally { await context.close(); }
+    }
+    // 연결 끊김(status 0)은 지금처럼 재시도가 남는다.
+    const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, acceptDownloads: true });
+    try {
+      const page = await context.newPage();
+      await page.goto(`${origin}/v41/?account=1#home`, { waitUntil: 'load' });
+      await waitSynced644(page);
+      await page.locator('#discover-ask-no').click().catch(() => {});
+      ctrl.failPut = true;
+      await quickAdd644(page, 'https://example.com/1056-offline.jpg');
+      await page.waitForFunction(() => !document.getElementById('save-feedback')?.hidden, null, { timeout: 20000 });
+      assert.equal(await page.locator('#save-actions button', { hasText: '다시 시도' }).count(), 1, '연결 문제는 재시도 유지');
+      ctrl.failPut = false;
+    } finally { await context.close(); }
   } finally {
     await browser.close();
     server.close();

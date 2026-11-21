@@ -1030,10 +1030,11 @@ function memberStatus(status){
    }
   }
   else{
-  for(const a of status.actions.filter(a=>['retry','pull','force','login'].includes(a.name))){
+  for(const a of status.actions.filter(a=>['retry','pull','force','login','backup'].includes(a.name))){
    const b=document.createElement('button');
    b.textContent=a.name==='login'?'새 창에서 로그인':a.label;
    b.onclick=async()=>{
+    if(a.name==='backup'){backup();return;}
     if(a.name==='login'){window.open(memberLoginUrl(readTheme(localStorage)),'_blank','noopener,noreferrer');return;}
     if(['pull','force'].includes(a.name)&&!confirm(a.name==='pull'
      ?'미저장 변경을 버리고 서버 기록을 불러올까요?'
@@ -1042,7 +1043,7 @@ function memberStatus(status){
    };
    $('save-actions').append(b);
   }
-  const b=document.createElement('button');b.textContent='현재 기록 백업';b.onclick=backup;$('save-actions').append(b);
+  if(!status.actions.some(a=>a.name==='backup')){const b=document.createElement('button');b.textContent='현재 기록 백업';b.onclick=backup;$('save-actions').append(b);}
   }
  }
  if(status.phase==='checking')notify('내 기록을 불러오고 있어요.');

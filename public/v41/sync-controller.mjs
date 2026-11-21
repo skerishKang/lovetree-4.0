@@ -64,7 +64,7 @@ export function createSyncController({getState, replaceState, api, draftStorage 
   let cachePainted = false;
   const emit = value => { current = value; onChange(value); listener(value); return value; };
   const actions = { login: [{name:'login',label:'로그인'}], logout: [{name:'logout',label:'로그아웃'}],
-    retry: [{name:'retry',label:'다시 시도'}] };
+    retry: [{name:'retry',label:'다시 시도'}], backup: [{name:'backup',label:'백업 내려받기'}] };
 
   function clearPendingDraft(subject = activeSubject) {
     const key = pendingDraftKey(subject);
@@ -190,9 +190,14 @@ export function createSyncController({getState, replaceState, api, draftStorage 
       return emit(status({phase:'conflict',detail:conflictDetail(),changes:editCount,
         actions:[{name:'pull',label:'최신 기록 불러오기'},{name:'force',label:'이 화면 것으로 덮어쓰기'}]}));
     }
-    if (answer.status === 409 && answer.code === 'client_key_conflict') attempt = null;
-    return emit(status({phase:answer.status === 0 ? 'offline' : 'rejected',
-      detail:'서버에 저장되지 않았어요. 이 화면을 닫기 전에 다시 시도해 주세요.',actions:actions.retry}));
+     if (answer.status === 409 && answer.code === 'client_key_conflict') attempt = null;
+     // #1056: 400·413은 다시 보내도 달라지지 않는다 — 서버가 준 문구와 백업 내려받기를 보여 준다.
+     // 연결 문제(status 0)와 그 밖의 일시적 오류만 다시 시도로 안내한다.
+     if (answer.status === 400 || answer.status === 413) return emit(status({
+       phase:'rejected', detail:answer.message || LABELS.rejected, actions:actions.backup
+     }));
+     return emit(status({phase:answer.status === 0 ? 'offline' : 'rejected',
+       detail:'서버에 저장되지 않았어요. 이 화면을 닫기 전에 다시 시도해 주세요.',actions:actions.retry}));
   }
 
   // 숨김·닫힘 때의 마지막 저장(창 닫힘 유실 막음): 900ms 저장 대기 중에 창이 닫히면(탭 닫기·앱 전환·휴대폰 화면 꺼짐)
