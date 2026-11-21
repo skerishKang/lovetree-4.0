@@ -30,7 +30,7 @@ const rawMoments = (demo ? demo.moments : tree.moments || []).map(m => ({ ...m }
 const GRAPH = buildGraph(rawMoments.map(m => ({ ...m, keywords: Array.isArray(m.keywords) ? m.keywords : [] })));
 const MOMENT_OF = new Map(rawMoments.map((m) => [m.id, m]));
 const model = { graph: GRAPH, narrow: false, W: 0, H: 0 };
-let selected = GRAPH.moments.length ? { type: 'moment', id: GRAPH.footprint.order[0] } : { type: null };
+let selected = { type: null };
 let filterHub = null;
 let walkIndex = -1, walkTimer = null;
 
@@ -614,7 +614,8 @@ const goMapWithView = (v) => {
   try { parent.postMessage({ type: 'lt41-navigate', view: 'track56-network.html' }, location.origin); } catch {}
 };
 document.getElementById('gViewNet')?.addEventListener('click', () => goMapWithView('network'));
-document.getElementById('gViewConc')?.addEventListener('click', () => goMapWithView('concentric'));
+document.getElementById('gViewConc')?.addEventListener('click', () => goMapWithView('tag'));
+document.getElementById('gViewGraph')?.addEventListener('click', () => goMapWithView('time'));
 /* 제안 목록 — 선반 단추와 빈 판 안내 단추가 같은 한 길로 쓴다. 목록 제목도 실제 뜻으로 부른다
    (2026-11-16 CTO 지적: '꼬리표 없는'이 아니라 '아직 묶음에 안 든'이다). */
 function showSuggestions() {
@@ -652,7 +653,7 @@ window.addEventListener('message', (event) => {
   moment.keywords = Array.isArray(event.data.keywords) ? event.data.keywords : [];
   const rebuilt = buildGraph([...MOMENT_OF.values()].map((m) => ({ ...m, keywords: Array.isArray(m.keywords) ? m.keywords : [] })));
   model.graph = rebuilt;
-  if (!momentById(selected?.id)) selected = rebuilt.moments.length ? { type: 'moment', id: rebuilt.footprint.order[0] } : { type: null };
+  if (selected?.type === 'moment' && !momentById(selected?.id)) selected = { type: null };
   refresh();
 });
 
