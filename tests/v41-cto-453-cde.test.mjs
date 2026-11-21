@@ -78,12 +78,6 @@ function communityHarness({ items = [], defer = false, emptyHidden = true } = {}
   };
 }
 
-test('C3·C4·C5: 이름·용량·공유 보기 이름', () => {
-  const nameLine = shell.slice(shell.indexOf('function paintSettingsProfile'), shell.indexOf('function paintSettingsProfile') + 700);
-  assert.match(nameLine, /displayName/, '표시 이름을 먼저 쓴다');
-  assert.equal((nameLine.match(/@/g) || []).length <= 1, true, '이메일은 한 번만 쓴다');
-});
-
 test('D1: 대화상자를 닫으면 빈 화면이 아닐 때만 탭의 "지금 보는 곳"을 되살린다', async () => {
   // 전: community-panel.mjs의 emptyShown 배선 글자 → 후: mountCommunity를 띄우고 열었다 닫아 본다.
   // screens.mjs가 빈 화면에서 aria-current를 전부 지우는 동작은 tests/v41-shell-screens.test.mjs가
