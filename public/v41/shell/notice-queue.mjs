@@ -29,8 +29,8 @@ export function createNoticeQueue({ now = () => Date.now() } = {}) {
       // 우선순위가 앞서는 안내가 나중에 와도 먼저 뜬다 — 떠 있던 낮은 안내는 다시 줄에 선다.
       if (current && (NOTICE_PRIORITY[id] ?? 9) < (NOTICE_PRIORITY[current.id] ?? 9)) {
         const held = current;
-        held.hide();
         current = null;
+        held.hide();
         pending.set(held.id, held);
         pending.set(id, entry);
         pump();
@@ -42,8 +42,9 @@ export function createNoticeQueue({ now = () => Date.now() } = {}) {
     },
     release(id) {
       if (current?.id !== id) { pending.delete(id); return false; }
-      current.hide();
+      const held = current;
       current = null;
+      held.hide();
       pump();
       return true;
     },

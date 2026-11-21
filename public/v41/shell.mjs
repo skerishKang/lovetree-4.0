@@ -70,10 +70,11 @@ addEventListener('orientationchange',()=>setTimeout(placeToast,0));
 placeToast();
 new MutationObserver(placeToast).observe(document.body,{attributes:true,attributeFilter:['class']});
 placeToast();
-// 안내 한 벌(#353 후속): 담기·중복·로그인 필요 안내(hold)가 상태 안내보다 먼저 일정 시간 보인다.
-const shellNotice=createNotifier({$,beforeShow:placeToast,afterShow:()=>{placeToast();setTimeout(placeToast,600);setTimeout(placeToast,1400);}});
 // #1103: 세 안내가 같은 줄을 차례로 지나간다. 판·띠가 떠 있는 동안 토스트는 띄우지 않는다.
 const noticeQueue=createNoticeQueue();
+// 안내 한 벌(#353 후속): 담기·중복·로그인 필요 안내(hold)가 상태 안내보다 먼저 일정 시간 보인다.
+// 안내가 스스로 내려가면(시간이 다 되어 숨을 때) 줄을 비워 다음 안내가 올라오게 한다.
+const shellNotice=createNotifier({$,beforeShow:placeToast,afterShow:()=>{placeToast();setTimeout(placeToast,600);setTimeout(placeToast,1400);},onHide:()=>{noticeQueue.release('toast');}});
 function hideToast(){const toast=$('toast');if(toast)toast.hidden=true;}
 function notify(text,options){return shellNotice.notify(text,options);}
 // 새 소식 띠도 같은 줄을 탄다 — 먼저 뜬 안내가 내려간 뒤에 올라온다.

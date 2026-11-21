@@ -1263,8 +1263,12 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     await page5b.addInitScript(() => localStorage.removeItem('lt41.updatesCardDay'));
     await page5b.goto(`${base}/v41/?account=1`, { waitUntil: 'load' });
     await page5b.waitForFunction(() => { const a = document.getElementById('account-avatar'); return a && !a.hidden; }, null, { timeout: 20000 });
-    await page5b.waitForFunction(() => { const t = document.getElementById('toast'); return t && !t.hidden; }, null, { timeout: 8000 });
-    await page5b.waitForFunction(() => { const c = document.getElementById('updates-card'); return c && !c.hidden; }, null, { timeout: 10000 });
+    // #1103: 안내는 한 줄을 차례로 지나간다. 이 상태는 목록 창이 주인공이므로 먼저 뜬 판·띠를 닫아 줄을 비운다.
+    await page5b.waitForFunction(() => !document.getElementById('tree-tips')?.hidden, null, { timeout: 8000 }).catch(() => {});
+    if (!await page5b.evaluate(() => document.getElementById('tree-tips')?.hidden)) await page5b.click('#tree-tips-close');
+    await page5b.waitForFunction(() => { const c = document.getElementById('updates-card'); return c && !c.hidden; }, null, { timeout: 10000 }).catch(() => {});
+    if (!await page5b.evaluate(() => document.getElementById('updates-card')?.hidden)) await page5b.click('#updates-dismiss');
+    await page5b.waitForFunction(() => { const c = document.getElementById('updates-card'); return c && c.hidden; }, null, { timeout: 8000 }).catch(() => {});
     await page5b.click('#record-menu');
     await page5b.waitForFunction(() => !document.getElementById('tree-popover')?.hidden, null, { timeout: 8000 });
     await page5b.click('#tree-popover [data-tree-action="moments"]');
@@ -1274,7 +1278,7 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
         let ok = false;
         try {
           ok = await Promise.race([
-            f.evaluate(() => Boolean(document.getElementById('orbit')?.shadowRoot?.querySelector('[data-do=moments],[data-do=index]'))),
+            f.evaluate(() => document.documentElement.getBoundingClientRect().width > 0 && Boolean(document.getElementById('orbit')?.shadowRoot?.querySelector('[data-do=moments],[data-do=index]'))),
             page5b.waitForTimeout(2000).then(() => false)
           ]);
         } catch { ok = false; }
@@ -1321,6 +1325,10 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
       card: getComputedStyle(document.getElementById('updates-card')).display
     }));
     assert.deepEqual(listFooter, { sheet: true, links: 'none', card: 'none' }, `순간 목록 창이 열리면 아래 고정 항목이 숨는다: ${JSON.stringify(listFooter)}`);
+    // #1103: 띠·판은 이 자리에서 우리가 닫았다. 정보 안내가 스스로 내려갈 때까지 기다린 뒤,
+    // 문구 길이가 자리 검사에 끼어들지 않도록 짧은 한 줄을 셸 알림 줄 자리에 그대로 그린다.
+    await page5b.waitForFunction(() => { const t = document.getElementById('toast'); return t && t.hidden; }, null, { timeout: 12000 }).catch(() => {});
+    await page5b.evaluate(() => { const t = document.getElementById('toast'); t.textContent = '불러왔어요.'; t.hidden = false; });
     const toastBox = await page5b.locator('#toast').boundingBox();
     const shellFrameBox = await page5b.locator('#view').boundingBox();
     const listFrame = await orbitFrameOf();
@@ -1341,6 +1349,7 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     assert.equal(toastOverlap, 0, `알림 줄과 순간 목록 마지막 줄 겹침이 0px²이다: ${JSON.stringify({ toastBox, rowInPage, toastOverlap })}`);
     assert.ok(toastBox.y + toastBox.height <= shellFrameBox.y + listWindowBox.top, `알림 줄은 목록 창 위쪽 바깥에 있다: ${JSON.stringify({ toastBox, shellFrameBox, listWindowBox })}`);
     await take(page5b, '순간 목록 다섯 개');
+    await lowerToast(page5b);
     const listClose = await frameEval(() => {
       const b = document.getElementById('orbit')?.shadowRoot?.querySelector('dialog[open] [data-do="close"]');
       const r = b?.getBoundingClientRect();
@@ -1354,7 +1363,8 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
       links: getComputedStyle(document.querySelector('.home-links')).display,
       card: getComputedStyle(document.getElementById('updates-card')).display
     }));
-    assert.deepEqual(restoredFooter, { links: 'flex', card: 'flex' }, `순간 목록 창을 닫으면 아래 고정 항목이 돌아온다: ${JSON.stringify(restoredFooter)}`);
+    // #1103: 이 상태는 줄을 비우려고 띠를 닫았다(한 번에 하나). 링크 줄은 창을 닫으면 돌아오고, 닫은 띠는 돌아오지 않는다.
+    assert.deepEqual(restoredFooter, { links: 'flex', card: 'none' }, `순간 목록 창을 닫으면 아래 링크 줄이 돌아온다(닫아 둔 띠는 그대로): ${JSON.stringify(restoredFooter)}`);
     let picked = null;
     for (let i = 0; i < 16; i++) {
       picked = await frameEval(() => {
@@ -1524,6 +1534,10 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
       const pageNotice = await ctxNotice.newPage();
       await pageNotice.goto(`${base}/v41/?account=1#board`, { waitUntil: 'domcontentloaded' });
       await readyFrame(pageNotice, /track58-pinboard/, { root: '#cardLayer', why: '390 보드 첫 진입 프레임' });
+      // #1103: 판이 떠 있으면 안내 줄을 비운다 — 정보 안내는 그 뒤에 차례로 온다.
+      // (이 화면은 #board라 새 소식 띠는 뜨지 않는다 — 띠는 첫 화면에서만.)
+      await pageNotice.waitForFunction(() => !document.getElementById('tree-tips')?.hidden, null, { timeout: 8000 }).catch(() => {});
+      if (!await pageNotice.evaluate(() => document.getElementById('tree-tips')?.hidden)) await pageNotice.click('#tree-tips-close');
       const twoNotices = await pageNotice.evaluate(async () => {
         const boxOf = (el) => { const r = el.getBoundingClientRect(); return { t: r.top, b: r.bottom, l: r.left, rt: r.right }; };
         const overlapArea = (a, b) => Math.max(0, Math.min(a.rt, b.rt) - Math.max(a.l, b.l)) * Math.max(0, Math.min(a.b, b.b) - Math.max(a.t, b.t));

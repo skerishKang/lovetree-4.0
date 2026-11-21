@@ -624,8 +624,10 @@ body:has(dialog[open]) .updates-card,body.lt-sheet-open .updates-card,
 body:has(dialog[open]) .home-links,body.lt-sheet-open .home-links{display:none}
 /* 짧은 알림은 창 밖에 둔다. 셸 창은 화면 맨 위, 프레임 창은 셸 머리글 바로 아래의 빈 띠에 둔다. */
 body:has(dialog[open]) #toast{top:calc(8px + env(safe-area-inset-top));bottom:auto;left:14px;transform:none;max-width:calc(100% - 88px)}
-body.lt-frame-dialog-open #toast{top:calc(72px + env(safe-area-inset-top));bottom:auto;left:14px;transform:none;max-width:calc(100% - 88px)}
-@media(max-width:780px){body.lt-frame-dialog-open #toast{top:calc(66px + env(safe-area-inset-top))}}
+/* 프레임 창은 셸 머리글 바로 아래 띠에 둔다. 실제 본문 글꼴(Pretendard) 줄 높이까지 재서 창 윗변을 침범하지 않게 한다. */
+body.lt-frame-dialog-open #toast{top:calc(68px + env(safe-area-inset-top));bottom:auto;left:14px;transform:none;max-width:calc(100% - 88px)}
+/* 390에서 프레임 창(순간 목록)이 화면 거의 꽉 차게 뜨므로, 알림 줄은 머리글 바로 아래(62px)에 붙여 창 위쪽을 침범하지 않게 한다. */
+@media(max-width:780px){body.lt-frame-dialog-open #toast{top:calc(62px + env(safe-area-inset-top))}}
 /* 새 소식 창: 바닥 닫기 줄이 스크롤 본문 글자를 덮지 않게 본문 끝에 그 높이만큼 여백. */
 #updates-panel>#eras,#updates-panel>.updates-list{margin-bottom:64px}
 /* 이슈 611: 새 소식 화면. */
