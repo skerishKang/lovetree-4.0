@@ -829,6 +829,11 @@ html[data-lt-theme=garden] #share-form select,html[data-lt-theme=garden] #share-
 /* Issue 784: discovery is a cover-first grid; controls stay in one compact toolbar. */
 #community-panel{background:var(--lt-stage);background-image:none;color:var(--lt-pearl);overflow-y:auto;overscroll-behavior:contain}
 #community-panel::backdrop{background:color-mix(in srgb,var(--lt-stage) 74%,transparent);backdrop-filter:blur(2px)}
+/* #1092: 둘러보기는 겹쳐 뜨는 창이 아니라 화면이다 — 상단 메뉴 위의 ×는 없애고, 화면 뒤의 iframe·빈 화면도 남지 않게 숨긴다
+   (body.community-screen은 shell/community-screen.mjs가 붙인다). 비모달로 열리므로 뒤 덮개가 없어 상단 메뉴는 흐려지지 않고,
+   위치는 data-lt-panel="full" 규칙(맨 위 메뉴 아래 내용 자리)을 그대로 쓴다. */
+#community-panel [data-close="community-panel"]{display:none}
+body.community-screen #stage>iframe,body.community-screen #empty{display:none}
 #community-panel .community-top{max-width:1500px;margin:0 auto 8px;padding-top:26px}
 #community-panel .panel-heading{max-width:1500px;margin:0 auto 12px}
 #community-panel .panel-note{max-width:1500px;margin:0 auto 18px;color:var(--lt-pearl)}

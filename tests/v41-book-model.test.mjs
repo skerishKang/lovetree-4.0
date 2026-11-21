@@ -2,6 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { youtubeIdFrom } from '../public/v41/youtube-id.mjs';
 
 globalThis.window = globalThis;
 await import('../public/v41/views/book/book-model.js');
@@ -194,4 +195,33 @@ test('17. 책장 돌아가기 배선: 윗줄 왼쪽 버튼·기존 셸 이동·�
   assert.ok(!/typo-b|typo-note/.test(BOOK_CSS), '타이포 CSS가 없다');
   const SRC_CSS = fs.readFileSync(new URL('../src/views/book-source.css', import.meta.url), 'utf8');
   assert.ok(!/typo-b|typo-note/.test(SRC_CSS), 'src 쪽도 없다');
+});
+
+// #1059 표 시험: 유튜브 주소 한 벌을 모든 진입 함수(정본·책 모델)가 같은 id로 판정한다.
+const YT_CORPUS = [
+  'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+  'https://youtu.be/dQw4w9WgXcQ?t=42',
+  'https://www.youtube.com/shorts/dQw4w9WgXcQ',
+  'https://www.youtube.com/live/dQw4w9WgXcQ',
+  'https://www.youtube.com/embed/dQw4w9WgXcQ',
+  'http://m.youtube.com/watch?v=dQw4w9WgXcQ',
+  'https://music.youtube.com/watch?v=dQw4w9WgXcQ',
+  'https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=PL123',
+  'https://www.youtube.com/playlist?list=PL123',
+  'https://youtube.com.evil.test/watch?v=dQw4w9WgXcQ',
+  'https://user:pass@www.youtube.com/watch?v=dQw4w9WgXcQ',
+  'ftp://youtu.be/dQw4w9WgXcQ',
+  'https://www.youtube.com/shorts/abcdefghijkEXTRA',
+  'https://youtu.be/short',
+  'https://www.youtube.com/watch?v=toolongid123456',
+  'javascript:alert(1)'
+];
+
+test('#1059 표 시험: 책 모델 썸네일이 정본과 같은 id를 쓴다', () => {
+  for (const url of YT_CORPUS) {
+    const item = M.journeyTimeline([{ id: 'x', title: 'X', date: 'd', externalUrl: url }], [], 'x', () => '').items[0];
+    const id = youtubeIdFrom(url, { allowThumbnail: false });
+    const want = id ? `https://i.ytimg.com/vi/${id}/hqdefault.jpg` : '';
+    assert.equal(item.thumb, want, `책 모델 ${url}`);
+  }
 });

@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 // 시험 정비 2차(2026-11-15): community 배선 검사는 mountCommunity를 직접 띄워 동작으로 본다.
 import { mountCommunity } from '../public/v41/community-panel.mjs';
+import { createSettings } from '../public/v41/shell/settings.mjs';
+import { accountPresentation } from '../public/v41/header-state.mjs';
 
 // #453 CTO 점검 1차 PR 2: 설정 창 정리(C) · 자세한 추가 파일 단추(B-2) · 빈 화면 정리(D) · 예시 책 제목(E).
 // 화면 배선은 글자로, 순수 규칙은 함수로 고정한다.
@@ -77,12 +79,6 @@ function communityHarness({ items = [], defer = false, emptyHidden = true } = {}
     restore() { for (const k of Object.keys(saved)) { if (saved[k] === undefined) delete globalThis[k]; else globalThis[k] = saved[k]; } }
   };
 }
-
-test('C3·C4·C5: 이름·용량·공유 보기 이름', () => {
-  const nameLine = shell.slice(shell.indexOf('function paintSettingsProfile'), shell.indexOf('function paintSettingsProfile') + 700);
-  assert.match(nameLine, /displayName/, '표시 이름을 먼저 쓴다');
-  assert.equal((nameLine.match(/@/g) || []).length <= 1, true, '이메일은 한 번만 쓴다');
-});
 
 test('D1: 대화상자를 닫으면 빈 화면이 아닐 때만 탭의 "지금 보는 곳"을 되살린다', async () => {
   // 전: community-panel.mjs의 emptyShown 배선 글자 → 후: mountCommunity를 띄우고 열었다 닫아 본다.
@@ -240,3 +236,30 @@ test('#824·#903: 가입 7일 미만이 담기를 누르면 안내가 단추 바
     globalThis.fetch = previous;
   } finally { h.restore(); }
 });
+
+// #886 PR 1: 코드 이전으로 지운 '이름·용량·공유 보기 이름' 글자 단정을 동작 시험으로 대체한다.
+// 설정 프로필이 표시 이름을 먼저 쓰고 이메일은 한 번만 쓰는 것을 실제 모듈로 확인한다.
+test('C3 동작: 설정 프로필은 표시 이름을 먼저 쓰고 이메일은 한 번만 표시한다', () => {
+  const saved = { document: globalThis.document, window: globalThis.window, location: globalThis.location, localStorage: globalThis.localStorage };
+  const els = new Map();
+  const mk = (id = '') => ({ id, textContent: '', hidden: false, value: '', open: false, tabIndex: 0, disabled: false, dataset: {}, style: {}, classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } }, setAttribute() {}, getAttribute() { return null; }, replaceChildren() {}, append() {}, addEventListener() {}, removeEventListener() {}, querySelectorAll() { return []; }, querySelector() { return null; }, focus() {}, scrollIntoView() {}, closest() { return null; } });
+  const $ = id => { if (!els.has(id)) els.set(id, mk(id)); return els.get(id); };
+  globalThis.document = { getElementById: $, querySelectorAll: () => [], querySelector: () => null, createElement: () => mk(), addEventListener() {}, body: mk('body'), activeElement: mk(), documentElement: mk('html') };
+  globalThis.window = { innerWidth: 1440, innerHeight: 900, addEventListener() {}, LT41: { tree: { id: 't1', title: '트리', moments: [] } } };
+  globalThis.location = { origin: 'http://test', href: 'http://test/v41/', hash: '', search: '', assign() {} };
+  globalThis.localStorage = { getItem: () => null, setItem() {}, removeItem() {} };
+  try {
+    const stub = new Proxy(function () {}, { get: () => stub, apply: () => stub });
+    const deps = new Proxy({ $, notify() {}, accountPresentation, normalizeAccentColor: () => '', member: { snapshot: () => ({ owned: true, subject: 'u1' }), state: () => ({ prefs: { displayName: '러브', accentColor: '' } }) } }, { get(t, k) { return k in t ? t[k] : stub; } });
+    const settings = createSettings(deps);
+    settings.paintSettingsProfile('fan@example.com');
+    assert.equal($('settings-profile-name').textContent, '러브', '표시 이름을 이메일보다 먼저 쓴다');
+    assert.equal($('settings-profile-email').textContent, 'fan@example.com', '이메일은 한 번 표시한다');
+    deps.member.state = () => ({ prefs: { displayName: '', accentColor: '' } });
+    settings.paintSettingsProfile('fan@example.com');
+    assert.equal($('settings-profile-name').textContent, '이름 없음', '표시 이름이 없으면 이름 없음으로 표시한다');
+  } finally {
+    for (const [key, value] of Object.entries(saved)) globalThis[key] = value;
+  }
+});
+

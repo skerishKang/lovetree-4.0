@@ -1054,15 +1054,17 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     });
     assert.deepEqual(closeBottom, { text: '닫기', visible: true }, '새 소식 창 맨 아래에도 닫기가 보인다');
     await take(page4, '새 소식 닫기 버튼');
-    // 겹친 창 닫기(2026-11-16 대표 지적): 새 소식(비모달) 위에อีก�창(공유 목록·모달)을 띄우고 Esc →
-    // 맨 위 창 하나만 닫힌다(공유 목록 닫힘·새 소식은 남음) → Esc 한 번 더 → 새 소식 닫힘.
+    // 겹친 창 닫기(2026-11-16 대표 지적): 새 소식(비모달) 위에 또 창(설정·모달)을 띄우고 Esc →
+    // 맨 위 창 하나만 닫힌다(설정 닫힘·새 소식은 남음) → Esc 한 번 더 → 새 소식 닫힘.
+    // (#1092부터 둘러보기는 창이 아니라 서재·책·보드·지도와 같은 화면이다 — Esc·바깥 누름으로 닫히지 않으므로,
+    //  겹친 창 시험은 맨 위 모달로 설정 창을 띄운다.)
     // 머리 메뉴(공유 목록 단추)는 '창이 열린 채 누르면 창 닫고 이동' 규칙의 대상이라, 겹친 창 시험은 메뉴를 거치지 않고 직접 띄운다.
-    await page4.evaluate(() => document.getElementById('community-panel')?.showModal());
-    await page4.waitForFunction(() => !!document.getElementById('community-panel')?.open, null, { timeout: 8000 }).catch(() => {});
+    await page4.evaluate(() => document.getElementById('account-settings')?.showModal());
+    await page4.waitForFunction(() => !!document.getElementById('account-settings')?.open, null, { timeout: 8000 }).catch(() => {});
     await page4.keyboard.press('Escape');
     await page4.waitForTimeout(500);
-    const afterFirst = await page4.evaluate(() => ({ community: !!document.getElementById('community-panel')?.open, updates: !!document.getElementById('updates-panel')?.open }));
-    assert.deepEqual(afterFirst, { community: false, updates: true }, 'Esc 1회는 맨 위 창(공유 목록) 하나만 닫는다 — 새 소식은 남는다');
+    const afterFirst = await page4.evaluate(() => ({ settings: !!document.getElementById('account-settings')?.open, updates: !!document.getElementById('updates-panel')?.open }));
+    assert.deepEqual(afterFirst, { settings: false, updates: true }, 'Esc 1회는 맨 위 창(설정) 하나만 닫는다 — 새 소식은 남는다');
     await take(page4, '겹친 창 닫기');
     await page4.keyboard.press('Escape');
     await page4.waitForTimeout(500);
