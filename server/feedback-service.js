@@ -1,5 +1,6 @@
 import {ApiError} from './errors.js';
 import {parsePrincipal} from './principal.js';
+import {createRateLimiter} from './rate-limit.js';
 import {ROLE_ADMIN, ROLE_AI_CUSTOMER} from './admin-roles.js';
 import {audienceForRole} from './ops-notify.js';
 
@@ -81,12 +82,9 @@ function publicFollowup(row,viewer){
 
 export function createFeedbackService({feedbackRepo,productId,admin=null,opsNotify=null,now=()=>Date.now()}={}){
   if(!feedbackRepo)throw new Error('feedbackRepo가 필요합니다.');
-  const writes=new Map();
-  function rate(key,limit,windowMs,message){
-   const cut=now()-windowMs,list=(writes.get(key)||[]).filter(at=>at>cut);
-   if(list.length>=limit)throw new ApiError(429,'rate_limited',message);
-   list.push(now());writes.set(key,list);
-  }
+  // 속도 제한은 공용 한 벌(server/rate-limit.js)로 — 의견 창구는 10분 창을 쓴다(#1073 B-19).
+  const limiter=createRateLimiter({now,windowMs:10*60_000});
+  const rate=(key,limit,message)=>limiter.rate(key,limit,message);
   async function roleOf(principal){return principal&&admin?await admin.roleFor(principal):null;}
   async function notifyAudience(principal){if(!opsNotify)return null;try{return audienceForRole(await roleOf(principal));}catch{return null;}}
   function notifySaved(kind,title,sourceId,audience){if(opsNotify&&audience)void opsNotify.notify({kind,audience,title,sourceId}).catch(()=>{});}
@@ -106,8 +104,8 @@ export function createFeedbackService({feedbackRepo,productId,admin=null,opsNoti
     const text=clean(body,MAX_BODY);
     if(!text)throw new ApiError(400,'body_required','의견을 입력해 주세요.');
     const subjectId=principal&&typeof principal.subjectId==='string'?principal.subjectId:null;
-    if(subjectId)rate('sub:'+subjectId,20,10*60_000,'잠시 뒤 다시 보내 주세요.');
-    else rate('ip:'+clientKey(request),3,10*60_000,'같은 곳에서 10분에 3번까지 보낼 수 있어요. 잠시 뒤 다시 시도해 주세요.');
+    if(subjectId)rate('sub:'+subjectId,20,'잠시 뒤 다시 보내 주세요.');
+    else rate('ip:'+clientKey(request),3,'같은 곳에서 10분에 3번까지 보낼 수 있어요. 잠시 뒤 다시 시도해 주세요.');
     const masked=maskPersonal(text);
     const row=await feedbackRepo.create({productId,subjectId,kind:'opinion',category,title:firstLine(masked),body:masked,context:sanitizeContext(context)});
     notifySaved('feedback_new',row.title||firstLine(masked),String(row.id),await notifyAudience(principal));
@@ -124,7 +122,7 @@ export function createFeedbackService({feedbackRepo,productId,admin=null,opsNoti
     if(!content)throw new ApiError(400,'body_required','오늘 사용한 내용을 적어 주세요.');
     let value=null;
     if(score!==undefined&&score!==null&&score!==''){value=Number(score);if(!Number.isInteger(value)||value<1||value>5)throw new ApiError(400,'score_invalid','다시 올 점수는 1~5로 골라 주세요.');}
-    rate('journal:'+principal.subjectId,20,10*60_000,'잠시 뒤 다시 시도해 주세요.');
+    rate('journal:'+principal.subjectId,20,'잠시 뒤 다시 시도해 주세요.');
     const masked=maskPersonal(content);
     const today=await feedbackRepo.todayJournal({productId,subjectId:principal.subjectId});
     if(today){
@@ -176,7 +174,7 @@ export function createFeedbackService({feedbackRepo,productId,admin=null,opsNoti
     if(!post||post.subjectId!==principal.subjectId||post.kind!=='opinion')throw new ApiError(404,'feedback_not_found','글을 찾을 수 없어요.');
     const text=clean(body,MAX_BODY);
     if(!text)throw new ApiError(400,'body_required','덧붙일 말을 입력해 주세요.');
-    rate('followup:'+principal.subjectId,20,10*60_000,'잠시 뒤 다시 시도해 주세요.');
+    rate('followup:'+principal.subjectId,20,'잠시 뒤 다시 시도해 주세요.');
     const reply=await feedbackRepo.addReply({productId,postId:post.id,authorType:'customer',authorSubjectId:principal.subjectId,body:maskPersonal(text)});
     notifySaved('feedback_append',post.title||firstLine(post.body),String(reply.id),await notifyAudience(principal));
     let status=post.status;
@@ -201,7 +199,7 @@ export function createFeedbackService({feedbackRepo,productId,admin=null,opsNoti
     if(current.authorSubjectId!==principal.subjectId)throw new ApiError(403,'followup_forbidden','이 덧붙일 말을 고칠 수 없어요.');
     const text=clean(body,MAX_BODY);
     if(!text)throw new ApiError(400,'body_required','덧붙일 말을 입력해 주세요.');
-    rate('followup:'+principal.subjectId,20,10*60_000,'잠시 뒤 다시 시도해 주세요.');
+    rate('followup:'+principal.subjectId,20,'잠시 뒤 다시 시도해 주세요.');
     const row=await feedbackRepo.updateReply({productId,replyId:current.id,subjectId:principal.subjectId,body:maskPersonal(text)});
     if(!row)throw new ApiError(403,'followup_forbidden','이 덧붙일 말을 고칠 수 없어요.');
     if(post.status==='fixed'||post.status==='closed'){

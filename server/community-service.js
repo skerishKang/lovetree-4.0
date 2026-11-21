@@ -1,6 +1,7 @@
 import {randomUUID} from 'node:crypto';
 import {ApiError} from './errors.js';
 import {parsePrincipal} from './principal.js';
+import {createRateLimiter} from './rate-limit.js';
 import {projectSharedTree} from './share-service.js';
 import {refreshStageIndex} from './stage-index-refresh.js';
 import {ROLE_TESTER,isAiTesterRole} from './admin-roles.js';
@@ -30,7 +31,9 @@ function clientKey(request){const value=String(request?.headers?.['idempotency-k
 function publicComment(row,viewer,isAdmin=false){const mine=!!viewer&&row.subjectId===viewer;const edited=!!(row.editedAt||(row.updatedAt&&row.createdAt&&String(row.updatedAt)>String(row.createdAt)));return {id:row.id,body:row.body,createdAt:row.createdAt,updatedAt:row.updatedAt,edited,mine,canDelete:mine||isAdmin,canEdit:mine,authorLabel:mine?'나':'기록한 사람'};}
 
 export function createCommunityService({communityRepo,shareRepo,workspaceRepo,visibilityRepo=null,productId,admin=null,stageIndex=null,stageVoteRepo=null,now=()=>Date.now(),makeId=()=>randomUUID(),signupAtFor=null,random=Math.random}){
- const writes=new Map();
+ // 속도 제한은 공용 한 벌(server/rate-limit.js)로 — 커뮤니티 창구는 1분 창을 쓴다(#1073 B-19).
+ const limiter=createRateLimiter({now});
+ const rate=(subjectId,kind,limit=20)=>limiter.rate(subjectId+'\0'+kind,limit);
  let totalsCache=null;
  // 이번 주의 시작(월요일 0시, KST — #824 결정 4 '주 = 월~일 KST'). KST는 UTC+9 고정이라 서머타임
  // 보정이 없다. 주 규칙은 여기 한 곳에서만 계산한다 — SQL·화면에 복제하지 않는다.
@@ -50,11 +53,6 @@ export function createCommunityService({communityRepo,shareRepo,workspaceRepo,vi
  function publicStage(result){
   if(!result)throw new ApiError(404,'stage_not_found','공개 무대를 찾을 수 없어요.');
   return result;
- }
- function rate(subjectId,kind,limit=20){
-  const key=subjectId+'\0'+kind,cut=now()-60_000,list=(writes.get(key)||[]).filter(at=>at>cut);
-  if(list.length>=limit)throw new ApiError(429,'rate_limited','잠시 뒤 다시 시도해 주세요.');
-  list.push(now());writes.set(key,list);
  }
  async function activeShare(shareId){
   if(!SHARE_ID.test(shareId))throw new ApiError(404,'share_not_found','공개 트리를 찾을 수 없어요.');
