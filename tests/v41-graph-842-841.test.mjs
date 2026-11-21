@@ -116,3 +116,64 @@ test('#842·#841 v3 — 실제 셸의 꼬리표 정리 판 연결과 저장 뒤 
     await new Promise((ok) => server.close(ok));
   }
 });
+
+// #1057: 그래프 점(tabindex=0·role=button)을 키보드로 눌러도 클릭과 같은 상세가 열린다(소스 글자 검사 없음).
+test('#1057 점에 초점을 두고 Enter·Space — 묶음·순간 상세가 열린다', { skip: skip || !REQUIRE ? skip || 'LT_GRAPH_842_REQUIRE=1 일 때 실행' : false, timeout: 180000 }, async () => {
+  assert.ok(chromium && !skip, '브라우저 준비 실패: ' + (skip || '알 수 없음'));
+  assert.ok(existsSync(DIST_HOME), '빌드 결과(dist/v41/home.html)가 없다');
+  const server = await serve();
+  const origin = `http://127.0.0.1:${server.address().port}`;
+  const TREE = fixtureTree();
+  const browser = await chromium.launch({ headless: true });
+  let ctx;
+  try {
+    ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
+    await ctx.addInitScript(() => { try { localStorage.setItem('lt41.theme', 'night'); } catch {} });
+    await ctx.route('**://i.ytimg.com/**', THUMB);
+    await ctx.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
+    await ctx.route('**/api/workspace**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ revision: 1, state: { version: 1, trees: [TREE], prefs: {} }, subject: '시험계정', writeSubjectBound: true, savedAt: '2026-11-18T09:00:00.000Z' }) }));
+    const page = await ctx.newPage();
+    await page.goto(`${origin}/v41/?account=1#my/graph`, { waitUntil: 'load' });
+    await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
+    await page.locator('#discover-ask-no').click().catch(() => {});
+    let graph = null;
+    for (let i = 0; i < 40 && !graph; i++) {
+      graph = page.frames().find((f) => /track60-graph/.test(f.url()));
+      if (!graph) await page.waitForTimeout(250);
+    }
+    assert.ok(graph, '그래프 화면이 열린다');
+    await graph.locator('#gBadge').waitFor({ timeout: 10000 });
+    const detail = () => graph.locator('#detailCard').innerText();
+    const dots = graph.locator('#gsvg g[role="button"][tabindex="0"]');
+    const count = await dots.count();
+    assert.ok(count >= 2, `누를 수 있는 점이 있다(실제 ${count}개)`);
+    // 순간 점에 초점을 두고 Enter — 순간 상세가 열린다.
+    const first = graph.locator('#gsvg g[data-moment]').first();
+    await first.focus();
+    assert.equal(await graph.evaluate(() => document.activeElement?.hasAttribute('data-moment')), true, '순간 점에 초점이 갔다');
+    await page.keyboard.press('Enter');
+    await graph.waitForFunction(() => document.querySelector('#detailCard .d-kicker')?.textContent === '순간 · 무대 날짜', null, { timeout: 5000 });
+    console.log('#1057 moment Enter', JSON.stringify((await detail()).slice(0, 80)));
+    // 다른 순간 점에 초점을 두고 Space — 같은 방식으로 상세가 바뀐다.
+    const second = graph.locator('#gsvg g[data-moment]').nth(1);
+    await second.focus();
+    await page.keyboard.press(' ');
+    await graph.waitForFunction(() => document.querySelector('#detailCard .d-kicker')?.textContent === '순간 · 무대 날짜', null, { timeout: 5000 });
+    const afterSpace = await detail();
+    assert.ok(afterSpace.length > 0, 'Space로도 상세가 열린다');
+    console.log('#1057 moment Space', JSON.stringify(afterSpace.slice(0, 80)));
+    // 묶음 점이 있는 표본에서는 묶음도 Enter로 열린다(공개 꼬리표가 있을 때만 그려진다).
+    const hub = graph.locator('#gsvg g[data-hub-key]').first();
+    if (await hub.count()) {
+      await hub.focus();
+      await page.keyboard.press('Enter');
+      await graph.waitForFunction(() => document.querySelector('#detailCard .d-kicker')?.textContent?.includes('묶음'), null, { timeout: 5000 });
+      console.log('#1057 hub Enter', JSON.stringify((await detail()).slice(0, 80)));
+    }
+    await page.close();
+  } finally {
+    if (ctx) await ctx.close();
+    await browser.close();
+    await new Promise((ok) => server.close(ok));
+  }
+});
