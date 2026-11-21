@@ -16,7 +16,7 @@ const failure=(s,c,m)=>new ApiError(s,c,m);
 function sanitizeLabel(raw){
  try{
   const decoded=decodeURIComponent(String(raw||''));
-  const cleaned=decoded.split(/[\\/]/).pop().replace(/[\u0000-\u001f\u007f]/g,'').trim();
+  const cleaned=decoded.split(/[\\/]/).pop().replace(/[\x00-\x1f\x7f]/g,'').trim();
   if(!cleaned)return null;
   return cleaned.slice(0,100);
  }catch{return null;}

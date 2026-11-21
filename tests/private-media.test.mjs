@@ -24,6 +24,8 @@ test('original file name is stored for display and unsafe values are cleaned',as
  assert.equal(cross.label,'secret.txt');
  const tooLong=await store.put(A,{id:randomUUID(),mime:'image/png',bytes:png,label:'x'.repeat(200)});
  assert.equal(tooLong.label?.length,100);
+ const ctrl=await store.put(A,{id:randomUUID(),mime:'image/png',bytes:png,label:encodeURIComponent('무\u0000대\u001f사\u007f진.png')});
+ assert.equal(ctrl.label,'무대사진.png');
  await assert.rejects(store.put(A,{id:'../outside',mime:'image/png',bytes:png,label:'x' }),{status:400});
 });
 test('private media round trip, account/product isolation, restart and deletion',async t=>{
