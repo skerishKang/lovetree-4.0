@@ -875,6 +875,8 @@ test('1001c 실행: 쓰기 판 날짜·감정·비공개 변경 — 재적재 0�
 // (3)이 만든 meta 모델 전용 길을 그대로 쓴다. 다른 트리 선택은 적절한 재적재를 유지한다.
 test('1001d 실행: 자세한 추가·설정·영상 정보·서재 ⋯ 같은 트리 — 재적재 0·갱신 결과 = 새로고침 결과(같은 펼침면)', { skip: skip || !REQUIRE ? skip || 'LT_BOOK_584_REQUIRE=1 일 때 실행' : false, timeout: 420000 }, async () => {
   if (skip) assert.fail(`CI에서 이 시험은 건너뛰도록 설계됐다 — ${skip}`);
+  // #1080: 동작별 shard — 지정하지 않으면 네 동작 모두, 지정하면 그 동작만. 검사 내용·기준은 같다.
+  const shardFilter = (process.env.LT_BOOK_1001D_ACTION || '').split(',').filter(Boolean);
   const { createTree: makeTree, addMoment: growTree } = await import('../public/v41/domain.mjs');
   const { serve: serveApp } = await import('./helpers/screen-audit.mjs');
   const { waitForShownScreen: waitShown } = await import('./helpers/visible-frame.mjs');
@@ -901,6 +903,7 @@ test('1001d 실행: 자세한 추가·설정·영상 정보·서재 ⋯ 같은 �
   });
   try {
     for (const action of ['add', 'setPrefs', 'cacheMediaMetadata', 'manageSame']) {
+      if (shardFilter.length && !shardFilter.includes(action)) continue;
       const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
       let rev = 1, stored = [t1, t2].map(x => JSON.parse(JSON.stringify(x)));
       const puts = [];

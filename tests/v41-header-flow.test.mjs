@@ -39,7 +39,7 @@ const STATES = [
     make: () => ({ owned: true, trees: 2, tree: { title: '리센느, 나의 순간들' }, source: 'server' }),
     expect: {
       treeViews: true, recordMenu: true, writeMenu: true, shareMenu: true,
-      picker: '트리: 리센느', write: '＋ 순간 추가', aria: '이 트리 보기'
+      picker: '리센느', write: '＋ 순간 추가', aria: '이 트리 보기'
     }
   },
   {
@@ -47,7 +47,7 @@ const STATES = [
     make: () => ({ owned: true, trees: 2, tree: { title: '리센느, 나의 순간들' }, source: 'share' }),
     expect: {
       treeViews: false, recordMenu: false, writeMenu: false, shareMenu: false,
-      picker: '트리: 리센느', write: '＋ 순간 추가', aria: '이 트리 보기'
+      picker: '리센느', write: '＋ 순간 추가', aria: '이 트리 보기'
     }
   }
 ];

@@ -47,7 +47,7 @@ export function treePickerLabel(treeTitle) {
   return title || '트리 고르기';
 }
 
-// 트리 선택 버튼 문구(전체). 로그인 상태에서 트리가 열려 있으면 "트리: <이름> ▾" 형태로 보여 준다.
+// 트리 선택 버튼의 전체 글자(스크린리더·안내용). 로그인 상태에서 "트리: <이름>"이다.
 // 로그아웃이면 예시 트리가 열려 있어도 "트리 고르기"다(내 트리가 아니다).
 // 브라우저에만 남은 미저장 기록이 있으면 "저장 안 된 기록"으로 구분해 보여 준다.
 export function treePickerText({ owned = false, treeTitle = '', pendingDraft = false, treeCount = 1 } = {}) {
@@ -55,6 +55,16 @@ export function treePickerText({ owned = false, treeTitle = '', pendingDraft = f
   if (!pendingDraft && Number(treeCount) === 0) return '트리 없음';
   const title = clean(treeTitle);
   return title ? `트리: ${title}` : '트리 고르기';
+}
+
+// 단추 안에 보이는 글자 — '트리:'는 단추 밖 고정 글자이므로 이름만 남긴다(#1090).
+export function treePickerVisible(options = {}) {
+  return treePickerText(options).replace(/^트리: /, '');
+}
+
+// 스크린리더가 읽는 이름 — 밖의 '트리'와 단추의 동작을 함께 적는다.
+export function treePickerAriaLabel(options = {}) {
+  return `${treePickerText(options)}, 트리 바꾸기`;
 }
 
 // 트리 보기 탭(기억책·기억 보드·관계 지도)은 로그인한 내 트리에서만 열린다.

@@ -181,6 +181,9 @@ export function createProxy({ fetcher = (...args) => fetch(...args), timeoutMs =
     // 브라우저가 보낸 값으로 덮어쓸 수 없게 여기서 마지막에 설정한다(#540).
     const clientIp = String(request.headers.get('cf-connecting-ip') || (request.headers.get('x-forwarded-for') || '').split(',')[0] || '').trim();
     if (clientIp) headers.set('x-lovetree-client-ip', clientIp.slice(0, 64));
+    // 서버 요청 출처 확인용 공유 머리말 — 브라우저가 보낸 값과 같은 이름을 쓰지 않는다.
+    const proof = typeof env?.LOVETREE_PROXY_SECRET === 'string' ? env.LOVETREE_PROXY_SECRET.trim() : '';
+    if (proof) headers.set('x-lovetree-proxy-proof', proof);
 
     // 타이머는 응답 본문까지 읽고 나서야 해제한다. 만료되면 업스트림 요청과 읽기를 함께 취소한다.
     const controller = new AbortController();

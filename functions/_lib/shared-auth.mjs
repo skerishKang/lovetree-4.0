@@ -28,7 +28,7 @@ export async function recordAccountEmail(env, fetcher, tokens, verified) {
       : undefined;
     const response = await fetcher(`${origin}${ACCOUNT_EMAIL_PATH}`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json', authorization: `Bearer ${tokens.access_token}` },
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${tokens.access_token}`, ...(typeof env?.LOVETREE_PROXY_SECRET === 'string' && env.LOVETREE_PROXY_SECRET.trim() ? { 'x-lovetree-proxy-proof': env.LOVETREE_PROXY_SECRET.trim() } : {}) },
       body: JSON.stringify({ email, canonical_subject_id: accountId }),
       redirect: 'manual',
       ...(signal ? { signal } : {})

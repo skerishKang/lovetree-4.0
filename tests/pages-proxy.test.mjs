@@ -28,7 +28,7 @@ test('무대 조회와 투표만 전달하고 담기 해제의 빈 204를 보존
     assert.equal(fetcher.calls.length,0);
   }
 });
-const onRequest = (proxy, url, init) => proxy({ request: new Request(url, init), env: { LOVETREE_API_ORIGIN: UPSTREAM } });
+const onRequest = (proxy, url, init, extraEnv = {}) => proxy({ request: new Request(url, init), env: { LOVETREE_API_ORIGIN: UPSTREAM, ...extraEnv } });
 
 function recorder(reply) {
   const calls = [];
@@ -425,4 +425,11 @@ test('사이트가 부르는 /api 경로는 프록시가 모두 넘긴다', asyn
     if (!forwarded) missing.push(raw);
   }
   assert.deepEqual(missing, [], `프록시 허용 목록에 빠진 사이트 경로: ${missing.join(', ')}`);
+});
+
+test('서버 요청 출처 확인: 프록시가 공유 머리말을 업스트림에 붙인다', async () => {
+  const fetcher = recorder(new Response('{"ok":true}', { headers: { 'content-type': 'application/json' } }));
+  const proxy = createProxy({ fetcher });
+  await onRequest(proxy, 'https://lovetree.example/api/workspace', { method: 'GET' }, { LOVETREE_API_ORIGIN: UPSTREAM, LOVETREE_PROXY_SECRET: 's'.repeat(48) });
+  assert.equal(fetcher.calls.at(-1).headers['x-lovetree-proxy-proof'], 's'.repeat(48));
 });
