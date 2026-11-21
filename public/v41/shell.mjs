@@ -546,11 +546,12 @@ const shellLocation=createLocation({
 });
 // 새 소식 창(비모달)의 Esc — 다른 창이 하나라도 열려 있으면 그 창이 Esc를 맡는다(맨 위 창 하나 규칙).
 // capture로 등록해 다른 Esc 처리보다 먼저 본다 — 아래 창(공유 목록)이 먼저 닫힌 뒤 '열린 창 없음'으로 오판하지 않게.
+// #1092: 둘러보기는 창이 아니라 화면이라 Esc를 맡지 않는다 — 맨 위 창 판정에서 뺀다(화면 위의 창도 Esc로 닫히게).
 document.addEventListener('keydown', event => {
   if (event.key !== 'Escape') return;
   const updates = $('updates-panel');
   if (!updates?.open || updates.matches(':modal')) return;
-  if ([...document.querySelectorAll('dialog[open]')].some(d => d !== updates)) return; // 다른 창이 남아 있으면(맨 위 모달 포함) 그 창이 맡는다
+  if ([...document.querySelectorAll('dialog[open]')].some(d => d !== updates && !(d.id === 'community-panel' && document.body.classList.contains('community-screen')))) return; // 다른 창이 남아 있으면(맨 위 모달 포함) 그 창이 맡는다
   event.preventDefault(); shellDialogs.requestClose('updates-panel');
 }, true);
 // 새 소식 창이 열린 채 위 메뉴(머리글)를 누르면 창을 닫고 그 메뉴로 이동한다(캡처 — 이동 처리는 그대로).
