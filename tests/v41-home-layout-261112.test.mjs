@@ -43,7 +43,8 @@ test('카드는 언제나 불투명하고, 크기·밝기·흐림으로 깊이�
     assert.doesNotMatch(body, /mix-blend/, `mix-blend 없음: ${sel.trim().slice(0,40)}`);
     assert.doesNotMatch(body, /blur/, `blur 없음: ${sel.trim().slice(0,40)}`);
   }
-  assert.match(orbit, /el\.style\.filter=`brightness\(\$\{fv\}\) blur\(\$\{bv\}px\)`/, '깊이 = 밝기 + 흐림');
+  assert.match(orbit, /el\.style\.filter=depthFilter/, '깊이는 filter 변수로 한 번만 쓴다');
+  assert.match(orbit, /brightness\(\$\{fv\}\) blur\(\$\{bv\}px\)/, '깊이 = 밝기 + 흐림');
   assert.match(orbit, /0\.78\+0\.22\*depth/, '뒤쪽 카드는 밝기 0.78까지');
   assert.match(orbit, /\(1-depth\)\*2\.2/, '뒤쪽 카드는 흐림 2.2px까지');
   assert.match(orbit, /ORBIT_MS=90000/, '한 바퀴 90초');
