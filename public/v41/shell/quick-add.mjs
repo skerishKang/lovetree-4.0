@@ -422,7 +422,9 @@ export function createQuickAdd(deps) {
     // #978: 저장은 동기화 끝에 화면을 다시 그리며 열린 창을 닫으려 한다(choose → show → closePanels). 지금
     // 담는 중인 창은 '아직 안 넣은 것'이 아니므로 물음 없이 열어 둔다 — 저장이 끝나면 바로 푼다.
     let held = false;
-    try { deps.holdPanel?.('write-panel', true); held = true; result = deps.getMember().apply('quickAdd', input) || null; }
+    // #1001 마지막: 고른 트리가 있으면 그 트리 안 변경 — (3)의 meta 모델 전용 길로 화면을 다시 띄우지 않는다.
+    // 트리를 못 골랐으면(inbox 신규 생성) 재적재를 유지한다.
+    try { deps.holdPanel?.('write-panel', true); held = true; result = deps.getMember().apply('quickAdd', input, undefined, input.treeId ? {moment:true} : undefined) || null; }
     catch (error) { if (held) deps.holdPanel?.('write-panel', false); $('quick-error').textContent = error.message; return false; }
     if (held) deps.holdPanel?.('write-panel', false);
     quickTarget = null;

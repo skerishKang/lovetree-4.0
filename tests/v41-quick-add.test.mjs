@@ -392,7 +392,7 @@ test('#638 두 번째 트리를 고른 상태에서 담으면 그 트리로 저�
   h.els['quick-url'].value = URL_OK;
   h.api.renderPreview();
   h.api.submitQuick({ preventDefault() {} });
-  assert.deepEqual(h.calls.apply[0], ['quickAdd', { url: URL_OK, treeId: 't-second' }]);
+  assert.deepEqual(h.calls.apply[0], ['quickAdd', { url: URL_OK, treeId: 't-second' }, undefined, {moment:true}]);
 });
 
 test('#638 트리가 0개면 기본 트리 문구를 보이고 treeId를 보내지 않는다', () => {
@@ -403,7 +403,7 @@ test('#638 트리가 0개면 기본 트리 문구를 보이고 treeId를 보내�
   h.els['quick-url'].value = URL_OK;
   h.api.renderPreview();
   h.api.submitQuick({ preventDefault() {} });
-  assert.deepEqual(h.calls.apply[0], ['quickAdd', { url: URL_OK }], '기존 규칙(기본 트리 생성)으로 저장한다');
+  assert.deepEqual(h.calls.apply[0], ['quickAdd', { url: URL_OK }, undefined, undefined], '기존 규칙(기본 트리 생성)으로 저장한다');
 });
 
 test('#638 트리가 하나뿐이면 고르기를 숨기고 그 트리 이름을 보인다', () => {
@@ -438,7 +438,7 @@ test('#671 openWrite는 목적지 순간 다음에 담기 문구를 보이고 �
   h.els['quick-url'].value = URL_OK;
   h.api.renderPreview();
   h.api.submitQuick({ preventDefault() {} });
-  assert.deepEqual(h.calls.apply[0], ['quickAdd', { url: URL_OK, treeId: 't-second', parentId: 's9' }]);
+  assert.deepEqual(h.calls.apply[0], ['quickAdd', { url: URL_OK, treeId: 't-second', parentId: 's9' }, undefined, {moment:true}]);
 });
 
 test('#671 목적지 없이 열면 기존 한 줄로 열고 parentId를 보내지 않는다', () => {
@@ -449,7 +449,7 @@ test('#671 목적지 없이 열면 기존 한 줄로 열고 parentId를 보내�
   h.els['quick-url'].value = URL_OK;
   h.api.renderPreview();
   h.api.submitQuick({ preventDefault() {} });
-  assert.deepEqual(h.calls.apply[0], ['quickAdd', { url: URL_OK, treeId: 't-second' }]);
+  assert.deepEqual(h.calls.apply[0], ['quickAdd', { url: URL_OK, treeId: 't-second' }, undefined, {moment:true}]);
 });
 
 test('#671 목적지 순간을 못 찾으면 목적지 없이 열린다', () => {
@@ -484,7 +484,7 @@ test('#638 제목이 늦게 도착하면 방금 담은 순간의 영상 제목�
   h.els['quick-url'].value = URL_OK;
   h.api.renderPreview(); // 미리보기 때 제목 요청이 나간다(아직 응답 전)
   h.api.submitQuick({ preventDefault() {} }); // 제목을 못 받은 채 담는다 — 기본 문구로 저장됨
-  assert.deepEqual(h.calls.apply[0], ['quickAdd', { url: URL_OK, treeId: 't-second' }]);
+  assert.deepEqual(h.calls.apply[0], ['quickAdd', { url: URL_OK, treeId: 't-second' }, undefined, {moment:true}]);
   assert.equal(h.calls.apply.length, 1, '제목이 오기 전에는 채우는 저장이 없다');
   h.resolveTitle(VIDEO_TITLE); // oEmbed 응답이 도착한다
   await new Promise(resolve => setImmediate(resolve));
@@ -500,14 +500,14 @@ test('#638 제목을 받아 둔 뒤 담으면 mediaMetadata가 저장 입력에 
   await new Promise(resolve => setImmediate(resolve));
   await new Promise(resolve => setImmediate(resolve));
   h.api.submitQuick({ preventDefault() {} });
-  assert.deepEqual(h.calls.apply[0], ['quickAdd', { url: URL_OK, treeId: 't-second', mediaMetadata: { title: VIDEO_TITLE } }]);
+  assert.deepEqual(h.calls.apply[0], ['quickAdd', { url: URL_OK, treeId: 't-second', mediaMetadata: { title: VIDEO_TITLE } }, undefined, {moment:true}]);
   assert.equal(h.calls.apply.length, 1);
 });
 
 test('#638 끌어다 놓기로 바로 담았을 때도(미리보기 요청이 없어도) 제목이 오면 채운다', async () => {
   const h = harness638();
   h.api.saveUrl(URL_OK); // 미리보기 없이 바로 담는다
-  assert.deepEqual(h.calls.apply[0], ['quickAdd', { url: URL_OK, treeId: 't-second' }]);
+  assert.deepEqual(h.calls.apply[0], ['quickAdd', { url: URL_OK, treeId: 't-second' }, undefined, {moment:true}]);
   h.resolveTitle(VIDEO_TITLE);
   await new Promise(resolve => setImmediate(resolve));
   await new Promise(resolve => setImmediate(resolve));
@@ -601,7 +601,7 @@ test('트리 한 줄 문구: 이름을 그대로 쓰고, 이름이 트리로 끝
 // 화면을 두 번 다시 띄우던 결함 — 한 번만 다시 떠야 한다.
 // 보정 조회(/api/youtube/oembed)를 쉬운 추가의 PUT 뒤까지 늦춰 두 동작이 한 흐름에 겹치게 한다.
 // 전: quickAdd 재적재 + backfillTitles 재적재 = 2회. 후: quickAdd 1회 + 보정은 모델만 갱신 = 1회.
-test('952/1001a 실행: 쉬운 추가 뒤 자동 제목 보정 — 같은 흐름에서 화면 재적재는 1회', { skip: skip952 || !REQUIRE952 ? skip952 || 'LT_MEDIA_952_REQUIRE=1 일 때 실행' : false, timeout: 180000 }, async () => {
+test('952/1001 최종 실행: 쉬운 추가 뒤 자동 제목 보정 — 같은 흐름에서 화면 재적재는 0회·새 순간이 책에 보인다', { skip: skip952 || !REQUIRE952 ? skip952 || 'LT_MEDIA_952_REQUIRE=1 일 때 실행' : false, timeout: 180000 }, async () => {
   if (skip952) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip952}`);
   const { createTree: makeTree, addMoment: growTree } = await import('../public/v41/domain.mjs');
   const { serve: serveApp } = await import('./helpers/screen-audit.mjs');
@@ -644,6 +644,8 @@ test('952/1001a 실행: 쉬운 추가 뒤 자동 제목 보정 — 같은 흐름
     await page.goto(`${base}/v41/?account=1`, { waitUntil: 'load' });
     await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
     await page.locator('#discover-ask-no').click().catch(() => {});
+    await page.locator('.tree-views [data-view="track59-sketchbook.html"]').click();
+    await page.waitForFunction(() => [...document.querySelectorAll('iframe')].some(f => /track59-sketchbook/.test(f.contentWindow?.location?.href || '')), null, { timeout: 10000 });
     await page.waitForTimeout(2000);
     await page.evaluate(() => document.getElementById('write-menu').click());
     await page.waitForFunction(() => !!document.getElementById('quick-url') && document.getElementById('quick-url').getClientRects().length, null, { timeout: 10000 });
@@ -666,7 +668,14 @@ test('952/1001a 실행: 쉬운 추가 뒤 자동 제목 보정 — 같은 흐름
     await page.waitForTimeout(2500);
     const fixed = stored.moments.find(m => (m.url || '').includes('OLDVIDEO123'));
     assert.equal(fixed?.title, '보정된 영상 제목', '보정이 실제로 제목을 바로잡았다(흐름이 헛돌지 않음)');
-    assert.equal(navs.length, 1, `같은 저장 흐름에서 화면 재적재는 1회여야 한다(실측 ${navs.length}: ${JSON.stringify(navs)})`);
+    assert.equal(navs.length, 0, `같은 저장 흐름에서 화면 재적재는 0회여야 한다(실측 ${navs.length}: ${JSON.stringify(navs)})`);
+    const added = stored.moments.find(m => (m.url || '').includes('NEWVIDEO456'));
+    assert.ok(added?.id, '새 순간이 모델에 저장된다');
+    const bookFrame = page.frames().find(f => /views\/track59-sketchbook/.test(f.url()));
+    const pages = await bookFrame.evaluate(() => window.__TRACK59__.pageCount());
+    await bookFrame.evaluate(i => window.__TRACK59__.jump(i), pages - 1);
+    await bookFrame.waitForSelector(`[data-moment="${added.id}"]`, { timeout: 10000 });
+    assert.ok(await bookFrame.evaluate(id => !!document.querySelector(`[data-moment="${id}"]`), added.id), '새 순간이 같은 책 문서에 그려진다(재적재 없이)');
     await ctx.close();
   } finally { await browser.close(); server.close(); }
 });

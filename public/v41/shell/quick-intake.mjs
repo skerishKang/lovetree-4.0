@@ -70,8 +70,8 @@ export function createQuickIntake(deps) {
     // #876(규칙 1·4): 붙여넣기·공유로 담을 때(담을 곳은 '모아둔 순간')도 같은 규칙 — 같은 영상·같은 장면이
     // 이미 있으면 조용히 막지 말고 안내 창으로 한 번 알려 준다. [그래도 담기]를 누르면(force) 이 판정을
     // 다시 보지 않고 담는다. 창을 닫으면 아무것도 담지 않고 끝낸다(붙여넣기 값은 이미 소비했다).
+    const inboxTree = trees.find(tree => tree?.inbox === true) || null;
     if (!options.force) {
-      const inboxTree = trees.find(tree => tree?.inbox === true) || null;
       const dup = inboxTree ? findSameVideoInTree(inboxTree, url) : null;
       if (dup) {
         slot.clear(); attempts.clear();
@@ -87,7 +87,9 @@ export function createQuickIntake(deps) {
     }
     const commit = (media) => {
       try {
-        member.apply('quickAdd', { url, ...media });
+        // #1001 마지막: 첫 화면 담기도 이미 있는 모아둔 순간 트리에 붙이면 모델만 갱신한다.
+        // inbox가 없어 새 트리를 만드는 경우에는 재적재를 유지한다.
+        member.apply('quickAdd', { url, ...media }, undefined, inboxTree ? {moment:true} : undefined);
         slot.clear(); attempts.clear();
         // #876 규칙 3: 다른 트리에 같은 영상이 있으면 막지 않고 담은 뒤 한 줄 알린다 — 담았다는 안내와 한 줄로.
         const others = treesWithSameVideo(trees, { excludeTreeId: String(trees.find(tree => tree?.inbox === true)?.id || ''), url });
