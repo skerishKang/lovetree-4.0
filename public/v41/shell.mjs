@@ -21,6 +21,7 @@ import {frameMessage, frameReadyMessages, FRAME_MESSAGE_TYPES} from './frame-wir
 import {screens,screenForView,viewForFile,themedViewFor} from './shell/navigation.mjs';
 import {createScreens} from './shell/screens.mjs';
 import {createHomeLink} from './shell/home-link.mjs';
+import {createCommunityScreen} from './shell/community-screen.mjs';
 import {createHeader} from './shell/header.mjs';
 import {createAuth} from './shell/auth.mjs';
 import {createPanels} from './shell/panels.mjs';
@@ -273,13 +274,12 @@ document.addEventListener('keydown',event=>{
 addEventListener('resize',()=>{if(matchMedia('(min-width:781px)').matches)closeMore();});
 // #458: 화상 키보드가 올라오면(시각 창이 눌리면) 떠 있는 단추가 입력 칸을 가리지 않게 숨긴다.
 if(window.visualViewport){const fabKbd=()=>document.body.classList.toggle('lt-kbd',window.visualViewport.height<window.innerHeight-120);window.visualViewport.addEventListener('resize',fabKbd);fabKbd();}
-document.addEventListener('keydown',event=>{
- const c=$('community-panel');
- // #380 4 마지막: 둘러보기도 공통 틀의 닫기 규칙(×·바같 클릭·Esc·초점 복귀)을 쓴다.
- if(event.key==='Escape'&&c.open&&![...document.querySelectorAll('dialog[open]')].some(d=>d!==c&&d.matches(':modal')))shellDialogs.requestClose('community-panel');
-});
+// #1092: 둘러보기는 겹쳐 뜨는 창이 아니라 서재·책·보드·지도와 같은 화면이다 — 공통 틀의 Esc·바깥 누름 닫기 규칙(#380)을 쓰지 않는다.
+// 열기·닫기·주소는 shell/community-screen.mjs 한 곳에서 바꾼다(창 모듈 community-panel.mjs는 그대로).
 const initialRoute=parseSelectionRoute(location.hash);
 let model=null,current=screenForView(initialRoute.view)[1],source='example',loadGeneration=0,previousDirty=false,member=null,handledHash=null,activeShareId=null,resumeAfterStart=null;
+// #1092: 둘러보기 화면 — 창 모듈의 showModal 호출을 비모달 화면 열기로 바꾸고, 닫을 때 #explore 주소 기록을 지킨다.
+const shellCommunityScreen=createCommunityScreen({$,setHandled:hash=>{handledHash=hash;}});
 // #583 '이 순간 열기': 주소(#my/network?tree=…&moment=…)로 지도를 특정 순간을 가운데 두고 열 요청이 오면
 // 여기에 한 번 적어 두고, 지도 프레임을 띄울 때(show) 소비해 프레임 주소에 ?open=<순간>을 붙인다.
 // 지도(network.js)는 이 표시가 있을 때만 그 순간을 고른 상태로 가운데에 둔다 — 그냥 지도를 열 때는
@@ -531,6 +531,7 @@ const shellLocation=createLocation({
   getActiveShareId:()=>activeShareId,
   getHandled:()=>handledHash,
   setHandled:hash=>{handledHash=hash;},
+  communityScreen:shellCommunityScreen,
   show:(file,write)=>show(file,write),
   choose:(id,momentId)=>choose(id,momentId),
   notify:text=>notify(text),
@@ -546,11 +547,12 @@ const shellLocation=createLocation({
 });
 // 새 소식 창(비모달)의 Esc — 다른 창이 하나라도 열려 있으면 그 창이 Esc를 맡는다(맨 위 창 하나 규칙).
 // capture로 등록해 다른 Esc 처리보다 먼저 본다 — 아래 창(공유 목록)이 먼저 닫힌 뒤 '열린 창 없음'으로 오판하지 않게.
+// #1092: 둘러보기는 창이 아니라 화면이라 Esc를 맡지 않는다 — 맨 위 창 판정에서 뺀다(화면 위의 창도 Esc로 닫히게).
 document.addEventListener('keydown', event => {
   if (event.key !== 'Escape') return;
   const updates = $('updates-panel');
   if (!updates?.open || updates.matches(':modal')) return;
-  if ([...document.querySelectorAll('dialog[open]')].some(d => d !== updates)) return; // 다른 창이 남아 있으면(맨 위 모달 포함) 그 창이 맡는다
+  if ([...document.querySelectorAll('dialog[open]')].some(d => d !== updates && !(d.id === 'community-panel' && document.body.classList.contains('community-screen')))) return; // 다른 창이 남아 있으면(맨 위 모달 포함) 그 창이 맡는다
   event.preventDefault(); shellDialogs.requestClose('updates-panel');
 }, true);
 // 새 소식 창이 열린 채 위 메뉴(머리글)를 누르면 창을 닫고 그 메뉴로 이동한다(캡처 — 이동 처리는 그대로).
@@ -1170,7 +1172,9 @@ const shellSettings=createSettings({ $, notify, panel, show, frames, frameLoaded
 const { applyAdvanced, applyDateStyleToFrame, applyPageTurnToFrame, applyNetworkViewToFrame, applyBoardThemeToFrame, syncBoardThemeToApp, quickTargetPreference, profileDirty, paintSettingsProfile, accountConfirmMatches, openAccountData, openAccountSettings, paintDateStyleControls, paintStartPlaceControls, paintShareControls, paintQuickTargetControls, paintNetworkViewControls, paintPageTurnControls, paintBoardThemeControls, paintTreeVisibilityList, paintSettingsUsage, loadTreeVisibility, paintTreeManagerVisibility, paintSettingsTab, focusSettingsSection, fillProfileForm, paintScreenControls, readAdvanced, advancedKey, currentDateStyle, currentPageTurn, sendToFrame, currentStartPlace, currentShareView, currentBoardTheme }=shellSettings;
 paintThemeControls();applyTheme();paintTitleDisplayControls();applyAdvanced();
 if(initialRoute.scope==='public')showPublicRoute(initialRoute);
-else if(/^#explore/.test(location.hash)){/* #1025: 둘러보기 패널이 자기 주소를 연다 — 예시 로드로 주소를 덮지 않는다. */}
+else if(/^#explore/.test(location.hash)){/* #1025: 둘러보기가 자기 주소를 연다 — 예시 로드로 주소를 덮지 않는다. #1092: [트리] 보기(#explore)는 화면으로 바로 연다 — [순간](#explore/moments)은 창 모듈이 자기 주소로 연다. */
+ if(location.hash==='#explore')shellCommunityScreen.openRoute();
+}
 else if(shouldLoadMemberRecords(location.search,document.cookie,location.hash)||shellIntake.pending()){
  // #1026 E: 기존 사용자는 예시를 받지 않는다. 주소가 정해지는 즉시 빈 틀을 세우고,
  // 아래 startMember()가 기록을 받는 대로 화면 iframe을 연다 — example.mjs 요청 0.
