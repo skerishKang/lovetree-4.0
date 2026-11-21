@@ -175,6 +175,7 @@ body.home-existing.lt-fab-ok #mobile-add{display:none}
 html[data-lt-theme=garden] .view-toggle{background:rgba(255,253,248,.9);border-color:rgba(119,91,82,.3)}
 html[data-lt-theme=garden] .view-toggle button{color:var(--lt-ink)}
 html[data-lt-theme=garden] .view-toggle button:hover{background:rgba(152,80,94,.08)}
+html[data-lt-theme=garden] .view-toggle button[aria-checked="true"]{background:var(--lt-primary);color:var(--lt-primary-ink)}
 @media(max-width:780px){.header-actions{flex-wrap:wrap;row-gap:4px}.view-toggle{padding:2px}.view-toggle button{min-height:36px;padding:0 9px;font-size:12px}}
 /* 좁은 화면에서는 머리줄 단추 줄이 부모 밖으로 넘쳐 트리 단추를 가리지 않게 토글을 줄이고 줄바꿈을 허용한다. */
 @media(max-width:780px){.header-actions{flex-wrap:wrap;row-gap:4px}.view-toggle button{min-height:36px;padding:0 9px;font-size:12px}}
