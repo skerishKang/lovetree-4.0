@@ -166,6 +166,18 @@ body.home-existing.lt-fab-ok #mobile-add{display:none}
 /* 261117 대표 결정: 위 메뉴의 테마 단추(☾/☀) — 아바타와 같은 44px 원형. 나중에 언어 단추가 옆에 붙는다. */
 #theme-toggle{width:44px;height:44px;min-width:44px;min-height:44px;padding:0;border-radius:50%;font-size:17px;line-height:1}
 #theme-toggle[hidden]{display:none}
+/* #1094 보기 방식 전환 묶음(책/목록) — 테마 단추 옆 두 칸고르기. 다음 이슈(#1093 선반/회전)도 같은 묶음을 쓴다. */
+.view-toggle{display:inline-flex;align-items:center;gap:0;padding:3px;border:1px solid rgba(255,255,255,.22);border-radius:var(--lt-r-pill);background:rgba(9,8,14,.62)}
+.view-toggle[hidden]{display:none}
+.view-toggle button{min-height:44px;padding:0 12px;border:0;border-radius:var(--lt-r-pill);background:transparent;color:#ece7f1;font-size:13px;letter-spacing:.02em;white-space:nowrap}
+.view-toggle button:hover{background:rgba(255,255,255,.09)}
+.view-toggle button[aria-checked="true"]{background:var(--lt-primary);color:var(--lt-primary-ink)}
+html[data-lt-theme=garden] .view-toggle{background:rgba(255,253,248,.9);border-color:rgba(119,91,82,.3)}
+html[data-lt-theme=garden] .view-toggle button{color:var(--lt-ink)}
+html[data-lt-theme=garden] .view-toggle button:hover{background:rgba(152,80,94,.08)}
+@media(max-width:780px){.header-actions{flex-wrap:wrap;row-gap:4px}.view-toggle{padding:2px}.view-toggle button{min-height:36px;padding:0 9px;font-size:12px}}
+/* 좁은 화면에서는 머리줄 단추 줄이 부모 밖으로 넘쳐 트리 단추를 가리지 않게 토글을 줄이고 줄바꿈을 허용한다. */
+@media(max-width:780px){.header-actions{flex-wrap:wrap;row-gap:4px}.view-toggle button{min-height:36px;padding:0 9px;font-size:12px}}
 .account-popover{position:absolute;right:0;top:calc(100% + 8px);z-index:30;width:232px;padding:8px;border:1px solid var(--lt-line);border-radius:var(--lt-r-card);background:var(--lt-glass-strong);backdrop-filter:blur(24px);box-shadow:0 12px 30px #0008;display:grid;grid-template-columns:minmax(0,1fr);gap:4px}
 .account-popover[hidden]{display:none}
 .account-email{margin:0;padding:8px 10px 10px;border-bottom:1px solid var(--lt-line);font-size:12px;line-height:1.6;color:var(--lt-muted);overflow-wrap:anywhere}
@@ -220,12 +232,21 @@ html[data-v41-screen=book] .tools .ui-btn::after,html[data-v41-screen=board] hea
  .account-popover{right:-4px;width:210px}
  .header-actions #header-overflow{top:52px}
 }
+/* 책/목록 토글(상단 단추)이 보일 때만 머리줄을 감아 트리 줄을 온전히 남긴다. */
+@media(max-width:780px){
+ .app-header:has(#book-display-toggle:not([hidden])){flex-wrap:wrap}
+ .app-header:has(#book-display-toggle:not([hidden])) .main-nav{flex-basis:100%;order:3}
+ /* 머리줄이 두 줄이 되면 트리 팝오버도 그 아래에서 열린다. */
+ .app-header:has(#book-display-toggle:not([hidden])) .tree-popover{top:108px}
+}
 /* 넘치는 쪽 끝의 페이드. 스크롤 위치에 따라 켜고 끄는 클래스는 shell.mjs가 붙인다. */
 @media(max-width:780px){
  .app-header{--nav-fade:28px}
  .app-header nav.fade-start{mask-image:linear-gradient(to right,transparent 0,#000 var(--nav-fade))}
  .app-header nav.fade-end{mask-image:linear-gradient(to left,transparent 0,#000 var(--nav-fade))}
  .app-header nav.fade-start.fade-end{mask-image:linear-gradient(to right,transparent 0,#000 var(--nav-fade),#000 calc(100% - var(--nav-fade)),transparent 100%)}
+ /* 트리 팝오버가 위에 있을 때 페이드 가림새가 눌림을 막지 않도록 가림새를 뺀다. */
+ .app-header nav:has(.tree-popover:not([hidden])){mask-image:none}
 }
 @media(max-width:420px){nav #record-menu{max-width:112px}}
 

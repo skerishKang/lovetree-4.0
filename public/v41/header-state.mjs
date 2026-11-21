@@ -249,6 +249,57 @@ export function themePressed(theme) {
   return normalizeTheme(theme) === THEME_GARDEN;
 }
 
+// #1094: 책/목록 보기 선택. 머리줄 전환 묶음(.view-toggle)과 설정 창이 같은 값·같은 키를 쓴다.
+// 다음 이슈(#1093)의 선반/회전 전환도 같은 묶음 모양(두 칸 중 하나 고르기)을 쓴다 — 값·키만 다르다.
+// 저장 루트는 날짜 표기·제목 보기와 같다: 계정 설정(state.prefs.bookDisplay) + 기기 미러(아래 키).
+export const BOOK_DISPLAY_KEY = 'lt41.bookDisplay';
+export const BOOK_DISPLAY_BOOK = 'book';
+export const BOOK_DISPLAY_LIST = 'list';
+export const BOOK_DISPLAYS = [BOOK_DISPLAY_BOOK, BOOK_DISPLAY_LIST];
+export const DEFAULT_BOOK_DISPLAY = BOOK_DISPLAY_BOOK;
+
+export function normalizeBookDisplay(value) {
+  return BOOK_DISPLAYS.includes(value) ? value : DEFAULT_BOOK_DISPLAY;
+}
+
+// 기기 미러를 읽는다. 저장소가 없거나 접근이 막히면 기본(책)으로 본다.
+export function readBookDisplay(storage) {
+  try {
+    return normalizeBookDisplay(storage?.getItem(BOOK_DISPLAY_KEY));
+  } catch {
+    return DEFAULT_BOOK_DISPLAY;
+  }
+}
+
+// 기기 미러에 쓴다. 저장에 성공하면 그 값을, 실패하면 기본을 돌려준다.
+export function writeBookDisplay(storage, value) {
+  const next = normalizeBookDisplay(value);
+  try {
+    storage?.setItem(BOOK_DISPLAY_KEY, next);
+  } catch {
+    return DEFAULT_BOOK_DISPLAY;
+  }
+  return next;
+}
+
+// 전환 묶음은 서재·책 화면에서만 보인다(보드·지도·첫 화면에는 해당 없음).
+export function bookDisplayVisible({ current = '' } = {}) {
+  return current === 'track32-bookshelf.html' || current === 'track59-sketchbook.html';
+}
+
+// 버튼 글자는 지금 고른 보기를 쓴다(책/목록 두 칸을 함께 거느른다).
+export function bookDisplayLabel(value) {
+  return normalizeBookDisplay(value) === BOOK_DISPLAY_LIST ? '목록' : '책';
+}
+
+export function bookDisplayAriaLabel(value) {
+  return normalizeBookDisplay(value) === BOOK_DISPLAY_LIST ? '목록으로 보기' : '책으로 보기';
+}
+
+export function bookDisplayPressed(value) {
+  return normalizeBookDisplay(value) === BOOK_DISPLAY_LIST;
+}
+
 // 2단계 범위: 공통 헤더·첫 화면·첫 여정은 B를 쓴다. 내 트리는 #212, 책은 2026-11-08 대표 확인으로 B를 받는다.
 // 기억 보드·관계 지도는 계속 A다(대표 결정: 책만 테마를 따라간다).
 export function appliedTheme(theme, view) {
