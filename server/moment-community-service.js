@@ -2,6 +2,7 @@ import {randomUUID} from 'node:crypto';
 import {ApiError} from './errors.js';
 import {parsePrincipal} from './principal.js';
 import {projectSharedTree} from './share-service.js';
+import {createRateLimiter} from './rate-limit.js';
 import {isAiTesterRole} from './admin-roles.js';
 
 // #1098 2단계 — 순간 단위 ♡·댓글 서버 규칙(러브버드 규칙 — 코드는 옮기지 않고 규칙만 가져왔다).
@@ -11,7 +12,7 @@ import {isAiTesterRole} from './admin-roles.js';
 //   옮겨졌어도 같은 404로 막는다(있는 것과 같이 — 공개 경로 규칙 #538과 같은 모양).
 // · 같은 요청 두 번 막기: 댓글·신고는 idempotency 키(기존 client_key 길), 반응은 표 PK가 하나만 남긴다.
 // · 쓰기 기록: 운영 조치(숨기기·처리)는 기존 moderation_audit 길로 남는다(새 감사 경로를 만들지 않는다).
-// · 쓰기 횟수 제한: 기존 방식(메모리 창) 그대로 — #1073 B-19(속도 제한 한 벌)가 main에 들어오면 공용으로 교체한다.
+// · 쓰기 횟수 제한: 공용 한 벌(server/rate-limit.js, #1073 B-19) — 커뮤니티 창구와 같은 1분 창을 쓴다.
 // · 순간 반응 종류는 ♡(heart) 하나다.
 // · 신고·숨기기는 순간 댓글도 트리와 같은 운영센터 길(같은 신고 표·관리자 경로)로 간다.
 // · 공개 숫자에서 시험 계정(tester) 것은 빼고, AI 명예회원(ai_customer) 것은 aiHearts·aiTester 비트로 구분한다.
@@ -35,13 +36,9 @@ function publicComment(row,viewer,isAiAuthor=false,isAdmin=false){
 }
 
 export function createMomentCommunityService({communityRepo,shareRepo,workspaceRepo,visibilityRepo=null,productId,admin=null,now=()=>Date.now(),makeId=()=>randomUUID()}){
- const writes=new Map();
- function rate(subjectId,kind,limit=20){
-  // B-19(#1073)의 공용 속도 제한 모듈이 main에 들어가기 전까지는 기존 방식(메모리 창)을 그대로 쓴다.
-  const key=subjectId+'\0'+kind,cut=now()-60_000,list=(writes.get(key)||[]).filter(at=>at>cut);
-  if(list.length>=limit)throw new ApiError(429,'rate_limited','잠시 뒤 다시 시도해 주세요.');
-  list.push(now());writes.set(key,list);
- }
+ // 속도 제한은 공용 한 벌(server/rate-limit.js)로 — 커뮤니티 창구는 1분 창을 쓴다(#1073 B-19).
+ const limiter=createRateLimiter({now});
+ const rate=(subjectId,kind,limit=20)=>limiter.rate(subjectId+'\0'+kind,limit);
  async function activeShare(shareId){
   if(!SHARE_ID.test(shareId))throw new ApiError(404,'share_not_found','공개 트리를 찾을 수 없어요.');
   const share=await shareRepo.load({productId,shareId});
