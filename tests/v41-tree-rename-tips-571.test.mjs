@@ -372,6 +372,9 @@ test('984 실행: 표지 — 저장 직후 서재·열린 책 반영, 실패하�
         });
         await page.goto(`${base}/v41/?account=1#my/shelf`, { waitUntil: 'load', timeout: 60000 });
         const frame = await findShelfFrame984(page, w);
+        // #1094: 기본(책) 방식은 서재에서 바로 책으로 가므로, 열린 책(목록)을 관찰하려면 상단 토글로 목록을 택한다.
+        await page.locator('#book-display-toggle [data-book-display="list"]').click();
+        await page.waitForFunction(() => window.LT41?.prefs?.bookDisplay === 'list', null, { timeout: 10000 });
         await frame.locator('.book-card button[data-book-id="tree1"]').click();
         await frame.waitForSelector('#readerScreen.active', { timeout: 10000 });
         const readerBefore = await frame.evaluate(() => document.getElementById('bookCoverFace')?.getAttribute('data-cover-design') || '');

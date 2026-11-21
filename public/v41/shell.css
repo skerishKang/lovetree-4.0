@@ -175,6 +175,9 @@ body.home-existing.lt-fab-ok #mobile-add{display:none}
 html[data-lt-theme=garden] .view-toggle{background:rgba(255,253,248,.9);border-color:rgba(119,91,82,.3)}
 html[data-lt-theme=garden] .view-toggle button{color:var(--lt-ink)}
 html[data-lt-theme=garden] .view-toggle button:hover{background:rgba(152,80,94,.08)}
+@media(max-width:780px){.header-actions{flex-wrap:wrap;row-gap:4px}.view-toggle{padding:2px}.view-toggle button{min-height:36px;padding:0 9px;font-size:12px}}
+/* 좁은 화면에서는 머리줄 단추 줄이 부모 밖으로 넘쳐 트리 단추를 가리지 않게 토글을 줄이고 줄바꿈을 허용한다. */
+@media(max-width:780px){.header-actions{flex-wrap:wrap;row-gap:4px}.view-toggle button{min-height:36px;padding:0 9px;font-size:12px}}
 .account-popover{position:absolute;right:0;top:calc(100% + 8px);z-index:30;width:232px;padding:8px;border:1px solid var(--lt-line);border-radius:var(--lt-r-card);background:var(--lt-glass-strong);backdrop-filter:blur(24px);box-shadow:0 12px 30px #0008;display:grid;grid-template-columns:minmax(0,1fr);gap:4px}
 .account-popover[hidden]{display:none}
 .account-email{margin:0;padding:8px 10px 10px;border-bottom:1px solid var(--lt-line);font-size:12px;line-height:1.6;color:var(--lt-muted);overflow-wrap:anywhere}
