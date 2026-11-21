@@ -460,6 +460,12 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
   const browser = await chromium.launch({ headless: true });
   const known = [], fresh = [];
   const SIZES = [[1440, 900], [390, 844]];
+  // #1080: 조합(테마×폭)을 shard로 나눠 병렬 잡에서 돌린다. shard가 없으면 예전처럼 네 조합 전부.
+  // 어느 shard를 골라도 검사 항목·기준은 그대로이고, 셋을 합치면 네 조합이 모두 실행된다.
+  const SHARD = process.env.LT_SCREEN_AUDIT_SHARD || '';
+  const shardOf = (theme, width) => theme === 'night' ? (width === 1440 ? 'a' : 'b') : 'c';
+  const COMBOS = [];
+  for (const theme of ['night', 'garden']) for (const size of SIZES) if (!SHARD || SHARD === shardOf(theme, size[0])) COMBOS.push([size, theme]);
 
   // 한 조합(크기·테마)을 돌고 실패 줄을 돌려준다.
   const runCombo = async ([width, height], theme) => {
@@ -1934,8 +1940,8 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
 
   try {
     // 두 조합씩 나란히(같은 브라우저의 다른 문맥) — 잡 시간을 지키기 위해서다.
-    for (const theme of ['night', 'garden']) {
-      const pairs = await Promise.all(SIZES.map((s) => runCombo(s, theme)));
+    for (let i = 0; i < COMBOS.length; i += 2) {
+      const pairs = await Promise.all(COMBOS.slice(i, i + 2).map(([size, theme]) => runCombo(size, theme)));
       for (const rows of pairs) for (const row of rows) (knownHit(row.항목, row.줄) ? known : fresh).push(row);
     }
   } finally {
