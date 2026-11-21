@@ -37,10 +37,12 @@ const SAMPLE = () => {
   const zones = [zone(shell.querySelector('.home-links')), zone(shell.getElementById('updates-card'))].filter(Boolean);
   const hit = (a, b) => Math.max(0, Math.min(a.r, b.r) - Math.max(a.l, b.l)) * Math.max(0, Math.min(a.b, b.b) - Math.max(a.t, b.t));
   const visible = all.filter((c) => { const cs = getComputedStyle(c); return cs.display !== 'none' && cs.visibility !== 'hidden' && !c.classList.contains('off'); });
+  // 바닥 자리를 지나는 동안 투명해진 카드는 글자를 덮지 않는다 — '가리는 카드'만 교차로 센다.
+  const opaque = visible.filter((c) => Number(getComputedStyle(c).opacity) > 0.05);
   let pairs = 0;
-  for (const box of visible.map(rectOf)) for (const z of zones) if (hit(box, z) > 1) pairs += 1;
-  const first = visible[0] ? rectOf(visible[0]) : null;
-  return { cards: all.length, visible: visible.length, zones: zones.length, pairs, firstCenter: first ? [Math.round((first.l + first.r) / 2), Math.round((first.t + first.b) / 2)] : null };
+  for (const box of opaque.map(rectOf)) for (const z of zones) if (hit(box, z) > 1) pairs += 1;
+  const first = opaque[0] ? rectOf(opaque[0]) : null;
+  return { cards: all.length, visible: visible.length, opaque: opaque.length, zones: zones.length, pairs, firstCenter: first ? [Math.round((first.l + first.r) / 2), Math.round((first.t + first.b) / 2)] : null };
 };
 
 test('#1077 390 로그아웃 첫 화면의 떠다니는 카드는 바닥 링크를 가리지 않는다', { skip: skip || undefined, timeout: 300000 }, async (t) => {
@@ -101,7 +103,7 @@ test('#1077 390 로그아웃 첫 화면의 떠다니는 카드는 바닥 링크�
         const total = samples.reduce((n, s) => n + s.pairs, 0);
         const moved = samples[0].firstCenter && samples[6].firstCenter && Math.hypot(samples[0].firstCenter[0] - samples[6].firstCenter[0], samples[0].firstCenter[1] - samples[6].firstCenter[1]) > 3;
         console.log('#1077', theme, JSON.stringify({ crossed, total, samples: samples.map((s) => ({ pairs: s.pairs, visible: s.visible, zones: s.zones })), moved }));
-        assert.ok(samples.every((s) => s.zones === 2 && s.visible > 0), `${theme}: 바닥 링크·새 소식 카드가 보이는 자리에서 카드를 잰다: ${JSON.stringify(samples[0])}`);
+        assert.ok(samples.every((s) => s.zones === 2 && s.visible >= 9 && s.opaque > 0), `${theme}: 바닥 링크·새 소식 카드가 보이는 자리에서 카드 9장 이상을 유지하고 잰다: ${JSON.stringify(samples[0])}`);
         assert.ok(moved, `${theme}: 3초 동안 카드가 움직인다`);
         assert.equal(total, 0, `${theme}: 3초×0.5초 간격 보이는 카드×바닥 자리 교차 ${total}쌍`);
       } finally { await ctx.close(); }

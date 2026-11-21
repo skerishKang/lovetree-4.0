@@ -56,6 +56,8 @@ extraCSS+=`.recent-card{pointer-events:auto;position:relative;display:block;widt
 extraCSS+=`.recent-head{position:relative;display:inline-flex;align-items:baseline;gap:1px;min-height:24px;margin:-4px 0;padding:2px 0;border:0;background:none;cursor:pointer;font:inherit;font-size:13px;letter-spacing:.04em;color:#cdc5da;text-align:left;white-space:nowrap}.recent-head:after{content:'';position:absolute;inset:-10px -12px -10px -8px;border-radius:8px}.recent-head:focus-visible{outline:3px solid #e8b8c9;outline-offset:2px}.recent-head-arrow{font-size:12px;color:#a79db8}.recent-head:hover{color:#eee6f6}`;
 // #1109: 정리 창과 같은 닫기 단추·뒤 덮개·390 꽉 찬 창 규칙.
 extraCSS+=`.orbit-dialog:not(#guidePanel)::backdrop{background:rgba(3,3,7,.85);backdrop-filter:blur(12px)}.orbit-dialog:not(#guidePanel) .close{box-sizing:border-box;width:44px;height:44px;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;padding:0;border:1px solid #615364;border-radius:50%;background:#ffffff07;font-size:24px;line-height:1;color:inherit;position:absolute;right:12px;top:10px;z-index:7}@media(max-width:520px){.orbit-dialog:not(#guidePanel){width:100vw;max-width:none;height:100dvh;max-height:100dvh;inset:0;margin:0;border:0;border-radius:0}.orbit-dialog:not(#guidePanel) .close{top:8px;right:8px;background:#151118e6}}`;
+// #1077: 바닥 링크·새 소식 카드 자리를 지나는 예시 카드는 그 구간만 투명하게(자리와 장수는 유지).
+extraCSS+=`.card.lt-under-link{opacity:0}`;
 
 export function mountOrbit(host,{trees,storage,context,actions,authHtml='',onSelect=()=>{},recordNote=null,examples=[],onOpen=null,empty=false,titleDisplay='both',momentList=null,dateStyle='dot',prefs=null,initialPicking=false,initialNotice=null,homePin=null,loggedIn}) {
  performance.mark('m0');
@@ -713,8 +715,17 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
    const cx=r.left+r.width/2,cy=r.top+r.height/2,w=r.width/k,h=r.height/k;
    const box={l:cx-w/2,t:cy-h/2,r:cx+w/2,b:cy+h/2};
    const exampleCard=demo||!!cards[i]?.example;
-   const hit=w>=2&&h>=2&&(zoneOverlapArea(zone,box)>1||(exampleCard&&bottomZones.some(z=>zoneOverlapArea(z,box)>1)));
-   el.classList.toggle('clash',hit);}};
+   const centerHit=w>=2&&h>=2&&zoneOverlapArea(zone,box)>1;
+   // #1077: 좁은 화면은 바닥 자리를 지나는 동안만 투명하게 — 궤도와 카드 수(9장 이상)는 그대로다.
+   // 넓은 화면은 기존처럼 숨긴다(#1018).
+   const bottomHit=w>=2&&h>=2&&exampleCard&&bottomZones.some(z=>zoneOverlapArea(z,box)>1);
+   if(bottomHit&&app.clientWidth<=650){
+    el.classList.toggle('clash',centerHit);
+    el.classList.toggle('lt-under-link',!centerHit);
+   }else{
+    el.classList.remove('lt-under-link');
+    el.classList.toggle('clash',centerHit||bottomHit);
+   }}};
  let layoutPending=true;
  function frame(now){performance.mark('f'+warmups);raf=0;
   if(layoutPending||safeZoneDirty){layoutPending=false;layout();}
