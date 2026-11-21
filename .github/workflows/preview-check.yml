@@ -61,13 +61,13 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: ms-playwright-${{ runner.os }}-1.49.1
+          key: ms-playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - name: 브라우저 준비(Playwright Chromium, 캐시)
         id: browser
         if: needs.screen-changes.outputs.changed == 'true'
         run: |
           # 모듈은 항상 설치한다(캐시는 브라우저 바이너리에만 걸린다). 캐시가 있어도 모듈이 없으면 실행이 안 된다.
-          npm i --no-save --no-package-lock playwright@1.49.1
+          npm i --no-save --no-package-lock playwright@$(node -p "require('./package-lock.json').packages['node_modules/playwright'].version")
           if ls "$HOME/.cache/ms-playwright" 2>/dev/null | grep -q chromium; then
             echo "캐시된 Chromium 사용"
           else
@@ -232,12 +232,12 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: ms-playwright-${{ runner.os }}-1.49.1
+          key: ms-playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - name: 브라우저 준비(Playwright Chromium, 캐시)
         id: browser
         if: needs.screen-changes.outputs.changed == 'true'
         run: |
-          npm i --no-save --no-package-lock playwright@1.49.1
+          npm i --no-save --no-package-lock playwright@$(node -p "require('./package-lock.json').packages['node_modules/playwright'].version")
           if ls "$HOME/.cache/ms-playwright" 2>/dev/null | grep -q chromium; then
             echo "캐시된 Chromium 사용"
           else
@@ -358,12 +358,12 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: ms-playwright-${{ runner.os }}-1.49.1
+          key: ms-playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - name: 브라우저 준비(Playwright Chromium, 캐시)
         id: browser
         if: needs.screen-changes.outputs.changed == 'true'
         run: |
-          npm i --no-save --no-package-lock playwright@1.49.1
+          npm i --no-save --no-package-lock playwright@$(node -p "require('./package-lock.json').packages['node_modules/playwright'].version")
           if ls "$HOME/.cache/ms-playwright" 2>/dev/null | grep -q chromium; then
             echo "캐시된 Chromium 사용"
           else
@@ -441,12 +441,12 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: ms-playwright-${{ runner.os }}-1.49.1
+          key: ms-playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - name: 브라우저 준비(Playwright Chromium, 캐시)
         id: browser
         if: needs.screen-changes.outputs.changed == 'true'
         run: |
-          npm i --no-save --no-package-lock playwright@1.49.1
+          npm i --no-save --no-package-lock playwright@$(node -p "require('./package-lock.json').packages['node_modules/playwright'].version")
           if ls "$HOME/.cache/ms-playwright" 2>/dev/null | grep -q chromium; then
             echo "캐시된 Chromium 사용"
           else
@@ -551,12 +551,12 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: ms-playwright-${{ runner.os }}-1.49.1
+          key: ms-playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - name: 브라우저 준비(Playwright Chromium, 캐시)
         id: browser
         if: needs.screen-changes.outputs.changed == 'true'
         run: |
-          npm i --no-save --no-package-lock playwright@1.49.1
+          npm i --no-save --no-package-lock playwright@$(node -p "require('./package-lock.json').packages['node_modules/playwright'].version")
           if ls "$HOME/.cache/ms-playwright" 2>/dev/null | grep -q chromium; then
             echo "캐시된 Chromium 사용"
           else
@@ -636,12 +636,12 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: ms-playwright-${{ runner.os }}-1.49.1
+          key: ms-playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - name: 브라우저 준비(Playwright Chromium, 캐시)
         id: browser
         if: needs.screen-changes.outputs.changed == 'true'
         run: |
-          npm i --no-save --no-package-lock playwright@1.49.1
+          npm i --no-save --no-package-lock playwright@$(node -p "require('./package-lock.json').packages['node_modules/playwright'].version")
           if ls "$HOME/.cache/ms-playwright" 2>/dev/null | grep -q chromium; then
             echo "캐시된 Chromium 사용"
           else
@@ -721,12 +721,12 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: ms-playwright-${{ runner.os }}-1.49.1
+          key: ms-playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - name: 브라우저 준비(Playwright Chromium, 캐시)
         id: browser
         if: needs.screen-changes.outputs.changed == 'true'
         run: |
-          npm i --no-save --no-package-lock playwright@1.49.1
+          npm i --no-save --no-package-lock playwright@$(node -p "require('./package-lock.json').packages['node_modules/playwright'].version")
           if ls "$HOME/.cache/ms-playwright" 2>/dev/null | grep -q chromium; then
             echo "캐시된 Chromium 사용"
           else
@@ -805,12 +805,12 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: ms-playwright-${{ runner.os }}-1.49.1
+          key: ms-playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - name: 브라우저 준비(Playwright Chromium, 캐시)
         id: browser
         if: needs.screen-changes.outputs.changed == 'true'
         run: |
-          npm i --no-save --no-package-lock playwright@1.49.1
+          npm i --no-save --no-package-lock playwright@$(node -p "require('./package-lock.json').packages['node_modules/playwright'].version")
           if ls "$HOME/.cache/ms-playwright" 2>/dev/null | grep -q chromium; then
             echo "캐시된 Chromium 사용"
           else
@@ -849,13 +849,13 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: ms-playwright-${{ runner.os }}-1.49.1
+          key: ms-playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - name: 브라우저 준비(Playwright Chromium, 캐시)
         id: browser
         if: needs.screen-changes.outputs.changed == 'true'
         run: |
           # 모듈은 항상 설치한다(캐시는 브라우저 바이너리에만 걸린다). 캐시가 있어도 모듈이 없으면 실행이 안 된다.
-          npm i --no-save --no-package-lock playwright@1.49.1
+          npm i --no-save --no-package-lock playwright@$(node -p "require('./package-lock.json').packages['node_modules/playwright'].version")
           if ls "$HOME/.cache/ms-playwright" 2>/dev/null | grep -q chromium; then
             echo "캐시된 Chromium 사용"
           else
@@ -964,14 +964,14 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: ms-playwright-${{ runner.os }}-1.49.1
+          key: ms-playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - name: 브라우저 준비(Playwright Chromium, 캐시)
         id: browser
         timeout-minutes: 8
         if: needs.screen-changes.outputs.changed == 'true'
         run: |
           # 모듈은 항상 설치한다(캐시는 브라우저 바이너리에만 걸린다). 캐시가 있어도 모듈이 없으면 실행이 안 된다.
-          npm i --no-save --no-package-lock playwright@1.49.1
+          npm i --no-save --no-package-lock playwright@$(node -p "require('./package-lock.json').packages['node_modules/playwright'].version")
           if ls "$HOME/.cache/ms-playwright" 2>/dev/null | grep -q chromium; then
             echo "캐시된 Chromium 사용"
           else
@@ -1113,13 +1113,13 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: ms-playwright-${{ runner.os }}-1.49.1
+          key: ms-playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - name: 브라우저 준비(Playwright Chromium, 캐시)
         id: browser
         if: needs.screen-changes.outputs.changed == 'true'
         run: |
           # 모듈은 항상 설치한다(캐시는 브라우저 바이너리에만 걸린다). 캐시가 있어도 모듈이 없으면 실행이 안 된다.
-          npm i --no-save --no-package-lock playwright@1.49.1
+          npm i --no-save --no-package-lock playwright@$(node -p "require('./package-lock.json').packages['node_modules/playwright'].version")
           if ls "$HOME/.cache/ms-playwright" 2>/dev/null | grep -q chromium; then
             echo "캐시된 Chromium 사용"
           else
@@ -1224,12 +1224,12 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: ms-playwright-${{ runner.os }}-1.49.1
+          key: ms-playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - name: 브라우저 준비(Playwright Chromium, 캐시)
         id: browser
         run: |
           # 모듈은 항상 설치한다(캐시는 브라우저 바이너리에만 걸린다). 캐시가 있어도 모듈이 없으면 실행이 안 된다.
-          npm i --no-save --no-package-lock playwright@1.49.1
+          npm i --no-save --no-package-lock playwright@$(node -p "require('./package-lock.json').packages['node_modules/playwright'].version")
           if ls "$HOME/.cache/ms-playwright" 2>/dev/null | grep -q chromium; then
             echo "캐시된 Chromium 사용"
           else
