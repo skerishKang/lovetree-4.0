@@ -55,7 +55,16 @@ export function createNotifier({ $, now = () => Date.now(), holdMs = NOTICE_HOLD
     timer = setTimer(() => { $('toast').hidden = true; }, hideMs);
     return true;
   }
-  return { notify, holdUntil: () => holdUntil };
+  // #1076: 같은 열쇠의 안내는 세션(셸 인스턴스)에서 한 번만. 화면 이동·다시 띄우기로 다시 오는
+  // 'synced' 상태에 같은 안내가 반복되지 않게 셸이 이 경로를 쓴다.
+  const onceShown = new Set();
+  function notifyOnce(text, key, options) {
+    if (onceShown.has(key)) return false;
+    const shown = notify(text, options);
+    if (shown) onceShown.add(key);
+    return shown;
+  }
+  return { notify, notifyOnce, holdUntil: () => holdUntil, onceShown: () => onceShown.size };
 }
 
 // 단추가 붙는 안내(자동 공개)는 문장과 단추를 한 줄로 그린다. 시험의 가짜 DOM처럼

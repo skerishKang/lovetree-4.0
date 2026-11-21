@@ -127,9 +127,9 @@ test('833-2: 크게 보기 → 전체 화면에서 단추는 ✕ 닫기, Esc로 
       await page.waitForFunction(() => document.fullscreenElement != null, null, { timeout: 3000 }).catch(() => {});
       const contrast = await page.evaluate(() => {
         const lum = (rgb) => { const c = rgb.map(v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; };
-        const parse = (s) => s.match(/[d.]+/g).slice(0, 3).map(Number);
+        const parse = (s) => s.match(/[\d.]+/g).slice(0, 3).map(Number);
         const b = window.__cell.button, cs = getComputedStyle(b);
-        const bg = cs.backgroundColor, m = bg.match(/[d.]+/g).map(Number);
+        const bg = cs.backgroundColor, m = bg.match(/[\d.]+/g).map(Number);
         const alpha = m.length > 3 ? m[3] : 1;
         // 검은 바탕(전체 화면) 위 반투명 배경 합성
         const comp = parse(bg).map((v, i) => Math.round(v * alpha));

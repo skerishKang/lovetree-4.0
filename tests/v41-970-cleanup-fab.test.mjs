@@ -326,3 +326,38 @@ test('정상 데이터만 있으면 어긋난 트리 안내가 뜨지 않는다'
     assert.deepEqual(errors, [], '페이지 오류 없음');
   });
 });
+
+test('#1089 정리 창은 순간 목록 창과 같은 가운데 카드 틀이다', async (t) => {
+  if (skip) { t.skip(skip); return; }
+  if (REQUIRE && !existsSync(new URL('../dist/v41/home.html', import.meta.url))) { t.skip('빌드 결과가 없어 화면 시험을 건너뜀'); return; }
+  for (const [width, height] of [[1440, 900], [390, 844]]) {
+    await withShell(sampleTree(), { width, height }, async ({ page }) => {
+      await openCleanup(page);
+      const cleanup = await page.locator('#cleanup-panel').evaluate((el) => {
+        const box = el.getBoundingClientRect();
+        const cs = getComputedStyle(el);
+        const rows = el.querySelector('#cleanup-moments').getBoundingClientRect();
+        return { width: Math.round(box.width), left: Math.round(box.left), rows: Math.round(rows.width), radius: cs.borderTopLeftRadius };
+      });
+      // 순간 목록 창(안쪽 iframe의 .orbit-dialog)도 같은 폭 규칙이다.
+      await page.locator('#cleanup-panel [data-close="cleanup-panel"]').click();
+      await page.waitForFunction(() => !document.querySelector('#cleanup-panel')?.open, null, { timeout: 5000 });
+      await page.frameLocator('#view').locator('.orbit-dialog').first().evaluate((el) => el.showModal());
+      await page.frameLocator('#view').locator('.orbit-dialog[open]').waitFor({ timeout: 5000 });
+      const list = await page.frameLocator('#view').locator('.orbit-dialog').first().evaluate((el) => {
+        const box = el.getBoundingClientRect();
+        return { width: Math.round(box.width), left: Math.round(box.left) };
+      });
+      const diff = Math.abs(cleanup.width - list.width);
+      console.log('#1089', width, JSON.stringify({ cleanup, list, diff }));
+      assert.ok(diff <= 40, `${width}: 정리 창 ${cleanup.width}px vs 순간 목록 ${list.width}px — 차이 ${diff}px`);
+      assert.ok(cleanup.rows <= Math.max(list.width, 900), `${width}: 정리 줄이 카드 밖으로 늘어나지 않는다(${cleanup.rows}px)`);
+      if (width === 1440) {
+        assert.ok(cleanup.width >= 800 && cleanup.width <= 900, `1440: 가운데 카드 폭(실측 ${cleanup.width}px)`);
+        assert.ok(Math.abs(cleanup.left - (width - cleanup.width) / 2) <= 2, '1440: 가운데 정렬');
+      } else {
+        assert.equal(cleanup.width, 390, '390: 꽉 찬 창');
+      }
+    });
+  }
+});

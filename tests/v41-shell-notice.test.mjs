@@ -169,3 +169,60 @@ test('952 실행: 부팅이 끝나면 synced 안내가 토스트에 뜬다(기�
     }
   } finally { await browser.close(); server.close(); }
 });
+
+test('#1076: 같은 열쇠 안내는 한 번만, 다른 안내는 그 뒤에도 보인다', () => {
+  const h = harness();
+  assert.equal(h.notifier.notifyOnce('내 기록을 불러왔어요.', 'synced'), true);
+  assert.equal(h.notifier.notifyOnce('내 기록을 불러왔어요.', 'synced'), false, '화면 이동으로 다시 온 같은 안내는 무시');
+  assert.equal(h.els['toast'].textContent, '내 기록을 불러왔어요.');
+  assert.equal(h.notifier.onceShown(), 1);
+  assert.equal(h.notifier.notifyOnce('다른 안내', 'other'), true, '다른 열쇠는 그대로 보인다');
+  assert.equal(h.notifier.onceShown(), 2);
+  const held = harness();
+  held.els['account-settings'].open = true;
+  assert.equal(held.notifier.notifyOnce('내 기록을 불러왔어요.', 'synced'), true);
+  // 창이 열려 있으면 토스트는 숨지만 안내 자체는 한 번으로 센다(다시 뜨지 않는다).
+  assert.equal(held.notifier.notifyOnce('내 기록을 불러왔어요.', 'synced'), false);
+});
+
+/* #1076 화면: 첫 진입에서만 synced 안내가 뜨고, 책→지도→첫 화면 이동에서는 0번. 계정 메뉴를 열면 바로 숨는다.
+   CI 셸 화면 잡(LT_SHELL_952_REQUIRE=1)에서 돈다 — 건너뜀=실패. */
+test('1076 실행: synced 안내는 첫 진입 1번, 화면 이동 0번, 계정 메뉴를 열면 숨는다', { skip: REQUIRE952N ? false : skip952n || undefined, timeout: 180000 }, async () => {
+  if (skip952n) assert.fail(`CI에서는 건너뜀이 실패다 — ${skip952n}`);
+  const { serve } = await import('./helpers/screen-audit.mjs');
+  const server = await serve({});
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium952n.launch();
+  try {
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
+    await ctx.addInitScript(() => {
+      try { localStorage.setItem('lt41.theme', 'garden'); } catch {}
+      window.__toastShows = 0;
+      let wasVisible = false;
+      setInterval(() => {
+        const t = document.getElementById('toast');
+        const visible = !!t && !t.hidden && t.textContent.includes('불러왔어요');
+        if (visible && !wasVisible) window.__toastShows += 1;
+        wasVisible = visible;
+      }, 20);
+    });
+    await ctx.route('**/api/**', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
+    await ctx.route('**/api/workspace*', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ revision: 1, state: { version: 1, trees: [tree952(1)] }, subject: '검사기계정', writeSubjectBound: true, savedAt: '2026-11-16T09:00:00.000Z' }) }));
+    const page = await ctx.newPage();
+    try {
+      await page.goto(`${base}/v41/?account=1`, { waitUntil: 'load' });
+      await page.waitForFunction(() => window.__toastShows === 1, null, { timeout: 20000 });
+      for (const view of ['track59-sketchbook.html', 'track56-network.html']) {
+        await page.evaluate((v) => document.querySelector(`button[data-view="${v}"]`)?.click(), view);
+        await page.waitForTimeout(700);
+        assert.equal(await page.evaluate(() => window.__toastShows), 1, `${view} 이동에서 안내가 다시 뜨지 않는다`);
+      }
+      await page.click('.brand');
+      await page.waitForTimeout(700);
+      assert.equal(await page.evaluate(() => window.__toastShows), 1, '첫 화면 복귀에서도 다시 뜨지 않는다');
+      await page.click('#account-avatar');
+      await page.waitForTimeout(200);
+      assert.equal(await page.evaluate(() => document.getElementById('toast').hidden), true, '계정 메뉴를 열면 안내가 바로 사라진다');
+    } finally { await ctx.close(); }
+  } finally { await browser.close(); server.close(); }
+});

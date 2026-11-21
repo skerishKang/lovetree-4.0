@@ -118,6 +118,7 @@ test('목록 집계: 이번 주 표 수는 공개·소개 중인 트리만 세�
     assert.deepEqual(popular.map((r) => r.share.shareId), [mk('a'), mk('b')], '소개 꺼진 트리는 목록 자체에 없고, 많이 담긴 순으로 정렬된다');
     assert.deepEqual(popular.map((r) => r.stats.weeklyFavorites), [2, 1], '지난 주 표는 이번 주 집계에서 빠진다');
     const latest = await repo.listDiscoverableSummaries({ productId, weekSince: weekAgo });
-    assert.deepEqual(latest.map((r) => r.stats.weeklyFavorites), [2, 1], '기본 정렬에서도 주간 수는 응답에 있다');
+    // 기본 정렬은 최신 활동 순이라 표 수 순서가 아니다 — 값의 집합만 확인한다.
+    assert.deepEqual(latest.map((r) => r.stats.weeklyFavorites).sort((a, b) => b - a), [2, 1], '기본 정렬에서도 주간 수는 응답에 있다');
   } finally { await pool.end(); }
 });

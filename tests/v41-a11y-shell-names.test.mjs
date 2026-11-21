@@ -53,8 +53,8 @@ test('실행: 접근성 이름 규칙은 실제 화면 요소에서 확인한다
     });
     assert.ok(names.brandLabel?.includes('LoveTree4.1'), '브랜드 이름은 화면에 보이는 글자(LoveTree4.1)를 그대로 포함한다');
     assert.ok(names.brandText?.startsWith('LoveTree'), `브랜드에 보이는 글자도 LoveTree다(${names.brandText})`);
-    assert.equal(names.recordAriaLabel, null, '트리 고르기 단추는 aria-label로 화면 글자를 덮지 않는다');
-    assert.ok(/^(트리:|트리 고르기|트리 없음)/.test(names.recordText || ''), `보이는 "트리 …"가 이름이다(${names.recordText})`);
+    assert.ok(/^트리: .+, 트리 바꾸기$/.test(names.recordAriaLabel || ''), `스크린리더 이름에 트리·이름·동작이 있다(${names.recordAriaLabel})`);
+    assert.ok(!/^트리: /.test(names.recordText || ''), `단추 안에는 이름만 있다(${names.recordText})`);
 
     // 설정 창 "화면" 묶음의 테마 항목(#380 5번): 밤/정원 두 칸이 radio·aria-checked를 쓴다.
     await page.click('#account-avatar');
