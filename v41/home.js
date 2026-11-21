@@ -300,7 +300,6 @@ if(hasMoments){
 const infoStyle=document.createElement('style');
 infoStyle.textContent=`.home-add-top{margin-top:12px;font-size:15px}@media(max-width:650px){.home-add-top{font-size:14px}}
 .center .actions{gap:18px;align-items:flex-start}
-@media(max-width:650px){.center{transform:translate(-50%,calc(-50% - var(--lt-band-shift,0px)))}}
 .center .actions .home-action-group{flex:1 1 0%;max-width:176px;min-width:0;display:flex;flex-direction:column;align-items:stretch;gap:5px}
 .center .actions .home-action-group .subtleBtn{flex:none;width:100%;max-width:none}
 .home-count{display:block;text-align:center;font-size:12px;line-height:16px;min-height:32px;white-space:nowrap;color:var(--lt-muted);font-variant-numeric:tabular-nums}
@@ -323,11 +322,7 @@ addEventListener('message',event=>{
   if(type==='lt41-motion'){motionPaused=!!event.data.paused;orbit?.motion?.set?.(motionPaused);}
   else if(type==='lt41-home-cards'){location.reload();}
   else if(type==='lt41-home-moment-set'){setHomeMoment(event.data.value);}
-  else if(type==='lt41-updates-band'){
-   const height=Math.max(0,Number(event.data.height)||0);
-   const center=shadow.querySelector('.center');
-   if(center){if(height)center.style.setProperty('--lt-band-shift',`${height}px`);else center.style.removeProperty('--lt-band-shift');}
-  }
+
  // #481: 제목 보기도 궤도가 그릴 때 값을 박아 두므로(orbit의 titleMode) 바뀌면 다시 떠야 한다.
  // 날짜 표기와 같은 판정 — 지금 그린 값과 다르고, 기기 미러가 이미 그 값일 때만(다시 뜨면 새 값으로 그려진다).
  else if(type==='lt41-title-display'){
