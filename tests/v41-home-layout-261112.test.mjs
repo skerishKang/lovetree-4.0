@@ -43,7 +43,10 @@ test('카드는 언제나 불투명하고, 크기·밝기·흐림으로 깊이�
     assert.doesNotMatch(body, /mix-blend/, `mix-blend 없음: ${sel.trim().slice(0,40)}`);
     assert.doesNotMatch(body, /blur/, `blur 없음: ${sel.trim().slice(0,40)}`);
   }
-  // #1086: 깊이 밝기·흐림의 소스 글자 단정은 제거했다(리팩터링에 깨지는 검사). 값 자체는 캡처로 확인한다.
+  assert.match(orbit, /el\.style\.filter=depthFilter/, '깊이는 filter 변수로 한 번만 쓴다');
+  assert.match(orbit, /brightness\(\$\{fv\}\) blur\(\$\{bv\}px\)/, '깊이 = 밝기 + 흐림');
+  assert.match(orbit, /0\.78\+0\.22\*depth/, '뒤쪽 카드는 밝기 0.78까지');
+  assert.match(orbit, /\(1-depth\)\*2\.2/, '뒤쪽 카드는 흐림 2.2px까지');
   assert.match(orbit, /ORBIT_MS=90000/, '한 바퀴 90초');
   // 원형 배치(8장 이하)는 같은 깊이이므로 전체가 어두워지지 않게 밝기 1이다.
   assert.match(orbit, /const depth=\(!demo&&cards\.length<=8\)\?1:/);
