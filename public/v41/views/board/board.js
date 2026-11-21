@@ -143,7 +143,8 @@ return moments.map(m=>{const pc=connections.find(c=>c.kind==='parent'&&c.b===m.i
 function orderPayload(m){const rank=orderRank(m.id);if(rank>=0)return{x:m.savedXY?m.savedXY.x:m.x,y:LT58Model.ORDER_Y_BASE+rank,rot:m.rot};
 return m.savedPos&&m.savedXY&&boardMode==='date'?{x:m.savedXY.x,y:m.savedXY.y,rot:m.savedXY.rot}:{x:m.x,y:m.y,rot:m.rot}}
 function newBoardId(){let id;do{id='m'+Math.random().toString(36).slice(2,10)}while(moments.some(m=>m.id===id));return id}
-function persistBoard(){if(!boardSaveEnabled())return;try{const treeId=window.parent.LT41.tree.id;window.parent.postMessage({type:'lt41-board-sync',treeId,moments:boardPayload()},location.origin)}catch{/* 셸이 없으면 저장하지 않는다 */}}
+// #1058: 보내기가 던지면 조용히 넘기지 않고 보드 알림 줄에 실패를 알린다(성공은 #905 규칙으로 알리지 않는다).
+function persistBoard(){if(!boardSaveEnabled())return;try{const treeId=window.parent.LT41.tree.id;window.parent.postMessage({type:'lt41-board-sync',treeId,moments:boardPayload()},location.origin)}catch{toast('보드 저장에 실패했어요. 잠시 뒤 다시 시도해 주세요.')}}
 window.addEventListener('message',e=>{if(e.origin!==location.origin)return;if(e.data?.type!=='lt41-board-saved')return;if(e.data.ok===false)toast(e.data.error||'서버에 저장하지 못했어요. 잠시 뒤 다시 시도해 주세요.')});
 
 const replayPath=(()=>{const ids=[],seen=new Set();let m=LTDEMO.moments[0];while(m&&!seen.has(m.id)){ids.push(m.id);seen.add(m.id);m=LTDEMO.moments.find(x=>x.id===m.next)}return ids})();

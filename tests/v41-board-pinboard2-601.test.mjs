@@ -552,3 +552,37 @@ test('#662 화면: 상세 판의 행동 단추를 실제 좌표 클릭으로 누
     }
   } finally { await browser.close(); server.close(); }
 });
+
+// #1058: 보내기가 던지면 조용히 넘기지 않고 보드 알림 줄에 실패를 알린다(소스 글자 검사 없음).
+test('#1058 보드 저장 보내기 실패 — 보드 알림 줄에 실패 문구가 보인다', { skip: REQUIRE ? false : skip, timeout: 180000 }, async () => {
+  if (skip) assert.fail(skip);
+  const server = await serve({ '/host1058.html': hostHTML(starTree(4)) });
+  const origin = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch({ headless: true });
+  try {
+    for (const [width, height] of [[1440, 900], [390, 844]]) {
+      const { context, page, frame, problems } = await openHost(browser, `${origin}/host1058.html`, { width, height });
+      try {
+        await frame.evaluate(() => {
+          window.__origPost = window.parent.postMessage;
+          window.parent.postMessage = () => { throw new Error('보내기 실패'); };
+        });
+        await frame.evaluate(() => window.persistBoard());
+        const notice = await frame.evaluate(() => {
+          const el = document.getElementById('toast');
+          return { text: el?.textContent || '', show: !!el?.classList.contains('show'), opacity: Number(getComputedStyle(el).opacity) };
+        });
+        const sent = await page.evaluate(() => (window.LT41_MESSAGES || []).filter((m) => m.type === 'lt41-board-sync').length);
+        console.log('#1058', width, JSON.stringify({ notice, sent }));
+        assert.equal(notice.show, true, `${width}: 보드 알림 줄이 떴다`);
+        assert.ok(/저장에 실패/.test(notice.text), `${width}: 실패 문구가 보인다 — ${notice.text}`);
+        assert.ok(notice.opacity > 0, `${width}: 알림이 실제로 보인다(opacity ${notice.opacity})`);
+        assert.equal(sent, 0, `${width}: 보내지 못했으므로 동기화 메시지 없음`);
+        assert.deepEqual(problems, [], `${width}: 던진 예외가 밖으로 새지 않았다`);
+      } finally { await context.close(); }
+    }
+  } finally {
+    await browser.close();
+    await new Promise((ok) => server.close(ok));
+  }
+});
