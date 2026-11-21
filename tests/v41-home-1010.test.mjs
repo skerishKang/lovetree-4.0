@@ -240,8 +240,8 @@ test('#1010 390 바닥 링크 — 넷 모두 보이고 줄바꿈으로 왼쪽 �
       assert.ok(links.rowH >= 56 && links.rowH <= 66, `링크가 두 줄로 카드 아래 자리에 들어간다(줄 높이 ${links.rowH}px — 66px 안)`);
       assert.ok(links.rowTop >= links.viewportH - 76, `링크 줄이 새 소식 카드 자리(아래 76px) 아래에 있다(윗변 ${links.rowTop}px / ${links.viewportH - 76}px)`);
       assert.ok(!links.overlap, '링크 줄이 오른쪽 아래 ＋ 단추와 겹치지 않는다');
-      assert.ok(links.fabVisible, '오른쪽 아래 ＋ 단추(#458)는 그대로 보인다');
-      assert.ok(links.rowRight <= (links.fabLeft ?? 9999), `링크 줄이 ＋ 단추 왼쪽 끝(${links.fabLeft}px)을 넘지 않는다(끝 ${links.rowRight}px)`);
+      assert.ok(!links.fabVisible, '첫 화면에서는 ＋가 가운데만 남는다(#1084)');
+      if (links.fabVisible) assert.ok(links.rowRight <= links.fabLeft, `링크 줄이 ＋ 단추 왼쪽 끝(${links.fabLeft}px)을 넘지 않는다(끝 ${links.rowRight}px)`);
     } finally { await close1010(h); }
   } finally { await browser.close(); }
 });

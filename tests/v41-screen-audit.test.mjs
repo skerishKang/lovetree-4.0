@@ -482,7 +482,7 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
       const audit = await auditPage(p, screen);
       rows.push(...failuresOf(audit, `${width}`, theme));
       const required = screen === '셸 첫 화면·알림 줄'
-        ? (width <= 780 ? ['updates-card×.home-links', 'updates-card×#mobile-add'] : ['updates-card×.home-links'])
+        ? ['updates-card×.home-links']
         : screen === '새 소식 닫기 버튼' ? ['updates-foot×body-text'] : [];
       for (const pair of required) {
         const check = audit.bottomChecks.find((x) => x.pair === pair);
