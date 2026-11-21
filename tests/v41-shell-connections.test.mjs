@@ -9,7 +9,7 @@ import {readFileSync, readdirSync} from 'node:fs';
 const SHELL_CONNECTIONS = [
   'account-assets-open', 'account-avatar', 'account-confirm',
   'account-entry', 'account-form', 'account-logout', 'account-open-settings',
-  'advanced-backup', 'advanced-import', 'change-parent', 'clear', 'delete-moment', 'editor-assets-open',
+  'advanced-backup', 'advanced-import', 'media-change-toggle', 'clear', 'delete-moment', 'editor-assets-open',
   'editor-cancel', 'empty-file', 'empty-records', 'empty-sample', 'file', 'logout', 'mobile-more', 'moment-form',
   'profile-color', 'profile-form', 'profile-reset', 'record-menu', 'sample', 'server', 'settings-assets-open',
   'share-copy', 'share-create', 'share-menu', 'share-moment', 'share-preview', 'share-view', 'tree-cover',
@@ -32,6 +32,8 @@ test('셸이 연결하던 요소는 지금도 셸·shell/ 안에서 연결을 �
   // #380 4 마지막: account-assets의 Esc 닫기도 공통 틀로 옮겨갔다(초점 복귀까지 틀이 맡는다).
   // 그래서 세 id는 이 목록에서 빼고, 공통 틀 계약은 tests/v41-panel-mode.test.mjs·v41-shell-dialogs.test.mjs가 고정한다.
   // 2026-11-16: 계정 메뉴의 '고급 기능 보기'(account-advanced)는 설정 화면 탭의 스위치(settings-advanced)로 옮겨졌다 — 목록의 자리를 바꿨다(개수 40 유지).
+  // #1097: 이전 순간·관련 연결의 별도 저장 버튼(change-parent 등)은 없어졌다 — 저장하기 한 번에 함께 저장한다.
+  //  대신 '영상 바꾸기'(media-change-toggle) 연결을 이 자리에서 고정한다.
   const missing = SHELL_CONNECTIONS.filter(id => !new RegExp(`\\$\\('${id}'\\)\\??\\.(onclick|onchange|onsubmit|oninput|addEventListener)`).test(source));
   assert.deepEqual(missing, [], '연결이 사라진 요소: ' + missing.join(', '));
   assert.equal(SHELL_CONNECTIONS.length, 40);
