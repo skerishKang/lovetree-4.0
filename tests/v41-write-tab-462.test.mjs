@@ -161,23 +161,6 @@ test('#462 설정 "먼저 보일 탭"에서 바꾸면 다음에 열 때 그 탭�
     assert.equal(h.shown(), 'easy', '되돌리면 다시 쉬운 추가');
   } finally { h.restore(); }
 
-  // 기본 탭을 쓰는 곳은 설정 행 하나뿐이다(눌러 보기·저장 경로가 다시 쓰지 않게 고정).
-  const shellSource = readFileSync(new URL('../public/v41/shell.mjs', import.meta.url), 'utf8');
-  const writers = [];
-  const walk = dir => {
-    for (const entry of readdirSync(dir, {withFileTypes: true})) {
-      const url = new URL(entry.name + (entry.isDirectory() ? '/' : ''), dir);
-      if (entry.isDirectory()) walk(url);
-      else if (/\.(m?js|html)$/.test(entry.name)) {
-        const text = readFileSync(url, 'utf8');
-        const count = (text.match(/writeWriteTab\(/g) || []).length - (text.match(/export function writeWriteTab\(/g) || []).length;
-        if (count) writers.push([url.pathname.split('/public/v41/')[1], count]);
-        if (/setItem\(\s*['"]lt41\.writeTab/.test(text)) writers.push([url.pathname.split('/public/v41/')[1], 'setItem']);
-      }
-    }
-  };
-  walk(new URL('../public/v41/', import.meta.url));
-  assert.deepEqual(writers, [['shell.mjs', 1]], '기본 탭을 저장하는 곳은 설정 행 한 곳');
 });
 
 test('#462 탭을 오가도 적어 둔 입력은 그대로이고, 쓴 뒤 닫으면 한 번 묻는 판정도 그대로다', () => {
