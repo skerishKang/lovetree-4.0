@@ -437,3 +437,33 @@ test('#1087 카드 바꾸기·숫자 두 줄·숫자 누르기', { skip: REQUIRE
     } finally { await close952(h); }
   } finally { await browser.close(); }
 });
+
+test('#1087 390 새 소식 띠와 숫자 두 줄 겹침 0', { skip: REQUIRE952 ? false : skip952, timeout: 180000 }, async () => {
+  if (skip952) assert.fail(skip952);
+  const browser = await chromium952.launch({ headless: true });
+  try {
+    const h = await boot952(browser, { member: true, width: 390 });
+    try {
+      const frame = h.frame;
+      await frame.locator('.home-count-line').first().waitFor({ state: 'visible', timeout: 15000 });
+      await h.page.evaluate(() => {
+        const band = document.getElementById('updates-card');
+        band.hidden = false;
+        const height = Math.round(band.getBoundingClientRect().height);
+        document.getElementById('view').contentWindow.postMessage({ type: 'lt41-updates-band', height }, location.origin);
+      });
+      await h.page.waitForTimeout(700);
+      const geo = await h.page.evaluate(() => {
+        const band = document.getElementById('updates-card').getBoundingClientRect();
+        const doc = document.getElementById('view').contentDocument;
+        const root = doc.querySelector('#orbit').shadowRoot;
+        const rows = [...root.querySelectorAll('.home-count-line')].map(n => n.getBoundingClientRect());
+        const links = doc.defaultView.parent.document.querySelector('.home-links')?.getBoundingClientRect();
+        const area = r => Math.max(0, Math.min(band.right, r.right) - Math.max(band.left, r.left)) * Math.max(0, Math.min(band.bottom, r.bottom) - Math.max(band.top, r.top));
+        return { numbers: rows.map(area), links: links ? area(links) : 0, shift: getComputedStyle(root.querySelector('.center')).transform };
+      });
+      assert.ok(geo.numbers.length >= 2 && geo.numbers.every(v => Math.round(v) === 0), '띠와 숫자 두 줄 겹침 0: ' + JSON.stringify(geo));
+      assert.equal(Math.round(geo.links), 0, '띠와 바닥 링크 겹침 0: ' + JSON.stringify(geo));
+    } finally { await close952(h); }
+  } finally { await browser.close(); }
+});

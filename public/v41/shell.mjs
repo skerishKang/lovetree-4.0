@@ -86,7 +86,12 @@ if(updatesCardBox)new MutationObserver(()=>{
     updatesCardBox.hidden=true;
     noticeQueue.request('updates',{show:()=>{hideToast();updatesCardBox.hidden=false;},hide:()=>{updatesCardBox.hidden=true;}});
   }
+  broadcastUpdatesBand();
 }).observe(updatesCardBox,{attributes:true,attributeFilter:['hidden']});
+function broadcastUpdatesBand(){
+ const height=updatesCardBox&&!updatesCardBox.hidden?Math.round(updatesCardBox.getBoundingClientRect().height):0;
+ for(const f of frames()){try{f.contentWindow.postMessage({type:'lt41-updates-band',height},location.origin)}catch{}}
+}
 // #977: 서버 기록에 형식이 어긋난 트리가 섞여 있으면 그 트리만 빼고 셸을 연다(읽기는 workspace-guard.mjs).
 // #986: 서버가 읽지 못해 빼 둔 트리는 개수(quarantined)만 응답에 온다 — 화면 안내에 함께 센다.
 // 화면에는 짧은 안내 한 줄, 콘솔에는 어느 트리가 왜 어긋났는지 한 줄만 남긴다 — 같은 기록을 다시 읽어도 한 번만.
@@ -1686,7 +1691,9 @@ document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{if(b.dataset.
  show(b.dataset.view);});
 for(const f of frames())f.addEventListener('load',()=>{frameLoaded(f);
  // #894: 새로 뜬 안쪽 화면에도 움직임 끄기 상태를 알린다(메모리 상태 — 화면을 다시 열면 처음 상태).
- try{f.contentWindow.postMessage({type:'lt41-motion',paused:motionPaused},location.origin)}catch{}});
+ try{f.contentWindow.postMessage({type:'lt41-motion',paused:motionPaused},location.origin)}catch{}
+ broadcastUpdatesBand();
+});
 paintThemeControls();applyTheme();paintTitleDisplayControls();applyAdvanced();
 if(initialRoute.scope==='public')showPublicRoute(initialRoute);
 else if(/^#explore/.test(location.hash)){/* #1025: 둘러보기 패널이 자기 주소를 연다 — 예시 로드로 주소를 덮지 않는다. */}
