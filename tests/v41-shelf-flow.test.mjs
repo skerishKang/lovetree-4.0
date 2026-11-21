@@ -7,6 +7,7 @@ import {
   filterShelf, findBook, lastMomentDate, leftPageMarkup, pageMeta, pageTarget, resolveShelfIndex,
   resumeCard, rightPageMarkup, shelfBook, shelfRowLayout, treeTitleOf, youtubeId
 } from '../public/v41/views/shelf/shelf-model.mjs';
+import { youtubeIdFrom } from '../public/v41/youtube-id.mjs';
 import { createReader } from '../public/v41/views/shelf/shelf-reader.js';
 import { fakeEl } from './helpers/fake-dom.mjs';
 
@@ -185,6 +186,32 @@ test('책 안 두 쪽 문구는 첫 장/지난 장·영상 안내를 그대로 �
   const video = rightPageMarkup({ ...book, chapters: [{ ...book.chapters[0], type: 'video', image: '' }] }, 0);
   assert.match(video, /영상의 예시 이미지입니다/);
   assert.match(video, /영상 예시 · 내 기록/);
+});
+
+test('#1059 표 시험: 모든 진입 함수(정본·서재 모델)가 같은 주소에서 같은 id를 준다', () => {
+  const CORPUS = [
+    'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+    'https://youtu.be/dQw4w9WgXcQ?t=42',
+    'https://www.youtube.com/shorts/dQw4w9WgXcQ',
+    'https://www.youtube.com/live/dQw4w9WgXcQ',
+    'https://www.youtube.com/embed/dQw4w9WgXcQ',
+    'http://m.youtube.com/watch?v=dQw4w9WgXcQ',
+    'https://music.youtube.com/watch?v=dQw4w9WgXcQ',
+    'https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=PL123',
+    'https://www.youtube.com/playlist?list=PL123',
+    'https://youtube.com.evil.test/watch?v=dQw4w9WgXcQ',
+    'https://user:pass@www.youtube.com/watch?v=dQw4w9WgXcQ',
+    'ftp://youtu.be/dQw4w9WgXcQ',
+    'https://www.youtube.com/shorts/abcdefghijkEXTRA',
+    'https://youtu.be/short',
+    'https://www.youtube.com/watch?v=toolongid123456',
+    'javascript:alert(1)'
+  ];
+  for (const url of CORPUS) {
+    assert.equal(youtubeId(url), youtubeIdFrom(url), `서재 모델 ${url}`);
+  }
+  assert.equal(youtubeId('https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg', () => null), '');
+  assert.equal(youtubeIdFrom('https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg'), 'dQw4w9WgXcQ');
 });
 
 test('유튜브 주소에서 영상 ID를 뽑고 LTMedia 설명이 있으면 그것을 먼저 쓴다', () => {

@@ -8,6 +8,9 @@
 export const YOUTUBE_HOSTS = new Set(['youtube.com', 'www.youtube.com', 'm.youtube.com', 'music.youtube.com', 'youtu.be']);
 export const YTIMG_HOST = /^(?:img\.youtube\.com|(?:[a-z0-9-]+\.)*ytimg\.com)$/i;
 export const VIDEO_ID_RE = /^[A-Za-z0-9_-]{11}$/;
+// #1059: 정본을 전역 스크립트에서도 부를 수 있게 한 벌을 globalThis에 남긴다(모듈 로드 뒤부터).
+// 전역 스크립트 화면(책·보드·서재)은 이 값을 먼저 보고, 없으면 LTMedia를 거친다.
+if (typeof globalThis !== 'undefined') globalThis.LTYouTubeId = { youtubeIdFrom };
 
 const trimText = (value) => (typeof value === 'string' ? value.trim() : '');
 

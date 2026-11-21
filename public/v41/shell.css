@@ -33,7 +33,7 @@ html[data-lt-theme=garden] #context-kind{color:var(--lt-rose-ink)}
 #context-tree{font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}#manage-tree{flex:0 0 auto;min-height:44px;padding:8px 13px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-pill);background:rgba(255,230,166,.07);color:var(--lt-pearl);font-size:12px}#manage-tree[hidden]{display:none}
 @media(max-width:780px){#view-context{padding:6px 12px;gap:8px}}
 
-.quick-entry-hint{min-height:24px;margin:4px 0 14px!important;padding-left:12px;border-left:2px solid var(--lt-gold-line);color:var(--lt-muted)!important}.quick-entry-hint:empty{display:none}
+.emotion-field{display:flex;flex-direction:column;gap:8px}.emotion-label{font-size:13px;color:var(--lt-muted)}.emotion-chips{display:flex;flex-wrap:wrap;gap:6px}.emotion-chips button{min-height:28px;padding:2px 12px;border:1px solid var(--line);border-radius:999px;background:transparent;color:var(--lt-pearl);font-size:12px}.emotion-chips button:focus-visible{outline:2px solid var(--lt-gold);outline-offset:2px}.emotion-chips button[aria-checked="true"]{background:var(--lt-gold);border-color:var(--lt-gold);color:#171310;font-weight:700}
 .management-block{padding-bottom:22px}.management-block+.management-block{padding-top:22px;border-top:1px solid var(--line)}.management-block label{display:block;margin:14px 0;font-size:13px;color:var(--lt-muted)}.management-block input{display:block;width:100%;min-height:44px;margin-top:8px;padding:11px 12px;border:1px solid rgba(255,255,255,.22);border-radius:12px;background:rgba(255,255,255,.04);color:var(--lt-pearl);line-height:1.6}#parent-current{margin:0;color:var(--lt-pearl);font-weight:600}#parent-management[hidden]{display:none}@media(max-width:780px){.management-block input,#tree-form input,#tree-form select{font-size:16px}}
 
 /* Explicit sharing keeps the established dark rose panels and 44px controls. */
@@ -355,8 +355,10 @@ html[data-lt-theme=garden] .settings-more-fold>summary:hover{color:var(--lt-ink)
 .quick-lede{margin:10px 0 0;font-size:13px;line-height:1.8;color:var(--lt-muted)}
 .quick-lede span{display:block}
 .quick-sr{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0}
-/* 순간 추가 한 창(이슈 425) — 쉬운 추가와 자세한 추가가 같은 창의 탭이다. 폭은 두 탭이 같고(540px), 길면 창 안에서 세로로 스크롤한다. */
-#write-panel{width:min(540px,calc(100vw - 32px));max-width:calc(100vw - 32px);max-height:calc(100dvh - 88px);overflow-y:auto;overscroll-behavior:contain}
+/* 순간 추가 한 창(이슈 425) — 쉬운 추가와 자세한 추가가 같은 창의 탭이다. #1097에서는 순간 수정 창이 720px라 두 탭 폭을 함께 720px로 둔다. 길면 창 안에서 세로로 스크롤한다. */
+#write-panel{width:min(720px,calc(100vw - 32px));max-width:calc(100vw - 32px);max-height:calc(100dvh - 88px);overflow-y:auto;overscroll-behavior:contain}
+/* #1097: 내가 올린 사진·영상 창도 순간 수정 창과 같은 틀(720)이다. */
+dialog#account-assets{width:min(720px,calc(100vw - 32px));max-width:calc(100vw - 32px)}
 .write-tabs{display:flex;gap:6px;margin:14px 0 0;padding:4px;border:1px solid var(--lt-line);border-radius:12px;background:rgba(255,255,255,.03)}
 .write-tabs[hidden]{display:none}
 .write-tabs [role=tab]{flex:1 1 0;min-width:0;min-height:40px;padding:0 12px;border:1px solid transparent;border-radius:9px;background:none;color:var(--lt-muted);font-size:13px;font-weight:600}
@@ -374,6 +376,7 @@ html[data-lt-theme=garden] .settings-more-fold>summary:hover{color:var(--lt-ink)
   .quick-preview[data-state=empty]{display:flex;height:120px}
  .quick-submit{position:sticky;bottom:calc(10px + env(safe-area-inset-bottom));z-index:1;box-shadow:0 0 0 10px var(--lt-glass-strong)}
  #moment-form>.button-row{position:sticky;bottom:0;z-index:1;margin:16px -18px 0;padding:10px 18px calc(10px + env(safe-area-inset-bottom));background:linear-gradient(var(--lt-glass-strong),var(--lt-glass-strong)),var(--lt-stage);border-top:1px solid var(--lt-line)}
+ #moment-form>.editor-bottom{position:sticky;bottom:0;z-index:1;margin:16px -18px 0;padding:10px 18px calc(10px + env(safe-area-inset-bottom));background:linear-gradient(var(--lt-glass-strong),var(--lt-glass-strong)),var(--lt-stage);border-top:1px solid var(--lt-line)}
 }
 #quick-form{margin-top:16px}
 .quick-input-row{display:flex;align-items:center;gap:8px;min-height:56px;padding:0 8px 0 14px;border:1px solid var(--lt-gold-line);border-radius:14px;background:rgba(255,255,255,.04)}
@@ -830,6 +833,11 @@ html[data-lt-theme=garden] #share-form select,html[data-lt-theme=garden] #share-
 /* Issue 784: discovery is a cover-first grid; controls stay in one compact toolbar. */
 #community-panel{background:var(--lt-stage);background-image:none;color:var(--lt-pearl);overflow-y:auto;overscroll-behavior:contain}
 #community-panel::backdrop{background:color-mix(in srgb,var(--lt-stage) 74%,transparent);backdrop-filter:blur(2px)}
+/* #1092: 둘러보기는 겹쳐 뜨는 창이 아니라 화면이다 — 상단 메뉴 위의 ×는 없애고, 화면 뒤의 iframe·빈 화면도 남지 않게 숨긴다
+   (body.community-screen은 shell/community-screen.mjs가 붙인다). 비모달로 열리므로 뒤 덮개가 없어 상단 메뉴는 흐려지지 않고,
+   위치는 data-lt-panel="full" 규칙(맨 위 메뉴 아래 내용 자리)을 그대로 쓴다. */
+#community-panel [data-close="community-panel"]{display:none}
+body.community-screen #stage>iframe,body.community-screen #empty{display:none}
 #community-panel .community-top{max-width:1500px;margin:0 auto 8px;padding-top:26px}
 #community-panel .panel-heading{max-width:1500px;margin:0 auto 12px}
 #community-panel .panel-note{max-width:1500px;margin:0 auto 18px;color:var(--lt-pearl)}
@@ -984,3 +992,77 @@ body.lt-frame-dialog-open .app-header::after,body.lt-frame-dialog-open .home-lin
 #cleanup-panel .panel-foot{flex:0 0 auto;display:flex;flex-wrap:wrap;gap:8px;padding:12px 0 20px;border-top:1px solid var(--line);background:var(--lt-glass-strong)}
 #cleanup-panel .panel-foot button{min-height:44px;border-radius:var(--lt-r-pill);border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.04);padding:10px 14px}
 #cleanup-panel .panel-foot .primary{background:var(--lt-primary);color:var(--lt-primary-ink)}
+
+
+/* #1097: 순간 수정 창 — 영상 먼저, 저장 하나, 이어짐 한 칸. 색은 --lt-* 토큰만 쓴다. */
+#editor-context{display:block;margin:6px 0 0;font-size:13px;line-height:1.6;color:var(--lt-muted)}
+#moment-form .moment-video{margin:18px 0 0}
+#moment-form .moment-media-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:10px}
+#moment-form .moment-media-actions #moment-media-open{display:inline-flex;flex-wrap:wrap;align-items:center;gap:8px}
+#moment-form .moment-media-actions button,#moment-form .moment-media-actions a{min-height:44px;display:inline-flex;align-items:center;padding:0 14px;border:1px solid var(--lt-line);border-radius:var(--lt-r-pill);background:rgba(255,255,255,.04);color:var(--lt-pearl);font-size:13px;text-decoration:none;white-space:nowrap}
+#moment-form .moment-media-actions button:hover,#moment-form .moment-media-actions a:hover{border-color:var(--lt-gold-line)}
+#moment-form .moment-media-actions .media-change-toggle{margin-left:auto;color:var(--lt-gold);border-color:var(--lt-gold-line)}
+#moment-form .moment-media-status{margin:0;font-size:13px;line-height:1.6;color:var(--lt-muted)}
+#moment-form .moment-media-status:empty{display:none}
+#moment-form .media-change-box{margin:14px 0 0;padding:14px;border:1px solid var(--lt-line);border-radius:var(--lt-r-card);background:var(--lt-stage-2)}
+#moment-form .media-change-box[hidden]{display:none}
+#moment-form .media-change-box>label{margin:0}
+#moment-form .media-note-small{margin:10px 0 0;font-size:12px;line-height:1.6;color:var(--lt-muted)}
+#moment-form .media-change-box .asset-picker{margin-top:12px}
+#moment-form .media-change-box .file-pick{margin-top:12px}
+#moment-form>.editor-bottom{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:16px -18px 0;padding:10px 18px calc(10px + env(safe-area-inset-bottom));border-top:1px solid var(--lt-line);background:linear-gradient(var(--lt-glass-strong),var(--lt-glass-strong)),var(--lt-stage)}
+#moment-form>.editor-bottom button{min-height:44px;border-radius:var(--lt-r-pill);border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.04);padding:10px 14px;font-size:14px}
+#moment-form>.editor-bottom button.primary{background:var(--lt-primary);color:var(--lt-primary-ink);border-color:var(--lt-primary)}
+#moment-form .editor-bottom-spacer{flex:1 1 auto}
+#moment-form>#range-fields{margin:14px 0 0}
+#moment-form>#segment-capture{margin:12px 0 0}
+#moment-form>.edit-continue{display:block;margin:16px 0 0;padding:0 14px 10px;border:1px solid var(--lt-line);border-radius:var(--lt-r-card);background:var(--lt-stage-2)}
+#moment-form>.edit-continue>summary{min-height:44px;align-content:center;font-size:14px;font-weight:600;color:var(--lt-pearl)}
+#moment-form .continue-body{display:grid;gap:16px;padding:4px 0 8px}
+#moment-form .continue-parent p,#moment-form .continue-related p{margin:0 0 4px;font-size:13px;line-height:1.6;color:var(--lt-muted)}
+#moment-form .continue-parent>label,#moment-form .continue-related>label{display:block;font-size:13px;color:var(--lt-muted);margin:12px 0 0}
+#moment-form .continue-parent-row{display:flex;align-items:center;gap:10px;margin-top:8px}
+#moment-form .continue-parent-row select{flex:1 1 auto;min-width:0}
+#moment-form .parent-preview{flex:0 0 auto;width:52px;height:52px;display:inline-flex;align-items:center;justify-content:center;overflow:hidden;border:1px solid var(--lt-line);border-radius:var(--lt-r-card);background:rgba(255,255,255,.04);color:var(--lt-muted);font-size:20px}
+#moment-form .parent-preview img{width:100%;height:100%;object-fit:cover;display:block}
+#moment-form .continue-related-hint{display:block;font-size:12px}
+#moment-form .related-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+#moment-form .related-chip{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 6px 0 14px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-pill);color:var(--lt-pearl);font-size:13px}
+#moment-form .related-chip-cut{flex:0 0 auto;width:44px;height:44px;border:0;border-radius:50%;background:none;color:var(--lt-muted);font-size:18px}
+#moment-form .related-chip-cut:hover{color:var(--lt-pearl)}
+#moment-form .related-chip-empty{font-size:13px;color:var(--lt-muted)}
+#moment-form .continue-related select{margin-top:8px}
+html[data-lt-theme=garden] #moment-form .moment-media-actions button,html[data-lt-theme=garden] #moment-form .moment-media-actions a{background:rgba(255,253,248,.9);color:var(--lt-ink)}
+html[data-lt-theme=garden] #moment-form .parent-preview{background:rgba(255,253,248,.9)}
+/* #1097: 내가 올린 사진·영상 — 용량 막대·탭·4열 격자. 색은 --lt-* 토큰만 쓴다. */
+dialog#account-assets .assets-panel{padding:0;border-top:0;margin-top:0}
+dialog#account-assets .assets-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+dialog#account-assets .assets-tabs{display:flex;flex-wrap:wrap;gap:6px;padding:4px;border:1px solid var(--lt-line);border-radius:12px;background:rgba(255,255,255,.03)}
+dialog#account-assets .assets-tabs [role=tab]{min-height:44px;padding:0 14px;border:1px solid transparent;border-radius:9px;background:none;color:var(--lt-muted);font-size:13px;font-weight:600}
+dialog#account-assets .assets-tabs [role=tab][aria-selected=true]{border-color:var(--lt-gold-line);background:rgba(255,230,166,.1);color:var(--lt-gold)}
+dialog#account-assets .assets-actions{display:flex;flex-wrap:wrap;gap:8px;margin-left:auto}
+dialog#account-assets .assets-actions button{min-height:44px;border-radius:var(--lt-r-pill);border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.04);padding:10px 14px;font-size:13px}
+dialog#account-assets .assets-usage-bar{height:8px;margin-top:12px;border-radius:var(--lt-r-pill);background:rgba(255,255,255,.08);overflow:hidden}
+dialog#account-assets .assets-usage-fill{display:block;width:var(--fill,0%);height:100%;background:var(--lt-gold)}
+dialog#account-assets .assets-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:12px}
+dialog#account-assets .asset-card-open{display:flex;flex-direction:column;gap:6px;width:100%;min-height:44px;padding:8px;border:1px solid var(--lt-line);border-radius:var(--lt-r-card);background:rgba(255,255,255,.04);text-align:left}
+dialog#account-assets .asset-card-open:hover{border-color:var(--lt-gold-line)}
+dialog#account-assets .asset-thumb{display:block;aspect-ratio:1;overflow:hidden;border-radius:9px;background:var(--lt-stage-2)}
+dialog#account-assets .asset-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+dialog#account-assets .asset-thumb-video{display:flex;width:100%;height:100%;align-items:center;justify-content:center;color:var(--lt-gold);font-size:22px}
+dialog#account-assets .asset-name{display:block;font-size:11px;line-height:1.5;color:var(--lt-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+dialog#account-assets .asset-count{display:block;font-size:12px;line-height:1.5;color:var(--lt-pearl)}
+dialog#account-assets .assets-detail{margin-top:14px;padding:12px;border:1px solid var(--lt-line);border-radius:var(--lt-r-card);background:var(--lt-stage-2)}
+dialog#account-assets .assets-detail:empty{display:none}
+dialog#account-assets .assets-detail-head{margin:0;font-size:12px;line-height:1.6;color:var(--lt-muted);overflow-wrap:anywhere}
+dialog#account-assets .assets-detail-list{margin:8px 0 0;padding-left:18px}
+dialog#account-assets .assets-detail-list li{font-size:13px;line-height:1.8;color:var(--lt-pearl)}
+dialog#account-assets .assets-detail-none{margin:0;font-size:13px;color:var(--lt-muted)}
+@media(max-width:640px){
+ dialog#account-assets .assets-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+ dialog#account-assets .assets-actions{margin-left:0}
+}
+@media(max-width:780px){
+ #moment-form #delete-moment{font-size:0}
+ #moment-form #delete-moment::before{content:'🗑';font-size:20px}
+}
