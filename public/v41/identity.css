@@ -247,7 +247,6 @@ html[data-lt-theme=garden] body,html[data-lt-theme=garden] .app-header{transitio
 /* #1027: 정원 이어 보기 카드만 종이와 잉크로 맞춘다. */
 :host([data-lt-theme=garden]) .recent-card{background:var(--lt-paper);color:var(--lt-ink)}
 :host([data-lt-theme=garden]) .recent-media{background:var(--lt-paper)}
-:host([data-lt-theme=garden]) .recent-media.vertical{width:100%}
  :host([data-lt-theme=garden]) .recent-media.vertical::before{opacity:.7}
 :host([data-lt-theme=garden]) .recent-meta{background:var(--lt-paper);border-top:1px solid var(--lt-line-paper)}
 :host([data-lt-theme=garden]) .recent-head,:host([data-lt-theme=garden]) .recent-head-arrow,:host([data-lt-theme=garden]) .recent-meta small{color:var(--lt-muted)}
