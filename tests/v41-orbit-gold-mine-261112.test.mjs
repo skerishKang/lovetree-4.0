@@ -68,7 +68,7 @@ test('좁은 화면(≤650px)에서 마지막 순간 카드가 화면 안에 온
 
 test('불투명·blur 없음·밝기 깊이는 그대로 유지한다(#440 계약)', () => {
   assert.doesNotMatch(orbit, /el\.style\.opacity=/);
-  assert.match(orbit, /el\.style\.filter=`brightness\(/);
+  assert.match(orbit, /el.style.filter=depthFilter/);
   // 카드 본체 규칙(.card·.card.mine·정원 .card.mine)에는 반투명·blur가 없다 — 캡션·hover 칩의 글자 투명도는 별개다.
   for (const [src, start] of [[orbitCSS, '.card{position:absolute'], [orbit, '.card.mine{'], [orbit, ':host([data-lt-theme=garden]) .card.mine{']]) {
     const body = ruleOf(src, start);
