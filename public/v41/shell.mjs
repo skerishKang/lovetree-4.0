@@ -808,7 +808,7 @@ function anyDialogOpen(){return !!document.querySelector('dialog[open]');}
 function tipsFollowDialogs(){
   const box=$('tree-tips');if(!box)return;
   if(anyDialogOpen()){
-    if(!box.hidden){tipsHeld=true;box.hidden=true;}
+    if(!box.hidden){tipsHeld=true;noticeQueue.release('tips');}
     return;
   }
   if(!tipsHeld)return;
@@ -830,7 +830,7 @@ let tipsHeld=false;
 function tipsFollowAccountMenu(){
   const box=$('tree-tips');
   if(accountMenuOpen()){
-    if(box&&!box.hidden){tipsHeld=true;closeTreeTips(false);}
+    if(box&&!box.hidden){tipsHeld=true;noticeQueue.release('tips');closeTreeTips(false);}
     return;
   }
   if(!tipsHeld)return;
@@ -858,7 +858,11 @@ function syncTreeTips(takeFocus=true){
   const wanted=current!=='first-journey.html'&&tipsWanted({owned:!!member?.snapshot().owned,treeCount:model?.trees?.length||0,momentCount,seen:readTipsSeen(localStorage),source});
   if(wanted){
    if(accountMenuOpen()||anyDialogOpen())showTreeTips(takeFocus);
-   else noticeQueue.request('tips',{show:()=>{hideToast();showTreeTips(takeFocus);},hide:()=>{const box=$('tree-tips');if(box)box.hidden=true;}});
+   else{
+    // 메뉴·창 때문에 숨었던 안내가 다시 보일 때 줄 상태를 맞춘다(#666 순서 유지).
+    if(noticeQueue.currentId()==='tips'&&$('tree-tips')?.hidden)noticeQueue.release('tips');
+    noticeQueue.request('tips',{show:()=>{hideToast();showTreeTips(takeFocus);},hide:()=>{const box=$('tree-tips');if(box)box.hidden=true;}});
+   }
   }else{noticeQueue.release('tips');closeTreeTips(false);}
 }
 // 창이 닫힐 때마다 안내를 다시 맞춘다 — 열려 있는 창이 없어지면 숨긴 안내를 다시 띄운다(#845).

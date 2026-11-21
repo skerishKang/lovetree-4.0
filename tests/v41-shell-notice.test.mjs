@@ -161,6 +161,13 @@ test('952 실행: 부팅이 끝나면 synced 안내가 토스트에 뜬다(기�
       const page = await ctx.newPage();
       try {
         await page.goto(`${base}/v41/?account=1`, { waitUntil: 'load' });
+        // #1103: 안내는 차례로 온다 — 첫 트리 판·새 소식 띠를 닫으면 정보 안내가 그 자리에 뜬다.
+        if (!await page.evaluate(() => document.getElementById('tree-tips')?.hidden)) await page.click('#tree-tips-close');
+        await page.waitForFunction(() => {
+          const card = document.getElementById('updates-card'), toast = document.getElementById('toast');
+          return (card && !card.hidden) || (toast && !toast.hidden && toast.textContent.includes('불러왔어요'));
+        }, null, { timeout: 10000 });
+        if (!await page.evaluate(() => document.getElementById('updates-card')?.hidden)) await page.click('#updates-dismiss');
         await page.waitForFunction((want) => {
           const toast = document.getElementById('toast');
           return !!toast && !toast.hidden && toast.textContent === want;
@@ -211,6 +218,12 @@ test('1076 실행: synced 안내는 첫 진입 1번, 화면 이동 0번, 계정 
     const page = await ctx.newPage();
     try {
       await page.goto(`${base}/v41/?account=1`, { waitUntil: 'load' });
+      if (!await page.evaluate(() => document.getElementById('tree-tips')?.hidden)) await page.click('#tree-tips-close');
+      await page.waitForFunction(() => {
+        const card = document.getElementById('updates-card'), toast = document.getElementById('toast');
+        return (card && !card.hidden) || (toast && !toast.hidden && toast.textContent.includes('불러왔어요'));
+      }, null, { timeout: 10000 });
+      if (!await page.evaluate(() => document.getElementById('updates-card')?.hidden)) await page.click('#updates-dismiss');
       await page.waitForFunction(() => window.__toastShows === 1, null, { timeout: 20000 });
       for (const view of ['track59-sketchbook.html', 'track56-network.html']) {
         await page.evaluate((v) => document.querySelector(`button[data-view="${v}"]`)?.click(), view);
