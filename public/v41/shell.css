@@ -631,6 +631,8 @@ body:has(dialog[open]) #toast{top:calc(8px + env(safe-area-inset-top));bottom:au
 body.lt-frame-dialog-open #toast{top:calc(68px + env(safe-area-inset-top));bottom:auto;left:14px;transform:none;max-width:calc(100% - 88px)}
 /* 390에서 프레임 창(순간 목록)이 화면 거의 꽉 차게 뜨므로, 알림 줄은 머리글 바로 아래(62px)에 붙여 창 위쪽을 침범하지 않게 한다. */
 @media(max-width:780px){body.lt-frame-dialog-open #toast{top:calc(62px + env(safe-area-inset-top))}}
+/* #1109: 390의 꽉 찬 창은 화면 전체를 차지한다 — 짧은 알림이 창 머리·닫기 단추를 덮지 않게 접는다. */
+@media(max-width:520px){body.lt-frame-dialog-open #toast{display:none}}
 /* 새 소식 창: 바닥 닫기 줄이 스크롤 본문 글자를 덮지 않게 본문 끝에 그 높이만큼 여백. */
 #updates-panel>#eras,#updates-panel>.updates-list{margin-bottom:64px}
 /* 이슈 611: 새 소식 화면. */
@@ -968,3 +970,16 @@ dialog.lt-close-confirm .button-row .primary{background:var(--lt-primary);color:
 html[data-lt-theme=garden] dialog.lt-close-confirm{border-color:var(--lt-line-paper)}
 html[data-lt-theme=garden] dialog.lt-close-confirm .button-row button{background:rgba(255,253,248,.9);color:var(--lt-ink);border-color:var(--lt-line-paper)}
 html[data-lt-theme=garden] dialog.lt-close-confirm .button-row .primary{background:var(--lt-primary);color:var(--lt-primary-ink);border-color:var(--lt-primary)}
+/* #1109: 정리 창·순간 목록 창의 덮개와 닫기 단추를 한 값으로 맞춘다. */
+:root{--lt-dialog-backdrop:rgba(3,3,7,.85);--lt-dialog-backdrop-blur:blur(12px);--lt-dialog-close-size:44px;--lt-dialog-close-radius:50%;--lt-dialog-close-font:24px}
+dialog[data-lt-panel=card]::backdrop{background:var(--lt-dialog-backdrop);backdrop-filter:var(--lt-dialog-backdrop-blur)}
+.close{width:var(--lt-dialog-close-size);height:var(--lt-dialog-close-size);border-radius:var(--lt-dialog-close-radius);font-size:var(--lt-dialog-close-font)}
+/* 프레임 안 창이 열리면 셸 머리줄·아래 고정 항목도 같은 덮개로 어둡게 — 뒤 배경이 화면 전체를 덮는다. */
+body.lt-frame-dialog-open .app-header,body.lt-frame-dialog-open .home-links,body.lt-frame-dialog-open #mobile-add,body.lt-frame-dialog-open .updates-card{pointer-events:none}
+body.lt-frame-dialog-open .app-header::after,body.lt-frame-dialog-open .home-links::after,body.lt-frame-dialog-open #mobile-add::after,body.lt-frame-dialog-open .updates-card::after{content:'';position:absolute;inset:0;z-index:1;border-radius:inherit;background:var(--lt-dialog-backdrop);backdrop-filter:var(--lt-dialog-backdrop-blur);pointer-events:none}
+/* 정리 창은 본문만 안에서 스크롤하고 주 단추는 아래 고정 줄에 둔다(옮기기·새 트리 만들기 잘림 방지). */
+#cleanup-panel[open]{display:flex;flex-direction:column;overflow:hidden;padding-bottom:0}
+#cleanup-panel .cleanup-scroll{flex:1 1 auto;min-height:0;overflow:auto;padding-bottom:16px}
+#cleanup-panel .panel-foot{flex:0 0 auto;display:flex;flex-wrap:wrap;gap:8px;padding:12px 0 20px;border-top:1px solid var(--line);background:var(--lt-glass-strong)}
+#cleanup-panel .panel-foot button{min-height:44px;border-radius:var(--lt-r-pill);border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.04);padding:10px 14px}
+#cleanup-panel .panel-foot .primary{background:var(--lt-primary);color:var(--lt-primary-ink)}
