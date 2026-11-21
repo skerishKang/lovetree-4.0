@@ -568,15 +568,38 @@ test('#1058 보드 저장 보내기 실패 — 보드 알림 줄에 실패 문�
           window.parent.postMessage = () => { throw new Error('보내기 실패'); };
         });
         await frame.evaluate(() => window.persistBoard());
+        await frame.waitForTimeout(450);
         const notice = await frame.evaluate(() => {
-          const el = document.getElementById('toast');
-          return { text: el?.textContent || '', show: !!el?.classList.contains('show'), opacity: Number(getComputedStyle(el).opacity) };
+          const el = document.getElementById('saveFail');
+          if (!el) return null;
+          const r = el.getBoundingClientRect();
+          const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+          const top = document.elementFromPoint(cx, cy);
+          const cs = getComputedStyle(el);
+          const lum = (c) => { const m = c.match(/[\d.]+/g) || []; const [r0,g0,b0] = m.map(Number); return 0.2126*r0 + 0.7152*g0 + 0.0722*b0; };
+          const bgL = lum(cs.backgroundColor), fgL = lum(cs.color);
+          const ratio = (Math.max(bgL,fgL) + 0.05) / (Math.min(bgL,fgL) + 0.05);
+          return { text: el.textContent.trim(), show: el.classList.contains('show'),
+            rect: { top: Math.round(r.top), bottom: Math.round(r.bottom), left: Math.round(r.left), right: Math.round(r.right), width: Math.round(r.width), height: Math.round(r.height) },
+            viewportH: innerHeight, viewportW: innerWidth,
+            topIsSelf: top === el || (top && el.contains(top)),
+            topTag: top ? top.tagName + '.' + top.className : '',
+            bg: cs.backgroundColor, color: cs.color, contrast: Math.round(ratio*100)/100,
+            opacity: Number(cs.opacity), pointerEvents: cs.pointerEvents, zIndex: cs.zIndex
+          };
         });
         const sent = await page.evaluate(() => (window.LT41_MESSAGES || []).filter((m) => m.type === 'lt41-board-sync').length);
         console.log('#1058', width, JSON.stringify({ notice, sent }));
+        assert.ok(notice, `${width}: 실패 알림 요소가 있다`);
         assert.equal(notice.show, true, `${width}: 보드 알림 줄이 떴다`);
-        assert.ok(/저장에 실패/.test(notice.text), `${width}: 실패 문구가 보인다 — ${notice.text}`);
-        assert.ok(notice.opacity > 0, `${width}: 알림이 실제로 보인다(opacity ${notice.opacity})`);
+    assert.ok(/저장에 실패/.test(notice.text), `${width}: 실패 문구가 보인다 — ${notice.text}`);
+        assert.equal(notice.opacity, 1, `${width}: 알림이 불투명하다(opacity ${notice.opacity})`);
+        assert.ok(notice.rect.bottom <= notice.viewportH && notice.rect.top >= 0, `${width}: 알림이 화면 안에 있다(${notice.rect.top}..${notice.rect.bottom} / ${notice.viewportH})`);
+        assert.ok(notice.contrast >= 4.5, `${width}: 글자 대비 4.5:1 이상(${notice.contrast}:1, bg=${notice.bg}, fg=${notice.color})`);
+        assert.equal(notice.topIsSelf, true, `${width}: 알림 가운데가 가장 위 층에 있다(top=${notice.topTag})`);
+        // 5초 이상 보인다 — 0.5초 후에도 그대로인지 확인한다(전체 지속은 6000ms).
+        await frame.waitForTimeout(500);
+        assert.equal(await frame.evaluate(() => document.getElementById('saveFail')?.classList.contains('show')), true, `${width}: 0.5초 뒤에도 보인다(최소 5초)`);
         assert.equal(sent, 0, `${width}: 보내지 못했으므로 동기화 메시지 없음`);
         assert.deepEqual(problems, [], `${width}: 던진 예외가 밖으로 새지 않았다`);
       } finally { await context.close(); }
