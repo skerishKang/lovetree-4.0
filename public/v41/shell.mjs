@@ -27,18 +27,23 @@ import {createPanels} from './shell/panels.mjs';
 import {createQuickAdd} from './shell/quick-add.mjs';
 import {createWritePanel, readWriteTab, writeWriteTab} from './shell/write-panel.mjs';
 import {createQuickIntake} from './shell/quick-intake.mjs';
-import {createVideoDup} from './shell/video-dup.mjs';
-import {createJourney} from './shell/journey.mjs';
 import {createMessages, lastShelfTreeId} from './shell/messages.mjs';
-import {createCleanup} from './shell/cleanup.mjs';
-// #627 PR B: 꼬리표 저장 한 곳(shell/tag-save.mjs — 기존 boardSync 경로로 keywords만)과 꼬리표 정리 창(shell/tag-manager.mjs).
 import {createTagSave} from './shell/tag-save.mjs';
-import {createTagManager} from './shell/tag-manager.mjs';
 import {headerBadge, cleanupAvailable} from './inbox-model.mjs';
 import {createDialogs} from './shell/dialogs.mjs';
 import {createFeedbackDialog} from './feedback.mjs';
 import {createFeedbackBoard} from './feedback-board.mjs';
 import {mountUpdates} from './updates.mjs';
+// #1026 E 2단계(A-06): 창을 열 때만 쓰는 모듈은 그때 받는다. 지연 프록시는 첫 메서드 호출에 모듈을
+// 불러오고 factory를 한 번만 만든 뒤, 이후 호출은 곧바로 실제 객체로 넘긴다(동기 반환도 유지).
+function lazyPanel(load){
+ let promise=null,inst=null;
+ const init=()=>promise||(promise=Promise.resolve().then(load).then(x=>(inst=x,x)));
+ return new Proxy({},{get(_,key){
+  if(key==='__ready')return ()=>!!inst;
+  return (...args)=>{if(inst)return inst[key](...args);return init().then(x=>x[key](...args));};
+ }});
+}
 import {connectionSignature} from './shell/panel-dirty.mjs';
 import {createLocation} from './shell/location.mjs';
 import {createNotifier, syncedNoticeText, newlyPublishedTrees} from './shell/notice.mjs';
@@ -305,7 +310,7 @@ function openLoginStart(intent='first'){return shellAuth.openLoginStart(intent);
 const shellWrite=createWritePanel({$,onModalShown:()=>tipsFollowDialogs()});
 // #876: 같은 영상을 다시 담을 때 담기 전에 한 번 알려 주는 창(shell/video-dup.mjs). 잠깐 판 — 순간 추가 창
 // 위에 겹쳐 열리고(#845 3단계 STACK_ALLOWED), ×·Esc·뒤로가기로 닫으면 아무것도 담지 않는다.
-const shellVideoDup=createVideoDup({$,onModalShown:()=>tipsFollowDialogs(),requestClose:id=>shellDialogs.requestClose(id),choose:(id,momentId)=>choose(id,momentId),openEditor:(mode,parentId)=>openEditor(mode,parentId)});
+const shellVideoDup=lazyPanel(()=>import('./shell/video-dup.mjs').then(m=>m.createVideoDup({$,onModalShown:()=>tipsFollowDialogs(),requestClose:id=>shellDialogs.requestClose(id),choose:(id,momentId)=>choose(id,momentId),openEditor:(mode,parentId)=>openEditor(mode,parentId)})));
 // 헤더·계정 메뉴는 shell/header.mjs가 맡는다(#231 1-B②-2). 셸은 자기 상태를 읽기 함수로 넘긴다.
 addEventListener('lovetree-auth-required',()=>shellAuth.authRequired());
 window.LT41=null;
@@ -354,7 +359,7 @@ const shellTags=createTagSave({
   // 결함 ③(tags-sync): 저장 뒤 열린 화면(iframe) 두 개에 답 모양(lt41-tags-saved)을 알린다.
   frames:()=>[$('view')?.contentWindow,$('view-next')?.contentWindow].filter(Boolean)
 });
-const shellTagManager=createTagManager({
+const shellTagManager=lazyPanel(()=>import('./shell/tag-manager.mjs').then(m=>m.createTagManager({
   $,
   getMember:()=>member,
   getSource:()=>source,
@@ -362,7 +367,7 @@ const shellTagManager=createTagManager({
   panel:id=>panel(id),
   closePanel:id=>{ shellDialogs.requestClose(id); const href=$('view')?.contentWindow?.location?.href || ''; if (!href || href === 'about:blank') show(current, false); },
   saveMoments:shellTags.saveMoments
-});
+})));
 const shellQuick=createQuickAdd({
   $,
   getMember:()=>member,
@@ -410,7 +415,7 @@ const shellIntake=createQuickIntake({
 });
 // #327 2부: 모아둔 순간 정리 창. #380 5번: 입구는 트리 ▾ 드롭다운의 '정리 전 N개 정리하기' 한 곳뿐이고,
 // 순간 상세의 '다른 트리로 옮기기'(lt41-move 메시지)는 그 순간을 옮기는 별개 동작으로 남는다.
-const shellCleanup=createCleanup({
+const shellCleanup=lazyPanel(()=>import('./shell/cleanup.mjs').then(m=>m.createCleanup({
   $,
   getMember:()=>member,
   getSource:()=>source,
@@ -426,7 +431,7 @@ const shellCleanup=createCleanup({
   addTitleLabel:ADD_TITLE_LABEL,
   unavailableLabel:VIDEO_UNAVAILABLE_TEXT,
   momentTitle:moment=>{const main=titleView(moment,titleDisplayValue()).main;return main||withoutAutoTitle(moment).title;},
-});
+})));
 mountThumbFallback(document,{
   isReadOnly:()=>source!=='server'||!member?.snapshot().writable,
   onEditTitle:({treeId,momentId})=>{
@@ -446,7 +451,7 @@ mountThumbFallback(document,{
 function updateMediaPreview(){return shellPanels.updateMediaPreview();}
 function updateQuickEntryHint(){return shellPanels.updateQuickEntryHint();}
 // 첫 여정 연결은 shell/journey.mjs, 공유·둘러보기·lt41-* 수신은 shell/messages.mjs가 맡는다(#231 1-B③-3).
-const shellJourney=createJourney({
+const shellJourney=lazyPanel(()=>import('./shell/journey.mjs').then(m=>m.createJourney({
   $,
   closePanels:()=>shellDialogs.closePanels(),
   syncTips:()=>syncTreeTips(),
@@ -464,7 +469,7 @@ const shellJourney=createJourney({
   openLoginStart:intent=>openLoginStart(intent),
   flowNavigation:()=>flowNavigation(),
   setHandled:hash=>{handledHash=hash;}
-});
+})));
 const shellMessages=createMessages({
   $,
   getCurrent:()=>current,

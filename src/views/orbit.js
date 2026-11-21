@@ -635,8 +635,15 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
    if(fewHide){elements[i].classList.add('off');noFit[i]=true;console.log('[few] hide',i,'of',cards.length);}
    else{placeCard(elements[i],c,i,th,x,y,z,sc,w,h,fit,narrow,zs,warmups);
    if(noFit[i])elements[i].classList.add('off');else if(i<cap&&!floatAnims[i])startFloat(i);}});
-  if(needBake){elements.forEach((el,i)=>{orbitKF[i]=null;});elements.forEach((el,i)=>{if(i<cap)startOrbit(i,w,h,warmups);});orbitBox=boxKey;}
-  orbitBand=band;
+   if(needBake){
+    // #1026 E 2단계: 카드 48장의 궤도 애니메이션 굽기를 한 프레임에 다 하지 않고 여러 프레임에 나눈다.
+    // 첫 자리·모양은 위 placeCard 가 이미 다 그렸으므로(화면 변화 0), WAAPI 붙임만 뒤로 미룬다.
+    elements.forEach((el,i)=>{orbitKF[i]=null;});
+    const total=Math.min(cap,elements.length),chunk=12;
+    for(let from=0;from<total;from+=chunk){const start=from;requestAnimationFrame(()=>{for(let i=start;i<Math.min(start+chunk,total);i++)startOrbit(i,w,h,warmups);});}
+    orbitBox=boxKey;
+   }
+   orbitBand=band;
   camWrite();
   dragDraw();
  }

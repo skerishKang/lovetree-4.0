@@ -238,7 +238,7 @@ test('저장: apply("quickAdd",{url}) 한 번 → ✓ 안내·지금 다듬기·
     h.els['quick-url'].value = URL_OK;
     h.els['quick-url'].listeners.input[0]();
     h.els['quick-form'].onsubmit({ preventDefault() {} });
-    assert.deepEqual(h.calls.apply, [['quickAdd', { url: URL_OK }]], '로컬1 계약 그대로 한 번');
+    assert.deepEqual(h.calls.apply, [['quickAdd', { url: URL_OK }, undefined, undefined]], '로컬1 계약 그대로 한 번');
     assert.equal(h.els['quick-notice'].textContent, savedNoticeText(FALLBACK_TITLE), '✓ 담았어요 · 제목 요약');
     assert.equal(h.els['quick-notice'].hidden, false);
     assert.equal(h.els['quick-refine'].hidden, false, '지금 다듬기가 안내 줄에 보인다');
@@ -353,7 +353,7 @@ test('끌어다 놓기: 놓으면 바로 저장하고, 모달 위에서는 칸�
   const shell = harness();
   try {
     shell.docListeners.drop({ dataTransfer: { types: ['text/uri-list'], getData: t => t === 'text/uri-list' ? URL_OK : '' }, preventDefault() {} });
-    assert.deepEqual(shell.calls.apply, [['quickAdd', { url: URL_OK }]], '셸 어디에나 놓으면 바로 담는다');
+    assert.deepEqual(shell.calls.apply, [['quickAdd', { url: URL_OK }, undefined, undefined]], '셸 어디에나 놓으면 바로 담는다');
     assert.equal(shell.els['drop-veil'].hidden, true, '놓은 뒤 덮개를 거둔다');
   } finally { shell.restore(); }
 

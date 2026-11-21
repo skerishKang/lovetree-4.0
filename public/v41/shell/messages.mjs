@@ -1,6 +1,6 @@
 // 셸의 공유 패널·둘러보기 연결·lt41-* 메시지 수신 (#231 1-B③-3).
 // 2026-11-08 리팩터링: 동작·문구·주소 형식 변경 0. shell.mjs에서 조건·조회 방식·인자 형태를 바꾸지 않고 그대로 옮겼다.
-import {mountCommunity} from '../community-panel.mjs';
+// #1026 E 2단계(A-06): 둘러보기 창 모듈은 이 연결 지점에서만 받는다(첫 클릭 리스너는 곧바로 단다).
 import {displayTreeTitle} from '../tree-name.mjs';
 import {parseTag,tagKey,isChannelLikeArtist} from '../tags.mjs';
 // #480 L13: 날짜는 책·보드·지도·첫 화면과 같은 한 벌(formatDisplayDate)로만 적는다.
@@ -474,7 +474,11 @@ export function createMessages(deps) {
   }
 
   // 둘러보기(공개 목록) 연결. 항목을 열면 공유 주소로, 내 기록 새로 시작은 첫 여정으로 간다.
-  mountCommunity({
+  // #1026 E: Node 단위 시험의 document 흉내에서는 브라우저 전용 모듈을 받지 않는다.
+  const browser = typeof document!=='undefined' && typeof HTMLElement!=='undefined' && !!document.querySelector;
+  if(!browser && !deps.mountCommunity)return {openSharePanel};
+  const mountCommunity = deps.mountCommunity || (() => import('../community-panel.mjs').then(m => m.mountCommunity));
+  void Promise.resolve(mountCommunity()).then(mount => mount({
     button: $('community-menu'),
     dialog: $('community-panel'),
     // #480 L13: 둘러보기 카드·댓글의 날짜도 계정 설정 한 벌을 따른다.
@@ -528,7 +532,7 @@ export function createMessages(deps) {
       }
       journey.openFirstJourney({subject: subject || ''});
     }
-  });
+  }));
 
   return {openSharePanel};
 }
