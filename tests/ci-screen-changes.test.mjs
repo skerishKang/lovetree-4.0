@@ -38,3 +38,23 @@ test('나머지 규칙은 그대로다 — 화면·화면 밖·애미', () => {
   assert.equal(classify(['src/server/community-service.js'], screen, helpers).changed, false, '서버는 화면 밖');
   assert.equal(classify(['src/new-thing.js'], screen, helpers).changed, true, '애매하면 바뀜');
 });
+
+// #1070: 서버·함수·일반 도구만 바뀐 PR은 화면 잡 13개를 돌지 않는다. 화면 잡이 쓰는 도구는 여전히 화면.
+test('판정 표: 서버·함수·도구는 화면 밖, 화면 도구는 화면', () => {
+  const table = [
+    [['server/http.js'], false, '서버만 바뀐 PR'],
+    [['functions/index.js'], false, '함수만 바뀐 PR'],
+    [['server/http.js', 'functions/index.js', 'docs/PRODUCT.md'], false, '서버·함수·문서'],
+    [['tools/ci/screen-changes.mjs'], true, '판정 도구 자체'],
+    [['tools/postdeploy/postdeploy.mjs'], true, '미리보기 검사 도구'],
+    [['tools/visual-baseline/visual-baseline.mjs'], true, '캡처 비교 도구'],
+    [['tools/v41-modulepreload.mjs'], true, '화면 빌드 검사 도구'],
+    [['tools/random-helper.mjs'], false, '일반 도구'],
+    [['src/server/community-service.js'], false, '기존 서버 경로'],
+    [['public/v41/shell.css'], true, '화면 파일']
+  ];
+  for (const [files, expected, label] of table) {
+    const r = classify(files, screen, helpers);
+    assert.equal(r.changed, expected, `${label}(${files.join(',')}): ${JSON.stringify(r.reasons)}`);
+  }
+});

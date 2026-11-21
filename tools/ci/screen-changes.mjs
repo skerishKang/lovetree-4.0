@@ -1,9 +1,10 @@
 // 이슈 947 뒤 사줄: 화면 바뀜 판정. preview-check.yml의 화면 잡들이 실제로 실행하는 시험 파일과
 // 그 파일이 import하는 시험 helpers가 바뀌었을 때만 '화면 바뀜'이다. 화면 시험 목록은 워크플로
 // 파일에서 자동으로 뽑는다(손으로 따로 적지 않는다 — 워크플로와 판정이 어긋나지 않게).
-// 나머지 규칙은 그대로: public/**·src/views/**·v41·vite 설정·package·index.html·이 워크플로 자체는
-// 화면, 문서·서버 등 화면 밖이 명확한 파일은 화면 밖, 목록에 없는 tests/ 파일은 화면 잡이
-// 실행하지 않으므로 화면 밖, 그 외 애매한 파일은 무조건 화면 바뀜이다.
+// 나머지 규칙: public/**·src/views/**·v41·vite 설정·package·index.html·이 워크플로 자체와
+// 화면 잡이 쓰는 도구(screen-changes·postdeploy·visual-baseline·v41-*)는 화면. 문서·서버·함수·
+// 일반 tools·배포 등은 화면 밖, 목록에 없는 tests/ 파일도 화면 잡이 실행하지 않으므로 화면 밖.
+// 그 외 애매한 파일은 무조건 화면 바뀜이다.
 import { readFileSync, existsSync, appendFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -37,6 +38,12 @@ export function helperFiles(testFiles) {
   return [...helpers].sort();
 }
 
+// 화면 잡이 직접 쓰는 도구만 화면으로 친다. 나머지 tools/는 서버·배포·일반 도구라 화면 밖.
+const SCREEN_TOOLS = /^tools\/(?:ci\/screen-changes\.mjs|postdeploy\/|visual-baseline\/|v41-[^/]+)/;
+function isScreenTool(file) {
+  return SCREEN_TOOLS.test(file);
+}
+
 export function classify(changedFiles, screenTests, screenHelpers) {
   const reasons = [];
   let changed = false;
@@ -54,7 +61,9 @@ export function classify(changedFiles, screenTests, screenHelpers) {
       reasons.push(`화면: ${f}`); changed = true;
     } else if (
       f.startsWith('docs/') || f.endsWith('.md') || f.startsWith('reference/') ||
-      f.startsWith('scripts/') || f.startsWith('src/server/') || f.startsWith('deploy/') ||
+      f.startsWith('scripts/') || f.startsWith('src/server/') || f.startsWith('server/') ||
+      f.startsWith('functions/') || f.startsWith('deploy/') ||
+      (f.startsWith('tools/') && !isScreenTool(f)) ||
       f.startsWith('.github/') || f === '.gitignore' || f === 'LICENSE'
     ) {
       reasons.push(`화면 밖: ${f}`);
