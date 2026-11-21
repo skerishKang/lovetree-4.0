@@ -564,6 +564,7 @@ test('#1058 보드 저장 보내기 실패 — 보드 알림 줄에 실패 문�
       const { context, page, frame, problems } = await openHost(browser, `${origin}/host1058.html`, { width, height });
       try {
         await frame.evaluate(() => {
+          window.toast('순간을 선택해 연결된 기록을 살펴보세요.');
           window.__origPost = window.parent.postMessage;
           window.parent.postMessage = () => { throw new Error('보내기 실패'); };
         });
@@ -602,6 +603,23 @@ test('#1058 보드 저장 보내기 실패 — 보드 알림 줄에 실패 문�
         assert.equal(await frame.evaluate(() => document.getElementById('saveFail')?.classList.contains('show')), true, `${width}: 0.5초 뒤에도 보인다(최소 5초)`);
         assert.equal(sent, 0, `${width}: 보내지 못했으므로 동기화 메시지 없음`);
         assert.deepEqual(problems, [], `${width}: 던진 예외가 밖으로 새지 않았다`);
+        // #1058 후속: 실패 알림이 떠 있는 동안 안내를 숨겨 보이는 겹침 넓이가 0이어야 한다.
+        const guide = await frame.evaluate(() => {
+          const a = document.getElementById('saveFail'), b = document.getElementById('toast');
+          const visibleRect = (el) => {
+            if (!el) return null;
+            const cs = getComputedStyle(el);
+            if (cs.display === 'none' || cs.visibility === 'hidden' || Number(cs.opacity) === 0) return null;
+            const r = el.getBoundingClientRect();
+            return { l: r.left, r: r.right, t: r.top, b: r.bottom };
+          };
+          const ra = visibleRect(a), rb = visibleRect(b);
+          const overlap = ra && rb ? Math.max(0, Math.min(ra.r, rb.r) - Math.max(ra.l, rb.l)) * Math.max(0, Math.min(ra.b, rb.b) - Math.max(ra.t, rb.t)) : 0;
+          return { overlap, guideShown: b ? b.classList.contains('show') : false };
+        });
+        console.log('#1058 guide', width, JSON.stringify(guide));
+        assert.equal(guide.guideShown, false, `${width}: 실패 알림이 떠 있는 동안 안내를 숨긴다`);
+        assert.equal(guide.overlap, 0, `${width}: 실패 알림과 안내의 보이는 겹침 넓이 0`);
       } finally { await context.close(); }
     }
   } finally {

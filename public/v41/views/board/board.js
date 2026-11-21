@@ -146,7 +146,7 @@ function newBoardId(){let id;do{id='m'+Math.random().toString(36).slice(2,10)}wh
 // #1058: 보내기가 던지면 조용히 넘기지 않고 보드 알림 줄에 실패를 알린다(성공은 #905 규칙으로 알리지 않는다).
 function persistBoard(){if(!boardSaveEnabled())return;try{const treeId=window.parent.LT41.tree.id;window.parent.postMessage({type:'lt41-board-sync',treeId,moments:boardPayload()},location.origin)}catch{failNotice('보드 저장에 실패했어요. 잠시 뒤 다시 시도해 주세요.')}}
 // #1058: 저장 실패 알림 — 카드보다 위 층(z 9999), 불투명 바탕, 화면 아래 가운데, 최소 5초.
-function failNotice(t){let el=$('#saveFail');if(!el)return;el.textContent=t;el.classList.add('show');clearTimeout(failNotice.t);failNotice.t=setTimeout(()=>el.classList.remove('show'),6000)}
+function failNotice(t){let el=$('#saveFail');if(!el)return;el.textContent=t;el.classList.add('show');hideToast();clearTimeout(failNotice.t);failNotice.t=setTimeout(()=>el.classList.remove('show'),6000)}
 window.addEventListener('message',e=>{if(e.origin!==location.origin)return;if(e.data?.type!=='lt41-board-saved')return;if(e.data.ok===false)toast(e.data.error||'서버에 저장하지 못했어요. 잠시 뒤 다시 시도해 주세요.')});
 
 const replayPath=(()=>{const ids=[],seen=new Set();let m=LTDEMO.moments[0];while(m&&!seen.has(m.id)){ids.push(m.id);seen.add(m.id);m=LTDEMO.moments.find(x=>x.id===m.next)}return ids})();
