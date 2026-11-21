@@ -156,7 +156,7 @@ function buildFoldMenu(){
  add('보드',()=>show('track58-pinboard.html'),current==='track58-pinboard.html');
  add('지도',()=>show('track56-network.html'),current==='track56-network.html');
   if(!$('write-menu').hidden)add('＋ 순간 추가',()=>$('write-menu').click());
-  add('의견 보내기',()=>feedbackDialog.open());
+  add('의견 보내기',()=>shellSettings.getFeedbackDialog().open());
  }
 const escHTML=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function treeMomentThumb(m){return thumbnailCandidates(m,{autoLoad:true})[0]||''}
@@ -1163,7 +1163,7 @@ $('account-entry').onclick=e=>{
 };
 $('account-avatar').onclick=e=>{
  e.stopPropagation();
- if($('account-popover').hidden){openAccountMenu(e.detail===0?'keyboard':'mouse');void feedbackBoard.refreshReplyDot();}else closeAccountMenu();
+ if($('account-popover').hidden){openAccountMenu(e.detail===0?'keyboard':'mouse');void shellSettings.getFeedbackBoard().refreshReplyDot();}else closeAccountMenu();
 };
 const shellSettings=createSettings({ $, notify, panel, show, frames, frameLoaded, hideFrames, closeAccountMenu, openAccountMenu, renderAccount, updateAccountControls, openAssets, openEditor, sample, backup, clear, startMember, leaveMember, openFallbackShell, writeLocation, load, flowNavigation, renderTreeMenu, requestBoardOpen, lastShelfTreeId, shellHeader, shellDialogs,  shareApi, accountApi, readTheme, writeTheme, normalizeAccentColor, normalizeDateStyle, normalizeStartPlace, normalizeShareView, normalizeHomeMoment,  readPageTurn, writePageTurn, frameMessage, displayTreeTitle, accountPresentation, createFeedbackDialog, createFeedbackBoard, mountUpdates, readWriteTab, writeWriteTab, clearCachedWorkspace, createWorkspaceApi, paintThemeControls, applyTheme, toggleTheme, get member(){return member}, get model(){return model}, get current(){return current}, get source(){return source}, get motionPaused(){return motionPaused}, get loadGeneration(){return loadGeneration}, get handledHash(){return handledHash}, get activeShareId(){return activeShareId}, set member(v){member=v}, set model(v){model=v}, set current(v){current=v}, set source(v){source=v}, set motionPaused(v){motionPaused=v}, set loadGeneration(v){loadGeneration=v}, set handledHash(v){handledHash=v}, set activeShareId(v){activeShareId=v}
  });
@@ -1197,6 +1197,8 @@ addEventListener('beforeunload',e=>{
 if(shouldLoadMemberRecords(location.search,document.cookie,location.hash)||shellIntake.pending())void startMember().catch(error=>openFallbackShell(error));
 // 로그아웃으로 다시 연 문서에서는 '로그인이 필요해요' 대신 이 안내를 한 번 띄운다.
 try{if(sessionStorage.getItem('lt41.logoutNotice')==='1'){sessionStorage.removeItem('lt41.logoutNotice');notify('로그아웃했어요.');}}catch{}
+
+
 
 
 
