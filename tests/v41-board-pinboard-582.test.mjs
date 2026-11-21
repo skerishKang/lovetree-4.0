@@ -281,7 +281,7 @@ test('#1026 동작: 그림 지연 도착에도 카드 top 변화 0, 보드 CLS 0
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
   await context.addInitScript(() => {
     window.__shift1026 = [];
-    try { new PerformanceObserver((list) => { for (const e of list.getEntries()) if (!e.hadRecentInput) window.__shift1026.push({ v: e.value, src: (e.sources || []).map(s => s.node ? (s.node.nodeName + (s.node.id ? '#' + s.node.id : '') + (typeof s.node.className === 'string' ? '.' + s.node.className.trim().split(/\s+/).slice(0, 2).join('.') : '')) : '?') }); }).observe({ type: 'layout-shift', buffered: true }); } catch {}
+    try { new PerformanceObserver((list) => { for (const e of list.getEntries()) if (!e.hadRecentInput) window.__shift1026.push({ v: +e.value.toFixed(6), t: Math.round(e.startTime), src: (e.sources || []).map(s => s.node ? (s.node.nodeName + (s.node.id ? '#' + s.node.id : '') + (typeof s.node.className === 'string' ? '.' + s.node.className.trim().split(/\s+/).slice(0, 2).join('.') : '')) : '?') }); }).observe({ type: 'layout-shift', buffered: true }); } catch {}
   });
   await context.route('**/i.ytimg.com/**', async (route) => {
     await new Promise((ok) => setTimeout(ok, 500));
@@ -304,7 +304,7 @@ test('#1026 동작: 그림 지연 도착에도 카드 top 변화 0, 보드 CLS 0
       shifts: window.__shift1026 || []
     }));
     const cls = result.shifts.reduce((sum, item) => sum + item.v, 0);
-    t.diagnostic(JSON.stringify({ cls: +cls.toFixed(6), sources: result.shifts.map(item => item.src) }));
+    t.diagnostic(JSON.stringify({ cls: +cls.toFixed(6), entries: result.shifts }));
     const moved = result.tops.filter((top, i) => top !== topsBefore[i]).length;
     assert.equal(moved, 0, `그림 도착 뒤 옮겨진 카드 ${moved}개 — 처음 자리가 최종 자리여야 한다`);
     assert.ok(cls <= 0.01, `보드 CLS ${cls.toFixed(6)}가 0.01을 넘었다`);
