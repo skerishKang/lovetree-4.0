@@ -100,7 +100,8 @@ export function createAdminRoleService({ store, productId, clock = () => new Dat
      */
     async assign({ actorPrincipal, targetSubjectId, role = ROLE_ADMIN, reason = null }) {
       const granted = await this.roleFor(actorPrincipal);
-      if (!granted) throw new ApiError(403, 'admin_forbidden', '역할을 바꿀 권한이 없어요.');
+      // B-09 (#1065): 역할이 있으면 통과시키지 않는다 — 관리자만 부여한다.
+      if (granted !== ROLE_ADMIN) throw new ApiError(403, 'admin_forbidden', '역할을 바꿀 권한이 없어요.');
       if (!ROLES.includes(role)) throw new ApiError(400, 'invalid_role', '알 수 없는 역할이에요.');
       const subjectId = requireSubject(targetSubjectId);
       const previous = await readRole(subjectId);
@@ -110,7 +111,8 @@ export function createAdminRoleService({ store, productId, clock = () => new Dat
 
     async revoke({ actorPrincipal, targetSubjectId }) {
       const granted = await this.roleFor(actorPrincipal);
-      if (!granted) throw new ApiError(403, 'admin_forbidden', '역할을 바꿀 권한이 없어요.');
+      // B-09 (#1065): 회수도 관리자만 한다.
+      if (granted !== ROLE_ADMIN) throw new ApiError(403, 'admin_forbidden', '역할을 바꿀 권한이 없어요.');
       const subjectId = requireSubject(targetSubjectId);
       const previous = await readRole(subjectId);
       const row = await store.revoke({ productId, subjectId, revokedBy: actorPrincipal.subjectId, at: at() });
