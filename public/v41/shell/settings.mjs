@@ -1,7 +1,7 @@
 // 설정·계정 창 — shell.mjs에서 코드 위치만 옮긴 모듈(#886). 동작·기준은 그대로다.
 // 상태는 deps의 getter로 받는다(모듈이 shell을 다시 import하지 않는다).
 export function createSettings(deps){
-const { $, notify, panel, show, frames, frameLoaded, hideFrames, closeAccountMenu, openAccountMenu, renderAccount, updateAccountControls, openAssets, openEditor, sample, backup, clear, startMember, leaveMember, openFallbackShell, writeLocation, load, flowNavigation, closePanels, renderTreeMenu, requestBoardOpen, lastShelfTreeId, shellHeader, shellDialogs, shellJourney, shareApi, accountApi, readTheme, writeTheme, normalizeAccentColor, normalizeDateStyle, normalizeStartPlace, normalizeShareView, normalizeHomeMoment, normalizeTitleDisplay, readPageTurn, writePageTurn, frameMessage, displayTreeTitle, accountPresentation, createFeedbackDialog, createFeedbackBoard, mountUpdates, readWriteTab, writeWriteTab, clearCachedWorkspace, createWorkspaceApi, paintThemeControls, applyTheme, toggleTheme, tipsFollowDialogs } = deps;
+const { $, notify, panel, show, frames, frameLoaded, hideFrames, closeAccountMenu, openAccountMenu, renderAccount, updateAccountControls, openAssets, openEditor, sample, backup, clear, startMember, leaveMember, openFallbackShell, writeLocation, load, flowNavigation, closePanels, renderTreeMenu, requestBoardOpen, lastShelfTreeId, shellHeader, shellDialogs,  shareApi, accountApi, readTheme, writeTheme, normalizeAccentColor, normalizeDateStyle, normalizeStartPlace, normalizeShareView, normalizeHomeMoment,  readPageTurn, writePageTurn, frameMessage, displayTreeTitle, accountPresentation, createFeedbackDialog, createFeedbackBoard, mountUpdates, readWriteTab, writeWriteTab, clearCachedWorkspace, createWorkspaceApi, paintThemeControls, applyTheme, toggleTheme } = deps;
 const $on=(id,fn)=>{const el=$(id);if(el)el.onclick=fn;};
 function advancedKey(){try{return 'lt41.advanced.'+(deps.member?.snapshot().subject||'')}catch{return 'lt41.advanced.'}}
 function readAdvanced(){try{return localStorage.getItem(advancedKey())==='1'}catch{return false}}
@@ -504,6 +504,7 @@ for(const f of frames())f.addEventListener('load',()=>{frameLoaded(f);
  try{f.contentWindow.postMessage({type:'lt41-motion',paused:deps.motionPaused},location.origin)}catch{}});
 return { getAccountTip:()=>accountTip, applyAdvanced, applyDateStyleToFrame, applyPageTurnToFrame, applyNetworkViewToFrame, applyBoardThemeToFrame, syncBoardThemeToApp, quickTargetPreference, profileDirty, paintSettingsProfile, accountConfirmMatches, openAccountData, openAccountSettings, paintDateStyleControls, paintStartPlaceControls, paintShareControls, paintQuickTargetControls, paintNetworkViewControls, paintPageTurnControls, paintBoardThemeControls, paintTreeVisibilityList, paintSettingsUsage, loadTreeVisibility, paintTreeManagerVisibility, paintSettingsTab, focusSettingsSection, fillProfileForm, paintScreenControls, readAdvanced, advancedKey, currentDateStyle, currentPageTurn, sendToFrame, currentStartPlace, currentShareView, currentBoardTheme };
 }
+
 
 
 
