@@ -16,7 +16,7 @@ button{color:inherit}
 
 .world{position:absolute;inset:0;z-index:3;perspective:1200px;transform-style:preserve-3d;will-change:transform}
 
-.card{position:absolute;left:50%;top:50%;width:180px;height:232px;border-radius:14px;overflow:hidden;transform-origin:center;will-change:transform;cursor:pointer;border:1px solid rgba(255,255,255,.12);background:#111;box-shadow:0 24px 60px rgba(0,0,0,.38);transition:border-color .18s,filter .25s,box-shadow .25s}
+.card{position:absolute;left:50%;top:50%;width:180px;height:232px;border-radius:14px;overflow:hidden;transform-origin:center;will-change:transform;cursor:pointer;border:1px solid rgba(255,255,255,.12);background:#111;box-shadow:0 24px 60px rgba(0,0,0,.38);transition:border-color .18s,box-shadow .25s}
 
 .card.sm{width:128px;height:166px;border-radius:11px}
 .card.lg{width:226px;height:292px;border-radius:16px}
@@ -28,7 +28,7 @@ button{color:inherit}
 
 .card .surface{position:absolute;inset:0;overflow:hidden;background:#111}
 
-.card img{width:100%;height:100%;object-fit:var(--fit,cover);object-position:var(--pos,50% 50%);display:block;filter:saturate(var(--sat, .66)) brightness(var(--bright, .86));transform:scale(1.02);transition:filter .25s,transform .45s ease}
+.card img{width:100%;height:100%;object-fit:var(--fit,cover);object-position:var(--pos,50% 50%);display:block;filter:saturate(var(--sat, .66)) brightness(var(--bright, .86));transform:scale(1.02);transition:transform .45s ease}
 
 .card.video .playGlyph{position:absolute;left:13px;top:13px;width:28px;height:28px;border-radius:50%;background:rgba(4,4,8,.6);backdrop-filter:blur(7px);display:grid;place-items:center;font-size:9px;border:1px solid rgba(255,255,255,.34)}
 
@@ -47,7 +47,7 @@ button{color:inherit}
 
 .card.hovered{border-color:rgba(245,241,233,.62);box-shadow:0 28px 75px rgba(0,0,0,.55),0 0 0 1px rgba(216,143,156,.15)}
 .card.hovered .caption{transform:none;opacity:1}
-.card.hovered img{filter:saturate(1) brightness(.98);transform:scale(1.055)}
+.card.hovered img{filter:saturate(1) brightness(.98);transform:scale(1.055);transition:filter .25s,transform .45s ease}
 
 .firstMark{position:absolute;left:10px;top:10px;font-size:8px;letter-spacing:.16em;padding:5px 7px;border-radius:999px;border:1px solid rgba(216,143,156,.68);box-shadow:0 0 22px rgba(216,143,156,.26);background:rgba(9,7,10,.36)}
 

@@ -1331,9 +1331,16 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     assert.deepEqual(listFooter, { sheet: true, links: 'none', card: 'none' }, `순간 목록 창이 열리면 아래 고정 항목이 숨는다: ${JSON.stringify(listFooter)}`);
     // #1103: 띠·판은 이 자리에서 우리가 닫았다. 정보 안내가 스스로 내려갈 때까지 기다린 뒤,
     // 문구 길이가 자리 검사에 끼어들지 않도록 짧은 한 줄을 셸 알림 줄 자리에 그대로 그린다.
-    await page5b.waitForFunction(() => { const t = document.getElementById('toast'); return t && t.hidden; }, null, { timeout: 12000 }).catch(() => {});
-    await page5b.evaluate(() => { const t = document.getElementById('toast'); t.textContent = '불러왔어요.'; t.hidden = false; });
-    const toastBox = await page5b.locator('#toast').boundingBox();
+    // #1109: 390의 순간 목록은 화면 꽉 찬 창이라 알림 줄을 접는다 — 겹칠 자체가 없다.
+    const narrow = width === 390;
+    if (narrow) {
+      const hidden = await page5b.evaluate(() => { const t = document.getElementById('toast'); return !t || t.hidden || getComputedStyle(t).display === 'none'; });
+      assert.equal(hidden, true, '390 꽉 찬 목록 창이 열리면 셸 알림 줄이 접힌다');
+    } else {
+      await page5b.waitForFunction(() => { const t = document.getElementById('toast'); return t && t.hidden; }, null, { timeout: 12000 }).catch(() => {});
+      await page5b.evaluate(() => { const t = document.getElementById('toast'); t.textContent = '불러왔어요.'; t.hidden = false; });
+    }
+    const toastBox = narrow ? null : await page5b.locator('#toast').boundingBox();
     const shellFrameBox = await page5b.locator('#view').boundingBox();
     const listFrame = await orbitFrameOf();
     const listWindowBox = await listFrame.evaluate(() => {
@@ -1345,15 +1352,19 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
       const r = rows.at(-1)?.getBoundingClientRect();
       return r && { x: r.x, y: r.y, width: r.width, height: r.height };
     });
-    assert.ok(toastBox?.width > 0 && toastBox?.height > 0 && shellFrameBox?.width > 0 && listWindowBox?.width > 0 && listWindowBox?.height > 0 && lastListRow?.width > 0 && lastListRow?.height > 0,
-      `목록 창 겹침 검사에서 알림·창·마지막 순간·프레임이 모두 보인다: ${JSON.stringify({ toastBox, shellFrameBox, listWindowBox, lastListRow })}`);
-    const rowInPage = { x: shellFrameBox.x + lastListRow.x, y: shellFrameBox.y + lastListRow.y, width: lastListRow.width, height: lastListRow.height };
-    const toastOverlap = Math.max(0, Math.min(toastBox.x + toastBox.width, rowInPage.x + rowInPage.width) - Math.max(toastBox.x, rowInPage.x))
-      * Math.max(0, Math.min(toastBox.y + toastBox.height, rowInPage.y + rowInPage.height) - Math.max(toastBox.y, rowInPage.y));
-    assert.equal(toastOverlap, 0, `알림 줄과 순간 목록 마지막 줄 겹침이 0px²이다: ${JSON.stringify({ toastBox, rowInPage, toastOverlap })}`);
-    assert.ok(toastBox.y + toastBox.height <= shellFrameBox.y + listWindowBox.top, `알림 줄은 목록 창 위쪽 바깥에 있다: ${JSON.stringify({ toastBox, shellFrameBox, listWindowBox })}`);
+    assert.ok(shellFrameBox?.width > 0 && listWindowBox?.width > 0 && listWindowBox?.height > 0 && lastListRow?.width > 0 && lastListRow?.height > 0,
+      `목록 창 겹침 검사에서 창·마지막 순간·프레임이 모두 보인다: ${JSON.stringify({ shellFrameBox, listWindowBox, lastListRow })}`);
+    if (!narrow) {
+      assert.ok(toastBox?.width > 0 && toastBox?.height > 0,
+        `목록 창 겹침 검사에서 알림 줄이 보인다: ${JSON.stringify(toastBox)}`);
+      const rowInPage = { x: shellFrameBox.x + lastListRow.x, y: shellFrameBox.y + lastListRow.y, width: lastListRow.width, height: lastListRow.height };
+      const toastOverlap = Math.max(0, Math.min(toastBox.x + toastBox.width, rowInPage.x + rowInPage.width) - Math.max(toastBox.x, rowInPage.x))
+        * Math.max(0, Math.min(toastBox.y + toastBox.height, rowInPage.y + rowInPage.height) - Math.max(toastBox.y, rowInPage.y));
+      assert.equal(toastOverlap, 0, `알림 줄과 순간 목록 마지막 줄 겹침이 0px²이다: ${JSON.stringify({ toastBox, rowInPage, toastOverlap })}`);
+      assert.ok(toastBox.y + toastBox.height <= shellFrameBox.y + listWindowBox.top, `알림 줄은 목록 창 위쪽 바깥에 있다: ${JSON.stringify({ toastBox, shellFrameBox, listWindowBox })}`);
+    }
     await take(page5b, '순간 목록 다섯 개');
-    await lowerToast(page5b);
+    if (!narrow) await lowerToast(page5b);
     const listClose = await frameEval(() => {
       const b = document.getElementById('orbit')?.shadowRoot?.querySelector('dialog[open] [data-do="close"]');
       const r = b?.getBoundingClientRect();
