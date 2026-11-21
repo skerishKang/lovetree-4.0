@@ -12,7 +12,7 @@ let exampleTree=null,examplePromise=null,exampleInitializing=false;
 function loadExampleTree(){if(!examplePromise)examplePromise=import('./example.mjs').then(mod=>{exampleTree=mod.exampleTree;return exampleTree});return examplePromise;}
 import {parseSelectionRoute,memberStartupView,ownerSelectionRoute,accountPosition,rememberAccountPosition,resolveAccountPosition,stashPendingOwnerRoute,pendingOwnerRoute,takePendingOwnerRoute} from './selection-location.mjs';
 import {applyViewAccessibility,connectionLabel} from './view-a11y.mjs';
-import {accountPresentation,treePickerLabel,treePickerText,treeViewsVisible,writeMenuLabel,headerState,headerPartsFor,readTipsSeen,writeTipsSeen,tipsWanted,unsavedNoticeText,FIRST_TREE_TIPS,homeCenterState,homeStartLoginUrl,readTheme,readLoginIntent,writeTheme,nextTheme,themeButtonLabel,themeButtonAriaLabel,themePressed,appliedTheme,applyThemeAttribute,LOGIN_INTENTS,readPageTurn,writePageTurn} from './header-state.mjs';
+import {accountPresentation,treePickerLabel,treePickerText,treeViewsVisible,writeMenuLabel,headerState,headerPartsFor,readTipsSeen,writeTipsSeen,tipsWanted,unsavedNoticeText,FIRST_TREE_TIPS,homeCenterState,homeStartLoginUrl,readTheme,readLoginIntent,writeTheme,nextTheme,themeButtonLabel,themeButtonAriaLabel,themePressed,appliedTheme,applyThemeAttribute,LOGIN_INTENTS,readPageTurn,writePageTurn,readBookDisplay,writeBookDisplay,bookDisplayVisible} from './header-state.mjs';
 import {parseJourneyRoute,journeyRouteDecision} from './first-journey.mjs';
 import {displayTreeTitle} from './tree-name.mjs';
 import {titleView, withoutAutoTitle} from './book-usability.mjs';
@@ -49,7 +49,7 @@ import {createLocation} from './shell/location.mjs';
 import {createNotifier, syncedNoticeText, newlyPublishedTrees} from './shell/notice.mjs';
 import {createNoticeQueue} from './shell/notice-queue.mjs';
 import {paintLoginLinks,paintThemeControls,applyTheme as applyThemeFor,toggleTheme as toggleThemeFor} from './shell/theme.mjs';
-import {normalizeTitleDisplay, normalizeAccentColor, normalizeDateStyle, normalizeStartPlace, normalizeShareView, normalizeHomeMoment, coverModeOf, normalizeCoverDesign} from './domain.mjs';
+import {normalizeTitleDisplay, normalizeAccentColor, normalizeDateStyle, normalizeStartPlace, normalizeShareView, normalizeHomeMoment, normalizeBookDisplay, coverModeOf, normalizeCoverDesign} from './domain.mjs';
 import {backfillVideoTitles} from './title-backfill.mjs';
 import {thumbnailCandidates, coverFallbackAttrs, fallbackCardData, emotionToneOf, mountThumbFallback, ADD_TITLE_LABEL, VIDEO_UNAVAILABLE_TEXT} from './thumb-fallback.mjs';
 const $=id=>document.getElementById(id);
@@ -126,6 +126,20 @@ function setTitleDisplay(value){
  rememberTitleDisplay(titleDisplayValue());
  paintTitleDisplayControls();
  postTitleDisplay();
+}
+// #1094: 책/목록 보기 선택. 계정 상태(state.prefs.bookDisplay)에 저장하고 기기 미러(lt41.bookDisplay)에 함께 둔다
+// (날짜 표기·제목 보기와 같은 길). 머리줄 묶음(.view-toggle)과 설정 창의 같은 data-book-display 단추 두 칸을 칠한다.
+// 서재 안의 프레임은 누르는 순간 부모의 prefs와 미러를 함께 읽어, 중간 화면 없이 고른 방식으로 연다.
+function currentBookDisplay(){try{return normalizeBookDisplay(member?.state?.().prefs?.bookDisplay)}catch{return readBookDisplay(localStorage)}}
+function rememberBookDisplay(value){writeBookDisplay(localStorage,value)}
+function paintBookDisplayControls(){const value=currentBookDisplay();for(const b of document.querySelectorAll('[data-book-display]'))b.setAttribute('aria-checked',String(b.dataset.bookDisplay===value));}
+function setBookDisplay(value){
+ const next=normalizeBookDisplay(value);
+ if(!member?.snapshot().owned){notify('로그인한 뒤 보기 방식을 바꿀 수 있어요.');return;}
+ try{member.apply('setPrefs',{bookDisplay:next});}catch(e){notify('보기 방식을 저장하지 못했어요. 잠시 뒤 다시 시도해 주세요.');return;}
+ if(window.LT41)window.LT41.prefs=member.state().prefs;
+ rememberBookDisplay(currentBookDisplay());
+ paintBookDisplayControls();
 }
 let backfillStarted=false,backfillAttempted=new Set();
 async function runTitleBackfill(state,session){
@@ -1136,6 +1150,9 @@ async function startMember(){setMemberRefreshStarted(true);if(!leaveMember())ret
    // #481: 제목 보기도 같은 이유로 기기 미러를 계정값으로 채운다.
    rememberTitleDisplay(state.prefs?.titleDisplay);
    paintTitleDisplayControls();
+   // #1094: 책/목록 보기도 같은 이유로 기기 미러를 계정값으로 채운다.
+   rememberBookDisplay(state.prefs?.bookDisplay);
+   paintBookDisplayControls();
    if(!backfillStarted&&snapshot.owned){backfillStarted=true;void runTitleBackfill(state,session);}
    if(snapshot.owned&&resolved.position.treeId){if(viewForFile(current)!=='home')writeLocation('replace');takePendingOwnerRoute(sessionStorage);if(route?.scope==='owner'&&resolved.treeMissing)startupNotice='이 주소의 기록을 현재 계정에서 찾을 수 없어 최근 위치를 열었어요.';else if(route?.scope==='owner'&&resolved.momentMissing)startupNotice='이 주소의 순간을 찾을 수 없어 트리의 시작 순간을 열었어요.';}
  }catch(error){openFallbackShell(error);}},onStatus:status=>{if(generation===loadGeneration)memberStatus(status);},
@@ -1383,6 +1400,11 @@ for(const b of document.querySelectorAll('[data-date-style]'))b.onclick=()=>{
  notify(b.dataset.dateStyle==='long'?'날짜를 11월 10일로 보여요.':b.dataset.dateStyle==='dash'?'날짜를 2026-11-10으로 보여요.':'날짜를 2026. 11. 10으로 보여요.');
 };
 paintDateStyleControls();
+// #1094: 머리줄 묶음과 설정 창의 같은 data-book-display 두 칸이 하나의 길로 바뀌고 저장된다.
+for(const b of document.querySelectorAll('[data-book-display]'))b.onclick=()=>{
+ setBookDisplay(b.dataset.bookDisplay);
+};
+paintBookDisplayControls();
 function currentStartPlace(){try{return normalizeStartPlace(member?.state?.().prefs?.startPlace)}catch{return 'resume'}}
 function paintStartPlaceControls(){const value=currentStartPlace();for(const b of document.querySelectorAll('[data-start-place]'))b.setAttribute('aria-checked',String(b.dataset.startPlace===value));}
 for(const b of document.querySelectorAll('[data-start-place]'))b.onclick=()=>{
@@ -1581,7 +1603,7 @@ async function openAccountSettings({section=''}={}){
  if(!member?.snapshot().owned){notify('로그인한 뒤 설정을 열 수 있어요.');return;}
  paintSettingsProfile();
  fillProfileForm();
- paintDateStyleControls();paintStartPlaceControls();paintNetworkViewControls();paintShareControls();paintQuickTargetControls();
+ paintDateStyleControls();paintBookDisplayControls();paintStartPlaceControls();paintNetworkViewControls();paintShareControls();paintQuickTargetControls();
  void paintSettingsUsage();void loadTreeVisibility();
  panel('account-settings');
  focusSettingsSection(section);
@@ -1664,7 +1686,7 @@ document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{if(b.dataset.
 for(const f of frames())f.addEventListener('load',()=>{frameLoaded(f);
  // #894: 새로 뜬 안쪽 화면에도 움직임 끄기 상태를 알린다(메모리 상태 — 화면을 다시 열면 처음 상태).
  try{f.contentWindow.postMessage({type:'lt41-motion',paused:motionPaused},location.origin)}catch{}});
-paintThemeControls();applyTheme();paintTitleDisplayControls();applyAdvanced();
+paintThemeControls();applyTheme();paintTitleDisplayControls();paintBookDisplayControls();applyAdvanced();
 if(initialRoute.scope==='public')showPublicRoute(initialRoute);
 else if(/^#explore/.test(location.hash)){/* #1025: 둘러보기 패널이 자기 주소를 연다 — 예시 로드로 주소를 덮지 않는다. */}
 else if(shouldLoadMemberRecords(location.search,document.cookie,location.hash)||shellIntake.pending()){

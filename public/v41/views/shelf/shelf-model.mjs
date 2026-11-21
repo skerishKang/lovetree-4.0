@@ -203,7 +203,7 @@ export function shelfRowLayout(count, railWidth, { pitch = 200, cardW = 190, pad
 // 책 안 페이지 표시와 화살표 상태.
 export function pageMeta(index, count) {
   return {
-    counter: 'PAGE ' + String(index + 1).padStart(2, '0') + ' / ' + String(count).padStart(2, '0'),
+    counter: String(index + 1).padStart(2, '0') + ' / ' + String(count).padStart(2, '0'),
     prevDisabled: index === 0,
     nextDisabled: index === count - 1
   };

@@ -166,6 +166,15 @@ body.home-existing.lt-fab-ok #mobile-add{display:none}
 /* 261117 대표 결정: 위 메뉴의 테마 단추(☾/☀) — 아바타와 같은 44px 원형. 나중에 언어 단추가 옆에 붙는다. */
 #theme-toggle{width:44px;height:44px;min-width:44px;min-height:44px;padding:0;border-radius:50%;font-size:17px;line-height:1}
 #theme-toggle[hidden]{display:none}
+/* #1094 보기 방식 전환 묶음(책/목록) — 테마 단추 옆 두 칸고르기. 다음 이슈(#1093 선반/회전)도 같은 묶음을 쓴다. */
+.view-toggle{display:inline-flex;align-items:center;gap:0;padding:3px;border:1px solid rgba(255,255,255,.22);border-radius:var(--lt-r-pill);background:rgba(9,8,14,.62)}
+.view-toggle[hidden]{display:none}
+.view-toggle button{min-height:44px;padding:0 12px;border:0;border-radius:var(--lt-r-pill);background:transparent;color:#ece7f1;font-size:13px;letter-spacing:.02em;white-space:nowrap}
+.view-toggle button:hover{background:rgba(255,255,255,.09)}
+.view-toggle button[aria-checked="true"]{background:var(--lt-primary);color:var(--lt-primary-ink)}
+html[data-lt-theme=garden] .view-toggle{background:rgba(255,253,248,.9);border-color:rgba(119,91,82,.3)}
+html[data-lt-theme=garden] .view-toggle button{color:var(--lt-ink)}
+html[data-lt-theme=garden] .view-toggle button:hover{background:rgba(152,80,94,.08)}
 .account-popover{position:absolute;right:0;top:calc(100% + 8px);z-index:30;width:232px;padding:8px;border:1px solid var(--lt-line);border-radius:var(--lt-r-card);background:var(--lt-glass-strong);backdrop-filter:blur(24px);box-shadow:0 12px 30px #0008;display:grid;grid-template-columns:minmax(0,1fr);gap:4px}
 .account-popover[hidden]{display:none}
 .account-email{margin:0;padding:8px 10px 10px;border-bottom:1px solid var(--lt-line);font-size:12px;line-height:1.6;color:var(--lt-muted);overflow-wrap:anywhere}
