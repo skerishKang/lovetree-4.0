@@ -486,6 +486,9 @@ test('이슈 644 화면(390·정원): 충돌 띠가 좁은 화면에서 넘치�
     await p1.evaluate(() => localStorage.setItem('lt41.theme', 'garden'));
     await p1.reload({ waitUntil: 'load' });
     await waitSynced644(p1);
+    // 첫 화면에서는 ＋가 가운데만 남으므로(#1084) 다른 화면에서 충돌 띠를 만든다.
+    await p1.evaluate(() => { location.hash = '#shelf'; });
+    await p1.waitForTimeout(300);
     // 정원 390: 토스트 글자 + 충돌 띠(서버를 먼저 바꾸고 뒤에서 고치면 409가 난다).
     assert.equal(await p1.evaluate(() => getComputedStyle(document.getElementById('toast')).color), 'rgb(255, 253, 248)', '정원 토스트 글자(390)');
     state.doc = doc644([tree644('시험', '다른 탭이 바꾼 트리')]);

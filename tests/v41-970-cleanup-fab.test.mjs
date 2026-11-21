@@ -183,6 +183,7 @@ test('아래 ＋ 단추: 390 폭에서 화면 안에 보이고(56px 원) 누르�
   if (skip) { t.skip(skip); return; }
   if (REQUIRE && !existsSync(new URL('../dist/v41/home.html', import.meta.url))) { t.skip('빌드 결과가 없어 화면 시험을 건너뜀'); return; }
   await withShell(sampleTree(), { width: 390, height: 844 }, async ({ page, errors }) => {
+    await page.evaluate(() => { location.hash = '#shelf'; });
     await page.waitForSelector('body.lt-fab-ok', { timeout: 10000 });
     const fab = page.locator('#mobile-add');
     await fab.waitFor({ state: 'visible', timeout: 8000 });

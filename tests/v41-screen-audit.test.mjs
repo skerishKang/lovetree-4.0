@@ -158,9 +158,10 @@ test('#942 첫 화면 추가 단추와 숫자 묶음', { skip: REQUIRE ? false :
         }
         const rose=theme==='night'?'rgb(180, 87, 107)':'rgb(152, 80, 94)';
         const visibleAdds=[head,fab,top].filter(b=>b?.visible);
-        check(visibleAdds.length===(member?2:0),key+' 추가 단추 개수 '+JSON.stringify(visibleAdds));
-        for(const b of visibleAdds)check(b.bg===rose&&b.ink==='rgb(255, 255, 255)'&&b.contrast>=4.5,key+' 장미색·대비 '+JSON.stringify(b));
-        check(head.visible===(member&&width===1440)&&fab.visible===(member&&width===390)&&!!top?.visible===member,key+' 추가 단추 위치');
+        check(visibleAdds.length===(member?(width===1440?2:1):0),key+' 추가 단추 개수 '+JSON.stringify(visibleAdds));
+        if(top?.visible)check(top.bg===rose&&top.ink==='rgb(255, 255, 255)'&&top.contrast>=4.5,key+' 가운데 장미색·대비 '+JSON.stringify(top));
+        if(head.visible)check(head.bg!==rose&&head.border!=='0px'&&head.contrast>=4.5,key+' 머리줄은 밝은 테두리 '+JSON.stringify(head));
+        check(head.visible===(member&&width===1440)&&!fab.visible&&!!top?.visible===member,key+' 추가 단추 위치');
         check(JSON.stringify(buttons.map(b=>b.text))===JSON.stringify(member?['순간 목록','둘러보기','서재']:['＋ 첫 순간 추가','둘러보기','어떻게 쓰나요']),key+' 가운데 순서');
         const light=theme==='night'?'rgb(238, 233, 224)':'rgb(255, 253, 248)';
         check(member?buttons.every(b=>b.bg===light):buttons[0]?.bg===rose,key+' 자주색 하나·나머지는 밝은 단추(#1084) '+JSON.stringify(buttons.map(b=>b.bg)));
