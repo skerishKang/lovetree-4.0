@@ -102,7 +102,7 @@ html[data-v41-screen=book] .viewer-media .lt-media{width:100%;height:100%;overfl
 html[data-lt-theme=garden] .lt-media-body button{color:var(--lt-paper)}
 /* #327 1부: 내 기록 YouTube 썸네일(처음부터 보임) + 썸네일 전체를 덮는 재생 단추 + 그 자리 재생 iframe */
 .lt-yt-preview{position:relative;margin:0;width:100%}
-.lt-yt-preview .lt-yt-play{position:absolute;inset:0;width:100%;min-height:44px;min-width:44px;border:0;padding:0;background:transparent;cursor:pointer;display:grid;place-items:center}
+.lt-yt-preview .lt-yt-play{position:absolute;inset:0;width:100%;min-height:44px;min-width:44px;border:0;padding:12px;background:transparent;cursor:pointer;display:grid;place-items:end}
 .lt-yt-preview .lt-yt-play>span{display:grid;place-items:center;min-width:56px;min-height:56px;border-radius:50%;background:var(--lt-ink);color:var(--lt-paper);border:2px solid var(--lt-paper);box-shadow:0 2px 10px rgba(0,0,0,.42);font-size:22px;line-height:1}
 .lt-yt-frame{display:block;width:100%;aspect-ratio:16/9;border:0;border-radius:8px;background:#000}
 /* #393 1: 세로 영상(쇼츠 주소·세로 비율 정보)은 세로 틀(9:16). 썸네일·재생 모두 같은 비율, 잘림 없음. */
