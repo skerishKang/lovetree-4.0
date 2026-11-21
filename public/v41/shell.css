@@ -480,6 +480,9 @@ html[data-lt-theme=garden] #cleanup-panel input:not([type=checkbox]),html[data-l
 .tree-frame .tree-views>button[aria-current=true]{background:none;color:var(--lt-pearl);box-shadow:none;font-weight:600;text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:6px;text-decoration-color:currentColor}
 @media(max-width:780px){.tree-frame .tree-views>button{font-size:14px}}
 .tree-slot{position:relative;display:flex;align-items:center;flex:0 0 auto;margin-left:6px}
+/* #1090: 트리 글자는 단추 밖 고정, 390에서는 자리가 좁아 숨긴다. */
+.tree-prefix{flex:0 0 auto;margin-right:8px;color:var(--lt-muted);font-size:12px;white-space:nowrap}
+@media(max-width:650px){.tree-prefix{display:none}}
 nav #record-menu{min-height:40px;font-size:14px;letter-spacing:0;margin-left:0;padding:0 12px;border:1px solid var(--lt-line);border-left:0;border-radius:var(--lt-r-pill);background:var(--lt-glass)}
 @media(max-width:780px){nav #record-menu{font-size:14px}}
 nav .tree-frame{scroll-snap-align:center}

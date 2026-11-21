@@ -95,7 +95,8 @@ test('flowNavigation: 트리가 있으면 탭·트리 이름·공유가 모두 �
   try {
     h.header.flowNavigation();
     assert.equal(h.els['tree-views'].hidden, false, '트리 보기 탭 표시');
-    assert.equal(h.els['source-label'].textContent, '트리: 리센느');
+    assert.equal(h.els['source-label'].textContent, '리센느');
+    assert.equal(h.els['record-menu'].getAttribute('aria-label'), '트리: 리센느, 트리 바꾸기');
     assert.equal(h.els['share-menu'].hidden, false, '공유 표시');
     assert.equal(h.els['record-menu'].hidden, false);
   } finally {

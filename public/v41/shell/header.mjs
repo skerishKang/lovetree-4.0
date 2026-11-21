@@ -2,7 +2,7 @@
 // 2026-11-08 리팩터링: 동작·겉모습 변경 0. shell.mjs에서 조건·조회 방식·인자 형태를 바꾸지 않고 그대로 옮겼다.
 // 셸은 자기 상태(member·model·source·current)를 읽기 함수로 넘기고, 이 파일은 헤더만 만진다.
 import {hasPendingDraft} from '../sync-controller.mjs';
-import {accountPresentation,treePickerText,treeViewsVisible,writeMenuLabel,headerPartsFor} from '../header-state.mjs';
+import {accountPresentation,treePickerText,treePickerVisible,treePickerAriaLabel,treeViewsVisible,writeMenuLabel,headerPartsFor} from '../header-state.mjs';
 import {normalizeAccentColor} from '../domain.mjs';
 import {displayTreeTitle} from '../tree-name.mjs';
 
@@ -38,7 +38,9 @@ function flowNavigation(){
   // 로그아웃이면 "트리 고르기", 브라우저에만 남은 미저장 기록이 있으면 "저장 안 된 기록"이다.
   const pendingDraft=hasPendingDraft(sessionStorage,getMember()?.snapshot().subject||null);
   $('record-menu').hidden=!parts.treePicker||publicReading;
-  $('source-label').textContent=treePickerText({owned,treeTitle:displayTreeTitle(window.LT41?.tree.title||''),pendingDraft,treeCount:getModel()?.trees?.length||0});
+  const pickerState={owned,treeTitle:displayTreeTitle(window.LT41?.tree.title||''),pendingDraft,treeCount:getModel()?.trees?.length||0};
+  $('source-label').textContent=treePickerVisible(pickerState);
+  $('record-menu').setAttribute('aria-label',treePickerAriaLabel(pickerState));
   // #601: 칸 폭이 고정되어 있으므로(11em) 긴 이름은 말줄임 — 마우스 올림·초점에 전체 이름을 보여 준다.
   $('record-menu').title=owned?(window.LT41?`트리: ${displayTreeTitle(window.LT41?.tree.title||'')} — 다른 트리를 고릅니다.`:'열어볼 트리를 고릅니다.'):(pendingDraft?'로그인하면 저장하지 못한 기록을 복원합니다.':'로그인하면 내 트리를 고를 수 있습니다.');
   // #942: 첫 화면에서는 실제 내 순간이 하나라도 있을 때만 머리줄·모바일 추가를 보인다.
