@@ -364,7 +364,7 @@ test('#951 ③④ 점 자리 썸네일(있음·깨짐·없음) + 이름표 말�
       // ④ 보기 이름: 무엇을 보는지로 — 저장값(id)은 그대로다.
       assert.deepEqual(m.viewNames, [{ id: 'viewNet', text: '이어진 길' }, { id: 'viewConc', text: '묶음' }, { id: 'viewGraph', text: '시간 순' }], `${width}: 보기 이름`);
       await frame.click('#viewConc');
-      assert.equal(await frame.evaluate(() => window.__lt.state.view), 'concentric', `${width}: [묶음]을 누르면 동심원 보기`);
+      assert.equal(await frame.evaluate(() => window.__lt.state.view), 'tag', `${width}: [묶음]을 누르면 꼬리표 묶음 보기`);
       await frame.click('#viewNet');
       assert.equal(await frame.evaluate(() => window.__lt.state.view), 'network', `${width}: [이어진 길]을 누르면 그물 보기`);
       await context.close();

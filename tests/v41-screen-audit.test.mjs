@@ -1043,15 +1043,17 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     });
     assert.deepEqual(closeBottom, { text: '닫기', visible: true }, '새 소식 창 맨 아래에도 닫기가 보인다');
     await take(page4, '새 소식 닫기 버튼');
-    // 겹친 창 닫기(2026-11-16 대표 지적): 새 소식(비모달) 위에อีก�창(공유 목록·모달)을 띄우고 Esc →
-    // 맨 위 창 하나만 닫힌다(공유 목록 닫힘·새 소식은 남음) → Esc 한 번 더 → 새 소식 닫힘.
+    // 겹친 창 닫기(2026-11-16 대표 지적): 새 소식(비모달) 위에 또 창(설정·모달)을 띄우고 Esc →
+    // 맨 위 창 하나만 닫힌다(설정 닫힘·새 소식은 남음) → Esc 한 번 더 → 새 소식 닫힘.
+    // (#1092부터 둘러보기는 창이 아니라 서재·책·보드·지도와 같은 화면이다 — Esc·바깥 누름으로 닫히지 않으므로,
+    //  겹친 창 시험은 맨 위 모달로 설정 창을 띄운다.)
     // 머리 메뉴(공유 목록 단추)는 '창이 열린 채 누르면 창 닫고 이동' 규칙의 대상이라, 겹친 창 시험은 메뉴를 거치지 않고 직접 띄운다.
-    await page4.evaluate(() => document.getElementById('community-panel')?.showModal());
-    await page4.waitForFunction(() => !!document.getElementById('community-panel')?.open, null, { timeout: 8000 }).catch(() => {});
+    await page4.evaluate(() => document.getElementById('account-settings')?.showModal());
+    await page4.waitForFunction(() => !!document.getElementById('account-settings')?.open, null, { timeout: 8000 }).catch(() => {});
     await page4.keyboard.press('Escape');
     await page4.waitForTimeout(500);
-    const afterFirst = await page4.evaluate(() => ({ community: !!document.getElementById('community-panel')?.open, updates: !!document.getElementById('updates-panel')?.open }));
-    assert.deepEqual(afterFirst, { community: false, updates: true }, 'Esc 1회는 맨 위 창(공유 목록) 하나만 닫는다 — 새 소식은 남는다');
+    const afterFirst = await page4.evaluate(() => ({ settings: !!document.getElementById('account-settings')?.open, updates: !!document.getElementById('updates-panel')?.open }));
+    assert.deepEqual(afterFirst, { settings: false, updates: true }, 'Esc 1회는 맨 위 창(설정) 하나만 닫는다 — 새 소식은 남는다');
     await take(page4, '겹친 창 닫기');
     await page4.keyboard.press('Escape');
     await page4.waitForTimeout(500);
@@ -1613,32 +1615,28 @@ test('#657 화면 공통 검사기: 주요 화면 17 상태 × 390·1440 × 밤�
     // 돌려 undefined.evaluate로 죽던 자리(#657 CI 2차 실측) — 준비된 frame을 기다리고, 없으면 URL 목록을
     // 담은 메시지로 실패한다(null.evaluate TypeError가 나지 않게).
     const tripMapFrame = (why) => readyFrame(pageMap, /track56-network/, { root: '#mapMain', why });
-    await (await tripMapFrame('지도→그래프: 지도 프레임')).evaluate(() => document.getElementById('viewGraph').click());
-    await pageMap.waitForFunction(() => [...document.querySelectorAll('iframe')].some((f) => { try { return /track60-graph/.test(f.contentWindow.location.href); } catch { return false; } }), null, { timeout: 10000 });
-    // 그래프 모듈이 그려질 때까지(배지가 채워질 때까지) 기다린다 — 프레임 주소만으로는 그리기 전이다.
-    await pageMap.waitForFunction(() => {
-      const f = [...document.querySelectorAll('iframe')].find((x) => { try { return /track60-graph/.test(x.contentWindow.location.href); } catch { return false; } });
-      return Boolean(f && (f.contentDocument.getElementById('gBadge')?.textContent || '').length > 0);
-    }, null, { timeout: 10000 });
-    const gFrameTrip = await readyFrame(pageMap, /track60-graph/, { root: '#gBadge', why: '지도의 [그래프] 단추로 그래프 보기가 열린다(기존 lt41-navigate 한 길)' });
-    const tripGraph = await gFrameTrip.evaluate(() => {
-      const b = [...document.querySelectorAll('.g-view-switch .pill')];
-      return { n: b.length, pressed: b.map((x) => x.getAttribute('aria-pressed')), badge: document.getElementById('gBadge')?.textContent || '' };
+    // #1095: 시간 순은 지도 프레임 안에서 그리는 보기다(별도 그래프 화면으로 이동하지 않는다).
+    await (await tripMapFrame('지도 시간 순: 지도 프레임')).evaluate(() => document.getElementById('viewGraph').click());
+    await pageMap.waitForTimeout(600);
+    const tripGraph = await (await tripMapFrame('시간 순 상태 확인')).evaluate(() => {
+      const b = [...document.querySelectorAll('.view-switch .pill')];
+      return { n: b.length, pressed: b.map((x) => x.getAttribute('aria-pressed')), view: document.body.dataset.ltView, stored: localStorage.getItem('lt41.network.view') };
     });
-    assert.equal(tripGraph.n, 3, '그래프 머리줄 보기 고르기 세 단추');
-    assert.deepEqual(tripGraph.pressed, ['false', 'false', 'true'], '현재 보기(그래프)만 aria-pressed=true');
-    assert.ok(tripGraph.badge.startsWith(`순간 ${treeBeforeTrip.moments}`), `그래프 표시의 순간 수가 지금 트리와 같다(실제 ${tripGraph.badge})`);
+    assert.equal(tripGraph.n, 3, '지도 머리줄 보기 고르기 세 단추');
+    assert.deepEqual(tripGraph.pressed, ['false', 'false', 'true'], '현재 보기(시간 순)만 aria-pressed=true');
+    assert.equal(tripGraph.view, 'time', '하나의 캔버스 안에서 시간 순 보기로 바뀐다');
+    assert.equal(tripGraph.stored, 'time', '지도 보기 저장 키(lt41.network.view)가 바뀐다');
     const navCurrent = await pageMap.evaluate(() => document.querySelector('.tree-views [data-view="track56-network.html"]')?.getAttribute('aria-current'));
-    assert.equal(navCurrent, 'true', '그래프 보기에서 위쪽 메뉴(책·보드·지도)의 지도가 켜진 상태다');
-    await gFrameTrip.evaluate(() => document.getElementById('gViewConc').click());
+    assert.equal(navCurrent, 'true', '시간 순 보기에서도 위쪽 메뉴(책·보드·지도)의 지도가 켜진 상태다');
+    await (await tripMapFrame('시간 순→묶음: 지도 프레임')).evaluate(() => document.getElementById('viewConc').click());
     await pageMap.waitForFunction(() => {
       const f = [...document.querySelectorAll('iframe')].find((x) => { try { return /track56-network/.test(x.contentWindow.location.href); } catch { return false; } });
-      return Boolean(f && f.contentDocument?.body && f.contentDocument.body.dataset.ltView === 'concentric');
+      return Boolean(f && f.contentDocument?.body && f.contentDocument.body.dataset.ltView === 'tag');
     }, null, { timeout: 10000 });
     const mapAfterConc = await (await tripMapFrame('동심원 복귀: 지도 프레임')).evaluate(() => ({ view: document.body.dataset.ltView, concPressed: document.getElementById('viewConc')?.getAttribute('aria-pressed'), stored: localStorage.getItem('lt41.network.view') }));
-    assert.equal(mapAfterConc.view, 'concentric', '그래프의 [동심원형]으로 지도가 동심원형 보기로 열린다');
-    assert.equal(mapAfterConc.concPressed, 'true', '동심원형이 눌린 상태(aria-pressed=true)');
-    assert.equal(mapAfterConc.stored, 'concentric', '지도 보기 저장 키(lt41.network.view)가 바뀐다');
+    assert.equal(mapAfterConc.view, 'tag', '그래프의 [묶음]으로 지도가 꼬리표 묶음 보기로 열린다');
+    assert.equal(mapAfterConc.concPressed, 'true', '묶음이 눌린 상태(aria-pressed=true)');
+    assert.equal(mapAfterConc.stored, 'tag', '지도 보기 저장 키(lt41.network.view)가 바뀐다');
     await (await tripMapFrame('그물 복귀 누르기: 지도 프레임')).evaluate(() => document.getElementById('viewNet').click());
     const treeAfterTrip = await pageMap.evaluate(() => ({ id: window.LT41?.tree?.id || '', moments: (window.LT41?.tree?.moments || []).length, momentId: window.LT41?.momentId || '' }));
     const mapAfterNet = await (await readyFrame(pageMap, /track56-network/, { root: '#mapMain', view: 'network', timeout: 45000, why: '그물 복귀 확인: 지도 프레임이 다시 붙고 준비될 때까지' })).evaluate(() => ({ view: document.body.dataset.ltView, netPressed: document.getElementById('viewNet')?.getAttribute('aria-pressed') }));

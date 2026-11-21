@@ -363,6 +363,14 @@ test('deleting a tree leaves quarantined originals in storage', async () => {
   assert.equal(got.body.quarantined, 1);
 });
 
+// #1073 B-22: % 묶음이 깨진 트리 경로는 서버 오류(500)가 아니라 404로 답한다.
+test('a malformed percent-encoded tree path answers 404, not 500', async () => {
+  const { handle } = buildHandle();
+  const bad = await handle({ method: 'DELETE', path: '/api/workspace/trees/%E0%A4%A', headers: {} });
+  assert.equal(bad.status, 404);
+  assert.equal(bad.body.error.code, 'not_found');
+});
+
 test('a stored tree with broken timestamps and names is repaired on read, not quarantined', async () => {
   const { handle, repo } = buildHandle({ principal: { productId: PRODUCT, subjectId: 'usr_d' } });
   const tree = createTree({ ...base, title: '고쳐 읽는 트리' }, CLOCK);

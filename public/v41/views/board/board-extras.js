@@ -56,15 +56,10 @@ let defaultPinStyle='pearl',defaultCardStyle='photo',lastAddedId=null,lastParent
 // 서버 기록은 사람이 고른 스타일이 없으면 기본(photo)으로 둔다 — 마지막 열에 검은 테두리 카드가 섞이던 원인.
 moments.forEach((m,i)=>{m.keywords=m.keywords||[];m.pinStyle=m.pinStyle||LT_PIN_STYLES[i%LT_PIN_STYLES.length];m.cardStyle=m.cardStyle||(exampleBoard?LT_CARD_STYLES[i%LT_CARD_STYLES.length]:'photo');m.privacy=m.privacy||'PRIVATE';if(m.type==='youtube')m.thumbnailUrl=youtubeThumbUrl(m.url||'');m.createdOrder=m.createdOrder||i+1});
 
-function youtubeId(url=''){try{let u=new URL(url);
-if(!['http:','https:'].includes(u.protocol))return '';
-const d=(window.LTMedia&&typeof window.LTMedia.describe==='function')?window.LTMedia.describe(u.href):null;
-if(d&&d.kind==='youtube')return d.videoId||'';
-const hosts=['youtube.com','www.youtube.com','m.youtube.com','music.youtube.com','youtu.be'];
-if(!hosts.includes(u.hostname))return '';
-if(u.hostname==='youtu.be'){const y=u.pathname.split('/').filter(Boolean)[0]||'';
-return /^[A-Za-z0-9_-]{11}$/.test(y)?y:''}if(u.pathname==='/watch'){const v=u.searchParams.get('v')||'';
-return /^[A-Za-z0-9_-]{11}$/.test(v)?v:''}const s=u.pathname.match(/^\/(shorts|live|embed)\/([^/?#]+)/);return s&&/^[A-Za-z0-9_-]{11}$/.test(s[2])?s[2]:''}catch(e){}return ''}
+// #1059: 사본을 걷어내고 정본(youtube-id.mjs → globalThis.LTYouTubeId)을 부른다. 전역 스크립트 화면은 LTMedia를 거친다.
+function youtubeId(url=''){try{const direct=globalThis.LTYouTubeId?.youtubeIdFrom;if(direct){const v=direct(url, {allowThumbnail:false});if(v)return v;}
+const d=(window.LTMedia&&typeof window.LTMedia.describe==='function')?window.LTMedia.describe(url):null;
+return (d&&d.kind==='youtube')?d.videoId||'':''}catch(e){}return ''}
 // #480 L12: 썸네일은 공용 한 벌(thumb-fallback.mjs)만 쓴다. 예전에는 이 파일이 자체 주소(img.youtube.com/hqdefault)와
 // 자체 그림(SVG)을 따로 만들었는데, 그러면 책·보관함·첫 화면과 다른 단계(저장 주소 → oardefault/hqdefault → mqdefault → 글 카드)를 가진다.
 // board-thumb.mjs가 thumb-fallback의 한 벌을 globalThis.LTThumbFallback으로 내놓는다.
