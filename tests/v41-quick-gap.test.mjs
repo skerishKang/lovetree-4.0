@@ -40,6 +40,7 @@ test('쉬운 추가 담겨요 줄과 담기 단추 사이 간격', { skip: skip 
       await page.goto(`${origin}/v41/?account=1`, { waitUntil: 'load' });
       await page.waitForFunction(() => !!window.LT41?.trees?.length, null, { timeout: 20000 });
       await page.locator('#discover-ask-no').click().catch(() => {});
+      await page.evaluate(() => { location.hash = '#shelf'; });
       if (await page.locator('#write-menu').isVisible()) await page.click('#write-menu');
       else await page.click('#mobile-add');
       await page.waitForFunction(() => document.getElementById('write-panel')?.open === true, null, { timeout: 10000 });

@@ -278,7 +278,8 @@ export const AUDIT_FN = function audit(opts) {
     for (const s of ['.home-links', '#mobile-add', '#toolCinema', '[data-cinema]', '.cinema-btn']) {
       const targets = [...document.querySelectorAll(s)].filter(shown);
       const required = (s === '.home-links' && linksExpected)
-        || (s === '#mobile-add' && innerWidth <= 780 && document.body.classList.contains('lt-fab-ok') && !openDialog && !openSheet);
+        || (s === '#mobile-add' && innerWidth <= 780 && document.body.classList.contains('lt-fab-ok')
+          && !document.body.classList.contains('home-existing') && !openDialog && !openSheet);
       if (required && !targets.length) checkPair('updates-card×' + s, cardEl, null, true);
       for (const el of targets) checkPair('updates-card×' + s, cardEl, el, required);
     }
