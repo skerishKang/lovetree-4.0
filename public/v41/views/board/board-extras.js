@@ -245,6 +245,17 @@ $('#cinemaBtn').onclick=()=>startCinemaV11(0);$('#toolCinema').onclick=()=>start
 /* Wire theme/style inspector quick controls */
 let styleSec=document.createElement('div');styleSec.className='section';styleSec.hidden=false;styleSec.id='styleSection';styleSec.innerHTML=`<div class="label">STYLE</div><div class="ctaRow" style="margin-top:8px"><button class="miniBtn" id="quickPin">핀 바꾸기</button><button class="miniBtn" id="quickCard">카드 바꾸기</button></div>`;$('#detail .section.ctaRow').before(styleSec);$('#quickPin').onclick=()=>{let m=moments.find(x=>x.id===selected);snapshot();m.pinStyle=LT_PIN_STYLES[(LT_PIN_STYLES.indexOf(m.pinStyle)+1)%LT_PIN_STYLES.length];renderCards();selectMoment(m.id,true);persistBoard()};$('#quickCard').onclick=()=>{let m=moments.find(x=>x.id===selected);snapshot();m.cardStyle=LT_CARD_STYLES[(LT_CARD_STYLES.indexOf(m.cardStyle)+1)%LT_CARD_STYLES.length];renderCards();selectMoment(m.id,true);persistBoard()};
 if($('#addBtn'))$('#addBtn').onclick=()=>{if(LTDEMO.readOnly)return;openAdd()};$('#confirmAdd').onclick=()=>{if(LTDEMO.readOnly)return;confirmAdd()};renderCards();renderThreads();updateKeywordFilter();formFor(addType);fitAll(false);applyPathHighlight();setTimeout(()=>{/* #891: 탭으로 들어오면 닫힘, ?open= 주소만 자동 열림(board.js bootDetailPanel) */bootDetailPanel()},100);
+/* #1105: 저장된 세로 표시가 없는 영상은 칸 모양을 나중에 바꾸지 않고 판정값만 적어 둔다.
+   다음 열기부터는 저장값으로 처음부터 맞은 모양을 그린다. */
+if(typeof LTMedia?.probeVertical==='function'&&!LTDEMO.readOnly){
+ for(const m of moments){
+  if(!m.url||typeof m.mediaMetadata?.vertical==='boolean')continue;
+  void LTMedia.probeVertical(m.url).then(v=>{
+   if(!v||window.parent===window)return;
+   try{window.parent.postMessage({type:'lt41-media-metadata',momentId:m.id,url:m.url,mediaMetadata:{...(m.mediaMetadata||{}),vertical:true}},location.origin)}catch{}
+  }).catch(()=>{});
+ }
+}
 window.__LT58V11={youtubeId,youtubeThumb,youtubeThumbUrl,openEdit,saveEdit,chooseNext,highlightPath,startCinema:startCinemaV11,endCinema:endCinemaV11,setCinemaPosition,theme:t=>{document.body.dataset.theme=t},setMomentStyle:(id,pin,card)=>{let m=moments.find(x=>x.id===id);m.pinStyle=pin;m.cardStyle=card;renderCards()},get cinema(){return{active:cinemaV11.active,paused:cinemaV11.paused,index:cinemaV11.index,beat:cinemaV11.beats[cinemaV11.index]?.label,focused:cinemaV11.focused}},get state(){return{moments:moments.length,connections:connections.length,theme:document.body.dataset.theme,selected,keywords:[...new Set(moments.flatMap(m=>m.keywords||[]))]}}};
 
 addEventListener('message',e=>{if(e.data?.type==='lt41-title-display'){if(typeof renderCards==='function')renderCards();if(typeof renderThreads==='function')renderThreads();if(selected)selectMoment(selected,$('#detail').classList.contains('open'));}});
