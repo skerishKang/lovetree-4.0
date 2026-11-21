@@ -157,18 +157,19 @@ test('②③④ 지도 화면: 이름표·썸네일·묶음 판·두 보기 판 
       const rows = await page.evaluate(() => [...document.querySelectorAll('.legend-row')].filter(r => !r.hidden).map(r => r.textContent.trim()));
       assert.ok(rows.length >= 2 && rows.length <= 6, `묶음 행 개수: ${rows.length}`);
       assert.ok(rows.every(t => /·\s*\d+개$/.test(t) && !/·\s*0개/.test(t)), `빈 행·이름 없는 행 없음: ${rows.join(' / ')}`);
-      // ③ 두 보기에서 묶음 판+아래 단추 줄이 같이 보인다(#951 ⑥: 큰 탐색 판은 숨고 단추 줄이 그 자리를 맡는다).
-      for (const view of ['network', 'concentric']) {
+      // ③ 세 보기에서 묶음 판+아래 단추 줄이 같이 보인다(#951 ⑥: 큰 탐색 판은 숨고 단추 줄이 그 자리를 맡는다).
+      for (const view of ['network', 'tag', 'time']) {
         await page.evaluate(v => { document.body.dataset.ltView = v; }, view);
         const vis = await page.evaluate(() => {
           const show = s => { const el = document.querySelector(s); if (!el) return false; const cs = getComputedStyle(el); return cs.display !== 'none' && cs.visibility !== 'hidden' && el.getBoundingClientRect().width > 1; };
           const ribBtns = [...document.querySelectorAll('#mobileRibbon button')].map(b => b.textContent.trim());
           return { legend: show('.legend'), ribbon: show('.mobile-ribbon'), controls: show('.controls'), minus: !!document.querySelector('#mobileRibbon button[aria-label="지도 축소(−)"]'), plus: !!document.querySelector('#mobileRibbon button[aria-label="지도 확대(＋)"]'), reset: ribBtns[ribBtns.length - 1] };
         });
-        assert.ok(vis.legend && vis.ribbon && !vis.controls, `${view}: 묶음 판과 단추 줄이 같이 보이고 큰 탐색 판은 숨는다`);
+        if (view === 'time') assert.ok(!vis.legend && vis.ribbon && !vis.controls, `${view}: 시간 순은 범례 없이 단추 줄이 보인다`);
+        else assert.ok(vis.legend && vis.ribbon && !vis.controls, `${view}: 묶음 판과 단추 줄이 같이 보이고 큰 탐색 판은 숨는다`);
         assert.ok(vis.minus && vis.plus, `${view}: [−][＋] 단추`);
         const rows = await page.evaluate(() => [...document.querySelectorAll('#mobileRibbon button')].map(b => b.textContent.trim()));
-        assert.equal(vis.reset, '전체 보기', `${view}: 마지막 단추 문구(390과 같은 줄) — 실제 렌더링값 ${JSON.stringify(rows)}`);
+        assert.equal(vis.reset, '전체 맞춤', `${view}: 마지막 단추 문구(390과 같은 줄) — 실제 렌더링값 ${JSON.stringify(rows)}`);
       }
     } finally { await ctx.close(); await browser.close(); }
 
