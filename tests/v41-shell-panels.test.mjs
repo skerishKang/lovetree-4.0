@@ -132,7 +132,7 @@ test('setEditorMode(add)는 추가 모드 기본값과 폼 기준값을 세운�
   } finally { h.restore(); }
 });
 
-test('setEditorMode(edit)는 기존 값을 채우고 이전 순간 관리와 더 적기를 펼친다', () => {
+test('setEditorMode(edit)는 기존 값을 채우고 이어짐 칸을 펼친다(#1097)', () => {
   const h = harness({ tree: sampleTree() });
   try {
     window.LT41.momentId = 'm2';
@@ -142,15 +142,17 @@ test('setEditorMode(edit)는 기존 값을 채우고 이전 순간 관리와 더
     assert.equal(form.title.value, '둘째 순간');
     assert.equal(form.url.value, 'https://example.test/a.jpg');
     assert.equal(form.relation.value, 'next');
-    assert.equal(h.els['more-fields'].open, true, '적어 둔 값이 있으면 더 적기를 펼친다');
-    assert.equal(h.els['moment-management'].hidden, false);
-    assert.equal(h.els['parent-management'].hidden, false, '이전 순간을 바꿀 수 있다');
+    // #1097: 제목은 접히지 않는다 — 더 적기 접힘(<details>)을 열지 않는다.
+    assert.equal(h.els['more-fields'], undefined, '제목 접힘은 없다 — 제목·감정·무대 날짜가 항상 보인다');
+    assert.equal(h.els['moment-management'].hidden, false, '이어짐 칸이 보인다');
     assert.equal(h.els['parent-current'].textContent, '현재 이전 순간 · 첫 순간');
     assert.equal(h.els['parent-target'].value, 'm1');
     assert.equal(h.els['relation-label'].hidden, true);
     // #627: 수정 모드의 무대 날짜는 이미 정해진 값이라 안내를 보이지 않는다.
     assert.equal(h.els['stage-date-hint'].hidden, true, '수정 모드에서는 무대 날짜 안내가 없다');
-    assert.equal(h.els['editor-context'].textContent, '수정할 순간 · 둘째 순간 · 현재 이전 순간: 첫 순간');
+    // #1097: 머리는 트리 · 담은 날 한 줄이다.
+    assert.equal(h.els['editor-context'].textContent, '윤슬 · 2026. 11. 02');
+    assert.equal(h.els['delete-moment'].hidden, false, '아래 고정 줄에 삭제가 있다');
     assert.equal(h.counts().tabsVisible, 'none', '수정에는 탭 줄이 없다');
     assert.deepEqual(h.calls, [], '모드 전환은 저장하지 않는다');
   } finally { h.restore(); }
@@ -163,7 +165,7 @@ test('setEditorMode(add, parentId)는 그 순간을 부모로 삼는다', () => 
     h.panels.setEditorMode('add', 'm1');
     // 부모를 정확히 고른 추가는 그 순간(m1)에서 이어짐을 보여 준다.
     assert.equal(h.els['editor-context'].textContent, '새 순간 추가 · 첫 순간에서 이어집니다.');
-    assert.equal(h.els['parent-management'].hidden, true);
+    assert.equal(h.els['moment-management'].hidden, true, '이어짐 칸은 수정에만 보인다');
   } finally { h.restore(); }
 });
 
@@ -228,16 +230,21 @@ test('편집기 저장은 editorMode와 폼 값·선택을 member.apply에 그�
   } finally { h.restore(); }
 });
 
-test('이전 순간을 먼저 저장하지 않으면 편집기 저장을 막는다', () => {
+test('이전 순간·이유 변경도 저장하기 한 번에 함께 저장한다(#1097)', () => {
   const h = harness({ tree: sampleTree() });
   try {
     window.LT41.momentId = 'm2';
     h.panels.setEditorMode('edit');
-    h.els['parent-target'].value = 'm2';
+    // 이유만 바꾸면 edit 뒤 reparent가 같은 한 번에 잇따라 간다(막지 않는다).
+    h.els['parent-relation'].value = '바꾼 이유';
+    h.els['write-panel'].open = true;
     const form = h.els['moment-form'];
     form.onsubmit({ preventDefault() {}, target: form });
-    assert.deepEqual(h.calls, [], '저장하지 않는다');
-    assert.equal(h.els['form-error'].textContent, '이전 순간 변경은 아래 버튼으로 먼저 저장해 주세요.');
+    assert.deepEqual(h.calls.map(call => call[0]), ['edit', 'reparent'], '내용과 이전 순간이 저장하기 한 번에 간다');
+    assert.equal(h.calls[1][1].relation, '바꾼 이유');
+    assert.equal(h.els['form-error'].textContent, '', '성공하면 오류 줄이 비고 창은 닫힌다');
+    assert.equal(h.els['write-panel'].open, false);
+    assert.equal(h.panels.formDirty(), false, '저장 뒤에는 더러움이 아니다');
   } finally { h.restore(); }
 });
 

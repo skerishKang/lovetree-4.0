@@ -359,8 +359,10 @@ test('#845 3단계 잠깐 판은 위에 겹친다 — 순간 추가 위에 내 �
     await openWithFirstTree(page);
     await page.click('#write-menu');
     await page.waitForFunction(() => document.getElementById('write-panel').open, null, { timeout: 10000 });
-    // 내 보관 파일에서 고르기 단추는 자세한 추가 탭 안에 있다.
+    // 내가 올린 사진·영상에서 고르기 단추는 자세한 추가 탭 안에 있다.
     await page.click('#write-tab-detailed');
+    // #1097: 단추는 '영상 바꾸기'를 눌렀을 때 펼쳐진다.
+    await page.click('#media-change-toggle');
     await page.click('#editor-assets-open');
     await page.waitForFunction(() => document.getElementById('account-assets').open, null, { timeout: 10000 });
     const both = await page.evaluate(() => ({

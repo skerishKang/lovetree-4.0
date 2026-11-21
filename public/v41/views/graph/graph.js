@@ -312,7 +312,10 @@ function render() {
       if (r) labelEls.push({ g, name, sub, count: h.momentIds.length, rect: r });
       else g.remove(); /* 넓은 무대에서 자리를 못 찾으면 숨긴다(범례에 이름이 남는다) */
     }
-    g.addEventListener('click', () => { filterHub = null; stopWalk(); selected = { type: 'hub', key: h.id }; refresh(); });
+    // #1057: 점에 초점을 두고 Enter·Space를 눌러도 누름과 같은 상세를 연다.
+    const activateHub = () => { filterHub = null; stopWalk(); selected = { type: 'hub', key: h.id }; refresh(); };
+    g.addEventListener('click', activateHub);
+    g.addEventListener('keydown', (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); activateHub(); } });
   }
   /* 순간 점: 고리 위 썸네일 동그라미(없으면 묶음 색 점). 무더기(stacks)는 대표 점 + 개수. */
   const dotG = el('g', {}, svg);
@@ -374,7 +377,10 @@ function render() {
       countEl.setAttribute('x', (chosen.cx - w2).toFixed(1));
       countEl.setAttribute('y', (chosen.cy + h2).toFixed(1));
     }
-    g.addEventListener('click', () => { stopWalk(); selected = { type: 'moment', id: m.id }; try { parent.postMessage({ type: 'lt-selection', id: m.id }, location.origin); } catch {} refresh(); });
+    // #1057: 순간 점도 키보드로 같은 감상 상세를 연다.
+    const activateMoment = () => { stopWalk(); selected = { type: 'moment', id: m.id }; try { parent.postMessage({ type: 'lt-selection', id: m.id }, location.origin); } catch {} refresh(); };
+    g.addEventListener('click', activateMoment);
+    g.addEventListener('keydown', (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); activateMoment(); } });
   }
   /* 처음·지금 표시는 허브 이름 상자를 피해 자리를 잡는다(좌표계: viewBox 사용자 단위로 통일). */
   const wrapBox = svg.parentElement.getBoundingClientRect();

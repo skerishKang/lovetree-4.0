@@ -291,7 +291,7 @@ test('1001b 실행: 지도 순간 변경(고치기·연결·삭제) — 재적�
     assert.ok(afterEdit.detailOpen, '열린 상세 판이 그대로다');
     assert.equal(afterEdit.detailTitle, '지도 고친 제목', '상세 판 제목이 새 값으로 다시 그려진다');
     // ② 연결: 재적재 0.
-    await openEditor(m3); await page.evaluate(id => { document.querySelector('#related-target').value = id; }, m4); await page.click('#link-moment'); await waitPut(2); await page.waitForTimeout(1500);
+    await openEditor(m3); await page.evaluate(id => { const s = document.querySelector('#related-target'); s.value = id; s.dispatchEvent(new Event('change', {bubbles: true})); document.querySelector('#moment-form').requestSubmit(); }, m4); await waitPut(2); await page.waitForTimeout(1500);
     const afterLink = await frame.evaluate(() => ({ doc: window.__doc1001b, sel: window.__lt.state.selected?.id, msg: window.__msg1001b }));
     assert.equal(afterLink.doc, 'alive', '연결 뒤에도 같은 문서다');
     assert.equal(afterLink.sel, m3, '연결 뒤에도 고른 순간이 그대로다');

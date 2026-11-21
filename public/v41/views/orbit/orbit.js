@@ -101,6 +101,11 @@ function project(c,w,h,phaseOverride=null){
 
 }
 
+// #1086: 매 프레임 바뀌는 값을 0.02 단위로 반올림해, 같은 값이면 CSS 변수를 쓰지 않는다.
+function setVar(el,name,value){
+ const key='__v_'+name,v=Math.round(value*50)/50;
+ if(el[key]!==v){el[key]=v;el.style.setProperty('--'+name,String(v));}
+}
 function render(){
  const w=innerWidth,h=innerHeight;
  state.cameraX+=(state.targetCameraX-state.cameraX)*.055;
@@ -137,23 +142,29 @@ function render(){
  op=1;
  blur=0;
  zIndex=5000;
- el.style.setProperty('--sat',state.previewPlaying?'1':'.96');
- el.style.setProperty('--bright','1');
+  setVar(el,'sat',state.previewPlaying?1:.96);
+  setVar(el,'bright',1);
  }
 
    else{ if(state.focusId){ op*=.10;
  blur+=1.3;
  }
- el.style.setProperty('--sat',String(p.sat));
- el.style.setProperty('--bright',String(.72+p.sat*.22));
+ setVar(el,'sat',p.sat);
+ setVar(el,'bright',.72+p.sat*.22);
  }
 
-   el.style.transform=`translate3d(${tx}px,${ty}px,0) scale(${sc}) rotateX(${p.rx}deg) rotateY(${p.ry}deg) rotateZ(${p.rz}deg)`;
- el.style.opacity=op;
- el.style.filter=`blur(${blur}px)`;
- el.style.zIndex=zIndex;
- el.classList.toggle('hovered',state.hoverId===c.id && !state.focusId);
- el.classList.toggle('previewPlaying',state.previewPlaying&&state.focusId===c.id);
+   // #1086: 같은 값은 쓰지 않는다 — 사용자 정의 속성·필터·transform 쓰기는 전부 스타일 재계산을 부른다.
+   const tf=`translate3d(${tx.toFixed(1)}px,${ty.toFixed(1)}px,0) scale(${sc.toFixed(3)}) rotateX(${p.rx.toFixed(1)}deg) rotateY(${p.ry.toFixed(1)}deg) rotateZ(${p.rz.toFixed(1)}deg)`;
+   if(el.__tf!==tf){el.__tf=tf;el.style.transform=tf;}
+   const ov=Math.round(op*50)/50;
+   if(el.__op!==ov){el.__op=ov;el.style.opacity=ov;}
+   const bv=Math.round(blur*20)/20;
+   if(el.__bv!==bv){el.__bv=bv;el.style.filter=bv?`blur(${bv}px)`:'none';}
+   if(el.__zi!==zIndex){el.__zi=zIndex;el.style.zIndex=zIndex;}
+   const hov=state.hoverId===c.id && !state.focusId;
+   if(el.__hov!==hov){el.__hov=hov;el.classList.toggle('hovered',hov);}
+   const pp=!!(state.previewPlaying&&state.focusId===c.id);
+   if(el.__pp!==pp){el.__pp=pp;el.classList.toggle('previewPlaying',pp);}
 
  }
 
