@@ -442,28 +442,49 @@ test('#1087 390 새 소식 띠와 숫자 두 줄 겹침 0', { skip: REQUIRE952 ?
   if (skip952) assert.fail(skip952);
   const browser = await chromium952.launch({ headless: true });
   try {
-    const h = await boot952(browser, { member: true, width: 390 });
-    try {
-      const frame = h.frame;
-      await frame.locator('.home-count-line').first().waitFor({ state: 'visible', timeout: 15000 });
-      await h.page.evaluate(() => {
-        const band = document.getElementById('updates-card');
-        band.hidden = false;
-        const height = Math.round(band.getBoundingClientRect().height);
-        document.getElementById('view').contentWindow.postMessage({ type: 'lt41-updates-band', height }, location.origin);
-      });
-      await h.page.waitForTimeout(700);
-      const geo = await h.page.evaluate(() => {
-        const band = document.getElementById('updates-card').getBoundingClientRect();
-        const doc = document.getElementById('view').contentDocument;
-        const root = doc.querySelector('#orbit').shadowRoot;
-        const rows = [...root.querySelectorAll('.home-count-line')].map(n => n.getBoundingClientRect());
-        const links = doc.defaultView.parent.document.querySelector('.home-links')?.getBoundingClientRect();
-        const area = r => Math.max(0, Math.min(band.right, r.right) - Math.max(band.left, r.left)) * Math.max(0, Math.min(band.bottom, r.bottom) - Math.max(band.top, r.top));
-        return { numbers: rows.map(area), links: links ? area(links) : 0, shift: getComputedStyle(root.querySelector('.center')).transform };
-      });
-      assert.ok(geo.numbers.length >= 2 && geo.numbers.every(v => Math.round(v) === 0), '띠와 숫자 두 줄 겹침 0: ' + JSON.stringify(geo));
-      assert.equal(Math.round(geo.links), 0, '띠와 바닥 링크 겹침 0: ' + JSON.stringify(geo));
-    } finally { await close952(h); }
+    for (const theme of ['garden', 'night']) {
+      const at = i => '2026-11-' + String(i + 1).padStart(2, '0') + 'T00:00:00.000Z';
+      let tree = createTree({ subject: '팬 트리', title: '팬 트리', date: '2026-11-20', emotion: '설렘', note: 'n', url: 'https://www.youtube.com/shorts/a1111111111' }, at(0));
+      tree.moments[0].mediaMetadata = { vertical: true, width: 1080, height: 1920 };
+      tree.moments[0].image = 'https://i.ytimg.com/vi/a1111111111/oardefault.jpg';
+      tree.moments[0].youtubeThumb = true;
+      tree = addMoment(tree, { title: '둘째', note: '', emotion: '설렘', date: '2026-11-21', url: 'https://www.youtube.com/shorts/a1111111111' }, tree.moments[0].id, at(1));
+      tree.moments[1].mediaMetadata = { vertical: true, width: 1080, height: 1920 };
+      tree.moments[1].image = 'https://i.ytimg.com/vi/a1111111111/oardefault.jpg';
+      tree.moments[1].youtubeThumb = true;
+      let inbox = createTree({ subject: '팬 트리', title: '모아둔 순간', date: '2026-11-19', emotion: '설렘', note: '모음', url: '' }, at(0));
+      inbox = addMoment(inbox, { title: '모은 것', note: '', emotion: '설렘', date: '2026-11-20', url: '' }, inbox.moments[0].id, at(1));
+      inbox.inbox = true;
+      const workspace = { revision: 1, state: { version: 1, trees: [tree, inbox], prefs: {} }, subject: 'visual-audit-fake', writeSubjectBound: true, savedAt: at(2) };
+      const h = await boot952(browser, { member: true, width: 390, initStorage: { 'lt41.theme': theme }, routes: {
+        '/api/workspace': route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(workspace) }),
+        '/api/community/stats': route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ trees: 11, moments: 42 }) })
+      } });
+      try {
+        const frame = h.frame;
+        await frame.locator('.home-count-line').first().waitFor({ state: 'visible', timeout: 15000 });
+        const geo = await h.page.evaluate(() => {
+          const bandEl = document.getElementById('updates-card');
+          bandEl.hidden = false;
+          const band = bandEl.getBoundingClientRect();
+          const iframe = document.getElementById('view');
+          const off = iframe.getBoundingClientRect();
+          const root = iframe.contentDocument.querySelector('#orbit').shadowRoot;
+          const rows = [...root.querySelectorAll('.home-count-line')].map(row => {
+            const el = row.lastElementChild || row;
+            if (!el.textContent.trim()) return null;
+            const r = el.getBoundingClientRect();
+            return { text: el.textContent.trim(), left: Math.round(r.left + off.left), right: Math.round(r.right + off.left), top: Math.round((r.top + off.top) * 10) / 10, bottom: Math.round((r.bottom + off.top) * 10) / 10 };
+          }).filter(Boolean);
+          const links = document.querySelector('.home-links').getBoundingClientRect();
+          const area = r => Math.max(0, Math.min(band.right, r.right) - Math.max(band.left, r.left)) * Math.max(0, Math.min(band.bottom, r.bottom) - Math.max(band.top, r.top));
+          return { theme: localStorage.getItem('lt41.theme'), bandTop: Math.round(band.top), bandBottom: Math.round(band.bottom), rows, overlaps: rows.map(area), links: area(links) };
+        });
+        console.log('#1087 BAND', JSON.stringify(geo));
+        assert.ok(geo.rows.length >= 2, '두 줄 숫자가 실제로 그려진다: ' + JSON.stringify(geo));
+        assert.ok(geo.overlaps.every(v => Math.round(v) === 0), '띠와 숫자 두 줄 겹침 0: ' + JSON.stringify(geo));
+        assert.equal(Math.round(geo.links), 0, '띠와 바닥 링크 겹침 0: ' + JSON.stringify(geo));
+      } finally { await close952(h); }
+    }
   } finally { await browser.close(); }
 });
