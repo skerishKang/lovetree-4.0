@@ -165,6 +165,46 @@ async function step(frame) {
   await frame.waitForTimeout(80);
 }
 
+// #1059 표 시험: 유튜브 주소 한 벌을 모든 진입 함수(정본·책 화면)가 같은 id로 판정한다.
+const YT_CORPUS = [
+  'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+  'https://youtu.be/dQw4w9WgXcQ?t=42',
+  'https://www.youtube.com/shorts/dQw4w9WgXcQ',
+  'https://www.youtube.com/live/dQw4w9WgXcQ',
+  'https://www.youtube.com/embed/dQw4w9WgXcQ',
+  'http://m.youtube.com/watch?v=dQw4w9WgXcQ',
+  'https://music.youtube.com/watch?v=dQw4w9WgXcQ',
+  'https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=PL123',
+  'https://www.youtube.com/playlist?list=PL123',
+  'https://youtube.com.evil.test/watch?v=dQw4w9WgXcQ',
+  'https://user:pass@www.youtube.com/watch?v=dQw4w9WgXcQ',
+  'ftp://youtu.be/dQw4w9WgXcQ',
+  'https://www.youtube.com/shorts/abcdefghijkEXTRA',
+  'https://youtu.be/short',
+  'https://www.youtube.com/watch?v=toolongid123456',
+  'javascript:alert(1)'
+];
+
+test('#1059 화면: 책 youtubeId 가 정본과 같은 판정이다(주소 표)', { skip }, async () => {
+  const browser = await chromium.launch();
+  try {
+    const { ctx, frame } = await openBook(browser, 1440, 900);
+    try {
+      const diffs = await frame.evaluate(async (corpus) => {
+        const { youtubeIdFrom } = await import('/v41/youtube-id.mjs');
+        const out = [];
+        for (const url of corpus) {
+          const a = youtubeId(url);
+          const b = youtubeIdFrom(url, { allowThumbnail: false });
+          if ((a || null) !== (b || null)) out.push(`${url} :: book=${a} canon=${b}`);
+        }
+        return out;
+      }, YT_CORPUS);
+      assert.deepEqual(diffs, [], `책 youtubeId 와 정본이 같다 (${diffs.join(' | ')})`);
+    } finally { await ctx.close(); }
+  } finally { await browser.close(); }
+});
+
 test('584 실행: 두 장 모드에서 두 쪽 모두 스크롤 없이 한 순간이 온전히 보인다(1440·1920)', { skip }, async () => {
   const browser = await chromium.launch();
   try {

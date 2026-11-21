@@ -173,7 +173,10 @@ $('#detailClose').onclick=()=>setBookOpen($('#detail'),false);$('#openViewerBtn'
 
 /* V1.1 · Real Link 순간 input */
 function normalizeHttpUrl(raw){let v=String(raw||'').trim();if(!v)return null;if(!/^[a-zA-Z][a-zA-Z\d+.-]*:/.test(v))v='https://'+v;try{const u=new URL(v);if(!['http:','https:'].includes(u.protocol))return null;return u.href}catch{return null}}
-function youtubeId(raw){const n=normalizeHttpUrl(raw);if(!n)return null;try{const u=new URL(n);const d=(window.LTMedia&&typeof window.LTMedia.describe==='function')?window.LTMedia.describe(n):null;if(d&&d.kind==='youtube')return d.videoId||null;const h=u.hostname;if(h==='youtu.be'){const y=u.pathname.split('/').filter(Boolean)[0]||'';return /^[A-Za-z0-9_-]{11}$/.test(y)?y:null}if(['youtube.com','www.youtube.com','m.youtube.com','music.youtube.com'].includes(h)){if(u.pathname==='/watch'){const v=u.searchParams.get('v')||'';return /^[A-Za-z0-9_-]{11}$/.test(v)?v:null}const p=u.pathname.split('/').filter(Boolean);if(['shorts','live','embed'].includes(p[0]))return /^[A-Za-z0-9_-]{11}$/.test(p[1]||'')?p[1]:null}}catch{}return null}
+// #1059: 사본을 걷어내고 정본(youtube-id.mjs → globalThis.LTYouTubeId)을 부른다. 전역 스크립트 화면은 LTMedia를 거친다.
+function youtubeId(raw){const n=normalizeHttpUrl(raw);if(!n)return null;try{const direct=globalThis.LTYouTubeId?.youtubeIdFrom;if(direct)return direct(n, {allowThumbnail:false})||null;
+const d=(window.LTMedia&&typeof window.LTMedia.describe==='function')?window.LTMedia.describe(n):null;
+return (d&&d.kind==='youtube')?d.videoId||null:null}catch{return null}}
 function isYouTubeUrl(raw){return !!youtubeId(raw)}
 
 /* Index */
