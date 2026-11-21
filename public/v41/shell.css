@@ -238,6 +238,8 @@ html[data-v41-screen=book] .tools .ui-btn::after,html[data-v41-screen=board] hea
  .app-header nav.fade-start{mask-image:linear-gradient(to right,transparent 0,#000 var(--nav-fade))}
  .app-header nav.fade-end{mask-image:linear-gradient(to left,transparent 0,#000 var(--nav-fade))}
  .app-header nav.fade-start.fade-end{mask-image:linear-gradient(to right,transparent 0,#000 var(--nav-fade),#000 calc(100% - var(--nav-fade)),transparent 100%)}
+ /* 트리 팝오버가 위에 있을 때 페이드 가림새가 눌림을 막지 않도록 가림새를 뺀다. */
+ .app-header nav:has(.tree-popover:not([hidden])){mask-image:none}
 }
 @media(max-width:420px){nav #record-menu{max-width:112px}}
 
