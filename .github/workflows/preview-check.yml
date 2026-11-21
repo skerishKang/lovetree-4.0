@@ -630,6 +630,8 @@ jobs:
           done
           wait $pid || r=$?
           echo "화면 공통 검사기 shard a 종료 코드 $r · $(( $(date +%s) - start ))초"
+          echo '— 화면 공통 검사기 실패 블록(전체) —'
+          awk '/^not ok /{p=1} p{print} p&&/^  \.\.\./{p=0}' /tmp/screen-audit.log || true
           echo '— 화면 공통 검사기 출력(마지막 60줄) —'
           tail -60 /tmp/screen-audit.log || true
           echo "화면 공통 검사기 shard a $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
@@ -715,6 +717,8 @@ jobs:
           done
           wait $pid || r=$?
           echo "화면 공통 검사기 shard b 종료 코드 $r · $(( $(date +%s) - start ))초"
+          echo '— 화면 공통 검사기 실패 블록(전체) —'
+          awk '/^not ok /{p=1} p{print} p&&/^  \.\.\./{p=0}' /tmp/screen-audit.log || true
           echo '— 화면 공통 검사기 출력(마지막 60줄) —'
           tail -60 /tmp/screen-audit.log || true
           echo "화면 공통 검사기 shard b $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"
@@ -800,6 +804,8 @@ jobs:
           done
           wait $pid || r=$?
           echo "화면 공통 검사기 shard c 종료 코드 $r · $(( $(date +%s) - start ))초"
+          echo '— 화면 공통 검사기 실패 블록(전체) —'
+          awk '/^not ok /{p=1} p{print} p&&/^  \.\.\./{p=0}' /tmp/screen-audit.log || true
           echo '— 화면 공통 검사기 출력(마지막 60줄) —'
           tail -60 /tmp/screen-audit.log || true
           echo "화면 공통 검사기 shard c $(( $(date +%s) - start ))초" >> "$GITHUB_STEP_SUMMARY"

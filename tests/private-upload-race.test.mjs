@@ -3,11 +3,12 @@ import assert from 'node:assert/strict';
 import {mountPrivateUpload} from '../public/v41/private-upload.mjs';
 
 test('only the latest simultaneous media list response is rendered', async () => {
- const oldDocument=globalThis.document,oldFetch=globalThis.fetch,oldWindow=globalThis.window;
+ const oldDocument=globalThis.document,oldFetch=globalThis.fetch,oldWindow=globalThis.window,oldLocation=globalThis.location;
  const pending=[];
  class Element {
-  constructor(){this.children=[];this.listeners={};this.textContent='';this.open=false;this.hidden=false;this.disabled=false;}
+  constructor(){this.children=[];this.listeners={};this.textContent='';this.open=false;this.hidden=false;this.disabled=false;this.attrs={};}
   addEventListener(name,fn){this.listeners[name]=fn;}
+  setAttribute(name,value){this.attrs[name]=String(value);}
   append(...nodes){this.children.push(...nodes);}
   replaceChildren(...nodes){this.children=nodes;this.textContent='';}
   close(){this.open=false;}
@@ -20,6 +21,7 @@ test('only the latest simultaneous media list response is rendered', async () =>
  assetsEl.querySelector=key=>assetElements.get(key);
  globalThis.document={createElement:()=>new Element()};
  globalThis.window={LTMedia:{privateAssetName:()=>null}};
+ globalThis.location={origin:'https://example.test'};
  globalThis.fetch=()=>new Promise(resolve=>pending.push(resolve));
  const form={querySelector:key=>key==='[data-media-slot]'?slot:key==='[type=submit]'?new Element():null,elements:{url:{value:''}}};
  const response=()=>Response.json({subject:'user',usedBytes:1,quotaBytes:100,maxItems:200,items:[{name:'a.png',mime:'image/png',size:1,createdAt:'2026-01-01'}]});
@@ -33,15 +35,16 @@ test('only the latest simultaneous media list response is rendered', async () =>
   pending[0](response()); await first;
   await new Promise(resolve=>setImmediate(resolve));
   assert.equal(assetElements.get('[data-assets]').children.length,1,'older response is ignored');
- } finally {globalThis.document=oldDocument;globalThis.fetch=oldFetch;globalThis.window=oldWindow;}
+ } finally {globalThis.document=oldDocument;globalThis.fetch=oldFetch;globalThis.window=oldWindow;globalThis.location=oldLocation;}
 });
 
 // #256-3 2단계: onUploaded·imagesOnly 옵션. 옵션이 없으면 기존 순간 폼 동작이 그대로여야 한다.
 function uploaderHarness({ onUploaded = null, imagesOnly = false } = {}) {
  const oldDocument=globalThis.document,oldFetch=globalThis.fetch,oldWindow=globalThis.window,oldLocation=globalThis.location;
  class Element {
-  constructor(){this.children=[];this.listeners={};this.textContent='';this.open=false;this.hidden=false;this.disabled=false;this.innerHTML='';this.files=[];}
+  constructor(){this.children=[];this.listeners={};this.textContent='';this.open=false;this.hidden=false;this.disabled=false;this.innerHTML='';this.files=[];this.attrs={};}
   addEventListener(name,fn){this.listeners[name]=fn;}
+  setAttribute(name,value){this.attrs[name]=String(value);}
   append(...nodes){this.children.push(...nodes);}
   replaceChildren(...nodes){this.children=nodes;this.textContent='';}
   close(){this.open=false;}
