@@ -161,6 +161,13 @@ test('952 실행: 부팅이 끝나면 synced 안내가 토스트에 뜬다(기�
       const page = await ctx.newPage();
       try {
         await page.goto(`${base}/v41/?account=1`, { waitUntil: 'load' });
+        // #1103: 안내는 차례로 온다 — 첫 트리 판·새 소식 띠를 닫으면 정보 안내가 그 자리에 뜬다.
+        if (!await page.evaluate(() => document.getElementById('tree-tips')?.hidden)) await page.click('#tree-tips-close');
+        await page.waitForFunction(() => {
+          const card = document.getElementById('updates-card'), toast = document.getElementById('toast');
+          return (card && !card.hidden) || (toast && !toast.hidden && toast.textContent.includes('불러왔어요'));
+        }, null, { timeout: 10000 });
+        if (!await page.evaluate(() => document.getElementById('updates-card')?.hidden)) await page.click('#updates-dismiss');
         await page.waitForFunction((want) => {
           const toast = document.getElementById('toast');
           return !!toast && !toast.hidden && toast.textContent === want;
@@ -211,6 +218,12 @@ test('1076 실행: synced 안내는 첫 진입 1번, 화면 이동 0번, 계정 
     const page = await ctx.newPage();
     try {
       await page.goto(`${base}/v41/?account=1`, { waitUntil: 'load' });
+      if (!await page.evaluate(() => document.getElementById('tree-tips')?.hidden)) await page.click('#tree-tips-close');
+      await page.waitForFunction(() => {
+        const card = document.getElementById('updates-card'), toast = document.getElementById('toast');
+        return (card && !card.hidden) || (toast && !toast.hidden && toast.textContent.includes('불러왔어요'));
+      }, null, { timeout: 10000 });
+      if (!await page.evaluate(() => document.getElementById('updates-card')?.hidden)) await page.click('#updates-dismiss');
       await page.waitForFunction(() => window.__toastShows === 1, null, { timeout: 20000 });
       for (const view of ['track59-sketchbook.html', 'track56-network.html']) {
         await page.evaluate((v) => document.querySelector(`button[data-view="${v}"]`)?.click(), view);
@@ -225,4 +238,49 @@ test('1076 실행: synced 안내는 첫 진입 1번, 화면 이동 0번, 계정 
       assert.equal(await page.evaluate(() => document.getElementById('toast').hidden), true, '계정 메뉴를 열면 안내가 바로 사라진다');
     } finally { await ctx.close(); }
   } finally { await browser.close(); server.close(); }
+});
+
+import { createNoticeQueue } from '../public/v41/shell/notice-queue.mjs';
+
+test('#1103: 세 안내는 한 줄을 차례로 지나가고 동시에 1개만 보인다', () => {
+  let clock = 1000;
+  const visible = [];
+  const q = createNoticeQueue({ now: () => clock });
+  const show = id => visible.push(id);
+  const hide = id => { const i = visible.indexOf(id); if (i >= 0) visible.splice(i, 1); assert.equal(visible.length <= 1, true); };
+  assert.equal(q.request('tips', { show: () => show('tips'), hide: () => hide('tips') }), true);
+  assert.equal(q.request('updates', { show: () => show('updates'), hide: () => hide('updates') }), true);
+  assert.equal(q.request('toast', { show: () => show('toast'), hide: () => hide('toast'), maxWait: 5000 }), true);
+  assert.deepEqual(visible, ['tips'], '먼저 온 안내가 떠 있다');
+  assert.equal(q.visibleCount(), 1);
+  assert.deepEqual(q.pendingIds().sort(), ['toast', 'updates']);
+  q.release('tips');
+  assert.deepEqual(visible, ['updates'], '그다음 ②');
+  q.release('updates');
+  assert.deepEqual(visible, ['toast'], '마지막 ③');
+  assert.equal(q.visibleCount(), 1);
+});
+
+test('#1103: 정보 안내는 5초 넘게 기다리면 건너뛴다', () => {
+  let clock = 1000;
+  const visible = [];
+  const q = createNoticeQueue({ now: () => clock });
+  q.request('tips', { show: () => visible.push('tips'), hide: () => {} });
+  q.request('toast', { show: () => visible.push('toast'), hide: () => {}, maxWait: 5000 });
+  clock += 5001;
+  q.release('tips');
+  assert.deepEqual(visible, ['tips'], '5초가 지난 정보 안내는 뜨지 않는다');
+  assert.equal(q.visibleCount(), 0);
+  assert.equal(q.currentId(), null);
+});
+
+test('#1103: 우선순위가 앞서는 안내는 나중에 와도 먼저 뜬다', () => {
+  const visible = [];
+  const q = createNoticeQueue();
+  q.request('updates', { show: () => visible.push('updates'), hide: () => { visible.splice(visible.indexOf('updates'), 1); } });
+  q.request('tips', { show: () => visible.push('tips'), hide: () => { visible.splice(visible.indexOf('tips'), 1); } });
+  assert.deepEqual(visible, ['tips'], '안내 판이 새 소식 띠를 선점');
+  assert.deepEqual(q.pendingIds(), ['updates']);
+  q.release('tips');
+  assert.deepEqual(visible, ['updates'], '밀린 새 소식 띠가 그다음에 뜬다');
 });

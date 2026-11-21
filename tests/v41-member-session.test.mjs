@@ -199,3 +199,25 @@ test('#1045 서버 개정이 앞선 기기 보관분은 기존 충돌 안내를 
   assert.ok(status.actions.some(action=>action.name==='pull'),'최신 기록 불러오기 선택지가 있다');
   assert.equal(writes.length,0,'충돌 상태에서는 요청을 보내지 않는다');
 });
+
+// A-07(#1056): 형식(400)·크기(413) 거부는 서버 문구와 백업만 — 같은 본 재전송인 재시도는 붙지 않는다.
+test('400·413 거부는 서버 문구와 백업 단추만, 연결 끊김은 재시도를 유지한다',async()=>{
+  const cases=[
+    {status:400,code:'invalid_document',message:'기록 형식을 확인해 주세요.',want:'rejected'},
+    {status:413,code:'payload_too_large',message:'보내는 기록이 너무 커요. 일부만 나눠서 저장해 주세요.',want:'rejected'},
+    {status:0,code:'network',message:null,want:'offline'}
+  ];
+  for(const c of cases){
+    const {session}=setup({put:()=>({ok:false,status:c.status,code:c.code,message:c.message})});
+    await session.start();
+    session.apply('new',fields);
+    const status=await session.act('retry');
+    assert.equal(status.phase,c.want,`${c.status}: 단계`);
+    if(c.status===0) assert.equal(status.detail,'서버에 저장되지 않았어요. 이 화면을 닫기 전에 다시 시도해 주세요.');
+    else assert.equal(status.detail,c.message,`${c.status}: 서버 문구 그대로`);
+    const names=status.actions.map(a=>a.name);
+    if(c.status===0) assert.deepEqual(names,['retry'],'연결 끊김은 재시도');
+    else assert.deepEqual(names,['backup'],`${c.status}: 재시도 없이 백업만`);
+    session.dispose();
+  }
+});
