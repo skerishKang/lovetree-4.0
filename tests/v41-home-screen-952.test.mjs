@@ -406,6 +406,14 @@ test('#1087 카드 바꾸기·숫자 두 줄·숫자 누르기', { skip: REQUIRE
       await frame.locator('.recent-menu').waitFor({ state: 'visible', timeout: 5000 });
       const items = await frame.locator('.recent-menu button').allTextContents();
       assert.ok(items.some(text => text.includes('마지막에 담은 순간')) && items.some(text => text.includes('무작위')), '바꾸기 목록 ' + JSON.stringify(items));
+      const menuFit = await frame.locator('.recent-menu').evaluate(el => {
+        const list = el.querySelector('.recent-menu-list');
+        for (let i = 0; i < 20; i += 1) { const b = document.createElement('button'); b.textContent = '트리 ' + i; list.append(b); }
+        const r = el.getBoundingClientRect();
+        return { top: Math.round(r.top), bottom: Math.round(r.bottom), viewport: el.ownerDocument.documentElement.clientHeight, scrollable: list.scrollHeight > list.clientHeight };
+      });
+      assert.ok(menuFit.top >= 0 && menuFit.bottom <= menuFit.viewport, '목록이 화면 안에 있다: ' + JSON.stringify(menuFit));
+      assert.ok(menuFit.scrollable, '목록 안에서만 스크롤된다: ' + JSON.stringify(menuFit));
       await h.page.keyboard.press('Escape');
       assert.equal(await frame.locator('.recent-menu').count(), 0, 'Esc로 닫힌다');
 
