@@ -376,3 +376,94 @@ test('#1026 마지막 순간 영상은 확인 전 실패를 보이지 않고 높
     }
   }finally{await browser.close()}
 });
+
+test('#1087 카드 바꾸기·숫자 두 줄·숫자 누르기', { skip: REQUIRE952 ? false : skip952, timeout: 180000 }, async () => {
+  if (skip952) assert.fail(skip952);
+  const at = i => '2026-11-' + String(i + 1).padStart(2, '0') + 'T00:00:00.000Z';
+  let tree = createTree({ subject: '팬 트리', title: '팬 트리', date: '2026-11-20', emotion: '설렘', note: '순간', url: '' }, at(0));
+  tree = addMoment(tree, { title: '둘째', note: '', emotion: '설렘', date: '2026-11-21', url: '' }, tree.moments[0].id, at(1));
+  let inbox = createTree({ subject: '팬 트리', title: '모아둔 순간', date: '2026-11-19', emotion: '설렘', note: '모음', url: '' }, at(0));
+  inbox = addMoment(inbox, { title: '모은 것', note: '', emotion: '설렘', date: '2026-11-20', url: '' }, inbox.moments[0].id, at(1));
+  inbox.inbox = true;
+  const workspace = { revision: 1, state: { version: 1, trees: [tree, inbox], prefs: {} }, subject: 'visual-audit-fake', writeSubjectBound: true, savedAt: at(2) };
+  const browser = await chromium952.launch({ headless: true });
+  try {
+    const h = await boot952(browser, { member: true, routes: {
+      '/api/workspace': route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(workspace) }),
+      '/api/shares': route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, shares: [{ id: 's'.repeat(24), treeId: tree.id, status: 'active' }] }) }),
+      '/api/community/stats': route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ trees: 11, moments: 42 }) })
+    } });
+    try {
+      const frame = h.frame;
+      await frame.locator('.home-count-line').first().waitFor({ state: 'visible', timeout: 15000 });
+      const groups = frame.locator('.home-action-group');
+      assert.equal(await groups.count(), 3);
+      for (const group of await groups.all()) assert.equal(await group.locator('.home-count-line').count(), 2, '단추마다 두 줄');
+      const texts = await groups.evaluateAll(es => es.map(e => [...e.querySelectorAll('.home-count-line')].map(row => row.textContent.trim())));
+      assert.deepEqual(texts, [['순간 4', '모아둔 2'], ['공개 트리 11', '공개 순간 42'], ['트리 2', '공개 트리 1']], JSON.stringify(texts));
+
+      await frame.locator('.recent-change').click();
+      await frame.locator('.recent-menu').waitFor({ state: 'visible', timeout: 5000 });
+      const items = await frame.locator('.recent-menu button').allTextContents();
+      assert.ok(items.some(text => text.includes('마지막에 담은 순간')) && items.some(text => text.includes('무작위')), '바꾸기 목록 ' + JSON.stringify(items));
+      const menuFit = await frame.locator('.recent-menu').evaluate(el => {
+        const list = el.querySelector('.recent-menu-list');
+        for (let i = 0; i < 20; i += 1) { const b = document.createElement('button'); b.textContent = '트리 ' + i; list.append(b); }
+        const r = el.getBoundingClientRect();
+        return { top: Math.round(r.top), bottom: Math.round(r.bottom), viewport: el.ownerDocument.documentElement.clientHeight, scrollable: list.scrollHeight > list.clientHeight };
+      });
+      assert.ok(menuFit.top >= 0 && menuFit.bottom <= menuFit.viewport, '목록이 화면 안에 있다: ' + JSON.stringify(menuFit));
+      assert.ok(menuFit.scrollable, '목록 안에서만 스크롤된다: ' + JSON.stringify(menuFit));
+      await h.page.keyboard.press('Escape');
+      assert.equal(await frame.locator('.recent-menu').count(), 0, 'Esc로 닫힌다');
+
+      await h.page.evaluate(() => { window.__msgs1087 = []; addEventListener('message', e => { if (e.data?.type) window.__msgs1087.push(e.data.type); }); });
+      await groups.nth(0).locator('.home-count button', { hasText: '순간 4' }).evaluate(el => el.click());
+      await frame.locator('.orbit-dialog .index-list').waitFor({ state: 'visible', timeout: 5000 });
+      await h.page.keyboard.press('Escape');
+      await frame.locator('.orbit-dialog[open]').waitFor({ state: 'detached', timeout: 5000 });
+      await groups.nth(0).locator('.home-count button', { hasText: '모아둔 2' }).evaluate(el => el.click());
+      await h.page.waitForFunction(() => window.__msgs1087.includes('lt41-cleanup'), null, { timeout: 5000 });
+      await groups.nth(1).locator('.home-count button', { hasText: '공개 트리 11' }).evaluate(el => el.click());
+      await groups.nth(1).locator('.home-count button', { hasText: '공개 순간 42' }).evaluate(el => el.click());
+      await h.page.waitForFunction(() => window.__msgs1087.filter(type => type === 'lt41-community').length >= 2, null, { timeout: 5000 });
+      await groups.nth(2).locator('.home-count button', { hasText: '트리 2' }).evaluate(el => el.click());
+      await groups.nth(2).locator('.home-count button', { hasText: '공개 트리 1' }).evaluate(el => el.click());
+      const navs = await h.page.evaluate(() => window.__msgs1087.filter(t => t === 'lt41-navigate').length);
+      assert.ok(navs >= 2, '트리 숫자 둘 → 서재 ' + navs);
+
+      await h.page.evaluate(() => document.querySelector('[data-home-moment="random"]').click());
+      await h.page.waitForFunction(() => window.__msgs1087.includes('lt41-home-moment'), null, { timeout: 5000 });
+    } finally { await close952(h); }
+  } finally { await browser.close(); }
+});
+
+test('#1087 390 새 소식 띠와 숫자 두 줄 겹침 0', { skip: REQUIRE952 ? false : skip952, timeout: 180000 }, async () => {
+  if (skip952) assert.fail(skip952);
+  const browser = await chromium952.launch({ headless: true });
+  try {
+    const h = await boot952(browser, { member: true, width: 390 });
+    try {
+      const frame = h.frame;
+      await frame.locator('.home-count-line').first().waitFor({ state: 'visible', timeout: 15000 });
+      await h.page.evaluate(() => {
+        const band = document.getElementById('updates-card');
+        band.hidden = false;
+        const height = Math.round(band.getBoundingClientRect().height);
+        document.getElementById('view').contentWindow.postMessage({ type: 'lt41-updates-band', height }, location.origin);
+      });
+      await h.page.waitForTimeout(700);
+      const geo = await h.page.evaluate(() => {
+        const band = document.getElementById('updates-card').getBoundingClientRect();
+        const doc = document.getElementById('view').contentDocument;
+        const root = doc.querySelector('#orbit').shadowRoot;
+        const rows = [...root.querySelectorAll('.home-count-line')].map(n => n.getBoundingClientRect());
+        const links = doc.defaultView.parent.document.querySelector('.home-links')?.getBoundingClientRect();
+        const area = r => Math.max(0, Math.min(band.right, r.right) - Math.max(band.left, r.left)) * Math.max(0, Math.min(band.bottom, r.bottom) - Math.max(band.top, r.top));
+        return { numbers: rows.map(area), links: links ? area(links) : 0, shift: getComputedStyle(root.querySelector('.center')).transform };
+      });
+      assert.ok(geo.numbers.length >= 2 && geo.numbers.every(v => Math.round(v) === 0), '띠와 숫자 두 줄 겹침 0: ' + JSON.stringify(geo));
+      assert.equal(Math.round(geo.links), 0, '띠와 바닥 링크 겹침 0: ' + JSON.stringify(geo));
+    } finally { await close952(h); }
+  } finally { await browser.close(); }
+});

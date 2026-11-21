@@ -183,48 +183,54 @@ const setHomeMoment=next=>{
  orbit?.recent?.set(picked.moment,picked.header);
  closeRecentMenu();
 };
-let recentMenu=null,recentMenuOpener=null;
-function closeRecentMenu(){recentMenu?.remove();recentMenu=null;if(recentMenuOpener){recentMenuOpener.setAttribute('aria-expanded','false');recentMenuOpener=null;}}
-function openRecentMenu(button){
- closeRecentMenu();
- recentMenuOpener=button;button.setAttribute('aria-expanded','true');
- recentMenu=document.createElement('div');recentMenu.className='recent-menu';recentMenu.setAttribute('role','menu');recentMenu.setAttribute('aria-label','첫 화면 카드 고르기');
- for(const item of homeMomentMenu(homeMomentValue,{trees:momentList?.trees||[]})){
-  const head=document.createElement('button');head.type='button';head.setAttribute('role','menuitemradio');
-  head.setAttribute('aria-checked',String(homeMomentValue.mode===item.mode));head.textContent=item.label;
-  if(item.mode!=='tree')head.dataset.mode=item.mode;
-  if(item.disabled)head.disabled=true;
-  head.onclick=()=>{closeRecentMenu();if(item.disabled||item.mode==='tree')return;setHomeMoment({mode:item.mode,momentId:item.mode==='pin'?homeMomentValue.momentId:'',treeId:item.mode==='pin'?homeMomentValue.treeId:''});};
-  recentMenu.append(head);
-  if(item.mode==='tree'){for(const tree of item.trees){
-   const tb=document.createElement('button');tb.type='button';tb.className='recent-menu-sub';tb.setAttribute('role','menuitemradio');
-   tb.setAttribute('aria-checked',String(homeMomentValue.mode==='tree'&&homeMomentValue.treeId===tree.id));tb.textContent=tree.label;
-   tb.onclick=()=>{closeRecentMenu();setHomeMoment({mode:'tree',treeId:tree.id});};
-   recentMenu.append(tb);
-  }}
+ let recentMenu=null,recentMenuOpener=null;
+ function closeRecentMenu(){
+  const menu=recentMenu,opener=recentMenuOpener;
+  recentMenu=null;recentMenuOpener=null;
+  if(menu){try{if(menu.open)menu.close();}catch{} menu.remove();}
+  if(opener)opener.setAttribute('aria-expanded','false');
  }
- shadow.append(recentMenu);
- // 카드 위 작은 목록 — 261117 대표 검수: 머리글 바로 위(카드 위쪽 가장자리에 붙여)로 열고,
- // 화면 위로 넘치면 아래로 연다. 좌우는 화면 안으로만 잡는다.
- const card=shadow.querySelector('.recent-card'),rect=card?.getBoundingClientRect(),menu=recentMenu.getBoundingClientRect();
- if(rect&&menu){
-  const width=Math.ceil(menu.width),height=Math.ceil(menu.height);
-  let left=Math.round(rect.left+rect.width/2-width/2),top=Math.round(rect.top-height);
-  if(top<8)top=Math.round(rect.bottom+6);
-  if(top+height>document.documentElement.clientHeight-8)top=Math.max(8,Math.round(document.documentElement.clientHeight-height-8));
-  if(top<8)top=8;
-  left=Math.max(8,Math.min(left,document.documentElement.clientWidth-width-8));
-  recentMenu.style.left=`${left}px`;recentMenu.style.top=`${top}px`;
+ function openRecentMenu(button){
+  closeRecentMenu();
+  recentMenuOpener=button;button.setAttribute('aria-expanded','true');
+  recentMenu=document.createElement('dialog');recentMenu.className='recent-menu';recentMenu.setAttribute('aria-label','첫 화면 카드 고르기');
+  const list=document.createElement('div');list.className='recent-menu-list';list.setAttribute('role','menu');
+  for(const item of homeMomentMenu(homeMomentValue,{trees:momentList?.trees||[]})){
+   const head=document.createElement('button');head.type='button';head.setAttribute('role','menuitemradio');
+   head.setAttribute('aria-checked',String(homeMomentValue.mode===item.mode));head.textContent=item.label;
+   if(item.mode!=='tree')head.dataset.mode=item.mode;
+   if(item.disabled)head.disabled=true;
+   head.onclick=()=>{closeRecentMenu();if(item.disabled||item.mode==='tree')return;setHomeMoment({mode:item.mode,momentId:item.mode==='pin'?homeMomentValue.momentId:'',treeId:item.mode==='pin'?homeMomentValue.treeId:''});};
+   list.append(head);
+   if(item.mode==='tree'){for(const tree of item.trees){
+    const tb=document.createElement('button');tb.type='button';tb.className='recent-menu-sub';tb.setAttribute('role','menuitemradio');
+    tb.setAttribute('aria-checked',String(homeMomentValue.mode==='tree'&&homeMomentValue.treeId===tree.id));tb.textContent=tree.label;
+    tb.onclick=()=>{closeRecentMenu();setHomeMoment({mode:'tree',treeId:tree.id});};
+    list.append(tb);
+   }}
+  }
+  recentMenu.append(list);
+  recentMenu.addEventListener('click',event=>{if(event.target===recentMenu)closeRecentMenu();});
+  recentMenu.addEventListener('cancel',event=>{event.preventDefault();const opener=recentMenuOpener;closeRecentMenu();opener?.focus();});
+  shadow.append(recentMenu);
+  recentMenu.showModal();
+  const card=shadow.querySelector('.recent-card'),rect=card?.getBoundingClientRect(),menu=recentMenu.getBoundingClientRect();
+  if(rect&&menu){
+   const width=Math.ceil(menu.width),height=Math.ceil(menu.height);
+   let left=Math.round(rect.left+rect.width/2-width/2),top=Math.round(rect.top-height-6);
+   if(top<8)top=Math.round(rect.bottom+6);
+   if(top+height>document.documentElement.clientHeight-8)top=Math.max(8,Math.round(document.documentElement.clientHeight-height-8));
+   if(top<8)top=8;
+   left=Math.max(8,Math.min(left,document.documentElement.clientWidth-width-8));
+   recentMenu.style.left=`${left}px`;recentMenu.style.top=`${top}px`;
+  }
+  recentMenu.querySelector('button:not([disabled])')?.focus();
  }
- const first=recentMenu.querySelector('button:not([disabled])');first?.focus();
-}
-shadow.addEventListener('click',event=>{
- const head=event.target.closest?.('[data-recent-head]');
- if(head){if(recentMenu)closeRecentMenu();else openRecentMenu(head);return;}
- if(recentMenu&&!event.target.closest?.('.recent-menu'))closeRecentMenu();
-});
-shadow.addEventListener('keydown',event=>{if(event.key==='Escape'&&recentMenu){event.stopPropagation();const opener=recentMenuOpener;closeRecentMenu();opener?.focus();}},true);
-// #942: 숫자는 해당 단추 바로 아래에만 둔다. 공개 집계는 기존 API를 재사용한다.
+  shadow.addEventListener('click',event=>{
+   const head=event.target.closest?.('[data-recent-head],[data-recent-change]');
+   if(head){if(recentMenu)closeRecentMenu();else openRecentMenu(head);return;}
+  });
+// #942·#1087: 숫자는 단추 바로 아래 두 줄로 둔다. 공개 집계는 기존 API를 재사용한다.
 const countLines=new Map();
 for(const button of centerButtons){
  if(button.hidden)continue;
@@ -233,21 +239,48 @@ for(const button of centerButtons){
  const line=document.createElement('div');line.className='home-count';line.hidden=true;line.setAttribute('data-lt-keep-clear','');
  group.append(line);countLines.set(button.dataset.do,line);
 }
-function showCount(key,text){
+function countItem(text,label,action){
+ const node=document.createElement(action?'button':'span');node.textContent=text;
+ if(action){node.type='button';node.setAttribute('aria-label',label);node.onclick=action;}
+ return node;
+}
+function showCount(key,items){
  const line=countLines.get(key);if(!line)return;
- line.textContent=text;line.hidden=false;return line;
+ line.replaceChildren();
+ for(let i=0;i<2;i+=1){
+  const row=document.createElement('span');row.className='home-count-line';
+  const item=items[i];
+  if(item)row.append(countItem(item.text,item.label,item.action));
+  line.append(row);
+ }
+ line.hidden=false;return line;
 }
 const inboxTree=(Array.isArray(context.trees)?context.trees:[]).find(t=>t?.inbox===true);
 const inboxCount=inboxTree?.moments?.length||0;
 const totalCount=momentList?.entries?.length||0;
+const openMoments=()=>orbit?.index?.('all');
+const openCommunity=()=>bridge.actions.community();
+const openTrees=()=>bridge.actions.navigate('trees');
 if(hasMoments){
- // #1010: '순간 3 ·모아둔 0' — flex 줄에서는 글자 끝 빈칸이 사라진다. 줄을 블록(text-align:center)으로 바꾸고
- // 글자 사이 공백(' · ')을 그대로 쓴다 — #994 계약(단추 아래 숫자 한 묶음)의 원래 구조를 유지한다.
- const line=showCount('moments',`순간 ${formatCount(totalCount)} · `);
- const inboxLine=document.createElement(inboxCount?'button':'span');inboxLine.textContent=`모아둔 ${formatCount(inboxCount)}`;
- if(inboxCount){inboxLine.type='button';inboxLine.setAttribute('aria-label',`모아둔 순간 ${inboxCount}개 정리하기`);inboxLine.onclick=()=>bridge.actions.cleanup();}
- line.append(inboxLine);
- showCount('trees',`트리 ${formatCount(momentList?.trees?.length||0)}`);
+ showCount('moments',[
+  {text:`순간 ${formatCount(totalCount)}`,label:`내 순간 ${totalCount}개 목록 열기`,action:openMoments},
+  inboxCount?{text:`모아둔 ${formatCount(inboxCount)}`,label:`모아둔 순간 ${inboxCount}개 정리하기`,action:()=>bridge.actions.cleanup()}:null
+ ]);
+ showCount('trees',[
+  {text:`트리 ${formatCount(momentList?.trees?.length||0)}`,label:`트리 ${momentList?.trees?.length||0}개 서재 열기`,action:openTrees},
+  null
+ ]);
+ (async()=>{try{
+  const answer=await fetch('/api/shares',{headers:{accept:'application/json'}});
+  if(!answer.ok)return;
+  const body=await answer.json();
+  const ids=new Set((Array.isArray(body?.shares)?body.shares:[]).filter(s=>s?.status==='active').map(s=>s.treeId).filter(Boolean));
+  const n=ids.size;
+  showCount('trees',[
+   {text:`트리 ${formatCount(momentList?.trees?.length||0)}`,label:`트리 ${momentList?.trees?.length||0}개 서재 열기`,action:openTrees},
+   {text:`공개 트리 ${formatCount(n)}`,label:`공개 트리 ${n}개 서재에서 보기`,action:openTrees}
+  ]);
+ }catch{ /* 공개 트리 수를 못 받으면 둘째 줄은 빈 자리로 둔다. */ }})();
 }
 (async()=>{const ctrl=new AbortController();const timer=setTimeout(()=>ctrl.abort(),8000);try{
  const answer=await fetch('/api/community/stats',{headers:{accept:'application/json'},signal:ctrl.signal});
@@ -256,20 +289,28 @@ if(hasMoments){
  const valid=n=>typeof n==='number'&&Number.isFinite(n)&&n>=0;
  if(!valid(stats?.trees)||(!hasMoments&&!valid(stats?.moments)))return;
  const prefix=loggedIn?'':'예시 ';
- const label=hasMoments?`공개 트리 ${formatCount(stats.trees)}`:`${prefix}공개 트리 ${formatCount(stats.trees)} · 순간 ${formatCount(stats.moments)}`;
- showCount('community',label);
-}catch{ /* 집계를 받지 못하면 해당 줄만 숨긴다. */ }finally{clearTimeout(timer);}})();
+ showCount('community',hasMoments?[
+  {text:`공개 트리 ${formatCount(stats.trees)}`,label:`공개 트리 ${stats.trees}개 둘러보기`,action:openCommunity},
+  {text:`공개 순간 ${formatCount(stats.moments)}`,label:`공개 순간 ${stats.moments}개 둘러보기`,action:openCommunity}
+ ]:[
+  {text:`${prefix}공개 트리 ${formatCount(stats.trees)}`,label:`공개 트리 ${stats.trees}개 둘러보기`,action:openCommunity},
+  {text:`순간 ${formatCount(stats.moments)}`,label:`공개 순간 ${stats.moments}개 둘러보기`,action:openCommunity}
+ ]);
+ }catch{ /* 집계를 받지 못하면 해당 줄만 숨긴다. */ }finally{clearTimeout(timer);}})();
 const infoStyle=document.createElement('style');
 infoStyle.textContent=`.home-add-top{margin-top:12px;font-size:15px}@media(max-width:650px){.home-add-top{font-size:14px}}
 .center .actions{gap:18px;align-items:flex-start}
 .center .actions .home-action-group{flex:1 1 0%;max-width:176px;min-width:0;display:flex;flex-direction:column;align-items:stretch;gap:5px}
 .center .actions .home-action-group .subtleBtn{flex:none;width:100%;max-width:none}
-.home-count{display:block;text-align:center;font-size:12px;line-height:16px;min-height:16px;white-space:nowrap;color:var(--lt-muted);font-variant-numeric:tabular-nums}
+.home-count{display:block;text-align:center;font-size:12px;line-height:16px;min-height:32px;white-space:nowrap;color:var(--lt-muted);font-variant-numeric:tabular-nums}
+.home-count-line{display:block;min-height:16px;line-height:16px}
 .home-count[hidden]{display:none}
-.home-count button{font:inherit;font-size:13px;line-height:inherit;color:var(--lt-gold);padding:0;border:0;background:none;cursor:pointer;pointer-events:auto}
+.home-count button{font:inherit;font-size:13px;line-height:inherit;color:var(--lt-gold);padding:0;border:0;background:none;cursor:pointer;pointer-events:auto;text-decoration:none}
+.home-count button:hover{color:var(--lt-gold-deep,#fff0c7);text-decoration:underline;text-underline-offset:3px}
+.home-count button:focus-visible{outline:2px solid #e8b8c9;outline-offset:2px;border-radius:4px}
 :host([data-lt-theme=garden]) .home-count button{color:var(--lt-gold-ink)}
 @media(max-width:480px){.center .actions:not([data-inline]){flex-direction:column;align-items:center}.center .actions:not([data-inline]) .home-action-group{flex:none;width:100%;max-width:240px}.center .actions[data-inline] .home-action-group{max-width:150px}}
-.recent-menu{position:fixed;z-index:4000;min-width:220px;max-width:min(300px,86vw);max-height:min(60dvh,420px);overflow:auto;padding:6px;border:1px solid var(--lt-line,rgba(255,255,255,.14));border-radius:14px;background:#07070c;box-shadow:0 18px 44px rgba(0,0,0,.5)}.recent-menu button{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;min-height:44px;padding:0 12px;border:0;border-radius:8px;background:none;cursor:pointer;font:inherit;font-size:13px;color:#e6ddef;text-align:left}.recent-menu button[aria-checked="true"]{color:var(--lt-gold,#ffe6a6)}.recent-menu button[disabled]{color:var(--lt-muted,#9b98a6);cursor:default}.recent-menu button:focus-visible{outline:2px solid #e8b8c9;outline-offset:-2px}.recent-menu .recent-menu-sub{padding-left:22px;font-size:12px;color:#cfc6dd}:host([data-lt-theme=garden]) .recent-menu{background:var(--lt-paper,#f7f0e8);border-color:var(--lt-line-paper)}:host([data-lt-theme=garden]) .recent-menu button{color:var(--lt-ink)}:host([data-lt-theme=garden]) .recent-menu button[aria-checked="true"]{color:var(--lt-gold-ink)}:host([data-lt-theme=garden]) .recent-menu button[disabled],:host([data-lt-theme=garden]) .recent-menu .recent-menu-sub{color:var(--lt-muted)}`;
+.recent-menu{position:fixed;z-index:4000;inset:auto;margin:0;min-width:220px;max-width:min(300px,86vw);max-height:calc(100dvh - 16px);overflow:hidden;padding:6px;border:1px solid var(--lt-line,rgba(255,255,255,.14));border-radius:14px;background:#07070c;box-shadow:0 18px 44px rgba(0,0,0,.5)}.recent-menu::backdrop{background:transparent}.recent-menu-list{display:grid;gap:1px;max-height:min(60dvh,420px);overflow-y:auto;overscroll-behavior:contain}.recent-menu button{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;min-height:44px;padding:0 12px;border:0;border-radius:8px;background:none;cursor:pointer;font:inherit;font-size:13px;color:#e6ddef;text-align:left}.recent-menu button[aria-checked="true"]{color:var(--lt-gold,#ffe6a6)}.recent-menu button[disabled]{color:var(--lt-muted,#9b98a6);cursor:default}.recent-menu button:focus-visible{outline:2px solid #e8b8c9;outline-offset:-2px}.recent-menu .recent-menu-sub{padding-left:22px;font-size:12px;color:#cfc6dd}:host([data-lt-theme=garden]) .recent-menu{background:var(--lt-paper,#f7f0e8);border-color:var(--lt-line-paper)}:host([data-lt-theme=garden]) .recent-menu button{color:var(--lt-ink)}:host([data-lt-theme=garden]) .recent-menu button[aria-checked="true"]{color:var(--lt-gold-ink)}:host([data-lt-theme=garden]) .recent-menu button[disabled],:host([data-lt-theme=garden]) .recent-menu .recent-menu-sub{color:var(--lt-muted)}`;
 shadow.append(infoStyle);
 const mobileFit=document.createElement('style');mobileFit.textContent='@media(max-width:768px){.topbar{gap:12px;flex-wrap:wrap;align-items:center;padding:8px 12px}.top-actions{gap:6px;flex-shrink:0;flex-wrap:wrap;margin-left:auto}.topbar .menuBtn{white-space:nowrap;padding:10px 9px;font-size:14px}.actions .subtleBtn{font-size:14px}.center .center-note{font-size:14px}.hint{font-size:14px}}';shadow.append(mobileFit);
 // #380 5번: 첫 화면 오른쪽 위 "보기 ▾" 메뉴(테마·움직임·카드 출처)는 없앴다.
@@ -278,8 +319,10 @@ const mobileFit=document.createElement('style');mobileFit.textContent='@media(ma
 addEventListener('message',event=>{
  if(event.origin!==location.origin)return;
  const type=event.data?.type;
- if(type==='lt41-motion'){motionPaused=!!event.data.paused;orbit?.motion?.set?.(motionPaused);}
- else if(type==='lt41-home-cards'){location.reload();}
+  if(type==='lt41-motion'){motionPaused=!!event.data.paused;orbit?.motion?.set?.(motionPaused);}
+  else if(type==='lt41-home-cards'){location.reload();}
+  else if(type==='lt41-home-moment-set'){setHomeMoment(event.data.value);}
+
  // #481: 제목 보기도 궤도가 그릴 때 값을 박아 두므로(orbit의 titleMode) 바뀌면 다시 떠야 한다.
  // 날짜 표기와 같은 판정 — 지금 그린 값과 다르고, 기기 미러가 이미 그 값일 때만(다시 뜨면 새 값으로 그려진다).
  else if(type==='lt41-title-display'){
