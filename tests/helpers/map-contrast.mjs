@@ -98,6 +98,15 @@ export async function measureMapPixelsInPage([png, overlaysArg]) {
     }
     return backdrops.get(row);
   };
+  // #1126: 라벨 자기 픽셀을 배경으로 잡으면 글자색과 배경색이 같아 1.01:1이 나온다(390 cluster 재현).
+  // 라벨 박스 바로 밖의 실제 그려진 픽셀을 배경 표본으로 쓴다(기준 4.5 그대로).
+  const labelBackground = (t) => {
+    const mid = (t.top + t.bottom) / 2;
+    for (const [x, y] of [[t.left - 10, mid], [t.right + 10, mid], [t.left - 10, t.bottom + 8], [t.right + 10, t.bottom + 8]]) {
+      if (visible(x, y)) return rgb(x, y);
+    }
+    return backdrop(mid);
+  };
   const sample = (x, y, bg = backdrop(y)) => ({ ratio: ratio(rgb(x, y), bg), fg: hex(rgb(x, y)), bg: hex(bg), x, y });
   const rows = [];
   const add = (role, id, samples, q = .85, why = null) => {
@@ -143,7 +152,7 @@ export async function measureMapPixelsInPage([png, overlaysArg]) {
       if (!visible(px, py)) { why.hidden++; continue; }
       // Hub numbers sit on a coloured/white disc. The centre of its upper
       // inner rim is a rendered background pixel, away from the two digits.
-      const bg = t.role === 'hub-number' ? rgb(t.x, t.y - 9) : backdrop(py);
+      const bg = t.role === 'hub-number' ? rgb(t.x, t.y - 9) : labelBackground(t);
       samples.push(sample(px, py, bg));
     }
     add(t.role, `${i}:${t.text}`, samples, .1, why); textBounds.push(t);
