@@ -37,9 +37,10 @@ export function newlyPublishedTrees(before, after, minCount = AUTO_PUBLISH_MIN_M
 // afterShow는 띄운 뒤에도 다시 잰다 — 화면이 늦게 편성되면(기록 불러오기·화면 교대 애니메이션·글꼴)
 // beforeShow 시점의 좌표가 낡아 알림이 화면 아래쪽 내용을 덮을 수 있다. 자리(--lt-toast-bottom)는
 // 살아 있는 값이라 다시 재면 떠 있는 알림이 그 자리로 옮겨 앉는다.
-export function createNotifier({ $, now = () => Date.now(), holdMs = NOTICE_HOLD_MS, hideMs = NOTICE_HIDE_MS, setTimer = setTimeout, clearTimer = clearTimeout, beforeShow = () => {}, afterShow = () => {} } = {}) {
+export function createNotifier({ $, now = () => Date.now(), holdMs = NOTICE_HOLD_MS, hideMs = NOTICE_HIDE_MS, setTimer = setTimeout, clearTimer = clearTimeout, beforeShow = () => {}, afterShow = () => {}, onHide = () => {} } = {}) {
   let holdUntil = 0;
   let timer = null;
+  const hide = () => { if (!$('toast')?.hidden) { $('toast').hidden = true; onHide(); } };
   // hold=true는 사용자의 방금 행동에 대한 결과 안내다. holdMs가 지나기 전에는 다른 안내로 덮지 않는다.
   function notify(text, { hold = false, action = null } = {}) {
     const at = now();
@@ -49,10 +50,10 @@ export function createNotifier({ $, now = () => Date.now(), holdMs = NOTICE_HOLD
     // #453 C2: 설정과 무관한 지난 안내가 창 안에 남지 않도록, 설정이 열려 있을 때만 그 줄에 쓴다.
     if ($('settings-feedback') && $('account-settings')?.open) $('settings-feedback').textContent = text;
     paintToast($('toast'), text, action);
-    if ($('account-settings')?.open) $('toast').hidden = true;
+    if ($('account-settings')?.open) hide();
     else { beforeShow(); $('toast').hidden = false; afterShow(); setTimer(afterShow, 600); setTimer(afterShow, 1400); }
     clearTimer(timer);
-    timer = setTimer(() => { $('toast').hidden = true; }, hideMs);
+    timer = setTimer(hide, hideMs);
     return true;
   }
   // #1076: 같은 열쇠의 안내는 세션(셸 인스턴스)에서 한 번만. 화면 이동·다시 띄우기로 다시 오는

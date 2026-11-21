@@ -344,7 +344,7 @@ test('1028 실행: 트리 목록만 스크롤하고 동작 칸은 고정이며 �
             };
           });
           assert.equal(m.menuScroll, 0, `${width}/${theme}/${count}: 메뉴 바깥 스크롤 ${m.menuScroll}px`);
-          assert.ok(m.menuOverflow.startsWith('visible'), `${width}/${theme}/${count}: 메뉴 자체 스크롤 없음(${m.menuOverflow})`);
+          assert.ok(/^(visible|hidden)/.test(m.menuOverflow), `${width}/${theme}/${count}: 메뉴 자체 스크롤 없음(${m.menuOverflow})`);
           assert.equal(m.docScroll, 0, `${width}/${theme}/${count}: 문서 스크롤 ${m.docScroll}px`);
           assert.equal(m.listExists, true, `${width}/${theme}/${count}: 목록 칸 존재`);
           assert.deepEqual(m.actionsInView, [true, true, true, true], `${width}/${theme}/${count}: 동작 4개 화면 안`);
@@ -392,12 +392,51 @@ test('1028 실행: 트리 목록만 스크롤하고 동작 칸은 고정이며 �
         }
       }
     }
-    // 휴대폰은 바꾸지 않고 현재 모양만 캡처한다.
+    // #1079: 휴대폰도 데스크탑과 같은 규칙 — 목록만 스크롤하고 동작 칸·찾기 칸이 고정된다.
     for (const theme of ['night', 'garden']) {
-      const { ctx, page } = await openMenu(390, 844, theme, 15);
-      if (SHOT) { mkdirSync(SHOT, { recursive: true }); await page.screenshot({ path: `${SHOT}/phone-390-${theme}-15.png` }); }
-      numbers.push({ width: 390, theme, count: 15, phoneCapture: true });
-      await ctx.close();
+      for (const count of [1, 15]) {
+        const { ctx, page, trees } = await openMenu(390, 844, theme, count);
+        const m = await page.evaluate(() => {
+          const pop = document.getElementById('tree-popover');
+          const list = pop.querySelector('.tree-list');
+          const search = pop.querySelector('[data-tree-search]');
+          const actions = ['new', 'manage', 'share', 'tags'].map((a) => pop.querySelector(`[data-tree-action="${a}"]`));
+          const inView = (el) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.top >= 0 && r.bottom <= innerHeight; };
+          const active = pop.querySelector('[data-tree-id][aria-checked="true"]');
+          const ar = active?.getBoundingClientRect(), lr = list?.getBoundingClientRect();
+          return {
+            menuScroll: pop.scrollHeight - pop.clientHeight,
+            menuOverflow: getComputedStyle(pop).overflow,
+            docScroll: document.documentElement.scrollHeight - document.documentElement.clientHeight,
+            listExists: !!list,
+            listOver: list ? list.scrollHeight - list.clientHeight : -1,
+            searchExists: !!search,
+            searchOutsideList: !!search && !search.closest('.tree-list'),
+            actionsInView: actions.map((a) => !!a && inView(a)),
+            listScrollTop: list ? Math.round(list.scrollTop) : -1,
+            chosenInList: !!(lr && ar && ar.top >= lr.top - 1 && ar.bottom <= lr.bottom + 1)
+          };
+        });
+        assert.equal(m.menuScroll, 0, `390/${theme}/${count}: 메뉴 바깥 스크롤 ${m.menuScroll}px`);
+        assert.ok(/^(visible|hidden)/.test(m.menuOverflow), `390/${theme}/${count}: 메뉴 자체 스크롤 없음(${m.menuOverflow})`);
+        assert.equal(m.docScroll, 0, `390/${theme}/${count}: 문서 스크롤 ${m.docScroll}px`);
+        assert.equal(m.listExists, true, `390/${theme}/${count}: 목록 칸 존재`);
+        assert.deepEqual(m.actionsInView, [true, true, true, true], `390/${theme}/${count}: 동작 4개 화면 안`);
+        assert.equal(m.searchExists, count >= 8, `390/${theme}/${count}: 찾기 칸 ${count >= 8 ? '있음' : '없음'}`);
+        if (count === 15) {
+          assert.ok(m.listOver > 0, `390/${theme}/15: 목록만 스크롤 가능(${m.listOver}px)`);
+          assert.equal(m.searchOutsideList, true, `390/${theme}/15: 찾기 칸은 목록 밖에 고정`);
+          assert.ok(m.listScrollTop > 0 && m.chosenInList, `390/${theme}/15: 고른 트리로 목록이 스크롤됨`);
+          await page.fill('[data-tree-search]', trees.at(-1).subject);
+          const found = await page.evaluate(() => [...document.querySelectorAll('#tree-popover [data-tree-id]')].filter((b) => !b.hidden).map((b) => b.querySelector('.tree-name').textContent.trim()));
+          assert.deepEqual(found, [trees.at(-1).subject], `390/${theme}/15: 찾기로 한 줄만 남음`);
+        } else {
+          assert.equal(m.listOver, 0, `390/${theme}/1: 넘치지 않으면 목록 스크롤 0`);
+        }
+        if (SHOT) { mkdirSync(SHOT, { recursive: true }); await page.screenshot({ path: `${SHOT}/phone-390-${theme}-${count}.png` }); }
+        numbers.push({ width: 390, theme, count, ...m });
+        await ctx.close();
+      }
     }
     if (SHOT) writeFileSync(`${SHOT}/numbers.json`, JSON.stringify(numbers, null, 2));
     console.log('MENU_1028_NUMBERS', JSON.stringify(numbers));

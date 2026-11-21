@@ -230,7 +230,7 @@ for(const button of centerButtons){
  if(button.hidden)continue;
  const group=document.createElement('div');group.className='home-action-group';
  button.before(group);group.append(button);
- const line=document.createElement('div');line.className='home-count';line.hidden=true;
+ const line=document.createElement('div');line.className='home-count';line.hidden=true;line.setAttribute('data-lt-keep-clear','');
  group.append(line);countLines.set(button.dataset.do,line);
 }
 function showCount(key,text){
