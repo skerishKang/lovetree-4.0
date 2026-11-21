@@ -2572,6 +2572,21 @@ test('#987 보드 첫 줄과 모바일 셸 겹침·현재 표시', { skip: REQUI
         check(menu.underline.includes('underline') && menu.shadow === 'none' && menu.border === '0px' && menu.others.every(x => !x.includes('underline')), '접힌 메뉴 ' + theme + ' ' + JSON.stringify(menu));
         await page.locator('#header-overflow').getByRole('menuitem', { name: '책', exact: true }).click();
         await page.frameLocator('#view').locator('.moment[data-moment]').first().waitFor();
+        // #1078: 한마디 줄 오른쪽 끝이 ＋ 단추에 덮이지 않는다(상세 창을 열기 전, 단추가 보이는 자리에서 잰다).
+        await page.waitForTimeout(250);
+        const story = await page.evaluate(() => {
+          const f = document.querySelector('#view'), r = f.getBoundingClientRect();
+          const el = f.contentDocument.querySelector('#whyMargin [data-story-open]');
+          const fab = document.getElementById('mobile-add');
+          if (!el || !fab || !fab.getBoundingClientRect().width) return { skipped: true };
+          const d = el.getBoundingClientRect(), a = fab.getBoundingClientRect();
+          return {
+            area: Math.max(0, Math.min(r.x + d.right, a.right) - Math.max(r.x + d.left, a.left)) * Math.max(0, Math.min(r.y + d.bottom, a.bottom) - Math.max(r.y + d.top, a.top)),
+            right: Math.round(r.x + d.right), fabLeft: Math.round(a.left), text: el.textContent.trim()
+          };
+        });
+        console.log('#1078 book', theme, JSON.stringify(story));
+        check(story.skipped || (story.area === 0 && story.right <= story.fabLeft), '책 한마디 줄 × ＋ 단추 겹침 0 ' + theme + ' ' + JSON.stringify(story));
         const frame = await (await page.locator('#view').elementHandle()).contentFrame();
         await frame.evaluate(() => { const c = [...document.querySelectorAll('.moment[data-moment]')].find(e => e.getBoundingClientRect().width > 0); showDetail(c.dataset.moment); });
         await frame.locator('#detailSide:not([hidden])').waitFor();

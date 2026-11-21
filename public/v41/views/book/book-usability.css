@@ -325,7 +325,8 @@ html[data-v41-screen=book] .story-tip span{color:var(--lt-ink);opacity:1}
 html[data-v41-screen=book] .why-margin .moment-meta-copy,html[data-v41-screen=book] .why-margin .story-action,html[data-v41-screen=book] .why-margin .story-tip span{font-size:12px}
 html[data-v41-screen=book][data-lt-theme=garden] .why-margin{padding:0;border:0;border-radius:0;background:transparent;box-shadow:none}
 /* On one-page mobile, reserve the space before navigation so the tip and relation remain in the viewport. */
-html[data-book-shape=phone][data-v41-screen=book] .why-margin{order:1;top:auto;bottom:auto;margin:0 10px;position:static;left:auto;transform:none;width:auto}
+/* #1078: 오른쪽 아래 ＋ 단추(56px·right 14px) 자리를 비우고, 한마디 줄의 오른쪽 끝이 단추 밑으로 가지 않게 한다(390만). */
+html[data-book-shape=phone][data-v41-screen=book] .why-margin{order:1;top:auto;bottom:auto;margin:0 76px 0 10px;position:static;left:auto;transform:none;width:auto}
 html[data-book-shape=phone][data-v41-screen=book] .nav-pill{order:2;position:static;bottom:auto;margin:2px auto 0}
 html[data-book-shape=phone][data-v41-screen=book] .branch-tab{order:3}
 html[data-book-shape=phone][data-v41-screen=book] .yt-play.is-vertical,
