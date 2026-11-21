@@ -594,9 +594,11 @@ performance.mark('m2'); const elements=cards.map(c=>{const b=document.createElem
   // #429 2/2: 깊이는 크기와 밝기로만 — 카드는 언제나 불투명(opacity 1, 비침 없음), blur는 쓰지 않는다.
   // #593: 밝기·순서는 궤도 키프레임이 아니라 배치 때 한 번만 쓴다(키프레임에 넣으면 컴포지터로 못 넘어간다).
   const depth=(!demo&&cards.length<=8)?1:Math.max(0,Math.min(1,(z+520)/1040));
-  const fv=(0.78+0.22*depth).toFixed(3),bv=((1-depth)*2.2).toFixed(2);
+  // #1086: 깊이는 매 프레임 조금씩 바뀐다. 0.02 단위로 반올림해 같은 값이면 쓰지 않는다 —
+  // filter 쓰기는 카드 전체 스타일 재계산을 부르므로 값이 같을 때 쓰면 안 된다.
+  const fv=(Math.round((0.78+0.22*depth)*50)/50).toFixed(2),bv=(Math.round((1-depth)*2.2*50)/50).toFixed(2);
   const depthFilter=`brightness(${fv}) blur(${bv}px)`;
-  if(el.__b!==depthFilter){el.__b=depthFilter;el.style.filter=`brightness(${fv}) blur(${bv}px)`;}
+  if(el.__b!==depthFilter){el.__b=depthFilter;el.style.filter=depthFilter;}
   // 사선 잘림 방지: .world를 flat으로 바꾸고 카드가 각자 perspective를 쓰므로, 겹침 순서도 깊이(z)가 아니라
   // 화면 배율로 매긴다 — scale 큰(가까운) 카드가 위. #586 계약은 그대로: z-index는 64 단계 밴드로 묶어
   // 궤도 굽기·끌기 자리 쓰기 때만 다시 쓴다(매 프레임이 아니다) — 밴드 안의 순서 오차는 배율(깊이) 차가 작아 눈에 띄지 않는다.
