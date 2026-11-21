@@ -42,6 +42,7 @@ import {mountUpdates} from './updates.mjs';
 import {connectionSignature} from './shell/panel-dirty.mjs';
 import {createLocation} from './shell/location.mjs';
 import {createNotifier, syncedNoticeText, newlyPublishedTrees} from './shell/notice.mjs';
+import {createNoticeQueue} from './shell/notice-queue.mjs';
 import {paintLoginLinks,paintThemeControls,applyTheme as applyThemeFor,toggleTheme as toggleThemeFor} from './shell/theme.mjs';
 import {normalizeTitleDisplay, normalizeAccentColor, normalizeDateStyle, normalizeStartPlace, normalizeShareView, normalizeHomeMoment, coverModeOf, normalizeCoverDesign} from './domain.mjs';
 import {backfillVideoTitles} from './title-backfill.mjs';
@@ -61,12 +62,26 @@ function placeToast(){let above=0;for(const el of document.querySelectorAll('.ho
 addEventListener('resize',placeToast);
 addEventListener('orientationchange',()=>setTimeout(placeToast,0));
 // ＋ 단추(body.lt-fab-ok)·새 소식 카드가 늦게 뜨거나 닫힐 때도 다시 잰다.
-for(const el of [$('updates-card')].filter(Boolean))new MutationObserver(placeToast).observe(el,{attributes:true,attributeFilter:['hidden']});
+placeToast();
 new MutationObserver(placeToast).observe(document.body,{attributes:true,attributeFilter:['class']});
 placeToast();
 // 안내 한 벌(#353 후속): 담기·중복·로그인 필요 안내(hold)가 상태 안내보다 먼저 일정 시간 보인다.
 const shellNotice=createNotifier({$,beforeShow:placeToast,afterShow:()=>{placeToast();setTimeout(placeToast,600);setTimeout(placeToast,1400);}});
-function notify(text,options){return shellNotice.notify(text,options);}
+// #1103: 세 안내가 같은 줄을 차례로 지나간다. 판·띠가 떠 있는 동안 토스트는 띄우지 않는다.
+const noticeQueue=createNoticeQueue();
+function hideToast(){const toast=$('toast');if(toast)toast.hidden=true;}
+function noticeBlocked(){const tips=$('tree-tips'),card=$('updates-card');return !!(tips&&!tips.hidden)||!!(card&&!card.hidden);}
+function notify(text,options){if(noticeBlocked())return false;return shellNotice.notify(text,options);}
+// 새 소식 띠도 같은 줄을 탄다 — 먼저 뜬 안내가 내려간 뒤에 올라온다.
+const updatesCardBox=$('updates-card');
+if(updatesCardBox)new MutationObserver(()=>{
+  placeToast();
+  if(updatesCardBox.hidden){if(noticeQueue.currentId()==='updates')noticeQueue.release('updates');}
+  else if(noticeQueue.currentId()!=='updates'){
+    updatesCardBox.hidden=true;
+    noticeQueue.request('updates',{show:()=>{hideToast();updatesCardBox.hidden=false;},hide:()=>{updatesCardBox.hidden=true;}});
+  }
+}).observe(updatesCardBox,{attributes:true,attributeFilter:['hidden']});
 // #977: 서버 기록에 형식이 어긋난 트리가 섞여 있으면 그 트리만 빼고 셸을 연다(읽기는 workspace-guard.mjs).
 // #986: 서버가 읽지 못해 빼 둔 트리는 개수(quarantined)만 응답에 온다 — 화면 안내에 함께 센다.
 // 화면에는 짧은 안내 한 줄, 콘솔에는 어느 트리가 왜 어긋났는지 한 줄만 남긴다 — 같은 기록을 다시 읽어도 한 번만.
@@ -837,14 +852,17 @@ function syncTreeTips(takeFocus=true){
   // 이슈 933: 새 트리 만들기(첫 여정) 화면에서는 안내 판을 띄우지 않는다 — 아직 트리를 만든 적이 없는데
   // '첫 트리를 만들었어요' 판이 미리보기 카드를 덮었다. 트리를 실제로 만든 뒤(다른 화면)에만 띄운다.
   const wanted=current!=='first-journey.html'&&tipsWanted({owned:!!member?.snapshot().owned,treeCount:model?.trees?.length||0,momentCount,seen:readTipsSeen(localStorage),source});
-  if(wanted)showTreeTips(takeFocus);else closeTreeTips(false);
+  if(wanted){
+   if(accountMenuOpen()||anyDialogOpen())showTreeTips(takeFocus);
+   else noticeQueue.request('tips',{show:()=>{hideToast();showTreeTips(takeFocus);},hide:()=>{const box=$('tree-tips');if(box)box.hidden=true;}});
+  }else{noticeQueue.release('tips');closeTreeTips(false);}
 }
 // 창이 닫힐 때마다 안내를 다시 맞춘다 — 열려 있는 창이 없어지면 숨긴 안내를 다시 띄운다(#845).
 document.addEventListener('close',()=>tipsFollowDialogs(),true);
 // 계정 메뉴가 열리고 닫힐 때마다 안내와의 순서를 다시 맞춘다(메뉴를 여는 길이 여럿이라 상태 변화를 본다).
 const accountPopoverBox=$('account-popover');
 if(accountPopoverBox)new MutationObserver(()=>tipsFollowAccountMenu()).observe(accountPopoverBox,{attributes:true,attributeFilter:['hidden']});
-$('tree-tips-close')?.addEventListener('click',()=>closeTreeTips());
+$('tree-tips-close')?.addEventListener('click',()=>{closeTreeTips();noticeQueue.release('tips');});
 // #571: 안내의 [이름 바꾸기]는 트리 관리 창을 바로 열고 이름 칸에 초점을 둔다(openTreeManager가 초점을 옮긴다).
 // 창이 열려 있는 동안은 안내 판이 숨고(#845), 이름 창을 닫고 돌아오면 두 번째 안내와 알겠어요가 다시 보인다 —
 // 이때 '봤음'으로 적지 않는다. 순간 추가 창이 열려 있는 동안에는 안내가 숨어 누르지 않는다(#845 결정).
@@ -1055,7 +1073,13 @@ function memberStatus(status){
   // 알림은 실패·오프라인·충돌(저장 안내 떠)과 사용자가 누른 큰 동작의 완료 확인만 띄운다.
   const momentCount=(model?.trees||[]).reduce((n,tree)=>n+((tree.moments||[]).length),0);
   // #1076: 서버 기록을 처음 불러왔을 때만 한 번 — 화면 이동·다시 띄우기로 오는 synced 상태에서는 띄우지 않는다.
-  if(!previousDirty)shellNotice.notifyOnce(syncedNoticeText({writable:status.writable,previousDirty,momentCount}),'synced:'+String(member?.snapshot()?.subject||'session'));
+  if(!previousDirty){
+   const text=syncedNoticeText({writable:status.writable,previousDirty,momentCount}),key='synced:'+String(member?.snapshot()?.subject||'session');
+   noticeQueue.request('toast',{maxWait:5000,
+    show:()=>shellNotice.notifyOnce(text,key),
+    hide:hideToast
+   });
+  }
   // 소개 질문(2026-11-16 대표 결정): 아직 안 물은 트리 중 순간 3개 이상인 것이 있으면 묻는다 —
   // 2→3 저장 직후가 대표 경로다. 직전 관측 스냅샷(상태마다 재촬영)은 두지 않는다(#718 원인): 재촬영하면
   // syncing에서 before==after가 되어 전이를 놓친다. 질문은 트리당 1회(discoverAsked), 백필(이미 켜진)은 건너뛴다.
