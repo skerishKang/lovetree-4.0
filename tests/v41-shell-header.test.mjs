@@ -187,7 +187,7 @@ test('renderAccount: 이메일이 없으면 subject를 쓰지 않고 점·내 �
 
 // #368 보완 1: 이메일을 메뉴를 열 때가 아니라 로그인 직후(updateAccountControls) 불러온다.
 test('updateAccountControls: 로그인 직후 계정 API를 불러 동그라미·라벨이 이메일을 쓰게 한다', async () => {
-  const email = 'fan02@love.io';
+  const email = 'fay@example.test';
   let calls = 0;
   const h = harness({ owned: true, accountApi: { account: async () => { calls += 1; return { ok: true, confirmKind: 'email', email }; } } });
   try {
@@ -232,7 +232,7 @@ test('updateAccountControls: 이메일 없는 계정은 한 번만 부르고, �
 });
 
 test('updateAccountControls: 로그아웃하면 이메일을 지워 다음 계정에 남기지 않는다', async () => {
-  const email = 'fan02@love.io';
+  const email = 'kate@example.test';
   const h = harness({ owned: true, accountApi: { account: async () => ({ ok: true, confirmKind: 'email', email }) } });
   try {
     h.header.updateAccountControls();
@@ -249,7 +249,7 @@ test('updateAccountControls: 로그아웃하면 이메일을 지워 다음 계�
 });
 
 test('loadAccountEmail: 계정 API가 이메일을 주면 갱신하고, 아니면 그대로 둔다', async () => {
-  const email = 'fan02@love.io';
+  const email = 'kate@example.test';
   const loaded = harness({ owned: true, accountApi: { account: async () => ({ ok: true, confirmKind: 'email', email }) } });
   try {
     await loaded.header.loadAccountEmail();
@@ -279,7 +279,7 @@ test('#465 4: 계정 정보를 부르는 동안에도 동그라미가 깜빡이�
 });
 
 test('#465 4: 저장본·직전 글자가 없으면 지금처럼 나였다가 이메일 글자로 바뀐다', async () => {
-  const email = 'fan02@love.io';
+  const email = 'fay@example.test';
   const h = harness({ owned: true, accountApi: { account: async () => ({ ok: true, confirmKind: 'email', email }) } });
   h.header.renderAccount();
   assert.equal(h.els['account-avatar'].textContent, '나', '다른 근거가 없으면 나로 시작(기존 동작)');
@@ -295,7 +295,7 @@ test('#465 4: 저장본·직전 글자가 없으면 지금처럼 나였다가 �
 });
 
 test('#465 4: 저장본 표시 이름이 있으면 이메일과 무관하게 표시 이름 첫 글자를 유지한다', async () => {
-  const h = harness({ owned: true, cachedName: '윤슬지기', accountApi: { account: async () => ({ ok: true, confirmKind: 'email', email: 'fan02@love.io' }) } });
+  const h = harness({ owned: true, cachedName: '윤슬지기', accountApi: { account: async () => ({ ok: true, confirmKind: 'email', email: 'kate@example.test' }) } });
   await h.header.loadAccountEmail();
   assert.equal(h.els['account-avatar'].textContent, '윤', '표시 이름 첫 글자가 이메일 글자보다 우선(#368 규칙)');
 });
@@ -316,23 +316,52 @@ test('#1134: 401 뒤 상단 단추·계정 메뉴가 같은 로그아웃 상태�
   } finally { h.restore(); }
 });
 
-test('#1134: authRequired()는 헤더의 로그아웃 상태 한 벌을 부른다(반쯤 로그아웃 금지)', () => {
+// #1134 후속: 401 뒤 바로 로그아웃하지 않고 2초·5초 두 번 세션을 다시 확인한다.
+function authHarness(checkResults) {
   const savedLoc = globalThis.location;
   globalThis.location = { search: '', pathname: '/v41/', hash: '' };
   const calls = [];
+  const checks = [...checkResults];
+  const auth = createAuth({
+    $: id => ({ textContent: '', hidden: false }),
+    getMember: () => ({ snapshot: () => ({ owned: true }) }),
+    notify: t => calls.push(['notify', t]),
+    closeAccountMenu: () => calls.push(['close']),
+    openEditor: () => {},
+    showScreen: () => {},
+    onAuthRequired: () => calls.push(['paintAuthExpired']),
+    sleep: async () => {},
+    checkSession: async () => { const v = checks.length ? checks.shift() : false; calls.push(['check', v]); return v; }
+  });
+  return { auth, calls, restore: () => { globalThis.location = savedLoc; } };
+}
+
+test('#1134 후속: 401 한 번 뒤 다시 확인 성공 → 화면 그대로·안내 없음', async () => {
+  const h = authHarness([true]);
   try {
-    const auth = createAuth({
-      $: id => ({ textContent: '', hidden: false }),
-      getMember: () => ({ snapshot: () => ({ owned: true }) }),
-      notify: t => calls.push(['notify', t]),
-      closeAccountMenu: () => calls.push(['close']),
-      openEditor: () => {},
-      showScreen: () => {},
-      onAuthRequired: () => calls.push(['paintAuthExpired'])
-    });
-    auth.authRequired();
-    assert.deepEqual(calls, [['paintAuthExpired'], ['close'], ['notify', '로그인 확인이 필요해요. 다시 로그인해 주세요.']], '헤더 상태 동기화를 먼저 부르고 안내를 띄운다');
-  } finally { globalThis.location = savedLoc; }
+    await h.auth.authRequired();
+    assert.deepEqual(h.calls, [['check', true]], '한 번만 다시 확인하고 아무 표시도 하지 않는다');
+  } finally { h.restore(); }
 });
 
+test('#1134 후속: 두 번 다 401 → 로그아웃 상태·안내 1번', async () => {
+  const h = authHarness([false, false]);
+  try {
+    await h.auth.authRequired();
+    assert.deepEqual(h.calls, [
+      ['check', false], ['check', false],
+      ['paintAuthExpired'], ['close'],
+      ['notify', '로그인 확인이 필요해요. 다시 로그인해 주세요.']
+    ], '두 번째 확인도 401일 때만 로그아웃 상태로 바꾸고 안내를 한 번 띄운다');
+  } finally { h.restore(); }
+});
 
+test('#1134 후속: 동시에 401 여러 개 → 다시 확인 한 벌', async () => {
+  const h = authHarness([false, false]);
+  try {
+    await Promise.all([h.auth.authRequired(), h.auth.authRequired(), h.auth.authRequired()]);
+    assert.deepEqual(h.calls.filter(c => c[0] === 'check').length, 2, '401이 여러 번 와도 확인은 두 번(2초·5초)만');
+    assert.equal(h.calls.filter(c => c[0] === 'paintAuthExpired').length, 1, '로그아웃 상태 반영은 한 번만');
+    assert.equal(h.calls.filter(c => c[0] === 'notify').length, 1, '안내도 한 번만');
+  } finally { h.restore(); }
+});

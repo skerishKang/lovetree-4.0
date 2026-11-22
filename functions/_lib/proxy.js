@@ -59,6 +59,9 @@ const ALLOWED = new Map([
   // 첫 화면 둘러보기 숫자(261116 PR 2) — 로그인 없이 읽는 공개 집계. GET만 넘긴다.
   ['/api/community/stats', new Set(['GET'])],
   ['/api/community/me/favorites', new Set(['GET'])],
+  // #1098 3단계 '내 소식' — 로그인한 사람의 목록(열면 읽음 표시)·안 읽은 수(읽기만).
+  ['/api/community/my-news', new Set(['GET'])],
+  ['/api/community/my-news/unread-count', new Set(['GET'])],
   ['/api/community/admin/reports', new Set(['GET'])],
   // #627 3단계 '다른 팬 보기' — 같은 꼬리표의 공개 순간(GET만).
   ['/api/public/tag-moments', new Set(['GET'])],

@@ -82,7 +82,7 @@
 - 레인 공통: 커밋에 `Co-authored-by` 꼬리말을 넣지 않고, 자동 병합은 `gh pr merge <번호> --squash --auto --subject "<제목>" --body "<본문>"`처럼 `--subject`·`--body`를 모두 명시한다(생략하면 squash 본문에 도구 꼬리말이 모인다).
 - 검사: `.github/workflows/commit-hygiene.yml`이 PR마다 제목·본문·커밋 메시지를 읽어 비밀값 목록의 낱말이나 도구 꼬리말이 있으면 실패한다. 비밀값이 없는 곳(포크 PR)에서는 꼬리말만 검사한다.
 - 낱말 경계로 비교한다 — 다른 낱말 속 글자는 걸리지 않고, 한글은 조사가 붙어도 같은 이름으로 본다.
-- 커밋 전 `git var GIT_AUTHOR_IDENT`로 작성자가 `skerishKang <36503867+skerishKang@users.noreply.github.com>`인지 확인한다(컴1 전역 설정이 Kilo였다 — CTO가 저장소 설정을 고쳤다).
+- 커밋 전 `git var GIT_AUTHOR_IDENT`로 작성자가 `skerishKang <skerishKang@users.noreply.example.test>`인지 확인한다(컴1 전역 설정이 Kilo였다 — CTO가 저장소 설정을 고쳤다).
 - 병합은 `gh pr merge <번호> --squash --subject "<PR 제목> (#<번호>)" --body "<한두 줄 요약>"`처럼 제목·본문을 직접 넣는다. GitHub 기본 메시지를 쓰지 않는다(작성자가 다르면 `Co-authored-by`가 자동으로 붙는다 — #998 병합 커밋 051dc70 사례).
 - `gh pr merge --body`에는 **PR 본문 첫 단락을 그대로** 넣는다(새로 쓰지 않는다) — PR 본문은 이미 검사를 통과했기 때문(#1022). 한국어로만 쓰고 한자가 섞이지 않았는지 직접 확인한다.
 
