@@ -316,6 +316,9 @@ test('#1018 떠다니는 카드는 바닥 링크 줄·새 소식 카드 자리�
           return maxCross;
         });
         assert.ok(crossed > 0, `${width}·${theme}: 궤도 경로가 바닥 자리를 지난다(최대 교차 ${Math.round(crossed)}px²) — 빈손 통과가 아니다`);
+        // 위상을 바꾼 뒤 가드가 카드 숨김 클래스를 반영하고 글꼴·그림이 그려질 때까지 기다린다.
+        await h.page.evaluate(() => document.fonts.ready);
+        await h.frame.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
         await h.page.waitForTimeout(150);
         const samples = [];
         for (let i = 0; i < 7; i++) { samples.push(await h.frame.evaluate(SAMPLE1018)); if (i < 6) await h.page.waitForTimeout(500); }
