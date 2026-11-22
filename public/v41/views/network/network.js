@@ -16,7 +16,7 @@ const themeSignature=()=>[document.documentElement.getAttribute('data-lt-theme')
 let drawnTheme=themeSignature();
 function refreshTheme(){const next=themeSignature();if(next===drawnTheme)return;drawnTheme=next;tokenVersion++;tokenCache.clear();paletteV=-1;scheduleDraw()}
 new MutationObserver(refreshTheme).observe(document.documentElement,{attributes:true,attributeFilter:['data-lt-theme','data-lt-board-theme']});
-addEventListener('message',e=>{if(e.origin!==location.origin||e.data?.type!=='lt41-board-theme')return;const v=plateValue(e.data.value);if(document.documentElement.getAttribute('data-lt-board-theme')!==v)document.documentElement.setAttribute('data-lt-board-theme',v);refreshTheme();paintNetBgMenu()});
+addEventListener('message',e=>{if(e.origin!==location.origin||e.data?.type!==globalThis.LT41_MSG.boardTheme)return;const v=plateValue(e.data.value);if(document.documentElement.getAttribute('data-lt-board-theme')!==v)document.documentElement.setAttribute('data-lt-board-theme',v);refreshTheme();paintNetBgMenu()});
 // #891(13:59 대표 결정): 지도 도구 줄에도 보드와 같은 '배경 ▾' 드롭을 둔다(그물형·동심원형 같은 머리줄).
 // 보드와 같은 저장값(lt41.boardTheme)을 쓰고, 고른 값은 셸이 한 곳에서 저장한다.
 function netBgChoice(){try{const s=localStorage.getItem('lt41.boardTheme');return s==='paper'||s==='night'?s:'auto'}catch{return 'auto'}}
@@ -28,7 +28,7 @@ document.addEventListener('click',e=>{if(menu.hidden)return;if(e.target.closest?
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!menu.hidden){menu.hidden=true;btn.setAttribute('aria-expanded','false');btn.focus()}});
 menu.addEventListener('click',e=>{const item=e.target.closest?.('.lt-bg-item');if(!item)return;menu.hidden=true;btn.setAttribute('aria-expanded','false');
 // #951 ①: ⋯ 안에는 배경과 함께 도움말이 들어간다 — 도움말은 판을 바꾸지 않고 안내만 띄운다.
-if(item.id==='helpBtn'){toast('점을 누르면 첫 순간에서 지나온 길이 밝아지고, 선에 올리면 연결 이유가 보여요.');return}try{if(window.parent!==window)window.parent.postMessage({type:'lt41-board-theme-choice',value:item.dataset.bg},location.origin)}catch{}});
+if(item.id==='helpBtn'){toast('점을 누르면 첫 순간에서 지나온 길이 밝아지고, 선에 올리면 연결 이유가 보여요.');return}try{if(window.parent!==window)window.parent.postMessage({type:globalThis.LT41_MSG.boardThemeChoice,value:item.dataset.bg},location.origin)}catch{}});
 })();
 const PALETTE=()=>{if(paletteV!==tokenVersion){paletteV=tokenVersion;palette=Array.from({length:6},(_,i)=>paint('group-'+(i+1)))}return palette};
 const colorOf=n=>{let idx=n.colorIndex??n.cluster??n.index??0;try{if(typeof state!=='undefined'&&state.view==='tag'&&n.kind==='moment')idx=TAG_INDEX.get(n.id)??idx}catch{}return PALETTE()[((idx)%6+6)%6]};const rgba=(hex,a)=>{const[r,g,b]=hexRgb(hex);return `rgba(${r},${g},${b},${a})`};
@@ -129,7 +129,7 @@ const dateText=v=>{try{return window.LTTitle?.formatDisplayDate?.(v)||v||''}catc
 /* #951 ⑤: 판의 날짜는 '날짜·감정·트리' 한 줄(#dBasic)에 있다 — 표기 값이 바뀌면 그 줄을 그 순간으로 다시 그린다. */addEventListener('lt-date-style-changed',()=>{const n=state.selected;if(n&&typeof paintDetail==='function')paintDetail(n);});
 // #368 3차: 설정의 '관계 지도 기본 보기' — 셸이 lt41-network-view로 알려 주면 지금 화면도 같은 보기로 바꾼다.
 // #1095: 옛 저장값 'concentric'(동심원)은 새 'tag'(꼬리표 묶음)로 읽는다.
-addEventListener('message',e=>{if(e.data?.type!=='lt41-network-view')return;const v=e.data.value==='concentric'?'tag':e.data.value;if((v==='network'||v==='tag'||v==='time')&&state.view!==v)setView(v);});
+addEventListener('message',e=>{if(e.data?.type!==globalThis.LT41_MSG.networkView)return;const v=e.data.value==='concentric'?'tag':e.data.value;if((v==='network'||v==='tag'||v==='time')&&state.view!==v)setView(v);});
 function setupMobileRibbon(){const r=$('mobileRibbon');if(!r)return;r.innerHTML='';const o=document.createElement('button');o.textContent='첫 순간 보기';o.className='origin';o.onclick=()=>selectMoment(FIRST,true);r.appendChild(o);
 const zm=document.createElement('button');zm.textContent='−';zm.setAttribute('aria-label','지도 축소(−)');zm.onclick=()=>{zoomAt(.84);scheduleDraw()};r.appendChild(zm);const zp=document.createElement('button');zp.textContent='＋';zp.setAttribute('aria-label','지도 확대(＋)');zp.onclick=()=>{zoomAt(1.18);scheduleDraw()};r.appendChild(zp);
 const addFit=()=>{const b=document.createElement('button');b.textContent='전체 맞춤';b.onclick=()=>{fitView();document.querySelector('.hero')?.classList.add('dim');scheduleDraw()};r.appendChild(b)};
@@ -169,7 +169,7 @@ function measureInsets(){const box=el=>{if(!el)return null;const cs=getComputedS
 function layoutNetwork(){NETFIT=LT56Model.networkLayout(LTDEMO.moments,{box:BOX,dotR:5,firstR:20,gap:8,hubR:9,edges:LTDEMO.edges,groups:GROUPS.map(g=>g.ids)});CLUSTERS.forEach((c,i)=>{const h=NETFIT.hubs[i];if(h){c.x=h.x;c.y=h.y}else if(NETFIT.fan||NETFIT.compact){/* #583 부채꼴 나무: 묶음 점이 뜻하는 묶음 자리가 없다(한 고리에 펼침) — 화면 밖에 치워 점·이름표·누르기에서 치운다 */c.x=-9999;c.y=-9999}})}
 function layoutTag(){TAGFIT=LT56Model.tagLayout(LTDEMO.moments,{box:BOX,dotR:5,firstR:12,gap:8,hubR:12,edges:LTDEMO.edges});TAG_CLUSTERS.forEach((c,i)=>{const h=TAGFIT.hubs?.[i];if(h){c.x=h.x;c.y=h.y}else if(TAGFIT.empty){const p=TAGFIT.points[c.id]||{x:-9999,y:-9999};c.x=-9999;c.y=-9999}});if(TAGFIT.empty){TAG_CLUSTERS.forEach(c=>{c.x=-9999;c.y=-9999})}}
 function layoutTime(){TIMEFIT=LT56Model.timeLayout(LTDEMO.moments,{box:BOX,dotR:5,gap:8,hubR:9})}
-function paintTagEmpty(){const el=$('tagEmpty');if(!el)return;const show=state.view==='tag'&&!!TAGFIT?.empty;el.hidden=!show;if(show&&!el.dataset.wired){el.dataset.wired='1';const b=el.querySelector('button');if(b)b.onclick=()=>{try{parent.postMessage({type:'lt-suggest-request',momentIds:LTDEMO.moments.map(m=>m.id)},location.origin)}catch{}try{parent.postMessage({type:'lt41-open-tags',suggest:true},location.origin)}catch{}toast('꼬리표 정리에서 제목으로 제안받을 수 있어요.')}}}
+function paintTagEmpty(){const el=$('tagEmpty');if(!el)return;const show=state.view==='tag'&&!!TAGFIT?.empty;el.hidden=!show;if(show&&!el.dataset.wired){el.dataset.wired='1';const b=el.querySelector('button');if(b)b.onclick=()=>{try{parent.postMessage({type:globalThis.LT41_MSG.openTags,suggest:true},location.origin)}catch{}toast('꼬리표 정리에서 제목으로 제안받을 수 있어요.')}}}
 function applyPoints(fit){if(!fit)return;for(const n of nodes){const p=fit.points[n.id];if(p){n.x=p.x;n.y=p.y}}}
 // 전체 보기 = 배율 1(배치가 이미 화면 좌표로 상자에 맞춰져 있다).
 function fitView(){state.scale=1;state.tx=0;state.ty=0}
@@ -450,7 +450,7 @@ watch();new MutationObserver(watch).observe(document.body,{childList:true});})()
    결정적 배치로 같은 자리에 다시 그린다. 고른 순간·보기·배율·열린 상세 판은 그대로 둔다(재적재 0).
    실제 기록(서버 트리) 기준 — 예시·공유는 읽기 전용이라 이 알림이 오지 않는다. */
 addEventListener('message',e=>{
- if(e.origin!==location.origin||e.source!==window.parent||e.data?.type!=='lt41-moments-saved')return;
+ if(e.origin!==location.origin||e.source!==window.parent||e.data?.type!==globalThis.LT41_MSG.momentsSaved)return;
  if(typeof LTDEMO.refresh!=='function'||!LTDEMO.refresh())return;
  const selId=state.selected?.id||null,detailOpen=$('detail').classList.contains('open');
  const view=state.view,scale=state.scale,tx=state.tx,ty=state.ty;

@@ -1,3 +1,4 @@
+import { MSG } from '../public/v41/frame-messages.mjs';
 import test from 'node:test';
 import { readFile } from 'node:fs/promises';
 import assert from 'node:assert/strict';
@@ -237,7 +238,7 @@ test('952 실행: 쉬운 추가 창은 처음에 담기가 막혀 있고, 안내
 
 // ---- 이슈 638 ②: 주소 형태별 영상 ID (media-preview.js를 실제로 실행해 본다) ----
 // #1060: 정본이 등록한 globalThis.LTYouTubeId 를 vm 에도 넣는다.
-const scope = { window: {}, URL, URLSearchParams, LTYouTubeId: globalThis.LTYouTubeId, LTEscapeHtml: globalThis.LTEscapeHtml };
+const scope = { LT41_MSG: MSG, window: {}, URL, URLSearchParams, LTYouTubeId: globalThis.LTYouTubeId, LTEscapeHtml: globalThis.LTEscapeHtml };
 vm.runInNewContext(readFileSync(new URL('../public/v41/media-preview.js', import.meta.url), 'utf8'), scope);
 const media = scope.window.LTMedia;
 const VIDEO_ID = 'dQw4w9WgXcQ';

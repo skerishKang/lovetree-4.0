@@ -1,3 +1,4 @@
+import { MSG } from './frame-messages.mjs';
 // #1072 A-16: 화면 공용 오류 기록 — report(error, where) 한 곳.
 // - 콘솔에 한 줄을 남긴다(개발자 도구에서 바로 본다).
 // - 메모리에는 '최근 20건'만 둔다. 한 건은 메시지·위치·시각뿐이다 — 값·토큰·메일 주소는 기록하지 않는다.
@@ -34,7 +35,7 @@ export function report(error, where) {
   // 안쪽 화면이면 셸 기록에도 올린다(의견 보내기는 셸 한 곳에서 보낸다).
   try {
     if (typeof window !== 'undefined' && window.parent && window.parent !== window) {
-      window.parent.postMessage({type: 'lt41-report', message: clean(message, 200), where: clean(where, 80), at}, location.origin);
+      window.parent.postMessage({type: MSG.report, message: clean(message, 200), where: clean(where, 80), at}, location.origin);
     }
   } catch {}
 }
@@ -44,7 +45,7 @@ if (typeof window !== 'undefined' && typeof addEventListener === 'function' && w
   addEventListener('message', (event) => {
     if (event.origin !== location.origin) return;
     const data = event.data;
-    if (!data || data.type !== 'lt41-report') return;
+    if (!data || data.type !== MSG.report) return;
     remember(data.message, data.where, data.at);
   });
 }

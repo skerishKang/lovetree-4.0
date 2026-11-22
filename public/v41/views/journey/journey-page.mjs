@@ -1,3 +1,4 @@
+import { MSG } from '../../frame-messages.mjs';
 // 첫 여정 페이지 스크립트 (#231 후속, 2026-11-09).
 // public/v41/views/first-journey.html 안에 있던 인라인 모듈을 그대로 옮겼다.
 // 조건·문구·id·순서·저장 키·lt41-* 메시지 변경 0. node에서 import할 수 있게
@@ -83,7 +84,7 @@ export function createJourneyPage(env = {}) {
   // 단독 미리보기에서는 이 화면이 같은 해시 규칙을 직접 기록해 뒤로가기를 검수할 수 있게 한다.
   function reportStep() {
     if (!embedded) return;
-    post({type: 'lt41-journey-step', step: state.step});
+    post({type: MSG.journeyStep, step: state.step});
   }
   function syncHistory(mode = 'push') {
     if (embedded) return;
@@ -379,13 +380,13 @@ export function createJourneyPage(env = {}) {
       }, 0);
       return;
     }
-    post({type: 'lt41-journey-save', draft});
+    post({type: MSG.journeySave, draft});
   }
 
   window.addEventListener('message', event => {
     if (event.origin !== location.origin || event.source !== window.parent) return;
-    if (event.data?.type === 'lt41-journey-goto') { goToStep(event.data.step); return; }
-    if (event.data?.type !== 'lt41-journey-result') return;
+    if (event.data?.type === MSG.journeyGoto) { goToStep(event.data.step); return; }
+    if (event.data?.type !== MSG.journeyResult) return;
     if (!applyResult(event.data)) return;
     state.phase = state.step === 2 ? 'bloom' : 'connected';
     render();
@@ -409,7 +410,7 @@ export function createJourneyPage(env = {}) {
     if (state.step === 4) {
       state.completed = true;
       finishJourneyDraft(storage);
-      if (embedded) post({type: 'lt41-journey-open-book', treeId: state.saved.treeId, firstMomentId: state.saved.momentId});
+      if (embedded) post({type: MSG.journeyOpenBook, treeId: state.saved.treeId, firstMomentId: state.saved.momentId});
       return;
     }
     const problem = journeyStepProblem(state.step, state.draft);
@@ -452,7 +453,7 @@ export function createJourneyPage(env = {}) {
 
   $('close').onclick = () => {
     if (!state.completed) { readForm(); persistDraft(); }
-    if (embedded) { post({type: 'lt41-journey-close'}); return; }
+    if (embedded) { post({type: MSG.journeyClose}); return; }
     // 단독 미리보기에서는 닫기가 곷 첫 화면으로 돌아간다(단계 기록은 뒤로가기용으로 남긴다).
     location.assign('/v41/');
   };
