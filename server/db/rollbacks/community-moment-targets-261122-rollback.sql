@@ -23,10 +23,33 @@ DELETE FROM lovetree_community_reactions WHERE target_kind = 'moment';
 -- 문단 3. 순간 단위 댓글 행을 지운다. 같은 idempotency 키를 트리 댓글에서 다시 쓰게 되는 충돌을 피하기 위해서다.
 DELETE FROM lovetree_community_comments WHERE target_kind = 'moment';
 
--- 문단 4. 댓글 표: 유일 제약을 원래 모양으로 되돌린다.
-ALTER TABLE lovetree_community_comments DROP CONSTRAINT IF EXISTS lovetree_community_comments_client_target_key;
-ALTER TABLE lovetree_community_comments
-  ADD CONSTRAINT lovetree_community_comments_product_id_subject_id_client_key_key UNIQUE (product_id, subject_id, client_key);
+-- 문단 4. 댓글 표: 유일 제약을 원래 모양으로 되돌린다. 옛 자동 이름은 63자에 잘려
+--   ('…_client_ke…') 실제 이름이 문서와 다를 수 있으므로, 지우고 만들 때 모두 정의로 판정한다(#1098 2단계 뒷수습).
+--   다시 만드는 제약 이름은 짧게 명시한다(뜻은 옛 것과 같다: 3칸 유일).
+DO $$
+DECLARE
+  constraint_name text;
+BEGIN
+  IF to_regclass('public.lovetree_community_comments') IS NULL THEN RETURN; END IF;
+  FOR constraint_name IN
+    SELECT conname
+    FROM pg_constraint
+    WHERE conrelid = 'lovetree_community_comments'::regclass AND contype = 'u'
+      AND pg_get_constraintdef(oid) ~ '^UNIQUE \(product_id, subject_id, client_key, target_kind, moment_id\)$'
+  LOOP
+    EXECUTE format('ALTER TABLE lovetree_community_comments DROP CONSTRAINT %I', constraint_name);
+    RAISE NOTICE '대상 5칸 유일 제약 % 제거', constraint_name;
+  END LOOP;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'lovetree_community_comments'::regclass AND contype = 'u'
+      AND pg_get_constraintdef(oid) ~ '^UNIQUE \(product_id, subject_id, client_key\)$'
+  ) THEN
+    EXECUTE 'ALTER TABLE lovetree_community_comments ADD CONSTRAINT lovetree_community_comments_legacy_client_key UNIQUE (product_id, subject_id, client_key)';
+    RAISE NOTICE '옛 3칸 유일 제약 복원 — lovetree_community_comments_legacy_client_key';
+  END IF;
+END
+$$;
 
 -- 문단 5. 반응 표: PK를 원래 모양으로 되돌린다(문단 2가 끝난 뒤에만 성공한다).
 ALTER TABLE lovetree_community_reactions DROP CONSTRAINT IF EXISTS lovetree_community_reactions_pkey;
