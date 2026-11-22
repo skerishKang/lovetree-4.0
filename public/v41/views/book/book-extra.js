@@ -27,7 +27,7 @@ const t=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt
 let lensPref=readLens(window.localStorage);
 try{lensOn=lensPref}catch{}
 /* 이슈 584: 돋보기는 아이콘 단추 — 글자 대신 SVG를 쓰고, 상태는 aria-pressed·말풍선으로 알린다. */
-function paintLensButton(){const b=$b('#lensBtn');if(!b)return;b.classList.toggle('active',lensPref);b.setAttribute('aria-pressed',String(lensPref));const tip='돋보기 — 마우스 근처를 크게 보기 · '+(lensPref?'켜짐':'꺼짐');b.setAttribute('data-lt-tip',tip);b.setAttribute('aria-label',tip)}
+function paintLensButton(){const b=$b('#lensBtn');if(!b)return;b.classList.toggle('active',lensPref);b.setAttribute('aria-pressed',String(lensPref));const tip='돋보기 — 마우스 근처를 크게 보기 · '+(lensPref?'켜짐':'꺼짐');b.setAttribute('data-lt-tip',tip);b.setAttribute('aria-label','찾기')}
 /* 이슈 584: 머리줄 단추 설명 — 브라우저 기본 title 대신 러브트리 모양 작은 말풍선.
    마우스를 올리거나 키보드 초점에 뜨고, 휴대폰(마우스 없는 기기)은 0.5초 길게 누르면 뜬다.
    설명 문구는 단추의 aria-label 과 같아서 낭독기와 눈이 같은 말을 듣는다. */

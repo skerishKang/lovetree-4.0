@@ -20,6 +20,7 @@ html[data-v41-screen=shelf] .shelf-screen{margin-top:var(--lt-content-top,52px)}
 }
 .lt-toolbar-tools button[aria-pressed=true]{border-color:var(--lt-gold-line);color:var(--lt-gold)}
 .lt-toolbar-tools .view-toggle,.lt-toolbar-tools .boardModeSwitch,.lt-toolbar-tools .bgDrop{display:inline-flex;align-items:center;flex:none}
+.lt-toolbar-tools .view-toggle{border:1px solid var(--lt-line);border-radius:var(--lt-r-pill);overflow:hidden}
 /* 보드에서 예전 절대 위치 요소가 줄과 겹치지 않게 아래로 내린다(좁은 화면은 기존 흐름 유지). */
 @media(min-width:701px){
   html[data-v41-screen=board] .themeBadge,
