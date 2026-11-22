@@ -39,11 +39,13 @@ async function step(page, panel, width, delta) {
   }
 }
 
-async function boot(browser, { width, height, theme, thumb = THUMB }) {
+async function boot(browser, { width, height, theme, thumb = THUMB, moment = null }) {
   const server = await serve();
   const base = `http://127.0.0.1:${server.address().port}`;
   const ctx = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce', hasTouch: width <= 780, isMobile: width <= 780 });
   await ctx.addInitScript(t => { try { localStorage.setItem('lt41.theme', t); } catch {} }, theme);
+  // #1098 2단계: 그 순간의 ♡·댓글 모의 응답 — moment 값을 넣지 않으면 숫자 0·안 눌림(기존 시험과 같은 기본).
+  const momentState = moment || { hearts: 0, aiHearts: 0, comments: 0, hearted: false, reactionCalls: 0, commentCalls: 0, commentList: [], failReaction: false };
   await ctx.route('**/*', (route) => {
     const u = new URL(route.request().url());
     if (u.origin !== base) return u.hostname === 'i.ytimg.com' ? thumb(route) : route.abort();
@@ -53,7 +55,29 @@ async function boot(browser, { width, height, theme, thumb = THUMB }) {
       const matched = items.filter(i => !exclude.has(i.videoId) && (!tag || i.keywords.some(k => k === tag)));
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ items: matched, total: matched.length, groups: GROUPS }) });
     }
-    if (u.pathname.startsWith('/api/')) return route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' });
+    if (u.pathname.startsWith('/api/')) {
+      const statsPath = u.pathname.match(/^\/api\/community\/shares\/[^/]+\/moments\/[^/]+$/);
+      if (statsPath) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ hearts: momentState.hearts, aiHearts: momentState.aiHearts, comments: momentState.comments, hearted: momentState.hearted }) });
+      if (/\/moments\/[^/]+\/reaction$/.test(u.pathname)) {
+        const enabled = route.request().method() === 'PUT';
+        momentState.reactionCalls = (momentState.reactionCalls || 0) + 1;
+        if (momentState.failReaction) return route.fulfill({ status: 429, contentType: 'application/json', body: JSON.stringify({ error: { code: 'rate_limited', message: '조금 쉬었다가 다시 시도해 주세요.' } }) });
+        momentState.hearts += enabled ? 1 : -1; momentState.hearted = enabled;
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ hearts: momentState.hearts, aiHearts: momentState.aiHearts, comments: momentState.comments, hearted: momentState.hearted }) });
+      }
+      if (/\/moments\/[^/]+\/comments$/.test(u.pathname)) {
+        if (route.request().method() === 'POST') {
+          momentState.commentCalls = (momentState.commentCalls || 0) + 1;
+          momentState.comments += 1;
+          // 서버(#1136)와 같은 응답 — 만들어진 댓글 하나를 201 {comment}로 돌려 준다.
+          const created = { id: 'mc-new-' + momentState.commentCalls, authorLabel: '나', body: '새 댓글', createdAt: '2026-11-20T11:00:00.000Z', edited: false };
+          momentState.commentList = [...(momentState.commentList || []), created];
+          return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ comment: created }) });
+        }
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ comments: momentState.commentList || [] }) });
+      }
+      return route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' });
+    }
     return route.continue();
   });
   const page = await ctx.newPage();
@@ -144,7 +168,7 @@ test('#1025 순간 보기 — iframe 2개 이하·10회 넘기기 같은 영상 
           return { viewport: innerHeight, cardBottom: Math.round(card.bottom), cardTop: Math.round(card.top), railCount: rail.length, railBottom: Math.round(Math.max(...rail.map(r => r.bottom))), railTop: Math.round(Math.min(...rail.map(r => r.top))) };
         });
         assert.ok(bounds.cardTop >= 0 && bounds.cardBottom <= bounds.viewport, `${width}·${theme}: 판이 화면 밖 — ${JSON.stringify(bounds)}`);
-        assert.equal(bounds.railCount, 4, `${width}·${theme}: 단추 4개`);
+        assert.equal(bounds.railCount, 5, `${width}·${theme}: 단추 다섯(마음·댓글·트리·담기·공유)`);
         assert.ok(bounds.railTop >= 0 && bounds.railBottom <= bounds.viewport, `${width}·${theme}: 단추가 화면 밖 — ${JSON.stringify(bounds)}`);
         const tags = await panel.locator('.moments-tags').textContent();
         assert.ok(!tags.includes(':'), `${width}·${theme}: 꼬리표 머리말을 뺀 값만 — ${tags}`);
@@ -199,18 +223,18 @@ test('#1025 2단계 — 가수 칩 필터·구간 주소·나무 선 아이콘·
    console.log('#1025 s2 chip', JSON.stringify({ artist: '아이유', ids: seen }));
    // 공유 — /t/<shareId> 주소를 복사한다.
    await h.page.evaluate(() => { globalThis.__copied = []; Object.defineProperty(navigator, 'clipboard', { value: { writeText: async (v) => { globalThis.__copied.push(v); } }, configurable: true }); });
-   await panel.locator('.moments-rail-button').nth(3).click();
+   await panel.locator('.moments-rail-button').nth(4).click();
    await h.page.waitForFunction(() => (globalThis.__copied || []).length > 0, null, { timeout: 5000 });
    const copied = await h.page.evaluate(() => globalThis.__copied[0]);
    assert.match(copied, /\/t\/share0/, '공개 트리 주소를 복사한다: ' + copied);
    // 나무 아이콘 — 컬러 이모지 없이 선 아이콘(svg path)이다.
-   const icon = await panel.locator('.moments-rail-svg').evaluate(el => ({ paths: el.querySelectorAll('path').length, stroke: getComputedStyle(el).stroke, text: el.textContent }));
+   const icon = await panel.locator('.moments-rail-button', { hasText: '트리' }).locator('.moments-rail-svg').evaluate(el => ({ paths: el.querySelectorAll('path').length, stroke: getComputedStyle(el).stroke, text: el.textContent }));
    assert.ok(icon.paths >= 1 && !/♣/.test(icon.text), '나무 선 아이콘: ' + JSON.stringify(icon));
   } finally { await h.ctx.close(); await new Promise(r => h.server.close(r)); }
  } finally { await browser.close(); }
 });
 
-test('#1075 — 밝은 영상 위에서도 390·1440의 단추 여섯 개가 보이고 눌린다', { skip: REQUIRE ? false : skip, timeout: 240000 }, async () => {
+test('#1075 — 밝은 영상 위에서도 390·1440의 단추 일곱 개가 보이고 눌린다', { skip: REQUIRE ? false : skip, timeout: 240000 }, async () => {
   if (skip) assert.fail(skip);
   const browser = await chromium.launch({ headless: true });
   try {
@@ -239,7 +263,7 @@ test('#1075 — 밝은 영상 위에서도 390·1440의 단추 여섯 개가 보
       const text = Math.max(...[...el.querySelectorAll('.moments-overlay > *')].map(node => node.getBoundingClientRect().right));
       return { cardRight: Math.round(card.right), buttonRight: Math.round(Math.max(...buttons.map(r => r.right))), buttonLeft: Math.round(Math.min(...buttons.map(r => r.left))), textRight: Math.round(text) };
      });
-     assert.equal(nodes.length, 6, `${width}·${theme}: 오른쪽 넷 + 위아래 둘`);
+     assert.equal(nodes.length, 7, `${width}·${theme}: 오른쪽 다섯(마음·댓글·트리·담기·공유) + 위아래 둘`);
      for (const node of nodes) {
       assert.ok(node.visible, `${width}·${theme}: ${node.label}이 보이지 않음 — ${JSON.stringify(node)}`);
       assert.ok(node.inView, `${width}·${theme}: ${node.label}이 화면 밖 — ${JSON.stringify(node)}`);
@@ -277,9 +301,92 @@ test('#1075 — 밝은 영상 위에서도 390·1440의 단추 여섯 개가 보
       const rail = await panel.locator('.moments-rail-button').first().evaluate(el => getComputedStyle(el).backgroundColor);
       assert.equal(rail, 'rgba(0, 0, 0, 0)', `${width}·${theme}: 데스크톱 단추는 그대로 — ${rail}`);
      }
-     console.log('#1075', width, theme, JSON.stringify({ reached: nodes.filter(n => n.reaches).length, nav: nodes.slice(4).map(n => n.rect), rail: nodes.slice(0, 4).map(n => n.rect) }));
+     console.log('#1075', width, theme, JSON.stringify({ reached: nodes.filter(n => n.reaches).length, nav: nodes.slice(5).map(n => n.rect), rail: nodes.slice(0, 5).map(n => n.rect) }));
     } finally { await h.ctx.close(); await new Promise(r => h.server.close(r)); }
    }
+  } finally { await browser.close(); }
+});
+
+// ── #1098 2단계 — 쇼츠(순간 보기)의 그 순간 ♡·댓글: 레일에 ♡ 수·댓글 수(3 미만은 숫자 없음),
+// ♡ 누르기는 순간 반응 API(PUT/DELETE), 댓글 읽기·쓰기는 순간 댓글 API, 막히면 서버 응답 안내를 그대로 보여 준다.
+// 로그인 없이 모의 응답만 쓴다(실제 계정·비밀값 미사용).
+test('#1098 2단계 — 쇼츠의 그 순간 ♡·댓글 수와 순간 단위 ♡ 누르기·댓글 쓰기', { skip: REQUIRE ? false : skip, timeout: 240000 }, async () => {
+  if (skip) assert.fail(skip);
+  const browser = await chromium.launch({ headless: true });
+  try {
+   const momentState = { hearts: 9, aiHearts: 2, comments: 0, hearted: false, reactionCalls: 0, commentCalls: 0, failReaction: false, commentList: [
+    { id: 'mc-1', authorLabel: '기록한 사람', body: '이 순간을 처음 본 날의 기억이 나요.', createdAt: '2026-11-20T09:00:00.000Z', edited: false, aiTester: true },
+    { id: 'mc-2', authorLabel: '기록한 사람', body: '같은 무대 다녀온 사람으로서 공감해요.', createdAt: '2026-11-20T10:00:00.000Z', edited: false }
+   ] };
+   const h = await boot(browser, { width: 1440, height: 900, theme: 'night', moment: momentState });
+   try {
+    const panel = h.page.locator('#community-moments-panel');
+    // ① 그 순간의 ♡ 수·댓글 수가 레일에 보인다(3 이상).
+    await h.page.waitForFunction(() => document.querySelector('#community-moments-panel .moments-rail-button .moments-rail-count')?.textContent === '9', null, { timeout: 5000 });
+    const rail = await panel.evaluate(() => [...document.querySelectorAll('#community-moments-panel .moments-rail-button')].map((node) => ({
+     label: node.getAttribute('aria-label') || node.textContent.trim(),
+     count: node.querySelector('.moments-rail-count')?.textContent || '',
+     pressed: node.getAttribute('aria-pressed') || ''
+    })));
+    assert.equal(rail[0].count, '9', `그 순간의 ♡ 수가 보인다: ${JSON.stringify(rail[0])}`);
+    assert.equal(rail[0].pressed, 'false', '아직 안 누른 상태');
+    assert.equal(rail[1].count, '', '댓글 0·3 미만은 숫자를 남기지 않는다(#824 결정 7 규칙)');
+    // ② ♡ 누르기 — 순간 반응 API(PUT)로, 누른 뒤 수가 10·채운 하트·눌림 표시.
+    const heart = panel.locator('.moments-rail-button').first();
+    await heart.click();
+    await panel.locator('.moments-rail-count').first().waitFor({ state: 'visible', timeout: 5000 });
+    await h.page.waitForFunction(() => document.querySelector('#community-moments-panel .moments-rail-button .moments-rail-count')?.textContent === '10', null, { timeout: 3000 });
+    assert.equal(momentState.reactionCalls, 1, '순간 반응 API를 한 번 부른다');
+    assert.equal(await heart.getAttribute('aria-pressed'), 'true', '눌림 표시');
+    assert.equal(await heart.locator('.moments-rail-icon').textContent(), '♥', '누른 마음은 채운 하트');
+    await heart.click();
+    await h.page.waitForFunction(() => document.querySelector('#community-moments-panel .moments-rail-button .moments-rail-count')?.textContent === '9', null, { timeout: 3000 });
+    assert.equal(momentState.reactionCalls, 2, '다시 누르면 끄기(DELETE)로 간다');
+    assert.equal(await heart.getAttribute('aria-pressed'), 'false', '끄면 눌림이 풀린다');
+    // ③ 댓글 창 — 그 순간의 댓글 목록(AI 명예회원 머리말 구분)과 쓰기 칸.
+    await panel.locator('.moments-rail-button').nth(1).click();
+    await h.page.waitForSelector('#community-moments-panel .moments-comments-dialog:not([hidden])', { timeout: 5000 });
+    await h.page.waitForFunction(() => document.querySelectorAll('#community-moments-panel .moments-comments-dialog .community-comment').length === 2, null, { timeout: 3000 });
+    const drawer = await h.page.evaluate(() => {
+     const dialog = document.querySelector('#community-moments-panel .moments-comments-dialog');
+     const heads = [...dialog.querySelectorAll('.community-comment small')].map((n) => n.textContent || '');
+     return { title: dialog.querySelector('.moments-comments-title')?.textContent || '', first: heads[0] || '' };
+    });
+    assert.equal(drawer.title, '댓글', '댓글 2·3 미만은 머리글에 숫자를 남기지 않는다');
+    assert.match(drawer.first, /^AI 명예회원/, 'AI 명예회원 댓글은 트리 작성자 표시와 같은 방식으로 구분된다');
+    // ④ 댓글 쓰기 — 순간 댓글 API(POST)로, 목록에 더해진다.
+    await h.page.locator('#community-moments-panel .moments-comments-dialog textarea').fill('우리도 같이 들었어요.');
+    await h.page.locator('#community-moments-panel .moments-comments-dialog button[type="submit"]').click();
+    await h.page.waitForFunction(() => document.querySelectorAll('#community-moments-panel .moments-comments-dialog .community-comment').length === 3, null, { timeout: 3000 });
+    assert.equal(momentState.commentCalls, 1, '순간 댓글 API를 한 번 부른다');
+    const afterWrite = await h.page.evaluate(() => ({
+     title: document.querySelector('#community-moments-panel .moments-comments-dialog .moments-comments-title')?.textContent || '',
+     railCount: document.querySelector('#community-moments-panel .moments-rail-button:nth-child(2) .moments-rail-count')?.textContent || ''
+    }));
+    assert.equal(afterWrite.title, '댓글 3', '머리글에 수가 붙는다(3 이상)');
+    assert.equal(afterWrite.railCount, '3', '레일 댓글 수도 같이 바뀐다');
+    // 댓글 창을 닫고 나서 ♡를 다시 누른다 — 창이 열려 있으면 레일이 뒤에 가린다.
+    await h.page.locator('#community-moments-panel .moments-comments-dialog .moments-add-close').click();
+    await h.page.waitForFunction(() => document.querySelector('#community-moments-panel .moments-comments-dialog')?.hidden === true, null, { timeout: 3000 });
+    // ⑤ 막히면(횟수 제한 모의 429) 서버 응답 안내를 그대로 보여 주고 눌림을 되돌린다.
+    momentState.failReaction = true;
+    await heart.click();
+    await h.page.waitForFunction(() => {
+     const icon = document.querySelector('#community-moments-panel .moments-rail-button .moments-rail-icon');
+     return icon && icon.textContent === '♡';
+    }, null, { timeout: 3000 });
+    assert.equal(momentState.reactionCalls, 3, '막힌 요청도 서버까지 갔다');
+    assert.equal(await heart.getAttribute('aria-pressed'), 'false', '막힌 요청은 눌림 표시를 되돌린다');
+    // ⑥ 390에서도 레일 숫자가 화면 안에 들어온다.
+    await h.page.setViewportSize({ width: 390, height: 844 });
+    await h.page.waitForTimeout(200);
+    const mobile = await h.page.evaluate(() => {
+     const nodes = [...document.querySelectorAll('#community-moments-panel .moments-rail-button, #community-moments-panel .moments-step')];
+     return { inView: nodes.every((n) => { const r = n.getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight && r.left >= 0 && r.right <= innerWidth; }), overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth };
+    });
+    assert.equal(mobile.inView, true, '390 단추 일곱 개가 화면 안에 있다');
+    assert.ok(mobile.overflow <= 1, `390 가로 넉침 0: ${mobile.overflow}`);
+   } finally { await h.ctx.close(); await new Promise(r => h.server.close(r)); }
   } finally { await browser.close(); }
 });
 

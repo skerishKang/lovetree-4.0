@@ -98,7 +98,7 @@ dialog.community-group-find::backdrop{background:transparent}
  .moments-rail{position:absolute;right:11px;bottom:64px;gap:6px;padding:0;z-index:5}
  .moments-rail-button{min-width:44px;min-height:44px;border-radius:var(--lt-r-pill);background:rgba(0,0,0,.72);color:#fff}
  .moments-rail-label{display:none}
- .moments-nav{display:grid;right:11px;top:auto;bottom:270px;transform:none;z-index:5}
+ .moments-nav{display:grid;right:11px;top:auto;bottom:336px;transform:none;z-index:5} /* #1098 2단계: 단추 다섯(마음·댓글·트리·담기·공유)으로 레일 꼭대기가 올라가 위아래 단추를 그 위로 옮긴다 */
  .moments-step{width:44px;height:44px;background:rgba(0,0,0,.72);color:#fff}
  .moments-overlay{padding-right:64px}
 }
@@ -115,3 +115,15 @@ dialog.community-group-find::backdrop{background:transparent}
 .moments-add-close{position:absolute;right:10px;top:8px;min-width:44px;min-height:44px;border:0;background:none;color:inherit;font-size:20px;cursor:pointer}
 .moments-add-list{display:grid;gap:8px}
 .moments-add-option{min-height:46px;padding:0 14px;border:1px solid var(--lt-line);border-radius:var(--lt-r-pill);background:var(--lt-glass);color:inherit;font:inherit;font-size:14px;text-align:left;cursor:pointer}
+/* #1098 2단계: 순간 댓글 창 — 담기 창과 같은 가운데 카드 틀, 목록은 트리 댓글과 같은 community-comment 한 벌. */
+.moments-comments-dialog{position:fixed;z-index:60;inset:0;margin:auto;width:min(460px,92vw);height:fit-content;max-height:80dvh;padding:20px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-panel);background:var(--lt-glass-strong);color:var(--lt-pearl);overflow:auto}
+.moments-comments-dialog[hidden]{display:none}
+.moments-comments-title{margin:0 0 12px;font-size:17px}
+.moments-comments-notice{margin:0 0 8px;color:var(--lt-muted);font-size:13px;line-height:1.5}
+.moments-comments-notice[hidden]{display:none}
+.moments-comments-list{display:grid;gap:10px;margin:0 0 12px}
+.moments-comments-list .community-comment{border:1px solid var(--lt-line);border-radius:var(--lt-r-card,14px);padding:10px 12px}
+.moments-comments-list .community-comment small{color:var(--lt-muted)}
+.moments-comments-list .community-comment p{margin:4px 0 0;color:var(--lt-pearl);font-size:14px;line-height:1.55}
+/* #1098 2단계: 레일 숫자 — ♡·댓글 수(3 미만은 숫자 없음). 390에서도 아이콘 아래 숫자가 같은 자리에 온다. */
+.moments-rail-count{font-size:12px;color:var(--lt-pearl);min-height:14px}
