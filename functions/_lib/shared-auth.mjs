@@ -138,7 +138,9 @@ async function exchange(env, params, fetcher, now) {
   if (!response.ok) {
     const problem = await response.json().catch(() => null);
     if (response.status === 400 && problem?.error === 'invalid_grant') throw new InvalidGrant();
-    throw new Error('token exchange failed');
+    // 원인 기록: 상태 코드와 오류 이름만 남긴다(토큰·코드·키 값은 적지 않는다).
+    const code = typeof problem?.error === 'string' && /^[a-z_]{1,40}$/.test(problem.error) ? problem.error : 'unknown';
+    throw new Error(`token exchange failed ${response.status} ${code}`);
   }
   return response.json();
 }
@@ -202,6 +204,8 @@ export function createSharedPagesAuth({ fetcher = fetch, now = () => Math.floor(
         response.headers.append('set-cookie', '__Host-lovetree-shared=; Path=/; Max-Age=0; Secure; SameSite=Lax');
         return response;
       }
+      // 원인 기록: 경로와 오류 문구만 남긴다(값은 적지 않는다). Pages 실시간 로그에서 본다.
+      console.warn('[lovetree-shared-auth]', path, String(error?.message || error).slice(0, 80));
       return json(503, 'auth_unavailable');
     }
   };
