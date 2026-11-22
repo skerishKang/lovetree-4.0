@@ -15,20 +15,21 @@ export function createCommunityRepo(pool, { hasRealCustomers = false } = {}){
   async discoverTotals({productId}){
    const {rows}=await pool.query(
     `WITH picked AS (
-       SELECT DISTINCT ON (s.tree_id) s.*
+       -- 트리 id는 계정끼리 겹칠 수 있다(복원 기록) — (계정, 트리)로 묶어 한 행을 고른다(B-08).
+       SELECT DISTINCT ON (s.subject_id, s.tree_id) s.*
        FROM lovetree_shares s
        WHERE s.product_id=$1 AND s.status='active' AND s.moment_count>=3
          AND EXISTS (
            SELECT 1 FROM lovetree_tree_discover d
            WHERE d.product_id=s.product_id AND d.subject_id=s.subject_id AND d.tree_id=s.tree_id AND d.discover=true
          )
-       ORDER BY s.tree_id,(s.origin='auto') DESC,s.created_at DESC,s.share_id DESC
+       ORDER BY s.subject_id, s.tree_id,(s.origin='auto') DESC,s.created_at DESC,s.share_id DESC
      )
      SELECT count(*)::int AS trees, COALESCE(sum(s.moment_count),0)::int AS moments
      FROM picked s
      WHERE NOT EXISTS (
        SELECT 1 FROM lovetree_shares s2
-       WHERE s2.product_id=s.product_id AND s2.tree_id=s.tree_id
+       WHERE s2.product_id=s.product_id AND s2.subject_id=s.subject_id AND s2.tree_id=s.tree_id
          AND EXISTS (SELECT 1 FROM lovetree_community_hidden_shares h WHERE h.product_id=s2.product_id AND h.share_id=s2.share_id)
      )
        AND NOT EXISTS (
@@ -53,7 +54,8 @@ export function createCommunityRepo(pool, { hasRealCustomers = false } = {}){
    const params=weekSince?[productId,viewerSubjectId,limit,weekSince,weekUntil]:[productId,viewerSubjectId,limit];
    const {rows}=await pool.query(
     `WITH picked AS (
-       SELECT DISTINCT ON (s.tree_id) s.*
+       -- 트리 id는 계정끼리 겹칠 수 있다(복원 기록) — (계정, 트리)로 묶어 한 행을 고른다(B-08).
+       SELECT DISTINCT ON (s.subject_id, s.tree_id) s.*
        FROM lovetree_shares s
        ${rankOwners ? 'LEFT JOIN lovetree_product_roles owner_role USING (product_id, subject_id)' : ''}
        WHERE s.product_id=$1 AND s.status='active' AND s.moment_count>=3
@@ -62,7 +64,7 @@ export function createCommunityRepo(pool, { hasRealCustomers = false } = {}){
            SELECT 1 FROM lovetree_tree_discover d
            WHERE d.product_id=s.product_id AND d.subject_id=s.subject_id AND d.tree_id=s.tree_id AND d.discover=true
          )
-       ORDER BY s.tree_id,(s.origin='auto') DESC,s.created_at DESC,s.share_id DESC
+       ORDER BY s.subject_id, s.tree_id,(s.origin='auto') DESC,s.created_at DESC,s.share_id DESC
      )
      SELECT s.*${weekSelect},
       (SELECT count(*)::int FROM lovetree_community_favorites WHERE product_id=s.product_id AND share_id=s.share_id) AS fav_count,
@@ -81,7 +83,7 @@ export function createCommunityRepo(pool, { hasRealCustomers = false } = {}){
      FROM picked s
      WHERE NOT EXISTS (
        SELECT 1 FROM lovetree_shares s2
-       WHERE s2.product_id=s.product_id AND s2.tree_id=s.tree_id
+       WHERE s2.product_id=s.product_id AND s2.subject_id=s.subject_id AND s2.tree_id=s.tree_id
          AND EXISTS (SELECT 1 FROM lovetree_community_hidden_shares h WHERE h.product_id=s2.product_id AND h.share_id=s2.share_id)
      )
        AND NOT EXISTS (
@@ -106,19 +108,20 @@ export function createCommunityRepo(pool, { hasRealCustomers = false } = {}){
   async listDiscoverable({productId,viewerSubjectId=null,limit=240}){
    const {rows}=await pool.query(
     `WITH picked AS (
-       SELECT DISTINCT ON (s.tree_id) s.*
+       -- 트리 id는 계정끼리 겹칠 수 있다(복원 기록) — (계정, 트리)로 묶어 한 행을 고른다(B-08).
+       SELECT DISTINCT ON (s.subject_id, s.tree_id) s.*
        FROM lovetree_shares s
        WHERE s.product_id=$1 AND s.status='active' AND s.moment_count>=3
          AND EXISTS (
            SELECT 1 FROM lovetree_tree_discover d
            WHERE d.product_id=s.product_id AND d.subject_id=s.subject_id AND d.tree_id=s.tree_id AND d.discover=true
          )
-       ORDER BY s.tree_id,(s.origin='auto') DESC,s.created_at DESC,s.share_id DESC
+       ORDER BY s.subject_id, s.tree_id,(s.origin='auto') DESC,s.created_at DESC,s.share_id DESC
      )
      SELECT s.* FROM picked s
      WHERE NOT EXISTS (
        SELECT 1 FROM lovetree_shares s2
-       WHERE s2.product_id=s.product_id AND s2.tree_id=s.tree_id
+       WHERE s2.product_id=s.product_id AND s2.subject_id=s.subject_id AND s2.tree_id=s.tree_id
          AND EXISTS (SELECT 1 FROM lovetree_community_hidden_shares h WHERE h.product_id=s2.product_id AND h.share_id=s2.share_id)
      )
        AND NOT EXISTS (
