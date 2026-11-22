@@ -21,6 +21,9 @@ export function createCommunityApi({fetchImpl=(...args)=>fetch(...args)}={}){
   removeComment:id=>call('/api/community/comments/'+encodeURIComponent(id),{method:'DELETE'}),
   editComment:(id,body)=>call('/api/community/comments/'+encodeURIComponent(id),{method:'PATCH',body:JSON.stringify({body})}),
   report:(id,reason)=>call('/api/community/shares/'+encodeURIComponent(id)+'/report',{method:'POST',headers:{'idempotency-key':key('report')},body:JSON.stringify({reason})}),
-  block:id=>call('/api/community/shares/'+encodeURIComponent(id)+'/block',{method:'POST'})
+  block:id=>call('/api/community/shares/'+encodeURIComponent(id)+'/block',{method:'POST'}),
+  // #1098 3단계 내 소식 — #1159에서 만든 두 읽기 경로만 쓴다(새 서버 경로 없음). 목록을 열면 서버가 읽음 표시를 남긴다.
+  myNews:()=>call('/api/community/my-news'),
+  myNewsUnread:()=>call('/api/community/my-news/unread-count')
  };
 }
