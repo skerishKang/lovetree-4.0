@@ -75,10 +75,10 @@ const renderedTitleDisplay=titleDisplayOf(readTitleDisplay(parent.LT41));
 if(momentsRequest){try{parent.postMessage({type:'lt41-moments-opened'},location.origin)}catch{}}
 const shadow=document.getElementById('orbit').shadowRoot;
 const viewerStyle=document.createElement('style');
-viewerStyle.textContent=`#mediaViewerHome .mediaVisual iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#000}#mediaViewerHome .mediaActions button,#mediaViewerHome .mediaActions a{font-size:13px;min-height:44px;padding:8px 14px}`;
+viewerStyle.textContent=`#mediaViewerHome .mediaVisual iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#000}#mediaViewerHome .mediaActions button,#mediaViewerHome .mediaActions a{display:inline-flex;align-items:center;justify-content:center;font-size:13px;min-height:44px;padding:8px 14px}#mediaViewerHome .mediaWhy[hidden]{display:none}`;
 shadow.append(viewerStyle);
 const viewer=document.createElement('div');viewer.className='mediaViewer';viewer.id='mediaViewerHome';viewer.setAttribute('aria-hidden','true');
-viewer.innerHTML=`<div class="mediaShell" role="dialog" aria-modal="true" aria-labelledby="mediaTitleHome"><div class="mediaVisual" id="mediaVisualHome"><button class="mediaClose" id="mediaCloseHome" aria-label="미디어 닫기">×</button><div class="videoBadge" id="mediaTypeBadgeHome">PHOTO</div><img id="mediaImageHome" alt="" src="" hidden><button class="videoPlay" id="mediaPlayHome" aria-label="미디어 미리보기 재생">▶</button><div class="mediaMemo" id="mediaMemoHome" hidden><div class="memoLabel">MEMORY NOTE</div><div class="memoMain" id="mediaMemoBodyHome"></div><div class="memoDate" id="mediaMemoDateHome"></div></div></div><div class="mediaInfo"><div class="mediaKicker" id="mediaKickerHome">MOMENT</div><h3 id="mediaTitleHome"></h3><div class="mediaMeta" id="mediaMetaHome"></div><div class="mediaWhy"><b>WHY NEXT</b><p id="mediaWhyHome"></p></div><div class="mediaActions"><button class="primary" id="mediaBookHome">책에서 이어 보기</button><a id="mediaExternalHome" href="#" target="_blank" rel="noopener" hidden>원본 보기 ↗</a></div></div></div>`;
+viewer.innerHTML=`<div class="mediaShell" role="dialog" aria-modal="true" aria-labelledby="mediaTitleHome"><div class="mediaVisual" id="mediaVisualHome"><button class="mediaClose" id="mediaCloseHome" aria-label="미디어 닫기">×</button><div class="videoBadge" id="mediaTypeBadgeHome">PHOTO</div><img id="mediaImageHome" alt="" src="" hidden><button class="videoPlay" id="mediaPlayHome" aria-label="미디어 미리보기 재생">▶</button><div class="mediaMemo" id="mediaMemoHome" hidden><div class="memoLabel">MEMORY NOTE</div><div class="memoMain" id="mediaMemoBodyHome"></div><div class="memoDate" id="mediaMemoDateHome"></div></div></div><div class="mediaInfo"><div class="mediaKicker" id="mediaKickerHome">MOMENT</div><h3 id="mediaTitleHome"></h3><div class="mediaMeta" id="mediaMetaHome"></div><div class="mediaWhy" hidden><b>WHY NEXT</b><p id="mediaWhyHome"></p></div><div class="mediaActions"><button class="primary" id="mediaBookHome">책에서 이어 보기</button><a id="mediaExternalHome" href="#" target="_blank" rel="noopener" hidden>원본 보기 ↗</a></div></div></div>`;
 shadow.append(viewer);
 const vEl=id=>shadow.querySelector('#'+id);
 shadow.querySelector('.recent-card')?.setAttribute('tabindex','0');
@@ -91,12 +91,14 @@ function closeHomeViewer(){
  vEl('mediaImageHome').hidden=true;vEl('mediaMemoHome').hidden=true;
  viewerOpener?.focus?.();viewerOpener=null;
 }
-function openHomeViewer(moment){
+function openHomeViewer(moment,opener=null){
  if(!moment||viewer.classList.contains('open'))return;
- const card=shadow.querySelector('.recent-card');viewerOpener=card||document.activeElement;
+ viewerOpener=opener||shadow.querySelector('.recent-card')||document.activeElement;
  const videoId=youtubeIdFrom(moment.url||'');
  vEl('mediaTitleHome').textContent=moment.title||'';
  vEl('mediaMetaHome').textContent=[moment.date||'',moment.emotion||''].filter(Boolean).join(' · ');
+ const why=vEl('mediaWhyHome'),whyRow=why.closest('.mediaWhy');
+ why.textContent=moment.whyNext||'';whyRow.hidden=!why.textContent;
  vEl('mediaKickerHome').textContent=`MOMENT · ${videoId?'VIDEO':moment.image?'PHOTO':'MEMO'}`;
  vEl('mediaTypeBadgeHome').textContent=videoId?'VIDEO':moment.image?'PHOTO':'MEMO';
  const img=vEl('mediaImageHome'),memo=vEl('mediaMemoHome');
@@ -127,6 +129,15 @@ shadow.addEventListener('click',event=>{
  if(event.target.closest?.('[data-recent-head],[data-recent-change]'))return;
  event.stopPropagation();event.preventDefault();
  openHomeViewer(homeMomentChoice?.moment);
+},true);
+shadow.addEventListener('click',event=>{
+ const floating=event.target.closest?.('.card');
+ if(!floating||event.target.closest?.('button,a'))return;
+ const label=floating.querySelector('.caption span')?.textContent||'';
+ const moment=(momentList?.entries||[]).find(entry=>entry.id===floating.dataset.id||entry.title===label);
+ if(!moment)return;
+ event.stopPropagation();event.preventDefault();
+ openHomeViewer(moment,floating);
 },true);
 // 261116 PR 2: 오른쪽 위 '순간 목록' 단추는 없앤다 — 목록 입구는 가운데 세트 첫 단추로 옮겼다.
 shadow.querySelector('.top-actions > .menuBtn[data-do="index"]')?.remove();

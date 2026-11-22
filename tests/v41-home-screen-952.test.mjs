@@ -539,3 +539,55 @@ test('#1088 가운데 카드 누름은 화면 이동 없이 크게 보기를 연
     } finally { await close952(h); }
   } finally { await browser.close(); }
 });
+
+test('#1088 2단계 떠 있는 카드도 그 자리에서 크게 보기', { skip: REQUIRE952 ? false : skip952, timeout: 180000 }, async () => {
+  if (skip952) assert.fail(skip952);
+  const at = '2026-11-20T00:00:00.000Z';
+  let tree = createTree({ subject: '팬 트리', title: '이유가 있는 순간', date: '2026-11-20', emotion: '설렘', note: '기억', url: '' }, at);
+  tree.moments[0].whyNext = '다음에 이어 볼 이유';
+  for (let i = 1; i < 8; i += 1) tree = addMoment(tree, { title: '순간 ' + i, note: '', emotion: '설렘', date: '2026-11-20', url: '' }, tree.moments[0].id, at);
+  const workspace = { revision: 1, state: { version: 1, trees: [tree], prefs: {} }, subject: 'visual-audit-fake', writeSubjectBound: true, savedAt: at };
+  const browser = await chromium952.launch({ headless: true });
+  try {
+    const h = await boot952(browser, { member: true, width: 1440, routes: { '/api/workspace': route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(workspace) }) } });
+    try {
+      const frame = h.frame;
+      const viewer = frame.locator('#mediaViewerHome');
+      await frame.locator('.recent-card').waitFor({ state: 'visible', timeout: 15000 });
+      await h.page.evaluate(() => { window.__nav2 = []; addEventListener('message', e => { if (['lt41-navigate', 'lt41-community', 'lt41-cleanup'].includes(e.data?.type)) window.__nav2.push(e.data.type); }); });
+      const before = await frame.evaluate(() => {
+        const root = document.querySelector('#orbit').shadowRoot;
+        return { hidden: root.querySelector('#mediaViewerHome .mediaWhy').hidden, text: root.querySelector('#mediaWhyHome').textContent };
+      });
+      assert.equal(before.hidden, true, '창을 열기 전에는 이유 줄이 없다: ' + JSON.stringify(before));
+
+      await frame.locator('.recent-card').click();
+      await viewer.waitFor({ state: 'visible', timeout: 5000 });
+      const withWhy = await frame.evaluate(() => {
+        const root = document.querySelector('#orbit').shadowRoot;
+        return { hidden: root.querySelector('#mediaViewerHome .mediaWhy').hidden, text: root.querySelector('#mediaWhyHome').textContent };
+      });
+      assert.equal(withWhy.hidden, true, '이유 내용이 없으면 WHY NEXT 제목도 숨는다: ' + JSON.stringify(withWhy));
+      const buttons = await frame.evaluate(() => {
+        const root = document.querySelector('#orbit').shadowRoot;
+        const a = root.querySelector('#mediaBookHome'), b = root.querySelector('#mediaExternalHome');
+        const ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect();
+        return { heights: [Math.round(ra.height), Math.round(rb.height)], tops: [Math.round(ra.top), Math.round(rb.top)] };
+      });
+      assert.equal(buttons.heights[0], buttons.heights[1], '두 단추 높이 같다: ' + JSON.stringify(buttons));
+      assert.equal(buttons.tops[0], buttons.tops[1], '두 단추 윗변 같다: ' + JSON.stringify(buttons));
+      await h.page.keyboard.press('Escape');
+      assert.equal(await viewer.getAttribute('aria-hidden'), 'true', 'Esc로 닫힘');
+
+      const surface = frame.locator('.card.mine .surface, .card .surface').first();
+      await surface.waitFor({ state: 'visible', timeout: 15000 });
+      const label = await surface.getAttribute('aria-label');
+      await surface.click();
+      await viewer.waitFor({ state: 'visible', timeout: 5000 });
+      assert.deepEqual(await h.page.evaluate(() => window.__nav2), [], '화면 이동 요청 0');
+      await h.page.keyboard.press('Escape');
+      const focused = await frame.evaluate(() => document.querySelector('#orbit').shadowRoot.activeElement?.getAttribute('aria-label') || '');
+      assert.equal(focused, label, '떠 있는 카드로 초점 복귀');
+    } finally { await close952(h); }
+  } finally { await browser.close(); }
+});
