@@ -81,7 +81,7 @@ export function mountMomentList({section,host,api,shareId,when,countLabel}){
    const rows=list.map((comment)=>{
     const item=el('article','community-comment');
     const edited=comment.edited?' · 수정됨':'';
-    item.append(el('small','',`${comment.aiTester?'AI 명예회원 ':''}${comment.authorLabel} · ${when(comment.createdAt)}${edited}`));
+    item.append(el('small','',`${comment.aiTester?'AI 명예회원 · ':''}${comment.authorLabel} · ${when(comment.createdAt)}${edited}`));
     item.append(el('p','',comment.body));
     return item;
    });
