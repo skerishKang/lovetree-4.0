@@ -141,7 +141,8 @@ import { createReader } from './shelf-reader.js';
       }
       // 화살표 0개(다 들어감) / 2개(넘침). 레일 폭이 정해지기 전에는 잠시 숨기고, ResizeObserver가 다시 맞춘다.
       function applyShelfArrows(count, railWidth) {
-        var show=shelfView()==='carousel'&&railWidth>0&&shelfRowLayout(count, railWidth).mode==='carousel'&&count>0;
+        // 화살표는 보기 방식과 무관하게 옛날과 같은 넘침 조건에서만 뜬다(도구 줄 토글은 계산에 넣지 않는다).
+        var show=railWidth>0&&shelfRowLayout(count, railWidth).mode==='carousel'&&count>0;
         var prevArrow=$('#shelfPrev'),nextArrow=$('#shelfNext');
         if(prevArrow)prevArrow.hidden=!show;
         if(nextArrow)nextArrow.hidden=!show;
@@ -151,6 +152,11 @@ import { createReader } from './shelf-reader.js';
         if(typeof rail.style.removeProperty==='function')rail.style.removeProperty('--drag-x');
         else if(typeof rail.style.setProperty==='function')rail.style.setProperty('--drag-x','');
         else delete rail.style['--drag-x'];
+      }
+      function setDragX(rail,px){
+        if(!rail||!rail.style)return;
+        if(typeof rail.style.setProperty==='function')rail.style.setProperty('--drag-x',px+'px');
+        else rail.style['--drag-x']=px+'px';
       }
       function reportShelfTree(center){
         // 261118 대표 지적 2차 5: 서재에서 마지막에 본 트리(가운데 책의 트리)를 셸에 알린다 —
@@ -164,8 +170,8 @@ import { createReader } from './shelf-reader.js';
         applyShelfArrows(state.shelfList.length, rail.clientWidth);
         var center=state.shelfIndex;
         if(shelfView()==='shelf'){
-          // 선반은 그리드가 자리를 정한다 — 좌표 계산 없이 가운데 책 표시만 갱신한다.
-          clearDragX(rail);
+          // 선반은 그리드가 자리를 정한다 — 넘침 화살표는 예전처럼 레일 전체를 한 칸씩 민다.
+          setDragX(rail,-(state.shelfOffset||0)*200);
           state.shelfList.forEach(function(book,index){
             var card=rail.querySelector('[data-book-index="'+index+'"]');
             if(card)card.classList.toggle('is-center',index===center);
@@ -196,11 +202,18 @@ import { createReader } from './shelf-reader.js';
         reportShelfTree(center);
       }
       function moveShelf(direction) {
-        if(!state.shelfList.length||shelfView()!=='carousel')return;
-        // 회전은 고른 책을 한 칸씩 옮긴다. 선반에서는 화살표가 숨겨져 있다.
-        var next=Math.max(0,Math.min(state.shelfList.length-1,(state.shelfIndex||0)+direction));
-        if(next===state.shelfIndex)return;
-        state.shelfIndex=next;save();updateCarousel();
+        if(!state.shelfList.length)return;
+        var rail=$('#shelfRail'),layout=shelfRowLayout(state.shelfList.length,rail?rail.clientWidth:0);
+        if(shelfView()==='shelf'){
+          // 선반도 예전과 같은 넘침 조건에서 화살표 한 칸만큼 레일을 민다.
+          var next=Math.max(0,Math.min(layout.maxOffset,(state.shelfOffset||0)+direction));
+          if(next===state.shelfOffset)return;
+          state.shelfOffset=next;save();updateCarousel();
+          return;
+        }
+        var center=Math.max(0,Math.min(state.shelfList.length-1,(state.shelfIndex||0)+direction));
+        if(center===state.shelfIndex)return;
+        state.shelfIndex=center;save();updateCarousel();
       }
       function selectShelfIndex(index) {
         if(index<0||index>=state.shelfList.length)return;

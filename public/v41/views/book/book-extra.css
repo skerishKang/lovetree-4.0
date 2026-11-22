@@ -2,11 +2,6 @@
    원래 캐스케이드 순서(읽기 스크롤 → book-usability → 터치 타깃)를 유지한다. */
 
 /* member-reading-scroll — Canonical notes can reach 500 characters; keep every line inside the paper. */
-/* #1093: 390에서는 책/목록 토글을 머리줄 대신 화면 안 도구 줄에 둔다. */
-.book-display-inline{display:none;align-items:center;padding:3px;border:1px solid var(--lt-line);border-radius:999px}
-.book-display-inline button.ui-btn{min-height:36px;padding:0 11px;border:0;border-radius:999px;background:transparent;color:var(--muted);font-size:12px;white-space:nowrap}
-.book-display-inline button.ui-btn[aria-checked=true]{background:var(--lt-primary);color:var(--lt-primary-ink)}
-@media(max-width:520px){.book-display-inline{display:inline-flex}}
 .page-content{overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y}
 .page-content .note-piece,.page-content .clipping{flex:0 0 auto}
 .book-wrap{touch-action:pan-y}

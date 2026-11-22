@@ -64,9 +64,8 @@ export function createMessages(deps) {
     const data = event.data;
     const fromView = event.source === $('view')?.contentWindow || event.source === $('view-next')?.contentWindow;
     if (event.origin !== location.origin || !fromView) return;
-    // #1093: 390 도구 줄의 보기 토글이 예전 저장 경로를 그대로 쓴다.
+    // #1093: 서재 도구 줄의 토글이 예전 저장 경로를 그대로 쓴다.
     if (data?.type === 'lt41-set-shelf-view') { deps.setShelfView?.(data.value); return; }
-    if (data?.type === 'lt41-set-book-display') { deps.setBookDisplay?.(data.value); return; }
     // 4.1 기억 보드 저장: 화면이 만든 순간·연결·배치를 기존 워크스페이스 저장 경로로 보낸다.
     if (data?.type === 'lt41-board-sync') {
       const reply = (ok, error) => { try { event.source?.postMessage({type:'lt41-board-saved', ok, error}, location.origin); } catch {} };

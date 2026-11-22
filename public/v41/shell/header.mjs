@@ -36,12 +36,12 @@ function flowNavigation(){
   // #1092 후속: 둘러보기는 서재 위에 뜨는 화면이라 현재 화면 값이 서재로 남는다 — 둘러보기 화면에서는 둘 다 접는다.
   const onCommunity=document.body.classList.contains('community-screen');
   const onShelf=getCurrent()==='track32-bookshelf.html';
-  // #1093: 390에서는 토글을 화면 안 도구 줄로 옮긴다 — 머리줄에서는 숨겨 한 줄(62px)을 유지한다.
-  const inlineToggles=typeof globalThis.matchMedia==='function' && globalThis.matchMedia('(max-width:520px)').matches;
+  // #1093: 서재 진열 토글만 390에서 화면 안 도구 줄로 옮긴다 — #1121 책 보기 토글의 자리·보임은 그대로다.
+  const inlineShelfToggle=typeof globalThis.matchMedia==='function' && globalThis.matchMedia('(max-width:520px)').matches;
   const bookToggle=$('book-display-toggle');
-  if(bookToggle)bookToggle.hidden=!bookDisplayVisible({current:getCurrent()})||onShelf||onCommunity||inlineToggles;
+  if(bookToggle)bookToggle.hidden=!bookDisplayVisible({current:getCurrent()})||onCommunity;
   const shelfToggle=$('shelf-view-toggle');
-  if(shelfToggle)shelfToggle.hidden=!shelfViewVisible({current:getCurrent()})||onCommunity||inlineToggles;
+  if(shelfToggle)shelfToggle.hidden=!shelfViewVisible({current:getCurrent()})||onCommunity||inlineShelfToggle;
   for(const b of document.querySelectorAll('nav>button'))b.hidden=publicReading;
   // 트리 선택은 뒤쪽 탭 묶음 바로 앞에 있고, 로그인 상태에서만 "트리: <이름> ▾"로 보여 준다.
   // 2026-11-18 13:49 대표 결정: 트리 선택은 모든 페이지에서 똑같이 보인다(서재 포함).
