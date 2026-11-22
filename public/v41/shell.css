@@ -5,8 +5,9 @@ dialog[data-lt-panel=center]{inset:0;margin:auto;width:min(460px,calc(100vw - 32
 /* #1089: 순간 정리·순간 잇기 창도 '순간 목록' 창과 같은 가운데 카드 틀 — 최대 폭·높이·흐린 뒤·닫기 위치를 맞춘다. */
 dialog[data-lt-panel=card]{inset:0;margin:auto;width:min(900px,94vw);max-width:calc(100vw - 16px);height:fit-content;max-height:88dvh;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-card);box-shadow:0 18px 60px #0009;overflow:auto}
 dialog[data-lt-panel=card]::backdrop{background:rgba(3,3,7,.85);backdrop-filter:blur(12px)}.panel-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}.eyebrow{font-size:12px;letter-spacing:var(--lt-track);font-weight:700;color:var(--lt-rose)}h2{font-size:23px;font-weight:500;letter-spacing:-.045em;margin:8px 0}h3{font-size:14px;font-weight:600;margin:0 0 10px}.close{width:44px;height:44px;flex-shrink:0;background:#ffffff07;border:1px solid var(--line);border-radius:50%;font-size:24px}.panel-note,dialog p{font-size:13px;line-height:1.8;color:var(--muted)}section{padding:24px 0;border-top:1px solid var(--line);margin-top:22px}.button-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}.button-row button,.share-item-actions button{min-height:44px;border-radius:var(--lt-r-pill);border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.04);padding:10px 14px}dialog select{min-height:44px;border-radius:12px;border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.04);padding:10px 12px}.button-row .primary{background:var(--lt-primary);color:var(--lt-primary-ink)}dialog select{width:100%;color:inherit}details{border-top:1px solid var(--line);padding-top:20px}summary{min-height:44px;cursor:pointer;font-size:13px;align-content:center}.file-label{display:block;font-size:12px;color:var(--muted)}input[type=file]{display:block;width:100%;margin-top:8px;min-height:44px;font-size:12px}#connections{display:grid;gap:10px;margin-top:24px}#connections button{display:flex;gap:14px;align-items:center;text-align:left;min-height:64px;padding:12px 14px;background:#ffffff05;border:1px solid var(--line);border-radius:var(--lt-r-card);line-height:1.6}#connections button small{font-size:11px;color:var(--rose);min-width:28px}#connections button span{min-width:0;overflow-wrap:anywhere}#connections button:hover{border-color:var(--lt-gold-line)}#selection-label{font-size:16px;color:var(--lt-pearl);overflow-wrap:anywhere}#toast{position:fixed;bottom:max(22px,var(--lt-toast-bottom,0px),env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);padding:12px 18px;max-width:calc(100% - 28px);width:max-content;border:1px solid rgba(255,230,166,.35);border-radius:var(--lt-r-card);color:var(--lt-pearl);background:rgba(7,7,12,.94);box-shadow:0 8px 40px #0005;font-size:13px;z-index:24}#toast[hidden]{display:none}@media(max-width:520px){dialog[data-lt-panel=card]{width:100vw;max-width:none;height:100dvh;max-height:100dvh;border:0;border-radius:0}}
-@media(max-width:1020px){.app-header{gap:12px;padding:12px 16px}nav button{padding:0 11px}.header-actions{gap:8px}.header-actions > button,.account-slot > button,.account-slot > .login{padding:8px 11px;font-size:13px}}@media(max-width:780px){.brand-sub{display:none}.app-header{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;padding:6px 12px 0}.brand{grid-column:1;grid-row:1}.header-actions{grid-column:2;grid-row:1;justify-self:end}.brand>span{font-size:12px}.header-actions > button,.account-slot > button,.account-slot > .login{font-size:13px;padding:0 10px;letter-spacing:.02em}nav{grid-column:1/-1;grid-row:2;overflow-x:auto;scrollbar-width:none;gap:0;padding:2px 0 7px;min-width:0}nav::-webkit-scrollbar{display:none}nav button{flex:1;min-height:44px;padding:0 12px;font-size:12px}dialog{padding:22px 18px}h2{font-size:21px}}@media(max-width:360px){.header-actions{gap:0}.brand small{margin-left:4px}.brand{gap:5px}.header-actions > button,.account-slot > button,.account-slot > .login{padding:0 6px}nav button{padding:0 10px}}@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+@media(max-width:1020px){.app-header{gap:12px;padding:12px 16px}nav button{padding:0 11px}.header-actions{gap:8px}.header-actions > button,.account-slot > button,.account-slot > .login{padding:8px 11px;font-size:13px}}@media(max-width:780px){.brand-sub{display:none}.app-header{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;padding:6px 12px 0}.brand{grid-column:1;grid-row:1}.header-actions{grid-column:2;grid-row:1;justify-self:end}.brand>span{font-size:12px}.header-actions > button,.account-slot > button,.account-slot > .login{font-size:13px;padding:0 10px;letter-spacing:.02em}nav{grid-column:1/-1;grid-row:2;overflow-x:auto;scrollbar-width:none;gap:0;padding:2px 0 7px;min-width:0}nav::-webkit-scrollbar{display:none}nav button{flex:1;min-height:44px;padding:0 12px;font-size:12px}dialog{padding:22px 18px}h2{font-size:21px}}@media(max-width:360px){.header-actions{gap:0}.brand small{margin-left:4px}.brand{gap:5px}.header-actions > button,.account-slot > button,.account-slot > .login{padding:0 6px}nav button{padding:0 10px}}/* Reduced-motion preference must override every component scroll-behavior rule. */@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
 
+/* Feedback color must remain legible against dialog text and theme overrides. */
 .feedback:empty{display:none}.feedback{padding:12px;border:1px solid rgba(255,230,166,.3);border-radius:12px;background:rgba(255,230,166,.06);color:var(--lt-pearl)!important}
 /* #453 C6: 설정은 넓은 화면에서도 읽기 좋은 한 칼럼(720px 안팎)으로 가운데 둔다. 390은 지금처럼 꽉 쓴다. */
 /* #987: 설정은 큰 화면에서도 같은 폭 비율을 유지하고, 짧은 내용은 세로 가운데에 둔다. */
@@ -67,7 +68,8 @@ html[data-lt-theme=garden] #context-kind{color:var(--lt-rose-ink)}
 #community-search-form label{font-size:12px;color:var(--muted)}
 #community-search-form input{display:block;width:100%;min-height:44px;margin-top:7px;padding:10px 12px;border:1px solid rgba(255,255,255,.22);border-radius:12px;background:rgba(255,255,255,.04);color:var(--lt-pearl)}
 #community-search-form button,#community-more{min-height:44px;padding:10px 16px;border:0;border-radius:var(--lt-r-pill);background:var(--lt-primary);color:var(--lt-primary-ink)}
-.community-policy{padding:12px 14px;border-left:2px solid var(--lt-gold-line);color:var(--lt-muted)!important;background:rgba(255,230,166,.05)}
+/* Legacy community card and preview theme colors must win over generic dialog text. */
+.community-policy{padding:12px 14px;border-left:2px solid var(--lt-gold-line);color:var(--lt-muted);background:rgba(255,230,166,.05)}
 #community-feedback{min-height:24px;color:var(--lt-muted)}
 #community-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
 .community-card{display:grid;grid-template-columns:150px minmax(0,1fr);min-width:0;overflow:hidden;border:1px solid #ffffff1e;border-radius:18px;background:linear-gradient(145deg,#241d29,#18141c);box-shadow:0 18px 42px #0003}
@@ -79,14 +81,15 @@ html[data-lt-theme=garden] #context-kind{color:var(--lt-rose-ink)}
 .community-ai{display:inline-flex;align-items:center;min-height:26px;padding:0 10px;border:1px solid var(--lt-rose);border-radius:var(--lt-r-pill);color:var(--lt-rose);font-size:12px;font-weight:700;letter-spacing:.04em}
 .community-cover .community-ai{position:absolute;z-index:1;top:10px;left:10px;background:rgba(9,7,10,.8)}
 .community-preview-paper .community-ai{margin-bottom:8px}
-.community-copy{min-width:0;padding:15px}.community-copy h3{margin:4px 0 8px;font-size:18px}.community-subject{margin:0;color:#d7a8ba!important;font-size:13px}.community-summary{min-height:42px;margin:0 0 8px;color:#e9dfe5!important;font-size:13px;line-height:1.65}.community-muted{color:var(--muted)!important;font-size:12px;line-height:1.6}
+.community-copy{min-width:0;padding:15px}.community-copy h3{margin:4px 0 8px;font-size:18px}.community-subject{margin:0;color:#d7a8ba;font-size:13px}.community-summary{min-height:42px;margin:0 0 8px;color:#e9dfe5;font-size:13px;line-height:1.65}.community-muted{color:var(--muted);font-size:12px;line-height:1.6}
 .community-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}.community-actions button,.community-details button{min-height:44px;border:1px solid #ffffff28;border-radius:var(--lt-r-pill);padding:8px 12px;background:#ffffff08;color:var(--lt-pearl)}.community-actions .community-primary{background:var(--lt-primary);color:var(--lt-primary-ink)}.community-mini[aria-pressed=true]{border-color:var(--lt-gold);background:rgba(255,230,166,.1)}
 .community-reaction-group{display:flex;flex-wrap:wrap;gap:4px;max-width:100%}.community-reaction-group .community-reaction{padding:6px 8px;min-height:44px;font-size:13px}
 .community-comment-tools{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}.community-comment-tools button{min-height:44px}
 .community-comment-edit{display:grid;gap:7px;margin-top:6px}.community-comment-edit textarea{width:100%;min-height:44px;padding:10px;border:1px solid rgba(255,255,255,.22);border-radius:12px;background:rgba(255,255,255,.04);color:var(--lt-pearl)}
-.community-details{margin-top:12px;border-top:1px solid #ffffff17;padding-top:10px}.community-details summary{color:#cdbec8;font-size:12px}.community-comment{padding:10px 0;border-bottom:1px solid #ffffff13}.community-comment p{margin:4px 0}.community-comment-form{display:grid;gap:7px;margin-top:10px}.community-comment-form textarea,.community-report-form input{width:100%;min-height:44px;padding:10px;border:1px solid rgba(255,255,255,.22);border-radius:12px;background:rgba(255,255,255,.04);color:var(--lt-pearl)}.community-report-form{display:grid;grid-template-columns:1fr auto;gap:7px;margin-top:14px}.community-link{background:transparent!important;color:#d9bdc8!important}.community-empty{grid-column:1/-1;padding:40px 18px;text-align:center;border:1px dashed rgba(255,255,255,.2);border-radius:var(--lt-r-panel);color:var(--muted)!important}
+.community-details{margin-top:12px;border-top:1px solid #ffffff17;padding-top:10px}.community-details summary{color:#cdbec8;font-size:12px}.community-comment{padding:10px 0;border-bottom:1px solid #ffffff13}.community-comment p{margin:4px 0}.community-comment-form{display:grid;gap:7px;margin-top:10px}.community-comment-form textarea,.community-report-form input{width:100%;min-height:44px;padding:10px;border:1px solid rgba(255,255,255,.22);border-radius:12px;background:rgba(255,255,255,.04);color:var(--lt-pearl)}.community-report-form{display:grid;grid-template-columns:1fr auto;gap:7px;margin-top:14px}.community-link{background:transparent!important;color:#d9bdc8!important}.community-empty{grid-column:1/-1;padding:40px 18px;text-align:center;border:1px dashed rgba(255,255,255,.2);border-radius:var(--lt-r-panel);color:var(--muted)}
 #community-more{display:block;margin:16px auto 0}#community-more[hidden]{display:none}
-@media(max-width:780px){#community-menu{min-width:44px}#community-panel{padding:14px 14px 28px}#community-search-form{grid-template-columns:1fr}.community-policy{font-size:12px}#community-list{grid-template-columns:1fr}.community-card{grid-template-columns:112px minmax(0,1fr)}.community-cover{min-height:210px}.community-copy{padding:12px}.community-actions button{flex:1 1 44%}.community-reaction-group{flex-wrap:wrap}.community-reaction-group .community-reaction{flex:0 1 auto}.community-report-form{grid-template-columns:1fr}.community-report-form button{width:100%}}
+@media(max-width:780px){#community-menu{min-width:44px}#community-panel{padding:14px 14px 28px}#community-search-form{grid-template-columns:1fr}/* Legacy community card and preview theme colors must win over generic dialog text. */
+.community-policy{font-size:12px}#community-list{grid-template-columns:1fr}.community-card{grid-template-columns:112px minmax(0,1fr)}.community-cover{min-height:210px}.community-copy{padding:12px}.community-actions button{flex:1 1 44%}.community-reaction-group{flex-wrap:wrap}.community-reaction-group .community-reaction{flex:0 1 auto}.community-report-form{grid-template-columns:1fr}.community-report-form button{width:100%}}
 @media(max-width:390px){.community-actions button{flex:1 1 100%}.community-reaction-group{gap:4px}.community-reaction-group .community-reaction{min-height:44px}.community-comment-tools button{flex:1 1 auto}.community-comment-edit textarea{min-height:44px;width:100%}}
 
 /* Compact mobile actions without changing desktop controls. */
@@ -98,15 +101,16 @@ html[data-lt-theme=garden] #context-kind{color:var(--lt-rose-ink)}
 #community-panel{padding:20px clamp(16px,3vw,48px) 40px;background:radial-gradient(ellipse at 80% 0,#17121f,transparent 45%),var(--lt-stage);color:var(--lt-pearl)}
 #community-panel .panel-heading{max-width:1500px;margin:auto}
 #community-panel .panel-heading h2{font-family:var(--lt-font-display);font-size:clamp(25px,3vw,40px);line-height:1.35}
-#community-panel>.panel-note,#community-search-form,.community-layout,#community-panel>.community-policy{max-width:1500px;margin-left:auto;margin-right:auto}
+#community-panel>.panel-note,#community-search-form,.community-layout,#community-panel>/* Legacy community card and preview theme colors must win over generic dialog text. */
+.community-policy{max-width:1500px;margin-left:auto;margin-right:auto}
 .community-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(340px,1.02fr);gap:24px;align-items:start}
 /* #453 D3: 공개 트리가 0개일 때는 미리보기 칸을 숨기고 빈 안내만 가운데에 둔다. */
 .community-layout:has(#community-preview[hidden]){grid-template-columns:minmax(0,1fr)}
 .community-layout:has(#community-preview[hidden]) .community-empty{margin:24px auto;max-width:440px;text-align:center}
 #community-list{grid-template-columns:repeat(2,minmax(0,1fr));margin:0;padding:0;border:0}
 .community-card{grid-template-columns:100px minmax(0,1fr);background:var(--lt-paper);color:var(--lt-ink);border-color:var(--lt-line-paper)}
-.community-card h3,.community-card .community-summary{color:#342a28!important}
-.community-card .community-muted,.community-card .community-subject{color:#6a5a51!important}
+.community-card h3,.community-card .community-summary{color:#342a28}
+.community-card .community-muted,.community-card .community-subject{color:#6a5a51}
 .community-card .community-actions button,.community-card .community-details button{background:#e4d7cb;color:#3a2f29;border-color:#b6a08f}
 .community-card .community-actions .community-primary{background:var(--lt-btn-ink,#1a1620);color:var(--lt-pearl)}
 .community-card .community-details summary{color:#6a5549}
@@ -419,7 +423,8 @@ dialog#account-assets{width:min(720px,calc(100vw - 32px));max-width:calc(100vw -
 #quick-url:focus-visible{outline:none}
 .quick-paste{flex:0 0 auto;min-height:44px;padding:0 14px;border:1px solid rgba(255,255,255,.3);border-radius:var(--lt-r-pill);background:none;color:var(--lt-pearl);font-size:13px;white-space:nowrap}
 .quick-paste:hover{border-color:var(--lt-gold-line)}
-.quick-drop-hint{margin:8px 0 0!important;padding-left:14px;font-size:13px;color:var(--lt-muted)}
+.quick-drop-hint{padding-left:14px;font-size:13px;color:var(--lt-muted)}
+#write-panel .quick-drop-hint{margin:8px 0 0}
 /* 미리보기 카드: 높이 고정 — 빈 상태·입력·담은 뒤 어느 쪽이든 아래 버튼 y가 같다(이슈 343). */
 .quick-preview{position:relative;display:flex;flex-direction:column;height:120px;margin-top:12px;border:1px solid var(--lt-line);border-radius:var(--lt-r-card);background:var(--lt-stage-2);overflow:hidden}
 .quick-preview[data-media=yes]{height:auto;aspect-ratio:16/9}
@@ -432,7 +437,8 @@ dialog#account-assets{width:min(720px,calc(100vw - 32px));max-width:calc(100vw -
 .quick-preview-tag{align-self:flex-start;padding:4px 10px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-pill);color:var(--lt-gold);font-size:10px;font-weight:700;letter-spacing:.12em}
 .quick-preview-title{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin:0;font-size:15px;font-weight:600;line-height:1.5;color:var(--lt-pearl);overflow-wrap:anywhere}
 /* 오류 줄도 높이 고정 — 오류 문구가 버튼 자리를 밀지 않는다. 정원 글자는 진한 장미(기존 선례). */
-.quick-error-line{margin:8px 0 0!important;min-height:18px;max-height:18px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:12px;line-height:1.5;color:var(--lt-rose)}
+.quick-error-line{min-height:18px;max-height:18px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:12px;line-height:1.5;color:var(--lt-rose)}
+#write-panel .quick-error-line{margin:8px 0 0}
 html[data-lt-theme=garden] .quick-error-line{color:var(--lt-rose-ink)}
 /* 815: 정원(밝은 바탕)에서는 순간 추가 폼의 입력칸이 흰 테두리라 안 보였다 — 정원 종이·선 토큰으로 같은 칸 모양을 쓴다. 밤은 기본값 그대로다. */
 html[data-lt-theme=garden] #moment-form input,html[data-lt-theme=garden] #moment-form textarea{background:var(--lt-paper);border-color:var(--lt-line-paper)}
@@ -440,12 +446,14 @@ html[data-lt-theme=garden] #moment-form input,html[data-lt-theme=garden] #moment
 /* 이슈 638: 담을 트리 한 줄 — 고른 트리 이름을 보이고 그 자리에서 바꾼다. 색은 --lt-* 토큰만 쓴다. */
 .quick-tree-row{display:flex;align-items:center;gap:10px;min-height:44px;margin-top:6px}
 .quick-tree-row:has(#quick-tree-select[hidden]){min-height:0}
-.quick-tree-line{flex:1;min-width:0;margin:0!important;font-size:13px;line-height:1.6;color:var(--lt-pearl);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.quick-tree-line{flex:1;min-width:0;font-size:13px;line-height:1.6;color:var(--lt-pearl);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#write-panel .quick-tree-line{margin:0}
 #quick-tree-select{flex:0 1 auto;max-width:46%;min-height:36px;padding:0 8px;border:1px solid var(--lt-line);border-radius:10px;background:rgba(255,255,255,.04);color:var(--lt-pearl);font-size:13px}
 #quick-tree-select:focus-visible{outline:2px solid var(--lt-gold);outline-offset:2px}
 #quick-tree-select[hidden]{display:none}
 .quick-notice-row{display:flex;align-items:center;gap:10px;min-height:44px;margin-top:8px}
-.quick-notice{flex:1;min-width:0;margin:0!important;font-size:13px;line-height:1.6;color:var(--lt-pearl);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.quick-notice{flex:1;min-width:0;font-size:13px;line-height:1.6;color:var(--lt-pearl);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#write-panel .quick-notice{margin:0}
 .quick-notice:empty{display:none}
 .quick-notice-row:has(.quick-notice:empty):has(.quick-refine[hidden]){display:none}
 .quick-refine{flex:0 0 auto;min-height:44px;padding:0;border:0;background:none;color:var(--lt-gold);font-size:13px;white-space:nowrap}
@@ -474,7 +482,7 @@ html[data-lt-theme=garden] #moment-form input,html[data-lt-theme=garden] #moment
 #cleanup-panel label:not(.cleanup-moment){display:block;font-size:13px;color:var(--lt-muted);margin:12px 0}
 #cleanup-panel input:not([type=checkbox]),#cleanup-panel select{display:block;width:100%;margin-top:8px;padding:11px 12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.22);border-radius:12px;color:var(--lt-pearl);min-height:44px;line-height:1.6}
 .cleanup-moments{display:grid;gap:8px;max-height:min(46vh,420px);overflow:auto;padding-right:4px}
-.cleanup-moment{display:flex;align-items:center;gap:12px;min-height:48px;margin:0!important;padding:8px 12px;background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:var(--lt-r-card);color:var(--lt-pearl);font-size:14px}
+label.cleanup-moment{display:flex;align-items:center;gap:12px;min-height:48px;margin:0;padding:8px 12px;background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:var(--lt-r-card);color:var(--lt-pearl);font-size:14px}
 .cleanup-moment input{width:22px;height:22px;margin:0;accent-color:var(--lt-primary);flex:0 0 auto}
 .cleanup-moment span{min-width:0;overflow-wrap:anywhere}
 .cleanup-moment .is-blank{color:var(--lt-muted)}
@@ -563,7 +571,7 @@ nav .tree-frame{scroll-snap-align:center}
 /* 이슈 368: 계정 메뉴 맨 위는 이메일 전체(자기 계정 메뉴는 가리지 않는다). */
 .account-identity{min-width:0}
 #account-email{display:block;font-size:13px;font-weight:600;color:var(--lt-pearl);line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
-#share-menu{display:none!important}
+#share-menu{display:none}
 #header-overflow{display:none}
 #header-overflow.is-open{display:grid;position:absolute;top:64px;right:16px;z-index:70;min-width:190px;padding:8px;border:1px solid var(--lt-line);border-radius:var(--lt-r-card);background:var(--lt-glass-strong);backdrop-filter:blur(24px);box-shadow:0 18px 50px #0009}
 #header-overflow button{min-height:44px;text-align:left;border:0;border-radius:10px;background:none;color:var(--lt-pearl);padding:0 10px;font-size:13px}
@@ -576,12 +584,12 @@ nav .tree-frame{scroll-snap-align:center}
  .tree-frame{margin-left:0;padding:0;border:0;background:none}
  .app-header{display:flex;min-height:56px;padding:6px 10px;gap:6px;flex-wrap:nowrap}
  .main-nav{flex:0 0 auto}
- .main-nav #community-menu,.main-nav .tree-views{display:none!important}
- .header-actions #write-menu{display:none!important}
+ body .main-nav #community-menu,body .main-nav .tree-views{display:none}
+ body .header-actions #write-menu{display:none}
  /* 이슈 457 3번: .main-nav가 더 안 자라(flex:0 0 auto) 트리 틀이 없으면(로그인·트리 0개) nav 내용이
     줄어 계정·☰가 로고 바로 옆에 붙는다. 오른쪽 끝에 고정해 트리 틀 유무와 상관없이 같은 자리에 있게 한다. */
   .header-actions{gap:6px;margin-left:auto}
-  #mobile-more{display:flex!important}
+  #mobile-more{display:flex}
   /* 머리줄 테마 단추(44px)를 넣고도 390에서 가로 넘침 0 — 간격·여백을 조인다. */
   @media(max-width:520px){.app-header{gap:4px;padding-inline:8px}.header-actions{gap:4px;flex:0 0 auto}.main-nav{flex:1 1 auto;min-width:0;overflow:hidden}}
  .tree-popover{position:fixed;left:10px;right:10px;top:60px;min-width:0;max-height:70vh}
@@ -930,8 +938,9 @@ body.community-screen #stage>iframe,body.community-screen #empty{display:none}
 #community-panel .community-card-moment{margin:4px 14px 0;color:var(--lt-ink);font-size:14px;line-height:1.45;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #community-panel .community-card-distinct{display:block;margin:4px 14px 0;color:var(--lt-ink);font-size:12px;line-height:1.35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #community-panel .community-card-meta{margin:7px 14px 14px;color:var(--lt-ink);font-size:13px;line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-#community-panel .community-policy{max-width:1500px;margin:20px auto 8px;color:var(--lt-pearl);font-size:13px;line-height:1.6}
-#community-panel .community-empty{max-width:520px;margin:28px auto;padding:28px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-panel);background:var(--lt-paper);color:var(--lt-ink);text-align:center}
+#community-panel /* Legacy community card and preview theme colors must win over generic dialog text. */
+.community-policy{max-width:1500px;margin:20px auto 8px;color:var(--lt-muted);font-size:13px;line-height:1.6}
+#community-panel .community-empty{max-width:520px;margin:28px auto;padding:28px;border:1px solid var(--lt-gold-line);border-radius:var(--lt-r-panel);background:var(--lt-paper);color:var(--muted);text-align:center}
 #community-panel .community-empty p{color:var(--lt-ink)}
 #community-panel #community-more{display:block;min-height:44px;margin:22px auto;padding:10px 18px;border:1px solid var(--lt-line-paper);border-radius:var(--lt-r-pill);background:var(--lt-paper);color:var(--lt-ink)}
 #community-panel #community-more[hidden]{display:none}
@@ -956,6 +965,7 @@ body.community-screen #stage>iframe,body.community-screen #empty{display:none}
 #community-preview .community-vote-note{margin:0;color:var(--lt-ink);font-size:13px;line-height:1.5}
 #community-preview .community-vote-note[hidden]{display:none}
 #community-preview .community-mini,#community-preview .community-link,#community-preview .community-preview-start,#community-preview .community-preview-open{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:9px 14px;border:1px solid var(--lt-line-paper);border-radius:var(--lt-r-pill);background:var(--lt-paper);color:var(--lt-ink);font-size:14px;font-weight:600}
+/* Preview action palette overrides community-link and theme button defaults. */
 #community-preview .community-link{border-color:var(--lt-line-paper)!important;background:var(--lt-paper)!important;color:var(--lt-ink)!important}
 #community-preview .community-preview-open{width:100%;border:0;background:var(--lt-primary);color:var(--lt-primary-ink);font-weight:700}
 #community-preview .community-preview-start{width:100%}
@@ -987,6 +997,7 @@ body.community-screen #stage>iframe,body.community-screen #empty{display:none}
 #community-preview .community-comment-host,#community-preview .community-comments{display:grid;gap:10px}
 #community-preview .community-comment,#community-preview .community-comment-form,#community-preview .community-comment-edit{display:grid;gap:8px;color:var(--lt-ink)}
 #community-preview .community-comment small,#community-preview .community-comment p,#community-preview .community-muted{margin:0;color:var(--lt-ink);font-size:13px;line-height:1.5}
+#community-preview .community-muted{color:var(--muted)}
 #community-preview .community-comment-form textarea,#community-preview .community-comment-edit textarea,#community-preview .community-report-form input{width:100%;min-height:44px;padding:10px 12px;border:1px solid var(--lt-line-paper);border-radius:var(--lt-r-card);background:var(--lt-paper);color:var(--lt-ink);font:inherit}
 #community-preview .community-report-form{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}
 #community-preview .community-report-form button.community-link{background:var(--lt-ink)!important;color:var(--lt-paper)!important}
@@ -995,7 +1006,8 @@ body.community-screen #stage>iframe,body.community-screen #empty{display:none}
 #community-preview .community-preview-message{min-height:20px;margin:0;color:var(--lt-ink);font-size:13px}
 #community-panel #community-preview p{color:var(--lt-ink)}
 @media(max-width:900px){#community-panel #community-list{grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}}
-@media(max-width:780px){#community-panel{padding:14px 14px 28px}#community-panel .community-top{padding-top:20px}#community-panel .community-toolbar{grid-template-columns:minmax(0,1fr) auto;gap:8px}#community-panel .community-search-submit{display:none}#community-panel #community-list{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}#community-panel .community-card-title{margin:10px 10px 0;font-size:15px}#community-panel .community-card-moment{margin:4px 10px 0;font-size:13px}#community-panel .community-card-distinct{margin:3px 10px 0;font-size:11px}#community-panel .community-card-meta{margin:6px 10px 11px;font-size:12px}#community-panel .community-policy{font-size:12px}}
+@media(max-width:780px){#community-panel{padding:14px 14px 28px}#community-panel .community-top{padding-top:20px}#community-panel .community-toolbar{grid-template-columns:minmax(0,1fr) auto;gap:8px}#community-panel .community-search-submit{display:none}#community-panel #community-list{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}#community-panel .community-card-title{margin:10px 10px 0;font-size:15px}#community-panel .community-card-moment{margin:4px 10px 0;font-size:13px}#community-panel .community-card-distinct{margin:3px 10px 0;font-size:11px}#community-panel .community-card-meta{margin:6px 10px 11px;font-size:12px}#community-panel /* Legacy community card and preview theme colors must win over generic dialog text. */
+.community-policy{font-size:12px}}
 @media(max-width:600px){#community-preview{inset:auto 0 0;transform:none;margin:0;width:100%;max-width:100vw;max-height:88dvh;padding-bottom:calc(12px + env(safe-area-inset-bottom));border-radius:var(--lt-r-panel) var(--lt-r-panel) 0 0}#community-preview>.community-cover{aspect-ratio:1.55;max-height:22dvh}#community-preview .community-preview-body{padding:12px 16px 16px;gap:7px}#community-preview .community-preview-body h3{font-size:21px}#community-preview .community-more-panel{min-width:min(360px,calc(100vw - 40px))}}
 @media(prefers-reduced-motion:reduce){#community-panel .community-card{transition:none}}
 /* 2026-11-17 대표 결정: 트리 0개 계정의 서재 빈 상태는 '+ 새 트리' 빈 책과 같은 점선 모양으로 둔다. */

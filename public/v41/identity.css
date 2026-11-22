@@ -31,11 +31,12 @@
  --lt-tree-1:#8a7fb8;--lt-tree-2:#6f9e8a;--lt-tree-3:#b08a6f;--lt-tree-4:#7d94b5;--lt-tree-5:#b5839a;--lt-tree-6:#9a9a6f;
 }
 body{font-family:var(--lt-ui)}
+/* Shared controls override legacy screen-specific fonts. */
 button,input,select,textarea,summary{font-family:var(--lt-ui)!important}
 .hero h1,.card h3,.cover-title,.book-title,.moment-title h3,.note-piece,.letter,.clipping,.archive-piece{font-family:var(--lt-font-display)}
 .hero h1,.card h3,.moment-title h3,.note-piece h2,.letter h2,.clipping h2{font-weight:400}
 /* The shell owns the sole service mark; each view keeps its own tools. */
-html[data-v41-screen] header>.brand,html[data-v41-screen] .topbar>.brand{display:none!important}
+html[data-v41-screen] header>.brand,html[data-v41-screen] .topbar>.brand{display:none}
 html[data-v41-screen=board] header>.crumb{display:none}
 html[data-v41-screen=book] .topbar{justify-content:flex-end}
 html[data-v41-screen=network] .topbar{justify-content:flex-end}
@@ -84,6 +85,7 @@ html[data-v41-screen] .lt-moment-picker label>span{font-size:12px}
 .lt-media{padding:12px;border:1px solid #ba9cae55;border-radius:12px;background:#ffffff12;font:14px/1.5 var(--lt-ui);overflow-wrap:anywhere;min-width:0}
 .lt-media-body{display:grid;place-items:center;min-height:100px;background:#82708016;border-radius:8px;overflow:hidden}
 .lt-media-body button{min-height:44px;max-width:100%;border:1px solid rgba(255,255,255,.14);border-radius:var(--lt-r-pill);padding:8px 14px;background:var(--lt-btn-ink,#1a1620);color:var(--lt-pearl);font-size:14px;cursor:pointer}
+/* Embedded media overrides legacy board/book/map image positioning and scaling; vertical media inherits this contract. */
 .lt-media-body img,.lt-media-body video{position:static!important;display:block;width:100%;max-height:240px;height:auto!important;object-fit:contain!important;transform:none!important;mix-blend-mode:normal!important}
 .lt-media .lt-media-status{font:12px/1.5 var(--lt-ui)!important;color:inherit!important;margin:8px 0}
 /* #632: 사라진 영상(삭제·비공개) 표시 — 배지와 안내 한 줄. 보관된 제목·채널·그림은 그대로 둔다. */
@@ -195,6 +197,7 @@ html[data-lt-theme=garden]{
 }
 /* 정원(명조)은 지금 보이던 글꼴 그대로 — 토큰만 지금 값으로 되돌린다. */
 html[data-lt-theme=garden]{--lt-font-display:var(--lt-reading)}
+/* Garden stage background overrides legacy per-screen body backgrounds. */
 html[data-lt-theme=garden] body{background:var(--lt-stage)!important}
 html[data-lt-theme=garden] #stage,html[data-lt-theme=garden] iframe{background:var(--lt-stage)}
 html[data-lt-theme=garden] .app-header{border-bottom-color:var(--lt-line)}
@@ -428,7 +431,7 @@ html[data-v41-screen=shelf][data-lt-theme=garden],html[data-v41-screen=board][da
 .index-row-thumb img{width:100%;height:100%;object-fit:cover;display:block}
 .index-row-body{flex:1;min-width:0}
 .lt-row-unavailable{display:block;font-size:11px;line-height:1.35;color:var(--lt-muted);margin-top:2px}
-.lt-row-unavailable[hidden]{display:none!important}
+.lt-row-unavailable[hidden]{display:none}
 html[data-v41-screen=book] .yt-play:has(.lt-fallback-card){padding:0;border:0;background:transparent;aspect-ratio:auto;cursor:default}
 html[data-v41-screen=book] .yt-play:has(.lt-fallback-card) .yt-play-label{display:none}
 .lt-media[data-lt-vertical="1"] .lt-media-body:has(.lt-fallback-card){height:auto}

@@ -11,7 +11,7 @@
 #treeTitleText{font-weight:700;font-size:18px;letter-spacing:-.01em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* 트리 목록 — 셸의 트리 드롭다운(.tree-item·.tree-cover)과 같은 내용·같은 모양 */
 .tree-menu{position:absolute;z-index:95;top:calc(100% + 6px);left:0;min-width:300px;max-height:min(70vh,520px);overflow:auto;padding:8px;border-radius:14px}
-.tree-menu[hidden]{display:none!important}
+.tree-menu[hidden]{display:none}
 .tree-menu .tree-item{display:flex;align-items:center;gap:10px;width:100%;min-height:52px;padding:5px 7px;border:0;border-radius:10px;background:none;text-align:left;font:13px var(--ui-sans,system-ui);cursor:pointer}
 .tree-menu .tree-cover{width:36px;height:46px;flex:0 0 auto;border-radius:6px;overflow:hidden;display:block}
 .tree-cover img{width:100%;height:100%;object-fit:cover;display:block}
