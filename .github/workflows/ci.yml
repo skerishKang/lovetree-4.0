@@ -30,9 +30,36 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
+  server-changes:
+    name: 서버 바뀜 검사
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      changed: ${{ steps.diff.outputs.changed }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: 바뀐 파일로 서버 바뀜을 가린다
+        id: diff
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          base='${{ github.event.pull_request.base.sha }}'
+          head='${{ github.event.pull_request.head.sha }}'
+          git diff --name-only "$base...$head" > /tmp/server-changed-files.txt
+          node tools/ci/server-changes.mjs /tmp/server-changed-files.txt
   postgres:
     name: PostgreSQL 저장·로그인 상태 검증
     runs-on: ubuntu-latest
+    needs: server-changes
+    if: needs.server-changes.outputs.changed == 'true'
     services:
       postgres:
         image: postgres:16
@@ -88,6 +115,8 @@ jobs:
     # ALTER TABLE IF NOT EXISTS 같은 PostgreSQL에 없는 문법은 여기서 실패한다.
     name: PostgreSQL migrations 실행 시험
     runs-on: ubuntu-latest
+    needs: server-changes
+    if: needs.server-changes.outputs.changed == 'true'
     services:
       postgres:
         image: postgres:16
@@ -137,6 +166,8 @@ jobs:
     # 운영 서비스·DB에는 접속하지 않는다.
     name: API 자동 배포 판정 시험
     runs-on: ubuntu-latest
+    needs: server-changes
+    if: needs.server-changes.outputs.changed == 'true'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
