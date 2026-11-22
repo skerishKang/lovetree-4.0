@@ -204,7 +204,7 @@ test('계정 자리: 로그아웃은 "로그인", 로그인은 동그라미 + �
     assert.equal(out.els['account-avatar'].hidden, true);
   } finally { out.restore(); }
 
-  const inTrees = createHeaderHarness({ owned: true, trees: 1, tree: { title: '리센느' }, account: { ok: true, email: 'a@b.co' } });
+  const inTrees = createHeaderHarness({ owned: true, trees: 1, tree: { title: '리센느' }, account: { ok: true, email: 'kate@example.test' } });
   try {
     await inTrees.header.loadAccountEmail();
     assert.equal(inTrees.els['account-entry'].hidden, true);
