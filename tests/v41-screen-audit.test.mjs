@@ -2781,6 +2781,18 @@ test('#1026 무대 불러오는 중 표시 — 느림 표시·빠름 비표시·
   const base = 'http://127.0.0.1:' + server.address().port;
   const browser = await chromium.launch({ headless: true });
   const share = COMMUNITY_CARDS[0];
+  // 실제 열린 표시는 #community-panel[open] + body.community-screen이다.
+  // 실행기가 느려 단추 배선이 늦게 붙을 수 있어, 열릴 때까지 누르기를 되풀이한다.
+  const openExplore = async (page) => {
+    await page.waitForFunction(() => !!window.LT41 && !!document.getElementById('community-menu'), null, { timeout: 30000 });
+    for (let i = 0; i < 30; i++) {
+      const opened = await page.evaluate(() => document.getElementById('community-panel')?.open === true || document.body.classList.contains('community-screen'));
+      if (opened) return;
+      await page.evaluate(() => document.getElementById('community-menu').click());
+      await page.waitForTimeout(500);
+    }
+    assert.fail('둘러보기 패널이 열리지 않았다');
+  };
   try {
     for (const slow of [true, false]) {
       const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
@@ -2808,9 +2820,7 @@ test('#1026 무대 불러오는 중 표시 — 느림 표시·빠름 비표시·
         });
         if (slow) {
           await page.goto(base + '/v41/', { waitUntil: 'domcontentloaded' });
-          await page.waitForFunction(() => !!window.LT41 && !!document.querySelector('#community-menu'), null, { timeout: 30000 });
-          await page.evaluate(() => document.getElementById('community-menu').click());
-          await page.waitForSelector('#community-panel[open]', { state: 'attached', timeout: 15000 });
+          await openExplore(page);
           await page.waitForTimeout(1100);
           const m = await state();
           console.log('#1026 slow', JSON.stringify(m));
@@ -2824,9 +2834,7 @@ test('#1026 무대 불러오는 중 표시 — 느림 표시·빠름 비표시·
           assert.ok(after.cls <= 0.1, '내용 도착 뒤 자리 밀림 0.1 이하 — ' + JSON.stringify(after));
         } else {
           await page.goto(base + '/v41/', { waitUntil: 'domcontentloaded' });
-          await page.waitForFunction(() => !!window.LT41 && !!document.querySelector('#community-menu'), null, { timeout: 30000 });
-          await page.evaluate(() => document.getElementById('community-menu').click());
-          await page.waitForSelector('#community-panel[open]', { state: 'attached', timeout: 15000 });
+          await openExplore(page);
           await page.waitForTimeout(700);
           const m = await state();
           console.log('#1026 fast', JSON.stringify(m));
@@ -2842,9 +2850,7 @@ test('#1026 무대 불러오는 중 표시 — 느림 표시·빠름 비표시·
       await ctx.route('**/api/community/shares**', (r) => new Promise((ok) => setTimeout(ok, 11500)).then(() => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, items: [share], totalVisible: 1, nextCursor: '', groups: [], groupsAll: [] }) })));
       const page = await ctx.newPage();
       await page.goto(base + '/v41/', { waitUntil: 'domcontentloaded' });
-      await page.waitForFunction(() => !!window.LT41 && !!document.querySelector('#community-menu'), null, { timeout: 30000 });
-      await page.evaluate(() => document.getElementById('community-menu').click());
-      await page.waitForSelector('#community-panel[open]', { state: 'attached', timeout: 15000 });
+      await openExplore(page);
       await page.waitForFunction(() => !document.getElementById('stage-loading-retry').hidden, null, { timeout: 20000, polling: 500 });
       const retryText = await page.locator('#stage-loading-retry').textContent();
       console.log('#1026 retry', JSON.stringify({ retryText }));
