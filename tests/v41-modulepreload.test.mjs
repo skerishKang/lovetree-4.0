@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {SCREENS, collect, apply} from '../tools/v41-modulepreload.mjs';
+import {SCREENS, collect, apply, builtGraph} from '../tools/v41-modulepreload.mjs';
 
 const repoRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const readScreen = s => fs.readFileSync(path.join(repoRoot, s.html), 'utf8');
@@ -54,6 +54,14 @@ test('#400 [home] 빌드가 진입 청크의 정적 import를 남김없이 modul
       logLevel: 'silent',
       build: {outDir: tmp, emptyOutDir: true},
     });
+    const graph = builtGraph(tmp);
+    assert.deepEqual(graph.duplicates, [], 'shell/home modules occur in one shared chunk');
+    for (const module of ['public/v41/domain.mjs', 'public/v41/header-state.mjs', 'public/v41/frame-messages.mjs']) {
+      assert.ok(graph.shared.includes(module), module + ': shared module');
+    }
+    for (const module of ['public/v41/shell.mjs', 'public/v41/shell/panels.mjs']) {
+      assert.ok(graph.shell.members.has(module), module + ': bundled shell module');
+    }
     const html = fs.readFileSync(path.join(tmp, 'v41', 'home.html'), 'utf8');
     assert.ok(!html.includes('modulepreload:start'), 'home.html에 수동 목록을 넣지 않는다(vite가 만든다)');
 
