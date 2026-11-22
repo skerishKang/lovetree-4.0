@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { readFileSync } from 'node:fs';
 import '../public/v41/youtube-id.mjs'; // #1060: 정본 등록을 vm 시험에도 적용한다.
+import '../public/v41/html-escape.mjs'; // A-15: 글자 막기 정본을 vm 에도 넣는다.
 import {
   VIDEO_STATUS_TTL_MS,
   VIDEO_STATUS_CACHE_KEY,
@@ -149,6 +150,7 @@ const docStub = {
 const scope = {
   window: {}, URL, URLSearchParams, setTimeout, clearTimeout,
   LTYouTubeId: globalThis.LTYouTubeId, // #1060: 정본이 등록한 단계 주소 함수를 vm 에도 넣는다.
+  LTEscapeHtml: globalThis.LTEscapeHtml, // A-15: 글자 막기 정본을 vm 에도 넣는다.
   document: docStub,
   MutationObserver: function () { this.observe = () => {}; this.disconnect = () => {}; },
   // 화면에 보이는 판정을 흉내 낸다 — 관찰하는 순간 보이는 것으로 알려 준다(online 재검사 시험용).

@@ -6,8 +6,18 @@ const KIND_LABEL = {opinion: '의견', journal: '일지'};
 // #638: 고객에게 보이는 상태 말은 쉬운 말로 쓴다(운영센터의 말은 src/admin-view.js가 따로 쓴다).
 const STATUS_LABEL = {received: '받았어요', reviewing: '살펴보는 중', fixed: '고쳤어요', later: '다음에', closed: '답했어요'};
 const REPLY_SEEN_KEY = 'lt41.replySeen';
-const esc = value => String(value ?? '').replace(/[&<>"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
-const time = value => { const d = new Date(value); return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString('ko-KR', {hour12: false}); };
+// A-15·A-20: 글자 막기·날짜 표기는 화면 정본 한 벌을 쓴다.
+import { escapeHtml as esc } from './html-escape.mjs';
+import { formatDisplayDate } from './book-usability.mjs';
+
+const dateStyle = () => {
+  try { const value = globalThis.localStorage?.getItem?.('lt41.dateStyle'); return value === 'dash' || value === 'long' ? value : 'dot'; }
+  catch { return 'dot'; }
+};
+const time = value => {
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? '—' : formatDisplayDate(value, dateStyle());
+};
 
 function createApi(fetchImpl = (...args) => fetch(...args)) {
   async function call(path, init = {}) {

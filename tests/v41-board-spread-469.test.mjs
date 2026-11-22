@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { exampleTree } from '../public/v41/example.mjs';
 // 화면과 같은 조건: 일반 스크립트가 window.LT58Model 하나를 남긴다(v41-board-model.test.mjs와 같다).
 globalThis.window = globalThis;
+import '../public/v41/html-escape.mjs'; // A-15: 글자 막기 정본을 먼저 등록한다.
 await import('../public/v41/views/board/board-model.js');
 const LT58Model = globalThis.LT58Model;
 

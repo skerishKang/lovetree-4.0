@@ -32,9 +32,7 @@ function ensureStyle(doc) {
   style.textContent = STYLE_TEXT;
   doc.head?.appendChild(style);
 }
-function esc(text) {
-  return String(text ?? '').replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
-}
+import { escapeHtml as esc } from './html-escape.mjs'; // A-15: 글자 막기 정본 한 벌
 /**
  * 재생 중 iframe을 넣을 칸을 만든다. host 안의 기존 내용은 비우고
  * 칸(.yt-video-cell)=무대(.yt-video-stage)+아래 단추 줄(.yt-video-row)을 만든다.
