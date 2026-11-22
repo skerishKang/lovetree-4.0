@@ -134,6 +134,17 @@ html[data-lt-theme=garden] #context-kind{color:var(--lt-rose-ink)}
 @media(max-width:600px){.community-top{gap:8px;margin-bottom:20px}.community-top>strong{font-size:10px}.community-top nav{overflow-x:auto}.community-top nav button,.community-top nav span{padding:0 8px;white-space:nowrap;font-size:12px}.community-top .close{width:40px;height:40px;flex-shrink:0}}
 
 /* 2026-11-05 첫 화면 기준 시각 통일: 안쪽 화면은 첫 화면과 같은 검은 무대 위 금테 카드 안에 놓인다. 첫 화면(body.home-screen)은 원래 전면 구성 그대로다. */
+/* #1026: 내용이 늦을 때 무대 자리에 먼저 잡아 둔 틀 — 자리를 밀지 않게 덮개로 띄운다. */
+#stage{position:relative}
+.stage-loading{position:absolute;inset:0;z-index:6;display:grid;place-items:center;align-content:center;gap:18px;background:var(--lt-stage);opacity:0;transition:opacity .2s ease;pointer-events:none}
+.stage-loading.is-on{opacity:1}
+.stage-loading.is-still{transition:none}
+.stage-loading-frame{display:flex;align-items:flex-end;justify-content:center;gap:12px;width:min(420px,76%);height:min(210px,42%)}
+.stage-loading-card{flex:1 1 0;max-width:120px;height:100%;border:1px solid var(--lt-line);border-radius:14px;background:var(--lt-stage-2)}
+.stage-loading-text{margin:0;color:var(--muted);font-size:12px;letter-spacing:.04em}
+.stage-loading-retry{min-height:44px;padding:0 16px;border:1px solid var(--lt-gold-line);border-radius:999px;color:var(--lt-pearl);background:none;font-size:12px;pointer-events:auto}
+.stage-loading-retry[hidden]{display:none}
+@media(prefers-reduced-motion:reduce){.stage-loading{transition:none}}
 body:not(.home-screen) #stage{padding:10px 14px 14px;background:radial-gradient(circle at 50% 0,var(--lt-stage-2),var(--lt-stage) 55%,#000)}
 body:not(.home-screen) iframe{border-radius:16px;border:1px solid var(--lt-gold-line);box-shadow:0 0 0 1px rgba(255,230,166,.1),0 0 32px rgba(238,190,104,.16),0 24px 60px rgba(0,0,0,.5)}
 @media(max-width:780px){body:not(.home-screen) #stage{padding:6px 6px 8px}body:not(.home-screen) iframe{border-radius:12px}}

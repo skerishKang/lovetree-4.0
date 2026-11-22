@@ -22,6 +22,7 @@ import {screens,screenForView,viewForFile,themedViewFor} from './shell/navigatio
 import {createScreens} from './shell/screens.mjs';
 import {createHomeLink} from './shell/home-link.mjs';
 import {createCommunityScreen} from './shell/community-screen.mjs';
+import {createStageLoading} from './shell/stage-loading.mjs';
 import {createHeader} from './shell/header.mjs';
 import {createAuth} from './shell/auth.mjs';
 import {createPanels} from './shell/panels.mjs';
@@ -298,7 +299,9 @@ if(window.visualViewport){const fabKbd=()=>document.body.classList.toggle('lt-kb
 const initialRoute=parseSelectionRoute(location.hash);
 let model=null,current=screenForView(initialRoute.view)[1],source='example',loadGeneration=0,previousDirty=false,member=null,handledHash=null,activeShareId=null,resumeAfterStart=null;
 // #1092: 둘러보기 화면 — 창 모듈의 showModal 호출을 비모달 화면 열기로 바꾸고, 닫을 때 #explore 주소 기록을 지킨다.
-const shellCommunityScreen=createCommunityScreen({$,setHandled:hash=>{handledHash=hash;},flowNavigation});
+// #1026: 0.8초 안에 내용이 오지 않으면 무대에 불러오는 중을 띄운다(움직임 끄기 설정은 표시할 때 읽는다).
+const shellStageLoading=createStageLoading({$,isMotionOff:()=>motionPaused});
+const shellCommunityScreen=createCommunityScreen({$,setHandled:hash=>{handledHash=hash;},flowNavigation,stageLoading:shellStageLoading});
 // #583 '이 순간 열기': 주소(#my/network?tree=…&moment=…)로 지도를 특정 순간을 가운데 두고 열 요청이 오면
 // 여기에 한 번 적어 두고, 지도 프레임을 띄울 때(show) 소비해 프레임 주소에 ?open=<순간>을 붙인다.
 // 지도(network.js)는 이 표시가 있을 때만 그 순간을 고른 상태로 가운데에 둔다 — 그냥 지도를 열 때는
@@ -761,7 +764,10 @@ function watchFrameSheet(frame){
 function frames(){return shellScreens.frames();}
 function hideFrames(){return shellScreens.hideFrames();}
 function showInFrame(url,title){return shellScreens.showInFrame(url,title);}
-function show(file,write=true,treeKey=''){return shellScreens.show(file,write,treeKey);}
+function show(file,write=true,treeKey=''){
+ if(file==='src064-orbit.html')shellStageLoading.start('home');else shellStageLoading.cancel();
+ return shellScreens.show(file,write,treeKey);
+}
 function frameLoaded(frame){return shellScreens.frameLoaded(frame);}
 
 // #380 5번: '정리하기' 입구는 트리 ▾ 드롭다운 한 곳에서만 그린다(renderTreeMenu). 헤더 단추는 없앴다.
@@ -1211,6 +1217,7 @@ else if(shouldLoadMemberRecords(location.search,document.cookie,location.hash)||
  clear();
 }else{
  // 로그아웃·신규 사용자는 예시가 실제 내용이므로 필요한 이 순간에만 동적으로 받는다.
+ shellStageLoading.start('home');
  exampleInitializing=true;
  void loadExampleTree().then(tree=>{if(source!=='server'&&source!=='share')load(null,'example',{}, {},tree);exampleInitializing=false;}).catch(()=>{exampleInitializing=false;});
 }
