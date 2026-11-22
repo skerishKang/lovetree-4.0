@@ -61,6 +61,7 @@ export function createShareService({ shareRepo, workspaceRepo, visibilityRepo = 
   const refreshStages = subjectId => refreshStageIndex(stageIndex, { productId, subjectId });
   // #1163(#1068 2단계): 응답 뒤에 시작되는 보임 동기화의 진행 중 Promise — 시험·종료 정리가 기다린다.
   const showTasks = new Set();
+  const showBusy = new Map();
 
   // 저장 응답 전(숨김): 문서에서 사라진 트리의 공유 행(자동·주인 모두)을 즉시 내리고, 그 트리의 소개 행도 지운다.
   // 늦게 반영되면 숨긴 게 잠깐 보일 수 있으므로 저장 응답 전에 전체 대조로 끝낸다.
@@ -131,8 +132,19 @@ export function createShareService({ shareRepo, workspaceRepo, visibilityRepo = 
     }
   }
 
+  // 같은 계정의 보임 동기화는 겹쳐 돌지 않는다(#1163): 진행 중이면 새로 시작하지 않고 '끝나면 한 번
+  // 더'만 남긴다 — 저장이 연달아 와도 마지막 상태로 전체 대조가 한 번 더 도는 정도다.
   function beginVisibleSync(subjectId, changedTreeIds) {
-    const task = syncVisibleShareRows(subjectId, changedTreeIds).finally(() => showTasks.delete(task));
+    const busy = showBusy.get(subjectId);
+    if (busy) { busy.again = true; return busy.task; }
+    const entry = { again: false };
+    const task = syncVisibleShareRows(subjectId, changedTreeIds).finally(() => {
+      showBusy.delete(subjectId);
+      showTasks.delete(task);
+      if (entry.again) beginVisibleSync(subjectId, null);
+    });
+    entry.task = task;
+    showBusy.set(subjectId, entry);
     showTasks.add(task);
     return task;
   }
@@ -240,9 +252,9 @@ export function createShareService({ shareRepo, workspaceRepo, visibilityRepo = 
       catch { return; }
       beginVisibleSync(subjectId, null);
     },
-    // 진행 중인 보임 동기화가 모두 끝날 때까지 기다린다 — 시험·종료 정리용.
+    // 진행 중인 보임 동기화가 모두 끝날 때까지 기다린다 — '끝나면 한 번 더' 재시작까지 커버한다(시험·종료 정리용).
     async waitForShowSync() {
-      await Promise.allSettled([...showTasks]);
+      while (showTasks.size) await Promise.allSettled([...showTasks]);
     },
     // #538: 트리 공개 상태. 비공개는 누구나 무료로 바꿀 수 있다 — 본인 트리만 바꿀 수 있다(#830).
     // 응답에 소개 여부(discover)를 함께 돌려준다 — 화면이 두 값을 한 번에 본다.
