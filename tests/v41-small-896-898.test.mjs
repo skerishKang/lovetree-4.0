@@ -11,15 +11,17 @@ const home = read('v41/home.js');
 const orbit = read('src/views/orbit.js');
 
 test('#897 책 갈림길 탭: 책 안쪽 오른쪽 가장자리에 붙인다(밖으로 삐져나오지 않는다)', () => {
+  // #1094: 가장자리에서 10px 안쪽으로 들여 가장자리 밖 노출을 없앤다(전 모서리 둥근 모양).
   const rule = bookCss.match(/\.branch-tab\{[^}]*\}/)?.[0] || '';
-  assert.match(rule, /right:0/, '탭은 책 판 오른쪽 가장자리 안에 붙는다');
+  assert.match(rule, /right:10px/, '탭은 책 판 오른쪽 가장자리 안쪽(10px 여백)에 둔다');
   assert.doesNotMatch(rule, /right:-\d+px/, '책 밖으로 삐져나오던 옛 자리는 뺐다');
-  assert.match(rule, /border-radius:10px 0 0 10px/, '안쪽 가장자리에 붙은 탭 모양(왼쪽만 둥글게)');
+  assert.match(rule, /border-radius:10px;/, '안쪽에 뜬 탭 모양(전 모서리 둥글게)');
   assert.match(rule, /bottom:44px/, '본문과 겹치지 않게 페이지 아래 줄 자리(오른쪽 쪽수 위)');
   assert.doesNotMatch(rule, /border-left:0/, '왼쪽 테두리를 다시 둔다');
   // 390(휴대폰)은 페이지 아래 줄 — 지금처럼 유지한다.
   const phone = bookCss.match(/html\[data-book-shape=phone\] \.branch-tab\{[^}]*\}/)?.[0] || '';
   assert.match(phone, /bottom:44px/, '휴대폰에서는 아래 줄 자리 그대로');
+  assert.match(phone, /right:10px/, '휴대폰에서도 책 안쪽에 둔다');
 });
 
 test('#898 ① 자세한 추가 창은 맨 위부터 연다(다듬기로 넘어와도 스크롤이 중간에 남지 않는다)', () => {

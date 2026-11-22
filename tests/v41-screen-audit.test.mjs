@@ -2657,3 +2657,71 @@ test('#987 보드 첫 줄과 모바일 셸 겹침·현재 표시', { skip: REQUI
   } finally { await browser.close(); await new Promise(r => server.close(r)); }
   assert.deepEqual(failures, []);
 });
+
+// #1094 후속: 390 서재 목록 첫 화면(스크롤 전)에서 화면에 붙은 아래 링크 줄이
+// '책 속의 트리' 상자 위에 포개지지 않는다(겹침 넓이 0, 상자는 끝까지 보인다).
+test('#1094 390 목록 첫 화면 아래 링크 × 책 속의 트리 겹침 0', { skip: REQUIRE ? false : skip, timeout: 180000 }, async () => {
+  if (skip) assert.fail(skip);
+  const server = await serve();
+  const base = 'http://127.0.0.1:' + server.address().port;
+  const browser = await chromium.launch({ headless: true });
+  const input = (title, date) => ({ subject: '겹침 시험', title, note: '화면 확인용 가짜 기록', emotion: '설렘', date, url: '' });
+  let tree = createTree(input('겹침 시험 책', '2026-11-22'), '2026-11-22T00:00:00.000Z');
+  tree = addMoment(tree, input('둘째 순간', '2026-11-21'), tree.moments[0].id, '2026-11-21T00:00:00.000Z');
+  const workspace = { revision: 1, state: { version: 1, trees: [tree], prefs: { bookDisplay: 'list' } }, subject: 'visual-audit-fake', writeSubjectBound: true, savedAt: '2026-11-22T00:00:00.000Z' };
+  try {
+    for (const theme of ['night', 'garden']) {
+      const ctx = await browser.newContext({ viewport: { width: 390, height: 900 }, reducedMotion: 'reduce' });
+      try {
+        await ctx.addInitScript((t) => { try { localStorage.setItem('lt41.theme', t); localStorage.setItem('lt41.updatesCardDay', 'audit'); } catch {} }, theme);
+        await ctx.route('**/*', (route) => {
+          const u = new URL(route.request().url());
+          if (u.origin !== base) return u.hostname === 'i.ytimg.com' || u.hostname === 'audit.invalid' ? THUMB(route) : route.abort();
+          if (u.pathname === '/api/workspace') return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(workspace) });
+          if (u.pathname === '/api/account') return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, email: 'audit@example.invalid', subject: 'visual-audit-fake' }) });
+          if (u.pathname.startsWith('/api/')) return route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' });
+          return route.continue();
+        });
+        const page = await ctx.newPage();
+        await page.goto(base + '/v41/?account=1', { waitUntil: 'domcontentloaded' });
+        await page.goto(base + '/v41/?account=1#my/shelf', { waitUntil: 'load' });
+        await page.waitForFunction(() => window.LT41?.trees?.length === 1 && !document.querySelector('#account-avatar')?.hidden, null, { timeout: 20000 });
+        await page.waitForTimeout(1200);
+        const frame = page.frames().find((f) => /track32-bookshelf/.test(f.url()));
+        assert.ok(frame, '책장 화면이 열린다');
+        await frame.waitForSelector('.book-card', { timeout: 10000 });
+        await frame.evaluate(() => localStorage.setItem('lt41.bookDisplay', 'list'));
+        await frame.locator('.book-card').first().click();
+        await frame.waitForFunction(() => document.querySelector('#readerScreen')?.classList.contains('active'));
+        await frame.locator('.info-rule').waitFor();
+        await page.waitForTimeout(700);
+        const m = await page.evaluate(() => {
+          const f = document.getElementById('view'), fr = f.getBoundingClientRect(), d = f.contentDocument;
+          const links = document.querySelector('.home-links'), ls = getComputedStyle(links), lr = links.getBoundingClientRect();
+          const linksShown = ls.display !== 'none' && ls.visibility !== 'hidden' && lr.width > 0 && lr.height > 0;
+          const box = d.querySelector('.info-rule'), br = box.getBoundingClientRect();
+          const screen = d.querySelector('#readerScreen'), sr = screen.getBoundingClientRect();
+          const clip = { left: Math.max(fr.left, fr.left + sr.left), right: Math.min(fr.right, fr.left + sr.right), top: Math.max(fr.top, fr.top + sr.top), bottom: Math.min(fr.bottom, fr.top + sr.bottom) };
+          const shown = { left: Math.max(fr.left + br.left, clip.left), right: Math.min(fr.left + br.right, clip.right), top: Math.max(fr.top + br.top, clip.top), bottom: Math.min(fr.top + br.bottom, clip.bottom) };
+          const overlap = linksShown
+            ? Math.max(0, Math.min(lr.right, shown.right) - Math.max(lr.left, shown.left)) * Math.max(0, Math.min(lr.bottom, shown.bottom) - Math.max(lr.top, shown.top))
+            : 0;
+          return {
+            text: box.textContent.trim(), scrollTop: screen.scrollTop, linksDisplay: ls.display,
+            box: { x: Math.round(fr.left + br.left), y: Math.round(fr.top + br.top), width: Math.round(br.width), height: Math.round(br.height) },
+            visible: { width: Math.round(Math.max(0, shown.right - shown.left)), height: Math.round(Math.max(0, shown.bottom - shown.top)), bottom: Math.round(shown.bottom) },
+            viewportHeight: innerHeight, overlap: Math.round(overlap)
+          };
+        });
+        console.log('#1094 list', theme, JSON.stringify(m));
+        assert.match(m.text, /책 속의 트리/, theme + ': ' + m.text);
+        assert.equal(m.scrollTop, 0, theme + ': 스크롤 전 첫 화면에서 잰다');
+        assert.equal(m.overlap, 0, theme + ': 아래 링크 × 책 속의 트리 겹침 넓이 0 — ' + JSON.stringify(m));
+        assert.equal(m.visible.width, m.box.width, theme + ': 트리 상자 가로가 잘리지 않는다 — ' + JSON.stringify(m));
+        assert.equal(m.visible.height, m.box.height, theme + ': 트리 상자 세로가 잘리지 않는다 — ' + JSON.stringify(m));
+        assert.ok(m.visible.bottom <= m.viewportHeight, theme + ': 트리 상자가 화면 안에 있다 — ' + JSON.stringify(m));
+        assert.equal(m.linksDisplay, 'none', theme + ': 390 서재에서는 바닥 링크 줄이 내용 위에 뜨지 않는다 — ' + JSON.stringify(m));
+      } finally { await ctx.close(); }
+    }
+  } finally { await browser.close(); await new Promise((r) => server.close(r)); }
+});

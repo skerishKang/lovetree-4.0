@@ -115,6 +115,8 @@ import { createReader } from './shelf-reader.js';
         strip.dataset.resumeKind=info.kind;
         strip.onclick=function(){
           if(info.kind==='first'){parent.postMessage({type:'lt41-write',mode:'new'},location.origin);return;}
+          // #1094 목록 방식: 띠도 목록으로 곧바로 연다(책 방식은 지금처럼 책으로 바로 간다).
+          if(reader&&typeof reader.shelfBookDisplay==='function'&&reader.shelfBookDisplay()==='list'){openReader(info.book.id,null);return;}
           if(info.moment)LTDEMO.openBook(info.moment.id,info.book.id);
           else LTDEMO.openBook(info.book.chapters[0]&&info.book.chapters[0].id,info.book.id);
         };
