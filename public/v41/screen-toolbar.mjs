@@ -30,9 +30,20 @@ export function mountScreenToolbar({ screen, titleFrom, tools = [], initialBar =
   // 상단 메뉴의 실제 높이를 기준으로 하고 도구 줄 높이는 CSS 변수 하나를 쓴다.
   const align = () => {
     if (!header) return;
-    const bottom = Math.round(header.getBoundingClientRect().bottom) + 4;
     bar.style.setProperty('--lt-toolbar-pad', getComputedStyle(header).paddingLeft);
-    document.documentElement.style.setProperty('--lt-toolbar-top', `${bottom}px`);
+    const root = document.documentElement;
+    // #886: the board's fixed header and first-paint positions are set in board.css.
+    // Only its wrapping narrow header needs measurement; never overwrite desktop geometry.
+    if (screen === 'board') {
+      if (!matchMedia('(max-width:580px)').matches) {
+        root.style.removeProperty('--lt-toolbar-top');
+        return;
+      }
+      if (header.offsetHeight > 0) root.style.setProperty('--lt-toolbar-top', `${header.offsetHeight + 4}px`);
+      return;
+    }
+    const bottom = Math.round(header.getBoundingClientRect().bottom) + 4;
+    root.style.setProperty('--lt-toolbar-top', `${bottom}px`);
   };
   align();
 
@@ -63,8 +74,11 @@ export function mountScreenToolbar({ screen, titleFrom, tools = [], initialBar =
     more.hidden = false;
   };
   more.addEventListener('click', () => { menu.hidden = !menu.hidden; });
-  if (typeof ResizeObserver === 'function') new ResizeObserver(reflow).observe(bar);
-  else window.addEventListener('resize', reflow);
+  if (typeof ResizeObserver === 'function') {
+    const observer = new ResizeObserver(reflow);
+    observer.observe(bar);
+    if (screen === 'board' && header) observer.observe(header);
+  } else window.addEventListener('resize', reflow);
   reflow();
 
   return { bar, title, group, more, menu };
