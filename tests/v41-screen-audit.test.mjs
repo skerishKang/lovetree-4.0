@@ -2774,88 +2774,118 @@ test('#1093 선반 40권 아래 링크와 책 겹침 0', { skip: REQUIRE ? false
   } finally { await browser.close(); await new Promise((r) => server.close(r)); }
 });
 
-// #1026: 내용이 0.8초 안에 오지 않으면 불러오는 중을 띄우고, 빠르면 띄우지 않는다(자리 밀림 없이).
+// #1026: 첫 누름부터 카드가 보일 때까지 안내와 자리 밀림을 화면에 그려지는 판마다 잰다.
 test('#1026 무대 불러오는 중 표시 — 느림 표시·빠름 비표시·자리 밀림 0', { skip: REQUIRE ? false : skip, timeout: 180000 }, async () => {
   if (skip) assert.fail(skip);
   const server = await serve();
   const base = 'http://127.0.0.1:' + server.address().port;
   const browser = await chromium.launch({ headless: true });
   const share = COMMUNITY_CARDS[0];
-  // 실제 열린 표시는 #community-panel[open] + body.community-screen이다.
-  // 실행기가 느려 단추 배선이 늦게 붙을 수 있어, 열릴 때까지 누르기를 되풀이한다.
-  const openExplore = async (page) => {
-    await page.waitForFunction(() => !!window.LT41 && !!document.getElementById('community-menu'), null, { timeout: 30000 });
-    for (let i = 0; i < 30; i++) {
-      const opened = await page.evaluate(() => document.getElementById('community-panel')?.open === true || document.body.classList.contains('community-screen'));
-      if (opened) return;
-      await page.evaluate(() => document.getElementById('community-menu').click());
-      await page.waitForTimeout(500);
-    }
-    assert.fail('둘러보기 패널이 열리지 않았다');
-  };
+  const workspace = { revision: 1, state: { version: 1, trees: [firstTree], prefs: {} }, subject: 'visual-audit-fake', writeSubjectBound: true, savedAt: '2026-11-22T00:00:00.000Z' };
+  const picture = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Z5x8AAAAASUVORK5CYII=', 'base64');
+  const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+
   try {
-    for (const slow of [true, false]) {
+    for (const [condition, delay, shareDelay] of [['느림', 2000, 2000], ['빠름', 0, 0], ['다시 시도', 0, 11500]]) {
       const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
       try {
-        await ctx.addInitScript(() => {
-          window.__cls1026 = 0;
-          new PerformanceObserver((list) => { for (const e of list.getEntries()) if (!e.hadRecentInput) window.__cls1026 += e.value; }).observe({ type: 'layout-shift', buffered: true });
+        await ctx.route('**/*', async route => {
+          const url = new URL(route.request().url());
+          if (url.hostname === 'i.ytimg.com' || /\.(webp|png|jpe?g)$/.test(url.pathname)) {
+            if (delay) await wait(delay);
+            return route.fulfill({ contentType: 'image/png', body: picture });
+          }
+          if (url.hostname !== '127.0.0.1') return route.abort();
+          if (!url.pathname.startsWith('/api/')) {
+            // 둘러보기 코드가 늦게 와도 보이는 단추는 한 번만 눌러 열 수 있어야 한다.
+            if (condition === '빠름' && url.pathname.endsWith('/community-panel.mjs')) await wait(500);
+            return route.continue();
+          }
+          const shares = url.pathname === '/api/community/shares';
+          const hold = shares ? shareDelay : delay;
+          if (hold) await wait(hold);
+          const json = shares ? { ok: true, items: [share], totalVisible: 1, nextCursor: '', groups: [], groupsAll: [] }
+            : url.pathname === '/api/workspace' ? workspace : { ok: true, items: [] };
+          return route.fulfill({ json });
         });
-        // 실행기 속도와 무관하게: 빠른 조건은 데이터·그림을 즉시, 느린 조건은 2초 붙잡아 돌려준다.
-        const tiny = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Z5x8AAAAASUVORK5CYII=', 'base64');
-        const hold = () => slow ? new Promise((ok) => setTimeout(ok, 2000)) : Promise.resolve();
-        await ctx.route('**/*', async (r) => {
-          const u = new URL(r.request().url());
-          if (u.hostname !== 'i.ytimg.com' && !/\.(webp|png|jpe?g)$/.test(u.pathname)) return r.continue();
-          await hold();
-          return r.fulfill({ status: 200, contentType: 'image/png', body: tiny });
-        });
-        await ctx.route('**/api/**', async (r) => { await hold(); return r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }); });
-        await ctx.route('**/api/workspace**', async (r) => { await hold(); return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ revision: 1, state: { version: 1, trees: [], prefs: {} }, subject: 'visual-audit-fake', writeSubjectBound: true, savedAt: '2026-11-22T00:00:00.000Z' }) }); });
-        await ctx.route('**/api/community/shares**', async (r) => { await hold(); return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, items: [share], totalVisible: 1, nextCursor: '', groups: [], groupsAll: [] }) }); });
+
         const page = await ctx.newPage();
-        const state = () => page.evaluate(() => {
-          const el = document.getElementById('stage-loading');
-          return { hidden: el.hidden, opacity: Number(getComputedStyle(el).opacity), text: document.getElementById('stage-loading-text').textContent, retryHidden: document.getElementById('stage-loading-retry').hidden, cls: window.__cls1026 };
+        await page.goto(base + '/v41/?account=1', { waitUntil: 'domcontentloaded' });
+        await page.evaluate(() => {
+          const record = window.stageAudit = { loadingAt: null, retryAt: null, at800: null, at10000: null, box: null, cls: 0 };
+          const addShifts = entries => {
+            for (const entry of entries) if (!entry.hadRecentInput) record.cls += entry.value;
+          };
+          const observer = new PerformanceObserver(list => addShifts(list.getEntries()));
+          observer.observe({ type: 'layout-shift', buffered: true });
+          const visible = el => {
+            if (!el.checkVisibility({ opacityProperty: true, visibilityProperty: true })) return false;
+            const box = el.getBoundingClientRect();
+            return box.width > 0 && box.height > 0 && box.right > 0 && box.bottom > 0 && box.left < innerWidth && box.top < innerHeight;
+          };
+          const notice = () => [...document.querySelectorAll('[role="status"]')].find(el =>
+            el.textContent.includes('불러오는 중') && visible(el) && el.innerText.trim() === '불러오는 중'
+          );
+          const retry = () => [...document.querySelectorAll('button')].find(el => /느리게 불러오고 있어요.*다시 시도/.test(el.textContent) && visible(el));
+          // 타이머가 끝난 뒤 화면을 그릴 기회 두 번을 준다. 실행기 속도에 맞춰 기준 시간을 늘리지 않는다.
+          const afterPaint = (ms, read) => setTimeout(() => requestAnimationFrame(() => requestAnimationFrame(read)), ms);
+          document.addEventListener('click', () => {
+            const start = performance.now();
+            const sample = () => {
+              const time = performance.now() - start;
+              const loading = notice();
+              if (loading && record.loadingAt === null) {
+                record.loadingAt = time;
+                const { x, y, width, height } = loading.getBoundingClientRect();
+                record.box = { x, y, width, height };
+                const fontSize = parseFloat(getComputedStyle(loading).fontSize);
+                record.hasFrame = [...loading.querySelectorAll('*')].some(el => {
+                  if (el.childElementCount || el.textContent.trim() || !visible(el)) return false;
+                  const rect = el.getBoundingClientRect();
+                  return rect.width > fontSize && rect.height > fontSize;
+                });
+              }
+              if (record.retryAt === null && retry()) record.retryAt = time;
+              requestAnimationFrame(sample);
+            };
+            requestAnimationFrame(sample);
+            afterPaint(800, () => { record.at800 = !!notice(); });
+            afterPaint(10000, () => { record.at10000 = !!retry(); });
+          }, { capture: true, once: true });
+          window.finishStageAudit = () => {
+            addShifts(observer.takeRecords());
+            return { ...record, loading: !!notice(), retry: !!retry() };
+          };
         });
-        if (slow) {
-          await page.goto(base + '/v41/', { waitUntil: 'domcontentloaded' });
-          await openExplore(page);
-          await page.waitForTimeout(1100);
-          const m = await state();
-          console.log('#1026 slow', JSON.stringify(m));
-          assert.equal(m.hidden, false, '느린 조건에서 0.8초 뒤 표시가 보인다');
-          assert.ok(m.opacity > 0.9, '표시가 완전히 보인다');
-          assert.match(m.text, /불러오는 중/, '짧은 안내 문구');
-          assert.equal(m.retryHidden, true, '10초 전에는 다시 시도 줄이 없다');
-          await page.waitForSelector('#community-panel[open] #community-list .community-card', { timeout: 15000 });
-          await page.waitForFunction(() => document.getElementById('stage-loading').hidden, null, { timeout: 5000 });
-          const after = await state();
-          assert.ok(after.cls <= 0.1, '내용 도착 뒤 자리 밀림 0.1 이하 — ' + JSON.stringify(after));
-        } else {
-          await page.goto(base + '/v41/', { waitUntil: 'domcontentloaded' });
-          await openExplore(page);
-          await page.waitForTimeout(700);
-          const m = await state();
-          console.log('#1026 fast', JSON.stringify(m));
-          assert.equal(m.hidden, true, '빠른 조건에서는 표시가 뜨지 않는다');
+        await page.getByRole('button', { name: '둘러보기', exact: true }).click();
+        const card = page.getByRole('button', { name: new RegExp(share.title) });
+        if (condition === '다시 시도') {
+          await page.getByRole('button', { name: /느리게 불러오고 있어요.*다시 시도/ }).waitFor();
+          await page.waitForFunction(() => window.stageAudit.at10000 !== null);
         }
+        await page.getByRole('heading', { name: share.title, exact: true }).waitFor();
+        const cover = await card.locator('img').elementHandle();
+        await page.waitForFunction(img => img.complete && img.naturalWidth > 0 && img.checkVisibility({ opacityProperty: true, visibilityProperty: true }), cover);
+        await page.waitForFunction(() => {
+          const state = window.finishStageAudit();
+          return state.at800 !== null && !state.loading && !state.retry;
+        });
+        await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+        const result = await page.evaluate(() => window.finishStageAudit());
+        console.log('#1026', condition, JSON.stringify(result));
+        assert.ok(result.cls <= 0.1, '카드가 보인 뒤 자리 밀림은 0.1 이하다');
+        if (condition === '빠름') {
+          assert.equal(result.loadingAt, null, '즉시 응답하면 0.8초가 지나도 안내가 한 번도 보이지 않는다');
+        } else {
+          assert.ok(result.loadingAt >= 800 && result.at800, '0.8초부터 불러오는 중 안내가 보인다');
+          assert.equal(result.hasFrame, true, '안내에는 납작한 선보다 폭과 높이가 큰 자리 틀이 보인다');
+          const { x, y, width, height } = result.box;
+          const stage = await page.getByRole('main').boundingBox();
+          assert.ok(x <= stage.x && y <= stage.y && x + width >= stage.x + stage.width && y + height >= stage.y + stage.height, '안내가 내용이 도착할 무대 자리를 차지한다');
+        }
+        if (condition === '다시 시도') assert.ok(result.retryAt >= 10000 && result.at10000, '다시 시도 단추가 10초부터 보인다');
+        else assert.equal(result.retryAt, null, '10초 전에 다시 시도 단추가 보이지 않는다');
       } finally { await ctx.close(); }
     }
-    // 10초가 넘으면 다시 시도 줄이 뜬다.
-    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
-    try {
-      await ctx.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"items":[]}' }));
-      await ctx.route('**/api/workspace**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ revision: 1, state: { version: 1, trees: [], prefs: {} }, subject: 'visual-audit-fake', writeSubjectBound: true, savedAt: '2026-11-22T00:00:00.000Z' }) }));
-      await ctx.route('**/api/community/shares**', (r) => new Promise((ok) => setTimeout(ok, 11500)).then(() => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, items: [share], totalVisible: 1, nextCursor: '', groups: [], groupsAll: [] }) })));
-      const page = await ctx.newPage();
-      await page.goto(base + '/v41/', { waitUntil: 'domcontentloaded' });
-      await openExplore(page);
-      await page.waitForFunction(() => !document.getElementById('stage-loading-retry').hidden, null, { timeout: 20000, polling: 500 });
-      const retryText = await page.locator('#stage-loading-retry').textContent();
-      console.log('#1026 retry', JSON.stringify({ retryText }));
-      assert.match(retryText, /느리게 불러오고 있어요/, '10초 뒤 느리다는 안내가 뜬다');
-      assert.match(retryText, /다시 시도/, '다시 시도 단추가 있다');
-    } finally { await ctx.close(); }
-  } finally { await browser.close(); await new Promise((r) => server.close(r)); }
+  } finally { await browser.close(); await new Promise(resolve => server.close(resolve)); }
 });

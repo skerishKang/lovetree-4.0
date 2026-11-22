@@ -18,13 +18,19 @@ export function createCommunityScreen(deps) {
   const viewTabs = () => document.querySelectorAll('nav [data-view]');
   const exploreHash = () => (/^#explore\/moments$/.test(location.hash) || /^#explore$/.test(location.hash) ? location.hash : '');
 
+  // 접기 메뉴와 첫 화면에서도 같은 단추로 들어온다. 목록을 받는 동안에는 갈 곳을 주소에 남긴다.
+  button.onclick = () => {
+    deps.stageLoading?.start('explore');
+    if (!exploreHash()) location.hash = '#explore';
+  };
+
   // 창 모듈이 부르는 showModal을 비모달 화면 열기로 바꾼다 — 열기 규칙(탭·메뉴·주소)은 창 모듈의 openPanel 한 벌을 그대로 탄다.
   dialog.showModal = function openAsScreen() {
     if (dialog.open) return;
+    deps.stageLoading?.start('explore'); // #1026: 카드가 늦으면 불러오는 중을 먼저 띄운다
     dialog.show();               // 비모달 — 뒤 덮개가 없어 상단 메뉴가 그대로 보인다
     paintPage(true);
     deps.flowNavigation?.();     // #1094: 서재 전용 보기 방식 토글을 둘러보기 화면에서 접는다
-    deps.stageLoading?.start('explore'); // #1026: 카드가 늦으면 불러오는 중을 먼저 띄운다
     // 주소도 다른 화면과 같은 방식 — 탭·메뉴로 열 때는 #explore 기록을 새로 쌓는다.
     // 주소(#explore·#explore/moments)로 열렸다면 이미 주소가 있으니 덮지 않는다.
     if (!exploreHash()) { history.pushState(null, '', '#explore'); setHandled?.('#explore'); }

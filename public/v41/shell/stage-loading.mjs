@@ -31,12 +31,14 @@ export function createStageLoading(deps) {
   }
   function show() {
     if (!active || !el) return;
+    if (contentReady()) { ready(); return; }
     el.hidden = false;
     if (deps.isMotionOff?.()) el.classList.add('is-still');
     requestAnimationFrame(() => el.classList.add('is-on'));
   }
   function showSlow() {
     if (!active || !text || !retry) return;
+    if (contentReady()) { ready(); return; }
     text.hidden = true;
     retry.hidden = false;
   }
@@ -67,6 +69,8 @@ export function createStageLoading(deps) {
     if (retry) retry.hidden = true;
   }
   function start(next) {
+    // 접기 메뉴에서 목록 연결을 기다린 시간도 같은 둘러보기 요청에 포함한다.
+    if (active && kind === 'explore' && next === kind) return;
     cancel();
     if (!el) return;
     kind = next;

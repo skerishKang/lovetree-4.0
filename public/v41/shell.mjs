@@ -764,6 +764,7 @@ function projectWorkspace(input){
  try{return workspaceModel(input);}
  catch(error){console.warn('[LT41] 작업 공간을 읽지 못했어요:',error?.message||String(error));return null;}
 }
+const onExploreRoute=()=>/^#explore(?:\/moments)?$/.test(location.hash);
 function load(input,kind,selection={},fallback={},example=null){
  const projected=kind==='example'?{trees:[example||exampleTree].filter(Boolean)}:projectWorkspace(input);
  if(!projected){
@@ -782,7 +783,9 @@ function load(input,kind,selection={},fallback={},example=null){
  document.body.dataset.treeCount=String(model?.trees?.length||0);
  // #368: 트리 고르기는 맨 위 트리 ▾ 드롭다운 한 곳이다(옛 내 기록 창의 select는 없앴다).
  const resolved=resolveAccountPosition(model.trees,selection,fallback),chosen=model.trees.find(t=>t.id===resolved.position.treeId);
- choose(chosen?.id,resolved.position.momentId);
+ // 예시나 회원 기록이 늦게 도착해도 먼저 고른 둘러보기는 그대로 둔다.
+ const keepExplore=(kind==='server'||(kind==='example'&&exampleInitializing))&&onExploreRoute();
+ choose(chosen?.id,resolved.position.momentId,keepExplore);
  return resolved;
 }
 function clear(){load({revision:0,state:{version:1,trees:[]}},'file');}
@@ -986,7 +989,7 @@ async function startMember(){setMemberRefreshStarted(true);if(!leaveMember())ret
    rememberShelfView(state.prefs?.shelfView);
    paintShelfViewControls();
    if(!backfillStarted&&snapshot.owned){backfillStarted=true;void runTitleBackfill(state,session);}
-   if(snapshot.owned&&resolved.position.treeId){if(viewForFile(current)!=='home')writeLocation('replace');takePendingOwnerRoute(sessionStorage);if(route?.scope==='owner'&&resolved.treeMissing)startupNotice='이 주소의 기록을 현재 계정에서 찾을 수 없어 최근 위치를 열었어요.';else if(route?.scope==='owner'&&resolved.momentMissing)startupNotice='이 주소의 순간을 찾을 수 없어 트리의 시작 순간을 열었어요.';}
+   if(snapshot.owned&&resolved.position.treeId){if(viewForFile(current)!=='home'&&!onExploreRoute())writeLocation('replace');takePendingOwnerRoute(sessionStorage);if(route?.scope==='owner'&&resolved.treeMissing)startupNotice='이 주소의 기록을 현재 계정에서 찾을 수 없어 최근 위치를 열었어요.';else if(route?.scope==='owner'&&resolved.momentMissing)startupNotice='이 주소의 순간을 찾을 수 없어 트리의 시작 순간을 열었어요.';}
  }catch(error){openFallbackShell(error);}},onStatus:status=>{if(generation===loadGeneration)memberStatus(status);},
  navigate:url=>{
   if(url.startsWith('/auth/login')&&parseSelectionRoute(location.hash).scope==='owner')stashPendingOwnerRoute(sessionStorage,location.hash);
@@ -1026,7 +1029,7 @@ for(const b of document.querySelectorAll('[data-shelf-view]'))b.onclick=()=>{
 };
 paintThemeControls();applyTheme();paintTitleDisplayControls();paintBookDisplayControls();paintShelfViewControls();applyAdvanced();
 if(initialRoute.scope==='public')showPublicRoute(initialRoute);
-else if(/^#explore/.test(location.hash)){/* #1025: 둘러보기가 자기 주소를 연다 — 예시 로드로 주소를 덮지 않는다. #1092: [트리] 보기(#explore)는 화면으로 바로 연다 — [순간](#explore/moments)은 창 모듈이 자기 주소로 연다. */
+else if(onExploreRoute()){/* #1025: 둘러보기가 자기 주소를 연다 — 예시 로드로 주소를 덮지 않는다. #1092: [트리] 보기(#explore)는 화면으로 바로 연다 — [순간](#explore/moments)은 창 모듈이 자기 주소로 연다. */
  if(location.hash==='#explore')shellCommunityScreen.openRoute();
 }
 else if(shouldLoadMemberRecords(location.search,document.cookie,location.hash)||shellIntake.pending()){
