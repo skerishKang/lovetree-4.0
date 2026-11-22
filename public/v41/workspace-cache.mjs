@@ -6,10 +6,28 @@ import { guardWorkspaceState } from './workspace-guard.mjs';
 
 const KEY_PREFIX = 'lovetree.v41.workspace-cache:';
 const LAST_KEY = 'lovetree.v41.workspace-cache:last';
+const ACCOUNT_KEY = 'lovetree.v41.account-marker';
 const MAX_BYTES = 1024 * 1024;
 const subjectValid = value => typeof value === 'string' && /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(value);
 
-export function readCachedWorkspace(storage) {
+// 로그인 표식: 서버가 계정을 확인한 뒤 남긴다. 다음 접속의 첫 그리기 전에 저장본 계정과 맞춘다.
+export function readAccountMarker(storage) {
+  if (!storage) return null;
+  try { const value = storage.getItem(ACCOUNT_KEY); return subjectValid(value) ? value : null; }
+  catch { return null; }
+}
+export function writeAccountMarker(storage, subject) {
+  if (!storage || !subjectValid(subject)) return false;
+  try { storage.setItem(ACCOUNT_KEY, subject); return true; }
+  catch { return false; }
+}
+export function clearAccountMarker(storage) {
+  if (!storage) return;
+  try { storage.removeItem(ACCOUNT_KEY); } catch { /* 접근 불가 */ }
+}
+
+// expectedSubject가 주어지면 같은 계정의 저장본만 돌려준다. 로그아웃·계정 불일치면 첫 그리기에 쓰지 않는다.
+export function readCachedWorkspace(storage, expectedSubject = null) {
   if (!storage) return null;
   let subject = null;
   try {
@@ -19,6 +37,8 @@ export function readCachedWorkspace(storage) {
     if (!raw) return null;
     const entry = JSON.parse(raw);
     if (entry?.version !== 1 || entry.subject !== subject) throw new Error('invalid_cache_entry');
+    // 다른 계정·로그아웃 상태에서는 저장본을 화면에 그리지 않는다. 저장본 자체는 남겨 둔다.
+    if (!subjectValid(expectedSubject) || expectedSubject !== subject) return null;
     // #986: 옛 저장본에는 어긋난 트리가 섞여 있을 수 있다. 저장본 통째를 버리지 않고
     // 어긋난 트리만 빼서 읽는다(안내는 서버 응답의 quarantined 개수가 알려 준다).
     // 뼈대 자체가 어긋난 저장본은 여전히 깨진 저장본이다 — 지운다.

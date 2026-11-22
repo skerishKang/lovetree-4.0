@@ -5,7 +5,7 @@ import {createWorkspaceApi, setMemberRefreshStarted} from './api.mjs';
 import {createShareApi} from './share-api.mjs';
 import {createMemberSession} from './member-session.mjs';
 import {hasPendingDraft} from './sync-controller.mjs';
-import {clearCachedWorkspace, readCachedWorkspace} from './workspace-cache.mjs';
+import {clearCachedWorkspace, readCachedWorkspace, readAccountMarker} from './workspace-cache.mjs';
 // #1026 E: 예시 데이터(1MB)는 정적으로 부르지 않는다 — 로그인 사용자의 화면 로딩을 막지 않게
 // 예시가 실제로 필요한 순간에만 동적으로 부른다(로그아웃 첫 화면, 예시 카드 열기, 예시 둘러보기).
 let exampleTree=null,examplePromise=null,exampleInitializing=false;
@@ -1129,7 +1129,7 @@ function memberStatus(status){
 async function startMember(){setMemberRefreshStarted(true);if(!leaveMember())return;backfillStarted=false;backfillAttempted.clear();const startup=parseSelectionRoute(location.hash);if(startup.scope==='owner')stashPendingOwnerRoute(sessionStorage,location.hash);++loadGeneration;const generation=loadGeneration;clear();
  const api=createWorkspaceApi({fetchImpl:(url,init)=>fetch(init?.method==='GET'&&url==='/api/workspace'?'/api/workspace?features=bound-writes':url,init)});
  let initialized=false,startupNotice='',session;
- session=createMemberSession({api,onGuard:read=>workspaceGuardNotice(read),onState:(state,selection,meta)=>{if(generation!==loadGeneration)return;try{
+ session=createMemberSession({api,expectedSubject:readAccountMarker(localStorage),onGuard:read=>workspaceGuardNotice(read),onState:(state,selection,meta)=>{if(generation!==loadGeneration)return;try{
   // 4.1 기억 보드 저장·트리 편집(#984)·한마디 저장/자동 제목 보정(#1001): 화면이 이미 자기 상태를 들고 있으므로 셸은 모델만 갱신하고 iframe을 다시 그리지 않는다.
   if(meta?.board||meta?.tree||meta?.moment){const projected=workspaceModel({revision:0,state});model=projected;if(window.LT41){const tree=projected.trees.find(t=>t.id===window.LT41.tree.id);if(tree){window.LT41.tree=tree;window.LT41.trees=projected.trees;window.LT41.writable=meta.board?true:(source==='server'&&!!member?.snapshot().writable);if(meta.moment&&!meta.story){if(selection?.momentId&&tree.moments.some(m=>m.id===selection.momentId))window.LT41.momentId=selection.momentId;try{for(const f of frames())f.contentWindow?.postMessage({type:'lt41-moments-saved',treeId:tree.id,momentId:window.LT41.momentId},location.origin);}catch{}}}}return;}const snapshot=session.snapshot(),saved=accountPosition(localStorage,snapshot.subject)||{},active=parseSelectionRoute(location.hash),pending=!initialized&&active.scope!=='owner'?pendingOwnerRoute(sessionStorage):null,route=active.scope==='owner'?active:pending;let requested=selection||stateSelection();
    if(!initialized){if(route)requested=route;else if(!selection)requested=saved;

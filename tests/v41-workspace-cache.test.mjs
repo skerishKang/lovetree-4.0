@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readCachedWorkspace, writeCachedWorkspace, clearCachedWorkspace} from '../public/v41/workspace-cache.mjs';
+import {readCachedWorkspace, writeCachedWorkspace, clearCachedWorkspace, readAccountMarker, writeAccountMarker, clearAccountMarker} from '../public/v41/workspace-cache.mjs';
 import {createMemberSession} from '../public/v41/member-session.mjs';
 import {createTree, EMPTY_STATE} from '../public/v41/domain.mjs';
 
@@ -25,7 +25,7 @@ test('#400 저장본 write→read 왕복은 계정과 상태를 그대로 돌려
   const storage = fakeStorage();
   const state = stateOf('서버 순간');
   assert.equal(writeCachedWorkspace(storage, 'member-A', state), true);
-  const cached = readCachedWorkspace(storage);
+  const cached = readCachedWorkspace(storage, 'member-A');
   assert.equal(cached.subject, 'member-A');
   assert.deepEqual(cached.state, state);
 });
@@ -36,7 +36,7 @@ test('#400 1MB가 넘으면 저장하지 않고 옛 저장본도 남기지 않�
   const huge = {version: 1, trees: [], prefs: {}, big: 'x'.repeat(1024 * 1024)};
   assert.equal(writeCachedWorkspace(storage, 'member-A', huge), false);
   assert.equal(storage.getItem(entryKey('member-A')), null);
-  assert.equal(readCachedWorkspace(storage), null);
+  assert.equal(readCachedWorkspace(storage, 'member-A'), null);
   assert.equal(storage.getItem(LAST), 'member-A');
 });
 
@@ -50,7 +50,7 @@ test('#400 깨진 저장본(JSON·계정 불일치·검증 실패)은 읽지 않
     const storage = fakeStorage();
     storage.setItem(LAST, 'member-A');
     storage.setItem(entryKey('member-A'), raw);
-    assert.equal(readCachedWorkspace(storage), null);
+    assert.equal(readCachedWorkspace(storage, 'member-A'), null);
     assert.equal(storage.getItem(entryKey('member-A')), null, '깨진 저장본이 남아 있으면 안 된다');
   }
 });
@@ -59,7 +59,7 @@ test('#400 계정별로 따로 저장하고 마지막 계정을 가리킨다', (
   const storage = fakeStorage();
   writeCachedWorkspace(storage, 'member-A', stateOf('A 기록'));
   writeCachedWorkspace(storage, 'member-B', stateOf('B 기록'));
-  assert.equal(readCachedWorkspace(storage).subject, 'member-B');
+  assert.equal(readCachedWorkspace(storage, 'member-B').subject, 'member-B');
   assert.ok(storage.getItem(entryKey('member-A')), 'A 저장본은 남아 있어야 한다');
   clearCachedWorkspace(storage, 'member-B');
   assert.equal(storage.getItem(entryKey('member-B')), null);
@@ -79,13 +79,13 @@ test('#400 저장소가 없거나 던져도 흐름은 멈추지 않는다', () =
 
 // ---- 세션 통합 ----
 
-function sessionWith({storage, get, onState = () => {}, put, logout}) {
+function sessionWith({storage, get, onState = () => {}, put, logout, expectedSubject = 'member-A'}) {
   const api = {
     get: get ?? (async () => ({ok: true, revision: 1, state: stateOf('서버 기록'), subject: 'member-A', writeSubjectBound: true})),
     put: put ?? (async () => ({ok: true, revision: 2})),
     logout: logout ?? (async () => ({ok: true})),
   };
-  const session = createMemberSession({api, cacheStorage: storage, onState, delay: () => new Promise(() => {}), makeClientKey: (() => { let i = 0; return () => `key-${++i}`; })()});
+  const session = createMemberSession({api, cacheStorage: storage, expectedSubject, onState, delay: () => new Promise(() => {}), makeClientKey: (() => { let i = 0; return () => `key-${++i}`; })()});
   return {session, api};
 }
 
@@ -116,7 +116,7 @@ test('#400 서버본이 항상 이긴다 — 저장본과 다르면 서버본으
   const {session} = sessionWith({storage, get: async () => ({ok: true, revision: 5, state: server, subject: 'member-A', writeSubjectBound: true})});
   await session.start();
   assert.deepEqual(session.state(), server);
-  assert.deepEqual(readCachedWorkspace(storage).state, server);
+  assert.deepEqual(readCachedWorkspace(storage, 'member-A').state, server);
   assert.equal(session.snapshot().phase, 'synced');
 });
 
@@ -127,7 +127,7 @@ test('#400 저장본이 없으면 추가 그리기 없이 기존 흐름 그대�
   await session.start();
   assert.equal(events.length, 1);
   assert.equal(session.state().trees[0].moments[0].title, '서버 기록');
-  assert.ok(readCachedWorkspace(storage), '서버 성공 뒤 저장본이 생긴다');
+  assert.ok(readCachedWorkspace(storage, 'member-A'), '서버 성공 뒤 저장본이 생긴다');
 });
 
 test('#400 재시도는 화면을 옛 저장본으로 되돌리지 않는다', async () => {
@@ -149,9 +149,9 @@ test('#400 로그아웃하면 저장본을 지운다', async () => {
   const storage = fakeStorage();
   const {session} = sessionWith({storage});
   await session.start();
-  assert.ok(readCachedWorkspace(storage));
+  assert.ok(readCachedWorkspace(storage, 'member-A'));
   await session.act('logout');
-  assert.equal(readCachedWorkspace(storage), null);
+  assert.equal(readCachedWorkspace(storage, 'member-A'), null);
   assert.equal(storage.getItem(LAST), null);
 });
 
@@ -162,7 +162,7 @@ test('#400 인증 만료(401)면 저장본을 지우고 빈 화면으로 돌린�
   await session.start();
   assert.equal(session.snapshot().phase, 'login');
   assert.deepEqual(session.state(), EMPTY_STATE());
-  assert.equal(readCachedWorkspace(storage), null);
+  assert.equal(readCachedWorkspace(storage, 'member-A'), null);
 });
 
 test('#400 pull(서버 기록 열기)도 저장본을 갱신한다', async () => {
@@ -181,7 +181,7 @@ test('#400 pull(서버 기록 열기)도 저장본을 갱신한다', async () =>
   assert.equal(session.snapshot().phase, 'conflict');
   await session.act('pull');
   assert.equal(session.state().trees[0].moments[0].title, '충돌 뒤 서버본');
-  assert.deepEqual(readCachedWorkspace(storage).state, session.state());
+  assert.deepEqual(readCachedWorkspace(storage, 'member-A').state, session.state());
 });
 
 test('#400 cacheStorage가 없으면 저장소를 건드리지 않는다(기존 시험 환경 그대로)', async () => {
@@ -202,8 +202,48 @@ test('#986 저장본에 어긋난 트리가 섞여 있으면 그 트리만 빼�
   const entry = JSON.parse(storage.getItem(entryKey('member-A')));
   entry.state.trees.push({ id: 't-broken', title: '어긋난 트리', moments: [] });
   storage.setItem(entryKey('member-A'), JSON.stringify(entry));
-  const cached = readCachedWorkspace(storage);
+  const cached = readCachedWorkspace(storage, 'member-A');
   assert.equal(cached.subject, 'member-A');
   assert.deepEqual(cached.state.trees.map(tree => tree.subject), ['별'], '어긋난 트리만 빠진다');
   assert.ok(storage.getItem(entryKey('member-A')), '저장본을 지우지 않는다');
+});
+
+// A-18: 첫 그리기 전에 로그인 표식의 계정과 저장본 계정을 맞춘다.
+test('A-18 다른 계정 표식이면 첫 그리기에 앞 계정의 트리 이름이 한 번도 나오지 않는다', async () => {
+  const storage = fakeStorage();
+  writeCachedWorkspace(storage, 'member-A', stateOf('앞 계정의 트리'));
+  let resolveGet;
+  const events = [];
+  const {session} = sessionWith({storage, expectedSubject: 'member-B', onState: s => events.push(s), get: () => new Promise(r => { resolveGet = r; })});
+  const starting = session.start();
+  assert.deepEqual(events, [], '서버 응답 전에는 어떤 기록도 그리지 않는다');
+  assert.ok(!events.some(s => s.trees?.some(t => t.moments?.some(m => m.title === '앞 계정의 트리'))), '첫 프레임에 앞 계정 트리 이름이 없다');
+  resolveGet({ok: true, revision: 4, state: stateOf('뒤 계정의 트리'), subject: 'member-B', writeSubjectBound: true});
+  await starting;
+  assert.equal(session.state().trees[0].moments[0].title, '뒤 계정의 트리');
+  assert.ok(storage.getItem(entryKey('member-A')), '다른 계정 저장본은 남는다');
+});
+
+test('A-18 로그아웃 표식이면 첫 그리기에 저장본을 쓰지 않는다', async () => {
+  const storage = fakeStorage();
+  writeCachedWorkspace(storage, 'member-A', stateOf('앞 계정의 트리'));
+  const events = [];
+  const {session} = sessionWith({storage, expectedSubject: null, onState: s => events.push(s), get: async () => ({ok: false, status: 401, code: 'unauthenticated'})});
+  await session.start();
+  assert.ok(!events.some(s => s.trees?.some(t => t.moments?.some(m => m.title === '앞 계정의 트리'))), '로그아웃 상태에서는 앞 계정 기록이 보이지 않는다');
+  assert.equal(session.snapshot().phase, 'login');
+});
+
+test('A-18 로그인 표식은 서버 확인 뒤 남고 로그아웃에서 비워진다', async () => {
+  const storage = fakeStorage();
+  assert.equal(readAccountMarker(storage), null);
+  writeAccountMarker(storage, 'member-A');
+  assert.equal(readAccountMarker(storage), 'member-A');
+  clearAccountMarker(storage);
+  assert.equal(readAccountMarker(storage), null);
+  const {session} = sessionWith({storage, expectedSubject: null});
+  await session.start();
+  assert.equal(readAccountMarker(storage), 'member-A', '서버가 계정을 확인하면 표식이 생긴다');
+  await session.act('logout');
+  assert.equal(readAccountMarker(storage), null, '로그아웃하면 표식이 비워진다');
 });

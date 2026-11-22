@@ -37,7 +37,7 @@ export function hasPendingDraft(storage, subject = null) {
 
 // A failed, authenticated write may cross a full-page re-login. Keep its
 // one-tab retry buffer in sessionStorage, scoped to the same account only.
-export function createSyncController({getState, replaceState, api, draftStorage = null, cacheStorage = null,
+export function createSyncController({getState, replaceState, api, draftStorage = null, cacheStorage = null, expectedSubject = null,
   makeClientKey = () => `front-${crypto.randomUUID()}`,
   delay = ms => new Promise(resolve => setTimeout(resolve, ms)),
   onGuard = () => {}, onChange = () => {}, navigate = url => globalThis.location.assign(url)}) {
@@ -134,7 +134,7 @@ export function createSyncController({getState, replaceState, api, draftStorage 
     emit(status({phase:'checking'}));
     if (!cachePainted) {
       cachePainted = true;
-      const cached = readCachedWorkspace(cacheStorage);
+      const cached = readCachedWorkspace(cacheStorage, expectedSubject);
       // 저장본은 서버 응답 전 첫 화면용일 뿐이다. phase은 checking 그대로 → 편집 잠금·서버본 우선.
       if (cached) replaceState(cached.state);
     }
