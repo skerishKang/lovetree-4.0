@@ -249,7 +249,13 @@ export function createSyncController({getState, replaceState, api, draftStorage 
   }
 
   async function act(name) {
-    if (name === 'login') { generation++; navigate('/auth/login?next=/'); return current; }
+    if (name === 'login') {
+      // A-18: 새 로그인은 지금 확인된 계정이 없다는 뜻 — 표식을 비우고 로그인 화면으로 보낸다.
+      generation++;
+      forgetLoginSubject(cacheStorage);
+      navigate('/auth/login?next=/');
+      return current;
+    }
     if (name === 'check') return check();
     if (name === 'retry') return dirty ? push() : start();
     if (name === 'pull') {

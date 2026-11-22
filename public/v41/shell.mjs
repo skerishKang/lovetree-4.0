@@ -5,7 +5,7 @@ import {createWorkspaceApi, setMemberRefreshStarted} from './api.mjs';
 import {createShareApi} from './share-api.mjs';
 import {createMemberSession} from './member-session.mjs';
 import {hasPendingDraft} from './sync-controller.mjs';
-import {clearCachedWorkspace, readCachedWorkspace, readLoginSubject} from './workspace-cache.mjs';
+import {clearCachedWorkspace, readCachedWorkspace, readLoginSubject, forgetLoginSubject} from './workspace-cache.mjs';
 // #1026 E: 예시 데이터(1MB)는 정적으로 부르지 않는다 — 로그인 사용자의 화면 로딩을 막지 않게
 // 예시가 실제로 필요한 순간에만 동적으로 부른다(로그아웃 첫 화면, 예시 카드 열기, 예시 둘러보기).
 let exampleTree=null,examplePromise=null,exampleInitializing=false;
@@ -1102,7 +1102,7 @@ function memberStatus(status){
    b.textContent=a.name==='login'?'새 창에서 로그인':a.label;
    b.onclick=async()=>{
     if(a.name==='backup'){backup();return;}
-    if(a.name==='login'){window.open(memberLoginUrl(readTheme(localStorage)),'_blank','noopener,noreferrer');return;}
+    if(a.name==='login'){forgetLoginSubject(localStorage);/* A-18: 새 로그인은 확인된 계정이 없어지는 일 — 표식을 비우고 새 창으로 보낸다 */window.open(memberLoginUrl(readTheme(localStorage)),'_blank','noopener,noreferrer');return;}
     if(['pull','force'].includes(a.name)&&!confirm(a.name==='pull'
      ?'미저장 변경을 버리고 서버 기록을 불러올까요?'
      :'서버의 최신 기록으로 현재 입력을 덮어쓸까요? 다른 창의 변경이 사라질 수 있습니다.'))return;

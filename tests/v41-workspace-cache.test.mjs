@@ -305,3 +305,30 @@ test('A-18 저장하다 만난 401은 표식과 저장본을 그대로 둔다(�
   assert.equal(readLoginSubject(storage), 'member-A', '일시적인 401 뒤에도 표식은 남는다');
   assert.ok(readCachedWorkspace(storage, 'member-A'), '저장본도 남는다');
 });
+
+test('A-18 로그인 시작으로 표식을 비운 뒤에는 다른 계정으로 확인되기 전까지 저장본을 그리지 않는다', async () => {
+  const storage = fakeStorage();
+  seedCache(storage, 'member-A', stateOf('옛 저장본'));
+  // shell/auth.mjs startLogin·상태 띄 로그인 단추·act('login')이 로그인 시작 때 하는 일과 같다.
+  forgetLoginSubject(storage);
+  let resolveGet;
+  const events = [];
+  const {session} = sessionWith({storage, get: () => new Promise(r => { resolveGet = r; }), onState: s => events.push(s)});
+  const starting = session.start();
+  assert.equal(events.length, 0, '표식이 비었으니 저장본이 그려지지 않는다');
+  assert.equal(session.snapshot().phase, 'checking');
+  resolveGet({ok: true, revision: 1, state: stateOf('새 계정 기록'), subject: 'member-B', writeSubjectBound: true});
+  await starting;
+  assert.equal(session.state().trees[0].moments[0].title, '새 계정 기록');
+  assert.equal(readLoginSubject(storage), 'member-B', '새 계정이 확인된 뒤 표식이 다시 생긴다');
+});
+
+test('A-18 세션의 로그인 시작(act)도 표식을 비운다', async () => {
+  const storage = fakeStorage();
+  seedCache(storage, 'member-A', stateOf('기록'));
+  const {session} = sessionWith({storage});
+  await session.start();
+  assert.equal(readLoginSubject(storage), 'member-A');
+  await session.act('login');
+  assert.equal(readLoginSubject(storage), null, '로그인 화면으로 보내기 전에 표식을 비운다');
+});
