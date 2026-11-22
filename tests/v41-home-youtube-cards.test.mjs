@@ -1,3 +1,4 @@
+import { MSG } from '../public/v41/frame-messages.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
@@ -11,7 +12,7 @@ import '../public/v41/html-escape.mjs'; // A-15: 글자 막기 정본을 vm 에�
 // 판정·썸네일 주소는 media-preview의 autoLoadMedia·describe 한 벌을 재사용하므로, 시험도 그 실제 함수를
 // vm으로 직접 불러 쓴다(docs/TESTING.md — 동작은 함수 호출로). 예시·공유·파일 기록은 기존 규칙 그대로다.
 
-const scope = {window: {}, URL, URLSearchParams, LTYouTubeId: globalThis.LTYouTubeId, LTEscapeHtml: globalThis.LTEscapeHtml};
+const scope = { LT41_MSG: MSG,window: {}, URL, URLSearchParams, LTYouTubeId: globalThis.LTYouTubeId, LTEscapeHtml: globalThis.LTEscapeHtml};
 vm.runInNewContext(readFileSync(new URL('../public/v41/media-preview.js', import.meta.url), 'utf8'), scope);
 const media = scope.window.LTMedia;
 

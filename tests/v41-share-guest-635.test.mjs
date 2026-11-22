@@ -732,7 +732,7 @@ test('#792 ⑤ 화면: 공유 책 순간 상세에서 순간 열기·이 무대 
       });
       // 상세 창을 연다 — book-extra의 placeDetail이 그리는 길(제목 보기 메시지로 그 길을 태운다).
       await frame.evaluate(() => window.__TRACK59__.showDetail(window.__TRACK59__.pageSteps()[0].id));
-      await frame.evaluate(() => window.postMessage({ type: 'lt41-title-display', value: 'both' }, location.origin));
+      await page.evaluate(() => document.querySelector('iframe').contentWindow.postMessage({ type: 'lt41-title-display', value: 'both' }, location.origin));
       await frame.waitForSelector('#detailSide:not([hidden]) [data-detail-stage]:not([hidden])', { timeout: 8000 });
       const measured = await frame.evaluate(() => {
         const panel = document.querySelector('#detailSide').getBoundingClientRect();

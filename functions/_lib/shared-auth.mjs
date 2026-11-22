@@ -110,7 +110,7 @@ function callbackFor(request, env) {
   return url.href;
 }
 async function aesKey(env) {
-  const bytes = un64(env.LOVETREE_AUTH_STATE_KEY || '');
+  const bytes = un64(cleanSecret(env.LOVETREE_AUTH_STATE_KEY));
   if (bytes.length !== 32) throw new Error('state key unavailable');
   return crypto.subtle.importKey('raw', bytes, 'AES-GCM', false, ['encrypt', 'decrypt']);
 }
@@ -124,9 +124,11 @@ async function unseal(env, token) {
   const clear = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: un64(parts[0]) }, await aesKey(env), un64(parts[1]));
   return JSON.parse(dec.decode(clear));
 }
+// 비밀 값 앞뒤에 붙은 BOM·줄 바꿈 없는 공백·폭 없는 공백을 걷어낸다(대시보드 붙여넣기 때 섞여 들어온다).
+const cleanSecret = (value) => String(value || '').replace(/^[\s\u200B]+|[\s\u200B]+$/g, '');
 async function assertion(env, now) {
-  const jwk = JSON.parse(env.LOVETREE_AUTH_CLIENT_PRIVATE_JWK || '{}');
-  const kid = env.LOVETREE_AUTH_CLIENT_KID; if (!kid) throw new Error('client key unavailable');
+  const jwk = JSON.parse(cleanSecret(env.LOVETREE_AUTH_CLIENT_PRIVATE_JWK) || '{}');
+  const kid = cleanSecret(env.LOVETREE_AUTH_CLIENT_KID); if (!kid) throw new Error('client key unavailable');
   const key = await crypto.subtle.importKey('jwk', jwk, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign']);
   const input = `${j64({ alg: 'ES256', kid })}.${j64({ iss: CLIENT, sub: CLIENT, aud: `${AUTH}/token`, iat: now, exp: now + 120, jti: random() })}`;
   return `${input}.${b64(await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, key, enc.encode(input)))}`;
@@ -138,7 +140,9 @@ async function exchange(env, params, fetcher, now) {
   if (!response.ok) {
     const problem = await response.json().catch(() => null);
     if (response.status === 400 && problem?.error === 'invalid_grant') throw new InvalidGrant();
-    throw new Error('token exchange failed');
+    // 원인 기록: 상태 코드와 오류 이름만 남긴다(토큰·코드·키 값은 적지 않는다).
+    const code = typeof problem?.error === 'string' && /^[a-z_]{1,40}$/.test(problem.error) ? problem.error : 'unknown';
+    throw new Error(`token exchange failed ${response.status} ${code}`);
   }
   return response.json();
 }
@@ -202,6 +206,8 @@ export function createSharedPagesAuth({ fetcher = fetch, now = () => Math.floor(
         response.headers.append('set-cookie', '__Host-lovetree-shared=; Path=/; Max-Age=0; Secure; SameSite=Lax');
         return response;
       }
+      // 원인 기록: 경로와 오류 문구만 남긴다(값은 적지 않는다). Pages 실시간 로그에서 본다.
+      console.warn('[lovetree-shared-auth]', path, String(error?.message || error).slice(0, 80));
       return json(503, 'auth_unavailable');
     }
   };

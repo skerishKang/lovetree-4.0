@@ -1,3 +1,4 @@
+import { MSG } from './frame-messages.mjs';
 // #481 T6: 화면(iframe)에 설정 값을 알리는 배선 한 벌 — 보내는 시점과 받는 쪽 판정을 값으로 시험하려고
 // 셸에서 계산 부분을 떼어 낸 순수 모듈이다. 메시지 타입·값 정규화·'다시 띄울지' 판정만 다룬다(DOM 없음).
 // 2026-11-12 사고(#476/#477)의 교훈: 보내는 시점과 받는 쪽 동작을 따로 고정하면 둘이 어긋난 틈이 남는다.
@@ -10,10 +11,10 @@ import {
 
 /** 셸이 프레임에 보내는 메시지 타입(한 곳에서만 적는다). */
 export const FRAME_MESSAGE_TYPES = Object.freeze({
-  dateStyle: 'lt41-date-style',
-  titleDisplay: 'lt41-title-display',
-  pageTurn: 'lt41-page-turn',
-  boardTheme: 'lt41-board-theme'
+  dateStyle: MSG.dateStyle,
+  titleDisplay: MSG.titleDisplay,
+  pageTurn: MSG.pageTurn,
+  boardTheme: MSG.boardTheme
 });
 
 /**

@@ -1,3 +1,4 @@
+import { MSG } from '../frame-messages.mjs';
 // createTreeMenu — shell.mjs에서 코드 위치만 옮긴 모듈(#886 PR 2). 동작은 그대로다.
 export function createTreeMenu(deps){
 const { $, document, window, location, treePopover, treeTrigger, thumbnailCandidates, coverFallbackAttrs, coverModeOf, normalizeCoverDesign, displayTreeTitle, cleanupAvailable, writeLocation, renderAccount, flowNavigation, choose, show, openEditor, openLoginStart } = deps;
@@ -61,7 +62,7 @@ function renderTreeMenu(){
     choose(id,'',true);
     renderAccount();
     flowNavigation();
-    try{for(const f of document.querySelectorAll('iframe'))f.contentWindow?.postMessage({type:'lt41-shelf-select-tree',treeId:id},location.origin);}catch{}
+    try{for(const f of document.querySelectorAll('iframe'))f.contentWindow?.postMessage({type:MSG.shelfSelectTree,treeId:id},location.origin);}catch{}
     writeLocation();return;
    }
    const wasTreeView=TREE_VIEWS.has(deps.current);choose(id);if(!wasTreeView)show('track59-sketchbook.html',false);flowNavigation();writeLocation();

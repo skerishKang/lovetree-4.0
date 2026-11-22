@@ -1,3 +1,4 @@
+import { MSG } from './frame-messages.mjs';
 import {displayTreeTitle} from './tree-name.mjs';
 import {normalizeDateStyle} from './domain.mjs';
 import {AUTO_TITLE} from './auto-title.mjs';
@@ -204,7 +205,7 @@ export function tapIntent({mode} = {}) {
 
 /** 오른쪽 페이지의 '다음 순간 추가'는 이 순간을 부모로 편집기를 연다. */
 export function nextMomentMessage(parentId) {
-  return { type: 'lt41-write', mode: 'add', parentId: String(parentId ?? '') };
+  return { type: MSG.write, mode: 'add', parentId: String(parentId ?? '') };
 }
 
 /* ── 글꼴(대표 결정 2026-11-08) ─────────────────────────────────────────────

@@ -1,3 +1,4 @@
+import { MSG } from '../public/v41/frame-messages.mjs';
 import test from 'node:test';import assert from 'node:assert/strict';import vm from 'node:vm';import {readFileSync} from 'node:fs';
 import {parseMomentLink} from '../src/media.js';
 import {createTree,addMoment,validateState,importTrees} from '../src/domain.js';
@@ -6,7 +7,7 @@ import {workspaceModel} from '../public/v41/workspace-model.mjs';
 import {createMemberSession} from '../public/v41/member-session.mjs';
 import '../public/v41/youtube-id.mjs'; // #1060: 정본이 등록한 globalThis.LTYouTubeId 를 vm 에도 넣는다.
 import '../public/v41/html-escape.mjs'; // A-15: 글자 막기 정본을 vm 에도 넣는다.
-const scope={window:{},URL,URLSearchParams,LTYouTubeId:globalThis.LTYouTubeId,LTEscapeHtml:globalThis.LTEscapeHtml};vm.runInNewContext(readFileSync(new URL('../public/v41/media-preview.js',import.meta.url),'utf8'),scope);const media=scope.window.LTMedia;
+const scope={ LT41_MSG: MSG,window:{},URL,URLSearchParams,LTYouTubeId:globalThis.LTYouTubeId,LTEscapeHtml:globalThis.LTEscapeHtml};vm.runInNewContext(readFileSync(new URL('../public/v41/media-preview.js',import.meta.url),'utf8'),scope);const media=scope.window.LTMedia;
 const urls=['https://youtu.be/abc123DEF45?t=2분','https://www.youtube.com/watch?v=abc123DEF45&start=83','https://youtube.com/shorts/abc123DEF45','https://youtube.com/live/abc123DEF45','https://youtube.com/playlist?list=x','https://youtube.com.evil.test/watch?v=abc123DEF45','https://example.test/a.png?size=2','https://example.test/a.mp4','https://example.test/notes','javascript:alert(1)','https://user:pass@example.test/a.jpg'];
 test('member media reuses current YouTube parser and exact-host/time normalization',()=>{for(const url of urls){const original=parseMomentLink(url),next=media.describe(url);assert.equal(next.openUrl,original.openUrl);if(original.kind==='youtube'){assert.equal(next.videoId,original.videoId);assert.equal(next.startSeconds,original.startSeconds);}}});
 test('file-extension classification is URL-path based and preserves the original value',()=>{assert.equal(media.describe(urls[6]).kind,'photo');assert.equal(media.describe(urls[7]).kind,'video');assert.equal(media.describe('https://example.test/notes?name=x.jpg').kind,'link');assert.equal(media.describe('https://example.test/photo%2Ewebp').kind,'photo');for(const url of urls)assert.equal(media.describe(url).original,url);});
@@ -19,7 +20,7 @@ test('bound member PUT and a new session GET preserve media URLs without a schem
 test('private aliases fetch on the current official host without rewriting stored values or trusting lookalikes',()=>{
  const name='12345678-1234-4234-8234-123456789abc.png',path='/api/media/'+name;
  for(const origin of ['https://lovetree.padiem.net','https://lovetree-4-0.pages.dev']){
-  const scope={window:{},location:{origin},URL,URLSearchParams,LTYouTubeId:globalThis.LTYouTubeId,LTEscapeHtml:globalThis.LTEscapeHtml};
+  const scope={ LT41_MSG: MSG,window:{},location:{origin},URL,URLSearchParams,LTYouTubeId:globalThis.LTYouTubeId,LTEscapeHtml:globalThis.LTEscapeHtml};
   vm.runInNewContext(readFileSync(new URL('../public/v41/media-preview.js',import.meta.url),'utf8'),scope);
   const media=scope.window.LTMedia;
   for(const old of ['https://lovetree.padiem.net','https://lovetree-4-0.pages.dev']){

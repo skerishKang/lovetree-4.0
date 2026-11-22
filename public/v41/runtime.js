@@ -27,7 +27,7 @@
     if(detail&&window.LTMedia){const host=document.createElement('div');detail.parentElement.after(host);let last=null;
       const update=()=>{const id=context.momentId;if(id===last)return;last=id;const m=tree.moments.find(m=>m.id===id);host.innerHTML=m?.url?window.LTMedia.markup(m.url,m.title,m.mediaMetadata,m.id,null,{emotion:m.emotion,date:m.date,note:m.note,treeId:tree.id,startSeconds:m.startSeconds,endSeconds:m.endSeconds}):'';
         // #327 2부: 내 기록(서버)의 순간 상세에서 다른 트리로 옮기기. 공유·예시는 숨긴다.
-        if(m&&context.source==='server'){const button=document.createElement('button');button.type='button';button.className='lt-move-btn';button.textContent='다른 트리로 옮기기';button.addEventListener('click',()=>parent.postMessage({type:'lt41-move',momentId:m.id},location.origin));host.append(button);}};
+        if(m&&context.source==='server'){const button=document.createElement('button');button.type='button';button.className='lt-move-btn';button.textContent='다른 트리로 옮기기';button.addEventListener('click',()=>parent.postMessage({type:globalThis.LT41_MSG.move,momentId:m.id},location.origin));host.append(button);}};
       new MutationObserver(update).observe(document.getElementById('detailTitle'),{childList:true,subtree:true});update();
     }
   });
@@ -38,7 +38,7 @@
   const readOnly = context.source === 'share' || context.source === 'example' || !!demo;
   window.LTDEMO = {title:tree.title,treeId:tree.id,source:context.source,writable:context.source==='server'&&!!context.writable,moments,edges:tree.edges,example:!!demo,readOnly,prefs:context.prefs||{titleDisplay:'both'},
     get:()=>context.momentId,
-    select:id=>{if(moments.some(m=>m.id===id)){context.momentId=id;parent.postMessage({type:'lt-selection',id},location.origin)}},
+    select:id=>{if(moments.some(m=>m.id===id)){context.momentId=id;parent.postMessage({type:globalThis.LT41_MSG.selection,id},location.origin)}},
     // #1001 (3): 셸이 모델만 갱신한 뒤(lt41-moments-saved) 화면이 부모 LT41.tree에서 순간·연결을 다시 읽는다.
     // moments 배열은 제자리에서 바꿔, 이미 이 배열을 든 화면(book.js SPREADS 재구축 등)이 같은 참조로 새 값을 본다.
     refresh:()=>{const fresh=parent.LT41?.tree;if(!fresh||fresh.id!==tree.id)return false;const next=projectMoments(fresh,context);moments.length=0;for(const m of next)moments.push(m);window.LTDEMO.edges=fresh.edges;window.LTDEMO.title=fresh.title;return true;}};

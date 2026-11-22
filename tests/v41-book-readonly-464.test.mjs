@@ -6,6 +6,7 @@
 //      runtime.js가 readOnly를 source==='share'만으로 내려서, 예시(example·demoData)가 '쓸 수 있는 책'으로 판정됐다.
 //   ② aria-pressed 값은 맞는데 색이 같았다. identity.css의 `html[data-v41-screen=book] .tools .ui-btn`(배경 지정)이
 //      book.css보다 뒤에 실려 [aria-pressed=true] 금테를 덮었다 — 눌린 쪽과 안 눌린 쪽 배경이 똑같았다.
+import { MSG } from '../public/v41/frame-messages.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -23,6 +24,7 @@ test('#464 runtime은 예시(example)와 demoData를 읽기 전용으로 판정�
   const vm = await import('node:vm');
   const run = (source, tree) => {
     const scope = {
+      LT41_MSG: MSG,
       window: {},
       document: { querySelectorAll: () => [], getElementById: () => null, addEventListener: () => {} },
       parent: { LT41: { source, tree } },
