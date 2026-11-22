@@ -85,27 +85,22 @@ export async function measureMapPixelsInPage([png, overlaysArg]) {
   // nearby rows, rather than a single edge pixel (ellipse crossings) or a row
   // median (a long horizontal edge can cover over half a narrow viewport).
   const backdrops = new Map();
-  const backdrop = (y) => {
-    const row = Math.round(y * scale);
-    if (!backdrops.has(row)) {
-      const bins = new Map();
-      for (const dy of [-3, 0, 3]) for (let x = 3; x < stage.clientWidth - 3; x += 11) if (visibleRect(x, y + dy)) {
-        const c = rgb(x, y + dy), key = c.map(v => Math.round(v / 4)).join(',');
-        if (!bins.has(key)) bins.set(key, []); bins.get(key).push(c);
-      }
-      const samples = [...bins.values()].sort((a, b) => b.length - a.length)[0] || [rgb(2, y)];
-      backdrops.set(row, [0, 1, 2].map(i => samples.map(s => s[i]).sort((a, b) => a - b)[Math.floor(samples.length / 2)]));
+  // #1126: 라벨 글자 픽셀이 같은 줄 표본에 섞이면 글자색과 배경색이 같아 1.01:1이 나온다.
+  // 원래 줄 표본 방식은 유지하고, 잴 라벨의 가로 구간만 표본에서 제외한다(기준 4.5 그대로).
+  const backdrop = (y, excludeLeft = null, excludeRight = null) => {
+    const row = Math.round(y * scale), cached = excludeLeft === null;
+    if (cached && backdrops.has(row)) return backdrops.get(row);
+    const bins = new Map();
+    for (const dy of [-3, 0, 3]) for (let x = 3; x < stage.clientWidth - 3; x += 11) {
+      if (excludeLeft !== null && x >= excludeLeft - 4 && x <= excludeRight + 4) continue;
+      if (!visibleRect(x, y + dy)) continue;
+      const c = rgb(x, y + dy), key = c.map(v => Math.round(v / 4)).join(',');
+      if (!bins.has(key)) bins.set(key, []); bins.get(key).push(c);
     }
-    return backdrops.get(row);
-  };
-  // #1126: 라벨 자기 픽셀을 배경으로 잡으면 글자색과 배경색이 같아 1.01:1이 나온다(390 cluster 재현).
-  // 라벨 박스 바로 밖의 실제 그려진 픽셀을 배경 표본으로 쓴다(기준 4.5 그대로).
-  const labelBackground = (t) => {
-    const mid = (t.top + t.bottom) / 2;
-    for (const [x, y] of [[t.left - 10, mid], [t.right + 10, mid], [t.left - 10, t.bottom + 8], [t.right + 10, t.bottom + 8]]) {
-      if (visible(x, y)) return rgb(x, y);
-    }
-    return backdrop(mid);
+    const samples = [...bins.values()].sort((a, b) => b.length - a.length)[0] || [rgb(2, y)];
+    const result = [0, 1, 2].map(i => samples.map(s => s[i]).sort((a, b) => a - b)[Math.floor(samples.length / 2)]);
+    if (cached) backdrops.set(row, result);
+    return result;
   };
   const sample = (x, y, bg = backdrop(y)) => ({ ratio: ratio(rgb(x, y), bg), fg: hex(rgb(x, y)), bg: hex(bg), x, y });
   const rows = [];
@@ -152,7 +147,7 @@ export async function measureMapPixelsInPage([png, overlaysArg]) {
       if (!visible(px, py)) { why.hidden++; continue; }
       // Hub numbers sit on a coloured/white disc. The centre of its upper
       // inner rim is a rendered background pixel, away from the two digits.
-      const bg = t.role === 'hub-number' ? rgb(t.x, t.y - 9) : labelBackground(t);
+      const bg = t.role === 'hub-number' ? rgb(t.x, t.y - 9) : backdrop(py, t.left, t.right);
       samples.push(sample(px, py, bg));
     }
     add(t.role, `${i}:${t.text}`, samples, .1, why); textBounds.push(t);
