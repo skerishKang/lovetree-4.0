@@ -51,6 +51,7 @@ jobs:
     runs-on: ${{ fromJSON((github.event.pull_request.head.repo.full_name == github.repository && vars.USE_CGI_RUNNER == '1') && '["self-hosted","Linux","X64","cgi"]' || '["ubuntu-latest"]') }}
     timeout-minutes: 25
     needs: screen-changes
+    if: needs.screen-changes.outputs.changed == 'true'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -64,13 +65,13 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: ms-playwright-${{ runner.os }}-1.49.1
+          key: ms-playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - name: 브라우저 준비(Playwright Chromium, 캐시)
         id: browser
         if: needs.screen-changes.outputs.changed == 'true'
         run: |
           # 모듈은 항상 설치한다(캐시는 브라우저 바이너리에만 걸린다). 캐시가 있어도 모듈이 없으면 실행이 안 된다.
-          npm i --no-save --no-package-lock playwright@1.49.1
+          npm i --no-save --no-package-lock playwright@$(node -p "require('./package-lock.json').packages['node_modules/playwright'].version")
           if [ "$RUNNER_ENVIRONMENT" = "self-hosted" ]; then
             # 자체 실행기는 홈 캐시에 다른 버전의 Chromium이 있을 수 있어 폴더 유무로 판단하지 않는다.
             # install은 이 버전 Chromium이 이미 있으면 받지 않고 끝난다. 시스템 라이브러리는 미리 깔아 두었다(sudo 없음).
@@ -227,6 +228,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     needs: screen-changes
+    if: needs.screen-changes.outputs.changed == 'true'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -239,12 +241,12 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: ms-playwright-${{ runner.os }}-1.49.1
+          key: ms-playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - name: 브라우저 준비(Playwright Chromium, 캐시)
         id: browser
         if: needs.screen-changes.outputs.changed == 'true'
         run: |
-          npm i --no-save --no-package-lock playwright@1.49.1
+          npm i --no-save --no-package-lock playwright@$(node -p "require('./package-lock.json').packages['node_modules/playwright'].version")
           if ls "$HOME/.cache/ms-playwright" 2>/dev/null | grep -q chromium; then
             echo "캐시된 Chromium 사용"
           else
@@ -353,6 +355,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     needs: screen-changes
+    if: needs.screen-changes.outputs.changed == 'true'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -365,12 +368,12 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: ms-playwright-${{ runner.os }}-1.49.1
+          key: ms-playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - name: 브라우저 준비(Playwright Chromium, 캐시)
         id: browser
         if: needs.screen-changes.outputs.changed == 'true'
         run: |
-          npm i --no-save --no-package-lock playwright@1.49.1
+          npm i --no-save --no-package-lock playwright@$(node -p "require('./package-lock.json').packages['node_modules/playwright'].version")
           if ls "$HOME/.cache/ms-playwright" 2>/dev/null | grep -q chromium; then
             echo "캐시된 Chromium 사용"
           else
@@ -436,6 +439,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     needs: screen-changes
+    if: needs.screen-changes.outputs.changed == 'true'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -448,12 +452,12 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: ms-playwright-${{ runner.os }}-1.49.1
+          key: ms-playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - name: 브라우저 준비(Playwright Chromium, 캐시)
         id: browser
         if: needs.screen-changes.outputs.changed == 'true'
         run: |
-          npm i --no-save --no-package-lock playwright@1.49.1
+          npm i --no-save --no-package-lock playwright@$(node -p "require('./package-lock.json').packages['node_modules/playwright'].version")
           if ls "$HOME/.cache/ms-playwright" 2>/dev/null | grep -q chromium; then
             echo "캐시된 Chromium 사용"
           else
@@ -568,6 +572,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     needs: screen-changes
+    if: needs.screen-changes.outputs.changed == 'true'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -580,12 +585,12 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: ms-playwright-${{ runner.os }}-1.49.1
+          key: ms-playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - name: 브라우저 준비(Playwright Chromium, 캐시)
         id: browser
         if: needs.screen-changes.outputs.changed == 'true'
         run: |
-          npm i --no-save --no-package-lock playwright@1.49.1
+          npm i --no-save --no-package-lock playwright@$(node -p "require('./package-lock.json').packages['node_modules/playwright'].version")
           if ls "$HOME/.cache/ms-playwright" 2>/dev/null | grep -q chromium; then
             echo "캐시된 Chromium 사용"
           else
@@ -655,6 +660,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     needs: screen-changes
+    if: needs.screen-changes.outputs.changed == 'true'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -667,12 +673,12 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: ms-playwright-${{ runner.os }}-1.49.1
+          key: ms-playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - name: 브라우저 준비(Playwright Chromium, 캐시)
         id: browser
         if: needs.screen-changes.outputs.changed == 'true'
         run: |
-          npm i --no-save --no-package-lock playwright@1.49.1
+          npm i --no-save --no-package-lock playwright@$(node -p "require('./package-lock.json').packages['node_modules/playwright'].version")
           if ls "$HOME/.cache/ms-playwright" 2>/dev/null | grep -q chromium; then
             echo "캐시된 Chromium 사용"
           else
@@ -742,6 +748,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     needs: screen-changes
+    if: needs.screen-changes.outputs.changed == 'true'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -754,12 +761,12 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: ms-playwright-${{ runner.os }}-1.49.1
+          key: ms-playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - name: 브라우저 준비(Playwright Chromium, 캐시)
         id: browser
         if: needs.screen-changes.outputs.changed == 'true'
         run: |
-          npm i --no-save --no-package-lock playwright@1.49.1
+          npm i --no-save --no-package-lock playwright@$(node -p "require('./package-lock.json').packages['node_modules/playwright'].version")
           if ls "$HOME/.cache/ms-playwright" 2>/dev/null | grep -q chromium; then
             echo "캐시된 Chromium 사용"
           else
@@ -828,6 +835,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     needs: screen-changes
+    if: needs.screen-changes.outputs.changed == 'true'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -840,12 +848,12 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: ms-playwright-${{ runner.os }}-1.49.1
+          key: ms-playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - name: 브라우저 준비(Playwright Chromium, 캐시)
         id: browser
         if: needs.screen-changes.outputs.changed == 'true'
         run: |
-          npm i --no-save --no-package-lock playwright@1.49.1
+          npm i --no-save --no-package-lock playwright@$(node -p "require('./package-lock.json').packages['node_modules/playwright'].version")
           if ls "$HOME/.cache/ms-playwright" 2>/dev/null | grep -q chromium; then
             echo "캐시된 Chromium 사용"
           else
@@ -872,6 +880,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     needs: screen-changes
+    if: needs.screen-changes.outputs.changed == 'true'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -884,13 +893,13 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: ms-playwright-${{ runner.os }}-1.49.1
+          key: ms-playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - name: 브라우저 준비(Playwright Chromium, 캐시)
         id: browser
         if: needs.screen-changes.outputs.changed == 'true'
         run: |
           # 모듈은 항상 설치한다(캐시는 브라우저 바이너리에만 걸린다). 캐시가 있어도 모듈이 없으면 실행이 안 된다.
-          npm i --no-save --no-package-lock playwright@1.49.1
+          npm i --no-save --no-package-lock playwright@$(node -p "require('./package-lock.json').packages['node_modules/playwright'].version")
           if ls "$HOME/.cache/ms-playwright" 2>/dev/null | grep -q chromium; then
             echo "캐시된 Chromium 사용"
           else
@@ -987,6 +996,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     needs: screen-changes
+    if: needs.screen-changes.outputs.changed == 'true'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -999,14 +1009,14 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: ms-playwright-${{ runner.os }}-1.49.1
+          key: ms-playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - name: 브라우저 준비(Playwright Chromium, 캐시)
         id: browser
         timeout-minutes: 8
         if: needs.screen-changes.outputs.changed == 'true'
         run: |
           # 모듈은 항상 설치한다(캐시는 브라우저 바이너리에만 걸린다). 캐시가 있어도 모듈이 없으면 실행이 안 된다.
-          npm i --no-save --no-package-lock playwright@1.49.1
+          npm i --no-save --no-package-lock playwright@$(node -p "require('./package-lock.json').packages['node_modules/playwright'].version")
           if ls "$HOME/.cache/ms-playwright" 2>/dev/null | grep -q chromium; then
             echo "캐시된 Chromium 사용"
           else
@@ -1136,6 +1146,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     needs: screen-changes
+    if: needs.screen-changes.outputs.changed == 'true'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -1148,13 +1159,13 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: ms-playwright-${{ runner.os }}-1.49.1
+          key: ms-playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - name: 브라우저 준비(Playwright Chromium, 캐시)
         id: browser
         if: needs.screen-changes.outputs.changed == 'true'
         run: |
           # 모듈은 항상 설치한다(캐시는 브라우저 바이너리에만 걸린다). 캐시가 있어도 모듈이 없으면 실행이 안 된다.
-          npm i --no-save --no-package-lock playwright@1.49.1
+          npm i --no-save --no-package-lock playwright@$(node -p "require('./package-lock.json').packages['node_modules/playwright'].version")
           if ls "$HOME/.cache/ms-playwright" 2>/dev/null | grep -q chromium; then
             echo "캐시된 Chromium 사용"
           else
@@ -1259,12 +1270,12 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: ms-playwright-${{ runner.os }}-1.49.1
+          key: ms-playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - name: 브라우저 준비(Playwright Chromium, 캐시)
         id: browser
         run: |
           # 모듈은 항상 설치한다(캐시는 브라우저 바이너리에만 걸린다). 캐시가 있어도 모듈이 없으면 실행이 안 된다.
-          npm i --no-save --no-package-lock playwright@1.49.1
+          npm i --no-save --no-package-lock playwright@$(node -p "require('./package-lock.json').packages['node_modules/playwright'].version")
           if ls "$HOME/.cache/ms-playwright" 2>/dev/null | grep -q chromium; then
             echo "캐시된 Chromium 사용"
           else
@@ -1425,15 +1436,12 @@ jobs:
     name: 미리보기 postdeploy(로그아웃)
     runs-on: ubuntu-latest
     if: always()
-    needs: [screen-board, screen-home, screen-book, screen-reload, screen-shell, screen-map-a, screen-map-b, screen-book-screen, screen-audit-a, screen-audit-b, screen-audit-c, deploy]
+    needs: [screen-changes, screen-board, screen-home, screen-book, screen-reload, screen-shell, screen-map-a, screen-map-b, screen-book-screen, screen-audit-a, screen-audit-b, screen-audit-c, deploy]
     steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: tools/ci
       - name: 모든 화면 시험·배포 검사 결과 모으기
         env:
           RESULTS: ${{ toJSON(needs) }}
-        run: |
-          echo "$RESULTS" | node -e '
-            let t="";process.stdin.on("data",d=>t+=d).on("end",()=>{
-              const needs=JSON.parse(t);let bad=0;
-              for(const [k,v] of Object.entries(needs)){console.log(`${k}: ${v.result}`);if(v.result!=="success")bad++;}
-              if(bad){console.error(`실패·취소된 잡 ${bad}개`);process.exit(1);}
-            });'
+        run: echo "$RESULTS" | node tools/ci/screen-results.mjs

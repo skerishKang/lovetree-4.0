@@ -85,18 +85,22 @@ export async function measureMapPixelsInPage([png, overlaysArg]) {
   // nearby rows, rather than a single edge pixel (ellipse crossings) or a row
   // median (a long horizontal edge can cover over half a narrow viewport).
   const backdrops = new Map();
-  const backdrop = (y) => {
-    const row = Math.round(y * scale);
-    if (!backdrops.has(row)) {
-      const bins = new Map();
-      for (const dy of [-3, 0, 3]) for (let x = 3; x < stage.clientWidth - 3; x += 11) if (visibleRect(x, y + dy)) {
-        const c = rgb(x, y + dy), key = c.map(v => Math.round(v / 4)).join(',');
-        if (!bins.has(key)) bins.set(key, []); bins.get(key).push(c);
-      }
-      const samples = [...bins.values()].sort((a, b) => b.length - a.length)[0] || [rgb(2, y)];
-      backdrops.set(row, [0, 1, 2].map(i => samples.map(s => s[i]).sort((a, b) => a - b)[Math.floor(samples.length / 2)]));
+  // #1126: 라벨 글자 픽셀이 같은 줄 표본에 섞이면 글자색과 배경색이 같아 1.01:1이 나온다.
+  // 원래 줄 표본 방식은 유지하고, 잴 라벨의 가로 구간만 표본에서 제외한다(기준 4.5 그대로).
+  const backdrop = (y, excludeLeft = null, excludeRight = null) => {
+    const row = Math.round(y * scale), cached = excludeLeft === null;
+    if (cached && backdrops.has(row)) return backdrops.get(row);
+    const bins = new Map();
+    for (const dy of [-3, 0, 3]) for (let x = 3; x < stage.clientWidth - 3; x += 11) {
+      if (excludeLeft !== null && x >= excludeLeft - 4 && x <= excludeRight + 4) continue;
+      if (!visibleRect(x, y + dy)) continue;
+      const c = rgb(x, y + dy), key = c.map(v => Math.round(v / 4)).join(',');
+      if (!bins.has(key)) bins.set(key, []); bins.get(key).push(c);
     }
-    return backdrops.get(row);
+    const samples = [...bins.values()].sort((a, b) => b.length - a.length)[0] || [rgb(2, y)];
+    const result = [0, 1, 2].map(i => samples.map(s => s[i]).sort((a, b) => a - b)[Math.floor(samples.length / 2)]);
+    if (cached) backdrops.set(row, result);
+    return result;
   };
   const sample = (x, y, bg = backdrop(y)) => ({ ratio: ratio(rgb(x, y), bg), fg: hex(rgb(x, y)), bg: hex(bg), x, y });
   const rows = [];
@@ -143,7 +147,7 @@ export async function measureMapPixelsInPage([png, overlaysArg]) {
       if (!visible(px, py)) { why.hidden++; continue; }
       // Hub numbers sit on a coloured/white disc. The centre of its upper
       // inner rim is a rendered background pixel, away from the two digits.
-      const bg = t.role === 'hub-number' ? rgb(t.x, t.y - 9) : backdrop(py);
+      const bg = t.role === 'hub-number' ? rgb(t.x, t.y - 9) : backdrop(py, t.left, t.right);
       samples.push(sample(px, py, bg));
     }
     add(t.role, `${i}:${t.text}`, samples, .1, why); textBounds.push(t);
@@ -252,7 +256,12 @@ export function overlayRectsInPage() {
 }
 
 export function measureMapDOMInPage() {
-  const parse = (s) => [...String(s).matchAll(/rgba?\(([^)]+)\)/g)].map(m => { const a = m[1].split(/[\s,/]+/).filter(Boolean).map(Number); return [...a.slice(0, 3), a[3] ?? 1]; });
+  const parse = (s) => {
+    const out = [];
+    for (const m of String(s).matchAll(/rgba?\(([^)]+)\)/g)) { const a = m[1].split(/[\s,/]+/).filter(Boolean).map(Number); if (a.length >= 3 && a.slice(0, 3).every(Number.isFinite)) out.push([...a.slice(0, 3), a[3] ?? 1]); }
+    for (const m of String(s).matchAll(/color\(\s*srgb\s+([^)]+)\)/g)) { const a = m[1].split(/[\s,/]+/).filter(Boolean).map(Number); if (a.length >= 3 && a.slice(0, 3).every(Number.isFinite)) out.push([...a.slice(0, 3).map(v => v * 255), a[3] ?? 1]); }
+    return out;
+  };
   const over = (a, b) => a.slice(0, 3).map((v, i) => v * a[3] + b[i] * (1 - a[3])).concat(1);
   const lum = c => c.slice(0, 3).map(v => { v /= 255; return v <= .04045 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; }).reduce((n, v, i) => n + v * [.2126, .7152, .0722][i], 0);
   const ratio = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + .05) / (Math.min(x, y) + .05); };
@@ -272,23 +281,30 @@ export function measureMapDOMInPage() {
     if (!el.textContent.trim()) continue;
     const r = el.getBoundingClientRect(), cs = getComputedStyle(el);
     if (r.width <= 0 || r.height <= 0 || r.right <= 0 || r.bottom <= 0 || r.left >= innerWidth || r.top >= innerHeight || cs.visibility !== 'visible') continue;
-    const chain = []; let opacity = 1;
-    for (let p = el; p && p !== document.documentElement; p = p.parentElement) { const s = getComputedStyle(p); if (s.display === 'none') { opacity = 0; break; } opacity *= Number(s.opacity); chain.unshift(p); }
+    const chain = [], unparsed = [], unmeasurable = []; let opacity = 1;
+    for (let p = el; p; p = p.parentElement) { const s = getComputedStyle(p); if (s.display === 'none') { opacity = 0; break; } opacity *= Number(s.opacity); chain.unshift(p); if (p === document.documentElement) break; }
     if (opacity <= 0) continue;
     const px = Math.max(0, Math.min(stage.width - 1, Math.floor((r.left + r.width / 2) * d))), py = Math.max(0, Math.min(stage.height - 1, Math.floor((r.top + r.height / 2) * d)));
-    const base = [...canvas.getImageData(px, py, 1, 1).data].slice(0, 3).concat(1);
+    let base = [...canvas.getImageData(px, py, 1, 1).data].slice(0, 3).concat(1);
+    // #1126: rgba(0,0,0,0)는 검정이 아니라 '배경 없음'. 캔버스 표본이 검정이면(요소가 판 밖)
+    // 조상 중 불투명 배경을 찾아 그 위에 반투명 레이어를 합성하고, 못 찾으면 측정 불가로 알린다.
+    if (base.every(v => v < 20)) {
+      const solid = chain.map(p => parse(getComputedStyle(p).backgroundColor).find(c => c[3] >= 1)).find(Boolean);
+      if (solid) base = solid.slice(0, 3).concat(1);
+      else unmeasurable.push(`${el.id || el.className}: 불투명 배경 없음`);
+    }
     let backgrounds = [base];
     for (const p of chain) {
-      // #stage is opaque and covers body/.app backgrounds.
-      if (p === document.body || p.classList.contains('app')) continue;
-      const s = getComputedStyle(p), colour = parse(s.backgroundColor).filter(c => c[3] > 0), gradient = parse(s.backgroundImage);
-      for (const layer of [colour, gradient]) if (layer.length) backgrounds = backgrounds.flatMap(b => layer.map(c => over(c, b)));
+      const s = getComputedStyle(p);
+      if (s.backgroundImage !== 'none' && parse(s.backgroundImage).length === 0) unparsed.push(`${p.id || p.className}: ${s.backgroundImage.slice(0, 60)}`);
+      const colour = parse(s.backgroundColor).filter(c => c[3] > 0), gradient = parse(s.backgroundImage);
+      for (const layer of [gradient, colour]) if (layer.length) backgrounds = backgrounds.flatMap(b => layer.map(c => over(c, b)));
     }
     const text = parse(cs.color)[0]; if (!text) continue;
     text[3] *= opacity;
     let worst = null;
     for (const bg of backgrounds) { const fg = over(text, bg), value = ratio(fg, bg); if (!worst || value < worst.ratio) worst = { ratio: value, fg: hex(fg), bg: hex(bg) }; }
-    rows.push({ role, id: el.id || `${el.tagName.toLowerCase()}.${el.className}`, text: el.textContent.trim(), ratio: Math.round(worst.ratio * 100) / 100, fg: worst.fg, bg: worst.bg });
+    rows.push({ role, id: el.id || `${el.tagName.toLowerCase()}.${el.className}`, text: el.textContent.trim(), ratio: Math.round(worst.ratio * 100) / 100, fg: worst.fg, bg: worst.bg, unparsed, unmeasurable });
   }
   return rows;
 }
