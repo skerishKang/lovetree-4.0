@@ -300,6 +300,38 @@ export function bookDisplayPressed(value) {
   return normalizeBookDisplay(value) === BOOK_DISPLAY_LIST;
 }
 
+// #1093: 서재 진열 방식(선반/회전)도 책 보기 방식과 같은 길 — 계정 설정 + 기기 미러.
+export const SHELF_VIEW_KEY = 'lt41.shelfView';
+export const SHELF_VIEW_SHELF = 'shelf';
+export const SHELF_VIEW_CAROUSEL = 'carousel';
+export const SHELF_VIEWS = [SHELF_VIEW_SHELF, SHELF_VIEW_CAROUSEL];
+export const DEFAULT_SHELF_VIEW = SHELF_VIEW_SHELF;
+
+export function normalizeShelfView(value) {
+  return SHELF_VIEWS.includes(value) ? value : DEFAULT_SHELF_VIEW;
+}
+export function readShelfView(storage) {
+  try { return normalizeShelfView(storage?.getItem(SHELF_VIEW_KEY)); } catch { return DEFAULT_SHELF_VIEW; }
+}
+export function writeShelfView(storage, value) {
+  const next = normalizeShelfView(value);
+  try { storage?.setItem(SHELF_VIEW_KEY, next); } catch { return DEFAULT_SHELF_VIEW; }
+  return next;
+}
+// 전환 묶음은 서재 화면에서만 보인다(책·보드·지도·첫 화면에는 해당 없음).
+export function shelfViewVisible({ current = '' } = {}) {
+  return current === 'track32-bookshelf.html';
+}
+export function shelfViewLabel(value) {
+  return normalizeShelfView(value) === SHELF_VIEW_CAROUSEL ? '회전' : '선반';
+}
+export function shelfViewAriaLabel(value) {
+  return normalizeShelfView(value) === SHELF_VIEW_CAROUSEL ? '회전 책장 보기' : '선반 보기';
+}
+export function shelfViewPressed(value) {
+  return normalizeShelfView(value) === SHELF_VIEW_CAROUSEL;
+}
+
 // 2단계 범위: 공통 헤더·첫 화면·첫 여정은 B를 쓴다. 내 트리는 #212, 책은 2026-11-08 대표 확인으로 B를 받는다.
 // 기억 보드·관계 지도는 계속 A다(대표 결정: 책만 테마를 따라간다).
 export function appliedTheme(theme, view) {

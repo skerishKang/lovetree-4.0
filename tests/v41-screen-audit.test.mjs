@@ -2726,3 +2726,50 @@ test('#1094 390 목록 첫 화면 아래 링크 × 책 속의 트리 겹침 0', 
     }
   } finally { await browser.close(); await new Promise((r) => server.close(r)); }
 });
+
+// #1093: 40권 선반에서 화면에 붙은 바닥 링크가 어떤 책도 덮지 않는다(겹침 넓이 0).
+test('#1093 선반 40권 아래 링크와 책 겹침 0', { skip: REQUIRE ? false : skip, timeout: 180000 }, async () => {
+  if (skip) assert.fail(skip);
+  const server = await serve();
+  const base = 'http://127.0.0.1:' + server.address().port;
+  const browser = await chromium.launch({ headless: true });
+  const trees = Array.from({ length: 40 }, (_, i) => createTree({ subject: '겹침 시험', title: '책 ' + i, note: '가짜 기록', emotion: '설렘', date: '2026-11-22', url: '' }, '2026-11-22T00:00:00.000Z'));
+  try {
+    for (const width of [1440, 390]) {
+      const ctx = await browser.newContext({ viewport: { width, height: width === 390 ? 844 : 900 }, reducedMotion: 'reduce' });
+      try {
+        await ctx.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, items: [] }) }));
+        await ctx.route('**/api/community/shares**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, items: [], groups: [] }) }));
+        await ctx.route('**/api/workspace**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ revision: 1, state: { version: 1, trees, prefs: { shelfView: 'shelf' } }, subject: 'visual-audit-fake', writeSubjectBound: true, savedAt: '2026-11-22T00:00:00.000Z' }) }));
+        const page = await ctx.newPage();
+        await page.goto(base + '/v41/?account=1#my/shelf', { waitUntil: 'load' });
+        await page.waitForFunction(() => window.LT41?.trees?.length === 40, null, { timeout: 20000 });
+        const frame = await (await page.locator('#view').elementHandle()).contentFrame();
+        await frame.waitForSelector('.book-card', { timeout: 10000 });
+        await page.waitForTimeout(500);
+        const m = await page.evaluate(() => {
+          const links = document.querySelector('.home-links');
+          const ls = getComputedStyle(links);
+          const f = document.getElementById('view'), fr = f.getBoundingClientRect(), d = f.contentDocument;
+          const lr = links.getBoundingClientRect();
+          let overlap = 0, cards = 0;
+          for (const card of d.querySelectorAll('#shelfRail .book-card')) {
+            const r = card.getBoundingClientRect();
+            if (r.width < 1 || r.height < 1) continue;
+            cards++;
+            if (ls.display !== 'none' && lr.width > 0 && lr.height > 0) {
+              overlap += Math.max(0, Math.min(lr.right, fr.left + r.right) - Math.max(lr.left, fr.left + r.left))
+                * Math.max(0, Math.min(lr.bottom, fr.top + r.bottom) - Math.max(lr.top, fr.top + r.top));
+            }
+          }
+          return { cards, linksDisplay: ls.display, overlap: Math.round(overlap), view: d.getElementById('shelfViewport')?.dataset.shelfView };
+        });
+        console.log('#1093 links', width, JSON.stringify(m));
+        assert.equal(m.view, 'shelf', width + ': 선반 보기다');
+        assert.equal(m.cards, 40, width + ': 책 40권이 모두 그려진다');
+        assert.equal(m.overlap, 0, width + ': 바닥 링크와 책 겹침 넓이 0 — ' + JSON.stringify(m));
+        assert.equal(m.linksDisplay, 'none', width + ': 서재에서 바닥 링크 줄이 내용 위에 뜨지 않는다');
+      } finally { await ctx.close(); }
+    }
+  } finally { await browser.close(); await new Promise((r) => server.close(r)); }
+});
