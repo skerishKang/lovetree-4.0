@@ -47,7 +47,7 @@ import { createAccountDeleteRpcRepo } from './db/account-delete-rpc-postgres.js'
 import { createAccountService } from './account-service.js';
 import { createAccountEmailStore } from './account-email-store.js';
 import { handlerForPath } from './route-handler.mjs';
-import { verifyProxyProof, logProxyProofStartup } from './proxy-proof.js';
+import { verifyProxyProof, logProxyProofStartup, OPS_INGEST_PATH } from './proxy-proof.js';
 import { createDeletedAccountGuard } from './account-guard.js';
 import { createTrustedAccountDeleteHandler, createSharedAccountDeletionWorkflow } from './shared-account-deletion.js';
 import { createVerifier } from './padiem-access-verify.mjs';
@@ -336,6 +336,7 @@ const requestHandler = async (request) => {
     enforce: LOVETREE_PROXY_ENFORCE === '1'
   });
   if (proof.reason === 'mismatch') proxyProofLog({ result: 'mismatch' });
+  if (!proof.ok && request.path === OPS_INGEST_PATH) return {status:proof.reason==='unavailable'?503:401,body:{error:{code:'proxy_proof_required',message:'운영센터 요청을 확인할 수 없어요.'}}};
   if (!proof.ok) return { status: 403, body: { error: { code: 'proxy_proof_required', message: '요청 출처를 확인할 수 없어요.' } } };
   return handlers[handlerForPath(request.path)](request);
 };

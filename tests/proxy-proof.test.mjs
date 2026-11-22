@@ -5,6 +5,14 @@ import { verifyProxyProof, logProxyProofStartup, PROXY_PROOF_HEADER } from '../s
 const SECRET = 's'.repeat(48);
 const req = (headers = {}, path = '/api/workspace') => ({ path, headers });
 
+test('#1211: 수신 경로는 기록 모드에서도 위조된 표시와 일반 프록시 증명을 거절한다', () => {
+  const path='/api/ops-feedback/ingest';
+  for(const headers of [{},{'x-lovetree-ops-ingest-proof':'verified'},{[PROXY_PROOF_HEADER]:SECRET},{[PROXY_PROOF_HEADER]:SECRET,'x-lovetree-ops-ingest-proof':'verified'}]){
+    assert.equal(verifyProxyProof(req(headers,path),{secret:SECRET,enforce:false}).ok,false);
+  }
+  assert.equal(verifyProxyProof(req({},path),{secret:'',enforce:false}).ok,false);
+});
+
 test('서버 요청 출처 확인: 맞는 머리말은 통과하고, 없거나 틀린 머리말은 기록만 남긴다', () => {
   const logs = [];
   assert.deepEqual(verifyProxyProof(req({ [PROXY_PROOF_HEADER]: SECRET }), { secret: SECRET }), { ok: true, reason: 'valid' });

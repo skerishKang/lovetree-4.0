@@ -2,10 +2,38 @@ import test from 'node:test';import assert from 'node:assert/strict';
 import {applySchema,createPool} from '../server/db/postgres.js';
 import {createFeedbackRepo} from '../server/db/feedback-postgres.js';
 import {createFeedbackOutboxRepo} from '../server/db/feedback-outbox-postgres.js';
+import {createFeedbackService} from '../server/feedback-service.js';
 import {ACCOUNT_USER_TABLES} from '../server/db/account-postgres.js';
 import {assertIsolatedTestDatabase} from '../server/testing/isolated-test-database.js';
 const DATABASE_URL=process.env.LOVETREE_TEST_DATABASE_URL??'',skip=DATABASE_URL?false:'isolated PostgreSQL unavailable';
 const suffix=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,9);
+
+test('#1211: 실제 DB에서 동시에 받은 일 키는 한 번만 쓰고 실패는 되돌린다',{skip},async()=>{
+ assertIsolatedTestDatabase(DATABASE_URL);const pool=await createPool(DATABASE_URL,{max:3});
+ try{
+  await applySchema(pool);const repo=createFeedbackRepo(pool),outbox=createFeedbackOutboxRepo(pool),productId='lt-'+suffix();
+  const service=createFeedbackService({feedbackRepo:repo,productId,outbox});
+  const principal={productId,subjectId:'sub_test'};
+  const post=await service.submit({principal,request:{headers:{}},category:'bug',body:'시험 의견'});
+  const event={eventKey:'ops_reply_1234567',feedbackId:post.id,kind:'reply',replyId:'ops-42',body:'답글',createdAt:'2026-11-23T00:00:00.000Z'};
+  await assert.rejects(service.ingestOpsEvent({...event,feedbackId:999999999}),e=>e.status===404);
+  const results=await Promise.all([service.ingestOpsEvent(event),service.ingestOpsEvent(event)]);
+  assert.equal(results.filter(x=>x.duplicate===true).length,1);
+  const replies=await repo.listReplies({productId,postId:post.id});
+  assert.equal(replies.length,1);
+  assert.equal(replies[0].opsReplyId,event.replyId);
+  assert.equal(replies[0].createdAt,event.createdAt);
+  assert.equal(replies[0].authorName,'운영센터');
+  const status={eventKey:'ops_status_123456',feedbackId:post.id,kind:'status',status:'closed'};
+  assert.deepEqual(await service.ingestOpsEvent(status),{ok:true});
+  assert.deepEqual(await service.ingestOpsEvent(status),{ok:true,duplicate:true});
+  assert.equal((await service.myPosts({principal}))[0].status,'closed');
+  assert.equal((await service.myPosts({principal}))[0].replies[0].body,'답글');
+  assert.equal((await outbox.list({productId})).length,1);
+  const count=await pool.query('SELECT count(*)::int AS n FROM lovetree_feedback_ingest_events WHERE product_id=$1',[productId]);
+  assert.equal(count.rows[0].n,2);
+ }finally{await pool.end();}
+});
 test('feedback rows save, mask-friendly body, filter, and update by status/memo/issue',{skip},async()=>{
  assertIsolatedTestDatabase(DATABASE_URL);const pool=await createPool(DATABASE_URL,{max:3});
  try{
