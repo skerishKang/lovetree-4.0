@@ -1,4 +1,4 @@
-import { MSG } from '../../frame-messages.mjs';
+import { MSG, isTrustedFrameMessage } from '../../frame-messages.mjs';
 (()=>{
 let mobilePicker=null;
 const canvas=document.getElementById('stage'),ctx=canvas.getContext('2d',{alpha:false});
@@ -130,7 +130,7 @@ const dateText=v=>{try{return window.LTTitle?.formatDisplayDate?.(v)||v||''}catc
 /* #951 ⑤: 판의 날짜는 '날짜·감정·트리' 한 줄(#dBasic)에 있다 — 표기 값이 바뀌면 그 줄을 그 순간으로 다시 그린다. */addEventListener('lt-date-style-changed',()=>{const n=state.selected;if(n&&typeof paintDetail==='function')paintDetail(n);});
 // #368 3차: 설정의 '관계 지도 기본 보기' — 셸이 lt41-network-view로 알려 주면 지금 화면도 같은 보기로 바꾼다.
 // #1095: 옛 저장값 'concentric'(동심원)은 새 'tag'(꼬리표 묶음)로 읽는다.
-addEventListener('message',e=>{if(e.data?.type!==MSG.networkView)return;const v=e.data.value==='concentric'?'tag':e.data.value;if((v==='network'||v==='tag'||v==='time')&&state.view!==v)setView(v);});
+addEventListener('message',e=>{if(!isTrustedFrameMessage(e,{fromParent:true})||e.data?.type!==MSG.networkView)return;const v=e.data.value==='concentric'?'tag':e.data.value;if((v==='network'||v==='tag'||v==='time')&&state.view!==v)setView(v);});
 function setupMobileRibbon(){const r=$('mobileRibbon');if(!r)return;r.innerHTML='';const o=document.createElement('button');o.textContent='첫 순간 보기';o.className='origin';o.onclick=()=>selectMoment(FIRST,true);r.appendChild(o);
 const zm=document.createElement('button');zm.textContent='−';zm.setAttribute('aria-label','지도 축소(−)');zm.onclick=()=>{zoomAt(.84);scheduleDraw()};r.appendChild(zm);const zp=document.createElement('button');zp.textContent='＋';zp.setAttribute('aria-label','지도 확대(＋)');zp.onclick=()=>{zoomAt(1.18);scheduleDraw()};r.appendChild(zp);
 const addFit=()=>{const b=document.createElement('button');b.textContent='전체 맞춤';b.onclick=()=>{fitView();document.querySelector('.hero')?.classList.add('dim');scheduleDraw()};r.appendChild(b)};

@@ -6,7 +6,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { MSG, FRAME_MESSAGES } from '../public/v41/frame-messages.mjs';
+import { MSG, FRAME_MESSAGES, isTrustedFrameMessage } from '../public/v41/frame-messages.mjs';
 import {
   FRAME_MESSAGE_TYPES, frameMessage, frameReadyMessages, shouldReloadOnFrameMessage, runFrameFlow
 } from '../public/v41/frame-wiring.mjs';
@@ -146,4 +146,36 @@ test('#1061: 코드가 쓰는 메시지 이름은 모두 표에 있고, 표에�
   assert.equal(MSG.dateStyle, 'lt41-date-style', '옛 이름 값은 그대로');
   assert.equal(MSG.pageTurn, 'lt41-page-turn');
   assert.equal(MSG.write, 'lt41-write');
+});
+
+test('#1161: 받는 곳은 다른 출처·다른 창의 같은 이름 메시지를 무시하고 셸 메시지는 그대로 받는다', () => {
+  const origin = 'https://lovetree.test';
+  const parentWindow = { tag: 'shell' };
+  const opts = { fromParent: true, origin, parentWindow };
+  const event = (o, src = parentWindow) => ({ origin: o, source: src, data: { type: MSG.titleDisplay, value: 'mine' } });
+  assert.equal(isTrustedFrameMessage(event(origin), opts), true, '셸이 보낸 같은 이름 메시지는 그대로 동작');
+  assert.equal(isTrustedFrameMessage(event('https://evil.test'), opts), false, '다른 출처는 무시');
+  assert.equal(isTrustedFrameMessage(event(origin, { tag: 'other' }), opts), false, '다른 창은 무시');
+  assert.equal(isTrustedFrameMessage(event(origin), { origin, parentWindow }), true, '셸 쪽 받는 곳은 출처만 확인');
+  assert.equal(isTrustedFrameMessage(event('https://evil.test'), { origin, parentWindow }), false);
+  // #1161 목록의 받는 곳이 모두 같은 확인 함수를 쓴다(이름은 그대로).
+  const spots = [
+    ['public/v41/views/board/board-extras.js', 'MSG.titleDisplay'],
+    ['public/v41/views/book/book-extra.js', 'MSG.treesRenamed'],
+    ['public/v41/views/book/book-extra.js', 'MSG.treesSaved'],
+    ['public/v41/views/book/book-extra.js', 'MSG.titleDisplay'],
+    ['public/v41/views/book/book-extra.js', 'MSG.pageTurn'],
+    ['public/v41/views/book/book-extra.js', 'MSG.dateStyle'],
+    ['public/v41/views/network/network.js', 'MSG.networkView'],
+    ['public/v41/views/shelf/shelf.js', 'MSG.shelfSelectTree'],
+    ['public/v41/views/track56-network.html', 'MSG.dateStyle'],
+    ['public/v41/views/track58-pinboard.html', 'MSG.dateStyle']
+  ];
+  for (const [file, name] of spots) {
+    const text = readFileSync(new URL('../' + file, import.meta.url), 'utf8');
+    const at = text.indexOf(name);
+    assert.ok(at >= 0, file + ': ' + name + ' 없음');
+    const near = text.slice(Math.max(0, at - 160), at + 40);
+    assert.ok(near.includes('isTrustedFrameMessage(e,{fromParent:true})'), file + ': ' + name + ' 받는 곳이 확인 함수를 쓰지 않는다');
+  }
 });

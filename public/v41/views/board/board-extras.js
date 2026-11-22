@@ -1,4 +1,4 @@
-import { MSG } from '../../frame-messages.mjs';
+import { MSG, isTrustedFrameMessage } from '../../frame-messages.mjs';
 window.addEventListener('resize',boardResize);
 
 renderCards();
@@ -243,7 +243,7 @@ let styleSec=document.createElement('div');styleSec.className='section';styleSec
 if($('#addBtn'))$('#addBtn').onclick=()=>{if(LTDEMO.readOnly)return;openAdd()};$('#confirmAdd').onclick=()=>{if(LTDEMO.readOnly)return;confirmAdd()};renderCards();renderThreads();updateKeywordFilter();formFor(addType);fitAll(false);applyPathHighlight();setTimeout(()=>{/* #891: 탭으로 들어오면 닫힘, ?open= 주소만 자동 열림(board.js bootDetailPanel) */bootDetailPanel()},100);
 window.__LT58V11={youtubeId,youtubeThumb,youtubeThumbUrl,openEdit,saveEdit,chooseNext,highlightPath,startCinema:startCinemaV11,endCinema:endCinemaV11,setCinemaPosition,theme:t=>{document.body.dataset.theme=t},setMomentStyle:(id,pin,card)=>{let m=moments.find(x=>x.id===id);m.pinStyle=pin;m.cardStyle=card;renderCards()},get cinema(){return{active:cinemaV11.active,paused:cinemaV11.paused,index:cinemaV11.index,beat:cinemaV11.beats[cinemaV11.index]?.label,focused:cinemaV11.focused}},get state(){return{moments:moments.length,connections:connections.length,theme:document.body.dataset.theme,selected,keywords:[...new Set(moments.flatMap(m=>m.keywords||[]))]}}};
 
-addEventListener('message',e=>{if(e.data?.type===MSG.titleDisplay){if(typeof renderCards==='function')renderCards();if(typeof renderThreads==='function')renderThreads();if(selected)selectMoment(selected,$('#detail').classList.contains('open'));}});
+addEventListener('message',e=>{if(!isTrustedFrameMessage(e,{fromParent:true}))return;if(e.data?.type===MSG.titleDisplay){if(typeof renderCards==='function')renderCards();if(typeof renderThreads==='function')renderThreads();if(selected)selectMoment(selected,$('#detail').classList.contains('open'));}});
 addEventListener('lt-title-ready',()=>{if(typeof renderCards==='function')renderCards();if(typeof renderThreads==='function')renderThreads();if(selected)selectMoment(selected,$('#detail').classList.contains('open'));});
 
 // #368 3차: 설정의 날짜 표기가 바뀌면 카드·실을 다시 그린다(상세는 다음에 열 때 새 표기).

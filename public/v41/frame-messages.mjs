@@ -60,3 +60,9 @@ export const FRAME_MESSAGES = Object.freeze({
 export const MSG = Object.freeze(Object.fromEntries(
   Object.entries(FRAME_MESSAGES).map(([key, entry]) => [key, entry.name])
 ));
+// #1161: 셸이 보낸 메시지인지 확인한다. 화면 쪽은 보낸 창까지 본다(다른 창·다른 출처는 무시).
+export function isTrustedFrameMessage(event, { fromParent = false, origin = globalThis.location?.origin, parentWindow = globalThis.parent } = {}) {
+  if (!event || event.origin !== origin) return false;
+  if (fromParent && event.source !== parentWindow) return false;
+  return true;
+}

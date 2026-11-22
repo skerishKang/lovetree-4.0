@@ -1,7 +1,7 @@
 // 내 트리(책장) 동작 (#231 후속, 2026-11-09).
 // 계산(표지 색·이름·정보 줄·검색·카드 배치·페이지)은 shelf-model.mjs로 옮기고 여기서는 화면만 다룬다.
 // 조건·문구·id·순서 변경 0. #291(궤도)와 같이 모듈로 불러 쓴다.
-import { MSG } from '../../frame-messages.mjs';
+import { MSG, isTrustedFrameMessage } from '../../frame-messages.mjs';
 import {
   COVER_PALETTE, allBooks as allBooksOf, bookMeta, buildShelf, carouselTransform,
   escapeShelf, filterShelf, findBook, lastMomentDate as lastMomentDateOf,
@@ -264,7 +264,7 @@ import { createReader } from './shelf-reader.js';
 const renderedTitleDisplay=titleDisplayOf((()=>{try{return parent.LT41?.prefs?.titleDisplay||'both'}catch{return 'both'}})());
 window.__shelfListenerInstalled=true;
 if(typeof addEventListener==='function')addEventListener('message',e=>{
- if(e.data?.type===MSG.shelfSelectTree){
+ if(!isTrustedFrameMessage(e,{fromParent:true}))return;if(e.data?.type===MSG.shelfSelectTree){
   window.__pickSeen=e.data.treeId;
   var picked=books.findIndex(b=>b.id===e.data.treeId);
   if(picked>=0){var rail=$('#shelfRail');state.shelfIndex=picked;state.shelfOffset=shelfRowLayout(state.shelfList.length,rail?rail.clientWidth:0).offsetFor(picked,state.shelfOffset||0);updateCarousel();}
