@@ -88,7 +88,7 @@ function serve(root) {
     }
     if (url.startsWith('/host-media')) {
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
-      res.end('<!doctype html><html><body data-record-source="server" data-member="in"><script src="/v41/media-preview.js"></script><div id="host"></div></body></html>');
+      res.end('<!doctype html><html><body data-record-source="server" data-member="in"><script type="module" src="/v41/youtube-id.mjs"></script><script src="/v41/media-preview.js"></script><div id="host"></div></body></html>');
       return;
     }
     const clean = decodeURIComponent(url.split('?')[0]);

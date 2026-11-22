@@ -88,7 +88,12 @@ if(updatesCardBox)new MutationObserver(()=>{
     updatesCardBox.hidden=true;
     noticeQueue.request('updates',{show:()=>{hideToast();updatesCardBox.hidden=false;},hide:()=>{updatesCardBox.hidden=true;}});
   }
+  broadcastUpdatesBand();
 }).observe(updatesCardBox,{attributes:true,attributeFilter:['hidden']});
+function broadcastUpdatesBand(){
+ const height=updatesCardBox&&!updatesCardBox.hidden?Math.round(updatesCardBox.getBoundingClientRect().height):0;
+ for(const f of frames()){try{f.contentWindow.postMessage({type:'lt41-updates-band',height},location.origin)}catch{}}
+}
 // #977: 서버 기록에 형식이 어긋난 트리가 섞여 있으면 그 트리만 빼고 셸을 연다(읽기는 workspace-guard.mjs).
 // #986: 서버가 읽지 못해 빼 둔 트리는 개수(quarantined)만 응답에 온다 — 화면 안내에 함께 센다.
 // 화면에는 짧은 안내 한 줄, 콘솔에는 어느 트리가 왜 어긋났는지 한 줄만 남긴다 — 같은 기록을 다시 읽어도 한 번만.
@@ -716,6 +721,7 @@ const shellScreens=createScreens({
     // #478: 고급 기능 보기 값도 새로 열린 화면에 알린다. applyAdvanced는 지금 화면(#view)에만 보내므로
     // 화면을 옮긴 뒤 열린 프레임은 단순 모드로 남았다(보드 도구가 숨는 결함).
     try{frame.contentWindow.postMessage({type:'lt41-advanced',value:readAdvanced()},location.origin)}catch{}
+    broadcastUpdatesBand();
     // 화면 교대(두 장 앞뒤 바꿈)가 늦게 끝나는 경우를 위해 한 번 더 알린다(같은 값을 또 보내는 건 무해하다).
     for(const message of ready.repeats)setTimeout(()=>sendToFrame(frame,message),1600);
     d.addEventListener('click',e=>{const b=e.target.closest('button,a');if(!b)return;let file;if(b.matches('[data-action="tree"],[data-menu="tree"]'))file='track32-bookshelf.html';if(b.matches('#storyBook,[data-menu="book"]'))file='track59-sketchbook.html';if(current==='track56-network.html'&&b.id==='openMoment')file='track59-sketchbook.html';if(file){e.preventDefault();e.stopImmediatePropagation();show(file);}},true);

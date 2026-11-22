@@ -4,14 +4,22 @@ on:
   pull_request:
 permissions:
   contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 jobs:
   check:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+    # 저장소 변수가 켜져 있고 같은 저장소 사건일 때만 우분투 잡을 자체 실행기로 옮긴다.
+    # 포크 PR과 변수가 꺼진 경우에는 호스트에서 그대로 돈다.
+    runs-on: ${{ fromJSON(((github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository) && vars.USE_CGI_RUNNER == '1' && matrix.os == 'ubuntu-latest') && '["self-hosted","Linux","X64","cgi"]' || format('["{0}"]', matrix.os)) }}
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+        with:
+          clean: true
       - uses: actions/setup-node@v4
         with:
           node-version: 22

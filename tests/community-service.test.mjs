@@ -8,6 +8,7 @@ import {createMemoryCommunityRepo} from '../server/testing/memory-community-repo
 import { createMemoryTreeDiscoverRepo } from '../server/testing/memory-tree-discover-repo.js';
 import {createCommunityHandler,createCommunityService} from '../server/community-service.js';
 import {createShareService} from '../server/share-service.js';
+import {readStoredDocument} from '../server/workspace-service.js';
 import {ApiError} from '../server/errors.js';
 import {createAdminRoleService} from '../server/admin-roles.js';
 
@@ -438,7 +439,7 @@ test('discover uses batched summaries, excludes blocked/hidden/deleted, and leak
 
 // ── #627 3단계 '다른 팬 보기': GET /api/public/tag-moments (화면 없음 — 서버 규칙만) ──────────
 const TAG_URL='https://example.com/video/zena.mp4';
-async function tagSetup({accounts,aiSubjects=[],testerSubjects=[],privateTreeId=null,hiddenShareIds=[],blocks=[],discoverOff=[],admin=null}={}){
+async function tagSetup({accounts,aiSubjects=[],testerSubjects=[],privateTreeId=null,hiddenShareIds=[],blocks=[],discoverOff=[],admin=null,validateDocument=null}={}){
  // accounts: [{subject, trees:[{title, moments:[{title, date, url, keywords, mediaMetadata?}]}]}]
  const workspaceRepo=createMemoryWorkspaceRepo(),workspace=createWorkspaceService({repo:workspaceRepo,productId:PRODUCT});
  const shareRepo=createMemoryShareRepo();
@@ -484,7 +485,7 @@ async function tagSetup({accounts,aiSubjects=[],testerSubjects=[],privateTreeId=
  }
  for(const [a,b] of blocks)await communityRepo.blockOwner({productId:PRODUCT,blockerSubjectId:a,blockedSubjectId:b});
  const adminStub=admin||{roleFor:async value=>aiSubjects.includes(value.subjectId)?'ai_customer':(testerSubjects.includes(value.subjectId)?'tester':null)};
- const service=createCommunityService({communityRepo,shareRepo,workspaceRepo,productId:PRODUCT,admin:adminStub,makeId:()=>String(++n).padStart(24,'c')});
+ const service=createCommunityService({communityRepo,shareRepo,workspaceRepo,productId:PRODUCT,admin:adminStub,makeId:()=>String(++n).padStart(24,'c'),validateDocument:validateDocument||undefined});
  const authenticate=async request=>{const subjectId=request.headers?.account;if(!subjectId)throw new ApiError(401,'unauthenticated','login');return principal(subjectId);};
  return {communityRepo,shareRepo,discoverRepo,workspaceRepo,handle:createCommunityHandler({authenticate,service,productId:PRODUCT}),shareRows:rows.map(r=>({subjectId:r.subjectId,treeId:r.treeId,shareId:r.shareId}))};
 }
@@ -828,4 +829,61 @@ test('#1071: 역할 조회 실패는 모름으로 구분해 공개 목록에서 
  assert.match(warnings[0],/역할을 읽지 못해/);
  const tagged=await tagCall(data.handle,'가수:RESCENE');
  assert.equal(tagged.body.items.some(item=>item.treeTitle==='역할 모름 트리'),false,'다른 팬 보기에서도 빠진다');
+});
+
+test('#1067: 한 번의 둘러보기에서 주인 문서는 한 번만 읽고 검증한다',async()=>{
+ let loads=0,validates=0;
+ const validateDocument=doc=>{validates+=1;return readStoredDocument(doc);};
+ const data=await tagSetup({
+  accounts:[{subject:'owner',trees:Array.from({length:10},(_,i)=>({title:'트리 '+i,moments:[{title:'순간 '+i,date:'2026-11-01',url:TAG_URL,keywords:[]}]}))}],
+  validateDocument
+ });
+ const load=data.workspaceRepo.load.bind(data.workspaceRepo);
+ data.workspaceRepo.load=async (...args)=>{loads+=1;return load(...args);};
+ const first=await call(data.handle,'GET','/api/community/shares');
+ assert.equal(first.status,200);
+ assert.equal(first.body.items.length,10);
+ assert.equal(loads,1,'문서 읽기는 한 번');
+ assert.equal(validates,1,'문서 검증은 한 번');
+ for(const row of data.shareRows)await data.discoverRepo.set({productId:PRODUCT,subjectId:row.subjectId,treeId:row.treeId,discover:false});
+ const second=await call(data.handle,'GET','/api/community/shares');
+ assert.equal(second.body.items.length,0,'공개를 끈 직후 다음 요청에서 바로 보이지 않는다');
+});
+
+
+// B-08(#1064): 트리 id는 계정끼리 겹칠 수 있다(복원 기록). 둘러보기는 (계정, 트리)로 묶고,
+// 숨김도 (계정, 트리) 범위로만 판정한다 — 한쪽 숨김이 다른 계정에 번지지 않는다.
+test('같은 tree_id의 두 계정은 둘 다 소개되고 한쪽 숨김이 다른 쪽에 번지지 않는다',async()=>{
+ const workspaceRepo=createMemoryWorkspaceRepo(),workspace=createWorkspaceService({repo:workspaceRepo,productId:PRODUCT});
+ const treeId='same-tree-id'; // 복원 기록은 서로 같은 로컬 트리 id를 가질 수 있다.
+ const t1=createTree({subject:'윤슬',title:'첫 무대',note:'기록',emotion:'설렘',date:'2026-11-01',url:PHOTO},CLOCK);
+ const t2=createTree({subject:'바다',title:'다른 무대',note:'기록',emotion:'위로',date:'2026-11-02',url:PHOTO},CLOCK);
+ t1.id=treeId;t2.id=treeId;
+ await workspace.write(principal('owner1'),{state:{version:1,trees:[t1]},expectedRevision:0,clientKey:'seed-1'});
+ await workspace.write(principal('owner2'),{state:{version:1,trees:[t2]},expectedRevision:0,clientKey:'seed-2'});
+ const shareRepo=createMemoryShareRepo();
+ const s1=await shareRepo.create({productId:PRODUCT,shareId:'s'.repeat(23)+'1',subjectId:'owner1',treeId,entryMomentId:t1.moments[0].id,view:'book',momentCount:3});
+ const s2=await shareRepo.create({productId:PRODUCT,shareId:'s'.repeat(23)+'2',subjectId:'owner2',treeId,entryMomentId:t2.moments[0].id,view:'book',momentCount:3});
+ await shareRepo.setDiscoverable({productId:PRODUCT,subjectId:'owner1',shareId:s1.shareId,discoverable:true});
+ await shareRepo.setDiscoverable({productId:PRODUCT,subjectId:'owner2',shareId:s2.shareId,discoverable:true});
+ const communityRepo=createMemoryCommunityRepo({now:()=>CLOCK});
+ communityRepo.seedShares([s1,s2]);
+ const adminStub={roleFor:async value=>value.subjectId==='admin'?'admin':null};
+ const service=createCommunityService({communityRepo,shareRepo,workspaceRepo,productId:PRODUCT,admin:adminStub,makeId:()=>String(1).padStart(24,'c'),now:()=>Date.UTC(2026,10,1)});
+ const authenticate=async request=>{const subjectId=request.headers?.account;if(!subjectId)throw new ApiError(401,'unauthenticated','login');return principal(subjectId);};
+ const handle=createCommunityHandler({authenticate,service,productId:PRODUCT});
+ const idsOf=result=>result.body.items.map(item=>item.shareId).sort();
+ const list=await call(handle,'GET','/api/community/shares');
+ assert.equal(list.status,200);
+ assert.deepEqual(idsOf(list),[s1.shareId,s2.shareId].sort(),'같은 tree_id라도 두 계정이 모두 나온다');
+ // owner1 쪽만 숨김 — owner2는 그대로 남는다(숨김이 tree_id로 번지지 않는다).
+ const report=await call(handle,'POST',`/api/community/shares/${s1.shareId}/report`,{account:'eve',key:'b08-report-0001',body:{reason:'숨김 시험'}});
+ assert.equal(report.status,201);
+ const hidden=await call(handle,'PATCH',`/api/community/admin/reports/${report.body.report.id}`,{account:'admin',body:{status:'resolved',visibility:'hidden'}});
+ assert.equal(hidden.status,200);assert.equal(hidden.body.report.hidden,true);
+ const after=await call(handle,'GET','/api/community/shares');
+ assert.deepEqual(idsOf(after),[s2.shareId],'owner1만 내려가고 owner2는 남는다');
+ // 해제 — 두 계정이 다시 나온다.
+ await call(handle,'PATCH',`/api/community/admin/reports/${report.body.report.id}`,{account:'admin',body:{status:'dismissed',visibility:'visible'}});
+ assert.deepEqual(idsOf(await call(handle,'GET','/api/community/shares')),[s1.shareId,s2.shareId].sort());
 });

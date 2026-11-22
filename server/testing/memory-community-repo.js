@@ -21,12 +21,14 @@ export function createMemoryCommunityRepo({isPrivateTree=null,isDiscoverOn=null,
     const role=await roleFor({productId,subjectId:row.subjectId});
     if(role===ROLE_TESTER || (hasRealCustomers && role===ROLE_AI_CUSTOMER))continue;
    }
-   const prev=picked.get(row.treeId);
-   if(!prev||(row.origin==='auto'&&prev.origin!=='auto'))picked.set(row.treeId,row);
+   // 트리 id는 계정끼리 겹칠 수 있다(복원 기록) — (계정, 트리)로 묶어 한 행을 고른다(B-08, listPublicTagShares와 같은 방식).
+   const prev=picked.get(key(row.subjectId,row.treeId));
+   if(!prev||(row.origin==='auto'&&prev.origin!=='auto'))picked.set(key(row.subjectId,row.treeId),row);
   }
   for(const row of picked.values()){
    let hiddenAny=false;
-   for(const other of (this.shares||[]))if(other.productId===productId&&other.treeId===row.treeId&&hiddenShares.has(key(productId,other.shareId))){hiddenAny=true;break;}
+   // 숨김도 (계정, 트리) 범위로만 판정한다 — 한 계정의 숨김이 같은 tree_id의 다른 계정에 번지지 않게(B-08).
+   for(const other of (this.shares||[]))if(other.productId===productId&&other.subjectId===row.subjectId&&other.treeId===row.treeId&&hiddenShares.has(key(productId,other.shareId))){hiddenAny=true;break;}
    if(hiddenAny)continue;
    if(isPrivateTree&&await isPrivateTree(productId,row.subjectId,row.treeId))continue;
    if(blocks.has(key(productId,viewerSubjectId,row.subjectId)))continue;
@@ -76,7 +78,8 @@ export function createMemoryCommunityRepo({isPrivateTree=null,isDiscoverOn=null,
    for(const row of owners){
     if(out.length>=limit)break;
     let hiddenAny=false;
-    for(const other of (this.shares||[]))if(other.productId===productId&&other.treeId===row.treeId&&hiddenShares.has(key(productId,other.shareId))){hiddenAny=true;break;}
+    // 숨김도 (계정, 트리) 범위로만 판정한다 — 한 계정의 숨김이 같은 tree_id의 다른 계정에 번지지 않게(B-08).
+    for(const other of (this.shares||[]))if(other.productId===productId&&other.subjectId===row.subjectId&&other.treeId===row.treeId&&hiddenShares.has(key(productId,other.shareId))){hiddenAny=true;break;}
     if(hiddenAny)continue;
     if(isPrivateTree&&await isPrivateTree(productId,row.subjectId,row.treeId))continue;
     if(viewerSubjectId&&row.subjectId===viewerSubjectId)continue;
