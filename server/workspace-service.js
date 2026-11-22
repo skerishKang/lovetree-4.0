@@ -87,11 +87,12 @@ function changedTreeIdsOf(previous, next) {
   return changed;
 }
 
-export function createWorkspaceService({ repo, productId, onCommit = null }) {
+export function createWorkspaceService({ repo, productId, onCommit = null, onAccess = null }) {
   // #538: 저장이 성공한 뒤 같은 훅에서 공유 행(자동 공개·moment_count)을 동기화한다.
-  // 저장 자체는 이미 끝났으므로 동기화 실패는 응답을 막지 않고 로그만 남긴다.
   // B-12(#1068): 훅에 이번 저장에서 바뀐 트리 목록(changedTreeIds)도 넘긴다 — 동기화 질의 수를
   // 바뀐 트리 수에 비례하게 줄이는 데 쓴다.
+  // #1163(2단계): 훅은 응답 전에 숨김(회수·소개 정리·색인 재조정)만 기다리고, 보임 동기화는
+  // 응답 뒤로 미룬다(실패하면 표식) — 저장 응답은 보임 동기화를 기다리지 않는다.
   async function afterCommit(subjectId, doc, changedTreeIds) {
     if (!onCommit) return;
     try { await onCommit({ subjectId, doc, changedTreeIds }); }
@@ -99,6 +100,8 @@ export function createWorkspaceService({ repo, productId, onCommit = null }) {
   }
   return {
     async read(principal) {
+      // #1163: 조회 요청이 들어오면 실패 표식이 있는 보임 동기화를 응답 뒤에 다시 시도한다 — 응답을 기다리지 않는다.
+      if (onAccess) { try { onAccess({ subjectId: principal.subjectId }); } catch {} }
       const stored = await repo.load({ productId: principal.productId, subjectId: principal.subjectId });
       // subject는 검증된 주체 식별자만 되돌린다. 이 기기에 남은 미전송 기록이
       // 어느 계정의 것인지 다음 로그인에 가려 읽기 위한 최소 정보다.
