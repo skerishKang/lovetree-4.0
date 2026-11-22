@@ -5,6 +5,8 @@
 // 여기서는 셸이 쓰는 바로 그 함수(public/v41/frame-wiring.mjs)를 돌려 보내는 시점과 받는 쪽 동작을 함께 확인한다.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { MSG, FRAME_MESSAGES } from '../public/v41/frame-messages.mjs';
 import {
   FRAME_MESSAGE_TYPES, frameMessage, frameReadyMessages, shouldReloadOnFrameMessage, runFrameFlow
 } from '../public/v41/frame-wiring.mjs';
@@ -109,3 +111,77 @@ test('흐름 대조: 예전 판정(받으면 무조건 다시 띄우기)이면 �
 // '배선 계약: 셸이 이 모듈의 함수로 값을 만들고, 메시지 타입을 따로 적지 않는다' 글자 검사는 지웠다(이슈 952).
 // 이 모듈이 지키는 실제 계약 — 다시 띄우기 판정·보내는 시점·흐름 — 은 위 실행 시험들이 확인하고,
 // 셸 연결 글자는 #477 사고의 방어(shouldReloadOnFrameMessage 판정)를 대신하지 못하는 문자열 고정이었다.
+
+test('#1061 메시지 검사기는 보내는 값과 실제 수신 분기를 구별한다', async () => {
+  const { messageUsage } = await import('./helpers/frame-message-usage.mjs');
+  const usage = messageUsage(`
+    // type: 'lt41-comment'
+    card.classList.add('lt41-write');
+    localStorage.getItem('lt41-write');
+    const duplicateTable = { open: \`lt41-viewer\` };
+    parent.postMessage({ type: 'lt41-unlisted-send' }, location.origin);
+    send('lt41-unlisted-helper');
+    function tellParent(type) { parent.postMessage({ type }); }
+    tellParent('lt41-unlisted-wrapper');
+    const name = 'lt41-unlisted-alias';
+    postMessage({ type: name });
+    postMessage({ type: \`lt41-unlisted-template\` });
+    postMessage({ type: MSG.onlySent });
+    function readSelection(event) {
+      const type = event.data.type;
+      switch (type) { case 'lt41-unlisted-case': break; case MSG.selected: break; }
+      if (type === 'lt41-unlisted-receive' || MSG.changed === type) return;
+      if (event.data.type === 'unknown-message' || event.data.item.type === 'picture') return;
+    }
+    addEventListener('message', readSelection);
+  `, new Set(['lt41-write', 'lt41-viewer']));
+  assert.deepEqual([...usage.literals].sort(), [
+    'lt41-unlisted-alias', 'lt41-unlisted-case', 'lt41-unlisted-helper', 'lt41-unlisted-receive', 'lt41-unlisted-send',
+    'lt41-unlisted-template', 'lt41-unlisted-wrapper', 'unknown-message'
+  ]);
+  assert.deepEqual([...usage.received].sort(), ['changed', 'selected']);
+  assert.ok(usage.keys.has('onlySent'), '보내기만 한 이름은 수신처로 세지 않는다');
+  assert.deepEqual([...usage.definitions], ['lt41-viewer'], '별도 표에 옮긴 이름을 잡고 화면용 글자와 저장 키는 건너뛴다');
+});
+
+test('#1061 셸과 화면은 한 표의 이름을 쓰고 이름마다 받는 곳이 있다', async () => {
+  const { messageUsage } = await import('./helpers/frame-message-usage.mjs');
+  const { readdirSync } = await import('node:fs');
+  const { join } = await import('node:path');
+  const { fileURLToPath } = await import('node:url');
+  const root = fileURLToPath(new URL('../', import.meta.url));
+  const tableNames = new Set(Object.values(MSG));
+  const files = ['reference/prototypes/graph-view.html'];
+  for (const dir of ['public/v41', 'v41', 'src']) {
+    for (const file of readdirSync(join(root, dir), { recursive: true })) {
+      if (/\.(?:m?js|html)$/.test(file)) files.push(join(dir, file));
+    }
+  }
+  const receivers = new Set();
+  for (const file of files) {
+    if (file === join('public/v41', 'frame-messages.js')) continue;
+    const source = readFileSync(join(root, file), 'utf8');
+    const scripts = file.endsWith('.html')
+      ? [...source.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)]
+        .filter(([, attrs]) => !/\bsrc\s*=|\btype\s*=\s*["'](?:application\/json|importmap)/i.test(attrs))
+        .map(match => match[2])
+      : [source];
+    for (const code of scripts) {
+      const usage = messageUsage(code, tableNames);
+      assert.deepEqual([...usage.literals], [], file + '에서 메시지 이름을 직접 썼다');
+      assert.deepEqual([...usage.definitions], [], file + '에서 표의 이름을 다시 정의했다');
+      for (const key of usage.keys) assert.ok(Object.hasOwn(MSG, key), file + '에 표 밖 이름이 있다 ' + key);
+      if (!file.startsWith('reference/')) for (const key of usage.received) receivers.add(key);
+    }
+  }
+  assert.equal(MSG, globalThis.LT41_MSG, '일반 스크립트와 모듈이 같은 표를 쓴다');
+  assert.equal(new Set(Object.values(MSG)).size, Object.keys(MSG).length, '전송하는 이름이 겹치지 않는다');
+  for (const [key, spec] of Object.entries(FRAME_MESSAGES)) {
+    assert.equal(MSG[key], spec.name);
+    assert.ok(spec.from && spec.to && spec.payload, spec.name + '의 방향과 본문이 있다');
+  }
+  assert.deepEqual(Object.keys(MSG).filter(key => !receivers.has(key)), [], '이름은 있지만 받는 곳이 없다');
+  assert.equal(MSG.dateStyle, 'lt41-date-style');
+  assert.equal(MSG.pageTurn, 'lt41-page-turn');
+  assert.equal(MSG.write, 'lt41-write');
+});

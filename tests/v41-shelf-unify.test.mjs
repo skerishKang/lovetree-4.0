@@ -163,16 +163,15 @@ test('#256-1 책장 마크업 태그 균형(div·section·button)', () => {
 });
 
 // 261117 대표 확정: '내 트리' 화면 이름을 '서재'로 — 화면 글자와 aria-label만(코드 이름은 그대로).
-test('#서재 책등 줄은 없고 "+ 새 트리" 입구는 오른쪽 단추 하나다', () => {
-  const js = read('public/v41/views/shelf/shelf.js');
+test('#서재에서 새 트리를 만드는 입구는 오른쪽 단추 하나다', () => {
   const html = read('public/v41/views/track32-bookshelf.html');
-  const model = read('public/v41/views/shelf/shelf-model.mjs');
-  const css = read('public/v41/views/shelf/shelf.css');
-  const extra = read('public/v41/views/shelf/shelf-extra.css');
-  // 책등 줄 흔적이 남지 않는다.
-  // '+ 새 트리' 입구는 단추 하나. 점선 빈 책·빈 칸은 없다.
-  assert.equal((js.match(/lt41-write',mode:'new'/g) || []).length, 1, '이어 보기 띠 first 경로만 순간 추가');
-  assert.equal((js.match(/lt41-new-tree'/g) || []).length, 1, '새 트리 단추는 트리 만들기 메시지');
+  const buttons = [...html.matchAll(/<button\b([^>]*)>([^<]*)<\/button>/g)];
+  const entries = buttons.filter(([, attributes, label]) =>
+    attributes.includes('aria-label="새 트리 만들기"') || /^\s*[＋+]\s*새 트리\s*$/.test(label)
+  );
+  assert.equal(entries.length, 1, '새 트리 만들기 단추 한 개가 있다');
+  assert.match(entries[0][2], /새 트리/);
+  // 실제 클릭이 순간 추가 대신 첫 트리 만들기를 여는지는 v41-shelf-new-tree에서 검사한다.
 });
 
 // 261118 대표 지적 4: 이어 보기 띠가 테마를 따른다 — 정원에서도 검은 밤 카드로 남지 않는다.

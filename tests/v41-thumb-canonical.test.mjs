@@ -2,6 +2,7 @@
 // 전: 보드(board-extras.js)가 자기 주소(img.youtube.com/hqdefault)와 자기 그림(인라인 SVG)을 따로 만들었다.
 //     그래서 책·보관함·첫 화면과 다른 단계를 가졌고, 그림이 실패하면 한 번에 글 카드로 떨어졌다.
 // 후: 공용 후보(저장 주소 → oardefault/hqdefault → mqdefault)와 공용 단계 판정을 그대로 쓴다.
+import { MSG } from '../public/v41/frame-messages.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -111,7 +112,7 @@ const STAGES = [
   ['unknown-stage', 'hqdefault.jpg'],
 ];
 
-const mediaScope = { window: {}, URL, URLSearchParams, LTYouTubeId: globalThis.LTYouTubeId, LTEscapeHtml: escapeHtml };
+const mediaScope = { LT41_MSG: MSG, window: {}, URL, URLSearchParams, LTYouTubeId: globalThis.LTYouTubeId, LTEscapeHtml: escapeHtml };
 vm.runInNewContext(read('public/v41/media-preview.js'), mediaScope);
 const media = mediaScope.window.LTMedia;
 
@@ -166,7 +167,7 @@ test('#1060 남은 자리도 같은 단계 옵션으로 정본을 부른다(주�
 });
 
 test('#1060 일반 스크립트 정본: 첫 그리기부터 주소가 들어간다', () => {
-  const scope = { window: {}, URL, URLSearchParams, LTEscapeHtml: escapeHtml };
+  const scope = { LT41_MSG: MSG, window: {}, URL, URLSearchParams, LTEscapeHtml: escapeHtml };
   // 보드가 싣는 일반 스크립트 정본을 먼저 실행한다(모듈 대기·다시 채우기 없음).
   vm.runInNewContext(read('public/v41/youtube-id.js'), scope);
   assert.equal(scope.LTYouTubeId.youtubeStageThumbUrl(ID, 'hqdefault'), `https://i.ytimg.com/vi/${ID}/hqdefault.jpg`);

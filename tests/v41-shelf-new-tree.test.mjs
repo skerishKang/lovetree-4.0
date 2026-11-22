@@ -55,7 +55,7 @@ for (const [name, fn] of [
     const fresh = tree(2);
     const shelf = page.frames().find((f) => /track32-bookshelf/.test(f.url()));
     await page.evaluate((t) => { window.LT41.trees.push(t); }, fresh);
-    await shelf.evaluate(() => window.dispatchEvent(new MessageEvent('message', { data: { type: 'lt41-trees-renamed', titles: [] } })));
+    await shelf.evaluate(() => window.dispatchEvent(new MessageEvent('message', { data: { type: 'lt41-trees-renamed', titles: [] }, origin: location.origin, source: window.parent })));
     await page.waitForFunction(() => [...document.querySelectorAll('iframe')].some((f) => {
       try { return /track32-bookshelf/.test(f.contentWindow.location.href) && f.contentDocument.querySelectorAll('.book-card').length === 2; } catch { return false; }
     }), null, { timeout: 10000 });

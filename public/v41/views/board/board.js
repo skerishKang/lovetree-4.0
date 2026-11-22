@@ -21,7 +21,7 @@ function setBoardTheme(theme){
   return v;
 }
 setBoardTheme(readBoardTheme());
-addEventListener('message',e=>{if(e.origin!==location.origin||e.data?.type!=='lt41-board-theme')return;setBoardTheme(e.data.value);paintBoardBgMenu()});
+addEventListener('message',e=>{if(e.origin!==location.origin||e.data?.type!==globalThis.LT41_MSG.boardTheme)return;setBoardTheme(e.data.value);paintBoardBgMenu()});
 // #891(13:59 대표 결정): 머리줄의 [종이|밤] 두 단추를 '배경 ▾' 드롭 하나로 바꾼다. 항목은
 // 테마 따라가기(기본)·종이·밤 — '테마 따라가기'는 저장값이 없는 상태(#853)로, 앱 테마를 따른다.
 // 고른 값은 셸이 한 곳에서 저장한다(localStorage lt41.boardTheme) — 보드는 요청만 넘긴다.
@@ -41,7 +41,7 @@ if(bgBtn&&bgMenu){
   if(v==='auto'){try{localStorage.removeItem('lt41.boardTheme')}catch{};setBoardTheme(readBoardTheme())}
   else{try{localStorage.setItem('lt41.boardTheme',v)}catch{};setBoardTheme(v)}
   paintBoardBgMenu();
-  try{if(window.parent!==window)window.parent.postMessage({type:'lt41-board-theme-choice',value:v},location.origin)}catch{}
+  try{if(window.parent!==window)window.parent.postMessage({type:globalThis.LT41_MSG.boardThemeChoice,value:v},location.origin)}catch{}
  });
 }
 
@@ -125,7 +125,7 @@ persistBoard();return true}
 // 자리를 미리 계산해 나머지 카드를 옮겨 둔다(180ms 전환). 움직임 끄기(셸 설정·lt41-motion)면 즉시.
 // 끌고 있는 카드 자체는 포인터를 그대로 따라오고, 놓으면 commitInsert가 같은 자리로 확정한다.
 let boardMotionOff=false,previewSig='';
-addEventListener('message',e=>{if(e.origin!==location.origin||e.data?.type!=='lt41-motion')return;boardMotionOff=!!e.data.paused;cardLayer.classList.toggle('motion-off',boardMotionOff)});
+addEventListener('message',e=>{if(e.origin!==location.origin||e.data?.type!==globalThis.LT41_MSG.motion)return;boardMotionOff=!!e.data.paused;cardLayer.classList.toggle('motion-off',boardMotionOff)});
 function previewShift(dragId,hit){
  if(boardMode!=='mine'||!hit){clearPreviewShift();return}
  const seq=momentOrder.filter(x=>x!==dragId);const at=Math.max(0,Math.min(seq.length,hit.index));seq.splice(at,0,dragId);
@@ -152,10 +152,10 @@ function orderPayload(m){const rank=orderRank(m.id);if(rank>=0)return{x:m.savedX
 return m.savedPos&&m.savedXY&&boardMode==='date'?{x:m.savedXY.x,y:m.savedXY.y,rot:m.savedXY.rot}:{x:m.x,y:m.y,rot:m.rot}}
 function newBoardId(){let id;do{id='m'+Math.random().toString(36).slice(2,10)}while(moments.some(m=>m.id===id));return id}
 // #1058: 보내기가 던지면 조용히 넘기지 않고 보드 알림 줄에 실패를 알린다(성공은 #905 규칙으로 알리지 않는다).
-function persistBoard(){if(!boardSaveEnabled())return;try{const treeId=window.parent.LT41.tree.id;window.parent.postMessage({type:'lt41-board-sync',treeId,moments:boardPayload()},location.origin)}catch(error){globalThis.LT41Report?.report(error,'보드 저장 보내기');failNotice('보드 저장에 실패했어요. 잠시 뒤 다시 시도해 주세요.')}}
+function persistBoard(){if(!boardSaveEnabled())return;try{const treeId=window.parent.LT41.tree.id;window.parent.postMessage({type:globalThis.LT41_MSG.boardSync,treeId,moments:boardPayload()},location.origin)}catch(error){globalThis.LT41Report?.report(error,'보드 저장 보내기');failNotice('보드 저장에 실패했어요. 잠시 뒤 다시 시도해 주세요.')}}
 // #1058: 저장 실패 알림 — 카드보다 위 층(z 9999), 불투명 바탕, 화면 아래 가운데, 최소 5초.
 function failNotice(t){let el=$('#saveFail');if(!el)return;el.textContent=t;el.classList.add('show');hideToast();clearTimeout(failNotice.t);failNotice.t=setTimeout(()=>el.classList.remove('show'),6000)}
-window.addEventListener('message',e=>{if(e.origin!==location.origin)return;if(e.data?.type!=='lt41-board-saved')return;if(e.data.ok===false)toast(e.data.error||'서버에 저장하지 못했어요. 잠시 뒤 다시 시도해 주세요.')});
+window.addEventListener('message',e=>{if(e.origin!==location.origin)return;if(e.data?.type!==globalThis.LT41_MSG.boardSaved)return;if(e.data.ok===false)toast(e.data.error||'서버에 저장하지 못했어요. 잠시 뒤 다시 시도해 주세요.')});
 
 const replayPath=(()=>{const ids=[],seen=new Set();let m=LTDEMO.moments[0];while(m&&!seen.has(m.id)){ids.push(m.id);seen.add(m.id);m=LTDEMO.moments.find(x=>x.id===m.next)}return ids})();
 

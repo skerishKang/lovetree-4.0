@@ -1,3 +1,4 @@
+import { MSG } from '../frame-messages.mjs';
 // #627 PR B: 꼬리표 저장 한 곳 — 기존 워크스페이스 저장 경로로 keywords만 바꾼다(새 저장 경로·서버 변경 없음).
 // 저장 경로는 기존 순간 수정 경로 가운데 keywords를 이미 받는 boardSync(4.1 기억 보드 저장)를 쓴다.
 // boardSync는 셸이 iframe을 다시 그리지 않는 길이라 상세를 연 채로 칩이 바뀐다 — 화면 사본은 lt41-tags-saved
@@ -16,7 +17,7 @@ export function createTagSave(deps) {
   function announce(momentId, keywords) {
     const origin = globalThis.location?.origin;
     for (const win of frames()) {
-      try { win.postMessage({ type: 'lt41-tags-saved', ok: true, momentId, keywords }, origin); } catch { /* 닫힌 프레임은 건너뛴다 */ }
+      try { win.postMessage({ type: MSG.tagsSaved, ok: true, momentId, keywords }, origin); } catch { /* 닫힌 프레임은 건너뛴다 */ }
     }
   }
 
