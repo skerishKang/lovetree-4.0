@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import { thumbnailCandidates, nextThumbnailStep } from '../public/v41/thumb-fallback.mjs';
-import { youtubeIdFrom, youtubeStageThumbUrl } from '../public/v41/youtube-id.mjs';
+import { youtubeIdFrom, youtubeStageThumbUrl, mediaAssetUrl, CARD_IMAGE_URL } from '../public/v41/youtube-id.mjs';
 import { escapeHtml } from '../public/v41/html-escape.mjs';
 import { videoKey } from '../public/v41/same-stage.mjs';
 import { cardImageFor } from '../functions/_lib/tree-preview.mjs';
@@ -175,5 +175,19 @@ test('#1060 일반 스크립트 정본: 첫 그리기부터 주소가 들어간�
   const html = media.markup(`https://www.youtube.com/watch?v=${ID}`, '제목', null, 'm1', { source: 'server', owned: true });
   assert.match(html, /src="https:\/\/i\.ytimg\.com\/vi\/dQw4w9WgXcQ\/hqdefault\.jpg"/);
   assert.doesNotMatch(html, /src=""/, '빈 주소로 첫 그림을 끝내지 않는다');
+});
+
+// A-11 표 시험: 입력별 출력 주소가 바꾸기 전과 한 글자도 같다.
+test('A-11 표: 유튜브·업로드·기본 카드 주소가 정본 한 벌에서 나온다', () => {
+  const origin = 'https://lovetree-4-0.pages.dev';
+  const rows = [
+    ['watch', youtubeStageThumbUrl('dQw4w9WgXcQ', 'hqdefault'), 'https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg'],
+    ['shorts', youtubeStageThumbUrl('9NXOCr-T8LU', 'oardefault'), 'https://i.ytimg.com/vi/9NXOCr-T8LU/oardefault.jpg'],
+    ['mq', youtubeStageThumbUrl('dQw4w9WgXcQ', 'mqdefault'), 'https://i.ytimg.com/vi/dQw4w9WgXcQ/mqdefault.jpg'],
+    ['잘못된 id', youtubeStageThumbUrl('short', 'hqdefault'), ''],
+    ['업로드 사진', mediaAssetUrl('01234567-89ab-4cde-8f01-234567890abc.png', origin), origin + '/api/media/01234567-89ab-4cde-8f01-234567890abc.png'],
+    ['기본 카드', CARD_IMAGE_URL, 'https://lovetree.padiem.net/og/lovetree-card.png'],
+  ];
+  for (const [name, got, want] of rows) assert.equal(got, want, name);
 });
 

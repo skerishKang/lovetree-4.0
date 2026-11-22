@@ -9,11 +9,13 @@
  *   같은 규칙(운영 주소 루트, 그 밖은 /v41/)을 따른다.
  */
 import { jsonError, upstreamOrigin } from './proxy.js';
+// A-11: 기본 카드 그림 주소도 썸네일 정본 한 벌에서 가져온다(출력 문자열 그대로).
+import { CARD_IMAGE_URL as CANONICAL_CARD_IMAGE_URL } from '../../public/v41/youtube-id.mjs';
 
 export const PRODUCTION_HOST = 'lovetree.padiem.net';
 // 기본 카드 그림. public/og/lovetree-card.png 로 배포되며 1200×630 이다.
 export const CARD_IMAGE_PATH = '/og/lovetree-card.png';
-export const CARD_IMAGE_URL = `https://${PRODUCTION_HOST}${CARD_IMAGE_PATH}`;
+export const CARD_IMAGE_URL = CANONICAL_CARD_IMAGE_URL;
 export const SITE_TITLE = '러브트리';
 export const SITE_TAGLINE = '좋아하는 순간을 모아 두는 곳';
 // 서버 share-service 의 SHARE_ID 와 같은 형식 검사. 주소 형식이 밖이면 서버까지 가지 않는다.
